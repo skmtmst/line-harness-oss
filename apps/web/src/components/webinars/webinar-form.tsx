@@ -6,6 +6,7 @@ import { api, webinarApi, type Webinar, type WebinarInput, type WebinarScheduleR
 import type { MediaItem } from '@line-crm/shared'
 import { useAccount } from '@/contexts/account-context'
 import StickyBar from '@/components/shared/sticky-bar'
+import DateTimeField, { TimeField } from '@/components/shared/date-time-field'
 import { CareCard } from '@/components/shared/side-cards'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { RequiredBadge } from '@/components/shared/form-controls'
@@ -385,8 +386,8 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
             <div className="rounded-xl border border-hairline bg-canvas p-4">
               <div className="mb-3 text-xs font-bold text-ink-secondary">毎日の枠をまとめて作成</div>
               <div className="flex flex-wrap items-end gap-3">
-                <label className="text-xs text-ink-faint">開始<input type="time" value={bulkStart} onChange={(e) => setBulkStart(e.target.value)} className="mt-1 block rounded-lg border border-hairline px-2 py-2 text-sm" /></label>
-                <label className="text-xs text-ink-faint">終了<input type="time" value={bulkEnd} onChange={(e) => setBulkEnd(e.target.value)} className="mt-1 block rounded-lg border border-hairline px-2 py-2 text-sm" /></label>
+                <span className="text-xs text-ink-faint">開始<TimeField value={bulkStart} onChange={setBulkStart} aria-label="まとめて作る枠の開始" className="mt-1" /></span>
+                <span className="text-xs text-ink-faint">終了<TimeField value={bulkEnd} onChange={setBulkEnd} aria-label="まとめて作る枠の終了" className="mt-1" /></span>
                 <label className="text-xs text-ink-faint">間隔<select value={bulkInterval} onChange={(e) => setBulkInterval(Number(e.target.value))} className="mt-1 block rounded-lg border border-hairline px-2 py-2 text-sm"><option value={30}>30分</option><option value={60}>60分</option><option value={120}>120分</option></select></label>
                 <button type="button" onClick={applyDailySchedule} className="rounded-lg bg-ink px-4 py-2 text-sm font-semibold text-white hover:brightness-92">毎日の枠を置き換える</button>
               </div>
@@ -430,18 +431,16 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
                 </label>
               ))}
             {r.type === 'once' ? (
-              <input
-                type="datetime-local"
+              <DateTimeField
                 value={(r.at ?? '').slice(0, 16)}
-                onChange={(e) => updateRule(i, { at: `${e.target.value}:00+09:00` })}
-                className="rounded-lg border border-hairline px-2 py-1"
+                onChange={(v) => updateRule(i, { at: `${v}:00+09:00` })}
+                aria-label="開催日時"
               />
             ) : (
-              <input
-                type="time"
+              <TimeField
                 value={r.time ?? '20:00'}
-                onChange={(e) => updateRule(i, { time: e.target.value })}
-                className="rounded-lg border border-hairline px-2 py-1"
+                onChange={(v) => updateRule(i, { time: v })}
+                aria-label="開催時刻"
               />
             )}
             <button

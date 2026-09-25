@@ -245,11 +245,26 @@ describe('N-025 引用返信と送信予約', () => {
       expect(host.querySelector('[data-inbox-v6="schedule-panel"]')).toBeTruthy()
     })
 
-    const input = host.querySelector<HTMLInputElement>('#schedule-at')!
+    // 日時の選択（★V7）で 2027-09-17 09:00 を選ぶ。値は今までどおり日本時間の文字列。
+    await act(async () => { host.querySelector<HTMLElement>('#schedule-at')!.click() })
+    const dialog = () => host.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
     await act(async () => {
-      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!
-      setter.call(input, '2027-09-17T09:00')
-      input.dispatchEvent(new Event('input', { bubbles: true }))
+      dialog().querySelector<HTMLButtonElement>('button[aria-label="日付"]')!.click()
+    })
+    for (let i = 0; i < 36; i += 1) {
+      const grid = host.querySelector('[role="grid"]')
+      if (grid?.getAttribute('aria-label') === '2027年9月') break
+      await act(async () => {
+        Array.from(host.querySelectorAll('button')).find((b) => b.getAttribute('aria-label') === '次の月')!.click()
+      })
+    }
+    await act(async () => {
+      Array.from(host.querySelectorAll('button')).find((b) => (b.getAttribute('aria-label') ?? '').startsWith('2027年9月17日（金）'))!.click()
+    })
+    await act(async () => {
+      const hour = dialog().querySelector<HTMLSelectElement>('select[aria-label="時"]')!
+      hour.value = '09'
+      hour.dispatchEvent(new Event('change', { bubbles: true }))
     })
 
     const scheduleButton = Array.from(host.querySelectorAll('button'))

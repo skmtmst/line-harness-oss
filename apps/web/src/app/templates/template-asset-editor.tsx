@@ -9,6 +9,7 @@ import Combobox from '@/components/shared/combobox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import StickyBar from '@/components/shared/sticky-bar'
 import { TextField } from '@/components/shared/text-field'
+import DateTimeField from '@/components/shared/date-time-field'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import InlineActionList, { useActionOptions } from '@/components/auto-replies/inline-action-list'
 import { toActionPayload, type InlineAction } from '@/components/auto-replies/draft-fields'
@@ -491,13 +492,15 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
                   {pickedMedia ? <span className="text-success mt-1 block text-xs">選択中: {pickedMedia.filename}</span> : null}
                   <span className="text-caption mt-1 block font-normal text-ink-faint">1029 × 1029px 推奨</span>
                 </Field>
-                <Field label="使える期間" required note="この管理画面の時刻（日本時間）で入ります。">
+                <div className="text-label block font-semibold text-ink-secondary">
+                  <span>使える期間<RequiredBadge /></span>
                   <div className="mt-2 flex items-center gap-2">
-                    <input type="datetime-local" className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value={couponStartsAt} onChange={(event) => setCouponStartsAt(event.target.value)} aria-label="使える期間の開始" />
+                    <DateTimeField value={couponStartsAt} onChange={setCouponStartsAt} aria-label="使える期間の開始" className="min-w-0 flex-1" />
                     <span>から</span>
-                    <input type="datetime-local" className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value={couponEndsAt} onChange={(event) => setCouponEndsAt(event.target.value)} aria-label="使える期間の終了" />
+                    <DateTimeField value={couponEndsAt} onChange={setCouponEndsAt} aria-label="使える期間の終了" className="min-w-0 flex-1" />
                   </div>
-                </Field>
+                  <span className="text-caption mt-1 block font-normal text-ink-faint">この管理画面の時刻（日本時間）で入ります。</span>
+                </div>
                 <Field label="使い方のご案内（お客さまに見えます）"><textarea className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent mt-2 w-full resize-y border px-3 py-2 text-sm focus:ring-2 focus:outline-none" rows={3} value={description} onChange={(event) => setDescription(event.target.value)} /></Field>
                 <div className="grid gap-3 text-sm">
                   <Field label="使える回数">
@@ -558,8 +561,14 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
           ) : (
             <>
               <section className="bg-canvas border-hairline rounded-card shadow-card grid gap-4 border p-4 md:grid-cols-3">
-                <Field label="受付の開始"><input type="datetime-local" className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent mt-2 w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value={researchStartsAt} onChange={(event) => setResearchStartsAt(event.target.value)} /></Field>
-                <Field label="受付の終了"><input type="datetime-local" className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent mt-2 w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value={researchEndsAt} onChange={(event) => setResearchEndsAt(event.target.value)} /></Field>
+                <div className="text-label block font-semibold text-ink-secondary">
+                  <span>受付の開始</span>
+                  <DateTimeField aria-label="受付の開始" value={researchStartsAt} onChange={setResearchStartsAt} className="mt-2" />
+                </div>
+                <div className="text-label block font-semibold text-ink-secondary">
+                  <span>受付の終了</span>
+                  <DateTimeField aria-label="受付の終了" value={researchEndsAt} onChange={setResearchEndsAt} className="mt-2" />
+                </div>
                 <Field label="答えてもらう人" note="タグで絞れます。選ばなければ全員が対象です。">
                   <Combobox
                     aria-label="答えてもらう人"

@@ -16,12 +16,7 @@
   font-weight: 600;
 }
 
-.timeField {
-  height: 40px;
-  width: 130px;
-  font-size: var(--text-body);
-  font-weight: 600;
-}
+/* 時刻の入力は★V7の時刻の選択（高さ40・14px）へ寄せた。幅130の決めは要らない。 */
 
 .bodyField {
   min-height: 160px;
@@ -40,8 +35,7 @@
  * レイアウトが動くので、欄の文字も16pxへそろえる（#976 U079）。
  */
 @media (pointer: coarse) {
-  .smallField,
-  .timeField {
+  .smallField {
     height: 44px;
     font-size: var(--text-lead);
   }
