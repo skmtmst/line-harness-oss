@@ -70,6 +70,8 @@ export type AuditAction =
   | 'line_notification.definition.publish'
   | 'line_notification.definition.stop'
   | 'line_notification.delivery.retry'
+  | 'line_notification.delivery.resend'
+  | 'line_notification.definition.test'
   | 'nen.column.duplicate'
   | 'nen.column.import'
   | 'nen.delivery.pending_now'

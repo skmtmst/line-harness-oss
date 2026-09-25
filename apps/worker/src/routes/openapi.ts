@@ -4004,6 +4004,103 @@ const spec = {
         },
       },
     },
+    '/api/line-notifications/deliveries/{id}': {
+      get: {
+        tags: ['Customer notifications'],
+        summary: '顧客通知の送信記録1件',
+        description: '送信台帳の1件を一覧と同じ形で返す。アカウント境界の外側は404に倒す。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '送信記録1件' },
+          '400': { description: 'lineAccountId が無い' },
+          '403': { description: 'このLINEアカウントを表示する権限がない' },
+          '404': { description: '送信記録が見つからない' },
+        },
+      },
+    },
+    '/api/line-notifications/quota': {
+      get: {
+        tags: ['Customer notifications'],
+        summary: '顧客通知の送信枠',
+        description: 'LINE公式の今月の送信枠（総量・使用・残り）を単体で返す。一覧の includeQuota=1 と同じ中身。',
+        parameters: [
+          { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '送信枠（available/unlimited/unavailable）' },
+          '400': { description: 'lineAccountId が無い' },
+          '403': { description: 'このLINEアカウントを表示する権限がない' },
+        },
+      },
+    },
+    '/api/line-notifications/deliveries/{id}/resend': {
+      post: {
+        tags: ['Customer notifications'],
+        summary: '顧客通知の新規再送',
+        description: '送れなかった通知を新しい送信として送り直す。元の行は残し、新しい送達行・新しい冪等キーで送る。理由は必須で監査へ残る。店長だけが使える。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['lineAccountId', 'expectedVersion', 'reason'],
+                properties: {
+                  lineAccountId: { type: 'string' },
+                  expectedVersion: { type: 'integer' },
+                  reason: { type: 'string' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: '新しい送信の記録' },
+          '400': { description: 'lineAccountId・expectedVersion・reason が無い' },
+          '403': { description: '店長だけが使える' },
+          '404': { description: '送信記録が見つからない' },
+          '409': { description: '送り直せない状態・版競合・送信枠不足' },
+        },
+      },
+    },
+    '/api/line-notifications/customer-definitions/{id}/test': {
+      post: {
+        tags: ['Customer notifications'],
+        summary: '顧客のお知らせの試し送り',
+        description: '編集中の下書き文面を指定した友だち（1〜5人）だけに試し送りする。先頭に確認用の断りを付けて送り、記録は test 扱いで再試行しない。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['lineAccountId', 'friendIds'],
+                properties: {
+                  lineAccountId: { type: 'string' },
+                  friendIds: { type: 'array', items: { type: 'string' } },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: '宛先ごとの試し送り結果' },
+          '400': { description: 'lineAccountId・friendIds が無い' },
+          '403': { description: 'このLINEアカウントを変更する権限がない' },
+          '404': { description: 'お知らせ・受け取れる友だちが見つからない' },
+          '409': { description: '文面未設定・送信枠不足' },
+        },
+      },
+    },
     // ── Webhook ─────────────────────────────────────────────────────────────
     '/webhook': {
       post: {
