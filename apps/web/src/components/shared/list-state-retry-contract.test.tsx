@@ -4,13 +4,23 @@ import { describe, expect, it, vi } from 'vitest'
 import ListState from './list-state'
 
 describe('ListState の再読み込み', () => {
-  it('失敗状態にだけ再読み込みを出す', () => {
+  it('失敗の1枚は TargetMissing の error と同じ中身にする', () => {
+    // ★V7 `x63W5x`：赤い三角・赤い見出しをやめ、中立の見た目にそろえる。
+    // 見た目が2か所でずれないよう、中身は TargetMissing の error を使う。
+    const html = renderToStaticMarkup(<ListState kind="error" onRetry={vi.fn()} />)
+    expect(html).toContain('data-target-missing="error"')
+    expect(html).not.toContain('text-danger')
+    expect(html).not.toContain('status-danger')
+  })
+
+  it('失敗状態にだけ読み直す口を出す', () => {
     const onRetry = vi.fn()
 
-    expect(renderToStaticMarkup(<ListState kind="error" onRetry={onRetry} />)).toContain('再読み込み')
+    // 副ボタンは「もう一度読み込む」1つ（TargetMissing の error と同じ）。
+    expect(renderToStaticMarkup(<ListState kind="error" onRetry={onRetry} />)).toContain('>もう一度読み込む<')
 
     for (const kind of ['loading', 'empty', 'forbidden'] as const) {
-      expect(renderToStaticMarkup(<ListState kind={kind} onRetry={onRetry} />)).not.toContain('再読み込み')
+      expect(renderToStaticMarkup(<ListState kind={kind} onRetry={onRetry} />)).not.toContain('もう一度読み込む')
     }
   })
 
@@ -23,7 +33,7 @@ describe('ListState の再読み込み', () => {
 
     expect(html).toContain('disabled')
     expect(html).toContain('読み込んでいます')
-    expect(html).not.toContain('>再読み込み<')
+    expect(html).not.toContain('>もう一度読み込む<')
   })
 
   it('既存の任意操作はそのまま表示する', () => {

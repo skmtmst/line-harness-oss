@@ -101,14 +101,15 @@ describe('#634 一斉配信の読込表示と再読み込み', () => {
     render(<BroadcastsPage />)
 
     // 応答を保留しているあいだ、ほかの一覧と同じ読込文言が出る。
-    await waitFor(() => expect(screen.getByText('読み込んでいます')).toBeTruthy())
+    // ★V7 `x63W5x`：件数（KPI）も「読み込んでいます」なので複数ある。
+    await waitFor(() => expect(screen.getAllByText('読み込んでいます').length).toBeGreaterThan(0))
 
     slow.resolve({ success: true, data: [] })
     await waitFor(() => expect(screen.getByText('まだ配信がありません')).toBeTruthy())
     expect(screen.queryByText('読み込んでいます')).toBeNull()
   })
 
-  it('失敗表示の「再読み込み」で一覧を取り直す', async () => {
+  it('失敗表示の「もう一度読み込む」で一覧を取り直す', async () => {
     fixture.broadcastsList
       .mockResolvedValueOnce({ success: false, error: '失敗' })
       .mockResolvedValueOnce({ success: true, data: [broadcast] })
@@ -117,9 +118,25 @@ describe('#634 一斉配信の読込表示と再読み込み', () => {
 
     await waitFor(() => expect(screen.getByText('表示できませんでした')).toBeTruthy())
 
-    fireEvent.click(screen.getByRole('button', { name: '再読み込み' }))
+    // ★V7 `x63W5x`：失敗の1枚の副ボタンは「もう一度読み込む」1つ。
+    fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
 
     await waitFor(() => expect(fixture.broadcastsList).toHaveBeenCalledTimes(2))
     await waitFor(() => expect(screen.getByText('8月キャンペーンのお知らせ')).toBeTruthy())
+  })
+
+  it('一覧もフォルダも失敗したら、読み直しは一覧の1枚だけ（フォルダ欄は出さない）', async () => {
+    fixture.broadcastsList.mockResolvedValue({ success: false, error: '失敗' })
+    fixture.foldersList.mockResolvedValue({ success: false, error: '失敗' })
+
+    render(<BroadcastsPage />)
+
+    await waitFor(() => expect(screen.getByText('表示できませんでした')).toBeTruthy())
+
+    // ★V7 `x63W5x`：失敗は1画面に1つ。一覧本体も失敗しているときは
+    // 一覧の1枚へまとめ、フォルダ欄の小さい読み直しは出さない。
+    expect(screen.getAllByRole('button', { name: 'もう一度読み込む' })).toHaveLength(1)
+    expect(screen.queryByRole('button', { name: 'もう一度' })).toBeNull()
+    expect(screen.queryByText(/フォルダを読み込めませんでした/)).toBeNull()
   })
 })

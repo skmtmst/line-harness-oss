@@ -612,6 +612,22 @@ button[aria-label$='を削除']:not(:hover, :focus-visible, :disabled) {
       color var(--motion-fast) ease-out,
       background-color var(--motion-fast) ease-out;
   }
+
+  /*
+   * 素の入力欄のフォーカス（2026-09-25・使いやすさ点検 §8）。
+   * 共通部品を使っていない `input` / `select` / `textarea` も、共通部品と
+   * 同じ見た目（2px・action 色・外側に少し余白）にする。枠の色を緑に
+   * 変えるだけの合図はやめる（緑は「正常」の意味、白地で 3:1 未満）。
+   * base 層なので、部品側の指定（components 層・utilities 層）がある
+   * 箇所はそちらが勝つ。SearchField などの複合部品（外枠の
+   * `:focus-within` が正本）は部品側が勝ち、二重の輪郭にならない。
+   */
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline: 2px solid var(--color-action);
+    outline-offset: 2px;
+  }
 }
 
 /*

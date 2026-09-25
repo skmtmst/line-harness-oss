@@ -16,6 +16,9 @@ export default function GlobalError({
 
   return (
     <html lang="ja">
+      <head>
+        <title>画面を表示できませんでした</title>
+      </head>
       <body style={{ margin: 0, fontFamily: 'system-ui, sans-serif', background: '#f6f7f6' }}>
         <main style={{ maxWidth: 560, margin: '12vh auto', padding: 32, background: '#fff', borderRadius: 16 }}>
           <h1 style={{ fontSize: 22 }}>画面を表示できませんでした</h1>

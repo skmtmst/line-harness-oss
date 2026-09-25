@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
-import NoteBar from '@/components/shared/note-bar'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -384,19 +383,16 @@ export default function NenCampaignsPage() {
 
   return (
     <>
-      {tabErrors[tab] ? (
-        <div className="mx-auto w-full pt-4" style={{ maxWidth: 1600 }}>
-          <NoteBar
-            tone="danger"
-            action={<Button type="button" onClick={() => void loadTab(tab)}>もう一度読み込む</Button>}
-          >
-            {tabErrors[tab]}
-          </NoteBar>
-        </div>
-      ) : null}
+      {/*
+        ★V7 `x63W5x`：タブの失敗をページ上の帯に出さない。一覧の場所の
+        ListState error だけにまとめる（同じ失敗を2回出さない）。
+        失敗の文言（`tabErrors`）と取り直し（`loadTab`）は NenOverview へ渡す。
+      */}
       <NenOverview
         topAction={headerAction}
         tab={tab} onTabChange={changeTab} settings={settings} columns={columns} kpis={kpis}
+        tabError={tabErrors[tab]} onRetryTab={() => loadTab(tab)}
+        kpisFailed={kpis === null && (tabErrors.auto !== '' || tabErrors.columns !== '' || tabErrors.paused !== '')}
         flowMetrics={flowMetrics} columnMetrics={columnMetrics} deliveryList={deliveryList} deliveryDetail={deliveryDetail}
         friends={friends} testFriendId={testFriendId} onTestFriendChange={setTestFriendId} accountId={selectedAccountId}
         loading={loading} notice={notice}

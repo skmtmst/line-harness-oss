@@ -115,9 +115,9 @@
   pointer-events: none;
 }
 
-/* キーボードで場所へ来たときの輪郭。ボタン自体の輪郭は共通 Button が持つ。 */
+/* キーボードで場所へ来たときの輪郭。緑は「正常」の意味なので輪郭に使わない。 */
 .zone:focus-visible {
-  outline: 2px solid var(--color-accent); /* stroke: $accent 2px */
+  outline: 2px solid var(--color-action);
   outline-offset: 2px;
 }
 

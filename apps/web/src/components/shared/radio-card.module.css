@@ -79,7 +79,7 @@
 
 /* フォーカス枠は選択色と別にする（色だけで選択／操作位置を兼ねない）。 */
 .radio:focus-visible {
-  outline: 2px solid var(--color-status-info);
+  outline: 2px solid var(--color-action);
   outline-offset: 2px;
 }
 

@@ -188,6 +188,8 @@ export default function BookingsPage() {
   const [menus, setMenus] = useState<BookingMenu[]>([])
   // 集計の読み込み失敗は0表示と分ける。黙って0のままだと運用者が気づけない。
   const [summaryError, setSummaryError] = useState(false)
+  // ★V7 `x63W5x`：集計が取れていない間、KPI に 0 を出さない。「—」と出す。
+  const [summaryReady, setSummaryReady] = useState(false)
   const [summarySeq, setSummarySeq] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -340,6 +342,7 @@ export default function BookingsPage() {
     setCandidatesStatus('loading')
     setAvailability({ status: 'loading', slots: [] })
     setSummaryError(false)
+    setSummaryReady(false)
     setSummary({
       total: 0, requested: 0, monthTotal: 0, monthConfirmed: 0,
       monthCancelled: 0, lastMonthTotal: 0, todayTotal: 0, weekTotal: 0,
@@ -376,6 +379,7 @@ export default function BookingsPage() {
     const requestedAccountId = selectedAccountId
     let alive = true
     setSummaryError(false)
+    setSummaryReady(false)
     setCandidatesStatus('loading')
     void (async () => {
       try {
@@ -390,6 +394,7 @@ export default function BookingsPage() {
         ])
         if (!alive || listAccountRef.current !== requestedAccountId) return
         setSummary(counts)
+        setSummaryReady(true)
         setMenus(menuList.menus)
         setStaffList(staffResult.staff.filter((item) => item.is_active === 1))
         setCandidatesStatus('ready')
@@ -633,10 +638,13 @@ export default function BookingsPage() {
         ) : null}
       </div>
       <nav aria-label="予約の表示" className="border-hairline mb-4 flex items-center gap-7 border-b">
+        {/*
+          ★V7：集計が取れていない間、タブの件数に 0 を出さない。件数は出さない。
+        */}
         {([
-          ['day', `今日 ${todayCount}`],
-          ['week', `今週 ${weekCount}`],
-          ['month', `今月 ${kpi.total}`],
+          ['day', summaryReady ? `今日 ${todayCount}` : '今日'],
+          ['week', summaryReady ? `今週 ${weekCount}` : '今週'],
+          ['month', summaryReady ? `今月 ${kpi.total}` : '今月'],
           ['list', '一覧'],
         ] as const).map(([key, label]) => (
           <button
@@ -688,29 +696,38 @@ export default function BookingsPage() {
     return (
       <div>
         {pageHead}
-        {error && (
-          <div className="bg-danger-bg border-danger-bg text-danger mb-4 rounded-lg border p-4 text-sm">
-            {error}
-            {/* #634: 一覧の失敗からも、その場で読み直せるようにする。 */}
-            <button type="button" className="ml-2 font-semibold underline" onClick={() => void load()}>もう一度読み込む</button>
+        {/*
+          ★V7 `x63W5x`：同じ失敗を1画面に1つへ。失敗の1枚はカレンダーの場所に
+          出す（#634 の読み直す口は保つ）。一覧が読めている間はカレンダーを出す。
+        */}
+        {error ? (
+          <div className="mb-4">
+            <ListState
+              kind="error"
+              title="予約を読み込めませんでした"
+              description="通信が切れたか、サーバが応えませんでした。登録した内容は消えていません。"
+              onRetry={() => void load()}
+            />
           </div>
+        ) : (
+          <BookingCalendar
+            mode={view}
+            items={calendarItems}
+            onOpen={setDetailId}
+            staffNames={staffList.map((item) => item.display_name)}
+            canCreate={canOperate}
+            anchorDay={calendarAnchor}
+            onAnchorChange={setCalendarAnchor}
+            availability={availability}
+            dataState={loading ? 'loading' : 'ready'}
+            /*
+             * #634: 空き枠の失敗からその場で読み直す。空き枠は集計・メニュー・
+             * 担当の候補が先に要るので、同じ取得列（summarySeq）を回し直す。
+             * 候補が揃うと空き枠の取得はuseEffectの依存で自動的に再実行される。
+             */
+            onRetryAvailability={() => setSummarySeq((n) => n + 1)}
+          />
         )}
-        <BookingCalendar
-          mode={view}
-          items={calendarItems}
-          onOpen={setDetailId}
-          staffNames={staffList.map((item) => item.display_name)}
-          canCreate={canOperate}
-          anchorDay={calendarAnchor}
-          onAnchorChange={setCalendarAnchor}
-          availability={availability}
-          /*
-           * #634: 空き枠の失敗からその場で読み直す。空き枠は集計・メニュー・
-           * 担当の候補が先に要るので、同じ取得列（summarySeq）を回し直す。
-           * 候補が揃うと空き枠の取得はuseEffectの依存で自動的に再実行される。
-           */
-          onRetryAvailability={() => setSummarySeq((n) => n + 1)}
-        />
         {dialogs}
       </div>
     )
@@ -720,42 +737,45 @@ export default function BookingsPage() {
     <div>
       {pageHead}
 
-      {error && (
-        <div className="bg-danger-bg border-danger-bg text-danger mb-4 rounded-lg border p-4 text-sm">
-          {error}
-          {/* #634: 一覧の失敗からも、その場で読み直せるようにする。 */}
-          <button type="button" className="ml-2 font-semibold underline" onClick={() => void load()}>もう一度読み込む</button>
-        </div>
-      )}
+      {/*
+        ★V7 `x63W5x`：一覧の失敗でページ上のピンクの帯は出さない。
+        一覧の場所の ListState error だけにまとめる。
+      */}
 
       {summaryError && (
-        <div className="bg-warning-bg border-warning text-warning mb-4 rounded-lg border p-4 text-sm">
+        // ★V7 `x63W5x`：補助のデータ（集計）だけ取れないときは、その場所に
+        // 小さく1行だけ。一覧はそのまま使える。文言は契約試験が守る。
+        <p className="text-ink-secondary mb-4 text-xs" role="status">
           集計を読み込めませんでした。一覧はそのまま使えます。
-          <button className="ml-2 font-semibold underline" onClick={() => setSummarySeq((n) => n + 1)}>もう一度読み込む</button>
-        </div>
+          <button type="button" className="text-action ml-2 font-semibold hover:underline" onClick={() => setSummarySeq((n) => n + 1)}>もう一度読み込む</button>
+        </p>
       )}
 
+      {/*
+        ★V7 `x63W5x`：取れない KPI は「—」。読み込み中は「読み込んでいます」、
+        失敗は「読み込めませんでした」と言い分け、0（本当に0件）と混ぜない。
+      */}
       <div data-design="KPIs" className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
         <Kpi
           title="今月の予約"
-          value={kpi.total}
+          value={summaryReady ? kpi.total : null}
           unit="件"
-          detail={`前月比 ${kpi.diff >= 0 ? '+' : ''}${kpi.diff}`}
+          detail={summaryError ? '読み込めませんでした' : !summaryReady ? '読み込んでいます' : `前月比 ${kpi.diff >= 0 ? '+' : ''}${kpi.diff}`}
         />
-        <Kpi title="確定" value={kpi.confirmed} unit="件" detail="来店予定" />
+        <Kpi title="確定" value={summaryReady ? kpi.confirmed : null} unit="件" detail={summaryError ? '読み込めませんでした' : !summaryReady ? '読み込んでいます' : '来店予定'} />
         {/* 設計は「変更依頼 / 要対応」。bookings の状態に「変更依頼」が無いので
             承認待ちを出す。要対応であることは変わらない。 */}
         <Kpi
           title="変更依頼"
-          value={summary.requested}
+          value={summaryReady ? summary.requested : null}
           unit="件"
-          detail="要対応"
+          detail={summaryError ? '読み込めませんでした' : !summaryReady ? '読み込んでいます' : '要対応'}
         />
         <Kpi
           title="キャンセル"
-          value={kpi.cancelled}
+          value={summaryReady ? kpi.cancelled : null}
           unit="件"
-          detail={kpi.rate === null ? '率 —' : `率 ${kpi.rate}%`}
+          detail={summaryError ? '読み込めませんでした' : !summaryReady ? '読み込んでいます' : kpi.rate === null ? '率 —' : `率 ${kpi.rate}%`}
         />
       </div>
 
@@ -865,8 +885,19 @@ export default function BookingsPage() {
               サイドバーでアカウントを選択してください
             </div>
           ) : loading ? (
-            <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-12 text-center text-sm">
-              読み込み中…
+            <div className="bg-canvas rounded-card border-hairline border">
+              <ListState kind="loading" title="予約を読み込んでいます" />
+            </div>
+          ) : error ? (
+            // ★V7 `x63W5x`：失敗を「まだありません」と言わない。
+            // 空の案内と作成ボタンは出さない。
+            <div className="bg-canvas rounded-card border-hairline border">
+              <ListState
+                kind="error"
+                title="予約を読み込めませんでした"
+                description="通信が切れたか、サーバが応えませんでした。登録した内容は消えていません。"
+                onRetry={() => void load()}
+              />
             </div>
           ) : shown.length === 0 ? (
             <div className="bg-canvas rounded-card border-hairline border">
@@ -1079,7 +1110,8 @@ function Kpi({
   detail,
 }: {
   title: string
-  value: number
+  // ★V7 `x63W5x`：取れていないときは null で「—」を出す。0 とは別物。
+  value: number | null
   unit: string
   detail: string
 }) {
@@ -1087,8 +1119,10 @@ function Kpi({
     <div className="bg-canvas rounded-card border-hairline border p-4">
       <p className="text-ink-faint text-xs">{title}</p>
       <p className="text-ink mt-1 text-2xl font-semibold tabular-nums">
-        {value}
-        <span className="text-ink-faint ml-1 text-xs font-normal">{unit}</span>
+        {value === null ? '—' : value.toLocaleString('ja-JP')}
+        {value === null ? null : (
+          <span className="text-ink-faint ml-1 text-xs font-normal">{unit}</span>
+        )}
       </p>
       <p className="text-ink-faint mt-1 text-xs">{detail}</p>
     </div>
@@ -1200,7 +1234,7 @@ function BookingDetailPanel({
             {(detail?.history.length ? detail.history : [{ id: b.id, startsAt: b.starts_at, menuName: b.menu_name, staffName: b.staff_name, price: b.price_at_booking, customerNote: b.customer_note, handoverNote: null, status: b.status }]).slice(0, 3).map((item) => (
               <div key={item.id} className="grid grid-cols-4 gap-3 py-3 text-sm"><span>{formatJpDateTime(item.startsAt)} {item.menuName}</span><span>{item.staffName}</span><span>¥{item.price.toLocaleString()}</span><span>{item.customerNote ?? '記入なし'}</span></div>
             ))}
-            {b.friend_id ? <Link href={`/friends/detail?id=${encodeURIComponent(b.friend_id)}`} className="text-action text-xs font-semibold">顧客カルテで以前の予約を見る →</Link> : null}
+            {b.friend_id ? <Link href={`/friends/detail?id=${encodeURIComponent(b.friend_id)}`} className="text-action text-xs font-semibold hover:underline focus-visible:underline">顧客カルテで以前の予約を見る →</Link> : null}
           </section>
 
           <section className="bg-canvas rounded-card border-hairline border p-5">
@@ -1230,7 +1264,7 @@ function BookingDetailPanel({
           </section>
           <section className="bg-canvas rounded-card border-hairline border p-5">
             <h3 className="text-ink text-sm font-semibold">つながる先</h3>
-            <div className="mt-3 space-y-2 text-xs"><p><Link href="/booking/menus" className="text-action font-semibold">→ 予約設定</Link>　メニューと受付枠</p><p><Link href="/reminders" className="text-action font-semibold">→ リマインダ</Link>　前日・開始前のお知らせ</p>{b.friend_id ? <p><Link href={`/chats?friend=${b.friend_id}`} className="text-action font-semibold">→ 受信箱</Link>　この方とのやりとり</p> : null}<p><Link href="/mileage" className="text-action font-semibold">→ マイル</Link>　来店時の付与</p></div>
+            <div className="mt-3 space-y-2 text-xs"><p><Link href="/booking/menus" className="text-action font-semibold hover:underline focus-visible:underline">→ 予約設定</Link>　メニューと受付枠</p><p><Link href="/reminders" className="text-action font-semibold hover:underline focus-visible:underline">→ リマインダ</Link>　前日・開始前のお知らせ</p>{b.friend_id ? <p><Link href={`/chats?friend=${b.friend_id}`} className="text-action font-semibold hover:underline focus-visible:underline">→ 受信箱</Link>　この方とのやりとり</p> : null}<p><Link href="/mileage" className="text-action font-semibold hover:underline focus-visible:underline">→ マイル</Link>　来店時の付与</p></div>
           </section>
           <div className="bg-canvas rounded-card border-hairline border p-5">
             <p className="text-ink-faint mb-2 text-xs">

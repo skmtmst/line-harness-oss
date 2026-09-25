@@ -625,15 +625,20 @@ function VarsPageInner() {
       {!selectedAccountId && !accountLoading && (
         <ListState kind="empty" title="LINEアカウントを選択してください" description="共通情報はLINEアカウントごとに管理します。" />
       )}
-      {error && (
-        <div className="bg-danger-bg border-danger-bg text-danger mb-4 rounded-lg border p-4 text-sm">
-          {error}
-        </div>
-      )}
+      {/*
+        ★V7 `x63W5x`：読み込み失敗の帯は出さない。一覧の場所の ListState error
+        だけにまとめる（同じ失敗を2回出さない）。
+      */}
 
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <Button href="/contents/vars/new" variant="primary">＋ 共通情報を作る</Button>
+          {/*
+            ★V7 `x63W5x`：失敗している間は作成ボタンを出さない。
+            読めていないのに「作る」があると、消えたように読める。
+          */}
+          {error ? null : (
+            <Button href="/contents/vars/new" variant="primary">＋ 共通情報を作る</Button>
+          )}
         </div>
         {/*
           N-192: 端末で見えている分だけをCSV化するのをやめ、台帳へ残る
@@ -790,6 +795,17 @@ function VarsPageInner() {
             {loading ? (
               <div className="text-ink-faint px-4 py-8 text-center text-sm">
                 <ListState kind="loading" title="共通情報を読み込んでいます" />
+              </div>
+            ) : error ? (
+              // ★V7 `x63W5x`：失敗を「まだありません」と言わない。
+              // 消えたように読めるため、空の案内と作成ボタンは出さない。
+              <div className="text-ink-faint px-4 py-8 text-center text-sm">
+                <ListState
+                  kind="error"
+                  title="共通情報を読み込めませんでした"
+                  description="通信が切れたか、サーバが応えませんでした。登録した内容は消えていません。"
+                  onRetry={() => void load()}
+                />
               </div>
             ) : current.length === 0 ? (
               <div className="text-ink-faint px-4 py-8 text-center text-sm">

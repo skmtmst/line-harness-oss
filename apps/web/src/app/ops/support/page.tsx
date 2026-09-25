@@ -117,13 +117,18 @@ export default function OpsSupportPage() {
     if (res.success) setSummary(res.data)
   }, [])
 
+  // ★V7：一覧と詳細の失敗は場所ごとに1つずつ出す。操作の失敗の知らせと混ぜない。
+  const [listFailed, setListFailed] = useState(false)
+  const [detailFailed, setDetailFailed] = useState(false)
+
   const loadList = useCallback(async () => {
     const sequence = ++listRequest.current
     setLoading(true)
+    setListFailed(false)
     const res = await opsCall(api.ops.support.tickets({ stage, priority: priority || undefined, q: q.trim() || undefined, sort, limit: 50 }))
     if (sequence !== listRequest.current) return
     setLoading(false)
-    if (!res.success) { setError(res.error || '読み込めませんでした'); return }
+    if (!res.success) { setError(res.error || '読み込めませんでした'); setListFailed(true); return }
     setTickets(res.data)
     setTotal(res.total)
     setSelectedId((current) => deepLink.current || (current && res.data.some((t) => t.id === current) ? current : res.data[0]?.id ?? null))
@@ -132,10 +137,11 @@ export default function OpsSupportPage() {
   const loadDetail = useCallback(async (id: string) => {
     const sequence = ++detailRequest.current
     setDetailLoading(true)
+    setDetailFailed(false)
     const res = await opsCall(api.ops.support.ticket(id))
     if (sequence !== detailRequest.current) return
     setDetailLoading(false)
-    if (!res.success) { setError(res.error || '内容を読み込めませんでした'); return }
+    if (!res.success) { setError(res.error || '内容を読み込めませんでした'); setDetailFailed(true); return }
     setDetail(res.data)
     setReply(res.data.draft?.body ?? '')
     setReplyFromAi(res.data.draft?.aiGenerated ? { generatedAt: res.data.draft.generatedAt } : null)
@@ -369,7 +375,11 @@ export default function OpsSupportPage() {
       </div>
 
       {notice ? <p role="status" className="mb-3 text-caption text-accent-deep">{notice}</p> : null}
-      {error ? <p role="alert" className="mb-3 text-caption text-danger">{error}</p> : null}
+      {/*
+        ★V7：一覧・詳細の失敗はその場所の1枚で出すので、ここでは操作の失敗の
+        知らせだけ出す（同じ失敗を2回出さない）。
+      */}
+      {error && !listFailed && !detailFailed ? <p role="alert" className="mb-3 text-caption text-danger">{error}</p> : null}
 
       <div className={knowledgeStyles.supportColumns} data-design-node="WmMDh">
         {/* 左：チケット一覧 */}
@@ -380,6 +390,14 @@ export default function OpsSupportPage() {
           </header>
           {loading && tickets.length === 0 ? (
             <ListState kind="loading" title="チケットを読み込んでいます" />
+          ) : listFailed && tickets.length === 0 ? (
+            // ★V7：失敗を「ありません」と言わない。一覧の場所の1枚だけ出す。
+            <ListState
+              kind="error"
+              title="チケットを読み込めませんでした"
+              description="通信が切れたか、サーバが応えませんでした。"
+              onRetry={() => void loadList()}
+            />
           ) : tickets.length === 0 ? (
             <ListState kind="empty" title="チケットがありません" description="統括の管理画面「お問い合わせ」から送られると、ここに新規として並びます。" />
           ) : (
@@ -417,7 +435,15 @@ export default function OpsSupportPage() {
         {/* 右：内容と返信 */}
         <section aria-label="内容と返信" className={knowledgeStyles.supportDetail} data-design-node="UcEaZ">
           {!ticket ? (
-            detailLoading ? <ListState kind="loading" title="内容を読み込んでいます" /> : <ListState kind="empty" title="チケットを選んでください" description="左の一覧から開きます。" />
+            detailLoading ? <ListState kind="loading" title="内容を読み込んでいます" /> : detailFailed ? (
+              // ★V7：詳細だけ落ちても外枠は落とさない。その場所の1枚だけ出す。
+              <ListState
+                kind="error"
+                title="内容を読み込めませんでした"
+                description="通信が切れたか、サーバが応えませんでした。"
+                onRetry={selectedId ? () => void loadDetail(selectedId) : undefined}
+              />
+            ) : <ListState kind="empty" title="チケットを選んでください" description="左の一覧から開きます。" />
           ) : (
             <div className="grid gap-3">
               {/* 見出し行 */}

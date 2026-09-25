@@ -54,6 +54,12 @@ export type SummaryCardProps = {
 
 /**
  * Pencil V5 の `XywGr` を基本に、V6のKPIと配信告知の差を名前付きvariantで固定したカード。
+ *
+ * 取れないときの出し方（★V7 `x63W5x`）。**0 とは別物。**
+ * - 読み込み中：`loading` を渡す。数値は骨組み、3段目（`detail`）に
+ *   「読み込んでいます」と書く。
+ * - 取得失敗：`value`（または `valueText`）を `null` にして「—」を出し、
+ *   3段目に「読み込めませんでした」と書く。やり直せるときは `onRetry` も渡す。
  */
 export default function SummaryCard({
   title,

@@ -2,12 +2,15 @@
 /*
  * 一覧の「中身が出せないとき」の1枚。
  *
- * Pencil の3部品の実測値をそのまま持つ。
+ * Pencil の2部品の実測値をそのまま持つ。
  *   `BDOJu` データがありません
  *   `sZE9Q` 読み込んでいます
- *   `OLMp0` 表示できませんでした
- * どれも 高さ132・$surface-pearl・$radius-md(10)・padding 24・gap 8・中央寄せ で、
- * 変わるのは **絵・見出しの色・文言だけ**。数字を変えるときは Pencil を先に直す。
+ * どちらも 高さ132・$surface-pearl・$radius-md(10)・padding 24・gap 8・中央寄せ で、
+ * 変わるのは **絵・文言だけ**。数字を変えるときは Pencil を先に直す。
+ *
+ * 失敗（`error`）はここで描かない。★V7 `x63W5x` の決まりで TargetMissing の
+ * error と同じ中立の見た目にするため、`list-state.tsx` から
+ * `target-missing.tsx` の中身を使う。赤い三角・赤い見出しはやめた。
  */
 .root {
   display: flex;
@@ -22,15 +25,10 @@
   text-align: center;
 }
 
-/* `hqTfD` / `u2ArlH` / `ZAkSe`。24px の線画。 */
+/* `hqTfD` / `u2ArlH`。24px の線画。 */
 .icon {
   flex-shrink: 0;
   color: var(--color-ink-faint);
-}
-
-/* `ZAkSe` だけ $status-danger。 */
-.iconDanger {
-  color: var(--color-status-danger);
 }
 
 /* `PzPQY` ほか。$size-label 13 / 700。 */
@@ -41,14 +39,6 @@
   line-height: 1.2;
 }
 
-/*
- * 失敗の見出しは中立（ink）。赤字の見出しは読み上げ・視覚の両方で
- * 「危険」だけが目立ち、何が起きたかが伝わらない（#798 の決まり）。
- * 失敗の印はアイコンの赤だけにし、見出しは通常の文字色にする。
- */
-.titleDanger {
-  color: var(--color-ink);
-}
 
 /*
  * `U5haB` ほか。$size-micro 11 / 行間1.4 / **幅220で折り返す**。

@@ -130,7 +130,7 @@ describe('画面', () => {
     expect(host.textContent).toContain('ダッシュボードを表示できませんでした')
     // 再読み込みで復帰する。
     fail = false
-    const retry = Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.includes('再読み込み'))
+    const retry = Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.includes('もう一度読み込む'))
     expect(retry).toBeTruthy()
     await act(async () => { retry!.click() })
     await flush()
@@ -157,7 +157,7 @@ describe('画面', () => {
     await flush()
     // ダイアログは「読み込んでいます」のままにせず、エラーと再読み込みを出す。
     expect(document.body.textContent).toContain('未登録の人を表示できませんでした')
-    const retry = Array.from(document.body.querySelectorAll('button')).find((b) => b.textContent?.includes('再読み込み'))
+    const retry = Array.from(document.body.querySelectorAll('button')).find((b) => b.textContent?.includes('もう一度読み込む'))
     expect(retry).toBeTruthy()
     fail = false
     await act(async () => { retry!.click() })

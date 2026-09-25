@@ -547,16 +547,24 @@ export default function Sidebar({
 
       {/* ナビゲーション */}
       <nav className={`${styles.nav} ${preview ? 'overflow-hidden' : ''}`} data-design-node="J33xq">
+        {/*
+          ★V7 `x63W5x`：補助のデータ（表示可否）の失敗は、その場所の
+          小さい1行で伝える。全文の「もう一度読み込む」は一覧本体の
+          失敗の1枚が使う言葉なので、ここは短い「もう一度」にして
+          1画面に同じ読み直しボタンを2つ出さない。
+        */}
         {visibilityStatus === 'error' && selectedAccountId && (
           <div className="mx-3 mb-2 rounded-control border border-warning bg-warning-bg px-3 py-2 text-xs text-ink-secondary">
-            <p>機能設定を読み込めませんでした。</p>
-            <button
-              type="button"
-              onClick={() => setVisibilityRetry((current) => current + 1)}
-              className="mt-1 cursor-pointer font-bold text-action underline"
-            >
-              もう一度読み込む
-            </button>
+            <p>
+              機能設定を読み込めませんでした。
+              <button
+                type="button"
+                onClick={() => setVisibilityRetry((current) => current + 1)}
+                className="ml-1 cursor-pointer font-bold text-action underline"
+              >
+                もう一度
+              </button>
+            </p>
           </div>
         )}
         {visibleSections.map((section, si) => (

@@ -305,9 +305,9 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
 
       <div className="rounded-card border-hairline overflow-hidden border bg-canvas lg:grid lg:h-[calc(100vh-260px)] lg:min-h-[620px] lg:grid-cols-[360px_1fr]">
         <aside className="border-b border-hairline lg:border-b-0 lg:border-r">
-          <div className="space-y-3 border-b border-hairline bg-canvas-sunken p-4">
+          <div className="space-y-3 border-b border-hairline bg-canvas-sunken/70 p-4">
             <div className="flex gap-2">
-              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="名前・メール・件名で検索" aria-label="名前・メール・件名で検索" className="min-w-0 flex-1 rounded-lg border border-hairline bg-canvas px-3 py-2 text-sm outline-none focus:border-success focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info" />
+              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="名前・メール・件名で検索" aria-label="名前・メール・件名で検索" className="min-w-0 flex-1 rounded-lg border border-hairline bg-canvas px-3 py-2 text-sm" />
               <select value={status} onChange={(event) => setStatus(event.target.value as typeof status)} aria-label="対応状況で絞り込む" className="rounded-lg border border-hairline bg-canvas px-2 text-xs font-medium">
                 <option value="open">未解決</option>
                 <option value="unread">未対応</option>
@@ -395,7 +395,7 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
                 <div ref={bottomRef} />
               </div>
               <div className="border-t border-hairline bg-canvas p-4">
-                <textarea value={reply} onChange={(event) => setReply(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) void sendReply() }} placeholder="メールの返信を入力…（Ctrl/Command + Enterで送信）" aria-label="メールの返信を入力" rows={4} className="w-full resize-none rounded-xl border border-hairline bg-canvas-sunken px-4 py-3 text-sm leading-6 outline-none focus:border-success focus:bg-canvas focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info" />
+                <textarea value={reply} onChange={(event) => setReply(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) void sendReply() }} placeholder="メールの返信を入力…（Ctrl/Command + Enterで送信）" aria-label="メールの返信を入力" rows={4} className="w-full resize-none rounded-xl border border-hairline bg-canvas-sunken px-4 py-3 text-sm leading-6 focus:bg-canvas" />
                 <div className="mt-3 flex items-center justify-between gap-3">
                   <p className="text-[11px] text-ink-faint">From: contact-shed@nen-petfood.com</p>
                   <button onClick={() => void sendReply()} disabled={!reply.trim() || sending} className="rounded-xl bg-accent-deep px-6 py-2.5 text-sm font-bold text-white shadow-sm hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-40">{sending ? '送信中…' : 'メールで返信'}</button>

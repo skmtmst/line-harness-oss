@@ -307,7 +307,7 @@ export default function AutomationRunsPage() {
       {retryNotice ? <p className="mb-4 rounded-control border border-hairline bg-canvas-sunken px-4 py-3 text-sm text-ink-secondary" role="status">{retryNotice}</p> : null}
 
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <input type="search" value={query} onChange={(event) => changeQuery(event.target.value)} placeholder="友だちの名前・オートメーションの名前で検索" className="h-10 w-full max-w-lg rounded-control border border-hairline bg-canvas px-3 text-sm outline-none focus:border-info focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info" />
+        <input type="search" value={query} onChange={(event) => changeQuery(event.target.value)} placeholder="友だちの名前・オートメーションの名前で検索" className="h-10 w-full max-w-lg rounded-control border border-hairline bg-canvas px-3 text-sm" />
         <div className="flex items-center gap-3">
           <label className="flex items-center gap-1.5 text-sm text-ink-secondary">
             <input
