@@ -810,8 +810,9 @@ function LineNotificationsPage() {
       setLoadState('ready')
     } catch (error) {
       if (!stale()) {
+        // ★V7 `x63W5x`：一覧の失敗でページ上の帯は出さない。
+        // 一覧の場所の ListState error だけにまとめる。
         setLoadState(error instanceof ApiError && error.status === 403 ? 'forbidden' : 'error')
-        setNotice({ tone: 'error', text: 'LINE通知の設定を読み込めませんでした。' })
       }
     }
   }, [selectedAccountId, tab])
@@ -1045,11 +1046,15 @@ function LineNotificationsPage() {
       * 隣に直す道を出す。出さないと、ページ全体を開き直す以外に
       * 読み直す手段がない。押すと load() が件数の取得からやり直す。
       */}
+    {/*
+      ★V7 `x63W5x`：補助のデータ（運用者タブの件数）だけ取れないときは、
+      その場所に小さく1行だけ。黄色の帯にしない。
+    */}
     {expandedSetting === null && operatorState === 'error' ? (
-      <div role="alert" className="bg-warning-bg border-warning text-warning mb-4 rounded-lg border p-4 text-sm">
+      <p role="alert" className="text-ink-secondary mb-4 text-xs">
         運用者へのお知らせの件数を読み込めませんでした。
-        <button type="button" className="ml-2 font-semibold underline" onClick={() => void load()}>もう一度読み込む</button>
-      </div>
+        <button type="button" className="text-action ml-2 font-semibold hover:underline" onClick={() => void load()}>もう一度</button>
+      </p>
     ) : null}
     {tab === 'failures' ? <NotificationRunList lineAccountId={selectedAccountId} mode="failures" /> : null}
     {tab === 'history' ? <NotificationRunList lineAccountId={selectedAccountId} mode="history" /> : null}
