@@ -24,7 +24,8 @@ const read = (path: string) => readFileSync(join(HERE, path), 'utf8')
 describe('Issue #709: フォルダ帯の見出し件数は行が表す項目の総件数', () => {
   it('テンプレートはテンプレート総件数（フォルダ数ではない）', () => {
     const src = read('templates/page.tsx')
-    expect(src).toContain('total={`${templates.length} 件`}')
+    // ★V7 `x63W5x`：取れていない間は「—」。読めたときはテンプレート総件数。
+    expect(src).toContain('`${templates.length} 件`')
     expect(src).not.toContain('total={`${folders.length} 件`}')
   })
 

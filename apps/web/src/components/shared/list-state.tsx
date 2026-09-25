@@ -86,13 +86,10 @@ export default function ListState({
 
   // 失敗の1枚は TargetMissing の error と同じ中身を使う（★V7 `x63W5x`）。
   // 見た目が2か所でずれないように、ここで組み立て直さない。
+  // className は付けない（見た目は TargetMissing が持つ。余白は親で付ける）。
   if (kind === 'error') {
     return (
-      <div
-        className={className}
-        data-list-state="error"
-        role="alert"
-      >
+      <div data-list-state="error" role="alert">
         <TargetMissing
           kind="error"
           title={title ?? preset.title}
@@ -100,7 +97,7 @@ export default function ListState({
           onRetry={onRetry}
           retrying={retrying}
         />
-        {action ? <div className={styles.action}>{action}</div> : null}
+        {action}
       </div>
     )
   }

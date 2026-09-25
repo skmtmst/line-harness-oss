@@ -226,7 +226,6 @@ shared-button-importer components/shared/create-page.tsx
 shared-button-importer components/shared/dialog.tsx
 shared-button-importer components/shared/file-drop.tsx
 shared-button-importer components/shared/folder-panel.tsx
-shared-button-importer components/shared/list-state.tsx
 shared-button-importer components/shared/not-connected.tsx
 shared-button-importer components/shared/progress.tsx
 # #985 LAY-18: 一覧の行の操作（詳細・編集）が共通Buttonを使う。
