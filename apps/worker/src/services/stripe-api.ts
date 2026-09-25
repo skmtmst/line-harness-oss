@@ -121,11 +121,27 @@ export interface StripeInvoice {
   status: string | null;
   amount_paid: number;
   amount_due: number;
+  amount_remaining: number;
   currency: string;
   created: number;
+  customer: string | null;
+  subscription: string | null;
+  charge: string | { id: string; amount_refunded: number } | null;
+  period_start: number | null;
+  period_end: number | null;
+  status_transitions?: { paid_at?: number | null } | null;
   hosted_invoice_url: string | null;
   invoice_pdf: string | null;
-  lines?: { data: Array<{ description: string | null }> };
+  lines?: { data: Array<{
+    description: string | null;
+    price?: { recurring?: { interval?: string | null } | null } | null;
+  }> };
+}
+
+export interface StripeInvoiceListOptions {
+  limit?: number;
+  startingAfter?: string;
+  createdGte?: number;
 }
 
 export const stripeApi = {
@@ -167,6 +183,16 @@ export const stripeApi = {
   retrieveSubscription: (env: StripeEnv, subscriptionId: string, fetchImpl?: typeof fetch) =>
     stripeRequest<StripeSubscription>(env, 'GET', `/v1/subscriptions/${encodeURIComponent(subscriptionId)}`, undefined, { fetchImpl }),
 
-  listInvoices: (env: StripeEnv, customerId: string, limit = 12, fetchImpl?: typeof fetch) =>
-    stripeRequest<{ data: StripeInvoice[] }>(env, 'GET', '/v1/invoices', { customer: customerId, limit }, { fetchImpl }),
+  listInvoices: (
+    env: StripeEnv,
+    customerId: string,
+    options: StripeInvoiceListOptions = {},
+    fetchImpl?: typeof fetch,
+  ) => stripeRequest<{ data: StripeInvoice[]; has_more: boolean }>(env, 'GET', '/v1/invoices', {
+    customer: customerId,
+    limit: options.limit ?? 100,
+    starting_after: options.startingAfter,
+    created: options.createdGte === undefined ? undefined : { gte: options.createdGte },
+    expand: ['data.charge'],
+  }, { fetchImpl }),
 };

@@ -13,12 +13,12 @@ import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
 import SummaryCard from '@/components/shared/summary-card'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
-import { deltaLabel, minutesLabel } from './format'
+import { contractDetail, minutesLabel, revenueDetail, revenueSourceLabel } from './format'
 
 /**
  * 運営ダッシュボード ★V6 37-2 `Xvofy`。
  *
- * 金額は「契約中プランの定価」で数える（決定 2026-09-17）。Stripe の実売上は後で差し替える。
+ * 売上は Stripe の入金実績。請求書が無い契約先だけ定価で補う。
  * 要対応の 4 行は、それぞれ契約先一覧・お問い合わせへの入口を兼ねる。
  */
 
@@ -71,7 +71,6 @@ export default function OpsDashboardPage() {
             </FilterChip>
           ))}
         </div>
-        <span className="ml-auto text-micro text-ink-faint">金額は契約中プランの定価で数えています（Stripe の実売上ではありません）</span>
       </div>
 
       {error ? <p role="alert" className="mb-3 text-caption text-danger">{error}</p> : null}
@@ -83,9 +82,9 @@ export default function OpsDashboardPage() {
         </div>
       ) : (
       <>
-      <div className="mb-4 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-        <SummaryCard variant="v6" title="今月のMRR" value={null} unit="" valueText={k ? formatYen(k.mrr) : undefined} detail={k ? deltaLabel(k.mrrDelta) : '—'} loading={loading} />
-        <SummaryCard variant="v6" title="契約中" value={k ? k.active : null} unit="" detail={k ? `ライト${k.byPlan.light}・スタンダード${k.byPlan.standard}・プロ${k.byPlan.pro}` : '—'} loading={loading} />
+      <div data-design-node="s7wSj" className="mb-4 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+        <div data-design-node="nPbgn"><SummaryCard variant="v6" title="今月の売上（入金済み）" value={null} unit="" valueText={k ? formatYen(k.revenueThisMonth) : undefined} detail={k ? revenueDetail(k.revenueDelta, k.refundsThisMonth) : '—'} loading={loading} /></div>
+        <div data-design-node="BaoAQ"><SummaryCard variant="v6" title="契約中の月額合計" value={null} unit="" valueText={k ? formatYen(k.contractMonthlyTotal) : undefined} detail={k ? contractDetail(k.active, k.byPlan, k.filledByListPriceCount) : '—'} loading={loading} /></div>
         <SummaryCard variant="v6" title="トライアル中" value={k ? k.trialing : null} unit="" detail={k ? `${label}の新規 ${k.newInPeriod}` : '—'} loading={loading} />
         <SummaryCard variant="v6" title={`${label}の解約`} value={k ? k.churnInPeriod : null} unit="" detail={k ? `解約率 ${k.churnRate.toFixed(1)}%` : '—'} badge={k && k.churnInPeriod > 0 ? '確認' : undefined} badgeTone="danger" loading={loading} />
         <div data-design-node="G0vK7"><SummaryCard variant="v6" title="今月の AI 利用" value={data?.ai?.callsThisMonth ?? null} unit="回" detail={data?.ai ? `返信の下書き${data.ai.draftsThisMonth}回・記事化${data.ai.callsThisMonth - data.ai.draftsThisMonth}回` : '—'} loading={loading} /></div>
@@ -93,8 +92,11 @@ export default function OpsDashboardPage() {
 
       {/* グラフ帯 */}
       <div className="mb-4 grid gap-4 xl:grid-cols-5">
-        <section aria-label="月ごとの売上" className="rounded-card border border-hairline bg-canvas px-5 py-4 xl:col-span-3">
-          <h3 className="mb-2 text-label font-bold text-ink">月ごとの売上</h3>
+        <section data-design-node="fyib5" aria-label="月ごとの売上" className="rounded-card border border-hairline bg-canvas px-5 py-4 xl:col-span-3">
+          <div data-design-node="MVufa" className="mb-2 flex items-center gap-2">
+            <h3 className="text-label font-bold text-ink">月ごとの売上</h3>
+            <span data-design-node="xaUOz" className="ml-auto text-nano text-ink-faint">{data ? revenueSourceLabel(data.pricing, data.lastSyncedAt) : '—'}</span>
+          </div>
           {data ? <RevenueBars rows={data.revenueByMonth} /> : <ListState kind="loading" title="読み込んでいます" />}
         </section>
         <section aria-label="プラン別の契約" className="rounded-card border border-hairline bg-canvas px-5 py-4 xl:col-span-2">

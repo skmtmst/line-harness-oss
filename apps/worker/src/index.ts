@@ -160,6 +160,7 @@ import { opsInvite } from './routes/ops-invite.js';
 import { opsSupport } from './routes/ops-support.js';
 import { opsKnowledge } from './routes/ops-knowledge.js';
 import { opsDashboard } from './routes/ops-dashboard.js';
+import { opsBilling } from './routes/ops-billing.js';
 import { opsAnnouncements } from './routes/ops-announcements.js';
 import { hqNotices } from './routes/hq-notices.js';
 import { codexSlackEvents } from './routes/codex-slack-events.js';
@@ -546,6 +547,7 @@ app.route('/', opsInvite);
 app.route('/', opsSupport);
 app.route('/', opsKnowledge);
 app.route('/', opsDashboard);
+app.route('/', opsBilling);
 app.route('/', opsAnnouncements);
 app.route('/', hqNotices);
 app.route('/', codexSlackEvents);
@@ -1601,6 +1603,22 @@ async function runSixHourlyHeavyJobs(
         console.log(
           `[event-booking-expirer] expired=${result.expired} idempotency_purged=${result.idempotencyPurged}`,
         );
+      },
+    },
+    {
+      name: 'billing invoice sync',
+      run: async () => {
+        const { syncBillingInvoicesDaily } = await import('./services/billing-invoices-sync.js');
+        const result = await syncBillingInvoicesDaily(env, new Date(event.scheduledTime));
+        if (result && (result.imported > 0 || result.failed > 0)) {
+          console.log(JSON.stringify({
+            event: 'billing_invoice_sync',
+            tenants: result.tenants,
+            imported: result.imported,
+            failed: result.failed,
+            completed: result.completed,
+          }));
+        }
       },
     },
   ];

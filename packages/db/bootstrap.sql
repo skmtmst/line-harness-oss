@@ -1124,6 +1124,26 @@ CREATE TABLE billing_events (
   received_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
+CREATE TABLE billing_invoices (
+  id                  TEXT PRIMARY KEY,
+  tenant_id           TEXT NOT NULL,
+  stripe_customer_id  TEXT,
+  subscription_id     TEXT,
+  status              TEXT,
+  amount_paid         INTEGER NOT NULL DEFAULT 0,
+  amount_due          INTEGER NOT NULL DEFAULT 0,
+  amount_refunded     INTEGER NOT NULL DEFAULT 0,
+  currency            TEXT NOT NULL DEFAULT 'jpy',
+  interval            TEXT CHECK (interval IN ('month', 'year')),
+  period_start        TEXT,
+  period_end          TEXT,
+  paid_at             TEXT,
+  hosted_invoice_url  TEXT,
+  raw_updated_at      TEXT,
+  synced_at           TEXT NOT NULL,
+  created_at          TEXT NOT NULL
+);
+
 CREATE TABLE booking_audit_logs (
   id              TEXT PRIMARY KEY,
   booking_id      TEXT NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
@@ -6755,6 +6775,12 @@ CREATE INDEX idx_banner_usage_tenant_created
 
 CREATE INDEX idx_billing_events_tenant
   ON billing_events(tenant_id, received_at DESC);
+
+CREATE INDEX idx_billing_invoices_paid
+  ON billing_invoices(paid_at);
+
+CREATE INDEX idx_billing_invoices_tenant_paid
+  ON billing_invoices(tenant_id, paid_at);
 
 CREATE INDEX idx_booking_audit_logs_booking
   ON booking_audit_logs(line_account_id, booking_id, occurred_at);

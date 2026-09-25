@@ -405,7 +405,8 @@
     "444_media_usage_terms.sql",
     "445_platform_knowledge_answer_examples.sql",
     "446_restaurant_google_business.sql",
-    "447_restaurant_google_profile.sql"
+    "447_restaurant_google_profile.sql",
+    "448_billing_invoices.sql"
   ],
-  "migrationCount": 406
+  "migrationCount": 407
 }

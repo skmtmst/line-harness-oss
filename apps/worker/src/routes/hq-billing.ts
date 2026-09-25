@@ -5,7 +5,10 @@ import {
   getTenantBilling,
   getTenantBillingByStripeCustomer,
   recordBillingEvent,
+  toJstString,
+  updateBillingInvoiceRefund,
   updateTenantBilling,
+  upsertBillingInvoice,
   type TenantBilling,
   type TenantPlanStatus,
 } from '@line-crm/db';
@@ -24,7 +27,8 @@ import {
   type BillingInterval,
   type PlanKey,
 } from '../services/billing-plans.js';
-import { StripeApiError, stripeApi, type StripeSubscription } from '../services/stripe-api.js';
+import { billingInvoiceInput } from '../services/billing-invoices-sync.js';
+import { StripeApiError, stripeApi, type StripeInvoice, type StripeSubscription } from '../services/stripe-api.js';
 import { MAX_STRIPE_WEBHOOK_BODY_BYTES, readBodyWithinLimit, verifyStripeSignature } from '../services/stripe-signature.js';
 
 /**
@@ -265,7 +269,7 @@ hqBilling.get('/api/hq/billing/invoices', requireRole('owner', 'admin'), async (
   try {
     const billing = await getTenantBilling(c.env.DB, tenantOf(c));
     if (!billing?.stripe_customer_id || !stripeReady(c)) return c.json({ success: true, data: [] });
-    const invoices = await stripeApi.listInvoices(c.env, billing.stripe_customer_id, 12);
+    const invoices = await stripeApi.listInvoices(c.env, billing.stripe_customer_id, { limit: 12 });
     return c.json({
       success: true,
       data: invoices.data.map((inv) => ({
@@ -385,11 +389,40 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
         break;
       }
       case 'invoice.paid': {
+        await upsertBillingInvoice(c.env.DB, billingInvoiceInput(object as unknown as StripeInvoice, {
+          tenantId: tenant.id,
+          fallbackPaidAt: toJstString(new Date()),
+        }));
         if (tenant.plan_status === 'past_due') await updateTenantBilling(c.env.DB, tenant.id, { plan_status: 'active' });
         break;
       }
       case 'invoice.payment_failed': {
+        await upsertBillingInvoice(c.env.DB, billingInvoiceInput({
+          ...(object as unknown as StripeInvoice),
+          status: 'open',
+        }, { tenantId: tenant.id }));
         if (tenant.plan_status === 'active') await updateTenantBilling(c.env.DB, tenant.id, { plan_status: 'past_due' });
+        break;
+      }
+      case 'invoice.voided': {
+        await upsertBillingInvoice(c.env.DB, billingInvoiceInput({
+          ...(object as unknown as StripeInvoice),
+          status: 'void',
+        }, { tenantId: tenant.id }));
+        break;
+      }
+      case 'charge.refunded': {
+        const invoice = typeof object.invoice === 'string'
+          ? object.invoice
+          : (object.invoice && typeof object.invoice === 'object' && typeof (object.invoice as { id?: unknown }).id === 'string'
+            ? (object.invoice as { id: string }).id
+            : null);
+        if (invoice) {
+          await updateBillingInvoiceRefund(c.env.DB, {
+            invoiceId: invoice,
+            amountRefunded: typeof object.amount_refunded === 'number' ? object.amount_refunded : 0,
+          });
+        }
         break;
       }
       default:

@@ -879,9 +879,12 @@ const spec = {
     },
     // ── Ops Console: ダッシュボード（★V6 37-2） ────────────────────────────
     '/api/ops/dashboard': {
-      get: { tags: ['Ops Console'], summary: '運営ダッシュボード（MRR は定価ベース・契約数・月ごとの売上・要対応・チケット・LINE登録・使用量）', parameters: [
+      get: { tags: ['Ops Console'], summary: '運営ダッシュボード（Stripe入金実績・契約中の月額合計・要対応・チケット・LINE登録・使用量）', parameters: [
         { name: 'period', in: 'query', required: false, schema: { type: 'string', enum: ['month', 'prev_month', 'year'] } },
       ], responses: { '200': { description: 'Dashboard aggregates' } } },
+    },
+    '/api/ops/billing/sync': {
+      post: { tags: ['Ops Console'], summary: 'Stripe の請求書を過去1〜12か月分同期する', requestBody: { required: false, content: { 'application/json': { schema: { type: 'object', properties: { months: { type: 'integer', minimum: 1, maximum: 12 } } } } } }, responses: { '200': { description: 'Sync result' }, '400': { description: 'Invalid months' }, '503': { description: 'Stripe not configured' } } },
     },
     '/api/ops/dashboard/line-unregistered': {
       get: { tags: ['Ops Console'], summary: 'LINE 未登録の権限者（名前と契約先だけ）', responses: { '200': { description: 'Unregistered staff' } } },

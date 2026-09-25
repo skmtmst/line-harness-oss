@@ -1,11 +1,16 @@
 import { Hono } from 'hono';
 import {
+  billingRevenueTotals,
+  BILLING_INVOICES_LAST_SYNCED_KEY,
   canceledAtByTenant,
+  countBillingInvoices,
   countBillingEventsByType,
   dashboardAlerts,
   dashboardLineRegistration,
   dashboardTickets,
   dashboardUsage,
+  getPlatformSetting,
+  latestPaidBillingInvoices,
   listContractTenants,
   knowledgeMetrics,
   type TenantPlanRow,
@@ -19,10 +24,8 @@ import { dbFor } from '../services/db-router.js';
 /**
  * 運営ダッシュボード（★V6 37-2 `Xvofy`）。
  *
- * 金額は「契約中プランの定価（billing-plans の fallbackMonthlyYen）」で数える。
- * Stripe の実売上ではないので、画面には「定価ベース」と出す（決定 2026-09-17）。
- * 過去の月の売上は「その月の末に契約中だった契約先の定価の合計」を、いまの契約先と
- * 解約日（Stripe の customer.subscription.deleted）から逆算した概算。
+ * 売上は Stripe の入金済み請求書から数え、返金を差し引く。
+ * Stripe 未設定または請求書がまだ無い環境だけ、契約中プランの定価へ戻す。
  */
 export const opsDashboard = new Hono<Env>();
 
@@ -88,7 +91,7 @@ opsDashboard.get('/api/ops/dashboard', async (c) => {
   const nextMonthStart = jstMonthStart(y, m + 1);
   const nowIso = jstIso(now);
 
-  const [tenants, canceled, alerts, tickets, line, usage, events, ai] = await Promise.all([
+  const [tenants, canceled, alerts, tickets, line, usage, events, ai, invoiceCount, lastSyncedAt] = await Promise.all([
     listContractTenants(db, DEFAULT_TENANT_ID),
     canceledAtByTenant(db),
     dashboardAlerts(db, {
@@ -102,6 +105,8 @@ opsDashboard.get('/api/ops/dashboard', async (c) => {
     dashboardUsage(db, { excludeTenantId: DEFAULT_TENANT_ID, from: thisMonthStart, to: nextMonthStart }),
     countBillingEventsByType(db, { from: range.from, to: range.to, types: ['customer.subscription.deleted', 'invoice.payment_failed'] }),
     knowledgeMetrics(db, thisMonthStart, nextMonthStart),
+    countBillingInvoices(db, DEFAULT_TENANT_ID),
+    getPlatformSetting(db, BILLING_INVOICES_LAST_SYNCED_KEY),
   ]);
 
   const active = tenants.filter((t) => t.plan_status === 'active' || t.plan_status === 'past_due');
@@ -109,17 +114,62 @@ opsDashboard.get('/api/ops/dashboard', async (c) => {
   const byPlan: Record<PlanKey, number> = { light: 0, standard: 0, pro: 0 };
   for (const t of active) if (t.plan_key && t.plan_key in byPlan) byPlan[t.plan_key as PlanKey] += 1;
 
-  const mrr = active.reduce((sum, t) => sum + monthlyPrice(t.plan_key), 0);
-  const mrrPrevMonthEnd = activeAt(tenants, canceled, thisMonthStart).reduce((sum, t) => sum + monthlyPrice(t.plan_key), 0);
-
-  // 月ごとの売上（定価ベースの概算）: 直近 6 か月
+  const pricing = c.env.STRIPE_SECRET_KEY && invoiceCount > 0 ? 'stripe_actual' as const : 'list_price' as const;
+  const prevMonthStart = jstMonthStart(y, m - 1);
+  let revenueThisMonth = 0;
+  let revenuePrevMonth = 0;
+  let refundsThisMonth = 0;
+  let contractMonthlyTotal = 0;
+  let filledByListPriceCount = 0;
   const months: Array<{ month: string; label: string; yen: number; current: boolean }> = [];
+  const monthRanges: Array<{ start: string; end: string; label: string; current: boolean }> = [];
   for (let i = 5; i >= 0; i -= 1) {
     const start = jstMonthStart(y, m - i);
     const end = jstMonthStart(y, m - i + 1);
-    const yen = activeAt(tenants, canceled, end).reduce((sum, t) => sum + monthlyPrice(t.plan_key), 0);
     const mm = ((((m - i) % 12) + 12) % 12) + 1;
-    months.push({ month: start.slice(0, 7), label: `${mm}月`, yen, current: i === 0 });
+    monthRanges.push({ start, end, label: `${mm}月`, current: i === 0 });
+  }
+
+  if (pricing === 'stripe_actual') {
+    const [currentTotals, previousTotals, latest, ...monthlyTotals] = await Promise.all([
+      billingRevenueTotals(db, { excludeTenantId: DEFAULT_TENANT_ID, from: thisMonthStart, to: nextMonthStart }),
+      billingRevenueTotals(db, { excludeTenantId: DEFAULT_TENANT_ID, from: prevMonthStart, to: thisMonthStart }),
+      latestPaidBillingInvoices(db, { excludeTenantId: DEFAULT_TENANT_ID }),
+      ...monthRanges.map(({ start, end }) => billingRevenueTotals(db, {
+        excludeTenantId: DEFAULT_TENANT_ID,
+        from: start,
+        to: end,
+      })),
+    ]);
+    revenueThisMonth = currentTotals.revenue;
+    revenuePrevMonth = previousTotals.revenue;
+    refundsThisMonth = currentTotals.refunds;
+    for (const tenant of active) {
+      const invoice = latest.get(tenant.id);
+      if (!invoice) {
+        filledByListPriceCount += 1;
+        contractMonthlyTotal += monthlyPrice(tenant.plan_key);
+        continue;
+      }
+      const net = Math.max(0, invoice.amount_paid - invoice.amount_refunded);
+      contractMonthlyTotal += invoice.interval === 'year' ? Math.floor(net / 12) : net;
+    }
+    monthRanges.forEach((item, index) => {
+      months.push({ month: item.start.slice(0, 7), label: item.label, yen: monthlyTotals[index]?.revenue ?? 0, current: item.current });
+    });
+  } else {
+    revenueThisMonth = active.reduce((sum, tenant) => sum + monthlyPrice(tenant.plan_key), 0);
+    revenuePrevMonth = activeAt(tenants, canceled, thisMonthStart).reduce((sum, tenant) => sum + monthlyPrice(tenant.plan_key), 0);
+    contractMonthlyTotal = revenueThisMonth;
+    filledByListPriceCount = active.length;
+    for (const item of monthRanges) {
+      months.push({
+        month: item.start.slice(0, 7),
+        label: item.label,
+        yen: activeAt(tenants, canceled, item.end).reduce((sum, tenant) => sum + monthlyPrice(tenant.plan_key), 0),
+        current: item.current,
+      });
+    }
   }
 
   const newInPeriod = tenants.filter((t) => t.created_at >= range.from && t.created_at < range.to).length;
@@ -168,11 +218,15 @@ opsDashboard.get('/api/ops/dashboard', async (c) => {
     data: {
       period,
       periodLabel: range.label,
-      pricing: 'list_price' as const,
+      pricing,
+      lastSyncedAt: pricing === 'stripe_actual' ? lastSyncedAt : null,
       plans: BILLING_PLANS.map((p) => ({ key: p.key, label: p.name, monthlyYen: p.fallbackMonthlyYen })),
       kpis: {
-        mrr,
-        mrrDelta: mrr - mrrPrevMonthEnd,
+        revenueThisMonth,
+        revenueDelta: revenueThisMonth - revenuePrevMonth,
+        refundsThisMonth,
+        contractMonthlyTotal,
+        filledByListPriceCount,
         active: active.length,
         byPlan,
         trialing: trialing.length,
