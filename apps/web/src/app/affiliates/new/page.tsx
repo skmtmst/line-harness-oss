@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { Friend } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import { usePageTitle } from '@/components/shell/page-chrome'
 import CreatePage, {
   AsideCard,
   ChoiceCard,
@@ -88,6 +89,8 @@ const PAYOUT_KINDS: Array<{ value: PayoutKind; label: string; note: string }> = 
 ]
 
 export default function NewAffiliatePage() {
+  /* ★V7: 画面名は共通トップバーにだけ置く。本文の重複見出しは出さない。 */
+  usePageTitle('アフィリエイターを登録する')
   const { selectedAccountId, selectedAccount } = useAccount()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -185,6 +188,7 @@ export default function NewAffiliatePage() {
       successHref={(id) => `${AFFILIATE_LIST_PATH}&highlight=${encodeURIComponent(String(id))}`}
       saveLabel={partialSave ? '追加情報の保存を再開する' : '登録して、紹介リンクを発行する'}
       statusLabel={partialSave ? '基本情報は保存済み・追加情報は未保存' : undefined}
+      showHeader={false}
       variant="v6"
       designNode="xqT1Z"
       validate={() => {

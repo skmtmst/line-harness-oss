@@ -21,6 +21,7 @@ shared-button-importer app/booking/bookings/new/page.tsx
 shared-button-importer app/booking/menus/new/page.tsx
 shared-button-importer app/booking/bookings/page.tsx
 shared-button-importer app/booking/menus/page.tsx
+shared-button-importer app/booking/menus/staff/page.tsx
 shared-button-importer app/booking/staff/page.tsx
 shared-button-importer app/booking/staff/shifts/page.tsx
 shared-button-importer app/booking/staff/shifts/staff-detail.tsx
@@ -150,9 +151,11 @@ shared-button-importer app/tags/fields/new/page.tsx
 shared-button-importer app/tags/folders/new/page.tsx
 shared-button-importer app/tags/searches/edit/page.tsx
 shared-button-importer app/templates/detail/page.tsx
+shared-button-importer app/templates/edit/page.tsx
 shared-button-importer app/templates/page.tsx
 shared-button-importer app/templates/questions/new/page.tsx
 shared-button-importer app/templates/template-asset-editor.tsx
+shared-button-importer app/updates/page.tsx
 shared-button-importer app/users/page.tsx
 shared-button-importer app/webhooks/page.tsx
 shared-button-importer app/webhooks/webhook-interactions.tsx

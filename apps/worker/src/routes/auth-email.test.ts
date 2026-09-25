@@ -248,7 +248,7 @@ describe('メール＋パスワードのログイン', () => {
   });
 
   it.each(['suspended', 'archived'] as const)(
-    '停止・保管中の契約先は正しいパスワードでも403でセッションを発行しない (%s)',
+    '停止・保管中の契約先も正しいパスワードなら2要素認証へ進む (%s)',
     async (status) => {
       testDb.raw.prepare(
         `INSERT INTO tenants (id, name, status) VALUES ('tenant-stopped', '停止中契約先', ?)`,
@@ -258,11 +258,11 @@ describe('メール＋パスワードのログイン', () => {
       const res = await call('POST', '/api/auth/password/login', {
         email: 'owner@example.com', password: 'Abcdefg1',
       });
-      expect(res.status).toBe(403);
-      expect(await json(res)).toMatchObject({ success: false, code: 'TENANT_SUSPENDED' });
+      expect(res.status).toBe(200);
+      expect(await json(res)).toMatchObject({ success: true, data: { twoFactorSetup: true } });
       expect(res.headers.get('set-cookie') ?? '').not.toContain('lh_admin_session=');
       expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM admin_sessions').get()).toEqual({ n: 0 });
-      expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM admin_two_factor_challenges').get()).toEqual({ n: 0 });
+      expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM admin_two_factor_challenges').get()).toEqual({ n: 1 });
     },
   );
 

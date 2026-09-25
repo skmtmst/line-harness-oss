@@ -410,11 +410,11 @@ export default function ActionScoreRulesPage() {
                      */
                     <div key={rule.id} className="grid min-h-10 grid-cols-12 items-center gap-x-3 gap-y-1 rounded-control px-3 py-2" style={{ background: rule.enabled ? 'var(--color-surface-pearl)' : 'var(--color-canvas-sunken)', opacity: rule.enabled ? 1 : 0.72 }}>
                       <button type="button" disabled={!canEdit} className="col-span-12 flex min-w-0 items-center gap-3 text-left font-semibold text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-default sm:col-span-6" aria-label={`${rule.name}を編集`} onClick={() => setEditRuleIndex(index)}>
-                        <span style={{ color: rule.value < 0 || rule.operation === 'set' ? 'var(--color-status-warn-deep)' : 'var(--color-accent-hover)' }}><RuleIcon eventType={rule.eventType} /></span>
+                        <span style={{ color: rule.value < 0 || rule.operation === 'set' ? 'var(--color-status-warn-deep)' : 'var(--color-ink-secondary)' }}><RuleIcon eventType={rule.eventType} /></span>
                         <span className="truncate" title={rule.name}>{rule.name}</span>
                         {canEdit ? <Pencil className="h-3.5 w-3.5 shrink-0 text-ink-faint" aria-hidden="true" /> : null}
                       </button>
-                      <span className="col-span-2 text-left text-sm font-bold sm:text-right" style={{ color: rule.value < 0 || rule.operation === 'set' ? 'var(--color-status-warn-deep)' : 'var(--color-accent-hover)' }}>{rulePointLabel(rule)}</span>
+                      <span className="col-span-2 text-left text-sm font-bold text-ink sm:text-right">{rulePointLabel(rule)}</span>
                       <span className="col-span-9 text-xs text-ink-secondary sm:col-span-3">{ruleFrequencyLabel(rule)}</span>
                       {canEdit ? <button type="button" className="col-span-1 justify-self-end rounded-control p-2 text-status-danger hover:bg-status-danger-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-status-danger" aria-label={`${rule.name}を削除`} onClick={() => removeRule(index)}><Trash2 className="h-4 w-4" aria-hidden="true" /></button> : null}
                     </div>

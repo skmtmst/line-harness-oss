@@ -7,6 +7,7 @@ import { isPublicAuthPath } from '@/lib/auth-email'
 import { SESSION_LOST_EVENT, type OpsImpersonation } from '@/lib/api'
 import { forgetSessionSnapshot, rememberSessionSnapshot } from '@/lib/session-snapshot'
 import TenantSuspended from './tenant-suspended'
+import { TenantAccessProvider, type TenantStatus } from './tenant-access-context'
 
 /*
  * PERF-07: 画面遷移のたびの /api/auth/session を短いあいだ再利用する。
@@ -22,7 +23,6 @@ import TenantSuspended from './tenant-suspended'
  *   書き換え（storageイベント）で即座に捨てる
  */
 const SESSION_REUSE_MS = 30_000
-type TenantStatus = 'active' | 'suspended' | 'archived'
 let lastSessionCheck: { at: number; fingerprint: string; tenantStatus: TenantStatus } | null = null
 
 function sessionFingerprint(handoffToken: string): string {
@@ -37,7 +37,7 @@ export function invalidateAuthSessionCheck(): void {
   forgetSessionSnapshot()
 }
 
-export default function AuthGuard({ children }: { children: React.ReactNode }) {
+export default function AuthGuard({ children, suspendedSupport }: { children: React.ReactNode; suspendedSupport?: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
   const [checked, setChecked] = useState(false)
@@ -65,6 +65,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
 
     if (
       lastSessionCheck
+      && lastSessionCheck.tenantStatus === 'active'
       && lastSessionCheck.fingerprint === fingerprint
       && Date.now() - lastSessionCheck.at < SESSION_REUSE_MS
     ) {
@@ -133,8 +134,12 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
   }
 
   if ((tenantStatus === 'suspended' || tenantStatus === 'archived') && !pathname.startsWith('/hq/support')) {
-    return <TenantSuspended />
+    return <TenantAccessProvider status={tenantStatus}><TenantSuspended /></TenantAccessProvider>
   }
 
-  return <>{children}</>
+  if ((tenantStatus === 'suspended' || tenantStatus === 'archived') && pathname.startsWith('/hq/support') && suspendedSupport) {
+    return <TenantAccessProvider status={tenantStatus}>{suspendedSupport}</TenantAccessProvider>
+  }
+
+  return <TenantAccessProvider status={tenantStatus}>{children}</TenantAccessProvider>
 }

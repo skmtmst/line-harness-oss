@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import styles from './note-bar.module.css'
 
-export type NoteTone = 'info' | 'warn' | 'danger'
+export type NoteTone = 'info' | 'success' | 'warn' | 'danger'
 
 /**
  * 案内帯。「この画面は何をするところか」を一行で言う。
@@ -26,7 +26,7 @@ export default function NoteBar({
 }) {
   return (
     <div className={[styles.note, styles[tone], className].filter(Boolean).join(' ')} role="note">
-      {tone === 'info' ? <InfoIcon /> : <AlertIcon />}
+      {tone === 'info' || tone === 'success' ? <InfoIcon /> : <AlertIcon />}
       <span>{children}</span>
       {action ? <span className={styles.action}>{action}</span> : null}
     </div>

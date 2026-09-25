@@ -155,14 +155,18 @@
   font-weight: 700;
 }
 
-.step[data-step-state='stalled'] .stepAction,
-.step[data-step-state='todo'] .stepAction {
+/* 主役は「いまの手順」（終わっていない最初の段）だけ。他の段の行き先は枠。 */
+.step[data-current='true'] .stepAction {
   border-color: var(--color-accent-deep);
   background: var(--color-accent-deep);
   color: var(--color-on-accent);
 }
 
-.stepAction:hover {
+.step[data-current='true'] .stepAction:hover {
+  filter: brightness(0.94);
+}
+
+.step:not([data-current='true']) .stepAction:hover {
   background: var(--color-canvas-sunken);
 }
 

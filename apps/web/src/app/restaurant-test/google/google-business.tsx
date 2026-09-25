@@ -671,6 +671,8 @@ function ReviewDraftScreen({ accountId, reviewId, data, canPublish, backHref, on
   const pendingConfirm = review.replyStatus === 'pending_confirm'
   const textLength = text.trim().length
   const canOpenConfirm = canPublish && data.writeEnabled && textLength > 0 && textLength <= 4096 && !alreadyReplied && busy === null
+  const googleReviewSourceUrl = data.connection.locationMapsUrl
+    ?? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(data.connection.locationTitle ?? data.store.name)}`
 
   if (confirming) {
     return (
@@ -733,7 +735,7 @@ function ReviewDraftScreen({ accountId, reviewId, data, canPublish, backHref, on
             <p className="text-sm font-semibold">{review.reviewerDisplayName ?? '匿名'} <span className="text-ink-faint text-xs font-normal">{formatDateTime(review.createTime)}</span></p>
             <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed">{review.comment ?? '（本文なし・評価のみ）'}</p>
             <p className="text-ink-faint mt-4 text-xs">Googleの口コミ原文です。投稿者の個人情報や来店履歴を返信に追加しないでください。</p>
-            {data.connection.locationMapsUrl ? <a href={data.connection.locationMapsUrl} target="_blank" rel="noreferrer" className="text-action mt-3 inline-flex items-center gap-1 text-xs font-semibold" data-gb3-action="open-google-review">Googleで原文を確認 <ExternalLink size={12} /></a> : null}
+            <a href={googleReviewSourceUrl} target="_blank" rel="noreferrer" className="text-action mt-3 inline-flex items-center gap-1 text-xs font-semibold" data-gb3-action="open-google-review">Googleで原文を確認 <ExternalLink size={12} /></a>
             {alreadyReplied && (review.replyComment || done) ? (
               <div className="bg-canvas-sunken mt-4 rounded-card p-3">
                 <p className="text-ink-secondary mb-1 text-xs font-semibold">公開済みの返信{review.replyUpdateTime ? `（${formatDateTime(review.replyUpdateTime)}）` : ''}</p>

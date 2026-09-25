@@ -100,8 +100,9 @@ describe('#639 ホバーは hover:hover かつ pointer:fine の中にだけ書�
   })
 
   it('背景色付きの主要ボタンは自前のホバー変化を持つ', () => {
-    // 予約メニュー・緊急時の確定口は濃色フィルに brightness で沈む。
-    expect(readApp('booking/menus/staff/page.tsx')).toContain('bg-accent-deep text-on-accent rounded-control px-4 py-2 text-sm font-medium hover:brightness-90')
+    // ★V7 1920px見直し: 予約スタッフの保存口は共通 Button primary へ寄せた。
+    // 塗りのままなのでホバー変化は要るが、持ち主は共通 Button（brightness で沈む）。
+    expect(readApp('booking/menus/staff/page.tsx')).toContain('variant="primary"')
     expect(readApp('emergency/page.tsx')).toContain('min-h-9 bg-accent-deep px-3 text-xs font-bold text-on-accent hover:brightness-90')
     // 流入経路モーダル・プールは brightness で沈む（生の色を増やさない）。
     expect(readApp('inflow-links/_components/create-genre-modal.tsx')).toContain('bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:brightness-90')

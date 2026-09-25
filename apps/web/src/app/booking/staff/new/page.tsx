@@ -114,6 +114,7 @@ export default function NewBookingStaffPage() {
       showHeader={false}
       parent={['予約設定', '/booking/menus?tab=staff']}
       saveLabel="スタッフを登録"
+      variant="v6"
       validate={() => {
         if (!selectedAccountId) return '先に上部でLINEアカウントを選んでください'
         const parsed = parseBookingStaffInput(staffInput(), 'create')
