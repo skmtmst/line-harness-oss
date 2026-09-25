@@ -659,7 +659,6 @@ function TemplateEditInner() {
           actions={(
             <>
               <Button href="/templates">キャンセル</Button>
-              <Button type="button" disabled title="テスト送信は準備中です">テスト送信</Button>
               <Button type="button" variant="primary" onClick={save} disabled={saving || loadFailed || saveGuard !== null} title={saveGuard ?? undefined}>
                 {saving ? '保存中...' : '保存'}
               </Button>
