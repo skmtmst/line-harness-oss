@@ -2414,6 +2414,17 @@ async function scheduled(
         processScheduledBroadcasts(env.DB, defaultLineClient, env.WORKER_URL),
         processQueuedBroadcasts(env.DB, defaultLineClient, env.WORKER_URL),
       ]);
+      // 送信後動作の取り残し回収（受理済みだが実行が終わっていない宛先）。
+      // 失敗・送達不明の宛先は対象外。送達自体は変えない。
+      try {
+        const { sweepBroadcastAfterActions } = await import('./services/broadcast-after-actions.js');
+        const swept = await sweepBroadcastAfterActions(env.DB);
+        if (swept.done + swept.failed > 0) {
+          console.log(JSON.stringify({ event: 'broadcast_after_actions_sweep', ...swept }));
+        }
+      } catch (sweepError) {
+        console.error('[broadcast] after-actions sweep failed', sweepError);
+      }
     }),
     observeDispatch('reminder deliveries',
       () => processReminderDeliveries(env.DB, defaultLineClient)),

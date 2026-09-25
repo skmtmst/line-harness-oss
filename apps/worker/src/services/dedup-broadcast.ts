@@ -204,6 +204,7 @@ import {
 } from '@line-crm/db';
 import { calculateStaggerDelay, sleep } from './stealth.js';
 import { createBroadcastRetryKey } from './broadcast-retry-key.js';
+import { processBroadcastAfterActions } from './broadcast-after-actions.js';
 import { classifyDeliveryFailure, deliveryErrorCode } from './broadcast-delivery-outcome.js';
 import {
   assertMessagePartsResolved,
@@ -640,6 +641,12 @@ export async function processMultiAccountDedupBroadcast(
         ];
         await db.batch(stmts);
         for (const id of deliveredIds) blocked.add(id);
+        // 送信後動作: この束で受け付けられた宛先にだけ固定版を実行する。
+        try {
+          await processBroadcastAfterActions(db, { broadcastId: broadcast.id, limit: 100 });
+        } catch (afterError) {
+          console.error(`[broadcast] after-actions failed broadcast=${broadcast.id}`, afterError);
+        }
         sentAnyBatch = true; // 1 batch 以上 durable に記録した → 前進保証 & yield 可
         if (batchDeliveryError) {
           // 1人ずつ送る経路で落ちた相手。届いていないと断定できたものだけを

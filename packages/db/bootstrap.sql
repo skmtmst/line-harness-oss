@@ -1344,6 +1344,22 @@ CREATE TABLE "bookings" (
   CHECK (friend_id IS NOT NULL OR booking_customer_id IS NOT NULL)
 );
 
+CREATE TABLE broadcast_after_action_runs (
+  id                       TEXT PRIMARY KEY,
+  broadcast_id             TEXT NOT NULL REFERENCES broadcasts (id) ON DELETE CASCADE,
+  friend_id                TEXT NOT NULL REFERENCES friends (id) ON DELETE CASCADE,
+  common_action_version_id TEXT NOT NULL,
+  action_id                TEXT NOT NULL,
+  status                   TEXT NOT NULL DEFAULT 'pending'
+                             CHECK (status IN ('pending', 'running', 'done', 'failed')),
+  attempt_count            INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+  max_attempts             INTEGER NOT NULL DEFAULT 5 CHECK (max_attempts >= 1),
+  error_code               TEXT,
+  created_at               TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at               TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  UNIQUE (broadcast_id, friend_id, action_id)
+);
+
 CREATE TABLE broadcast_insights (
   id                  TEXT PRIMARY KEY,
   broadcast_id        TEXT NOT NULL REFERENCES broadcasts(id) ON DELETE CASCADE,
@@ -6827,6 +6843,9 @@ CREATE INDEX idx_bookings_v298_friend_starts
 
 CREATE INDEX idx_bookings_v298_staff_overlap
   ON bookings(staff_id, status, starts_at, block_ends_at);
+
+CREATE INDEX idx_broadcast_after_action_runs_due
+  ON broadcast_after_action_runs (status, updated_at);
 
 CREATE INDEX idx_broadcast_insights_broadcast_id ON broadcast_insights(broadcast_id);
 
