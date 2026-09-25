@@ -355,9 +355,9 @@ async function handleStoppedTenantEvent(
     const data = (event as unknown as { postback: { data: string } }).postback.data || '[メニュー]';
     try {
       await db.prepare(
-        `INSERT INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, source, line_account_id, created_at)
-         VALUES (?, ?, 'incoming', 'text', ?, NULL, NULL, 'postback', ?, ?)`,
-      ).bind(crypto.randomUUID(), friend.id, data, lineAccountId, jstNow()).run();
+        `INSERT INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, source, line_account_id, created_at, line_event_at)
+         VALUES (?, ?, 'incoming', 'text', ?, NULL, NULL, 'postback', ?, ?, ?)`,
+      ).bind(crypto.randomUUID(), friend.id, data, lineAccountId, jstNow(), toJstString(new Date(event.timestamp))).run();
     } catch (error) {
       logWebhookStepFailure('stopped_tenant_postback_log', error, lineAccountId, event);
     }
@@ -398,10 +398,11 @@ async function handleStoppedTenantEvent(
     lineMessageAccountKey,
     lineMessageId: message.id,
     createdAt: jstNow(),
+    lineEventAt: toJstString(new Date(event.timestamp)),
     quoteToken: message.quoteToken ?? null,
   });
   if (!recorded.inserted || recorded.isUnsent) return;
-  await upsertChatOnMessage(db, friend.id);
+  await upsertChatOnMessage(db, friend.id, toJstString(new Date(event.timestamp)));
   await recordWebhookAnalyticsEvent(db, lineAccountId, event, {
     friendId: friend.id,
     eventType: 'message_received',
@@ -1280,10 +1281,10 @@ async function handleEvent(
     try {
       await db
         .prepare(
-          `INSERT INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, source, line_account_id, created_at)
-           VALUES (?, ?, 'incoming', 'text', ?, NULL, NULL, 'postback', ?, ?)`,
+          `INSERT INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, source, line_account_id, created_at, line_event_at)
+           VALUES (?, ?, 'incoming', 'text', ?, NULL, NULL, 'postback', ?, ?, ?)`,
         )
-        .bind(postbackIncomingLogId, friend.id, postbackLogText, lineAccountId ?? null, jstNow())
+        .bind(postbackIncomingLogId, friend.id, postbackLogText, lineAccountId ?? null, jstNow(), toJstString(new Date(event.timestamp)))
         .run();
     } catch (err) {
       postbackIncomingLogId = null;
@@ -1397,6 +1398,7 @@ async function handleEvent(
       lineMessageAccountKey,
       lineMessageId: msg.id,
       createdAt: jstNow(),
+      lineEventAt: toJstString(new Date(event.timestamp)),
       quoteToken: msg.quoteToken ?? null,
     });
     // 別webhook IDで同じmessageが再送された場合と、先に取消済みの場合は
@@ -1433,7 +1435,7 @@ async function handleEvent(
     // (unanswered-inbox CANDIDATES_SQL) が「解決済み後に画像だけ送ってきた
     // 友だち」をバッジ・未対応一覧から永久に落としてしまう。
     if (!nonTextMatched) {
-      await upsertChatOnMessage(db, friend.id);
+      await upsertChatOnMessage(db, friend.id, toJstString(new Date(event.timestamp)));
     }
     await recordWebhookAnalyticsEvent(db, lineAccountId, event, {
       friendId: friend.id,
@@ -1467,6 +1469,7 @@ async function handleEvent(
       lineMessageAccountKey,
       lineMessageId: textMessage.id,
       createdAt: now,
+      lineEventAt: toJstString(new Date(event.timestamp)),
       quoteToken: textMessage.quoteToken ?? null,
     });
     if (!recorded.inserted || recorded.isUnsent) return;
@@ -1558,7 +1561,7 @@ async function handleEvent(
 
     // auto_replies にマッチしなかった = 自発メッセージ → unread にする
     if (!matched) {
-      await upsertChatOnMessage(db, friend.id);
+      await upsertChatOnMessage(db, friend.id, toJstString(new Date(event.timestamp)));
     }
 
     // イベントバス発火: message_received

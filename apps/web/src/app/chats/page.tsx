@@ -1187,7 +1187,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     try {
       const res = await api.chats.get(requestedChatId, {
         limit: CHAT_MESSAGE_PAGE_SIZE,
-        beforeAt: oldest.createdAt,
+        beforeAt: oldest.eventAt ?? oldest.createdAt,
         beforeId: oldest.id,
       })
       if (selectedChatIdRef.current !== requestedChatId || detailAccountRef.current !== requestedAccountId) return

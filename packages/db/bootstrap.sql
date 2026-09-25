@@ -3501,6 +3501,7 @@ CREATE TABLE messages_log (
   source           TEXT,
   line_account_id  TEXT,
   sent_by_staff_id TEXT,
+  line_event_at    TEXT,
   created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , origin_kind TEXT, origin_id TEXT, scenario_version_step_id TEXT, line_message_id TEXT, line_message_account_key TEXT, unsent_at TEXT, quote_token TEXT, quoted_message_id TEXT);
 
@@ -7461,6 +7462,8 @@ CREATE INDEX idx_messages_log_friend_direction_source_created
 CREATE INDEX idx_messages_log_friend_id ON messages_log (friend_id);
 
 CREATE INDEX idx_messages_log_friend_source ON messages_log (friend_id, source);
+
+CREATE INDEX idx_messages_log_line_event_at ON messages_log (line_event_at);
 
 CREATE UNIQUE INDEX idx_messages_log_line_message_scope
   ON messages_log (line_message_account_key, line_message_id)

@@ -288,7 +288,7 @@ describe('POST /webhook — N-082 非テキスト受信の自動応答接続', (
 
     expect(lineClientMocks.replyMessageWithRequestId).not.toHaveBeenCalled();
     expect(lineClientMocks.pushMessage).not.toHaveBeenCalled();
-    expect(upsertChatOnMessage).toHaveBeenCalledWith(db, 'friend-1');
+    expect(upsertChatOnMessage).toHaveBeenCalledWith(db, 'friend-1', '2026-08-24T12:00:00.000+09:00');
     const prepares = vi.mocked(db.prepare).mock.calls.map((call) => String(call[0]));
     expect(prepares.some((sql) => sql.includes('INSERT INTO messages_log'))).toBe(true);
     expect(recordAnalyticsEvent).toHaveBeenCalledWith(db, expect.objectContaining({
@@ -301,7 +301,7 @@ describe('POST /webhook — N-082 非テキスト受信の自動応答接続', (
     await postWebhook(db, [nonTextEvent({ id: 'msg-image-2', type: 'image' }, 'evt-stopped-1')]);
 
     expect(lineClientMocks.replyMessageWithRequestId).not.toHaveBeenCalled();
-    expect(upsertChatOnMessage).toHaveBeenCalledWith(db, 'friend-1');
+    expect(upsertChatOnMessage).toHaveBeenCalledWith(db, 'friend-1', '2026-08-24T12:00:00.000+09:00');
   });
 
   test('別アカウントのルールには返さない', async () => {
@@ -309,7 +309,7 @@ describe('POST /webhook — N-082 非テキスト受信の自動応答接続', (
     await postWebhook(db, [nonTextEvent({ id: 'msg-image-3', type: 'image' }, 'evt-other-account-1')]);
 
     expect(lineClientMocks.replyMessageWithRequestId).not.toHaveBeenCalled();
-    expect(upsertChatOnMessage).toHaveBeenCalledWith(db, 'friend-1');
+    expect(upsertChatOnMessage).toHaveBeenCalledWith(db, 'friend-1', '2026-08-24T12:00:00.000+09:00');
   });
 
   test('キーワード条件のルールは非テキストの本文なしでは当たらない（本文を捏造しない）', async () => {
@@ -322,7 +322,7 @@ describe('POST /webhook — N-082 非テキスト受信の自動応答接続', (
     await postWebhook(db, [nonTextEvent({ id: 'msg-image-4', type: 'image' }, 'evt-keyword-1')]);
 
     expect(lineClientMocks.replyMessageWithRequestId).not.toHaveBeenCalled();
-    expect(upsertChatOnMessage).toHaveBeenCalledWith(db, 'friend-1');
+    expect(upsertChatOnMessage).toHaveBeenCalledWith(db, 'friend-1', '2026-08-24T12:00:00.000+09:00');
   });
 
   test('重複 Webhook は2通目を送信しない', async () => {
@@ -365,7 +365,7 @@ describe('POST /webhook — N-082 非テキスト受信の自動応答接続', (
 
     await postWebhook(db, [textEvent('さようなら', 'evt-text-miss-1')]);
     expect(lineClientMocks.replyMessageWithRequestId).toHaveBeenCalledTimes(1);
-    expect(upsertChatOnMessage).toHaveBeenCalledWith(db, 'friend-1');
+    expect(upsertChatOnMessage).toHaveBeenCalledWith(db, 'friend-1', '2026-08-24T12:00:00.000+09:00');
   });
 
   test('初回接触の非テキスト送信者も友だち登録して処理する', async () => {
