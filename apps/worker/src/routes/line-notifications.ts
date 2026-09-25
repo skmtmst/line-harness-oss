@@ -16,9 +16,16 @@ import {
   stopCustomerNotificationDefinition,
   setNotificationDeliveryResolution,
   updateCustomerNotificationDraft,
+  getNotificationDelivery,
+  insertNotificationResendDelivery,
+  finishNotificationResendDelivery,
+  createCustomerTestInstance,
+  recordCustomerTestDelivery,
+  recordCustomerTestAudit,
   type CustomerNotificationDefinitionRow,
   type CustomerNotificationVersionRow,
   type NotificationDeliveryListRow,
+  type NotificationDeliveryAttemptRow,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
@@ -336,6 +343,48 @@ function sourceMetadata(value: string | null): Record<string, unknown> {
   return jsonObject(value);
 }
 
+function serializeDeliveryItem(
+  row: NotificationDeliveryListRow,
+  attemptHistory: NotificationDeliveryAttemptRow[],
+) {
+  const metadata = sourceMetadata(row.source_metadata_json);
+  return {
+    id: row.id,
+    recipientType: row.audience_type,
+    notificationName: row.definition_name ?? row.source_event_type,
+    source: sourceLabel(row.source_event_type),
+    sourceEventId: row.source_event_id,
+    friendId: row.recipient_type === 'friend' ? row.recipient_id : null,
+    friendName: row.friend_name,
+    orderNumber: typeof metadata.orderNumber === 'string' ? metadata.orderNumber : null,
+    channel: row.channel,
+    status: publicDeliveryStatus(row.status),
+    reason: row.error_message_safe,
+    receivedAt: row.queued_at,
+    acceptedAt: row.accepted_at,
+    attemptCount: Number(row.attempts),
+    nextRetryAt: row.next_retry_at,
+    clickedAt: row.clicked_at,
+    version: row.definition_version == null ? null : Number(row.definition_version),
+    executionMode: row.execution_mode,
+    retryAvailable: row.resolution_action !== 'resolved' && Number(row.retryable) === 1
+      && (row.status === 'retry_wait' || row.status === 'failed'),
+    recordVersion: Number(row.version),
+    providerStatus: row.provider_status,
+    resolved: row.resolution_action === 'resolved',
+    resolvedAt: row.resolved_at,
+    resolvedBy: row.resolved_by_name,
+    attemptHistory: attemptHistory.map((attempt) => ({
+      number: Number(attempt.attempt_number),
+      outcome: attempt.outcome,
+      attemptedAt: attempt.attempted_at,
+      providerRequestId: attempt.provider_request_id,
+      errorCode: attempt.error_code,
+      error: attempt.error_message_safe,
+    })),
+  };
+}
+
 /** 画面と互換APIが共有する、アカウント限定の送信台帳レスポンス。 */
 export async function notificationDeliveriesResponse(c: Context<Env>): Promise<Response> {
   const lineAccountId = c.req.query('lineAccountId')?.trim();
@@ -370,44 +419,7 @@ export async function notificationDeliveriesResponse(c: Context<Env>): Promise<R
   return c.json({
     success: true,
     data: {
-      items: result.items.map((row) => {
-        const metadata = sourceMetadata(row.source_metadata_json);
-        return {
-          id: row.id,
-          recipientType: row.audience_type,
-          notificationName: row.definition_name ?? row.source_event_type,
-          source: sourceLabel(row.source_event_type),
-          sourceEventId: row.source_event_id,
-          friendId: row.recipient_type === 'friend' ? row.recipient_id : null,
-          friendName: row.friend_name,
-          orderNumber: typeof metadata.orderNumber === 'string' ? metadata.orderNumber : null,
-          channel: row.channel,
-          status: publicDeliveryStatus(row.status),
-          reason: row.error_message_safe,
-          receivedAt: row.queued_at,
-          acceptedAt: row.accepted_at,
-          attemptCount: Number(row.attempts),
-          nextRetryAt: row.next_retry_at,
-          clickedAt: row.clicked_at,
-          version: row.definition_version == null ? null : Number(row.definition_version),
-          executionMode: row.execution_mode,
-          retryAvailable: row.resolution_action !== 'resolved' && Number(row.retryable) === 1
-            && (row.status === 'retry_wait' || row.status === 'failed'),
-          recordVersion: Number(row.version),
-          providerStatus: row.provider_status,
-          resolved: row.resolution_action === 'resolved',
-          resolvedAt: row.resolved_at,
-          resolvedBy: row.resolved_by_name,
-          attemptHistory: (attemptsByDelivery.get(row.id) ?? []).map((attempt) => ({
-            number: Number(attempt.attempt_number),
-            outcome: attempt.outcome,
-            attemptedAt: attempt.attempted_at,
-            providerRequestId: attempt.provider_request_id,
-            errorCode: attempt.error_code,
-            error: attempt.error_message_safe,
-          })),
-        };
-      }),
+      items: result.items.map((row) => serializeDeliveryItem(row, attemptsByDelivery.get(row.id) ?? [])),
       summary: result.summary,
       coverage: {
         source: 'notification_delivery_ledger',
@@ -686,6 +698,323 @@ lineNotifications.post(
       });
     } finally {
       if (reserved) await releaseQuotaSlot(c.env.DB, lineAccountId, reservationId);
+    }
+  },
+);
+
+function bodyReason(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed.length >= 1 && trimmed.length <= 200 ? trimmed : null;
+}
+
+function bodyFriendIds(value: unknown): string[] | null {
+  if (!Array.isArray(value) || value.length === 0 || value.length > 5) return null;
+  const ids = value.map((item) => (typeof item === 'string' ? item.trim() : ''));
+  if (ids.some((id) => !id || id.length > 100)) return null;
+  return [...new Set(ids)];
+}
+
+/**
+ * 要件 v6-24 §6 `GET deliveries/:id`。一覧と同じ1件の形で返す。
+ * アカウント境界の外側は 404 に倒して存在を明かさない。
+ */
+lineNotifications.get(
+  '/api/line-notifications/deliveries/:id',
+  requireRole('owner', 'admin', 'staff'),
+  async (c) => {
+    const lineAccountId = c.req.query('lineAccountId')?.trim();
+    if (!lineAccountId) {
+      return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    }
+    const denied = await requireAccount(c, lineAccountId);
+    if (denied) return denied;
+    const row = await getNotificationDelivery(c.env.DB, c.req.param('id'), lineAccountId);
+    if (!row) return c.json({ success: false, error: '送信記録が見つかりません' }, 404);
+    const attempts = await listNotificationDeliveryAttempts(c.env.DB, lineAccountId, [row.id]);
+    return c.json({ success: true, data: serializeDeliveryItem(row, attempts) });
+  },
+);
+
+/**
+ * 要件 v6-24 §6 `GET quota`。一覧の `includeQuota=1` と同じ送信枠を単体で返す。
+ */
+lineNotifications.get(
+  '/api/line-notifications/quota',
+  requireRole('owner', 'admin', 'staff'),
+  async (c) => {
+    const lineAccountId = c.req.query('lineAccountId')?.trim();
+    if (!lineAccountId) {
+      return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    }
+    const denied = await requireAccount(c, lineAccountId);
+    if (denied) return denied;
+    const quota = await notificationQuotaForAccount(c, lineAccountId);
+    return c.json({ success: true, data: quota });
+  },
+);
+
+/**
+ * 要件 v6-24 §6 `POST deliveries/:id/resend`。
+ * retry（未完了の試行を続ける）と分け、新規通知として送り直す。
+ * 元の行は残し、新しい送達行・新しい冪等キーで送る。理由は必須で監査に残す。
+ * 除外（送信対象外）の記録は送り直さない。対象外の判定を覆す操作だからだ。
+ */
+lineNotifications.post(
+  '/api/line-notifications/deliveries/:id/resend',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    const body = await c.req.json<Record<string, unknown>>().catch(() => null);
+    const lineAccountId = bodyString(body?.lineAccountId);
+    const expectedVersion = bodyVersion(body?.expectedVersion);
+    const reason = bodyReason(body?.reason);
+    if (!lineAccountId || !expectedVersion) {
+      return c.json({ success: false, error: 'LINEアカウントと現在の版は必須です' }, 400);
+    }
+    if (!reason) {
+      return c.json({ success: false, error: '再送する理由を1〜200文字で入力してください' }, 400);
+    }
+    const denied = await requireAccount(c, lineAccountId);
+    if (denied) return denied;
+    if (c.get('staff').role !== 'owner') {
+      return c.json({ success: false, error: '送信の再送は店長だけができます' }, 403);
+    }
+    const delivery = await getNotificationDeliveryForRetry(c.env.DB, c.req.param('id'), lineAccountId);
+    if (!delivery) return c.json({ success: false, error: '送信記録が見つかりません' }, 404);
+    if (delivery.channel !== 'line' || delivery.recipient_type !== 'friend'
+      || !delivery.line_user_id || Number(delivery.friend_is_following) !== 1
+      || !delivery.line_template_json) {
+      return c.json({ success: false, code: 'resend_unavailable', error: 'この記録はLINEで送り直せません' }, 409);
+    }
+    if (delivery.resolution_action === 'resolved') {
+      return c.json({ success: false, code: 'resend_unavailable', error: '対応済みを未対応に戻してから送り直してください' }, 409);
+    }
+    if (delivery.status === 'excluded') {
+      return c.json({ success: false, code: 'resend_unavailable', error: '送信対象外の記録は送り直せません' }, 409);
+    }
+    if (!Number(delivery.retryable)
+      || (delivery.status !== 'retry_wait' && delivery.status !== 'failed')) {
+      return c.json({ success: false, code: 'resend_unavailable', error: '送れなかった通知だけ送り直せます' }, 409);
+    }
+    let messages: Message[];
+    try {
+      const parsed = JSON.parse(delivery.line_template_json) as unknown;
+      if (!Array.isArray(parsed) || parsed.length === 0) throw new Error('invalid template');
+      messages = parsed as Message[];
+    } catch {
+      return c.json({ success: false, code: 'invalid_template', error: '送信内容を確認してください' }, 409);
+    }
+    let account;
+    try {
+      account = await getLineAccountById(c.env.DB, lineAccountId, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY);
+    } catch {
+      account = null;
+    }
+    const token = account?.channel_access_token?.trim();
+    if (!account || !account.is_active || account.archived_at || !token) {
+      return c.json({ success: false, code: 'resend_unavailable', error: 'LINEの接続設定を確認してください' }, 409);
+    }
+    const quota = await notificationQuota(token);
+    if (quota.state === 'unavailable') {
+      return c.json({ success: false, code: 'quota_unavailable', error: '送信枠を確認できないため、再送を止めました' }, 503);
+    }
+    if (quota.state === 'available' && quota.remaining < 1) {
+      return c.json({ success: false, code: 'quota_insufficient', error: '今月の送信枠が残っていないため、再送できません' }, 409);
+    }
+    if (Number(delivery.version) !== expectedVersion) {
+      return c.json({ success: false, code: 'version_conflict', error: 'ほかの担当者が先に変更しました' }, 409);
+    }
+    const created = await insertNotificationResendDelivery(c.env.DB, {
+      lineAccountId,
+      sourceDelivery: delivery,
+      staffId: c.get('staff').id,
+      reason,
+    });
+    const reservationId = `notification-resend:${created.id}`;
+    const reserved = quota.state === 'available'
+      ? await tryReserveQuotaSlot(c.env.DB, lineAccountId, reservationId, 1, quota.used, quota.total)
+      : false;
+    if (quota.state === 'available' && !reserved) {
+      return c.json({ success: false, code: 'quota_insufficient', error: '同時送信を含めると送信枠が足りないため、再送できません' }, 409);
+    }
+    try {
+      let result: { data: unknown; requestId: string | null };
+      try {
+        result = await new LineClient(token)
+          .pushMessageWithRequestId(delivery.line_user_id, messages, created.idempotencyKey);
+      } catch (error) {
+        const responseUnknown = lineErrorStatus(error) === null;
+        const transient = responseUnknown || isTransientLineError(error);
+        const nextRetryAt = transient ? new Date(Date.now() + 5 * 60 * 1000).toISOString() : null;
+        const finished = await finishNotificationResendDelivery(c.env.DB, {
+          id: created.id,
+          lineAccountId,
+          idempotencyKey: created.idempotencyKey,
+          outcome: transient ? 'retry_wait' : 'failed',
+          errorCode: responseUnknown
+            ? 'provider_response_unknown'
+            : transient ? 'provider_temporary_error' : 'provider_permanent_error',
+          errorMessageSafe: responseUnknown
+            ? 'LINEの応答を確認できません。同じ通知として再試行を待っています'
+            : transient
+              ? 'LINEへの再試行を待っています'
+              : 'LINEが送信を受け付けませんでした。設定と送信内容を確認してください',
+          nextRetryAt,
+        });
+        if (!finished) throw new Error('notification resend result was not recorded');
+        return c.json({
+          success: false,
+          code: transient ? 'resend_scheduled' : 'resend_failed',
+          error: transient ? '一時的な失敗のため、新しい送信を再試行待ちにしました' : '再送できませんでした',
+          data: { id: created.id },
+        }, transient ? 503 : 422);
+      }
+      const finished = await finishNotificationResendDelivery(c.env.DB, {
+        id: created.id,
+        lineAccountId,
+        idempotencyKey: created.idempotencyKey,
+        outcome: 'provider_accepted',
+        providerRequestId: result.requestId,
+      });
+      if (!finished) throw new Error('notification resend result was not recorded');
+      auditLog(c, 'line_notification.delivery.resend', { kind: 'notification_delivery', id: created.id });
+      return c.json({
+        success: true,
+        data: { id: created.id, status: 'accepted', attemptCount: 1, version: 1 },
+      });
+    } finally {
+      if (reserved) await releaseQuotaSlot(c.env.DB, lineAccountId, reservationId);
+    }
+  },
+);
+
+const CUSTOMER_TEST_SEND_NOTICE =
+  '【テスト送信】公開前の確認用です。実際の注文情報は含みません。';
+
+/**
+ * 要件 v6-24 §6 `POST customer-definitions/:id/test`。
+ * いま編集中の下書き文面を、指定した友だちだけに試し送りする。
+ * 実注文・住所・クーポンは使わず、先頭に確認用の断りを付けて送る。
+ * 記録は `test` 扱いで、再試行の対象にしない。
+ */
+lineNotifications.post(
+  '/api/line-notifications/customer-definitions/:id/test',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    const body = await c.req.json<Record<string, unknown>>().catch(() => null);
+    const lineAccountId = bodyString(body?.lineAccountId);
+    const friendIds = bodyFriendIds(body?.friendIds);
+    if (!lineAccountId) {
+      return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    }
+    if (!friendIds) {
+      return c.json({ success: false, error: '試し送りする友だちを1〜5人選んでください' }, 400);
+    }
+    const denied = await requireAccount(c, lineAccountId);
+    if (denied) return denied;
+    const found = await getCustomerNotificationDefinition(c.env.DB, c.req.param('id'), lineAccountId);
+    if (!found) return c.json({ success: false, error: 'お知らせが見つかりません' }, 404);
+    const draft = jsonObject(found.definition.draft_config_json) as CustomerDraft;
+    const template = draft.lineTemplate;
+    if (!Array.isArray(template) || template.length === 0) {
+      return c.json({ success: false, code: 'incomplete_draft', error: '試し送りする前にLINEで送る内容を設定してください' }, 409);
+    }
+    const placeholders = friendIds.map(() => '?').join(',');
+    const recipients = await c.env.DB.prepare(`
+      SELECT id, line_user_id FROM friends
+       WHERE line_account_id = ? AND id IN (${placeholders})
+         AND is_following = 1 AND line_user_id IS NOT NULL AND line_user_id != ''
+    `).bind(lineAccountId, ...friendIds).all<{ id: string; line_user_id: string }>();
+    const recipientById = new Map(recipients.results.map((row) => [row.id, row.line_user_id]));
+    const missing = friendIds.filter((id) => !recipientById.has(id));
+    if (missing.length > 0) {
+      return c.json({ success: false, error: '受け取れない友だちが含まれています。フォロー中の友だちを選び直してください' }, 404);
+    }
+    let account;
+    try {
+      account = await getLineAccountById(c.env.DB, lineAccountId, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY);
+    } catch {
+      account = null;
+    }
+    const token = account?.channel_access_token?.trim();
+    if (!account || !account.is_active || account.archived_at || !token) {
+      return c.json({ success: false, code: 'test_unavailable', error: 'LINEの接続設定を確認してください' }, 409);
+    }
+    const quota = await notificationQuota(token);
+    if (quota.state === 'unavailable') {
+      return c.json({ success: false, code: 'quota_unavailable', error: '送信枠を確認できないため、試し送りを止めました' }, 503);
+    }
+    if (quota.state === 'available' && quota.remaining < friendIds.length) {
+      return c.json({ success: false, code: 'quota_insufficient', error: '今月の送信枠が残っていないため、試し送りできません' }, 409);
+    }
+    const messages: Message[] = [
+      { type: 'text', text: CUSTOMER_TEST_SEND_NOTICE } as Message,
+      ...(template as Message[]),
+    ];
+    const client = new LineClient(token);
+    const { instanceId, sourceEventId } = await createCustomerTestInstance(c.env.DB, {
+      lineAccountId,
+      definitionId: found.definition.id,
+      definitionVersionId: found.definition.current_version_id,
+      sourceEventType: found.definition.source_event_type,
+      metadata: { recipientCount: friendIds.length },
+    });
+    const reservedIds: string[] = [];
+    try {
+      if (quota.state === 'available') {
+        for (const friendId of friendIds) {
+          const reservationId = `notification-test:${sourceEventId}:${friendId}`;
+          const reserved = await tryReserveQuotaSlot(
+            c.env.DB, lineAccountId, reservationId, 1, quota.used, quota.total,
+          );
+          if (!reserved) {
+            return c.json({ success: false, code: 'quota_insufficient', error: '同時送信を含めると送信枠が足りないため、試し送りできません' }, 409);
+          }
+          reservedIds.push(reservationId);
+        }
+      }
+      const results: Array<{ friendId: string; deliveryId: string; sent: boolean; error?: string }> = [];
+      for (const friendId of friendIds) {
+        const lineUserId = recipientById.get(friendId) as string;
+        const idempotencyKey = `test:${sourceEventId}:${friendId}`;
+        try {
+          const sent = await client.pushMessageWithRequestId(lineUserId, messages, idempotencyKey);
+          const recorded = await recordCustomerTestDelivery(c.env.DB, {
+            lineAccountId,
+            instanceId,
+            recipientId: friendId,
+            idempotencyKey,
+            outcome: 'provider_accepted',
+            providerRequestId: sent.requestId,
+          });
+          results.push({ friendId, deliveryId: recorded.id, sent: true });
+        } catch (error) {
+          const message = error instanceof Error ? error.message.slice(0, 200) : '送信できませんでした';
+          const recorded = await recordCustomerTestDelivery(c.env.DB, {
+            lineAccountId,
+            instanceId,
+            recipientId: friendId,
+            idempotencyKey,
+            outcome: 'failed',
+            errorCode: 'provider_error',
+            errorMessageSafe: '試し送りできませんでした。設定と送信内容を確認してください',
+          });
+          results.push({ friendId, deliveryId: recorded.id, sent: false, error: message });
+        }
+      }
+      await recordCustomerTestAudit(c.env.DB, {
+        definitionId: found.definition.id,
+        lineAccountId,
+        staffId: c.get('staff').id,
+        sourceEventId,
+        recipientIds: friendIds,
+      });
+      auditLog(c, 'line_notification.definition.test', { kind: 'customer_notification', id: found.definition.id });
+      return c.json({ success: true, data: { definitionId: found.definition.id, sourceEventId, results } });
+    } finally {
+      for (const reservationId of reservedIds) {
+        await releaseQuotaSlot(c.env.DB, lineAccountId, reservationId);
+      }
     }
   },
 );

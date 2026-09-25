@@ -93,8 +93,8 @@ describe('processNenDeliveries account and snapshot safety', () => {
     dbMocks.getLineAccountById.mockResolvedValue({ id: 'account-a', channel_access_token: 'account-token' });
 
     await expect(processNenDeliveries(db, {
-      proxyBaseUrl: 'https://proxy.example.com', defaultAccessToken: 'must-not-be-used',
-    })).resolves.toEqual({ sent: 0, failed: 0, skipped: 1 });
+      proxyBaseUrl: 'https://proxy.example.com', defaultAccessToken: 'must-not-be-used', now: new Date('2026-09-25T12:00:00+09:00'),
+    })).resolves.toEqual({ sent: 0, failed: 0, skipped: 1, deferred: 0 });
 
     expect(pushViaHarnessProxy).not.toHaveBeenCalled();
     expect(updates).toContainEqual(expect.objectContaining({
@@ -111,8 +111,8 @@ describe('processNenDeliveries account and snapshot safety', () => {
     dbMocks.getLineAccountById.mockResolvedValue({ id: 'account-a', channel_access_token: 'account-token' });
 
     await expect(processNenDeliveries(db, {
-      proxyBaseUrl: 'https://proxy.example.com', defaultAccessToken: 'must-not-be-used',
-    })).resolves.toEqual({ sent: 1, failed: 0, skipped: 0 });
+      proxyBaseUrl: 'https://proxy.example.com', defaultAccessToken: 'must-not-be-used', now: new Date('2026-09-25T12:00:00+09:00'),
+    })).resolves.toEqual({ sent: 1, failed: 0, skipped: 0, deferred: 0 });
 
     expect(pushViaHarnessProxy).toHaveBeenCalledWith(
       'https://proxy.example.com', 'account-token', 'U1',
@@ -130,7 +130,7 @@ describe('processNenDeliveries account and snapshot safety', () => {
     dbMocks.getLineAccountById.mockResolvedValue({ id: 'account-a', channel_access_token: 'account-token' });
 
     await processNenDeliveries(db, {
-      proxyBaseUrl: 'https://proxy.example.com', defaultAccessToken: 'must-not-be-used',
+      proxyBaseUrl: 'https://proxy.example.com', defaultAccessToken: 'must-not-be-used', now: new Date('2026-09-25T12:00:00+09:00'),
     });
 
     expect(pushViaHarnessProxy).toHaveBeenCalledWith(
@@ -161,8 +161,8 @@ describe('processNenDeliveries account and snapshot safety', () => {
     dbMocks.getLineAccountById.mockResolvedValue({ id: 'account-a', channel_access_token: 'account-token' });
 
     await expect(processNenDeliveries(db, {
-      proxyBaseUrl: 'https://proxy.example.com', defaultAccessToken: 'must-not-be-used',
-    })).resolves.toEqual({ sent: 0, failed: 0, skipped: 1 });
+      proxyBaseUrl: 'https://proxy.example.com', defaultAccessToken: 'must-not-be-used', now: new Date('2026-09-25T12:00:00+09:00'),
+    })).resolves.toEqual({ sent: 0, failed: 0, skipped: 1, deferred: 0 });
 
     expect(pushViaHarnessProxy).not.toHaveBeenCalled();
     expect(updates).toContainEqual(expect.objectContaining({
