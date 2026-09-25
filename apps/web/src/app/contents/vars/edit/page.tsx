@@ -1,6 +1,8 @@
 'use client'
 
 import { X } from 'lucide-react'
+import DateField from '@/components/shared/date-field'
+import DateTimeField, { TimeField } from '@/components/shared/date-time-field'
 import SelectField from '@/components/shared/select-field'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
@@ -636,9 +638,9 @@ function EditCommonVarInner() {
                     <label htmlFor="cv-value" className="text-ink-secondary text-sm font-medium">差し込まれる文字</label>
                     <span className="text-ink-faint text-xs tabular-nums">{value.length} / {item.type === 'long_text' ? 10000 : 200}</span>
                   </div>
-                  {item.type === 'boolean' ? <SelectField id="cv-value" value={value} onChange={(e) => { setSaved(false); setValue(e.target.value) }} options={[{ value: 'true', label: 'true' }, { value: 'false', label: 'false' }]} className="w-full" /> : (item.type as string) === 'long_text' ? <textarea id="cv-value" maxLength={10000} value={value} onChange={(e) => { setSaved(false); setValue(e.target.value) }} className="border-hairline rounded-control w-full border px-3 py-3 text-sm" rows={5} /> : <input
+                  {item.type === 'boolean' ? <SelectField id="cv-value" value={value} onChange={(e) => { setSaved(false); setValue(e.target.value) }} options={[{ value: 'true', label: 'true' }, { value: 'false', label: 'false' }]} className="w-full" /> : (item.type as string) === 'long_text' ? <textarea id="cv-value" maxLength={10000} value={value} onChange={(e) => { setSaved(false); setValue(e.target.value) }} className="border-hairline rounded-control w-full border px-3 py-3 text-sm" rows={5} /> : (item.type as string) === 'date' ? <DateField id="cv-value" value={value} onChange={(v) => { setSaved(false); setValue(v) }} /> : (item.type as string) === 'datetime' ? <DateTimeField id="cv-value" value={value} onChange={(v) => { setSaved(false); setValue(v) }} /> : <input
                     id="cv-value"
-                    type={item.type === 'number' ? 'number' : (item.type as string) === 'date' ? 'date' : (item.type as string) === 'datetime' ? 'datetime-local' : 'text'}
+                    type={item.type === 'number' ? 'number' : 'text'}
                     maxLength={item.type === 'number' ? undefined : 200}
                     value={value}
                     onChange={(e) => { setSaved(false); setValue(e.target.value) }}
@@ -688,11 +690,11 @@ function EditCommonVarInner() {
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div>
                       <label htmlFor="cv-valid-from" className="text-ink-secondary mb-1 block text-xs font-medium">有効開始</label>
-                      <input id="cv-valid-from" type="datetime-local" value={validFrom} onChange={(e) => { setSaved(false); setValidFrom(e.target.value) }} className="border-hairline rounded-control w-full border px-3 py-2 text-sm" />
+                      <DateTimeField id="cv-valid-from" value={validFrom} onChange={(v) => { setSaved(false); setValidFrom(v) }} />
                     </div>
                     <div>
                       <label htmlFor="cv-valid-until" className="text-ink-secondary mb-1 block text-xs font-medium">有効終了</label>
-                      <input id="cv-valid-until" type="datetime-local" value={validUntil} onChange={(e) => { setSaved(false); setValidUntil(e.target.value) }} className="border-hairline rounded-control w-full border px-3 py-2 text-sm" />
+                      <DateTimeField id="cv-valid-until" value={validUntil} onChange={(v) => { setSaved(false); setValidUntil(v) }} />
                     </div>
                   </div>
                   <div>
@@ -709,10 +711,14 @@ function EditCommonVarInner() {
                           onChange={(e) => { setSaved(false); setFallbackValue(e.target.value) }}
                           options={[{ value: '', label: '選んでください' }, { value: 'true', label: 'true' }, { value: 'false', label: 'false' }]}
                         />
+                      ) : (item.type as string) === 'date' ? (
+                        <DateField id="cv-fallback-value" value={fallbackValue} onChange={(v) => { setSaved(false); setFallbackValue(v) }} />
+                      ) : (item.type as string) === 'datetime' ? (
+                        <DateTimeField id="cv-fallback-value" value={fallbackValue} onChange={(v) => { setSaved(false); setFallbackValue(v) }} />
                       ) : (
                         <input
                           id="cv-fallback-value"
-                          type={item.type === 'number' ? 'number' : (item.type as string) === 'date' ? 'date' : (item.type as string) === 'datetime' ? 'datetime-local' : 'text'}
+                          type={item.type === 'number' ? 'number' : 'text'}
                           value={fallbackValue}
                           onChange={(e) => { setSaved(false); setFallbackValue(e.target.value) }}
                           className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
@@ -1009,25 +1015,21 @@ function EditCommonVarInner() {
                 <label htmlFor="sc-date" className="text-ink-secondary mb-1 block text-xs font-medium">
                   開始日
                 </label>
-                <input
+                <DateField
                   id="sc-date"
-                  type="date"
                   value={draft.date}
                   min={jstNowLocalInput().date}
-                  onChange={(e) => setDraft({ ...draft, date: e.target.value })}
-                  className="border-hairline rounded-control border px-2 py-1.5 text-sm"
+                  onChange={(v) => setDraft({ ...draft, date: v })}
                 />
               </div>
               <div>
                 <label htmlFor="sc-time" className="text-ink-secondary mb-1 block text-xs font-medium">
                   開始時刻
                 </label>
-                <input
+                <TimeField
                   id="sc-time"
-                  type="time"
                   value={draft.time}
-                  onChange={(e) => setDraft({ ...draft, time: e.target.value })}
-                  className="border-hairline rounded-control border px-2 py-1.5 text-sm"
+                  onChange={(v) => setDraft({ ...draft, time: v })}
                 />
               </div>
             </div>
@@ -1043,10 +1045,14 @@ function EditCommonVarInner() {
                   options={[{ value: '', label: '選んでください' }, { value: 'true', label: 'true' }, { value: 'false', label: 'false' }]}
                   className="w-full"
                 />
+              ) : (item?.type as string) === 'date' ? (
+                <DateField id="sc-value" value={draft.value} onChange={(v) => setDraft({ ...draft, value: v })} />
+              ) : (item?.type as string) === 'datetime' ? (
+                <DateTimeField id="sc-value" value={draft.value} onChange={(v) => setDraft({ ...draft, value: v })} />
               ) : (
                 <input
                   id="sc-value"
-                  type={item?.type === 'number' ? 'number' : (item?.type as string) === 'date' ? 'date' : (item?.type as string) === 'datetime' ? 'datetime-local' : 'text'}
+                  type={item?.type === 'number' ? 'number' : 'text'}
                   value={draft.value}
                   onChange={(e) => setDraft({ ...draft, value: e.target.value })}
                   className="border-hairline rounded-control w-full border px-3 py-2 text-sm"

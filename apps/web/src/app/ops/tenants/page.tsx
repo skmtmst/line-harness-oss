@@ -171,7 +171,8 @@ export default function OpsTenantsPage() {
               <Th className="w-16" align="right">権限者</Th>
               <Th className="w-36">最終ログイン</Th>
               {/* 「代理ログイン」（5文字）が w-28 では右端で切れる。操作列は入る幅で固定する。 */}
-              <Th className="w-32" align="right">操作</Th>
+              {/* 代理ログインボタンが列からはみ出さない幅にする。 */}
+                <Th className="w-36" align="right">操作</Th>
             </TableHeadRow>
           </thead>
           <tbody>

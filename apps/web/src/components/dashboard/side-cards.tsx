@@ -2,6 +2,7 @@ import Link from 'next/link'
 import type { ReactNode } from 'react'
 import type { BookingRequest, DashboardOverview } from '@/lib/api'
 import Card from '@/components/shared/card'
+import { HelpTip } from '@/components/dashboard/help-tip'
 
 /**
  * 右カラムのカード。
@@ -9,9 +10,14 @@ import Card from '@/components/shared/card'
  * 設計（`Right`）は「見出し ＋ 右上のリンク ＋ 中身」という同じ形が並ぶ。
  * 枠だけ共通にして、中身はカードごとに書く。
  */
-function SideCard({
+/**
+ * ダッシュボードの右カラム以外のカード（送信枠・運用アラート）でも使う。
+ * 行き先リンクは見出しの行の右端に1つ、更新時刻は右下にそろえる。
+ */
+export function SideCard({
   title,
   period,
+  helpTip,
   action,
   freshness,
   children,
@@ -20,8 +26,14 @@ function SideCard({
   /*
    * 数字の対象期間。「今月」「直近7日」など、見出しの脇に小さく添える
    * （IDEA-01: カードの数字がいつの範囲かを読めるようにする）。
+   * 題と合わせて1行に収まらないときは、脇に置かず HelpTip へ移す。
    */
   period?: string
+  /*
+   * 「？」に入れる補足（いつ元に戻るかなど）。題の脇をふさがない。
+   * period と両方は置かない。
+   */
+  helpTip?: string
   /** 設計に右上のリンクが無いカードもある（現在の対応状況）。 */
   action?: { label: string; href: string }
   /** 更新時刻・取得失敗などの鮮度表示。カードの末尾右寄せで出す。 */
@@ -33,8 +45,15 @@ function SideCard({
       <div className="flex flex-col gap-2.5">
         <div className="flex items-start justify-between gap-3">
           <h2 className="text-ink min-w-0 text-base leading-normal font-bold">{title}</h2>
-          {period ? <span className="text-ink-faint flex-1 pt-0.5 text-[11px] font-normal">{period}</span> : null}
-          {action ? <Link href={action.href} className="text-info shrink-0 text-xs font-semibold hover:underline">{action.label}</Link> : null}
+          {helpTip ? <HelpTip text={helpTip} /> : null}
+          {/* 期間は常に1行にする（DASH-23）。折り返すとカード間で見出しの高さがずれる。 */}
+          {period ? <span className="text-ink-faint flex-1 pt-0.5 text-[11px] font-normal whitespace-nowrap">{period}</span> : null}
+          {/*
+            行き先リンクは CardHeader の action（actionTone="info"）と
+            同じ見た目にする。ダッシュボードの行き先リンクはこの1つに
+            そろえ、独自の色・大きさを増やさない。
+          */}
+          {action ? <Link href={action.href} className="text-status-info shrink-0 text-label font-semibold hover:underline">{action.label}</Link> : null}
         </div>
         <div>{children}</div>
         {freshness ? <div className="flex justify-end">{freshness}</div> : null}
@@ -87,10 +106,13 @@ export function MonthlyDeliveryCard({ delivery, freshness }: { delivery: Dashboa
 /**
  * 現在の対応状況（設計 `vUXKb` の右カラム）。
  *
- * 未対応と対応済みは `/api/dashboard/overview` の `inbox` から出る。
+ * 4つの状態は `/api/dashboard/overview` の `inbox` から出る。数え方は
+ * 受信箱の絞り込みと同じ定義・同じ範囲（`getInboxStatusCounts` が正本で、
+ * ダッシュボードと受信箱が同じ関数を通る）。MAIL の未対応が入らない・
+ * 対応中と保留が出ない、というずれを直した形。
  * 「メッセージ受信時の自動変更」は、選択中のLINEアカウントの
  * 対応マーク一覧を読み、1件でも自動変更があれば「有効」とする。
- * **「対応マーク」は自由分類のほう。**このカードが並べる未対応・対応済みは
+ * **「対応マーク」は自由分類のほう。**このカードが並べる4状態は
  * 固定4状態の「対応状況」で、別物（要件書 `v6-02-inbox-requirements-draft.md:77`）。
  * 一覧を取得できなかったときだけ `—`（未取得）にする。
  */
@@ -106,21 +128,39 @@ export function SupportMarkStatusCard({
 }) {
   return (
     /*
-      件数は選択中アカウントの受信箱のもの。行き先も同じ受信箱へ
-      絞って開く（IDEA-01）。
+      件数は受信箱の絞り込みと同じもの。各状態を押すと、その状態で
+      絞った受信箱を開く（IDEA-01）。単位は受信箱に合わせて「件」。
     */
-    <SideCard title="現在の対応状況" period="現在" action={{ label: '受信箱を見る →', href: '/chats' }} freshness={freshness}>
-      <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2">
+    <SideCard
+      title="現在の対応状況"
+      helpTip="現在の件数。選択中のアカウントのLINE（友だち単位）と、すべてのMAIL（メール単位）の合計。受信箱の絞り込みと同じ数。"
+      action={{ label: '受信箱を見る →', href: '/chats' }}
+      freshness={freshness}
+    >
+      {/*
+        4状態は2×2に並べる（未対応・対応中／保留・対応済み）。1行に4つ並べると
+        狭い右カラムで「対応済み」だけ下へ落ちる。数は右端にそろえ、桁が
+        ずれても位が合うよう等幅数字にする。
+      */}
+      <div className="grid grid-cols-2 gap-x-6 gap-y-2">
         {[
-          { label: '未対応', value: inbox?.unanswered ?? null },
-          { label: '対応済み', value: inbox?.resolved ?? null },
+          { label: '未対応', value: inbox?.unanswered ?? null, href: '/chats?status=unread' },
+          { label: '対応中', value: inbox?.inProgress ?? null, href: '/chats?status=in_progress' },
+          // 段階配備中の旧Workerは保留を返さない。その間は「—」にし、0件と見せない。
+          { label: '保留', value: inbox?.onHold ?? null, href: '/chats?status=on_hold' },
+          { label: '対応済み', value: inbox?.resolved ?? null, href: '/chats?status=resolved' },
         ].map((row) => (
-          <p key={row.label} className={`${row.label === '未対応' && (row.value ?? 0) > 0 ? 'text-danger' : 'text-ink'} text-sm font-bold`}>
-            {row.label}
-            <span className="ml-1.5 tabular-nums">
-              {row.value === null ? '—' : `${row.value.toLocaleString('ja-JP')}人`}
+          <Link
+            key={row.label}
+            href={row.href}
+            title={`${row.label}で絞った受信箱を開く`}
+            className={`${row.label === '未対応' && (row.value ?? 0) > 0 ? 'text-danger' : 'text-ink'} flex items-baseline justify-between gap-3 text-sm font-bold hover:underline`}
+          >
+            <span className="min-w-0 truncate">{row.label}</span>
+            <span className="shrink-0 tabular-nums">
+              {row.value === null ? '—' : `${row.value.toLocaleString('ja-JP')}件`}
             </span>
-          </p>
+          </Link>
         ))}
       </div>
       <p className="text-ink-secondary mt-3 text-xs">

@@ -13,6 +13,11 @@ import {
   deleteTemplate,
   getCarouselTapTotals,
   getFolderById,
+  listTemplateVersions,
+  revertTemplateToVersion,
+  listBroadcastReferences,
+  listTemplateReferences,
+  getBroadcastDeleteBlockers,
   MediaReferenceAccountError,
 } from '@line-crm/db';
 import type { TemplateRow } from '@line-crm/db';
@@ -356,7 +361,9 @@ templates.get('/api/templates/:id', async (c) => {
     if (!item || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [item.line_account_id])) {
       return c.json({ success: false, error: 'Template not found' }, 404);
     }
-    const usedBy = await getTemplateUsage(c.env.DB, id, item.line_account_id);
+    const usedBy = await usageWithVersions(c.env.DB, id, item.line_account_id);
+    // 467: 一斉配信の参照は参照表から足す（送った時の版のまま）。
+    const broadcasts = await listBroadcastReferences(c.env.DB, id);
     return c.json({
       success: true,
       data: {
@@ -373,7 +380,7 @@ templates.get('/api/templates/:id', async (c) => {
         carouselTapLimitMode: draftCarouselTapLimitModeOf(item),
         carouselTapLimitText: draftCarouselTapLimitTextOf(item),
         ...versionInfoOf(item),
-        usedBy,
+        usedBy: { ...usedBy, broadcasts },
         createdAt: item.created_at,
         updatedAt: item.updated_at,
       },
@@ -388,6 +395,34 @@ function templateUsageCount(usage: Awaited<ReturnType<typeof getTemplateUsage>>)
   return Object.values(usage).reduce((total, items) => total + items.length, 0);
 }
 
+/**
+ * 467: 利用先の行に「使っている版」を載せる。参照表にない古い参照は
+ * 空のままにし、無い版番号をでっち上げない（画面では「—」）。
+ */
+async function usageWithVersions(
+  db: D1Database,
+  templateId: string,
+  accountId: string | null | undefined,
+) {
+  const usage = await getTemplateUsage(db, templateId, accountId);
+  const refs = await listTemplateReferences(db, templateId);
+  const versionOf = (kind: string, consumerId: string): number | null => {
+    const hit = refs.find((row) => row.consumer_kind === kind && row.consumer_id === consumerId);
+    return hit ? hit.template_version_number : null;
+  };
+  return {
+    ...usage,
+    autoReplies: usage.autoReplies.map((row) => ({
+      ...row,
+      templateVersion: versionOf('auto_reply', row.id),
+    })),
+    scenarioSteps: usage.scenarioSteps.map((row) => ({
+      ...row,
+      templateVersion: versionOf('scenario', row.scenarioId),
+    })),
+  };
+}
+
 // GET /api/templates/:id/usages — 現行 templates.id を参照する設定をまとめて返す
 templates.get('/api/templates/:id/usages', async (c) => {
   try {
@@ -398,7 +433,10 @@ templates.get('/api/templates/:id/usages', async (c) => {
       return c.json({ success: false, error: 'Template not found' }, 404);
     }
 
-    return c.json({ success: true, data: await getTemplateUsage(c.env.DB, templateId, tpl.line_account_id) });
+    // 467: 一斉配信の参照は参照表から足す（送った時の版のまま）。
+    const usage = await usageWithVersions(c.env.DB, templateId, tpl.line_account_id);
+    const broadcasts = await listBroadcastReferences(c.env.DB, templateId);
+    return c.json({ success: true, data: { ...usage, broadcasts } });
   } catch (err) {
     console.error('GET /api/templates/:id/usages error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
@@ -678,7 +716,7 @@ templates.post('/api/templates/:id/publish', requireRole('owner', 'admin'), asyn
     }
     // 独立審査P2: 版の確認は任意にしない。確認なしの公開は受け付けない。
     // 詳細口が返す publishedVersion・draftRevision をそのまま送る。
-    const body: { expectedVersion?: unknown; expectedDraftRevision?: unknown } =
+    const body: { expectedVersion?: unknown; expectedDraftRevision?: unknown; effectiveFrom?: unknown } =
       await c.req.json().catch(() => ({}));
     const expectedVersion = body.expectedVersion === undefined || body.expectedVersion === null
       ? undefined
@@ -691,6 +729,14 @@ templates.post('/api/templates/:id/publish', requireRole('owner', 'admin'), asyn
       : Number(body.expectedDraftRevision);
     if (expectedDraftRevision === undefined || !Number.isInteger(expectedDraftRevision)) {
       return c.json({ success: false, error: '下書きの版を確認してください' }, 400);
+    }
+    // 466: 使い始めの日時は持てるだけ（予約の札で見せる）。来たら日付か確かめる。
+    let effectiveFrom: string | undefined;
+    if (body.effectiveFrom !== undefined && body.effectiveFrom !== null) {
+      if (typeof body.effectiveFrom !== 'string' || !Number.isFinite(Date.parse(body.effectiveFrom))) {
+        return c.json({ success: false, error: '使い始めの日時を確認してください' }, 400);
+      }
+      effectiveFrom = body.effectiveFrom;
     }
     // 公開する版も保存時と同じ検査を通す。下書きは保存時に検査済みだが、
     // 検査基準が変わった後に残った下書きをそのまま出さないため。
@@ -709,10 +755,13 @@ templates.post('/api/templates/:id/publish', requireRole('owner', 'admin'), asyn
       const structured = checkStructuredSize(draftType, draftContent);
       if (!structured.ok) return c.json({ success: false, error: structured.error }, 422);
     }
+    const staff = c.get('staff') as unknown as { id?: string };
     const result = await publishTemplate(c.env.DB, id, {
       expectedVersion,
       expectedDraftRevision,
       idempotencyKey: requestKey,
+      effectiveFrom,
+      createdByStaffId: staff?.id ?? null,
     });
     const row = result.row;
     return c.json({
@@ -749,6 +798,104 @@ templates.post('/api/templates/:id/publish', requireRole('owner', 'admin'), asyn
   }
 });
 
+// GET /api/templates/:id/versions — 版の履歴。新しい版から返す。
+templates.get('/api/templates/:id/versions', async (c) => {
+  try {
+    const id = c.req.param('id');
+    const item = await getTemplateById(c.env.DB, id);
+    if (!item || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [item.line_account_id])) {
+      return c.json({ success: false, error: 'Template not found' }, 404);
+    }
+    const versions = await listTemplateVersions(c.env.DB, id);
+    return c.json({
+      success: true,
+      data: versions.map((v) => ({
+        versionNumber: v.version_number,
+        status: v.status,
+        messageType: v.message_type,
+        messageContent: v.message_content,
+        carouselActions: v.carousel_actions_json ? JSON.parse(v.carousel_actions_json) : null,
+        carouselTapLimitMode: v.carousel_tap_limit_mode,
+        carouselTapLimitText: v.carousel_tap_limit_text,
+        question: v.question_json ? questionValue(v.question_json) : null,
+        questionStatus: v.question_status,
+        effectiveFrom: v.effective_from,
+        createdAt: v.created_at,
+      })),
+    });
+  } catch (err) {
+    console.error('GET /api/templates/:id/versions error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/**
+ * 466: この版に戻す。過去の版は変えず、その中身で新しい版を作る
+ * （下書きへ写して公開する）。公開口と同じ確認キーと版確認を使う。
+ */
+templates.post('/api/templates/:id/revert', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const id = c.req.param('id');
+    const requestKey = c.req.header('Idempotency-Key');
+    if (!validPublishKey(requestKey)) {
+      return c.json({ success: false, error: '公開操作の確認キーが必要です' }, 400);
+    }
+    const existing = await getTemplateById(c.env.DB, id);
+    if (!existing || !await canAccessAllLineAccounts(
+      c.env.DB, c.get('staff'), [existing.line_account_id],
+    )) {
+      return c.json({ success: false, error: 'Template not found' }, 404);
+    }
+    const body: { versionNumber?: unknown; expectedVersion?: unknown } =
+      await c.req.json().catch(() => ({}));
+    const versionNumber = body.versionNumber === undefined || body.versionNumber === null
+      ? undefined
+      : Number(body.versionNumber);
+    if (versionNumber === undefined || !Number.isInteger(versionNumber) || versionNumber < 1) {
+      return c.json({ success: false, error: '戻す版を確認してください' }, 400);
+    }
+    const expectedVersion = body.expectedVersion === undefined || body.expectedVersion === null
+      ? undefined
+      : Number(body.expectedVersion);
+    if (expectedVersion === undefined || !Number.isInteger(expectedVersion)) {
+      return c.json({ success: false, error: '版の番号を確認してください' }, 400);
+    }
+    const staff = c.get('staff') as unknown as { id?: string };
+    const result = await revertTemplateToVersion(c.env.DB, id, versionNumber, {
+      expectedVersion,
+      idempotencyKey: requestKey,
+      staffId: staff?.id ?? null,
+    });
+    return c.json({
+      success: true,
+      data: {
+        id: result.row!.id,
+        publishedVersion: result.publishedVersion,
+        hasDraft: hasTemplateDraft(result.row!),
+      },
+    });
+  } catch (err) {
+    const code = err instanceof Error ? err.message : '';
+    if (code === 'TEMPLATE_NOT_FOUND') {
+      return c.json({ success: false, error: 'Template not found' }, 404);
+    }
+    if (code === 'TEMPLATE_VERSION_NOT_FOUND') {
+      return c.json({ success: false, error: 'その版はありません。開き直して確認してください' }, 404);
+    }
+    if (code === 'TEMPLATE_VERSION_CONFLICT') {
+      return c.json({ success: false, error: 'ほかの人が先に公開しました。開き直して確認してください' }, 409);
+    }
+    if (code === 'TEMPLATE_DRAFT_CONFLICT') {
+      return c.json({ success: false, error: '下書きが書き換わっています。開き直して確認してください' }, 409);
+    }
+    if (code === 'TEMPLATE_PUBLISH_KEY_CONFLICT') {
+      return c.json({ success: false, error: '同じ確認キーが別の公開操作で使われています' }, 409);
+    }
+    console.error('POST /api/templates/:id/revert error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
 templates.delete('/api/templates/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const id = c.req.param('id');
@@ -760,15 +907,29 @@ templates.delete('/api/templates/:id', requireRole('owner', 'admin'), async (c) 
     }
     // ON DELETE SET NULL や本文の控えがあっても、参照中の設定を運用者に知らせず
     // 切ることはしない。すべての利用先を先に差し替えてもらう。
-    const usage = await getTemplateUsage(c.env.DB, id, existing.line_account_id);
+    const usage = await usageWithVersions(c.env.DB, id, existing.line_account_id);
     const usageCount = templateUsageCount(usage);
-    if (usageCount > 0) {
+    // 467: 予約済み・送信中の配信で使っているものは消せない。
+    // 送った配信は送った時の版のまま残り、下書きは本文の写しで作り直せる。
+    const blockers = await getBroadcastDeleteBlockers(c.env.DB, id);
+    const broadcasts = await listBroadcastReferences(c.env.DB, id);
+    if (usageCount > 0 || blockers.length > 0) {
+      const named = blockers.slice(0, 3).map((b) => `「${b.title}」`).join('、');
+      const rest = blockers.length > 3 ? `ほか${blockers.length - 3}件` : '';
+      const reasons: string[] = [];
+      if (blockers.length > 0) {
+        reasons.push(`予約済み・送信中の配信${blockers.length}件（${named}${rest}）で使われています`);
+      }
+      if (usageCount > 0) {
+        reasons.push(`${usageCount}件の設定で使用中です`);
+      }
       return c.json({
         success: false,
         code: 'IN_USE',
-        usageCount,
-        error: `${usageCount}件の設定で使用中です。先に使用先を差し替えてください。`,
-        usedBy: usage,
+        usageCount: usageCount + blockers.length,
+        error: `${reasons.join('。')}。先に使用先を差し替えてください。`,
+        usedBy: { ...usage, broadcasts },
+        blockers,
       }, 409);
     }
     await deleteTemplate(c.env.DB, id);

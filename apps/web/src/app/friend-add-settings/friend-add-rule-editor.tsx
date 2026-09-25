@@ -15,6 +15,7 @@ import ListState from '@/components/shared/list-state'
 import SelectField from '@/components/shared/select-field'
 import StickyBar from '@/components/shared/sticky-bar'
 import { TextArea, TextField } from '@/components/shared/text-field'
+import DateTimeField, { TimeField } from '@/components/shared/date-time-field'
 import type {
   FriendAddRule,
   FriendAddRuleAction,
@@ -490,20 +491,18 @@ function RoutesStep({ rule, definition, options, toggleRoute, setDefinition }: {
           {windows.length === 0 && <p className={'friend-add-editor-helper'}>時間帯の制限はありません。</p>}
           {windows.map((slot, index) => (
             <div key={index} className={'friend-add-editor-windowRow'}>
-              <input
+              <TimeField
                 aria-label={`時間帯${index + 1}の開始`}
-                className={'friend-add-editor-nativeField'}
-                type="time"
                 value={slot.start}
-                onChange={(event) => setDefinition((current) => ({ ...current, timeWindows: updateTimeWindow(current.timeWindows, index, { start: event.target.value }) }))}
+                onChange={(v) => setDefinition((current) => ({ ...current, timeWindows: updateTimeWindow(current.timeWindows, index, { start: v }) }))}
+                className="w-32"
               />
               <span>〜</span>
-              <input
+              <TimeField
                 aria-label={`時間帯${index + 1}の終了`}
-                className={'friend-add-editor-nativeField'}
-                type="time"
                 value={slot.end}
-                onChange={(event) => setDefinition((current) => ({ ...current, timeWindows: updateTimeWindow(current.timeWindows, index, { end: event.target.value }) }))}
+                onChange={(v) => setDefinition((current) => ({ ...current, timeWindows: updateTimeWindow(current.timeWindows, index, { end: v }) }))}
+                className="w-32"
               />
               <IconButton
                 aria-label={`時間帯${index + 1}を削除`}
@@ -517,8 +516,8 @@ function RoutesStep({ rule, definition, options, toggleRoute, setDefinition }: {
         <div><Button type="button" onClick={() => setDefinition((current) => ({ ...current, timeWindows: addTimeWindow(current.timeWindows) }))}><Plus size={16} />時間帯を追加</Button></div>
       </div>
       <div className={'friend-add-editor-twoCols'}>
-        <Field label="有効期間の開始"><input className={'friend-add-editor-nativeField'} type="datetime-local" value={definition.activeFrom ?? ''} onChange={(event) => setDefinition((current) => ({ ...current, activeFrom: event.target.value || null }))} /></Field>
-        <Field label="有効期間の終了"><input className={'friend-add-editor-nativeField'} type="datetime-local" value={definition.activeUntil ?? ''} onChange={(event) => setDefinition((current) => ({ ...current, activeUntil: event.target.value || null }))} /></Field>
+        <Field label="有効期間の開始"><DateTimeField aria-label="有効期間の開始" value={definition.activeFrom ?? ''} onChange={(v) => setDefinition((current) => ({ ...current, activeFrom: v || null }))} /></Field>
+        <Field label="有効期間の終了"><DateTimeField aria-label="有効期間の終了" value={definition.activeUntil ?? ''} onChange={(v) => setDefinition((current) => ({ ...current, activeUntil: v || null }))} /></Field>
       </div>
       <FriendConditionField definition={definition} setDefinition={setDefinition} />
       <p className={'friend-add-editor-helper'}>同じ友だちが複数の流入条件に当てはまったときは、優先順位の小さいものだけを実行します。</p>

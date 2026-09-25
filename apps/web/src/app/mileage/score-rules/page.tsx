@@ -10,6 +10,7 @@ import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import { Field, TextInput } from '@/components/shared/form-controls'
+import DateTimeField from '@/components/shared/date-time-field'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
 import Toggle from '@/components/shared/toggle'
@@ -536,8 +537,8 @@ export default function ActionScoreRulesPage() {
               }} /></Field>
               <Field label="回数"><Select aria-label={`${rule.name}の回数制限`} value={rule.frequency.kind} onChange={(value) => updateRule(editRuleIndex, { frequency: { kind: value as ActionScoreFrequencyKind, limit: 1 } })} options={FREQUENCY_OPTIONS} size="full" /></Field>
               <Field label="上限回数" htmlFor="rule-limit"><TextInput id="rule-limit" type="number" min={1} max={1000} value={rule.frequency.limit} disabled={!['per_day', 'per_subject', 'per_subject_per_day'].includes(rule.frequency.kind)} onChange={(event) => updateRule(editRuleIndex, { frequency: { ...rule.frequency, limit: Number(event.target.value) } })} /></Field>
-              <Field label="開始日時" htmlFor="rule-start"><TextInput id="rule-start" type="datetime-local" value={localDateTime(rule.validFrom)} onChange={(event) => updateRule(editRuleIndex, { validFrom: utcDateTime(event.target.value) })} /></Field>
-              <Field label="終了日時" htmlFor="rule-end"><TextInput id="rule-end" type="datetime-local" value={localDateTime(rule.validUntil)} onChange={(event) => updateRule(editRuleIndex, { validUntil: utcDateTime(event.target.value) })} /></Field>
+              <Field label="開始日時" htmlFor="rule-start"><DateTimeField id="rule-start" value={localDateTime(rule.validFrom)} onChange={(v) => updateRule(editRuleIndex, { validFrom: utcDateTime(v) })} /></Field>
+              <Field label="終了日時" htmlFor="rule-end"><DateTimeField id="rule-end" value={localDateTime(rule.validUntil)} onChange={(v) => updateRule(editRuleIndex, { validUntil: utcDateTime(v) })} /></Field>
               <div className="sm:col-span-2"><Toggle checked={rule.enabled} label="このできごとを動かす" onChange={(enabled) => updateRule(editRuleIndex, { enabled })} /></div>
             </div>
           </Dialog>

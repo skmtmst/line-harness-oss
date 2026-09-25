@@ -4,6 +4,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import type { MediaDeleteImpactReference, MediaItem } from '@line-crm/shared'
 import { ApiError, api, type MediaVersionBlocker, type MediaVersionPreview } from '@/lib/api'
 import Button from '@/components/shared/button'
+import DateField from '@/components/shared/date-field'
 import Select from '@/components/shared/select'
 import { formatMediaSize } from './media-usage-display'
 import { checkedAtText, referenceKindText, referenceNameText } from './media-delete-impact'
@@ -563,12 +564,11 @@ export default function MediaDetailDialog({
               <div className="border-hairline mt-3 space-y-3 border-t pt-3">
                 <div>
                   <label htmlFor={`${fileInputId}-expires`} className="text-ink-secondary block text-xs font-semibold">利用期限（分かる場合だけ）</label>
-                  <input
+                  <DateField
                     id={`${fileInputId}-expires`}
-                    type="date"
                     value={termsExpiresAt}
-                    onChange={(event) => setTermsExpiresAt(event.target.value)}
-                    className="border-hairline rounded-control mt-1 w-full border px-3 py-2 text-sm"
+                    onChange={setTermsExpiresAt}
+                    className="mt-1"
                   />
                 </div>
                 <div>

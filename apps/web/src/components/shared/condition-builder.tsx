@@ -20,6 +20,7 @@ import { useEffect, useState } from 'react'
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
+import DateField from './date-field'
 import { TextField } from './text-field'
 import SelectField from './select-field'
 import {
@@ -552,20 +553,18 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
           <span className="text-ink text-sm font-medium">
             {rule.type === 'registered_at' ? '友だち登録日' : '最終反応日'}
           </span>
-          <input
-            type="date"
+          <DateField
             value={String(v.from ?? '')}
-            onChange={(e) => onChange({ type: rule.type, value: { ...v, from: e.target.value } })}
+            onChange={(next) => onChange({ type: rule.type, value: { ...v, from: next } })}
             aria-label={rule.type === 'registered_at' ? '友だち登録日の開始' : '最終反応日の開始'}
-            className={selectClass}
+            className="w-48"
           />
           <span className="text-ink-faint text-sm">〜</span>
-          <input
-            type="date"
+          <DateField
             value={String(v.to ?? '')}
-            onChange={(e) => onChange({ type: rule.type, value: { ...v, to: e.target.value } })}
+            onChange={(next) => onChange({ type: rule.type, value: { ...v, to: next } })}
             aria-label={rule.type === 'registered_at' ? '友だち登録日の終了' : '最終反応日の終了'}
-            className={selectClass}
+            className="w-48"
           />
         </div>
       )
@@ -764,6 +763,18 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
 
     case 'analytics_audience':
       return <span className="text-ink-faint text-xs">分析で作った一時対象者（この画面では編集できません）</span>
+
+    case 'broadcast_link_clicked': {
+      // 配信詳細の「押していない人へ追送」で来る条件。対象の配信を
+      // この場で変えると「届いた人」の母集団も変わるので、ここでは
+      // 編集させない（違う配信にしたいときは、その配信の詳細から開く）。
+      const clicked = (rule.value as { clicked?: boolean } | null)?.clicked === true
+      return (
+        <span className="text-ink-faint text-xs">
+          {clicked ? 'その配信の計測リンクを押した人' : 'その配信の計測リンクを押していない人'}（この画面では編集できません）
+        </span>
+      )
+    }
 
     default:
       return <span className="text-ink-faint text-xs">この条件はこの画面では編集できません（{rule.type}）</span>

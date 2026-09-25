@@ -391,7 +391,7 @@ function MenuStaffMatrixContent() {
                                   }
                                   placeholder={String(m.duration_minutes)}
                                   aria-label={`${s.display_name || s.name} の ${m.name} の所要時間`}
-                                  className="border-hairline rounded-control w-14 border px-1.5 py-1 text-xs tabular-nums"
+                                  className="border-hairline rounded-control h-8 w-14 border px-1.5 text-xs tabular-nums"
                                 />
                                 <span className="text-ink-faint text-[10px]">分</span>
                                 <span className="text-ink-faint text-[10px]">・¥</span>
@@ -407,7 +407,7 @@ function MenuStaffMatrixContent() {
                                   }
                                   placeholder={String(m.base_price)}
                                   aria-label={`${s.display_name || s.name} の ${m.name} の料金`}
-                                  className="border-hairline rounded-control w-20 border px-1.5 py-1 text-xs tabular-nums"
+                                  className="border-hairline rounded-control h-8 w-20 border px-1.5 text-xs tabular-nums"
                                 />
                               </div>
                               {overridden && (

@@ -72,7 +72,9 @@
     "direct-th": 6
   },
   "app/booking/staff/shifts/liff-preview.tsx": {
-    "direct-secondary-button": 1
+    "arbitrary-value": 1,
+    "direct-primary-button": 1,
+    "direct-secondary-button": 2
   },
   "app/broadcasts/detail/page.tsx": {
     "direct-secondary-button": 2
@@ -786,5 +788,8 @@
   },
   "components/webinars/webinar-line-preview.tsx": {
     "unresolved-classname": 7
+  },
+  "components/shared/date-time-field.tsx": {
+    "unresolved-classname": 25
   }
 }

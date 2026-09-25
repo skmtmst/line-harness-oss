@@ -1,6 +1,7 @@
 'use client'
 
 import type { DeliveryMode } from '@line-crm/shared'
+import { TimeField } from '@/components/shared/date-time-field'
 
 export interface ScheduleValue {
   delayMinutes: number
@@ -111,11 +112,11 @@ export default function ScheduleInput({ mode, value, onChange }: Props) {
           onChange={(e) => onChange({ ...value, offsetDays: Math.max(0, Number(e.target.value) || 0) })}
         />
         <span className="text-sm text-ink-secondary">日後の</span>
-        <input
-          type="time"
-          className="border border-hairline rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+        <TimeField
           value={value.deliveryTime}
-          onChange={(e) => onChange({ ...value, deliveryTime: e.target.value })}
+          aria-label="配信する時刻"
+          onChange={(v) => onChange({ ...value, deliveryTime: v })}
+          className="w-32"
         />
         <span className="text-sm text-ink-secondary">に配信</span>
       </div>

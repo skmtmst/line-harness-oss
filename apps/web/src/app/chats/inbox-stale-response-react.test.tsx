@@ -289,13 +289,46 @@ async function typeMessage(text: string) {
 }
 
 async function typeDatetime(text: string) {
-  const el = host.querySelector<HTMLInputElement>('#schedule-at')
-  if (!el) throw new Error('予約日時の入力が見つからない')
-  const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!
-  await act(async () => {
-    setter.call(el, text)
-    el.dispatchEvent(new Event('input', { bubbles: true }))
-  })
+  // 日時の選択（★V7）で選ぶ。値は今までどおり YYYY-MM-DDTHH:mm（日本時間）。
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(text)
+  if (!match) throw new Error('日時が読めない')
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const week = '日月火水木金土'[new Date(year, month - 1, day).getDay()]
+  const dialog = () => host.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')
+  const trigger = host.querySelector<HTMLElement>('#schedule-at')
+  if (!trigger) throw new Error('予約日時の入力が見つからない')
+  if (!dialog()) await click(trigger)
+  const dateButton = dialog()?.querySelector('button[aria-label="日付"]')
+  if (dateButton) await click(dateButton)
+  for (let i = 0; i < 36; i += 1) {
+    const grid = host.querySelector('[role="grid"]')
+    const label = grid?.getAttribute('aria-label')
+    if (label === `${year}年${month}月`) break
+    const target = year * 12 + month
+    const currentLabel = /^(\d+)年(\d+)月$/.exec(label ?? '')
+    const current = currentLabel ? Number(currentLabel[1]) * 12 + Number(currentLabel[2]) : target
+    const nav = [...host.querySelectorAll('button')].find(
+      (b) => b.getAttribute('aria-label') === (target > current ? '次の月' : '前の月'),
+    )
+    if (!nav) throw new Error('暦が見つからない')
+    await click(nav)
+  }
+  // 今日の日付には「、今日」が付くので前方一致で探す。
+  await click(
+    [...host.querySelectorAll('button')].find((b) =>
+      (b.getAttribute('aria-label') ?? '').startsWith(`${year}年${month}月${day}日（${week}）`),
+    ) ?? null,
+  )
+  for (const [label, v] of [['時', match[4]], ['分', match[5]]] as const) {
+    const select = dialog()?.querySelector<HTMLSelectElement>(`select[aria-label="${label}"]`)
+    if (!select) throw new Error('時刻の選択が見つからない')
+    await act(async () => {
+      select.value = v
+      select.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+  }
 }
 
 async function click(el: Element | null) {

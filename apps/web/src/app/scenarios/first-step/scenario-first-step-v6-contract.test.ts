@@ -91,18 +91,21 @@ describe('V6 1通目設定の契約', () => {
     /*
      * SCENARIO-19: 入力・選択・ボタンは PC 40px・タッチ 44px。
      * 本文の作成欄は 160px を下限に内容に応じて伸び、上限を超えた分は
-     * 欄内スクロール。幅だけが設計固有の数（日数110・時刻130）。
+     * 欄内スクロール。幅だけが設計固有の数（日数110）。
+     * 時刻の入力は★V7の時刻の選択（高さ40・14px）へ寄せ、画面固有の
+     * 幅130の決めは消した。
      */
     expect(PAGE_CSS).toMatch(/\.smallField \{[^}]*height: 40px;[^}]*width: 110px;/)
-    expect(PAGE_CSS).toMatch(/\.timeField \{[^}]*height: 40px;[^}]*width: 130px;/)
     expect(PAGE_CSS).toMatch(/\.bodyField \{[^}]*min-height: 160px;/)
     expect(PAGE_CSS).toMatch(/\.bodyField \{[^}]*field-sizing: content;/)
     expect(PAGE_CSS).toMatch(/\.bodyField \{[^}]*max-height:/)
     expect(PAGE_CSS).toContain('@media (pointer: coarse)')
-    expect(PAGE_CSS).toMatch(/\.smallField,\s*\n\s*\.timeField \{[^}]*height: 44px;/)
+    expect(PAGE_CSS).toMatch(/\.smallField \{[^}]*height: 44px;/)
     expect(PAGE).toContain('styles.bodyField')
     expect(PAGE).toContain('styles.smallField')
-    expect(PAGE).toContain('styles.timeField')
+    expect(PAGE).toContain('<TimeField')
+    expect(PAGE).toContain('aria-label="配信する時刻"')
+    expect(PAGE).not.toContain('styles.timeField')
     expect(PAGE).not.toContain('w-20 border px-3 py-2 text-sm')
   })
 

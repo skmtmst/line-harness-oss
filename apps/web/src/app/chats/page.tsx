@@ -35,6 +35,8 @@ import ImageUploader, { type ImageUploaderValue } from '@/components/shared/imag
 import { Suspense } from 'react'
 import EmailThread from '@/components/support/email-thread'
 import Button from '@/components/shared/button'
+import DateTimeField from '@/components/shared/date-time-field'
+import HelpTip from '@/components/shared/help-tip'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { MoreAction } from '@/components/shared/row-actions'
 import { CheckCircle2, Link2, NotebookPen, PanelRightClose, PanelRightOpen, Star, X } from 'lucide-react'
@@ -3442,15 +3444,15 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     className="mb-2 rounded-lg border border-hairline bg-canvas-sunken p-3"
                   >
                     <div className="flex flex-wrap items-center gap-2">
-                      <label htmlFor="schedule-at" className="text-ink-faint text-xs">
-                        送る日時:
-                      </label>
-                      <input
+                      <span className="text-ink-secondary flex items-center gap-1 text-sm font-semibold">
+                        <label htmlFor="schedule-at">送る日時</label>
+                        <HelpTip label="送る日時の説明">入力した日時は日本時間です。</HelpTip>
+                      </span>
+                      <DateTimeField
                         id="schedule-at"
-                        type="datetime-local"
                         value={scheduleInput}
-                        onChange={(e) => setScheduleInput(e.target.value)}
-                        className="rounded-control border border-hairline bg-canvas px-2 py-1 text-xs"
+                        onChange={setScheduleInput}
+                        className="min-w-64 flex-1"
                       />
                       <Button
                         variant="primary"
@@ -3460,7 +3462,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       >
                         {scheduling ? '予約中...' : 'この日時で予約する'}
                       </Button>
-                      <span className="text-ink-faint text-xs">入力した日時は日本時間です</span>
                     </div>
                     {scheduledSendsFailed && (
                       <p className="mt-2 text-xs text-danger">
@@ -3491,16 +3492,14 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                             <span className="min-w-0 flex-1 truncate text-ink-secondary" title={row.content}>
                               {row.content}
                             </span>
-                            <input
-                              type="datetime-local"
+                            <DateTimeField
                               aria-label="予約時刻を変更(日本時間)"
-                              title="日本時間で指定します"
                               defaultValue={isoToJstDatetimeLocal(row.scheduledAt)}
                               disabled={row.status !== 'scheduled'}
-                              onChange={(e) => {
-                                if (e.target.value) void handleReschedule(row.id, e.target.value)
+                              onChange={(v) => {
+                                if (v) void handleReschedule(row.id, v)
                               }}
-                              className="w-40 shrink-0 rounded-control border border-hairline bg-canvas px-1.5 py-0.5 text-xs disabled:opacity-40"
+                              className="w-56 shrink-0"
                             />
                             <button
                               type="button"

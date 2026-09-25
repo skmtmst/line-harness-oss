@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
+import DateField from '@/components/shared/date-field'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import Pagination from '@/components/shared/pagination'
@@ -176,14 +177,14 @@ export default function MileageHistoryTab({ accountId }: { accountId: string }) 
               <option value="manual">手動</option>
             </select>
           </label>
-          <label className="grid w-36 gap-1 text-xs font-semibold text-ink-secondary">
+          <span className="grid w-48 gap-1 text-xs font-semibold text-ink-secondary">
             開始日
-            <input type="date" value={from} onChange={(event) => resetFilter(() => setFrom(event.target.value))} className="h-10 rounded-control border border-hairline bg-canvas px-3 text-sm font-normal text-ink" />
-          </label>
-          <label className="grid w-36 gap-1 text-xs font-semibold text-ink-secondary">
+            <DateField aria-label="開始日" value={from} onChange={(v) => resetFilter(() => setFrom(v))} />
+          </span>
+          <span className="grid w-48 gap-1 text-xs font-semibold text-ink-secondary">
             終了日
-            <input type="date" value={to} onChange={(event) => resetFilter(() => setTo(event.target.value))} className="h-10 rounded-control border border-hairline bg-canvas px-3 text-sm font-normal text-ink" />
-          </label>
+            <DateField aria-label="終了日" value={to} onChange={(v) => resetFilter(() => setTo(v))} />
+          </span>
         </div>
       </div>
 

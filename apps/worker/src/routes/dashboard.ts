@@ -201,6 +201,16 @@ dashboard.get('/api/dashboard/overview', async (c) => {
     }
 
     const statsScope = { allowedAccountIds: [accountId], includeUnassigned: false };
+    /*
+     * 受信箱の数だけは、受信箱の一覧と同じ範囲で数える。MAIL は LINE
+     * アカウントを持たないため、未割り当てが見える担当者の範囲では MAIL も
+     * 合わせる（受信箱の「すべて」と同じ条件）。見えない範囲では LINE だけ。
+     */
+    const visibleScope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    const inboxScope = {
+      allowedAccountIds: [accountId],
+      includeUnassigned: visibleScope.canSeeUnassigned,
+    };
     const quotaToken = selectedAccount.channel_access_token;
     /*
      * LINE の送信枠は外部APIなので、DB集計と並行して始め、待つ時間に上限を
@@ -209,7 +219,7 @@ dashboard.get('/api/dashboard/overview', async (c) => {
      * 友だち数などの成功分は使える状態にする。
      */
     const [overview, quota] = await Promise.all([
-      getDashboardOverview(c.env.DB, period, statsScope),
+      getDashboardOverview(c.env.DB, period, statsScope, inboxScope),
       fetchQuota(quotaToken, QUOTA_OVERVIEW_BUDGET_MS),
     ]);
     if (quota.failed) {
@@ -268,6 +278,9 @@ dashboard.get('/api/dashboard/organization-overview', requireRole('owner'), asyn
     const overview = await getDashboardOverview(c.env.DB, period, {
       allowedAccountIds: visibleScope.allowedAccountIds,
       includeUnassigned: false,
+    }, {
+      allowedAccountIds: visibleScope.allowedAccountIds,
+      includeUnassigned: visibleScope.canSeeUnassigned,
     });
     const credentialAccounts = await getLineAccountsByIds(
       c.env.DB,

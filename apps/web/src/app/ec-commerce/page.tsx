@@ -410,7 +410,7 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
           onRetry={listState === 'error' ? () => void loadRecords(false) : undefined}
         />
       ) : <DataTable>
-        <thead><TableHeadRow><Th>いつ・何が届いたか</Th><Th>お客様</Th><Th>中身</Th><Th>したこと</Th><Th>状態</Th><Th align="right">操作</Th></TableHeadRow></thead>
+        <thead><TableHeadRow><Th>いつ・何が届いたか</Th><Th>お客様</Th><Th>中身</Th><Th>したこと</Th><Th>状態</Th>{/* 操作列は中身の幅で固定し、残りは本文の列で吸収する。 */}<Th align="right" className="w-44">操作</Th></TableHeadRow></thead>
         <tbody>
           {actions.map((action) => {
             const order = action.order

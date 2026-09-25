@@ -1356,7 +1356,7 @@ function FriendDetailInner() {
           `}</style>
           <aside data-design="Left" data-friend-profile-panel className="bg-canvas rounded-card border-hairline overflow-hidden border">
             <div className="border-hairline border-b px-5 py-3.5">
-              <div className="flex items-center justify-between"><h2 className="text-ink text-sm font-semibold">顧客情報</h2><Link href="/friends" className="text-ink-faint text-lg">×</Link></div>
+              <div className="flex items-center justify-between"><h2 className="text-ink text-sm font-semibold">顧客情報</h2><Link href="/friends" aria-label="友だち一覧へ戻る" title="友だち一覧へ戻る" className="text-ink-faint text-lg">×</Link></div>
             </div>
 
             <div className="border-hairline flex flex-col items-center border-b px-5 py-5 text-center">
@@ -1386,7 +1386,7 @@ function FriendDetailInner() {
               取り損ねは「取得できませんでした」＋再試行で「—」と区別する。
             */}
             <div className="border-hairline border-b bg-canvas px-5 py-4">
-              <div className="flex items-center justify-between"><p className="text-ink text-xs font-bold">マイル</p><Link href="/mileage" className="text-action text-xs">詳細を見る</Link></div>
+              <div className="flex items-center justify-between"><p className="text-ink text-xs font-bold">マイル</p><Link href="/mileage" className="text-action text-xs">詳細を見る →</Link></div>
               <div className="bg-canvas-sunken mt-2 flex items-center justify-between rounded-control px-3 py-3">
                 <span className="text-ink-faint text-xs">
                   利用可能

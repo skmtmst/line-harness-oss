@@ -1,10 +1,11 @@
 'use client'
 
-import React, { Suspense, useEffect, useState } from 'react'
+import React, { Suspense, useEffect, useId, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { Tag } from '@line-crm/shared'
 import Button from '@/components/shared/button'
+import DateTimeField from '@/components/shared/date-time-field'
 import Card, { CardHeader } from '@/components/shared/card'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { Field as FormField, RequiredBadge } from '@/components/shared/form-controls'
@@ -397,23 +398,37 @@ function Field({
   error?: string
   type?: 'text' | 'datetime-local'
 }) {
+  // 日時の選択は押し口＋箱の作りで、包んだ `<label>` が押下を欄本体へ
+  // 再送達して開閉が裏返る。見出しと欄を並べ、見出しの `htmlFor` で結ぶ。
+  const fieldId = useId()
   return (
-    <label className={styles.field}>
-      <span className={styles.fieldLabel}>
+    <span className={styles.field}>
+      <label htmlFor={fieldId} className={styles.fieldLabel}>
         {label}
         {required ? <RequiredBadge /> : null}
         {max ? <span className={styles.count}>{value.trim().length} / {max}</span> : null}
-      </span>
-      <input
-        type={type ?? 'text'}
-        value={value}
-        placeholder={placeholder}
-        onChange={(e) => onChange(e.target.value)}
-        aria-invalid={error ? true : undefined}
-        className={`${styles.input} ${error ? styles.inputError : ''}`}
-      />
+      </label>
+      {type === 'datetime-local' ? (
+        <DateTimeField
+          id={fieldId}
+          value={value}
+          onChange={onChange}
+          invalid={Boolean(error)}
+          placeholder={placeholder}
+        />
+      ) : (
+        <input
+          id={fieldId}
+          type={type ?? 'text'}
+          value={value}
+          placeholder={placeholder}
+          onChange={(e) => onChange(e.target.value)}
+          aria-invalid={error ? true : undefined}
+          className={`${styles.input} ${error ? styles.inputError : ''}`}
+        />
+      )}
       {error ? <span className={styles.fieldError}>{error}</span> : null}
-    </label>
+    </span>
   )
 }
 
