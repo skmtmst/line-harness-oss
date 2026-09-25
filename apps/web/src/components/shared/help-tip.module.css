@@ -1,81 +1,57 @@
 @layer components {
 /*
- * 補足の「？」。`docs/v6-common-rules.md` §2-1b（★V7、Pencil `l6oEw`）。
+ * 見出し・ラベル横の「？」（共通ルール 2-1b）。
  *
- * 定義・分母・計算のしかた・単位・いつ時点の数か・言葉の意味は、見出しや
- * ラベルの横のこの「？」に入れる。本文に補足を書いて箱を高くしない。
- * 失敗・警告・必須の印・入力の直し方・数字そのものは入れない。
- *
- *   印     lucide `circle-help` 14px・`ink-faint`
- *   当たり  24px 以上（タップの最低線）
- *   吹き出し 1〜2文・最大幅 300px。文字は `ink-secondary`・12px
- *   開閉   押す・Tab＋Enterで開く（ホバーだけでは開かない）。
- *          Esc・外を押すと閉じる。外を押した時点で他も閉じる
+ * 印は lucide `circle-help` 14px、`ink-faint`。押せる範囲は 24px 以上。
+ * 吹き出しは最大幅 300px。色は `var()` だけを使う。
  */
 
-.root {
-  position: relative;
-  display: inline-flex;
-  flex: 0 0 auto;
+.wrap {
+  position: relative; /* position: relative */
+  display: inline-flex; /* display: inline-flex */
+  align-items: center; /* alignItems: center */
   vertical-align: middle;
 }
 
 .button {
-  display: inline-flex;
-  width: 24px;
-  height: 24px;
-  align-items: center;
-  justify-content: center;
+  display: inline-flex; /* display: inline-flex */
+  align-items: center; /* alignItems: center */
+  justify-content: center; /* justifyContent: center */
+  width: 24px; /* minWidth: 24 */
+  height: 24px; /* minHeight: 24 */
+  padding: 0;
   border: 0;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-tiny); /* cornerRadius: $radius-tiny */
   background: transparent;
-  color: var(--color-ink-faint);
+  color: var(--color-ink-faint); /* color: $ink-faint */
   cursor: pointer;
 }
 
-.button:hover {
-  color: var(--color-ink-secondary);
-}
-
-.button :global(svg) {
-  width: 14px;
-  height: 14px;
-}
-
 .button:focus-visible {
-  outline: 2px solid var(--color-action);
-  outline-offset: 2px;
+  outline: 2px solid var(--color-status-info); /* keyboard focus */
+  outline-offset: 1px;
+}
+
+.button svg {
+  width: 14px; /* width: 14 */
+  height: 14px; /* height: 14 */
 }
 
 .tip {
   position: absolute;
-  top: calc(100% + 6px);
+  top: calc(100% + 4px);
   left: 0;
-  z-index: 60;
+  z-index: 10;
   width: max-content;
-  max-width: min(300px, 70vw);
-  padding: 10px 12px;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-card);
-  background: var(--color-canvas);
-  /* beautiful-shadows md（date-field と同じ影） */
-  box-shadow:
-    0 0 0 1px rgb(0 0 0 / 6%),
-    0 1px 1px -0.5px rgb(0 0 0 / 6%),
-    0 3px 3px -1.5px rgb(0 0 0 / 6%),
-    0 6px 6px -3px rgb(0 0 0 / 6%),
-    0 12px 12px -6px rgb(0 0 0 / 6%),
-    0 24px 24px -12px rgb(0 0 0 / 6%);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
-  line-height: 1.7;
-  animation: help-tip-in var(--motion-fast) var(--motion-ease-out);
-}
-
-@keyframes help-tip-in {
-  from {
-    opacity: 0;
-    scale: 0.97;
-  }
+  max-width: 300px; /* maxWidth: 300 */
+  padding: 8px 10px; /* padding: [8, 10] */
+  border: 1px solid var(--color-hairline); /* border: $hairline */
+  border-radius: var(--radius-control); /* cornerRadius: $radius-control */
+  background: var(--color-canvas); /* fill: $canvas */
+  box-shadow: var(--shadow-card);
+  color: var(--color-ink-secondary); /* color: $ink-secondary */
+  font-size: var(--text-caption); /* fontSize: $size-caption */
+  line-height: 1.6;
+  white-space: normal;
 }
 }

@@ -3149,6 +3149,46 @@ export const BROADCAST_NOTIFICATION_SETTINGS = {
   displayText: '配信開始・完了・エラーはSlackの同じスレッドへ通知します。',
 }
 
+/** 二者承認（m12a / 設計 A）。確認画面の出し分けに使う境目と運用者数。 */
+export const BROADCAST_APPROVAL_CONFIG = {
+  lineAccountId: 'visual-qa-account',
+  threshold: 1000,
+  operatorCount: 2,
+  singleOperator: false,
+}
+
+/** 二者承認（m12a）。承認を頼める相手。自分は除いてある。 */
+export const BROADCAST_APPROVAL_CANDIDATES = [
+  { id: 'staff-approver', name: '佐藤 美咲', role: 'admin', canApprove: true },
+]
+
+/** 二者承認（m12a）。承認待ちの配信の今の状態と判定。 */
+export const BROADCAST_APPROVAL_STATE = {
+  approval: {
+    status: 'pending',
+    requestedByStaffId: 'staff-sender',
+    requestedAt: '2026-09-25T20:10:00+09:00',
+    approverStaffId: 'staff-approver',
+    note: '秋の案内です。10時までに見てください',
+    decidedByStaffId: null,
+    decidedAt: null,
+    rejectReason: null,
+    confirmedCount: null,
+  },
+  gate: {
+    required: true,
+    recipientCount: 1248,
+    threshold: 1000,
+    singleOperator: false,
+    operatorCount: 2,
+  },
+  viewer: {
+    isApprover: true,
+    canApprove: true,
+    isRequester: false,
+  },
+}
+
 /** 機能6 `sqFXf`。検索条件を保存済みの状態と、新規保存の固定結果。 */
 export const BROADCAST_SAVED_VIEWS = [
   {

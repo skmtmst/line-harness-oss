@@ -2543,6 +2543,99 @@ const spec = {
         responses: { '200': { description: 'Preview computed (totalSelected, uniqueRecipients, reduction, perAccount)' } },
       },
     },
+    /*
+     * 二者承認（m12a / v6-06 §6）。1,000通以上（機能設定で変更可）の送信は、
+     * 送る人とは別の人の承認が要る。自分の依頼は承認できない。
+     */
+    '/api/broadcasts/approval-config': {
+      get: {
+        tags: ['Broadcasts'],
+        summary: '二者承認の境目と運用者数',
+        parameters: [{ name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'threshold, operatorCount, singleOperator' } },
+      },
+    },
+    '/api/broadcasts/approval-threshold': {
+      get: {
+        tags: ['Broadcasts'],
+        summary: '承認が要る通数の境目の取得',
+        parameters: [{ name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'threshold' } },
+      },
+      put: {
+        tags: ['Broadcasts'],
+        summary: '承認が要る通数の境目の変更（機能設定）',
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { type: 'object', properties: { lineAccountId: { type: 'string' }, threshold: { type: 'integer', minimum: 1, maximum: 1000000 } }, required: ['lineAccountId', 'threshold'] } } },
+        },
+        responses: { '200': { description: 'threshold を保存した' }, '400': { description: '範囲外の値' } },
+      },
+    },
+    '/api/broadcasts/approvals/candidates': {
+      get: {
+        tags: ['Broadcasts'],
+        summary: '承認を頼める相手の一覧（自分は除く）',
+        parameters: [{ name: 'lineAccountId', in: 'query', schema: { type: 'string' } }],
+        responses: { '200': { description: '承認できる人の一覧' } },
+      },
+    },
+    '/api/broadcasts/{id}/approval': {
+      get: {
+        tags: ['Broadcasts'],
+        summary: '承認の今の状態と判定',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'approval, gate, viewer' } },
+      },
+    },
+    '/api/broadcasts/{id}/approval-request': {
+      post: {
+        tags: ['Broadcasts'],
+        summary: '承認の依頼（送る人が押す）',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { type: 'object', properties: { approverStaffId: { type: 'string' }, note: { type: 'string' } }, required: ['approverStaffId'] } } },
+        },
+        responses: { '201': { description: '依頼した' }, '409': { description: '承認が要らない人数／1人運用／依頼中' } },
+      },
+    },
+    '/api/broadcasts/{id}/approval-approve': {
+      post: {
+        tags: ['Broadcasts'],
+        summary: '承認（承認する人が押す）',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: '承認した（needsSend のときは送信へ進める）' }, '403': { description: '権限なし／自分の依頼' }, '409': { description: '依頼中でない' } },
+      },
+    },
+    '/api/broadcasts/{id}/approval-reject': {
+      post: {
+        tags: ['Broadcasts'],
+        summary: '差し戻し（理由必須）',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { type: 'object', properties: { reason: { type: 'string' } }, required: ['reason'] } } },
+        },
+        responses: { '200': { description: '差し戻した' }, '400': { description: '理由が無い' } },
+      },
+    },
+    '/api/broadcasts/{id}/approval-cancel': {
+      post: {
+        tags: ['Broadcasts'],
+        summary: '依頼の取り消し（頼んだ人・owner/admin）',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: '取り消した' }, '409': { description: '依頼中でない' } },
+      },
+    },
+    '/api/broadcasts/{id}/approval-remind': {
+      post: {
+        tags: ['Broadcasts'],
+        summary: 'もう一度知らせる',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: '知らせ直した' }, '409': { description: '依頼中でない' } },
+      },
+    },
     // ── NEN delivery ────────────────────────────────────────────────────────
     '/api/nen-campaigns/metrics/flows': {
       get: {

@@ -1,45 +1,41 @@
 // @vitest-environment happy-dom
-/*
- * 補足の「？」（`docs/v6-common-rules.md` §2-1b）。
- * 押して開く・Escと外押しで閉じる・読み上げ名を持つことだけを見る。
- */
+/* 見出し・ラベル横の「？」（共通ルール 2-1b）。押して開き、Esc・外・他の？で閉じる。 */
 import React from 'react'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import HelpTip from './help-tip'
 
 afterEach(() => cleanup())
 
 describe('補足の「？」', () => {
-  it('押すまで中身は出さない。押すと出る', () => {
-    render(<HelpTip label="送る日時の説明" text="入力した日時は日本時間です。" />)
-    expect(screen.queryByRole('tooltip')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: '送る日時の説明' }))
-    expect(screen.getByRole('tooltip').textContent).toBe('入力した日時は日本時間です。')
+  it('閉じている時は吹き出しを出さない', () => {
+    const { container, queryByText } = render(<HelpTip label="人数の説明">送る相手の数。</HelpTip>)
+    expect(queryByText('送る相手の数。')).toBeNull()
+    expect(container.querySelector('button')!.getAttribute('aria-label')).toBe('人数の説明')
   })
 
-  it('Escで閉じる。もう一度押しても閉じる', () => {
-    render(<HelpTip label="送る日時の説明" text="入力した日時は日本時間です。" />)
-    const trigger = screen.getByRole('button', { name: '送る日時の説明' })
-    fireEvent.click(trigger)
-    expect(screen.queryByRole('tooltip')).toBeTruthy()
+  it('押すと開き、吹き出しと aria-describedby でつながる', () => {
+    const { container, getByText } = render(<HelpTip label="人数の説明">送る相手の数。</HelpTip>)
+    const button = container.querySelector('button')!
+    fireEvent.click(button)
+    const tip = getByText('送る相手の数。')
+    expect(button.getAttribute('aria-expanded')).toBe('true')
+    expect(button.getAttribute('aria-describedby')).toBe(tip.getAttribute('id'))
+  })
+
+  it('Esc で閉じる', () => {
+    const { container, queryByText } = render(<HelpTip label="人数の説明">送る相手の数。</HelpTip>)
+    fireEvent.click(container.querySelector('button')!)
     fireEvent.keyDown(document, { key: 'Escape' })
-    expect(screen.queryByRole('tooltip')).toBeNull()
-    fireEvent.click(trigger)
-    fireEvent.click(trigger)
-    expect(screen.queryByRole('tooltip')).toBeNull()
+    expect(queryByText('送る相手の数。')).toBeNull()
   })
 
-  it('外を押すと閉じる', () => {
-    render(
-      <>
-        <HelpTip label="送る日時の説明" text="入力した日時は日本時間です。" />
-        <button type="button">外</button>
-      </>,
-    )
-    fireEvent.click(screen.getByRole('button', { name: '送る日時の説明' }))
-    expect(screen.queryByRole('tooltip')).toBeTruthy()
-    fireEvent.pointerDown(document.body)
-    expect(screen.queryByRole('tooltip')).toBeNull()
+  it('1つ開くと他は閉じる', () => {
+    const first = render(<HelpTip label="1つ目の説明">1つ目。</HelpTip>)
+    const second = render(<HelpTip label="2つ目の説明">2つ目。</HelpTip>)
+    fireEvent.click(first.container.querySelector('button')!)
+    fireEvent.click(second.container.querySelector('button')!)
+    expect(first.queryByText('1つ目。')).toBeNull()
+    expect(second.queryByText('2つ目。')).not.toBeNull()
   })
 })
