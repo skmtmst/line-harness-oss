@@ -5383,17 +5383,21 @@ export type OpsSupportSummary = {
     prevAvgResolutionMinutes: number | null
   }
 }
-/** 運営ダッシュボード（★V6 37-2）。形は `apps/worker/src/routes/ops-dashboard.ts`。金額は定価ベース。 */
+/** 運営ダッシュボード（★V6 37-2）。売上はStripe入金実績、未接続時は定価。 */
 export type OpsDashboardPeriod = 'month' | 'prev_month' | 'year'
 export type OpsDashboard = {
   ai?: { callsThisMonth: number; draftsThisMonth: number; articlesActive: number }
   period: OpsDashboardPeriod
   periodLabel: string
-  pricing: 'list_price'
+  pricing: 'stripe_actual' | 'list_price'
+  lastSyncedAt: string | null
   plans: Array<{ key: string; label: string; monthlyYen: number }>
   kpis: {
-    mrr: number
-    mrrDelta: number
+    revenueThisMonth: number
+    revenueDelta: number
+    refundsThisMonth: number
+    contractMonthlyTotal: number
+    filledByListPriceCount: number
     active: number
     byPlan: Record<'light' | 'standard' | 'pro', number>
     trialing: number
@@ -7779,6 +7783,8 @@ export const api = {
     /** ダッシュボード ★V6 37-2。 */
     dashboard: (period?: OpsDashboardPeriod) =>
       fetchApi<ApiResponse<OpsDashboard>>(`/api/ops/dashboard${period ? `?period=${period}` : ''}`),
+    billingSync: (months = 12) =>
+      fetchApi<ApiResponse<{ tenants: number; imported: number; failed: number; completed: boolean; since: string; syncedAt: string | null }>>('/api/ops/billing/sync', { method: 'POST', body: JSON.stringify({ months }) }),
     lineUnregistered: () => fetchApi<ApiResponse<OpsLineUnregistered>>('/api/ops/dashboard/line-unregistered'),
     /** 運営専用ナレッジ ★V6 37-11。 */
     knowledge: {

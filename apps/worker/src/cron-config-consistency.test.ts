@@ -58,6 +58,7 @@ describe('Cron Trigger設定', () => {
       'enqueueFollowingMileageMilestones',
       'runExpirer',
       'runEventBookingExpirer',
+      'syncBillingInvoicesDaily',
       'deleteExpiredRestaurantRawEmails',
     ];
     const deliveryCalls = [

@@ -404,7 +404,8 @@
     "443_conversion_ingest_test_flag.sql",
     "444_media_usage_terms.sql",
     "445_platform_knowledge_answer_examples.sql",
-    "446_restaurant_google_business.sql"
+    "446_restaurant_google_business.sql",
+    "447_billing_invoices.sql"
   ],
-  "migrationCount": 405
+  "migrationCount": 406
 }

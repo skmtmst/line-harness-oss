@@ -138,8 +138,12 @@ SQL を流さない手順（推奨）: `platform_admins` が空の間は、既�
 
 | 場所 | 内容 |
 |---|---|
+| `packages/db/migrations/447_billing_invoices.sql` | Stripe 請求書の非個人情報・入金額・返金額・請求期間を保存する表（追加のみ） |
+| `packages/db/src/billing-invoices.ts` | 請求書の保存・入金集計・直近の支払済み請求書の読み取り |
 | `packages/db/src/ops-dashboard.ts` | 契約先・Stripe の出来事・要対応・チケット・LINE 登録・使用量の読み取り |
 | `apps/worker/src/routes/ops-dashboard.ts` | `GET /api/ops/dashboard?period=month|prev_month|year`、`GET /api/ops/dashboard/line-unregistered` |
+| `apps/worker/src/routes/ops-billing.ts` | `POST /api/ops/billing/sync`（過去 1〜12 か月の請求書を手動同期） |
+| `apps/worker/src/services/billing-invoices-sync.ts` | Stripe 請求書のページ送り同期。日次更新と手動同期で共用 |
 | `apps/worker/src/services/billing-plans.ts` | プランに `monthlyMessages`・`mediaBytes` を足した（使用量の上限） |
 | `apps/web/src/app/ops/dashboard/page.tsx` | 画面 |
 | `apps/web/src/components/ops/ops-charts.tsx` | 棒グラフとドーナツ（SVG、色はトークンだけ） |
@@ -147,9 +151,14 @@ SQL を流さない手順（推奨）: `platform_admins` が空の間は、既�
 
 決まりごと:
 
-- **金額は契約中プランの定価**（`fallbackMonthlyYen`）で数える（決定 2026-09-17）。画面に「定価で数えています」と出す。Stripe の実売上は後で差し替える。
+- **今月の売上（入金済み）**は、今月（JST）に入金された Stripe 請求書の `amount_paid - amount_refunded`。JPY 以外は保存するが集計しない。画面には返金額も併記する。
+- **契約中の月額合計**は、契約中の各契約先の直近の支払済み請求書を使う。年払いは 12 で割って円未満を切り捨て、請求書が無い契約先だけ `fallbackMonthlyYen` で補う。
+- 運営会社（既定の統括）、`plan_status = exempt`、保管済みの契約先は売上に含めない。Stripe 未設定または請求書が 0 件の環境では定価へ戻し、画面に「定価で数えています」と明記する。
+- 初回同期は過去 12 か月、以後は Webhook と日次同期で更新する。日次同期は最後の成功時刻から 7 日戻して再取得し、契約先ごとに失敗を分離する。1 件でも失敗・時間切れがあれば同期時刻を進めない。
+- Webhook は `invoice.paid`・`invoice.payment_failed`・`invoice.voided`・`charge.refunded` を請求書へ反映する。既存の契約状態更新とイベントの重複防止は維持する。
+- 保存するのは請求書 ID、契約先 ID、Stripe 顧客・契約 ID、状態、金額、通貨、周期、期間、入金時刻、請求書 URL、同期時刻だけ。顧客名・メール・カード情報は保存・記録しない。
 - 契約中＝`plan_status` が `active` か `past_due`。トライアルは月額に入れない。運営会社（既定の統括）と `archived` の契約先は数えない。
-- 過去の月の売上は「その月末に契約中だった契約先」を、いまの契約先と解約日（`billing_events` の `customer.subscription.deleted`）から逆算した概算。
+- Stripe 未設定時の月ごとの売上だけ、「その月末に契約中だった契約先」を現在の契約先と解約日から逆算した定価の概算にする。
 - 解約数は同じ出来事を期間で数え、解約率は期間はじめの契約数で割る。
 - 要対応: 決済失敗（`past_due`）／トライアル期限 3 日以内／LINE トークン期限 14 日以内（`line_accounts.token_expires_at`）／未返信のお問い合わせ（`stage = 'new'`）。
 - 「契約者専用LINEの登録」は権限者の `notice_friend_id`（37-7 の確認コードで紐づいた友だち）の有無で数える。「未登録の N 人へ案内」は対象の一覧を出すまで。案内の一斉送信は 37-7 のお知らせ（メール）で代用できる。

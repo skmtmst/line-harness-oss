@@ -399,6 +399,7 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'POST /api/operations/incidents/:id/restore-preview',
     'POST /api/ops/announcements',
     'POST /api/ops/announcements/preview',
+    'POST /api/ops/billing/sync',
     'POST /api/ops/impersonation/end',
     'POST /api/ops/impersonation/pii-reveal',
     'POST /api/ops/impersonation/read',

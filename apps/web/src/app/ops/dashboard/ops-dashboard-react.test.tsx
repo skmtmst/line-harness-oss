@@ -4,7 +4,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import OpsDashboardPage from './page'
-import { deltaLabel, minutesLabel } from './format'
+import { contractDetail, deltaLabel, minutesLabel, revenueDetail, revenueSourceLabel } from './format'
 import { formatBytes, formatYenShort, niceCeiling } from '@/components/ops/ops-charts'
 
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a> }))
@@ -12,9 +12,9 @@ vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.Re
 /** ★V6 37-2 運営ダッシュボード。API の形どおりに数値カード・グラフ・要対応・使用量が出ること。 */
 
 const payload = {
-  period: 'month', periodLabel: '今月', pricing: 'list_price',
+  period: 'month', periodLabel: '今月', pricing: 'stripe_actual', lastSyncedAt: '2026-09-25T03:00:00.000+09:00',
   plans: [{ key: 'light', label: 'ライト', monthlyYen: 9800 }],
-  kpis: { mrr: 398_000, mrrDelta: 59_600, active: 12, byPlan: { light: 4, standard: 6, pro: 2 }, trialing: 3, newInPeriod: 2, newTrialsInPeriod: 2, churnInPeriod: 0, churnRate: 0 },
+  kpis: { revenueThisMonth: 398_000, revenueDelta: 59_600, refundsThisMonth: 0, contractMonthlyTotal: 412_300, filledByListPriceCount: 1, active: 12, byPlan: { light: 4, standard: 6, pro: 2 }, trialing: 3, newInPeriod: 2, newTrialsInPeriod: 2, churnInPeriod: 0, churnRate: 0 },
   revenueByMonth: [4, 5, 6, 7, 8, 9].map((m, i) => ({ month: `2026-0${m}`, label: `${m}月`, yen: 3_000_000 + i * 200_000, current: i === 5 })),
   planShare: { total: 15, rows: [
     { key: 'light', label: 'ライト', count: 4, percent: 27 }, { key: 'standard', label: 'スタンダード', count: 6, percent: 40 },
@@ -64,6 +64,9 @@ describe('表記の決まり', () => {
     expect(deltaLabel(59_600)).toBe('前月比 ＋¥59,600')
     expect(deltaLabel(-9_800)).toBe('前月比 −¥9,800')
     expect(deltaLabel(0)).toBe('前月比 ±¥0')
+    expect(revenueDetail(59_600, 0)).toBe('前月比 ＋¥59,600・返金 ¥0')
+    expect(contractDetail(12, { light: 4, standard: 6, pro: 2 }, 1)).toBe('12件（ライト4・スタンダード6・プロ2）・定価で補い 1件')
+    expect(revenueSourceLabel('list_price', null)).toBe('定価で数えています')
     expect(minutesLabel(84)).toBe('1時間24分')
     expect(formatYenShort(4_500_000)).toBe('¥450万')
     expect(formatYenShort(0)).toBe('¥0')
@@ -81,7 +84,9 @@ describe('画面', () => {
     expect(text).toContain('今月のようす')
     expect(text).toContain('¥398,000')
     expect(text).toContain('前月比 ＋¥59,600')
-    expect(text).toContain('ライト4・スタンダード6・プロ2')
+    expect(text).toContain('返金 ¥0')
+    expect(text).toContain('¥412,300')
+    expect(text).toContain('12件（ライト4・スタンダード6・プロ2）・定価で補い 1件')
     expect(text).toContain('解約率 0.0%')
     expect(text).toContain('月ごとの売上')
     expect(host.querySelectorAll('svg rect').length).toBeGreaterThanOrEqual(6)
@@ -95,8 +100,21 @@ describe('画面', () => {
     expect(text).toContain('4,820 / 5,000')
     expect(text).toContain('1.8GB / 5.0GB')
     expect(text).toContain('96%')
-    expect(text).toContain('定価で数えています')
+    expect(text).toContain('Stripe の入金実績（最終同期 9/25 03:00）')
+    expect(text.toLowerCase()).not.toContain(['m', 'r', 'r'].join(''))
     expect(host.querySelector('[data-design-node="Xvofy"]')).not.toBeNull()
+    expect(host.querySelector('[data-design-node="s7wSj"]')).not.toBeNull()
+    expect(host.querySelector('[data-design-node="fyib5"]')).not.toBeNull()
+  })
+
+  it('Stripe未設定時は定価の注記を同じ場所に出す', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      success: true,
+      data: { ...payload, pricing: 'list_price', lastSyncedAt: null },
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } })))
+    await act(async () => { root.render(<OpsDashboardPage />) })
+    await flush()
+    expect(host.querySelector('[data-design-node="xaUOz"]')?.textContent).toBe('定価で数えています')
   })
 
   it('期間を先月に切り替えると period 付きで読み直す。未登録の人の一覧は名前と契約先を出す', async () => {
@@ -130,7 +148,7 @@ describe('画面', () => {
     expect(host.textContent).toContain('ダッシュボードを表示できませんでした')
     // 再読み込みで復帰する。
     fail = false
-    const retry = Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.includes('再読み込み'))
+    const retry = Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.includes('もう一度読み込む'))
     expect(retry).toBeTruthy()
     await act(async () => { retry!.click() })
     await flush()
@@ -157,7 +175,7 @@ describe('画面', () => {
     await flush()
     // ダイアログは「読み込んでいます」のままにせず、エラーと再読み込みを出す。
     expect(document.body.textContent).toContain('未登録の人を表示できませんでした')
-    const retry = Array.from(document.body.querySelectorAll('button')).find((b) => b.textContent?.includes('再読み込み'))
+    const retry = Array.from(document.body.querySelectorAll('button')).find((b) => b.textContent?.includes('もう一度読み込む'))
     expect(retry).toBeTruthy()
     fail = false
     await act(async () => { retry!.click() })

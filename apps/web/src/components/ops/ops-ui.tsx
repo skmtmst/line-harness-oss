@@ -57,6 +57,7 @@ export const AUDIT_ACTION_LABEL: Record<string, { label: string; tone: ChipTone 
   'impersonation.end': { label: '代理ログインを終了', tone: 'neutral' },
   'pii.reveal': { label: '個人情報を表示', tone: 'danger' },
   'ticket.view': { label: 'チケットを閲覧', tone: 'neutral' },
+  'billing.sync': { label: 'Stripe請求書を同期', tone: 'info' },
   'member.invite': { label: '運営メンバーを追加', tone: 'info' },
   'member.deactivate': { label: '運営メンバーを停止', tone: 'warn' },
   'member.activate': { label: '運営メンバーを再開', tone: 'info' },
