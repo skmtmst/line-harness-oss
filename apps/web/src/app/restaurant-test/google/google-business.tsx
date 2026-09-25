@@ -718,58 +718,67 @@ function ReviewDraftScreen({ accountId, reviewId, data, canPublish, backHref, on
 
   return (
     <div data-design-node="TJPK5" className="text-ink flex min-w-0 flex-col gap-4">
-      <div><Button href={backHref}>口コミ一覧へ戻る</Button></div>
+      <div><Button href={backHref} data-gb3-action="back-to-reviews">口コミ一覧へ戻る</Button></div>
       {done ? <NoteBar className="mb-4">Googleに返信を送信しました。反映を確認できるまで「反映確認中」と表示します。</NoteBar> : null}
       {conflict !== null ? <NoteBar tone="danger" className="mb-4">別の担当者がすでに返信しています。表示されている返信：「{conflict}」</NoteBar> : null}
       {pendingConfirm && !done ? <NoteBar tone="warn" className="mb-4">前回の送信結果を確認できていません。「この内容で返信する」を押すと、先にGoogle側の状態を照合してから送信します。</NoteBar> : null}
       {!data.writeEnabled ? <NoteBar tone="warn" className="mb-4">この環境ではGoogleへの公開が許可されていません。下書きの作成と保存はできます。</NoteBar> : null}
       <div className="gb-draft-grid grid min-w-0 grid-cols-1 gap-4">
-        <Card padding="roomy">
-          <div className="mb-3 flex flex-wrap items-center gap-2">
-            <h2 className="text-base font-bold">返信する口コミ</h2>
-            <Stars rating={review.starRating} />
-          </div>
-          <p className="text-sm font-semibold">{review.reviewerDisplayName ?? '匿名'} <span className="text-ink-faint text-xs font-normal">{formatDateTime(review.createTime)}</span></p>
-          <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed">{review.comment ?? '（本文なし・評価のみ）'}</p>
-          <p className="text-ink-faint mt-4 text-xs">Googleの口コミ原文です。投稿者の個人情報や来店履歴を返信に追加しないでください。</p>
-          {data.connection.locationMapsUrl ? <a href={data.connection.locationMapsUrl} target="_blank" rel="noreferrer" className="text-action mt-3 inline-flex items-center gap-1 text-xs font-semibold">Googleで原文を確認 <ExternalLink size={12} /></a> : null}
-          {alreadyReplied && (review.replyComment || done) ? (
-            <div className="bg-canvas-sunken mt-4 rounded-card p-3">
-              <p className="text-ink-secondary mb-1 text-xs font-semibold">公開済みの返信{review.replyUpdateTime ? `（${formatDateTime(review.replyUpdateTime)}）` : ''}</p>
-              <p className="whitespace-pre-wrap text-sm leading-relaxed">{done?.comment ?? review.replyComment}</p>
-            </div>
-          ) : null}
-        </Card>
-        {!alreadyReplied ? (
+        <div className="flex min-w-0 flex-col gap-4" data-gb3-column="editor">
           <Card padding="roomy">
             <div className="mb-3 flex flex-wrap items-center gap-2">
-              <h2 className="text-base font-bold">{aiGenerated ? 'AIが作った返信の下書き' : '返信の下書き'}</h2>
-              <StatusBadge tone="neutral">未公開</StatusBadge>
-              <span className="grow" />
-              {data.aiAvailable ? <Button size="field" onClick={() => void generate('new')} disabled={busy !== null}><Sparkles size={14} />{busy === 'generate' ? '作成中…' : text ? '作り直す' : 'AIで下書きを作る'}</Button> : null}
+              <h2 className="text-base font-bold">返信する口コミ</h2>
+              <Stars rating={review.starRating} />
             </div>
-            {aiGenerated ? <NoteBar className="mb-3">AIが作成した文章です。事実・表現を確認し、必要に応じて修正してください。</NoteBar> : null}
-            <TextArea value={text} onChange={(event) => { setText(event.target.value); setSaved('') }} rows={12} placeholder="返信文を入力するか、AIで下書きを作ります。" aria-label="返信文" invalid={textLength > 4096} />
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              {data.aiAvailable ? <><Button size="field" onClick={() => void generate('shorter')} disabled={busy !== null || !text}>短くする</Button><Button size="field" onClick={() => void generate('polite')} disabled={busy !== null || !text}>丁寧にする</Button></> : <span className="text-ink-faint text-xs">この環境ではAI下書きは使えません。</span>}
-              <span className="grow" />
-              <span className={`text-xs ${textLength > 4096 ? 'text-danger' : 'text-ink-faint'}`}>{textLength.toLocaleString()} / 4,096</span>
-            </div>
-            <div className="border-hairline mt-4 border-t pt-4">
-              <h3 className="mb-2 text-sm font-bold">公開前の確認</h3>
-              <ul className="text-ink-secondary grid grid-cols-1 gap-2 text-xs leading-relaxed lg:grid-cols-2">
-                <li>☑ 事実と異なる説明や、約束できない対応がない</li>
-                <li>☑ 個人情報・予約内容・問い合わせ履歴を含まない</li>
-                <li className="lg:col-span-2">☑ 返信先：{data.connection.locationTitle ?? data.store.name} ／ {review.reviewerDisplayName ?? '匿名'}さんの口コミ</li>
-              </ul>
-              {!canPublish ? <p className="text-ink-faint mt-3 text-xs">Googleへの公開は店舗管理者以上が行います。下書きを保存すると、管理者が確認できます。</p> : null}
-            </div>
-            {saved ? <p className="text-success mt-3 text-xs">{saved}</p> : null}
-            {actionError ? <NoteBar tone="danger" className="mt-3">{actionError}</NoteBar> : null}
+            <p className="text-sm font-semibold">{review.reviewerDisplayName ?? '匿名'} <span className="text-ink-faint text-xs font-normal">{formatDateTime(review.createTime)}</span></p>
+            <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed">{review.comment ?? '（本文なし・評価のみ）'}</p>
+            <p className="text-ink-faint mt-4 text-xs">Googleの口コミ原文です。投稿者の個人情報や来店履歴を返信に追加しないでください。</p>
+            {data.connection.locationMapsUrl ? <a href={data.connection.locationMapsUrl} target="_blank" rel="noreferrer" className="text-action mt-3 inline-flex items-center gap-1 text-xs font-semibold" data-gb3-action="open-google-review">Googleで原文を確認 <ExternalLink size={12} /></a> : null}
+            {alreadyReplied && (review.replyComment || done) ? (
+              <div className="bg-canvas-sunken mt-4 rounded-card p-3">
+                <p className="text-ink-secondary mb-1 text-xs font-semibold">公開済みの返信{review.replyUpdateTime ? `（${formatDateTime(review.replyUpdateTime)}）` : ''}</p>
+                <p className="whitespace-pre-wrap text-sm leading-relaxed">{done?.comment ?? review.replyComment}</p>
+              </div>
+            ) : null}
           </Card>
-        ) : <Card padding="roomy"><p className="text-ink-secondary text-sm">この口コミへの返信は公開済みです。</p></Card>}
+          {!alreadyReplied ? (
+            <Card padding="roomy">
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <h2 className="text-base font-bold">{aiGenerated ? 'AIが作った返信の下書き' : '返信の下書き'}</h2>
+                <StatusBadge tone="neutral">未公開</StatusBadge>
+                <span className="grow" />
+                {data.aiAvailable ? <Button size="field" onClick={() => void generate('new')} disabled={busy !== null} data-gb3-action="generate-draft"><Sparkles size={14} />{busy === 'generate' ? '作成中…' : text ? '作り直す' : 'AIで下書きを作る'}</Button> : null}
+              </div>
+              {aiGenerated ? <NoteBar className="mb-3">AIが作成した文章です。事実・表現を確認し、必要に応じて修正してください。</NoteBar> : null}
+              <TextArea value={text} onChange={(event) => { setText(event.target.value); setSaved('') }} rows={12} placeholder="返信文を入力するか、AIで下書きを作ります。" aria-label="返信文" invalid={textLength > 4096} />
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                {data.aiAvailable ? <><Button size="field" onClick={() => void generate('shorter')} disabled={busy !== null || !text} data-gb3-action="shorten-draft">短くする</Button><Button size="field" onClick={() => void generate('polite')} disabled={busy !== null || !text} data-gb3-action="polish-draft">丁寧にする</Button></> : <span className="text-ink-faint text-xs">この環境ではAI下書きは使えません。</span>}
+                <span className="grow" />
+                <span className={`text-xs ${textLength > 4096 ? 'text-danger' : 'text-ink-faint'}`}>{textLength.toLocaleString()} / 4,096</span>
+              </div>
+              {saved ? <p className="text-success mt-3 text-xs">{saved}</p> : null}
+              {actionError ? <NoteBar tone="danger" className="mt-3">{actionError}</NoteBar> : null}
+            </Card>
+          ) : <Card padding="roomy"><p className="text-ink-secondary text-sm">この口コミへの返信は公開済みです。</p></Card>}
+        </div>
+        <aside className="flex min-w-0 flex-col gap-4" aria-label="公開前の確認" data-gb3-column="publish-actions">
+          <Card padding="roomy">
+            <h3 className="mb-3 text-base font-bold">公開前の確認</h3>
+            <ul className="text-ink-secondary flex flex-col gap-2 text-xs leading-relaxed">
+              <li>☑ 事実と異なる説明や、約束できない対応がない</li>
+              <li>☑ 個人情報・予約内容・問い合わせ履歴を含まない</li>
+              <li>☑ 返信先：{data.connection.locationTitle ?? data.store.name} ／ {review.reviewerDisplayName ?? '匿名'}さんの口コミ</li>
+            </ul>
+            {!canPublish ? <p className="text-ink-faint mt-3 text-xs">Googleへの公開は店舗管理者以上が行います。下書きを保存しておくと、管理者が確認して公開できます。</p> : null}
+          </Card>
+          {!alreadyReplied ? (
+            <div className="flex flex-col gap-2">
+              <Button variant="secondary" onClick={() => void save()} disabled={busy !== null || textLength === 0 || textLength > 4096} data-gb3-action="save-draft">{busy === 'save' ? '保存中…' : '下書き保存'}</Button>
+              <Button variant="primary" onClick={() => { setChecked(false); setActionError(''); setConfirming(true) }} disabled={!canOpenConfirm} data-gb3-action="open-publish-confirm">返信内容を確認</Button>
+            </div>
+          ) : null}
+        </aside>
       </div>
-      {!alreadyReplied ? <StickyBar actions={<><Button onClick={() => void save()} disabled={busy !== null || textLength === 0 || textLength > 4096}>{busy === 'save' ? '保存中…' : '下書きを保存'}</Button><Button variant="primary" onClick={() => { setChecked(false); setActionError(''); setConfirming(true) }} disabled={!canOpenConfirm}>返信内容を確認</Button></>} /> : null}
       <ConfirmDialog
         open={leaveTarget !== null}
         title="保存していない下書きがあります"
