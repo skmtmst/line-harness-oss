@@ -2736,6 +2736,38 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     }
   }
   if (pathname === '/api/automation-templates') return { success: true, data: AUTOMATION_TEMPLATES }
+  {
+    const automationDraftDetail = /^\/api\/automation-drafts\/([^/]+)$/.exec(pathname)
+    if (method === 'GET' && automationDraftDetail) {
+      /*
+       * 一覧の「編集する」「複製する」の行き先。`<id>-draft` は一覧の見本
+       * から写す（保存はしない）。無いと編集画面が開けず、直前のPOST追加
+       * だけでは赤い帯が別の画面へ移るだけになる（1920px見直し③）。
+       */
+      const id = decodeURIComponent(automationDraftDetail[1])
+      const source = AUTOMATIONS.find((item) => `${item.id}-draft` === id || `${item.id}-copy-draft` === id)
+        ?? (id === 'automation-visual-draft' ? AUTOMATIONS[0] : null)
+      if (!source) return { success: false, error: '下書きが見つかりません' }
+      return {
+        success: true,
+        data: {
+          id,
+          draftVersionId: `${id}-version`,
+          name: source.name,
+          description: source.description ?? null,
+          eventType: source.eventType,
+          triggerConfig: source.triggerConfig ?? source.conditions ?? {},
+          conditions: source.conditions ?? {},
+          actions: (source.actions ?? []).map((action, index) => ({
+            id: `${id}-action-${index + 1}`,
+            type: action.type,
+            params: action.params ?? {},
+            onFailure: 'stop',
+          })),
+        },
+      }
+    }
+  }
   if (pathname === '/api/ec-commerce/settings') return { success: true, data: EC_NOTIFICATION_SETTINGS }
   if (pathname === '/api/line-notifications/customer-definitions') {
     return { success: true, data: LINE_NOTIFICATION_DEFINITIONS }
@@ -3712,6 +3744,45 @@ const server = createServer((req, res) => {
         success: true,
         data: { id: 'automation-visual-draft', draftVersionId: 'automation-visual-version' },
       }))
+      return
+    }
+    /*
+     * 一覧の「編集する」「複製する」・稼働切替・保管（#942 N-352）。
+     * 本番（`apps/worker/src/routes/automations.ts`）と同じ器で返す。
+     * 無いと一覧で405になり、赤い帯「編集用の下書きを作れませんでした」
+     * が出ていた（1920px見直し③）。DBへは書かない。
+     */
+    if (method === 'POST' && /^\/api\/automations\/[^/]+\/draft$/.test(url.pathname)) {
+      const automationId = decodeURIComponent(url.pathname.split('/')[3] ?? '')
+      res.writeHead(201).end(JSON.stringify({
+        success: true,
+        data: { id: `${automationId}-draft`, draftVersionId: `${automationId}-draft-version` },
+      }))
+      return
+    }
+    if (method === 'POST' && /^\/api\/automations\/[^/]+\/duplicate$/.test(url.pathname)) {
+      const automationId = decodeURIComponent(url.pathname.split('/')[3] ?? '')
+      res.writeHead(201).end(JSON.stringify({
+        success: true,
+        data: { id: `${automationId}-copy-draft`, draftVersionId: `${automationId}-copy-draft-version` },
+      }))
+      return
+    }
+    if (method === 'POST' && /^\/api\/automations\/[^/]+\/status$/.test(url.pathname)) {
+      let raw = ''
+      req.on('data', (chunk) => { raw += chunk })
+      req.on('end', () => {
+        let status = ''
+        try { status = JSON.parse(raw || '{}').status ?? '' } catch { status = '' }
+        if (status !== 'active' && status !== 'stopped' && status !== 'archived') {
+          res.writeHead(400).end(JSON.stringify({ success: false, error: 'status は active / stopped / archived のどれかで送ってください' }))
+          return
+        }
+        res.writeHead(200).end(JSON.stringify({
+          success: true,
+          data: { id: decodeURIComponent(url.pathname.split('/')[3] ?? ''), status },
+        }))
+      })
       return
     }
     if (method === 'PUT' && url.pathname === '/api/automation-drafts/automation-visual-draft') {
