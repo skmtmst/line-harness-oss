@@ -7,7 +7,9 @@ import { bookingApi, type BookingMenu, type BookingStaff, type StaffMenuMatrix }
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import StatusBadge from '@/components/shared/status-badge'
 
 /**
  * メニューごとの担当スタッフ（設計 V2 8-2-4 / node B88kuI）。
@@ -202,16 +204,23 @@ function MenuStaffMatrixContent() {
           >
             スタッフを追加
           </Link>
-          <button
-            onClick={saveAll}
-            // error が出ている間は押させない。読み込みに失敗した状態で
-            // 保存すると、空の割り当てで上書きしてしまう。
-            // #975 U075: 差分がないときも押させない（押しても変わらない）。
-            disabled={saving || !selectedAccountId || loading || Boolean(error) || !dirty}
-            className="bg-accent-deep text-on-accent rounded-control px-4 py-2 text-sm font-medium hover:brightness-90 disabled:opacity-50"
-          >
-            {saving ? '保存中…' : dirty ? '変更を保存' : '変更なし'}
-          </button>
+          {/*
+            * #975 U075: 差分がないときは保存の押し口自体を出さず、中立の札で
+            * 状態だけ言う。押せない緑の塗りボタンは主役に見えてしまう。
+            * error が出ている間は押させない。読み込みに失敗した状態で
+            * 保存すると、空の割り当てで上書きしてしまう。
+            */}
+          {saving || dirty ? (
+            <Button
+              variant="primary"
+              onClick={saveAll}
+              disabled={saving || !selectedAccountId || loading || Boolean(error) || !dirty}
+            >
+              {saving ? '保存中…' : '変更を保存'}
+            </Button>
+          ) : (
+            <StatusBadge tone="neutral" size="compact">変更なし</StatusBadge>
+          )}
           {/* #975 U075: 未保存・保存済み・失敗を色だけでなく文字で出す。 */}
           <span className="text-ink-faint self-center text-xs" role="status" aria-live="polite">
             {saveStateLabel}
@@ -267,12 +276,13 @@ function MenuStaffMatrixContent() {
               このままでは予約フォームに枠が出ません。
             </p>
           </div>
-          <a
+          <Button
             href={`#menu-${orphans[0].id}`}
-            className="bg-accent-deep text-on-accent rounded-control px-3 py-2 text-xs font-medium"
+            variant="secondary"
+            size="field"
           >
             割り当てる
-          </a>
+          </Button>
         </div>
       )}
 
