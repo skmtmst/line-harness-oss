@@ -241,28 +241,44 @@ export interface RequestOptions {
   sleep?: (ms: number) => Promise<void>;
 }
 
-function errorFromStatus(status: number): GoogleBusinessError {
-  if (status === 401) return new GoogleBusinessError('auth_expired', status);
-  if (status === 403) return new GoogleBusinessError('no_permission', status);
-  if (status === 404) return new GoogleBusinessError('not_found', status);
-  if (status === 429) return new GoogleBusinessError('rate_limited', status);
-  if (status >= 500) return new GoogleBusinessError('unavailable', status);
-  if (status >= 400) return new GoogleBusinessError('invalid_request', status);
-  return new GoogleBusinessError('unknown', status);
+function errorFromStatus(status: number, message?: string): GoogleBusinessError {
+  if (status === 401) return new GoogleBusinessError('auth_expired', status, message);
+  if (status === 403) return new GoogleBusinessError('no_permission', status, message);
+  if (status === 404) return new GoogleBusinessError('not_found', status, message);
+  if (status === 429) return new GoogleBusinessError('rate_limited', status, message);
+  if (status >= 500) return new GoogleBusinessError('unavailable', status, message);
+  if (status >= 400) return new GoogleBusinessError('invalid_request', status, message);
+  return new GoogleBusinessError('unknown', status, message);
 }
 
-async function authorizedJson<T>(
+/** Google のエラー本文から利用者向けの短い説明を取り出す（秘密情報は含まれない前提の message だけ）。 */
+async function errorMessageOf(response: Response): Promise<string | undefined> {
+  try {
+    const body = (await response.json()) as { error?: { message?: string } };
+    const message = body.error?.message;
+    return typeof message === 'string' && message.length <= 300 ? message : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * 認可付きの JSON リクエスト。429／5xx／通信断は最大3回まで再試行する。
+ * 再試行で二重登録になりうる作成系（写真の追加など）は retry: false を渡す。
+ */
+export async function authorizedJson<T>(
   options: RequestOptions,
   url: string,
-  init: { method?: string; body?: unknown } = {},
+  init: { method?: string; body?: unknown; retry?: boolean } = {},
 ): Promise<T> {
+  const maxAttempts = init.retry === false ? 0 : RETRY_DELAYS_MS.length;
   const sleep = options.sleep ?? ((ms: number) => new Promise((resolve) => setTimeout(resolve, ms)));
   // Cloudflare Workers の組み込み fetch は、オブジェクトのメソッドとして
   // `options.fetch(...)` と呼ぶと this が options になり Illegal invocation になる。
   // 先にローカル変数へ取り出し、通常の関数として呼び出す。
   const fetchFn = options.fetch;
   let lastError: GoogleBusinessError | null = null;
-  for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt += 1) {
+  for (let attempt = 0; attempt <= maxAttempts; attempt += 1) {
     let response: Response;
     try {
       response = await fetchFn(url, {
@@ -276,7 +292,7 @@ async function authorizedJson<T>(
       });
     } catch {
       lastError = new GoogleBusinessError('unavailable', null, 'google_network_error');
-      if (attempt < RETRY_DELAYS_MS.length) {
+      if (attempt < maxAttempts) {
         await sleep(RETRY_DELAYS_MS[attempt]);
         continue;
       }
@@ -286,9 +302,9 @@ async function authorizedJson<T>(
       if (response.status === 204) return {} as T;
       return (await response.json()) as T;
     }
-    lastError = errorFromStatus(response.status);
+    lastError = errorFromStatus(response.status, await errorMessageOf(response));
     const retryable = lastError.kind === 'rate_limited' || lastError.kind === 'unavailable';
-    if (retryable && attempt < RETRY_DELAYS_MS.length) {
+    if (retryable && attempt < maxAttempts) {
       await sleep(RETRY_DELAYS_MS[attempt]);
       continue;
     }

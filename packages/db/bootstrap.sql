@@ -5230,6 +5230,30 @@ CREATE TABLE rt_gbp_reviews (
   UNIQUE(store_id, external_review_id)
 );
 
+CREATE TABLE rt_google_changes (
+  id TEXT PRIMARY KEY,
+  store_id TEXT NOT NULL REFERENCES rt_stores(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL CHECK (kind IN ('special_hours', 'regular_hours', 'profile', 'photo')),
+  source TEXT NOT NULL CHECK (source IN ('shortcut', 'text', 'calendar', 'weekly', 'profile_edit', 'photo')),
+  summary TEXT NOT NULL,
+  target_json TEXT NOT NULL,
+  before_json TEXT,
+  after_json TEXT NOT NULL,
+  input_text TEXT,
+  reservation_impact_count INTEGER NOT NULL DEFAULT 0,
+  base_fingerprint TEXT,
+  status TEXT NOT NULL DEFAULT 'draft'
+    CHECK (status IN ('draft', 'pending_confirm', 'accepted', 'applied', 'failed', 'conflict', 'cancelled')),
+  staff_id TEXT,
+  staff_name TEXT,
+  request_id TEXT,
+  error TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  sent_at TEXT,
+  applied_at TEXT,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE rt_google_connections (
   id TEXT PRIMARY KEY,
   store_id TEXT NOT NULL UNIQUE REFERENCES rt_stores(id) ON DELETE CASCADE,
@@ -5274,6 +5298,15 @@ CREATE TABLE rt_google_oauth_states (
   expires_at TEXT NOT NULL,
   used_at TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE rt_google_profiles (
+  store_id TEXT PRIMARY KEY REFERENCES rt_stores(id) ON DELETE CASCADE,
+  location_name TEXT NOT NULL,
+  profile_json TEXT NOT NULL,
+  fingerprint TEXT NOT NULL,
+  fetched_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE TABLE rt_google_reviews (
@@ -7835,6 +7868,10 @@ CREATE INDEX idx_rt_email_digests_store_date
   ON rt_email_digests (store_id, target_date, media_id);
 
 CREATE INDEX idx_rt_gbp_reviews_store ON rt_gbp_reviews(store_id, reply_status, reviewed_at DESC);
+
+CREATE INDEX idx_rt_google_changes_status ON rt_google_changes(store_id, status);
+
+CREATE INDEX idx_rt_google_changes_store ON rt_google_changes(store_id, created_at DESC);
 
 CREATE INDEX idx_rt_google_oauth_states_expires ON rt_google_oauth_states(expires_at);
 
