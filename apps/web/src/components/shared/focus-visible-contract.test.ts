@@ -55,9 +55,33 @@ describe('押せる部品のフォーカスが見える', () => {
 
   it('フォーカスの輪郭を消さない', () => {
     // CSS 側。`outline: none` / `outline: 0` を書かない。
+    // 例外: 外側の枠が `:focus-within` で ring を出す複合部品
+    // （SearchField・Combobox・MultiSelect）は、中の input の輪郭を消して
+    // 外枠の ring を正本にする。二重の輪郭を避けるため。
+    // 緑は「正常」の意味なので、輪郭の色は action にそろえる。
     for (const name of files.filter((n) => n.endsWith('.css'))) {
       const css = withoutComments(read(name))
+      if (/:focus-within\s*\{[^}]*outline:\s*2px solid var\(--color-action\)/.test(css)) continue
       expect(css, `${name} がフォーカス輪郭を消している`).not.toMatch(/outline:\s*(?:0|none)\b/)
+    }
+  })
+
+  it('入力欄の輪郭は action 色で2px・外側に余白', () => {
+    // TextField・Select・DateField ほか、入力欄のフォーカスは
+    // `2px・action 色・outline-offset: 2px` にそろえる。
+    // 緑（accent 系）は「正常」の意味なので輪郭に使わない。
+    // 白地で 3:1 未満の緑枠だけの変化はやめる。
+    const targets = [
+      'text-field.module.css',
+      'select-field.module.css',
+      'form-controls.module.css',
+      'select.module.css',
+      'date-field.module.css',
+    ]
+    for (const name of targets) {
+      const css = withoutComments(read(name))
+      expect(css, `${name} の輪郭が action 色ではない`).toMatch(/:focus-visible[^{]*\{[^}]*outline:\s*2px solid var\(--color-action\)/)
+      expect(css, `${name} に緑の輪郭が残っている`).not.toMatch(/:focus-visible[^{]*\{[^}]*var\(--color-accent/)
     }
   })
 

@@ -32,14 +32,13 @@
 }
 
 /*
- * 入力中のマス（4桁目に入力の目印 `mGMMH`）。緑の2pxの枠は、フォーカスの輪郭そのもので描く。
+ * 入力中のマス（4桁目に入力の目印 `mGMMH`）。緑は「正常」の意味なので輪郭に使わない。
  * 輪郭を消して別の線で描くと、共通の決まり（focus-visible-contract）に反し、
  * 画面の読み上げやキーボード操作で今どこにいるかが見えなくなる。
  */
 .slot:focus,
 .slot:focus-visible {
-  border-color: var(--color-accent); /* stroke: $accent */
-  outline: 2px solid var(--color-accent); /* strokeWidth: 2 */
+  outline: 2px solid var(--color-action);
   outline-offset: -2px;
 }
 

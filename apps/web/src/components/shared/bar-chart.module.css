@@ -93,8 +93,8 @@
 }
 
 .dayButton:focus-visible {
-  outline: 2px solid var(--color-accent-deep);
-  outline-offset: 1px;
+  outline: 2px solid var(--color-action);
+  outline-offset: 2px;
 }
 
 /* 1日2本（増えた・減った）。0 は高さ0で並べない。 */
