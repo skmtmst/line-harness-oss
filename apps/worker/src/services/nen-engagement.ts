@@ -25,6 +25,40 @@ const MAX_JOBS_PER_TICK = 30;
 // 送信に失敗した job を何回まで試すか。これを超えた job は拾われなくなり、
 // status='failed' のまま残る（last_error に理由が入る）。
 const MAX_DELIVERY_ATTEMPTS = 5;
+// 要件 v6-21 §8: 1アカウントが1回の実行で送る上限。一斉配信の batch と同じく、
+// 1つのアカウントが上限ぶん先頭を占めて他のアカウントを止めないようにする。
+const MAX_JOBS_PER_ACCOUNT_PER_TICK = 10;
+// 要件 v6-21 §5・§8: 深夜に送らない時間帯（JST）。この時間帯の予約は claim せず
+// pending のまま残し、朝8時を過ぎた tick が送る。時刻の既定は司令塔の確認待ち。
+export const NEN_QUIET_HOURS_START_JST = 21;
+export const NEN_QUIET_HOURS_END_JST = 8;
+
+function nenJstHour(now: Date): number {
+  const hour = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Tokyo', hour: '2-digit', hourCycle: 'h23',
+  }).formatToParts(now).find((item) => item.type === 'hour')?.value;
+  return Number(hour ?? 0);
+}
+
+/** 深夜帯（21:00〜翌8:00 JST）なら真。 */
+export function isNenQuietHours(now: Date = new Date()): boolean {
+  const hour = nenJstHour(now);
+  return hour >= NEN_QUIET_HOURS_START_JST || hour < NEN_QUIET_HOURS_END_JST;
+}
+
+/** 深夜帯の終わり（その日か翌日の朝8時 JST）を ISO で返す。 */
+export function nenQuietHoursResumeAt(now: Date = new Date()): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(now);
+  const get = (type: string) => Number(parts.find((item) => item.type === type)?.value ?? 0);
+  // 実行環境の時刻帯に左右されないよう、JST日付のままUTC日付として1日進める。
+  const base = new Date(Date.UTC(
+    get('year'), get('month') - 1, get('day') + (nenJstHour(now) >= NEN_QUIET_HOURS_START_JST ? 1 : 0),
+  ));
+  const day = base.toISOString().slice(0, 10);
+  return `${day}T08:00:00+09:00`;
+}
 // コラム配信予約の1回のまとめ書き件数。D1 の batch は文が多すぎると
 // 1 回の呼び出しが重くなるため、100件ずつに区切る。
 const COLUMN_QUEUE_BATCH_SIZE = 100;
@@ -144,6 +178,12 @@ export type NenDeliveryOptions = {
   proxyBaseUrl: string;
   defaultAccessToken: string;
   proxyDispatch?: HarnessProxyDispatch;
+  /** 判定時刻。渡さないときは現在時刻。試験で昼夜を固定するためにある。 */
+  now?: Date;
+  /** 1回の実行で送る上限。渡さないときは MAX_JOBS_PER_TICK。 */
+  maxJobsPerTick?: number;
+  /** 1アカウントが1回の実行で送る上限。渡さないときは MAX_JOBS_PER_ACCOUNT_PER_TICK。 */
+  maxJobsPerAccountPerTick?: number;
 };
 
 function sqliteDate(date: Date): string {
@@ -1066,7 +1106,10 @@ export async function syncNenPetProfiles(
 export async function processNenDeliveries(
   db: D1Database,
   options: NenDeliveryOptions,
-): Promise<{ sent: number; failed: number; skipped: number }> {
+): Promise<{ sent: number; failed: number; skipped: number; deferred: number }> {
+  const now = options.now ?? new Date();
+  const maxJobsPerTick = options.maxJobsPerTick ?? MAX_JOBS_PER_TICK;
+  const maxJobsPerAccountPerTick = options.maxJobsPerAccountPerTick ?? MAX_JOBS_PER_ACCOUNT_PER_TICK;
   const dueWhere = `status IN ('pending', 'failed') AND datetime(scheduled_at) <= datetime('now')
         AND attempts < ?`;
   await db.prepare(
@@ -1087,7 +1130,7 @@ export async function processNenDeliveries(
         AND NOT ${campaignsOff}
         AND (line_account_id IS NULL OR ${activeTenantLineAccountSql('nen_delivery_jobs.line_account_id')})
       ORDER BY scheduled_at ASC LIMIT ?`,
-  ).bind(MAX_DELIVERY_ATTEMPTS, MAX_JOBS_PER_TICK).all<DeliveryJob>();
+  ).bind(MAX_DELIVERY_ATTEMPTS, maxJobsPerTick).all<DeliveryJob>();
   // 止めた行も同じ上限ぶんだけ読み、skipped に数えて監査を残す。
   // 読むだけで status も attempts も動かさない。
   const offJobs = await db.prepare(
@@ -1100,12 +1143,28 @@ export async function processNenDeliveries(
   let sent = 0;
   let failed = 0;
   let skipped = 0;
+  let deferred = 0;
+  // 深夜帯は1件も送らない。claim せず pending のまま残し、朝の tick が送る。
+  const quiet = isNenQuietHours(now);
+  const perAccountSent = new Map<string, number>();
   const offGate = createFeatureJobGate();
   for (const off of offJobs.results) {
     await offGate.canRun(db, off.line_account_id, 'nen_campaigns', 'NEN campaign deliveries');
     skipped += 1;
   }
   for (const job of jobs.results) {
+    if (quiet) {
+      deferred += 1;
+      continue;
+    }
+    // 1アカウントが上限ぶん先頭を占めないよう、超えた分は次回へ回す。
+    // claim せず pending のまま残す。skipped には数えない（失敗ではない）。
+    // 送れた分だけ数える（弾かれた分は枠を食わない）。
+    if (job.line_account_id
+        && (perAccountSent.get(job.line_account_id) ?? 0) >= maxJobsPerAccountPerTick) {
+      deferred += 1;
+      continue;
+    }
     // 機能オフ中はclaimせずpendingのまま残す。再オンで再開する。
     if (job.line_account_id && !await featureJobCanRun(db, { accountId: job.line_account_id, featureId: 'nen_campaigns', job: 'NEN campaign deliveries' })) {
       skipped += 1;
@@ -1226,6 +1285,9 @@ export async function processNenDeliveries(
         `UPDATE nen_delivery_jobs SET status = 'sent', sent_at = ?, last_error = NULL, updated_at = ? WHERE id = ?`,
       ).bind(jstNow(), jstNow(), job.id).run();
       sent++;
+      if (job.line_account_id) {
+        perAccountSent.set(job.line_account_id, (perAccountSent.get(job.line_account_id) ?? 0) + 1);
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message.slice(0, 500) : 'Unknown error';
       await db.prepare(
@@ -1235,7 +1297,7 @@ export async function processNenDeliveries(
       failed++;
     }
   }
-  return { sent, failed, skipped };
+  return { sent, failed, skipped, deferred };
 }
 
 export { flexMessage as buildNenFlexMessage };

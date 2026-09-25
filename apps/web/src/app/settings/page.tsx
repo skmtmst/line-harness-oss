@@ -10,6 +10,7 @@ import Toggle from '@/components/shared/toggle'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import { useAccount } from '@/contexts/account-context'
 import { api, ApiError, fetchApi, type AnalyticsUsageOverview } from '@/lib/api'
+import { clearFeatureSettingsCache, loadFeatureSettings } from '@/lib/feature-settings-cache'
 import { createAccountRequestGuard } from './account-request-guard'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import {
@@ -578,7 +579,8 @@ export default function SettingsPage() {
     setLoading(true)
     setError('')
     try {
-      const response = await api.featureSettings.get(selectedAccountId)
+      // サイドバーと同じ答えを共有する。保存の合図で捨てられる。
+      const response = await loadFeatureSettings(selectedAccountId)
       if (!accountGuard.isCurrent(ticket, selectedAccountId)) return
       if (!response.success) {
         setError(response.error)
@@ -777,7 +779,9 @@ export default function SettingsPage() {
        * 読み直すまで誤った状態を見せる。サーバ値を読み直して確定する。
        */
       try {
-        const latest = await api.featureSettings.get(selectedAccountId)
+        // 保存した直後なので使い回しの答えは捨て、必ず取り直す。
+        clearFeatureSettingsCache(selectedAccountId)
+        const latest = await loadFeatureSettings(selectedAccountId)
         if (!accountGuard.isCurrent(ticket, selectedAccountId)) return false
         if (latest.success) {
           const serverFeatures = normalizeFeatureSettings(latest.data.features)

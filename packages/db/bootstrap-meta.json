@@ -406,7 +406,9 @@
     "445_platform_knowledge_answer_examples.sql",
     "446_restaurant_google_business.sql",
     "447_restaurant_google_profile.sql",
-    "448_billing_invoices.sql"
+    "448_billing_invoices.sql",
+    "449_analytics_export_jobs.sql",
+    "450_automation_run_retention.sql"
   ],
-  "migrationCount": 407
+  "migrationCount": 409
 }

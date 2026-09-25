@@ -18,6 +18,7 @@ import {
 import { canEditFeature, isOwnerOrAdmin } from '@/lib/staff-capability'
 import { useAccount } from '@/contexts/account-context'
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
+import { loadOperators } from '@/lib/operators-cache'
 import { FeatureDisabledScreen } from '@/components/feature-disabled-gate'
 import TagBadge from '@/components/friends/tag-badge'
 import { FIELD_TYPE_LABELS } from '@/components/friend-fields/field-list'
@@ -935,7 +936,8 @@ function FriendDetailInner() {
     try {
       const [chatRes, operatorRes] = await Promise.all([
         api.chats.get(friendId),
-        api.operators.list(),
+        // 友だち一覧の絞り込みと同じ名簿を共有する。保存の可否はサーバ側。
+        loadOperators(),
       ])
       if (chatRes.success) {
         setSupportStatus(chatRes.data.status)

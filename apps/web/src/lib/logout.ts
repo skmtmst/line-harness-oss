@@ -1,5 +1,6 @@
 import { adminSessionHeaders, clearAdminSession } from './admin-session'
 import { resetAuthSelectionCleared } from './hq-navigation'
+import { clearCommonCaches } from './common-caches'
 
 /**
  * ログアウト。共通トップバーと、統括の左下アカウントメニューが同じものを呼ぶ。
@@ -33,5 +34,8 @@ export async function logoutAndGoToLogin(loginPath: string = '/login'): Promise<
     // ストレージが使えなくても、行き先だけは変える
   }
   clearAdminSession()
+  // 使い回していた共通の答えを捨てる（次のログインで古い権限を見せない）。
+  // ふつうはこの後の画面遷移で破棄されるが、遷移に失敗しても残さない。
+  clearCommonCaches()
   window.location.href = loginPath
 }

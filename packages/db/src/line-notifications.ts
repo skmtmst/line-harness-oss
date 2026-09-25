@@ -782,6 +782,283 @@ export interface NotificationMetricRow {
   reason: string | null;
 }
 
+/**
+ * 送信台帳の1件取得。要件 v6-24 §6 `GET deliveries/:id`。
+ * 一覧と同じ射影・同じ結合で返し、アカウント境界の外側は null（404 隠蔽）にする。
+ */
+export async function getNotificationDelivery(
+  db: D1Database,
+  id: string,
+  lineAccountId: string,
+): Promise<NotificationDeliveryListRow | null> {
+  return db.prepare(`
+    WITH resolution_latest AS (
+      SELECT id, target_id, action, actor_id, created_at
+        FROM (
+          SELECT oa.*,
+                 ROW_NUMBER() OVER (
+                   PARTITION BY oa.target_id
+                   ORDER BY CAST(json_extract(oa.detail_json, '$.version') AS INTEGER) DESC,
+                            oa.created_at DESC, oa.id DESC
+                 ) AS row_number
+            FROM operation_audit oa
+           WHERE oa.target_kind = 'notification_delivery'
+             AND oa.action IN ('resolved', 'reopened')
+        ) WHERE row_number = 1
+    )
+    SELECT d.id, d.audience_type, d.recipient_type, d.recipient_id, d.channel,
+           d.status, d.retryable, d.attempts, d.next_retry_at, d.provider_status,
+           d.error_code, d.error_message_safe, d.queued_at, d.accepted_at,
+           d.execution_mode, d.version,
+           i.source_event_type, i.source_event_id, i.source_metadata_json,
+           def.name AS definition_name, ver.version_number AS definition_version,
+           CASE WHEN d.recipient_type = 'friend' THEN f.display_name ELSE NULL END AS friend_name,
+           (SELECT MAX(x.clicked_at) FROM notification_interactions x
+             WHERE x.delivery_id = d.id) AS clicked_at,
+           resolution.action AS resolution_action,
+           CASE WHEN resolution.action = 'resolved' THEN resolution.created_at ELSE NULL END AS resolved_at,
+           CASE WHEN resolution.action = 'resolved' THEN resolver.name ELSE NULL END AS resolved_by_name
+      FROM notification_deliveries d
+      JOIN notification_instances i ON i.id = d.instance_id AND i.line_account_id = d.line_account_id
+      LEFT JOIN customer_notification_definitions def
+        ON def.id = i.definition_id AND def.line_account_id = d.line_account_id
+      LEFT JOIN customer_notification_versions ver ON ver.id = i.definition_version_id
+      LEFT JOIN friends f
+        ON f.id = d.recipient_id AND f.line_account_id = d.line_account_id
+      LEFT JOIN resolution_latest resolution ON resolution.target_id = d.id
+      LEFT JOIN staff_members resolver ON resolver.id = resolution.actor_id
+     WHERE d.id = ? AND d.line_account_id = ?
+  `).bind(id, lineAccountId).first<NotificationDeliveryListRow>();
+}
+
+/**
+ * 手動の新規再送（resend）の送達行を、元の通知インスタンス配下に積む。
+ * retry と違い元の行は触らず、新しい冪等キーで送る。要件 v6-24 §6。
+ */
+export async function insertNotificationResendDelivery(
+  db: D1Database,
+  input: {
+    lineAccountId: string;
+    sourceDelivery: NotificationRetryRow;
+    staffId: string;
+    reason: string;
+  },
+): Promise<{ id: string; idempotencyKey: string }> {
+  const now = jstNow();
+  const id = crypto.randomUUID();
+  const idempotencyKey = `resend:${id}`;
+  const instance = await db.prepare(`
+    SELECT instance_id, audience_type, recipient_type, recipient_id, channel
+      FROM notification_deliveries WHERE id = ? AND line_account_id = ?
+  `).bind(input.sourceDelivery.id, input.lineAccountId).first<{
+    instance_id: string; audience_type: string; recipient_type: string;
+    recipient_id: string; channel: string;
+  }>();
+  if (!instance) throw new Error('notification resend source was not found');
+  const results = await db.batch([
+    db.prepare(`
+      INSERT INTO notification_deliveries
+        (id, line_account_id, instance_id, audience_type, recipient_type, recipient_id,
+         channel, idempotency_key, status, retryable, attempts, queued_at,
+         execution_mode, version, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', 1, 0, ?, 'resend', 1, ?)
+    `).bind(
+      id, input.lineAccountId, instance.instance_id, instance.audience_type,
+      instance.recipient_type, instance.recipient_id, instance.channel,
+      idempotencyKey, now, now,
+    ),
+    // 再送理由は監査として残す。対応状況の履歴（resolved/reopened）とは
+    // 別actionなので一覧の解決状態には影響しない。
+    db.prepare(`
+      INSERT INTO operation_audit
+        (id, target_kind, target_id, action, actor_id, detail_json, created_at)
+      VALUES (?, 'notification_delivery', ?, 'line_notification.delivery.resend', ?, ?, ?)
+    `).bind(
+      crypto.randomUUID(), id, input.staffId,
+      JSON.stringify({
+        lineAccountId: input.lineAccountId, version: 1,
+        sourceDeliveryId: input.sourceDelivery.id, reason: input.reason,
+      }), now,
+    ),
+  ]);
+  if (Number(results[0]?.meta.changes ?? 0) !== 1) {
+    throw new Error('notification resend delivery was not recorded');
+  }
+  return { id, idempotencyKey };
+}
+
+/**
+ * 新規再送の送信結果を確定する。試行履歴を1件足し、送達の回数を進める。
+ */
+export async function finishNotificationResendDelivery(
+  db: D1Database,
+  input: {
+    id: string;
+    lineAccountId: string;
+    idempotencyKey: string;
+    outcome: 'provider_accepted' | 'retry_wait' | 'failed';
+    providerRequestId?: string | null;
+    errorCode?: string | null;
+    errorMessageSafe?: string | null;
+    nextRetryAt?: string | null;
+  },
+): Promise<boolean> {
+  const attemptedAt = jstNow();
+  const results = await db.batch([
+    db.prepare(`
+      INSERT INTO notification_delivery_attempts
+        (id, delivery_id, attempt_number, retry_key, outcome, provider_request_id,
+         error_code, error_message_safe, attempted_at)
+      VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      crypto.randomUUID(), input.id, input.idempotencyKey, input.outcome,
+      input.providerRequestId ?? null, input.errorCode ?? null,
+      input.errorMessageSafe ?? null, attemptedAt,
+    ),
+    db.prepare(`
+      UPDATE notification_deliveries
+         SET status = ?, attempts = 1, provider_request_id = ?, provider_status = ?,
+             error_code = ?, error_message_safe = ?, next_retry_at = ?,
+             accepted_at = CASE WHEN ? = 'provider_accepted' THEN ? ELSE NULL END,
+             failed_at = CASE WHEN ? IN ('retry_wait', 'failed') THEN ? ELSE NULL END,
+             retryable = CASE WHEN ? = 'retry_wait' THEN 1 ELSE 0 END,
+             updated_at = ?
+       WHERE id = ? AND line_account_id = ? AND status = 'pending' AND attempts = 0
+    `).bind(
+      input.outcome,
+      input.providerRequestId ?? null,
+      input.outcome,
+      input.errorCode ?? null,
+      input.errorMessageSafe ?? null,
+      input.nextRetryAt ?? null,
+      input.outcome,
+      attemptedAt,
+      input.outcome,
+      attemptedAt,
+      input.outcome,
+      attemptedAt,
+      input.id,
+      input.lineAccountId,
+    ),
+  ]);
+  return Number(results[0]?.meta.changes ?? 0) === 1
+    && Number(results[1]?.meta.changes ?? 0) === 1;
+}
+
+/**
+ * 顧客定義の公開前テスト送信の記録先インスタンスを作る。
+ * 実イベントとは別の `test:` 系キーで、再送・集計と混ざらない。
+ */
+export async function createCustomerTestInstance(
+  db: D1Database,
+  input: {
+    lineAccountId: string;
+    definitionId: string;
+    definitionVersionId: string | null;
+    sourceEventType: string;
+    metadata?: Record<string, unknown>;
+  },
+): Promise<{ instanceId: string; sourceEventId: string }> {
+  const now = jstNow();
+  const sourceEventId = `test:${crypto.randomUUID()}`;
+  const instanceId = crypto.randomUUID();
+  await db.prepare(`
+    INSERT INTO notification_instances
+      (id, line_account_id, audience_type, definition_id, definition_version_id,
+       source_event_type, source_event_id, source_metadata_json, dedupe_key,
+       status, created_at, updated_at)
+    VALUES (?, ?, 'customer', ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
+  `).bind(
+    instanceId, input.lineAccountId, input.definitionId, input.definitionVersionId,
+    input.sourceEventType, sourceEventId,
+    input.metadata ? JSON.stringify(input.metadata) : null,
+    `test:${sourceEventId}`, now, now,
+  ).run();
+  return { instanceId, sourceEventId };
+}
+
+/**
+ * テスト送信の操作自体を監査に残す。誰がどの定義を誰に試し送りしたかが
+ * 後から分かる。対応状況の履歴（resolved/reopened）とは別action・別kind。
+ */
+export async function recordCustomerTestAudit(
+  db: D1Database,
+  input: {
+    definitionId: string;
+    lineAccountId: string;
+    staffId: string;
+    sourceEventId: string;
+    recipientIds: string[];
+  },
+): Promise<void> {
+  await db.prepare(`
+    INSERT INTO operation_audit
+      (id, target_kind, target_id, action, actor_id, detail_json, created_at)
+    VALUES (?, 'customer_notification', ?, 'line_notification.definition.test', ?, ?, ?)
+  `).bind(
+    crypto.randomUUID(), input.definitionId, input.staffId,
+    JSON.stringify({
+      lineAccountId: input.lineAccountId,
+      sourceEventId: input.sourceEventId,
+      recipientIds: input.recipientIds,
+    }), jstNow(),
+  ).run();
+}
+
+/**
+ * テスト送信の1宛先ぶんを記録する。送信は呼び出し側が行い、結果だけ書く。
+ * テスト送信は再試行の対象にしない（retryable 0）。
+ */
+export async function recordCustomerTestDelivery(
+  db: D1Database,
+  input: {
+    lineAccountId: string;
+    instanceId: string;
+    recipientId: string;
+    idempotencyKey: string;
+    outcome: 'provider_accepted' | 'failed';
+    providerRequestId?: string | null;
+    errorCode?: string | null;
+    errorMessageSafe?: string | null;
+  },
+): Promise<{ id: string }> {
+  const now = jstNow();
+  const id = crypto.randomUUID();
+  const status = input.outcome === 'provider_accepted' ? 'provider_accepted' : 'failed';
+  await db.prepare(`
+    INSERT INTO notification_deliveries
+      (id, line_account_id, instance_id, audience_type, recipient_type, recipient_id,
+       channel, idempotency_key, status, retryable, attempts, provider_request_id,
+       provider_status, error_code, error_message_safe, queued_at, accepted_at,
+       failed_at, execution_mode, version, updated_at)
+    VALUES (?, ?, ?, 'customer', 'friend', ?, 'line', ?, ?, 0, 1, ?, ?, ?, ?,
+            ?, ?, ?, 'test', 1, ?)
+  `).bind(
+    id, input.lineAccountId, input.instanceId, input.recipientId,
+    input.idempotencyKey, status,
+    input.providerRequestId ?? null, status,
+    input.errorCode ?? null, input.errorMessageSafe ?? null, now,
+    status === 'provider_accepted' ? now : null,
+    status === 'failed' ? now : null, now,
+  ).run();
+  await db.prepare(`
+    INSERT INTO notification_delivery_attempts
+      (id, delivery_id, attempt_number, retry_key, outcome, provider_request_id,
+       error_code, error_message_safe, attempted_at)
+    VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?)
+  `).bind(
+    crypto.randomUUID(), id, input.idempotencyKey, input.outcome,
+    input.providerRequestId ?? null, input.errorCode ?? null,
+    input.errorMessageSafe ?? null, now,
+  ).run();
+  await db.prepare(`
+    UPDATE notification_instances SET status = ?, updated_at = ?
+     WHERE id = ? AND line_account_id = ?
+  `).bind(input.outcome === 'provider_accepted' ? 'completed' : 'failed', now,
+    input.instanceId, input.lineAccountId).run();
+  return { id };
+}
+
 export async function listNotificationMetrics(
   db: D1Database,
   input: { lineAccountId: string; from?: string; to?: string },
