@@ -38,6 +38,12 @@ export const PERMISSION_LABELS: Record<string, string> = {
   '/line-notifications': 'LINE通知',
   '/nen-campaigns': 'フォロー配信',
   '/nen-members': '投稿写真審査',
+  'broadcast.definition.edit': '一斉配信の下書き作成・編集',
+  'broadcast.test.send': '一斉配信のテスト送信',
+  'broadcast.definition.publish': '一斉配信の予約・送信',
+  'broadcast.job.stop': '一斉配信の緊急停止',
+  'broadcast.job.retry': '一斉配信の失敗再送',
+  'broadcast.result.export': '一斉配信の結果書き出し',
 }
 
 /** 知らない権限パスが来たら件数表示に落とす前の名前解決。 */

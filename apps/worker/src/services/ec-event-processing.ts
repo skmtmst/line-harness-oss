@@ -75,6 +75,7 @@ async function fireEcV6Event(
   input: {
     eventId: string; lineAccountId: string; externalEventId: string;
     event: EcEvent; friendId: string; accessToken: string; now: string;
+    credentialKey?: string;
   },
 ): Promise<void> {
   const idempotencyKey = ecDispatchIdempotencyKey(input.lineAccountId, input.externalEventId, 'v6');
@@ -83,7 +84,10 @@ async function fireEcV6Event(
   if (await getEcDispatchStatus(db, input.eventId, 'v6') === 'sent') return;
   const v6Event = buildEcV6Event(input.event, input.friendId);
   try {
-    await fireEvent(db, v6Event.eventType, v6Event.payload, input.accessToken, input.lineAccountId);
+    await fireEvent(
+      db, v6Event.eventType, v6Event.payload, input.accessToken, input.lineAccountId,
+      undefined, input.credentialKey,
+    );
   } catch (error) {
     try {
       await markEcDispatch(db, {
@@ -117,9 +121,10 @@ export async function processEcEvent(
     event: EcEvent;
     eventRowId: string;
     now: string;
+    credentialKey?: string;
   },
 ): Promise<EcEventOutcome> {
-  const { account, lineAccountId, event, now } = input;
+  const { account, lineAccountId, event, now, credentialKey } = input;
   const row = { id: input.eventRowId };
   const claim = await db.prepare(
     `UPDATE ec_events SET status = 'processing', error_message = NULL, updated_at = ?
@@ -237,7 +242,7 @@ export async function processEcEvent(
       ).bind(friend.id, now, now, row.id).run();
       await fireEcV6Event(db, {
         eventId: row.id, lineAccountId, externalEventId: event.event_id,
-        event, friendId: friend.id, accessToken, now,
+        event, friendId: friend.id, accessToken, now, credentialKey,
       });
       await setEcActionExecutionStatus(db, {
         eventId: row.id, lineAccountId, status: 'succeeded', now,
@@ -300,7 +305,7 @@ export async function processEcEvent(
       });
       await fireEcV6Event(db, {
         eventId: row.id, lineAccountId, externalEventId: event.event_id,
-        event, friendId: friend.id, accessToken, now,
+        event, friendId: friend.id, accessToken, now, credentialKey,
       });
       await setEcActionExecutionStatus(db, {
         eventId: row.id, lineAccountId, status: 'skipped',
@@ -410,7 +415,7 @@ export async function processEcEvent(
 
     await fireEcV6Event(db, {
       eventId: row.id, lineAccountId, externalEventId: event.event_id,
-      event, friendId: friend.id, accessToken, now,
+      event, friendId: friend.id, accessToken, now, credentialKey,
     });
 
     await setEcActionExecutionStatus(db, {

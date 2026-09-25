@@ -36,6 +36,28 @@ export const ACCESS_USER_VIEW_KEY = 'access.user.view';
 export const ACCESS_AUDIT_VIEW_KEY = 'access.audit.view';
 
 /**
+ * 一斉配信の操作キー（v6-06 §6 が正本）。
+ * 下書き作成・編集／テスト送信／予約・即時送信／緊急停止／失敗再送／CSV。
+ */
+export const BROADCAST_DEFINITION_EDIT_KEY = 'broadcast.definition.edit';
+export const BROADCAST_TEST_SEND_KEY = 'broadcast.test.send';
+export const BROADCAST_DEFINITION_PUBLISH_KEY = 'broadcast.definition.publish';
+export const BROADCAST_JOB_STOP_KEY = 'broadcast.job.stop';
+export const BROADCAST_JOB_RETRY_KEY = 'broadcast.job.retry';
+export const BROADCAST_RESULT_EXPORT_KEY = 'broadcast.result.export';
+
+/**
+ * 配信 edit と組で付ける操作キー。緊急停止・失敗再送は指定者のみ
+ * （束には入れず、管理者が個別に付ける）。
+ */
+export const BROADCAST_EDIT_OPERATION_KEYS: readonly string[] = [
+  BROADCAST_DEFINITION_EDIT_KEY,
+  BROADCAST_TEST_SEND_KEY,
+  BROADCAST_DEFINITION_PUBLISH_KEY,
+  BROADCAST_RESULT_EXPORT_KEY,
+];
+
+/**
  * 予約の細かい権限（N-411 / v6-30 §7-2「予約管理editでも予約設定は別permission」）。
  * - `/booking/menus`: メニューと担当割当の編集・閲覧
  * - `booking.settings`: 予約設定（受付枠・資源・例外・予約スタッフ登録）の変更
@@ -241,8 +263,12 @@ export function scopeLevelsToKeys(levels: ScopeLevels): { edit: string[]; view: 
   for (const item of SCOPE_ITEMS) {
     if (item.kind !== 'feature') continue;
     const level = levels[item.id];
-    if (level === 'edit') edit.push(...item.keys);
-    else if (level === 'view') view.push(...item.keys);
+    if (level === 'edit') {
+      edit.push(...item.keys);
+      // 配信を変えられる人は、下書き・テスト・送信・CSVも組で付ける。
+      // 止める・送り直すは指定者のみ（ここには入れない）。
+      if (item.id === 'delivery') edit.push(...BROADCAST_EDIT_OPERATION_KEYS);
+    } else if (level === 'view') view.push(...item.keys);
   }
   return { edit, view };
 }

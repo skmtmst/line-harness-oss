@@ -11,6 +11,9 @@ export interface User {
   phone: string | null;
   external_id: string | null;
   display_name: string | null;
+  /** active / review / archived。archived は一覧・詳細・照合から外す。 */
+  status: string;
+  archived_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -31,7 +34,8 @@ export interface UserAccessScope {
 }
 
 const ACCESSIBLE_USER_PREDICATE = `
-  (
+  COALESCE(u.status, 'active') <> 'archived'
+  AND (
     u.tenant_id = ?
     OR (
       u.tenant_id IS NULL
@@ -232,6 +236,36 @@ export async function updateUser(
 
 export async function deleteUser(db: D1Database, id: string): Promise<void> {
   await db.prepare(`DELETE FROM users WHERE id = ?`).bind(id).run();
+}
+
+export interface UserRelationCounts {
+  /** user_id が付いた友だちの件数。 */
+  friends: number;
+  /** 解除していない名寄せの結びつきの件数。 */
+  activeLinks: number;
+}
+
+/** 物理削除の前に確かめる関連の件数。孤立した user_id を作らないため。 */
+export async function getUserRelationCounts(db: D1Database, id: string): Promise<UserRelationCounts> {
+  const friends = await db.prepare(
+    `SELECT COUNT(*) AS total FROM friends WHERE user_id = ?`,
+  ).bind(id).first<{ total: number }>();
+  const links = await db.prepare(
+    `SELECT COUNT(*) AS total FROM friend_identity_links WHERE user_id = ? AND unlinked_at IS NULL`,
+  ).bind(id).first<{ total: number }>();
+  return { friends: Number(friends?.total ?? 0), activeLinks: Number(links?.total ?? 0) };
+}
+
+/**
+ * 通常の削除操作。行は消さず退避（archive）にする。
+ * 履歴・監査・支払の記録が user_id で残っていても壊れない。
+ */
+export async function archiveUser(db: D1Database, id: string): Promise<User | null> {
+  const now = jstNow();
+  await db.prepare(
+    `UPDATE users SET status = 'archived', archived_at = COALESCE(archived_at, ?), updated_at = ? WHERE id = ?`,
+  ).bind(now, now, id).run();
+  return getUserById(db, id);
 }
 
 export async function linkFriendToUser(

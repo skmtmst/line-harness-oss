@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import {
+  decryptCredential,
   getLineAccountById,
   jstNow,
   setEcActionExecutionStatus,
@@ -402,15 +403,60 @@ function lineUserIdFromRawBody(rawBody: string): string | null {
   }
 }
 
+/** 全体の鍵。未設定・短いときは使えない（移行が済むまでのつなぎ）。 */
+function usableGlobalSecret(value: string | undefined): string | null {
+  return value && value.length >= 32 ? value : null;
+}
+
+/**
+ * つなぎ先ごとの受信鍵。ec_connectors の暗号化された鍵を復号する。
+ * 鍵の用意がない・復号できないときは null（全体の鍵へ倒す）。
+ */
+async function getConnectorSecret(
+  db: D1Database,
+  lineAccountId: string,
+  encryptionKey: string | undefined,
+): Promise<string | null> {
+  try {
+    const row = await db.prepare(
+      `SELECT inbound_secret_encrypted FROM ec_connectors WHERE line_account_id = ? LIMIT 1`,
+    ).bind(lineAccountId).first<{ inbound_secret_encrypted: string | null }>();
+    const encrypted = row?.inbound_secret_encrypted;
+    if (!encrypted) return null;
+    const secret = await decryptCredential(encrypted, encryptionKey);
+    return secret && secret.length >= 32 ? secret : null;
+  } catch {
+    return null;
+  }
+}
+
+/** 候補の鍵を順に試し、1つでも合えば通す。移行期間の両受けが本体。 */
+async function verifyWithAnySecret(
+  secrets: Array<string | null>,
+  signedPayload: string,
+  signature: string,
+): Promise<boolean> {
+  for (const secret of secrets) {
+    if (!secret) continue;
+    const expected = await hmacHex(secret, signedPayload);
+    if (constantTimeHexEqual(signature.toLowerCase(), expected)) return true;
+  }
+  return false;
+}
+
 ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
   const requestedLineAccountId = c.req.header('x-line-account-id')?.trim();
   // ヘッダー無し（EC-CUBE 標準）で署名の時刻も無い呼び出しは、宛先を探す前に断る。
   if (!requestedLineAccountId && !c.req.header('x-nen-timestamp')) {
     return c.json({ success: false, error: 'LINE account is required' }, 400);
   }
-  const secret = c.env.ECCUBE_WEBHOOK_SECRET;
-  if (!secret || secret.length < 32) {
-    console.error('[ec-event] ECCUBE_WEBHOOK_SECRET is missing or too short');
+  // つなぎ先ごとの鍵へ移行中。使える鍵が1つもないときだけ 503 にする。
+  const globalSecret = usableGlobalSecret(c.env.ECCUBE_WEBHOOK_SECRET);
+  const headerConnectorSecret = requestedLineAccountId
+    ? await getConnectorSecret(c.env.DB, requestedLineAccountId, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY)
+    : null;
+  if (!globalSecret && !headerConnectorSecret) {
+    console.error('[ec-event] no usable webhook secret (global or connector)');
     return c.json({ success: false, error: 'Integration is not configured' }, 503);
   }
 
@@ -429,11 +475,24 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
     return c.json({ success: false, error: 'Expired request' }, 401);
   }
   // ヘッダー無し（EC-CUBE 標準）は署名を先に確かめ、本文の line_user_id から宛先を決める。
+  // ヘッダー有りはつなぎ先の鍵を先に試し、だめなら全体の鍵（移行期間）。
+  // ヘッダー無しは全体の鍵を先に試し、だめなら宛先を決めてつなぎ先の鍵を試す。
   const signedPayload = requestedLineAccountId
     ? `${timestamp}.${requestedLineAccountId}.${rawBody}`
     : `${timestamp}.${rawBody}`;
-  const expected = await hmacHex(secret, signedPayload);
-  if (!constantTimeHexEqual(signature.toLowerCase(), expected)) {
+  let verified = requestedLineAccountId
+    ? await verifyWithAnySecret([headerConnectorSecret, globalSecret], signedPayload, signature)
+    : await verifyWithAnySecret([globalSecret], signedPayload, signature);
+  if (!verified && !requestedLineAccountId) {
+    const fallbackAccountId = await resolveAccountIdWithoutHeader(c.env.DB, lineUserIdFromRawBody(rawBody));
+    if (fallbackAccountId) {
+      const fallbackSecret = await getConnectorSecret(
+        c.env.DB, fallbackAccountId, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY,
+      );
+      verified = await verifyWithAnySecret([fallbackSecret], signedPayload, signature);
+    }
+  }
+  if (!verified) {
     return c.json({ success: false, error: 'Invalid signature' }, 401);
   }
   const lineAccountId = requestedLineAccountId || await resolveAccountIdWithoutHeader(c.env.DB, lineUserIdFromRawBody(rawBody));
@@ -585,6 +644,7 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
       event,
       eventRowId: row.id,
       now,
+      credentialKey: c.env.LINE_CREDENTIAL_ENCRYPTION_KEY,
     });
     if (outcome === 'duplicate') return c.json({ success: true, duplicate: true, status: 'processing' }, 202);
     if (outcome === 'processed') return c.json({ success: true, status: 'processed' });

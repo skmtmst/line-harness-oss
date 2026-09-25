@@ -912,6 +912,7 @@ async function serveMediaFile(
       'Content-Type': media.mime_type,
       'Content-Disposition': disposition,
       'Cache-Control': 'private, no-store',
+      'X-Content-Type-Options': 'nosniff',
     },
   });
 }
@@ -986,6 +987,7 @@ contents.get('/api/media/:id/versions/:versionNo/download', requireRole('owner',
         'Content-Type': version.mime_type,
         'Content-Disposition': `attachment; filename="download"; filename*=UTF-8''${encodeURIComponent(downloadName)}`,
         'Cache-Control': 'private, no-store',
+        'X-Content-Type-Options': 'nosniff',
       },
     });
   } catch (err) {
@@ -1014,11 +1016,16 @@ contents.get('/media/:id/content', async (c) => {
     if (etag && c.req.header('if-none-match') === etag) {
       return new Response(null, { status: 304 });
     }
+    // 判別不能なまま開かせない。画像以外はそのまま表示せず添付で渡す。
+    const inline = media.mime_type.toLowerCase().startsWith('image/');
     return new Response(object.body, {
       headers: {
         'Content-Type': media.mime_type,
-        'Content-Disposition': `inline; filename*=UTF-8''${encodeURIComponent(media.filename)}`,
+        'Content-Disposition': inline
+          ? `inline; filename*=UTF-8''${encodeURIComponent(media.filename)}`
+          : `attachment; filename="download"; filename*=UTF-8''${encodeURIComponent(media.filename)}`,
         'Cache-Control': 'public, max-age=0, must-revalidate',
+        'X-Content-Type-Options': 'nosniff',
         ...(etag ? { ETag: etag } : {}),
       },
     });

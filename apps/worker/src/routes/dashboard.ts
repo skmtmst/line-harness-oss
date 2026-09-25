@@ -74,10 +74,16 @@ function readDashboardCards(value: unknown): DashboardCards | null {
     for (const candidate of input) {
       if (!candidate || typeof candidate !== 'object') return null;
       const item = candidate as { id?: unknown; visible?: unknown };
-      if (typeof item.id !== 'string' || !DASHBOARD_CARD_GROUPS[group].has(item.id)) return null;
+      if (typeof item.id !== 'string' || item.id.length === 0) return null;
       if (typeof item.visible !== 'boolean' || seen.has(item.id)) return null;
       seen.add(item.id);
-      items.push({ id: item.id, visible: item.visible });
+      /*
+       * 機能OFF・廃止で候補から外れたIDが残っていても保存全体を400に
+       * しない。未知IDは visible=false で保持し、表示には使わない。
+       * 並びは残るため、機能が戻ったときに配置が復活する。
+       */
+      const known = DASHBOARD_CARD_GROUPS[group].has(item.id);
+      items.push({ id: item.id, visible: known && item.visible });
     }
     if (group === 'today' && items.filter((item) => item.visible).length > DASHBOARD_TODAY_VISIBLE_LIMIT) return null;
     out[group] = items;

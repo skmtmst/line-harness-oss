@@ -91,10 +91,17 @@ images.get('/images/*', async (c) => {
     return c.json({ success: false, error: 'Image not found' }, 404);
   }
 
+  const contentType = object.httpMetadata?.contentType || 'image/png';
   const headers = new Headers();
-  headers.set('Content-Type', object.httpMetadata?.contentType || 'image/png');
+  headers.set('Content-Type', contentType);
   headers.set('Cache-Control', 'public, max-age=31536000, immutable');
   headers.set('ETag', object.etag);
+  // 判別不能なまま開かせない。画像以外はそのまま表示せず添付で渡す。
+  headers.set('X-Content-Type-Options', 'nosniff');
+  headers.set(
+    'Content-Disposition',
+    contentType.toLowerCase().startsWith('image/') ? 'inline' : 'attachment',
+  );
 
   return new Response(object.body, { headers });
 });
