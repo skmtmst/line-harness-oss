@@ -52,7 +52,13 @@ beforeEach(() => {
   vi.stubGlobal('fetch', (input: string | URL) => {
     const url = new URL(String(input), 'http://localhost')
     if (url.pathname === '/api/chats') {
+      // 口は「未読が先・新しい順」で返す。画面はこの順のまま混ぜる。
       return response({ success: true, data: [
+        {
+          id: 'chat-unread-old', friendId: 'friend-unread-old', friendName: 'LINE未読古', operatorId: null,
+          status: 'resolved', isUnread: true, lastMessageAt: '2026-08-30T00:00:00.000Z',
+          lastMessageContent: '古いが未読', lastMessageType: 'text', lastMessageDirection: 'incoming',
+        },
         {
           id: 'chat-new', friendId: 'friend-new', friendName: 'LINE新', operatorId: null,
           status: 'resolved', isUnread: false, lastMessageAt: '2026-09-03T00:00:00.000Z',
@@ -97,18 +103,19 @@ afterEach(async () => {
   vi.unstubAllGlobals()
 })
 
-test('並び順は固定表示で、LINEとメールを新しい順に統合する', async () => {
+test('並び順は固定表示で、LINEとメールを未読が先・新しい順に統合する', async () => {
   await act(async () => root.render(<ChatsPage />))
 
   await eventually(() => {
     expect(host.textContent).toContain('LINE新')
     expect(host.textContent).toContain('メール中')
     expect(host.textContent).toContain('LINE古')
+    expect(host.textContent).toContain('LINE未読古')
   })
 
   const list = host.querySelector<HTMLElement>('[data-inbox-v4="conversation-list"]')!
   const sortDescription = list.querySelector<HTMLElement>('[data-inbox-sort="fixed"]')
-  expect(sortDescription?.textContent?.trim()).toBe('並び順：新しい順')
+  expect(sortDescription?.textContent?.trim()).toBe('並び順：未読が先・新しい順')
 
   const interactiveSortControls = [...list.querySelectorAll('select, button, [role="combobox"]')]
     .filter((element) => /並び順|新しい順/.test(
@@ -117,6 +124,8 @@ test('並び順は固定表示で、LINEとメールを新しい順に統合す�
   expect(interactiveSortControls).toHaveLength(0)
 
   const rendered = list.textContent ?? ''
+  // 古いが未読の行が、新しい既読より先に来る。既読同士は新しい順。
+  expect(rendered.indexOf('LINE未読古')).toBeLessThan(rendered.indexOf('LINE新'))
   expect(rendered.indexOf('LINE新')).toBeLessThan(rendered.indexOf('メール中'))
   expect(rendered.indexOf('メール中')).toBeLessThan(rendered.indexOf('LINE古'))
 })

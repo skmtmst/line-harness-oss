@@ -65,9 +65,14 @@ interface EmailInboxItem {
   revision: number
   assignedStaffId?: string | null
   assignedStaffName?: string | null
+  /** 受信・送信のうち新しい方の時刻。口はこの順で返す。無い口は受信時刻に倒す。 */
+  lastMessageAt?: string | null
   lastIncomingAt: string
   isUnread: boolean
 }
+
+/** 受信箱一覧の続きを読む位置。口の並び（未読が先・新しい順）と同じ3点。 */
+type ListCursor = { at: string; id: string; unread: 0 | 1 }
 
 const statusConfig: Record<Chat['status'], { label: string; className: string }> = {
   unread: { label: '未対応', className: 'bg-danger-bg text-danger' },
@@ -117,6 +122,14 @@ function ChannelBadge({ channel }: { channel: 'line' | 'email' }) {
 // 300 のままだと API が200件に丸めるのに画面は300件で「続き」を判定し、
 // 201件目以降に「さらに読み込む」が出ず開けなくなる。
 const CHAT_PAGE_SIZE = 200
+
+/** 一覧の末尾から「続きを読む」位置を作る。口の並び（未読が先・新しい順）と同じ3点。 */
+function toListCursor(
+  last: Pick<ChatListItem, 'id' | 'lastMessageAt' | 'isUnread'> | undefined,
+): ListCursor | null {
+  if (!last?.lastMessageAt) return null
+  return { at: last.lastMessageAt, id: last.id, unread: last.isUnread ? 1 : 0 }
+}
 
 function StickerMessageImage({ content }: { content: string }) {
   const [failed, setFailed] = useState(false)
@@ -679,7 +692,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   // ページング用カーソル。表示リストは楽観更新で並び替わるため、
   // 「サーバから最後に受け取った行」を ref で保持して次ページの起点にする
   // (offset 方式だと新着で行が押し下げられた分が欠落する)。
-  const nextCursorRef = useRef<{ at: string; id: string } | null>(null)
+  const nextCursorRef = useRef<ListCursor | null>(null)
   // 会話を素早く切り替えたとき、前の会話の遅い応答で現在の詳細を
   // 上書きしない。注目操作が別の友だちへ向く事故もここで防ぐ。
   const detailRequestIdRef = useRef(0)
@@ -725,11 +738,11 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     return () => window.clearTimeout(timer)
   }, [nameQuery])
 
-  const buildListParams = useCallback((cursor: { at: string; id: string } | null) => {
+  const buildListParams = useCallback((cursor: ListCursor | null) => {
     const params: {
       status?: string; accountId?: string; q?: string;
       operatorId?: string; unreadOnly?: boolean; quickFilter?: 'reply' | 'overdue';
-      limit?: number; beforeAt?: string; beforeId?: string;
+      limit?: number; beforeUnread?: 0 | 1; beforeAt?: string; beforeId?: string;
     } = {}
     if (statusFilter !== 'all') params.status = statusFilter
     if (selectedAccountId) params.accountId = selectedAccountId
@@ -739,6 +752,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     if (quickFilter !== 'all') params.quickFilter = quickFilter
     params.limit = CHAT_PAGE_SIZE
     if (cursor) {
+      params.beforeUnread = cursor.unread
       params.beforeAt = cursor.at
       params.beforeId = cursor.id
     }
@@ -853,7 +867,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         const rows = chatRes.data
         setChats(rows)
         const last = rows[rows.length - 1]
-        nextCursorRef.current = last?.lastMessageAt ? { at: last.lastMessageAt, id: last.id } : null
+        nextCursorRef.current = toListCursor(last)
         // ページ丁度いっぱい返ってきた = 続きがある可能性が高い
         setHasMoreChats(rows.length === CHAT_PAGE_SIZE)
       } else {
@@ -894,7 +908,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           return [...prev, ...rows.filter((r) => !seen.has(r.id))]
         })
         const last = rows[rows.length - 1]
-        nextCursorRef.current = last?.lastMessageAt ? { at: last.lastMessageAt, id: last.id } : null
+        nextCursorRef.current = toListCursor(last)
         setHasMoreChats(rows.length === CHAT_PAGE_SIZE)
       }
     } catch {
@@ -1282,7 +1296,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         return merged
       })
       const last = rows[rows.length - 1]
-      nextCursorRef.current = last?.lastMessageAt ? { at: last.lastMessageAt, id: last.id } : null
+      nextCursorRef.current = toListCursor(last)
       setHasMoreChats(rows.length === CHAT_PAGE_SIZE)
       setChatListFailed(false)
       return true
@@ -1632,6 +1646,24 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     setSelectedChatId(null)
     // 会話の指定だけ外す。保存検索は一覧の条件なので残す(N-021)。
     router.replace(buildInboxUrl(channel, savedViewParam || null))
+  }
+
+  // 状態の切り替えの5つの押し場所。選んでいる所だけ Tab で止まる
+  // （ラジオの決まり）。左右・先頭・末尾のキーで選ぶ。
+  const statusFilterButtonRefs = useRef<(HTMLButtonElement | null)[]>([])
+  const handleStatusFilterKeyDown = (event: React.KeyboardEvent) => {
+    const current = statusFilters.findIndex((f) => f.key === statusFilter)
+    let next: number | null = null
+    if (event.key === 'ArrowRight') next = (current + 1) % statusFilters.length
+    else if (event.key === 'ArrowLeft') next = (current - 1 + statusFilters.length) % statusFilters.length
+    else if (event.key === 'Home') next = 0
+    else if (event.key === 'End') next = statusFilters.length - 1
+    if (next == null) return
+    event.preventDefault()
+    const filter = statusFilters[next]
+    setStatusFilter(filter.key)
+    dropSavedViewParam()
+    statusFilterButtonRefs.current[next]?.focus()
   }
 
   const handleSelectChat = (chatId: string) => {
@@ -2487,12 +2519,12 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
             メールを開いても一覧が残って中央が半分のままだった。 */}
         <div
           data-inbox-v4="conversation-list"
-          className={`w-full border-[#E5E7EB] bg-canvas lg:flex-shrink-0 border-r flex-col overflow-hidden ${showFriendInfo ? 'lg:w-72' : 'lg:w-[330px] 2xl:w-[420px]'} ${selectedChatId || selectedThreadId ? 'hidden lg:flex' : 'flex'}`}
+          className={`bg-canvas lg:flex-shrink-0 border-r flex-col overflow-hidden border-hairline ${showFriendInfo ? 'lg:w-72' : 'lg:w-[330px] 2xl:w-[420px]'} ${selectedChatId || selectedThreadId ? 'hidden lg:flex' : 'flex'}`}
         >
           {/* タブ (すべて / 未読 / 対応中 / 対応済み) は意図的に削除。直近メッセージが見やすい LINE 風一覧を優先。 */}
 
           {/* 設計 `ListPane` の「名前で検索」。一覧が長くなると状態の絞り込みだけでは足りない。 */}
-          <div className="border-[#E5E7EB] border-b p-3">
+          <div className="border-b border-hairline p-3">
             <div className="relative">
               <svg className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-[#98A2B3]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
               <input
@@ -2536,7 +2568,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   aria-label={item.label}
                   title={item.label}
                   aria-pressed={channel === item.key}
-                  className={`inline-flex shrink-0 items-center justify-center rounded-md px-1.5 py-1.5 text-[11px] font-semibold whitespace-nowrap ${channel === item.key ? 'bg-[#EAFBF0] text-[#057A37]' : 'text-[#344054] hover:bg-[#F7F8F6]'}`}
+                  className={`inline-flex shrink-0 items-center justify-center rounded-md px-1.5 py-1.5 text-[11px] font-semibold whitespace-nowrap ${channel === item.key ? 'bg-accent-soft text-accent-deep' : 'text-ink hover:bg-shell'}`}
                 >
                   {item.key === 'line' && <ChannelBadge channel="line" />}
                   {item.key === 'email' && <ChannelBadge channel="email" />}
@@ -2545,28 +2577,51 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               ))}
               <span
                 data-inbox-sort="fixed"
-                className="ml-auto shrink-0 text-[11px] font-semibold whitespace-nowrap text-[#667085]"
+                className="text-ink-secondary ml-auto shrink-0 text-[11px] font-semibold whitespace-nowrap"
               >
-                並び順：新しい順
+                並び順：未読が先・新しい順
               </span>
             </div>
           </div>
 
-          {/* Filter row */}
-          <div className="flex flex-wrap items-center gap-1.5 border-b border-[#E5E7EB] px-3 py-2">
-            {statusFilters.map((f) => (
-              <button
-                key={f.key}
-                onClick={() => { setStatusFilter(f.key); dropSavedViewParam() }}
-                className={`shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                  statusFilter === f.key
-                    ? 'bg-accent-deep text-on-accent'
-                    : 'bg-[#F2F4F7] text-[#667085] hover:bg-[#EAECF0]'
-                }`}
-              >
-                {f.label}
-              </button>
-            ))}
+          {/*
+            状態の絞り込みは5等分の切り替え。左の欄（開いている間は288px）でも
+            必ず1行に収まるよう、折り返さない・5つで幅いっぱいにする。
+            選んだ所は白地に濃い文字。読み上げはラジオの決まり。
+          */}
+          <div className="border-b border-hairline px-3 py-2">
+            <div
+              role="radiogroup"
+              aria-label="対応状況で絞り込む"
+              onKeyDown={handleStatusFilterKeyDown}
+              className="bg-shell flex h-8 flex-nowrap items-stretch rounded-lg p-0.5"
+            >
+              {statusFilters.map((f, index) => {
+                const selected = statusFilter === f.key
+                return (
+                  <button
+                    key={f.key}
+                    ref={(el) => { statusFilterButtonRefs.current[index] = el }}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    tabIndex={selected ? 0 : -1}
+                    title={f.label}
+                    onClick={() => { setStatusFilter(f.key); dropSavedViewParam() }}
+                    // #639 の素のボタンの最小高さ32pxをここだけ外す。
+                    // 切り替え全体の高さ32pxの中に収めるため。
+                    style={{ minHeight: 0 }}
+                    className={`min-w-0 flex-1 truncate rounded-md px-1 text-center text-xs whitespace-nowrap transition-colors ${
+                      selected
+                        ? 'bg-canvas font-semibold text-ink shadow-sm'
+                        : 'text-ink-secondary hover:text-ink font-medium'
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                )
+              })}
+            </div>
           </div>
 
           {/* Chat List */}
@@ -2617,14 +2672,15 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   メールはメールの往復で、中央に出すものの作りが違う。
                 */}
                 {/*
-                  LINE とメールを1本に混ぜて、新しいものが上に来るように並べる。
-                  以前はメールを全部出してから LINE を出していたので、
-                  出どころで固まってしまい、返信を待っている人を2か所で
-                  探すことになっていた。
+                  LINE とメールを1本に混ぜる。どちらも口側で「未読が先・
+                  新しい順」に並んでいるので、画面では並べ替えない。
+                  受け取った順のまま、先頭同士を比べて混ぜるだけで全体が
+                  保たれる。ページ送りで足された分も、各出どころの続き
+                  として正しい場所に入る。
 
                   行の中身の作りは出どころで違う（メールは件名、LINE は
                   最後のメッセージと未対応の印）ので、描き方はそれぞれ
-                  残したまま、並びだけそろえる。
+                  残したまま、混ぜ方だけそろえる。
                 */}
                 {(() => {
                   const mailRows = (channel === 'line' ? [] : emailItems)
@@ -2637,10 +2693,13 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   )
                   .filter((item) => statusFilter === 'all' || item.status === statusFilter)
                   .map((item) => ({
-                    at: item.lastIncomingAt,
+                    at: item.lastMessageAt ?? item.lastIncomingAt,
+                    unread: item.isUnread,
                     node: (
+                    // 区切り線は外の箱が持つ。押し場所に border-hairline を書くと
+                    // 直書きボタンの借金に数えられる (design-debt)。
+                    <div key={item.id} className="border-b border-hairline">
                     <button
-                      key={item.id}
                       onClick={() => {
                         // LINEの選択を外す。両方開いていると中央に何を
                         // 出すのか決まらない。URL指定の案内とURL状態も外す。
@@ -2658,8 +2717,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                           method: 'POST',
                         }).catch(() => undefined)
                       }}
-                      className={`w-full border-b border-[#E5E7EB] px-3 py-3 text-left transition-colors ${
-                        selectedThreadId === item.threadId ? 'bg-[#EAFBF0]' : 'hover:bg-[#F7F8F6]'
+                      className={`w-full px-3 py-3 text-left transition-colors ${
+                        selectedThreadId === item.threadId ? 'bg-accent-soft' : 'hover:bg-shell'
                       }`}
                     >
                       <div className="flex items-start gap-3">
@@ -2699,6 +2758,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                         </div>
                       </div>
                     </button>
+                    </div>
                     ),
                   }))
                   const lineRows = (channel === 'email' ? [] : chats)
@@ -2741,20 +2801,22 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     if (chat.lastMessageType === 'unsent') return '送信を取り消しました'
                     return previewRaw.replace(/\n+/g, ' ').slice(0, 60)
                   })()
+                  // 区切り線は外の箱が持つ。押し場所に border-hairline を書くと
+                  // 直書きボタンの借金に数えられる (design-debt)。
                   const node = (
+                    <div key={chat.id} className="border-b border-hairline">
                     <button
-                      key={chat.id}
                       onClick={() => handleSelectChat(chat.id)}
-                      className={`w-full border-b border-[#E5E7EB] px-3 py-3 text-left transition-colors ${
+                      className={`w-full px-3 py-3 text-left transition-colors ${
                         isSelected
-                          ? 'bg-[#EAFBF0]'
+                          ? 'bg-accent-soft'
                           : chat.isUnread
                             /*
                               設計 `f0zn6` は、自分あての未読だけ行の地を薄い赤に
                               する。丸い点だけだと、行を目で追うときに見落とす。
                             */
                             ? 'bg-status-danger-soft hover:bg-status-danger-selected'
-                            : 'hover:bg-[#F7F8F6]'
+                            : 'hover:bg-shell'
                       }`}
                     >
                       <div className="flex items-start gap-3">
@@ -2810,11 +2872,29 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                         </div>
                       </div>
                     </button>
+                    </div>
                   )
-                  return { at: chat.lastMessageAt ?? '', node }
+                  return { at: chat.lastMessageAt ?? '', unread: chat.isUnread, node }
                 })
-                  const rows = [...mailRows, ...lineRows]
-                    .sort((a, b) => String(b.at).localeCompare(String(a.at)))
+                  // 両方とも口側で「未読が先・新しい順」。未読の有無が違う
+                  // 行同士は時刻に関わらず未読が先、同じ中では新しい順。
+                  const precedes = (
+                    a: { at: string; unread: boolean },
+                    b: { at: string; unread: boolean },
+                  ): number =>
+                    Number(b.unread) - Number(a.unread)
+                    || String(b.at).localeCompare(String(a.at))
+                  const rows: { node: React.ReactNode }[] = []
+                  {
+                    let i = 0
+                    let j = 0
+                    while (i < mailRows.length && j < lineRows.length) {
+                      if (precedes(mailRows[i], lineRows[j]) <= 0) rows.push(mailRows[i++])
+                      else rows.push(lineRows[j++])
+                    }
+                    while (i < mailRows.length) rows.push(mailRows[i++])
+                    while (j < lineRows.length) rows.push(lineRows[j++])
+                  }
                   if (inboxListLoading) {
                     return (
                       <div
