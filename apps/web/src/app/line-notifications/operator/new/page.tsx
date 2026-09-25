@@ -3,9 +3,10 @@
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useEffect, useState } from 'react'
-import { AlertTriangle, ArrowRight, Building2, Users } from 'lucide-react'
+import { AlertTriangle, ArrowRight, Building2 } from 'lucide-react'
 import Button from '@/components/shared/button'
 import { Field, TextInput } from '@/components/shared/form-controls'
+import NoteBar from '@/components/shared/note-bar'
 import SelectField from '@/components/shared/select-field'
 import StickyBar from '@/components/shared/sticky-bar'
 import { useAccount } from '@/contexts/account-context'
@@ -236,10 +237,7 @@ function NewOperatorNotificationInner() {
         <Link href="/line-notifications" className="text-action hover:underline">LINE通知</Link><span className="mx-2">›</span><Link href="/line-notifications?tab=operator" className="text-action hover:underline">運用者へのお知らせ</Link><span className="mx-2">›</span><span>{editId ? 'なおす' : 'つくる'}</span>
       </nav><Button onClick={() => void testSend()} disabled={saving || ruleLoading}>自分にテスト送信</Button></div>
 
-      <div className="border-info bg-info-bg text-info flex items-start gap-2 rounded-control border px-4 py-3 text-sm">
-        <Users className="mt-0.5 shrink-0" aria-hidden="true" size={17} />
-        <p>宛先はお店の人です。あとから顧客向けへは変えられません。顧客へ送るものは別の画面で作ります。</p>
-      </div>
+      <div className="mb-4"><NoteBar>宛先はお店の人です。あとから顧客向けへは変えられません。顧客へ送るものは別の画面で作ります。</NoteBar></div>
 
       <div className="grid gap-4 xl:grid-cols-3">
         <div className="space-y-4 xl:col-span-2">

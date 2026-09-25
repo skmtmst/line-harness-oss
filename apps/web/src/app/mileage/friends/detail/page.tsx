@@ -229,7 +229,7 @@ function FriendMileageInner() {
         <CardHeader
           title="友だちと接続LINEアカウント"
           meta={connectedAccounts === null ? '—' : `${connectedAccounts.length}件を表示`}
-          action={<div className="flex flex-wrap gap-2">{canAdjust ? <Button variant="primary" onClick={() => setAdjustmentOpen(true)}>マイルを手で増やす・減らす</Button> : null}<Button href={`/friends/detail?id=${encodeURIComponent(friend.id)}`}>友だちの詳細を見る</Button></div>}
+          action={<div className="flex flex-wrap gap-2">{canAdjust ? <Button variant="secondary" onClick={() => setAdjustmentOpen(true)}>マイルを手で増やす・減らす</Button> : null}<Button href={`/friends/detail?id=${encodeURIComponent(friend.id)}`}>友だちの詳細を見る</Button></div>}
         />
         <div className="flex flex-wrap items-center gap-4 p-4">
           {friend.pictureUrl ? <img src={friend.pictureUrl} alt="" className="h-12 w-12 rounded-full object-cover" /> : <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent-soft text-lg font-bold text-accent-deep">{displayName.slice(0, 1)}</div>}
