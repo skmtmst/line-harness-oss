@@ -6,6 +6,8 @@ import { clearSelectionAfterAuthentication } from '@/lib/hq-navigation'
 import { isPublicAuthPath } from '@/lib/auth-email'
 import { SESSION_LOST_EVENT, type OpsImpersonation } from '@/lib/api'
 import { forgetSessionSnapshot, rememberSessionSnapshot } from '@/lib/session-snapshot'
+import { clearCommonCaches } from '@/lib/common-caches'
+import { prefetchLineAccounts } from '@/lib/line-accounts-cache'
 import TenantSuspended from './tenant-suspended'
 import { TenantAccessProvider, type TenantStatus } from './tenant-access-context'
 
@@ -35,6 +37,7 @@ function sessionFingerprint(handoffToken: string): string {
 export function invalidateAuthSessionCheck(): void {
   lastSessionCheck = null
   forgetSessionSnapshot()
+  clearCommonCaches()
 }
 
 export default function AuthGuard({ children, suspendedSupport }: { children: React.ReactNode; suspendedSupport?: React.ReactNode }) {
@@ -52,7 +55,8 @@ export default function AuthGuard({ children, suspendedSupport }: { children: Re
     }
 
     // セッション切れ・別タブでのログアウトは、次の遷移で必ず確認し直す。
-    const invalidate = () => { lastSessionCheck = null; forgetSessionSnapshot() }
+    // 使い回していた共通の答えも捨てる（古い権限や別アカウントを見せない）。
+    const invalidate = () => { lastSessionCheck = null; forgetSessionSnapshot(); clearCommonCaches() }
     const onStorage = (event: StorageEvent) => {
       if (event.key === 'lh_csrf' || event.key === 'lh_staff_role') invalidate()
     }
@@ -62,6 +66,12 @@ export default function AuthGuard({ children, suspendedSupport }: { children: Re
     // URLハンドオフは遷移ごとに拾う（新しいトークンなら指紋が変わって再確認になる）。
     const handoffToken = captureAdminSessionHandoff()
     const fingerprint = sessionFingerprint(handoffToken)
+
+    // 別のログイン・権限更新で指紋が変わったら、使い回しの答えは捨てる。
+    // 古い権限や別アカウントの一覧・名簿・設定を見せない。
+    if (lastSessionCheck && lastSessionCheck.fingerprint !== fingerprint) {
+      clearCommonCaches()
+    }
 
     if (
       lastSessionCheck
@@ -80,6 +90,8 @@ export default function AuthGuard({ children, suspendedSupport }: { children: Re
 
     // Verify the session via the HttpOnly cookie. /api/auth/session returns the
     // staff identity and refreshes the CSRF token if it was lost (e.g. reload).
+    // 一覧の取得は確認の結果を要らないので、確認と並べて先に始める（直列にしない）。
+    prefetchLineAccounts()
     const checkSession = async () => {
       try {
         try { localStorage.removeItem('lh_api_key') } catch { /* HttpOnly / bearer session is still usable */ }
