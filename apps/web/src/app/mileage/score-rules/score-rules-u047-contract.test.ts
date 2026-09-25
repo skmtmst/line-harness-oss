@@ -15,7 +15,7 @@ describe('スコアールールの行（#975 U047）', () => {
   })
 
   it('点数と頻度は2段目へ下がり、削除は右端に残る', () => {
-    expect(PAGE).toContain('col-span-2 text-left text-sm font-bold sm:text-right')
+    expect(PAGE).toContain('col-span-2 text-left text-sm font-bold text-ink sm:text-right')
     expect(PAGE).toContain('col-span-9 text-xs text-ink-secondary sm:col-span-3')
     expect(PAGE).toContain('col-span-1 justify-self-end')
   })

@@ -59,6 +59,8 @@ export default function GettingStartedPage() {
   }, [accountLoading, selectedAccountId])
 
   const reasons = stoppedReasons(steps)
+  // 主役は「いまの手順」（終わっていない最初の段）だけ。他の段の行き先は枠にする。
+  const currentKey = steps.find((step) => step.state !== 'done')?.key ?? null
 
   return (
     <div className={styles.page}>
@@ -85,7 +87,7 @@ export default function GettingStartedPage() {
           <div className={styles.columns}>
             <ol className={styles.steps} aria-label="はじめの設定の順路">
               {steps.map((step) => (
-                <StepRow key={step.key} step={step} />
+                <StepRow key={step.key} step={step} current={step.key === currentKey} />
               ))}
             </ol>
 
@@ -110,10 +112,10 @@ export default function GettingStartedPage() {
   )
 }
 
-function StepRow({ step }: { step: StepResult }) {
+function StepRow({ step, current }: { step: StepResult; current: boolean }) {
   const done = step.state === 'done'
   return (
-    <li className={styles.step} data-step-state={step.state}>
+    <li className={styles.step} data-step-state={step.state} data-current={current ? 'true' : 'false'}>
       <span className={done ? [styles.mark, styles.markDone].join(' ') : styles.mark} aria-hidden>
         {done ? '✓' : step.ordinal}
       </span>

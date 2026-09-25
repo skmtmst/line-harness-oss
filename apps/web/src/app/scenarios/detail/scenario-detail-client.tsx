@@ -2296,7 +2296,7 @@ export default function ScenarioDetailClient({
                               {reachBarWidth === null ? null : (
                                 <span className="bg-canvas-sunken h-1.5 w-20 overflow-hidden rounded-full">
                                   <span
-                                    className="bg-accent block h-full rounded-full"
+                                    className="bg-ink-faint block h-full rounded-full"
                                     style={{ width: reachBarWidth }}
                                   />
                                 </span>

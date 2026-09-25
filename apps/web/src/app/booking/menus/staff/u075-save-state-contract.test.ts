@@ -13,9 +13,10 @@ describe('担当割り当ての保存状態（#975 U075）', () => {
     expect(PAGE).toContain("JSON.stringify(grid) !== JSON.stringify(savedGrid)")
   })
 
-  it('差分がないときは保存を押せない', () => {
+  it('差分がないときは保存の押し口を出さず中立の札にする', () => {
     expect(PAGE).toContain('|| !dirty')
-    expect(PAGE).toContain("'変更なし'")
+    expect(PAGE).toContain('変更なし')
+    expect(PAGE).toContain('tone="neutral"')
   })
 
   it('状態を文字で出す（未保存・変更なし・失敗）', () => {
