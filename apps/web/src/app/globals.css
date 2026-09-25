@@ -699,7 +699,7 @@ select:not([multiple]):not(.appearance-none) {
 
 @media (min-width: 1280px) {
   .gb-draft-grid {
-    grid-template-columns: 420px minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) 390px;
   }
 
   .gb-confirm-grid {
