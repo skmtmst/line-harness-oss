@@ -69,6 +69,9 @@ export function isRuleComplete(rule: SegmentRule): boolean {
     case 'analytics_audience':
       // 分析画面から渡された一時対象者。audienceId が空なら書きかけと同じく落とす。
       return typeof v?.audienceId === 'string' && v.audienceId !== ''
+    case 'broadcast_link_clicked':
+      // 配信詳細の追送で渡す条件。broadcastId が無いと「全員」として数えられるので必須。
+      return typeof v?.broadcastId === 'string' && v.broadcastId !== ''
     case 'scenario_subscribed':
       return typeof rule.value === 'string' && rule.value !== ''
     case 'score_range': {
