@@ -12,6 +12,7 @@ import HelpTip from '@/components/shared/help-tip'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import SelectField from '@/components/shared/select-field'
+import { RowActions } from '@/components/shared/row-actions'
 import { DataTable, Td, Th, TableHeadRow, Tr } from '@/components/shared/table'
 import { TextField, TextArea } from '@/components/shared/text-field'
 import Toggle from '@/components/shared/toggle'
@@ -267,18 +268,20 @@ export default function FileScanSettingsPage() {
                     <span className="block truncate" title={item.reasonLabel ?? '確認が必要です'}>{item.reasonLabel ?? '確認が必要です'}</span>
                   </Td>
                   <Td>
-                    <span className="flex flex-wrap gap-2">
-                      {item.status === 'quarantined' ? (
-                        <Button type="button" variant="secondary" onClick={() => { setReleaseTarget(item); setReleaseReason('') }}>
-                          使えるように戻す
-                        </Button>
-                      ) : null}
-                      {item.status === 'quarantined' || item.status === 'rejected' ? (
-                        <Button type="button" variant="danger" onClick={() => setDeleteTarget(item)}>
-                          消す
-                        </Button>
-                      ) : null}
-                    </span>
+                    {item.status === 'quarantined' ? (
+                      <RowActions
+                        subjectName={item.filename}
+                        edit={{ label: '使えるように戻す', onClick: () => { setReleaseTarget(item); setReleaseReason('') } }}
+                        destructiveItem={{ id: 'delete', label: '消す', onSelect: () => setDeleteTarget(item) }}
+                      />
+                    ) : item.status === 'rejected' ? (
+                      <RowActions
+                        subjectName={item.filename}
+                        destructiveItem={{ id: 'delete', label: '消す', onSelect: () => setDeleteTarget(item) }}
+                      />
+                    ) : (
+                      <span className="text-ink-faint">—</span>
+                    )}
                   </Td>
                 </Tr>
               ))}
@@ -287,18 +290,17 @@ export default function FileScanSettingsPage() {
         </div>
       )}
 
-      <h2 className="text-ink mt-8 text-base font-bold">
-        外の検査
-        <HelpTip label="外の検査の意味">
-          内蔵の簡易検査に加えて、外の検査サービスにも送る設定です。設定がある時だけ送ります。鍵そのものはここに置かず、秘密値の仕組みにある名前だけを指します。
-        </HelpTip>
-      </h2>
+      <h2 className="text-ink mt-8 text-base font-bold">外の検査</h2>
       <p className="text-ink-secondary mt-1 text-xs">
         {config?.externalEndpointUrl ? `送り先：${config.externalEndpointUrl}` : 'いまは内蔵の簡易検査だけです。'}
       </p>
-      <div className="mt-2">
+      <div className="mt-2 flex items-center gap-2">
+        <span id="file-scan-external-label" className="text-ink text-sm">外の検査サービスを使う</span>
+        <HelpTip label="外の検査サービスの意味">
+          内蔵の簡易検査に加えて、外の検査サービスにも送る設定です。設定がある時だけ送ります。鍵そのものはここに置かず、秘密値の仕組みにある名前だけを指します。
+        </HelpTip>
         <Toggle
-          label="外の検査にも送る"
+          label="外の検査サービスを使う"
           checked={configOpen}
           onChange={setConfigOpen}
         />

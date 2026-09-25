@@ -99,7 +99,8 @@ describe('ファイルの検査の設定画面', () => {
     expect(screen.getByText('危険な仕掛けが見つかりました')).toBeTruthy()
     expect(screen.getByText('1件')).toBeTruthy()
     expect(screen.getByRole('button', { name: '使えるように戻す' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: '消す' })).toBeTruthy()
+    // 消すは「…」の中の危ない操作として入る。
+    expect(screen.getByRole('button', { name: 'invoice.pdfのその他操作' })).toBeTruthy()
     // 中身は画面に出さない。理由の言葉だけ。
     expect(screen.queryByText(/JavaScript/)).toBeNull()
   })
