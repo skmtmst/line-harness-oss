@@ -448,7 +448,7 @@ function TenantInfoTab({ canEdit }: { canEdit: boolean }) {
     let cancelled = false
     void api.tenants.me()
       .then((response) => {
-        if (!cancelled && response.success) setName(response.data.name)
+        if (!cancelled && response.success) setName(response.data.name ?? '')
       })
       .catch(() => {
         if (!cancelled) setError('統括名を読み込めませんでした。時間をおいてもう一度お試しください。')
@@ -470,7 +470,7 @@ function TenantInfoTab({ canEdit }: { canEdit: boolean }) {
     try {
       const response = await api.tenants.updateName(trimmed)
       if (!response.success) throw new Error(response.error)
-      setName(response.data.name)
+      setName(response.data.name ?? trimmed)
       setSaved(true)
     } catch (caught) {
       setError(caught instanceof Error && caught.message ? caught.message : '統括名を保存できませんでした。')

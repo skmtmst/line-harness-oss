@@ -34,9 +34,7 @@ function formatAgreementDate(value: string | null): string | null {
 }
 
 function ManualLink({ href, children }: { href: string; children: ReactNode }) {
-  if (!href) {
-    return <span aria-disabled="true" className="inline-flex cursor-not-allowed rounded-control border border-hairline bg-canvas-sunken px-3 py-2 text-xs font-semibold text-ink-faint">マニュアルは準備中です</span>
-  }
+  if (!href) return null
   return <a href={href} target="_blank" rel="noreferrer" className="inline-flex rounded-control border border-action px-3 py-2 text-xs font-semibold text-action">{children}</a>
 }
 
