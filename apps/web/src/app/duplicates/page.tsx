@@ -268,7 +268,7 @@ export default function DuplicatesPage() {
 
           <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-[#565F59]">
             <div className="flex flex-1 flex-wrap items-center gap-2">
-              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="名前・メール・電話で検索" className="h-10 min-w-60 rounded-control border border-hairline bg-canvas px-3 text-sm" />
+              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="名前・メール・電話で検索" aria-label="名前・メール・電話で検索" className="h-10 min-w-60 rounded-control border border-hairline bg-canvas px-3 text-sm" />
               <Select
                 aria-label="状態で絞り込む"
                 label="状態"
