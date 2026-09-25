@@ -1,0 +1,57 @@
+@layer components {
+/*
+ * 見出し・ラベル横の「？」。小さな丸ボタンと補足の吹き出し。
+ * 色は本文の薄い文字と髪線だけ。意味の色（緑・黄・赤）は付けない。
+ */
+
+.root {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px; /* width: 18 */
+  height: 18px; /* height: 18 */
+  border: 1px solid var(--color-hairline); /* border: $hairline */
+  border-radius: var(--radius-pill); /* cornerRadius: $radius-full */
+  background: var(--color-canvas); /* fill: $canvas */
+  color: var(--color-ink-faint); /* color: $ink-faint */
+  font-size: var(--text-micro); /* fontSize: $size-micro */
+  font-weight: 700; /* fontWeight: 700 */
+  line-height: 1;
+  cursor: pointer;
+}
+
+.button:hover {
+  color: var(--color-ink-secondary); /* color: $ink-secondary */
+  border-color: var(--color-ink-faint); /* border: $ink-faint */
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--color-status-info); /* focus: $status-info */
+  outline-offset: 2px;
+}
+
+.body {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 30;
+  min-width: 220px;
+  max-width: 320px;
+  padding: 10px 12px; /* padding: [10, 12] */
+  border: 1px solid var(--color-hairline); /* border: $hairline */
+  border-radius: var(--radius-card); /* cornerRadius: $radius-card */
+  background: var(--color-canvas); /* fill: $canvas */
+  color: var(--color-ink-secondary); /* color: $ink-secondary */
+  font-size: var(--text-caption); /* fontSize: $size-caption */
+  font-weight: 400;
+  line-height: 1.7;
+  box-shadow: 0 4px 16px rgb(17 24 39 / 12%);
+  white-space: normal;
+}
+}
