@@ -137,7 +137,7 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
           <h2 className="mb-4 text-sm font-bold text-ink">基本情報</h2>
           <label className="mb-4 block">
             <span className="mb-1.5 block text-xs font-semibold text-ink-secondary">マーク名</span>
-            <input value={name} onChange={(event) => setName(event.target.value)} className="h-10 w-full rounded-control border border-hairline px-3 text-sm outline-none focus:border-accent" placeholder="例：要確認" />
+            <input value={name} onChange={(event) => setName(event.target.value)} className="h-10 w-full rounded-control border border-hairline px-3 text-sm outline-none focus:border-accent focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info" placeholder="例：要確認" />
             <DuplicateNameNote duplicates={nameDuplicates} kindLabel="対応マーク" />
           </label>
           <fieldset className="mb-4">
@@ -148,7 +148,7 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
           </fieldset>
           <label className="mb-4 block">
             <span className="mb-1.5 block text-xs font-semibold text-ink-secondary">並び順</span>
-            <input type="number" min={0} value={displayOrder} onChange={(event) => setDisplayOrder(Number(event.target.value))} className="h-10 w-28 rounded-control border border-hairline px-3 text-sm outline-none focus:border-accent" />
+            <input type="number" min={0} value={displayOrder} onChange={(event) => setDisplayOrder(Number(event.target.value))} className="h-10 w-28 rounded-control border border-hairline px-3 text-sm outline-none focus:border-accent focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info" />
           </label>
           {/*
             説明文とチェックは別行にする（#973 U020）。1行に押し込むと
@@ -156,7 +156,7 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
           */}
           <div className="border-t border-hairline pt-4">
             <label className="flex items-center gap-2 text-sm font-semibold text-ink">
-              <input type="checkbox" checked={isDefault} disabled={selected?.isDefault} onChange={(event) => setIsDefault(event.target.checked)} className="h-5 w-5 shrink-0 accent-accent" />
+              <input type="checkbox" checked={isDefault} disabled={selected?.isDefault} onChange={(event) => setIsDefault(event.target.checked)} className="h-6 w-6 shrink-0 accent-accent-deep" />
               新しい友だちに最初から付ける
             </label>
             <p className="mt-1 text-xs font-normal leading-relaxed text-ink-faint">最初から付けるマークは1つだけ選べます</p>
@@ -188,7 +188,7 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
               <div className="mt-3 rounded-control border border-hairline p-3 text-sm">
                 <label className="block text-xs font-semibold text-ink-secondary">
                   きっかけ
-                  <select aria-label="きっかけ" value={ruleEvent} onChange={(event) => setRuleEvent(event.target.value as SupportMarkAutomationEvent)} className="v6-select mt-1 h-10 w-full rounded-control border border-hairline bg-canvas px-3 text-sm font-semibold text-ink">
+                  <select aria-label="きっかけ" value={ruleEvent} onChange={(event) => setRuleEvent(event.target.value as SupportMarkAutomationEvent)} className="v6-select mt-1 h-10 w-full rounded-control border border-hairline bg-canvas px-3 text-sm font-semibold text-ink focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info">
                     {EVENT_LABELS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
                   </select>
                 </label>
@@ -196,7 +196,7 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
                 <p className="min-w-0 break-words rounded-control bg-surface-soft px-3 py-2.5 font-semibold text-ink">「{name || 'このマーク'}」に変更</p>
                 <label className="mt-3 block text-xs font-semibold text-ink-secondary">
                   手動で変更した直後の保護
-                  <select aria-label="手動変更の保護時間" value={String(ruleProtectionMinutes)} onChange={(event) => setRuleProtectionMinutes(Number(event.target.value))} className="v6-select mt-1 h-10 w-full rounded-control border border-hairline bg-canvas px-3 text-sm font-semibold text-ink">
+                  <select aria-label="手動変更の保護時間" value={String(ruleProtectionMinutes)} onChange={(event) => setRuleProtectionMinutes(Number(event.target.value))} className="v6-select mt-1 h-10 w-full rounded-control border border-hairline bg-canvas px-3 text-sm font-semibold text-ink focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info">
                     <option value="0">保護しない（次のきっかけですぐ変更）</option>
                     <option value="30">30分は手動の変更を守る</option>
                     <option value="60">1時間は手動の変更を守る</option>
@@ -204,7 +204,7 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
                   </select>
                 </label>
                 <label className="mt-3 flex items-center gap-2 text-sm font-semibold text-ink">
-                  <input type="checkbox" checked={ruleActive} onChange={(event) => setRuleActive(event.target.checked)} className="h-5 w-5 shrink-0 accent-accent" />
+                  <input type="checkbox" checked={ruleActive} onChange={(event) => setRuleActive(event.target.checked)} className="h-6 w-6 shrink-0 accent-accent-deep" />
                   このルールを有効にして登録する
                 </label>
                 <div className="mt-3 flex justify-end">
