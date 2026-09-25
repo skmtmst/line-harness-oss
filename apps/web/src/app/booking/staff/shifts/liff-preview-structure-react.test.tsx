@@ -26,6 +26,10 @@ const LIFF_SOURCE = readFileSync(
   join(REPO_ROOT, 'apps/liff/src/components/DateTimePicker.tsx'),
   'utf8',
 )
+const LIFF_USER_MESSAGE_SOURCE = readFileSync(
+  join(REPO_ROOT, 'apps/liff/src/lib/user-message.ts'),
+  'utf8',
+)
 const PAGE_SOURCE = readFileSync(join(DIR, 'page.tsx'), 'utf8')
 
 function slot(date: string, start: string): BookingAvailabilitySlot {
@@ -48,7 +52,17 @@ describe('前提: 実LIFFが「日時を選んでください」＋日付縦並�
   it('LIFF側の文言と構造が変わっていない（変わったらプレビューも追随が必要）', () => {
     expect(LIFF_SOURCE).toContain('日時を選んでください')
     expect(LIFF_SOURCE).toContain('この期間に空きはありません。')
-    expect(LIFF_SOURCE).toContain('空き枠を取得中...')
+    // 読み込み中・失敗は共通部品（LoadingView・LoadErrorView）で出す。
+    expect(LIFF_SOURCE).toContain('LoadingView')
+    expect(LIFF_SOURCE).toContain('LoadErrorView')
+    expect(LIFF_USER_MESSAGE_SOURCE).toContain('読み込み中...')
+    expect(LIFF_USER_MESSAGE_SOURCE).toContain(
+      '読み込めませんでした。時間をおいて、もう一度お試しください。',
+    )
+    expect(LIFF_USER_MESSAGE_SOURCE).toContain('もう一度読み込む')
+    // 旧い見せ方（枠ごとの文言・赤いそのまま表示）が復活していない。
+    expect(LIFF_SOURCE).not.toContain('空き枠を取得中...')
+    expect(LIFF_SOURCE).not.toContain('text-red-600')
     expect(LIFF_SOURCE).toContain('grid-cols-4')
     // LIFFにカレンダー表示が導入されたら検知できるよう、不在も確認する。
     expect(LIFF_SOURCE).not.toContain('grid-cols-7')
@@ -139,16 +153,23 @@ describe('プレビューが実LIFFと同じ構造で描画される', () => {
     expect(screen.getByText('この期間に空きはありません。')).toBeTruthy()
   })
 
-  it('取得中は実LIFFと同じ「空き枠を取得中...」、失敗時は案内を出す', () => {
-    const { unmount } = render(
+  it('取得中・失敗は実LIFFの共通部品と同じ文言とボタンで出す', () => {
+    const { container: loadingContainer, unmount } = render(
       <LiffDateTimePreview status="loading" slots={[]} menuName="カット" staffName="田中" />,
     )
-    expect(screen.getByText('空き枠を取得中...')).toBeTruthy()
+    expect(screen.getByText('読み込み中...')).toBeTruthy()
+    expect(loadingContainer.textContent).not.toContain('空き枠を取得中...')
     unmount()
-    render(
+    const { container } = render(
       <LiffDateTimePreview status="error" slots={[]} menuName="カット" staffName="田中" />,
     )
-    expect(screen.getByText('空き状況だけ読み込めませんでした。')).toBeTruthy()
+    expect(
+      screen.getByText('読み込めませんでした。時間をおいて、もう一度お試しください。'),
+    ).toBeTruthy()
+    expect(screen.getByText('もう一度読み込む')).toBeTruthy()
+    // 実LIFFの失敗表示と同じく赤は使わず、旧い案内文も残さない。
+    expect(container.querySelector('.text-danger')).toBeNull()
+    expect(container.textContent).not.toContain('空き状況だけ読み込めませんでした。')
   })
 
   it('どのメニュー・担当の画面かを枠の外に注記する', () => {

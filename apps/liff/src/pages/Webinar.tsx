@@ -2,6 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import liff from '@line/liff';
 import { api, type WebinarState, type WebinarSakuraComment } from '../lib/api.js';
+import { logFailure } from '../lib/user-message.js';
+import LoadErrorView from '../components/LoadErrorView.js';
+import LoadingView from '../components/LoadingView.js';
 
 // 疑似ライブプレーヤー。時刻の権威はサーバー:
 //   期待位置 = state.offsetSeconds + (performance.now() - t0) / 1000
@@ -28,6 +31,7 @@ export default function Webinar() {
   const { slug } = useParams<{ slug: string }>();
   const [state, setState] = useState<WebinarState | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [ended, setEnded] = useState(false);
   const [needsTap, setNeedsTap] = useState(false);
   const [countdown, setCountdown] = useState('');
@@ -50,6 +54,8 @@ export default function Webinar() {
 
   const load = useCallback(async () => {
     if (!slug) return;
+    setError(null);
+    setLoadFailed(false);
     try {
       const s = await api.webinarState(slug);
       if (s.live) {
@@ -61,10 +67,10 @@ export default function Webinar() {
       }
       setState(s);
     } catch (err) {
+      logFailure('webinar', err);
       const status = (err as { status?: number }).status;
       if (status === 403) setError('この配信は友だち追加後にご覧いただけます。');
-      else setError('読み込みに失敗しました。開き直してください。');
-      console.error(err);
+      else setLoadFailed(true);
     }
   }, [slug]);
 
@@ -223,8 +229,9 @@ export default function Webinar() {
     else window.open(url, '_blank', 'noopener');
   };
 
-  if (error) return <div className="p-8 text-center text-gray-600">{error}</div>;
-  if (!state) return <div className="p-8 text-center text-gray-400">読み込み中...</div>;
+  if (loadFailed) return <LoadErrorView onRetry={() => void load()} />;
+  if (error) return <LoadErrorView message={error} onRetry={() => void load()} />;
+  if (!state) return <LoadingView />;
 
   // ---- 待機画面 ----
   if (!state.live) {

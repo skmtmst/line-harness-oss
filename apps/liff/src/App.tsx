@@ -1,5 +1,6 @@
 import { Suspense, lazy } from 'react';
 import { Routes, Route, Navigate, useSearchParams } from 'react-router-dom';
+import LoadingView from './components/LoadingView.js';
 
 // 画面ごとに束を分ける。開いた画面のぶんだけ読む。
 const Booking = lazy(() => import('./pages/Booking.js'));
@@ -14,7 +15,7 @@ const Form = lazy(() => import('./pages/Form.js'));
 const EventWaitlistOffer = lazy(() => import('./pages/EventWaitlistOffer.js'));
 
 function Loading() {
-  return <div className="p-8 text-center text-gray-500">読み込み中...</div>;
+  return <LoadingView />;
 }
 
 export default function App() {
