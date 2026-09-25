@@ -697,7 +697,8 @@ function BroadcastList() {
                 <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase tracking-wider whitespace-nowrap">
                   配信・開封・クリック
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-ink-faint uppercase tracking-wider whitespace-nowrap">
+                {/* #768: 表が横に流れる帯でも操作列は右端に留める。 */}
+                <th className="bg-canvas-sunken sticky right-0 px-4 py-3 text-right text-xs font-semibold text-ink-faint uppercase tracking-wider whitespace-nowrap">
                   操作
                 </th>
               </tr>
@@ -710,7 +711,7 @@ function BroadcastList() {
                 const insight = insights[broadcast.id] ?? summaryInsight(broadcast.insightSummary)
 
                 return (
-                  <tr key={broadcast.id} className="hover:bg-canvas-sunken transition-colors">
+                  <tr key={broadcast.id} className="group hover:bg-canvas-sunken transition-colors">
                     {/*
                       タイトル・内容。設計は「8月キャンペーンのお知らせ」の下に
                       「キャンペーン告知／画像＋テキスト 2通」と出す。一覧から
@@ -806,7 +807,7 @@ function BroadcastList() {
                     </td>
 
                     {/* 操作 */}
-                    <td className="px-4 py-3 text-right">
+                    <td className="bg-canvas group-hover:bg-canvas-sunken sticky right-0 px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-2">
                         {(broadcast.status === 'draft' || broadcast.status === 'scheduled') && (
                           <button

@@ -844,14 +844,15 @@ function VarsPageInner() {
                     <Th className="px-4 py-3" style={{ width: '19%' }} title="最終更新日・次の変更予定">
                       更新・次の変更
                     </Th>
-                    <Th align="right" className="w-36 px-4 py-3" title="編集・削除">操作</Th>
+                    {/* #768: 表が横に流れる帯でも操作列は右端に留める。 */}
+                    <Th align="right" className="bg-canvas-sunken sticky right-0 w-36 px-4 py-3" title="編集・削除">操作</Th>
                   </TableHeadRow>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {current.map((item) => {
                       const pending = item.nextSchedule
                       return (
-                        <tr key={item.id} className="hover:bg-canvas-sunken">
+                        <tr key={item.id} className="group hover:bg-canvas-sunken">
                           <td className="px-3 py-3">
                             <input
                               type="checkbox"
@@ -922,7 +923,7 @@ function VarsPageInner() {
                               </>
                             )}
                           </td>
-                          <td className="whitespace-nowrap px-4 py-3 text-right" title="編集・削除">
+                          <td className="bg-canvas group-hover:bg-canvas-sunken whitespace-nowrap sticky right-0 px-4 py-3 text-right" title="編集・削除">
                             <span className="inline-flex items-center justify-end gap-2">
                               <Link
                                 href={`/contents/vars/edit?id=${item.id}`}
