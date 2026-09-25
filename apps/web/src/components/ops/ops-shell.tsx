@@ -148,7 +148,11 @@ export default function OpsShell({ children }: { children: ReactNode }) {
               メニュー
             </button>
           </div>
-          <div className="mx-auto max-w-screen-2xl px-4 pb-8 pt-4 xl:px-10">{children}</div>
+          {/*
+           * ★V7: 本文は外枠の幅いっぱいに広げる。`max-w` で絞ると 1920px で
+           * 右が大きく空く。左右の余白（16px／40px）はここが持つ。
+           */}
+          <div className="px-4 pb-8 pt-4 xl:px-10">{children}</div>
         </main>
       </div>
     </div>

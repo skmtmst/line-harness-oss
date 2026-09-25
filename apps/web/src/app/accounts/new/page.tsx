@@ -189,7 +189,8 @@ export default function NewLineAccountPage() {
   )
 
   return (
-    <div data-design-node="b2NGxk" className="mx-auto w-full max-w-6xl pb-24">
+    <div data-design-node="b2NGxk" className="w-full pb-24">
+      {/* ★V7: 登録専用の枠の幅いっぱいに広げる。中央寄せの狭い列にしない。 */}
       <div data-design="Head">
         <div className="mb-4 flex justify-end"><Button href="/hq">統括コンソールへ戻る</Button></div>
         <PageHeader

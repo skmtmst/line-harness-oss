@@ -441,8 +441,13 @@ function CarouselEditorInner() {
           読み込み中...
         </div>
       ) : (
-        <div className="relative max-w-none space-y-4 xl:pr-96">
-          <aside className="hidden xl:absolute xl:top-0 xl:right-0 xl:block xl:w-96">
+        <div className="flex flex-col gap-4 xl:flex-row">
+          {/*
+            ★V7: 本体＋右のプレビューの2列を、通常の横並びで組む。
+            以前は右列を絶対配置にしていた。1920px で本体が左に寄り、
+            右が大きく空いて見えた。読み上げ順は変えない（案内が先）。
+          */}
+          <aside className="hidden w-full shrink-0 xl:order-2 xl:block xl:w-96">
             <section className="rounded-card bg-line-preview p-4 text-on-accent">
               <h2 className="text-center text-sm font-bold">LINEプレビュー</h2>
               <p className="mx-auto mt-2 w-fit rounded-pill bg-line-preview-label px-3 py-1 text-xs">カルーセルの見え方（横にスクロールします）</p>
@@ -472,6 +477,7 @@ function CarouselEditorInner() {
               </p>
             </section>
           </aside>
+          <div className="min-w-0 flex-1 space-y-4 xl:order-1">
           <div className="bg-canvas rounded-card border-hairline border p-5">
             <Field label="テンプレート名" htmlFor="cr-name" required>
               <input
@@ -897,6 +903,7 @@ function CarouselEditorInner() {
             >
               キャンセル
             </Link>
+          </div>
           </div>
         </div>
       )}

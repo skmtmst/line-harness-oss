@@ -63,6 +63,7 @@ export default function NewStaffPage() {
     parent={['ログインユーザー', '/staff?tab=members']}
     saveLabel="招待メールを送る"
     showHeader={false}
+    variant="v6"
     validate={() => !name.trim() ? '名前を入力してください' : !email.trim() ? 'メールアドレスを入力してください' : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) ? '正しいメールアドレスを入力してください' : !assignedLineAccountId ? '最初に表示するLINEアカウントを選択してください' : role === 'staff' && permissionKeys.length === 0 ? 'スタッフに表示する機能を1つ以上選択してください' : null}
     onSave={async () => { if (!selectedAccountId) throw new Error('店舗を選択してください'); const res = await api.staff.create({ name: name.trim(), email: email.trim(), role, permissionKeys: normalizeStaffPermissionKeys(permissionKeys), notificationPreferences: notifications, assignedLineAccountId, canAccessDescendantAccounts: inheritAccounts, accountScope: 'accounts', scopedLineAccountIds: [selectedAccountId] }); if (!res.success) throw new Error(res.error); return res.data.id }}
     aside={<>

@@ -70,6 +70,7 @@ export default function NewWebhookPage() {
       description="このツールのできごとを外部へ知らせます（送り出す向きのみ）。"
       showHeader={false}
       parent={['外部連携', '/webhooks']}
+      variant="v6"
       aside={
         <AsideCard title="どちら向きの連携か">
           <ul className="text-ink-faint space-y-1.5 text-xs leading-relaxed">

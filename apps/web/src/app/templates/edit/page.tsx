@@ -8,6 +8,8 @@ import { api, ApiError, describeSaveFailure } from '@/lib/api'
 import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { type Folder } from '@line-crm/shared'
 import { Field, inputClass } from '@/components/shared/create-page'
+import Button from '@/components/shared/button'
+import StickyBar from '@/components/shared/sticky-bar'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import TemplateAssetEditor from '../template-asset-editor'
@@ -609,6 +611,7 @@ function TemplateEditInner() {
           読み込み中...
         </div>
       ) : (
+        <>
         <MessageTemplateEditor
           value={{ messageType, messageContent }}
           onChange={(next) => updateDraft(next)}
@@ -644,14 +647,26 @@ function TemplateEditInner() {
               ) : null}
               {(loadFailed ? TEMPLATE_LOAD_FAILED_MESSAGE : error) && <p className="text-danger text-sm">{loadFailed ? TEMPLATE_LOAD_FAILED_MESSAGE : error}</p>}
               {saveGuard && !loadFailed && !accountMismatch && <p role="status" className="text-ink-secondary text-sm">{saveGuard}</p>}
-              <div className="flex flex-wrap gap-2">
-                <button onClick={save} disabled={saving || loadFailed || saveGuard !== null} title={saveGuard ?? undefined} className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40">{saving ? '保存中...' : '保存'}</button>
-                <button disabled title="テスト送信は準備中です" className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50">テスト送信</button>
-                <Link href="/templates" className="text-ink-secondary bg-canvas-sunken hover:bg-hairline rounded-control px-4 py-2 text-sm font-medium">キャンセル</Link>
-              </div>
+              {/*
+                ★V7: 保存・実行は下の固定バーにしか置かない。本文の最後に置くと、
+                長い画面で「どこで保存されるのか」が分からなくなる。
+                理由の文（利用先・保存できない理由）は手前に残す。
+              */}
             </>
           )}
         />
+        <StickyBar
+          actions={(
+            <>
+              <Button href="/templates">キャンセル</Button>
+              <Button type="button" disabled title="テスト送信は準備中です">テスト送信</Button>
+              <Button type="button" variant="primary" onClick={save} disabled={saving || loadFailed || saveGuard !== null} title={saveGuard ?? undefined}>
+                {saving ? '保存中...' : '保存'}
+              </Button>
+            </>
+          )}
+        />
+        </>
       )}
     </div>
   )

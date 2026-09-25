@@ -329,7 +329,7 @@ function NewCommonVarInner() {
   return (
     <div>
       {!accountLoading && !selectedAccountId && (
-        <div className="bg-warning-bg text-warning mb-4 max-w-3xl rounded-card p-4 text-sm">
+        <div className="bg-warning-bg text-warning mb-4 rounded-card p-4 text-sm">
           共通情報を登録するLINEアカウントを選択してください。
         </div>
       )}
@@ -341,15 +341,28 @@ function NewCommonVarInner() {
         <span>共通情報登録</span>
       </nav>
 
-      <div className="bg-canvas rounded-card border-hairline max-w-3xl space-y-6 border p-6">
-        <div className="bg-warning-bg text-warning rounded-control border border-current/20 p-4 text-sm" role="note">
+      {/* ★V7: ほかの新規画面と同じ「本体＋右の案内」の2列にする。右の文は画面内の既存の文だけを使う。注意は入力より先に読ませる（読み上げ順もこの順）。 */}
+      <div className="grid items-start gap-4 xl:grid-cols-3">
+      <aside className="space-y-4 xl:col-start-3 xl:row-start-1" aria-label="登録の案内">
+        <div className="bg-warning-bg text-warning rounded-card border border-current/20 p-4 text-sm" role="note">
           <p className="font-semibold">秘密値は保存しないでください</p>
           <p className="mt-1 leading-relaxed">
             パスワード、APIトークン、秘密鍵などは共通情報に入力しないでください。
             配信文へ誤って差し込まれるおそれがあります。
           </p>
         </div>
-
+        <section className="bg-canvas rounded-card border-hairline border p-4">
+          <h2 className="text-ink text-sm font-bold">差し込み名の決めかた</h2>
+          <p className="text-ink-faint mt-1 text-xs leading-relaxed">
+            半角の英小文字で始め、英小文字・数字・下線だけ、32文字まで。テンプレートには差し込み名で書きます。
+          </p>
+          <p className="text-ink-faint mt-1 text-xs leading-relaxed">
+            <strong>あとから変えられません。</strong>
+            変えるとテンプレートの差し込みが空になるためです。
+          </p>
+        </section>
+      </aside>
+      <div className="bg-canvas rounded-card border-hairline min-w-0 space-y-6 border p-6 xl:col-span-2 xl:col-start-1 xl:row-start-1">
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label htmlFor="cv-name" className="text-ink-secondary mb-1 block text-sm font-medium">
@@ -592,6 +605,7 @@ function NewCommonVarInner() {
         )}
 
         {error && <p className="text-danger text-sm" role="alert">{error}</p>}
+      </div>
       </div>
 
       <StickyBar
