@@ -162,6 +162,50 @@ async function setInputValue(input: HTMLInputElement, value: string) {
   })
 }
 
+/** 利用期限の日付の選択（★V7）で YYYY-MM-DD を選ぶ。値は今までどおりの文字列。 */
+async function pickExpiresDate(iso: string) {
+  const [y, mo, d] = iso.split('-').map(Number)
+  const week = '日月火水木金土'[new Date(y, mo - 1, d).getDay()]
+  await act(async () => {
+    dialog().querySelector<HTMLElement>('[id$="-expires"]')!.click()
+    await settle()
+  })
+  for (let i = 0; i < 36; i += 1) {
+    const grid = dialog().querySelector('[role="grid"]')
+    const label = grid?.getAttribute('aria-label')
+    if (label === `${y}年${mo}月`) break
+    const target = y * 12 + mo
+    const currentLabel = /^(\d+)年(\d+)月$/.exec(label ?? '')
+    const current = currentLabel ? Number(currentLabel[1]) * 12 + Number(currentLabel[2]) : target
+    const nav = [...dialog().querySelectorAll('button')].find(
+      (b) => b.getAttribute('aria-label') === (target > current ? '次の月' : '前の月'),
+    )!
+    await act(async () => {
+      nav.click()
+      await settle()
+    })
+  }
+  await act(async () => {
+    [...dialog().querySelectorAll('button')].find((b) =>
+      (b.getAttribute('aria-label') ?? '').startsWith(`${y}年${mo}月${d}日（${week}）`),
+    )!.click()
+    await settle()
+  })
+}
+
+/** 利用期限の日付の選択を空にする。 */
+async function clearExpiresDate() {
+  await act(async () => {
+    dialog().querySelector<HTMLElement>('[id$="-expires"]')!.click()
+    await settle()
+  })
+  const picker = dialog().querySelector('[role="dialog"][aria-label="日付を選ぶ"]')!
+  await act(async () => {
+    [...picker.querySelectorAll('button')].find((b) => b.textContent?.trim() === '消す')!.click()
+    await settle()
+  })
+}
+
 beforeEach(() => {
   fixture.updates.length = 0
   fixture.downloadedVersions.length = 0
@@ -214,10 +258,9 @@ describe('IDEA-15 利用期限・同意の表示と記録', () => {
     await renderDialog()
     await clickButton('記録する')
 
-    const dateInput = dialog().querySelector<HTMLInputElement>('input[type="date"]')
     const noteInput = dialog().querySelector<HTMLInputElement>('input[maxlength="500"]')
-    if (!dateInput || !noteInput) throw new Error('記録フォームがありません')
-    await setInputValue(dateInput, '2027-03-31')
+    if (!noteInput) throw new Error('記録フォームがありません')
+    await pickExpiresDate('2027-03-31')
     await setInputValue(noteInput, '同意書確認済み')
     await clickButton('保存する')
 
@@ -233,10 +276,9 @@ describe('IDEA-15 利用期限・同意の表示と記録', () => {
   it('空欄で保存すると記録を消して「不明」へ戻す', async () => {
     await renderDialog({ ...ITEM, usageExpiresAt: '2027-03-31', usageConsentNote: '確認済み' })
     await clickButton('記録する')
-    const dateInput = dialog().querySelector<HTMLInputElement>('input[type="date"]')
     const noteInput = dialog().querySelector<HTMLInputElement>('input[maxlength="500"]')
-    if (!dateInput || !noteInput) throw new Error('記録フォームがありません')
-    await setInputValue(dateInput, '')
+    if (!noteInput) throw new Error('記録フォームがありません')
+    await clearExpiresDate()
     await setInputValue(noteInput, '   ')
     await clickButton('保存する')
 

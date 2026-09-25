@@ -214,12 +214,44 @@ describe('NEN新規作成入口（#618）', () => {
     await setInputReact(titleInput, '専用データの題名618')
     await setInputReact(urlInput, 'https://example.com/columns/618-draft')
 
-    // 配信日時（日本時間）に未来の日時を入れる。
-    const labels = Array.from(container.querySelectorAll('label'))
-    const scheduleLabel = labels.find((l) => l.textContent?.includes('配信日時（日本時間）'))
-    const scheduleInput = scheduleLabel?.querySelector('input')
-    if (!scheduleInput) throw new Error('配信日時の入力欄が見つかりません')
-    await setInputReact(scheduleInput as HTMLInputElement, '2099-05-01T10:30')
+    // 配信日時（日本時間）に未来の日時を入れる（日時の選択★V7。実行日から60日先）。
+    const ahead = new Date()
+    ahead.setDate(ahead.getDate() + 60)
+    const future = {
+      y: ahead.getFullYear(),
+      mo: ahead.getMonth() + 1,
+      d: ahead.getDate(),
+      iso: `${ahead.getFullYear()}-${String(ahead.getMonth() + 1).padStart(2, '0')}-${String(ahead.getDate()).padStart(2, '0')}T10:30`,
+    }
+    const futureWeek = '日月火水木金土'[new Date(future.y, future.mo - 1, future.d).getDay()]
+    const scheduleLabel = Array.from(container.querySelectorAll('label')).find((l) =>
+      l.textContent?.includes('配信日時（日本時間）'),
+    )
+    const trigger = scheduleLabel?.htmlFor ? container.querySelector(`#${scheduleLabel.htmlFor.replace(/:/g, '\\:')}`) : null
+    if (!trigger) throw new Error('配信日時の入力欄が見つかりません')
+    await click(trigger as HTMLElement)
+    const picker = container.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')
+    if (!picker) throw new Error('日時の選択箱が開きません')
+    await click(picker.querySelector('button[aria-label="日付"]') as HTMLElement)
+    for (let i = 0; i < 12; i += 1) {
+      const grid = container.querySelector('[role="grid"]')
+      if (grid?.getAttribute('aria-label') === `${future.y}年${future.mo}月`) break
+      const next = Array.from(container.querySelectorAll('button')).find((b) => b.getAttribute('aria-label') === '次の月')
+      if (!next) throw new Error('暦が見つかりません')
+      await click(next as HTMLElement)
+    }
+    const day = Array.from(container.querySelectorAll('button')).find((b) =>
+      (b.getAttribute('aria-label') ?? '').startsWith(`${future.y}年${future.mo}月${future.d}日（${futureWeek}）`),
+    )
+    if (!day) throw new Error('未来の日が見つかりません')
+    await click(day as HTMLElement)
+    // 時刻は 10:30 のまま（日付を選ぶと時刻 10:00 になるので分だけ 30 にする）。
+    await act(async () => {
+      const minute = container.querySelector('select[aria-label="分"]') as HTMLSelectElement
+      minute.value = '30'
+      minute.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    await settle()
 
     const save = Array.from(container.querySelectorAll('button')).find((b) => b.textContent === '下書きに保存')
     if (!save) throw new Error('下書きに保存ボタンが見つかりません')
@@ -230,7 +262,7 @@ describe('NEN新規作成入口（#618）', () => {
     expect(accountId).toBe('account-a')
     expect(body.title).toBe('専用データの題名618')
     // 日時あり: 日本時間として +09:00 で送る（再読込で日本時間に読める）。
-    expect(body.scheduledAt).toBe('2099-05-01T10:30:00+09:00')
+    expect(body.scheduledAt).toBe(`${future.iso}:00+09:00`)
     expect(navigation.push).toHaveBeenCalledWith('/nen-campaigns?tab=columns')
 
     // 保存後の再読込: 一覧にその下書きが並ぶ。

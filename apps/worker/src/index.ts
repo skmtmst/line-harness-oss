@@ -60,6 +60,7 @@ import { friendMigrations } from './routes/friend-migrations.js';
 import { tags } from './routes/tags.js';
 import { scenarios } from './routes/scenarios.js';
 import { broadcasts } from './routes/broadcasts.js';
+import { broadcastApprovals } from './routes/broadcast-approvals.js';
 import { broadcastMessageAssets } from './routes/broadcast-message-assets.js';
 import { users } from './routes/users.js';
 import { lineAccounts } from './routes/line-accounts.js';
@@ -451,6 +452,9 @@ app.route('/', friendMigrations);
 app.route('/', friends);
 app.route('/', tags);
 app.route('/', scenarios);
+// NOTE: 承認の口（approval-threshold 等の固定名）は :id より先に載せる。
+// broadcasts の PUT /:id が先だと approval-threshold を id と読んで404になる。
+app.route('/', broadcastApprovals);
 app.route('/', broadcasts);
 app.route('/', broadcastMessageAssets);
 app.route('/', users);

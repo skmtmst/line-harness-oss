@@ -41,6 +41,8 @@ import {
 import type { SegmentCondition } from '@/lib/segment-condition'
 import { newBroadcastDraftSession, persistBroadcastDraft } from '@/lib/broadcast-draft'
 import ConditionBuilder from '@/components/shared/condition-builder'
+import DateField from '@/components/shared/date-field'
+import { TimeField } from '@/components/shared/date-time-field'
 import SegmentPresetControls from '@/components/broadcasts/segment-preset-controls'
 import { audienceSummary } from '@/lib/broadcast-summary'
 import InsertToolbar from '@/components/scenarios/insert-toolbar'
@@ -63,6 +65,11 @@ import BroadcastStepRail from '@/components/broadcasts/broadcast-step-rail'
 import { broadcastSteps, type BroadcastStepKey } from '@/components/broadcasts/broadcast-steps'
 import { testSendFailure, testSendResult, type TestSendView } from './test-send-view'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import {
+  ApprovalRequestFields,
+  SingleOperatorFields,
+} from '@/components/broadcasts/broadcast-approval'
+import type { BroadcastApprovalCandidate } from '@/lib/api'
 
 interface BroadcastFormProps {
   tags: Tag[]
@@ -133,11 +140,11 @@ export function typeLabel(type: string): string {
  * 必要があるので、まだ蓋をしてある。
  */
 const UNSENDABLE_TYPES: Partial<Record<BroadcastBubbleType, string>> = {
-  rich_message: 'リッチメッセージは準備中です。いまは写真かFlexで作れます',
-  rich_video: 'リッチビデオは準備中です。いまは動画で送れます',
-  card_message: 'カードタイプは準備中です。いまはカルーセルで作れます',
-  coupon: 'クーポンは準備中です',
-  research: 'リサーチは準備中です',
+  rich_message: 'リッチメッセージには未対応です。いまは写真かFlexで作れます',
+  rich_video: 'リッチビデオには未対応です。いまは動画で送れます',
+  card_message: 'カードタイプには未対応です。いまはカルーセルで作れます',
+  coupon: 'クーポンには未対応です',
+  research: 'リサーチには未対応です',
 }
 
 /** メッセージ形式タブの並び。null は「紹介」（まだ作れない）。 */
@@ -306,7 +313,7 @@ function BubbleEditor({ bubble, index, total, assets, assetsStatus, accountId, o
           const reason = UNSENDABLE_TYPES[value as BroadcastBubbleType]
           return (
             <option key={value} value={value} disabled={Boolean(reason)}>
-              {reason ? `${label}（準備中）` : label}
+              {reason ? `${label}（未対応）` : label}
             </option>
           )
         })}
@@ -655,6 +662,20 @@ export default function BroadcastForm({
   const [previewConfirmed, setPreviewConfirmed] = useState(visualQaAugustCampaign)
   const [error, setError] = useState('')
   const [draftSaved, setDraftSaved] = useState(false)
+  /*
+   * 二者承認（m12a / 設計 A-1・A-4）。確認の窓を開いたときに境目と
+   * 運用者数を読み、人数で出し分ける。人数は配信前チェックの数だけを使う。
+   */
+  const [approvalConfig, setApprovalConfig] = useState<{
+    threshold: number
+    singleOperator: boolean
+  } | null>(null)
+  const [approvalConfigState, setApprovalConfigState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
+  const [approvalCandidates, setApprovalCandidates] = useState<BroadcastApprovalCandidate[]>([])
+  const [approvalCandidatesState, setApprovalCandidatesState] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [approverId, setApproverId] = useState('')
+  const [approvalNote, setApprovalNote] = useState('')
+  const [approvalCountInput, setApprovalCountInput] = useState('')
 
   const stepTitle: Record<BroadcastStepKey, string> = {
     basic: '一斉配信を作成・基本設定',
@@ -1212,7 +1233,7 @@ export default function BroadcastForm({
     return new Date(Date.UTC(y, mo - 1, d, h - 9, m)).toISOString()
   }
 
-  const draftPayload = (scheduledAt: string | null, saveAsDraft = false) => {
+  const draftPayload = (scheduledAt: string | null, saveAsDraft = false, confirmedCount?: number) => {
     const first = bubbles[0]
     const legacy = bubbleLegacyMessage(first)
     return {
@@ -1223,6 +1244,8 @@ export default function BroadcastForm({
       ...targetPayload(),
       lineAccountId: selectedAccountId || null,
       scheduledAt,
+      // 1人運用のとき、送る人が確認で入れた人数。予約の口が突き合わせる。
+      ...(confirmedCount !== undefined ? { confirmedRecipientCount: confirmedCount } : {}),
       trackLinks,
       folderId: folderId || null,
       measureOpens,
@@ -1242,7 +1265,11 @@ export default function BroadcastForm({
    * #772: 更新は保持している版をその場で付けて送り、成功応答の版へ進める。
    * 版を閉じ込めた古い関数は作らない。409時は送り直さず、最新版を読み直して案内する。
    */
-  const persistDraft = async (scheduledAt: string | null, saveAsDraft = false): Promise<ApiBroadcast | null> => {
+  const persistDraft = async (
+    scheduledAt: string | null,
+    saveAsDraft = false,
+    confirmedCount?: number,
+  ): Promise<ApiBroadcast | null> => {
     const accountId = selectedAccountId || null
     /*
      * 編集中にアカウントが切り替わったまま保存すると、下書きが別アカウントの
@@ -1253,7 +1280,7 @@ export default function BroadcastForm({
       setError('別のLINEアカウントへ切り替わっています。元のアカウントへ戻してから保存してください。')
       return null
     }
-    const payload = draftPayload(scheduledAt, saveAsDraft)
+    const payload = draftPayload(scheduledAt, saveAsDraft, confirmedCount)
     try {
       const result = await persistBroadcastDraft(
         draftSession.current,
@@ -1475,6 +1502,45 @@ export default function BroadcastForm({
   }
 
   /*
+   * 二者承認の境目と候補は、確認の窓を開いたときに読む。
+   * 入力を打つたびに読むと重く、開く前に読むと古くなる。
+   */
+  useEffect(() => {
+    if (!confirmOpen) return
+    setApproverId('')
+    setApprovalNote('')
+    setApprovalCountInput('')
+    const accountId = selectedAccountId
+    if (!accountId) {
+      setApprovalConfigState('error')
+      setApprovalCandidatesState('error')
+      return
+    }
+    let cancelled = false
+    setApprovalConfigState('loading')
+    setApprovalCandidatesState('loading')
+    api.broadcasts.approval.config(accountId).then((res) => {
+      if (cancelled) return
+      if (res.success) {
+        setApprovalConfig({ threshold: res.data.threshold, singleOperator: res.data.singleOperator })
+        setApprovalConfigState('ready')
+      } else {
+        setApprovalConfigState('error')
+      }
+    }).catch(() => { if (!cancelled) setApprovalConfigState('error') })
+    api.broadcasts.approval.candidates(accountId).then((res) => {
+      if (cancelled) return
+      if (res.success) {
+        setApprovalCandidates(res.data)
+        setApprovalCandidatesState('ready')
+      } else {
+        setApprovalCandidatesState('error')
+      }
+    }).catch(() => { if (!cancelled) setApprovalCandidatesState('error') })
+    return () => { cancelled = true }
+  }, [confirmOpen, selectedAccountId])
+
+  /*
     **人数が数えられていないなら送らせない。**
     `ConfirmDialog` は `onConfirm` を渡さないと確認のボタンごと出さないので、
     押せそうに見えるボタンが残らない。
@@ -1505,12 +1571,47 @@ export default function BroadcastForm({
 
   const canConfirm = audienceCount !== null && audienceCount > 0
 
+  /*
+   * 二者承認の出し分け（設計 A-1・A-4）。人数は配信前チェックの数だけを使う。
+   * 境目が読めないときは承認なしの従来どおりに進める（送る直前に口が守る）。
+   */
+  const needsApproval = audienceCount !== null
+    && approvalConfig !== null
+    && audienceCount >= approvalConfig.threshold
+  const needsApprovalSingle = needsApproval && approvalConfig?.singleOperator === true
+  const approvalCountMatched = needsApprovalSingle
+    && approvalCountInput.trim() !== ''
+    && Number(approvalCountInput) === audienceCount
+
   const save = async () => {
     const validationError = validate(); if (validationError) { setError(validationError); return }
+    if (needsApproval && !needsApprovalSingle && approverId === '') {
+      setError('承認をお願いする人を選んでください')
+      return
+    }
+    if (needsApprovalSingle && !approvalCountMatched) {
+      setError('人数を入れて一致させてください')
+      return
+    }
     setSaving(true); setError('')
     try {
-      const saved = await persistDraft(scheduledAtIso())
+      const saved = await persistDraft(
+        scheduledAtIso(),
+        false,
+        needsApprovalSingle ? Number(approvalCountInput) : undefined,
+      )
       if (!saved) return
+      // 承認が要るときは、保存のあと承認の依頼まで続ける。依頼までが1つの操作。
+      if (needsApproval && !needsApprovalSingle) {
+        const requested = await api.broadcasts.approval.request(saved.id, {
+          approverStaffId: approverId,
+          note: approvalNote.trim() || undefined,
+        })
+        if (!requested.success) {
+          setError(requested.error)
+          return
+        }
+      }
       setConfirmOpen(false)
       onSuccess(saved)
     } catch { setError('下書きを保存できませんでした') } finally { setSaving(false) }
@@ -2081,15 +2182,7 @@ export default function BroadcastForm({
             >
               日時を指定して予約
             </button>
-            {/* 1人ずつ最適な時刻を出す仕組みが無い。開封の時間帯を持っていない。 */}
-            <button
-              type="button"
-              disabled
-              title="友だちごとの最適な時間は準備中です"
-              className="border-hairline rounded-card text-ink-faint border p-3 text-left text-sm opacity-50"
-            >
-              友だちごとの最適な時間
-            </button>
+            {/* 「友だちごとの最適な時間」は開封の時間帯を持っていないので押し口を出さない。 */}
           </div>
 
           {sendMode === 'scheduled' && (
@@ -2098,24 +2191,22 @@ export default function BroadcastForm({
                 <label htmlFor="bc-date" className="text-ink-secondary mb-1 block text-xs font-medium">
                   配信日（日本時間）
                 </label>
-                <input
+                <DateField
                   id="bc-date"
-                  type="date"
                   value={scheduledDate}
-                  onChange={(e) => setScheduledDate(e.target.value)}
-                  className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
+                  onChange={setScheduledDate}
+                  aria-label="配信日（日本時間）"
                 />
               </div>
               <div>
                 <label htmlFor="bc-time" className="text-ink-secondary mb-1 block text-xs font-medium">
                   時刻（日本時間）
                 </label>
-                <input
+                <TimeField
                   id="bc-time"
-                  type="time"
                   value={scheduledTime}
-                  onChange={(e) => setScheduledTime(e.target.value)}
-                  className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
+                  onChange={setScheduledTime}
+                  aria-label="時刻（日本時間）"
                 />
               </div>
               {/*
@@ -2562,9 +2653,13 @@ export default function BroadcastForm({
     <div data-design-node="FpgxH">
       <ConfirmDialog
         open={confirmOpen}
-        title="この内容で予約しますか？"
-        description="送信対象・日時・内容を確認して予約します。予約後も配信開始前までは編集・取消できます。"
-        confirmLabel="この内容で予約"
+        title={needsApproval && !needsApprovalSingle ? 'この内容で送りますか？' : 'この内容で予約しますか？'}
+        description={
+          needsApproval && !needsApprovalSingle
+            ? '送る相手・日時・内容を確認し、承認をお願いする人を選んでください。承認されるまで送られません。'
+            : '送信対象・日時・内容を確認して予約します。予約後も配信開始前までは編集・取消できます。'
+        }
+        confirmLabel={needsApproval && !needsApprovalSingle ? '承認を依頼する' : 'この内容で予約'}
         cancelLabel="戻って修正"
         busy={saving}
         error={error || undefined}
@@ -2661,6 +2756,30 @@ export default function BroadcastForm({
               {previewConfirmed ? null : <li>LINEプレビューが未確認です</li>}
             </ul>
           </div>
+        ) : null}
+
+        {/*
+          二者承認（設計 A-1・A-4）。承認が要る人数のときだけ出す。
+          境目が読めているときだけ判定する（読めないときは従来どおり）。
+        */}
+        {needsApproval && !needsApprovalSingle && audienceCount !== null && approvalConfig !== null ? (
+          <ApprovalRequestFields
+            recipientCount={audienceCount}
+            threshold={approvalConfig.threshold}
+            candidates={approvalCandidates}
+            candidatesState={approvalCandidatesState}
+            approverId={approverId}
+            onApproverChange={setApproverId}
+            note={approvalNote}
+            onNoteChange={setApprovalNote}
+          />
+        ) : null}
+        {needsApprovalSingle && audienceCount !== null ? (
+          <SingleOperatorFields
+            recipientCount={audienceCount}
+            value={approvalCountInput}
+            onChange={setApprovalCountInput}
+          />
         ) : null}
 
         {/* 人数が無いなら送らせない。上で確認のボタン自体を出していない。 */}

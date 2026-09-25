@@ -2682,6 +2682,99 @@ const spec = {
         responses: { '200': { description: 'Preview computed (totalSelected, uniqueRecipients, reduction, perAccount)' } },
       },
     },
+    /*
+     * 二者承認（m12a / v6-06 §6）。1,000通以上（機能設定で変更可）の送信は、
+     * 送る人とは別の人の承認が要る。自分の依頼は承認できない。
+     */
+    '/api/broadcasts/approval-config': {
+      get: {
+        tags: ['Broadcasts'],
+        summary: '二者承認の境目と運用者数',
+        parameters: [{ name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'threshold, operatorCount, singleOperator' } },
+      },
+    },
+    '/api/broadcasts/approval-threshold': {
+      get: {
+        tags: ['Broadcasts'],
+        summary: '承認が要る通数の境目の取得',
+        parameters: [{ name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'threshold' } },
+      },
+      put: {
+        tags: ['Broadcasts'],
+        summary: '承認が要る通数の境目の変更（機能設定）',
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { type: 'object', properties: { lineAccountId: { type: 'string' }, threshold: { type: 'integer', minimum: 1, maximum: 1000000 } }, required: ['lineAccountId', 'threshold'] } } },
+        },
+        responses: { '200': { description: 'threshold を保存した' }, '400': { description: '範囲外の値' } },
+      },
+    },
+    '/api/broadcasts/approvals/candidates': {
+      get: {
+        tags: ['Broadcasts'],
+        summary: '承認を頼める相手の一覧（自分は除く）',
+        parameters: [{ name: 'lineAccountId', in: 'query', schema: { type: 'string' } }],
+        responses: { '200': { description: '承認できる人の一覧' } },
+      },
+    },
+    '/api/broadcasts/{id}/approval': {
+      get: {
+        tags: ['Broadcasts'],
+        summary: '承認の今の状態と判定',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'approval, gate, viewer' } },
+      },
+    },
+    '/api/broadcasts/{id}/approval-request': {
+      post: {
+        tags: ['Broadcasts'],
+        summary: '承認の依頼（送る人が押す）',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { type: 'object', properties: { approverStaffId: { type: 'string' }, note: { type: 'string' } }, required: ['approverStaffId'] } } },
+        },
+        responses: { '201': { description: '依頼した' }, '409': { description: '承認が要らない人数／1人運用／依頼中' } },
+      },
+    },
+    '/api/broadcasts/{id}/approval-approve': {
+      post: {
+        tags: ['Broadcasts'],
+        summary: '承認（承認する人が押す）',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: '承認した（needsSend のときは送信へ進める）' }, '403': { description: '権限なし／自分の依頼' }, '409': { description: '依頼中でない' } },
+      },
+    },
+    '/api/broadcasts/{id}/approval-reject': {
+      post: {
+        tags: ['Broadcasts'],
+        summary: '差し戻し（理由必須）',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { type: 'object', properties: { reason: { type: 'string' } }, required: ['reason'] } } },
+        },
+        responses: { '200': { description: '差し戻した' }, '400': { description: '理由が無い' } },
+      },
+    },
+    '/api/broadcasts/{id}/approval-cancel': {
+      post: {
+        tags: ['Broadcasts'],
+        summary: '依頼の取り消し（頼んだ人・owner/admin）',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: '取り消した' }, '409': { description: '依頼中でない' } },
+      },
+    },
+    '/api/broadcasts/{id}/approval-remind': {
+      post: {
+        tags: ['Broadcasts'],
+        summary: 'もう一度知らせる',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: '知らせ直した' }, '409': { description: '依頼中でない' } },
+      },
+    },
     // ── NEN delivery ────────────────────────────────────────────────────────
     '/api/nen-campaigns/metrics/flows': {
       get: {
@@ -3653,6 +3746,45 @@ const spec = {
       },
     },
     // ── Templates (#645 公開版固定) ─────────────────────────────────────────
+    '/api/templates/{id}/versions': {
+      get: {
+        tags: ['Templates'],
+        summary: 'テンプレートの版の履歴を新しい版から返す',
+        description: '公開のたびに足した版を新しい順に返す。前の版は変わらない。status は in_use（いま使っている）/ reserved（予約）/ past（過去）。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '版の一覧 { versionNumber・status・messageType・messageContent・effectiveFrom・createdAt }' },
+          '404': { description: 'Not found in account scope' },
+        },
+      },
+    },
+    '/api/templates/{id}/revert': {
+      post: {
+        tags: ['Templates'],
+        summary: '指定の版の中身で新しい版を作る',
+        description: '過去の版は変えない。その中身を下書きへ写して公開する。Idempotency-Key ヘッダ(必須)で再試行を見分ける。版(expectedVersion)が進んでいたら409。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'Idempotency-Key', in: 'header', required: true, schema: { type: 'string', minLength: 8, maxLength: 200 }, description: '公開操作の確認キー。必須。同じキーの再試行は同じ結果を返す。' },
+        ],
+        requestBody: { content: { 'application/json': { schema: {
+          type: 'object',
+          required: ['versionNumber', 'expectedVersion'],
+          properties: {
+            versionNumber: { type: 'integer', minimum: 1, description: '戻す版の番号。必須。無い版は404。' },
+            expectedVersion: { type: 'integer', minimum: 0, description: '確認したときの公開版。必須。進んでいたら409。' },
+          },
+        } } } },
+        responses: {
+          '200': { description: '戻す成功。data に publishedVersion・hasDraft を返す。' },
+          '400': { description: '確認キー不足・版の番号が数でない' },
+          '404': { description: 'Not found in account scope・戻す版が無い' },
+          '409': { description: '公開版の同時更新の負け・下書きの書き換わり・確認キーの別操作への使い回し' },
+        },
+      },
+    },
     '/api/templates/{id}/publish': {
       post: {
         tags: ['Templates'],

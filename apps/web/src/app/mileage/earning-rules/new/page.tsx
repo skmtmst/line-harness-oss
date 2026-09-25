@@ -14,6 +14,7 @@ import CreatePage, {
   inputClass,
 } from '@/components/shared/create-page'
 import { TextInput } from '@/components/shared/form-controls'
+import DateField from '@/components/shared/date-field'
 import ConditionBuilder, {
   pruneCondition,
   type SegmentCondition,
@@ -610,9 +611,9 @@ export default function NewMileageRulePage() {
           <div className="mt-3 grid gap-3 lg:grid-cols-2">
             <Field label="開始日・終了日" note="空欄なら期限なしです。">
               <div className="flex items-center gap-2">
-                <input type="date" value={validFrom} onChange={(e) => setValidFrom(e.target.value)} className={inputClass} aria-label="開始日" />
+                <DateField value={validFrom} onChange={setValidFrom} aria-label="開始日" className="min-w-0 flex-1" />
                 <span className="text-sm text-ink-faint">〜</span>
-                <input type="date" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} className={inputClass} aria-label="終了日" />
+                <DateField value={validUntil} onChange={setValidUntil} aria-label="終了日" className="min-w-0 flex-1" />
               </div>
             </Field>
             <Field label="付いたマイルの有効期限" htmlFor="sc-expiry" note="空欄なら期限なしです。">

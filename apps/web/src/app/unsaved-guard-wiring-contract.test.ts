@@ -77,6 +77,8 @@ const EXEMPTIONS: Record<string, string> = {
     '★V7: 方式選択はラジオの即時確定で未保存を持たない。名前・フォルダ欄は新規時は確定時に同送、既存時は欄内の保存で確定する小さな操作のため番兵を付けない',
   'app/staff/page.tsx':
     '権限プレビューの「変更後の予定」。リンクは下書きを捨てて移る仕様として明示済み',
+  'components/automations/automation-draft-editor.tsx':
+    '自動化ウィザードの段内エディタ。下書きはサーバーへ保存し、離脱の扱いは app/automations/new/page.tsx と同じく別途検討',
   'components/scenarios/trigger-editor.tsx':
     'ダイアログ内の dirty。閉じると元に戻る仕様で、画面離脱ガードの対象外',
   'components/shared/drawer.tsx':
@@ -92,7 +94,7 @@ const EXEMPTIONS: Record<string, string> = {
  * 画面を編集画面とみなし、分類を求める。
  */
 const EDITOR_SAVE_SIGNATURE = /(?:\bapi(?:\.[A-Za-z]+)+|\b[a-z][A-Za-z]*Api)\.(?:create|update|save|patch|upsert)[A-Za-z]*\(/
-const EDITOR_INPUT_SIGNATURE = /<(input|textarea|TextField|TextArea|SelectField)\b/g
+const EDITOR_INPUT_SIGNATURE = /<(input|textarea|TextField|TextArea|SelectField|DateField|DateTimeField|TimeField)\b/g
 const EDITOR_MIN_INPUTS = 3
 
 /*

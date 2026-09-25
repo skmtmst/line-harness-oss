@@ -19,6 +19,7 @@ import {
   SupportMarkStatusCard,
   MonthlyDeliveryCard,
   RecentResultsCard,
+  SideCard,
   UpcomingCard,
   activeUpcomingBookings,
   inactiveBookingStatuses,
@@ -172,9 +173,13 @@ function TodayTaskCard({
         </p>
         <span className={`${statusTone === 'muted' ? 'text-ink-faint' : statusTone === 'danger' ? 'text-danger' : 'text-success'} shrink-0 whitespace-nowrap text-xs font-semibold`}>{status}</span>
       </div>
+      {/*
+        配置は右下のまま（★V7「ダッシュボードの見せ方」fyR7V）。
+        見た目だけ CardHeader の action（actionTone="info"）にそろえる。
+      */}
       <div className="mt-auto flex items-center justify-between gap-3">
         <span className="text-ink-faint min-w-0 truncate text-xs" title={detail}>{detail}</span>
-        <Link href={href} className="text-action inline-flex min-h-6 shrink-0 items-center gap-1 text-xs font-bold hover:underline">
+        <Link href={href} className="text-status-info inline-flex min-h-6 shrink-0 items-center gap-1 text-label font-semibold hover:underline">
           {action}
           <span aria-hidden="true">→</span>
         </Link>
@@ -409,7 +414,11 @@ function LiveDataCard({
       <div className="flex items-start justify-between gap-3">
         <h2 className="text-ink min-w-0 truncate text-sm font-semibold" title={title}>{title}</h2>
         {period ? <span className="text-ink-faint flex-1 whitespace-nowrap pt-0.5 text-[11px] font-normal">{period}</span> : null}
-        <Link href={href} className="text-action shrink-0 text-xs hover:underline">{linkLabel} →</Link>
+        {/*
+          行き先リンクは CardHeader の action（actionTone="info"）と
+          同じ色・大きさにする。配置はもとから見出しの行の右端なので変えない。
+        */}
+        <Link href={href} className="text-status-info shrink-0 text-label font-semibold hover:underline">{linkLabel} →</Link>
       </div>
       <p className="text-ink mt-4 text-2xl font-bold tabular-nums" aria-busy={loading || undefined}>
         {loading ? (
@@ -458,17 +467,23 @@ function SendQuotaCard({
   const remainingRate = remaining !== null && limit ? Math.max(0, Math.min(100, remaining / limit * 100)) : null
   /* 残りわずか・0件を緑のままにしない。10%を切ったら危険色にする。 */
   const low = remainingRate !== null && remainingRate <= 10
-  return <Card padding="roomy" className="min-h-[128px]">
-    <div className="flex items-start justify-between gap-3">
-      <h2 className="text-ink text-base font-bold">今月の送信枠</h2>
-      <span className="text-ink-faint text-xs">毎月1日リセット</span>
-    </div>
+  /*
+   * 行き先リンクは見出しの行の右端に1つ（SideCard の action）、
+   * 更新時刻は右下にそろえる。「毎月1日リセット」は題の脇に置くと
+   * 題が2行に折れるため、「？」（HelpTip：いつ元に戻るか）へ移す。
+   */
+  return <SideCard
+    title="今月の送信枠"
+    helpTip="送信枠は毎月1日にリセットされます。使い切ると翌月1日まで送れません。"
+    action={{ label: '配信設定へ →', href: '/accounts' }}
+    freshness={freshness}
+  >
     {/*
       設計（`vUXKb`）は数の前に「LINE公式」と置く。送信枠はLINE公式アカウント
       の枠で、メールには効かない。どちらの枠かが書いていないと、メールが
       止まったときにここを見てしまう。
     */}
-    <p className="text-ink mt-3 flex items-baseline gap-2 whitespace-nowrap">
+    <p className="text-ink flex items-baseline gap-2 whitespace-nowrap">
       <span className="text-ink-secondary text-sm font-semibold">LINE公式</span>
       <span className="text-metric leading-none font-bold tabular-nums">
         {/*
@@ -495,7 +510,7 @@ function SendQuotaCard({
     ) : (
       <div className="bg-hairline mt-3 h-1.5 overflow-hidden rounded-pill"><div className={`${low ? 'bg-danger' : 'bg-accent'} h-full rounded-pill`} style={{ width: `${remainingRate ?? 0}%` }} /></div>
     )}
-    <div className="mt-2 flex items-center justify-between gap-3 text-xs">
+    <div className="mt-2 text-xs">
       {notConnected ? (
         <span className="text-ink-faint">LINEアカウントが未接続です</span>
       ) : failed ? (
@@ -511,12 +526,8 @@ function SendQuotaCard({
           {remainingRate === null ? '残りを確認中' : `残り ${remainingRate.toFixed(1)}%`}
         </span>
       )}
-      <span className="flex shrink-0 items-center gap-3">
-        {freshness}
-        <Link href="/accounts" className="text-action font-medium hover:underline">配信設定へ →</Link>
-      </span>
     </div>
-  </Card>
+  </SideCard>
 }
 
 function OperationalAlertsCard({ risk, healthIssues, oldestWaitMinutes, twoFactor, referenceCount, failed, updatedAt }: { risk: HealthRisk; healthIssues: number | null; oldestWaitMinutes: number | null; twoFactor: { enabled: number; total: number } | null; referenceCount?: number; failed?: boolean; updatedAt?: Date | null }) {
@@ -524,21 +535,27 @@ function OperationalAlertsCard({ risk, healthIssues, oldestWaitMinutes, twoFacto
   // 未対応の長さは受信カードで管理する。ここへ重ねて警告扱いすると、
   // 接続も自動処理も正常なのに赤い「1件」が出てしまう。
   const count = referenceCount ?? (risk === null ? null : currentHealthIssue ? Math.max(1, healthIssues ?? 1) : 0)
-  return <Card padding="roomy" className="min-h-[128px]">
-    {/* 見出しを切らない（★V7）。状態の文が長いので、見出しと同じ行に並べず下の段へ回す。 */}
-    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-      <h2 className="text-ink shrink-0 text-base font-bold">運用アラート</h2>
-      {/* 現在時点の状態。数の対象期間が分かるよう見出し脇へ書く（IDEA-01）。 */}
-      <span className="text-ink-faint flex-1 whitespace-nowrap pt-0.5 text-[11px] font-normal">現在</span>
-      {/*
-        #631: 件数の母集団は変えない（health issue だけを数える）。
-        「最も古い未対応」と別のものを数えていることが、件数の脇の文言
-        だけで分かるようにする。0件のときに「未対応が長引いている」の
-        隣で緑の「0件」が出ても、別の指標だと読めるようにするのが狙い。
-        取れていないときは 0件 ではなく「未取得」とする（IDEA-01）。
-      */}
-      <span className="flex flex-wrap items-center gap-2"><span className={failed || count === null ? 'text-ink-faint text-sm font-bold' : 'text-ink text-sm font-bold'}>{failed ? '未取得' : count === null ? '—' : `接続・自動処理 ${count}件`}</span>{!failed && count !== null ? <StatusBadge tone={count > 0 ? 'danger' : 'success'} size="compact">{count > 0 ? '要確認' : '正常'}</StatusBadge> : null}</span>
-    </div>
+  /*
+   * 行き先リンクは見出しの行の右端に1つ（SideCard の action）、
+   * 更新時刻は右下にそろえる。見出しの脇の「現在」はそのまま残す。
+   * 件数と札は見出し行から本文の先頭へ移す（見出しを切らない★V7）。
+   */
+  return <SideCard
+    title="運用アラート"
+    period="現在"
+    action={{ label: '運用状態を見る →', href: '/emergency' }}
+    freshness={dashboardLocalUpdatedAt(updatedAt) ? (
+      <span className="text-ink-faint shrink-0 text-xs font-medium">{dashboardLocalUpdatedAt(updatedAt)}</span>
+    ) : undefined}
+  >
+    {/*
+      #631: 件数の母集団は変えない（health issue だけを数える）。
+      「最も古い未対応」と別のものを数えていることが、件数の脇の文言
+      だけで分かるようにする。0件のときに「未対応が長引いている」の
+      隣で緑の「0件」が出ても、別の指標だと読めるようにするのが狙い。
+      取れていないときは 0件 ではなく「未取得」とする（IDEA-01）。
+    */}
+    <p className="flex flex-wrap items-center gap-2"><span className={failed || count === null ? 'text-ink-faint text-sm font-bold' : 'text-ink text-sm font-bold'}>{failed ? '未取得' : count === null ? '—' : `接続・自動処理 ${count}件`}</span>{!failed && count !== null ? <StatusBadge tone={count > 0 ? 'danger' : 'success'} size="compact">{count > 0 ? '要確認' : '正常'}</StatusBadge> : null}</p>
     {/*
       設計（`vUXKb`）は「最も古い未対応」と「二段階認証」の2行。
       二段階認証は既存のログインユーザー一覧から、有効な人だけを数える。
@@ -552,13 +569,7 @@ function OperationalAlertsCard({ risk, healthIssues, oldestWaitMinutes, twoFacto
       <p>・最も古い未対応：{oldestWaitMinutes === null ? '—' : formatWaitRough(oldestWaitMinutes)}</p>
       <p>・組織全体の二段階認証：{twoFactor === null ? '—' : `${twoFactor.enabled} / ${twoFactor.total}人`}</p>
     </div>
-    <div className="mt-3 flex items-center justify-between gap-3">
-      <Link href="/emergency" className="text-action inline-block text-xs font-medium hover:underline">運用状態を見る →</Link>
-      {dashboardLocalUpdatedAt(updatedAt) ? (
-        <span className="text-ink-faint shrink-0 text-xs font-medium">{dashboardLocalUpdatedAt(updatedAt)}</span>
-      ) : null}
-    </div>
-  </Card>
+  </SideCard>
 }
 
 function ConnectionStatusCard({ account, risk, activeFriends, healthFailed, updatedAt }: { account: ReturnType<typeof useAccount>['selectedAccount']; risk: HealthRisk; activeFriends: number | null; healthFailed?: boolean; updatedAt?: Date | null }) {
@@ -646,7 +657,6 @@ function DashboardPageInner() {
   const [inboxFailed, setInboxFailed] = useState(false)
   const [shipmentSummary, setShipmentSummary] = useState<ShipmentSummary | null>(null)
   const [shipmentState, setShipmentState] = useState<'loading' | 'ready' | 'error'>('loading')
-  const shipmentEmpty = shipmentState === 'ready' && shipmentSummary !== null && shipmentSummary.today + shipmentSummary.soon + shipmentSummary.later === 0
   const [pendingPhotos, setPendingPhotos] = useState<number | null>(null)
   /*
    * 写真審査の件数が取れなかった理由。null のままだと「読み込み中」を
@@ -1199,16 +1209,22 @@ function DashboardPageInner() {
     : data.metrics.activeFriends.value
   /*
    * 「対応が必要な受信」小カードの件数は、遷移先 `/chats?status=unread` と
-   * 同じ口で数える（IDEA-01）:
-   *   LINE … 選択中アカウントの未対応（overview.inbox.unanswered）
+   * 同じ口で数える（IDEA-01）。右の「現在の対応状況」と同じ
+   * `overview.inbox`（受信箱の正本 `getInboxStatusCounts`）から取るので、
+   * 2つのカードで数がずれない:
+   *   LINE … 選択中アカウントの未対応（overview.inbox.line.unanswered）
    *   MAIL … メールはアカウントを持たない。受信箱に同じ一覧で混ざる
-   *          未対応メール（support/inbox の emailUnread、権限のある範囲）
+   *          未対応メール（overview.inbox.email.unanswered）
+   * 段階配備中の旧Workerは内訳を返さない。その間は従来どおり LINE を概要、
+   * MAIL を受信箱カードの取得結果（support/inbox の emailUnread）から取る。
    * 片方でも取れていない間は合計を出さず「—」にする。取れたぶんだけを
    * 足すと実際より少ない件数を本物の数字に見せてしまう。
    */
   const inboxSectionOk = data !== null && sectionAvailable('inbox')
-  const lineUnread = inboxSectionOk ? data.inbox.unanswered : null
-  const mailUnread = inboxSummary?.emailUnread ?? null
+  const lineUnread = inboxSectionOk ? (data.inbox.line?.unanswered ?? data.inbox.unanswered) : null
+  const mailUnread = inboxSectionOk && data.inbox.email
+    ? data.inbox.email.unanswered
+    : (inboxSummary?.emailUnread ?? null)
   const pendingTotal = lineUnread === null || mailUnread === null ? null : lineUnread + mailUnread
   const pendingDetail = lineUnread === null && mailUnread === null
     ? (data !== null || inboxFailed || error ? STATE_TEXT.error : STATE_TEXT.loading)
@@ -1485,9 +1501,7 @@ function DashboardPageInner() {
       ) : null}
 
       {visibleToday.length > 0 ? <section data-design="TodayTasks" className="mb-6">
-        <div className="mb-2.5 flex items-center justify-between gap-3">
-          <h2 className="text-ink text-lg font-bold">今日やること</h2>
-        </div>
+        {/* 見出しは置かない（オーナー指示）。4枚の小カードだけ出す。 */}
         {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}
         <KpiCollapse gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {visibleToday.map((item) => <div key={item.id}>{renderTodayCard(item.id)}</div>)}
@@ -1512,10 +1526,11 @@ function DashboardPageInner() {
             if (item.id === 'shipment') {
               return (
                 /*
-                 * 出荷が0件の時は、上の小カード「出荷予定 0件」で足りるので大きな空の欄は出さない
-                 * （★V7 ダッシュボードの見せ方）。件数は取り続けるので、隠すだけでマウントは保つ。
+                 * 表示ONなら0件でもカードを出す。空のときは
+                 * パネル側が1行の空表示を出す。件数は取り続けるので、
+                 * OFFのときは隠すだけでマウントは保つ（受信箱と同じ形）。
                  */
-                <div key={item.id} data-design="Shipment" className={item.visible && !shipmentEmpty ? '' : 'hidden'} aria-hidden={!item.visible || shipmentEmpty}>
+                <div key={item.id} data-design="Shipment" className={item.visible ? '' : 'hidden'} aria-hidden={!item.visible}>
                   {/*
                     選択中アカウントの出荷だけを数える（IDEA-01）。
                     小カード「出荷予定」と遷移先 /ec-commerce は同じアカウント範囲。

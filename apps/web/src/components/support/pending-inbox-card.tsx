@@ -202,6 +202,12 @@ export default function PendingInboxCard({
 
   return (
     <Card layout="vertical" overflow="hidden" className="h-fit min-w-0">
+      {/*
+        行き先リンクは見出しの行の右端に1つ（CardHeader の action）。
+        ほかのカード（「さらに詳しく →」「アクセス解析へ →」「すべて見る →」）
+        と同じ部品・同じ色・同じ大きさにする。独自の文字色・大きさや
+        矢印なしの書き方はしない。
+      */}
       <CardHeader
         size="roomy"
         /*
@@ -211,27 +217,26 @@ export default function PendingInboxCard({
         */
         title="対応が必要な受信（全アカウント）"
         meta={summary && summary.total > 0 ? `${summary.total}件` : undefined}
+        action={<Link href="/chats" className="hover:underline">受信箱をすべて見る →</Link>}
+        actionTone="info"
       />
 
       {/*
-        見出し行と「表示件数・全件リンク」を別行にする（DASH-26）。
-        320pxでは見出し・件数選択・リンクを1行に収まらないので、
-        操作は2行目へ下げて折り返せるようにする。
+        一覧がいつ時点のものか。30秒ごとの再取得で古い値を最新と誤認しない。
+        見出し行と別行にする（DASH-26）。320pxでは見出し・件数・リンクを
+        1行に収まらない。リンクと同じ行に押し込まない。
+        まだ一度も取れていないときは行ごと出さない（空の罫線を残さない）。
       */}
-      <div className="border-hairline flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 border-b px-5 pb-2">
-        {/*
-          ダッシュボードでは件数を変えさせない（★V7 ダッシュボードの見せ方、2026-09-24）。
-          ここは「いま対応が要る人」をひと目で見る場所で、全件は受信箱で見る。
-          以前あった「表示件数」のプルダウンは外した（保存済みの件数は読むだけ）。
-        */}
-        <span className="ml-auto flex items-center gap-3">
-          {/* 一覧がいつ時点のものか。30秒ごとの再取得で古い値を最新と誤認しない。 */}
-          {dashboardLocalUpdatedAt(lastSuccessAt) ? (
-            <span className="text-ink-faint text-xs">{dashboardLocalUpdatedAt(lastSuccessAt)}</span>
-          ) : null}
-          <Link href="/chats" className="text-info text-xs font-semibold hover:underline">受信箱をすべて見る</Link>
-        </span>
-      </div>
+      {dashboardLocalUpdatedAt(lastSuccessAt) ? (
+        <div className="border-hairline flex flex-wrap items-center justify-end gap-x-3 gap-y-1.5 border-b px-5 pb-2">
+          {/*
+            ダッシュボードでは件数を変えさせない（★V7 ダッシュボードの見せ方、2026-09-24）。
+            ここは「いま対応が要る人」をひと目で見る場所で、全件は受信箱で見る。
+            以前あった「表示件数」のプルダウンは外した（保存済みの件数は読むだけ）。
+          */}
+          <span className="text-ink-faint text-xs">{dashboardLocalUpdatedAt(lastSuccessAt)}</span>
+        </div>
+      ) : null}
 
       {/*
         成功済みの数を残したまま、直近の更新に失敗したことを隠さない
@@ -273,13 +278,18 @@ export default function PendingInboxCard({
             状態を各行へ分ける。
           */}
           <div className="min-h-0 flex-1 overflow-hidden max-sm:hidden">
+            {/*
+              状態の列は札の幅に合わせた固定幅にする。割合（10%）にすると
+              狭い幅で札が右の余白へ食い込む。残りは内容の列で吸収する
+              （幅を指定しない列が伸びる）。右端の余白は見出しと同じ px-5。
+            */}
             <table className="w-full table-fixed text-sm">
               <thead>
                 <tr className="text-ink-faint border-hairline h-[34px] border-b text-left text-xs">
                   <th className="w-[36%] px-5 font-medium">お名前</th>
-                  <th className="w-[40%] px-3 font-medium">内容</th>
+                  <th className="px-3 font-medium">内容</th>
                   <th className="w-[14%] px-3 text-right font-medium whitespace-nowrap">待ち時間</th>
-                  <th className="w-[10%] px-5 font-medium whitespace-nowrap">状態</th>
+                  <th className="w-24 px-5 font-medium whitespace-nowrap">状態</th>
                 </tr>
               </thead>
               <tbody className="divide-hairline divide-y">

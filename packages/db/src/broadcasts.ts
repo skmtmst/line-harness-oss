@@ -1,3 +1,4 @@
+import { refreshBroadcastReferences, removeConsumerReferences } from './template-versions.js';
 import { jstNow } from './utils.js';
 // 'segment' は 029 の CHECK では前から許されていたが、型だけ落ちていた。
 // 絞り込み条件（segment_conditions）で宛先を決める配信で使う。
@@ -66,6 +67,29 @@ export interface Broadcast {
   stopped_by?: string | null;
   /** 送信の試行番号。失敗分の再送で1つ進む。provider へ渡す再送キーの一部。 */
   send_attempt_no?: number;
+  /**
+   * 二者承認の今の状態（m12a）。
+   * none（承認がいらない・まだ頼んでいない）/ pending / approved /
+   * rejected / cancelled / expired（予約時刻を過ぎた）。
+   * 送信の段階（status）とは別の軸。未マイグレーション環境では undefined。
+   */
+  approval_status?: string | null;
+  /** 承認を頼んだ担当者（送る人）。 */
+  approval_requested_by_staff_id?: string | null;
+  /** 承認を頼んだ日時（JST）。 */
+  approval_requested_at?: string | null;
+  /** 承認を頼まれた担当者（承認する人）。 */
+  approval_approver_staff_id?: string | null;
+  /** 承認を頼むときのひとこと（任意）。 */
+  approval_note?: string | null;
+  /** 承認・差し戻しを決めた担当者。 */
+  approval_decided_by_staff_id?: string | null;
+  /** 承認・差し戻しを決めた日時（JST）。 */
+  approval_decided_at?: string | null;
+  /** 差し戻しの理由（差し戻すとき必須）。 */
+  approval_reject_reason?: string | null;
+  /** 1人運用のとき、送る人が確認で入れた人数。 */
+  approval_confirmed_count?: number | null;
 }
 
 export async function getBroadcasts(
@@ -240,6 +264,8 @@ export async function createBroadcast(
     )
     .run();
 
+  // 467: 保存で参照表を書き換える。吹き出しの templateId を読む。
+  await refreshBroadcastReferences(db, id, input.messageBubblesJson ?? null);
   return (await getBroadcastById(db, id))!;
 }
 
@@ -370,11 +396,18 @@ export async function updateBroadcast(
     if (!current || Number(current.lock_version ?? 1) !== expectedVersion) return null;
   }
 
-  return getBroadcastById(db, id);
+  const saved = await getBroadcastById(db, id);
+  // 467: 吹き出しが変わった保存だけ参照を数え直す。触っていない保存では残す。
+  if (saved && updates.message_bubbles_json !== undefined) {
+    await refreshBroadcastReferences(db, id, updates.message_bubbles_json);
+  }
+  return saved;
 }
 
 export async function deleteBroadcast(db: D1Database, id: string): Promise<void> {
   await db.prepare(`DELETE FROM broadcasts WHERE id = ?`).bind(id).run();
+  // 467: 消えた配信の参照を消す。
+  await removeConsumerReferences(db, 'broadcast', id);
 }
 
 export async function createBroadcastInsight(

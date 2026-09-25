@@ -14,8 +14,9 @@ import type { BookingAvailabilitySlot } from '@/lib/api'
  * （apps/liff/src/components/DateTimePicker.tsx）と同じ構造かを
  * 実Reactで確かめる。
  *
- * 実LIFF: 「日時を選んでください」の下に、空きのある日が縦に並び、
- * 各日の下に時刻ボタンが4列（grid-cols-4）で並ぶだけ。
+ * 実LIFF（★V7）: 「日時を選んでください」の下に日付の札が横に並び
+ * （枠の無い日は「満席」で押せない）、選んだ日の時刻ボタンが
+ * 3列（grid-cols-3）で並ぶだけ。
  * 月間カレンダー・○×休・凡例・「空き枠の内訳」は実画面に無い。
  */
 
@@ -48,7 +49,7 @@ function slot(date: string, start: string): BookingAvailabilitySlot {
 
 afterEach(cleanup)
 
-describe('前提: 実LIFFが「日時を選んでください」＋日付縦並び＋4列時刻ボタンの構造', () => {
+describe('前提: 実LIFFが「日時を選んでください」＋日付横並び札＋3列時刻ボタンの構造', () => {
   it('LIFF側の文言と構造が変わっていない（変わったらプレビューも追随が必要）', () => {
     expect(LIFF_SOURCE).toContain('日時を選んでください')
     expect(LIFF_SOURCE).toContain('この期間に空きはありません。')
@@ -56,14 +57,19 @@ describe('前提: 実LIFFが「日時を選んでください」＋日付縦並�
     expect(LIFF_SOURCE).toContain('LoadingView')
     expect(LIFF_SOURCE).toContain('LoadErrorView')
     expect(LIFF_USER_MESSAGE_SOURCE).toContain('読み込み中...')
+    // 失敗は題「読み込めませんでした」＋本文 LOAD_FAILED_MESSAGE（★V7）。
     expect(LIFF_USER_MESSAGE_SOURCE).toContain(
-      '読み込めませんでした。時間をおいて、もう一度お試しください。',
+      '電波の良いところで、もう一度お試しください。',
     )
     expect(LIFF_USER_MESSAGE_SOURCE).toContain('もう一度読み込む')
-    // 旧い見せ方（枠ごとの文言・赤いそのまま表示）が復活していない。
+    // 旧い見せ方（枠ごとの文言・赤いそのまま表示・題と本文の重ね）が復活していない。
     expect(LIFF_SOURCE).not.toContain('空き枠を取得中...')
     expect(LIFF_SOURCE).not.toContain('text-red-600')
-    expect(LIFF_SOURCE).toContain('grid-cols-4')
+    // ★V7: 日付は横に並ぶ札（枠無しは「満席」）、時刻は選んだ日の3列。
+    expect(LIFF_SOURCE).toContain('grid-cols-3')
+    expect(LIFF_SOURCE).toContain('満席')
+    expect(LIFF_SOURCE).toContain('aria-label="日付"')
+    expect(LIFF_SOURCE).not.toContain('grid-cols-4')
     // LIFFにカレンダー表示が導入されたら検知できるよう、不在も確認する。
     expect(LIFF_SOURCE).not.toContain('grid-cols-7')
   })
@@ -101,7 +107,7 @@ describe('プレビューが実LIFFと同じ構造で描画される', () => {
     expect(screen.getByText('お客様のLINEではこう見えます')).toBeTruthy()
   })
 
-  it('空きのある日だけが M/D(曜) 見出しのセクションで縦に並び、時刻ボタンが4列グリッド', () => {
+  it('日付の札が横に並び、選んだ日の時刻ボタンが3列グリッド（実LIFFと同じ）', () => {
     const { container } = render(
       <LiffDateTimePreview
         status="ready"
@@ -111,22 +117,30 @@ describe('プレビューが実LIFFと同じ構造で描画される', () => {
       />,
     )
     // LIFF formatJp と同じ見出し表記（2026-10-01 は木曜、10-03 は土曜）
-    expect(screen.getByText('10/1(木)')).toBeTruthy()
-    expect(screen.getByText('10/3(土)')).toBeTruthy()
     expect(formatLiffDate('2026-10-01')).toBe('10/1(木)')
     expect(formatLiffDate('2026-10-03')).toBe('10/3(土)')
 
-    // LIFFと同じく、空きのある日1つにつき <section> が1つ。
-    const sections = container.querySelectorAll('section')
-    expect(sections.length).toBe(2)
-    const grids = container.querySelectorAll('.grid.grid-cols-4')
-    expect(grids.length).toBe(2)
-    // 空きの無い日（10/2）は出ない。時刻はボタンとして並ぶ。
-    expect(container.textContent).not.toContain('10/2(')
-    for (const time of ['10:00', '10:30', '11:00', '11:30', '13:00', '09:00', '09:30']) {
+    // 実LIFFと同じく、日付の札が横に1列。枠の無い 10/2（金）は「満席」で押せない。
+    const strip = container.querySelector('[aria-label="日付"]')
+    expect(strip).not.toBeNull()
+    const dayButtons = strip!.querySelectorAll('button')
+    expect(dayButtons.length).toBe(3)
+    const closed = [...dayButtons].find((button) => button.textContent?.includes('10/2'))
+    expect(closed?.textContent).toContain('満席')
+    expect(closed?.disabled).toBe(true)
+
+    // 実LIFFと同じく、空きのある先頭の日（10/1）を選んだ状態で1つだけ <section>。
+    expect(screen.getByText('10/1(木) の空き')).toBeTruthy()
+    expect(container.querySelectorAll('section').length).toBe(1)
+    const grids = container.querySelectorAll('.grid.grid-cols-3')
+    expect(grids.length).toBe(1)
+    expect(container.querySelector('.grid-cols-4')).toBeNull()
+    // 選んだ日の時刻だけがボタンで並ぶ（10/3 の 09:00 は選ぶまで出ない）。
+    for (const time of ['10:00', '10:30', '11:00', '11:30', '13:00']) {
       expect(within(container).getAllByText(time).length).toBeGreaterThan(0)
     }
-    expect(container.querySelectorAll('button').length).toBe(7)
+    expect(container.textContent).not.toContain('09:00')
+    expect(container.querySelectorAll('button').length).toBe(8)
   })
 
   it('架空カレンダーの部品（曜日見出し・○×休・凡例・内訳）は出ない', () => {
@@ -163,12 +177,13 @@ describe('プレビューが実LIFFと同じ構造で描画される', () => {
     const { container } = render(
       <LiffDateTimePreview status="error" slots={[]} menuName="カット" staffName="田中" />,
     )
-    expect(
-      screen.getByText('読み込めませんでした。時間をおいて、もう一度お試しください。'),
-    ).toBeTruthy()
+    // 実LIFFの LoadErrorView と同じ題＋本文（★V7）。
+    expect(screen.getByText('読み込めませんでした')).toBeTruthy()
+    expect(screen.getByText('電波の良いところで、もう一度お試しください。')).toBeTruthy()
     expect(screen.getByText('もう一度読み込む')).toBeTruthy()
     // 実LIFFの失敗表示と同じく赤は使わず、旧い案内文も残さない。
     expect(container.querySelector('.text-danger')).toBeNull()
+    expect(container.textContent).not.toContain('時間をおいて、もう一度お試しください。')
     expect(container.textContent).not.toContain('空き状況だけ読み込めませんでした。')
   })
 

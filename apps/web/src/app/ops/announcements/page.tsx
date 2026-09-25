@@ -22,6 +22,7 @@ import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { TextArea, TextField } from '@/components/shared/text-field'
+import DateTimeField from '@/components/shared/date-time-field'
 
 /**
  * お知らせ配信 ★V6 37-7 `q2CokV`。
@@ -211,11 +212,11 @@ export default function OpsAnnouncementsPage() {
               ))}
             </div>
           </div>
-          <label className="grid gap-1.5">
+          <div className="grid gap-1.5">
             <span className="text-label font-bold text-ink">公開日時</span>
-            <TextField type="datetime-local" value={form.publishAt} onChange={(e) => setForm((f) => ({ ...f, publishAt: e.target.value }))} aria-label="公開日時（日本時間）" />
+            <DateTimeField value={form.publishAt} onChange={(v) => setForm((f) => ({ ...f, publishAt: v }))} aria-label="公開日時（日本時間）" />
             <span className="text-micro text-ink-faint">空のまま「今すぐ送る」を押すとすぐに送ります。日時を入れると「配信を予約する」に変わります（日本時間）。</span>
-          </label>
+          </div>
           {editingId ? <Button onClick={() => { setEditingId(null); setForm(EMPTY) }}>直すのをやめる</Button> : null}
         </section>
 

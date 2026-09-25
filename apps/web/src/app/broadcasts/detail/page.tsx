@@ -4,12 +4,20 @@ import { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import type { Tag } from '@line-crm/shared'
-import { ApiError, api, type ApiBroadcast, type BroadcastInsight } from '@/lib/api'
+import { ApiError, api, type ApiBroadcast, type BroadcastInsight, type BroadcastApprovalState } from '@/lib/api'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import Progress from '@/components/shared/progress'
 import StickyBar from '@/components/shared/sticky-bar'
 import TargetMissing from '@/components/shared/target-missing'
+import {
+  ApprovalBadge,
+  ApprovalRequestFields,
+  ApprovalStatusSection,
+  ApproverSection,
+  formatApprovalDateTime,
+} from '@/components/broadcasts/broadcast-approval'
+import type { BroadcastApprovalCandidate } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { audienceSummary, messageTypeLabel } from '@/lib/broadcast-summary'
 import { broadcastBelongsToSelectedAccount } from './broadcast-detail-account'
@@ -38,6 +46,17 @@ function BroadcastDetailInner() {
     scenarios: Array<{ id: string; name: string }>
   }>({ tags: [], scenarios: [] })
   const contentRef = useRef<HTMLElement>(null)
+  /*
+   * 二者承認（m12a / 設計 A-2・A-3）。配信本体とは別に読む。
+   * 取れなくても配信の詳細は出し続ける（承認の欄だけ出さない）。
+   */
+  const [approvalState, setApprovalState] = useState<BroadcastApprovalState | null>(null)
+  const [approvalCandidates, setApprovalCandidates] = useState<BroadcastApprovalCandidate[]>([])
+  const [approvalBusy, setApprovalBusy] = useState(false)
+  const [approvalMessage, setApprovalMessage] = useState<string | null>(null)
+  // 承認の依頼を出し直すときの入力（差し戻し・期限切れのあと）。
+  const [reApproverId, setReApproverId] = useState('')
+  const [reApprovalNote, setReApprovalNote] = useState('')
 
   const exportCsv = () => {
     if (!broadcast) return
@@ -85,6 +104,23 @@ function BroadcastDetailInner() {
 
         setBroadcast(detail.data)
         setLoadState('ready')
+
+        // 二者承認の今の状態。取れなくても詳細は出す。
+        setApprovalState(null)
+        setApprovalMessage(null)
+        void api.broadcasts.approval.get(id).then((approvalRes) => {
+          if (!active) return
+          if (approvalRes.success) {
+            setApprovalState(approvalRes.data)
+            // 承認する人・頼み直す人の名前を出すため、候補も読む。
+            if (selectedAccountId) {
+              void api.broadcasts.approval.candidates(selectedAccountId).then((candidatesRes) => {
+                if (!active) return
+                if (candidatesRes.success) setApprovalCandidates(candidatesRes.data)
+              }).catch(() => undefined)
+            }
+          }
+        }).catch(() => undefined)
 
         // 宛先が絞り込みのときだけ、条件に出すタグ名・シナリオ名を取る。
         // 取れなくても配信の詳細は出し続ける。
@@ -237,6 +273,115 @@ function BroadcastDetailInner() {
           ? '宛先の条件を確認できませんでした'
           : '宛先の条件を確認しています…'
 
+  /*
+   * 二者承認の操作（設計 A-2・A-3）。終わったら状態を読み直す。
+   * 承認して送るは、承認のあと送る操作まで続ける。
+   */
+  const reloadApproval = async () => {
+    if (!id) return
+    try {
+      const res = await api.broadcasts.approval.get(id)
+      if (res.success) setApprovalState(res.data)
+    } catch {
+      // 読み直しの失敗は黙って次へ。帯の文は古いまま残る。
+    }
+  }
+  const runApprovalAction = async (
+    action: () => Promise<{ success: boolean; error?: string }>,
+  ) => {
+    if (approvalBusy) return
+    setApprovalBusy(true)
+    setApprovalMessage(null)
+    try {
+      const res = await action()
+      if (!res.success) {
+        setApprovalMessage(res.error ?? '操作できませんでした。')
+        return
+      }
+      await reloadApproval()
+    } catch {
+      setApprovalMessage('操作できませんでした。状態を読み直してから、もう一度お試しください。')
+    } finally {
+      setApprovalBusy(false)
+    }
+  }
+  const handleApprovalCancel = () => void runApprovalAction(() => api.broadcasts.approval.cancel(id))
+  const handleApprovalRemind = () => void runApprovalAction(() => api.broadcasts.approval.remind(id))
+  const handleApprovalReject = (reason: string) =>
+    void runApprovalAction(() => api.broadcasts.approval.reject(id, reason))
+  const handleApprovalApprove = () =>
+    void (async () => {
+      if (approvalBusy) return
+      setApprovalBusy(true)
+      setApprovalMessage(null)
+      try {
+        const approved = await api.broadcasts.approval.approve(id)
+        if (!approved.success) {
+          setApprovalMessage(approved.error)
+          return
+        }
+        // 予約なし（今すぐ送る分）は、承認のあと既存の送信の流れへ渡す。
+        if (approved.data?.needsSend) {
+          const sent = await api.broadcasts.send(id)
+          if (!sent.success) {
+            setApprovalMessage(`承認しましたが、送信できませんでした。${sent.error}`)
+            await reloadApproval()
+            return
+          }
+          setReloadToken((value) => value + 1)
+          return
+        }
+        await reloadApproval()
+      } catch {
+        setApprovalMessage('操作できませんでした。状態を読み直してから、もう一度お試しください。')
+      } finally {
+        setApprovalBusy(false)
+      }
+    })()
+  const handleApprovalRequest = () =>
+    void (async () => {
+      if (approvalBusy) return
+      if (!reApproverId) {
+        setApprovalMessage('承認をお願いする人を選んでください')
+        return
+      }
+      setApprovalBusy(true)
+      setApprovalMessage(null)
+      try {
+        const requested = await api.broadcasts.approval.request(id, {
+          approverStaffId: reApproverId,
+          note: reApprovalNote.trim() || undefined,
+        })
+        if (!requested.success) {
+          setApprovalMessage(requested.error)
+          return
+        }
+        setReApproverId('')
+        setReApprovalNote('')
+        await reloadApproval()
+      } catch {
+        setApprovalMessage('依頼できませんでした。状態を読み直してから、もう一度お試しください。')
+      } finally {
+        setApprovalBusy(false)
+      }
+    })()
+  const approvalRequesterName = approvalState?.approval.requestedByStaffId
+    ? (approvalCandidates.find((item) => item.id === approvalState.approval.requestedByStaffId)?.name ?? null)
+    : null
+  const approvalApproverName = approvalState?.approval.approverStaffId
+    ? (approvalCandidates.find((item) => item.id === approvalState.approval.approverStaffId)?.name ?? null)
+    : null
+  const approvalMessageSummary = broadcast?.messageBubbles && broadcast.messageBubbles.length > 0
+    ? `${broadcast.messageBubbles.length}通`
+    : null
+  // 差し戻し・期限切れ・取り消しのあと、頼み直せる条件。
+  const canReRequest = broadcast
+    && approvalState
+    && approvalState.gate.required
+    && !approvalState.gate.singleOperator
+    && (broadcast.status === 'draft' || broadcast.status === 'scheduled')
+    && ['none', 'rejected', 'cancelled', 'expired'].includes(approvalState.approval.status)
+
   return (
     <div>
       <nav data-design="Crumb" className="text-ink-faint mb-4 text-xs">
@@ -255,6 +400,77 @@ function BroadcastDetailInner() {
         <SentResult broadcast={broadcast} insight={insight} insightState={insightState} contentRef={contentRef} />
       ) : (
         <div className="space-y-4">
+          {/*
+            二者承認（設計 A-2）。配信の題の横に承認待ちの札を出す。
+            題自体は枠の見出しに出るので、ここでは札と並べるだけにする。
+          */}
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-ink text-base font-bold">{broadcast.title}</p>
+            <ApprovalBadge status={broadcast.approvalStatus} />
+          </div>
+          {/*
+            二者承認（設計 A-2・A-3）。承認待ちの帯と、承認する人の操作。
+            差し戻し・期限切れのあとは頼み直す欄を出す。
+          */}
+          {approvalState ? (
+            <ApprovalStatusSection
+              approval={approvalState.approval}
+              scheduledLabel={
+                broadcast.scheduledAt ? formatApprovalDateTime(broadcast.scheduledAt) : null
+              }
+              approverName={approvalApproverName}
+              requesterName={approvalRequesterName}
+              viewer={approvalState.viewer}
+              onCancel={handleApprovalCancel}
+              onRemind={handleApprovalRemind}
+              busy={approvalBusy}
+              message={approvalMessage}
+            />
+          ) : null}
+          {approvalState ? (
+            <ApproverSection
+              approval={approvalState.approval}
+              viewer={approvalState.viewer}
+              requesterName={approvalRequesterName}
+              recipientCount={approvalState.gate.recipientCount}
+              scheduledLabel={
+                broadcast.scheduledAt ? formatApprovalDateTime(broadcast.scheduledAt) : null
+              }
+              messageSummary={approvalMessageSummary}
+              messageHref="#broadcast-content"
+              onApprove={handleApprovalApprove}
+              onReject={handleApprovalReject}
+              busy={approvalBusy}
+              message={approvalMessage}
+            />
+          ) : null}
+          {canReRequest && approvalState ? (
+            <section aria-label="承認の依頼" className="bg-canvas rounded-card border-hairline border p-5">
+              <p className="text-ink text-sm font-semibold">承認を依頼する</p>
+              <p className="text-ink-secondary mt-1 text-xs leading-5">
+                {approvalState.gate.recipientCount.toLocaleString('ja-JP')}人への配信です。
+                承認されるまで送られません。
+              </p>
+              <div className="mt-3">
+                <ApprovalRequestFields
+                  recipientCount={approvalState.gate.recipientCount}
+                  threshold={approvalState.gate.threshold}
+                  candidates={approvalCandidates}
+                  candidatesState={approvalCandidates.length > 0 ? 'ready' : 'loading'}
+                  approverId={reApproverId}
+                  onApproverChange={setReApproverId}
+                  note={reApprovalNote}
+                  onNoteChange={setReApprovalNote}
+                />
+              </div>
+              {approvalMessage ? <p className="text-danger mt-2 text-xs">{approvalMessage}</p> : null}
+              <div className="mt-3">
+                <Button variant="secondary" onClick={handleApprovalRequest} disabled={approvalBusy}>
+                  承認を依頼する
+                </Button>
+              </div>
+            </section>
+          ) : null}
           {/* ★V7: 予約・下書きも共通の枠の幅いっぱいに広げる。絞ると 1920px で右が大きく空く。 */}
           <section className="bg-canvas rounded-card border-hairline border p-5">
             <p className="text-ink text-sm font-semibold">送信の進み具合</p>
@@ -482,6 +698,18 @@ function BroadcastDetailInner() {
   )
 }
 
+/**
+ * 「この配信のリンクを押していない人」を宛先にした作成画面のURL。
+ * 宛先は condition 引継ぎ、文面は duplicateFrom で種にする。
+ */
+function chaseHref(broadcastId: string): string {
+  const condition = JSON.stringify({
+    operator: 'AND',
+    rules: [{ type: 'broadcast_link_clicked', value: { broadcastId, clicked: false } }],
+  })
+  return `/broadcasts/new?duplicateFrom=${encodeURIComponent(broadcastId)}&condition=${encodeURIComponent(condition)}`
+}
+
 function rateText(rate: number | null | undefined): string {
   if (rate == null || !Number.isFinite(rate)) return '—'
   return `${((rate <= 1 ? rate * 100 : rate)).toFixed(1)}%`
@@ -547,6 +775,28 @@ function SentResult({
             ) : (
               <p className="text-ink-faint bg-canvas-sunken mt-3 rounded-control p-3 text-xs">計測したボタン・リンクはありません。</p>
             )}
+            {/*
+              追いかけ配信。この配信を受け取って計測リンクを押さなかった人を
+              宛先にした作成画面を開く。文面は同じものを種にして作り直すので、
+              追送らしい文面への書き換えは運用者が行う。
+              計測リンクが無い配信では「押していない人」が全員になるので出さない。
+            */}
+            {insight?.links?.length ? (
+              <div className="border-hairline mt-3 rounded-control border p-3">
+                <p className="text-ink text-sm font-bold">リンクを押していない人へ追送</p>
+                <p className="text-ink-faint mt-1 text-xs leading-relaxed">
+                  届いたのにリンクを押していない人だけを宛先にして、同じ文面で作り直します。対象は作成画面で人数を確かめてから送ってください。
+                </p>
+                <div className="mt-2">
+                  <Link
+                    href={chaseHref(broadcast.id)}
+                    className="text-action text-xs font-semibold hover:underline"
+                  >
+                    追送する配信を作る →
+                  </Link>
+                </div>
+              </div>
+            ) : null}
             <div className="bg-canvas-sunken mt-3 rounded-control p-3">
               <p className="text-ink text-sm font-bold">エラー</p>
               <p className="text-ink-faint mt-1 text-xs">送信失敗 {failed.toLocaleString('ja-JP')}人</p>

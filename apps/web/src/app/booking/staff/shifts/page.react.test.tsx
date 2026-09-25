@@ -78,6 +78,58 @@ vi.mock('@/lib/api', () => {
 })
 
 import { ApiError } from '@/lib/api'
+
+const WEEK = '日月火水木金土'
+function partsOf(date: Date) {
+  return { y: date.getFullYear(), mo: date.getMonth() + 1, d: date.getDate() }
+}
+function isoOf(date: Date) {
+  const { y, mo, d } = partsOf(date)
+  return `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+}
+function monthLabelOf(date: Date) {
+  const { y, mo } = partsOf(date)
+  return `${y}年${mo}月`
+}
+function dayLabelOf(date: Date) {
+  const { y, mo, d } = partsOf(date)
+  return `${y}年${mo}月${d}日（${WEEK[date.getDay()]}）`
+}
+function daysAhead(n: number) {
+  const t = new Date()
+  t.setDate(t.getDate() + n)
+  return t
+}
+
+/** 日付の選択（★V7）で選ぶ。値は今までどおり YYYY-MM-DD。 */
+async function pickDateByLabel(label: string, date: Date) {
+  fireEvent.click(screen.getByLabelText(label))
+  const target = partsOf(date).y * 12 + partsOf(date).mo
+  for (let i = 0; i < 24; i += 1) {
+    const grid = document.querySelector('[role="grid"]')
+    const currentLabel = /^(\d+)年(\d+)月$/.exec(grid?.getAttribute('aria-label') ?? '')
+    const current = currentLabel ? Number(currentLabel[1]) * 12 + Number(currentLabel[2]) : target
+    if (grid?.getAttribute('aria-label') === monthLabelOf(date)) break
+    const nav = [...document.querySelectorAll('button')].find(
+      (b) => b.getAttribute('aria-label') === (target >= current ? '次の月' : '前の月'),
+    )!
+    fireEvent.click(nav)
+  }
+  const day = [...document.querySelectorAll('button')].find((b) =>
+    (b.getAttribute('aria-label') ?? '').startsWith(dayLabelOf(date)),
+  )!
+  fireEvent.click(day)
+}
+
+/** 時刻の選択（★V7）で HH:mm を選ぶ。値は今までどおり HH:mm。 */
+async function pickTimeByLabel(label: string, hhmm: string) {
+  fireEvent.click(screen.getByLabelText(label))
+  const picker = document.querySelector('[role="dialog"][aria-label="時刻を選ぶ"]')!
+  const [hour, minute] = hhmm.split(':')
+  fireEvent.change(picker.querySelector('select[aria-label="時"]')!, { target: { value: hour } })
+  fireEvent.change(picker.querySelector('select[aria-label="分"]')!, { target: { value: minute } })
+  fireEvent.click([...picker.querySelectorAll('button')].find((b) => b.textContent?.trim() === '閉じる')!)
+}
 import StaffShiftsPage from './page'
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -227,9 +279,9 @@ describe('店舗営業時間の編集', () => {
   test('7曜日をexpectedVersion付きで1回だけ保存し、設定と空き枠を読み直す', async () => {
     await renderEditor()
     fireEvent.click(screen.getByRole('checkbox', { name: '月曜日を受け付ける' }))
-    const mondayStart = await screen.findByLabelText('月曜日 1件目の開始')
-    fireEvent.change(mondayStart, { target: { value: '10:00' } })
-    fireEvent.change(screen.getByLabelText('月曜日 1件目の終了'), { target: { value: '18:00' } })
+    await screen.findByLabelText('月曜日 1件目の開始')
+    await pickTimeByLabel('月曜日 1件目の開始', '10:00')
+    await pickTimeByLabel('月曜日 1件目の終了', '18:00')
     fireEvent.change(screen.getByLabelText('月曜日 1件目の同時受付数'), { target: { value: '3' } })
     const save = screen.getByRole('button', { name: '営業時間を保存' })
     fireEvent.click(save)
@@ -260,9 +312,9 @@ describe('店舗営業時間の編集', () => {
   test('24:00・日またぎを黙って丸めず画面内で案内する', async () => {
     await renderEditor()
     fireEvent.click(screen.getByRole('checkbox', { name: '月曜日を受け付ける' }))
-    const mondayStart = await screen.findByLabelText('月曜日 1件目の開始')
-    fireEvent.change(mondayStart, { target: { value: '22:00' } })
-    fireEvent.change(screen.getByLabelText('月曜日 1件目の終了'), { target: { value: '02:00' } })
+    await screen.findByLabelText('月曜日 1件目の開始')
+    await pickTimeByLabel('月曜日 1件目の開始', '22:00')
+    await pickTimeByLabel('月曜日 1件目の終了', '02:00')
     fireEvent.click(screen.getByRole('button', { name: '営業時間を保存' }))
     expect((await screen.findByRole('alert')).textContent).toContain('日ごとに分けて入力してください')
     expect(fixture.saveSettings).not.toHaveBeenCalled()
@@ -414,7 +466,7 @@ describe('登録済みの休業日の修正・削除 (#953 E-09)', () => {
     await renderWithException()
     fireEvent.click(screen.getByRole('button', { name: '修正する' }))
 
-    fireEvent.change(screen.getByLabelText('休業日の終了日'), { target: { value: '2027-01-03' } })
+    await pickDateByLabel('休業日の終了日', new Date(2027, 0, 3))
     fireEvent.change(screen.getByLabelText('休業日の理由'), { target: { value: '年末年始' } })
     fireEvent.click(screen.getByRole('button', { name: '休業日を保存' }))
 
@@ -466,9 +518,12 @@ describe('登録済みの休業日の修正・削除 (#953 E-09)', () => {
 })
 
 describe('日時を指定して空きを確認 (IDEA-28)', () => {
+  const checkDate = daysAhead(30)
+  const checkIso = isoOf(checkDate)
   async function fillCheckForm() {
-    fireEvent.change(await screen.findByLabelText('確認する日付'), { target: { value: '2099-01-10' } })
-    fireEvent.change(screen.getByLabelText('確認する開始時刻'), { target: { value: '11:00' } })
+    await screen.findByLabelText('確認する日付')
+    await pickDateByLabel('確認する日付', checkDate)
+    await pickTimeByLabel('確認する開始時刻', '11:00')
   }
 
   test('日時を入れて確かめるとAPIを呼び、取れる旨と残数を表示する', async () => {
@@ -478,7 +533,7 @@ describe('日時を指定して空きを確認 (IDEA-28)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'この日時を確かめる' }))
 
     await waitFor(() => expect(fixture.checkAvailability).toHaveBeenCalledWith('account-a', {
-      menuId: 'menu-1', staffId: 's1', date: '2099-01-10', time: '11:00',
+      menuId: 'menu-1', staffId: 's1', date: checkIso, time: '11:00',
     }))
     expect((await screen.findByText('この日時は予約を受けられます。')).textContent).toBeTruthy()
     expect(screen.getByText('担当A: 残り 1/1')).toBeTruthy()
@@ -486,7 +541,7 @@ describe('日時を指定して空きを確認 (IDEA-28)', () => {
 
   test('取れないときは理由を運用者向けの文で出し、詳細（予定の件名など）は出さない', async () => {
     fixture.checkAvailability.mockResolvedValue({
-      date: '2099-01-10',
+      date: checkIso,
       time: '11:00',
       timeZone: 'Asia/Tokyo',
       bookable: false,
@@ -522,7 +577,7 @@ describe('日時を指定して空きを確認 (IDEA-28)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'この日時を確かめる' }))
     await screen.findByText('この日時は予約を受けられます。')
 
-    fireEvent.change(screen.getByLabelText('確認する日付'), { target: { value: '2099-01-11' } })
+    await pickDateByLabel('確認する日付', daysAhead(31))
     expect(screen.queryByText('この日時は予約を受けられます。')).toBeNull()
   })
 })

@@ -143,9 +143,12 @@ describe('担当者別 勤務・シフト・外の予定(N-405)', () => {
     }
   })
 
-  it('キーボードで操作でき、日付と時刻は専用の入力を使う', () => {
-    expect(DETAIL).toContain('type="date"')
-    expect(DETAIL).toContain('type="time"')
+  it('キーボードで操作でき、日付と時刻は★V7の部品を使う', () => {
+    expect(DETAIL).toContain('DateField')
+    expect(DETAIL).toContain('TimeField')
+    expect(DETAIL).toContain('date-field')
+    expect(DETAIL).not.toContain('type="date"')
+    expect(DETAIL).not.toContain('type="time"')
     expect(DETAIL).toContain('aria-label=')
   })
 })

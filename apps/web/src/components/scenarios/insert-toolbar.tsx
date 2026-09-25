@@ -18,6 +18,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useAccount } from '@/contexts/account-context'
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
 import { scenarioReferenceData } from './scenario-reference-data'
+import DateField from '@/components/shared/date-field'
 
 /** 日付の書き方。worker の interpolation-date.ts と同じ並び。 */
 const DATE_FORMATS: { token: string; label: string; example: string }[] = [
@@ -196,11 +197,11 @@ export default function InsertToolbar({ targetRef, value, onChange, includeAnswe
               「あと3日」のように出ます。配信のたびに数え直すので、書き換えは要りません。
             </p>
             <div className="flex flex-wrap items-center gap-2">
-              <input
-                type="date"
+              <DateField
                 value={targetDate}
-                onChange={(e) => setTargetDate(e.target.value)}
-                className="border-hairline rounded-control text-ink h-8 min-w-0 flex-1 border px-2 text-xs"
+                onChange={setTargetDate}
+                aria-label="目標日"
+                className="min-w-0 flex-1"
               />
               <button
                 type="button"

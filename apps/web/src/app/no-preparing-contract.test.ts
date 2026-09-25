@@ -92,13 +92,13 @@ const REMAINING: Record<string, number> = {
      page.tsx は 0 件になったので行を消した。 */
   /* 監査7 #810 で「画像を選ぶ」（準備中です）の飾りボタンを撤去し 0 件になったので行を消した。 */
   /* 2026-09-08 #605 で「同じ設定で作り直す」を実動作へ接続し 0 件になったので行を消した。 */
-  'app/restaurant-test/stores/new/page.tsx': 1,
   /* ★V7 C6 で押せない「マニュアル」（準備中です）を撤去し 0 件になったので行を消した。 */
   /* 2026-09-24 V7残り一覧の手直しで飾りボタン2件と接続見出しの言い回しを消し 0 件になったので行を消した。 */
   /* 監査7 #810 で carousel の「下書き保存」と edit の「テスト送信」他の飾りボタンを撤去し 0 件になったので行を消した。 */
-  'components/broadcasts/broadcast-form.tsx': 7,
-  'components/events/event-wizard.tsx': 2,
-  'components/friends/friend-timeline.tsx': 1,
+  /* 監査8 で残り11件を消化し表が空になった。stores/new の押せないマニュアル札は
+     描かない形へ、broadcast-form は未対応の種別を「準備中」ではなく事実表記
+     （未対応）へ、event-wizard の押せないプルダウンとチェック、friend-timeline の
+     押せない「★のみ」を撤去した。 */
 }
 
 describe('画面に「準備中」を置かない', () => {

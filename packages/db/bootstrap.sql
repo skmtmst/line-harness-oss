@@ -1392,6 +1392,15 @@ CREATE TABLE broadcast_after_action_runs (
   UNIQUE (broadcast_id, friend_id, action_id)
 );
 
+CREATE TABLE broadcast_approval_events (
+  id              TEXT PRIMARY KEY,
+  broadcast_id    TEXT NOT NULL REFERENCES broadcasts (id) ON DELETE CASCADE,
+  actor_staff_id  TEXT NOT NULL,
+  action          TEXT NOT NULL CHECK (action IN ('requested', 'approved', 'rejected', 'cancelled', 'expired', 'reminded')),
+  reason          TEXT,
+  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
 CREATE TABLE broadcast_insights (
   id                  TEXT PRIMARY KEY,
   broadcast_id        TEXT NOT NULL REFERENCES broadcasts(id) ON DELETE CASCADE,
@@ -1490,7 +1499,7 @@ CREATE TABLE "broadcasts" (
   CHECK (message_options_json IS NULL OR json_valid(message_options_json)), after_action_version_id TEXT
   REFERENCES common_action_versions(id) ON DELETE RESTRICT, lock_version INTEGER NOT NULL DEFAULT 1
   CHECK (lock_version > 0), stopped_at TEXT, stopped_by TEXT, send_attempt_no INTEGER NOT NULL DEFAULT 1, common_var_snapshot TEXT
-  CHECK (common_var_snapshot IS NULL OR json_valid(common_var_snapshot)), common_var_snapshot_at TEXT);
+  CHECK (common_var_snapshot IS NULL OR json_valid(common_var_snapshot)), common_var_snapshot_at TEXT, approval_status TEXT NOT NULL DEFAULT 'none', approval_requested_by_staff_id TEXT, approval_requested_at TEXT, approval_approver_staff_id TEXT, approval_note TEXT, approval_decided_by_staff_id TEXT, approval_decided_at TEXT, approval_reject_reason TEXT, approval_confirmed_count INTEGER);
 
 CREATE TABLE calendar_bookings (
   id             TEXT PRIMARY KEY,
@@ -6113,6 +6122,41 @@ CREATE TABLE template_publish_keys (
   PRIMARY KEY (template_id, idempotency_key)
 );
 
+CREATE TABLE template_references (
+  id TEXT PRIMARY KEY,
+  template_id TEXT NOT NULL
+    REFERENCES templates(id) ON DELETE CASCADE,
+  -- 使っている版 (templates.published_version と同じ番号)。版履歴より前の
+  -- 参照は空のままにし、画面では「—」と出す（無い版番号をでっち上げない）。
+  template_version_number INTEGER,
+  consumer_kind TEXT NOT NULL
+    CHECK (consumer_kind IN ('broadcast', 'scenario', 'auto_reply')),
+  consumer_id TEXT NOT NULL,
+  reference_mode TEXT NOT NULL DEFAULT 'fixed'
+    CHECK (reference_mode IN ('fixed', 'latest')),
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (template_id, consumer_kind, consumer_id)
+);
+
+CREATE TABLE template_versions (
+  id TEXT PRIMARY KEY,
+  template_id TEXT NOT NULL
+    REFERENCES templates(id) ON DELETE CASCADE,
+  version_number INTEGER NOT NULL,
+  message_type TEXT NOT NULL,
+  message_content TEXT NOT NULL,
+  carousel_actions_json TEXT,
+  carousel_tap_limit_mode TEXT,
+  carousel_tap_limit_text TEXT,
+  question_json TEXT,
+  question_status TEXT,
+  -- 使い始めの日時。空は「公開と同時」。未来の日時は「予約」の札で見せる。
+  effective_from TEXT,
+  created_by_staff_id TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (template_id, version_number)
+);
+
 CREATE TABLE templates (
   id              TEXT PRIMARY KEY,
   name            TEXT NOT NULL,
@@ -6926,6 +6970,9 @@ CREATE INDEX idx_bookings_v298_staff_overlap
 CREATE INDEX idx_broadcast_after_action_runs_due
   ON broadcast_after_action_runs (status, updated_at);
 
+CREATE INDEX idx_broadcast_approval_events_broadcast
+  ON broadcast_approval_events (broadcast_id, created_at DESC);
+
 CREATE INDEX idx_broadcast_insights_broadcast_id ON broadcast_insights(broadcast_id);
 
 CREATE INDEX idx_broadcast_insights_status ON broadcast_insights(status);
@@ -6941,6 +6988,10 @@ CREATE INDEX idx_broadcast_send_claims_state
 
 CREATE INDEX idx_broadcast_tracked_links_link
   ON broadcast_tracked_links(tracked_link_id, broadcast_id);
+
+CREATE INDEX idx_broadcasts_approval_approver ON broadcasts (approval_approver_staff_id);
+
+CREATE INDEX idx_broadcasts_approval_status ON broadcasts (approval_status);
 
 CREATE INDEX idx_broadcasts_status_lookup ON broadcasts (status);
 
@@ -8205,6 +8256,15 @@ CREATE INDEX idx_tags_line_account
   ON tags(line_account_id, display_order, id);
 
 CREATE INDEX idx_tags_order ON tags (folder_id, display_order);
+
+CREATE INDEX idx_template_references_consumer
+  ON template_references (consumer_kind, consumer_id);
+
+CREATE INDEX idx_template_references_template
+  ON template_references (template_id);
+
+CREATE INDEX idx_template_versions_template
+  ON template_versions (template_id, version_number DESC);
 
 CREATE INDEX idx_templates_category ON templates (category);
 

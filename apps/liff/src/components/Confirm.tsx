@@ -1,20 +1,27 @@
 import { useState } from 'react';
 import { api, type MenuItem, type StaffItem } from '../lib/api.js';
-import { jstStartsAtIso } from '../lib/datetime.js';
+import { formatJp, jstStartsAtIso } from '../lib/datetime.js';
 import { logFailure } from '../lib/user-message.js';
+import Icon from './ui/Icon.js';
+import Button from './ui/Button.js';
+import BottomBar from './ui/BottomBar.js';
+import type { SlotPick } from './DateTimePicker.js';
 
+/**
+ * 1-d 内容の確認。送った中身のカード＋ご要望＋案内の帯。
+ * 進む操作 (予約をリクエストする) は下の操作の帯にだけ置く。
+ * 送信の失敗は入力を消さず、その場で理由を出す (動きはそのまま)。
+ */
 export default function Confirm({
   menu,
   staff,
   slot,
   onSubmitted,
-  onBack,
 }: {
   menu: MenuItem;
   staff: StaffItem;
-  slot: { date: string; start: string };
+  slot: SlotPick;
   onSubmitted: () => void;
-  onBack: () => void;
 }) {
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -50,42 +57,51 @@ export default function Confirm({
 
   return (
     <div className="space-y-4">
-      <button onClick={onBack} className="text-sm text-gray-500">← 戻る</button>
-      <h1 className="text-xl font-bold">内容のご確認</h1>
-      <dl className="space-y-2 border rounded p-4 text-sm">
+      <dl className="space-y-3 rounded-xl border border-hairline bg-canvas p-4 text-sm">
         <Row label="メニュー" value={menu.name} />
+        <Row label="日時" value={`${formatJp(slot.date)} ${slot.start}`} />
+        <Row label="所要" value={`${staff.duration_minutes}分`} />
         <Row label="担当" value={staff.display_name} />
-        <Row label="日時" value={`${slot.date} ${slot.start}`} />
-        <Row label="所要" value={`${staff.duration_minutes} 分`} />
         <Row label="料金（目安）" value={`¥${staff.price.toLocaleString()}`} />
       </dl>
       <label className="block">
-        <span className="text-sm text-gray-700">ご要望（任意）</span>
+        <span className="text-sm text-ink">
+          ご要望 <span className="text-xs text-ink-faint">任意</span>
+        </span>
         <textarea
           value={note}
           onChange={(e) => setNote(e.target.value)}
-          className="mt-1 w-full border rounded p-2 text-sm"
+          className="mt-1 min-h-24 w-full rounded-lg border border-hairline bg-canvas p-3 text-sm text-ink placeholder:text-ink-faint focus-visible:outline-2 focus-visible:outline-ink"
           rows={3}
-          placeholder="髪型の希望、アレルギー、その他"
+          placeholder="例：前髪は短めにしたい"
         />
       </label>
-      {error && <p className="text-red-600 text-sm">{error}</p>}
-      <button
-        onClick={handleSubmit}
-        disabled={submitting}
-        className="w-full bg-green-600 text-white py-3 rounded font-semibold disabled:opacity-50"
-      >
-        {submitting ? '送信中...' : '予約をリクエスト'}
-      </button>
+      {error && (
+        <p role="alert" className="text-sm leading-6 text-danger">
+          {error}
+        </p>
+      )}
+      <div className="flex gap-2 rounded-lg bg-info-bg p-3 text-xs leading-5 text-ink-secondary">
+        <Icon name="info" className="h-4 w-4 shrink-0" />
+        <p>まだ確定ではありません。お店が確認すると LINE でお知らせします。</p>
+      </div>
+      <div className="pb-28" aria-hidden="true" />
+      <BottomBar>
+        <Button variant="primary" onClick={handleSubmit} disabled={submitting}>
+          {submitting ? '送信中...' : '予約をリクエストする'}
+        </Button>
+      </BottomBar>
     </div>
   );
 }
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex justify-between">
-      <dt className="text-gray-600">{label}</dt>
-      <dd>{value}</dd>
+    <div className="flex items-baseline justify-between gap-4">
+      <dt className="shrink-0 text-ink-secondary">{label}</dt>
+      <dd className="min-w-0 truncate font-medium text-ink" title={value}>
+        {value}
+      </dd>
     </div>
   );
 }
