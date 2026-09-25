@@ -609,9 +609,9 @@ export default function NewProxyBookingPage() {
   return (
     <div data-design-node={NODE_BY_STEP[step]} className="space-y-4 pb-24">
       <nav data-design="Crumb" aria-label="現在位置" className="text-ink-faint text-xs">
-        <Link href="/booking/bookings" className="text-action">予約</Link>
+        <Link href="/booking/bookings" className="text-action underline">予約</Link>
         <span className="mx-2">›</span>
-        <Link href="/booking/bookings" className="text-action">予約管理</Link>
+        <Link href="/booking/bookings" className="text-action underline">予約管理</Link>
         <span className="mx-2">›</span>
         <span>{step === 'confirm' ? '内容を確認' : step === 'done' ? '登録が終わりました' : step === 'conflict' ? '入れられません' : '電話の予約を入れる'}</span>
       </nav>

@@ -515,7 +515,7 @@ export default function TagEditorV4({
             <StepTitle number={2} title="自動で付ける条件" note="指定しない場合は、手動でのみ付けられます。" />
             <div className="rounded-control border border-hairline bg-canvas-sunken p-4">
               <p className="text-sm font-semibold text-ink">手動でのみ付ける</p>
-              <p className="mt-1 text-xs leading-5 text-ink-secondary">一覧やチャットから手で付けます。きっかけで付けたい場合は <Link href="/form-submissions" className="text-action hover:underline">回答フォーム</Link> か <Link href="/automations" className="text-action hover:underline">オートメーション</Link> の設定から指定してください。</p>
+              <p className="mt-1 text-xs leading-5 text-ink-secondary">一覧やチャットから手で付けます。きっかけで付けたい場合は <Link href="/form-submissions" className="text-action underline">回答フォーム</Link> か <Link href="/automations" className="text-action underline">オートメーション</Link> の設定から指定してください。</p>
             </div>
           </section>
 

@@ -334,7 +334,7 @@ function NewCommonVarInner() {
         </div>
       )}
       <nav className="text-ink-faint mb-3 text-xs">
-        <Link href="/contents/vars" className="text-info hover:underline">
+        <Link href="/contents/vars" className="text-info underline">
           共通情報一覧
         </Link>
         <span className="mx-1.5">›</span>
