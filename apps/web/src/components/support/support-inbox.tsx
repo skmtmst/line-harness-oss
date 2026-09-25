@@ -303,12 +303,12 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
         </div>
       )}
 
-      <div className="rounded-card border-hairline overflow-hidden border bg-white lg:grid lg:h-[calc(100vh-260px)] lg:min-h-[620px] lg:grid-cols-[360px_1fr]">
-        <aside className="border-b border-gray-200 lg:border-b-0 lg:border-r">
-          <div className="space-y-3 border-b border-gray-200 bg-gray-50/70 p-4">
+      <div className="rounded-card border-hairline overflow-hidden border bg-canvas lg:grid lg:h-[calc(100vh-260px)] lg:min-h-[620px] lg:grid-cols-[360px_1fr]">
+        <aside className="border-b border-hairline lg:border-b-0 lg:border-r">
+          <div className="space-y-3 border-b border-hairline bg-canvas-sunken p-4">
             <div className="flex gap-2">
-              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="名前・メール・件名で検索" className="min-w-0 flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500" />
-              <select value={status} onChange={(event) => setStatus(event.target.value as typeof status)} className="rounded-lg border border-gray-200 bg-white px-2 text-xs font-medium">
+              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="名前・メール・件名で検索" aria-label="名前・メール・件名で検索" className="min-w-0 flex-1 rounded-lg border border-hairline bg-canvas px-3 py-2 text-sm outline-none focus:border-success focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info" />
+              <select value={status} onChange={(event) => setStatus(event.target.value as typeof status)} aria-label="対応状態で絞り込む" className="rounded-lg border border-hairline bg-canvas px-2 text-xs font-medium">
                 <option value="open">未解決</option>
                 <option value="unread">未対応</option>
                 <option value="in_progress">対応中</option>
@@ -317,18 +317,18 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
               </select>
             </div>
           </div>
-          <div className="max-h-[520px] divide-y divide-gray-100 overflow-y-auto lg:max-h-none lg:h-[calc(100%-116px)]">
-            {loading ? <div className="p-10 text-center text-sm text-gray-400">読み込み中...</div> : items.length === 0 ? <div className="p-10 text-center text-sm text-gray-400">対応待ちはありません</div> : items.map((item) => (
-              <button key={item.id} onClick={() => choose(item)} className={`w-full p-4 text-left transition-colors hover:bg-gray-50 ${selected?.id === item.id ? 'bg-emerald-50 ring-1 ring-inset ring-emerald-200' : ''}`}>
+          <div className="max-h-[520px] divide-y divide-divider-soft overflow-y-auto lg:max-h-none lg:h-[calc(100%-116px)]">
+            {loading ? <div className="p-10 text-center text-sm text-ink-faint">読み込み中...</div> : items.length === 0 ? <div className="p-10 text-center text-sm text-ink-faint">対応待ちはありません</div> : items.map((item) => (
+              <button key={item.id} onClick={() => choose(item)} className={`w-full p-4 text-left transition-colors hover:bg-canvas-sunken ${selected?.id === item.id ? 'bg-success-bg ring-1 ring-inset ring-success' : ''}`}>
                 <div className="flex items-start gap-3">
                   <Avatar name={item.customerName} src={item.pictureUrl ?? null} size={40} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <p className="truncate text-sm font-bold text-gray-900">{item.customerName}</p>
+                      <p className="truncate text-sm font-bold text-ink">{item.customerName}</p>
                       <span className={`rounded-full px-2 py-0.5 text-micro font-bold ${item.channel === 'line' ? 'bg-accent-soft text-accent-deep' : 'bg-canvas-sunken text-ink-secondary'}`}>{item.channel === 'line' ? 'LINE' : 'メール'}</span>
                     </div>
-                    <p className="mt-1 truncate text-xs font-medium text-gray-600">{item.subject}</p>
-                    <p className="mt-1 truncate text-xs text-gray-400">{item.preview}</p>
+                    <p className="mt-1 truncate text-xs font-medium text-ink-secondary">{item.subject}</p>
+                    <p className="mt-1 truncate text-xs text-ink-faint">{item.preview}</p>
                   </div>
                   <div className="shrink-0 text-right">
                     <p className={`text-[11px] font-semibold ${isStaleUnresolved(item) ? 'text-status-warn-deep' : 'text-ink-faint'}`}>{elapsed(item.lastIncomingAt)}</p>
@@ -346,9 +346,9 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
           </div>
         </aside>
 
-        <div className="flex min-h-[560px] flex-col bg-[#f4f6f5]">
+        <div className="flex min-h-[560px] flex-col bg-canvas-sunken">
           {!selected ? (
-            <div className="flex flex-1 items-center justify-center p-8 text-center text-sm text-gray-400">
+            <div className="flex flex-1 items-center justify-center p-8 text-center text-sm text-ink-faint">
               <div>
                 <svg className="text-ink-faint mx-auto mb-3 h-10 w-10" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h8M8 14h5M21 12a8 8 0 0 1-11.4 7.2L3 21l1.8-6.1A8 8 0 1 1 21 12Z" />
@@ -359,45 +359,50 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
           ) : selected.channel === 'line' ? (
             <div className="flex flex-1 flex-col items-center justify-center p-8 text-center">
               <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-accent-deep text-2xl font-bold text-white">LINE</div>
-              <h2 className="text-lg font-bold text-gray-900">{selected.customerName}</h2>
-              <p className="mt-2 max-w-md text-sm leading-6 text-gray-500">LINEの会話履歴と送信機能は、既存の個別チャット画面でそのまま使えます。</p>
-              <p className="mt-4 rounded-xl bg-white px-4 py-3 text-sm text-gray-700 shadow-sm">{selected.preview}</p>
-              <Link href={`/chats?friend=${encodeURIComponent(selected.threadId)}&unanswered=1`} className="mt-6 rounded-xl bg-accent-deep px-6 py-3 text-sm font-bold text-white shadow-sm hover:bg-emerald-600">LINEで返信する →</Link>
+              <h2 className="text-lg font-bold text-ink">{selected.customerName}</h2>
+              <p className="mt-2 max-w-md text-sm leading-6 text-ink-secondary">LINEの会話履歴と送信機能は、既存の個別チャット画面でそのまま使えます。</p>
+              <p className="mt-4 rounded-xl bg-canvas px-4 py-3 text-sm text-ink shadow-sm">{selected.preview}</p>
+              <Link href={`/chats?friend=${encodeURIComponent(selected.threadId)}&unanswered=1`} className="mt-6 rounded-xl bg-accent-deep px-6 py-3 text-sm font-bold text-white shadow-sm hover:brightness-90">LINEで返信する →</Link>
             </div>
           ) : detail ? (
             <>
-              <div className="flex flex-col gap-3 border-b border-gray-200 bg-white px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+              {/*
+               * 状態切替の札はトークンの組にする。以前の bg-amber-500＋白字は 2.15:1、
+               * bg-emerald-600＋白字は 3.77:1 で読めない。選んだ札は濃い塗り＋白字
+               * （warning 5.33:1・success 5.61:1）、選んでいない札は薄い塗り＋濃い字。
+               */}
+              <div className="flex flex-col gap-3 border-b border-hairline bg-canvas px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
-                  <h2 className="truncate text-base font-bold text-gray-900">{detail.thread.subject}</h2>
-                  <p className="mt-1 truncate text-xs text-gray-500">{detail.thread.customer_name || selected.customerName} · {detail.thread.customer_email}</p>
+                  <h2 className="truncate text-base font-bold text-ink">{detail.thread.subject}</h2>
+                  <p className="mt-1 truncate text-xs text-ink-faint">{detail.thread.customer_name || selected.customerName} · {detail.thread.customer_email}</p>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={() => void updateStatus('in_progress')} className={`rounded-lg px-3 py-2 text-xs font-bold ${detail.thread.status === 'in_progress' ? 'bg-amber-500 text-white' : 'bg-amber-50 text-amber-700'}`}>対応中</button>
+                  <button onClick={() => void updateStatus('in_progress')} className={`rounded-lg px-3 py-2 text-xs font-bold ${detail.thread.status === 'in_progress' ? 'bg-warning text-on-accent' : 'bg-warning-bg text-warning'}`}>対応中</button>
                   <button onClick={() => void updateStatus('on_hold')} className={`rounded-lg px-3 py-2 text-xs font-bold ${detail.thread.status === 'on_hold' ? 'bg-action text-on-action' : 'bg-action-soft text-action'}`}>保留</button>
-                  <button onClick={() => void updateStatus('resolved')} className={`rounded-lg px-3 py-2 text-xs font-bold ${detail.thread.status === 'resolved' ? 'bg-emerald-600 text-white' : 'bg-emerald-50 text-success'}`}>✓ 対応済み</button>
-                  {detail.thread.status === 'resolved' && <button onClick={() => void updateStatus('unread')} className="rounded-lg bg-gray-100 px-3 py-2 text-xs font-bold text-gray-600">再オープン</button>}
+                  <button onClick={() => void updateStatus('resolved')} className={`rounded-lg px-3 py-2 text-xs font-bold ${detail.thread.status === 'resolved' ? 'bg-success text-on-accent' : 'bg-success-bg text-success'}`}>✓ 対応済み</button>
+                  {detail.thread.status === 'resolved' && <button onClick={() => void updateStatus('unread')} className="rounded-lg bg-canvas-sunken px-3 py-2 text-xs font-bold text-ink-secondary">再オープン</button>}
                 </div>
               </div>
               <div className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-6">
                 {detail.messages.map((message) => (
                   <div key={message.id} className={`flex ${message.direction === 'outgoing' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[86%] rounded-2xl px-4 py-3 shadow-sm sm:max-w-[72%] ${message.direction === 'outgoing' ? 'rounded-br-md bg-[#c9f4d8] text-gray-900' : 'rounded-bl-md bg-white text-gray-900'}`}>
+                    <div className={`max-w-[86%] rounded-2xl px-4 py-3 shadow-sm sm:max-w-[72%] ${message.direction === 'outgoing' ? 'rounded-br-md bg-success-bg text-ink' : 'rounded-bl-md bg-canvas text-ink'}`}>
                       <p className="whitespace-pre-wrap break-words text-sm leading-6">{message.body_text}</p>
-                      <p className="mt-2 text-right text-[10px] text-gray-400">{dateTime(message.created_at)}{message.direction === 'outgoing' ? ' · 送信済み' : ''}</p>
+                      <p className="mt-2 text-right text-[10px] text-ink-faint">{dateTime(message.created_at)}{message.direction === 'outgoing' ? ' · 送信済み' : ''}</p>
                     </div>
                   </div>
                 ))}
                 <div ref={bottomRef} />
               </div>
-              <div className="border-t border-gray-200 bg-white p-4">
-                <textarea value={reply} onChange={(event) => setReply(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) void sendReply() }} placeholder="メールの返信を入力…（Ctrl/Command + Enterで送信）" rows={4} className="w-full resize-none rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm leading-6 outline-none focus:border-emerald-500 focus:bg-white" />
+              <div className="border-t border-hairline bg-canvas p-4">
+                <textarea value={reply} onChange={(event) => setReply(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) void sendReply() }} placeholder="メールの返信を入力…（Ctrl/Command + Enterで送信）" aria-label="メールの返信を入力" rows={4} className="w-full resize-none rounded-xl border border-hairline bg-canvas-sunken px-4 py-3 text-sm leading-6 outline-none focus:border-success focus:bg-canvas focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info" />
                 <div className="mt-3 flex items-center justify-between gap-3">
-                  <p className="text-[11px] text-gray-400">From: contact-shed@nen-petfood.com</p>
-                  <button onClick={() => void sendReply()} disabled={!reply.trim() || sending} className="rounded-xl bg-accent-deep px-6 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-40">{sending ? '送信中…' : 'メールで返信'}</button>
+                  <p className="text-[11px] text-ink-faint">From: contact-shed@nen-petfood.com</p>
+                  <button onClick={() => void sendReply()} disabled={!reply.trim() || sending} className="rounded-xl bg-accent-deep px-6 py-2.5 text-sm font-bold text-white shadow-sm hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-40">{sending ? '送信中…' : 'メールで返信'}</button>
                 </div>
               </div>
             </>
-          ) : <div className="flex flex-1 items-center justify-center text-sm text-gray-400">会話を読み込み中...</div>}
+          ) : <div className="flex flex-1 items-center justify-center text-sm text-ink-faint">会話を読み込み中...</div>}
         </div>
       </div>
     </div>
