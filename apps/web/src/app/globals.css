@@ -783,6 +783,31 @@ select:not([multiple]):not(.appearance-none) {
   }
 }
 
+/* Googleビジネス第2段（GB-10〜GB-19）。主列 1126 ＋ 右カード 390（1920px 設計）。 */
+.gb-history-row {
+  grid-template-columns: 96px minmax(0, 1fr) 110px 128px 130px;
+}
+
+@media (min-width: 1024px) {
+  .gb-calendar-grid {
+    grid-template-columns: 520px minmax(0, 1fr);
+  }
+
+  .gb-edit-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .gb-compare-grid {
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  }
+}
+
+@media (min-width: 1280px) {
+  .gb-profile-grid {
+    grid-template-columns: minmax(0, 1fr) 390px;
+  }
+}
+
 @media (max-width: 1350px) {
   .gb-review-filters {
     flex-wrap: wrap;

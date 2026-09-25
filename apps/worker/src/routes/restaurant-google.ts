@@ -47,11 +47,11 @@ const CALLBACK_PATH = '/api/restaurant-test/google/oauth/callback';
 const ADMIN_RETURN_PATH = '/restaurant-test/google';
 /** 画面を開いたとき、最終同期からこの時間を過ぎていれば同期を勧める。 */
 export const SYNC_STALE_AFTER_MS = 10 * 60 * 1000;
-const DEFAULT_AI_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
-const AI_TIMEOUT_MS = 45_000;
+export const DEFAULT_AI_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
+export const AI_TIMEOUT_MS = 45_000;
 const REVIEWS_PAGE_SIZE_MAX = 100;
 
-type ConnectionStatus = 'pending_location' | 'connected' | 'expired' | 'no_permission' | 'disconnected';
+export type ConnectionStatus = 'pending_location' | 'connected' | 'expired' | 'no_permission' | 'disconnected';
 type ReplyStatus = 'unreplied' | 'draft' | 'pending_confirm' | 'replied' | 'published';
 
 /**
@@ -78,7 +78,7 @@ async function canManageGoogleConnection(c: Context<Env>): Promise<boolean> {
   return row?.account_scope === 'all';
 }
 
-async function googlePermissions(c: Context<Env>) {
+export async function googlePermissions(c: Context<Env>) {
   const staff = c.get('staff');
   return {
     canManageConnection: await canManageGoogleConnection(c),
@@ -93,14 +93,14 @@ const requireConnectionManager: MiddlewareHandler<Env> = async (c, next) => {
   return next();
 };
 
-interface StoreContext {
+export interface StoreContext {
   id: string;
   name: string;
   organizationId: string;
   lineAccountId: string;
 }
 
-interface ConnectionRow {
+export interface ConnectionRow {
   id: string;
   store_id: string;
   line_account_id: string | null;
@@ -141,7 +141,7 @@ interface ReviewRow {
   updated_at: string;
 }
 
-class GoogleAiTimeout extends Error {
+export class GoogleAiTimeout extends Error {
   constructor() {
     super('google_ai_timeout');
     this.name = 'GoogleAiTimeout';
@@ -157,23 +157,23 @@ function oauthClient(c: Context<Env>): GoogleOAuthClient | null {
   return { clientId, clientSecret, redirectUri: `${new URL(c.req.url).origin}${CALLBACK_PATH}` };
 }
 
-function writeEnabled(env: Env['Bindings']): boolean {
+export function writeEnabled(env: Env['Bindings']): boolean {
   return env.GOOGLE_BUSINESS_WRITE_ENABLED === 'true';
 }
 
-function accountId(c: Context<Env>): string | null {
+export function accountId(c: Context<Env>): string | null {
   return c.req.query('account_id') || null;
 }
 
-function staffTenantId(c: Context<Env>): string {
+export function staffTenantId(c: Context<Env>): string {
   return c.get('staff')?.tenantId ?? DEFAULT_TENANT_ID;
 }
 
-function nowIso(): string {
+export function nowIso(): string {
   return new Date().toISOString();
 }
 
-function fail(c: Context<Env>, status: 400 | 401 | 403 | 404 | 409 | 500 | 502 | 503 | 504, error: string, extra: Record<string, unknown> = {}) {
+export function fail(c: Context<Env>, status: 400 | 401 | 403 | 404 | 409 | 500 | 502 | 503 | 504, error: string, extra: Record<string, unknown> = {}) {
   return c.json({ success: false, error, ...extra }, status);
 }
 
@@ -205,7 +205,7 @@ function adminReturnUrl(c: Context<Env>, lineAccountId: string | null, result: s
 }
 
 /** account_id と担当者の統括から店舗を1つ引く。組織IDだけで引かない（アカウント分離の原則）。 */
-async function storeFor(c: Context<Env>): Promise<StoreContext | null> {
+export async function storeFor(c: Context<Env>): Promise<StoreContext | null> {
   const lineAccountId = accountId(c);
   if (!lineAccountId) return null;
   const row = await dbFor(c.env)
@@ -291,14 +291,14 @@ async function ensureStoreForGoogle(c: Context<Env>): Promise<StoreContext | nul
   return store;
 }
 
-async function connectionFor(c: Context<Env>, storeId: string): Promise<ConnectionRow | null> {
+export async function connectionFor(c: Context<Env>, storeId: string): Promise<ConnectionRow | null> {
   return dbFor(c.env, storeId)
     .prepare('SELECT * FROM rt_google_connections WHERE store_id = ? LIMIT 1')
     .bind(storeId)
     .first<ConnectionRow>();
 }
 
-function publicConnection(row: ConnectionRow | null) {
+export function publicConnection(row: ConnectionRow | null) {
   if (!row) return { status: 'disconnected' as ConnectionStatus };
   return {
     status: row.status,
@@ -336,7 +336,7 @@ function publicReview(row: ReviewRow) {
   };
 }
 
-async function setConnectionStatus(c: Context<Env>, storeId: string, status: ConnectionStatus, error?: string | null): Promise<void> {
+export async function setConnectionStatus(c: Context<Env>, storeId: string, status: ConnectionStatus, error?: string | null): Promise<void> {
   await dbFor(c.env, storeId)
     .prepare(`UPDATE rt_google_connections SET status = ?, last_sync_error = COALESCE(?, last_sync_error), updated_at = ? WHERE store_id = ?`)
     .bind(status, error ?? null, nowIso(), storeId)
@@ -372,7 +372,7 @@ async function writeLog(
  * 有効なアクセストークンを返す。期限が近ければ更新して保存する。
  * 更新に失敗（invalid_grant）したら接続状態を expired にして例外を投げる。
  */
-async function accessTokenFor(c: Context<Env>, connection: ConnectionRow): Promise<string> {
+export async function accessTokenFor(c: Context<Env>, connection: ConnectionRow): Promise<string> {
   const key = c.env.LINE_CREDENTIAL_ENCRYPTION_KEY;
   const expiresAt = connection.access_token_expires_at ? Date.parse(connection.access_token_expires_at) : 0;
   if (connection.access_token_enc && expiresAt > Date.now() + 60_000) {
@@ -406,7 +406,7 @@ async function accessTokenFor(c: Context<Env>, connection: ConnectionRow): Promi
   }
 }
 
-function googleErrorResponse(c: Context<Env>, error: unknown) {
+export function googleErrorResponse(c: Context<Env>, error: unknown) {
   if (error instanceof CredentialEncryptionKeyError) {
     return fail(c, 503, 'トークン暗号化キーが設定されていません', { code: 'encryption_key_missing' });
   }
@@ -430,7 +430,7 @@ function googleErrorResponse(c: Context<Env>, error: unknown) {
   return fail(c, 500, '予期しないエラーが発生しました');
 }
 
-async function requireConnectedStore(c: Context<Env>): Promise<{ store: StoreContext; connection: ConnectionRow } | Response> {
+export async function requireConnectedStore(c: Context<Env>): Promise<{ store: StoreContext; connection: ConnectionRow } | Response> {
   const store = await storeFor(c);
   if (!store) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
   const connection = await connectionFor(c, store.id);
@@ -449,7 +449,7 @@ async function reviewFor(c: Context<Env>, storeId: string, id: string): Promise<
 
 // ---------- access guard（restaurant-test.ts と同じ3点検査） ----------
 
-restaurantGoogle.use('/api/restaurant-test/google/*', async (c, next) => {
+export const googleAccessGuard: MiddlewareHandler<Env> = async (c, next) => {
   if (!restaurantTestEnabled(c.env)) return fail(c, 404, 'Not found');
   const requestedTenant = c.req.query('tenant_id');
   if (requestedTenant && requestedTenant !== staffTenantId(c)) {
@@ -462,7 +462,8 @@ restaurantGoogle.use('/api/restaurant-test/google/*', async (c, next) => {
     return fail(c, 403, 'このLINEアカウントを操作する権限がありません');
   }
   return next();
-});
+};
+restaurantGoogle.use('/api/restaurant-test/google/*', googleAccessGuard);
 
 // ---------- 設定タブ ----------
 
@@ -892,12 +893,34 @@ restaurantGoogle.get('/api/restaurant-test/google/reviews/:id', async (c) => {
   return c.json({ success: true, review: publicReview(row), store: { id: store.id, name: store.name }, connection: publicConnection(connection) });
 });
 
-function aiText(result: unknown): string {
+export function aiText(result: unknown): string {
   if (!result || typeof result !== 'object') return '';
   const value = result as { response?: unknown; choices?: Array<{ message?: { content?: unknown } }> };
   if (typeof value.response === 'string') return value.response.trim();
   const content = value.choices?.[0]?.message?.content;
   return typeof content === 'string' ? content.trim() : '';
+}
+
+/** Workers AI を時間制限付きで呼び、本文を文字列で返す。時間切れは GoogleAiTimeout。呼び出し側で c.env.AI の有無を確認すること。 */
+export async function runGoogleAi(c: Context<Env>, prompt: { system: string; user: string }, opts: { temperature: number; maxTokens: number }): Promise<string> {
+  const model = c.env.GOOGLE_BUSINESS_AI_MODEL || c.env.OPS_SUPPORT_AI_MODEL || DEFAULT_AI_MODEL;
+  const run = c.env.AI!.run(model as keyof AiModels, {
+    messages: [
+      { role: 'system', content: prompt.system },
+      { role: 'user', content: prompt.user },
+    ],
+    temperature: opts.temperature,
+    max_tokens: opts.maxTokens,
+  });
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new GoogleAiTimeout()), AI_TIMEOUT_MS);
+  });
+  try {
+    return aiText(await Promise.race([run, timeout]));
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 restaurantGoogle.post('/api/restaurant-test/google/reviews/:id/draft/generate', async (c) => {
@@ -919,28 +942,11 @@ restaurantGoogle.post('/api/restaurant-test/google/reviews/:id/draft/generate', 
     mode,
     previousDraft: row.reply_draft,
   });
-  const model = c.env.GOOGLE_BUSINESS_AI_MODEL || c.env.OPS_SUPPORT_AI_MODEL || DEFAULT_AI_MODEL;
   let text = '';
   try {
-    const run = c.env.AI.run(model as keyof AiModels, {
-      messages: [
-        { role: 'system', content: prompt.system },
-        { role: 'user', content: prompt.user },
-      ],
-      temperature: 0.4,
-      max_tokens: 600,
-    });
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const timeout = new Promise<never>((_, reject) => {
-      timer = setTimeout(() => reject(new GoogleAiTimeout()), AI_TIMEOUT_MS);
-    });
-    try {
-      text = aiText(await Promise.race([run, timeout]));
-    } finally {
-      if (timer) clearTimeout(timer);
-    }
+    text = await runGoogleAi(c, prompt, { temperature: 0.4, maxTokens: 600 });
   } catch (error) {
-    console.error('[restaurant-google] AI draft failed', { model, code: error instanceof GoogleAiTimeout ? 'timeout' : 'provider_failure' });
+    console.error('[restaurant-google] AI draft failed', { code: error instanceof GoogleAiTimeout ? 'timeout' : 'provider_failure' });
     return fail(c, error instanceof GoogleAiTimeout ? 504 : 502, 'AIの下書き作成に失敗しました。もう一度お試しください', { code: error instanceof GoogleAiTimeout ? 'ai_timeout' : 'ai_failed' });
   }
   const validated = validateReplyText(text);

@@ -148,6 +148,7 @@ import { dashboard } from './routes/dashboard.js';
 import { siteTracking } from './routes/site-tracking.js';
 import { restaurantTest } from './routes/restaurant-test.js';
 import { restaurantGoogle } from './routes/restaurant-google.js';
+import { restaurantGoogleProfile } from './routes/restaurant-google-profile.js';
 import { tenants } from './routes/tenants.js';
 import { ops } from './routes/ops.js';
 import { piiMaskMiddleware, type ImpersonationContext } from './middleware/impersonation.js';
@@ -535,6 +536,7 @@ app.route('/', siteTracking);
 // 飲食店向けの検証専用領域。既存NEN機能とはAPI/DB名前空間を分離する。
 app.route('/', restaurantTest);
 app.route('/', restaurantGoogle);
+app.route('/', restaurantGoogleProfile);
 app.route('/', tenants);
 app.route('/', hqBanners);
 app.route('/', hqSupport);

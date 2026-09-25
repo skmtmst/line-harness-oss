@@ -393,6 +393,14 @@ const STAFF_EXPLICIT_ALLOW: Array<[method: string, path: string]> = [
   ['GET', '/api/restaurant-test/google/connection'],
   ['GET', '/api/restaurant-test/google/reviews'],
   ['POST', '/api/restaurant-test/google/reviews/sync'],
+  // Googleビジネス第2段（GB-10〜GB-19）：担当者もプロフィールを読み、変更案を作れる。Googleへの送信は店舗管理者以上。
+  ['GET', '/api/restaurant-test/google/profile'],
+  ['POST', '/api/restaurant-test/google/profile/sync'],
+  ['GET', '/api/restaurant-test/google/holidays'],
+  ['GET', '/api/restaurant-test/google/photos'],
+  ['POST', '/api/restaurant-test/google/hours/propose'],
+  ['POST', '/api/restaurant-test/google/profile/propose'],
+  ['GET', '/api/restaurant-test/google/changes'],
   // 運営からのお知らせ（★V6 37-7）は本人宛て。担当者でも読んで既読にできる。
   ['GET', '/api/hq/notices'],
   ['GET', '/api/hq/notices/line-registration'],
@@ -403,6 +411,8 @@ const STAFF_EXPLICIT_ALLOW_PATTERNS: Array<[method: string, pattern: RegExp]> = 
   ['GET', /^\/api\/restaurant-test\/google\/reviews\/[^/]+$/],
   ['POST', /^\/api\/restaurant-test\/google\/reviews\/[^/]+\/draft\/generate$/],
   ['PUT', /^\/api\/restaurant-test\/google\/reviews\/[^/]+\/draft$/],
+  ['GET', /^\/api\/restaurant-test\/google\/changes\/[^/]+$/],
+  ['POST', /^\/api\/restaurant-test\/google\/changes\/[^/]+\/cancel$/],
   ['POST', /^\/api\/hq\/notices\/[^/]+\/read$/],
 ];
 
