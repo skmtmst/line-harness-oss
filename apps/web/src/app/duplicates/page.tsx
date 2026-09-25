@@ -285,7 +285,7 @@ export default function DuplicatesPage() {
             </div>
             <div className="flex items-center gap-3">
               {data.computedAt && (
-                <span className="text-xs text-[#8B938D]">
+                <span className="text-xs text-ink-faint">
                   {formatRelative(data.computedAt)}に計算
                 </span>
               )}
@@ -380,7 +380,7 @@ export default function DuplicatesPage() {
             <h2 className="text-sm font-bold text-[#1D1D1F]">アカウント別ブレイクダウン</h2>
             <p className="mt-1 text-xs text-ink-faint">どのアカウントに重複が偏っているかを見ます。</p>
             {data.perAccount.length === 0 ? (
-              <p className="mt-3 text-sm text-[#8B938D]">アカウントが登録されていません。</p>
+              <p className="mt-3 text-sm text-ink-faint">アカウントが登録されていません。</p>
             ) : (
               <div className="mt-3 overflow-hidden rounded-[14px] border border-[#DADDE2] bg-white shadow-card">
                 <table className="w-full table-fixed text-sm">
@@ -416,7 +416,7 @@ export default function DuplicatesPage() {
             return (
             <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card">
               <h2 className="text-sm font-bold text-[#1D1D1F]">アカウント間 重複マトリックス</h2>
-              <p className="mt-1 text-xs text-[#8B938D]">
+              <p className="mt-1 text-xs text-ink-faint">
                 行アカウントの友だちのうち、列アカウントにも居る人数 （行のアカウントに対する割合）。
               </p>
               <div className="mt-3 overflow-hidden rounded-[14px] border border-[#DADDE2] bg-white shadow-card">
@@ -466,7 +466,7 @@ export default function DuplicatesPage() {
                               className="px-2 py-4 text-right tabular-nums"
                             >
                               {fmt.format(overlap)}{' '}
-                              <span className="text-xs text-[#8B938D]">
+                              <span className="text-xs text-ink-faint">
                                 ({(rate * 100).toFixed(0)}%)
                               </span>
                             </td>

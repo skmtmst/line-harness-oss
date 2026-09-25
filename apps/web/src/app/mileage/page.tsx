@@ -661,7 +661,7 @@ function MileagePageInner() {
         </div>
 
         {ruleActionError ? (
-          <p role="alert" className="border-status-danger bg-status-danger-soft text-status-danger mb-3 rounded-control border px-3 py-2 text-sm">
+          <p role="alert" className="border-status-danger bg-status-danger-soft text-danger mb-3 rounded-control border px-3 py-2 text-sm">
             {ruleActionError}
           </p>
         ) : null}

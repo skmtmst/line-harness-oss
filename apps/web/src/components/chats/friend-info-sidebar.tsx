@@ -4,6 +4,7 @@ import Avatar from '@/components/shared/avatar'
 import { useCallback, useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { api, type FriendUpcoming, type MileageHistoryItem, type MileageSummary } from '@/lib/api'
+import { tagTextColor } from '@/lib/presentation'
 import type { FriendField } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import { GripVertical, X } from 'lucide-react'
@@ -848,7 +849,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
                       className="inline-flex max-w-full items-center rounded px-2 py-0.5 text-[10px] font-medium"
                       style={{
                         backgroundColor: `${tag.color}20`,
-                        color: tag.color,
+                        color: tagTextColor(tag.color),
                       }}
                     >
                       <ExpandableText value={tag.name} className="max-w-full text-inherit" />

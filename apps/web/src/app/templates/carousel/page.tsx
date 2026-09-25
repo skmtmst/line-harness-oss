@@ -472,7 +472,11 @@ function CarouselEditorInner() {
               >
                 自分に送って確かめる
               </button>
-              <p className="text-on-accent/80 mt-2 text-xs leading-relaxed">
+              {/*
+                80% の白字だと帯の上で 4.5:1 に届かない。100% の白字にする。
+                NEXT-24: 押せない形＋理由＋代替手順のまま残す（無反応に見せない）。
+              */}
+              <p className="text-on-accent mt-2 text-xs leading-relaxed">
                 この画面からのテスト送信にはまだ対応していません。保存して一斉配信に組み込むと、配信の画面からテスト送信できます。
               </p>
             </section>
@@ -573,9 +577,11 @@ function CarouselEditorInner() {
 
               <Field
                 label="画像のURL"
+                htmlFor={`cr-panel-${i}-image`}
                 note="画像を入れるなら、全部の枚に入れてください。1枚だけ無いと、その枚だけ高さが変わって崩れます。"
               >
                 <input
+                  id={`cr-panel-${i}-image`}
                   type="url"
                   value={panel.thumbnailImageUrl}
                   onChange={(e) => update(i, { thumbnailImageUrl: e.target.value })}
@@ -584,8 +590,9 @@ function CarouselEditorInner() {
                 />
               </Field>
 
-              <Field label="パネルタイトル" note={`${TITLE_MAX}文字まで`}>
+              <Field label="パネルタイトル" htmlFor={`cr-panel-${i}-title`} note={`${TITLE_MAX}文字まで`}>
                 <input
+                  id={`cr-panel-${i}-title`}
                   type="text"
                   value={panel.title}
                   onChange={(e) => update(i, { title: e.target.value })}
@@ -600,6 +607,7 @@ function CarouselEditorInner() {
 
               <Field
                 label="パネル本文"
+                htmlFor={`cr-panel-${i}-text`}
                 required
                 note={
                   anyImage
@@ -608,6 +616,7 @@ function CarouselEditorInner() {
                 }
               >
                 <textarea
+                  id={`cr-panel-${i}-text`}
                   rows={3}
                   value={panel.text}
                   onChange={(e) => update(i, { text: e.target.value })}
@@ -640,6 +649,7 @@ function CarouselEditorInner() {
                           })
                         }
                         placeholder="ボタンの文字"
+                        aria-label={`パネル${i + 1}の選択肢${ai + 1}の文字`}
                         className={`${inputClass} w-40`}
                       />
                       <div className="flex gap-1.5">
@@ -689,6 +699,7 @@ function CarouselEditorInner() {
                           })
                         }
                         placeholder="https://example.com"
+                        aria-label={`パネル${i + 1}の選択肢${ai + 1}のURL`}
                         className={`${inputClass} w-full`}
                       />
                     ) : (

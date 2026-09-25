@@ -115,11 +115,11 @@ export default function AutomationTemplateGallery({
 
   return (
     <section data-design-node="WjYAC" data-automation-template-gallery="v6">
-      <div className="mb-4 rounded-v6-control border border-info bg-info-bg px-4 py-3 text-sm text-v6-ink-secondary">
+      <div className="mb-4 rounded-control border border-info bg-info-bg px-4 py-3 text-sm text-ink-secondary">
         見本を選ぶと、公開されていない下書きを作ります。タグやシナリオは、次の画面でこのアカウントのものを選び直してください。
       </div>
       {actionError ? (
-        <div className="mb-4 rounded-v6-control border border-v6-danger-border bg-v6-danger-bg px-4 py-3 text-sm text-v6-danger-text">
+        <div className="mb-4 rounded-control border border-status-danger-border bg-danger-bg px-4 py-3 text-sm text-danger">
           {actionError}
         </div>
       ) : null}
@@ -145,21 +145,21 @@ export default function AutomationTemplateGallery({
         {visibleItems.map((item, index) => {
           const Icon = ICONS[index % ICONS.length]
           return (
-            <article key={item.key} className="rounded-v6-card border border-hairline bg-canvas p-5 shadow-v6-card">
+            <article key={item.key} className="rounded-card border border-hairline bg-canvas p-5 shadow-card">
               <div className="mb-4 flex items-start gap-3">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-v6-control bg-v6-action-soft text-v6-action">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-control bg-action-soft text-action">
                   <Icon aria-hidden="true" size={20} strokeWidth={1.8} />
                 </span>
                 <div className="min-w-0">
-                  <h2 className="text-base font-semibold text-v6-ink">{item.name}</h2>
-                  <p className="mt-1 text-sm leading-6 text-v6-ink-faint">{item.description}</p>
+                  <h2 className="text-base font-semibold text-ink">{item.name}</h2>
+                  <p className="mt-1 text-sm leading-6 text-ink-faint">{item.description}</p>
                 </div>
               </div>
               <dl className="mb-5 grid grid-cols-3 gap-x-3 gap-y-2 text-sm">
-                <dt className="text-v6-ink-faint">きっかけ</dt>
-                <dd className="col-span-2 font-medium text-v6-ink-secondary">{item.triggerLabel}</dd>
-                <dt className="text-v6-ink-faint">すること</dt>
-                <dd className="col-span-2 font-medium text-v6-ink-secondary">{item.actionLabel}</dd>
+                <dt className="text-ink-faint">きっかけ</dt>
+                <dd className="col-span-2 font-medium text-ink-secondary">{item.triggerLabel}</dd>
+                <dt className="text-ink-faint">すること</dt>
+                <dd className="col-span-2 font-medium text-ink-secondary">{item.actionLabel}</dd>
               </dl>
               <Button
                 variant="secondary"

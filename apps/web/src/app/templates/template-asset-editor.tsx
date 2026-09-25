@@ -710,7 +710,7 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
               ) : null}
             </div>
             <Button type="button" className="mt-4 w-full" disabled title={TEST_SEND_UNAVAILABLE_NOTE}>自分に送って確かめる</Button>
-            <p className="text-on-accent/80 mt-2 text-xs leading-relaxed">{TEST_SEND_UNAVAILABLE_NOTE}</p>
+            <p className="text-on-accent mt-2 text-xs leading-relaxed">{TEST_SEND_UNAVAILABLE_NOTE}</p>
           </section>
           <section className="bg-canvas border-hairline rounded-card shadow-card border p-4 text-sm">
             <h2 className="font-bold">{kind === 'rich_message' ? 'リッチメニューとの違い' : kind === 'coupon' ? '公開したあとに見られる数' : '回答フォームとの使い分け'}</h2>

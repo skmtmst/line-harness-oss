@@ -48,10 +48,14 @@
   color: var(--color-status-warn-deep);
 }
 
-/* 止まっている・失敗した。 */
+/*
+ * 止まっている・失敗した。文字だけ濃い赤（`--color-danger` #b3261e）。
+ * 薄赤の地面では `--color-status-danger`(#e5484d) は 3.53:1 で読めない。
+ * `--color-danger` なら 5.59:1。札の背景は薄いまま、文字だけ濃くする。
+ */
 .danger {
   border-color: var(--color-status-danger);
   background: var(--color-status-danger-soft);
-  color: var(--color-status-danger);
+  color: var(--color-danger);
 }
 }

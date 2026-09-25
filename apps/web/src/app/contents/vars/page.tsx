@@ -843,19 +843,19 @@ function VarsPageInner() {
                           })
                         }
                         aria-label="このページの共通情報をすべて選ぶ"
-                        className="accent-green-500"
+                        className="accent-accent-deep"
                       />
                     </Th>
                     {/* 見出しも固定幅で切れ得るので、重ねると全文が読める
                         title を付ける（第5パス D-3）。 */}
-                    <Th className="px-4 py-3" style={{ width: '14%' }} title="共通情報">
+                    <Th className="w-28 px-4 py-3" title="共通情報">
                       共通情報
                     </Th>
-                    <Th className="px-4 py-3" style={{ width: '20%' }} title="差し込みキー">
+                    <Th className="w-40 px-4 py-3" title="差し込みキー">
                       差し込みキー
                     </Th>
                     <Th className="px-4 py-3" title="中身">中身</Th>
-                    <Th className="px-4 py-3" style={{ width: '14%' }} title="使われている場所">
+                    <Th className="w-32 px-4 py-3" title="使われている場所">
                       使われている場所
                     </Th>
                     <Th className="cq-hide-below-870 px-4 py-3" style={{ width: '19%' }} title="最終更新日・次の変更予定">
@@ -876,7 +876,7 @@ function VarsPageInner() {
                               checked={selected.has(item.id)}
                               onChange={() => toggle(item.id)}
                               aria-label={`${item.name}を選ぶ`}
-                              className="accent-green-500"
+                              className="accent-accent-deep"
                             />
                           </td>
                           <td className="px-4 py-3">
@@ -927,12 +927,16 @@ function VarsPageInner() {
                             className="text-ink-secondary cq-hide-below-870 px-4 py-3 text-xs"
                             title={`最終更新 ${formatListDate(item.updatedAt)}${!pending ? ' ／ 予定なし' : ` ／ ${formatStamp(pending.effectiveFrom)} に ${formatVarValue(item.type, pending.value) || '（空）'}へ${(item.pendingScheduleCount ?? 0) > 1 ? ` ほか${(item.pendingScheduleCount ?? 1) - 1}件` : ''}`}`}
                           >
-                            <span className="whitespace-nowrap">{formatListDate(item.updatedAt)}</span>
+                            {/*
+                              狭い列でも横に流さないよう、日付と予定は2行に分ける。
+                              空白の位置で折れる（全文は列の title）。
+                            */}
+                            <span className="block">{formatListDate(item.updatedAt)}</span>
                             {!pending ? (
-                              <span className="text-ink-faint whitespace-nowrap"> ／ 予定なし</span>
+                              <span className="text-ink-faint block"> ／ 予定なし</span>
                             ) : (
                               <>
-                                <span className="text-ink-faint whitespace-nowrap"> ／ {formatStamp(pending.effectiveFrom)} に</span>
+                                <span className="text-ink-faint block"> ／ {formatStamp(pending.effectiveFrom)} に</span>
                                 <span className="text-ink-faint"> {formatVarValue(item.type, pending.value) || '（空）'}へ</span>
                                 {(item.pendingScheduleCount ?? 0) > 1 && (
                                   <span className="text-ink-faint"> ほか{(item.pendingScheduleCount ?? 1) - 1}件</span>

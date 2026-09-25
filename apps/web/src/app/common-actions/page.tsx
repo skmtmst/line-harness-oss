@@ -341,11 +341,11 @@ export default function CommonActionsPage() {
         <div className="border-hairline flex items-center justify-between border-x border-b bg-canvas px-4 py-3 text-xs text-ink-faint">
           <span>{total}件中 {(page - 1) * PAGE_SIZE + 1}〜{Math.min(page * PAGE_SIZE, total)}件</span>
           <div className="flex items-center gap-3" aria-label="ページ送り">
-            <button type="button" disabled={page === 1} onClick={() => setPage((value) => Math.max(1, value - 1))} className="text-action disabled:text-ink-faint">前へ</button>
+            <button type="button" disabled={page === 1} onClick={() => setPage((value) => Math.max(1, value - 1))} className="inline-flex min-h-6 min-w-6 items-center justify-center text-action disabled:text-ink-faint">前へ</button>
             {Array.from({ length: Math.ceil(total / PAGE_SIZE) }, (_, index) => index + 1).map((pageNumber) => (
-              <button key={pageNumber} type="button" aria-current={pageNumber === page ? 'page' : undefined} onClick={() => setPage(pageNumber)} className={pageNumber === page ? 'text-action font-bold' : 'text-ink-faint'}>{pageNumber}</button>
+              <button key={pageNumber} type="button" aria-current={pageNumber === page ? 'page' : undefined} onClick={() => setPage(pageNumber)} className={`inline-flex min-h-6 min-w-6 items-center justify-center ${pageNumber === page ? 'text-action font-bold' : 'text-ink-faint'}`}>{pageNumber}</button>
             ))}
-            <button type="button" disabled={page * PAGE_SIZE >= total} onClick={() => setPage((value) => value + 1)} className="text-action disabled:text-ink-faint">次へ</button>
+            <button type="button" disabled={page * PAGE_SIZE >= total} onClick={() => setPage((value) => value + 1)} className="inline-flex min-h-6 min-w-6 items-center justify-center text-action disabled:text-ink-faint">次へ</button>
           </div>
         </div>
       ) : null}

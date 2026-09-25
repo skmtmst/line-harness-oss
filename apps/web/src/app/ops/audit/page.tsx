@@ -93,7 +93,7 @@ export default function OpsAuditPage() {
         </Button>
       </div>
 
-      {error ? <p role="alert" className="mb-3 text-caption text-status-danger">{error}</p> : null}
+      {error ? <p role="alert" className="mb-3 text-caption text-danger">{error}</p> : null}
 
       {loading ? (
         <ListState kind="loading" title="記録を読み込んでいます" />

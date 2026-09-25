@@ -465,7 +465,7 @@ function ProjectInner() {
         )}
       </div>
 
-      {actionError ? <p className="text-label text-status-danger" role="alert">{actionError}</p> : null}
+      {actionError ? <p className="text-label text-danger" role="alert">{actionError}</p> : null}
       {project.description ? <p className="text-caption text-ink-faint">{project.description}</p> : null}
 
       <div data-design-node="H2eb7f" className="flex flex-col gap-4 xl:flex-row xl:items-start">
@@ -486,7 +486,7 @@ function ProjectInner() {
           </div>
           <div className="border-t border-hairline" />
           {generationError ? (
-            <div className="mx-4 mt-4 rounded-card bg-status-danger-soft px-4 py-3 text-label text-status-danger" role="alert">
+            <div className="mx-4 mt-4 rounded-card bg-status-danger-soft px-4 py-3 text-label text-danger" role="alert">
               {generationError}
             </div>
           ) : null}

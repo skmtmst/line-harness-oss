@@ -253,7 +253,7 @@ export default function HqSupportDetailPage() {
                   </button>
                 ) : null}
                 {notice ? <p className="text-label text-accent-deep" role="status">{notice}</p> : null}
-                {error ? <p className="text-label text-status-danger" role="alert">{error}</p> : null}
+                {error ? <p className="text-label text-danger" role="alert">{error}</p> : null}
               </div>
             </>
           )}

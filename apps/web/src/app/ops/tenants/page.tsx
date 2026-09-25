@@ -148,7 +148,7 @@ export default function OpsTenantsPage() {
       {/*
         ★V7：一覧の失敗は一覧の場所の1枚で出すので、ここでは操作の知らせだけ出す。
       */}
-      {error && !listFailed ? <p role="alert" className="mb-3 text-caption text-status-danger">{error}</p> : null}
+      {error && !listFailed ? <p role="alert" className="mb-3 text-caption text-danger">{error}</p> : null}
 
       {loading ? (
         <ListState kind="loading" title="契約先を読み込んでいます" />

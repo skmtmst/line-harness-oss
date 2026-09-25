@@ -24,7 +24,8 @@ describe('質問エディタのはみ出し（#973 U022）', () => {
 
   it('友だち情報欄は選択と値を同じ行に押し込まない', () => {
     // ラベル・選択・値は全幅の縦配置。横並びの flex 行ではない。
-    const block = EDITOR.match(/友だち情報欄<\/span>[\s\S]{0,1600}?セットする値（既存の値は上書き）/)
+    // 2026-09-25: 見出しの span を label へ（読み上げ対応）。見張りは配置のまま。
+    const block = EDITOR.match(/友だち情報欄<\/(span|label)>[\s\S]{0,1600}?セットする値（既存の値は上書き）/)
     expect(block, '友だち情報欄のブロックが見つからない').not.toBeNull()
     expect(block![0]).not.toContain('flex flex-wrap items-center')
     expect(block![0]).toContain('w-full')
