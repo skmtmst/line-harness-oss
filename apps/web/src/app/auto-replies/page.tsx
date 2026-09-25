@@ -735,20 +735,24 @@ export default function AutoRepliesPage() {
         <div data-design="Table" className="bg-canvas rounded-card border border-hairline overflow-hidden">
           {/* #641: 枠つきボタンで広くなった操作列ぶん、表だけが横に流れるようにする */}
           <div className="overflow-x-auto">
-          <table className="min-w-[880px] w-full table-fixed">
+          {/*
+            1152px（表の器 802）でも1440px（器 834）でも横に流れないよう、
+            固定列の合計を 576（80+128+128+80+160）にし、最小幅の指定は
+            外す。伸ばすのは文字のルール名だけ。操作列は固定幅＋右端 sticky。
+          */}
+          <table className="w-full table-fixed">
             <thead>
               <tr className="bg-canvas-sunken border-b border-hairline">
-                <th className="w-2/6 px-4 py-3 text-left text-xs font-semibold text-ink-faint">ルール名</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint">ルール名</th>
                 <th className="w-20 px-4 py-3 text-left text-xs font-semibold text-ink-faint">状態</th>
-                <th title="動く条件（キーワード・適用アカウント）" className="w-1/6 whitespace-nowrap px-4 py-3 text-left text-xs font-semibold text-ink-faint">条件</th>
-                <th title="返信と実行するアクション" className="w-1/6 whitespace-nowrap px-4 py-3 text-left text-xs font-semibold text-ink-faint">返すもの</th>
-                <th title="今月動いた回数" className="w-24 px-4 py-3 text-left text-xs font-semibold text-ink-faint">今月の応答</th>
+                <th title="動く条件（キーワード・適用アカウント）" className="w-32 whitespace-nowrap px-4 py-3 text-left text-xs font-semibold text-ink-faint">条件</th>
+                <th title="返信と実行するアクション" className="w-32 whitespace-nowrap px-4 py-3 text-left text-xs font-semibold text-ink-faint">返すもの</th>
+                <th title="今月動いた回数" className="w-20 px-4 py-3 text-left text-xs font-semibold text-ink-faint">今月の応答</th>
                 {/*
-                  #774: 表の最小幅880pxがカード幅を超える帯で、右端の操作列が
-                  スクロールしないと見えなかった（macOSはバー非表示で気づけない）。
-                  操作列だけ右端にstickyで留め、表が横に流れても操作は常に見える。
+                  #774: 右端の操作列は sticky で留める。幅は中身（編集＋
+                  削除＋その他の 32px 級 3つ）に合わせた固定 160。
                 */}
-                <th title="編集・停止または再開・削除" className="bg-canvas-sunken sticky right-0 w-44 px-4 py-3 text-right text-xs font-semibold text-ink-faint">操作</th>
+                <th title="編集・停止または再開・削除" className="bg-canvas-sunken sticky right-0 w-40 px-4 py-3 text-right text-xs font-semibold text-ink-faint">操作</th>
                 <th className="hidden px-4 py-3">テンプレート</th>
                 <th className="hidden px-4 py-3">応答条件</th>
                 <th className="hidden px-4 py-3">適用アカウント</th>
@@ -850,7 +854,8 @@ export default function AutoRepliesPage() {
                       {/* **数えられていないものを 0 と書かない。** 0 は「当たらなかった」の意味。 */}
                       <span className="text-ink text-sm tabular-nums">{r.hits?.period ?? '—'}</span>
                       <span className="text-ink-faint text-xs">回</span>
-                      <span className="text-ink-faint mt-0.5 block text-[10px]">累計 {r.hits?.total ?? '—'}回</span>
+                      {/* 狭い列でも横に流さないよう、累計は1行で切る（全文は列の title） */}
+                      <span className="text-ink-faint mt-0.5 block max-w-full truncate text-[10px]">累計 {r.hits?.total ?? '—'}回</span>
                     </td>
                     {/* 狭い列でボタンが切れても、重ねるだけで操作の全部が
                         読めるように title を付ける（第5パス D-3）。 */}
