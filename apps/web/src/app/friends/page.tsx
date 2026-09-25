@@ -570,7 +570,10 @@ function FriendsPageInner({
               : <Star aria-hidden="true" className="h-3.5 w-3.5" />}
             注目のみ
           </button>
-          <span className="shrink-0 whitespace-nowrap text-xs text-ink-faint">{loadStatus === 'ready' ? `${total.toLocaleString('ja-JP')}件` : '—'}</span>
+          {/*
+            絞り込みの行の件数は出さない。一覧の見出しの横とページ送りの
+            表示に同じ数があり、1画面に3回出ていた。件数はあの2か所で足りる。
+          */}
           {broadcastHandoffHref ? (
             <Link
               href={broadcastHandoffHref}
