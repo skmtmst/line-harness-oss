@@ -110,6 +110,14 @@ async function postBinary<T>(path: string, file: Blob): Promise<T> {
 // Event booking types
 // ============================================================
 
+export interface EventQuestion {
+  id: string;
+  label: string;
+  type: 'text' | 'textarea' | 'radio' | 'checkbox';
+  required: boolean;
+  options?: string[] | null;
+}
+
 export interface EventDetail {
   id: string;
   name: string;
@@ -121,6 +129,8 @@ export interface EventDetail {
   max_bookings_per_friend: number | null;
   requires_approval: number;
   cancel_deadline_hours_before: number | null;
+  /** 申込時のカスタム質問 (#841)。定義が無いイベントは空配列。 */
+  questions?: EventQuestion[];
 }
 
 export interface EventSlot {
@@ -225,7 +235,12 @@ export const api = {
   getEventSlots: (id: string) => get<{ items: EventSlot[] }>(`/api/liff/events/${id}/slots`),
   createEventBooking: (
     eventId: string,
-    body: { slot_id: string; customer_note?: string | null },
+    body: {
+      slot_id: string;
+      customer_note?: string | null;
+      /** カスタム質問への回答。質問id → 文字列、複数選択は文字列配列 */
+      answers?: Record<string, string | string[]>;
+    },
     idempotencyKey: string,
   ) =>
     post<{ id: string; status: string }>(

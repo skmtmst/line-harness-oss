@@ -13069,6 +13069,16 @@ export interface EventListItem {
   line_account_id?: string;
 }
 
+/** 申込時に聞く質問 (#841)。Worker 側で events.questions_json に保存される。 */
+export interface EventQuestion {
+  id: string;
+  label: string;
+  type: 'text' | 'textarea' | 'radio' | 'checkbox';
+  required: boolean;
+  /** radio / checkbox の選択肢。記述式では null。 */
+  options?: string[] | null;
+}
+
 export interface EventDetail {
   id: string;
   name: string;
@@ -13102,6 +13112,13 @@ export interface EventDetail {
   account_ids?: string | string[] | null;
   dedup_priority?: string | string[] | null;
   line_account_id?: string;
+  /**
+   * Worker の応答では questions_json の生JSON文字列。送信時は配列の
+   * questions を使い、読み込み時は questions_json を parse する
+   * (account_ids と同じ扱い)。
+   */
+  questions_json?: string | null;
+  questions?: EventQuestion[] | null;
   version?: number;
 }
 
@@ -13154,6 +13171,8 @@ export interface EventBookingItem {
   status: string;
   customer_note: string | null;
   internal_note: string | null;
+  /** カスタム質問への回答 (#841)。{質問id: 回答} のJSON文字列。 */
+  answer_snapshot_json?: string | null;
   requested_at: string;
   decided_at: string | null;
   cancelled_at: string | null;

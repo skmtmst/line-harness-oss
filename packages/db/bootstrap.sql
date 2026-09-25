@@ -2238,7 +2238,9 @@ CREATE TABLE events (
   CHECK (account_ids IS NULL OR json_valid(account_ids)), dedup_priority TEXT
   CHECK (dedup_priority IS NULL OR json_valid(dedup_priority)), failed_account_ids TEXT
   CHECK (failed_account_ids IS NULL OR json_valid(failed_account_ids)), confirmation_message_extra TEXT, reminder_message_extra TEXT, og_title TEXT, og_description TEXT, og_image_url TEXT, visible_tag_id TEXT, waitlist_enabled INTEGER NOT NULL DEFAULT 0, entry_cutoff_hours_before INTEGER, version INTEGER NOT NULL DEFAULT 1, current_published_version_id TEXT, version_write_token TEXT, approval_deadline_hours INTEGER NOT NULL DEFAULT 24
-  CHECK (approval_deadline_hours IN (2, 24, 72)),
+  CHECK (approval_deadline_hours IN (2, 24, 72)), questions_json TEXT CHECK (
+    questions_json IS NULL OR json_valid(questions_json)
+  ),
   FOREIGN KEY (line_account_id) REFERENCES line_accounts(id)
 );
 

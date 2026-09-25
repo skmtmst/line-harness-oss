@@ -413,7 +413,8 @@
     "452_broadcast_after_action_runs.sql",
     "453_ad_platform_secret_vault.sql",
     "454_broadcast_approval.sql",
-    "455_broadcast_approval_events.sql"
+    "455_broadcast_approval_events.sql",
+    "468_event_custom_questions.sql"
   ],
-  "migrationCount": 414
+  "migrationCount": 415
 }

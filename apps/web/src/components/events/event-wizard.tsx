@@ -19,6 +19,7 @@ import { formatSlotJp, jstHHMMToUtcIso, splitBand, todayJst } from './jst'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { TextInput } from '@/components/shared/form-controls'
 import Select from '@/components/shared/select'
+import EventQuestionsEditor, { parseEventQuestions } from '@/components/events/event-questions-editor'
 // #740: 下書きの初期値と字数上限は編集画面と共有する。片方だけ変えないこと。
 import {
   EVENT_CANCEL_DEADLINE_OPTIONS,
@@ -144,7 +145,9 @@ export default function EventWizard({ accountId, eventId, step }: EventWizardPro
           eventsApi.listSlots(accountId, eventId),
         ])
         if (cancelled) return
-        setDraft(ev)
+        // Worker は質問定義を questions_json の文字列で返す。フォームは
+        // 配列で触るので、ここでほぐしてから draft に載せる。
+        setDraft({ ...ev, questions: parseEventQuestions(ev.questions_json) })
         setSlots(slotsRes.items)
         const first = slotsRes.items[0]
         // フォームへ写した枠のIDを記録する。あとで一覧が並び替わっても
@@ -206,6 +209,8 @@ export default function EventWizard({ accountId, eventId, step }: EventWizardPro
       // サーバの multi 契約（非空配列）に触れて 422 になる。単一のときは
       // 従来どおり送らない（既存挙動を変えない）。
       account_ids: resolveEventMultiAccountIds(d, accountId),
+      // 申込時の質問。空配列は「質問なし」を保存する（null なら定義を消す）。
+      questions: d.questions ?? null,
     }
   }
 
@@ -673,6 +678,17 @@ function OverviewStep({
       <div className="grid gap-4 xl:grid-cols-2">
       <FormSection
         step={5}
+        label="申し込みのときに聞くこと"
+        note="予約フォームに質問を追加できます。回答は申込の一覧で確認できます。"
+      >
+        <EventQuestionsEditor
+          questions={draft.questions ?? []}
+          onChange={(next) => update('questions', next)}
+        />
+      </FormSection>
+
+      <FormSection
+        step={6}
         label="満席になったとき"
         note="満席後も申し込みを受けるかを決めます。"
       >
@@ -693,7 +709,7 @@ function OverviewStep({
       </FormSection>
 
       <FormSection
-        step={6}
+        step={7}
         label="申し込んだ人にすること"
         note="受付と前日のお知らせを自動で行います。"
       >
