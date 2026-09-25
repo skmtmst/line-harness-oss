@@ -244,13 +244,16 @@ const OPS_DASHBOARD = {
   period: 'month',
   periodLabel: '2026年9月',
   pricing: 'list_price',
+  lastSyncedAt: null,
+  ai: { callsThisMonth: 12, draftsThisMonth: 9, articlesActive: 3 },
   plans: [
     { key: 'light', label: 'ライト', monthlyYen: 9800 },
     { key: 'standard', label: 'スタンダード', monthlyYen: 29800 },
     { key: 'pro', label: 'プロ', monthlyYen: 59800 },
   ],
   kpis: {
-    mrr: 129200, mrrDelta: 9800, active: 4,
+    revenueThisMonth: 129200, revenueDelta: 9800, refundsThisMonth: 0,
+    contractMonthlyTotal: 129200, filledByListPriceCount: 2, active: 4,
     byPlan: { light: 1, standard: 2, pro: 1 },
     trialing: 2, newInPeriod: 1, newTrialsInPeriod: 1,
     churnInPeriod: 0, churnRate: 0,
@@ -358,6 +361,37 @@ const OPS_SUPPORT_DETAIL = {
   draft: null,
   ai: { available: false },
   knowledge: { article: null, job: null },
+}
+/**
+ * 統括のお問い合わせの続き（`/hq/support/detail?id=…`）。
+ * `apps/web/src/lib/hq-support.ts` の `HqSupportDetail` と同じ器。
+ * 名前はすべて作り物で、日時は固定（撮るたびに同じ絵になる）。
+ */
+const HQ_SUPPORT_REQUESTS = [
+  {
+    id: 'visual-ticket-1', kind: 'usage', kindLabel: '使い方について',
+    subject: '画面確認用の問い合わせ', body: '画面確認用の問い合わせ本文。',
+    lineAccountId: 'visual-qa-account', attachments: [],
+    status: 'open', staffName: '検証 一郎', notified: true,
+    createdAt: '2026-09-06T10:00:00+09:00', ticketLabel: 'No.1',
+  },
+]
+const HQ_SUPPORT_DETAIL = {
+  ...HQ_SUPPORT_REQUESTS[0],
+  stageLabel: '受付済み',
+  messages: [
+    {
+      id: 'visual-support-msg-1', authorKind: 'tenant', authorName: '検証 一郎',
+      body: '画面確認用の問い合わせ本文。', attachments: [],
+      createdAt: '2026-09-06T10:00:00+09:00',
+    },
+    {
+      id: 'visual-support-msg-2', authorKind: 'ops', authorName: '検証 太郎',
+      body: '画面確認用の返信文。', attachments: [],
+      createdAt: '2026-09-06T11:00:00+09:00',
+    },
+  ],
+  canFollowUp: true,
 }
 const OPS_KNOWLEDGE = [
   {
@@ -1566,6 +1600,19 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
           planLabel: 'スタンダード',
         },
       },
+    }
+  }
+  {
+    /*
+     * 統括のお問い合わせの続き（`HqSupportDetail`）。
+     * 無いと既定の `{items,total,page,limit}` が返り、日時の整形で落ちて
+     * `/hq/support/detail?id=visual-ticket-1` が開けなかった（2026-09-25）。
+     */
+    const hqSupportDetail = /^\/api\/hq\/support\/requests\/([^/]+)$/.exec(pathname)
+    if (method === 'GET' && hqSupportDetail) {
+      const id = decodeURIComponent(hqSupportDetail[1])
+      const found = HQ_SUPPORT_REQUESTS.find((row) => row.id === id) ?? HQ_SUPPORT_REQUESTS[0]
+      return { success: true, data: { ...HQ_SUPPORT_DETAIL, ...found, messages: HQ_SUPPORT_DETAIL.messages } }
     }
   }
   if (pathname === '/api/auth/session') {
