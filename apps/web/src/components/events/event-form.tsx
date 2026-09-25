@@ -589,8 +589,8 @@ function OverviewTab({
         </label>
       </div>
       <div className="border-t border-hairline pt-5">
-        <div className="text-sm font-medium text-gray-700 mb-1">申し込みのときに聞くこと</div>
-        <p className="text-xs text-gray-500 mb-3">
+        <div className="text-sm font-medium text-ink mb-1">申し込みのときに聞くこと</div>
+        <p className="text-xs text-ink-secondary mb-3">
           予約フォームに質問を追加できます。回答は申込の一覧で確認できます。
         </p>
         <EventQuestionsEditor

@@ -98,7 +98,7 @@ export default function EventQuestionsEditor({
                 </option>
               ))}
             </select>
-            <label className="text-ink-secondary flex items-center gap-1.5 text-xs">
+            <label className="text-ink-secondary flex items-center gap-2 text-xs">
               <input
                 type="checkbox"
                 checked={q.required}
