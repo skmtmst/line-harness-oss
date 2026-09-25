@@ -25,6 +25,11 @@ const mocks = vi.hoisted(() => ({
   deleteTemplate: vi.fn(),
   getCarouselTapTotals: vi.fn(),
   getFolderById: vi.fn(),
+  listTemplateVersions: vi.fn().mockResolvedValue([]),
+  revertTemplateToVersion: vi.fn(),
+  listTemplateReferences: vi.fn().mockResolvedValue([]),
+  listBroadcastReferences: vi.fn().mockResolvedValue([]),
+  getBroadcastDeleteBlockers: vi.fn().mockResolvedValue([]),
 }));
 vi.mock('@line-crm/db', () => mocks);
 
@@ -261,6 +266,9 @@ describe('公開口の契約', () => {
       expectedVersion: 1,
       expectedDraftRevision: 0,
       idempotencyKey: 'publish-key-0001',
+      // 466: 使い始めの日時（来なければ公開と同時）と書いた人を引き渡す。
+      effectiveFrom: undefined,
+      createdByStaffId: 'owner-1',
     });
     expect(await response.json()).toMatchObject({
       success: true,
