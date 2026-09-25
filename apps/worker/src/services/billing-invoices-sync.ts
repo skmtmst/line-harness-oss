@@ -148,6 +148,8 @@ export async function syncBillingInvoicesDaily(
   env: BillingInvoiceSyncEnv,
   now = new Date(),
 ): Promise<BillingInvoiceSyncResult | null> {
+  // Stripe を使わない環境では定期ジョブ自体を静かに止める。手動同期は明示的な 503 にする。
+  if (!env.STRIPE_SECRET_KEY) return null;
   const last = await getPlatformSetting(env.DB, BILLING_INVOICES_LAST_SYNCED_KEY);
   if (last && now.getTime() - new Date(last).getTime() < DAY_SECONDS * 1000) return null;
   const since = last

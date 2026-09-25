@@ -10,7 +10,7 @@ vi.mock('./stripe-api.js', async (importOriginal) => {
   return { ...actual, stripeApi: { ...actual.stripeApi, listInvoices } };
 });
 
-const { syncBillingInvoices } = await import('./billing-invoices-sync.js');
+const { syncBillingInvoices, syncBillingInvoicesDaily } = await import('./billing-invoices-sync.js');
 const { opsBilling } = await import('../routes/ops-billing.js');
 
 let testDb: SqliteD1;
@@ -93,6 +93,12 @@ describe('Stripe請求書同期', () => {
     app.route('/', opsBilling);
     const res = await app.request('/api/ops/billing/sync', { method: 'POST', body: JSON.stringify({ months: 12 }), headers: { 'Content-Type': 'application/json' } }, { DB: testDb.db } as Env['Bindings']);
     expect(res.status).toBe(503);
+    expect(listInvoices).not.toHaveBeenCalled();
+  });
+
+  it('Stripe未設定の定期同期はDBも外部通信も使わず静かに止まる', async () => {
+    const result = await syncBillingInvoicesDaily({ DB: testDb.db });
+    expect(result).toBeNull();
     expect(listInvoices).not.toHaveBeenCalled();
   });
 
