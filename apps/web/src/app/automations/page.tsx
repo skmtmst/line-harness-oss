@@ -14,6 +14,7 @@ import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import AutomationTemplateGallery from '@/components/automations/automation-template-gallery'
 import { useCanManageAutomations } from '@/components/automations/use-automation-permission'
 import Chip from '@/components/shared/chip'
+import Disclosure from '@/components/shared/disclosure'
 import ListState from '@/components/shared/list-state'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import KpiCollapse from '@/components/ui/kpi-collapse'
@@ -521,7 +522,7 @@ export default function AutomationsPage() {
         <div className="mb-4">
           <MergedTabs basePath="/automations" paramName="tab" tabs={tabs} active={tab} />
         </div>
-        <div className="mb-4 rounded-control border border-info bg-info-bg px-4 py-3 text-sm font-medium text-info">
+        <div className="bg-info-bg text-ink-secondary mb-4 rounded-control px-4 py-3 text-xs">
           見本を選ぶと、そのまま「つくる」画面が開きます。中身は自由に直せます。よく使われている順に並べています。
         </div>
         <AutomationTemplateGallery accountId={selectedAccountId} canManage={canManageAutomations} />
@@ -606,12 +607,12 @@ export default function AutomationsPage() {
         </div>
       </div>
       {viewerOnly ? (
-        <p className="mb-4 rounded-control border border-hairline bg-canvas-sunken px-4 py-3 text-sm text-ink-secondary" role="note">
+        <p className="bg-status-warn-soft text-status-warn-deep mb-4 rounded-control px-4 py-3 text-xs" role="note">
           閲覧のみのため、ルールの作成・変更はできません。操作する権限がありません。
         </p>
-      ) : null}
-
-      <p className="mb-4 text-sm text-ink-faint">「〜のとき、〜する」を登録して自動で実行します。友だち一覧から手で実行したり、毎日決まった時刻に動かすこともできます。</p>
+      ) : (
+        <p className="bg-info-bg text-ink-secondary mb-4 rounded-control px-4 py-3 text-xs">「〜のとき、〜する」を登録して自動で実行します。友だち一覧から手で実行したり、毎日決まった時刻に動かすこともできます。</p>
+      )}
       <p className="sr-only">共通アクションは友だち一覧からの手動実行にも使えます。</p>
 
       {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}
@@ -641,9 +642,9 @@ export default function AutomationsPage() {
         </div>
       </KpiCollapse>
 
-      <div className="mb-4 rounded-control border border-info bg-info-bg px-4 py-3 text-sm font-medium text-info">
-        上から順に見て、当てはまったものが動きます。同じきっかけで2本が当てはまると両方が動くため、片方だけにしたいときは条件をずらしてください。
-      </div>
+      <Disclosure size="compact" title="動く順番の見方" hint="上から順に確認" className="mb-4">
+        <p>上から順に見て、当てはまったものが動きます。同じきっかけで2本が当てはまると両方が動くため、片方だけにしたいときは条件をずらしてください。</p>
+      </Disclosure>
 
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <input

@@ -50,20 +50,20 @@ a{color:var(--info)}
 <h3>まだ Messaging API を使っていないとき（新しい公式アカウント）</h3>
 <p class="desc">作ったばかりの公式アカウントは「ステータス：未利用」になっています。先にこれを済ませます。</p>
 <ol class="steps"><li><span class="n">1</span><div>LINE公式アカウントマネージャーで公式アカウントを選び、右上の <b>「設定」</b> を押します。</div></li><li><span class="n">2</span><div>左のメニューで <b>「Messaging API」</b> を押します。</div></li><li><span class="n">3</span><div><b>「Messaging APIを利用する」</b> を押します。</div></li><li><span class="n">4</span><div>初めてなら「プロバイダーを作成」に会社名や店名を入れます（例：株式会社サンプル）。</div></li><li><span class="n">5</span><div>すでにプロバイダーがあるときは、その名前を選びます。<span class="sub">プロバイダーは「会社の箱」です。手順3の LINE Login チャネルも同じ箱に作ります。あとから変えられません。</span></div></li><li><span class="n">6</span><div><b>「同意する」</b> を押します。</div></li><li><span class="n">7</span><div>「プライバシーポリシーと利用規約」の画面が出ます。2つとも空のまま <b>「OK」</b> を押します（あとから登録できます）。</div></li><li><span class="n">8</span><div>確認の画面で、プロバイダー名が自分の会社名になっていることを確かめて <b>「OK」</b> を押します。</div></li><li><span class="n">9</span><div>ステータスが <b>「利用中」</b> になれば完了です。続けて下の「取り方」へ進みます。</div></li></ol>
-<figure><img src="images/m1-oam-unused.jpg" alt="Messaging API が未利用のときの画面" loading="lazy"></figure>
-<figure><img src="images/m1-oam-provider.jpg" alt="プロバイダーを選ぶ画面" loading="lazy"></figure>
-<figure><img src="images/m1-oam-privacy.jpg" alt="プライバシーポリシーと利用規約の画面" loading="lazy"></figure>
-<figure><img src="images/m1-oam-confirm.jpg" alt="Messaging APIを利用の確認画面" loading="lazy"></figure>
-<figure><img src="images/m1-oam-inuse.jpg" alt="ステータスが利用中になった画面" loading="lazy"></figure>
+<figure><img src="/manuals/line-connect/images/m1-oam-unused.jpg" alt="Messaging API が未利用のときの画面" loading="lazy"></figure>
+<figure><img src="/manuals/line-connect/images/m1-oam-provider.jpg" alt="プロバイダーを選ぶ画面" loading="lazy"></figure>
+<figure><img src="/manuals/line-connect/images/m1-oam-privacy.jpg" alt="プライバシーポリシーと利用規約の画面" loading="lazy"></figure>
+<figure><img src="/manuals/line-connect/images/m1-oam-confirm.jpg" alt="Messaging APIを利用の確認画面" loading="lazy"></figure>
+<figure><img src="/manuals/line-connect/images/m1-oam-inuse.jpg" alt="ステータスが利用中になった画面" loading="lazy"></figure>
 <h3>取り方（LINE公式アカウントマネージャー）</h3>
 <ol class="steps"><li><span class="n">1</span><div>LINE公式アカウントマネージャーを開き、つなぐ公式アカウントを選びます。画面右上の <b>「設定」</b> を押します。</div></li><li><span class="n">2</span><div>左のメニューで <b>「Messaging API」</b> を押します。</div></li><li><span class="n">3</span><div>「Channel ID」の右の <b>「コピー」</b> を押し、musubo の <b>チャネルID</b> の欄に貼ります。</div></li><li><span class="n">4</span><div>「Channel secret」の右の <b>「コピー」</b> を押し、musubo の <b>チャネルシークレット</b> の欄に貼ります。</div></li></ol>
-<figure><img src="images/m1-oam-messaging-api.jpg" alt="LINE公式アカウントマネージャーの Messaging API 画面" loading="lazy"></figure>
+<figure><img src="/manuals/line-connect/images/m1-oam-messaging-api.jpg" alt="LINE公式アカウントマネージャーの Messaging API 画面" loading="lazy"></figure>
 <p class="note info">「Webhook URL」の欄は空のままで進めてください。musubo が手順4で自動で入れます。</p>
 <h3>別の取り方（LINE Developers から）</h3>
 <p class="desc">LINE Developers（developers.line.biz/console）にログインし、プロバイダー →「Messaging API」のチャネルを開きます。</p>
 <ol class="steps"><li><span class="n">1</span><div><b>「チャネル基本設定」</b> タブを開きます。</div></li><li><span class="n">2</span><div>「チャネルID」を musubo の <b>チャネルID</b> の欄に貼ります（右のコピーの印を押すとコピーできます）。</div></li><li><span class="n">3</span><div>同じ画面を下へ進み、「チャネルシークレット」を musubo の <b>チャネルシークレット</b> の欄に貼ります。</div></li></ol>
-<figure><img src="images/m1-dev-id.jpg" alt="LINE Developers チャネル基本設定のチャネルID" loading="lazy"></figure>
-<figure><img src="images/m1-dev-secret.jpg" alt="LINE Developers チャネル基本設定のチャネルシークレット" loading="lazy"></figure>
+<figure><img src="/manuals/line-connect/images/m1-dev-id.jpg" alt="LINE Developers チャネル基本設定のチャネルID" loading="lazy"></figure>
+<figure><img src="/manuals/line-connect/images/m1-dev-secret.jpg" alt="LINE Developers チャネル基本設定のチャネルシークレット" loading="lazy"></figure>
 <p class="note warn">「発行」ボタンは押さないでください。押すとシークレットが新しい値に変わり、いままでの接続が切れます。</p>
 </section>
 <section class="card" id="m2"><h2>手順3　LoginチャネルID・Loginチャネルシークレットの取得（LINE Login）</h2>
@@ -71,20 +71,20 @@ a{color:var(--info)}
 <p class="note warn">LINE Login チャネルは、手順2の Messaging API と <b>同じプロバイダー</b> に置いてください。プロバイダーが違うと、同じ人が別の友だちとして数えられます。</p>
 <h3>取り方</h3>
 <ol class="steps"><li><span class="n">1</span><div><a href="https://developers.line.biz/console/" target="_blank" rel="noreferrer">LINE Developers コンソール</a> にログインし、「プロバイダー」の一覧から自分のプロバイダー（会社名）を押します。</div></li><li><span class="n">2</span><div>「LINEログイン」と書かれたチャネルを押します。<span class="sub">無いときは、下の「LINE Login チャネルの作り方」で作ってから戻ってください。</span></div></li><li><span class="n">3</span><div><b>「チャネル基本設定」</b> タブを開きます。</div></li><li><span class="n">4</span><div>「チャネルID」を musubo の <b>LoginチャネルID</b> の欄に貼ります。</div></li><li><span class="n">5</span><div>下へ進み、「チャネルシークレット」を musubo の <b>Loginチャネルシークレット</b> の欄に貼ります。</div></li></ol>
-<figure><img src="images/m2-home.jpg" alt="LINE Developers ホームのプロバイダー一覧" loading="lazy"></figure>
-<figure><img src="images/m2-provider.jpg" alt="プロバイダーのチャネル一覧" loading="lazy"></figure>
+<figure><img src="/manuals/line-connect/images/m2-home.jpg" alt="LINE Developers ホームのプロバイダー一覧" loading="lazy"></figure>
+<figure><img src="/manuals/line-connect/images/m2-provider.jpg" alt="プロバイダーのチャネル一覧" loading="lazy"></figure>
 <p class="note warn">チャネル名の横が <b>「開発中」</b> のときは、その文字を押して「公開」にしてください。開発中のままだと、管理者以外の人が友だち追加URLからログインできません。</p>
-<figure><img src="images/m2-publish.jpg" alt="開発中を公開にする" loading="lazy"></figure>
-<figure><img src="images/m2-login-id.jpg" alt="LINE Login チャネルのチャネルID" loading="lazy"></figure>
-<figure><img src="images/m2-login-secret.jpg" alt="LINE Login チャネルのチャネルシークレット" loading="lazy"></figure>
+<figure><img src="/manuals/line-connect/images/m2-publish.jpg" alt="開発中を公開にする" loading="lazy"></figure>
+<figure><img src="/manuals/line-connect/images/m2-login-id.jpg" alt="LINE Login チャネルのチャネルID" loading="lazy"></figure>
+<figure><img src="/manuals/line-connect/images/m2-login-secret.jpg" alt="LINE Login チャネルのチャネルシークレット" loading="lazy"></figure>
 <h3>LINE Login チャネルの作り方（まだ無い人）</h3>
 <p class="desc">プロバイダーの画面で「新規チャネル作成」を押すと、作る画面になります。5分ほどで終わります。</p>
 <ol class="steps"><li><span class="n">1</span><div>チャネルの種類で <b>「LINEログイン」</b> を選びます。</div></li><li><span class="n">2</span><div>「プロバイダー」が手順2の Messaging API と同じ会社名になっていることを確かめます。</div></li><li><span class="n">3</span><div>「サービスを提供する地域」は <b>日本</b> を選びます。</div></li><li><span class="n">4</span><div>「会社・事業者の所在国・地域」は <b>日本</b> を選びます。</div></li><li><span class="n">5</span><div>「チャネル名」に会社名や店名を入れます（例：株式会社サンプル）。</div></li><li><span class="n">6</span><div>「チャネル説明」に一言入れます（例：musubo で使う）。</div></li><li><span class="n">7</span><div>「アプリタイプ」は <b>ウェブアプリ</b> にチェックします。</div></li><li><span class="n">8</span><div>「2要素認証の必須化」はオンのままでかまいません。</div></li><li><span class="n">9</span><div>「メールアドレス」に連絡が取れるメールアドレスを入れます。</div></li><li><span class="n">10</span><div>「LINE開発者契約に同意します」にチェックします。</div></li><li><span class="n">11</span><div><b>「作成」</b> を押します。作ったチャネルの「チャネル基本設定」が開きます。</div></li><li><span class="n">12</span><div>チャネル名の横の <b>「開発中」</b> を押して「公開」にします。そのあと、上の取り方の 4・5 に進みます。</div></li></ol>
-<figure><img src="images/m2-create-1.jpg" alt="新規チャネル作成でLINEログインを選ぶ" loading="lazy"></figure>
-<figure><img src="images/m2-create-2.jpg" alt="プロバイダーと地域の入力" loading="lazy"></figure>
-<figure><img src="images/m2-create-3.jpg" alt="チャネル名・説明・アプリタイプの入力" loading="lazy"></figure>
-<figure><img src="images/m2-create-4.jpg" alt="メールアドレスの入力" loading="lazy"></figure>
-<figure><img src="images/m2-create-5.jpg" alt="同意して作成" loading="lazy"></figure>
+<figure><img src="/manuals/line-connect/images/m2-create-1.jpg" alt="新規チャネル作成でLINEログインを選ぶ" loading="lazy"></figure>
+<figure><img src="/manuals/line-connect/images/m2-create-2.jpg" alt="プロバイダーと地域の入力" loading="lazy"></figure>
+<figure><img src="/manuals/line-connect/images/m2-create-3.jpg" alt="チャネル名・説明・アプリタイプの入力" loading="lazy"></figure>
+<figure><img src="/manuals/line-connect/images/m2-create-4.jpg" alt="メールアドレスの入力" loading="lazy"></figure>
+<figure><img src="/manuals/line-connect/images/m2-create-5.jpg" alt="同意して作成" loading="lazy"></figure>
 <p class="note info">チャネルアイコン・プライバシーポリシーURL・サービス利用規約URLは空のままで作れます。</p>
 </section>
 <section class="card" id="m3"><h2>手順4　LINE側の設定（Webhook・応答・Callback）</h2>
@@ -93,27 +93,27 @@ a{color:var(--info)}
 <h3>A　「Webhookの利用」をオンにする</h3>
 <p class="desc">LINE Developers でプロバイダー →「Messaging API」のチャネルを開きます。</p>
 <ol class="steps"><li><span class="n">1</span><div><b>「Messaging API設定」</b> タブを押します。</div></li><li><span class="n">2</span><div>「Webhook設定」の <b>「Webhookの利用」</b> を押してオン（緑）にします。「Webhook URL」には musubo が入れた URL が入っています。触らないでください。</div></li></ol>
-<figure><img src="images/m3-tab.jpg" alt="Messaging API設定タブ" loading="lazy"></figure>
-<figure><img src="images/m3-webhook-on.jpg" alt="Webhookの利用をオンにする" loading="lazy"></figure>
+<figure><img src="/manuals/line-connect/images/m3-tab.jpg" alt="Messaging API設定タブ" loading="lazy"></figure>
+<figure><img src="/manuals/line-connect/images/m3-webhook-on.jpg" alt="Webhookの利用をオンにする" loading="lazy"></figure>
 <p class="note info">「Webhook URL」が空のときは、musubo の手順4で「接続して設定する」がまだ通っていません。musubo に戻って先に接続してください。</p>
 <h3>B　あいさつメッセージ・応答メッセージをオフにする</h3>
 <p class="desc">オンのままだと、musubo の配信と LINE の自動返信が二重に届きます。LINE公式アカウントマネージャーで切ります。</p>
 <ol class="steps"><li><span class="n">1</span><div>LINE公式アカウントマネージャーで公式アカウントを選び、右上の <b>「設定」</b> を押します。</div></li><li><span class="n">2</span><div>左のメニューで <b>「応答設定」</b> を押します。</div></li><li><span class="n">3</span><div><b>「あいさつメッセージ」</b> をオフにします。</div></li><li><span class="n">4</span><div><b>「応答メッセージ」</b> をオフにします。「チャット」はオフのままにしてください（オンにすると musubo にメッセージが届きません）。</div></li></ol>
-<figure><img src="images/m3-oam-response.jpg" alt="LINE公式アカウントマネージャーの応答設定" loading="lazy"></figure>
+<figure><img src="/manuals/line-connect/images/m3-oam-response.jpg" alt="LINE公式アカウントマネージャーの応答設定" loading="lazy"></figure>
 <p class="sub">LINE Developers の「Messaging API設定」にある「応答メッセージ」「あいさつメッセージ」の右の「編集」からも、同じ画面を開けます。</p>
-<figure><img src="images/m3-dev-response.jpg" alt="LINE Developers から応答設定を開く" loading="lazy"></figure>
+<figure><img src="/manuals/line-connect/images/m3-dev-response.jpg" alt="LINE Developers から応答設定を開く" loading="lazy"></figure>
 <h3>C　Callback URL を貼る</h3>
 <p class="desc">パソコンのブラウザから友だち追加する人のために必要です。LINE Developers でプロバイダー →「LINEログイン」のチャネルを開きます。</p>
 <ol class="steps"><li><span class="n">1</span><div><b>「LINEログイン設定」</b> タブを押します。</div></li><li><span class="n">2</span><div>「ウェブアプリでLINEログインを利用する」がオン（緑）になっていることを確かめます。オフなら押してオンにします。</div></li><li><span class="n">3</span><div>「コールバックURL」の <b>「編集」</b> を押します。</div></li><li><span class="n">4</span><div>musubo の手順4の画面にある <b>Callback URL</b> を「コピー」して、ここに貼ります。</div></li><li><span class="n">5</span><div><b>「更新」</b> を押します。</div></li></ol>
-<figure><img src="images/m3-login-tab.jpg" alt="LINEログイン設定タブ" loading="lazy"></figure>
-<figure><img src="images/m3-callback-1.jpg" alt="コールバックURLの編集を押す" loading="lazy"></figure>
-<figure><img src="images/m3-callback-2.jpg" alt="Callback URL を貼って更新" loading="lazy"></figure>
+<figure><img src="/manuals/line-connect/images/m3-login-tab.jpg" alt="LINEログイン設定タブ" loading="lazy"></figure>
+<figure><img src="/manuals/line-connect/images/m3-callback-1.jpg" alt="コールバックURLの編集を押す" loading="lazy"></figure>
+<figure><img src="/manuals/line-connect/images/m3-callback-2.jpg" alt="Callback URL を貼って更新" loading="lazy"></figure>
 <p class="note info">すでに別の URL が入っているときは、消さずに改行して下の行に足してください（1行に1つ）。</p>
 <h3>D　公式アカウントをリンクする</h3>
 <p class="desc">友だち追加URLから開いたときに「友だち追加」の案内を出すために必要です。LINE Login チャネルの「チャネル基本設定」タブの一番下にあります。</p>
 <ol class="steps"><li><span class="n">1</span><div>「友だち追加オプション」の「リンクされたLINE公式アカウント」で <b>「編集」</b> を押します。</div></li><li><span class="n">2</span><div>一覧から、手順2でつないだ公式アカウントを選びます。</div></li><li><span class="n">3</span><div><b>「更新」</b> を押します。</div></li></ol>
-<figure><img src="images/m3-linked-oa.jpg" alt="リンクされたLINE公式アカウント" loading="lazy"></figure>
-<figure><img src="images/m3-linked-edit.jpg" alt="公式アカウントを選んで更新" loading="lazy"></figure>
+<figure><img src="/manuals/line-connect/images/m3-linked-oa.jpg" alt="リンクされたLINE公式アカウント" loading="lazy"></figure>
+<figure><img src="/manuals/line-connect/images/m3-linked-edit.jpg" alt="公式アカウントを選んで更新" loading="lazy"></figure>
 <p class="note ok">4つ終わったら、musubo の手順4に戻って「接続して保存」を押してください。設定がまだの項目は、その行に理由が出ます。</p>
 </section>
 <p class="sub">画像の値（チャネルID・シークレット・メールアドレスなど）は説明用の例です。実際の値は自分の画面のものを使ってください。</p></div>

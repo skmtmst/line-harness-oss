@@ -105,7 +105,6 @@ function ReservedBroadcastContent() {
     if (!id) {
       if (!isCurrent()) return
       setBroadcast(null)
-      setError('予約した配信を特定できませんでした。')
       setLoading(false)
       return
     }
@@ -181,6 +180,20 @@ function ReservedBroadcastContent() {
     }
   }, [load])
 
+  /*
+   * `?id=` なしで開くと読み込みが始まらない。対象未指定は失敗ではないので、
+   * 落とさず予定へ戻して選び直させる（全ルート監査 A2、2026-09-25）。
+   */
+  if (!id) {
+    return (
+      <ListState
+        kind="empty"
+        title="予約した配信が指定されていません"
+        description="配信予定から、確認する予約を選び直してください。"
+        action={<Button href="/broadcasts">配信予定へ戻る</Button>}
+      />
+    )
+  }
   if (accountLoading || loading) {
     return <ListState kind="loading" title="予約結果を確認しています" />
   }
@@ -272,7 +285,7 @@ function ReservedBroadcastContent() {
         measureOpens: broadcast.measureOpens,
       }, { idempotencyKey: duplicateKey.current })
       if (!result.success) throw new Error(result.error)
-      router.push(`/broadcasts?id=${encodeURIComponent(result.data.id)}`)
+      router.push(`/broadcasts/detail?id=${encodeURIComponent(result.data.id)}`)
     } catch {
       setActionError('複製できませんでした。通信を確認して、もう一度お試しください。')
     } finally {
@@ -330,7 +343,7 @@ function ReservedBroadcastContent() {
 
           <div className="mt-4 flex flex-wrap justify-center gap-2">
             <Button href="/broadcasts"><List size={16} aria-hidden="true" />一覧へ戻る</Button>
-            <Button variant="primary" href={`/broadcasts?id=${encodeURIComponent(broadcast.id)}`}>
+            <Button variant="primary" href={`/broadcasts/detail?id=${encodeURIComponent(broadcast.id)}`}>
               <Eye size={16} aria-hidden="true" />予約内容を確認
             </Button>
           </div>
@@ -340,7 +353,7 @@ function ReservedBroadcastContent() {
           <h2 className="text-ink text-base font-bold">次にできること</h2>
           <p className="text-ink-faint mt-1 text-xs">予約後も開始前まで確認・取消できます。</p>
           <div className="mt-4 grid gap-2">
-            <Button href={`/broadcasts?id=${encodeURIComponent(broadcast.id)}`} className="w-full">
+            <Button href={`/broadcasts/detail?id=${encodeURIComponent(broadcast.id)}`} className="w-full">
               <Eye size={16} aria-hidden="true" />予約の内容を見る
             </Button>
             <Button onClick={() => void testSend()} disabled={actionBusy !== null} className="w-full">

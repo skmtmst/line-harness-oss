@@ -508,15 +508,16 @@ describe('Issue #674 ウェビナー編集の実挙動', () => {
       : Promise.resolve({ data: { ...webinar, id, title: '後のウェビナーB' } })))
 
     const view = await mount(<EditWebinarPage />)
-    expect(view.container.textContent).toContain('見つかりませんでした。開き直してください。')
+    // 404 は ★V7 TargetMissing の not-found で出す。
+    expect(view.container.textContent).toContain('このウェビナーは見つかりません')
 
     navigationMocks.query = 'id=webinar-b&pane=review'
     const frame = await view.rerender(<EditWebinarPage />)
     /* 切替の一コマ目に前の失敗文を持ち越さない。 */
     expect(frame.text).toContain('読み込み中...')
-    expect(frame.text).not.toContain('見つかりませんでした')
+    expect(frame.text).not.toContain('このウェビナーは見つかりません')
     expect(view.container.textContent).toContain('後のウェビナーB')
-    expect(view.container.textContent).not.toContain('見つかりませんでした。開き直してください。')
+    expect(view.container.textContent).not.toContain('このウェビナーは見つかりません')
   })
 
   it('切替直後は前のウェビナーの候補とCTAを出さず、揃うまで保存も止める', async () => {

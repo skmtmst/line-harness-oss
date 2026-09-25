@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import type { MediaItem } from '@line-crm/shared'
 import { api, type BroadcastAssetKind } from '@/lib/api'
 import Button from '@/components/shared/button'
+import Combobox from '@/components/shared/combobox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import StickyBar from '@/components/shared/sticky-bar'
 import { TextField } from '@/components/shared/text-field'
@@ -560,10 +561,14 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
                 <Field label="受付の開始"><input type="datetime-local" className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent mt-2 w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value={researchStartsAt} onChange={(event) => setResearchStartsAt(event.target.value)} /></Field>
                 <Field label="受付の終了"><input type="datetime-local" className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent mt-2 w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value={researchEndsAt} onChange={(event) => setResearchEndsAt(event.target.value)} /></Field>
                 <Field label="答えてもらう人" note="タグで絞れます。選ばなければ全員が対象です。">
-                  <select aria-label="答えてもらう人" className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent mt-2 w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value={targetTagId} onChange={(event) => setTargetTagId(event.target.value)}>
-                    <option value="">友だち全員</option>
-                    {actionOptions.tags.map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}
-                  </select>
+                  <Combobox
+                    aria-label="答えてもらう人"
+                    placeholder="友だち全員"
+                    value={targetTagId}
+                    onChange={setTargetTagId}
+                    options={actionOptions.tags.map((tag) => ({ value: tag.id, label: tag.name }))}
+                    className="mt-2 w-full"
+                  />
                 </Field>
                 <div className="md:col-span-3">
                   <Field label="説明（お客さまに見えます）"><textarea className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent mt-2 w-full resize-y border px-3 py-2 text-sm focus:ring-2 focus:outline-none" rows={2} value={description} onChange={(event) => setDescription(event.target.value)} /></Field>

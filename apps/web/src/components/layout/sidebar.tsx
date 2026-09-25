@@ -8,6 +8,7 @@ import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 import { useBrand } from '@/lib/use-brand'
 import { restaurantTestUiEnabled } from '@/lib/environment-features'
 import { HQ_MENU_SECTIONS, menuOwnerForScreen, orderedMenuSections, type MenuItem } from '@/lib/menu'
+import { HQ_TEMPLATE_DISTRIBUTION_ENABLED } from '@/lib/hq-template-availability'
 import { usePageChrome } from '@/components/shell/page-chrome'
 import { defaultTitleForPath } from '@/components/shell/app-top-bar'
 import SidebarIdentity from './sidebar-identity'
@@ -18,6 +19,14 @@ import {
   SPECIALIZED_FEATURE_KEYS,
 } from '@/lib/feature-settings'
 import styles from './sidebar.module.css'
+
+/** 配布の受け口が無いあいだ、統括サイドバーから外す4画面。 */
+const HQ_UNAVAILABLE_DISTRIBUTION_HREFS = new Set([
+  '/hq/friend-attributes',
+  '/hq/templates',
+  '/hq/rich-menus',
+  '/hq/form-submissions',
+])
 
 // ─── メニュー定義 ───
 //
@@ -238,6 +247,12 @@ export default function Sidebar({
     .map((section) => ({
       ...section,
       items: section.items.filter((item) => {
+        /*
+         * ★V7 C6: 統括のひな形配布（4画面）は Worker の受け口が無いあいだ
+         * 「利用できません」だけのページになるため、サイドバーには出さない。
+         * ページ自体は残し、配布が有効になれば再表示する。
+         */
+        if (isHq && !HQ_TEMPLATE_DISTRIBUTION_ENABLED && HQ_UNAVAILABLE_DISTRIBUTION_HREFS.has(item.href)) return false
         if (isHq) return true
         // 移行中のV2画面では、承認画像どおり「友だち属性」を1行だけ出す。
         // 現行 /tags 自体は消さず、通常画面のメニューにはそのまま残す。
@@ -428,10 +443,7 @@ export default function Sidebar({
    * 「共通情報」(/contents/vars) を開くと「登録メディア一覧」(/contents) も
    * 選ばれて見えていた。当たるもののうち、いちばん長いものだけを選ぶ。
    */
-  // 比較専用ルートも、実際に確認する「友だち属性V2」を選択中として写す。
-  const activePathname = pathname === '/visual-qa/friend-attributes-v2'
-    ? '/tags-v2'
-    : pathname
+  const activePathname = pathname
   const activeHref = (() => {
     let best: string | null = null
     for (const section of sections) {
@@ -557,9 +569,7 @@ export default function Sidebar({
             {section.items.map((item) => {
               const active = isActive(item)
               const isDanger = 'danger' in item && item.danger
-              const visibleLabel = friendAttributesV2Mode && item.href === '/tags-v2'
-                ? '友だち属性'
-                : item.label
+              const visibleLabel = item.label
               return (
                 <Link
                   key={item.href}

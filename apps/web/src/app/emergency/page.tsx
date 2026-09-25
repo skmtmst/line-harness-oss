@@ -8,6 +8,7 @@ import React, { Suspense, useCallback, useEffect, useRef, useState, type ReactNo
 import type { LineAccount } from '@line-crm/shared'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import PageHeader from '@/components/shared/page-header'
+import NoteBar from '@/components/shared/note-bar'
 import KpiCollapse from '@/components/ui/kpi-collapse'
 import {
   api,
@@ -390,7 +391,8 @@ function OperationAlertsPanel({
 }) {
   const [notes, setNotes] = useState<Record<string, string>>({})
   if (failed) return <section className="rounded-card border border-warning bg-warning-bg px-4 py-3 text-xs font-medium text-warning" role="alert">異常の受領・通知記録を取得できませんでした。異常なしとは扱いません。時間をおいて読み直してください。</section>
-  if (alerts.length === 0) return <section className="rounded-card border border-success bg-success-bg px-4 py-3 text-xs font-medium text-success"><strong>異常の記録はありません。</strong> 健全性チェックで新しい異常が見つかると、ここで担当者と通知結果を確認できます。</section>
+  // ★V7: 緑は「正常」の札だけに使う。異常なしの案内は枠なしの info の小さい帯にする。
+  if (alerts.length === 0) return <NoteBar tone="info">異常の記録はありません。健全性チェックで新しい異常が見つかると、ここで担当者と通知結果を確認できます。</NoteBar>
   return <section className="border-hairline rounded-card overflow-hidden border bg-canvas" aria-label="異常の受領と通知">
     <div className="border-hairline border-b px-4 py-3"><h2 className="text-base font-bold text-ink">異常の対応履歴と通知</h2><p className="mt-1 text-xs text-ink-faint">同じ異常はまとめます。悪化・解消・再発は履歴と通知に残ります。</p></div>
     <div className="divide-y divide-hairline">{alerts.map((alert) => {
@@ -639,10 +641,10 @@ function HealthPanel({
         <SummaryCard label="最後の確認" value={formatOperationDate(checkedAt)} note="5分ごとに自動確認" />
         <SummaryCard label="緊急停止状態" value={controlSummary.value} note={controlSummary.note} />
       </div>
-      <div className="rounded-control bg-info-bg text-info px-4 py-3 text-xs font-semibold">
-        LINEとのつながりや配信の詰まりを、5分ごとに自動で確かめています。赤が出たら「緊急コントロール」で止められます。
+      <div className="bg-info-bg text-ink-secondary rounded-control px-4 py-3 text-xs">
+        LINEとのつながりや配信の詰まりを、5分ごとに自動で確かめています。
       </div>
-      <div className={`rounded-card flex flex-wrap items-center gap-3 border px-4 py-3 ${severityStyle[displayedSeverity].panel}`}>
+      <div className="rounded-card border-hairline flex flex-wrap items-center gap-3 border bg-canvas px-4 py-3">
         <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-canvas text-sm font-bold ${statusIconClass}`}>{statusIcon}</span>
         <div className="min-w-0 flex-1">
           <p className="text-base font-bold text-ink">{loading ? '確認しています…' : `${resultTitle}。${isNormal ? '6項目のすべてが正常です。' : ''}`}</p>
@@ -718,8 +720,20 @@ function SendPathCoveragePanel({ accountId, revision }: { accountId: string | nu
     api.operations.sendPaths(accountId)
       .then((response) => {
         if (cancelled) return
-        if (response.success) setData(response.data)
-        else setFailed(true)
+        if (!response.success) {
+          setFailed(true)
+          return
+        }
+        /*
+         * 形の違う応答は置かない。そのまま回すと `capabilities` で
+         * 画面ごと落ちる（全ルート監査 A1、2026-09-25）。
+         */
+        const data = response.data as unknown as { capabilities?: unknown; paths?: unknown } | null
+        if (data && Array.isArray(data.capabilities) && Array.isArray(data.paths)) {
+          setData(response.data)
+        } else {
+          setFailed(true)
+        }
       })
       .catch(() => { if (!cancelled) setFailed(true) })
     return () => { cancelled = true }
@@ -752,7 +766,7 @@ function SendPathCoveragePanel({ accountId, revision }: { accountId: string | nu
     <div className="border-hairline border-b px-4 py-3">
       <h2 className="text-base font-bold text-ink">停止が届く送信経路</h2>
       <p className="mt-0.5 text-xs text-ink-faint">緊急停止が実際に届く経路と、対象外の経路の一覧です。{formatOperationDate(data.evaluatedAt)}時点</p>
-      {data.problems.length > 0 && <p className="mt-2 rounded-control bg-warning-bg px-3 py-2 text-xs font-bold text-warning" role="alert">台帳と実装がずれています: {data.problems.join(' / ')}</p>}
+      {(data.problems ?? []).length > 0 && <p className="mt-2 rounded-control bg-warning-bg px-3 py-2 text-xs font-bold text-warning" role="alert">台帳と実装がずれています: {(data.problems ?? []).join(' / ')}</p>}
     </div>
     <div className="divide-y divide-hairline">
       {groups.map((group) => <div key={group.title} className="px-4 py-3">

@@ -8,7 +8,7 @@
  * - トークンは暗号化して保存し、応答・ログに平文を出さない。
  */
 import { Hono } from 'hono';
-import type { Context } from 'hono';
+import type { Context, MiddlewareHandler } from 'hono';
 import { CredentialEncryptionKeyError, decryptCredential, encryptCredential } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
@@ -53,6 +53,45 @@ const REVIEWS_PAGE_SIZE_MAX = 100;
 
 type ConnectionStatus = 'pending_location' | 'connected' | 'expired' | 'no_permission' | 'disconnected';
 type ReplyStatus = 'unreplied' | 'draft' | 'pending_confirm' | 'replied' | 'published';
+
+/**
+ * Google接続は統括の設定。owner は常に許可し、admin はDB上で
+ * 「全アカウント担当」が明示されている場合だけ許可する。
+ * `can_access_descendant_accounts` は親子階層の範囲を表す別の権限であり、
+ * 統括全体の接続管理可否には使わない。店舗限定の管理者へ接続権限を
+ * 広げないため、行が無い・値が曖昧なら拒否する。
+ */
+async function canManageGoogleConnection(c: Context<Env>): Promise<boolean> {
+  const staff = c.get('staff');
+  if (!staff) return false;
+  if (staff.role === 'owner') return true;
+  if (staff.role !== 'admin' || staff.id === 'env-owner') return false;
+  const row = await dbFor(c.env)
+    .prepare(
+      `SELECT account_scope
+       FROM staff_members
+       WHERE id = ? AND tenant_id = ? AND role = 'admin' AND is_active = 1
+       LIMIT 1`,
+    )
+    .bind(staff.id, staffTenantId(c))
+    .first<{ account_scope: string | null }>();
+  return row?.account_scope === 'all';
+}
+
+async function googlePermissions(c: Context<Env>) {
+  const staff = c.get('staff');
+  return {
+    canManageConnection: await canManageGoogleConnection(c),
+    canPublishReply: staff?.role === 'owner' || staff?.role === 'admin',
+  };
+}
+
+const requireConnectionManager: MiddlewareHandler<Env> = async (c, next) => {
+  if (!await canManageGoogleConnection(c)) {
+    return fail(c, 403, 'Googleアカウントの接続には統括の管理者権限が必要です');
+  }
+  return next();
+};
 
 interface StoreContext {
   id: string;
@@ -468,10 +507,11 @@ restaurantGoogle.get('/api/restaurant-test/google/connection', async (c) => {
     writeEnabled: writeEnabled(c.env),
     oauthConfigured: Boolean(oauthClient(c)),
     aiAvailable: Boolean(c.env.AI),
+    permissions: await googlePermissions(c),
   });
 });
 
-restaurantGoogle.post('/api/restaurant-test/google/connect/start', requireRole('owner'), async (c) => {
+restaurantGoogle.post('/api/restaurant-test/google/connect/start', requireConnectionManager, async (c) => {
   const client = oauthClient(c);
   if (!client) return fail(c, 503, 'Google接続の設定（OAuthクライアント）がこの環境にありません', { code: 'oauth_not_configured' });
   const store = await ensureStoreForGoogle(c);
@@ -511,10 +551,15 @@ restaurantGoogle.post('/api/restaurant-test/google/connect/start', requireRole('
 });
 
 /**
- * Googleからの戻り。管理画面のセッションCookie（同一サイトの最上位GET）と、
- * 認可開始時に置いたstate Cookie／DBの state の両方が一致したときだけ保存する。
+ * Googleからの戻り。DBのstateを管理画面のログイン担当者へ結び付け、
+ * 1回使い切り・10分失効で検証してから保存する。
+ *
+ * 管理画面（pages.dev）からWorker（workers.dev）への認可開始はクロスサイト通信に
+ * なるため、ブラウザのCookie制限によってstate Cookieが保存されない場合がある。
+ * Cookieが届いた場合は追加検査として一致を必須にする一方、届かない場合も
+ * DB上の高エントロピーstate・担当者・期限・未使用の全条件が一致すれば続行する。
  */
-restaurantGoogle.get('/api/restaurant-test/google/oauth/callback', requireRole('owner'), async (c) => {
+restaurantGoogle.get('/api/restaurant-test/google/oauth/callback', requireConnectionManager, async (c) => {
   c.header('Set-Cookie', stateCookie('', 0));
   const state = c.req.query('state') ?? '';
   const code = c.req.query('code') ?? '';
@@ -527,13 +572,13 @@ restaurantGoogle.get('/api/restaurant-test/google/oauth/callback', requireRole('
     : null;
   const lineAccountId = stateRow?.line_account_id ?? null;
 
-  if (!stateRow || !cookieState || cookieState !== state || stateRow.used_at || Date.parse(stateRow.expires_at) < Date.now()) {
+  if (!stateRow || (cookieState !== null && cookieState !== state) || stateRow.used_at || Date.parse(stateRow.expires_at) < Date.now()) {
     return c.redirect(adminReturnUrl(c, lineAccountId, 'error:invalid_state'));
   }
-  await dbFor(c.env, stateRow.store_id).prepare('UPDATE rt_google_oauth_states SET used_at = ? WHERE state = ?').bind(nowIso(), state).run();
   if (stateRow.staff_id !== c.get('staff')!.id) {
     return c.redirect(adminReturnUrl(c, lineAccountId, 'error:invalid_state'));
   }
+  await dbFor(c.env, stateRow.store_id).prepare('UPDATE rt_google_oauth_states SET used_at = ? WHERE state = ?').bind(nowIso(), state).run();
   if (c.req.query('error') || !code) {
     return c.redirect(adminReturnUrl(c, lineAccountId, 'error:denied'));
   }
@@ -645,7 +690,7 @@ restaurantGoogle.get('/api/restaurant-test/google/oauth/callback', requireRole('
   }
 });
 
-restaurantGoogle.post('/api/restaurant-test/google/connect/select-location', requireRole('owner'), async (c) => {
+restaurantGoogle.post('/api/restaurant-test/google/connect/select-location', requireConnectionManager, async (c) => {
   const store = await storeFor(c);
   if (!store) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
   const connection = await connectionFor(c, store.id);
@@ -671,7 +716,7 @@ restaurantGoogle.post('/api/restaurant-test/google/connect/select-location', req
   return c.json({ success: true, connection: publicConnection(await connectionFor(c, store.id)) });
 });
 
-restaurantGoogle.post('/api/restaurant-test/google/disconnect', requireRole('owner'), async (c) => {
+restaurantGoogle.post('/api/restaurant-test/google/disconnect', requireConnectionManager, async (c) => {
   const store = await storeFor(c);
   if (!store) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
   const body = await c.req.json<{ confirmed?: boolean }>().catch(() => ({}) as { confirmed?: boolean });

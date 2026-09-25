@@ -7,6 +7,7 @@ import Button from '@/components/shared/button'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
+import FileDropzone, { AttachmentRow } from '@/components/shared/file-drop'
 import ListState from '@/components/shared/list-state'
 import SelectField from '@/components/shared/select-field'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
@@ -67,6 +68,12 @@ export function parseUidCsv(text: string) {
 
 /** 対応表の1ページの行数。口側の既定とそろえる。 */
 const ITEM_PAGE_SIZE = 20
+
+/** 選んだ対応表の大きさを行に出すだけの短い表記。 */
+function formatMappingBytes(bytes: number): string {
+  if (bytes >= 1024 * 1024) return `${Math.round(bytes / (1024 * 1024) * 10) / 10}MB`
+  return `${Math.max(1, Math.round(bytes / 1024))}KB`
+}
 
 const ITEM_CLASSIFICATIONS = ['auto', 'review', 'unmatched', 'conflict'] as const
 type ItemClassification = (typeof ITEM_CLASSIFICATIONS)[number]
@@ -250,6 +257,23 @@ export default function AccountMigration() {
   }, [loadDetail])
 
   useEffect(() => { void load() }, [load])
+
+  /*
+    対応表CSVの受け口。選ぶ・落とすのどちらもここへ来る。
+    受け付ける種類（accept）・読み方・読み飛ばしの文は変えない。
+  */
+  const onUidFile = async (files: File[]) => {
+    const selected = files[0] ?? null
+    setFile(selected)
+    if (!selected) { setMappings([]); return }
+    const text = await selected.text()
+    const parsed = parseUidCsv(text)
+    setMappings(parsed)
+    const dataLines = Math.max(text.replace(/^\uFEFF/, '').split(/\r?\n/).filter((line) => line.trim()).length - 1, 0)
+    setMessage(dataLines > parsed.length
+      ? `対応表のうち ${dataLines - parsed.length} 行は読み取れなかったため除いています。列の数と引用符を確認してください。`
+      : null)
+  }
 
   const createDryRun = async () => {
     if (!file || mappings.length === 0 || !fromAccountId || !toAccountId || !purpose.trim()) {
@@ -478,7 +502,7 @@ export default function AccountMigration() {
         実行前後の判断を誤らせる。
       */}
       {(!active || ['dry_run', 'review', 'ready'].includes(active.status)) && (
-        <div className="bg-success-bg text-success mb-4 rounded-control px-4 py-3 text-sm font-medium">本移行まで、既存ユーザー・配信・シナリオには影響しません。</div>
+        <div className="bg-info-bg text-ink-secondary mb-4 rounded-control px-4 py-3 text-xs">本移行まで、既存ユーザー・配信・シナリオには影響しません。</div>
       )}
       {/*
         #984 LAY-13: 段組みと寸法をそろえる。
@@ -507,20 +531,28 @@ export default function AccountMigration() {
           {/* 共通の入力欄（高さ40px・タッチ端末は44pxと16px文字を部品側が持つ）。 */}
           <TextField value={purpose} onChange={(event) => setPurpose(event.target.value)} />
         </label>
-        <div className="mt-4 flex flex-wrap items-center gap-3">
-          <label className="border-hairline rounded-control cursor-pointer border px-4 py-2 text-sm font-semibold">CSVをアップロード<input type="file" accept=".csv,text/csv" className="sr-only" onChange={async (event) => {
-            const selected = event.target.files?.[0] ?? null
-            setFile(selected)
-            if (!selected) { setMappings([]); return }
-            const text = await selected.text()
-            const parsed = parseUidCsv(text)
-            setMappings(parsed)
-            const dataLines = Math.max(text.replace(/^\uFEFF/, '').split(/\r?\n/).filter((line) => line.trim()).length - 1, 0)
-            setMessage(dataLines > parsed.length
-              ? `対応表のうち ${dataLines - parsed.length} 行は読み取れなかったため除いています。列の数と引用符を確認してください。`
-              : null)
-          }} /></label>
-          <span className="text-ink-secondary text-sm">{file ? `${file.name}（${mappings.length.toLocaleString()}行）` : 'ファイルは未選択です'}</span>
+        {/*
+          テスト移行は1回のAPI呼び出しで、途中の割合を測れない。
+          実測できない進みは出さない（Progress は足さない）。
+        */}
+        <FileDropzone
+          title="対応表のCSVをここに置く"
+          hint="old_uid・new_uid 列のCSVを選びます"
+          accept=".csv,text/csv"
+          chooseLabel="CSVをアップロード"
+          onFiles={(files) => void onUidFile(files)}
+          className="mt-4"
+        />
+        <div className="mt-2">
+          {file ? (
+            <AttachmentRow
+              name={file.name}
+              meta={`${mappings.length.toLocaleString()}行・${formatMappingBytes(file.size)}`}
+              onRemove={() => { setFile(null); setMappings([]); setMessage(null) }}
+            />
+          ) : (
+            <p className="text-ink-secondary text-sm">ファイルは未選択です</p>
+          )}
         </div>
         <div className="mt-4">
           <Button variant="primary" disabled={busy} onClick={() => void createDryRun()}>{busy ? '確認中…' : 'テスト移行を実行'}</Button>

@@ -4,9 +4,10 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Suspense, useCallback, useEffect, useState } from 'react'
 import type { LineAccount } from '@line-crm/shared'
-import { api } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import TargetMissing from '@/components/shared/target-missing'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import StatusBadge from '@/components/shared/status-badge'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -42,6 +43,8 @@ function AccountDetail() {
   const [account, setAccount] = useState<AccountDetailView | null>(null)
   const [all, setAll] = useState<LineAccount[]>([])
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
+  const [missing, setMissing] = useState(false)
   const [stopTarget, setStopTarget] = useState<LineAccount | null>(null)
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState('')
@@ -49,13 +52,19 @@ function AccountDetail() {
   const load = useCallback(async () => {
     if (!id) return
     setStatus('loading')
+    setMissing(false)
     try {
       const [one, list] = await Promise.all([api.lineAccounts.get(id), api.lineAccounts.list()])
       if (!one.success) { setStatus('error'); return }
       setAccount(one.data)
       if (list.success) setAll(list.data)
       setStatus('ready')
-    } catch {
+    } catch (caught) {
+      if (caught instanceof ApiError && caught.status === 404) {
+        setMissing(true)
+        setStatus('ready')
+        return
+      }
       setStatus('error')
     }
   }, [id])
@@ -86,20 +95,34 @@ function AccountDetail() {
   */
   if (!id) {
     return (
-      <ListState
-        kind="empty"
+      <TargetMissing
+        kind="unspecified"
         title="見るアカウントが指定されていません"
         description="LINEアカウントの一覧から、見るアカウントを選び直してください。"
-        action={<Button href="/accounts">LINEアカウントの一覧へ戻る</Button>}
+        backHref="/accounts"
+        backLabel="LINEアカウントの一覧へ戻る"
       />
     )
   }
   if (status === 'loading') return <ListState kind="loading" />
+  if (missing || (status === 'ready' && !account)) {
+    return (
+      <TargetMissing
+        kind="not-found"
+        title="このアカウントは見つかりません"
+        description="削除されたか、別の記録です。一覧から選び直してください。"
+        backHref="/accounts"
+        backLabel="LINEアカウントの一覧へ戻る"
+      />
+    )
+  }
   if (status === 'error' || !account) {
     return (
-      <ListState
+      <TargetMissing
         kind="error"
-        action={<Button type="button" onClick={() => void load()}>再読み込み</Button>}
+        title="アカウントを読み込めませんでした"
+        description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+        onRetry={() => void load()}
       />
     )
   }
@@ -224,10 +247,10 @@ function AccountDetail() {
                 <StatusBadge tone={webhook.tone}>{webhook.label}</StatusBadge>
               </div>
               <dl className="mt-4 space-y-3">
-                <InlineRow label="LINE側に登録したURL" value={webhook.label === '一致・利用中' ? 'このシステムと一致' : webhook.label} tone={webhook.tone === 'success' ? 'success' : 'muted'} />
-                <InlineRow label="Webhookの利用" value={account.webhook?.active === null || account.webhook?.active === undefined ? '確かめていません' : account.webhook.active ? 'オン' : 'オフ'} tone={account.webhook?.active ? 'success' : 'muted'} />
-                <InlineRow label="最後のテスト" value={account.connection?.lastTestAt ? `${formatMonthDayTime(account.connection.lastTestAt)} に${account.connection.lastTestStatus === 'succeeded' ? '成功' : '失敗'}` : '未取得'} tone={account.connection?.lastTestStatus === 'succeeded' ? 'success' : 'muted'} />
-                <InlineRow label="最後の受信" value={account.connection?.lastReceivedAt ? formatMonthDayTime(account.connection.lastReceivedAt) : '未取得'} />
+                <StackedRow label="LINE側に登録したURL" value={webhook.label === '一致・利用中' ? 'このシステムと一致' : webhook.label} tone={webhook.tone === 'success' ? 'success' : 'muted'} />
+                <StackedRow label="Webhookの利用" value={account.webhook?.active === null || account.webhook?.active === undefined ? '確かめていません' : account.webhook.active ? 'オン' : 'オフ'} tone={account.webhook?.active ? 'success' : 'muted'} />
+                <StackedRow label="最後のテスト" value={account.connection?.lastTestAt ? `${formatMonthDayTime(account.connection.lastTestAt)} に${account.connection.lastTestStatus === 'succeeded' ? '成功' : '失敗'}` : '未取得'} tone={account.connection?.lastTestStatus === 'succeeded' ? 'success' : 'muted'} />
+                <StackedRow label="最後の受信" value={account.connection?.lastReceivedAt ? formatMonthDayTime(account.connection.lastReceivedAt) : '未取得'} />
               </dl>
               <p className="text-ink-secondary mt-3 break-all text-xs">{account.webhook?.actualUrl ?? '—'}</p>
               <Button href={`/accounts/detail?id=${account.id}&tab=connection`} className="mt-4">
@@ -370,6 +393,33 @@ function InlineRow({
         : tone === 'muted'
           ? 'text-ink-secondary min-w-0 break-words text-right text-sm'
           : 'text-ink min-w-0 break-words text-right text-sm'}>
+        {value}
+      </dd>
+    </div>
+  )
+}
+
+/*
+ * 狭い脇カード用の縦並びの行。札を上に、値を下の行頭に置くので、
+ * 短い値が1〜2文字ずつ折れない（全ルート監査、2026-09-25）。
+ */
+function StackedRow({
+  label,
+  value,
+  tone = 'default',
+}: {
+  label: string
+  value: string
+  tone?: 'default' | 'success' | 'muted'
+}) {
+  return (
+    <div className="min-w-0 border-b border-hairline py-1 last:border-b-0">
+      <dt className="text-ink-faint text-xs">{label}</dt>
+      <dd className={tone === 'success'
+        ? 'text-success mt-0.5 min-w-0 text-sm font-medium'
+        : tone === 'muted'
+          ? 'text-ink-secondary mt-0.5 min-w-0 text-sm'
+          : 'text-ink mt-0.5 min-w-0 text-sm'}>
         {value}
       </dd>
     </div>

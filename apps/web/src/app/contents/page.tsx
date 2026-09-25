@@ -12,6 +12,8 @@ import { api, ApiError, type MediaQuota } from '@/lib/api'
 import FeatureGate from '@/components/feature-gate'
 import Button from '@/components/shared/button'
 import IconButton from '@/components/shared/icon-button'
+import ActionMenu from '@/components/shared/action-menu'
+import { MoreAction } from '@/components/shared/row-actions'
 import { formatMediaSize } from './media-usage-display'
 import Dialog from '@/components/shared/dialog'
 import {
@@ -145,6 +147,8 @@ function MediaLibraryInner() {
   const [folderName, setFolderName] = useState('')
   const [savingFolder, setSavingFolder] = useState(false)
   const [uploadOpen, setUploadOpen] = useState(false)
+  /* ★V7: 札の操作を並べない。「使用箇所＋ダウンロード＋…」の1行に収め、削除の印は残す。取得は読取権限でも使うので「…」に隠さない。 */
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
 
   const [kinds, setKinds] = useState<Set<MediaItem['kind']>>(
     () => new Set(KINDS.map((k) => k.key)),
@@ -1129,48 +1133,44 @@ function MediaLibraryInner() {
                   >
                     使用箇所
                   </button>
-                  {canManageMedia && !item.archivedAt ? (
-                  <button
-                    onClick={() => { setRenameError(''); setRenaming({ id: item.id, value: item.filename }) }}
-                    title="名前を変える"
-                    aria-label={`${item.filename}の名前を変える`}
-                    className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-2.5 py-1 text-xs whitespace-nowrap"
-                  >
-                    編集
-                  </button>
-                  ) : null}
+                  {/*
+                    取得は読取権限でも使う操作なので「…」に隠さず、見えるボタンで出す。
+                    読み上げ名は「＜ファイル名＞をダウンロード」のまま保つ。
+                  */}
                   <button
                     onClick={() => void downloadItem(item)}
                     disabled={downloadingIds.has(item.id)}
-                    title="ダウンロード"
+                    title={downloadingIds.has(item.id) ? 'ファイルを取り出しています' : 'ダウンロード'}
                     aria-label={`${item.filename}をダウンロード`}
-                    className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-2.5 py-1 text-xs whitespace-nowrap disabled:opacity-50"
+                    className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-2.5 py-1 text-xs whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {downloadingIds.has(item.id) ? '取得中…' : 'ダウンロード'}
                   </button>
+                  {canManageMedia ? (
+                  <span className="relative inline-flex items-center">
+                    <MoreAction
+                      label={`${item.filename}のその他操作`}
+                      aria-expanded={openMenuId === item.id}
+                      onClick={() => setOpenMenuId((current) => (current === item.id ? null : item.id))}
+                    />
+                    <ActionMenu
+                      open={openMenuId === item.id}
+                      ariaLabel={`${item.filename}の操作`}
+                      onClose={() => setOpenMenuId(null)}
+                      items={[
+                        ...(!item.archivedAt ? [{ id: 'rename', label: '編集', onSelect: () => { setRenameError(''); setRenaming({ id: item.id, value: item.filename }) } }] : []),
+                        { id: 'archive', label: item.archivedAt ? '一覧へ戻す' : 'アーカイブ', onSelect: () => { setArchiveError(''); setArchiveReason(''); setArchiveTarget({ item, mode: item.archivedAt ? 'restore' : 'archive' }) } },
+                      ]}
+                    />
+                  </span>
+                  ) : null}
                   {/*
                     退避は消去ではない。使用中でも止めないが、理由を必ず聞く。
                     退避済みは編集・削除の押し口を出さず、戻す口だけを残す。
+                    ★V7：札の操作は「使用箇所＋ダウンロード＋…」の1行。編集・
+                    アーカイブは「…」の中、削除はゴミ箱の印のまま残す。
+                    権限のない人には「…」自体を出さない（空の飾りにしない）。
                   */}
-                  {/*
-                    ★V7：札の操作が小さいボタン3つと大きいボタン2つで段違いに積まれていた。
-                    同じ大きさの小さいボタンにそろえ、削除は他の一覧と同じゴミ箱の印にする。
-                  */}
-                  {canManageMedia ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setArchiveError('')
-                      setArchiveReason('')
-                      setArchiveTarget({ item, mode: item.archivedAt ? 'restore' : 'archive' })
-                    }}
-                    title={item.archivedAt ? '一覧へ戻す' : '一覧と新規選択から外す'}
-                    aria-label={item.archivedAt ? `${item.filename}を一覧へ戻す` : `${item.filename}をアーカイブ`}
-                    className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-2.5 py-1 text-xs whitespace-nowrap"
-                  >
-                    {item.archivedAt ? '一覧へ戻す' : 'アーカイブ'}
-                  </button>
-                  ) : null}
                   {canManageMedia && !item.archivedAt ? (
                   <IconButton
                     onClick={() => void openDelete(item)}

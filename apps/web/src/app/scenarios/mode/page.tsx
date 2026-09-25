@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import type { DeliveryMode, Folder, Scenario } from '@line-crm/shared'
 import { ApiError, api } from '@/lib/api'
 import SelectField from '@/components/shared/select-field'
+import Button from '@/components/shared/button'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
@@ -43,6 +44,11 @@ function ScenarioModeContent() {
     id ? 'loading' : 'ready',
   )
   const [saving, setSaving] = useState<DeliveryMode | null>(null)
+  /*
+   * ★V7: 2択はカードごとの緑ボタンで即確定させない。カード全体を選ぶ
+   * ラジオ選択にし、確定は画面1つの主ボタンにまとめる。
+   */
+  const [selectedMode, setSelectedMode] = useState<DeliveryMode | null>(null)
   const [error, setError] = useState('')
   const [name, setName] = useState('')
   const [folders, setFolders] = useState<Folder[]>([])
@@ -361,9 +367,13 @@ function ScenarioModeContent() {
         </div>
       </div>
 
-      <div data-design="Choices" className="grid gap-4 xl:grid-cols-2">
+      <fieldset data-design="Choices">
+        <legend className="sr-only">配信方式</legend>
+        <div className="grid gap-4 xl:grid-cols-2">
         <ModeCard
           mode="absolute_time"
+          selected={selectedMode === 'absolute_time'}
+          onSelect={setSelectedMode}
           title="時刻で指定"
           lead="配信時刻がそろうため、開封されやすい時間帯に寄せられます。"
           body="配信のタイミングを「購読開始から〇日後の〇時」と指定できます。メルマガのような決まった時間の定期配信ができます。"
@@ -375,10 +385,7 @@ function ScenarioModeContent() {
             { who: '友だち B', start: '4/1 14:00 に購読開始', first: '4/1 15:00', second: '4/2 20:00' },
           ]}
           heads={['当日 15:00', '翌日 20:00']}
-          saving={saving}
           disabled={(Boolean(id) && !scenario) || detailsSaving}
-          onChoose={choose}
-          cta="時刻で作成"
         />
         <ModeCard
           mode="elapsed"
@@ -392,26 +399,35 @@ function ScenarioModeContent() {
             { who: '友だち A', start: '4/1 12:00 に購読開始', first: '4/1 15:00', second: '4/2 20:00', gaps: ['+3時間', '+1日と8時間'] },
             { who: '友だち B', start: '4/1 14:00 に購読開始', first: '4/1 17:00', second: '4/2 22:00', gaps: ['+3時間', '+1日と8時間'] },
           ]}
-          saving={saving}
+          selected={selectedMode === 'elapsed'}
+          onSelect={setSelectedMode}
           disabled={(Boolean(id) && !scenario) || detailsSaving}
-          onChoose={choose}
-          cta="経過時間で作成"
         />
-      </div>
+        </div>
+      </fieldset>
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <p className="text-ink-faint text-xs">
-          ⓘ どちらを選んでも、作成後にステップの追加・並べ替えができます。
+          どちらを選んでも、作成後にステップの追加・並べ替えができます。
           {/* 1通だけ試しに送る受け口が無いので、テスト送信とは書かない。 */}
         </p>
-        <button
-          type="button"
-          disabled={(Boolean(id) && !scenario) || saving !== null || detailsSaving}
-          onClick={() => void continueAsDraft()}
-          className="text-action ml-auto text-sm font-medium hover:underline disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          あとで決める（下書きとして保存）
-        </button>
+        <div className="ml-auto flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            disabled={(Boolean(id) && !scenario) || saving !== null || detailsSaving}
+            onClick={() => void continueAsDraft()}
+            className="text-action text-sm font-medium hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            あとで決める（下書きとして保存）
+          </button>
+          <Button
+            variant="primary"
+            disabled={!selectedMode || (Boolean(id) && !scenario) || saving !== null || detailsSaving}
+            onClick={() => { if (selectedMode) void choose(selectedMode) }}
+          >
+            {saving !== null ? '作成中…' : id ? 'この方式で保存' : 'この方式で作成'}
+          </Button>
+        </div>
       </div>
     </div>
   )
@@ -439,6 +455,8 @@ function scenarioModeError(cause: unknown): string {
 
 function ModeCard({
   mode,
+  selected,
+  onSelect,
   title,
   recommended,
   lead,
@@ -448,12 +466,11 @@ function ModeCard({
   heads,
   result,
   note,
-  cta,
-  saving,
   disabled,
-  onChoose,
 }: {
   mode: DeliveryMode
+  selected: boolean
+  onSelect: (mode: DeliveryMode) => void
   title: string
   recommended?: boolean
   lead: string
@@ -463,15 +480,21 @@ function ModeCard({
   heads?: string[]
   result: string
   note: string
-  cta: string
-  saving: DeliveryMode | null
   disabled: boolean
-  onChoose: (mode: DeliveryMode) => void
 }) {
   return (
-    // カードの高さはそろえるが、操作は説明の直後に置く。Pencilでは内容の短い
-    // 「時刻で指定」の操作を下端まで押し下げず、読んだ流れで選べる。
-    <section className="bg-canvas rounded-card border-hairline flex h-full flex-col border p-5">
+    // ★V7: カード全体を選ぶラジオ選択。本物の input[type=radio] を使い、
+    // 選択中は枠と淡い面で示す（色だけに頼らない）。確定は画面下の主ボタン。
+    <label className={`rounded-card flex h-full cursor-pointer flex-col border bg-canvas p-5 ${selected ? 'border-accent bg-accent-soft' : 'border-hairline'} ${disabled ? 'cursor-not-allowed opacity-60' : ''}`}>
+      <input
+        type="radio"
+        name="delivery-mode"
+        value={mode}
+        checked={selected}
+        disabled={disabled}
+        onChange={() => onSelect(mode)}
+        className="sr-only"
+      />
       <div className="flex items-start gap-3">
         {/* 絵文字は使わない。端末やフォントで見た目が変わるうえ、
             色が乗って見出しより目立つ。線の記号にする。 */}
@@ -544,15 +567,7 @@ function ModeCard({
         <p className={`text-ink-faint text-[11px] leading-relaxed ${mode === 'absolute_time' ? 'mt-0' : 'mt-1'}`}>※ {note}</p>
       </div>
 
-      <button
-        type="button"
-        onClick={() => onChoose(mode)}
-        disabled={disabled || saving !== null}
-        className="bg-accent-deep hover:brightness-92 text-on-accent rounded-control mt-0 w-full px-4 py-3 text-sm font-bold transition-colors disabled:opacity-50"
-      >
-        {saving === mode ? '作成中…' : `${cta} →`}
-      </button>
-    </section>
+    </label>
   )
 }
 

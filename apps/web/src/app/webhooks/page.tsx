@@ -95,7 +95,7 @@ const MERGED_TABS = [
 function WebhookSamples() {
   return (
     <div>
-      <p className="bg-accent-soft text-ink-secondary rounded-card mb-4 px-4 py-3 text-sm leading-6">
+      <p className="bg-info-bg text-ink-secondary mb-4 rounded-control px-4 py-3 text-xs">
         よくあるつなぎ方の見本です。使いたい見本を選ぶと、作成画面がその内容で開きます。
       </p>
       <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-2">

@@ -20,6 +20,7 @@ import { canOperateBookings } from '../../lib/booking-permissions'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import SelectField from '@/components/shared/select-field'
+import TargetMissing from '@/components/shared/target-missing'
 import { usePageTitle } from '@/components/shell/page-chrome'
 
 type BookingAction = 'approve' | 'reject' | 'cancel' | 'complete' | 'no_show'
@@ -287,6 +288,8 @@ function BookingDetailInner() {
   const [decideTarget, setDecideTarget] = useState<BookingAction | null>(null)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
+  const [bookingMissing, setBookingMissing] = useState(false)
   /**
    * 表示・操作に使うのは、URLの予約IDと選択中アカウントに一致する
    * 詳細だけ。鍵が合わない（切替直後・古い応答）ものは null として
@@ -365,17 +368,22 @@ function BookingDetailInner() {
     }
     setLoading(true)
     setError('')
+    setBookingMissing(false)
     try {
       const res = await bookingApi.getBooking(accountId, bookingId)
       // あとから始めた取得が先に返っている場合、この応答は古い。
       // 遅い応答で今の対象を上書きしない（世代の確認）。
       if (loadGeneration.current !== generation) return
       setDetailState({ key: { accountId, bookingId }, booking: res.booking })
-    } catch {
+    } catch (caught) {
       if (loadGeneration.current !== generation) return
       // 失敗時は前の予約を「今の予約」として残さない。
       setDetailState(null)
-      setError('読み込みに失敗しました。もう一度読み込んでください。')
+      if (caught instanceof ApiError && caught.status === 404) {
+        setBookingMissing(true)
+      } else {
+        setError('読み込みに失敗しました。もう一度読み込んでください。')
+      }
     } finally {
       if (loadGeneration.current === generation) setLoading(false)
     }
@@ -718,14 +726,36 @@ function BookingDetailInner() {
 
   if (!id) {
     return (
-      <div>
-        <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
-          予約が指定されていません。
-          <Link href="/booking/bookings" className="text-action ml-1 hover:underline">
-            一覧へ戻る
-          </Link>
-        </p>
-      </div>
+      <TargetMissing
+        kind="unspecified"
+        title="見る予約が指定されていません"
+        description="一覧から、見たい予約を選び直してください。"
+        backHref="/booking/bookings"
+        backLabel="予約一覧へ戻る"
+      />
+    )
+  }
+
+  if (!loading && (bookingMissing || (!error && !detail))) {
+    return (
+      <TargetMissing
+        kind="not-found"
+        title="この予約は見つかりません"
+        description="取り消されたか、別の記録です。一覧から選び直してください。"
+        backHref="/booking/bookings"
+        backLabel="予約一覧へ戻る"
+      />
+    )
+  }
+
+  if (!loading && error && !detail) {
+    return (
+      <TargetMissing
+        kind="error"
+        title="予約を読み込めませんでした"
+        description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+        onRetry={() => void load()}
+      />
     )
   }
 
@@ -739,7 +769,7 @@ function BookingDetailInner() {
         <span>予約の詳細</span>
       </nav>
 
-      {error && (
+      {error && detail && (
         <div className="bg-danger-bg border-danger-bg text-danger mb-4 rounded-lg border p-4 text-sm">
           {error}
         </div>
@@ -750,25 +780,10 @@ function BookingDetailInner() {
         </div>
       )}
 
-      {loading ? (
+      {loading || !detail ? (
         <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
           読み込み中...
         </div>
-      ) : !detail ? (
-        // DEEP-18: 取得失敗を「存在しない予約」と混ぜない。失敗時は
-        // 前の予約も出さず、読み直す導線だけを置く。
-        <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
-          {error ? '予約を読み込めませんでした。' : 'この予約は見つかりませんでした。'}
-          {error ? (
-            <button
-              type="button"
-              onClick={() => void load()}
-              className="text-action ml-2 underline"
-            >
-              もう一度読み込む
-            </button>
-          ) : null}
-        </p>
       ) : (
         <div data-design="Body" className="flex flex-col gap-4 xl:flex-row">
           <div data-design="Left" className="min-w-0 flex-1 space-y-4">

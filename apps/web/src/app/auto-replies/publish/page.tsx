@@ -31,13 +31,14 @@ import type {
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
+import TargetMissing from '@/components/shared/target-missing'
 import Select from '@/components/shared/select'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { ApiError, api, type FriendListItem } from '@/lib/api'
 import { canPublish, conflictTone, publishGates, type PublishStage } from './publish-flow'
 import './publish.css'
 
-type LoadState = 'loading' | 'ready' | 'error' | 'denied' | 'missing'
+type LoadState = 'loading' | 'ready' | 'error' | 'denied' | 'missing' | 'not-found'
 type FriendLoadState = 'loading' | 'ready' | 'error'
 
 const PAGE_TITLES: Record<PublishStage, string> = {
@@ -308,7 +309,8 @@ function AutoReplyPublishInner() {
       setLoadState('ready')
       await loadFriends(draftRes.data.settings.lineAccountId)
     } catch (cause) {
-      setLoadState(cause instanceof ApiError && cause.status === 403 ? 'denied' : 'error')
+      if (cause instanceof ApiError && cause.status === 404) setLoadState('not-found')
+      else setLoadState(cause instanceof ApiError && cause.status === 403 ? 'denied' : 'error')
     }
   }, [autoReplyId, loadFriends])
 
@@ -337,9 +339,10 @@ function AutoReplyPublishInner() {
   if (loadState === 'denied') {
     return (
       <ListState
-        kind="error"
+        kind="forbidden"
         title="この自動応答を有効化する権限がありません"
         description="下書きの中身も表示していません。統括または管理者に有効化を依頼してください。"
+        action={<Button href="/auto-replies">自動応答の一覧へ戻る</Button>}
       />
     )
   }
@@ -349,26 +352,33 @@ function AutoReplyPublishInner() {
       一覧へ戻して、公開する下書きを選び直させる。
     */
     return (
-      <ListState
-        kind="empty"
+      <TargetMissing
+        kind="unspecified"
         title="公開する自動応答が指定されていません"
         description="編集画面から「公開」へ進むか、一覧から自動応答を選び直してください。"
-        action={<Button href="/auto-replies">自動応答の一覧へ戻る</Button>}
+        backHref="/auto-replies"
+        backLabel="自動応答の一覧へ戻る"
+      />
+    )
+  }
+  if (loadState === 'not-found' || (!draft && loadState !== 'error')) {
+    return (
+      <TargetMissing
+        kind="not-found"
+        title="この自動応答は見つかりません"
+        description="削除されたか、別の記録です。一覧から選び直してください。"
+        backHref="/auto-replies"
+        backLabel="自動応答の一覧へ戻る"
       />
     )
   }
   if (loadState === 'error' || !draft) {
     return (
-      <ListState
+      <TargetMissing
         kind="error"
         title="下書きを表示できませんでした"
-        description="保存した下書きは消えていません。状態を読み直して、もう一度お試しください。"
-        action={
-          <>
-            <Button onClick={() => void load()}>再読み込み</Button>
-            <Button href="/auto-replies">自動応答の一覧へ戻る</Button>
-          </>
-        }
+        description="保存した下書きは消えていません。通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+        onRetry={() => void load()}
       />
     )
   }

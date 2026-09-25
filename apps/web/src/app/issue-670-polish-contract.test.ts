@@ -36,17 +36,18 @@ const TAG_EDITOR = readFileSync(
 )
 
 describe('#670 15 登録メディアの札の操作5個は同じ寸法', () => {
-  it('compact 1種にそろえ、共通Buttonと混ぜない', () => {
-    // ★V7（#701）：同じ寸法の小ボタン4つ（12px・rounded-control）＋削除は他の一覧と同じゴミ箱の印。
-    // 「同じ寸法にそろえ、大きい共通Buttonを混ぜない」という #670 の狙いはそのまま見張る。
+  it('「使用箇所＋…」の1行に収め、削除はゴミ箱の印のまま残す（★V7 D）', () => {
+    // ★V7 監査D：札にボタン5つは多すぎる。「使用箇所＋…」の1行にまとめ、
+    // 編集・取得・アーカイブは「…」の中へ。#670 の狙い（段違いに積まない）は
+    // 1行化で継ぐ。削除の印（YfTfJ の押し口）は残す。
     const footerStart = CONTENTS.indexOf('mt-auto flex flex-wrap items-center justify-end')
     expect(footerStart).toBeGreaterThan(-1)
     const footer = CONTENTS.slice(footerStart, CONTENTS.indexOf('</div>', footerStart))
-    expect(
-      footer.match(/className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-2\.5 py-1 text-xs whitespace-nowrap[^"]*"/g),
-    ).toHaveLength(4)
+    expect(footer).toContain('使用箇所')
+    expect(footer).toContain('<MoreAction')
+    expect(footer).toContain('<ActionMenu')
     expect(footer).toContain('<IconButton')
-    expect(footer).not.toContain('<Button')
+    expect(footer).toContain('data-qa-open="YfTfJ"')
   })
 })
 

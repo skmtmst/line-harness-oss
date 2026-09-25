@@ -17,6 +17,7 @@ import {
 } from './saved-search-utils'
 import { TextInput } from '@/components/shared/form-controls'
 import Button from '@/components/shared/button'
+import Combobox from '@/components/shared/combobox'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 
 /**
@@ -863,18 +864,15 @@ function OrAxisPicker({
       <span className="text-xs font-semibold text-ink-secondary">{axis.label}</span>
       <div className="flex items-center gap-1.5">
         {axis.input === 'mark' || axis.input === 'scenario' ? (
-          <select
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            disabled={waitingForOptions}
+          <Combobox
             aria-label={`${axis.label}を選ぶ`}
-            className="border-hairline rounded-control bg-canvas text-ink min-w-0 flex-1 border px-2 py-1.5 text-xs disabled:opacity-50"
-          >
-            <option value="">選ぶ</option>
-            {options.map((option) => (
-              <option key={option.id} value={option.id}>{option.name}</option>
-            ))}
-          </select>
+            placeholder="選ぶ"
+            value={draft}
+            onChange={setDraft}
+            disabled={waitingForOptions}
+            options={options.map((option) => ({ value: option.id, label: option.name }))}
+            className="min-w-0 flex-1"
+          />
         ) : axis.input === 'date' ? (
           <input
             type="date"
@@ -934,11 +932,11 @@ function TagPicker({
         同じ行に並べると狭いパネルでタグ名が数文字に切れて読めなかった。
         選んだタグの札は下で複数行に広がり、全文を確認できる。
       */}
-      <select
+      <Combobox
         aria-label="タグ名を選ぶ"
+        placeholder="タグ名を選ぶ"
         value={pick}
-        onChange={(e) => {
-          const id = e.target.value
+        onChange={(id) => {
           if (!id) return
           if (mode === 'include') {
             if (!include.includes(id)) onChange([...include, id], exclude)
@@ -947,15 +945,9 @@ function TagPicker({
           }
           setPick('')
         }}
-        className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm"
-      >
-        <option value="">タグ名を選ぶ</option>
-        {tags.map((t) => (
-          <option key={t.id} value={t.id}>
-            {t.name}
-          </option>
-        ))}
-      </select>
+        options={tags.map((t) => ({ value: t.id, label: t.name }))}
+        className="w-full"
+      />
       <div className="mt-2 flex flex-wrap items-center gap-2">
         <select
           value={mode}

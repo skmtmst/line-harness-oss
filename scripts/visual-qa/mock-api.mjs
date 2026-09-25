@@ -100,6 +100,10 @@ import {
   FRIEND_ADD_RULE_PUBLISH, FRIEND_ADD_RULE_VALIDATE,
   ACCESS_USERS, ACCESS_ROLES, ACCESS_AUDIT_EVENTS,
   GETTING_STARTED, RECIPES, MANUAL_LINKS,
+  TEST_RECIPIENT_LOGIN_USERS,
+  HQ_BANNER_PRESETS, HQ_BANNER_USAGE, HQ_BANNER_STATS, HQ_BANNER_PROJECTS, HQ_BANNER_IMAGES,
+  NEN_RANK_SETTINGS, NEN_MEMBER_LIST, NEN_PET_LIST, NEN_HEALTH_LIST,
+  FRIEND_ADD_RUN_DETAIL, OPERATION_SEND_PATHS, REMINDER_REGISTRANTS,
 } from './fixtures.mjs'
 
 if (process.env.NODE_ENV === 'production') {
@@ -162,6 +166,240 @@ const ACCOUNT = {
  * 落ちるため、混ぜられない）。
  */
 const EMPTY_PAGE = { items: [], total: 0, page: 1, limit: 20 }
+
+/**
+ * 運営コンソール（`/ops/*`）の見本データ。形は Worker の
+ * `apps/worker/src/routes/ops.ts`・`ops-dashboard.ts`・`ops-support.ts`・
+ * `ops-knowledge.ts`・`ops-announcements.ts` と `apps/web/src/lib/api.ts`
+ * の `Ops*` 型に合わせる。名前はすべて作り物で、実在の個人情報は入れない。
+ * 日時は固定（撮るたびに同じ絵になる）。
+ */
+const OPS_ME = {
+  id: 'visual-qa-ops',
+  name: '検証 太郎',
+  email: null,
+  readOnly: false,
+  totpEnabled: true,
+  lineLinked: false,
+  legacy: false,
+  impersonation: null,
+}
+const OPS_TENANTS = [
+  {
+    id: 'visual-tenant-1', name: '検証商事', status: 'active', featurePacks: [],
+    plan_key: 'standard', plan_status: 'active', trial_ends_at: null,
+    current_period_ends_at: '2026-10-01T00:00:00+09:00',
+    created_at: '2026-04-01T10:00:00+09:00', updated_at: '2026-09-01T10:00:00+09:00',
+    account_count: 2, staff_count: 5, last_login_at: '2026-09-07T08:00:00+09:00',
+  },
+  {
+    id: 'visual-tenant-2', name: '見本物産', status: 'active', featurePacks: [],
+    plan_key: null, plan_status: 'trialing', trial_ends_at: '2026-09-14T00:00:00+09:00',
+    current_period_ends_at: null,
+    created_at: '2026-08-20T10:00:00+09:00', updated_at: '2026-09-02T10:00:00+09:00',
+    account_count: 1, staff_count: 2, last_login_at: '2026-09-06T10:00:00+09:00',
+  },
+  {
+    id: 'visual-tenant-3', name: 'サンプル商店', status: 'suspended', featurePacks: [],
+    plan_key: 'light', plan_status: 'past_due', trial_ends_at: null,
+    current_period_ends_at: '2026-09-01T00:00:00+09:00',
+    created_at: '2026-02-01T10:00:00+09:00', updated_at: '2026-08-20T10:00:00+09:00',
+    account_count: 1, staff_count: 1, last_login_at: '2026-08-10T10:00:00+09:00',
+  },
+]
+const OPS_TENANT_SUMMARY = { active: 1, trialing: 1, suspended: 1, pastDue: 1 }
+const OPS_AUDIT = [
+  {
+    id: 'visual-audit-1', staff_id: 'visual-qa-ops', staff_name: '検証 太郎',
+    tenant_id: 'visual-tenant-1', tenant_name: '検証商事',
+    action: 'tenant.status.change', reason: '検証用の記録', detail: '{"from":"suspended","to":"active"}',
+    ip: null, visible_to_tenant: 1, created_at: '2026-09-05T10:00:00+09:00',
+  },
+  {
+    id: 'visual-audit-2', staff_id: 'visual-qa-ops', staff_name: '検証 太郎',
+    tenant_id: null, tenant_name: null,
+    action: 'ticket.view', reason: null, detail: '{"ticketNo":1}',
+    ip: null, visible_to_tenant: 0, created_at: '2026-09-06T10:00:00+09:00',
+  },
+]
+const OPS_MEMBERS = [
+  {
+    staffId: 'visual-qa-ops', name: '検証 太郎', email: null, isActive: true,
+    totpEnabled: true, lineLinked: false, inviteStatus: 'accepted', activationState: 'active',
+    invitedAt: '2026-04-01T10:00:00+09:00', approvedBy: null,
+    lastLoginAt: '2026-09-07T08:00:00+09:00', createdAt: '2026-04-01T10:00:00+09:00',
+  },
+  {
+    staffId: 'visual-ops-invited', name: '見本 花子', email: null, isActive: true,
+    totpEnabled: false, lineLinked: false, inviteStatus: 'sent', activationState: 'invited',
+    invitedAt: '2026-09-06T10:00:00+09:00', approvedBy: '検証 太郎',
+    lastLoginAt: null, createdAt: '2026-09-06T10:00:00+09:00',
+  },
+]
+const OPS_MEMBER_SUMMARY = {
+  members: 1, invited: 1, awaitingTotp: 0, totpEnabled: 1,
+  impersonationsThisMonth: 0, writeImpersonationsThisMonth: 0, piiRevealsThisMonth: 0,
+}
+const OPS_DASHBOARD = {
+  period: 'month',
+  periodLabel: '2026年9月',
+  pricing: 'list_price',
+  plans: [
+    { key: 'light', label: 'ライト', monthlyYen: 9800 },
+    { key: 'standard', label: 'スタンダード', monthlyYen: 29800 },
+    { key: 'pro', label: 'プロ', monthlyYen: 59800 },
+  ],
+  kpis: {
+    mrr: 129200, mrrDelta: 9800, active: 4,
+    byPlan: { light: 1, standard: 2, pro: 1 },
+    trialing: 2, newInPeriod: 1, newTrialsInPeriod: 1,
+    churnInPeriod: 0, churnRate: 0,
+  },
+  revenueByMonth: [
+    { month: '2026-04', label: '4月', yen: 99400, current: false },
+    { month: '2026-05', label: '5月', yen: 99400, current: false },
+    { month: '2026-06', label: '6月', yen: 109200, current: false },
+    { month: '2026-07', label: '7月', yen: 119400, current: false },
+    { month: '2026-08', label: '8月', yen: 119400, current: false },
+    { month: '2026-09', label: '9月', yen: 129200, current: true },
+  ],
+  planShare: {
+    total: 6,
+    rows: [
+      { key: 'light', label: 'ライト', count: 1, percent: 17 },
+      { key: 'standard', label: 'スタンダード', count: 2, percent: 33 },
+      { key: 'pro', label: 'プロ', count: 1, percent: 17 },
+      { key: 'trial', label: 'トライアル', count: 2, percent: 33 },
+    ],
+  },
+  alerts: { pastDue: 1, trialEndingSoon: 1, lineTokenExpiring: 0, unansweredTickets: 2 },
+  tickets: { newCount: 2, inProgressCount: 1, avgFirstReplyMinutes: 95, closedInPeriod: 5 },
+  lineRegistration: { registered: 8, total: 10, unregisteredCount: 2 },
+  usage: [
+    {
+      tenantId: 'visual-tenant-1', tenantName: '検証商事', planKey: 'standard', planLabel: 'スタンダード',
+      messages: 12000, bannerUnits: 3, mediaBytes: 800000000,
+      limits: { messages: 30000, images: 10, mediaBytes: 1000000000 }, usageRate: 80,
+    },
+    {
+      tenantId: 'visual-tenant-3', tenantName: 'サンプル商店', planKey: 'light', planLabel: 'ライト',
+      messages: 4500, bannerUnits: 0, mediaBytes: 100000000,
+      limits: { messages: 5000, images: 3, mediaBytes: 300000000 }, usageRate: 90,
+    },
+  ],
+  generatedAt: '2026-09-07T06:00:00+09:00',
+}
+const OPS_LINE_UNREGISTERED = {
+  registered: 8,
+  total: 10,
+  people: [
+    { staffId: 'visual-staff-1', name: '検証 一郎', tenantName: '検証商事', hasEmail: true },
+    { staffId: 'visual-staff-2', name: '見本 二郎', tenantName: '見本物産', hasEmail: false },
+  ],
+}
+const OPS_SUPPORT_SUMMARY = {
+  byStage: { all: 3, new: 1, in_progress: 1, waiting: 0, resolved: 1, closed: 0 },
+  kpis: {
+    untouched: 1, untouchedFromLine: 0,
+    avgFirstReplyMinutes: 95, prevAvgFirstReplyMinutes: 120,
+    resolutionRate: 80, prevResolutionRate: 75,
+    avgResolutionMinutes: 300, prevAvgResolutionMinutes: 360,
+  },
+}
+const OPS_SUPPORT_TICKETS = [
+  {
+    id: 'visual-ticket-1', ticketNo: 1, ticketLabel: 'No.1',
+    tenantId: 'visual-tenant-1', tenantName: '検証商事',
+    tenantPlanKey: 'standard', tenantPlanStatus: 'active', tenantStatus: 'active',
+    staffId: 'visual-staff-1', staffName: '検証 一郎', staffRole: 'owner', staffEmailRegistered: true,
+    kind: 'usage', kindLabel: '使い方',
+    subject: '検証用の問い合わせ', subjectAuto: false,
+    body: '画面確認用の問い合わせ本文。',
+    attachments: [],
+    stage: 'new', stageLabel: '新規', priority: 'high', priorityLabel: '高',
+    channel: 'admin', channelLabel: '管理画面',
+    assigneeStaffId: null, replyCount: 0, firstRepliedAt: null,
+    lastMessageAt: '2026-09-06T10:00:00+09:00', resolvedAt: null, closedAt: null,
+    createdAt: '2026-09-06T10:00:00+09:00', updatedAt: '2026-09-06T10:00:00+09:00',
+  },
+  {
+    id: 'visual-ticket-2', ticketNo: 2, ticketLabel: 'No.2',
+    tenantId: 'visual-tenant-2', tenantName: '見本物産',
+    tenantPlanKey: null, tenantPlanStatus: 'trialing', tenantStatus: 'active',
+    staffId: null, staffName: '—', staffRole: null, staffEmailRegistered: false,
+    kind: 'bug', kindLabel: '不具合',
+    subject: '検証用の対応中の問い合わせ', subjectAuto: true,
+    body: '画面確認用の対応中の問い合わせ本文。',
+    attachments: [],
+    stage: 'in_progress', stageLabel: '対応中', priority: 'medium', priorityLabel: '中',
+    channel: 'line', channelLabel: 'LINE',
+    assigneeStaffId: 'visual-qa-ops', replyCount: 1, firstRepliedAt: '2026-09-05T11:00:00+09:00',
+    lastMessageAt: '2026-09-05T12:00:00+09:00', resolvedAt: null, closedAt: null,
+    createdAt: '2026-09-05T10:00:00+09:00', updatedAt: '2026-09-05T12:00:00+09:00',
+  },
+]
+const OPS_SUPPORT_DETAIL = {
+  ticket: { ...OPS_SUPPORT_TICKETS[0], replyCount: 1 },
+  tenant: { accountCount: 2, staffCount: 5, staffWithLine: 3, pastTickets: 2, pastOpen: 1 },
+  messages: [
+    {
+      id: 'visual-msg-1', authorKind: 'tenant', authorName: '検証 一郎',
+      body: '画面確認用の問い合わせ本文。', attachments: [],
+      aiAssisted: false, deliveredVia: ['admin'],
+      createdAt: '2026-09-06T10:00:00+09:00',
+    },
+    {
+      id: 'visual-msg-2', authorKind: 'ops', authorName: '検証 太郎',
+      body: '画面確認用の返信文。', attachments: [],
+      aiAssisted: false, deliveredVia: ['admin'],
+      createdAt: '2026-09-06T11:00:00+09:00',
+    },
+  ],
+  draft: null,
+  ai: { available: false },
+  knowledge: { article: null, job: null },
+}
+const OPS_KNOWLEDGE = [
+  {
+    id: 'visual-article-1', version: 1,
+    title: '検証用の手順書', question: '画面確認用の質問文。', answer: '画面確認用の回答文。',
+    kind: 'usage', keywords: ['検証', '手順'],
+    sourceRequestId: 'visual-ticket-1', ticketNo: 1, sourceCurrent: true,
+    articleKind: 'verified',
+    reviewState: 'approved', status: 'active', reviewReason: '',
+    evidence: [], usedCount: 3, helpfulCount: 2, unhelpfulCount: 0,
+    updatedAt: '2026-09-05T10:00:00+09:00',
+  },
+  {
+    id: 'visual-article-2', version: 2,
+    title: '検証用の回答例', question: '画面確認用の質問文その2。', answer: '画面確認用の回答文その2。',
+    kind: 'bug', keywords: ['検証'],
+    sourceRequestId: 'visual-ticket-2', ticketNo: 2, sourceCurrent: false,
+    articleKind: 'answer_example',
+    reviewState: 'needs_review', status: 'active', reviewReason: '',
+    evidence: [], usedCount: 1, helpfulCount: 0, unhelpfulCount: 1,
+    updatedAt: '2026-09-04T10:00:00+09:00',
+  },
+]
+const OPS_ANNOUNCEMENTS = [
+  {
+    id: 'visual-announcement-1', subject: '検証用のお知らせ', body: '画面確認用のお知らせ本文。',
+    audienceKind: 'all', audiencePlans: [], audienceTenantIds: [], audienceLabel: 'すべて',
+    channels: ['screen'], channelLabels: ['画面'],
+    status: 'draft', statusLabel: '下書き',
+    publishAt: null, sentAt: null,
+    recipientsTotal: 10, lineSent: 0, lineFailed: 0, mailSent: 0, mailFailed: 0,
+    screenRead: 0, screenTotal: 10, lastError: null,
+    createdByName: '検証 太郎',
+    createdAt: '2026-09-06T10:00:00+09:00', updatedAt: '2026-09-06T10:00:00+09:00',
+  },
+]
+const OPS_NOTICE_LINE = {
+  currentId: 'visual-qa-account',
+  current: { id: 'visual-qa-account', name: '画面確認アカウント', basicId: null, addFriendUrl: null },
+  candidates: [{ id: 'visual-qa-account', name: '画面確認アカウント', basicId: null }],
+  linked: { linked: 8, total: 10 },
+}
 
 /** 機能9。設計の一覧・5段編集・削除確認を同じ1組の設定で撮る。 */
 const FRIEND_ADD_RULE = {
@@ -983,7 +1221,12 @@ const SHAPES = {
  * 本番データは変更せず、毎回同じ結果を返す。ほかの更新は従来どおり405。
  */
 function visualQaWriteBody(method, pathname) {
-  if (method === 'POST' && pathname === '/api/notifications/operator-rules/recipients-preview') {
+  if (method === 'POST' && (pathname === '/api/notifications/operator-rules/recipients-preview' || pathname === '/api/line-notifications/operator-rules/recipients-preview')) {
+    /*
+     * 本物は両方の名で同じ候補を返す（`notifications.ts`）。
+     * `line-notifications` 側が無いと、つくる画面の「受け取る人」が
+     * 「読み込めませんでした」になっていた。
+     */
     return OPERATOR_NOTIFICATION_RECIPIENTS
   }
   if (method === 'POST' && /^\/api\/notifications\/operator-rules\/[^/]+\/(publish|test)$/.test(pathname)) {
@@ -1300,7 +1543,110 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     return { success: true, data: [] }
   }
   if (pathname === '/api/auth/session') {
-    return { success: true, data: STAFF, csrfToken: 'visual-qa-csrf' }
+    /*
+     * 運営コンソールの外枠（`OpsShell`）は `platformAdmin` を見る。
+     * 本物（`apps/worker/src/routes/admin-auth.ts`）と同じ器で、
+     * 運営メンバーとして返す。通常の `AuthGuard` は余分な鍵を無視するので、
+     * 他の画面は変わらない。
+     */
+    return {
+      success: true,
+      data: { ...STAFF, platformAdmin: true, platformAdminState: null, impersonation: null },
+      csrfToken: 'visual-qa-csrf',
+    }
+  }
+  /*
+   * 運営コンソール（`/ops/*`）。画面側は変えない。見本データは上の `OPS_*`。
+   * 更新系は従来どおり405で、撮影では読みの画面だけを見る。
+   */
+  if (method === 'GET' && pathname === '/api/ops/me') {
+    return { success: true, data: OPS_ME }
+  }
+  if (method === 'GET' && pathname === '/api/ops/impersonation/current') {
+    return { success: true, data: null }
+  }
+  if (method === 'GET' && pathname === '/api/ops/tenants') {
+    return { success: true, data: OPS_TENANTS, summary: OPS_TENANT_SUMMARY }
+  }
+  {
+    const tenantDetail = /^\/api\/ops\/tenants\/([^/]+)$/.exec(pathname)
+    if (method === 'GET' && tenantDetail) {
+      const id = decodeURIComponent(tenantDetail[1])
+      const tenant = OPS_TENANTS.find((row) => row.id === id) ?? OPS_TENANTS[0]
+      return {
+        success: true,
+        data: {
+          tenant: { ...tenant, id: tenant.id },
+          accounts: [
+            {
+              id: 'visual-qa-account', name: '画面確認アカウント', is_active: 1,
+              archived_at: null, updated_at: '2026-09-01T10:00:00+09:00', friend_count: 231,
+            },
+          ],
+          members: [
+            {
+              id: 'visual-staff-1', name: '検証 一郎', email: null, role: 'owner',
+              access_level: 'admin', is_active: 1, invite_status: 'accepted',
+              last_login_at: '2026-09-07T08:00:00+09:00',
+            },
+          ],
+          audit: OPS_AUDIT,
+        },
+      }
+    }
+  }
+  if (method === 'GET' && pathname === '/api/ops/dashboard') {
+    const period = query.get('period')
+    const selected = period === 'prev_month' || period === 'year' ? period : 'month'
+    return { success: true, data: { ...OPS_DASHBOARD, period: selected } }
+  }
+  if (method === 'GET' && pathname === '/api/ops/dashboard/line-unregistered') {
+    return { success: true, data: OPS_LINE_UNREGISTERED }
+  }
+  if (method === 'GET' && pathname === '/api/ops/support/summary') {
+    return { success: true, data: OPS_SUPPORT_SUMMARY }
+  }
+  if (method === 'GET' && pathname === '/api/ops/support/tickets') {
+    return { success: true, data: OPS_SUPPORT_TICKETS, total: OPS_SUPPORT_TICKETS.length }
+  }
+  {
+    const supportDetail = /^\/api\/ops\/support\/tickets\/([^/]+)$/.exec(pathname)
+    if (method === 'GET' && supportDetail) {
+      const id = decodeURIComponent(supportDetail[1])
+      const ticket = OPS_SUPPORT_TICKETS.find((row) => row.id === id) ?? OPS_SUPPORT_TICKETS[0]
+      return {
+        success: true,
+        data: { ...OPS_SUPPORT_DETAIL, ticket: { ...OPS_SUPPORT_DETAIL.ticket, ...ticket, replyCount: 1 } },
+      }
+    }
+  }
+  if (method === 'GET' && pathname === '/api/ops/knowledge') {
+    return { success: true, data: OPS_KNOWLEDGE, total: OPS_KNOWLEDGE.length }
+  }
+  {
+    const knowledgeDetail = /^\/api\/ops\/knowledge\/([^/]+)$/.exec(pathname)
+    if (method === 'GET' && knowledgeDetail) {
+      const id = decodeURIComponent(knowledgeDetail[1])
+      const article = OPS_KNOWLEDGE.find((row) => row.id === id) ?? OPS_KNOWLEDGE[0]
+      return { success: true, data: { ...article, sourceSubject: null } }
+    }
+  }
+  if (method === 'GET' && pathname === '/api/ops/announcements') {
+    return {
+      success: true,
+      data: OPS_ANNOUNCEMENTS,
+      linked: OPS_NOTICE_LINE.linked,
+      noticeLineConfigured: true,
+    }
+  }
+  if (method === 'GET' && pathname === '/api/ops/notice-line-account') {
+    return { success: true, data: OPS_NOTICE_LINE }
+  }
+  if (method === 'GET' && pathname === '/api/ops/audit') {
+    return { success: true, data: OPS_AUDIT, total: OPS_AUDIT.length }
+  }
+  if (method === 'GET' && pathname === '/api/ops/members') {
+    return { success: true, data: OPS_MEMBERS, summary: OPS_MEMBER_SUMMARY }
   }
   if (pathname === '/api/inbox/unanswered') {
     return {
@@ -1461,11 +1807,46 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (pathname === '/api/recipes') return { success: true, data: RECIPES }
   const recipeDetail = /^\/api\/recipes\/([^/]+)$/.exec(pathname)
   if (recipeDetail) {
-    return { success: true, data: RECIPES.find((recipe) => recipe.id === recipeDetail[1]) ?? null }
+    /*
+     * 未知IDは本物と同じく失敗にする。成功＋null だと
+     * 複製画面が `recipe.items.map` で落ちていた。
+     */
+    const found = RECIPES.find((recipe) => recipe.id === recipeDetail[1])
+    if (!found) return { success: false, error: 'レシピが見つかりません' }
+    return { success: true, data: found }
   }
   if (pathname === '/api/manual-links') return { success: true, data: MANUAL_LINKS }
   if (pathname === '/api/operations/control/preview') {
     return { success: true, data: OPERATION_CONTROL_PREVIEW }
+  }
+  if (pathname === '/api/operations/send-paths') {
+    /*
+     * 無いと既定の器が返り、`data.capabilities` が回せず
+     * 「画面を表示できませんでした」になっていた（`?tab=control`）。
+     * 本物は `{evaluatedAt,capabilities,problems,paths}`（`operations.ts`）。
+     */
+    return { success: true, data: OPERATION_SEND_PATHS }
+  }
+  if (pathname === '/api/hq/banners/presets') {
+    /*
+     * 無いと既定の器が返り、`stats.projects.active` で
+     * 「画面を表示できませんでした」になっていた。本物の形で置く。
+     */
+    return {
+      success: true,
+      data: { presets: HQ_BANNER_PRESETS, maxCount: 4, usage: HQ_BANNER_USAGE, engineReady: true },
+    }
+  }
+  if (pathname === '/api/hq/banners/stats') {
+    return { success: true, data: HQ_BANNER_STATS }
+  }
+  if (pathname === '/api/hq/banners/projects') {
+    const archived = query.get('archived') === '1'
+    const items = archived ? [] : HQ_BANNER_PROJECTS
+    return { success: true, data: items }
+  }
+  if (pathname === '/api/hq/banners/images') {
+    return { success: true, data: HQ_BANNER_IMAGES, nextBefore: null }
   }
   if (pathname === '/api/operations/health') {
     return { success: true, data: OPERATION_HEALTH }
@@ -1752,6 +2133,14 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (pathname === '/api/account-settings/test-recipients') {
     return { success: true, data: TEMPLATE_TEST_RECIPIENTS }
   }
+  if (pathname === '/api/account-settings/test-recipient-login-users') {
+    /*
+     * 無いと既定の器（`{items,total,page,limit}`）が返り、
+     * `loginUsers.filter` で「画面を表示できませんでした」になっていた。
+     * 本物は配列を返す（`account-settings.ts`）。
+     */
+    return { success: true, data: TEST_RECIPIENT_LOGIN_USERS }
+  }
   // 管理画面の保存・保管・削除の流れ（#503 L5）。絵の検証用に成功だけ返す。
   if (method === 'POST' && pathname === '/api/forms/drafts') {
     return { success: true, data: { id: 'form-draft-qa', isActive: false } }
@@ -1929,6 +2318,14 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     const reminder = REMINDERS.find((item) => item.id === reminderSteps[1])
     return { success: true, data: reminder ? reminderStepsOf(reminder) : [] }
   }
+  const reminderRegistrants = /^\/api\/reminders\/([^/]+)\/registrants$/.exec(pathname)
+  if (reminderRegistrants) {
+    /*
+     * 無いと既定の器が返り、登録者の欄が
+     * 「読み込めませんでした」になっていた。本物は配列（`reminders.ts`）。
+     */
+    return { success: true, data: REMINDER_REGISTRANTS }
+  }
   if (pathname === '/api/friend-add-runs') {
     const status = query.get('status')
     const ruleId = query.get('rule_id')
@@ -1945,6 +2342,17 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       .filter((item) => !attribution || item.attribution?.status === attribution)
       .slice(0, limit)
     return { success: true, data: { ...FRIEND_ADD_RUNS, items } }
+  }
+  const friendAddRunDetail = /^\/api\/friend-add-runs\/([^/]+)$/.exec(pathname)
+  if (friendAddRunDetail) {
+    /*
+     * 無いと既定の器が返り、`detail.actionRuns.filter` で
+     * 「画面を表示できませんでした」になっていた。
+     * 本物は `actionRuns` まで含めた1件（`friend-add-rules.ts`）。
+     * 未知IDは本物と同じく失敗にする。
+     */
+    if (friendAddRunDetail[1] !== FRIEND_ADD_RUN_DETAIL.id) return { success: false, error: '実行結果が見つかりません' }
+    return { success: true, data: FRIEND_ADD_RUN_DETAIL }
   }
   if (pathname === '/api/scenarios') {
     const requestedPage = Number.parseInt(query.get('page') ?? '', 10)
@@ -2012,6 +2420,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (pathname === '/api/broadcasts') {
     return { success: true, data: BROADCASTS, ...BROADCAST_LIST_META }
   }
+  /* 予約結果（`/broadcasts/reserved?id=`）は上の1件取得で足りる。 */
   if (pathname === '/api/inbox/saved-views') return { success: true, data: INBOX_SAVED_VIEWS }
   if (pathname === '/api/friends/saved-views') {
     const id = query.get('id')
@@ -2348,8 +2757,40 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     ).map(toPublic)
     return { success: true, data: { ...LINE_NOTIFICATION_DELIVERIES, items: items.slice(offset, offset + limit) }, pagination: { total: items.length, limit, offset } }
   }
-  if (pathname === '/api/notifications/operator-rules') {
+  if (pathname === '/api/notifications/operator-rules' || pathname === '/api/line-notifications/operator-rules') {
+    /*
+     * 本物は両方の名で同じ一覧を返す（`notifications.ts`）。
+     * `line-notifications` 側が無いと、運用者タブの件数が
+     * 「読み込めませんでした」になっていた。
+     */
     return { success: true, data: { items: OPERATOR_NOTIFICATION_RULES, summary: { total: 11, published: 9, stopped: 2, missingRecipients: 1, recipients: 6, acceptedToday: 42, excludedToday: 1 } } }
+  }
+  const lineOperatorRuleDetail = /^\/api\/line-notifications\/operator-rules\/([^/]+)$/.exec(pathname)
+  if (lineOperatorRuleDetail && lineOperatorRuleDetail[1] !== 'recipients-preview') {
+    const rule = OPERATOR_NOTIFICATION_RULES.find((item) => item.id === lineOperatorRuleDetail[1])
+    if (!rule) return { success: false, error: 'ルールが見つかりません' }
+    return { success: true, data: rule }
+  }
+  if (pathname === '/api/nen/rank-settings') {
+    /*
+     * 無いと既定の器が返り、`settings.kpis.members` で
+     * 「画面を表示できませんでした」になっていた。
+     * 本物は `settingsResponse` の形（`nen-ranks.ts`）。
+     */
+    return { success: true, data: NEN_RANK_SETTINGS }
+  }
+  if (pathname === '/api/nen/members') {
+    return { success: true, data: NEN_MEMBER_LIST }
+  }
+  if (pathname === '/api/nen/pets') {
+    /*
+     * 無いと既定の器が返り、`kpis.total` が取れず
+     * 「ペットを読み込めませんでした」になっていた。
+     */
+    return { success: true, data: NEN_PET_LIST }
+  }
+  if (pathname === '/api/nen/health') {
+    return { success: true, data: NEN_HEALTH_LIST }
   }
   if (pathname === '/api/ec-commerce/notification-runs') {
     const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)
@@ -2385,8 +2826,26 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   }
   if (/^\/api\/nen-members\/photos\/[^/]+$/.test(pathname)) return { success: true, data: NEN_PHOTO_DETAIL }
   if (pathname === '/api/ec-commerce/overview') return { success: true, data: EC_OVERVIEW }
-  /* 取り込みの記録。ページ送りの数を器の外に持つ口。 */
+  /* 取り込みの記録。`?view=actions` は処理1件ずつの形（`ec-commerce.ts`）。 */
   if (pathname === '/api/ec-commerce/events') {
+    if (query.get('view') === 'actions') {
+      /*
+       * 前は出来事の配列をそのまま返していて、画面の
+       * `data.items` が取れず「読み込めませんでした」になっていた。
+       * 本物と同じ処理1件ずつの器で返す。
+       */
+      const items = EC_ACTION_EXECUTIONS.items.map((execution) => ({
+        ...execution,
+        eventLabel: '',
+        friendId: null,
+        failureKind: null,
+        order: null,
+      }))
+      return {
+        success: true,
+        data: { items, total: items.length, summary: EC_ACTION_EXECUTIONS.summary },
+      }
+    }
     return { success: true, data: EC_EVENTS, pagination: { total: EC_EVENTS.length, limit: 20, offset: 0 } }
   }
   if (pathname === '/api/ec-commerce/subscriptions') {

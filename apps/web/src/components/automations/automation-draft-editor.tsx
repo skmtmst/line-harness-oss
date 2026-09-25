@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from 'react'
 import { AUTOMATION_DRAFT_ACTION_OPTIONS, AUTOMATION_DRAFT_TRIGGER_OPTIONS } from '@line-crm/shared'
-import { api, type AutomationDraftAction, type AutomationDraftDetail } from '@/lib/api'
+import { api, ApiError, type AutomationDraftAction, type AutomationDraftDetail } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import CreatePage from '@/components/shared/create-page'
 import { Field, TextArea, TextInput } from '@/components/shared/form-controls'
 import ListState from '@/components/shared/list-state'
+import TargetMissing from '@/components/shared/target-missing'
 import Select from '@/components/shared/select'
 import { useCanManageAutomations } from './use-automation-permission'
 
@@ -74,7 +75,9 @@ export default function AutomationDraftEditor({ draftId }: { draftId: string }) 
   const [tags, setTags] = useState<Array<{ id: string; name: string }>>([])
   const [scenarios, setScenarios] = useState<Array<{ id: string; name: string }>>([])
   const [commonActions, setCommonActions] = useState<Array<{ id: string; name: string }>>([])
-  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error' | 'not-found'>('loading')
+  /** 失敗したあとの「もう一度読み込む」で取り直すための番号。 */
+  const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     if (accountLoading || canManage !== true || !selectedAccountId) return
@@ -114,11 +117,13 @@ export default function AutomationDraftEditor({ draftId }: { draftId: string }) 
         setActionCommonActionId(stringParam(action.params.commonActionId))
       }
       setLoadState('ready')
-    }).catch(() => {
-      if (!cancelled) setLoadState('error')
+    }).catch((caught: unknown) => {
+      if (cancelled) return
+      if (caught instanceof ApiError && caught.status === 404) setLoadState('not-found')
+      else setLoadState('error')
     })
     return () => { cancelled = true }
-  }, [accountLoading, canManage, draftId, selectedAccountId])
+  }, [accountLoading, canManage, draftId, reloadKey, selectedAccountId])
 
   if (accountLoading || canManage === null) {
     return <ListState kind="loading" title="下書きを読み込んでいます" />
@@ -132,12 +137,24 @@ export default function AutomationDraftEditor({ draftId }: { draftId: string }) 
   if (loadState === 'loading') {
     return <ListState kind="loading" title="下書きを読み込んでいます" />
   }
+  if (loadState === 'not-found') {
+    return (
+      <TargetMissing
+        kind="not-found"
+        title="この下書きは見つかりません"
+        description="削除されたか、別の記録です。見本の一覧から選び直してください。"
+        backHref="/automations?tab=templates"
+        backLabel="見本の一覧へ戻る"
+      />
+    )
+  }
   if (loadState === 'error') {
     return (
-      <ListState
+      <TargetMissing
         kind="error"
         title="下書きを表示できませんでした"
-        description="下書きは消えていません。前の画面へ戻り、もう一度開いてください。"
+        description="下書きは消えていません。通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+        onRetry={() => setReloadKey((key) => key + 1)}
       />
     )
   }

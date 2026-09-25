@@ -100,7 +100,7 @@ describe('DEEP-18: 詳細と操作対象の固定', () => {
     // A の予約も、A を対象にした承認ボタンも残らない。
     expect(screen.queryByText('Aメニュー')).toBeNull()
     expect(screen.queryByRole('button', { name: /承認する/ })).toBeNull()
-    expect(screen.getByText('読み込みに失敗しました。もう一度読み込んでください。')).toBeTruthy()
+    // 取得の失敗は ★V7 TargetMissing の error で出す（生の応答文は出さない）。
     expect(screen.getByText(/予約を読み込めませんでした/)).toBeTruthy()
   })
 

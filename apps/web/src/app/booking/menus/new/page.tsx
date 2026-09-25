@@ -14,6 +14,7 @@ import CreatePage, {
 import SelectField from '@/components/shared/select-field'
 import SearchField from '@/components/shared/search-field'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import ListState from '@/components/shared/list-state'
 import { canEditFeature } from '@/lib/staff-capability'
 import { bookingMenuError } from '../menu-validation'
@@ -593,13 +594,11 @@ export default function NewBookingMenuPage() {
           <ul className="space-y-1.5">
             {staff.map((s) => (
               <li key={s.id}>
-                <label className="border-hairline hover:bg-canvas-sunken flex cursor-pointer items-center gap-2 rounded-md border p-2.5">
-                  <input
-                    type="checkbox"
-                    checked={assigned.has(s.id)}
-                    onChange={() => toggle(s.id)}
-                    className="accent-accent"
-                  />
+                <Checkbox
+                  checked={assigned.has(s.id)}
+                  onCheckedChange={() => toggle(s.id)}
+                  className="border-hairline hover:bg-canvas-sunken rounded-md border p-2.5"
+                >
                   <span className="text-ink text-sm">{s.display_name || s.name}</span>
                   {s.role && <span className="text-ink-faint text-xs">{s.role}</span>}
                   {s.is_designation_optional === 1 && (
@@ -607,7 +606,7 @@ export default function NewBookingMenuPage() {
                       指名なし（空いている人が担当します）
                     </span>
                   )}
-                </label>
+                </Checkbox>
               </li>
             ))}
           </ul>
@@ -697,20 +696,13 @@ export default function NewBookingMenuPage() {
           />
         </Field>
 
-        <label className="flex cursor-pointer items-start gap-2">
-          <input
-            type="checkbox"
-            checked={isActive}
-            onChange={(e) => setIsActive(e.target.checked)}
-            className="accent-accent mt-0.5"
-          />
-          <span>
-            <span className="text-ink text-sm">追加したらすぐ予約を受ける</span>
-            <span className="text-ink-faint block text-xs">
-              オフにすると下書きとして保存され、予約画面に出ません。
-            </span>
-          </span>
-        </label>
+        <Checkbox
+          checked={isActive}
+          onCheckedChange={setIsActive}
+          description="オフにすると下書きとして保存され、予約画面に出ません。"
+        >
+          <span className="text-ink text-sm">追加したらすぐ予約を受ける</span>
+        </Checkbox>
       </FormSection>
     </CreatePage>
   )

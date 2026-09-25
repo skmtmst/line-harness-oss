@@ -65,6 +65,16 @@ function MembersInner() {
     try {
       const res = await nenRanksApi.settings(account)
       if (!res.success) throw new Error(res.error)
+      /*
+       * 形の違う応答は置かない。そのまま置くと `settings.kpis.members` で
+       * 画面ごと落ちる（全ルート監査 A1、2026-09-25）。
+       */
+      const settingsData = res.data as { kpis?: unknown; ranks?: unknown } | null
+      if (typeof settingsData !== 'object' || settingsData === null
+        || typeof settingsData.kpis !== 'object' || settingsData.kpis === null
+        || !Array.isArray(settingsData.ranks)) {
+        throw new Error('invalid_nen_settings')
+      }
       // 新しい要求が出ている＝アカウント切替済み。古い応答は捨てる。
       if (generationRef.current !== generation) return
       setSnapshot({ accountId: account, data: res.data })
@@ -99,7 +109,7 @@ function MembersInner() {
         {/* U091: 右にはみ出すタブへ届くよう、横スクロール＋端の送りボタン付き。 */}
         <ScrollableTabs
           items={[
-            { label: '会員一覧', count: settings?.kpis.members, current: tab === 'members', onClick: () => changeTab('members') },
+            { label: '会員一覧', count: settings?.kpis?.members, current: tab === 'members', onClick: () => changeTab('members') },
             { label: 'ランク設定', current: tab === 'ranks', onClick: () => changeTab('ranks') },
             { label: 'ライフタイム', current: tab === 'lifetime', onClick: () => changeTab('lifetime') },
             { label: 'ECとの照合', href: '/ec-commerce/identity-candidates' },

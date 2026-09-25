@@ -7,9 +7,12 @@ import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Button from '@/components/shared/button'
+import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
+import TargetMissing from '@/components/shared/target-missing'
 import Pagination from '@/components/shared/pagination'
 import SelectField from '@/components/shared/select-field'
+import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import { ActionCell, DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 // #740: 一覧の Kpi と一字一句同じだったため、機能内共有の1部品へ統合した。
 import EventKpi from '@/components/events/event-kpi'
@@ -37,15 +40,20 @@ const STATUS_TABS: Array<{ key: string; label: string }> = [
   { key: 'all', label: '全件' },
 ]
 
-const statusBadge: Record<string, string> = {
-  requested: 'bg-warning-bg text-warning',
-  confirmed: 'bg-success-bg text-success',
-  rejected: 'bg-canvas-sunken text-ink-secondary',
-  cancelled: 'bg-canvas-sunken text-ink-secondary',
-  expired: 'bg-canvas-sunken text-ink-faint',
-  attended: 'bg-accent-soft text-accent-deep',
-  no_show: 'bg-danger-bg text-danger',
-  waitlist: 'bg-warning-bg text-warning',
+/** 予約・申込の状態の見え方。**色だけに頼らず、必ず文字で言う。** */
+const statusTone: Record<string, StatusBadgeTone> = {
+  requested: 'warning',
+  confirmed: 'success',
+  rejected: 'neutral',
+  cancelled: 'neutral',
+  expired: 'neutral',
+  attended: 'success',
+  no_show: 'danger',
+  waitlist: 'warning',
+  waiting: 'warning',
+  offered: 'info',
+  accepted: 'success',
+  converted: 'success',
 }
 
 const STATUS_LABELS = new Map([
@@ -216,7 +224,9 @@ function OccurrenceApplicantsPanel({
                         : '申込'}
                     </Td>
                     <Td>
-                      {STATUS_LABELS.get(applicant.status) ?? applicant.status}
+                      <StatusBadge tone={statusTone[applicant.status] ?? 'neutral'} size="compact">
+                        {STATUS_LABELS.get(applicant.status) ?? applicant.status}
+                      </StatusBadge>
                     </Td>
                     <Td className="text-xs">
                       {applicant.offerExpiresAt
@@ -264,7 +274,7 @@ function OccurrenceApplicantsPanel({
                     {attendance.entries.map((entry) => (
                       <Tr key={entry.id}>
                         <NameCell name={entry.displayName ?? '友だちは未取得'} sub={`${entry.partySize}人`} />
-                        <Td>{STATUS_LABELS.get(entry.status) ?? entry.status}</Td>
+                        <Td><StatusBadge tone={statusTone[entry.status] ?? 'neutral'} size="compact">{STATUS_LABELS.get(entry.status) ?? entry.status}</StatusBadge></Td>
                         <Td className="text-xs">{formatJp(entry.markedAt, '記録日時は未取得')}</Td>
                       </Tr>
                     ))}
@@ -298,7 +308,7 @@ function OccurrenceApplicantsPanel({
                 {waitlistHistory.map((entry) => (
                   <Tr key={entry.id}>
                     <NameCell name={entry.displayName ?? '友だちは未取得'} sub={`${entry.partySize}人`} />
-                    <Td>{WAITLIST_HISTORY_LABELS[entry.status] ?? STATUS_LABELS.get(entry.status) ?? entry.status}</Td>
+                    <Td><StatusBadge tone={statusTone[entry.status] ?? 'neutral'} size="compact">{WAITLIST_HISTORY_LABELS[entry.status] ?? STATUS_LABELS.get(entry.status) ?? entry.status}</StatusBadge></Td>
                     <Td className="text-xs">{formatJp(entry.createdAt, '—')}</Td>
                     <Td className="text-xs">
                       {entry.offeredAt ? formatJp(entry.offeredAt, '案内日時は未取得') : '案内なし'}
@@ -624,11 +634,13 @@ function BookingsInner() {
   if (!eventId) {
     /* #975 U070: イベント未指定は行き止まりにしない。一覧へ戻る入口を出す。 */
     return (
-      <div className="rounded-card border border-hairline bg-canvas p-5">
-        <p className="text-sm font-semibold text-ink">どのイベントの申込かが決まっていません</p>
-        <p className="mt-1 text-xs text-ink-faint">イベントの一覧から選び直してください。</p>
-        <Button href="/events" className="mt-3">イベント一覧へ戻る</Button>
-      </div>
+      <TargetMissing
+        kind="unspecified"
+        title="どのイベントの申込かが決まっていません"
+        description="イベントの一覧から選び直してください。"
+        backHref="/events"
+        backLabel="イベント一覧へ戻る"
+      />
     )
   }
 
@@ -1068,22 +1080,18 @@ function BookingsInner() {
         )}
 
         <div className="bg-canvas rounded-card border-hairline overflow-hidden border">
-          <div className="border-hairline flex overflow-x-auto border-b">
+          <div className="border-hairline flex flex-wrap gap-2 border-b px-4 py-3">
             {STATUS_TABS.map((t) => (
-              <button
+              <FilterChip
                 key={t.key}
-                onClick={() => {
+                selected={tab === t.key}
+                onChange={() => {
                   setPage(1)
                   setTab(t.key)
                 }}
-                className={`px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
-                  tab === t.key
-                    ? 'border-accent text-accent-deep bg-accent-soft'
-                    : 'text-ink-secondary hover:bg-canvas-sunken border-transparent'
-                }`}
               >
                 {t.label}
-              </button>
+              </FilterChip>
             ))}
           </div>
 
@@ -1168,19 +1176,19 @@ function BookingsInner() {
                           : b.is_first_time === 1 ? 'はじめての方です' : '来店履歴があります'}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <span className={`rounded-pill px-2 py-0.5 text-xs font-medium ${statusBadge[b.status] ?? 'bg-canvas-sunken text-ink-secondary'}`}>
+                        <StatusBadge tone={statusTone[b.status] ?? 'neutral'}>
                           {STATUS_LABELS.get(b.status) ?? '状態は未取得'}
-                        </span>
+                        </StatusBadge>
                         {b.status === 'requested' && (
-                          <div className="ml-2 inline-flex gap-1.5">
-                            <button
+                          <div className="ml-2 inline-flex items-center gap-1.5">
+                            <Button
                               onClick={() => decide(b.id, 'confirm')}
                               disabled={busy}
-                              className="bg-success text-on-accent rounded-control px-3 py-1 text-xs font-medium hover:brightness-95 disabled:opacity-50"
                             >
                               承認
-                            </button>
+                            </Button>
                             <button
+                              type="button"
                               data-qa-open="i5SN2j-reject"
                               onClick={() => {
                                 setRejectReason('')
@@ -1188,7 +1196,7 @@ function BookingsInner() {
                                 setRejectTarget(b)
                               }}
                               disabled={busy}
-                              className="bg-ink-secondary text-on-accent rounded-control px-3 py-1 text-xs font-medium hover:brightness-95 disabled:opacity-50"
+                              className="rounded-control px-2 py-1 text-xs font-semibold text-danger hover:underline disabled:opacity-50"
                             >
                               拒否
                             </button>

@@ -399,14 +399,14 @@ function ResourceEditor({ accountId, resource, canManage, onSaved, onDeleted }: 
         </label>
       </div>
       <p className="text-ink-faint mt-2 text-xs">
-        メニュー {resource.usage.menuCount}件 ／ 予約 {resource.usage.bookingCount}件 ／ 例外日 {resource.usage.exceptionCount}件
+        メニュー {resource.usage?.menuCount ?? '—'}件 ／ 予約 {resource.usage?.bookingCount ?? '—'}件 ／ 例外日 {resource.usage?.exceptionCount ?? '—'}件
       </p>
       {error ? <p className="text-danger mt-2 text-xs" role="alert">{error}</p> : null}
       {canManage ? (
         <div className="mt-3 flex flex-wrap gap-2">
           <Button variant="primary" onClick={() => void update()} disabled={saving}>{saving ? '保存中…' : '設備を保存'}</Button>
           <Button onClick={() => void update(!resource.isActive)} disabled={saving}>{resource.isActive ? '受付を停止' : '受付を再開'}</Button>
-          {!resource.usage.referenced ? <Button onClick={() => void remove()} disabled={saving}>設備を削除</Button> : null}
+          {!resource.usage?.referenced ? <Button onClick={() => void remove()} disabled={saving}>設備を削除</Button> : null}
         </div>
       ) : <p className="text-ink-faint mt-2 text-xs">閲覧のみです。変更はオーナーまたは管理者が行えます。</p>}
     </div>
@@ -602,7 +602,7 @@ function SlotCheckCard({ accountId, menus }: { accountId: string; menus: Booking
         ) : null}
       </div>
       <div className="mt-3 flex justify-end">
-        <Button variant="primary" onClick={() => void run()} disabled={!canRun}>{checking ? '確認中…' : 'この日時を確かめる'}</Button>
+        <Button onClick={() => void run()} disabled={!canRun}>{checking ? '確認中…' : 'この日時を確かめる'}</Button>
       </div>
       {checkError ? <p className="text-danger mt-3 text-sm" role="alert">{checkError}</p> : null}
       {result ? (
@@ -884,7 +884,7 @@ function StoreShiftsView() {
         <a href="#rules" className="text-ink-faint rounded-t-md px-4 py-2 text-sm hover:text-ink-secondary">予約のルール</a>
       </div>
 
-      <div data-design="Info" className="bg-info-bg text-info rounded-card px-4 py-3 text-sm">
+      <div data-design="Info" className="bg-info-bg text-ink-secondary rounded-card px-4 py-3 text-xs">
         何時から何時まで、どの曜日を受けるかです。右に、お客様のLINEに出る日時の選び方がそのまま出ます。
       </div>
 

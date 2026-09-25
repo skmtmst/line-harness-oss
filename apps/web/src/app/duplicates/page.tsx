@@ -6,6 +6,7 @@ import KpiCard from '@/components/shared/kpi-card'
 import Pagination from '@/components/shared/pagination'
 import Select from '@/components/shared/select'
 import { TableHeadRow, Th } from '@/components/shared/table'
+import { TableStateRow } from '@/components/shared/table'
 import { api } from '@/lib/api'
 import type { IdentityCandidateListItem, IdentityCandidateStatus } from '@line-crm/shared'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -293,7 +294,7 @@ export default function DuplicatesPage() {
 
           <section className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card" aria-busy={candidatesLoading}>
             <table className="w-full table-fixed text-sm">
-              <colgroup><col style={{ width: '18%' }}/><col style={{ width: '10%' }}/><col style={{ width: '27%' }}/><col style={{ width: '18%' }}/><col style={{ width: '12%' }}/><col style={{ width: '8%' }}/><col style={{ width: '12%' }}/></colgroup>
+              <colgroup><col style={{ width: '17%' }}/><col style={{ width: '8%' }}/><col style={{ width: '24%' }}/><col style={{ width: '17%' }}/><col style={{ width: '11%' }}/><col style={{ width: '8%' }}/><col style={{ width: '15%' }}/></colgroup>
               {/*
                 #984 LAY-12: 見出しは共通の TableHeadRow（高さ44px・
                 背景・罫線を部品側で持つ）。セルの外付け余白で高さを
@@ -302,21 +303,16 @@ export default function DuplicatesPage() {
               <thead><TableHeadRow><Th>候補</Th><Th>確信度</Th><Th>一致した根拠</Th><Th>所属アカウント</Th><Th>最終更新</Th><Th>状態</Th><Th>操作</Th></TableHeadRow></thead>
               <tbody className="divide-y divide-hairline">
                 {candidateError ? (
-                  <tr>
-                    <td colSpan={7} className="px-4 py-12 text-center text-sm text-ink-faint">
-                      {candidateError}
-                      <button
-                        type="button"
-                        onClick={() => void loadCandidates()}
-                        className="ml-2 font-semibold text-action hover:underline"
-                      >
-                        再試行
-                      </button>
-                    </td>
-                  </tr>
+                  <TableStateRow
+                    colSpan={7}
+                    kind="error"
+                    title={candidateError}
+                    onRetry={() => void loadCandidates()}
+                    retryLabel="再試行"
+                  />
                 ) : candidatesLoading && candidates.length === 0 ? (
                   // FRIEND-12: 応答待ちを「0件」と見せない。
-                  <tr><td colSpan={7} className="px-4 py-12 text-center text-sm text-ink-faint">読み込んでいます…</td></tr>
+                  <TableStateRow colSpan={7} kind="loading" title="読み込んでいます…" />
                 ) : candidates.length ? candidates.map((candidate) => (
                   <tr key={candidate.id}>
                     <td className="truncate px-3 py-3 font-semibold text-ink" title={`${candidate.left.label} ↔ ${candidate.right.label}`}>{candidate.left.label} ↔ {candidate.right.label}</td>
@@ -325,9 +321,9 @@ export default function DuplicatesPage() {
                     <td className="truncate px-3 py-3 text-ink-secondary">{[candidate.left.lineAccountName, candidate.right.lineAccountName].filter(Boolean).join(' / ') || '—'}</td>
                     <td className="px-3 py-3 text-ink-secondary">{new Date(candidate.reviewedAt ?? candidate.detectedAt).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
                     <td className="px-3 py-3 font-semibold text-ink">{candidate.status === 'pending' ? '未確認' : candidate.status === 'linked' ? '確認済み' : candidate.status === 'deferred' ? '保留' : '別人'}</td>
-                    <td className="px-3 py-2"><Button href={`/friends/identity-candidates?id=${encodeURIComponent(candidate.id)}`} variant="primary">重複候補を確認</Button></td>
+                    <td className="whitespace-nowrap px-3 py-2"><Button href={`/friends/identity-candidates?id=${encodeURIComponent(candidate.id)}`}>重複候補を確認</Button></td>
                   </tr>
-                )) : <tr><td colSpan={7} className="px-4 py-12 text-center text-sm text-ink-faint">条件に合う重複候補はありません</td></tr>}
+                )) : <TableStateRow colSpan={7} kind="empty" title="条件に合う重複候補はありません" />}
               </tbody>
             </table>
             {/*

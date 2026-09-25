@@ -93,8 +93,8 @@ const REMAINING: Record<string, number> = {
   'app/booking/staff/new/page.tsx': 2,
   /* 2026-09-08 #605 で「同じ設定で作り直す」を実動作へ接続し 0 件になったので行を消した。 */
   'app/restaurant-test/stores/new/page.tsx': 1,
-  'app/scenarios/detail/scenario-detail-client.tsx': 1,
-  'app/search-console/page.tsx': 3,
+  /* ★V7 C6 で押せない「マニュアル」（準備中です）を撤去し 0 件になったので行を消した。 */
+  /* 2026-09-24 V7残り一覧の手直しで飾りボタン2件と接続見出しの言い回しを消し 0 件になったので行を消した。 */
   'app/templates/carousel/page.tsx': 2,
   'app/templates/edit/page.tsx': 4,
   'components/broadcasts/broadcast-form.tsx': 7,
@@ -107,7 +107,7 @@ describe('画面に「準備中」を置かない', () => {
     // 数え漏れ（読む場所を間違えて 0 件になる）だけを見張る。
     // ちょうどの枚数は画面が増えるたびに動くので、下限をゆるく取る。
     expect(FILES.length).toBeGreaterThan(300)
-    expect(FILES.filter((f) => /^app\/.*\/page\.tsx$/.test(f.p) || f.p === 'app/page.tsx')).toHaveLength(184)  // 情報欄の編集画面と運営専用ナレッジ（37-11）を含む実測値。
+    expect(FILES.filter((f) => /^app\/.*\/page\.tsx$/.test(f.p) || f.p === 'app/page.tsx')).toHaveLength(185)  // 情報欄の編集画面と運営専用ナレッジ（37-11）、★V7見本（v7-progress-filedrop・v7-combobox・v7-target-missing）を含む実測値。2026-09-25 に比較用 /tags-v2・/tags-v3 の2画面を撤去。
   })
 
   it('共通部品に「準備中」が1つも無い', () => {

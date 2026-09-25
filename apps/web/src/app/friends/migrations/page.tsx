@@ -5,8 +5,12 @@ import { useCallback, useEffect, useState } from 'react'
 import type { LineAccount } from '@line-crm/shared'
 import { api, type FriendMigrationJob } from '@/lib/api'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import Disclosure from '@/components/shared/disclosure'
+import FileDropzone, { AttachmentRow } from '@/components/shared/file-drop'
 import ListState from '@/components/shared/list-state'
 import PageHeader from '@/components/shared/page-header'
+import { usePageTitle } from '@/components/shell/page-chrome'
 import SelectField from '@/components/shared/select-field'
 import StatusBadge from '@/components/shared/status-badge'
 import SummaryCard from '@/components/shared/summary-card'
@@ -23,7 +27,15 @@ const JOB_STATUS_LABELS: Record<string, string> = {
 // 大きすぎるファイルは固まる前に断る。5000行の取り込み上限に対し十分な大きさ。
 const MAX_IMPORT_FILE_BYTES = 5 * 1024 * 1024
 
+/** 選んだCSVの大きさを行に出すだけの短い表記。 */
+function formatImportBytes(bytes: number): string {
+  if (bytes >= 1024 * 1024) return `${Math.round(bytes / (1024 * 1024) * 10) / 10}MB`
+  return `${Math.max(1, Math.round(bytes / 1024))}KB`
+}
+
 export default function FriendMigrationsPage() {
+  // ★V7: 画面の題は上の帯だけ。本文の PageHeader は説明だけ残し、見出しは帯と同じ言葉にして隠す。
+  usePageTitle('UID・顧客データ移行')
   const [accounts, setAccounts] = useState<LineAccount[]>([])
   const [accountId, setAccountId] = useState('')
   const [jobs, setJobs] = useState<FriendMigrationJob[]>([])
@@ -116,15 +128,17 @@ export default function FriendMigrationsPage() {
       <Link href="/accounts?tab=migration" className="text-ink-secondary pb-3">UIDの移行</Link>
       <span className="border-action text-action border-b-2 pb-3 font-semibold">CSVで書き出す・取り込む</span>
     </nav>
-    <div className="bg-success-bg text-success mb-4 rounded-control px-4 py-3 text-sm">書き出しても友だちの情報は変わりません。取り込みは、まず確認だけを実行できます。</div>
-    <p className="text-ink-secondary mb-4 text-sm">取り込みは「追加・更新・変更なし・競合・エラー」の内訳を先に見せます。反映後も、いつ誰が操作したかを履歴に残します。</p>
+    <div className="bg-info-bg text-ink-secondary mb-4 rounded-control px-4 py-3 text-xs">書き出しても友だちの情報は変わりません。取り込みは、まず確認だけを実行できます。</div>
+    <Disclosure size="compact" title="取り込みの内訳の見方" hint="追加・更新など5区分" className="mb-4">
+      <p className="text-sm">取り込みは「追加・更新・変更なし・競合・エラー」の内訳を先に見せます。反映後も、いつ誰が操作したかを履歴に残します。</p>
+    </Disclosure>
 
     <div className="grid gap-4 xl:grid-cols-2">
       <section className="bg-canvas rounded-card border-hairline border p-4">
         <h2 className="text-ink text-base font-bold">CSVで書き出す</h2>
         <label className="text-ink-secondary mt-4 block text-xs font-semibold">対象<SelectField aria-label="書き出すLINEアカウント" value={accountId} onChange={(event) => setAccountId(event.target.value)} options={[{ value: '', label: 'アカウントを選択' }, ...accounts.map((account) => ({ value: account.id, label: account.name }))]} /></label>
         <fieldset className="mt-4 space-y-2"><legend className="text-ink-secondary mb-2 text-xs font-semibold">書き出す項目</legend>
-          {([['basic', '基本（名前・LINEアカウント・登録日）'], ['tags_fields', 'タグ・友だち情報'], ['support', '対応状況・対応マーク・担当者']] as const).map(([value, label]) => <label key={value} className="text-ink flex items-center gap-2 text-sm"><input type="checkbox" checked={columns.includes(value)} onChange={() => toggleColumn(value)} />{label}</label>)}
+          {([['basic', '基本（名前・LINEアカウント・登録日）'], ['tags_fields', 'タグ・友だち情報'], ['support', '対応状況・対応マーク・担当者']] as const).map(([value, label]) => <Checkbox key={value} checked={columns.includes(value)} onCheckedChange={() => toggleColumn(value)}>{label}</Checkbox>)}
         </fieldset>
         <p className="text-ink-faint mt-2 text-xs">電話番号やメールなどの個人情報は、見る権限がある人だけ選べます。</p>
         <p className="text-ink-secondary mt-4 text-sm">文字コード： UTF-8</p><p className="text-ink-faint mt-1 text-xs">Shift_JISの書き出しはまだ使えません。今はUTF-8を選んでください。</p>
@@ -134,7 +148,26 @@ export default function FriendMigrationsPage() {
 
       <section className="bg-canvas rounded-card border-hairline border p-4">
         <h2 className="text-ink text-base font-bold">CSVを取り込む</h2>
-        <div className="border-hairline bg-canvas-sunken mt-4 rounded-card border border-dashed p-6 text-center"><p className="text-ink text-sm font-medium">ここにCSVを置くか、ファイルを選んでください。</p><p className="text-ink-faint mt-1 text-xs">このシステムから書き出したUTF-8のCSVは、そのまま取り込めます（上限5MB）。</p><label className="border-hairline bg-canvas rounded-control mt-3 inline-block cursor-pointer border px-4 py-2 text-sm font-semibold">ファイルを選ぶ<input type="file" accept=".csv,text/csv" className="sr-only" onChange={(event) => { void onPickFile(event.target.files?.[0] ?? null) }} /></label>{file && <p className="text-ink-secondary mt-2 text-sm">{file.name}（{rows.length.toLocaleString()}行）</p>}</div>
+        {/*
+          確認・反映は1回ずつのAPI呼び出しで、途中の割合を測れない。
+          実測できない進みは出さない（Progress は足さない）。
+        */}
+        <FileDropzone
+          title="ここにCSVを置く"
+          hint="このシステムから書き出したUTF-8のCSVは、そのまま取り込めます（上限5MB）"
+          accept=".csv,text/csv"
+          onFiles={(files) => void onPickFile(files[0] ?? null)}
+          className="mt-4"
+        />
+        {file ? (
+          <div className="mt-2">
+            <AttachmentRow
+              name={file.name}
+              meta={`${rows.length.toLocaleString()}行・${formatImportBytes(file.size)}`}
+              onRemove={() => void onPickFile(null)}
+            />
+          </div>
+        ) : null}
         <div className="mt-4 flex items-center gap-3"><Button variant="primary" disabled={busy} onClick={() => void previewImport()}>まず確認だけする</Button><span className="text-ink-faint text-xs">確認の結果を見てから反映</span></div>
         {summary && <><h3 className="text-ink mt-5 text-sm font-bold">確認の結果</h3><div className="mt-2 grid grid-cols-5 gap-2"><SummaryCard variant="v6" title="追加" value={summary.add} unit="件" detail="新しく登録" /><SummaryCard variant="v6" title="更新" value={summary.update} unit="件" detail="値を変更" /><SummaryCard variant="v6" title="変更なし" value={summary.unchanged} unit="件" detail="同じ内容" /><SummaryCard variant="v6" title="競合" value={summary.conflict} unit="件" detail="判断が必要" /><SummaryCard variant="v6" title="エラー" value={summary.error} unit="件" detail="直して再確認" /></div>{importId && <div className="mt-4"><Button disabled={summary.conflict + summary.error > 0 || busy} onClick={async () => { setBusy(true); const response = await api.friendMigrations.executeImport(importId); setMessage(response.success ? `${response.data.applied ?? 0}件を反映しました。` : response.error); setBusy(false); await load() }}>確認した内容を反映</Button></div>}</>}
         <p className="text-ink-faint mt-4 text-xs leading-relaxed">LINEのユーザーIDとLINEアカウントは、既存行の取り込みでは変わりません。同じファイルをもう一度入れても二重には反映しません。</p>

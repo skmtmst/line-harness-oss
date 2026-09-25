@@ -41,3 +41,20 @@ describe('ペット一覧の操作列（#984 LAY-17）', () => {
     expect(PAGE).toContain('function PetCard(')
   })
 })
+
+describe('ペット一覧の1440px収まり（監査・崩れ1）', () => {
+  it('固定幅の合計が容器（1103px）に収まる', () => {
+    // 1440 - 脇メニュー256 - 枠線1 - 本文余白80 = 1103。操作列 w-40 は保つ。
+    for (const width of ['w-48', 'w-36', 'w-20', 'w-28', 'w-24', 'w-40']) {
+      expect(PAGE).toContain(width)
+    }
+    expect(PAGE).not.toContain('<Th className="w-64"')
+    expect(PAGE).not.toContain('<Th className="w-16"')
+  })
+
+  it('短い値は1行省略＋全文を出す', () => {
+    expect(PAGE).toContain('title={NEUTERED_LABEL[pet.neutered]}')
+    expect(PAGE).toContain('title={pet.activityLabel}')
+    expect(PAGE).toContain("title={pet.productName ?? '（未設定）'}")
+  })
+})

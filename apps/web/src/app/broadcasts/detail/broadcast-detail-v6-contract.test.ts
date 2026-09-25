@@ -19,7 +19,9 @@ describe('V6 一斉配信詳細の契約', () => {
   it('取得失敗を配信なしと混ぜず、同じ画面で再読込できる', () => {
     expect(PAGE).toContain("setLoadState(error instanceof ApiError && error.status === 404 ? 'not-found' : 'error')")
     expect(PAGE).toContain('配信を読み込めませんでした')
-    expect(PAGE).toContain('配信を再読み込み')
+    // 再読み込みは TargetMissing の error（onRetry が同じ画面の取り直し）。
+    expect(PAGE).toContain('kind="error"')
+    expect(PAGE).toContain('onRetry={() => setReloadToken((value) => value + 1)}')
   })
 
   it('期間集計ではなく配信自身の保存済みインサイトを読む', () => {
@@ -73,5 +75,27 @@ describe('V6 一斉配信詳細の、取れない数の断り', () => {
     expect(PAGE).toContain('/broadcasts/new?duplicateFrom=')
     expect(PAGE).toContain('同じ設定で作り直す')
     expect(PAGE).not.toContain('種にして作り直す口がまだないため押せません')
+  })
+})
+
+describe('V6 一斉配信詳細の、送信前の進み具合', () => {
+  it('Progress は送信中だけに出す（下書き・予約では棒も回る印も出さない）', () => {
+    // 予約しただけの配信に preparing の棒を出すと、送り始めているように見える。
+    expect(PAGE).toContain('state="active"')
+    expect(PAGE).not.toContain('state="preparing"')
+    expect(PAGE).not.toContain('state="done"')
+    expect(PAGE).not.toContain('state="partial"')
+    expect(PAGE).not.toContain('state={')
+  })
+
+  it('下書き・予約は1行の文だけにし、0/0 の件数行を出さない', () => {
+    expect(PAGE).toContain('に送り始めます')
+    expect(PAGE).toContain('まだ送っていません')
+  })
+
+  it('sent は SentResult の分かれ道へ行くので、完了の分岐をここに置かない', () => {
+    expect(PAGE).toContain('<SentResult')
+    expect(PAGE).not.toContain('送信が完了しました')
+    expect(PAGE).not.toContain('一部届きませんでした')
   })
 })

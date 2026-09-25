@@ -50,7 +50,7 @@ describe('V6 33-3 LINEアカウントの詳細・編集', () => {
     */
     expect(PAGE).toContain('if (!id)')
     expect(PAGE).toContain('見るアカウントが指定されていません')
-    expect(PAGE).toContain('href="/accounts"')
+    expect(PAGE).toContain('backHref="/accounts"')
   })
 
   it('動的セグメントを使わない', () => {
@@ -124,5 +124,13 @@ describe('V6 33-3 LINEアカウントの詳細・編集', () => {
   it('止める前に、何が止まって何が残るかを読ませる', () => {
     expect(PAGE).toContain('友だちと履歴はそのまま残ります')
     expect(PAGE).toContain('予約している配信は止まります')
+  })
+})
+
+describe('Webhookの突合カードの縦並び（監査・崩れ2）', () => {
+  it('狭い脇カードの4行は札の上・値の下に置く', () => {
+    for (const label of ['LINE側に登録したURL', 'Webhookの利用', '最後のテスト', '最後の受信']) {
+      expect(PAGE).toContain(`StackedRow label="${label}"`)
+    }
   })
 })

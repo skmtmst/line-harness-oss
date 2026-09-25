@@ -6,7 +6,10 @@ import { useSearchParams } from 'next/navigation'
 import type { Tag } from '@line-crm/shared'
 import { ApiError, api, type ApiBroadcast, type BroadcastInsight } from '@/lib/api'
 import Button from '@/components/shared/button'
+import ListState from '@/components/shared/list-state'
+import Progress from '@/components/shared/progress'
 import StickyBar from '@/components/shared/sticky-bar'
+import TargetMissing from '@/components/shared/target-missing'
 import { useAccount } from '@/contexts/account-context'
 import { audienceSummary, messageTypeLabel } from '@/lib/broadcast-summary'
 import { broadcastBelongsToSelectedAccount } from './broadcast-detail-account'
@@ -15,16 +18,9 @@ import { broadcastDetailCsv } from './broadcast-detail-export'
 import { broadcastCsvFilename } from '@/components/broadcasts/broadcast-csv-filename'
 import { usePageTitle } from '@/components/shell/page-chrome'
 
-const STATUS_LABELS: Record<string, string> = {
-  draft: '下書き',
-  scheduled: '予約済み',
-  sending: '送信中',
-  sent: '送信済み',
-}
-
 function BroadcastDetailInner() {
   const params = useSearchParams()
-  const { selectedAccountId, loading: accountLoading } = useAccount()
+  const { selectedAccountId, selectedAccount, loading: accountLoading } = useAccount()
   const id = params.get('id') ?? ''
   const [broadcast, setBroadcast] = useState<ApiBroadcast | null>(null)
   usePageTitle(broadcast ? `配信結果：${broadcast.title}` : '配信の詳細')
@@ -144,16 +140,79 @@ function BroadcastDetailInner() {
     }
   }, [accountLoading, id, reloadToken, selectedAccountId])
 
+  /*
+   * 送信中は5秒ごとに配信を取り直し、進み具合と成功件数を更新する。
+   * 送信中に開いた人が止まった数字を見続けないようにする。
+   * 送り終わった・失敗した・画面を離れたら止める。
+   */
+  useEffect(() => {
+    if (!id || broadcast?.status !== 'sending') return
+    let active = true
+    const timer = setInterval(() => {
+      void (async () => {
+        try {
+          const detail = await api.broadcasts.get(id)
+          if (!active || !detail.success) return
+          if (detail.data.status !== 'sending') {
+            // 状態が変わったら全体を取り直して集計も更新する。
+            setReloadToken((value) => value + 1)
+          }
+          setBroadcast((prev) => (prev && prev.id === id ? detail.data : prev))
+        } catch {
+          // 失敗は数えず、次の周期で取り直す。
+        }
+      })()
+    }, 5000)
+    return () => {
+      active = false
+      clearInterval(timer)
+    }
+  }, [id, broadcast?.status])
+
   if (!id) {
     return (
-      <div>
-        <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
-          配信が指定されていません。
-          <Link href="/broadcasts" className="text-action ml-1 hover:underline">
-            一覧へ戻る
-          </Link>
-        </p>
-      </div>
+      <TargetMissing
+        kind="unspecified"
+        title="見る配信が指定されていません"
+        description="一覧から、見たい配信を選び直してください。"
+        backHref="/broadcasts"
+        backLabel="一斉配信の一覧へ戻る"
+      />
+    )
+  }
+
+  if (loadState === 'error') {
+    return (
+      <TargetMissing
+        kind="error"
+        title="配信を読み込めませんでした"
+        description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+        onRetry={() => setReloadToken((value) => value + 1)}
+      />
+    )
+  }
+
+  if (loadState === 'not-found' || (loadState === 'ready' && !broadcast)) {
+    if (!selectedAccountId) {
+      // アカウント未選択は対象の有無とは別の状態。他の画面と同じく ListState で出す。
+      return (
+        <ListState
+          kind="empty"
+          title="LINE公式アカウントを選んでください"
+          description="選ぶと配信を確認できます。"
+          action={<Button href="/broadcasts">一斉配信の一覧へ戻る</Button>}
+        />
+      )
+    }
+    return (
+      <TargetMissing
+        kind="not-found"
+        title="この配信は見つかりません"
+        description="このLINEアカウントで確認できる配信は見つかりませんでした。削除されたか、一覧から選び直してください。"
+        accountName={selectedAccount?.name}
+        backHref="/broadcasts"
+        backLabel="一斉配信の一覧へ戻る"
+      />
     )
   }
 
@@ -190,59 +249,52 @@ function BroadcastDetailInner() {
         <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
           読み込み中...
         </div>
-      ) : loadState === 'error' ? (
-        <div className="bg-canvas rounded-card border-hairline border p-8 text-center">
-          <p className="text-ink text-sm font-semibold">配信を読み込めませんでした</p>
-          <p className="text-ink-faint mt-1 text-xs">通信状態を確認して、もう一度お試しください。</p>
-          <Button className="mt-4" onClick={() => setReloadToken((value) => value + 1)}>
-            配信を再読み込み
-          </Button>
+      ) : !broadcast ? (
+        <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
+          読み込み中...
         </div>
-      ) : loadState === 'not-found' || !broadcast ? (
-        <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
-          {/*
-            未選択と対象外を書き分ける。未選択のまま「確認できる配信は
-            見つかりません」と出すと、権限の問題に読み違える（#490 軽6）。
-          */}
-          {!selectedAccountId
-            ? 'LINE公式アカウントを選んでください。選ぶと配信を確認できます。'
-            : 'このLINEアカウントで確認できる配信は見つかりませんでした。'}
-        </p>
       ) : String(broadcast.status) === 'sent' ? (
         <SentResult broadcast={broadcast} insight={insight} insightState={insightState} contentRef={contentRef} />
       ) : (
         <div className="max-w-3xl space-y-4">
           <section className="bg-canvas rounded-card border-hairline border p-5">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-ink text-sm font-semibold">送信の進み具合</p>
-              <span
-                className={`rounded-pill px-2 py-0.5 text-xs ${
-                  broadcast.status === 'sent'
-                    ? 'bg-success-bg text-success'
-                    : broadcast.status === 'sending'
-                      ? 'bg-warning-bg text-warning'
-                      : 'bg-canvas-sunken text-ink-faint'
-                }`}
-              >
-                {STATUS_LABELS[broadcast.status] ?? broadcast.status}
-              </span>
-            </div>
-            <p className="text-ink mt-2 text-sm tabular-nums">
-              {success.toLocaleString('ja-JP')} / {total.toLocaleString('ja-JP')} 件
-              {broadcast.status === 'sent' ? ' 完了' : ''}
-            </p>
-            <div className="bg-canvas-sunken mt-2 h-2 overflow-hidden rounded-full">
-              <div
-                className="bg-accent h-full"
-                style={{ width: total > 0 ? `${(success / total) * 100}%` : '0%' }}
-              />
-            </div>
-            {/* 開始・完了の時刻を別々に持っていない。sent_at は完了だけ。 */}
-            <p className="text-ink-faint mt-2 text-xs">
-              {broadcast.sentAt
-                ? `完了 ${formatBroadcastDateTime(broadcast.sentAt)}`
-                : '開始・完了の時刻は記録していません'}
-            </p>
+            <p className="text-ink text-sm font-semibold">送信の進み具合</p>
+            {/*
+              Progress（処理の進み部品）は送信中（sending）だけに出す。
+              下書き・予約で preparing の棒や回る印を出すと、まだ送って
+              いないのに送り始めているように見える。そのときは棒も印も
+              出さず、1行の文だけにする。sent は上の分かれ道で SentResult
+              へ行くので、ここに done / partial の分岐は置かない。
+            */}
+            {broadcast.status === 'sending' ? (
+              <>
+                <Progress
+                  state="active"
+                  title="送信中"
+                  percent={total > 0 ? (success / total) * 100 : 0}
+                  countText={`${success.toLocaleString('ja-JP')} / ${total.toLocaleString('ja-JP')} 件`}
+                  className="mt-3"
+                />
+                {/*
+                  失敗数は `totalCount - successCount` でしか出せない。送信中は
+                  「まだ送っていないぶん」も同じ引き算に入るため、その数を失敗として
+                  出すと、起きていない失敗を作ることになる。完了してから出す。
+                  （下の「到達」の欄と同じ理由。）
+                */}
+                {/* 開始・完了の時刻を別々に持っていない。sent_at は完了だけ。 */}
+                <p className="text-ink-faint mt-2 text-xs">
+                  {broadcast.sentAt
+                    ? `完了 ${formatBroadcastDateTime(broadcast.sentAt)}`
+                    : '開始・完了の時刻は記録していません'}
+                </p>
+              </>
+            ) : (
+              <p className="text-ink-secondary mt-2 text-sm">
+                {broadcast.scheduledAt
+                  ? `${formatBroadcastDateTime(broadcast.scheduledAt)} に送り始めます`
+                  : 'まだ送っていません'}
+              </p>
+            )}
           </section>
 
           <div data-design="KPIs" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">

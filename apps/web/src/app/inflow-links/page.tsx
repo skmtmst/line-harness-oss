@@ -928,10 +928,10 @@ function InflowLinksPageInner({
               {/* ★V7：REF は流入元名の下へ。名前が「Googl…」まで削られていたので列を1つ減らし、
                   編集ボタンは割合でなく固定幅にして右端で切れないようにする。 */}
               <col className="w-10" />
-              <col className="w-[20%]" />
+              <col className="w-[17%]" />
               <col className="w-[8%]" />
-              <col className="w-[13%]" />
-              <col className="w-[9%]" />
+              <col className="w-[12%]" />
+              <col className="w-[8%]" />
               <col className="w-[8%]" />
               <col className="w-[9%]" />
               <col className="w-[7%]" />

@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
   api,
+  ApiError,
   type ReminderDeliveryRun,
   type ReminderDeliveryRunsResponse,
   type ReminderDeliveryRunStatus,
@@ -14,6 +15,7 @@ import Breadcrumb from '@/components/shared/breadcrumb'
 import Card, { CardHeader } from '@/components/shared/card'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import ListState from '@/components/shared/list-state'
+import TargetMissing from '@/components/shared/target-missing'
 import NoteBar from '@/components/shared/note-bar'
 import Pagination from '@/components/shared/pagination'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
@@ -85,14 +87,9 @@ function csvFor(items: ReminderDeliveryRun[]): string {
   return `\uFEFF${rows.map((row) => row.map(csvCell).join(',')).join('\n')}`
 }
 
-function MetricCard({ label, value, tone }: { label: string; value: string; tone: 'success' | 'info' | 'warning' | 'danger' }) {
-  const toneClass = {
-    success: styles.metricSuccess,
-    info: styles.metricInfo,
-    warning: styles.metricWarning,
-    danger: styles.metricDanger,
-  }[tone]
-  return <Card padding="default" className={styles.metric}><p>{label}</p><strong className={toneClass}>{value}</strong></Card>
+/* ★V7: 数字は本文色（ink）。状態は見出しの言葉で言い、数字を色で塗らない。 */
+function MetricCard({ label, value }: { label: string; value: string }) {
+  return <Card padding="default" className={styles.metric}><p>{label}</p><strong className={styles.metricValue}>{value}</strong></Card>
 }
 
 function Fact({ label, value }: { label: string; value: string }) {
@@ -107,6 +104,8 @@ function ReminderRunsInner() {
   const [data, setData] = useState<ReminderDeliveryRunsResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
+  const [runsMissing, setRunsMissing] = useState(false)
   const [status, setStatus] = useState<'' | ReminderDeliveryRunStatus>(isPlannedView ? 'planned' : '')
   const [page, setPage] = useState(1)
   const [retryingId, setRetryingId] = useState<string | null>(null)
@@ -124,11 +123,13 @@ function ReminderRunsInner() {
     // idなしで帰ると「読み込んでいます」が永遠に出る。先に止めて文面を出す。
     if (!reminderId) {
       setLoading(false)
-      setError('リマインダが指定されていません。一覧から選び直してください。')
+      setError('')
+      setRunsMissing(false)
       return
     }
     setLoading(true)
     setError('')
+    setRunsMissing(false)
     // 読み直しに失敗したとき、前に取れた数字を現在値として残さない。
     setData(null)
     try {
@@ -139,8 +140,12 @@ function ReminderRunsInner() {
       })
       if (!response.success) throw new Error(response.error)
       setData(response.data)
-    } catch {
-      setError(`${isPlannedView ? '配信予定' : '実行結果'}を読み込めませんでした。時間を置いてもう一度お試しください。`)
+    } catch (caught) {
+      if (caught instanceof ApiError && caught.status === 404) {
+        setRunsMissing(true)
+      } else {
+        setError(`${isPlannedView ? '配信予定' : '実行結果'}を読み込めませんでした。時間を置いてもう一度お試しください。`)
+      }
     } finally {
       setLoading(false)
     }
@@ -239,6 +244,43 @@ function ReminderRunsInner() {
     requestAnimationFrame(() => document.querySelector('#recent-runs')?.scrollIntoView({ behavior: 'smooth' }))
   }
 
+  /*
+    対象が無いときは、KPI・タブ・右の案内・下の操作列のどれも出さない。
+    代わりに ★V7 TargetMissing を出す（設計 `x5cgUH`）。
+  */
+  if (!reminderId) {
+    return (
+      <TargetMissing
+        kind="unspecified"
+        title="見るリマインダが指定されていません"
+        description="一覧から、見たいリマインダを選び直してください。"
+        backHref="/reminders"
+        backLabel="リマインダ一覧へ戻る"
+      />
+    )
+  }
+  if (!loading && (runsMissing || (!error && !data))) {
+    return (
+      <TargetMissing
+        kind="not-found"
+        title="このリマインダは見つかりません"
+        description="削除されたか、別の記録です。一覧から選び直してください。"
+        backHref="/reminders"
+        backLabel="リマインダ一覧へ戻る"
+      />
+    )
+  }
+  if (!loading && (error || !data)) {
+    return (
+      <TargetMissing
+        kind="error"
+        title={`${isPlannedView ? '配信予定' : '実行結果'}を読み込めませんでした`}
+        description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+        onRetry={() => void load()}
+      />
+    )
+  }
+
   return (
     <div className={styles.page} data-design-node="GC4St">
       <div className={styles.topActions}>
@@ -252,10 +294,10 @@ function ReminderRunsInner() {
       </div>
 
       <div className={styles.summary}>
-        <MetricCard label="送信済み" value={data ? `${data.summary.sent.toLocaleString('ja-JP')}通` : '—'} tone="success" />
-        <MetricCard label="送信予定" value={data ? `${data.summary.scheduled.toLocaleString('ja-JP')}通` : '—'} tone="info" />
-        <MetricCard label="停止" value={data ? `${data.summary.stopped.toLocaleString('ja-JP')}人` : '—'} tone="warning" />
-        <MetricCard label="エラー" value={data ? `${data.summary.errors.toLocaleString('ja-JP')}件` : '—'} tone="danger" />
+        <MetricCard label="送信済み" value={data ? `${data.summary.sent.toLocaleString('ja-JP')}通` : '—'} />
+        <MetricCard label="送信予定" value={data ? `${data.summary.scheduled.toLocaleString('ja-JP')}通` : '—'} />
+        <MetricCard label="停止" value={data ? `${data.summary.stopped.toLocaleString('ja-JP')}人` : '—'} />
+        <MetricCard label="エラー" value={data ? `${data.summary.errors.toLocaleString('ja-JP')}件` : '—'} />
       </div>
 
       {actionMessage ? <NoteBar tone={actionMessage.includes('ません') ? 'danger' : 'info'}>{actionMessage}</NoteBar> : null}
@@ -267,9 +309,6 @@ function ReminderRunsInner() {
             <CardHeader title="通知実績" />
             <p className={styles.sectionNote}>ステップごとの送信状況を確認できます。</p>
             {loading ? <ListState kind="loading" title="通知実績を読み込んでいます" /> : null}
-            {!loading && error ? (
-              <ListState kind="error" title="通知実績を表示できませんでした" description="実行結果を再読み込みしてください。" />
-            ) : null}
             {!loading && !error && (data?.steps.length ?? 0) > 0 ? (
               <div className={styles.tableWrap}>
                 <DataTable>
@@ -315,9 +354,6 @@ function ReminderRunsInner() {
             <p className={styles.sectionNote}>{isPlannedView ? 'これから送る予定を友だちごとに確認できます。' : '対象者ごとの履歴を確認できます。'}</p>
 
             {loading ? <ListState kind="loading" /> : null}
-            {!loading && error ? (
-              <ListState kind="error" description={error} action={<Button onClick={() => void load()}>{isPlannedView ? '配信予定' : '実行結果'}を再読み込み</Button>} />
-            ) : null}
             {!loading && !error && (data?.items.length ?? 0) === 0 ? (
               <ListState
                 kind="empty"

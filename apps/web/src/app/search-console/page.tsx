@@ -2,7 +2,11 @@
 
 import { useEffect, useState } from 'react'
 import MergedTabs from '@/components/layout/merged-tabs'
+import Button from '@/components/shared/button'
+import Disclosure from '@/components/shared/disclosure'
+import StatusBadge from '@/components/shared/status-badge'
 import { api } from '@/lib/api'
+import { csvCell } from '@/lib/presentation'
 import type {
   SearchConsoleMetric,
   SearchConsoleMetricRow,
@@ -64,13 +68,13 @@ function MetricCard({
   const delta = percentDelta(current, previous, lowerIsBetter)
   const positive = delta !== null && delta >= 0
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="rounded-card border-hairline border bg-canvas p-5">
       <div className="flex items-center justify-between gap-3">
-        <p className="whitespace-nowrap text-sm font-medium text-slate-500">{label}</p>
+        <p className="text-ink-secondary whitespace-nowrap text-sm font-medium">{label}</p>
         <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
       </div>
-      <p className="mt-3 whitespace-nowrap text-3xl font-bold tabular-nums tracking-[-0.02em] text-slate-950">{value}</p>
-      <p className={`mt-2 whitespace-nowrap text-xs font-semibold ${delta === null ? 'text-slate-400' : positive ? 'text-success' : 'text-rose-500'}`}>
+      <p className="text-ink mt-3 whitespace-nowrap text-3xl font-bold tabular-nums tracking-[-0.02em]">{value}</p>
+      <p className={`mt-2 whitespace-nowrap text-xs font-semibold ${delta === null ? 'text-ink-faint' : positive ? 'text-success' : 'text-danger'}`}>
         {delta === null ? '前期間との比較なし' : `${positive ? '↑' : '↓'} ${oneDecimal.format(Math.abs(delta))}% 前期間比`}
       </p>
     </div>
@@ -79,7 +83,7 @@ function MetricCard({
 
 function TrendChart({ rows }: { rows: SearchConsoleMetricRow[] }) {
   if (rows.length === 0) {
-    return <div className="flex h-64 items-center justify-center text-sm text-slate-400">期間内のデータがありません</div>
+    return <div className="text-ink-faint flex h-64 items-center justify-center text-sm">期間内のデータがありません</div>
   }
   const width = 1000
   const height = 240
@@ -95,17 +99,17 @@ function TrendChart({ rows }: { rows: SearchConsoleMetricRow[] }) {
       <svg viewBox={`0 0 ${width} ${height}`} className="h-64 w-full" role="img" aria-label="日別クリック数の推移">
         <defs>
           <linearGradient id="searchClickArea" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#2563eb" stopOpacity="0.24" />
-            <stop offset="100%" stopColor="#2563eb" stopOpacity="0" />
+            <stop offset="0%" stopColor="var(--color-action)" stopOpacity="0.24" />
+            <stop offset="100%" stopColor="var(--color-action)" stopOpacity="0" />
           </linearGradient>
         </defs>
         {[0.25, 0.5, 0.75, 1].map((ratio) => (
-          <line key={ratio} x1="0" x2={width} y1={height * ratio} y2={height * ratio} stroke="#e2e8f0" strokeWidth="1" />
+          <line key={ratio} x1="0" x2={width} y1={height * ratio} y2={height * ratio} stroke="var(--color-hairline)" strokeWidth="1" />
         ))}
         <polygon points={fillPoints} fill="url(#searchClickArea)" />
-        <polyline points={points} fill="none" stroke="#2563eb" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+        <polyline points={points} fill="none" stroke="var(--color-action)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
-      <div className="flex justify-between text-[11px] text-slate-400">
+      <div className="text-ink-faint text-micro flex justify-between">
         <span>{rows[0]?.key.replaceAll('-', '/')}</span>
         <span>{rows.at(-1)?.key.replaceAll('-', '/')}</span>
       </div>
@@ -124,26 +128,26 @@ function RankingTable({ title, rows, kind }: { title: string; rows: SearchConsol
     }
   }
   return (
-    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <div className="border-b border-slate-100 px-5 py-4">
-        <h2 className="whitespace-nowrap text-base font-bold text-slate-900">{title}</h2>
+    <section className="rounded-card border-hairline overflow-hidden border bg-canvas">
+      <div className="border-hairline border-b px-5 py-4">
+        <h2 className="text-ink whitespace-nowrap text-base font-bold">{title}</h2>
       </div>
       {rows.length === 0 ? (
-        <p className="p-8 text-center text-sm text-slate-400">データがありません</p>
+        <p className="text-ink-faint p-8 text-center text-sm">データがありません</p>
       ) : (
         <table className="w-full table-fixed text-xs">
           <colgroup><col className="w-[43%]" /><col className="w-[16%]" /><col className="w-[14%]" /><col className="w-[13%]" /><col className="w-[14%]" /></colgroup>
-          <thead className="bg-slate-50 text-[11px] font-semibold text-slate-500">
+          <thead className="bg-canvas-sunken text-ink-faint text-[11px] font-semibold">
             <tr><th className="px-4 py-3 text-left">{kind === 'query' ? 'キーワード' : 'ページ'}</th><th className="px-2 py-3 text-right">表示回数</th><th className="px-2 py-3 text-right">クリック</th><th className="px-2 py-3 text-right">CTR</th><th className="px-4 py-3 text-right">掲載順位</th></tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-hairline divide-y">
             {rows.map((row) => (
-              <tr key={row.key} className="hover:bg-slate-50/70">
-                <td className="px-4 py-3"><span className="block truncate whitespace-nowrap font-medium text-slate-800" title={row.key}>{displayKey(row.key)}</span></td>
-                <td className="whitespace-nowrap px-2 py-3 text-right text-slate-600">{number.format(row.impressions)}</td>
-                <td className="whitespace-nowrap px-2 py-3 text-right font-semibold text-slate-800">{number.format(row.clicks)}</td>
-                <td className="whitespace-nowrap px-2 py-3 text-right text-slate-600">{oneDecimal.format(row.ctr * 100)}%</td>
-                <td className="whitespace-nowrap px-4 py-3 text-right text-slate-600">{oneDecimal.format(row.position)}</td>
+              <tr key={row.key} className="hover:bg-canvas-sunken">
+                <td className="px-4 py-3"><span className="text-ink block truncate whitespace-nowrap font-medium" title={row.key}>{displayKey(row.key)}</span></td>
+                <td className="text-ink-secondary whitespace-nowrap px-2 py-3 text-right">{number.format(row.impressions)}</td>
+                <td className="text-ink whitespace-nowrap px-2 py-3 text-right font-semibold">{number.format(row.clicks)}</td>
+                <td className="text-ink-secondary whitespace-nowrap px-2 py-3 text-right">{oneDecimal.format(row.ctr * 100)}%</td>
+                <td className="text-ink-secondary whitespace-nowrap px-4 py-3 text-right">{oneDecimal.format(row.position)}</td>
               </tr>
             ))}
           </tbody>
@@ -155,17 +159,17 @@ function RankingTable({ title, rows, kind }: { title: string; rows: SearchConsol
 
 function SetupCard({ setup, denied = false }: { setup: SearchConsoleSetup | null; denied?: boolean }) {
   return (
-    <div className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-white p-6 shadow-sm">
+    <div className="rounded-card border-hairline bg-status-warn-soft border p-6">
       <div className="flex items-start gap-4">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-xl">G</div>
+        <div className="border-hairline flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border bg-canvas text-xl">G</div>
         <div>
-          <h2 className="text-lg font-bold text-slate-900">{denied ? '閲覧権限の確認が必要です' : 'Search Consoleとの接続準備中です'}</h2>
-          <p className="mt-1 text-sm leading-6 text-slate-600">
+          <h2 className="text-ink text-lg font-bold">{denied ? '閲覧権限の確認が必要です' : 'Search Consoleとつなぐ設定'}</h2>
+          <p className="text-ink-secondary mt-1 text-sm leading-6">
             Search Consoleで対象プロパティを開き、サービスアカウントを「制限付きユーザー」として追加すると、検索データを読み取り専用で表示できます。
           </p>
           <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-            <div className="rounded-xl bg-white p-3 ring-1 ring-slate-200"><dt className="text-xs text-slate-400">対象プロパティ</dt><dd className="mt-1 truncate whitespace-nowrap font-medium text-slate-800" title={setup?.siteUrl ?? ''}>{setup?.siteUrl ?? '未設定'}</dd></div>
-            <div className="rounded-xl bg-white p-3 ring-1 ring-slate-200"><dt className="text-xs text-slate-400">追加するアカウント</dt><dd className="mt-1 truncate whitespace-nowrap font-medium text-slate-800" title={setup?.serviceAccountEmail ?? ''}>{setup?.serviceAccountEmail ?? '未設定'}</dd></div>
+            <div className="border-hairline rounded-xl border bg-canvas p-3"><dt className="text-ink-faint text-xs">対象プロパティ</dt><dd className="text-ink mt-1 truncate whitespace-nowrap font-medium" title={setup?.siteUrl ?? ''}>{setup?.siteUrl ?? '未設定'}</dd></div>
+            <div className="border-hairline rounded-xl border bg-canvas p-3"><dt className="text-ink-faint text-xs">追加するアカウント</dt><dd className="text-ink mt-1 truncate whitespace-nowrap font-medium" title={setup?.serviceAccountEmail ?? ''}>{setup?.serviceAccountEmail ?? '未設定'}</dd></div>
           </dl>
         </div>
       </div>
@@ -202,84 +206,104 @@ export default function SearchConsolePage() {
   }, [days])
 
   const metrics: Array<{ label: string; value: string; key: keyof SearchConsoleMetric; color: string; lower?: boolean }> = [
-    { label: '合計クリック数', value: number.format(data?.summary.clicks ?? 0), key: 'clicks', color: '#2563eb' },
-    { label: '合計表示回数', value: number.format(data?.summary.impressions ?? 0), key: 'impressions', color: '#7c3aed' },
-    { label: '平均CTR', value: `${oneDecimal.format((data?.summary.ctr ?? 0) * 100)}%`, key: 'ctr', color: '#059669' },
-    { label: '平均掲載順位', value: oneDecimal.format(data?.summary.position ?? 0), key: 'position', color: '#f59e0b', lower: true },
+    { label: '合計クリック数', value: number.format(data?.summary.clicks ?? 0), key: 'clicks', color: 'var(--color-action)' },
+    { label: '合計表示回数', value: number.format(data?.summary.impressions ?? 0), key: 'impressions', color: 'var(--color-info)' },
+    { label: '平均CTR', value: `${oneDecimal.format((data?.summary.ctr ?? 0) * 100)}%`, key: 'ctr', color: 'var(--color-success)' },
+    { label: '平均掲載順位', value: oneDecimal.format(data?.summary.position ?? 0), key: 'position', color: 'var(--color-status-warn-deep)', lower: true },
   ]
+
+  /*
+   * 操作は分析タブの後に残す（header-removal 契約）。どちらも実際に動く口にする
+   * （出す＝使える）。CSVは手元の表示データをそのまま書き出し、連携設定は
+   * 権限を足すSearch Consoleの管理画面を別タブで開く。受け口が無い飾りボタンは置かない。
+   */
+  const exportCsv = () => {
+    if (!data) return
+    const lines: string[][] = [
+      ['区分', '項目', '表示回数', 'クリック数', 'CTR(%)', '掲載順位'],
+      ['集計', `合計（${data.startDate}〜${data.endDate}）`, String(data.summary.impressions), String(data.summary.clicks), oneDecimal.format(data.summary.ctr * 100), oneDecimal.format(data.summary.position)],
+      ...data.daily.map((row) => ['日別', row.key, '', String(row.clicks), '', '']),
+      ...data.devices.map((device) => ['デバイス', { MOBILE: 'スマートフォン', DESKTOP: 'パソコン', TABLET: 'タブレット' }[device.key] ?? device.key, '', String(device.clicks), '', '']),
+      ...data.queries.map((row) => ['キーワード', row.key || '（検索語句なし）', String(row.impressions), String(row.clicks), oneDecimal.format(row.ctr * 100), oneDecimal.format(row.position)]),
+      ...data.pages.map((row) => ['ページ', row.key, String(row.impressions), String(row.clicks), oneDecimal.format(row.ctr * 100), oneDecimal.format(row.position)]),
+    ]
+    const csv = lines.map((row) => row.map((value) => csvCell(value)).join(',')).join('\n')
+    const url = URL.createObjectURL(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' }))
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `search-console-${data.startDate}_${data.endDate}.csv`
+    anchor.click()
+    URL.revokeObjectURL(url)
+  }
+  const settingsHref = setup?.siteUrl
+    ? `https://search.google.com/search-console/users?resource_id=${encodeURIComponent(setup.siteUrl)}`
+    : null
 
   return (
     <div>
       <MergedTabs basePath="/analytics" tabs={ANALYTICS_TABS} active="search" />
 
       <div data-design="Head" className="mb-4 flex flex-wrap items-center justify-end gap-2">
-        <div className="flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+        {data ? <Button onClick={exportCsv}>CSVで書き出す</Button> : null}
+        {settingsHref ? <Button href={settingsHref} target="_blank" rel="noreferrer">連携を設定</Button> : null}
+        <div className="border-hairline flex rounded-xl border bg-canvas p-1">
           {ranges.map((range) => (
             <button
               key={range}
               onClick={() => setDays(range)}
-              className={`whitespace-nowrap rounded-lg px-3 py-2 text-xs font-semibold transition ${days === range ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-50'}`}
+              className={`whitespace-nowrap rounded-lg px-3 py-2 text-xs font-semibold transition ${days === range ? 'bg-ink text-canvas' : 'text-ink-secondary hover:bg-canvas-sunken'}`}
             >
               {range}日
             </button>
           ))}
         </div>
-        {/* 書き出しと連携の設定は、まだ受け口がない。 */}
-        <button disabled title="準備中です" className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-400 opacity-60">
-          CSVで書き出す
-        </button>
-        <button disabled title="準備中です" className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-400 opacity-60">
-          連携を設定
-        </button>
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">{metrics.map((item) => <div key={item.label} className="h-36 animate-pulse rounded-2xl bg-slate-200/70" />)}</div>
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">{metrics.map((item) => <div key={item.label} className="rounded-card bg-canvas-sunken h-36 animate-pulse" />)}</div>
       ) : !data ? (
         <SetupCard setup={setup} denied={denied} />
       ) : (
         <div className="space-y-5">
-          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+          <div className="text-ink-secondary flex flex-wrap items-center justify-between gap-2 text-xs">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="font-medium text-slate-700">{siteLabel(data.siteUrl)}</span>
-              <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-success">連携中</span>
-              <span className="text-slate-400">Search Console のデータは反映まで2〜3日かかります</span>
+              <span className="text-ink font-medium">{siteLabel(data.siteUrl)}</span>
+              <StatusBadge tone="success" size="compact">連携中</StatusBadge>
+              <span className="text-ink-faint">Search Console のデータは反映まで2〜3日かかります</span>
             </div>
-            <p className="whitespace-nowrap text-slate-400">集計期間 {data.startDate.replaceAll('-', '/')} 〜 {data.endDate.replaceAll('-', '/')}</p>
+            <p className="text-ink-faint whitespace-nowrap">集計期間 {data.startDate.replaceAll('-', '/')} 〜 {data.endDate.replaceAll('-', '/')}</p>
           </div>
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             {metrics.map((item) => <MetricCard key={item.key} label={item.label} value={item.value} current={data.summary[item.key]} previous={data.previousSummary[item.key]} color={item.color} lowerIsBetter={item.lower} />)}
-            {/* 検索で来た人がそのまま友だちになったかは、サイトスクリプトの記録と
-                Search Console を突き合わせないと出ない。その突き合わせがまだ無い。 */}
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <p className="whitespace-nowrap text-sm font-medium text-slate-500">検索から友だち追加</p>
-              <p className="mt-3 text-3xl font-bold tracking-[-0.02em] text-slate-300">—</p>
-              <p className="mt-2 text-xs text-slate-400">サイトスクリプトとの突き合わせが未対応</p>
-            </div>
           </div>
           <div className="grid gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(260px,1fr)]">
-            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div><h2 className="whitespace-nowrap text-base font-bold text-slate-900">検索クリックの推移</h2><p className="mt-1 text-xs text-slate-400">日別のクリック数</p></div>
+            <section className="rounded-card border-hairline border bg-canvas p-5">
+              <div><h2 className="text-ink whitespace-nowrap text-base font-bold">検索クリックの推移</h2><p className="text-ink-faint mt-1 text-xs">日別のクリック数</p></div>
               <TrendChart rows={data.daily} />
             </section>
-            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <h2 className="whitespace-nowrap text-base font-bold text-slate-900">デバイス別</h2>
-              <div className="mt-5 space-y-5">{data.devices.map((device) => { const ratio = data.summary.clicks ? (device.clicks / data.summary.clicks) * 100 : 0; const label = { MOBILE: 'スマートフォン', DESKTOP: 'パソコン', TABLET: 'タブレット' }[device.key] ?? device.key; return <div key={device.key}><div className="flex items-center justify-between gap-3 text-sm"><span className="whitespace-nowrap font-medium text-slate-700">{label}</span><span className="whitespace-nowrap text-slate-500">{number.format(device.clicks)}クリック</span></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-blue-500" style={{ width: `${Math.min(ratio, 100)}%` }} /></div><p className="mt-1 text-right text-[11px] text-slate-400">{oneDecimal.format(ratio)}%</p></div> })}</div>
+            <section className="rounded-card border-hairline border bg-canvas p-5">
+              <h2 className="text-ink whitespace-nowrap text-base font-bold">デバイス別</h2>
+              {/*
+                端末別の割合（★V7 h99Gb の棒に寄せる）。共通部品 BarChart は
+                「日ごとの増減」専用（増えた・減ったの2系列）で3項目には使えないため、
+                今の横棒の並びのまま、目盛りの字（text-micro）・等幅数字・1色の棒にそろえる。
+                3項目に3色は付けない（h99Gb の決まり「色は2つまで」）。
+              */}
+              <div className="mt-5 space-y-5">{data.devices.map((device) => { const ratio = data.summary.clicks ? (device.clicks / data.summary.clicks) * 100 : 0; const label = { MOBILE: 'スマートフォン', DESKTOP: 'パソコン', TABLET: 'タブレット' }[device.key] ?? device.key; return <div key={device.key}><div className="flex items-center justify-between gap-3 text-sm"><span className="text-ink-secondary whitespace-nowrap font-medium">{label}</span><span className="text-ink-secondary whitespace-nowrap tabular-nums">{number.format(device.clicks)}クリック</span></div><div className="bg-canvas-sunken mt-2 h-2 overflow-hidden rounded-full"><div className="bg-action h-full rounded-full" style={{ width: `${Math.min(ratio, 100)}%` }} /></div><p className="text-ink-faint text-micro mt-1 text-right tabular-nums">{oneDecimal.format(ratio)}%</p></div> })}</div>
             </section>
           </div>
           <div className="grid gap-5 xl:grid-cols-2">
             <RankingTable title="検索キーワード 上位10件" rows={data.queries} kind="query" />
             <RankingTable title="検索流入ページ 上位10件" rows={data.pages} kind="page" />
           </div>
-          <section className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-            <h2 className="text-sm font-bold text-slate-800">見かたの注意</h2>
-            <ul className="mt-2 space-y-1 text-xs leading-relaxed text-slate-500">
+          <Disclosure title="見かたの注意" hint="3項目" size="compact">
+            <ul className="text-ink-secondary space-y-1 text-xs leading-relaxed">
               <li>・Search Console のデータは反映まで2〜3日かかります。直近の数字は出ません</li>
               <li>・掲載順位は平均値です。検索する人や場所によって実際の順位は変わります</li>
               <li>・「検索から友だち追加」は、サイトスクリプトで結びついた分だけを数えるものですが、その突き合わせはまだありません</li>
             </ul>
-          </section>
-          <p className="text-right text-[11px] text-slate-400">Search Console APIから読み取り専用で取得・最終更新 {new Date(data.fetchedAt).toLocaleString('ja-JP')}</p>
+          </Disclosure>
+          <p className="text-ink-faint text-micro text-right">Search Console APIから読み取り専用で取得・最終更新 {new Date(data.fetchedAt).toLocaleString('ja-JP')}</p>
         </div>
       )}
     </div>

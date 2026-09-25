@@ -10,6 +10,7 @@ import type {
 import Button from '@/components/shared/button'
 import Card, { CardHeader } from '@/components/shared/card'
 import ListState from '@/components/shared/list-state'
+import TargetMissing from '@/components/shared/target-missing'
 import PageHeader from '@/components/shared/page-header'
 import { api, ApiError, type FriendAddRule } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -36,7 +37,7 @@ import styles from './publish.module.css'
  * 出せないときは4つに分ける。読込・空（下書きが無い）・失敗・権限不足。
  * 空を失敗にしない。失敗を0件にしない。
  */
-type Phase = 'loading' | 'ready' | 'empty' | 'error' | 'forbidden'
+type Phase = 'loading' | 'ready' | 'empty' | 'error' | 'forbidden' | 'missing'
 
 const STEPS = ['基本設定', '流入条件', '初回案内', 'アクション', '確認']
 type RuleDetail = {
@@ -126,7 +127,7 @@ function FriendAddPublishInner() {
   useEffect(() => {
     if (!selectedAccountId) return
     if (!ruleId) {
-      setPhase('empty')
+      setPhase('missing')
       return
     }
     let alive = true
@@ -271,24 +272,44 @@ function FriendAddPublishInner() {
 
   if (phase === 'loading') return <ListState kind="loading" />
   if (phase === 'forbidden') {
-    return <ListState kind="forbidden" title={failure?.title} description={failure?.description} />
-  }
-  if (phase === 'empty') {
     return (
       <ListState
-        kind="empty"
+        kind="forbidden"
+        title={failure?.title}
+        description={failure?.description}
+        action={<Button href="/friend-add-settings">設定へ戻る</Button>}
+      />
+    )
+  }
+  if (phase === 'missing') {
+    return (
+      <TargetMissing
+        kind="unspecified"
+        title="公開する下書きが指定されていません"
+        description="一覧から、公開する下書きを選び直してください。"
+        backHref="/friend-add-settings"
+        backLabel="設定へ戻る"
+      />
+    )
+  }
+  if (phase === 'empty') {
+    // 404 は「確認する下書きがない」。失敗と混ぜない。
+    return (
+      <TargetMissing
+        kind="not-found"
         title="確認する下書きがありません"
         description="友だち追加時の配信を作ってから、この画面で公開します。"
-        action={<Button href="/friend-add-settings">設定へ戻る</Button>}
+        backHref="/friend-add-settings"
+        backLabel="設定へ戻る"
       />
     )
   }
   if (phase === 'error' || !draft) {
     return (
-      <ListState
+      <TargetMissing
         kind="error"
-        title={failure?.title}
-        description={failure?.description}
+        title={failure?.title ?? '下書きを読み込めませんでした'}
+        description={failure?.description ?? '通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。'}
         onRetry={() => setReloadKey((key) => key + 1)}
       />
     )

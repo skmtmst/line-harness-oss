@@ -80,3 +80,12 @@ describe('V6 5-1-L シナリオ配信結果', () => {
     expect(PAGE).toContain('シナリオ編集へ戻る')
   })
 })
+
+describe('ステップの到達人数の色（監査・崩れ3）', () => {
+  it('「○人到達」は緑に塗らず ink にする', () => {
+    const css = readFileSync(new URL('./scenario-results.module.css', import.meta.url), 'utf8')
+    const reached = /\.reached \{[^}]*\}/.exec(css)?.[0] ?? ''
+    expect(reached).toContain('--color-ink')
+    expect(reached).not.toContain('accent')
+  })
+})
