@@ -3,8 +3,19 @@ import { api, type MenuItem } from '../lib/api.js';
 import { logFailure } from '../lib/user-message.js';
 import LoadErrorView from './LoadErrorView.js';
 import LoadingView from './LoadingView.js';
+import Icon from './ui/Icon.js';
 
-export default function MenuList({ onSelect }: { onSelect: (m: MenuItem) => void }) {
+/**
+ * 1-a メニューを選ぶ。札を押すと選ばれるだけで、進むのは下の操作の帯。
+ * (撮影: ボタン名にメニュー名をそのまま出す。qa-shots.mjs が名前で押す)
+ */
+export default function MenuList({
+  selectedId,
+  onSelect,
+}: {
+  selectedId: string | null;
+  onSelect: (m: MenuItem) => void;
+}) {
   const [menus, setMenus] = useState<MenuItem[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
@@ -31,26 +42,49 @@ export default function MenuList({ onSelect }: { onSelect: (m: MenuItem) => void
   }
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-xl font-bold">メニューを選んでください</h1>
+    <div className="space-y-5">
+      <h2 className="text-base font-bold text-ink">メニューを選んでください</h2>
       {[...grouped.entries()].map(([cat, items]) => (
         <section key={cat}>
-          <h2 className="font-semibold text-gray-700 mb-2">{cat}</h2>
+          <h3 className="mb-2 text-sm font-semibold text-ink-secondary">{cat}</h3>
           <ul className="space-y-2">
-            {items.map((m) => (
-              <li key={m.id}>
-                <button
-                  onClick={() => onSelect(m)}
-                  className="w-full text-left p-3 border rounded-lg hover:bg-gray-50 active:bg-gray-100"
-                >
-                  <div className="font-medium">{m.name}</div>
-                  {m.description && <div className="text-sm text-gray-500 mt-1">{m.description}</div>}
-                  <div className="text-sm text-gray-500 mt-1">
-                    {m.duration_minutes} 分 / ¥{m.base_price.toLocaleString()}
-                  </div>
-                </button>
-              </li>
-            ))}
+            {items.map((m) => {
+              const selected = m.id === selectedId;
+              return (
+                <li key={m.id}>
+                  <button
+                    type="button"
+                    onClick={() => onSelect(m)}
+                    aria-pressed={selected}
+                    className={`flex w-full items-center gap-3 rounded-xl border bg-canvas p-4 text-left focus-visible:outline-2 focus-visible:outline-ink ${
+                      selected ? 'border-accent-deep' : 'border-hairline'
+                    }`}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate font-semibold text-ink" title={m.name}>
+                        {m.name}
+                      </div>
+                      {m.description && (
+                        <div className="mt-0.5 truncate text-sm text-ink-secondary" title={m.description}>
+                          {m.description}
+                        </div>
+                      )}
+                      <div className="mt-0.5 text-sm text-ink-secondary">
+                        {m.duration_minutes}分・¥{m.base_price.toLocaleString()}（目安）
+                      </div>
+                    </div>
+                    <span
+                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${
+                        selected ? 'bg-accent-deep text-white' : 'border border-hairline text-transparent'
+                      }`}
+                      aria-hidden="true"
+                    >
+                      <Icon name="check" className="h-4 w-4" />
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         </section>
       ))}
