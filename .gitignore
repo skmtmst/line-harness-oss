@@ -69,3 +69,4 @@ docs/design-reference/**/*.png
 # 画像比較の基準画像。**CIで使っていないので版から外す**（決定済み・2026-09-03）。
 # 手元で `capture.spec.mjs` を回すときは、その場で作り直す。
 scripts/visual-qa/capture.spec.mjs-snapshots/
+apps/liff/scripts/qa-shots-out/
