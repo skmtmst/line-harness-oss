@@ -997,7 +997,9 @@ export default function TagsPageV4({
                 「登録日」はタグ名の下へ折り畳み、列を1つ減らす。
                 狭い画面では表だけが横に逃げる（情報を落とさないための例外）。
               */}
-              <div className="overflow-x-auto">
+              {/* @container: 谷間帯の列削減。表の幅が足りない間だけ「付け方」を畳む。
+                  「付け方」は行の操作ではない補助情報で、編集画面で読める。 */}
+              <div className="overflow-x-auto @container">
               {/*
                 960px以上は表。それ未満は縦に重ねたカードへ（#1014 ATTR-20）。
                 #636: 最小幅は 880→800px。1440pxではフォルダ欄を引いた表の
@@ -1005,7 +1007,7 @@ export default function TagsPageV4({
                 常時出ていた。800pxなら1440pxに収まり、それより狭い幅では
                 従来どおり表の内側だけが横へ動く。
               */}
-              <table className="hidden w-full min-w-[800px] table-fixed text-sm md:table">
+              <table className="hidden w-full min-w-[712px] table-fixed text-sm @[830px]:min-w-[800px] md:table">
                 {/* 設計 `HrwyW` の見出し。「表示」は★、「操作」はゴミ箱だけ。 */}
                 <thead className="border-b border-hairline bg-canvas-sunken text-[11px] text-ink-faint">
                   <tr>
@@ -1013,7 +1015,7 @@ export default function TagsPageV4({
                     <th className="w-[22%] px-3 py-3 text-left">タグ</th>
                     <th className="w-[11%] px-3 py-3 text-left">フォルダ</th>
                     <th className="w-[7%] whitespace-nowrap px-3 py-3 text-left">人数</th>
-                    <th className="w-[11%] whitespace-nowrap px-3 py-3 text-left">付け方</th>
+                    <th className="cq-hide-below-830 w-[11%] whitespace-nowrap px-3 py-3 text-left">付け方</th>
                     <th className="w-[17%] whitespace-nowrap px-3 py-3 text-left" title="マイル・アクションとの連動">連動</th>
                     <th className="px-3 py-3 text-left">使用先</th>
                     <th className="w-[6%] px-3 py-3 text-left">表示</th>
@@ -1080,7 +1082,7 @@ export default function TagsPageV4({
                           <FolderSelect tag={tag} groups={groups} onItemsChange={setItems} onError={setError} />
                         </td>
                         <td className="px-3 py-3 text-label tabular-nums">{tag.friendCount ?? 0}人</td>
-                        <td className="truncate px-3 py-3 text-label text-ink" title={sourceLabel(tag)}>{sourceLabel(tag)}</td>
+                        <td className="cq-hide-below-830 truncate px-3 py-3 text-label text-ink" title={sourceLabel(tag)}>{sourceLabel(tag)}</td>
                         <td className="px-3 py-3">
                           <div className="flex flex-wrap gap-1.5">
                             {chips.length === 0

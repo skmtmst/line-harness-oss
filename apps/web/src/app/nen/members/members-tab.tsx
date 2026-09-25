@@ -135,7 +135,9 @@ export default function MembersTab({
           <ListState kind="empty" emptyPreset="readonly" title="まだ会員がいません" description="ECの会員がLINEと結びつくと、ここに並びます。" />
         ) : data ? (
           <>
-            <DataTable>
+            {/* @container: 列の出し分けを画面幅ではなく表の実際の幅で決める。
+                サイドバー・フォルダ欄の有無で同じ画面幅でも表の幅が違うため。 */}
+            <DataTable className="@container">
               <thead>
                 <TableHeadRow>
                   <Th className="w-72">会員</Th>
@@ -144,8 +146,9 @@ export default function MembersTab({
                   <Th className="w-32" align="right">ライフタイム</Th>
                   <Th className="w-28" align="right">マイル残高</Th>
                   <Th>ペット</Th>
-                  <Th className="w-28">最終購入</Th>
-                  <Th className="w-24" align="right">マイル還元</Th>
+                  {/* 谷間帯の列削減: 詳細画面で見られる列から先に畳む。 */}
+                  <Th className="cq-hide-below-1120 w-28">最終購入</Th>
+                  <Th className="cq-hide-below-1010 w-24" align="right">マイル還元</Th>
                   {/* #768: 表が横に流れる帯でも操作列は右端に留める。 */}
                   <Th className="bg-surface-pearl sticky right-0 w-16" align="right"><span className="sr-only">操作</span></Th>
                 </TableHeadRow>
@@ -189,8 +192,8 @@ function MemberRow({ member, rankOrder }: { member: NenMemberRow; rankOrder: str
           {member.petNames ? `${member.petNames}${member.petCount > 2 ? ` ほか${member.petCount - 2}頭` : ''}` : '—'}
         </span>
       </Td>
-      <Td><span className="text-label text-ink-secondary">{member.lastPurchasedAt ? member.lastPurchasedAt.slice(5, 10).replace('-', '/') : '—'}</span></Td>
-      <Td align="right"><span className="text-label font-semibold tabular-nums text-ink">{member.mileRatePercent == null ? '—' : `${member.mileRatePercent}%`}</span></Td>
+      <Td className="cq-hide-below-1120"><span className="text-label text-ink-secondary">{member.lastPurchasedAt ? member.lastPurchasedAt.slice(5, 10).replace('-', '/') : '—'}</span></Td>
+      <Td className="cq-hide-below-1010" align="right"><span className="text-label font-semibold tabular-nums text-ink">{member.mileRatePercent == null ? '—' : `${member.mileRatePercent}%`}</span></Td>
       <Td align="right" className="bg-canvas sticky right-0">
         <Link href={`/friends/detail?id=${encodeURIComponent(member.friendId)}`} className="text-label font-semibold text-action">詳細</Link>
       </Td>

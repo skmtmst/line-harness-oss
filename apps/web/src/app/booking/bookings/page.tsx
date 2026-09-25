@@ -922,23 +922,25 @@ export default function BookingsPage() {
               data-design="Table"
               className="bg-canvas rounded-card border-hairline overflow-hidden border"
             >
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[820px]">
+              {/* @container: 谷間帯の列削減。表の幅が足りない間だけ「担当」を畳む。
+                  担当は予約の詳細で読める補助情報。畳んでいる間も操作列は右端に留める。 */}
+              <div className="overflow-x-auto @container">
+                <table className="w-full min-w-[720px] @[830px]:min-w-[820px]">
                   <thead>
                     <tr className="bg-canvas-sunken border-hairline border-b">
                       <Th>日時</Th>
                       <Th>お客さま</Th>
                       <Th>メニュー</Th>
-                      <Th>担当</Th>
+                      <Th className="cq-hide-below-830">担当</Th>
                       <Th>予約経路</Th>
                       <Th className="text-right">料金</Th>
                       <Th>状態</Th>
-                      <Th className="text-right">操作</Th>
+                      <Th className="bg-canvas-sunken sticky right-0 text-right">操作</Th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {shown.map((b) => (
-                      <tr key={b.id} className="hover:bg-canvas-sunken">
+                      <tr key={b.id} className="group hover:bg-canvas-sunken">
                         <td className="px-4 py-3 text-sm whitespace-nowrap">
                           {formatShort(b.starts_at)}
                         </td>
@@ -955,7 +957,7 @@ export default function BookingsPage() {
                           )}
                         </td>
                         <td className="px-4 py-3 text-sm">{b.menu_name}</td>
-                        <td className="px-4 py-3 text-sm">{b.staff_name}</td>
+                        <td className="cq-hide-below-830 px-4 py-3 text-sm">{b.staff_name}</td>
                         <td className="px-4 py-3 text-sm">
                           <span
                             className={`${b.friend_id ? 'bg-success-bg text-success' : 'bg-info-bg text-info'} rounded-pill px-2 py-0.5 text-xs`}
@@ -973,7 +975,7 @@ export default function BookingsPage() {
                             {statusLabel[b.status] ?? b.status}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-right">
+                        <td className="bg-canvas group-hover:bg-canvas-sunken sticky right-0 px-4 py-3 text-right">
                           <div className="inline-flex items-center gap-1">
                             <button
                               onClick={() => setDetailId(b.id)}

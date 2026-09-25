@@ -158,6 +158,33 @@
   }
 }
 
+/*
+ * 谷間帯（1280〜1439px）: メニューを216pxに畳んで本文へ幅を譲る。
+ * この帯でサイドバーが出ると本文の表が右にはみ出していた。
+ * 区分名・項目名・件数はすべて見せたままにする。アイコンだけの帯は
+ * 項目名を読めない幅になるので作らない（sidebar-design.test.ts）。
+ * 1440px以上では256pxに戻る。
+ */
+@media (min-width: 1280px) and (max-width: 1439.98px) {
+  .desktop {
+    width: 216px;
+    flex: 0 0 216px;
+  }
+
+  .nav {
+    padding: 0 8px 8px;
+  }
+
+  .item {
+    padding: 0 10px;
+  }
+
+  .sectionHeading {
+    padding-right: 10px;
+    padding-left: 10px;
+  }
+}
+
 /* 会社名とメニューの間の線。Pencil `J33xq/pN2aM`。 */
 .identityRule {
   height: 1px;
