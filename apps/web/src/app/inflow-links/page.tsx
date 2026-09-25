@@ -937,7 +937,8 @@ function InflowLinksPageInner({
             <colgroup>
               {/* ★V7：REF は流入元名の下へ。名前が「Googl…」まで削られていたので列を1つ減らし、
                   編集ボタンは割合でなく固定幅にして右端で切れないようにする。 */}
-              <col className="w-10" />
+              {/* 先頭・末尾の列は見出しの余白（20px）にそろえる。編集ボタンがはみ出さない幅にする。 */}
+              <col className="w-14" />
               <col className="w-[17%]" />
               <col className="w-[8%]" />
               <col className="w-[12%]" />
@@ -947,11 +948,12 @@ function InflowLinksPageInner({
               <col className="w-[7%]" />
               <col className="w-[8%]" />
               <col className="w-[9%]" />
-              <col className="w-20" />
+              <col className="w-32" />
             </colgroup>
             <thead>
               <TableHeadRow>
-                <Th>
+                {/* 先頭・末尾の見出しの余白を本文（px-2）にそろえる。 */}
+                <Th className="pl-5">
                   <Checkbox
                     aria-label="表示中の登録済み経路をすべて選ぶ"
                     checked={allShownSelected}
@@ -990,7 +992,7 @@ function InflowLinksPageInner({
                 <Th>
                   発行URL
                 </Th>
-                <Th align="right">編集</Th>
+                <Th align="right" className="pr-5">編集</Th>
               </TableHeadRow>
             </thead>
             <tbody className="divide-y divide-hairline">
@@ -1014,7 +1016,7 @@ function InflowLinksPageInner({
                     accountId={selectedAccountId}
                     orderStats={r.stats}
                   >
-                    <td className="px-2 py-3" onClick={(e) => e.stopPropagation()}>
+                    <td className="py-3 pr-2 pl-5" onClick={(e) => e.stopPropagation()}>
                       {r.entryRouteId ? (
                         <Checkbox
                           aria-label={`${r.name}をまとめて操作の対象にする`}
@@ -1156,7 +1158,7 @@ function InflowLinksPageInner({
                         )}
                       </div>
                     </td>
-                    <td className="px-2 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                    <td className="py-3 pr-5 pl-2 text-right" onClick={(e) => e.stopPropagation()}>
                       {editTarget ? (
                         /* #641: 編集は共通の枠つきボタン */
                         <Button
