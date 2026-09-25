@@ -308,7 +308,7 @@ export default function DuplicatesPage() {
                 背景・罫線を部品側で持つ）。セルの外付け余白で高さを
                 作らない。ページ内のほかの表と同じ見出し規則にそろえる。
               */}
-              <thead><TableHeadRow>{/* 操作は右へ寄せ、右端の余白を左端とそろえる。 */}<Th>候補</Th><Th>確信度</Th><Th>一致した根拠</Th><Th>所属アカウント</Th><Th>最終更新</Th><Th>状態</Th><Th align="right">操作</Th></TableHeadRow></thead>
+              <thead><TableHeadRow>{/* 表の外側の余白は見出しの余白（20px）にそろえ、操作は右へ寄せる。 */}<Th className="pl-5">候補</Th><Th>確信度</Th><Th>一致した根拠</Th><Th>所属アカウント</Th><Th>最終更新</Th><Th>状態</Th><Th align="right" className="pr-5">操作</Th></TableHeadRow></thead>
               <tbody className="divide-y divide-hairline">
                 {candidateError ? (
                   <TableStateRow
@@ -323,13 +323,13 @@ export default function DuplicatesPage() {
                   <TableStateRow colSpan={7} kind="loading" title="読み込んでいます…" />
                 ) : candidates.length ? candidates.map((candidate) => (
                   <tr key={candidate.id}>
-                    <td className="truncate px-3 py-3 font-semibold text-ink" title={`${candidate.left.label} ↔ ${candidate.right.label}`}>{candidate.left.label} ↔ {candidate.right.label}</td>
+                    <td className="truncate py-3 pr-3 pl-5 font-semibold text-ink" title={`${candidate.left.label} ↔ ${candidate.right.label}`}>{candidate.left.label} ↔ {candidate.right.label}</td>
                     <td className="px-3 py-3 text-ink-secondary">{candidate.confidence.label === 'very_high' ? '最高' : candidate.confidence.label === 'high' ? '高' : candidate.confidence.label === 'medium' ? '中' : '低'}</td>
                     <td className="truncate px-3 py-3 text-ink-secondary" title={candidate.evidenceSummary.join('・')}>{candidate.evidenceSummary.join('・') || '根拠を確認'}</td>
                     <td className="truncate px-3 py-3 text-ink-secondary">{[candidate.left.lineAccountName, candidate.right.lineAccountName].filter(Boolean).join(' / ') || '—'}</td>
                     <td className="px-3 py-3 text-ink-secondary">{new Date(candidate.reviewedAt ?? candidate.detectedAt).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
                     <td className="px-3 py-3 font-semibold text-ink">{candidate.status === 'pending' ? '未確認' : candidate.status === 'linked' ? '確認済み' : candidate.status === 'deferred' ? '保留' : '別人'}</td>
-                    <td className="whitespace-nowrap px-3 py-2 text-right"><Button href={`/friends/identity-candidates?id=${encodeURIComponent(candidate.id)}`}>重複候補を確認</Button></td>
+                    <td className="whitespace-nowrap py-2 pr-5 pl-3 text-right"><Button href={`/friends/identity-candidates?id=${encodeURIComponent(candidate.id)}`}>重複候補を確認</Button></td>
                   </tr>
                 )) : <TableStateRow colSpan={7} kind="empty" title="条件に合う重複候補はありません" />}
               </tbody>
@@ -386,20 +386,20 @@ export default function DuplicatesPage() {
                 <table className="w-full table-fixed text-sm">
                   <thead>
                     <TableHeadRow>
-                      {/* 表の外側の余白は左右で同じにする（本文の px-4 に合わせる）。 */}
-                      <Th className="pl-4">アカウント</Th>
+                      {/* 表の外側の余白は見出しの余白（20px）にそろえる。 */}
+                      <Th className="pl-5">アカウント</Th>
                       <Th align="right">友だち数</Th>
                       <Th align="right">うち重複</Th>
-                      <Th align="right" className="pr-4">重複率</Th>
+                      <Th align="right" className="pr-5">重複率</Th>
                     </TableHeadRow>
                   </thead>
                   <tbody className="divide-y divide-[#EAEBED] bg-white text-[#565F59]">
                     {data.perAccount.map((row) => (
                       <tr key={row.accountId}>
-                        <td className="truncate px-4 py-4 font-semibold text-[#1D1D1F]" title={row.accountName}>{row.accountName}</td>
+                        <td className="truncate py-4 pr-4 pl-5 font-semibold text-[#1D1D1F]" title={row.accountName}>{row.accountName}</td>
                         <td className="px-4 py-4 text-right tabular-nums">{fmt.format(row.friends)}</td>
                         <td className="px-4 py-4 text-right tabular-nums">{fmt.format(row.dups)}</td>
-                        <td className="px-4 py-4 text-right tabular-nums">
+                        <td className="py-4 pr-5 pl-4 text-right tabular-nums">
                           {(row.dupRate * 100).toFixed(0)}%
                         </td>
                       </tr>
@@ -420,18 +420,23 @@ export default function DuplicatesPage() {
               <p className="mt-1 text-xs text-ink-faint">
                 行アカウントの友だちのうち、列アカウントにも居る人数 （行のアカウントに対する割合）。
               </p>
-              <div className="mt-3 overflow-hidden rounded-[14px] border border-[#DADDE2] bg-white shadow-card">
+              {/*
+                列数が可変のため、末尾列の右余白だけは要素指定で付ける
+                （16px。先頭列の pl-4 とそろえる）。
+              */}
+              <style>{`[data-duplicates-matrix] tr > :last-child { padding-right: 16px; }`}</style>
+              <div data-duplicates-matrix className="mt-3 overflow-hidden rounded-[14px] border border-[#DADDE2] bg-white shadow-card">
                 <table className="w-full table-fixed text-sm">
                   <thead>
                     <TableHeadRow>
-                      {/* 表の外側の余白は左右で同じにする（本文の px-2 に合わせる）。 */}
-                      <Th className="pl-2">行 \ 列</Th>
+                      {/* 表の外側の余白は見出しの余白（16px）にそろえる。 */}
+                      <Th className="pl-4">行 \ 列</Th>
                       {data.perAccount.map((col) => (
                         <Th
                           key={col.accountId}
                           title={col.accountName}
                           align="right"
-                          className="truncate pr-2"
+                          className="truncate pr-4"
                         >
                           {col.accountName}
                         </Th>
@@ -441,7 +446,7 @@ export default function DuplicatesPage() {
                   <tbody className="divide-y divide-[#EAEBED] bg-white text-[#565F59]">
                     {data.perAccount.map((row) => (
                       <tr key={row.accountId}>
-                        <td title={row.accountName} className="truncate px-2 py-4 font-semibold text-[#1D1D1F]">
+                        <td title={row.accountName} className="truncate py-4 pr-2 pl-4 font-semibold text-[#1D1D1F]">
                           {row.accountName}
                         </td>
                         {data.perAccount.map((col) => {

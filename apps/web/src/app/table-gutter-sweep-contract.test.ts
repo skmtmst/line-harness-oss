@@ -106,10 +106,12 @@ describe('表の外側の余白の洗い出し', () => {
     expect(body).toContain('<Th className="w-28 pr-5">状態</Th>')
   })
 
-  it('/reminders/new：外側をそろえ、操作は右へ寄せる', () => {
+  it('/reminders/new：外側は16pxにそろえ、操作は右へ寄せる', () => {
     const body = code(read('app', 'reminders', 'new', 'page.tsx'))
-    expect(body).toContain('<Th className="pl-2">ひな形</Th>')
-    expect(body).toContain('<Th align="right" className="pr-2">操作</Th>')
+    expect(body).toContain('<Th className="pl-4">ひな形</Th>')
+    expect(body).toContain('<Th align="right" className="pr-4">操作</Th>')
+    expect(body).toContain('py-2 pr-2 pl-4')
+    expect(body).toContain('py-2 pr-4 pl-2 text-right')
   })
 
   it('/settings/manual-links：操作は右へ寄せる', () => {
@@ -118,14 +120,22 @@ describe('表の外側の余白の洗い出し', () => {
     expect(body).toContain('<Td align="right">')
   })
 
-  it('/duplicates：候補の操作は右へ寄せ、外側を本文にそろえる', () => {
+  it('/duplicates：外側は見出しの余白にそろえ、操作は右へ寄せる', () => {
     const body = code(read('app', 'duplicates', 'page.tsx'))
-    expect(body).toContain('<Th align="right">操作</Th>')
-    expect(body).toContain('px-3 py-2 text-right')
-    expect(body).toContain('<Th className="pl-4">アカウント</Th>')
-    expect(body).toContain('pr-4">重複率')
-    expect(body).toContain('<Th className="pl-2">行')
-    expect(body).toContain('truncate pr-2')
+    // 候補の表（20px）。
+    expect(body).toContain('<Th className="pl-5">候補</Th>')
+    expect(body).toContain('<Th align="right" className="pr-5">操作</Th>')
+    expect(body).toContain('truncate py-3 pr-3 pl-5')
+    expect(body).toContain('whitespace-nowrap py-2 pr-5 pl-3 text-right')
+    // アカウント別の表（20px）。
+    expect(body).toContain('<Th className="pl-5">アカウント</Th>')
+    expect(body).toContain('pr-5">重複率')
+    expect(body).toContain('truncate py-4 pr-4 pl-5')
+    expect(body).toContain('py-4 pr-5 pl-4 text-right tabular-nums')
+    // 行列の表（16px。列数が可変のため末尾列は要素指定）。
+    expect(body).toContain('<Th className="pl-4">行')
+    expect(body).toContain('truncate pr-4')
+    expect(body).toContain('[data-duplicates-matrix] tr > :last-child')
   })
 
   it('/tags・/tags/folders/new：先頭列と操作列の外側をそろえる', () => {
@@ -135,9 +145,26 @@ describe('表の外側の余白の洗い出し', () => {
     expect(body).toContain('cursor-grab px-3 py-3')
   })
 
-  it('/inflow-links：見出しの外側を本文（px-2）にそろえる', () => {
+  it('/inflow-links：外側は見出しの余白（20px）にそろえる', () => {
     const body = code(read('app', 'inflow-links', 'page.tsx'))
-    expect(body).toContain('<Th className="pl-2">')
-    expect(body).toContain('<Th align="right" className="pr-2">編集</Th>')
+    expect(body).toContain('<col className="w-14" />')
+    expect(body).toContain('<col className="w-32" />')
+    expect(body).toContain('<Th className="pl-5">')
+    expect(body).toContain('<Th align="right" className="pr-5">編集</Th>')
+    expect(body).toContain('py-3 pr-2 pl-5')
+    expect(body).toContain('py-3 pr-5 pl-2 text-right')
+  })
+
+  it('/friends/identity-candidates：外側は20px、採用する値は固定幅', () => {
+    const body = code(read('app', 'friends', 'identity-candidates', 'page.tsx'))
+    expect(body).toContain('<Th className="pl-5">項目</Th>')
+    expect(body).toContain('<Th className="w-36 pr-5">採用する値</Th>')
+    expect(body).toContain('<Td className="pl-5">')
+    expect(body).toContain('<Td className="pr-5">')
+  })
+
+  it('/ops/members：自分自身の行にも「—」を置き、右端を空にしない', () => {
+    const body = code(read('app', 'ops', 'members', 'page.tsx'))
+    expect(body).toContain('<span className="text-ink-faint text-xs">—</span>')
   })
 })

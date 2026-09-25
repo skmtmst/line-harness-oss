@@ -185,7 +185,10 @@ export default function OpsMembersPage() {
                   <Td>{memberStateChip(m)}</Td>
                   <Td><span className="text-caption text-ink-secondary">{formatDateTime(m.lastLoginAt)}</span></Td>
                   <Td align="right">
-                    {m.staffId === me ? null : (
+                    {m.staffId === me ? (
+                      /* 自分自身への操作は無い。空のままにすると右端の余白が0に見えるため「—」を置く。 */
+                      <span className="text-ink-faint text-xs">—</span>
+                    ) : (
                       <span className="inline-flex gap-2">
                         {m.isActive && m.activationState !== 'active' ? (
                           <Button size="field" onClick={() => void resend(m)} disabled={resendingId !== null}>
