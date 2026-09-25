@@ -131,9 +131,9 @@ export default function ShipmentPanel({
             <button type="button" onClick={() => setAttempt((count) => count + 1)} className="text-action ml-2 font-semibold hover:underline">もう一度読み込む</button>
           </p>
         ) : !data || (data.soonCount === 0 && data.laterCount === 0) ? (
-          /* 0件の詳細枠は1行へ縮める（A01-05）。大きな空きは「取得中」と紛らわしい。 */
+          /* 0件は1行の空表示にする。大きな空きは「取得中」と紛らわしい。 */
           <p className="py-4 text-center text-sm text-ink-faint">
-            出荷予定はまだありません。EC通知を受け取るとここに並びます。
+            今日・明日の出荷予定はありません
           </p>
         ) : (
           <>
