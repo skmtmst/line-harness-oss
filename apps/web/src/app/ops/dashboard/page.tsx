@@ -135,7 +135,7 @@ export default function OpsDashboardPage() {
         <section aria-label="お問い合わせ（チケット）" className="rounded-card border border-hairline bg-canvas px-5 py-4 xl:col-span-2">
           <div className="mb-2 flex items-center justify-between">
             <h3 className="text-label font-bold text-ink">お問い合わせ（チケット）</h3>
-            <Link href="/ops/support" className="text-caption text-action underline-offset-2 hover:underline">すべて見る</Link>
+            <Link href="/ops/support" className="text-caption text-action underline-offset-2 hover:underline">すべて見る →</Link>
           </div>
           {data ? (
             <>
@@ -168,12 +168,16 @@ export default function OpsDashboardPage() {
           <DataTable>
             <thead>
               <TableHeadRow>
-                <Th className="w-72">上限に近い契約先</Th>
+                {/*
+                  契約先の列で残りを吸収し、表を枠に収める。
+                  使用率は短い札なので右へ寄せ、右端の余白を左端とそろえる。
+                */}
+                <Th>上限に近い契約先</Th>
                 <Th className="w-32">プラン</Th>
                 <Th className="w-40">配信通数</Th>
                 <Th className="w-40">バナー生成</Th>
                 <Th className="w-40">メディア容量</Th>
-                <Th className="w-28">使用率</Th>
+                <Th className="w-28" align="right">使用率</Th>
               </TableHeadRow>
             </thead>
             <tbody>
@@ -184,7 +188,7 @@ export default function OpsDashboardPage() {
                   <Td><span className="text-caption text-ink">{row.messages.toLocaleString('ja-JP')} / {row.limits.messages === null ? '—' : row.limits.messages.toLocaleString('ja-JP')}</span></Td>
                   <Td><span className="text-caption text-ink">{row.bannerUnits} / {row.limits.images ?? '—'}</span></Td>
                   <Td><span className="text-caption text-ink">{formatBytes(row.mediaBytes)} / {row.limits.mediaBytes === null ? '—' : formatBytes(row.limits.mediaBytes)}</span></Td>
-                  <Td>{row.usageRate >= 90 ? <Chip tone="danger">{row.usageRate}%</Chip> : row.usageRate >= 70 ? <Chip tone="warn">{row.usageRate}%</Chip> : <Chip tone="neutral">{row.usageRate}%</Chip>}</Td>
+                  <Td align="right">{row.usageRate >= 90 ? <Chip tone="danger">{row.usageRate}%</Chip> : row.usageRate >= 70 ? <Chip tone="warn">{row.usageRate}%</Chip> : <Chip tone="neutral">{row.usageRate}%</Chip>}</Td>
                 </Tr>
               ))}
             </tbody>

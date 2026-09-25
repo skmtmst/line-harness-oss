@@ -1011,7 +1011,8 @@ export default function TagsPageV4({
                 {/* 設計 `HrwyW` の見出し。「表示」は★、「操作」はゴミ箱だけ。 */}
                 <thead className="border-b border-hairline bg-canvas-sunken text-[11px] text-ink-faint">
                   <tr>
-                    <th className="w-9 px-2 py-3" />
+                    {/* 先頭の選択列と末尾の操作列は外側の余白をそろえる。操作列は中身の幅で固定する。 */}
+                    <th className="w-11 px-3 py-3" />
                     <th className="w-[22%] px-3 py-3 text-left">タグ</th>
                     <th className="w-[11%] px-3 py-3 text-left">フォルダ</th>
                     <th className="w-[7%] whitespace-nowrap px-3 py-3 text-left">人数</th>
@@ -1020,7 +1021,7 @@ export default function TagsPageV4({
                     <th className="px-3 py-3 text-left">使用先</th>
                     <th className="w-[6%] px-3 py-3 text-left">表示</th>
                     {/* #768: 表が横に流れる帯でも操作列は右端に留める。 */}
-                    <th className="bg-canvas-sunken sticky right-0 w-[6%] px-3 py-3 text-left">操作</th>
+                    <th className="bg-canvas-sunken sticky right-0 w-11 px-3 py-3 text-left">操作</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-hairline">
@@ -1057,7 +1058,7 @@ export default function TagsPageV4({
                           onDragStart={() => setDragId(tag.id)}
                           onDragOver={(event) => event.preventDefault()}
                           onDrop={() => void move(tag.id)}
-                          className="cursor-grab px-2 py-3 text-center text-hairline"
+                          className="cursor-grab px-3 py-3 text-center text-hairline"
                         >
                           <ReorderGrip label={tag.name} onMove={(direction) => void keyboardMove(tag.id, direction)}><GripIcon /></ReorderGrip>
                         </td>

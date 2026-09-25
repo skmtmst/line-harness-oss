@@ -164,8 +164,12 @@ export default function OpsMembersPage() {
                   ★V7: 操作列は入る幅で固定する（「再送」「停止」の2つ＋送信中の表示）。
                   1440px で合計が枠に収まるよう、メール・最終ログインは詰める（1行省略＋全文は title）。
                 */}
-                <Th className="w-72">名前</Th>
-                <Th className="w-52">メール</Th>
+                {/*
+                  名前・メールは幅を切らずに残りで吸収する。固定の合計が
+                  枠を超えると表だけ横スクロールし、左右の余白がずれる。
+                */}
+                <Th>名前</Th>
+                <Th>メール</Th>
                 <Th className="w-36">2要素認証</Th>
                 <Th className="w-28">状態</Th>
                 <Th className="w-36">最終ログイン</Th>
@@ -181,7 +185,10 @@ export default function OpsMembersPage() {
                   <Td>{memberStateChip(m)}</Td>
                   <Td><span className="text-caption text-ink-secondary">{formatDateTime(m.lastLoginAt)}</span></Td>
                   <Td align="right">
-                    {m.staffId === me ? null : (
+                    {m.staffId === me ? (
+                      /* 自分自身への操作は無い。空のままにすると右端の余白が0に見えるため「—」を置く。 */
+                      <span className="text-ink-faint text-xs">—</span>
+                    ) : (
                       <span className="inline-flex gap-2">
                         {m.isActive && m.activationState !== 'active' ? (
                           <Button size="field" onClick={() => void resend(m)} disabled={resendingId !== null}>

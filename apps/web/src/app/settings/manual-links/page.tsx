@@ -237,7 +237,8 @@ export default function ManualLinksPage() {
               <Th>公式記事のURL</Th>
               <Th>最後に確かめた日</Th>
               <Th>リンクの状態</Th>
-              <Th>操作</Th>
+              {/* 操作は右へ寄せ、右端の余白を左端とそろえる。 */}
+              <Th align="right">操作</Th>
             </TableHeadRow>
           </thead>
           <tbody>
@@ -271,7 +272,7 @@ export default function ManualLinksPage() {
                     {LINK_STATUS_LABEL[row.status]}
                   </StatusBadge>
                 </Td>
-                <Td>
+                <Td align="right">
                   {editing ? (
                     <>
                       <Button disabled={saving} onClick={() => void saveEdit()}>保存</Button>

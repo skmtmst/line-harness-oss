@@ -866,28 +866,32 @@ export default function RichMenusListPage() {
                 <div className="overflow-x-auto">
                 <table className="w-full min-w-[760px] table-fixed text-left text-sm">
                   <colgroup>
+                    {/*
+                      操作列はボタン幅で固定し、残りはメニューの列で吸収する。
+                      26%にすると右に余白が残り、枠にくっついて見える。
+                    */}
                     <col style={{ width: '24%' }} />
                     <col style={{ width: '12%' }} />
                     <col style={{ width: '17%' }} />
                     <col style={{ width: '12%' }} />
                     <col style={{ width: '9%' }} />
-                    <col style={{ width: '26%' }} />
+                    <col style={{ width: '12rem' }} />
                   </colgroup>
                   <thead>
                     <TableHeadRow>
-                      <Th>メニュー</Th>
+                      <Th className="pl-5">メニュー</Th>
                       <Th>状態</Th>
                       <Th>誰に出るか</Th>
                       <Th align="right">今月のタップ</Th>
                       <Th>更新</Th>
                       {/* 表が横に流れる帯でも操作列は右端に留める。 */}
-                      <Th className="bg-canvas-sunken sticky right-0">操作</Th>
+                      <Th className="bg-canvas-sunken sticky right-0 pr-5">操作</Th>
                     </TableHeadRow>
                   </thead>
                   <tbody className="divide-hairline divide-y">
                     {shownGroups.map((g) => (
                       <tr key={g.id} className="h-[76px] align-middle">
-                        <td className="px-4 py-3">
+                        <td className="py-3 pr-4 pl-5">
                           <div className="flex items-center gap-2">
                             {reordering ? (
                               <div className="flex shrink-0 gap-1">
@@ -928,7 +932,7 @@ export default function RichMenusListPage() {
                         <td className="px-4 py-3 text-xs text-ink-secondary tabular-nums">
                           {new Date(g.updatedAt).toLocaleDateString('ja-JP', { month: 'long', day: 'numeric' })}
                         </td>
-                        <td className="bg-canvas sticky right-0 px-4 py-3">
+                        <td className="bg-canvas sticky right-0 py-3 pr-5 pl-4">
                           {/* #641: 「編集」＋「削除」＋「その他（…）」の形にそろえる。表示先・複製・切替はメニューへ集約。 */}
                           <div className="relative inline-flex items-center justify-end gap-1.5">
                             <Button href={`/rich-menus/edit?id=${g.id}`} variant="secondary">編集</Button>

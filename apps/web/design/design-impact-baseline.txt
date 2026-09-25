@@ -238,6 +238,7 @@ shared-button-importer components/shared/progress.tsx
 # #985 LAY-18: 一覧の行の操作（詳細・編集）が共通Buttonを使う。
 shared-button-importer components/shared/row-actions.tsx
 shared-button-importer components/shared/target-missing.tsx
+shared-button-importer components/shared/version-history.tsx
 shared-button-importer components/store-selection-gate.tsx
 shared-button-importer components/templates/message-template-editor.tsx
 shared-button-importer components/ui/kpi-collapse.tsx

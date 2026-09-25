@@ -1,4 +1,5 @@
 import { accountFeatureOffExclusionSql } from './account-settings.js';
+import { refreshScenarioReferences, removeConsumerReferences } from './template-versions.js';
 import { jstNow } from './utils.js';
 import { computeNextDeliveryAt } from './scenario-schedule.js';
 import { resolveStepContent } from './scenario-resolve.js';
@@ -384,6 +385,8 @@ export async function deleteScenario(db: D1Database, id: string): Promise<void> 
     db.prepare(`UPDATE forms SET on_submit_scenario_id = NULL WHERE on_submit_scenario_id = ?`).bind(id),
     db.prepare(`UPDATE scenarios SET on_complete_scenario_id = NULL WHERE on_complete_scenario_id = ?`).bind(id),
   ]);
+  // 467: 消えたシナリオの参照を消す。残すと削除の止めが誤作動する。
+  await removeConsumerReferences(db, 'scenario', id);
 }
 
 // ============================================================
@@ -455,10 +458,13 @@ export async function createScenarioStep(
     )
     .run();
 
-  return (await db
+  const created = (await db
     .prepare(`SELECT * FROM scenario_steps WHERE id = ?`)
     .bind(id)
     .first<ScenarioStep>())!;
+  // 467: 手順の保存で参照表を書き換える。どの版を使っているかの正本。
+  await refreshScenarioReferences(db, created.scenario_id);
+  return created;
 }
 
 export type UpdateScenarioStepInput = Partial<
@@ -569,14 +575,23 @@ export async function updateScenarioStep(
       .run();
   }
 
-  return db
+  const updated = await db
     .prepare(`SELECT * FROM scenario_steps WHERE id = ?`)
     .bind(id)
     .first<ScenarioStep>();
+  // 467: 手順の保存で参照表を書き換える。消えた手順の参照はここで消える。
+  if (updated) await refreshScenarioReferences(db, updated.scenario_id);
+  return updated;
 }
 
 export async function deleteScenarioStep(db: D1Database, id: string): Promise<void> {
+  const target = await db
+    .prepare(`SELECT scenario_id FROM scenario_steps WHERE id = ?`)
+    .bind(id)
+    .first<{ scenario_id: string }>();
   await db.prepare(`DELETE FROM scenario_steps WHERE id = ?`).bind(id).run();
+  // 467: 消えた手順の参照を数え直す。
+  if (target) await refreshScenarioReferences(db, target.scenario_id);
 }
 
 export async function getScenarioSteps(
