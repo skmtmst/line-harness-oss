@@ -15,6 +15,7 @@ import ActionEditor from './action-editor'
 import { describeAction } from './form-update-summary'
 import { fieldInput, type FormRefs } from './form-refs'
 import Button from '@/components/shared/button'
+import DateTimeField from '@/components/shared/date-time-field'
 
 /**
  * 期限を初めてONにしたときの初期値。日本時間で「7日後の23:59」。
@@ -102,7 +103,7 @@ export default function OptionsDialog({
           </section>
 
           {value.deadline?.enabled && <div className="bg-accent-soft mt-2 grid grid-cols-2 gap-3 rounded-control p-3">
-            <FieldLine label="受付の期限"><input type="datetime-local" value={value.deadline.endsAt ?? ''} onChange={(e) => patch({ deadline: { ...value.deadline, enabled: true, endsAt: e.target.value } })} className={fieldInput} /></FieldLine>
+            <FieldLine label="受付の期限"><DateTimeField aria-label="受付の期限" value={value.deadline.endsAt ?? ''} onChange={(v) => patch({ deadline: { ...value.deadline, enabled: true, endsAt: v } })} /></FieldLine>
             <FieldLine label="期限を過ぎた人に出す文"><input type="text" value={value.deadline.message ?? ''} onChange={(e) => patch({ deadline: { ...value.deadline, enabled: true, message: e.target.value } })} className={fieldInput} /></FieldLine>
           </div>}
 

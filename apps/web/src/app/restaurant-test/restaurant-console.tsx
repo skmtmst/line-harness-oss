@@ -6,6 +6,7 @@ import { useAccount, type AccountWithStats } from '@/contexts/account-context'
 import { ApiError } from '@/lib/api'
 import StoreContextBanner from './stores/store-context-banner'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import DateTimeField from '@/components/shared/date-time-field'
 import {
   restaurantTestApi,
   type RestaurantApproval,
@@ -461,6 +462,9 @@ function Reservations({ data, store, busy, create, importInbound }: { data: Rest
 }
 
 function Field({ label, name, type = 'text', defaultValue, required = false }: { label: string; name: string; type?: string; defaultValue?: string; required?: boolean }) {
+  if (type === 'datetime-local') {
+    return <span className="text-xs font-bold text-ink-secondary">{label}<DateTimeField name={name} defaultValue={defaultValue} required={required} aria-label={label} className="mt-1" /></span>
+  }
   return <label className="text-xs font-bold text-ink-secondary">{label}<input name={name} type={type} defaultValue={defaultValue} required={required} className="mt-1 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-normal text-ink" /></label>
 }
 function InlineForm({ title, children }: { title: string; children: ReactNode }) { return <section className="rounded-card border border-accent bg-accent-soft/40 p-5"><h2 className="mb-4 font-bold text-accent-deep">{title}</h2>{children}</section> }

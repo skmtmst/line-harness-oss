@@ -1,5 +1,6 @@
 'use client'
 
+import DateTimeField from '@/components/shared/date-time-field'
 import SelectField from '@/components/shared/select-field'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
@@ -2045,8 +2046,8 @@ function PublishStep({
           </div>
           {mode !== 'now' ? (
             <div className="border-hairline mt-5 grid gap-4 border-t pt-5 sm:grid-cols-2">
-              <label className="text-ink-secondary text-xs font-semibold">出しはじめ<input aria-label="出しはじめ" type="datetime-local" value={startsAt} onChange={(event) => onPublishChange({ startsAt: event.target.value })} className="border-hairline rounded-control text-ink mt-1 block w-full border px-3 py-2 text-sm" /></label>
-              {mode === 'period' ? <label className="text-ink-secondary text-xs font-semibold">出しおわり<input aria-label="出しおわり" type="datetime-local" value={endsAt} onChange={(event) => onPublishChange({ endsAt: event.target.value })} className="border-hairline rounded-control text-ink mt-1 block w-full border px-3 py-2 text-sm" /></label> : null}
+              <span className="text-ink-secondary text-xs font-semibold">出しはじめ<DateTimeField aria-label="出しはじめ" value={startsAt} onChange={(v) => onPublishChange({ startsAt: v })} className="mt-1" /></span>
+              {mode === 'period' ? <span className="text-ink-secondary text-xs font-semibold">出しおわり<DateTimeField aria-label="出しおわり" value={endsAt} onChange={(v) => onPublishChange({ endsAt: v })} className="mt-1" /></span> : null}
               {mode === 'period' ? <label className="text-ink-secondary text-xs font-semibold sm:col-span-2">終わったらどうする<SelectField aria-label="終わったらどうする" value={restoreGroupId} onChange={(event) => onPublishChange({ restoreGroupId: event.target.value })} options={[{ value: '', label: '前のメニューに戻す（実行開始時に確定）' }, ...restoreMenus.map((item) => ({ value: item.id, label: item.name }))]} className="mt-1" /><span className="text-ink-faint mt-1 block text-xs">{restoreGroupId ? '終了時に選んだメニューへ戻します。' : '「前のメニューに戻す」は実行開始の直前、そのときに表示中のメニューに確定します。表示中のメニューが無い場合は終了時に表示を外します。'}</span></label> : null}
             </div>
           ) : null}

@@ -28,6 +28,7 @@ import QuestionEditor, {
 import { ConditionDialog, describeCondition } from '@/components/scenarios/scenario-dialogs'
 import CarouselPicker from '@/components/scenarios/carousel-picker'
 import InsertToolbar from '@/components/scenarios/insert-toolbar'
+import { TimeField } from '@/components/shared/date-time-field'
 import StepPreview from '@/components/scenarios/step-preview'
 import CharCounter, { LINE_TEXT_LIMIT, isOverCharLimit } from '@/components/scenarios/char-counter'
 import styles from './first-step.module.css'
@@ -625,15 +626,14 @@ function FirstStepContent() {
               </div>
             </label>
             {mode === 'absolute_time' ? (
-              <label className="block">
+              <span className="block">
                 <span className="text-ink-secondary mb-1 block text-xs font-medium">配信する時刻</span>
-                <input
-                  type="time"
+                <TimeField
                   value={deliveryTime}
-                  onChange={e => setDeliveryTime(e.target.value)}
-                  className={`${styles.timeField} border-hairline rounded-control bg-canvas text-ink border px-3`}
+                  onChange={setDeliveryTime}
+                  aria-label="配信する時刻"
                 />
-              </label>
+              </span>
             ) : (
               <label className="block">
                 <span className="text-ink-secondary mb-1 block text-xs font-medium">さらに</span>

@@ -19,6 +19,33 @@ export function formatJp(date: string): string {
   return `${d.getUTCMonth() + 1}/${d.getUTCDate()}(${'日月火水木金土'[d.getUTCDay()]})`;
 }
 
+/** '2026-10-01' → '10/1'。下の操作の帯 (「10/1 10:00 で確認へ」) で使う。 */
+export function formatMd(date: string): string {
+  const d = new Date(`${date}T00:00:00Z`);
+  return `${d.getUTCMonth() + 1}/${d.getUTCDate()}`;
+}
+
+/** '2026-10-01' → '水'。日付の札で使う。 */
+export function formatWeekday(date: string): string {
+  const d = new Date(`${date}T00:00:00Z`);
+  return '日月火水木金土'[d.getUTCDay()];
+}
+
+function jstParts(utcIso: string): string {
+  return new Date(new Date(utcIso).getTime() + JST_OFFSET_MS).toISOString();
+}
+
+/** UTC ISO → '10/1' (JST)。履歴の日付の四角で使う。 */
+export function utcToJstMd(utcIso: string): string {
+  const d = jstParts(utcIso);
+  return `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
+}
+
+/** UTC ISO → '10:00' (JST)。履歴の日付の四角で使う。 */
+export function utcToJstHm(utcIso: string): string {
+  return jstParts(utcIso).slice(11, 16);
+}
+
 export function jstStartsAtIso(date: string, hhmm: string): string {
   // `+09:00` suffix tells JS to treat the wall-clock time as JST.
   return new Date(`${date}T${hhmm}:00+09:00`).toISOString();

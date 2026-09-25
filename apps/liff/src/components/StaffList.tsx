@@ -3,17 +3,25 @@ import { api, type StaffItem } from '../lib/api.js';
 import { logFailure } from '../lib/user-message.js';
 import LoadErrorView from './LoadErrorView.js';
 import LoadingView from './LoadingView.js';
+import Icon from './ui/Icon.js';
 
+/**
+ * 1-b 担当を選ぶ。札を押すと選ばれるだけで、進むのは下の操作の帯。
+ * 担当できる人がいないときは、その理由だけ出す (案内は付けない)。
+ */
 export default function StaffList({
   menuId,
   basePrice,
+  selectedId,
   onSelect,
-  onBack,
+  onLoadState,
 }: {
   menuId: string;
   basePrice: number;
+  selectedId: string | null;
   onSelect: (s: StaffItem) => void;
-  onBack: () => void;
+  /** 読み込み中・失敗・選ぶものが無い間は、下の帯を出さないための合図。 */
+  onLoadState?: (ready: boolean) => void;
 }) {
   const [list, setList] = useState<StaffItem[] | null>(null);
   const [failed, setFailed] = useState(false);
@@ -30,47 +38,73 @@ export default function StaffList({
       });
   }, [menuId, reloadKey]);
 
+  useEffect(() => {
+    onLoadState?.(list !== null && !failed && list.length > 0);
+  }, [list, failed, onLoadState]);
+
   if (failed) return <LoadErrorView onRetry={() => setReloadKey((k) => k + 1)} />;
   if (!list) return <LoadingView />;
   if (list.length === 0) {
-    return (
-      <div className="space-y-3">
-        <button onClick={onBack} className="text-sm text-gray-500">← 戻る</button>
-        <p className="text-gray-500">このメニューを担当できるスタッフがいません。</p>
-      </div>
-    );
+    return <p className="text-sm leading-6 text-ink-secondary">このメニューを担当できるスタッフがいません。</p>;
   }
 
   return (
-    <div className="space-y-3">
-      <button onClick={onBack} className="text-sm text-gray-500">← 戻る</button>
-      <h1 className="text-xl font-bold">担当を選んでください</h1>
+    <div className="space-y-5">
+      <h2 className="text-base font-bold text-ink">担当を選んでください</h2>
       <ul className="space-y-2">
-        {list.map((s) => (
-          <li key={s.id}>
-            <button
-              onClick={() => onSelect(s)}
-              className="w-full flex items-center gap-3 p-3 border rounded-lg hover:bg-gray-50"
-            >
-              {s.profile_image_url ? (
-                <img
-                  src={s.profile_image_url}
-                  alt={s.display_name}
-                  className="w-12 h-12 rounded-full object-cover"
-                />
-              ) : (
-                <div className="w-12 h-12 rounded-full bg-gray-200" />
-              )}
-              <div className="text-left flex-1">
-                <div className="font-medium">{s.display_name}</div>
-                {s.role && <div className="text-sm text-gray-500">{s.role}</div>}
-                {s.price !== basePrice && (
-                  <div className="text-xs text-gray-500">¥{s.price.toLocaleString()}〜</div>
+        {list.map((s) => {
+          const selected = s.id === selectedId;
+          return (
+            <li key={s.id}>
+              <button
+                type="button"
+                onClick={() => onSelect(s)}
+                aria-pressed={selected}
+                className={`flex w-full items-center gap-3 rounded-xl border bg-canvas p-4 text-left focus-visible:outline-2 focus-visible:outline-ink ${
+                  selected ? 'border-accent-deep' : 'border-hairline'
+                }`}
+              >
+                {s.profile_image_url ? (
+                  <img
+                    src={s.profile_image_url}
+                    alt=""
+                    className="h-12 w-12 shrink-0 rounded-full object-cover"
+                  />
+                ) : (
+                  <span
+                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-ground text-ink-faint"
+                    aria-hidden="true"
+                  >
+                    <Icon name="user" className="h-6 w-6" />
+                  </span>
                 )}
-              </div>
-            </button>
-          </li>
-        ))}
+                <span className="min-w-0 flex-1 text-left">
+                  <span className="block truncate font-semibold text-ink" title={s.display_name}>
+                    {s.display_name}
+                  </span>
+                  {s.role && (
+                    <span className="block truncate text-sm text-ink-secondary" title={s.role}>
+                      {s.role}
+                    </span>
+                  )}
+                  {s.price !== basePrice && (
+                    <span className="block text-xs text-ink-secondary">
+                      ¥{s.price.toLocaleString()}〜
+                    </span>
+                  )}
+                </span>
+                <span
+                  className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${
+                    selected ? 'bg-accent-deep text-white' : 'border border-hairline text-transparent'
+                  }`}
+                  aria-hidden="true"
+                >
+                  <Icon name="check" className="h-4 w-4" />
+                </span>
+              </button>
+            </li>
+          );
+        })}
       </ul>
     </div>
   );

@@ -7,6 +7,7 @@ import Card, { CardHeader } from '@/components/shared/card'
 import ConditionBuilder, { pruneCondition } from '@/components/shared/condition-builder'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { Field, TextArea, TextInput } from '@/components/shared/form-controls'
+import DateTimeField from '@/components/shared/date-time-field'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import Select from '@/components/shared/select'
@@ -414,9 +415,9 @@ function MileageRewardEditorInner() {
           </Field>
           <Field label="交換できる期間" htmlFor="reward-starts" note="空欄ならいつでも" error={touched && errors.includes('交換終了は交換開始より後にしてください') ? '交換終了は交換開始より後にしてください' : undefined}>
             <div className="flex flex-wrap items-center gap-2">
-              <TextInput id="reward-starts" type="datetime-local" value={form.startsAt} onChange={(e) => set('startsAt', e.target.value)} />
+              <DateTimeField id="reward-starts" value={form.startsAt} onChange={(v) => set('startsAt', v)} />
               <span className="text-ink-faint text-xs">から</span>
-              <TextInput aria-label="交換終了" type="datetime-local" value={form.endsAt} onChange={(e) => set('endsAt', e.target.value)} />
+              <DateTimeField aria-label="交換終了" value={form.endsAt} onChange={(v) => set('endsAt', v)} />
             </div>
           </Field>
           <Field label="交換後に使える日数" htmlFor="reward-expires" note="空欄なら期限なし">
