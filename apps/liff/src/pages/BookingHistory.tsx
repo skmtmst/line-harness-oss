@@ -40,7 +40,7 @@ export default function BookingHistory() {
       <div className="mx-auto w-full max-w-md space-y-4 px-4 pt-2 pb-10">
         <PageHeader title="予約の履歴" />
         {failed ? (
-          <LoadErrorView onRetry={() => setReloadKey((k) => k + 1)} />
+          <LoadErrorView note="予約はなくなっていません。" onRetry={() => setReloadKey((k) => k + 1)} />
         ) : !data ? (
           <LoadingView />
         ) : (

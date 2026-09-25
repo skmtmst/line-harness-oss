@@ -22,7 +22,7 @@ export default function StatusView({
     <div className="flex flex-col items-center px-6 py-10 text-center">
       <span
         className={`flex h-16 w-16 items-center justify-center rounded-full ${
-          tone === 'success' ? 'bg-ok-bg text-ok-ink' : 'bg-ground text-ink-faint'
+          tone === 'success' ? 'bg-ok-bg text-ok-ink' : 'bg-state-mark text-ink-faint'
         }`}
         aria-hidden="true"
       >

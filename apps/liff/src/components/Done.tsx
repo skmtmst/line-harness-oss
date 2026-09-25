@@ -2,6 +2,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { formatJp } from '../lib/datetime.js';
 import StatusView from './ui/StatusView.js';
 import Button from './ui/Button.js';
+import Icon from './ui/Icon.js';
 import type { SlotPick } from './DateTimePicker.js';
 
 /**
@@ -40,6 +41,7 @@ export default function Done({ menuName, slot }: { menuName: string; slot: SlotP
         variant="secondary"
         onClick={() => navigate({ pathname: '/booking/history', search })}
       >
+        <Icon name="calendar-days" className="h-4 w-4" />
         予約の履歴を見る
       </Button>
     </div>

@@ -16,6 +16,19 @@ const PATHS = {
     <path key="b" d="M8 2v4" />,
     <path key="c" d="M3 10h18" />,
   ],
+  /** 予約の履歴を見る */
+  'calendar-days': [
+    <path key="a" d="M8 2v4" />,
+    <path key="b" d="M16 2v4" />,
+    <rect key="r" width="18" height="18" x="3" y="4" rx="2" />,
+    <path key="c" d="M3 10h18" />,
+    <path key="d" d="M8 14h.01" />,
+    <path key="e" d="M12 14h.01" />,
+    <path key="f" d="M16 14h.01" />,
+    <path key="g" d="M8 18h.01" />,
+    <path key="h" d="M12 18h.01" />,
+    <path key="i" d="M16 18h.01" />,
+  ],
   /** 時刻 */
   clock: [
     <circle key="c" cx="12" cy="12" r="10" />,

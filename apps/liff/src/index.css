@@ -22,6 +22,7 @@
   --color-info-link: #0b63ce;
   --color-danger: #b3261e;
   --color-skeleton: #e9ebef;
+  --color-state-mark: #ebedf1;
 }
 
 body {
