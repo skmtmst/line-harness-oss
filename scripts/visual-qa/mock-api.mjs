@@ -1542,6 +1542,32 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (method === 'GET' && pathname === '/api/hq/billing/invoices') {
     return { success: true, data: [] }
   }
+  if (method === 'GET' && pathname === '/api/hq/support/context') {
+    /*
+     * 統括のお問い合わせ（`apps/worker/src/routes/hq-support.ts`）と同じ器。
+     * 無いと既定の `{items,total,page,limit}` が返り、画面の `kinds.map` で
+     * `/hq/support` が真っ白になった（2026-09-25）。
+     */
+    return {
+      success: true,
+      data: {
+        kinds: [
+          { key: 'usage', label: '使い方について' },
+          { key: 'bug', label: '不具合の報告' },
+          { key: 'billing', label: '料金・契約について' },
+          { key: 'feature', label: '要望・提案' },
+          { key: 'other', label: 'その他' },
+        ],
+        accounts: [{ id: 'visual-qa-account', name: '画面確認アカウント' }],
+        sender: {
+          tenantName: '画面確認統括',
+          name: '検証 一郎',
+          email: 'owner@example.com',
+          planLabel: 'スタンダード',
+        },
+      },
+    }
+  }
   if (pathname === '/api/auth/session') {
     /*
      * 運営コンソールの外枠（`OpsShell`）は `platformAdmin` を見る。

@@ -23,6 +23,7 @@ import {
   SUPPORT_SUBJECT_MAX,
   validateSupportAttachment,
   validateSupportInput,
+  type HqSupportContext,
   type HqSupportInput,
   type HqSupportKind,
   type HqSupportRequest,
@@ -58,9 +59,19 @@ export default function HqSupportPage() {
     let cancelled = false
     void api.hqSupport.context().then((res) => {
       if (cancelled || !res.success) return
-      setKinds(res.data.kinds)
-      setAccounts(res.data.accounts)
-      setSender(res.data.sender)
+      // 2026-09-25: 偽APIの既定の器（`{items,total,page,limit}`）が返ると
+      // `kinds.map` で画面ごと落ちた。形が違っても入力欄は出す。
+      const data = res.data as Partial<HqSupportContext> | undefined
+      setKinds(Array.isArray(data?.kinds) ? data.kinds : [])
+      setAccounts(Array.isArray(data?.accounts) ? data.accounts : [])
+      if (data?.sender) {
+        setSender({
+          tenantName: data.sender.tenantName ?? '',
+          name: data.sender.name ?? '',
+          email: data.sender.email ?? null,
+          planLabel: data.sender.planLabel ?? '—',
+        })
+      }
     }).catch(() => {
       // 履歴と送信は独立して使える。表示用情報だけ空のままにする。
     })
@@ -75,6 +86,7 @@ export default function HqSupportPage() {
     try {
       const res = await api.hqSupport.list()
       if (!res.success) throw new Error(res.error)
+      if (!Array.isArray(res.data)) throw new Error('unexpected history shape')
       setHistory(res.data)
     } catch {
       setHistory([])
