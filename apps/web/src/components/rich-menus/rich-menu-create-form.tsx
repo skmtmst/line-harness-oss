@@ -128,6 +128,13 @@ type Props = {
   compatibilityError?: string | null
   validationError?: string | null
   /**
+   * その場の入力欄エラー（作成画面の保存前検証用）。
+   * 渡すと該当の入力欄の下にその場で出し、欄へフォーカスできるよう
+   * 欄に id を付ける。ページ最下部の帯には出さない。
+   */
+  nameError?: string | null
+  chatBarTextError?: string | null
+  /**
    * N-161: 「最初に見せるページ・出す相手・全員既定」の入力を出すか。
    * 統括ひな形（HQ）はこの3つを保存できないため、そこでは付けない。
    * 出したまま保存先に無いと、入力が黙って捨てられる。
@@ -149,6 +156,8 @@ export default function RichMenuCreateForm({
   disabled = false,
   compatibilityError,
   validationError,
+  nameError,
+  chatBarTextError,
   audienceSetup = false,
   imageAction,
   footer,
@@ -227,18 +236,18 @@ export default function RichMenuCreateForm({
         <div className="border-hairline bg-canvas rounded-card min-w-0 space-y-4 border p-4 shadow-sm lg:col-span-3">
           <div className="grid gap-3 lg:grid-cols-6">
             <div className="lg:col-span-3">
-              <label className="text-ink-secondary mb-1 block text-sm font-medium">メニュー名<RequiredBadge /></label>
-              <input value={value.name} aria-label="メニュー名" onChange={(event) => patch({ name: event.target.value })} aria-required="true" disabled={locked} className="border-hairline rounded-control focus:ring-accent block w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" placeholder="例：メインメニュー" />
-              <p className="text-ink-faint mt-1 text-xs">管理画面での識別用です。友だちには表示されません。</p>
+              <label className="text-ink-secondary mb-1 block text-sm font-medium" htmlFor="rich-menu-name">メニュー名<RequiredBadge /></label>
+              <input id="rich-menu-name" value={value.name} aria-label="メニュー名" onChange={(event) => patch({ name: event.target.value })} aria-required="true" aria-invalid={Boolean(nameError)} aria-describedby={nameError ? 'rich-menu-name-error' : undefined} disabled={locked} className="border-hairline rounded-control focus:ring-accent block w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" placeholder="例：メインメニュー" />
+              {nameError ? <p id="rich-menu-name-error" role="alert" className="text-danger mt-1 text-xs">{nameError}</p> : <p className="text-ink-faint mt-1 text-xs">管理画面での識別用です。友だちには表示されません。</p>}
             </div>
             <div className="lg:col-span-1">
               <label className="text-ink-secondary mb-1 block text-sm font-medium" htmlFor="rich-menu-folder">フォルダ</label>
               <SelectField id="rich-menu-folder" aria-label="フォルダ" value={value.folderId} disabled={locked || folders.length === 0} onChange={(event) => patch({ folderId: event.target.value })} options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]} />
             </div>
             <div className="lg:col-span-2">
-              <label className="text-ink-secondary mb-1 block text-sm font-medium">トーク画面下の文言</label>
-              <input value={value.chatBarText} aria-label="メニューを開くボタンの文字" onChange={(event) => patch({ chatBarText: event.target.value })} maxLength={14} aria-required="true" disabled={locked} className="border-hairline rounded-control focus:ring-accent block w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" />
-              <p className="text-ink-faint mt-1 text-xs">14文字以内。メニューを開く前にトーク画面下に表示されます。</p>
+              <label className="text-ink-secondary mb-1 block text-sm font-medium" htmlFor="rich-menu-chat-bar-text">トーク画面下の文言</label>
+              <input id="rich-menu-chat-bar-text" value={value.chatBarText} aria-label="メニューを開くボタンの文字" onChange={(event) => patch({ chatBarText: event.target.value })} maxLength={14} aria-required="true" aria-invalid={Boolean(chatBarTextError)} aria-describedby={chatBarTextError ? 'rich-menu-chat-bar-text-error' : undefined} disabled={locked} className="border-hairline rounded-control focus:ring-accent block w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" />
+              {chatBarTextError ? <p id="rich-menu-chat-bar-text-error" role="alert" className="text-danger mt-1 text-xs">{chatBarTextError}</p> : <p className="text-ink-faint mt-1 text-xs">14文字以内。メニューを開く前にトーク画面下に表示されます。</p>}
             </div>
           </div>
 

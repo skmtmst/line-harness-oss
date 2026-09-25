@@ -82,7 +82,7 @@ describe('お問い合わせ（36-3）', () => {
     expect(support).toContain('label="種類" required')
     expect(support).toContain('label="件名" required')
     expect(support).toContain('label="本文" required')
-    expect(support).toContain('label="関係するアカウント" note="任意"')
+    expect(support).toContain('label="関係する店舗" note="任意"')
     expect(support).toContain('accept="image/png,image/jpeg"')
   })
 

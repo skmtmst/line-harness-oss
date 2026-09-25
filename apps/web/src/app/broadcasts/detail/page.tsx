@@ -254,7 +254,8 @@ function BroadcastDetailInner() {
       ) : String(broadcast.status) === 'sent' ? (
         <SentResult broadcast={broadcast} insight={insight} insightState={insightState} contentRef={contentRef} />
       ) : (
-        <div className="max-w-3xl space-y-4">
+        <div className="space-y-4">
+          {/* ★V7: 予約・下書きも共通の枠の幅いっぱいに広げる。絞ると 1920px で右が大きく空く。 */}
           <section className="bg-canvas rounded-card border-hairline border p-5">
             <p className="text-ink text-sm font-semibold">送信の進み具合</p>
             {/*

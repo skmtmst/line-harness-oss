@@ -12,7 +12,7 @@ import type {
   BannerStats,
   BannerUsage,
 } from './hq-banners'
-import type { HqSupportDetail, HqSupportKind, HqSupportMessage, HqSupportRequest } from './hq-support'
+import type { HqSupportContext, HqSupportDetail, HqSupportKind, HqSupportMessage, HqSupportRequest } from './hq-support'
 import type { BillingInterval, BillingInvoice, BillingSummary, PlanKey } from './hq-billing'
 import type {
   ReminderDraftSettings,
@@ -7868,6 +7868,7 @@ export const api = {
   },
   /** 統括から運営へのお問い合わせ（★V6 36-3）。形は `apps/worker/src/routes/hq-support.ts`。 */
   hqSupport: {
+    context: () => fetchApi<ApiResponse<HqSupportContext>>('/api/hq/support/context'),
     kinds: () => fetchApi<ApiResponse<Array<{ key: HqSupportKind; label: string }>>>('/api/hq/support/kinds'),
     list: () => fetchApi<ApiResponse<HqSupportRequest[]>>('/api/hq/support/requests'),
     create: (input: {

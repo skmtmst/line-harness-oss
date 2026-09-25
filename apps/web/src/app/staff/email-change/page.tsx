@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Button from '@/components/shared/button'
+import TargetMissing from '@/components/shared/target-missing'
 import { api } from '@/lib/api'
 
 /*
@@ -55,9 +56,13 @@ export default function StaffEmailChangePage() {
 
         {view === 'reading' && <p className="mt-5 text-sm text-ink-secondary">確認内容を読み込んでいます…</p>}
         {view === 'invalid' && (
-          <p role="alert" className="mt-5 rounded-control bg-danger-bg p-4 text-sm text-danger">
-            確認情報が見つかりません。確認メールのリンクをもう一度開いてください。
-          </p>
+          <div className="mt-5">
+            <TargetMissing
+              kind="not-found"
+              title="確認情報が見つかりません"
+              description="確認メールのリンクをもう一度開いてください。"
+            />
+          </div>
         )}
         {(view === 'ready' || view === 'submitting') && (
           <>

@@ -14,6 +14,12 @@ import styles from './app-shell.module.css'
 import { isPublicAuthPath } from '@/lib/auth-email'
 import OpsShell from './ops/ops-shell'
 import ImpersonationNotice from './ops/impersonation-notice'
+import SuspendedSidebar from './layout/suspended-sidebar'
+import TopBar from './shared/top-bar'
+import NoteBar from './shared/note-bar'
+import PlatformNotices from './hq/platform-notices'
+import { logoutAndGoToLogin } from '@/lib/logout'
+import { useEffect, useState } from 'react'
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -54,8 +60,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   const guardedContent = <RootLandingGate><StoreSelectionGate><FeatureDisabledGate>{children}</FeatureDisabledGate></StoreSelectionGate></RootLandingGate>
 
+  const suspendedSupport = (
+    <PageChromeProvider>
+      <SuspendedSupportWorkspace>{children}</SuspendedSupportWorkspace>
+    </PageChromeProvider>
+  )
+
   return (
-    <AuthGuard>
+    <AuthGuard suspendedSupport={suspendedSupport}>
       <AccountProvider>
         <PageChromeProvider>
           {isAccountCreate ? (
@@ -86,6 +98,53 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </PageChromeProvider>
       </AccountProvider>
     </AuthGuard>
+  )
+}
+
+/** 停止中のお問い合わせ。V6 `IwfA0` の外枠だけを組み、通常の画面機能は再利用する。 */
+function SuspendedSupportWorkspace({ children }: { children: React.ReactNode }) {
+  const { title } = usePageChrome()
+  const [staffName, setStaffName] = useState('')
+
+  useEffect(() => {
+    try { setStaffName(localStorage.getItem('lh_staff_name') ?? '') } catch { /* storage なし */ }
+  }, [])
+
+  return (
+    <div className={styles.shell} data-design-node="IwfA0">
+      <SessionLostNotice />
+      <div className={styles.workspace}>
+        <SuspendedSidebar />
+        <div className={styles.side}>
+          <div className="hidden xl:block">
+            <TopBar
+              title={title ?? 'お問い合わせ'}
+              manualHref={null}
+              accounts={[]}
+              selectedAccountId=""
+              onAccountChange={() => undefined}
+              showAccountSwitcher={false}
+              roleLabel="統括"
+              userName={staffName}
+              onLogout={logoutAndGoToLogin}
+            />
+          </div>
+          <main id="main-content" tabIndex={-1} className={styles.main}>
+            <div className={`${styles.content} ${styles.contentFull} flex min-h-full flex-col`}>
+              <div className="flex min-h-full flex-1 flex-col gap-4">
+                <div data-design-node="MdTiR">
+                  <NoteBar tone="danger">
+                    ご契約の利用が停止されています。この画面の「お問い合わせ」と、運営からのお知らせだけご利用いただけます。他の機能は復帰後に使えるようになります。
+                  </NoteBar>
+                </div>
+                <PlatformNotices />
+                {children}
+              </div>
+            </div>
+          </main>
+        </div>
+      </div>
+    </div>
   )
 }
 
