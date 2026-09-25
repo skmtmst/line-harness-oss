@@ -780,6 +780,8 @@ select:not([multiple]):not(.appearance-none) {
 @container (max-width: 1119.98px) {
   .cq-hide-below-1120 {
     display: none;
+  }
+}
 
 /* Googleビジネス第2段（GB-10〜GB-19）。主列 1126 ＋ 右カード 390（1920px 設計）。 */
 .gb-history-row {

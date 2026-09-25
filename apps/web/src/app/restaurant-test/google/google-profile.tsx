@@ -357,6 +357,15 @@ function periodsProblem(periods: GoogleHoursPeriod[]): string | null {
   return null
 }
 
+/** 変更前後の枠を比べ、枠数が同じなら変わった枠だけを「17:00–22:00 → 17:00–23:00」の形で返す。 */
+function periodDiff(before: GoogleHoursPeriod[], after: GoogleHoursPeriod[]): [string, string] {
+  if (before.length === after.length && before.length > 0) {
+    const changed = before.map((p, i) => [p, after[i]] as const).filter(([b, a]) => b.open !== a.open || b.close !== a.close)
+    if (changed.length > 0) return [formatPeriods(changed.map(([b]) => b)), formatPeriods(changed.map(([, a]) => a))]
+  }
+  return [formatPeriods(before, '定休日'), formatPeriods(after, '定休日')]
+}
+
 function ChangeTargetCard({ storeName, today, timeZone, title, current, note, hint }: { storeName: string; today: string; timeZone: string; title: string; current: ReactNode; note: string; hint: string }) {
   return (
     <section className="border-hairline bg-canvas flex flex-col gap-4 self-start rounded-card border p-5" aria-label="変更対象の確認">
@@ -474,7 +483,7 @@ export function HoursEditor({ accountId, mode, initialDate, go }: { accountId: s
           today={today.date}
           timeZone={timeZone}
           title="変更した曜日"
-          current={weeklyChanged.length === 0 ? <span className="text-ink-faint text-sm font-normal">まだ変更はありません</span> : weeklyChanged.map((d) => <p key={d} className="text-lead">{WEEKDAY_JA[d]}曜 {formatPeriods(profile.regularHours[d] ?? [], '定休日')} → {formatPeriods(weekly[d] ?? [], '定休日')}</p>)}
+          current={weeklyChanged.length === 0 ? <span className="text-ink-faint text-sm font-normal">まだ変更はありません</span> : weeklyChanged.map((d) => { const [b, a] = periodDiff(profile.regularHours[d] ?? [], weekly[d] ?? []); return <p key={d}>{WEEKDAY_JA[d]}曜 {b} → {a}</p> })}
           note="通常の営業時間（毎週）として変更します。変えていない曜日はそのままです。"
           hint="特定の日だけ変えたい場合は「カレンダーで指定」から設定してください。"
         />
@@ -656,7 +665,7 @@ export function HoursEditor({ accountId, mode, initialDate, go }: { accountId: s
                       <TimeSelect kind="open" label={`${WEEKDAY_JA[d]}曜 枠${i + 1}の開始`} value={p.open} onChange={(v) => setDayPeriods(d, periods.map((x, j) => (j === i ? { ...x, open: v } : x)))} />
                       <span className="text-ink-faint">–</span>
                       <TimeSelect kind="close" label={`${WEEKDAY_JA[d]}曜 枠${i + 1}の終了`} value={p.close} onChange={(v) => setDayPeriods(d, periods.map((x, j) => (j === i ? { ...x, close: v } : x)))} />
-                      {periods.length > 1 ? <button type="button" aria-label={`${WEEKDAY_JA[d]}曜 枠${i + 1}を削除`} onClick={() => setDayPeriods(d, periods.filter((_, j) => j !== i))} className="text-ink-faint flex h-8 w-8 items-center justify-center rounded-control hover:bg-canvas-sunken"><X size={16} /></button> : null}
+                      {periods.length > 1 && i === periods.length - 1 ? <button type="button" aria-label={`${WEEKDAY_JA[d]}曜 枠${i + 1}を削除`} onClick={() => setDayPeriods(d, periods.filter((_, j) => j !== i))} className="text-ink-faint flex h-8 w-8 items-center justify-center rounded-control hover:bg-canvas-sunken"><X size={16} /></button> : null}
                     </span>
                   )
                 })}
@@ -693,7 +702,10 @@ function describeHours(value: unknown, kind: GoogleChange['kind']): ReactNode {
   if (kind === 'special_hours') {
     const days = (value as GoogleDayHours[] | null) ?? []
     return days.map((d) => (
-      <p key={d.date}>{days.length > 1 ? <span className="text-label mr-2 font-normal">{formatYmdShort(d.date)}</span> : null}{d.closed ? '休業' : d.periods.map((p) => `${p.open}–${p.close === '00:00' ? '24:00' : p.close}`).join(' / ')}</p>
+      <div key={d.date}>
+        {days.length > 1 ? <p className="text-label font-normal">{formatYmdShort(d.date)}</p> : null}
+        {d.closed ? <p>休業</p> : d.periods.map((p, i) => <p key={i}>{p.open}–{p.close === '00:00' ? '24:00' : p.close}</p>)}
+      </div>
     ))
   }
   const weekly = (value as Partial<GoogleWeeklyHours> | null) ?? {}
@@ -845,12 +857,12 @@ export function ChangeConfirmScreen({ accountId, ids, go }: { accountId: string;
         <div className="gb-compare-grid grid min-w-0 grid-cols-1 items-center gap-6">
           <div className="border-hairline bg-canvas flex flex-col gap-3 rounded-card border p-5">
             <p className="text-ink-faint text-label">現在</p>
-            <div className="text-ink-secondary text-hero leading-relaxed font-semibold">{beforeNode}</div>
+            <div className={`text-ink-secondary leading-relaxed font-semibold ${isHours ? 'text-hero' : 'text-lead'}`}>{beforeNode}</div>
           </div>
           <ArrowRight size={24} className="text-ink-faint hidden shrink-0 justify-self-center lg:block" aria-hidden="true" />
           <div className="bg-accent-soft border-accent flex flex-col gap-3 rounded-card border p-5">
             <p className="text-accent-deep text-label font-semibold">変更後</p>
-            <div className="text-hero leading-relaxed font-bold">{afterNode}</div>
+            <div className={`leading-relaxed font-bold ${isHours ? 'text-hero' : 'text-lead'}`}>{afterNode}</div>
             <p className="text-ink-secondary text-label">{afterNote}</p>
           </div>
         </div>
@@ -876,8 +888,7 @@ export function ChangeConfirmScreen({ accountId, ids, go }: { accountId: string;
         <StickyBar actions={<>{ids.length > 1 && index < ids.length - 1 ? <Button variant="primary" onClick={() => setIndex(index + 1)}>次の変更へ</Button> : null}<Button variant={ids.length > 1 && index < ids.length - 1 ? 'secondary' : 'primary'} onClick={() => go({ tab: 'profile' })}>プロフィールへ戻る</Button><Button onClick={() => go({ tab: 'profile', view: 'history' })}>変更履歴を見る</Button></>} />
       ) : (
         <StickyBar
-          destructive={change.status === 'draft' || change.status === 'failed' || change.status === 'conflict' ? <Button variant="danger" onClick={() => void cancel()} disabled={busy}>この変更を取り消す</Button> : undefined}
-          actions={<><Button onClick={backTo} disabled={busy}>修正する</Button><Button variant="primary" onClick={() => void send()} disabled={!canPress}>{busy ? '送信中…' : 'Googleに変更を送信'}</Button></>}
+          actions={<><Button onClick={backTo} disabled={busy}>修正する</Button>{change.status === 'failed' || change.status === 'conflict' ? <Button onClick={() => void cancel()} disabled={busy}>この変更を取り消す</Button> : null}<Button variant="primary" onClick={() => void send()} disabled={!canPress}>{busy ? '送信中…' : 'Googleに変更を送信'}</Button></>}
         />
       )}
     </div>
@@ -960,7 +971,7 @@ export function HistoryScreen({ accountId, initialResult, go }: { accountId: str
       <div className="flex flex-wrap items-center gap-3">
         <PillTabs label="変更の種類" items={HISTORY_KINDS.map((k) => ({ key: k.key, label: `${k.label}${data ? ` ${data.counts[k.key]}` : ''}`, current: kind === k.key, onClick: () => { setKind(k.key); setPage(1) } }))} />
         <span className="grow" />
-        <SelectField size="compact" aria-label="結果で絞り込み" value={result} onChange={(event) => { setResult(event.target.value as GoogleHistoryResult); setPage(1) }} options={[{ value: 'all', label: '結果：すべて' }, { value: 'applied', label: '反映済み' }, { value: 'pending', label: '反映確認中' }, { value: 'failed', label: '失敗・取り消し' }]} />
+        <SelectField aria-label="結果で絞り込み" value={result} onChange={(event) => { setResult(event.target.value as GoogleHistoryResult); setPage(1) }} options={[{ value: 'all', label: '結果：すべて' }, { value: 'applied', label: '反映済み' }, { value: 'pending', label: '反映確認中' }, { value: 'failed', label: '失敗・取り消し' }]} />
         <SelectField size="compact" aria-label="期間" value={days} onChange={(event) => { setDays(event.target.value); setPage(1) }} options={[{ value: '7', label: '期間：7日' }, { value: '30', label: '期間：30日' }, { value: '90', label: '期間：90日' }, { value: '365', label: '期間：1年' }]} />
         <SearchField placeholder="内容で検索" aria-label="内容で検索" value={search} onChange={setSearch} onClear={() => setSearch('')} />
       </div>
@@ -980,10 +991,10 @@ export function HistoryScreen({ accountId, initialResult, go }: { accountId: str
               return (
                 <div key={entry.id} role="row" className={`border-hairline gb-history-row grid items-center border-t px-4 py-4 ${open ? 'hover:bg-canvas-sunken cursor-pointer' : ''}`} onClick={open} onKeyDown={open ? (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); open() } } : undefined} tabIndex={open ? 0 : undefined}>
                   <span role="cell" className="text-sm font-semibold whitespace-nowrap">{formatDateTime(entry.createdAt)}</span>
-                  <span role="cell" className="min-w-0 truncate text-sm" title={entry.summary}>{entry.summary}{entry.status === 'failed' && entry.error ? <span className="text-ink-faint ml-2 text-caption">（{entry.error}）</span> : null}</span>
+                  <span role="cell" className="min-w-0 truncate text-sm" title={entry.summary}>{entry.summary}</span>
                   <span role="cell" className="text-ink-faint truncate text-label" title={entry.staffName ?? ''}>{entry.staffName ?? '—'}</span>
                   <span role="cell"><StatusBadge tone={entry.kind === 'review_reply' ? 'neutral' : entry.kind === 'profile' || entry.kind === 'photo' ? 'neutral' : 'warning'}>{KIND_LABEL[entry.kind] ?? entry.kind}</StatusBadge></span>
-                  <span role="cell"><StatusBadge tone={status.tone}>{status.label}</StatusBadge></span>
+                  <span role="cell"><StatusBadge tone={status.tone}>{status.label}{entry.status === 'failed' && entry.error ? `（${entry.error}）` : ''}</StatusBadge></span>
                 </div>
               )
             })}
@@ -1010,7 +1021,7 @@ function formFrom(data: GoogleProfileData): ProfileForm {
     postalCode: p.address?.postalCode ?? '',
     administrativeArea: p.address?.administrativeArea ?? '',
     locality: p.address?.locality ?? '',
-    addressLines: (p.address?.addressLines ?? []).join('\n'),
+    addressLines: (p.address?.addressLines ?? []).join(' / '),
     phone: p.phone ?? '',
     websiteUri: p.websiteUri ?? '',
     description: p.description ?? '',
@@ -1075,7 +1086,7 @@ export function ProfileEditScreen({ accountId, go }: { accountId: string; go: Pr
     setActionError('')
     const proposals: GoogleProfileProposal[] = []
     if (changedFields.includes('title')) proposals.push({ field: 'title', value: form.title.trim() })
-    if (addressChanged) proposals.push({ field: 'address', value: { postalCode: form.postalCode.trim(), administrativeArea: form.administrativeArea.trim(), locality: form.locality.trim(), addressLines: form.addressLines.split('\n').map((l) => l.trim()).filter(Boolean) } })
+    if (addressChanged) proposals.push({ field: 'address', value: { postalCode: form.postalCode.trim(), administrativeArea: form.administrativeArea.trim(), locality: form.locality.trim(), addressLines: form.addressLines.split(' / ').map((l) => l.trim()).filter(Boolean) } })
     if (changedFields.includes('phone')) proposals.push({ field: 'phone', value: form.phone.trim() })
     if (changedFields.includes('websiteUri')) proposals.push({ field: 'websiteUri', value: form.websiteUri.trim() })
     if (changedFields.includes('description')) proposals.push({ field: 'description', value: form.description.trim() })
@@ -1125,7 +1136,7 @@ export function ProfileEditScreen({ accountId, go }: { accountId: string; go: Pr
               <span style={{ width: 200 }}><TextField aria-label="都道府県" placeholder="東京都" value={form.administrativeArea} onChange={(e) => set('administrativeArea')(e.target.value)} maxLength={20} /></span>
             </div>
             <TextField aria-label="市区町村" placeholder="渋谷区神宮前" value={form.locality} onChange={(e) => set('locality')(e.target.value)} maxLength={40} />
-            <TextArea aria-label="番地・建物" placeholder="1-2-3 こもれびビル 1F" rows={2} value={form.addressLines} onChange={(e) => set('addressLines')(e.target.value)} />
+            <TextField aria-label="番地・建物" placeholder="1-2-3 こもれびビル 1F" value={form.addressLines} onChange={(e) => set('addressLines')(e.target.value)} maxLength={160} />
           </Field>
           <Field label="電話番号" htmlFor="gb-phone" note="ハイフンありで入力できます。">
             <TextField id="gb-phone" inputMode="tel" value={form.phone} onChange={(e) => set('phone')(e.target.value)} maxLength={20} />

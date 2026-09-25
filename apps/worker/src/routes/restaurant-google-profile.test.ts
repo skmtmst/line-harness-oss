@@ -473,11 +473,23 @@ describe('Googleビジネス：変更履歴（GB-17）', () => {
     const b = await propose({ source: 'calendar', days: [{ date: '2026-09-30', closed: true, periods: [] }] });
     await call(`/api/restaurant-test/google/changes/${b.json.change!.id}/cancel`, { body: {} });
     await propose({ source: 'calendar', days: [{ date: '2026-10-05', closed: true, periods: [] }] }); // draft のまま
-    const res = await call('/api/restaurant-test/google/changes?limit=10');
+    testDb.raw
+      .prepare(`INSERT INTO rt_google_write_log (id, store_id, kind, target_name, staff_id, result, created_at) VALUES ('wl-1', 'store-shibuya', 'review_reply', ?, 'owner-1', 'accepted', '2026-09-22 01:00:00')`)
+      .run(`${LOCATION}/reviews/r1`);
+    testDb.raw
+      .prepare(`INSERT INTO rt_google_reviews (id, store_id, review_name, reviewer_display_name, star_rating, create_time) VALUES ('rv-1', 'store-shibuya', ?, 'Aki', 5, '2026-09-20T00:00:00Z')`)
+      .run(`${LOCATION}/reviews/r1`);
+    const res = await call('/api/restaurant-test/google/changes?per_page=10');
     expect(res.status).toBe(200);
-    const list = ((await res.json()) as { changes: Array<{ status: string; summary: string; staffName: string | null }> }).changes;
-    expect(list.map((x) => x.status)).toEqual(['cancelled', 'applied']);
+    const body = (await res.json()) as { changes: Array<{ status: string; summary: string; kind: string; staffName: string | null }>; total: number; counts: Record<string, number> };
+    const list = body.changes;
+    expect(list.map((x) => x.status)).toEqual(['cancelled', 'applied', 'applied']);
     expect(list[1]).toMatchObject({ summary: '9/23（水）を休業に' });
+    expect(list[2]).toMatchObject({ kind: 'review_reply', summary: '口コミ返信を公開：Akiさんの口コミ（★5）' });
+    expect(body.counts).toEqual({ all: 3, hours: 2, profile: 0, review_reply: 1 });
+    const onlyHours = (await (await call('/api/restaurant-test/google/changes?kind=hours&result=applied')).json()) as { total: number; counts: Record<string, number> };
+    expect(onlyHours.total).toBe(1);
+    expect(onlyHours.counts.all).toBe(3);
     const detail = await call(`/api/restaurant-test/google/changes/${a.json.change!.id}`);
     expect(((await detail.json()) as { change: { status: string }; canSend: boolean }).canSend).toBe(true);
   });
