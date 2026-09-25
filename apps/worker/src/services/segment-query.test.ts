@@ -91,3 +91,36 @@ describe('詳細条件で絞る', () => {
     expect(bindings).toEqual([]);
   });
 });
+
+describe('配信のリンクを押したかで絞る', () => {
+  it('押していない人は「届いた人 − 押した人」になる', () => {
+    const { sql, bindings } = buildSegmentQuery({
+      operator: 'AND',
+      rules: [{ type: 'broadcast_link_clicked', value: { broadcastId: 'bc-1', clicked: false } }],
+    });
+    // 届いた人だけが母集団。届いていない人の未クリックを数えない。
+    expect(sql).toContain("ml.broadcast_id = ?");
+    expect(sql).toContain("AND NOT EXISTS");
+    expect(sql).toContain('FROM link_clicks lc');
+    expect(sql).toContain('btl.broadcast_id = ?');
+    expect(bindings).toEqual(['bc-1', 'bc-1']);
+  });
+
+  it('押した人はクリック記録がある人だけ', () => {
+    const { sql, bindings } = buildSegmentQuery({
+      operator: 'AND',
+      rules: [{ type: 'broadcast_link_clicked', value: { broadcastId: 'bc-1', clicked: true } }],
+    });
+    expect(sql).toContain('AND EXISTS');
+    expect(bindings).toEqual(['bc-1', 'bc-1']);
+  });
+
+  it('配信IDが無い条件は受け付けない', () => {
+    expect(() =>
+      buildSegmentQuery({
+        operator: 'AND',
+        rules: [{ type: 'broadcast_link_clicked', value: { clicked: false } }],
+      }),
+    ).toThrow(/broadcast_link_clicked/);
+  });
+});

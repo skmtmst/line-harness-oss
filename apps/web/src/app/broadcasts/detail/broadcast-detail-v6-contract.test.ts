@@ -102,4 +102,15 @@ describe('V6 一斉配信詳細の、送信前の進み具合', () => {
     expect(PAGE).not.toContain('送信が完了しました')
     expect(PAGE).not.toContain('一部届きませんでした')
   })
+
+  it('計測リンクのある配信だけ「押していない人へ追送」を出す', () => {
+    // 追いかけ配信（G-3）。母集団は「届いた人」なので、計測リンクが無い
+    // 配信に出すと全員が対象になってしまう。links がある時だけ出す。
+    expect(PAGE).toContain('リンクを押していない人へ追送')
+    expect(PAGE).toContain('insight?.links?.length ? (')
+    expect(PAGE).toContain("type: 'broadcast_link_clicked'")
+    expect(PAGE).toContain('clicked: false')
+    // 文面は元配信を種にする（宛先だけ差し替える）。
+    expect(PAGE).toContain('duplicateFrom=')
+  })
 })

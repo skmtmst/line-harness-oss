@@ -63,6 +63,12 @@ export interface SegmentRule {
      * 画面の条件ビルダーには出さない。
      */
     | 'analytics_audience'
+    /**
+     * 指定した一斉配信を受け取り、その中の計測リンクを押した／押さなかった人。
+     * 配信詳細の「押していない人へ追送」で作る引き継ぎ条件。
+     * 画面の条件ビルダーには出さない。
+     */
+    | 'broadcast_link_clicked'
     /** 内部用途: 作成時点の宛先IDを固定した配信。画面の条件ビルダーには出さない。 */
     | 'friend_id_in'
   value: unknown
@@ -555,6 +561,30 @@ function buildRuleClause(rule: SegmentRule): { sql: string; bindings: unknown[] 
                WHERE arm.friend_id = f.id AND ara.id = ?
                  AND ara.line_account_id = f.line_account_id
                  AND ara.expires_at > ?)`,
+        bindings,
+      }
+    }
+
+    /*
+     * その配信を受け取った人のうち、計測リンクを押した人／押さなかった人。
+     * 「届いた」の正本は messages_log（送信ごとに書く）。「押した」の正本は
+     * broadcast_tracked_links 経由の link_clicks。押した記録が無い人は
+     * 「押さなかった」側へ入る。
+     */
+    case 'broadcast_link_clicked': {
+      const v = asRecord(rule.value, 'broadcast_link_clicked')
+      const broadcastId = typeof v.broadcastId === 'string' ? v.broadcastId.trim() : ''
+      if (broadcastId === '') {
+        throw new Error('broadcast_link_clicked rule requires a broadcastId')
+      }
+      const clicked = v.clicked === true
+      bindings.push(broadcastId, broadcastId)
+      return {
+        sql: `EXISTS (SELECT 1 FROM messages_log ml WHERE ml.friend_id = f.id AND ml.broadcast_id = ? AND ml.direction = 'outgoing')
+          ${clicked ? 'AND' : 'AND NOT'} EXISTS (
+            SELECT 1 FROM link_clicks lc
+            JOIN broadcast_tracked_links btl ON btl.tracked_link_id = lc.tracked_link_id
+            WHERE lc.friend_id = f.id AND btl.broadcast_id = ?)`,
         bindings,
       }
     }

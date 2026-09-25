@@ -764,6 +764,18 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
     case 'analytics_audience':
       return <span className="text-ink-faint text-xs">分析で作った一時対象者（この画面では編集できません）</span>
 
+    case 'broadcast_link_clicked': {
+      // 配信詳細の「押していない人へ追送」で来る条件。対象の配信を
+      // この場で変えると「届いた人」の母集団も変わるので、ここでは
+      // 編集させない（違う配信にしたいときは、その配信の詳細から開く）。
+      const clicked = (rule.value as { clicked?: boolean } | null)?.clicked === true
+      return (
+        <span className="text-ink-faint text-xs">
+          {clicked ? 'その配信の計測リンクを押した人' : 'その配信の計測リンクを押していない人'}（この画面では編集できません）
+        </span>
+      )
+    }
+
     default:
       return <span className="text-ink-faint text-xs">この条件はこの画面では編集できません（{rule.type}）</span>
   }
