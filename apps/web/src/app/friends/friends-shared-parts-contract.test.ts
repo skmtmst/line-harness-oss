@@ -116,7 +116,7 @@ describe('重複検出で取れない数を作らない契約', () => {
     expect(DUPLICATES_BODY).toContain('読み込めませんでした')
     // ★V7 `x63W5x`：失敗の1枚は共通部品の error（副ボタン「もう一度読み込む」つき）。
     // 文言は部品が持つ。ここでは口（`onRetry`）があることだけ見る。
-    expect(DUPLICATES_BODY, '取得失敗にやり直す口が無い').toContain('onRetry={() => void detect()}')
+    expect(DUPLICATES_BODY, '取得失敗にやり直す口が無い').toContain('onRetry={() => void loadCandidates()}')
     expect(DUPLICATES_BODY).not.toContain('読み込み中…')
     expect(DUPLICATES_BODY).not.toContain('集計の取得に失敗しました')
   })
