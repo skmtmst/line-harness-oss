@@ -609,6 +609,17 @@ export async function processScheduledBroadcasts(
       new Date(b.scheduled_at).getTime() <= nowMs,
   );
 
+  /*
+   * 二者承認（m12a）。予約時刻を過ぎても承認されなかった依頼は、
+   * 先に期限切れにして送らない（依頼主に知らせる）。
+   */
+  try {
+    const { sweepBroadcastApprovalExpiry } = await import('./broadcast-approval.js');
+    await sweepBroadcastApprovalExpiry(db, nowMs);
+  } catch (sweepError) {
+    console.error('[broadcast] approval expiry sweep failed:', sweepError);
+  }
+
   for (const broadcast of scheduled) {
     try {
       const ownerAccountId = (broadcast as unknown as Record<string, unknown>).line_account_id as string | null;
@@ -628,6 +639,18 @@ export async function processScheduledBroadcasts(
       // 予約のまま残す。停止中に時刻を過ぎた分は、復旧の検査
       // (holdExpiredBroadcasts) が下書きへ戻し、まとめて追い送りしない。
       if (await isOperationCapabilityStopped(db, ownerAccountId, 'broadcast_dispatch')) {
+        continue;
+      }
+      /*
+       * 二者承認（m12a）。承認が要る人数なのに承認済みでなければ送らない。
+       * 期限切れの走査は上で済ませてある。数えられないときは送らず残す。
+       */
+      try {
+        const { checkScheduledBroadcastApproval } = await import('./broadcast-approval.js');
+        const approvalCheck = await checkScheduledBroadcastApproval(db, broadcast);
+        if (!approvalCheck.sendable) continue;
+      } catch (approvalError) {
+        console.error(`[broadcast] scheduled broadcast ${broadcast.id} held: approval check failed:`, approvalError);
         continue;
       }
       // Optimistic lock: claim this broadcast (scheduled → sending)

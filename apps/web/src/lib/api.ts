@@ -1597,6 +1597,54 @@ export type ApiBroadcast = Omit<Broadcast, 'targetType'> & {
   stoppedAt?: string | null;
   /** 送信の試行番号。失敗分の再送で進む。 */
   sendAttemptNo?: number;
+  /*
+   * 二者承認の今の状態（m12a）。送信の段階（status）とは別の軸。
+   * none（承認がいらない・まだ頼んでいない）/ pending / approved /
+   * rejected / cancelled / expired（予約時刻を過ぎた）。
+   */
+  approvalStatus?: 'none' | 'pending' | 'approved' | 'rejected' | 'cancelled' | 'expired';
+  approvalRequestedByStaffId?: string | null;
+  approvalRequestedAt?: string | null;
+  approvalApproverStaffId?: string | null;
+  approvalNote?: string | null;
+  approvalDecidedByStaffId?: string | null;
+  approvalDecidedAt?: string | null;
+  approvalRejectReason?: string | null;
+};
+
+/** 承認の依頼先の候補（承認できる人だけ。自分は除く）。 */
+export type BroadcastApprovalCandidate = {
+  id: string
+  name: string
+  role: string
+  canApprove: boolean
+};
+
+/** 二者承認の今の状態と判定（GET /:id/approval の応答）。 */
+export type BroadcastApprovalState = {
+  approval: {
+    status: NonNullable<ApiBroadcast['approvalStatus']>;
+    requestedByStaffId: string | null;
+    requestedAt: string | null;
+    approverStaffId: string | null;
+    note: string | null;
+    decidedByStaffId: string | null;
+    decidedAt: string | null;
+    rejectReason: string | null;
+    confirmedCount: number | null;
+  };
+  gate: {
+    required: boolean;
+    recipientCount: number;
+    threshold: number;
+    singleOperator: boolean;
+    operatorCount: number;
+  };
+  viewer: {
+    isApprover: boolean;
+    canApprove: boolean;
+    isRequester: boolean;
+  };
 };
 
 /**
@@ -7446,6 +7494,8 @@ export const api = {
       internalMemo?: string | null
       messageOptions?: BroadcastMessageOptions | null
       afterActionVersionId?: string | null
+      /** 1人運用のとき、送る人が確認で入れた人数 */
+      confirmedRecipientCount?: number
     }, options?: { idempotencyKey?: string }) =>
       fetchApi<ApiResponse<ApiBroadcast>>('/api/broadcasts', {
         method: 'POST',
@@ -7494,6 +7544,8 @@ export const api = {
         internalMemo?: string | null
         messageOptions?: BroadcastMessageOptions | null
         afterActionVersionId?: string | null
+        /** 1人運用のとき、送る人が確認で入れた人数 */
+        confirmedRecipientCount?: number
         // #772: 版なしの更新は 400 で拒否される。
         expectedVersion: number
       }
@@ -7506,11 +7558,55 @@ export const api = {
       fetchApi<ApiResponse<null>>(`/api/broadcasts/${id}`, { method: 'DELETE' }),
     // 本送信は取り消せないため、サーバー側が確認ヘッダを要求する。
     // 画面の確認ダイアログを経たことをここで示す。
-    send: (id: string) =>
+    // 1人運用のときは確認で入れた人数も送る（合わなければ409）。
+    send: (id: string, options?: { confirmedRecipientCount?: number }) =>
       fetchApi<ApiResponse<ApiBroadcast>>(`/api/broadcasts/${id}/send`, {
         method: 'POST',
         headers: IRREVERSIBLE_BROADCAST_HEADERS,
+        body: options?.confirmedRecipientCount !== undefined
+          ? JSON.stringify({ confirmedRecipientCount: options.confirmedRecipientCount })
+          : undefined,
       }),
+    /**
+     * 二者承認（m12a）。承認の依頼・承認・差し戻し・取り消し・もう一度知らせる。
+     * 承認する人・頼んだ人の出し分けに使う今の状態と判定もここから取る。
+     */
+    approval: {
+      config: (lineAccountId: string) =>
+        fetchApi<ApiResponse<{ lineAccountId: string; threshold: number; operatorCount: number; singleOperator: boolean }>>(
+          `/api/broadcasts/approval-config?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+        ),
+      candidates: (lineAccountId: string) =>
+        fetchApi<ApiResponse<BroadcastApprovalCandidate[]>>(
+          `/api/broadcasts/approvals/candidates?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+        ),
+      get: (id: string) =>
+        fetchApi<ApiResponse<BroadcastApprovalState>>(`/api/broadcasts/${id}/approval`),
+      request: (id: string, data: { approverStaffId: string; note?: string }) =>
+        fetchApi<ApiResponse<{ approval: BroadcastApprovalState['approval'] }>>(
+          `/api/broadcasts/${id}/approval-request`, { method: 'POST', body: JSON.stringify(data) },
+        ),
+      approve: (id: string) =>
+        fetchApi<ApiResponse<{ approval: BroadcastApprovalState['approval']; needsSend: boolean }>>(
+          `/api/broadcasts/${id}/approval-approve`, { method: 'POST' },
+        ),
+      reject: (id: string, reason: string) =>
+        fetchApi<ApiResponse<{ approval: BroadcastApprovalState['approval'] }>>(
+          `/api/broadcasts/${id}/approval-reject`, { method: 'POST', body: JSON.stringify({ reason }) },
+        ),
+      cancel: (id: string) =>
+        fetchApi<ApiResponse<{ approval: BroadcastApprovalState['approval'] }>>(
+          `/api/broadcasts/${id}/approval-cancel`, { method: 'POST' },
+        ),
+      remind: (id: string) =>
+        fetchApi<ApiResponse<{ reminded: boolean }>>(
+          `/api/broadcasts/${id}/approval-remind`, { method: 'POST' },
+        ),
+      threshold: (lineAccountId: string) =>
+        fetchApi<ApiResponse<{ lineAccountId: string; threshold: number }>>(
+          `/api/broadcasts/approval-threshold?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+        ),
+    },
     getInsight: (id: string) =>
       fetchApi<ApiResponse<BroadcastInsight | null>>(`/api/broadcasts/${id}/insight`),
     fetchInsight: (id: string) =>
