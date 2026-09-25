@@ -138,7 +138,7 @@ SQL を流さない手順（推奨）: `platform_admins` が空の間は、既�
 
 | 場所 | 内容 |
 |---|---|
-| `packages/db/migrations/447_billing_invoices.sql` | Stripe 請求書の非個人情報・入金額・返金額・請求期間を保存する表（追加のみ） |
+| `packages/db/migrations/448_billing_invoices.sql` | Stripe 請求書の非個人情報・入金額・返金額・請求期間を保存する表（追加のみ） |
 | `packages/db/src/billing-invoices.ts` | 請求書の保存・入金集計・直近の支払済み請求書の読み取り |
 | `packages/db/src/ops-dashboard.ts` | 契約先・Stripe の出来事・要対応・チケット・LINE 登録・使用量の読み取り |
 | `apps/worker/src/routes/ops-dashboard.ts` | `GET /api/ops/dashboard?period=month|prev_month|year`、`GET /api/ops/dashboard/line-unregistered` |
