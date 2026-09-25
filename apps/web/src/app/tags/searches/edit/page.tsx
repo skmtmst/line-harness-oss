@@ -26,6 +26,7 @@ import StickyBar from '@/components/shared/sticky-bar'
 import TargetMissing from '@/components/shared/target-missing'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { TextInput } from '@/components/shared/form-controls'
+import DateField from '@/components/shared/date-field'
 import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
 import { optionsWithCurrent } from './reference-options'
@@ -227,12 +228,12 @@ function ConditionEditor({
         <div className="flex min-w-0 flex-1 flex-wrap items-end gap-2">
           <label className="min-w-40 flex-1 text-xs font-semibold text-ink-faint">
             開始日
-            <TextInput type="date" value={typeof condition.value === 'object' && condition.value ? String((condition.value as { from?: string }).from ?? '') : ''} onChange={(event) => onChange({ ...condition, op: 'between', value: { ...(typeof condition.value === 'object' ? condition.value : {}), from: event.target.value } })} className="mt-1 w-full" />
+            <DateField aria-label="開始日" value={typeof condition.value === 'object' && condition.value ? String((condition.value as { from?: string }).from ?? '') : ''} onChange={(v) => onChange({ ...condition, op: 'between', value: { ...(typeof condition.value === 'object' ? condition.value : {}), from: v } })} className="mt-1" />
           </label>
           <span className="pb-2 text-ink-faint" aria-hidden="true">〜</span>
           <label className="min-w-40 flex-1 text-xs font-semibold text-ink-faint">
             終了日
-            <TextInput type="date" value={typeof condition.value === 'object' && condition.value ? String((condition.value as { to?: string }).to ?? '') : ''} onChange={(event) => onChange({ ...condition, op: 'between', value: { ...(typeof condition.value === 'object' ? condition.value : {}), to: event.target.value } })} className="mt-1 w-full" />
+            <DateField aria-label="終了日" value={typeof condition.value === 'object' && condition.value ? String((condition.value as { to?: string }).to ?? '') : ''} onChange={(v) => onChange({ ...condition, op: 'between', value: { ...(typeof condition.value === 'object' ? condition.value : {}), to: v } })} className="mt-1" />
           </label>
         </div>
       ) : (

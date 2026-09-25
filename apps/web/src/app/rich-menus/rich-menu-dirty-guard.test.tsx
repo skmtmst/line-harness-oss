@@ -122,12 +122,43 @@ async function gotoStep(view: ReturnType<typeof render>, step: string | null) {
   await flush()
 }
 
+const WEEK = '日月火水木金土'
+
+/** 出しはじめ・出しおわりを日時の選択（★V7）で選ぶ。値は今までどおり YYYY-MM-DDTHH:mm。 */
+async function pickDateTime(label: string, iso: string) {
+  const [date, time] = iso.split('T')
+  const [hour, minute] = time.split(':')
+  const [y, mo, d] = date.split('-').map(Number)
+  const week = WEEK[new Date(y, mo - 1, d).getDay()]
+  fireEvent.click(screen.getByLabelText(label))
+  const picker = document.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
+  fireEvent.click(picker.querySelector('button[aria-label="日付"]')!)
+  for (let i = 0; i < 24; i += 1) {
+    const grid = document.querySelector('[role="grid"]')
+    if (grid?.getAttribute('aria-label') === `${y}年${mo}月`) break
+    const currentLabel = /^(\d+)年(\d+)月$/.exec(grid?.getAttribute('aria-label') ?? '')
+    const current = currentLabel ? Number(currentLabel[1]) * 12 + Number(currentLabel[2]) : y * 12 + mo
+    const nav = [...document.querySelectorAll('button')].find(
+      (b) => b.getAttribute('aria-label') === (y * 12 + mo >= current ? '次の月' : '前の月'),
+    )!
+    fireEvent.click(nav)
+  }
+  fireEvent.click([...document.querySelectorAll('button')].find((b) =>
+    (b.getAttribute('aria-label') ?? '').startsWith(`${y}年${mo}月${d}日（${week}）`),
+  )!)
+  const reopened = document.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
+  fireEvent.change(reopened.querySelector('select[aria-label="時"]')!, { target: { value: hour } })
+  fireEvent.change(reopened.querySelector('select[aria-label="分"]')!, { target: { value: minute } })
+  fireEvent.click([...reopened.querySelectorAll('button')].find((b) => b.textContent?.trim() === '閉じる')!)
+  await flush()
+}
+
 async function fillPublishSchedule() {
   const radios = document.querySelectorAll<HTMLInputElement>('input[name="publish-mode"]')
   // [0] いますぐ出す / [1] 日時を決めて出す / [2] 期間を決める
   fireEvent.click(radios[1])
   await flush()
-  await type(screen.getByLabelText('出しはじめ'), '2026-10-01T10:00')
+  await pickDateTime('出しはじめ', '2026-10-01T10:00')
 }
 
 /** 試験ごとに空で始めるための localStorage 代替。 */
@@ -318,7 +349,7 @@ describe('公開のしかたの入力保持 (RICHMENU-06)', () => {
 
     const radios = document.querySelectorAll<HTMLInputElement>('input[name="publish-mode"]')
     expect(radios[1].checked).toBe(true)
-    expect((screen.getByLabelText('出しはじめ') as HTMLInputElement).value).toBe('2026-10-01T10:00')
+    expect(screen.getByLabelText('出しはじめ').textContent).toContain('2026年10月1日（木）10:00')
   })
 
   test('期間を決める＋出しおわり＋戻し先がSTEP往復で消えない', async () => {
@@ -330,8 +361,8 @@ describe('公開のしかたの入力保持 (RICHMENU-06)', () => {
     const radios = document.querySelectorAll<HTMLInputElement>('input[name="publish-mode"]')
     fireEvent.click(radios[2])
     await flush()
-    await type(screen.getByLabelText('出しはじめ'), '2026-10-01T10:00')
-    await type(screen.getByLabelText('出しおわり'), '2026-10-07T10:00')
+    await pickDateTime('出しはじめ', '2026-10-01T10:00')
+    await pickDateTime('出しおわり', '2026-10-07T10:00')
 
     await gotoStep(view, 'targeting')
     await screen.findByText('このメニューを出す相手')
@@ -339,8 +370,8 @@ describe('公開のしかたの入力保持 (RICHMENU-06)', () => {
     await screen.findByText('いつ出すか')
 
     expect(document.querySelectorAll<HTMLInputElement>('input[name="publish-mode"]')[2].checked).toBe(true)
-    expect((screen.getByLabelText('出しはじめ') as HTMLInputElement).value).toBe('2026-10-01T10:00')
-    expect((screen.getByLabelText('出しおわり') as HTMLInputElement).value).toBe('2026-10-07T10:00')
+    expect(screen.getByLabelText('出しはじめ').textContent).toContain('2026年10月1日（木）10:00')
+    expect(screen.getByLabelText('出しおわり').textContent).toContain('2026年10月7日（水）10:00')
   })
 
   test('公開日時を入れたまま一覧へ離れると確認が出る（dirty署名に含まれる）', async () => {
@@ -372,7 +403,7 @@ describe('公開のしかたの入力保持 (RICHMENU-06)', () => {
 
     expect(screen.queryByText('保存していない変更があります')).toBeNull()
     expect(document.querySelectorAll<HTMLInputElement>('input[name="publish-mode"]')[1].checked).toBe(true)
-    expect((screen.getByLabelText('出しはじめ') as HTMLInputElement).value).toBe('2026-10-01T10:00')
+    expect(screen.getByLabelText('出しはじめ').textContent).toContain('2026年10月1日（木）10:00')
   })
 
   test('「保存せずに移動」を選ぶと公開入力は初期値へ戻る', async () => {
@@ -411,7 +442,7 @@ describe('公開のしかたの入力保持 (RICHMENU-06)', () => {
     await flush()
 
     expect(document.querySelectorAll<HTMLInputElement>('input[name="publish-mode"]')[1].checked).toBe(true)
-    expect((screen.getByLabelText('出しはじめ') as HTMLInputElement).value).toBe('2026-10-01T10:00')
+    expect(screen.getByLabelText('出しはじめ').textContent).toContain('2026年10月1日（木）10:00')
   })
 
   test('公開予約を保存できたら、その内容は未保存扱いにしない', async () => {
@@ -618,7 +649,7 @@ describe('公開入力の下書き（localStorage）', () => {
     await screen.findByText('いつ出すか')
 
     expect(document.querySelectorAll<HTMLInputElement>('input[name="publish-mode"]')[1].checked).toBe(true)
-    expect((screen.getByLabelText('出しはじめ') as HTMLInputElement).value).toBe('2026-10-01T10:00')
+    expect(screen.getByLabelText('出しはじめ').textContent).toContain('2026年10月1日（木）10:00')
   })
 
   test('期間公開の入力（出しおわり・戻し先）も復元される', async () => {
@@ -630,8 +661,8 @@ describe('公開入力の下書き（localStorage）', () => {
     const radios = document.querySelectorAll<HTMLInputElement>('input[name="publish-mode"]')
     fireEvent.click(radios[2])
     await flush()
-    await type(screen.getByLabelText('出しはじめ'), '2026-10-01T10:00')
-    await type(screen.getByLabelText('出しおわり'), '2026-10-07T10:00')
+    await pickDateTime('出しはじめ', '2026-10-01T10:00')
+    await pickDateTime('出しおわり', '2026-10-07T10:00')
 
     view.unmount()
     render(<RichMenuEditPage />)
@@ -639,8 +670,8 @@ describe('公開入力の下書き（localStorage）', () => {
     await screen.findByText('いつ出すか')
 
     expect(document.querySelectorAll<HTMLInputElement>('input[name="publish-mode"]')[2].checked).toBe(true)
-    expect((screen.getByLabelText('出しはじめ') as HTMLInputElement).value).toBe('2026-10-01T10:00')
-    expect((screen.getByLabelText('出しおわり') as HTMLInputElement).value).toBe('2026-10-07T10:00')
+    expect(screen.getByLabelText('出しはじめ').textContent).toContain('2026年10月1日（木）10:00')
+    expect(screen.getByLabelText('出しおわり').textContent).toContain('2026年10月7日（水）10:00')
   })
 
   test('「保存せずに移動」を選ぶと下書きも消える', async () => {
@@ -717,6 +748,6 @@ describe('公開入力の下書き（localStorage）', () => {
     await flush()
     await screen.findByText('いつ出すか')
     expect(document.querySelectorAll<HTMLInputElement>('input[name="publish-mode"]')[1].checked).toBe(true)
-    expect((screen.getByLabelText('出しはじめ') as HTMLInputElement).value).toBe('2026-10-01T10:00')
+    expect(screen.getByLabelText('出しはじめ').textContent).toContain('2026年10月1日（木）10:00')
   })
 })

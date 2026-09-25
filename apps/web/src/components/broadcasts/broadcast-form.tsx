@@ -41,6 +41,8 @@ import {
 import type { SegmentCondition } from '@/lib/segment-condition'
 import { newBroadcastDraftSession, persistBroadcastDraft } from '@/lib/broadcast-draft'
 import ConditionBuilder from '@/components/shared/condition-builder'
+import DateField from '@/components/shared/date-field'
+import { TimeField } from '@/components/shared/date-time-field'
 import SegmentPresetControls from '@/components/broadcasts/segment-preset-controls'
 import { audienceSummary } from '@/lib/broadcast-summary'
 import InsertToolbar from '@/components/scenarios/insert-toolbar'
@@ -2189,24 +2191,22 @@ export default function BroadcastForm({
                 <label htmlFor="bc-date" className="text-ink-secondary mb-1 block text-xs font-medium">
                   配信日（日本時間）
                 </label>
-                <input
+                <DateField
                   id="bc-date"
-                  type="date"
                   value={scheduledDate}
-                  onChange={(e) => setScheduledDate(e.target.value)}
-                  className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
+                  onChange={setScheduledDate}
+                  aria-label="配信日（日本時間）"
                 />
               </div>
               <div>
                 <label htmlFor="bc-time" className="text-ink-secondary mb-1 block text-xs font-medium">
                   時刻（日本時間）
                 </label>
-                <input
+                <TimeField
                   id="bc-time"
-                  type="time"
                   value={scheduledTime}
-                  onChange={(e) => setScheduledTime(e.target.value)}
-                  className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
+                  onChange={setScheduledTime}
+                  aria-label="時刻（日本時間）"
                 />
               </div>
               {/*

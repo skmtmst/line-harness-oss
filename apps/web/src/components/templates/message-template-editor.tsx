@@ -6,6 +6,7 @@ import { listInterpolations, type CommonVar, type FriendField } from '@line-crm/
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
 import Button from '@/components/shared/button'
 import { Field, TextArea } from '@/components/shared/form-controls'
+import DateField from '@/components/shared/date-field'
 import SelectField from '@/components/shared/select-field'
 
 export const MESSAGE_TEMPLATE_TYPES = [
@@ -189,10 +190,10 @@ export function TemplateInsertControls({
         )}
         <SelectField aria-label="配信日を差し込む" value="" disabled={disabled} onChange={(event) => choose(event.target.value)} options={[{ value: '', label: '配信日を選ぶ' }, ...DATE_OPTIONS]} />
         <SelectField aria-label="その他の差し込みを選ぶ" value="" disabled={disabled} onChange={(event) => choose(event.target.value)} options={[{ value: '', label: 'その他を選ぶ' }, ...OTHER_OPTIONS]} />
-        <label className="flex items-center gap-2 text-xs text-ink-secondary">
+        <span className="flex items-center gap-2 text-xs text-ink-secondary">
           目標日
-          <input aria-label="日数を数える目標日" type="date" value={targetDate} disabled={disabled} onChange={(event) => onTargetDateChange(event.target.value)} className="border-hairline rounded-control border bg-canvas px-2 py-1 text-xs text-ink disabled:opacity-40" />
-        </label>
+          <DateField aria-label="日数を数える目標日" value={targetDate} disabled={disabled} onChange={onTargetDateChange} className="w-48" />
+        </span>
         <Button size="field" disabled={disabled || !targetDate} onClick={() => onInsert(`{{days_until:${targetDate}}`)}>目標日までの日数</Button>
       </div>
       <p className="text-ink-faint text-xs">フォーム回答は直接差し込めません。回答を保存した友だち情報を選んでください。</p>

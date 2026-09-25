@@ -116,7 +116,24 @@ describe('画面', () => {
     await act(async () => {
       setValue(host.querySelector<HTMLInputElement>('input[placeholder^="例："]')!, '予約のお知らせ')
       setValue(host.querySelector<HTMLTextAreaElement>('textarea')!, '本文')
-      setValue(host.querySelector<HTMLInputElement>('input[type="datetime-local"]')!, '2026-09-20T02:00')
+    })
+    // 公開日時の選択（★V7）で 2026-09-20 02:00 を選ぶ。値は今までどおり日本時間の文字列。
+    await act(async () => {
+      host.querySelector<HTMLButtonElement>('button[aria-label="公開日時（日本時間）"]')!.click()
+    })
+    const picker = host.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
+    await act(async () => {
+      picker.querySelector<HTMLButtonElement>('button[aria-label="日付"]')!.click()
+    })
+    await act(async () => {
+      Array.from(host.querySelectorAll('button')).find((b) =>
+        (b.getAttribute('aria-label') ?? '').startsWith('2026年9月20日（日）'),
+      )!.click()
+    })
+    await act(async () => {
+      const hour = picker.querySelector<HTMLSelectElement>('select[aria-label="時"]')!
+      hour.value = '02'
+      hour.dispatchEvent(new Event('change', { bubbles: true }))
     })
     expect(button('今すぐ送る')).toBeUndefined()
     await act(async () => { button('配信を予約する')!.click() })

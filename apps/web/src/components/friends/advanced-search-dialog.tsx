@@ -16,6 +16,7 @@ import {
   type SavedSearchConditionLabels,
 } from './saved-search-utils'
 import { TextInput } from '@/components/shared/form-controls'
+import DateField from '@/components/shared/date-field'
 import Button from '@/components/shared/button'
 import Combobox from '@/components/shared/combobox'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
@@ -595,20 +596,16 @@ export default function AdvancedSearchDialog({
 
                 {b.kind === 'created_at' && (
                   <div className="flex flex-wrap items-center gap-2">
-                    <input
-                      type="date"
+                    <DateField
                       value={b.from}
-                      onChange={(e) => patch(i, { ...b, from: e.target.value })}
+                      onChange={(v) => patch(i, { ...b, from: v })}
                       aria-label="友だち登録日の開始"
-                      className="border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm"
                     />
                     <span className="text-ink-secondary text-sm">〜</span>
-                    <input
-                      type="date"
+                    <DateField
                       value={b.to}
-                      onChange={(e) => patch(i, { ...b, to: e.target.value })}
+                      onChange={(v) => patch(i, { ...b, to: v })}
                       aria-label="友だち登録日の終了"
-                      className="border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm"
                     />
                   </div>
                 )}
@@ -874,12 +871,11 @@ function OrAxisPicker({
             className="min-w-0 flex-1"
           />
         ) : axis.input === 'date' ? (
-          <input
-            type="date"
+          <DateField
             value={draft}
-            onChange={(event) => setDraft(event.target.value)}
+            onChange={setDraft}
             aria-label={`${axis.label}の日付（この日以降）`}
-            className="border-hairline rounded-control bg-canvas text-ink min-w-0 flex-1 border px-2 py-1.5 text-xs"
+            className="min-w-0 flex-1"
           />
         ) : axis.input === 'text' ? (
           <input
