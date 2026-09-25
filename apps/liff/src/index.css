@@ -324,3 +324,17 @@ body {
   padding: 12px;
   background: #fafafa;
 }
+
+/* 読み込み中の小さな回る印 (LoadingView が使う。全画面で同じ)。 */
+@keyframes liff-spin { to { transform: rotate(360deg); } }
+.liff-spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid #e5e7eb;
+  border-top-color: #9ca3af;
+  border-radius: 9999px;
+  animation: liff-spin 0.8s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .liff-spinner { animation: none; }
+}
