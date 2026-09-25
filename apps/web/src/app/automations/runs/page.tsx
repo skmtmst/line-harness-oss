@@ -296,7 +296,7 @@ export default function AutomationRunsPage() {
       {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}
       <KpiCollapse className="mb-4" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Metric label="この30日に動いた" value={data ? `${data.summary.executed.toLocaleString('ja-JP')}回` : '—'} note={data ? '実行結果を集計' : '未取得'} />
-        <Metric label="失敗した" value={data ? `${data.summary.failed.toLocaleString('ja-JP')}回` : '—'} note="処理結果を確認してください" danger={Boolean(data?.summary.failed)} />
+        <Metric label="失敗した" value={data ? `${data.summary.failed.toLocaleString('ja-JP')}回` : '—'} note="処理結果を確認してください" />
         <Metric label="いちばん動いた" value={data?.summary.mostRunName ?? '—'} note={data?.summary.mostRunCount !== null && data?.summary.mostRunCount !== undefined ? `${data.summary.mostRunCount.toLocaleString('ja-JP')}回` : '未取得'} />
         <Metric label="条件に外れて動かなかった" value={data ? `${data.summary.skipped.toLocaleString('ja-JP')}回` : '—'} note="条件が厳しすぎないか見てください" />
       </KpiCollapse>
@@ -473,11 +473,11 @@ function RunDetail({ label, value }: { label: string; value: string }) {
   )
 }
 
-function Metric({ label, value, note, danger = false }: { label: string; value: string; note: string; danger?: boolean }) {
+function Metric({ label, value, note }: { label: string; value: string; note: string }) {
   return (
     <section className="rounded-card border border-hairline bg-canvas p-4 shadow-sm">
       <p className="text-xs font-semibold text-ink-faint">{label}</p>
-      <p className={`mt-1 truncate text-xl font-bold ${danger ? 'text-danger' : 'text-ink'}`} title={value}>{value}</p>
+      <p className="mt-1 truncate text-xl font-bold text-ink" title={value}>{value}</p>
       <p className="mt-1 truncate text-xs text-ink-faint" title={note}>{note}</p>
     </section>
   )

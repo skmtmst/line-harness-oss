@@ -290,7 +290,7 @@ describe('Googleビジネス：設定（接続）', () => {
       if (url === 'https://oauth2.googleapis.com/token') return jsonResponse({ access_token: 'a', refresh_token: 'r', expires_in: 3600 });
       if (url.includes('userinfo')) return jsonResponse({ email: 'owner@example.test' });
       if (url.startsWith('https://mybusinessaccountmanagement.googleapis.com/v1/accounts')) return jsonResponse({ accounts: [{ name: 'accounts/111' }] });
-      if (url.includes('/locations')) return jsonResponse({ locations: [{ name: 'locations/222', title: '渋谷店' }, { name: 'locations/333', title: '新宿店' }] });
+      if (url.includes('/locations')) return jsonResponse({ locations: [{ name: 'locations/222', title: '渋谷店', metadata: { mapsUri: 'https://maps.google.com/?cid=222' } }, { name: 'locations/333', title: '新宿店', metadata: { mapsUri: 'https://maps.google.com/?cid=333' } }] });
       return jsonResponse({}, 404);
     };
     const response = await startAndCallback((state) => `state=${state}&code=c`);
@@ -304,7 +304,7 @@ describe('Googleビジネス：設定（接続）', () => {
     expect(bad.status).toBe(400);
     const ok = await call('/api/restaurant-test/google/connect/select-location?account_id=account-2', { body: { locationName: 'accounts/111/locations/222' } });
     expect(ok.status).toBe(200);
-    expect(testDb.raw.prepare('SELECT status, location_title FROM rt_google_connections').get()).toEqual({ status: 'connected', location_title: '渋谷店' });
+    expect(testDb.raw.prepare('SELECT status, location_title, location_maps_url FROM rt_google_connections').get()).toEqual({ status: 'connected', location_title: '渋谷店', location_maps_url: 'https://maps.google.com/?cid=222' });
     expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM rt_google_location_candidates').get()).toEqual({ n: 0 });
   });
 

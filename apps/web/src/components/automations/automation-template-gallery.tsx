@@ -162,7 +162,7 @@ export default function AutomationTemplateGallery({
                 <dd className="col-span-2 font-medium text-v6-ink-secondary">{item.actionLabel}</dd>
               </dl>
               <Button
-                variant="primary"
+                variant="secondary"
                 className="w-full justify-center"
                 disabled={creating !== null || canManage !== true}
                 onClick={() => void create(item)}
