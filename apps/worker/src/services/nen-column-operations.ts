@@ -1,4 +1,5 @@
 import { jstNow } from '@line-crm/db';
+import { isNenQuietHours, nenQuietHoursResumeAt } from './nen-engagement.js';
 
 export class NenColumnOperationError extends Error {
   constructor(public readonly code: string, message: string, public readonly status: 400 | 404 | 409 = 400) {
@@ -84,7 +85,7 @@ export async function recordNenColumnReadEvent(db: D1Database, input: {
 
 export async function sendPendingNenDeliveriesNow(
   db: D1Database,
-  input: { lineAccountId: string; expectedCount: number },
+  input: { lineAccountId: string; expectedCount: number; now?: Date },
 ) {
   if (!Number.isSafeInteger(input.expectedCount) || input.expectedCount < 0) {
     throw new NenColumnOperationError('expected_count_invalid', '画面に表示された配信待ち件数を確認してください');
@@ -102,5 +103,15 @@ export async function sendPendingNenDeliveriesNow(
     `UPDATE nen_delivery_jobs SET scheduled_at = ?, updated_at = ?
       WHERE line_account_id = ? AND status = 'pending' AND datetime(scheduled_at) > datetime('now')`,
   ).bind(now, now, input.lineAccountId).run();
-  return { queued: Number(result.meta.changes ?? 0) };
+  // 要件 v6-21 §8: 深夜帯の「今すぐ送る」は止めないが、送り先が朝になることを返す。
+  // 画面はこの文面で「すぐには届かない」を伝えられる。
+  const at = input.now ?? new Date();
+  const quiet = isNenQuietHours(at);
+  return {
+    queued: Number(result.meta.changes ?? 0),
+    quietHours: {
+      active: quiet,
+      resumesAt: quiet ? nenQuietHoursResumeAt(at) : null,
+    },
+  };
 }

@@ -228,6 +228,15 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
     },
   },
   {
+    name: 'automation retention purge',
+    classification: { kind: 'feature', featureId: 'automations' },
+    enforcement: {
+      mode: 'gated',
+      sources: ['packages/db/src/automation-retention.ts'],
+      markers: ['accountFeatureOffExclusionSql(', "`${alias}.line_account_id`, 'automations'"],
+    },
+  },
+  {
     name: 'friend snapshot',
     classification: { kind: 'core', reason: '友だち基礎集計' },
     enforcement: { mode: 'exempt', reason: '友だちの基礎集計で、外部呼び出しも機能の状態更新もしない' },
