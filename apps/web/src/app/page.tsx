@@ -34,6 +34,7 @@ import Button from '@/components/shared/button'
 import IconButton from '@/components/shared/icon-button'
 import NotificationPanel from '@/components/shared/notification-panel'
 import KpiCollapse from '@/components/ui/kpi-collapse'
+import HelpTip from '@/components/shared/help-tip'
 import SelectField from '@/components/shared/select-field'
 import StatusBadge from '@/components/shared/status-badge'
 import { STATE_TEXT } from '@/components/shared/not-connected'
@@ -394,12 +395,14 @@ function UnavailableDataCard({ title, onRetry, section }: {
 }
 
 function LiveDataCard({
-  title, period, href, linkLabel, value, unit = '件', detail, freshness, loading = false,
+  title, period, href, linkLabel, value, unit = '件', detail, help, freshness, loading = false,
 }: {
   title: string
   /* 数字の対象期間（「現在」・選択中の期間など）。見出しの脇へ小さく出す（IDEA-01）。 */
   period?: string
   href: string; linkLabel: string; value: number | null; unit?: string; detail: string
+  /* 定義・分母・計算のしかた。見出しのすぐ右の「？」へ入れる（★V7・§2-1b）。 */
+  help?: string
   freshness?: NonNullable<DashboardOverview['sections']>[keyof NonNullable<DashboardOverview['sections']>]
   /* true の間は数値の場所に骨組みを出す。失敗・未取得は「—」のまま（#673）。 */
   loading?: boolean
@@ -408,6 +411,7 @@ function LiveDataCard({
     <Card padding="roomy">
       <div className="flex items-start justify-between gap-3">
         <h2 className="text-ink min-w-0 truncate text-sm font-semibold" title={title}>{title}</h2>
+        {help ? <HelpTip label={`${title}の説明`}>{help}</HelpTip> : null}
         {period ? <span className="text-ink-faint flex-1 whitespace-nowrap pt-0.5 text-[11px] font-normal">{period}</span> : null}
         <Link href={href} className="text-action shrink-0 text-xs hover:underline">{linkLabel} →</Link>
       </div>
@@ -1383,8 +1387,8 @@ function DashboardPageInner() {
       /* 「経路と成果」タブが期間内の経路別の登録・成果を見る画面（IDEA-01）。 */
       return <LiveDataCard title="流入経路TOP3" period={dashboardPeriodLabel(period) ?? undefined} href="/analytics?tab=routes" linkLabel="経路別の内訳を見る" value={inflowTop?.[0]?.count ?? (inflowTop ? 0 : null)} detail={inflowTop ? inflowTop.map((item) => `${item.name ?? '—'} ${item.count}`).join('、') || '期間内の追加なし' : data ? STATE_TEXT.error : STATE_TEXT.loading} freshness={data?.sections?.operations} loading={loading} />
     }
-    if (id === 'funnel-alert') return <LiveDataCard title="ファネル要注意" period={dashboardPeriodLabel(period) ?? undefined} href="/analytics?tab=funnel" linkLabel="ファネルを見る" value={sectionAvailable('operations') ? data?.operations?.funnelAlerts ?? null : null} detail="3人以上追加・成果0件の経路" freshness={data?.sections?.operations} loading={loading} />
-    if (id === 'automation-failures') return <LiveDataCard title="オートメーション失敗" period={dashboardPeriodLabel(period) ?? undefined} href="/automations/runs?status=problems" linkLabel="実行状況を見る" value={sectionAvailable('operations') ? data?.operations?.automationFailures ?? null : null} detail="期間内の失敗・一部失敗" freshness={data?.sections?.operations} loading={loading} />
+    if (id === 'funnel-alert') return <LiveDataCard title="ファネル要注意" period={dashboardPeriodLabel(period) ?? undefined} href="/analytics?tab=funnel" linkLabel="ファネルを見る" value={sectionAvailable('operations') ? data?.operations?.funnelAlerts ?? null : null} detail="" help="3人以上追加され、成果が0件の経路です" freshness={data?.sections?.operations} loading={loading} />
+    if (id === 'automation-failures') return <LiveDataCard title="オートメーション失敗" period={dashboardPeriodLabel(period) ?? undefined} href="/automations/runs?status=problems" linkLabel="実行状況を見る" value={sectionAvailable('operations') ? data?.operations?.automationFailures ?? null : null} detail="" help="期間内の失敗と一部失敗の合計です" freshness={data?.sections?.operations} loading={loading} />
     return null
   }
 
