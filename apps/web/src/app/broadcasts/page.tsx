@@ -17,6 +17,7 @@ import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import SelectField from '@/components/shared/select-field'
 import Button from '@/components/shared/button'
+import { ApprovalBadge } from '@/components/broadcasts/broadcast-approval'
 
 const statusConfig: Record<
   ApiBroadcast['status'],
@@ -768,10 +769,13 @@ function BroadcastList() {
                       </p>
                     </td>
 
-                    {/* 状態。設計では2列目。 */}
+                    {/* 状態。設計では2列目。承認待ちの札もここに出す（A-2）。 */}
                     <td className="px-4 py-3">
-                      <span className={`inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded-full text-xs font-medium ${statusInfo.className}`}>
-                        {statusInfo.label}
+                      <span className="inline-flex flex-wrap items-center gap-1">
+                        <span className={`inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded-full text-xs font-medium ${statusInfo.className}`}>
+                          {statusInfo.label}
+                        </span>
+                        <ApprovalBadge status={broadcast.approvalStatus} />
                       </span>
                     </td>
 

@@ -65,7 +65,12 @@ function app() {
   instance.use('*', async (c, next) => {
     const db = {
       prepare: vi.fn(() => ({
-        bind: vi.fn(() => ({ run: mocks.dbRun })),
+        // 二者承認のゲートも口の一部。人数0・境目既定で承認なしに通す。
+        bind: vi.fn(() => ({
+          run: mocks.dbRun,
+          first: vi.fn(async () => null),
+          all: vi.fn(async () => ({ results: [] })),
+        })),
       })),
     } as unknown as D1Database;
     c.env = { DB: db, LINE_CHANNEL_ACCESS_TOKEN: 'default', WORKER_URL: 'https://worker.test' };

@@ -45,6 +45,13 @@ export const BROADCAST_DEFINITION_PUBLISH_KEY = 'broadcast.definition.publish';
 export const BROADCAST_JOB_STOP_KEY = 'broadcast.job.stop';
 export const BROADCAST_JOB_RETRY_KEY = 'broadcast.job.retry';
 export const BROADCAST_RESULT_EXPORT_KEY = 'broadcast.result.export';
+/**
+ * 一斉配信の承認キー（v6-06 §6 の二者承認）。
+ * 1,000通以上の送信を、送る人とは別の人が確かめるための鍵。
+ * owner・admin は常に通る（role-guard の hasStaffPermission）。
+ * 止める・送り直すと同じく束には入れず、管理者が個別に付ける。
+ */
+export const BROADCAST_APPROVE_KEY = 'broadcast.approve';
 
 /**
  * 配信 edit と組で付ける操作キー。緊急停止・失敗再送は指定者のみ
