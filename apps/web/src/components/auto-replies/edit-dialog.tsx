@@ -21,6 +21,7 @@ import {
 } from './draft-fields'
 import ImageUploader from '@/components/shared/image-uploader'
 import Button from '@/components/shared/button'
+import { TimeField } from '@/components/shared/date-time-field'
 import StickyBar from '@/components/shared/sticky-bar'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import {
@@ -963,20 +964,17 @@ export default function EditDialog({
                   時間帯（JST）
                 </label>
                 <div className="flex items-center gap-1.5">
-                  <input
+                  <TimeField
                     id="ar-from"
-                    type="time"
                     value={activeFrom}
-                    onChange={(e) => setActiveFrom(e.target.value)}
-                    className="border-hairline rounded-control border px-2 py-1.5 text-sm"
+                    onChange={setActiveFrom}
+                    aria-label="時間帯の始まり"
                   />
                   <span className="text-ink-faint text-xs">〜</span>
-                  <input
+                  <TimeField
                     aria-label="時間帯の終わり"
-                    type="time"
                     value={activeUntil}
-                    onChange={(e) => setActiveUntil(e.target.value)}
-                    className="border-hairline rounded-control border px-2 py-1.5 text-sm"
+                    onChange={setActiveUntil}
                   />
                 </div>
               </div>

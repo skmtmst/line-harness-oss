@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { api } from '@/lib/api'
+import DateTimeField from '@/components/shared/date-time-field'
 import { isCurrentPreviewRequest } from './bulk-preview-request'
 
 interface Props {
@@ -19,7 +20,7 @@ interface PreviewStep {
 }
 
 function nowJstAsLocalInput(): string {
-  // JST clock-time as YYYY-MM-DDTHH:MM for <input type="datetime-local">
+  // JST clock-time as YYYY-MM-DDTHH:MM for DateTimeField
   const d = new Date(Date.now() + 9 * 60 * 60_000)
   return d.toISOString().slice(0, 16)
 }
@@ -99,11 +100,10 @@ export default function BulkPreviewModal({ open, scenarioId, onClose }: Props) {
           <label className="block text-xs font-medium text-ink-secondary mb-1">
             起点 (購読開始日時)
           </label>
-          <input
-            type="datetime-local"
-            className="border border-hairline rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+          <DateTimeField
             value={startAt}
-            onChange={(e) => setStartAt(e.target.value)}
+            onChange={setStartAt}
+            aria-label="起点（購読開始日時）"
           />
         </div>
 

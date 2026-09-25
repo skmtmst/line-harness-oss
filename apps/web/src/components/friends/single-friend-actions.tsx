@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { Chat, Reminder, Scenario, Tag, Template } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
+import DateTimeField from '@/components/shared/date-time-field'
 
 /**
  * 1人だけ選んだときの操作（設計 `BulkBar` の6つ）。
@@ -318,13 +319,10 @@ function ReminderPanel({ friendId, busy, run }: { friendId: string; busy: boolea
           <option key={r.id} value={r.id}>{r.name}</option>
         ))}
       </select>
-      <input
-        type="datetime-local"
+      <DateTimeField
         value={targetDate}
-        onChange={(e) => setTargetDate(e.target.value)}
+        onChange={setTargetDate}
         aria-label="ゴール日時"
-        title="予約日や開催日。ここから逆算して届きます"
-        className={SELECT}
       />
       <Go
         busy={busy || !id || !targetDate}
