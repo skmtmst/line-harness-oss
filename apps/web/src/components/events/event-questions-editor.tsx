@@ -1,6 +1,7 @@
 'use client'
 
 import type { EventQuestion } from '@/lib/api'
+import Button from '@/components/shared/button'
 
 const TYPE_LABELS: Record<EventQuestion['type'], string> = {
   text: '1行テキスト',
@@ -70,13 +71,13 @@ export default function EventQuestionsEditor({
                 className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
               />
             </div>
-            <button
-              type="button"
+            <Button
+              variant="danger"
+              size="field"
               onClick={() => onChange(questions.filter((_, i) => i !== index))}
-              className="text-danger rounded-control border-hairline hover:bg-danger-bg border px-2 py-1.5 text-xs font-medium"
             >
               削除
-            </button>
+            </Button>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <label htmlFor={`eq-type-${q.id}`} className="text-ink-faint text-xs">
@@ -149,18 +150,18 @@ export default function EventQuestionsEditor({
         </div>
       ))}
       {questions.length < EVENT_QUESTIONS_MAX && (
-        <button
-          type="button"
+        <Button
+          variant="secondary"
+          className="w-full"
           onClick={() =>
             onChange([
               ...questions,
               { id: newQuestionId(questions), label: '', type: 'text', required: false, options: null },
             ])
           }
-          className="border-hairline text-action hover:bg-canvas-sunken rounded-control w-full border border-dashed px-3 py-2 text-sm font-medium"
         >
           質問を追加
-        </button>
+        </Button>
       )}
     </div>
   )
