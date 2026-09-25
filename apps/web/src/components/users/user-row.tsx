@@ -79,7 +79,7 @@ export default function UserRow({ row, onOpenMergedPerson }: Props) {
   return (
     <>
       <tr className="border-b border-divider-soft hover:bg-surface-pearl">
-        <td className="overflow-hidden px-3 py-3 text-sm font-semibold text-ink" title={row.displayName ?? undefined}>
+        <td className="overflow-hidden py-3 pr-3 pl-5 text-sm font-semibold text-ink" title={row.displayName ?? undefined}>
           {/*
             ★V7（#748）：統合ユーザー詳細（設計 `w8W4Eh`）は名前から開く。
             「…」の中に同じ行き先を1つだけ置くより、名前を押すほうが早い。
@@ -164,7 +164,7 @@ export default function UserRow({ row, onOpenMergedPerson }: Props) {
             </span>
           )}
         </td>
-        <td className="px-3 py-3 text-right">
+        <td className="py-3 pr-5 pl-3 text-right">
           {/*
             行の操作は枠つきボタン1つ（詳細の開閉）。統合ユーザー詳細は名前から開く。
             緑の塗りは行ごとに置かない。

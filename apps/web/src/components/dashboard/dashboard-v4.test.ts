@@ -114,7 +114,8 @@ describe('ダッシュボードV4の初期表示', () => {
     expect(page).toContain('className="mt-2 flex items-end justify-between gap-3"')
     expect(page).not.toContain('className="mt-auto flex items-end justify-between gap-3 pt-2"')
     expect(page).toContain('className="text-metric leading-none font-bold tabular-nums"')
-    expect(page).toContain('className="text-ink mt-3 flex items-baseline gap-2 whitespace-nowrap"')
+    // 送信枠の数は1行で出す（SideCard の行間が面倒を見るため mt-3 は付けない）。
+    expect(page).toContain('className="text-ink flex items-baseline gap-2 whitespace-nowrap"')
     expect(sideCards).toContain('<Card padding="roomy">')
     expect(sideCards).toContain('className="flex flex-col gap-2.5"')
     expect(sideCards).not.toContain('<CardHeader')
