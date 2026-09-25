@@ -145,7 +145,7 @@ async function renderDetailAndWait(usedBy = USED_BY) {
   render(<TemplateDetailPage />)
   await act(async () => { await Promise.resolve() })
   await act(async () => { await Promise.resolve() })
-  await screen.findByText('どこから呼ばれているか')
+  await screen.findByText('使われている場所')
 }
 
 describe('テンプレート詳細の使用先リンク (#891 N-143)', () => {
@@ -169,7 +169,7 @@ describe('テンプレート詳細の使用先リンク (#891 N-143)', () => {
   test('使用先が0件なら「どこからも呼ばれていません」と出る', async () => {
     await renderDetailAndWait(EMPTY_USED_BY)
 
-    expect(screen.getByText('どこからも呼ばれていません。')).toBeTruthy()
+    expect(screen.getByText('どこからも呼ばれていません')).toBeTruthy()
     expect(screen.queryByText('開く')).toBeNull()
   })
 })
