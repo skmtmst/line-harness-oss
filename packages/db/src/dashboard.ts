@@ -94,7 +94,15 @@ export interface DashboardOverview {
   inbox: {
     unanswered: number;
     inProgress: number;
+    /** 保留。受信箱の対応状況と同じ4状態で数える。 */
+    onHold: number;
     resolved: number;
+    /**
+     * チャネル別の内訳。LINE は友だち単位、MAIL はスレッド単位で数える。
+     * 受信箱の一覧（`/api/chats`・`/api/support/inbox`）と同じ定義・同じ範囲。
+     */
+    line: InboxStatusBreakdown;
+    email: InboxStatusBreakdown;
     /** 未対応のうち、最も古いものからの経過時間（分）。無ければ null。 */
     oldestUnansweredMinutes: number | null;
     /**
@@ -359,21 +367,108 @@ function accountScopeSql(scope: AccountStatsScope, column: string): { sql: strin
   return { sql: scope.includeUnassigned ? `${column} IS NULL` : '1 = 0', binds: [] };
 }
 
-async function inboxState(db: D1Database, scope: AccountStatsScope): Promise<DashboardOverview['inbox']> {
-  const account = accountScopeSql(scope, 'f.line_account_id');
-  const row = await db
+/** 受信箱の対応状況4状態の件数。受信箱の一覧と同じ定義で数えたもの。 */
+export interface InboxStatusBreakdown {
+  unanswered: number;
+  inProgress: number;
+  onHold: number;
+  resolved: number;
+}
+
+/**
+ * 受信箱の対応状況の正本（LINE＋MAILの4状態）。
+ *
+ * ダッシュボードの「現在の対応状況」と受信箱の絞り込みが同じ数を出すための、
+ * 唯一の数え方。二重に持たない。
+ *
+ * - LINE は `/api/chats` の一覧と同じく友だち単位。messages_log か chats の
+ *   どちらかに履歴がある友だちを母集団にし、最新の chats 行の status を使う
+ *   （行が無い友だちは対応済み。一覧の `COALESCE(c.status, 'resolved')` と同じ）。
+ * - MAIL は `/api/support/inbox` と同じく `support_email_threads` の status 単位。
+ * - MAIL はアカウントを持たないため、未割り当てが見える範囲のときだけ数える
+ *   （受信箱の一覧と同じ条件。選択中のLINEアカウントだけを見る範囲では 0）。
+ */
+export interface InboxStatusCounts extends InboxStatusBreakdown {
+  line: InboxStatusBreakdown;
+  email: InboxStatusBreakdown;
+}
+
+const ZERO_BREAKDOWN: InboxStatusBreakdown = { unanswered: 0, inProgress: 0, onHold: 0, resolved: 0 };
+
+export async function getInboxStatusCounts(
+  db: D1Database,
+  scope: AccountStatsScope,
+): Promise<InboxStatusCounts> {
+  const friendScope = accountScopeSql(scope, 'f.line_account_id');
+  const includeEmail = 'allTenants' in scope ? true : scope.includeUnassigned;
+
+  const lineRow = await db
     .prepare(
       `SELECT
          SUM(CASE WHEN status = 'unread' THEN 1 ELSE 0 END) AS unanswered,
          SUM(CASE WHEN status = 'in_progress' THEN 1 ELSE 0 END) AS in_progress,
-         SUM(CASE WHEN status = 'resolved' THEN 1 ELSE 0 END) AS resolved,
-         MIN(CASE WHEN status = 'unread' THEN last_message_at END) AS oldest
-       FROM chats c
-       JOIN friends f ON f.id = c.friend_id
-       WHERE ${account.sql}`,
+         SUM(CASE WHEN status = 'on_hold' THEN 1 ELSE 0 END) AS on_hold,
+         SUM(CASE WHEN status = 'resolved' THEN 1 ELSE 0 END) AS resolved
+       FROM (
+         SELECT COALESCE(
+           (SELECT c.status FROM chats c
+             WHERE c.friend_id = f.id
+             ORDER BY c.created_at DESC, c.id DESC LIMIT 1),
+           'resolved'
+         ) AS status
+         FROM friends f
+         WHERE ${friendScope.sql}
+           AND (EXISTS (
+                  SELECT 1 FROM messages_log m
+                   WHERE m.friend_id = f.id
+                     AND (m.delivery_type IS NULL OR m.delivery_type != 'test')
+                )
+             OR EXISTS (SELECT 1 FROM chats c WHERE c.friend_id = f.id))
+       )`,
     )
-    .bind(...account.binds)
-    .first<{ unanswered: number; in_progress: number; resolved: number; oldest: string | null }>();
+    .bind(...friendScope.binds)
+    .first<{ unanswered: number | null; in_progress: number | null; on_hold: number | null; resolved: number | null }>();
+  const line: InboxStatusBreakdown = {
+    unanswered: lineRow?.unanswered ?? 0,
+    inProgress: lineRow?.in_progress ?? 0,
+    onHold: lineRow?.on_hold ?? 0,
+    resolved: lineRow?.resolved ?? 0,
+  };
+
+  let email: InboxStatusBreakdown = { ...ZERO_BREAKDOWN };
+  if (includeEmail) {
+    const mailRow = await db
+      .prepare(
+        `SELECT
+           SUM(CASE WHEN status = 'unread' THEN 1 ELSE 0 END) AS unanswered,
+           SUM(CASE WHEN status = 'in_progress' THEN 1 ELSE 0 END) AS in_progress,
+           SUM(CASE WHEN status = 'on_hold' THEN 1 ELSE 0 END) AS on_hold,
+           SUM(CASE WHEN status = 'resolved' THEN 1 ELSE 0 END) AS resolved
+         FROM support_email_threads`,
+      )
+      .first<{ unanswered: number | null; in_progress: number | null; on_hold: number | null; resolved: number | null }>();
+    email = {
+      unanswered: mailRow?.unanswered ?? 0,
+      inProgress: mailRow?.in_progress ?? 0,
+      onHold: mailRow?.on_hold ?? 0,
+      resolved: mailRow?.resolved ?? 0,
+    };
+  }
+
+  return {
+    unanswered: line.unanswered + email.unanswered,
+    inProgress: line.inProgress + email.inProgress,
+    onHold: line.onHold + email.onHold,
+    resolved: line.resolved + email.resolved,
+    line,
+    email,
+  };
+}
+
+async function inboxState(db: D1Database, scope: AccountStatsScope): Promise<DashboardOverview['inbox']> {
+  const account = accountScopeSql(scope, 'f.line_account_id');
+  const counts = await getInboxStatusCounts(db, scope);
+  const includeEmail = 'allTenants' in scope ? true : scope.includeUnassigned;
 
   // 受信から初回返信までの平均。JSTの過去7日。
   // 記録が無い往復（107より前）は WHERE で外れる。
@@ -397,16 +492,42 @@ async function inboxState(db: D1Database, scope: AccountStatsScope): Promise<Das
     // 107 がまだ当たっていない環境。平均だけ出ない。
   }
 
+  // 最も古い未対応。LINE と MAIL のうち待ちが長い方（受信箱の最長待ちと同じ）。
+  const oldestAt: Array<string | null> = [];
+  const lineOldest = await db
+    .prepare(
+      `SELECT MIN(CASE WHEN c.status = 'unread' THEN c.last_message_at END) AS oldest
+         FROM chats c
+         JOIN friends f ON f.id = c.friend_id
+        WHERE ${account.sql}`,
+    )
+    .bind(...account.binds)
+    .first<{ oldest: string | null }>();
+  oldestAt.push(lineOldest?.oldest ?? null);
+  if (includeEmail) {
+    const mailOldest = await db
+      .prepare(
+        `SELECT MIN(CASE WHEN status = 'unread' THEN last_incoming_at END) AS oldest
+           FROM support_email_threads`,
+      )
+      .first<{ oldest: string | null }>();
+    oldestAt.push(mailOldest?.oldest ?? null);
+  }
   let oldestMinutes: number | null = null;
-  if (row?.oldest) {
-    const diff = Date.now() - new Date(row.oldest).getTime();
+  for (const at of oldestAt) {
+    if (!at) continue;
+    const diff = Date.now() - new Date(at).getTime();
     // 未来の時刻が入っていることがある（時計ずれ）。負の経過時間は意味がないので落とす。
-    oldestMinutes = diff > 0 ? Math.floor(diff / 60000) : 0;
+    const minutes = diff > 0 ? Math.floor(diff / 60000) : 0;
+    oldestMinutes = oldestMinutes === null ? minutes : Math.max(oldestMinutes, minutes);
   }
   return {
-    unanswered: row?.unanswered ?? 0,
-    inProgress: row?.in_progress ?? 0,
-    resolved: row?.resolved ?? 0,
+    unanswered: counts.unanswered,
+    inProgress: counts.inProgress,
+    onHold: counts.onHold,
+    resolved: counts.resolved,
+    line: counts.line,
+    email: counts.email,
     oldestUnansweredMinutes: oldestMinutes,
     averageFirstReplyMinutes: averageFirstReply,
   };
@@ -666,6 +787,13 @@ export async function getDashboardOverview(
   db: D1Database,
   period: DashboardPeriod,
   scope: AccountStatsScope,
+  /**
+   * 受信箱の数を数える範囲。省略時は `scope` と同じ。
+   * ダッシュボードは選択中のアカウントだけを見るが、MAIL はアカウントを
+   * 持たないため、受信箱の一覧と同じく未割り当てが見える範囲では MAIL も
+   * 合わせて数える。呼び出し側（ルート）が staff の可視範囲で渡す。
+   */
+  inboxScope: AccountStatsScope = scope,
 ): Promise<DashboardOverview> {
   const start = periodStart(period);
   const month = monthStart();
@@ -758,10 +886,13 @@ export async function getDashboardOverview(
       hiddenByUs: 0,
       blockedBoth: 0,
     }),
-    safe('inbox', inboxState(db, scope), {
+    safe('inbox', inboxState(db, inboxScope), {
       unanswered: 0,
       inProgress: 0,
+      onHold: 0,
       resolved: 0,
+      line: { ...ZERO_BREAKDOWN },
+      email: { ...ZERO_BREAKDOWN },
       oldestUnansweredMinutes: null,
       averageFirstReplyMinutes: null,
     }),
@@ -827,7 +958,7 @@ export async function getDashboardOverview(
   }
   const sections: DashboardOverview['sections'] = {
     friends: status('friends', friends.total === 0, 'latest'),
-    inbox: status('inbox', inbox.unanswered + inbox.inProgress + inbox.resolved === 0, 'latest'),
+    inbox: status('inbox', inbox.unanswered + inbox.inProgress + inbox.onHold + inbox.resolved === 0, 'latest'),
     delivery: status(['delivery', 'broadcasts'], (sent?.sent ?? 0) === 0 && broadcasts === 0, 'this-month'),
     quota: {
       status: 'unavailable', asOf: null, freshness: 'unavailable',
@@ -1066,8 +1197,9 @@ export async function getFriendStats(
     // （相手にブロックされている事実は変わらないため）。
     blockedByThem: breakdown.blockedByThem + breakdown.blockedBoth,
     hiddenByUs: breakdown.hiddenByUs,
-    unanswered: inbox.unanswered,
-    resolved: inbox.resolved,
+    // 友だち画面は LINE の友だちの数。MAIL のスレッドは混ぜない。
+    unanswered: inbox.line.unanswered,
+    resolved: inbox.line.resolved,
     addedThisMonth,
     addedLastMonth,
   };
@@ -1287,21 +1419,10 @@ export async function getListStats(db: D1Database, scope: AccountStatsScope): Pr
         )
         .bind(...markScope.binds, ...friendScope.binds)
         .first<{ total: number; in_use: number }>();
-      const inbox = await inboxState(db, scope);
-      /*
-        #1014 ATTR-21: 「未対応◯%」の母数は受信箱全体（unread＋対応中＋
-        保留＋対応済み）にする。保留は inboxState が返していないため、
-        同じアカウント範囲で別に数える。
-      */
-      const onHold = await db
-        .prepare(
-          `SELECT COUNT(*) AS n
-             FROM chats c
-             JOIN friends f ON f.id = c.friend_id
-            WHERE c.status = 'on_hold' AND ${friendScope.sql}`,
-        )
-        .bind(...friendScope.binds)
-        .first<{ n: number }>();
+      // #1014 ATTR-21: 「未対応◯%」の母数は受信箱全体（unread＋対応中＋
+      // 保留＋対応済み）。数え方は受信箱の正本（getInboxStatusCounts）の
+      // LINE 側を使う。MAIL のスレッドは友だち属性の母数に混ぜない。
+      const inbox = (await getInboxStatusCounts(db, scope)).line;
       // 変更履歴も、対象の友だちが属するアカウントで絞る。
       const changed = await db
         .prepare(
@@ -1321,7 +1442,7 @@ export async function getListStats(db: D1Database, scope: AccountStatsScope): Pr
         inUse: row?.in_use ?? 0,
         unanswered: inbox.unanswered,
         inProgress: inbox.inProgress,
-        onHold: onHold?.n ?? 0,
+        onHold: inbox.onHold,
         resolved: inbox.resolved,
         changedLast7,
       };

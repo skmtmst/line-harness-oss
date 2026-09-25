@@ -604,7 +604,11 @@ const DASHBOARD_OVERVIEW = {
   inbox: {
     unanswered: 5,
     inProgress: 0,
+    onHold: 0,
     resolved: 38,
+    // 受信箱の見本（summary total 5・line 1・email 4・emailUnread 4）と同じ内訳。
+    line: { unanswered: 1, inProgress: 0, onHold: 0, resolved: 34 },
+    email: { unanswered: 4, inProgress: 0, onHold: 0, resolved: 4 },
     // 設計の運用アラート「最も古い未対応：9,110分前」。
     oldestUnansweredMinutes: 9110,
     averageFirstReplyMinutes: null,
@@ -675,8 +679,11 @@ const DASHBOARD_OVERVIEW = {
     twoFactor: { enabled: 0, total: 6 },
     notificationUnreadCount: 3,
     shipmentStatus: '未処理なし',
-    // 設計の運用アラート見本は未対応360件。本番相当の inbox.unanswered=5 とは別物の見本値。
-    supportInbox: { unanswered: 360, resolved: 38 },
+    /*
+     * 対応状況の差し替えは置かない。本物の概要と同じ数（上の小カード5件と
+     * 右の未対応が同じ `overview.inbox`）にする。360件の見本を置いていた頃、
+     * 同じ画面で 5件と360件が並んで食い違いに見えた。
+     */
   },
 }
 

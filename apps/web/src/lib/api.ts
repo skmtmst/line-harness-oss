@@ -3904,7 +3904,15 @@ export type DashboardOverview = {
   inbox: {
     unanswered: number
     inProgress: number
+    /** 保留。段階配備中の旧Workerでは未返却。 */
+    onHold?: number
     resolved: number
+    /**
+     * チャネル別の内訳。LINE は友だち単位、MAIL はスレッド単位。
+     * 段階配備中の旧Workerでは未返却。
+     */
+    line?: { unanswered: number; inProgress: number; onHold: number; resolved: number }
+    email?: { unanswered: number; inProgress: number; onHold: number; resolved: number }
     oldestUnansweredMinutes: number | null
     /** 受信から初回返信までの平均（分）。記録が無ければ null。 */
     averageFirstReplyMinutes: number | null
