@@ -82,6 +82,7 @@ shared-button-importer app/inflow-links/_components/edit-route-modal.tsx
 shared-button-importer app/inflow-links/ad-integration.tsx
 shared-button-importer app/inflow-links/detail/page.tsx
 shared-button-importer app/inflow-links/page.tsx
+shared-button-importer app/inflow-links/referral-qr-modal.tsx
 shared-button-importer app/line-notifications/operator/new/page.tsx
 shared-button-importer app/line-notifications/operator-notification-rules.tsx
 shared-button-importer app/line-notifications/page.tsx

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { api } from '@/lib/api'
 import type { ScenarioActionType } from '@/lib/api'
 import { ActionConfigEditor, ACTION_KINDS } from '@/components/scenarios/action-editor'
+import SelectField from '@/components/shared/select-field'
 import { newActionKey, type InlineAction } from './draft-fields'
 import { useAccount } from '@/contexts/account-context'
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
@@ -107,11 +108,16 @@ export default function InlineActionList({
   const actionFeatureVisibility = useFeatureVisibility(selectedAccountId)
   function add(actionType: ScenarioActionType) {
     const kind = ACTION_KINDS.find((k) => k.type === actionType)
-    onChange([...actions, { key: newActionKey(), actionType, config: kind?.make() ?? {} }])
+    // 失敗したときは続けるが既定（いまの動き）。止めたい人だけ変える。
+    onChange([...actions, { key: newActionKey(), actionType, config: kind?.make() ?? {}, onFailure: 'continue' as const }])
   }
 
   function update(key: string, config: unknown) {
     onChange(actions.map((a) => (a.key === key ? { ...a, config } : a)))
+  }
+
+  function updateOnFailure(key: string, onFailure: 'stop' | 'continue') {
+    onChange(actions.map((a) => (a.key === key ? { ...a, onFailure } : a)))
   }
 
   function remove(key: string) {
@@ -170,6 +176,19 @@ export default function InlineActionList({
             </div>
           </div>
           <div className="space-y-2">
+            <label className="flex items-center gap-2 text-xs">
+              <span className="text-ink-faint shrink-0">失敗したら</span>
+              <SelectField
+                value={action.onFailure}
+                onChange={(e) => updateOnFailure(action.key, e.target.value === 'stop' ? 'stop' : 'continue')}
+                aria-label={`${index + 1}つ目の失敗したときの動き`}
+                className="w-36"
+                options={[
+                  { value: 'continue', label: '次へ進む' },
+                  { value: 'stop', label: 'ここで止める' },
+                ]}
+              />
+            </label>
             <ActionConfigEditor
               action={{
                 // ActionConfigEditor は中身と種別しか見ない。行として保存しないので、

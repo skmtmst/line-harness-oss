@@ -195,7 +195,7 @@ const read = (relative: string) => readFileSync(path.join(repoRoot, relative), '
  * 頼む絵の大きさが固定であることが効いてくる。
  */
 const QR_CALL_SITES = [
-  { file: 'apps/web/src/app/inflow-links/page.tsx', kind: 'bounded', fixedSize: '320x320' },
+  { file: 'apps/web/src/app/inflow-links/referral-qr-modal.tsx', kind: 'bounded', fixedSize: '320x320' },
   { file: 'apps/web/src/components/dashboard/qr-dialog.tsx', kind: 'bounded', fixedSize: null },
   { file: 'apps/worker/src/index.ts', kind: 'passthrough', fixedSize: '240x240' },
   { file: 'apps/worker/src/routes/liff.ts', kind: 'passthrough', fixedSize: '240x240' },

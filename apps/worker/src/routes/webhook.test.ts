@@ -276,7 +276,7 @@ describe('POST /webhook — 停止中の契約先', () => {
     expect(recordIncomingLineMessage).toHaveBeenCalledWith(baseEnv.DB, expect.objectContaining({
       friendId: 'friend-stopped', content: '問い合わせです', lineAccountId: 'account-stopped',
     }));
-    expect(upsertChatOnMessage).toHaveBeenCalledWith(baseEnv.DB, 'friend-stopped');
+    expect(upsertChatOnMessage).toHaveBeenCalledWith(baseEnv.DB, 'friend-stopped', '2026-08-24T12:00:00.000+09:00');
     expect(lineClientMocks.replyMessage).not.toHaveBeenCalled();
     expect(lineClientMocks.pushMessage).not.toHaveBeenCalled();
     expect(fireEvent).not.toHaveBeenCalled();
@@ -750,7 +750,7 @@ describe('POST /webhook — first-contact existing friends', () => {
       pictureUrl: 'https://example.com/profile.jpg',
       statusMessage: 'hello',
     });
-    expect(upsertChatOnMessage).toHaveBeenCalledWith(db, 'friend-1');
+    expect(upsertChatOnMessage).toHaveBeenCalledWith(db, 'friend-1', '2026-08-24T12:00:00.000+09:00');
     expect(fireEvent).toHaveBeenCalledWith(
       db,
       'message_received',

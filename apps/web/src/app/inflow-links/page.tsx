@@ -21,6 +21,7 @@ import { isPoolsFeatureAvailable } from '@/lib/pools-availability'
 import type { FeatureKey } from '@/lib/feature-settings'
 import AdIntegration from './ad-integration'
 import RefOrdersPanel from './_components/ref-orders'
+import ReferralQrModal, { type ReferralQrRoute } from './referral-qr-modal'
 import SiteScript from '@/components/inflow-links/site-script'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import Button from '@/components/shared/button'
@@ -201,7 +202,7 @@ function InflowLinksPageInner({
   const [selectedGenre, setSelectedGenre] = useState('')
   const [search, setSearch] = useState('')
   const [editingGenre, setEditingGenre] = useState<EntryRouteGenre | 'new' | null>(null)
-  const [qrRoute, setQrRoute] = useState<{ refCode: string; name: string; genre: string | null } | null>(null)
+  const [qrRoute, setQrRoute] = useState<ReferralQrRoute | null>(null)
   // Expanded-row state for showing friends acquired through a given ref.
   // Mirrors the legacy /affiliates page UX — click row → load via
   // /api/analytics/ref/:refCode → render friend list inline.
@@ -477,6 +478,11 @@ function InflowLinksPageInner({
     scenarioId: string | null
     /** entry_route のみ意味を持つ (並走/上書き)。他は null。 */
     runAccountFriendAddScenarios: boolean | null
+    /**
+     * entry_route は登録の有効・無効。tracked_link 行は有効のみ並ぶので true、
+     * 未登録 ref は概念が無いので null。停止中は QR を出さない判定に使う。
+     */
+    isActive: boolean | null
     stats: RefRouteStats | undefined
   }
 
@@ -524,6 +530,7 @@ function InflowLinksPageInner({
         tagId: r.tagId,
         scenarioId: r.scenarioId,
         runAccountFriendAddScenarios: r.runAccountFriendAddScenarios,
+        isActive: r.isActive,
         stats: statsByRef.get(r.refCode),
       })
     }
@@ -548,6 +555,7 @@ function InflowLinksPageInner({
         tagId: null,
         scenarioId: tl.scenarioId,
         runAccountFriendAddScenarios: null,
+        isActive: true,
         stats: statsByRef.get(tl.id),
       })
     }
@@ -563,6 +571,7 @@ function InflowLinksPageInner({
         tagId: null,
         scenarioId: null,
         runAccountFriendAddScenarios: null,
+        isActive: null,
         stats: s,
       })
     }
@@ -1127,13 +1136,24 @@ function InflowLinksPageInner({
                         >
                           {copyFailedId === r.refCode ? 'コピー失敗' : copiedId === r.refCode ? '済み' : 'コピー'}
                         </button>
-                        <button
-                          onClick={() => setQrRoute({ refCode: r.refCode, name: r.name, genre: r.genre })}
-                          className="text-[11px] font-medium text-action hover:underline"
-                          aria-label={`${r.name}のQRコードを表示`}
-                        >
-                          QR
-                        </button>
+                        {/*
+                          停止中の経路のQRは出さない。読み取っても友だち追加
+                          できないQRを配る事故を防ぐ。押せない飾りは置かず、
+                          理由（停止中）だけを同じ場所に出す。
+                        */}
+                        {r.isActive === false ? (
+                          <span className="text-[11px] text-ink-faint" title="停止中のためQRコードは表示できません">
+                            停止中
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => setQrRoute({ refCode: r.refCode, name: r.name, genre: r.genre, isActive: r.isActive })}
+                            className="text-[11px] font-medium text-action hover:underline"
+                            aria-label={`${r.name}のQRコードを表示`}
+                          >
+                            QR
+                          </button>
+                        )}
                       </div>
                     </td>
                     <td className="px-2 py-3 text-right" onClick={(e) => e.stopPropagation()}>
@@ -1203,7 +1223,7 @@ function InflowLinksPageInner({
           onSaved={(savedRoute, created) => {
             setEditing(null)
             load()
-            if (created) setQrRoute({ refCode: savedRoute.refCode, name: savedRoute.name, genre: savedRoute.genre })
+            if (created) setQrRoute({ refCode: savedRoute.refCode, name: savedRoute.name, genre: savedRoute.genre, isActive: savedRoute.isActive })
           }}
         />
       )}
@@ -1332,51 +1352,6 @@ function FragmentRow({
         </tr>
       )}
     </Fragment>
-  )
-}
-
-function ReferralQrModal({
-  route,
-  onClose,
-}: {
-  route: { refCode: string; name: string; genre: string | null }
-  onClose: () => void
-}) {
-  const [copied, setCopied] = useState(false)
-  const url = referralUrl(route.refCode)
-  const qrBase = `${WORKER_BASE.replace(/\/$/, '')}/api/qr?size=320x320&data=${encodeURIComponent(url)}`
-  const downloadUrl = `${qrBase}&download=1&filename=${encodeURIComponent(`referral-${route.refCode}`)}`
-  const copy = async () => {
-    await navigator.clipboard.writeText(url)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1500)
-  }
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/45 p-4">
-      <div className="w-full max-w-md rounded-2xl bg-canvas p-6 shadow-2xl">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-medium text-ink-faint">リファラルリンク・QRコード</p>
-            <h2 className="mt-1 text-lg font-bold text-ink">{route.name}</h2>
-            <p className="mt-1 text-sm text-ink-faint">{route.genre ?? '未分類'}</p>
-          </div>
-          <button onClick={onClose} className="text-2xl leading-none text-ink-faint" aria-label="閉じる">×</button>
-        </div>
-        <div className="mt-5 rounded-xl bg-canvas-sunken p-3">
-          <p className="break-all font-mono text-xs text-ink-secondary">{url}</p>
-          <button onClick={copy} className="mt-3 w-full rounded-lg border border-hairline bg-canvas px-3 py-2 text-sm font-medium text-action hover:bg-canvas-sunken">
-            {copied ? 'コピーしました' : 'URLをコピー'}
-          </button>
-        </div>
-        <div className="mt-5 text-center">
-          {/* eslint-disable-next-line @next/next/no-img-element -- Workerが動的生成するQRコード */}
-          <img src={qrBase} alt={`${route.name}のQRコード`} className="mx-auto h-64 w-64 rounded-xl border border-hairline bg-canvas p-2" />
-          <a href={downloadUrl} download={`referral-${route.refCode}.png`} className="mt-4 inline-flex w-full items-center justify-center rounded-lg bg-accent-deep px-4 py-2.5 text-sm font-semibold text-on-accent hover:brightness-92">
-            QRコードをダウンロード
-          </a>
-        </div>
-      </div>
-    </div>
   )
 }
 

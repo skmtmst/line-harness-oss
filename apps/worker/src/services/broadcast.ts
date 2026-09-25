@@ -28,6 +28,7 @@ import { aggregationUnitFor, aggregationUnits } from './broadcast-aggregation.js
 import { getFriendFieldMap } from '@line-crm/db';
 import { contentNeedsFriendFields } from './interpolation-context.js';
 import { createBroadcastRetryKey } from './broadcast-retry-key.js';
+import { processBroadcastAfterActions } from './broadcast-after-actions.js';
 import { classifyDeliveryFailure, deliveryErrorCode } from './broadcast-delivery-outcome.js';
 import { evaluateQuota, fetchQuota, shortfallMessage } from './broadcast-quota-guard.js';
 import { getSendPermissionForAccount, type SendPermissionCache } from './send-entitlements.js';
@@ -1115,6 +1116,14 @@ async function processQueuedBroadcastBatches(
           ]);
           blocked.add(friend.id);
           currentOffset++;
+          // 送信後動作: LINEが受け付けたこの宛先にだけ固定版を実行する。
+          // 送達は確定済みなので、ここが落ちても送り直さない。取り残しは
+          // 定期回収が拾う。
+          try {
+            await processBroadcastAfterActions(db, { broadcastId: broadcast.id, limit: 5 });
+          } catch (afterError) {
+            console.error(`[broadcast] after-actions failed broadcast=${broadcast.id}`, afterError);
+          }
         } catch (err) {
           console.error(`Personalized broadcast recipient ${friend.id} failed:`, err);
           // 届いていないと断定できたものだけ再送の対象にする。分からない
@@ -1249,6 +1258,13 @@ async function processQueuedBroadcastBatches(
       }
     }
     for (const friend of sendable) blocked.add(friend.id);
+    // 送信後動作: この束で受け付けられた宛先にだけ固定版を実行する。
+    // 失敗した束は上の catch で決着済みで、ここには来ない。
+    try {
+      await processBroadcastAfterActions(db, { broadcastId: broadcast.id, limit: 100 });
+    } catch (afterError) {
+      console.error(`[broadcast] after-actions failed broadcast=${broadcast.id}`, afterError);
+    }
 
     currentOffset += batch.length;
     // Update success_count but keep batch_offset=-1 (locked) during processing

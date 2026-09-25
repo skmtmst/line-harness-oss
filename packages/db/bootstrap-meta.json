@@ -409,7 +409,9 @@
     "448_billing_invoices.sql",
     "449_analytics_export_jobs.sql",
     "450_automation_run_retention.sql",
+    "451_messages_log_line_event_at.sql",
+    "452_broadcast_after_action_runs.sql",
     "453_ad_platform_secret_vault.sql"
   ],
-  "migrationCount": 410
+  "migrationCount": 412
 }

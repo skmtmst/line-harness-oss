@@ -575,6 +575,15 @@ async function readDraftSettings(db: D1Database, raw: unknown): Promise<DraftRea
     if (parsedActions.length !== extras.value.actions.length) {
       return { ok: false, error: '応答したあとにすることの設定を確認してください' };
     }
+    // 失敗したら止めるか続けるかは stop/continue のどちらかだけ受け付ける。
+    // 読めない値は実行側が続けるに倒すが、保存時には書き直しを促す。
+    for (const [index, item] of (extras.value.actions as unknown[]).entries()) {
+      const raw = (item as Record<string, unknown> | null)?.onFailure
+        ?? (item as Record<string, unknown> | null)?.on_failure;
+      if (raw !== undefined && raw !== 'stop' && raw !== 'continue') {
+        return { ok: false, error: `${index + 1}つ目の失敗したときの設定を確認してください` };
+      }
+    }
   }
 
   const templateId = typeof body.templateId === 'string' && body.templateId ? body.templateId : null;

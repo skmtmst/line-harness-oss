@@ -860,7 +860,7 @@ ecCommerce.put('/api/ec-commerce/connector', requireRole('owner', 'admin'), asyn
     return c.json({ success: false, error: 'つなぐための鍵は32文字以上で入力してください' }, 400);
   }
   const current = await c.env.DB.prepare(
-    `SELECT id, version, inbound_secret_encrypted, inbound_secret_last4, secret_updated_at
+    `SELECT id, version, status, inbound_secret_encrypted, inbound_secret_last4, secret_updated_at
        FROM ec_connectors WHERE line_account_id = ? LIMIT 1`,
   ).bind(lineAccountId).first<Record<string, unknown>>();
   if ((current ? Number(current.version) : 0) !== expectedVersion) {
@@ -909,6 +909,20 @@ ecCommerce.put('/api/ec-commerce/connector', requireRole('owner', 'admin'), asyn
     } catch {
       return c.json({ success: false, error: 'ほかの担当者が先に設定を追加しました' }, 409);
     }
+  }
+  // 停止から再開したときは、止めていた分の受信を待ち行列へ戻す。
+  // 再試行の定期回収が拾って処理する（上限つき・失敗は dead letter）。
+  if (String(current?.status ?? '') === 'paused' && status !== 'paused') {
+    await c.env.DB.prepare(
+      `UPDATE ec_events SET status = 'received', error_message = NULL, updated_at = ?
+        WHERE line_account_id = ? AND status = 'skipped' AND error_message = 'connector_paused'`,
+    ).bind(now, lineAccountId).run();
+    await c.env.DB.prepare(
+      `UPDATE ec_action_executions
+          SET status = 'retryable_failed', error_code = 'connector_paused',
+              error_message_safe = '取り込み再開のため再試行します', next_retry_at = ?, updated_at = ?
+        WHERE line_account_id = ? AND status = 'skipped' AND error_code = 'connector_paused'`,
+    ).bind(now, now, lineAccountId).run();
   }
   auditLog(c, 'ec.connector.update', { kind: 'line_account', id: lineAccountId });
   return c.json({ success: true, data: { version: nextVersion } });

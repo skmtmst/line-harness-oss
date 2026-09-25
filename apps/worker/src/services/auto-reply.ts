@@ -236,7 +236,20 @@ export async function previewAutoReplyContent(
  * 読めない設定は空として扱う。ここで落とすと、キーワードに当たっても
  * 返信ごと止まる。アクションが動かないより、返信が来ないほうが困る。
  */
-export function parseAutoReplyActions(raw: string | null | undefined): ScenarioActionRow[] {
+/**
+ * 自動応答のアクション1件。失敗したら止めるか続けるかを1件ずつ持つ。
+ * 無指定・読めない値は `continue`（いまの動き）に倒す。
+ */
+export type AutoReplyActionRow = ScenarioActionRow & {
+  onFailure: 'stop' | 'continue';
+};
+
+export function readAutoReplyOnFailure(raw: unknown): 'stop' | 'continue' {
+  const value = typeof raw === 'string' ? raw : null;
+  return value === 'stop' ? 'stop' : 'continue';
+}
+
+export function parseAutoReplyActions(raw: string | null | undefined): AutoReplyActionRow[] {
   if (!raw) return [];
   let parsed: unknown;
   try {
@@ -247,7 +260,7 @@ export function parseAutoReplyActions(raw: string | null | undefined): ScenarioA
   }
   if (!Array.isArray(parsed)) return [];
 
-  return parsed.flatMap((item, index): ScenarioActionRow[] => {
+  return parsed.flatMap((item, index): AutoReplyActionRow[] => {
     if (!item || typeof item !== 'object') return [];
     const row = item as Record<string, unknown>;
     const actionType = row.actionType ?? row.action_type;
@@ -255,6 +268,7 @@ export function parseAutoReplyActions(raw: string | null | undefined): ScenarioA
     if (typeof actionType !== 'string' || config === undefined) return [];
     return [
       {
+        onFailure: readAutoReplyOnFailure(row.onFailure ?? row.on_failure),
         // 実行側は id をログにしか使わない。並び順が分かる値にしておく。
         id: `auto-reply-action-${index}`,
         // 自動応答はシナリオに属さない。'scenario' アクションで
@@ -608,9 +622,13 @@ export async function matchAndReply(
         idempotencyKey: `${incomingEventId}:${action.id}`,
       });
       if (!reserved.acquired) continue;
+      // 「失敗したら止める」の指定があるアクションが失敗したら、後続は
+      // 実行しない。無指定は `continue`（いまの動き）に倒してある。
+      let actionFailed = false;
       try {
         const result = await runActionRows(db, [action], friend.id);
         addActionResult(actionSummary, result);
+        actionFailed = result.failed > 0;
         try {
           await finishAutoReplyActionRun(db, {
             id: reserved.id,
@@ -626,6 +644,7 @@ export async function matchAndReply(
         }
       } catch (err) {
         actionSummary.failed += 1;
+        actionFailed = true;
         try {
           await finishAutoReplyActionRun(db, {
             id: reserved.id,
@@ -637,6 +656,7 @@ export async function matchAndReply(
         }
         console.error('[auto-reply] failed to run action', err);
       }
+      if (actionFailed && action.onFailure === 'stop') break;
     }
   }
 
