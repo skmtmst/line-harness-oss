@@ -1419,7 +1419,9 @@ async function runFrequentHeavyJobs(
       name: 'ad conversion outbox retry',
       run: async () => {
         const { drainAdConversionOutbox } = await import('./services/ad-conversion.js');
-        const result = await drainAdConversionOutbox(env.DB, { limit: 50 });
+        const result = await drainAdConversionOutbox(env.DB, {
+          limit: 50, credentialKey: env.LINE_CREDENTIAL_ENCRYPTION_KEY,
+        });
         if (result.claimed > 0) {
           console.log(JSON.stringify({ event: 'ad_conversion_outbox_tick', ...result }));
         }

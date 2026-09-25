@@ -1,10 +1,12 @@
 import { Hono, type Context } from 'hono';
 import {
   getUsersForAccess,
+  getUserById,
   getUserByIdForAccess,
   createUser,
   updateUser,
-  deleteUser,
+  archiveUser,
+  getUserRelationCounts,
   linkFriendToUser,
   getUserFriends,
   getUserByEmailForAccess,
@@ -26,6 +28,8 @@ function serializeUser(row: DbUser) {
     phone: row.phone,
     externalId: row.external_id,
     displayName: row.display_name,
+    status: row.status,
+    archivedAt: row.archived_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -129,14 +133,37 @@ users.put('/api/users/:id', requireRole('owner', 'admin'), async (c) => {
   }
 });
 
-// DELETE /api/users/:id - delete
+// DELETE /api/users/:id - archive (never physically delete)
+//
+// 結びついた友だち・名寄せがある利用者を消すと、履歴・監査・支払の記録が
+// 誰のものか分からなくなる。関連があるときは 409 で止め、通常は行を残した
+// まま退避（archive）にする。退避済みは一覧・詳細に出さない。
 users.delete('/api/users/:id', requireRole('owner'), async (c) => {
   try {
     const id = c.req.param('id');
-    if (!await visibleUser(c, id)) {
+    const user = await visibleUser(c, id);
+    if (!user) {
+      // 退避済みは見えないが、削除のやり直しは成功扱いにする。
+      const staff = c.get('staff');
+      const gone = await getUserById(c.env.DB, id);
+      if (gone && gone.status === 'archived'
+        && (gone.tenant_id ?? DEFAULT_TENANT_ID) === (staff?.tenantId ?? DEFAULT_TENANT_ID)) {
+        return c.json({ success: true, data: null });
+      }
       return c.json({ success: false, error: 'User not found' }, 404);
     }
-    await deleteUser(c.env.DB, id);
+    if (user.status === 'archived') {
+      return c.json({ success: true, data: null });
+    }
+    const relations = await getUserRelationCounts(c.env.DB, id);
+    if (relations.friends > 0 || relations.activeLinks > 0) {
+      return c.json({
+        success: false,
+        error: 'この利用者には結びついた友だちがあるため削除できません。結びつきを外してからやり直してください',
+        relations,
+      }, 409);
+    }
+    await archiveUser(c.env.DB, id);
     return c.json({ success: true, data: null });
   } catch (err) {
     console.error('DELETE /api/users/:id error:', err);

@@ -4,6 +4,7 @@ import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 
 const db = vi.hoisted(() => ({
   getUsersForAccess: vi.fn(),
+  getUserById: vi.fn(),
   getUserByIdForAccess: vi.fn(),
   createUser: vi.fn(),
   updateUser: vi.fn(),
@@ -67,6 +68,7 @@ beforeEach(() => {
   });
   access.canAccessAllLineAccounts.mockResolvedValue(true);
   db.getUsersForAccess.mockResolvedValue([ownUser]);
+  db.getUserById.mockResolvedValue(null);
   db.getUserByIdForAccess.mockResolvedValue(ownUser);
   db.createUser.mockResolvedValue(ownUser);
   db.updateUser.mockResolvedValue(ownUser);

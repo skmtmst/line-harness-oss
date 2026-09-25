@@ -49,6 +49,8 @@ const BASE_SCHEMA = `
     name         TEXT NOT NULL,
     display_name TEXT,
     config       TEXT NOT NULL DEFAULT '{}',
+    config_encrypted TEXT,
+    verified_at  TEXT,
     is_active    INTEGER DEFAULT 1,
     created_at   TEXT NOT NULL DEFAULT '',
     updated_at   TEXT NOT NULL DEFAULT ''
