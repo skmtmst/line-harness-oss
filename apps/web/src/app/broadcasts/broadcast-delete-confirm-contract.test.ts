@@ -103,6 +103,7 @@ describe('一斉配信一覧の削除確認', () => {
   })
 
   it('削除ボタンは窓を開くだけで、押した時点では消さない', () => {
-    expect(PAGE).toContain("onClick={() => { setDeleteError(''); setDeleteTarget(broadcast) }}")
+    // m13f：行を押すと詳細へ行くため、行の中の削除ボタンは行へ伝えない。開くだけの動きは同じ。
+    expect(PAGE).toContain("event.stopPropagation(); setDeleteError(''); setDeleteTarget(broadcast)")
   })
 })
