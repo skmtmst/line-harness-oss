@@ -20,7 +20,7 @@ describe('V6 機能32 運用状態の表示確認', () => {
     expect(visible).not.toMatch(/<h1[\s>]/)
     expect(source).toContain('text-base font-bold text-ink">チェック結果')
     expect(source).toContain('text-base font-bold text-ink">何を止めますか')
-    expect(source).toContain('}>復旧</h2>')
+    expect(source).toContain('text-base font-bold text-ink">復旧</h2>')
     expect(source).toContain('text-base font-bold text-ink">止めた・戻した記録')
     expect(source).toContain('text-[11px] font-bold')
   })

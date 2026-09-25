@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import MergedTabs from '@/components/layout/merged-tabs'
 import Button from '@/components/shared/button'
 import Disclosure from '@/components/shared/disclosure'
+import NoteBar from '@/components/shared/note-bar'
 import StatusBadge from '@/components/shared/status-badge'
 import { api } from '@/lib/api'
 import { csvCell } from '@/lib/presentation'
@@ -159,7 +160,7 @@ function RankingTable({ title, rows, kind }: { title: string; rows: SearchConsol
 
 function SetupCard({ setup, denied = false }: { setup: SearchConsoleSetup | null; denied?: boolean }) {
   return (
-    <div className="rounded-card border-hairline bg-status-warn-soft border p-6">
+    <div className="rounded-card border-hairline bg-canvas border p-6">
       <div className="flex items-start gap-4">
         <div className="border-hairline flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border bg-canvas text-xl">G</div>
         <div>
@@ -262,7 +263,10 @@ export default function SearchConsolePage() {
       {loading ? (
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">{metrics.map((item) => <div key={item.label} className="rounded-card bg-canvas-sunken h-36 animate-pulse" />)}</div>
       ) : !data ? (
-        <SetupCard setup={setup} denied={denied} />
+        <>
+          <div className="mb-4"><NoteBar>Search Console をつなぐと、検索からの流入が見られます。</NoteBar></div>
+          <SetupCard setup={setup} denied={denied} />
+        </>
       ) : (
         <div className="space-y-5">
           <div className="text-ink-secondary flex flex-wrap items-center justify-between gap-2 text-xs">
