@@ -73,6 +73,12 @@ describe('運営コンソールの画面確認モック', () => {
     for (const key of ['kindLabel', 'staffName', 'createdAt', 'stageLabel', 'messages', 'canFollowUp', 'authorKind', 'authorName']) {
       expect(block, `HQ_SUPPORT_DETAIL に ${key} がない`).toContain(key);
     }
+    /*
+     * 本物と同じく、最初の本文は `messages` に入れない（画面で2回出る）。
+     * 運営の追記の名は `musubo 運営 ／ 名前` の形。
+     */
+    expect(block).not.toContain("authorKind: 'tenant'");
+    expect(block).toContain('musubo 運営 ／');
   });
 
   it('見本データに実在しそうな個人情報を入れない', () => {

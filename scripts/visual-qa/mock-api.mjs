@@ -379,14 +379,14 @@ const HQ_SUPPORT_REQUESTS = [
 const HQ_SUPPORT_DETAIL = {
   ...HQ_SUPPORT_REQUESTS[0],
   stageLabel: '受付済み',
+  /*
+   * 本物（`apps/worker/src/routes/hq-support.ts`）と同じく、最初の本文は
+   * `body` にだけ置き、`messages` には追記だけを入れる。本文を両方に
+   * 入れると画面で2回出る。運営の名は `musubo 運営 ／ 名前` の形。
+   */
   messages: [
     {
-      id: 'visual-support-msg-1', authorKind: 'tenant', authorName: '検証 一郎',
-      body: '画面確認用の問い合わせ本文。', attachments: [],
-      createdAt: '2026-09-06T10:00:00+09:00',
-    },
-    {
-      id: 'visual-support-msg-2', authorKind: 'ops', authorName: '検証 太郎',
+      id: 'visual-support-msg-1', authorKind: 'ops', authorName: 'musubo 運営 ／ 検証 太郎',
       body: '画面確認用の返信文。', attachments: [],
       createdAt: '2026-09-06T11:00:00+09:00',
     },
