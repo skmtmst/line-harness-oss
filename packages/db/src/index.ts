@@ -128,6 +128,7 @@ export * from './ops-support';
 export * from './ops-dashboard';
 export * from './platform-announcements';
 export * from './tenant-billing';
+export * from './billing-invoices';
 export * from './auth-email';
 export * from './friend-tag-side-effects';
 export * from './hq-templates';

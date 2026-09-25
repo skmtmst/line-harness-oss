@@ -6,7 +6,7 @@ import type { AuthenticatedStaff } from '../middleware/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { jstMonthStart, opsDashboard, resolvePeriod } from './ops-dashboard.js';
 
-/** ★V6 37-2 運営ダッシュボード。金額は定価ベース（決定 2026-09-17）。 */
+/** ★V6 37-2 運営ダッシュボード。Stripe入金実績と定価フォールバック。 */
 
 let testDb: SqliteD1;
 
@@ -14,14 +14,16 @@ function app(staff: AuthenticatedStaff) {
   const instance = new Hono<Env>();
   instance.use('*', async (c, next) => { c.set('staff', staff); return next(); });
   instance.route('/', opsDashboard);
-  return { request: (path: string) => instance.request(path, {}, { DB: testDb.db, ADMIN_PUBLIC_URL: 'https://admin.example.com' } as Env['Bindings']) };
+  return { request: (path: string, stripe = false) => instance.request(path, {}, { DB: testDb.db, ADMIN_PUBLIC_URL: 'https://admin.example.com', STRIPE_SECRET_KEY: stripe ? 'sk_test_x' : undefined } as Env['Bindings']) };
 }
 
 const master: AuthenticatedStaff = { id: 'master-1', name: '坂本 真人', role: 'owner', readOnly: false, tenantId: null };
 const tenantOwner: AuthenticatedStaff = { id: 'owner-1', name: '山田 太郎', role: 'owner', readOnly: false, tenantId: 'tenant-a' };
 
 type Body = { data: {
-  kpis: { mrr: number; mrrDelta: number; active: number; byPlan: Record<string, number>; trialing: number; newInPeriod: number; churnInPeriod: number; churnRate: number };
+  pricing: 'stripe_actual' | 'list_price';
+  lastSyncedAt: string | null;
+  kpis: { revenueThisMonth: number; revenueDelta: number; refundsThisMonth: number; contractMonthlyTotal: number; filledByListPriceCount: number; active: number; byPlan: Record<string, number>; trialing: number; newInPeriod: number; churnInPeriod: number; churnRate: number };
   revenueByMonth: Array<{ label: string; yen: number; current: boolean }>;
   planShare: { total: number; rows: Array<{ key: string; count: number; percent: number }> };
   alerts: { pastDue: number; trialEndingSoon: number; lineTokenExpiring: number; unansweredTickets: number };
@@ -75,12 +77,15 @@ describe('集計', () => {
     expect((await app(tenantOwner).request('/api/ops/dashboard')).status).toBe(403);
   });
 
-  it('MRR は契約中（決済失敗を含む）の定価の合計。保管した契約先と運営会社は数えない', async () => {
+  it('請求書が無い環境は契約中（決済失敗を含む）の定価へ戻す', async () => {
     const res = await app(master).request('/api/ops/dashboard');
     expect(res.status).toBe(200);
     const body = await res.json() as Body;
     // standard 29,800 + light 9,800 + pro 59,800（past_due も契約中に含む）
-    expect(body.data.kpis.mrr).toBe(99_400);
+    expect(body.data.pricing).toBe('list_price');
+    expect(body.data.kpis.revenueThisMonth).toBe(99_400);
+    expect(body.data.kpis.contractMonthlyTotal).toBe(99_400);
+    expect(body.data.kpis.filledByListPriceCount).toBe(3);
     expect(body.data.kpis.active).toBe(3);
     expect(body.data.kpis.byPlan).toEqual({ light: 1, standard: 1, pro: 1 });
     expect(body.data.kpis.trialing).toBe(1);
@@ -105,7 +110,35 @@ describe('集計', () => {
     // 期間はじめに契約中だったのは a, b, c と（今月解約した）e の 4 社 → 25%
     expect(body.data.kpis.churnRate).toBe(25);
     // 先月末には e も契約中だったので、前月比はマイナス
-    expect(body.data.kpis.mrrDelta).toBe(-9_800);
+    expect(body.data.kpis.revenueDelta).toBe(-9_800);
+  });
+
+  it('Stripe入金・返金・年払いを集計し、請求書の無い契約先だけ定価で補う', async () => {
+    const current = iso(-1);
+    const previous = iso(-35);
+    const insert = testDb.raw.prepare(`INSERT INTO billing_invoices
+      (id, tenant_id, status, amount_paid, amount_due, amount_refunded, currency, interval, paid_at, synced_at, created_at)
+      VALUES (?, ?, 'paid', ?, ?, ?, ?, ?, ?, ?, ?)`);
+    insert.run('in-a', 'tenant-a', 303_000, 303_000, 0, 'jpy', 'year', current, current, current);
+    insert.run('in-b', 'tenant-b', 9_800, 9_800, 1_000, 'jpy', 'month', current, current, current);
+    insert.run('in-prev', 'tenant-a', 29_800, 29_800, 0, 'jpy', 'month', previous, previous, previous);
+    insert.run('in-usd', 'tenant-b', 999_999, 999_999, 0, 'usd', 'month', current, current, current);
+    insert.run('in-archived', 'tenant-z', 59_800, 59_800, 0, 'jpy', 'month', current, current, current);
+    insert.run('in-default', 'default', 88_000, 88_000, 0, 'jpy', 'month', current, current, current);
+    testDb.raw.prepare(`INSERT INTO platform_settings (key, value) VALUES ('billing_invoices_last_synced_at', ?)`)
+      .run(current);
+
+    const body = await (await app(master).request('/api/ops/dashboard', true)).json() as Body;
+    expect(body.data.pricing).toBe('stripe_actual');
+    expect(body.data.lastSyncedAt).toBe(current);
+    expect(body.data.kpis).toMatchObject({
+      revenueThisMonth: 311_800,
+      revenueDelta: 282_000,
+      refundsThisMonth: 1_000,
+      contractMonthlyTotal: 93_850,
+      filledByListPriceCount: 1,
+    });
+    expect(body.data.revenueByMonth.at(-1)).toMatchObject({ current: true, yen: 311_800 });
   });
 
   it('LINE 登録は権限者のうち LINE 連携済みの人数。未登録の一覧は名前と契約先だけ', async () => {
