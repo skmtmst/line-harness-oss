@@ -93,7 +93,7 @@ export default function DateTimePicker({
                     onClick={() => setDay(d)}
                     disabled={!open}
                     aria-pressed={active}
-                    className={`flex min-h-16 w-15 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl border px-1 py-2 focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-100 ${
+                    className={`flex min-h-16 w-15 shrink-0 flex-col items-center justify-center gap-1 rounded-xl border px-1 py-2 focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-100 ${
                       active
                         ? 'border-accent-deep bg-accent-deep text-white'
                         : open

@@ -133,7 +133,7 @@ export default function LiffDateTimePreview({
                         type="button"
                         disabled={!open}
                         aria-pressed={active}
-                        className={`flex min-h-16 w-15 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl border px-1 py-2 ${
+                        className={`flex min-h-16 w-15 shrink-0 flex-col items-center justify-center gap-1 rounded-xl border px-1 py-2 ${
                           active
                             ? 'border-accent-deep bg-accent-deep text-on-accent'
                             : open
