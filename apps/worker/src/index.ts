@@ -1966,7 +1966,7 @@ async function scheduled(
         { now: new Date() },
       );
       if (birthday.queued + birthday.failed + result.sent + result.failed + result.skipped
-        + photoRewards.synced + photoRewards.failed + photoRewards.skipped > 0) {
+        + result.deferred + photoRewards.synced + photoRewards.failed + photoRewards.skipped > 0) {
         console.log(JSON.stringify({ event: 'nen_campaign_tick', birthdayQueued: birthday.queued, birthdayIssueFailed: birthday.failed, photoRewardSynced: photoRewards.synced, photoRewardFailed: photoRewards.failed, ...result }));
       }
     });
