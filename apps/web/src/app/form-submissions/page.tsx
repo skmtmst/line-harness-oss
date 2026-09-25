@@ -635,7 +635,8 @@ export default function FormSubmissionsPage() {
                   <Th className="w-32">回答の保存先</Th>
                   <Th className="w-24" align="right">回答数</Th>
                   <Th className="w-20">更新</Th>
-                  <Th className="w-32" align="right">操作</Th>
+                  {/* #768: 表が横に流れる帯でも操作列は右端に留める。 */}
+                  <Th className="bg-surface-pearl sticky right-0 w-32" align="right">操作</Th>
                 </TableHeadRow>
               </thead>
               <tbody className="divide-hairline divide-y">
@@ -698,7 +699,7 @@ export default function FormSubmissionsPage() {
                     {form.weeklySubmitCount ? <span className="block text-ink-faint">今週 {form.weeklySubmitCount.toLocaleString('ja-JP')}件</span> : null}
                   </td>
                   <td className="px-3 py-2.5 text-xs tabular-nums" title={form.updatedAt ? undefined : '更新日時を取得できません'}>{displayUpdatedAt(form.updatedAt)}</td>
-                  <td className="px-3 py-2.5 text-right text-xs">
+                  <td className="bg-canvas sticky right-0 px-3 py-2.5 text-right text-xs">
                     {/*
                      * 管理者確認モードは読み取り専用(#724)。編集・削除・回答の口は
                      * 担当アカウント経由しか受けないため、未割当フォームには使えない。

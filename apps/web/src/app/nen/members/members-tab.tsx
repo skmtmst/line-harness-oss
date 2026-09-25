@@ -146,7 +146,8 @@ export default function MembersTab({
                   <Th>ペット</Th>
                   <Th className="w-28">最終購入</Th>
                   <Th className="w-24" align="right">マイル還元</Th>
-                  <Th className="w-16" align="right"><span className="sr-only">操作</span></Th>
+                  {/* #768: 表が横に流れる帯でも操作列は右端に留める。 */}
+                  <Th className="bg-surface-pearl sticky right-0 w-16" align="right"><span className="sr-only">操作</span></Th>
                 </TableHeadRow>
               </thead>
               <tbody>
@@ -190,7 +191,7 @@ function MemberRow({ member, rankOrder }: { member: NenMemberRow; rankOrder: str
       </Td>
       <Td><span className="text-label text-ink-secondary">{member.lastPurchasedAt ? member.lastPurchasedAt.slice(5, 10).replace('-', '/') : '—'}</span></Td>
       <Td align="right"><span className="text-label font-semibold tabular-nums text-ink">{member.mileRatePercent == null ? '—' : `${member.mileRatePercent}%`}</span></Td>
-      <Td align="right">
+      <Td align="right" className="bg-canvas sticky right-0">
         <Link href={`/friends/detail?id=${encodeURIComponent(member.friendId)}`} className="text-label font-semibold text-action">詳細</Link>
       </Td>
     </Tr>
