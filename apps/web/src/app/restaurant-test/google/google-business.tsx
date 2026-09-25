@@ -21,6 +21,8 @@ import { TextArea } from '@/components/shared/text-field'
 import { ActionCell, DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { ApiError } from '@/lib/api'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { errorMessage, formatDate, formatDateTime } from './google-format'
+import { ChangeConfirmScreen, HistoryScreen, HoursEditor, PROFILE_DESIGN_NODES, ProfileEditScreen, ProfileTab, type HoursMode } from './google-profile'
 import {
   restaurantGoogleApi,
   type GoogleConnectionData,
@@ -38,8 +40,8 @@ import {
  *  - GB-2  lM0zP  口コミ一覧          - GB-3  TJPK5  AI返信下書き
  *  - GB-16 xSudF  返信の公開確認      - GB-15 oQRFu  状態・エラー
  *
- * 投稿・パフォーマンス・プロフィールは第2段以降。タブは見せるが押せない
- * （未対応機能を利用可能に見せない）。
+ * 第2段（プロフィール・営業時間・変更履歴）は `google-profile.tsx`（GB-10〜GB-12、GB-17〜GB-19）。
+ * 投稿・パフォーマンスは第3段以降。タブは見せるが押せない（未対応機能を利用可能に見せない）。
  */
 
 type TabKey = 'reviews' | 'posts' | 'performance' | 'profile' | 'settings'
@@ -51,24 +53,6 @@ const ORDER_OPTIONS: Array<{ value: GoogleReviewOrder; label: string }> = [
   { value: 'rating_low', label: '評価が低い順' },
   { value: 'rating_high', label: '評価が高い順' },
 ]
-
-function formatDateTime(value: string | null | undefined): string {
-  if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  const now = new Date()
-  const sameDay = date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() && date.getDate() === now.getDate()
-  const time = new Intl.DateTimeFormat('ja-JP', { hour: '2-digit', minute: '2-digit' }).format(date)
-  if (sameDay) return `今日 ${time}`
-  return `${new Intl.DateTimeFormat('ja-JP', { month: 'numeric', day: 'numeric' }).format(date)} ${time}`
-}
-
-function formatDate(value: string | null | undefined): string {
-  if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  return new Intl.DateTimeFormat('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' }).format(date)
-}
 
 function Stars({ rating }: { rating: number }) {
   return (
@@ -87,11 +71,6 @@ function replyBadge(review: GoogleReview): { label: string; tone: StatusBadgeTon
   if (review.replyStatus === 'draft') return { label: review.replyDraftAiGenerated ? 'AI下書きあり' : '下書きあり', tone: 'info' }
   if (review.needsAttention) return { label: '要確認', tone: 'danger' }
   return { label: '未返信', tone: 'warning' }
-}
-
-function errorMessage(error: unknown, fallback: string): string {
-  if (error instanceof ApiError && error.message) return error.message
-  return fallback
 }
 
 export default function GoogleBusinessPage() {
@@ -173,20 +152,34 @@ function GoogleBusinessInner() {
     label: TAB_LABELS[key],
     current: tab === key,
     count: key === 'reviews' && connected ? data.summary.newCount : undefined,
-    disabled: !connected && key !== 'settings' ? true : key === 'posts' || key === 'performance' || key === 'profile',
+    disabled: !connected && key !== 'settings' ? true : key === 'posts' || key === 'performance',
     onClick: () => go({ tab: key }),
   }))
 
   const reviewEditorOpen = tab === 'reviews' && connected && view === 'draft' && Boolean(reviewId)
   const designNode = reviewEditorOpen ? 'TJPK5' : tab === 'settings' ? 'p9ALPi' : 'lM0zP'
+  const hoursMode: HoursMode = searchParams.get('mode') === 'calendar' ? 'calendar' : searchParams.get('mode') === 'weekly' ? 'weekly' : 'text'
+  const profileView = tab === 'profile' && connected ? (view === 'hours' || view === 'confirm' || view === 'history' || view === 'edit' ? view : 'profile') : null
+  const profileNode = profileView === 'hours' ? PROFILE_DESIGN_NODES[`hours:${hoursMode}`] : profileView === 'confirm' ? PROFILE_DESIGN_NODES['confirm:hours'] : profileView ? PROFILE_DESIGN_NODES[profileView] : null
+  const panelNode = profileNode ?? designNode
 
   return (
-    <section className="border-hairline bg-canvas text-ink min-w-0 overflow-hidden rounded-card border" data-design-node={designNode}>
+    <section className="border-hairline bg-canvas text-ink min-w-0 overflow-hidden rounded-card border" data-design-node={panelNode}>
       <GoogleBusinessTabs items={tabItems} mapsUrl={connected ? data.connection.locationMapsUrl : null} />
       <div className="border-hairline border-t p-5 sm:p-6 lg:p-8">
         {banner && data.connection.status !== 'pending_location' ? <NoteBar tone={banner.tone} className="mb-4" action={<button type="button" className="text-sm font-semibold" onClick={() => setBanner(null)}>閉じる</button>}>{banner.text}</NoteBar> : null}
         {reviewEditorOpen && reviewId ? (
           <ReviewDraftScreen accountId={selectedAccountId} reviewId={reviewId} data={data} canPublish={canPublish} backHref="/restaurant-test/google?tab=reviews" onPublished={() => { void load() }} />
+        ) : profileView === 'hours' ? (
+          <HoursEditor accountId={selectedAccountId} mode={hoursMode} initialDate={searchParams.get('date')} go={go} />
+        ) : profileView === 'confirm' && reviewId ? (
+          <ChangeConfirmScreen key={reviewId} accountId={selectedAccountId} ids={reviewId.split(',').filter(Boolean)} go={go} />
+        ) : profileView === 'history' ? (
+          <HistoryScreen accountId={selectedAccountId} initialResult={searchParams.get('result') === 'pending' ? 'pending' : null} go={go} />
+        ) : profileView === 'edit' ? (
+          <ProfileEditScreen accountId={selectedAccountId} go={go} />
+        ) : profileView === 'profile' ? (
+          <ProfileTab accountId={selectedAccountId} go={go} />
         ) : tab === 'settings' ? (
           <SettingsTab accountId={selectedAccountId} data={data} canManage={canManageConnection} onChanged={() => { void load() }} />
         ) : (

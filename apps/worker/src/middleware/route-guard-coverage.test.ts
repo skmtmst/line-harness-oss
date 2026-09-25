@@ -415,6 +415,7 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'POST /api/ops/support/tickets/:id/reply',
     'POST /api/recipes/:id/clone',
     'POST /api/restaurant-test/gbp/posts',
+    'POST /api/restaurant-test/google/changes/:id/send',
     'POST /api/restaurant-test/google/connect/select-location',
     'POST /api/restaurant-test/google/connect/start',
     'POST /api/restaurant-test/google/disconnect',

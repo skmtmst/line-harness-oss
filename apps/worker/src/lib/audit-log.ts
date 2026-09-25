@@ -119,7 +119,8 @@ export type AuditAction =
   | 'restaurant.google.connect'
   | 'restaurant.google.reconnect'
   | 'restaurant.google.disconnect'
-  | 'restaurant.google.review.reply';
+  | 'restaurant.google.review.reply'
+  | 'restaurant.google.change.send';
 
 function commonAuditWriter(): typeof recordAuditEvent | null {
   try {
