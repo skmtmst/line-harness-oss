@@ -4,6 +4,7 @@ import type {
   ReactNode,
   TextareaHTMLAttributes,
 } from 'react'
+import HelpTip from './help-tip'
 import styles from './form-controls.module.css'
 
 /**
@@ -32,6 +33,9 @@ export function Field({
   required,
   note,
   error,
+  help,
+  helpLabel,
+  helpHref,
   children,
 }: {
   label: string
@@ -39,8 +43,18 @@ export function Field({
   required?: boolean
   note?: ReactNode
   error?: ReactNode
+  /**
+   * 言葉の意味・単位・いつ時点の値か。ラベルのすぐ右の「？」へ入れる
+   * （★V7・§2-1b）。必須の印・入力の直し方・失敗は入れない。
+   */
+  help?: ReactNode
+  /** 「？」の見出し。省略時は label。読み上げ名は「{見出し}の説明」。 */
+  helpLabel?: string
+  /** 長い説明がある場所。渡すと吹き出しに「くわしく」が出る。 */
+  helpHref?: string
   children: ReactNode
 }) {
+  const hasHelp = help !== undefined && help !== null
   return (
     <div className={styles.field}>
       <label htmlFor={htmlFor} className={styles.label}>
@@ -48,6 +62,11 @@ export function Field({
         {/* 設計は「必須」と字で書いている。* だけだと、色が見えない人には
             何も伝わらない。 */}
         {required && <RequiredBadge />}
+        {hasHelp ? (
+          <HelpTip label={`${helpLabel ?? label}の説明`} moreHref={helpHref}>
+            {help}
+          </HelpTip>
+        ) : null}
       </label>
       {children}
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
