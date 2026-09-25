@@ -3,6 +3,7 @@
 import { Calendar, Clock, X } from 'lucide-react'
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
 import DateField, { formatLabel as formatDateLabel, parseDate } from './date-field'
+import SelectField from './select-field'
 import dateStyles from './date-field.module.css'
 import styles from './date-time-field.module.css'
 
@@ -36,6 +37,7 @@ export default function DateTimeField({
   max,
   disabled = false,
   invalid = false,
+  required = false,
   placeholder = '日時を選ぶ',
   id,
   name,
@@ -51,6 +53,8 @@ export default function DateTimeField({
   max?: string
   disabled?: boolean
   invalid?: boolean
+  /** お任せ式の検証用。見た目は変えず、読み上げにだけ必須と伝える。 */
+  required?: boolean
   placeholder?: string
   id?: string
   name?: string
@@ -140,6 +144,7 @@ export default function DateTimeField({
         className={dateStyles.field}
         disabled={disabled}
         data-invalid={invalid || undefined}
+        aria-required={required || undefined}
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={open ? dialogId : undefined}
@@ -175,7 +180,16 @@ export default function DateTimeField({
       ) : null}
 
       {open ? (
-        <div ref={popoverRef} id={dialogId} role="dialog" aria-label="日時を選ぶ" className={styles.popover}>
+        <div
+          ref={popoverRef}
+          id={dialogId}
+          role="dialog"
+          aria-label="日時を選ぶ"
+          className={styles.popover}
+          // 箱の中の押下はここで止める。呼び出し側が `<label>` で欄全体を包んでいると、
+          // 箱の中の押下がラベル経由で欄本体へ再送達して開閉が裏返る（公開日時の試験で発生）。
+          onClick={(event) => event.stopPropagation()}
+        >
           <div className={styles.dateWrap}>
             <DateField
               value={datePart}
@@ -188,29 +202,21 @@ export default function DateTimeField({
           <div className={styles.timeRow}>
             <label className={styles.timeLabel}>
               時
-              <select
-                className={styles.select}
+              <SelectField
                 aria-label="時"
                 value={pad(shownTime.hours)}
                 onChange={(event) => chooseTime(Number(event.target.value), shownTime.minutes)}
-              >
-                {HOURS.map((hour) => (
-                  <option key={hour} value={pad(hour)}>{`${hour}時`}</option>
-                ))}
-              </select>
+                options={HOURS.map((hour) => ({ value: pad(hour), label: `${hour}時` }))}
+              />
             </label>
             <label className={styles.timeLabel}>
               分
-              <select
-                className={styles.select}
+              <SelectField
                 aria-label="分"
                 value={pad(shownTime.minutes)}
                 onChange={(event) => chooseTime(shownTime.hours, Number(event.target.value))}
-              >
-                {MINUTES.map((minute) => (
-                  <option key={minute} value={pad(minute)}>{`${minute}分`}</option>
-                ))}
-              </select>
+                options={MINUTES.map((minute) => ({ value: pad(minute), label: `${minute}分` }))}
+              />
             </label>
           </div>
           <div className={styles.footer}>
@@ -237,6 +243,7 @@ export function TimeField({
   step,
   disabled = false,
   invalid = false,
+  required = false,
   placeholder = '時刻を選ぶ',
   id,
   name,
@@ -251,6 +258,8 @@ export function TimeField({
   step?: number
   disabled?: boolean
   invalid?: boolean
+  /** お任せ式の検証用。見た目は変えず、読み上げにだけ必須と伝える。 */
+  required?: boolean
   placeholder?: string
   id?: string
   name?: string
@@ -319,6 +328,7 @@ export function TimeField({
         className={dateStyles.field}
         disabled={disabled}
         data-invalid={invalid || undefined}
+        aria-required={required || undefined}
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={open ? dialogId : undefined}
@@ -346,35 +356,34 @@ export function TimeField({
       ) : null}
 
       {open ? (
-        <div id={dialogId} role="dialog" aria-label="時刻を選ぶ" className={styles.popover}>
+        <div
+          id={dialogId}
+          role="dialog"
+          aria-label="時刻を選ぶ"
+          className={styles.popover}
+          // 日時の選択と同じく、箱の中の押下はここで止める（包んだ `<label>` への再送達を防ぐ）。
+          onClick={(event) => event.stopPropagation()}
+        >
           <div className={styles.timeRow}>
             <label className={styles.timeLabel}>
               時
-              <select
-                className={styles.select}
+              <SelectField
                 aria-label="時"
                 value={pad(shownHours)}
                 disabled={disabled}
                 onChange={(event) => chooseTime(Number(event.target.value), shownMinutes)}
-              >
-                {HOURS.map((hour) => (
-                  <option key={hour} value={pad(hour)}>{`${hour}時`}</option>
-                ))}
-              </select>
+                options={HOURS.map((hour) => ({ value: pad(hour), label: `${hour}時` }))}
+              />
             </label>
             <label className={styles.timeLabel}>
               分
-              <select
-                className={styles.select}
+              <SelectField
                 aria-label="分"
                 value={pad(shownMinutes)}
                 disabled={disabled}
                 onChange={(event) => chooseTime(shownHours, Number(event.target.value))}
-              >
-                {MINUTES.map((minute) => (
-                  <option key={minute} value={pad(minute)}>{`${minute}分`}</option>
-                ))}
-              </select>
+                options={MINUTES.map((minute) => ({ value: pad(minute), label: `${minute}分` }))}
+              />
             </label>
           </div>
           <div className={styles.footer}>
