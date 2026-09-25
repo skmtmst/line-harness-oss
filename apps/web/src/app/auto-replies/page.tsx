@@ -743,7 +743,12 @@ export default function AutoRepliesPage() {
                 <th title="動く条件（キーワード・適用アカウント）" className="w-1/6 whitespace-nowrap px-4 py-3 text-left text-xs font-semibold text-ink-faint">条件</th>
                 <th title="返信と実行するアクション" className="w-1/6 whitespace-nowrap px-4 py-3 text-left text-xs font-semibold text-ink-faint">返すもの</th>
                 <th title="今月動いた回数" className="w-24 px-4 py-3 text-left text-xs font-semibold text-ink-faint">今月の応答</th>
-                <th title="編集・停止または再開・削除" className="w-44 px-4 py-3 text-right text-xs font-semibold text-ink-faint">操作</th>
+                {/*
+                  #774: 表の最小幅880pxがカード幅を超える帯で、右端の操作列が
+                  スクロールしないと見えなかった（macOSはバー非表示で気づけない）。
+                  操作列だけ右端にstickyで留め、表が横に流れても操作は常に見える。
+                */}
+                <th title="編集・停止または再開・削除" className="bg-canvas-sunken sticky right-0 w-44 px-4 py-3 text-right text-xs font-semibold text-ink-faint">操作</th>
                 <th className="hidden px-4 py-3">テンプレート</th>
                 <th className="hidden px-4 py-3">応答条件</th>
                 <th className="hidden px-4 py-3">適用アカウント</th>
@@ -783,7 +788,7 @@ export default function AutoRepliesPage() {
                 />
               ) : (
                 shownInFolder.map((r) => (
-                  <tr key={r.id} className="hover:bg-canvas-sunken">
+                  <tr key={r.id} className="group hover:bg-canvas-sunken">
                     <td className="px-4 py-3 text-sm font-medium text-ink">
                       {/* 名前があればそれを出す。無ければキーワード。
                           一律で応答するルールはキーワードが無いので、名前を付けて
@@ -850,7 +855,7 @@ export default function AutoRepliesPage() {
                     {/* 狭い列でボタンが切れても、重ねるだけで操作の全部が
                         読めるように title を付ける（第5パス D-3）。 */}
                     <td
-                      className="px-3 py-3 text-right whitespace-nowrap"
+                      className="bg-canvas group-hover:bg-canvas-sunken sticky right-0 px-3 py-3 text-right whitespace-nowrap"
                       title={['編集', r.isActive ? '停止' : r.lifecycleStatus !== 'draft' ? '再開' : null, '削除'].filter(Boolean).join('・')}
                     >
                       {/* #641: 「編集」＋「削除」＋「その他（…）」の形にそろえる。
