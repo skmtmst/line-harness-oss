@@ -495,12 +495,14 @@ function RoutesStep({ rule, definition, options, toggleRoute, setDefinition }: {
                 aria-label={`時間帯${index + 1}の開始`}
                 value={slot.start}
                 onChange={(v) => setDefinition((current) => ({ ...current, timeWindows: updateTimeWindow(current.timeWindows, index, { start: v }) }))}
+                className="w-32"
               />
               <span>〜</span>
               <TimeField
                 aria-label={`時間帯${index + 1}の終了`}
                 value={slot.end}
                 onChange={(v) => setDefinition((current) => ({ ...current, timeWindows: updateTimeWindow(current.timeWindows, index, { end: v }) }))}
+                className="w-32"
               />
               <IconButton
                 aria-label={`時間帯${index + 1}を削除`}

@@ -177,11 +177,11 @@ export default function MileageHistoryTab({ accountId }: { accountId: string }) 
               <option value="manual">手動</option>
             </select>
           </label>
-          <span className="grid w-36 gap-1 text-xs font-semibold text-ink-secondary">
+          <span className="grid w-48 gap-1 text-xs font-semibold text-ink-secondary">
             開始日
             <DateField aria-label="開始日" value={from} onChange={(v) => resetFilter(() => setFrom(v))} />
           </span>
-          <span className="grid w-36 gap-1 text-xs font-semibold text-ink-secondary">
+          <span className="grid w-48 gap-1 text-xs font-semibold text-ink-secondary">
             終了日
             <DateField aria-label="終了日" value={to} onChange={(v) => resetFilter(() => setTo(v))} />
           </span>

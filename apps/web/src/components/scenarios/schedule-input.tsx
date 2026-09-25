@@ -116,6 +116,7 @@ export default function ScheduleInput({ mode, value, onChange }: Props) {
           value={value.deliveryTime}
           aria-label="配信する時刻"
           onChange={(v) => onChange({ ...value, deliveryTime: v })}
+          className="w-32"
         />
         <span className="text-sm text-ink-secondary">に配信</span>
       </div>

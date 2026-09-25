@@ -969,12 +969,14 @@ export default function EditDialog({
                     value={activeFrom}
                     onChange={setActiveFrom}
                     aria-label="時間帯の始まり"
+                    className="w-32"
                   />
                   <span className="text-ink-faint text-xs">〜</span>
                   <TimeField
                     aria-label="時間帯の終わり"
                     value={activeUntil}
                     onChange={setActiveUntil}
+                    className="w-32"
                   />
                 </div>
               </div>

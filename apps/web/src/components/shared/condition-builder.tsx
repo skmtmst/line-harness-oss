@@ -557,12 +557,14 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
             value={String(v.from ?? '')}
             onChange={(next) => onChange({ type: rule.type, value: { ...v, from: next } })}
             aria-label={rule.type === 'registered_at' ? '友だち登録日の開始' : '最終反応日の開始'}
+            className="w-48"
           />
           <span className="text-ink-faint text-sm">〜</span>
           <DateField
             value={String(v.to ?? '')}
             onChange={(next) => onChange({ type: rule.type, value: { ...v, to: next } })}
             aria-label={rule.type === 'registered_at' ? '友だち登録日の終了' : '最終反応日の終了'}
+            className="w-48"
           />
         </div>
       )

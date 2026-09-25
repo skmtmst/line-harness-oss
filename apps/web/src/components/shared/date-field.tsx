@@ -138,6 +138,8 @@ export default function DateField({
         className={styles.field}
         disabled={disabled}
         data-invalid={invalid || undefined}
+        // 狭い欄で切れても、重ねれば全文が読める（短い文字列は1行省略＋titleの決まり）。
+        title={selected ? formatLabel(selected) : undefined}
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={open ? dialogId : undefined}

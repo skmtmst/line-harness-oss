@@ -192,7 +192,7 @@ export function TemplateInsertControls({
         <SelectField aria-label="その他の差し込みを選ぶ" value="" disabled={disabled} onChange={(event) => choose(event.target.value)} options={[{ value: '', label: 'その他を選ぶ' }, ...OTHER_OPTIONS]} />
         <span className="flex items-center gap-2 text-xs text-ink-secondary">
           目標日
-          <DateField aria-label="日数を数える目標日" value={targetDate} disabled={disabled} onChange={onTargetDateChange} />
+          <DateField aria-label="日数を数える目標日" value={targetDate} disabled={disabled} onChange={onTargetDateChange} className="w-48" />
         </span>
         <Button size="field" disabled={disabled || !targetDate} onClick={() => onInsert(`{{days_until:${targetDate}}`)}>目標日までの日数</Button>
       </div>

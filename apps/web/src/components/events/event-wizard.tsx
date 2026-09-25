@@ -582,7 +582,12 @@ function OverviewStep({
         label="最初の予約枠"
         note="イベントの内容と一緒に、最初の開催日時と定員を保存します。追加の回は次の段階で増やせます。"
       >
-        <div className="grid gap-3 sm:grid-cols-4">
+        {/*
+          日付 4・開始 3・かかる時間 2・定員 2 の割合。日付は「2026年9月26日（土）」と
+          長いので均等4列では「2026年9月…」と切れて何日か読めない。
+        */}
+        <div className="grid gap-3 sm:grid-cols-11">
+          <div className="sm:col-span-4">
           <Field label="日付" htmlFor="first-slot-date" required>
             <DateField
               id="first-slot-date"
@@ -590,6 +595,8 @@ function OverviewStep({
               onChange={(v) => setFirstSlot({ ...firstSlot, date: v })}
             />
           </Field>
+          </div>
+          <div className="sm:col-span-3">
           <Field label="開始" htmlFor="first-slot-start" required>
             <TimeField
               id="first-slot-start"
@@ -597,6 +604,8 @@ function OverviewStep({
               onChange={(v) => setFirstSlot({ ...firstSlot, startTime: v })}
             />
           </Field>
+          </div>
+          <div className="sm:col-span-2">
           <Field label="かかる時間（分）" htmlFor="first-slot-duration" required>
             <TextInput
               id="first-slot-duration"
@@ -607,6 +616,8 @@ function OverviewStep({
               onChange={(event) => setFirstSlot({ ...firstSlot, durationMinutes: Number(event.target.value) })}
             />
           </Field>
+          </div>
+          <div className="sm:col-span-2">
           <Field label="定員" htmlFor="first-slot-capacity" required>
             <TextInput
               id="first-slot-capacity"
@@ -616,6 +627,7 @@ function OverviewStep({
               onChange={(event) => setFirstSlot({ ...firstSlot, capacity: event.target.value })}
             />
           </Field>
+          </div>
         </div>
       </FormSection>
 

@@ -323,6 +323,7 @@ function ReminderPanel({ friendId, busy, run }: { friendId: string; busy: boolea
         value={targetDate}
         onChange={setTargetDate}
         aria-label="ゴール日時"
+        className="w-60"
       />
       <Go
         busy={busy || !id || !targetDate}

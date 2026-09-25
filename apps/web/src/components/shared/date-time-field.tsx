@@ -145,6 +145,8 @@ export default function DateTimeField({
         disabled={disabled}
         data-invalid={invalid || undefined}
         aria-required={required || undefined}
+        // 狭い欄で切れても、重ねれば全文が読める（短い文字列は1行省略＋titleの決まり）。
+        title={parsed ? formatDateTimeLabel(parsed) : undefined}
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={open ? dialogId : undefined}
@@ -329,6 +331,8 @@ export function TimeField({
         disabled={disabled}
         data-invalid={invalid || undefined}
         aria-required={required || undefined}
+        // 狭い欄で切れても、重ねれば全文が読める（短い文字列は1行省略＋titleの決まり）。
+        title={parsed ? formatTimeLabel(parsed) : undefined}
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={open ? dialogId : undefined}
