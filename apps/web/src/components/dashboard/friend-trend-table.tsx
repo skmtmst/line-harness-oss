@@ -42,7 +42,7 @@ function EstimatedHelp({
           onToggle()
         }
       }}
-      className="border-ink-faint text-ink-faint focus-visible:border-action focus-visible:text-action inline-flex h-3.5 w-3.5 cursor-help items-center justify-center rounded-full border text-nano leading-none font-semibold outline-none"
+      className="border-ink-faint text-ink-faint inline-flex h-6 w-6 cursor-help items-center justify-center rounded-full border text-nano leading-none font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action"
     >
       ?
     </button>
