@@ -58,6 +58,13 @@ export function dashboardNotificationDestination(
   item: NotificationCenterItem,
 ): string {
   if (item.eventType.startsWith('account_health_')) return '/emergency'
+  // 二者承認の通知は配信の詳細へ（承認・差し戻しをその場でできる）。
+  if (item.eventType.startsWith('broadcast.approval')) {
+    const broadcastId = item.metadata && typeof item.metadata.broadcastId === 'string'
+      ? item.metadata.broadcastId
+      : null
+    return broadcastId ? `/broadcasts/detail?id=${encodeURIComponent(broadcastId)}` : '/broadcasts'
+  }
   // 一斉配信(送信枠不足を含む)の通知は配信一覧へ。
   if (item.eventType.startsWith('broadcast')) return '/broadcasts'
   /*

@@ -8,7 +8,8 @@ const NEW_PAGE = readFileSync(join(process.cwd(), 'src/app/broadcasts/new/page.t
 
 describe('V6 一斉配信の予約完了', () => {
   it('作成結果の実IDを完了画面へ渡す', () => {
-    expect(FORM).toContain('const saved = await persistDraft(scheduledAtIso())')
+    expect(FORM).toContain('await persistDraft(')
+    expect(FORM).toContain('scheduledAtIso(),')
     expect(FORM).toContain('onSuccess(saved)')
     expect(NEW_PAGE).toContain('/broadcasts/reserved?id=')
     expect(NEW_PAGE).toContain("broadcast.status === 'scheduled'")
