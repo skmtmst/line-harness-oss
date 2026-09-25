@@ -583,7 +583,7 @@ function OverviewStep({
         note="イベントの内容と一緒に、最初の開催日時と定員を保存します。追加の回は次の段階で増やせます。"
       >
         {/*
-          日付 4・開始 3・かかる時間 2・定員 2 の割合。日付は「2026年9月26日（土）」と
+          日付 4・開始 3・時間 2・定員 2 の割合。日付は「2026年9月26日（土）」と
           長いので均等4列では「2026年9月…」と切れて何日か読めない。
         */}
         <div className="grid gap-3 sm:grid-cols-11">
@@ -606,7 +606,7 @@ function OverviewStep({
           </Field>
           </div>
           <div className="sm:col-span-2">
-          <Field label="かかる時間（分）" htmlFor="first-slot-duration" required>
+          <Field label="時間（分）" htmlFor="first-slot-duration" required>
             <TextInput
               id="first-slot-duration"
               type="number"
