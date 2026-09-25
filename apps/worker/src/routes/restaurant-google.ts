@@ -706,11 +706,21 @@ restaurantGoogle.post('/api/restaurant-test/google/connect/select-location', req
     .bind(store.id, locationName)
     .first<{ location_name: string; location_title: string }>();
   if (!candidate) return fail(c, 400, '選べる店舗ではありません');
+  let selectedLocation: GoogleLocation | undefined;
+  try {
+    const accessToken = await accessTokenFor(c, connection);
+    selectedLocation = (await listManageableLocations({ fetch, accessToken })).find(
+      (location) => location.name === candidate.location_name,
+    );
+  } catch (error) {
+    return googleErrorResponse(c, error);
+  }
+  if (!selectedLocation) return fail(c, 409, '選択した店舗をGoogleで確認できません', { code: 'location_mismatch' });
   await db
     .prepare(
-      `UPDATE rt_google_connections SET location_name = ?, location_title = ?, status = 'connected', connected_at = ?, updated_at = ? WHERE store_id = ?`,
+      `UPDATE rt_google_connections SET location_name = ?, location_title = ?, location_maps_url = ?, status = 'connected', connected_at = ?, updated_at = ? WHERE store_id = ?`,
     )
-    .bind(candidate.location_name, candidate.location_title, nowIso(), nowIso(), store.id)
+    .bind(candidate.location_name, selectedLocation.title, selectedLocation.mapsUri, nowIso(), nowIso(), store.id)
     .run();
   await db.prepare('DELETE FROM rt_google_location_candidates WHERE store_id = ?').bind(store.id).run();
   await writeLog(c, store.id, { kind: 'connect', targetName: candidate.location_name, result: 'accepted' });
