@@ -755,6 +755,12 @@ const spec = {
       },
     },
     // ── HQ Support ─────────────────────────────────────────────────────────
+    '/api/hq/support/context': {
+      get: {
+        tags: ['HQ Support'], summary: '問い合わせ画面の表示用情報を取得',
+        responses: { '200': { description: 'Tenant-scoped kinds, accounts and sender' } },
+      },
+    },
     '/api/hq/support/kinds': {
       get: {
         tags: ['HQ Support'], summary: '問い合わせ種別を取得',

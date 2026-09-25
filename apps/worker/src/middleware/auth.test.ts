@@ -127,7 +127,10 @@ function app() {
   a.get('/api/friends', (c) => c.json({ success: true }));
   a.post('/api/broadcasts/:id/send', (c) => c.json({ success: true }));
   a.post('/api/hq/support/requests', (c) => c.json({ success: true }));
+  a.get('/api/hq/support/requests', (c) => c.json({ success: true }));
   a.get('/api/hq/notices', (c) => c.json({ success: true }));
+  a.post('/api/hq/notices/:id/read', (c) => c.json({ success: true }));
+  a.get('/api/tenants/me', (c) => c.json({ success: true }));
   a.get('/api/ops/me', requirePlatformAdmin(), (c) => c.json({ success: true, data: c.get('staff') }));
   a.get('/api/auto-reply-runs', (c) => c.json({ success: true }));
   a.get('/api/automation-runs', (c) => c.json({ success: true }));
@@ -1093,15 +1096,31 @@ describe('N-423 staff deny-by-default (#670)', () => {
     },
   );
 
-  test('停止中でもsession・お問い合わせ・運営からのお知らせは利用できる', async () => {
+  test('停止中セッションはsession・logout・お問い合わせ・運営からのお知らせだけ利用できる', async () => {
     const session = await app().request('/api/auth/session', staffBearer('suspended-key'), crossSiteEnv());
     expect(session.status).toBe(200);
     expect(await session.json()).toMatchObject({ success: true, data: { tenantStatus: 'suspended' } });
 
-    expect((await app().request('/api/hq/support/requests', {
-      ...staffBearer('suspended-key'), method: 'POST',
-    }, crossSiteEnv())).status).toBe(200);
-    expect((await app().request('/api/hq/notices', staffBearer('suspended-key'), crossSiteEnv())).status).toBe(200);
+    for (const [method, path] of [
+      ['POST', '/api/auth/logout'],
+      ['POST', '/api/hq/support/requests'],
+      ['GET', '/api/hq/support/requests'],
+      ['GET', '/api/hq/notices'],
+      ['POST', '/api/hq/notices/notice-1/read'],
+    ] as const) {
+      expect((await app().request(path, { ...staffBearer('suspended-key'), method }, crossSiteEnv())).status).toBe(200);
+    }
+
+    for (const [method, path] of [
+      ['GET', '/api/friends'],
+      ['POST', '/api/broadcasts/b1/send'],
+      ['GET', '/api/tenants/me'],
+      ['POST', '/api/hq/notices'],
+    ] as const) {
+      const res = await app().request(path, { ...staffBearer('suspended-key'), method }, crossSiteEnv());
+      expect(res.status).toBe(403);
+      expect(await res.json()).toMatchObject({ code: 'TENANT_SUSPENDED' });
+    }
   });
 
   test('運営マスターの有効な代理ログインは停止中契約先を閲覧できる', async () => {

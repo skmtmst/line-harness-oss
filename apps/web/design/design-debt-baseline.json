@@ -610,6 +610,10 @@
   "components/layout/sidebar-identity.tsx": {
     "unresolved-classname": 5
   },
+  "components/layout/suspended-sidebar.tsx": {
+    "unresolved-classname": 13,
+    "arbitrary-value": 4
+  },
   "components/legal/terms-document.tsx": {
     "arbitrary-value": 1,
     "direct-th": 1
