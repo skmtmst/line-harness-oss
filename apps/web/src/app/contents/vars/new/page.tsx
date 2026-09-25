@@ -378,7 +378,7 @@ function NewCommonVarInner() {
                 if (!keyTouched) setVarKey(suggestKey(e.target.value))
               }}
               placeholder="営業時間、予約受付人数、連絡先、店のオープン日"
-              className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+              className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info"
             />
             <p className="text-ink-faint mt-1 text-right text-xs tabular-nums">
               {name.length}/{NAME_MAX}
@@ -404,11 +404,11 @@ function NewCommonVarInner() {
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <label htmlFor="cv-valid-from" className="text-ink-secondary mb-1 block text-xs font-medium">有効開始</label>
-              <input id="cv-valid-from" type="datetime-local" value={validFrom} onChange={(e) => setValidFrom(e.target.value)} className="border-hairline rounded-control w-full border px-3 py-2 text-sm" />
+              <input id="cv-valid-from" type="datetime-local" value={validFrom} onChange={(e) => setValidFrom(e.target.value)} className="border-hairline rounded-control w-full border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info" />
             </div>
             <div>
               <label htmlFor="cv-valid-until" className="text-ink-secondary mb-1 block text-xs font-medium">有効終了</label>
-              <input id="cv-valid-until" type="datetime-local" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} className="border-hairline rounded-control w-full border px-3 py-2 text-sm" />
+              <input id="cv-valid-until" type="datetime-local" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} className="border-hairline rounded-control w-full border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info" />
             </div>
           </div>
           <div>
@@ -432,7 +432,7 @@ function NewCommonVarInner() {
                   type={type === 'number' ? 'number' : type === 'date' ? 'date' : type === 'datetime' ? 'datetime-local' : 'text'}
                   value={fallbackValue}
                   onChange={(e) => setFallbackValue(e.target.value)}
-                  className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
+                  className="border-hairline rounded-control w-full border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info"
                 />
               )}
             </div>
@@ -452,7 +452,7 @@ function NewCommonVarInner() {
               setVarKey(e.target.value)
             }}
             placeholder="shop_hours"
-            className="border-hairline rounded-control focus:ring-accent w-full max-w-sm border px-3 py-2 font-mono text-sm focus:ring-2 focus:outline-none"
+            className="border-hairline rounded-control focus:ring-accent w-full max-w-sm border px-3 py-2 font-mono text-sm focus:ring-2 focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info"
           />
           <p className="text-ink-faint mt-1 text-xs leading-relaxed">
             半角の英小文字で始め、英小文字・数字・下線だけ、32文字まで。
@@ -525,7 +525,7 @@ function NewCommonVarInner() {
               setSecretWarningFields(null)
             }}
             placeholder={spec.placeholder}
-            className="border-hairline rounded-control w-full max-w-md border px-3 py-2 text-sm"
+            className="border-hairline rounded-control w-full max-w-md border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info"
           /> : <input
             ref={valueRef}
             id="cv-value"
@@ -534,7 +534,7 @@ function NewCommonVarInner() {
             value={value}
             onChange={(e) => { setValue(e.target.value); setSecretWarningFields(null) }}
             placeholder={spec.placeholder}
-            className="border-hairline rounded-control w-full max-w-md border px-3 py-2 text-sm"
+            className="border-hairline rounded-control w-full max-w-md border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info"
           />}
           {type !== 'number' && type !== 'boolean' && (
             <p className="text-ink-faint mt-1 max-w-md text-right text-xs tabular-nums">

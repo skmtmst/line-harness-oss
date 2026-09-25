@@ -284,7 +284,7 @@ function QuestionTemplatePageInner() {
             <p className="text-ink-secondary text-label mt-2">
               {id ? `使用先 ${usageCount}か所` : '保存後にシナリオから選べます'}
             </p>
-            <Link href="/scenarios" className="text-action mt-3 inline-block font-semibold hover:underline">
+            <Link href="/scenarios" className="text-action mt-3 inline-block font-semibold underline">
               シナリオで使う
             </Link>
           </section>

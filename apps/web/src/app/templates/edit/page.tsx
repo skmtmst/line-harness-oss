@@ -334,7 +334,7 @@ function TemplateUsageNotice({ usedBy }: { usedBy: TemplateUsedBy }) {
             {entries.map((entry) => (
               <li key={entry.key}>
                 {entry.href ? (
-                  <Link href={entry.href} className="text-action hover:underline">
+                  <Link href={entry.href} className="text-action underline">
                     {entry.label}
                   </Link>
                 ) : (
