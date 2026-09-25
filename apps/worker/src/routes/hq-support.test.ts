@@ -170,6 +170,25 @@ describe('統括からのお問い合わせ', () => {
     const data = (await res.json<{ data: Array<{ key: string; label: string }> }>()).data;
     expect(data.map((k) => k.key)).toEqual(['usage', 'bug', 'billing', 'feature', 'other']);
   });
+
+  it('停止中でも使う問い合わせ専用contextは必要最小限の店舗・送信者・プランを返す', async () => {
+    testDb.raw.prepare(`UPDATE tenants SET name = '株式会社サンプル', status = 'suspended', plan_key = 'standard', plan_status = 'active' WHERE id = ?`).run(DEFAULT_TENANT_ID);
+    const res = await call('GET', '/api/hq/support/context');
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      success: true,
+      data: {
+        kinds: expect.arrayContaining([expect.objectContaining({ key: 'billing' })]),
+        accounts: [{ id: 'account-1', name: '然-NEN- TEST' }],
+        sender: {
+          tenantName: '株式会社サンプル',
+          name: '山田 太郎',
+          email: 'masato@example.com',
+          planLabel: 'スタンダード',
+        },
+      },
+    });
+  });
 });
 
 describe('お問い合わせの続き（★V6 36-3-A）', () => {

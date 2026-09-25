@@ -192,4 +192,35 @@ describe('PERF-07 AuthGuard のセッション確認再利用', () => {
     expect(host.querySelector('[data-child]')).not.toBeNull()
     expect(host.querySelector('[data-design-node="CXFjb9"]')).toBeNull()
   })
+
+  it('停止中の /hq/support は専用シェルを使う', async () => {
+    fetchSpy.mockImplementation(async () => sessionOk('suspended'))
+    currentPath = '/hq/support'
+    await act(async () => {
+      root.render(
+        <AuthGuard suspendedSupport={<div data-suspended-support>停止中お問い合わせ</div>}>
+          <div data-child>通常画面</div>
+        </AuthGuard>,
+      )
+    })
+    await settle()
+
+    expect(host.querySelector('[data-suspended-support]')).not.toBeNull()
+    expect(host.querySelector('[data-child]')).toBeNull()
+  })
+
+  it('停止中は遷移ごとに状態を確認し、activeへ戻れば再ログインせず通常画面へ戻る', async () => {
+    fetchSpy.mockImplementation(async () => currentPath === '/friends' ? sessionOk('suspended') : sessionOk('active'))
+    currentPath = '/friends'
+    await render()
+    await settle()
+    expect(host.querySelector('[data-design-node="CXFjb9"]')).not.toBeNull()
+
+    currentPath = '/hq'
+    await act(async () => { root.render(<AuthGuard><div data-child>通常画面</div></AuthGuard>) })
+    await settle()
+
+    expect(fetchSpy.mock.calls.length).toBeGreaterThanOrEqual(2)
+    expect(host.querySelector('[data-child]')).not.toBeNull()
+  })
 })

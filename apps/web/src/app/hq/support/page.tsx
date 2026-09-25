@@ -3,7 +3,6 @@
 import { CheckCircle2, ImagePlus, Send, X } from 'lucide-react'
 import Link from 'next/link'
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
-import type { LineAccount, StaffMember } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import NoticeLineRegisterDialog from '@/components/hq/notice-line-register-dialog'
@@ -13,6 +12,7 @@ import StickyBar from '@/components/shared/sticky-bar'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { useTenantStatus } from '@/components/tenant-access-context'
 import { api } from '@/lib/api'
 import { readFileAsBase64, shortDateTime } from '@/lib/hq-banners'
 import {
@@ -38,12 +38,13 @@ type Attachment = { name: string; mimeType: string; data: string; size: number; 
  */
 export default function HqSupportPage() {
   usePageTitle('お問い合わせ')
+  const tenantStatus = useTenantStatus()
+  const tenantUnavailable = tenantStatus === 'suspended' || tenantStatus === 'archived'
   const uid = useId()
   const fileRef = useRef<HTMLInputElement>(null)
   const [kinds, setKinds] = useState<Array<{ key: HqSupportKind; label: string }>>([])
-  const [accounts, setAccounts] = useState<LineAccount[]>([])
-  const [me, setMe] = useState<StaffMember | null>(null)
-  const [tenantName, setTenantName] = useState('')
+  const [accounts, setAccounts] = useState<Array<{ id: string; name: string }>>([])
+  const [sender, setSender] = useState({ tenantName: '', name: '', email: null as string | null, planLabel: '—' })
   const [history, setHistory] = useState<HqSupportRequest[] | null>(null)
   const [historyError, setHistoryError] = useState(false)
   const [input, setInput] = useState<HqSupportInput>(EMPTY_SUPPORT_INPUT)
@@ -55,15 +56,14 @@ export default function HqSupportPage() {
 
   useEffect(() => {
     let cancelled = false
-    void Promise.allSettled([api.hqSupport.kinds(), api.lineAccounts.list(), api.staff.me(), api.tenants.me()]).then(
-      ([kindRes, accountRes, meRes, tenantRes]) => {
-        if (cancelled) return
-        if (kindRes.status === 'fulfilled' && kindRes.value.success) setKinds(kindRes.value.data)
-        if (accountRes.status === 'fulfilled' && accountRes.value.success) setAccounts(accountRes.value.data)
-        if (meRes.status === 'fulfilled' && meRes.value.success) setMe(meRes.value.data)
-        if (tenantRes.status === 'fulfilled' && tenantRes.value.success) setTenantName(tenantRes.value.data.name)
-      },
-    )
+    void api.hqSupport.context().then((res) => {
+      if (cancelled || !res.success) return
+      setKinds(res.data.kinds)
+      setAccounts(res.data.accounts)
+      setSender(res.data.sender)
+    }).catch(() => {
+      // 履歴と送信は独立して使える。表示用情報だけ空のままにする。
+    })
     void loadHistory()
     return () => {
       cancelled = true
@@ -149,18 +149,22 @@ export default function HqSupportPage() {
   }
 
   return (
-    <div data-design-node="X6LZP" className="flex flex-col gap-4">
+    <div data-design-node="X6LZP" className={`flex flex-col gap-4 ${tenantUnavailable ? 'min-h-full flex-1' : ''}`}>
       <div data-design-node="kcTeV">
-        <NoteBar tone="info">
-          使い方の質問、不具合、料金の相談はここから送れます。返信は登録メールアドレスに届きます（平日 2営業日以内）。
-          <button type="button" onClick={() => setLineGuide(true)} className="ml-2 text-action underline-offset-2 hover:underline">
-            運営からの大事なお知らせを LINE で受け取る（契約者専用LINEの登録案内）
-          </button>
-        </NoteBar>
+        {tenantUnavailable ? (
+          <NoteBar tone="success">使い方の質問、不具合、料金の相談はここから送れます。返信は登録メールアドレスに届きます（平日 2営業日以内）。</NoteBar>
+        ) : (
+          <NoteBar tone="info">
+            使い方の質問、不具合、料金の相談はここから送れます。返信は登録メールアドレスに届きます（平日 2営業日以内）。
+            <button type="button" onClick={() => setLineGuide(true)} className="ml-2 text-action underline-offset-2 hover:underline">
+              運営からの大事なお知らせを LINE で受け取る（契約者専用LINEの登録案内）
+            </button>
+          </NoteBar>
+        )}
       </div>
 
       {/* 契約者専用LINEの登録案内（2026-09-18 決定: 登録直後の案内を、ここからもいつでも開ける） */}
-      <NoticeLineRegisterDialog open={lineGuide} onClose={() => setLineGuide(false)} quietWhenUnavailable={false} />
+      {!tenantUnavailable ? <NoticeLineRegisterDialog open={lineGuide} onClose={() => setLineGuide(false)} quietWhenUnavailable={false} /> : null}
 
       {/* 送信完了の知らせ（2026-09-18 決定: 帯だけでは気づきにくいので、窓で止めて伝える） */}
       <Dialog
@@ -214,7 +218,7 @@ export default function HqSupportPage() {
           <Field label="本文" required note="困っていること・期待する動き・起きた日時" htmlFor={`${uid}-body`}>
             <TextArea
               id={`${uid}-body`}
-              rows={8}
+              rows={tenantUnavailable ? 6 : 8}
               value={input.body}
               maxLength={SUPPORT_BODY_MAX}
               disabled={sending}
@@ -224,7 +228,7 @@ export default function HqSupportPage() {
             />
           </Field>
 
-          <Field label="関係するアカウント" note="任意" htmlFor={`${uid}-account`}>
+          <Field label="関係する店舗" note="任意" htmlFor={`${uid}-account`}>
             <SelectField
               id={`${uid}-account`}
               className="w-full"
@@ -285,11 +289,16 @@ export default function HqSupportPage() {
           <section data-design-node="a1kbdf" className="flex flex-col gap-2.5 rounded-card border border-hairline bg-canvas p-4">
             <h2 className="text-body font-bold text-ink">送信者</h2>
             <dl className="flex flex-col gap-2">
-              <Row label="統括" value={tenantName || '—'} />
-              <Row label="名前" value={me?.name ?? '—'} />
-              <Row label="メール" value={me?.email ?? '—'} />
+              <Row label="統括" value={sender.tenantName || '—'} />
+              <Row label="名前" value={sender.name || '—'} />
+              <Row label="メール" value={sender.email ?? '—'} />
+              <Row label="プラン" value={sender.planLabel} />
             </dl>
-            <p className="text-micro text-ink-faint">この内容が問い合わせに添えられます。返信はこのメールアドレスに届きます。</p>
+            <p className="text-micro text-ink-faint">
+              {tenantUnavailable
+                ? 'この内容が問い合わせに添えられます。変えるにはプロフィールを編集してください。'
+                : 'この内容が問い合わせに添えられます。返信はこのメールアドレスに届きます。'}
+            </p>
           </section>
 
           <section data-design-node="Srh5W" className="flex flex-col rounded-card border border-hairline bg-canvas">
@@ -321,7 +330,7 @@ export default function HqSupportPage() {
                           {SUPPORT_STATUS_LABELS[item.status]}
                         </span>
                       </span>
-                      {item.replies && item.replies.length > 0 ? (
+                      {!tenantUnavailable && item.replies && item.replies.length > 0 ? (
                         <span className="text-micro text-ink-secondary">運営からの返信 {item.replies.length}件・開いて続きを送れます</span>
                       ) : null}
                     </Link>
@@ -333,7 +342,7 @@ export default function HqSupportPage() {
         </div>
       </div>
 
-      <div data-design-node="kgFxH" className="sticky bottom-0 z-10">
+      <div data-design-node="kgFxH" className="sticky bottom-0 z-10 mt-auto">
         <StickyBar
           status={blocked && (input.subject || input.body || input.kind) ? <span className="text-status-warn-deep">{blocked}</span> : '送信すると、控えが登録メールアドレスにも届きます'}
           actions={
