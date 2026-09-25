@@ -6,8 +6,9 @@ const PAGE = readFileSync(new URL('./tags-page-v4.tsx', import.meta.url), 'utf8'
 /**
  * #981 A04-02: タグ総数とフォルダ内訳の母集団の照合。
  *
- * タグ画面の件数は「KPI・フォルダ帯の見出し・すべて・各フォルダ・未分類」
- * の5か所に出る。一覧そのもの（items）から数えるものと /api/list-stats
+ * タグ画面の件数は「KPI・すべて・各フォルダ・未分類」の4か所に出る。
+ * フォルダ帯の見出しは「すべて」と重ねて出さない（m13f）。
+ * 一覧そのもの（items）から数えるものと /api/list-stats
  * から来るものが混在すると、選択中アカウントの範囲で数字が食い違う
  * （tags.total はテナント全体の件数でアカウント範囲を見ない）。
  *
@@ -25,9 +26,9 @@ describe('タグ一覧の件数定義（#981 A04-02）', () => {
     expect(PAGE).toContain('accountId={accountId ?? undefined}')
   })
 
-  it('フォルダ帯の「すべて」と見出しは一覧の件数そのもの', () => {
+  it('フォルダ帯の「すべて」は一覧の件数そのもの（見出しとの重ね書きなし）', () => {
     expect(PAGE).toContain("name: 'すべて', count: items.length")
-    expect(PAGE).toContain('`${items.length}件`')
+    expect(PAGE).not.toContain('`${items.length}件`')
   })
 
   it('保管済みタグも件数の母集団に入ることを画面で説明する', () => {
