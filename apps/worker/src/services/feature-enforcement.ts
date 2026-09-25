@@ -113,6 +113,14 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
     },
   },
   {
+    name: 'ec event retry',
+    classification: { kind: 'core', reason: 'ECイベント通知の再試行' },
+    enforcement: {
+      mode: 'exempt',
+      reason: '再試行の可否はアカウント自身のEC連携の取り込み停止だけで決まり、機能設定に属さない',
+    },
+  },
+  {
     name: 'analytics url exposure projection',
     classification: { kind: 'feature', featureId: 'analytics' },
     enforcement: {
