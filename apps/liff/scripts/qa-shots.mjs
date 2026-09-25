@@ -82,17 +82,23 @@ try {
       waitMs: 1500,
       after: async (p) => {
         await p.getByRole('button', { name: 'QA カット' }).click();
+        await p.getByRole('button', { name: '担当を選ぶ' }).click();
         await p.getByRole('button', { name: /QA スタッフ/ }).click();
+        await p.getByRole('button', { name: '日時を選ぶ' }).click();
         await p.getByRole('button', { name: '10:00' }).click();
+        await p.getByRole('button', { name: /で確認へ/ }).click();
       },
     });
     await shot(page, viewport, 'booking-done', '/booking?liffId=qa', {
       waitMs: 1500,
       after: async (p) => {
         await p.getByRole('button', { name: 'QA カット' }).click();
+        await p.getByRole('button', { name: '担当を選ぶ' }).click();
         await p.getByRole('button', { name: /QA スタッフ/ }).click();
+        await p.getByRole('button', { name: '日時を選ぶ' }).click();
         await p.getByRole('button', { name: '10:00' }).click();
-        await p.getByRole('button', { name: '予約をリクエスト' }).click();
+        await p.getByRole('button', { name: /で確認へ/ }).click();
+        await p.getByRole('button', { name: '予約をリクエストする' }).click();
         await p.waitForTimeout(1500);
       },
     });
