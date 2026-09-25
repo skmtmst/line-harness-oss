@@ -56,8 +56,10 @@ describe('押せる部品のフォーカスが見える', () => {
   it('フォーカスの輪郭を消さない', () => {
     // CSS 側。`outline: none` / `outline: 0` を書かない。
     // 例外: 外側の枠が `:focus-within` で ring を出す複合部品
-    // （SearchField・Combobox・MultiSelect）は、中の input の輪郭を消して
+    // （Combobox・MultiSelect）は、中の input の輪郭を消して
     // 外枠の ring を正本にする。二重の輪郭を避けるため。
+    // SearchField は例外にしない。外枠 ring では Tab 点検が反応せず、
+    // 輪郭は中の input 自身に出す（2026-09-25）。
     // 緑は「正常」の意味なので、輪郭の色は action にそろえる。
     for (const name of files.filter((n) => n.endsWith('.css'))) {
       const css = withoutComments(read(name))
