@@ -95,7 +95,7 @@ export default function FriendListRow({
         {/* アバターは設計 `PhxG6` の 40x40 / r=18。真円（r=20）にしない。 */}
         <Avatar name={friend.displayName} src={friend.pictureUrl} size={40} />
         <div className="min-w-0">
-          <Link href={`/friends/detail?id=${friend.id}`} onClick={(event) => event.stopPropagation()} title={friend.displayName} className="block truncate text-sm font-bold text-ink hover:text-action hover:underline">
+          <Link href={`/friends/detail?id=${friend.id}`} onClick={(event) => event.stopPropagation()} title={friend.displayName} className="block min-h-6 truncate text-sm font-bold text-ink hover:text-action hover:underline">
             {friend.displayName}
           </Link>
           <p className="mt-1 truncate text-micro text-ink-faint">登録 {formatDate(friend.createdAt)}</p>
@@ -273,7 +273,7 @@ export function FriendListCard({
         </button>
         <Avatar name={friend.displayName} src={friend.pictureUrl} size={40} />
         <div className="min-w-0 flex-1">
-          <Link href={`/friends/detail?id=${friend.id}`} title={friend.displayName} className="block truncate text-sm font-bold text-ink hover:text-action hover:underline">
+          <Link href={`/friends/detail?id=${friend.id}`} title={friend.displayName} className="block min-h-6 truncate text-sm font-bold text-ink hover:text-action hover:underline">
             {friend.displayName}
           </Link>
           {friend.supportMark ? (
