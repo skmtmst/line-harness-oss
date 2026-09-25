@@ -10,6 +10,8 @@
  */
 
 export function formatYen(yen: number): string {
+  // 数字でない値が来ても「¥NaN」を出さない。未取得は「—」が決まり。
+  if (typeof yen !== 'number' || !Number.isFinite(yen)) return '—'
   return `¥${Math.round(yen).toLocaleString('ja-JP')}`
 }
 
