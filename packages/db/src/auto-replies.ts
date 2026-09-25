@@ -1,4 +1,5 @@
 import { jstNow } from './utils.js';
+import { removeConsumerReferences, syncTemplateReferences } from './template-versions.js';
 import { saveAutoReplyInternalMemo } from './auto-reply-runs.js';
 // =============================================================================
 // Auto-Replies — Keyword-triggered automatic responses (L社 自動応答 equivalent)
@@ -217,6 +218,8 @@ export async function createAutoReply(
    * lifecycle_status（stopped）は変えない。
    */
   await saveAutoReplyInternalMemo(db, created, input.internalMemo ?? null);
+  // 467: 保存で参照表を書き換える。どの版を使っているかの正本。
+  await syncTemplateReferences(db, 'auto_reply', created.id, created.template_id ? [created.template_id] : []);
   return created;
 }
 
@@ -365,6 +368,10 @@ export async function updateAutoReply(
   if (updated && 'internalMemo' in input) {
     await saveAutoReplyInternalMemo(db, updated, input.internalMemo ?? null);
   }
+  // 467: 保存で参照表を書き換える。外した参照はここで消える。
+  if (updated) {
+    await syncTemplateReferences(db, 'auto_reply', updated.id, updated.template_id ? [updated.template_id] : []);
+  }
   return updated;
 }
 
@@ -436,6 +443,8 @@ export async function deleteAutoReply(
     )
     .bind(jstNow(), staffId, id)
     .run();
+  // 467: 消えた（論理削除の）自動応答の参照を消す。
+  await removeConsumerReferences(db, 'auto_reply', id);
 }
 
 // =============================================================================
