@@ -57,17 +57,21 @@ export function Field({
   const hasHelp = help !== undefined && help !== null
   return (
     <div className={styles.field}>
-      <label htmlFor={htmlFor} className={styles.label}>
-        {label}
-        {/* 設計は「必須」と字で書いている。* だけだと、色が見えない人には
-            何も伝わらない。 */}
-        {required && <RequiredBadge />}
+      {/* 「？」は label の外に置く。中に入れるとラベルがボタンを指してしまい、
+          入力欄との結びつき（htmlFor・読み上げ）が壊れる。 */}
+      <div className={styles.labelRow}>
+        <label htmlFor={htmlFor} className={styles.label}>
+          {label}
+          {/* 設計は「必須」と字で書いている。* だけだと、色が見えない人には
+              何も伝わらない。 */}
+          {required && <RequiredBadge />}
+        </label>
         {hasHelp ? (
           <HelpTip label={`${helpLabel ?? label}の説明`} moreHref={helpHref}>
             {help}
           </HelpTip>
         ) : null}
-      </label>
+      </div>
       {children}
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
       {!error && note ? <p className={styles.note}>{note}</p> : null}
