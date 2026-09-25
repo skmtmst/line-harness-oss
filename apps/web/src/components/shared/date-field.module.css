@@ -48,7 +48,8 @@
 }
 
 .field:focus-visible {
-  outline: revert;
+  outline: 2px solid var(--color-action);
+  outline-offset: 2px;
 }
 
 .icon {
@@ -261,8 +262,12 @@
   opacity: 0.4;
 }
 
-.day:focus-visible {
-  outline: revert;
+.day:focus-visible,
+.clear:focus-visible,
+.today:focus-visible,
+.reset:focus-visible {
+  outline: 2px solid var(--color-action);
+  outline-offset: 2px;
 }
 
 .footer {

@@ -117,7 +117,7 @@ export function definitionsForSave(actions: LinkedAction[]): TagDefinitionAction
 const cardClass =
   'rounded-card border border-hairline bg-canvas p-5 [box-shadow:1px_1px_1px_rgba(15,23,42,0.14)]'
 const inputClass =
-  'w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm text-ink outline-none focus:border-accent focus:ring-2 focus:ring-accent/15'
+  'w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm text-ink'
 
 function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (next: boolean) => void; label: string }) {
   return (

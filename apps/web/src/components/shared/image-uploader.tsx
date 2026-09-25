@@ -146,7 +146,7 @@ export default function ImageUploader({ mode, value, onChange, label }: ImageUpl
           onDrop={onDrop}
           onPaste={onPaste}
           tabIndex={0}
-          className="rounded-lg border-2 border-dashed border-gray-300 bg-white p-4 transition-colors hover:border-gray-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-status-info"
+          className="rounded-lg border-2 border-dashed border-gray-300 bg-white p-4 transition-colors hover:border-gray-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-action"
         >
           <div className="flex items-center gap-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}

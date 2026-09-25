@@ -222,7 +222,7 @@ function FolderEditor() {
                 placeholder="例: 購入"
                 maxLength={60}
                 disabled={loadState !== 'ready'}
-                className="rounded-control border-hairline text-label focus:border-accent focus:ring-accent/15 h-11 w-full border px-3 outline-none focus:ring-2 disabled:opacity-40"
+                className="rounded-control border-hairline text-label h-11 w-full border px-3 disabled:opacity-40"
               />
             </label>
 

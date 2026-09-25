@@ -414,7 +414,7 @@ function OperationAlertsPanel({
         {alert.status !== 'resolved' && response && <dl className="rounded-control grid gap-3 bg-canvas-sunken px-4 py-3 text-xs sm:grid-cols-3">
           <div><dt className="font-bold text-ink-faint">お客さまへの影響</dt><dd className="mt-1 leading-relaxed text-ink-secondary">{alert.severity === 'unknown' ? 'この項目はまだ確認できていないため、影響の有無も未確認です。' : response.impact}</dd></div>
           <div><dt className="font-bold text-ink-faint">担当</dt><dd className="mt-1 leading-relaxed text-ink-secondary">{alert.acknowledgedById ?? 'まだ受領されていません。下の「受領する」で担当が記録されます。'}</dd></div>
-          <div><dt className="font-bold text-ink-faint">直し方</dt><dd className="mt-1 leading-relaxed text-ink-secondary">{response.recovery} <Link href={response.href} className="font-bold text-action">対象画面へ</Link></dd></div>
+          <div><dt className="font-bold text-ink-faint">直し方</dt><dd className="mt-1 leading-relaxed text-ink-secondary">{response.recovery} <Link href={response.href} className="font-bold text-action hover:underline focus-visible:underline">対象画面へ</Link></dd></div>
         </dl>}
         {alert.status === 'open' && <div className="flex flex-wrap items-end gap-2"><label className="min-w-56 flex-1 text-xs font-bold text-ink-secondary" htmlFor={`operation-alert-note-${alert.id}`}>受領メモ（任意）<input id={`operation-alert-note-${alert.id}`} value={notes[alert.id] ?? ''} maxLength={500} onChange={(event) => setNotes((current) => ({ ...current, [alert.id]: event.target.value }))} disabled={busy} className="border-hairline rounded-control mt-1 block min-h-9 w-full border bg-canvas px-3 text-sm font-normal text-ink" /></label><Button variant="primary" disabled={busy} onClick={() => void onAcknowledge(alert, notes[alert.id] ?? '')}>{busy ? '保存中…' : '受領する'}</Button></div>}
         {alert.notification.failed + alert.notification.unconfigured > 0 && <button type="button" disabled={busy} onClick={() => void onRetry(alert)} className="rounded-control min-h-9 border border-danger px-3 text-xs font-bold text-danger disabled:opacity-50">{busy ? '処理しています…' : alert.notification.unconfigured > 0 ? '通知先を再確認する' : '失敗した通知を再送する'}</button>}
@@ -1125,9 +1125,9 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
             <p><strong>直したら復旧します</strong><br />止める前に動いていたものだけを戻します。</p>
           </OperationSideCard>
           <OperationSideCard title="つながる先">
-            <p><Link href="/emergency?tab=health" className="font-bold text-action">→ 健全性チェック</Link><br />止める前に、どこが変かを確認</p>
-            <p><Link href="/emergency?tab=history" className="font-bold text-action">→ 更新履歴</Link><br />止めた・戻した記録</p>
-            <p><Link href="/broadcasts" className="font-bold text-action">→ 一斉配信</Link><br />下書きに戻った配信</p>
+            <p><Link href="/emergency?tab=health" className="font-bold text-action hover:underline focus-visible:underline">→ 健全性チェック</Link><br />止める前に、どこが変かを確認</p>
+            <p><Link href="/emergency?tab=history" className="font-bold text-action hover:underline focus-visible:underline">→ 更新履歴</Link><br />止めた・戻した記録</p>
+            <p><Link href="/broadcasts" className="font-bold text-action hover:underline focus-visible:underline">→ 一斉配信</Link><br />下書きに戻った配信</p>
           </OperationSideCard>
         </aside>
       </div>
@@ -1282,9 +1282,9 @@ function HistoryPanel() {
             <p><strong>通常の管理者は消せません</strong></p>
           </OperationSideCard>
           <OperationSideCard title="つながる先">
-            <p><Link href="/emergency?tab=control" className="font-bold text-action">→ 緊急コントロール</Link><br />止める・戻す</p>
-            <p><Link href="/staff" className="font-bold text-action">→ ログインユーザー</Link><br />入った記録と担当者</p>
-            <p><Link href="/broadcasts" className="font-bold text-action">→ 一斉配信</Link><br />下書きに戻った配信</p>
+            <p><Link href="/emergency?tab=control" className="font-bold text-action hover:underline focus-visible:underline">→ 緊急コントロール</Link><br />止める・戻す</p>
+            <p><Link href="/staff" className="font-bold text-action hover:underline focus-visible:underline">→ ログインユーザー</Link><br />入った記録と担当者</p>
+            <p><Link href="/broadcasts" className="font-bold text-action hover:underline focus-visible:underline">→ 一斉配信</Link><br />下書きに戻った配信</p>
           </OperationSideCard>
           <OperationSideCard title="気をつけること" tone="warning">
             <p><strong>止めているあいだの配信は出ません</strong><br />戻しても、そのぶんはさかのぼって送りません。</p>

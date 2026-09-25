@@ -127,12 +127,25 @@
   cursor: not-allowed;
 }
 
-.input:focus-visible,
+/*
+ * 外側の欄に ring を出す（:focus-within）。中の input の輪郭は消し、
+ * 外枠の ring を正本にする（focus-visible-contract の例外として許可）。
+ */
+.field:focus-within {
+  outline: 2px solid var(--color-action);
+  outline-offset: 2px;
+}
+
+.input:focus-visible {
+  outline: none;
+}
+
 .chipRemove:focus-visible,
 .overflow:focus-visible,
 .clearAll:focus-visible,
 .create:focus-visible {
-  outline: revert;
+  outline: 2px solid var(--color-action);
+  outline-offset: 2px;
 }
 
 .popup {

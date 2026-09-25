@@ -137,7 +137,7 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
           <h2 className="mb-4 text-sm font-bold text-ink">基本情報</h2>
           <label className="mb-4 block">
             <span className="mb-1.5 block text-xs font-semibold text-ink-secondary">マーク名</span>
-            <input value={name} onChange={(event) => setName(event.target.value)} className="h-10 w-full rounded-control border border-hairline px-3 text-sm outline-none focus:border-accent" placeholder="例：要確認" />
+            <input value={name} onChange={(event) => setName(event.target.value)} className="h-10 w-full rounded-control border border-hairline px-3 text-sm" placeholder="例：要確認" />
             <DuplicateNameNote duplicates={nameDuplicates} kindLabel="対応マーク" />
           </label>
           <fieldset className="mb-4">
@@ -148,7 +148,7 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
           </fieldset>
           <label className="mb-4 block">
             <span className="mb-1.5 block text-xs font-semibold text-ink-secondary">並び順</span>
-            <input type="number" min={0} value={displayOrder} onChange={(event) => setDisplayOrder(Number(event.target.value))} className="h-10 w-28 rounded-control border border-hairline px-3 text-sm outline-none focus:border-accent" />
+            <input type="number" min={0} value={displayOrder} onChange={(event) => setDisplayOrder(Number(event.target.value))} className="h-10 w-28 rounded-control border border-hairline px-3 text-sm" />
           </label>
           {/*
             説明文とチェックは別行にする（#973 U020）。1行に押し込むと

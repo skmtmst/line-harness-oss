@@ -98,4 +98,4 @@ export const TextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(function 
 
 /** 入力欄の見た目。画面ごとに枠線の色が変わらないようにする。 */
 export const inputClass =
-  'border-hairline rounded-control focus-visible:ring-accent w-full border px-3 py-2 text-sm focus-visible:ring-2'
+  'border-hairline rounded-control focus-visible:outline-action w-full border px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2'

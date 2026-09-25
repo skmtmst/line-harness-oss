@@ -1282,7 +1282,7 @@ function SlotsStep({
                 {slots.slice(0, 5).map((s) => (
                   <li
                     key={s.id}
-                    className="text-ink border-hairline rounded-control border bg-white px-3 py-2 text-xs"
+                    className="text-ink border-hairline rounded-control border bg-canvas px-3 py-2 text-xs"
                   >
                     {formatSlotJp(s.starts_at, s.ends_at)}
                     {s.capacity != null && ` 残り${Math.max(0, s.capacity - (s.active_count ?? 0))}`}
@@ -1582,7 +1582,7 @@ function PublishStep({
         <AsideCard title="確定したときに届くメッセージ" note="プレビュー">
           <div className="bg-canvas-sunken rounded-card p-3">
             <p className="text-ink-faint mb-1 text-xs">然-NEN-</p>
-            <p className="text-ink rounded-2xl bg-white px-4 py-3 text-sm leading-6 whitespace-pre-wrap">
+            <p className="text-ink rounded-2xl bg-canvas px-4 py-3 text-sm leading-6 whitespace-pre-wrap">
               {preview}
             </p>
           </div>
