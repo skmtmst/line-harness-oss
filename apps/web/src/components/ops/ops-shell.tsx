@@ -49,6 +49,8 @@ export default function OpsShell({ children }: { children: ReactNode }) {
   const [checked, setChecked] = useState(false)
   const [loadError, setLoadError] = useState('')
   const [navOpen, setNavOpen] = useState(false)
+  // ★V7：担当者の取得だけ落ちても外枠は落とさない。本文は普通に出す。
+  const [meError, setMeError] = useState('')
 
   /*
    * 狭い画面のメニューは開閉式。画面を移ったら閉じ、開いている間は
@@ -86,17 +88,37 @@ export default function OpsShell({ children }: { children: ReactNode }) {
         router.replace(body.data.platformAdminState === 'awaiting_totp' ? '/ops/two-factor' : '/ops/login?error=not_platform_admin')
         return
       }
-      const meRes = await api.ops.me()
-      if (!meRes.success) throw new Error(meRes.error)
-      setMe(meRes.data)
       setLoadError('')
-      setChecked(true)
     } catch (caught) {
       // 認証済みなのに後続APIが失敗した場合までログインへ戻すと、原因を隠したまま
       // ログイン画面とのループになる。401 だけを上で戻し、それ以外は画面に残す。
-      setLoadError(caught instanceof Error ? caught.message : '運営コンソールを読み込めませんでした')
+      // 口の生文言（英語の `Failed to fetch` など）をそのまま出さない。
+      setLoadError(
+        caught instanceof TypeError
+          ? '通信できませんでした。ネットワークを確認してもう一度お試しください'
+          : caught instanceof Error && caught.message
+            ? caught.message
+            : '運営コンソールを読み込めませんでした',
+      )
       setChecked(true)
+      return
     }
+    // セッションは通った。担当者の取得だけ落ちても外枠は落とさない。
+    try {
+      const meRes = await api.ops.me()
+      if (!meRes.success) throw new Error(meRes.error)
+      setMe(meRes.data)
+      setMeError('')
+    } catch (caught) {
+      setMeError(
+        caught instanceof TypeError
+          ? '通信できませんでした。ネットワークを確認してもう一度お試しください'
+          : caught instanceof Error && caught.message
+            ? caught.message
+            : '担当者の情報を読み込めませんでした',
+      )
+    }
+    setChecked(true)
   }, [router])
 
   useEffect(() => { void load() }, [load])
@@ -109,7 +131,9 @@ export default function OpsShell({ children }: { children: ReactNode }) {
     )
   }
 
-  if (loadError || !me) {
+  // ★V7：セッション以外の失敗（担当者の取得）で外枠ごと落とさない。
+  // 担当者が読めていない間は、外枠と本文を出したまま左下に1行出す。
+  if (loadError) {
     return (
       <div className="flex min-h-svh items-center justify-center bg-canvas-sunken px-4">
         <div className="w-full max-w-md rounded-card border border-hairline bg-canvas p-6 text-center shadow-sm">
@@ -129,9 +153,9 @@ export default function OpsShell({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-svh flex-col bg-canvas-sunken" data-design-node="jIZP0">
       <OpsEnvBar />
-      {me.impersonation ? <ImpersonationBar initial={me.impersonation} onChange={() => void load()} /> : null}
+      {me?.impersonation ? <ImpersonationBar initial={me.impersonation} onChange={() => void load()} /> : null}
       <div className="flex flex-1">
-        <OpsSidebar me={me} pathname={pathname} open={navOpen} onClose={() => setNavOpen(false)} />
+        <OpsSidebar me={me} meError={meError} onRetryMe={() => { setChecked(false); setMeError(''); void load() }} pathname={pathname} open={navOpen} onClose={() => setNavOpen(false)} />
         <main className="min-w-0 flex-1">
           {/*
            * 1280px未満ではナビを常設しない。256pxの帯が残ると本文が潰れて
@@ -155,7 +179,7 @@ export default function OpsShell({ children }: { children: ReactNode }) {
   )
 }
 
-function OpsSidebar({ me, pathname, open, onClose }: { me: OpsMe; pathname: string; open: boolean; onClose: () => void }) {
+function OpsSidebar({ me, meError, onRetryMe, pathname, open, onClose }: { me: OpsMe | null; meError: string; onRetryMe: () => void; pathname: string; open: boolean; onClose: () => void }) {
   return (
     <>
       {/* 狭い画面でメニューを開いたときの暗幕。押すと閉じる。 */}
@@ -209,7 +233,21 @@ function OpsSidebar({ me, pathname, open, onClose }: { me: OpsMe; pathname: stri
         </ul>
       </nav>
       <div className="h-px bg-hairline" />
-      <OpsAccountMenu me={me} />
+      {me ? (
+        <OpsAccountMenu me={me} />
+      ) : (
+        // ★V7：担当者だけ読めていない間は、左下に小さく1行出す。外枠は残す。
+        <div className="px-4 py-3">
+          <p className="text-nano text-ink-secondary" role="status">
+            {meError || '担当者を読み込んでいます'}
+            {meError ? (
+              <button type="button" onClick={onRetryMe} className="text-action ml-2 font-semibold hover:underline">
+                もう一度
+              </button>
+            ) : null}
+          </p>
+        </div>
+      )}
       </aside>
     </>
   )
