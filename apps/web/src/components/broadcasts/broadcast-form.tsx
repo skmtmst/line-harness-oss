@@ -138,11 +138,11 @@ export function typeLabel(type: string): string {
  * 必要があるので、まだ蓋をしてある。
  */
 const UNSENDABLE_TYPES: Partial<Record<BroadcastBubbleType, string>> = {
-  rich_message: 'リッチメッセージは準備中です。いまは写真かFlexで作れます',
-  rich_video: 'リッチビデオは準備中です。いまは動画で送れます',
-  card_message: 'カードタイプは準備中です。いまはカルーセルで作れます',
-  coupon: 'クーポンは準備中です',
-  research: 'リサーチは準備中です',
+  rich_message: 'リッチメッセージには未対応です。いまは写真かFlexで作れます',
+  rich_video: 'リッチビデオには未対応です。いまは動画で送れます',
+  card_message: 'カードタイプには未対応です。いまはカルーセルで作れます',
+  coupon: 'クーポンには未対応です',
+  research: 'リサーチには未対応です',
 }
 
 /** メッセージ形式タブの並び。null は「紹介」（まだ作れない）。 */
@@ -311,7 +311,7 @@ function BubbleEditor({ bubble, index, total, assets, assetsStatus, accountId, o
           const reason = UNSENDABLE_TYPES[value as BroadcastBubbleType]
           return (
             <option key={value} value={value} disabled={Boolean(reason)}>
-              {reason ? `${label}（準備中）` : label}
+              {reason ? `${label}（未対応）` : label}
             </option>
           )
         })}
@@ -2180,15 +2180,7 @@ export default function BroadcastForm({
             >
               日時を指定して予約
             </button>
-            {/* 1人ずつ最適な時刻を出す仕組みが無い。開封の時間帯を持っていない。 */}
-            <button
-              type="button"
-              disabled
-              title="友だちごとの最適な時間は準備中です"
-              className="border-hairline rounded-card text-ink-faint border p-3 text-left text-sm opacity-50"
-            >
-              友だちごとの最適な時間
-            </button>
+            {/* 「友だちごとの最適な時間」は開封の時間帯を持っていないので押し口を出さない。 */}
           </div>
 
           {sendMode === 'scheduled' && (
