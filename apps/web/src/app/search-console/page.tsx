@@ -17,7 +17,7 @@ import type {
 import { usePageTitle } from '@/components/shell/page-chrome'
 
 /**
- * Google検索の分析画面（設計 V2 6-11）。タブ表記は利用者指定のGoogle Analytics。
+ * Google検索の分析画面。要件 v6-20 §2: Search Console を「Google Analytics」と呼ばない。
  *
  * 設計では「分析」の5タブのうちの1枚。実体だけ別ルートに残っているので、
  * 同じタブの帯をここにも出して、行き来できるようにしてある。
@@ -27,7 +27,7 @@ const ANALYTICS_TABS = [
   { key: 'funnel', label: 'ファネル' },
   { key: 'cross', label: 'クロス集計' },
   { key: 'clicks', label: 'URLクリック' },
-  { key: 'search', label: 'Google Analytics', href: '/search-console' },
+  { key: 'search', label: 'Search Console', href: '/search-console' },
 ]
 
 const ranges = [7, 28, 90] as const

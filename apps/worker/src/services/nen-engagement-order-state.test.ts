@@ -79,7 +79,7 @@ function stubDispatch(calls: { count: number }) {
 }
 
 const options = (calls: { count: number }) => ({
-  proxyBaseUrl: 'https://proxy.invalid', defaultAccessToken: 'x', proxyDispatch: stubDispatch(calls) as never,
+  proxyBaseUrl: 'https://proxy.invalid', defaultAccessToken: 'x', proxyDispatch: stubDispatch(calls) as never, now: new Date('2026-09-25T12:00:00+09:00'),
 });
 
 describe('IDEA-21 注文の取り消し・返金と発送後の案内', () => {
@@ -90,7 +90,7 @@ describe('IDEA-21 注文の取り消し・返金と発送後の案内', () => {
     insertOrder(raw, 'NEN-100', 'cancelled');
     const calls = { count: 0 };
     const result = await processNenDeliveries(db, options(calls));
-    expect(result).toEqual({ sent: 0, failed: 0, skipped: 3 });
+    expect(result).toEqual({ sent: 0, failed: 0, skipped: 3, deferred: 0 });
     expect(calls.count).toBe(0);
     expect(jobRows(raw).map((row) => `${row.status}:${row.last_error}`)).toEqual([
       'skipped:order_cancelled', 'skipped:order_cancelled', 'skipped:order_cancelled',
@@ -104,7 +104,7 @@ describe('IDEA-21 注文の取り消し・返金と発送後の案内', () => {
     insertOrder(raw, 'NEN-101', 'refunded');
     const calls = { count: 0 };
     const result = await processNenDeliveries(db, options(calls));
-    expect(result).toEqual({ sent: 0, failed: 0, skipped: 3 });
+    expect(result).toEqual({ sent: 0, failed: 0, skipped: 3, deferred: 0 });
     expect(calls.count).toBe(0);
     expect(jobRows(raw).every((row) => row.last_error === 'order_refunded')).toBe(true);
   });

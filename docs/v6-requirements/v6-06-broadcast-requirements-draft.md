@@ -133,6 +133,7 @@ KPI:
 - 一部失敗
 - 失敗
 - 予約取消
+> 後段階（2026-09-25 オーナー判断）：今の段階の合格条件から外す。#816 で扱う。
 
 ### 3-2. 対象
 
@@ -335,6 +336,7 @@ KPI:
 `broadcasts`:
 
 - 状態へ `preparing` `stopping` `stopped` `partial` `failed` `cancelled`
+> 後段階（2026-09-25 オーナー判断）：今の段階の合格条件から外す。#816 で扱う。
 - `condition_snapshot`
 - `audience_evaluated_at`
 - `started_at` / `completed_at` / `stopped_at`
@@ -359,6 +361,7 @@ KPI:
 - `idempotency_key`
 
 一意制約は配信内の正規宛先キーで持つ。同じ宛先へ再試行しても重複行を作らない。
+> 後段階（2026-09-25 オーナー判断）：今の段階の合格条件から外す。#816 で扱う。
 
 `broadcast_action_runs`:
 
@@ -369,11 +372,13 @@ KPI:
 - `next_retry_at`
 - `last_error_code`
 - `idempotency_key`
+> 後段階（2026-09-25 オーナー判断）：今の段階の合格条件から外す。#816 で扱う。
 
 `broadcast_audit_logs`:
 
 - 作成、編集、予約、取消、送信、停止、再送、CSV出力
 - 実行者、時刻、前後差分、理由、request_id
+> 後段階（2026-09-25 オーナー判断）：今の段階の合格条件から外す。#816 で扱う。
 
 ## 5. API要件
 
@@ -389,7 +394,7 @@ KPI:
 - `POST /api/broadcasts/{id}/duplicate`
 - `GET /api/broadcasts/{id}`
 - `GET /api/broadcasts/{id}/progress`
-- `GET /api/broadcasts/{id}/recipients?status=&cursor=`
+- `GET /api/broadcasts/{id}/recipients?status=&cursor=`（後段階 #816）
 - `GET /api/broadcasts/{id}/insight`
 - `POST /api/broadcasts/{id}/fetch-insight`
 
@@ -431,9 +436,11 @@ KPI:
 1. バックアップ
 2. 状態別件数、予約、送信数、成功数、LINE要求IDをdry-run集計
 3. 完了済み配信は宛先台帳を捏造せず、集約のみの旧配信として維持
+> 後段階（2026-09-25 オーナー判断）：今の段階の合格条件から外す。#816 で扱う。
 4. 送信中配信は切替前に完了または安全停止
 5. 下書き・予約配信へ条件スナップショットを作る
 6. 新規配信だけ宛先台帳方式へ切り替える
+> 後段階（2026-09-25 オーナー判断）：今の段階の合格条件から外す。#816 で扱う。
 7. 旧・新キューを同時に同じ配信へ使わない
 8. 既存詳細URLと集計を維持
 9. 移行前後で予約件数、完了件数、総通数を照合
@@ -491,6 +498,7 @@ KPI:
 ## 11. 実装順
 
 1. 状態機械と宛先台帳
+> 後段階（2026-09-25 オーナー判断）：今の段階の合格条件から外す。#816 で扱う。
 2. 送信開始時スナップショット
 3. 未送信停止
 4. 失敗再送と送信後動作

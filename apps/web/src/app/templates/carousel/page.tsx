@@ -901,13 +901,6 @@ function CarouselEditorInner() {
             >
               {saving ? '保存中...' : '保存'}
             </button>
-            <button
-              disabled
-              title="下書き保存は準備中です"
-              className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
-            >
-              下書き保存
-            </button>
             <Link
               href="/templates"
               className="text-ink-secondary bg-canvas-sunken hover:bg-hairline rounded-control px-4 py-2 text-sm font-medium"

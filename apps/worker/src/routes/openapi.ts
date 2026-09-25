@@ -1066,6 +1066,66 @@ const spec = {
         responses: { '200': { description: 'Audience detail' }, '404': { description: 'Not found' }, '410': { description: 'Audience expired (24h)' } },
       },
     },
+    '/api/analytics/exports': {
+      post: {
+        tags: ['Analytics'], summary: '分析CSVの非同期書き出し（画面内のCSVと同じ中身）',
+        description: '書き出し対象（配信の反応・URLクリック・クロス・ファネル・保存した分析）を選び、画面のCSVと同じ列で書き出す。202で書き出しIDを返し、状態確認・ダウンロードと進める。統括・管理者だけが使える。',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['accountId', 'target'],
+                properties: {
+                  accountId: { type: 'string' },
+                  target: { type: 'string', enum: ['reactions', 'url-clicks', 'cross', 'funnel', 'saved'] },
+                  params: {
+                    type: 'object',
+                    properties: {
+                      from: { type: 'string' }, to: { type: 'string' }, query: { type: 'string' },
+                      resultId: { type: 'string' }, funnelId: { type: 'string' }, groupKey: { type: 'string' },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '202': { description: '書き出しID（非同期）' },
+          '400': { description: 'accountId・target が無い' },
+          '403': { description: '統括・管理者だけが使える' },
+          '404': { description: 'LINEアカウント・集計が見つからない' },
+          '422': { description: '結果・ファネルの指定が無い' },
+        },
+      },
+    },
+    '/api/analytics/exports/{id}': {
+      get: {
+        tags: ['Analytics'], summary: '分析CSVの書き出し状態',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'accountId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: { '200': { description: '書き出しの状態' }, '400': { description: 'accountId が無い' }, '404': { description: 'Not found' } },
+      },
+    },
+    '/api/analytics/exports/{id}/download': {
+      get: {
+        tags: ['Analytics'], summary: '分析CSVのダウンロード',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'accountId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'CSV(text/csv; charset=utf-8、BOM付き)' },
+          '404': { description: 'Not found' },
+          '409': { description: 'まだダウンロードできない' },
+          '410': { description: 'ダウンロード期限切れ' },
+        },
+      },
+    },
     '/api/analytics/ref/{refCode}/orders': {
       get: {
         tags: ['Analytics'], summary: '流入経路(REF)から来た友だちの注文明細。経路別集計(ref-summaryのorderCount)と同じfirst-touch条件で返す（IDEA-18）',
@@ -4001,6 +4061,103 @@ const spec = {
           '200': { description: 'CSV(text/csv; charset=utf-8、BOM付き)' },
           '400': { description: 'lineAccountId・reason が無い' },
           '403': { description: 'このLINEアカウントを出力する権限がない' },
+        },
+      },
+    },
+    '/api/line-notifications/deliveries/{id}': {
+      get: {
+        tags: ['Customer notifications'],
+        summary: '顧客通知の送信記録1件',
+        description: '送信台帳の1件を一覧と同じ形で返す。アカウント境界の外側は404に倒す。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '送信記録1件' },
+          '400': { description: 'lineAccountId が無い' },
+          '403': { description: 'このLINEアカウントを表示する権限がない' },
+          '404': { description: '送信記録が見つからない' },
+        },
+      },
+    },
+    '/api/line-notifications/quota': {
+      get: {
+        tags: ['Customer notifications'],
+        summary: '顧客通知の送信枠',
+        description: 'LINE公式の今月の送信枠（総量・使用・残り）を単体で返す。一覧の includeQuota=1 と同じ中身。',
+        parameters: [
+          { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '送信枠（available/unlimited/unavailable）' },
+          '400': { description: 'lineAccountId が無い' },
+          '403': { description: 'このLINEアカウントを表示する権限がない' },
+        },
+      },
+    },
+    '/api/line-notifications/deliveries/{id}/resend': {
+      post: {
+        tags: ['Customer notifications'],
+        summary: '顧客通知の新規再送',
+        description: '送れなかった通知を新しい送信として送り直す。元の行は残し、新しい送達行・新しい冪等キーで送る。理由は必須で監査へ残る。店長だけが使える。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['lineAccountId', 'expectedVersion', 'reason'],
+                properties: {
+                  lineAccountId: { type: 'string' },
+                  expectedVersion: { type: 'integer' },
+                  reason: { type: 'string' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: '新しい送信の記録' },
+          '400': { description: 'lineAccountId・expectedVersion・reason が無い' },
+          '403': { description: '店長だけが使える' },
+          '404': { description: '送信記録が見つからない' },
+          '409': { description: '送り直せない状態・版競合・送信枠不足' },
+        },
+      },
+    },
+    '/api/line-notifications/customer-definitions/{id}/test': {
+      post: {
+        tags: ['Customer notifications'],
+        summary: '顧客のお知らせの試し送り',
+        description: '編集中の下書き文面を指定した友だち（1〜5人）だけに試し送りする。先頭に確認用の断りを付けて送り、記録は test 扱いで再試行しない。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['lineAccountId', 'friendIds'],
+                properties: {
+                  lineAccountId: { type: 'string' },
+                  friendIds: { type: 'array', items: { type: 'string' } },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: '宛先ごとの試し送り結果' },
+          '400': { description: 'lineAccountId・friendIds が無い' },
+          '403': { description: 'このLINEアカウントを変更する権限がない' },
+          '404': { description: 'お知らせ・受け取れる友だちが見つからない' },
+          '409': { description: '文面未設定・送信枠不足' },
         },
       },
     },

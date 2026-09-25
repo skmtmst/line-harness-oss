@@ -68,9 +68,9 @@ describe('#749 送信直前の窓の見直し', () => {
     await setDedup(db, 30);
     const calls = { count: 0 };
     const result = await processNenDeliveries(db, {
-      proxyBaseUrl: 'https://proxy.invalid', defaultAccessToken: 'x', proxyDispatch: stubDispatch(calls) as never,
+      proxyBaseUrl: 'https://proxy.invalid', defaultAccessToken: 'x', proxyDispatch: stubDispatch(calls) as never, now: new Date('2026-09-25T12:00:00+09:00'),
     });
-    expect(result).toEqual({ sent: 3, failed: 0, skipped: 3 });
+    expect(result).toEqual({ sent: 3, failed: 0, skipped: 3, deferred: 0 });
     expect(calls.count).toBe(3);
     expect(reviewRows(raw, 'sent').map((row) => row.source_key)).toEqual(['order-1']);
     const skipped = reviewRows(raw, 'skipped');
@@ -86,9 +86,9 @@ describe('#749 送信直前の窓の見直し', () => {
     await setDedup(db, 0);
     const calls = { count: 0 };
     const result = await processNenDeliveries(db, {
-      proxyBaseUrl: 'https://proxy.invalid', defaultAccessToken: 'x', proxyDispatch: stubDispatch(calls) as never,
+      proxyBaseUrl: 'https://proxy.invalid', defaultAccessToken: 'x', proxyDispatch: stubDispatch(calls) as never, now: new Date('2026-09-25T12:00:00+09:00'),
     });
-    expect(result).toEqual({ sent: 3, failed: 0, skipped: 0 });
+    expect(result).toEqual({ sent: 3, failed: 0, skipped: 0, deferred: 0 });
     expect(calls.count).toBe(3);
   });
 
@@ -115,9 +115,9 @@ describe('#749 送信直前の窓の見直し', () => {
     }
     const calls = { count: 0 };
     const result = await processNenDeliveries(db, {
-      proxyBaseUrl: 'https://proxy.invalid', defaultAccessToken: 'x', proxyDispatch: stubDispatch(calls) as never,
+      proxyBaseUrl: 'https://proxy.invalid', defaultAccessToken: 'x', proxyDispatch: stubDispatch(calls) as never, now: new Date('2026-09-25T12:00:00+09:00'),
     });
-    expect(result).toEqual({ sent: 1, failed: 0, skipped: 1 });
+    expect(result).toEqual({ sent: 1, failed: 0, skipped: 1, deferred: 0 });
     expect(calls.count).toBe(1);
     expect(reviewRows(raw, 'sent').map((row) => row.id)).toEqual(['job-early']);
     expect(reviewRows(raw, 'skipped').map((row) => row.last_error)).toEqual(['frequency_suppressed']);
@@ -163,9 +163,9 @@ describe('#749 送信直前の窓の見直し', () => {
     await enqueuePostShippingFollowUps(db, shipped('order-1', '2026-08-01T09:00:00+09:00') as never, 'friend-1', 'acc-1');
     const calls = { count: 0 };
     const result = await processNenDeliveries(db, {
-      proxyBaseUrl: 'https://proxy.invalid', defaultAccessToken: 'x', proxyDispatch: stubDispatch(calls) as never,
+      proxyBaseUrl: 'https://proxy.invalid', defaultAccessToken: 'x', proxyDispatch: stubDispatch(calls) as never, now: new Date('2026-09-25T12:00:00+09:00'),
     });
-    expect(result).toEqual({ sent: 3, failed: 0, skipped: 0 });
+    expect(result).toEqual({ sent: 3, failed: 0, skipped: 0, deferred: 0 });
     expect(calls.count).toBe(3);
   });
 

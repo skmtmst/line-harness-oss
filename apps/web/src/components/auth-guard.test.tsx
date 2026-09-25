@@ -95,8 +95,34 @@ describe('PERF-07 AuthGuard のセッション確認再利用', () => {
     await render()
     await settle()
 
-    expect(fetchSpy).toHaveBeenCalledTimes(1)
-    expect(String(fetchSpy.mock.calls[0]?.[0])).toContain('/api/auth/session')
+    // 確認と並べてアカウント一覧も先に取り始める（直列にしない）。
+    expect(fetchSpy).toHaveBeenCalledTimes(2)
+    const urls = fetchSpy.mock.calls.map(([url]) => String(url))
+    expect(urls.some((url) => url.includes('/api/auth/session'))).toBe(true)
+    expect(urls.some((url) => url.includes('/api/line-accounts'))).toBe(true)
+    expect(host.querySelector('[data-child]')).not.toBeNull()
+  })
+
+  it('確認の応答を待たずに一覧を取り始める（並列）', async () => {
+    let resolveSession: ((res: Response) => void) | null = null
+    fetchSpy.mockImplementation(async (url: unknown) => {
+      if (String(url).includes('/api/auth/session')) {
+        return new Promise<Response>((resolve) => { resolveSession = resolve })
+      }
+      return sessionOk()
+    })
+
+    await render()
+    await settle()
+
+    // 確認がまだ返事を待っているあいだに、一覧の取得が出ている。
+    expect(resolveSession).not.toBeNull()
+    expect(fetchSpy.mock.calls.map(([url]) => String(url)).some((url) => url.includes('/api/line-accounts'))).toBe(true)
+    // 確認が終わるまで中身は出さない（認可を待たずに描かない）。
+    expect(host.querySelector('[data-child]')).toBeNull()
+
+    await act(async () => { resolveSession?.(sessionOk()) })
+    await settle()
     expect(host.querySelector('[data-child]')).not.toBeNull()
   })
 
@@ -112,8 +138,8 @@ describe('PERF-07 AuthGuard のセッション確認再利用', () => {
     await act(async () => { root.render(<AuthGuard><div data-child>中身</div></AuthGuard>) })
     await settle()
 
-    // 30秒以内の遷移なら確認は初回の1回だけ。
-    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    // 30秒以内の遷移なら確認も一覧も初回の1回ずつだけ。
+    expect(fetchSpy).toHaveBeenCalledTimes(2)
     expect(host.querySelector('[data-child]')).not.toBeNull()
   })
 
@@ -124,33 +150,35 @@ describe('PERF-07 AuthGuard のセッション確認再利用', () => {
 
     await render()
     await settle()
-    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    expect(fetchSpy).toHaveBeenCalledTimes(2)
 
     now += 31_000
     currentPath = '/friends'
     await act(async () => { root.render(<AuthGuard><div data-child>中身</div></AuthGuard>) })
     await settle()
 
-    expect(fetchSpy).toHaveBeenCalledTimes(2)
+    // 期限切れは確認と一覧の両方を取り直す。
+    expect(fetchSpy).toHaveBeenCalledTimes(4)
   })
 
   it('CSRFトークンが変わった（別ログイン/権限更新）なら期限前でも確認し直す', async () => {
     await render()
     await settle()
-    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    expect(fetchSpy).toHaveBeenCalledTimes(2)
 
     storage.setItem('lh_csrf', 'csrf-token-2')
     currentPath = '/friends'
     await act(async () => { root.render(<AuthGuard><div data-child>中身</div></AuthGuard>) })
     await settle()
 
-    expect(fetchSpy).toHaveBeenCalledTimes(2)
+    // 指紋が変わったので使い回しの答えを捨て、確認と一覧の両方を取り直す。
+    expect(fetchSpy).toHaveBeenCalledTimes(4)
   })
 
   it('401の合図（SESSION_LOST_EVENT）のあとは期限前でも確認し直す', async () => {
     await render()
     await settle()
-    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    expect(fetchSpy).toHaveBeenCalledTimes(2)
 
     act(() => { window.dispatchEvent(new Event(SESSION_LOST_EVENT)) })
 
@@ -158,7 +186,8 @@ describe('PERF-07 AuthGuard のセッション確認再利用', () => {
     await act(async () => { root.render(<AuthGuard><div data-child>中身</div></AuthGuard>) })
     await settle()
 
-    expect(fetchSpy).toHaveBeenCalledTimes(2)
+    // 合図で使い回しの答えを捨てたので、確認と一覧の両方を取り直す。
+    expect(fetchSpy).toHaveBeenCalledTimes(4)
   })
 
   it('確認に失敗したら再利用せずログイン画面へ送る', async () => {
