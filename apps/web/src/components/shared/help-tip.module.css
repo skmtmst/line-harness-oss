@@ -10,13 +10,19 @@
   position: relative; /* position: relative */
   display: inline-flex; /* display: inline-flex */
   align-items: center; /* alignItems: center */
+  flex-shrink: 0; /* 狭い行で押し潰されない */
   vertical-align: middle;
 }
 
+/*
+ * 押せる範囲は 24px を保ち、行の高さを変えない・楕円にならない。
+ * 狭い行（表見出し・札の横）で潰れないよう縮小を止める。
+ */
 .button {
   display: inline-flex; /* display: inline-flex */
   align-items: center; /* alignItems: center */
   justify-content: center; /* justifyContent: center */
+  flex-shrink: 0; /* 押し潰されて楕円にならない */
   width: 24px; /* minWidth: 24 */
   height: 24px; /* minHeight: 24 */
   padding: 0;

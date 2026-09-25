@@ -54,17 +54,16 @@ describe('補足の「？」', () => {
     expect(document.activeElement).toBe(button)
   })
 
-  it('くわしくは渡した時だけ出す', () => {
-    const without = render(<HelpTip label="用語の説明">ひとことです。</HelpTip>)
-    fireEvent.click(without.container.querySelector('button')!)
-    expect(without.container.querySelector('a')).toBeNull()
-
-    const { container, getByText } = render(
-      <HelpTip label="用語の説明" moreHref="/manual#word">
-        ひとことです。
+  it('「くわしく」は本文（children）と一緒に渡す', () => {
+    const { container, getByText, queryByText } = render(
+      <HelpTip label="用語の説明">
+        ひとことです。<a href="/manual#word">くわしく</a>
       </HelpTip>,
     )
+    // 閉じている間は本文もリンクも出さない。
+    expect(queryByText('ひとことです。')).toBeNull()
     fireEvent.click(container.querySelector('button')!)
+    expect(getByText('ひとことです。')).not.toBeNull()
     const more = getByText('くわしく')
     expect(more.getAttribute('href')).toBe('/manual#word')
   })

@@ -44,8 +44,9 @@ export default function NoteBar({
       <span>
         {children}
         {hasHelp ? (
-          <HelpTip label={`${helpLabel ?? 'この案内'}の説明`} moreHref={helpHref}>
+          <HelpTip label={`${helpLabel ?? 'この案内'}の説明`}>
             {help}
+            {helpHref ? <a href={helpHref}>くわしく</a> : null}
           </HelpTip>
         ) : null}
       </span>

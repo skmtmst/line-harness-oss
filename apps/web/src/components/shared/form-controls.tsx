@@ -67,8 +67,9 @@ export function Field({
           {required && <RequiredBadge />}
         </label>
         {hasHelp ? (
-          <HelpTip label={`${helpLabel ?? label}の説明`} moreHref={helpHref}>
+          <HelpTip label={`${helpLabel ?? label}の説明`}>
             {help}
+            {helpHref ? <a href={helpHref}>くわしく</a> : null}
           </HelpTip>
         ) : null}
       </div>

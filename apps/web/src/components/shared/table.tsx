@@ -73,8 +73,9 @@ export function Th({
     <th className={classes} scope={scope} {...cellProps}>
       {children}
       {hasHelp ? (
-        <HelpTip label={`${heading}の説明`} moreHref={helpHref}>
+        <HelpTip label={`${heading}の説明`}>
           {help}
+          {helpHref ? <a href={helpHref}>くわしく</a> : null}
         </HelpTip>
       ) : null}
     </th>

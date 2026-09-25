@@ -37,8 +37,9 @@ export default function StatusBadge({
     <span className={classes} data-design-node="xRvDB" {...props}>
       {children}
       {hasHelp ? (
-        <HelpTip label={`${heading}の説明`} moreHref={helpHref}>
+        <HelpTip label={`${heading}の説明`}>
           {help}
+          {helpHref ? <a href={helpHref}>くわしく</a> : null}
         </HelpTip>
       ) : null}
     </span>

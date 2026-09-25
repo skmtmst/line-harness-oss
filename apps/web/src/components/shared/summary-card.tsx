@@ -127,12 +127,9 @@ export default function SummaryCard({
         <p className={[styles.label, labelVariantClass].filter(Boolean).join(' ')}>
           {title || (loading ? <span className={styles.labelSkeleton} aria-hidden="true" /> : null)}
           {hasTip ? (
-            <HelpTip
-              label={descriptionLabel ?? `${helpLabel ?? title}の説明`}
-              moreHref={helpHref}
-              moreLabel={helpHrefLabel}
-            >
+            <HelpTip label={descriptionLabel ?? `${helpLabel ?? title}の説明`}>
               {tip}
+              {helpHref ? <a href={helpHref}>{helpHrefLabel ?? 'くわしく'}</a> : null}
             </HelpTip>
           ) : null}
         </p>

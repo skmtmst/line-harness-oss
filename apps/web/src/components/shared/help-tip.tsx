@@ -20,18 +20,15 @@ const CLOSE_OTHERS_EVENT = 'help-tip-open'
 export default function HelpTip({
   label,
   className,
-  moreHref,
-  moreLabel = 'くわしく',
   children,
 }: {
   /** 読み上げ名（例：「今月の完了率の説明」）。吹き出しとは aria-describedby でつなぐ。 */
   label: string
   className?: string
-  /** 長い説明がある場所（用語集など）。渡すと吹き出しに「くわしく」が出る。 */
-  moreHref?: string
-  /** 「くわしく」の代わりの文言。 */
-  moreLabel?: string
-  /** 1〜2文の補足。 */
+  /**
+   * 1〜2文の補足。長い説明がある場所への「くわしく」リンクも
+   * ここへ一緒に渡す（`<a href="...">くわしく</a>`）。
+   */
   children: ReactNode
 }) {
   const [open, setOpen] = useState(false)
@@ -98,11 +95,6 @@ export default function HelpTip({
       {open ? (
         <span role="note" id={tipId} className={styles.tip}>
           {children}
-          {moreHref ? (
-            <a href={moreHref}>
-              {moreLabel}
-            </a>
-          ) : null}
         </span>
       ) : null}
     </span>
