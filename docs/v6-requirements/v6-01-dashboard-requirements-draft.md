@@ -383,8 +383,8 @@ V6画面の「現在の対応マーク」は、02の用語では「対応状況�
 | データ | 所有 | 01の読み方 |
 |---|---|---|
 | `friend_daily_snapshots`（migration 106） | 03（cron記録） | `date, line_account_id, active, total, blocked_by_them, hidden_by_us, added, blocked` を直近7日で読む。無い日は逆算し `estimated=true` |
-| 共通通知台帳 `notification_instances` / `notification_deliveries` | 24 §5-3 | `audience_type='operator'`、`channel='in_app'`、`line_account_id` 一致の行を新しい順に読む。01は行を作らない |
-| `staff_notification_reads`（migration 197） | 01 | `notification_id`（移行後は `delivery_id`）、`staff_id`、`read_at`。既読はstaff単位 |
+| 共通通知台帳 `notification_instances` / `notification_deliveries` | 24 §5-3 | `audience_type='operator'`、`channel='in_app'`、`line_account_id` 一致の行を新しい順に読む。01は行を作らない（後段階 #824） |
+| `staff_notification_reads`（migration 197） | 01 | `notification_id`（移行後は `delivery_id`）、`staff_id`、`read_at`。既読はstaff単位（後段階 #824） |
 | `operation_alerts` / `health_check_results` | 32 | 未解決件数、最終check、Webhook・dispatcher状態 |
 | `bookings` と監査ログ | 27 | 今日・今後・変更取消 |
 | 出荷read model、`ec_orders`、`fulfillments` | 23 | 今日・明日の出荷、未処理 |
@@ -412,7 +412,7 @@ V6画面の「現在の対応マーク」は、02の用語では「対応状況�
 | DELETE | `/api/dashboard/preferences?account_id=` | 既存 | 個人配置の削除（初期状態に戻す） |
 | PUT | `/api/dashboard/preferences/default?account_id=` | 既存 | 会社既定の保存。`dashboard.default_layout.edit` |
 | GET | `/api/dashboard/upcoming?account_id=&days=7` | 追加 | 06・07・27の未来の予定を時刻順に束ねる |
-| GET | `/api/notifications/center?lineAccountId=&category=&limit=` | 既存 | 通知パネル。24の台帳へ読取元を切替 |
+| GET | `/api/notifications/center?lineAccountId=&category=&limit=` | 既存 | 通知パネル。24の台帳へ読取元を切替（後段階 #824） |
 | POST | `/api/notifications/center/:id/read` | 既存 | 個別既読 |
 | POST | `/api/notifications/center/read-all` | 既存 | `{ lineAccountId, category }`。絞り込み内の全件 |
 | GET | `/api/inflow/routes?account_id=&status=published` | 18 | 発行中URLの候補 |
@@ -432,6 +432,7 @@ V6画面の「現在の対応マーク」は、02の用語では「対応状況�
 - `items[]`: `id`、`category`（`error|update`）、`title`、`occurredAt`、`link`（`{ path, label }`）、`read`
 - `counts`: `{ all, error, update, unread }`
 - `source`: `ledger`（24台帳）または `legacy`（`notifications` 表）。画面は `legacy` でも件数を出すが、`ledger` になるまで design-qa の判定を「データ未接続」のままにする
+> 後段階（2026-09-25 オーナー判断）：今の段階の合格条件から外す。#824 で扱う。
 
 ## 8. 権限
 
@@ -487,7 +488,9 @@ V6画面の「現在の対応マーク」は、02の用語では「対応状況�
 4. `sections[].asOf` を `generatedAt` から取得元の最終成功時刻へ切り替える。切替前は `freshness=partial` とし「更新時刻は暫定」を表示する
 5. 写真審査件数に `account_id` を必須化する。必須化までカードは「未取得」
 6. 通知パネルの読取元を `notifications`（`category` `error|update|info`）から24の台帳へ切り替える。`info` は `update` として表示し、24の台帳に無い旧行は保持期間内だけ `source=legacy` で読む
+> 後段階（2026-09-25 オーナー判断）：今の段階の合格条件から外す。#824 で扱う。
 7. `staff_notification_reads` に `delivery_id` を追加し、旧 `notification_id` 行は残す。既読を推測で埋めない
+> 後段階（2026-09-25 オーナー判断）：今の段階の合格条件から外す。#824 で扱う。
 8. `friend_daily_snapshots` の記録開始日より前は `estimated=true` のまま。過去を実測へ上書きしない
 9. `/api/accounts/:id/health` から32の `GET /api/operations/health` へカードの取得元を移す。移行中は両方を読まず、切替日を決めて一方だけ
 10. クエリ名 `lineAccountId` を `account_id` へ揃える。互換期間中は両方受け、期間後に `lineAccountId` を400
@@ -551,6 +554,7 @@ Lステップ公式FAQはトップ画面に友だち数推移があることを�
 - `read-all` に `category=error` を渡すと `update` の未読が残り、`category` 省略で全件が既読になるテストが通る
 - 通知を既読にしても32の `operation_alerts` の状態が変わらないテストが通る
 - 通知パネルが `source=ledger` のとき、01のコードが `notification_instances` `notification_deliveries` へINSERT/UPDATEを発行しない静的検査が通る
+> 後段階（2026-09-25 オーナー判断）：今の段階の合格条件から外す。#824 で扱う。
 - QRのPNG・JPG・SVGが `Content-Type` と拡張子一致で返り、デコード結果が「発行中の追加URL」で選んだURLと一致するテストが通る
 - archiveした経路をQRダイアログのURLで指定すると「この経路は停止しています」を表示し、QR画像を返さないテストが通る
 - 写真審査件数が選択中 `account_id` の件数であり、他アカウントの投稿を含まないテストが通る
@@ -562,6 +566,7 @@ Lステップ公式FAQはトップ画面に友だち数推移があることを�
 2. 写真審査の `account_id` 必須化と、`overview.delivery` の `this-month` 固定
 3. 画面文言をD8の語へ統一（`—` + 「未取得」「取得失敗」「権限不足」「未接続」）
 4. 通知パネルの読取元を24の台帳へ切替（`source=ledger`）。既読台帳の `delivery_id` 追加
+> 後段階（2026-09-25 オーナー判断）：今の段階の合格条件から外す。#824 で扱う。
 5. `GET /api/dashboard/upcoming` と今後の予定カード
 6. 接続状態・運用アラートを32の `GET /api/operations/health` `alerts` へ切替
 7. QRの形式・大きさ・PDF、経路失効の扱い
