@@ -135,7 +135,7 @@ export default function LiffDateTimePreview({
                         aria-pressed={active}
                         className={`flex min-h-16 w-15 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl border px-1 py-2 ${
                           active
-                            ? 'border-accent-deep bg-accent-deep text-white'
+                            ? 'border-accent-deep bg-accent-deep text-on-accent'
                             : open
                               ? 'border-hairline bg-canvas text-ink'
                               : 'border-hairline bg-canvas text-ink-faint'
