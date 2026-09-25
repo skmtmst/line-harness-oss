@@ -42,7 +42,14 @@ import { getLineAccountById } from '@line-crm/db';
 import { isOperationCapabilityStopped } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { resolveLineToken } from '../services/line-token.js';
-import { requireIrreversibleConfirmation, requireRole } from '../middleware/role-guard.js';
+import { requireIrreversibleConfirmation, requireRole, requirePermission, hasStaffPermission } from '../middleware/role-guard.js';
+import {
+  BROADCAST_DEFINITION_EDIT_KEY,
+  BROADCAST_DEFINITION_PUBLISH_KEY,
+  BROADCAST_JOB_RETRY_KEY,
+  BROADCAST_JOB_STOP_KEY,
+  BROADCAST_TEST_SEND_KEY,
+} from '@line-crm/shared';
 import {
   assertNoUnresolvedBroadcastVariables,
   getUnsupportedBroadcastVariables,
@@ -93,15 +100,16 @@ async function canAccessBroadcast(
 }
 
 /**
- * 配信の作成・更新・送信の共通境界(N-061)。
+ * 配信の作成・更新・送信の共通境界(N-061＋v6-06 §6)。
  *
  * owner/adminは従来の範囲確認だけ通す(動作・状態を変えない)。一般staffは
- * 既存 /broadcasts を操作権限キーとして共通土台へ渡す。新しい権限キーは
- * 増やさない。readOnlyは土台が拒否する。
+ * /broadcasts に加え、操作ごとの個別キー（下書き・送信など）も要る。
+ * readOnlyは土台が拒否する。
  */
 async function broadcastWriteBoundary(
   c: Context<Env>,
   accountIds: Array<string | null | undefined>,
+  options?: { operationKey?: string },
 ): Promise<{ allowed: true } | { allowed: false; reason: 'forbidden' | 'outside-scope' }> {
   const staff = c.get('staff');
   if (staff && (staff.role === 'owner' || staff.role === 'admin')) {
@@ -111,8 +119,15 @@ async function broadcastWriteBoundary(
   const decision = await resolveRequestBoundaries(c.env.DB, staff, accountIds, {
     requiredPermissionKey: '/broadcasts',
   });
-  if (decision.allowed) return { allowed: true };
-  return { allowed: false, reason: decision.reason === 'forbidden' ? 'forbidden' : 'outside-scope' };
+  if (!decision.allowed) {
+    return { allowed: false, reason: decision.reason === 'forbidden' ? 'forbidden' : 'outside-scope' };
+  }
+  // 範囲の中でも、操作ごとの個別キーが要る。無いstaffはここで止める。
+  // 範囲外は先に 404 で伏せるため、この順番を変えない。
+  if (options?.operationKey && !hasStaffPermission(c, options.operationKey)) {
+    return { allowed: false, reason: 'forbidden' };
+  }
+  return { allowed: true };
 }
 
 function unsupportedVariablesError(content: string): string | null {
@@ -834,7 +849,7 @@ broadcasts.get('/api/broadcasts/:id/per-account-stats', async (c) => {
 // 一斉配信は取り消せないので、押す前に見せる。
 //
 // :id を使う経路より先に置く。後ろだと 'preflight' が :id として拾われる。
-broadcasts.post('/api/broadcasts/preflight', requireRole('owner', 'admin'), async (c) => {
+broadcasts.post('/api/broadcasts/preflight', requirePermission(BROADCAST_DEFINITION_PUBLISH_KEY), async (c) => {
   try {
     const body = await c.req.json<{
       targetType?: unknown;
@@ -985,7 +1000,7 @@ broadcasts.post('/api/broadcasts', async (c) => {
       ? (Array.isArray(body.accountIds) ? body.accountIds : [null])
       : [body.lineAccountId ?? null];
     // N-061: 要求accountを共通境界へ渡す。/broadcasts持ちstaffだけが作れる。
-    const createBoundary = await broadcastWriteBoundary(c, requestedAccountIds);
+    const createBoundary = await broadcastWriteBoundary(c, requestedAccountIds, { operationKey: BROADCAST_DEFINITION_EDIT_KEY });
     if (!createBoundary.allowed) {
       return createBoundary.reason === 'forbidden'
         ? c.json({ success: false, error: 'この機能を操作する権限がありません' }, 403)
@@ -1228,7 +1243,7 @@ broadcasts.put('/api/broadcasts/:id', async (c) => {
           ? body.lineAccountId
           : (existingRaw.line_account_id as string | null | undefined) ?? null];
     // N-061: 変更後の宛先accountも共通境界へ渡す。/broadcasts持ちstaffだけが変えられる。
-    const updateBoundary = await broadcastWriteBoundary(c, requestedAccountIds);
+    const updateBoundary = await broadcastWriteBoundary(c, requestedAccountIds, { operationKey: BROADCAST_DEFINITION_EDIT_KEY });
     if (!updateBoundary.allowed) {
       return updateBoundary.reason === 'forbidden'
         ? c.json({ success: false, error: 'この機能を操作する権限がありません' }, 403)
@@ -1418,7 +1433,7 @@ broadcasts.put('/api/broadcasts/:id', async (c) => {
 //
 // 読み取りの直後に予約実行が始まっても sending を draft に戻さないよう、
 // scheduled のままであることを UPDATE 側でも確認する。
-broadcasts.post('/api/broadcasts/:id/cancel', requireRole('owner', 'admin'), async (c) => {
+broadcasts.post('/api/broadcasts/:id/cancel', requirePermission(BROADCAST_DEFINITION_PUBLISH_KEY), async (c) => {
   try {
     const id = c.req.param('id');
     const existing = await getBroadcastById(c.env.DB, id);
@@ -1554,7 +1569,7 @@ async function broadcastLedgerSummary(db: D1Database, id: string) {
 }
 
 // POST /api/broadcasts/:id/stop — 送信中の配信を止める
-broadcasts.post('/api/broadcasts/:id/stop', requireRole('owner', 'admin'), async (c) => {
+broadcasts.post('/api/broadcasts/:id/stop', requirePermission(BROADCAST_JOB_STOP_KEY), async (c) => {
   try {
     const id = c.req.param('id');
     const existing = await getBroadcastById(c.env.DB, id);
@@ -1664,7 +1679,7 @@ broadcasts.post('/api/broadcasts/:id/stop', requireRole('owner', 'admin'), async
 });
 
 // POST /api/broadcasts/:id/resume — 止めた配信の続きを送る
-broadcasts.post('/api/broadcasts/:id/resume', requireRole('owner', 'admin'), async (c) => {
+broadcasts.post('/api/broadcasts/:id/resume', requirePermission(BROADCAST_JOB_STOP_KEY), async (c) => {
   try {
     const id = c.req.param('id');
     const existing = await getBroadcastById(c.env.DB, id);
@@ -1720,7 +1735,7 @@ broadcasts.post('/api/broadcasts/:id/resume', requireRole('owner', 'admin'), asy
 // （送信の口と同じ扱い）。
 broadcasts.post(
   '/api/broadcasts/:id/retry-failed',
-  requireRole('owner', 'admin'),
+  requirePermission(BROADCAST_JOB_RETRY_KEY),
   requireIrreversibleConfirmation('broadcast-send'),
   async (c) => {
     try {
@@ -1803,7 +1818,7 @@ broadcasts.post(
 );
 
 // DELETE /api/broadcasts/:id - delete
-broadcasts.delete('/api/broadcasts/:id', requireRole('owner', 'admin'), async (c) => {
+broadcasts.delete('/api/broadcasts/:id', requirePermission(BROADCAST_DEFINITION_EDIT_KEY), async (c) => {
   try {
     const id = c.req.param('id');
     const existing = await getBroadcastById(c.env.DB, id);
@@ -1838,7 +1853,7 @@ broadcasts.post('/api/broadcasts/:id/send', requireIrreversibleConfirmation('bro
       return c.json({ success: false, error: 'Broadcast not found' }, 404);
     }
     // N-061: 行のaccountを共通境界へ渡す。/broadcasts持ちstaffだけが送れる。
-    const sendBoundary = await broadcastWriteBoundary(c, broadcastAccountIds(existing));
+    const sendBoundary = await broadcastWriteBoundary(c, broadcastAccountIds(existing), { operationKey: BROADCAST_DEFINITION_PUBLISH_KEY });
     if (!sendBoundary.allowed) {
       return sendBoundary.reason === 'forbidden'
         ? c.json({ success: false, error: 'この機能を操作する権限がありません' }, 403)
@@ -2239,7 +2254,7 @@ broadcasts.post('/api/broadcasts/:id/send', requireIrreversibleConfirmation('bro
 
 // POST /api/broadcasts/:id/send-segment - send to a filtered segment (常にキュー方式)
 // 友だちへ実際に届き、取り消せない。権限に加えて明示的な確認を要求する。
-broadcasts.post('/api/broadcasts/:id/send-segment', requireRole('owner', 'admin'), requireIrreversibleConfirmation('broadcast-send'), async (c) => {
+broadcasts.post('/api/broadcasts/:id/send-segment', requirePermission(BROADCAST_DEFINITION_PUBLISH_KEY), requireIrreversibleConfirmation('broadcast-send'), async (c) => {
   try {
     const id = c.req.param('id');
     const existing = await getBroadcastById(c.env.DB, id);
@@ -2406,7 +2421,7 @@ broadcasts.get('/api/broadcasts/:id/insight', async (c) => {
 });
 
 // POST /api/broadcasts/:id/fetch-insight — LINE APIからインサイトを即時取得
-broadcasts.post('/api/broadcasts/:id/fetch-insight', requireRole('owner', 'admin'), async (c) => {
+broadcasts.post('/api/broadcasts/:id/fetch-insight', requirePermission('/broadcasts'), async (c) => {
   try {
     const id = c.req.param('id');
     const broadcast = await getBroadcastById(c.env.DB, id);
@@ -2586,7 +2601,7 @@ broadcasts.post('/api/broadcasts/:id/fetch-insight', requireRole('owner', 'admin
 });
 
 // POST /api/broadcasts/:id/test-send — send to test recipients with 【テスト配信】 label
-broadcasts.post('/api/broadcasts/:id/test-send', requireRole('owner', 'admin'), async (c) => {
+broadcasts.post('/api/broadcasts/:id/test-send', requirePermission(BROADCAST_TEST_SEND_KEY), async (c) => {
   const id = c.req.param('id');
   try {
     const broadcast = await getBroadcastById(c.env.DB, id);
@@ -2818,7 +2833,7 @@ broadcasts.get('/api/broadcasts/:id/progress', async (c) => {
 });
 
 // POST /api/segments/count — count friends matching segment conditions
-broadcasts.post('/api/segments/count', requireRole('owner', 'admin'), async (c) => {
+broadcasts.post('/api/segments/count', requirePermission(BROADCAST_DEFINITION_EDIT_KEY), async (c) => {
   const body = await c.req.json<{ conditions: unknown; accountId?: string }>();
   try {
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId ?? null])) {
