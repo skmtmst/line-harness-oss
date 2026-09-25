@@ -149,7 +149,7 @@ export default function HqAccountMenu() {
             type="button"
             role="menuitem"
             onClick={() => void logoutAndGoToLogin()}
-            className="flex h-11 items-center gap-3 px-4 text-label font-bold text-status-danger hover:bg-status-danger-soft focus-visible:bg-status-danger-soft"
+            className="flex h-11 items-center gap-3 px-4 text-label font-bold text-danger hover:bg-status-danger-soft focus-visible:bg-status-danger-soft"
           >
             <LogOut aria-hidden="true" className="h-4.5 w-4.5" />
             ログアウト
@@ -194,7 +194,7 @@ function PlanChip({ chip }: { chip: { label: string; tone: string } }) {
         chip.tone === 'warn'
           ? 'inline-flex h-4.5 w-fit items-center rounded-pill bg-status-warn-soft px-2 text-nano font-bold text-status-warn-deep'
           : chip.tone === 'danger'
-            ? 'inline-flex h-4.5 w-fit items-center rounded-pill bg-status-danger-soft px-2 text-nano font-bold text-status-danger'
+            ? 'inline-flex h-4.5 w-fit items-center rounded-pill bg-status-danger-soft px-2 text-nano font-bold text-danger'
             : chip.tone === 'ok'
               ? 'inline-flex h-4.5 w-fit items-center rounded-pill bg-accent-soft px-2 text-nano font-bold text-accent-deep'
               : 'inline-flex h-4.5 w-fit items-center rounded-pill bg-step-idle px-2 text-nano font-bold text-ink-secondary'

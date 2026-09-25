@@ -201,7 +201,7 @@ export default function LibrarySection({
         </div>
         <div className="border-t border-hairline" />
 
-        {actionError ? <p className="px-4 pt-4 text-label text-status-danger" role="alert">{actionError}</p> : null}
+        {actionError ? <p className="px-4 pt-4 text-label text-danger" role="alert">{actionError}</p> : null}
 
         <div data-design-node="lQDQz" className="flex flex-col gap-4 p-4">
           {status === 'loading' ? (

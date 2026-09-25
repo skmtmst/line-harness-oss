@@ -74,7 +74,7 @@ export default function OpsDashboardPage() {
         <span className="ml-auto text-micro text-ink-faint">金額は契約中プランの定価で数えています（Stripe の実売上ではありません）</span>
       </div>
 
-      {error ? <p role="alert" className="mb-3 text-caption text-status-danger">{error}</p> : null}
+      {error ? <p role="alert" className="mb-3 text-caption text-danger">{error}</p> : null}
 
       {/* 初回の読み込みに失敗したときは、各セクションが「読み込んでいます」のまま残らないよう1枚のエラー表示にまとめる。 */}
       {!data && error ? (

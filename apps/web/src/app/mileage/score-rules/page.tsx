@@ -416,7 +416,7 @@ export default function ActionScoreRulesPage() {
                       </button>
                       <span className="col-span-2 text-left text-sm font-bold text-ink sm:text-right">{rulePointLabel(rule)}</span>
                       <span className="col-span-9 text-xs text-ink-secondary sm:col-span-3">{ruleFrequencyLabel(rule)}</span>
-                      {canEdit ? <button type="button" className="col-span-1 justify-self-end rounded-control p-2 text-status-danger hover:bg-status-danger-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-status-danger" aria-label={`${rule.name}を削除`} onClick={() => removeRule(index)}><Trash2 className="h-4 w-4" aria-hidden="true" /></button> : null}
+                      {canEdit ? <button type="button" className="col-span-1 justify-self-end rounded-control p-2 text-danger hover:bg-status-danger-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-status-danger" aria-label={`${rule.name}を削除`} onClick={() => removeRule(index)}><Trash2 className="h-4 w-4" aria-hidden="true" /></button> : null}
                     </div>
                   ))}
                 </div>

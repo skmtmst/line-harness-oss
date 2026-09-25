@@ -141,7 +141,7 @@ export default function OpsMembersPage() {
       </div>
 
       {notice ? <p role="status" className="mb-3 text-caption text-accent-deep">{notice}</p> : null}
-      {error ? <p role="alert" className="mb-3 text-caption text-status-danger">{error}</p> : null}
+      {error ? <p role="alert" className="mb-3 text-caption text-danger">{error}</p> : null}
 
       {tab === 'members' ? (
         !loaded ? (

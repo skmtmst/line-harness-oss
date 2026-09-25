@@ -113,7 +113,7 @@ export default function OpsShell({ children }: { children: ReactNode }) {
     return (
       <div className="flex min-h-svh items-center justify-center bg-canvas-sunken px-4">
         <div className="w-full max-w-md rounded-card border border-hairline bg-canvas p-6 text-center shadow-sm">
-          <p role="alert" className="text-label font-bold text-status-danger">{loadError || '運営コンソールを読み込めませんでした'}</p>
+          <p role="alert" className="text-label font-bold text-danger">{loadError || '運営コンソールを読み込めませんでした'}</p>
           <div className="mt-4 flex justify-center gap-2">
             <Button variant="primary" onClick={() => { setChecked(false); setLoadError(''); void load() }}>もう一度試す</Button>
             <Button onClick={() => void logoutAndGoToLogin('/ops/login')}>ログインへ戻る</Button>
@@ -265,7 +265,7 @@ function OpsAccountMenu({ me }: { me: OpsMe }) {
             type="button"
             role="menuitem"
             onClick={() => void logoutAndGoToLogin('/ops/login')}
-            className="flex h-10 w-full items-center gap-2.5 px-3.5 text-label font-bold text-status-danger hover:bg-status-danger-soft"
+            className="flex h-10 w-full items-center gap-2.5 px-3.5 text-label font-bold text-danger hover:bg-status-danger-soft"
           >
             <LogOut aria-hidden="true" className="h-4 w-4" />
             ログアウト

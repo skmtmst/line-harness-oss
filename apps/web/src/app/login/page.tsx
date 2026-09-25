@@ -100,7 +100,7 @@ export default function LoginPage() {
     >
       <form onSubmit={(event) => void submit(event)} noValidate className="flex w-full flex-col gap-4">
         {error ? (
-          <p role="alert" className="rounded-control bg-status-danger-soft px-4 py-3 text-label text-status-danger">
+          <p role="alert" className="rounded-control bg-status-danger-soft px-4 py-3 text-label text-danger">
             {error}
           </p>
         ) : null}

@@ -183,7 +183,7 @@ export default function FeedingTab({ accountId }: { accountId: string }) {
       </div>
 
       {notice ? <p className="text-label text-accent-deep" role="status">{notice}</p> : null}
-      {error ? <p className="text-label text-status-danger" role="alert">{error}</p> : null}
+      {error ? <p className="text-label text-danger" role="alert">{error}</p> : null}
 
       <div data-design="Body" data-design-node="feeding-body" className="grid gap-4 xl:grid-cols-3">
         <div data-design="Tables" data-design-node="feeding-tables" className="flex min-w-0 flex-col gap-4 xl:col-span-2">

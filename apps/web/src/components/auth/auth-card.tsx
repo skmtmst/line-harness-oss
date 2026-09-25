@@ -90,7 +90,7 @@ export function AuthField({
       {hint ? <p className="text-micro text-ink-faint">{hint}</p> : null}
       {children}
       {error ? (
-        <p id={`${htmlFor}-error`} className="text-micro text-status-danger" role="alert">
+        <p id={`${htmlFor}-error`} className="text-micro text-danger" role="alert">
           {error}
         </p>
       ) : null}

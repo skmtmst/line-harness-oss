@@ -106,7 +106,7 @@ export default function OpsTwoFactorPage() {
       ) : (
         <form onSubmit={(event) => void submit(event)} noValidate className="flex w-full flex-col items-center gap-4">
           {error ? (
-            <p role="alert" className="w-full rounded-control bg-status-danger-soft px-4 py-3 text-label text-status-danger">{error}</p>
+            <p role="alert" className="w-full rounded-control bg-status-danger-soft px-4 py-3 text-label text-danger">{error}</p>
           ) : null}
           {qr ? (
             // eslint-disable-next-line @next/next/no-img-element -- 手元で描いた data: URL の QR。最適化の対象ではない

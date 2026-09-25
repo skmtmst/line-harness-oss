@@ -142,7 +142,7 @@ export default function OpsTenantsPage() {
         <NoteBar tone="info">契約先を選ぶと詳細が開きます。代理ログインは既定で閲覧のみです。</NoteBar>
       </div>
 
-      {error ? <p role="alert" className="mb-3 text-caption text-status-danger">{error}</p> : null}
+      {error ? <p role="alert" className="mb-3 text-caption text-danger">{error}</p> : null}
 
       {loading ? (
         <ListState kind="loading" title="契約先を読み込んでいます" />

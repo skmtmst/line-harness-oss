@@ -98,7 +98,7 @@ export default function OpsInvitePage() {
       ) : (
         <form onSubmit={(event) => void submit(event)} noValidate className="flex w-full flex-col gap-4">
           {error ? (
-            <p role="alert" className="rounded-control bg-status-danger-soft px-4 py-3 text-label text-status-danger">{error}</p>
+            <p role="alert" className="rounded-control bg-status-danger-soft px-4 py-3 text-label text-danger">{error}</p>
           ) : null}
           <AuthField label="メールアドレス" htmlFor="ops-invite-email">
             <TextField id="ops-invite-email" type="email" value={check?.email ?? ''} readOnly />

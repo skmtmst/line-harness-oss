@@ -210,7 +210,7 @@ function MembersInner() {
           </div>
 
           {notice ? <p className="text-label text-accent-deep" role="status">{notice}</p> : null}
-          {actionError ? <p className="text-label text-status-danger" role="alert">{actionError}</p> : null}
+          {actionError ? <p className="text-label text-danger" role="alert">{actionError}</p> : null}
 
           <section data-design="Table" data-design-node="nLVwc">
             {status === 'loading' ? (
@@ -267,7 +267,7 @@ function MembersInner() {
                               : state === 'invited'
                                 ? 'inline-flex h-5.5 items-center rounded-pill bg-status-warn-soft px-2 text-nano font-bold text-status-warn-deep'
                                 : state === 'expired'
-                                  ? 'inline-flex h-5.5 items-center rounded-pill bg-status-danger-soft px-2 text-nano font-bold text-status-danger'
+                                  ? 'inline-flex h-5.5 items-center rounded-pill bg-status-danger-soft px-2 text-nano font-bold text-danger'
                                   : 'inline-flex h-5.5 items-center rounded-pill bg-step-idle px-2 text-nano font-bold text-ink-secondary'
                           }
                         >
@@ -367,7 +367,7 @@ function MembersInner() {
                                 : state === 'invited'
                                   ? 'inline-flex h-5.5 items-center rounded-pill bg-status-warn-soft px-2 text-nano font-bold text-status-warn-deep'
                                   : state === 'expired'
-                                    ? 'inline-flex h-5.5 items-center rounded-pill bg-status-danger-soft px-2 text-nano font-bold text-status-danger'
+                                    ? 'inline-flex h-5.5 items-center rounded-pill bg-status-danger-soft px-2 text-nano font-bold text-danger'
                                     : 'inline-flex h-5.5 items-center rounded-pill bg-step-idle px-2 text-nano font-bold text-ink-secondary'
                             }
                           >
@@ -495,7 +495,7 @@ function TenantInfoTab({ canEdit }: { canEdit: boolean }) {
             className="w-full"
           />
         </div>
-        {error ? <p className="text-label text-status-danger" role="alert">{error}</p> : null}
+        {error ? <p className="text-label text-danger" role="alert">{error}</p> : null}
         {saved ? <p className="text-label text-accent-deep" role="status">保存しました。</p> : null}
       </form>
       <div className="sticky bottom-0 z-10">

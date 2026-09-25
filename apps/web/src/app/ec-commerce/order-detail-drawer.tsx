@@ -320,7 +320,7 @@ export default function OrderDetailDrawer({
                       </p>
                     ) : null}
                     {conversion.duplicateCandidate ? (
-                      <p className="mt-1.5 text-caption font-semibold text-status-danger">
+                      <p className="mt-1.5 text-caption font-semibold text-danger">
                         同じ注文・同じ成果地点の成果がほかにもあります。二重に認めないか注文番号で確かめてください。
                       </p>
                     ) : null}

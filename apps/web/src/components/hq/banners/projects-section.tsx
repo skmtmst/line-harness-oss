@@ -192,7 +192,7 @@ export default function ProjectsSection({
         <div className="border-t border-hairline" />
 
         {actionError ? (
-          <p className="px-4 pt-4 text-label text-status-danger" role="alert">{actionError}</p>
+          <p className="px-4 pt-4 text-label text-danger" role="alert">{actionError}</p>
         ) : null}
 
         <div data-design-node="AYX0k" className="p-4">
