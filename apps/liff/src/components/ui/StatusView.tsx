@@ -44,7 +44,7 @@ export default function StatusView({
 function BodyText({ text }: { text: string }) {
   const lines = text.split('\n');
   return (
-    <p className="mt-2 text-sm leading-6 text-ink-secondary">
+    <p className="mt-2 text-sm leading-6 text-balance text-ink-secondary">
       {lines.map((line, i) => (
         <span key={i}>
           {i > 0 && <br />}

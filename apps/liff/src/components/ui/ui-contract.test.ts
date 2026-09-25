@@ -151,3 +151,23 @@ describe('送信した画面は中央寄せ＋暦の印', () => {
     expect(src('pages', 'Booking.tsx')).toContain('justify-center');
   });
 });
+
+describe('撮り直しの3点', () => {
+  it('選んでいる日が見える位置まで横に流れる', () => {
+    const picker = src('components', 'DateTimePicker.tsx');
+    expect(picker).toContain('scrollIntoView');
+    expect(picker).toContain("inline: 'center'");
+    expect(picker).toContain("block: 'nearest'");
+  });
+
+  it('日時の帯は選ぶ前「日時を選んでください」・選んだら「M/D HH:MM で確認へ」', () => {
+    const booking = src('pages', 'Booking.tsx');
+    expect(booking).toContain('日時を選んでください');
+    expect(booking).toContain('で確認へ');
+  });
+
+  it('中央寄せの本文は均等に折り返す (行末の1〜2文字落ち防止)', () => {
+    expect(src('components', 'ui/StatusView.tsx')).toContain('text-balance');
+    expect(src('components', 'LoadErrorView.tsx')).toContain('text-balance');
+  });
+});

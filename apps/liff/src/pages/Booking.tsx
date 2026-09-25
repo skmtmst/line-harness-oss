@@ -139,7 +139,7 @@ export default function Booking() {
       {step === 'datetime' && !isPeek && stepReady && (
         <BottomBar>
           <Button variant="primary" disabled={!slot} onClick={() => setStep('confirm')}>
-            {slot ? `${formatMd(slot.date)} ${slot.start} で確認へ` : '日時を選ぶ'}
+            {slot ? `${formatMd(slot.date)} ${slot.start} で確認へ` : '日時を選んでください'}
           </Button>
         </BottomBar>
       )}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
 import { jstToday, addDays, formatJp, formatMd, formatWeekday } from '../lib/datetime.js';
 import { logFailure } from '../lib/user-message.js';
@@ -34,6 +34,7 @@ export default function DateTimePicker({
   const [failed, setFailed] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [day, setDay] = useState<string | null>(null);
+  const stripRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setFailed(false);
@@ -57,6 +58,13 @@ export default function DateTimePicker({
     onLoadState?.(byDate !== null && !failed && hasSlots);
   }, [byDate, failed, hasSlots, onLoadState]);
 
+  // 選んでいる日が枠の外にいるときは、横だけ中央に流す (縦には動かさない)。
+  useEffect(() => {
+    stripRef.current
+      ?.querySelector('[aria-pressed="true"]')
+      ?.scrollIntoView({ block: 'nearest', inline: 'center' });
+  }, [day, byDate]);
+
   if (failed) return <LoadErrorView onRetry={() => setReloadKey((k) => k + 1)} />;
   if (!byDate) return <LoadingView />;
 
@@ -73,7 +81,7 @@ export default function DateTimePicker({
         <p className="text-sm leading-6 text-ink-secondary">この期間に空きはありません。</p>
       ) : (
         <>
-          <div className="-mx-4 overflow-x-auto px-4" role="group" aria-label="日付">
+          <div ref={stripRef} className="-mx-4 overflow-x-auto px-4" role="group" aria-label="日付">
             <div className="flex gap-2 pb-1">
               {days.map((d) => {
                 const open = (byDate[d]?.length ?? 0) > 0;
