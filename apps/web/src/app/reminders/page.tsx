@@ -165,10 +165,12 @@ export default function RemindersPage() {
       return [{ title: 'リマインダ数', value: reminderStats.total, unit: '件', detail: `有効 ${reminderStats.active}件` }, { title: '送信予定', value: reminderStats.waiting, unit: '通', detail: '今後7日' }, { title: '今月の送信', value: reminderStats.sentThisMonth, unit: '通', detail: '正常送信' }, { title: '失敗', value: reminderStats.failed ?? null, unit: '通', detail: '要確認' }]
     }} /></div>
     <div className="mb-3 flex gap-2"><Button href="/reminders/new" variant="primary">リマインダを作成</Button></div>
-    {error ? <div className="bg-danger-bg text-danger mb-3 rounded-lg p-3 text-sm">{LIST_STATE_PRESETS.error.title}。{LIST_STATE_PRESETS.error.description}</div> : null}
+    {/*
+      ★V7 `x63W5x`：一覧の失敗でページ上の帯は出さない。表の中の
+      TableStateRow error（読み直す口つき）だけにまとめる。
+    */}
     {moveError ? <div className="bg-danger-bg text-danger mb-3 rounded-lg p-3 text-sm">{moveError}</div> : null}
     <div data-design="Body" style={FOLDER_RAIL_STYLE} className="grid gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
-      {foldersError ? <div className="bg-danger-bg text-danger rounded-lg p-3 text-sm lg:col-span-2">フォルダを読み込めませんでした。<Button className="ml-2" onClick={() => void loadFolders()}>フォルダを再読み込み</Button></div> : null}
       <FolderPanel
         total={loading || error ? '—' : `${listTotal}件`}
         activeId={folderFilter}
@@ -186,7 +188,20 @@ export default function RemindersPage() {
           })),
           { id: UNFILED, label: '未分類', count: unfiledCount },
         ]}
-      />
+      >
+        {/*
+          ★V7 `x63W5x`：補助のデータ（フォルダ）だけ取れないときは、
+          その場所に小さく1行だけ。赤字にしない。一覧は普通に出す。
+        */}
+        {foldersError ? (
+          <p role="alert" className="text-ink-secondary text-xs">
+            フォルダを読み込めませんでした。
+            <button type="button" onClick={() => void loadFolders()} className="text-action ml-2 font-semibold hover:underline">
+              もう一度
+            </button>
+          </p>
+        ) : null}
+      </FolderPanel>
       <div className="min-w-0">
         <div className="bg-canvas rounded-card border-hairline mb-3 border p-3">
           <div className="flex items-center gap-2"><TextInput type="search" placeholder="名前・内容で検索" aria-label="名前・内容で検索" value={nameQuery} onChange={(event) => setNameQuery(event.target.value)} className="min-w-0 flex-1 text-xs" /></div>
@@ -197,7 +212,7 @@ export default function RemindersPage() {
           {/* #641: 操作列が広くなった分は表だけが横に流れる */}
           <div className="overflow-x-auto">
           <table className="w-full min-w-[820px] table-fixed text-left text-xs"><thead className="bg-canvas-sunken text-ink-faint"><TableHeadRow><Th className="w-[31%]">リマインダ名</Th><Th className="w-1/12">状態</Th><Th className="w-1/5">基準日</Th><Th className="w-1/12">予定</Th><Th className="w-1/6">最終送信</Th><Th className="w-44" align="center">操作</Th></TableHeadRow></thead><tbody className="divide-y divide-hairline">
-            {loading ? <TableStateRow colSpan={6} kind="loading" title="読み込んでいます" description="このまま少しお待ちください。" /> : reminders.length === 0 ? (<>{error ? <TableStateRow colSpan={6} kind="error" title="表示できませんでした" description="再読み込みしても直らないときは、エラー報告へお知らせください。" onRetry={reminderList.retry} /> : nameQuery.trim() || folderFilter || statusFilter ? (<><TableStateRow colSpan={6} kind="empty" title="この条件に合うリマインダはありません。" description="検索語や絞り込みを変えてください。" /><tr><td colSpan={6} className="px-4 pb-10 text-center"><Button onClick={() => { setNameQuery(''); setFolderFilter(''); setStatusFilter('') }}>検索と絞り込みを解除</Button></td></tr></>) : <TableStateRow colSpan={6} kind="empty" title="まだリマインダがありません" description="日付を決めておくと、その前と後に自動で送れます。上の「リマインダを作成」から始められます。" />}</>) : reminders.map((reminder) => { const view = rowView(reminder); return <tr key={reminder.id} className="hover:bg-canvas-sunken"><td className="px-3 py-3"><Link href={`/reminders/detail?id=${encodeURIComponent(reminder.id)}`} className="text-action block truncate font-bold" title={reminder.name}>{reminder.name}</Link><span className="text-ink-faint text-micro mt-1 block truncate" title={view.subtitle}>{view.subtitle}</span></td><td><Pill tone={view.status === '有効' ? 'success' : view.status === '下書き' ? 'warning' : 'neutral'}>{view.status}</Pill></td><td className="truncate pr-2" title={view.base}>{view.base}</td><td>{view.planned}</td><td>{view.last}</td><td className="text-center"><div className="relative inline-flex items-center justify-center gap-1">{/* #641: 主操作は枠つき「詳細」ボタン、削除はゴミ箱、残りは「その他」へ */}<Button href={`/reminders/detail?id=${encodeURIComponent(reminder.id)}`} variant="secondary">詳細</Button><IconButton aria-label={`${reminder.name}を削除`} title={`${reminder.name}を削除`} className="text-danger" onClick={() => { setSelected(new Set([reminder.id])); setDeleteError(''); setConfirmOpen(true) }}><Trash2 /></IconButton><IconButton aria-label={`${reminder.name}のその他操作`} title={`${reminder.name}のその他操作`} onClick={() => setOpenMenuId((currentId) => currentId === reminder.id ? null : reminder.id)}><MoreHorizontal /></IconButton><ActionMenu open={openMenuId === reminder.id} ariaLabel={`${reminder.name}の操作`} onClose={() => setOpenMenuId(null)} items={[{ id: 'registrants', label: '登録者を管理', icon: <CalendarClock />, onSelect: () => router.push(`/reminders/detail?id=${encodeURIComponent(reminder.id)}`) }, { id: 'planned', label: '配信予定を確認', icon: <CalendarClock />, onSelect: () => router.push(`/reminders/detail?id=${encodeURIComponent(reminder.id)}&status=planned`) }, { id: 'history', label: '実行履歴を見る', icon: <History />, onSelect: () => router.push(`/reminders/detail?id=${encodeURIComponent(reminder.id)}`) }]} /></div></td></tr> })}
+            {loading ? <TableStateRow colSpan={6} kind="loading" title="読み込んでいます" description="このまま少しお待ちください。" /> : reminders.length === 0 ? (<>{error ? <TableStateRow colSpan={6} kind="error" title={LIST_STATE_PRESETS.error.title} description={LIST_STATE_PRESETS.error.description} onRetry={reminderList.retry} /> : nameQuery.trim() || folderFilter || statusFilter ? (<><TableStateRow colSpan={6} kind="empty" title="この条件に合うリマインダはありません。" description="検索語や絞り込みを変えてください。" /><tr><td colSpan={6} className="px-4 pb-10 text-center"><Button onClick={() => { setNameQuery(''); setFolderFilter(''); setStatusFilter('') }}>検索と絞り込みを解除</Button></td></tr></>) : <TableStateRow colSpan={6} kind="empty" title="まだリマインダがありません" description="日付を決めておくと、その前と後に自動で送れます。上の「リマインダを作成」から始められます。" />}</>) : reminders.map((reminder) => { const view = rowView(reminder); return <tr key={reminder.id} className="hover:bg-canvas-sunken"><td className="px-3 py-3"><Link href={`/reminders/detail?id=${encodeURIComponent(reminder.id)}`} className="text-action block truncate font-bold" title={reminder.name}>{reminder.name}</Link><span className="text-ink-faint text-micro mt-1 block truncate" title={view.subtitle}>{view.subtitle}</span></td><td><Pill tone={view.status === '有効' ? 'success' : view.status === '下書き' ? 'warning' : 'neutral'}>{view.status}</Pill></td><td className="truncate pr-2" title={view.base}>{view.base}</td><td>{view.planned}</td><td>{view.last}</td><td className="text-center"><div className="relative inline-flex items-center justify-center gap-1">{/* #641: 主操作は枠つき「詳細」ボタン、削除はゴミ箱、残りは「その他」へ */}<Button href={`/reminders/detail?id=${encodeURIComponent(reminder.id)}`} variant="secondary">詳細</Button><IconButton aria-label={`${reminder.name}を削除`} title={`${reminder.name}を削除`} className="text-danger" onClick={() => { setSelected(new Set([reminder.id])); setDeleteError(''); setConfirmOpen(true) }}><Trash2 /></IconButton><IconButton aria-label={`${reminder.name}のその他操作`} title={`${reminder.name}のその他操作`} onClick={() => setOpenMenuId((currentId) => currentId === reminder.id ? null : reminder.id)}><MoreHorizontal /></IconButton><ActionMenu open={openMenuId === reminder.id} ariaLabel={`${reminder.name}の操作`} onClose={() => setOpenMenuId(null)} items={[{ id: 'registrants', label: '登録者を管理', icon: <CalendarClock />, onSelect: () => router.push(`/reminders/detail?id=${encodeURIComponent(reminder.id)}`) }, { id: 'planned', label: '配信予定を確認', icon: <CalendarClock />, onSelect: () => router.push(`/reminders/detail?id=${encodeURIComponent(reminder.id)}&status=planned`) }, { id: 'history', label: '実行履歴を見る', icon: <History />, onSelect: () => router.push(`/reminders/detail?id=${encodeURIComponent(reminder.id)}`) }]} /></div></td></tr> })}
           </tbody></table>
           </div>
         </div>
