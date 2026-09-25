@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import { ApiError, api } from '@/lib/api'
 import { FEATURE_SETTINGS_UPDATED_EVENT } from '@/lib/feature-settings'
+import { loadFeatureSettings } from '@/lib/feature-settings-cache'
 import {
   FEATURE_PRESETS,
   FEATURE_SET_LABELS,
@@ -49,7 +50,8 @@ export function FeatureSetCard({ accountId }: { accountId: string | null }) {
     setState({ kind: 'loading' })
     setApplyError('')
     try {
-      const res = await api.featureSettings.get(accountId)
+      // サイドバー・機能設定画面と同じ答えを共有する。保存の合図で捨てられる。
+      const res = await loadFeatureSettings(accountId)
       if (generationRef.current !== generation) return
       if (!res.success) {
         setState({ kind: 'error' })
