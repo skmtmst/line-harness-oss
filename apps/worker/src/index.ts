@@ -1321,6 +1321,7 @@ async function runFrequentHeavyJobs(
         const { processDueEcRetries } = await import('./services/ec-retry.js');
         const result = await processDueEcRetries(env.DB, {
           now: new Date(event.scheduledTime).toISOString(),
+          credentialKey: env.LINE_CREDENTIAL_ENCRYPTION_KEY,
         });
         if (result.processed + result.failed > 0) {
           console.log(JSON.stringify({ event: 'ec_event_retry', ...result }));

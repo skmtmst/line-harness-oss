@@ -25,7 +25,7 @@ export interface EcRetrySweepResult {
 
 export async function processDueEcRetries(
   db: D1Database,
-  input: { now: string; limit?: number },
+  input: { now: string; limit?: number; credentialKey?: string },
 ): Promise<EcRetrySweepResult> {
   const result: EcRetrySweepResult = { processed: 0, failed: 0, dead: 0, skipped: 0 };
   const limit = input.limit ?? 50;
@@ -103,6 +103,7 @@ export async function processDueEcRetries(
         event,
         eventRowId: row.event_row_id,
         now: input.now,
+        credentialKey: input.credentialKey,
       });
       if (outcome === 'duplicate') {
         // 誰かが処理中。待ちに戻す。

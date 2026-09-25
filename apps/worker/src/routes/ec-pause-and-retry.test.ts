@@ -179,6 +179,29 @@ describe('ECの停止と再試行 (P1-23)', () => {
     expect(event.status).toBe('processed');
   });
 
+  it('回収した受信のV6連携へ復号鍵を渡す', async () => {
+    const payload = JSON.stringify(orderEvent('evt-retry-key-1')).replace(/'/g, "''");
+    db.raw.exec(`
+      INSERT INTO ec_events (id, source, external_event_id, event_type, line_account_id, customer_id,
+        line_user_id, payload, status, received_at, updated_at)
+      VALUES ('row-retry-key-1', 'eccube', 'evt-retry-key-1', 'ec.order.confirmed', 'account-a', 'C-1',
+        'Uaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', '${payload}', 'received', '${NOW_JST}', '${NOW_JST}');
+      INSERT INTO ec_action_executions
+        (id, event_id, line_account_id, action_type, rule_version, idempotency_key, status,
+         attempt_count, max_attempts, version, created_at, updated_at)
+      VALUES ('exec-retry-key-1', 'row-retry-key-1', 'account-a', 'customer_notification', 'v1',
+        'key-retry-key-1', 'pending', 0, 3, 1, '${NOW_JST}', '${NOW_JST}');
+    `);
+    const result = await processDueEcRetries(db.db, {
+      now: '2026-09-20T10:00:00.000Z', credentialKey: 'retry-credential-key',
+    });
+    expect(result.processed).toBe(1);
+    const { fireEvent } = await import('../services/event-bus.js');
+    const fireEventMock = fireEvent as unknown as ReturnType<typeof vi.fn>;
+    expect(fireEventMock).toHaveBeenCalledTimes(1);
+    expect(fireEventMock.mock.calls[0][6]).toBe('retry-credential-key');
+  });
+
   it('送ったあとの失敗を回しても二重に送らない', async () => {
     await postEvent('evt-retry-2');
     const { __pushMessage } = await import('@line-crm/line-sdk') as unknown as { __pushMessage: ReturnType<typeof vi.fn> };
