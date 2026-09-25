@@ -530,8 +530,11 @@ function BroadcastList() {
               {/*
                 ★V7 `x63W5x`：補助のデータ（フォルダ）だけ取れないときは、
                 その場所に小さく1行だけ。赤字にしない。一覧は普通に出す。
+                一覧本体も失敗しているとき（一覧の失敗・権限不足の1枚が
+                出ているとき）はそちらへまとめ、ここは出さない。一覧が
+                戻れば、まだ取れていなければ再び出る。
               */}
-              {folderError ? (
+              {folderError && !forbidden && (broadcasts.length > 0 || showCreate || !error) ? (
                 <p role="alert" className="text-ink-secondary text-xs">
                   {folderError}
                   <button type="button" onClick={() => void loadFolders()} className="text-action ml-2 font-semibold hover:underline">

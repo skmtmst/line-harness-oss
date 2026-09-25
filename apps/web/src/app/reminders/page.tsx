@@ -192,8 +192,10 @@ export default function RemindersPage() {
         {/*
           ★V7 `x63W5x`：補助のデータ（フォルダ）だけ取れないときは、
           その場所に小さく1行だけ。赤字にしない。一覧は普通に出す。
+          一覧本体も失敗しているとき（一覧の失敗の1枚が出ているとき）は
+          そちらへまとめ、ここは出さない。
         */}
-        {foldersError ? (
+        {foldersError && (reminders.length > 0 || !error) ? (
           <p role="alert" className="text-ink-secondary text-xs">
             フォルダを読み込めませんでした。
             <button type="button" onClick={() => void loadFolders()} className="text-action ml-2 font-semibold hover:underline">

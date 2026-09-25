@@ -124,4 +124,19 @@ describe('#634 一斉配信の読込表示と再読み込み', () => {
     await waitFor(() => expect(fixture.broadcastsList).toHaveBeenCalledTimes(2))
     await waitFor(() => expect(screen.getByText('8月キャンペーンのお知らせ')).toBeTruthy())
   })
+
+  it('一覧もフォルダも失敗したら、読み直しは一覧の1枚だけ（フォルダ欄は出さない）', async () => {
+    fixture.broadcastsList.mockResolvedValue({ success: false, error: '失敗' })
+    fixture.foldersList.mockResolvedValue({ success: false, error: '失敗' })
+
+    render(<BroadcastsPage />)
+
+    await waitFor(() => expect(screen.getByText('表示できませんでした')).toBeTruthy())
+
+    // ★V7 `x63W5x`：失敗は1画面に1つ。一覧本体も失敗しているときは
+    // 一覧の1枚へまとめ、フォルダ欄の小さい読み直しは出さない。
+    expect(screen.getAllByRole('button', { name: 'もう一度読み込む' })).toHaveLength(1)
+    expect(screen.queryByRole('button', { name: 'もう一度' })).toBeNull()
+    expect(screen.queryByText(/フォルダを読み込めませんでした/)).toBeNull()
+  })
 })
