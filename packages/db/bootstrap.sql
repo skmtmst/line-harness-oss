@@ -1031,6 +1031,21 @@ CREATE TABLE automation_runs (
   UNIQUE (line_account_id, automation_id, idempotency_key)
 );
 
+CREATE TABLE automation_run_daily_counts (
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  automation_id   TEXT NOT NULL,
+  day             TEXT NOT NULL,
+  status          TEXT NOT NULL,
+  run_count       INTEGER NOT NULL DEFAULT 0 CHECK (run_count >= 0),
+  step_count      INTEGER NOT NULL DEFAULT 0 CHECK (step_count >= 0),
+  created_at      TEXT NOT NULL,
+  updated_at      TEXT NOT NULL,
+  PRIMARY KEY (line_account_id, automation_id, day, status)
+);
+
+CREATE INDEX IF NOT EXISTS idx_automation_run_daily_counts_day
+  ON automation_run_daily_counts(day);
+
 CREATE TABLE automation_versions (
   id                TEXT PRIMARY KEY,
   automation_id     TEXT NOT NULL REFERENCES automation_definitions(id),
@@ -8514,13 +8529,8 @@ BEFORE DELETE ON automation_versions
 WHEN OLD.status = 'published'
 BEGIN SELECT RAISE(ABORT, 'published automation version cannot be deleted'); END;
 
-CREATE TRIGGER trg_automation_run_steps_no_delete
-BEFORE DELETE ON automation_run_steps
-BEGIN SELECT RAISE(ABORT, 'automation step history cannot be deleted'); END;
-
-CREATE TRIGGER trg_automation_runs_no_delete
-BEFORE DELETE ON automation_runs
-BEGIN SELECT RAISE(ABORT, 'automation run history cannot be deleted'); END;
+-- v6-25 §15 の保持期間のため、実行履歴の全面削除禁止は 450 で廃止。
+-- 期限切れの確定済み明細だけを定期処理（purgeExpiredAutomationRuns）が消す。
 
 CREATE TRIGGER trg_common_action_binding_migrations_no_delete
 BEFORE DELETE ON common_action_binding_migration_events

@@ -46,6 +46,7 @@ export * from './stripe';
 export * from './health';
 export * from './automations';
 export * from './automation-migration';
+export * from './automation-retention';
 export * from './entry-routes';
 export * from './entry-route-genres';
 export * from './entry-route-stop-suppressions';

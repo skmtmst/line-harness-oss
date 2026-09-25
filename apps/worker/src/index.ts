@@ -1562,6 +1562,17 @@ async function runSixHourlyHeavyJobs(
       },
     },
     {
+      // v6-25 §15: 明細90日・日別13か月。確定済みだけ畳んで消す。
+      name: 'automation retention purge',
+      run: async () => {
+        const { purgeExpiredAutomationRuns } = await import('@line-crm/db');
+        const purged = await purgeExpiredAutomationRuns(env.DB, new Date(event.scheduledTime));
+        if (purged.runs + purged.dailyExpired > 0) {
+          console.log(JSON.stringify({ event: 'automation_retention_purged', ...purged }));
+        }
+      },
+    },
+    {
       name: 'friend snapshot',
       run: async () => {
         const { recordFriendSnapshot } = await import('@line-crm/db');
