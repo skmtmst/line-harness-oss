@@ -259,6 +259,11 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
     },
   },
   {
+    name: 'file scan retry',
+    classification: { kind: 'core', reason: '危険なファイルの検査の再試行（メディア・写真・添付を横断）' },
+    enforcement: { mode: 'exempt', reason: '安全の後始末で、止めると検査待ちが詰まる。単一機能に属さない' },
+  },
+  {
     name: 'following mileage',
     classification: { kind: 'feature', featureId: 'mileage' },
     enforcement: {
