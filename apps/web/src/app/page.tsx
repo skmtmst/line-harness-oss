@@ -1463,16 +1463,24 @@ function DashboardPageInner() {
         </div>
       </div>
 
+      {/*
+        ★V7 `x63W5x`：ページ全体の失敗はピンクの箱ではなく、中立のカードで出す。
+        赤は使わない（利用者の失敗ではないため）。読み直す口は残す。
+      */}
       {error && (
-        <div className="bg-danger-bg text-danger rounded-card mb-5 flex flex-wrap items-center gap-3 p-4 text-sm" role="alert">
-          <span className="min-w-0 flex-1">{error}</span>
-          <button type="button" onClick={() => void load()} className="shrink-0 font-medium underline">もう一度読み込む</button>
+        <div className="bg-canvas border-hairline rounded-card mb-5 flex flex-wrap items-center gap-3 border p-4 text-sm" role="alert">
+          <span className="text-ink min-w-0 flex-1">{error}</span>
+          <Button type="button" variant="secondary" onClick={() => void load()}>もう一度読み込む</Button>
         </div>
       )}
+      {/*
+        ★V7 `x63W5x`：一部のデータだけ取れないときは、その場所に小さく1行だけ。
+        黄色の帯にしない。
+      */}
       {data?.partialFailures?.length ? (
-        <div className="bg-warning-bg text-warning rounded-card mb-5 p-4 text-sm" role="status">
+        <p className="text-ink-secondary mb-5 text-xs" role="status">
           一部のデータを{STATE_TEXT.error}（{data.partialFailures.join('、')}）。0件としては表示していません。
-        </div>
+        </p>
       ) : null}
 
       {visibleToday.length > 0 ? <section data-design="TodayTasks" className="mb-6">
