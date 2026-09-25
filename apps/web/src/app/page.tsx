@@ -469,12 +469,12 @@ function SendQuotaCard({
   const low = remainingRate !== null && remainingRate <= 10
   /*
    * 行き先リンクは見出しの行の右端に1つ（SideCard の action）、
-   * 更新時刻は右下にそろえる。「毎月1日リセット」はリンクの場所を
-   * ふさぐので、見出しの脇の小さい文字へ移す。
+   * 更新時刻は右下にそろえる。「毎月1日リセット」は題の脇に置くと
+   * 題が2行に折れるため、「？」（HelpTip：いつ元に戻るか）へ移す。
    */
   return <SideCard
     title="今月の送信枠"
-    period="毎月1日リセット"
+    helpTip="送信枠は毎月1日にリセットされます。使い切ると翌月1日まで送れません。"
     action={{ label: '配信設定へ →', href: '/accounts' }}
     freshness={freshness}
   >

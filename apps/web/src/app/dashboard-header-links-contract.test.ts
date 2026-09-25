@@ -38,10 +38,13 @@ const SIDE = code(SIDE_CARDS)
 const SINGLE_LOOK = 'text-status-info'
 
 describe('ダッシュボードの行き先リンクの置き場所', () => {
-  it('今月の送信枠は SideCard で右上に「配信設定へ →」、脇に「毎月1日リセット」', () => {
+  it('今月の送信枠は SideCard で右上に「配信設定へ →」、題は1行のまま', () => {
     expect(CODE).toContain('title="今月の送信枠"')
-    expect(CODE).toContain('period="毎月1日リセット"')
     expect(CODE).toContain("action={{ label: '配信設定へ →', href: '/accounts' }}")
+    // 「毎月1日リセット」は題の脇に置くと題が2行に折れる。
+    // 脇（period）には置かず、「？」（HelpTip：いつ元に戻るか）へ移す。
+    expect(CODE).not.toContain('period="毎月1日リセット"')
+    expect(CODE).toContain('helpTip="送信枠は毎月1日にリセットされます。')
   })
 
   it('運用アラートは SideCard で右上に「運用状態を見る →」、脇の「現在」は残す', () => {
