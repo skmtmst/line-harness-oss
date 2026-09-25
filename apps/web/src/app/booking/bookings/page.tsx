@@ -638,10 +638,13 @@ export default function BookingsPage() {
         ) : null}
       </div>
       <nav aria-label="予約の表示" className="border-hairline mb-4 flex items-center gap-7 border-b">
+        {/*
+          ★V7：集計が取れていない間、タブの件数に 0 を出さない。件数は出さない。
+        */}
         {([
-          ['day', `今日 ${todayCount}`],
-          ['week', `今週 ${weekCount}`],
-          ['month', `今月 ${kpi.total}`],
+          ['day', summaryReady ? `今日 ${todayCount}` : '今日'],
+          ['week', summaryReady ? `今週 ${weekCount}` : '今週'],
+          ['month', summaryReady ? `今月 ${kpi.total}` : '今月'],
           ['list', '一覧'],
         ] as const).map(([key, label]) => (
           <button
@@ -694,10 +697,10 @@ export default function BookingsPage() {
       <div>
         {pageHead}
         {/*
-          ★V7 `x63W5x`：同じ失敗を1画面に1つへ。ページ上のピンクの帯は出さず、
-          一覧の場所の ListState error だけ残す（#634 の読み直す口は保つ）。
+          ★V7 `x63W5x`：同じ失敗を1画面に1つへ。失敗の1枚はカレンダーの場所に
+          出す（#634 の読み直す口は保つ）。一覧が読めている間はカレンダーを出す。
         */}
-        {error && (
+        {error ? (
           <div className="mb-4">
             <ListState
               kind="error"
@@ -706,23 +709,25 @@ export default function BookingsPage() {
               onRetry={() => void load()}
             />
           </div>
+        ) : (
+          <BookingCalendar
+            mode={view}
+            items={calendarItems}
+            onOpen={setDetailId}
+            staffNames={staffList.map((item) => item.display_name)}
+            canCreate={canOperate}
+            anchorDay={calendarAnchor}
+            onAnchorChange={setCalendarAnchor}
+            availability={availability}
+            dataState={loading ? 'loading' : 'ready'}
+            /*
+             * #634: 空き枠の失敗からその場で読み直す。空き枠は集計・メニュー・
+             * 担当の候補が先に要るので、同じ取得列（summarySeq）を回し直す。
+             * 候補が揃うと空き枠の取得はuseEffectの依存で自動的に再実行される。
+             */
+            onRetryAvailability={() => setSummarySeq((n) => n + 1)}
+          />
         )}
-        <BookingCalendar
-          mode={view}
-          items={calendarItems}
-          onOpen={setDetailId}
-          staffNames={staffList.map((item) => item.display_name)}
-          canCreate={canOperate}
-          anchorDay={calendarAnchor}
-          onAnchorChange={setCalendarAnchor}
-          availability={availability}
-          /*
-           * #634: 空き枠の失敗からその場で読み直す。空き枠は集計・メニュー・
-           * 担当の候補が先に要るので、同じ取得列（summarySeq）を回し直す。
-           * 候補が揃うと空き枠の取得はuseEffectの依存で自動的に再実行される。
-           */
-          onRetryAvailability={() => setSummarySeq((n) => n + 1)}
-        />
         {dialogs}
       </div>
     )
