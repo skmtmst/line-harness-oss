@@ -3514,6 +3514,45 @@ const spec = {
       },
     },
     // ── Templates (#645 公開版固定) ─────────────────────────────────────────
+    '/api/templates/{id}/versions': {
+      get: {
+        tags: ['Templates'],
+        summary: 'テンプレートの版の履歴を新しい版から返す',
+        description: '公開のたびに足した版を新しい順に返す。前の版は変わらない。status は in_use（いま使っている）/ reserved（予約）/ past（過去）。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '版の一覧 { versionNumber・status・messageType・messageContent・effectiveFrom・createdAt }' },
+          '404': { description: 'Not found in account scope' },
+        },
+      },
+    },
+    '/api/templates/{id}/revert': {
+      post: {
+        tags: ['Templates'],
+        summary: '指定の版の中身で新しい版を作る',
+        description: '過去の版は変えない。その中身を下書きへ写して公開する。Idempotency-Key ヘッダ(必須)で再試行を見分ける。版(expectedVersion)が進んでいたら409。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'Idempotency-Key', in: 'header', required: true, schema: { type: 'string', minLength: 8, maxLength: 200 }, description: '公開操作の確認キー。必須。同じキーの再試行は同じ結果を返す。' },
+        ],
+        requestBody: { content: { 'application/json': { schema: {
+          type: 'object',
+          required: ['versionNumber', 'expectedVersion'],
+          properties: {
+            versionNumber: { type: 'integer', minimum: 1, description: '戻す版の番号。必須。無い版は404。' },
+            expectedVersion: { type: 'integer', minimum: 0, description: '確認したときの公開版。必須。進んでいたら409。' },
+          },
+        } } } },
+        responses: {
+          '200': { description: '戻す成功。data に publishedVersion・hasDraft を返す。' },
+          '400': { description: '確認キー不足・版の番号が数でない' },
+          '404': { description: 'Not found in account scope・戻す版が無い' },
+          '409': { description: '公開版の同時更新の負け・下書きの書き換わり・確認キーの別操作への使い回し' },
+        },
+      },
+    },
     '/api/templates/{id}/publish': {
       post: {
         tags: ['Templates'],
