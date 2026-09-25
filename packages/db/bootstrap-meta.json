@@ -411,7 +411,9 @@
     "450_automation_run_retention.sql",
     "451_messages_log_line_event_at.sql",
     "452_broadcast_after_action_runs.sql",
-    "453_ad_platform_secret_vault.sql"
+    "453_ad_platform_secret_vault.sql",
+    "456_media_file_scans.sql",
+    "457_file_scan_config.sql"
   ],
-  "migrationCount": 412
+  "migrationCount": 414
 }
