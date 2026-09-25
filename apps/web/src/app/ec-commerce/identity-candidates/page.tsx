@@ -148,7 +148,7 @@ export default function EcIdentityCandidatesPage() {
             <SummaryCard variant="v6" title="結びつけると増える売上" value={operations?.summary.potentialRevenue ?? null} unit="円" detail={`この${(operations?.summary.unmatched ?? 0).toLocaleString('ja-JP')}件ぶん。分析にも入ります`} />
           </div>
 
-          <NoteBar>メールアドレスか電話番号が同じなら、自動で結びつきます。どちらも違うときに、ここへ並びます。名前だけが同じ人は、別人のこともあるので自動では結びつけません。</NoteBar>
+          <NoteBar help="メールアドレスか電話番号が同じなら自動で結びつきます" helpLabel="自動で結びつく条件">メールアドレスか電話番号が同じなら、自動で結びつきます。どちらも違うときに、ここへ並びます。名前だけが同じ人は、別人のこともあるので自動では結びつけません。</NoteBar>
 
           <div className="flex flex-wrap items-center justify-between gap-3">
             <Tabs items={([

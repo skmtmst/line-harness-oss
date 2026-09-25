@@ -250,7 +250,7 @@ function CommonActionVersionsInner() {
         <SummaryCard variant="v6" title="古い版のまま" value={detail.bindings.filter((binding) => binding.hasNewerVersion).length} unit="" detail="回答フォーム" badge={detail.bindings.some((binding) => binding.hasNewerVersion) ? '要確認' : undefined} />
       </div>
 
-      <NoteBar>
+      <NoteBar help="新版を公開しても、利用先は現在の版を使い続けます" helpLabel="版の切り替え">
         新版を公開しても、利用先は現在の版を使い続けます。差分を確認した利用先だけ切り替えてください。
       </NoteBar>
 

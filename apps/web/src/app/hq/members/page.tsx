@@ -204,7 +204,7 @@ function MembersInner() {
           </KpiCollapse>
 
           <div data-design="Note" data-design-node="Y1EarL">
-            <NoteBar tone="info">
+            <NoteBar tone="info" help="権限者は統括の管理画面に入れる人です" helpLabel="権限者の意味">
               権限者は統括の管理画面に入れる人です。担当アカウントを限定すると、そのアカウントの管理画面だけが見えます。招待メールの有効期限は48時間です。
             </NoteBar>
           </div>
@@ -481,7 +481,7 @@ function TenantInfoTab({ canEdit }: { canEdit: boolean }) {
 
   return (
     <>
-      <NoteBar tone="info">統括名は、統括コンソールとメールの差出人に使われます。アカウントの名前はそれぞれのアカウントの設定で変えます。</NoteBar>
+      <NoteBar tone="info" help="統括名は統括コンソールとメールの差出人に使われます" helpLabel="統括名の意味">統括名は、統括コンソールとメールの差出人に使われます。アカウントの名前はそれぞれのアカウントの設定で変えます。</NoteBar>
       <form onSubmit={save} className="flex max-w-2xl flex-col gap-4 rounded-card border border-hairline bg-canvas p-5">
         <div className="flex flex-col gap-1.5">
           <label htmlFor="tenant-name" className="text-label font-bold text-ink">統括名</label>

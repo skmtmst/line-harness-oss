@@ -2591,7 +2591,7 @@ export function OffersTab() {
 
   return (
     <div data-design-node="GH8VL" data-affiliate-offers-design="v6">
-      <NoteBar>
+      <NoteBar help="案件は、何をしたら成果になりいくら払うかの組み合わせです" helpLabel="案件の意味">
         案件は「何をしたら成果になり、いくら払うか」の組み合わせです。アフィリエイターはこの案件を選んで紹介します。
       </NoteBar>
 
