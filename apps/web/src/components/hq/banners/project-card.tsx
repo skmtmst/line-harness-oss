@@ -1,8 +1,31 @@
 'use client'
 
+import { useState } from 'react'
 import { Star } from 'lucide-react'
 import type { BannerImage, BannerProject } from '@/lib/hq-banners'
 import { relativeUpdated } from '@/lib/hq-banners'
+
+/**
+ * モザイクの1枚。読めない画像はブラウザの壊れた印のままにせず、
+ * メディア一覧と同じ「画像を表示できません」の枠にする。
+ * 画像が無い枚は地の色のまま（枠を出さない）。
+ */
+function MosaicCell({ image }: { image: BannerImage | null }) {
+  const [failed, setFailed] = useState(false)
+  if (!image) return null
+  if (failed) {
+    return (
+      <span
+        className="grid h-full w-full place-items-center bg-canvas-sunken px-1 text-center text-micro font-bold leading-tight text-ink-faint"
+        title="画像を表示できません"
+      >
+        画像を表示できません
+      </span>
+    )
+  }
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={image.media.url} alt="" className="h-full w-full object-cover" loading="lazy" onError={() => setFailed(true)} />
+}
 
 /**
  * プロジェクトのカード。Pencil 35-1 `iDZtt`。
@@ -39,10 +62,7 @@ export default function ProjectCard({
       >
         {cells.map((image, i) => (
           <span key={i} className="block min-w-0 flex-1 overflow-hidden bg-step-idle">
-            {image ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={image.media.url} alt="" className="h-full w-full object-cover" loading="lazy" />
-            ) : null}
+            <MosaicCell image={image} />
           </span>
         ))}
       </button>
