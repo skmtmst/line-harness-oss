@@ -55,7 +55,19 @@ const fullInbox = {
 describe('SupportMarkStatusCard（現在の対応状況）', () => {
   it('4つの状態を件で出し、それぞれ絞り込み済みの受信箱へつなぐ', () => {
     const el = render(fullInbox)
+    // 2×2（未対応・対応中／保留・対応済み）の並び。対応済みだけ下へ落ちない。
+    const grid = el.querySelector('.grid-cols-2')
+    expect(grid).not.toBeNull()
     const links = [...el.querySelectorAll('a')] as HTMLAnchorElement[]
+    const labels = links
+      .filter((a) => a.getAttribute('href')?.startsWith('/chats?status='))
+      .map((a) => a.getAttribute('href'))
+    expect(labels).toEqual([
+      '/chats?status=unread',
+      '/chats?status=in_progress',
+      '/chats?status=on_hold',
+      '/chats?status=resolved',
+    ])
     const byLabel = (label: string) => links.find((a) => a.textContent?.includes(label))
     expect(byLabel('未対応')?.textContent).toContain('2件')
     expect(byLabel('対応中')?.textContent).toContain('3件')

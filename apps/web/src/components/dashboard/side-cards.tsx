@@ -137,7 +137,12 @@ export function SupportMarkStatusCard({
       action={{ label: '受信箱を見る →', href: '/chats' }}
       freshness={freshness}
     >
-      <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2">
+      {/*
+        4状態は2×2に並べる（未対応・対応中／保留・対応済み）。1行に4つ並べると
+        狭い右カラムで「対応済み」だけ下へ落ちる。数は右端にそろえ、桁が
+        ずれても位が合うよう等幅数字にする。
+      */}
+      <div className="grid grid-cols-2 gap-x-6 gap-y-2">
         {[
           { label: '未対応', value: inbox?.unanswered ?? null, href: '/chats?status=unread' },
           { label: '対応中', value: inbox?.inProgress ?? null, href: '/chats?status=in_progress' },
@@ -149,10 +154,10 @@ export function SupportMarkStatusCard({
             key={row.label}
             href={row.href}
             title={`${row.label}で絞った受信箱を開く`}
-            className={`${row.label === '未対応' && (row.value ?? 0) > 0 ? 'text-danger' : 'text-ink'} text-sm font-bold hover:underline`}
+            className={`${row.label === '未対応' && (row.value ?? 0) > 0 ? 'text-danger' : 'text-ink'} flex items-baseline justify-between gap-3 text-sm font-bold hover:underline`}
           >
-            {row.label}
-            <span className="ml-1.5 tabular-nums">
+            <span className="min-w-0 truncate">{row.label}</span>
+            <span className="shrink-0 tabular-nums">
               {row.value === null ? '—' : `${row.value.toLocaleString('ja-JP')}件`}
             </span>
           </Link>
