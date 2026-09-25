@@ -10,7 +10,7 @@
  * 保存を止めるのではなく**その場で残り文字数を出す**。
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { useAccount } from '@/contexts/account-context'
 import { scenarioReferenceData } from './scenario-reference-data'
 
@@ -144,6 +144,8 @@ export default function QuestionEditor({
   choiceColumns = false,
 }: QuestionEditorProps) {
   const { selectedAccountId } = useAccount()
+  /* 見出しの文字と欄をつなぐための番号。同じ画面に複数置いても重ならない。 */
+  const fieldBase = useId()
   const [tags, setTags] = useState<{ id: string; name: string }[]>([])
   const [fields, setFields] = useState<{ id: string; name: string }[]>([])
   const [scenarios, setScenarios] = useState<{ id: string; name: string }[]>([])
@@ -176,7 +178,7 @@ export default function QuestionEditor({
     <div className="space-y-5">
       <div>
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <span className="text-ink-secondary text-xs font-medium">前文</span>
+          <label htmlFor={`${fieldBase}-intro`} className="text-ink-secondary text-xs font-medium">前文</label>
           <CharCount value={value.intro ?? ''} max={4500} />
         </div>
         <p className="text-ink-faint mt-0.5 mb-1.5 text-xs leading-relaxed">
@@ -184,6 +186,7 @@ export default function QuestionEditor({
           <code className="text-ink-faint">{'{{name}}'}</code> など）が使えます。
         </p>
         <textarea
+          id={`${fieldBase}-intro`}
           rows={3}
           value={value.intro ?? ''}
           onChange={(e) => onChange({ ...value, intro: e.target.value })}
@@ -193,12 +196,13 @@ export default function QuestionEditor({
 
       <div>
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <span className="text-ink-secondary text-xs font-medium">
+          <label htmlFor={`${fieldBase}-text`} className="text-ink-secondary text-xs font-medium">
             質問文 <span className="text-danger">*</span>
-          </span>
+          </label>
           <CharCount value={value.text} max={160} />
         </div>
         <input
+          id={`${fieldBase}-text`}
           value={value.text}
           onChange={(e) => onChange({ ...value, text: e.target.value })}
           placeholder="例：体調はいかがですか？"
@@ -207,8 +211,9 @@ export default function QuestionEditor({
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <span className="text-ink-secondary text-xs font-medium">質問の回答は</span>
+        <label htmlFor={`${fieldBase}-tapmode`} className="text-ink-secondary text-xs font-medium">質問の回答は</label>
         <select
+          id={`${fieldBase}-tapmode`}
           value={value.tapMode}
           onChange={(e) => onChange({ ...value, tapMode: e.target.value as 'single' | 'multiple' })}
           className={selectClass}
@@ -276,12 +281,13 @@ export default function QuestionEditor({
               <div className="space-y-4 px-4 py-4">
                 <div>
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <span className="text-ink-secondary text-xs font-medium">
+                    <label htmlFor={`${fieldBase}-choice-${index}-label`} className="text-ink-secondary text-xs font-medium">
                       ボタンの文字 <span className="text-danger">*</span>
-                    </span>
+                    </label>
                     <CharCount value={choice.label} max={20} />
                   </div>
                   <input
+                    id={`${fieldBase}-choice-${index}-label`}
                     value={choice.label}
                     onChange={(e) => setChoice(index, { label: e.target.value })}
                     className={`${inputClass} mt-1.5`}
@@ -292,8 +298,9 @@ export default function QuestionEditor({
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-ink-secondary text-xs font-medium">選択後の挙動</span>
+                  <label htmlFor={`${fieldBase}-choice-${index}-behavior`} className="text-ink-secondary text-xs font-medium">選択後の挙動</label>
                   <select
+                    id={`${fieldBase}-choice-${index}-behavior`}
                     value={choice.behavior}
                     onChange={(e) => setChoice(index, { behavior: e.target.value as ChoiceBehavior })}
                     className={selectClass}
@@ -311,6 +318,7 @@ export default function QuestionEditor({
                     value={choice.url ?? ''}
                     onChange={(e) => setChoice(index, { url: e.target.value })}
                     placeholder="https://…"
+                    aria-label={`選択肢${index + 1}のURL`}
                     className={inputClass}
                   />
                 )}
@@ -319,6 +327,7 @@ export default function QuestionEditor({
                     value={choice.tel ?? ''}
                     onChange={(e) => setChoice(index, { tel: e.target.value })}
                     placeholder="0312345678"
+                    aria-label={`選択肢${index + 1}の電話番号`}
                     className={inputClass}
                   />
                 )}
@@ -327,6 +336,7 @@ export default function QuestionEditor({
                     value={choice.email ?? ''}
                     onChange={(e) => setChoice(index, { email: e.target.value })}
                     placeholder="info@example.com"
+                    aria-label={`選択肢${index + 1}のメールアドレス`}
                     className={inputClass}
                   />
                 )}
@@ -334,6 +344,7 @@ export default function QuestionEditor({
                   <div className="bg-canvas-sunken rounded-card space-y-2 px-3 py-3">
                     <div className="flex flex-wrap items-center gap-2">
                       <select
+                        aria-label={`選択肢${index + 1}のシナリオ操作`}
                         value={choice.scenario?.op ?? 'start'}
                         onChange={(e) =>
                           setChoice(index, {
@@ -346,6 +357,7 @@ export default function QuestionEditor({
                         <option value="stop">購読を止める</option>
                       </select>
                       <select
+                        aria-label={`選択肢${index + 1}の移動先シナリオ`}
                         value={choice.scenario?.scenarioId ?? ''}
                         onChange={(e) =>
                           setChoice(index, {
@@ -440,10 +452,11 @@ export default function QuestionEditor({
                   <>
                 <div>
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <span className="text-ink-secondary text-xs font-medium">選択時の返信</span>
+                    <label htmlFor={`${fieldBase}-choice-${index}-reply`} className="text-ink-secondary text-xs font-medium">選択時の返信</label>
                     <CharCount value={choice.reply ?? ''} max={4500} />
                   </div>
                   <textarea
+                    id={`${fieldBase}-choice-${index}-reply`}
                     rows={3}
                     value={choice.reply ?? ''}
                     onChange={(e) => setChoice(index, { reply: e.target.value })}
@@ -459,10 +472,11 @@ export default function QuestionEditor({
                   <div className="border-hairline space-y-4 border-t px-3 py-3">
                     <div>
                       <div className="flex flex-wrap items-baseline justify-between gap-2">
-                        <span className="text-ink-secondary text-xs font-medium">ユーザーメッセージ</span>
+                        <label htmlFor={`${fieldBase}-choice-${index}-usermsg`} className="text-ink-secondary text-xs font-medium">ユーザーメッセージ</label>
                         <CharCount value={choice.userMessage ?? ''} max={60} />
                       </div>
                       <input
+                        id={`${fieldBase}-choice-${index}-usermsg`}
                         value={choice.userMessage ?? ''}
                         onChange={(e) => setChoice(index, { userMessage: e.target.value })}
                         placeholder={choice.label || '空欄なら選択肢の文字が使われます'}
@@ -484,10 +498,11 @@ export default function QuestionEditor({
 
                     <div>
                       <div className="flex flex-wrap items-baseline justify-between gap-2">
-                        <span className="text-ink-secondary text-xs font-medium">二度押し時の返信</span>
+                        <label htmlFor={`${fieldBase}-choice-${index}-repeat`} className="text-ink-secondary text-xs font-medium">二度押し時の返信</label>
                         <CharCount value={choice.repeatReply ?? ''} max={4500} />
                       </div>
                       <textarea
+                        id={`${fieldBase}-choice-${index}-repeat`}
                         rows={3}
                         value={choice.repeatReply ?? ''}
                         onChange={(e) => setChoice(index, { repeatReply: e.target.value })}
@@ -517,8 +532,9 @@ export default function QuestionEditor({
                       書き込む値を同じ行に押し込むと、狭い幅で右側が切れる。
                     */}
                     <div>
-                      <span className="text-ink-secondary text-xs font-medium">友だち情報欄</span>
+                      <label htmlFor={`${fieldBase}-choice-${index}-field`} className="text-ink-secondary text-xs font-medium">友だち情報欄</label>
                       <select
+                        id={`${fieldBase}-choice-${index}-field`}
                         value={choice.field?.fieldId ?? ''}
                         onChange={(e) =>
                           setChoice(index, {
@@ -538,6 +554,7 @@ export default function QuestionEditor({
                       </select>
                       {choice.field?.fieldId && (
                         <input
+                          aria-label={`選択肢${index + 1}の友だち情報欄にセットする値`}
                           value={choice.field.value}
                           onChange={(e) =>
                             setChoice(index, {
@@ -576,10 +593,11 @@ export default function QuestionEditor({
 
       <div>
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <span className="text-ink-secondary text-xs font-medium">PC版・通知欄での代替テキスト</span>
+          <label htmlFor={`${fieldBase}-alttext`} className="text-ink-secondary text-xs font-medium">PC版・通知欄での代替テキスト</label>
           <CharCount value={value.altText ?? ''} max={400} />
         </div>
         <input
+          id={`${fieldBase}-alttext`}
           value={value.altText ?? ''}
           onChange={(e) => onChange({ ...value, altText: e.target.value })}
           placeholder="空欄なら質問文が使われます"

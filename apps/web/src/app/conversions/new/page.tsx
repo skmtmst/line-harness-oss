@@ -488,8 +488,8 @@ export default function NewConversionPointPage() {
               />
             </Field>
           ) : (
-            <Field label="どの注文を数えるか" note="すべての注文を対象に保存します。">
-              <SelectField value="all" disabled options={[{ value: 'all', label: 'すべての注文' }]} className="w-full" />
+            <Field label="どの注文を数えるか" htmlFor="cv-order-scope" note="すべての注文を対象に保存します。">
+              <SelectField id="cv-order-scope" value="all" disabled options={[{ value: 'all', label: 'すべての注文' }]} className="w-full" />
             </Field>
           )}
 
@@ -543,8 +543,9 @@ export default function NewConversionPointPage() {
               className={`${inputClass} tabular-nums disabled:bg-canvas-sunken`}
             />
           </Field>
-          <Field label="取り消しの扱い" note="元の成果は消さず、取消記録を追加します。">
+          <Field label="取り消しの扱い" htmlFor="cv-reversal-policy" note="元の成果は消さず、取消記録を追加します。">
             <SelectField
+              id="cv-reversal-policy"
               value={reversalPolicy}
               onChange={(event) => setReversalPolicy(event.target.value as ConversionReversalPolicy)}
               options={[
