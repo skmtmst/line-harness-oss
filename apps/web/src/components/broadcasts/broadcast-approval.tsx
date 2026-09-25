@@ -56,8 +56,22 @@ export function formatApprovalDateTime(value: string | null | undefined): string
 
 /** A-2 一覧の札。承認待ちと期限切れだけ出す。 */
 export function ApprovalBadge({ status }: { status: ApprovalStatus | undefined }) {
-  if (status === 'pending') return <Chip tone="info">承認待ち</Chip>
-  if (status === 'expired') return <Chip tone="neutral">期限切れ</Chip>
+  if (status === 'pending') {
+    return (
+      <>
+        <Chip tone="info">承認待ち</Chip>
+        <HelpTip label="承認待ちの説明">承認する人が中身を見て決めるのを待っています。</HelpTip>
+      </>
+    )
+  }
+  if (status === 'expired') {
+    return (
+      <>
+        <Chip tone="neutral">期限切れ</Chip>
+        <HelpTip label="期限切れの説明">承認の期限が過ぎました。頼み直してください。</HelpTip>
+      </>
+    )
+  }
   return null
 }
 
