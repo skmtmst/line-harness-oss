@@ -599,12 +599,13 @@ export default function NewConversionPointPage() {
                   <ul className="mt-2 space-y-1.5">
                     {targets.map((target) => (
                       <li key={usageKey(target)}>
-                        <label className="flex cursor-pointer items-start gap-2">
+                        {/* 13px の箱だけだと的が小さい。箱自体を 24px にして行全体を押せるようにする。 */}
+                        <label className="flex min-h-6 cursor-pointer items-center gap-2">
                           <input
                             type="checkbox"
                             checked={selectedUsageKeys.has(usageKey(target))}
                             onChange={() => toggleUsage(target)}
-                            className="mt-0.5"
+                            className="h-6 w-6 shrink-0 accent-accent-deep"
                           />
                           <span className="text-ink text-xs">{target.label}</span>
                         </label>
@@ -616,12 +617,12 @@ export default function NewConversionPointPage() {
             )
           })}
         </div>
-        <label className="border-hairline rounded-control mt-3 flex cursor-pointer items-start gap-3 border p-3">
+        <label className="border-hairline rounded-control mt-3 flex min-h-6 cursor-pointer items-start gap-3 border p-3">
           <input
             type="checkbox"
             checked={saveAsDraft}
             onChange={(event) => setSaveAsDraft(event.target.checked)}
-            className="mt-0.5"
+            className="h-6 w-6 shrink-0 accent-accent-deep"
           />
           <span>
             <span className="text-ink block text-sm font-semibold">まだ計測せず、下書きとして保存する</span>
