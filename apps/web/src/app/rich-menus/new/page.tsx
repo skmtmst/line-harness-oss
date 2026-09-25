@@ -53,6 +53,18 @@ export default function NewRichMenuPage() {
   const [trackedLinks, setTrackedLinks] = useState<RichMenuOption[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  /*
+   * その場の入力欄エラー。名前・トーク画面下の文言の空は、ページ最下部の
+   * 帯ではなく該当の欄の下に出し、その欄へフォーカスを移す。
+   * 入力し直したらその欄の文言は消す。
+   */
+  const [nameError, setNameError] = useState<string | null>(null)
+  const [chatBarTextError, setChatBarTextError] = useState<string | null>(null)
+
+  function focusField(id: 'rich-menu-name' | 'rich-menu-chat-bar-text') {
+    // state の描画を待たずに欄へ移す（欄自体は既に画面にある）。
+    requestAnimationFrame(() => document.getElementById(id)?.focus())
+  }
   /** N-164: 登録メディアから選んだ画像。作成時に既定ページへ登録する。 */
   const [mediaPickerOpen, setMediaPickerOpen] = useState(false)
   const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null)
@@ -96,9 +108,20 @@ export default function NewRichMenuPage() {
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
     if (!selectedAccount) return setError('アカウントを選択してください')
-    if (!value.name.trim()) return setError('名前を入力してください')
     // ブラウザ標準の required 吹き出しは英語になるため使わない。空はここで日本語で止める。
-    if (!value.chatBarText.trim()) return setError('トーク画面下の文言を入力してください')
+    // 名前・トーク画面下の文言は該当の欄の下にその場で出し、その欄へ移す。
+    if (!value.name.trim()) {
+      setNameError('名前を入力してください')
+      setError(null)
+      focusField('rich-menu-name')
+      return
+    }
+    if (!value.chatBarText.trim()) {
+      setChatBarTextError('トーク画面下の文言を入力してください')
+      setError(null)
+      focusField('rich-menu-chat-bar-text')
+      return
+    }
     const selectedTemplate = TEMPLATES.find((item) => item.key === value.templateKey)
     if (!selectedTemplate) return setError('面の分けかたを選び直してください')
     const areas = value.areaDraftsByTemplate[selectedTemplate.key] ?? createAreaDrafts(selectedTemplate)
@@ -116,6 +139,8 @@ export default function NewRichMenuPage() {
     const pageAreas = areaDraftsWithSwitchTargets(areas)
     setSubmitting(true)
     setError(null)
+    setNameError(null)
+    setChatBarTextError(null)
     try {
       const response = await api.richMenuGroups.create({
         accountId: selectedAccount.id,
@@ -156,7 +181,14 @@ export default function NewRichMenuPage() {
       <form onSubmit={handleSubmit}>
         <RichMenuCreateForm
           value={value}
-          onChange={setValue}
+          onChange={(next) => {
+            // 入力し直したらその欄の文言は消す。
+            if (next.name !== value.name && nameError) setNameError(null)
+            if (next.chatBarText !== value.chatBarText && chatBarTextError) setChatBarTextError(null)
+            setValue(next)
+          }}
+          nameError={nameError}
+          chatBarTextError={chatBarTextError}
           folders={folders}
           tags={tags}
           templates={templates}
