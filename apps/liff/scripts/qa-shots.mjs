@@ -70,6 +70,22 @@ try {
 
     // 予約 (メニュー→担当→日時→確認→完了まで進める)
     await shot(page, viewport, 'booking', '/booking?liffId=qa', { waitMs: 2000 });
+    await shot(page, viewport, 'booking-staff', '/booking?liffId=qa', {
+      waitMs: 2000,
+      after: async (p) => {
+        await p.getByRole('button', { name: 'QA カット' }).click();
+        await p.getByRole('button', { name: '担当を選ぶ' }).click();
+      },
+    });
+    await shot(page, viewport, 'booking-datetime', '/booking?liffId=qa', {
+      waitMs: 2000,
+      after: async (p) => {
+        await p.getByRole('button', { name: 'QA カット' }).click();
+        await p.getByRole('button', { name: '担当を選ぶ' }).click();
+        await p.getByRole('button', { name: /QA スタッフ/ }).click();
+        await p.getByRole('button', { name: '日時を選ぶ' }).click();
+      },
+    });
     await shot(page, viewport, 'booking-loading', '/booking?liffId=qa', {
       mock: { delayMs: 5000 },
       waitMs: 1200,
@@ -82,17 +98,23 @@ try {
       waitMs: 1500,
       after: async (p) => {
         await p.getByRole('button', { name: 'QA カット' }).click();
+        await p.getByRole('button', { name: '担当を選ぶ' }).click();
         await p.getByRole('button', { name: /QA スタッフ/ }).click();
+        await p.getByRole('button', { name: '日時を選ぶ' }).click();
         await p.getByRole('button', { name: '10:00' }).click();
+        await p.getByRole('button', { name: /で確認へ/ }).click();
       },
     });
     await shot(page, viewport, 'booking-done', '/booking?liffId=qa', {
       waitMs: 1500,
       after: async (p) => {
         await p.getByRole('button', { name: 'QA カット' }).click();
+        await p.getByRole('button', { name: '担当を選ぶ' }).click();
         await p.getByRole('button', { name: /QA スタッフ/ }).click();
+        await p.getByRole('button', { name: '日時を選ぶ' }).click();
         await p.getByRole('button', { name: '10:00' }).click();
-        await p.getByRole('button', { name: '予約をリクエスト' }).click();
+        await p.getByRole('button', { name: /で確認へ/ }).click();
+        await p.getByRole('button', { name: '予約をリクエストする' }).click();
         await p.waitForTimeout(1500);
       },
     });

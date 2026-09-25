@@ -24,11 +24,16 @@ describe('受付枠と休業日のV6契約', () => {
     expect(PAGE).toContain('settings.maxActiveBookingsPerFriend')
     expect(PAGE).toContain('bookingApi.getAvailability(selectedAccountId')
     expect(PAGE).not.toContain('staffId: staff.id')
-    // Issue #643: 実LIFFは「日時を選んでください」＋空き日の縦並び＋4列時刻ボタン。
+    // Issue #643: 実LIFFは「日時を選んでください」＋日付の横並び札＋3列時刻ボタン（★V7）。
     // 架空の月間カレンダー（○×休・凡例・内訳）は実画面に無いので残さない。
     expect(PREVIEW).toContain('日時を選んでください')
     expect(PREVIEW).toContain('この期間に空きはありません。')
-    expect(PREVIEW).toContain('grid-cols-4')
+    expect(PREVIEW).toContain('grid-cols-3')
+    expect(PREVIEW).not.toContain('grid-cols-4')
+    // 失敗は実LIFFの LoadErrorView と同じ題＋本文（★V7）。
+    expect(PREVIEW).toContain('読み込めませんでした')
+    expect(PREVIEW).toContain('電波の良いところで、もう一度お試しください。')
+    expect(PREVIEW).not.toContain('時間をおいて、もう一度お試しください。')
     expect(PAGE).not.toContain('ご希望の日をえらんでください')
     expect(PAGE).not.toContain('grid-cols-7')
     expect(PREVIEW).not.toContain('ご希望の日をえらんでください')
