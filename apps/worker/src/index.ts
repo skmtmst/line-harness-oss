@@ -1311,6 +1311,21 @@ async function runFrequentHeavyJobs(
   const defaultLineClient = new LineClient(env.LINE_CHANNEL_ACCESS_TOKEN);
   const jobs: ScheduledJob[] = [
     {
+      // EC の再試行（上限つき）の回収。落ちた受信を保存済み payload から
+      // 同じ入口で回し直す。上限到達は dead letter へ倒す。安定キーと
+      // claim で二重実行なし。停止中は回さない。
+      name: 'ec event retry',
+      run: async () => {
+        const { processDueEcRetries } = await import('./services/ec-retry.js');
+        const result = await processDueEcRetries(env.DB, {
+          now: new Date(event.scheduledTime).toISOString(),
+        });
+        if (result.processed + result.failed > 0) {
+          console.log(JSON.stringify({ event: 'ec_event_retry', ...result }));
+        }
+      },
+    },
+    {
       // 取消時の Calendar 削除の残り (retry_wait) を自動回収する。
       // 初回 200 の後に残っても次の tick で直る。安定キーで二重実行なし。
       name: 'booking calendar delete retry',

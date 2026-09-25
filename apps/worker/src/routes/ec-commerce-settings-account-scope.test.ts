@@ -98,7 +98,9 @@ describe('EC通知設定のアカウント境界', () => {
   });
 
   it('実配信も受信したLINEアカウントの設定を優先して読む', () => {
-    const source = readFileSync(new URL('./ec-integrations.ts', import.meta.url), 'utf8');
+    // 実配信の処理本体は services/ec-event-processing.ts へ切り出してある
+    //（受付口と再試行で共用）。読む設定の向きは変えていない。
+    const source = readFileSync(new URL('../services/ec-event-processing.ts', import.meta.url), 'utf8');
     expect(source).toContain('a.line_account_id = ?');
     expect(source).toContain('.bind(lineAccountId, event.event_type)');
     expect(source).toContain('COALESCE(a.is_enabled, s.is_enabled)');

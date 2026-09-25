@@ -223,6 +223,20 @@ type ActionRow = {
   updated_at: string;
 };
 
+/**
+ * 再試行の待ち時間（秒）。失敗回数が増えるほど待つが、上限で頭打ちにし、
+ * ±10% のぶれを付けて同時刻の再試行が束にならないようにする。
+ */
+export function ecRetryDelaySeconds(attempt: number): number {
+  const capped = Math.min(300 * 2 ** Math.max(0, attempt - 1), 7200);
+  const jitter = 0.9 + Math.random() * 0.2;
+  return Math.max(60, Math.round(capped * jitter));
+}
+
+export function ecRetryAt(nowIso: string, attempt: number): string {
+  return new Date(new Date(nowIso).getTime() + ecRetryDelaySeconds(attempt) * 1000).toISOString();
+}
+
 export async function setEcActionExecutionStatus(
   db: D1Database,
   input: {
@@ -239,33 +253,63 @@ export async function setEcActionExecutionStatus(
   ).bind(input.eventId, input.lineAccountId).first<ActionRow>();
   if (!current) return;
   const now = input.now ?? new Date().toISOString();
-  const attemptNumber = Math.max(1, Number(current.attempt_count) || 0);
-  const firstAttempt = Number(current.attempt_count) === 0;
-  const requestedStatus = input.status === 'retryable_failed'
-    && attemptNumber >= Number(current.max_attempts)
+  // 失敗の報告は試行回数に数える。上限に達したら dead letter
+  //（permanent_failed）へ倒し、それ以上は再試行しない。
+  const failedReport = input.status === 'retryable_failed';
+  const nextAttempt = failedReport ? Number(current.attempt_count || 0) + 1 : Number(current.attempt_count) || 0;
+  const requestedStatus = failedReport && nextAttempt >= Number(current.max_attempts)
     ? 'permanent_failed'
     : input.status;
+  const nextRetryAt = requestedStatus === 'retryable_failed' ? ecRetryAt(now, nextAttempt) : null;
   const update = db.prepare(
     `UPDATE ec_action_executions
-        SET status = ?, attempt_count = CASE WHEN attempt_count = 0 THEN 1 ELSE attempt_count END,
-            error_code = ?, error_message_safe = ?, last_attempted_at = ?, next_retry_at = NULL,
+        SET status = ?, attempt_count = ?,
+            error_code = ?, error_message_safe = ?, last_attempted_at = ?, next_retry_at = ?,
             version = version + 1, updated_at = ?
       WHERE id = ? AND line_account_id = ? AND version = ?`,
   ).bind(
-    requestedStatus, input.errorCode ?? null, input.errorMessageSafe ?? null,
-    now, now, current.id, input.lineAccountId, current.version,
+    requestedStatus, nextAttempt, input.errorCode ?? null, input.errorMessageSafe ?? null,
+    now, nextRetryAt, now, current.id, input.lineAccountId, current.version,
   );
-  if (firstAttempt) {
+  if (failedReport) {
+    // 失敗のたびに試行の行を1行足す（監査のため閉じた行で残す）。
     await db.batch([
       update,
       db.prepare(
         `INSERT OR IGNORE INTO ec_action_execution_attempts
            (id, action_execution_id, attempt_number, trigger_kind, from_status, to_status,
             requested_by, idempotency_key, request_fingerprint, error_code, error_message_safe, created_at)
+         VALUES (?, ?, ?, 'automatic', ?, ?, NULL, ?, ?, ?, ?, ?)`,
+      ).bind(
+        crypto.randomUUID(), current.id, nextAttempt, current.status, requestedStatus,
+        `automatic:${current.id}:${nextAttempt}`, `automatic:${current.id}:${nextAttempt}`,
+        input.errorCode ?? null, input.errorMessageSafe ?? null, now,
+      ),
+    ]);
+    return;
+  }
+  if (Number(current.attempt_count) === 0) {
+    // 初回報告の記録も残す（成功・スキップのまま終わった試行を見せるため）。
+    await db.batch([
+      db.prepare(
+        `UPDATE ec_action_executions
+            SET status = ?, attempt_count = 1,
+                error_code = ?, error_message_safe = ?, last_attempted_at = ?, next_retry_at = NULL,
+                version = version + 1, updated_at = ?
+          WHERE id = ? AND line_account_id = ? AND version = ?`,
+      ).bind(
+        requestedStatus, input.errorCode ?? null, input.errorMessageSafe ?? null,
+        now, now, current.id, input.lineAccountId, current.version,
+      ),
+      db.prepare(
+        `INSERT OR IGNORE INTO ec_action_execution_attempts
+           (id, action_execution_id, attempt_number, trigger_kind, from_status, to_status,
+            requested_by, idempotency_key, request_fingerprint, error_code, error_message_safe, created_at)
          VALUES (?, ?, 1, 'automatic', 'pending', ?, NULL, ?, ?, ?, ?, ?)`,
       ).bind(
-        crypto.randomUUID(), current.id, requestedStatus, `automatic:${current.id}:1`,
-        `automatic:${current.id}:1`, input.errorCode ?? null, input.errorMessageSafe ?? null, now,
+        crypto.randomUUID(), current.id, requestedStatus,
+        `automatic:${current.id}:1`, `automatic:${current.id}:1`,
+        input.errorCode ?? null, input.errorMessageSafe ?? null, now,
       ),
     ]);
     return;
@@ -278,7 +322,7 @@ export async function setEcActionExecutionStatus(
         WHERE action_execution_id = ? AND attempt_number = ?`,
     ).bind(
       requestedStatus, input.errorCode ?? null, input.errorMessageSafe ?? null,
-      current.id, attemptNumber,
+      current.id, Math.max(1, nextAttempt),
     ),
   ]);
 }
