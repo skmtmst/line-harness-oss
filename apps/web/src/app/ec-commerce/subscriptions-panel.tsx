@@ -102,9 +102,9 @@ export default function SubscriptionsPanel({ accountId }: { accountId: string | 
     <>
       <div className={styles.kpis}>
         <SummaryCard variant="v6" title="続いている定期便" value={summary?.active ?? null} unit="件" detail={summary?.monthlyAmount === null ? '今月の金額は未取得' : `今月 ¥${summary?.monthlyAmount.toLocaleString('ja-JP')}`} />
-        <SummaryCard variant="v6" title="今月 はじまった" value={summary?.startedThisMonth ?? null} unit="件" detail="定期便の開始日から集計" badge={summary?.startedThisMonth === null ? '未取得' : undefined} badgeTone="neutral" />
+        <SummaryCard variant="v6" title="今月 はじまった" value={summary?.startedThisMonth ?? null} unit="件" detail="" help="定期便の開始日から集計しています" badge={summary?.startedThisMonth === null ? '未取得' : undefined} badgeTone="neutral" />
         <SummaryCard variant="v6" title="今月 止まった" value={summary?.cancelledThisMonth ?? null} unit="件" detail={summary?.cancellationTopReason ? `多い理由「${summary.cancellationTopReason}」` : '解約理由の記録なし'} badge={summary?.cancelledThisMonth === null ? '未取得' : undefined} badgeTone="neutral" />
-        <SummaryCard variant="v6" title="支払いを確認" value={summary?.atRisk ?? null} unit="人" detail="ECの決済状態から確認" />
+        <SummaryCard variant="v6" title="支払いを確認" value={summary?.atRisk ?? null} unit="人" detail="" help="ECの決済状態から確認する人数です" />
       </div>
       {/*
        * IDEA-21: 「次の発送」はECの定期便に登録された確定の予定日。推定ではない。
