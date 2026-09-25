@@ -5148,6 +5148,42 @@ export type MediaUploadCompletion = {
   targetMediaId?: string | null
 }
 
+export type FileScanStatus = 'pending' | 'clean' | 'rejected' | 'quarantined'
+
+export type FileScanItem = {
+  id: string
+  lineAccountId: string | null
+  subjectKind: string
+  subjectId: string
+  mediaId: string | null
+  filename: string
+  mimeType: string
+  sizeBytes: number
+  status: FileScanStatus
+  reasonCode: string | null
+  reasonLabel: string | null
+  /** 一覧の時だけ付く。上げた人の表示。 */
+  uploaderLabel?: string | null
+  attempts: number
+  nextRetryAt: string | null
+  scannedAt: string | null
+  quarantinedAt: string | null
+  releasedAt: string | null
+  releaseReason: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type FileScanConfig = {
+  externalProvider: string | null
+  externalEndpointUrl: string | null
+  externalSecretRef: string | null
+  externalTimeoutMs: number
+  maxBytesOverride: number | null
+  maxPixelsOverride: number | null
+  updatedAt: string
+}
+
 export type MediaVersionMetadata = {
   width: number | null
   height: number | null
@@ -6887,6 +6923,62 @@ export const api = {
      */
     contentUrl: (id: string, accountId: string) =>
       `${API_URL}/api/media/${encodeURIComponent(id)}/content?accountId=${encodeURIComponent(accountId)}`,
+  },
+  /** 危険なファイルの検査。確かめ終わるまで中身は出さない。 */
+  fileScan: {
+    list: (accountId: string, params?: { status?: string; limit?: number; offset?: number }) => {
+      const q = new URLSearchParams()
+      q.set('accountId', accountId)
+      if (params?.status) q.set('status', params.status)
+      if (params?.limit) q.set('limit', String(params.limit))
+      if (params?.offset) q.set('offset', String(params.offset))
+      return fetchApi<ApiResponse<{ items: FileScanItem[]; total: number; limit: number; offset: number }>>(
+        `/api/file-scans?${q.toString()}`,
+      )
+    },
+    bySubject: (kind: string, id: string, accountId: string) =>
+      fetchApi<ApiResponse<{ scan: FileScanItem | null }>>(
+        `/api/file-scans/by-subject?kind=${encodeURIComponent(kind)}&id=${encodeURIComponent(id)}&accountId=${encodeURIComponent(accountId)}`,
+      ),
+    forMedia: (mediaId: string, accountId: string) =>
+      fetchApi<ApiResponse<{ scan: FileScanItem | null }>>(
+        `/api/file-scans/for-media?mediaId=${encodeURIComponent(mediaId)}&accountId=${encodeURIComponent(accountId)}`,
+      ),
+    health: (accountId: string) =>
+      fetchApi<ApiResponse<{ stopped: boolean; pendingCount: number; oldestPendingAt: string | null }>>(
+        `/api/file-scans/health?accountId=${encodeURIComponent(accountId)}`,
+      ),
+    retry: (id: string, accountId: string) =>
+      fetchApi<ApiResponse<{ id: string; status: string }>>(
+        `/api/file-scans/${encodeURIComponent(id)}/retry`,
+        { method: 'POST', body: JSON.stringify({ accountId }) },
+      ),
+    release: (id: string, accountId: string, reason: string) =>
+      fetchApi<ApiResponse<{ id: string; status: string }>>(
+        `/api/file-scans/${encodeURIComponent(id)}/release`,
+        { method: 'POST', body: JSON.stringify({ accountId, reason }) },
+      ),
+    remove: (id: string, accountId: string) =>
+      fetchApi<ApiResponse<{ id: string }>>(
+        `/api/file-scans/${encodeURIComponent(id)}?accountId=${encodeURIComponent(accountId)}`,
+        { method: 'DELETE' },
+      ),
+    getConfig: (accountId: string) =>
+      fetchApi<ApiResponse<{ config: FileScanConfig | null }>>(
+        `/api/file-scans/config?accountId=${encodeURIComponent(accountId)}`,
+      ),
+    saveConfig: (accountId: string, data: {
+      externalProvider?: string | null
+      externalEndpointUrl?: string | null
+      externalSecretRef?: string | null
+      externalTimeoutMs?: number
+      maxBytesOverride?: number | null
+      maxPixelsOverride?: number | null
+    }) =>
+      fetchApi<ApiResponse<{ lineAccountId: string }>>(
+        '/api/file-scans/config',
+        { method: 'PUT', body: JSON.stringify({ accountId, ...data }) },
+      ),
   },
   /** 共通情報。営業時間などを1か所で直す。 */
   commonVars: {

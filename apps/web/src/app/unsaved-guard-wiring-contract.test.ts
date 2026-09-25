@@ -40,6 +40,7 @@ const GUARDED = [
   'app/rich-menus/edit/page.tsx',
   'app/rich-menus/new/page.tsx',
   'app/settings/page.tsx',
+  'app/settings/file-scan/page.tsx',
   'app/tags/fields/new/page.tsx',
   'app/tags/searches/edit/page.tsx',
   'app/webinars/edit/page.tsx',
