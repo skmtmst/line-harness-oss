@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import OpsDashboardPage from './page'
 import { contractDetail, deltaLabel, minutesLabel, revenueDetail, revenueSourceLabel } from './format'
-import { formatBytes, formatYenShort, niceCeiling } from '@/components/ops/ops-charts'
+import { formatBytes, formatYen, formatYenShort, niceCeiling } from '@/components/ops/ops-charts'
 
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a> }))
 
@@ -70,6 +70,11 @@ describe('表記の決まり', () => {
     expect(minutesLabel(84)).toBe('1時間24分')
     expect(formatYenShort(4_500_000)).toBe('¥450万')
     expect(formatYenShort(0)).toBe('¥0')
+    // 数字でない値が来ても「¥NaN」を出さず「—」にする（金額は formatYen の1か所で守る）。
+    expect(formatYen(398_000)).toBe('¥398,000')
+    expect(formatYen(Number.NaN)).toBe('—')
+    expect(formatYen(undefined as unknown as number)).toBe('—')
+    expect(formatYenShort(Number.NaN)).toBe('—')
     expect(niceCeiling(3_980_000)).toBe(4_000_000)
     expect(niceCeiling(0)).toBe(100_000)
     expect(formatBytes(1.8 * 1024 ** 3)).toBe('1.8GB')

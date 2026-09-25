@@ -141,7 +141,7 @@ function OpsTenantDetailContent() {
         <div className="grid gap-4 lg:grid-cols-2">
           <Card>
             <CardHeader title="契約先の情報" />
-            <dl className="flex flex-col gap-3">
+            <dl className="flex flex-col gap-3 px-4 pb-4">
               <Kv k="統括名" v={tenant.name} />
               <Kv k="登録日" v={formatDate(tenant.created_at)} />
               <Kv k="店舗数" v={String(accounts.filter((a) => !a.archived_at).length)} />
@@ -152,7 +152,7 @@ function OpsTenantDetailContent() {
           </Card>
           <Card>
             <CardHeader title="契約の状況" />
-            <dl className="flex flex-col gap-3">
+            <dl className="flex flex-col gap-3 px-4 pb-4">
               <Kv k="プラン" v={planLabel(tenant.plan_key)} />
               <Kv k="状態" v={PLAN_STATUS_LABEL[tenant.plan_status] ?? tenant.plan_status} />
               <Kv k="次回の請求日" v={formatDate(tenant.current_period_ends_at)} />
