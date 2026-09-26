@@ -218,17 +218,6 @@
 .arp-evaluationList strong { color: var(--color-success); }
 .arp-evaluationList small { grid-column: 1 / -1; color: var(--color-ink-faint); }
 
-.arp-linePreview { min-height: 356px; border-radius: var(--radius-card); background: var(--color-line-preview); padding: 18px; }
-[data-design-node='U9hzqH'] .arp-linePreview { min-height: 322px; }
-.arp-confirmPreview { min-height: 410px; }
-.arp-donePreview { min-height: 280px; }
-.arp-linePreview > strong,
-.arp-linePreview > span { display: block; color: var(--color-on-accent); text-align: center; }
-.arp-linePreview > strong { font-size: var(--text-label); }
-.arp-linePreview > span { width: fit-content; margin: 14px auto 0; border-radius: var(--radius-pill); background: var(--color-line-preview-label); padding: 5px 12px; font-size: 10px; font-weight: 700; }
-.arp-linePreview > div { margin-top: 18px; border-radius: var(--radius-panel); background: var(--color-canvas); padding: 14px; font-size: var(--text-caption); font-weight: 650; line-height: 1.65; }
-.arp-linePreview > div p { white-space: pre-wrap; }
-.arp-linePreview > div span { display: block; margin-top: 10px; border-radius: var(--radius-control); background: var(--color-accent-deep); padding: 9px 12px; color: var(--color-on-accent); text-align: center; }
 .arp-previewActions { justify-content: flex-start; }
 .arp-previewActions svg,
 .arp-doneActions svg,

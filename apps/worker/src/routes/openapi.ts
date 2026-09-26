@@ -1786,7 +1786,7 @@ const spec = {
     '/api/chats/{id}/send-combined': {
       post: {
         tags: ['Chats'],
-        summary: '画像と本文を1回で送信',
+        summary: '画像と本文（複数可）を1回で送信',
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
         requestBody: {
           required: true,
@@ -1803,6 +1803,11 @@ const spec = {
                     },
                   },
                   text: { type: 'string' },
+                  texts: {
+                    type: 'array',
+                    items: { type: 'string' },
+                    description: 'パック送信の本文（挿入順）。text と合わせて画像含め最大5通',
+                  },
                   revision: { type: 'integer' },
                   quotedMessageId: { type: 'string' },
                 },
@@ -2878,6 +2883,118 @@ const spec = {
           '401': { description: 'Invalid signature' },
           '404': { description: 'Unknown coupon code' },
           '503': { description: 'Integration not configured' },
+        },
+      },
+    },
+    '/api/integrations/google-sheets/connection': {
+      get: {
+        tags: ['External integrations'],
+        summary: 'Google Sheets連携の接続状態（接続中・要再接続・未接続）と直近の同期状況',
+        parameters: [
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'Connection status' },
+          '403': { description: 'owner/admin required' },
+          '404': { description: 'Account not in scope' },
+        },
+      },
+    },
+    '/api/integrations/google-sheets/runs': {
+      get: {
+        tags: ['External integrations'],
+        summary: 'Google Sheets同期の直近10件（手動・定期・結果・書き込み行数）',
+        parameters: [
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'Recent sync runs' },
+          '403': { description: 'owner/admin required' },
+          '404': { description: 'Account not in scope' },
+        },
+      },
+    },
+    '/api/integrations/google-sheets/connect/start': {
+      post: {
+        tags: ['External integrations'],
+        summary: 'Google Sheets連携の認可を開始（state発行＋Google認可URLを返す）',
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object',
+          required: ['accountId'],
+          properties: { accountId: { type: 'string' } },
+        } } } },
+        responses: {
+          '200': { description: 'Authorize URL issued' },
+          '403': { description: '統括の管理者権限が必要' },
+          '404': { description: 'Account not in scope' },
+          '503': { description: 'OAuth client not configured' },
+        },
+      },
+    },
+    '/api/integrations/google-sheets/oauth/callback': {
+      get: {
+        tags: ['External integrations'],
+        summary: 'Google認可の戻り口。stateを検証してトークンを暗号化保存し、管理画面へ戻す',
+        parameters: [
+          { name: 'state', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'code', in: 'query', required: false, schema: { type: 'string' } },
+        ],
+        responses: {
+          '302': { description: '成功・失敗どちらも結果クエリ付きで管理画面へ302で戻す' },
+          '403': { description: '統括の管理者権限が必要' },
+          // 契約上2xxまたはdefaultが要るため明記。実際は常に302で、本体のJSON応答は無い。
+          'default': { description: '302リダイレクトのみ返す' },
+        },
+      },
+    },
+    '/api/integrations/google-sheets/disconnect': {
+      post: {
+        tags: ['External integrations'],
+        summary: 'Google Sheets連携を解除（Google側revoke＋連携行の削除）',
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object',
+          required: ['accountId', 'confirmed'],
+          properties: { accountId: { type: 'string' }, confirmed: { type: 'boolean' } },
+        } } } },
+        responses: {
+          '200': { description: 'Disconnected' },
+          '400': { description: 'Confirmation required' },
+          '403': { description: '統括の管理者権限が必要' },
+          '409': { description: 'Not connected' },
+        },
+      },
+    },
+    '/api/integrations/google-sheets/target': {
+      put: {
+        tags: ['External integrations'],
+        summary: '書き出し先スプレッドシートを設定（URLまたはID。保存前にアクセス可否を検証）',
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object',
+          required: ['accountId', 'spreadsheet'],
+          properties: { accountId: { type: 'string' }, spreadsheet: { type: 'string' } },
+        } } } },
+        responses: {
+          '200': { description: 'Target saved' },
+          '400': { description: 'Invalid spreadsheet URL/ID' },
+          '403': { description: '統括の管理者権限が必要' },
+          '404': { description: 'Spreadsheet not found' },
+          '409': { description: 'Not connected or permission denied' },
+        },
+      },
+    },
+    '/api/integrations/google-sheets/sync': {
+      post: {
+        tags: ['External integrations'],
+        summary: 'Google Sheetsへ今すぐ同期（全データ種別・増分upsert）',
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object',
+          required: ['accountId'],
+          properties: { accountId: { type: 'string' } },
+        } } } },
+        responses: {
+          '200': { description: 'Sync result per data type' },
+          '403': { description: '統括の管理者権限が必要' },
+          '409': { description: 'Not connected / auth expired' },
         },
       },
     },

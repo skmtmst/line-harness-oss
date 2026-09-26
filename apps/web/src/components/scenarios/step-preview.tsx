@@ -12,6 +12,7 @@
  */
 
 import { Clock } from 'lucide-react'
+import LinePreview from '@/components/shared/line-preview'
 import styles from './step-preview.module.css'
 import type { DeliveryMode } from '@line-crm/shared'
 import type { ScenarioQuestion } from './question-editor'
@@ -202,15 +203,11 @@ export default function StepPreview({
       aria-label="1通目の下見"
       className={`${styles.preview} border-hairline bg-canvas border p-4`}
     >
-      <section className="bg-line-preview -mx-4 -mt-4 mb-4 min-h-75 rounded-t-card p-4">
-        <h3 className="text-on-accent text-center text-sm font-bold">LINEプレビュー</h3>
-        <p className="mt-3 flex justify-center">
-          <span className="bg-line-preview-label text-on-accent rounded-pill inline-flex items-center gap-1 px-2.5 py-1 text-micro font-semibold">
-            <Clock aria-hidden size={13} strokeWidth={1.75} />
-            {words}に届きます（1通目）
-          </span>
-        </p>
-        <div className="mt-4">
+      {/* LINEの見た目の枠は共通部品 `LinePreview`（B-6）。届く日時は見える札のまま残す。 */}
+      <div className="-mx-4 -mt-4 mb-4">
+        <LinePreview
+          caption={<span className="inline-flex items-center gap-1"><Clock aria-hidden size={13} strokeWidth={1.75} />{words}に届きます（1通目）</span>}
+        >
           {templateName ? (
             <Bubble>
               <span className="text-ink-faint text-micro">テンプレート</span>
@@ -221,8 +218,8 @@ export default function StepPreview({
           ) : (
             <Placeholder>本文を書くと、ここに出ます</Placeholder>
           )}
-        </div>
-      </section>
+        </LinePreview>
+      </div>
 
       <h3 className="text-ink text-sm font-bold">配信の流れ</h3>
       <p className="text-ink-faint mt-0.5 text-micro leading-relaxed">
