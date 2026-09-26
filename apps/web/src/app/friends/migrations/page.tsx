@@ -8,6 +8,7 @@ import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import Disclosure from '@/components/shared/disclosure'
 import FileDropzone, { AttachmentRow } from '@/components/shared/file-drop'
+import HelpTip from '@/components/shared/help-tip'
 import ListState from '@/components/shared/list-state'
 import PageHeader from '@/components/shared/page-header'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -169,13 +170,13 @@ export default function FriendMigrationsPage() {
           </div>
         ) : null}
         <div className="mt-4 flex items-center gap-3"><Button variant="primary" disabled={busy} onClick={() => void previewImport()}>まず確認だけする</Button><span className="text-ink-faint text-xs">確認の結果を見てから反映</span></div>
-        {summary && <><h3 className="text-ink mt-5 text-sm font-bold">確認の結果</h3><div className="mt-2 grid grid-cols-5 gap-2"><SummaryCard variant="v6" title="追加" value={summary.add} unit="件" detail="新しく登録" /><SummaryCard variant="v6" title="更新" value={summary.update} unit="件" detail="値を変更" /><SummaryCard variant="v6" title="変更なし" value={summary.unchanged} unit="件" detail="同じ内容" /><SummaryCard variant="v6" title="競合" value={summary.conflict} unit="件" detail="判断が必要" /><SummaryCard variant="v6" title="エラー" value={summary.error} unit="件" detail="直して再確認" /></div>{importId && <div className="mt-4"><Button disabled={summary.conflict + summary.error > 0 || busy} onClick={async () => { setBusy(true); const response = await api.friendMigrations.executeImport(importId); setMessage(response.success ? `${response.data.applied ?? 0}件を反映しました。` : response.error); setBusy(false); await load() }}>確認した内容を反映</Button></div>}</>}
+        {summary && <><h3 className="text-ink mt-5 text-sm font-bold">確認の結果</h3><div className="mt-2 grid grid-cols-5 gap-2"><SummaryCard variant="v6" title="追加" value={summary.add} unit="件" detail="" help="新しく登録する件数です" /><SummaryCard variant="v6" title="更新" value={summary.update} unit="件" detail="" help="値を変更する件数です" /><SummaryCard variant="v6" title="変更なし" value={summary.unchanged} unit="件" detail="" help="同じ内容の件数です" /><SummaryCard variant="v6" title="競合" value={summary.conflict} unit="件" detail="判断が必要" /><SummaryCard variant="v6" title="エラー" value={summary.error} unit="件" detail="直して再確認" /></div>{importId && <div className="mt-4"><Button disabled={summary.conflict + summary.error > 0 || busy} onClick={async () => { setBusy(true); const response = await api.friendMigrations.executeImport(importId); setMessage(response.success ? `${response.data.applied ?? 0}件を反映しました。` : response.error); setBusy(false); await load() }}>確認した内容を反映</Button></div>}</>}
         <p className="text-ink-faint mt-4 text-xs leading-relaxed">LINEのユーザーIDとLINEアカウントは、既存行の取り込みでは変わりません。同じファイルをもう一度入れても二重には反映しません。</p>
       </section>
     </div>
     {message && <p role="status" className="bg-action-soft text-action mt-4 rounded-control px-4 py-3 text-sm">{message}</p>}
 
-    <section className="bg-canvas rounded-card border-hairline mt-4 overflow-hidden border"><div className="border-hairline border-b px-4 py-3"><h2 className="text-ink text-sm font-bold">書き出し・取り込みの履歴</h2></div>{jobs.length === 0 ? <ListState kind="empty" title="履歴はまだありません" description="書き出しまたは取り込みを実行すると、ここに残ります。" /> : <table className="w-full"><thead><TableHeadRow>{/*
+<section className="bg-canvas rounded-card border-hairline mt-4 overflow-hidden border"><div className="border-hairline border-b px-4 py-3"><h2 className="text-ink flex items-center gap-1 text-sm font-bold">書き出し・取り込みの履歴<HelpTip label="状態の札の意味">反映ずみは反映が終わったもの、確認までは確認待ち、期限切れは確認の期限が過ぎたものです。</HelpTip></h2></div>{jobs.length === 0 ? <ListState kind="empty" title="履歴はまだありません" description="書き出しまたは取り込みを実行すると、ここに残ります。" /> : <table className="w-full"><thead><TableHeadRow>{/*
                   表の外側の余白は左右で同じにする。状態の札は中身の幅で固定し、
                   残りは本文の列で吸収する。
                 */}<Th className="pl-5">日時</Th><Th>種類</Th><Th>対象</Th><Th>件数</Th><Th>実行した人</Th><Th className="w-28 pr-5">状態</Th></TableHeadRow></thead><tbody>{jobs.map((job) => <tr key={`${job.kind}-${job.id}`} className="border-hairline border-t"><td className="py-3 pr-4 pl-5 text-sm">{new Date(job.created_at).toLocaleString('ja-JP')}</td><td className="px-4 py-3 text-sm">{job.kind === 'export' ? '書き出し' : '取り込み'}</td><td className="px-4 py-3 text-sm">{accounts.find((account) => account.id === job.line_account_id)?.name ?? '—'}</td><td className="px-4 py-3 text-sm">{job.row_count ?? job.total_count ?? '—'}件</td><td className="px-4 py-3 text-sm">{job.created_by_name}</td><td className="py-3 pr-5 pl-4"><StatusBadge tone={job.status === 'completed' ? 'success' : 'neutral'}>{JOB_STATUS_LABELS[job.status] ?? '確認中'}</StatusBadge>{/*

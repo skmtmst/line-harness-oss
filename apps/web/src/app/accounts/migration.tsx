@@ -759,7 +759,7 @@ function ActiveMigration({
   const statusView = runStatusView(active, unresolved)
   return (<>
     <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
-      <SummaryCard variant="v6" title="読み込み" value={active.counts.total} unit="件" detail="対応表の全件" />
+      <SummaryCard variant="v6" title="読み込み" value={active.counts.total} unit="件" detail="" help="対応表の全件です" />
       <SummaryCard variant="v6" title="自動一致" value={active.counts.auto} unit="件" detail={active.counts.total ? `${Math.round(active.counts.auto / active.counts.total * 1000) / 10}%` : '0%'} />
       <SummaryCard variant="v6" title="要確認・競合" value={active.counts.review + active.counts.conflict} unit="件" detail="すべて判断が必要" />
       <SummaryCard variant="v6" title="未一致" value={active.counts.unmatched} unit="件" detail="除外（新規作成は取り込みで）" />

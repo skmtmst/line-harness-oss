@@ -102,16 +102,16 @@ export default function SubscriptionsPanel({ accountId }: { accountId: string | 
     <>
       <div className={styles.kpis}>
         <SummaryCard variant="v6" title="続いている定期便" value={summary?.active ?? null} unit="件" detail={summary?.monthlyAmount === null ? '今月の金額は未取得' : `今月 ¥${summary?.monthlyAmount.toLocaleString('ja-JP')}`} />
-        <SummaryCard variant="v6" title="今月 はじまった" value={summary?.startedThisMonth ?? null} unit="件" detail="定期便の開始日から集計" badge={summary?.startedThisMonth === null ? '未取得' : undefined} badgeTone="neutral" />
+        <SummaryCard variant="v6" title="今月 はじまった" value={summary?.startedThisMonth ?? null} unit="件" detail="" help="定期便の開始日から集計しています" badge={summary?.startedThisMonth === null ? '未取得' : undefined} badgeTone="neutral" />
         <SummaryCard variant="v6" title="今月 止まった" value={summary?.cancelledThisMonth ?? null} unit="件" detail={summary?.cancellationTopReason ? `多い理由「${summary.cancellationTopReason}」` : '解約理由の記録なし'} badge={summary?.cancelledThisMonth === null ? '未取得' : undefined} badgeTone="neutral" />
-        <SummaryCard variant="v6" title="支払いを確認" value={summary?.atRisk ?? null} unit="人" detail="ECの決済状態から確認" />
+        <SummaryCard variant="v6" title="支払いを確認" value={summary?.atRisk ?? null} unit="人" detail="" help="ECの決済状態から確認する人数です" />
       </div>
       {/*
        * IDEA-21: 「次の発送」はECの定期便に登録された確定の予定日。推定ではない。
        * 購入後の案内（発送後の到着確認・口コミ・次の商品）はNEN配信が担う。
        * 定期便の変更・休止そのものはEC側（管理画面・お客様のマイページ）で行う。
        */}
-      <NoteBar>「支払いを確認」はECから届いた決済状態です。将来止めるかどうかを予測した数字ではありません。「次の発送」はECに登録された確定の予定日で、EC側で変わると次の同期で更新されます。購入後の案内は <Link href="/nen-campaigns" className="font-semibold underline">NEN配信</Link> で管理します。</NoteBar>
+      <NoteBar help="支払いを確認はECから届いた決済状態です" helpLabel="支払いを確認の意味">「支払いを確認」はECから届いた決済状態です。将来止めるかどうかを予測した数字ではありません。「次の発送」はECに登録された確定の予定日で、EC側で変わると次の同期で更新されます。購入後の案内は <Link href="/nen-campaigns" className="font-semibold underline">NEN配信</Link> で管理します。</NoteBar>
       {(summary?.monthlyStats ?? []).length > 0 ? <div className="my-4 rounded-card border border-hairline bg-canvas p-4"><p className="text-sm font-semibold text-ink">月別の定期便</p><div className="mt-3 grid gap-2 sm:grid-cols-3">{summary?.monthlyStats.slice(-6).map((item) => <div key={item.month} className="rounded-control bg-canvas-sunken px-3 py-2"><p className="text-xs text-ink-faint">{item.month}</p><p className="mt-1 text-sm font-semibold text-ink">{item.count.toLocaleString('ja-JP')}件</p><p className="text-xs text-ink-secondary">¥{item.amount.toLocaleString('ja-JP')}</p></div>)}</div></div> : null}
       <div className={styles.toolbar}>
         {/*
