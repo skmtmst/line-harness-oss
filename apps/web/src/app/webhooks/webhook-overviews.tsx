@@ -111,7 +111,7 @@ function OutgoingKpis({
   const listDetail = listFailed ? '読み込めませんでした' : listLoading ? '読み込んでいます' : `止めているもの ${paused}本`
 
   return (
-    <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4" data-design="KPIs">
+    <div className="grid grid-cols-2 gap-3 xl:grid-cols-4" data-design="KPIs">
       <SummaryCard
         title="こちらから送る"
         value={status === 'ready' ? items.length : null}
@@ -325,7 +325,7 @@ export function OutgoingOverview({
   }
 
   return (
-    <section aria-label="こちらから送る一覧">
+    <section aria-label="こちらから送る一覧" className="flex flex-col gap-4">
       <OutgoingKpis
         items={items}
         status={status}
@@ -334,12 +334,12 @@ export function OutgoingOverview({
         summaryStatus={summaryStatus}
       />
 
-      <p className="bg-info-bg text-ink-secondary rounded-card mb-3 px-4 py-3 text-xs leading-6">
+      <p className="bg-info-bg text-ink-secondary rounded-card px-4 py-3 text-xs leading-6">
         「こちらから送る」は、うちで起きたことを相手に知らせます。「こちらで受け取る」は、相手で起きたことをうちに取り込みます。受け取る側のURLは、相手のサービスに貼ってください。
       </p>
 
       {testNotice ? (
-        <div className="mb-3">
+        <div>
           <Notice tone={testNotice.tone} message={testNotice.message} onClose={() => setTestNotice(null)} />
         </div>
       ) : null}
@@ -385,17 +385,21 @@ export function OutgoingOverview({
           onRetry={onReload}
         />
       ) : items.length === 0 && !showCreate ? (
-        <ListState
-          kind="empty"
-          title="まだ連携がありません"
-          description="うちで起きたことを、ほかのサービスに知らせられます。右上の「送り先を追加」から作成してください。"
-        />
+        <div className="bg-canvas rounded-card border-hairline border">
+          <ListState
+            kind="empty"
+            title="まだ連携がありません"
+            description="うちで起きたことを、ほかのサービスに知らせられます。右上の「送り先を追加」から作成してください。"
+          />
+        </div>
       ) : visible.length === 0 ? (
-        <ListState
-          kind="empty"
-          title="当てはまる送り先がありません"
-          description="検索の言葉か、状態の絞り込みを変えてください。"
-        />
+        <div className="bg-canvas rounded-card border-hairline border">
+          <ListState
+            kind="empty"
+            title="当てはまる送り先がありません"
+            description="検索の言葉か、状態の絞り込みを変えてください。"
+          />
+        </div>
       ) : (
         <DataTable>
           <thead>
@@ -749,12 +753,12 @@ export function IncomingOverview({
   if (!selected) return null
 
   return (
-    <section aria-label="こちらで受け取る詳細">
-      <p className="bg-info-bg text-info rounded-card mb-4 px-4 py-3 text-sm leading-6">
+    <section aria-label="こちらで受け取る詳細" className="flex flex-col gap-4">
+      <p className="bg-info-bg text-info rounded-card px-4 py-3 text-sm leading-6">
         相手のサービスで起きたことを、うちに取り込みます。下のURLを相手に貼ってもらってください。合言葉は人に見せないでください。
       </p>
 
-      <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-4">
+      <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-4">
         <div className="space-y-4 xl:col-span-3">
           <section className="bg-canvas border-hairline rounded-card border p-5">
             <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
