@@ -419,7 +419,8 @@
     "466_template_versions.sql",
     "467_template_references.sql",
     "468_event_custom_questions.sql",
-    "469_manual_link_screens.sql"
+    "469_manual_link_screens.sql",
+    "470_google_sheets_integrations.sql"
   ],
-  "migrationCount": 420
+  "migrationCount": 421
 }

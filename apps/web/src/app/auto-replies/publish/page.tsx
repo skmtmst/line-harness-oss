@@ -29,6 +29,7 @@ import type {
   AutoReplyValidationResult,
 } from '@line-crm/shared'
 import Button from '@/components/shared/button'
+import LinePreview from '@/components/shared/line-preview'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import TargetMissing from '@/components/shared/target-missing'
@@ -159,26 +160,26 @@ function SummaryRows({ rows }: { rows: Array<{ label: string; value: string }> }
   )
 }
 
-function LinePreview({
+/*
+ * LINEの見た目の枠は共通部品 `LinePreview`（B-6）。
+ * `lead`（いつ・何番目が動くか）は動く情報なので、見える札のまま残す。
+ */
+function AutoReplyPreview({
   lead,
   message,
   actionLabel = '予約を確認',
-  variant,
 }: {
   lead: string
   message: string
   actionLabel?: string
-  variant?: 'confirm' | 'done'
 }) {
   return (
-    <section className={`arp-linePreview ${variant === 'confirm' ? 'arp-confirmPreview' : variant === 'done' ? 'arp-donePreview' : ''}`} aria-label="LINEプレビュー">
-      <strong>LINEプレビュー</strong>
-      <span>{lead}</span>
-      <div>
-        <p>{message}</p>
-        {actionLabel ? <span>{actionLabel}</span> : null}
+    <LinePreview caption={lead}>
+      <div className="rounded-card bg-canvas p-4 text-caption font-semibold leading-relaxed text-ink">
+        <p className="whitespace-pre-wrap">{message}</p>
+        {actionLabel ? <p className="bg-accent-deep text-on-accent rounded-control mt-3 px-3 py-2 text-center">{actionLabel}</p> : null}
       </div>
-    </section>
+    </LinePreview>
   )
 }
 
@@ -577,7 +578,7 @@ function AutoReplyPublishInner() {
                   ))}
                 </ul>
               </section>
-              <LinePreview lead="1番目のルールだけが実行されます" message={previewMessage} actionLabel="" />
+              <AutoReplyPreview lead="1番目のルールだけが実行されます" message={previewMessage} actionLabel="" />
             </aside>
           </div>
           <div className={"arp-stickyBar"}>
@@ -737,7 +738,7 @@ function AutoReplyPublishInner() {
                   { label: '実行される内容', value: actionLabel(testedActionTypes) },
                 ]} />
               </section>
-              <LinePreview lead="［テスト］受信から 3秒後に返信" message={previewMessage} actionLabel="空き枠を見る" />
+              <AutoReplyPreview lead="［テスト］受信から 3秒後に返信" message={previewMessage} actionLabel="空き枠を見る" />
               <div className={"arp-previewActions"}>
                 <Button onClick={() => setTestDialogOpen(true)}><Send aria-hidden="true" />テスト送信</Button>
                 <Button onClick={() => setTestDialogOpen(true)}><Eye aria-hidden="true" />応答イメージを見る</Button>
@@ -807,7 +808,7 @@ function AutoReplyPublishInner() {
             </div>
 
             <aside className={"arp-sideColumn"}>
-              <LinePreview variant="confirm" lead={`${conditionLabel(draft)}メッセージが届いたら、すぐに返します`} message={previewMessage} />
+              <AutoReplyPreview lead={`${conditionLabel(draft)}メッセージが届いたら、すぐに返します`} message={previewMessage} />
               <section className={"arp-panel"}>
                 <PanelHeading title="有効化する内容" />
                 <SummaryRows rows={[
@@ -917,7 +918,7 @@ function AutoReplyPublishInner() {
                   ))}
                 </ul>
               </section>
-              <LinePreview variant="done" lead={`「${testMessage}」を受信したらすぐ返します`} message={previewMessage} actionLabel="空き枠を見る" />
+              <AutoReplyPreview lead={`「${testMessage}」を受信したらすぐ返します`} message={previewMessage} actionLabel="空き枠を見る" />
             </aside>
           </div>
           <div className={"arp-stickyBar"} aria-hidden="true"><div /></div>

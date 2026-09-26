@@ -2874,6 +2874,55 @@ CREATE TABLE google_calendar_connections (
   updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
+CREATE TABLE google_sheets_integrations (
+  id TEXT PRIMARY KEY,
+  line_account_id TEXT NOT NULL UNIQUE REFERENCES line_accounts(id) ON DELETE CASCADE,
+  tenant_id TEXT,
+  google_account_email TEXT,
+  refresh_token_enc TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending_target'
+    CHECK (status IN ('pending_target', 'connected', 'expired')),
+  spreadsheet_id TEXT,
+  spreadsheet_title TEXT,
+  -- データ種別ごとの再開点。{"friends": {"after": "...", "lastId": "..."}} の形。
+  -- 途中で止まった同期が前回の続きから書き直すためのもの。
+  sync_cursor_json TEXT NOT NULL DEFAULT '{}',
+  last_synced_at TEXT,
+  last_sync_status TEXT
+    CHECK (last_sync_status IN ('ok', 'partial', 'error') OR last_sync_status IS NULL),
+  last_sync_error TEXT,
+  consecutive_failures INTEGER NOT NULL DEFAULT 0,
+  connected_by_staff_id TEXT,
+  connected_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE google_sheets_oauth_states (
+  state TEXT PRIMARY KEY,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  staff_id TEXT NOT NULL,
+  mode TEXT NOT NULL CHECK (mode IN ('connect', 'reconnect')),
+  code_verifier_enc TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  used_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE google_sheets_sync_runs (
+  id TEXT PRIMARY KEY,
+  integration_id TEXT NOT NULL REFERENCES google_sheets_integrations(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL CHECK (kind IN ('manual', 'scheduled')),
+  data_type TEXT NOT NULL CHECK (data_type IN ('friends', 'form_answers')),
+  status TEXT NOT NULL CHECK (status IN ('running', 'ok', 'partial', 'error')),
+  rows_written INTEGER NOT NULL DEFAULT 0 CHECK (rows_written >= 0),
+  cursor_json TEXT,
+  error TEXT,
+  started_at TEXT NOT NULL,
+  finished_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE hq_support_messages (
   id               TEXT PRIMARY KEY,
   request_id       TEXT NOT NULL REFERENCES hq_support_requests(id) ON DELETE CASCADE,
@@ -7435,6 +7484,16 @@ CREATE INDEX idx_funnels_line_account_created
 
 CREATE INDEX idx_google_calendar_connections_staff
   ON google_calendar_connections (line_account_id, staff_id, is_active);
+
+CREATE INDEX idx_google_sheets_oauth_states_expires
+  ON google_sheets_oauth_states(expires_at);
+
+CREATE INDEX idx_google_sheets_sync_runs_integration
+  ON google_sheets_sync_runs(integration_id, started_at DESC);
+
+CREATE INDEX idx_google_sheets_sync_runs_running
+  ON google_sheets_sync_runs(integration_id, status)
+  WHERE status = 'running';
 
 CREATE INDEX idx_handover_decisions_handover
   ON account_handover_decisions (handover_id);

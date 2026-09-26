@@ -99,7 +99,8 @@ describe('友だち追加時配信の公開画面', () => {
 
   it('設計の最終確認に必要な時刻・プレビュー・監視状態を表示する', () => {
     expect(PAGE).toContain('登録直後から5分以内')
-    expect(PAGE).toContain('LINEプレビュー')
+    // B-6: 題「LINEプレビュー」は共通部品が出す。画面側は使うだけ。
+    expect(PAGE).toContain('<LinePreview')
     expect(PAGE).toContain("ruleDetail?.staffNotification?.status === 'connected'")
     expect(PAGE).toContain('ruleDetail?.rule.definition.messageText')
   })

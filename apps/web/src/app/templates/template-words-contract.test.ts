@@ -71,7 +71,8 @@ describe('V6の作成画面', () => {
   it('本文のURLと差し込み後のLINE表示を確認できる', () => {
     expect(EDIT_PAGE).toContain('<MessageTemplateEditor')
     expect(MESSAGE_EDITOR).toContain('本文に入れたURLの扱い')
-    expect(MESSAGE_EDITOR).toContain('LINEプレビュー')
+    // B-6: 題「LINEプレビュー」は共通部品が出す。画面側は使うだけ。
+    expect(MESSAGE_EDITOR).toContain('<LinePreview')
     expect(MESSAGE_EDITOR).toContain("if (name === 'name') return '山田 太郎'")
     expect(MESSAGE_EDITOR).toContain('preview.unresolved.length > 0')
     expect(EDIT_PAGE).not.toContain('内容 / JSON')
@@ -81,7 +82,8 @@ describe('V6の作成画面', () => {
     expect(CAROUSEL_PAGE).toContain('const MAX_COLUMNS = 10')
     expect(CAROUSEL_PAGE).toContain('このパネルの選択肢（最大{MAX_ACTIONS}つ）')
     expect(CAROUSEL_PAGE).toContain('画像は横1024 × 縦678pxを推奨')
-    expect(CAROUSEL_PAGE).toContain('LINEプレビュー')
+    // B-6: 題「LINEプレビュー」は共通部品が出す。画面側は使うだけ。
+    expect(CAROUSEL_PAGE).toContain('<LinePreview')
   })
 
   it('リッチメッセージ・クーポン・リサーチを保存APIへ接続する', () => {
