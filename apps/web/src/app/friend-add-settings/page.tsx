@@ -303,7 +303,7 @@ function FriendAddSettingsList() {
             appliedSearch.trim() || folder ? (
               <ListState kind="empty" title="条件に合う設定はありません" description="検索やフォルダの絞り込みを変えてください。" />
             ) : (
-              <ListState kind="empty" title="友だち追加時の配信がまだありません" description="最初の案内を作ると、ここに表示されます。" action={<Button href="/friend-add-settings?view=new" variant="primary">友だち追加時配信を作る</Button>} />
+              <ListState kind="empty" title="友だち追加時の配信がまだありません" description="最初の案内を作ると、ここに表示されます。" action={<Button href="/friend-add-settings?view=new" variant="primary">＋ 友だち追加時配信を作る</Button>} />
             )
           ) : (
             <>

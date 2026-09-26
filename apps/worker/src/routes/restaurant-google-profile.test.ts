@@ -304,11 +304,30 @@ describe('Googleビジネス：変更の送信（GB-12 / GB-15）', () => {
     expect(patch).toHaveLength(1);
     expect(patch[0].url).toContain('updateMask=specialHours');
     const body = JSON.parse(String(patch[0].init?.body)) as { specialHours: { specialHourPeriods: Array<{ startDate: { day: number }; closed?: boolean }> } };
-    expect(body.specialHours.specialHourPeriods.map((x) => x.startDate.day)).toEqual([23, 1]);
+    expect(body.specialHours.specialHourPeriods.map((x) => x.startDate.day).sort((a, b) => a - b)).toEqual([1, 23]);
     expect(body.specialHours.specialHourPeriods.every((x) => x.closed)).toBe(true);
     const audit = logSpy.mock.calls.map((args) => String(args[0])).filter((line) => line.includes('"tag":"audit"') && line.includes('restaurant.google.change.send'));
     expect(audit).toHaveLength(1);
     expect(audit[0]).not.toContain('access-secret');
+  });
+
+  it('送信では変更しない日の specialHours を Google の原文のまま送り返す（他の日が変わらない）', async () => {
+    location.specialHours = { specialHourPeriods: [
+      { startDate: { year: 2026, month: 10, day: 1 }, endDate: { year: 2026, month: 10, day: 1 }, closed: true },
+      { startDate: { year: 2026, month: 10, day: 5 }, openTime: { hours: 17 }, endDate: { year: 2026, month: 10, day: 6 }, closeTime: { hours: 0 }, extraField: 'keep-me' },
+    ] } as unknown as typeof location.specialHours;
+    const r = await propose({ source: 'calendar', days: [{ date: '2026-09-29', closed: false, periods: [{ open: '17:00', close: '00:00' }] }] });
+    expect(r.status).toBe(200);
+    const s = await send(r.json.change!.id);
+    expect(s.status).toBe(200);
+    const body = JSON.parse(String(patchCalls()[0].init?.body)) as { specialHours: { specialHourPeriods: Array<Record<string, unknown>> } };
+    const periods = body.specialHours.specialHourPeriods;
+    expect(periods).toHaveLength(3);
+    // 変更しない 10/1・10/5 は原文どおり（余分な項目も含めてそのまま）
+    expect(periods[0]).toEqual({ startDate: { year: 2026, month: 10, day: 1 }, endDate: { year: 2026, month: 10, day: 1 }, closed: true });
+    expect(periods[1]).toEqual({ startDate: { year: 2026, month: 10, day: 5 }, openTime: { hours: 17 }, endDate: { year: 2026, month: 10, day: 6 }, closeTime: { hours: 0 }, extraField: 'keep-me' });
+    // 変更した 9/29 は同日 24:00 まで（翌日に延びない）
+    expect(periods[2]).toEqual({ startDate: { year: 2026, month: 9, day: 29 }, openTime: { hours: 17, minutes: 0 }, endDate: { year: 2026, month: 9, day: 29 }, closeTime: { hours: 24, minutes: 0 } });
   });
 
   it('毎週の送信は7曜日すべてを regularHours に含め、対象曜日だけ変わっている', async () => {
