@@ -886,9 +886,9 @@ function ArchiveReviewBackdrop({ target }: { target: WebinarListItem }) {
    */
   return (
     <div className="bg-canvas-sunken fixed inset-x-0 bottom-0 top-[var(--mobile-header-height)] z-10 overflow-y-auto px-4 py-5 sm:px-10 xl:left-64 xl:top-14" data-design-node="LKuAQ">
-      <div className="mx-auto max-w-screen-2xl">
+      <div className="mx-auto flex max-w-screen-2xl flex-col gap-4">
         <p className="text-ink-faint text-xs font-bold">← ウェビナー一覧</p>
-        <div className="mt-5 grid gap-4 xl:grid-cols-4">
+        <div className="grid gap-4 xl:grid-cols-4">
           <div className="space-y-4 xl:col-span-3">
             <section className="rounded-card border border-hairline bg-canvas p-5">
               <h2 className="text-base font-bold text-ink">アーカイブする対象</h2>
