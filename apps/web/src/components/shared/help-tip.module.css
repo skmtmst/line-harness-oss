@@ -10,21 +10,46 @@
   position: relative; /* position: relative */
   display: inline-flex; /* display: inline-flex */
   align-items: center; /* alignItems: center */
+  flex-shrink: 0; /* 狭い行で押し潰されない */
   vertical-align: middle;
 }
 
+/*
+ * 見た目の箱は 18px（中は 14px）に固定し、題の行の高さに入れない。
+ * globals の button{min-height:32px} を min-height:0 で上書きする。
+ * 押せる範囲は位置を持たない ::before で広げる（28px・指では 44px）。
+ * 狭い行（表見出し・札の横）で潰れないよう縮小を止める。
+ */
 .button {
+  position: relative; /* ::before の当たりをここ基準に */
   display: inline-flex; /* display: inline-flex */
   align-items: center; /* alignItems: center */
   justify-content: center; /* justifyContent: center */
-  width: 24px; /* minWidth: 24 */
-  height: 24px; /* minHeight: 24 */
+  flex-shrink: 0; /* 押し潰されて楕円にならない */
+  width: 18px;
+  height: 18px;
+  min-width: 0;
+  min-height: 0; /* globals の 32px を上書き。題の行を伸ばさない */
   padding: 0;
   border: 0;
   border-radius: var(--radius-tiny); /* cornerRadius: $radius-tiny */
   background: transparent;
   color: var(--color-ink-faint); /* color: $ink-faint */
   cursor: pointer;
+}
+
+/* 当たりだけを広げる。absolute のため行の高さ・幅に影響しない。 */
+.button::before {
+  content: "";
+  position: absolute;
+  inset: -5px; /* 18 + 10 = 28px の当たり */
+}
+
+/* 指では 44px の当たりを確保する。見た目と行の高さは変わらない。 */
+@media (pointer: coarse) {
+  .button::before {
+    inset: -13px; /* 18 + 26 = 44px の当たり */
+  }
 }
 
 .button:focus-visible {
@@ -53,5 +78,19 @@
   font-size: var(--text-caption); /* fontSize: $size-caption */
   line-height: 1.6;
   white-space: normal;
+}
+
+/* 吹き出しの中の「くわしく」。長い説明のある場所へ逃がす。 */
+.tip a {
+  display: inline-block;
+  margin-left: 8px;
+  color: var(--color-action);
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.tip a:focus-visible {
+  outline: 2px solid var(--color-status-info);
+  outline-offset: 1px;
 }
 }

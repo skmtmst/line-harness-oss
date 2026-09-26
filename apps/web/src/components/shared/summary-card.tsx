@@ -1,9 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import React, { useEffect, useId, useRef, useState } from 'react'
+import React from 'react'
 import type { ReactNode } from 'react'
-import { Info } from 'lucide-react'
+import HelpTip from './help-tip'
 import styles from './summary-card.module.css'
 
 export type SummaryCardProps = {
@@ -24,13 +24,25 @@ export type SummaryCardProps = {
   detail: ReactNode
   /**
    * 指標の定義や取得できない詳しい理由などの長い説明。
-   * 見出しの説明アイコンを押したときだけ開くポップオーバーへ入れるので、
+   * 見出しの「？」を押したときだけ開く吹き出しへ入れるので、
    * カードの高さを理由の長さで伸ばさない。説明を開かないと異常が
    * 分からない形にしないため、状態の一言は必ず detail 側へ残す。
    */
   description?: ReactNode
   /** 説明アイコンの読み上げ名。省略時は「<title>の説明」。 */
   descriptionLabel?: string
+  /**
+   * 定義・分母・計算のしかた・単位・いつ時点の数か・言葉の意味。
+   * 見出しのすぐ右の「？」へ入れる（★V7・§2-1b）。
+   * `description` と両方渡したときは `help` を使う。
+   */
+  help?: ReactNode
+  /** 「？」の見出し。省略時は title。読み上げ名は「{見出し}の説明」。 */
+  helpLabel?: string
+  /** 長い説明がある場所。渡すと吹き出しに「くわしく」が出る。 */
+  helpHref?: string
+  /** 「くわしく」の代わりの文言。 */
+  helpHrefLabel?: string
   /**
    * 取得失敗など、その場でやり直せるときの再試行。
    * 短い状態のそばに出すので、説明を開かなくても辿れる。
@@ -68,6 +80,10 @@ export default function SummaryCard({
   detail,
   description,
   descriptionLabel,
+  help,
+  helpLabel,
+  helpHref,
+  helpHrefLabel,
   onRetry,
   retryLabel,
   badge,
@@ -94,65 +110,27 @@ export default function SummaryCard({
   const classes = [styles.card, variantClass, className].filter(Boolean).join(' ')
 
   /*
-    説明の開閉。実ボタンなのでクリック・Enter・Space・タップはそのまま効く。
-    Esc・外側のタップ・フォーカス離脱で閉じ、Escでは押したアイコンへ戻る。
-    ポップオーバーはカード幅の内側に収めるので、画面の端で横にはみ出さない。
+    補足は見出しの「？」（HelpTip）へ。開閉・Esc・外側・1つだけの
+    扱いは HelpTip が持つので、カード側は中身を渡すだけにする。
   */
-  const rootRef = useRef<HTMLDivElement>(null)
-  const infoButtonRef = useRef<HTMLButtonElement>(null)
-  const descriptionId = useId()
-  const [descriptionOpen, setDescriptionOpen] = useState(false)
-  const hasDescription = description !== undefined && description !== null
-
-  useEffect(() => {
-    if (!descriptionOpen) return
-    const onPointerDown = (event: PointerEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setDescriptionOpen(false)
-    }
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return
-      event.preventDefault()
-      setDescriptionOpen(false)
-      infoButtonRef.current?.focus()
-    }
-    document.addEventListener('pointerdown', onPointerDown)
-    document.addEventListener('keydown', onKeyDown)
-    return () => {
-      document.removeEventListener('pointerdown', onPointerDown)
-      document.removeEventListener('keydown', onKeyDown)
-    }
-  }, [descriptionOpen])
-
-  useEffect(() => {
-    if (!hasDescription) setDescriptionOpen(false)
-  }, [hasDescription])
+  const tip = help ?? description
+  const hasTip = tip !== undefined && tip !== null
 
   return (
     <div
-      ref={rootRef}
       className={classes}
       aria-busy={loading || undefined}
       data-design-version={variant}
-      onBlur={(event) => {
-        if (!rootRef.current?.contains(event.relatedTarget)) setDescriptionOpen(false)
-      }}
       {...cardProps}
     >
       <div className={styles.head}>
         <p className={[styles.label, labelVariantClass].filter(Boolean).join(' ')}>
           {title || (loading ? <span className={styles.labelSkeleton} aria-hidden="true" /> : null)}
-          {hasDescription ? (
-            <button
-              ref={infoButtonRef}
-              type="button"
-              className={styles.infoButton}
-              aria-label={descriptionLabel ?? `${title}の説明`}
-              aria-expanded={descriptionOpen}
-              aria-controls={descriptionId}
-              onClick={() => setDescriptionOpen((open) => !open)}
-            >
-              <Info className={styles.infoIcon} aria-hidden="true" />
-            </button>
+          {hasTip ? (
+            <HelpTip label={descriptionLabel ?? `${helpLabel ?? title}の説明`}>
+              {tip}
+              {helpHref ? <a href={helpHref}>{helpHrefLabel ?? 'くわしく'}</a> : null}
+            </HelpTip>
           ) : null}
         </p>
         {badge ? (
@@ -161,11 +139,6 @@ export default function SummaryCard({
           <Link href={action.href} className={styles.link}>
             {action.label}
           </Link>
-        ) : null}
-        {hasDescription && descriptionOpen ? (
-          <div id={descriptionId} role="note" className={styles.popover}>
-            {description}
-          </div>
         ) : null}
       </div>
 

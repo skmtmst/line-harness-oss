@@ -75,7 +75,11 @@ afterEach(() => {
   rmSync(root, { recursive: true, force: true });
 });
 
-describe('acquireLock', () => {
+// Each test below shells out to real git ~10 times. The 5s default timeout
+// flakes when files run in parallel, so real-git suites get 60s.
+const GIT_TIMEOUT = { timeout: 60_000 };
+
+describe('acquireLock', GIT_TIMEOUT, () => {
   it('grants the lock when the ref is free', () => {
     expect(acquireLock(payload('kenta', '安全ゲート'), devA)).toEqual({ ok: true });
     expect(readLock('staging', devB)?.payload.holder).toBe('kenta');
@@ -100,7 +104,7 @@ describe('acquireLock', () => {
   });
 });
 
-describe('readLock', () => {
+describe('readLock', GIT_TIMEOUT, () => {
   it('returns null when nothing holds the environment', () => {
     expect(readLock('staging', devA)).toBeNull();
   });
@@ -112,7 +116,7 @@ describe('readLock', () => {
   });
 });
 
-describe('releaseLock', () => {
+describe('releaseLock', GIT_TIMEOUT, () => {
   it('releases when the ref still matches the lease', () => {
     acquireLock(payload('kenta', '安全ゲート'), devA);
     const current = readLock('staging', devA);
@@ -162,7 +166,7 @@ describe('releaseLock', () => {
   });
 });
 
-describe('resolveRemote', () => {
+describe('resolveRemote', GIT_TIMEOUT, () => {
   const saved = process.env[REMOTE_ENV_VAR];
 
   afterEach(() => {
