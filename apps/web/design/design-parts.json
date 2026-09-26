@@ -3102,13 +3102,6 @@
           "resolved": "14px"
         },
         {
-          "pencil": "xifuV item hover fill: $shell",
-          "class": "item",
-          "prop": "background",
-          "source": "var(--color-shell)",
-          "resolved": "#f5f5f7"
-        },
-        {
           "pencil": "xifuV danger fill: $status-danger",
           "class": "danger",
           "prop": "color",
