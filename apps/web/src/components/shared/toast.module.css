@@ -1,0 +1,99 @@
+@layer components {
+/*
+ * 保存の知らせ（Toast）。★V7 共通部品その2 §2。
+ *
+ * 「保存しました」「削除しました」など、画面の中に文で出していた
+ * 知らせを右下にまとめる。4秒で消える。読み上げには role=status で
+ * 伝える。取り消せる操作は「元に戻す」を1つだけ付ける。
+ *
+ * 画面側は `notifyToast` を呼ぶだけ。置き場所（`ToastHost`）は
+ * 外枠（`app/layout.tsx`）に1つだけある。
+ */
+
+/* 画面の右下に重ねる置き場所。幅は持たせない。 */
+.host {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: min(360px, calc(100vw - 32px));
+}
+
+.host[hidden] {
+  display: none;
+}
+
+/* 知らせ1件。黒地に白字（成功・失敗の色分けはしない）。 */
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius-control);
+  background: var(--color-ink);
+  color: var(--color-canvas);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: 1.6;
+}
+
+.icon {
+  width: 15px;
+  height: 15px;
+  flex: none;
+}
+
+/* うまくいった印。黒地に載せる薄い緑（飾りなので読み上げない）。 */
+.iconSuccess {
+  color: var(--color-success-bg);
+}
+
+/* できなかった印。黒地に載せる薄い赤（飾りなので読み上げない）。 */
+.iconError {
+  color: var(--color-status-danger-soft);
+}
+
+.message {
+  min-width: 0;
+  flex: 1;
+}
+
+/* 「元に戻す」。知らせ1件に1つまで。 */
+.undo {
+  flex: none;
+  border: 0;
+  padding: 4px 8px;
+  background: transparent;
+  color: var(--color-canvas);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.undo:focus-visible {
+  outline: revert;
+}
+
+/* 閉じる印。 */
+.close {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--color-canvas);
+  cursor: pointer;
+}
+
+.close:focus-visible {
+  outline: revert;
+}
+}

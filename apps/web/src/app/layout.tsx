@@ -3,6 +3,7 @@ import './globals.css'
 import AppShell from '@/components/app-shell'
 import BrandTitle from '@/components/brand-title'
 import ClientErrorReporter from '@/components/client-error-reporter'
+import ToastHost from '@/components/shared/toast'
 
 /**
  * 書き出しの時点で決まる題。
@@ -39,6 +40,8 @@ export default function RootLayout({
         <AppShell>
           {children}
         </AppShell>
+        {/* 保存の知らせ（Toast）の置き場所。全画面で1つ。画面側は置かない。 */}
+        <ToastHost />
       </body>
     </html>
   )
