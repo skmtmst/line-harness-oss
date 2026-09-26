@@ -1,7 +1,8 @@
 'use client'
 
 import { ArrowUpRight } from 'lucide-react'
-import React, { useEffect, useRef, type KeyboardEvent, type ReactNode } from 'react'
+import React, { useEffect, useRef, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
+import MenuPortal from './menu-portal'
 import styles from './action-menu.module.css'
 
 export type ActionMenuItem = {
@@ -42,15 +43,23 @@ export type ActionMenuProps = {
   ariaLabel?: string
   /** 参照画像の固定比較用。 */
   inline?: boolean
+  /**
+   * 開くボタン。渡すとメニューの位置の基準になり、ボタンの
+   * 押し直しで閉じられる。渡さないときは直前のボタン要素を
+   * 基準にする（`MoreAction`＋`ActionMenu` の並びが前提）。
+   */
+  anchorRef?: RefObject<HTMLElement | null>
 }
 
 /** Pencil ★V7 `xifuV` を正本にした小型操作メニュー（V5 `hGpFq` から移行）。 */
-export default function ActionMenu({ open, items, note, onClose, ariaLabel = '操作', inline = false }: ActionMenuProps) {
+export default function ActionMenu({ open, items, note, onClose, ariaLabel = '操作', inline = false, anchorRef }: ActionMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null)
+  const anchorMarkRef = useRef<HTMLSpanElement>(null)
 
+  // 最上層（portal）では外側・Esc の扱いを MenuPortal に任せる。
+  // 開くボタンの押し直しはトグル（閉じる）になる。
   useEffect(() => {
-    if (!open) return
-    if (!inline) menuRef.current?.querySelector<HTMLButtonElement>('button:not([disabled])')?.focus()
+    if (!open || !inline) return
     const onPointerDown = (event: PointerEvent) => {
       if (!menuRef.current?.contains(event.target as Node)) onClose()
     }
@@ -65,6 +74,11 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
     }
   }, [inline, onClose, open])
 
+  useEffect(() => {
+    if (!open) return
+    if (!inline) menuRef.current?.querySelector<HTMLButtonElement>('button:not([disabled])')?.focus()
+  }, [inline, open])
+
   if (!open) return null
 
   const moveFocus = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -77,12 +91,23 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
     buttons[next].focus()
   }
 
-  return (
+  const getAnchor = () => {
+    const explicit = anchorRef?.current
+    if (explicit) return explicit
+    const mark = anchorMarkRef.current
+    if (!mark) return null
+    // `MoreAction` 等の開くボタンの直後に置く並びが前提。
+    // ボタンが無ければ目印自体を基準にする。
+    const previous = mark.previousElementSibling
+    return previous instanceof HTMLElement ? previous : mark
+  }
+
+  const menu = (
     <div
       ref={menuRef}
       role="menu"
       aria-label={ariaLabel}
-      className={`${styles.menu} ${inline ? styles.inline : ''}`}
+      className={`${styles.menu} ${inline ? styles.inline : styles.menuPortal}`}
       onKeyDown={moveFocus}
       data-design-part="action-menu"
       data-design-node="xifuV"
@@ -121,5 +146,18 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
       ))}
       {note ? <p className={styles.note}>{note}</p> : null}
     </div>
+  )
+
+  // 参照画像の固定比較（`inline`）以外は、カード・表・ダイアログ・
+  // 固定の帯の中でも切られないよう、最上層（portal）に出す。
+  // 下に場所が無ければ上へ、右に無ければ左へ寄せる。
+  if (inline) return menu
+  return (
+    <>
+      <span ref={anchorMarkRef} aria-hidden="true" className={styles.anchor} />
+      <MenuPortal open={open} getAnchor={getAnchor} onClose={onClose}>
+        {menu}
+      </MenuPortal>
+    </>
   )
 }

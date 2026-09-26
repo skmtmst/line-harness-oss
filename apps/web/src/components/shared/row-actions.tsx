@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type ButtonHTMLAttributes, type ReactNode } from 'react'
+import { useRef, useState, type ButtonHTMLAttributes, type ReactNode, type RefObject } from 'react'
 import ActionMenu, { type ActionMenuItem } from './action-menu'
 import Button from './button'
 import styles from './row-actions.module.css'
@@ -12,11 +12,13 @@ function IconButton({
   tone,
   grip,
   className,
+  buttonRef,
   children,
   ...rest
-}: Base & { label: string; tone?: 'danger'; grip?: boolean; children: ReactNode }) {
+}: Base & { label: string; tone?: 'danger'; grip?: boolean; buttonRef?: RefObject<HTMLButtonElement | null>; children: ReactNode }) {
   return (
     <button
+      ref={buttonRef}
       type="button"
       aria-label={label}
       title={label}
@@ -68,9 +70,9 @@ export function DeleteAction({ label = '削除する', ...rest }: Base & { label
 /**
  * その他操作（…）。Pencil V5 の `H0V8EK`。
  */
-export function MoreAction({ label = 'そのほかの操作', ...rest }: Base & { label?: string }) {
+export function MoreAction({ label = 'そのほかの操作', buttonRef, ...rest }: Base & { label?: string; buttonRef?: RefObject<HTMLButtonElement | null> }) {
   return (
-    <IconButton label={label} {...rest}>
+    <IconButton label={label} buttonRef={buttonRef} {...rest}>
       <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden>
         <circle cx="5" cy="12" r="1.8" />
         <circle cx="12" cy="12" r="1.8" />
@@ -154,6 +156,7 @@ export function RowActions({
   className,
 }: RowActionsProps) {
   const [menuOpen, setMenuOpen] = useState(false)
+  const moreRef = useRef<HTMLButtonElement>(null)
   const items: ActionMenuItem[] = destructiveItem
     ? [...menuItems, { ...destructiveItem, tone: 'danger', dividerBefore: menuItems.length > 0 }]
     : menuItems
@@ -165,6 +168,7 @@ export function RowActions({
         <>
           <MoreAction
             {...menuButtonProps}
+            buttonRef={moreRef}
             label={subjectName ? `${subjectName}のその他操作` : 'そのほかの操作'}
             aria-expanded={menuOpen}
             onClick={() => setMenuOpen((open) => !open)}
@@ -175,6 +179,7 @@ export function RowActions({
             onClose={() => setMenuOpen(false)}
             items={items}
             note={menuNote}
+            anchorRef={moreRef}
           />
         </>
       ) : null}

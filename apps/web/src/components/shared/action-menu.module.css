@@ -156,4 +156,26 @@
   font-size: var(--text-nano);
   line-height: 1.5;
 }
+
+/*
+ * 最上層（portal）の中での姿。白地・角丸・影などの見た目は
+ * `.menu` のまま。場所の決め方だけ portal の器に任せる。
+ */
+.menuPortal {
+  position: static;
+  top: auto;
+  right: auto;
+  bottom: auto;
+  left: auto;
+  z-index: auto;
+}
+
+/* portal の位置の目印。箱を持たず、並びに影響しない。 */
+.anchor {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  vertical-align: top;
+}
 }

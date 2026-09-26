@@ -37,7 +37,12 @@ afterEach(async () => {
 })
 
 function menuButtons(): HTMLButtonElement[] {
-  return Array.from(host.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'))
+  // メニューは最上層（`document.body` 直下の portal）に出る。
+  return Array.from(document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'))
+}
+
+function openMenu(): HTMLElement | null {
+  return document.querySelector<HTMLElement>('[role="menu"]')
 }
 
 describe('ActionMenu ★V7 の項目', () => {
@@ -71,20 +76,21 @@ describe('ActionMenu ★V7 の項目', () => {
         />,
       )
     })
-    const menu = host.querySelector('[role="menu"]')
+    const menu = openMenu()
     expect(menu?.getAttribute('aria-label')).toBe('この友だちへの個別操作')
     expect(menu?.getAttribute('data-design-node')).toBe('xifuV')
-    expect(host.textContent).toContain('テンプレートを送る')
-    expect(host.textContent).toContain('受信箱で選んで送ります')
-    expect(host.textContent).toContain('整理')
+    // 中身は最上層（portal）に出るので、置き場所ではなく文書全体で見る。
+    expect(document.body.textContent).toContain('テンプレートを送る')
+    expect(document.body.textContent).toContain('受信箱で選んで送ります')
+    expect(document.body.textContent).toContain('整理')
     // 別画面へ行く項目は ↗（読み上げに含めない飾り）。
-    const external = host.querySelector('svg[aria-hidden="true"]')
+    const external = document.querySelector('svg[aria-hidden="true"]')
     expect(external).toBeTruthy()
     // 危ない操作は danger。
     const danger = menuButtons().find((b) => b.textContent?.includes('アーカイブする'))
     expect(danger?.className).toMatch(/danger/)
     // 区切り線がある。
-    expect(host.querySelector('hr')).toBeTruthy()
+    expect(document.querySelector('[role="menu"] hr')).toBeTruthy()
   })
 
   it('選ぶと実行して閉じる', async () => {
@@ -189,5 +195,99 @@ describe('ActionMenu ★V7 の見た目', () => {
     expect(css).toMatch(/\.menu\s*{[^}]*max-width:\s*min\(320px,\s*calc\(100vw - 16px\)\)/s)
     expect(css).toMatch(/\.menu\s*{[^}]*max-height:/s)
     expect(css).toMatch(/\.menu\s*{[^}]*overflow-y:\s*auto/s)
+  })
+})
+
+describe('ActionMenu の最上層（portal）', () => {
+  it('カード・表・ダイアログの中でも切られない（body 直下に出る）', async () => {
+    await act(async () => {
+      root.render(
+        <div style={{ overflow: 'hidden', height: 40 }}>
+          <span style={{ position: 'relative', display: 'inline-block' }}>
+            <button type="button">…</button>
+            <ActionMenu open onClose={vi.fn()} items={[{ id: 'a', label: '編集', onSelect: vi.fn() }]} />
+          </span>
+        </div>,
+      )
+    })
+    const menu = openMenu()
+    expect(menu).toBeTruthy()
+    // 開く場所（`overflow: hidden` の箱）の中には残らない。
+    expect(host.querySelector('[role="menu"]')).toBeNull()
+    // 最上層の器に入っている。
+    expect(menu?.closest('[data-menu-portal]')).toBeTruthy()
+    expect(menu?.parentElement?.closest('[data-menu-portal]')).toBeTruthy()
+  })
+
+  it('下に場所が無ければ上に開く', async () => {
+    const rectSpy = vi.spyOn(Element.prototype, 'getBoundingClientRect')
+    rectSpy.mockReturnValue({
+      x: 100, y: 700, width: 32, height: 32,
+      top: 700, right: 132, bottom: 732, left: 100,
+      toJSON: () => ({}),
+    } as DOMRect)
+    // happy-dom は箱の高さを持たないので、メニューの高さだけ代表値で置く。
+    const heightSpy = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get')
+    heightSpy.mockReturnValue(300)
+    Object.defineProperty(window, 'innerHeight', { value: 768, configurable: true })
+    try {
+      await act(async () => {
+        root.render(
+          <ActionMenu open onClose={vi.fn()} items={[{ id: 'a', label: '編集', onSelect: vi.fn() }]} />,
+        )
+      })
+      const portal = document.querySelector('[data-menu-portal]')
+      expect(portal?.getAttribute('data-placement')).toBe('up')
+    } finally {
+      rectSpy.mockRestore()
+      heightSpy.mockRestore()
+    }
+  })
+
+  it('下に場所があれば下に開く', async () => {
+    const rectSpy = vi.spyOn(Element.prototype, 'getBoundingClientRect')
+    rectSpy.mockReturnValue({
+      x: 100, y: 100, width: 32, height: 32,
+      top: 100, right: 132, bottom: 132, left: 100,
+      toJSON: () => ({}),
+    } as DOMRect)
+    const heightSpy = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get')
+    heightSpy.mockReturnValue(300)
+    Object.defineProperty(window, 'innerHeight', { value: 768, configurable: true })
+    try {
+      await act(async () => {
+        root.render(
+          <ActionMenu open onClose={vi.fn()} items={[{ id: 'a', label: '編集', onSelect: vi.fn() }]} />,
+        )
+      })
+      const portal = document.querySelector('[data-menu-portal]')
+      expect(portal?.getAttribute('data-placement')).toBe('down')
+    } finally {
+      rectSpy.mockRestore()
+      heightSpy.mockRestore()
+    }
+  })
+
+  it('開くボタンの押し直しで閉じられる', async () => {
+    const onClose = vi.fn()
+    await act(async () => {
+      root.render(
+        <span>
+          <button type="button">…</button>
+          <ActionMenu open onClose={onClose} items={[{ id: 'a', label: '編集', onSelect: vi.fn() }]} />
+        </span>,
+      )
+    })
+    const trigger = host.querySelector('button:not([role="menuitem"])')
+    await act(async () => {
+      // MenuPortal は開くボタンの押下を「外側」と見なさない。
+      // ボタンの click は呼び出し側のトグルに任せる。
+      trigger?.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+    })
+    expect(onClose).not.toHaveBeenCalled()
+    await act(async () => {
+      document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+    })
+    expect(onClose).toHaveBeenCalledTimes(1)
   })
 })
