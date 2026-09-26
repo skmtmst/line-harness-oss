@@ -1,6 +1,7 @@
 'use client'
 
 import Disclosure from '@/components/shared/disclosure'
+import FilterChip from '@/components/shared/filter-chip'
 import SortSelect from '@/components/ui/sort-select'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
@@ -669,19 +670,14 @@ export default function AutoRepliesPage() {
         {SAVED_FILTERS.map((f) => {
           const on = savedFilter === f.key
           return (
-            <button
+            <FilterChip
               key={f.key}
-              onClick={() => setSavedFilter(on ? '' : f.key)}
-              aria-pressed={on}
+              selected={on}
+              onChange={(next) => setSavedFilter(next ? f.key : '')}
               title={f.note}
-              className={`rounded-pill border px-3 py-1 text-xs transition-colors ${
-                on
-                  ? 'border-accent bg-accent-soft text-ink'
-                  : 'border-hairline text-ink-secondary hover:bg-canvas-sunken'
-              }`}
             >
               {f.label}
-            </button>
+            </FilterChip>
           )
         })}
         <SortSelect

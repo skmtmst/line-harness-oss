@@ -35,9 +35,11 @@ import ImageUploader, { type ImageUploaderValue } from '@/components/shared/imag
 import { Suspense } from 'react'
 import EmailThread from '@/components/support/email-thread'
 import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import DateTimeField from '@/components/shared/date-time-field'
 import HelpTip from '@/components/shared/help-tip'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import ActionMenu from '@/components/shared/action-menu'
 import { MoreAction } from '@/components/shared/row-actions'
 import { CheckCircle2, Link2, NotebookPen, PanelRightClose, PanelRightOpen, Star, X } from 'lucide-react'
 
@@ -536,6 +538,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   const [memoSaving, setMemoSaving] = useState(false)
   const [memoError, setMemoError] = useState('')
   const [showTemplatePicker, setShowTemplatePicker] = useState(false)
+  // G-4: ピッカーで「まとめて選ぶ」で選んだ本文たち。送る前に確認する。
+  const [pendingPack, setPendingPack] = useState<string[] | null>(null)
   const imageInputRef = useRef<HTMLInputElement>(null)
   const [imageError, setImageError] = useState('')
   /*
@@ -1915,6 +1919,68 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   }
 
   /**
+   * G-4: テンプレートのパック送信。選んだ順の本文を1回のpushにまとめて送る。
+   * 入力欄・添付・引用とは別系統で、パック自身が完結した送信単位になる。
+   * （LINEのpushは1回あたり5通まで。）
+   */
+  const handleSendPack = async (texts: string[]) => {
+    if (!selectedChatId || texts.length === 0 || sendLockRef.current) return
+    const sendingChatId = selectedChatId
+    const sendingAccountId = selectedAccountId
+    sendLockRef.current = true
+    setSending(true)
+    try {
+      const now = new Date().toISOString()
+      const signature = JSON.stringify({ chatId: sendingChatId, combined: true, texts })
+      const sendResult = await api.chats.sendCombined(sendingChatId,
+        { texts, revision: chatDetail?.revision },
+        sendKeysRef.current.get(signature),
+      )
+      sendKeysRef.current.clear(signature)
+      if (!sendResult.success) {
+        if (detailAccountRef.current === sendingAccountId && selectedChatIdRef.current === sendingChatId) {
+          setError(sendResult.error || '送信できませんでした。')
+        }
+        return
+      }
+      const staffName = sendResult.data.sentByStaffName
+      const packMessages = texts.map((content) =>
+        buildOutgoingMessage({ messageType: 'text', content, sentByStaffName: staffName, sentAt: now }),
+      )
+      setChatDetail((prev) => (prev && prev.id === sendingChatId) ? {
+        ...prev,
+        lastMessageAt: now,
+        status: 'in_progress',
+        revision: sendResult.data.revision,
+        messages: [...(prev.messages ?? []), ...packMessages],
+      } : prev)
+      setChats((prev) => {
+        const exists = prev.some((c) => c.id === sendingChatId)
+        if (!exists) return prev
+        return refreshChatListAfterSend(prev, statusFilterRef.current, (c) => (c.id === sendingChatId ? {
+          ...c,
+          lastMessageAt: now,
+          status: 'in_progress' as const,
+          // 一覧のpreviewはパックの最後の1通を見せる（相手に届く並びの末尾）。
+          lastMessageContent: texts[texts.length - 1],
+          lastMessageDirection: 'outgoing' as const,
+          lastMessageType: 'text' as const,
+        } : c))
+      })
+      // 手動返信で未対応が減るので、サイドバーのバッジを即時更新させる
+      window.dispatchEvent(new Event(UNANSWERED_REFRESH_EVENT))
+    } catch (sendError) {
+      if (detailAccountRef.current === sendingAccountId && selectedChatIdRef.current === sendingChatId) {
+        setError(describeSendFailure(sendError))
+      }
+    } finally {
+      setSending(false)
+      sendLockRef.current = false
+      setPendingPack(null)
+    }
+  }
+
+  /**
    * N-025: 本文を予約送信する。画像つきは予約口がまだ持たないため止める。
    * 成功したら入力と引用をクリアし、予約一覧を読み直す。
    */
@@ -2400,23 +2466,27 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                         data-qa-open={view.id === savedViews[0]?.id ? 'ASsb3-menu' : undefined}
                         onClick={() => setSavedViewMenuId((current) => current === view.id ? null : view.id)}
                       />
-                      {savedViewMenuId === view.id ? (
-                        <div className="border-hairline bg-canvas absolute top-full right-0 z-50 mt-1 w-40 rounded-control border p-1 shadow-lg" role="menu">
-                          <button
-                            type="button"
-                            role="menuitem"
-                            onClick={async () => {
-                              if (!selectedAccountId) return
-                              await api.chats.savedViews.delete(view.id, selectedAccountId)
-                              setSavedViewMenuId(null)
-                              await loadSavedViews()
-                            }}
-                            className="text-danger hover:bg-status-danger-soft w-full rounded-mini px-2.5 py-2 text-left text-xs"
-                          >
-                            保存した検索を削除
-                          </button>
-                        </div>
-                      ) : null}
+                      {/* ★V7（m13g）：保存した検索の操作も共通 ActionMenu にそろえる。できることは変えない。 */}
+                      <ActionMenu
+                        open={savedViewMenuId === view.id}
+                        onClose={() => setSavedViewMenuId(null)}
+                        ariaLabel={`${view.name}の操作`}
+                        items={[
+                          {
+                            id: `${view.id}-delete`,
+                            label: '保存した検索を削除',
+                            tone: 'danger',
+                            onSelect: () => {
+                              void (async () => {
+                                if (!selectedAccountId) return
+                                await api.chats.savedViews.delete(view.id, selectedAccountId)
+                                setSavedViewMenuId(null)
+                                await loadSavedViews()
+                              })()
+                            },
+                          },
+                        ]}
+                      />
                     </div>
                   </div>
                 ))}
@@ -3758,7 +3828,32 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       // 入力済みの文があれば消さずに続ける。書きかけを失わせない。
                       setMessageContent((prev) => (prev.trim() ? `${prev}\n${content}` : content))
                     }
+                    onPickPack={(texts) => setPendingPack(texts)}
                   />
+                  {/*
+                    G-4: パック送信の最終確認。本文を全部読み合わせてから送る。
+                    入力欄を経由しないので、ここで「何が・何通」送られるかを示す。
+                  */}
+                  <ConfirmDialog
+                    open={pendingPack !== null}
+                    title="テンプレートをまとめて送る"
+                    description={pendingPack ? `${pendingPack.length}通をこの順番で一度に送ります。送信すると取り消せません。` : ''}
+                    confirmLabel={pendingPack ? `まとめて送る（${pendingPack.length}通）` : 'まとめて送る'}
+                    onConfirm={pendingPack ? () => void handleSendPack(pendingPack) : undefined}
+                    onCancel={() => setPendingPack(null)}
+                    busy={sending}
+                  >
+                    {pendingPack ? (
+                      <ol className="max-h-56 space-y-2 overflow-y-auto">
+                        {pendingPack.map((text, index) => (
+                          <li key={index} className="rounded-lg bg-canvas-sunken px-3 py-2 text-xs leading-relaxed text-ink-secondary">
+                            <span className="mr-1 font-semibold text-ink">{index + 1}.</span>
+                            <span className="whitespace-pre-wrap break-words">{text.length > 200 ? `${text.slice(0, 200)}…` : text}</span>
+                          </li>
+                        ))}
+                      </ol>
+                    ) : null}
+                  </ConfirmDialog>
                   </div>
                 </div>
               </div>

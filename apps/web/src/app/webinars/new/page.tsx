@@ -8,6 +8,7 @@ import SelectField from '@/components/shared/select-field'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import StepTrail from '@/components/shared/step-trail'
 import StickyBar from '@/components/shared/sticky-bar'
+import LinePreview from '@/components/shared/line-preview'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { webinarApi, type WebinarFolder } from '@/lib/api'
@@ -160,14 +161,15 @@ export default function NewWebinarPage() {
             <p className="text-ink mt-3 text-xs font-semibold">タグ「配信済み」は確認画面で追加できます</p>
           </section>
 
-          <section className="bg-line-preview rounded-card p-4 text-on-accent shadow-card">
-            <h2 className="text-center text-sm font-bold">LINEプレビュー</h2>
-            <p className="bg-line-preview-label mx-auto mt-3 w-fit rounded-pill px-3 py-1 text-micro">実際のLINE表示に近いプレビューです</p>
-            <div className="bg-canvas text-ink mt-4 min-h-12 rounded-control p-4 text-sm font-medium">
+          <div className="shadow-card">
+          <LinePreview
+            note="実際のLINE表示に近いプレビューです"
+          >
+            <div className="bg-canvas text-ink min-h-12 rounded-control p-4 text-sm font-medium">
               {title.trim() ? `${title.trim()}へようこそ。` : 'ウェビナー名を入れると、案内文をここで確認できます。'}
             </div>
-            <div className="mt-52" aria-hidden="true" />
-          </section>
+          </LinePreview>
+          </div>
           <div className="flex gap-2">
             <Button disabled title="下書き保存後に使えます">テスト送信</Button>
             <Button disabled title="公開後に使えます">公開ページを見る</Button>

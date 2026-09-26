@@ -1,7 +1,9 @@
-import styles from './webinar-line-preview.module.css'
+import LinePreview from '@/components/shared/line-preview'
 
 /**
  * LINEプレビュー（設計 `PV1Vh` `d3rFGD` `Ho8z4` の右側）。
+ *
+ * 枠は共通部品 `LinePreview`（B-6）。中身の組み立てだけが仕事。
  *
  * **中身は各段の入力から組み立てる。** 新しい口は使わない。
  * 入力がまだ無いときは、**それらしい文を作らずに「まだありません」と書く**。
@@ -20,18 +22,16 @@ export default function WebinarLinePreview({
   empty: string
 }) {
   return (
-    <section className={styles.panel} data-webinar-part="line-preview">
-      <h2 className={styles.title}>LINEプレビュー</h2>
-      {/* 断りを先に置く。実物と1ピクセル同じではない。 */}
-      <p className={styles.badge}>実際のLINE表示に近いプレビューです</p>
-      <div className={styles.bubble}>
-        {body ? (
-          <p className={styles.body}>{body}</p>
-        ) : (
-          <p className={styles.empty}>{empty}</p>
-        )}
-        {body && buttonLabel ? <p className={styles.button}>{buttonLabel}</p> : null}
-      </div>
-    </section>
+    <LinePreview
+      note="実際のLINE表示に近いプレビューです"
+      empty={body ? undefined : empty}
+    >
+      {body ? (
+        <>
+          <p className="rounded-card bg-canvas p-4 text-sm leading-relaxed whitespace-pre-wrap text-ink">{body}</p>
+          {buttonLabel ? <p className="bg-accent-deep text-on-accent rounded-control mx-auto mt-3 w-fit px-4 py-2 text-xs font-bold">{buttonLabel}</p> : null}
+        </>
+      ) : null}
+    </LinePreview>
   )
 }

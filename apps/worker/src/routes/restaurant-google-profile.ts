@@ -37,6 +37,7 @@ import {
   isValidDate,
   isValidTime,
   listMedia,
+  mergeSpecialHours,
   parseHoursResponse,
   patchProfile,
   todayIn,
@@ -49,7 +50,6 @@ import {
   type HoursPeriod,
   type ProfileAddress,
   type ProfilePatch,
-  type SpecialDay,
   type Weekday,
   type WeeklyHours,
 } from '../services/google-business-profile.js';
@@ -984,9 +984,8 @@ function buildSendPatch(latest: GoogleProfile, row: ChangeRow): ProfilePatch {
   const after = parseJson<unknown>(row.after_json, null);
   if (row.kind === 'special_hours') {
     const days = after as DayHours[];
-    const byDate = new Map<string, SpecialDay>(latest.specialHours.map((s) => [s.date, s]));
-    for (const d of days) byDate.set(d.date, { date: d.date, closed: d.closed, periods: d.closed ? [] : d.periods });
-    return { field: 'specialHours', value: [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date)) };
+    // 変更する日だけを作り直し、それ以外の日は Google の原文をそのまま送り返す（他の日を絶対に変えない）。
+    return { field: 'specialHoursMerged', value: mergeSpecialHours(latest.rawSpecialHours ?? [], days.map((d) => ({ date: d.date, closed: d.closed, periods: d.closed ? [] : d.periods }))) };
   }
   if (row.kind === 'regular_hours') {
     const target = parseJson<ChangeTarget>(row.target_json, { weekdays: [] });

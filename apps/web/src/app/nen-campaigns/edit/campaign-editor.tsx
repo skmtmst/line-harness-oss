@@ -8,6 +8,7 @@ import { checkNenCampaignBodyLength, NEN_CAMPAIGN_BODY_MAX_LENGTH } from '@line-
 import { useAccount } from '@/contexts/account-context'
 import { Field, inputClass } from '@/components/shared/form-controls'
 import Button from '@/components/shared/button'
+import LinePreview from '@/components/shared/line-preview'
 import { TimeField } from '@/components/shared/date-time-field'
 import Combobox from '@/components/shared/combobox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -345,7 +346,8 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
         <aside data-design="Right" className="space-y-3">
           <section className="bg-canvas rounded-card border-hairline border p-4">
             <p className="text-ink-secondary mb-3 flex items-center gap-2 text-xs font-bold"><Eye aria-hidden size={15} />高橋 直人さん（ももちゃん）にはこう届きます</p>
-            <div className="bg-line-preview rounded-card p-4"><h2 className="text-on-accent text-center text-sm font-bold">LINEプレビュー</h2><p className="mt-3 text-center"><span className="bg-line-preview-label text-on-accent rounded-pill text-micro px-3 py-1 font-bold">◷ {timing}</span></p><div className="bg-canvas mt-4 rounded-card p-4"><p className="text-sm leading-relaxed whitespace-pre-wrap">{previewBody(merged.bodyText)}</p>{merged.buttonLabel && <p className="bg-accent-deep text-on-accent rounded-control mt-3 py-2 text-center text-xs font-bold">★ {merged.buttonLabel}</p>}</div></div>
+            {/* LINEの見た目の枠は共通部品 `LinePreview`（B-6）。届く日時は見える札のまま残す。 */}
+            <LinePreview caption={`◷ ${timing}`}><div className="bg-canvas rounded-card p-4"><p className="text-sm leading-relaxed whitespace-pre-wrap">{previewBody(merged.bodyText)}</p>{merged.buttonLabel && <p className="bg-accent-deep text-on-accent rounded-control mt-3 py-2 text-center text-xs font-bold">★ {merged.buttonLabel}</p>}</div></LinePreview>
           </section>
           <section className="bg-canvas rounded-card border-hairline border p-4"><h2 className="text-sm font-bold">つながる先</h2><dl className="mt-3 space-y-2 text-xs"><div className="flex justify-between gap-3"><dt className="text-ink font-bold">→ EC連携</dt><dd className="text-ink-secondary">注文と到着の記録</dd></div><div className="flex justify-between gap-3"><dt className="text-ink font-bold">→ 共通情報</dt><dd className="text-ink-secondary">差し込んでいる「商品名」</dd></div><div className="flex justify-between gap-3"><dt className="text-ink font-bold">→ 友だち属性</dt><dd className="text-ink-secondary">友だち情報欄「ペットの名前」</dd></div>{mileageAction?.kind === 'award_mileage' && <div className="flex justify-between gap-3"><dt className="text-ink font-bold">→ マイル</dt><dd className="text-ink-secondary">書いてくれたら {mileageAction.amount}</dd></div>}{formAction?.kind === 'open_form' && <div className="flex justify-between gap-3"><dt className="text-ink font-bold">→ 回答フォーム</dt><dd className="text-ink-secondary">{formAction.formName}{selectedForm ? (selectedForm.isActive ? '（公開中）' : '（公開されていません）') : '（見つかりません）'}</dd></div>}</dl></section>
           <section className="border-warning bg-warning-bg text-warning rounded-card border p-4"><h2 className="text-sm font-bold">気をつけること</h2><div className="mt-3 space-y-3 text-xs"><p><strong className="block">◷ 20時台がいちばん押されます</strong>分析の「配信の反応」で確かめられます</p><p><strong className="block">▣ 3つ以上の吹き出しは嫌がられます</strong>1回に3つ送った配信は、ブロック率が3倍でした</p></div></section>

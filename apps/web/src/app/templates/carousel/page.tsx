@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { api } from '@/lib/api'
 import type { Folder } from '@line-crm/shared'
 import { Field, inputClass } from '@/components/shared/create-page'
+import LinePreview from '@/components/shared/line-preview'
 import SelectField from '@/components/shared/select-field'
 import InlineActionList, { useActionOptions } from '@/components/auto-replies/inline-action-list'
 import { useAccount } from '@/contexts/account-context'
@@ -448,10 +449,8 @@ function CarouselEditorInner() {
             右が大きく空いて見えた。読み上げ順は変えない（案内が先）。
           */}
           <aside className="hidden w-full shrink-0 xl:order-2 xl:block xl:w-96">
-            <section className="rounded-card bg-line-preview p-4 text-on-accent">
-              <h2 className="text-center text-sm font-bold">LINEプレビュー</h2>
-              <p className="mx-auto mt-2 w-fit rounded-pill bg-line-preview-label px-3 py-1 text-xs">カルーセルの見え方（横にスクロールします）</p>
-              <div className="rounded-card mt-4 overflow-hidden bg-canvas text-ink">
+            <LinePreview note="カルーセルの見え方（横にスクロールします）">
+              <div className="rounded-card overflow-hidden bg-canvas text-ink">
                 <div className="bg-canvas-sunken h-36" />
                 <div className="p-4">
                   <p className="font-bold">{panels[1]?.title || panels[0]?.title || '（タイトル）'}</p>
@@ -459,6 +458,7 @@ function CarouselEditorInner() {
                   {(panels[1]?.actions || panels[0]?.actions || []).map((action, index) => <p key={index} className="border-hairline mt-2 rounded-control border p-2 text-center text-sm text-accent-deep">{action.label}</p>)}
                 </div>
               </div>
+            </LinePreview>
               {/*
                 NEXT-24: テンプレートのテスト送信口はまだ無い。押せる見た目の
                 まま置くと「送れた」と誤解するので、押せない形にして理由と
@@ -473,13 +473,12 @@ function CarouselEditorInner() {
                 自分に送って確かめる
               </button>
               {/*
-                80% の白字だと帯の上で 4.5:1 に届かない。100% の白字にする。
                 NEXT-24: 押せない形＋理由＋代替手順のまま残す（無反応に見せない）。
+                枠の外に置く。枠の中は届く見た目だけにする（B-6）。
               */}
-              <p className="text-on-accent mt-2 text-xs leading-relaxed">
+              <p className="text-ink-faint mt-2 text-xs leading-relaxed">
                 この画面からのテスト送信にはまだ対応していません。保存して一斉配信に組み込むと、配信の画面からテスト送信できます。
               </p>
-            </section>
           </aside>
           <div className="min-w-0 flex-1 space-y-4 xl:order-1">
           <div className="bg-canvas rounded-card border-hairline border p-5">

@@ -12,6 +12,7 @@ import type {
 import { api } from '@/lib/api'
 import Button from '@/components/shared/button'
 import FileDropzone, { AttachmentRow } from '@/components/shared/file-drop'
+import FilterChip from '@/components/shared/filter-chip'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import {
@@ -258,17 +259,16 @@ export default function TagCsvImportDialog({
             </div>
             <div className={styles.filters}>
               {([
-                ['all', `すべて ${preview.summary.total}`],
-                ['ready', `新規 ${preview.summary.ready}`],
-                ['skipped', `飛ばす ${preview.summary.skipped}`],
-                ['invalid', `エラー ${preview.summary.invalid}`],
-              ] as Array<[PreviewFilter, string]>).map(([key, label]) => <button
-                type="button"
+                ['all', 'すべて', preview.summary.total],
+                ['ready', '新規', preview.summary.ready],
+                ['skipped', '飛ばす', preview.summary.skipped],
+                ['invalid', 'エラー', preview.summary.invalid],
+              ] as Array<[PreviewFilter, string, number]>).map(([key, label, total]) => <FilterChip
                 key={key}
-                aria-pressed={filter === key}
-                className={`${styles.filter} ${filter === key ? styles.filterOn : ''}`}
-                onClick={() => setFilter(key)}
-              >{label}</button>)}
+                selected={filter === key}
+                onChange={() => setFilter(key)}
+                count={total}
+              >{label}</FilterChip>)}
             </div>
             <div className={styles.tableFrame}>
               <table className={styles.table}>

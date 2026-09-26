@@ -12,6 +12,7 @@ import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import SelectField from '@/components/shared/select-field'
 import WebhookInteractions from './webhook-interactions'
+import GoogleSheetsPanel from './google-sheets-panel'
 import { IncomingOverview, OutgoingKpis, OutgoingOverview } from './webhook-overviews'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { MIN_SECRET_LENGTH, generateSecret } from './secret'
@@ -84,6 +85,8 @@ const MERGED_TABS = [
   { key: 'outgoing', label: 'こちらから送る' },
   { key: 'incoming', label: 'こちらで受け取る' },
   { key: 'interactions', label: 'やり取りの記録' },
+  // #838 第2段: Sheets連携のOAuth戻り先もこのタブ（?tab=sheets&sheets=…）。
+  { key: 'sheets', label: 'Google Sheets' },
   { key: 'notify', label: `見本 ${SOURCE_PRESETS.length + OUTGOING_SAMPLES.length}` },
 ]
 
@@ -891,6 +894,7 @@ function WebhooksPageHost() {
     <div>
       <MergedTabs basePath="/webhooks" paramName="tab" tabs={MERGED_TABS} active={tab} />
       {tab === 'interactions' && <WebhookInteractions />}
+      {tab === 'sheets' && <GoogleSheetsPanel />}
       {tab === 'notify' && <WebhookSamples />}
     </div>
   )

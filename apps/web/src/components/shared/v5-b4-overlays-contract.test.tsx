@@ -38,7 +38,8 @@ describe('V5 B4 オーバーレイ共通部品', () => {
       <Notice tone="error" message="処理に失敗しました。通信を確かめて、もう一度お試しください。" />
       <ActionMenu open inline onClose={vi.fn()} items={[{ id: 'delete', label: '削除', tone: 'danger', onSelect: vi.fn() }]} />
     </div>)
-    for (const nodeId of ['VJKAT', 'ApbSZ', 'zPRvi', 'I5rKbM', 'hGpFq']) expect(html).toContain(`data-design-node="${nodeId}"`)
+    // ★V7（m13g）：操作メニューは V5 `hGpFq` から ★V7 `xifuV` へ移行した。
+    for (const nodeId of ['VJKAT', 'ApbSZ', 'zPRvi', 'I5rKbM', 'xifuV']) expect(html).toContain(`data-design-node="${nodeId}"`)
     expect(html).toContain('aria-label="通知を閉じる"')
     expect(html).toContain('role="menuitem"')
   })
@@ -107,8 +108,12 @@ describe('V5 B4 オーバーレイ共通部品', () => {
     expect(contract.parts.dialog.pencilNodes).toEqual(['J6x4Q', 'H2S1T4'])
     expect(contract.parts.drawer.pencilNodes).toEqual(['VJKAT'])
     expect(contract.parts.notice.pencilNodes).toEqual(['ApbSZ', 'zPRvi', 'I5rKbM'])
-    expect(contract.parts['action-menu'].pencilNodes).toEqual(['hGpFq'])
+    // ★V7（m13g）：操作メニューは V5 `hGpFq` から ★V7 `xifuV` へ移行した。
+    // 台帳の整合のため新旧両ノードを記録する（`hGpFq` 自体は Pencil に残る）。
+    expect(contract.parts['action-menu'].pencilNodes).toEqual(['hGpFq', 'xifuV'])
     expect(contract.parts['notification-panel'].status).toBe('implemented')
+    // Pencil 台帳の `hGpFq` は残る（Pencil 上のノード自体は消えていない）。
+    // 実装の参照先だけ ★V7 `xifuV` へ移行した（m13g）。
     for (const nodeId of ['J6x4Q', 'H2S1T4', 'VJKAT', 'ApbSZ', 'zPRvi', 'I5rKbM', 'hGpFq']) expect(inventory.components[nodeId].status).toBe('active')
     expect(inventory.components.z6TmF.status).toBe('implemented')
   })

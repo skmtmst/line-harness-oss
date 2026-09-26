@@ -16,8 +16,18 @@
   transition: background-color 120ms ease-out, border-color 120ms ease-out, color 120ms ease-out;
 }
 
-.v6-filter-chip:hover {
-  background: var(--color-canvas-sunken);
+/*
+ * #639: ホバーは触れられる端末だけ（タップ後に残らないように）。
+ * 選んでいない札は沈み色へ、選んだ札は少し沈める。
+ */
+@media (hover: hover) and (pointer: fine) {
+  .v6-filter-chip:not([aria-pressed='true']):hover {
+    background: var(--color-canvas-sunken);
+  }
+
+  .v6-filter-chip[aria-pressed='true']:hover {
+    filter: brightness(0.92);
+  }
 }
 
 /*
@@ -31,16 +41,38 @@
   outline-offset: 2px;
 }
 
+/*
+ * #669: 選んだ札は「有効状態」なので濃い緑の地に白文字＋✓。
+ * `--color-accent-deep`(#087a3e)と`--color-on-accent`(#ffffff)は5.44:1。
+ */
 .v6-filter-chip[aria-pressed='true'] {
-  border-color: var(--color-accent);
-  background: var(--color-accent-soft);
-  color: var(--color-accent-deep);
+  border-color: var(--color-accent-deep);
+  background: var(--color-accent-deep);
+  color: var(--color-on-accent);
+}
+
+.v6-filter-chip:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 .v6-filter-chip__icon {
   width: 14px;
   height: 14px;
   flex: 0 0 auto;
+}
+
+/* 件数は文字の後ろに小さく。選んだ札では白を少し透かせる。 */
+.v6-filter-chip__count {
+  font-size: var(--text-micro);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-ink-faint);
+}
+
+.v6-filter-chip[aria-pressed='true'] .v6-filter-chip__count {
+  color: var(--color-on-accent);
+  opacity: 0.85;
 }
 
 /*

@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import type { MediaItem } from '@line-crm/shared'
 import { api, type BroadcastAssetKind } from '@/lib/api'
 import Button from '@/components/shared/button'
+import LinePreview from '@/components/shared/line-preview'
 import Combobox from '@/components/shared/combobox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -675,10 +676,8 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
         </div>
 
         <aside className="min-w-0 space-y-4 xl:sticky xl:top-4 xl:w-96 xl:shrink-0 xl:self-start">
-          <section className="rounded-card bg-line-preview p-4 text-on-accent">
-            <h2 className="text-center font-bold">LINEプレビュー</h2>
-            <p className="mx-auto mt-2 w-fit rounded-pill bg-line-preview-label px-3 py-1 text-xs">{meta.title}の見え方</p>
-            <div className="rounded-card mt-4 bg-canvas p-4 text-ink">
+          <LinePreview note={`${meta.title}の見え方`}>
+            <div className="rounded-card bg-canvas p-4 text-ink">
               <p className="font-bold">{name || `${meta.title}名`}</p>
               {kind === 'rich_message' ? (
                 <div className="bg-canvas-sunken relative mt-3 aspect-square w-full overflow-hidden rounded-lg">
@@ -718,9 +717,9 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
                 </>
               ) : null}
             </div>
-            <Button type="button" className="mt-4 w-full" disabled title={TEST_SEND_UNAVAILABLE_NOTE}>自分に送って確かめる</Button>
-            <p className="text-on-accent mt-2 text-xs leading-relaxed">{TEST_SEND_UNAVAILABLE_NOTE}</p>
-          </section>
+          </LinePreview>
+          <Button type="button" className="mt-4 w-full" disabled title={TEST_SEND_UNAVAILABLE_NOTE}>自分に送って確かめる</Button>
+          <p className="text-ink-faint mt-2 text-xs leading-relaxed">{TEST_SEND_UNAVAILABLE_NOTE}</p>
           <section className="bg-canvas border-hairline rounded-card shadow-card border p-4 text-sm">
             <h2 className="font-bold">{kind === 'rich_message' ? 'リッチメニューとの違い' : kind === 'coupon' ? '公開したあとに見られる数' : '回答フォームとの使い分け'}</h2>
             <p className="mt-2 leading-relaxed text-ink-secondary">{kind === 'rich_message' ? 'リッチメッセージはトークに1回流れて、過去のやり取りに残ります。リッチメニューは画面の下に常に出ます。' : kind === 'coupon' ? '配った数 ／ 開いた数 ／ 使われた数 ／ 当選した数。使われた数は成果とアフィリエイトにも送れます。' : 'リサーチはLINEの中で完結する短い質問向けです。住所や画像も聞く場合は回答フォームを使います。'}</p>
