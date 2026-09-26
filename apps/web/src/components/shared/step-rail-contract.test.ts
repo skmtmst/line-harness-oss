@@ -41,14 +41,22 @@ describe('段の進み表示は共通部品', () => {
   })
 
   it('何の進みかを言う', () => {
+    /* 入口は名前を固定せず、そのまま共通の Stepper へ渡す。 */
     const shared = code(fs.readFileSync(SHARED, 'utf8'))
-    expect(shared, 'aria-label を固定しない').toContain('aria-label={ariaLabel}')
+    expect(shared, 'aria-label を固定しない').toContain('label={ariaLabel}')
     const broadcast = code(fs.readFileSync(BROADCAST, 'utf8'))
     expect(broadcast).toContain('ariaLabel="配信作成の進み"')
   })
 
-  it('設計の言い方で「STEP 1」と出す', () => {
-    const shared = code(fs.readFileSync(SHARED, 'utf8'))
-    expect(shared).toContain('STEP {step.order}')
+  it('番号と名前で段を出す（★V7 その2 §4）', () => {
+    /*
+     * 旧V6の「STEP 1」接頭辞は付けない。★V7 の手順は丸の中の番号＋名前だけ。
+     * 段の順番（order）は Stepper が描くので、入口が落としていないことを見る。
+     */
+    const stepper = code(
+      fs.readFileSync(path.join(__dirname, 'stepper.tsx'), 'utf8'),
+    )
+    expect(stepper).toContain('step.order')
+    expect(stepper).not.toContain('STEP ')
   })
 })
