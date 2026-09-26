@@ -1208,8 +1208,9 @@ function ExternalImportWorkspace({
   const areas = selected ? Array.from({ length: Math.min(selected.areasCount, 6) }, (_, index) => String.fromCharCode(65 + index)) : []
 
   return (
-    <div data-design-node="TL7tp" className="mx-auto max-w-[1584px]">
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+    <div data-design-node="TL7tp" className="mx-auto flex max-w-[1584px] flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <nav className="text-ink-faint text-xs">
           <button type="button" className="text-action hover:underline" onClick={onBack}>リッチメニュー</button>
           <span className="mx-2">›</span>
@@ -1221,7 +1222,9 @@ function ExternalImportWorkspace({
       {loading ? <ListState kind="loading" title="LINEのメニューを読み込んでいます" /> : null}
       {!loading && error && !external ? <ListState kind="error" title="LINEのメニューを表示できませんでした" onRetry={onReload} /> : null}
       {!loading && !error && unmanaged.length === 0 ? (
-        <ListState kind="empty" title="管理画面の外のメニューはありません" description="LINE側だけにあるメニューが見つかると、ここに表示します。" />
+        <div className="bg-canvas rounded-card border-hairline border">
+          <ListState kind="empty" title="管理画面の外のメニューはありません" description="LINE側だけにあるメニューが見つかると、ここに表示します。" />
+        </div>
       ) : null}
 
       {!loading && unmanaged.length > 0 ? (
