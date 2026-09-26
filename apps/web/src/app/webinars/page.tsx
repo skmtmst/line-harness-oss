@@ -412,7 +412,7 @@ function WebinarListContent({
         kind="empty"
         title="まだウェビナーがありません"
         description="動画セミナーの申込と視聴を、ここで管理します。"
-        action={<Button variant="primary" href="/webinars/new">＋ ウェビナーをつくる</Button>}
+        action={<Button variant="primary" href="/webinars/new">＋ ウェビナーを作る</Button>}
       />
     ) : (
       <ListState kind="empty" title="条件に合うウェビナーはありません" description="検索文字かよく使う絞り込みを変えてください。" />
@@ -764,9 +764,9 @@ function WebinarsPage() {
       )}
       {/* 外枠の余白は共通シェルが持つ。ここで px-6 を足すと左端がずれる。 */}
       <div data-design-node="ZC13r">
-        {/* 作る操作は画面右上。表の上に単独で浮かせない。他の一覧と同じ置き場所。 */}
-        <div data-design="Head" className="mb-4 flex flex-wrap justify-end gap-2">
-          <Button variant="primary" href="/webinars/new">＋ ウェビナーをつくる</Button>
+        {/* 作る操作は一覧のすぐ上の左。右上には置かない。他の一覧と同じ置き場所。 */}
+        <div data-design="Head" className="mb-4 flex flex-wrap justify-start gap-2">
+          <Button variant="primary" href="/webinars/new">＋ ウェビナーを作る</Button>
         </div>
 
         <div style={FOLDER_RAIL_STYLE} className="grid gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">

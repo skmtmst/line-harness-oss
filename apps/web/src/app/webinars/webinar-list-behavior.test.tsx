@@ -289,9 +289,9 @@ describe('ウェビナー一覧の表示状態と操作', () => {
         onArchive={vi.fn()}
       />,
     )
-    expect(html).toContain('＋ ウェビナーをつくる')
+    expect(html).toContain('＋ ウェビナーを作る')
     expect(html).not.toContain('ウェビナーを作成')
-    expect(html).not.toContain('ウェビナーを作る')
+    expect(html).not.toContain('ウェビナーをつくる')
   })
 
   it('再検索が失敗しても直前の行を残し、再読み込み操作を受け付ける', async () => {

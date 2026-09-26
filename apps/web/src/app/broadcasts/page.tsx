@@ -469,14 +469,14 @@ function BroadcastList() {
       </div>
 
       <div data-design="Head" className="mb-4 flex flex-wrap items-center gap-2">
-        <button
+        <Button
           type="button"
-          aria-label="新規配信を作成"
+          variant="primary"
+          aria-label="＋ 配信を作る"
           onClick={() => { setOpenTemplatePicker(false); setShowCreate(true) }}
-          className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-status-info"
         >
-          配信を作成
-        </button>
+          ＋ 配信を作る
+        </Button>
       </div>
 
       {/* 一覧本体（設計 `Body`）。 */}

@@ -13,7 +13,7 @@ import TemplateDefinitionEditor, { definitionError, definitionForName, definitio
 
 const LABELS: Record<TemplateType, string> = { tag: 'タグ', template: 'テンプレート', rich_menu: 'リッチメニュー', form: '回答フォーム' }
 const PAGE_TITLES: Record<TemplateType, string> = { tag: '友だち属性', template: 'テンプレート', rich_menu: 'リッチメニュー', form: '回答フォーム' }
-const CREATE_LABELS: Record<TemplateType, string> = { tag: '＋ タグを追加', template: 'テンプレートを作る', rich_menu: 'メニューを作る', form: 'フォームを作る' }
+const CREATE_LABELS: Record<TemplateType, string> = { tag: '＋ タグを作る', template: 'テンプレートを作る', rich_menu: 'メニューを作る', form: 'フォームを作る' }
 const LIST_DESCRIPTIONS: Record<TemplateType, string> = {
   tag: 'タグのひな形を作成し、各LINEアカウントへ配布します。',
   template: 'メッセージのひな形を作成し、各LINEアカウントへ配布します。',

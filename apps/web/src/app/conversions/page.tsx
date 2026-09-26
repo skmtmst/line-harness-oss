@@ -788,7 +788,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
       ) : null}
 
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <Button href="/conversions/new" variant="primary">＋ 成果地点をつくる</Button>
+        <Button href="/conversions/new" variant="primary">＋ 成果地点を作る</Button>
         <Button onClick={() => void exportCsv()} disabled={exporting}>
           {exporting ? '書き出しています' : 'CSVで書き出す'}
         </Button>
@@ -880,7 +880,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
           description={
             query
               ? '検索の言葉を変えてください。'
-              : '右上の「成果地点をつくる」から登録すると、ここに出ます。'
+              : '上の「＋ 成果地点を作る」から登録すると、ここに出ます。'
           }
         />
       ) : (

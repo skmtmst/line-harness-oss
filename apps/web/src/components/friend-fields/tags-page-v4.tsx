@@ -838,20 +838,17 @@ export default function TagsPageV4({
         }))}
         actions={currentTabBlocked ? undefined : tab === 'tags' && status !== 'forbidden' ? (
           /*
-            設計 `Sn86o` はここに CSV。「＋ タグを追加」は ATTR-22 で
-            他のタブと同じくタブ行の右端へ寄せた（`HWP5R` との2箇所を
-            やめ、主要作成はどのタブでも同じ位置・同じ見た目にする）。
+            設計 `Sn86o` はここに CSV。普段使う「＋ タグを作る」は
+            一覧のすぐ上の左の並び（「フォルダを追加」の横）へ移した。
+            タブ行の右端には、たまにしか使わない CSV だけを残す。
             `H374MR` から確認 `sfTEW`、完了 `op1rh`、一部失敗 `QzRsJ`
             まで同じ操作の中で進む。
           */
-          <span className="flex items-center gap-2">
-            <Button type="button" onClick={() => setCsvOpen(true)}>CSVで一括登録</Button>
-            <Button href="/tags/new" variant="primary">＋ タグを追加</Button>
-          </span>
+          <Button type="button" onClick={() => setCsvOpen(true)}>CSVで一括登録</Button>
         ) : tab === 'marks' ? (
-          <Button href="/tags/marks/new" variant="primary">＋ マークを追加</Button>
+          <Button href="/tags/marks/new" variant="primary">＋ マークを作る</Button>
         ) : tab === 'fields' ? (
-          <Button href="/tags/fields/new" variant="primary">＋ 項目を追加</Button>
+          <Button href="/tags/fields/new" variant="primary">＋ 項目を作る</Button>
         ) : tab === 'searches' ? (
           /* 検索の作成は友だち一覧の絞り込みから保存する（#1014 ATTR-23）。 */
           <Button href="/friends" variant="primary">友だち一覧で条件を作る</Button>
@@ -926,9 +923,10 @@ export default function TagsPageV4({
           何が足りないのかが分からないまま拒まれることになる。
         */}
         {status === 'forbidden' ? null : (
-          <div className="mb-4 flex items-center gap-2">
+          <div className="mb-4 flex flex-wrap items-center gap-2">
             <Button href="/tags/folders/new">フォルダを追加</Button>
-            {/* 「＋ タグを追加」はタブ行の右端へ移動した（#1014 ATTR-22）。 */}
+            {/* 作る操作は一覧のすぐ上の左の並びにまとめる。右上には置かない。 */}
+            <Button href="/tags/new" variant="primary">＋ タグを作る</Button>
           </div>
         )}
         {notice && <Notice className="mb-4" tone="success" message={notice} onClose={() => setNotice('')} />}
@@ -1021,7 +1019,8 @@ export default function TagsPageV4({
                     <th className="px-3 py-3 text-left">使用先</th>
                     <th className="w-[6%] px-3 py-3 text-left">表示</th>
                     {/* #768: 表が横に流れる帯でも操作列は右端に留める。 */}
-                    <th className="bg-canvas-sunken sticky right-0 w-11 px-3 py-3 text-left">操作</th>
+                    {/* 見出し「操作」は2文字で1行に収める（w-11 では「操／作」と折れる）。中身はゴミ箱1つなので w-16 で足りる。 */}
+                    <th className="bg-canvas-sunken sticky right-0 w-16 whitespace-nowrap px-3 py-3 text-left">操作</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-hairline">
@@ -1039,7 +1038,7 @@ export default function TagsPageV4({
                     <tr><td colSpan={9} className="p-0"><ListState kind="error" description="タグを読み込めませんでした。再読み込みしても直らない場合はエラー報告へ。" onRetry={() => void load()} /></td></tr>
                   ) : items.length === 0 ? (
                     // まだ1件も作っていない。「条件を変える」は言えない。
-                    <tr><td colSpan={9} className="p-0"><ListState kind="empty" title="まだタグがありません" description="「＋ タグを追加」から最初の1つを作ると、ここに並びます。" /></td></tr>
+                    <tr><td colSpan={9} className="p-0"><ListState kind="empty" title="まだタグがありません" description="「＋ タグを作る」から最初の1つを作ると、ここに並びます。" /></td></tr>
                   ) : visible.length === 0 ? (
                     // 作ってはあるが、いまの絞り込みに合うものが無い。
                     <tr><td colSpan={9} className="p-0"><ListState kind="empty" title="条件に合うタグはありません" description="検索語・フォルダ・絞り込みを変えてください。" /></td></tr>
@@ -1136,7 +1135,7 @@ export default function TagsPageV4({
                 ) : status === 'error' ? (
                   <ListState kind="error" description="タグを読み込めませんでした。再読み込みしても直らない場合はエラー報告へ。" onRetry={() => void load()} />
                 ) : items.length === 0 ? (
-                  <ListState kind="empty" title="まだタグがありません" description="「＋ タグを追加」から最初の1つを作ると、ここに並びます。" />
+                  <ListState kind="empty" title="まだタグがありません" description="「＋ タグを作る」から最初の1つを作ると、ここに並びます。" />
                 ) : visible.length === 0 ? (
                   <ListState kind="empty" title="条件に合うタグはありません" description="検索語・フォルダ・絞り込みを変えてください。" />
                 ) : (
