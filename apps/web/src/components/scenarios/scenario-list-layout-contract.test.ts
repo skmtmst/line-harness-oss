@@ -57,7 +57,8 @@ describe('シナリオ一覧の列幅と並び替え案内', () => {
   })
 
   it('長い名前は1行省略で、全文は title で読める（NEXT-25）', () => {
-    expect(LIST).toContain('min-w-0 truncate text-sm font-medium')
+    // m13f：一覧の決まりで名前は黒文字の太字。1行省略＋titleは同じ。
+    expect(LIST).toContain('min-w-0 truncate text-sm font-bold')
     expect(LIST).toContain('title={s.name}')
   })
 })

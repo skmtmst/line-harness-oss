@@ -1,6 +1,7 @@
 import Checkbox from '@/components/shared/checkbox'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { ListPlus } from 'lucide-react'
 import type { Scenario, DeliveryMode, Folder } from '@line-crm/shared'
 import Button from '@/components/shared/button'
@@ -84,6 +85,7 @@ export default function ScenarioList({
   loading,
   onCreate,
 }: ScenarioListProps) {
+  const router = useRouter()
   /** いま掴んでいるシナリオ。落とした先と入れ替える。 */
   const [dragId, setDragId] = useState<string | null>(null)
 
@@ -488,9 +490,25 @@ export default function ScenarioList({
                 ...(showFolder ? [folderName] : []),
               ].join('・')
               return (
-              <tr key={s.id} className="hover:bg-canvas-sunken">
+              <tr
+                key={s.id}
+                className="cursor-pointer hover:bg-canvas-sunken"
+                tabIndex={0}
+                onClick={() => router.push(`/scenarios/detail?id=${s.id}`)}
+                onKeyDown={(event) => {
+                  if (event.target !== event.currentTarget) return
+                  if (event.key === 'Enter') {
+                    event.preventDefault()
+                    router.push(`/scenarios/detail?id=${s.id}`)
+                  }
+                }}
+              >
+                {/*
+                  行を押したら詳細へ（一覧の決まり）。名前は黒文字の太字。
+                  選択・並び替え・操作のセルは行の移動を起こさない。
+                */}
                 {canMove && (
-                  <td className="w-10 px-2 py-3 text-center align-top">
+                  <td className="w-10 px-2 py-3 text-center align-top" onClick={(event) => event.stopPropagation()}>
                     <Checkbox
                       checked={selectedIds.has(s.id)}
                       onCheckedChange={() => toggleOne(s.id)}
@@ -506,6 +524,7 @@ export default function ScenarioList({
                 */}
                 <td
                   className="text-ink-faint w-10 cursor-grab px-2 py-3 text-center align-top select-none active:cursor-grabbing"
+                  onClick={(event) => event.stopPropagation()}
                   draggable={Boolean(onReorder)}
                   onDragStart={() => setDragId(s.id)}
                   onDragOver={(e) => e.preventDefault()}
@@ -533,7 +552,7 @@ export default function ScenarioList({
                       <Link
                         href={`/scenarios/detail?id=${s.id}`}
                         title={s.name}
-                        className="text-info min-w-0 truncate text-sm font-medium hover:underline"
+                        className="text-ink min-w-0 truncate text-sm font-bold hover:text-action hover:underline"
                       >
                         {s.name}
                       </Link>
@@ -605,7 +624,7 @@ export default function ScenarioList({
                   右端の列を狭く保つ。
                 */}
                 <td className="px-4 py-3 text-right whitespace-nowrap">
-                  <div className="relative inline-flex items-center justify-end gap-1.5">
+                  <div className="relative inline-flex items-center justify-end gap-1.5" onClick={(event) => event.stopPropagation()}>
                     {/* #641: 編集も「その他」と同じ枠つきボタンにそろえる（友だち追加時配信と同じ形） */}
                     <Button href={`/scenarios/detail?id=${s.id}`} variant="secondary">
                       編集

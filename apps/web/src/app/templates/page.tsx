@@ -707,8 +707,7 @@ export default function TemplatesPage() {
       */}
       <div className={`${styles.folderRail} shrink-0`}>
         <FolderPanel
-          // ★V7 `x63W5x`：取れていない間の件数（「0件」）は出さない。
-          total={view === 'ready' || view === 'empty' || view === 'no-match' ? `${templates.length} 件` : '—'}
+          // 見出しの総数は「すべて」の行と同じ数なので出さない（件数の重ね書きをやめる）。
           activeId={selectedCategory}
           onSelect={setSelectedCategory}
           onAddFolder={canMutateTemplates ? () => setFolderDialogOpen(true) : undefined}

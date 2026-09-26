@@ -21,7 +21,12 @@ describe('V6 友だち一覧の読込状態', () => {
   })
 
   it('未取得の件数を0件にせずCSVも止める', () => {
-    expect(PAGE).toContain("loadStatus === 'ready' ? `${total.toLocaleString('ja-JP')}件` : '—'")
+    /*
+     * 絞り込みの行の件数は消した（見出し・ページ送りと3重だった）。
+     * 「未取得を0件に見せない」の役目は見出しの横の1か所が持つ。
+     */
+    expect(TABLE).toContain("status === 'ready' ? `${total.toLocaleString('ja-JP')}件` : '—'")
+    expect(PAGE).not.toContain("{loadStatus === 'ready' ? `${total.toLocaleString('ja-JP')}件` : '—'}")
     expect(PAGE).toContain("onExportReady(loadStatus === 'ready' ? exportCurrentPage : null)")
     expect(PAGE).toContain('disabled={!exportCurrentPage}')
   })
