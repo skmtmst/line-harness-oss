@@ -281,8 +281,9 @@ export default function AutomationRunsPage() {
   }
 
   return (
-    <div data-design-node="DkPY0">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <div data-design-node="DkPY0" className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-ink-faint">自動化 ＞ オートメーション ＞ 動いた記録</p>
         {runPermissions?.canExport ? (
           <div className="text-right">
@@ -291,22 +292,22 @@ export default function AutomationRunsPage() {
           </div>
         ) : null}
       </div>
-      <div className="mb-4"><MergedTabs basePath="/automations/runs" paramName="tab" tabs={TABS} active="runs" /></div>
+      <div><MergedTabs basePath="/automations/runs" paramName="tab" tabs={TABS} active="runs" /></div>
 
       {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}
-      <KpiCollapse className="mb-4" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <KpiCollapse gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Metric label="この30日に動いた" value={data ? `${data.summary.executed.toLocaleString('ja-JP')}回` : '—'} note={data ? '実行結果を集計' : '未取得'} />
         <Metric label="失敗した" value={data ? `${data.summary.failed.toLocaleString('ja-JP')}回` : '—'} note="処理結果を確認してください" />
         <Metric label="いちばん動いた" value={data?.summary.mostRunName ?? '—'} note={data?.summary.mostRunCount !== null && data?.summary.mostRunCount !== undefined ? `${data.summary.mostRunCount.toLocaleString('ja-JP')}回` : '未取得'} />
         <Metric label="条件に外れて動かなかった" value={data ? `${data.summary.skipped.toLocaleString('ja-JP')}回` : '—'} note="条件が厳しすぎないか見てください" />
       </KpiCollapse>
 
-      <div className="bg-info-bg text-ink-secondary mb-4 rounded-control px-4 py-3 text-xs">
+      <div className="bg-info-bg text-ink-secondary rounded-control px-4 py-3 text-xs">
         オートメーションが動いた記録です。条件に外れて動かなかったものも並びます。
       </div>
       {retryNotice ? <p className="mb-4 rounded-control border border-hairline bg-canvas-sunken px-4 py-3 text-sm text-ink-secondary" role="status">{retryNotice}</p> : null}
 
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <input type="search" value={query} onChange={(event) => changeQuery(event.target.value)} placeholder="友だちの名前・オートメーションの名前で検索" className="h-10 w-full max-w-lg rounded-control border border-hairline bg-canvas px-3 text-sm" />
         <div className="flex items-center gap-3">
           <label className="flex items-center gap-1.5 text-sm text-ink-secondary">
@@ -321,7 +322,7 @@ export default function AutomationRunsPage() {
         </div>
       </div>
 
-      <div className="mb-3 flex flex-wrap gap-2" aria-label="結果で絞り込む">
+      <div className="flex flex-wrap gap-2" aria-label="結果で絞り込む">
         {([
           ['all', `すべて ${data?.summary.total.toLocaleString('ja-JP') ?? '—'}`],
           ['executed', `動いた ${data?.summary.executed.toLocaleString('ja-JP') ?? '—'}`],
@@ -337,7 +338,9 @@ export default function AutomationRunsPage() {
       ) : status === 'error' ? (
         <ListState kind="error" title="動いた記録を読み込めませんでした" description="記録は消えていません。再読み込みしてください。" action={<Button onClick={() => void load()}>もう一度読み込む</Button>} />
       ) : !data || data.items.length === 0 ? (
-        <ListState kind="empty" title={query || resultFilter !== 'all' ? '条件に合う記録はありません' : '動いた記録はまだありません'} description={query || resultFilter !== 'all' ? '検索語や絞り込みを変えてください。' : 'オートメーションが動くと、結果がここに残ります。'} />
+        <div className="bg-canvas rounded-card border-hairline border">
+          <ListState kind="empty" title={query || resultFilter !== 'all' ? '条件に合う記録はありません' : '動いた記録はまだありません'} description={query || resultFilter !== 'all' ? '検索語や絞り込みを変えてください。' : 'オートメーションが動くと、結果がここに残ります。'} />
+        </div>
       ) : (
         <div className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-sm">
           <div className="grid grid-cols-6 gap-3 bg-canvas-sunken px-4 py-3 text-xs font-semibold text-ink-faint">
@@ -369,7 +372,7 @@ export default function AutomationRunsPage() {
       )}
 
       {selectedRun ? (
-        <section data-design="run-detail" className="mt-4 rounded-card border border-hairline bg-canvas p-5 shadow-sm" aria-label="実行記録の中身">
+        <section data-design="run-detail" className="rounded-card border border-hairline bg-canvas p-5 shadow-sm" aria-label="実行記録の中身">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <p className="text-xs font-semibold text-info">実行記録の中身</p>
