@@ -260,8 +260,9 @@ function ScenarioModeContent() {
   const selectedFolderMissing = Boolean(folderId && !folders.some((folder) => folder.id === folderId))
 
   return (
-    <div data-design-node="cCB7r" data-list-state={scenarioState} aria-busy={scenarioState === 'loading'}>
-      <div data-design="Head" className="mb-7 flex items-center justify-between">
+    <div data-design-node="cCB7r" data-list-state={scenarioState} aria-busy={scenarioState === 'loading'} className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <div data-design="Head" className="flex items-center justify-between">
         <nav data-design="Crumb" className="text-ink-faint text-xs">
           <Link href="/scenarios" className="hover:underline">
             シナリオ配信
@@ -287,7 +288,7 @@ function ScenarioModeContent() {
         ]}
       />
 
-      <div data-design="Notice" className="mt-4 space-y-2">
+      <div data-design="Notice" className="space-y-2">
         {scenarioState === 'loading' && (
           <p className="bg-info-bg text-info rounded-card px-4 py-3 text-sm">
             シナリオを読み込んでいます。
@@ -307,7 +308,7 @@ function ScenarioModeContent() {
         {error && <p className="bg-danger-bg text-danger rounded-card px-4 py-3 text-sm">{error}</p>}
       </div>
 
-      <div data-design="Name" className="bg-canvas rounded-card border-hairline mt-4 mb-4 border p-4">
+      <div data-design="Name" className="bg-canvas rounded-card border-hairline border p-4">
         <h2 className="text-ink text-sm font-bold">シナリオ情報</h2>
         <div className="mt-2 grid max-w-4xl gap-4 md:grid-cols-2">
           <label className="block">
@@ -406,7 +407,7 @@ function ScenarioModeContent() {
         </div>
       </fieldset>
 
-      <div className="mt-4 flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <p className="text-ink-faint text-xs">
           どちらを選んでも、作成後にステップの追加・並べ替えができます。
           {/* 1通だけ試しに送る受け口が無いので、テスト送信とは書かない。 */}
