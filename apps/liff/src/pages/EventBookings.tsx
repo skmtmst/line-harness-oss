@@ -4,6 +4,7 @@ import { api, type EventBookingMine } from '../lib/api.js';
 import { logFailure } from '../lib/user-message.js';
 import LoadErrorView from '../components/LoadErrorView.js';
 import LoadingView from '../components/LoadingView.js';
+import ConfirmDialog from '../components/ui/ConfirmDialog.js';
 
 function formatJp(iso: string): string {
   return new Date(iso).toLocaleString('ja-JP', {
@@ -58,8 +59,14 @@ export default function EventBookings() {
     void refresh();
   }, [refresh]);
 
-  async function cancel(b: EventBookingMine) {
-    if (!confirm(`「${b.event_name}」の予約をキャンセルしますか？`)) return;
+  // 取り消す予約。開いている間だけ持つ。ブラウザの `confirm()` は使わず、
+  // 共通の確認窓で聞く (やめるを選ぶとここが空のまま終わる)。
+  const [pendingCancel, setPendingCancel] = useState<EventBookingMine | null>(null);
+
+  async function runCancel() {
+    const b = pendingCancel;
+    if (!b || busy) return;
+    setPendingCancel(null);
     setBusy(true);
     setActionError(null);
     try {
@@ -130,7 +137,10 @@ export default function EventBookings() {
                 {canCancel(b) && (
                   <div className="border-t p-2 text-right">
                     <button
-                      onClick={() => cancel(b)}
+                      onClick={() => {
+                        setActionError(null);
+                        setPendingCancel(b);
+                      }}
                       disabled={busy}
                       className="text-sm text-red-600 hover:underline disabled:opacity-50"
                     >
@@ -146,6 +156,23 @@ export default function EventBookings() {
       <div className="text-center mt-4">
         <Link to="/booking" className="text-xs text-gray-500 underline">サロン予約はこちら</Link>
       </div>
+      <ConfirmDialog
+        open={pendingCancel !== null}
+        title={pendingCancel ? `「${pendingCancel.event_name}」の予約をキャンセルしますか？` : ''}
+        description={
+          pendingCancel
+            ? `${formatJp(pendingCancel.slot_starts_at)}${pendingCancel.venue_name ? `・${pendingCancel.venue_name}` : ''}の予約を取り消します。`
+            : ''
+        }
+        confirmLabel="キャンセルする"
+        cancelLabel="やめる"
+        destructive
+        busy={busy}
+        onCancel={() => {
+          if (!busy) setPendingCancel(null);
+        }}
+        onConfirm={() => void runCancel()}
+      />
     </div>
   );
 }
