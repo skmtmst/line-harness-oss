@@ -1040,7 +1040,7 @@ function LineNotificationsPage() {
     setBusy(null)
   }
 
-  return <>
+  return <div className="flex flex-col gap-4">
     {expandedSetting === null ? <MergedTabs basePath="/line-notifications" tabs={tabsWithCounts} active={tab} defaultKey="customer" /> : null}
     {/*
       * #634: 運用者タブの件数だけが取れなかったとき、タブの「取得失敗」の
@@ -1052,7 +1052,7 @@ function LineNotificationsPage() {
       その場所に小さく1行だけ。黄色の帯にしない。
     */}
     {expandedSetting === null && operatorState === 'error' ? (
-      <p role="alert" className="text-ink-secondary mb-4 text-xs">
+      <p role="alert" className="text-ink-secondary text-xs">
         運用者へのお知らせの件数を読み込めませんでした。
         <button type="button" className="text-action ml-2 font-semibold hover:underline" onClick={() => void load()}>もう一度</button>
       </p>
@@ -1153,7 +1153,7 @@ function LineNotificationsPage() {
         </div>
       </section>
     </KpiCollapse>
-    <div className="mb-4"><NoteBar>これは「お知らせ」であって「売り込みの配信」ではありません。顧客が配信を止めていても、取引に必要な連絡は届きます。</NoteBar></div>
+    <div><NoteBar>これは「お知らせ」であって「売り込みの配信」ではありません。顧客が配信を止めていても、取引に必要な連絡は届きます。</NoteBar></div>
 
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="grid w-full max-w-[48rem] grid-cols-2 gap-2 lg:grid-cols-4" aria-label="お知らせの絞り込み">
@@ -1199,7 +1199,7 @@ function LineNotificationsPage() {
         </>}
     </section>
     </div> : null}
-  </>
+  </div>
 }
 
 /*
