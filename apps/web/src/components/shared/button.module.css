@@ -45,10 +45,19 @@
   height: 40px;
 }
 
+/*
+ * 行内用は32px（★V7：行内の操作は32）。アイコン操作（32×32）と
+ * 同じ高さにそろえる。文字サイズ・余白は共通のまま変えない。
+ */
+.compact {
+  height: 32px;
+}
+
 /* タッチ端末は指の当たり判定のため44pxを確保する（#976 U083）。 */
 @media (pointer: coarse) {
   .standard,
-  .field {
+  .field,
+  .compact {
     min-height: 44px;
   }
 }

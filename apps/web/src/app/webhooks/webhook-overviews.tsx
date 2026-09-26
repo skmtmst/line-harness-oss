@@ -81,7 +81,7 @@ function matchesOutgoing(item: OutgoingWebhookOverview, filter: OutgoingFilter, 
   )
 }
 
-function OutgoingKpis({
+export function OutgoingKpis({
   items,
   status,
   incomingCount,
@@ -389,7 +389,7 @@ export function OutgoingOverview({
           <ListState
             kind="empty"
             title="まだ連携がありません"
-            description="うちで起きたことを、ほかのサービスに知らせられます。右上の「送り先を追加」から作成してください。"
+            description="うちで起きたことを、ほかのサービスに知らせられます。「＋ 送り先を作る」から作成してください。"
           />
         </div>
       ) : visible.length === 0 ? (
@@ -746,7 +746,7 @@ export function IncomingOverview({
       <ListState
         kind="empty"
         title="まだ受け取り口がありません"
-        description="相手のサービスから知らせを受け取るURLを、右上の「受け取り口を追加」から作成してください。"
+        description="相手のサービスから知らせを受け取るURLを、「＋ 受け取り口を作る」から作成してください。"
       />
     )
   }

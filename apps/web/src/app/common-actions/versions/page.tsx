@@ -248,12 +248,12 @@ function CommonActionVersionsInner() {
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
         <SummaryCard variant="v6" title="いまの版" value={published?.versionNumber ?? null} unit="" detail={published?.publishedAt ? `${new Date(published.publishedAt).toLocaleDateString('ja-JP')} に公開` : 'まだ公開していません'} />
         <SummaryCard variant="v6" title="呼び出し元" value={detail.bindings.length} unit="" detail={usageSummaryDetail(detail.bindings)} />
-        <SummaryCard variant="v6" title="今月 動いた回数" value={summary?.executionCountThisMonth ?? null} unit="" detail="実行記録から集計" />
-        <SummaryCard variant="v6" title="失敗" value={summary?.failureCountThisMonth ?? null} unit="" detail="部分成功を含む" />
+        <SummaryCard variant="v6" title="今月 動いた回数" value={summary?.executionCountThisMonth ?? null} unit="" detail="" help="実行記録から集計しています" />
+        <SummaryCard variant="v6" title="失敗" value={summary?.failureCountThisMonth ?? null} unit="" detail="" help="部分成功を含みます" />
         <SummaryCard variant="v6" title="古い版のまま" value={detail.bindings.filter((binding) => binding.hasNewerVersion).length} unit="" detail="回答フォーム" badge={detail.bindings.some((binding) => binding.hasNewerVersion) ? '要確認' : undefined} />
       </div>
 
-      <NoteBar>
+      <NoteBar help="新版を公開しても、利用先は現在の版を使い続けます" helpLabel="版の切り替え">
         新版を公開しても、利用先は現在の版を使い続けます。差分を確認した利用先だけ切り替えてください。
       </NoteBar>
 

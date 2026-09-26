@@ -414,9 +414,12 @@
     "453_ad_platform_secret_vault.sql",
     "454_broadcast_approval.sql",
     "455_broadcast_approval_events.sql",
+    "456_media_file_scans.sql",
+    "457_file_scan_config.sql",
     "466_template_versions.sql",
     "467_template_references.sql",
-    "468_event_custom_questions.sql"
+    "468_event_custom_questions.sql",
+    "469_manual_link_screens.sql"
   ],
-  "migrationCount": 417
+  "migrationCount": 420
 }

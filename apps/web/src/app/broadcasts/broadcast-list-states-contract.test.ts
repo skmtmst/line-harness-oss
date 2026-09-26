@@ -80,7 +80,7 @@ describe('フォルダ操作（設計 6-1-M `xkRDb`）', () => {
     expect(PAGE).toContain('onClick={() => { setOpenTemplatePicker(false); setShowCreate(true) }}')
     expect(PAGE).toContain('openTemplatePickerInitially={openTemplatePicker}')
     expect(PAGE).not.toContain('テンプレートから作成')
-    expect(PAGE).toContain('配信を作成')
+    expect(PAGE).toContain('＋ 配信を作る')
   })
 })
 

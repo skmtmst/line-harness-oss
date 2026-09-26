@@ -240,7 +240,7 @@ export default function DuplicatesPage() {
               （読み込み50件で頭打ちにならない。）
             */}
             <KpiCard title="重複候補" value={null} unit="" valueText={`${fmt.format(Object.values(statusCounts).reduce((sum, n) => sum + (n ?? 0), 0))}組`} detail={`${fmt.format(statusCounts.pending ?? 0)}組を確認待ち`} />
-            <KpiCard title="確認済み" value={null} unit="" valueText={`${fmt.format(statusCounts.linked ?? 0)}組`} detail="統合ユーザーに紐付け済み" />
+            <KpiCard title="確認済み" value={null} unit="" valueText={`${fmt.format(statusCounts.linked ?? 0)}組`} detail="" help="統合ユーザーに紐付け済みの組数です" />
             {/*
               friendDups は「重複した登録の行数」。送った通数ではない。
               以前はこれを「余分な配信回数」「1配信あたり浪費 ¥X」と言い切り、
@@ -263,7 +263,7 @@ export default function DuplicatesPage() {
               detail={`¥${fmt.format(data.msgUnitYen)}/通の見積り`}
               description="重複している友だち登録の数に1通あたりの単価を掛けた見積りです。実際に送った配信の実績ではありません。"
             />
-            <KpiCard title="根拠不足" value={null} unit="" valueText={`${fmt.format(lowConfidenceCount)}組`} detail="名前・画像だけの候補" />
+            <KpiCard title="根拠不足" value={null} unit="" valueText={`${fmt.format(lowConfidenceCount)}組`} detail="" help="名前・画像だけの候補です" />
           </section>
 
           <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-[#565F59]">

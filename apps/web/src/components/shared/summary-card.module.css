@@ -35,57 +35,11 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-}
-
-/* 説明アイコン。数値カードの高さを変えない大きさに留める。 */
-.infoButton {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  margin-left: 4px;
-  border-radius: var(--radius-pill);
-  color: var(--color-ink-faint);
-  vertical-align: -4px;
-}
-
-.infoButton:hover {
-  background: var(--color-canvas-sunken);
-  color: var(--color-ink-secondary);
-}
-
-.infoButton:focus-visible {
-  outline: revert;
-}
-
-.infoIcon {
-  width: 14px;
-  height: 14px;
-}
-
-/*
-  説明のポップオーバー。見出し行の幅＝カードの内幅に収めるので、
-  画面の端でも横へはみ出さない。高さは内容に任せ、固定で切らない。
-*/
-.popover {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  left: 0;
-  z-index: 50;
-  padding: 10px 12px;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-control);
-  background: var(--color-canvas);
-  box-shadow: var(--shadow-float);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
-  font-weight: 400;
-  line-height: 1.5;
-  text-align: left;
-  /* 指標ごとの理由を並べるときの改行を残しつつ、長い文は幅で折り返す。 */
-  white-space: pre-line;
+  /*
+   * 題の行の高さは 20px にそろえる。「？」の有無で数字の位置が
+   * ずれないようにする（？自体は 18px の箱で、行を伸ばさない）。
+   */
+  min-height: 20px;
 }
 
 .retry {

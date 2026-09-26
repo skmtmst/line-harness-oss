@@ -626,11 +626,12 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
           onChange={(value) => { setPageSize(Number(value)); setPage(1) }}
           size="page-size"
         />
+        {/* 作る操作は行の左。たまに使う CSV は右に残す。 */}
+        <AffiliateButton variant="primary" onClick={() => setCreateOpen(true)}>
+          ＋ アフィリエイターを作る
+        </AffiliateButton>
         <AffiliateButton onClick={exportAffiliatesCsv} disabled={shownRows.length === 0} className="ml-auto">
           CSVで書き出す
-        </AffiliateButton>
-        <AffiliateButton variant="primary" onClick={() => setCreateOpen(true)}>
-          アフィリエイターを追加
         </AffiliateButton>
       </div>
 
@@ -690,7 +691,7 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
             kind="empty"
             title="紹介者はまだ登録されていません"
             description="紹介してくれる方を登録すると、専用リンクと成果を管理できます。"
-            action={<Button variant="primary" onClick={() => setCreateOpen(true)}>アフィリエイターを追加</Button>}
+            action={<Button variant="primary" onClick={() => setCreateOpen(true)}>＋ アフィリエイターを作る</Button>}
           />
         </div>
       ) : shownRows.length === 0 ? (
@@ -1934,7 +1935,8 @@ export function ApprovalQueue() {
           title="確認したほうがよい"
           value={loading || error ? null : flaggedCount}
           unit={loading || error ? '' : '件'}
-          detail="同じ友だち・同じ注文の重複や、返金・取り消し済みの注文の成果"
+          detail=""
+          help="同じ友だち・同じ注文の重複や、返金・取り消し済みの注文の成果です"
           loading={loading}
         />
         <KpiCard
@@ -1948,7 +1950,8 @@ export function ApprovalQueue() {
           title="待たせている日数"
           value={loading || error ? null : Math.round(averageWaitDays * 10) / 10}
           unit={loading || error ? '' : '日'}
-          detail="承認待ちの平均"
+          detail=""
+          help="承認待ちの平均日数です"
           loading={loading}
         />
       </div>
@@ -2022,16 +2025,18 @@ export function ApprovalQueue() {
               setPage(1)
               setSelected(new Set())
             }}
+            count={counts[s]}
           >
-            {s === 'pending' ? '認めるのを待っている' : s === 'approved' ? '認めた' : '却下した'} {counts[s]}
+            {s === 'pending' ? '認めるのを待っている' : s === 'approved' ? '認めた' : '却下した'}
           </FilterChip>
         ))}
         {status === 'pending' && (
           <FilterChip
             selected={flaggedOnly}
             onChange={(value) => { setFlaggedOnly(value); setPage(1); setSelected(new Set()) }}
+            count={flaggedCount}
           >
-            確認したほうがよい {flaggedCount}
+            確認したほうがよい
           </FilterChip>
         )}
       </div>
@@ -2387,7 +2392,7 @@ function OffersList({
             kind="empty"
             title="案件はまだ登録されていません"
             description="何をしたら成果になり、いくら払うかを決めると、アフィリエイターが紹介できるようになります。"
-            action={<Button href="/affiliate-offers/new" variant="primary">案件を作る</Button>}
+            action={<Button href="/affiliate-offers/new" variant="primary">＋ 案件を作る</Button>}
           />
         )}
       </div>
@@ -2605,7 +2610,7 @@ export function OffersTab() {
 
   return (
     <div data-design-node="GH8VL" data-affiliate-offers-design="v6" className="flex flex-col gap-4">
-      <NoteBar>
+      <NoteBar help="案件は、何をしたら成果になりいくら払うかの組み合わせです" helpLabel="案件の意味">
         案件は「何をしたら成果になり、いくら払うか」の組み合わせです。アフィリエイターはこの案件を選んで紹介します。
       </NoteBar>
 
@@ -2662,12 +2667,13 @@ export function OffersTab() {
           size="page-size"
         />
         {/* 「並び順を保存」は設計にあるが、保存する口が無いので置かない。 */}
+        {/* 作る操作は行の左。たまに使う CSV は右に残す。 */}
+        <Button href="/affiliate-offers/new" variant="primary">
+          ＋ 案件を作る
+        </Button>
         <AffiliateButton onClick={exportCsv} disabled={shown.length === 0} className="ml-auto">
           CSVで書き出す
         </AffiliateButton>
-        <Button href="/affiliate-offers/new" variant="primary">
-          案件を作る
-        </Button>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">

@@ -295,6 +295,13 @@ describe('二者承認の見た目', () => {
     )
     expect(fields.host.querySelector('button[aria-label="承認をお願いする人の説明"]')).not.toBeNull()
     expect(fields.host.textContent).not.toContain('自分は選べない')
+    // ？を label の中に入れると、ラベルがボタンを指して入力欄との
+    // 結びつき（htmlFor・読み上げ）が壊れる。外に置く。
+    const approverLabel = fields.host.querySelector('label[for="approval-approver"]')
+    expect(approverLabel?.querySelector('button')).toBeNull()
+    expect(
+      approverLabel?.parentElement?.querySelector('button[aria-label="承認をお願いする人の説明"]'),
+    ).not.toBeNull()
     cleanup(fields)
 
     const count = render(

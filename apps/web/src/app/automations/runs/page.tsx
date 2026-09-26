@@ -324,12 +324,12 @@ export default function AutomationRunsPage() {
 
       <div className="flex flex-wrap gap-2" aria-label="結果で絞り込む">
         {([
-          ['all', `すべて ${data?.summary.total.toLocaleString('ja-JP') ?? '—'}`],
-          ['executed', `動いた ${data?.summary.executed.toLocaleString('ja-JP') ?? '—'}`],
-          ['skipped', `条件に外れた ${data?.summary.skipped.toLocaleString('ja-JP') ?? '—'}`],
-          ['problems', `失敗 ${data?.summary.failed.toLocaleString('ja-JP') ?? '—'}`],
-        ] as const).map(([value, label]) => (
-          <FilterChip key={value} selected={resultFilter === value} onChange={() => setResultFilter(value)}>{label}</FilterChip>
+          ['all', 'すべて', data?.summary.total.toLocaleString('ja-JP') ?? '—'],
+          ['executed', '動いた', data?.summary.executed.toLocaleString('ja-JP') ?? '—'],
+          ['skipped', '条件に外れた', data?.summary.skipped.toLocaleString('ja-JP') ?? '—'],
+          ['problems', '失敗', data?.summary.failed.toLocaleString('ja-JP') ?? '—'],
+        ] as const).map(([value, label, total]) => (
+          <FilterChip key={value} selected={resultFilter === value} onChange={() => setResultFilter(value)} count={total}>{label}</FilterChip>
         ))}
       </div>
 

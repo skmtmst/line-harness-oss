@@ -10,6 +10,7 @@ import {
   type CommonVarReplacementCandidate,
   type CommonVarReplacementImpact,
 } from '@/lib/api'
+import FilterChip from '@/components/shared/filter-chip'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import { formatStamp } from '@/lib/common-vars'
 import Pagination from '@/components/shared/pagination'
@@ -756,20 +757,16 @@ function VarsPageInner() {
               ['scheduled', '期限つき'],
               ['unused', '使われていない'],
             ] as const).map(([value, label]) => (
-              <button
+              <FilterChip
                 key={value}
-                type="button"
-                aria-pressed={stateFilter === value}
-                onClick={() => {
+                selected={stateFilter === value}
+                onChange={() => {
                   setStateFilter(value)
                   setPage(1)
                 }}
-                className={stateFilter === value
-                  ? 'border-accent bg-accent-soft text-accent-deep rounded-pill border px-3 py-1.5 text-xs font-semibold'
-                  : 'border-hairline bg-canvas text-ink-secondary rounded-pill border px-3 py-1.5 text-xs font-semibold'}
               >
                 {label}
-              </button>
+              </FilterChip>
             ))}
             <SortSelect
               className="ml-auto"
@@ -948,15 +945,20 @@ function VarsPageInner() {
                             )}
                           </td>
                           <td className="bg-canvas group-hover:bg-canvas-sunken whitespace-nowrap sticky right-0 px-4 py-3 text-right" title="編集・削除">
+                            {/*
+                              行の操作は同じ高さ（32）にそろえる。削除は撮影入口
+                             （data-qa-open="yPkWe"）のため行に残す。
+                            */}
                             <span className="inline-flex items-center justify-end gap-2">
-                              <Link
+                              <Button
                                 href={`/contents/vars/edit?id=${item.id}`}
-                                className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded border px-2 py-1 text-xs"
+                                size="compact"
                               >
                                 編集
-                              </Link>
+                              </Button>
                               <Button
                                 type="button"
+                                size="compact"
                                 onClick={() => void openSingleDelete(item)}
                                 data-qa-open="yPkWe"
                                 aria-label={`${item.name}を削除`}

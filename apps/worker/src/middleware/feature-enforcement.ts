@@ -102,6 +102,7 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
   feature('/api/traffic-pools', 'multi_store_hierarchy'),
   feature('/api/images', 'media'),
   feature('/api/media', 'media'),
+  feature('/api/file-scans', 'media'),
   feature('/api/common-vars', 'common_vars'),
   feature('/api/contents', 'media'),
   feature('/api/analytics', 'analytics'),

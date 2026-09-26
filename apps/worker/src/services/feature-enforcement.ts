@@ -250,6 +250,11 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
     enforcement: { mode: 'exempt', reason: '友だちの基礎集計で、外部呼び出しも機能の状態更新もしない' },
   },
   {
+    name: 'scheduled exports',
+    classification: { kind: 'core', reason: '友だちCSVの定期書き出し' },
+    enforcement: { mode: 'exempt', reason: '既存の書き出し台帳へ行を足すだけで、外部呼び出しも機能の状態更新もしない' },
+  },
+  {
     name: 'media usage scan',
     classification: { kind: 'feature', featureId: 'media' },
     enforcement: {
@@ -257,6 +262,11 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
       sources: ['apps/worker/src/services/media-usage-scan.ts'],
       markers: ["'media', 'media usage scan'"],
     },
+  },
+  {
+    name: 'file scan retry',
+    classification: { kind: 'core', reason: '危険なファイルの検査の再試行（メディア・写真・添付を横断）' },
+    enforcement: { mode: 'exempt', reason: '安全の後始末で、止めると検査待ちが詰まる。単一機能に属さない' },
   },
   {
     name: 'following mileage',

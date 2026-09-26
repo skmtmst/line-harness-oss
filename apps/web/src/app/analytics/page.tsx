@@ -849,7 +849,7 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
 
       <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {/* 表の合計は延べ人数で、実際の人数とは違う。人数として出すと嘘になる。 */}
-        <KpiCard title="集計対象" value={null} unit="人" detail="延べ数しか出せません" />
+        <KpiCard title="集計対象" value={null} unit="人" detail="" help="表の合計は延べ人数です。実際の人数とは違います" />
         <KpiCard
           title="いちばん多い組み合わせ"
           value={summary?.top.count ?? null}
@@ -1666,7 +1666,7 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
             />
             {/* 段ごとの到達日時を持っていない。ファネルの集計は「通ったか」
                 だけを見ていて、いつ通ったかを残していない。 */}
-            <KpiCard title="平均の到達日数" value={null} unit="日" detail="入口から最後まで" />
+            <KpiCard title="平均の到達日数" value={null} unit="日" detail="" help="入口から最後までの日数です" />
             <KpiCard
               title="比較で差が大きい段"
               value={comparisonGap}
@@ -2262,6 +2262,8 @@ const METRIC_STATE_TEXT: Record<AnalyticsMetricState, string> = {
 type KpiCardState = {
   detail: string
   description?: string
+  /** 定義・計算のしかた。KpiCard の「？」へ渡す。 */
+  help?: string
   onRetry?: () => void
 }
 
@@ -2369,8 +2371,8 @@ function FriendsOverviewTab({ accountId }: { accountId: string }) {
     <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
       <KpiCard title="現在つながっている" value={shownValue(overview.metrics.currentFriends)} unit="人" {...metricCardState(overview.metrics.currentFriends, netValue === null ? pendingCard : { detail: `この${days}日の差し引き ${netValue > 0 ? '+' : ''}${netValue}人` }, state.retry)} />
       <KpiCard title="増えた友だち" value={addedValue} unit="人" {...metricCardState(overview.metrics.added, addedValue === null ? pendingCard : { detail: `この${days}日。初回 ${metricText(overview.metrics.firstTime)}人` }, state.retry)} />
-      <KpiCard title="減った友だち" value={removedValue} unit="人" {...metricCardState(overview.metrics.removed, removedValue === null ? pendingCard : { detail: `この${days}日。ブロック・友だち解除` }, state.retry)} />
-      <KpiCard title="差し引き" value={netValue} unit="人" {...metricCardState(overview.metrics.net, remainingRate === null ? pendingCard : { detail: `増加 − 減少。残っている割合 ${remainingRate.toFixed(1)}%` }, state.retry)} />
+      <KpiCard title="減った友だち" value={removedValue} unit="人" help="ブロックと友だち解除を合わせた人数です" {...metricCardState(overview.metrics.removed, removedValue === null ? pendingCard : { detail: `この${days}日` }, state.retry)} />
+      <KpiCard title="差し引き" value={netValue} unit="人" help="増えた人数から減った人数を引いた数です" {...metricCardState(overview.metrics.net, remainingRate === null ? pendingCard : { detail: `残っている割合 ${remainingRate.toFixed(1)}%` }, state.retry)} />
     </div>
     {/* ★V7：グラフの小見出しと同じことを繰り返していた説明の帯は外した。配信との照らし合わせは凡例の横に出ている。 */}
     <section className="bg-canvas rounded-card border-hairline border p-4">
@@ -2439,6 +2441,9 @@ function ReactionsOverviewTab({ accountId }: { accountId: string }) {
     overview.campaignsTruncation.broadcast ? `一斉配信は新しい方から先頭${broadcastShown}件` : null,
     overview.campaignsTruncation.scenario ? `シナリオは新しい方から先頭${scenarioShown}件` : null,
   ].filter(Boolean).join('・')
+  // 計算のしかたはふだん「？」へ。取れなかった理由があるときは理由を出す。
+  const clickReason = overview.metrics.lineClicked.reason ?? overview.metrics.delivered.reason ?? undefined
+  const clickHelp = clickReason ? undefined : 'LINEクリックを届いた人で割った割合です'
   const exportCampaigns = () => downloadCsv('analytics-reactions.csv', [
     ['配信', '種類', '送った日時', '対象', '到達', '開封', 'LINEクリック', '成果'],
     ...overview.campaigns.map((item) => [
@@ -2458,10 +2463,10 @@ function ReactionsOverviewTab({ accountId }: { accountId: string }) {
   return <div data-design-node="J6Inc" className="space-y-4">
     <AnalyticsPeriodControl days={days} onChange={setDays} />
     <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-      <KpiCard title={`この${days}日に送った`} value={overview.campaigns.length} unit="回" detail="一覧に取得できた配信" />
-      <KpiCard title="届いた人" value={delivered} unit="人" {...metricCardState(overview.metrics.delivered, { detail: '配信ごとの到達数の合計' }, state.retry)} />
-      <KpiCard title="押された割合" value={clickRate} unit="%" detail="LINEクリック ÷ 届いた人" description={overview.metrics.lineClicked.reason ?? overview.metrics.delivered.reason ?? undefined} />
-      <KpiCard title="取得できない配信" value={shownValue(overview.metrics.unavailableCampaigns)} unit="件" {...metricCardState(overview.metrics.unavailableCampaigns, { detail: '開封などを取得できない配信' }, state.retry)} />
+      <KpiCard title={`この${days}日に送った`} value={overview.campaigns.length} unit="回" detail="" help="一覧に取得できた配信の回数です" />
+      <KpiCard title="届いた人" value={delivered} unit="人" help="配信ごとの到達数の合計です" {...metricCardState(overview.metrics.delivered, { detail: '' }, state.retry)} />
+      <KpiCard title="押された割合" value={clickRate} unit="%" detail="" help={clickHelp} description={clickReason} />
+      <KpiCard title="取得できない配信" value={shownValue(overview.metrics.unavailableCampaigns)} unit="件" help="開封などを取得できない配信の件数です" {...metricCardState(overview.metrics.unavailableCampaigns, { detail: '' }, state.retry)} />
     </div>
     <AnalyticsNotice>配信ごとの開かれ方・押され方です。20人未満など取得できない数は、0ではなく「—」と理由で示します。</AnalyticsNotice>
     {truncationNote && <AnalyticsNotice>{truncationNote}までを表示しています。それより古い配信は一覧にもCSVの書き出しにも入りません。</AnalyticsNotice>}
@@ -2481,7 +2486,7 @@ function ReactionsOverviewTab({ accountId }: { accountId: string }) {
       <AnalyticsExportButton onClick={exportCampaigns} disabled={overview.campaigns.length === 0} />
     </div>
     <div className="bg-canvas rounded-card border-hairline overflow-hidden border"><table className="w-full table-fixed">
-      <thead><TableHeadRow><Th>配信</Th><Th>種類・日時</Th><Th align="right">対象</Th><Th align="right">到達</Th><Th align="right">開封</Th><Th align="right">LINEクリック</Th><Th align="right">成果</Th></TableHeadRow></thead>
+      <thead><TableHeadRow><Th>配信</Th><Th>種類・日時</Th><Th align="right">対象</Th><Th align="right" help="配信ごとの到達数の合計です">到達</Th><Th align="right" help="開いた人数です。20人未満など取得できない数は「—」で示します">開封</Th><Th align="right" help="こちらで作った中継URLを押した人数です">LINEクリック</Th><Th align="right">成果</Th></TableHeadRow></thead>
       <tbody className="divide-hairline divide-y">{overview.campaigns.length === 0 ? <tr><td colSpan={7} className="text-ink-faint p-8 text-center text-sm">この期間の配信はありません</td></tr> : overview.campaigns.map((item) => <tr key={`${item.kind}:${item.id}`} className="text-sm"><td className="truncate px-4 py-3 font-medium" title={item.name}>{item.name}</td><td className="text-ink-secondary px-3 py-3">{item.kind === 'broadcast' ? '一斉配信' : 'シナリオ'}<br /><span className="text-xs tabular-nums">{formatAnalyticsDateTime(item.sentAt)}</span></td><td className="px-3 py-3 text-right"><MetricCell metric={item.targetPeople} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.delivered} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.opened} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.lineClicked} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.outcomes} /></td></tr>)}</tbody>
     </table></div>
   </div>
@@ -2513,9 +2518,9 @@ function RoutesOverviewTab({ accountId }: { accountId: string }) {
     <AnalyticsPeriodControl days={days} onChange={setDays} />
     <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
       <KpiCard title={`この${days}日の成果`} value={conversions} unit="件" detail={revenue === null ? '売上は未取得です' : `売上 ${revenue.toLocaleString('ja-JP')}円`} />
-      <KpiCard title="かかった広告費" value={adCost} unit="円" detail="接続済みの経路を合計" />
-      <KpiCard title="差し引き" value={profit} unit="円" detail="売上から広告費を引いた残り" />
-      <KpiCard title="費用を取得できない経路" value={overview.routes.filter((item) => shownValue(item.adCost) === null).length} unit="件" detail="0円として計算しません" />
+      <KpiCard title="かかった広告費" value={adCost} unit="円" detail="" help="接続済みの経路の広告費を合計した金額です" />
+      <KpiCard title="差し引き" value={profit} unit="円" detail="" help="売上から広告費を引いた残りです" />
+      <KpiCard title="費用を取得できない経路" value={overview.routes.filter((item) => shownValue(item.adCost) === null).length} unit="件" detail="" help="0円として計算していません" />
     </div>
     <AnalyticsNotice><span>経路ごとに、かかった費用と出た成果を差し引きまで出します。帰属方式は「{overview.attributionLabel}」です。</span> <Link href={overview.searchConsoleHref} className="font-medium text-action hover:underline">Search Consoleを見る</Link>
       <p className="mt-1"><AnalyticsPeriodCaption from={state.data.period.from} to={state.data.period.to} cutoffAt={state.data.dataCutoffAt} /></p>

@@ -143,6 +143,7 @@ import { friendAttributes } from './routes/friend-attributes.js';
 import { featureSettings } from './routes/feature-settings.js';
 import { friendAddRules } from './routes/friend-add-rules.js';
 import { contents } from './routes/contents.js';
+import { fileScan } from './routes/file-scan.js';
 import { commonVarExports } from './routes/common-var-exports.js';
 import { analytics } from './routes/analytics.js';
 import { analyticsExports } from './routes/analytics-exports.js';
@@ -536,6 +537,7 @@ app.route('/', friendAddRules);
 // 登録しないと、静的な 'exports' が :id に取られて届かない。
 app.route('/', commonVarExports);
 app.route('/', contents);
+app.route('/', fileScan);
 app.route('/', analytics);
 app.route('/', analyticsExports);
 app.route('/', dashboard);
@@ -1353,6 +1355,18 @@ async function runFrequentHeavyJobs(
       },
     },
     {
+      // 危険なファイルの検査の再試行。期限切れの pending を拾って回す。
+      // 検査が動かない時は pending のまま置き、clean に格上げしない。
+      name: 'file scan retry',
+      run: async () => {
+        const { processDueFileScans } = await import('./routes/file-scan.js');
+        const result = await processDueFileScans(env, 20);
+        if (result.processed > 0) {
+          console.log(JSON.stringify({ event: 'file_scan_retry', ...result }));
+        }
+      },
+    },
+    {
       name: 'friend bulk runs',
       run: async () => {
         const result = await processDueFriendBulkRuns(env.DB, {
@@ -1481,6 +1495,20 @@ async function runFrequentHeavyJobs(
         const result = await processDueAnalyticsReports(env, new Date(event.scheduledTime));
         if (result.processed + result.failed + result.purged > 0) {
           console.log(JSON.stringify({ event: 'analytics_report_tick', ...result }));
+        }
+      },
+    },
+    {
+      // #838 第1段: 日次の友だちCSV書き出し。その日分は run_date の
+      // 一意制約で1回しか作らない（6時間tickのどれか1回が生成する）。
+      name: 'scheduled exports',
+      run: async () => {
+        const { processDueScheduledExports } = await import('./services/scheduled-exports.js');
+        const result = await processDueScheduledExports(env, {
+          now: new Date(event.scheduledTime).toISOString(),
+        });
+        if (result.generated + result.failed > 0) {
+          console.log(JSON.stringify({ event: 'scheduled_exports_tick', ...result }));
         }
       },
     },

@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Header from '@/components/layout/header'
 import Button from '@/components/shared/button'
+import HelpTip from '@/components/shared/help-tip'
 import StickyBar from '@/components/shared/sticky-bar'
 import { ApiError } from '@/lib/api'
 
@@ -244,14 +245,21 @@ export function FormSection({
   step,
   label,
   note,
+  help,
   children,
 }: {
   step: number
   label: string
   note?: string
+  /**
+   * 節の言葉の意味・仕様。見出しのすぐ右の「？」へ入れる
+   * （★V7・§2-1b）。警告・直し方は note のまま残す。
+   */
+  help?: ReactNode
   children: ReactNode
 }) {
   const v6 = useContext(VariantContext) === 'v6'
+  const hasHelp = help !== undefined && help !== null
   return (
     <section
       className={`border-hairline border-b last:border-b-0 last:pb-0 ${v6 ? 'pb-3' : 'pb-5'}`}
@@ -267,6 +275,7 @@ export function FormSection({
         <div>
           <h2 className={v6 ? 'text-ink text-lead font-bold' : 'text-ink text-sm font-semibold'}>
             {label}
+            {hasHelp ? <HelpTip label={`${label}の説明`}>{help}</HelpTip> : null}
           </h2>
           {note && (
             <p className={v6 ? 'text-ink-faint text-micro mt-0.5 font-medium' : 'text-ink-faint mt-0.5 text-xs'}>

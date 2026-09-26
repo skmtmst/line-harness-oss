@@ -12,7 +12,7 @@ import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import SelectField from '@/components/shared/select-field'
 import WebhookInteractions from './webhook-interactions'
-import { IncomingOverview, OutgoingOverview } from './webhook-overviews'
+import { IncomingOverview, OutgoingKpis, OutgoingOverview } from './webhook-overviews'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { MIN_SECRET_LENGTH, generateSecret } from './secret'
 
@@ -541,8 +541,9 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
   /*
     #980: タブの件数は、そのタブの一覧と同じ取得から数える。
     `incoming` / `outgoing` はこの画面が選択中アカウントで絞って取った配列で、
-    下の一覧（IncomingOverview / OutgoingOverview）とKPI帯がそのまま描く
-    同じ集合。読み込み中・取得失敗・まだ取っていない間は数字を付けない
+    下の一覧（IncomingOverview / OutgoingOverview）とKPI帯（OutgoingKpis、
+    タブの下にこの画面が描く）がそのまま描く同じ集合。読み込み中・
+    取得失敗・まだ取っていない間は数字を付けない
     （一覧側も「読み込んでいます」「表示できませんでした」と数を分けている）。
   */
   const countedTabs = MERGED_TABS.map((item) => {
@@ -564,18 +565,34 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
           <span className="mx-2">›</span>
           <span>外部連携</span>
         </nav>
-        <div className="flex flex-wrap justify-end gap-2">
-          <Button variant="secondary" href="/webhooks?tab=notify">見本から作る</Button>
-          {tab === 'incoming' ? (
-            <Button variant="primary" onClick={() => setShowCreate(!showCreate)}>
-              {showCreate ? 'キャンセル' : '受け取り口を追加'}
-            </Button>
-          ) : (
-            <Button variant="primary" href="/webhooks/new">送り先を追加</Button>
-          )}
-        </div>
       </div>
       <MergedTabs basePath="/webhooks" paramName="tab" tabs={countedTabs} active={tab} />
+      {/*
+        作る操作は数字のカードの下・一覧のすぐ上の左にそろえる。
+        「見本から作る」も作る操作なので同じ並びの副ボタンへ。
+        数字のカード（こちらから送るタブの KPI 帯）の下に置く。
+      */}
+      {tab === 'outgoing' ? (
+        <div className="mt-4">
+          <OutgoingKpis
+            items={outgoing}
+            status={outgoingStatus}
+            incomingCount={incoming.length}
+            summary={interactionSummary}
+            summaryStatus={summaryStatus}
+          />
+        </div>
+      ) : null}
+      <div className="mb-4 mt-4 flex flex-wrap items-center gap-2">
+        {tab === 'incoming' ? (
+          <Button variant="primary" onClick={() => setShowCreate(!showCreate)}>
+            {showCreate ? 'キャンセル' : '＋ 受け取り口を作る'}
+          </Button>
+        ) : (
+          <Button variant="primary" href="/webhooks/new">＋ 送り先を作る</Button>
+        )}
+        <Button variant="secondary" href="/webhooks?tab=notify">見本から作る</Button>
+      </div>
 
       {/* Rotate-secret modal — used to recover legacy webhooks or rotate. */}
       {rotateTarget && (
@@ -629,13 +646,12 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
               >
                 キャンセル
               </Button>
-              <button
+              <Button
                 type="submit"
-                className="px-4 py-2 text-sm rounded-lg text-white font-medium"
-                style={{ backgroundColor: 'var(--color-accent)' }}
+                variant="primary"
               >
                 保存
-              </button>
+              </Button>
             </div>
           </form>
         </div>
@@ -795,13 +811,13 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
               </p>
             </div>
           </div>
-          <button
+          <Button
             type="submit"
-            className="mt-4 px-4 py-2 rounded-lg text-white text-sm font-medium"
-            style={{ backgroundColor: 'var(--color-accent)' }}
+            variant="primary"
+            className="mt-4"
           >
             作成
-          </button>
+          </Button>
         </form>
       )}
 

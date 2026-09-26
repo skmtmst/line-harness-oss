@@ -25,12 +25,16 @@ export default function HelpTip({
   /** 読み上げ名（例：「今月の完了率の説明」）。吹き出しとは aria-describedby でつなぐ。 */
   label: string
   className?: string
-  /** 1〜2文の補足。 */
+  /**
+   * 1〜2文の補足。長い説明がある場所への「くわしく」リンクも
+   * ここへ一緒に渡す（`<a href="...">くわしく</a>`）。
+   */
   children: ReactNode
 }) {
   const [open, setOpen] = useState(false)
   const tipId = useId()
   const wrapRef = useRef<HTMLSpanElement>(null)
+  const buttonRef = useRef<HTMLButtonElement>(null)
 
   // 1つ開くと他は閉じる。開いた側が合図し、違う持ち主だけ閉じる。
   useEffect(() => {
@@ -42,11 +46,14 @@ export default function HelpTip({
     return () => window.removeEventListener(CLOSE_OTHERS_EVENT, closeOthers)
   }, [open, tipId])
 
-  // Esc や外を押すと閉じる。
+  // Esc や外を押すと閉じる。Escでは押した？へ戻る。
   useEffect(() => {
     if (!open) return
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false)
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      setOpen(false)
+      buttonRef.current?.focus()
     }
     const onPointer = (event: PointerEvent) => {
       if (wrapRef.current && !wrapRef.current.contains(event.target as Node)) setOpen(false)
@@ -67,11 +74,18 @@ export default function HelpTip({
   }
 
   return (
-    <span ref={wrapRef} className={[styles.wrap, className].filter(Boolean).join(' ')}>
+    <span
+      ref={wrapRef}
+      className={[styles.wrap, className].filter(Boolean).join(' ')}
+      onBlur={(event) => {
+        if (!wrapRef.current?.contains(event.relatedTarget as Node)) setOpen(false)
+      }}
+    >
       <button
+        ref={buttonRef}
         type="button"
         aria-label={label}
-        aria-describedby={tipId}
+        aria-describedby={open ? tipId : undefined}
         aria-expanded={open}
         onClick={toggle}
         className={styles.button}

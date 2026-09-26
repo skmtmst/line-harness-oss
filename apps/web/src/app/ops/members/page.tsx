@@ -105,16 +105,25 @@ export default function OpsMembersPage() {
             { label: '権限者', current: tab === 'members', onClick: () => setTab('members') },
             { label: '運営の情報', current: tab === 'info', onClick: () => setTab('info') },
           ]}
-          actions={
-            tab === 'members' ? (
-              <Button variant="primary" onClick={() => setInviting((v) => !v)}>
-                <Plus aria-hidden="true" className="h-4 w-4" />
-                運営メンバーを招待
-              </Button>
-            ) : undefined
-          }
         />
       </div>
+
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <SummaryCard variant="v6" title="運営メンバー" value={summary ? summary.members : null} unit="人" detail={summary ? `招待中 ${summary.invited}・2要素認証待ち ${summary.awaitingTotp}` : '—'} loading={!loaded} />
+        <SummaryCard variant="v6" title="2要素認証" value={summary ? summary.totpEnabled : null} unit={summary ? `/ ${summary.members}人` : '人'} detail={totpMissing > 0 ? `未設定 ${totpMissing}人` : '全員設定済み'} badge={totpMissing > 0 ? '要対応' : undefined} badgeTone="danger" loading={!loaded} />
+        <SummaryCard variant="v6" title="今月の代理ログイン" value={summary ? summary.impersonationsThisMonth : null} unit="回" detail={summary ? `書き込み ${summary.writeImpersonationsThisMonth}回` : '—'} loading={!loaded} />
+        <SummaryCard variant="v6" title="今月の個人情報の表示" value={summary ? summary.piiRevealsThisMonth : null} unit="回" detail="理由の記録あり" loading={!loaded} />
+      </div>
+
+      {/* 作る操作は数字のカードの下・一覧のすぐ上の左にそろえる。 */}
+      {tab === 'members' ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="primary" onClick={() => setInviting((v) => !v)}>
+            <Plus aria-hidden="true" className="h-4 w-4" />
+            運営メンバーを招待
+          </Button>
+        </div>
+      ) : null}
 
       {inviting ? (
         <form onSubmit={(event) => void invite(event)} className="flex items-center gap-2 rounded-card border border-hairline bg-canvas px-4 py-3">

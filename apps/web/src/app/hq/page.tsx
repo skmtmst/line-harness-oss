@@ -150,8 +150,8 @@ export default function HqPage() {
           {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}
           <KpiCollapse data-design="KPIs" data-design-node="w7yY6" gridClassName="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <SummaryCard variant="v6" title="アカウント" value={accounts.length} unit="件" detail={`有効 ${totals.active}・停止中 ${accounts.length - totals.active}`} />
-            <SummaryCard variant="v6" title="友だち合計" value={totals.friends} unit="人" detail="全アカウントの合計" />
-            <SummaryCard variant="v6" title="今月の配信" value={totals.messages} unit="通" detail={`${month}/1 から今日まで`} />
+            <SummaryCard variant="v6" title="友だち合計" value={totals.friends} unit="人" detail="" help="全アカウントの合計です" />
+            <SummaryCard variant="v6" title="今月の配信" value={totals.messages} unit="通" detail="" help={`${month}/1 から今日までの配信です`} />
             <SummaryCard variant="v6" title="要確認" value={totals.warnings} unit="件" detail="接続に問題があるアカウント" valueTone="warning" />
           </KpiCollapse>
         </>

@@ -627,15 +627,6 @@ export default function BookingsPage() {
           <span className="mx-1.5">/</span>
           <span>予約管理</span>
         </nav>
-        {/* N-401: 閲覧のみの人には代理予約の入口を出さない */}
-        {canOperate ? (
-          <Link
-            href="/booking/bookings/new"
-            className="bg-accent-deep text-on-accent rounded-control px-4 py-2 text-sm font-medium"
-          >
-            電話の予約を入れる
-          </Link>
-        ) : null}
       </div>
       <nav aria-label="予約の表示" className="border-hairline flex items-center gap-7 border-b">
         {/*
@@ -661,6 +652,16 @@ export default function BookingsPage() {
       </nav>
     </>
   )
+
+  /*
+   * 作る操作は一覧のすぐ上の左の並びへ。見出しの行の右端には置かない。
+   * N-401: 閲覧のみの人には代理予約の入口を出さない。
+   */
+  const createRow = canOperate ? (
+    <div className="mb-3 flex flex-wrap items-center gap-2">
+      <Button variant="primary" href="/booking/bookings/new">電話の予約を入れる</Button>
+    </div>
+  ) : null
 
   const dialogs = (
     <>
@@ -697,6 +698,7 @@ export default function BookingsPage() {
     return (
       <div className="flex flex-col gap-4">
         {pageHead}
+        {createRow}
         {/*
           ★V7 `x63W5x`：同じ失敗を1画面に1つへ。失敗の1枚はカレンダーの場所に
           出す（#634 の読み直す口は保つ）。一覧が読めている間はカレンダーを出す。
@@ -777,6 +779,8 @@ export default function BookingsPage() {
           detail={summaryError ? '読み込めませんでした' : !summaryReady ? '読み込んでいます' : kpi.rate === null ? '率 —' : `率 ${kpi.rate}%`}
         />
       </div>
+
+      {createRow}
 
       <div
         data-design="Body"

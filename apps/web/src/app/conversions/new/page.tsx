@@ -304,7 +304,7 @@ export default function NewConversionPointPage() {
 
   return (
     <CreatePage
-      title="成果地点をつくる"
+      title="成果地点を作る"
       description="「申込」「購入」など、成果として数えたい行動を登録します。"
       showHeader={false}
       parent={['コンバージョン', '/conversions?tab=points']}
@@ -454,7 +454,7 @@ export default function NewConversionPointPage() {
             label="成果地点の名前"
             htmlFor="cv-name"
             required
-            note="一覧・案件・分析にこの名前で並びます。"
+            help="一覧・案件・分析にこの名前で並びます。"
           >
             <input
               id="cv-name"
@@ -476,7 +476,7 @@ export default function NewConversionPointPage() {
               label="数えてよいページ"
               htmlFor="cv-url"
               required
-              note="前方一致で判定し、パラメータは無視します。"
+              help="前方一致で判定し、パラメータは無視します。"
             >
               <input
                 id="cv-url"
@@ -488,7 +488,7 @@ export default function NewConversionPointPage() {
               />
             </Field>
           ) : (
-            <Field label="どの注文を数えるか" htmlFor="cv-order-scope" note="すべての注文を対象に保存します。">
+            <Field label="どの注文を数えるか" htmlFor="cv-order-scope" help="すべての注文を対象に保存します。">
               <SelectField id="cv-order-scope" value="all" disabled options={[{ value: 'all', label: 'すべての注文' }]} className="w-full" />
             </Field>
           )}
@@ -532,7 +532,7 @@ export default function NewConversionPointPage() {
               className="w-full"
             />
           </Field>
-          <Field label="決まった金額（円）" htmlFor="cv-value" note="1件ごとの金額です。">
+          <Field label="決まった金額（円）" htmlFor="cv-value" help="1件ごとの金額です。">
             <input
               id="cv-value"
               type="number"
@@ -543,7 +543,7 @@ export default function NewConversionPointPage() {
               className={`${inputClass} tabular-nums disabled:bg-canvas-sunken`}
             />
           </Field>
-          <Field label="取り消しの扱い" htmlFor="cv-reversal-policy" note="元の成果は消さず、取消記録を追加します。">
+          <Field label="取り消しの扱い" htmlFor="cv-reversal-policy" help="元の成果は消さず、取消記録を追加します。">
             <SelectField
               id="cv-reversal-policy"
               value={reversalPolicy}

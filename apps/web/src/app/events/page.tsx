@@ -143,12 +143,6 @@ export default function EventsListPage() {
             <span className="mx-1.5">/</span>
             <span>イベント予約</span>
           </nav>
-          <Link
-            href="/events/new"
-            className="bg-accent-deep text-on-accent rounded-control px-4 py-2 text-sm font-medium"
-          >
-            イベントをつくる
-          </Link>
         </div>
         <p className="text-ink-faint text-sm">
           開催するイベントの申込を管理します。定員と承認制の設定ができます。
@@ -204,6 +198,13 @@ export default function EventsListPage() {
 
       <div className="bg-info-bg text-ink-secondary rounded-control px-4 py-3 text-xs">
         定員に達すると、お客様の画面では自動で「満席」になります。キャンセルが出たら、キャンセル待ちの人に自動で順番が回ります。
+      </div>
+
+      {/*
+        作る操作は一覧のすぐ上の左。見出しの行の右端には置かない。
+      */}
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <Button variant="primary" href="/events/new">＋ イベントを作る</Button>
       </div>
 
       <div
