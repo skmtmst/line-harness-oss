@@ -10,6 +10,7 @@ import Breadcrumb from '@/components/shared/breadcrumb'
 import Disclosure from '@/components/shared/disclosure'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
+import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import {
   api,
@@ -430,33 +431,28 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
             {reorderError}
           </p>
         )}
-        <div
-          data-design="Table"
-          className="bg-canvas rounded-card border border-hairline overflow-hidden"
-        >
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[880px]">
+        <DataTable>
               <thead>
-                <tr className="bg-canvas-sunken border-b border-hairline">
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint">メニュー</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint">かかる時間</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-ink-faint">金額</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint">だれが受けられるか</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-ink-faint">
+                <TableHeadRow>
+                  <Th style={{ width: '26%' }}>メニュー</Th>
+                  <Th style={{ width: '12%' }}>かかる時間</Th>
+                  <Th style={{ width: '10%' }} align="right">金額</Th>
+                  <Th style={{ width: '18%' }}>だれが受けられるか</Th>
+                  <Th style={{ width: '12%' }} align="right">
                     この30日
-                  </th>
+                  </Th>
                   {/* #707: 390pxで表を横スクロールしても操作列を右端へ留める */}
-                  <th className="sticky right-0 bg-canvas-sunken px-4 py-3 text-right text-xs font-semibold text-ink-faint">操作</th>
-                </tr>
+                  <Th style={{ width: '22%' }} align="right" className="sticky right-0 bg-canvas-sunken">操作</Th>
+                </TableHeadRow>
               </thead>
-              <tbody className="divide-hairline divide-y">
+              <tbody>
                 {visible.map((m) => {
                   const orderIndex = shown.findIndex((item) => item.id === m.id)
                   const canMoveUp = orderIndex > 0
                   const canMoveDown = orderIndex >= 0 && orderIndex < shown.length - 1
                   return (
-                  <tr key={m.id} className={`hover:bg-canvas-sunken ${m.is_active ? '' : 'text-ink-faint'}`}>
-                    <td className="px-4 py-3 text-sm font-medium">
+                  <Tr key={m.id} interactive className={m.is_active ? '' : 'text-ink-faint'}>
+                    <Td className="font-medium">
                       {/*
                         行頭の持ち手の飾りは置かない。ドラッグで並び替えられる
                         ように見えるが実際は押せない印になる（監査 A12・#709）。
@@ -469,14 +465,14 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
                           {m.category_label}
                         </span>
                       )}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-ink-secondary tabular-nums">
+                    </Td>
+                    <Td className="text-ink-secondary tabular-nums">
                       {m.duration_minutes} 分
-                    </td>
-                    <td className={`px-4 py-3 text-sm text-right tabular-nums ${menuPriceLabel(m) === '無料' ? 'text-ink font-semibold' : ''}`}>
+                    </Td>
+                    <Td align="right" className={`tabular-nums ${menuPriceLabel(m) === '無料' ? 'text-ink font-semibold' : ''}`}>
                       {menuPriceLabel(m)}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-ink-secondary">
+                    </Td>
+                    <Td className="text-ink-secondary">
                       {/*
                        * #953 E-05: 休止中でも担当の割当は残る。is_active を先に見て
                        * 「だれもいません」と出すと、割当済みなのに未割当に見える。
@@ -489,11 +485,11 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
                       ) : (
                         <span className="text-xs">{(menuStaff.get(m.id) ?? []).join('・')}</span>
                       )}
-                    </td>
-                    <td className="px-4 py-3 text-right text-sm tabular-nums">
+                    </Td>
+                    <Td align="right" className="tabular-nums">
                       {`${bookingCounts.get(m.id) ?? 0} 件`}
-                    </td>
-                    <td className="sticky right-0 bg-canvas px-4 py-3 text-right">
+                    </Td>
+                    <ActionCell className="sticky right-0 bg-canvas">
                       <div className="inline-flex gap-2 text-xs">
                         {/* QSLEH の行操作は共通Button（高さ36px）より小さいため、
                             表の行高を設計どおり保つ専用の小ボタンにする。 */}
@@ -528,14 +524,12 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
                           </>
                         )}
                       </div>
-                    </td>
-                  </tr>
+                    </ActionCell>
+                  </Tr>
                   )
                 })}
               </tbody>
-            </table>
-          </div>
-        </div>
+        </DataTable>
       </>)}
 
       <div className="mt-3 flex items-center justify-between gap-3">
@@ -623,25 +617,23 @@ function BookingRulesSummary({ accountId, settings, items, loading, error, canMa
           <p className="text-ink-faint mt-1 text-xs">個別に値を入れたメニューは、下の値が優先されます。</p>
         </div>
         {/*
-          #734: 390pxでは列が多くて入りきらない。w-full だけだと表が容器幅に
-          潰れて右列の文字が途中で切れるため、内容が必要とする最小幅を持たせて
-          容器側の横スクロールで読めるようにする。
+          #734: 390pxでは列が多くて入りきらない。共通の表は外枠で横スクロールし、
+          列幅を均等に分ける（以前の最小幅 560px の指定はやめた）。
         */}
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[560px] text-sm">
-            <thead className="bg-canvas-sunken text-ink-secondary">
-              <tr><th className="px-4 py-3 text-left font-medium">メニュー</th>{rows.map((row) => <th key={row.key} className="px-4 py-3 text-left font-medium whitespace-nowrap">{row.label}</th>)}</tr>
+        {/* 外のカードが枠線を持つため、表の枠は消して二重線にしない。 */}
+        <DataTable className="rounded-none border-0">
+            <thead>
+              <TableHeadRow><Th>メニュー</Th>{rows.map((row) => <Th key={row.key} className="whitespace-nowrap">{row.label}</Th>)}</TableHeadRow>
             </thead>
-            <tbody className="divide-hairline divide-y">
+            <tbody>
               {items.map((menu) => (
-                <tr key={menu.id}>
-                  <td className="px-4 py-3 font-medium whitespace-nowrap">{menu.name}</td>
-                  {rows.map((row) => <td key={row.key} className="text-ink-secondary px-4 py-3 tabular-nums whitespace-nowrap">{menu[row.key] == null ? row.none : `${menu[row.key]}${row.unit}`}</td>)}
-                </tr>
+                <Tr key={menu.id}>
+                  <Td className="font-medium whitespace-nowrap">{menu.name}</Td>
+                  {rows.map((row) => <Td key={row.key} className="text-ink-secondary tabular-nums whitespace-nowrap">{menu[row.key] == null ? row.none : `${menu[row.key]}${row.unit}`}</Td>)}
+                </Tr>
               ))}
             </tbody>
-          </table>
-        </div>
+        </DataTable>
       </div>}
     </section>
   )

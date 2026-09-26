@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { DashboardOverview } from '@/lib/api'
+import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 
 /**
  * 友だち数の推移。
@@ -83,19 +84,18 @@ export default function FriendTrendTable({
         （DASH-27）。見出しは折り返さず、横へ移動できることを案内する。
       */}
       <p className="text-ink-faint px-5 pt-2 text-micro sm:hidden">表は横にスクロールできます</p>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm font-normal">
+      <DataTable className="rounded-none border-0">
           <thead>
-            <tr className="text-ink-faint border-hairline border-b text-left text-xs">
-              <th className="px-5 py-2 font-medium whitespace-nowrap">日付</th>
-              <th className="px-3 py-2 text-right font-medium whitespace-nowrap">前日比</th>
-              <th className="px-3 py-2 text-right font-medium whitespace-nowrap">登録</th>
-              <th className="px-3 py-2 text-right font-medium whitespace-nowrap">ブロック</th>
-              <th className="px-3 py-2 text-right font-medium whitespace-nowrap">有効友だち</th>
-              <th className="px-5 py-2 font-medium whitespace-nowrap">流入元の内訳</th>
-            </tr>
+            <TableHeadRow>
+              <Th style={{ width: '18%' }} className="whitespace-nowrap">日付</Th>
+              <Th style={{ width: '12%' }} align="right" className="whitespace-nowrap">前日比</Th>
+              <Th style={{ width: '12%' }} align="right" className="whitespace-nowrap">登録</Th>
+              <Th style={{ width: '12%' }} align="right" className="whitespace-nowrap">ブロック</Th>
+              <Th style={{ width: '14%' }} align="right" className="whitespace-nowrap">有効友だち</Th>
+              <Th style={{ width: '32%' }} className="whitespace-nowrap">流入元の内訳</Th>
+            </TableHeadRow>
           </thead>
-          <tbody className="divide-hairline divide-y">
+          <tbody>
             {rows.map((row, i) => {
               // 前日比は、1つ後ろ（＝前日）との差。最終行は比べる相手がいない。
               const previous = rows[i + 1]
@@ -105,8 +105,8 @@ export default function FriendTrendTable({
               const sourcesOpen = sourcesOpenFor === row.date
               const canExpandSources = sources.full !== sources.compact
               return (
-                <tr key={row.date} className="text-ink-secondary">
-                  <td className="px-5 py-2.5 whitespace-nowrap">
+                <Tr key={row.date} className="text-ink-secondary">
+                  <Td className="whitespace-nowrap">
                     {formatDate(row.date)}
                     {row.estimated && (
                       <span className="ml-1.5 inline-flex items-center gap-1 text-nano">
@@ -123,16 +123,16 @@ export default function FriendTrendTable({
                         {ESTIMATED_NOTE}
                       </span>
                     ) : null}
-                  </td>
-                  <td className="px-3 py-2.5 text-right tabular-nums">
+                  </Td>
+                  <Td align="right" className="tabular-nums">
                     {diff === null ? '—' : diff === 0 ? '0' : diff > 0 ? `+${diff}` : diff}
-                  </td>
-                  <td className="px-3 py-2.5 text-right tabular-nums">{row.added}</td>
-                  <td className="px-3 py-2.5 text-right tabular-nums">{row.blocked}</td>
-                  <td className="px-3 py-2.5 text-right font-medium tabular-nums">
+                  </Td>
+                  <Td align="right" className="tabular-nums">{row.added}</Td>
+                  <Td align="right" className="tabular-nums">{row.blocked}</Td>
+                  <Td align="right" className="font-medium tabular-nums">
                     {row.active.toLocaleString('ja-JP')}
-                  </td>
-                  <td className="text-ink-faint max-w-[240px] px-5 py-2.5">
+                  </Td>
+                  <Td className="text-ink-faint">
                     {canExpandSources ? (
                       /*
                         内訳が省略されているときは、指・キーボードで全文を開ける
@@ -154,13 +154,12 @@ export default function FriendTrendTable({
                     ) : (
                       <span className="block truncate" title={sources.full}>{sources.compact}</span>
                     )}
-                  </td>
-                </tr>
+                  </Td>
+                </Tr>
               )
             })}
           </tbody>
-        </table>
-      </div>
+      </DataTable>
 
     </div>
   )

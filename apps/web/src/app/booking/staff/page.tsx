@@ -12,6 +12,7 @@ import IconButton from '@/components/shared/icon-button'
 import ActionMenu from '@/components/shared/action-menu'
 import ListState from '@/components/shared/list-state'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { api, bookingApi, type BookingStaff } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -149,23 +150,21 @@ export default function BookingStaffPage() {
       ) : items.length === 0 ? (
         <ListState kind="empty" title="予約スタッフはまだいません" description="「＋ スタッフを作る」から最初のスタッフを追加してください。" />
       ) : (
-        <div data-design="Table" className="bg-canvas rounded-card border border-hairline overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px]">
+        <DataTable>
               <thead>
-                <tr className="bg-canvas-sunken border-b border-hairline">
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">スタッフ</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">役職</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-ink-faint uppercase">指名なし枠</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-ink-faint uppercase">並び順</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-ink-faint uppercase">有効</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-ink-faint uppercase">操作</th>
-                </tr>
+                <TableHeadRow>
+                  <Th style={{ width: '26%' }}>スタッフ</Th>
+                  <Th style={{ width: '16%' }}>役職</Th>
+                  <Th style={{ width: '14%' }} align="center">指名なし枠</Th>
+                  <Th style={{ width: '10%' }} align="right">並び順</Th>
+                  <Th style={{ width: '10%' }} align="center">有効</Th>
+                  <Th style={{ width: '24%' }} align="right">操作</Th>
+                </TableHeadRow>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody>
                 {items.map((s) => (
-                  <tr key={s.id} className="hover:bg-canvas-sunken">
-                    <td className="px-4 py-3 text-sm">
+                  <Tr key={s.id} interactive>
+                    <Td>
                       <div className="flex items-center gap-3">
                         {s.profile_image_url ? (
                           <img
@@ -185,24 +184,24 @@ export default function BookingStaffPage() {
                           )}
                         </div>
                       </div>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-ink-secondary">{s.role ?? '-'}</td>
-                    <td className="px-4 py-3 text-center">
+                    </Td>
+                    <Td className="text-ink-secondary">{s.role ?? '-'}</Td>
+                    <Td align="center">
                       {s.is_designation_optional ? (
                         <span className="inline-block px-2 py-0.5 rounded bg-purple-100 text-purple-700 text-xs">指名なし</span>
                       ) : (
                         <span className="text-xs text-gray-300">-</span>
                       )}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-right tabular-nums text-ink-faint">{s.sort_order}</td>
-                    <td className="px-4 py-3 text-center">
+                    </Td>
+                    <Td align="right" className="tabular-nums text-ink-faint">{s.sort_order}</Td>
+                    <Td align="center">
                       {s.is_active ? (
                         <span className="inline-block px-2 py-0.5 rounded bg-success-bg text-success text-xs">ON</span>
                       ) : (
                         <span className="inline-block px-2 py-0.5 rounded bg-canvas-sunken text-ink-faint text-xs">OFF</span>
                       )}
-                    </td>
-                    <td className="px-4 py-3 text-right">
+                    </Td>
+                    <ActionCell>
                       {/* 行の操作は「主な1つ＋…メニュー」。削除は行に直に置かず、メニューの中の危ない操作へ。 */}
                       <div className="relative inline-flex items-center justify-end gap-1.5">
                         {canManageStaff ? (
@@ -238,13 +237,11 @@ export default function BookingStaffPage() {
                           </Button>
                         )}
                       </div>
-                    </td>
-                  </tr>
+                    </ActionCell>
+                  </Tr>
                 ))}
               </tbody>
-            </table>
-          </div>
-        </div>
+        </DataTable>
       )}
 
       {editing && <Modal staff={editing} onSave={save} onClose={() => setEditing(null)} />}

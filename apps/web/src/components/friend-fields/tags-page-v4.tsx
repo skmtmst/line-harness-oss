@@ -14,6 +14,7 @@ import Button from '@/components/shared/button'
 import ListKpis from '@/components/shared/list-kpis'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
+import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { Tabs } from '@/components/shared/tabs'
 import FriendFieldList from './field-list'
 import SupportMarkList from './mark-list'
@@ -997,7 +998,7 @@ export default function TagsPageV4({
               */}
               {/* @container: 谷間帯の列削減。表の幅が足りない間だけ「付け方」を畳む。
                   「付け方」は行の操作ではない補助情報で、編集画面で読める。 */}
-              <div className="overflow-x-auto @container">
+              <div className="hidden overflow-x-auto @container md:block">
               {/*
                 960px以上は表。それ未満は縦に重ねたカードへ（#1014 ATTR-20）。
                 #636: 最小幅は 880→800px。1440pxではフォルダ欄を引いた表の
@@ -1005,23 +1006,23 @@ export default function TagsPageV4({
                 常時出ていた。800pxなら1440pxに収まり、それより狭い幅では
                 従来どおり表の内側だけが横へ動く。
               */}
-              <table className="hidden w-full min-w-[712px] table-fixed text-sm @[830px]:min-w-[800px] md:table">
+              <DataTable>
                 {/* 設計 `HrwyW` の見出し。「表示」は★、「操作」はゴミ箱だけ。 */}
-                <thead className="border-b border-hairline bg-canvas-sunken text-[11px] text-ink-faint">
-                  <tr>
+                <thead>
+                  <TableHeadRow>
                     {/* 先頭の選択列と末尾の操作列は外側の余白をそろえる。操作列は中身の幅で固定する。 */}
-                    <th className="w-11 px-3 py-3" />
-                    <th className="w-[22%] px-3 py-3 text-left">タグ</th>
-                    <th className="w-[11%] px-3 py-3 text-left">フォルダ</th>
-                    <th className="w-[7%] whitespace-nowrap px-3 py-3 text-left">人数</th>
-                    <th className="cq-hide-below-830 w-[11%] whitespace-nowrap px-3 py-3 text-left">付け方</th>
-                    <th className="w-[17%] whitespace-nowrap px-3 py-3 text-left" title="マイル・アクションとの連動">連動</th>
-                    <th className="px-3 py-3 text-left">使用先</th>
-                    <th className="w-[6%] px-3 py-3 text-left">表示</th>
+                    <Th style={{ width: 44 }}><span className="sr-only">並び替え</span></Th>
+                    <Th style={{ width: '22%' }}>タグ</Th>
+                    <Th style={{ width: '11%' }}>フォルダ</Th>
+                    <Th style={{ width: '7%' }} className="whitespace-nowrap">人数</Th>
+                    <Th style={{ width: '11%' }} className="cq-hide-below-830 whitespace-nowrap">付け方</Th>
+                    <Th style={{ width: '17%' }} className="whitespace-nowrap" title="マイル・アクションとの連動">連動</Th>
+                    <Th>使用先</Th>
+                    <Th style={{ width: '6%' }}>表示</Th>
                     {/* #768: 表が横に流れる帯でも操作列は右端に留める。 */}
                     {/* 見出し「操作」は2文字で1行に収める（w-11 では「操／作」と折れる）。中身はゴミ箱1つなので w-16 で足りる。 */}
-                    <th className="bg-canvas-sunken sticky right-0 w-16 whitespace-nowrap px-3 py-3 text-left">操作</th>
-                  </tr>
+                    <Th style={{ width: 64 }} className="sticky right-0 whitespace-nowrap bg-canvas-sunken">操作</Th>
+                  </TableHeadRow>
                 </thead>
                 <tbody className="divide-y divide-hairline">
                   {/*
@@ -1046,7 +1047,7 @@ export default function TagsPageV4({
                     const group = groups.find((item) => item.id === tag.groupId)
                     const chips = linkChips(tag)
                     return (
-                      <tr key={tag.id} className="group cursor-pointer hover:bg-canvas-sunken" tabIndex={0} onClick={() => router.push(`/tags/edit?id=${tag.id}`)} onKeyDown={(event) => { if (event.target !== event.currentTarget) return; if (event.key === 'Enter') { event.preventDefault(); router.push(`/tags/edit?id=${tag.id}`) } }}>
+                      <Tr key={tag.id} interactive className="group cursor-pointer" tabIndex={0} onClick={() => router.push(`/tags/edit?id=${tag.id}`)} onKeyDown={(event) => { if (event.target !== event.currentTarget) return; if (event.key === 'Enter') { event.preventDefault(); router.push(`/tags/edit?id=${tag.id}`) } }}>
                         {/*
                           行を押したら編集へ（一覧の決まり）。名前は黒文字の太字。
                           並び替え・フォルダ選択・星・削除は行の移動を起こさない。
@@ -1056,17 +1057,17 @@ export default function TagsPageV4({
                           「並び替え」ボタンで出し入れしない。押す前は
                           並び替えられることに気づけないため。
                         */}
-                        <td
+                        <Td
                           draggable
                           onClick={(event) => event.stopPropagation()}
                           onDragStart={() => setDragId(tag.id)}
                           onDragOver={(event) => event.preventDefault()}
                           onDrop={() => void move(tag.id)}
-                          className="cursor-grab px-3 py-3 text-center text-hairline"
+                          className="cursor-grab text-center text-hairline"
                         >
                           <ReorderGrip label={tag.name} onMove={(direction) => void keyboardMove(tag.id, direction)}><GripIcon /></ReorderGrip>
-                        </td>
-                        <td className="px-3 py-3">
+                        </Td>
+                        <Td>
                           <div className="flex min-w-0 items-center gap-2">
                             <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: group?.color ?? '#8b938d' }} />
                             {/* 名前は黒文字の太字。押すと編集へ行く（編集ボタンは置かない）。 */}
@@ -1082,13 +1083,13 @@ export default function TagsPageV4({
                           </div>
                           {/* ATTR-20: 登録日は名前の下へ畳む。独立した列にすると1024pxでつぶれる。 */}
                           <p className="mt-0.5 pl-4 text-[11px] text-ink-faint">{formatDate(tag.createdAt)} 登録</p>
-                        </td>
-                        <td className="px-3 py-3" onClick={(event) => event.stopPropagation()}>
+                        </Td>
+                        <Td onClick={(event) => event.stopPropagation()}>
                           <FolderSelect tag={tag} groups={groups} onItemsChange={setItems} onError={setError} />
-                        </td>
-                        <td className="px-3 py-3 text-label tabular-nums">{tag.friendCount ?? 0}人</td>
-                        <td className="cq-hide-below-830 truncate px-3 py-3 text-label text-ink" title={sourceLabel(tag)}>{sourceLabel(tag)}</td>
-                        <td className="px-3 py-3">
+                        </Td>
+                        <Td className="text-label tabular-nums">{tag.friendCount ?? 0}人</Td>
+                        <Td className="cq-hide-below-830 truncate text-label text-ink" title={sourceLabel(tag)}>{sourceLabel(tag)}</Td>
+                        <Td>
                           <div className="flex flex-wrap gap-1.5">
                             {chips.length === 0
                               ? <span className="text-xs text-ink-faint">—</span>
@@ -1096,9 +1097,9 @@ export default function TagsPageV4({
                                   <span key={chip.label} className={`rounded-mini px-[7px] py-[2px] text-micro font-semibold ${chip.tone}`}>{chip.label}</span>
                                 ))}
                           </div>
-                        </td>
-                        <td className="truncate px-3 py-3 text-label text-ink" title={usageLabel(tag)}>{usageLabel(tag)}</td>
-                        <td className="px-3 py-3" onClick={(event) => event.stopPropagation()}>
+                        </Td>
+                        <Td className="truncate text-label text-ink" title={usageLabel(tag)}>{usageLabel(tag)}</Td>
+                        <Td onClick={(event) => event.stopPropagation()}>
                           {/* 設計 `zMlMX`。押すと友だち一覧への表示を切り替える。 */}
                           <button
                             type="button"
@@ -1109,18 +1110,20 @@ export default function TagsPageV4({
                           >
                             <StarIcon filled={Boolean(tag.isStarred)} />
                           </button>
-                        </td>
-                        <td className="bg-canvas group-hover:bg-canvas-sunken sticky right-0 px-3 py-3" onClick={(event) => event.stopPropagation()}>
+                        </Td>
+                        <ActionCell className="sticky right-0 bg-canvas group-hover:bg-canvas-sunken">
                           {/* 設計 `E2NC4`。赤いゴミ箱だけ。文字の「削除」は置かない。 */}
-                          <button type="button" onClick={() => setDeleteTarget(tag)} aria-label={`${tag.name} を削除`} className="text-danger hover:opacity-70">
-                            <TrashIcon />
-                          </button>
-                        </td>
-                      </tr>
+                          <span onClick={(event) => event.stopPropagation()}>
+                            <button type="button" onClick={() => setDeleteTarget(tag)} aria-label={`${tag.name} を削除`} className="text-danger hover:opacity-70">
+                              <TrashIcon />
+                            </button>
+                          </span>
+                        </ActionCell>
+                      </Tr>
                     )
                   })}
                 </tbody>
-              </table>
+              </DataTable>
               </div>
               {/*
                 960px未満は縦に重ねたカード（#1014 ATTR-20）。

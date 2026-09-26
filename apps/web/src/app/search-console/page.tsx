@@ -5,6 +5,7 @@ import MergedTabs from '@/components/layout/merged-tabs'
 import Button from '@/components/shared/button'
 import Disclosure from '@/components/shared/disclosure'
 import NoteBar from '@/components/shared/note-bar'
+import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import StatusBadge from '@/components/shared/status-badge'
 import { api } from '@/lib/api'
 import { csvCell } from '@/lib/presentation'
@@ -136,23 +137,22 @@ function RankingTable({ title, rows, kind }: { title: string; rows: SearchConsol
       {rows.length === 0 ? (
         <p className="text-ink-faint p-8 text-center text-sm">データがありません</p>
       ) : (
-        <table className="w-full table-fixed text-xs">
-          <colgroup><col className="w-[43%]" /><col className="w-[16%]" /><col className="w-[14%]" /><col className="w-[13%]" /><col className="w-[14%]" /></colgroup>
-          <thead className="bg-canvas-sunken text-ink-faint text-[11px] font-semibold">
-            <tr><th className="px-4 py-3 text-left">{kind === 'query' ? 'キーワード' : 'ページ'}</th><th className="px-2 py-3 text-right">表示回数</th><th className="px-2 py-3 text-right">クリック</th><th className="px-2 py-3 text-right">CTR</th><th className="px-4 py-3 text-right">掲載順位</th></tr>
+        <DataTable className="rounded-none border-0">
+          <thead>
+            <TableHeadRow><Th style={{ width: '43%' }}>{kind === 'query' ? 'キーワード' : 'ページ'}</Th><Th style={{ width: '16%' }} align="right">表示回数</Th><Th style={{ width: '14%' }} align="right">クリック</Th><Th style={{ width: '13%' }} align="right">CTR</Th><Th style={{ width: '14%' }} align="right">掲載順位</Th></TableHeadRow>
           </thead>
-          <tbody className="divide-hairline divide-y">
+          <tbody>
             {rows.map((row) => (
-              <tr key={row.key} className="hover:bg-canvas-sunken">
-                <td className="px-4 py-3"><span className="text-ink block truncate whitespace-nowrap font-medium" title={row.key}>{displayKey(row.key)}</span></td>
-                <td className="text-ink-secondary whitespace-nowrap px-2 py-3 text-right">{number.format(row.impressions)}</td>
-                <td className="text-ink whitespace-nowrap px-2 py-3 text-right font-semibold">{number.format(row.clicks)}</td>
-                <td className="text-ink-secondary whitespace-nowrap px-2 py-3 text-right">{oneDecimal.format(row.ctr * 100)}%</td>
-                <td className="text-ink-secondary whitespace-nowrap px-4 py-3 text-right">{oneDecimal.format(row.position)}</td>
-              </tr>
+              <Tr key={row.key} interactive>
+                <Td><span className="text-ink block truncate whitespace-nowrap font-medium" title={row.key}>{displayKey(row.key)}</span></Td>
+                <Td align="right" className="text-ink-secondary whitespace-nowrap">{number.format(row.impressions)}</Td>
+                <Td align="right" className="text-ink whitespace-nowrap font-semibold">{number.format(row.clicks)}</Td>
+                <Td align="right" className="text-ink-secondary whitespace-nowrap">{oneDecimal.format(row.ctr * 100)}%</Td>
+                <Td align="right" className="text-ink-secondary whitespace-nowrap">{oneDecimal.format(row.position)}</Td>
+              </Tr>
             ))}
           </tbody>
-        </table>
+        </DataTable>
       )}
     </section>
   )

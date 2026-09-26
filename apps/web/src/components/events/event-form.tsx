@@ -18,6 +18,7 @@ import { Field, TextInput } from '@/components/shared/form-controls'
 import HelpTip from '@/components/shared/help-tip'
 import EventQuestionsEditor, { parseEventQuestions } from '@/components/events/event-questions-editor'
 import DateField from '@/components/shared/date-field'
+import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { TimeField } from '@/components/shared/date-time-field'
 // #740: 下書きの初期値と字数上限は作成画面と共有する。片方だけ変えないこと。
 import {
@@ -858,26 +859,25 @@ function SlotsTab({
           予約枠がありません。「＋ 枠を追加」または「一括追加」から作成してください。
         </div>
       ) : (
-        <div className="overflow-x-auto border border-hairline rounded-lg">
-          <table className="w-full text-sm">
-            <thead className="bg-canvas-sunken text-gray-600">
-              <tr>
-                <th className="text-left px-3 py-2 font-medium">日時</th>
-                <th className="text-left px-3 py-2 font-medium">定員</th>
-                <th className="text-left px-3 py-2 font-medium">予約数</th>
-                <th className="text-left px-3 py-2 font-medium">状態</th>
-                <th className="text-right px-3 py-2 font-medium">操作</th>
-              </tr>
+        <DataTable>
+            <thead>
+              <TableHeadRow>
+                <Th style={{ width: '30%' }}>日時</Th>
+                <Th style={{ width: '14%' }}>定員</Th>
+                <Th style={{ width: '14%' }}>予約数</Th>
+                <Th style={{ width: '16%' }}>状態</Th>
+                <Th style={{ width: '26%' }} align="right">操作</Th>
+              </TableHeadRow>
             </thead>
             <tbody>
               {slots.map((s) => (
-                <tr key={s.id} className="border-t border-hairline">
-                  <td className="px-3 py-2 text-gray-800">
+                <Tr key={s.id}>
+                  <Td>
                     {formatJpSlotRange(s.starts_at, s.ends_at)}
-                  </td>
-                  <td className="px-3 py-2 text-gray-700">{s.capacity ?? '無制限'}</td>
-                  <td className="px-3 py-2 text-gray-700">{s.active_count ?? 0}</td>
-                  <td className="px-3 py-2">
+                  </Td>
+                  <Td>{s.capacity ?? '無制限'}</Td>
+                  <Td>{s.active_count ?? 0}</Td>
+                  <Td>
                     <button
                       onClick={() => toggleActive(s)}
                       disabled={busy}
@@ -887,8 +887,8 @@ function SlotsTab({
                     >
                       {s.is_active === 1 ? '有効' : '停止'}
                     </button>
-                  </td>
-                  <td className="px-3 py-2 text-right">
+                  </Td>
+                  <ActionCell>
                     <div className="flex items-center justify-end gap-3">
                       <button
                         onClick={() => setEditSlotTarget(s)}
@@ -901,17 +901,16 @@ function SlotsTab({
                         onClick={() => { setDeleteSlotError(''); setDeleteSlotTarget(s) }}
                         disabled={busy || (s.active_count ?? 0) > 0}
                         title={(s.active_count ?? 0) > 0 ? '既存予約があるため削除できません' : '削除'}
-                        className="text-xs text-red-600 hover:underline disabled:opacity-30 disabled:no-underline"
+                        className="text-xs text-danger hover:underline disabled:opacity-30 disabled:no-underline"
                       >
                         削除
                       </button>
                     </div>
-                  </td>
-                </tr>
+                  </ActionCell>
+                </Tr>
               ))}
             </tbody>
-          </table>
-        </div>
+        </DataTable>
       )}
 
       {showAdd && (

@@ -47,17 +47,17 @@ describe('一斉配信の検索行（U014）', () => {
     expect(pageSizeAt).toBeGreaterThan(rowEnd)
     // 条件の帯（チップ行）より後ろ＝結果の側にある。
     expect(pageSizeAt).toBeGreaterThan(PAGE.indexOf('broadcast-filter-chip'))
-    // 一覧（表）より前にある。
-    expect(pageSizeAt).toBeLessThan(PAGE.indexOf('min-w-[640px]'))
+    // 一覧（表）より前にある。表は共通の DataTable（以前は min-w-[640px] の手書き表）。
+    expect(pageSizeAt).toBeLessThan(PAGE.indexOf('<DataTable'))
   })
 
   it('狭い幅の1列グリッドは minmax(0,1fr) で画面内に収める', () => {
     /*
-     * 暗黙の auto 列は中身の最大幅（表の min-w-[640px]）まで広がるため、
-     * 390px で検索行ごと右にはみ出し、横スクロールしないと入力の右端へ
-     * 届かなかった（実ブラウザ実測: 検索欄642px / 本文658px）。
+     * 暗黙の auto 列は中身の最大幅まで広がるため、390px で検索行ごと
+     * 右にはみ出し、横スクロールしないと入力の右端へ届かなかった
+     * （実ブラウザ実測: 検索欄642px / 本文658px。当時は表に min-w-[640px]）。
      * `grid-cols-1`（= minmax(0,1fr)）で列を容器の幅に止め、
-     * 表はカード内の横スクロールに閉じ込める。
+     * 表は共通部品の外枠の横スクロールに閉じ込める。
      */
     expect(PAGE).toContain('grid grid-cols-1 gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]')
   })

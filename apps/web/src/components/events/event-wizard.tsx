@@ -21,6 +21,7 @@ import { TextInput } from '@/components/shared/form-controls'
 import DateField from '@/components/shared/date-field'
 import { TimeField } from '@/components/shared/date-time-field'
 import Select from '@/components/shared/select'
+import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import EventQuestionsEditor, { parseEventQuestions } from '@/components/events/event-questions-editor'
 // #740: 下書きの初期値と字数上限は編集画面と共有する。片方だけ変えないこと。
 import {
@@ -1172,35 +1173,34 @@ function SlotsStep({
               まだ枠がありません。枠を1つも作らないと公開できません。
             </p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[420px] text-sm">
+            <DataTable>
                 <thead>
-                  <tr className="border-hairline text-ink-faint border-b text-xs">
-                    <th className="px-2 py-2 text-left font-semibold">日時</th>
-                    <th className="px-2 py-2 text-right font-semibold">定員</th>
-                    <th className="px-2 py-2 text-right font-semibold">申込</th>
-                    <th className="px-2 py-2 text-right font-semibold">残り</th>
-                    <th className="px-2 py-2 text-right font-semibold">操作</th>
-                  </tr>
+                  <TableHeadRow>
+                    <Th style={{ width: '32%' }}>日時</Th>
+                    <Th style={{ width: '14%' }} align="right">定員</Th>
+                    <Th style={{ width: '14%' }} align="right">申込</Th>
+                    <Th style={{ width: '14%' }} align="right">残り</Th>
+                    <Th style={{ width: '26%' }} align="right">操作</Th>
+                  </TableHeadRow>
                 </thead>
                 <tbody>
                   {slots.map((s) => {
                     const taken = s.active_count ?? 0
                     return (
-                      <tr key={s.id} className="border-hairline border-b last:border-b-0">
-                        <td className="text-ink px-2 py-2">
+                      <Tr key={s.id}>
+                        <Td>
                           {formatSlotJp(s.starts_at, s.ends_at)}
-                        </td>
-                        <td className="text-ink-secondary px-2 py-2 text-right tabular-nums">
+                        </Td>
+                        <Td align="right" className="text-ink-secondary tabular-nums">
                           {s.capacity == null ? '無制限' : `${s.capacity}名`}
-                        </td>
-                        <td className="text-ink-secondary px-2 py-2 text-right tabular-nums">
+                        </Td>
+                        <Td align="right" className="text-ink-secondary tabular-nums">
                           {taken}名
-                        </td>
-                        <td className="text-ink-secondary px-2 py-2 text-right tabular-nums">
+                        </Td>
+                        <Td align="right" className="text-ink-secondary tabular-nums">
                           {s.capacity == null ? '—' : `${Math.max(0, s.capacity - taken)}名`}
-                        </td>
-                        <td className="px-2 py-2 text-right">
+                        </Td>
+                        <ActionCell>
                           <button
                             onClick={() => { setRemoveError(''); setRemoveTarget(s) }}
                             disabled={busy || taken > 0}
@@ -1209,13 +1209,12 @@ function SlotsStep({
                           >
                             削除
                           </button>
-                        </td>
-                      </tr>
+                        </ActionCell>
+                      </Tr>
                     )
                   })}
                 </tbody>
-              </table>
-            </div>
+            </DataTable>
           )}
         </FormSection>
 

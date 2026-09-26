@@ -22,6 +22,7 @@ import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import StickyBar from '@/components/shared/sticky-bar'
+import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import TargetMissing from '@/components/shared/target-missing'
 import { CheckCircle2, Circle, LoaderCircle, TriangleAlert } from 'lucide-react'
 import type { MediaItem } from '@line-crm/shared'
@@ -262,52 +263,53 @@ function CommentsTab({ webinarId }: { webinarId: string }) {
           読み込む
         </Button>
       </div>
-      <table className="w-full text-sm">
+      <DataTable>
         <thead>
-          <tr className="border-b border-hairline text-left text-ink-faint">
-            <th className="w-24 px-4 py-3 font-medium">秒数</th>
-            <th className="w-40 px-4 py-3 font-medium">名前</th>
-            <th className="px-4 py-3 font-medium">本文</th>
-            <th className="w-12 px-4 py-3"></th>
-          </tr>
+          <TableHeadRow>
+            <Th style={{ width: 96 }}>秒数</Th>
+            <Th style={{ width: 160 }}>名前</Th>
+            <Th>本文</Th>
+            <Th style={{ width: 48 }}><span className="sr-only">削除</span></Th>
+          </TableHeadRow>
         </thead>
         <tbody>
           {comments.map((c, i) => (
-            <tr key={i} className="border-b border-divider-soft">
-              <td className="py-1 pr-2">
+            <Tr key={i}>
+              <Td>
                 <input
                   type="number"
                   value={c.atSeconds}
                   onChange={(e) => update(i, { atSeconds: Number(e.target.value) })}
                   className={`${inputClass} w-20`}
                 />
-              </td>
-              <td className="pr-2">
+              </Td>
+              <Td>
                 <input
                   value={c.authorName}
                   onChange={(e) => update(i, { authorName: e.target.value })}
                   className={inputClass}
                 />
-              </td>
-              <td className="pr-2">
+              </Td>
+              <Td>
                 <input
                   value={c.body}
                   onChange={(e) => update(i, { body: e.target.value })}
                   className={inputClass}
                 />
-              </td>
-              <td>
+              </Td>
+              <Td>
                 <button
                   onClick={() => setComments((prev) => prev.filter((_, j) => j !== i))}
                   className="text-danger hover:text-danger"
+                  aria-label={`${c.authorName || '名前未入力'}のコメントを削除`}
                 >
                   ×
                 </button>
-              </td>
-            </tr>
+              </Td>
+            </Tr>
           ))}
         </tbody>
-      </table>
+      </DataTable>
       <StickyBar actions={(
         <>
         <Button onClick={() => setComments((prev) => [...prev, { atSeconds: 0, authorName: '', body: '' }])}>
@@ -967,42 +969,42 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
           <div className="p-10 text-center text-sm text-ink-faint">まだ参加者がいません</div>
         ) : (
           <>
-            <div className="hidden overflow-x-auto md:block">
-              <table className="w-full min-w-[760px] text-sm">
+            <div className="hidden md:block">
+              <DataTable>
                 <thead>
-                  <tr className="bg-canvas-sunken text-left text-[11px] font-semibold uppercase tracking-wide text-ink-secondary">
-                    <th className="px-4 py-3">参加者</th>
-                    <th className="px-4 py-3">最終参加</th>
-                    <th className="px-4 py-3">視聴</th>
-                    <th className="px-4 py-3">アクション</th>
-                    <th className="px-4 py-3 text-right">詳細</th>
-                  </tr>
+                  <TableHeadRow>
+                    <Th style={{ width: '28%' }}>参加者</Th>
+                    <Th style={{ width: '16%' }}>最終参加</Th>
+                    <Th style={{ width: '24%' }}>視聴</Th>
+                    <Th style={{ width: '18%' }}>アクション</Th>
+                    <Th style={{ width: '14%' }} align="right">詳細</Th>
+                  </TableHeadRow>
                 </thead>
-                <tbody className="divide-y divide-hairline">
+                <tbody>
                   {recentParticipants.map((p) => {
                     const name = p.friendName ?? `友だち ${p.friendId.slice(0, 6)}`
                     const watchedRate = Math.min(100, Math.round((p.maxWatchedSeconds / Math.max(1, durationSeconds)) * 100))
                     return (
-                      <tr key={p.friendId} className="hover:bg-canvas-sunken">
-                        <td className="px-5 py-3.5">
+                      <Tr key={p.friendId} interactive>
+                        <Td>
                           <div className="flex items-center gap-3">
                             <ParticipantAvatar name={name} pictureUrl={p.pictureUrl} size="lg" />
                             <div className="min-w-0">
-                              <div className="max-w-48 truncate font-semibold text-ink">{name}</div>
+                              <div className="max-w-48 truncate font-semibold text-ink" title={name}>{name}</div>
                               <div className="mt-0.5 text-[11px] text-ink-faint">{p.sessions > 1 ? `${p.sessions}回参加` : p.registered ? '予約から参加' : '直接参加'}</div>
                             </div>
                           </div>
-                        </td>
-                        <td className="px-4 py-3.5 text-xs text-ink-secondary">{compactDateTime(p.latestJoinedAt)}</td>
-                        <td className="w-48 px-4 py-3.5">
+                        </Td>
+                        <Td className="text-xs text-ink-secondary">{compactDateTime(p.latestJoinedAt)}</Td>
+                        <Td>
                           <div className="flex items-center justify-between text-[11px] text-ink-secondary">
                             <span>{fmtSec(p.maxWatchedSeconds)}</span><span>{watchedRate}%</span>
                           </div>
                           <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-canvas-sunken">
                             <div className="h-full rounded-full bg-action" style={{ width: `${watchedRate}%` }} />
                           </div>
-                        </td>
-                        <td className="px-4 py-3.5">
+                        </Td>
+                        <Td>
                           <div className="flex flex-wrap gap-1.5">
                             {p.formSubmittedAt ? (
                               <span className="rounded-full bg-success-bg px-2 py-1 text-[10px] font-semibold text-success">フォーム送信</span>
@@ -1012,15 +1014,15 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
                               <span className="rounded-full bg-canvas-sunken px-2 py-1 text-[10px] font-medium text-ink-secondary">視聴のみ</span>
                             )}
                           </div>
-                        </td>
-                        <td className="px-5 py-3.5 text-right">
+                        </Td>
+                        <Td align="right">
                           <Link href={`/chats?friend=${p.friendId}`} className="text-xs font-semibold text-action hover:text-action">チャットを見る →</Link>
-                        </td>
-                      </tr>
+                        </Td>
+                      </Tr>
                     )
                   })}
                 </tbody>
-              </table>
+              </DataTable>
             </div>
             <div className="divide-y divide-hairline md:hidden">
               {recentParticipants.map((p) => {
@@ -1067,16 +1069,17 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
           <div className="min-w-0">
             <h4 className="mb-3 text-sm font-semibold text-ink">直近の開催回</h4>
             <div className="max-h-80 overflow-auto rounded-xl border border-hairline">
-              <table className="w-full min-w-[520px] text-xs">
-                <thead className="sticky top-0 bg-canvas-sunken text-left text-ink-secondary">
-                  <tr><th className="px-4 py-3 font-medium">開始</th><th className="px-4 py-3 font-medium">参加</th><th className="px-4 py-3 font-medium">平均視聴</th><th className="px-4 py-3 font-medium">CTA</th></tr>
+              {/* 外の箱が枠とスクロールを持つため、表の枠は消す。見出しの吸着は欄ごとに残す。 */}
+              <DataTable className="rounded-none border-0">
+                <thead>
+                  <TableHeadRow><Th className="sticky top-0 bg-surface-pearl">開始</Th><Th className="sticky top-0 bg-surface-pearl">参加</Th><Th className="sticky top-0 bg-surface-pearl">平均視聴</Th><Th className="sticky top-0 bg-surface-pearl">CTA</Th></TableHeadRow>
                 </thead>
-                <tbody className="divide-y divide-hairline">
+                <tbody>
                   {analytics.sessions.slice(0, 30).map((s) => (
-                    <tr key={s.sessionStartAt}><td className="px-3 py-2 text-ink-secondary">{fmtSession(s.sessionStartAt)}</td><td>{s.viewers}</td><td>{fmtSec(s.avgWatchedSeconds)}</td><td>{s.ctaClicks} ({percent(s.ctaClicks, s.viewers)})</td></tr>
+                    <Tr key={s.sessionStartAt}><Td className="text-ink-secondary text-xs">{fmtSession(s.sessionStartAt)}</Td><Td className="text-xs">{s.viewers}</Td><Td className="text-xs">{fmtSec(s.avgWatchedSeconds)}</Td><Td className="text-xs">{s.ctaClicks} ({percent(s.ctaClicks, s.viewers)})</Td></Tr>
                   ))}
                 </tbody>
-              </table>
+              </DataTable>
             </div>
           </div>
         </div>

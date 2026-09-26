@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { ApiError, api, fetchApi } from '@/lib/api'
 import Card, { CardHeader } from '@/components/shared/card'
 import Pagination from '@/components/shared/pagination'
+import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import StatusBadge from '@/components/shared/status-badge'
 import { STATE_TEXT } from '@/components/shared/not-connected'
 import { dashboardLocalUpdatedAt } from '@/components/dashboard/freshness'
@@ -283,19 +284,19 @@ export default function PendingInboxCard({
               狭い幅で札が右の余白へ食い込む。残りは内容の列で吸収する
               （幅を指定しない列が伸びる）。右端の余白は見出しと同じ px-5。
             */}
-            <table className="w-full table-fixed text-sm">
+            <DataTable className="rounded-none border-0">
               <thead>
-                <tr className="text-ink-faint border-hairline h-[34px] border-b text-left text-xs">
-                  <th className="w-[36%] px-5 font-medium">お名前</th>
-                  <th className="px-3 font-medium">内容</th>
-                  <th className="w-[14%] px-3 text-right font-medium whitespace-nowrap">待ち時間</th>
-                  <th className="w-24 px-5 font-medium whitespace-nowrap">状態</th>
-                </tr>
+                <TableHeadRow>
+                  <Th style={{ width: '36%' }}>お名前</Th>
+                  <Th>内容</Th>
+                  <Th style={{ width: '14%' }} align="right" className="whitespace-nowrap">待ち時間</Th>
+                  <Th style={{ width: 96 }} className="whitespace-nowrap">状態</Th>
+                </TableHeadRow>
               </thead>
-              <tbody className="divide-hairline divide-y">
+              <tbody>
                 {items.map((item) => (
-                  <tr key={item.id} className="h-[61px] hover:bg-canvas-sunken">
-                    <td className="overflow-hidden px-5 py-2.5 whitespace-nowrap">
+                  <Tr key={item.id} interactive>
+                    <Td className="overflow-hidden whitespace-nowrap">
                       <ChannelBadge channel={item.channel} />
                       <Link
                         href={inboxItemHref(item)}
@@ -304,20 +305,20 @@ export default function PendingInboxCard({
                       >
                         {item.customerName}
                       </Link>
-                    </td>
-                    <td className="text-ink-secondary truncate px-3 py-2.5" title={item.preview}>
+                    </Td>
+                    <Td className="text-ink-secondary truncate" title={item.preview}>
                       {item.preview}
-                    </td>
-                    <td className="text-ink-faint px-3 py-2.5 text-right text-xs whitespace-nowrap">
+                    </Td>
+                    <Td align="right" className="text-ink-faint text-xs whitespace-nowrap">
                       {elapsed(item.lastIncomingAt)}
-                    </td>
-                    <td className="px-5 py-2.5 whitespace-nowrap">
+                    </Td>
+                    <Td className="whitespace-nowrap">
                       <StatusBadge tone="warning" size="compact">未確認</StatusBadge>
-                    </td>
-                  </tr>
+                    </Td>
+                  </Tr>
                 ))}
               </tbody>
-            </table>
+            </DataTable>
           </div>
           <ul className="divide-hairline divide-y sm:hidden">
             {items.map((item) => (

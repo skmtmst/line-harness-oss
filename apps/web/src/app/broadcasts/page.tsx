@@ -17,6 +17,7 @@ import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import SelectField from '@/components/shared/select-field'
 import Button from '@/components/shared/button'
+import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { ApprovalBadge } from '@/components/broadcasts/broadcast-approval'
 
 const statusConfig: Record<
@@ -695,9 +696,8 @@ function BroadcastList() {
           description="絞り込みを変えるか、新しく作成してください。"
         />
       ) : (
-        <div className="bg-canvas rounded-card border border-hairline overflow-hidden">
-          <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px]">
+        <>
+        <DataTable>
             {/*
               列は設計 `q76C35`（V6 6-1 一斉配信）の6列。
               タイトル・内容／状態／配信条件／配信日時／配信・開封・クリック／操作。
@@ -709,33 +709,33 @@ function BroadcastList() {
               （配信・開封・クリック）にまとまっている。
             */}
             <thead>
-              <tr className="bg-canvas-sunken border-b border-hairline">
-                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase tracking-wider whitespace-nowrap">
+              <TableHeadRow>
+                <Th style={{ width: '30%' }}>
                   タイトル・内容
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase tracking-wider whitespace-nowrap">
+                </Th>
+                <Th style={{ width: '12%' }}>
                   状態
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase tracking-wider whitespace-nowrap">
+                </Th>
+                <Th style={{ width: '14%' }}>
                   配信条件
-                </th>
+                </Th>
                 {/*
                   予約中なら予約の時刻、送信済みなら送った時刻。
                   2列に分けると、どちらか一方が常に空になる。
                 */}
-                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase tracking-wider whitespace-nowrap">
+                <Th style={{ width: '14%' }}>
                   配信日時
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase tracking-wider whitespace-nowrap">
+                </Th>
+                <Th style={{ width: '18%' }}>
                   配信・開封・クリック
-                </th>
+                </Th>
                 {/* #768: 表が横に流れる帯でも操作列は右端に留める。 */}
-                <th className="bg-canvas-sunken sticky right-0 px-4 py-3 text-right text-xs font-semibold text-ink-faint uppercase tracking-wider whitespace-nowrap">
+                <Th style={{ width: '12%' }} align="right" className="sticky right-0 bg-canvas-sunken">
                   操作
-                </th>
-              </tr>
+                </Th>
+              </TableHeadRow>
             </thead>
-            <tbody className="divide-y divide-hairline">
+            <tbody>
               {visibleBroadcasts.map((broadcast) => {
                 const statusInfo = statusConfig[broadcast.status]
                 const isDedup = broadcast.targetType === 'multi-account-dedup'
@@ -743,9 +743,10 @@ function BroadcastList() {
                 const insight = insights[broadcast.id] ?? summaryInsight(broadcast.insightSummary)
 
                 return (
-                  <tr
+                  <Tr
                     key={broadcast.id}
-                    className="group cursor-pointer transition-colors hover:bg-canvas-sunken"
+                    interactive
+                    className="group cursor-pointer"
                     tabIndex={0}
                     onClick={() => router.push(`/broadcasts/detail?id=${encodeURIComponent(broadcast.id)}`)}
                     onKeyDown={(event) => {
@@ -765,7 +766,7 @@ function BroadcastList() {
                       「キャンペーン告知／画像＋テキスト 2通」と出す。一覧から
                       中身を思い出せないと、開いて確かめることになる。
                     */}
-                    <td className="px-4 py-3">
+                    <Td>
                       <div className="flex items-center gap-2">
                         <a href={`/broadcasts/detail?id=${encodeURIComponent(broadcast.id)}`} className="text-sm font-bold text-ink hover:text-action hover:underline">
                           {broadcast.title}
@@ -784,39 +785,39 @@ function BroadcastList() {
                       <p className="text-xs text-ink-faint mt-0.5 line-clamp-2 break-all">
                         {rowExcerpt(broadcast.messageType, broadcast.messageContent)}
                       </p>
-                    </td>
+                    </Td>
 
                     {/* 状態。設計では2列目。承認待ちの札もここに出す（A-2）。 */}
-                    <td className="px-4 py-3">
+                    <Td>
                       <span className="inline-flex flex-wrap items-center gap-1">
                         <span className={`inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded-full text-xs font-medium ${statusInfo.className}`}>
                           {statusInfo.label}
                         </span>
                         <ApprovalBadge status={broadcast.approvalStatus} />
                       </span>
-                    </td>
+                    </Td>
 
                     {/*
                       配信条件。前は「全員」か「タグ指定」の2つしか見ていなかったので、
                       詳細条件で絞った配信も「タグ指定」と出ていた。送った相手を
                       後から確かめられないので、監査にならなかった。
                     */}
-                    <td className="px-4 py-3 text-sm text-ink-secondary">
+                    <Td className="text-ink-secondary">
                       {audienceSummary(broadcast, getTagName, getScenarioName)}
-                    </td>
+                    </Td>
 
-                    <td className="px-4 py-3 text-sm text-ink-faint tabular-nums">
+                    <Td className="text-ink-faint tabular-nums">
                       {broadcast.status === 'sent'
                         ? formatDatetime(broadcast.sentAt)
                         : formatDatetime(broadcast.scheduledAt)}
-                    </td>
+                    </Td>
 
                     {/*
                       配信・開封・クリック。送信済みの配信だけ数がある。
                       **まだ送っていない配信に 0件 とは書かない。** 0通届いた
                       のではなく、届く前だから数が無い。
                     */}
-                    <td className="px-4 py-3 text-sm text-ink-faint">
+                    <Td className="text-ink-faint">
                       {broadcast.status !== 'sent' ? (
                         <span className="text-ink-faint">—</span>
                       ) : (
@@ -855,10 +856,10 @@ function BroadcastList() {
                           )}
                         </div>
                       )}
-                    </td>
+                    </Td>
 
                     {/* 操作 */}
-                    <td className="bg-canvas group-hover:bg-canvas-sunken sticky right-0 px-4 py-3 text-right">
+                    <ActionCell className="sticky right-0 bg-canvas group-hover:bg-canvas-sunken">
                       <div className="flex items-center justify-end gap-2">
                         {(broadcast.status === 'draft' || broadcast.status === 'scheduled') && (
                           <button
@@ -871,13 +872,12 @@ function BroadcastList() {
                           </button>
                         )}
                       </div>
-                    </td>
-                  </tr>
+                    </ActionCell>
+                  </Tr>
                 )
               })}
             </tbody>
-          </table>
-          </div>
+        </DataTable>
           {/*
             口側ページ送りの続き。押すと次のカーソルから足す。
             件数・タブを変えると先頭から取り直す(load の依存で自動)。
@@ -892,7 +892,7 @@ function BroadcastList() {
               {loadingMoreBroadcasts ? '読み込み中...' : 'さらに読み込む'}
             </button>
           )}
-        </div>
+        </>
       )}
             </div>
           </div>
