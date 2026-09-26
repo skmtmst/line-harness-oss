@@ -26,8 +26,18 @@ describe('manualScreenKeyForPath', () => {
     expect(manualScreenKeyForPath('/broadcasts/new/step2')).toBe('6-1')
   })
 
+  it('対応表に足した主要画面が画面IDへ届く', () => {
+    expect(manualScreenKeyForPath('/')).toBe('1-1')
+    expect(manualScreenKeyForPath('/chats')).toBe('2-1')
+    expect(manualScreenKeyForPath('/scenarios/detail')).toBe('5-1')
+    expect(manualScreenKeyForPath('/friend-add-settings')).toBe('9-1')
+    expect(manualScreenKeyForPath('/analytics')).toBe('20-1')
+    expect(manualScreenKeyForPath('/common-actions/versions')).toBe('25-1')
+    expect(manualScreenKeyForPath('/emergency')).toBe('32-1')
+    expect(manualScreenKeyForPath('/getting-started')).toBe('34-1')
+  })
+
   it('対応が無い画面は null を返す（リンク自体を出さない）', () => {
-    expect(manualScreenKeyForPath('/')).toBeNull()
     expect(manualScreenKeyForPath('/login')).toBeNull()
     expect(manualScreenKeyForPath('/unknown-path')).toBeNull()
   })
