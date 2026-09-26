@@ -691,7 +691,6 @@ function BroadcastDetailInner() {
       */}
       {broadcast ? (
         <StickyBar
-          className="mt-6"
           actions={<Button onClick={exportCsv}>CSVで書き出す</Button>}
         />
       ) : null}
