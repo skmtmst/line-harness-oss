@@ -79,8 +79,9 @@ export default function AccountsPage() {
   if (searchParams.get('tab') === 'migration') return <AccountMigration />
 
   return (
-    <div data-design-node="QT91v">
-      <div data-design="Head" className="mb-4 flex min-h-10 flex-wrap items-center justify-between gap-3">
+    <div data-design-node="QT91v" className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <div data-design="Head" className="flex min-h-10 flex-wrap items-center justify-between gap-3">
         {/* ★V7：上の帯の画面名と同じ1段だけのパンくずは出さない。 */}
         <div />
         <div className="flex flex-wrap gap-2">
@@ -93,7 +94,7 @@ export default function AccountsPage() {
 
       {orderingOpen && <AccountOrdering />}
 
-      <div data-design="KPIs" className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
+      <div data-design="KPIs" className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         {/* ★V7：「100%」の札は何の割合でもない固定の文字だったので外す。 */}
         <SummaryCard title="稼働中" value={activeCount} unit="" variant="v6"
           detail={activeFriendDetail} />
@@ -106,7 +107,7 @@ export default function AccountsPage() {
           detail="Webhookが合っていません" />
       </div>
 
-      <div className="bg-canvas rounded-card border-hairline mb-3 border p-3">
+      <div className="bg-canvas rounded-card border-hairline border p-3">
         {/*
           検索は独立した全幅の行にする（U019）。件数の札を隣に置くと、
           狭い幅でプレースホルダーが途中までしか見えなくなる。
@@ -146,13 +147,15 @@ export default function AccountsPage() {
           action={<Button type="button" onClick={() => void load()}>再読み込み</Button>}
         />
       ) : shown.length === 0 ? (
-        <ListState
-          kind="empty"
-          title={accounts.length === 0 ? 'LINEアカウントがありません' : 'この条件に合うアカウントはありません'}
-          description={accounts.length === 0
-            ? '「＋ LINEアカウントを登録」から、送受信に使うアカウントを登録してください。'
-            : '検索の言葉か、表示する状態を変えてください。'}
-        />
+        <div className="bg-canvas rounded-card border-hairline border">
+          <ListState
+            kind="empty"
+            title={accounts.length === 0 ? 'LINEアカウントがありません' : 'この条件に合うアカウントはありません'}
+            description={accounts.length === 0
+              ? '「＋ LINEアカウントを登録」から、送受信に使うアカウントを登録してください。'
+              : '検索の言葉か、表示する状態を変えてください。'}
+          />
+        </div>
       ) : (
         <div className="bg-canvas rounded-card border-hairline border">
           {/*
