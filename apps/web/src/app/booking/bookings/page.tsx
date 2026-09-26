@@ -949,16 +949,10 @@ export default function BookingsPage() {
                           {formatShort(b.starts_at)}
                         </td>
                         <td className="px-4 py-3 text-sm">
-                          {b.friend_id ? (
-                            <Link
-                              href={`/chats?friend=${b.friend_id}`}
-                              className="text-blue-600 hover:underline"
-                            >
-                              {b.friend_name ?? '-'}
-                            </Link>
-                          ) : (
-                            <span>{b.friend_name ?? 'LINE未連携のお客さま'}</span>
-                          )}
+                          {/* R11: 行の物は予約のため、お客さま名から別画面へ飛ばさない。名前は黒文字。 */}
+                          <span className="text-ink" title={b.friend_name ?? undefined}>
+                            {b.friend_name ?? (b.friend_id ? '-' : 'LINE未連携のお客さま')}
+                          </span>
                         </td>
                         <td className="px-4 py-3 text-sm">{b.menu_name}</td>
                         <td className="cq-hide-below-830 px-4 py-3 text-sm">{b.staff_name}</td>
@@ -987,6 +981,16 @@ export default function BookingsPage() {
                             >
                               詳細
                             </button>
+                            {/* R11: 受信箱への行き先は名前ではなく操作列の明示のボタンから。 */}
+                            {b.friend_id ? (
+                              <Link
+                                href={`/chats?friend=${b.friend_id}`}
+                                aria-label={`${b.friend_name ?? 'お客さま'}さんとの会話を受信箱で開く`}
+                                className="text-ink-secondary bg-canvas-sunken rounded-md px-3 py-1 text-xs font-medium hover:bg-hairline"
+                              >
+                                会話
+                              </Link>
+                            ) : null}
                             {/* N-401: 閲覧のみの人には状態を変えるボタンを出さない */}
                             {canOperate ? (
                               <ActionButtons
