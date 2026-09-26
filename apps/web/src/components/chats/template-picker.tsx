@@ -419,7 +419,7 @@ export default function TemplatePicker({
                     setPackItems([])
                   }}
                   aria-pressed={packMode}
-                  className={`rounded-md border px-2.5 py-1.5 text-xs font-semibold ${packMode ? 'border-[#A6E7BD] bg-[#EAFBF0] text-[#057A37]' : 'border-[#E5E7EB] bg-canvas text-[#667085] hover:bg-[#F2F4F7]'}`}
+                  className={`rounded-md border px-2.5 py-1.5 text-xs font-semibold ${packMode ? 'border-accent-border bg-accent-soft text-accent-deep' : 'border-surface-chrome bg-canvas text-ink-faint hover:bg-canvas-sunken'}`}
                 >
                   まとめて選ぶ
                 </button>
@@ -470,7 +470,7 @@ export default function TemplatePicker({
                         )
                       }}
                       aria-pressed={packMode ? inPack : selected?.id === template.id}
-                      className={`w-full rounded-lg border px-3 py-3 text-left ${inPack || (!packMode && selected?.id === template.id) ? 'border-[#A6E7BD] bg-[#EAFBF0]' : 'border-[#E5E7EB] bg-canvas hover:bg-[#F2F4F7]'}`}
+                      className={`w-full rounded-lg border px-3 py-3 text-left ${inPack || (!packMode && selected?.id === template.id) ? 'border-accent-border bg-accent-soft' : 'border-surface-chrome bg-canvas hover:bg-canvas-sunken'}`}
                     >
                       <p className="truncate text-sm font-semibold text-[#1F2937]" title={template.name}>
                         {inPack ? `${packIndex + 1}. ` : ''}{template.name}
@@ -502,18 +502,18 @@ export default function TemplatePicker({
 
           <section className="min-h-0 bg-canvas p-6 md:overflow-y-auto" aria-label="テンプレートのプレビュー">
             {packMode && packItems.length > 0 ? (
-              <div className="mb-4 rounded-lg border border-[#E5E7EB] bg-[#F7F8F6] p-3">
-                <p className="text-xs font-semibold text-[#344054]">まとめて送る順番（{packItems.length}/5通）</p>
+              <div className="mb-4 rounded-lg border border-hairline bg-canvas-sunken p-3">
+                <p className="text-xs font-semibold text-ink-secondary">まとめて送る順番（{packItems.length}/5通）</p>
                 <ol className="mt-2 space-y-1">
                   {packItems.map((item, index) => (
-                    <li key={item.id} className="flex items-center gap-2 text-xs text-[#667085]">
-                      <span className="w-4 shrink-0 text-right font-semibold text-[#344054]">{index + 1}.</span>
+                    <li key={item.id} className="flex items-center gap-2 text-xs text-ink-secondary">
+                      <span className="w-4 shrink-0 text-right font-semibold text-ink-secondary">{index + 1}.</span>
                       <span className="min-w-0 flex-1 truncate" title={item.name}>{item.name}</span>
                       <button
                         type="button"
                         onClick={() => setPackItems((prev) => prev.filter((p) => p.id !== item.id))}
                         aria-label={`${item.name}をまとめ送りから外す`}
-                        className="shrink-0 rounded px-1.5 py-0.5 text-[#98A2B3] hover:bg-[#E5E7EB] hover:text-[#344054]"
+                        className="shrink-0 rounded px-1.5 py-0.5 text-ink-faint hover:bg-surface-chrome hover:text-ink-secondary"
                       >
                         外す
                       </button>
@@ -521,7 +521,7 @@ export default function TemplatePicker({
                   ))}
                 </ol>
                 {packItems.length >= 5 ? (
-                  <p className="mt-2 text-[11px] text-[#B45309]">1回に送れるのは5通までです。</p>
+                  <p className="mt-2 text-caption text-warning">1回に送れるのは5通までです。</p>
                 ) : null}
               </div>
             ) : null}
@@ -580,31 +580,22 @@ export default function TemplatePicker({
             >
               キャンセル
             </button>
-            {packMode && onPickPack ? (
-              <button
-                disabled={packItems.length === 0}
-                onClick={() => {
+            <button
+              disabled={packMode && onPickPack ? packItems.length === 0 : !selected}
+              onClick={() => {
+                if (packMode && onPickPack) {
                   if (packItems.length === 0) return
                   onPickPack(packItems.map((item) => item.content))
-                  onClose()
-                }}
-                className="min-h-11 whitespace-nowrap rounded-lg bg-accent-deep px-5 py-2 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-deep/90 disabled:opacity-40"
-              >
-                まとめて送る（{packItems.length}通）
-              </button>
-            ) : (
-              <button
-                disabled={!selected}
-                onClick={() => {
+                } else {
                   if (!selected) return
                   onPick(selected.messageContent)
-                  onClose()
-                }}
-                className="min-h-11 whitespace-nowrap rounded-lg bg-accent-deep px-5 py-2 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-deep/90 disabled:opacity-40"
-              >
-                入力欄へ挿入
-              </button>
-            )}
+                }
+                onClose()
+              }}
+              className="min-h-11 whitespace-nowrap rounded-lg bg-accent-deep px-5 py-2 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-deep/90 disabled:opacity-40"
+            >
+              {packMode && onPickPack ? `まとめて送る（${packItems.length}通）` : '入力欄へ挿入'}
+            </button>
           </div>
         </footer>
       </div>
