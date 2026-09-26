@@ -2017,16 +2017,18 @@ export function ApprovalQueue() {
               setPage(1)
               setSelected(new Set())
             }}
+            count={counts[s]}
           >
-            {s === 'pending' ? '認めるのを待っている' : s === 'approved' ? '認めた' : '却下した'} {counts[s]}
+            {s === 'pending' ? '認めるのを待っている' : s === 'approved' ? '認めた' : '却下した'}
           </FilterChip>
         ))}
         {status === 'pending' && (
           <FilterChip
             selected={flaggedOnly}
             onChange={(value) => { setFlaggedOnly(value); setPage(1); setSelected(new Set()) }}
+            count={flaggedCount}
           >
-            確認したほうがよい {flaggedCount}
+            確認したほうがよい
           </FilterChip>
         )}
       </div>
