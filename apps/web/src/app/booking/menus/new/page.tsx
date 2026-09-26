@@ -440,7 +440,7 @@ export default function NewBookingMenuPage() {
               <span className="text-ink-faint whitespace-nowrap text-xs">分</span>
             </div>
           </Field>
-          <Field label="料金" htmlFor="bm-price" note="税込の金額。0円は「無料」、空けると「お問い合わせ」と出ます。">
+          <Field label="料金" htmlFor="bm-price" help="税込の金額です。0円は「無料」、空けると「お問い合わせ」と出ます。">
             <div className="flex items-center gap-1.5">
               <input
                 id="bm-price"
@@ -456,7 +456,7 @@ export default function NewBookingMenuPage() {
           </Field>
         </div>
 
-        <Field label="分類" htmlFor="bm-category" note="お客様の画面で見出しになります。">
+        <Field label="分類" htmlFor="bm-category" help="お客様の画面で見出しになります。">
           <input
             id="bm-category"
             type="text"
@@ -484,7 +484,7 @@ export default function NewBookingMenuPage() {
           <Field
             label="同時に受けられる件数"
             htmlFor="bm-capacity"
-            note="同じ時間帯に何組まで受けるかです。"
+            help="同じ時間帯に何組まで受けるかです。"
           >
             <div className="flex items-center gap-1.5">
               <input
@@ -557,7 +557,7 @@ export default function NewBookingMenuPage() {
         <Field
           label="後の空き時間"
           htmlFor="bm-buffer"
-          note="片づけや移動の時間です。次の予約はこのぶん後ろから入ります。"
+          help="片づけや移動の時間です。次の予約はこのぶん後ろから入ります。"
         >
           <div className="flex items-center gap-1.5">
             <input
@@ -576,7 +576,7 @@ export default function NewBookingMenuPage() {
       <FormSection
         step={3}
         label="このメニューを担当できる人"
-        note="チェックした人だけ、お客様が指名できます。"
+        help="チェックした人だけ、お客様が指名できます。"
       >
         {staffLoadState === 'loading' ? (
           <p className="text-ink-faint text-sm">
@@ -639,7 +639,7 @@ export default function NewBookingMenuPage() {
         <Field
           label="予約後に付けるタグ"
           htmlFor="bm-auto-tag"
-          note="このメニューで予約が入ると、予約した人の友だちに自動で付きます。付けないときは「なし」のままにしてください。"
+          help="このメニューで予約が入ると、予約した人の友だちに自動で付きます。付けないときは「なし」のままにしてください。"
         >
           {tagLoadState === 'loading' ? (
             <p className="text-ink-faint text-sm">タグを読み込んでいます…</p>
@@ -682,7 +682,7 @@ export default function NewBookingMenuPage() {
       <FormSection
         step={5}
         label="予約時に質問を出す"
-        note="犬種・体重など、当日必要な情報を先に聞けます。"
+        help="犬種・体重など、当日必要な情報を先に聞けます。"
       >
         <Field label="質問文" htmlFor="bm-intake" note="空欄なら質問しません。">
           <input

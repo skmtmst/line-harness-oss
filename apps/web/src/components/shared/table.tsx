@@ -1,6 +1,7 @@
 import React from 'react'
 import type { ReactNode, ThHTMLAttributes, TdHTMLAttributes, HTMLAttributes } from 'react'
 import shell from './data-table.module.css'
+import HelpTip from './help-tip'
 import styles from './table.module.css'
 
 type TableHeadRowProps = Omit<HTMLAttributes<HTMLTableRowElement>, 'children' | 'className'> & {
@@ -34,6 +35,15 @@ export type ThProps = Omit<
   align?: 'left' | 'right' | 'center'
   className?: string
   scope?: Scope
+  /**
+   * 定義・分母・単位・言葉の意味。見出しのすぐ右の「？」へ入れる
+   * （★V7・§2-1b）。表の下の注はここへ移し、2回書かない。
+   */
+  help?: ReactNode
+  /** 「？」の見出し。省略時は見出し文字。読み上げ名は「{見出し}の説明」。 */
+  helpLabel?: string
+  /** 長い説明がある場所。渡すと吹き出しに「くわしく」が出る。 */
+  helpHref?: string
 }
 
 /** Pencil V5/V6の `tPTMp` を正本にした表見出しセル。 */
@@ -42,6 +52,9 @@ export function Th({
   align = 'left',
   className,
   scope = 'col',
+  help,
+  helpLabel,
+  helpHref,
   ...cellProps
 }: ThProps) {
   const classes = [
@@ -53,9 +66,18 @@ export function Th({
     .filter(Boolean)
     .join(' ')
 
+  const hasHelp = help !== undefined && help !== null
+  const heading = helpLabel ?? (typeof children === 'string' ? children : 'この項目')
+
   return (
     <th className={classes} scope={scope} {...cellProps}>
       {children}
+      {hasHelp ? (
+        <HelpTip label={`${heading}の説明`}>
+          {help}
+          {helpHref ? <a href={helpHref}>くわしく</a> : null}
+        </HelpTip>
+      ) : null}
     </th>
   )
 }
@@ -166,11 +188,17 @@ export type SortThProps = ThProps & {
  * 並び順は `aria-sort` と ▲▼ の印の両方で伝える（印だけ・読み上げだけにしない）。
  * 押せない見出しは今までどおり `Th` を使う。
  */
-export function SortTh({ children, sort, onSort, sortLabel, ...cellProps }: SortThProps) {
+export function SortTh({ children, sort, onSort, sortLabel, help, helpLabel, helpHref, ...cellProps }: SortThProps) {
   const mark = sort === 'asc' ? '▲' : sort === 'desc' ? '▼' : null
   const name = typeof children === 'string' ? children : undefined
   return (
-    <Th aria-sort={sort === 'none' ? 'none' : sort === 'asc' ? 'ascending' : 'descending'} {...cellProps}>
+    <Th
+      aria-sort={sort === 'none' ? 'none' : sort === 'asc' ? 'ascending' : 'descending'}
+      help={help}
+      helpLabel={helpLabel ?? name}
+      helpHref={helpHref}
+      {...cellProps}
+    >
       <button
         type="button"
         onClick={onSort}

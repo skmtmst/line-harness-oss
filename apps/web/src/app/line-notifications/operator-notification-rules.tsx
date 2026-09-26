@@ -139,7 +139,7 @@ export default function OperatorNotificationRules({ lineAccountId }: { lineAccou
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <SummaryCard title="出しているお知らせ" value={state === 'ready' ? summary?.published ?? null : null} unit="件" detail={state === 'ready' ? `うち止めている ${summary?.stopped ?? '—'}` : undefined} variant="v6" />
       <SummaryCard title="受け取る人" value={state === 'ready' ? summary?.recipients ?? null : null} unit="人" detail={state === 'ready' ? `受け取れる人がいない ${summary?.missingRecipients ?? '—'}件` : undefined} variant="v6" />
-      <SummaryCard title="今日届いた数" value={state === 'ready' ? summary?.acceptedToday ?? null : null} unit="件" detail="重複を除いて" variant="v6" />
+      <SummaryCard title="今日届いた数" value={state === 'ready' ? summary?.acceptedToday ?? null : null} unit="件" detail="" help="重複を除いた件数です" variant="v6" />
       <SummaryCard title="届かなかった" value={state === 'ready' ? summary?.excludedToday ?? null : null} unit="件" detail="受け取る人がいません" badge={(summary?.excludedToday ?? 0) > 0 ? '要確認' : undefined} badgeTone="danger" variant="v6" />
     </div>
 

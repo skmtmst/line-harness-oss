@@ -212,7 +212,7 @@ function FriendMileageInner() {
       <Breadcrumb items={[{ label: 'マイル', href: '/mileage' }, { label: `${displayName}のマイル明細` }]} />
 
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
-        <SummaryCard variant="v6" title="利用可能" value={available} unit=" マイル" detail="いま使える残高" />
+        <SummaryCard variant="v6" title="利用可能" value={available} unit=" マイル" detail="" help="いま使える残高です" />
         <SummaryCard variant="v6" title="確定待ち" value={v6Friend?.pending ?? mileage.summary.pending} unit=" マイル" detail="条件の確定を待っています" />
         <SummaryCard variant="v6" title="30日以内に失効" value={v6Friend?.expiringMiles30d ?? null} unit=" マイル" detail={v6Friend ? (v6Friend.expiringMiles30d == null ? '期限付きの付与記録はありません' : '30日以内に期限を迎える分') : '友だち別失効の取得口を確認できませんでした'} />
         <SummaryCard
