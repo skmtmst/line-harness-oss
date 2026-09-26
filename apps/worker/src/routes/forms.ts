@@ -54,6 +54,9 @@ import {
 import { enrollFriendInScenario } from '@line-crm/db';
 import { attachTagAndFireSideEffects } from '../services/friend-tag-attach.js';
 import { verifyCallerLineIdentity } from '../services/liff-auth.js';
+import { builtinFileScan, markFileScanClean } from '../services/file-scan.js';
+import { imageDimensions } from '../services/media-metadata.js';
+import { ensureFileScanForUpload } from './file-scan.js';
 import { pushViaHarnessProxy } from '../services/line-proxy-send.js';
 import { dispatchLineProxyLocally } from '../services/local-line-proxy.js';
 import { listLimit, listPage } from './list-pagination.js';
@@ -1858,10 +1861,38 @@ forms.post('/api/forms/:id/files', async (c) => {
     // 誰の・どのフォームの添付かが、キーを見れば分かるようにしておく。
     // 削除依頼が来たときに、消す対象をキーの形だけで絞り込める。
     const key = `form-uploads/${formId}/${friend.id}/${crypto.randomUUID()}.${extension}`;
+    // 保存の前に検査の段を入れる。危険な中身はしまって保存しない。
+    const formBytes = new Uint8Array(data);
+    const formDims = imageDimensions(formBytes, mimeType);
+    const formCheck = builtinFileScan(formBytes, {
+      filename: `添付.${extension}`,
+      mimeType,
+      sizeBytes: formBytes.byteLength,
+      width: formDims?.width ?? null,
+      height: formDims?.height ?? null,
+    });
+    if (formCheck.verdict !== 'clean') {
+      const message = formCheck.verdict === 'quarantined'
+        ? '確認のため受け付けできません。別の画像を選び直してください'
+        : `受け付けできません（${formCheck.detail}）。画像を選び直してください`;
+      return c.json({ success: false, code: 'file_scan_blocked', error: message }, 422);
+    }
     await c.env.IMAGES.put(key, data, {
       httpMetadata: { contentType: mimeType },
       customMetadata: { formId, friendId: friend.id },
     });
+    // 配信・公開に出す前の門番用に、検査済みの記録を残す。
+    await ensureFileScanForUpload({
+      db: c.env.DB,
+      lineAccountId: identity.lineAccountId,
+      subjectKind: 'form_file',
+      subjectId: key,
+      mediaId: null,
+      filename: `添付.${extension}`,
+      mimeType,
+      sizeBytes: formBytes.byteLength,
+    }).then((scan) => markFileScanClean(c.env.DB, scan.id))
+      .catch((err) => console.error('form file scan record error:', key, err));
 
     const workerUrl = c.env.WORKER_URL || new URL(c.req.url).origin;
     return c.json(

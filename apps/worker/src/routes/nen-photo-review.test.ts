@@ -31,6 +31,9 @@ vi.mock('../services/nen-tag-sync.js', () => ({
   refreshAllNenTags: vi.fn(), syncNenHealthTags: vi.fn(),
   syncNenPetTags: vi.fn(), syncNenPhotoTags: mocks.syncTags,
 }));
+// 検査の門番は本物でなく通す。門番自体は file-scan-gate.test.ts で見る。
+vi.mock('../services/file-scan.js', () => ({ getFileScanBySubject: async () => ({ status: 'clean' }) }));
+vi.mock('./file-scan.js', () => ({ ensureFileScanForUpload: async () => ({ id: 'scan-test-1' }) }));
 
 const { nenMembers, loadPhotoReviewRecipient } = await import('./nen-members.js');
 

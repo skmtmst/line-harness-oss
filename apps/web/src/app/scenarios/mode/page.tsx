@@ -269,12 +269,8 @@ function ScenarioModeContent() {
           <span className="mx-1.5">/</span>
           <span>新規作成</span>
         </nav>
-        <Link
-          href="/scenarios"
-          className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control inline-flex items-center border px-3 py-2 text-sm font-medium"
-        >
-          ✕ キャンセル
-        </Link>
+        {/* 見た目を手書きしない。共通ボタンで高さをそろえる。 */}
+        <Button href="/scenarios">✕ キャンセル</Button>
       </div>
 
       <Stepper
@@ -412,14 +408,13 @@ function ScenarioModeContent() {
           {/* 1通だけ試しに送る受け口が無いので、テスト送信とは書かない。 */}
         </p>
         <div className="ml-auto flex flex-wrap items-center gap-3">
-          <button
-            type="button"
+          <Button
+            variant="secondary"
             disabled={(Boolean(id) && !scenario) || saving !== null || detailsSaving}
             onClick={() => void continueAsDraft()}
-            className="text-action text-sm font-medium hover:underline disabled:cursor-not-allowed disabled:opacity-50"
           >
             あとで決める（下書きとして保存）
-          </button>
+          </Button>
           <Button
             variant="primary"
             disabled={!selectedMode || (Boolean(id) && !scenario) || saving !== null || detailsSaving}

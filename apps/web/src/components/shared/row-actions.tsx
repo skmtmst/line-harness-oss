@@ -133,7 +133,7 @@ function RowActionButton({ action, defaultLabel }: { action: RowAction; defaultL
       ? { href: action.href }
       : { onClick: action.onClick, disabled: action.disabled }
   return (
-    <Button {...props} className={styles.rowButton}>
+    <Button {...props} size="compact" className={styles.rowButton}>
       {label}
     </Button>
   )

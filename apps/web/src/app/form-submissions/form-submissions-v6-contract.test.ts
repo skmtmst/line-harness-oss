@@ -47,7 +47,7 @@ describe('V6回答フォーム一覧', () => {
   it('フォームを公開せず下書きで作って編集画面へ進む', () => {
     expect(API).toContain('createDraft:')
     expect(PAGE).toContain('api.forms.createDraft(selectedAccountId)')
-    expect(PAGE).toContain('フォームを作る')
+    expect(PAGE).toContain('＋ フォームを作る')
     expect(PAGE).toContain('&tab=basic')
     expect(PAGE).not.toContain('準備中')
   })

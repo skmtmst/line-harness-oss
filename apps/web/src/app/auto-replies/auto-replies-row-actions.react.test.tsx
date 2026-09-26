@@ -1,8 +1,7 @@
 // @vitest-environment happy-dom
 /*
- * #641: 自動応答一覧の行操作を「枠つき編集ボタン＋削除アイコン＋・・・」へ統一。
- * 文字ボタン3個（編集・停止/再開・削除）をやめ、停止・再開は「その他」メニューへ
- * 集約したことを実マウントで確かめる。
+ * 行の操作は「主な1つ（編集）＋…メニュー」。削除は行に直に置かず、
+ * 停止・再開と並んでメニューの中の危ない操作にあることを実マウントで確かめる。
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -102,8 +101,8 @@ async function flush() {
   }
 }
 
-describe('#641 自動応答一覧の行操作', () => {
-  it('「編集」が枠つきボタン、削除はアイコン、停止は「・・・」メニューの中', async () => {
+describe('自動応答一覧の行操作', () => {
+  it('「編集」が枠つきボタン、停止・削除は「・・・」メニューの中', async () => {
     await act(async () => { root.render(<AutoRepliesPage />) })
     await flush()
 
@@ -111,8 +110,8 @@ describe('#641 自動応答一覧の行操作', () => {
       .find((el) => el.textContent?.trim() === '編集')
     expect(edit, '枠つき「編集」ボタンが見つかりません').toBeTruthy()
 
-    const del = host.querySelector('button[aria-label="自動応答「旧キーワードルール」を削除"]')
-    expect(del, '削除アイコンが見つかりません').toBeTruthy()
+    // 削除は行に直に置かない。
+    expect(host.querySelector('button[aria-label="自動応答「旧キーワードルール」を削除"]')).toBeNull()
 
     const more = host.querySelector('button[aria-label="自動応答「旧キーワードルール」のその他操作"]') as HTMLButtonElement
     expect(more, 'その他ボタンが見つかりません').toBeTruthy()
@@ -120,15 +119,23 @@ describe('#641 自動応答一覧の行操作', () => {
     const menu = host.querySelector('[role="menu"]')
     expect(menu, 'メニューが開きません').toBeTruthy()
     expect(menu!.textContent).toContain('停止する')
+    expect(menu!.textContent).toContain('削除する')
   })
 
-  it('下書き行には「その他」ボタンを出さない（公開の前段なので動かせない）', async () => {
+  it('下書き行の「その他」には削除だけが入る（公開の前段なので動かせない）', async () => {
     listReplies.mockImplementation(async () => ({
       success: true,
       data: [{ ...rule, isActive: false, lifecycleStatus: 'draft' }],
     }))
     await act(async () => { root.render(<AutoRepliesPage />) })
     await flush()
-    expect(host.querySelector('button[aria-label="自動応答「旧キーワードルール」のその他操作"]')).toBeNull()
+    const more = host.querySelector('button[aria-label="自動応答「旧キーワードルール」のその他操作"]') as HTMLButtonElement
+    expect(more, '下書き行にもその他ボタンがある').toBeTruthy()
+    act(() => { more.click() })
+    const menu = host.querySelector('[role="menu"]')
+    expect(menu, 'メニューが開きません').toBeTruthy()
+    expect(menu!.textContent).toContain('削除する')
+    expect(menu!.textContent).not.toContain('停止する')
+    expect(menu!.textContent).not.toContain('再開する')
   })
 })

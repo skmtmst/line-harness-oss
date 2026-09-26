@@ -51,13 +51,23 @@ function app() {
   return instance;
 }
 
+const CHAIN_PNG = Uint8Array.from([
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+  0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
+  0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+  0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
+]);
+
 function environment(): Env['Bindings'] {
   return {
     DB: testDb.db,
     IMAGES: {
       get: async (key: string) =>
         key === 'media/xxx.png'
-          ? { body: 'PNGDATA', etag: 'etag-1', httpMetadata: { contentType: 'image/png' } }
+          ? {
+            body: 'PNGDATA', etag: 'etag-1', httpMetadata: { contentType: 'image/png' },
+            arrayBuffer: async () => CHAIN_PNG.buffer as ArrayBuffer,
+          }
           : null,
     } as unknown as R2Bucket,
     WORKER_URL: 'https://api.example.com',
@@ -94,8 +104,8 @@ beforeEach(() => {
   insertStaff('staff-contents', CONTENTS_KEY, '["/contents"]');
   insertStaff('staff-noperm', NOPERM_KEY, '[]');
   testDb.raw.prepare(`INSERT INTO media
-    (id, line_account_id, kind, filename, mime_type, size_bytes, r2_key, public_url, uploaded_by)
-    VALUES ('md-1', 'acc-1', 'image', 'a.png', 'image/png', 100, 'media/xxx.png', NULL, 'staff-contents')`).run();
+    (id, line_account_id, kind, filename, mime_type, size_bytes, r2_key, public_url, uploaded_by, width, height)
+    VALUES ('md-1', 'acc-1', 'image', 'a.png', 'image/png', 100, 'media/xxx.png', NULL, 'staff-contents', 1, 1)`).run();
 });
 
 afterEach(() => {

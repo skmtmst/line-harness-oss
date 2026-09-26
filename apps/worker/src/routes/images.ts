@@ -1,6 +1,8 @@
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
+import { builtinFileScan, checkKeyGate } from '../services/file-scan.js';
+import { imageDimensions } from '../services/media-metadata.js';
 
 const images = new Hono<Env>();
 
@@ -51,6 +53,23 @@ images.post('/api/images', requireRole('owner', 'admin', 'staff'), async (c) => 
       return c.json({ success: false, error: `Unsupported image type: ${mimeType}. Allowed: ${allowedTypes.join(', ')}` }, 400);
     }
 
+    // 保存の前に検査の段を入れる。危険な中身は保存せず、URL も返さない。
+    const rawBytes = new Uint8Array(data);
+    const rawDims = imageDimensions(rawBytes, mimeType);
+    const preCheck = builtinFileScan(rawBytes, {
+      filename: filename ?? `image.${mimeType.split('/')[1]}`,
+      mimeType,
+      sizeBytes: rawBytes.byteLength,
+      width: rawDims?.width ?? null,
+      height: rawDims?.height ?? null,
+    });
+    if (preCheck.verdict !== 'clean') {
+      const message = preCheck.verdict === 'quarantined'
+        ? '確認のため受け付けできません'
+        : `受け付けできません（${preCheck.detail}）`;
+      return c.json({ success: false, code: 'file_scan_blocked', error: message }, 422);
+    }
+
     const ext = mimeType.split('/')[1] === 'jpeg' ? 'jpg' : mimeType.split('/')[1];
     const id = crypto.randomUUID();
     const key = `${id}.${ext}`;
@@ -84,6 +103,18 @@ images.get('/images/*', async (c) => {
   // 写真審査の原本は公開配信しない。管理画面もreview/public派生画像だけを使う。
   if (key.startsWith('nen-photo-originals/')) {
     return c.json({ success: false, error: 'Image not found' }, 404);
+  }
+  // 検査が終わるまで出さない。記録が無い古いファイルは通す。
+  const gateKind = key.startsWith('form-uploads/')
+    ? 'form_file'
+    : key.startsWith('broadcast-media/')
+      ? 'broadcast_asset'
+      : null;
+  if (gateKind) {
+    const gate = await checkKeyGate(c.env.DB, c.env.IMAGES, gateKind, key);
+    if (!gate.allowed) {
+      return c.json({ success: false, code: gate.code, error: gate.message }, 409);
+    }
   }
   const object = await c.env.IMAGES.get(key);
 

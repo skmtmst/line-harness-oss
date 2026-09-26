@@ -788,7 +788,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
       ) : null}
 
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <Button href="/conversions/new" variant="primary">＋ 成果地点をつくる</Button>
+        <Button href="/conversions/new" variant="primary">＋ 成果地点を作る</Button>
         <Button onClick={() => void exportCsv()} disabled={exporting}>
           {exporting ? '書き出しています' : 'CSVで書き出す'}
         </Button>
@@ -820,14 +820,14 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {([
-            ['all', `すべて ${definitions?.pagination.total ?? 0}`],
-            ['active', `動いている ${definitions?.stateCounts.active ?? 0}`],
-            ['draft', `下書き ${definitions?.stateCounts.draft ?? 0}`],
-            ['invalid', `入力不良 ${definitions?.stateCounts.invalid ?? 0}`],
-            ['sourceStopped', `起点停止 ${definitions?.stateCounts.sourceStopped ?? 0}`],
-            ['stopped', `止めている ${definitions?.stateCounts.stopped ?? 0}`],
-            ['unused', `どこからも使われていない ${definitions?.stateCounts.unused ?? 0}`],
-          ] as const).map(([value, label]) => (
+            ['all', 'すべて', definitions?.pagination.total ?? 0],
+            ['active', '動いている', definitions?.stateCounts.active ?? 0],
+            ['draft', '下書き', definitions?.stateCounts.draft ?? 0],
+            ['invalid', '入力不良', definitions?.stateCounts.invalid ?? 0],
+            ['sourceStopped', '起点停止', definitions?.stateCounts.sourceStopped ?? 0],
+            ['stopped', '止めている', definitions?.stateCounts.stopped ?? 0],
+            ['unused', 'どこからも使われていない', definitions?.stateCounts.unused ?? 0],
+          ] as const).map(([value, label, total]) => (
             <FilterChip
               key={value}
               selected={status === value}
@@ -835,6 +835,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                 setStatus(value)
                 setPage(1)
               }}
+              count={total}
             >
               {label}
             </FilterChip>
@@ -880,7 +881,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
           description={
             query
               ? '検索の言葉を変えてください。'
-              : '右上の「成果地点をつくる」から登録すると、ここに出ます。'
+              : '上の「＋ 成果地点を作る」から登録すると、ここに出ます。'
           }
         />
       ) : (

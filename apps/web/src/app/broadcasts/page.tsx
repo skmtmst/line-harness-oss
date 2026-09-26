@@ -1,6 +1,7 @@
 'use client'
 
 import DateField from '@/components/shared/date-field'
+import FilterChip from '@/components/shared/filter-chip'
 import { Suspense, useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Trash2 } from 'lucide-react'
@@ -469,14 +470,14 @@ function BroadcastList() {
       </div>
 
       <div data-design="Head" className="mb-4 flex flex-wrap items-center gap-2">
-        <button
+        <Button
           type="button"
-          aria-label="新規配信を作成"
+          variant="primary"
+          aria-label="＋ 配信を作る"
           onClick={() => { setOpenTemplatePicker(false); setShowCreate(true) }}
-          className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-status-info"
         >
-          配信を作成
-        </button>
+          ＋ 配信を作る
+        </Button>
       </div>
 
       {/* 一覧本体（設計 `Body`）。 */}
@@ -602,8 +603,8 @@ function BroadcastList() {
           )}
 
           <div className="mb-3 flex flex-wrap items-center gap-2">
-            <button type="button" className="broadcast-filter-chip" data-active={statusFilter === 'scheduled' || undefined} onClick={() => setStatusFilter(statusFilter === 'scheduled' ? 'all' : 'scheduled')}>予約中のみ</button>
-            <button type="button" className="broadcast-filter-chip" data-active={statusFilter === 'draft' || undefined} onClick={() => setStatusFilter(statusFilter === 'draft' ? 'all' : 'draft')}>下書き</button>
+            <FilterChip selected={statusFilter === 'scheduled'} onChange={(on) => setStatusFilter(on ? 'scheduled' : 'all')}>予約中のみ</FilterChip>
+            <FilterChip selected={statusFilter === 'draft'} onChange={(on) => setStatusFilter(on ? 'draft' : 'all')}>下書き</FilterChip>
             {/* ★V7：押せない「非表示」「開封率が低い」の札は外した（機能が無い・未接続のまま置かれていた）。 */}
             <span className="text-ink-faint ml-1 text-xs whitespace-nowrap">配信日</span>
             <div className="w-52"><DateField value={dateFrom} onChange={setDateFrom} max={dateTo || undefined} aria-label="配信日（開始）" /></div>
@@ -940,21 +941,7 @@ function BroadcastList() {
         }}
       />
       <style jsx global>{`
-        .broadcast-filter-chip {
-          min-height: 32px;
-          border: 1px solid var(--color-hairline);
-          border-radius: 999px;
-          background: var(--color-canvas);
-          padding: 0 12px;
-          color: var(--color-ink-secondary);
-          font-size: 12px;
-        }
-        .broadcast-filter-chip[data-active='true'] {
-          border-color: var(--color-accent);
-          background: var(--color-accent-soft);
-          color: var(--color-accent-deep);
-        }
-        .broadcast-filter-chip:disabled { cursor: not-allowed; opacity: .5; }
+        /* m13i: 絞り込み札は共通 FilterChip 1つにそろえた（形・色は部品が持つ）。 */
         [data-design-node='EGMb1'][role='presentation'] {
           align-items: flex-start;
           padding-top: 280px;

@@ -23,7 +23,7 @@ describe('V6 対応マーク', () => {
 
   it('追加編集画面は本文タイトルを置かず、トップバーへ画面名を渡す', () => {
     expect(EDITOR).toContain('data-design-node="GMvBd"')
-    expect(EDITOR).toContain("usePageTitle(editing ? '対応マークを編集' : '対応マークを追加')")
+    expect(EDITOR).toContain("usePageTitle(editing ? '対応マークを編集' : '対応マークを作る')")
     expect(EDITOR).not.toContain('<Header')
     expect(EDITOR).toContain('api.supportMarks.create')
     expect(EDITOR).toContain('api.supportMarks.update')
@@ -79,6 +79,6 @@ describe('V6 対応マーク', () => {
 
   it('タブ行から追加画面へ進める', () => {
     expect(TABS).toContain('href="/tags/marks/new"')
-    expect(TABS).toContain('＋ マークを追加')
+    expect(TABS).toContain('＋ マークを作る')
   })
 })

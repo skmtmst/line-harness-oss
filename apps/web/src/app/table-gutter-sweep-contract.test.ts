@@ -141,7 +141,8 @@ describe('表の外側の余白の洗い出し', () => {
   it('/tags・/tags/folders/new：先頭列と操作列の外側をそろえる', () => {
     const body = code(read('components', 'friend-fields', 'tags-page-v4.tsx'))
     expect(body).toContain('<th className="w-11 px-3 py-3" />')
-    expect(body).toContain('sticky right-0 w-11 px-3 py-3 text-left">操作')
+    // 見出し「操作」は2文字で1行のため w-16。外側の余白 px-3 は先頭列とそろえる。
+    expect(body).toContain('sticky right-0 w-16 whitespace-nowrap px-3 py-3 text-left">操作')
     expect(body).toContain('cursor-grab px-3 py-3')
   })
 

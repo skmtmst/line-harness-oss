@@ -159,7 +159,6 @@ export default function CommonActionsPage() {
         description=""
         actions={(
           <>
-            {canManage ? <Button href="/common-actions/new" variant="primary">共通アクションをつくる</Button> : null}
             <Button href="/support">マニュアル</Button>
           </>
         )}
@@ -200,8 +199,12 @@ export default function CommonActionsPage() {
         ここを直すと、呼び出している機能すべてに効きます。動いている途中のものは、始まったときの版のまま最後まで進みます。
       </NoteBar>
 
+      {/*
+        作る操作は一覧のすぐ上の左。見出しの行の右端には置かない。
+        ★V7：同じボタンを2つ並べない。
+      */}
       <div className="my-3 flex flex-wrap items-center gap-2">
-        {/* ★V7：「共通アクションをつくる」は見出しの右にある。同じボタンを2つ並べない。 */}
+        {canManage ? <Button href="/common-actions/new" variant="primary">＋ 共通アクションを作る</Button> : null}
         {selectedAccountId ? <Button href={api.commonActions.csvUrl(selectedAccountId)}>CSVで書き出す</Button> : null}
         <SearchField
           value={query}
@@ -245,7 +248,7 @@ export default function CommonActionsPage() {
           kind="empty"
           title={query || filter !== 'all' ? '条件に合う共通アクションはありません' : '共通アクションはまだありません'}
           description={query || filter !== 'all' ? '検索語や絞り込みを変えてください。' : 'よく使う処理をまとめると、設定の重複を減らせます。'}
-          action={canManage && !query && filter === 'all' ? <Button href="/common-actions/new" variant="primary">共通アクションをつくる</Button> : undefined}
+          action={canManage && !query && filter === 'all' ? <Button href="/common-actions/new" variant="primary">＋ 共通アクションを作る</Button> : undefined}
         />
       ) : (
         /* U035: 390pxでは6列の表が潰れて見出しが重なる。列の比較が要る表なので、
