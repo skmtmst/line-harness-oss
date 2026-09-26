@@ -1145,7 +1145,7 @@ function Editor({
         </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4">
         {/* 中央: キャンバス */}
         <section>
           <div className="mb-3">
