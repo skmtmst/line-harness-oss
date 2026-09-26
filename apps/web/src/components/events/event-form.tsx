@@ -15,6 +15,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
 import { Field, TextInput } from '@/components/shared/form-controls'
+import HelpTip from '@/components/shared/help-tip'
 import EventQuestionsEditor, { parseEventQuestions } from '@/components/events/event-questions-editor'
 import DateField from '@/components/shared/date-field'
 import { TimeField } from '@/components/shared/date-time-field'
@@ -321,7 +322,7 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
           return (
             <div className="bg-canvas rounded-control border-hairline mb-4 space-y-4 border p-4">
               <div>
-                <div className="text-ink mb-2 text-sm font-medium">broadcast 用テンプレ URL</div>
+                <div className="text-ink mb-2 flex items-center gap-1 text-sm font-medium">broadcast 用テンプレ URL<HelpTip label="broadcast 用テンプレ URLの説明">{'{{liff_id}} は配信時に各友だちのアカウントに対応した値に置換されます。'}</HelpTip></div>
                 <div className="flex items-center gap-2">
                   <input
                     readOnly
@@ -338,7 +339,6 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
                 </div>
                 <p className="text-ink-secondary mt-2 text-xs">
                   broadcast 編集で「リンクするイベント」から選ぶと自動挿入。
-                  {'{{liff_id}}'} は配信時に各友だちのアカウントに対応した値に置換されます。
                 </p>
               </div>
               <div>

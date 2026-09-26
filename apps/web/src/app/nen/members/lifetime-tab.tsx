@@ -119,14 +119,14 @@ export default function LifetimeTab({
   return (
     <>
       <KpiCollapse data-design="KPIs" data-design-node="lr93j" gridClassName="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard variant="v6" title="ライフタイム 合計" value={settings.kpis.lifetimeTotalYen} unit="円" detail="LINE連携済みの会員の累計" />
+        <SummaryCard variant="v6" title="ライフタイム 合計" value={settings.kpis.lifetimeTotalYen} unit="円" detail="" help="LINE連携済みの会員の累計です" />
         <SummaryCard variant="v6" title={first ? `${yen(first.thresholdYen)} 到達` : '節目 到達'} value={first ? first.reachedCount : null} unit="人" detail={first ? first.title : '節目がありません'} />
         <SummaryCard variant="v6" title={second ? `${yen(second.thresholdYen)} 到達` : '節目 到達'} value={second ? second.reachedCount : null} unit="人" detail={second ? second.title : '—'} />
         <SummaryCard variant="v6" title={top && top !== second ? `${yen(top.thresholdYen)} 到達` : '最上位'} value={top && top !== second ? top.reachedCount : null} unit="人" detail={top && top !== second ? top.title : '—'} />
       </KpiCollapse>
 
       <div data-design="Note" data-design-node="oLPs8">
-        <NoteBar tone="info">
+        <NoteBar tone="info" help="ライフタイムはこれまでの購入額の累計で、減りません" helpLabel="ライフタイムの意味">
           ライフタイムはこれまでの購入額の累計です。減らず、年が変わっても戻りません。節目ごとの特典は、決まってからここで設定できます。
         </NoteBar>
       </div>

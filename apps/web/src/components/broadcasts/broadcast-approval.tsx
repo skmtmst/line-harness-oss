@@ -56,8 +56,22 @@ export function formatApprovalDateTime(value: string | null | undefined): string
 
 /** A-2 一覧の札。承認待ちと期限切れだけ出す。 */
 export function ApprovalBadge({ status }: { status: ApprovalStatus | undefined }) {
-  if (status === 'pending') return <Chip tone="info">承認待ち</Chip>
-  if (status === 'expired') return <Chip tone="neutral">期限切れ</Chip>
+  if (status === 'pending') {
+    return (
+      <>
+        <Chip tone="info">承認待ち</Chip>
+        <HelpTip label="承認待ちの説明">承認する人が中身を見て決めるのを待っています。</HelpTip>
+      </>
+    )
+  }
+  if (status === 'expired') {
+    return (
+      <>
+        <Chip tone="neutral">期限切れ</Chip>
+        <HelpTip label="期限切れの説明">承認の期限が過ぎました。頼み直してください。</HelpTip>
+      </>
+    )
+  }
   return null
 }
 
@@ -91,10 +105,13 @@ export function ApprovalRequestFields({
       </p>
       <div className="mt-3 space-y-3">
         <div>
-          <label htmlFor="approval-approver" className="text-ink mb-1 flex items-center gap-1 text-xs font-semibold">
-            承認をお願いする人
+          {/* ？は label の外に置く。中に入れるとラベルがボタンを指して入力欄との結びつきが壊れる。 */}
+          <div className="mb-1 flex items-center gap-1">
+            <label htmlFor="approval-approver" className="text-ink text-xs font-semibold">
+              承認をお願いする人
+            </label>
             <HelpTip label="承認をお願いする人の説明">送る人とは別の人。</HelpTip>
-          </label>
+          </div>
           {candidatesState === 'loading' ? (
             <p className="text-ink-faint text-xs">読み込んでいます…</p>
           ) : candidatesState === 'error' ? (
@@ -158,10 +175,13 @@ export function SingleOperatorFields({
         {formatCount(recipientCount)}
       </p>
       <div className="mt-3">
-        <label htmlFor="approval-count" className="text-ink mb-1 flex items-center gap-1 text-xs font-semibold">
-          人数を入れる
+        {/* ？は label の外に置く。中に入れるとラベルがボタンを指して入力欄との結びつきが壊れる。 */}
+        <div className="mb-1 flex items-center gap-1">
+          <label htmlFor="approval-count" className="text-ink text-xs font-semibold">
+            人数を入れる
+          </label>
           <HelpTip label="人数の説明">送る相手の人数。送信の直前に数えた数。</HelpTip>
-        </label>
+        </div>
         <TextField
           id="approval-count"
           inputMode="numeric"

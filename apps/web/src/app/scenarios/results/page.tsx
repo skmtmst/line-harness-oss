@@ -434,7 +434,7 @@ function ResultsInner() {
           <div className={styles.main}>
             <Panel title="配信結果" lead="開始・完了・どの通まで届いたかを確認します。">
               <div className={styles.resultSummary}>
-                <SummaryCard variant="v6" title="開始" value={stats.enrolledTotal} unit="人" detail="このシナリオに参加した人数" />
+                <SummaryCard variant="v6" title="開始" value={stats.enrolledTotal} unit="人" detail="" help="このシナリオに参加した人数です" />
                 <SummaryCard variant="v6" title="完了" value={stats.completed} unit="人" detail={percentLabel(stats.completed, stats.enrolledTotal)} />
               </div>
             </Panel>

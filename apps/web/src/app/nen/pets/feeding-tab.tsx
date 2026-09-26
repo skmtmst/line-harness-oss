@@ -177,7 +177,7 @@ export default function FeedingTab({ accountId }: { accountId: string }) {
   return (
     <>
       <div data-design="Note" data-design-node="feeding-note">
-        <NoteBar tone="info">
+        <NoteBar tone="info" help="1日の必要カロリーを主食の kcal で割ってグラムにします" helpLabel="今日の目安の計算">
           マイページの「今日の目安」は、1日の必要カロリーを「主食」の kcal で割ってグラムにします。「然の鹿肉の目安」は、必要カロリー × おやつの上限（%）を然の商品の kcal で割ります。主食が1つも無いと、目安は kcal だけの表示になります。
         </NoteBar>
       </div>
