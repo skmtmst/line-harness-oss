@@ -4,6 +4,9 @@ import React from 'react'
 
 export type StepperState = 'done' | 'current' | 'todo'
 
+/** 旧名。Stepper に寄せたので、新しくは StepperState を使う。 */
+export type StepState = StepperState
+
 export interface StepperStep {
   key: string
   label: string
@@ -28,20 +31,13 @@ export interface StepperStep {
 export default function Stepper({
   steps,
   label,
-  className,
 }: {
   /** 何の進みか（例：「配信作成の進み」）。nav の読み上げ名。 */
   label: string
   steps: ReadonlyArray<StepperStep>
-  className?: string
 }) {
   return (
-    <nav
-      aria-label={label}
-      className={['border-hairline bg-canvas rounded-card mb-4 border p-4', className]
-        .filter(Boolean)
-        .join(' ')}
-    >
+    <nav aria-label={label} className="border-hairline bg-canvas rounded-card mb-4 border p-4">
       <ol data-design="Steps" aria-label={label} className="flex flex-wrap items-center gap-y-3">
         {steps.map((step, index) => {
           const clickable = step.state === 'done' && (step.anchor || step.onSelect)
