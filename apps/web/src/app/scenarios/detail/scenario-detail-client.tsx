@@ -1228,7 +1228,7 @@ export default function ScenarioDetailClient({
   // 新規追加（上部）とステップ編集（行直下インライン）の両方で使うフォーム。
   // 同時に開くのは常に片方だけなので、state は stepForm を共有する。
   const renderStepForm = () => (
-    <div className={editingStepId ? '' : 'border-hairline rounded-card bg-canvas-sunken mb-6 border p-4'}>
+    <div className={editingStepId ? '' : 'border-hairline rounded-card bg-canvas-sunken border p-4'}>
       {!editingStepId && (
         <h4 className="text-sm font-medium text-ink-secondary mb-3">新しいステップを追加</h4>
       )}
@@ -1702,8 +1702,9 @@ export default function ScenarioDetailClient({
   const modeBadge = modeBadgeStyle[deliveryMode]
 
   return (
-    <div>
-      <div className={editingStepId ? 'mb-3 flex items-center justify-between gap-4' : ''}>
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <div className={editingStepId ? 'flex items-center justify-between gap-4' : ''}>
         <nav data-design="Crumb" className="text-ink-faint text-xs">
           <Link href="/scenarios" className="hover:underline">
             シナリオ配信
@@ -1777,7 +1778,7 @@ export default function ScenarioDetailClient({
       {showStarted ? (
         <div
           data-design-node="NrBkW"
-          className="border-success bg-success-bg text-success mb-4 flex flex-wrap items-center justify-between gap-3 rounded-card border px-4 py-3 text-sm"
+          className="border-success bg-success-bg text-success flex flex-wrap items-center justify-between gap-3 rounded-card border px-4 py-3 text-sm"
           role="status"
         >
           <p className="font-semibold">
@@ -1801,7 +1802,7 @@ export default function ScenarioDetailClient({
       */}
       <section
         data-design-node="bV5Vs"
-        className="border-warning bg-warning-bg rounded-card mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 border px-4 py-3"
+        className="border-warning bg-warning-bg rounded-card flex flex-wrap items-center gap-x-3 gap-y-1 border px-4 py-3"
         role="note"
       >
         <p className="text-warning text-sm font-semibold">
@@ -1816,13 +1817,13 @@ export default function ScenarioDetailClient({
       </section>
 
       {error && (
-        <div className="bg-danger-bg text-danger rounded-card mb-4 p-4 text-sm">
+        <div className="bg-danger-bg text-danger rounded-card p-4 text-sm">
           {error}
         </div>
       )}
 
       {/* Scenario Info */}
-      <div className="bg-canvas rounded-card border border-hairline p-6 mb-6">
+      <div className="bg-canvas rounded-card border border-hairline p-6">
         {editing ? (
           /* ★V7: 編集フォームもカードの幅いっぱいに広げる。1920px で右が大きく空く。 */
           <div className="space-y-4">
@@ -2078,7 +2079,7 @@ export default function ScenarioDetailClient({
       {stats && stats.enrolledTotal > 0 && (
         <div
           data-design="KPIs"
-          className="bg-canvas rounded-card border-hairline mb-4 flex flex-wrap items-center gap-x-8 gap-y-3 border px-5 py-4"
+          className="bg-canvas rounded-card border-hairline flex flex-wrap items-center gap-x-8 gap-y-3 border px-5 py-4"
         >
           <div>
             <p className="text-ink-faint text-xs">購読中</p>
@@ -2405,7 +2406,7 @@ export default function ScenarioDetailClient({
         分からないシナリオが一覧に増える。
       */}
       {duplicateRemainder && (
-        <div className="border-warning bg-warning-bg rounded-card mt-4 border px-4 py-3" role="alert">
+        <div className="border-warning bg-warning-bg rounded-card border px-4 py-3" role="alert">
           <p className="text-warning text-sm font-bold">
             複製が「{duplicateRemainder.stage}」の途中で止まりました
           </p>
@@ -2449,7 +2450,7 @@ export default function ScenarioDetailClient({
         削除は右端に離して置く。編集の流れの途中にあると、保存のつもりで
         押し間違える。複製は左、戻るは中。
       */}
-      <div className="border-hairline mt-4 flex flex-wrap items-center gap-3 border-t pt-4">
+      <div className="border-hairline flex flex-wrap items-center gap-3 border-t pt-4">
         <span className="inline-flex flex-wrap items-center gap-2">
           <button
             type="button"

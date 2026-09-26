@@ -329,13 +329,14 @@ function NewCommonVarInner() {
   }
 
   return (
-    <div>
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       {!accountLoading && !selectedAccountId && (
-        <div className="bg-warning-bg text-warning mb-4 rounded-card p-4 text-sm">
+        <div className="bg-warning-bg text-warning rounded-card p-4 text-sm">
           共通情報を登録するLINEアカウントを選択してください。
         </div>
       )}
-      <nav className="text-ink-faint mb-3 text-xs">
+      <nav className="text-ink-faint text-xs">
         <Link href="/contents/vars" className="text-info underline">
           共通情報一覧
         </Link>

@@ -891,8 +891,9 @@ function BookingsInner() {
   const activeBroadcastPreview = broadcastPreview?.scope === scope ? broadcastPreview : null
 
   return (
-    <div>
-      <nav data-design="Crumb" className="text-ink-faint mb-2 text-xs">
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <nav data-design="Crumb" className="text-ink-faint text-xs">
         <Link href="/events" className="hover:underline">
           イベント予約
         </Link>
@@ -904,7 +905,7 @@ function BookingsInner() {
         <span>予約者</span>
       </nav>
 
-      <div data-design="Head" className="mb-4">
+      <div data-design="Head">
         <h2 className="text-ink text-lg font-semibold">イベントの予約者</h2>
         <p className="text-ink-faint mt-1 text-sm">
           申込の確認・承認・キャンセルを行います。承認制のイベントは、承認するまで確定しません。
@@ -912,7 +913,7 @@ function BookingsInner() {
         </p>
       </div>
 
-      <div data-design="Sel" className="bg-canvas rounded-card border-hairline mb-4 border p-3">
+      <div data-design="Sel" className="bg-canvas rounded-card border-hairline border p-3">
         <span className="text-ink-faint mr-2 text-xs">イベント</span>
         {/*
           **読めなかったのを「読み込み中」と言わない。** いつまでも
@@ -931,7 +932,7 @@ function BookingsInner() {
         「対応するものが無い」と読める。取れていないだけなら、
         待たせている人を見落とす。
       */}
-      <div data-design="KPIs" className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
+      <div data-design="KPIs" className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <EventKpi
           title="申込"
           value={dataReady ? applied : null}
@@ -988,7 +989,7 @@ function BookingsInner() {
         />
       </div>
 
-      <section className="bg-canvas rounded-card border-hairline mb-4 border p-4" aria-labelledby="occurrence-applicants-title">
+      <section className="bg-canvas rounded-card border-hairline border p-4" aria-labelledby="occurrence-applicants-title">
         <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
           <div>
             <h3 id="occurrence-applicants-title" className="text-ink font-semibold">開催回ごとの申込者とキャンセル待ち</h3>
@@ -1078,7 +1079,7 @@ function BookingsInner() {
           どの予約に対して失敗したのかが分からなくなる。
         */}
         {actionError && (
-          <div className="bg-danger-bg border-danger-bg text-danger mb-4 rounded-lg border p-3 text-sm">
+          <div className="bg-danger-bg border-danger-bg text-danger rounded-lg border p-3 text-sm">
             {actionError}
           </div>
         )}

@@ -627,15 +627,16 @@ export default function ScenariosPage() {
   }
 
   return (
-    <div>
-      <p data-design="Head" className="bg-info-bg text-ink-secondary mb-4 rounded-control px-4 py-3 text-xs">
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <p data-design="Head" className="bg-info-bg text-ink-secondary rounded-control px-4 py-3 text-xs">
         作成しただけでは配信されません。開始条件を設定すると配信が始まります。
       </p>
       {/*
         SCENARIO-16: 下線だけの span は押せない。3手順の説明は
         開閉欄へ移し、帯は1〜2文だけにする。
       */}
-      <Disclosure size="compact" title="配信を始める方法" hint="3手順" className="mb-4">
+      <Disclosure size="compact" title="配信を始める方法" hint="3手順">
         <ol className="list-decimal space-y-1 pl-5 text-sm">
           <li>一覧からシナリオを開き、「開始のきっかけ」（友だち追加時・タグが付いたときなど）を設定します。</li>
           <li>詳細画面の「テスト送信」で、実際の届き方を確認します。</li>
@@ -734,7 +735,7 @@ export default function ScenariosPage() {
 
       {/* 一覧本体（設計 `Body`）。 */}
       <div data-design="Body">
-      <div className="mb-4 flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <Button
           variant="primary"
           onClick={handleCreate}
@@ -824,7 +825,7 @@ export default function ScenariosPage() {
       )}
 
       {actionError && (
-        <div className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
+        <div className="p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
           {actionError}
         </div>
       )}
@@ -850,7 +851,7 @@ export default function ScenariosPage() {
         />
       )}
       {scenarioList.pageCount > 1 ? (
-        <div className="mt-4 flex items-center justify-end gap-3 text-sm">
+        <div className="flex items-center justify-end gap-3 text-sm">
           <Button disabled={scenarioList.page <= 1 || scenarioList.loading} onClick={() => scenarioList.setPage(scenarioList.page - 1)}>
             前へ
           </Button>

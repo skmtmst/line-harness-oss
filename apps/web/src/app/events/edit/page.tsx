@@ -125,8 +125,9 @@ function EditEventInner() {
   }
 
   return (
-    <div>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <nav className="text-ink-faint text-xs" data-design="Crumb" aria-label="パンくず">
           <Link href="/events" className="hover:underline">
             イベント予約
@@ -153,7 +154,7 @@ function EditEventInner() {
             <EventForm accountId={selectedAccountId} eventId={id} />
           </div>
 
-          <section className="bg-canvas-sunken rounded-card border-hairline mt-5 border p-4">
+          <section className="bg-canvas-sunken rounded-card border-hairline border p-4">
             <h2 className="text-ink text-sm font-bold">気をつけること</h2>
             <ul className="text-ink-faint mt-2 space-y-1 text-xs leading-relaxed">
               <li>

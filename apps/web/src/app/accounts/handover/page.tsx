@@ -209,22 +209,26 @@ function Handover() {
       />
     )
   }
+  // 空の案内もカード（白地・枠・角丸）の中に出す。灰色の地だけにしない。
   if (!handover) {
     return (
-      <ListState
-        kind="empty"
-        title="進行中の引き継ぎはありません"
-        description="引き継ぎコードを発行すると、事前確認の結果をここで確かめられます。"
-        action={<Button href={`/accounts/detail?id=${account.id}`}>アカウントの詳細へ戻る</Button>}
-      />
+      <section className="bg-canvas rounded-card border-hairline border">
+        <ListState
+          kind="empty"
+          title="進行中の引き継ぎはありません"
+          description="引き継ぎコードを発行すると、事前確認の結果をここで確かめられます。"
+          action={<Button href={`/accounts/detail?id=${account.id}`}>アカウントの詳細へ戻る</Button>}
+        />
+      </section>
     )
   }
 
   const currentStep = statusStep[handover.status]
 
   return (
-    <div data-design-node="nx3XW">
-      <div data-design="Head" className="mb-4">
+    <div data-design-node="nx3XW" className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <div data-design="Head">
         <Breadcrumb items={[
           { label: 'LINEアカウント', href: '/accounts' },
           { label: account.name, href: `/accounts/detail?id=${account.id}` },
@@ -254,7 +258,7 @@ function Handover() {
         })}
       </ol>
 
-      <div className="mt-4 grid gap-4 xl:grid-cols-4">
+      <div className="grid gap-4 xl:grid-cols-4">
         <div className="space-y-4 xl:col-span-3">
           <section className="bg-canvas rounded-card border-hairline border p-5">
             <p className="text-ink text-base font-bold">どこからどこへ</p>

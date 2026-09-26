@@ -540,9 +540,10 @@ export default function AutoRepliesPage() {
   const visualMonthly = monthlyHits
 
   return (
-    <div>
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}
-      <KpiCollapse data-design="KPIs" className="mb-4" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <KpiCollapse data-design="KPIs" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">ルール数</p>
           <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
@@ -593,7 +594,7 @@ export default function AutoRepliesPage() {
         </div>
       </KpiCollapse>
 
-      <div data-design="Actions" className="mb-4 flex flex-wrap items-center gap-2">
+      <div data-design="Actions" className="flex flex-wrap items-center gap-2">
         <Button
           variant="primary"
           onClick={() => setEditing({
@@ -616,7 +617,7 @@ export default function AutoRepliesPage() {
         複数当てはまったときの挙動と、「適用アカウント」欄の札の読み方。書いていないと必ず問い合わせになるが、
         毎回2つの帯が一覧を押し下げていたので、閉じた欄にしまう（★V7：今は出さなくてよいもの）。
       */}
-      <Disclosure size="compact" title="ルールの動き方と札の見方" hint="上から順に1つだけ動きます" className="mb-4">
+      <Disclosure size="compact" title="ルールの動き方と札の見方" hint="上から順に1つだけ動きます">
         <div className="text-ink-secondary mb-3 text-xs leading-relaxed">
           上にあるルールから順に見て、<strong>最初に当てはまった1つだけ</strong>が動きます。
           時間帯や連投の設定で見送られたときは、その次のルールを見ます。
@@ -646,7 +647,7 @@ export default function AutoRepliesPage() {
 
       <div
         data-design="Bar"
-        className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3"
+        className="bg-canvas rounded-card border-hairline flex flex-wrap items-center gap-2 border p-3"
       >
         {/*
           #636: 検索欄は min-w-45（180px）を下限にする。min-w-0 だと
@@ -665,7 +666,7 @@ export default function AutoRepliesPage() {
       </div>
 
       {/* #668: 並びは「絞り込み → 並び順 → 表示件数」の1形。 */}
-      <div data-design="Saved" className="mb-3 flex flex-wrap items-center gap-2">
+      <div data-design="Saved" className="flex flex-wrap items-center gap-2">
         <span className="text-ink-faint text-xs whitespace-nowrap">よく使う絞り込み</span>
         {SAVED_FILTERS.map((f) => {
           const on = savedFilter === f.key

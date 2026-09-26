@@ -182,7 +182,8 @@ function NewBroadcastPageContent() {
   const audiencePending = Boolean(effectiveAudienceId) && Boolean(selectedAccountId) && !audience && !audienceError
 
   return (
-    <div>
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       {loading || audiencePending || (effectiveAudienceId && accountLoading) ? (
         <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
           読み込み中...
@@ -225,7 +226,7 @@ function NewBroadcastPageContent() {
       ) : (
         <>
           {conditionParamInvalid ? (
-            <p className="bg-canvas rounded-card border-hairline text-ink-secondary mb-3 border px-4 py-3 text-xs">
+            <p className="bg-canvas rounded-card border-hairline text-ink-secondary border px-4 py-3 text-xs">
               引き継がれた絞り込み条件を読めませんでした。条件なしの作成画面を開いています。
             </p>
           ) : null}

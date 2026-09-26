@@ -189,10 +189,10 @@ export default function NewLineAccountPage() {
   )
 
   return (
-    <div data-design-node="b2NGxk" className="w-full pb-24">
+    <div data-design-node="b2NGxk" className="flex w-full flex-col gap-4 pb-24">
       {/* ★V7: 登録専用の枠の幅いっぱいに広げる。中央寄せの狭い列にしない。 */}
       <div data-design="Head">
-        <div className="mb-4 flex justify-end"><Button href="/hq">統括コンソールへ戻る</Button></div>
+        <div className="flex justify-end"><Button href="/hq">統括コンソールへ戻る</Button></div>
         <PageHeader
           breadcrumb={[{ label: 'LINEアカウント', href: '/accounts' }, { label: '登録' }]}
           title="LINEアカウントを登録"
@@ -205,7 +205,7 @@ export default function NewLineAccountPage() {
         長かった。狭い画面では「いまの手順＋位置」だけを出し、全手順は
         開いて確認する形にする。640px 以上ではこれまでどおり5段で出す。
       */}
-      <nav data-design="Steps" aria-label="登録の進捗" className="bg-canvas rounded-card border-hairline mb-4 border p-4">
+      <nav data-design="Steps" aria-label="登録の進捗" className="bg-canvas rounded-card border-hairline border p-4">
         <ol className="hidden gap-2 sm:grid sm:grid-cols-5">
           {WIZARD_STEPS.map((step) => {
             const active = currentStep === step.number
@@ -314,11 +314,10 @@ export default function NewLineAccountPage() {
           </div>}
         </div>
 
-        {error && <p role="alert" aria-live="assertive" className="bg-danger-bg text-danger rounded-control mt-4 p-3 text-sm">{error}</p>}
+        {error && <p role="alert" aria-live="assertive" className="bg-danger-bg text-danger rounded-control p-3 text-sm">{error}</p>}
         <NoticeLineRegisterDialog open={noticeDialog === 'open'} onClose={() => setNoticeDialog('done')} />
         <div data-design="Actions">
           <StickyBar
-            className="mt-4"
             status={createdId ? (importingIds ? '既存の友だちを取り込んでいます' : '登録が完了しました') : busyAction === 'save' ? '接続して保存しています' : `手順 ${currentStep} / 5`}
             actions={createdId ? <>
               {importingIds ? <><Button type="button" disabled>登録したアカウントを見る</Button><Button type="button" variant="primary" disabled>統括コンソールへ</Button></> : <><Button href={`/accounts/detail?id=${encodeURIComponent(createdId)}`}>登録したアカウントを見る</Button><Button href="/hq" variant="primary">統括コンソールへ</Button></>}

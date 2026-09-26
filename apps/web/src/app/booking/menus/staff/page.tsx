@@ -188,8 +188,9 @@ function MenuStaffMatrixContent() {
           : '変更はありません'
 
   return (
-    <div>
-      <nav data-design="Crumb" className="text-ink-faint mb-2 text-xs">
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <nav data-design="Crumb" className="text-ink-faint text-xs">
         <Link href="/booking/menus" className="hover:underline">
           予約設定
         </Link>
@@ -197,7 +198,7 @@ function MenuStaffMatrixContent() {
         <span>担当スタッフ</span>
       </nav>
 
-      <div data-design="Actions" className="mb-4 flex flex-wrap items-center gap-2">
+      <div data-design="Actions" className="flex flex-wrap items-center gap-2">
           <Link
             href="/booking/staff/new"
             className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-3 py-2 text-sm"
@@ -227,7 +228,7 @@ function MenuStaffMatrixContent() {
           </span>
       </div>
 
-      <div data-design="KPIs" className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
+      <div data-design="KPIs" className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <Kpi
           title="メニュー"
           value={String(menus.length)}
@@ -255,18 +256,18 @@ function MenuStaffMatrixContent() {
       </div>
 
       {error && (
-        <div className="bg-danger-bg border-danger-bg text-danger mb-4 rounded-lg border p-4 text-sm">
+        <div className="bg-danger-bg border-danger-bg text-danger rounded-lg border p-4 text-sm">
           {error}
         </div>
       )}
       {savedAt && Date.now() - savedAt < 3000 && (
-        <div className="bg-success-bg text-success mb-4 rounded-lg p-3 text-sm">保存しました</div>
+        <div className="bg-success-bg text-success rounded-lg p-3 text-sm">保存しました</div>
       )}
 
       {orphans.length > 0 && (
         <div
           data-design="Warn"
-          className="bg-warning-bg rounded-card mb-4 flex flex-wrap items-center justify-between gap-2 p-4"
+          className="bg-warning-bg rounded-card flex flex-wrap items-center justify-between gap-2 p-4"
         >
           <div>
             <p className="text-warning text-sm font-medium">

@@ -383,8 +383,9 @@ function BroadcastDetailInner() {
     && ['none', 'rejected', 'cancelled', 'expired'].includes(approvalState.approval.status)
 
   return (
-    <div>
-      <nav data-design="Crumb" className="text-ink-faint mb-4 text-xs">
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <nav data-design="Crumb" className="text-ink-faint text-xs">
         <Link href="/broadcasts" className="hover:underline">
           ← 一斉配信一覧
         </Link>
@@ -690,7 +691,6 @@ function BroadcastDetailInner() {
       */}
       {broadcast ? (
         <StickyBar
-          className="mt-6"
           actions={<Button onClick={exportCsv}>CSVで書き出す</Button>}
         />
       ) : null}

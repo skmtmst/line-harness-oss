@@ -335,8 +335,8 @@ function FormResponsesInner() {
   const nextVisitCount = nextVisitPeople(summary)
 
   return (
-    <div data-design-node="v9tYhl">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <div data-design-node="v9tYhl" className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <nav className="text-ink-faint text-xs">
           <Link href="/form-submissions" className="text-action hover:underline">回答フォーム</Link>
           <span className="mx-2">/</span>
@@ -353,12 +353,12 @@ function FormResponsesInner() {
         </div>
       </div>
 
-      <div className="border-hairline mb-4 flex items-center gap-6 border-b">
+      <div className="border-hairline flex items-center gap-6 border-b">
         <button type="button" onClick={() => setView('rows')} className={`border-b-2 px-1 py-3 text-sm font-semibold ${view === 'rows' ? 'border-accent-deep text-accent-deep' : 'border-transparent text-ink-faint'}`}>1件ずつ見る　{total === null ? '—' : `${total.toLocaleString('ja-JP')}件`}</button>
         <button type="button" onClick={() => setView('summary')} className={`border-b-2 px-1 py-3 text-sm font-semibold ${view === 'summary' ? 'border-accent-deep text-accent-deep' : 'border-transparent text-ink-faint'}`}>まとめて見る</button>
       </div>
 
-      <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Kpi label="回答" value={total === null ? '—' : `${total.toLocaleString('ja-JP')}件`} note="現在保存されている回答" />
         <Kpi
           label="開いた人のうち答えた割合"
@@ -377,13 +377,13 @@ function FormResponsesInner() {
         />
       </div>
 
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <label className="text-ink-secondary text-xs" htmlFor="form-response-filter">名前・回答内容で検索（全件から探す）</label>
         <input id="form-response-filter" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="名前・回答内容で検索" className="border-hairline bg-canvas text-ink rounded-control w-full border px-3 py-2 text-sm sm:w-72" />
       </div>
-      {exportError && <p className="text-danger mb-3 text-sm">{exportError}</p>}
+      {exportError && <p className="text-danger text-sm">{exportError}</p>}
       {exporting && exportProgress && (
-        <p className="text-ink-secondary mb-3 text-sm" role="status">{exportProgress}</p>
+        <p className="text-ink-secondary text-sm" role="status">{exportProgress}</p>
       )}
 
       {total === 0 && !query.trim() ? (

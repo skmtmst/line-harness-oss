@@ -112,8 +112,9 @@ export default function BookingStaffPage() {
   }
 
   return (
-    <div>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <nav data-design="Crumb" className="text-ink-faint text-xs" aria-label="パンくず">
           <Link href="/booking/menus" className="hover:underline">予約設定</Link>
           <span className="mx-1.5">/</span>
@@ -124,7 +125,7 @@ export default function BookingStaffPage() {
         作る操作は一覧のすぐ上の左。見出しの行の右端には置かない。
         押せない理由はボタンの説明に出す。押せないボタンを黙って置かない。
       */}
-      <div data-design="Actions" className="mb-4 flex flex-wrap items-center gap-2">
+      <div data-design="Actions" className="flex flex-wrap items-center gap-2">
         <Button
           variant="primary"
           onClick={() => setEditing(EMPTY)}
@@ -136,7 +137,9 @@ export default function BookingStaffPage() {
       </div>
 
       {!selectedAccountId ? (
-        <ListState kind="empty" title="LINEアカウントを選んでください" description="共通メニューで、予約スタッフを管理するLINEアカウントを選んでください。" />
+        <div className="bg-canvas rounded-card border border-hairline">
+          <ListState kind="empty" title="LINEアカウントを選んでください" description="共通メニューで、予約スタッフを管理するLINEアカウントを選んでください。" />
+        </div>
       ) : loadStatus === 'loading' ? (
         <ListState kind="loading" title="予約スタッフを読み込んでいます" />
       ) : loadStatus === 'error' ? (
@@ -147,7 +150,9 @@ export default function BookingStaffPage() {
           action={<Button variant="secondary" onClick={() => void load()}>予約スタッフを再読み込み</Button>}
         />
       ) : items.length === 0 ? (
-        <ListState kind="empty" title="予約スタッフはまだいません" description="「＋ スタッフを作る」から最初のスタッフを追加してください。" />
+        <div className="bg-canvas rounded-card border border-hairline">
+          <ListState kind="empty" title="予約スタッフはまだいません" description="「＋ スタッフを作る」から最初のスタッフを追加してください。" />
+        </div>
       ) : (
         <div data-design="Table" className="bg-canvas rounded-card border border-hairline overflow-hidden">
           <div className="overflow-x-auto">

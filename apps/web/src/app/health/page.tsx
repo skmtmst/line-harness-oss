@@ -208,11 +208,12 @@ export default function HealthPage() {
   }
 
   return (
-    <div>
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
 
       {/* Error */}
       {error && (
-        <div className="mb-4 p-4 bg-danger-bg border border-danger/30 rounded-card text-danger text-sm">
+        <div className="p-4 bg-danger-bg border border-danger/30 rounded-card text-danger text-sm">
           {error}
         </div>
       )}
@@ -228,9 +229,9 @@ export default function HealthPage() {
           <p className="text-xs text-ink-faint">先にアカウント管理からLINEアカウントを登録してください</p>
         </div>
       ) : (
-        <>
+        <div className="flex flex-col gap-4">
           {/* Account Health Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {accounts.map((account) => {
               const risk = latestRisk[account.id] ?? 'unknown'
               const config = riskConfig[risk]
@@ -347,7 +348,7 @@ export default function HealthPage() {
 
           {/* Migration Form Modal */}
           {migrateFrom && (
-            <div className="mb-8 bg-canvas rounded-card border border-danger/30 p-6">
+            <div className="bg-canvas rounded-card border border-danger/30 p-6">
               <h2 className="text-sm font-bold text-ink mb-4">
                 友だち移行: {getAccountName(migrateFrom)}
               </h2>
@@ -483,7 +484,7 @@ export default function HealthPage() {
               </div>
             )}
           </div>
-        </>
+        </div>
       )}
     </div>
   )

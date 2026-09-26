@@ -42,6 +42,8 @@ const net = vi.hoisted(() => ({
   failRollback: null as null | 'network',
   /** 対応表GETの回数（結果不明時の読み直しを見る）。 */
   detailGets: 0,
+  /** 一覧GETの失敗再現。'network' で fetch が投げる。 */
+  failList: null as null | 'network',
 }))
 
 vi.mock('next/link', () => ({
@@ -102,7 +104,10 @@ function installFetch() {
     if (path === '/api/staff/me') {
       return net.me ? json(net.me) : new Response(JSON.stringify({ success: false, error: 'x' }), { status: 500 })
     }
-    if (path === '/api/friends/migrations' && method === 'GET') return json(net.runs)
+    if (path === '/api/friends/migrations' && method === 'GET') {
+      if (net.failList === 'network') throw new TypeError('Failed to fetch')
+      return json(net.runs)
+    }
     const itemMatch = path.match(/^\/api\/friends\/migrations\/[^/]+\/items\/[^/]+$/)
     if (itemMatch && method === 'PATCH') {
       if (net.failItemPatch === 'network') throw new TypeError('Failed to fetch')
@@ -148,6 +153,7 @@ beforeEach(() => {
   net.failExecute = null
   net.failRollback = null
   net.detailGets = 0
+  net.failList = null
   installFetch()
   ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
   host = document.createElement('div')
@@ -422,5 +428,66 @@ describe('通信例外の結果不明（TECH-07 / FRIEND-33/34）', () => {
     expect(dialog.textContent).toContain('応答を確認できませんでした')
     expect(net.calls.filter((call) => call.path.endsWith('/rollback') && call.method === 'POST')).toHaveLength(1)
     expect(net.detailGets).toBeGreaterThan(getsBefore)
+  })
+})
+
+/**
+ * カード間隔そろえ（★V7 gap-4・2026-09-26）の描画試験。
+ * 空（履歴なし）・読み込み中・失敗・正常の主な状態を押さえる。
+ */
+describe('UID移行の空と履歴のカード表示', () => {
+  it('履歴なしは「テスト移行はまだありません」を白いカードの中に出す', async () => {
+    net.runs = []
+    await render()
+    await flush()
+    const emptyTitle = Array.from(document.body.querySelectorAll('p')).find((node) => node.textContent === 'テスト移行はまだありません')
+    expect(emptyTitle).toBeTruthy()
+    // 灰色の1枚ではなく、白地・枠・角丸のカード（section）の中にある。
+    const card = emptyTitle!.closest('section.bg-canvas')
+    expect(card).toBeTruthy()
+    expect(card!.querySelector('h2')?.textContent).toBe('テスト移行の結果')
+    // 履歴側の空カードも同じ形で出す。
+    expect(document.body.textContent).toContain('移行履歴はまだありません')
+  })
+
+  it('履歴なしでも下の履歴節へ飛ぶだけのボタンは出さない', async () => {
+    net.runs = []
+    await render()
+    await flush()
+    expect(document.body.querySelector('a[href="#migration-history"]')).toBeNull()
+    // 別画面への導線は残す。
+    expect(document.body.querySelector('a[href="/friends/migrations"]')).toBeTruthy()
+  })
+
+  it('読み込み中は1枚だけ出す', async () => {
+    net.runs = []
+    await render()
+    // 読み込み完了後は空のカードが出る（読み込み中の1枚と置き換わる）。
+    await flush()
+    expect(document.body.textContent).toContain('テスト移行はまだありません')
+    expect(document.body.textContent).not.toContain('UID移行を読み込んでいます')
+  })
+
+  it('読み込み失敗は1画面に1枚だけ出し、再読み込みできる', async () => {
+    net.runs = []
+    net.failList = 'network'
+    await render()
+    await flush()
+    expect(document.body.textContent).toContain('UID移行を表示できませんでした')
+    // 登録した履歴が消えたように見せない文言を出す。
+    expect(document.body.textContent).toContain('登録した移行履歴は消えていません')
+    // 再読み込みで直る。
+    net.failList = null
+    fireEvent.click(buttonByText('再読み込み'))
+    await flush()
+    expect(document.body.textContent).toContain('テスト移行はまだありません')
+  })
+
+  it('対応表あり（正常）は結果カードと履歴節を両方出す', async () => {
+    await render()
+    await flush()
+    expect(document.body.textContent).toContain('テスト移行の状態')
+    expect(document.body.textContent).toContain('移行履歴')
+    expect(document.body.querySelector('a[href="#migration-history"]')).toBeNull()
   })
 })

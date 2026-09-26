@@ -12,7 +12,8 @@ const PAGE = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'detail'
  */
 describe('友だち詳細のタブ帯は右列を押し広げない', () => {
   it('グリッドの右列（data-design="Right"）は min-w-0 を持つ', () => {
-    expect(PAGE).toContain('data-design="Right" className="min-w-0"')
+    // タブ帯とパネルの縦間隔は親の gap-4 にそろえる（m13h。min-w-0 の意図は変えない）。
+    expect(PAGE).toContain('data-design="Right" className="flex min-w-0 flex-col gap-4"')
   })
 
   it('タブ帯は折り返さず横スクロールする', () => {

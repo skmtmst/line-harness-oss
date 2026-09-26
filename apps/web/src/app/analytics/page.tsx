@@ -1407,7 +1407,7 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
   }
 
   return (
-    <div data-design-node="C2I7ry" className="space-y-4">
+    <div data-design-node="C2I7ry" className="flex flex-col gap-4">
       <div className="flex justify-end"><AnalyticsExportButton onClick={exportFunnel} disabled={!result} /></div>
       <AnalyticsNotice>段は上から順に見ます。同じ人が同じ段を2回通っても1回として数えます。判定できる期間は、最初の段から設定した日数です。まだ途中の人は完了した人に含めません。</AnalyticsNotice>
       <p className="text-sm text-ink-secondary">友だちがどこまで進んで、どこで離れたかを段階ごとに見ます。段を自由に組み替えられるので、配信の流れでも購入の流れでも作れます。</p>
@@ -2046,7 +2046,7 @@ function FunnelForm({
   }
 
   return (
-    <div className="bg-canvas rounded-card border-hairline mb-5 space-y-4 border p-5">
+    <div className="bg-canvas rounded-card border-hairline space-y-4 border p-5">
       {presetConversion && !edit ? (
         <p className="border-info bg-info-bg text-info rounded-control border px-3 py-2 text-xs font-semibold" role="status">
           成果地点「{presetConversion.name}」を2段目に入れています。このまま段を組んで作成すると、その成果地点を使う分析として登録されます。

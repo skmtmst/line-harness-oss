@@ -163,15 +163,16 @@ function EditFriendFieldForm() {
 
   // 編集画面のPencilノードは未定。新規作成の A1ZYeP を仮に名乗ると誤比較されるので付けない。
   return (
-    <div>
-      <div className="mb-4 flex items-center justify-between gap-4">
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <div className="flex items-center justify-between gap-4">
         <Breadcrumb items={[{ label: '友だち情報欄', href: '/tags?tab=fields' }, { label: field.name }]} />
         <Button href="/tags?tab=fields">友だち情報欄へ</Button>
       </div>
 
-      {error ? <p role="alert" className="mb-4 rounded-control border border-danger/20 bg-danger-bg p-3 text-sm text-danger">{error}</p> : null}
+      {error ? <p role="alert" className="rounded-control border border-danger/20 bg-danger-bg p-3 text-sm text-danger">{error}</p> : null}
       {locked ? (
-        <p className="mb-4 rounded-control border border-warning/30 bg-warning-bg p-3 text-sm text-warning">
+        <p className="rounded-control border border-warning/30 bg-warning-bg p-3 text-sm text-warning">
           共通項目はこのアカウントから直接変更できません。新しい項目へ移行してから編集してください。
         </p>
       ) : null}

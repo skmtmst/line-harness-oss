@@ -193,7 +193,7 @@ export default function DuplicatesPage() {
   }, [])
 
   return (
-    <div className="space-y-4" data-duplicates-design="v4">
+    <div className="flex flex-col gap-4" data-duplicates-design="v4">
       <section className="rounded-card border border-hairline bg-canvas px-4 py-3 shadow-card">
         <p className="text-sm font-bold text-ink">重複の可能性を検出します。自動統合はしません。</p>
         <p className="mt-1 text-xs leading-5 text-ink-secondary">確定済みID・連携UID・メール／電話の一致は強い根拠、プロフィール画像や名前だけの一致は候補として表示します。確認後も元のLINE友だちデータは残ります。</p>

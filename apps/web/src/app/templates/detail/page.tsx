@@ -331,8 +331,9 @@ function TemplateDetailInner() {
   ]
 
   return (
-    <div>
-      <div data-design="Head" className="mb-3 flex flex-wrap items-center justify-between gap-3">
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <div data-design="Head" className="flex flex-wrap items-center justify-between gap-3">
         <nav data-design="Crumb" className="text-ink-faint text-xs">
           <Link href="/templates" className="hover:underline">
             テンプレート

@@ -121,13 +121,13 @@ function NewFriendFieldForm() {
   }
 
   return (
-    <div data-design-node="A1ZYeP">
-      <div className="mb-4 flex items-center justify-between gap-4">
+    <div data-design-node="A1ZYeP" className="flex flex-col gap-4">
+      <div className="flex items-center justify-between gap-4">
         <Breadcrumb items={[{ label: '友だち情報欄', href: '/tags?tab=fields' }, { label: '項目を作る' }]} />
         <Button href={back ?? '/tags?tab=fields'}>友だち情報欄へ</Button>
       </div>
 
-      {error ? <p role="alert" className="mb-4 rounded-control border border-danger/20 bg-danger-bg p-3 text-sm text-danger">{error}</p> : null}
+      {error ? <p role="alert" className="rounded-control border border-danger/20 bg-danger-bg p-3 text-sm text-danger">{error}</p> : null}
 
       <div className="grid gap-4 xl:grid-cols-2">
         <section data-design="Basic" className="rounded-card border border-hairline bg-canvas p-5 shadow-card">

@@ -90,17 +90,18 @@ export default function OpsTenantsPage() {
   }
 
   return (
-    <div data-design-node="X9f5jy">
+    <div data-design-node="X9f5jy" className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       <OpsPageHeader title="契約先アカウント" />
 
-      <div className="mb-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <SummaryCard variant="v6" title="契約中" value={summary ? summary.active : null} unit="社" detail="" help="トライアルを除きます" loading={loading && !summary} />
         <SummaryCard variant="v6" title="トライアル中" value={summary ? summary.trialing : null} unit="社" detail="期限切れ前に案内" loading={loading && !summary} />
         <SummaryCard variant="v6" title="停止中" value={summary ? summary.suspended : null} unit="社" detail="" help="運営が止めた契約先です" badge={summary?.suspended ? '確認' : undefined} badgeTone="warning" loading={loading && !summary} />
         <SummaryCard variant="v6" title="決済失敗" value={summary ? summary.pastDue : null} unit="社" detail="Stripe で支払いが止まっている" badge={summary?.pastDue ? '要対応' : undefined} badgeTone="danger" loading={loading && !summary} />
       </div>
 
-      <div className="mb-4">
+      <div>
         <NoteBar tone="info">契約先を選ぶと詳細が開きます。代理ログインは既定で閲覧のみです。</NoteBar>
       </div>
 
@@ -108,7 +109,7 @@ export default function OpsTenantsPage() {
         作る操作は数字のカードの下・一覧のすぐ上の左にそろえる。
         探す・絞り込むも一覧の操作なので同じ並びへ。
       */}
-      <div className="mb-4 flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <Button variant="primary" onClick={() => setCreating((v) => !v)}>
           ＋ 契約先を作る
         </Button>
@@ -131,7 +132,7 @@ export default function OpsTenantsPage() {
       </div>
 
       {creating ? (
-        <form onSubmit={(event) => void create(event)} className="mb-4 flex items-center gap-2 rounded-card border border-hairline bg-canvas px-4 py-3">
+        <form onSubmit={(event) => void create(event)} className="flex items-center gap-2 rounded-card border border-hairline bg-canvas px-4 py-3">
           <div className="flex-1">
             <TextField
               value={newName}
@@ -157,7 +158,9 @@ export default function OpsTenantsPage() {
         // 「1件も無い」と「読み込めなかった」を言い分ける。失敗時は空の案内ではなくエラーと再読み込みを出す。
         <ListState kind="error" title="契約先を表示できませんでした" onRetry={() => void load()} />
       ) : visible.length === 0 ? (
-        <ListState kind="empty" title="該当する契約先がありません" description="検索の言葉や絞り込みを変えてください。" />
+        <div className="bg-canvas rounded-card border-hairline border">
+          <ListState kind="empty" title="該当する契約先がありません" description="検索の言葉や絞り込みを変えてください。" />
+        </div>
       ) : (
         <DataTable>
           <thead>

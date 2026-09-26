@@ -741,14 +741,17 @@ function MediaLibraryInner() {
   }
 
   return (
-    <div data-design-node="g89Tc" data-media-design="v6">
+    <div data-design-node="g89Tc" data-media-design="v6" className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
 
       {!selectedAccountId && !accountLoading && (
-        <ListState kind="empty" title="LINEアカウントを選択してください" description="登録メディアはLINEアカウントごとに管理します。" />
+        <div className="bg-canvas rounded-card border-hairline border">
+          <ListState kind="empty" title="LINEアカウントを選択してください" description="登録メディアはLINEアカウントごとに管理します。" />
+        </div>
       )}
 
       {error && (
-        <Notice tone="error" message={error} onClose={() => setError('')} className="mb-4" />
+        <Notice tone="error" message={error} onClose={() => setError('')} />
       )}
       {!error && selectedAccountId ? (
         <div className="mb-4">
@@ -756,10 +759,10 @@ function MediaLibraryInner() {
         </div>
       ) : null}
       {successMessage && (
-        <Notice tone="success" message={successMessage} onClose={() => setSuccessMessage('')} className="mb-4" />
+        <Notice tone="success" message={successMessage} onClose={() => setSuccessMessage('')} />
       )}
 
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <Button type="button" variant="primary" onClick={() => setUploadOpen(true)}>ファイルを入れる</Button>
         </div>
@@ -976,9 +979,9 @@ function MediaLibraryInner() {
         />
       </div>
 
-      <div data-design-node="h8pBZr">
+      <div data-design-node="h8pBZr" className="flex flex-col gap-4">
       {total > 200 ? (
-        <p className="text-ink-faint mb-3 text-xs">200件を超えるメディアも、ページを移動してすべて確認できます。</p>
+        <p className="text-ink-faint text-xs">200件を超えるメディアも、ページを移動してすべて確認できます。</p>
       ) : null}
       {loading ? (
         <ListState kind="loading" title="読み込んでいます" description="このまま少しお待ちください。" />
@@ -990,12 +993,14 @@ function MediaLibraryInner() {
           action={<Button variant="secondary" onClick={() => void load()}>もう一度読み込む</Button>}
         />
       ) : current.length === 0 ? (
-        <ListState
-          kind="empty"
-          title={total === 0 && !query && !folderFilter ? 'まだメディアがありません' : '条件に合うメディアはありません'}
-          description={total === 0 && !query && !folderFilter ? '配信で使う画像・動画・音声・ファイルの置き場です。' : '種類、フォルダ、または検索条件を変えてください。'}
-          action={total === 0 && !query && !folderFilter ? <Button variant="primary" onClick={() => setUploadOpen(true)}>メディアを登録</Button> : undefined}
-        />
+        <div className="bg-canvas rounded-card border-hairline border">
+          <ListState
+            kind="empty"
+            title={total === 0 && !query && !folderFilter ? 'まだメディアがありません' : '条件に合うメディアはありません'}
+            description={total === 0 && !query && !folderFilter ? '配信で使う画像・動画・音声・ファイルの置き場です。' : '種類、フォルダ、または検索条件を変えてください。'}
+            action={total === 0 && !query && !folderFilter ? <Button variant="primary" onClick={() => setUploadOpen(true)}>メディアを登録</Button> : undefined}
+          />
+        </div>
       ) : (
         <div
           className={
@@ -1380,7 +1385,7 @@ function MediaLibraryInner() {
         </label>
       </Dialog>
 
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
           <ListRange total={total} first={total === 0 ? 0 : (page - 1) * pageSize + 1} last={Math.min(page * pageSize, total)} />
           <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />

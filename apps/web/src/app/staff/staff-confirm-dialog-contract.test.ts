@@ -50,7 +50,7 @@ describe('ログインユーザーの確認窓', () => {
   })
 
   it('二段階認証の解除が二度押しを止め、返事を確かめ、finally で戻す', () => {
-    const body = slice(PAGE, 'const runDisableTwoFactor = async', '\n  return <div data-design-node="e3jz3">')
+    const body = slice(PAGE, 'const runDisableTwoFactor = async', '\n  return <div data-design-node="e3jz3"')
     expect(body, '処理中でも受け付けてしまう').toContain('if (!disablingTarget || disablingTwoFactor) return')
     expect(body, '返事を確かめていない').toContain('if (!res.success) throw new Error(res.error)')
     expect(body, '失敗を握りつぶしている').toContain(

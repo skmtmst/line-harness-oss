@@ -541,8 +541,9 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
   // ─────────────────────────────────────────────────────────────────────────
 
   return (
-    <div data-design-node="PouPn" data-affiliate-design="v6">
-      <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+    <div data-design-node="PouPn" data-affiliate-design="v6" className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <KpiCard
           title="今月の成果"
           value={confirmedValue(approvalState, approvedTotals.count)}
@@ -566,11 +567,11 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
         />
       </div>
 
-      <NoteBar className="mb-4">
+      <NoteBar>
         紹介リンクを渡した人ごとに、クリックから成果までの流れと確定した報酬を確認できます。
       </NoteBar>
 
-      <section className="bg-canvas rounded-card border-hairline mb-4 border p-4" aria-label="今月の成果の流れ">
+      <section className="bg-canvas rounded-card border-hairline border p-4" aria-label="今月の成果の流れ">
         <div className="mb-3 flex items-center justify-between gap-3">
           <h3 className="text-ink text-sm font-semibold">今月の成果の流れ</h3>
           <span className="text-ink-faint text-xs">どこで人が減っているかを1本で見る</span>
@@ -597,7 +598,7 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
         </div>
       </section>
 
-      <div className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3">
+      <div className="bg-canvas rounded-card border-hairline flex flex-wrap items-center gap-2 border p-3">
         <SearchField
           placeholder="名前・紹介コードで検索"
           aria-label="名前・紹介コードで検索"
@@ -634,7 +635,7 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
         </AffiliateButton>
       </div>
 
-      <div className="mb-3 flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <FilterChip
           selected={filters.length === 0}
           onChange={() => { setFilters([]); setPage(1) }}
@@ -685,18 +686,22 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
       ) : loading ? (
         <ListState kind="loading" title="紹介者を読み込んでいます" />
       ) : rows.length === 0 ? (
-        <ListState
-          kind="empty"
-          title="紹介者はまだ登録されていません"
-          description="紹介してくれる方を登録すると、専用リンクと成果を管理できます。"
-          action={<Button variant="primary" onClick={() => setCreateOpen(true)}>＋ アフィリエイターを作る</Button>}
-        />
+        <div className="bg-canvas rounded-card border-hairline border">
+          <ListState
+            kind="empty"
+            title="紹介者はまだ登録されていません"
+            description="紹介してくれる方を登録すると、専用リンクと成果を管理できます。"
+            action={<Button variant="primary" onClick={() => setCreateOpen(true)}>＋ アフィリエイターを作る</Button>}
+          />
+        </div>
       ) : shownRows.length === 0 ? (
-        <ListState
-          kind="empty"
-          title="絞り込みに合う紹介者がいません"
-          description="検索語を変えるか、絞り込みの札を外すと表示されます。"
-        />
+        <div className="bg-canvas rounded-card border-hairline border">
+          <ListState
+            kind="empty"
+            title="絞り込みに合う紹介者がいません"
+            description="検索語を変えるか、絞り込みの札を外すと表示されます。"
+          />
+        </div>
       ) : (
         <div className="bg-canvas rounded-card border-hairline overflow-x-auto border">
           <table className="w-full min-w-[720px]">
@@ -1911,14 +1916,14 @@ export function ApprovalQueue() {
   }
 
   return (
-    <div data-design-node="n5VVTb" data-approval-design="v6">
+    <div data-design-node="n5VVTb" data-approval-design="v6" className="flex flex-col gap-4">
       <NoteBar tone={flaggedCount > 0 ? 'warn' : 'info'}>
         {flaggedCount > 0
           ? `${flaggedCount}件は同じ友だちや同じ注文の重複、返金・取り消し済みの注文が疑われます。内容を確認してから判断してください。`
           : '成果を認めると報酬が確定します。確認が必要な成果は、まとめて承認の対象から外れます。'}
       </NoteBar>
 
-      <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard
           title="認めるのを待っている"
           value={loading || error ? null : counts.pending}
@@ -1951,7 +1956,7 @@ export function ApprovalQueue() {
         />
       </div>
 
-      <div className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3">
+      <div className="bg-canvas rounded-card border-hairline flex flex-wrap items-center gap-2 border p-3">
         <SearchField
           placeholder="友だち・紹介者・案件・成果地点・注文番号で検索"
           aria-label="成果承認を検索"
@@ -2008,7 +2013,7 @@ export function ApprovalQueue() {
         )}
       </div>
 
-      <div className="mb-4 flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2">
         {(['pending', 'approved', 'rejected'] as const).map((s) => (
           <FilterChip
             key={s}
@@ -2046,11 +2051,13 @@ export function ApprovalQueue() {
       ) : loading ? (
         <ListState kind="loading" title="成果を読み込んでいます" />
       ) : shownItems.length === 0 ? (
-        <ListState
-          kind="empty"
-          title="条件に合う成果がありません"
-          description="状態や検索語を変えると、ほかの成果を確認できます。"
-        />
+        <div className="bg-canvas rounded-card border-hairline border">
+          <ListState
+            kind="empty"
+            title="条件に合う成果がありません"
+            description="状態や検索語を変えると、ほかの成果を確認できます。"
+          />
+        </div>
       ) : (
         <div className="bg-canvas rounded-card border-hairline overflow-x-auto border">
           <table className="w-full min-w-[820px]">
@@ -2370,20 +2377,25 @@ function OffersList({
     return <ListState kind="loading" title="案件を読み込んでいます" />
   }
 
+  // 空の案内も表と同じカード（白地・枠・角丸）の中に出す。灰色の地だけにしない。
   if (offers.length === 0) {
-    return filtered ? (
-      <ListState
-        kind="empty"
-        title="絞り込みに合う案件がありません"
-        description="検索語を変えるか、絞り込みの札を外すと表示されます。"
-      />
-    ) : (
-      <ListState
-        kind="empty"
-        title="案件はまだ登録されていません"
-        description="何をしたら成果になり、いくら払うかを決めると、アフィリエイターが紹介できるようになります。"
-        action={<Button href="/affiliate-offers/new" variant="primary">＋ 案件を作る</Button>}
-      />
+    return (
+      <div className="bg-canvas rounded-card border-hairline border">
+        {filtered ? (
+          <ListState
+            kind="empty"
+            title="絞り込みに合う案件がありません"
+            description="検索語を変えるか、絞り込みの札を外すと表示されます。"
+          />
+        ) : (
+          <ListState
+            kind="empty"
+            title="案件はまだ登録されていません"
+            description="何をしたら成果になり、いくら払うかを決めると、アフィリエイターが紹介できるようになります。"
+            action={<Button href="/affiliate-offers/new" variant="primary">＋ 案件を作る</Button>}
+          />
+        )}
+      </div>
     )
   }
 
@@ -2597,12 +2609,12 @@ export function OffersTab() {
   }
 
   return (
-    <div data-design-node="GH8VL" data-affiliate-offers-design="v6">
+    <div data-design-node="GH8VL" data-affiliate-offers-design="v6" className="flex flex-col gap-4">
       <NoteBar help="案件は、何をしたら成果になりいくら払うかの組み合わせです" helpLabel="案件の意味">
         案件は「何をしたら成果になり、いくら払うか」の組み合わせです。アフィリエイターはこの案件を選んで紹介します。
       </NoteBar>
 
-      <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard title="紹介できる案件" value={openCount} unit="件" detail={`公開中。停止・終了 ${offers.length - openCount}件`} />
         <KpiCard
           title="いちばん成果が出た案件"
@@ -2629,7 +2641,7 @@ export function OffersTab() {
 
       <div
         data-design="Bar"
-        className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3"
+        className="bg-canvas rounded-card border-hairline flex flex-wrap items-center gap-2 border p-3"
       >
         <SearchField
           placeholder="案件名・説明で検索"
@@ -2664,7 +2676,7 @@ export function OffersTab() {
         </AffiliateButton>
       </div>
 
-      <div className="mb-3 flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {OFFER_FILTERS.map((f) => (
           <FilterChip
             key={f.key}
@@ -2693,7 +2705,7 @@ export function OffersTab() {
         onRefresh={loadOffers}
       />
 
-      <div data-design="tf" className="mt-3 flex flex-wrap items-center justify-between gap-2">
+      <div data-design="tf" className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-ink-faint text-xs font-semibold tabular-nums">
           {shown.length === offers.length
             ? `全 ${offers.length}件`
@@ -2704,7 +2716,7 @@ export function OffersTab() {
         )}
       </div>
 
-      <section className="bg-canvas rounded-card border-hairline mt-4 border p-4">
+      <section className="bg-canvas rounded-card border-hairline border p-4">
         <h3 className="text-ink text-sm font-semibold">アフィリエイターと案件のちがい</h3>
         <ul className="text-ink-faint mt-2 space-y-1.5 text-xs leading-relaxed">
           <li>・アフィリエイター＝紹介してくれる人。紹介コードを持ちます</li>

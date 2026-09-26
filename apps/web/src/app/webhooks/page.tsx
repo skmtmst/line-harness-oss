@@ -97,11 +97,12 @@ const MERGED_TABS = [
 */
 function WebhookSamples() {
   return (
-    <div>
-      <p className="bg-info-bg text-ink-secondary mb-4 rounded-control px-4 py-3 text-xs">
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <p className="bg-info-bg text-ink-secondary rounded-control px-4 py-3 text-xs">
         よくあるつなぎ方の見本です。使いたい見本を選ぶと、作成画面がその内容で開きます。
       </p>
-      <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-2">
+      <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
         <section className="bg-canvas border-hairline rounded-card border p-5" aria-label="受け取る見本">
           <h2 className="text-ink mb-1 text-lg font-bold">受け取る見本</h2>
           <p className="text-ink-secondary mb-4 text-sm">相手のサービスで起きたことをうちに取り込みます。</p>
@@ -559,8 +560,9 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
   })
 
   return (
-    <div>
-      <div data-design="Crumb" className="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <div data-design="Crumb" className="flex flex-wrap items-center justify-between gap-3">
         <nav className="text-ink-faint text-xs" aria-label="パンくず">
           <span className="text-action font-semibold">自動化</span>
           <span className="mx-2">›</span>
@@ -709,7 +711,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
 
       {/* Error */}
       {error && (
-        <div className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
+        <div className="p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
           {error}
         </div>
       )}
@@ -718,7 +720,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
           key={key}
           role="alert"
           data-webhook-toggle-error={key}
-          className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm"
+          className="p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm"
         >
           「{failure.name}」を{failure.kind === 'incoming' ? '受け取る設定' : '送る設定'}：{failure.message}
         </div>
@@ -734,7 +736,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
           key={key}
           role="status"
           data-webhook-toggle-busy={key}
-          className="bg-status-warning-soft text-status-warning rounded-control mb-4 px-4 py-3 text-sm"
+          className="bg-status-warning-soft text-status-warning rounded-control px-4 py-3 text-sm"
         >
           「{busy.name}」を{busy.kind === 'incoming' ? '受け取る設定' : '送る設定'}：いま切り替えを送っています。返事が来るまでお待ちください。
         </div>
@@ -742,7 +744,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
 
       {/* Create forms */}
       {showCreate && tab === 'incoming' && (
-        <form onSubmit={handleCreateIncoming} className="bg-canvas rounded-lg border border-hairline p-6 mb-6">
+        <form onSubmit={handleCreateIncoming} className="bg-canvas rounded-lg border border-hairline p-6">
           <h3 className="text-sm font-semibold text-ink mb-4">受け取る設定を追加</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
@@ -891,7 +893,7 @@ function WebhooksPageHost() {
   usePageTitle('外部連携')
   if (tab === 'incoming' || tab === 'outgoing') return <WebhooksPageInner key={tab} tab={tab} />
   return (
-    <div>
+    <div className="flex flex-col gap-4">
       <MergedTabs basePath="/webhooks" paramName="tab" tabs={MERGED_TABS} active={tab} />
       {tab === 'interactions' && <WebhookInteractions />}
       {tab === 'sheets' && <GoogleSheetsPanel />}
