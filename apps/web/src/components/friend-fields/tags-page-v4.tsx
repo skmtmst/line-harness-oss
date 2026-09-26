@@ -838,16 +838,13 @@ export default function TagsPageV4({
         }))}
         actions={currentTabBlocked ? undefined : tab === 'tags' && status !== 'forbidden' ? (
           /*
-            設計 `Sn86o` はここに CSV。「＋ タグを追加」は ATTR-22 で
-            他のタブと同じくタブ行の右端へ寄せた（`HWP5R` との2箇所を
-            やめ、主要作成はどのタブでも同じ位置・同じ見た目にする）。
+            設計 `Sn86o` はここに CSV。普段使う「＋ タグを追加」は
+            一覧のすぐ上の左の並び（「フォルダを追加」の横）へ移した。
+            タブ行の右端には、たまにしか使わない CSV だけを残す。
             `H374MR` から確認 `sfTEW`、完了 `op1rh`、一部失敗 `QzRsJ`
             まで同じ操作の中で進む。
           */
-          <span className="flex items-center gap-2">
-            <Button type="button" onClick={() => setCsvOpen(true)}>CSVで一括登録</Button>
-            <Button href="/tags/new" variant="primary">＋ タグを追加</Button>
-          </span>
+          <Button type="button" onClick={() => setCsvOpen(true)}>CSVで一括登録</Button>
         ) : tab === 'marks' ? (
           <Button href="/tags/marks/new" variant="primary">＋ マークを追加</Button>
         ) : tab === 'fields' ? (
@@ -926,9 +923,10 @@ export default function TagsPageV4({
           何が足りないのかが分からないまま拒まれることになる。
         */}
         {status === 'forbidden' ? null : (
-          <div className="mb-4 flex items-center gap-2">
+          <div className="mb-4 flex flex-wrap items-center gap-2">
             <Button href="/tags/folders/new">フォルダを追加</Button>
-            {/* 「＋ タグを追加」はタブ行の右端へ移動した（#1014 ATTR-22）。 */}
+            {/* 作る操作は一覧のすぐ上の左の並びにまとめる。右上には置かない。 */}
+            <Button href="/tags/new" variant="primary">＋ タグを追加</Button>
           </div>
         )}
         {notice && <Notice className="mb-4" tone="success" message={notice} onClose={() => setNotice('')} />}
