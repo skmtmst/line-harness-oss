@@ -219,8 +219,8 @@ function FriendAddSettingsList() {
   if (error) return <ListState kind="error" title="友だち追加時の配信を表示できませんでした" description={error} onRetry={() => void load()} />
 
   return (
-    <div data-design-node="uLQQc" className="text-ink min-w-0">
-      <div data-design="Head" className="mb-4 flex justify-end gap-2">
+    <div data-design-node="uLQQc" className="flex min-w-0 flex-col gap-4 text-ink">
+      <div data-design="Head" className="flex justify-end gap-2">
         <Button href="/friend-add-settings/runs">実行結果を見る</Button>
         <Button href="/friend-add-settings?view=new" variant="primary"><Plus size={16} />初回案内を作成</Button>
       </div>
@@ -229,11 +229,11 @@ function FriendAddSettingsList() {
         ★V7：仕組みの説明で、異常ではない。橙の太字の警告帯だと毎回「何か起きている」と読めるので、
         情報の色の小さな帯にする。
       */}
-      <div data-design="Alert" className="rounded-card bg-info-bg text-ink-secondary mb-4 px-4 py-2.5 text-xs leading-relaxed">
+      <div data-design="Alert" className="rounded-card bg-info-bg text-ink-secondary px-4 py-2.5 text-xs leading-relaxed">
         経路を確定できるのは「流入と計測」で発行したリンクから来た人だけです。素のQR・検索から来た人は「経路が分からなかった人」の設定が動きます。
       </div>
 
-      <section data-design="Flow" className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="この7日の状況">
+      <section data-design="Flow" className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="この7日の状況">
         <span className="sr-only">どう振り分けられるか。友だち追加された。この1か月の実績。</span>
         <SummaryCard title="初回案内" value={data?.summary.rules ?? 0} unit="件" detail={`有効 ${data?.summary.active ?? 0}件`} variant="v6" />
         <SummaryCard title="直近7日の友だち追加" value={data?.summary.recentAdds ?? null} unit="人" detail={`経路が取れた ${countText(data?.summary.captured ?? null, '人')}`} variant="v6" />
@@ -262,7 +262,7 @@ function FriendAddSettingsList() {
         <Tabs label="配信の種類" items={(Object.keys(KIND_LABELS) as FriendAddRuleKind[]).map((tab) => ({ label: KIND_LABELS[tab], current: kind === tab, onClick: () => { resetCursor(); router.replace(`/friend-add-settings?kind=${tab}`) } }))} />
         <span data-design="Returning" className="sr-only">以前からの友だち・ブロックを解除した人。配信しない。別のシナリオを配信する。はじめての人と同じものを配信する。開始位置。前回読んだところから。</span>
       </div>
-      <p className="text-ink-faint my-2 text-xs">この2つを分けないと、以前からのお客さまに「はじめまして」が届きます。</p>
+      <p className="text-ink-faint text-xs">この2つを分けないと、以前からのお客さまに「はじめまして」が届きます。</p>
 
       {/*
         #636: lg未満の単列も明示トラックにする。暗黙列は中身の
