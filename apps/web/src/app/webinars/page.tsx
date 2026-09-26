@@ -762,9 +762,9 @@ function WebinarsPage() {
         </KpiCollapse>
       )}
       {/* 外枠の余白は共通シェルが持つ。ここで px-6 を足すと左端がずれる。 */}
-      <div data-design-node="ZC13r">
+      <div data-design-node="ZC13r" className="flex flex-col gap-4">
         {/* 作る操作は画面右上。表の上に単独で浮かせない。他の一覧と同じ置き場所。 */}
-        <div data-design="Head" className="mb-4 flex flex-wrap justify-end gap-2">
+        <div data-design="Head" className="flex flex-wrap justify-end gap-2">
           <Button variant="primary" href="/webinars/new">＋ ウェビナーをつくる</Button>
         </div>
 
