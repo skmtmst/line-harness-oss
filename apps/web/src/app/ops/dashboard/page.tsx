@@ -11,6 +11,7 @@ import Chip from '@/components/shared/chip'
 import Dialog from '@/components/shared/dialog'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 import SummaryCard from '@/components/shared/summary-card'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { contractDetail, minutesLabel, revenueDetail, revenueSourceLabel } from './format'
@@ -145,14 +146,16 @@ export default function OpsDashboardPage() {
                 <MiniStat label="平均の初回返信" value={minutesLabel(data.tickets.avgFirstReplyMinutes)} />
                 <MiniStat label={`${label}クローズ`} value={String(data.tickets.closedInPeriod)} />
               </div>
-              <div className="mt-3 flex flex-wrap items-center gap-2 rounded-control bg-accent-soft px-4 py-3">
-                <span className="text-caption text-ink">契約者専用LINEの登録　{data.lineRegistration.registered}人 / {data.lineRegistration.total}人</span>
-                <span className="ml-auto">
+              <Notice
+                tone="success"
+                className="mt-3"
+                message={`契約者専用LINEの登録　${data.lineRegistration.registered}人 / ${data.lineRegistration.total}人`}
+                action={(
                   <Button size="field" onClick={() => void openUnregistered()} disabled={data.lineRegistration.unregisteredCount === 0}>
                     未登録の{data.lineRegistration.unregisteredCount}人へ案内
                   </Button>
-                </span>
-              </div>
+                )}
+              />
             </>
           ) : <ListState kind="loading" title="読み込んでいます" />}
         </section>

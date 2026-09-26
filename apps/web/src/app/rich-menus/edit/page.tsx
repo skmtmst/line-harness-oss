@@ -4,6 +4,7 @@ import DateTimeField from '@/components/shared/date-time-field'
 import SelectField from '@/components/shared/select-field'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 import TargetMissing from '@/components/shared/target-missing'
 import { useEffect, useState, useCallback, useRef, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
@@ -1100,15 +1101,11 @@ function Editor({
 
       {/* 登録・取り下げの結果。`alert()` と違い、押したあとも読み返せる。 */}
       {notice && (
-        <div className="bg-success-bg text-success text-sm p-3 rounded mb-4" role="status">
-          {notice}
-        </div>
+        <Notice tone="success" message={notice} className="mb-4" />
       )}
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 text-sm p-3 rounded mb-4">
-          {error}
-        </div>
+        <Notice tone="danger" message={error} className="mb-4" />
       )}
 
       {/* タブバー */}
@@ -1224,9 +1221,7 @@ function Editor({
             読み返せる。** 区画を押しながら右の設定と見比べられる。
           */}
           {previewMessage && (
-            <p role="status" className="bg-status-info-soft text-status-info rounded-control mt-3 px-3 py-2 text-xs">
-              {previewMessage}
-            </p>
+            <Notice tone="info" message={previewMessage} className="mt-3" />
           )}
         </section>
 
@@ -1871,8 +1866,8 @@ function TargetingStep({
             <p className="text-ink-faint mt-2 text-xs">人数はまだ保存していない条件で数えています</p>
           ) : null}
           {conditionEmpty ? (
-            <p className="bg-warning-bg text-warning mt-4 rounded-control px-3 py-2 text-xs">条件が空です。このままだと誰にも出しません。条件を1つ以上足してください。</p>
-          ) : preview?.overlap.value ? <p className="bg-warning-bg text-warning mt-4 rounded-control px-3 py-2 text-xs">このうち {preview.overlap.value.toLocaleString('ja-JP')}人 は上の「{preview.higherMenus[0] ?? '優先メニュー'}」にも当てはまるため、そちらが出ます。</p> : null}
+            <Notice tone="warn" className="mt-4">条件が空です。このままだと誰にも出しません。条件を1つ以上足してください。</Notice>
+          ) : preview?.overlap.value ? <Notice tone="warn" className="mt-4">このうち {preview.overlap.value.toLocaleString('ja-JP')}人 は上の「{preview.higherMenus[0] ?? '優先メニュー'}」にも当てはまるため、そちらが出ます。</Notice> : null}
           {previewError ? <p className="text-danger mt-3 text-xs" role="alert">{previewError}</p> : null}
           <Button type="button" onClick={onRefresh} className="mt-3">人数をもう一度確認</Button>
         </section>
@@ -1886,7 +1881,7 @@ function TargetingStep({
             <p className="text-ink-secondary mt-4 text-xs font-bold">この画面だけの軸（6軸）</p>
             <div className="text-ink-secondary mt-2 flex flex-wrap gap-1.5 text-xs">{['担当者','流入経路','配信状況','予約状況','購入履歴','ブロック状態'].map((label) => <span key={label} className="bg-canvas-sunken rounded px-2 py-1">{label}</span>)}</div>
           </section>
-          <section className="bg-status-info-soft text-status-info rounded-card p-4 text-xs leading-5"><strong className="block">条件はここだけの話ではありません</strong>一度作った条件は保存した検索として、配信や自動応答でも呼び出せます。</section>
+          <Notice tone="info"><strong className="block text-xs">条件はここだけの話ではありません</strong><span className="text-xs">一度作った条件は保存した検索として、配信や自動応答でも呼び出せます。</span></Notice>
         </aside>
       </div>
 
@@ -2069,7 +2064,7 @@ function PublishStep({
 
         <aside className="space-y-4">
           <section className="border-hairline bg-canvas rounded-card border p-5"><h2 className="text-ink text-sm font-bold">このメニューの設定</h2><dl className="mt-4 space-y-3 text-xs"><div><dt className="text-ink-faint">誰に出るか</dt><dd className="text-ink mt-1 font-semibold">{conditionEmpty ? '0人' : <MetricValue metric={preview?.effective} />}{previewUnsaved && !conditionEmpty ? <span className="text-ink-faint ml-1 font-normal">（未保存の条件）</span> : null}</dd></div><div><dt className="text-ink-faint">形</dt><dd className="text-ink mt-1 font-semibold">{group.size === 'large' ? '大' : '小'}・切替あり {pages.length}枚</dd></div><div><dt className="text-ink-faint">終わったら</dt><dd className="text-ink mt-1 font-semibold">{mode === 'period' ? restoreMenus.find((item) => item.id === restoreGroupId)?.name ?? '前のメニューに戻す' : '指定なし'}</dd></div></dl></section>
-          <section className="bg-status-info-soft text-status-info rounded-card p-5 text-xs leading-5"><h2 className="text-sm font-bold">公開すると何が変わるか</h2><p className="mt-2">{conditionEmpty ? '0人' : <MetricValue metric={preview?.effective} />} のトーク画面のメニューが入れ替わります。</p><p className="mt-2">LINEへの反映は数分かかることがあります。</p></section>
+          <Notice tone="info"><h2 className="text-sm font-bold">公開すると何が変わるか</h2><p className="mt-2 text-xs">{conditionEmpty ? '0人' : <MetricValue metric={preview?.effective} />} のトーク画面のメニューが入れ替わります。</p><p className="mt-2 text-xs">LINEへの反映は数分かかることがあります。</p></Notice>
           {/* N-152: 全員へ出す前に、自分のLINEだけで見え方を確かめる。 */}
           {canOperate ? <TestApplySection groupId={group.id} /> : null}
         </aside>

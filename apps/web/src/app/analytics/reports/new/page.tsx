@@ -6,6 +6,8 @@ import { useSearchParams } from 'next/navigation'
 import Button from '@/components/shared/button'
 import { TimeField } from '@/components/shared/date-time-field'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
+import { notifyToast } from '@/components/shared/toast'
 import PageHeader from '@/components/shared/page-header'
 import SelectField from '@/components/shared/select-field'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -89,7 +91,6 @@ function AnalyticsReportFormPage() {
   const [canManage, setCanManage] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [notice, setNotice] = useState('')
   const [saving, setSaving] = useState(false)
   // レポート名は変えられるようにする(点検#508軽12)。固定だと複数作ったときに区別できない。
   const [name, setName] = useState('週次まとめ')
@@ -127,7 +128,6 @@ function AnalyticsReportFormPage() {
     let active = true
     setLoading(true)
     setError('')
-    setNotice('')
     setOptions(null)
     // id が外れた/変わったとき前の編集対象が残ると、新規作成のつもりが旧レポートへ
     // PUT してしまう。取り直すたびに編集状態も初期化する。
@@ -222,7 +222,6 @@ function AnalyticsReportFormPage() {
     }
     setSaving(true)
     setError('')
-    setNotice('')
     const emailRecipients = emails.map((item) => item.trim()).filter(Boolean)
     const recipients = [
       ...options.recipients.filter((item) => staffIds.includes(item.id)).map((item) => ({
@@ -245,7 +244,7 @@ function AnalyticsReportFormPage() {
         })
         if (!response.success) throw new Error(response.error)
         setEditing(response.data)
-        setNotice(response.data.status === 'paused'
+        notifyToast(response.data.status === 'paused'
           ? '定期レポートを更新しました。止まっている間は届きません。再開すると次の予定から届きます。'
           : `定期レポートを更新しました。次は${nextLabel}に届きます。`)
       } else {
@@ -253,7 +252,7 @@ function AnalyticsReportFormPage() {
           ...payload, sendOnce,
         })
         if (!response.success) throw new Error(response.error)
-        setNotice(sendOnce ? '1回だけ送る依頼を受け付けました。送信結果は運用状態に残ります。' : `${nextLabel}から届く定期レポートを作りました。`)
+        notifyToast(sendOnce ? '1回だけ送る依頼を受け付けました。送信結果は運用状態に残ります。' : `${nextLabel}から届く定期レポートを作りました。`)
       }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : editing ? '定期レポートを更新できませんでした' : '定期レポートを作れませんでした')
@@ -287,8 +286,7 @@ function AnalyticsReportFormPage() {
         description=""
       />
       {!canManage && <div className="bg-canvas-sunken mb-4 rounded-control px-4 py-3 text-sm">運用担当は内容を確認できます。作成は統括または管理者が行います。</div>}
-      {error && <div className="bg-danger-bg text-danger mb-4 rounded-control px-4 py-3 text-sm" role="alert">{error}</div>}
-      {notice && <div className="bg-success-bg text-success mb-4 rounded-control px-4 py-3 text-sm" role="status">{notice}</div>}
+      {error && <Notice tone="danger" message={error} onClose={() => setError('')} className="mb-4" />}
 
       <div className="grid items-start gap-6 xl:grid-cols-3">
         <div className="grid gap-4 xl:col-span-2">

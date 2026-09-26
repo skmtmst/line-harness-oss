@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 import { DataTable, TableHeadRow, TableStateRow, Td, Th, Tr } from '@/components/shared/table'
 import { STATE_TEXT, notConnectedText } from '@/components/shared/not-connected'
 import { formatMileageDate, formatMileageNumber } from './mileage-display'
@@ -353,7 +354,7 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
         <Button variant="primary" href="/mileage/rewards/edit">使い道をつくる</Button>
       </div>
 
-      {actionError ? <div className="mb-4 rounded-control border border-danger/30 bg-danger-bg px-4 py-3 text-sm text-danger">{actionError}</div> : null}
+      {actionError ? <Notice tone="danger" message={actionError} className="mb-4" /> : null}
 
       <section aria-label="ランクごとの使い道" className="mb-4 grid gap-3 md:grid-cols-3">
         {rankBenefits.length === 0 ? (
@@ -444,7 +445,7 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
           <p className="text-ink-faint mt-1 text-xs leading-5">
             マイルは減ったまま、特典だけ届いていない交換です。やり直してもマイルはもう減りません。
           </p>
-          {retryError ? <div className="mt-3 rounded-control border border-danger/30 bg-danger-bg px-4 py-3 text-sm text-danger">{retryError}</div> : null}
+          {retryError ? <Notice tone="danger" message={retryError} className="mt-3" /> : null}
           <div className="mt-3">
             <DataTable>
               <thead>

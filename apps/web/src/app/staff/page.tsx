@@ -13,6 +13,8 @@ import SearchField from '@/components/shared/search-field'
 import { Tabs } from '@/components/shared/tabs'
 import { TableHeadRow, TableStateRow, Th } from '@/components/shared/table'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Notice from '@/components/shared/notice'
+import { notifyToast } from '@/components/shared/toast'
 import StepUpDialog from '@/components/shared/step-up-dialog'
 import NotificationSwitch from '@/components/ui/notification-switch'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -171,7 +173,7 @@ function StepUpPrompt({ request, onDone, onClose }: { request: StepUpRequest; on
 /** 本人がいまログインしている端末の一覧と失効（N-427）。 */
 function SessionsCard() {
   const [sessions, setSessions] = useState<Array<{ id: string; current: boolean; createdAt: string; expiresAt: string; userAgent: string | null; ipPrefix: string | null }> | null>(null)
-  const [error, setError] = useState(''), [notice, setNotice] = useState('')
+  const [error, setError] = useState('')
   const [revokingId, setRevokingId] = useState<string | null>(null), [confirmCurrent, setConfirmCurrent] = useState(false), [confirmOthers, setConfirmOthers] = useState(false)
   const load = useCallback(async () => {
     try {
@@ -182,7 +184,7 @@ function SessionsCard() {
   }, [])
   useEffect(() => { void load() }, [load])
   const revoke = async (id: string, isCurrent: boolean) => {
-    setRevokingId(id); setError(''); setNotice('')
+    setRevokingId(id); setError('')
     try {
       await api.sessions.revoke(id, { confirmCurrent: isCurrent })
       if (isCurrent) {
@@ -190,15 +192,15 @@ function SessionsCard() {
         window.location.assign('/login')
         return
       }
-      setNotice('その端末のログインを終了しました')
+      notifyToast('その端末のログインを終了しました')
       await load()
     } catch (caught) { setError(messageOf(caught)) } finally { setRevokingId(null) }
   }
   const revokeOthers = async () => {
-    setRevokingId('others'); setError(''); setNotice('')
+    setRevokingId('others'); setError('')
     try {
       const res = await api.sessions.revokeOthers()
-      if (res.success) { setNotice(res.data.revoked > 0 ? `この端末以外の ${res.data.revoked} 件のログインを終了しました` : '他にログイン中の端末はありませんでした') }
+      if (res.success) { notifyToast(res.data.revoked > 0 ? `この端末以外の ${res.data.revoked} 件のログインを終了しました` : '他にログイン中の端末はありませんでした') }
       await load()
     } catch (caught) { setError(messageOf(caught)) } finally { setRevokingId(null); setConfirmOthers(false) }
   }
@@ -211,8 +213,7 @@ function SessionsCard() {
   return <section className="mb-4 rounded-card border border-hairline bg-canvas p-4" aria-label="ログイン中の端末">
     <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-sm font-bold text-ink">ログイン中の端末</h2><p className="mt-1 text-xs text-ink-secondary">あなたのアカウントでいまログインしている端末です。見覚えのない端末があれば「ログインを終了」で切り離せます。</p></div>
       {sessions && sessions.length > 1 && <Button variant="secondary" onClick={() => setConfirmOthers(true)}>この端末以外をすべて終了</Button>}</div>
-    {error && <p className="mt-3 rounded-control bg-danger-bg p-3 text-sm text-danger" role="alert">{error}</p>}
-    {notice && <p className="mt-3 rounded-control bg-info-bg p-3 text-sm font-medium text-info" role="status">{notice}</p>}
+    {error && <Notice tone="danger" className="mt-3" message={error} />}
     {sessions === null ? <p className="mt-3 text-xs text-ink-faint">読み込んでいます…</p> : sessions.length === 0 ? <p className="mt-3 text-xs text-ink-faint">ログイン中の端末はありません。</p> : (
       <ul className="mt-3 divide-y divide-hairline">
         {sessions.map((session) => <li key={session.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
@@ -529,10 +530,10 @@ function StaffPageHost() {
   /* ブラウザの `confirm()` をやめて、共通の確認窓へ移した（理由は EditModal と同じ）。 */
   const [disablingTarget, setDisablingTarget] = useState<StaffMember | null>(null), [disablingTwoFactor, setDisablingTwoFactor] = useState(false), [disableError, setDisableError] = useState('')
   const [removingTarget, setRemovingTarget] = useState<StaffMember | null>(null), [removing, setRemoving] = useState(false), [removeError, setRemoveError] = useState('')
-  const [resendingId, setResendingId] = useState<string | null>(null), [resendNotice, setResendNotice] = useState(''), [resendError, setResendError] = useState('')
+  const [resendingId, setResendingId] = useState<string | null>(null), [resendError, setResendError] = useState('')
   /* 権限停止・二段階認証の解除が 428 で止まったときの本人確認窓。 */
   const [stepUp, setStepUp] = useState<StepUpRequest | null>(null)
-  const [permissionSaveNotice, setPermissionSaveNotice] = useState('')
+
   /* 送信中の掛け金。state は次の描画まで古いままなので、素早い二度押しの2回目を止められない。 */
   const resendingRef = useRef(false)
   const removingRef = useRef(false)
@@ -591,10 +592,10 @@ function StaffPageHost() {
     return map
   }, [accessUsers, members])
   const activeUsers = accessUsers.filter((user) => user.status === 'active')
-  const openPermissions = (user: AccessUserItem) => { setPermissionSaveNotice(''); setPermissionTarget(user) }
+  const openPermissions = (user: AccessUserItem) => { setPermissionTarget(user) }
   const finishPermissionSave = async () => {
     await load()
-    setPermissionSaveNotice('見せる範囲を保存しました。対象者のすべてのログインを終了したため、新しい権限で使うにはもう一度ログインが必要です。')
+    notifyToast('見せる範囲を保存しました。対象者のすべてのログインを終了したため、新しい権限で使うにはもう一度ログインが必要です。')
   }
   const invitedUsers = accessUsers.filter((user) => user.status === 'invited' || user.status === 'expired')
   // ★V7 `x63W5x`：集計が取れていない間、タブの件数に 0 を出さない。「—」と出す。
@@ -669,12 +670,11 @@ function StaffPageHost() {
     if (resendingRef.current) return
     resendingRef.current = true
     setResendingId(member.id)
-    setResendNotice('')
     setResendError('')
     try {
       const result = await fetchApi<{ success: boolean; data: StaffMemberWithInvite }>(`/api/staff/${member.id}/resend-invitation`, { method: 'POST' })
       const expiry = formatInviteExpiry(result.data.inviteExpiresAt)
-      setResendNotice(`招待メールを送り直しました。新しい期限は${expiry}です。相手にメールを確認してもらってください。期限内に受諾がなければ、もう一度送り直せます。`)
+      notifyToast(`招待メールを送り直しました。新しい期限は${expiry}です。相手にメールを確認してもらってください。期限内に受諾がなければ、もう一度送り直せます。`)
       await load()
     } catch (caught) {
       setResendError(`${messageOf(caught)}。状態を読み直してから、もう一度お試しください。`)
@@ -705,20 +705,18 @@ function StaffPageHost() {
       [data-tabs-row] nav:has(> span) > span + span { margin-left: auto; }
     `}</style>
     {tab === 'audit' ? <div data-design-node="jwVlo"><LoginAudit /></div> : <>
-    {missing > 0 && <div className="mb-4 flex items-center rounded-control bg-warning-bg px-4 py-3 text-sm"><KeyRound aria-hidden="true" className="text-status-warn-deep mr-2 size-4 shrink-0" /><p>二段階認証が未設定のユーザーが <b>{missing}人</b> います。高い権限の人から設定してください。</p></div>}
+    {missing > 0 && <Notice tone="warn" className="mb-4">二段階認証が未設定のユーザーが <b>{missing}人</b> います。高い権限の人から設定してください。</Notice>}
     {/*
       ★V7 `x63W5x`：取れない KPI は「—」。読み込み中は「読み込んでいます」、
       失敗は「読み込めませんでした」と言い分け、0（本当に0人）と混ぜない。
     */}
     <div data-design="KPIs" className="mb-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4"><Kpi label="いまいる人" value={summaryReady ? `${accessSummary.active}` : '—'} unit="人" note={error ? '読み込めませんでした' : summaryReady ? `管理者 ${accessSummary.roleCounts.administrator}・運用 ${accessSummary.roleCounts.operations}・見るだけ ${accessSummary.roleCounts.view_only}` : '読み込んでいます'} /><Kpi label="招待して返事がない" value={summaryReady ? `${accessSummary.invited}` : '—'} unit="人" note={error ? '読み込めませんでした' : summaryReady ? `期限切れ ${accessSummary.expiredInvitations}人` : '読み込んでいます'} /><Kpi label="90日 入っていない" value={summaryReady ? `${accessSummary.unused90Days}` : '—'} unit="人" note={error ? '読み込めませんでした' : summaryReady ? '最終ログインから90日以上' : '読み込んでいます'} /><Kpi label="2段階の確認" value={summaryReady ? `${accessSummary.mfaEnabled} / ${accessSummary.active}` : '—'} unit="人" note={error ? '読み込めませんでした' : summaryReady ? `管理者は必ず入れてください${accessSummary.mfaRate === null ? '' : `（${accessSummary.mfaRate}%）`}` : '読み込んでいます'} /></div>
-    <div className="mb-4 flex items-center justify-between gap-3 rounded-control bg-info-bg px-4 py-3 text-xs text-ink-secondary"><span>「見せる範囲」は、画面ごとに決められます。電話番号や住所など、必要な情報だけを見せると事故が減ります。</span></div>
+    <Notice tone="info" className="mb-4">「見せる範囲」は、画面ごとに決められます。電話番号や住所など、必要な情報だけを見せると事故が減ります。</Notice>
     {/*
       ★V7 `x63W5x`：一覧の失敗でページ上の帯は出さない。表の中の
       TableStateRow error（読み直す口つき）だけにまとめる。
     */}
-    {resendNotice && <div className="mb-4 rounded-control bg-info-bg px-4 py-3 text-sm font-medium text-info" role="status"><p>{resendNotice}</p></div>}
-    {resendError && <div className="mb-4 rounded-control bg-danger-bg p-3 text-sm text-danger" role="alert"><p>{resendError}</p></div>}
-    {permissionSaveNotice && <div className="mb-4 rounded-control bg-info-bg px-4 py-3 text-sm font-medium text-info" role="status"><p>{permissionSaveNotice}</p></div>}
+    {resendError && <Notice tone="danger" className="mb-4" message={resendError} />}
     {tab === 'members' && <SessionsCard />}
     {tab === 'roles' && <div className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">{accessRoles.map((role) => <div key={role.id} className="rounded-card border border-hairline bg-canvas p-4"><div className="flex items-start justify-between gap-2"><p className="font-semibold text-ink">{role.name}</p><span className="rounded-full bg-accent-soft px-2 py-1 text-[11px] font-semibold text-accent-deep">{role.assignedUserCount}人</span></div><p className="mt-2 text-xs leading-5 text-ink-secondary">{role.description}</p><p className="mt-3 text-xs text-ink-faint">{role.requiresMfa ? '2段階の確認が必要' : role.featureAccess === 'view' ? '閲覧のみ' : role.featureAccess === 'custom' ? '機能ごとに設定' : '編集できる'}</p></div>)}</div>}
     <div className="mb-3 flex flex-wrap items-center gap-3"><SearchField aria-label="人の名前・メールで検索" value={query} onChange={setQuery} onClear={() => setQuery('')} placeholder="人の名前・メールで検索" className="min-w-64 flex-1" />{/* ★V7：標準幅では「最後に入った日…」と切れるので、この欄だけ広げる。 */}<div className="w-full sm:w-64"><Select aria-label="並び順" size="full" value={sort} onChange={setSort} options={LIST_SORT_OPTIONS} /></div></div>

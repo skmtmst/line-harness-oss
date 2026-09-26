@@ -99,9 +99,11 @@ vi.mock('@/lib/api', () => {
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 const { default: StaffPage } = await import('./page')
+const { default: ToastHost, clearToastsForTest } = await import('@/components/shared/toast')
 
 async function mount() {
-  await act(async () => { render(<StaffPage />) })
+  // 保存の知らせは Toast（右下・4秒）で出す。置き場所も一緒に描く。
+  await act(async () => { render(<><StaffPage /><ToastHost /></>) })
   await waitFor(() => expect(screen.getByText('招待された人')).toBeTruthy())
 }
 
@@ -120,6 +122,7 @@ beforeEach(() => {
   fixture.fetchApi.mockReset()
   state.members = [member({})]
   state.users = [accessUser({})]
+  clearToastsForTest()
 })
 afterEach(() => { cleanup() })
 

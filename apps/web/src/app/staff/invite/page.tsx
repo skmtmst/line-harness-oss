@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
 import TargetMissing from '@/components/shared/target-missing'
 import { api } from '@/lib/api'
 
@@ -61,7 +62,7 @@ export default function StaffInvitationPage() {
             <p className="mt-5 text-sm leading-7 text-ink-secondary">
               「参加する」を押すとメールアドレスの確認が完了します。続いて届くメールからLINE連携を行ってください。
             </p>
-            {error && <p role="alert" className="mt-4 rounded-control bg-danger-bg p-4 text-sm text-danger">{error}</p>}
+            {error && <Notice tone="danger" message={error} className="mt-4" />}
             <div className="mt-6">
               <Button type="button" variant="primary" disabled={view === 'submitting'} onClick={() => void accept()}>
                 {view === 'submitting' ? '確認中…' : '参加する'}
@@ -70,10 +71,10 @@ export default function StaffInvitationPage() {
           </>
         )}
         {view === 'complete' && (
-          <div className="mt-5 rounded-control border border-accent bg-accent-soft p-5">
-            <p className="font-bold text-accent-deep">メールアドレスを確認しました</p>
-            <p className="mt-2 text-sm leading-6 text-ink-secondary">続いて届くメールからLINE連携を完了してください。</p>
-          </div>
+          <Notice tone="success" className="mt-5">
+            <p className="font-bold">メールアドレスを確認しました</p>
+            <p className="mt-2 text-sm leading-6">続いて届くメールからLINE連携を完了してください。</p>
+          </Notice>
         )}
       </section>
     </main>

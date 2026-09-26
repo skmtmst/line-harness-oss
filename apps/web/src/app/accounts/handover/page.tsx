@@ -13,6 +13,8 @@ import Breadcrumb from '@/components/shared/breadcrumb'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
+import { notifyToast } from '@/components/shared/toast'
 import TargetMissing from '@/components/shared/target-missing'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -67,7 +69,6 @@ function Handover() {
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [executing, setExecuting] = useState(false)
   const [executeError, setExecuteError] = useState('')
-  const [executeMessage, setExecuteMessage] = useState('')
 
   const load = useCallback(async () => {
     if (!id) return
@@ -150,7 +151,6 @@ function Handover() {
     if (!handover || executing) return
     setExecuting(true)
     setExecuteError('')
-    setExecuteMessage('')
     try {
       const result = await api.accountHandovers.execute(handover.id)
       if (!result.success) {
@@ -161,7 +161,7 @@ function Handover() {
       const detail = await api.accountHandovers.get(handover.id)
       if (detail.success) setHandover(detail.data as HandoverView)
       const moved = result.data.movedCount ?? result.data.plannedCount ?? 0
-      setExecuteMessage(
+      notifyToast(
         result.data.failureReason
           ?? `本実行が終わりました。${moved.toLocaleString('ja-JP')}人を移しました。`,
       )
@@ -273,10 +273,10 @@ function Handover() {
               </div>
             </div>
             {handover.providerMatch === 'different' && (
-              <div className="bg-warning-bg text-warning rounded-control mt-3 p-3 text-xs leading-relaxed">
+              <Notice tone="warn" className="mt-3">
                 <p className="font-bold">プロバイダーが違うので、友だちのIDは自動でつなげません</p>
                 <p className="mt-1">{DIFFERENT_PROVIDER_NOTE.replace('プロバイダーが違うので、友だちのIDは自動でつなげません。', '')}</p>
-              </div>
+              </Notice>
             )}
           </section>
 
@@ -339,15 +339,8 @@ function Handover() {
             </p>
           </section>
 
-          {executeMessage && (
-            <p role="status" className="bg-success-bg text-success rounded-control mt-3 p-3 text-xs leading-relaxed">
-              {executeMessage}
-            </p>
-          )}
           {executeError && (
-            <p role="alert" className="bg-warning-bg text-warning rounded-control mt-3 p-3 text-xs leading-relaxed">
-              {executeError}
-            </p>
+            <Notice tone="danger" message={executeError} onClose={() => setExecuteError('')} className="mt-3" />
           )}
           <div className="flex flex-wrap items-center justify-between gap-2">
             <Button href={`/accounts/detail?id=${account.id}`}>やめる</Button>
@@ -359,7 +352,7 @@ function Handover() {
                 type="button"
                 variant="primary"
                 disabled={(handover.unresolvedReviews ?? 1) > 0}
-                onClick={() => { setExecuteError(''); setExecuteMessage(''); setConfirmOpen(true) }}
+                onClick={() => { setExecuteError(''); setConfirmOpen(true) }}
               >
                 {executing ? '実行中…' : '本実行へ進む'}
               </Button>

@@ -23,6 +23,7 @@ vi.mock('@/contexts/account-context', () => ({
 }))
 
 const { default: SettingsPage } = await import('./page')
+const { default: ToastHost, clearToastsForTest } = await import('@/components/shared/toast')
 
 const response = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
   status, headers: { 'Content-Type': 'application/json' },
@@ -77,6 +78,7 @@ beforeEach(() => {
   document.body.appendChild(host)
   root = createRoot(host)
   mounted = true
+  clearToastsForTest()
 })
 
 afterEach(async () => {
@@ -87,8 +89,9 @@ afterEach(async () => {
 })
 
 async function render() {
+  // 保存の知らせは Toast（右下・4秒）で出す。置き場所も一緒に描く。
   await act(async () => {
-    root.render(<SettingsPage />)
+    root.render(<><SettingsPage /><ToastHost /></>)
     await Promise.resolve()
     await Promise.resolve()
     await Promise.resolve()

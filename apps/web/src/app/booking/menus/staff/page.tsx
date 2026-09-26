@@ -9,7 +9,9 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Notice from '@/components/shared/notice'
 import StatusBadge from '@/components/shared/status-badge'
+import { notifyToast } from '@/components/shared/toast'
 
 /**
  * メニューごとの担当スタッフ（設計 V2 8-2-4 / node B88kuI）。
@@ -41,7 +43,7 @@ function MenuStaffMatrixContent() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [savedAt, setSavedAt] = useState<number | null>(null)
+
 
   const load = useCallback(async () => {
     if (!selectedAccountId) return
@@ -135,7 +137,7 @@ function MenuStaffMatrixContent() {
       )
       /* #975 U075: 保存できた時点の表を新しい基準にする。以後の差分が未保存。 */
       setSavedGrid(grid)
-      setSavedAt(Date.now())
+      notifyToast('保存しました')
     } catch (e) {
       // 全件不適用のはずだが、画面の表示とDBの状態が食い違う可能性を
       // 残さないため再読み込みを促す。
@@ -255,12 +257,7 @@ function MenuStaffMatrixContent() {
       </div>
 
       {error && (
-        <div className="bg-danger-bg border-danger-bg text-danger mb-4 rounded-lg border p-4 text-sm">
-          {error}
-        </div>
-      )}
-      {savedAt && Date.now() - savedAt < 3000 && (
-        <div className="bg-success-bg text-success mb-4 rounded-lg p-3 text-sm">保存しました</div>
+        <Notice tone="danger" message={error} onClose={() => setError(null)} className="mb-4" />
       )}
 
       {orphans.length > 0 && (

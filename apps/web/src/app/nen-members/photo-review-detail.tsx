@@ -6,6 +6,7 @@ import Card from '@/components/shared/card'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
+import Notice from '@/components/shared/notice'
 import { FeatureLinkCard } from '@/components/shared/side-cards'
 import StickyBar from '@/components/shared/sticky-bar'
 import type { PhotoAssetStatus, PhotoDerivatives } from '@/lib/api'
@@ -18,7 +19,7 @@ import { photoReviewReasonLabel, mileStatusLabel, text } from './photo-text'
 const numberOrDash = (value: unknown) => Number.isFinite(Number(value)) ? Number(value).toLocaleString('ja-JP') : '—'
 
 export function PhotoReviewDetail({
-  photo, position, total, loading, loadKind, reviewing, notice, assetStatus, derivatives, assetsFailed, onReloadAssets, assetProcessing, rotationSaving,
+  photo, position, total, loading, loadKind, reviewing, notice, accountNotice, assetStatus, derivatives, assetsFailed, onReloadAssets, assetProcessing, rotationSaving,
   onBack, onMove, onApprove, onReturn, onProcessReviewAsset, onSaveRotation, onDownloadOriginal, onPointAction, pointActionBusy,
 }: {
   photo: Record<string, unknown> | null
@@ -28,6 +29,7 @@ export function PhotoReviewDetail({
   loadKind: 'ready' | 'empty' | 'error' | 'forbidden'
   reviewing: boolean
   notice: string
+  accountNotice: string
   assetStatus: PhotoAssetStatus | null
   derivatives: PhotoDerivatives | null
   assetsFailed: boolean
@@ -89,7 +91,8 @@ export function PhotoReviewDetail({
     ?? safePhotoSrc(photo.image_url)
   const latestAssetJob = assetStatus?.jobs[0] ?? null
   return <div data-photo-view="detail">
-    {notice && <div role="status" aria-live="polite" className="mb-4 rounded-control border border-accent-border bg-accent-soft px-4 py-3 text-sm text-accent-deep">{notice}</div>}
+    {notice && <Notice tone="danger" className="mb-4" message={notice} />}
+    {accountNotice && <Notice tone="warn" className="mb-4" message={accountNotice} />}
     <div className="flex items-center justify-between gap-2 max-md:flex-col max-md:items-start">
       <div>
         <p className="text-xs font-bold text-ink-faint">写真審査</p>

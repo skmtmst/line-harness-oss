@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import Notice from '@/components/shared/notice'
 
 /**
  * 受信箱のプルダウン。
@@ -223,12 +224,12 @@ export function OperatorDropdown({
             )
           })}
           {unreadUnavailable ? (
-            <div className="border-warning bg-warning-bg border-t px-3 py-3" role="status">
-              <p className="text-warning text-xs font-bold">未読の数をいま数えられません</p>
-              <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
+            <Notice tone="warn">
+              <p className="font-bold">未読の数をいま数えられません</p>
+              <p className="mt-1">
                 担当者は選べます。数だけが取れていないので「—」にしています。0件とは違います。少し待ってからもう一度開いてください。
               </p>
-            </div>
+            </Notice>
           ) : null}
         </div>
       ) : null}

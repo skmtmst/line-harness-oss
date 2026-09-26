@@ -22,6 +22,7 @@ import { api, type ScenarioTriggerItem } from '@/lib/api'
 import { pruneCondition, type SegmentCondition } from '@/lib/segment-condition'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
+import Notice from '@/components/shared/notice'
 import { describeCondition } from './scenario-dialogs'
 import { scenarioReferenceData } from './scenario-reference-data'
 
@@ -251,9 +252,9 @@ export default function TriggerEditor({
       */}
       <div className="overflow-y-auto" style={{ maxHeight: 'calc(100dvh - 15rem)' }}>
         {dirty && (
-          <p className="bg-warning-bg text-warning mb-4 rounded-control px-4 py-2 text-xs">
+          <Notice tone="warn" className="mb-4">
             未保存の変更があります。キャンセル・Esc・背景を押すと元に戻ります。
-          </p>
+          </Notice>
         )}
 
         {/*
@@ -474,7 +475,7 @@ export default function TriggerEditor({
               : ' 試算では配信も購読も始まりません。'}
           </p>
         </div>
-        <p className="bg-warning-bg text-warning mt-4 rounded-control px-4 py-3 text-xs">保存後も配信は始まりません。テスト送信と開始確認を完了してから有効化します。</p>
+        <Notice tone="warn" className="mt-4">保存後も配信は始まりません。テスト送信と開始確認を完了してから有効化します。</Notice>
       </div>
     </Dialog>
   )

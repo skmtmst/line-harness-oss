@@ -16,6 +16,7 @@ import React from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { act } from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 
 const localStorageValues = new Map<string, string>()
 Object.defineProperty(window, 'localStorage', {
@@ -119,6 +120,7 @@ const MENUS = [menuBase('menu-1', 'カット', 0), menuBase('menu-2', 'カラー
 
 beforeEach(() => {
   window.localStorage.setItem('lh_staff_role', 'owner')
+  clearToastsForTest()
   fixture.selectedAccountId = 'account-a'
   fixture.activeTab = 'menus'
   fixture.updateMenu = vi.fn(async () => ({ ok: true }))
@@ -134,7 +136,7 @@ afterEach(() => {
 
 describe('Issue #709残件: 28予約メニューの↑↓並び替え', () => {
   test('⠿の飾りが出ず、各行に上へ/下へボタンがある', async () => {
-    const { container } = render(<MenusPage />)
+    const { container } = render(<><MenusPage /><ToastHost /></>)
     await screen.findByRole('button', { name: 'カラーを上へ' })
 
     expect(container.textContent).not.toContain('⠿')
@@ -145,7 +147,7 @@ describe('Issue #709残件: 28予約メニューの↑↓並び替え', () => {
   })
 
   test('先頭の上へ・末尾の下へは押せない', async () => {
-    render(<MenusPage />)
+    render(<><MenusPage /><ToastHost /></>)
     await screen.findByRole('button', { name: 'カラーを上へ' })
 
     expect((screen.getByRole('button', { name: 'カットを上へ' }) as HTMLButtonElement).disabled).toBe(true)
@@ -155,7 +157,7 @@ describe('Issue #709残件: 28予約メニューの↑↓並び替え', () => {
   })
 
   test('下へを押すと2件のsort_orderを交換したPUTが送られる', async () => {
-    render(<MenusPage />)
+    render(<><MenusPage /><ToastHost /></>)
     await screen.findByRole('button', { name: 'カラーを上へ' })
 
     fireEvent.click(screen.getByRole('button', { name: 'カットを下へ' }))
@@ -170,7 +172,7 @@ describe('Issue #709残件: 28予約メニューの↑↓並び替え', () => {
 
   test('失敗したらalertで理由が出る', async () => {
     fixture.updateMenu = vi.fn(async () => { throw new Error('down') })
-    render(<MenusPage />)
+    render(<><MenusPage /><ToastHost /></>)
     await screen.findByRole('button', { name: 'カラーを上へ' })
 
     fireEvent.click(screen.getByRole('button', { name: 'カラーを上へ' }))

@@ -53,6 +53,7 @@ import BulkPreviewModal from '@/components/scenarios/bulk-preview-modal'
 import ActionMenu from '@/components/shared/action-menu'
 import { MoreAction } from '@/components/shared/row-actions'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Notice from '@/components/shared/notice'
 import { Th } from '@/components/shared/table'
 import {
   scenarioReachBarWidth,
@@ -1816,9 +1817,7 @@ export default function ScenarioDetailClient({
       </section>
 
       {error && (
-        <div className="bg-danger-bg text-danger rounded-card mb-4 p-4 text-sm">
-          {error}
-        </div>
+        <Notice tone="danger" message={error} className="mb-4" />
       )}
 
       {/* Scenario Info */}
