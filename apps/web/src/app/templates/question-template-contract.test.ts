@@ -21,7 +21,8 @@ describe('V6 質問テンプレート', () => {
   it('既存の質問エンジンを再利用し、プレビューと利用先を同じ画面で確認できる', () => {
     expect(page).toContain('<QuestionEditor')
     expect(page).toContain('choiceColumns')
-    expect(page).toContain('LINEプレビュー')
+    // B-6: 題「LINEプレビュー」は共通部品が出す。画面側は使うだけ。
+    expect(page).toContain('<LinePreview')
     expect(page).toContain('答えをどこに残すか')
     expect(page).toContain('この質問を使う場所')
     expect(editor).toContain("choiceColumns ? 'grid gap-3 xl:grid-cols-2'")

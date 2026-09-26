@@ -39,10 +39,11 @@ describe('V6 予約管理の時間台帳', () => {
     for (const text of [
       'LINEの友だちなら、名前で探して結びつけてください。',
       'お客様に何を送りますか',
-      'LINEプレビュー',
       'この方について',
       'つながる先',
     ]) expect(CREATE).toContain(text)
+    // B-6: 題「LINEプレビュー」は共通部品が出す。画面側は使うだけ。
+    expect(CREATE).toContain('<LinePreview')
     expect(CREATE).toContain('予約と顧客台帳に残ります')
   })
 
