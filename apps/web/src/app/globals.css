@@ -161,14 +161,15 @@
   --color-avatar-green: #079b45;
 
   /*
-   * LINEトークのプレビュー。実画面の青いトーク面と回答操作の緑。
+   * LINEプレビュー共通部品のトーク背景色（B-6、★V7）。
+   * LINE のトーク背景色と同じ色あい。
    *
-   * 白文字が乗るので AA の 4.5:1 が要る。2026-09-25 に計算して確かめた。
-   * 以前の #789bc5 は白字で 2.88:1、ラベルの #5579a8 は 4.48:1 で届かない。
-   * 色あいはそのままに明るさだけ下げた（白字で 5.21:1 と 4.91:1）。
+   * 以前は画面ごとに青い地（`line-preview` #4a6f9a）を敷いていたが、
+   * B-6 で1つの部品に寄せたため、古い2色は消した。
+   * 題・札・空の箱の字は `ink` 系の濃い字で載せる（約 7:1）。
+   * 白字だと約 2.4:1 しかなく、4.5:1 に届かない。
    */
-  --color-line-preview: #4a6f9a;
-  --color-line-preview-label: #4f739e;
+  --color-line-talk: #8cabd9;
   /*
    * 回答の選択肢の緑。白地に文字として載るので AA の 4.5:1 が要る。
    * 以前の #00a947 は 3.1:1。色あいはそのままに濃くした（4.64:1）。
@@ -800,7 +801,7 @@ select:not([multiple]):not(.appearance-none) {
 
 @media (min-width: 1024px) {
   .gb-calendar-grid {
-    grid-template-columns: 520px minmax(0, 1fr);
+    grid-template-columns: 480px minmax(0, 1fr);
   }
 
   .gb-edit-grid {

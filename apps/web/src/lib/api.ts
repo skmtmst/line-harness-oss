@@ -244,6 +244,33 @@ export interface IssuedIntegrationApiToken extends IntegrationApiTokenInfo {
   token: string
 }
 
+/* #838 第2段: Google Sheets 連携。トークン類は応答に乗らない設計。 */
+export type GoogleSheetsConnectionStatus = 'disconnected' | 'pending_target' | 'connected' | 'expired'
+
+export interface GoogleSheetsConnection {
+  status: GoogleSheetsConnectionStatus
+  googleAccountEmail?: string | null
+  spreadsheetId?: string | null
+  spreadsheetTitle?: string | null
+  spreadsheetUrl?: string | null
+  lastSyncedAt?: string | null
+  lastSyncStatus?: 'ok' | 'partial' | 'error' | null
+  lastSyncError?: string | null
+  consecutiveFailures?: number
+  connectedAt?: string | null
+}
+
+export interface GoogleSheetsSyncRun {
+  id: string
+  kind: 'manual' | 'scheduled'
+  dataType: 'friends' | 'form_answers'
+  status: 'running' | 'ok' | 'partial' | 'error'
+  rowsWritten: number
+  error: string | null
+  startedAt: string
+  finishedAt: string | null
+}
+
 export type AccessUserStatus = 'active' | 'invited' | 'expired' | 'suspended'
 export type AccessRoleBundle = 'administrator' | 'operations' | 'reception' | 'view_only' | 'custom'
 
@@ -11076,6 +11103,45 @@ export const api = {
         fetchApi<ApiResponse<IssuedIntegrationApiToken>>(
           `/api/webhooks/api-tokens/${encodeURIComponent(id)}/rotate?lineAccountId=${encodeURIComponent(lineAccountId)}`,
           { method: 'POST', body: '{}' },
+        ),
+    },
+    /* #838 第2段: Google Sheets への直接書き出し。接続はOAuthの別画面へ飛ばす。 */
+    googleSheets: {
+      connection: (lineAccountId: string) =>
+        fetchApi<ApiResponse<{
+          connection: GoogleSheetsConnection
+          oauthConfigured: boolean
+          syncRunning: boolean
+          canManage: boolean
+        }>>(
+          `/api/integrations/google-sheets/connection?account_id=${encodeURIComponent(lineAccountId)}`,
+        ),
+      runs: (lineAccountId: string) =>
+        fetchApi<ApiResponse<{ runs: GoogleSheetsSyncRun[] }>>(
+          `/api/integrations/google-sheets/runs?account_id=${encodeURIComponent(lineAccountId)}`,
+        ),
+      connectStart: (lineAccountId: string) =>
+        fetchApi<ApiResponse<{ authorizeUrl: string; mode: 'connect' | 'reconnect' }>>(
+          '/api/integrations/google-sheets/connect/start',
+          { method: 'POST', body: JSON.stringify({ accountId: lineAccountId }) },
+        ),
+      disconnect: (lineAccountId: string) =>
+        fetchApi<ApiResponse<{ revoked: boolean }>>(
+          '/api/integrations/google-sheets/disconnect',
+          { method: 'POST', body: JSON.stringify({ accountId: lineAccountId, confirmed: true }) },
+        ),
+      setTarget: (lineAccountId: string, spreadsheet: string) =>
+        fetchApi<ApiResponse<{ connection: GoogleSheetsConnection }>>(
+          '/api/integrations/google-sheets/target',
+          { method: 'PUT', body: JSON.stringify({ accountId: lineAccountId, spreadsheet }) },
+        ),
+      sync: (lineAccountId: string) =>
+        fetchApi<ApiResponse<{
+          status: 'ok' | 'partial' | 'already_running' | 'error'
+          results: Array<{ dataType: string; status: string; rowsWritten: number; error?: string | null }>
+        }>>(
+          '/api/integrations/google-sheets/sync',
+          { method: 'POST', body: JSON.stringify({ accountId: lineAccountId }) },
         ),
     },
   },

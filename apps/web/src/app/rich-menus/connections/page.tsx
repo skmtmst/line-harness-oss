@@ -8,6 +8,7 @@ import { api, ApiError } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
+import LinePreview from '@/components/shared/line-preview'
 import ListState from '@/components/shared/list-state'
 import TargetMissing from '@/components/shared/target-missing'
 import NoteBar from '@/components/shared/note-bar'
@@ -215,7 +216,7 @@ function ConnectionHeading({ group }: { group: RichMenuGroup }) {
 }
 
 function ConnectionAside() {
-  return <aside className="space-y-4"><section className="border-hairline bg-canvas rounded-card border p-5 shadow-sm"><h2 className="text-ink text-sm font-bold">LINEプレビュー</h2><p className="text-ink-faint mt-1 text-xs">「商品を見る」を開いたとき</p><div className="border-ink bg-canvas-sunken mt-4 overflow-hidden rounded-3xl border-4 p-3 shadow-inner"><div className="text-ink-faint flex min-h-60 items-center justify-center text-xs">トーク画面</div><div className="bg-canvas text-ink-secondary grid grid-cols-3 gap-1 rounded-lg p-2 text-center text-xs font-semibold"><span>トップ</span><span className="bg-accent-deep text-on-accent rounded px-2 py-1">商品</span><span>予約</span><span>新着</span><span>定番</span></div></div></section><section className="bg-warning-bg text-warning rounded-card p-5 text-xs leading-5"><h2 className="text-sm font-bold">切替メニューでよくある事故</h2><ul className="mt-2 space-y-1"><li>・戻るタブが無く、元のメニューに帰れない</li><li>・切替先が下書きのままで、押しても動かない</li><li>・切替先だけ「誰に出すか」が違う</li></ul></section></aside>
+  return <aside className="space-y-4">{/* LINEの見た目の枠は共通部品 `LinePreview`（B-6）。白い箱＋携帯の縁取りはやめる。 */}<LinePreview note="「商品を見る」を開いたときの見え方"><div className="rounded-card bg-canvas p-3"><div className="text-ink-faint flex min-h-60 items-center justify-center text-xs">トーク画面</div><div className="bg-canvas text-ink-secondary grid grid-cols-3 gap-1 rounded-lg p-2 text-center text-xs font-semibold"><span>トップ</span><span className="bg-accent-deep text-on-accent rounded px-2 py-1">商品</span><span>予約</span><span>新着</span><span>定番</span></div></div></LinePreview><section className="bg-warning-bg text-warning rounded-card p-5 text-xs leading-5"><h2 className="text-sm font-bold">切替メニューでよくある事故</h2><ul className="mt-2 space-y-1"><li>・戻るタブが無く、元のメニューに帰れない</li><li>・切替先が下書きのままで、押しても動かない</li><li>・切替先だけ「誰に出すか」が違う</li></ul></section></aside>
 }
 
 function ConnectionFooter({ status, groupId }: { status: string; groupId: string }) {
