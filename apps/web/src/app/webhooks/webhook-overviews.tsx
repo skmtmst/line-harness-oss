@@ -8,7 +8,8 @@ import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import ListToolbar from '@/components/shared/list-toolbar'
-import Notice, { type NoticeTone } from '@/components/shared/notice'
+import Notice from '@/components/shared/notice'
+import { notifyToast } from '@/components/shared/toast'
 import Pagination from '@/components/shared/pagination'
 import SelectField from '@/components/shared/select-field'
 import StatusBadge from '@/components/shared/status-badge'
@@ -207,7 +208,7 @@ export function OutgoingOverview({
    * 以前は口の戻り値を読まず、成功も失敗も画面に何も出なかった。
    * 成功は届いた旨、失敗は「やり取りの記録」タブへの案内を出す。
    */
-  const [testNotice, setTestNotice] = useState<{ tone: NoticeTone; message: string } | null>(null)
+  const [testNotice, setTestNotice] = useState<{ tone: 'danger'; message: string } | null>(null)
 
   const runTest = async (item: OutgoingWebhookOverview) => {
     if (!lineAccountId || testingId !== null) return
@@ -218,20 +219,17 @@ export function OutgoingOverview({
       const response = await api.webhooks.outgoing.test(item.id, lineAccountId)
       if (response.success && response.data.delivered) {
         const status = response.data.responseStatus
-        setTestNotice({
-          tone: 'success',
-          message: `「${item.name}」への試し送信が届きました${status === null ? '' : `(相手の応答 ${status})`}。`,
-        })
+        notifyToast(`「${item.name}」への試し送信が届きました${status === null ? '' : `(相手の応答 ${status})`}。`)
       } else {
         const status = response.success ? response.data.responseStatus : null
         setTestNotice({
-          tone: 'error',
+          tone: 'danger',
           message: `「${item.name}」への試し送信は届きませんでした${status === null ? '' : `(相手の応答 ${status})`}。「やり取りの記録」タブで詳しく確認できます。`,
         })
       }
     } catch {
       setTestNotice({
-        tone: 'error',
+        tone: 'danger',
         message: `「${item.name}」への試し送信に失敗しました。「やり取りの記録」タブで詳しく確認できます。`,
       })
     } finally {
@@ -334,13 +332,13 @@ export function OutgoingOverview({
         summaryStatus={summaryStatus}
       />
 
-      <p className="bg-info-bg text-ink-secondary rounded-card mb-3 px-4 py-3 text-xs leading-6">
+      <Notice tone="info" className="mb-3">
         「こちらから送る」は、うちで起きたことを相手に知らせます。「こちらで受け取る」は、相手で起きたことをうちに取り込みます。受け取る側のURLは、相手のサービスに貼ってください。
-      </p>
+      </Notice>
 
       {testNotice ? (
         <div className="mb-3">
-          <Notice tone={testNotice.tone} message={testNotice.message} onClose={() => setTestNotice(null)} />
+          <Notice tone="danger" message={testNotice.message} onClose={() => setTestNotice(null)} />
         </div>
       ) : null}
 

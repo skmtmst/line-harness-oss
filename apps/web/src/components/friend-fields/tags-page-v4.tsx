@@ -10,6 +10,7 @@ import ActionMenu from '@/components/shared/action-menu'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import Notice from '@/components/shared/notice'
+import { notifyToast } from '@/components/shared/toast'
 import Button from '@/components/shared/button'
 import ListKpis from '@/components/shared/list-kpis'
 import ListState from '@/components/shared/list-state'
@@ -366,7 +367,7 @@ function FolderList({ groups, items, countsKnown, active, onSelect, onChanged }:
           { id: 'delete', label: 'フォルダを削除', icon: <Trash2 size={15} />, tone: 'danger', dividerBefore: true, disabled: busy, onSelect: () => setDeleteGroup(group) },
         ]} /> : null}</div>
       })}</nav>
-      {menuError ? <Notice className="mx-2 mb-2" tone="error" message={menuError} onClose={() => setMenuError('')} /> : null}
+      {menuError ? <Notice className="mx-2 mb-2" tone="danger" message={menuError} onClose={() => setMenuError('')} /> : null}
       {/*
         母集団の説明（#981 A04-02）。件数は一覧と同じものを数える：
         選択中アカウントのタグで、保管済み（archived）も含む。
@@ -640,8 +641,7 @@ export default function TagsPageV4({
   const [page, setPage] = useState(1)
   const [dragId, setDragId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Tag | null>(null)
-  /** 「すでに整理済み」など、失敗ではない結果を出すための通知。 */
-  const [notice, setNotice] = useState('')
+  /** 「すでに整理済み」など、失敗ではない結果は Toast（右下・4秒）へ送る。 */
   const [csvOpen, setCsvOpen] = useState(false)
   const loadRequestRef = useRef<TagListRequestKey>({ accountId, generation: 0 })
 
@@ -931,8 +931,7 @@ export default function TagsPageV4({
             {/* 「＋ タグを追加」はタブ行の右端へ移動した（#1014 ATTR-22）。 */}
           </div>
         )}
-        {notice && <Notice className="mb-4" tone="success" message={notice} onClose={() => setNotice('')} />}
-        {error && <p className="mb-4 rounded-control border border-danger/20 bg-danger-bg p-3 text-sm text-danger">{error}</p>}
+        {error && <Notice className="mb-4" tone="danger" message={error} />}
         {/* 設計 `HrwyW` は gap 14、フォルダは 240 固定（`DgeL8`）。 */}
         <div className="grid min-w-0 gap-[14px] xl:grid-cols-[240px_minmax(0,1fr)]">
           {/*
@@ -1207,7 +1206,7 @@ export default function TagsPageV4({
         ) : null}
       </> : tab === 'fields' ? <FriendFieldList accountId={accountId} /> : tab === 'marks' ? <SupportMarkList accountId={accountId} /> : <SavedSearchList accountId={accountId} />}
       </div>
-      {deleteTarget && <DeleteTagDialog tag={deleteTarget} accountId={accountId} onCancel={() => setDeleteTarget(null)} onArchived={(result) => { setDeleteTarget(null); setNotice(result ?? ''); void load() }} />}
+      {deleteTarget && <DeleteTagDialog tag={deleteTarget} accountId={accountId} onCancel={() => setDeleteTarget(null)} onArchived={(result) => { setDeleteTarget(null); if (result) notifyToast(result); void load() }} />}
     </div>
   )
 }

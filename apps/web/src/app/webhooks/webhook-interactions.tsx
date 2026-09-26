@@ -12,6 +12,7 @@ import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import Notice from '@/components/shared/notice'
+import { notifyToast } from '@/components/shared/toast'
 import Pagination from '@/components/shared/pagination'
 import ListRange from '@/components/ui/list-range'
 import SearchField from '@/components/shared/search-field'
@@ -143,7 +144,7 @@ export default function WebhookInteractions() {
   const [selected, setSelected] = useState<WebhookInteraction | null>(null)
   const [retrying, setRetrying] = useState<string | null>(null)
   const [bulkRetrying, setBulkRetrying] = useState(false)
-  const [notice, setNotice] = useState<{ tone: 'success' | 'error'; message: string } | null>(null)
+  const [notice, setNotice] = useState<{ tone: 'danger'; message: string } | null>(null)
   const [canRetry, setCanRetry] = useState(false)
   /*
    * 「届いたか分からない」失敗の送り直し確認(IDEA-26)。
@@ -244,12 +245,11 @@ export default function WebhookInteractions() {
       const response = await api.webhooks.interactions.retry(item.id, requestAccountId, { confirmed })
       if (selectedAccountIdRef.current !== requestAccountId) return
       if (!response.success) throw new Error(response.error)
-      setNotice({
-        tone: response.data.status === 'succeeded' ? 'success' : 'error',
-        message: response.data.status === 'succeeded'
-          ? `「${item.webhookName}」へもう一度送り、届いたことを確認しました。`
-          : `「${item.webhookName}」へ送り直しましたが、まだ届きませんでした。`,
-      })
+      if (response.data.status === 'succeeded') {
+        notifyToast(`「${item.webhookName}」へもう一度送り、届いたことを確認しました。`)
+      } else {
+        setNotice({ tone: 'danger', message: `「${item.webhookName}」へ送り直しましたが、まだ届きませんでした。` })
+      }
       await load()
     } catch (error) {
       if (selectedAccountIdRef.current !== requestAccountId) return
@@ -261,7 +261,7 @@ export default function WebhookInteractions() {
       if (error instanceof ApiError && error.code === 'result_unknown_needs_check') {
         setConfirmingRetry(item)
       } else {
-        setNotice({ tone: 'error', message: '送り直しを受け付けられませんでした。状態を読み直してからお試しください。' })
+        setNotice({ tone: 'danger', message: '送り直しを受け付けられませんでした。状態を読み直してからお試しください。' })
       }
     } finally {
       if (selectedAccountIdRef.current === requestAccountId) setRetrying(null)
@@ -287,14 +287,16 @@ export default function WebhookInteractions() {
       const reviewNote = response.data.needsReview > 0
         ? `届いたか分からないものが${response.data.needsReview}件あります。相手先の記録で同じ処理がないか確かめてから、一覧で1件ずつやり直してください。`
         : ''
-      setNotice({
-        tone: response.data.failed > 0 || response.data.skipped > 0 || response.data.remaining > 0 || response.data.needsReview > 0 ? 'error' : 'success',
-        message: `${response.data.requested}件を確認し、${response.data.succeeded}件が届きました。届かなかったもの ${response.data.failed}件、対象外 ${response.data.skipped}件です。${remainingNote}${reviewNote}`,
-      })
+      const bulkMessage = `${response.data.requested}件を確認し、${response.data.succeeded}件が届きました。届かなかったもの ${response.data.failed}件、対象外 ${response.data.skipped}件です。${remainingNote}${reviewNote}`
+      if (response.data.failed > 0 || response.data.skipped > 0 || response.data.remaining > 0 || response.data.needsReview > 0) {
+        setNotice({ tone: 'danger', message: bulkMessage })
+      } else {
+        notifyToast(bulkMessage)
+      }
       await load()
     } catch {
       if (selectedAccountIdRef.current !== requestAccountId) return
-      setNotice({ tone: 'error', message: 'まとめて送り直せませんでした。状態を読み直してからお試しください。' })
+      setNotice({ tone: 'danger', message: 'まとめて送り直せませんでした。状態を読み直してからお試しください。' })
     } finally {
       if (selectedAccountIdRef.current === requestAccountId) setBulkRetrying(false)
     }
@@ -321,7 +323,7 @@ export default function WebhookInteractions() {
         </Button>
       </div> : null}
 
-      {notice ? <Notice tone={notice.tone} message={notice.message} onClose={() => setNotice(null)} /> : null}
+      {notice ? <Notice tone="danger" message={notice.message} onClose={() => setNotice(null)} /> : null}
 
       {loading && data.items.length === 0 ? (
         <ListState kind="loading" title="やり取りの記録を読み込んでいます" />

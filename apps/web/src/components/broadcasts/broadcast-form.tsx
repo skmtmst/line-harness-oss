@@ -57,6 +57,8 @@ import CarouselPicker, {
   filterSendableTemplates,
 } from '@/components/scenarios/carousel-picker'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Notice from '@/components/shared/notice'
+import { notifyToast } from '@/components/shared/toast'
 import Combobox from '@/components/shared/combobox'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Button from '@/components/shared/button'
@@ -661,7 +663,7 @@ export default function BroadcastForm({
   const [testHistory, setTestHistory] = useState<TestSendView[]>([])
   const [previewConfirmed, setPreviewConfirmed] = useState(visualQaAugustCampaign)
   const [error, setError] = useState('')
-  const [draftSaved, setDraftSaved] = useState(false)
+
   /*
    * 二者承認（m12a / 設計 A-1・A-4）。確認の窓を開いたときに境目と
    * 運用者数を読み、人数で出し分ける。人数は配信前チェックの数だけを使う。
@@ -1310,12 +1312,11 @@ export default function BroadcastForm({
   const saveDraftNow = async () => {
     setSaving(true)
     setError('')
-    setDraftSaved(false)
     try {
       // #772: 409時は persistDraft が案内ずみで null を返すため、保存ずみにはしない。
       const saved = await persistDraft(scheduledAtIso(), true)
       if (saved) {
-        setDraftSaved(true)
+        notifyToast('下書きを保存しました。')
         // BROADCAST-16: フォームは閉じない保存なので、背後の一覧と
         // フォルダ件数の読み直しは呼び側に任せる。失敗時は呼ばない。
         onDraftSaved?.(saved)
@@ -1956,7 +1957,7 @@ export default function BroadcastForm({
                   </div>
                 ))}
               </div>
-              <p className="mt-3 rounded-control bg-info-bg p-3 text-xs text-info">重複アカウントは1人として数え、配信直前に再計算します。</p>
+              <Notice tone="info" className="mt-3">重複アカウントは1人として数え、配信直前に再計算します。</Notice>
               <section className="mt-4 border-t border-hairline pt-4">
                 <h4 className="text-sm font-bold text-ink">対象プレビュー</h4>
                 <p className="mt-1 text-xs text-ink-faint">代表的な友だちを確認できます。</p>
@@ -2151,12 +2152,12 @@ export default function BroadcastForm({
           予約まで進んでから、配信の時刻に断られるのがいちばん困る。
         */}
         {bubbles.length > 1 && (
-          <p className="rounded-card bg-warning-bg text-warning p-3 text-sm leading-relaxed">
+          <Notice tone="warn">
             2通目以降はまだ配信できません。下書きとして残せますが、送信・予約はできません。
             いまは1通にまとめるか、配信を分けてください。
-          </p>
+          </Notice>
         )}
-        {error && <p className="rounded-card bg-danger-bg p-3 text-sm text-danger">{error}</p>}
+        {error && <Notice tone="danger" message={error} />}
         </div>
         <section id="broadcast-step-schedule" className={`${shows('schedule') ? '' : 'hidden'} border-hairline mb-3 rounded-card border bg-canvas p-5`}>
           <h3 className="text-lg font-bold text-ink">送信設定</h3>
@@ -2219,10 +2220,10 @@ export default function BroadcastForm({
                 **送信枠には触れない。** 残り通数を読む口がこの画面には無く、
                 「送信枠も再確認します」と書くと出せない数を約束することになる。
               */}
-              <p className="bg-warning-bg text-warning rounded-control sm:col-span-2 p-3 text-xs leading-relaxed">
+              <Notice tone="warn" className="sm:col-span-2">
                 予約した時刻に、そのときの条件でもう一度対象を数え直してから送ります。
                 いま出ている人数から増減することがあります。
-              </p>
+              </Notice>
             </div>
           )}
 
@@ -2335,18 +2336,18 @@ export default function BroadcastForm({
           ))}
         </dl>
         {concurrentBroadcasts.length > 0 && (
-          <div className="mt-3 rounded-control bg-warning-bg p-3 text-xs text-warning">
+          <Notice tone="warn" className="mt-3">
             <p className="font-semibold">同じ時刻の前後1時間に別の予約配信があります。対象が重なる場合は間隔を空けてください。</p>
             <ul className="mt-1 list-disc pl-4">
               {concurrentBroadcasts.map((item) => <li key={item.id}>{formatScheduleTime(item.scheduledAt)}　{item.title}</li>)}
             </ul>
-          </div>
+          </Notice>
         )}
-        <p className="mt-3 rounded-control bg-warning-bg p-3 text-xs text-warning">
+        <Notice tone="warn" className="mt-3">
           {sendMode === 'scheduled'
             ? '予約後も配信開始前までは編集・取消できます。'
             : '下書きとして保存します。送信は詳細画面で実行し、送信前にもう一度確認できます。'}
-        </p>
+        </Notice>
       </section>
     </div>
     {/*
@@ -2361,12 +2362,11 @@ export default function BroadcastForm({
       **こちらは常に出す。**
     */}
     {shows('message') && lengthNotice.tone === 'error' && (
-      <div className="border-danger-bg bg-danger-bg rounded-card mb-3 border p-3">
+      <Notice tone="danger" className="mb-3">
         <p className="text-danger text-sm font-bold">{lengthNotice.title}</p>
         <p className="text-danger mt-1 text-xs">{lengthNotice.description}</p>
-      </div>
+      </Notice>
     )}
-    {draftSaved && <p role="status" className="mb-3 rounded-control bg-success-bg p-3 text-sm text-success">下書きを保存しました。</p>}
       </div>
       {/*
         xl で右列を追従させるとき、列の中身（LINEプレビュー + 操作）が
@@ -2622,7 +2622,7 @@ export default function BroadcastForm({
           <div className="mt-2 flex flex-wrap gap-1.5">{STANDARD_CONDITION_AXES.map((axis) => <span key={axis} className="rounded-pill border border-hairline px-2 py-1 text-xs text-ink-secondary">{axis}</span>)}</div>
           <p className="mt-3 text-xs font-bold text-ink-secondary">この画面だけの軸（6軸）</p>
           <div className="mt-2 flex flex-wrap gap-1.5">{BROADCAST_ONLY_CONDITION_AXES.map((axis) => <span key={axis} className="rounded-pill border border-hairline px-2 py-1 text-xs text-ink-faint">{axis}</span>)}</div>
-          <p className="mt-3 rounded-control bg-info-bg p-3 text-xs text-info">複数条件は「すべて一致（AND）」または「いずれか一致（OR）」で結合できます。未接続の軸は選択肢に出ません。</p>
+          <Notice tone="info" className="mt-3">複数条件は「すべて一致（AND）」または「いずれか一致（OR）」で結合できます。未接続の軸は選択肢に出ません。</Notice>
         </section>
       </div>
     </ConfirmDialog>
@@ -2730,14 +2730,14 @@ export default function BroadcastForm({
           読み合わせるときに見落とす。
         */}
         {concurrentBroadcasts.length > 0 && (
-          <div className="bg-warning-bg text-warning rounded-control mt-3 p-3 text-xs leading-5">
+          <Notice tone="warn" className="mt-3">
             <p className="font-semibold">同じ時刻の前後1時間に別の予約配信があります</p>
             <ul className="mt-1 list-disc pl-4">
               {concurrentBroadcasts.map((item) => (
                 <li key={item.id}>{formatScheduleTime(item.scheduledAt)}　{item.title}</li>
               ))}
             </ul>
-          </div>
+          </Notice>
         )}
 
         {/*
@@ -2746,7 +2746,7 @@ export default function BroadcastForm({
           目に入っていないと、あとから気づけない。
         */}
         {unconfirmedCount !== null && unconfirmedCount > 0 ? (
-          <div className="bg-warning-bg text-warning rounded-control mt-3 p-3 text-xs leading-5">
+          <Notice tone="warn" className="mt-3">
             <p className="font-semibold">配信前チェックに {unconfirmedCount}件 の未確認があります</p>
             <ul className="mt-1 list-disc pl-4">
               {preflight?.warnings.filter((w) => w.level === 'warning').map((w) => (
@@ -2755,7 +2755,7 @@ export default function BroadcastForm({
               {testResult?.kind === 'success' ? null : testResult ? <li>テスト送信で届かなかった宛先があります</li> : <li>テスト送信がまだです</li>}
               {previewConfirmed ? null : <li>LINEプレビューが未確認です</li>}
             </ul>
-          </div>
+          </Notice>
         ) : null}
 
         {/*
@@ -2784,14 +2784,14 @@ export default function BroadcastForm({
 
         {/* 人数が無いなら送らせない。上で確認のボタン自体を出していない。 */}
         {audienceCount === null ? (
-          <p className="bg-danger-bg text-danger rounded-control mt-3 p-3 text-xs leading-5">
+          <Notice tone="danger" className="mt-3">
             対象の人数を数えられていないため、予約できません。
             宛先と本文を確かめてから、もう一度お試しください。
-          </p>
+          </Notice>
         ) : audienceCount === 0 ? (
-          <p className="bg-danger-bg text-danger rounded-control mt-3 p-3 text-xs leading-5">
+          <Notice tone="danger" className="mt-3">
             いま届く人が0人です。宛先の条件を見直してください。
-          </p>
+          </Notice>
         ) : null}
       </ConfirmDialog>
     </div>
@@ -2811,7 +2811,7 @@ export default function BroadcastForm({
     >
       <div className="space-y-3">
         {testRecipientState === 'loading' && <p className="text-sm text-ink-faint">読み込んでいます</p>}
-        {testRecipientState === 'error' && <p className="rounded-control bg-danger-bg p-3 text-sm text-danger">テスト送信先を読み込めませんでした。</p>}
+        {testRecipientState === 'error' && <Notice tone="danger">テスト送信先を読み込めませんでした。</Notice>}
         {testRecipientState === 'ready' && testRecipients.length === 0 && (
           <p className="rounded-control bg-canvas-sunken p-3 text-sm text-ink-faint">
             テスト送信先が登録されていません。アカウント設定で、LINE連携済みの担当者を登録してください。
@@ -2842,9 +2842,9 @@ export default function BroadcastForm({
               テスト送信も通常の pushMessage を通すので、LINE公式アカウントの
               送信枠を使う。「消費しません」と書くと実装と食い違う。
             */}
-            <p className="rounded-control bg-info-bg p-3 text-xs font-semibold text-info">
+            <Notice tone="info">
               テスト送信もLINE公式アカウントの送信枠を使用します（見込み {(testRecipients.length * bubbles.length).toLocaleString('ja-JP')}通）。
-            </p>
+            </Notice>
           </>
         )}
         {testResult && (

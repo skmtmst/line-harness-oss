@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { newBlockId, type FormBlock, type FormInputType, type FormLayout, type FormOptions, type FormSection } from '@line-crm/shared'
 import type { FormDefinition } from '@/lib/hq-templates-api'
 import BlockEditor, { BLOCK_MENU } from './block-editor'
@@ -9,6 +9,7 @@ import OptionsDialog from './options-dialog'
 import { EMPTY_REFS, type FormRefs } from './form-refs'
 import { normalizeSectionName } from './section-name'
 import Notice from '@/components/shared/notice'
+import { notifyToast } from '@/components/shared/toast'
 import StickyBar from '@/components/shared/sticky-bar'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -63,6 +64,10 @@ export default function HqFormDefinitionEditor({
   const [renameSectionName, setRenameSectionName] = useState('')
   const [removeSectionIndex, setRemoveSectionIndex] = useState<number | null>(null)
   const [localError, setLocalError] = useState('')
+  // 親から渡る保存の知らせは、画面の中の文で出さず Toast（右下・4秒）へ送る。
+  useEffect(() => {
+    if (notice) notifyToast(notice)
+  }, [notice])
   const undoStack = useRef<FormLayout[]>([])
   const redoStack = useRef<FormLayout[]>([])
 
@@ -200,8 +205,7 @@ export default function HqFormDefinitionEditor({
   }
 
   return <div>
-    {(localError || error) && <Notice className="mb-4" tone="error" message={localError || error} />}
-    {notice && <Notice className="mb-4" tone="success" message={notice} />}
+    {(localError || error) && <Notice className="mb-4" tone="danger" message={localError || error} />}
     <div className="mb-4 grid gap-4 rounded-card border border-hairline bg-canvas p-4 sm:grid-cols-2 xl:grid-cols-4">
       <Field label="フォーム名" htmlFor="hq-form-name" required><TextInput id="hq-form-name" value={value.name} onChange={event => setValue(current => ({ ...current, name: event.target.value }))} /></Field>
       <Field label="公開状態"><p className="rounded-control border border-hairline bg-canvas-sunken px-3 py-2 text-sm">配布先へ非公開の下書きとして保存</p></Field>

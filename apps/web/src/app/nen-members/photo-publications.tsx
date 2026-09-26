@@ -8,6 +8,7 @@ import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import Notice from '@/components/shared/notice'
+import { notifyToast } from '@/components/shared/toast'
 import { FeatureLinkCard } from '@/components/shared/side-cards'
 import { Tabs } from '@/components/shared/tabs'
 import { safePhotoSrc } from './photo-src'
@@ -114,7 +115,7 @@ export function PhotoPublications({ accountId, onBack }: { accountId: string; on
       await api.nenMembers.withdrawPhotoPublication(text(publication.id), {
         accountId, expectedVersion: Number(publication.version),
       }, crypto.randomUUID())
-      setNotice('写真をすべての掲載先から外しました。審査と同意の履歴、付与済みのマイルは残ります。')
+      notifyToast('写真をすべての掲載先から外しました。審査と同意の履歴、付与済みのマイルは残ります。')
       await load()
     } catch (error) {
       setNotice(error instanceof ApiError && error.status === 409
@@ -139,7 +140,7 @@ export function PhotoPublications({ accountId, onBack }: { accountId: string; on
         placements: PLACEMENT_CHOICES.filter((choice) => selectedPlacements.includes(choice.type)),
       }, crypto.randomUUID())
       setEditing(null)
-      setNotice('写真を使う場所を更新しました。')
+      notifyToast('写真を使う場所を更新しました。')
       await load()
     } catch (error) {
       setNotice(error instanceof ApiError && error.status === 409
@@ -167,7 +168,7 @@ export function PhotoPublications({ accountId, onBack }: { accountId: string; on
       <Button onClick={onBack}>審査待ちへ戻る</Button>
     </div>
     <Tabs items={[{ label: '公式サイト掲載', current: true }, { label: '並び順を変える', disabled: true }]} />
-    {notice && <div className="mt-4"><Notice tone={notice.includes('できません') || notice.includes('変更しました') ? 'error' : 'success'} message={notice} /></div>}
+    {notice && <div className="mt-4"><Notice tone="danger" message={notice} /></div>}
     <section className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
       <Card padding="default"><span className="block text-xs text-ink-faint">公式サイト掲載中の写真</span><strong className="my-1 block text-2xl text-ink">{data.summary.publishedCount}枚</strong><small className="block text-xs text-ink-faint">採用した写真のうち</small></Card>
       <Card padding="default"><span className="block text-xs text-ink-faint">どこで使っているか</span><strong className="my-1 block text-2xl text-ink">{data.summary.placementCount}か所</strong><small className="block text-xs text-ink-faint">現在つながっている掲載先</small></Card>

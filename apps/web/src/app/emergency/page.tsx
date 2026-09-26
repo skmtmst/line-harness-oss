@@ -9,6 +9,7 @@ import type { LineAccount } from '@line-crm/shared'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import PageHeader from '@/components/shared/page-header'
 import NoteBar from '@/components/shared/note-bar'
+import Notice from '@/components/shared/notice'
 import KpiCollapse from '@/components/ui/kpi-collapse'
 import {
   api,
@@ -225,8 +226,8 @@ function EmergencyControlFeedback({
   onReload: () => void
 }) {
   return <>
-    {message && <div className={`rounded-control flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-xs font-bold ${message.tone === 'success' ? 'bg-success-bg text-success' : message.tone === 'warning' ? 'bg-warning-bg text-warning' : 'bg-danger-bg text-danger'}`}><p>{message.text}</p>{needsReload && <button type="button" onClick={onReload} disabled={reloading} className="rounded-control border border-current px-3 py-1.5 font-bold hover:opacity-80 disabled:opacity-50">{reloading ? '読み直しています…' : '最新の状態を読み直す'}</button>}</div>}
-    {previewSettled && stopBlockers.length > 0 && <div className="border-warning rounded-card border bg-warning-bg px-4 py-3 text-xs leading-relaxed text-warning" role="status"><p className="font-bold">いまは緊急停止できません</p><ul className="mt-1 list-disc space-y-1 pl-5">{stopBlockers.includes('unavailable') && <li>停止状態を確認できないため、停止・復旧を実行できません。<button type="button" onClick={onReload} disabled={reloading} className="font-bold underline disabled:opacity-50">{reloading ? '読み直しています…' : 'もう一度読む'}</button></li>}{stopBlockers.includes('forbidden') && <li>緊急停止を実行する権限がありません。オーナーに権限付与を依頼してください。</li>}{stopBlockers.includes('scope') && <li>この範囲を操作する権限がありません。対象アカウントを選び直すか、オーナーに確認してください。</li>}{stopBlockers.includes('empty') && <li>停止する配信を1つ以上選んでください。</li>}{stopBlockers.includes('stopped') && <li>停止中です。新しい停止は復旧のあとに行えます。</li>}</ul></div>}
+    {message && <Notice tone={message.tone === 'success' ? 'success' : message.tone === 'warning' ? 'warn' : 'danger'} action={needsReload && <button type="button" onClick={onReload} disabled={reloading} className="rounded-control border border-current px-3 py-1.5 font-bold hover:opacity-80 disabled:opacity-50">{reloading ? '読み直しています…' : '最新の状態を読み直す'}</button>}>{message.text}</Notice>}
+    {previewSettled && stopBlockers.length > 0 && <Notice tone="warn"><p className="font-bold">いまは緊急停止できません</p><ul className="mt-1 list-disc space-y-1 pl-5">{stopBlockers.includes('unavailable') && <li>停止状態を確認できないため、停止・復旧を実行できません。<button type="button" onClick={onReload} disabled={reloading} className="font-bold underline disabled:opacity-50">{reloading ? '読み直しています…' : 'もう一度読む'}</button></li>}{stopBlockers.includes('forbidden') && <li>緊急停止を実行する権限がありません。オーナーに権限付与を依頼してください。</li>}{stopBlockers.includes('scope') && <li>この範囲を操作する権限がありません。対象アカウントを選び直すか、オーナーに確認してください。</li>}{stopBlockers.includes('empty') && <li>停止する配信を1つ以上選んでください。</li>}{stopBlockers.includes('stopped') && <li>停止中です。新しい停止は復旧のあとに行えます。</li>}</ul></Notice>}
   </>
 }
 
@@ -390,7 +391,7 @@ function OperationAlertsPanel({
   onRetry: (alert: OperationAlert) => Promise<void>
 }) {
   const [notes, setNotes] = useState<Record<string, string>>({})
-  if (failed) return <section className="rounded-card border border-warning bg-warning-bg px-4 py-3 text-xs font-medium text-warning" role="alert">異常の受領・通知記録を取得できませんでした。異常なしとは扱いません。時間をおいて読み直してください。</section>
+  if (failed) return <Notice tone="warn">異常の受領・通知記録を取得できませんでした。異常なしとは扱いません。時間をおいて読み直してください。</Notice>
   // ★V7: 緑は「正常」の札だけに使う。異常なしの案内は枠なしの info の小さい帯にする。
   if (alerts.length === 0) return <NoteBar tone="info">異常の記録はありません。健全性チェックで新しい異常が見つかると、ここで担当者と通知結果を確認できます。</NoteBar>
   return <section className="border-hairline rounded-card overflow-hidden border bg-canvas" aria-label="異常の受領と通知">
@@ -641,9 +642,9 @@ function HealthPanel({
         <SummaryCard label="最後の確認" value={formatOperationDate(checkedAt)} note="5分ごとに自動確認" />
         <SummaryCard label="緊急停止状態" value={controlSummary.value} note={controlSummary.note} />
       </div>
-      <div className="bg-info-bg text-ink-secondary rounded-control px-4 py-3 text-xs">
+      <Notice tone="info">
         LINEとのつながりや配信の詰まりを、5分ごとに自動で確かめています。
-      </div>
+      </Notice>
       <div className="rounded-card border-hairline flex flex-wrap items-center gap-3 border bg-canvas px-4 py-3">
         <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-canvas text-sm font-bold ${statusIconClass}`}>{statusIcon}</span>
         <div className="min-w-0 flex-1">
@@ -740,9 +741,9 @@ function SendPathCoveragePanel({ accountId, revision }: { accountId: string | nu
   }, [accountId, revision])
 
   if (failed) {
-    return <section className="rounded-card border border-warning bg-warning-bg px-4 py-3 text-xs font-medium text-warning" role="alert">
+    return <Notice tone="warn">
       送信経路の台帳を取得できませんでした。停止の届く範囲が確認できないため、経路の網羅は保証できません。時間をおいて読み直してください。
-    </section>
+    </Notice>
   }
   if (!data) {
     return <section className="border-hairline rounded-card border bg-canvas px-4 py-3 text-xs text-ink-faint">送信経路の台帳を読み込んでいます…</section>
@@ -766,7 +767,7 @@ function SendPathCoveragePanel({ accountId, revision }: { accountId: string | nu
     <div className="border-hairline border-b px-4 py-3">
       <h2 className="text-base font-bold text-ink">停止が届く送信経路</h2>
       <p className="mt-0.5 text-xs text-ink-faint">緊急停止が実際に届く経路と、対象外の経路の一覧です。{formatOperationDate(data.evaluatedAt)}時点</p>
-      {(data.problems ?? []).length > 0 && <p className="mt-2 rounded-control bg-warning-bg px-3 py-2 text-xs font-bold text-warning" role="alert">台帳と実装がずれています: {(data.problems ?? []).join(' / ')}</p>}
+      {(data.problems ?? []).length > 0 && <Notice tone="warn" className="mt-2">台帳と実装がずれています: {(data.problems ?? []).join(' / ')}</Notice>}
     </div>
     <div className="divide-y divide-hairline">
       {groups.map((group) => <div key={group.title} className="px-4 py-3">
@@ -1143,11 +1144,11 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
           <div className="flex-1 space-y-3 overflow-y-auto p-6">{confirmMode === 'stop' ? <>
             <section className="rounded-control border border-danger bg-danger-bg p-4 text-danger"><p className="text-sm font-bold">{accountName}</p><div className="mt-3 divide-y divide-danger/15">{selectedTargets.map((key) => <div key={key} className="flex items-center justify-between gap-4 py-2" style={{ minHeight: 58 }}><div className="flex items-center gap-3"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-canvas text-danger">■</span><div><p className="text-sm font-bold">{targetLabels[key].label}</p><p className="mt-0.5 text-xs">{targetLabels[key].note}</p></div></div><strong className="text-right text-sm">{impactText(key)}</strong></div>)}</div><p className="mt-3 text-xs font-bold">停止前にすでにLINEへ渡したものは取り消せません。</p></section>
             <section className="rounded-control bg-canvas-sunken px-4 py-3"><p className="text-xs font-bold text-ink">理由</p><p className="mt-1 text-sm text-ink-secondary">{fullReason}</p></section>
-            <section className="rounded-control bg-success-bg px-4 py-3"><p className="text-xs font-bold text-success">止まらないもの</p><p className="mt-1 text-xs text-success">{targets.automations ? '受信箱からの手の返信と予約の受付は止まりません。' : '自動処理／受信箱からの手の返信／予約の受付は止まりません。'}</p></section>
+            <Notice tone="success"><p className="text-xs font-bold text-success">止まらないもの</p><p className="mt-1 text-xs text-success">{targets.automations ? '受信箱からの手の返信と予約の受付は止まりません。' : '自動処理／受信箱からの手の返信／予約の受付は止まりません。'}</p></Notice>
           </> : <>
-            <section className="rounded-control border border-info bg-info-bg p-4 text-info"><p className="font-bold">{accountName}</p><p className="mt-1">期限を過ぎた予約は自動では送りません。</p></section>
+            <Notice tone="info"><p className="font-bold">{accountName}</p><p className="mt-1">期限を過ぎた予約は自動では送りません。</p></Notice>
             {/* N-451: 停止中の変更・追加・期限切れを復旧の前に見せる。未取得なら出さない。 */}
-            {restoreDrift && describeRestoreDrift(restoreDrift).length > 0 && <section className="rounded-control border border-warning bg-warning-bg p-4 text-warning"><p className="text-sm font-bold">停止しているあいだに変わったものがあります</p><ul className="mt-2 list-disc space-y-1 pl-5 text-xs">{describeRestoreDrift(restoreDrift).map((line) => <li key={line}>{line}</li>)}</ul><p className="mt-2 text-xs">変更・追加があった配信は再開しません。期限切れの予約は下書きへ戻します。</p></section>}
+            {restoreDrift && describeRestoreDrift(restoreDrift).length > 0 && <Notice tone="warn"><p className="text-sm font-bold">停止しているあいだに変わったものがあります</p><ul className="mt-2 list-disc space-y-1 pl-5 text-xs">{describeRestoreDrift(restoreDrift).map((line) => <li key={line}>{line}</li>)}</ul><p className="mt-2 text-xs">変更・追加があった配信は再開しません。期限切れの予約は下書きへ戻します。</p></Notice>}
           </>}
             <div><label className="block text-sm font-bold text-ink-secondary" htmlFor="emergency-confirm-word">確認のため「{confirmMode === 'stop' ? '停止' : '復旧'}」と入力</label><input id="emergency-confirm-word" value={confirmWord} onChange={(event) => setConfirmWord(event.target.value)} autoFocus className="mt-2 min-h-11 rounded-control border border-hairline px-3 text-sm" style={{ width: 280 }} /><p className="mt-2 text-xs text-ink-faint">この操作は記録に残り、ログインユーザーへ通知されます。</p></div>
           </div>
@@ -1259,7 +1260,7 @@ function HistoryPanel() {
         <SummaryCard label="管理画面の更新" value={`${updateCount}回`} note="この30日" />
         <SummaryCard label="いまの版" value={currentVersion} note="反映済み" />
       </KpiCollapse>
-      <div className="rounded-control bg-info-bg text-info px-4 py-3 text-xs font-semibold">止めた・戻した記録です。だれが、いつ、何を止めたかが残ります。通常の管理者は消せません。</div>
+      <Notice tone="info">止めた・戻した記録です。だれが、いつ、何を止めたかが残ります。通常の管理者は消せません。</Notice>
       <div className="flex flex-col items-start gap-4 xl:flex-row">
         <div className="min-w-0 flex-1 space-y-4">
           <section className="border-hairline rounded-card overflow-hidden border bg-canvas">

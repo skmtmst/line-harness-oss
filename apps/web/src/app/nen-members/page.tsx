@@ -16,6 +16,8 @@ import Dialog from '@/components/shared/dialog'
 import Checkbox from '@/components/shared/checkbox'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
+import { notifyToast } from '@/components/shared/toast'
 import { Tabs } from '@/components/shared/tabs'
 import { FeatureLinkCard } from '@/components/shared/side-cards'
 import { formatPhotoReceivedAt } from './photo-review-time'
@@ -72,6 +74,8 @@ export default function PhotoReviewsPage() {
   const [detailAssetsFailed, setDetailAssetsFailed] = useState(false)
   const [assetProcessing, setAssetProcessing] = useState(false)
   const [notice, setNotice] = useState('')
+  /** アカウント未選択の案内。失敗ではないので危険の帯と分ける。 */
+  const [accountNotice, setAccountNotice] = useState('')
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [loadForbidden, setLoadForbidden] = useState(false)
@@ -189,6 +193,7 @@ export default function PhotoReviewsPage() {
   useEffect(() => {
     accountGeneration.current += 1
     setNotice('')
+    setAccountNotice('')
     setRejectingPhotoId(null)
     setRejectingPhotoDetail(null)
     setReasonCode('privacy')
@@ -440,7 +445,7 @@ export default function PhotoReviewsPage() {
     rejection?: { reasonCode: ReviewReasonCode; reasonNote: string; resubmitInvite: boolean; watchSubmitter: boolean },
   ) => {
     if (!selectedAccountId) {
-      setNotice('LINEアカウントを選んでください。')
+      setAccountNotice('LINEアカウントを選んでください。')
       return
     }
     const generation = accountGeneration.current
@@ -482,7 +487,7 @@ export default function PhotoReviewsPage() {
         : response.data.pointSync === 'needs_attention'
           ? 'EC会員とつながっていないため、マイルの手続きはまだ始まっていません。'
           : ''
-      setNotice(nextStatus === 'adopted'
+      notifyToast(nextStatus === 'adopted'
         ? `写真を採用しました。${adoptedNote}公開は本人の同意がある場合だけ行います。${notification}`
         : `見送り理由を保存しました。${notification}`)
       setRejectingPhotoId(null)
@@ -535,9 +540,11 @@ export default function PhotoReviewsPage() {
         return { photoId, petName: names.get(photoId) ?? '写真', error }
       }).filter((item) => item.photoId)
       setBulkFailed(failedPhotos)
-      setNotice(failedPhotos.length === 0
-        ? `${count}枚の審査結果を保存し、投稿者へLINEで通知しました。`
-        : `${count}枚の審査結果は保存済みです。${failedPhotos.length}枚のLINE通知は送れませんでした（通知だけ再送できます）。`)
+      if (failedPhotos.length === 0) {
+        notifyToast(`${count}枚の審査結果を保存し、投稿者へLINEで通知しました。`)
+      } else {
+        setNotice(`${count}枚の審査結果は保存済みです。${failedPhotos.length}枚のLINE通知は送れませんでした（通知だけ再送できます）。`)
+      }
       setSelectedPhotoIds([])
       setBulkApproveOpen(false)
       setBulkReturnOpen(false)
@@ -567,7 +574,7 @@ export default function PhotoReviewsPage() {
         operation: 'review',
       }, crypto.randomUUID())
       if (!response.success) throw new Error(response.error)
-      setNotice(response.data.status === 'completed'
+      notifyToast(response.data.status === 'completed'
         ? '審査用画像を作り直しました。'
         : '審査用画像の作り直しを受け付けました。')
       await refreshDetailAssets(id, selectedAccountId)
@@ -691,6 +698,7 @@ export default function PhotoReviewsPage() {
       loadKind={detailState}
       reviewing={Boolean(reviewing)}
       notice={notice}
+      accountNotice={accountNotice}
       assetStatus={detailAssetStatus}
       derivatives={detailDerivatives}
       assetsFailed={detailAssetsFailed}
@@ -757,7 +765,8 @@ export default function PhotoReviewsPage() {
     {/* 外枠の余白は共通シェルが持つ（上14・左右40・下32）。ここで p-6 を足すと左端がずれる。 */}
     <div data-design-node="cqWo8" className="flex min-w-0 flex-col gap-4">
       {/* 審査の結果を読み上げにも届ける（V6R-S3-e）。 */}
-      {notice && <div role="status" aria-live="polite" className="rounded-control border border-accent-border bg-accent-soft px-4 py-3 text-sm text-accent-deep">{notice}</div>}
+      {notice && <Notice tone="danger" message={notice} />}
+      {accountNotice && <Notice tone="warn" message={accountNotice} />}
       {bulkFailed.length > 0 && <div className="rounded-control border border-hairline bg-canvas px-4 py-3">
         <p className="text-sm font-bold text-ink">LINE通知を送れなかった写真（{bulkFailed.length}枚）</p>
         <p className="mt-1 text-xs text-ink-secondary">審査は保存済みです。通知だけ再送できます。</p>
@@ -835,9 +844,9 @@ export default function PhotoReviewsPage() {
         </div>
       </KpiCollapse>
 
-      <p className="bg-info-bg text-ink-secondary rounded-control px-4 py-3 text-xs leading-relaxed">
+      <Notice tone="info">
         採用・見送りを押した時点で、投稿者へお礼や直してほしい点が届きます。見送るときは理由を選び、送る文章を確認できます。
-      </p>
+      </Notice>
 
       {/*
         * 名前・ペット名・コメントの絞り込み（#931 N-308）。
@@ -924,16 +933,16 @@ export default function PhotoReviewsPage() {
              * 「この人の次の投稿は、必ず人が見る」を付けた方の写真。
              * 差戻しで付けた印が届いた写真へ出る（#931 N-312）。
              */}
-            {Number(photo.submitter_watch) === 1 && <p className="mt-2 rounded-control bg-status-warn-soft px-3 py-2 text-xs font-semibold text-status-warn-deep">確認対象：この方の投稿は必ず人が見ます</p>}
-            {text(photo.latest_risk_flag) && !['safe', 'none', 'low'].includes(text(photo.latest_risk_flag)) && <p className="mt-2 rounded-control bg-status-warn-soft px-3 py-2 text-xs font-semibold text-status-warn-deep">注意候補：{photoRiskLabel(text(photo.latest_risk_flag))}</p>}
+            {Number(photo.submitter_watch) === 1 && <Notice tone="warn" className="mt-2">確認対象：この方の投稿は必ず人が見ます</Notice>}
+            {text(photo.latest_risk_flag) && !['safe', 'none', 'low'].includes(text(photo.latest_risk_flag)) && <Notice tone="warn" className="mt-2">注意候補：{photoRiskLabel(text(photo.latest_risk_flag))}</Notice>}
             {/*
              * マイルの表記は付与の実状態に合わせる（#931 N-307）。
              * ECとつながっていない採用に「付与済み」と出すのは、
              * できていない約束を画面へ書くことになる。
              */}
-            {photo.status === 'adopted' && <p className="mt-3 rounded-control bg-accent-soft px-3 py-2 text-xs font-semibold text-accent-deep">{mileStatusLabel(photo.point_sync_status)}・{photo.publication_consent_at && !photo.publication_withdrawn_at ? '公開中' : '公開は未同意'}</p>}
+            {photo.status === 'adopted' && <Notice tone="success" className="mt-3">{mileStatusLabel(photo.point_sync_status)}・{photo.publication_consent_at && !photo.publication_withdrawn_at ? '公開中' : '公開は未同意'}</Notice>}
             {photo.status === 'rejected' && <div className="mt-3 rounded-control bg-surface-pearl px-3 py-2 text-xs text-ink-secondary"><span className="font-semibold">見送った理由：</span>{REVIEW_REASONS.find((reason) => reason.value === photo.review_reason_code)?.label ?? '理由未記録'}{text(photo.review_reason_note) && <p className="mt-1 text-ink-faint">{text(photo.review_reason_note)}</p>}</div>}
-            {photo.review_notification_status === 'failed' && <div className="mt-2 flex items-center justify-between gap-3 rounded-control bg-status-warn-soft px-3 py-2 text-xs font-semibold text-status-warn-deep"><span>投稿者へのLINE通知を送れませんでした</span><Button variant="secondary" disabled={reviewing === photo.id} onClick={() => void retryNotification(text(photo.id))} className="shrink-0">{reviewing === photo.id ? '再送中...' : 'LINE通知を再送'}</Button></div>}
+            {photo.review_notification_status === 'failed' && <Notice tone="warn" className="mt-2" action={<Button variant="secondary" disabled={reviewing === photo.id} onClick={() => void retryNotification(text(photo.id))} className="shrink-0">{reviewing === photo.id ? '再送中...' : 'LINE通知を再送'}</Button>}>投稿者へのLINE通知を送れませんでした</Notice>}
             {photo.status === 'pending' && <div className="mt-3 grid grid-cols-2 gap-2"><Button variant="secondary" aria-label={`${photoPetDisplayName(photo.pet_name, { callName: photo.pet_call_name, gender: photo.pet_gender })}の写真を採用する`} disabled={reviewing === photo.id} onClick={() => void review(text(photo.id), 'adopted')}>{reviewing === photo.id ? '処理中...' : '採用する'}</Button><Button data-qa-open={photoId === text(visiblePhotos[0]?.id) && status === 'pending' ? 'N2J629' : undefined} variant="secondary" aria-label={`${photoPetDisplayName(photo.pet_name, { callName: photo.pet_call_name, gender: photo.pet_gender })}の写真を見送る`} disabled={reviewing === photo.id} onClick={() => void openRejectDialog(photoId)}>見送る</Button></div>}
           </div>
         </article>})}

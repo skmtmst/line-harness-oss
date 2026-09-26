@@ -272,7 +272,7 @@ export default function SavedViewDialog({
             {error || showMissingError ? (
               <Notice
                 id={error ? 'saved-view-error' : 'saved-view-name-hint'}
-                tone="error"
+                tone="danger"
                 message={error || '検索名を入力してください。'}
               />
             ) : nameMissing ? (
@@ -282,12 +282,12 @@ export default function SavedViewDialog({
               */
               <Notice
                 id="saved-view-name-hint"
-                tone="validation"
+                tone="warn"
                 message="検索名は必須です。入力すると保存できるようになります。"
               />
             ) : (
               <Notice
-                tone="validation"
+                tone="warn"
                 message="保存されるのは検索条件です。受信件数は最新の状態に自動更新されます。"
               />
             )}

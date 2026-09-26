@@ -41,7 +41,7 @@ export default function SaveConflictBar({
   return (
     <div className={styles.bar} data-design-part="save-conflict-bar">
       <div className={styles.inner}>
-        <Notice tone="error" message={message} className={styles.notice} />
+        <Notice tone="danger" message={message} className={styles.notice} />
         {actionLabel && onAction ? (
           <button type="button" onClick={onAction} data-qa={actionQa} className={styles.action}>
             {actionLabel}

@@ -27,6 +27,7 @@ import MetricValue from '@/components/ui/metric-value'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import { useSearchParams } from 'next/navigation'
 import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import Chip, { type ChipTone } from '@/components/shared/chip'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -105,11 +106,7 @@ function downloadCsv(filename: string, rows: Array<Array<string | number | null 
 }
 
 function AnalyticsNotice({ children }: { children: ReactNode }) {
-  return (
-    <div className="bg-info-bg border-info rounded-card border px-4 py-3 text-sm leading-relaxed text-ink-secondary">
-      {children}
-    </div>
-  )
+  return <Notice tone="info">{children}</Notice>
 }
 
 function AnalyticsExportButton({ onClick, disabled }: { onClick: () => void; disabled: boolean }) {
@@ -243,12 +240,16 @@ function SaveAnalysisAction({
 
   if (saved) {
     return (
-      <div className="bg-success-bg rounded-control flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-xs">
-        <span className="text-success">定義とこの時点の結果を保存しました</span>
-        <Link href="/analytics?tab=saved" className="text-action font-medium hover:underline">
-          保存した分析を見る
-        </Link>
-      </div>
+      <Notice
+        tone="success"
+        action={
+          <Link href="/analytics?tab=saved" className="text-action font-medium hover:underline">
+            保存した分析を見る
+          </Link>
+        }
+      >
+        定義とこの時点の結果を保存しました
+      </Notice>
     )
   }
 
@@ -1026,13 +1027,13 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
                   {canManage && <Button onClick={() => void prepareCrossAudience()} variant="secondary">友だち一覧で見る</Button>}
                 </div>
                 {audience && (
-                  <div className="bg-success-bg rounded-control flex flex-wrap items-center justify-between gap-2 p-3 text-xs">
-                    <span className="text-success">{audience.memberCount}人を24時間の対象者として準備しました</span>
-                    <span className="flex items-center gap-3">
-                      <Link href={`/friends?audienceId=${encodeURIComponent(audience.id)}`} className="text-action font-medium hover:underline">対象者を開く</Link>
-                      <Link href={`/broadcasts/new?audienceId=${encodeURIComponent(audience.id)}`} className="text-action font-medium hover:underline">この対象者へ配信を作成</Link>
-                    </span>
-                  </div>
+                  <Notice tone="success">
+                    {audience.memberCount}人を24時間の対象者として準備しました
+                    {' '}
+                    <Link href={`/friends?audienceId=${encodeURIComponent(audience.id)}`} className="font-medium text-action hover:underline">対象者を開く</Link>
+                    {' '}
+                    <Link href={`/broadcasts/new?audienceId=${encodeURIComponent(audience.id)}`} className="font-medium text-action hover:underline">この対象者へ配信を作成</Link>
+                  </Notice>
                 )}
               </div>
             ) : (
@@ -1784,13 +1785,13 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
                   </p>
                 )}
                 {funnelAudience && (
-                  <div className="bg-success-bg mt-3 flex flex-wrap items-center justify-between gap-2 rounded-control p-3 text-xs">
-                    <span className="text-success">{funnelAudience.memberCount}人を24時間の対象者として準備しました</span>
-                    <span className="flex items-center gap-3">
-                      <Link href={`/friends?audienceId=${encodeURIComponent(funnelAudience.id)}`} className="text-action font-medium hover:underline">対象者を開く</Link>
-                      <Link href={`/broadcasts/new?audienceId=${encodeURIComponent(funnelAudience.id)}`} className="text-action font-medium hover:underline">この対象者へ配信を作成</Link>
-                    </span>
-                  </div>
+                  <Notice tone="success" className="mt-3">
+                    {funnelAudience.memberCount}人を24時間の対象者として準備しました
+                    {' '}
+                    <Link href={`/friends?audienceId=${encodeURIComponent(funnelAudience.id)}`} className="font-medium text-action hover:underline">対象者を開く</Link>
+                    {' '}
+                    <Link href={`/broadcasts/new?audienceId=${encodeURIComponent(funnelAudience.id)}`} className="font-medium text-action hover:underline">この対象者へ配信を作成</Link>
+                  </Notice>
                 )}
               </div>
             </section>
@@ -2048,9 +2049,9 @@ function FunnelForm({
   return (
     <div className="bg-canvas rounded-card border-hairline mb-5 space-y-4 border p-5">
       {presetConversion && !edit ? (
-        <p className="border-info bg-info-bg text-info rounded-control border px-3 py-2 text-xs font-semibold" role="status">
+        <Notice tone="info">
           成果地点「{presetConversion.name}」を2段目に入れています。このまま段を組んで作成すると、その成果地点を使う分析として登録されます。
-        </p>
+        </Notice>
       ) : null}
       <div>
         <label htmlFor="fn-name" className="text-ink-secondary mb-1 block text-sm font-medium">
@@ -2366,7 +2367,7 @@ function FriendsOverviewTab({ accountId }: { accountId: string }) {
   const selectedCampaigns = overview.campaigns.filter((item) => item.date === selectedDay?.date)
   return <div data-design-node="Zxezb" className="space-y-4">
     <AnalyticsPeriodControl days={days} onChange={setDays} />
-    {overview.state !== 'available' && overview.stateReason && <div className="bg-warning-bg border-warning rounded-card border px-4 py-3 text-sm">{overview.stateReason}</div>}
+    {overview.state !== 'available' && overview.stateReason && <Notice tone="warn">{overview.stateReason}</Notice>}
     {/* #1005: 理由文は description（説明アイコン）へ。detail は短い状態だけ。 */}
     <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
       <KpiCard title="現在つながっている" value={shownValue(overview.metrics.currentFriends)} unit="人" {...metricCardState(overview.metrics.currentFriends, netValue === null ? pendingCard : { detail: `この${days}日の差し引き ${netValue > 0 ? '+' : ''}${netValue}人` }, state.retry)} />
@@ -2607,12 +2608,14 @@ function UsageOverviewTab({ accountId }: { accountId: string }) {
         onRetry={overview.summary.estimatedHoursSaved.state === 'failed' ? state.retry : undefined}
       />
     </div>
-    {overview.stateReason ? <div className="bg-warning-bg border-warning rounded-card border px-4 py-3 text-sm">{overview.stateReason}</div> : <AnalyticsNotice>項目が多いほど良い、ではありません。使っていないものは使用先を確かめてから、下の「片づける」で整理できます。</AnalyticsNotice>}
+    {overview.stateReason ? <Notice tone="warn">{overview.stateReason}</Notice> : <AnalyticsNotice>項目が多いほど良い、ではありません。使っていないものは使用先を確かめてから、下の「片づける」で整理できます。</AnalyticsNotice>}
     {menuFeaturesError && (
-      <div className="border-hairline bg-canvas flex flex-wrap items-center justify-between gap-2 rounded-card border px-4 py-2 text-xs text-ink-secondary" role="alert">
-        <span>{menuFeaturesError}</span>
-        <Button variant="secondary" onClick={() => setMenuReload((n) => n + 1)}>もう一度確認</Button>
-      </div>
+      <Notice
+        tone="danger"
+        action={<Button variant="secondary" onClick={() => setMenuReload((n) => n + 1)}>もう一度確認</Button>}
+      >
+        {menuFeaturesError}
+      </Notice>
     )}
     <div id="usage-items" className="bg-canvas rounded-card border-hairline overflow-hidden border"><table className="w-full table-fixed">
       <thead><TableHeadRow><Th>機能</Th><Th align="right">作成</Th><Th align="right">利用中</Th><Th align="right">未使用</Th><Th>気づいたこと</Th><Th align="right">操作</Th></TableHeadRow></thead>
@@ -2658,7 +2661,7 @@ function UrlClicksOverviewTab({ accountId }: { accountId: string }) {
       <KpiCard title="押されていないURL" value={zeroLinks} unit="件" detail="実測できたURLのうち" />
     </div>
     <AnalyticsNotice>数えているのは、こちらで作った中継URLだけです。直接貼ったURLは数えられません。同じURLを同じ人が何度押しても「押した人」は1人と数えます。</AnalyticsNotice>
-    {overview.stateReason && <div className="bg-warning-bg border-warning rounded-card border px-4 py-3 text-sm">{overview.stateReason}</div>}
+    {overview.stateReason && <Notice tone="warn">{overview.stateReason}</Notice>}
     {overview.hasMore && <AnalyticsNotice>200件まで表示しています。探す言葉を足して絞ってください。CSVの書き出しも、表示している範囲だけが入ります。</AnalyticsNotice>}
     <div className="flex flex-wrap items-center gap-2">
       <label htmlFor="url-click-search" className="sr-only">URL・配信名・リンク名で探す</label>
@@ -2889,12 +2892,12 @@ function SavedAnalyticsTab({ accountId, onCountChange, canManage }: {
         <KpiCard title="定義が古いもの" value={error ? null : staleCount} unit="件" detail={error ? '読み込めませんでした' : 'いまの定義でまだ集計していないもの'} loading={loading} />
         <KpiCard title="選んだ分析の履歴" value={selected ? selected.snapshotCount : null} unit="件" detail={selected?.name ?? (error ? '読み込めませんでした' : '分析を選んでください')} loading={loading} />
       </div>
-      <div className="bg-info-bg border-info rounded-card border px-4 py-3 text-sm">
-        <p className="text-ink font-medium">条件の定義と集計結果を分けて保存しています</p>
-        <p className="text-ink-secondary mt-1 text-xs">
+      <Notice tone="info">
+        <p className="font-medium">条件の定義と集計結果を分けて保存しています</p>
+        <p className="mt-1 text-xs">
           あとから条件が変わっても、保存時点の結果は書き換わりません。定期レポートはこの下の一覧で止めたり変えたりできます。
         </p>
-      </div>
+      </Notice>
 
       <section className="bg-canvas rounded-card border-hairline overflow-hidden border">
         <div className="border-hairline flex items-center justify-between border-b px-4 py-3">
