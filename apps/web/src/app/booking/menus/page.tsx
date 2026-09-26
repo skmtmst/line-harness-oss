@@ -1396,8 +1396,9 @@ function MenusPageHost() {
     ? `${workerBase}/o?liffId=${encodeURIComponent(selectedAccount.liffId)}&page=salon-book`
     : null
   return (
-    <div>
-      <div data-design="Head" className="mb-5 flex min-h-10 flex-wrap items-center justify-between gap-3">
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <div data-design="Head" className="flex min-h-10 flex-wrap items-center justify-between gap-3">
         <Breadcrumb items={[{ label: '予約' }, { label: '予約設定' }]} />
         {previewUrl && <Button href={previewUrl}>お客様に見える画面を確かめる</Button>}
       </div>
@@ -1405,7 +1406,7 @@ function MenusPageHost() {
           受付時間は別URLへ移動する。
           MergedTabs は「同じ画面の中で切り替わるもの」しか扱えないので
           ここは手で並べている。 */}
-      <div data-design="Tabs" className="border-hairline mb-4 flex flex-wrap gap-1 border-b">
+      <div data-design="Tabs" className="border-hairline flex flex-wrap gap-1 border-b">
         <Link
           href="/booking/menus?tab=menus"
           className={`rounded-t-md px-4 py-2 text-sm ${
