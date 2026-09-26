@@ -115,8 +115,12 @@ export default function FolderPanel({
   rows: FolderPanelRow[]
   activeId: string
   onSelect: (id: string) => void
-  /** 見出しの右に出す総数。単位は画面ごとに違うので文字で受ける。 */
-  total: string
+  /*
+   * 見出しの右に出す総数。単位は画面ごとに違うので文字で受ける。
+   * 「すべて」の行が同じ数を出すので、重ねて出さない画面では渡さない
+   * （1画面に同じ数を何度も書かない）。渡さないときは見出しだけ出す。
+   */
+  total?: string
   /** 予約管理の「メニュー」など、分類の呼び名が異なる画面で使う。 */
   heading?: string
   /** 一覧の下に置く追加操作。道具列へ重複して置かない。 */
@@ -140,7 +144,7 @@ export default function FolderPanel({
     <aside aria-label="フォルダ" className="bg-canvas rounded-card border-hairline h-fit overflow-visible border">
       <div className="border-hairline flex items-center justify-between border-b px-4 py-3">
         <p className="text-ink text-sm font-semibold">{heading}</p>
-        <span className="text-ink-faint text-xs tabular-nums">{total}</span>
+        {total === undefined ? null : <span className="text-ink-faint text-xs tabular-nums">{total}</span>}
       </div>
       <nav className="p-2">
         {rows.map((row) => {
