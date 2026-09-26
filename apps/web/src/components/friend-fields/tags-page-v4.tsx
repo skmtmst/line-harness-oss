@@ -11,6 +11,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import Notice from '@/components/shared/notice'
 import Button from '@/components/shared/button'
+import FilterChip from '@/components/shared/filter-chip'
 import ListKpis from '@/components/shared/list-kpis'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
@@ -974,15 +975,13 @@ export default function TagsPageV4({
               {QUICK_FILTERS.map(([key, label]) => {
                 const on = quick.includes(key)
                 return (
-                  <button
+                  <FilterChip
                     key={key}
-                    type="button"
-                    aria-pressed={on}
-                    onClick={() => setQuick((current) => on ? current.filter((k) => k !== key) : [...current, key])}
-                    className={`rounded-pill border px-3 py-1.5 ${on ? 'border-accent bg-accent-soft text-accent-deep' : 'border-hairline bg-canvas text-ink-secondary'}`}
+                    selected={on}
+                    onChange={(next) => setQuick((current) => next ? [...current, key] : current.filter((k) => k !== key))}
                   >
                     {label}
-                  </button>
+                  </FilterChip>
                 )
               })}
             </div>
