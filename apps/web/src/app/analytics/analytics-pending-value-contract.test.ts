@@ -89,6 +89,6 @@ describe('分析は、集計待ちの理由を帯と図で二重に出さない'
     expect(PAGE).toContain(
       '<p>{reasonShownInBanner ? (METRIC_STATE_TEXT[overview.state] ||',
     )
-    expect(PAGE, '帯が理由全文を出さなくなっている').toContain('{overview.stateReason}</div>')
+    expect(PAGE, '帯が理由全文を出さなくなっている').toContain('{overview.stateReason}</Notice>')
   })
 })

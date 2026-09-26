@@ -4,6 +4,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WebinarNotificationOverview, WebinarNotificationSettings } from '@/lib/api'
 import WebinarNotifications from './webinar-notifications'
+import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 
 /*
  * WEBINAR-09 — 設定がまだ無いウェビナーは「空」のまま終わらせない。
@@ -65,8 +66,10 @@ afterEach(async () => {
 })
 
 async function mount() {
+  // 保存の知らせは Toast（右下・4秒）で出す。置き場所も一緒に描く。
+  clearToastsForTest()
   await act(async () => {
-    root.render(<WebinarNotifications webinarId="w1" />)
+    root.render(<><WebinarNotifications webinarId="w1" /><ToastHost /></>)
   })
 }
 

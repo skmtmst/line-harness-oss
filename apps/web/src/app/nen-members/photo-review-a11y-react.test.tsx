@@ -3,6 +3,7 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import PhotoReviewsPage from './page'
+import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 
 /*
  * V6R-S3-e: 写真審査の一覧を読み上げでも使えるようにする。
@@ -104,7 +105,9 @@ afterEach(async () => {
 })
 
 async function render() {
-  await act(async () => { root.render(<PhotoReviewsPage />) })
+  // 審査の結果の知らせは Toast（role=status）で出す。置き場所も一緒に描く。
+  clearToastsForTest()
+  await act(async () => { root.render(<><PhotoReviewsPage /><ToastHost /></>) })
   await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)) })
 }
 

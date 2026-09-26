@@ -3,6 +3,7 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import ReportNewPage from './reports/new/page'
+import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 
 /**
  * 定期レポート作成/編集画面を本物のReactで動かす試験(#844 / N-277,N-278)。
@@ -123,7 +124,9 @@ afterEach(async () => {
 })
 
 async function render() {
-  await act(async () => { root.render(<ReportNewPage />) })
+  // 保存の知らせは Toast（右下・4秒）で出す。置き場所も一緒に描く。
+  clearToastsForTest()
+  await act(async () => { root.render(<><ReportNewPage /><ToastHost /></>) })
 }
 
 function button(label: string): HTMLButtonElement {
