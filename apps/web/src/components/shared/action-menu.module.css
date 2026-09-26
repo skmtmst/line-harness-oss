@@ -10,8 +10,9 @@
   right: 0;
   z-index: 60;
   display: flex;
-  width: 200px;
-  max-width: calc(100vw - 16px);
+  width: max-content;
+  min-width: 224px;
+  max-width: min(320px, calc(100vw - 16px));
   max-height: min(70dvh, 20rem);
   flex-direction: column;
   gap: 2px;

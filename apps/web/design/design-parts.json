@@ -2997,11 +2997,18 @@
       },
       "declarations": [
         {
-          "pencil": "xifuV width: 200",
+          "pencil": "xifuV width: min 224 / max 320",
           "class": "menu",
-          "prop": "width",
-          "source": "200px",
-          "resolved": "200px"
+          "prop": "min-width",
+          "source": "224px",
+          "resolved": "224px"
+        },
+        {
+          "pencil": "xifuV width: min 224 / max 320",
+          "class": "menu",
+          "prop": "max-width",
+          "source": "min(320px, calc(100vw - 16px))",
+          "resolved": "min(320px, calc(100vw - 16px))"
         },
         {
           "pencil": "xifuV stroke: $hairline / 1",

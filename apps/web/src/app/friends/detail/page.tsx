@@ -1,6 +1,7 @@
 'use client'
 
 import Avatar from '@/components/shared/avatar'
+import { ArrowLeft, CircleDot, Copy, List, ListPlus, PencilLine, Send, Star } from 'lucide-react'
 import { Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -1092,6 +1093,7 @@ function FriendDetailInner() {
       ? [{
           id: 'support',
           label: '対応状況を編集',
+          icon: <CircleDot size={16} />,
           onSelect: () => void openSupportEditor(),
         }]
       : []),
@@ -1099,6 +1101,7 @@ function FriendDetailInner() {
       ? [{
           id: 'fields',
           label: '情報欄を編集',
+          icon: <PencilLine size={16} />,
           onSelect: () =>
             router.push(`/friends/detail?id=${encodeURIComponent(friendId)}&tab=info`),
         }]
@@ -1108,29 +1111,31 @@ function FriendDetailInner() {
       ? [{
           id: 'scenario-enroll',
           label: 'シナリオに登録',
+          icon: <ListPlus size={16} />,
           onSelect: () => void openScenarioPicker(),
         }]
       : []),
     {
       id: 'send-template',
       label: 'テンプレートを送る',
+      icon: <Send size={16} />,
       description: '受信箱で選んで送ります',
       external: true,
       onSelect: () => router.push(inboxHrefForFriend(friendId)),
     },
   ]
-  // どれも別画面への移動なので ↗ を付ける（★V7）。
+  // 別画面への移動には ↗ を付ける（★V7）。「戻る」は戻る操作なので付けない。
   const secondaryActions: ActionMenuItem[] = [
-    { id: 'templates', label: 'テンプレート一覧を見る', external: true, onSelect: () => router.push('/templates') },
-    { id: 'scenarios', label: 'シナリオ一覧を見る', external: true, onSelect: () => router.push('/scenarios') },
-    { id: 'reminders', label: 'リマインダ一覧を見る', external: true, onSelect: () => router.push('/reminders') },
-    { id: 'mileage', label: 'マイルを確認', external: true, onSelect: () => router.push('/mileage') },
-    { id: 'duplicates', label: '重複候補を確認', external: true, onSelect: () => router.push('/duplicates') },
+    { id: 'templates', label: 'テンプレート一覧を見る', icon: <List size={16} />, external: true, onSelect: () => router.push('/templates') },
+    { id: 'scenarios', label: 'シナリオ一覧を見る', icon: <List size={16} />, external: true, onSelect: () => router.push('/scenarios') },
+    { id: 'reminders', label: 'リマインダ一覧を見る', icon: <List size={16} />, external: true, onSelect: () => router.push('/reminders') },
+    { id: 'mileage', label: 'マイルを確認', icon: <Star size={16} />, external: true, onSelect: () => router.push('/mileage') },
+    { id: 'duplicates', label: '重複候補を確認', icon: <Copy size={16} />, external: true, onSelect: () => router.push('/duplicates') },
     {
       id: 'back-to-list',
       label: '友だち一覧へ戻る',
+      icon: <ArrowLeft size={16} />,
       dividerBefore: true,
-      external: true,
       onSelect: () => router.push('/friends'),
     },
   ]

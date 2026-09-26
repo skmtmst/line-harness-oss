@@ -310,6 +310,28 @@ describe('NEXT-08 「個別操作」「…」が操作メニューにつなが�
     expect(net.pushed).toContain('/chats?friend=friend-1')
   })
 
+  it('項目に絵が付き、別画面へ行く項目にだけ矢印が付く', async () => {
+    await render()
+    await act(async () => {
+      buttonByText('個別操作').click()
+    })
+    // どれも左に絵（16px）を持つ。「テンプレートを送る」は別画面なので矢印も持つ。
+    for (const item of menuItems()) {
+      expect(item.querySelector('svg')).toBeTruthy()
+    }
+    const template = menuItems().find((b) => b.textContent?.includes('テンプレートを送る'))!
+    expect(template.querySelectorAll('svg')).toHaveLength(2)
+    await act(async () => {
+      buttonByText('個別操作').click()
+    })
+    await act(async () => {
+      host.querySelector<HTMLButtonElement>('button[aria-label="その他の操作"]')!.click()
+    })
+    // 「戻る」は戻る操作なので矢印が無い（絵だけ）。
+    const back = menuItems().find((b) => b.textContent?.includes('友だち一覧へ戻る'))!
+    expect(back.querySelectorAll('svg')).toHaveLength(1)
+  })
+
   it('「…」を押すと関連画面への移動が出て、選ぶと画面遷移する', async () => {
     await render()
     await act(async () => {
