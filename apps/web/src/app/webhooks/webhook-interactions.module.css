@@ -36,28 +36,7 @@
   gap: 8px;
 }
 
-.filter {
-  min-height: 36px;
-  padding: 0 12px;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-pill);
-  background: var(--color-canvas);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-label);
-  font-weight: 600;
-}
-
-.filterActive {
-  border-color: var(--color-accent);
-  background: var(--color-accent-soft);
-  color: var(--color-accent-deep);
-}
-
-.filterDanger {
-  border-color: var(--color-danger);
-  background: var(--color-danger-bg);
-  color: var(--color-danger);
-}
+/* m13i: 絞り込み札は共通 FilterChip 1つにそろえた（形・色は部品が持つ）。 */
 
 .table col:nth-child(1) { width: 29%; }
 .table col:nth-child(2) { width: 16%; }
