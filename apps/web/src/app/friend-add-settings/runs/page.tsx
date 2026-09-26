@@ -18,7 +18,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
 import StickyBar from '@/components/shared/sticky-bar'
 import ListRange from '@/components/ui/list-range'
 
@@ -377,10 +377,10 @@ function FriendAddRunsInner() {
       ) : null}
 
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <SummaryCard variant="v6" title="直近28日の追加" value={summary?.totalRuns ?? null} unit="人" detail="" help="友だち追加の合計です" loading={loading} />
-        <SummaryCard variant="v6" title="累計配信" value={summary?.cumulativeDeliveries ?? null} unit="通" detail="" help="実際に送った通数です" loading={loading} />
-        <SummaryCard variant="v6" title="シナリオ開始" value={summary?.scenarioStarts ?? null} unit="件" detail="" help="登録できた件数です" loading={loading} />
-        <SummaryCard variant="v6" title="エラー" value={summary?.failed ?? null} unit="件" detail="処理できなかった記録" loading={loading} badge={summary && summary.failed > 0 ? '要確認' : undefined} badgeTone="danger" />
+        <KpiCard variant="v6" title="直近28日の追加" value={summary?.totalRuns ?? null} unit="人" detail="" help="友だち追加の合計です" loading={loading} />
+        <KpiCard variant="v6" title="累計配信" value={summary?.cumulativeDeliveries ?? null} unit="通" detail="" help="実際に送った通数です" loading={loading} />
+        <KpiCard variant="v6" title="シナリオ開始" value={summary?.scenarioStarts ?? null} unit="件" detail="" help="登録できた件数です" loading={loading} />
+        <KpiCard variant="v6" title="エラー" value={summary?.failed ?? null} unit="件" detail="処理できなかった記録" loading={loading} badge={summary && summary.failed > 0 ? '要確認' : undefined} badgeTone="danger" />
       </div>
 
       <div className="flex flex-col items-start gap-4 xl:flex-row">

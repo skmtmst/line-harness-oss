@@ -12,7 +12,7 @@ import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import StickyBar from '@/components/shared/sticky-bar'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
 import { api, ApiError } from '@/lib/api'
 import styles from './auto-reply-runs.module.css'
 
@@ -248,10 +248,10 @@ function AutoReplyRunsInner() {
       <div className={styles.columns}>
         <div className={styles.main}>
           <section className={styles.summary} aria-label="実行結果のまとめ">
-            <SummaryCard variant="v6" title="今月ヒット" value={data?.summary.monthHits ?? null} unit="回" detail="" help="今月、条件に合った回数です" loading={loading} />
-            <SummaryCard variant="v6" title="累計ヒット" value={data?.summary.totalHits ?? null} unit="回" detail="" help="記録を開始してからの合計です" loading={loading} />
-            <SummaryCard variant="v6" title="引継ぎ" value={data?.summary.handovers ?? null} unit="件" detail="" help="担当者へ渡した件数です" loading={loading} />
-            <SummaryCard variant="v6" title="エラー" value={data?.summary.errors ?? null} unit="件" detail="失敗した実行を確認" badgeTone="danger" loading={loading} />
+            <KpiCard variant="v6" title="今月ヒット" value={data?.summary.monthHits ?? null} unit="回" detail="" help="今月、条件に合った回数です" loading={loading} />
+            <KpiCard variant="v6" title="累計ヒット" value={data?.summary.totalHits ?? null} unit="回" detail="" help="記録を開始してからの合計です" loading={loading} />
+            <KpiCard variant="v6" title="引継ぎ" value={data?.summary.handovers ?? null} unit="件" detail="" help="担当者へ渡した件数です" loading={loading} />
+            <KpiCard variant="v6" title="エラー" value={data?.summary.errors ?? null} unit="件" detail="失敗した実行を確認" badgeTone="danger" loading={loading} />
           </section>
 
           <Card className={styles.runCard} id="recent-runs">

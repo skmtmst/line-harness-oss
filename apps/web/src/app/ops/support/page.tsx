@@ -22,7 +22,7 @@ import Chip, { type ChipTone } from '@/components/shared/chip'
 import ListState from '@/components/shared/list-state'
 import SearchField from '@/components/shared/search-field'
 import SelectField from '@/components/shared/select-field'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
 import { Tabs } from '@/components/shared/tabs'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import { compareLabel, durationLabel, elapsedLabel } from './format'
@@ -361,16 +361,16 @@ export default function OpsSupportPage() {
 
       <div className={knowledgeStyles.supportMetrics} data-design-node="beOJV">
         <div className={knowledgeStyles.supportMetric}><Inbox aria-hidden="true" className="text-danger" />
-        <SummaryCard variant="v6" title="未対応のチケット" value={kpis ? kpis.untouched : null} unit="" detail={kpis ? `LINEから受付 ${kpis.untouchedFromLine}件` : '—'} loading={!summary} />
+        <KpiCard variant="v6" title="未対応のチケット" value={kpis ? kpis.untouched : null} unit="" detail={kpis ? `LINEから受付 ${kpis.untouchedFromLine}件` : '—'} loading={!summary} />
         </div>
         <div className={knowledgeStyles.supportMetric}><Timer aria-hidden="true" className="text-status-info" />
-        <SummaryCard variant="v6" title="平均の初回返信" value={null} unit="" detail={kpis ? compareLabel(kpis.avgFirstReplyMinutes, kpis.prevAvgFirstReplyMinutes, 'time') : '—'} loading={!summary} valueText={kpis ? durationLabel(kpis.avgFirstReplyMinutes) : undefined} />
+        <KpiCard variant="v6" title="平均の初回返信" value={null} unit="" detail={kpis ? compareLabel(kpis.avgFirstReplyMinutes, kpis.prevAvgFirstReplyMinutes, 'time') : '—'} loading={!summary} valueText={kpis ? durationLabel(kpis.avgFirstReplyMinutes) : undefined} />
         </div>
         <div className={knowledgeStyles.supportMetric}><CheckCircle2 aria-hidden="true" className="text-accent-deep" />
-        <SummaryCard variant="v6" title="解決率" value={null} unit="" detail={kpis ? compareLabel(kpis.resolutionRate, kpis.prevResolutionRate, 'rate') : '—'} loading={!summary} valueText={kpis ? (kpis.resolutionRate === null ? '—' : `${kpis.resolutionRate.toFixed(1)}%`) : undefined} />
+        <KpiCard variant="v6" title="解決率" value={null} unit="" detail={kpis ? compareLabel(kpis.resolutionRate, kpis.prevResolutionRate, 'rate') : '—'} loading={!summary} valueText={kpis ? (kpis.resolutionRate === null ? '—' : `${kpis.resolutionRate.toFixed(1)}%`) : undefined} />
         </div>
         <div className={knowledgeStyles.supportMetric}><Hourglass aria-hidden="true" className="text-chip-alt" />
-        <SummaryCard variant="v6" title="平均の解決時間" value={null} unit="" detail={kpis ? compareLabel(kpis.avgResolutionMinutes, kpis.prevAvgResolutionMinutes, 'time') : '—'} loading={!summary} valueText={kpis ? durationLabel(kpis.avgResolutionMinutes) : undefined} />
+        <KpiCard variant="v6" title="平均の解決時間" value={null} unit="" detail={kpis ? compareLabel(kpis.avgResolutionMinutes, kpis.prevAvgResolutionMinutes, 'time') : '—'} loading={!summary} valueText={kpis ? durationLabel(kpis.avgResolutionMinutes) : undefined} />
         </div>
       </div>
 

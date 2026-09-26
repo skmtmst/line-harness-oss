@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, type FriendStats } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
 
 /** Pencil ★V6（`zZMNG`）の上部カード。数え方は既存APIのままにする。 */
 export default function FriendKpis() {
@@ -100,7 +100,7 @@ export default function FriendKpis() {
       ) : null}
       <div className="grid grid-cols-2 gap-3.5 xl:grid-cols-4">
         {cards.map((card) => (
-          <SummaryCard key={card.title} {...card} loading={loading} variant="v6" className="!min-h-25 !gap-1 !px-4 !py-3.5" />
+          <KpiCard key={card.title} {...card} loading={loading} variant="v6" className="!min-h-25 !gap-1 !px-4 !py-3.5" />
         ))}
       </div>
     </div>

@@ -7,7 +7,7 @@ import DateField from '@/components/shared/date-field'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import Pagination from '@/components/shared/pagination'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
 import { DataTable, NameCell, Td, Th, Tr } from '@/components/shared/table'
 import { api, type MileageAdminHistory, type MileageAdminHistoryItem, type MileageHistoryItem } from '@/lib/api'
 import { csvCell } from '@/lib/presentation'
@@ -126,10 +126,10 @@ export default function MileageHistoryTab({ accountId }: { accountId: string }) 
   return (
     <section aria-label="マイルの履歴" data-design-node="MvZm5" className="space-y-4">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <SummaryCard variant="v6" title="この期間の記録" value={total} unit="件" detail={periodSummary ? `付いた ${grantedCount.toLocaleString('ja-JP')}・使った ${spentCount.toLocaleString('ja-JP')}` : '内訳を取得できませんでした'} />
-        <SummaryCard variant="v6" title="手で動かした分" value={periodSummary?.manualCount ?? null} unit="件" detail="" help="担当者が直接増減したものです" />
-        <SummaryCard variant="v6" title="取り消し" value={periodSummary ? reversalCount : null} unit="件" detail="" help="予約取消などに伴うものです" />
-        <SummaryCard variant="v6" title="反映を待っている" value={periodSummary?.pendingCount ?? null} unit="件" detail="確定条件を待っている記録" />
+        <KpiCard variant="v6" title="この期間の記録" value={total} unit="件" detail={periodSummary ? `付いた ${grantedCount.toLocaleString('ja-JP')}・使った ${spentCount.toLocaleString('ja-JP')}` : '内訳を取得できませんでした'} />
+        <KpiCard variant="v6" title="手で動かした分" value={periodSummary?.manualCount ?? null} unit="件" detail="" help="担当者が直接増減したものです" />
+        <KpiCard variant="v6" title="取り消し" value={periodSummary ? reversalCount : null} unit="件" detail="" help="予約取消などに伴うものです" />
+        <KpiCard variant="v6" title="反映を待っている" value={periodSummary?.pendingCount ?? null} unit="件" detail="確定条件を待っている記録" />
       </div>
 
       <NoteBar>マイルが増えた・減った記録です。手で増やしたものは理由と担当者が残り、あとから辿れます。</NoteBar>

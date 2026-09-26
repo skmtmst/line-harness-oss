@@ -10,7 +10,7 @@ import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import StickyBar from '@/components/shared/sticky-bar'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
 import KpiCollapse from '@/components/ui/kpi-collapse'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import ScrollableTabs from '@/components/layout/scrollable-tabs'
@@ -197,10 +197,10 @@ function MembersInner() {
         <>
           {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}
           <KpiCollapse data-design="KPIs" data-design-node="kCaRU" gridClassName="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <SummaryCard variant="v6" title="権限者" value={status === 'ready' ? kpis.total : null} unit="人" detail={status === 'ready' ? `有効 ${kpis.active}人` : '—'} loading={status === 'loading'} />
-            <SummaryCard variant="v6" title="招待中" value={status === 'ready' ? kpis.invited : null} unit="人" detail="" help="まだ承諾していない招待です" loading={status === 'loading'} />
-            <SummaryCard variant="v6" title="閲覧のみ" value={status === 'ready' ? kpis.viewers : null} unit="人" detail="" help="編集できない権限者です" loading={status === 'loading'} />
-            <SummaryCard variant="v6" title="担当アカウントの割り当て" value={status === 'ready' ? kpis.scopedAccounts : null} unit="アカウント" detail={status === 'ready' ? `全アカウントを担当 ${kpis.allScope}人` : '—'} loading={status === 'loading'} />
+            <KpiCard variant="v6" title="権限者" value={status === 'ready' ? kpis.total : null} unit="人" detail={status === 'ready' ? `有効 ${kpis.active}人` : '—'} loading={status === 'loading'} />
+            <KpiCard variant="v6" title="招待中" value={status === 'ready' ? kpis.invited : null} unit="人" detail="" help="まだ承諾していない招待です" loading={status === 'loading'} />
+            <KpiCard variant="v6" title="閲覧のみ" value={status === 'ready' ? kpis.viewers : null} unit="人" detail="" help="編集できない権限者です" loading={status === 'loading'} />
+            <KpiCard variant="v6" title="担当アカウントの割り当て" value={status === 'ready' ? kpis.scopedAccounts : null} unit="アカウント" detail={status === 'ready' ? `全アカウントを担当 ${kpis.allScope}人` : '—'} loading={status === 'loading'} />
           </KpiCollapse>
 
           <div data-design="Note" data-design-node="Y1EarL">

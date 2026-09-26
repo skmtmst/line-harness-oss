@@ -17,7 +17,7 @@ import ListRange from '@/components/ui/list-range'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { ActionCell, DataTable, Td, Tr } from '@/components/shared/table'
 
@@ -335,10 +335,10 @@ export default function WebhookInteractions() {
       ) : (
         <>
           <div className={styles.cards}>
-            <SummaryCard variant="v6" title={`この${periodDays}日`} value={data.summary.total} unit="回" detail={`送った ${data.summary.outgoing.toLocaleString('ja-JP')}・受け取った ${data.summary.incoming.toLocaleString('ja-JP')}`} />
-            <SummaryCard variant="v6" title="成功" value={data.summary.succeeded} unit="回" detail={`この${periodDays}日で ${successRate.toLocaleString('ja-JP')}%`} />
-            <SummaryCard variant="v6" title="失敗" value={data.summary.failed} unit="回" detail={failureDetail(data.items, data.summary.failed, data.summary.resultUnknown)} badge={data.summary.failed > 0 ? 'やり直す' : undefined} badgeTone="danger" />
-            <SummaryCard variant="v6" title="返事までの時間" value={data.summary.averageDurationMs == null ? null : Math.round(data.summary.averageDurationMs / 100) / 10} unit="秒" detail={durationDetail(data.items, data.summary.averageDurationMs, periodDays)} />
+            <KpiCard variant="v6" title={`この${periodDays}日`} value={data.summary.total} unit="回" detail={`送った ${data.summary.outgoing.toLocaleString('ja-JP')}・受け取った ${data.summary.incoming.toLocaleString('ja-JP')}`} />
+            <KpiCard variant="v6" title="成功" value={data.summary.succeeded} unit="回" detail={`この${periodDays}日で ${successRate.toLocaleString('ja-JP')}%`} />
+            <KpiCard variant="v6" title="失敗" value={data.summary.failed} unit="回" detail={failureDetail(data.items, data.summary.failed, data.summary.resultUnknown)} badge={data.summary.failed > 0 ? 'やり直す' : undefined} badgeTone="danger" />
+            <KpiCard variant="v6" title="返事までの時間" value={data.summary.averageDurationMs == null ? null : Math.round(data.summary.averageDurationMs / 100) / 10} unit="秒" detail={durationDetail(data.items, data.summary.averageDurationMs, periodDays)} />
           </div>
 
           <NoteBar>送った・受け取ったやり取りの記録です。失敗したものはここからやり直せます。</NoteBar>

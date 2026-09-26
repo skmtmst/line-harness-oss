@@ -11,7 +11,7 @@ import PageHeader from '@/components/shared/page-header'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import SearchField from '@/components/shared/search-field'
 import StatusBadge from '@/components/shared/status-badge'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
 import { Tabs } from '@/components/shared/tabs'
 import { useCanManageCommonActions } from '@/components/automations/use-common-action-permission'
@@ -190,10 +190,10 @@ export default function CommonActionsPage() {
         失敗は「読み込めませんでした」と言い分け、0 と混ぜない。
       */}
       <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <SummaryCard variant="v6" title="共通アクション" value={loading || error ? null : (summary?.total ?? 0)} unit="" detail={error ? '読み込めませんでした' : loading ? '読み込んでいます' : `うち公開中 ${totals.published}`} loading={loading} />
-        <SummaryCard variant="v6" title="呼び出し元" value={loading || error ? null : totals.bindings} unit="" detail={error ? '読み込めませんでした' : loading ? '読み込んでいます' : '5機能から'} loading={loading} />
-        <SummaryCard variant="v6" title="今月 動いた回数" value={loading || error ? null : totals.executions} unit="" detail={error ? '読み込めませんでした' : loading ? '読み込んでいます' : `失敗 ${totals.failures}`} loading={loading} />
-        <SummaryCard variant="v6" title="古い版のまま" value={loading || error ? null : totals.outdatedItems} unit="" detail={error ? '読み込めませんでした' : loading ? '読み込んでいます' : `呼び出し元 ${totals.outdated}か所`} loading={loading} badge={!error && totals.outdatedItems > 0 ? '要確認' : undefined} badgeTone="warning" />
+        <KpiCard variant="v6" title="共通アクション" value={loading || error ? null : (summary?.total ?? 0)} unit="" detail={error ? '読み込めませんでした' : loading ? '読み込んでいます' : `うち公開中 ${totals.published}`} loading={loading} />
+        <KpiCard variant="v6" title="呼び出し元" value={loading || error ? null : totals.bindings} unit="" detail={error ? '読み込めませんでした' : loading ? '読み込んでいます' : '5機能から'} loading={loading} />
+        <KpiCard variant="v6" title="今月 動いた回数" value={loading || error ? null : totals.executions} unit="" detail={error ? '読み込めませんでした' : loading ? '読み込んでいます' : `失敗 ${totals.failures}`} loading={loading} />
+        <KpiCard variant="v6" title="古い版のまま" value={loading || error ? null : totals.outdatedItems} unit="" detail={error ? '読み込めませんでした' : loading ? '読み込んでいます' : `呼び出し元 ${totals.outdated}か所`} loading={loading} badge={!error && totals.outdatedItems > 0 ? '要確認' : undefined} badgeTone="warning" />
       </div>
 
       <NoteBar>

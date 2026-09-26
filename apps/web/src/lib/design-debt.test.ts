@@ -40,7 +40,7 @@ describe('共通部品を通らない直書き', () => {
       'components/shared/icon-button.tsx',
       'components/shared/pagination.tsx',
       'components/shared/status-badge.tsx',
-      'components/shared/summary-card.tsx',
+      'components/shared/kpi-card.tsx',
       'components/shared/table.tsx',
       'components/shared/bar-chart.tsx',
     ]) {

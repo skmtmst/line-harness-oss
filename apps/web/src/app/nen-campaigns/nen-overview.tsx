@@ -17,7 +17,7 @@ import { RowActions } from '@/components/shared/row-actions'
 import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import StickyBar from '@/components/shared/sticky-bar'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
 import KpiCollapse from '@/components/ui/kpi-collapse'
 import ListRange from '@/components/ui/list-range'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
@@ -195,10 +195,10 @@ function Kpis({ kpis, loading, failed }: { kpis: NenKpis | null; loading: boolea
   const missingDetail = failed ? '読み込めませんでした' : loading ? '読み込んでいます' : '—'
   return (
     <KpiCollapse data-design="KPIs" data-design-node="nen-kpis" gridClassName="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-      <SummaryCard variant="v6" title={`${month} 送った数`} value={kpis?.sentThisMonth ?? null} unit="通" detail={kpis ? `先月 ${num(kpis.sentLastMonth)}通` : missingDetail} loading={loading} />
-      <SummaryCard variant="v6" title="開封" value={null} unit="%" valueText={kpis?.openRate == null ? '—' : `${kpis.openRate}%`} detail={kpis ? 'コラムを開いた割合' : missingDetail} description="自動配信はLINEから個人開封を取得できません。" loading={loading} />
-      <SummaryCard variant="v6" title="配信からの注文" value={kpis?.orders ?? null} unit="件" detail={kpis?.orderAmount == null ? (kpis ? '送信後7日以内の注文' : missingDetail) : `¥${num(kpis.orderAmount)}（送信後7日以内）`} loading={loading} />
-      <SummaryCard variant="v6" title="届かなかった" value={kpis?.undelivered ?? null} unit="通" detail={kpis ? `友だち解除 ${num(kpis.unfollowed)}・ブロック ${num(kpis.blocked)}` : failed || loading ? missingDetail : '友だち解除・ブロック'} loading={loading} />
+      <KpiCard variant="v6" title={`${month} 送った数`} value={kpis?.sentThisMonth ?? null} unit="通" detail={kpis ? `先月 ${num(kpis.sentLastMonth)}通` : missingDetail} loading={loading} />
+      <KpiCard variant="v6" title="開封" value={null} unit="%" valueText={kpis?.openRate == null ? '—' : `${kpis.openRate}%`} detail={kpis ? 'コラムを開いた割合' : missingDetail} description="自動配信はLINEから個人開封を取得できません。" loading={loading} />
+      <KpiCard variant="v6" title="配信からの注文" value={kpis?.orders ?? null} unit="件" detail={kpis?.orderAmount == null ? (kpis ? '送信後7日以内の注文' : missingDetail) : `¥${num(kpis.orderAmount)}（送信後7日以内）`} loading={loading} />
+      <KpiCard variant="v6" title="届かなかった" value={kpis?.undelivered ?? null} unit="通" detail={kpis ? `友だち解除 ${num(kpis.unfollowed)}・ブロック ${num(kpis.blocked)}` : failed || loading ? missingDetail : '友だち解除・ブロック'} loading={loading} />
     </KpiCollapse>
   )
 }
