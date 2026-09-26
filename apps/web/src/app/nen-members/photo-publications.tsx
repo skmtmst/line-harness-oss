@@ -157,25 +157,26 @@ export function PhotoPublications({ accountId, onBack }: { accountId: string; on
   const pendingWithdrawals = Array.isArray(data?.pendingWithdrawals) ? data.pendingWithdrawals : []
   const withdrawnItems = Array.isArray(data?.withdrawnItems) ? data.withdrawnItems : []
   if (!data || (items.length === 0 && pendingWithdrawals.length === 0 && withdrawnItems.length === 0)) {
-    return <div><Button onClick={onBack}>写真審査へ戻る</Button><ListState kind="empty" title="公式サイト掲載中の写真はありません" description="同意のある写真を掲載すると、使っている場所と表示回数がここに出ます。" /></div>
+    return <div className="flex flex-col gap-4"><div><Button onClick={onBack}>写真審査へ戻る</Button></div><section className="bg-canvas rounded-card border-hairline border"><ListState kind="empty" title="公式サイト掲載中の写真はありません" description="同意のある写真を掲載すると、使っている場所と表示回数がここに出ます。" /></section></div>
   }
 
   const top = data.summary.topPhoto
-  return <><div data-photo-view="publications">
+  {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+  return <><div data-photo-view="publications" className="flex flex-col gap-4">
     <div className="flex items-center justify-between gap-2 max-md:flex-col max-md:items-start">
       <div><p className="text-xs font-bold text-ink-faint">専用機能</p><h2 className="mt-1 text-2xl font-extrabold text-ink">写真審査</h2></div>
       <Button onClick={onBack}>審査待ちへ戻る</Button>
     </div>
     <Tabs items={[{ label: '公式サイト掲載', current: true }, { label: '並び順を変える', disabled: true }]} />
-    {notice && <div className="mt-4"><Notice tone={notice.includes('できません') || notice.includes('変更しました') ? 'error' : 'success'} message={notice} /></div>}
-    <section className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+    {notice && <div><Notice tone={notice.includes('できません') || notice.includes('変更しました') ? 'error' : 'success'} message={notice} /></div>}
+    <section className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
       <Card padding="default"><span className="block text-xs text-ink-faint">公式サイト掲載中の写真</span><strong className="my-1 block text-2xl text-ink">{data.summary.publishedCount}枚</strong><small className="block text-xs text-ink-faint">採用した写真のうち</small></Card>
       <Card padding="default"><span className="block text-xs text-ink-faint">どこで使っているか</span><strong className="my-1 block text-2xl text-ink">{data.summary.placementCount}か所</strong><small className="block text-xs text-ink-faint">現在つながっている掲載先</small></Card>
       <Card padding="default"><span className="block text-xs text-ink-faint">いちばん見られた</span><strong className="my-1 block truncate text-2xl text-ink">{top ? photoPetDisplayName(top.pet_name, { honorific: false }) : '—（未取得）'}</strong><small className="block text-xs text-ink-faint">{top ? views(top.view_count) : '表示回数は未取得'}</small></Card>
       <Card padding="default"><span className="block text-xs text-ink-faint">ご本人の同意</span><strong className="my-1 block text-2xl text-ink">{data.summary.consentedCount}枚 すべて</strong><small className="block text-xs text-ink-faint">投稿時に同意をいただいています</small></Card>
     </section>
-    <div className="mt-4"><NoteBar>公式サイト掲載中の写真は、投稿してくださった方の名前を写真ごとに伏せられます。ご本人の希望があれば、すべての掲載先から外せます。外しても採用時に付けたマイルは戻りません。</NoteBar></div>
-    <div className="mt-4 grid items-start gap-4 xl:grid-cols-5">
+    <div><NoteBar>公式サイト掲載中の写真は、投稿してくださった方の名前を写真ごとに伏せられます。ご本人の希望があれば、すべての掲載先から外せます。外しても採用時に付けたマイルは戻りません。</NoteBar></div>
+    <div className="grid items-start gap-4 xl:grid-cols-5">
       <section className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:col-span-4 xl:grid-cols-4">
         {items.length === 0 && <p className="col-span-full rounded-control border border-hairline bg-canvas px-4 py-3 text-sm text-ink-faint">いま公式サイト掲載中の写真はありません。</p>}
         {items.map((item) => {
@@ -210,7 +211,7 @@ export function PhotoPublications({ accountId, onBack }: { accountId: string; on
      * ご本人が同意を撤回しても掲載先の登録は残る。ここで残っている先を
      * 確認して「掲載先から外す」で整理を完了させる。自動では外さない。
      */}
-    {pendingWithdrawals.length > 0 && <section className="mt-6">
+    {pendingWithdrawals.length > 0 && <section>
       <h2 className="text-sm font-extrabold text-ink">整理が必要なもの（{pendingWithdrawals.length}件）</h2>
       <p className="mt-1 text-xs text-ink-faint">同意の状態と掲載先の登録が合っていないものです。残っている掲載先を確認して、外す操作で整理を完了させてください。</p>
       <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -237,7 +238,7 @@ export function PhotoPublications({ accountId, onBack }: { accountId: string; on
     </section>}
 
     {/* 外し終えた履歴。同意・審査・マイルの記録は残す（Issue #1040 IDEA-22）。 */}
-    {withdrawnItems.length > 0 && <section className="mt-6">
+    {withdrawnItems.length > 0 && <section>
       <h2 className="text-sm font-extrabold text-ink">外したもの（{withdrawnItems.length}件）</h2>
       <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
         {withdrawnItems.map((item) => {
