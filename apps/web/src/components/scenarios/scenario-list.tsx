@@ -7,6 +7,7 @@ import type { Scenario, DeliveryMode, Folder } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import ListState from '@/components/shared/list-state'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import { MoreAction } from '@/components/shared/row-actions'
 import ReorderGrip from '@/components/friend-fields/reorder-grip'
@@ -379,20 +380,16 @@ export default function ScenarioList({
   if (scenarios.length === 0) {
     return (
       <>
-        <div className="bg-canvas rounded-card border-hairline border p-12 text-center">
-          <ListPlus aria-hidden className="text-ink-faint mx-auto" size={24} />
-          <p className="text-ink mt-3 text-sm font-bold">まだシナリオがありません</p>
-          <p className="text-ink-faint mt-1 text-xs">1つ作ると、順番に届く配信をここで管理できます。</p>
-          {onCreate ? (
-            <Button
-              variant="primary"
-              onClick={onCreate}
-              className="mt-3"
-            >
+        <ListState
+          kind="empty"
+          title="まだシナリオがありません"
+          description="1つ作ると、順番に届く配信をここで管理できます。"
+          action={onCreate ? (
+            <Button variant="primary" onClick={onCreate}>
               ＋ シナリオを作る
             </Button>
-          ) : null}
-        </div>
+          ) : undefined}
+        />
         {moveDialog}
         {confirmDialog}
       </>

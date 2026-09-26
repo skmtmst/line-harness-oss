@@ -18,6 +18,7 @@ import Card from '@/components/shared/card'
 import Button from '@/components/shared/button'
 import { STATE_TEXT } from '@/components/shared/not-connected'
 import { Tabs } from '@/components/shared/tabs'
+import ListState from '@/components/shared/list-state'
 import {
   dashboardNotificationDestination,
   isDashboardNotificationData,
@@ -154,7 +155,11 @@ function NotificationsPageInner() {
 
       <Card overflow="hidden">
         {items.length === 0 && !loading ? (
-          <p className="text-ink-faint px-5 py-8 text-center text-sm">通知はまだありません。</p>
+          <ListState
+            kind="empty"
+            title="通知はまだありません"
+            description="お知らせが届くと、ここに並びます。"
+          />
         ) : (
           <ul className="divide-hairline divide-y">
             {items.map((item) => (

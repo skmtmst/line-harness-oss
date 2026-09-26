@@ -213,7 +213,7 @@ describe('問い合わせ受信箱の実React動作(#630)', () => {
     await render()
     await wait(30_000)
     expect(inboxCalls('open')).toBe(0)
-    expect(host.textContent).toContain('読み込み中')
+    expect(host.textContent).toContain('対応待ちを読み込んでいます')
 
     hidden = false
     await act(async () => {

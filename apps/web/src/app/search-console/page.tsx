@@ -6,6 +6,7 @@ import Button from '@/components/shared/button'
 import Disclosure from '@/components/shared/disclosure'
 import NoteBar from '@/components/shared/note-bar'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import ListState from '@/components/shared/list-state'
 import StatusBadge from '@/components/shared/status-badge'
 import { api } from '@/lib/api'
 import { csvCell } from '@/lib/presentation'
@@ -85,7 +86,13 @@ function MetricCard({
 
 function TrendChart({ rows }: { rows: SearchConsoleMetricRow[] }) {
   if (rows.length === 0) {
-    return <div className="text-ink-faint flex h-64 items-center justify-center text-sm">期間内のデータがありません</div>
+    return (
+      <ListState
+        kind="empty"
+        title="期間内のデータがありません"
+        description="集計期間を変えると、ここに推移が出ます。"
+      />
+    )
   }
   const width = 1000
   const height = 240

@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Avatar from '@/components/shared/avatar'
 import StatusBadge from '@/components/shared/status-badge'
+import ListState from '@/components/shared/list-state'
 import { ApiError, fetchApi } from '@/lib/api'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import { createPollGeneration, startVisiblePoll } from '@/lib/visible-polling'
@@ -318,7 +319,7 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
             </div>
           </div>
           <div className="max-h-[520px] divide-y divide-divider-soft overflow-y-auto lg:max-h-none lg:h-[calc(100%-116px)]">
-            {loading ? <div className="p-10 text-center text-sm text-ink-faint">読み込み中...</div> : items.length === 0 ? <div className="p-10 text-center text-sm text-ink-faint">対応待ちはありません</div> : items.map((item) => (
+            {loading ? <ListState kind="loading" title="対応待ちを読み込んでいます" /> : items.length === 0 ? <ListState kind="empty" title="対応待ちはありません" description="新しい受信があると、ここに並びます。" /> : items.map((item) => (
               <button key={item.id} onClick={() => choose(item)} className={`w-full p-4 text-left transition-colors hover:bg-canvas-sunken ${selected?.id === item.id ? 'bg-success-bg ring-1 ring-inset ring-success' : ''}`}>
                 <div className="flex items-start gap-3">
                   <Avatar name={item.customerName} src={item.pictureUrl ?? null} size={40} />

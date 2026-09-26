@@ -8,6 +8,7 @@ import Dialog from '@/components/shared/dialog'
 import Select from '@/components/shared/select'
 import Pagination from '@/components/shared/pagination'
 import ListRange from '@/components/ui/list-range'
+import ListState from '@/components/shared/list-state'
 import { checkedAtText, referenceKindText, referenceNameText } from './media-delete-impact'
 
 export default function MediaReplacementDialog({
@@ -191,15 +192,27 @@ export default function MediaReplacementDialog({
             <Button type="submit">検索</Button>
           </form>
           {candidatePhase === 'loading' ? (
-            <p className="text-ink-faint mt-2 text-xs" role="status">差し替え候補を読み込んでいます…</p>
+            <ListState kind="loading" title="差し替え候補を読み込んでいます" />
           ) : candidatePhase === 'error' ? (
-            <p className="text-danger mt-2 text-xs" role="alert">差し替え候補を読み込めませんでした。読み直してから、もう一度お試しください。</p>
+            <ListState
+              kind="error"
+              title="差し替え候補を読み込めませんでした"
+              description="読み直してから、もう一度お試しください。"
+            />
           ) : candidatePhase === 'empty' ? (
-            <p className="text-ink-faint mt-2 text-xs">
-              {candidateQuery
-                ? `「${candidateQuery}」に合う候補が見つかりませんでした。`
-                : '同じ種類の別メディアがありません。先に差し替え先を登録してください。'}
-            </p>
+            <ListState
+              kind="empty"
+              title={
+                candidateQuery
+                  ? `「${candidateQuery}」に合う候補が見つかりませんでした`
+                  : '同じ種類の別メディアがありません'
+              }
+              description={
+                candidateQuery
+                  ? '検索語を変えてください。'
+                  : '先に差し替え先を登録してください。'
+              }
+            />
           ) : (
             <>
               <Select

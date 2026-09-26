@@ -6,6 +6,7 @@ import { api, fetchApi } from '@/lib/api'
 import { resolveStoreReturnPath } from '@/lib/hq-navigation'
 import { useAccount, type AccountWithStats } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
+import ListState from '@/components/shared/list-state'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import HqAccountList from '@/components/hq/account-list'
 import AccountEditModal from '@/components/accounts/account-edit-modal'
@@ -157,13 +158,12 @@ export default function HqPage() {
       ) : null}
 
       {!error && !loading && accounts.length === 0 ? (
-        <section data-design="Empty" className="rounded-card border border-hairline bg-canvas px-6 py-16 text-center shadow-sm">
-          <h2 className="text-xl font-bold text-ink">まだアカウントがありません</h2>
-          <p className="mt-2 text-sm text-ink-secondary">最初のLINE公式アカウントを登録すると、ここからアカウントへログインできます。</p>
-          <Button href="/accounts/new" variant="primary" className="mt-6">
-            ＋ LINEアカウントを新規登録
-          </Button>
-        </section>
+        <ListState
+          kind="empty"
+          title="まだアカウントがありません"
+          description="最初のLINE公式アカウントを登録すると、ここからアカウントへログインできます。"
+          action={<Button href="/accounts/new" variant="primary">＋ LINEアカウントを新規登録</Button>}
+        />
       ) : null}
 
       {!error && !loading && accounts.length > 0 ? (

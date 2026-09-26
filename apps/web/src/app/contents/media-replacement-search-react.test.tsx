@@ -184,7 +184,7 @@ describe('差し替え候補の名前検索（N-205）', () => {
   it('候補の読込中・0件・失敗を分けて出す', async () => {
     fixture.listQueue.push(new Promise((resolve, reject) => { fixture.pending.push({ resolve, reject }) }))
     await renderDialog()
-    expect(dialog().textContent).toContain('差し替え候補を読み込んでいます…')
+    expect(dialog().textContent).toContain('差し替え候補を読み込んでいます')
 
     // 失敗（0件とも混ざらない案内）。
     await act(async () => {

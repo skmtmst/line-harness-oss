@@ -3,6 +3,7 @@
 import InboxRow, { type InboxRowData } from './inbox-row'
 import ListRange from '@/components/ui/list-range'
 import Pagination from '@/components/shared/pagination'
+import ListState from '@/components/shared/list-state'
 
 
 
@@ -30,9 +31,11 @@ export default function InboxList({
   return (
     <div className="overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-gray-200">
       {rows.length === 0 && !loading ? (
-        <div className="px-4 py-12 text-center text-sm text-gray-400">
-          未対応はありません
-        </div>
+        <ListState
+          kind="empty"
+          title="未対応はありません"
+          description="新しい受信があると、ここに並びます。"
+        />
       ) : (
         <div>
           {rows.map((row) => (
