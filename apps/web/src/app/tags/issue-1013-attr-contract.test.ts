@@ -71,8 +71,8 @@ describe('ATTR-06: マーク作成と自動ルールの有効化を分ける', (
     // 以前は useState(true) で、何もしなくても有効なルールが作られた。
     expect(MARK_EDITOR).toContain('const [createRule, setCreateRule] = useState(false)')
     expect(MARK_EDITOR).not.toContain('const [createRule, setCreateRule] = useState(true)')
-    // 利用者が「＋ ルールを追加」を押したときだけルールを作る。
-    expect(MARK_EDITOR).toContain('＋ ルールを追加')
+    // 利用者が「＋ ルールを作る」を押したときだけルールを作る。
+    expect(MARK_EDITOR).toContain('＋ ルールを作る')
     expect(MARK_EDITOR).toContain('ルールを外す')
     // 有効化も利用者が選ぶ（外せる・無効のまま登録できる）。
     expect(MARK_EDITOR).toContain('このルールを有効にして登録する')

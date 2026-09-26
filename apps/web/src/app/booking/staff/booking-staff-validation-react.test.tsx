@@ -95,7 +95,7 @@ function deferred<T>() {
 async function openCreateModal() {
   render(<BookingStaffPage />)
   await screen.findByText('予約スタッフはまだいません')
-  fireEvent.click(screen.getByRole('button', { name: '+ 新規スタッフ' }))
+  fireEvent.click(screen.getByRole('button', { name: '＋ スタッフを作る' }))
   await screen.findByText('新規スタッフ')
 }
 
@@ -248,7 +248,7 @@ describe('N-411 項目別権限と画面の一致（実React）', () => {
     fixture.listStaff.mockResolvedValue({ staff: [STAFF_ROW] })
     render(<BookingStaffPage />)
     await screen.findByText('佐藤')
-    const create = screen.getByRole('button', { name: '+ 新規スタッフ' }) as HTMLButtonElement
+    const create = screen.getByRole('button', { name: '＋ スタッフを作る' }) as HTMLButtonElement
     expect(create.disabled).toBe(true)
     expect(screen.queryByText('編集')).toBeNull()
     expect(screen.queryByText('削除')).toBeNull()
@@ -261,9 +261,12 @@ describe('N-411 項目別権限と画面の一致（実React）', () => {
     fixture.listStaff.mockResolvedValue({ staff: [STAFF_ROW] })
     render(<BookingStaffPage />)
     await screen.findByText('佐藤')
-    expect((screen.getByRole('button', { name: '+ 新規スタッフ' }) as HTMLButtonElement).disabled).toBe(false)
+    expect((screen.getByRole('button', { name: '＋ スタッフを作る' }) as HTMLButtonElement).disabled).toBe(false)
     expect(screen.getByText('編集')).toBeTruthy()
-    expect(screen.getByRole('button', { name: '佐藤を削除' })).toBeTruthy()
+    // 削除は行に直に置かず、…メニューの中の危ない操作にある。
+    expect(screen.queryByRole('menuitem', { name: '削除する' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '佐藤のその他操作' }))
+    expect(screen.getByRole('menuitem', { name: '削除する' })).toBeTruthy()
   })
 
   test('権限の無い staff が新規登録画面を直URLで開いても保存導線を出さない', async () => {

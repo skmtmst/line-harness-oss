@@ -32,7 +32,7 @@ describe('友だち詳細 監査#1011の契約', () => {
   it('FRIEND-23: 権限で隠れた項目と「項目なし」を分ける', () => {
     expect(PAGE).toContain('hiddenPersonalCount > 0')
     expect(PAGE).toContain('個人情報の閲覧権限が要ります')
-    // 権限で隠れているだけのときは「項目を追加」を勧めない。
+    // 権限で隠れているだけのときは「項目を作る」を勧めない。
     expect(PAGE).toContain('canManageFieldDefs && hiddenPersonalCount === 0')
   })
 
