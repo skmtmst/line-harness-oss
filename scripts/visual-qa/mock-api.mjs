@@ -2219,8 +2219,47 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     // 設計 `xGLVe` のトーク欄。載っていない友だちは空で返す（実際に空の人もいる）。
     return { success: true, data: FRIEND_MESSAGES[messages[1]] ?? [] }
   }
-  // テンプレート選択（設計 `NfgOs` / `NWbuF`）。空だと選ぶものが1つも出ない。
-  if (pathname === '/api/templates') return { success: true, data: TEMPLATES }
+  /*
+   * テンプレート選択（設計 `NfgOs` / `NWbuF`）。空だと選ぶものが1つも出ない。
+   *
+   * 実Workerは口を2つに分けている。`page` か `limit` が付くとページ区切りの
+   * `{ items, total, limit, sort }` を返し、無ければ配列のまま返す
+   * （`apps/worker/src/routes/templates.ts`）。受信箱のテンプレート選択は
+   * 区切り形だけを読むので、ここも同じ分け方にする。ずれていると
+   * `items` が undefined になって画面ごと落ちる。
+   */
+  if (pathname === '/api/templates') {
+    if (query.has('page') || query.has('limit')) {
+      const q = query.get('q')?.toLowerCase()
+      const folderId = query.get('folder_id')
+      const messageType = query.get('message_type')
+      const filtered = TEMPLATES.filter((item) =>
+        (messageType ? item.messageType === messageType : true)
+        && (folderId ? (folderId === '__none__' ? !item.folderId : item.folderId === folderId) : true)
+        && (q ? item.name.toLowerCase().includes(q) || item.messageContent.toLowerCase().includes(q) : true))
+      const limit = Math.max(1, Number(query.get('limit') ?? 100) || 100)
+      const page = Math.max(1, Number(query.get('page') ?? 1) || 1)
+      const items = filtered.slice((page - 1) * limit, page * limit)
+      const folderCounts = query.get('folder_counts') === '1'
+        ? filtered.reduce((acc, item) => {
+            const key = item.folderId ?? ''
+            acc[key] = (acc[key] ?? 0) + 1
+            return acc
+          }, {})
+        : undefined
+      return {
+        success: true,
+        data: {
+          items,
+          total: filtered.length,
+          limit,
+          sort: [{ field: 'created_at', direction: 'desc' }, { field: 'id', direction: 'asc' }],
+          ...(folderCounts ? { folderCounts } : {}),
+        },
+      }
+    }
+    return { success: true, data: TEMPLATES }
+  }
   const templateDetail = /^\/api\/templates\/(template-\d+)$/.exec(pathname)
   if (templateDetail) {
     const template = TEMPLATES.find((item) => item.id === templateDetail[1])
