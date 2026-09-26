@@ -35,6 +35,11 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  /*
+   * 題の行の高さは 20px にそろえる。「？」の有無で数字の位置が
+   * ずれないようにする（？自体は 18px の箱で、行を伸ばさない）。
+   */
+  min-height: 20px;
 }
 
 .retry {
