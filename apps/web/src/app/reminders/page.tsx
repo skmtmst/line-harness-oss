@@ -172,7 +172,7 @@ export default function RemindersPage() {
     {moveError ? <div className="bg-danger-bg text-danger mb-3 rounded-lg p-3 text-sm">{moveError}</div> : null}
     <div data-design="Body" style={FOLDER_RAIL_STYLE} className="grid gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
       <FolderPanel
-        total={loading || error ? '—' : `${listTotal}件`}
+        /* R12: 総数は「すべて」の行と同じ数なので見出しには出さない。 */
         activeId={folderFilter}
         onSelect={setFolderFilter}
         onAddFolder={() => setFolderDialogOpen(true)}
