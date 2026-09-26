@@ -480,7 +480,7 @@ export default function FormSubmissionsPage() {
 
       <div style={FOLDER_RAIL_STYLE} className="grid items-start gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
         <FolderPanel
-          total={loading || loadError ? '— 件' : `${folderTotal} 件`}
+          /* R12: 総数は「すべて」の行と同じ数なので見出しには出さない。 */
           activeId={activeFolderId}
           onSelect={(folder) => {
             setActiveFolderId(folder)

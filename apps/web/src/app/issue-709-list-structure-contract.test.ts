@@ -50,7 +50,15 @@ describe('Issue #709: フォルダ帯の見出し件数は行が表す項目の�
 
   it('フォームはフォーム総件数を出す', () => {
     const src = read('form-submissions/page.tsx')
-    expect(src).toContain('`${folderTotal} 件`')
+    // R12: 総数は「すべて」の行に出し、見出しには重ねて出さない。
+    expect(src).toContain("{ id: 'all', label: 'すべて', count: loading || loadError ? 0 : folderTotal }")
+    expect(src).not.toContain('`${folderTotal} 件`')
+  })
+
+  it('R12: リマインダは見出しの総数を「すべて」の行と重ねて出さない', () => {
+    const src = read('reminders/page.tsx')
+    expect(src).toContain("{ id: '', label: 'すべて', count: listTotal }")
+    expect(src).not.toContain('`${listTotal}件`')
   })
 })
 

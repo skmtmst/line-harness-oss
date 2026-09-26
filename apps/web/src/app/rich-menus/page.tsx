@@ -672,15 +672,18 @@ export default function RichMenusListPage() {
         className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"
       >
         <div className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-faint text-xs">メニュー</p>
+          {/* R12: 総数は「すべて」の行とページ送りだけにし、KPIの主数値は公開中にする。 */}
+          <p className="text-ink-faint text-xs">公開中</p>
           <p className={`${groupKpiReady ? 'text-ink' : 'text-ink-faint'} mt-1 text-2xl font-bold tabular-nums`}>
-            {groupKpiReady ? (groupFacets?.total ?? groupTotal) : '—'}
+            {groupKpiReady ? (groupFacets?.published ?? '—') : '—'}
             {groupKpiReady && <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>}
           </p>
           <p className="text-ink-faint mt-0.5 text-xs">
             {groupKpiReady
-              ? `公開中 ${groupFacets?.published ?? '—'}`
-              : `公開中 —・${groupKpiUnavailableText}`}
+              ? groupFacets?.published != null
+                ? `下書き ${(groupFacets?.total ?? groupTotal) - groupFacets.published}件`
+                : `下書き —`
+              : `下書き —・${groupKpiUnavailableText}`}
           </p>
         </div>
         <div className="bg-canvas rounded-card border-hairline border p-4">
@@ -734,7 +737,7 @@ export default function RichMenusListPage() {
       >
         <div className="flex flex-wrap items-center gap-2">
           <Button href="/rich-menus/new" variant="primary">
-            メニューを作る
+            ＋ メニューを作る
           </Button>
           <Button
             onClick={() => {
@@ -858,7 +861,7 @@ export default function RichMenusListPage() {
                 kind="empty"
                 title="まだリッチメニューがありません"
                 description="トークの下に出すメニューを作れます。"
-                action={<Button href="/rich-menus/new" variant="primary">メニューを作る</Button>}
+                action={<Button href="/rich-menus/new" variant="primary">＋ メニューを作る</Button>}
               />
             ) : (
               <section className="border-hairline bg-canvas rounded-card overflow-hidden border shadow-card">
