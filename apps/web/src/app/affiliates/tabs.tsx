@@ -625,11 +625,12 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
           onChange={(value) => { setPageSize(Number(value)); setPage(1) }}
           size="page-size"
         />
+        {/* 作る操作は行の左。たまに使う CSV は右に残す。 */}
+        <AffiliateButton variant="primary" onClick={() => setCreateOpen(true)}>
+          ＋ アフィリエイターを作る
+        </AffiliateButton>
         <AffiliateButton onClick={exportAffiliatesCsv} disabled={shownRows.length === 0} className="ml-auto">
           CSVで書き出す
-        </AffiliateButton>
-        <AffiliateButton variant="primary" onClick={() => setCreateOpen(true)}>
-          アフィリエイターを追加
         </AffiliateButton>
       </div>
 
@@ -688,7 +689,7 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
           kind="empty"
           title="紹介者はまだ登録されていません"
           description="紹介してくれる方を登録すると、専用リンクと成果を管理できます。"
-          action={<Button variant="primary" onClick={() => setCreateOpen(true)}>アフィリエイターを追加</Button>}
+          action={<Button variant="primary" onClick={() => setCreateOpen(true)}>＋ アフィリエイターを作る</Button>}
         />
       ) : shownRows.length === 0 ? (
         <ListState
@@ -2381,7 +2382,7 @@ function OffersList({
         kind="empty"
         title="案件はまだ登録されていません"
         description="何をしたら成果になり、いくら払うかを決めると、アフィリエイターが紹介できるようになります。"
-        action={<Button href="/affiliate-offers/new" variant="primary">案件を作る</Button>}
+        action={<Button href="/affiliate-offers/new" variant="primary">＋ 案件を作る</Button>}
       />
     )
   }
@@ -2654,12 +2655,13 @@ export function OffersTab() {
           size="page-size"
         />
         {/* 「並び順を保存」は設計にあるが、保存する口が無いので置かない。 */}
+        {/* 作る操作は行の左。たまに使う CSV は右に残す。 */}
+        <Button href="/affiliate-offers/new" variant="primary">
+          ＋ 案件を作る
+        </Button>
         <AffiliateButton onClick={exportCsv} disabled={shown.length === 0} className="ml-auto">
           CSVで書き出す
         </AffiliateButton>
-        <Button href="/affiliate-offers/new" variant="primary">
-          案件を作る
-        </Button>
       </div>
 
       <div className="mb-3 flex flex-wrap items-center gap-2">

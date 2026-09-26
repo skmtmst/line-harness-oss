@@ -34,7 +34,7 @@ describe('Issue #451 V6画面名はトップバーだけに置く', () => {
     const autoReplies = read('auto-replies/page.tsx')
     expect(webhooks.indexOf('data-design="Crumb"')).toBeLessThan(webhooks.indexOf('<MergedTabs'))
     expect(autoReplies.indexOf('data-design="KPIs"')).toBeLessThan(autoReplies.indexOf('data-design="Actions"'))
-    expect(autoReplies).toContain('ルールを作成')
+    expect(autoReplies).toContain('＋ ルールを作る')
   })
 
   it('一斉配信詳細のCSV操作を下部追従バーへ置く', () => {

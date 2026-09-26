@@ -190,7 +190,7 @@ describe('V6 案件一覧（GH8VL）の画面', () => {
   })
 })
 
-describe('V6 アフィリエイターを追加する（xqT1Z）', () => {
+describe('V6 アフィリエイターを作る（xqT1Z）', () => {
   it('設計のV6寸法を使う版を指定する', () => {
     expect(NEW_PAGE).toContain('variant="v6"')
     expect(NEW_PAGE).toContain('designNode="xqT1Z"')

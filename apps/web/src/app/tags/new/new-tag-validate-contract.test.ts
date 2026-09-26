@@ -25,7 +25,7 @@ describe('タグ作成の名前検査の契約', () => {
     expect(ROUTE).toContain('<NewTagPageV4 />')
     expect(ROUTE).not.toContain('LegacyNewTagPage')
     expect(ROUTE).not.toContain('CreatePage')
-    expect(LIST).toContain('<Button href="/tags/new" variant="primary">＋ タグを追加</Button>')
+    expect(LIST).toContain('<Button href="/tags/new" variant="primary">＋ タグを作る</Button>')
     expect(EDITOR).toContain('href={`/tags/new?copy=${tag?.id ?? \'\'}`}')
   })
 

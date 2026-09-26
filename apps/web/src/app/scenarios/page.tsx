@@ -735,12 +735,12 @@ export default function ScenariosPage() {
       {/* 一覧本体（設計 `Body`）。 */}
       <div data-design="Body">
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <button
+        <Button
+          variant="primary"
           onClick={handleCreate}
-          className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50"
         >
-          ＋ シナリオを作成
-        </button>
+          ＋ シナリオを作る
+        </Button>
       </div>
       {/*
         設計はフォルダを左の縦パネルに置く。シナリオはフォルダを持って

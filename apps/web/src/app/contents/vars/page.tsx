@@ -942,15 +942,20 @@ function VarsPageInner() {
                             )}
                           </td>
                           <td className="bg-canvas group-hover:bg-canvas-sunken whitespace-nowrap sticky right-0 px-4 py-3 text-right" title="編集・削除">
+                            {/*
+                              行の操作は同じ高さ（32）にそろえる。削除は撮影入口
+                             （data-qa-open="yPkWe"）のため行に残す。
+                            */}
                             <span className="inline-flex items-center justify-end gap-2">
-                              <Link
+                              <Button
                                 href={`/contents/vars/edit?id=${item.id}`}
-                                className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded border px-2 py-1 text-xs"
+                                size="compact"
                               >
                                 編集
-                              </Link>
+                              </Button>
                               <Button
                                 type="button"
+                                size="compact"
                                 onClick={() => void openSingleDelete(item)}
                                 data-qa-open="yPkWe"
                                 aria-label={`${item.name}を削除`}
