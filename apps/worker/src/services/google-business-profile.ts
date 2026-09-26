@@ -53,6 +53,8 @@ export interface GoogleProfile {
   openStatus: string | null; // OPEN / CLOSED_TEMPORARILY / CLOSED_PERMANENTLY
   regularHours: WeeklyHours;
   specialHours: SpecialDay[];
+  /** Google が返した specialHours の原文。送信時、変更しない日はこの原文をそのまま送り返す（変換で意味が変わるのを防ぐ）。 */
+  rawSpecialHours: GoogleSpecialHourPeriod[];
   mapsUri: string | null;
   /** 取得時の内容から作る指紋。送信前照合に使う。 */
   fingerprint: string;
@@ -75,7 +77,7 @@ interface GoogleDate {
   month?: number;
   day?: number;
 }
-interface GoogleSpecialHourPeriod {
+export interface GoogleSpecialHourPeriod {
   startDate?: GoogleDate;
   openTime?: GoogleTimeOfDay;
   endDate?: GoogleDate;
@@ -170,11 +172,27 @@ export function specialFromGoogle(periods: GoogleSpecialHourPeriod[] | undefined
       entry.closed = true;
       entry.periods = [];
     } else if (!entry.closed) {
-      entry.periods.push({ open: timeToString(p.openTime), close: timeToString(p.closeTime) });
+      // endDate が翌日で closeTime が 0:00 なら「同日 24:00 まで」。endDate が翌日でそれ以外なら日跨ぎ（close<open）。
+      // endDate が2日以上先のものは画面で表せないので、その日の 24:00 までとして扱う（送り直すと切り詰まるため、
+      // 呼び出し側は通常この形を再送しない）。
+      const endDate = dateToString(p.endDate) ?? date;
+      const close = timeToString(p.closeTime);
+      const closeStr = endDate === date ? close : endDate === addDays(date, 1) ? close : '00:00';
+      entry.periods.push({ open: timeToString(p.openTime), close: closeStr });
     }
     byDate.set(date, entry);
   }
   return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date)).map((d) => ({ ...d, periods: d.periods.sort((a, b) => a.open.localeCompare(b.open)) }));
+}
+
+/**
+ * 送信用：変更する日付だけ画面の値から作り、それ以外の日は Google の原文（rawSpecialHours）をそのまま返す。
+ * specialHours は全置換なので、変換の往復で他の日が変わる事故（0:00 終了が翌日へ延びた 2026-09-26 の事故）を構造的に防ぐ。
+ */
+export function mergeSpecialHours(raw: GoogleSpecialHourPeriod[], changed: SpecialDay[]): { untouched: GoogleSpecialHourPeriod[]; changed: SpecialDay[] } {
+  const targets = new Set(changed.map((d) => d.date));
+  const untouched = raw.filter((p) => { const d = dateToString(p.startDate); return !d || !targets.has(d); });
+  return { untouched, changed };
 }
 
 /** 日付ごとの形 → Google の specialHours（全置換されるので、必ず全日分を渡す）。 */
@@ -186,7 +204,9 @@ export function specialToGoogle(days: SpecialDay[]): { specialHourPeriods: Googl
       continue;
     }
     for (const p of d.periods) {
-      const overnight = p.close <= p.open;
+      // 終了 00:00 は「同日の 24:00」。翌日にまたぐのは 00:00 以外で終了≦開始のときだけ
+      // （00:00 を翌日扱いにすると「翌日 24:00 まで」＝翌日が24時間営業になってしまう）。
+      const overnight = p.close !== '00:00' && p.close <= p.open;
       const end = overnight ? addDays(d.date, 1) : d.date;
       out.push({
         startDate: stringToDate(d.date),
@@ -313,7 +333,7 @@ export async function normalizeProfile(raw: RawLocation, locationName: string): 
     specialHours,
     mapsUri: raw.metadata?.mapsUri ?? null,
   };
-  return { ...base, fingerprint: await fingerprintOf(base) };
+  return { ...base, rawSpecialHours: raw.specialHours?.specialHourPeriods ?? [], fingerprint: await fingerprintOf(base) };
 }
 
 // ---------- Google API ----------
@@ -376,6 +396,8 @@ export async function getGoogleUpdates(options: RequestOptions, locationName: st
 export type ProfilePatch =
   | { field: 'regularHours'; value: WeeklyHours }
   | { field: 'specialHours'; value: SpecialDay[] }
+  /** 変更しない日は Google の原文をそのまま、変更する日だけ画面の値から作る。 */
+  | { field: 'specialHoursMerged'; value: { untouched: GoogleSpecialHourPeriod[]; changed: SpecialDay[] } }
   | { field: 'title'; value: string }
   | { field: 'phone'; value: string | null }
   | { field: 'websiteUri'; value: string | null }
@@ -389,6 +411,8 @@ export function buildPatch(patch: ProfilePatch): { updateMask: string; body: Rec
       return { updateMask: 'regularHours', body: { regularHours: weeklyToGoogle(patch.value) } };
     case 'specialHours':
       return { updateMask: 'specialHours', body: { specialHours: specialToGoogle(patch.value) } };
+    case 'specialHoursMerged':
+      return { updateMask: 'specialHours', body: { specialHours: { specialHourPeriods: [...patch.value.untouched, ...specialToGoogle(patch.value.changed).specialHourPeriods] } } };
     case 'title':
       return { updateMask: 'title', body: { title: patch.value } };
     case 'phone':
