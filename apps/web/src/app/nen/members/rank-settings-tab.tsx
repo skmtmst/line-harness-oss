@@ -158,7 +158,7 @@ export default function RankSettingsTab({
   return (
     <>
       <div data-design="Note" data-design-node="CmAMb">
-        <NoteBar tone="info">
+        <NoteBar tone="info" help="通年の購入額でランクが決まります" helpLabel="ランクの決まり">
           通年（1月1日〜12月31日の購入額）でランクが決まります。保存するとECへ同期され、次のお買い物からマイル還元が変わります。
         </NoteBar>
       </div>

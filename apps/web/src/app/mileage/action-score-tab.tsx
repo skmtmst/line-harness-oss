@@ -199,10 +199,10 @@ export default function ActionScoreTab({ accountId }: { accountId: string }) {
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <SummaryCard variant="v6" title="点数がついている人" value={summary?.scoredFriends ?? null} unit="人" detail="選択中のLINEアカウント" />
-        <SummaryCard variant="v6" title={`高い（${summary?.highMin ?? 70}点以上）`} value={summary?.high ?? null} unit="人" detail="よく反応している帯" />
-        <SummaryCard variant="v6" title={`ふつう（${summary?.normalMin ?? 30}〜${(summary?.highMin ?? 70) - 1}点）`} value={summary?.normal ?? null} unit="人" detail="反応が続いている帯" />
-        <SummaryCard variant="v6" title={`低い（${(summary?.normalMin ?? 30) - 1}点以下）`} value={summary?.low ?? null} unit="人" detail="直近の反応が少ない帯" />
+        <SummaryCard variant="v6" title="点数がついている人" value={summary?.scoredFriends ?? null} unit="人" detail="" help="選択中のLINEアカウントの人数です" />
+        <SummaryCard variant="v6" title={`高い（${summary?.highMin ?? 70}点以上）`} value={summary?.high ?? null} unit="人" detail="" help="よく反応している帯です" />
+        <SummaryCard variant="v6" title={`ふつう（${summary?.normalMin ?? 30}〜${(summary?.highMin ?? 70) - 1}点）`} value={summary?.normal ?? null} unit="人" detail="" help="反応が続いている帯です" />
+        <SummaryCard variant="v6" title={`低い（${(summary?.normalMin ?? 30) - 1}点以下）`} value={summary?.low ?? null} unit="人" detail="" help="直近の反応が少ない帯です" />
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">

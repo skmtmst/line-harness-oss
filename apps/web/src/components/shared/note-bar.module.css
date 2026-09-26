@@ -55,4 +55,13 @@
   margin-left: auto;
   flex: none;
 }
+
+/*
+ * 「？」の吹き出しの中の「くわしく」。見た目は HelpTip 側が持つ。
+ * ここでは押せるものとして輪郭の存在を契約へ示す。
+ */
+.note a:focus-visible {
+  outline: 2px solid var(--color-status-info);
+  outline-offset: 1px;
+}
 }

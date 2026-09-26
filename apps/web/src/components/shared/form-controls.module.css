@@ -5,10 +5,17 @@
 
 .label {
   display: block;
-  margin-bottom: 4px;
   color: var(--color-ink-secondary);
   font-size: var(--text-body);
   font-weight: 500;
+}
+
+/* ラベルと「？」の行。？は label の外に置き、横に並べる。 */
+.labelRow {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-bottom: 4px;
 }
 
 /*

@@ -38,4 +38,33 @@ describe('補足の「？」', () => {
     expect(first.queryByText('1つ目。')).toBeNull()
     expect(second.queryByText('2つ目。')).not.toBeNull()
   })
+
+  it('閉じている時は aria-describedby を付けない', () => {
+    const { container } = render(<HelpTip label="人数の説明">送る相手の数。</HelpTip>)
+    expect(container.querySelector('button')!.hasAttribute('aria-describedby')).toBe(false)
+  })
+
+  it('Esc で閉じると押した？へ戻る', () => {
+    const { container, queryByText } = render(<HelpTip label="人数の説明">送る相手の数。</HelpTip>)
+    const button = container.querySelector('button')!
+    fireEvent.click(button)
+    expect(queryByText('送る相手の数。')).not.toBeNull()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(queryByText('送る相手の数。')).toBeNull()
+    expect(document.activeElement).toBe(button)
+  })
+
+  it('「くわしく」は本文（children）と一緒に渡す', () => {
+    const { container, getByText, queryByText } = render(
+      <HelpTip label="用語の説明">
+        ひとことです。<a href="/manual#word">くわしく</a>
+      </HelpTip>,
+    )
+    // 閉じている間は本文もリンクも出さない。
+    expect(queryByText('ひとことです。')).toBeNull()
+    fireEvent.click(container.querySelector('button')!)
+    expect(getByText('ひとことです。')).not.toBeNull()
+    const more = getByText('くわしく')
+    expect(more.getAttribute('href')).toBe('/manual#word')
+  })
 })

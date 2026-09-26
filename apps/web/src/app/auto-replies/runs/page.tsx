@@ -248,9 +248,9 @@ function AutoReplyRunsInner() {
       <div className={styles.columns}>
         <div className={styles.main}>
           <section className={styles.summary} aria-label="実行結果のまとめ">
-            <SummaryCard variant="v6" title="今月ヒット" value={data?.summary.monthHits ?? null} unit="回" detail="今月、条件に合った回数" loading={loading} />
-            <SummaryCard variant="v6" title="累計ヒット" value={data?.summary.totalHits ?? null} unit="回" detail="記録を開始してからの合計" loading={loading} />
-            <SummaryCard variant="v6" title="引継ぎ" value={data?.summary.handovers ?? null} unit="件" detail="担当者へ渡した件数" loading={loading} />
+            <SummaryCard variant="v6" title="今月ヒット" value={data?.summary.monthHits ?? null} unit="回" detail="" help="今月、条件に合った回数です" loading={loading} />
+            <SummaryCard variant="v6" title="累計ヒット" value={data?.summary.totalHits ?? null} unit="回" detail="" help="記録を開始してからの合計です" loading={loading} />
+            <SummaryCard variant="v6" title="引継ぎ" value={data?.summary.handovers ?? null} unit="件" detail="" help="担当者へ渡した件数です" loading={loading} />
             <SummaryCard variant="v6" title="エラー" value={data?.summary.errors ?? null} unit="件" detail="失敗した実行を確認" badgeTone="danger" loading={loading} />
           </section>
 
