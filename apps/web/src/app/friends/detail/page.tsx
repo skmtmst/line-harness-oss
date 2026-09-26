@@ -1087,11 +1087,7 @@ function FriendDetailInner() {
    * 移動。どちらも選んだ先で操作・取消・完了まで辿れるものだけを並べる。
    */
   const primaryActions: ActionMenuItem[] = [
-    {
-      id: 'inbox',
-      label: '受信箱で開く',
-      onSelect: () => router.push(inboxHrefForFriend(friendId)),
-    },
+    // 「受信箱で開く」は画面右上のボタンにあるので、メニューには重ねない（★V7）。
     ...(canEditSupport
       ? [{
           id: 'support',
@@ -1117,20 +1113,24 @@ function FriendDetailInner() {
       : []),
     {
       id: 'send-template',
-      label: 'テンプレートを送る（受信箱で選択）',
+      label: 'テンプレートを送る',
+      description: '受信箱で選んで送ります',
+      external: true,
       onSelect: () => router.push(inboxHrefForFriend(friendId)),
     },
   ]
+  // どれも別画面への移動なので ↗ を付ける（★V7）。
   const secondaryActions: ActionMenuItem[] = [
-    { id: 'templates', label: 'テンプレート一覧を見る', onSelect: () => router.push('/templates') },
-    { id: 'scenarios', label: 'シナリオ一覧を見る', onSelect: () => router.push('/scenarios') },
-    { id: 'reminders', label: 'リマインダ一覧を見る', onSelect: () => router.push('/reminders') },
-    { id: 'mileage', label: 'マイルを確認', onSelect: () => router.push('/mileage') },
-    { id: 'duplicates', label: '重複候補を確認', onSelect: () => router.push('/duplicates') },
+    { id: 'templates', label: 'テンプレート一覧を見る', external: true, onSelect: () => router.push('/templates') },
+    { id: 'scenarios', label: 'シナリオ一覧を見る', external: true, onSelect: () => router.push('/scenarios') },
+    { id: 'reminders', label: 'リマインダ一覧を見る', external: true, onSelect: () => router.push('/reminders') },
+    { id: 'mileage', label: 'マイルを確認', external: true, onSelect: () => router.push('/mileage') },
+    { id: 'duplicates', label: '重複候補を確認', external: true, onSelect: () => router.push('/duplicates') },
     {
       id: 'back-to-list',
       label: '友だち一覧へ戻る',
       dividerBefore: true,
+      external: true,
       onSelect: () => router.push('/friends'),
     },
   ]

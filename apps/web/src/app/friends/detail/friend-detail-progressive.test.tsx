@@ -299,11 +299,13 @@ describe('NEXT-08 「個別操作」「…」が操作メニューにつなが�
     })
     expect(host.innerHTML).not.toBe(before)
     const labels = menuItems().map((b) => b.textContent)
-    expect(labels).toContain('受信箱で開く')
+    // ★V7（m13g）：「受信箱で開く」は画面右上のボタンにあるので、メニューには重ねない。
+    expect(labels.some((text) => text === '受信箱で開く')).toBe(false)
+    expect(labels.some((text) => text?.includes('テンプレートを送る'))).toBe(true)
     expect(labels).toContain('シナリオに登録')
 
     await act(async () => {
-      menuItems().find((b) => b.textContent === '受信箱で開く')!.click()
+      menuItems().find((b) => b.textContent?.includes('テンプレートを送る'))!.click()
     })
     expect(net.pushed).toContain('/chats?friend=friend-1')
   })
