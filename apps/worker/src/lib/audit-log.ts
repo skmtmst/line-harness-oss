@@ -117,6 +117,13 @@ export type AuditAction =
   | 'webhook.api_token.create'
   | 'webhook.api_token.revoke'
   | 'webhook.api_token.rotate'
+  // #838 第2段: Google Sheets 連携の接続・切断・出力先変更・手動同期。
+  | 'google.sheets.connect.start'
+  | 'google.sheets.connect'
+  | 'google.sheets.reconnect'
+  | 'google.sheets.disconnect'
+  | 'google.sheets.target.update'
+  | 'google.sheets.sync'
   | 'restaurant.google.store.bootstrap'
   | 'restaurant.google.connect.start'
   | 'restaurant.google.connect'

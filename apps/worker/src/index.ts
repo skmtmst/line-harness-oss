@@ -151,6 +151,7 @@ import { dashboard } from './routes/dashboard.js';
 import { siteTracking } from './routes/site-tracking.js';
 import { restaurantTest } from './routes/restaurant-test.js';
 import { restaurantGoogle } from './routes/restaurant-google.js';
+import { googleSheets } from './routes/google-sheets.js';
 import { restaurantGoogleProfile } from './routes/restaurant-google-profile.js';
 import { tenants } from './routes/tenants.js';
 import { ops } from './routes/ops.js';
@@ -281,6 +282,9 @@ export type Env = {
     GOOGLE_BUSINESS_WRITE_ENABLED?: string;
     /** 口コミ返信の下書きに使う Workers AI のモデル。未設定なら OPS_SUPPORT_AI_MODEL → 既定値。 */
     GOOGLE_BUSINESS_AI_MODEL?: string;
+    /** Google Sheets連携(#838)：利用者のGoogleアカウントで認可するOAuthクライアント。環境ごとに分ける。 */
+    GOOGLE_SHEETS_OAUTH_CLIENT_ID?: string;
+    GOOGLE_SHEETS_OAUTH_CLIENT_SECRET?: string;
     ECCUBE_WEBHOOK_SECRET?: string;
     NEN_EC_BASE_URL?: string;
     NEN_RICH_MENU_STORE_URL?: string;
@@ -546,6 +550,7 @@ app.route('/', siteTracking);
 app.route('/', restaurantTest);
 app.route('/', restaurantGoogle);
 app.route('/', restaurantGoogleProfile);
+app.route('/', googleSheets);
 app.route('/', tenants);
 app.route('/', hqBanners);
 app.route('/', hqSupport);
@@ -1509,6 +1514,20 @@ async function runFrequentHeavyJobs(
         });
         if (result.generated + result.failed > 0) {
           console.log(JSON.stringify({ event: 'scheduled_exports_tick', ...result }));
+        }
+      },
+    },
+    {
+      // #838 第2段: Google Sheets への日次同期。その日(JST)の scheduled
+      // 実行が済んでいる連携は飛ばし、未実行分だけ6時間tickのどれか1回が回す。
+      name: 'google sheets sync',
+      run: async () => {
+        const { processDueGoogleSheetsSyncs } = await import('./services/google-sheets.js');
+        const result = await processDueGoogleSheetsSyncs(env, {
+          now: new Date(event.scheduledTime).toISOString(),
+        });
+        if (result.synced + result.failed > 0) {
+          console.log(JSON.stringify({ event: 'google_sheets_sync_tick', ...result }));
         }
       },
     },

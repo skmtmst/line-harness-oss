@@ -255,6 +255,15 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
     enforcement: { mode: 'exempt', reason: '既存の書き出し台帳へ行を足すだけで、外部呼び出しも機能の状態更新もしない' },
   },
   {
+    name: 'google sheets sync',
+    classification: { kind: 'feature', featureId: 'external_integrations' },
+    enforcement: {
+      mode: 'gated',
+      sources: ['apps/worker/src/services/google-sheets.ts'],
+      markers: ["'external_integrations', 'google sheets sync'"],
+    },
+  },
+  {
     name: 'media usage scan',
     classification: { kind: 'feature', featureId: 'media' },
     enforcement: {
