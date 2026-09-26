@@ -62,6 +62,32 @@ describe('営業時間の変換', () => {
     expect(specialToGoogle(days).specialHourPeriods[0]).toMatchObject({ closed: true });
   });
 
+  it('specialHours の 0:00 終了は「同日 24:00」で送り、翌日にまたがせない（翌日が24時間営業になる事故の再発防止）', () => {
+    const sent = specialToGoogle([
+      { date: '2026-09-29', closed: false, periods: [{ open: '17:00', close: '00:00' }] },
+      { date: '2026-10-03', closed: false, periods: [{ open: '18:00', close: '02:00' }] },
+    ]).specialHourPeriods;
+    expect(sent[0]).toEqual({ startDate: { year: 2026, month: 9, day: 29 }, openTime: { hours: 17, minutes: 0 }, endDate: { year: 2026, month: 9, day: 29 }, closeTime: { hours: 24, minutes: 0 } });
+    expect(sent[1]).toEqual({ startDate: { year: 2026, month: 10, day: 3 }, openTime: { hours: 18, minutes: 0 }, endDate: { year: 2026, month: 10, day: 4 }, closeTime: { hours: 2, minutes: 0 } });
+  });
+
+  it('Google が「翌日 0:00 まで」で返す枠は 00:00 終了として読み、送り直しても同じ意味になる（往復で変わらない）', () => {
+    const fromGoogle = specialFromGoogle([
+      { startDate: { year: 2026, month: 7, day: 13 }, openTime: { hours: 11 }, endDate: { year: 2026, month: 7, day: 13 }, closeTime: { hours: 15 } },
+      { startDate: { year: 2026, month: 7, day: 13 }, openTime: { hours: 17 }, endDate: { year: 2026, month: 7, day: 14 }, closeTime: { hours: 0 } },
+      { startDate: { year: 2026, month: 7, day: 20 }, openTime: { hours: 17 }, endDate: { year: 2026, month: 7, day: 20 }, closeTime: { hours: 24 } },
+      { startDate: { year: 2026, month: 7, day: 25 }, openTime: { hours: 18 }, endDate: { year: 2026, month: 7, day: 26 }, closeTime: { hours: 2 } },
+    ]);
+    expect(fromGoogle).toEqual([
+      { date: '2026-07-13', closed: false, periods: [{ open: '11:00', close: '15:00' }, { open: '17:00', close: '00:00' }] },
+      { date: '2026-07-20', closed: false, periods: [{ open: '17:00', close: '00:00' }] },
+      { date: '2026-07-25', closed: false, periods: [{ open: '18:00', close: '02:00' }] },
+    ]);
+    const resent = specialToGoogle(fromGoogle).specialHourPeriods;
+    // 7/14・7/21 などの「翌日」に枠が生えない
+    expect(resent.map((p) => `${p.startDate!.day}->${p.endDate!.day}:${p.closeTime!.hours}`)).toEqual(['13->13:15', '13->13:24', '20->20:24', '25->26:2']);
+  });
+
   it('枠の検証：重なり・上限・日跨ぎの位置', () => {
     expect(validatePeriods([{ open: '11:00', close: '15:00' }, { open: '14:00', close: '22:00' }])).toMatchObject({ ok: false });
     expect(validatePeriods([{ open: '18:00', close: '02:00' }, { open: '11:00', close: '15:00' }])).toMatchObject({ ok: true });

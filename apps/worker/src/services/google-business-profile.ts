@@ -170,7 +170,13 @@ export function specialFromGoogle(periods: GoogleSpecialHourPeriod[] | undefined
       entry.closed = true;
       entry.periods = [];
     } else if (!entry.closed) {
-      entry.periods.push({ open: timeToString(p.openTime), close: timeToString(p.closeTime) });
+      // endDate が翌日で closeTime が 0:00 なら「同日 24:00 まで」。endDate が翌日でそれ以外なら日跨ぎ（close<open）。
+      // endDate が2日以上先のものは画面で表せないので、その日の 24:00 までとして扱う（送り直すと切り詰まるため、
+      // 呼び出し側は通常この形を再送しない）。
+      const endDate = dateToString(p.endDate) ?? date;
+      const close = timeToString(p.closeTime);
+      const closeStr = endDate === date ? close : endDate === addDays(date, 1) ? close : '00:00';
+      entry.periods.push({ open: timeToString(p.openTime), close: closeStr });
     }
     byDate.set(date, entry);
   }
@@ -186,7 +192,9 @@ export function specialToGoogle(days: SpecialDay[]): { specialHourPeriods: Googl
       continue;
     }
     for (const p of d.periods) {
-      const overnight = p.close <= p.open;
+      // 終了 00:00 は「同日の 24:00」。翌日にまたぐのは 00:00 以外で終了≦開始のときだけ
+      // （00:00 を翌日扱いにすると「翌日 24:00 まで」＝翌日が24時間営業になってしまう）。
+      const overnight = p.close !== '00:00' && p.close <= p.open;
       const end = overnight ? addDays(d.date, 1) : d.date;
       out.push({
         startDate: stringToDate(d.date),
