@@ -30,7 +30,10 @@ describe('V6 7-1-H リマインダ実行結果', () => {
     expect(LIST_PAGE).toContain("label: '実行履歴を見る'")
     expect(LIST_PAGE).toContain('<ActionMenu')
     expect(LIST_PAGE).toContain('<MoreHorizontal />')
-    expect(LIST_PAGE).toContain('<Trash2 />')
+    // 削除は行に直に置かず、メニューの中の危ない操作にする。
+    expect(LIST_PAGE).not.toContain('<Trash2 />')
+    expect(LIST_PAGE).toContain("label: '削除する'")
+    expect(LIST_PAGE).toContain("tone: 'danger'")
     expect(PAGE).toContain("const isPlannedView = searchParams.get('status') === 'planned'")
     expect(PAGE).toContain("setStatus(isPlannedView ? 'planned' : '')")
     expect(PAGE).toContain('status: status || undefined')

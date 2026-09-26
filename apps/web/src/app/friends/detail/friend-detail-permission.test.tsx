@@ -256,14 +256,14 @@ async function setSelectValue(select: HTMLSelectElement, value: string) {
 }
 
 describe('N-037 staffの情報欄は読み取り専用（403と画面を一致）', () => {
-  it('管理者には入力欄と「保存」「項目を追加」が出る', async () => {
+  it('管理者には入力欄と「保存」「項目を作る」が出る', async () => {
     setRole('admin')
     await render('info')
     const input = host.querySelector<HTMLInputElement>('input[type="text"]')
     expect(input).toBeTruthy()
     expect(input!.disabled).toBe(false)
     expect(buttonsByText('保存')).toHaveLength(1)
-    expect(linksByText('項目を追加').length).toBeGreaterThan(0)
+    expect(linksByText('項目を作る').length).toBeGreaterThan(0)
     expect(host.textContent).not.toContain('情報欄の値を保存できるのは')
   })
 
@@ -277,7 +277,7 @@ describe('N-037 staffの情報欄は読み取り専用（403と画面を一致�
     expect(input!.value).toBe('既存の値')
     // 押すと403になる口は出さない
     expect(buttonsByText('保存')).toHaveLength(0)
-    expect(linksByText('項目を追加')).toHaveLength(0)
+    expect(linksByText('項目を作る')).toHaveLength(0)
     expect(host.textContent).toContain('情報欄の値を保存できるのはオーナー・管理者、または個人情報の編集権限を持つスタッフです。')
   })
 })
@@ -303,7 +303,7 @@ describe('N-045 個人情報の項目は個別権限で編集する', () => {
     expect(personal.value).toBe('090-0000-0000')
     expect(buttonsByText('保存')).toHaveLength(1)
     // 項目の定義を足す口はオーナー・管理者専用のまま
-    expect(linksByText('項目を追加')).toHaveLength(0)
+    expect(linksByText('項目を作る')).toHaveLength(0)
     expect(host.textContent).toContain('個人情報')
   })
 
@@ -336,7 +336,7 @@ describe('N-045 個人情報の項目は個別権限で編集する', () => {
     // 値は読める
     expect(personal.value).toBe('090-0000-0000')
     expect(buttonsByText('保存')).toHaveLength(0)
-    expect(linksByText('項目を追加')).toHaveLength(0)
+    expect(linksByText('項目を作る')).toHaveLength(0)
   })
 
   it('鍵の無い staff はサーバーが個人情報を返さない前提で、読み取り専用のまま', async () => {

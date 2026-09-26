@@ -225,7 +225,7 @@ export default function SupportMarkRulesPanel({
           onClick={openNew}
           disabled={state === 'forbidden' || state === 'not-connected'}
         >
-          ルールを追加
+          ＋ ルールを作る
         </Button>
       </header>
 
@@ -299,7 +299,7 @@ export default function SupportMarkRulesPanel({
 
       {editingId !== null ? (
         <div className={styles.form}>
-          <h4 className={styles.formTitle}>{editingId === 'new' ? 'ルールを追加' : 'ルールを変更'}</h4>
+          <h4 className={styles.formTitle}>{editingId === 'new' ? 'ルールを作る' : 'ルールを変更'}</h4>
           <label className={styles.field}>
             <span className={styles.label}>ルールの名前</span>
             <input

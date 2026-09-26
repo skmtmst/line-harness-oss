@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { MoreHorizontal, Trash2, X } from 'lucide-react'
+import { MoreHorizontal, X } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { BOOKING_STAFF_LIMITS, parseBookingStaffInput, type StaffMember } from '@line-crm/shared'
@@ -119,15 +119,20 @@ export default function BookingStaffPage() {
           <span className="mx-1.5">/</span>
           <span>担当スタッフ</span>
         </nav>
-        <button
-          data-design="Actions"
+      </div>
+      {/*
+        作る操作は一覧のすぐ上の左。見出しの行の右端には置かない。
+        押せない理由はボタンの説明に出す。押せないボタンを黙って置かない。
+      */}
+      <div data-design="Actions" className="mb-4 flex flex-wrap items-center gap-2">
+        <Button
+          variant="primary"
           onClick={() => setEditing(EMPTY)}
           disabled={!canManageStaff || !selectedAccountId || loadStatus !== 'ready'}
           title={canManageStaff ? undefined : '予約設定の変更権限がありません'}
-          className="bg-accent-deep text-on-accent rounded-control px-4 py-2 text-sm font-medium transition-colors hover:brightness-92 disabled:opacity-50"
         >
-          + 新規スタッフ
-        </button>
+          ＋ スタッフを作る
+        </Button>
       </div>
 
       {!selectedAccountId ? (
@@ -142,7 +147,7 @@ export default function BookingStaffPage() {
           action={<Button variant="secondary" onClick={() => void load()}>予約スタッフを再読み込み</Button>}
         />
       ) : items.length === 0 ? (
-        <ListState kind="empty" title="予約スタッフはまだいません" description="「＋ 新規スタッフ」から最初のスタッフを追加してください。" />
+        <ListState kind="empty" title="予約スタッフはまだいません" description="「＋ スタッフを作る」から最初のスタッフを追加してください。" />
       ) : (
         <div data-design="Table" className="bg-canvas rounded-card border border-hairline overflow-hidden">
           <div className="overflow-x-auto">
@@ -198,18 +203,11 @@ export default function BookingStaffPage() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      {/* #641: 「編集」＋「削除」＋「その他（…）」の形にそろえる。シフトはメニューへ集約。 */}
+                      {/* 行の操作は「主な1つ＋…メニュー」。削除は行に直に置かず、メニューの中の危ない操作へ。 */}
                       <div className="relative inline-flex items-center justify-end gap-1.5">
                         {canManageStaff ? (
                           <>
-                            <Button variant="secondary" onClick={() => setEditing(s)}>編集</Button>
-                            <IconButton
-                              aria-label={`${s.display_name}を削除`}
-                              title="削除"
-                              onClick={() => { setRemoveError(''); setRemoveTarget(s) }}
-                            >
-                              <Trash2 aria-hidden />
-                            </IconButton>
+                            <Button variant="secondary" size="compact" onClick={() => setEditing(s)}>編集</Button>
                             <IconButton
                               aria-label={`${s.display_name}のその他操作`}
                               aria-expanded={openMenuId === s.id}
@@ -225,11 +223,17 @@ export default function BookingStaffPage() {
                                 id: 'shift',
                                 label: 'シフト',
                                 onSelect: () => router.push(`/booking/staff/shifts?staff_id=${s.id}`),
+                              }, {
+                                id: 'delete',
+                                label: '削除する',
+                                tone: 'danger',
+                                dividerBefore: true,
+                                onSelect: () => { setRemoveError(''); setRemoveTarget(s) },
                               }]}
                             />
                           </>
                         ) : (
-                          <Button href={`/booking/staff/shifts?staff_id=${s.id}`} variant="secondary">
+                          <Button href={`/booking/staff/shifts?staff_id=${s.id}`} variant="secondary" size="compact">
                             シフト
                           </Button>
                         )}

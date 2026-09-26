@@ -30,7 +30,7 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
   const router = useRouter()
   const { selectedAccountId } = useAccount()
   const editing = Boolean(markId)
-  usePageTitle(editing ? '対応マークを編集' : '対応マークを追加')
+  usePageTitle(editing ? '対応マークを編集' : '対応マークを作る')
 
   const [items, setItems] = useState<MarkRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -42,7 +42,7 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
     ATTR-06: 自動変更ルールは「作るだけで有効」にしない。
     以前は初期値が true で、追加ボタンを押さなくても保存時に
     isActive=true のルールと保護時間0分が黙って送られていた。
-    利用者が「＋ ルールを追加」を押したときだけ登録し、
+    利用者が「＋ ルールを作る」を押したときだけ登録し、
     外す・無効化する操作を同じ場所に置く。
   */
   const [createRule, setCreateRule] = useState(false)
@@ -122,7 +122,7 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
   return (
     <div data-design-node="GMvBd">
       <div className="mb-4 flex items-center justify-between gap-4">
-        <Breadcrumb items={[{ label: '対応マーク', href: '/tags?tab=marks' }, { label: editing ? 'マークを編集' : 'マークを追加' }]} />
+        <Breadcrumb items={[{ label: '対応マーク', href: '/tags?tab=marks' }, { label: editing ? 'マークを編集' : 'マークを作る' }]} />
         <Button href="/tags?tab=marks">対応マークへ</Button>
       </div>
 
@@ -176,7 +176,7 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
             <p className="text-xs leading-relaxed text-ink-faint">受信・返信・担当割当・期限超過などをきっかけに自動変更できます。</p>
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
               <p className="text-xs font-semibold text-ink-secondary">このマークを作るときに登録するルール</p>
-              {createRule ? null : <Button type="button" onClick={() => setCreateRule(true)}>＋ ルールを追加</Button>}
+              {createRule ? null : <Button type="button" onClick={() => setCreateRule(true)}>＋ ルールを作る</Button>}
             </div>
             {createRule ? (
               /*
@@ -231,7 +231,7 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
       <StickyBar
         className="mt-4"
         status={editing ? '変更内容を確認して保存してください' : 'マーク名・色・初期値を確認してください'}
-        actions={<><Button href="/tags?tab=marks">キャンセル</Button><Button type="button" variant="primary" disabled={saving || !name.trim() || (editing && !selected)} onClick={() => void save()}>{saving ? '保存中…' : editing ? '変更を保存' : '対応マークを追加'}</Button></>}
+        actions={<><Button href="/tags?tab=marks">キャンセル</Button><Button type="button" variant="primary" disabled={saving || !name.trim() || (editing && !selected)} onClick={() => void save()}>{saving ? '保存中…' : editing ? '変更を保存' : '対応マークを作る'}</Button></>}
       />
     </div>
   )
