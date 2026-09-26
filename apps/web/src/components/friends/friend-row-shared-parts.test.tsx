@@ -5,7 +5,7 @@ import type { FriendListItem } from '@/lib/api'
 import FriendListRow from './friend-list-row'
 import type { FriendListColumn } from './friend-list-table'
 
-/* 画面のコードは行を押すと会話へ飛ぶ。描くだけなので遷移先は使わない。 */
+/* 画面のコードは行を押すと詳細へ飛ぶ。描くだけなので遷移先は使わない。 */
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: () => {} }),
 }))

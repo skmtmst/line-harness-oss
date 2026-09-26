@@ -52,18 +52,23 @@ export default function FriendListRow({
     : incomingAt ?? outgoingAt ?? friend.createdAt
   const attention = String(friend.metadata?.__attention ?? '') === '1'
 
-  const openChat = () => router.push(`/chats?friend=${friend.id}`)
+  /*
+   * 行を押した先は友だちの詳細。一覧の行として正しい行き先にする。
+   * 受信箱へは最新メッセージの列の明示のリンクからのみ行く。
+   */
+  const openDetail = () => router.push(`/friends/detail?id=${friend.id}`)
 
   return (
     <div
       role="link"
       tabIndex={0}
-      onClick={openChat}
+      aria-label={`${friend.displayName}の詳細を開く`}
+      onClick={openDetail}
       onKeyDown={(event) => {
         if (event.target !== event.currentTarget) return
-        if (event.key === 'Enter' || event.key === ' ') {
+        if (event.key === 'Enter') {
           event.preventDefault()
-          openChat()
+          openDetail()
         }
       }}
       className="grid h-19.5 min-w-0 cursor-pointer items-center gap-2 border-b border-divider-soft px-3 transition hover:bg-surface-pearl focus:bg-surface-pearl focus:outline-none"
@@ -91,14 +96,18 @@ export default function FriendListRow({
         <Star aria-hidden="true" className={`h-4 w-4 ${attention ? 'fill-current' : ''}`} />
       </button>
 
-      <div className="flex min-w-0 items-center gap-3">
+      <div className="flex min-w-0 items-center gap-3 overflow-hidden">
         {/* アバターは設計 `PhxG6` の 40x40 / r=18。真円（r=20）にしない。 */}
         <Avatar name={friend.displayName} src={friend.pictureUrl} size={40} />
-        <div className="min-w-0">
-          <Link href={`/friends/detail?id=${friend.id}`} onClick={(event) => event.stopPropagation()} title={friend.displayName} className="block min-h-6 truncate text-sm font-bold text-ink hover:text-action hover:underline">
+        <div className="min-w-0 flex-1 overflow-hidden">
+          {/*
+            長い名前はこの列の中で1行省略＋titleで全文。列幅（minmax）を
+            超えて隣の列へはみ出さないよう、受け側も overflow-hidden で受ける。
+          */}
+          <Link href={`/friends/detail?id=${friend.id}`} onClick={(event) => event.stopPropagation()} title={friend.displayName} className="block max-w-full min-h-6 truncate text-sm font-bold text-ink hover:text-action hover:underline">
             {friend.displayName}
           </Link>
-          <p className="mt-1 truncate text-micro text-ink-faint">登録 {formatDate(friend.createdAt)}</p>
+          <p className="mt-1 max-w-full truncate text-micro text-ink-faint">登録 {formatDate(friend.createdAt)}</p>
         </div>
       </div>
 
@@ -145,13 +154,28 @@ export default function FriendListRow({
       ) : null}
 
       {visibleColumns.has('latest') ? (
-        <div className="min-w-0">
+        <div className="min-w-0 overflow-hidden">
           {latest ? (
             <>
               <p className="truncate text-xs text-ink" title={latest.content}>
                 {latest.messageType === 'text' ? latest.content : messageTypeLabel(latest.messageType)}
               </p>
-              <p className="mt-1 text-micro text-ink-faint">{formatDateTime(latest.createdAt)}</p>
+              <p className="mt-1 flex min-w-0 items-center gap-2">
+                <span className="shrink-0 text-micro text-ink-faint">{formatDateTime(latest.createdAt)}</span>
+                {/*
+                  受信箱へ行く口はこの列の明示のリンクだけ。行全体は詳細へ行く。
+                  行の移動を起こさないよう、押下は行へ伝えない。
+                */}
+                <Link
+                  href={`/chats?friend=${friend.id}`}
+                  onClick={(event) => event.stopPropagation()}
+                  aria-label={`${friend.displayName}さんの会話を受信箱で開く`}
+                  title="受信箱で開く"
+                  className="truncate text-micro font-semibold text-action hover:underline"
+                >
+                  受信箱で開く
+                </Link>
+              </p>
             </>
           ) : <><span className="text-xs text-ink-secondary">受信なし</span><p className="mt-1 text-micro text-ink-faint">—</p></>}
         </div>
