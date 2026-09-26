@@ -1003,14 +1003,14 @@ export default function SettingsPage() {
           {loading ? (
             <div className="border-hairline bg-canvas text-ink-faint rounded-card border p-10 text-center text-sm">読み込み中…</div>
           ) : (
-            <div className={ordering ? 'grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]' : ''}>
+            <div className={ordering ? 'grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]' : 'grid gap-4'}>
               {/*
                 利用状況の取得自体に失敗したとき。バッジは付かないので、
                 無表示のままにせず一覧の先頭で理由とやり直しを出す。
                 設定の切替はこの間も触れるままにする。
               */}
               {usageFailed && (
-                <div className="border-hairline bg-canvas-sunken text-ink-faint mb-4 flex items-center gap-2 rounded-card border px-4 py-2 text-xs">
+                <div className="border-hairline bg-canvas-sunken text-ink-faint flex items-center gap-2 rounded-card border px-4 py-2 text-xs">
                   <span>機能の利用状況を読めませんでした。設定の切替はそのまま使えます。</span>
                   <button
                     type="button"
