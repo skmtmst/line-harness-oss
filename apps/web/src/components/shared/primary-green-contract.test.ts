@@ -109,10 +109,14 @@ describe('白文字を載せる緑', () => {
     expect(hits, 'var(--color-accent-deep) にしてください').toEqual([])
   })
 
-  it('受信箱の選択中の札も濃い緑', () => {
+  it('受信箱の状態の切り替えは白地の選択（緑の塗り札は置かない）', () => {
     const chats = FILES.find((f) => f.p === 'app/chats/page.tsx')
     expect(chats).toBeDefined()
     expect(chats!.s).not.toMatch(/bg-\[#06[cC]755\]/)
-    expect(chats!.s).toContain("? 'bg-accent-deep text-on-accent'")
+    // オーナー指示 (m13d)：丸い札をやめ、5等分の切り替えにする。
+    // 選んだ所は白地に濃い文字。見た目を文字で固定していた旧指定は新指定へ。
+    expect(chats!.s).toContain('role="radiogroup"')
+    expect(chats!.s).toContain("'bg-canvas font-semibold text-ink shadow-sm'")
+    expect(chats!.s).not.toContain("? 'bg-accent-deep text-on-accent'")
   })
 })

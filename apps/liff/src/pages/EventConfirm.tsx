@@ -25,6 +25,8 @@ export default function EventConfirm() {
   const [event, setEvent] = useState<EventDetail | null>(null);
   const [slot, setSlot] = useState<EventSlot | null>(null);
   const [note, setNote] = useState('');
+  // カスタム質問への回答。質問id → 文字列、複数選択は文字列配列。
+  const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
   const [submitting, setSubmitting] = useState(false);
   // 読み込みの失敗と送信の失敗は別に持つ。送信の失敗は入力を消さずその場に出す。
   const [loadFailed, setLoadFailed] = useState(false);
@@ -72,10 +74,25 @@ export default function EventConfirm() {
       setSubmitError('備考は5000字以内で入力してください');
       return;
     }
+    // 必須質問の未回答を送信前に止める。サーバ側でも同じ検査をしている。
+    const missing = (event?.questions ?? []).find((q) => {
+      if (!q.required) return false;
+      const a = answers[q.id];
+      return a == null || (typeof a === 'string' ? a.trim() === '' : a.length === 0);
+    });
+    if (missing) {
+      setSubmitError(`「${missing.label}」が未回答です`);
+      return;
+    }
     setSubmitting(true);
     setSubmitError(null);
     try {
-      const res = await api.createEventBooking(id, { slot_id: slotId, customer_note: note || null }, idemKey);
+      const hasAnswers = Object.keys(answers).length > 0;
+      const res = await api.createEventBooking(
+        id,
+        { slot_id: slotId, customer_note: note || null, ...(hasAnswers ? { answers } : {}) },
+        idemKey,
+      );
       navigate(`/events/${id}/done?bookingId=${res.id}&status=${res.status}`);
     } catch (err) {
       logFailure('create-event-booking', err);
@@ -91,6 +108,7 @@ export default function EventConfirm() {
           case 'unauthorized':
           case 'friend_not_found':
             return 'LINE 認証に失敗しました。一度 LINE のトークルームに戻り、友だち追加が完了していることを確認してから再度お試しください。';
+          case 'missing_required_answers': return '未回答の必須項目があります。入力してからもう一度お試しください。';
           case 'idempotent_in_progress': return '前回のリクエストを処理中です。少しお待ちください。';
           default: return '予約を送れませんでした。時間をおいて、もう一度お試しください。';
         }
@@ -136,6 +154,76 @@ export default function EventConfirm() {
       {event.requires_approval === 1 && (
         <div className="bg-yellow-50 border border-yellow-200 text-yellow-900 text-xs rounded p-2 mb-3">
           このイベントは承認制です。受付後、運営が承認するまでお待ちください。
+        </div>
+      )}
+
+      {(event.questions ?? []).length > 0 && (
+        <div className="space-y-3 mb-4">
+          {(event.questions ?? []).map((q) => {
+            const value = answers[q.id];
+            return (
+              <div key={q.id}>
+                <label className="block text-sm font-medium mb-1">
+                  {q.label}
+                  {q.required && <span className="text-red-600 ml-1">*</span>}
+                </label>
+                {q.type === 'text' && (
+                  <input
+                    type="text"
+                    value={typeof value === 'string' ? value : ''}
+                    onChange={(e) => setAnswers((cur) => ({ ...cur, [q.id]: e.target.value }))}
+                    className="w-full border rounded p-2 text-sm"
+                  />
+                )}
+                {q.type === 'textarea' && (
+                  <textarea
+                    value={typeof value === 'string' ? value : ''}
+                    onChange={(e) => setAnswers((cur) => ({ ...cur, [q.id]: e.target.value }))}
+                    rows={3}
+                    className="w-full border rounded p-2 text-sm"
+                  />
+                )}
+                {q.type === 'radio' && (
+                  <div className="space-y-1">
+                    {(q.options ?? []).map((opt) => (
+                      <label key={opt} className="flex items-center gap-2 text-sm">
+                        <input
+                          type="radio"
+                          name={`eq-${q.id}`}
+                          checked={value === opt}
+                          onChange={() => setAnswers((cur) => ({ ...cur, [q.id]: opt }))}
+                        />
+                        {opt}
+                      </label>
+                    ))}
+                  </div>
+                )}
+                {q.type === 'checkbox' && (
+                  <div className="space-y-1">
+                    {(q.options ?? []).map((opt) => {
+                      const chosen = Array.isArray(value) ? value : [];
+                      const checked = chosen.includes(opt);
+                      return (
+                        <label key={opt} className="flex items-center gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() =>
+                              setAnswers((cur) => ({
+                                ...cur,
+                                [q.id]: checked ? chosen.filter((x) => x !== opt) : [...chosen, opt],
+                              }))
+                            }
+                          />
+                          {opt}
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 

@@ -657,7 +657,6 @@ function DashboardPageInner() {
   const [inboxFailed, setInboxFailed] = useState(false)
   const [shipmentSummary, setShipmentSummary] = useState<ShipmentSummary | null>(null)
   const [shipmentState, setShipmentState] = useState<'loading' | 'ready' | 'error'>('loading')
-  const shipmentEmpty = shipmentState === 'ready' && shipmentSummary !== null && shipmentSummary.today + shipmentSummary.soon + shipmentSummary.later === 0
   const [pendingPhotos, setPendingPhotos] = useState<number | null>(null)
   /*
    * 写真審査の件数が取れなかった理由。null のままだと「読み込み中」を
@@ -1210,16 +1209,22 @@ function DashboardPageInner() {
     : data.metrics.activeFriends.value
   /*
    * 「対応が必要な受信」小カードの件数は、遷移先 `/chats?status=unread` と
-   * 同じ口で数える（IDEA-01）:
-   *   LINE … 選択中アカウントの未対応（overview.inbox.unanswered）
+   * 同じ口で数える（IDEA-01）。右の「現在の対応状況」と同じ
+   * `overview.inbox`（受信箱の正本 `getInboxStatusCounts`）から取るので、
+   * 2つのカードで数がずれない:
+   *   LINE … 選択中アカウントの未対応（overview.inbox.line.unanswered）
    *   MAIL … メールはアカウントを持たない。受信箱に同じ一覧で混ざる
-   *          未対応メール（support/inbox の emailUnread、権限のある範囲）
+   *          未対応メール（overview.inbox.email.unanswered）
+   * 段階配備中の旧Workerは内訳を返さない。その間は従来どおり LINE を概要、
+   * MAIL を受信箱カードの取得結果（support/inbox の emailUnread）から取る。
    * 片方でも取れていない間は合計を出さず「—」にする。取れたぶんだけを
    * 足すと実際より少ない件数を本物の数字に見せてしまう。
    */
   const inboxSectionOk = data !== null && sectionAvailable('inbox')
-  const lineUnread = inboxSectionOk ? data.inbox.unanswered : null
-  const mailUnread = inboxSummary?.emailUnread ?? null
+  const lineUnread = inboxSectionOk ? (data.inbox.line?.unanswered ?? data.inbox.unanswered) : null
+  const mailUnread = inboxSectionOk && data.inbox.email
+    ? data.inbox.email.unanswered
+    : (inboxSummary?.emailUnread ?? null)
   const pendingTotal = lineUnread === null || mailUnread === null ? null : lineUnread + mailUnread
   const pendingDetail = lineUnread === null && mailUnread === null
     ? (data !== null || inboxFailed || error ? STATE_TEXT.error : STATE_TEXT.loading)
@@ -1496,9 +1501,7 @@ function DashboardPageInner() {
       ) : null}
 
       {visibleToday.length > 0 ? <section data-design="TodayTasks" className="mb-6">
-        <div className="mb-2.5 flex items-center justify-between gap-3">
-          <h2 className="text-ink text-lg font-bold">今日やること</h2>
-        </div>
+        {/* 見出しは置かない（オーナー指示）。4枚の小カードだけ出す。 */}
         {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}
         <KpiCollapse gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {visibleToday.map((item) => <div key={item.id}>{renderTodayCard(item.id)}</div>)}
@@ -1523,10 +1526,11 @@ function DashboardPageInner() {
             if (item.id === 'shipment') {
               return (
                 /*
-                 * 出荷が0件の時は、上の小カード「出荷予定 0件」で足りるので大きな空の欄は出さない
-                 * （★V7 ダッシュボードの見せ方）。件数は取り続けるので、隠すだけでマウントは保つ。
+                 * 表示ONなら0件でもカードを出す。空のときは
+                 * パネル側が1行の空表示を出す。件数は取り続けるので、
+                 * OFFのときは隠すだけでマウントは保つ（受信箱と同じ形）。
                  */
-                <div key={item.id} data-design="Shipment" className={item.visible && !shipmentEmpty ? '' : 'hidden'} aria-hidden={!item.visible || shipmentEmpty}>
+                <div key={item.id} data-design="Shipment" className={item.visible ? '' : 'hidden'} aria-hidden={!item.visible}>
                   {/*
                     選択中アカウントの出荷だけを数える（IDEA-01）。
                     小カード「出荷予定」と遷移先 /ec-commerce は同じアカウント範囲。
