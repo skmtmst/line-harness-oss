@@ -3904,7 +3904,15 @@ export type DashboardOverview = {
   inbox: {
     unanswered: number
     inProgress: number
+    /** 保留。段階配備中の旧Workerでは未返却。 */
+    onHold?: number
     resolved: number
+    /**
+     * チャネル別の内訳。LINE は友だち単位、MAIL はスレッド単位。
+     * 段階配備中の旧Workerでは未返却。
+     */
+    line?: { unanswered: number; inProgress: number; onHold: number; resolved: number }
+    email?: { unanswered: number; inProgress: number; onHold: number; resolved: number }
     oldestUnansweredMinutes: number | null
     /** 受信から初回返信までの平均（分）。記録が無ければ null。 */
     averageFirstReplyMinutes: number | null
@@ -10196,7 +10204,7 @@ export const api = {
     installRichMenu: (accountId: string) => fetchApi<ApiResponse<{ richMenuId: string; liffId: string }>>('/api/nen-members/rich-menu/install', { method: 'POST', body: JSON.stringify({ accountId }) }),
   },
   chats: {
-    list: (params?: { status?: string; operatorId?: string; accountId?: string; q?: string; unansweredOnly?: boolean; unreadOnly?: boolean; quickFilter?: 'reply' | 'overdue'; limit?: number; beforeAt?: string; beforeId?: string }) => {
+    list: (params?: { status?: string; operatorId?: string; accountId?: string; q?: string; unansweredOnly?: boolean; unreadOnly?: boolean; quickFilter?: 'reply' | 'overdue'; limit?: number; beforeAt?: string; beforeId?: string; beforeUnread?: 0 | 1 }) => {
       const query: Record<string, string> = {}
       if (params?.status) query.status = params.status
       if (params?.operatorId) query.operatorId = params.operatorId
@@ -10206,7 +10214,8 @@ export const api = {
       if (params?.unreadOnly) query.unreadOnly = '1'
       if (params?.quickFilter) query.quickFilter = params.quickFilter
       if (params?.limit !== undefined) query.limit = String(params.limit)
-      // カーソルページング: (lastMessageAt, friendId) の複合カーソルより古い行を返す
+      // カーソルページング: (未読, lastMessageAt, friendId) の複合カーソルより後の行を返す
+      if (params?.beforeUnread !== undefined) query.beforeUnread = String(params.beforeUnread)
       if (params?.beforeAt) query.beforeAt = params.beforeAt
       if (params?.beforeId) query.beforeId = params.beforeId
       return fetchApi<ApiResponse<ChatListItem[]>>(
@@ -13107,6 +13116,16 @@ export interface EventListItem {
   line_account_id?: string;
 }
 
+/** 申込時に聞く質問 (#841)。Worker 側で events.questions_json に保存される。 */
+export interface EventQuestion {
+  id: string;
+  label: string;
+  type: 'text' | 'textarea' | 'radio' | 'checkbox';
+  required: boolean;
+  /** radio / checkbox の選択肢。記述式では null。 */
+  options?: string[] | null;
+}
+
 export interface EventDetail {
   id: string;
   name: string;
@@ -13140,6 +13159,13 @@ export interface EventDetail {
   account_ids?: string | string[] | null;
   dedup_priority?: string | string[] | null;
   line_account_id?: string;
+  /**
+   * Worker の応答では questions_json の生JSON文字列。送信時は配列の
+   * questions を使い、読み込み時は questions_json を parse する
+   * (account_ids と同じ扱い)。
+   */
+  questions_json?: string | null;
+  questions?: EventQuestion[] | null;
   version?: number;
 }
 
@@ -13192,6 +13218,8 @@ export interface EventBookingItem {
   status: string;
   customer_note: string | null;
   internal_note: string | null;
+  /** カスタム質問への回答 (#841)。{質問id: 回答} のJSON文字列。 */
+  answer_snapshot_json?: string | null;
   requested_at: string;
   decided_at: string | null;
   cancelled_at: string | null;
