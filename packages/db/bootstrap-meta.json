@@ -417,7 +417,8 @@
     "456_media_file_scans.sql",
     "457_file_scan_config.sql",
     "466_template_versions.sql",
-    "467_template_references.sql"
+    "467_template_references.sql",
+    "468_event_custom_questions.sql"
   ],
-  "migrationCount": 418
+  "migrationCount": 419
 }

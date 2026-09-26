@@ -1804,22 +1804,28 @@ nenMembers.put('/api/nen-members/photos/:id/review', requireRole('owner', 'admin
            FROM nen_photo_submissions WHERE id = ?`,
       ).bind(targetPhotoId).first<{
         r2_key: string; content_type: string; image_width: number | null;
-        image_height: number | null; image_byte_size: number; line_account_id: string;
+        image_height: number | null; image_byte_size: number | null; line_account_id: string;
       }>();
-      if (row) {
-        photoScan = await ensureFileScanForUpload({
-          db: c.env.DB,
-          lineAccountId: row.line_account_id,
-          subjectKind: 'photo',
-          subjectId: targetPhotoId,
-          mediaId: null,
-          filename: `photo.${targetPhotoId}`,
-          mimeType: row.content_type,
-          sizeBytes: row.image_byte_size,
-        });
-        photoScan = await runScanForStoredObject(c.env.DB, c.env.IMAGES, photoScan, row.r2_key, {
-          width: row.image_width, height: row.image_height,
-        }).catch(() => photoScan);
+      // 大きさが分からない古い行では検査の記録を作れない。作らず門番に
+      // 409 で止めてもらい、500 にしない。
+      if (row && Number.isSafeInteger(row.image_byte_size) && (row.image_byte_size as number) >= 0) {
+        try {
+          const created = await ensureFileScanForUpload({
+            db: c.env.DB,
+            lineAccountId: row.line_account_id,
+            subjectKind: 'photo',
+            subjectId: targetPhotoId,
+            mediaId: null,
+            filename: `photo.${targetPhotoId}`,
+            mimeType: row.content_type,
+            sizeBytes: row.image_byte_size as number,
+          });
+          photoScan = await runScanForStoredObject(c.env.DB, c.env.IMAGES, created, row.r2_key, {
+            width: row.image_width, height: row.image_height,
+          }).catch(() => created);
+        } catch {
+          photoScan = null;
+        }
       }
     }
     if (!photoScan || photoScan.status !== 'clean') {
