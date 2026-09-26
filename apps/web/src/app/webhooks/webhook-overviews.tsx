@@ -81,7 +81,7 @@ function matchesOutgoing(item: OutgoingWebhookOverview, filter: OutgoingFilter, 
   )
 }
 
-function OutgoingKpis({
+export function OutgoingKpis({
   items,
   status,
   incomingCount,
@@ -326,14 +326,6 @@ export function OutgoingOverview({
 
   return (
     <section aria-label="こちらから送る一覧">
-      <OutgoingKpis
-        items={items}
-        status={status}
-        incomingCount={incomingCount}
-        summary={summary}
-        summaryStatus={summaryStatus}
-      />
-
       <p className="bg-info-bg text-ink-secondary rounded-card mb-3 px-4 py-3 text-xs leading-6">
         「こちらから送る」は、うちで起きたことを相手に知らせます。「こちらで受け取る」は、相手で起きたことをうちに取り込みます。受け取る側のURLは、相手のサービスに貼ってください。
       </p>

@@ -93,8 +93,20 @@ export default function OpsTenantsPage() {
     <div data-design-node="X9f5jy">
       <OpsPageHeader title="契約先アカウント" />
 
+      <div className="mb-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <SummaryCard variant="v6" title="契約中" value={summary ? summary.active : null} unit="社" detail="トライアルを除く" loading={loading && !summary} />
+        <SummaryCard variant="v6" title="トライアル中" value={summary ? summary.trialing : null} unit="社" detail="期限切れ前に案内" loading={loading && !summary} />
+        <SummaryCard variant="v6" title="停止中" value={summary ? summary.suspended : null} unit="社" detail="運営が止めた契約先" badge={summary?.suspended ? '確認' : undefined} badgeTone="warning" loading={loading && !summary} />
+        <SummaryCard variant="v6" title="決済失敗" value={summary ? summary.pastDue : null} unit="社" detail="Stripe で支払いが止まっている" badge={summary?.pastDue ? '要対応' : undefined} badgeTone="danger" loading={loading && !summary} />
+      </div>
+
+      <div className="mb-4">
+        <NoteBar tone="info">契約先を選ぶと詳細が開きます。代理ログインは既定で閲覧のみです。</NoteBar>
+      </div>
+
       {/*
-        作る操作は一覧のすぐ上の左。見出しの行の右端には置かない。
+        作る操作は数字のカードの下・一覧のすぐ上の左にそろえる。
+        探す・絞り込むも一覧の操作なので同じ並びへ。
       */}
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <Button variant="primary" onClick={() => setCreating((v) => !v)}>
@@ -133,17 +145,6 @@ export default function OpsTenantsPage() {
           <Button onClick={() => setCreating(false)}>やめる</Button>
         </form>
       ) : null}
-
-      <div className="mb-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard variant="v6" title="契約中" value={summary ? summary.active : null} unit="社" detail="トライアルを除く" loading={loading && !summary} />
-        <SummaryCard variant="v6" title="トライアル中" value={summary ? summary.trialing : null} unit="社" detail="期限切れ前に案内" loading={loading && !summary} />
-        <SummaryCard variant="v6" title="停止中" value={summary ? summary.suspended : null} unit="社" detail="運営が止めた契約先" badge={summary?.suspended ? '確認' : undefined} badgeTone="warning" loading={loading && !summary} />
-        <SummaryCard variant="v6" title="決済失敗" value={summary ? summary.pastDue : null} unit="社" detail="Stripe で支払いが止まっている" badge={summary?.pastDue ? '要対応' : undefined} badgeTone="danger" loading={loading && !summary} />
-      </div>
-
-      <div className="mb-4">
-        <NoteBar tone="info">契約先を選ぶと詳細が開きます。代理ログインは既定で閲覧のみです。</NoteBar>
-      </div>
 
       {/*
         ★V7：一覧の失敗は一覧の場所の1枚で出すので、ここでは操作の知らせだけ出す。

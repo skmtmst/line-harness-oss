@@ -12,7 +12,7 @@ import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import SelectField from '@/components/shared/select-field'
 import WebhookInteractions from './webhook-interactions'
-import { IncomingOverview, OutgoingOverview } from './webhook-overviews'
+import { IncomingOverview, OutgoingKpis, OutgoingOverview } from './webhook-overviews'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { MIN_SECRET_LENGTH, generateSecret } from './secret'
 
@@ -540,8 +540,9 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
   /*
     #980: タブの件数は、そのタブの一覧と同じ取得から数える。
     `incoming` / `outgoing` はこの画面が選択中アカウントで絞って取った配列で、
-    下の一覧（IncomingOverview / OutgoingOverview）とKPI帯がそのまま描く
-    同じ集合。読み込み中・取得失敗・まだ取っていない間は数字を付けない
+    下の一覧（IncomingOverview / OutgoingOverview）とKPI帯（OutgoingKpis、
+    タブの下にこの画面が描く）がそのまま描く同じ集合。読み込み中・
+    取得失敗・まだ取っていない間は数字を付けない
     （一覧側も「読み込んでいます」「表示できませんでした」と数を分けている）。
   */
   const countedTabs = MERGED_TABS.map((item) => {
@@ -565,19 +566,29 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
       </div>
       <MergedTabs basePath="/webhooks" paramName="tab" tabs={countedTabs} active={tab} />
       {/*
-        作る操作は一覧のすぐ上の左。たまに使う「見本から作る」は同じ行の右。
-        見出しの行の右端には置かない。
+        作る操作は数字のカードの下・一覧のすぐ上の左にそろえる。
+        「見本から作る」も作る操作なので同じ並びの副ボタンへ。
+        数字のカード（こちらから送るタブの KPI 帯）の下に置く。
       */}
-      <div className="mb-4 mt-4 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-2">
-          {tab === 'incoming' ? (
-            <Button variant="primary" onClick={() => setShowCreate(!showCreate)}>
-              {showCreate ? 'キャンセル' : '＋ 受け取り口を作る'}
-            </Button>
-          ) : (
-            <Button variant="primary" href="/webhooks/new">＋ 送り先を作る</Button>
-          )}
+      {tab === 'outgoing' ? (
+        <div className="mt-4">
+          <OutgoingKpis
+            items={outgoing}
+            status={outgoingStatus}
+            incomingCount={incoming.length}
+            summary={interactionSummary}
+            summaryStatus={summaryStatus}
+          />
         </div>
+      ) : null}
+      <div className="mb-4 mt-4 flex flex-wrap items-center gap-2">
+        {tab === 'incoming' ? (
+          <Button variant="primary" onClick={() => setShowCreate(!showCreate)}>
+            {showCreate ? 'キャンセル' : '＋ 受け取り口を作る'}
+          </Button>
+        ) : (
+          <Button variant="primary" href="/webhooks/new">＋ 送り先を作る</Button>
+        )}
         <Button variant="secondary" href="/webhooks?tab=notify">見本から作る</Button>
       </div>
 
