@@ -733,10 +733,10 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
   }, [highlightedPoint, current])
 
   return (
-    <div data-conversion-points-design="v6">
+    <div data-conversion-points-design="v6" className="flex flex-col gap-4">
 
       {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}
-      <KpiCollapse data-design="KPIs" className="mb-4" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <KpiCollapse data-design="KPIs" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard
           title="決めてある成果地点"
           value={definitions?.pagination.total ?? null}
@@ -774,30 +774,30 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
         />
       </KpiCollapse>
 
-      <p className="bg-info-bg text-ink-secondary mb-4 rounded-control px-4 py-3 text-xs">
+      <p className="bg-info-bg text-ink-secondary rounded-control px-4 py-3 text-xs">
         成果地点は「数え方の決めごと」です。ここで決めたものを、案件・自動応答・分析などから呼び出して使います。
       </p>
 
       {highlightedPoint ? (
         <p
           role="status"
-          className="border-info bg-info-bg text-info mb-4 rounded-control border px-4 py-3 text-sm font-semibold"
+          className="border-info bg-info-bg text-info rounded-control border px-4 py-3 text-sm font-semibold"
         >
           「{highlightedPoint.name}」を保存しました。色の付いた行です。
         </p>
       ) : null}
 
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <Button href="/conversions/new" variant="primary">＋ 成果地点をつくる</Button>
         <Button onClick={() => void exportCsv()} disabled={exporting}>
           {exporting ? '書き出しています' : 'CSVで書き出す'}
         </Button>
       </div>
-      {exportError ? <p className="text-danger mb-3 text-sm" role="alert">{exportError}</p> : null}
+      {exportError ? <p className="text-danger text-sm" role="alert">{exportError}</p> : null}
 
       <div
         data-design="Bar"
-        className="mb-3 space-y-3"
+        className="space-y-3"
       >
         <div className="flex flex-wrap items-center justify-between gap-2">
           <SearchField
