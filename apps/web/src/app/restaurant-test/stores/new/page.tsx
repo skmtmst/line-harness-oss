@@ -157,8 +157,8 @@ export default function NewRestaurantStorePage() {
     }
   }
 
-  return <div>
-    <div className="mb-5 flex justify-end">
+  return <div className="flex flex-col gap-4">
+    <div className="flex justify-end">
       <Link href="/hq" className="text-sm font-semibold text-action">統括へ戻る</Link>
     </div>
     {/*
@@ -166,7 +166,7 @@ export default function NewRestaurantStorePage() {
      * minmax(0,1fr) と子の min-w-0 をそろえないと、規約・手順パネルの
      * 右側が画面外へ出る（U095）。
      */}
-    <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[220px_minmax(0,1fr)]">
+    <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[220px_minmax(0,1fr)]">
       <ol className="min-w-0 rounded-card border border-hairline bg-canvas p-4">{steps.map(([title, description], index) => {
         const number = index + 1
         const complete = number === STEP.TERMS
@@ -182,7 +182,7 @@ export default function NewRestaurantStorePage() {
         </li>
       })}</ol>
 
-      <div className="grid min-w-0 grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
+      <div className="grid min-w-0 grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
         <div className="min-w-0 rounded-card border border-hairline bg-canvas p-5 sm:p-7">
           <p className="text-xs font-semibold text-ink-faint">ステップ {step} / 5</p>
           <h2 className="mt-2 text-xl font-bold text-ink">{steps[step - 1][0]}</h2>
