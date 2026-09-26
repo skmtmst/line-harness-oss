@@ -88,6 +88,7 @@ const UNFILED = '__unfiled__'
 
 function BroadcastList() {
   usePageTitle('一斉配信')
+  const router = useRouter()
   const { selectedAccountId } = useAccount()
   const [broadcasts, setBroadcasts] = useState<ApiBroadcast[]>([])
   const [listKpis, setListKpis] = useState<BroadcastListKpis | null | undefined>(undefined)
@@ -742,7 +743,23 @@ function BroadcastList() {
                 const insight = insights[broadcast.id] ?? summaryInsight(broadcast.insightSummary)
 
                 return (
-                  <tr key={broadcast.id} className="group hover:bg-canvas-sunken transition-colors">
+                  <tr
+                    key={broadcast.id}
+                    className="group cursor-pointer transition-colors hover:bg-canvas-sunken"
+                    tabIndex={0}
+                    onClick={() => router.push(`/broadcasts/detail?id=${encodeURIComponent(broadcast.id)}`)}
+                    onKeyDown={(event) => {
+                      if (event.target !== event.currentTarget) return
+                      if (event.key === 'Enter') {
+                        event.preventDefault()
+                        router.push(`/broadcasts/detail?id=${encodeURIComponent(broadcast.id)}`)
+                      }
+                    }}
+                  >
+                    {/*
+                      行を押したら詳細へ（一覧の決まり）。名前は黒文字の太字。
+                      行の中の操作（インサイト取得・削除）は行の移動を起こさない。
+                    */}
                     {/*
                       タイトル・内容。設計は「8月キャンペーンのお知らせ」の下に
                       「キャンペーン告知／画像＋テキスト 2通」と出す。一覧から
@@ -750,7 +767,7 @@ function BroadcastList() {
                     */}
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <a href={`/broadcasts/detail?id=${encodeURIComponent(broadcast.id)}`} className="text-sm font-medium text-action hover:text-action-hover hover:underline">
+                        <a href={`/broadcasts/detail?id=${encodeURIComponent(broadcast.id)}`} className="text-sm font-bold text-ink hover:text-action hover:underline">
                           {broadcast.title}
                         </a>
                         {isDedup && (
@@ -829,7 +846,7 @@ function BroadcastList() {
                             </div>
                           ) : (
                             <button
-                              onClick={() => handleFetchInsight(broadcast.id)}
+                              onClick={(event) => { event.stopPropagation(); handleFetchInsight(broadcast.id) }}
                               disabled={fetchingInsight === broadcast.id}
                               className="mt-1 text-xs text-action hover:text-action-hover disabled:opacity-50"
                             >
@@ -845,7 +862,7 @@ function BroadcastList() {
                       <div className="flex items-center justify-end gap-2">
                         {(broadcast.status === 'draft' || broadcast.status === 'scheduled') && (
                           <button
-                            onClick={() => { setDeleteError(''); setDeleteTarget(broadcast) }}
+                            onClick={(event) => { event.stopPropagation(); setDeleteError(''); setDeleteTarget(broadcast) }}
                             className="rounded-control p-2 text-ink-faint transition-colors hover:bg-danger-bg hover:text-danger focus-visible:text-danger"
                             aria-label={`${broadcast.title}を削除`}
                             title="削除"

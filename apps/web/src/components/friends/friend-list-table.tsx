@@ -111,7 +111,11 @@ export default function FriendListTable({
       */}
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-hairline px-4 py-3 lg:h-14 lg:flex-nowrap lg:py-0">
         <h2 className="whitespace-nowrap text-sm font-bold text-ink">
-          友だち一覧 <span className="ml-1 text-xs font-bold text-ink-faint">{total.toLocaleString('ja-JP')}件</span>
+          {/*
+            未取得の件数は0件に見せない（絞り込みの行の件数を消した後は、
+            この見出しがその役目を持つ）。取れるまでは「—」。
+          */}
+          友だち一覧 <span className="ml-1 text-xs font-bold text-ink-faint">{status === 'ready' ? `${total.toLocaleString('ja-JP')}件` : '—'}</span>
         </h2>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
           {/* 選んでいる時だけ出す（★V7：0件の時は意味が無い）。 */}

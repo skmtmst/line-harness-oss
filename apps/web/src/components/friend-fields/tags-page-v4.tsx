@@ -354,7 +354,7 @@ function FolderList({ groups, items, countsKnown, active, onSelect, onChanged }:
   }
   return (
     <aside className={`h-fit rounded-card border border-hairline bg-canvas ${cardShadow}`}>
-      <div className="flex items-center justify-between border-b border-hairline px-4 py-3"><h2 className="text-sm font-bold text-ink">フォルダ</h2><span className="text-xs text-ink-faint">{countsKnown ? `${items.length}件` : '—'}</span></div>
+      <div className="flex items-center justify-between border-b border-hairline px-4 py-3"><h2 className="text-sm font-bold text-ink">フォルダ</h2>{/* 見出しの総数は「すべて」の行と同じ数なので出さない（件数の重ね書きをやめる）。 */}</div>
       <nav className="p-2">{rows.map((row) => {
         const group = groups.find((item) => item.id === row.id)
         const groupIndex = group ? groups.findIndex((item) => item.id === group.id) : -1
@@ -1046,7 +1046,11 @@ export default function TagsPageV4({
                     const group = groups.find((item) => item.id === tag.groupId)
                     const chips = linkChips(tag)
                     return (
-                      <tr key={tag.id} className="group hover:bg-canvas-sunken">
+                      <tr key={tag.id} className="group cursor-pointer hover:bg-canvas-sunken" tabIndex={0} onClick={() => router.push(`/tags/edit?id=${tag.id}`)} onKeyDown={(event) => { if (event.target !== event.currentTarget) return; if (event.key === 'Enter') { event.preventDefault(); router.push(`/tags/edit?id=${tag.id}`) } }}>
+                        {/*
+                          行を押したら編集へ（一覧の決まり）。名前は黒文字の太字。
+                          並び替え・フォルダ選択・星・削除は行の移動を起こさない。
+                        */}
                         {/*
                           並び替えのつまみ。設計 `i1Xb2V` は**常に出す**。
                           「並び替え」ボタンで出し入れしない。押す前は
@@ -1054,6 +1058,7 @@ export default function TagsPageV4({
                         */}
                         <td
                           draggable
+                          onClick={(event) => event.stopPropagation()}
                           onDragStart={() => setDragId(tag.id)}
                           onDragOver={(event) => event.preventDefault()}
                           onDrop={() => void move(tag.id)}
@@ -1064,8 +1069,8 @@ export default function TagsPageV4({
                         <td className="px-3 py-3">
                           <div className="flex min-w-0 items-center gap-2">
                             <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: group?.color ?? '#8b938d' }} />
-                            {/* 設計 `VQykB` は青文字。押すと編集へ行く（編集ボタンは置かない）。 */}
-                            <Link href={`/tags/edit?id=${tag.id}`} className="truncate text-label font-semibold text-status-info hover:underline" title={tag.name}>{tag.name}</Link>
+                            {/* 名前は黒文字の太字。押すと編集へ行く（編集ボタンは置かない）。 */}
+                            <Link href={`/tags/edit?id=${tag.id}`} className="truncate text-label font-bold text-ink hover:text-action hover:underline" title={tag.name}>{tag.name}</Link>
                             {/* 保管済みは一覧に出続けるが、開くと名前と説明しか直せない(#710)。 */}
                             {tag.status === 'archived' && <span className="shrink-0 rounded-pill bg-canvas-sunken px-2 py-0.5 text-micro font-bold text-ink-faint">保管済み</span>}
                             {/*
@@ -1078,7 +1083,7 @@ export default function TagsPageV4({
                           {/* ATTR-20: 登録日は名前の下へ畳む。独立した列にすると1024pxでつぶれる。 */}
                           <p className="mt-0.5 pl-4 text-[11px] text-ink-faint">{formatDate(tag.createdAt)} 登録</p>
                         </td>
-                        <td className="px-3 py-3">
+                        <td className="px-3 py-3" onClick={(event) => event.stopPropagation()}>
                           <FolderSelect tag={tag} groups={groups} onItemsChange={setItems} onError={setError} />
                         </td>
                         <td className="px-3 py-3 text-label tabular-nums">{tag.friendCount ?? 0}人</td>
@@ -1093,7 +1098,7 @@ export default function TagsPageV4({
                           </div>
                         </td>
                         <td className="truncate px-3 py-3 text-label text-ink" title={usageLabel(tag)}>{usageLabel(tag)}</td>
-                        <td className="px-3 py-3">
+                        <td className="px-3 py-3" onClick={(event) => event.stopPropagation()}>
                           {/* 設計 `zMlMX`。押すと友だち一覧への表示を切り替える。 */}
                           <button
                             type="button"
@@ -1105,7 +1110,7 @@ export default function TagsPageV4({
                             <StarIcon filled={Boolean(tag.isStarred)} />
                           </button>
                         </td>
-                        <td className="bg-canvas group-hover:bg-canvas-sunken sticky right-0 px-3 py-3">
+                        <td className="bg-canvas group-hover:bg-canvas-sunken sticky right-0 px-3 py-3" onClick={(event) => event.stopPropagation()}>
                           {/* 設計 `E2NC4`。赤いゴミ箱だけ。文字の「削除」は置かない。 */}
                           <button type="button" onClick={() => setDeleteTarget(tag)} aria-label={`${tag.name} を削除`} className="text-danger hover:opacity-70">
                             <TrashIcon />
@@ -1139,15 +1144,15 @@ export default function TagsPageV4({
                       const group = groups.find((item) => item.id === tag.groupId)
                       const chips = linkChips(tag)
                       return (
-                        <li key={tag.id} className="px-3 py-3">
+                        <li key={tag.id} className="cursor-pointer px-3 py-3" onClick={() => router.push(`/tags/edit?id=${tag.id}`)}>
                           <div className="flex items-start gap-2">
-                            <span className="pt-1 text-hairline">
+                            <span className="pt-1 text-hairline" onClick={(event) => event.stopPropagation()}>
                               <ReorderGrip label={tag.name} onMove={(direction) => void keyboardMove(tag.id, direction)}><GripIcon /></ReorderGrip>
                             </span>
                             <div className="min-w-0 flex-1">
                               <div className="flex min-w-0 items-center gap-2">
                                 <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: group?.color ?? '#8b938d' }} />
-                                <Link href={`/tags/edit?id=${tag.id}`} className="truncate text-label font-semibold text-status-info hover:underline" title={tag.name}>{tag.name}</Link>
+                                <Link href={`/tags/edit?id=${tag.id}`} className="truncate text-label font-bold text-ink hover:text-action hover:underline" title={tag.name}>{tag.name}</Link>
                                 {tag.status === 'archived' && <span className="shrink-0 rounded-pill bg-canvas-sunken px-2 py-0.5 text-micro font-bold text-ink-faint">保管済み</span>}
                                 {/* IDEA-04: 重複名の整理候補はカード表示でも行ごとに示す。 */}
                                 {tag.cleanupReasons?.includes('duplicate_name') && <span className="shrink-0 rounded-pill bg-status-warn-soft px-2 py-0.5 text-micro font-bold text-status-warn-deep" title="正規化した名前がほかのタグと重なっています。整理候補です。">重複名</span>}
@@ -1159,19 +1164,19 @@ export default function TagsPageV4({
                                 </p>
                               ) : null}
                               <p className="mt-1 text-xs text-ink-secondary">{tag.friendCount ?? 0}人・{usageLabel(tag)}</p>
-                              <div className="mt-2"><FolderSelect tag={tag} groups={groups} onItemsChange={setItems} onError={setError} /></div>
+                              <div className="mt-2" onClick={(event) => event.stopPropagation()}><FolderSelect tag={tag} groups={groups} onItemsChange={setItems} onError={setError} /></div>
                             </div>
                             <div className="flex shrink-0 items-center gap-2 pt-1">
                               <button
                                 type="button"
                                 aria-pressed={Boolean(tag.isStarred)}
                                 aria-label={tag.isStarred ? '友だち一覧に表示しない' : '友だち一覧に表示する'}
-                                onClick={() => void toggleStar(tag)}
+                                onClick={(event) => { event.stopPropagation(); void toggleStar(tag) }}
                                 className={tag.isStarred ? 'text-status-warn-deep' : 'text-hairline hover:text-status-warn-deep'}
                               >
                                 <StarIcon filled={Boolean(tag.isStarred)} />
                               </button>
-                              <button type="button" onClick={() => setDeleteTarget(tag)} aria-label={`${tag.name} を削除`} className="text-danger hover:opacity-70">
+                              <button type="button" onClick={(event) => { event.stopPropagation(); setDeleteTarget(tag) }} aria-label={`${tag.name} を削除`} className="text-danger hover:opacity-70">
                                 <TrashIcon />
                               </button>
                             </div>

@@ -705,7 +705,7 @@ export default function AutoRepliesPage() {
 
       <div style={FOLDER_RAIL_STYLE} className="grid gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
         <FolderPanel
-          total={ready ? `${visualTotal} 件` : '—'}
+          /* 見出しの総数は「すべて」の行と同じ数なので出さない（件数の重ね書きをやめる）。 */
           activeId={folderFilter}
           onSelect={setFolderFilter}
           onAddFolder={() => setFolderDialogOpen(true)}

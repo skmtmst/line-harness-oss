@@ -22,16 +22,23 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const read = (path: string) => readFileSync(join(HERE, path), 'utf8')
 
 describe('Issue #709: フォルダ帯の見出し件数は行が表す項目の総件数', () => {
+  /*
+   * m13f：見出しの総数は「すべて」の行と重ねて出さない。総件数の置き場所は
+   * 「すべて」の行へ移し、母集団の正しさ（フォルダ数ではない）はそちらで守る。
+   */
   it('テンプレートはテンプレート総件数（フォルダ数ではない）', () => {
     const src = read('templates/page.tsx')
     // ★V7 `x63W5x`：取れていない間は「—」。読めたときはテンプレート総件数。
-    expect(src).toContain('`${templates.length} 件`')
+    expect(src).toContain("{ id: 'all', label: 'すべて'")
+    expect(src).toContain('? templates.length : null')
+    expect(src).not.toContain('`${templates.length} 件`')
     expect(src).not.toContain('total={`${folders.length} 件`}')
   })
 
   it('リッチメニューはグループ総件数（フォルダ数+1ではない）', () => {
     const src = read('rich-menus/page.tsx')
-    expect(src).toContain('total={`${groupFacets?.total ?? groupTotal} 件`}')
+    expect(src).toContain("{ id: '', label: 'すべて', count: groupFacets?.total ?? groupTotal }")
+    expect(src).not.toContain('total={`${groupFacets?.total ?? groupTotal} 件`}')
     expect(src).not.toContain('total={`${folders.length + 1}`}')
   })
 
