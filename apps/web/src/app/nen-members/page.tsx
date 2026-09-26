@@ -897,8 +897,8 @@ export default function PhotoReviewsPage() {
       </div>
 
       <div className={styles.body}>
-      <div className="min-w-0 space-y-6">
-      {!selectedAccountId ? <ListState kind="empty" title="LINEアカウントを選んでください" description="上のバーから、写真審査を行うLINEアカウントを選びます。" /> : loading ? <ListState kind="loading" title="写真を読み込んでいます" /> : loadForbidden ? <ListState kind="forbidden" title="写真を見る権限がありません" description="管理者へ写真審査の閲覧権限を確認してください。" /> : loadError ? <ListState kind="error" title="写真を読み込めませんでした" description="通信状態を確認して、もう一度読み込んでください。" onRetry={() => void load()} /> : visiblePhotos.length === 0 ? <ListState kind="empty" title="この状態の写真はありません" description="別の状態を選ぶか、新しい写真が届くまでお待ちください。" /> : <section className="grid grid-cols-1 gap-2.5 md:grid-cols-2 2xl:grid-cols-4">
+      <div className="flex min-w-0 flex-col gap-4">
+      {!selectedAccountId ? <div className="bg-canvas rounded-card border-hairline border"><ListState kind="empty" title="LINEアカウントを選んでください" description="上のバーから、写真審査を行うLINEアカウントを選びます。" /></div> : loading ? <ListState kind="loading" title="写真を読み込んでいます" /> : loadForbidden ? <ListState kind="forbidden" title="写真を見る権限がありません" description="管理者へ写真審査の閲覧権限を確認してください。" /> : loadError ? <ListState kind="error" title="写真を読み込めませんでした" description="通信状態を確認して、もう一度読み込んでください。" onRetry={() => void load()} /> : visiblePhotos.length === 0 ? <div className="bg-canvas rounded-card border-hairline border"><ListState kind="empty" title="この状態の写真はありません" description="別の状態を選ぶか、新しい写真が届くまでお待ちください。" /></div> : <section className="grid grid-cols-1 gap-2.5 md:grid-cols-2 2xl:grid-cols-4">
         {visiblePhotos.map((photo) => {
           const photoId = text(photo.id)
           const selected = selectedPhotoIds.includes(photoId)
