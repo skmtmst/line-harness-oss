@@ -429,27 +429,30 @@ export default function AccountMigration() {
   if (status === 'error') return <ListState kind="error" title="UID移行を表示できませんでした" description="登録した移行履歴は消えていません。" action={<Button onClick={() => void load()}>再読み込み</Button>} />
 
   return (
-    <div data-design-node="vtBCu">
+    <div data-design-node="vtBCu" className="flex flex-col gap-4">
+      {/*
+        カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。
+        子ごとの mb/mt で間隔を作らない（0に潰れる箇所が出るため）。
+      */}
       {/*
         #984 LAY-14: 主タブは友だち一覧側と同じ定義・同じ部品・同じ選択色。
-        手書き nav（選択が青の別実装）はやめる。「移行履歴」は主タブに
-        増やさず、ページ内の履歴節へ飛ぶ補助リンクとして右端へ置く。
+        手書き nav（選択が青の別実装）はやめる。
+        右端の「移行履歴」は下の履歴節へ飛ぶだけの補助リンクで、
+        同じ節が画面内に常に見えるため置かない（重複を出さない）。
+        「CSVで書き出す・取り込む」は別画面への導線なので残す。
       */}
-      <div className="mb-4" data-design="V6Tabs">
+      <div data-design="V6Tabs">
         <MergedTabs
           basePath="/friends"
           tabs={FRIENDS_MERGED_TABS}
           active="uid-migration"
           actions={(
-            <>
-              <Button href="#migration-history">移行履歴</Button>
-              <Button href="/friends/migrations">CSVで書き出す・取り込む</Button>
-            </>
+            <Button href="/friends/migrations">CSVで書き出す・取り込む</Button>
           )}
         />
       </div>
       {/* 現在地：UID移行は友だちのタブ。左メニューの選択も友だち（lib/menu.ts）。 */}
-      <div className="mb-4">
+      <div>
         <Breadcrumb items={[{ label: '友だち', href: '/friends' }, { label: 'UID移行' }]} />
       </div>
 
@@ -467,7 +470,7 @@ export default function AccountMigration() {
               ? 4
               : 3
         return (
-          <div className="bg-canvas rounded-card border-hairline mb-4 border">
+          <div className="bg-canvas rounded-card border-hairline border">
             <div className="px-4 py-3 sm:hidden">
               <p className="text-action text-xs font-bold">
                 {currentStep >= STEPS.length ? 'すべて完了' : `現在 ${currentStep + 1}/${STEPS.length}`}
@@ -502,7 +505,7 @@ export default function AccountMigration() {
         実行前後の判断を誤らせる。
       */}
       {(!active || ['dry_run', 'review', 'ready'].includes(active.status)) && (
-        <div className="bg-info-bg text-ink-secondary mb-4 rounded-control px-4 py-3 text-xs">本移行まで、既存ユーザー・配信・シナリオには影響しません。</div>
+        <div className="bg-info-bg text-ink-secondary rounded-control px-4 py-3 text-xs">本移行まで、既存ユーザー・配信・シナリオには影響しません。</div>
       )}
       {/*
         #984 LAY-13: 段組みと寸法をそろえる。
@@ -514,7 +517,7 @@ export default function AccountMigration() {
         U063と同じ属性スコープ（data-selects-wide）でこの画面の
         select だけを欄いっぱいに広げる。
       */}
-      <section data-selects-wide className="bg-canvas rounded-card border-hairline mb-4 border p-4">
+      <section data-selects-wide className="bg-canvas rounded-card border-hairline border p-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
           <label className="text-ink-secondary block min-w-0 flex-1 text-xs font-semibold">
             <span className="mb-2 block">移行元</span>
@@ -593,7 +596,17 @@ export default function AccountMigration() {
           setPage(nextPage)
           void loadDetail(active.id, nextPage, classification, pendingOnly)
         }}
-      /> : <ListState kind="empty" title="テスト移行はまだありません" description="移行元・移行先と対応表を選び、まず確認だけ実行してください。" />}
+      /> : (
+        <section className="bg-canvas rounded-card border-hairline overflow-hidden border">
+          {/*
+            空の案内も、ほかと同じカード（白地・枠・角丸）の中に出す。
+            灰色の地だけの枠をカードの間に直接置くと、下の履歴カードと
+            境目が重なって見える。履歴カードと同じく見出し＋空の1枚にする。
+          */}
+          <div className="border-hairline border-b px-4 py-3"><h2 className="text-ink text-sm font-bold">テスト移行の結果</h2></div>
+          <ListState kind="empty" title="テスト移行はまだありません" description="移行元・移行先と対応表を選び、まず確認だけ実行してください。" />
+        </section>
+      )}
 
       {/*
         FRIEND-14: 「詳細を見る」は読み取り専用。開くだけでは更新APIを
@@ -757,14 +770,15 @@ function ActiveMigration({
   const from = total === 0 ? 0 : page * ITEM_PAGE_SIZE + 1
   const to = Math.min((page + 1) * ITEM_PAGE_SIZE, total)
   const statusView = runStatusView(active, unresolved)
-  return (<>
-    <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
+  {/* 中のカード同士も親の gap-4（16px）でそろえる。mb-6（24px）は作らない。 */}
+  return (<div className="flex flex-col gap-4">
+    <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
       <SummaryCard variant="v6" title="読み込み" value={active.counts.total} unit="件" detail="対応表の全件" />
       <SummaryCard variant="v6" title="自動一致" value={active.counts.auto} unit="件" detail={active.counts.total ? `${Math.round(active.counts.auto / active.counts.total * 1000) / 10}%` : '0%'} />
       <SummaryCard variant="v6" title="要確認・競合" value={active.counts.review + active.counts.conflict} unit="件" detail="すべて判断が必要" />
       <SummaryCard variant="v6" title="未一致" value={active.counts.unmatched} unit="件" detail="除外（新規作成は取り込みで）" />
     </div>
-    <div className="bg-canvas rounded-card border-hairline mb-4 overflow-hidden border">
+    <div className="bg-canvas rounded-card border-hairline overflow-hidden border">
       {/*
         FRIEND-15: 見出し・説明・バッジは run.status で連動させる。
         完了履歴へ「実データはまだ変更していません」は出さない。
@@ -807,7 +821,7 @@ function ActiveMigration({
       確認ダイアログを開くだけで、ここでは書き込まない。
       権限が無いなら理由を文字で示す（押せるのに失敗する形にしない）。
     */}
-    <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+    <div className="flex flex-wrap items-center justify-between gap-3">
       <p className="text-ink-secondary text-sm">
         {active.status === 'ready'
           ? '競合をすべて判断すると、本移行へ進めます。本移行は別のownerによる確認が必要です。'
@@ -836,5 +850,5 @@ function ActiveMigration({
         </>)}
       </div>
     </div>
-  </>)
+  </div>)
 }
