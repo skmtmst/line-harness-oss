@@ -96,9 +96,10 @@ export default function OpsMembersPage() {
   const totpMissing = summary ? summary.members - summary.totpEnabled : 0
 
   return (
-    <div data-design-node="POteo">
+    <div data-design-node="POteo" className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       <OpsPageHeader title="メンバー管理" />
-      <div className="mb-4">
+      <div>
         <Tabs
           items={[
             { label: '権限者', current: tab === 'members', onClick: () => setTab('members') },
@@ -116,7 +117,7 @@ export default function OpsMembersPage() {
       </div>
 
       {inviting ? (
-        <form onSubmit={(event) => void invite(event)} className="mb-4 flex items-center gap-2 rounded-card border border-hairline bg-canvas px-4 py-3">
+        <form onSubmit={(event) => void invite(event)} className="flex items-center gap-2 rounded-card border border-hairline bg-canvas px-4 py-3">
           <div className="flex-1">
             <TextField
               type="email"
@@ -132,18 +133,18 @@ export default function OpsMembersPage() {
         </form>
       ) : null}
 
-      <div className="mb-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <SummaryCard variant="v6" title="運営メンバー" value={summary ? summary.members : null} unit="人" detail={summary ? `招待中 ${summary.invited}・2要素認証待ち ${summary.awaitingTotp}` : '—'} loading={!loaded} />
         <SummaryCard variant="v6" title="2要素認証" value={summary ? summary.totpEnabled : null} unit={summary ? `/ ${summary.members}人` : '人'} detail={totpMissing > 0 ? `未設定 ${totpMissing}人` : '全員設定済み'} badge={totpMissing > 0 ? '要対応' : undefined} badgeTone="danger" loading={!loaded} />
         <SummaryCard variant="v6" title="今月の代理ログイン" value={summary ? summary.impersonationsThisMonth : null} unit="回" detail={summary ? `書き込み ${summary.writeImpersonationsThisMonth}回` : '—'} loading={!loaded} />
         <SummaryCard variant="v6" title="今月の個人情報の表示" value={summary ? summary.piiRevealsThisMonth : null} unit="回" detail="理由の記録あり" loading={!loaded} />
       </div>
 
-      <div className="mb-4">
+      <div>
         <NoteBar tone="warn">運営メンバーはメールで招待します。招待された人はパスワードを設定し、2要素認証の登録が終わるまで運営コンソールに入れません。自分自身は変えられません。</NoteBar>
       </div>
 
-      {notice ? <p role="status" className="mb-3 text-caption text-accent-deep">{notice}</p> : null}
+      {notice ? <p role="status" className="text-caption text-accent-deep">{notice}</p> : null}
       {/*
         ★V7：一覧の失敗は一覧の場所の1枚で出すので、ここでは操作の知らせだけ出す。
       */}
@@ -155,7 +156,9 @@ export default function OpsMembersPage() {
         ) : error && members.length === 0 ? (
           <ListState kind="error" title="運営メンバーを表示できませんでした" onRetry={() => void load()} />
         ) : members.length === 0 ? (
-          <ListState kind="empty" title="運営メンバーがいません" description="最初の 1 人は、自分のメールアドレスを「運営メンバーを招待」に入れて登録します。" />
+          <div className="bg-canvas rounded-card border-hairline border">
+            <ListState kind="empty" title="運営メンバーがいません" description="最初の 1 人は、自分のメールアドレスを「運営メンバーを招待」に入れて登録します。" />
+          </div>
         ) : (
           <DataTable>
             <thead>
