@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react'
 import Link from 'next/link'
+import SharedLinePreview from '@/components/shared/line-preview'
 import Button, { type ButtonProps } from '@/components/shared/button'
 import StatusBadge from '@/components/shared/status-badge'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -62,13 +63,16 @@ export function SummaryCard({ rows, title = '設定内容' }: { title?: string; 
   )
 }
 
+/*
+ * LINEの見た目の枠は共通部品 `LinePreview`（B-6）。
+ * `caption`（いつ届くか・失敗の知らせ）は動く情報なので、見える札の
+ * まま残す。? には入れない。呼び出し側はそのまま使える。
+ */
 export function LinePreview({ caption, children, empty = false }: { caption: string; children: ReactNode; empty?: boolean }) {
   return (
-    <section className={styles.linePreview}>
-      <h2>LINEプレビュー</h2>
-      <p className={styles.previewCaption}>{caption}</p>
-      <div className={empty ? styles.previewEmpty : styles.bubble}>{children}</div>
-    </section>
+    <SharedLinePreview caption={caption} empty={empty || undefined}>
+      {children}
+    </SharedLinePreview>
   )
 }
 

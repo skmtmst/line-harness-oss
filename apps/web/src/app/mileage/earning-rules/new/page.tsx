@@ -14,6 +14,7 @@ import CreatePage, {
   inputClass,
 } from '@/components/shared/create-page'
 import { TextInput } from '@/components/shared/form-controls'
+import LinePreview from '@/components/shared/line-preview'
 import DateField from '@/components/shared/date-field'
 import ConditionBuilder, {
   pruneCondition,
@@ -437,17 +438,17 @@ export default function NewMileageRulePage() {
             </p>
           </AsideCard>
 
-          <AsideCard title="LINEプレビュー">
-            <p className="text-ink-faint text-xs">{selected.label}あと、すぐに届く想定です</p>
-            <div className="mt-3 rounded-card bg-accent-soft p-3 text-sm leading-6 text-ink">
+          {/* LINEの見た目の枠は共通部品 `LinePreview`（B-6）。届く想定は見える札のまま残す。 */}
+          <LinePreview caption={`${selected.label}あと、すぐに届く想定です`}>
+            <div className="rounded-card bg-canvas p-3 text-sm leading-6 text-ink">
               ありがとうございます。{validAmount ? value.toLocaleString('ja-JP') : '—'} マイルが付きました。現在の残高は、配信時に自動で入ります。
             </div>
-            <label className="mt-3 flex items-start gap-2 text-xs text-ink-secondary">
+            <label className="mt-3 flex items-start gap-2 text-xs text-ink">
               <input type="checkbox" checked={notifyFriend} onChange={(event) => setNotifyFriend(event.target.checked)} />
               <span>マイルが付いたら、この内容を自動で知らせる</span>
             </label>
-            <p className="mt-2 text-xs text-ink-faint">通知するかどうかと本文を、たまる決めごとの下書きへ一緒に保存します。</p>
-          </AsideCard>
+            <p className="mt-2 text-xs text-ink-secondary">通知するかどうかと本文を、たまる決めごとの下書きへ一緒に保存します。</p>
+          </LinePreview>
 
           <AsideCard title="詳細設定と気をつけること">
             <details>

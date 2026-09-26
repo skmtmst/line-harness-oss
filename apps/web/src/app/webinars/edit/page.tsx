@@ -1,6 +1,7 @@
 'use client'
 
 import Disclosure from '@/components/shared/disclosure'
+import LinePreview from '@/components/shared/line-preview'
 import SelectField from '@/components/shared/select-field'
 import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
@@ -134,12 +135,14 @@ function SummaryAside({
     </section>
   )
   const preview = (
-    <section className="bg-line-preview min-h-[365px] rounded-card p-4 text-on-accent shadow-card">
-        <h2 className="text-center text-sm font-bold">LINEプレビュー</h2>
-        <p className="bg-line-preview-label mx-auto mt-3 w-fit rounded-pill px-3 py-1 text-micro">実際のLINE表示に近いプレビューです</p>
-        <div className="bg-canvas text-ink mt-4 rounded-control p-4 text-sm font-medium leading-relaxed">{previewBody}</div>
+    <div className="min-h-[365px] shadow-card">
+    <LinePreview
+      note="実際のLINE表示に近いプレビューです"
+    >
+        <div className="bg-canvas text-ink rounded-control p-4 text-sm font-medium leading-relaxed">{previewBody}</div>
         {previewButton ? <div className="bg-accent-deep text-on-accent mx-auto mt-3 w-fit rounded-control px-4 py-2 text-xs font-bold">{previewButton}</div> : null}
-    </section>
+    </LinePreview>
+    </div>
   )
   return (
     <aside className="space-y-3 xl:w-[390px] xl:shrink-0">

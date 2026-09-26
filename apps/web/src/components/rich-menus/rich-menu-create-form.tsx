@@ -2,6 +2,7 @@
 
 import { useMemo, useState, type ReactNode } from 'react'
 import Button from '@/components/shared/button'
+import LinePreview from '@/components/shared/line-preview'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import SelectField from '@/components/shared/select-field'
 import Stepper from '@/components/shared/stepper'
@@ -373,7 +374,11 @@ export default function RichMenuCreateForm({
         </div>
 
         <aside className="sticky top-20 space-y-3">
-          <section className="bg-info rounded-card p-4 text-on-accent"><h2 className="mb-3 text-center text-sm font-bold">LINEプレビュー</h2><p className="bg-canvas text-ink mb-1 rounded-t-control py-2 text-center text-xs">{value.chatBarText || 'メニュー'}</p><RichMenuTemplatePreview template={template} /></section>
+          {/* LINEの見た目の枠は共通部品 `LinePreview`（B-6）。青い地はやめる。 */}
+          <LinePreview note="メニューを開くボタンの文字と面の分け方を確認できます">
+            <p className="bg-canvas text-ink rounded-t-control py-2 text-center text-xs">{value.chatBarText || 'メニュー'}</p>
+            <RichMenuTemplatePreview template={template} />
+          </LinePreview>
           <section className="bg-warning-bg text-warning rounded-card p-4 text-xs leading-6"><h2 className="font-bold">公開前に見ておくところ</h2><p>・アクションが未設定の面が {unsetLabels.length}つあります</p><p>・画像は1MBまで。超えると登録できません</p><p>・切替メニューの移動先は、公開してからでないと動きません</p></section>
         </aside>
         {footer ? <div className="lg:col-span-4">{footer}</div> : null}

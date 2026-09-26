@@ -9,6 +9,7 @@ import type {
 } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import Card, { CardHeader } from '@/components/shared/card'
+import LinePreview from '@/components/shared/line-preview'
 import ListState from '@/components/shared/list-state'
 import Stepper from '@/components/shared/stepper'
 import TargetMissing from '@/components/shared/target-missing'
@@ -382,20 +383,17 @@ function FriendAddPublishInner() {
         </div>
 
         <aside className={styles.side}>
-          <Card layout="vertical" className={styles.section} data-friend-add-part="preview">
-            <CardHeader title="LINEプレビュー" />
-            <p className="text-center text-xs text-ink-secondary">
-              {draft.routing.firstTime.timing === 'immediate'
-                ? '登録直後から5分以内に届きます'
-                : '設定したシナリオの時刻に届きます'}
-            </p>
-            <div className="mx-auto w-full max-w-xs overflow-hidden rounded-card border border-hairline bg-line-preview">
-              <div className="border-b border-hairline bg-canvas px-3 py-2.5 text-center text-xs font-bold text-ink">LINE公式アカウント</div>
-              <div className="m-3 my-7 w-4/5 rounded-card bg-canvas p-3 text-xs leading-6 text-ink-secondary">
-                {ruleDetail?.rule.definition.messageText || `シナリオ「${ruleDetail?.rule.scenarioName ?? '選択中'}」を開始します。`}
-              </div>
+          {/* LINEの見た目の枠は共通部品 `LinePreview`（B-6）。白い箱はやめる。 */}
+          <LinePreview
+            caption={draft.routing.firstTime.timing === 'immediate'
+              ? '登録直後から5分以内に届きます'
+              : '設定したシナリオの時刻に届きます'}
+            accountName="LINE公式アカウント"
+          >
+            <div className="rounded-card bg-canvas p-3 text-xs leading-6 text-ink-secondary">
+              {ruleDetail?.rule.definition.messageText || `シナリオ「${ruleDetail?.rule.scenarioName ?? '選択中'}」を開始します。`}
             </div>
-          </Card>
+          </LinePreview>
           <Card layout="vertical" className={styles.section} data-friend-add-part="side">
             <CardHeader title="設定サマリー" meta="有効化する内容です。" />
             <div className={styles.rows}>
