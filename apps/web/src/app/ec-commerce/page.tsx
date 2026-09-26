@@ -349,7 +349,7 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
           {overviewState === 'error' ? <button type="button" className="text-action ml-2 font-semibold hover:underline" onClick={() => void loadOverview(false)}>集計をもう一度読む</button> : null}
         </p>
       ) : null}
-      <NoteBar>ECの注文には、LINEの友だちが誰なのかが書かれていません。メールアドレスか電話番号で結びつけています。どちらも一致しなかった注文は「会員のつき合わせ」に並びます。</NoteBar>
+      <NoteBar help="注文にはLINEの友だちが書かれていないため、メールアドレスか電話番号で結びつけます" helpLabel="つき合わせの仕方">ECの注文には、LINEの友だちが誰なのかが書かれていません。メールアドレスか電話番号で結びつけています。どちらも一致しなかった注文は「会員のつき合わせ」に並びます。</NoteBar>
       {notice ? <div className={notice.tone === 'success' ? styles.noticeSuccess : styles.noticeError} role="status">{notice.text}</div> : null}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <input
