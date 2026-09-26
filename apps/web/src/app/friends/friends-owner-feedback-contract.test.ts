@@ -19,11 +19,12 @@ describe('友だち画面のオーナー指摘契約', () => {
   })
 
   it('未対応と注目のみを小さな押し口にし、選択中はチェックで示す', () => {
-    expect(PAGE).toContain('data-filter-chip="unhandled"')
-    expect(PAGE).toContain('data-filter-chip="attention"')
-    expect(PAGE).toContain('inline-flex h-8 shrink-0')
-    expect(PAGE).toContain("responseFilter === 'unhandled'\n              ? <Check")
-    expect(PAGE).toContain("attentionOnly\n              ? <Check")
+    // m13i: 札の形は共通 FilterChip 1つにそろえた。
+    // 小さな押し口（高さ32）・選択中の✓は部品側が持つ。ここでは結びだけ見る。
+    expect(PAGE).toContain("selected={responseFilter === 'unhandled'}")
+    expect(PAGE).toContain('selected={attentionOnly}')
+    expect(PAGE).toContain('未対応')
+    expect(PAGE).toContain('注目のみ')
   })
 
   it('友だち詳細のマイル残高を利用可能ラベルと同じ枠の一行に置く', () => {
