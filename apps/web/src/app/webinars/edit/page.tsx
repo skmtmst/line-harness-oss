@@ -797,7 +797,7 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
   }
 
   return (
-    <div className="space-y-6 scroll-mt-4" id="webinar-overview" data-design-node="yxyzQ">
+    <div className="space-y-4 scroll-mt-4" id="webinar-overview" data-design-node="yxyzQ">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-action">Performance overview</p>
@@ -2618,7 +2618,7 @@ function EditWebinarInner() {
           )}
         />
       ) : null}
-      {pane === 'participants' ? <div className="mt-4 flex justify-end gap-2"><Button href={`/webinars/edit?id=${encodeURIComponent(webinar.id)}&pane=analytics`}>分析を見る</Button><Button href={`/webinars/edit?id=${encodeURIComponent(webinar.id)}`}>ウェビナーの設定を編集</Button></div> : null}
+      {pane === 'participants' ? <div className="flex justify-end gap-2"><Button href={`/webinars/edit?id=${encodeURIComponent(webinar.id)}&pane=analytics`}>分析を見る</Button><Button href={`/webinars/edit?id=${encodeURIComponent(webinar.id)}`}>ウェビナーの設定を編集</Button></div> : null}
       {leaveConfirmDialog}
     </div>
   )
