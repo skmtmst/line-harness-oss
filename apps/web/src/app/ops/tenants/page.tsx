@@ -94,7 +94,14 @@ export default function OpsTenantsPage() {
     <div data-design-node="X9f5jy">
       <OpsPageHeader title="契約先アカウント" />
 
+      {/*
+        作る操作は一覧のすぐ上の左。見出しの行の右端には置かない。
+      */}
       <div className="mb-4 flex flex-wrap items-center gap-3">
+        <Button variant="primary" onClick={() => setCreating((v) => !v)}>
+          <Plus aria-hidden="true" className="h-4 w-4" />
+          契約先を追加
+        </Button>
         <div className="w-full max-w-md">
           <SearchField
             value={q}
@@ -111,11 +118,6 @@ export default function OpsTenantsPage() {
             </FilterChip>
           ))}
         </div>
-        <div className="flex-1" />
-        <Button variant="primary" onClick={() => setCreating((v) => !v)}>
-          <Plus aria-hidden="true" className="h-4 w-4" />
-          契約先を追加
-        </Button>
       </div>
 
       {creating ? (

@@ -562,8 +562,14 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
           <span className="mx-2">›</span>
           <span>外部連携</span>
         </nav>
-        <div className="flex flex-wrap justify-end gap-2">
-          <Button variant="secondary" href="/webhooks?tab=notify">見本から作る</Button>
+      </div>
+      <MergedTabs basePath="/webhooks" paramName="tab" tabs={countedTabs} active={tab} />
+      {/*
+        作る操作は一覧のすぐ上の左。たまに使う「見本から作る」は同じ行の右。
+        見出しの行の右端には置かない。
+      */}
+      <div className="mb-4 mt-4 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {tab === 'incoming' ? (
             <Button variant="primary" onClick={() => setShowCreate(!showCreate)}>
               {showCreate ? 'キャンセル' : '受け取り口を追加'}
@@ -572,8 +578,8 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
             <Button variant="primary" href="/webhooks/new">送り先を追加</Button>
           )}
         </div>
+        <Button variant="secondary" href="/webhooks?tab=notify">見本から作る</Button>
       </div>
-      <MergedTabs basePath="/webhooks" paramName="tab" tabs={countedTabs} active={tab} />
 
       {/* Rotate-secret modal — used to recover legacy webhooks or rotate. */}
       {rotateTarget && (
@@ -627,13 +633,12 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
               >
                 キャンセル
               </Button>
-              <button
+              <Button
                 type="submit"
-                className="px-4 py-2 text-sm rounded-lg text-white font-medium"
-                style={{ backgroundColor: 'var(--color-accent)' }}
+                variant="primary"
               >
                 保存
-              </button>
+              </Button>
             </div>
           </form>
         </div>
@@ -793,13 +798,13 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
               </p>
             </div>
           </div>
-          <button
+          <Button
             type="submit"
-            className="mt-4 px-4 py-2 rounded-lg text-white text-sm font-medium"
-            style={{ backgroundColor: 'var(--color-accent)' }}
+            variant="primary"
+            className="mt-4"
           >
             作成
-          </button>
+          </Button>
         </form>
       )}
 

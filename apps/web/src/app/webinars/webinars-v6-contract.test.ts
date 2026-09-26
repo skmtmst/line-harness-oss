@@ -96,10 +96,10 @@ describe('V6 ウェビナー一覧の契約', () => {
     expect(PAGE).not.toContain('保存した条件')
   })
 
-  it('同じ /webinars/new への操作名は「＋ ウェビナーをつくる」で一致する(DETAIL-02)', () => {
-    expect(PAGE).toContain('href="/webinars/new">＋ ウェビナーをつくる')
+  it('同じ /webinars/new への操作名は「＋ ウェビナーを作る」で一致する(DETAIL-02)', () => {
+    expect(PAGE).toContain('href="/webinars/new">＋ ウェビナーを作る')
     expect(PAGE).not.toContain('ウェビナーを作成')
-    expect(PAGE).not.toContain('ウェビナーを作る')
+    expect(PAGE).not.toContain('ウェビナーをつくる')
   })
 
   it('動画欄は実メディア名を出し、slug.mp4 の偽名を作らない(DETAIL-18)', () => {

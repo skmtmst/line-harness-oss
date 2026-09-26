@@ -880,7 +880,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
           description={
             query
               ? '検索の言葉を変えてください。'
-              : '右上の「成果地点をつくる」から登録すると、ここに出ます。'
+              : '上の「＋ 成果地点をつくる」から登録すると、ここに出ます。'
           }
         />
       ) : (

@@ -1,8 +1,7 @@
 // @vitest-environment happy-dom
 /*
- * #641: リマインダ一覧の行操作を「枠つき詳細ボタン＋削除アイコン＋・・・」へ統一。
- * 削除とその他メニューだけだった行に、主操作の枠つきボタンが出ることを
- * 実マウントで確かめる。
+ * 行の操作は「主な1つ（詳細）＋…メニュー」。削除は行に直に置かず、
+ * メニューの中の危ない操作にあることを実マウントで確かめる。
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -81,8 +80,8 @@ async function flush() {
   await act(async () => { await Promise.resolve() })
 }
 
-describe('#641 リマインダ一覧の行操作', () => {
-  it('行の先頭に枠つき「詳細」ボタン、削除アイコン、「・・・」が並ぶ', async () => {
+describe('リマインダ一覧の行操作', () => {
+  it('行の先頭に枠つき「詳細」ボタンと「・・・」が並び、削除は行に無い', async () => {
     await act(async () => { root.render(<RemindersPage />) })
     await flush()
 
@@ -90,14 +89,13 @@ describe('#641 リマインダ一覧の行操作', () => {
       .find((el) => el.getAttribute('href') === '/reminders/detail?id=r-1' && el.textContent?.includes('詳細'))
     expect(detail, '枠つき「詳細」ボタンが見つかりません').toBeTruthy()
 
-    const del = host.querySelector('button[aria-label="予約前のお知らせを削除"]')
-    expect(del, '削除アイコンが見つかりません').toBeTruthy()
+    expect(host.querySelector('button[aria-label="予約前のお知らせを削除"]')).toBeNull()
 
     const more = host.querySelector('button[aria-label="予約前のお知らせのその他操作"]') as HTMLButtonElement
     expect(more, 'その他ボタンが見つかりません').toBeTruthy()
   })
 
-  it('「・・・」を押すとメニュー（登録者を管理など）が開く', async () => {
+  it('「・・・」を押すとメニュー（登録者を管理など）と削除が開く', async () => {
     await act(async () => { root.render(<RemindersPage />) })
     await flush()
     const more = host.querySelector('button[aria-label="予約前のお知らせのその他操作"]') as HTMLButtonElement
@@ -106,5 +104,6 @@ describe('#641 リマインダ一覧の行操作', () => {
     expect(menu, 'メニューが開きません').toBeTruthy()
     expect(menu!.textContent).toContain('登録者を管理')
     expect(menu!.textContent).toContain('配信予定を確認')
+    expect(menu!.textContent).toContain('削除する')
   })
 })

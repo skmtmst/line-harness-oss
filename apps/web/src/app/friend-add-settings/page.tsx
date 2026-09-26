@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { FlaskConical, History, MoreHorizontal, Plus, Rocket, Trash2 } from 'lucide-react'
+import { FlaskConical, History, MoreHorizontal, Rocket, Trash2 } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import ActionMenu from '@/components/shared/action-menu'
@@ -220,9 +220,13 @@ function FriendAddSettingsList() {
 
   return (
     <div data-design-node="uLQQc" className="text-ink min-w-0">
-      <div data-design="Head" className="mb-4 flex justify-end gap-2">
+      {/*
+        作る操作は一覧のすぐ上の左。たまに見る実行結果は同じ行の右。
+        見出しの行の右端には置かない。
+      */}
+      <div data-design="Head" className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <Button href="/friend-add-settings?view=new" variant="primary">＋ 初回案内を作る</Button>
         <Button href="/friend-add-settings/runs">実行結果を見る</Button>
-        <Button href="/friend-add-settings?view=new" variant="primary"><Plus size={16} />初回案内を作成</Button>
       </div>
 
       {/*

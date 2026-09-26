@@ -191,7 +191,7 @@ function AutomationRowActions({
       {canManage ? (
         <>
           {/* #942 N-352: 編集・複製・保管を行から直接開けるようにする。 */}
-          <Button onClick={onEdit} disabled={busy} variant="secondary" className="whitespace-nowrap">編集する</Button>
+          <Button onClick={onEdit} disabled={busy} variant="secondary" size="compact" className="whitespace-nowrap">編集する</Button>
           <IconButton
             aria-label={`${automation.name}のその他操作`}
             aria-expanded={menuOpen}
@@ -517,7 +517,7 @@ export default function AutomationsPage() {
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-ink-faint">自動化 ＞ オートメーション ＞ 見本</p>
           {/* 作成は owner/admin だけ（N-361）。見本の閲覧と「これで作る」の出し分けは画廊側で行う。 */}
-          {canManageAutomations ? <Button href="/automations/new">ルールを作成</Button> : null}
+          {canManageAutomations ? <Button href="/automations/new" variant="primary">＋ ルールを作る</Button> : null}
         </div>
         <div className="mb-4">
           <MergedTabs basePath="/automations" paramName="tab" tabs={tabs} active={tab} />
@@ -597,12 +597,15 @@ export default function AutomationsPage() {
         <MergedTabs basePath="/automations" paramName="tab" tabs={tabs} active={tab} />
       </div>
       <div data-design="Head" className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-ink-faint">自動化 ＞ オートメーション</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-sm text-ink-faint">自動化 ＞ オートメーション</p>
+          {/* 普段使う作る操作は左の並びへ。右上には置かない。 */}
+          {canManageAutomations ? <Button href="/automations/new" variant="primary">＋ ルールを作る</Button> : null}
+        </div>
         <div className="flex flex-wrap gap-2">
           <Button href="/common-actions">共通アクションを見る</Button>
           <Button href="/automations?tab=templates">見本から作る</Button>
           {/* 作成は owner/admin だけ。閲覧のみには出さず、下で理由を出す（N-361）。 */}
-          {canManageAutomations ? <Button href="/automations/new" variant="primary">ルールを作成</Button> : null}
           <Button href="/support">マニュアル</Button>
         </div>
       </div>
@@ -699,7 +702,7 @@ export default function AutomationsPage() {
             ? (tab === 'stopped' ? '止めているオートメーションはありません。' : '動いているオートメーションはありません。')
             : '条件に合うオートメーションはありません。'}
           description={automations.length === 0 ? 'きっかけ・だれに・することの3つを決めると動きます。' : '検索語や絞り込みを変えてください。'}
-          action={tab === 'active' && canManageAutomations ? <Button href="/automations/new" variant="primary">ルールを作成</Button> : undefined}
+          action={tab === 'active' && canManageAutomations ? <Button href="/automations/new" variant="primary">＋ ルールを作る</Button> : undefined}
         />
       ) : (
         <div className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-sm">

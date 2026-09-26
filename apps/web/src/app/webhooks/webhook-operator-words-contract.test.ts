@@ -21,8 +21,10 @@ describe('V6 外部連携の運用者向け文言', () => {
     expect(PAGE).toContain("{showCreate ? 'キャンセル' : '受け取り口を追加'}")
     expect(PAGE).toContain('href="/webhooks/new">送り先を追加')
     expect(PAGE).not.toContain('送る設定を追加')
-    expect(OVERVIEWS).toContain('右上の「受け取り口を追加」から作成してください。')
-    expect(OVERVIEWS).toContain('右上の「送り先を追加」から作成してください。')
+    expect(OVERVIEWS).toContain('「受け取り口を追加」から作成してください。')
+    expect(OVERVIEWS).toContain('「送り先を追加」から作成してください。')
+    expect(OVERVIEWS).not.toContain('右上の「受け取り口を追加」')
+    expect(OVERVIEWS).not.toContain('右上の「送り先を追加」')
     expect(SCREEN).not.toContain('新規Webhook')
   })
 
