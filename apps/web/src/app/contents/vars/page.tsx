@@ -621,16 +621,19 @@ function VarsPageInner() {
   ]
 
   return (
-    <div data-design-node="WuKzU">
+    <div data-design-node="WuKzU" className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       {!selectedAccountId && !accountLoading && (
-        <ListState kind="empty" title="LINEアカウントを選択してください" description="共通情報はLINEアカウントごとに管理します。" />
+        <div className="bg-canvas rounded-card border-hairline border">
+          <ListState kind="empty" title="LINEアカウントを選択してください" description="共通情報はLINEアカウントごとに管理します。" />
+        </div>
       )}
       {/*
         ★V7 `x63W5x`：読み込み失敗の帯は出さない。一覧の場所の ListState error
         だけにまとめる（同じ失敗を2回出さない）。
       */}
 
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
           {/*
             ★V7 `x63W5x`：失敗している間は作成ボタンを出さない。
@@ -652,13 +655,13 @@ function VarsPageInner() {
       </div>
 
       {emptyInUseCount > 0 ? (
-        <div className="bg-status-warning-soft text-status-warning mb-4 rounded-control px-4 py-3 text-sm font-semibold" role="status">
+        <div className="bg-status-warning-soft text-status-warning rounded-control px-4 py-3 text-sm font-semibold" role="status">
           中身が空のまま使われているものが {emptyInUseCount.toLocaleString('ja-JP')}件あります。差し込んだところが空欄のまま送られます。
         </div>
       ) : null}
 
       {listLimited ? (
-        <div className="bg-status-warning-soft text-status-warning mb-4 rounded-control px-4 py-3 text-sm font-semibold" role="status">
+        <div className="bg-status-warning-soft text-status-warning rounded-control px-4 py-3 text-sm font-semibold" role="status">
           表示は最初の200件までです。フォルダや検索で絞り込んでください。
         </div>
       ) : null}
