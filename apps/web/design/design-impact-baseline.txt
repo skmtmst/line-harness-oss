@@ -145,6 +145,7 @@ shared-button-importer app/search-console/page.tsx
 shared-button-importer app/staff/email-change/page.tsx
 shared-button-importer app/staff/invite/page.tsx
 shared-button-importer app/staff/page.tsx
+shared-button-importer app/settings/file-scan/page.tsx
 shared-button-importer app/settings/manual-links/page.tsx
 shared-button-importer app/settings/page.tsx
 shared-button-importer app/tags/fields/edit/page.tsx

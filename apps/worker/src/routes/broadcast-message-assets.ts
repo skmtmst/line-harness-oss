@@ -12,6 +12,8 @@ import {
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { storeBroadcastMedia } from '../services/broadcast-media-storage.js';
+import { builtinFileScan, checkKeyGate } from '../services/file-scan.js';
+import { ensureFileScanForUpload } from './file-scan.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 
 const broadcastMessageAssets = new Hono<Env>();
@@ -216,6 +218,11 @@ broadcastMessageAssets.get('/images/broadcast-media/:filename', async (c) => {
     : match[2].toLowerCase() === 'png'
       ? 'image/png'
       : 'video/mp4';
+  // 検査が終わるまで配信には出さない。記録が無い古いファイルは通す。
+  const broadcastGate = await checkKeyGate(c.env.DB, c.env.IMAGES, 'broadcast_asset', `broadcast-media/${filename}`);
+  if (!broadcastGate.allowed) {
+    return c.json({ success: false, code: broadcastGate.code, error: broadcastGate.message }, 409);
+  }
   const object = await c.env.IMAGES.get(`broadcast-media/${filename}`);
   if (!object) return c.json({ success: false, error: 'Not found' }, 404);
   return new Response(object.body, {
@@ -244,14 +251,28 @@ broadcastMessageAssets.post('/api/broadcast-message-assets/upload', requireRole(
   }
   if (!c.req.raw.body) return c.json({ success: false, error: 'File body is required' }, 400);
   const [inspectionBody, storageBody] = c.req.raw.body.tee();
+  const prefix = await readPrefix(inspectionBody, 16);
   const validation = validateBroadcastMediaUpload(
-    await readPrefix(inspectionBody, 16),
+    prefix,
     declaredType,
     c.req.header('X-Filename'),
   );
   if (!validation.ok) {
     await storageBody.cancel().catch(() => undefined);
     return c.json({ success: false, error: validation.error }, 400);
+  }
+  // 先頭だけでも分かる脅威（実行ファイルの印）は保存の前に落とす。
+  const prefixCheck = builtinFileScan(prefix, {
+    filename: validation.filename,
+    mimeType: validation.mimeType,
+    sizeBytes: contentLength,
+    width: 1,
+    height: 1,
+  });
+  if (prefixCheck.verdict === 'quarantined'
+    && (prefixCheck.reasonCode === 'executable_signature' || prefixCheck.reasonCode === 'office_macro')) {
+    await storageBody.cancel().catch(() => undefined);
+    return c.json({ success: false, code: 'file_scan_blocked', error: '確認のため受け付けできません' }, 422);
   }
   const workerUrl = c.env.WORKER_URL || new URL(c.req.url).origin;
   const stored = await storeBroadcastMedia({
@@ -262,6 +283,17 @@ broadcastMessageAssets.post('/api/broadcast-message-assets/upload', requireRole(
     originalFilename: validation.filename,
     publicBaseUrl: workerUrl,
   });
+  // 全体の検査は保存の直後に回す。clean になるまで配信には出さない。
+  await ensureFileScanForUpload({
+    db: c.env.DB,
+    lineAccountId: null,
+    subjectKind: 'broadcast_asset',
+    subjectId: stored.key,
+    mediaId: null,
+    filename: validation.filename,
+    mimeType: validation.mimeType,
+    sizeBytes: stored.size,
+  }).catch((err) => console.error('broadcast asset scan record error:', stored.key, err));
   return c.json({
     success: true,
     data: stored,
