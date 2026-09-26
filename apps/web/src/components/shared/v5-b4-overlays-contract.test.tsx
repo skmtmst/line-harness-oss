@@ -30,15 +30,22 @@ describe('V5 B4 オーバーレイ共通部品', () => {
     expect(html).toContain('確認できません')
   })
 
-  it('右詳細・3通知・操作メニューを同じAPIで表せる', () => {
+  it('右詳細・4種の帯・操作メニューを同じAPIで表せる', () => {
+    // 帯の正本は Pencil「★V7 共通部品その2」uR9s8 の §1。旧 tone 名は同じ見た目の別名。
     const html = renderToStaticMarkup(<div>
       <Drawer open modal={false} title="友だち詳細" details={[{ label: '担当', value: '未設定' }]} onClose={vi.fn()} />
+      <Notice tone="info" message="この画面の数は日本時間で数えます。" />
       <Notice tone="success" message="保存しました" onClose={vi.fn()} />
+      <Notice tone="warn" message="入力内容を確認してください" />
+      <Notice tone="danger" message="処理に失敗しました。通信を確かめて、もう一度お試しください。" />
       <Notice tone="validation" message="入力内容を確認してください" />
-      <Notice tone="error" message="処理に失敗しました。通信を確かめて、もう一度お試しください。" />
+      <Notice tone="error" message="処理に失敗しました。" />
       <ActionMenu open inline onClose={vi.fn()} items={[{ id: 'delete', label: '削除', tone: 'danger', onSelect: vi.fn() }]} />
     </div>)
-    for (const nodeId of ['VJKAT', 'ApbSZ', 'zPRvi', 'I5rKbM', 'hGpFq']) expect(html).toContain(`data-design-node="${nodeId}"`)
+    for (const nodeId of ['VJKAT', 'uR9s8', 'hGpFq']) expect(html).toContain(`data-design-node="${nodeId}"`)
+    expect(html).not.toContain('data-design-node="ApbSZ"')
+    expect(html).not.toContain('data-design-node="zPRvi"')
+    expect(html).not.toContain('data-design-node="I5rKbM"')
     expect(html).toContain('aria-label="通知を閉じる"')
     expect(html).toContain('role="menuitem"')
   })
@@ -106,10 +113,12 @@ describe('V5 B4 オーバーレイ共通部品', () => {
     expect(contract.required.partDeclarations).toBe(301)
     expect(contract.parts.dialog.pencilNodes).toEqual(['J6x4Q', 'H2S1T4'])
     expect(contract.parts.drawer.pencilNodes).toEqual(['VJKAT'])
-    expect(contract.parts.notice.pencilNodes).toEqual(['ApbSZ', 'zPRvi', 'I5rKbM'])
+    // 帯の節点は★V7 共通部品その2（uR9s8）。V5 の3節点は置き換え済みとして棚卸しに残す。
+    expect(contract.parts.notice.pencilNodes).toEqual(['uR9s8'])
     expect(contract.parts['action-menu'].pencilNodes).toEqual(['hGpFq'])
     expect(contract.parts['notification-panel'].status).toBe('implemented')
-    for (const nodeId of ['J6x4Q', 'H2S1T4', 'VJKAT', 'ApbSZ', 'zPRvi', 'I5rKbM', 'hGpFq']) expect(inventory.components[nodeId].status).toBe('active')
+    for (const nodeId of ['J6x4Q', 'H2S1T4', 'VJKAT', 'uR9s8', 'hGpFq']) expect(inventory.components[nodeId].status).toBe('active')
+    for (const nodeId of ['ApbSZ', 'zPRvi', 'I5rKbM']) expect(inventory.components[nodeId].status).toBe('implemented')
     expect(inventory.components.z6TmF.status).toBe('implemented')
   })
 })

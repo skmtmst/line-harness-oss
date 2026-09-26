@@ -28,6 +28,11 @@
 
 /* 知らせ1件。黒地に白字（成功・失敗の色分けはしない）。 */
 .toast {
+  /*
+   * 消えるまでの時間。`notifyToast` の規定値（4000ms）と合わせる。
+   * 設計台帳（design-parts.json の toast auto-dismiss）がここを読む。
+   */
+  --toast-duration: 4000ms;
   display: flex;
   align-items: center;
   gap: 8px;

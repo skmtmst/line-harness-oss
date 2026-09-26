@@ -13,7 +13,7 @@
   },
   "$componentInventory": {
     "file": "design/pencil-component-inventory.json",
-    "requiredCount": 85,
+    "requiredCount": 86,
     "requiredClassifications": [
       "global",
       "feature",
@@ -64,10 +64,10 @@
   },
   "required": {
     "$説明": "この数を下回るとCIを落とす。B3では入力・検索・選択まで契約へ追加した。減らす方向の変更は承認が要る。",
-    "$tokens履歴": "2026-09-03: 24 → 21。色と角丸を1系統にまとめ、同値の別名 --radius-tile(=--radius-card)、--color-status-warning(=--color-status-warn-deep)、--color-status-warning-soft(=--color-status-warn-soft) の3つを消した。承認は docs/v6-directives.md §4「色トークンの3系統を1本に」と台帳 kentavndng/line-harness-board#2。",
+    "$tokens履歴": "2026-09-03: 24 → 21。色と角丸を1系統にまとめ、同値の別名 --radius-tile(=--radius-card)、--color-status-warning(=--color-status-warn-deep)、--color-status-warning-soft(=--color-status-warn-soft) の3つを消した。承認は docs/v6-directives.md §4「色トークンの3系統を1本に」と台帳 kentavndng/line-harness-board#2。2026-09-26: 必須節点の ApbSZ・zPRvi・I5rKbM を uR9s8（★V7 共通部品その2 §1・§2）へ置き換え。",
     "tokens": 21,
     "parts": 20,
-    "componentInventory": 85,
+    "componentInventory": 86,
     "v6RepresentativeNodes": 10,
     "v6PartNodes": [
       "nBRKk",
@@ -103,11 +103,9 @@
       "J6x4Q",
       "H2S1T4",
       "VJKAT",
-      "ApbSZ",
-      "zPRvi",
-      "I5rKbM",
       "hGpFq",
-      "z6TmF"
+      "z6TmF",
+      "uR9s8"
     ],
     "partDeclarations": 301
   },
@@ -2978,11 +2976,9 @@
       ]
     },
     "notice": {
-      "name": "V5 共通通知",
+      "name": "★V7 共通の帯（Notice）",
       "pencilNodes": [
-        "ApbSZ",
-        "zPRvi",
-        "I5rKbM"
+        "uR9s8"
       ],
       "role": "canonical",
       "status": "active",
@@ -2993,15 +2989,14 @@
         "Notice"
       ],
       "cssPrefix": "notice",
-      "pencilUsage": "友だち属性の保存・失敗表示へ適用",
-      "lastCheckedAt": "2026-08-24",
-      "note": "成功・入力確認・失敗をtoneで固定し、閉じる・自動消去・読み上げを補う。",
+      "pencilUsage": "★V7 共通部品その2 §1 の帯へ適用",
+      "lastCheckedAt": "2026-09-26",
+      "note": "4種（案内・うまくいった・注意・危険）。高さは中身なり。旧 tone 名（validation・error）は同じ見た目の別名として残す。",
       "routes": {
         "active": [
-          "/tags/new",
-          "/tags/edit"
+          "*"
         ],
-        "impact": "保存・検証・失敗通知を持つ管理画面"
+        "impact": "帯を持つ管理画面"
       },
       "visualVerification": {
         "status": "verified",
@@ -3009,68 +3004,68 @@
           1440,
           1920
         ],
-        "reason": "B4固定状態で3つのPencil通知と比較する。"
+        "reason": "★V7 共通部品その2 §1 の4種と比べる。"
       },
       "declarations": [
         {
-          "pencil": "notice height: 48",
-          "class": "notice",
-          "prop": "min-height",
-          "source": "48px",
-          "resolved": "48px"
-        },
-        {
-          "pencil": "notice gap: 10",
+          "pencil": "uR9s8 gap: 8",
           "class": "notice",
           "prop": "gap",
-          "source": "10px",
-          "resolved": "10px"
+          "source": "8px",
+          "resolved": "8px"
         },
         {
-          "pencil": "notice padding left: 14",
+          "pencil": "uR9s8 padding: 10 12",
           "class": "notice",
           "prop": "padding",
-          "source": "0 44px 0 14px",
-          "resolved": "0 44px 0 14px"
+          "source": "10px 12px",
+          "resolved": "10px 12px"
         },
         {
-          "pencil": "notice cornerRadius: $radius-sm",
+          "pencil": "uR9s8 cornerRadius: $radius-control",
           "class": "notice",
           "prop": "border-radius",
           "source": "var(--radius-control)",
           "resolved": "8px"
         },
         {
-          "pencil": "notice fontSize: $size-label",
+          "pencil": "uR9s8 fontSize: $size-label",
           "class": "notice",
           "prop": "font-size",
           "source": "var(--text-label)",
           "resolved": "13px"
         },
         {
-          "pencil": "notice fontWeight: 700",
+          "pencil": "uR9s8 fontWeight: 400",
           "class": "notice",
           "prop": "font-weight",
-          "source": "700",
-          "resolved": "700"
+          "source": "400",
+          "resolved": "400"
         },
         {
-          "pencil": "ApbSZ fill: $accent-soft",
+          "pencil": "uR9s8 icon: 16",
+          "class": "icon",
+          "prop": "width",
+          "source": "16px",
+          "resolved": "16px"
+        },
+        {
+          "pencil": "success fill: $success-bg",
           "class": "success",
           "prop": "background",
-          "source": "var(--color-accent-soft)",
+          "source": "var(--color-success-bg)",
           "resolved": "#e8f8ee"
         },
         {
-          "pencil": "zPRvi fill: $status-warn-soft",
-          "class": "validation",
+          "pencil": "warn fill: $status-warn-soft",
+          "class": "warn",
           "prop": "background",
           "source": "var(--color-status-warn-soft)",
           "resolved": "#fff7e6"
         },
         {
-          "pencil": "I5rKbM fill: $status-danger-soft",
-          "class": "error",
+          "pencil": "danger fill: $status-danger-soft",
+          "class": "danger",
           "prop": "background",
           "source": "var(--color-status-danger-soft)",
           "resolved": "#fef0f0"
@@ -3086,7 +3081,9 @@
     },
     "toast": {
       "name": "★V7 保存の知らせ（Toast）",
-      "pencilNodes": [],
+      "pencilNodes": [
+        "uR9s8"
+      ],
       "role": "canonical",
       "status": "active",
       "reviewStatus": "confirmed",
@@ -3098,7 +3095,7 @@
         "notifyToast"
       ],
       "cssPrefix": "toast",
-      "pencilUsage": "画面の中の保存・削除の文を右下の知らせへ移す",
+      "pencilUsage": "★V7 共通部品その2 §2 の知らせへ適用",
       "lastCheckedAt": "2026-09-26",
       "note": "4秒で消える。role=status。取り消せる操作は「元に戻す」を1つ付ける。置き場所は外枠に1つ。",
       "routes": {
@@ -3109,7 +3106,7 @@
       },
       "declarations": [
         {
-          "pencil": "toast host: right-bottom overlay",
+          "pencil": "uR9s8 placement: right-bottom",
           "class": "host",
           "prop": "position",
           "source": "fixed",
@@ -3139,7 +3136,7 @@
         {
           "pencil": "toast auto-dismiss",
           "class": "toast",
-          "prop": "duration",
+          "prop": "--toast-duration",
           "source": "4000ms",
           "resolved": "4000ms"
         }

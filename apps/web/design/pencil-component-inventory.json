@@ -7,11 +7,11 @@
   ],
   "$pencilFile": "4b332ccf-fe84-4df8-9e23-6554f2bef197/pencil-new.pen",
   "$snapshot": {
-    "reusableComponents": 85,
-    "componentDefinitionsInspected": 85,
+    "reusableComponents": 86,
+    "componentDefinitionsInspected": 86,
     "globalReferenceCount": "unverified",
     "globalReferenceCountReason": "Pencil全体のref visitorは規模上限で中断したため、既存契約で実測済みの部品以外は参照回数を合格証拠にしない。",
-    "lastCheckedAt": "2026-08-24"
+    "lastCheckedAt": "2026-09-26"
   },
   "$classification": {
     "global": "機能を問わず同じ意味・操作・状態で使う全画面共通候補",
@@ -721,7 +721,7 @@
       "classification": "global",
       "designState": "success",
       "role": "canonical",
-      "status": "active",
+      "status": "implemented",
       "version": {
         "base": "V5",
         "v6": "unverified"
@@ -730,10 +730,10 @@
         "*"
       ],
       "migration": {
-        "action": "reuse",
-        "target": "Notice.success"
+        "action": "replace",
+        "target": "Notice（★V7 共通部品その2 §1）"
       },
-      "lastCheckedAt": "2026-08-24"
+      "lastCheckedAt": "2026-09-26"
     },
     "zPRvi": {
       "name": "入力内容を確認してください",
@@ -741,7 +741,7 @@
       "classification": "global",
       "designState": "validation-error",
       "role": "canonical",
-      "status": "active",
+      "status": "implemented",
       "version": {
         "base": "V5",
         "v6": "unverified"
@@ -750,10 +750,10 @@
         "*"
       ],
       "migration": {
-        "action": "reuse",
-        "target": "Notice.validation"
+        "action": "replace",
+        "target": "Notice（★V7 共通部品その2 §1）"
       },
-      "lastCheckedAt": "2026-08-24"
+      "lastCheckedAt": "2026-09-26"
     },
     "I5rKbM": {
       "name": "処理に失敗しました",
@@ -761,7 +761,7 @@
       "classification": "global",
       "designState": "error",
       "role": "canonical",
-      "status": "active",
+      "status": "implemented",
       "version": {
         "base": "V5",
         "v6": "unverified"
@@ -770,10 +770,10 @@
         "*"
       ],
       "migration": {
-        "action": "reuse",
-        "target": "Notice.error"
+        "action": "replace",
+        "target": "Notice（★V7 共通部品その2 §1）"
       },
-      "lastCheckedAt": "2026-08-24"
+      "lastCheckedAt": "2026-09-26"
     },
     "BDOJu": {
       "name": "データがありません",
@@ -2359,6 +2359,26 @@
         "target": "ConditionAxisPalette"
       },
       "lastCheckedAt": "2026-08-24"
+    },
+    "uR9s8": {
+      "name": "★V7 共通部品その2（帯・知らせ）",
+      "family": "notice",
+      "classification": "global",
+      "designState": "notice-toast",
+      "role": "canonical",
+      "status": "active",
+      "version": {
+        "base": "V5",
+        "v6": "variant"
+      },
+      "impactRoutes": [
+        "*"
+      ],
+      "migration": {
+        "action": "reuse",
+        "target": "Notice/Toast"
+      },
+      "lastCheckedAt": "2026-09-26"
     }
   }
 }

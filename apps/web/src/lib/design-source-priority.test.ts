@@ -68,10 +68,11 @@ describe('Pencilの設計優先順位', () => {
     expect(checkShape(missingReference)).toContain('V6部品 tPTMp の参照数が記録されていません')
   })
 
-  it('Pen.devの再利用部品85件を3段階に分け、状態・影響・V5/V6差を保持する', () => {
+  it('Pen.devの再利用部品86件を3段階に分け、状態・影響・V5/V6差を保持する', () => {
+    // ★V7 共通部品その2（uR9s8）の帯・知らせを数え、V5 の3節点は置き換え済みとして残す。消したものはない。
     const components = Object.values(inventory.components)
-    expect(components).toHaveLength(85)
-    expect(inventory.$snapshot.reusableComponents).toBe(85)
+    expect(components).toHaveLength(86)
+    expect(inventory.$snapshot.reusableComponents).toBe(86)
     expect(new Set(components.map((component) => component.classification))).toEqual(
       new Set(['global', 'feature', 'screen']),
     )
@@ -84,7 +85,7 @@ describe('Pencilの設計優先順位', () => {
     const missing = structuredClone(inventory)
     delete missing.components.Ai3fq
     expect(checkInventoryShape(contract, missing)).toContain(
-      'Pen.dev部品が 84 件。必須 85 件を下回っています',
+      'Pen.dev部品が 85 件。必須 86 件を下回っています',
     )
 
     const wrongClassification = structuredClone(inventory)

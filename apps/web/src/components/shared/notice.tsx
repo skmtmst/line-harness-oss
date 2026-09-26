@@ -27,10 +27,12 @@ const CANONICAL: Record<NoticeTone, CanonicalTone> = {
   error: 'danger',
 }
 
-const NODE_BY_TONE: Partial<Record<CanonicalTone, string>> = {
-  success: 'ApbSZ',
-  warn: 'zPRvi',
-  danger: 'I5rKbM',
+/* 正本は Pencil「★V7 共通部品 その2」uR9s8 の §1。4種とも同じ節点。 */
+const NODE_BY_TONE: Record<CanonicalTone, string> = {
+  info: 'uR9s8',
+  success: 'uR9s8',
+  warn: 'uR9s8',
+  danger: 'uR9s8',
 }
 
 const ICON_BY_TONE: Record<CanonicalTone, typeof CircleCheck> = {
@@ -90,7 +92,7 @@ export default function Notice({
       data-design-part="notice"
       data-design-node={node}
     >
-      <Icon className={styles.icon} aria-hidden="true" size={15} />
+      <Icon className={styles.icon} aria-hidden="true" size={16} />
       <span className={styles.message}>
         {children ?? message}
         {hasHelp ? (
