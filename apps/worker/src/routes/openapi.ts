@@ -2935,8 +2935,10 @@ const spec = {
           { name: 'code', in: 'query', required: false, schema: { type: 'string' } },
         ],
         responses: {
-          '302': { description: 'Redirect to admin page with result' },
+          '302': { description: '成功・失敗どちらも結果クエリ付きで管理画面へ302で戻す' },
           '403': { description: '統括の管理者権限が必要' },
+          // 契約上2xxまたはdefaultが要るため明記。実際は常に302で、本体のJSON応答は無い。
+          'default': { description: '302リダイレクトのみ返す' },
         },
       },
     },
