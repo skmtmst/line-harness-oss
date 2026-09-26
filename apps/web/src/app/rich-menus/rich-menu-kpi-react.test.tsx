@@ -94,14 +94,16 @@ async function renderPage() {
 }
 
 describe('リッチメニュー一覧のKPI', () => {
-  test('実取得した全体・公開中・タップ・最多・出し分けを見える位置に表示する', async () => {
+  test('実取得した公開中・下書き・タップ・最多・出し分けを見える位置に表示する', async () => {
     const { kpis } = await renderPage()
 
     await within(kpis).findByText('12')
     expect(kpis.hidden).toBe(false)
     expect(kpis.dataset.groupKpiState).toBe('ready')
-    expect(within(kpis).queryByText('3')).toBeTruthy()
-    expect(within(kpis).queryByText('公開中 2')).toBeTruthy()
+    // R12: 全体（3）はKPIに重ねて出さず、「すべて」の行とページ送りだけにする。
+    expect(within(kpis).queryByText('3')).toBeNull()
+    expect(within(kpis).queryByText('2')).toBeTruthy()
+    expect(within(kpis).queryByText('下書き 1件')).toBeTruthy()
     expect(within(kpis).queryByText('予約ボタン')).toBeTruthy()
     expect(within(kpis).queryByText('1')).toBeTruthy()
   })
@@ -123,7 +125,7 @@ describe('リッチメニュー一覧のKPI', () => {
     fixture.tapStats = () => Promise.resolve(tapResult(0))
     const ready = await renderPage()
     await within(ready.kpis).findAllByText('0', {}, { timeout: 2_000 })
-    expect(within(ready.kpis).getByText('公開中 0')).toBeTruthy()
+    expect(within(ready.kpis).getByText('下書き 0件')).toBeTruthy()
     expect(within(ready.kpis).getByText('まだ押されていません')).toBeTruthy()
     ready.unmount()
 

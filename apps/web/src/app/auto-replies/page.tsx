@@ -360,10 +360,11 @@ export default function AutoRepliesPage() {
     if (!word.linked) {
       return <span className="text-[11px] text-ink-faint" title={word.note}>{word.label}</span>
     }
+    // R11: テンプレートはこの行の物とは別物のため、別画面へ飛ばさない。名前は黒文字。
     return (
-      <a href="/templates" className="text-blue-600 hover:underline text-xs" title={word.note}>
+      <span className="text-ink text-xs" title={word.note}>
         {word.label}
-      </a>
+      </span>
     )
   }
 
@@ -544,14 +545,15 @@ export default function AutoRepliesPage() {
       {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}
       <KpiCollapse data-design="KPIs" className="mb-4" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-faint text-xs">ルール数</p>
+          {/* R12: 総数は「すべて」の行とページ送りだけにし、KPIの主数値は有効にする。 */}
+          <p className="text-ink-faint text-xs">有効</p>
           <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-            {metricWord(visibleLoadState, visualTotal)}
+            {metricWord(visibleLoadState, visualActive)}
             {ready && <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>}
           </p>
           <p className="text-ink-faint mt-0.5 text-xs">
             {ready
-              ? `有効 ${visualActive}件`
+              ? `動いていない ${visualTotal - visualActive}件`
               : LOAD_STATE_WORDS[visibleLoadState].label}
           </p>
         </div>
