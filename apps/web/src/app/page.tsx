@@ -686,6 +686,7 @@ function DashboardPageInner() {
   const [twoFactorSummary, setTwoFactorSummary] = useState<TwoFactorSummary | null>(null)
   const [supportMarkAutoOnInbound, setSupportMarkAutoOnInbound] = useState<boolean | null>(null)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const notificationBellRef = useRef<HTMLDivElement>(null)
   const [notificationFilter, setNotificationFilter] = useState<DashboardNotificationFilter>('all')
   const [notificationData, setNotificationData] = useState<NotificationCenterData | null>(null)
   const [notificationAccountId, setNotificationAccountId] = useState<string | null>(null)
@@ -1440,7 +1441,7 @@ function DashboardPageInner() {
             ))}
           </div>
           {/* 選択中のLINEアカウントの通知だけを表示し、未取得を0件に見せない。 */}
-          <div className="relative">
+          <div className="relative" ref={notificationBellRef}>
             <IconButton
               aria-label={unreadNotificationCount > 0 ? `通知、未読${unreadNotificationCount}件` : '通知'}
               aria-expanded={notificationsOpen}
@@ -1479,6 +1480,7 @@ function DashboardPageInner() {
                 setNotificationsOpen(false)
                 router.push('/line-notifications')
               }}
+              getAnchor={() => notificationBellRef.current}
             />
           </div>
         </div>

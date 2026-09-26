@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
+import MenuPortal from '@/components/shared/menu-portal'
 
 /**
  * 受信箱のプルダウン。
@@ -19,25 +20,43 @@ import { useEffect, useRef, useState } from 'react'
  * 素のセレクトのままでは永久に見比べられない。
  */
 
-/** 外側を押したら閉じる。開いたまま別の操作へ移ると、どれが開いているのか分からなくなる。 */
-function useCloseOnOutside(open: boolean, close: () => void) {
-  const ref = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    if (!open) return
-    const onDown = (event: MouseEvent) => {
-      if (ref.current && !ref.current.contains(event.target as Node)) close()
-    }
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') close()
-    }
-    document.addEventListener('mousedown', onDown)
-    document.addEventListener('keydown', onKey)
-    return () => {
-      document.removeEventListener('mousedown', onDown)
-      document.removeEventListener('keydown', onKey)
-    }
-  }, [open, close])
-  return ref
+/**
+ * 外側を押したら閉じる・Esc で閉じる・置き場所（カード・表・帯）の中でも
+ * 切れない。開くボタンの器を基準に、最上層（portal）へ出す。
+ */
+function FloatingPanel({
+  open,
+  getAnchor,
+  onClose,
+  align,
+  matchWidth,
+  label,
+  panelClassName,
+  children,
+}: {
+  open: boolean
+  getAnchor: () => HTMLElement | null
+  onClose: () => void
+  align: 'start' | 'end'
+  matchWidth?: boolean | 'min'
+  label: string
+  /** 箱の見た目（幅・余白）。位置の指定（absolute・z・mt）は器が決める。 */
+  panelClassName: string
+  children: React.ReactNode
+}) {
+  return (
+    <MenuPortal open={open} align={align} matchWidth={matchWidth} getAnchor={getAnchor} onClose={onClose}>
+      <div
+        role="listbox"
+        aria-label={label}
+        className={panelClassName}
+        // 最上層では absolute 指定を無効にする（位置は器が決める）。
+        style={{ position: 'static' }}
+      >
+        {children}
+      </div>
+    </MenuPortal>
+  )
 }
 
 function Chevron({ open }: { open: boolean }) {
@@ -143,7 +162,7 @@ export function OperatorDropdown({
 }) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
-  const ref = useCloseOnOutside(open, () => setOpen(false))
+  const wrapRef = useRef<HTMLDivElement>(null)
 
   const rows = buildOperatorRows(operators, allowAll, value)
   // 名前で絞る。**大文字小文字を区別しない。** 「Kenta」と打っても出る。
@@ -153,7 +172,7 @@ export function OperatorDropdown({
   const current = rows.find((row) => row.id === value)
 
   return (
-    <div className="relative" ref={ref}>
+    <div className="relative" ref={wrapRef}>
       <button
         type="button"
         aria-label={ariaLabel}
@@ -178,7 +197,15 @@ export function OperatorDropdown({
         <span className="text-ink-faint ml-auto"><Chevron open={open} /></span>
       </button>
       {open ? (
-        <div className={panelClass} role="listbox" aria-label={ariaLabel}>
+        <FloatingPanel
+          open={open}
+          align="start"
+          matchWidth="min"
+          getAnchor={() => wrapRef.current}
+          onClose={() => setOpen(false)}
+          label={ariaLabel ?? '担当者'}
+          panelClassName={panelClass}
+        >
           {/* 担当が増えるほど縦に伸びる。探す手段が無いと使えない。 */}
           <div className="border-hairline border-b p-2">
             <input
@@ -230,7 +257,7 @@ export function OperatorDropdown({
               </p>
             </div>
           ) : null}
-        </div>
+        </FloatingPanel>
       ) : null}
     </div>
   )
@@ -265,11 +292,11 @@ export function StatusDropdown({
   ariaLabel?: string
 }) {
   const [open, setOpen] = useState(false)
-  const ref = useCloseOnOutside(open, () => setOpen(false))
+  const wrapRef = useRef<HTMLDivElement>(null)
   const current = STATUS_STYLE[value]
 
   return (
-    <div className="relative" ref={ref}>
+    <div className="relative" ref={wrapRef}>
       <button
         type="button"
         aria-label={ariaLabel}
@@ -282,7 +309,15 @@ export function StatusDropdown({
         <span className="text-ink-faint"><Chevron open={open} /></span>
       </button>
       {open ? (
-        <div className={`${panelClass} right-0`} role="listbox" aria-label={ariaLabel}>
+        <FloatingPanel
+          open={open}
+          align="end"
+          matchWidth="min"
+          getAnchor={() => wrapRef.current}
+          onClose={() => setOpen(false)}
+          label={ariaLabel}
+          panelClassName={`${panelClass} right-0`}
+        >
           {STATUS_ORDER.map((status) => {
             const style = STATUS_STYLE[status]
             const selected = status === value
@@ -301,7 +336,7 @@ export function StatusDropdown({
               </button>
             )
           })}
-        </div>
+        </FloatingPanel>
       ) : null}
     </div>
   )
@@ -340,7 +375,7 @@ export function FolderDropdown({
 }) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
-  const ref = useCloseOnOutside(open, () => setOpen(false))
+  const wrapRef = useRef<HTMLDivElement>(null)
 
   const shown = query.trim()
     ? folders.filter((folder) => folder.name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()))
@@ -348,7 +383,7 @@ export function FolderDropdown({
   const current = folders.find((folder) => folder.id === value)
 
   return (
-    <div className="relative" ref={ref}>
+    <div className="relative" ref={wrapRef}>
       <button
         type="button"
         aria-label={ariaLabel}
@@ -362,7 +397,14 @@ export function FolderDropdown({
         <span className="text-ink-faint ml-auto"><Chevron open={open} /></span>
       </button>
       {open ? (
-        <div className={`${panelClass} right-0 w-70`} role="listbox" aria-label={ariaLabel}>
+        <FloatingPanel
+          open={open}
+          align="end"
+          getAnchor={() => wrapRef.current}
+          onClose={() => setOpen(false)}
+          label={ariaLabel}
+          panelClassName={`${panelClass} right-0 w-70`}
+        >
           <div className="border-hairline border-b p-2">
             <input
               type="text"
@@ -403,7 +445,7 @@ export function FolderDropdown({
             )
           })}
           {shown.length === 0 ? <p className="text-ink-faint px-3 py-3 text-xs">見つかりません</p> : null}
-        </div>
+        </FloatingPanel>
       ) : null}
     </div>
   )
