@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, type CSSProperties, type ReactNode } from 'react'
+import ActionMenu, { type ActionMenuItem } from './action-menu'
 import Button from './button'
 
 /** テンプレート一覧を正とする、全画面共通のフォルダ欄幅。 */
@@ -62,6 +63,40 @@ export interface FolderPanelRow {
   deleteNote?: string
   /** 画像確認で、この行の操作メニューを開くための実Node。 */
   qaOpen?: string
+}
+
+/**
+ * フォルダ行の操作メニューの中身（★V7 共通 ActionMenu）。
+ * できることは変えない。端の行にはコールバックが渡らないため、
+ * 押せない項目も出ない。削除は区切りの後・赤で最後に置く。
+ */
+function folderMenuItems(
+  row: FolderPanelRow,
+  runAction: (action: (() => void) | undefined) => void,
+): ActionMenuItem[] {
+  const items: ActionMenuItem[] = []
+  if (row.onEdit) {
+    items.push(
+      { id: `${row.id}-rename`, label: '名前を変更', onSelect: () => runAction(row.onEdit) },
+      { id: `${row.id}-color`, label: '色を変える', onSelect: () => runAction(row.onEdit) },
+    )
+  }
+  if (row.onMoveUp) {
+    items.push({ id: `${row.id}-up`, label: '並び順を上へ', onSelect: () => runAction(row.onMoveUp) })
+  }
+  if (row.onMoveDown) {
+    items.push({ id: `${row.id}-down`, label: '並び順を下へ', onSelect: () => runAction(row.onMoveDown) })
+  }
+  if (row.onDelete) {
+    items.push({
+      id: `${row.id}-delete`,
+      label: 'フォルダを削除',
+      tone: 'danger',
+      dividerBefore: items.length > 0,
+      onSelect: () => runAction(row.onDelete),
+    })
+  }
+  return items
 }
 
 export default function FolderPanel({
@@ -154,12 +189,7 @@ export default function FolderPanel({
               {/* 操作は設計どおり1つの「…」へまとめる。行に5個の小さな口を
                   並べると、選択との押し間違いが増え、短い名前も狭くなる。 */}
               {hasActions && (
-                <div
-                  className="relative shrink-0"
-                  onBlur={(event) => {
-                    if (!event.currentTarget.contains(event.relatedTarget)) setOpenMenuId(null)
-                  }}
-                >
+                <div className="relative shrink-0">
                   <button
                     type="button"
                     data-qa-open={row.qaOpen}
@@ -172,41 +202,17 @@ export default function FolderPanel({
                   >
                     …
                   </button>
-                  {openMenuId === row.id && (
-                    <div
-                      role="menu"
-                      aria-label={`フォルダ「${row.label}」の操作`}
-                      className="bg-canvas border-hairline rounded-card absolute top-full right-0 z-30 mt-1 w-52 border p-1.5 shadow-lg"
-                    >
-                      {row.onEdit && (
-                        <>
-                          <button type="button" role="menuitem" onClick={() => runAction(row.onEdit)} className="text-ink-secondary hover:bg-canvas-sunken rounded-control block w-full px-3 py-2 text-left text-sm">
-                            名前を変更
-                          </button>
-                          <button type="button" role="menuitem" onClick={() => runAction(row.onEdit)} className="text-ink-secondary hover:bg-canvas-sunken rounded-control block w-full px-3 py-2 text-left text-sm">
-                            色を変える
-                          </button>
-                        </>
-                      )}
-                      {/* 端の行にはコールバックが渡らないため、押せない項目も出ない。 */}
-                      {row.onMoveUp && (
-                        <button type="button" role="menuitem" onClick={() => runAction(row.onMoveUp)} className="text-ink-secondary hover:bg-canvas-sunken rounded-control block w-full px-3 py-2 text-left text-sm">
-                          並び順を上へ
-                        </button>
-                      )}
-                      {row.onMoveDown && (
-                        <button type="button" role="menuitem" onClick={() => runAction(row.onMoveDown)} className="text-ink-secondary hover:bg-canvas-sunken rounded-control block w-full px-3 py-2 text-left text-sm">
-                          並び順を下へ
-                        </button>
-                      )}
-                      {row.onDelete && (
-                        <button type="button" role="menuitem" onClick={() => runAction(row.onDelete)} title={row.deleteNote ?? 'フォルダを削除'} className="text-danger hover:bg-danger-bg rounded-control block w-full px-3 py-2 text-left text-sm">
-                          フォルダを削除
-                        </button>
-                      )}
-                      {row.deleteNote && <p className="text-ink-faint border-hairline mt-1 border-t px-3 pt-2 text-xs leading-relaxed">{row.deleteNote}</p>}
-                    </div>
-                  )}
+                  {/*
+                    ★V7（m13g）：フォルダの操作も共通 ActionMenu にそろえる。
+                    できること（名前・色・並び順・削除・消す前の注意）は変えない。
+                  */}
+                  <ActionMenu
+                    open={openMenuId === row.id}
+                    onClose={() => setOpenMenuId(null)}
+                    ariaLabel={`フォルダ「${row.label}」の操作`}
+                    note={row.deleteNote}
+                    items={folderMenuItems(row, runAction)}
+                  />
                 </div>
               )}
             </div>
