@@ -7,7 +7,7 @@
  * 古い通知まで辿れる一覧にする。行を押すと既読にして詳しい画面へ送る
  * 動きはパネルと同じ（notification-summary の行き先判定を共有）。
  */
-import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { AlertTriangle, Download } from 'lucide-react'
 import type { NotificationCenterData, NotificationCenterItem } from '@line-crm/shared'
@@ -36,6 +36,15 @@ function NotificationsPageInner() {
   const filter: DashboardNotificationFilter =
     categoryParam === 'error' || categoryParam === 'update' ? categoryParam : 'all'
   const [items, setItems] = useState<NotificationCenterItem[]>([])
+  // R16: 未読・未対応を扱う一覧は「未読が先・新しい順」。口は作成日降順のみの
+  // ため、読んだ分はここで並べ替える（Workerの口は数の直し以外触らない）。
+  const orderedItems = useMemo(
+    () => [...items].sort((a, b) => {
+      if (a.isRead !== b.isRead) return a.isRead ? 1 : -1
+      return b.createdAt.localeCompare(a.createdAt)
+    }),
+    [items],
+  )
   const [counts, setCounts] = useState<NotificationCenterData['counts'] | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -157,7 +166,7 @@ function NotificationsPageInner() {
           <p className="text-ink-faint px-5 py-8 text-center text-sm">通知はまだありません。</p>
         ) : (
           <ul className="divide-hairline divide-y">
-            {items.map((item) => (
+            {orderedItems.map((item) => (
               <li key={item.id}>
                 <button
                   type="button"
