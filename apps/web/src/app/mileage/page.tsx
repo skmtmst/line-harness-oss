@@ -633,7 +633,7 @@ function MileagePageInner() {
             kind="empty"
             title="まだ決めごとがありません"
             description="どんなことをしたら何マイル付けるかを決めます。"
-            action={<Button href="/mileage/earning-rules/new" variant="primary">決めごとを作る</Button>}
+            action={<Button href="/mileage/earning-rules/new" variant="primary">＋ 決めごとを作る</Button>}
           />
         ) : (
         <>
