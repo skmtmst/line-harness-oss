@@ -2964,9 +2964,10 @@
       ]
     },
     "action-menu": {
-      "name": "V5 共通フォルダ操作メニュー",
+      "name": "★V7 メニュー",
       "pencilNodes": [
-        "hGpFq"
+        "hGpFq",
+        "xifuV"
       ],
       "role": "canonical",
       "status": "active",
@@ -2979,7 +2980,7 @@
       "cssPrefix": "action-menu",
       "pencilUsage": "友だち属性のフォルダ行へ適用",
       "lastCheckedAt": "2026-08-24",
-      "note": "項目・区切り・危険操作・注記をデータで渡し、矢印キー/Escape/外側クリックを補う。",
+      "note": "項目・補足・別画面・区切り・見出し・危険操作・注記をデータで渡し、矢印キー/Escape/外側クリックを補う。",
       "routes": {
         "active": [
           "/tags"
@@ -2992,102 +2993,130 @@
           1440,
           1920
         ],
-        "reason": "B4固定状態でhGpFqと比較する。"
+        "reason": "B4固定状態でxifuVと比較する。"
       },
       "declarations": [
         {
-          "pencil": "hGpFq width: 200",
+          "pencil": "xifuV width: 200",
           "class": "menu",
           "prop": "width",
           "source": "200px",
           "resolved": "200px"
         },
         {
-          "pencil": "hGpFq stroke: $hairline / 1",
+          "pencil": "xifuV stroke: $hairline / 1",
           "class": "menu",
           "prop": "border",
           "source": "1px solid var(--color-hairline)",
           "resolved": "1px solid #dadde2"
         },
         {
-          "pencil": "hGpFq cornerRadius: $radius-sm",
+          "pencil": "xifuV cornerRadius: 12",
           "class": "menu",
           "prop": "border-radius",
-          "source": "var(--radius-control)",
-          "resolved": "8px"
+          "source": "12px",
+          "resolved": "12px"
         },
         {
-          "pencil": "hGpFq fill: $canvas",
+          "pencil": "xifuV fill: $canvas",
           "class": "menu",
           "prop": "background",
           "source": "var(--color-canvas)",
           "resolved": "#ffffff"
         },
         {
-          "pencil": "hGpFq effect: float",
+          "pencil": "xifuV effect: float",
           "class": "menu",
           "prop": "box-shadow",
           "source": "var(--shadow-float)",
           "resolved": "0px 4px 8px -2px #00000014,0px 12px 24px -4px #191c2124,0px 0px 0px 1px #191c2114"
         },
         {
-          "pencil": "hGpFq gap: 2",
+          "pencil": "xifuV gap: 2",
           "class": "menu",
           "prop": "gap",
           "source": "2px",
           "resolved": "2px"
         },
         {
-          "pencil": "hGpFq padding: 6",
+          "pencil": "xifuV padding: 6",
           "class": "menu",
           "prop": "padding",
           "source": "6px",
           "resolved": "6px"
         },
         {
-          "pencil": "hGpFq item height: 34",
+          "pencil": "xifuV item height: 36",
           "class": "item",
           "prop": "height",
-          "source": "34px",
-          "resolved": "34px"
+          "source": "36px",
+          "resolved": "36px"
         },
         {
-          "pencil": "hGpFq item gap: 9",
+          "pencil": "xifuV item with description height: 52",
+          "class": "itemTall",
+          "prop": "height",
+          "source": "52px",
+          "resolved": "52px"
+        },
+        {
+          "pencil": "xifuV item gap: 9",
           "class": "item",
           "prop": "gap",
           "source": "9px",
           "resolved": "9px"
         },
         {
-          "pencil": "hGpFq item padding: [0,10]",
+          "pencil": "xifuV item padding: [0,10]",
           "class": "item",
           "prop": "padding",
           "source": "0 10px",
           "resolved": "0 10px"
         },
         {
-          "pencil": "hGpFq item cornerRadius: $radius-xs",
+          "pencil": "xifuV item cornerRadius: $radius-xs",
           "class": "item",
           "prop": "border-radius",
           "source": "var(--radius-icon)",
           "resolved": "3px"
         },
         {
-          "pencil": "hGpFq item fontSize: $size-label",
-          "class": "item",
-          "prop": "font-size",
-          "source": "var(--text-label)",
-          "resolved": "13px"
+          "pencil": "xifuV item icon: 16",
+          "class": "icon",
+          "prop": "width",
+          "source": "16px",
+          "resolved": "16px"
         },
         {
-          "pencil": "hGpFq danger fill: $status-danger",
+          "pencil": "xifuV item fontSize: $size-body",
+          "class": "item",
+          "prop": "font-size",
+          "source": "var(--text-body)",
+          "resolved": "14px"
+        },
+        {
+          "pencil": "xifuV item hover fill: $shell",
+          "class": "item",
+          "prop": "background",
+          "source": "var(--color-shell)",
+          "resolved": "#f5f5f7"
+        },
+        {
+          "pencil": "xifuV danger fill: $status-danger",
           "class": "danger",
           "prop": "color",
           "source": "var(--color-status-danger)",
           "resolved": "#e5484d"
         },
         {
-          "pencil": "hGpFq note fontSize: $size-nano",
+          "pencil": "xifuV description fontSize: $size-micro",
+          "class": "description",
+          "prop": "font-size",
+          "source": "var(--text-micro)",
+          "resolved": "11px"
+        },
+        {
+          "pencil": "xifuV note fontSize: $size-nano",
           "class": "note",
           "prop": "font-size",
           "source": "var(--text-nano)",
