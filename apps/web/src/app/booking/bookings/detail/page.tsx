@@ -761,8 +761,9 @@ function BookingDetailInner() {
   }
 
   return (
-    <div>
-      <nav className="text-ink-faint mb-2 text-xs" aria-label="パンくず">
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <nav className="text-ink-faint text-xs" aria-label="パンくず">
         <Link href="/booking/bookings" className="hover:underline">
           予約管理
         </Link>
@@ -771,12 +772,12 @@ function BookingDetailInner() {
       </nav>
 
       {error && detail && (
-        <div className="bg-danger-bg border-danger-bg text-danger mb-4 rounded-lg border p-4 text-sm">
+        <div className="bg-danger-bg border-danger-bg text-danger rounded-lg border p-4 text-sm">
           {error}
         </div>
       )}
       {notice && (
-        <div className="bg-success-bg text-success mb-4 rounded-lg border border-transparent p-4 text-sm">
+        <div className="bg-success-bg text-success rounded-lg border border-transparent p-4 text-sm">
           {notice}
         </div>
       )}
