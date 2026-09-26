@@ -1786,7 +1786,7 @@ const spec = {
     '/api/chats/{id}/send-combined': {
       post: {
         tags: ['Chats'],
-        summary: '画像と本文を1回で送信',
+        summary: '画像と本文（複数可）を1回で送信',
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
         requestBody: {
           required: true,
@@ -1803,6 +1803,11 @@ const spec = {
                     },
                   },
                   text: { type: 'string' },
+                  texts: {
+                    type: 'array',
+                    items: { type: 'string' },
+                    description: 'パック送信の本文（挿入順）。text と合わせて画像含め最大5通',
+                  },
                   revision: { type: 'integer' },
                   quotedMessageId: { type: 'string' },
                 },

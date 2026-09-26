@@ -2144,7 +2144,7 @@ chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'
     const chat = await resolveOrCreateChat(c.env.DB, chatId);
     if (!chat) return c.json({ success: false, error: 'Chat not found' }, 404);
 
-    let body: { image?: { originalContentUrl?: unknown; previewImageUrl?: unknown } | null; text?: unknown; revision?: number; quotedMessageId?: string };
+    let body: { image?: { originalContentUrl?: unknown; previewImageUrl?: unknown } | null; text?: unknown; texts?: unknown; revision?: number; quotedMessageId?: string };
     try {
       body = await c.req.json();
     } catch {
@@ -2152,7 +2152,16 @@ chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'
     }
     const image = body.image ?? null;
     const text = typeof body.text === 'string' ? body.text : null;
-    if (!image && !text) return c.json({ success: false, error: 'content is required' }, 400);
+    // G-4: テンプレートパック。`texts` は `text` と並べて受け、
+    // 挿入順のまま1回のpushにまとめる。LINEのpush上限は1回5通。
+    const extraTexts = Array.isArray(body.texts)
+      ? body.texts.filter((t): t is string => typeof t === 'string' && t.length > 0)
+      : [];
+    const texts = [...(text ? [text] : []), ...extraTexts];
+    if (!image && texts.length === 0) return c.json({ success: false, error: 'content is required' }, 400);
+    if (texts.length + (image ? 1 : 0) > 5) {
+      return c.json({ success: false, error: 'まとめて送れるのは5通までです' }, 400);
+    }
     if (body.revision !== undefined && body.revision !== chat.revision) {
       return c.json({
         success: false,
@@ -2203,12 +2212,12 @@ chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'
         previewImageUrl: image.previewImageUrl,
       };
     }
-    let textPart: string | null = null;
-    if (text) {
+    const textParts: string[] = [];
+    for (const rawText of texts) {
       // N-026: 差し込みは単体送信口と同じ解決器・同じ拒否。片方だけ
       // 素通しだと、画像つき送信が `{{name}}` をそのまま相手へ出す。
       const renderedText = await renderChatMessageContent(
-        c.env.DB, friend, 'text', text, liffId,
+        c.env.DB, friend, 'text', rawText, liffId,
         { kind: 'chat', id: friend.id },
       );
       if (renderedText.unresolved.length > 0) {
@@ -2218,11 +2227,11 @@ chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'
       if (renderedText.content.length > 5000) {
         return c.json({ success: false, error: 'メッセージは5000文字以内で入力してください' }, 400);
       }
-      textPart = renderedText.content;
+      textParts.push(renderedText.content);
     }
     const messages: Message[] = [
       ...(imagePart ? [{ type: 'image', ...imagePart } as Message] : []),
-      ...(textPart !== null ? [{ type: 'text', text: textPart } as Message] : []),
+      ...textParts.map((part) => ({ type: 'text', text: part }) as Message),
     ];
     // 引用は先頭のメッセージに付ける(1送信要求につき1つの引用元)。
     if (quoted?.quote_token && messages.length > 0) {
@@ -2254,7 +2263,7 @@ chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'
         friendId: friend.id,
         combined: true,
         image: imagePart,
-        text: textPart,
+        texts: textParts,
         quotedMessageId: quoted?.id ?? null,
       }),
     );
@@ -2356,11 +2365,11 @@ chats.post('/api/chats/:id/send-combined', requireRole('owner', 'admin', 'staff'
         messageType: 'image',
         content: JSON.stringify(imagePart),
       }] : []),
-      ...(textPart !== null ? [{
-        id: `${logBaseId}:${imagePart ? 1 : 0}`,
+      ...textParts.map((part, index) => ({
+        id: `${logBaseId}:${index + (imagePart ? 1 : 0)}`,
         messageType: 'text',
-        content: textPart,
-      }] : []),
+        content: part,
+      })),
     ];
     try {
       await c.env.DB.batch([
