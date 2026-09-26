@@ -1272,12 +1272,9 @@ function FriendDetailInner() {
           <span>{friend?.displayName ?? '詳細'}</span>
         </nav>
         <div className="flex flex-wrap gap-2">
-          <Link
-            href={inboxHrefForFriend(friendId)}
-            className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors"
-          >
+          <Button href={inboxHrefForFriend(friendId)} variant="primary">
             受信箱で開く
-          </Link>
+          </Button>
           {/*
             NEXT-08: 押しても何も起きないボタンを共通メニューへ接続する。
             「個別操作」はこの友だちへの操作、「…」は関連する画面への移動。
