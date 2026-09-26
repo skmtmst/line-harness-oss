@@ -2286,6 +2286,19 @@ CREATE TABLE field_migration_runs (
   updated_at            TEXT NOT NULL
 );
 
+CREATE TABLE file_scan_configs (
+  line_account_id      TEXT PRIMARY KEY REFERENCES line_accounts(id) ON DELETE CASCADE,
+  external_provider    TEXT,
+  external_endpoint_url TEXT,
+  external_secret_ref  TEXT,
+  external_timeout_ms  INTEGER NOT NULL DEFAULT 10000 CHECK (external_timeout_ms > 0),
+  max_bytes_override   INTEGER CHECK (max_bytes_override IS NULL OR max_bytes_override > 0),
+  max_pixels_override  INTEGER CHECK (max_pixels_override IS NULL OR max_pixels_override > 0),
+  stopped_notified_at  TEXT,
+  updated_by           TEXT,
+  updated_at           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
 CREATE TABLE "folders" (
   id            TEXT PRIMARY KEY,
   kind          TEXT NOT NULL CHECK (kind IN (
@@ -3407,6 +3420,34 @@ CREATE TABLE media (
   uploaded_by TEXT,
   created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours'))
 , line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE, archived_at TEXT, archived_by TEXT, archive_reason TEXT, usage_expires_at TEXT, usage_consent_note TEXT);
+
+CREATE TABLE media_file_scans (
+  id               TEXT PRIMARY KEY,
+  -- 全体で使う素材（配信用画像など）はアカウントを持たないため NULL を許す。
+  line_account_id  TEXT REFERENCES line_accounts(id) ON DELETE CASCADE,
+  -- form_file / broadcast_asset / generic_image は R2 キーを subject_id に入れる。
+  subject_kind     TEXT NOT NULL CHECK (subject_kind IN (
+                     'media', 'media_version', 'upload_session', 'photo',
+                     'form_file', 'broadcast_asset', 'generic_image')),
+  subject_id       TEXT NOT NULL,
+  media_id         TEXT REFERENCES media(id) ON DELETE SET NULL,
+  filename         TEXT NOT NULL,
+  mime_type        TEXT NOT NULL,
+  size_bytes       INTEGER NOT NULL CHECK (size_bytes >= 0),
+  status           TEXT NOT NULL DEFAULT 'pending'
+                     CHECK (status IN ('pending', 'clean', 'rejected', 'quarantined')),
+  reason_code      TEXT,
+  reason_detail    TEXT,
+  attempts         INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+  next_retry_at    TEXT,
+  scanned_at       TEXT,
+  quarantined_at   TEXT,
+  released_at      TEXT,
+  release_reason   TEXT,
+  released_by      TEXT,
+  created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
 
 CREATE TABLE media_storage_quotas (
   line_account_id TEXT PRIMARY KEY REFERENCES line_accounts(id) ON DELETE CASCADE,
@@ -7528,6 +7569,18 @@ CREATE INDEX idx_media_account_archived_v424
 
 CREATE INDEX idx_media_account_created
   ON media(line_account_id, created_at DESC, id);
+
+CREATE INDEX idx_media_file_scans_account_status
+  ON media_file_scans(line_account_id, status, updated_at DESC);
+
+CREATE INDEX idx_media_file_scans_media
+  ON media_file_scans(media_id, status) WHERE media_id IS NOT NULL;
+
+CREATE INDEX idx_media_file_scans_retry
+  ON media_file_scans(status, next_retry_at) WHERE status = 'pending';
+
+CREATE INDEX idx_media_file_scans_subject
+  ON media_file_scans(subject_kind, subject_id);
 
 CREATE INDEX idx_media_kind ON media(kind, created_at DESC);
 

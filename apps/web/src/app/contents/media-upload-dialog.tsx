@@ -6,6 +6,7 @@ import { X } from 'lucide-react'
 import type { Folder } from '@line-crm/shared'
 import { ApiError, api } from '@/lib/api'
 import Button from '@/components/shared/button'
+import Chip from '@/components/shared/chip'
 import FileDropzone, { AttachmentRow } from '@/components/shared/file-drop'
 import Progress from '@/components/shared/progress'
 import Select from '@/components/shared/select'
@@ -21,6 +22,16 @@ type UploadEntry = {
   message: string
   retryable: boolean
   progress: number
+  mediaId?: string | null
+  /** 検査の状態。確かめ終わるまで中身は出さない。 */
+  scanStatus?: 'pending' | 'clean' | 'rejected' | 'quarantined' | null
+}
+
+function scanChipProps(status: NonNullable<UploadEntry['scanStatus']>): { tone: 'info' | 'ok' | 'danger' | 'warn'; label: string } {
+  if (status === 'clean') return { tone: 'ok', label: '使えます' }
+  if (status === 'rejected') return { tone: 'danger', label: '使えません' }
+  if (status === 'quarantined') return { tone: 'warn', label: '確認のため使えません' }
+  return { tone: 'info', label: '確かめています' }
 }
 
 const LIMITS = [
@@ -137,9 +148,24 @@ export default function MediaUploadDialog({
           const response = await api.media.completeUpload(session.id, { accountId, etag })
           if (!response.success || response.data.status !== 'completed') throw new Error('登録を完了できませんでした')
           completed += 1
+          const mediaId = response.data.mediaId ?? null
           setEntries((current) => current.map((item, entryIndex) => (
-            entryIndex === index ? { ...item, state: 'done', message: '入りました', retryable: false, progress: 100 } : item
+            entryIndex === index
+              ? { ...item, state: 'done', message: '入りました', retryable: false, progress: 100, mediaId, scanStatus: 'pending' }
+              : item
           )))
+          // 検査の状態を読む。確かめ終わるまで配信・公開には出さない。
+          if (mediaId) {
+            try {
+              const scan = await api.fileScan.forMedia(mediaId, accountId)
+              const status = scan.success ? scan.data.scan?.status ?? null : null
+              setEntries((current) => current.map((item, entryIndex) => (
+                entryIndex === index ? { ...item, scanStatus: status ?? 'pending' } : item
+              )))
+            } catch {
+              // 読めなくても登録自体は済んでいる。確かめ中として置く。
+            }
+          }
         } catch (caught) {
           const message = caught instanceof ApiError || caught instanceof Error
             ? caught.message
@@ -288,6 +314,7 @@ export default function MediaUploadDialog({
                     </li>
                   )
                 }
+                const scan = entry.state === 'done' ? scanChipProps(entry.scanStatus ?? 'pending') : null
                 return (
                   <li key={`${entry.file.name}-${entry.file.size}-${index}`} aria-live="polite">
                     <AttachmentRow
@@ -296,6 +323,14 @@ export default function MediaUploadDialog({
                       tone={tone}
                       onRemove={busy ? undefined : () => removeEntry(index)}
                     />
+                    {scan ? (
+                      <p className="mt-1 flex items-center gap-2">
+                        <Chip tone={scan.tone}>{scan.label}</Chip>
+                        {entry.scanStatus === 'pending' ? (
+                          <span className="text-ink-faint text-xs">確かめ終わるまで配信・公開には出ません</span>
+                        ) : null}
+                      </p>
+                    ) : null}
                   </li>
                 )
               })}
