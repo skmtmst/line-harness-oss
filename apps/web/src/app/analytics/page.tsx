@@ -2046,7 +2046,7 @@ function FunnelForm({
   }
 
   return (
-    <div className="bg-canvas rounded-card border-hairline mb-5 space-y-4 border p-5">
+    <div className="bg-canvas rounded-card border-hairline space-y-4 border p-5">
       {presetConversion && !edit ? (
         <p className="border-info bg-info-bg text-info rounded-control border px-3 py-2 text-xs font-semibold" role="status">
           成果地点「{presetConversion.name}」を2段目に入れています。このまま段を組んで作成すると、その成果地点を使う分析として登録されます。
