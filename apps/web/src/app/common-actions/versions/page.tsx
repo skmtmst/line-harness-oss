@@ -168,14 +168,17 @@ function CommonActionVersionsInner() {
   if (loading) {
     return <div className="border-hairline rounded-card border bg-canvas p-10 text-center text-sm text-ink-faint" aria-busy="true">版と利用先を読み込んでいます</div>
   }
+  // 空の案内もカード（白地・枠・角丸）の中に出す。灰色の地だけにしない。
   if (!selectedAccountId && !detail) {
     return (
-      <ListState
-        kind="empty"
-        title="LINE公式アカウントを選んでください"
-        description="選ぶと版と利用先を確認できます。"
-        action={<Button href="/common-actions">共通アクション一覧へ戻る</Button>}
-      />
+      <section className="bg-canvas rounded-card border-hairline border">
+        <ListState
+          kind="empty"
+          title="LINE公式アカウントを選んでください"
+          description="選ぶと版と利用先を確認できます。"
+          action={<Button href="/common-actions">共通アクション一覧へ戻る</Button>}
+        />
+      </section>
     )
   }
   if (!detail && loadFailure === 'missing') {
@@ -211,7 +214,7 @@ function CommonActionVersionsInner() {
   }
 
   return (
-    <div data-design-node="syWp4">
+    <div data-design-node="syWp4" className="flex flex-col gap-4">
       <PageHeader
         breadcrumb={[
           { label: '共通アクション', href: '/common-actions' },
@@ -242,7 +245,7 @@ function CommonActionVersionsInner() {
         )}
       />
 
-      <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
         <SummaryCard variant="v6" title="いまの版" value={published?.versionNumber ?? null} unit="" detail={published?.publishedAt ? `${new Date(published.publishedAt).toLocaleDateString('ja-JP')} に公開` : 'まだ公開していません'} />
         <SummaryCard variant="v6" title="呼び出し元" value={detail.bindings.length} unit="" detail={usageSummaryDetail(detail.bindings)} />
         <SummaryCard variant="v6" title="今月 動いた回数" value={summary?.executionCountThisMonth ?? null} unit="" detail="実行記録から集計" />
@@ -254,9 +257,9 @@ function CommonActionVersionsInner() {
         新版を公開しても、利用先は現在の版を使い続けます。差分を確認した利用先だけ切り替えてください。
       </NoteBar>
 
-      {error ? <p className="text-danger my-4 text-sm" role="alert">{error}</p> : null}
+      {error ? <p className="text-danger text-sm" role="alert">{error}</p> : null}
 
-      <section className="mt-4">
+      <section>
         <h2 className="text-ink font-semibold">どこから呼ばれているか</h2>
         <p className="text-ink-faint mt-1 text-sm">公開しても、呼び出し元は自動で変わりません。使う場所ごとに新しい版へ更新します。</p>
         {detail.bindings.length === 0 ? (
@@ -303,7 +306,7 @@ function CommonActionVersionsInner() {
         )}
       </section>
 
-      <section className="mt-4">
+      <section>
         <div className="mb-3 flex items-center justify-between">
           <div>
             <h2 className="text-ink font-semibold">版の履歴</h2>
@@ -371,7 +374,7 @@ function CommonActionVersionsInner() {
         </DataTable>
       </section>
 
-      <section className="mt-6 grid gap-3 sm:grid-cols-2">
+      <section className="grid gap-3 sm:grid-cols-2">
         <SummaryCard
           variant="v6"
           title="このアクションを実行中"
