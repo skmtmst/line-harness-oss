@@ -12,6 +12,10 @@ vi.mock('next/link', () => ({
   default: ({ children, href, ...rest }: { children: React.ReactNode; href: string } & Record<string, unknown>) =>
     React.createElement('a', { href, ...rest }, children),
 }))
+/* 行を押すと詳細へ行く（m13f）。遷移先は使わないので空の push で受ける。 */
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }),
+}))
 
 import ScenarioList from './scenario-list'
 

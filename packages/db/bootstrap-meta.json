@@ -416,7 +416,8 @@
     "455_broadcast_approval_events.sql",
     "466_template_versions.sql",
     "467_template_references.sql",
-    "468_event_custom_questions.sql"
+    "468_event_custom_questions.sql",
+    "469_manual_link_screens.sql"
   ],
-  "migrationCount": 417
+  "migrationCount": 418
 }
