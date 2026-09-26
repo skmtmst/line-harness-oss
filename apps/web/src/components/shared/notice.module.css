@@ -1,22 +1,58 @@
 @layer components {
+/*
+ * 帯（Notice）。★V7 共通部品その2 §1。
+ *
+ * 黄・青・赤・緑を画面ごとに手書きしていた帯を1本にまとめたもの。
+ * 種類は4つ（案内・うまくいった・注意・危険）。左に線のアイコン、
+ * 本文は1〜2文、右に操作1つまで。`note-bar.tsx` はこの部品への
+ * 互換品（props をそのまま渡すだけ。中身はここが持つ）。
+ *
+ * 使い分け: 読まなくても操作できる説明は帯にせず HelpTip へ（§2-1b）。
+ * 読み込めなかったときは帯でなく ListState error。1画面2つまで。
+ */
+
+/* 帯の土台。幅は持たない（呼び出し側が className で渡す。§5-2）。 */
 .notice {
-  position: relative;
   display: flex;
-  width: 100%;
-  min-height: 48px;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  padding: 10px 12px;
   border-radius: var(--radius-control);
-  padding: 0 44px 0 14px;
-  font-size: var(--text-label);
-  font-weight: 700;
+  font-size: var(--text-caption);
+  font-weight: 600;
+  line-height: 1.6;
 }
 
 .notice[hidden] {
   display: none;
 }
 
+.icon {
+  width: 15px;
+  height: 15px;
+  flex: none;
+}
+
+/* 本文。1〜2文。長い定義の補足は HelpTip（?）へ入れ、箱を高くしない。 */
+.message {
+  min-width: 0;
+  flex: 1;
+}
+
+/* 帯の右に置く操作（1つまで）。 */
+.action {
+  margin-left: auto;
+  flex: none;
+}
+
+/* 案内（青）。地は info-bg、文字は ink-secondary（★V7 画面の決まり）。 */
+.info {
+  background: var(--color-info-bg);
+  color: var(--color-ink-secondary);
+}
+
 /*
+ * うまくいった（緑）。
  * #669 成功の通知の文字は success に1本化する（status-badge と同じ）。
  * 地は同値（#e8f8ee）の success-bg に名前をそろえる。
  */
@@ -25,33 +61,26 @@
   color: var(--color-success);
 }
 
-.validation {
+/* 注意（黄）。文字は必ず warn-deep（地に warn は読めないため）。 */
+.warn {
+  border: 1px solid var(--color-status-warn);
   background: var(--color-status-warn-soft);
   color: var(--color-status-warn-deep);
 }
 
-.error {
+/* 危険（赤）。止まっている・失敗していることだけに使う。 */
+.danger {
+  border: 1px solid var(--color-status-danger);
   background: var(--color-status-danger-soft);
   color: var(--color-status-danger);
 }
 
-.icon {
-  flex: 0 0 auto;
-}
-
-.message {
-  min-width: 0;
-  flex: 1;
-  line-height: 1.5;
-}
-
+/* 閉じる印。帯の右端。 */
 .close {
-  position: absolute;
-  top: 8px;
-  right: 8px;
   display: inline-flex;
   width: 32px;
   height: 32px;
+  flex: none;
   align-items: center;
   justify-content: center;
   border: 0;
@@ -67,5 +96,14 @@
 
 .close:focus-visible {
   outline: revert;
+}
+
+/*
+ * 操作の中のリンク（「くわしく」など）。押せるものとして輪郭を出す。
+ * HelpTip 側が持つ見た目は変えない。ここでは存在だけ示す。
+ */
+.notice a:focus-visible {
+  outline: 2px solid var(--color-status-info);
+  outline-offset: 1px;
 }
 }
