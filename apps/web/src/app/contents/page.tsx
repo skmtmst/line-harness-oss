@@ -38,6 +38,7 @@ import { RequiredBadge } from '@/components/shared/form-controls'
 import Select from '@/components/shared/select'
 import { useAccount } from '@/contexts/account-context'
 import MediaDetailDialog from './media-detail-dialog'
+import FileScanStoppedBanner from './file-scan-stopped-banner'
 import { MediaQuotaGuidance } from './media-quota-guidance'
 import MediaReplacementDialog from './media-replacement-dialog'
 import MediaUploadDialog from './media-upload-dialog'
@@ -748,6 +749,11 @@ function MediaLibraryInner() {
       {error && (
         <Notice tone="danger" message={error} onClose={() => setError('')} className="mb-4" />
       )}
+      {!error && selectedAccountId ? (
+        <div className="mb-4">
+          <FileScanStoppedBanner accountId={selectedAccountId} />
+        </div>
+      ) : null}
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">

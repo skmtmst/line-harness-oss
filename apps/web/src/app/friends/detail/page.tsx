@@ -1,6 +1,7 @@
 'use client'
 
 import Avatar from '@/components/shared/avatar'
+import { ArrowLeft, CircleDot, Copy, List, ListPlus, PencilLine, Send, Star } from 'lucide-react'
 import { Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -1088,15 +1089,12 @@ function FriendDetailInner() {
    * 移動。どちらも選んだ先で操作・取消・完了まで辿れるものだけを並べる。
    */
   const primaryActions: ActionMenuItem[] = [
-    {
-      id: 'inbox',
-      label: '受信箱で開く',
-      onSelect: () => router.push(inboxHrefForFriend(friendId)),
-    },
+    // 「受信箱で開く」は画面右上のボタンにあるので、メニューには重ねない（★V7）。
     ...(canEditSupport
       ? [{
           id: 'support',
           label: '対応状況を編集',
+          icon: <CircleDot size={16} />,
           onSelect: () => void openSupportEditor(),
         }]
       : []),
@@ -1104,6 +1102,7 @@ function FriendDetailInner() {
       ? [{
           id: 'fields',
           label: '情報欄を編集',
+          icon: <PencilLine size={16} />,
           onSelect: () =>
             router.push(`/friends/detail?id=${encodeURIComponent(friendId)}&tab=info`),
         }]
@@ -1113,24 +1112,30 @@ function FriendDetailInner() {
       ? [{
           id: 'scenario-enroll',
           label: 'シナリオに登録',
+          icon: <ListPlus size={16} />,
           onSelect: () => void openScenarioPicker(),
         }]
       : []),
     {
       id: 'send-template',
-      label: 'テンプレートを送る（受信箱で選択）',
+      label: 'テンプレートを送る',
+      icon: <Send size={16} />,
+      description: '受信箱で選んで送ります',
+      external: true,
       onSelect: () => router.push(inboxHrefForFriend(friendId)),
     },
   ]
+  // 別画面への移動には ↗ を付ける（★V7）。「戻る」は戻る操作なので付けない。
   const secondaryActions: ActionMenuItem[] = [
-    { id: 'templates', label: 'テンプレート一覧を見る', onSelect: () => router.push('/templates') },
-    { id: 'scenarios', label: 'シナリオ一覧を見る', onSelect: () => router.push('/scenarios') },
-    { id: 'reminders', label: 'リマインダ一覧を見る', onSelect: () => router.push('/reminders') },
-    { id: 'mileage', label: 'マイルを確認', onSelect: () => router.push('/mileage') },
-    { id: 'duplicates', label: '重複候補を確認', onSelect: () => router.push('/duplicates') },
+    { id: 'templates', label: 'テンプレート一覧を見る', icon: <List size={16} />, external: true, onSelect: () => router.push('/templates') },
+    { id: 'scenarios', label: 'シナリオ一覧を見る', icon: <List size={16} />, external: true, onSelect: () => router.push('/scenarios') },
+    { id: 'reminders', label: 'リマインダ一覧を見る', icon: <List size={16} />, external: true, onSelect: () => router.push('/reminders') },
+    { id: 'mileage', label: 'マイルを確認', icon: <Star size={16} />, external: true, onSelect: () => router.push('/mileage') },
+    { id: 'duplicates', label: '重複候補を確認', icon: <Copy size={16} />, external: true, onSelect: () => router.push('/duplicates') },
     {
       id: 'back-to-list',
       label: '友だち一覧へ戻る',
+      icon: <ArrowLeft size={16} />,
       dividerBefore: true,
       onSelect: () => router.push('/friends'),
     },
@@ -1273,12 +1278,9 @@ function FriendDetailInner() {
           <span>{friend?.displayName ?? '詳細'}</span>
         </nav>
         <div className="flex flex-wrap gap-2">
-          <Link
-            href={inboxHrefForFriend(friendId)}
-            className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors"
-          >
+          <Button href={inboxHrefForFriend(friendId)} variant="primary">
             受信箱で開く
-          </Link>
+          </Button>
           {/*
             NEXT-08: 押しても何も起きないボタンを共通メニューへ接続する。
             「個別操作」はこの友だちへの操作、「…」は関連する画面への移動。
@@ -2074,7 +2076,7 @@ function FriendDetailInner() {
                           href={`/tags/fields/new?back=/friends/detail?id=${friendId}`}
                           className="text-action ml-1 hover:underline"
                         >
-                          項目を追加
+                          項目を作る
                         </Link>
                       ) : null}
                     </p>
@@ -2151,7 +2153,7 @@ function FriendDetailInner() {
                             href={`/tags/fields/new?back=/friends/detail?id=${friendId}`}
                             className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-4 py-2 text-sm font-medium"
                           >
-                            項目を追加
+                            項目を作る
                           </Link>
                         )}
                       </div>

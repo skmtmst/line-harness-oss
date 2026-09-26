@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { FlaskConical, History, MoreHorizontal, Plus, Rocket, Trash2 } from 'lucide-react'
+import { FlaskConical, History, MoreHorizontal, Rocket, Trash2 } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import ActionMenu from '@/components/shared/action-menu'
@@ -221,9 +221,12 @@ function FriendAddSettingsList() {
 
   return (
     <div data-design-node="uLQQc" className="text-ink min-w-0">
-      <div data-design="Head" className="mb-4 flex justify-end gap-2">
+      {/*
+        作る操作は数字のカードの下・一覧のすぐ上の左。
+        たまに見る実行結果は見出しの行の右端に残す。
+      */}
+      <div data-design="Head" className="mb-4 flex flex-wrap items-center justify-end gap-2">
         <Button href="/friend-add-settings/runs">実行結果を見る</Button>
-        <Button href="/friend-add-settings?view=new" variant="primary"><Plus size={16} />初回案内を作成</Button>
       </div>
 
       {/*
@@ -239,6 +242,11 @@ function FriendAddSettingsList() {
         <SummaryCard title="送信成功" value={data?.summary.delivered ?? null} unit="通" detail={successRate(data?.summary.delivered ?? null, data?.summary.failed ?? null)} variant="v6" />
         <SummaryCard title="経路が分からなかった人" value={data?.summary.unknownRoute ?? null} unit="人" detail="共通の案内が動いた" badge={(data?.summary.unknownRoute ?? 0) > 0 ? '要確認' : undefined} badgeTone="warning" variant="v6" />
       </section>
+
+      {/* 作る操作は数字のカードの下・一覧のすぐ上の左。 */}
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <Button href="/friend-add-settings?view=new" variant="primary">＋ 初回案内を作る</Button>
+      </div>
 
       {/*
         #972: 390pxでは2つの切替タブが右へはみ出し、下の表の見出しも

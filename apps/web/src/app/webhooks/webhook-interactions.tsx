@@ -9,6 +9,7 @@ import { api, ApiError } from '@/lib/api'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
+import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import Notice from '@/components/shared/notice'
@@ -361,10 +362,10 @@ export default function WebhookInteractions() {
           </div>
 
           <div className={styles.filters} aria-label="やり取りの絞り込み">
-            <button type="button" className={`${styles.filter} ${direction === 'all' && status === 'all' ? styles.filterActive : ''}`} onClick={() => { setDirection('all'); setStatus('all'); setPage(1) }}>すべて {data.summary.total.toLocaleString('ja-JP')}</button>
-            <button type="button" className={`${styles.filter} ${direction === 'outgoing' ? styles.filterActive : ''}`} onClick={() => { setDirection('outgoing'); setStatus('all'); setPage(1) }}>送った {data.summary.outgoing.toLocaleString('ja-JP')}</button>
-            <button type="button" className={`${styles.filter} ${direction === 'incoming' ? styles.filterActive : ''}`} onClick={() => { setDirection('incoming'); setStatus('all'); setPage(1) }}>受け取った {data.summary.incoming.toLocaleString('ja-JP')}</button>
-            <button type="button" className={`${styles.filter} ${status === 'failed' ? styles.filterDanger : ''}`} onClick={() => { setDirection('all'); setStatus('failed'); setPage(1) }}>失敗 {data.summary.failed.toLocaleString('ja-JP')}</button>
+            <FilterChip selected={direction === 'all' && status === 'all'} onChange={() => { setDirection('all'); setStatus('all'); setPage(1) }} count={data.summary.total.toLocaleString('ja-JP')}>すべて</FilterChip>
+            <FilterChip selected={direction === 'outgoing'} onChange={() => { setDirection('outgoing'); setStatus('all'); setPage(1) }} count={data.summary.outgoing.toLocaleString('ja-JP')}>送った</FilterChip>
+            <FilterChip selected={direction === 'incoming'} onChange={() => { setDirection('incoming'); setStatus('all'); setPage(1) }} count={data.summary.incoming.toLocaleString('ja-JP')}>受け取った</FilterChip>
+            <FilterChip selected={status === 'failed'} onChange={() => { setDirection('all'); setStatus('failed'); setPage(1) }} count={data.summary.failed.toLocaleString('ja-JP')}>失敗</FilterChip>
           </div>
 
           {data.items.length === 0 ? (

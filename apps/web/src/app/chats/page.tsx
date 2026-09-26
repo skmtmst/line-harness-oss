@@ -39,6 +39,7 @@ import DateTimeField from '@/components/shared/date-time-field'
 import HelpTip from '@/components/shared/help-tip'
 import Notice from '@/components/shared/notice'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import ActionMenu from '@/components/shared/action-menu'
 import { MoreAction } from '@/components/shared/row-actions'
 import { CheckCircle2, Link2, NotebookPen, PanelRightClose, PanelRightOpen, Star, X } from 'lucide-react'
 
@@ -2342,7 +2343,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           設計は 対応状況・担当者・受信経路・期限・メッセージ種別・未読だけ の
           6項目。**箱が小さいと、置ける条件の数が先に決まってしまう。**
         */}
-        <Button type="button" onClick={() => setFilterOpen(true)} aria-expanded={filterOpen}>
+        <Button type="button" size="compact" onClick={() => setFilterOpen(true)} aria-expanded={filterOpen}>
           絞り込み
         </Button>
         {/*
@@ -2399,23 +2400,27 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                         data-qa-open={view.id === savedViews[0]?.id ? 'ASsb3-menu' : undefined}
                         onClick={() => setSavedViewMenuId((current) => current === view.id ? null : view.id)}
                       />
-                      {savedViewMenuId === view.id ? (
-                        <div className="border-hairline bg-canvas absolute top-full right-0 z-50 mt-1 w-40 rounded-control border p-1 shadow-lg" role="menu">
-                          <button
-                            type="button"
-                            role="menuitem"
-                            onClick={async () => {
-                              if (!selectedAccountId) return
-                              await api.chats.savedViews.delete(view.id, selectedAccountId)
-                              setSavedViewMenuId(null)
-                              await loadSavedViews()
-                            }}
-                            className="text-danger hover:bg-status-danger-soft w-full rounded-mini px-2.5 py-2 text-left text-xs"
-                          >
-                            保存した検索を削除
-                          </button>
-                        </div>
-                      ) : null}
+                      {/* ★V7（m13g）：保存した検索の操作も共通 ActionMenu にそろえる。できることは変えない。 */}
+                      <ActionMenu
+                        open={savedViewMenuId === view.id}
+                        onClose={() => setSavedViewMenuId(null)}
+                        ariaLabel={`${view.name}の操作`}
+                        items={[
+                          {
+                            id: `${view.id}-delete`,
+                            label: '保存した検索を削除',
+                            tone: 'danger',
+                            onSelect: () => {
+                              void (async () => {
+                                if (!selectedAccountId) return
+                                await api.chats.savedViews.delete(view.id, selectedAccountId)
+                                setSavedViewMenuId(null)
+                                await loadSavedViews()
+                              })()
+                            },
+                          },
+                        ]}
+                      />
                     </div>
                   </div>
                 ))}

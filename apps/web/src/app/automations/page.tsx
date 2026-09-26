@@ -192,7 +192,7 @@ function AutomationRowActions({
       {canManage ? (
         <>
           {/* #942 N-352: 編集・複製・保管を行から直接開けるようにする。 */}
-          <Button onClick={onEdit} disabled={busy} variant="secondary" className="whitespace-nowrap">編集する</Button>
+          <Button onClick={onEdit} disabled={busy} variant="secondary" size="compact" className="whitespace-nowrap">編集する</Button>
           <IconButton
             aria-label={`${automation.name}のその他操作`}
             aria-expanded={menuOpen}
@@ -518,7 +518,7 @@ export default function AutomationsPage() {
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-ink-faint">自動化 ＞ オートメーション ＞ 見本</p>
           {/* 作成は owner/admin だけ（N-361）。見本の閲覧と「これで作る」の出し分けは画廊側で行う。 */}
-          {canManageAutomations ? <Button href="/automations/new">ルールを作成</Button> : null}
+          {canManageAutomations ? <Button href="/automations/new" variant="primary">＋ ルールを作る</Button> : null}
         </div>
         <div className="mb-4">
           <MergedTabs basePath="/automations" paramName="tab" tabs={tabs} active={tab} />
@@ -595,13 +595,16 @@ export default function AutomationsPage() {
       <div className="mb-4">
         <MergedTabs basePath="/automations" paramName="tab" tabs={tabs} active={tab} />
       </div>
+      {/*
+        作る操作は数字のカードの下・一覧のすぐ上の左にそろえる。
+        見出しの行の右端には、たまに使う「共通アクションを見る」
+        「マニュアル」だけを残す。
+      */}
       <div data-design="Head" className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-ink-faint">自動化 ＞ オートメーション</p>
         <div className="flex flex-wrap gap-2">
           <Button href="/common-actions">共通アクションを見る</Button>
-          <Button href="/automations?tab=templates">見本から作る</Button>
           {/* 作成は owner/admin だけ。閲覧のみには出さず、下で理由を出す（N-361）。 */}
-          {canManageAutomations ? <Button href="/automations/new" variant="primary">ルールを作成</Button> : null}
           <Button href="/support">マニュアル</Button>
         </div>
       </div>
@@ -642,6 +645,15 @@ export default function AutomationsPage() {
       <Disclosure size="compact" title="動く順番の見方" hint="上から順に確認" className="mb-4">
         <p>上から順に見て、当てはまったものが動きます。同じきっかけで2本が当てはまると両方が動くため、片方だけにしたいときは条件をずらしてください。</p>
       </Disclosure>
+
+      {/*
+        作る操作は数字のカードの下・一覧のすぐ上の左。
+        「見本から作る」も作る操作なので同じ並びの副ボタンへ。
+      */}
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        {canManageAutomations ? <Button href="/automations/new" variant="primary">＋ ルールを作る</Button> : null}
+        <Button href="/automations?tab=templates">見本から作る</Button>
+      </div>
 
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <input
@@ -694,7 +706,7 @@ export default function AutomationsPage() {
             ? (tab === 'stopped' ? '止めているオートメーションはありません。' : '動いているオートメーションはありません。')
             : '条件に合うオートメーションはありません。'}
           description={automations.length === 0 ? 'きっかけ・だれに・することの3つを決めると動きます。' : '検索語や絞り込みを変えてください。'}
-          action={tab === 'active' && canManageAutomations ? <Button href="/automations/new" variant="primary">ルールを作成</Button> : undefined}
+          action={tab === 'active' && canManageAutomations ? <Button href="/automations/new" variant="primary">＋ ルールを作る</Button> : undefined}
         />
       ) : (
         <div className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-sm">

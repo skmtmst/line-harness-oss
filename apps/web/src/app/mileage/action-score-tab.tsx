@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Download, Send, Users } from 'lucide-react'
 import Button from '@/components/shared/button'
+import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
@@ -247,15 +248,14 @@ export default function ActionScoreTab({ accountId }: { accountId: string }) {
 
         <div className="flex flex-wrap items-center gap-2 border-b border-hairline px-4 py-3">
           {filters.map((item) => (
-            <Button
+            <FilterChip
               key={item.key}
-              type="button"
-              aria-pressed={filter === item.key}
-              onClick={() => { setPage(1); setFilter(item.key) }}
-              variant={filter === item.key ? 'primary' : 'secondary'}
+              selected={filter === item.key}
+              onChange={() => { setPage(1); setFilter(item.key) }}
+              count={item.count === undefined ? '—' : formatMileageNumber(item.count)}
             >
-              {item.label} {item.count === undefined ? '—' : formatMileageNumber(item.count)}
-            </Button>
+              {item.label}
+            </FilterChip>
           ))}
           <Select
             aria-label="並び順"

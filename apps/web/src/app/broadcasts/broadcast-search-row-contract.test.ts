@@ -46,7 +46,8 @@ describe('一斉配信の検索行（U014）', () => {
     const pageSizeAt = PAGE.indexOf('aria-label="表示件数"')
     expect(pageSizeAt).toBeGreaterThan(rowEnd)
     // 条件の帯（チップ行）より後ろ＝結果の側にある。
-    expect(pageSizeAt).toBeGreaterThan(PAGE.indexOf('broadcast-filter-chip'))
+    // m13i: 札は共通 FilterChip になったので錨を変える（順序の意図は同じ）。
+    expect(pageSizeAt).toBeGreaterThan(PAGE.indexOf('<FilterChip'))
     // 一覧（表）より前にある。
     expect(pageSizeAt).toBeLessThan(PAGE.indexOf('min-w-[640px]'))
   })

@@ -66,6 +66,16 @@ function seed(raw: Database.Database): void {
         (id, photo_id, line_account_id, flag, confidence, assessed_at, created_at)
        VALUES (?, ?, 'account-a', 'safe', 0.99, '2026-09-01', '2026-09-01')`,
     ).run(`risk-${photoId}`, photoId);
+    // ファイル検査の門番は clean の時だけ採用を通す。通知の試験では
+    // 検査済みとして種を置き、門番自体の振る舞いは file-scan-gate.test.ts で見る。
+    raw.prepare(
+      `INSERT INTO media_file_scans
+        (id, line_account_id, subject_kind, subject_id, filename, mime_type,
+         size_bytes, status, scanned_at, created_at, updated_at)
+       VALUES (?, 'account-a', 'photo', ?, ?, 'image/jpeg',
+               100, 'clean', '2026-09-01T00:00:00.000Z',
+               '2026-09-01T00:00:00.000Z', '2026-09-01T00:00:00.000Z')`,
+    ).run(`scan-${photoId}`, photoId, `photo-${photoId}.jpg`);
   }
 }
 

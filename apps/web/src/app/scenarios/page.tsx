@@ -15,6 +15,7 @@ function scenarioCompletionDetail(active: number, completed: number): string {
   return `登録合計 ${enrolled.toLocaleString('ja-JP')}人のうち ${rate}%`
 }
 import type { Folder } from '@line-crm/shared'
+import FilterChip from '@/components/shared/filter-chip'
 import ListKpis from '@/components/shared/list-kpis'
 import ListToolbar from '@/components/shared/list-toolbar'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
@@ -735,12 +736,12 @@ export default function ScenariosPage() {
       {/* 一覧本体（設計 `Body`）。 */}
       <div data-design="Body">
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <button
+        <Button
+          variant="primary"
           onClick={handleCreate}
-          className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50"
         >
-          ＋ シナリオを作成
-        </button>
+          ＋ シナリオを作る
+        </Button>
       </div>
       {/*
         設計はフォルダを左の縦パネルに置く。シナリオはフォルダを持って
@@ -799,22 +800,15 @@ export default function ScenariosPage() {
             onClick: () => setCreatedThisMonthOnly((current) => !current),
           },
         ].map((filter) => (
-          <button
+          <FilterChip
             key={filter.label}
-            disabled={filter.disabled}
-            title={filter.title}
-            onClick={filter.onClick}
-            aria-pressed={filter.disabled ? undefined : filter.active}
-            className={`rounded-pill border px-3 py-1 text-xs transition-colors ${
-              filter.disabled
-                ? 'border-hairline text-ink-faint opacity-50'
-                : filter.active
-                  ? 'border-accent-soft bg-accent-soft text-accent-deep'
-                  : 'border-hairline text-ink-secondary hover:bg-canvas-sunken'
-            }`}
+            selected={filter.disabled ? false : filter.active}
+            onChange={() => {
+              if (!filter.disabled) filter.onClick()
+            }}
           >
             {filter.label}
-          </button>
+          </FilterChip>
         ))}
       </div>
 
