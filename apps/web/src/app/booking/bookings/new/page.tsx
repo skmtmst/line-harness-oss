@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
+import MenuPortal from '@/components/shared/menu-portal'
 import Select from '@/components/shared/select'
 import StickyBar from '@/components/shared/sticky-bar'
 import LinePreview from '@/components/shared/line-preview'
@@ -125,6 +126,8 @@ export default function NewProxyBookingPage() {
   const [slotsReady, setSlotsReady] = useState(false)
   const [friends, setFriends] = useState<FriendListItem[]>([])
   const [friendQuery, setFriendQuery] = useState('')
+  const [friendSuggestOpen, setFriendSuggestOpen] = useState(false)
+  const friendInputRef = useRef<HTMLInputElement>(null)
   const [friend, setFriend] = useState<FriendListItem | null>(null)
   const [customer, setCustomer] = useState<BookingCustomerSummary | null>(null)
   const [phoneCustomer, setPhoneCustomer] = useState(false)
@@ -441,7 +444,10 @@ export default function NewProxyBookingPage() {
     const timer = window.setTimeout(() => {
       void api.friends.list({ accountId: selectedAccountId, search: query, limit: 20 })
         .then((response) => {
-          if (active && response.success) setFriends(response.data.items)
+          if (active && response.success) {
+            setFriends(response.data.items)
+            setFriendSuggestOpen(response.data.items.length > 0)
+          }
         })
         .catch(() => {
           if (active) setError('友だちを検索できませんでした')
@@ -667,23 +673,38 @@ export default function NewProxyBookingPage() {
               ) : (
                 <div className="relative">
                   <input
+                    ref={friendInputRef}
                     value={friendQuery}
-                    onChange={(event) => setFriendQuery(event.target.value)}
+                    onChange={(event) => {
+                      setFriendQuery(event.target.value)
+                      setFriendSuggestOpen(true)
+                    }}
                     placeholder="名前・電話番号で探す"
                     className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
                   />
-                  {friends.length > 0 && (
-                    <div className="border-hairline bg-canvas absolute z-20 mt-1 max-h-64 w-full divide-y overflow-y-auto rounded-control border shadow-lg">
+                  <MenuPortal
+                    open={friendSuggestOpen && friends.length > 0}
+                    align="start"
+                    matchWidth
+                    getAnchor={() => friendInputRef.current}
+                    onClose={() => setFriendSuggestOpen(false)}
+                  >
+                    <div
+                      className="border-hairline bg-canvas max-h-64 divide-y overflow-y-auto rounded-control border shadow-lg"
+                      // 最上層では absolute 指定を無効にする（位置は器が決める）。
+                      style={{ position: 'static', width: '100%' }}
+                    >
                       {friends.map((item) => (
                         <button key={item.id} type="button" onClick={() => {
                           setFriend(item)
                           setFriendQuery(item.displayName)
+                          setFriendSuggestOpen(false)
                         }} className="hover:bg-canvas-sunken block w-full px-3 py-2 text-left text-sm">
                           {item.displayName}
                         </button>
                       ))}
                     </div>
-                  )}
+                  </MenuPortal>
                 </div>
               )}
               {!phoneCustomer ? <p className="text-ink-faint mt-2 text-xs">別の友だちへ推測で結び付けず、選んだ相手だけに予約を記録します。</p> : null}

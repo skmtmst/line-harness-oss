@@ -13,6 +13,7 @@ import {
 import type { Tag, Scenario, LineAccount } from '@line-crm/shared'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import ActionMenu from '@/components/shared/action-menu'
+import MenuPortal from '@/components/shared/menu-portal'
 import { MoreAction } from '@/components/shared/row-actions'
 import Button from '@/components/shared/button'
 import type { ButtonProps } from '@/components/shared/button'
@@ -1099,6 +1100,8 @@ export function CreateAffiliateModal({
   const [search, setSearch] = useState('')
   const [options, setOptions] = useState<FriendOption[]>([])
   const [searching, setSearching] = useState(false)
+  const [suggestDismissed, setSuggestDismissed] = useState(false)
+  const searchInputRef = useRef<HTMLInputElement>(null)
   const [selected, setSelected] = useState<FriendOption | null>(null)
   const [commissionRate, setCommissionRate] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -1243,14 +1246,25 @@ export function CreateAffiliateModal({
               ) : (
                 <div className="relative">
                   <input
+                    ref={searchInputRef}
                     id="aff-friend-search"
                     value={search}
-                    onChange={(e) => setSearch(e.target.value)}
+                    onChange={(e) => { setSearch(e.target.value); setSuggestDismissed(false) }}
                     placeholder="名前で検索..."
                     className="w-full rounded-control border border-hairline px-3 py-2 text-sm"
                   />
-                  {(searching || options.length > 0) && search.trim() && (
-                    <div className="absolute z-10 mt-1 max-h-56 w-full overflow-y-auto rounded-control border border-hairline bg-canvas shadow-lg">
+                  <MenuPortal
+                    open={!suggestDismissed && (searching || options.length > 0) && Boolean(search.trim())}
+                    align="start"
+                    matchWidth
+                    getAnchor={() => searchInputRef.current}
+                    onClose={() => setSuggestDismissed(true)}
+                  >
+                    <div
+                      className="max-h-56 overflow-y-auto rounded-control border border-hairline bg-canvas shadow-lg"
+                      // 最上層では absolute 指定を無効にする（位置は器が決める）。
+                      style={{ position: 'static', width: '100%' }}
+                    >
                       {searching ? (
                         <div className="px-3 py-2 text-sm text-ink-faint">検索中...</div>
                       ) : options.length === 0 ? (
@@ -1268,7 +1282,7 @@ export function CreateAffiliateModal({
                         ))
                       )}
                     </div>
-                  )}
+                  </MenuPortal>
                 </div>
               )}
             </div>

@@ -16,6 +16,7 @@ import { useCursorStack } from '../use-cursor-stack'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
+import MenuPortal from '@/components/shared/menu-portal'
 import Select from '@/components/shared/select'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import SummaryCard from '@/components/shared/summary-card'
@@ -119,6 +120,8 @@ function FriendAddRunsInner() {
   const [error, setError] = useState('')
   const [csvBusy, setCsvBusy] = useState(false)
   const [csvNote, setCsvNote] = useState('')
+  const [filterOpen, setFilterOpen] = useState(false)
+  const filterButtonRef = useRef<HTMLButtonElement>(null)
   const [stopBusy, setStopBusy] = useState(false)
   const [stopDialogOpen, setStopDialogOpen] = useState(false)
   const [stopMessage, setStopMessage] = useState('')
@@ -323,9 +326,27 @@ function FriendAddRunsInner() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Link className="text-sm font-bold text-action hover:underline" href="/friend-add-settings">← 友だち追加時の配信</Link>
         <div className="flex gap-2">
-          <details className="relative">
-            <summary className="cursor-pointer list-none rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-bold">絞り込み</summary>
-            <div className="absolute right-0 z-20 mt-2 flex w-screen max-w-3xl flex-wrap items-end gap-3 rounded-card border border-hairline bg-canvas p-4 shadow-panel">
+          <span className="relative inline-flex">
+            <button
+              ref={filterButtonRef}
+              type="button"
+              aria-expanded={filterOpen}
+              onClick={() => setFilterOpen((current) => !current)}
+              className="cursor-pointer rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-bold"
+            >
+              絞り込み
+            </button>
+            <MenuPortal
+              open={filterOpen}
+              align="end"
+              getAnchor={() => filterButtonRef.current}
+              onClose={() => setFilterOpen(false)}
+            >
+            <div
+              className="flex w-[min(48rem,calc(100vw-16px))] max-w-3xl flex-wrap items-end gap-3 rounded-card border border-hairline bg-canvas p-4 shadow-panel"
+              // 最上層では absolute 指定を無効にする（位置は器が決める）。
+              style={{ position: 'static' }}
+            >
               <Select
                 aria-label="追加の種類"
                 label="追加の種類"
@@ -364,7 +385,8 @@ function FriendAddRunsInner() {
               />
               <Button onClick={() => void load()} disabled={loading}>一覧を更新</Button>
             </div>
-          </details>
+            </MenuPortal>
+          </span>
           <Button onClick={() => void exportCsv()} disabled={!data?.items.length || csvBusy}>{csvBusy ? '書き出し中…' : '実行結果をCSVで書き出す'}</Button>
         </div>
       </div>
