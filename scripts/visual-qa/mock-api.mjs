@@ -48,6 +48,8 @@ import {
   MEDIA_FOLDERS,
   MEDIA_ITEMS,
   MEDIA_QUOTA,
+  FILE_SCAN_ITEMS,
+  FILE_SCAN_CONFIG,
   FRIEND_ADD_RUNS,
   AUTO_REPLIES, AUTO_REPLY_FOLDERS, AUTO_REPLY_RUNS, AUTO_REPLY_CONFLICT_SUMMARY,
   AUTO_REPLY_PUBLISH_CONFLICTS, AUTO_REPLY_PUBLISH_DRAFT,
@@ -3667,6 +3669,32 @@ const server = createServer((req, res) => {
     return
   }
 
+  if (method === 'GET' && url.pathname === '/api/file-scans') {
+    const status = url.searchParams.get('status')
+    const filtered = FILE_SCAN_ITEMS.filter((item) => !status || item.status === status)
+    res.writeHead(200).end(JSON.stringify({ success: true, data: { items: filtered, total: filtered.length, limit: 50, offset: 0 } }))
+    return
+  }
+  if (method === 'GET' && url.pathname === '/api/file-scans/by-subject') {
+    const id = url.searchParams.get('id')
+    const scan = FILE_SCAN_ITEMS.find((item) => item.subjectId === id) ?? null
+    res.writeHead(200).end(JSON.stringify({ success: true, data: { scan } }))
+    return
+  }
+  if (method === 'GET' && url.pathname === '/api/file-scans/for-media') {
+    const mediaId = url.searchParams.get('mediaId')
+    const scan = FILE_SCAN_ITEMS.find((item) => item.mediaId === mediaId) ?? null
+    res.writeHead(200).end(JSON.stringify({ success: true, data: { scan } }))
+    return
+  }
+  if (method === 'GET' && url.pathname === '/api/file-scans/health') {
+    res.writeHead(200).end(JSON.stringify({ success: true, data: { stopped: false, pendingCount: 1, oldestPendingAt: null } }))
+    return
+  }
+  if (method === 'GET' && url.pathname === '/api/file-scans/config') {
+    res.writeHead(200).end(JSON.stringify({ success: true, data: { config: FILE_SCAN_CONFIG } }))
+    return
+  }
   if (method === 'GET' && url.pathname === '/api/media') {
     const limit = Math.min(100, Math.max(1, Number(url.searchParams.get('limit') || 20)))
     const offset = Math.max(0, Number(url.searchParams.get('offset') || 0))
