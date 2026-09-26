@@ -1153,7 +1153,7 @@ function LineNotificationsPage() {
         </div>
       </section>
     </KpiCollapse>
-    <div className="mb-4"><NoteBar>これは「お知らせ」であって「売り込みの配信」ではありません。顧客が配信を止めていても、取引に必要な連絡は届きます。</NoteBar></div>
+    <div className="mb-4"><NoteBar help="お知らせは売り込みではなく取引に必要な連絡です" helpLabel="お知らせの意味">これは「お知らせ」であって「売り込みの配信」ではありません。顧客が配信を止めていても、取引に必要な連絡は届きます。</NoteBar></div>
 
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="grid w-full max-w-[48rem] grid-cols-2 gap-2 lg:grid-cols-4" aria-label="お知らせの絞り込み">

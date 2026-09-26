@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { LOAD_FAILED_MESSAGE, SUBMIT_FAILED_MESSAGE, logFailure } from '../lib/user-message.js';
 import LoadErrorView from '../components/LoadErrorView.js';
 import LoadingView from '../components/LoadingView.js';
+import HelpTip from '../components/HelpTip.js';
 
 const BASE = import.meta.env.VITE_API_BASE ?? '';
 
@@ -311,8 +312,9 @@ function MileageSummaryCard({ wallet }: { wallet: MileageWalletData }) {
           <p className="mt-1 text-xs opacity-75">現在利用できるマイル</p>
         </div>
         {mileage.pending > 0 && (
-          <span className="rounded-full bg-white/20 px-3 py-1 text-xs font-semibold">
+          <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-3 py-1 text-xs font-semibold">
             確定待ち {mileage.pending.toLocaleString()}
+            <HelpTip label="確定待ちの説明" align="right">条件の確定を待っているマイルです。</HelpTip>
           </span>
         )}
       </div>
@@ -339,8 +341,10 @@ function MileageHistoryAccordion({ wallet }: { wallet: MileageWalletData }) {
     <details className="af-card af-history-accordion">
       <summary className="af-history-summary">
         <div className="min-w-0">
-          <h2 className="text-sm font-bold text-gray-900">マイル履歴</h2>
-          <p className="text-[11px] text-gray-400 mt-0.5">行動後、定期集計で反映されます</p>
+          <h2 className="flex items-center gap-1 text-sm font-bold text-gray-900">
+            マイル履歴
+            <HelpTip label="マイル履歴の説明">行動後、定期集計で反映されます。確定待ちは条件の確定待ち、取消は取り消されたものです。</HelpTip>
+          </h2>
         </div>
         <div className="flex items-center gap-2">
           <span className="af-badge" style={{ background: '#fff7ed', color: '#b45309' }}>

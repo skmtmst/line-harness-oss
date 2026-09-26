@@ -740,7 +740,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
       {/* Create forms */}
       {showCreate && tab === 'incoming' && (
         <form onSubmit={handleCreateIncoming} className="bg-canvas rounded-lg border border-hairline p-6 mb-6">
-          <h3 className="text-sm font-semibold text-ink mb-4">受け取る設定を作る</h3>
+          <h3 className="text-sm font-semibold text-ink mb-4">受け取る設定を追加</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-ink-secondary mb-1">名前</label>

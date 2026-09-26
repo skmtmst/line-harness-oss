@@ -1930,7 +1930,8 @@ export function ApprovalQueue() {
           title="確認したほうがよい"
           value={loading || error ? null : flaggedCount}
           unit={loading || error ? '' : '件'}
-          detail="同じ友だち・同じ注文の重複や、返金・取り消し済みの注文の成果"
+          detail=""
+          help="同じ友だち・同じ注文の重複や、返金・取り消し済みの注文の成果です"
           loading={loading}
         />
         <KpiCard
@@ -1944,7 +1945,8 @@ export function ApprovalQueue() {
           title="待たせている日数"
           value={loading || error ? null : Math.round(averageWaitDays * 10) / 10}
           unit={loading || error ? '' : '日'}
-          detail="承認待ちの平均"
+          detail=""
+          help="承認待ちの平均日数です"
           loading={loading}
         />
       </div>
@@ -2594,7 +2596,7 @@ export function OffersTab() {
 
   return (
     <div data-design-node="GH8VL" data-affiliate-offers-design="v6">
-      <NoteBar>
+      <NoteBar help="案件は、何をしたら成果になりいくら払うかの組み合わせです" helpLabel="案件の意味">
         案件は「何をしたら成果になり、いくら払うか」の組み合わせです。アフィリエイターはこの案件を選んで紹介します。
       </NoteBar>
 

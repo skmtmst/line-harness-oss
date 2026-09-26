@@ -634,7 +634,9 @@ try {
       detail,
     })
     await openList(page)
-    await page.getByRole('button', { name: '停止するフォームを削除' }).click()
+    // 削除は行の「…」メニューの中の危ない操作へ移したので、 menu から開く。
+    await page.getByRole('button', { name: '停止するフォームのその他操作' }).click()
+    await page.getByRole('menuitem', { name: '削除する' }).click()
     const stop = page.getByRole('button', { name: '受付だけ止める' })
     await stop.waitFor({ timeout: 15_000 })
     await stop.click()
