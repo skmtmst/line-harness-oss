@@ -296,13 +296,14 @@ function MigrateFriendField() {
   const running = executing || (run ? RUN_RUNNING.has(run.status) : false)
 
   return (
-    <div data-design-node="KoT6c">
-      <div className="mb-4 flex items-center justify-between gap-4">
+    <div data-design-node="KoT6c" className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <div className="flex items-center justify-between gap-4">
         <Breadcrumb items={[{ label: '友だち情報欄', href: '/tags?tab=fields' }, { label: '項目を移行' }]} />
         <Button href="/tags?tab=fields">友だち情報欄へ</Button>
       </div>
 
-      <div className="mb-4 rounded-control border border-info/25 bg-info-bg p-4 text-sm leading-6 text-info">
+      <div className="rounded-control border border-info/25 bg-info-bg p-4 text-sm leading-6 text-info">
         事前確認では値を1件も変更しません。移せる数と切り替わる使用先を確かめてから、「移行を実行する」を押した時だけ書き込みます。
       </div>
       {error ? <p role="alert" className="mb-4 rounded-control border border-danger/20 bg-danger-bg p-3 text-sm text-danger">{error}</p> : null}
@@ -387,7 +388,7 @@ function MigrateFriendField() {
         </section>
       </div>
 
-      <section data-design="Preview" className="mt-4 rounded-card border border-hairline bg-canvas p-5 shadow-sm">
+      <section data-design="Preview" className="rounded-card border border-hairline bg-canvas p-5 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div><h2 className="text-base font-bold text-ink">値を変換できるか事前確認</h2><p className="mt-1 text-sm text-ink-secondary">登録済みの値を読み取り、移行できる数だけを確認します。</p></div>
           <Button type="button" onClick={() => void runPreview()} disabled={checking || running || (!target && targetMode === 'existing' && !existingTargetId)}>
@@ -412,7 +413,7 @@ function MigrateFriendField() {
         ) : <p className="mt-4 text-sm text-ink-faint">まだ事前確認していません。未取得を0人として表示しません。</p>}
       </section>
 
-      <section data-design="Usage" className="mt-4 rounded-card border border-hairline bg-canvas p-5 shadow-sm">
+      <section data-design="Usage" className="rounded-card border border-hairline bg-canvas p-5 shadow-sm">
         <h2 className="text-base font-bold text-ink">切り替わる使用先</h2>
         {preview ? preview.usageTargets.length > 0 ? (
           <div className="mt-3 grid gap-2 text-sm sm:grid-cols-3">
@@ -424,7 +425,7 @@ function MigrateFriendField() {
       </section>
 
       {run ? (
-        <section data-design="Result" className="mt-4 rounded-card border border-hairline bg-canvas p-5 shadow-sm" aria-live="polite">
+        <section data-design="Result" className="rounded-card border border-hairline bg-canvas p-5 shadow-sm" aria-live="polite">
           <h2 className="text-base font-bold text-ink">移行の結果</h2>
           <p className="mt-2 text-sm font-semibold text-ink">{RUN_STATUS_LABELS[run.status]}</p>
           <div className="mt-3 grid gap-3 sm:grid-cols-3">
