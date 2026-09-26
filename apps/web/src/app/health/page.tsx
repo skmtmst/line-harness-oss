@@ -208,11 +208,12 @@ export default function HealthPage() {
   }
 
   return (
-    <div>
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
 
       {/* Error */}
       {error && (
-        <div className="mb-4 p-4 bg-danger-bg border border-danger/30 rounded-card text-danger text-sm">
+        <div className="p-4 bg-danger-bg border border-danger/30 rounded-card text-danger text-sm">
           {error}
         </div>
       )}
@@ -230,7 +231,7 @@ export default function HealthPage() {
       ) : (
         <>
           {/* Account Health Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {accounts.map((account) => {
               const risk = latestRisk[account.id] ?? 'unknown'
               const config = riskConfig[risk]
