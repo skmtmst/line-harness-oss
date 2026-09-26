@@ -62,8 +62,9 @@ export default function HqOpenPage() {
   }
 
   return (
-    <div>
-      <header data-design="Head" className="mb-6 flex flex-wrap items-start justify-between gap-4">
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <header data-design="Head" className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="text-sm font-semibold text-ink-secondary">統括コンソール</p>
           <h1 className="mt-1 text-2xl font-bold tracking-tight text-ink">どのアカウントの{target.label}を開きますか</h1>
