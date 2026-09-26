@@ -10204,7 +10204,7 @@ export const api = {
     installRichMenu: (accountId: string) => fetchApi<ApiResponse<{ richMenuId: string; liffId: string }>>('/api/nen-members/rich-menu/install', { method: 'POST', body: JSON.stringify({ accountId }) }),
   },
   chats: {
-    list: (params?: { status?: string; operatorId?: string; accountId?: string; q?: string; unansweredOnly?: boolean; unreadOnly?: boolean; quickFilter?: 'reply' | 'overdue'; limit?: number; beforeAt?: string; beforeId?: string }) => {
+    list: (params?: { status?: string; operatorId?: string; accountId?: string; q?: string; unansweredOnly?: boolean; unreadOnly?: boolean; quickFilter?: 'reply' | 'overdue'; limit?: number; beforeAt?: string; beforeId?: string; beforeUnread?: 0 | 1 }) => {
       const query: Record<string, string> = {}
       if (params?.status) query.status = params.status
       if (params?.operatorId) query.operatorId = params.operatorId
@@ -10214,7 +10214,8 @@ export const api = {
       if (params?.unreadOnly) query.unreadOnly = '1'
       if (params?.quickFilter) query.quickFilter = params.quickFilter
       if (params?.limit !== undefined) query.limit = String(params.limit)
-      // カーソルページング: (lastMessageAt, friendId) の複合カーソルより古い行を返す
+      // カーソルページング: (未読, lastMessageAt, friendId) の複合カーソルより後の行を返す
+      if (params?.beforeUnread !== undefined) query.beforeUnread = String(params.beforeUnread)
       if (params?.beforeAt) query.beforeAt = params.beforeAt
       if (params?.beforeId) query.beforeId = params.beforeId
       return fetchApi<ApiResponse<ChatListItem[]>>(

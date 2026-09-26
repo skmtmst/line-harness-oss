@@ -104,7 +104,8 @@ describe('受信箱V4の画面契約', () => {
     expect(PAGE).toContain("{item.key === 'all' && item.label}")
     expect(PAGE).not.toContain('{item.label}\n                </button>')
     expect(PAGE).toContain('data-inbox-sort="fixed"')
-    expect(PAGE).toContain('並び順：新しい順')
+    // オーナー指示 (m13d)：未読の会話を先に並べる。文言で固定していた旧表示は新表示へ。
+    expect(PAGE).toContain('並び順：未読が先・新しい順')
     expect(PAGE).not.toContain('aria-label="並び順"')
     expect(PAGE).not.toContain('defaultValue="newest"')
     expect(PAGE).toContain('shrink-0 items-center')

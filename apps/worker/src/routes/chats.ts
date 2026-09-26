@@ -893,7 +893,8 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
     //   新実装は (a) ROW_NUMBER を argmax GROUP BY に置換 (SQLite の bare-column +
     //   単一 MAX() は max 行の値を返す documented 挙動)、(b) CTE を MATERIALIZED して
     //   二重評価を防止、(c) page CTE で先に対象 friend を limit 件に確定してから
-    //   preview を計算、(d) デフォルト LIMIT 200 (最終行は last_message_at DESC)。
+    //   preview を計算、(d) デフォルト LIMIT 200
+    //   (最終行は 未読 DESC, last_message_at DESC, friend_id DESC)。
     //   同条件の本番実測: 459ms / 165k rows_read (旧 LIMIT 300 時)。
     //   - content は text のみ先頭 200 文字まで切り詰めて返す (flex/image など raw JSON を
     //     返すと broadcast 後の rows で multi-MB レスポンスになる)。
@@ -920,11 +921,17 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
     // 不正値や負値を SQLite の「LIMIT 無制限」に渡さず、未対応絞り込みも含めて
     // 1回の応答を最大200件に止める。未対応一覧は上の専用DBページングで扱う。
     const limit = listLimit(c.req.query('limit'), 200);
-    // カーソルページング: (last_message_at, friend_id) の複合カーソルより古い行を返す。
-    // offset 方式は「取得の合間に新着で行が押し下げられた分が欠落する」構造問題が
-    // あるため採用しない。friend_id は同時刻 (broadcast 一斉配信等) のタイブレーク。
+    // カーソルページング: (未読, last_message_at, friend_id) の複合カーソルより後の行を返す。
+    // 一覧は「未読が先 → 最新の受信・送信が新しい順」。offset 方式は「取得の合間に
+    // 新着で行が押し下げられた分が欠落する」構造問題があるため採用しない。
+    // friend_id は同時刻 (broadcast 一斉配信等) のタイブレーク。
+    // beforeUnread が無い古い渡し方は、時刻だけの従来条件に倒す。
     const beforeAt = c.req.query('beforeAt') || undefined;
     const beforeId = c.req.query('beforeId') || undefined;
+    const beforeUnreadRaw = c.req.query('beforeUnread');
+    const beforeUnread = beforeUnreadRaw === '1' || beforeUnreadRaw === 'true'
+      ? 1
+      : beforeUnreadRaw === '0' || beforeUnreadRaw === 'false' ? 0 : null;
     const useCursor = Boolean(beforeAt && beforeId);
 
     const conditions: string[] = [];
@@ -993,9 +1000,20 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
     // 値を返す」という SQLite の documented 挙動で argmax として使っている。
     // 集約は page 確定後の friend に絞って実行する (全 friend 分の content を
     // materialize しない)。last_any は並び順決定専用のスリムな全走査 1 回のみ。
+    // 一覧の並びは「未読が先 → 最新の受信・送信が新しい順」。
+    // 未読は担当者ごとの既読位置で決まる (最後の受信より既読が古い = 未読)。
+    // page 確定の前に要るので、受信の最新は last_any の集計から取る。
+    // 最終段の is_unread_for_staff と同じ定義 (受信なしは既読扱い)。
+    const unreadExpr = `CASE
+      WHEN la.last_incoming_at IS NOT NULL
+       AND (sr.last_read_at IS NULL OR la.last_incoming_at > sr.last_read_at)
+      THEN 1 ELSE 0
+    END`;
     const sql = `
       WITH last_any AS MATERIALIZED (
-        SELECT friend_id, MAX(COALESCE(line_event_at, created_at)) AS last_message_at
+        SELECT friend_id,
+          MAX(COALESCE(line_event_at, created_at)) AS last_message_at,
+          MAX(CASE WHEN direction = 'incoming' THEN created_at END) AS last_incoming_at
         FROM messages_log
         WHERE (delivery_type IS NULL OR delivery_type != 'test')
           AND ${accountFilterSql}
@@ -1009,16 +1027,25 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
         ) GROUP BY friend_id
       ),
       page AS MATERIALIZED (
-        SELECT d.friend_id, d.last_message_at
+        SELECT d.friend_id, d.last_message_at, ${unreadExpr} AS is_unread
         FROM deduped d
         INNER JOIN friends f ON f.id = d.friend_id
+        LEFT JOIN last_any la ON la.friend_id = d.friend_id
+        LEFT JOIN inbox_staff_reads sr
+          ON sr.channel = 'line'
+         AND sr.conversation_id = d.friend_id
+         AND sr.staff_id = ?
         ${pageNeedsChats ? `LEFT JOIN chats c ON c.id = (
           SELECT id FROM chats WHERE friend_id = f.id ORDER BY created_at DESC LIMIT 1
         )` : ''}
         WHERE 1=1
         ${conditions.length > 0 ? 'AND ' + conditions.join(' AND ') : ''}
-        ${useCursor ? 'AND (d.last_message_at < ? OR (d.last_message_at = ? AND d.friend_id < ?))' : ''}
-        ORDER BY d.last_message_at DESC, d.friend_id DESC
+        ${useCursor
+          ? beforeUnread == null
+            ? 'AND (d.last_message_at < ? OR (d.last_message_at = ? AND d.friend_id < ?))'
+            : `AND (${unreadExpr} < ? OR (${unreadExpr} = ? AND (d.last_message_at < ? OR (d.last_message_at = ? AND d.friend_id < ?))))`
+          : ''}
+        ORDER BY is_unread DESC, d.last_message_at DESC, d.friend_id DESC
         LIMIT ?
       ),
       any_agg AS (
@@ -1095,16 +1122,22 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
         ON sr.channel = 'line'
        AND sr.conversation_id = f.id
        AND sr.staff_id = ?
-      ORDER BY d.last_message_at DESC, d.friend_id DESC
+      ORDER BY is_unread_for_staff DESC, d.last_message_at DESC, d.friend_id DESC
     `;
 
     // placeholder 順 = SQL 出現順: last_any(account) → deduped 内 chats(account) →
-    // page 条件 → cursor (beforeAt ×2 + beforeId) → LIMIT。
+    // page の未読判定 (sr 用 staff) → page 条件 → cursor
+    // (beforeUnread あり: unread ×2 + beforeAt ×2 + beforeId / なし: beforeAt ×2 + beforeId) →
+    // LIMIT → 最終段の未読判定 (sr 用 staff)。
     // any_agg は page で friend が確定済みのため account filter 不要。
     const allBindings: unknown[] = [];
     allBindings.push(...accountFilterBindings, ...accountFilterBindings);
+    allBindings.push(staff.id);
     allBindings.push(...conditionBindings);
-    if (useCursor) allBindings.push(beforeAt, beforeAt, beforeId);
+    if (useCursor) {
+      if (beforeUnread == null) allBindings.push(beforeAt, beforeAt, beforeId);
+      else allBindings.push(beforeUnread, beforeUnread, beforeAt, beforeAt, beforeId);
+    }
     allBindings.push(limit, staff.id);
     const result = await c.env.DB.prepare(sql).bind(...allBindings).all();
 
