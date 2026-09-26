@@ -644,7 +644,7 @@ export default function RichMenusListPage() {
   }, [page, pageCount])
 
   return (
-    <div data-design-node="GO8RQ" className="mx-auto max-w-[1584px]">
+    <div data-design-node="GO8RQ" className="mx-auto flex max-w-[1584px] flex-col gap-4">
       <span hidden>メニュー名・ボタン名で検索・保存した条件・公開中のみ</span>
       {showExternal && selectedAccount ? (
         /*
@@ -669,7 +669,7 @@ export default function RichMenusListPage() {
         data-design="KPIs"
         data-group-kpi-state={groupKpiState}
         data-tap-kpi-state={tapKpiState}
-        className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"
+        className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"
       >
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">メニュー</p>
@@ -730,7 +730,7 @@ export default function RichMenusListPage() {
 
       <div
         data-design="Bar"
-        className="bg-canvas rounded-card border-hairline mb-3 border p-3"
+        className="bg-canvas rounded-card border-hairline border p-3"
       >
         <div className="flex flex-wrap items-center gap-2">
           <Button href="/rich-menus/new" variant="primary">
@@ -787,7 +787,7 @@ export default function RichMenusListPage() {
         ★V7：「保存した検索」と書いていたが、中身は状態の絞り込み。保存はできないので名前を合わせる。
         「管理画面の外」は絞り込みではなく別の画面を開く操作なので、札の列から出して枠つきボタンにする。
       */}
-      <div data-design="Saved" className="mb-3 flex flex-wrap items-center gap-2">
+      <div data-design="Saved" className="flex flex-wrap items-center gap-2">
         <span className="text-ink-faint text-xs whitespace-nowrap">よく使う絞り込み</span>
         {SAVED_FILTERS.map((f) => (
           <FilterChip key={f.key} selected={savedFilter === f.key} onChange={() => setSavedFilter(savedFilter === f.key && f.key ? '' : f.key)}>
