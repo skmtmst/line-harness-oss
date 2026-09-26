@@ -61,22 +61,25 @@ export default function UpdatesPage() {
   const rows = state.kind === 'ready' ? state.rows : []
 
   return (
-    <div>
-      <h1 className="text-ink mb-4 text-xl font-semibold">アップデート履歴</h1>
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <h1 className="text-ink text-xl font-semibold">アップデート履歴</h1>
       {state.kind === 'unconfigured' && (
         <>
-          <div className="mb-4"><NoteBar>この環境では自動アップデートが構成されていないため、履歴はありません。</NoteBar></div>
-          <ListState
-            kind="empty"
-            emptyPreset="readonly"
-            title="更新履歴はまだありません"
-            description="自動アップデートは create-line-harness でセットアップした環境で利用できます。自前でデプロイしている場合は手動アップデートガイドをご覧ください。"
-            action={<Button href={MANUAL_UPDATE_GUIDE_URL} target="_blank" rel="noreferrer">手動アップデートガイドを開く</Button>}
-          />
+          <div><NoteBar>この環境では自動アップデートが構成されていないため、履歴はありません。</NoteBar></div>
+          <section className="bg-canvas rounded-card border-hairline border">
+            <ListState
+              kind="empty"
+              emptyPreset="readonly"
+              title="更新履歴はまだありません"
+              description="自動アップデートは create-line-harness でセットアップした環境で利用できます。自前でデプロイしている場合は手動アップデートガイドをご覧ください。"
+              action={<Button href={MANUAL_UPDATE_GUIDE_URL} target="_blank" rel="noreferrer">手動アップデートガイドを開く</Button>}
+            />
+          </section>
         </>
       )}
       {state.kind === 'error' && (
-        <div className="bg-status-warn-soft text-status-warn-deep mb-4 rounded-control p-3 text-sm">
+        <div className="bg-status-warn-soft text-status-warn-deep rounded-control p-3 text-sm">
           履歴を取得できませんでした（{state.message}）。時間をおいて再読み込みしてください。
         </div>
       )}
