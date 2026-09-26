@@ -143,6 +143,17 @@ const scanMocks = { scanSingleMediaUsage: vi.fn() };
 vi.mock('../services/media-usage-scan.js', () => scanMocks);
 const signingMocks = { createR2PresignedPutUrl: vi.fn() };
 vi.mock('../services/r2-presigned-upload.js', () => signingMocks);
+// 検査の門番は別ファイル（file-scan-gate.test.ts）で本物を見る。
+// ここではDBが空モックのため、門番だけ差し替えて通す。
+const fileScanServiceMocks = {
+  checkMediaGate: vi.fn(async () => ({ allowed: true })),
+  getMediaGateInfo: vi.fn(async () => ({ lineAccountId: 'acc-1', sizeBytes: 100, width: 1, height: 1 })),
+  runScanForStoredObject: vi.fn(async (_db: unknown, _store: unknown, scan: { id: string }) => scan),
+};
+vi.mock('../services/file-scan.js', () => fileScanServiceMocks);
+vi.mock('./file-scan.js', () => ({
+  ensureFileScanForUpload: vi.fn(async () => ({ id: 'scan-test-1' })),
+}));
 
 const { contents } = await import('./contents.js');
 // 実物のエラークラス（モックは actual を引き継ぐので本物の instanceof が効く）

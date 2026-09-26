@@ -10,6 +10,7 @@ import {
   type CommonVarReplacementCandidate,
   type CommonVarReplacementImpact,
 } from '@/lib/api'
+import FilterChip from '@/components/shared/filter-chip'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import { formatStamp } from '@/lib/common-vars'
 import Pagination from '@/components/shared/pagination'
@@ -753,20 +754,16 @@ function VarsPageInner() {
               ['scheduled', '期限つき'],
               ['unused', '使われていない'],
             ] as const).map(([value, label]) => (
-              <button
+              <FilterChip
                 key={value}
-                type="button"
-                aria-pressed={stateFilter === value}
-                onClick={() => {
+                selected={stateFilter === value}
+                onChange={() => {
                   setStateFilter(value)
                   setPage(1)
                 }}
-                className={stateFilter === value
-                  ? 'border-accent bg-accent-soft text-accent-deep rounded-pill border px-3 py-1.5 text-xs font-semibold'
-                  : 'border-hairline bg-canvas text-ink-secondary rounded-pill border px-3 py-1.5 text-xs font-semibold'}
               >
                 {label}
-              </button>
+              </FilterChip>
             ))}
             <SortSelect
               className="ml-auto"

@@ -1445,7 +1445,7 @@ export default function BroadcastForm({
         ].filter((part): part is string => part !== null)
         return parts.length > 0 ? `${parts.join('・')}を除外` : '除外なし'
       })()
-    : preflight?.warnings.find((w) => w.message.includes('除いて'))?.message ?? null
+    : preflight?.warnings?.find((w) => w.message.includes('除いて'))?.message ?? null
   const quota = preflight?.quota ?? null
   const quotaAvailable = quota?.state === 'available'
   const quotaInsufficient = quota?.state === 'insufficient'
