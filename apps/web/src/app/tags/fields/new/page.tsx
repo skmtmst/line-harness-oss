@@ -123,7 +123,7 @@ function NewFriendFieldForm() {
   return (
     <div data-design-node="A1ZYeP">
       <div className="mb-4 flex items-center justify-between gap-4">
-        <Breadcrumb items={[{ label: '友だち情報欄', href: '/tags?tab=fields' }, { label: '項目を追加' }]} />
+        <Breadcrumb items={[{ label: '友だち情報欄', href: '/tags?tab=fields' }, { label: '項目を作る' }]} />
         <Button href={back ?? '/tags?tab=fields'}>友だち情報欄へ</Button>
       </div>
 

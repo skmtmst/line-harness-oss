@@ -627,7 +627,7 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
         />
         {/* 作る操作は行の左。たまに使う CSV は右に残す。 */}
         <AffiliateButton variant="primary" onClick={() => setCreateOpen(true)}>
-          アフィリエイターを追加
+          ＋ アフィリエイターを作る
         </AffiliateButton>
         <AffiliateButton onClick={exportAffiliatesCsv} disabled={shownRows.length === 0} className="ml-auto">
           CSVで書き出す
@@ -689,7 +689,7 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
           kind="empty"
           title="紹介者はまだ登録されていません"
           description="紹介してくれる方を登録すると、専用リンクと成果を管理できます。"
-          action={<Button variant="primary" onClick={() => setCreateOpen(true)}>アフィリエイターを追加</Button>}
+          action={<Button variant="primary" onClick={() => setCreateOpen(true)}>＋ アフィリエイターを作る</Button>}
         />
       ) : shownRows.length === 0 ? (
         <ListState

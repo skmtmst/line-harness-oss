@@ -1,6 +1,5 @@
 'use client'
 
-import { Plus } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
@@ -99,8 +98,7 @@ export default function OpsTenantsPage() {
       */}
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <Button variant="primary" onClick={() => setCreating((v) => !v)}>
-          <Plus aria-hidden="true" className="h-4 w-4" />
-          契約先を追加
+          ＋ 契約先を作る
         </Button>
         <div className="w-full max-w-md">
           <SearchField

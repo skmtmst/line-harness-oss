@@ -304,7 +304,7 @@ export default function NewConversionPointPage() {
 
   return (
     <CreatePage
-      title="成果地点をつくる"
+      title="成果地点を作る"
       description="「申込」「購入」など、成果として数えたい行動を登録します。"
       showHeader={false}
       parent={['コンバージョン', '/conversions?tab=points']}
