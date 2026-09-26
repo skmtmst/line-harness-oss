@@ -17,6 +17,7 @@ import {
 } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import StickyBar from '@/components/shared/sticky-bar'
+import LinePreview from '@/components/shared/line-preview'
 import {
   MAX_BUBBLES,
   MAX_TEXT_LENGTH,
@@ -98,16 +99,10 @@ interface BroadcastFormProps {
 }
 
 /*
- * 右側のプレビューの枠は、**LINEのトーク画面を描いたもの**。
- * アプリのデザインの色ではないので、トークンにしない。
- * `bg-canvas` などに置き換えると、LINEに見えなくなって用をなさなくなる。
+ * 右側のプレビューの枠は、LINEのトーク画面に近い共通部品
+ * `LinePreview`（`components/shared/line-preview`）を使う。
+ * 画面ごとに枠の色を作らない（B-6）。
  */
-const LINE_MOCK = {
-  frame: 'border-[#1f2937]',   // 端末の外枠
-  bar: 'bg-[#1f2937]',         // 上のバー
-  wallpaper: 'bg-[#8faed2]',   // LINEの既定の壁紙
-  onDark: 'text-white',        // 上のバーと日付の文字
-} as const
 
 /**
  * 種類の名前。**内部の語をそのまま画面へ出さない。**
@@ -2413,22 +2408,20 @@ export default function BroadcastForm({
           </div>
         ) : currentStep === 'confirm' ? (
           <div className="space-y-3">
-            <section className="broadcast-line-preview rounded-card p-5 text-on-accent">
-              <h3 className="text-center text-sm font-bold">LINEプレビュー</h3>
-              {/*
-                * BC-03: 実際に決めた値だけを出す。固定の日時・人数・
-                * タグ名を出すと、対象0人や未設定でも「実行される」
-                * ように見えてしまう。
-                */}
-              <p className="mx-auto mt-4 w-fit rounded-pill bg-ink/25 px-3 py-1 text-xs font-semibold">
-                {visualQaAugustCampaign ? '2026/08/24 10:00 に届きます'
-                  : scheduledLabel ? `${scheduledLabel} に届きます`
-                  : '保存後、詳細画面から送信します'}
-              </p>
-              <div className="mt-4 flex flex-col gap-3 text-ink">
+            {/*
+              * BC-03: 実際に決めた値だけを出す。固定の日時・人数・
+              * タグ名を出すと、対象0人や未設定でも「実行される」
+              * ように見えてしまう。
+              */}
+            <LinePreview
+              caption={visualQaAugustCampaign ? '2026/08/24 10:00 に届きます'
+                : scheduledLabel ? `${scheduledLabel} に届きます`
+                : '保存後、詳細画面から送信します'}
+            >
+              <div className="flex flex-col gap-3 text-ink">
                 {bubbles.map((bubble, index) => <BubblePreview key={bubble.id} bubble={bubble} buttons={index === 0 ? messageButtons : []} />)}
               </div>
-            </section>
+            </LinePreview>
             <section className="rounded-card border border-hairline bg-canvas p-4">
               <h3 className="font-bold text-ink">設定内容</h3>
               <dl className="mt-3 divide-y divide-hairline text-xs">
@@ -2477,7 +2470,7 @@ export default function BroadcastForm({
               <p className="mt-1 text-xs text-ink-faint">現在の枠内で送信できるか確認します。</p>
               {quota ? <><p className="mt-3 text-sm font-bold text-ink">使用予定　{quota.planned.toLocaleString('ja-JP')} / {quota.monthlyLimit?.toLocaleString('ja-JP') ?? '—'}通</p><div className="mt-2 h-2 overflow-hidden rounded-full bg-canvas-sunken"><div className={`h-full ${quotaInsufficient ? 'bg-danger' : 'bg-accent'}`} style={{ width: quota.monthlyLimit ? `${Math.min(100, ((quota.monthlyUsed ?? 0) + quota.planned) / quota.monthlyLimit * 100)}%` : '0%' }} /></div><p className={`mt-2 text-xs font-bold ${quotaInsufficient ? 'text-danger' : 'text-success'}`}>{quotaInsufficient ? `不足 ${Math.max(0, quota.planned - (quota.remaining ?? 0)).toLocaleString('ja-JP')}通` : `残り ${quota.remaining?.toLocaleString('ja-JP') ?? '—'}通`}</p></> : <p className="mt-3 text-xs text-warning">送信枠を確認できませんでした。</p>}
             </section>
-            <section className="broadcast-line-preview rounded-card p-5 text-on-accent"><h3 className="text-center text-sm font-bold">LINEプレビュー</h3><div className="mt-4 rounded-control bg-canvas p-4 text-sm text-ink"><BubblePreview bubble={bubbles[0]} buttons={messageButtons} /></div></section>
+            <LinePreview><div className="rounded-control bg-canvas p-4 text-sm text-ink"><BubblePreview bubble={bubbles[0]} buttons={messageButtons} /></div></LinePreview>
           </div>
         ) : currentStep === 'basic' ? (
           <div className="space-y-3">
@@ -2489,13 +2482,11 @@ export default function BroadcastForm({
                 ))}
               </dl>
             </section>
-            <section className="broadcast-line-preview rounded-card p-5 text-on-accent">
-              <h3 className="text-center text-sm font-bold">LINEプレビュー</h3>
-              <p className="mx-auto mt-4 w-fit rounded-pill bg-ink/25 px-3 py-1 text-xs font-semibold">配信日時は STEP 4 で設定します</p>
-              <div className="mt-4 rounded-control bg-canvas p-4 text-sm leading-relaxed text-ink">
+            <LinePreview caption="配信日時は STEP 4 で設定します">
+              <div className="rounded-control bg-canvas p-4 text-sm leading-relaxed text-ink">
                 メッセージは STEP 3 で作成します。テンプレートや過去の配信を選ぶと、ここに内容が入ります。
               </div>
-            </section>
+            </LinePreview>
             <div className="grid grid-cols-2 gap-2">
               <Button type="button" disabled>テスト送信</Button>
               <Button type="button" disabled>配信イメージを見る</Button>
@@ -2503,17 +2494,15 @@ export default function BroadcastForm({
           </div>
         ) : currentStep === 'message' ? (
           <div className="space-y-3">
-            <section className="broadcast-line-preview rounded-card p-5 text-on-accent">
-              <h3 className="text-center text-sm font-bold">LINEプレビュー</h3>
-              <p className="mx-auto mt-4 w-fit rounded-pill bg-ink/25 px-3 py-1 text-xs font-semibold">
-                {visualQaAugustCampaign ? '2026/08/24 10:00 に届きます'
-                  : scheduledLabel ? `${scheduledLabel} に届きます`
-                  : '配信日時は STEP 4 で設定します'}
-              </p>
-              <div className="mt-4 flex flex-col gap-3 text-ink">
+            <LinePreview
+              caption={visualQaAugustCampaign ? '2026/08/24 10:00 に届きます'
+                : scheduledLabel ? `${scheduledLabel} に届きます`
+                : '配信日時は STEP 4 で設定します'}
+            >
+              <div className="flex flex-col gap-3 text-ink">
                 {bubbles.map((bubble, index) => <BubblePreview key={bubble.id} bubble={bubble} buttons={index === 0 ? messageButtons : []} />)}
               </div>
-            </section>
+            </LinePreview>
             <div className="grid grid-cols-2 gap-2">
               <Button type="button" onClick={() => void openTestDialog()}><Send size={15} aria-hidden /> テスト送信</Button>
               <Button type="button" disabled><Eye size={15} aria-hidden /> 配信イメージを見る</Button>
@@ -2521,12 +2510,9 @@ export default function BroadcastForm({
           </div>
         ) : (
           <>
-            <h3 className="mb-2 text-sm font-bold text-ink">LINEプレビュー</h3>
-            <p className="text-ink-faint mb-3 text-xs">実際のLINE表示に近い確認用プレビューです。</p>
-            <div className={`overflow-hidden rounded-[28px] border-[8px] shadow-xl ${LINE_MOCK.frame} ${LINE_MOCK.wallpaper}`}>
-              <div className={`px-4 py-2 text-center text-xs font-bold ${LINE_MOCK.bar} ${LINE_MOCK.onDark}`}>プレビュー</div>
-              <div className="flex min-h-[600px] flex-col gap-3 p-4"><p className={`mb-3 text-center text-[11px] opacity-80 ${LINE_MOCK.onDark}`}>今日</p>{bubbles.map((bubble, index) => <BubblePreview key={bubble.id} bubble={bubble} buttons={index === 0 ? messageButtons : []} />)}</div>
-            </div>
+            <LinePreview note="実際のLINE表示に近い確認用プレビューです。">
+              <div className="flex flex-col gap-3 text-ink"><p className="text-center text-micro text-ink-faint">今日</p>{bubbles.map((bubble, index) => <BubblePreview key={bubble.id} bubble={bubble} buttons={index === 0 ? messageButtons : []} />)}</div>
+            </LinePreview>
           </>
         )}
         </>
@@ -2917,7 +2903,6 @@ export default function BroadcastForm({
       .broadcast-template-row strong,
       .broadcast-template-row small { display: block; }
       .broadcast-template-row small { margin-top: 3px; color: var(--color-ink-faint); }
-      .broadcast-line-preview { background: var(--color-line-preview); min-height: 428px; }
        .broadcast-url-row { display: grid; grid-template-columns: minmax(7rem, .7fr) minmax(0, 1.4fr) 7rem; }
        .broadcast-preflight-page-open > :not(.broadcast-preflight-page) { display: none; }
       @media (min-width: 640px) {
