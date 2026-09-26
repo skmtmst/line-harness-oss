@@ -1498,6 +1498,20 @@ async function runFrequentHeavyJobs(
         }
       },
     },
+    {
+      // #838 第1段: 日次の友だちCSV書き出し。その日分は run_date の
+      // 一意制約で1回しか作らない（6時間tickのどれか1回が生成する）。
+      name: 'scheduled exports',
+      run: async () => {
+        const { processDueScheduledExports } = await import('./services/scheduled-exports.js');
+        const result = await processDueScheduledExports(env, {
+          now: new Date(event.scheduledTime).toISOString(),
+        });
+        if (result.generated + result.failed > 0) {
+          console.log(JSON.stringify({ event: 'scheduled_exports_tick', ...result }));
+        }
+      },
+    },
     { name: 'account health', run: async () => { await checkAccountHealth(env.DB); } },
     {
       name: 'broadcast insights',

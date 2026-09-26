@@ -250,6 +250,11 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
     enforcement: { mode: 'exempt', reason: '友だちの基礎集計で、外部呼び出しも機能の状態更新もしない' },
   },
   {
+    name: 'scheduled exports',
+    classification: { kind: 'core', reason: '友だちCSVの定期書き出し' },
+    enforcement: { mode: 'exempt', reason: '既存の書き出し台帳へ行を足すだけで、外部呼び出しも機能の状態更新もしない' },
+  },
+  {
     name: 'media usage scan',
     classification: { kind: 'feature', featureId: 'media' },
     enforcement: {
