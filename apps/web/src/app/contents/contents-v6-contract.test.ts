@@ -167,7 +167,8 @@ describe('V6 登録メディア一覧の契約', () => {
   it('差し替え候補も一覧の200件上限に依存しない', () => {
     expect(REPLACEMENT).toContain('excludeId: source.id')
     expect(REPLACEMENT).toContain('limit: 50')
-    expect(REPLACEMENT).toContain('candidatePage * 50 >= candidateTotal')
+    // 次へ・前へ・番号は共通の Pagination が担い、候補の総件数から頁数を数える。
+    expect(REPLACEMENT).toContain('Math.ceil(candidateTotal / 50)')
   })
 
   it('使用中メディアの強制削除口を持たない', () => {

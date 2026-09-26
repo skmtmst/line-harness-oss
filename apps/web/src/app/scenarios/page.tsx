@@ -23,6 +23,8 @@ import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Disclosure from '@/components/shared/disclosure'
 import ListState from '@/components/shared/list-state'
+import Pagination from '@/components/shared/pagination'
+import ListRange from '@/components/ui/list-range'
 import ScenarioList from '@/components/scenarios/scenario-list'
 import { ON_COMPLETE_LABEL, type OnCompleteMode } from '@/components/scenarios/scenario-dialogs'
 import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
@@ -856,14 +858,13 @@ export default function ScenariosPage() {
         />
       )}
       {scenarioList.pageCount > 1 ? (
-        <div className="mt-4 flex items-center justify-end gap-3 text-sm">
-          <Button disabled={scenarioList.page <= 1 || scenarioList.loading} onClick={() => scenarioList.setPage(scenarioList.page - 1)}>
-            前へ
-          </Button>
-          <span className="text-ink-secondary">{scenarioList.page} / {scenarioList.pageCount}ページ</span>
-          <Button disabled={scenarioList.page >= scenarioList.pageCount || scenarioList.loading} onClick={() => scenarioList.setPage(scenarioList.page + 1)}>
-            次へ
-          </Button>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+          <ListRange
+            total={scenarioList.total}
+            first={(scenarioList.page - 1) * scenarioList.limit + 1}
+            last={Math.min(scenarioList.page * scenarioList.limit, scenarioList.total)}
+          />
+          <Pagination page={scenarioList.page} pageCount={scenarioList.pageCount} onPageChange={scenarioList.setPage} />
         </div>
       ) : null}
         </div>

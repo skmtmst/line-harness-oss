@@ -13,6 +13,8 @@ import SearchField from '@/components/shared/search-field'
 import StatusBadge from '@/components/shared/status-badge'
 import SummaryCard from '@/components/shared/summary-card'
 import ListState from '@/components/shared/list-state'
+import Pagination from '@/components/shared/pagination'
+import ListRange from '@/components/ui/list-range'
 import { Tabs } from '@/components/shared/tabs'
 import { useCanManageCommonActions } from '@/components/automations/use-common-action-permission'
 import IconButton from '@/components/shared/icon-button'
@@ -343,14 +345,8 @@ export default function CommonActionsPage() {
       )}
       {!loading && !error && items.length > 0 ? (
         <div className="border-hairline flex items-center justify-between border-x border-b bg-canvas px-4 py-3 text-xs text-ink-faint">
-          <span>{total}件中 {(page - 1) * PAGE_SIZE + 1}〜{Math.min(page * PAGE_SIZE, total)}件</span>
-          <div className="flex items-center gap-3" aria-label="ページ送り">
-            <button type="button" disabled={page === 1} onClick={() => setPage((value) => Math.max(1, value - 1))} className="inline-flex min-h-6 min-w-6 items-center justify-center text-action disabled:text-ink-faint">前へ</button>
-            {Array.from({ length: Math.ceil(total / PAGE_SIZE) }, (_, index) => index + 1).map((pageNumber) => (
-              <button key={pageNumber} type="button" aria-current={pageNumber === page ? 'page' : undefined} onClick={() => setPage(pageNumber)} className={`inline-flex min-h-6 min-w-6 items-center justify-center ${pageNumber === page ? 'text-action font-bold' : 'text-ink-faint'}`}>{pageNumber}</button>
-            ))}
-            <button type="button" disabled={page * PAGE_SIZE >= total} onClick={() => setPage((value) => value + 1)} className="inline-flex min-h-6 min-w-6 items-center justify-center text-action disabled:text-ink-faint">次へ</button>
-          </div>
+          <ListRange total={total} first={(page - 1) * PAGE_SIZE + 1} last={Math.min(page * PAGE_SIZE, total)} />
+          <Pagination page={page} pageCount={Math.ceil(total / PAGE_SIZE)} onPageChange={setPage} />
         </div>
       ) : null}
     </div>

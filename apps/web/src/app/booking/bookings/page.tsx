@@ -11,6 +11,8 @@ import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
 import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import Pagination from '@/components/shared/pagination'
+import ListRange from '@/components/ui/list-range'
 import FolderPanel, { FOLDER_RAIL_WIDTH } from '@/components/shared/folder-panel'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { canOperateBookings } from '../lib/booking-permissions'
@@ -1064,26 +1066,12 @@ export default function BookingsPage() {
           </div>
 
           <div data-design="tf" className="mt-3 flex flex-wrap items-center justify-between gap-2">
-            <span className="text-ink-faint text-xs">全 {total} 件</span>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={current <= 1}
-                className="border-hairline rounded-control border px-3 py-1 text-xs disabled:opacity-40"
-              >
-                前へ
-              </button>
-              <span className="text-ink-secondary px-2 text-xs tabular-nums">
-                {current} / {pageCount}
-              </span>
-              <button
-                onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
-                disabled={current >= pageCount}
-                className="border-hairline rounded-control border px-3 py-1 text-xs disabled:opacity-40"
-              >
-                次へ
-              </button>
-            </div>
+            <ListRange
+              total={total}
+              first={(current - 1) * PAGE_SIZE + 1}
+              last={Math.min(current * PAGE_SIZE, total)}
+            />
+            <Pagination page={current} pageCount={pageCount} onPageChange={setPage} />
           </div>
         </div>
       </div>

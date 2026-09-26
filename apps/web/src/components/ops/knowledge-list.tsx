@@ -11,6 +11,8 @@ import Chip from '@/components/shared/chip'
 import ListState from '@/components/shared/list-state'
 import SelectField from '@/components/shared/select-field'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import Pagination from '@/components/shared/pagination'
+import ListRange from '@/components/ui/list-range'
 import { TextField } from '@/components/shared/text-field'
 import styles from '@/components/ops/knowledge.module.css'
 
@@ -97,11 +99,10 @@ export default function KnowledgeList() {
           </Tr>
         })}</tbody>
       </DataTable>}
-    {loaded && !error && total > 50 && <nav className={styles.pagination} aria-label="ページ切り替え">
-      <Button disabled={offset === 0} onClick={() => setOffset(v => Math.max(0, v - 50))}>前へ</Button>
-      <span>{offset + 1}–{Math.min(offset + 50, total)} / {total}件</span>
-      <Button disabled={offset + 50 >= total} onClick={() => setOffset(v => v + 50)}>次へ</Button>
-    </nav>}
+    {loaded && !error && total > 50 && <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+      <ListRange total={total} first={offset + 1} last={Math.min(offset + 50, total)} />
+      <Pagination page={Math.floor(offset / 50) + 1} pageCount={Math.ceil(total / 50)} onPageChange={(next) => setOffset((next - 1) * 50)} />
+    </div>}
     {editing && <KnowledgeEditor key={editing.id} article={editing} onClose={() => setEditing(null)} onSaved={() => void load()} />}
   </div>
 }
