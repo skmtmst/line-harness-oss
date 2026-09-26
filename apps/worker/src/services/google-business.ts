@@ -128,12 +128,14 @@ export function buildAuthorizeUrl(input: {
   state: string;
   codeChallenge: string;
   loginHint?: string | null;
+  /** 省略時は Googleビジネス用。Sheets 連携など別スコープで使うときに渡す。 */
+  scopes?: readonly string[];
 }): string {
   const url = new URL(AUTHORIZE_URL);
   url.searchParams.set('client_id', input.clientId);
   url.searchParams.set('redirect_uri', input.redirectUri);
   url.searchParams.set('response_type', 'code');
-  url.searchParams.set('scope', GOOGLE_BUSINESS_SCOPES.join(' '));
+  url.searchParams.set('scope', (input.scopes ?? GOOGLE_BUSINESS_SCOPES).join(' '));
   url.searchParams.set('state', input.state);
   url.searchParams.set('code_challenge', input.codeChallenge);
   url.searchParams.set('code_challenge_method', 'S256');
