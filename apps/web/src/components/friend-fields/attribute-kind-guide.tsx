@@ -39,14 +39,14 @@ const KIND_GUIDE: Record<AttributeKind, KindGuide> = {
     holds: '誕生日・会員番号など友だちごとの値',
     useWhen: '型を決めて値を保存し、テンプレートに差し込みたい',
     createHref: '/tags/fields/new',
-    createLabel: '項目を追加',
+    createLabel: '項目を作る',
   },
   mark: {
     label: '対応マーク',
     holds: '要確認・対応中など問い合わせ対応の状態',
     useWhen: '受信箱・一覧で対応の進み具合を色で管理したい',
     createHref: '/tags/marks/new',
-    createLabel: 'マークを追加',
+    createLabel: 'マークを作る',
   },
   search: {
     label: '保存した検索',
