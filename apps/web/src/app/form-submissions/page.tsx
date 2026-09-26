@@ -550,14 +550,12 @@ export default function FormSubmissionsPage() {
               </FilterChip>
             ))}
             <span className="ml-auto">
-              <Button
-                type="button"
-                variant={reviewMode ? 'primary' : 'secondary'}
-                aria-pressed={reviewMode}
-                onClick={() => { setReviewMode((mode) => !mode); setPage(1) }}
+              <FilterChip
+                selected={reviewMode}
+                onChange={(next) => { setReviewMode(next); setPage(1) }}
               >
                 {reviewMode ? '通常の一覧に戻る' : '管理者確認（担当未割り当て）'}
-              </Button>
+              </FilterChip>
             </span>
           </div>
           {reviewMode && (
