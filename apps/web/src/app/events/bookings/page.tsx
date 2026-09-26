@@ -16,6 +16,7 @@ import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-ba
 import { ActionCell, DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 // #740: 一覧の Kpi と一字一句同じだったため、機能内共有の1部品へ統合した。
 import EventKpi from '@/components/events/event-kpi'
+import { parseEventQuestions } from '@/components/events/event-questions-editor'
 import {
   api,
   eventsApi,
@@ -330,6 +331,9 @@ function BookingsInner() {
   const eventId = params.get('id')
   const { selectedAccountId, accounts } = useAccount()
   const [event, setEvent] = useState<EventDetail | null>(null)
+  // #841: 回答に質問文を付けるための定義。Workerは questions_json の
+  // 文字列で返すのでここでほぐす。未取得なら回答はid表記になる。
+  const eventQuestions = parseEventQuestions(event?.questions_json)
   const [items, setItems] = useState<EventBookingItem[]>([])
   const [bookingsTotal, setBookingsTotal] = useState(0)
   const [summary, setSummary] = useState<EventBookingSummary | null>(null)
@@ -1144,6 +1148,34 @@ function BookingsInner() {
                       <td className="text-ink px-4 py-3">
                         <span className="block font-medium">{friendName ?? '友だちは未取得'}</span>
                         <span className="text-ink-faint mt-0.5 block text-xs">{accountLabel}</span>
+                        {/* #841: 申込時の質問への回答。質問文はイベントの
+                            定義から引き、消えた質問はidのまま出す。 */}
+                        {(() => {
+                          const raw = b.answer_snapshot_json
+                          if (!raw) return null
+                          let map: Record<string, unknown>
+                          try { map = JSON.parse(raw) } catch { return null }
+                          const entries = Object.entries(map)
+                          if (entries.length === 0) return null
+                          const labelOf = new Map(
+                            (eventQuestions ?? []).map((q) => [q.id, q.label]),
+                          )
+                          return (
+                            <dl className="text-ink-faint mt-1 space-y-0.5 text-xs">
+                              {entries.map(([qid, ans]) => (
+                                <div key={qid}>
+                                  <dt className="inline font-medium">{labelOf.get(qid) ?? qid}：</dt>
+                                  <dd className="inline">
+                                    {Array.isArray(ans) ? ans.join('、') : String(ans)}
+                                  </dd>
+                                </div>
+                              ))}
+                            </dl>
+                          )
+                        })()}
+                        {b.customer_note ? (
+                          <p className="text-ink-faint mt-1 text-xs">備考：{b.customer_note}</p>
+                        ) : null}
                       </td>
                       <td className="text-ink-secondary px-4 py-3 text-xs">
                         {formatJp(b.requested_at ?? b.created_at, '受付日時は未取得')}

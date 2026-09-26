@@ -185,6 +185,110 @@ function serializeAnswerSnapshot(value: unknown): { ok: true; json: string | nul
   }
 }
 
+// ----------------------------------------------------------------
+// 申込時のカスタム質問 (#841)
+// events.questions_json に定義、event_bookings.answer_snapshot_json に
+// {質問id: 回答} として保存する。id が変わると過去の回答と紐付かなくなるので、
+// 画面が送ってきた id はそのまま採用し、無い分だけ連番で補う。
+// ----------------------------------------------------------------
+
+const EVENT_QUESTION_TYPES = new Set(['text', 'textarea', 'radio', 'checkbox']);
+const EVENT_QUESTIONS_MAX = 10;
+const EVENT_QUESTION_LABEL_MAX = 100;
+const EVENT_QUESTION_OPTIONS_MAX = 20;
+const EVENT_QUESTION_OPTION_MAX = 100;
+
+export interface EventQuestion {
+  id: string;
+  label: string;
+  type: 'text' | 'textarea' | 'radio' | 'checkbox';
+  required: boolean;
+  options: string[] | null;
+}
+
+function normalizeEventQuestions(
+  value: unknown,
+): { ok: true; questions: EventQuestion[] } | { ok: false; code: string } {
+  if (value == null) return { ok: true, questions: [] };
+  if (!Array.isArray(value) || value.length > EVENT_QUESTIONS_MAX) {
+    return { ok: false, code: 'invalid_questions' };
+  }
+  const used = new Set<string>();
+  const out: EventQuestion[] = [];
+  for (const [i, raw] of value.entries()) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+      return { ok: false, code: 'invalid_questions' };
+    }
+    const q = raw as Record<string, unknown>;
+    const label = typeof q.label === 'string' ? q.label.trim() : '';
+    if (!label || label.length > EVENT_QUESTION_LABEL_MAX) {
+      return { ok: false, code: 'invalid_questions' };
+    }
+    const type = String(q.type ?? '');
+    if (!EVENT_QUESTION_TYPES.has(type)) {
+      return { ok: false, code: 'invalid_questions' };
+    }
+    let options: string[] | null = null;
+    if (type === 'radio' || type === 'checkbox') {
+      if (!Array.isArray(q.options) || q.options.length === 0
+          || q.options.length > EVENT_QUESTION_OPTIONS_MAX
+          || !q.options.every((o) => typeof o === 'string' && o.trim().length > 0 && o.length <= EVENT_QUESTION_OPTION_MAX)) {
+        return { ok: false, code: 'invalid_questions' };
+      }
+      options = (q.options as string[]).map((o) => o.trim());
+    }
+    const id = typeof q.id === 'string' && /^[a-zA-Z0-9_-]{1,64}$/.test(q.id)
+      ? q.id
+      : `q${i + 1}`;
+    if (used.has(id)) return { ok: false, code: 'invalid_questions' };
+    used.add(id);
+    out.push({ id, label, type: type as EventQuestion['type'], required: q.required === true, options });
+  }
+  return { ok: true, questions: out };
+}
+
+function parseEventQuestions(json: unknown): EventQuestion[] {
+  if (typeof json !== 'string' || !json) return [];
+  try {
+    const parsed = JSON.parse(json);
+    const n = normalizeEventQuestions(parsed);
+    return n.ok ? n.questions : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * 必須質問への回答が揃っているか。回答の形は「質問id → 文字列(単一選択)・
+ * 文字列配列(複数選択)」。定義に無い質問idへの回答は保存だけして無視する
+ * (公開中に質問を編集された場合のずれを許容するため)。
+ */
+function validateEventAnswers(
+  questions: EventQuestion[],
+  answers: unknown,
+): boolean {
+  if (questions.length === 0) return true;
+  if (answers == null) {
+    return questions.every((q) => !q.required);
+  }
+  if (typeof answers !== 'object' || Array.isArray(answers)) return false;
+  const map = answers as Record<string, unknown>;
+  for (const q of questions) {
+    const a = map[q.id];
+    const empty = a == null
+      || (typeof a === 'string' && a.trim() === '')
+      || (Array.isArray(a) && a.length === 0);
+    if (q.required && empty) return false;
+    if (empty) continue;
+    if (q.type === 'checkbox') {
+      if (!Array.isArray(a) || !a.every((x) => typeof x === 'string')) return false;
+    } else if (typeof a !== 'string') {
+      return false;
+    }
+  }
+  return true;
+}
+
 async function resolveAccountIdFromLiff(c: Context<Env>): Promise<string | null> {
   const liffId = c.req.query('liffId');
   if (!liffId) return null;
@@ -302,6 +406,10 @@ function validateEventInput(
       }
     }
   }
+  if (has('questions') && body.questions != null) {
+    const q = normalizeEventQuestions(body.questions);
+    if (!q.ok) return { ok: false, code: q.code };
+  }
   return { ok: true };
 }
 
@@ -353,8 +461,9 @@ events.post('/api/events/admin/events', requireRole('owner', 'admin'), async (c)
          confirmation_message_extra, reminder_message_extra,
          og_title, og_description, og_image_url,
          visible_tag_id, waitlist_enabled, entry_cutoff_hours_before,
+         questions_json,
          current_published_version_id
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -384,6 +493,8 @@ events.post('/api/events/admin/events', requireRole('owner', 'admin'), async (c)
       (body.visible_tag_id as string | null | undefined) ?? null,
       (body.waitlist_enabled as number | undefined) ?? 0,
       (body.entry_cutoff_hours_before as number | null | undefined) ?? null,
+      // validateEventInput で形は検証済み。id未指定の分だけここで連番を補う。
+      body.questions == null ? null : JSON.stringify((normalizeEventQuestions(body.questions) as { questions: EventQuestion[] }).questions),
       publishedVersionId,
     );
   if (publishedVersionId) {
@@ -605,6 +716,16 @@ events.put('/api/events/admin/events/:id', requireRole('owner', 'admin'), async 
   if (Object.prototype.hasOwnProperty.call(body, 'dedup_priority')) {
     setClauses.push('dedup_priority = ?');
     setValues.push(body.dedup_priority == null ? null : JSON.stringify(body.dedup_priority));
+  }
+  // 質問の定義は questions_json 列に正規化して保存する(account_ids と同じ
+  // JSON 列の扱い)。null を送ると定義ごと消える。
+  if (Object.prototype.hasOwnProperty.call(body, 'questions')) {
+    setClauses.push('questions_json = ?');
+    setValues.push(
+      body.questions == null
+        ? null
+        : JSON.stringify((normalizeEventQuestions(body.questions) as { questions: EventQuestion[] }).questions),
+    );
   }
   // multi-account-dedup に切り替わったら line_account_id sentinel を account_ids[0] に合わせる
   if (body.target_type === 'multi-account-dedup' && Array.isArray(body.account_ids) && (body.account_ids as string[]).length > 0) {
@@ -1630,7 +1751,9 @@ events.get('/api/liff/events/:id', async (c) => {
     if (!me) return bad(c, 'not_found', 404);
   }
 
-  return c.json({ ...row, my_existing_booking: myExistingBooking });
+  // questions_json は生JSON文字列のまま返すと利用側で二重parseになるので、
+  // 画面がそのまま使える配列として添える（定義が無ければ空配列）。
+  return c.json({ ...row, questions: parseEventQuestions(row.questions_json), my_existing_booking: myExistingBooking });
 });
 
 events.get('/api/liff/events/:id/slots', async (c) => {
@@ -1676,6 +1799,8 @@ interface EventDbRow {
   waitlist_enabled: number;
   /** 申込の締め切り（開始の何時間前まで）。null なら開始まで受ける */
   entry_cutoff_hours_before: number | null;
+  /** 申込時のカスタム質問定義 (#841)。未設定なら NULL。 */
+  questions_json: string | null;
 }
 
 interface SlotDbRow {
@@ -1875,7 +2000,8 @@ events.post('/api/liff/events/:id/bookings', async (c) => {
               requires_approval, approval_deadline_hours, current_published_version_id,
               max_bookings_per_friend,
               reminder_day_before_enabled, reminder_hours_before,
-              visible_tag_id, waitlist_enabled, entry_cutoff_hours_before
+              visible_tag_id, waitlist_enabled, entry_cutoff_hours_before,
+              questions_json
          FROM events
         WHERE id = ? AND deleted_at IS NULL AND is_published = 1 AND (
           (target_type = 'single' AND line_account_id = ?)
@@ -1908,6 +2034,11 @@ events.post('/api/liff/events/:id/bookings', async (c) => {
   const partySize = requestedPartySize as number;
   const answerSnapshot = serializeAnswerSnapshot(body.answers);
   if (!answerSnapshot.ok) return finalize(422, { error: 'invalid_answers' });
+  // 必須の質問に答えていない申込は受け付けない。定義に無いidへの回答は
+  // 編集途中のずれとして許容し、保存だけする。
+  if (!validateEventAnswers(parseEventQuestions(event.questions_json), body.answers)) {
+    return finalize(422, { error: 'missing_required_answers' });
+  }
   const firstParticipationCheckedAt = new Date().toISOString();
   const attended = await c.env.DB
     .prepare(

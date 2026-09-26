@@ -15,6 +15,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
 import { Field, TextInput } from '@/components/shared/form-controls'
+import EventQuestionsEditor, { parseEventQuestions } from '@/components/events/event-questions-editor'
 import DateField from '@/components/shared/date-field'
 import { TimeField } from '@/components/shared/date-time-field'
 // #740: 下書きの初期値と字数上限は作成画面と共有する。片方だけ変えないこと。
@@ -142,7 +143,9 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
           eventsApi.listSlots(accountId, eventId),
         ])
         if (cancelled) return
-        setDraft(ev)
+        // Worker は質問定義を questions_json の文字列で返す。フォームは
+        // 配列で触るので、ここでほぐしてから draft に載せる。
+        setDraft({ ...ev, questions: parseEventQuestions(ev.questions_json) })
         setSlots(slotsRes.items)
       } catch (e) {
         // 生の `API error: 404` を主文にしない。消えたものと通信の失敗を言い分ける。
@@ -223,6 +226,9 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
         account_ids: targetType === 'multi-account-dedup'
           ? (accountIdsArr as unknown as EventDetail['account_ids'])
           : null,
+        // 申込時の質問 (#841)。配列のまま送り、Worker が questions_json に
+        // 正規化して保存する。null を送ると定義ごと消える。
+        questions: draft.questions ?? null,
       }
       if (eventId) {
         const updated = await eventsApi.updateEvent(accountId, eventId, payload, draft.version ?? 1)
@@ -584,6 +590,17 @@ function OverviewTab({
           詳細を中央揃えで表示
         </label>
       </div>
+      <div className="border-t border-hairline pt-5">
+        <div className="text-sm font-medium text-ink mb-1">申し込みのときに聞くこと</div>
+        <p className="text-xs text-ink-secondary mb-3">
+          予約フォームに質問を追加できます。回答は申込の一覧で確認できます。
+        </p>
+        <EventQuestionsEditor
+          questions={draft.questions ?? []}
+          onChange={(next) => update('questions', next)}
+        />
+      </div>
+
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1.5">
           1 人あたり予約回数

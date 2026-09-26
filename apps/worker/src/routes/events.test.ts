@@ -1010,8 +1010,9 @@ function makeEventDb(state: {
               target_type: target_type as 'single' | 'multi-account-dedup',
               account_ids,
               dedup_priority,
+              questions_json: (bound[27] as string | null) ?? null,
               version: 1,
-              current_published_version_id: (bound[27] as string | null) ?? null,
+              current_published_version_id: (bound[28] as string | null) ?? null,
             });
             return { success: true, meta: { changes: 1 } };
           }
@@ -3343,5 +3344,162 @@ describe('094 公開対象・申込締切・キャンセル待ち', () => {
     const res = await book(setupApp(state));
     expect(res.status).toBe(409);
     await expect(res.json()).resolves.toEqual({ error: 'slot_full' });
+  });
+});
+
+describe('イベント申込のカスタム質問 (#841)', () => {
+  const account = { id: 'la1', liff_id: 'L1', is_active: 1, channel_access_token: 'tok' };
+  const friend = { id: 'f1', line_account_id: 'la1', line_user_id: 'U1' };
+  const futureSlot = {
+    id: 's1',
+    event_id: 'e1',
+    starts_at: '2099-06-01T10:00:00Z',
+    ends_at: '2099-06-01T12:00:00Z',
+    capacity: 5,
+    is_active: 1,
+    sort_order: 0,
+    deleted_at: null,
+  };
+  function book(app: ReturnType<typeof setupApp>, body: Record<string, unknown>) {
+    return app.request('/api/liff/events/e1/bookings?liffId=L1', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'Idempotency-Key': 'k1',
+        Authorization: 'Bearer t',
+      },
+      body: JSON.stringify(body),
+    });
+  }
+
+  test('作成時に質問を保存し、id未指定には連番を補う', async () => {
+    const state = { events: [] as EventRow[] };
+    const app = setupApp(state);
+    const res = await app.request('/api/events/admin/events?account_id=la1', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        name: 'X',
+        questions: [
+          { label: 'アレルギーはありますか', type: 'text', required: true },
+          { id: 'kind', label: '参加区分', type: 'radio', required: false, options: ['会場', 'オンライン'] },
+        ],
+      }),
+    });
+    expect(res.status).toBe(201);
+    const stored = JSON.parse(state.events[0].questions_json as string) as Array<Record<string, unknown>>;
+    expect(stored).toEqual([
+      { id: 'q1', label: 'アレルギーはありますか', type: 'text', required: true, options: null },
+      { id: 'kind', label: '参加区分', type: 'radio', required: false, options: ['会場', 'オンライン'] },
+    ]);
+  });
+
+  test('不正な質問定義は 422 invalid_questions', async () => {
+    for (const questions of [
+      'not-an-array',
+      [{ label: '', type: 'text' }],
+      [{ label: 'X', type: 'date' }],
+      [{ label: 'X', type: 'radio' }],
+      [{ label: 'X', type: 'radio', options: [] }],
+      Array.from({ length: 11 }, (_, i) => ({ label: `Q${i}`, type: 'text' })),
+      [{ id: 'same', label: 'A', type: 'text' }, { id: 'same', label: 'B', type: 'text' }],
+    ]) {
+      const app = setupApp({ events: [] });
+      const res = await app.request('/api/events/admin/events?account_id=la1', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ name: 'X', questions }),
+      });
+      expect(res.status).toBe(422);
+      expect((await res.json()) as { error: string }).toEqual({ error: 'invalid_questions' });
+    }
+  });
+
+  test('更新で質問を差し替えられる', async () => {
+    const state = {
+      events: [baseEvent({ id: 'e1', questions_json: null })],
+    };
+    const app = setupApp(state);
+    const res = await app.request('/api/events/admin/events/e1?account_id=la1', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        expected_version: 1,
+        questions: [{ label: '同伴者', type: 'checkbox', required: false, options: ['犬', '猫'] }],
+      }),
+    });
+    expect(res.status).toBe(200);
+    const saved = JSON.parse(state.events[0].questions_json as string) as Array<Record<string, unknown>>;
+    expect(saved[0]).toMatchObject({ label: '同伴者', type: 'checkbox', options: ['犬', '猫'] });
+  });
+
+  test('LIFF詳細は質問を配列で返す', async () => {
+    const state = {
+      events: [baseEvent({
+        id: 'e1',
+        is_published: 1,
+        questions_json: JSON.stringify([{ id: 'q1', label: '人数', type: 'text', required: true, options: null }]),
+      })],
+      accounts: [account],
+    };
+    const app = setupApp(state);
+    const res = await app.request('/api/liff/events/e1?liffId=L1');
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { questions: unknown[] };
+    expect(body.questions).toEqual([
+      { id: 'q1', label: '人数', type: 'text', required: true, options: null },
+    ]);
+  });
+
+  test('必須質問への回答が無い申込は 422 missing_required_answers', async () => {
+    const state = {
+      events: [baseEvent({
+        id: 'e1',
+        is_published: 1,
+        questions_json: JSON.stringify([
+          { id: 'q1', label: 'アレルギー', type: 'text', required: true, options: null },
+          { id: 'q2', label: '希望', type: 'checkbox', required: false, options: ['A', 'B'] },
+        ]),
+      })],
+      slots: [futureSlot],
+      bookings: [],
+      accounts: [account],
+      friends: [friend],
+    };
+    liffAuthMocks.verifyCallerLineUserId.mockResolvedValue('U1');
+    idempotencyMocks.reserveEventIdempotency.mockResolvedValue({ kind: 'inserted' });
+    const app = setupApp(state);
+    const res = await book(app, { slot_id: 's1', answers: { q2: ['A'] } });
+    expect(res.status).toBe(422);
+    expect((await res.json()) as { error: string }).toEqual({ error: 'missing_required_answers' });
+    expect(state.bookings).toHaveLength(0);
+  });
+
+  test('回答は質問idをキーに保存される', async () => {
+    const state = {
+      events: [baseEvent({
+        id: 'e1',
+        is_published: 1,
+        questions_json: JSON.stringify([
+          { id: 'q1', label: 'アレルギー', type: 'text', required: true, options: null },
+          { id: 'q2', label: '希望', type: 'checkbox', required: false, options: ['A', 'B'] },
+        ]),
+      })],
+      slots: [futureSlot],
+      bookings: [] as BookingRow[],
+      accounts: [account],
+      friends: [friend],
+    };
+    liffAuthMocks.verifyCallerLineUserId.mockResolvedValue('U1');
+    idempotencyMocks.reserveEventIdempotency.mockResolvedValue({ kind: 'inserted' });
+    const app = setupApp(state);
+    const res = await book(app, {
+      slot_id: 's1',
+      answers: { q1: 'なし', q2: ['A', 'B'] },
+    });
+    expect(res.status).toBe(201);
+    expect(state.bookings[0].answer_snapshot_json).toBe(
+      JSON.stringify({ q1: 'なし', q2: ['A', 'B'] }),
+    );
   });
 });
