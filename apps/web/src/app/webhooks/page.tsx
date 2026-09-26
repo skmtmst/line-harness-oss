@@ -572,10 +572,10 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
         <div className="flex flex-wrap items-center gap-2">
           {tab === 'incoming' ? (
             <Button variant="primary" onClick={() => setShowCreate(!showCreate)}>
-              {showCreate ? 'キャンセル' : '受け取り口を追加'}
+              {showCreate ? 'キャンセル' : '＋ 受け取り口を作る'}
             </Button>
           ) : (
-            <Button variant="primary" href="/webhooks/new">送り先を追加</Button>
+            <Button variant="primary" href="/webhooks/new">＋ 送り先を作る</Button>
           )}
         </div>
         <Button variant="secondary" href="/webhooks?tab=notify">見本から作る</Button>
@@ -729,7 +729,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
       {/* Create forms */}
       {showCreate && tab === 'incoming' && (
         <form onSubmit={handleCreateIncoming} className="bg-canvas rounded-lg border border-hairline p-6 mb-6">
-          <h3 className="text-sm font-semibold text-ink mb-4">受け取る設定を追加</h3>
+          <h3 className="text-sm font-semibold text-ink mb-4">受け取る設定を作る</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-ink-secondary mb-1">名前</label>
