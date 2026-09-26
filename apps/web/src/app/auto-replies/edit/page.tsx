@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { api } from '@/lib/api'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import StepTrail, { type StepTrailItem } from '@/components/shared/step-trail'
+import Stepper, { type StepperStep } from '@/components/shared/stepper'
 import EditDialog, { toVersionDraft, type AutoReplyDraft } from '@/components/auto-replies/edit-dialog'
 import './issue481-height.css'
 
@@ -122,10 +122,10 @@ function AutoReplyEditInner() {
         </div>
       ) : draft ? (
         <>
-        <StepTrail
+        <Stepper
           label="自動応答を作る進み方"
-          items={STEP_LABELS.map(
-            (label, index): StepTrailItem => ({
+          steps={STEP_LABELS.map(
+            (label, index): StepperStep => ({
               label,
               state: index < currentStep ? 'done' : index === currentStep ? 'current' : 'todo',
             }),

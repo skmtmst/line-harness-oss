@@ -10,6 +10,7 @@ import type {
 import Button from '@/components/shared/button'
 import Card, { CardHeader } from '@/components/shared/card'
 import ListState from '@/components/shared/list-state'
+import Stepper from '@/components/shared/stepper'
 import TargetMissing from '@/components/shared/target-missing'
 import PageHeader from '@/components/shared/page-header'
 import { api, ApiError, type FriendAddRule } from '@/lib/api'
@@ -76,28 +77,6 @@ function routingVersionOf(rule: FriendAddRule): FriendAddRoutingVersion {
  * **どこまで済んでいるかが読めないと、戻ってよいのか分からない。**
  * 共通の部品はこの枝に無いので、この画面のぶんだけ置く。
  */
-function StepTrail({ steps, current, complete = false }: { steps: string[]; current: number; complete?: boolean }) {
-  return (
-    <ol className={styles.steps} aria-label="設定の進み">
-      {steps.map((label, index) => {
-        const done = complete || index + 1 < current
-        const now = !complete && index + 1 === current
-        return (
-          <li key={label} className={styles.step} aria-current={now ? 'step' : undefined}>
-            <span className={`${styles.stepMark} ${done ? styles.stepDone : now ? styles.stepNow : ''}`}>
-              {done ? '✓' : index + 1}
-            </span>
-            <span className={styles.stepText}>
-              <span className={styles.stepNo}>STEP {index + 1}</span>
-              <span className={styles.stepLabel}>{label}</span>
-            </span>
-          </li>
-        )
-      })}
-    </ol>
-  )
-}
-
 function FriendAddPublishInner() {
   const searchParams = useSearchParams()
   const { selectedAccountId } = useAccount()
@@ -328,7 +307,7 @@ function FriendAddPublishInner() {
         title="友だち追加時・最終確認"
         description="有効化すると、新しく追加された友だちへ初回案内を送ります。"
       />
-      <StepTrail steps={STEPS} current={5} />
+      <Stepper label="設定の進み" steps={STEPS.map((label, index) => ({ label, state: index + 1 < 5 ? 'done' as const : 'current' as const }))} />
 
       <div className={styles.split}>
         <div className={styles.main}>
@@ -488,7 +467,7 @@ function PublishedView({ result, detail, accountId }: { result: FriendAddRouting
         title="友だち追加時・有効化完了"
         description="新しく追加された友だちへ、流入経路に合った初回案内を自動で送ります。"
       />
-      <StepTrail steps={STEPS} current={5} complete />
+      <Stepper label="設定の進み" steps={STEPS.map((label) => ({ label, state: 'done' as const }))} />
 
       <div className={styles.split}>
         <Card layout="vertical" className={styles.section} data-friend-add-part="done">

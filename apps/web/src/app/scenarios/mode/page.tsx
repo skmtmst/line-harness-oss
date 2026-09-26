@@ -1,6 +1,6 @@
 'use client'
 
-import StepTrail from '@/components/shared/step-trail'
+import Stepper from '@/components/shared/stepper'
 import { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -277,9 +277,9 @@ function ScenarioModeContent() {
         </Link>
       </div>
 
-      <StepTrail
+      <Stepper
         label="シナリオ作成の進み方"
-        items={[
+        steps={[
           // id なしは「これから作る」。名前と方式をこの画面でまとめて決める。
           { label: 'シナリオ情報', state: id ? 'done' : 'current' },
           { label: '配信方式', state: 'current' },

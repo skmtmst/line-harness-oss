@@ -30,6 +30,6 @@ describe('配信作成の手順表示（#973 U048）', () => {
 
   it('広い幅ではこれまでどおり5段の帯を共通部品で出す', () => {
     expect(RAIL).toContain('hidden sm:block')
-    expect(RAIL).toContain('<StepRail steps={steps} ariaLabel="配信作成の進み" />')
+    expect(RAIL).toContain('<Stepper label="配信作成の進み" steps={steps} />')
   })
 })

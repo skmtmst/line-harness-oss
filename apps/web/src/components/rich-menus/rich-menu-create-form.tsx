@@ -4,7 +4,7 @@ import { useMemo, useState, type ReactNode } from 'react'
 import Button from '@/components/shared/button'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import SelectField from '@/components/shared/select-field'
-import StepTrail from '@/components/shared/step-trail'
+import Stepper from '@/components/shared/stepper'
 import ConditionBuilder from '@/components/shared/condition-builder'
 import { AreaProperties } from './area-properties'
 import type { Area } from './canvas-editor'
@@ -230,7 +230,7 @@ export default function RichMenuCreateForm({
         <p>リッチメニューを作る</p>
         <p>名前と土台のレイアウトを決めます。画像とタップ領域は、作成後の編集画面で設定します。</p>
       </section>
-      <StepTrail label="リッチメニュー作成の進み方" items={[{ label: '形とボタン', state: 'current' }, { label: '誰に出すか', state: 'todo' }, { label: '公開のしかた', state: 'todo' }]} />
+      <Stepper label="リッチメニュー作成の進み方" steps={[{ label: '形とボタン', state: 'current' }, { label: '誰に出すか', state: 'todo' }, { label: '公開のしかた', state: 'todo' }]} />
       {compatibilityError || validationError ? <div role="alert" className="border-danger bg-danger-bg text-danger mt-4 rounded-control border p-3 text-sm">{compatibilityError ?? validationError}</div> : null}
       <div className="mt-4 grid items-start gap-4 lg:grid-cols-4">
         <div className="border-hairline bg-canvas rounded-card min-w-0 space-y-4 border p-4 shadow-sm lg:col-span-3">

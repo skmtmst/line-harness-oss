@@ -573,7 +573,7 @@ export default function EditDialog({
       }}
     >
       {/*
-       * 手順表示（StepTrail）は edit/page.tsx が出す。
+       * 手順表示（Stepper）は edit/page.tsx が出す。
        * この窓は一覧のダイアログとページの両方で使うため、ここに置くと
        * 手順の無い一覧にも Steps の節が混入する。
        */}

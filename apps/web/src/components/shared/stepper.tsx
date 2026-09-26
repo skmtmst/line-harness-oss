@@ -8,12 +8,13 @@ export type StepperState = 'done' | 'current' | 'todo'
 export type StepState = StepperState
 
 export interface StepperStep {
-  key: string
+  /** 省略時は label を使う。同名の段が並ぶときだけ付ける。 */
+  key?: string
   label: string
-  /** 1始まりの表示番号。 */
-  order: number
+  /** 1始まりの表示番号。省略時は上からの順番。 */
+  order?: number
   state: StepperState
-  /** 押したときに飛ぶ節の id（StepRail 互換）。済みの段だけに付ける。 */
+  /** 押したときに飛ぶ節の id。済みの段だけに付ける。 */
   anchor?: string
   /** anchor の代わりに押したときの動き。済みの段だけに付ける。 */
   onSelect?: () => void
@@ -39,7 +40,8 @@ export default function Stepper({
   return (
     <nav aria-label={label} className="border-hairline bg-canvas rounded-card mb-4 border p-4">
       <ol data-design="Steps" aria-label={label} className="flex flex-wrap items-center gap-y-3">
-        {steps.map((step, index) => {
+        {steps.map((raw, index) => {
+          const step = { ...raw, key: raw.key ?? raw.label, order: raw.order ?? index + 1 }
           const clickable = step.state === 'done' && (step.anchor || step.onSelect)
           const circle = (
             <span
