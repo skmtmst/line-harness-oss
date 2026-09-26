@@ -596,15 +596,15 @@ export default function AutomationsPage() {
       <div className="mb-4">
         <MergedTabs basePath="/automations" paramName="tab" tabs={tabs} active={tab} />
       </div>
+      {/*
+        作る操作は数字のカードの下・一覧のすぐ上の左にそろえる。
+        見出しの行の右端には、たまに使う「共通アクションを見る」
+        「マニュアル」だけを残す。
+      */}
       <div data-design="Head" className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="text-sm text-ink-faint">自動化 ＞ オートメーション</p>
-          {/* 普段使う作る操作は左の並びへ。右上には置かない。 */}
-          {canManageAutomations ? <Button href="/automations/new" variant="primary">＋ ルールを作る</Button> : null}
-        </div>
+        <p className="text-sm text-ink-faint">自動化 ＞ オートメーション</p>
         <div className="flex flex-wrap gap-2">
           <Button href="/common-actions">共通アクションを見る</Button>
-          <Button href="/automations?tab=templates">見本から作る</Button>
           {/* 作成は owner/admin だけ。閲覧のみには出さず、下で理由を出す（N-361）。 */}
           <Button href="/support">マニュアル</Button>
         </div>
@@ -648,6 +648,15 @@ export default function AutomationsPage() {
       <Disclosure size="compact" title="動く順番の見方" hint="上から順に確認" className="mb-4">
         <p>上から順に見て、当てはまったものが動きます。同じきっかけで2本が当てはまると両方が動くため、片方だけにしたいときは条件をずらしてください。</p>
       </Disclosure>
+
+      {/*
+        作る操作は数字のカードの下・一覧のすぐ上の左。
+        「見本から作る」も作る操作なので同じ並びの副ボタンへ。
+      */}
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        {canManageAutomations ? <Button href="/automations/new" variant="primary">＋ ルールを作る</Button> : null}
+        <Button href="/automations?tab=templates">見本から作る</Button>
+      </div>
 
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <input

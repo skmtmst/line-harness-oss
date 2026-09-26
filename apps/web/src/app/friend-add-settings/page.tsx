@@ -221,11 +221,10 @@ function FriendAddSettingsList() {
   return (
     <div data-design-node="uLQQc" className="text-ink min-w-0">
       {/*
-        作る操作は一覧のすぐ上の左。たまに見る実行結果は同じ行の右。
-        見出しの行の右端には置かない。
+        作る操作は数字のカードの下・一覧のすぐ上の左。
+        たまに見る実行結果は見出しの行の右端に残す。
       */}
-      <div data-design="Head" className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <Button href="/friend-add-settings?view=new" variant="primary">＋ 初回案内を作る</Button>
+      <div data-design="Head" className="mb-4 flex flex-wrap items-center justify-end gap-2">
         <Button href="/friend-add-settings/runs">実行結果を見る</Button>
       </div>
 
@@ -244,6 +243,11 @@ function FriendAddSettingsList() {
         <SummaryCard title="送信成功" value={data?.summary.delivered ?? null} unit="通" detail={successRate(data?.summary.delivered ?? null, data?.summary.failed ?? null)} variant="v6" />
         <SummaryCard title="経路が分からなかった人" value={data?.summary.unknownRoute ?? null} unit="人" detail="共通の案内が動いた" badge={(data?.summary.unknownRoute ?? 0) > 0 ? '要確認' : undefined} badgeTone="warning" variant="v6" />
       </section>
+
+      {/* 作る操作は数字のカードの下・一覧のすぐ上の左。 */}
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <Button href="/friend-add-settings?view=new" variant="primary">＋ 初回案内を作る</Button>
+      </div>
 
       {/*
         #972: 390pxでは2つの切替タブが右へはみ出し、下の表の見出しも
