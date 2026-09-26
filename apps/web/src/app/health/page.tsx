@@ -229,7 +229,7 @@ export default function HealthPage() {
           <p className="text-xs text-ink-faint">先にアカウント管理からLINEアカウントを登録してください</p>
         </div>
       ) : (
-        <>
+        <div className="flex flex-col gap-4">
           {/* Account Health Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {accounts.map((account) => {
@@ -348,7 +348,7 @@ export default function HealthPage() {
 
           {/* Migration Form Modal */}
           {migrateFrom && (
-            <div className="mb-8 bg-canvas rounded-card border border-danger/30 p-6">
+            <div className="bg-canvas rounded-card border border-danger/30 p-6">
               <h2 className="text-sm font-bold text-ink mb-4">
                 友だち移行: {getAccountName(migrateFrom)}
               </h2>
@@ -484,7 +484,7 @@ export default function HealthPage() {
               </div>
             )}
           </div>
-        </>
+        </div>
       )}
     </div>
   )
