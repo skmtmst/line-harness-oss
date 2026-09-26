@@ -111,7 +111,11 @@ describe('V6共通アクションの画面契約', () => {
   })
 
   it('ヘッダーの最後をマニュアルにする', () => {
-    expect(LIST.indexOf('マニュアル')).toBeGreaterThan(LIST.indexOf('共通アクションをつくる'))
+    // 作る操作は見出しの右ではなく一覧の上の行へ。マニュアルは見出しに残す。
+    expect(LIST).toContain('＋ 共通アクションを作る')
+    expect(LIST).not.toContain('共通アクションをつくる')
+    expect(LIST).toContain('<Button href="/support">マニュアル</Button>')
+    expect(LIST.indexOf('＋ 共通アクションを作る')).toBeGreaterThan(LIST.indexOf('<NoteBar>'))
     expect(VERSIONS.indexOf('マニュアル')).toBeGreaterThan(VERSIONS.indexOf('前の版から新版を作る'))
   })
 })

@@ -105,4 +105,11 @@ describe('RowActions 一覧の操作の共通ルール（#985 LAY-18）', () => 
     expect(css).toMatch(/\.rowActions\s*{[^}]*white-space:\s*nowrap/s)
     expect(css).toMatch(/\.rowActions\s*{[^}]*position:\s*relative/s)
   })
+
+  it('行の文字ボタンは32px級でアイコン操作と高さをそろえる（★V7行内32）', () => {
+    const src = read('row-actions.tsx')
+    expect(src).toContain('size="compact"')
+    const buttonCss = read('button.module.css')
+    expect(buttonCss).toMatch(/\.compact\s*{[^}]*height:\s*32px/s)
+  })
 })

@@ -320,13 +320,32 @@ export default function OpsSupportPage() {
               </span>
               <SelectField size="compact" aria-label="優先度で絞る" options={PRIORITY_OPTIONS} value={priority} onChange={(e) => setPriority(e.target.value as '' | OpsSupportPriority)} />
               <SelectField aria-label="並び替え" options={SORT_OPTIONS} value={sort} onChange={(e) => setSort(e.target.value as typeof sort)} />
-              <Button variant="primary" onClick={() => setCreating((v) => !v)}>
-                <Plus aria-hidden="true" className="h-4 w-4" />
-                チケットを作る
-              </Button>
             </span>
           }
         />
+      </div>
+
+      <div className={knowledgeStyles.supportMetrics} data-design-node="beOJV">
+        <div className={knowledgeStyles.supportMetric}><Inbox aria-hidden="true" className="text-danger" />
+        <SummaryCard variant="v6" title="未対応のチケット" value={kpis ? kpis.untouched : null} unit="" detail={kpis ? `LINEから受付 ${kpis.untouchedFromLine}件` : '—'} loading={!summary} />
+        </div>
+        <div className={knowledgeStyles.supportMetric}><Timer aria-hidden="true" className="text-status-info" />
+        <SummaryCard variant="v6" title="平均の初回返信" value={null} unit="" detail={kpis ? compareLabel(kpis.avgFirstReplyMinutes, kpis.prevAvgFirstReplyMinutes, 'time') : '—'} loading={!summary} valueText={kpis ? durationLabel(kpis.avgFirstReplyMinutes) : undefined} />
+        </div>
+        <div className={knowledgeStyles.supportMetric}><CheckCircle2 aria-hidden="true" className="text-accent-deep" />
+        <SummaryCard variant="v6" title="解決率" value={null} unit="" detail={kpis ? compareLabel(kpis.resolutionRate, kpis.prevResolutionRate, 'rate') : '—'} loading={!summary} valueText={kpis ? (kpis.resolutionRate === null ? '—' : `${kpis.resolutionRate.toFixed(1)}%`) : undefined} />
+        </div>
+        <div className={knowledgeStyles.supportMetric}><Hourglass aria-hidden="true" className="text-chip-alt" />
+        <SummaryCard variant="v6" title="平均の解決時間" value={null} unit="" detail={kpis ? compareLabel(kpis.avgResolutionMinutes, kpis.prevAvgResolutionMinutes, 'time') : '—'} loading={!summary} valueText={kpis ? durationLabel(kpis.avgResolutionMinutes) : undefined} />
+        </div>
+      </div>
+
+      {/* 作る操作は数字のカードの下・一覧のすぐ上の左にそろえる。 */}
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <Button variant="primary" onClick={() => setCreating((v) => !v)}>
+          <Plus aria-hidden="true" className="h-4 w-4" />
+          チケットを作る
+        </Button>
       </div>
 
       {creating ? (
@@ -358,21 +377,6 @@ export default function OpsSupportPage() {
           </div>
         </form>
       ) : null}
-
-      <div className={knowledgeStyles.supportMetrics} data-design-node="beOJV">
-        <div className={knowledgeStyles.supportMetric}><Inbox aria-hidden="true" className="text-danger" />
-        <SummaryCard variant="v6" title="未対応のチケット" value={kpis ? kpis.untouched : null} unit="" detail={kpis ? `LINEから受付 ${kpis.untouchedFromLine}件` : '—'} loading={!summary} />
-        </div>
-        <div className={knowledgeStyles.supportMetric}><Timer aria-hidden="true" className="text-status-info" />
-        <SummaryCard variant="v6" title="平均の初回返信" value={null} unit="" detail={kpis ? compareLabel(kpis.avgFirstReplyMinutes, kpis.prevAvgFirstReplyMinutes, 'time') : '—'} loading={!summary} valueText={kpis ? durationLabel(kpis.avgFirstReplyMinutes) : undefined} />
-        </div>
-        <div className={knowledgeStyles.supportMetric}><CheckCircle2 aria-hidden="true" className="text-accent-deep" />
-        <SummaryCard variant="v6" title="解決率" value={null} unit="" detail={kpis ? compareLabel(kpis.resolutionRate, kpis.prevResolutionRate, 'rate') : '—'} loading={!summary} valueText={kpis ? (kpis.resolutionRate === null ? '—' : `${kpis.resolutionRate.toFixed(1)}%`) : undefined} />
-        </div>
-        <div className={knowledgeStyles.supportMetric}><Hourglass aria-hidden="true" className="text-chip-alt" />
-        <SummaryCard variant="v6" title="平均の解決時間" value={null} unit="" detail={kpis ? compareLabel(kpis.avgResolutionMinutes, kpis.prevAvgResolutionMinutes, 'time') : '—'} loading={!summary} valueText={kpis ? durationLabel(kpis.avgResolutionMinutes) : undefined} />
-        </div>
-      </div>
 
       {notice ? <p role="status" className="mb-3 text-caption text-accent-deep">{notice}</p> : null}
       {/*

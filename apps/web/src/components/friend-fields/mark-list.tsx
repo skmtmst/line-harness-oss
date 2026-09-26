@@ -420,7 +420,7 @@ export default function SupportMarkList({ accountId }: { accountId: string | nul
               ) : status === 'error' ? (
                 <tr><td colSpan={7} className="p-0"><ListState kind="error" description="対応マークを読み込めませんでした。再読み込みしてください。" onRetry={() => void load()} /></td></tr>
               ) : items.length === 0 ? (
-                <tr><td colSpan={7} className="p-0"><ListState kind="empty" title="まだ対応マークがありません" description="「＋ マークを追加」から最初のマークを作ってください。" /></td></tr>
+                <tr><td colSpan={7} className="p-0"><ListState kind="empty" title="まだ対応マークがありません" description="「＋ マークを作る」から最初のマークを作ってください。" /></td></tr>
               ) : visible.length === 0 ? (
                 <tr><td colSpan={7} className="p-0"><ListState kind="empty" title="条件に合う対応マークはありません" description="検索語か利用状態を変えてください。" /></td></tr>
               ) : visible.map((mark) => (
@@ -454,7 +454,7 @@ export default function SupportMarkList({ accountId }: { accountId: string | nul
               {status === 'loading' ? <ListState kind="loading" />
                 : status === 'forbidden' ? <ListState kind="forbidden" description="対応マークを見る権限がありません。オーナーか管理者に確認してください。" />
                 : status === 'error' ? <ListState kind="error" description="対応マークを読み込めませんでした。再読み込みしてください。" onRetry={() => void load()} />
-                : items.length === 0 ? <ListState kind="empty" title="まだ対応マークがありません" description="「＋ マークを追加」から最初のマークを作ってください。" />
+                : items.length === 0 ? <ListState kind="empty" title="まだ対応マークがありません" description="「＋ マークを作る」から最初のマークを作ってください。" />
                 : <ListState kind="empty" title="条件に合う対応マークはありません" description="検索語か利用状態を変えてください。" />}
             </div>
           ) : null}

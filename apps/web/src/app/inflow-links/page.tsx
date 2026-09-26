@@ -807,7 +807,7 @@ function InflowLinksPageInner({
         </div>
       </Disclosure>
 
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2"><Button href="/inflow-links/new" variant="primary">＋ 流入リンクをつくる</Button><div className="flex gap-2"><Button variant="secondary" onClick={() => setBulkOpen(true)}>まとめて操作{selectedRouteIds.size > 0 ? `（${selectedRouteIds.size}件選択中）` : ''}</Button></div></div>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2"><Button href="/inflow-links/new" variant="primary">＋ 流入リンクを作る</Button><div className="flex gap-2"><Button variant="secondary" onClick={() => setBulkOpen(true)}>まとめて操作{selectedRouteIds.size > 0 ? `（${selectedRouteIds.size}件選択中）` : ''}</Button></div></div>
 
       <div style={FOLDER_RAIL_STYLE} className="grid gap-5 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
         <FolderPanel
@@ -927,7 +927,7 @@ function InflowLinksPageInner({
           title={selectedGenre ? `「${selectedGenreLabel}」にはまだリンクがありません` : 'まだ流入経路がありません'}
           description={
             selectedGenre
-              ? '上の「流入リンクをつくる」から作ると、ここに出ます。'
+              ? '上の「＋ 流入リンクを作る」から作ると、ここに出ます。'
               : '左側の「フォルダを追加」から最初のフォルダを作ってください。'
           }
         />

@@ -11,7 +11,9 @@ describe('V6回答フォーム削除確認 gBp2J', () => {
     expect(PAGE).toContain("import ConfirmDialog from '@/components/shared/confirm-dialog'")
     expect(PAGE).toContain('<ConfirmDialog')
     expect(PAGE).toContain('displayFormName(deleteTarget.name)')
-    expect(PAGE).toContain('回答フォームを削除')
+    // 削除は行に直に置かず、…メニューの中の危ない操作から確認ダイアログへつなぐ。
+    expect(PAGE).toContain("label: '削除する'")
+    expect(PAGE).toContain("tone: 'danger'")
   })
 
   it('影響確認を先に読み、公開中・回答あり・利用中はアーカイブへ分ける', () => {

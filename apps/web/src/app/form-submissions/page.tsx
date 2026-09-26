@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { Trash2, X } from 'lucide-react'
+import { MoreHorizontal, X } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { fetchApi } from '@/lib/api'
@@ -11,6 +11,7 @@ import { useCanManage } from '@/components/automations/use-can-manage'
 import { displayFormName, sortFormsByLatestAnswer } from './form-list'
 import Button from '@/components/shared/button'
 import IconButton from '@/components/shared/icon-button'
+import ActionMenu from '@/components/shared/action-menu'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
@@ -168,6 +169,7 @@ export default function FormSubmissionsPage() {
   const [savingName, setSavingName] = useState(false)
   const [renameError, setRenameError] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<Form | null>(null)
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [deleteImpact, setDeleteImpact] = useState<FormDeleteImpact | null>(null)
   const [deleteImpactLoading, setDeleteImpactLoading] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -471,7 +473,7 @@ export default function FormSubmissionsPage() {
       <div data-design="Bar" className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap gap-2">
           <Button variant="primary" onClick={createDraft} disabled={creating}>
-            {creating ? '下書きを作成中' : 'フォームを作る'}
+            {creating ? '下書きを作成中' : '＋ フォームを作る'}
           </Button>
         </div>
       </div>
@@ -608,7 +610,7 @@ export default function FormSubmissionsPage() {
             description="最初の1つを作ると、集まった回答もここから見られます。"
             action={(
               <Button variant="primary" onClick={createDraft} disabled={creating}>
-                {creating ? '下書きを作成中' : 'フォームを作る'}
+                {creating ? '下書きを作成中' : '＋ フォームを作る'}
               </Button>
             )}
           />
@@ -709,12 +711,27 @@ export default function FormSubmissionsPage() {
                     {reviewMode ? (
                       <span className="sr-only">読み取り専用</span>
                     ) : (
-                      /* #641: 行操作は枠つきボタン＋削除アイコンにそろえる。削除は撮影口のため見せたまま */
-                      <span className="inline-flex items-center justify-end gap-1.5">
-                        <Button variant="secondary" onClick={() => openRename(form)}>編集</Button>
-                        <IconButton aria-label={`${normalizedName}を削除`} title="回答フォームを削除" onClick={() => void openDelete(form)}>
-                          <Trash2 aria-hidden />
+                      /* 行の操作は「主な1つ＋…メニュー」。削除は行に直に置かず、メニューの中の危ない操作へ。 */
+                      <span className="relative inline-flex items-center justify-end gap-1.5">
+                        <Button variant="secondary" size="compact" onClick={() => openRename(form)}>編集</Button>
+                        <IconButton
+                          aria-label={`${normalizedName}のその他操作`}
+                          aria-expanded={openMenuId === form.id}
+                          onClick={() => setOpenMenuId((current) => (current === form.id ? null : form.id))}
+                        >
+                          <MoreHorizontal aria-hidden />
                         </IconButton>
+                        <ActionMenu
+                          open={openMenuId === form.id}
+                          ariaLabel={`${normalizedName}の操作`}
+                          onClose={() => setOpenMenuId(null)}
+                          items={[{
+                            id: 'delete',
+                            label: '削除する',
+                            tone: 'danger',
+                            onSelect: () => void openDelete(form),
+                          }]}
+                        />
                       </span>
                     )}
                   </td>

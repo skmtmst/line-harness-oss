@@ -607,7 +607,7 @@ export default function AutoRepliesPage() {
             isActive: false,
           })}
         >
-          ルールを作成
+          ＋ ルールを作る
         </Button>
       </div>
 
@@ -747,9 +747,9 @@ export default function AutoRepliesPage() {
                 <th title="今月動いた回数" className="cq-hide-below-880 w-24 px-4 py-3 text-left text-xs font-semibold text-ink-faint">今月の応答</th>
                 {/*
                   #774: 右端の操作列は sticky で留める。幅は中身（編集＋
-                  削除＋その他の 32px 級 3つ）に合わせた固定 160。
+                  その他の 32px 級 2つ）に合わせた固定 144。
                 */}
-                <th title="編集・停止または再開・削除" className="bg-canvas-sunken sticky right-0 w-40 px-4 py-3 text-right text-xs font-semibold text-ink-faint">操作</th>
+                <th title="編集・停止または再開・削除" className="bg-canvas-sunken sticky right-0 w-36 px-4 py-3 text-right text-xs font-semibold text-ink-faint">操作</th>
                 <th className="hidden px-4 py-3">テンプレート</th>
                 <th className="hidden px-4 py-3">応答条件</th>
                 <th className="hidden px-4 py-3">適用アカウント</th>
@@ -860,64 +860,64 @@ export default function AutoRepliesPage() {
                       className="bg-canvas group-hover:bg-canvas-sunken sticky right-0 px-3 py-3 text-right whitespace-nowrap"
                       title={['編集', r.isActive ? '停止' : r.lifecycleStatus !== 'draft' ? '再開' : null, '削除'].filter(Boolean).join('・')}
                     >
-                      {/* #641: 「編集」＋「削除」＋「その他（…）」の形にそろえる。
+                      {/* 行の操作は「主な1つ＋…メニュー」。削除は行に直に置かず、
+                          メニューの中の危ない操作へ。
                           N-086: 行から止められる。下書き（未公開）は公開の前段なので、
                           動かす口は出さず、公開の流れに任せる。 */}
                       <div className="relative inline-flex items-center justify-end gap-1.5">
                         <Button
                           variant="secondary"
+                          size="compact"
                           onClick={() => setEditing(toDraft(r))}
                         >
                           編集
                         </Button>
                         <IconButton
-                          aria-label={`自動応答「${r.name || (r.respondToAll ? 'すべてのメッセージ' : r.keyword)}」を削除`}
-                          title="削除"
-                          onClick={() => {
-                            setDeleteError('')
-                            setPendingDelete({ item: r, accountId: selectedAccountId })
-                          }}
+                          aria-label={`自動応答「${r.name || (r.respondToAll ? 'すべてのメッセージ' : r.keyword)}」のその他操作`}
+                          aria-expanded={openMenuId === r.id}
+                          onClick={() =>
+                            setOpenMenuId((current) => (current === r.id ? null : r.id))
+                          }
                         >
-                          <Trash2 aria-hidden />
+                          <MoreHorizontal aria-hidden />
                         </IconButton>
-                        {(r.isActive || r.lifecycleStatus !== 'draft') && (
-                          <>
-                            <IconButton
-                              aria-label={`自動応答「${r.name || (r.respondToAll ? 'すべてのメッセージ' : r.keyword)}」のその他操作`}
-                              aria-expanded={openMenuId === r.id}
-                              onClick={() =>
-                                setOpenMenuId((current) => (current === r.id ? null : r.id))
-                              }
-                            >
-                              <MoreHorizontal aria-hidden />
-                            </IconButton>
-                            <ActionMenu
-                              open={openMenuId === r.id}
-                              ariaLabel={`自動応答「${r.name || (r.respondToAll ? 'すべてのメッセージ' : r.keyword)}」の操作`}
-                              onClose={() => setOpenMenuId(null)}
-                              items={[
-                                r.isActive
-                                  ? {
-                                      id: 'stop',
-                                      label: '停止する',
-                                      onSelect: () => {
-                                        setToggleError('')
-                                        setToggleReason('')
-                                        setPendingToggle({ item: r, kind: 'stop', accountId: selectedAccountId })
-                                      },
-                                    }
-                                  : {
-                                      id: 'resume',
-                                      label: '再開する',
-                                      onSelect: () => {
-                                        setToggleError('')
-                                        setPendingToggle({ item: r, kind: 'resume', accountId: selectedAccountId })
-                                      },
+                        <ActionMenu
+                          open={openMenuId === r.id}
+                          ariaLabel={`自動応答「${r.name || (r.respondToAll ? 'すべてのメッセージ' : r.keyword)}」の操作`}
+                          onClose={() => setOpenMenuId(null)}
+                          items={[
+                            ...((r.isActive || r.lifecycleStatus !== 'draft')
+                              ? [r.isActive
+                                ? {
+                                    id: 'stop',
+                                    label: '停止する',
+                                    onSelect: () => {
+                                      setToggleError('')
+                                      setToggleReason('')
+                                      setPendingToggle({ item: r, kind: 'stop', accountId: selectedAccountId })
                                     },
-                              ]}
-                            />
-                          </>
-                        )}
+                                  }
+                                : {
+                                    id: 'resume',
+                                    label: '再開する',
+                                    onSelect: () => {
+                                      setToggleError('')
+                                      setPendingToggle({ item: r, kind: 'resume', accountId: selectedAccountId })
+                                    },
+                                  }]
+                              : []),
+                            {
+                              id: 'delete',
+                              label: '削除する',
+                              tone: 'danger',
+                              dividerBefore: r.isActive || r.lifecycleStatus !== 'draft',
+                              onSelect: () => {
+                                setDeleteError('')
+                                setPendingDelete({ item: r, accountId: selectedAccountId })
+                              },
+                            },
+                          ]}
+                        />
                       </div>
                     </td>
                   </tr>
