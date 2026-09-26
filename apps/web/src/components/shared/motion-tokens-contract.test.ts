@@ -23,7 +23,7 @@ const BASELINE = [
   'list-state.module.css',
   'radio-card.module.css',
   'search-field.module.css',
-  'summary-card.module.css',
+  'kpi-card.module.css',
 ]
 
 function rawDurationDeclarations(css: string): string[] {

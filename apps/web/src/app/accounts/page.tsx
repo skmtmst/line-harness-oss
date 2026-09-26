@@ -7,7 +7,7 @@ import type { LineAccount } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
 import StatusBadge from '@/components/shared/status-badge'
 import SearchField from '@/components/shared/search-field'
 import FilterChip from '@/components/shared/filter-chip'
@@ -95,13 +95,13 @@ export default function AccountsPage() {
 
       <div data-design="KPIs" className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
         {/* ★V7：「100%」の札は何の割合でもない固定の文字だったので外す。 */}
-        <SummaryCard title="稼働中" value={activeCount} unit="" variant="v6"
+        <KpiCard title="稼働中" value={activeCount} unit="" variant="v6"
           detail={activeFriendDetail} />
-        <SummaryCard title="停止中" value={inactiveCount} unit="" variant="v6"
+        <KpiCard title="停止中" value={inactiveCount} unit="" variant="v6"
           detail="送受信を止めています" />
-        <SummaryCard title="アーカイブ" value={archivedCount} unit="" variant="v6"
+        <KpiCard title="アーカイブ" value={archivedCount} unit="" variant="v6"
           detail="記録は残っています" />
-        <SummaryCard title="接続に問題" value={problemCount} unit="" variant="v6"
+        <KpiCard title="接続に問題" value={problemCount} unit="" variant="v6"
           badge={problemCount > 0 ? '要対応' : undefined} badgeTone="danger"
           detail="Webhookが合っていません" />
       </div>

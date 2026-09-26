@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import Button from '@/components/shared/button'
 import SelectField from '@/components/shared/select-field'
 import { RequiredBadge } from '@/components/shared/form-controls'
-import StepTrail from '@/components/shared/step-trail'
+import Stepper from '@/components/shared/stepper'
 import StickyBar from '@/components/shared/sticky-bar'
 import LinePreview from '@/components/shared/line-preview'
 import { useAccount } from '@/contexts/account-context'
@@ -87,9 +87,9 @@ export default function NewWebinarPage() {
         <Link href="/webinars" className="text-action hover:underline">← ウェビナー一覧</Link>
       </nav>
 
-      <StepTrail
+      <Stepper
         label="ウェビナー作成の進み方"
-        items={STEPS.map((step, index) => ({ label: step.title, state: index === 0 ? 'current' as const : 'todo' as const }))}
+        steps={STEPS.map((step, index) => ({ label: step.title, state: index === 0 ? 'current' as const : 'todo' as const }))}
       />
 
       {error ? (

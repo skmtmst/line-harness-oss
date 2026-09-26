@@ -11,7 +11,7 @@ import Chip from '@/components/shared/chip'
 import Dialog from '@/components/shared/dialog'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { contractDetail, minutesLabel, revenueDetail, revenueSourceLabel } from './format'
 
@@ -83,11 +83,11 @@ export default function OpsDashboardPage() {
       ) : (
       <>
       <div data-design-node="s7wSj" className="mb-4 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-        <div data-design-node="nPbgn"><SummaryCard variant="v6" title="今月の売上（入金済み）" value={null} unit="" valueText={k ? formatYen(k.revenueThisMonth) : undefined} detail={k ? revenueDetail(k.revenueDelta, k.refundsThisMonth) : '—'} loading={loading} /></div>
-        <div data-design-node="BaoAQ"><SummaryCard variant="v6" title="契約中の月額合計" value={null} unit="" valueText={k ? formatYen(k.contractMonthlyTotal) : undefined} detail={k ? contractDetail(k.active, k.byPlan, k.filledByListPriceCount) : '—'} loading={loading} /></div>
-        <SummaryCard variant="v6" title="トライアル中" value={k ? k.trialing : null} unit="" detail={k ? `${label}の新規 ${k.newInPeriod}` : '—'} loading={loading} />
-        <SummaryCard variant="v6" title={`${label}の解約`} value={k ? k.churnInPeriod : null} unit="" detail={k ? `解約率 ${k.churnRate.toFixed(1)}%` : '—'} badge={k && k.churnInPeriod > 0 ? '確認' : undefined} badgeTone="danger" loading={loading} />
-        <div data-design-node="G0vK7"><SummaryCard variant="v6" title="今月の AI 利用" value={data?.ai?.callsThisMonth ?? null} unit="回" detail={data?.ai ? `返信の下書き${data.ai.draftsThisMonth}回・記事化${data.ai.callsThisMonth - data.ai.draftsThisMonth}回` : '—'} loading={loading} /></div>
+        <div data-design-node="nPbgn"><KpiCard variant="v6" title="今月の売上（入金済み）" value={null} unit="" valueText={k ? formatYen(k.revenueThisMonth) : undefined} detail={k ? revenueDetail(k.revenueDelta, k.refundsThisMonth) : '—'} loading={loading} /></div>
+        <div data-design-node="BaoAQ"><KpiCard variant="v6" title="契約中の月額合計" value={null} unit="" valueText={k ? formatYen(k.contractMonthlyTotal) : undefined} detail={k ? contractDetail(k.active, k.byPlan, k.filledByListPriceCount) : '—'} loading={loading} /></div>
+        <KpiCard variant="v6" title="トライアル中" value={k ? k.trialing : null} unit="" detail={k ? `${label}の新規 ${k.newInPeriod}` : '—'} loading={loading} />
+        <KpiCard variant="v6" title={`${label}の解約`} value={k ? k.churnInPeriod : null} unit="" detail={k ? `解約率 ${k.churnRate.toFixed(1)}%` : '—'} badge={k && k.churnInPeriod > 0 ? '確認' : undefined} badgeTone="danger" loading={loading} />
+        <div data-design-node="G0vK7"><KpiCard variant="v6" title="今月の AI 利用" value={data?.ai?.callsThisMonth ?? null} unit="回" detail={data?.ai ? `返信の下書き${data.ai.draftsThisMonth}回・記事化${data.ai.callsThisMonth - data.ai.draftsThisMonth}回` : '—'} loading={loading} /></div>
       </div>
 
       {/* グラフ帯 */}

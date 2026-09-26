@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react'
 import NoteBar from '@/components/shared/note-bar'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
 import KpiCollapse from '@/components/ui/kpi-collapse'
 import { Tabs } from '@/components/shared/tabs'
 import {
@@ -75,7 +75,7 @@ export function BannerKpis({
   const percent = remainingPercent(usage)
   return (
     <KpiCollapse data-design-node="jT1tM" gridClassName="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-      <SummaryCard
+      <KpiCard
         variant="v6"
         title="プロジェクト"
         value={stats ? stats.projects.active : null}
@@ -83,7 +83,7 @@ export function BannerKpis({
         detail={stats ? `アーカイブ ${stats.projects.archived}` : '—'}
         loading={loading}
       />
-      <SummaryCard
+      <KpiCard
         variant="v6"
         title="今月の生成"
         value={usage ? usage.month.used : null}
@@ -91,7 +91,7 @@ export function BannerKpis({
         detail={usage ? `今日 ${usage.today.used}枚・1日の上限 ${usage.today.limit}枚` : '—'}
         loading={loading}
       />
-      <SummaryCard
+      <KpiCard
         variant="v6"
         title="今月の残り"
         value={usage ? usage.month.remaining : null}
@@ -101,7 +101,7 @@ export function BannerKpis({
         detail={usage ? `上限 ${usage.month.limit}枚・${nextMonthResetLabel()} に戻る` : '—'}
         loading={loading}
       />
-      <SummaryCard
+      <KpiCard
         variant="v6"
         title="アカウントへ渡した画像"
         value={stats ? stats.deliveredImages : null}

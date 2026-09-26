@@ -8,7 +8,7 @@ const PAGE = readFileSync(join(HERE, '..', '..', 'app', 'friends', 'page.tsx'), 
 const TABLE = readFileSync(join(HERE, 'friend-list-table.tsx'), 'utf8')
 const ROW = readFileSync(join(HERE, 'friend-list-row.tsx'), 'utf8')
 const KPIS = readFileSync(join(HERE, 'friend-kpis.tsx'), 'utf8')
-const SUMMARY_CARD_CSS = readFileSync(join(HERE, '..', 'shared', 'summary-card.module.css'), 'utf8')
+const SUMMARY_CARD_CSS = readFileSync(join(HERE, '..', 'shared', 'kpi-card.module.css'), 'utf8')
 const PAGINATION = readFileSync(join(HERE, '..', 'shared', 'pagination.tsx'), 'utf8')
 const ADVANCED = readFileSync(join(HERE, 'advanced-search-dialog.tsx'), 'utf8')
 /* N-039: 保存検索・通知の窓は overlay 規約へ乗せるため部品へ切り出した。 */
@@ -76,7 +76,7 @@ describe('友だちV6の画面契約', () => {
     for (const source of [PAGE, TABLE]) {
       expect(source).toContain('shadow-card')
     }
-    expect(KPIS).toContain("import SummaryCard from '@/components/shared/summary-card'")
+    expect(KPIS).toContain("import KpiCard from '@/components/shared/kpi-card'")
     expect(SUMMARY_CARD_CSS).toContain('box-shadow: var(--shadow-card)')
     expect(PAGE).toContain('text-action')
     expect(PAGE).toContain('bg-accent')

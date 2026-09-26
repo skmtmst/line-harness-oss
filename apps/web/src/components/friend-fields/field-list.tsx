@@ -11,7 +11,7 @@ import { createResponseGate } from '@/lib/latest-request'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
 import { STATE_TEXT, notConnectedText } from '@/components/shared/not-connected'
 import { Th } from '@/components/shared/table'
 
@@ -268,7 +268,7 @@ export default function FriendFieldList({ accountId }: { accountId: string | nul
 
   return (
     <div data-design-node="HBTk0">
-      <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">{cards.map((card) => <SummaryCard key={card.title} {...card} loading={statsStatus === 'loading'} variant="v6" />)}</div>
+      <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">{cards.map((card) => <KpiCard key={card.title} {...card} loading={statsStatus === 'loading'} variant="v6" />)}</div>
       <NoteBar className="mb-4">既定値は友だち情報が空欄のときの送信値です。種類は新規登録後に変更せず、回答フォーム・友だち詳細・変数挿入で同じ定義を使います。</NoteBar>
 
       <div className="mb-4 flex flex-wrap items-center gap-2">

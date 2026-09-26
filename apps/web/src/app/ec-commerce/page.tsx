@@ -12,7 +12,7 @@ import NoteBar from '@/components/shared/note-bar'
 import PageHeaderH2 from '@/components/layout/page-header-h2'
 import Pagination from '@/components/shared/pagination'
 import Select from '@/components/shared/select'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
 import KpiCollapse from '@/components/ui/kpi-collapse'
 import ListRange from '@/components/ui/list-range'
 import { ActionCell, DataTable, Td, Th, TableHeadRow, Tr } from '@/components/shared/table'
@@ -325,9 +325,9 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
     <>
       {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}
       <KpiCollapse gridClassName={styles.kpis}>
-        <SummaryCard variant="v6" title="今日 取り込んだ" value={overview?.last24h ?? null} unit="件" detail={overview?.byType.map((item) => `${item.label} ${item.count.toLocaleString('ja-JP')}`).join('・') ?? '内訳は未取得'} />
-        <SummaryCard variant="v6" title="つながっていない注文" value={overview?.identityPending ?? null} unit="件" detail="LINEの友だちが見つかりません" badge="つき合わせ" badgeTone="neutral" />
-        <SummaryCard variant="v6" title="取り込みに失敗" value={overview?.failed ?? null} unit="件" detail="3回やり直しても入りませんでした" badge="確認" badgeTone="neutral" />
+        <KpiCard variant="v6" title="今日 取り込んだ" value={overview?.last24h ?? null} unit="件" detail={overview?.byType.map((item) => `${item.label} ${item.count.toLocaleString('ja-JP')}`).join('・') ?? '内訳は未取得'} />
+        <KpiCard variant="v6" title="つながっていない注文" value={overview?.identityPending ?? null} unit="件" detail="LINEの友だちが見つかりません" badge="つき合わせ" badgeTone="neutral" />
+        <KpiCard variant="v6" title="取り込みに失敗" value={overview?.failed ?? null} unit="件" detail="3回やり直しても入りませんでした" badge="確認" badgeTone="neutral" />
         <div className="min-w-0 rounded-card border border-hairline bg-canvas p-4">
           <p className="text-xs font-semibold text-ink-faint">最後に届いた</p>
           <p className="mt-1 text-2xl font-bold text-ink tabular-nums">{dateTime(overview?.lastReceivedAt ?? null)}</p>

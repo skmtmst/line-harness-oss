@@ -334,8 +334,8 @@
         { "pencil": "UcEaZ padding 18 22", "class": "supportDetail", "prop": "padding", "source": "18px 22px", "resolved": "18px 22px" }
       ]
     },
-    "summary-card": {
-      "name": "共通 サマリーカード",
+    "kpi-card": {
+      "name": "共通 KPIカード",
       "pencilNodes": [
         "XywGr",
         "mNUQ3",
@@ -348,15 +348,15 @@
       "role": "canonical",
       "status": "active",
       "reviewStatus": "confirmed",
-      "code": "src/components/shared/summary-card.tsx",
-      "cssModule": "src/components/shared/summary-card.module.css",
+      "code": "src/components/shared/kpi-card.tsx",
+      "cssModule": "src/components/shared/kpi-card.module.css",
       "components": [
-        "SummaryCard"
+        "KpiCard"
       ],
-      "cssPrefix": "summary-card",
+      "cssPrefix": "kpi-card",
       "pencilUsage": 56,
       "lastCheckedAt": "2026-08-24",
-      "note": "コード側の3系統をSummaryCardへ集約。V5を基本とし、V6がある画面はv6、配信予定の告知はbroadcastの名前付きvariantで差を固定する。emergencyの文字列値だけは対象外。",
+      "note": "数のカードをKpiCardへ1本化（旧SummaryCard）。V6の見せ方を基本とし、配信予定の告知はbroadcastの名前付きvariantで差を固定する。emergencyの文字列値だけは対象外。",
       "routes": {
         "v5": [
           "/friends",

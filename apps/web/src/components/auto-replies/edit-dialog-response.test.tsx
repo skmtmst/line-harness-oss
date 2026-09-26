@@ -331,7 +331,7 @@ describe('U003: 処理のない返信ボタンを置かない', () => {
   })
 })
 
-describe('U049: 手順表示は共通の StepTrail（edit/page.tsx 側で描画）', () => {
+describe('U049: 手順表示は共通の Stepper（edit/page.tsx 側で描画）', () => {
   it('編集窓の内側には Steps の節を持たない（一覧画面へ混入しないため）', async () => {
     mountPage(newDraft, 'basic')
     await flush()

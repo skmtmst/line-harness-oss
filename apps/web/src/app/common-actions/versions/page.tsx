@@ -12,7 +12,7 @@ import NoteBar from '@/components/shared/note-bar'
 import TargetMissing from '@/components/shared/target-missing'
 import PageHeader from '@/components/shared/page-header'
 import StatusBadge from '@/components/shared/status-badge'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
 import { ActionCell, DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { useCanManageCommonActions } from '@/components/automations/use-common-action-permission'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -243,11 +243,11 @@ function CommonActionVersionsInner() {
       />
 
       <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-5">
-        <SummaryCard variant="v6" title="いまの版" value={published?.versionNumber ?? null} unit="" detail={published?.publishedAt ? `${new Date(published.publishedAt).toLocaleDateString('ja-JP')} に公開` : 'まだ公開していません'} />
-        <SummaryCard variant="v6" title="呼び出し元" value={detail.bindings.length} unit="" detail={usageSummaryDetail(detail.bindings)} />
-        <SummaryCard variant="v6" title="今月 動いた回数" value={summary?.executionCountThisMonth ?? null} unit="" detail="" help="実行記録から集計しています" />
-        <SummaryCard variant="v6" title="失敗" value={summary?.failureCountThisMonth ?? null} unit="" detail="" help="部分成功を含みます" />
-        <SummaryCard variant="v6" title="古い版のまま" value={detail.bindings.filter((binding) => binding.hasNewerVersion).length} unit="" detail="回答フォーム" badge={detail.bindings.some((binding) => binding.hasNewerVersion) ? '要確認' : undefined} />
+        <KpiCard variant="v6" title="いまの版" value={published?.versionNumber ?? null} unit="" detail={published?.publishedAt ? `${new Date(published.publishedAt).toLocaleDateString('ja-JP')} に公開` : 'まだ公開していません'} />
+        <KpiCard variant="v6" title="呼び出し元" value={detail.bindings.length} unit="" detail={usageSummaryDetail(detail.bindings)} />
+        <KpiCard variant="v6" title="今月 動いた回数" value={summary?.executionCountThisMonth ?? null} unit="" detail="" help="実行記録から集計しています" />
+        <KpiCard variant="v6" title="失敗" value={summary?.failureCountThisMonth ?? null} unit="" detail="" help="部分成功を含みます" />
+        <KpiCard variant="v6" title="古い版のまま" value={detail.bindings.filter((binding) => binding.hasNewerVersion).length} unit="" detail="回答フォーム" badge={detail.bindings.some((binding) => binding.hasNewerVersion) ? '要確認' : undefined} />
       </div>
 
       <NoteBar help="新版を公開しても、利用先は現在の版を使い続けます" helpLabel="版の切り替え">
@@ -372,14 +372,14 @@ function CommonActionVersionsInner() {
       </section>
 
       <section className="mt-6 grid gap-3 sm:grid-cols-2">
-        <SummaryCard
+        <KpiCard
           variant="v6"
           title="このアクションを実行中"
           value={detail.bindings.reduce((sum, binding) => sum + (binding.runningCount ?? 0), 0)}
           unit="件"
           detail="始まったときの版のまま最後まで進みます"
         />
-        <SummaryCard
+        <KpiCard
           variant="v6"
           title="待ち時間の途中"
           value={detail.bindings.reduce((sum, binding) => sum + (binding.waitingCount ?? 0), 0)}

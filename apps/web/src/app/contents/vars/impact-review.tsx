@@ -7,7 +7,7 @@ import { csvCell } from '@/lib/presentation'
 import Button from '@/components/shared/button'
 import Pagination from '@/components/shared/pagination'
 import StickyBar from '@/components/shared/sticky-bar'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { characterCountText } from './change-impact'
 
@@ -106,14 +106,14 @@ export default function ImpactReview({
       </div>
 
       <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <SummaryCard
+        <KpiCard
           title="変わる場所"
           value={impact.blockingTotal}
           unit="か所"
           detail={impactBreakdown(impact)}
           variant="v6"
         />
-        <SummaryCard
+        <KpiCard
           title="すぐ効くもの"
           value={urgent}
           unit="件"
@@ -123,7 +123,7 @@ export default function ImpactReview({
           badgeTone="neutral"
           variant="v6"
         />
-        <SummaryCard
+        <KpiCard
           title="文字数が上限を超えるもの"
           value={overLimit}
           unit="件"
@@ -131,7 +131,7 @@ export default function ImpactReview({
           badgeTone={overLimit > 0 ? 'danger' : 'neutral'}
           variant="v6"
         />
-        <SummaryCard
+        <KpiCard
           title="送信済みの文"
           value={impact.historicalTotal}
           unit="件"

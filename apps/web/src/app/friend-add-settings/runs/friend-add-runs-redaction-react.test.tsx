@@ -14,7 +14,7 @@ vi.mock('@/components/shared/confirm-dialog', () => ({ default: () => null }))
 vi.mock('@/components/shared/list-state', () => ({ default: ({ title }: { title: string }) => <div>{title}</div> }))
 vi.mock('@/components/shared/select', () => ({ default: () => null }))
 vi.mock('@/components/shared/status-badge', () => ({ default: ({ children }: { children: React.ReactNode }) => <span>{children}</span> }))
-vi.mock('@/components/shared/summary-card', () => ({ default: () => null }))
+vi.mock('@/components/shared/kpi-card', () => ({ default: () => null }))
 vi.mock('@/components/shared/sticky-bar', () => ({ default: ({ actions }: { actions: React.ReactNode }) => <div>{actions}</div> }))
 vi.mock('@/lib/api', () => ({ api: { friendAddRules: {
   runs: vi.fn(async () => ({ success: true, data: {

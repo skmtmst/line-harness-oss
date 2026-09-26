@@ -6,7 +6,7 @@ import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import Pagination from '@/components/shared/pagination'
 import Select from '@/components/shared/select'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
 import KpiCollapse from '@/components/ui/kpi-collapse'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { TextField } from '@/components/shared/text-field'
@@ -66,10 +66,10 @@ export default function HealthTab({
   return (
     <>
       <KpiCollapse data-design="KPIs" data-design-node="health-kpis" gridClassName="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard variant="v6" title="今週の記録" value={ready ? kpis!.recordsThisWeek : null} unit="件" detail="" help="直近7日にお客様が付けた記録です" loading={!ready && status === 'loading'} />
-        <SummaryCard variant="v6" title="記録しているペット" value={ready ? kpis!.petsWithRecords : null} unit="頭" detail={ready ? `登録 ${kpis!.petsTotal.toLocaleString('ja-JP')}頭のうち` : '—'} loading={!ready && status === 'loading'} />
-        <SummaryCard variant="v6" title="気になる変化" value={ready ? kpis!.concerning : null} unit="頭" detail="" help="体重の±10%の変化・便の異常・食いつき不良が3回続いたペットです" loading={!ready && status === 'loading'} />
-        <SummaryCard variant="v6" title="30日以上 記録なし" value={ready ? kpis!.silent30 : null} unit="頭" detail="続けるきっかけを配信できる" loading={!ready && status === 'loading'} />
+        <KpiCard variant="v6" title="今週の記録" value={ready ? kpis!.recordsThisWeek : null} unit="件" detail="" help="直近7日にお客様が付けた記録です" loading={!ready && status === 'loading'} />
+        <KpiCard variant="v6" title="記録しているペット" value={ready ? kpis!.petsWithRecords : null} unit="頭" detail={ready ? `登録 ${kpis!.petsTotal.toLocaleString('ja-JP')}頭のうち` : '—'} loading={!ready && status === 'loading'} />
+        <KpiCard variant="v6" title="気になる変化" value={ready ? kpis!.concerning : null} unit="頭" detail="" help="体重の±10%の変化・便の異常・食いつき不良が3回続いたペットです" loading={!ready && status === 'loading'} />
+        <KpiCard variant="v6" title="30日以上 記録なし" value={ready ? kpis!.silent30 : null} unit="頭" detail="続けるきっかけを配信できる" loading={!ready && status === 'loading'} />
       </KpiCollapse>
 
       <div data-design="Note" data-design-node="health-note">

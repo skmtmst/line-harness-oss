@@ -2547,7 +2547,7 @@ function EditWebinarInner() {
                       : 'text-ink-secondary hover:bg-canvas-sunken'
                   }`}
                 >
-                  {/* 印の描き方は共通の `StepRail`（設計 `LMiL2`）にそろえる。 */}
+                  {/* 印の描き方は共通の Stepper にそろえる。pane 間の自由な移動はこの画面だけの動き（例外）。 */}
                   <span
                     className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
                       state === 'done'

@@ -11,6 +11,7 @@ import {
 } from '@/lib/api'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import Button from '@/components/shared/button'
+import Card from '@/components/shared/card'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import TargetMissing from '@/components/shared/target-missing'
@@ -256,7 +257,7 @@ function Handover() {
 
       <div className="mt-4 grid gap-4 xl:grid-cols-4">
         <div className="space-y-4 xl:col-span-3">
-          <section className="bg-canvas rounded-card border-hairline border p-5">
+          <Card padding="roomy">
             <p className="text-ink text-base font-bold">どこからどこへ</p>
             <p className="text-ink-secondary mt-1 text-xs">引き継ぎコードで両方のアカウントをつなぎました。</p>
             <div className="mt-3 overflow-hidden rounded-control border border-hairline">
@@ -278,9 +279,9 @@ function Handover() {
                 <p className="mt-1">{DIFFERENT_PROVIDER_NOTE.replace('プロバイダーが違うので、友だちのIDは自動でつなげません。', '')}</p>
               </div>
             )}
-          </section>
+          </Card>
 
-          <section className="bg-canvas rounded-card border-hairline border p-5">
+          <Card padding="roomy">
             <p className="text-ink text-base font-bold">事前確認の結果</p>
             <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
               本実行はしていません。ここで止めても、元のアカウントは何も変わりません。
@@ -301,9 +302,9 @@ function Handover() {
                 ? `元の友だち ${handover.counts.sourceTotal}人 ＝ 自動で一致 ${handover.counts.auto} ＋ 要確認 ${handover.counts.review} ＋ 一致しない ${handover.counts.unmatched} ＋ 別人の可能性 ${handover.counts.lookalike}`
                 : '4区分の合計を確認できないため、人数は表示していません。'}
             </p>
-          </section>
+          </Card>
 
-          <section className="bg-canvas rounded-card border-hairline overflow-hidden border">
+          <Card overflow="hidden">
             <div className="border-hairline border-b px-5 py-4">
               <p className="text-ink text-base font-bold">人が決める {handover.counts?.review ?? '—'}人</p>
               <p className="text-ink-secondary mt-1 text-xs">「要確認」を全部決めるまで本実行できません。決めた内容はあとから見返せます。</p>
@@ -337,7 +338,7 @@ function Handover() {
             <p className="text-ink-secondary border-hairline border-t px-5 py-3 text-xs">
               残り {handover.unresolvedReviews ?? '—'}人。名前と画像だけの一致では、自動で同じ人にしません。
             </p>
-          </section>
+          </Card>
 
           {executeMessage && (
             <p role="status" className="bg-success-bg text-success rounded-control mt-3 p-3 text-xs leading-relaxed">
@@ -378,7 +379,7 @@ function Handover() {
         </div>
 
         <aside className="space-y-4">
-          <section className="bg-canvas rounded-card border-hairline border p-5">
+          <Card padding="roomy">
             <p className="text-ink text-sm font-bold">引き継ぎコード</p>
             <div className="bg-canvas-sunken rounded-control mt-3 p-4 text-center">
               <p className="text-ink text-xl font-bold tracking-wider">{handover.code}</p>
@@ -390,25 +391,25 @@ function Handover() {
               受け取り先のアカウントでこのコードを読むと、つながります。期限は発行から24時間です。
             </p>
             <p className="text-ink-faint mt-2 text-xs">読み終わりました（{formatMonthDayTime(handover.linkedAt)}）。</p>
-          </section>
+          </Card>
 
-          <section className="bg-canvas rounded-card border-hairline border p-5">
+          <Card padding="roomy">
             <p className="text-ink text-sm font-bold">戻せること</p>
             <ul className="text-ink-secondary mt-2 space-y-2 text-xs leading-relaxed">
               <li>・本実行しても、元のアカウントの友だち・履歴・配信は消しません。</li>
               <li>・引き継いだ先の内容は、実行から30日以内なら戻せます。</li>
               <li>・戻すときも、友だちのつなぎ方だけを元に戻します。</li>
             </ul>
-          </section>
+          </Card>
 
-          <section className="bg-canvas rounded-card border-hairline border p-5">
+          <Card padding="roomy">
             <p className="text-ink text-sm font-bold">気をつけること</p>
             <ul className="text-ink-secondary mt-2 space-y-2 text-xs leading-relaxed">
               <li>・送信を止める設定と同意状態は、厳しいほうを引き継ぎます。</li>
               <li>・名前と画像だけが似ている組は、自動では同じ人にしません。</li>
               <li>・本実行の前に、控えと戻し先の目印を作ります。</li>
             </ul>
-          </section>
+          </Card>
         </aside>
       </div>
     </div>

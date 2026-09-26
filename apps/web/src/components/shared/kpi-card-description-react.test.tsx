@@ -2,13 +2,13 @@
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import SummaryCard from './summary-card'
+import KpiCard from './kpi-card'
 
 /**
  * #1005: 長い理由・定義は説明アイコンのポップオーバーへ。
  * クリックで開き、Escで閉じて元の位置へ戻ることを実物のReactで確かめる。
  */
-describe('SummaryCardの説明ポップオーバー', () => {
+describe('KpiCardの説明ポップオーバー', () => {
   let host: HTMLDivElement
   let root: Root
 
@@ -26,7 +26,7 @@ describe('SummaryCardの説明ポップオーバー', () => {
   async function render() {
     await act(async () => {
       root.render(
-        <SummaryCard
+        <KpiCard
           title="視聴"
           value={null}
           unit="人"

@@ -12,7 +12,7 @@ import Notice, { type NoticeTone } from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import SelectField from '@/components/shared/select-field'
 import StatusBadge from '@/components/shared/status-badge'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
 import { ActionCell, DataTable, NameCell, Td, Th, TableHeadRow, Tr } from '@/components/shared/table'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
@@ -112,7 +112,7 @@ export function OutgoingKpis({
 
   return (
     <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4" data-design="KPIs">
-      <SummaryCard
+      <KpiCard
         title="こちらから送る"
         value={status === 'ready' ? items.length : null}
         unit="本"
@@ -120,7 +120,7 @@ export function OutgoingKpis({
         loading={listLoading}
         variant="v6"
       />
-      <SummaryCard
+      <KpiCard
         title="この30日に送った"
         value={summaryMissing ? null : summary?.outgoing ?? null}
         unit="回"
@@ -128,7 +128,7 @@ export function OutgoingKpis({
         loading={summaryLoading}
         variant="v6"
       />
-      <SummaryCard
+      <KpiCard
         title="返事がなかった"
         value={summaryMissing ? null : summary?.failed ?? null}
         unit="回"
@@ -138,7 +138,7 @@ export function OutgoingKpis({
         loading={summaryLoading}
         variant="v6"
       />
-      <SummaryCard
+      <KpiCard
         title="受け取った"
         value={summaryMissing ? null : summary?.incoming ?? null}
         unit="回"

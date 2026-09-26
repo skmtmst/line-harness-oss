@@ -11,7 +11,7 @@ import Chip from '@/components/shared/chip'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { Tabs } from '@/components/shared/tabs'
 import { TextField } from '@/components/shared/text-field'
@@ -108,10 +108,10 @@ export default function OpsMembersPage() {
       </div>
 
       <div className="mb-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard variant="v6" title="運営メンバー" value={summary ? summary.members : null} unit="人" detail={summary ? `招待中 ${summary.invited}・2要素認証待ち ${summary.awaitingTotp}` : '—'} loading={!loaded} />
-        <SummaryCard variant="v6" title="2要素認証" value={summary ? summary.totpEnabled : null} unit={summary ? `/ ${summary.members}人` : '人'} detail={totpMissing > 0 ? `未設定 ${totpMissing}人` : '全員設定済み'} badge={totpMissing > 0 ? '要対応' : undefined} badgeTone="danger" loading={!loaded} />
-        <SummaryCard variant="v6" title="今月の代理ログイン" value={summary ? summary.impersonationsThisMonth : null} unit="回" detail={summary ? `書き込み ${summary.writeImpersonationsThisMonth}回` : '—'} loading={!loaded} />
-        <SummaryCard variant="v6" title="今月の個人情報の表示" value={summary ? summary.piiRevealsThisMonth : null} unit="回" detail="理由の記録あり" loading={!loaded} />
+        <KpiCard variant="v6" title="運営メンバー" value={summary ? summary.members : null} unit="人" detail={summary ? `招待中 ${summary.invited}・2要素認証待ち ${summary.awaitingTotp}` : '—'} loading={!loaded} />
+        <KpiCard variant="v6" title="2要素認証" value={summary ? summary.totpEnabled : null} unit={summary ? `/ ${summary.members}人` : '人'} detail={totpMissing > 0 ? `未設定 ${totpMissing}人` : '全員設定済み'} badge={totpMissing > 0 ? '要対応' : undefined} badgeTone="danger" loading={!loaded} />
+        <KpiCard variant="v6" title="今月の代理ログイン" value={summary ? summary.impersonationsThisMonth : null} unit="回" detail={summary ? `書き込み ${summary.writeImpersonationsThisMonth}回` : '—'} loading={!loaded} />
+        <KpiCard variant="v6" title="今月の個人情報の表示" value={summary ? summary.piiRevealsThisMonth : null} unit="回" detail="理由の記録あり" loading={!loaded} />
       </div>
 
       {/* 作る操作は数字のカードの下・一覧のすぐ上の左にそろえる。 */}
