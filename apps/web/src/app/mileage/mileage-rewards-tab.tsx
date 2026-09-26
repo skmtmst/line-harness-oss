@@ -281,8 +281,9 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
         : null
 
   return (
-    <div data-design-node="qlVLJ">
-      <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div data-design-node="qlVLJ" className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">出している使い道</p>
           <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
@@ -346,16 +347,16 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
         設計 `qlVLJ` の「使い道をつくる」。**つくる面（`p9CcEB` =
         `/mileage/rewards/edit`）ができたので置く。** 行き止まりにならない。
       */}
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <p className="text-ink-secondary text-xs leading-5">
           使い道がないと、マイルはためてもらっても動きにつながりません。まず1つ、すぐ交換できる小さな使い道を出すのがおすすめです。
         </p>
         <Button variant="primary" href="/mileage/rewards/edit">使い道をつくる</Button>
       </div>
 
-      {actionError ? <div className="mb-4 rounded-control border border-danger/30 bg-danger-bg px-4 py-3 text-sm text-danger">{actionError}</div> : null}
+      {actionError ? <div className="rounded-control border border-danger/30 bg-danger-bg px-4 py-3 text-sm text-danger">{actionError}</div> : null}
 
-      <section aria-label="ランクごとの使い道" className="mb-4 grid gap-3 md:grid-cols-3">
+      <section aria-label="ランクごとの使い道" className="grid gap-3 md:grid-cols-3">
         {rankBenefits.length === 0 ? (
           <div className="rounded-card border border-hairline bg-canvas p-4 md:col-span-3">
             <p className="font-bold text-ink">ランクの使い道はまだありません</p>
@@ -439,7 +440,7 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
         取れなかったときは欄ごと出さない。「0件」と書くと見落とす。
       */}
       {redemptionsVisible && failedRedemptions.length > 0 && (
-        <section aria-label="届かなかった交換" className="mt-6">
+        <section aria-label="届かなかった交換">
           <h2 className="text-ink text-sm font-bold">届かなかった交換</h2>
           <p className="text-ink-faint mt-1 text-xs leading-5">
             マイルは減ったまま、特典だけ届いていない交換です。やり直してもマイルはもう減りません。
