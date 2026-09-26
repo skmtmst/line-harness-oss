@@ -831,7 +831,7 @@ export default function ScenariosPage() {
       )}
 
       {actionError && (
-        <div className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
+        <div className="p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
           {actionError}
         </div>
       )}
@@ -857,7 +857,7 @@ export default function ScenariosPage() {
         />
       )}
       {scenarioList.pageCount > 1 ? (
-        <div className="mt-4 flex items-center justify-end gap-3 text-sm">
+        <div className="flex items-center justify-end gap-3 text-sm">
           <Button disabled={scenarioList.page <= 1 || scenarioList.loading} onClick={() => scenarioList.setPage(scenarioList.page - 1)}>
             前へ
           </Button>
