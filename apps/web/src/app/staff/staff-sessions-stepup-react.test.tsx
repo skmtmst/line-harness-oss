@@ -80,11 +80,13 @@ vi.mock('@/lib/api', () => ({
   ApiError: MockApiError,
   fetchApi: vi.fn(),
   api: {
+    auth: {
+      stepUp: (...args: unknown[]) => fixture.staffStepUp(...args),
+    },
     staff: {
       list: async () => ({ success: true, data: state.members }),
       me: async () => ({ success: true, data: member({ id: 'me-1', name: '管理者', email: 'me@example.test', role: 'admin' }) }),
       update: (...args: unknown[]) => fixture.staffUpdate(...args),
-      stepUp: (...args: unknown[]) => fixture.staffStepUp(...args),
       loginSummary: async () => ({ success: true, data: { loginCount: 0 } }),
       lastLogins: async () => ({ success: true, data: {} }),
     },
@@ -209,7 +211,7 @@ describe('権限変更の直前再認証 (N-427)', () => {
     fireEvent.change(screen.getByLabelText('1桁目'), { target: { value: '123456' } })
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '本人確認して実行' })) })
 
-    expect(fixture.staffStepUp).toHaveBeenCalledWith('123456', 'staff.permissions.change')
+    expect(fixture.staffStepUp).toHaveBeenCalledWith({ method: 'totp', value: '123456', purpose: 'staff.permissions.change' })
     await waitFor(() => expect(fixture.staffUpdate).toHaveBeenCalledTimes(2))
     expect(fixture.staffUpdate.mock.calls[1][2]).toBe('grant-token-1')
     expect(screen.queryByText('認証アプリで本人確認')).toBeNull()

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import Image from 'next/image'
 import { api, type FollowerImportState, type LineAccountConnectData } from '@/lib/api'
+import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
 import Button from '@/components/shared/button'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import PageHeader from '@/components/shared/page-header'
@@ -43,6 +44,7 @@ export default function NewLineAccountPage() {
   const [busyAction, setBusyAction] = useState<BusyAction>(null)
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [error, setError] = useState('')
+  const [stepUp, setStepUp] = useState<StepUpRequest | null>(null)
   const busyLock = useRef(false)
   const stepPanelRef = useRef<HTMLDivElement>(null)
 
@@ -149,7 +151,7 @@ export default function NewLineAccountPage() {
     }
   }
 
-  const save = async () => {
+  const save = async (stepUpToken?: string) => {
     if (!connectionPassed || busyLock.current) {
       setError('5段すべて通ってから保存してください。')
       return
@@ -158,7 +160,7 @@ export default function NewLineAccountPage() {
     setBusyAction('save')
     setError('')
     try {
-      const response = await api.lineAccounts.connect(input())
+      const response = await api.lineAccounts.connect(input(), stepUpToken)
       if (!response.success) {
         setError(response.error)
         return
@@ -166,7 +168,12 @@ export default function NewLineAccountPage() {
       setConnection(response.data)
       setForm((current) => ({ ...current, channelSecret: '', loginChannelSecret: '' }))
       setCurrentStep(5)
-    } catch {
+    } catch (caught) {
+      // LINEの接続は大事な操作。本人確認を求められたら窓を立ててやり直す（V-1）。
+      if (!stepUpToken && isStepUpRequired(caught)) {
+        setStepUp({ purpose: 'line_account.connect', action: 'LINEの接続を登録する', retry: save })
+        return
+      }
       setError('登録できませんでした。DBには保存していません。時間をおいて、もう一度お試しください。')
     } finally {
       busyLock.current = false
@@ -316,6 +323,7 @@ export default function NewLineAccountPage() {
 
         {error && <p role="alert" aria-live="assertive" className="bg-danger-bg text-danger rounded-control mt-4 p-3 text-sm">{error}</p>}
         <NoticeLineRegisterDialog open={noticeDialog === 'open'} onClose={() => setNoticeDialog('done')} />
+        {stepUp && <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} />}
         <div data-design="Actions">
           <StickyBar
             className="mt-4"

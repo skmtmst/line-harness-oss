@@ -429,9 +429,9 @@ const spec = {
     },
     '/api/auth/step-up': {
       post: {
-        tags: ['Auth'], summary: '高危険操作用の5分・1回限り再認証grantを発行',
-        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['code', 'purpose'], properties: { code: { type: 'string' }, purpose: { type: 'string', enum: ['operations.control', 'affiliate.payout.export', 'photo.original.download', 'staff.permissions.change', 'staff.two_factor.remove'] } } } } } },
-        responses: { '201': { description: 'Step-up grant issued' }, '400': { description: 'Invalid or wrong code' }, '403': { description: 'TOTP not configured' }, '409': { description: 'Code already used' }, '429': { description: 'Attempt limit exceeded' } },
+        tags: ['Auth'], summary: '高危険操作用の5分・1回限り再認証grantを発行（V: パスワード経路あり）',
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['purpose'], properties: { code: { type: 'string', description: '6桁コード（2段階認証の設定がある人）' }, password: { type: 'string', description: 'パスワード（2段階認証の設定が無い人）' }, purpose: { type: 'string', enum: ['operations.control', 'affiliate.payout.export', 'photo.original.download', 'staff.permissions.change', 'staff.two_factor.remove', 'line_account.connect', 'line_account.credentials', 'line_account.archive', 'broadcast.approval', 'webhook.api_token', 'webhook.secret'] } } } } } },
+        responses: { '201': { description: 'Step-up grant issued' }, '400': { description: 'Invalid or wrong credential' }, '401': { description: 'Not authenticated (STEP_UP_UNAUTHORIZED)' }, '403': { description: 'Neither TOTP nor password configured' }, '409': { description: 'Code already used' }, '429': { description: 'Attempt limit exceeded' } },
       },
     },
     // ── HQ Banners ─────────────────────────────────────────────────────────

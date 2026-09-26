@@ -29,8 +29,10 @@ describe('V6 写真審査の一枚表示と掲載管理', () => {
   it('does not expose an original URL and only downloads it after photo-specific step-up', () => {
     expect(detail).not.toContain('r2_key')
     expect(detail).not.toContain('image_url_original')
-    expect(detail).toContain('6桁の再認証コードを入力すると、一度だけ保存できます。')
-    expect(page).toContain('api.nenMembers.photoOriginalStepUp(code)')
+    // V-1: 説明文は聞き方（6桁コード／パスワード）で分岐するので部品だけ固定する。
+    expect(detail).toContain('再認証コード')
+    expect(detail).toContain('一度だけ保存できます')
+    expect(page).toContain('api.nenMembers.photoOriginalStepUp({')
     expect(page).toContain('api.nenMembers.issuePhotoOriginalDownload(')
     expect(page).toContain('api.nenMembers.downloadPhotoOriginal(issued.data.downloadUrl)')
     expect(page).toContain('URL.createObjectURL(blob)')

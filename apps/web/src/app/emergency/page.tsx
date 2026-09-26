@@ -28,6 +28,7 @@ import { formatMinutesRough } from '@/lib/format-duration'
 import { operationImpactText, type EmergencyStopTarget } from '@/lib/operation-impact'
 import { onlyWhenVisible } from '@/lib/visible-polling'
 import OtpInput from '@/components/shared/otp-input'
+import { readSessionSnapshot } from '@/lib/session-snapshot'
 import { operationControlSummary } from './control-summary'
 import {
   CAPABILITY_LABEL as RESTORE_DRIFT_CAPABILITY_LABEL,
@@ -797,6 +798,9 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
   const [confirmWord, setConfirmWord] = useState('')
   const [stepUpMode, setStepUpMode] = useState<Exclude<ConfirmMode, null> | null>(null)
   const [stepUpCode, setStepUpCode] = useState('')
+  /* V-1: 2段階認証を使っている人は6桁、無い人はパスワードで確認する。 */
+  const stepUpMethod = readSessionSnapshot()?.stepUpMethod ?? 'totp'
+  const stepUpReady = stepUpMethod === 'password' ? stepUpCode.length > 0 : /^\d{6}$/.test(stepUpCode)
   const [requestKey, setRequestKey] = useState('')
   const [running, setRunning] = useState(false)
   const [message, setMessage] = useState<ControlMessage | null>(null)
@@ -1002,10 +1006,10 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
   }
 
   const runStop = async () => {
-    if (needsReload || !/^\d{6}$/.test(stepUpCode) || !control || !requestKey) return
+    if (needsReload || !stepUpReady || !control || !requestKey || stepUpMethod === 'none') return
     setRunning(true); setMessage(null)
     try {
-      const grant = await api.operations.stepUp(stepUpCode)
+      const grant = await api.operations.stepUp({ method: stepUpMethod === 'password' ? 'password' : 'totp', value: stepUpCode })
       if (!grant.success) throw new Error(grant.error)
       const response = await api.operations.stop({
         lineAccountId: targetAccountId === 'all' ? null : targetAccountId,
@@ -1032,10 +1036,10 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
   }
 
   const runRestore = async () => {
-    if (needsReload || !control?.activeIncidentId || !/^\d{6}$/.test(stepUpCode) || !requestKey) return
+    if (needsReload || !control?.activeIncidentId || !stepUpReady || !requestKey || stepUpMethod === 'none') return
     setRunning(true); setMessage(null)
     try {
-      const grant = await api.operations.stepUp(stepUpCode)
+      const grant = await api.operations.stepUp({ method: stepUpMethod === 'password' ? 'password' : 'totp', value: stepUpCode })
       if (!grant.success) throw new Error(grant.error)
       const response = await api.operations.restore(control.activeIncidentId, {
         confirmation: '復旧',
@@ -1154,7 +1158,60 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-hairline px-6 py-4" style={{ minHeight: 84 }}><p className="max-w-sm text-xs text-ink-faint">止めたことは、ログインユーザー全員のLINEとメールへ知らせます。</p><div className="flex gap-2"><button onClick={() => { setConfirmMode(null); setConfirmWord('') }} disabled={mutationLocked} className="min-h-11 rounded-control px-4 text-sm font-bold text-action hover:bg-action-soft">キャンセル</button><button onClick={() => { setStepUpMode(confirmMode); setConfirmMode(null); setStepUpCode('') }} disabled={mutationLocked || confirmWord !== (confirmMode === 'stop' ? '停止' : '復旧')} className={`min-h-11 rounded-control px-4 text-sm font-bold text-on-accent disabled:opacity-40 ${confirmMode === 'stop' ? 'bg-danger' : 'bg-info'}`}>{confirmMode === 'stop' ? '配信を緊急停止する' : '復旧を実行する'}</button></div></div>
         </div>
       </div>}
-      {stepUpMode && <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 p-4" role="dialog" aria-modal="true" aria-labelledby="emergency-step-up-title"><div className="rounded-card w-full max-w-md bg-canvas p-6 shadow-2xl"><div className="flex items-start justify-between gap-3"><h2 id="emergency-step-up-title" className="text-lg font-bold text-ink">認証アプリで本人確認</h2><button type="button" onClick={() => { setStepUpMode(null); setStepUpCode('') }} disabled={mutationLocked} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken disabled:opacity-50"><X aria-hidden="true" className="h-5 w-5" /></button></div><p className="mt-2 text-xs leading-relaxed text-ink-faint">この操作専用に、5分以内に1回だけ使える6桁コードを確認します。</p><label className="mt-5 block text-sm font-bold text-ink-secondary" htmlFor="emergency-step-up-code">認証アプリの6桁コード</label>{/* ★V7 共通 認証コード入力（xHzFK）。 */}<div className="mt-2"><OtpInput id="emergency-step-up-code" value={stepUpCode} onChange={setStepUpCode} label="認証アプリの6桁コード" disabled={mutationLocked} autoFocus /></div><div className="mt-6 flex justify-end gap-2"><button onClick={() => { setStepUpMode(null); setStepUpCode('') }} disabled={mutationLocked} className="rounded-control min-h-11 px-4 text-sm font-bold text-action">戻る</button><button onClick={() => void (stepUpMode === 'stop' ? runStop() : runRestore())} disabled={mutationLocked || !/^\d{6}$/.test(stepUpCode)} className={`rounded-control min-h-11 px-4 text-sm font-bold text-on-accent disabled:opacity-40 ${stepUpMode === 'stop' ? 'bg-danger hover:brightness-90' : 'bg-info hover:brightness-90'}`}>{running ? '確認中...' : stepUpMode === 'stop' ? '本人確認して停止' : '本人確認して復旧'}</button></div></div></div>}
+      {stepUpMode && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 p-4" role="dialog" aria-modal="true" aria-labelledby="emergency-step-up-title">
+          <div className="rounded-card w-full max-w-md bg-canvas p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-3">
+              <h2 id="emergency-step-up-title" className="text-lg font-bold text-ink">
+                {stepUpMethod === 'password' ? 'パスワードで本人確認' : '認証アプリで本人確認'}
+              </h2>
+              <button type="button" onClick={() => { setStepUpMode(null); setStepUpCode('') }} disabled={mutationLocked} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken disabled:opacity-50">
+                <X aria-hidden="true" className="h-5 w-5" />
+              </button>
+            </div>
+            {stepUpMethod === 'none' ? (
+              <p className="mt-2 text-xs leading-relaxed text-ink-faint">
+                この操作には二段階認証またはパスワードの設定が必要です。権限者の設定画面で登録してから、もう一度お試しください。
+              </p>
+            ) : (
+              <>
+                <p className="mt-2 text-xs leading-relaxed text-ink-faint">
+                  この操作専用に、5分以内に1回だけ使える{stepUpMethod === 'password' ? '確認を発行するためパスワード' : '6桁コード'}を確認します。
+                </p>
+                {stepUpMethod === 'password' ? (
+                  <>
+                    <label className="mt-5 block text-sm font-bold text-ink-secondary" htmlFor="emergency-step-up-code">パスワード</label>
+                    <input
+                      id="emergency-step-up-code"
+                      type="password"
+                      value={stepUpCode}
+                      onChange={(event) => setStepUpCode(event.target.value)}
+                      disabled={mutationLocked}
+                      autoFocus
+                      autoComplete="current-password"
+                      className="mt-2 w-full rounded-control border border-surface-chrome bg-canvas px-3 py-2 text-sm text-ink outline-none focus:border-action"
+                    />
+                  </>
+                ) : (
+                  <>
+                    <label className="mt-5 block text-sm font-bold text-ink-secondary" htmlFor="emergency-step-up-code">認証アプリの6桁コード</label>
+                    {/* ★V7 共通 認証コード入力（xHzFK）。 */}
+                    <div className="mt-2"><OtpInput id="emergency-step-up-code" value={stepUpCode} onChange={setStepUpCode} label="認証アプリの6桁コード" disabled={mutationLocked} autoFocus /></div>
+                  </>
+                )}
+              </>
+            )}
+            <div className="mt-6 flex justify-end gap-2">
+              <button onClick={() => { setStepUpMode(null); setStepUpCode('') }} disabled={mutationLocked} className="rounded-control min-h-11 px-4 text-sm font-bold text-action">戻る</button>
+              {stepUpMethod !== 'none' && (
+                <button onClick={() => void (stepUpMode === 'stop' ? runStop() : runRestore())} disabled={mutationLocked || !stepUpReady} className={`rounded-control min-h-11 px-4 text-sm font-bold text-on-accent disabled:opacity-40 ${stepUpMode === 'stop' ? 'bg-danger hover:brightness-90' : 'bg-info hover:brightness-90'}`}>
+                  {running ? '確認中...' : stepUpMode === 'stop' ? '本人確認して停止' : '本人確認して復旧'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
