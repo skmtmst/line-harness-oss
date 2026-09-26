@@ -19,6 +19,7 @@ import { formatSlotJp, jstHHMMToUtcIso, splitBand, todayJst } from './jst'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { TextInput } from '@/components/shared/form-controls'
 import DateField from '@/components/shared/date-field'
+import Notice from '@/components/shared/notice'
 import { TimeField } from '@/components/shared/date-time-field'
 import Select from '@/components/shared/select'
 import EventQuestionsEditor, { parseEventQuestions } from '@/components/events/event-questions-editor'
@@ -350,7 +351,9 @@ export default function EventWizard({ accountId, eventId, step }: EventWizardPro
       <StepNav current={step} />
 
       {error && (
-        <div className="bg-danger-bg text-danger rounded-card mb-3 px-4 py-3 text-sm">{error}</div>
+        <Notice tone="danger" className="mb-3">
+          {error}
+        </Notice>
       )}
 
       {step === 1 && (

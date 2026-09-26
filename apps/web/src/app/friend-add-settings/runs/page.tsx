@@ -16,6 +16,7 @@ import { useCursorStack } from '../use-cursor-stack'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import SummaryCard from '@/components/shared/summary-card'
@@ -514,10 +515,10 @@ function FriendAddRunsInner() {
           <section className="rounded-card border border-hairline bg-canvas p-4">
             <h2 className="font-bold">要テスト</h2>
             <p className="mt-1 text-xs text-ink-faint">未処理の問題だけ表示します。</p>
-            <div className="mt-4 rounded-control bg-status-danger-soft p-3 text-sm text-danger">
+            <Notice tone="danger" className="mt-4">
               <strong>未送信 {summary?.failed ?? '—'}件</strong>
               <p className="mt-1 text-xs">失敗した記録は使用ルール・版・処理結果と一緒に一覧で確認できます。</p>
-            </div>
+            </Notice>
             {(() => {
               const href = editHref('preview')
               return href

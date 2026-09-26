@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { ChoiceCard } from '@/components/shared/create-page'
 import Dialog from '@/components/shared/dialog'
+import Notice from '@/components/shared/notice'
 import { Field, TextArea, TextInput } from '@/components/shared/form-controls'
 import { ApiError, api } from '@/lib/api'
 
@@ -156,9 +157,9 @@ export default function ActionScoreAdjustmentDialog({
             <Field label="理由" htmlFor="score-adjustment-reason" required note="履歴に残り、あとから実行者と一緒に確認できます。">
               <TextArea id="score-adjustment-reason" rows={3} value={reason} onChange={(event) => setReason(event.target.value)} />
             </Field>
-            <p className="rounded-control bg-info-bg p-3 text-xs leading-5 text-ink-secondary">
+            <Notice tone="info">
               点数は、設定された帯の下限〜上限の範囲でしか動かせません。範囲をまたぐ変更は実行されません。
-            </p>
+            </Notice>
           </>
         ) : (
           <section aria-label="変更内容の確認" className="space-y-3">
@@ -171,9 +172,9 @@ export default function ActionScoreAdjustmentDialog({
             <dl className="grid gap-2 rounded-control bg-canvas-sunken p-4 text-sm">
               <div className="grid grid-cols-3 gap-3"><dt className="text-ink-faint">理由</dt><dd className="col-span-2 whitespace-pre-wrap text-ink">{reason.trim()}</dd></div>
             </dl>
-            <div className="rounded-control bg-warning-bg p-3 text-xs leading-5 text-warning">
+            <Notice tone="warn">
               既存の履歴は書き換えず、理由と実行者を持つ新しい調整行を追加します。同じ操作を再送しても二重反映しません。
-            </div>
+            </Notice>
           </section>
         )}
       </div>

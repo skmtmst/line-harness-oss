@@ -8,6 +8,7 @@ import { checkNenCampaignBodyLength, NEN_CAMPAIGN_BODY_MAX_LENGTH } from '@line-
 import { useAccount } from '@/contexts/account-context'
 import { Field, inputClass } from '@/components/shared/form-controls'
 import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
 import { TimeField } from '@/components/shared/date-time-field'
 import Combobox from '@/components/shared/combobox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -276,9 +277,9 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
         <Button onClick={() => setTestSearchOpen((open) => !open)} className="h-10"><FlaskConical aria-hidden size={17} />自分にテスト送信</Button>
       </div>
 
-      {error && <p className="bg-danger-bg text-danger rounded-card px-4 py-3 text-sm">{error}</p>}
+      {error && <Notice tone="danger" message={error} />}
       {notice && <p className="bg-accent-soft text-accent-deep rounded-card px-4 py-3 text-sm">{notice}</p>}
-      {formIssueBanner && <p role="alert" className="bg-warning-bg text-warning border-warning rounded-card border px-4 py-3 text-sm">{formIssueBanner}</p>}
+      {formIssueBanner && <Notice tone="warn" message={formIssueBanner} />}
 
       {testSearchOpen && (
         <section className="bg-canvas rounded-card border-hairline flex flex-wrap items-center gap-2 border p-3">

@@ -9,6 +9,8 @@ import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import NoteBar from '@/components/shared/note-bar'
+import Notice from '@/components/shared/notice'
+import { notifyToast } from '@/components/shared/toast'
 import BroadcastStepRail from '@/components/broadcasts/broadcast-step-rail'
 import { useAccount } from '@/contexts/account-context'
 import { api, type ApiBroadcast } from '@/lib/api'
@@ -92,7 +94,6 @@ function ReservedBroadcastContent() {
   const [cancelError, setCancelError] = useState('')
   const [cancelled, setCancelled] = useState(false)
   const [actionBusy, setActionBusy] = useState<'test' | 'duplicate' | null>(null)
-  const [actionMessage, setActionMessage] = useState('')
   const [actionError, setActionError] = useState('')
   const duplicateKey = useRef<string | null>(null)
   const requestGeneration = useRef(0)
@@ -249,12 +250,11 @@ function ReservedBroadcastContent() {
   const testSend = async () => {
     if (actionBusy) return
     setActionBusy('test')
-    setActionMessage('')
     setActionError('')
     try {
       const result = await api.broadcasts.testSend(broadcast.id)
       if (!result.success) throw new Error(result.error)
-      setActionMessage(`テスト送信が完了しました（成功 ${result.sent ?? 0}件・失敗 ${result.failed ?? 0}件）。`)
+      notifyToast(`テスト送信が完了しました（成功 ${result.sent ?? 0}件・失敗 ${result.failed ?? 0}件）。`)
     } catch {
       setActionError('テスト送信できませんでした。テスト送信先の設定と配信内容を確認してください。')
     } finally {
@@ -265,7 +265,6 @@ function ReservedBroadcastContent() {
   const duplicateBroadcast = async () => {
     if (actionBusy) return
     setActionBusy('duplicate')
-    setActionMessage('')
     setActionError('')
     duplicateKey.current ??= crypto.randomUUID()
     try {
@@ -370,24 +369,21 @@ function ReservedBroadcastContent() {
           </div>
           <p className="text-ink-faint mt-4 text-xs">配信内容: {bubbleCount}通</p>
           {estimate ? <p className="text-ink-faint mt-1 text-xs">除外見込み: {estimate.hiddenExcluded.toLocaleString('ja-JP')}人</p> : null}
-          {actionMessage ? <p role="status" className="bg-success-bg text-success rounded-control mt-3 px-3 py-2 text-xs">{actionMessage}</p> : null}
-          {actionError ? <p role="alert" className="bg-danger-bg text-danger rounded-control mt-3 px-3 py-2 text-xs">{actionError}</p> : null}
+          {actionError ? <Notice tone="danger" message={actionError} onClose={() => setActionError('')} className="mt-3" /> : null}
         </aside>
       </div>
 
       {estimate?.warnings.length ? (
-        <section className="rounded-card border border-warning-bg bg-warning-bg p-4 text-sm text-warning">
+        <Notice tone="warn">
           <p className="font-bold">配信前に確認すること</p>
           <ul className="mt-2 list-disc space-y-1 pl-5">
             {estimate.warnings.map((warning, index) => <li key={`${warning.level}-${index}`}>{warning.message}</li>)}
           </ul>
-        </section>
+        </Notice>
       ) : null}
 
       {cancelled && (
-        <p className="bg-success-bg text-success rounded-card px-4 py-3 text-sm">
-          予約を取り消しました。内容は下書きとして残っています。
-        </p>
+        <Notice tone="success" message="予約を取り消しました。内容は下書きとして残っています。" />
       )}
 
       <ConfirmDialog

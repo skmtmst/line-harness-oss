@@ -13,6 +13,8 @@ import { BULK_SLOT_LIMIT, generateBulkSlots, type BulkSlotInput } from './bulk-s
 import { jstHHMMToUtcIso, utcIsoToJstDate, utcIsoToJstHHMM } from './jst'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
+import { notifyToast } from '@/components/shared/toast'
 import Select from '@/components/shared/select'
 import { Field, TextInput } from '@/components/shared/form-controls'
 import HelpTip from '@/components/shared/help-tip'
@@ -90,7 +92,7 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [toast, setToast] = useState<string | null>(null)
+
   const [copiedValue, setCopiedValue] = useState<string | null>(null)
   const [tags, setTags] = useState<Array<{ id: string; name: string }>>([])
 
@@ -169,11 +171,6 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
     setDraft((d) => ({ ...d, [key]: value }))
   }
 
-  function flashToast(msg: string) {
-    setToast(msg)
-    setTimeout(() => setToast(null), 2200)
-  }
-
   async function save(nextTab?: Tab) {
     setSaving(true)
     setError(null)
@@ -234,11 +231,11 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
       if (eventId) {
         const updated = await eventsApi.updateEvent(accountId, eventId, payload, draft.version ?? 1)
         setDraft(updated)
-        flashToast('保存しました')
+        notifyToast('保存しました')
         if (nextTab) setTab(nextTab)
       } else {
         const created = await eventsApi.createEvent(accountId, payload)
-        flashToast('イベントを作成しました。続けて予約枠を追加してください。')
+        notifyToast('イベントを作成しました。続けて予約枠を追加してください。')
         router.replace(`/events/edit?id=${created.id}`)
       }
     } catch (e) {
@@ -295,16 +292,10 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
         )}
       </div>
 
-      {/* toast */}
-      {toast && (
-        <div className="bg-success-bg text-success mb-3 rounded-control p-3 text-sm">
-          ✓ {toast}
-        </div>
-      )}
       {error && (
-        <div className="bg-danger-bg text-danger mb-3 rounded-control p-3 text-sm">
+        <Notice tone="danger" className="mb-3">
           {error}
-        </div>
+        </Notice>
       )}
 
       {/* LIFF URL box(es) */}
@@ -1168,11 +1159,11 @@ function EditSlotDialog({
             <X aria-hidden="true" className="h-5 w-5" />
           </button>
         </div>
-        {err && <div className="bg-danger-bg border-danger-bg text-danger rounded-control mb-3 border p-2 text-sm">{err}</div>}
+        {err && <Notice tone="danger" className="mb-3">{err}</Notice>}
         {booked > 0 && (
-          <p className="bg-warning-bg border-warning-bg text-warning rounded-control mb-3 border p-2 text-xs">
+          <Notice tone="warn" className="mb-3">
             この枠には{booked}件の予約が入っています。日時を変えると、確定している予約のリマインド予定も新しい日時へ合わせて動きます。定員は{booked}以上にしてください。
-          </p>
+          </Notice>
         )}
         <div className="space-y-3">
           <label className="block">

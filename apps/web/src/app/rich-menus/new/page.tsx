@@ -15,6 +15,7 @@ import type { Area } from '@/components/rich-menus/canvas-editor'
 import MediaPickerDialog from '@/app/contents/media-picker-dialog'
 import StickyBar from '@/components/shared/sticky-bar'
 import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { api } from '@/lib/api'
@@ -221,7 +222,7 @@ export default function NewRichMenuPage() {
           )}
           footer={<StickyBar actions={<><Button href="/rich-menus">キャンセル</Button><Button type="submit" variant="primary" disabled={submitting || !selectedAccount}>{submitting ? '作成中...' : '作成して編集へ'}</Button></>} />}
         />
-        {error ? <div role="alert" className="border-danger bg-danger-bg text-danger mt-3 rounded-control border p-3 text-sm">{error}</div> : null}
+        {error ? <Notice tone="danger" message={error} className="mt-3" /> : null}
       </form>
       {/* N-164: キャンセル（onClose）は何も変えない。入力した内容はそのまま残る。 */}
       <MediaPickerDialog

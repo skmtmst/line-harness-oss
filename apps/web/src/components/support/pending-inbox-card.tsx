@@ -9,6 +9,7 @@ import StatusBadge from '@/components/shared/status-badge'
 import { STATE_TEXT } from '@/components/shared/not-connected'
 import { dashboardLocalUpdatedAt } from '@/components/dashboard/freshness'
 import ListRange from '@/components/ui/list-range'
+import Notice from '@/components/shared/notice'
 
 /**
  * 対応が必要な受信（設計 `V2 1-1 ダッシュボード` の `card 対応が必要な受信`）。
@@ -244,13 +245,13 @@ export default function PendingInboxCard({
         最後に取れた時刻と読み直しを一覧の上に出す。
       */}
       {loadFailure && summary ? (
-        <div className="bg-warning-bg text-warning flex flex-wrap items-center justify-between gap-2 px-5 py-2 text-xs" role="status">
-          <span>
-            最新の状態に更新できませんでした。
-            {lastSuccessAt ? `最終更新 ${lastSuccessAt.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })} の内容を表示しています。` : ''}
-          </span>
-          <button type="button" onClick={() => void load()} className="font-medium underline">もう一度読み込む</button>
-        </div>
+        <Notice
+          tone="warn"
+          action={<button type="button" onClick={() => void load()} className="font-medium underline">もう一度読み込む</button>}
+        >
+          最新の状態に更新できませんでした。
+          {lastSuccessAt ? `最終更新 ${lastSuccessAt.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })} の内容を表示しています。` : ''}
+        </Notice>
       ) : null}
 
       {loadFailure === 'forbidden' && !summary ? (

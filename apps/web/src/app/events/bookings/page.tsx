@@ -8,6 +8,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Button from '@/components/shared/button'
 import FilterChip from '@/components/shared/filter-chip'
+import Notice from '@/components/shared/notice'
 import ListState from '@/components/shared/list-state'
 import TargetMissing from '@/components/shared/target-missing'
 import Pagination from '@/components/shared/pagination'
@@ -1078,9 +1079,7 @@ function BookingsInner() {
           どの予約に対して失敗したのかが分からなくなる。
         */}
         {actionError && (
-          <div className="bg-danger-bg border-danger-bg text-danger mb-4 rounded-lg border p-3 text-sm">
-            {actionError}
-          </div>
+          <Notice tone="danger" message={actionError} onClose={() => setActionError(null)} className="mb-4" />
         )}
 
         <div className="bg-canvas rounded-card border-hairline overflow-hidden border">

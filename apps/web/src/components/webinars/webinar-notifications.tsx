@@ -12,6 +12,8 @@ import { TimeField } from '@/components/shared/date-time-field'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
 import { audienceText } from '@/app/webinars/overview-view'
+import Notice from '@/components/shared/notice'
+import { notifyToast } from '@/components/shared/toast'
 
 /**
  * ウェビナーの通知・リマインド（設計 `Ho8z4` 10-1-D）。
@@ -86,7 +88,6 @@ export default function WebinarNotifications({ webinarId, onLoaded, onDirtyChang
   const [overview, setOverview] = useState<WebinarNotificationOverview | null>(null)
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [saving, setSaving] = useState(false)
-  const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
 
   const load = useCallback(async () => {
@@ -130,7 +131,6 @@ export default function WebinarNotifications({ webinarId, onLoaded, onDirtyChang
   const save = async (): Promise<boolean> => {
     if (!settings || saving) return false
     setSaving(true)
-    setNotice('')
     setError('')
     try {
       const input: WebinarNotificationSettingsInput = {
@@ -149,7 +149,7 @@ export default function WebinarNotifications({ webinarId, onLoaded, onDirtyChang
       setBaseline(res.data.settings)
       /* **何が起きたかを数で言う。** 「保存しました」だけでは、予定が
          積まれたのか取り消されたのか分からない。 */
-      setNotice(`保存しました。${res.data.queued}件を予定に入れ、${res.data.cancelled}件を取り消しました。`)
+      notifyToast(`保存しました。${res.data.queued}件を予定に入れ、${res.data.cancelled}件を取り消しました。`)
       await load()
       return true
     } catch {
@@ -200,7 +200,6 @@ export default function WebinarNotifications({ webinarId, onLoaded, onDirtyChang
               const initial = emptySettings(webinarId)
               setSettings(initial)
               setBaseline(initial)
-              setNotice('')
               setError('')
             }}
           >
@@ -372,8 +371,7 @@ export default function WebinarNotifications({ webinarId, onLoaded, onDirtyChang
         ))}
       </ul>
 
-      {notice && <p className="bg-success-bg text-success rounded-card px-4 py-3 text-sm">{notice}</p>}
-      {error && <p className="bg-danger-bg text-danger rounded-card px-4 py-3 text-sm">{error}</p>}
+      {error && <Notice tone="danger">{error}</Notice>}
 
       <div className="flex justify-end">
         <Button variant="primary" onClick={() => void save()} disabled={saving}>

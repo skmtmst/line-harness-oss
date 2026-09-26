@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { RICH_MENU_DIMENSIONS, type RichMenuAreaIntent } from '@line-crm/shared'
+import Notice from '@/components/shared/notice'
 
 export type Area = {
   id: string
@@ -302,9 +303,9 @@ export function CanvasEditor({
   return (
     <div className="space-y-2 select-none">
       {limitNotice && (
-        <p role="status" className="bg-status-warn-soft text-status-warn-deep rounded-control px-3 py-2 text-xs">
+        <Notice tone="warn">
           {limitNotice}
-        </p>
+        </Notice>
       )}
       <div className="flex items-center gap-2 text-sm">
         <span className="text-gray-500 text-xs">ズーム</span>

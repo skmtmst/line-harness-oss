@@ -9,6 +9,7 @@ import QuestionEditor, {
   type ScenarioQuestion,
 } from '@/components/scenarios/question-editor'
 import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
 import StickyBar from '@/components/shared/sticky-bar'
 import ListState from '@/components/shared/list-state'
 import SelectField from '@/components/shared/select-field'
@@ -198,9 +199,7 @@ function QuestionTemplatePageInner() {
       </nav>
 
       {error && (
-        <div role="alert" className="bg-danger-bg text-danger rounded-control text-label mb-4 px-4 py-3">
-          {error}
-        </div>
+        <Notice tone="danger" message={error} className="mb-4" />
       )}
 
       <div className="grid min-w-0 gap-4 2xl:grid-cols-4">

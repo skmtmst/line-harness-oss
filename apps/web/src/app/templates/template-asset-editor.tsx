@@ -7,6 +7,7 @@ import { api, type BroadcastAssetKind } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Combobox from '@/components/shared/combobox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Notice from '@/components/shared/notice'
 import StickyBar from '@/components/shared/sticky-bar'
 import { TextField } from '@/components/shared/text-field'
 import DateTimeField from '@/components/shared/date-time-field'
@@ -399,8 +400,8 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
         <span className="mx-2">›</span><span>新しく作る</span>
       </nav>
 
-      {error ? <p role="alert" className="bg-danger-bg text-danger rounded-control mb-4 px-4 py-3 text-sm">{error}</p> : null}
-      {saved ? <p role="status" className="bg-success-bg text-success rounded-control mb-4 px-4 py-3 text-sm">保存しました。<Link href="/templates" className="font-semibold underline">一覧へ戻る</Link></p> : null}
+      {error ? <Notice tone="danger" message={error} className="mb-4" /> : null}
+      {saved ? <Notice tone="success" message="保存しました。" className="mb-4" action={<Link href="/templates" className="font-semibold underline">一覧へ戻る</Link>} /> : null}
 
       <div className="flex min-w-0 flex-col gap-4 xl:flex-row">
         <div className="min-w-0 flex-1 space-y-4">

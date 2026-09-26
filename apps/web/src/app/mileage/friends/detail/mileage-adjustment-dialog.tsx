@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import { ChoiceCard } from '@/components/shared/create-page'
 import Dialog from '@/components/shared/dialog'
+import Notice from '@/components/shared/notice'
 import { Field, TextArea, TextInput } from '@/components/shared/form-controls'
 import DateField from '@/components/shared/date-field'
 import Select from '@/components/shared/select'
@@ -206,9 +207,9 @@ export default function MileageAdjustmentDialog({
                 ))}
               </div>
               {direction === 'decrease' ? (
-                <p className="rounded-control bg-warning-bg p-3 text-xs leading-5 text-warning">
+                <Notice tone="warn">
                   残高より多くは減らせません。変更後の残高が0未満になる操作は実行しません。
-                </p>
+                </Notice>
               ) : null}
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="マイル数" htmlFor="mileage-adjustment-amount" required>
@@ -253,9 +254,9 @@ export default function MileageAdjustmentDialog({
                   </div>
                 </section>
               ) : null}
-              <p className="rounded-control bg-info-bg p-3 text-xs leading-5 text-ink-secondary">
+              <Notice tone="info">
                 通知の成否と有効期限は記録に残ります。自動通知なので、担当者からの個別返信としては扱いません。
-              </p>
+              </Notice>
             </>
           ) : (
             <section aria-label="変更内容の確認" className="space-y-3">
@@ -272,9 +273,9 @@ export default function MileageAdjustmentDialog({
                 <div className="grid grid-cols-3 gap-3"><dt className="text-ink-faint">有効期限</dt><dd className="col-span-2 text-ink">{expiresOn || '期限なし'}</dd></div>
                 <div className="grid grid-cols-3 gap-3"><dt className="text-ink-faint">LINE通知</dt><dd className="col-span-2 text-ink">{notifyFriend ? '変更後に自動で知らせる' : '知らせない'}</dd></div>
               </dl>
-              <div className="rounded-control bg-warning-bg p-3 text-xs leading-5 text-warning">
+              <Notice tone="warn">
                 既存の履歴は書き換えず、理由と実行者を持つ新しい調整行を追加します。同じ操作を再送しても二重反映しません。
-              </div>
+              </Notice>
             </section>
           )}
         </div>

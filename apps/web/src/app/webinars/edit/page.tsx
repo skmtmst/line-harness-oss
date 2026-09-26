@@ -1,6 +1,7 @@
 'use client'
 
 import Disclosure from '@/components/shared/disclosure'
+import Notice from '@/components/shared/notice'
 import SelectField from '@/components/shared/select-field'
 import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
@@ -238,15 +239,9 @@ function CommentsTab({ webinarId }: { webinarId: string }) {
   return (
     <div className="space-y-4">
       {message && (
-        <div
-          className={`p-3 rounded-lg text-sm border ${
-            isErrorMessage
-              ? 'bg-danger-bg border-danger/20 text-danger'
-              : 'bg-info-bg border-info text-info'
-          }`}
-        >
+        <Notice tone={isErrorMessage ? 'danger' : 'info'}>
           {message}
-        </div>
+        </Notice>
       )}
       <div>
         <p className="mb-1 text-sm text-ink-secondary">
@@ -350,10 +345,12 @@ function UserCommentsSection({ webinarId }: { webinarId: string }) {
 
   if (failed) {
     return (
-      <div className="rounded-2xl border border-danger/20 bg-danger-bg p-5 text-sm text-danger">
-        <p>視聴者コメントを読み込めませんでした。</p>
-        <button type="button" onClick={() => setAttempt((count) => count + 1)} className="mt-1 font-medium underline">もう一度読み込む</button>
-      </div>
+      <Notice
+        tone="danger"
+        action={<button type="button" onClick={() => setAttempt((count) => count + 1)} className="font-medium underline">もう一度読み込む</button>}
+      >
+        視聴者コメントを読み込めませんでした。
+      </Notice>
     )
   }
   if (!comments || comments.length === 0) return null
@@ -635,10 +632,12 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
   /* 分析・一覧の面は集計が本体。集計の失敗だけは面全体の失敗として扱う。 */
   if (analyticsState === 'error') {
     return (
-      <div className="rounded-2xl border border-danger/20 bg-danger-bg p-5 text-sm text-danger">
-        <p>分析データを読み込めませんでした。</p>
-        <button type="button" onClick={() => { setAttempt((count) => count + 1); onRetry() }} className="mt-1 font-medium underline">もう一度読み込む</button>
-      </div>
+      <Notice
+        tone="danger"
+        action={<button type="button" onClick={() => { setAttempt((count) => count + 1); onRetry() }} className="font-medium underline">もう一度読み込む</button>}
+      >
+        分析データを読み込めませんでした。
+      </Notice>
     )
   }
   if (!analytics) return <div className="text-ink-faint text-sm">読み込み中...</div>
@@ -1524,12 +1523,14 @@ function CtasTab({ webinarId, durationSeconds, forms, formsState, onRetryForms, 
         フォーム機能のタグ付与・シナリオ発火が自動で動きます。「URL」は外部ページを開きます。
       </p>
       {message && (
-        <p className="whitespace-pre-line rounded bg-info-bg p-2 text-sm">
+        <Notice
+          tone="info"
+          action={!loaded ? (
+            <button type="button" onClick={() => void loadCtas()} className="font-medium underline">もう一度読み込む</button>
+          ) : undefined}
+        >
           {message}
-          {!loaded && (
-            <button type="button" onClick={() => void loadCtas()} className="ml-2 font-medium underline">もう一度読み込む</button>
-          )}
-        </p>
+        </Notice>
       )}
       {ctas.map((c, i) => (
         <div key={i} className="space-y-2 rounded border border-hairline p-3">
@@ -2083,27 +2084,29 @@ function ReviewStep({ webinar, editor, registrations, ctaCount, onBack, onPublis
       <section className="border-hairline bg-canvas space-y-4 rounded-card border p-5 shadow-card">
       <div><h2 className="text-ink font-bold">公開前チェック</h2><p className="text-ink-faint mt-1 text-xs">公開に必要な設定を確認します。</p></div>
       {validationState === 'ready' && blockers.length > 0 ? (
-        <div className="text-warning bg-warning-bg rounded-card p-4 text-sm">
+        <Notice tone="warn">
           <p className="font-bold">このままでは公開できません。</p>
           <ul className="mt-2 list-disc space-y-1 pl-5 text-xs">
             {blockers.map((text) => <li key={text}>{text}</li>)}
           </ul>
-        </div>
+        </Notice>
       ) : validationState === 'ready' ? (
-        <p className="bg-success-bg text-success rounded-card p-4 text-sm font-bold">
+        <Notice tone="success">
           必要なものは揃っています。
-        </p>
+        </Notice>
       ) : null}
       <ul className="divide-hairline border-hairline divide-y rounded-xl border text-sm">
         {(validation?.checks ?? []).map((check) => <li key={check.key} className="text-ink flex items-start gap-2 px-4 py-3"><span className={check.status === 'passed' ? 'text-success' : check.status === 'warning' ? 'text-warning' : 'text-danger'}>{check.status === 'passed' ? '✓' : '!'}</span><span><strong className="block">{check.label}</strong><span className="text-ink-faint text-xs">{check.detail}</span></span></li>)}
         {validationState === 'loading' ? <li className="text-ink-faint px-4 py-3">公開前検査を読み込んでいます。</li> : null}
       </ul>
       {validationState === 'error' ? (
-        <div className="border-danger bg-danger-bg rounded-card border p-4 text-sm" role="alert">
-          <p className="text-danger font-bold">公開前検査を読み込めませんでした。このままでは公開できません。</p>
-          <p className="text-ink-secondary mt-1 text-xs">まず下のボタンでもう一度読み込んでください。直らなければ基本設定・動画・CTAの各段が保存済みか確かめ、時間をおいて開き直してください。</p>
-          <div className="mt-3"><Button onClick={loadValidation}>もう一度読み込む</Button></div>
-        </div>
+        <Notice
+          tone="danger"
+          action={<Button onClick={loadValidation}>もう一度読み込む</Button>}
+        >
+          <p className="font-bold">公開前検査を読み込めませんでした。このままでは公開できません。</p>
+          <p className="mt-1 text-xs">まず下のボタンでもう一度読み込んでください。直らなければ基本設定・動画・CTAの各段が保存済みか確かめ、時間をおいて開き直してください。</p>
+        </Notice>
       ) : null}
       </section>
       <section className="border-hairline bg-canvas space-y-4 rounded-card border p-5 shadow-card">

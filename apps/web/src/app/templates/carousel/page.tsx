@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { api } from '@/lib/api'
 import type { Folder } from '@line-crm/shared'
 import { Field, inputClass } from '@/components/shared/create-page'
+import Notice from '@/components/shared/notice'
 import SelectField from '@/components/shared/select-field'
 import InlineActionList, { useActionOptions } from '@/components/auto-replies/inline-action-list'
 import { useAccount } from '@/contexts/account-context'
@@ -806,15 +807,16 @@ function CarouselEditorInner() {
           )}
 
           {error && (
-            <div role="alert" className="bg-danger-bg border-danger-bg text-danger rounded-lg border p-4 text-sm">
-              <p>{error}</p>
-              {saveFailed && (
+            <Notice
+              tone="danger"
+              message={error}
+              action={saveFailed ? (
                 /*
                  * N-149: 原因だけ出して止めると、人は「入力が消えたか」と
                  * 不安になる。残っていることと、やり直す口を一緒に出す。
                  */
-                <p className="mt-2">
-                  <span className="text-ink-secondary">入力した内容はそのまま残っています。</span>
+                <span className="text-xs">
+                  <span>入力した内容はそのまま残っています。</span>
                   <button
                     type="button"
                     onClick={save}
@@ -823,9 +825,9 @@ function CarouselEditorInner() {
                   >
                     もう一度保存する
                   </button>
-                </p>
-              )}
-            </div>
+                </span>
+              ) : undefined}
+            />
           )}
 
           <section className="bg-canvas rounded-card border-hairline border p-5">

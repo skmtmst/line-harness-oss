@@ -5,6 +5,7 @@ import Button from '@/components/shared/button'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import SelectField from '@/components/shared/select-field'
 import StepTrail from '@/components/shared/step-trail'
+import Notice from '@/components/shared/notice'
 import ConditionBuilder from '@/components/shared/condition-builder'
 import { AreaProperties } from './area-properties'
 import type { Area } from './canvas-editor'
@@ -231,7 +232,7 @@ export default function RichMenuCreateForm({
         <p>名前と土台のレイアウトを決めます。画像とタップ領域は、作成後の編集画面で設定します。</p>
       </section>
       <StepTrail label="リッチメニュー作成の進み方" items={[{ label: '形とボタン', state: 'current' }, { label: '誰に出すか', state: 'todo' }, { label: '公開のしかた', state: 'todo' }]} />
-      {compatibilityError || validationError ? <div role="alert" className="border-danger bg-danger-bg text-danger mt-4 rounded-control border p-3 text-sm">{compatibilityError ?? validationError}</div> : null}
+      {compatibilityError || validationError ? <Notice tone="danger" className="mt-4">{compatibilityError ?? validationError}</Notice> : null}
       <div className="mt-4 grid items-start gap-4 lg:grid-cols-4">
         <div className="border-hairline bg-canvas rounded-card min-w-0 space-y-4 border p-4 shadow-sm lg:col-span-3">
           <div className="grid gap-3 lg:grid-cols-6">
@@ -374,7 +375,7 @@ export default function RichMenuCreateForm({
 
         <aside className="sticky top-20 space-y-3">
           <section className="bg-info rounded-card p-4 text-on-accent"><h2 className="mb-3 text-center text-sm font-bold">LINEプレビュー</h2><p className="bg-canvas text-ink mb-1 rounded-t-control py-2 text-center text-xs">{value.chatBarText || 'メニュー'}</p><RichMenuTemplatePreview template={template} /></section>
-          <section className="bg-warning-bg text-warning rounded-card p-4 text-xs leading-6"><h2 className="font-bold">公開前に見ておくところ</h2><p>・アクションが未設定の面が {unsetLabels.length}つあります</p><p>・画像は1MBまで。超えると登録できません</p><p>・切替メニューの移動先は、公開してからでないと動きません</p></section>
+          <Notice tone="warn"><h2 className="font-bold">公開前に見ておくところ</h2><p>・アクションが未設定の面が {unsetLabels.length}つあります</p><p>・画像は1MBまで。超えると登録できません</p><p>・切替メニューの移動先は、公開してからでないと動きません</p></Notice>
         </aside>
         {footer ? <div className="lg:col-span-4">{footer}</div> : null}
       </div>

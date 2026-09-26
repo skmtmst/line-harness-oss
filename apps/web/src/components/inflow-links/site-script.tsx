@@ -6,6 +6,7 @@ import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import { TableHeadRow, Th } from '@/components/shared/table'
+import Notice from '@/components/shared/notice'
 
 type PageRow = { host: string | null; path: string; views: number; visitors: number }
 type TrackingSummary = {
@@ -102,9 +103,9 @@ export default function SiteScript() {
 
   return (
     <div className="space-y-4" data-design-node="IhSBB">
-      <p className="rounded-card bg-info-bg px-4 py-3 text-xs leading-relaxed text-ink-secondary">
+      <Notice tone="info">
         見ているページを数えるためのコードです。サイトに貼ると、どのページを見た人が友だちになったかが分かります。入力フォームの中身など、個人が特定できる情報は送りません。
-      </p>
+      </Notice>
 
       <section className={`rounded-card border p-4 ${receiving ? 'border-success-bg bg-success-bg' : 'border-hairline bg-canvas'}`}>
         <div className="flex flex-wrap items-center justify-between gap-3">

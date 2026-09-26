@@ -20,6 +20,7 @@ import Chip from '@/components/shared/chip'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
+import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
@@ -1298,9 +1299,7 @@ export function CreateAffiliateModal({
             </p>
 
             {formError && (
-              <div className="rounded-control border border-danger-bg bg-danger-bg p-3 text-sm text-danger" role="alert">
-                {formError}
-              </div>
+              <Notice tone="danger" message={formError} />
             )}
 
             <div className="flex justify-end gap-2 pt-2">

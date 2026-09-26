@@ -4,6 +4,7 @@ import { useMemo } from 'react'
 import Link from 'next/link'
 import type { BookingRequest } from '@/lib/api'
 import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
 
 // BOOKING-01: 9〜18時の固定10マスは「空き枠」ではなく、空き枠APIの実績が
 // まだ届いていないときの表示レンジ。実際に受け付けられる枠が届いたら、
@@ -558,9 +559,7 @@ export default function BookingCalendar({ mode, items, onOpen, staffNames, canCr
       {/* BOOKING-01: 未設定・取得不能・空き0を区別して知らせる。
           未設定・取得不能のときの「—」は空き0とは別の意味なので理由を出す。 */}
       {availability.status === 'unconfigured' ? (
-        <div className="bg-warning-bg text-warning mb-4 rounded-control px-4 py-3 text-xs font-semibold">
-          担当者または予約メニューがまだ設定されていません。受け付けられる枠がないため、空きは「—」で表示しています。予約設定で登録すると空き枠が出ます。
-        </div>
+        <Notice tone="warn" message="担当者または予約メニューがまだ設定されていません。受け付けられる枠がないため、空きは「—」で表示しています。予約設定で登録すると空き枠が出ます。" className="mb-4" />
       ) : null}
       {/*
         ★V7：空き枠だけ取れないときは、その場所に小さく1行だけ。

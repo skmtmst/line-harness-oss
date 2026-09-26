@@ -3,10 +3,11 @@
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useEffect, useState } from 'react'
-import { AlertTriangle, ArrowRight, Building2 } from 'lucide-react'
+import { ArrowRight, Building2 } from 'lucide-react'
 import Button from '@/components/shared/button'
 import { Field, TextInput } from '@/components/shared/form-controls'
 import NoteBar from '@/components/shared/note-bar'
+import Notice from '@/components/shared/notice'
 import SelectField from '@/components/shared/select-field'
 import StickyBar from '@/components/shared/sticky-bar'
 import { useAccount } from '@/contexts/account-context'
@@ -288,7 +289,7 @@ function NewOperatorNotificationInner() {
             <label className="mt-4 flex items-start gap-3 text-sm text-ink-secondary"><input type="checkbox" checked={emailFallback} onChange={(event) => setEmailFallback(event.target.checked)} className="mt-0.5 h-4 w-4 accent-accent" /><span><strong className="block text-ink">だれも受け取れないときはメールでも送る</strong><span className="text-xs text-ink-faint">LINE未ログインの人がいるとき</span></span></label>
           </section>
 
-          {error ? <p role="alert" className="border-danger bg-danger-bg text-danger rounded-control border px-4 py-3 text-sm">{error}</p> : null}
+          {error ? <Notice tone="danger" message={error} /> : null}
           {notice ? <p role="status" className="border-success bg-success-bg text-success rounded-control border px-4 py-3 text-sm">{notice}</p> : null}
         </div>
 
@@ -297,14 +298,14 @@ function NewOperatorNotificationInner() {
             <div className="flex items-center gap-2"><Building2 aria-hidden="true" size={18} className="text-ink-faint" /><h2 className="text-sm font-semibold text-ink">お店の人にはこう届きます</h2></div>
             <p className="mt-2 whitespace-pre-wrap text-xs text-ink-faint">文面はここで確かめられます。<br />【運用者へのお知らせ】{name.trim() || 'お知らせ名'}</p>
           </section>
-          <section className="border-warning bg-warning-bg text-warning rounded-card border p-4">
-            <div className="flex items-center gap-2"><AlertTriangle aria-hidden="true" size={18} /><h2 className="text-sm font-semibold">気をつけること</h2></div>
+          <Notice tone="warn">
+            <h2 className="text-sm font-semibold">気をつけること</h2>
             <ul className="mt-3 space-y-3 text-xs leading-5">
               <li>受け取る人が0人だと公開できません。</li>
               <li>お客様の連絡先は宛先に入りません。</li>
               <li>下書きを保存しても通知は始まりません。</li>
             </ul>
-          </section>
+          </Notice>
           <section className="border-hairline bg-canvas rounded-card border p-4">
             <h2 className="text-sm font-semibold text-ink">つながる先</h2>
             <div className="mt-3 space-y-2 text-xs">

@@ -12,6 +12,7 @@ import StickyBar from '@/components/shared/sticky-bar'
 import SupportMarkRulesPanel from './support-mark-rules-panel'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
+import Notice from '@/components/shared/notice'
 import { EVENT_LABELS, eventLabel } from './support-mark-rules-view'
 import { AttributeKindGuide, DuplicateNameNote, findDuplicateNames } from './attribute-kind-guide'
 
@@ -126,7 +127,7 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
         <Button href="/tags?tab=marks">対応マークへ</Button>
       </div>
 
-      {error ? <p role="alert" className="mb-4 rounded-control border border-danger/20 bg-danger-bg p-3 text-sm text-danger">{error}</p> : null}
+      {error ? <Notice tone="danger" className="mb-4">{error}</Notice> : null}
 
       {/*
         グリッド子は `min-w-0` で縮める（#973 U020）。無いと中身の

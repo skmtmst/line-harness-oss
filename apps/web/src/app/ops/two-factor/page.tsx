@@ -6,6 +6,7 @@ import { opsCall } from '@/components/ops/ops-ui'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
+import Notice from '@/components/shared/notice'
 import { adminSessionHeaders, captureAdminSessionHandoff } from '@/lib/admin-session'
 import { api } from '@/lib/api'
 import { logoutAndGoToLogin } from '@/lib/logout'
@@ -106,7 +107,7 @@ export default function OpsTwoFactorPage() {
       ) : (
         <form onSubmit={(event) => void submit(event)} noValidate className="flex w-full flex-col items-center gap-4">
           {error ? (
-            <p role="alert" className="w-full rounded-control bg-status-danger-soft px-4 py-3 text-label text-danger">{error}</p>
+            <Notice tone="danger" message={error} className="w-full" />
           ) : null}
           {qr ? (
             // eslint-disable-next-line @next/next/no-img-element -- 手元で描いた data: URL の QR。最適化の対象ではない

@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
 import { ApiError, api } from '@/lib/api'
 import { FEATURE_SETTINGS_UPDATED_EVENT } from '@/lib/feature-settings'
 import { loadFeatureSettings } from '@/lib/feature-settings-cache'
@@ -259,14 +260,15 @@ function Picker({ currentFeatures, selectedId, busy, applyError, onSelect, onApp
       </ul>
 
       {applyError && (
-        <p role="alert" className="rounded-control border-danger bg-danger-bg text-danger border p-3 text-sm leading-relaxed">
-          {applyError}{' '}
-          {applyError === FEATURE_SET_LABELS.impactBlocked && (
-            <Link href="/settings" className="font-bold underline">
+        <Notice
+          tone="danger"
+          message={applyError}
+          action={applyError === FEATURE_SET_LABELS.impactBlocked ? (
+            <Link href="/settings">
               {FEATURE_SET_LABELS.openSettings}
             </Link>
-          )}
-        </p>
+          ) : undefined}
+        />
       )}
 
       <div className="flex justify-end">

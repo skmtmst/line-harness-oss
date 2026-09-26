@@ -10,6 +10,7 @@ import MergedTabs from '@/components/layout/merged-tabs'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import FilterChip from '@/components/shared/filter-chip'
 import KpiCollapse from '@/components/ui/kpi-collapse'
+import Notice from '@/components/shared/notice'
 import ListRange from '@/components/ui/list-range'
 import { useAutomationRunPermissions } from '@/components/automations/use-can-manage'
 
@@ -301,9 +302,7 @@ export default function AutomationRunsPage() {
         <Metric label="条件に外れて動かなかった" value={data ? `${data.summary.skipped.toLocaleString('ja-JP')}回` : '—'} note="条件が厳しすぎないか見てください" />
       </KpiCollapse>
 
-      <div className="bg-info-bg text-ink-secondary mb-4 rounded-control px-4 py-3 text-xs">
-        オートメーションが動いた記録です。条件に外れて動かなかったものも並びます。
-      </div>
+      <Notice tone="info" message="オートメーションが動いた記録です。条件に外れて動かなかったものも並びます。" className="mb-4" />
       {retryNotice ? <p className="mb-4 rounded-control border border-hairline bg-canvas-sunken px-4 py-3 text-sm text-ink-secondary" role="status">{retryNotice}</p> : null}
 
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">

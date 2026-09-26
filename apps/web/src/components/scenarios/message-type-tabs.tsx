@@ -1,4 +1,5 @@
 'use client'
+import Notice from '@/components/shared/notice'
 import styles from './message-type-tabs.module.css'
 
 /*
@@ -113,9 +114,9 @@ export default function MessageTypeTabs({ value, onChange, children }: MessageTy
         分からない。選ばれている種別の説明を、タブのすぐ下に出しておく。
       */}
       {selected?.disabledReason && (
-        <p className="bg-warning-bg text-ink-secondary rounded-card mt-3 px-4 py-3 text-xs">
+        <Notice tone="warn" className="mt-3">
           {selected.disabledReason}
-        </p>
+        </Notice>
       )}
 
       <div className="mt-4">{children}</div>

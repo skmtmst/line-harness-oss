@@ -11,6 +11,7 @@ import Dialog from '@/components/shared/dialog'
 import SelectField from '@/components/shared/select-field'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import styles from './knowledge.module.css'
+import Notice from '@/components/shared/notice'
 
 /** ★V6 37-11-A DHdsw / 37-11-B ZAOc7. Mount with key={article.id}. */
 export default function KnowledgeEditor({ article: initial, onClose, onSaved }: {
@@ -70,9 +71,9 @@ export default function KnowledgeEditor({ article: initial, onClose, onSaved }: 
     </div>}>
     <div className={styles.editor}>
       {/* ★V7: 緑は「正常」だけ。説明の帯は枠なしの info の小さい帯にする。 */}
-      <div role="note" className="rounded-control bg-info-bg px-4 py-3 text-xs text-ink-secondary">{editing
+      <Notice tone="info">{editing
         ? '変更を保存すると承認待ちに戻ります。再承認するまで、この記事は AI の返信に使われません。'
-        : '自動で作成した下書きです。解決の根拠と記事案を確認してください。承認するまで AI の返信には使われません。'}</div>
+        : '自動で作成した下書きです。解決の根拠と記事案を確認してください。承認するまで AI の返信には使われません。'}</Notice>
       <div className={styles.sourceLine}>
         <p className={styles.source}>元の問い合わせ：{article.ticketNo == null ? '番号未取得' : `#MB-${String(article.ticketNo).padStart(4, '0')}`}{article.sourceSubject ? ` ${article.sourceSubject}` : ''}</p>
         <Chip data-design-node="aeReviewKind" tone={kindLabel.tone} className={styles.articleKindChip}>{kindLabel.label}</Chip>

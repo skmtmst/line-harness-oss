@@ -180,6 +180,7 @@ import { useAccount } from '@/contexts/account-context'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
@@ -774,17 +775,10 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
         />
       </KpiCollapse>
 
-      <p className="bg-info-bg text-ink-secondary mb-4 rounded-control px-4 py-3 text-xs">
-        成果地点は「数え方の決めごと」です。ここで決めたものを、案件・自動応答・分析などから呼び出して使います。
-      </p>
+      <Notice tone="info" message="成果地点は「数え方の決めごと」です。ここで決めたものを、案件・自動応答・分析などから呼び出して使います。" className="mb-4" />
 
       {highlightedPoint ? (
-        <p
-          role="status"
-          className="border-info bg-info-bg text-info mb-4 rounded-control border px-4 py-3 text-sm font-semibold"
-        >
-          「{highlightedPoint.name}」を保存しました。色の付いた行です。
-        </p>
+        <Notice tone="info" message={`「${highlightedPoint.name}」を保存しました。色の付いた行です。`} className="mb-4" />
       ) : null}
 
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -1037,9 +1031,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
               <div><dt className="text-ink-faint">取消内訳</dt><dd className="text-ink mt-1 font-semibold">{detailTarget.metrics.cancellationCount == null ? '取消台帳は未接続' : `${detailTarget.metrics.cancellationCount}件・¥${(detailTarget.metrics.cancellationValue ?? 0).toLocaleString('ja-JP')}`}</dd></div>
             </dl>
             {detailTarget.stateReason ? (
-              <p className="bg-warning-bg text-warning rounded-control px-4 py-3 text-sm font-semibold" role="status">
-                {detailTarget.stateReason}
-              </p>
+              <Notice tone="warn" message={detailTarget.stateReason} />
             ) : null}
             {ingestError ? <p className="text-danger text-sm" role="alert">{ingestError}</p> : null}
             {/*
@@ -1119,10 +1111,10 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                   ) : null}
                 </div>
                 {issuedSecret ? (
-                  <p className="bg-info-bg text-info mt-2 rounded-control px-3 py-2 text-xs font-semibold">
+                  <Notice tone="info" className="mt-2">
                     新しい鍵: <code className="break-all">{issuedSecret}</code><br />
                     この表示は一度だけです。連携先へ渡して保管してください。
-                  </p>
+                  </Notice>
                 ) : null}
                 {ingestEvents.length > 0 ? (
                   <ul className="mt-3 space-y-1 text-xs">
@@ -1507,9 +1499,7 @@ function ReportTab({ accountId }: { accountId: string | null }) {
         />
       </KpiCollapse>
 
-      <p className="bg-info-bg text-info rounded-control px-4 py-3 text-sm font-semibold">
-        成果地点ごとの件数と、どこから来たかです。数え方は「成果地点」で決めます。
-      </p>
+      <Notice tone="info" message="成果地点ごとの件数と、どこから来たかです。数え方は「成果地点」で決めます。" />
 
       <section className="bg-canvas rounded-card border-hairline border p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">

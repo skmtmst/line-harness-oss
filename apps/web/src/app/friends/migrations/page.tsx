@@ -7,6 +7,7 @@ import { api, type FriendMigrationJob } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import Disclosure from '@/components/shared/disclosure'
+import Notice from '@/components/shared/notice'
 import FileDropzone, { AttachmentRow } from '@/components/shared/file-drop'
 import HelpTip from '@/components/shared/help-tip'
 import ListState from '@/components/shared/list-state'
@@ -129,7 +130,7 @@ export default function FriendMigrationsPage() {
       <Link href="/accounts?tab=migration" className="text-ink-secondary pb-3">UIDの移行</Link>
       <span className="border-action text-action border-b-2 pb-3 font-semibold">CSVで書き出す・取り込む</span>
     </nav>
-    <div className="bg-info-bg text-ink-secondary mb-4 rounded-control px-4 py-3 text-xs">書き出しても友だちの情報は変わりません。取り込みは、まず確認だけを実行できます。</div>
+    <Notice tone="info" message="書き出しても友だちの情報は変わりません。取り込みは、まず確認だけを実行できます。" className="mb-4" />
     <Disclosure size="compact" title="取り込みの内訳の見方" hint="追加・更新など5区分" className="mb-4">
       <p className="text-sm">取り込みは「追加・更新・変更なし・競合・エラー」の内訳を先に見せます。反映後も、いつ誰が操作したかを履歴に残します。</p>
     </Disclosure>

@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Avatar from '@/components/shared/avatar'
+import Notice from '@/components/shared/notice'
 import StatusBadge from '@/components/shared/status-badge'
 import { ApiError, fetchApi } from '@/lib/api'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
@@ -286,21 +287,26 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
         両方が出すと、同じものが画面に2つ並ぶ（実際そうなっていた）。
       */}
       {error && (
-        <div className="bg-danger-bg border-danger-bg text-danger rounded-card mb-4 border px-4 py-3 text-sm">
+        <Notice tone="danger" className="mb-4">
           {error}
-        </div>
+        </Notice>
       )}
       {inboxStalled && (
-        <div className="bg-danger-bg border-danger-bg text-danger rounded-card mb-4 border px-4 py-3 text-sm">
+        <Notice
+          tone="danger"
+          className="mb-4"
+          action={(
+            <button
+              type="button"
+              onClick={() => setInboxRetryKey((key) => key + 1)}
+              className="font-bold underline"
+            >
+              再試行する
+            </button>
+          )}
+        >
           お問い合わせ一覧の更新を一時停止しています（接続できません）。
-          <button
-            type="button"
-            onClick={() => setInboxRetryKey((key) => key + 1)}
-            className="font-bold underline"
-          >
-            再試行する
-          </button>
-        </div>
+        </Notice>
       )}
 
       <div className="rounded-card border-hairline overflow-hidden border bg-canvas lg:grid lg:h-[calc(100vh-260px)] lg:min-h-[620px] lg:grid-cols-[360px_1fr]">

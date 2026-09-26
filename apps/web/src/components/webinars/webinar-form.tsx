@@ -11,6 +11,7 @@ import { CareCard } from '@/components/shared/side-cards'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import { webinarErrorText } from './webinar-error-text'
+import Notice from '@/components/shared/notice'
 
 const DAYS = ['日', '月', '火', '水', '木', '金', '土']
 
@@ -262,9 +263,9 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
   return (
     <div className="space-y-5">
       {error && (
-        <div className="p-3 bg-danger-bg border border-danger/20 rounded-lg text-danger text-sm">
+        <Notice tone="danger">
           {error}
-        </div>
+        </Notice>
       )}
 
       {/* ★V7: 基本の段も共通の枠の幅で「本体＋右の案内」の2列にする。右の文は画面内の既存の文だけを使う。 */}
@@ -363,9 +364,9 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
           {rules.length === 0 && (
             /* 枠が無いと、公開しても友だちの画面に「次の回」が出ない。
                作ったのに見られない状態になるので、その場で断る。 */
-            <p className="text-warning bg-warning-bg rounded-card mt-3 p-3 text-xs">
+            <Notice tone="warn" className="mt-3">
               配信枠が未設定です。このままでは友だちが視聴できません。
-            </p>
+            </Notice>
           )}
           {dailyRules.length > 0 ? (
             <div className="mt-4 flex flex-col gap-1 rounded-xl border border-info/25 bg-info-bg p-4 sm:flex-row sm:items-center sm:justify-between">

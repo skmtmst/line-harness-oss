@@ -16,6 +16,7 @@ import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Card from '@/components/shared/card'
 import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
 import { STATE_TEXT } from '@/components/shared/not-connected'
 import { Tabs } from '@/components/shared/tabs'
 import {
@@ -146,10 +147,11 @@ function NotificationsPageInner() {
       </div>
 
       {error ? (
-        <div className="bg-danger-bg text-danger rounded-card flex flex-wrap items-center gap-3 p-4 text-sm" role="alert">
-          <span className="min-w-0 flex-1">{error}</span>
-          <button type="button" onClick={() => void load(0, false)} className="shrink-0 font-medium underline">もう一度読み込む</button>
-        </div>
+        <Notice
+          tone="danger"
+          message={error}
+          action={<button type="button" onClick={() => void load(0, false)} className="shrink-0 font-medium underline">もう一度読み込む</button>}
+        />
       ) : null}
 
       <Card overflow="hidden">

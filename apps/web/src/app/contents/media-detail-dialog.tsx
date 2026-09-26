@@ -5,6 +5,7 @@ import type { MediaDeleteImpactReference, MediaItem } from '@line-crm/shared'
 import { ApiError, api, type MediaVersionBlocker, type MediaVersionPreview } from '@/lib/api'
 import Button from '@/components/shared/button'
 import DateField from '@/components/shared/date-field'
+import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import { formatMediaSize } from './media-usage-display'
 import { checkedAtText, referenceKindText, referenceNameText } from './media-delete-impact'
@@ -493,11 +494,11 @@ export default function MediaDetailDialog({
                 <input id={`${fileInputId}-reason`} value={changeReason} onChange={(event) => setChangeReason(event.target.value)} maxLength={500} className="border-hairline rounded-control mt-1 min-h-10 w-full border px-3 text-sm" placeholder="例：秋の写真へ更新" />
               </div>
             ) : null}
-            {versionError ? <p className="bg-danger-bg text-danger mt-3 rounded-control p-3 text-xs" role="alert">{versionError}</p> : null}
+            {versionError ? <Notice tone="danger" message={versionError} className="mt-3" /> : null}
             {impact && impact.usageCount > 0 ? (
-              <p className="bg-warning-bg text-warning rounded-control mt-3 p-3 text-xs font-semibold leading-5">
+              <Notice tone="warn" className="mt-3">
                 新しい版を追加しても、現在このメディアを使っている{impact.usageCount}か所の固定版は変わりません。使う場所ごとに切り替えてください。
-              </p>
+              </Notice>
             ) : null}
             <div className="mt-4 flex justify-end">
               {versionPreview?.canReplace ? (
@@ -583,7 +584,7 @@ export default function MediaDetailDialog({
                     placeholder="例：出演者の同意書を確認済み（2026-01-10）"
                   />
                 </div>
-                {termsError ? <p className="bg-danger-bg text-danger rounded-control p-3 text-xs" role="alert">{termsError}</p> : null}
+                {termsError ? <Notice tone="danger" message={termsError} /> : null}
                 <div className="flex justify-end gap-2">
                   <Button type="button" onClick={() => setTermsEditing(false)} disabled={termsBusy}>キャンセル</Button>
                   <Button type="button" variant="primary" onClick={() => void saveTerms()} disabled={termsBusy}>

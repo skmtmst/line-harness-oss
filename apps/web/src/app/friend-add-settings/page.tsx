@@ -8,6 +8,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import ActionMenu from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Notice from '@/components/shared/notice'
 import IconButton from '@/components/shared/icon-button'
 import ListToolbar from '@/components/shared/list-toolbar'
 import ListState from '@/components/shared/list-state'
@@ -229,9 +230,7 @@ function FriendAddSettingsList() {
         ★V7：仕組みの説明で、異常ではない。橙の太字の警告帯だと毎回「何か起きている」と読めるので、
         情報の色の小さな帯にする。
       */}
-      <div data-design="Alert" className="rounded-card bg-info-bg text-ink-secondary mb-4 px-4 py-2.5 text-xs leading-relaxed">
-        経路を確定できるのは「流入と計測」で発行したリンクから来た人だけです。素のQR・検索から来た人は「経路が分からなかった人」の設定が動きます。
-      </div>
+      <Notice data-design="Alert" tone="info" message="経路を確定できるのは「流入と計測」で発行したリンクから来た人だけです。素のQR・検索から来た人は「経路が分からなかった人」の設定が動きます。" className="mb-4" />
 
       <section data-design="Flow" className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="この7日の状況">
         <span className="sr-only">どう振り分けられるか。友だち追加された。この1か月の実績。</span>

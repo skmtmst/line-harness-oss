@@ -12,6 +12,7 @@ import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import ListKpis from '@/components/shared/list-kpis'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
+import Notice from '@/components/shared/notice'
 import { Th } from '@/components/shared/table'
 
 type MarkRow = SupportMarkListItem
@@ -103,7 +104,7 @@ function ArchiveMarkDialog({ mark, impact, replacementMarkId, loading, saving, e
               {selected ? <p className="mt-2 text-xs text-ink-faint">{impact.friendCount}人を「{selected.name}」へ置き換えます。</p> : null}
             </div>
           ) : null}
-          {error ? <p role="alert" className="mt-4 rounded-control border border-danger/20 bg-danger-bg p-3 text-sm text-danger">{error}</p> : null}
+          {error ? <Notice tone="danger" className="mt-4">{error}</Notice> : null}
         </div>
         <div className="flex justify-end gap-2 border-t border-hairline p-4"><Button onClick={onCancel} disabled={saving}>やめる</Button><button type="button" onClick={onConfirm} disabled={loading || saving || !impact?.canArchive || !replacementMarkId} className="h-9 rounded-control bg-danger px-4 text-sm font-bold text-on-accent disabled:opacity-40">{saving ? '保管中…' : '置き換えて保管する'}</button></div>
       </section>
@@ -370,14 +371,15 @@ export default function SupportMarkList({ accountId }: { accountId: string | nul
         {/* 追加ボタンはタブの右に1個だけ（#1014 ATTR-22）。一覧の中には置かない。 */}
       </div>
 
-      {error ? <p role="alert" className="mb-4 rounded-control border border-danger/20 bg-danger-bg p-3 text-sm text-danger">{error}</p> : null}
+      {error ? <Notice tone="danger" className="mb-4">{error}</Notice> : null}
       {status === 'ready' && actionError ? (
-        <p role="alert" className="mb-4 rounded-control border border-danger/20 bg-danger-bg p-3 text-sm text-danger">
-          {actionError}
-          {retryOrder ? (
+        <Notice
+          tone="danger"
+          className="mb-4"
+          action={retryOrder ? (
             <button
               type="button"
-              className="ml-2 font-semibold underline underline-offset-2"
+              className="font-semibold underline underline-offset-2"
               onClick={() => {
                 const next = retryOrder
                 setRetryOrder(null)
@@ -386,8 +388,10 @@ export default function SupportMarkList({ accountId }: { accountId: string | nul
             >
               再試行
             </button>
-          ) : null}
-        </p>
+          ) : undefined}
+        >
+          {actionError}
+        </Notice>
       ) : null}
 
       <div className="overflow-hidden rounded-card border border-hairline bg-canvas [box-shadow:1px_1px_2px_rgba(15,23,42,0.10)]">

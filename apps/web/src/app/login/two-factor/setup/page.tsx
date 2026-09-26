@@ -6,6 +6,7 @@ import Button from '@/components/shared/button'
 import { adminSessionHandoffPath, adminSessionHeaders, captureTwoFactorChallenge, clearTwoFactorChallenge, storeAdminSession, takeTwoFactorNextPath } from '@/lib/admin-session'
 import { useBrand } from '@/lib/use-brand'
 import { qrToDataURL } from '@/lib/qr-image'
+import Notice from '@/components/shared/notice'
 import OtpInput from '@/components/shared/otp-input'
 
 type SetupData = { provisioningUri: string; manualKey: string }
@@ -108,7 +109,7 @@ export default function TwoFactorSetupPage() {
           管理者には二段階認証が必須です。認証アプリ（Google Authenticator など）でQRコードを読み取り、表示された6桁の数字を入れてください。
         </p>
       </div>
-      {error && <p role="alert" className="mt-5 rounded-control bg-danger-bg px-3 py-2 text-sm text-danger">{error}</p>}
+      {error && <Notice tone="danger" message={error} className="mt-5" />}
       {loading ? (
         <p className="mt-6 text-center text-xs text-ink-faint">QRコードを用意しています…</p>
       ) : setup ? (

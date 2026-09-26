@@ -6,6 +6,7 @@ import { Suspense, useCallback, useEffect, useState } from 'react'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
+import Notice from '@/components/shared/notice'
 import Toggle from '@/components/shared/toggle'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -122,14 +123,10 @@ function BillingInner() {
   return (
     <div data-design-node={interval === 'year' ? 'clQZw' : 'OjkqO'} className="flex flex-col gap-4">
       {checkoutResult === 'success' ? (
-        <div className="rounded-card bg-accent-soft px-4 py-3 text-label text-ink" role="status">
-          お申し込みを受け付けました。決済の確認が済むと「契約中」に変わります（数秒〜1分ほどかかります）。
-        </div>
+        <Notice tone="info" message="お申し込みを受け付けました。決済の確認が済むと「契約中」に変わります（数秒〜1分ほどかかります）。" />
       ) : null}
       {checkoutResult === 'cancel' ? (
-        <div className="rounded-card bg-shell px-4 py-3 text-label text-ink-secondary" role="status">
-          お申し込みを中止しました。プランはいつでも選び直せます。
-        </div>
+        <Notice tone="info" message="お申し込みを中止しました。プランはいつでも選び直せます。" />
       ) : null}
 
       <div data-design="Status" data-design-node={interval === 'year' ? 'D9Ics' : 'bNTX7'}>

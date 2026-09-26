@@ -9,6 +9,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import FileDropzone, { AttachmentRow } from '@/components/shared/file-drop'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 import SelectField from '@/components/shared/select-field'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import SummaryCard from '@/components/shared/summary-card'
@@ -502,7 +503,7 @@ export default function AccountMigration() {
         実行前後の判断を誤らせる。
       */}
       {(!active || ['dry_run', 'review', 'ready'].includes(active.status)) && (
-        <div className="bg-info-bg text-ink-secondary mb-4 rounded-control px-4 py-3 text-xs">本移行まで、既存ユーザー・配信・シナリオには影響しません。</div>
+        <Notice tone="info" message="本移行まで、既存ユーザー・配信・シナリオには影響しません。" className="mb-4" />
       )}
       {/*
         #984 LAY-13: 段組みと寸法をそろえる。

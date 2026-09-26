@@ -10,6 +10,8 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
 import TargetMissing from '@/components/shared/target-missing'
 import TagEditorV4, { definitionsForSave, linkedActionFromDefinition, type TagEditorValues } from './tag-editor-v4'
+import Notice from '@/components/shared/notice'
+import { notifyToast } from '@/components/shared/toast'
 
 /**
  * 一覧の `DeleteTagDialog` (`tags-page-v4.tsx`) と同じ分け方。
@@ -63,7 +65,7 @@ export function DeleteDialog({ tag, dependencies, dependenciesStatus, onCancel, 
             <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">すでに積んだマイル</dt><dd className="font-bold">そのまま残る</dd></div>
           </dl>
         </div>
-        <p className="mt-4 rounded-control border border-danger/25 bg-danger-bg p-3 text-sm font-medium leading-6 text-danger">アフィリエイトや外部連携で使用中の場合は削除できません。削除後は元に戻せません。</p>
+        <Notice tone="danger" className="mt-4">アフィリエイトや外部連携で使用中の場合は削除できません。削除後は元に戻せません。</Notice>
         <label className="mt-5 block"><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">確認のため「{tag.name}」と入力してください</span><input value={confirmation} onChange={(event) => setConfirmation(event.target.value)} disabled={blocked} className="w-full rounded-control border border-hairline px-3 py-2.5 text-sm focus:border-danger disabled:bg-canvas-sunken" /></label>
         <div className="mt-6 flex items-center justify-end gap-2">{blockedReason && <p className="min-w-0 flex-1 text-xs text-ink-faint">{blockedReason}</p>}<button type="button" onClick={onCancel} className="shrink-0 rounded-control border border-hairline px-4 py-2.5 text-sm font-medium text-ink-secondary">キャンセル</button><button type="button" disabled={deleting || blocked || confirmation !== tag.name} onClick={onDelete} className="rounded-control bg-danger px-4 py-2.5 text-sm font-bold text-on-accent disabled:opacity-40">{deleting ? '削除中…' : 'タグを削除'}</button></div>
       </section>
@@ -92,19 +94,17 @@ function ArchivedTagEditor({ tag, accountId, onCancel, onSaved }: {
   const [description, setDescription] = useState(tag.description ?? '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const [notice, setNotice] = useState('')
 
   const save = async () => {
     if (saving) return
     setSaving(true)
     setError('')
-    setNotice('')
     try {
       const result = await api.tags.updateArchivedNameAndDescription(tag.id, accountId, tag.version ?? 1, {
         name, description: description || null,
       })
       if (!result.success) throw new Error(result.error)
-      setNotice('保存しました。')
+      notifyToast('保存しました。')
       onSaved(result.data.tag)
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : '保存に失敗しました。通信を確かめて、もう一度お試しください。')
@@ -115,12 +115,11 @@ function ArchivedTagEditor({ tag, accountId, onCancel, onSaved }: {
 
   return (
     <div className="mx-auto max-w-[680px] space-y-4 p-6">
-      <div role="status" className="rounded-card border border-warning/40 bg-warning-bg p-4 text-sm text-warning">
+      <Notice tone="warn">
         <p className="font-bold">このタグは保管済みです</p>
         <p className="mt-1 text-xs leading-5">保管済みのタグは、あとから元に戻す機能がありません。誤字などの表示名の訂正だけできます。フォルダ・付与のしかた・マイル・連動アクションなどの設定は変更できません。</p>
-      </div>
-      {error && <p role="alert" className="rounded-control border border-danger/25 bg-danger-bg p-3 text-sm text-danger">{error}</p>}
-      {notice && <p className="rounded-control border border-accent/25 bg-accent-soft p-3 text-sm text-accent-deep">{notice}</p>}
+      </Notice>
+      {error && <Notice tone="danger">{error}</Notice>}
       <label className="block"><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">タグ名</span><input value={name} onChange={(event) => setName(event.target.value)} maxLength={80} className="w-full rounded-control border border-hairline px-3 py-2.5 text-sm" /></label>
       <label className="block"><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">説明</span><textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} className="w-full rounded-control border border-hairline px-3 py-2.5 text-sm" /></label>
       <div className="flex justify-end gap-2">
@@ -252,7 +251,7 @@ export default function EditTagPageV4() {
       />
     )
   }
-  if (!selectedAccountId) return <div role="alert" className="rounded-card border border-warning/30 bg-warning-bg p-6 text-sm text-warning">LINE公式アカウントを選んでください。</div>
+  if (!selectedAccountId) return <Notice tone="warn">LINE公式アカウントを選んでください。</Notice>
   if ((!tag || !definition) && (tagMissing || !error)) {
     return (
       <TargetMissing

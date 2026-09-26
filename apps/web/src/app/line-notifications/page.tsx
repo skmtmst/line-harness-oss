@@ -10,6 +10,7 @@ import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
+import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import {
   ApiError,
@@ -542,7 +543,7 @@ function CustomerNotificationEditor({
       </div>
       <Button onClick={onTestSend} disabled={busy}>テスト受信者に送信</Button>
     </div>
-    {notice && <div role={notice.tone === 'success' ? 'status' : 'alert'} aria-live={notice.tone === 'success' ? 'polite' : 'assertive'} className={`rounded-control border px-4 py-3 text-sm ${notice.tone === 'success' ? 'border-success bg-success-bg text-success' : 'border-danger bg-danger-bg text-danger'}`}>{notice.text}</div>}
+    {notice && <Notice tone={notice.tone === 'success' ? 'success' : 'danger'} message={notice.text} />}
 
     {/* N-337: 狭い幅では見本を下に回す。390pxを無条件に横置きしない。 */}
     <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_390px]">
@@ -591,10 +592,10 @@ function CustomerNotificationEditor({
           <p className="mb-2 text-xs font-semibold text-ink-faint">架空の注文による表示例</p>
           <CardPreview setting={setting} />
         </section>
-        <section className="rounded-card border border-warning bg-warning-bg p-4 text-sm text-warning">
-          <h2 className="font-bold">これは「お知らせ」です</h2>
-          <ul className="mt-2 space-y-2 leading-5"><li>配信を止めている人にも届きます</li><li>売り込みの文章は入れないでください</li><li>遅れると問い合わせが増えます</li></ul>
-        </section>
+        <Notice tone="warn">
+          <h2 className="text-sm font-bold">これは「お知らせ」です</h2>
+          <ul className="mt-2 space-y-2 text-sm leading-5"><li>配信を止めている人にも届きます</li><li>売り込みの文章は入れないでください</li><li>遅れると問い合わせが増えます</li></ul>
+        </Notice>
         <section className="rounded-card border border-hairline bg-canvas p-4 text-sm">
           <h2 className="font-bold text-ink">つながる先</h2>
           {/* #988 LAY-10拡張: リンク色だけの p をやめ、実際に移動できる Link にする。 */}
@@ -1162,7 +1163,7 @@ function LineNotificationsPage() {
       <p className="text-xs text-ink-faint">送った数が多い順</p>
     </div>
 
-    {notice && <div role={notice.tone === 'success' ? 'status' : 'alert'} aria-live={notice.tone === 'success' ? 'polite' : 'assertive'} className={`rounded-control border px-4 py-3 text-sm ${notice.tone === 'success' ? 'border-success bg-success-bg text-success' : 'border-danger bg-danger-bg text-danger'}`}>{notice.text}</div>}
+    {notice && <Notice tone={notice.tone === 'success' ? 'success' : 'danger'} message={notice.text} />}
 
     <section className="min-w-0 overflow-hidden rounded-card border border-hairline bg-canvas">
       {loadState === 'loading' ? <ListState kind="loading" title="顧客へのお知らせを読み込んでいます" />

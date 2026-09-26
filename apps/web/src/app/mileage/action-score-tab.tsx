@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Download, Send, Users } from 'lucide-react'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
@@ -187,16 +188,16 @@ export default function ActionScoreTab({ accountId }: { accountId: string }) {
 
   return (
     <section data-design-node="z3PB2" className="space-y-3.5">
-      <div className="rounded-control border border-status-warn-deep/25 bg-status-warn-soft px-4 py-3 text-xs text-ink-secondary">
+      <Notice tone="warn">
         {/*
           設計 `z3PB2` の文そのまま。**「顧客には表示されず」だけでは足りない。**
           「マイルが減るのでは」と聞かれたときに答えられる形にする——
           交換できないこと、残高が動かないことを先に言う。
         */}
-        <strong className="text-ink">スコアはマイルではありません。</strong>
+        <strong>スコアはマイルではありません。</strong>
         お客様には見せず、交換もできません。マイル残高はスコアで増えも減りもしません。
         反応の目安として、配信や対応の順番を決めるために使います。
-      </div>
+      </Notice>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <SummaryCard variant="v6" title="点数がついている人" value={summary?.scoredFriends ?? null} unit="人" detail="" help="選択中のLINEアカウントの人数です" />

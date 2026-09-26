@@ -20,6 +20,8 @@ import { canOperateBookings } from '../../lib/booking-permissions'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import DateField from '@/components/shared/date-field'
+import Notice from '@/components/shared/notice'
+import { notifyToast } from '@/components/shared/toast'
 import SelectField from '@/components/shared/select-field'
 import TargetMissing from '@/components/shared/target-missing'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -288,7 +290,6 @@ function BookingDetailInner() {
   const [acting, setActing] = useState(false)
   const [decideTarget, setDecideTarget] = useState<BookingAction | null>(null)
   const [error, setError] = useState('')
-  const [notice, setNotice] = useState('')
   /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
   const [bookingMissing, setBookingMissing] = useState(false)
   /**
@@ -400,7 +401,6 @@ function BookingDetailInner() {
     setEditing(false)
     setDecideTarget(null)
     setError('')
-    setNotice('')
     // IDEA-27: 追加取得した履歴・開いた内訳も前の対象のものを残さない。
     setExtraAuditLogs(null)
     setAuditLoading(false)
@@ -655,7 +655,6 @@ function BookingDetailInner() {
     }
     setSaving(true)
     setError('')
-    setNotice('')
     try {
       const updated = await bookingApi.updateBooking(selectedAccountId, id, patch)
       setEditing(false)
@@ -669,7 +668,7 @@ function BookingDetailInner() {
       if (updated.reminders_created > 0) {
         effects.push('今後のお知らせを新しい日時で組み直しました')
       }
-      setNotice(`${['予約を変更しました', ...effects].join('。')}。`)
+      notifyToast(`${['予約を変更しました', ...effects].join('。')}。`)
       await load()
     } catch (cause) {
       if (cause instanceof ApiError && cause.code === 'version_conflict') {
@@ -693,10 +692,9 @@ function BookingDetailInner() {
     if (!selectedAccountId) return
     setRetrying('calendar')
     setError('')
-    setNotice('')
     try {
       const result = await bookingApi.retryCalendarSync(selectedAccountId, id)
-      setNotice(result.status === 'succeeded' ? 'Googleカレンダーへ反映しました' : '反映を再試行しました（まだ失敗している場合は時間をおいて再度お試しください）')
+      notifyToast(result.status === 'succeeded' ? 'Googleカレンダーへ反映しました' : '反映を再試行しました（まだ失敗している場合は時間をおいて再度お試しください）', result.status === 'succeeded' ? undefined : { tone: 'error' })
       await load()
     } catch (cause) {
       setError(cause instanceof ApiError && cause.code === 'no_retryable_operation'
@@ -712,10 +710,9 @@ function BookingDetailInner() {
     if (!selectedAccountId) return
     setRetrying(runId)
     setError('')
-    setNotice('')
     try {
       const result = await bookingApi.retryNotification(selectedAccountId, id, runId)
-      setNotice(result.status === 'succeeded' ? 'お知らせを送りました' : 'お知らせの送信に失敗しました。通信を確かめて、もう一度お試しください。')
+      notifyToast(result.status === 'succeeded' ? 'お知らせを送りました' : 'お知らせの送信に失敗しました。通信を確かめて、もう一度お試しください。', result.status === 'succeeded' ? undefined : { tone: 'error' })
       await load()
     } catch {
       setError('お知らせを再送できませんでした')
@@ -771,14 +768,7 @@ function BookingDetailInner() {
       </nav>
 
       {error && detail && (
-        <div className="bg-danger-bg border-danger-bg text-danger mb-4 rounded-lg border p-4 text-sm">
-          {error}
-        </div>
-      )}
-      {notice && (
-        <div className="bg-success-bg text-success mb-4 rounded-lg border border-transparent p-4 text-sm">
-          {notice}
-        </div>
+        <Notice tone="danger" message={error} onClose={() => setError('')} className="mb-4" />
       )}
 
       {loading || !detail ? (

@@ -37,6 +37,7 @@ import EmailThread from '@/components/support/email-thread'
 import Button from '@/components/shared/button'
 import DateTimeField from '@/components/shared/date-time-field'
 import HelpTip from '@/components/shared/help-tip'
+import Notice from '@/components/shared/notice'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { MoreAction } from '@/components/shared/row-actions'
 import { CheckCircle2, Link2, NotebookPen, PanelRightClose, PanelRightOpen, Star, X } from 'lucide-react'
@@ -2287,9 +2288,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       ) : null}
       {/* Error */}
       {error && (
-        <div className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
-          {error}
-        </div>
+        <Notice tone="danger" message={error} onClose={() => setError('')} className="mb-4" />
       )}
       {/*
         URLの保存検索IDが見つからなかったときの案内(N-021)。

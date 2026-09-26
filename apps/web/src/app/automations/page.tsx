@@ -15,6 +15,7 @@ import AutomationTemplateGallery from '@/components/automations/automation-templ
 import { useCanManageAutomations } from '@/components/automations/use-automation-permission'
 import Chip from '@/components/shared/chip'
 import Disclosure from '@/components/shared/disclosure'
+import Notice from '@/components/shared/notice'
 import ListState from '@/components/shared/list-state'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import KpiCollapse from '@/components/ui/kpi-collapse'
@@ -522,9 +523,7 @@ export default function AutomationsPage() {
         <div className="mb-4">
           <MergedTabs basePath="/automations" paramName="tab" tabs={tabs} active={tab} />
         </div>
-        <div className="bg-info-bg text-ink-secondary mb-4 rounded-control px-4 py-3 text-xs">
-          見本を選ぶと、そのまま「つくる」画面が開きます。中身は自由に直せます。よく使われている順に並べています。
-        </div>
+        <Notice tone="info" message="見本を選ぶと、そのまま「つくる」画面が開きます。中身は自由に直せます。よく使われている順に並べています。" className="mb-4" />
         <AutomationTemplateGallery accountId={selectedAccountId} canManage={canManageAutomations} />
         <style jsx global>{`
           [data-design-node="WjYAC"] [aria-label="きっかけで絞り込む"] { display: none; }
@@ -607,11 +606,9 @@ export default function AutomationsPage() {
         </div>
       </div>
       {viewerOnly ? (
-        <p className="bg-status-warn-soft text-status-warn-deep mb-4 rounded-control px-4 py-3 text-xs" role="note">
-          閲覧のみのため、ルールの作成・変更はできません。操作する権限がありません。
-        </p>
+        <Notice tone="warn" message="閲覧のみのため、ルールの作成・変更はできません。操作する権限がありません。" className="mb-4" />
       ) : (
-        <p className="bg-info-bg text-ink-secondary mb-4 rounded-control px-4 py-3 text-xs">「〜のとき、〜する」を登録して自動で実行します。友だち一覧から手で実行したり、毎日決まった時刻に動かすこともできます。</p>
+        <Notice tone="info" message="「〜のとき、〜する」を登録して自動で実行します。友だち一覧から手で実行したり、毎日決まった時刻に動かすこともできます。" className="mb-4" />
       )}
       <p className="sr-only">共通アクションは友だち一覧からの手動実行にも使えます。</p>
 
@@ -678,9 +675,7 @@ export default function AutomationsPage() {
 
       {/* Error */}
       {error && (
-        <div className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
-          {error}
-        </div>
+        <Notice tone="danger" message={error} onClose={() => setError('')} className="mb-4" />
       )}
 
       {loadStatus === 'loading' ? (

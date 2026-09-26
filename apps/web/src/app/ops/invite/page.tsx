@@ -5,6 +5,7 @@ import AuthCard, { AuthField } from '@/components/auth/auth-card'
 import PasswordField from '@/components/auth/password-field'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 import { TextField } from '@/components/shared/text-field'
 import { adminSessionHandoffPath, storeAdminSession } from '@/lib/admin-session'
 import { authRequest, passwordError } from '@/lib/auth-email'
@@ -98,7 +99,7 @@ export default function OpsInvitePage() {
       ) : (
         <form onSubmit={(event) => void submit(event)} noValidate className="flex w-full flex-col gap-4">
           {error ? (
-            <p role="alert" className="rounded-control bg-status-danger-soft px-4 py-3 text-label text-danger">{error}</p>
+            <Notice tone="danger" message={error} />
           ) : null}
           <AuthField label="メールアドレス" htmlFor="ops-invite-email">
             <TextField id="ops-invite-email" type="email" value={check?.email ?? ''} readOnly />

@@ -26,6 +26,7 @@ import {
 } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import Notice from '@/components/shared/notice'
 
 /*
  * カードIDと区分の正本は @line-crm/shared の DASHBOARD_CARD_GROUPS。
@@ -443,10 +444,10 @@ export default function DashboardEditor({ open, preferences, saving = false, sav
                     </SortableContext>
                   </DndContext>
                   {group === 'today' ? (
-                    <div className="bg-status-warn-soft text-status-warn-deep mt-3 rounded-control px-3 py-2.5 text-xs leading-relaxed">
+                    <Notice tone="warn" className="mt-3">
                       <p className="font-semibold">「今日やること」は4枠までです</p>
                       <p className="mt-1">5つ目をONにすると、いちばん下のカードが自動でOFFになります。順番を入れ替えて、先に出したい4つを上に置いてください。</p>
-                    </div>
+                    </Notice>
                   ) : null}
                 </section>
               ))}

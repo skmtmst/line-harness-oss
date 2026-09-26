@@ -1,10 +1,11 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Check, Landmark, TriangleAlert, X } from 'lucide-react'
+import { Check, Landmark, X } from 'lucide-react'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import {
   api,
@@ -375,10 +376,7 @@ export function AffiliatePaymentConfirmDialog({
               )
             ) : null}
           </div>
-          <p className="flex items-start gap-2 rounded-control border border-warning bg-warning-bg px-4 py-3 text-xs font-semibold leading-5 text-warning">
-            <TriangleAlert size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
-            確定したあとに成果を却下しても、この支払いからは外れません。次の未確定期間へマイナス調整として残します。
-          </p>
+          <Notice tone="warn" message="確定したあとに成果を却下しても、この支払いからは外れません。次の未確定期間へマイナス調整として残します。" />
           {/*
             NEXT-22: 明細の作成とLINE通知は `createStatement` 1本の処理で、
             別々に止められない。連動する2つのチェックを、実際の動作どおり
@@ -409,7 +407,7 @@ export function AffiliatePaymentConfirmDialog({
         </div>
       ) : null}
         </div>
-        {error ? <p className="mx-6 mb-3 rounded-control bg-danger-bg px-3 py-2 text-xs text-danger" role="alert">{error}</p> : null}
+        {error ? <Notice tone="danger" message={error} className="mx-6 mb-3" /> : null}
         <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-hairline px-6 py-4">
           <p className="min-w-0 flex-1 text-xs text-ink-faint">振込そのものはここでは行いません。振込用CSVを書き出して銀行で処理してください。</p>
           <div className="flex shrink-0 items-center gap-2">

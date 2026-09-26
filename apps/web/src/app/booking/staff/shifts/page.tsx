@@ -23,6 +23,8 @@ import { canEditFeature, canViewFeature } from '@/lib/staff-capability'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import DateField from '@/components/shared/date-field'
+import Notice from '@/components/shared/notice'
+import { notifyToast } from '@/components/shared/toast'
 import { TimeField } from '@/components/shared/date-time-field'
 import ListState from '@/components/shared/list-state'
 import SelectField from '@/components/shared/select-field'
@@ -93,7 +95,6 @@ function BusinessHoursEditor({ accountId, settings, canEdit, onSaved, onReload }
   const [draft, setDraft] = useState(() => initialBusinessHours(settings))
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
-  const [saved, setSaved] = useState(false)
   const activeRef = useRef(true)
   const inFlightRef = useRef(false)
 
@@ -106,7 +107,6 @@ function BusinessHoursEditor({ accountId, settings, canEdit, onSaved, onReload }
     setDraft((current) => current.map((day) => day.weekday === weekday
       ? { ...day, intervals: update(day.intervals) }
       : day))
-    setSaved(false)
     setSaveError(null)
   }
 
@@ -132,7 +132,6 @@ function BusinessHoursEditor({ accountId, settings, canEdit, onSaved, onReload }
     inFlightRef.current = true
     setSaving(true)
     setSaveError(null)
-    setSaved(false)
     try {
       const response = await bookingApi.saveSettings(accountId, {
         expectedVersion: settings.version,
@@ -151,7 +150,7 @@ function BusinessHoursEditor({ accountId, settings, canEdit, onSaved, onReload }
       })
       if (!activeRef.current) return
       if (!response.success) throw new Error('booking_business_hours_save_failed')
-      setSaved(true)
+      notifyToast('営業時間を保存しました。')
       onSaved(response.data)
     } catch (error) {
       if (activeRef.current) setSaveError(businessHoursSaveError(error))
@@ -167,9 +166,7 @@ function BusinessHoursEditor({ accountId, settings, canEdit, onSaved, onReload }
         <h2 className="text-ink font-semibold">開ける時間</h2>
         <p className="text-ink-faint mt-1 text-xs">曜日ごとの受付時間と休けいを決めます。同時受付数は「1時間に受けられる数」ではなく、同じ時間に重ねられる予約数です。閉めた曜日は、お客様の画面に出ません。</p>
         {!settings.businessHoursConfigured ? (
-          <p className="bg-warning-bg text-warning mt-3 rounded-control px-3 py-2 text-xs" role="note">
-            まだ週全体の営業時間を保存していません。入力済みの時間帯は適用されていますが、時間帯がない曜日は現在は担当者の勤務時間どおりに受け付けます。保存すると、その曜日は休業になります。
-          </p>
+          <Notice tone="warn" message="まだ週全体の営業時間を保存していません。入力済みの時間帯は適用されていますが、時間帯がない曜日は現在は担当者の勤務時間どおりに受け付けます。保存すると、その曜日は休業になります。" className="mt-3" />
         ) : null}
       </div>
       <fieldset disabled={!canEdit} className="contents">
@@ -222,12 +219,14 @@ function BusinessHoursEditor({ accountId, settings, canEdit, onSaved, onReload }
       <div className="border-hairline border-t px-4 py-4">
         <p className="text-ink-faint text-xs">日をまたぐ営業は、日ごとに分けて入力してください。終了時刻に24:00は使えません。</p>
         {saveError ? (
-          <div className="bg-danger-bg text-danger mt-3 rounded-control p-3 text-sm" role="alert">
-            <p>{saveError}</p>
-            {saveError.includes('先に保存') ? <button type="button" onClick={onReload} className="mt-2 font-semibold underline">最新の内容を読み直す</button> : null}
-          </div>
+          <Notice
+            tone="danger"
+            message={saveError}
+            onClose={() => setSaveError(null)}
+            className="mt-3"
+            action={saveError.includes('先に保存') ? <button type="button" onClick={onReload} className="font-semibold underline">最新の内容を読み直す</button> : undefined}
+          />
         ) : null}
-        {saved ? <p className="text-success mt-3 text-sm font-semibold" role="status">営業時間を保存しました。</p> : null}
         {canEdit ? (
           <div className="mt-3 flex justify-end">
             <Button variant="primary" onClick={() => void submit()} disabled={saving}>{saving ? '保存中…' : '営業時間を保存'}</Button>
@@ -609,16 +608,16 @@ function SlotCheckCard({ accountId, menus }: { accountId: string; menus: Booking
       {checkError ? <p className="text-danger mt-3 text-sm" role="alert">{checkError}</p> : null}
       {result ? (
         result.bookable ? (
-          <div className="bg-success-bg text-success mt-3 rounded-control p-3 text-sm" role="status">
+          <Notice tone="success" className="mt-3">
             <p className="font-semibold">この日時は予約を受けられます。</p>
             <ul className="mt-1 space-y-0.5 text-xs">
               {result.per_staff.filter((staff) => staff.bookable).map((staff) => (
                 <li key={staff.staff_id}>{staff.display_name}: 残り {staff.remaining}/{staff.capacity}</li>
               ))}
             </ul>
-          </div>
+          </Notice>
         ) : (
-          <div className="bg-warning-bg text-warning mt-3 rounded-control p-3 text-sm" role="status">
+          <Notice tone="warn" className="mt-3">
             <p className="font-semibold">この日時は予約できません。</p>
             <ul className="mt-1 list-disc space-y-0.5 pl-5 text-xs">
               {result.reasons.map((reason) => <li key={reason}>{slotReasonLabel(reason)}</li>)}
@@ -634,7 +633,7 @@ function SlotCheckCard({ accountId, menus }: { accountId: string; menus: Booking
                 ))}
               </ul>
             ) : null}
-          </div>
+          </Notice>
         )
       ) : null}
     </section>
@@ -886,9 +885,7 @@ function StoreShiftsView() {
         <a href="#rules" className="text-ink-faint rounded-t-md px-4 py-2 text-sm hover:text-ink-secondary">予約のルール</a>
       </div>
 
-      <div data-design="Info" className="bg-info-bg text-ink-secondary rounded-card px-4 py-3 text-xs">
-        何時から何時まで、どの曜日を受けるかです。右に、お客様のLINEに出る日時の選び方がそのまま出ます。
-      </div>
+      <Notice data-design="Info" tone="info" message="何時から何時まで、どの曜日を受けるかです。右に、お客様のLINEに出る日時の選び方がそのまま出ます。" />
 
       {!selectedAccountId ? (
         <ListState kind="empty" title="LINEアカウントを選んでください" description="受付枠を確認するアカウントを選びます。" />

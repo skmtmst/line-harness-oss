@@ -6,6 +6,7 @@ import type { Tag } from '@line-crm/shared'
 import { api, type FriendSavedView } from '@/lib/api'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
 import type { AdvancedSearchResult } from '@/components/friends/advanced-search-dialog'
 import {
   conditionsToEditorState,
@@ -103,16 +104,21 @@ export default function SavedSearchDialog({
         <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-1">
         {loading ? <p className="mt-4 text-sm text-ink-faint">読み込み中…</p> : null}
         {error ? (
-          <div className="mt-4 rounded-control bg-status-danger-soft p-3 text-sm text-danger">
-            <p>{error}</p>
-            <button
-              type="button"
-              onClick={() => setReloadKey((key) => key + 1)}
-              className="mt-2 font-semibold text-action underline"
-            >
-              再読み込み
-            </button>
-          </div>
+          <Notice
+            tone="danger"
+            className="mt-4"
+            action={(
+              <button
+                type="button"
+                onClick={() => setReloadKey((key) => key + 1)}
+                className="font-semibold text-action underline"
+              >
+                再読み込み
+              </button>
+            )}
+          >
+            {error}
+          </Notice>
         ) : null}
         {!loading && !error && saved.length > 0 ? (
           <div className="mt-4 space-y-2">

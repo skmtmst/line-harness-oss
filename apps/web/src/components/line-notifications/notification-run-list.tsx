@@ -10,6 +10,7 @@ import Pagination from '@/components/shared/pagination'
 import Select from '@/components/shared/select'
 import SummaryCard from '@/components/shared/summary-card'
 import { DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import Notice from '@/components/shared/notice'
 
 const PAGE_SIZE = 20
 
@@ -453,14 +454,14 @@ export default function NotificationRunList({
         </>}
       </div>
 
-      <div className="rounded-control border border-warning bg-warning-bg px-4 py-3 text-sm leading-6 text-warning">
+      <Notice tone="warn">
         {mode === 'failures'
           ? '発送や返金のお知らせが届いていない場合は、その日のうちに受信箱など別の手だてで連絡してください。確認を終えた記録は、この一覧で対応済みにできます。'
           : '選択中のLINEアカウントと結び付きを確認できたEC通知だけを表示します。個人の既読は取得せず、押されたかどうかは自社の短縮URLだけで数えます。'}
         <span className="mt-1 block text-xs">個人の既読は取得できません。試行回数と次の再試行予定は送信台帳の記録を表示します。</span>
-      </div>
+      </Notice>
 
-      {visibleNotice ? <div className={`rounded-control border px-4 py-3 text-sm ${visibleNotice.tone === 'success' ? 'border-success bg-success-bg text-success' : 'border-danger bg-danger-bg text-danger'}`}>{visibleNotice.text}</div> : null}
+      {visibleNotice ? <Notice tone={visibleNotice.tone === 'success' ? 'success' : 'danger'}>{visibleNotice.text}</Notice> : null}
 
       <div className="flex flex-wrap items-center gap-2">
         <label className="min-w-64 flex-1">

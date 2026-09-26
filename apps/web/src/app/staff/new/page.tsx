@@ -5,6 +5,7 @@ import type { LineAccount } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import CreatePage, { AsideCard, FormSection, Field } from '@/components/shared/create-page'
 import Checkbox from '@/components/shared/checkbox'
+import Notice from '@/components/shared/notice'
 import { TextInput } from '@/components/shared/form-controls'
 import Select from '@/components/shared/select'
 import NotificationSwitch from '@/components/ui/notification-switch'
@@ -71,7 +72,7 @@ export default function NewStaffPage() {
       <AsideCard title="設定内容"><dl className="space-y-2 text-sm"><div className="flex justify-between"><dt className="text-ink-faint">役割</dt><dd className="text-ink">{ROLES.find((item) => item.value === role)?.label}</dd></div><div className="flex justify-between"><dt className="text-ink-faint">表示機能</dt><dd className="text-ink">{role === 'staff' ? `${permissionKeys.length}件` : 'すべて'}</dd></div></dl></AsideCard>
     </>}
   >
-    <p className="rounded-control bg-info-bg px-4 py-3 text-sm text-ink-secondary">{selectedAccount?.name ? `${selectedAccount.name}の担当として追加されます。` : 'この店舗の担当として追加されます。'}</p>
+    <Notice tone="info">{selectedAccount?.name ? `${selectedAccount.name}の担当として追加されます。` : 'この店舗の担当として追加されます。'}</Notice>
     <FormSection step={1} label="どなたを追加するか">
       <div className="grid gap-4 md:grid-cols-2">
         <Field label="名前" htmlFor="staff-name" required><TextInput id="staff-name" value={name} onChange={(e) => setName(e.target.value)} /></Field>

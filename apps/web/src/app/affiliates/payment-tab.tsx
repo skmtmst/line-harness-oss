@@ -5,6 +5,8 @@ import KpiCard from '@/components/shared/kpi-card'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
+import { notifyToast } from '@/components/shared/toast'
 import { DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import {
   api,
@@ -246,7 +248,6 @@ export default function AffiliatePaymentTab({ accountId }: { accountId: string }
   const [closeOpen, setCloseOpen] = useState(false)
   const [closed, setClosed] = useState<AffiliateAccountSettlementResult | null>(null)
   const [batch, setBatch] = useState<AffiliatePayoutBatch | null>(null)
-  const [notice, setNotice] = useState('')
   const [operationError, setOperationError] = useState('')
   const [operationBusy, setOperationBusy] = useState(false)
   const [payoutKey, setPayoutKey] = useState('')
@@ -296,7 +297,6 @@ export default function AffiliatePaymentTab({ accountId }: { accountId: string }
     if (!closed || !preview || operationBusy) return
     setOperationBusy(true)
     setOperationError('')
-    setNotice('')
     try {
       // 1人失敗で全体失敗にしない。人ごとに結果を分けて出す。
       // 合言葉は人ごとに使い回すので、押し直しは失敗分だけ試せる。
@@ -317,9 +317,9 @@ export default function AffiliatePaymentTab({ accountId }: { accountId: string }
         else failedNames.push(preview.affiliates[index].affiliateName)
       })
       if (failedNames.length === 0) {
-        setNotice(`${preview.affiliates.length.toLocaleString('ja-JP')}人分の支払明細を発行し、LINE通知を依頼しました。`)
+        notifyToast(`${preview.affiliates.length.toLocaleString('ja-JP')}人分の支払明細を発行し、LINE通知を依頼しました。`)
       } else {
-        if (succeeded > 0) setNotice(`${succeeded.toLocaleString('ja-JP')}人分の支払明細を発行しました。`)
+        if (succeeded > 0) notifyToast(`${succeeded.toLocaleString('ja-JP')}人分の支払明細を発行しました。`)
         const shown = failedNames.slice(0, 5).join('、')
         const rest = failedNames.length > 5 ? `ほか${failedNames.length - 5}人` : ''
         setOperationError(`${failedNames.length}人分を発行できませんでした（${shown}${rest}）。もう一度押すと失敗分を試し直せます。`)
@@ -340,7 +340,6 @@ export default function AffiliatePaymentTab({ accountId }: { accountId: string }
     }
     setOperationBusy(true)
     setOperationError('')
-    setNotice('')
     try {
       const response = await api.affiliates.createPayoutBatch({
         lineAccountId: accountId,
@@ -362,7 +361,7 @@ export default function AffiliatePaymentTab({ accountId }: { accountId: string }
     anchor.href = `${process.env.NEXT_PUBLIC_API_URL ?? ''}${downloadUrl}`
     anchor.download = ''
     anchor.click()
-    setNotice('銀行用CSVを書き出しました。ファイルは15分で期限切れになります。')
+    notifyToast('銀行用CSVを書き出しました。ファイルは15分で期限切れになります。')
   }
 
   const summaryUnavailable = error && !loading
@@ -405,23 +404,20 @@ export default function AffiliatePaymentTab({ accountId }: { accountId: string }
         />
       </div>
 
-      <div className="rounded-control border border-info bg-info-bg px-4 py-3 text-sm text-info">
-        締める前なら、成果を却下すると今回の支払いから外れます。締めたあとの取消は次の支払いで差し引きます。
-      </div>
+      <Notice tone="info" message="締める前なら、成果を却下すると今回の支払いから外れます。締めたあとの取消は次の支払いで差し引きます。" />
 
       {preview?.excludedZeroAmount && preview.excludedZeroAmount.count > 0 ? (
-        <div className="rounded-control border border-warning bg-warning-bg px-4 py-3 text-sm text-warning">
+        <Notice tone="warn">
           報酬が0円の成果 {preview.excludedZeroAmount.count.toLocaleString('ja-JP')}件は、支払えないため今回の締め対象から外れています。対象は「{dateLabel(preview.periodTo)} で締める」の確認画面で見られます。
-        </div>
+        </Notice>
       ) : null}
 
       {closed ? (
-        <div className="rounded-control border border-success bg-success-bg px-4 py-3 text-sm text-success">
+        <Notice tone="success">
           {dateLabel(closed.closedAt)} に {yen(closed.totalAmount)}・{closed.conversionCount.toLocaleString('ja-JP')}件を締めました。明細と銀行用CSVを準備できます。
-        </div>
+        </Notice>
       ) : null}
-      {notice ? <div className="rounded-control border border-success bg-success-bg px-4 py-3 text-sm text-success">{notice}</div> : null}
-      {operationError ? <div role="alert" className="rounded-control border border-danger bg-danger-bg px-4 py-3 text-sm text-danger">{operationError}</div> : null}
+      {operationError ? <Notice tone="danger" message={operationError} onClose={() => setOperationError('')} /> : null}
 
       <SettlementCloseDialog
         preview={closeOpen ? preview : null}
@@ -431,7 +427,7 @@ export default function AffiliatePaymentTab({ accountId }: { accountId: string }
           setClosed(result)
           setPayoutKey(crypto.randomUUID())
           statementKeysRef.current.clear()
-          setNotice('締めの記録を追記しました。')
+          notifyToast('締めの記録を追記しました。')
         }}
       />
       <PayoutStepUpDialog batch={batch} accountId={accountId} onClose={() => setBatch(null)} onExported={download} />

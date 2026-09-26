@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import HqAccountList from '@/components/hq/account-list'
 import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount, type AccountWithStats } from '@/contexts/account-context'
 import { api } from '@/lib/api'
@@ -73,17 +74,19 @@ export default function HqOpenPage() {
       </header>
 
       {error ? (
-        <div className="rounded-card bg-danger-bg p-4 text-sm text-danger" role="alert">
-          <p>{error}</p>
-          <Button
-            type="button"
-            variant="secondary"
-            className="mt-3"
-            onClick={() => { setError(''); setLoading(true); setReloadKey((key) => key + 1) }}
-          >
-            再読み込み
-          </Button>
-        </div>
+        <Notice
+          tone="danger"
+          message={error}
+          action={
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => { setError(''); setLoading(true); setReloadKey((key) => key + 1) }}
+            >
+              再読み込み
+            </Button>
+          }
+        />
       ) : null}
       {!error && loading ? (
         <div className="flex min-h-64 items-center justify-center" role="status" aria-label="アカウントを読み込み中">

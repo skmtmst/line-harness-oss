@@ -8,6 +8,7 @@ import SelectField from '@/components/shared/select-field'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import StepTrail from '@/components/shared/step-trail'
 import StickyBar from '@/components/shared/sticky-bar'
+import Notice from '@/components/shared/notice'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { webinarApi, type WebinarFolder } from '@/lib/api'
@@ -92,7 +93,7 @@ export default function NewWebinarPage() {
       />
 
       {error ? (
-        <p className="bg-danger-bg text-danger mt-4 rounded-control border border-danger p-3 text-sm" role="alert">{error}</p>
+        <Notice tone="danger" className="mt-4">{error}</Notice>
       ) : null}
 
       <div className="mt-4 grid items-start gap-4 xl:grid-cols-4">

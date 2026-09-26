@@ -7,6 +7,7 @@ import { api, eventsApi, type EventListItem } from '@/lib/api'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Notice from '@/components/shared/notice'
 import SelectField from '@/components/shared/select-field'
 import { TextArea, TextInput } from '@/components/shared/form-controls'
 import { TableHeadRow, Th } from '@/components/shared/table'
@@ -344,7 +345,7 @@ export default function NewReminderPage() {
     <div data-design-node="uJP22" data-design="Body" className={styles.screen}>
       <div data-design="Crumb"><ReminderWizard current={1} /></div>
       <div data-design="Head" />
-      {error ? <p className="bg-danger-bg text-danger mb-3 rounded-lg p-3 text-sm">{error}</p> : null}
+      {error ? <Notice tone="danger" message={error} className="mb-3" /> : null}
       <ReminderWorkspace aside={<div data-design="Right">
         <SummaryCard rows={[["対象者", '未設定'], ['基準日', baseSummary], ['通知ステップ', appliedTemplate ? `1通（${appliedTemplate.timingLabel}）` : '未設定'], ['状態', lifecycleLabel]]} />
         <LinePreview caption={appliedTemplate ? `${appliedTemplate.timingLabel}に届く予定です` : '通知ステップは STEP 3 で設定します'} empty={!appliedTemplate}>

@@ -6,6 +6,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import AuthCard, { AuthField } from '@/components/auth/auth-card'
 import PasswordField from '@/components/auth/password-field'
 import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
 import { TextField } from '@/components/shared/text-field'
 import { storeAdminSession, adminSessionHeaders } from '@/lib/admin-session'
 import { authRequest, emailError } from '@/lib/auth-email'
@@ -125,9 +126,7 @@ export default function OpsLoginPage() {
     >
       <form onSubmit={(event) => void submit(event)} noValidate className="flex w-full flex-col gap-4">
         {error ? (
-          <p role="alert" className="rounded-control bg-status-danger-soft px-4 py-3 text-label text-danger">
-            {error}
-          </p>
+          <Notice tone="danger" message={error} />
         ) : null}
         <AuthField label="メールアドレス" htmlFor="ops-login-email" error={emailMessage}>
           <TextField

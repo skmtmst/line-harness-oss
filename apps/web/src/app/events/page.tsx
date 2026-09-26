@@ -10,6 +10,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import SelectField from '@/components/shared/select-field'
 // #740: bookings の EventKpi と一字一句同じだったため、機能内共有の1部品へ統合した。
@@ -201,9 +202,7 @@ export default function EventsListPage() {
         />
       </div>
 
-      <div className="bg-info-bg text-ink-secondary mb-4 rounded-control px-4 py-3 text-xs">
-        定員に達すると、お客様の画面では自動で「満席」になります。キャンセルが出たら、キャンセル待ちの人に自動で順番が回ります。
-      </div>
+      <Notice tone="info" message="定員に達すると、お客様の画面では自動で「満席」になります。キャンセルが出たら、キャンセル待ちの人に自動で順番が回ります。" className="mb-4" />
 
       <div
         data-design="Bar"

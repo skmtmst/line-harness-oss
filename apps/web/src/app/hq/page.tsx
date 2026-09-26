@@ -6,6 +6,7 @@ import { api, fetchApi } from '@/lib/api'
 import { resolveStoreReturnPath } from '@/lib/hq-navigation'
 import { useAccount, type AccountWithStats } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import HqAccountList from '@/components/hq/account-list'
 import AccountEditModal from '@/components/accounts/account-edit-modal'
@@ -122,20 +123,22 @@ export default function HqPage() {
       </div>
 
       {connectionProgress ? <p className="mb-4 text-sm text-ink-secondary" role="status">{connectionProgress}</p> : null}
-      {connectionResult ? <p className="mb-4 rounded-card bg-accent-soft p-4 text-sm text-ink" role="status">{connectionResult}</p> : null}
+      {connectionResult ? <Notice tone="info" message={connectionResult} className="mb-4" /> : null}
 
       {error ? (
-        <div className="rounded-card bg-danger-bg p-4 text-sm text-danger" role="alert">
-          <p>{error}</p>
-          <Button
-            type="button"
-            variant="secondary"
-            className="mt-3"
-            onClick={() => { setLoading(true); setReloadKey((key) => key + 1) }}
-          >
-            再読み込み
-          </Button>
-        </div>
+        <Notice
+          tone="danger"
+          message={error}
+          action={
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => { setLoading(true); setReloadKey((key) => key + 1) }}
+            >
+              再読み込み
+            </Button>
+          }
+        />
       ) : null}
 
       {!error && loading ? (

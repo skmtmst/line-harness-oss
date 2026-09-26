@@ -7,6 +7,7 @@ import { api, type AutomationTemplateSummary } from '@/lib/api'
 import Button from '@/components/shared/button'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 
 const ICONS = [UserPlus, MessageCircle, Tags] as const
 
@@ -115,13 +116,13 @@ export default function AutomationTemplateGallery({
 
   return (
     <section data-design-node="WjYAC" data-automation-template-gallery="v6">
-      <div className="mb-4 rounded-control border border-info bg-info-bg px-4 py-3 text-sm text-ink-secondary">
+      <Notice tone="info" className="mb-4">
         見本を選ぶと、公開されていない下書きを作ります。タグやシナリオは、次の画面でこのアカウントのものを選び直してください。
-      </div>
+      </Notice>
       {actionError ? (
-        <div className="mb-4 rounded-control border border-status-danger-border bg-danger-bg px-4 py-3 text-sm text-danger">
+        <Notice tone="danger" className="mb-4">
           {actionError}
-        </div>
+        </Notice>
       ) : null}
       <div className="mb-4 flex flex-wrap gap-2" aria-label="きっかけで絞り込む">
         {triggerFilters.map((filter) => (

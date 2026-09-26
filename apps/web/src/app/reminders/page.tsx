@@ -14,6 +14,7 @@ import { PRESETS as LIST_STATE_PRESETS } from '@/components/shared/list-state'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import SortSelect from '@/components/ui/sort-select'
@@ -169,7 +170,7 @@ export default function RemindersPage() {
       ★V7 `x63W5x`：一覧の失敗でページ上の帯は出さない。表の中の
       TableStateRow error（読み直す口つき）だけにまとめる。
     */}
-    {moveError ? <div className="bg-danger-bg text-danger mb-3 rounded-lg p-3 text-sm">{moveError}</div> : null}
+    {moveError ? <Notice tone="danger" message={moveError} className="mb-3" /> : null}
     <div data-design="Body" style={FOLDER_RAIL_STYLE} className="grid gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
       <FolderPanel
         total={loading || error ? '—' : `${listTotal}件`}

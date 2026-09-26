@@ -8,6 +8,7 @@ import FeatureGate from '@/components/feature-gate'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
 import ListState from '@/components/shared/list-state'
 import StickyBar from '@/components/shared/sticky-bar'
 import TargetMissing from '@/components/shared/target-missing'
@@ -254,10 +255,9 @@ function MigrateFriendField() {
     )
   }
   if (!selectedAccountId) return (
-    <div data-design-node="KoT6c" role="alert" className="rounded-control border border-warning/30 bg-warning-bg p-4 text-sm text-warning">
+    <Notice tone="warn" data-design-node="KoT6c" action={<Button href="/tags?tab=fields">友だち情報欄の一覧へ戻る</Button>}>
       LINE公式アカウントを選んでください。
-      <div className="mt-3"><Button href="/tags?tab=fields">友だち情報欄の一覧へ戻る</Button></div>
-    </div>
+    </Notice>
   )
   /*
     ATTR-11: 「読み込めなかった」と「移行元が無い」を分ける。
@@ -302,10 +302,10 @@ function MigrateFriendField() {
         <Button href="/tags?tab=fields">友だち情報欄へ</Button>
       </div>
 
-      <div className="mb-4 rounded-control border border-info/25 bg-info-bg p-4 text-sm leading-6 text-info">
+      <Notice tone="info" className="mb-4">
         事前確認では値を1件も変更しません。移せる数と切り替わる使用先を確かめてから、「移行を実行する」を押した時だけ書き込みます。
-      </div>
-      {error ? <p role="alert" className="mb-4 rounded-control border border-danger/20 bg-danger-bg p-3 text-sm text-danger">{error}</p> : null}
+      </Notice>
+      {error ? <Notice tone="danger" message={error} className="mb-4" /> : null}
 
       {/*
         ATTR-25: 比較は「元 1fr ／ 矢印 44px ／ 先 1fr」。
@@ -407,7 +407,7 @@ function MigrateFriendField() {
                 <thead><TableHeadRow><Th>友だちID</Th><Th>いまの値</Th><Th>確認する理由</Th></TableHeadRow></thead>
                 <tbody>{preview.rows.map((row) => <Tr key={row.friendId}><Td className="truncate font-mono text-xs" title={row.friendId}>{row.friendId}</Td><Td className="truncate" title={row.sourceValue}>{row.sourceValue || '（空欄）'}</Td><Td>{row.reason ?? '確認してください'}</Td></Tr>)}</tbody>
               </DataTable>
-            ) : <p className="mt-4 rounded-control bg-accent-soft p-3 text-sm text-accent-deep">確認が必要な値はありません。</p>}
+            ) : <Notice tone="success" className="mt-4">確認が必要な値はありません。</Notice>}
           </div>
         ) : <p className="mt-4 text-sm text-ink-faint">まだ事前確認していません。未取得を0人として表示しません。</p>}
       </section>
@@ -418,7 +418,7 @@ function MigrateFriendField() {
           <div className="mt-3 grid gap-2 text-sm sm:grid-cols-3">
             {preview.usageTargets.map((usage) => <p key={`${usage.kind}:${usage.id}`} className="rounded-control bg-surface-soft p-3"><span className="block truncate font-semibold text-ink" title={usage.name}>{usage.name}</span><span className="mt-1 block text-xs text-ink-faint">{usage.kind} ／ {usage.switchable ? '移行時に切り替え' : '手動確認が必要'}</span></p>)}
           </div>
-        ) : <p className="mt-3 rounded-control bg-accent-soft p-3 text-sm text-accent-deep">切り替えが必要な使用先はありません。</p>
+        ) : <Notice tone="success" className="mt-3">切り替えが必要な使用先はありません。</Notice>
           : <p className="mt-3 text-sm text-ink-faint">事前確認すると、回答フォームや自動処理などの使用先を表示します。</p>}
         {preview?.runId && preview.previewExpiresAt ? <p className="mt-2 text-xs text-ink-faint">確認番号：{preview.runId} ／ 有効期限：{new Date(preview.previewExpiresAt).toLocaleString('ja-JP')}</p> : null}
       </section>
@@ -438,7 +438,7 @@ function MigrateFriendField() {
               <tbody>{run.rows.filter((row) => row.status === 'failed').map((row) => <Tr key={row.friendId}><Td className="truncate font-mono text-xs" title={row.friendId}>{row.friendId}</Td><Td className="truncate" title={row.sourceValue}>{row.sourceValue || '（空欄）'}</Td><Td>{row.reason ?? '失敗しました。通信を確かめて、もう一度お試しください。'}</Td></Tr>)}</tbody>
             </DataTable>
           ) : null}
-          {run.error ? <p role="alert" className="mt-3 rounded-control border border-danger/20 bg-danger-bg p-3 text-sm text-danger">{run.error}</p> : null}
+          {run.error ? <Notice tone="danger" message={run.error} className="mt-3" /> : null}
           {/*
             復旧可否を正直に伝える。元の項目の値は期限まで残るが、
             自動で元に戻す操作はまだ無い。戻す必要が出たときの行き先を

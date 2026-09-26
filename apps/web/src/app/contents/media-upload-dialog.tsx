@@ -7,6 +7,7 @@ import type { Folder } from '@line-crm/shared'
 import { ApiError, api } from '@/lib/api'
 import Button from '@/components/shared/button'
 import FileDropzone, { AttachmentRow } from '@/components/shared/file-drop'
+import Notice from '@/components/shared/notice'
 import Progress from '@/components/shared/progress'
 import Select from '@/components/shared/select'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
@@ -205,13 +206,13 @@ export default function MediaUploadDialog({
           onFiles={stage}
         />
 
-        <div className="bg-info-bg text-info rounded-control p-3 text-xs leading-5">
+        <Notice tone="info">
           <p className="font-bold">LINEで送れる大きさ（超えると入れられません）</p>
           {LIMITS.map((limit) => <p key={limit.label}>{limit.label} {limit.note}</p>)}
           <p className="mt-2 font-semibold">大きなファイルも管理画面を経由せず、保存先へ直接送ります。</p>
           <p className="mt-2 font-semibold">中身の形式とファイル名の拡張子が食い違うものは保存できません。</p>
           <p className="font-semibold">公開リンクが作られるため、個人情報の取り扱いに注意してください。</p>
-        </div>
+        </Notice>
 
         {entries.length > 0 ? (
           <div>
@@ -313,7 +314,7 @@ export default function MediaUploadDialog({
           />
         </div>
         </div>
-        {error ? <p className="bg-danger-bg text-danger mx-6 mb-4 rounded-control p-3 text-xs" role="alert">{error}</p> : null}
+        {error ? <Notice tone="danger" message={error} className="mx-6 mb-4" /> : null}
         <div className="border-hairline flex flex-wrap items-center justify-between gap-3 border-t px-6 py-4">
           <p className={errorCount > 0 ? 'text-danger text-xs font-semibold' : 'text-ink-faint text-xs'}>
             {errorCount > 0 ? `${errorCount}件は登録できません` : `${entries.length}件を選択中`}

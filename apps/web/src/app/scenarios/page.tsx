@@ -23,6 +23,7 @@ import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Disclosure from '@/components/shared/disclosure'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 import ScenarioList from '@/components/scenarios/scenario-list'
 import { ON_COMPLETE_LABEL, type OnCompleteMode } from '@/components/scenarios/scenario-dialogs'
 import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
@@ -291,12 +292,12 @@ function StartScenarioDialog({
           </section>
         </div>
 
-        <div className="bg-warning-bg mx-6 mb-5 rounded-card px-5 py-4">
-          <p className="text-warning text-sm font-bold">開始後に起きること</p>
-          <ul className="text-ink-secondary mt-2 space-y-1 text-xs"><li>・条件に一致した{simulation?.audience.newStartPlanned.toLocaleString('ja-JP') ?? '—'}人が購読を開始します</li><li>・配信中の友だちは停止するまで次のステップへ進みます</li><li>・一度届いたメッセージは取り消せません。間違いに気づいたらすぐ停止してください</li></ul>
-        </div>
+        <Notice tone="warn" className="mx-6 mb-5">
+          <p className="text-sm font-bold">開始後に起きること</p>
+          <ul className="mt-2 space-y-1 text-xs"><li>・条件に一致した{simulation?.audience.newStartPlanned.toLocaleString('ja-JP') ?? '—'}人が購読を開始します</li><li>・配信中の友だちは停止するまで次のステップへ進みます</li><li>・一度届いたメッセージは取り消せません。間違いに気づいたらすぐ停止してください</li></ul>
+        </Notice>
         <label className={`mx-6 mb-4 flex items-center gap-2 text-sm font-medium ${preflightLoading ? 'opacity-60' : ''}`}><input type="checkbox" checked={confirmed} disabled={preflightState !== 'ready'} onChange={(event) => setConfirmed(event.target.checked)} />対象人数・内容・送信枠を確認しました</label>
-        {error ? <p className="bg-danger-bg text-danger mx-6 mb-4 rounded-card px-4 py-3 text-sm">{error}</p> : null}
+        {error ? <Notice tone="danger" message={error} className="mx-6 mb-4" /> : null}
         <div className="border-hairline mt-auto flex justify-end gap-3 border-t px-6 py-4">
           <span className="text-ink-faint mr-auto self-center text-xs">開始後も、一覧からいつでも停止できます。</span><Button onClick={onCancel} disabled={busy}>戻って確認</Button>
           <Button variant="primary" onClick={onConfirm} disabled={busy || !confirmed || preflightState !== 'ready'}>{busy ? '開始中…' : '配信を開始'}</Button>
@@ -627,9 +628,9 @@ export default function ScenariosPage() {
 
   return (
     <div>
-      <p data-design="Head" className="bg-info-bg text-ink-secondary mb-4 rounded-control px-4 py-3 text-xs">
+      <Notice tone="info" className="mb-4" data-design="Head">
         作成しただけでは配信されません。開始条件を設定すると配信が始まります。
-      </p>
+      </Notice>
       {/*
         SCENARIO-16: 下線だけの span は押せない。3手順の説明は
         開閉欄へ移し、帯は1〜2文だけにする。
@@ -830,9 +831,7 @@ export default function ScenariosPage() {
       )}
 
       {actionError && (
-        <div className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
-          {actionError}
-        </div>
+        <Notice tone="danger" message={actionError} className="mb-4" />
       )}
 
       {scenarioList.loading && scenarios.length === 0 ? (

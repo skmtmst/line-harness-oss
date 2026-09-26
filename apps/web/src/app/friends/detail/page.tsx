@@ -24,6 +24,7 @@ import TagBadge from '@/components/friends/tag-badge'
 import { FIELD_TYPE_LABELS } from '@/components/friend-fields/field-list'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
 import TargetMissing from '@/components/shared/target-missing'
 import SelectField from '@/components/shared/select-field'
 import ListRange from '@/components/ui/list-range'
@@ -1326,9 +1327,7 @@ function FriendDetailInner() {
 
       {/* 本体が取れている途中の失敗（保存など）は帯で出す。本体の失敗は下のカードが出す。 */}
       {error && friend && (
-        <div className="bg-danger-bg border-danger-bg text-danger mb-4 rounded-lg border p-4 text-sm">
-          {error}
-        </div>
+        <Notice tone="danger" message={error} onClose={() => setError('')} className="mb-4" />
       )}
 
       {/*

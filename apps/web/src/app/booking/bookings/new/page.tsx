@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import StickyBar from '@/components/shared/sticky-bar'
 import {
@@ -617,15 +618,11 @@ export default function NewProxyBookingPage() {
       </nav>
 
       {error && step !== 'conflict' && (
-        <div className="border-danger bg-danger-bg text-danger rounded-card border px-4 py-3 text-sm">
-          {error}
-        </div>
+        <Notice tone="danger" message={error} onClose={() => setError('')} />
       )}
 
       {staffResolved && !canOperate ? (
-        <div className="border-warning bg-warning-bg text-warning rounded-card border px-4 py-3 text-sm">
-          予約を入れられるのは、予約の操作権限を持つ人だけです。閲覧のみの権限では操作ボタンは出ません。
-        </div>
+        <Notice tone="warn" message="予約を入れられるのは、予約の操作権限を持つ人だけです。閲覧のみの権限では操作ボタンは出ません。" />
       ) : null}
 
       {draftRestored && step === 'input' ? (
@@ -728,9 +725,9 @@ export default function NewProxyBookingPage() {
                 </Field>
               </div>
               {date && time && selectedStaff && menu ? (
-                <div className="border-success bg-success-bg text-success mt-3 rounded-control border px-3 py-2 text-xs font-semibold">
+                <Notice tone="success" className="mt-3">
                   {dateLabel(slotStartIso, slotTimeZone)} は空いています。{selectedStaff.duration_minutes}分のメニューです。
-                </div>
+                </Notice>
               ) : null}
             </Card>
 
@@ -853,9 +850,9 @@ export default function NewProxyBookingPage() {
                 </>
               )}
             </Card>
-            <p data-booking-slot-check="available" className="border-success bg-success-bg text-success rounded-card border px-4 py-3 text-xs">
+            <Notice tone="success" data-booking-slot-check="available">
               この日時は、確認画面を開く直前に空きを再確認しました。
-            </p>
+            </Notice>
           </div>
           <aside data-design="Right" className="space-y-4">
             <Card title={`${customerLabel}さんにはこう届きます`} note="送る前に、文面をそのまま確かめられます。">
@@ -869,18 +866,18 @@ export default function NewProxyBookingPage() {
 
       {step === 'conflict' && (friend || customer) && menu && selectedStaff && (
         <>
-          <section className="border-danger bg-danger-bg text-danger flex flex-wrap items-center justify-between gap-3 rounded-card border px-4 py-3">
-            <div>
-              <p className="text-sm font-semibold">{dateLabel(slotStartIso, slotTimeZone)} は {selectedStaff.display_name} がふさがっています</p>
-              <p className="mt-1 text-xs">
-                {conflictAlternatives
-                  ? `${scheduleLabel(conflictAlternatives.conflict.from, slotTimeZone)}〜${scheduleLabel(conflictAlternatives.conflict.to, slotTimeZone)}に${conflictAlternatives.conflict.count}件重なっています（${conflictAlternatives.conflict.source === 'internal_booking' ? '店内予約' : conflictAlternatives.conflict.source === 'google_calendar' ? 'Google予定' : '受付時間外'}）。`
-                  : ''}
-                時間か担当を変えてください。
-              </p>
-            </div>
-            <Button onClick={() => void recoverConflict()}>空いている時間を選び直す</Button>
-          </section>
+          <Notice
+            tone="danger"
+            action={<Button onClick={() => void recoverConflict()}>空いている時間を選び直す</Button>}
+          >
+            <p className="text-sm font-semibold">{dateLabel(slotStartIso, slotTimeZone)} は {selectedStaff.display_name} がふさがっています</p>
+            <p className="mt-1 text-xs">
+              {conflictAlternatives
+                ? `${scheduleLabel(conflictAlternatives.conflict.from, slotTimeZone)}〜${scheduleLabel(conflictAlternatives.conflict.to, slotTimeZone)}に${conflictAlternatives.conflict.count}件重なっています（${conflictAlternatives.conflict.source === 'internal_booking' ? '店内予約' : conflictAlternatives.conflict.source === 'google_calendar' ? 'Google予定' : '受付時間外'}）。`
+                : ''}
+              時間か担当を変えてください。
+            </p>
+          </Notice>
           <div data-design="Body" className="grid gap-4 xl:grid-cols-4">
             <div data-design="Left" className="min-w-0 space-y-4 xl:col-span-3">
               <Card title="だれの予約か"><Summary label="お客様" value={customerLabel} /><Summary label="LINEとの結びつき" value={friend ? '結びついています' : '未連携の電話客'} /></Card>
