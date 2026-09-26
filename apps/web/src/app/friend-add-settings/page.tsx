@@ -271,7 +271,7 @@ function FriendAddSettingsList() {
       */}
       <div style={FOLDER_RAIL_STYLE} className="grid grid-cols-[minmax(0,1fr)] items-start gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
         <FolderPanel
-          total={`${data?.total ?? data?.items.length ?? 0}件`}
+          /* 見出しの総数は「すべて」の行と同じ数なので出さない（件数の重ね書きをやめる）。 */
           activeId={folder ?? ''}
           onSelect={(id) => selectFolder(id || null)}
           onAddFolder={() => setFolderDialogOpen(true)}
