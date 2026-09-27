@@ -101,7 +101,8 @@ describe('#641 ウェビナー一覧の行操作', () => {
     expect(more, '「…」の撮影口が消えています').toBeTruthy()
     expect(more.getAttribute('aria-label')).toBe('旧機能説明会のその他操作')
     act(() => { more.click() })
-    const menu = host.querySelector('[role="menu"]')
+    // メニューは最上層（MenuPortal→document.body）に出る。器の中にはいない。
+    const menu = document.querySelector('[role="menu"]')
     expect(menu, 'メニューが開きません').toBeTruthy()
     expect(menu!.textContent).toContain('アーカイブする')
   })
