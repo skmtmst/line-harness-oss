@@ -68,3 +68,45 @@ describe('任意機能オフ時の参照一覧(#861/#862)', () => {
     spy.mockRestore()
   })
 })
+
+describe('R23横展開 タグ・テンプレート候補は今のアカウントだけ', () => {
+  it('タグの取得に選んでいるアカウントを渡す', async () => {
+    const spy = vi.spyOn(api.tags, 'list')
+      .mockResolvedValue({ success: true as const, data: [] })
+    await scenarioReferenceData.tags('r23-acc-a')
+    expect(spy).toHaveBeenCalledWith({ accountId: 'r23-acc-a' })
+    spy.mockRestore()
+  })
+
+  it('アカウントが違えば取り直す（混ぜない）', async () => {
+    const spy = vi.spyOn(api.tags, 'list')
+      .mockResolvedValue({ success: true as const, data: [] })
+    await scenarioReferenceData.tags('r23-acc-c')
+    await scenarioReferenceData.tags('r23-acc-d')
+    expect(spy).toHaveBeenCalledWith({ accountId: 'r23-acc-c' })
+    expect(spy).toHaveBeenCalledWith({ accountId: 'r23-acc-d' })
+    expect(spy).toHaveBeenCalledTimes(2)
+    spy.mockRestore()
+  })
+
+  it('テンプレートの取得に選んでいるアカウントを渡す', async () => {
+    const spy = vi.spyOn(api.templates, 'list')
+      .mockResolvedValue({ success: true as const, data: [] })
+    await scenarioReferenceData.templates('r23-acc-e')
+    expect(spy).toHaveBeenCalledWith(undefined, 'r23-acc-e')
+    spy.mockRestore()
+  })
+
+  it('未指定は従来どおり全体を取る', async () => {
+    const tagsSpy = vi.spyOn(api.tags, 'list')
+      .mockResolvedValue({ success: true as const, data: [] })
+    const tplSpy = vi.spyOn(api.templates, 'list')
+      .mockResolvedValue({ success: true as const, data: [] })
+    await scenarioReferenceData.tags()
+    await scenarioReferenceData.templates()
+    expect(tagsSpy).toHaveBeenCalledWith(undefined)
+    expect(tplSpy).toHaveBeenCalledWith(undefined, undefined)
+    tagsSpy.mockRestore()
+    tplSpy.mockRestore()
+  })
+})

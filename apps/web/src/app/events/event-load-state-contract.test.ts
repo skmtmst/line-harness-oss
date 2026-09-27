@@ -44,9 +44,9 @@ describe('V6 イベント・申込者一覧の状態', () => {
 
   it('イベント一覧は未取得の帯を0件にしない', () => {
     const body = code(EVENTS)
-    // 帯は「数」ではなく「次にすること」を出す（`event-attention.ts`）。
-    expect(body).toContain("value={dataReady ? attention.upcoming.length : null}")
-    expect(body).toContain("value={dataReady ? attention.applied : null}")
+    // 帯は「数」ではなく「次にすること」を出す（R79/R80 で全体集計へ）。
+    expect(body).toContain("value={dataReady ? kpi.upcoming_slots : null}")
+    expect(body).toContain("value={dataReady ? kpi.upcoming_active : null}")
     expect(body).toContain('登録したイベントは消えていません。')
   })
 
