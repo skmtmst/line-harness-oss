@@ -2905,9 +2905,11 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   }
   if (pathname === '/api/automation-runs') {
     // #519 軽: 本番口と同じく search・status・limit で絞る（固定7件を返さない）。
+    // R24: offset にも連動させ、ページ送りの撮影ができるようにする。
     const runStatus = query.get('status')
     const runSearch = (query.get('search') ?? '').trim().toLocaleLowerCase('ja')
     const runLimit = Math.max(1, Number.parseInt(query.get('limit') ?? '', 10) || 20)
+    const runOffset = Math.max(0, Number.parseInt(query.get('offset') ?? '', 10) || 0)
     const statusDomains = runStatus === 'executed'
       ? ['success', 'partial', 'failed']
       : runStatus === 'problems'
@@ -2925,8 +2927,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       success: true,
       data: {
         ...AUTOMATION_RUNS,
-        items: runItems.slice(0, runLimit),
-        pagination: { total: runItems.length, limit: runLimit, offset: 0 },
+        items: runItems.slice(runOffset, runOffset + runLimit),
+        pagination: { total: runItems.length, limit: runLimit, offset: runOffset },
       },
     }
   }
