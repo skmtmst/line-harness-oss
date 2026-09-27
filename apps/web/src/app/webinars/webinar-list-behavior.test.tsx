@@ -6,6 +6,11 @@ import { ApiError, type WebinarListItem, type WebinarListParams, type WebinarLis
 import WebinarsPage from './page'
 import { webinarLoadFailure } from './webinar-load-failure'
 
+/* 一覧の行操作（R94 参加者・分析・演出への移動）が使う router の撮影口。 */
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn(), replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
+}))
+
 const {
   WEBINAR_SEARCH_DEBOUNCE_MS,
   WebinarArchiveConfirm,

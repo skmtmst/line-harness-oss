@@ -34,7 +34,13 @@ describe('パネルの上限', () => {
   it('要件どおり 10 枚まで作れる', () => {
     /* 要件 11 §156「最大10パネル」。9 で止めると 10 枚目が作れない。 */
     expect(PART).toContain('const MAX_PANELS = 10')
-    expect(PART).toContain('disabled={cards.length >= MAX_PANELS}')
+    expect(PART).toContain('disabled={cards.length >= maxCards}')
+  })
+
+  it('「もっと見る」のぶんを数え方に出す', () => {
+    /* 「もっと見る」も LINE の10列のうち1列を使う。付けるときは本文9枚まで。 */
+    expect(PART).toContain('MAX_PANELS - 1')
+    expect(PART).toContain('「もっと見る」で1枠使うため')
   })
 
   it('上限を直書きしない', () => {

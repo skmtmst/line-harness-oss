@@ -410,7 +410,7 @@ export default function NenCampaignsPage() {
         onChangeDeliveryView={(status, cursor, q) => void changeDeliveryView(status, cursor, q)}
       />
       {/* #935 N-301: 紹介文の入力途中で画面を離れる／別コラムへ移るときの確認。 */}
-      <ConfirmDialog
+      <ConfirmDialog primaryAction="cancel"
         open={leaveTarget !== null}
         title="入力した紹介文が保存されていません"
         description="このまま移動すると、入力した紹介文は保存されません。移動しますか？"

@@ -37,10 +37,51 @@ describe('一斉配信の複数吹き出し契約', () => {
   it('6通・未対応種別・壊れた中身を送信前に止める', () => {
     expect(() => parseBroadcastMessageParts({ messageType: 'text', messageContent: 'x', messageBubbles: [...bubbles, bubbles[0]] }))
       .toThrow('1 to 5');
-    expect(() => parseBroadcastMessageParts({ messageType: 'text', messageContent: 'x', messageBubbles: [{ type: 'coupon', content: {} }] }))
+    expect(() => parseBroadcastMessageParts({ messageType: 'text', messageContent: 'x', messageBubbles: [{ type: 'unknown_type', content: {} }] }))
       .toThrow('Unsupported');
     expect(() => parseBroadcastMessageParts({ messageType: 'text', messageContent: 'x', messageBubbles: [{ type: 'image', content: {} }] }))
       .toThrow('originalContentUrl');
+  });
+
+  it('配信用素材4種類を画面と同じ変換でLINEの種別に直す', () => {
+    // 画面の保存（1吹き出し）と複数吹き出しの解析が同じ変換を使う。
+    // 中身の JSON が本文にならない（監査 R144）。
+    const assetBubbles = [
+      {
+        id: 'c1', type: 'card_message',
+        content: {
+          assetId: 'a1', assetName: '夏の案内',
+          cards: [{ title: 'パネル', description: '説明です', actionLabel: '詳しく見る', actionUrl: 'https://example.com/a' }],
+          moreCard: false,
+        },
+      },
+      {
+        id: 'r1', type: 'rich_message',
+        content: { assetId: 'a2', assetName: '便り', imageUrl: 'https://example.com/a.png', description: '新米です', actionUrl: 'https://example.com/lp' },
+      },
+      {
+        id: 'q1', type: 'coupon',
+        content: { assetId: 'a3', assetName: '夏クーポン', description: '500円引き', actionUrl: 'https://example.com/c' },
+      },
+      {
+        id: 's1', type: 'research',
+        content: { assetId: 'a4', assetName: '調査', description: '答えてください', actionUrl: 'https://example.com/f' },
+      },
+    ];
+    const parts = parseBroadcastMessageParts({ messageType: 'text', messageContent: 'legacy', messageBubbles: assetBubbles });
+    expect(parts.map((part) => part.messageType)).toEqual(['carousel', 'flex', 'text', 'text']);
+    for (const part of parts) {
+      expect(part.messageContent).not.toContain('assetId');
+    }
+    expect(parts[2].messageContent).toBe('500円引き\nhttps://example.com/c');
+    expect(buildMessages(parts).map((message) => message.type)).toEqual(['template', 'flex', 'text', 'text']);
+  });
+
+  it('直せない素材は直し方で止める', () => {
+    expect(() => parseBroadcastMessageParts({
+      messageType: 'text', messageContent: 'x',
+      messageBubbles: [{ type: 'card_message', content: { assetId: 'a', assetName: '案内', cards: [{ title: 'パネル' }] } }],
+    })).toThrow('リンク先');
   });
 
   it('全吹き出しをまとめて差し込み検査し、各通を相手ごとに描画する', () => {

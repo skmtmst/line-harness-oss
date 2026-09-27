@@ -74,6 +74,7 @@ import {
 } from '@line-crm/db';
 import { verifyCallerLineUserId } from '../services/liff-auth.js';
 import { attachTagAndFireSideEffects } from '../services/friend-tag-attach.js';
+import { runWebinarTriggerActions } from '../services/webinar-action-runner.js';
 import { recordConversionSourceEvent } from '@line-crm/db';
 import { resolveSession, parseScheduleRules, upcomingSessions } from '../services/webinar-schedule.js';
 import { sendWebinarRegistrationConfirmation } from '../services/webinar-reminders.js';
@@ -127,6 +128,41 @@ function nowEpoch(): number {
   return Math.floor(Date.now() / 1000);
 }
 
+// 公開期間の窓。開始前・終了後は顧客向け入口（視聴・申込）で止める。
+// 一覧の表示分類とは別に、顧客が入れるかどうかをここで決める。
+function publicationWindowBlockReason(row: Webinar): 'not_started' | 'ended' | null {
+  const now = Date.now();
+  const startsAt = row.publication_starts_at ? Date.parse(row.publication_starts_at) : null;
+  const endsAt = row.publication_ends_at ? Date.parse(row.publication_ends_at) : null;
+  if (startsAt !== null && !Number.isNaN(startsAt) && startsAt > now) return 'not_started';
+  if (endsAt !== null && !Number.isNaN(endsAt) && endsAt <= now) return 'ended';
+  return null;
+}
+
+type WebinarDeliveryKind = 'on_demand' | 'scheduled' | 'external';
+
+// 顧客向け処理が見る配信方法。保存が無い旧データは枠の有無から読み替える
+// （枠なし＝いつでも視聴のオンデマンド、枠あり＝日時指定）。
+async function resolveWebinarDeliveryKind(db: D1Database, row: Webinar): Promise<WebinarDeliveryKind> {
+  const settings = await getWebinarEditorSettings(db, row.id);
+  if (
+    settings &&
+    (settings.delivery_kind === 'on_demand' ||
+      settings.delivery_kind === 'scheduled' ||
+      settings.delivery_kind === 'external')
+  ) {
+    return settings.delivery_kind;
+  }
+  return parseScheduleRules(row.schedule_json).length === 0 ? 'on_demand' : 'scheduled';
+}
+
+// オンデマンドの常設回。枠を持たないため、作った時点を全員の共通の回にする。
+// 入場のたびに回を作ると視聴記録が散らばるので、この値に固定する。
+function onDemandSessionStartAt(row: Webinar, now: number): number {
+  const created = Date.parse(row.created_at);
+  return Number.isFinite(created) ? Math.floor(created / 1000) : now;
+}
+
 // LIFF caller を認証し、webinar とそのアカウント配下の friend を解決する。
 // 認証 (401) を webinar 存在確認より先に行う (existence oracle 対策)。
 // friend はウェビナーのアカウント配下の行を優先する (同一プロバイダーの複数
@@ -169,6 +205,68 @@ webinarRoutes.get('/api/liff/webinars/:slug', async (c) => {
     const { webinar } = auth;
 
     const now = nowEpoch();
+    // R99: 公開開始前・終了後は顧客の入口で止める。予約済み本人が
+    // 終わった回を専用リンクで開く録画視聴だけは例外として通す。
+    if (publicationWindowBlockReason(webinar)) {
+      const requestedRaw = c.req.query('sessionStartAt');
+      const requestedStart = requestedRaw === undefined ? null : Number(requestedRaw);
+      const replayReg =
+        requestedStart !== null && Number.isInteger(requestedStart) && requestedStart > 0
+          ? await getWebinarRegistration(c.env.DB, webinar.id, auth.friendId, requestedStart)
+          : null;
+      const replayEligible =
+        replayReg !== null && requestedStart !== null &&
+        now >= requestedStart + webinar.duration_seconds;
+      if (!replayEligible) return c.json({ error: 'not_found' }, 404);
+    }
+    // R96: オンデマンドは枠を持たない。入場そのものを開始として録画の
+    // 常設回を開く。申込の有無では止めない。
+    if ((await resolveWebinarDeliveryKind(c.env.DB, webinar)) === 'on_demand') {
+      const sessionStartAt = onDemandSessionStartAt(webinar, now);
+      await upsertWebinarViewer(c.env.DB, webinar.id, auth.friendId, sessionStartAt);
+      if (webinar.tag_on_attend) {
+        c.executionCtx.waitUntil(
+          Promise.resolve(
+            attachTagAndFireSideEffects(c.env.DB, auth.friendId, webinar.tag_on_attend),
+          ).catch((err) => console.error('webinar on-demand attend tag error:', err)),
+        );
+      }
+      const exp = now + webinar.duration_seconds + TOKEN_GRACE_SECONDS;
+      const token = await signWebinarToken(c.env.LINE_CHANNEL_SECRET, webinar.slug, exp);
+      const [comments, ctas] = await Promise.all([
+        getWebinarComments(c.env.DB, webinar.id),
+        getWebinarCtas(c.env.DB, webinar.id),
+      ]);
+      return c.json({
+        live: true,
+        replay: true,
+        title: webinar.title,
+        durationSeconds: webinar.duration_seconds,
+        sessionStartAt,
+        offsetSeconds: 0,
+        upcoming: [],
+        registeredSessionAt: null,
+        registeredForThisSession: true,
+        playlistUrl: `/webinar-assets/${token}/${webinar.slug}/master.m3u8`,
+        cta: webinar.cta_json ? (JSON.parse(webinar.cta_json) as unknown) : null,
+        comments: comments.map((cm) => ({
+          atSeconds: cm.at_seconds,
+          authorName: cm.author_name,
+          body: cm.body,
+        })),
+        ctas: ctas.map((ct) => ({
+          id: ct.id,
+          atSeconds: ct.at_seconds,
+          kind: ct.kind,
+          title: ct.title,
+          body: ct.body,
+          buttonLabel: ct.button_label,
+          autoOpen: Boolean(ct.auto_open),
+          formId: ct.form_id,
+          url: ct.url,
+        })),
+      });
+    }
     const rules = parseScheduleRules(webinar.schedule_json);
     const session = resolveSession(rules, webinar.duration_seconds, now);
 
@@ -408,6 +506,14 @@ webinarRoutes.post('/api/liff/webinars/:slug/heartbeat', async (c) => {
         sourceEventId: `${loaded.webinar.id}:${auth.friendId}:complete`,
         metadata: { webinarId: loaded.webinar.id, sessionStartAt },
       }).catch((err) => console.error('webinar conversion record failed:', err)));
+      // R97: 保存した視聴後アクション（完了のきっかけ）を実行口へ接続する。
+      // 同じ視聴の再送は実行記録の冪等キーで1件にまとまる。
+      c.executionCtx.waitUntil(runWebinarTriggerActions(c.env.DB, {
+        webinarId: loaded.webinar.id,
+        friendId: auth.friendId,
+        sessionStartAt,
+        trigger: 'completed',
+      }).catch((err) => console.error('webinar completed actions failed:', err)));
     }
     return c.json({ ok: true });
   } catch (err) {
@@ -443,7 +549,12 @@ webinarRoutes.post('/api/liff/webinars/:slug/comments', async (c) => {
       loaded.webinar.duration_seconds,
       nowEpoch(),
     );
-    if (session.live) {
+    // R96: オンデマンドは枠を持たない。常設回への投稿だけ受ける。
+    if ((await resolveWebinarDeliveryKind(c.env.DB, loaded.webinar)) === 'on_demand') {
+      if (sessionStartAt !== onDemandSessionStartAt(loaded.webinar, nowEpoch())) {
+        return c.json({ error: 'not_live' }, 409);
+      }
+    } else if (session.live) {
       if (sessionStartAt !== session.sessionStartAt) {
         return c.json({ error: 'not_live' }, 409);
       }
@@ -484,10 +595,30 @@ webinarRoutes.post('/api/liff/webinars/:slug/register', async (c) => {
     const loaded = { webinar: auth.webinar };
     const { webinar } = loaded;
 
+    // R99: 公開開始前・終了後は新しい申込を受けない（録画視聴の例外は作らない）。
+    if (publicationWindowBlockReason(webinar)) return c.json({ error: 'not_found' }, 404);
+
     const body = await c.req.json<{ sessionStartAt?: unknown }>();
     const sessionStartAt = Number(body.sessionStartAt);
-    const rules = parseScheduleRules(webinar.schedule_json);
     const now = nowEpoch();
+    // R96: オンデマンドは枠を持たない。常設回への申込だけ受け、
+    // 確認通知は送らない（入場そのものが開始のため）。
+    if ((await resolveWebinarDeliveryKind(c.env.DB, webinar)) === 'on_demand') {
+      const onDemandStart = onDemandSessionStartAt(webinar, now);
+      if (!Number.isFinite(sessionStartAt) || sessionStartAt !== onDemandStart) {
+        return c.json({ error: 'invalid_session' }, 400);
+      }
+      const registered = await registerWebinarSession(
+        c.env.DB, webinar.id, auth.friendId, sessionStartAt,
+      );
+      return c.json({
+        ok: true,
+        sessionStartAt,
+        rescheduled: registered.rescheduled,
+        confirmationQueued: false,
+      });
+    }
+    const rules = parseScheduleRules(webinar.schedule_json);
     const session = resolveSession(rules, webinar.duration_seconds, now);
     const upcoming = upcomingSessions(rules, webinar.duration_seconds, now, 48);
     const currentIsBookable =
@@ -584,6 +715,13 @@ webinarRoutes.post('/api/liff/webinars/:slug/cta-click', async (c) => {
         ).catch((err) => console.error('webinar cta tag error:', err)),
       );
     }
+    // R97: 保存した視聴後アクション（CTAクリックのきっかけ）を実行口へ接続する。
+    c.executionCtx.waitUntil(runWebinarTriggerActions(c.env.DB, {
+      webinarId: loaded.webinar.id,
+      friendId: auth.friendId,
+      sessionStartAt,
+      trigger: 'cta_clicked',
+    }).catch((err) => console.error('webinar cta actions failed:', err)));
     return c.json({ ok: true });
   } catch (err) {
     console.error('POST cta-click error:', err);
@@ -618,7 +756,10 @@ webinarRoutes.post('/api/liff/webinars/:slug/funnel-event', async (c) => {
     const registration = await getWebinarRegistration(
       c.env.DB, auth.webinar.id, auth.friendId, sessionStartAt,
     );
-    if (!registration) return c.json({ error: 'not_registered' }, 409);
+    // R96: オンデマンドは申込なしで入れるため、計測の申込必須を外す。
+    if (!registration && (await resolveWebinarDeliveryKind(c.env.DB, auth.webinar)) !== 'on_demand') {
+      return c.json({ error: 'not_registered' }, 409);
+    }
 
     const ctas = await getWebinarCtas(c.env.DB, auth.webinar.id);
     if (ctaId && !ctas.some((cta) => cta.id === ctaId)) {
@@ -1155,6 +1296,11 @@ webinarRoutes.post('/api/webinars', requireRole('owner', 'admin'), async (c) => 
     if (!body.accountId) {
       return c.json({ success: false, error: 'account_id_required' }, 400);
     }
+    // R95: 作った瞬間の公開は受けない。公開前検査と公開版の固定を通す
+    // 公開専用口（POST /:id/publish）へ寄せるため、下書きで作る。
+    if (body.status === 'active') {
+      return c.json({ success: false, error: 'publish_via_publish_endpoint' }, 422);
+    }
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
       return c.json({ success: false, error: 'Forbidden' }, 403);
     }
@@ -1320,6 +1466,18 @@ async function buildPublishValidation(c: Context<Env>, row: Webinar) {
         (cta.kind !== 'url' || Boolean(cta.url && /^https:\/\//.test(cta.url)))
       ) ? 'passed' : 'failed',
       detail: 'CTAは動画の長さ以内、外部URLはhttpsで検査します',
+    },
+    // R96: 日時指定の配信は枠が無いと「次の回」が出ない。枠なしで
+    // 公開できるのはオンデマンド（いつでも視聴）だけにする。
+    {
+      key: 'delivery_schedule',
+      label: '配信方法に合った枠が設定されています',
+      status: editor.deliveryKind === 'scheduled' &&
+        parseScheduleRules(row.schedule_json).length === 0 ? 'failed' : 'passed',
+      detail: editor.deliveryKind === 'scheduled' &&
+        parseScheduleRules(row.schedule_json).length === 0
+        ? '日時指定の配信には配信枠を1件以上設定してください'
+        : '配信方法と枠の組み合わせは正しいです',
     },
     {
       key: 'notification_test',
@@ -1593,6 +1751,12 @@ webinarRoutes.put('/api/webinars/:id', requireRole('owner', 'admin'), async (c) 
     const row = await getWebinarById(c.env.DB, id);
     if (!row) return c.json({ success: false, error: 'Not found' }, 404);
     const body = await c.req.json<WebinarBody>();
+    // R95: 下書きから公開中への切替は通常更新では受けない。公開前検査と
+    // 公開版の固定を通す公開専用口（POST /:id/publish）へ寄せる。
+    // 公開中のまま他項目を直す保存は通す。
+    if (body.status === 'active' && row.status !== 'active') {
+      return c.json({ success: false, error: 'publish_via_publish_endpoint' }, 409);
+    }
     if (body.accountId !== undefined && !await canAccessAllLineAccounts(
       c.env.DB, c.get('staff'), [body.accountId],
     )) {

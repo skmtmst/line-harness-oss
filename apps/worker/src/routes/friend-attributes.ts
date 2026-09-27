@@ -700,16 +700,22 @@ friendAttributes.post(
         return c.json({ success: false, error: 'Idempotency-Keyを指定してください' }, 400);
       }
       const body = await c.req.json<Record<string, unknown>>();
-      const replacementMarkId = typeof body.replacementMarkId === 'string'
+      const replacementRaw = typeof body.replacementMarkId === 'string'
         ? body.replacementMarkId.trim()
         : '';
+      /*
+       * R180: 使っている友だちが0人のときは置換先なしで保管できる。
+       * 空の置換先はここでは null へ倒し、0人かどうかの判定は
+       * `archiveSupportMarkWithReplacement` が最新の実値で行う。
+       */
+      const replacementMarkId = replacementRaw === '' ? null : replacementRaw;
       const impactRevision = typeof body.impactRevision === 'string'
         ? body.impactRevision.trim()
         : '';
       const expectedVersion = Number(body.expectedVersion);
-      if (!replacementMarkId || !impactRevision
+      if (!impactRevision
         || !Number.isInteger(expectedVersion) || expectedVersion < 1) {
-        return c.json({ success: false, error: '置換先・確認版・現在版を指定してください' }, 400);
+        return c.json({ success: false, error: '確認版・現在版を指定してください' }, 400);
       }
       const result = await archiveSupportMarkWithReplacement(c.env.DB, scope, {
         markId: c.req.param('id'),
@@ -719,7 +725,9 @@ friendAttributes.post(
         idempotencyKey,
         actorId: c.get('staff').id,
       });
-      const replacement = await getSupportMarkById(c.env.DB, replacementMarkId, scope);
+      const replacement = replacementMarkId === null
+        ? null
+        : await getSupportMarkById(c.env.DB, replacementMarkId, scope);
       return c.json({
         success: true,
         data: {

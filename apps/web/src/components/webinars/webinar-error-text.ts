@@ -31,6 +31,7 @@ const WEBINAR_ERROR_TEXT: Record<string, string> = {
   invalid_delivery_kind: '配信方法が正しくありません。',
   account_id_required: 'LINE公式アカウントを選んでください。',
   version_conflict: '別の画面で更新されました。開き直してから試してください。',
+  publish_via_publish_endpoint: '公開は確認ステップから行ってください。',
   publish_validation_failed: '公開前の確認で問題があります。表示された項目を直してください。',
   webinar_pause_required: '先にウェビナーを一時停止してください。',
   no_upcoming_session: 'これからの配信枠がありません。',

@@ -343,13 +343,23 @@ function SavedSearchEditInner() {
     gateRef.current.invalidate()
   }, [selectedAccountId])
 
-  const recount = useCallback(async () => {
+  /*
+   * R179: 保存直後の再計算は、保存応答の新しい版と正規化済み条件を
+   * 明示的に渡す。以前は `setOriginal` の直後に保存前の `recount` を
+   * 呼んでおり、クロージャの古い版で計算して409になり、人数が
+   * 「未計算・人数を計算できませんでした」になっていた。
+   */
+  const recount = useCallback(async (next?: { revision?: number; conditions?: SavedSearchConditions }) => {
     if (!selectedAccountId || !id) return
     const account = selectedAccountId
     const token = gateRef.current.begin()
     setPreviewError('')
     try {
-      const res = await api.savedSearches.preview(account, { savedSearchId: id, conditions, revision: original?.revision })
+      const res = await api.savedSearches.preview(account, {
+        savedSearchId: id,
+        conditions: next?.conditions ?? conditions,
+        revision: next?.revision ?? original?.revision,
+      })
       if (!gateRef.current.current(token) || accountRef.current !== account) return
       setPreviewCount(res.success ? res.data.match.total : null)
       setPreview(res.success ? res.data.match : null)
@@ -486,9 +496,11 @@ function SavedSearchEditInner() {
       const refreshed = await api.savedSearches.detail(id, selectedAccountId)
       if (!refreshed.success) throw new Error(refreshed.error)
       setOriginal(refreshed.data)
-      setConditions(normalizeForEdit(refreshed.data))
+      const normalized = normalizeForEdit(refreshed.data)
+      setConditions(normalized)
       setPreviewStale(false)
-      await recount()
+      /* R179: 保存応答の新しい版と正規化済み条件で数え直す。古い版では409になる。 */
+      await recount({ revision: refreshed.data.revision, conditions: normalized })
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : '変更を保存できませんでした')
     } finally {
@@ -566,9 +578,12 @@ function SavedSearchEditInner() {
 
   return (
     <div data-design-node="XBkiQ">
+      {/* R177: 長い条件名で戻るボタンが右へ押し出される同じ構図。パンくずを縮め、ボタンは残す。 */}
       <div className="mb-4 flex items-center justify-between gap-4">
-        <Breadcrumb items={[{ label: '保存した検索', href: '/tags?tab=searches' }, { label: original.name }]} />
-        <Button href="/tags?tab=searches">保存した検索へ</Button>
+        <div className="min-w-0 flex-1">
+          <Breadcrumb items={[{ label: '保存した検索', href: '/tags?tab=searches' }, { label: original.name }]} />
+        </div>
+        <Button href="/tags?tab=searches" className="shrink-0">保存した検索へ</Button>
       </div>
 
       {error ? <Notice tone="danger" message={error} className="mb-4" /> : null}
@@ -699,7 +714,7 @@ function SavedSearchEditInner() {
         )}
       />
       <ConfirmDialog open={deleteOpen && original.canDelete === true} title={`「${name}」を削除しますか？`} description="使用先が無いことをサーバーで確認済みです。保存した条件だけを削除し、友だちは削除しません。" confirmLabel="削除する" destructive onCancel={() => setDeleteOpen(false)} onConfirm={() => { setDeleteOpen(false); void remove() }} />
-      <ConfirmDialog
+      <ConfirmDialog primaryAction="cancel"
         open={leaveTarget !== null}
         title="保存していない変更があります"
         description="このまま移動すると、検索条件への変更は失われます。保存せずに移動しますか？"

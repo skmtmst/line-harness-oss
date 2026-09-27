@@ -198,6 +198,7 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
 
     // Email threads have no account key in the legacy schema. Until a thread
     // is explicitly attributed, only the default tenant may view them.
+    // R110: アカウント選択中は件数側と同じく対象外にする（一覧と件数で一致）。
     if (channel !== 'line' && scope.canSeeUnassigned && !selectedLineAccountId) {
       const statusSql = status === 'all'
         ? '1=1'

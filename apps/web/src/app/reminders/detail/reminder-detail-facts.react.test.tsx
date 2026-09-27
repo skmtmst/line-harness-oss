@@ -48,6 +48,8 @@ const RESPONSE = (overrides: Partial<ReminderDeliveryRunsResponse['reminder']> =
       daysAfterTarget: 7,
       friendBlocked: true,
     },
+    // R146 監査：公開版の有無。ある設定が既定。
+    hasPublishedVersion: true,
     ...overrides,
   },
   summary: { sent: 0, scheduled: 0, stopped: 0, errors: 0, targetCount: 0, nextScheduledAt: null },
@@ -104,5 +106,17 @@ describe('リマインダ詳細の停止予定', () => {
     const pause = await screen.findByText('リマインダを一時停止')
     fireEvent.click(pause)
     await waitFor(() => expect(apiMock.update).toHaveBeenCalledWith('rem-1', { isActive: false }))
+  })
+
+  it('R146: 未公開の下書きは「下書き」と出し、再開ボタンを出さない', async () => {
+    apiMock.runs.mockResolvedValue({
+      success: true,
+      data: RESPONSE({ isActive: false, lifecycleStatus: 'draft', hasPublishedVersion: false }),
+    })
+    render(<ReminderRunsPage />)
+    // 稼働状況の「状態」と追従バーの状態の2か所に「下書き」と出る。
+    await waitFor(() => expect(screen.getAllByText('下書き').length).toBeGreaterThan(0))
+    expect(screen.queryByText('リマインダを再開')).toBeNull()
+    expect(screen.getByText('リマインダの設定を編集')).toBeTruthy()
   })
 })

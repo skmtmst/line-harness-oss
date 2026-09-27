@@ -2,16 +2,24 @@ import { describe, expect, it } from 'vitest'
 import { buildSupportEmailInboxQuery } from './support-email-query'
 
 describe('buildSupportEmailInboxQuery', () => {
-  it('LINEアカウントの選択に関係なくメール問い合わせを取得する', () => {
+  it('R110 選択中のLINEアカウントは件数と同じ条件で送る', () => {
     const query = new URLSearchParams(buildSupportEmailInboxQuery({
       status: 'all',
       query: '定期便',
+      accountId: 'account-a',
     }))
 
     expect(query.get('channel')).toBe('email')
     expect(query.get('status')).toBe('all')
     expect(query.get('q')).toBe('定期便')
     expect(query.get('limit')).toBe('200')
+    expect(query.get('lineAccountId')).toBe('account-a')
+  })
+
+  it('R110 アカウント未選択のときは送らず全メールのままにする', () => {
+    const query = new URLSearchParams(buildSupportEmailInboxQuery({ status: 'all' }))
+
+    expect(query.get('channel')).toBe('email')
     expect(query.has('lineAccountId')).toBe(false)
   })
 

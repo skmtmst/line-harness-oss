@@ -484,7 +484,7 @@ function Editor({
    * 「保存せずに移動」を選ぶ手段がなくなる。
    */
   const leaveConfirmDialog = (
-    <ConfirmDialog
+    <ConfirmDialog primaryAction="cancel"
       open={leaveTarget !== null}
       title="保存していない変更があります"
       description="このまま移動すると、メニューへの変更は失われます。保存せずに移動しますか？"
