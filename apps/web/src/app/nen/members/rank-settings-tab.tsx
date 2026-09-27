@@ -1,7 +1,7 @@
 'use client'
 
 import { RefreshCw } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Chip from '@/components/shared/chip'
@@ -53,22 +53,6 @@ export default function RankSettingsTab({
   const [notice, setNotice] = useState('')
   /** 削除の確認を開いている行。null の間は確認を出さない。 */
   const [removeTarget, setRemoveTarget] = useState<number | null>(null)
-  // 真因の直し：「追加」の行の列結合は見えている列の数にする。table-layout: fixed
-  // では colSpan=6 が畳んだ会員数列を6列目として作り直し、残り幅を吸収列（タグ）と
-  // 見えない列で分け合う（1440pxで帯と線が約113px手前で切れて見える）。
-  // 表の器（この区画）の実幅を ResizeObserver で見て結合数を合わせる（会員数を
-  // 畳む幅 cq-hide-below-800 と同じ800pxが境目）。
-  const tableSectionRef = useRef<HTMLElement | null>(null)
-  const [tableWidth, setTableWidth] = useState(Number.POSITIVE_INFINITY)
-  useEffect(() => {
-    const el = tableSectionRef.current
-    if (!el || typeof ResizeObserver === 'undefined') return
-    const update = () => setTableWidth(el.getBoundingClientRect().width)
-    update()
-    const observer = new ResizeObserver(update)
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [])
   /** 下書きがどのアカウントのものか。編集状態はアカウントに固定する（DEEP-21）。 */
   const [draftAccountId, setDraftAccountId] = useState(accountId)
 
@@ -186,7 +170,7 @@ export default function RankSettingsTab({
       {error ? <p className="text-label text-danger" role="alert">{error}</p> : null}
 
       <div data-design="Body" data-design-node="Y4zWdG" className="grid gap-4 xl:grid-cols-3">
-        <section data-design="Table" data-design-node="C0WaS" className="@container min-w-0 xl:col-span-2" ref={tableSectionRef}>
+        <section data-design="Table" data-design-node="C0WaS" className="@container min-w-0 xl:col-span-2">
           {/*
             R55: @container＋谷間帯の列削減は会員一覧と同じ形。1440pxでは
             2/3幅の表に固定幅が収まらず、タグ見出しが会員数へ重なっていた。
@@ -263,15 +247,20 @@ export default function RankSettingsTab({
                   </Tr>
                 )
               })}
-              <Tr>
-                <Td colSpan={tableWidth < 800 ? 5 : 6}>
-                  <button type="button" className="text-label font-semibold text-action" onClick={add} disabled={drafts.length >= 8}>
-                    ＋ ランクを追加
-                  </button>
-                </Td>
-              </Tr>
             </tbody>
           </DataTable>
+          {/*
+            m18s 真因の直し：「追加」は表の外（表の下）に置き colSpan を使わない。
+            table-layout: fixed では結合セルが畳んだ列を見えない列として作り直し、
+            残り幅を分け合って帯と線が手前で切れて見える。表の中に結合が無いので
+            列は見えている列だけで決まる。枠の中のdivは共有の表部品が作るため、
+            同じ区画の表の直下に置く。
+          */}
+          <div className="mt-3">
+            <button type="button" className="text-label font-semibold text-action" onClick={add} disabled={drafts.length >= 8}>
+              ＋ ランクを追加
+            </button>
+          </div>
         </section>
 
         <div data-design="Side" data-design-node="RgQEL" className="flex flex-col gap-4">

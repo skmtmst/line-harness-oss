@@ -1,12 +1,11 @@
 // @vitest-environment happy-dom
 /*
- * m18s 真因の直し：「追加」の行の列結合は見えている列の数にする。
- * table-layout: fixed では colSpan=6 が畳んだ列を見えない6列目として作り直し、
- * 残り幅を吸収列と見えない列で分け合う（1440pxで帯と線が約113px手前で切れる）。
- * 本物のReactで動かして見る。表の器の実幅を変えたとき、
- * - ランク表：800px未満は5列、800px以上は6列
- * - lifetime表：800px未満は4列、800px以上1010px未満は5列、1010px以上は6列
- * 固定の colSpan=6 に戻すと赤（1440px相当の700pxで結合数が6のまま）。
+ * m18s 真因の直し：「追加」は表の外（表の下）に置き colSpan を使わない。
+ * table-layout: fixed では結合セルが畳んだ列を見えない列として作り直し、
+ * 残り幅を分け合って帯と線が手前で切れて見える。本物のReactで動かして見る。
+ * - 表の中に結合セル（td[colspan]）が無い
+ * - 「追加」のボタンは表の中に無く、同じ区画にある
+ * 表の中に戻すと赤。
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -25,7 +24,6 @@ import LifetimeTab from './lifetime-tab'
 
 let host: HTMLDivElement
 let root: Root
-let roCallbacks: Array<() => void>
 
 const SETTINGS: NenRankSettingsData = {
   ranks: [
@@ -38,53 +36,29 @@ const SETTINGS: NenRankSettingsData = {
   kpis: { members: 10, annualTotalYen: 0, lifetimeTotalYen: 0, balanceTotal: 0, usedThisMonth: 0, byRank: {} },
 }
 
-async function renderRank() {
+async function settle(milliseconds: number) {
   await act(async () => {
-    root.render(
-      <RankSettingsTab accountId="acc-1" status="ready" settings={SETTINGS} onSaved={() => {}} onRetry={() => {}} />,
-    )
+    await new Promise((resolve) => setTimeout(resolve, milliseconds))
   })
 }
 
-async function renderLifetime() {
-  await act(async () => {
-    root.render(
-      <LifetimeTab accountId="acc-1" status="ready" settings={SETTINGS} onSaved={() => {}} onRetry={() => {}} />,
-    )
-  })
-}
-
-/** 表の器の実幅を作り、ResizeObserver の通知を送る。 */
-async function setTableWidthPx(px: number) {
-  const section = host.querySelector('section[data-design="Table"]') as HTMLElement
+/** 区画の表の中に結合セルが無く、追加ボタンが表の外・区画の中にある。 */
+function expectAddOutsideTable(label: string) {
+  const section = host.querySelector('section[data-design="Table"]')
   expect(section).toBeTruthy()
-  vi.spyOn(section, 'getBoundingClientRect').mockReturnValue({
-    width: px, height: 0, top: 0, left: 0, bottom: 0, right: 0, x: 0, y: 0, toJSON: () => ({}),
-  })
-  expect(roCallbacks.length).toBeGreaterThan(0)
-  await act(async () => {
-    roCallbacks.forEach((cb) => cb())
-  })
+  const table = section!.querySelector('table')
+  expect(table).toBeTruthy()
+  expect(section!.querySelector('td[colspan]')).toBeNull()
+  const add = Array.from(section!.querySelectorAll('button')).find((b) => b.textContent?.includes(label))
+  expect(add).toBeTruthy()
+  expect(table!.contains(add!)).toBe(false)
 }
 
-function addRowColSpan(): string | null {
-  return host.querySelector('tbody tr td[colspan]')?.getAttribute('colspan') ?? null
-}
-
-describe('m18s 追加行の列結合は見えている列の数', () => {
+describe('m18s 追加は表の外に置き表の中に結合を作らない', () => {
   beforeEach(() => {
     host = document.createElement('div')
     document.body.appendChild(host)
     root = createRoot(host)
-    roCallbacks = []
-    vi.stubGlobal('ResizeObserver', class {
-      constructor(cb: () => void) {
-        roCallbacks.push(cb)
-      }
-      observe() {}
-      unobserve() {}
-      disconnect() {}
-    })
   })
 
   afterEach(() => {
@@ -92,37 +66,25 @@ describe('m18s 追加行の列結合は見えている列の数', () => {
       root.unmount()
     })
     host.remove()
-    vi.unstubAllGlobals()
-    vi.restoreAllMocks()
   })
 
-  it('ランク表：1440px相当（700px）では5列に結合する', async () => {
-    await renderRank()
-    await setTableWidthPx(700)
-    expect(addRowColSpan()).toBe('5')
+  it('ランク表：「ランクを追加」は表の外にある', async () => {
+    await act(async () => {
+      root.render(
+        <RankSettingsTab accountId="acc-1" status="ready" settings={SETTINGS} onSaved={() => {}} onRetry={() => {}} />,
+      )
+    })
+    await settle(50)
+    expectAddOutsideTable('ランクを追加')
   })
 
-  it('ランク表：広い器（900px）では6列に結合する', async () => {
-    await renderRank()
-    await setTableWidthPx(900)
-    expect(addRowColSpan()).toBe('6')
-  })
-
-  it('lifetime表：狭い器（700px）では4列に結合する', async () => {
-    await renderLifetime()
-    await setTableWidthPx(700)
-    expect(addRowColSpan()).toBe('4')
-  })
-
-  it('lifetime表：中の器（900px）では5列に結合する', async () => {
-    await renderLifetime()
-    await setTableWidthPx(900)
-    expect(addRowColSpan()).toBe('5')
-  })
-
-  it('lifetime表：広い器（1100px）では6列に結合する', async () => {
-    await renderLifetime()
-    await setTableWidthPx(1100)
-    expect(addRowColSpan()).toBe('6')
+  it('lifetime表：「節目を追加」は表の外にある', async () => {
+    await act(async () => {
+      root.render(
+        <LifetimeTab accountId="acc-1" status="ready" settings={SETTINGS} onSaved={() => {}} onRetry={() => {}} />,
+      )
+    })
+    await settle(50)
+    expectAddOutsideTable('節目を追加')
   })
 })
