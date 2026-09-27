@@ -58,6 +58,27 @@ describe('一斉配信の検索行（U014 → ★V7 Xn1Mz）', () => {
     expect(PAGE).not.toMatch(/justify-end[^>]*>\s*(<span[^>]*>表示件数<\/span>)?\s*<SelectField/)
   })
 
+  it('日付の入力2つは狭い幅で2行目に置き、並び順・表示件数を3行目へ落とさない', () => {
+    /*
+     * 各208px（w-52）では1440pxで並び順と表示件数だけの3行目が
+     * できていた。各150pxの共通決まり（ListToolbarのdata-date-input）
+     * で同じ2行目に収める。1152px以下での折り返しは許す。
+     */
+    expect(PAGE).not.toMatch(/<div className="w-52"><DateField/)
+    const toolbarAt = PAGE.indexOf('<ListToolbar')
+    const filtersAt = PAGE.indexOf('filters={', toolbarAt)
+    const trailingAt = PAGE.indexOf('trailing={', toolbarAt)
+    expect(filtersAt).toBeGreaterThan(toolbarAt)
+    expect(trailingAt).toBeGreaterThan(filtersAt)
+    const firstDateAt = PAGE.indexOf('data-date-input', filtersAt)
+    expect(firstDateAt).toBeGreaterThan(filtersAt)
+    expect(firstDateAt).toBeLessThan(trailingAt)
+    expect(PAGE.indexOf('aria-label="配信日（開始）"', filtersAt)).toBeGreaterThan(filtersAt)
+    expect(PAGE.indexOf('aria-label="配信日（開始）"', filtersAt)).toBeLessThan(trailingAt)
+    expect(PAGE.indexOf('aria-label="配信日（終了）"', filtersAt)).toBeGreaterThan(filtersAt)
+    expect(PAGE.indexOf('aria-label="配信日（終了）"', filtersAt)).toBeLessThan(trailingAt)
+  })
+
   it('狭い幅の1列グリッドは minmax(0,1fr) で画面内に収める', () => {
     /*
      * 暗黙の auto 列は中身の最大幅（表の min-w-[640px]）まで広がるため、

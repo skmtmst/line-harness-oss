@@ -93,4 +93,21 @@ describe('ListToolbar 一覧の上の道具の並び（★V7 Xn1Mz）', () => {
     expect(src).toContain("from './search-field'")
     expect(src).toContain('<SearchField')
   })
+
+  it('日付の範囲の入力はListToolbarの中で狭くそろえる（1440で2行目に収める）', () => {
+    /*
+     * 一斉配信の2行目で日付2つが各208px（w-52）あり、1440pxで
+     * 並び順と表示件数が3行目へ落ちた。各150px（計300px・116px減）
+     * なら同じ行に収まる。「日付を選ぶ」（5文字・14px＝約70px＋
+     * 暦の絵16px＋余白）は150pxで欠けずに入る。
+     * 1152px以下での折り返しは .row2 の flex-wrap のまま許す。
+     */
+    const css = read('list-toolbar.module.css')
+    const rule = css.match(/\.filters\s*>\s*\[data-date-input\]\s*{[^}]*}/s)
+    expect(rule, '日付入力の幅指定がありません').toBeTruthy()
+    expect(rule![0]).toContain('150px')
+    expect(rule![0]).not.toContain('208px')
+    // 縮めて潰さない（flex:none・入りきらない幅では行ごと折り返す）。
+    expect(rule![0]).toMatch(/flex:\s*none/)
+  })
 })

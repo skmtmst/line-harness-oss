@@ -177,7 +177,14 @@ export function RowActions({
             note={menuNote}
           />
         </>
-      ) : null}
+      ) : (
+        /*
+         * 「⋯」が無い行（送信済みなど）でも同じ幅の場所を取る。
+         * 無いと主ボタン（詳細）が右へずれて行ごとにそろわない。
+         * 見せない・読ませないが、幅は「⋯」と同じだけ取る。
+         */
+        <span className={styles.morePlaceholder} data-more-placeholder aria-hidden="true" />
+      )}
     </span>
   )
 }

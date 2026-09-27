@@ -578,9 +578,9 @@ function BroadcastList() {
                 <FilterChip selected={statusFilter === 'draft'} onChange={(on) => setStatusFilter(on ? 'draft' : 'all')}>下書き</FilterChip>
                 {/* ★V7：押せない「非表示」「開封率が低い」の札は外した（機能が無い・未接続のまま置かれていた）。 */}
                 <span className="text-ink-faint ml-1 text-xs whitespace-nowrap">配信日</span>
-                <div className="w-52"><DateField value={dateFrom} onChange={setDateFrom} max={dateTo || undefined} aria-label="配信日（開始）" /></div>
+                <div data-date-input><DateField value={dateFrom} onChange={setDateFrom} max={dateTo || undefined} aria-label="配信日（開始）" /></div>
                 <span className="text-ink-faint text-xs">〜</span>
-                <div className="w-52"><DateField value={dateTo} onChange={setDateTo} min={dateFrom || undefined} aria-label="配信日（終了）" /></div>
+                <div data-date-input><DateField value={dateTo} onChange={setDateTo} min={dateFrom || undefined} aria-label="配信日（終了）" /></div>
                 {(dateFrom || dateTo) && <button type="button" className="text-xs font-semibold text-action" onClick={() => { setDateFrom(''); setDateTo('') }}>日付を外す</button>}
               </>
             }

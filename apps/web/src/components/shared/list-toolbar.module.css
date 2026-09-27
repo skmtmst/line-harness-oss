@@ -52,6 +52,21 @@
     flex: 1 1 auto;
   }
 
+  /*
+   * 日付の範囲の入力（開始・終了）はこの幅にそろえる。
+   * 208px（w-52）では2つで416pxになり、1440pxで並び順と
+   * 表示件数が3行目へ落ちた。150pxなら「日付を選ぶ」
+   * （5文字・14px＝約70px＋暦の絵16px＋余白）が欠けずに入る。
+   * 選んだ日が長いときは DateField 側の省略＋titleで読める。
+   * 1152px以下での折り返しは .row2 の flex-wrap のまま。
+   * 印は呼び出し側が付ける：<div data-date-input><DateField … /></div>
+   */
+  .filters > [data-date-input] {
+    width: 150px;
+    flex: none;
+    max-width: 100%;
+  }
+
   .trailing {
     display: flex;
     flex-wrap: wrap;
