@@ -21,6 +21,7 @@ import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import ListRange from '@/components/ui/list-range'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { useManualHref } from '@/lib/use-manual-href'
 import KpiCollapse from '@/components/ui/kpi-collapse'
 import MetricValue from '@/components/ui/metric-value'
 import {
@@ -277,6 +278,8 @@ export default function AutomationsPage() {
   const tab = useMergedTab(MERGED_TABS)
   usePageTitle(tab === 'templates' ? '見本から作る' : 'オートメーション')
   const canManageAutomations = useCanManageAutomations()
+  /* 監査 R128: 正本表に登録があるときだけ出す。無ければボタン自体を出さない。 */
+  const manualHref = useManualHref('/automations')
   /*
    * 閲覧のみの利用者（N-361、要件 §4-1・§4-9）。
    *
@@ -609,7 +612,7 @@ export default function AutomationsPage() {
         <div className="flex flex-wrap gap-2">
           <Button href="/common-actions">共通アクションを見る</Button>
           {/* 作成は owner/admin だけ。閲覧のみには出さず、下で理由を出す（N-361）。 */}
-          <Button href="/support">マニュアル</Button>
+          {manualHref ? <Button href={manualHref}>マニュアル</Button> : null}
         </div>
       </div>
       {viewerOnly ? (

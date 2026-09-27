@@ -151,6 +151,50 @@
   .kindColumn, .articleKindColumn, .stateColumn, .numberColumn, .helpfulColumn, .dateColumn, .actionsColumn { width: auto; }
   .rowActions { gap: 8px; flex-wrap: wrap; }
 }
+/*
+ * 監査 R134: スマートフォンでは8列の表が44pxずつに潰れ、題名が読めず
+ * 操作ボタンがセルの外へ隠れていた。狭い画面は表を畳み、1記事を1枚の
+ * カードとして、題名を先頭に・状態などをラベル付きの行で・操作を
+ * 十分な幅で並べる。
+ */
+@media (max-width: 640px) {
+  .table thead { display: none; }
+  .table, .table tbody, .table tr, .table td { display: block; width: auto; }
+  .table tbody tr {
+    height: auto;
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    border: 1px solid var(--color-hairline);
+    border-radius: var(--radius-control);
+    background: var(--color-surface, #fff);
+  }
+  .table td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 4px 0;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+  }
+  .table td[data-label]::before {
+    content: attr(data-label);
+    flex-shrink: 0;
+    color: var(--color-ink-faint);
+    font-size: var(--text-nano);
+  }
+  .table .titleCell {
+    display: block;
+    padding-bottom: 8px;
+    margin-bottom: 4px;
+    border-bottom: 1px solid var(--color-hairline);
+    font-size: var(--text-label);
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .rowActions { justify-content: flex-end; gap: 16px; }
+}
 @media (max-height: 900px) {
   :global([data-design-node='DHdsw'][role='presentation']):has(.editor),
   :global([data-design-node='ZAOc7'][role='presentation']):has(.editor) { padding-top: 24px; }

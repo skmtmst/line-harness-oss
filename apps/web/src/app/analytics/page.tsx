@@ -3161,7 +3161,12 @@ function SavedAnalyticsTab({ accountId, onCountChange, canManage }: {
 }
 
 function AnalyticsInner() {
-  const tab = useMergedTab(TABS)
+  /*
+   * 旧キー `clicks`（Search Console 側の以前の表記）で来たURLも
+   * URLクリックへ寄せる。知らない値は先頭（友だちの増減）へ落ちる
+   * useMergedTab の既定のままにすると、調べたい分析と違う画面が開く。
+   */
+  const tab = useMergedTab(TABS, 'tab', undefined, { clicks: 'url-clicks' })
   /*
    * N-256: 成果地点の一覧から「使う場所を足す」で渡された地点を
    * ファネル作成へ引き渡す。`?tab=funnel&conversionPointId=…` が入口。

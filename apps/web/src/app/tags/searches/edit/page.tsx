@@ -377,7 +377,8 @@ function SavedSearchEditInner() {
     void Promise.all([
       api.savedSearches.detail(id, selectedAccountId),
       api.savedSearches.list(selectedAccountId, { limit: 50 }),
-      api.tags.list(),
+      // R23横展開: タグ候補も今のアカウントだけ（条件の表示名の取り違え防止）。
+      api.tags.list({ accountId: selectedAccountId }),
       api.supportMarks.list(selectedAccountId, { suppressFeatureDisabledEvent: true }).catch(() => null),
       api.scenarios.list({ accountId: selectedAccountId }).catch(() => null),
       api.friendFields.list(selectedAccountId, undefined, { suppressFeatureDisabledEvent: true }).catch(() => null),

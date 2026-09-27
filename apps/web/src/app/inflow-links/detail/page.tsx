@@ -102,21 +102,12 @@ function InflowLinkDetailPageContent() {
     )
     void Promise.allSettled([
       api.entryRoutes.list(),
-      api.tags.list(),
-      api.scenarios.list(),
       poolsRequest,
-      // 編集窓の「追加直後に送るメッセージ」選択肢に使う。
-      api.templates.list(),
       api.staff.me(),
-    ]).then(([r, t, sc, p, tp, me]) => {
+    ]).then(([r, p, me]) => {
       if (cancelled) return
       if (r.status === 'fulfilled' && r.value.success) setRoutes(r.value.data)
-      if (t.status === 'fulfilled' && t.value.success) setTags(t.value.data)
-      if (sc.status === 'fulfilled' && sc.value.success) setScenarios(sc.value.data)
       if (p.status === 'fulfilled' && p.value.success) setPools(p.value.data)
-      if (tp.status === 'fulfilled' && tp.value.success) {
-        setTemplates(tp.value.data as unknown as MessageTemplate[])
-      }
       if (me.status === 'fulfilled' && me.value.success) {
         setCanPermanentlyDelete(me.value.data.role === 'owner' || me.value.data.role === 'admin')
       }
@@ -126,6 +117,33 @@ function InflowLinkDetailPageContent() {
       cancelled = true
     }
   }, [])
+
+  /*
+   * R23横展開: 名前の解決・編集窓の候補は、この経路のアカウントだけ。
+   * 経路が変わったら取り直す。別アカウントの同名タグ混入防止。
+   */
+  const routeAccountId = route?.lineAccountId ?? null
+  useEffect(() => {
+    let cancelled = false
+    if (!route) return () => { cancelled = true }
+    const accountParams = routeAccountId ? { accountId: routeAccountId } : undefined
+    void Promise.allSettled([
+      api.tags.list(accountParams),
+      api.scenarios.list(accountParams),
+      // 編集窓の「追加直後に送るメッセージ」選択肢に使う。
+      api.templates.list(undefined, routeAccountId ?? undefined),
+    ]).then(([t, sc, tp]) => {
+      if (cancelled) return
+      if (t.status === 'fulfilled' && t.value.success) setTags(t.value.data)
+      if (sc.status === 'fulfilled' && sc.value.success) setScenarios(sc.value.data)
+      if (tp.status === 'fulfilled' && tp.value.success) {
+        setTemplates(tp.value.data as unknown as MessageTemplate[])
+      }
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [route, routeAccountId])
 
   // 右の内訳。リンクを選び直すたびに引き直す。
   useEffect(() => {

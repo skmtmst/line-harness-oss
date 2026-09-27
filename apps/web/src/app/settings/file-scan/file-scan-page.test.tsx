@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   me: vi.fn(),
   list: vi.fn(),
   getConfig: vi.fn(),
+  saveConfig: vi.fn(),
 }))
 
 vi.mock('@/contexts/account-context', () => ({
@@ -44,6 +45,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
         ...actual.api.fileScan,
         list: mocks.list,
         getConfig: mocks.getConfig,
+        saveConfig: mocks.saveConfig,
       },
     },
   }
@@ -142,5 +144,69 @@ describe('ファイルの検査の設定画面', () => {
     })
     fireEvent.click(screen.getByRole('button', { name: '使えるように戻す' }))
     expect(screen.getByLabelText(/理由/)).toBeTruthy()
+  })
+
+  test('51件以上あるときページ送りが出て、先のページを取りに行く (監査R132)', async () => {
+    ready()
+    mocks.list.mockImplementation((_id: string, params?: { offset?: number }) =>
+      Promise.resolve({ success: true, data: { items: [scanOf()], total: 51, limit: 50, offset: params?.offset ?? 0 } }))
+    render(<FileScanSettingsPage />)
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '次のページ' })).toBeTruthy()
+    })
+    fireEvent.click(screen.getByRole('button', { name: '次のページ' }))
+    await waitFor(() => {
+      expect(mocks.list).toHaveBeenCalledWith('acc-1', expect.objectContaining({ offset: 50 }))
+    })
+  })
+
+  test('ファイル名で探すと検索語をAPIへ渡す (監査R132)', async () => {
+    ready()
+    mocks.list.mockResolvedValue({ success: true, data: { items: [], total: 0, limit: 50, offset: 0 } })
+    render(<FileScanSettingsPage />)
+    const input = await screen.findByLabelText('ファイル名で探す')
+    fireEvent.change(input, { target: { value: 'invoice' } })
+    await waitFor(() => {
+      expect(mocks.list).toHaveBeenCalledWith('acc-1', expect.objectContaining({ q: 'invoice' }))
+    })
+  })
+
+  test('外の検査の有効表示は保存済み設定に従い、止めると設定を消す (監査R133)', async () => {
+    ready()
+    mocks.getConfig.mockResolvedValue({
+      success: true,
+      data: {
+        config: {
+          externalProvider: 'acme-scan',
+          externalEndpointUrl: 'https://scan.example.com/check',
+          externalSecretRef: 'FILE_SCAN_API_KEY',
+          externalTimeoutMs: 10000,
+          maxBytesOverride: null,
+          maxPixelsOverride: null,
+          updatedAt: '2026-09-20T00:00:00Z',
+        },
+      },
+    })
+    mocks.saveConfig.mockResolvedValue({ success: true, data: { lineAccountId: 'acc-1' } })
+    mocks.list.mockResolvedValue({ success: true, data: { items: [scanOf()], total: 1, limit: 50, offset: 0 } })
+    render(<FileScanSettingsPage />)
+    // 設定済みなら「使っています」と出る。畳んでいても実行状態の表示は変わらない。
+    await waitFor(() => {
+      expect(screen.getByText(/使っています。送り先：/)).toBeTruthy()
+    })
+    expect(screen.getByRole('button', { name: '設定を編集' })).toBeTruthy()
+    // 止める操作は確認を経て、実際に設定を消す。
+    fireEvent.click(screen.getByRole('button', { name: '外の検査を止める' }))
+    await waitFor(() => {
+      expect(screen.getByText('外の検査サービスへの送信設定を消します。内蔵の簡易検査は続きます。もう一度使うには設定を入れ直します。')).toBeTruthy()
+    })
+    fireEvent.click(screen.getAllByRole('button', { name: '外の検査を止める' }).at(-1)!)
+    await waitFor(() => {
+      expect(mocks.saveConfig).toHaveBeenCalledWith('acc-1', {
+        externalProvider: null,
+        externalEndpointUrl: null,
+        externalSecretRef: null,
+      })
+    })
   })
 })

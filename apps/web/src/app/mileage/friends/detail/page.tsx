@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import Breadcrumb from '@/components/shared/breadcrumb'
@@ -26,6 +27,7 @@ import {
   formatMileageDate,
   friendHistoryItem,
   mileageDetailHasSourceEvent,
+  mileageRankProgress,
   mileageEntryTypeLabel,
   mileageSourceLabel,
   mileageSourceNoteText,
@@ -198,6 +200,16 @@ function FriendMileageInner() {
       : v6Friend?.nextRank === 'bronze'
         ? 'ブロンズ'
         : v6Friend?.nextRank
+  /* R54: 未公開と最高到達の区別は mileageRankProgress にまとめる。 */
+  const rankProgress = mileageRankProgress({
+    rank: v6Friend?.rank,
+    rankReason: v6Friend?.rankReason,
+    nextRankLabel,
+    milesToNextRank: v6Friend?.milesToNextRank,
+  })
+  const rankHeadline = rankProgress.headline
+  const rankDetail = rankProgress.detail
+  const rankUnpublished = rankProgress.unpublished
   const available = v6Friend?.available ?? mileage.summary.available
   const rewardedActions = mileageRewardedActions(mileage.insights)
   const connectedAccounts = mileageConnectedAccounts(mileage.connections)
@@ -251,8 +263,20 @@ function FriendMileageInner() {
         <Card>
           <CardHeader title="ランクの進み" meta={rankLabel} />
           <div className="p-4">
-            <p className="text-sm font-bold text-ink">{nextRankLabel ? `次は「${nextRankLabel}」` : 'いちばん上のランクです'}</p>
-            <p className="mt-1 text-xs text-ink-faint">{v6Friend?.milesToNextRank == null ? v6Friend?.rankReason ?? 'ランク情報を確認できません' : `あと ${v6Friend.milesToNextRank.toLocaleString('ja-JP')} マイル`}</p>
+            {/*
+              R54: ランク未公開（今も次もなし）と最高到達を区別する。
+              未公開なのに「いちばん上のランクです」と出していた。
+              未公開の2行目は理由の重ね書きにせず、作り先を案内する。
+            */}
+            <p className="text-sm font-bold text-ink">{rankHeadline}</p>
+            {rankUnpublished ? (
+              <p className="mt-1 text-xs text-ink-faint">
+                ランクを作ると、ここに進み具合が出ます。
+                <Link href="/mileage?tab=rewards" className="font-semibold text-action">使い道・ランクを作る</Link>
+              </p>
+            ) : (
+              <p className="mt-1 text-xs text-ink-faint">{rankDetail}</p>
+            )}
           </div>
         </Card>
         <Card>
