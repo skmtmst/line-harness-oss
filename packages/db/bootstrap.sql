@@ -1335,7 +1335,8 @@ CREATE TABLE booking_settings (
          OR (reminder_day_before_time GLOB '[0-2][0-9]:[0-5][0-9]'
              AND substr(reminder_day_before_time, 1, 2) <= '23')), reminder_hours_before INTEGER
   CHECK (reminder_hours_before IS NULL
-         OR reminder_hours_before BETWEEN 1 AND 72));
+         OR reminder_hours_before BETWEEN 1 AND 72), liff_date_view TEXT NOT NULL DEFAULT 'list'
+  CHECK (liff_date_view IN ('list', 'calendar')));
 
 CREATE TABLE "bookings" (
   id                           TEXT PRIMARY KEY,

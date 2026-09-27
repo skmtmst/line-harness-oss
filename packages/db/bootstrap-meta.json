@@ -420,7 +420,8 @@
     "467_template_references.sql",
     "468_event_custom_questions.sql",
     "469_manual_link_screens.sql",
-    "470_google_sheets_integrations.sql"
+    "470_google_sheets_integrations.sql",
+    "502_booking_liff_date_view.sql"
   ],
-  "migrationCount": 421
+  "migrationCount": 422
 }

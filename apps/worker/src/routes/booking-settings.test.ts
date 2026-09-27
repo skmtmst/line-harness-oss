@@ -869,3 +869,180 @@ describe('店舗共通の予約設定API', () => {
     expect(conflict.status).toBe(409);
   });
 });
+
+describe('LIFF 日時表示の最初の形 (liff_date_view)', () => {
+  let sqlite: Database.Database;
+  let db: D1Database;
+
+  const baseBody = {
+    expectedVersion: 0,
+    timeZone: 'Asia/Tokyo',
+    bookingWindowDays: 60,
+    cutoffMinutesBefore: 1440,
+    cancelDeadlineMinutesBefore: 1440,
+    maxActiveBookingsPerFriend: 1,
+    approvalMode: 'automatic',
+    holdMinutes: 15,
+    slotGranularityMinutes: 15,
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    accountAccessMocks.canAccessAllLineAccounts.mockResolvedValue(true);
+    sqlite = new Database(':memory:');
+    sqlite.pragma('foreign_keys = ON');
+    sqlite.exec(readFileSync(join(process.cwd(), '../../packages/db/bootstrap.sql'), 'utf8'));
+    sqlite.exec(`
+      INSERT INTO line_accounts
+        (id, channel_id, name, channel_access_token, channel_secret, liff_id)
+      VALUES
+        ('account-a', 'channel-a', '本店', 'token-a', 'secret-a', 'liff-a'),
+        ('account-b', 'channel-b', '支店', 'token-b', 'secret-b', 'liff-b'),
+        ('account-empty', 'channel-empty', '新店舗', 'token-empty', 'secret-empty', 'liff-empty');
+      INSERT INTO booking_settings
+        (id, line_account_id, booking_window_days, cutoff_minutes_before,
+         cancel_deadline_minutes_before, approval_mode)
+      VALUES ('settings-a', 'account-a', 60, 1440, 720, 'manual');
+      INSERT INTO booking_business_hours
+        (id, booking_settings_id, weekday, start_time, end_time)
+      VALUES
+        ('hours-a-1', 'settings-a', 1, '09:00', '12:00'),
+        ('hours-a-2', 'settings-a', 1, '13:00', '19:00');
+      INSERT INTO menus
+        (id, line_account_id, name, duration_minutes, base_price, is_active)
+      VALUES ('menu-a', 'account-a', '相談', 60, 8000, 1);
+      INSERT INTO staff (id, line_account_id, name, display_name)
+      VALUES ('staff-a', 'account-a', '担当A', '担当A');
+      INSERT INTO staff_menus (staff_id, menu_id, is_offered)
+      VALUES ('staff-a', 'menu-a', 1);
+      INSERT INTO booking_availability_exceptions
+        (id, line_account_id, scope_kind, date_from, date_to, kind, hours_json, reason)
+      VALUES
+        ('exception-a', 'account-a', 'store', '2026-12-30', '2026-12-30',
+         'closed', '[]', '年末休業');
+    `);
+    db = asD1(sqlite);
+  });
+
+  afterEach(() => sqlite.close());
+
+  test('migration 前の行は既定 list で読める', async () => {
+    const { app, env } = makeApp(db);
+    const res = await app.request('/api/booking/admin/settings?account_id=account-a', {}, env);
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toMatchObject({
+      success: true,
+      data: { liffDateView: 'list' },
+    });
+  });
+
+  test('calendar を保存し、そのまま読み出せる', async () => {
+    const { app, env } = makeApp(db);
+    const created = await app.request('/api/booking/admin/settings?account_id=account-empty', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...baseBody, liffDateView: 'calendar' }),
+    }, env);
+    expect(created.status).toBe(201);
+    await expect(created.json()).resolves.toMatchObject({
+      success: true,
+      data: { liffDateView: 'calendar' },
+    });
+    expect(sqlite.prepare(`SELECT liff_date_view FROM booking_settings
+      WHERE line_account_id = 'account-empty'`).get()).toEqual({ liff_date_view: 'calendar' });
+
+    const reread = await app.request('/api/booking/admin/settings?account_id=account-empty', {}, env);
+    await expect(reread.json()).resolves.toMatchObject({
+      success: true,
+      data: { liffDateView: 'calendar' },
+    });
+  });
+
+  test('形が違う値は 400 で保存しない', async () => {
+    const { app, env } = makeApp(db);
+    const res = await app.request('/api/booking/admin/settings?account_id=account-empty', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...baseBody, liffDateView: 'grid' }),
+    }, env);
+    expect(res.status).toBe(400);
+    expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM booking_settings
+      WHERE line_account_id = 'account-empty'`).get()).toEqual({ count: 0 });
+  });
+
+  test('省いたら今の形を保つ（営業時間だけの保存で戻さない）', async () => {
+    const { app, env } = makeApp(db);
+    const created = await app.request('/api/booking/admin/settings?account_id=account-empty', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...baseBody, liffDateView: 'calendar' }),
+    }, env);
+    expect(created.status).toBe(201);
+    const updated = await app.request('/api/booking/admin/settings?account_id=account-empty', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...baseBody, expectedVersion: 1, bookingWindowDays: 90 }),
+    }, env);
+    expect(updated.status).toBe(200);
+    await expect(updated.json()).resolves.toMatchObject({
+      success: true,
+      data: { version: 2, bookingWindowDays: 90, liffDateView: 'calendar' },
+    });
+  });
+
+  test('LIFF の設定口は自分の店舗だけ読める', async () => {
+    const { app, env } = makeApp(db);
+    sqlite.exec(`UPDATE booking_settings SET liff_date_view = 'calendar', booking_window_days = 45
+      WHERE line_account_id = 'account-a'`);
+    const own = await app.request('/api/liff/booking/settings?liffId=liff-a', {}, env);
+    expect(own.status).toBe(200);
+    await expect(own.json()).resolves.toEqual({
+      liff_date_view: 'calendar',
+      booking_window_days: 45,
+    });
+    // 別店舗の liffId では別店舗の値にならない（設定行が無い新店舗は既定値）。
+    const other = await app.request('/api/liff/booking/settings?liffId=liff-empty', {}, env);
+    expect(other.status).toBe(200);
+    await expect(other.json()).resolves.toEqual({
+      liff_date_view: 'list',
+      booking_window_days: 60,
+    });
+  });
+
+  test('LIFF の設定口は不明な liffId を 404 で断る', async () => {
+    const { app, env } = makeApp(db);
+    const unknown = await app.request('/api/liff/booking/settings?liffId=liff-unknown', {}, env);
+    expect(unknown.status).toBe(404);
+    const missing = await app.request('/api/liff/booking/settings', {}, env);
+    expect(missing.status).toBe(404);
+  });
+
+  test('LIFF の空き枠口は休みの日を closed_dates で返す', async () => {
+    const { app, env } = makeApp(db);
+    const res = await app.request(
+      '/api/liff/booking/availability?liffId=liff-a&menu_id=menu-a&staff_id=staff-a&from=2026-12-29&to=2026-12-31',
+      {},
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { by_staff: unknown[]; closed_dates: string[] };
+    expect(Array.isArray(body.closed_dates)).toBe(true);
+    // 店舗の休業日（例外日）は休み。枠の有無の判定自体は変えない。
+    expect(body.closed_dates).toContain('2026-12-30');
+    expect(body.by_staff.length).toBeGreaterThan(0);
+  });
+
+  test('LIFF の空き枠口は28日を超える期間を 400 で断る', async () => {
+    const { app, env } = makeApp(db);
+    const wide = await app.request(
+      '/api/liff/booking/availability?liffId=liff-a&menu_id=menu-a&staff_id=staff-a&from=2026-12-01&to=2027-01-01',
+      {},
+      env,
+    );
+    expect(wide.status).toBe(400);
+    await expect(wide.json()).resolves.toMatchObject({ error: 'range_too_wide' });
+    // 28日ちょうどは通る（カレンダーは月を28日ずつに割って呼ぶ）。
+    const fit = await app.request(
+      '/api/liff/booking/availability?liffId=liff-a&menu_id=menu-a&staff_id=staff-a&from=2026-12-01&to=2026-12-29',
+      {},
+      env,
+    );
+    expect(fit.status).toBe(200);
+  });
+});
