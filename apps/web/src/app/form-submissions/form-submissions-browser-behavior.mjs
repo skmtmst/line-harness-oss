@@ -792,10 +792,17 @@ try {
     const dialogBox = await dialog.boundingBox()
     assert.equal(dialogBox.height <= 844, true, 'R26: 窓の高さが画面に収まる')
 
-    await page.getByText('アクションを設定', { exact: true }).click()
-    await page.getByRole('button', { name: '＋ 動作を追加' }).click()
-    await dialog.locator('select').first().waitFor()
-    const edges = await dialog.locator('select, button').evaluateAll((nodes) =>
+    // R26: 動作の欄は折りたたみの中。閉じたままだと足す口が見えないので、
+    // 見えているかで開閉を決める（開き直しの有無で裏返らないように）。
+    const actionFold = dialog.locator('details', { hasText: 'アクションを設定' })
+    if (!(await actionFold.getByRole('button', { name: '＋ 動作を追加' }).isVisible())) {
+      await page.getByText('アクションを設定', { exact: true }).click()
+    }
+    await actionFold.getByRole('button', { name: '＋ 動作を追加' }).click()
+    // 共通 Select は素の select を置かず操作子（button）で作ってあるため、
+    // 足した動作の種類の操作子を待つのが、開いて足せたことの印になる。
+    await actionFold.getByRole('button', { name: '動作の種類' }).waitFor()
+    const edges = await actionFold.locator('button').evaluateAll((nodes) =>
       nodes.map((node) => node.getBoundingClientRect().right),
     )
     for (const right of edges) {
