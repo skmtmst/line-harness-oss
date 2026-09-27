@@ -6,6 +6,7 @@ import type { KeyboardEvent } from 'react'
 import Checkbox from '@/components/shared/checkbox'
 import { OptionMatch } from './combobox'
 import type { ComboboxOption } from './combobox'
+import MenuPortal from './menu-portal'
 import styles from './multi-select.module.css'
 
 export type MultiSelectOption = ComboboxOption
@@ -74,6 +75,7 @@ export default function MultiSelect({
   const errorId = `${generatedId}-error`
   const rootRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const fieldRef = useRef<HTMLDivElement>(null)
   const [open, setOpen] = useState(defaultOpen)
   const [query, setQuery] = useState(initialQuery ?? '')
   const [activeIndex, setActiveIndex] = useState(0)
@@ -175,6 +177,7 @@ export default function MultiSelect({
         ? values.map((value) => <input key={value} type="hidden" name={name} value={value} disabled={disabled} />)
         : null}
       <div
+        ref={fieldRef}
         className={[styles.field, open ? styles.open : null, error ? styles.invalid : null, disabled ? styles.disabled : null]
           .filter(Boolean)
           .join(' ')}
@@ -251,10 +254,27 @@ export default function MultiSelect({
         />
       </div>
       {open ? (
-        <div className={styles.popup}>
+        <MenuPortal
+          open={open}
+          align="start"
+          matchWidth
+          getAnchor={() => fieldRef.current}
+          onClose={() => setOpen(false)}
+        >
+        <div
+          className={styles.popup}
+          // 最上層では absolute 指定を無効にする（位置は器が決める）。
+          style={{ position: 'static', width: '100%' }}
+        >
           <div className={styles.summary}>
             <span>{values.length}件選択中</span>
-            <button type="button" disabled={disabled || values.length === 0} onClick={clearAll} className={styles.clearAll}>
+            <button
+              type="button"
+              disabled={disabled || values.length === 0}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={clearAll}
+              className={styles.clearAll}
+            >
               すべて外す
             </button>
           </div>
@@ -317,6 +337,7 @@ export default function MultiSelect({
             </div>
           )}
         </div>
+        </MenuPortal>
       ) : null}
       {open ? (
         <span role="status" className={styles.status}>

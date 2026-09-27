@@ -100,7 +100,8 @@ describe('リマインダ一覧の行操作', () => {
     await flush()
     const more = host.querySelector('button[aria-label="予約前のお知らせのその他操作"]') as HTMLButtonElement
     act(() => { more.click() })
-    const menu = host.querySelector('[role="menu"]')
+    // メニューは最上層（MenuPortal→document.body）に出る。器の中にはいない。
+    const menu = document.querySelector('[role="menu"]')
     expect(menu, 'メニューが開きません').toBeTruthy()
     expect(menu!.textContent).toContain('登録者を管理')
     expect(menu!.textContent).toContain('配信予定を確認')

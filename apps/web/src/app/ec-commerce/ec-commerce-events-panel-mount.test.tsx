@@ -231,7 +231,8 @@ async function retryButton(el: HTMLDivElement): Promise<HTMLButtonElement> {
   if (!trigger) throw new Error('「その他」メニューが見つかりません')
   trigger.click()
   await drainMicrotasks()
-  const button = Array.from(el.querySelectorAll('button[role="menuitem"]')).find((node) => node.textContent === 'もう一度やる')
+  // メニューは最上層（MenuPortal→document.body）に出る。器の中にはいない。
+  const button = Array.from(document.querySelectorAll('button[role="menuitem"]')).find((node) => node.textContent === 'もう一度やる')
   if (!button) throw new Error('「もう一度やる」ボタンが見つかりません')
   return button as HTMLButtonElement
 }
