@@ -170,13 +170,17 @@ export default function RankSettingsTab({
       {error ? <p className="text-label text-danger" role="alert">{error}</p> : null}
 
       <div data-design="Body" data-design-node="Y4zWdG" className="grid gap-4 xl:grid-cols-3">
-        <section data-design="Table" data-design-node="C0WaS" className="min-w-0 xl:col-span-2">
+        <section data-design="Table" data-design-node="C0WaS" className="@container min-w-0 xl:col-span-2">
           {/*
             R55: @container＋谷間帯の列削減は会員一覧と同じ形。1440pxでは
             2/3幅の表に固定幅が収まらず、タグ見出しが会員数へ重なっていた。
             入力3列を少し絞り、会員数は狭い表のとき畳む。
+            m18s: 器（@container）は枠ではなく区画に置く。表の幅（100%）は
+            ふつうの枠で決めないと、枠いっぱいに広がらず右側が空く。
+            区画に余白はなく枠と同幅のため、会員数を畳む境目（800）は変わらない。
+            操作列（w-14・右寄せ）は表の右端に付く。
           */}
-          <DataTable className="@container">
+          <DataTable>
             <thead>
               <TableHeadRow>
                 <Th className="w-44">ランク名</Th>

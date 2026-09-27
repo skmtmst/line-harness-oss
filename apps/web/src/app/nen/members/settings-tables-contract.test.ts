@@ -33,7 +33,16 @@ function hiddenPairs(source: string, marker: string): { th: number; td: number }
 
 describe('R55 会員設定表の重なり', () => {
   it('ランク設定表は表幅で列を畳み、畳まない列は予算に収める', () => {
-    expect(RANK).toContain('<DataTable className="@container">')
+    /*
+     * m18s: 器（@container）は区画に置き、表の枠には付けない。表の幅（100%）
+     * がサイズ封じ込めの中で決まると、枠いっぱいに広がらず右側が空く
+     * （1440pxで帯と区切り線が約912pxで止まった）。区画に余白はなく枠と
+     * 同幅のため、会員数を畳む境目（800）は変わらない。戻すと赤。
+     */
+    expect(RANK).toContain('@container min-w-0 xl:col-span-2')
+    expect(RANK).not.toContain('<DataTable className="@container">')
+    // 操作列は固定幅・右寄せで表の右端に付く。戻すと赤。
+    expect(RANK).toContain('<Th className="w-14" align="right">')
     // 会員数だけを狭い表で畳む。ThとTdの組が一致する。
     const pairs = hiddenPairs(RANK, 'cq-hide-below-800')
     expect(pairs.th).toBe(1)

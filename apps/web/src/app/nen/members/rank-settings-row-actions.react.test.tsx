@@ -62,6 +62,24 @@ describe('m18s ランク表の行操作は一覧共通の形', () => {
     host.remove()
   })
 
+  it('表は区画の器で幅を決め、枠いっぱいに広がる形にする（1440px・1152px）', async () => {
+    await renderTab()
+    await settle(50)
+    // 器（@container）は区画に置き、表の枠には付けない。枠の中で幅を
+    // 決めると狭く縮んで右側が空く。区画と枠は同幅のため境目は変わらない。
+    const section = host.querySelector('section[data-design="Table"]')
+    expect(section).toBeTruthy()
+    expect(section!.className).toContain('@container')
+    const frame = section!.querySelector('div')
+    expect(frame).toBeTruthy()
+    expect(frame!.className.split(' ').some((c) => c === '@container')).toBe(false)
+    // 操作列は固定幅で表の右端に付く（右寄せは契約テストで文字どおり守る）。
+    const heads = Array.from(section!.querySelectorAll('thead th'))
+    const last = heads[heads.length - 1]
+    expect(last.className).toContain('w-14')
+    expect(last.textContent).toContain('操作')
+  })
+
   it('保存済みの行は「…」に削除を集約し、直置きのゴミ箱は出さない', async () => {
     await renderTab()
     await settle(50)

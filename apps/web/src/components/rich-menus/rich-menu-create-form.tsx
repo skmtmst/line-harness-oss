@@ -239,17 +239,22 @@ export default function RichMenuCreateForm({
       {compatibilityError || validationError ? <Notice tone="danger" className="mt-4">{compatibilityError ?? validationError}</Notice> : null}
       <div className="mt-4 grid items-start gap-4 lg:grid-cols-4">
         <div className="border-hairline bg-canvas rounded-card min-w-0 space-y-4 border p-4 shadow-sm lg:col-span-3">
+          {/*
+            m18s: 3欄は均等（2/2/2）に割る。フォルダの選択欄は決まった幅
+            （176px）を持つため、1/6幅では隣の入力欄へはみ出して枠線が隠れる。
+            選択欄は欄いっぱい（size="full"）にし、1152pxでも重ならない。
+          */}
           <div className="grid gap-3 lg:grid-cols-6">
-            <div className="lg:col-span-3">
+            <div className="min-w-0 lg:col-span-2">
               <label className="text-ink-secondary mb-1 block text-sm font-medium" htmlFor="rich-menu-name">メニュー名<RequiredBadge /></label>
               <input id="rich-menu-name" value={value.name} aria-label="メニュー名" onChange={(event) => patch({ name: event.target.value })} aria-required="true" aria-invalid={Boolean(nameError)} aria-describedby={nameError ? 'rich-menu-name-error' : undefined} disabled={locked} className="border-hairline rounded-control focus:ring-accent block w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" placeholder="例：メインメニュー" />
               {nameError ? <p id="rich-menu-name-error" role="alert" className="text-danger mt-1 text-xs">{nameError}</p> : <p className="text-ink-faint mt-1 text-xs">管理画面での識別用です。友だちには表示されません。</p>}
             </div>
-            <div className="lg:col-span-1">
+            <div className="min-w-0 lg:col-span-2">
               <label className="text-ink-secondary mb-1 block text-sm font-medium" htmlFor="rich-menu-folder">フォルダ</label>
-              <Select id="rich-menu-folder" aria-label="フォルダ" value={value.folderId} disabled={locked || folders.length === 0} onChange={(value) => patch({ folderId: value })} options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]} />
+              <Select id="rich-menu-folder" aria-label="フォルダ" value={value.folderId} disabled={locked || folders.length === 0} onChange={(value) => patch({ folderId: value })} options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]} size="full" />
             </div>
-            <div className="lg:col-span-2">
+            <div className="min-w-0 lg:col-span-2">
               <label className="text-ink-secondary mb-1 block text-sm font-medium" htmlFor="rich-menu-chat-bar-text">トーク画面下の文言</label>
               <input id="rich-menu-chat-bar-text" value={value.chatBarText} aria-label="メニューを開くボタンの文字" onChange={(event) => patch({ chatBarText: event.target.value })} maxLength={14} aria-required="true" aria-invalid={Boolean(chatBarTextError)} aria-describedby={chatBarTextError ? 'rich-menu-chat-bar-text-error' : undefined} disabled={locked} className="border-hairline rounded-control focus:ring-accent block w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none" />
               {chatBarTextError ? <p id="rich-menu-chat-bar-text-error" role="alert" className="text-danger mt-1 text-xs">{chatBarTextError}</p> : <p className="text-ink-faint mt-1 text-xs">14文字以内。メニューを開く前にトーク画面下に表示されます。</p>}
