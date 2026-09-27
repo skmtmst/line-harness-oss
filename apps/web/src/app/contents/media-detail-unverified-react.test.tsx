@@ -134,3 +134,28 @@ describe('使用箇所の未確認（R34、実React）', () => {
     expect(host.textContent).not.toContain('確かめられませんでした')
   })
 })
+
+describe('入れた人の表示（R35、実React）', () => {
+  it('内部IDではなく担当者の表示名を出す', async () => {
+    fixture.impact = { ...BASE_IMPACT, verified: true, canDelete: true, recommendedAction: 'delete' }
+    await renderDialog({ ...ITEM, uploadedBy: 'c0ffee-uuid', uploadedByName: '山田 太郎' })
+
+    expect(host.textContent).toContain('山田 太郎')
+    expect(host.textContent).not.toContain('c0ffee-uuid')
+  })
+
+  it('退職・削除済みで引けないときは人に分かる言葉にし、IDは出さない', async () => {
+    fixture.impact = { ...BASE_IMPACT, verified: true, canDelete: true, recommendedAction: 'delete' }
+    await renderDialog({ ...ITEM, uploadedBy: 'gone-uuid', uploadedByName: null })
+
+    expect(host.textContent).toContain('削除された担当者')
+    expect(host.textContent).not.toContain('gone-uuid')
+  })
+
+  it('記録が無いときは未取得と出す', async () => {
+    fixture.impact = { ...BASE_IMPACT, verified: true, canDelete: true, recommendedAction: 'delete' }
+    await renderDialog({ ...ITEM, uploadedBy: null, uploadedByName: null })
+
+    expect(host.textContent).toContain('—（未取得）')
+  })
+})

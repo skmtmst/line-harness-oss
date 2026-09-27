@@ -245,7 +245,24 @@ function hasMediaSignature(bytes: Uint8Array, mimeType: string): boolean {
  * `liveUrl` はライブ参照用の公開URL。メディアIDだけを含み、
  * 配信時にその時点の最新版へ解決される。
  */
-function serializeMedia(row: Media, workerUrl: string) {
+/**
+ * 入れた人の表示名を添える（R35）。
+ *
+ * `uploaded_by` は内部ID（UUID）のまま残し、画面には `uploadedByName`
+ * を出す。退職・削除済みで引けないときは null（画面が「削除された
+ * 担当者」と出す）。`env-owner`（環境の API キー）は staff 表に無いため、
+ * 認証と同じ呼び名 'Owner' を添える。
+ */
+async function uploaderNameMap(
+  db: D1Database,
+  rows: Array<{ uploaded_by?: string | null }>,
+): Promise<Map<string, string>> {
+  const names = await getStaffNameMap(db, rows.map((row) => row.uploaded_by));
+  names.set('env-owner', 'Owner');
+  return names;
+}
+
+function serializeMedia(row: Media, workerUrl: string, uploaderNames?: Map<string, string>) {
   return {
     id: row.id,
     lineAccountId: row.line_account_id,
@@ -260,6 +277,7 @@ function serializeMedia(row: Media, workerUrl: string) {
     url: row.public_url ?? `${workerUrl}/images/${row.r2_key}`,
     liveUrl: `${workerUrl}/media/${row.id}/content`,
     uploadedBy: row.uploaded_by,
+    uploadedByName: row.uploaded_by ? (uploaderNames?.get(row.uploaded_by) ?? null) : null,
     createdAt: row.created_at,
     archivedAt: row.archived_at ?? null,
     archivedBy: row.archived_by ?? null,
@@ -872,9 +890,10 @@ contents.get('/api/media', async (c) => {
       countMedia(c.env.DB, filters),
     ]);
     const workerUrl = c.env.WORKER_URL || new URL(c.req.url).origin;
+    const names = await uploaderNameMap(c.env.DB, items);
     return c.json({
       success: true,
-      data: { items: items.map((m) => serializeMedia(m, workerUrl)), total, limit, offset },
+      data: { items: items.map((m) => serializeMedia(m, workerUrl, names)), total, limit, offset },
     });
   } catch (err) {
     console.error('GET /api/media error:', err);
@@ -902,9 +921,10 @@ contents.get('/api/media/:id', requireRole('owner', 'admin'), async (c) => {
       ? folder.name
       : null;
     const workerUrl = c.env.WORKER_URL || new URL(c.req.url).origin;
+    const names = await uploaderNameMap(c.env.DB, [media]);
     return c.json({
       success: true,
-      data: { item: serializeMedia(media, workerUrl), folderName },
+      data: { item: serializeMedia(media, workerUrl, names), folderName },
     });
   } catch (err) {
     console.error('GET /api/media/:id error:', err);
@@ -1208,7 +1228,8 @@ contents.patch('/api/media/:id', requireRole('owner', 'admin'), async (c) => {
         ...(usageExpiresAt !== undefined ? { usageExpiresAt } : {}),
         ...(usageConsentNote !== undefined ? { usageConsentNote } : {}),
       });
-      return c.json({ success: true, data: serializeMedia(media!, workerUrl) });
+      const names = await uploaderNameMap(c.env.DB, [media!]);
+      return c.json({ success: true, data: serializeMedia(media!, workerUrl, names) });
     }
 
     /*
@@ -1255,10 +1276,11 @@ contents.patch('/api/media/:id', requireRole('owner', 'admin'), async (c) => {
         console.error('usage rescan after reference switch failed:', scanError);
       }
       const fresh = await getMediaById(c.env.DB, id, accountId);
+      const names = await uploaderNameMap(c.env.DB, [fresh ?? existing]);
       return c.json({
         success: true,
         data: {
-          ...serializeMedia(fresh ?? existing, workerUrl),
+          ...serializeMedia(fresh ?? existing, workerUrl, names),
           usageReference: {
             refKind,
             refId,
@@ -1333,7 +1355,8 @@ async function mediaArchiveRoute(c: Context<Env>, archive: boolean, mediaId: str
   if (result.status === 'not_found') return c.json({ success: false, error: 'Not found' }, 404);
   if (result.status === 'archived' || result.status === 'restored') {
     const workerUrl = c.env.WORKER_URL || new URL(c.req.url).origin;
-    return c.json({ success: true, data: serializeMedia(result.media, workerUrl) });
+    const names = await uploaderNameMap(c.env.DB, [result.media]);
+    return c.json({ success: true, data: serializeMedia(result.media, workerUrl, names) });
   }
   return c.json({
     success: false,

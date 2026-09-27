@@ -326,6 +326,11 @@ export interface MediaItem {
   durationMs: number | null;
   url: string;
   uploadedBy: string | null;
+  /**
+   * 入れた人の表示名（R35）。uploadedBy は内部ID（UUID）のまま残し、
+   * 画面にはこちらを出す。退職・削除済みで引けないときは null。
+   */
+  uploadedByName?: string | null;
   createdAt: string;
   /** アーカイブ済みなら退避した時刻・実行者・理由。使用中でも触れない消去ではない。 */
   archivedAt?: string | null;

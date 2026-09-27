@@ -523,7 +523,9 @@ export default function MediaDetailDialog({
                 ['大きさ', mediaDimensions(item)],
                 ['容量', formatMediaSize(item.sizeBytes)],
                 ['入れた日', formatDate(item.createdAt)],
-                ['入れた人', item.uploadedBy || '—（未取得）'],
+                // R35: 内部ID（UUID）ではなく担当者の表示名を出す。
+                // 退職・削除済みで引けないときは人に分かる言葉にし、IDは出さない。
+                ['入れた人', item.uploadedByName ?? (item.uploadedBy ? '削除された担当者' : '—（未取得）')],
                 ['LINEの上限', mediaLimit(item)],
               ].map(([label, value]) => (
                 <div key={label} className="flex items-start justify-between gap-3">

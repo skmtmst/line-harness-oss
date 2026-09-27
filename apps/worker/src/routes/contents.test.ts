@@ -33,6 +33,7 @@ class MockMediaUsageReferenceError extends Error {
 }
 
 const mocks = {
+  getStaffNameMap: vi.fn(async () => new Map()),
   getMedia: vi.fn(),
   countMedia: vi.fn(),
   getMediaById: vi.fn(),
@@ -534,6 +535,26 @@ describe('メディアのアップロード', () => {
       limit: 20,
       offset: 0,
     });
+  });
+
+  it('R35: 一覧は入れた人の表示名を添え、IDをそのまま出さない', async () => {
+    mocks.getStaffNameMap.mockResolvedValueOnce(new Map([['u-1', '川野 健太']]));
+    const res = await req('/api/media?accountId=account-1', 'GET');
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      data: { items: Array<{ uploadedBy: string; uploadedByName: string | null }> };
+    };
+    expect(body.data.items[0]?.uploadedBy).toBe('u-1');
+    expect(body.data.items[0]?.uploadedByName).toBe('川野 健太');
+  });
+
+  it('R35: 退職・削除済みで引けない入れた人は null で返し、画面が言葉にする', async () => {
+    mocks.getStaffNameMap.mockResolvedValueOnce(new Map());
+    const res = await req('/api/media/md-1?accountId=account-1', 'GET');
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { data: { item: { uploadedBy: string; uploadedByName: string | null } } };
+    expect(body.data.item.uploadedBy).toBe('u-1');
+    expect(body.data.item.uploadedByName).toBeNull();
   });
 
   it('LINEアカウントを指定しない一覧取得は止める', async () => {
