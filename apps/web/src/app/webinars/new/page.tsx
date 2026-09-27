@@ -82,9 +82,9 @@ export default function NewWebinarPage() {
       data-design-node="lvaY5"
       // U054: 外側の左右余白は app-shell が持つ（16px/24px/40px）。
       // ここで px を重ねるとスマホで入力幅が二重に削られる。
-      className="mx-auto max-w-screen-2xl pb-28 pt-4"
+      className="mx-auto flex max-w-screen-2xl flex-col gap-4 pb-28 pt-4"
     >
-      <nav data-design="Crumb" className="text-ink-faint mb-5 text-xs">
+      <nav data-design="Crumb" className="text-ink-faint text-xs">
         <Link href="/webinars" className="text-action hover:underline">← ウェビナー一覧</Link>
       </nav>
 
@@ -97,7 +97,7 @@ export default function NewWebinarPage() {
         <Notice tone="danger" className="mt-4">{error}</Notice>
       ) : null}
 
-      <div className="mt-4 grid items-start gap-4 xl:grid-cols-4">
+      <div className="grid items-start gap-4 xl:grid-cols-4">
         <div className="space-y-4 xl:col-span-3">
           <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card">
             <h2 className="text-ink text-base font-bold">基本設定</h2>

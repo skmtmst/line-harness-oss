@@ -572,8 +572,9 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
   })
 
   return (
-    <div>
-      <div data-design="Crumb" className="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <div data-design="Crumb" className="flex flex-wrap items-center justify-between gap-3">
         <nav className="text-ink-faint text-xs" aria-label="パンくず">
           <span className="text-action font-semibold">自動化</span>
           <span className="mx-2">›</span>
@@ -756,7 +757,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
 
       {/* Create forms */}
       {showCreate && tab === 'incoming' && (
-        <form onSubmit={handleCreateIncoming} className="bg-canvas rounded-lg border border-hairline p-6 mb-6">
+        <form onSubmit={handleCreateIncoming} className="bg-canvas rounded-lg border border-hairline p-6">
           <h3 className="text-sm font-semibold text-ink mb-4">受け取る設定を追加</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
@@ -906,7 +907,7 @@ function WebhooksPageHost() {
   usePageTitle('外部連携')
   if (tab === 'incoming' || tab === 'outgoing') return <WebhooksPageInner key={tab} tab={tab} />
   return (
-    <div>
+    <div className="flex flex-col gap-4">
       <MergedTabs basePath="/webhooks" paramName="tab" tabs={MERGED_TABS} active={tab} />
       {tab === 'interactions' && <WebhookInteractions />}
       {tab === 'sheets' && <GoogleSheetsPanel />}

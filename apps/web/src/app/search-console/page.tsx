@@ -241,10 +241,11 @@ export default function SearchConsolePage() {
     : null
 
   return (
-    <div>
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       <MergedTabs basePath="/analytics" tabs={ANALYTICS_TABS} active="search" />
 
-      <div data-design="Head" className="mb-4 flex flex-wrap items-center justify-end gap-2">
+      <div data-design="Head" className="flex flex-wrap items-center justify-end gap-2">
         {data ? <Button onClick={exportCsv}>CSVで書き出す</Button> : null}
         {settingsHref ? <Button href={settingsHref} target="_blank" rel="noreferrer">連携を設定</Button> : null}
         <div className="border-hairline flex rounded-xl border bg-canvas p-1">
@@ -264,7 +265,7 @@ export default function SearchConsolePage() {
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">{metrics.map((item) => <div key={item.label} className="rounded-card bg-canvas-sunken h-36 animate-pulse" />)}</div>
       ) : !data ? (
         <>
-          <div className="mb-4"><NoteBar>Search Console をつなぐと、検索からの流入が見られます。</NoteBar></div>
+          <div><NoteBar>Search Console をつなぐと、検索からの流入が見られます。</NoteBar></div>
           <SetupCard setup={setup} denied={denied} />
         </>
       ) : (

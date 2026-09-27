@@ -67,4 +67,10 @@ describe('補足の「？」', () => {
     const more = getByText('くわしく')
     expect(more.getAttribute('href')).toBe('/manual#word')
   })
+
+  it('印は「?」の文字で、丸いアイコンは出さない', () => {
+    const { container } = render(<HelpTip label="人数の説明">送る相手の数。</HelpTip>)
+    expect(container.querySelector('button')!.textContent).toBe('?')
+    expect(container.querySelector('svg')).toBeNull()
+  })
 })

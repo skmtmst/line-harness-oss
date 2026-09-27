@@ -1576,7 +1576,8 @@ export default function NewAutomationPage() {
   if (resumeTarget === undefined) return null
 
   return (
-    <div data-design-node="Rv8Jv">
+    <div data-design-node="Rv8Jv" className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       <div data-design="Crumb">
         <Breadcrumb
           items={[{ label: 'オートメーション', href: '/automations' }, { label: 'ルールを作る' }]}
@@ -1585,7 +1586,7 @@ export default function NewAutomationPage() {
 
       {storedDraftHint && !savedDraft && resumeTarget === null ? (
         <div
-          className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-control border border-info bg-info-bg px-4 py-3 text-sm font-medium text-info"
+          className="flex flex-wrap items-center justify-between gap-2 rounded-control border border-info bg-info-bg px-4 py-3 text-sm font-medium text-info"
           role="note"
         >
           <span>
@@ -1597,7 +1598,7 @@ export default function NewAutomationPage() {
         </div>
       ) : null}
 
-      <div className="mb-3 grid grid-cols-3 gap-3 rounded-card border border-hairline bg-canvas px-5 py-4" aria-label="いまの決めごと">
+      <div className="grid grid-cols-3 gap-3 rounded-card border border-hairline bg-canvas px-5 py-4" aria-label="いまの決めごと">
         <SummaryStep number={1} label="きっかけ" value={selectedEvent.label} />
         <SummaryStep number={2} label="だれに" value={targetSummary} />
         <SummaryStep number={3} label="すること" value={actionSummary || '処理を選んでください'} active />

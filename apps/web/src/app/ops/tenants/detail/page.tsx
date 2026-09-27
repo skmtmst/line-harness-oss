@@ -109,10 +109,11 @@ function OpsTenantDetailContent() {
   const { tenant, accounts, members, audit } = detail
 
   return (
-    <div data-design-node="vhwld">
+    <div data-design-node="vhwld" className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       <OpsPageHeader title="契約先アカウント" actions={<BackToList />} />
 
-      <div className="mb-4 flex flex-wrap items-center gap-2.5">
+      <div className="flex flex-wrap items-center gap-2.5">
         <h2 className="text-heading font-bold text-ink">{tenant.name}</h2>
         {tenant.plan_key ? <Chip tone="info">{planLabel(tenant.plan_key)}</Chip> : null}
         {tenantStatusChip(tenant.status, tenant.plan_status)}
@@ -131,9 +132,9 @@ function OpsTenantDetailContent() {
         )}
       </div>
 
-      {error ? <p role="alert" className="mb-3 text-caption text-danger">{error}</p> : null}
+      {error ? <p role="alert" className="text-caption text-danger">{error}</p> : null}
 
-      <div className="mb-4">
+      <div>
         <Tabs items={TABS.map((t) => ({ label: t.label, current: tab === t.key, onClick: () => setTab(t.key) }))} />
       </div>
 

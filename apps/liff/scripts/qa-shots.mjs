@@ -165,9 +165,10 @@ try {
       waitMs: 2000,
     });
 
-    // イベント完了 (確定・承認待ちの2種)
-    await shot(page, viewport, 'event-done', '/events/qa-event-1/done?bookingId=qa-1&status=confirmed&liffId=qa');
+    // イベント完了 (確定・承認待ち・キャンセル待ちの3種)
+    await shot(page, viewport, 'event-done', '/events/qa-event-1/done?bookingId=qa-1&status=confirmed&startsAt=2026-10-01T10:00:00%2B09:00&liffId=qa');
     await shot(page, viewport, 'event-done-pending', '/events/qa-event-1/done?bookingId=qa-1&status=requested&liffId=qa');
+    await shot(page, viewport, 'event-done-waitlisted', '/events/qa-event-1/done?status=waitlisted&startsAt=2026-10-01T10:00:00%2B09:00&liffId=qa');
 
     // 待ちの案内 (準備→確定→失敗)
     await shot(page, viewport, 'waitlist', '/?eventWaitlistToken=qa-token-1&liffId=qa');

@@ -1479,7 +1479,7 @@ export default function BroadcastForm({
    */
   const sendWhenLabel = scheduledLabel ?? (sendMode === 'now' ? '今すぐ（保存後に詳細画面で送信）' : null)
   const unconfirmedCount = preflight
-    ? preflight.warnings.filter((w) => w.level === 'warning').length
+    ? (preflight.warnings ?? []).filter((w) => w.level === 'warning').length
       + (testResult?.kind === 'success' ? 0 : 1)
       + (previewConfirmed ? 0 : 1)
     : null
@@ -2735,7 +2735,7 @@ export default function BroadcastForm({
           <Notice tone="warn" className="mt-3">
             <p className="font-semibold">配信前チェックに {unconfirmedCount}件 の未確認があります</p>
             <ul className="mt-1 list-disc pl-4">
-              {preflight?.warnings.filter((w) => w.level === 'warning').map((w) => (
+              {(preflight?.warnings ?? []).filter((w) => w.level === 'warning').map((w) => (
                 <li key={w.message}>{w.message}</li>
               ))}
               {testResult?.kind === 'success' ? null : testResult ? <li>テスト送信で届かなかった宛先があります</li> : <li>テスト送信がまだです</li>}

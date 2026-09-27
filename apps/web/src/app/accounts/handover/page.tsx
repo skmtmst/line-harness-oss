@@ -361,6 +361,7 @@ function Handover() {
       />
     )
   }
+  // 空の案内もカード（白地・枠・角丸）の中に出す。灰色の地だけにしない。
   if (!handover) {
     /*
       段1・段2の入口。**「出す側」と「受け取る側」の両方の口を出す。**
@@ -421,8 +422,9 @@ function Handover() {
   const currentStep = statusStep[handover.status]
 
   return (
-    <div data-design-node="nx3XW">
-      <div data-design="Head" className="mb-4">
+    <div data-design-node="nx3XW" className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <div data-design="Head">
         <Breadcrumb items={[
           { label: 'LINEアカウント', href: '/accounts' },
           { label: account.name, href: `/accounts/detail?id=${account.id}` },
@@ -452,7 +454,7 @@ function Handover() {
         })}
       </ol>
 
-      <div className="mt-4 grid gap-4 xl:grid-cols-4">
+      <div className="grid gap-4 xl:grid-cols-4">
         <div className="space-y-4 xl:col-span-3">
           <Card padding="roomy">
             <p className="text-ink text-base font-bold">どこからどこへ</p>
