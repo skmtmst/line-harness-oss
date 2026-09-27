@@ -9,8 +9,9 @@ import {
   archiveMedia,
   restoreMedia,
   getMediaUsages,
-  getMediaDeleteImpact,
   getMediaDeleteImpactSnapshot,
+  isMissingTableError,
+  getStaffNameMap,
   getMediaReplacementPlan,
   applyMediaReplacementPlan,
   getMediaStorageQuota,
@@ -244,7 +245,24 @@ function hasMediaSignature(bytes: Uint8Array, mimeType: string): boolean {
  * `liveUrl` はライブ参照用の公開URL。メディアIDだけを含み、
  * 配信時にその時点の最新版へ解決される。
  */
-function serializeMedia(row: Media, workerUrl: string) {
+/**
+ * 入れた人の表示名を添える（R35）。
+ *
+ * `uploaded_by` は内部ID（UUID）のまま残し、画面には `uploadedByName`
+ * を出す。退職・削除済みで引けないときは null（画面が「削除された
+ * 担当者」と出す）。`env-owner`（環境の API キー）は staff 表に無いため、
+ * 認証と同じ呼び名 'Owner' を添える。
+ */
+async function uploaderNameMap(
+  db: D1Database,
+  rows: Array<{ uploaded_by?: string | null }>,
+): Promise<Map<string, string>> {
+  const names = await getStaffNameMap(db, rows.map((row) => row.uploaded_by));
+  names.set('env-owner', 'Owner');
+  return names;
+}
+
+function serializeMedia(row: Media, workerUrl: string, uploaderNames?: Map<string, string>) {
   return {
     id: row.id,
     lineAccountId: row.line_account_id,
@@ -259,6 +277,7 @@ function serializeMedia(row: Media, workerUrl: string) {
     url: row.public_url ?? `${workerUrl}/images/${row.r2_key}`,
     liveUrl: `${workerUrl}/media/${row.id}/content`,
     uploadedBy: row.uploaded_by,
+    uploadedByName: row.uploaded_by ? (uploaderNames?.get(row.uploaded_by) ?? null) : null,
     createdAt: row.created_at,
     archivedAt: row.archived_at ?? null,
     archivedBy: row.archived_by ?? null,
@@ -871,9 +890,10 @@ contents.get('/api/media', async (c) => {
       countMedia(c.env.DB, filters),
     ]);
     const workerUrl = c.env.WORKER_URL || new URL(c.req.url).origin;
+    const names = await uploaderNameMap(c.env.DB, items);
     return c.json({
       success: true,
-      data: { items: items.map((m) => serializeMedia(m, workerUrl)), total, limit, offset },
+      data: { items: items.map((m) => serializeMedia(m, workerUrl, names)), total, limit, offset },
     });
   } catch (err) {
     console.error('GET /api/media error:', err);
@@ -901,9 +921,10 @@ contents.get('/api/media/:id', requireRole('owner', 'admin'), async (c) => {
       ? folder.name
       : null;
     const workerUrl = c.env.WORKER_URL || new URL(c.req.url).origin;
+    const names = await uploaderNameMap(c.env.DB, [media]);
     return c.json({
       success: true,
-      data: { item: serializeMedia(media, workerUrl), folderName },
+      data: { item: serializeMedia(media, workerUrl, names), folderName },
     });
   } catch (err) {
     console.error('GET /api/media/:id error:', err);
@@ -1207,7 +1228,8 @@ contents.patch('/api/media/:id', requireRole('owner', 'admin'), async (c) => {
         ...(usageExpiresAt !== undefined ? { usageExpiresAt } : {}),
         ...(usageConsentNote !== undefined ? { usageConsentNote } : {}),
       });
-      return c.json({ success: true, data: serializeMedia(media!, workerUrl) });
+      const names = await uploaderNameMap(c.env.DB, [media!]);
+      return c.json({ success: true, data: serializeMedia(media!, workerUrl, names) });
     }
 
     /*
@@ -1254,10 +1276,11 @@ contents.patch('/api/media/:id', requireRole('owner', 'admin'), async (c) => {
         console.error('usage rescan after reference switch failed:', scanError);
       }
       const fresh = await getMediaById(c.env.DB, id, accountId);
+      const names = await uploaderNameMap(c.env.DB, [fresh ?? existing]);
       return c.json({
         success: true,
         data: {
-          ...serializeMedia(fresh ?? existing, workerUrl),
+          ...serializeMedia(fresh ?? existing, workerUrl, names),
           usageReference: {
             refKind,
             refId,
@@ -1332,7 +1355,8 @@ async function mediaArchiveRoute(c: Context<Env>, archive: boolean, mediaId: str
   if (result.status === 'not_found') return c.json({ success: false, error: 'Not found' }, 404);
   if (result.status === 'archived' || result.status === 'restored') {
     const workerUrl = c.env.WORKER_URL || new URL(c.req.url).origin;
-    return c.json({ success: true, data: serializeMedia(result.media, workerUrl) });
+    const names = await uploaderNameMap(c.env.DB, [result.media]);
+    return c.json({ success: true, data: serializeMedia(result.media, workerUrl, names) });
   }
   return c.json({
     success: false,
@@ -1370,7 +1394,7 @@ contents.get('/api/media/:id/delete-impact', requireRole('owner', 'admin'), asyn
     const existing = await getMediaById(c.env.DB, c.req.param('id'), accountId);
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
     const checkedAt = jstNow();
-    await scanSingleMediaUsage(c.env.DB, checkedAt, {
+    const scan = await scanSingleMediaUsage(c.env.DB, checkedAt, {
       id: existing.id,
       r2_key: existing.r2_key,
     });
@@ -1378,11 +1402,34 @@ contents.get('/api/media/:id/delete-impact', requireRole('owner', 'admin'), asyn
     if (!snapshot) return c.json({ success: false, error: 'Not found' }, 404);
     const { impact, usages } = snapshot;
     /*
+      R34: 版の表が無い環境では版の一覧が読めない。全体を503にせず、
+      版なしで続けて「未確認」として返す。
+    */
+    let versions: Awaited<ReturnType<typeof getMediaVersionList>> = [];
+    let versionsReady = true;
+    try {
+      versions = await getMediaVersionList(c.env.DB, existing.id, accountId);
+    } catch (err) {
+      if (!isMissingTableError(err)) throw err;
+      console.error('GET /api/media/:id/delete-impact versions skipped:', err);
+      versionsReady = false;
+    }
+    /*
+      R34: 読み残しがあるときは「どこでも使っていない」にしない。
+      usageCount 0 でも未確認として返し、削除も止める（canDelete false）。
+      確かめられないものは消させない。
+    */
+    const verified = versionsReady && (scan.skippedTables ?? []).length === 0;
+    const verifiedImpact = verified ? impact : {
+      ...impact,
+      canDelete: false,
+      recommendedAction: 'review_references' as const,
+    };
+    /*
       使用先ごとの参照モード（ライブ参照・固定する版）と、切替に使う
       版の一覧も一緒に返す。references と usages は同じsnapshotから
       作られているので、index対応中に別走査の行が混ざらない。
     */
-    const versions = await getMediaVersionList(c.env.DB, existing.id, accountId);
     const states = await getMediaUsageReferenceStates(c.env.DB, {
       media: existing,
       usages,
@@ -1393,8 +1440,9 @@ contents.get('/api/media/:id/delete-impact', requireRole('owner', 'admin'), asyn
     return c.json({
       success: true,
       data: {
-        ...impact,
-        references: impact.references.map((reference, index) => ({
+        ...verifiedImpact,
+        verified,
+        references: verifiedImpact.references.map((reference, index) => ({
           ...reference,
           refKind: usages[index]?.ref_kind ?? null,
           refId: usages[index]?.ref_id ?? null,
@@ -1570,20 +1618,35 @@ contents.delete('/api/media/:id', requireRole('owner', 'admin'), async (c) => {
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
 
     const checkedAt = jstNow();
-    await scanSingleMediaUsage(c.env.DB, checkedAt, {
+    const scan = await scanSingleMediaUsage(c.env.DB, checkedAt, {
       id: existing.id,
       r2_key: existing.r2_key,
     });
-    const impact = await getMediaDeleteImpact(c.env.DB, id, accountId, checkedAt);
-    if (!impact) return c.json({ success: false, error: 'Not found' }, 404);
+    const snapshot = await getMediaDeleteImpactSnapshot(c.env.DB, id, accountId, checkedAt);
+    if (!snapshot) return c.json({ success: false, error: 'Not found' }, 404);
+    // R34: 読み残しがあるときは使われていないと断定できない。確かめられ
+    // ないものは消させない（ fail-closed ）。読み直しを促す409で返す。
+    const verified = (scan.skippedTables ?? []).length === 0;
+    const impact = verified ? snapshot.impact : {
+      ...snapshot.impact,
+      canDelete: false,
+      recommendedAction: 'review_references' as const,
+    };
     if (!impact.canDelete) {
       return c.json(
-        {
-          success: false,
-          error: `このファイルは ${impact.usageCount} か所で使われています。先に使用先から外してください。`,
-          code: 'media_delete_blocked',
-          data: impact,
-        },
+        verified
+          ? {
+            success: false,
+            error: `このファイルは ${impact.usageCount} か所で使われています。先に使用先から外してください。`,
+            code: 'media_delete_blocked',
+            data: { ...impact, verified },
+          }
+          : {
+            success: false,
+            error: '使用先を確かめられなかったため削除できません。使用先を読み直してから、もう一度お試しください。',
+            code: 'media_delete_unverified',
+            data: { ...impact, verified },
+          },
         409,
       );
     }
@@ -2087,12 +2150,15 @@ contents.post('/api/common-vars', requireRole('owner', 'admin'), async (c) => {
       return c.json({ success: false, error: '名前は200文字までで入力してください' }, 400);
     }
     if (value === null) {
-      // VAR-06: 何が悪いかを画面へ返す。画像はURL形だけを受ける（VAR-03）。
+      // VAR-06: 何が悪いかを画面へ返す。画像はURL形だけを受け（VAR-03）、
+      // URL型は http/https のURLだけを受ける（R36）。
       return c.json({
         success: false,
         error: type === 'image'
           ? '画像には https:// からはじまるURLを入力してください'
-          : '種別に合う値を入力してください',
+          : type === 'url'
+            ? 'URLの値は http:// または https:// からはじまる形で入力してください'
+            : '種別に合う値を入力してください',
       }, 400);
     }
     if (memo.length > 1000) {
@@ -2180,7 +2246,9 @@ contents.patch('/api/common-vars/:id', requireRole('owner', 'admin'), async (c) 
         success: false,
         error: existing.type === 'image'
           ? '画像には https:// からはじまるURLを入力してください'
-          : '種別に合う値を入力してください',
+          : existing.type === 'url'
+            ? 'URLの値は http:// または https:// からはじまる形で入力してください'
+            : '種別に合う値を入力してください',
       }, 400);
     }
     const patchMemo = body.memo === undefined ? undefined : String(body.memo);

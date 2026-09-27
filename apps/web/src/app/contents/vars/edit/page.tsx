@@ -94,9 +94,18 @@ function EditCommonVarInner() {
   const [validUntil, setValidUntil] = useState('')
   const [expiryBehavior, setExpiryBehavior] = useState<'stop' | 'fallback'>('stop')
   const [fallbackValue, setFallbackValue] = useState('')
+  /** R36: 直し方は欄のすぐ下にも出す。全体の失敗文だけではどの欄か分からない。 */
+  const [valueFieldError, setValueFieldError] = useState('')
+  const [fallbackFieldError, setFallbackFieldError] = useState('')
+  const [scheduleFieldError, setScheduleFieldError] = useState('')
 
   /** 予約を足す窓。開いていない間は null。 */
   const [draft, setDraft] = useState<{ date: string; time: string; value: string } | null>(null)
+
+  // 直したら欄の下の文言は消す。残ると直ったのに怒られているように見える。
+  useEffect(() => { setValueFieldError('') }, [value])
+  useEffect(() => { setFallbackFieldError('') }, [fallbackValue])
+  useEffect(() => { setScheduleFieldError('') }, [draft?.value])
 
   /**
    * 変える前の影響確認（設計 `uNBlA`）。
@@ -274,9 +283,11 @@ function EditCommonVarInner() {
       return
     }
     // VAR-06: 新規画面と同じ型検査を保存前に行い、理由を出して欄へ戻す。
+    // 理由は欄のすぐ下にも出す（R36）。
     const valueError = commonVarValueError(item.type, value)
     if (valueError) {
       setError(valueError)
+      setValueFieldError(valueError)
       document.getElementById('cv-value')?.focus()
       return
     }
@@ -293,6 +304,7 @@ function EditCommonVarInner() {
       const fallbackError = commonVarValueError(item.type, fallbackValue, '代替値')
       if (fallbackError) {
         setError(fallbackError)
+        setFallbackFieldError(fallbackError)
         document.getElementById('cv-fallback-value')?.focus()
         return
       }
@@ -329,6 +341,9 @@ function EditCommonVarInner() {
       if (accountAtRequest !== latestAccountRef.current) return
       if (!res.success) {
         setError(res.error)
+        // 口で止まった理由も欄のすぐ下に映す（R36）。
+        if (res.error.includes('代替値')) setFallbackFieldError(res.error)
+        else if (res.error.includes('値')) setValueFieldError(res.error)
         return
       }
       setSaved(true)
@@ -484,6 +499,7 @@ function EditCommonVarInner() {
     const scheduleValueError = commonVarValueError(item.type, draft.value, '更新後の値')
     if (scheduleValueError) {
       setError(scheduleValueError)
+      setScheduleFieldError(scheduleValueError)
       return
     }
     setError('')
@@ -494,6 +510,9 @@ function EditCommonVarInner() {
       })
       if (!res.success) {
         setError(res.error)
+        if (res.error.includes('更新後の値') || res.error.includes('種別')) {
+          setScheduleFieldError(res.error)
+        }
         return
       }
       setDraft(null)
@@ -647,6 +666,7 @@ function EditCommonVarInner() {
                     onChange={(e) => { setSaved(false); setValue(e.target.value) }}
                     className="border-hairline rounded-control w-full border px-3 py-3 text-sm"
                   />}
+                  {valueFieldError ? <p className="text-danger mt-1 text-xs">{valueFieldError}</p> : null}
                 </div>
 
                 {/*
@@ -726,6 +746,7 @@ function EditCommonVarInner() {
                           className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
                         />
                       )}
+                      {fallbackFieldError ? <p className="text-danger mt-1 text-xs">{fallbackFieldError}</p> : null}
                     </div>
                   )}
                 </fieldset>
@@ -1054,6 +1075,7 @@ function EditCommonVarInner() {
                   className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
                 />
               )}
+              {scheduleFieldError ? <p className="text-danger mt-1 text-xs">{scheduleFieldError}</p> : null}
             </div>
             <div className="flex justify-end gap-2">
               <button

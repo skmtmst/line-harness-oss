@@ -352,6 +352,33 @@ describe('共通情報の新規作成: 型別の入力エラー(VAR-06, 実React
     expect(host.textContent).toContain('https://')
   })
 
+  it('URL型にURLでない文章を入れると止め、欄のすぐ下にも理由を出す(R36)', async () => {
+    await render()
+    await setValue(byId('cv-name'), '店舗リンク')
+    await setValue(byId('cv-key'), 'shop_link')
+    await click(host.querySelector('input[name="cv-type"][value="url"]') as HTMLInputElement)
+    await setValue(byId('cv-value'), 'これはURLではありません')
+    await click(byExactText('button', '登録'))
+
+    expect(api.create).not.toHaveBeenCalled()
+    // 欄のすぐ下に出る。
+    const valueField = byId('cv-value').closest('div')
+    expect(valueField?.textContent).toContain('http://')
+    expect((document.activeElement as HTMLElement | null)?.id).toBe('cv-value')
+  })
+
+  it('URL型は http/https のURLなら通す(R36)', async () => {
+    await render()
+    await setValue(byId('cv-name'), '店舗リンク')
+    await setValue(byId('cv-key'), 'shop_link2')
+    await click(host.querySelector('input[name="cv-type"][value="url"]') as HTMLInputElement)
+    await setValue(byId('cv-value'), 'https://example.com/shop')
+    await click(byExactText('button', '登録'))
+
+    expect(api.create).toHaveBeenCalledTimes(1)
+    expect(api.create.mock.calls[0][0]).toMatchObject({ type: 'url', value: 'https://example.com/shop' })
+  })
+
   it('期間外の代替値が種別に合わないと止める', async () => {
     await render()
     await setValue(byId('cv-name'), 'ロゴ')
