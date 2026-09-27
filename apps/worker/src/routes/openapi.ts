@@ -2822,6 +2822,31 @@ const spec = {
         responses: { '200': { description: '知らせ直した' }, '409': { description: '依頼中でない' } },
       },
     },
+    '/api/broadcasts/{id}/recipients': {
+      get: {
+        tags: ['Broadcasts'],
+        summary: '宛先ごとの結果の台帳',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'result', in: 'query', schema: { type: 'string', enum: ['all', 'delivered', 'temporary', 'permanent', 'unknown', 'inflight'], default: 'all' } },
+          { name: 'cursor', in: 'query', schema: { type: 'integer', minimum: 0, default: 0 } },
+          { name: 'limit', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 100, default: 50 } },
+        ],
+        responses: { '200': { description: 'rows, summary, pagination（全員配信・旧配信は集約だけ）' }, '400': { description: 'result が正しくない' }, '404': { description: 'Broadcast not found' } },
+      },
+    },
+    '/api/broadcasts/{id}/activity': {
+      get: {
+        tags: ['Broadcasts'],
+        summary: '配信への操作の記録（新しい順）',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'cursor', in: 'query', schema: { type: 'integer', minimum: 0, default: 0 } },
+          { name: 'limit', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 100, default: 50 } },
+        ],
+        responses: { '200': { description: 'entries, pagination（追記だけ。消せない）' }, '404': { description: 'Broadcast not found' } },
+      },
+    },
     // ── NEN delivery ────────────────────────────────────────────────────────
     '/api/nen-campaigns/metrics/flows': {
       get: {
@@ -4800,6 +4825,21 @@ const spec = {
         ],
         responses: {
           '200': { description: '送信枠（available/unlimited/unavailable）' },
+          '400': { description: 'lineAccountId が無い' },
+          '403': { description: 'このLINEアカウントを表示する権限がない' },
+        },
+      },
+    },
+    '/api/line-notifications/send-counts': {
+      get: {
+        tags: ['Customer notifications'],
+        summary: '顧客通知の送信件数（今日・この30日）',
+        description: '共通送信台帳の受け付け済みをJSTの今日・今日を含む30日で数える。ECの取り込み件数でもLINE集計の全期間合計でもない。試し送りは除く。',
+        parameters: [
+          { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '送信件数（合計・出来事の種類別・期間）' },
           '400': { description: 'lineAccountId が無い' },
           '403': { description: 'このLINEアカウントを表示する権限がない' },
         },

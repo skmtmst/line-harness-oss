@@ -41,6 +41,19 @@ import {
   syncGoogleSheetsIntegration,
   type GoogleSheetsIntegrationRow,
 } from '../services/google-sheets.js';
+/*
+ * 応答の形は packages/shared の型が正本（`data` の包みでそろえる）。
+ * 管理画面はこの包みで読む。包みが無いと画面が「読み込み中」のまま止まる。
+ */
+import {
+  type GoogleSheetsConnectionPayload,
+  type GoogleSheetsConnectStartPayload,
+  type GoogleSheetsDisconnectPayload,
+  type GoogleSheetsRunsPayload,
+  type GoogleSheetsSyncPayload,
+  type GoogleSheetsSyncRun,
+  type GoogleSheetsTargetPayload,
+} from '@line-crm/shared';
 
 export const googleSheets = new Hono<Env>();
 
@@ -203,20 +216,23 @@ googleSheets.get('/api/integrations/google-sheets/connection', requireRole('owne
             COALESCE(SUM(CASE WHEN status = 'running' THEN 1 ELSE 0 END), 0) AS running
        FROM google_sheets_sync_runs WHERE integration_id = ?`,
   ).bind(integration?.id ?? '').first<{ total: number; running: number }>();
-  return c.json({
-    success: true,
+  const payload: GoogleSheetsConnectionPayload = {
     connection: publicIntegration(integration),
     oauthConfigured: Boolean(sheetsOauthClient(c.env, 'https://localhost/unused')),
     syncRunning: Number(counts?.running ?? 0) > 0,
     canManage: await canManageIntegration(c),
-  });
+  };
+  return c.json({ success: true, data: payload });
 });
 
 googleSheets.get('/api/integrations/google-sheets/runs', requireRole('owner', 'admin'), async (c) => {
   const selected = await visibleAccount(c);
   if (!selected) return fail(c, 404, 'Not found');
   const integration = await integrationFor(c, selected);
-  if (!integration) return c.json({ success: true, runs: [] });
+  if (!integration) {
+    const empty: GoogleSheetsRunsPayload = { runs: [] };
+    return c.json({ success: true, data: empty });
+  }
   const rows = await dbFor(c.env)
     .prepare(
       `SELECT id, kind, data_type, status, rows_written, error, started_at, finished_at
@@ -228,19 +244,19 @@ googleSheets.get('/api/integrations/google-sheets/runs', requireRole('owner', 'a
       id: string; kind: string; data_type: string; status: string;
       rows_written: number; error: string | null; started_at: string; finished_at: string | null;
     }>();
-  return c.json({
-    success: true,
-    runs: rows.results.map((row) => ({
+  const payload: GoogleSheetsRunsPayload = {
+    runs: rows.results.map((row): GoogleSheetsSyncRun => ({
       id: row.id,
-      kind: row.kind,
-      dataType: row.data_type,
-      status: row.status,
+      kind: row.kind as GoogleSheetsSyncRun['kind'],
+      dataType: row.data_type as GoogleSheetsSyncRun['dataType'],
+      status: row.status as GoogleSheetsSyncRun['status'],
       rowsWritten: row.rows_written,
       error: row.error,
       startedAt: row.started_at,
       finishedAt: row.finished_at,
     })),
-  });
+  };
+  return c.json({ success: true, data: payload });
 });
 
 // ---------- OAuth ----------
@@ -274,8 +290,7 @@ googleSheets.post('/api/integrations/google-sheets/connect/start', requireIntegr
     .run();
   c.header('Set-Cookie', stateCookie(state));
   auditLog(c, 'google.sheets.connect.start', { id: selected, kind: 'google_sheets_integration' }, { lineAccountId: selected });
-  return c.json({
-    success: true,
+  const payload: GoogleSheetsConnectStartPayload = {
     mode,
     authorizeUrl: buildAuthorizeUrl({
       clientId: client.clientId,
@@ -285,7 +300,8 @@ googleSheets.post('/api/integrations/google-sheets/connect/start', requireIntegr
       loginHint: existing?.google_account_email ?? null,
       scopes: GOOGLE_SHEETS_SCOPES,
     }),
-  });
+  };
+  return c.json({ success: true, data: payload });
 });
 
 /**
@@ -400,7 +416,8 @@ googleSheets.post('/api/integrations/google-sheets/disconnect', requireIntegrati
   // 要件 #838 §2: 切断は行ごと消す。同期履歴も CASCADE で消える。
   await dbFor(c.env).prepare('DELETE FROM google_sheets_integrations WHERE id = ?').bind(integration.id).run();
   auditLog(c, 'google.sheets.disconnect', { id: selected, kind: 'google_sheets_integration' }, { lineAccountId: selected });
-  return c.json({ success: true, revoked, connection: publicIntegration(null) });
+  const payload: GoogleSheetsDisconnectPayload = { revoked, connection: publicIntegration(null) };
+  return c.json({ success: true, data: payload });
 });
 
 // ---------- 出力先 ----------
@@ -430,7 +447,10 @@ googleSheets.put('/api/integrations/google-sheets/target', requireIntegrationMan
       .bind(spreadsheetId, title, nowIso(), integration.id)
       .run();
     auditLog(c, 'google.sheets.target.update', { id: integration.id, kind: 'google_sheets_integration' }, { lineAccountId: selected });
-    return c.json({ success: true, connection: publicIntegration(await integrationFor(c, selected)) });
+    const payload: GoogleSheetsTargetPayload = {
+      connection: publicIntegration(await integrationFor(c, selected)),
+    };
+    return c.json({ success: true, data: payload });
   } catch (error) {
     return sheetsErrorResponse(c, error);
   }
@@ -463,7 +483,8 @@ googleSheets.post('/api/integrations/google-sheets/sync', requireIntegrationMana
         : results.every((r) => r.status === 'already_running')
           ? 'already_running'
           : 'error';
-    return c.json({ success: status !== 'error', status, results });
+    const payload: GoogleSheetsSyncPayload = { status, results };
+    return c.json({ success: status !== 'error', data: payload });
   } catch (error) {
     return sheetsErrorResponse(c, error);
   }

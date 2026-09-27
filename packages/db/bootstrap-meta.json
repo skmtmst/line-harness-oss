@@ -416,6 +416,8 @@
     "455_broadcast_approval_events.sql",
     "456_media_file_scans.sql",
     "457_file_scan_config.sql",
+    "458_broadcast_recipient_request_id.sql",
+    "459_broadcast_lifecycle_events.sql",
     "466_template_versions.sql",
     "467_template_references.sql",
     "468_event_custom_questions.sql",
