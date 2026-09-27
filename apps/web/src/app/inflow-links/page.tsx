@@ -940,14 +940,19 @@ function InflowLinksPageInner({
               {/* ★V7：REF は流入元名の下へ。名前が「Googl…」まで削られていたので列を1つ減らし、
                   編集ボタンは割合でなく固定幅にして右端で切れないようにする。 */}
               {/* 先頭・末尾の列は見出しの余白（20px）にそろえる。編集ボタンがはみ出さない幅にする。 */}
+              {/*
+                数字の列は中身に合わせる。友だち追加（72px）・クリック（60px）が
+                列幅（68px・53px）より広くはみ出していた。流入元名から回して
+                合計は変えない（86%）。名前は省略＋title で確認する。
+              */}
               <col className="w-14" />
-              <col className="w-[17%]" />
+              <col className="w-[13%]" />
               <col className="w-[8%]" />
               <col className="w-[12%]" />
               <col className="w-[8%]" />
               <col className="w-[8%]" />
+              <col className="w-[11%]" />
               <col className="w-[9%]" />
-              <col className="w-[7%]" />
               <col className="w-[8%]" />
               <col className="w-[9%]" />
               <col className="w-32" />
@@ -982,10 +987,10 @@ function InflowLinksPageInner({
                 <Th>
                   <span title="同時に動く配信">同時配信</span>
                 </Th>
-                <Th align="right">
+                <Th align="right" className="whitespace-nowrap">
                   友だち追加
                 </Th>
-                <Th align="right">
+                <Th align="right" className="whitespace-nowrap">
                   クリック
                 </Th>
                 <Th>

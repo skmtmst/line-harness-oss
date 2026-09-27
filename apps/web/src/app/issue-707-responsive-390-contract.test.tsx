@@ -184,10 +184,11 @@ describe('16: 6タブ行は続きの手がかりと送りを持つ', () => {
 
 describe('28: 予約メニューの操作列は右端へ留まる', () => {
   it('表は横スクロール容器＋操作列sticky（ページ全体ではない最小単位）', () => {
-    expect(BOOKING_MENUS_SRC).toContain('overflow-x-auto')
-    expect(BOOKING_MENUS_SRC).toContain('sticky right-0 bg-canvas-sunken px-4 py-3 text-right')
-    expect(BOOKING_MENUS_SRC).toContain('sticky right-0 bg-canvas px-4 py-3 text-right')
+    // 横スクロールは共通 DataTable の外枠（CSS）が持つ。ページ側は DataTable と sticky を保つ。
+    expect(DATA_TABLE_CSS).toContain('overflow-x: auto')
+    expect(BOOKING_MENUS_SRC).toContain('<DataTable')
+    expect(BOOKING_MENUS_SRC).toContain('sticky right-0')
     expect(BOOKING_MENUS_SRC).toContain('中身を見る')
-    expect(BOOKING_MENUS_SRC).toContain('止める・出す')
+    expect(BOOKING_MENUS_SRC).toContain("label: m.is_active ? '止める' : '再開'")
   })
 })

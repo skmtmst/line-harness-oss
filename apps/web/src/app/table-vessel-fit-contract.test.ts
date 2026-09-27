@@ -30,12 +30,23 @@ function percentTotal(source: string): number {
 }
 
 describe('表は器の幅にぴったり収める', () => {
-  it('/booking/menus: 操作列は固定幅で、中身が器からはみ出さない', () => {
+  it('/booking/menus: 操作は「中身を見る」＋「…」で、中身が器からはみ出さない', () => {
     const page = read('booking/menus/page.tsx')
     expect(page).toContain('<DataTable')
-    // 操作列は 3ボタン（約178px）に合わせた固定幅。割合（22%）に戻さない。
-    expect(page).toMatch(/<Th[^>]*w-48[^>]*>操作<\/Th>/)
-    expect(page).not.toMatch(/width:\s*['"]22%['"]/)
+    // ★V7 行の操作の決まり：主な1つ＋「…」。共通の RowActions を使う。
+    // 4つ並べると1440pxで器から72pxはみ出す。上へ・下へ・止める／再開は「…」の中。
+    expect(page).toContain('<RowActions')
+    expect(page).toContain("label: '中身を見る'")
+    expect(page).toContain("label: '上へ'")
+    expect(page).toContain("label: '下へ'")
+    expect(page).toContain("label: m.is_active ? '止める' : '再開'")
+    // 行への直置きボタン（↑↓・止める・出す）に戻さない。
+    expect(page).not.toContain('を上へ')
+    expect(page).not.toContain('を下へ')
+    expect(page).not.toContain('止める・出す')
+    // 操作列は「中身を見る」＋「…」（約138px）に合わせた固定幅。4つ並びの w-48 に戻さない。
+    expect(page).toMatch(/<Th[^>]*w-44[^>]*>操作<\/Th>/)
+    expect(page).not.toMatch(/<Th[^>]*w-48[^>]*>操作<\/Th>/)
     // 割合の合計は 100% 未満。残りは「だれが受けられるか」（自動）が吸う。
     expect(percentTotal(page)).toBeLessThan(100)
   })
@@ -47,6 +58,29 @@ describe('表は器の幅にぴったり収める', () => {
     expect(page).toMatch(/<Th[^>]*w-64[^>]*>操作<\/Th>/)
     expect(page).not.toMatch(/width:\s*['"]14%['"]/)
     expect(percentTotal(page)).toBeLessThan(100)
+  })
+
+  it('/events: 申込条件は1行で省略し、全文は title で確認する', () => {
+    const page = read('events/page.tsx')
+    // タグ名は長さが読めない。列幅（自動・実測31px）より広い中身（60px）が
+    // そのまま出ると器からはみ出す。省略を外して素の文字に戻さない。
+    expect(page).toContain('max-w-32 truncate')
+    expect(page).toContain('title={e.visible_tag_name}')
+  })
+
+  it('/inflow-links: 友だち追加・クリックの列は中身に合わせた幅にする', () => {
+    const page = read('inflow-links/page.tsx')
+    // 数字の列が中身より狭い（友だち追加 72>68・クリック 60>53）と
+    // 器からはみ出す。流入元名から回し、割合の合計は変えない（86%）。
+    expect(page).toMatch(/<col className="w-\[11%\]" \/>\s*<col className="w-\[9%\]" \/>/)
+    expect(page).toContain('<col className="w-[13%]" />')
+    expect(page).not.toContain('<col className="w-[17%]" />')
+    expect(page).not.toContain('<col className="w-[7%]" />')
+    const values = [...page.matchAll(/w-\[(\d+(?:\.\d+)?)%\]/g)].map((m) => Number(m[1]))
+    expect(values.reduce((sum, value) => sum + value, 0)).toBe(86)
+    // 見出しは折り返さず1行。狭い列に戻しても割れないようにする。
+    expect(page).toMatch(/<Th align="right" className="whitespace-nowrap">\s*友だち追加/)
+    expect(page).toMatch(/<Th align="right" className="whitespace-nowrap">\s*クリック/)
   })
 
   it('/booking/staff: 操作列は固定幅で、右に大きく空けない', () => {

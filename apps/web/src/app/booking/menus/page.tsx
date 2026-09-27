@@ -13,6 +13,7 @@ import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
 import Pagination from '@/components/shared/pagination'
 import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { RowActions } from '@/components/shared/row-actions'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import {
   api,
@@ -229,9 +230,9 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
 
   /**
    * #709残件: 28の行頭の持ち手飾りは掴めないため置かず、
-   * 代わりに操作列の↑↓で隣と並び順を入れ替える。専用の並び替えAPIや
-   * dnd実装は無いので、既存の updateMenu（PUT・版つき）で2件の
-   * sort_order を交換する。仕様書の一括更新口は未実装のため作らない。
+   * 代わりに操作列の「…」の中の上へ・下へで隣と並び順を入れ替える。
+   * 専用の並び替えAPIやdnd実装は無いので、既存の updateMenu（PUT・版つき）で
+   * 2件の sort_order を交換する。仕様書の一括更新口は未実装のため作らない。
    */
   async function moveMenu(menu: BookingMenu, delta: -1 | 1) {
     if (!selectedAccountId || reorderBusy) return
@@ -385,7 +386,7 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
         />
       </div>
 
-      <Notice data-design="Bar" tone="info" message="上から並んだ順に、お客様の画面に出ます。順番は操作列の↑↓で変えられます。" className="mb-4" />
+      <Notice data-design="Bar" tone="info" message="上から並んだ順に、お客様の画面に出ます。順番は操作列の「…」から変えられます。" className="mb-4" />
       <Disclosure size="compact" title="時間と金額の決め方" hint="2項目" className="mb-4">
         <ul className="list-disc space-y-1 pl-5 text-sm">
           <li>かかる時間を長めにしておくと、あとの予約とぶつかりません。</li>
@@ -442,10 +443,11 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
                   </Th>
                   {/*
                     #707: 390pxで表を横スクロールしても操作列を右端へ留める。
-                    操作列は固定幅（192px）。割合にすると中身（3ボタン約178px）が
-                    器からはみ出す。残りは割合と自動の列で吸う。
+                    操作列は固定幅（176px）。割合にすると中身
+                    （「中身を見る」＋「…」約138px）が器からはみ出す。
+                    残りは割合と自動の列で吸う。
                   */}
-                  <Th align="right" className="sticky right-0 w-48 bg-canvas-sunken">操作</Th>
+                  <Th align="right" className="sticky right-0 w-44 bg-canvas-sunken">操作</Th>
                 </TableHeadRow>
               </thead>
               <tbody>
@@ -459,7 +461,7 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
                       {/*
                         行頭の持ち手の飾りは置かない。ドラッグで並び替えられる
                         ように見えるが実際は押せない印になる（監査 A12・#709）。
-                        並び順は操作列の↑↓で変える。
+                        並び順は操作列の「…」の中の上へ・下へで変える。
                       */}
                       {m.name}{m.is_active ? '' : '（休止中）'}
                       {m.description && <span className="text-ink-faint mt-1 block max-w-72 truncate text-xs" title={m.description}>{m.description}</span>}
@@ -493,40 +495,37 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
                       {`${bookingCounts.get(m.id) ?? 0} 件`}
                     </Td>
                     <ActionCell className="sticky right-0 bg-canvas">
-                      <div className="inline-flex gap-2 text-xs">
-                        {/* QSLEH の行操作は共通Button（高さ36px）より小さいため、
-                            表の行高を設計どおり保つ専用の小ボタンにする。 */}
-                        <button onClick={() => setEditing(m)} className="border-hairline rounded-control border px-2 py-1 font-semibold">
-                          中身を見る
-                        </button>
-                        {canEditMenus && (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => void moveMenu(m, -1)}
-                              disabled={reorderBusy || !canMoveUp}
-                              aria-label={`${m.name}を上へ`}
-                              title="上へ移動"
-                              className="border-hairline rounded-control border px-2 py-1 font-semibold disabled:opacity-40"
-                            >
-                              ↑
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => void moveMenu(m, 1)}
-                              disabled={reorderBusy || !canMoveDown}
-                              aria-label={`${m.name}を下へ`}
-                              title="下へ移動"
-                              className="border-hairline rounded-control border px-2 py-1 font-semibold disabled:opacity-40"
-                            >
-                              ↓
-                            </button>
-                            <button onClick={() => setVisibilityTarget(m)} className="border-hairline rounded-control border px-2 py-1 font-semibold">
-                              止める・出す
-                            </button>
-                          </>
-                        )}
-                      </div>
+                      {/*
+                        ★V7 行の操作の決まり：主な1つ＋「…」。共通の RowActions を使う。
+                        4つ並べると1440pxで器から72pxはみ出す。上へ・下へ・止める／再開は
+                        「…」の中へ集め、キーボード操作はメニューの ↑↓・Enter で行う。
+                      */}
+                      <RowActions
+                        subjectName={m.name}
+                        detail={{ label: '中身を見る', onClick: () => setEditing(m) }}
+                        menuItems={canEditMenus ? [
+                          {
+                            id: 'move-up',
+                            label: '上へ',
+                            disabled: reorderBusy || !canMoveUp,
+                            disabledReason: !canMoveUp ? 'いちばん上です' : '並び替えを保存中です',
+                            onSelect: () => void moveMenu(m, -1),
+                          },
+                          {
+                            id: 'move-down',
+                            label: '下へ',
+                            disabled: reorderBusy || !canMoveDown,
+                            disabledReason: !canMoveDown ? 'いちばん下です' : '並び替えを保存中です',
+                            onSelect: () => void moveMenu(m, 1),
+                          },
+                          {
+                            id: 'visibility',
+                            label: m.is_active ? '止める' : '再開',
+                            dividerBefore: true,
+                            onSelect: () => setVisibilityTarget(m),
+                          },
+                        ] : []}
+                      />
                     </ActionCell>
                   </Tr>
                   )

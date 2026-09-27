@@ -347,11 +347,17 @@ export default function EventsListPage() {
                         つもりで誰にも見えていない状態に気づけない。
                         タグを消しても events 側の ID は残るので、その場合は名前が
                         引けない＝もう誰にも見えない、と分かるように別の文言を出す。 */}
+                    {/*
+                      申込条件のタグ名は長さが読めない。列幅（自動）より広いと
+                      器からはみ出すので、1行で省略し全文は title で確認する。
+                    */}
                     <Td className="text-ink-secondary">
                       {!e.visible_tag_id ? (
                         '全員'
                       ) : e.visible_tag_name ? (
-                        e.visible_tag_name
+                        <span className="block max-w-32 truncate" title={e.visible_tag_name}>
+                          {e.visible_tag_name}
+                        </span>
                       ) : (
                         <span className="text-warning">消えたタグ</span>
                       )}
