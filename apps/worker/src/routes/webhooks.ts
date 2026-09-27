@@ -48,6 +48,7 @@ import { computeHmacSha256Hex, safeEqualHex } from '../lib/hmac.js';
 import { reserveIncomingWebhook, type IncomingWebhookExecution } from '../services/incoming-webhook-receipts.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
+import { sensitiveStepUpSatisfied, stepUpRequiredResponse } from '../lib/step-up.js';
 import { auditLog } from '../lib/audit-log.js';
 import {
   retryWebhookInteraction,
@@ -408,6 +409,10 @@ webhooks.patch('/api/webhooks/incoming/:id/config', requireRole('owner'), async 
 
 webhooks.post('/api/webhooks/incoming', requireRole('owner'), async (c) => {
   try {
+    // 受信フックの登録は秘密値を扱う大事な操作（V）。
+    if (!await sensitiveStepUpSatisfied(c, 'webhook.secret')) {
+      return stepUpRequiredResponse(c, '秘密の値の登録には本人確認が必要です');
+    }
     const body = await c.req.json<{ name: string; sourceType?: string; secret?: string; lineAccountId: string }>();
     const nameError = validateWebhookName(body.name);
     if (nameError) {
@@ -465,6 +470,10 @@ webhooks.put('/api/webhooks/incoming/:id', requireRole('owner'), async (c) => {
     const existing = await getIncomingWebhookById(c.env.DB, id, lineAccountId);
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
     const body = await c.req.json<{ name?: string; sourceType?: string; secret?: string; isActive?: boolean }>();
+    // 秘密値の入れ替えを伴う更新は鍵・トークンの操作（V）。
+    if (body.secret !== undefined && !await sensitiveStepUpSatisfied(c, 'webhook.secret')) {
+      return stepUpRequiredResponse(c, '秘密の値の変更には本人確認が必要です');
+    }
     if (body.name !== undefined) {
       const nameError = validateWebhookName(body.name);
       if (nameError) {
@@ -745,6 +754,10 @@ webhooks.get('/api/webhooks/outgoing/:id', requireRole('owner', 'admin', 'staff'
 
 webhooks.post('/api/webhooks/outgoing', requireRole('owner'), async (c) => {
   try {
+    // 送信フックの登録は署名用の秘密値を扱う大事な操作（V）。
+    if (!await sensitiveStepUpSatisfied(c, 'webhook.secret')) {
+      return stepUpRequiredResponse(c, '秘密の値の登録には本人確認が必要です');
+    }
     const body = await c.req.json<{
       name: string;
       url: string;
@@ -835,6 +848,10 @@ webhooks.put('/api/webhooks/outgoing/:id', requireRole('owner'), async (c) => {
       isActive?: boolean;
       maxRetries?: unknown;
     }>();
+    // 秘密値の入れ替えを伴う更新は鍵・トークンの操作（V）。
+    if (body.secret !== undefined && !await sensitiveStepUpSatisfied(c, 'webhook.secret')) {
+      return stepUpRequiredResponse(c, '秘密の値の変更には本人確認が必要です');
+    }
     // 検証済みの値だけを別に持つ。body をそのまま書き換えると unknown のまま
     // 下流へ渡ることになる。
     let maxRetries: number | undefined;
@@ -1195,6 +1212,10 @@ webhooks.post('/api/webhooks/interactions/retry-failed', requireRole('owner', 'a
  */
 webhooks.post('/api/webhooks/maintenance/secret-backfill', requireRole('owner'), async (c) => {
   try {
+    // 秘密値の一括補完は鍵・トークンの操作（V）。
+    if (!await sensitiveStepUpSatisfied(c, 'webhook.secret')) {
+      return stepUpRequiredResponse(c, '秘密の値の補完には本人確認が必要です');
+    }
     const body = await c.req.json<{
       lineAccountId?: string; dryRun?: boolean; batchSize?: unknown;
     }>().catch(() => null);
@@ -1480,6 +1501,10 @@ webhooks.get('/api/webhooks/api-tokens', requireRole('owner', 'admin', 'staff'),
 
 webhooks.post('/api/webhooks/api-tokens', requireRole('owner'), async (c) => {
   try {
+    // 連携APIトークンの発行は鍵・トークンの操作（V）。
+    if (!await sensitiveStepUpSatisfied(c, 'webhook.api_token')) {
+      return stepUpRequiredResponse(c, 'APIトークンの発行には本人確認が必要です');
+    }
     const body = await c.req.json<{ name?: unknown; scopes?: unknown; lineAccountId?: unknown }>()
       .catch(() => null);
     const name = typeof body?.name === 'string' ? body.name.trim() : '';
@@ -1527,6 +1552,10 @@ webhooks.post('/api/webhooks/api-tokens/:id/revoke', requireRole('owner'), async
       return c.json({ success: false, error: 'このLINEアカウントを変更する権限がありません' }, 403);
     }
     const id = c.req.param('id');
+    // トークンの失効は鍵・トークンの操作（V）。
+    if (!await sensitiveStepUpSatisfied(c, 'webhook.api_token')) {
+      return stepUpRequiredResponse(c, 'APIトークンの失効には本人確認が必要です');
+    }
     const revoked = await revokeIntegrationApiToken(c.env.DB, id, lineAccountId, c.get('staff')?.id);
     if (!revoked) return c.json({ success: false, error: 'Not found' }, 404);
     auditLog(c, 'webhook.api_token.revoke', { kind: 'integration_api_token', id }, { lineAccountId });
@@ -1545,6 +1574,10 @@ webhooks.post('/api/webhooks/api-tokens/:id/rotate', requireRole('owner'), async
       return c.json({ success: false, error: 'このLINEアカウントを変更する権限がありません' }, 403);
     }
     const id = c.req.param('id');
+    // トークンの回転は鍵・トークンの操作（V）。
+    if (!await sensitiveStepUpSatisfied(c, 'webhook.api_token')) {
+      return stepUpRequiredResponse(c, 'APIトークンの再発行には本人確認が必要です');
+    }
     const rotated = await rotateIntegrationApiToken(c.env.DB, id, lineAccountId, c.get('staff')?.id);
     if (!rotated) return c.json({ success: false, error: 'Not found' }, 404);
     auditLog(c, 'webhook.api_token.rotate', { kind: 'integration_api_token', id: rotated.row.id }, { lineAccountId });

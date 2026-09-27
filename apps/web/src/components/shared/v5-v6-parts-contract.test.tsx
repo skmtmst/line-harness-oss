@@ -6,7 +6,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import Button from './button'
 import Pagination, { paginationItems } from './pagination'
-import SummaryCard from './summary-card'
+import KpiCard from './kpi-card'
 import { TableHeadRow, Th } from './table'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -71,10 +71,10 @@ describe('共通Button', () => {
   })
 })
 
-describe('共通SummaryCard', () => {
+describe('共通KpiCard', () => {
   it('数値を日本語表記し、hiddenとaria属性を実要素へ渡す', () => {
     const html = renderToStaticMarkup(
-      <SummaryCard
+      <KpiCard
         title="有効友だち"
         value={1234}
         unit="人"
@@ -90,14 +90,14 @@ describe('共通SummaryCard', () => {
 
   it('読み込み中はaria-busyを付ける', () => {
     const html = renderToStaticMarkup(
-      <SummaryCard title="配信数" value={null} unit="件" detail="集計中" loading />,
+      <KpiCard title="配信数" value={null} unit="件" detail="集計中" loading />,
     )
     expect(html).toContain('aria-busy="true"')
   })
 
   it('長い説明は説明アイコンのポップオーバーへ入れ、カードを伸ばさない（#1005）', () => {
     const html = renderToStaticMarkup(
-      <SummaryCard
+      <KpiCard
         title="視聴"
         value={null}
         unit="人"
@@ -116,7 +116,7 @@ describe('共通SummaryCard', () => {
 
   it('再試行は短い状態のそばに常時出す', () => {
     const html = renderToStaticMarkup(
-      <SummaryCard
+      <KpiCard
         title="配信実績"
         value={null}
         unit="件"
@@ -150,14 +150,14 @@ describe('共通表見出し', () => {
 describe('部品のCSS境界', () => {
   it('表示制御はhidden属性で効き、フォーカスの既定輪郭を消さない', () => {
     expect(read('button.module.css')).toMatch(/\.button\[hidden\]\s*\{[^}]*display:\s*none;/s)
-    expect(read('summary-card.module.css')).toMatch(/\.card\[hidden\]\s*\{[^}]*display:\s*none;/s)
+    expect(read('kpi-card.module.css')).toMatch(/\.card\[hidden\]\s*\{[^}]*display:\s*none;/s)
     expect(read('table.module.css')).toMatch(/\.cell\[hidden\][^{]*\{[^}]*display:\s*none;/s)
     expect(read('button.module.css')).toMatch(/\.button:focus-visible\s*\{[^}]*outline:\s*revert;/s)
-    expect(read('summary-card.module.css')).toMatch(/\.link:focus-visible\s*\{[^}]*outline:\s*revert;/s)
+    expect(read('kpi-card.module.css')).toMatch(/\.link:focus-visible\s*\{[^}]*outline:\s*revert;/s)
   })
 
   it('生の色・ローカル変数・Pencilに無い大文字化や字間を持たない', () => {
-    for (const name of ['button.module.css', 'pagination.module.css', 'summary-card.module.css', 'table.module.css']) {
+    for (const name of ['button.module.css', 'pagination.module.css', 'kpi-card.module.css', 'table.module.css']) {
       const css = withoutComments(read(name))
       expect(css, `${name} に生の色がある`).not.toMatch(/#[0-9a-fA-F]{3,8}\b/)
       expect(css, `${name} がローカル変数を定義している`).not.toMatch(/^\s*--(?!tw-)[a-z-]+:/m)

@@ -19,7 +19,7 @@ describe('機能32のサーバー契約', () => {
     expect(apiSource).toContain("'/api/auth/step-up'")
     expect(apiSource).toContain("'X-Step-Up-Token': stepUpToken")
     expect(apiSource).toContain("'Idempotency-Key': idempotencyKey")
-    expect(pageSource).toContain('api.operations.stepUp(stepUpCode)')
+    expect(pageSource).toContain('api.operations.stepUp({')
     expect(pageSource).toContain('setRequestKey(crypto.randomUUID())')
   })
 

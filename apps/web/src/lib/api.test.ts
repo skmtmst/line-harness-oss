@@ -145,7 +145,7 @@ describe('api.nenMembers の写真審査運用契約', () => {
     })
     vi.stubGlobal('fetch', fetchSpy)
 
-    const grant = await api.nenMembers.photoOriginalStepUp('123456')
+    const grant = await api.nenMembers.photoOriginalStepUp({ method: 'totp', value: '123456' })
     const issued = await api.nenMembers.issuePhotoOriginalDownload(
       'photo-1', { lineAccountId: 'account-1', expectedVersion: 2 }, grant.data.token, 'original-key-123',
     )
@@ -636,7 +636,7 @@ describe('api.affiliates.paymentSummaries', () => {
     await api.affiliates.createPayoutBatch({
       lineAccountId: 'account/1', settlementId: 'settlement/1', expectedVersion: 1, bankFormat: 'zengin_csv',
     }, 'batch-key-1')
-    await api.affiliates.payoutStepUp('123456')
+    await api.affiliates.payoutStepUp({ method: 'totp', value: '123456' })
     await api.affiliates.exportPayoutBatch(
       'batch/1', { lineAccountId: 'account/1', expectedVersion: 1 }, 'step-up-token', 'export-key-1',
     )

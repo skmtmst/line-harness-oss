@@ -192,7 +192,7 @@ CREATE TABLE admin_sessions (
   staff_id   TEXT NOT NULL,
   expires_at TEXT NOT NULL,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), selected_restaurant_store_id TEXT
-  REFERENCES rt_stores(id) ON DELETE SET NULL, user_agent TEXT, ip_prefix TEXT,
+  REFERENCES rt_stores(id) ON DELETE SET NULL, user_agent TEXT, ip_prefix TEXT, step_up_at TEXT, device_hash TEXT, unfamiliar_at TEXT,
   FOREIGN KEY (staff_id) REFERENCES staff_members(id) ON DELETE CASCADE
 );
 
@@ -6732,7 +6732,13 @@ CREATE INDEX idx_admin_sessions_restaurant_store
   ON admin_sessions(selected_restaurant_store_id)
   WHERE selected_restaurant_store_id IS NOT NULL;
 
+CREATE INDEX idx_admin_sessions_staff_device
+  ON admin_sessions(staff_id, device_hash);
+
 CREATE INDEX idx_admin_sessions_staff_id ON admin_sessions(staff_id);
+
+CREATE INDEX idx_admin_sessions_staff_ip_prefix
+  ON admin_sessions(staff_id, ip_prefix);
 
 CREATE INDEX idx_admin_two_factor_challenges_expires
   ON admin_two_factor_challenges(expires_at);

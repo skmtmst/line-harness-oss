@@ -5,7 +5,7 @@ import Button from '@/components/shared/button'
 import NoteBar from '@/components/shared/note-bar'
 import PageHeader from '@/components/shared/page-header'
 import Select from '@/components/shared/select'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
 import { ActionCell, DataTable, Td, Th, TableHeadRow, Tr } from '@/components/shared/table'
 import { Tabs } from '@/components/shared/tabs'
 import IdentityDecisionDialog from '@/components/identity/identity-decision-dialog'
@@ -142,10 +142,10 @@ export default function EcIdentityCandidatesPage() {
       {pageState === 'ready' ? (
         <>
           <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-            <SummaryCard variant="v6" title="結びついていない" value={operations?.summary.unmatched ?? null} unit="件" detail="確認待ちの注文・会員" badge="要対応" />
-            <SummaryCard variant="v6" title="候補が見つかった" value={candidateCount} unit="件" detail="" help="名前や電話が近い人がいます" />
-            <SummaryCard variant="v6" title="自動で結びついた" value={operations?.summary.linked ?? null} unit="件" detail="" help="同じ人として結びついた会員です" />
-            <SummaryCard variant="v6" title="結びつけると増える売上" value={operations?.summary.potentialRevenue ?? null} unit="円" detail={`この${(operations?.summary.unmatched ?? 0).toLocaleString('ja-JP')}件ぶん。分析にも入ります`} />
+            <KpiCard variant="v6" title="結びついていない" value={operations?.summary.unmatched ?? null} unit="件" detail="確認待ちの注文・会員" badge="要対応" />
+            <KpiCard variant="v6" title="候補が見つかった" value={candidateCount} unit="件" detail="" help="名前や電話が近い人がいます" />
+            <KpiCard variant="v6" title="自動で結びついた" value={operations?.summary.linked ?? null} unit="件" detail="" help="同じ人として結びついた会員です" />
+            <KpiCard variant="v6" title="結びつけると増える売上" value={operations?.summary.potentialRevenue ?? null} unit="円" detail={`この${(operations?.summary.unmatched ?? 0).toLocaleString('ja-JP')}件ぶん。分析にも入ります`} />
           </div>
 
           <NoteBar help="メールアドレスか電話番号が同じなら自動で結びつきます" helpLabel="自動で結びつく条件">メールアドレスか電話番号が同じなら、自動で結びつきます。どちらも違うときに、ここへ並びます。名前だけが同じ人は、別人のこともあるので自動では結びつけません。</NoteBar>
