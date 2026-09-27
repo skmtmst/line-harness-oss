@@ -212,6 +212,23 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
   const dailyOverview = inferDailySchedule(rules)
   const nonDailyCount = rules.length - dailyRules.length
 
+  /*
+    R95: 公開は公開専用口で行う。下書きの保存と公開を分け、どの入口からも
+    公開前検査と公開版の固定を通す。基本設定で公開中を選んだときは、
+    まず下書きとして保存し、そのあと公開専用口を呼ぶ。
+  */
+  const publishNow = async (webinarId: string): Promise<boolean> => {
+    try {
+      const editor = await webinarApi.editor(webinarId)
+      await webinarApi.publish(webinarId, editor.data.version)
+      router.push(`/webinars/published?id=${webinarId}`)
+      return true
+    } catch (err) {
+      setError(webinarErrorText(err, '公開できませんでした。確認ステップから公開してください。'))
+      return false
+    }
+  }
+
   /** 保存が完了したら true。失敗したら入力を残したまま false を返す。 */
   const save = async (): Promise<boolean> => {
     if (!initial && !selectedAccountId) {
@@ -233,13 +250,14 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
     }
     try {
       if (initial) {
-        const updated = await webinarApi.update(initial.id, input)
+        /* 公開中への切替は通常更新では送らない（サーバーも409で止める）。 */
+        const draftInput = isPublishing ? { ...input, status: baseline.status } : input
+        const updated = await webinarApi.update(initial.id, draftInput)
         /* 未保存判定の正本を送った内容へ進める。画面を畳まなくても印が消える。 */
-        setBaseline({ title, slug, status, durationMinutes, videoChoice, rules })
-        /* 公開したときは完了の面へ。**何が公開されたのかを最後に読ませる。** */
+        setBaseline({ title, slug, status: isPublishing ? baseline.status : status, durationMinutes, videoChoice, rules })
+        /* 公開するときは公開専用口へ。**何が公開されたのかを最後に読ませる。** */
         if (isPublishing) {
-          router.push(`/webinars/published?id=${updated.data.id}`)
-          return true
+          return publishNow(updated.data.id)
         }
         /* 編集画面の段の中では、一覧へ戻さず新しい中身を親へ返す。 */
         if (onSaved) {
@@ -249,9 +267,13 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
         router.push('/webinars')
         return true
       }
-      const created = await webinarApi.create(input)
-      /* 作ってすぐ公開したときも、完了の面へ。 */
-      router.push(isPublishing ? `/webinars/published?id=${created.data.id}` : `/webinars/edit?id=${created.data.id}`)
+      /* 作るときに公開中は送らない（サーバーも422で止める）。 */
+      const created = await webinarApi.create(isPublishing ? { ...input, status: 'draft' } : input)
+      /* 作ってすぐ公開するときも、公開専用口を通して完了の面へ。 */
+      if (isPublishing) {
+        return publishNow(created.data.id)
+      }
+      router.push(`/webinars/edit?id=${created.data.id}`)
       return true
     } catch (err) {
       setError(webinarErrorText(err, '保存できませんでした。入力を見直してください。'))

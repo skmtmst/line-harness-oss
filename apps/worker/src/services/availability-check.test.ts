@@ -29,6 +29,8 @@ interface StubData {
   staff?: Array<{ id: string; display_name: string; is_designation_optional: number }>;
   shifts?: Array<{ staff_id: string; work_date: string; start_time: string; end_time: string }>;
   rules?: Array<{ staff_id: string; weekday: number; start_time: string; end_time: string }>;
+  breaks?: Array<{ staff_id: string; weekday: number; start_time: string; end_time: string }>;
+  breakDates?: Array<{ staff_id: string; work_date: string; start_time: string; end_time: string }>;
   bookings?: Array<{
     staff_id: string;
     menu_id?: string;
@@ -97,6 +99,12 @@ function stubDB(data: StubData): D1Database {
           }
           if (sql.includes('FROM staff_availability_rules')) {
             return { results: data.rules ?? [] };
+          }
+          if (sql.includes('FROM staff_break_dates')) {
+            return { results: data.breakDates ?? [] };
+          }
+          if (sql.includes('FROM staff_breaks')) {
+            return { results: data.breaks ?? [] };
           }
           if (sql.includes('FROM bookings')) {
             return { results: data.bookings ?? [] };
@@ -415,6 +423,41 @@ describe('explainBookingSlot', () => {
     const s2 = result.per_staff.find((staff) => staff.staff_id === 'S2');
     expect(s2?.bookable).toBe(false);
     expect(s2?.reasons).toEqual(['outside_working']);
+  });
+
+  test('曜日指定の休憩中 → 列挙と確定前判定の両方で取れない(R164)', async () => {
+    // 2026-05-09 は土曜（weekday=6）。勤務 10:00-14:00 のうち 12:00-13:00 が休憩。
+    const data: StubData = {
+      menu: MENU_BASIC,
+      staff: STAFF_S1,
+      shifts: [{ staff_id: 'S1', work_date: DAY, start_time: '10:00', end_time: '14:00' }],
+      breaks: [{ staff_id: 'S1', weekday: 6, start_time: '12:00', end_time: '13:00' }],
+    };
+    expect((await check(data, '12:00')).bookable).toBe(false);
+    expect(await actuallyBookable(data, '12:00')).toBe(false);
+    // 休憩の前後は取れる。両方の口で一致する。
+    expect((await check(data, '10:00')).bookable).toBe(true);
+    expect(await actuallyBookable(data, '10:00')).toBe(true);
+    expect(await actuallyBookable(data, '11:00')).toBe(true);
+    expect(await actuallyBookable(data, '13:00')).toBe(true);
+  });
+
+  test('その日だけの休憩中 → 列挙と確定前判定の両方で取れない(R164)', async () => {
+    const data: StubData = {
+      menu: MENU_BASIC,
+      staff: STAFF_S1,
+      shifts: [{ staff_id: 'S1', work_date: DAY, start_time: '10:00', end_time: '14:00' }],
+      breakDates: [{ staff_id: 'S1', work_date: DAY, start_time: '12:00', end_time: '13:00' }],
+    };
+    expect((await check(data, '12:00')).bookable).toBe(false);
+    expect(await actuallyBookable(data, '12:00')).toBe(false);
+    expect(await actuallyBookable(data, '10:00')).toBe(true);
+    // 別の日の休憩は効かない。
+    const otherDay: StubData = {
+      ...data,
+      breakDates: [{ staff_id: 'S1', work_date: '2026-05-10', start_time: '12:00', end_time: '13:00' }],
+    };
+    expect(await actuallyBookable(otherDay, '12:00')).toBe(true);
   });
 
   test('全員が取れないとき理由は全担当分の和集合', async () => {

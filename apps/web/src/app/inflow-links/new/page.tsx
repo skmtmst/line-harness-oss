@@ -423,7 +423,7 @@ export default function NewInflowLinkPage() {
 
     </CreatePage>
 
-    <ConfirmDialog
+    <ConfirmDialog primaryAction="cancel"
       open={leaveTarget !== null}
       title="保存していない変更があります"
       description="このまま移動すると、入力した流入リンクは失われます。保存せずに移動しますか？"

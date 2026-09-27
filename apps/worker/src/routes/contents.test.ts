@@ -1771,7 +1771,7 @@ describe('共通情報', () => {
     });
     expect(preview.status).toBe(200);
     const { impactProof } = (await preview.json() as { data: { impactProof: string } }).data;
-    const res = await req('/api/common-vars/cv-1?accountId=account-1', 'PATCH', { value: '11-20', impactProof });
+    const res = await req('/api/common-vars/cv-1?accountId=account-1', 'PATCH', { value: '11-20', impactProof, changeReason: '理由' });
     expect(res.status).toBe(200);
   });
 
@@ -1863,7 +1863,7 @@ describe('共通情報', () => {
     });
     const { impactProof } = (await preview.json() as { data: { impactProof: string } }).data;
     const patched = await req('/api/common-vars/cv-1?accountId=account-1', 'PATCH', {
-      value: 'true', expectedVersion: 3, impactProof,
+      value: 'true', expectedVersion: 3, impactProof, changeReason: '理由',
     });
     expect(patched.status).toBe(200);
     expect(mocks.updateCommonVar).toHaveBeenLastCalledWith(env.DB, 'cv-1', 'account-1', expect.objectContaining({
@@ -1951,7 +1951,7 @@ describe('共通情報', () => {
     const { impactProof: conflictProof } = (await conflictPreview.json() as { data: { impactProof: string } }).data;
     mocks.updateCommonVar.mockRejectedValueOnce(new MockCommonVarVersionConflictError(4));
     const conflict = await req('/api/common-vars/cv-1?accountId=account-1', 'PATCH', {
-      value: 'true', expectedVersion: 3, impactProof: conflictProof,
+      value: 'true', expectedVersion: 3, impactProof: conflictProof, changeReason: '理由',
     });
     expect(conflict.status).toBe(409);
     expect(await conflict.json()).toMatchObject({ code: 'common_var_version_conflict', currentVersion: 4 });
@@ -1963,7 +1963,7 @@ describe('共通情報', () => {
       accountId: 'account-1', nextValue: '11-20',
     });
     const { impactProof } = (await preview.json() as { data: { impactProof: string } }).data;
-    const res = await req('/api/common-vars/cv-1?accountId=account-1', 'PATCH', { value: '11-20', impactProof });
+    const res = await req('/api/common-vars/cv-1?accountId=account-1', 'PATCH', { value: '11-20', impactProof, changeReason: '理由' });
     expect(res.status).toBe(200);
     expect(mocks.updateCommonVar).toHaveBeenCalledWith(env.DB, 'cv-1', 'account-1', expect.objectContaining({
       expectedVersion: undefined,
@@ -1981,7 +1981,7 @@ describe('共通情報', () => {
       accountId: 'account-1', nextValue: '10-19',
     });
     const { impactProof } = (await preview.json() as { data: { impactProof: string } }).data;
-    expect((await req('/api/common-vars/cv-1?accountId=account-1', 'PATCH', { folderId: 'other-folder', impactProof })).status)
+    expect((await req('/api/common-vars/cv-1?accountId=account-1', 'PATCH', { folderId: 'other-folder', impactProof, changeReason: '理由' })).status)
       .toBe(400);
   });
 
@@ -2302,7 +2302,7 @@ describe('共通情報', () => {
         source_content: '{{var.shop_hours}}です', is_historical: 0,
       }],
     });
-    const res = await req('/api/common-vars/cv-1?accountId=account-1', 'DELETE');
+    const res = await req('/api/common-vars/cv-1?accountId=account-1&reason=%E9%81%8B%E7%94%A8%E7%B5%82%E4%BA%86', 'DELETE');
     expect(res.status).toBe(200);
     expect(mocks.deleteCommonVar).toHaveBeenCalled();
   });
@@ -2343,7 +2343,7 @@ describe('共通情報', () => {
       blockingTotal: 3,
       byKind: { ...EMPTY_COMMON_VAR_IMPACT.byKind, template: 2, broadcast: 1 },
     });
-    const res = await req('/api/common-vars/cv-1?accountId=account-1', 'DELETE');
+    const res = await req('/api/common-vars/cv-1?accountId=account-1&reason=%E9%81%8B%E7%94%A8%E7%B5%82%E4%BA%86', 'DELETE');
     expect(res.status).toBe(409);
     expect(mocks.deleteCommonVar).not.toHaveBeenCalled();
     expect(mocks.getCommonVarUsageImpact).toHaveBeenCalledWith(env.DB, 'shop_hours', 'account-1');
@@ -2355,15 +2355,15 @@ describe('共通情報', () => {
 
   it('使用先を確認できないときは0件扱いせず削除を止める', async () => {
     mocks.getCommonVarUsageImpact.mockRejectedValue(new Error('D1 unavailable'));
-    const res = await req('/api/common-vars/cv-1?accountId=account-1', 'DELETE');
+    const res = await req('/api/common-vars/cv-1?accountId=account-1&reason=%E9%81%8B%E7%94%A8%E7%B5%82%E4%BA%86', 'DELETE');
     expect(res.status).toBe(503);
     expect(mocks.deleteCommonVar).not.toHaveBeenCalled();
   });
 
   it('未使用なら影響確認後に削除できる', async () => {
-    const res = await req('/api/common-vars/cv-1?accountId=account-1', 'DELETE');
+    const res = await req('/api/common-vars/cv-1?accountId=account-1&reason=%E9%81%8B%E7%94%A8%E7%B5%82%E4%BA%86', 'DELETE');
     expect(res.status).toBe(200);
-    expect(mocks.deleteCommonVar).toHaveBeenCalledWith(env.DB, 'cv-1', 'account-1', 'u-1');
+    expect(mocks.deleteCommonVar).toHaveBeenCalledWith(env.DB, 'cv-1', 'account-1', 'u-1', '運用終了');
   });
 
   it('差し替え候補は専用APIから取得できる', async () => {
@@ -2396,6 +2396,7 @@ describe('共通情報', () => {
     const applied = await req('/api/common-vars/cv-1/replace', 'POST', {
       accountId: 'account-1', replacementId: 'cv-2', apply: true,
       expectedVersion: 3, expectedRevision: preview.data.revision,
+      changeReason: '旧キーの統廃合',
     });
     expect(applied.status).toBe(200);
     expect(await applied.json()).toMatchObject({
@@ -2429,7 +2430,7 @@ describe('共通情報', () => {
         source_content: '{{var.shop_hours}}でした', is_historical: 1,
       }],
     });
-    const res = await req('/api/common-vars/cv-1?accountId=account-1', 'DELETE');
+    const res = await req('/api/common-vars/cv-1?accountId=account-1&reason=%E9%81%8B%E7%94%A8%E7%B5%82%E4%BA%86', 'DELETE');
     expect(res.status).toBe(200);
     expect(mocks.deleteCommonVar).toHaveBeenCalled();
   });

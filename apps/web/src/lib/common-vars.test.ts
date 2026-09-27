@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { COMMON_VAR_VALUE_REQUIRED, commonVarValueError } from './common-vars'
+import { COMMON_VAR_VALUE_REQUIRED, commonVarValueError, isSecretLikeVarValue } from './common-vars'
 
 /*
  * VAR-06: 新規・編集・代替値・更新予約の送信前検査。
@@ -62,5 +62,37 @@ describe('commonVarValueError（送信前の型検査）', () => {
     expect(commonVarValueError('text', 'あ'.repeat(201))).toContain('200文字')
     expect(commonVarValueError('long_text', 'あ'.repeat(10_000))).toBeNull()
     expect(commonVarValueError('long_text', 'あ'.repeat(10_001))).toContain('10,000文字')
+  })
+})
+
+/*
+ * Q: 秘密らしい値は共通情報へ置かせない。判定はサーバの isSecretLikeValue
+ * と同じもの——画面側はAPIを呼ぶ前に欄へ戻すためだけの前段。
+ */
+describe('isSecretLikeVarValue（秘密値の見立て・Q）', () => {
+  it('有名な鍵の形と長い乱数を止める', () => {
+    // 鍵の形の文字列はリポジトリの秘匿情報スキャンに引っかかるため、
+    // 断片を連結して組み立てる。判定は組み立て後の文字列で行う。
+    for (const secret of [
+      ['sk', 'live', 'fakefake12345'].join('_'),
+      'AKIA' + 'FAKEFAKEFAKE1234',
+      'xoxb-' + '123456789012-ABCDEFGHIJKLM',
+      'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4',
+      'Xk9#mP2$vL8&qR4!nW7@tY3*uI6pO1sD5fGh',
+    ]) {
+      expect(isSecretLikeVarValue(secret), secret).toBe(true)
+    }
+  })
+
+  it('普通の案内文・URL・電話番号は通す', () => {
+    for (const normal of [
+      '営業時間 10:00-19:00',
+      'https://example.com/shop/notice?campaign=autumn2026',
+      '03-1234-5678',
+      '株式会社サンプル',
+      '利用規約を更新しました。'.repeat(40),
+    ]) {
+      expect(isSecretLikeVarValue(normal), normal).toBe(false)
+    }
   })
 })
