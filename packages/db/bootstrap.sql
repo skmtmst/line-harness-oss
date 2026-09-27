@@ -1417,6 +1417,19 @@ CREATE TABLE broadcast_insights (
   created_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
+CREATE TABLE broadcast_lifecycle_events (
+  id              TEXT PRIMARY KEY,
+  broadcast_id    TEXT NOT NULL REFERENCES broadcasts (id) ON DELETE CASCADE,
+  actor_staff_id  TEXT,
+  action          TEXT NOT NULL CHECK (action IN (
+    'created', 'updated', 'scheduled', 'send_started',
+    'stopped', 'resumed', 'retried', 'cancelled'
+  )),
+  reason          TEXT,
+  detail_json     TEXT,
+  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
 CREATE TABLE broadcast_message_assets (
   id              TEXT PRIMARY KEY,
   line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE,
@@ -1454,7 +1467,7 @@ CREATE TABLE broadcast_send_claims (
   settled_at      TEXT,
   error_code      TEXT,
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
-  updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), line_request_id TEXT,
   PRIMARY KEY (broadcast_id, friend_id)
 );
 
@@ -7027,6 +7040,9 @@ CREATE INDEX idx_broadcast_approval_events_broadcast
 CREATE INDEX idx_broadcast_insights_broadcast_id ON broadcast_insights(broadcast_id);
 
 CREATE INDEX idx_broadcast_insights_status ON broadcast_insights(status);
+
+CREATE INDEX idx_broadcast_lifecycle_events_broadcast
+  ON broadcast_lifecycle_events (broadcast_id, created_at DESC);
 
 CREATE INDEX idx_broadcast_message_assets_account_kind
   ON broadcast_message_assets(line_account_id, kind, updated_at DESC);
