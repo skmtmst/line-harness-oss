@@ -105,6 +105,7 @@ export type AuditAction =
   | 'webhook.incoming.secret.rotate'
   | 'webhook.incoming.delete'
   | 'webhook.incoming.unmatched.resolve'
+  | 'webhook.incoming.test'
   | 'webhook.outgoing.create'
   | 'webhook.outgoing.update'
   | 'webhook.outgoing.activate'
