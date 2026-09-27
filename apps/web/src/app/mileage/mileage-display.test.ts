@@ -5,6 +5,7 @@ import {
   formatMileageDate,
   formatMileageNumber,
   mileageEntryTypeLabel,
+  mileageRankProgress,
   mileageSourceLabel,
   mileageSourceNoteText,
   mileageStatusLabel,
@@ -62,5 +63,57 @@ describe('行動スコアの理由表示（IDEA-17）', () => {
 
   it('担当者が書いた日本語の理由はそのまま出す', () => {
     expect(actionScoreReasonLabel('問い合わせ対応のお詫び')).toBe('問い合わせ対応のお詫び')
+  })
+})
+
+describe('ランクの進み表示（R54）', () => {
+  it('未公開は最高到達と言わず、2行目は作り先の案内に譲る', () => {
+    // 口は rank も nextRank も null、理由は「公開中のランクがありません」を返す。
+    const result = mileageRankProgress({
+      rank: null,
+      rankReason: '公開中のランクがありません',
+      nextRankLabel: null,
+      milesToNextRank: null,
+    })
+    expect(result.headline).toBe('公開中のランクがありません')
+    expect(result.headline).not.toBe('いちばん上のランクです')
+    expect(result.detail).toBeNull()
+    expect(result.unpublished).toBe(true)
+  })
+
+  it('最高到達は「いちばん上」と言い、理由を2行目に出す', () => {
+    const result = mileageRankProgress({
+      rank: 'ゴールド',
+      rankReason: '5,000マイル以上',
+      nextRankLabel: null,
+      milesToNextRank: null,
+    })
+    expect(result.headline).toBe('いちばん上のランクです')
+    expect(result.detail).toBe('5,000マイル以上')
+    expect(result.unpublished).toBe(false)
+  })
+
+  it('次のランクがあるときは次と残りマイルを出す', () => {
+    const result = mileageRankProgress({
+      rank: null,
+      rankReason: '最初のランクに届いていません',
+      nextRankLabel: 'ブロンズ',
+      milesToNextRank: 800,
+    })
+    expect(result.headline).toBe('次は「ブロンズ」')
+    expect(result.detail).toBe('あと 800 マイル')
+    expect(result.unpublished).toBe(false)
+  })
+
+  it('取れていないときは確認できないと言い、未公開扱いにしない', () => {
+    const result = mileageRankProgress({
+      rank: undefined,
+      rankReason: undefined,
+      nextRankLabel: undefined,
+      milesToNextRank: undefined,
+    })
+    expect(result.headline).toBe('ランク情報を確認できません')
+    expect(result.detail).toBe('ランク情報を確認できません')
+    expect(result.unpublished).toBe(false)
   })
 })

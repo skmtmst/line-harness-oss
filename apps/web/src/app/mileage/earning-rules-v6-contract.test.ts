@@ -64,6 +64,9 @@ describe('V6 たまる決めごと（N46cQ）の画面', () => {
     expect(PAGE).toContain('ruleSummary?.grantedMiles')
     expect(PAGE).toContain('ruleSummary?.averageBalance')
     expect(PAGE).toContain('grantedMiles30d(rule)')
+    // R53: 決めごと行の30日額は台帳の実額。回数×今の下書き金額にしない。
+    expect(PAGE).toContain('rule.metrics30d.grantedMiles')
+    expect(PAGE).not.toContain('rule.metrics30d.granted * rule.draft.amount')
   })
 
   it('平均の分母と説明文の人数は同じ値を使う（MILEAGE-05）', () => {
