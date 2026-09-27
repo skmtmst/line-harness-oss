@@ -518,7 +518,9 @@ try {
     await addFolder.click()
     await page.getByRole('textbox', { name: /フォルダ名/ }).fill('来店・予約')
     await page.getByRole('button', { name: '追加する' }).click()
-    await page.getByRole('button', { name: /来店・予約/ }).waitFor()
+    // 行ボタンだけを待つ。先頭一致にしないと「フォルダ「来店・予約」の操作」
+    // （…ボタン）にも当たって strict mode violation になる。
+    await page.getByRole('button', { name: /^来店・予約/ }).waitFor()
     assert.equal(state.folderWrites.length, 1, '箱の作成を1回出す')
     assert.equal(state.folderWrites[0].body.kind, 'form', '箱の種類を送る')
     assert.equal(state.folderWrites[0].body.accountId, 'account-a', '選んだアカウントに付けて作る')
