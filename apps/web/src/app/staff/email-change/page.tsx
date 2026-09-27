@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
 import TargetMissing from '@/components/shared/target-missing'
 import { api } from '@/lib/api'
 
@@ -69,7 +70,7 @@ export default function StaffEmailChangePage() {
             <p className="mt-5 text-sm leading-7 text-ink-secondary">
               「変更を確定する」を押すと、このメールアドレスへの変更が完了します。
             </p>
-            {error && <p role="alert" className="mt-4 rounded-control bg-danger-bg p-4 text-sm text-danger">{error}</p>}
+            {error && <Notice tone="danger" message={error} className="mt-4" />}
             <div className="mt-6">
               <Button type="button" variant="primary" disabled={view === 'submitting'} onClick={() => void applyChange()}>
                 {view === 'submitting' ? '確定中…' : '変更を確定する'}
@@ -78,10 +79,10 @@ export default function StaffEmailChangePage() {
           </>
         )}
         {view === 'complete' && (
-          <div className="mt-5 rounded-control border border-accent bg-accent-soft p-5">
-            <p className="font-bold text-accent-deep">メールアドレスを変更しました</p>
-            <p className="mt-2 text-sm leading-6 text-ink-secondary">次回から新しいメールアドレスが使われます。</p>
-          </div>
+          <Notice tone="success" className="mt-5">
+            <p className="font-bold">メールアドレスを変更しました</p>
+            <p className="mt-2 text-sm leading-6">次回から新しいメールアドレスが使われます。</p>
+          </Notice>
         )}
       </section>
     </main>

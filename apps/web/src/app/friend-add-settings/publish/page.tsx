@@ -9,7 +9,9 @@ import type {
 } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import Card, { CardHeader } from '@/components/shared/card'
+import LinePreview from '@/components/shared/line-preview'
 import ListState from '@/components/shared/list-state'
+import Stepper from '@/components/shared/stepper'
 import TargetMissing from '@/components/shared/target-missing'
 import PageHeader from '@/components/shared/page-header'
 import { api, ApiError, type FriendAddRule } from '@/lib/api'
@@ -76,28 +78,6 @@ function routingVersionOf(rule: FriendAddRule): FriendAddRoutingVersion {
  * **どこまで済んでいるかが読めないと、戻ってよいのか分からない。**
  * 共通の部品はこの枝に無いので、この画面のぶんだけ置く。
  */
-function StepTrail({ steps, current, complete = false }: { steps: string[]; current: number; complete?: boolean }) {
-  return (
-    <ol className={styles.steps} aria-label="設定の進み">
-      {steps.map((label, index) => {
-        const done = complete || index + 1 < current
-        const now = !complete && index + 1 === current
-        return (
-          <li key={label} className={styles.step} aria-current={now ? 'step' : undefined}>
-            <span className={`${styles.stepMark} ${done ? styles.stepDone : now ? styles.stepNow : ''}`}>
-              {done ? '✓' : index + 1}
-            </span>
-            <span className={styles.stepText}>
-              <span className={styles.stepNo}>STEP {index + 1}</span>
-              <span className={styles.stepLabel}>{label}</span>
-            </span>
-          </li>
-        )
-      })}
-    </ol>
-  )
-}
-
 function FriendAddPublishInner() {
   const searchParams = useSearchParams()
   const { selectedAccountId } = useAccount()
@@ -328,7 +308,7 @@ function FriendAddPublishInner() {
         title="友だち追加時・最終確認"
         description="有効化すると、新しく追加された友だちへ初回案内を送ります。"
       />
-      <StepTrail steps={STEPS} current={5} />
+      <Stepper label="設定の進み" steps={STEPS.map((label, index) => ({ label, state: index + 1 < 5 ? 'done' as const : 'current' as const }))} />
 
       <div className={styles.split}>
         <div className={styles.main}>
@@ -403,20 +383,17 @@ function FriendAddPublishInner() {
         </div>
 
         <aside className={styles.side}>
-          <Card layout="vertical" className={styles.section} data-friend-add-part="preview">
-            <CardHeader title="LINEプレビュー" />
-            <p className="text-center text-xs text-ink-secondary">
-              {draft.routing.firstTime.timing === 'immediate'
-                ? '登録直後から5分以内に届きます'
-                : '設定したシナリオの時刻に届きます'}
-            </p>
-            <div className="mx-auto w-full max-w-xs overflow-hidden rounded-card border border-hairline bg-line-preview">
-              <div className="border-b border-hairline bg-canvas px-3 py-2.5 text-center text-xs font-bold text-ink">LINE公式アカウント</div>
-              <div className="m-3 my-7 w-4/5 rounded-card bg-canvas p-3 text-xs leading-6 text-ink-secondary">
-                {ruleDetail?.rule.definition.messageText || `シナリオ「${ruleDetail?.rule.scenarioName ?? '選択中'}」を開始します。`}
-              </div>
+          {/* LINEの見た目の枠は共通部品 `LinePreview`（B-6）。白い箱はやめる。 */}
+          <LinePreview
+            caption={draft.routing.firstTime.timing === 'immediate'
+              ? '登録直後から5分以内に届きます'
+              : '設定したシナリオの時刻に届きます'}
+            accountName="LINE公式アカウント"
+          >
+            <div className="rounded-card bg-canvas p-3 text-xs leading-6 text-ink-secondary">
+              {ruleDetail?.rule.definition.messageText || `シナリオ「${ruleDetail?.rule.scenarioName ?? '選択中'}」を開始します。`}
             </div>
-          </Card>
+          </LinePreview>
           <Card layout="vertical" className={styles.section} data-friend-add-part="side">
             <CardHeader title="設定サマリー" meta="有効化する内容です。" />
             <div className={styles.rows}>
@@ -488,7 +465,7 @@ function PublishedView({ result, detail, accountId }: { result: FriendAddRouting
         title="友だち追加時・有効化完了"
         description="新しく追加された友だちへ、流入経路に合った初回案内を自動で送ります。"
       />
-      <StepTrail steps={STEPS} current={5} complete />
+      <Stepper label="設定の進み" steps={STEPS.map((label) => ({ label, state: 'done' as const }))} />
 
       <div className={styles.split}>
         <Card layout="vertical" className={styles.section} data-friend-add-part="done">

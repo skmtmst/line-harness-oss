@@ -326,13 +326,13 @@ export function ProfileTab({ accountId, go }: { accountId: string; go: ProfileNa
 
 function TimeSelect({ value, onChange, kind, label }: { value: string; onChange: (v: string) => void; kind: 'open' | 'close'; label: string }) {
   return (
-    <span className="relative inline-flex">
+    <span className="relative inline-flex min-w-0 shrink" style={{ flex: '1 1 84px', maxWidth: 120 }}>
       <select
         aria-label={label}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="bg-canvas text-ink h-9 appearance-none rounded-control border pr-8 pl-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-status-info"
-        style={{ width: 120, borderColor: 'var(--color-hairline)' }}
+        className="bg-canvas text-ink h-9 w-full appearance-none rounded-control border pr-7 pl-2.5 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-status-info"
+        style={{ borderColor: 'var(--color-hairline)' }}
       >
         {TIME_OPTIONS.map((t) => <option key={t} value={t}>{kind === 'close' && t === '00:00' ? '24:00' : t}</option>)}
       </select>
@@ -429,7 +429,7 @@ export function HoursEditor({ accountId, mode, initialDate, go }: { accountId: s
     if (mode === 'text') proposal = { source: 'text', text: text.trim() }
     else if (mode === 'calendar') {
       const list = Object.values(days)
-      const bad = list.map((d) => (d.closed ? null : d.periods.length === 0 ? '営業する日は枠を1つ以上入れてください' : periodsProblem(d.periods))).find(Boolean)
+      const bad = list.map((d) => (d.remove || d.closed ? null : d.periods.length === 0 ? '営業する日は枠を1つ以上入れてください' : periodsProblem(d.periods))).find(Boolean)
       if (bad) { setActionError(bad); return }
       proposal = { source: 'calendar', days: list }
     } else {
@@ -473,44 +473,18 @@ export function HoursEditor({ accountId, mode, initialDate, go }: { accountId: s
   )
 
   // ---- 右側「変更対象の確認」 ----
-  const targetDate = mode === 'calendar' ? selectedDate : today.date
-  const targetWeekday = weekdayOf(targetDate || today.date)
   const editedDates = Object.keys(days).sort()
-  const side = mode === 'weekly'
-    ? (
-        <ChangeTargetCard
-          storeName={storeName}
-          today={today.date}
-          timeZone={timeZone}
-          title="変更した曜日"
-          current={weeklyChanged.length === 0 ? <span className="text-ink-faint text-sm font-normal">まだ変更はありません</span> : weeklyChanged.map((d) => { const [b, a] = periodDiff(profile.regularHours[d] ?? [], weekly[d] ?? []); return <p key={d}>{WEEKDAY_JA[d]}曜 {b} → {a}</p> })}
-          note="通常の営業時間（毎週）として変更します。変えていない曜日はそのままです。"
-          hint="特定の日だけ変えたい場合は「カレンダーで指定」から設定してください。"
-        />
-      )
-    : mode === 'calendar'
-      ? (
-          <ChangeTargetCard
-            storeName={storeName}
-            today={today.date}
-            timeZone={timeZone}
-            title={`${formatYmdJa(targetDate)}の現在の営業時間`}
-            current={(() => { const s = profile.specialHours.find((x) => x.date === targetDate); const periods = s ? (s.closed ? [] : s.periods) : profile.regularHours[targetWeekday] ?? []; return periods.length ? periods.map((p, i) => <p key={i}>{periods.length > 1 ? (i === 0 ? '昼 ' : i === 1 ? '夜 ' : '') : ''}{p.open}–{p.close === '00:00' ? '24:00' : p.close}</p>) : <p>{s ? '休業（特別営業時間）' : '定休日'}</p> })()}
-            note={editedDates.length ? `${editedDates.map((d) => formatYmdShort(d)).join('・')}だけの特別営業時間として変更します。ほかの日は変わりません。` : `${formatYmdJa(targetDate)}だけの特別営業時間として変更します。ほかの日は変わりません。`}
-            hint="毎週変えたい場合は「毎週の営業時間」から設定してください。"
-          />
-        )
-      : (
-          <ChangeTargetCard
-            storeName={storeName}
-            today={today.date}
-            timeZone={timeZone}
-            title={`現在の${WEEKDAY_JA[today.weekday]}曜日`}
-            current={(profile.regularHours[today.weekday] ?? []).length ? (profile.regularHours[today.weekday] ?? []).map((p, i, arr) => <p key={i}>{arr.length > 1 ? (i === 0 ? '昼 ' : i === 1 ? '夜 ' : '') : ''}{p.open}–{p.close === '00:00' ? '24:00' : p.close}</p>) : <p>定休日</p>}
-            note="文章から「いつ・何時に」を読み取り、1日だけの特別営業時間または毎週の営業時間の変更案を作ります。"
-            hint="毎週変えたい場合は「毎週の営業時間」から設定してください。"
-          />
-        )
+  const side = (
+    <ChangeTargetCard
+      storeName={storeName}
+      today={today.date}
+      timeZone={timeZone}
+      title={`現在の${WEEKDAY_JA[today.weekday]}曜日`}
+      current={(profile.regularHours[today.weekday] ?? []).length ? (profile.regularHours[today.weekday] ?? []).map((p, i, arr) => <p key={i}>{arr.length > 1 ? (i === 0 ? '昼 ' : i === 1 ? '夜 ' : '') : ''}{p.open}–{p.close === '00:00' ? '24:00' : p.close}</p>) : <p>定休日</p>}
+      note="文章から「いつ・何時に」を読み取り、1日だけの特別営業時間または毎週の営業時間の変更案を作ります。"
+      hint="毎週変えたい場合は「毎週の営業時間」から設定してください。"
+    />
+  )
 
   // ---- 左側 ----
   let main: ReactNode
@@ -552,16 +526,21 @@ export function HoursEditor({ accountId, mode, initialDate, go }: { accountId: s
     const maxDate = addDays(today.date, 366)
     const shiftMonth = (delta: number) => { const d = new Date(Date.UTC(y, m - 1 + delta, 1)); setMonth(`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`) }
     const special = (date: string) => profile.specialHours.find((s) => s.date === date) ?? null
-    const currentFor = (date: string): GoogleDayHours => days[date] ?? (() => { const s = special(date); return s ? { date, closed: s.closed, periods: s.periods } : { date, closed: false, periods: profile.regularHours[weekdayOf(date)] ?? [] } })()
+    const regularFor = (date: string): GoogleDayHours => ({ date, closed: (profile.regularHours[weekdayOf(date)] ?? []).length === 0, periods: profile.regularHours[weekdayOf(date)] ?? [] })
+    const originalFor = (date: string): GoogleDayHours => { const s = special(date); return s ? { date, closed: s.closed, periods: s.periods, special: true } : { ...regularFor(date), special: false } }
+    const currentFor = (date: string): GoogleDayHours => days[date] ?? originalFor(date)
     const edited = selectedDate ? currentFor(selectedDate) : null
+    const original = selectedDate ? originalFor(selectedDate) : null
     const setDay = (next: GoogleDayHours) => setDays((prev) => ({ ...prev, [next.date]: next }))
     const problem = edited && !edited.closed ? periodsProblem(edited.periods) : null
+    const describe = (d: GoogleDayHours, closedLabel: string) => (d.closed || d.periods.length === 0 ? closedLabel : d.periods.map((p, i, arr) => `${arr.length > 1 ? (i === 0 ? '昼 ' : i === 1 ? '夜 ' : '') : ''}${p.open}–${p.close === '00:00' ? '24:00' : p.close}`).join(' ／ '))
 
     main = (
       <div className="flex min-w-0 flex-col gap-4">
         <h3 className="text-lead font-bold">日付を選んで、その日の営業時間を決めます</h3>
-        <div className="gb-calendar-grid grid min-w-0 grid-cols-1 gap-6">
-          <div className="border-hairline bg-canvas flex flex-col gap-2 rounded-card border p-4" role="group" aria-label="カレンダー">
+        <p className="text-ink-faint text-label">基準日：{formatYmdJa(today.date, true)}・{timeZone === 'Asia/Tokyo' ? '日本時間（Asia/Tokyo）' : timeZone}・{storeName}</p>
+        <div className="gb-calendar-grid grid min-w-0 grid-cols-1 items-start gap-6">
+          <div className="border-hairline bg-canvas flex w-full flex-col gap-2 rounded-card border p-4" style={{ maxWidth: 480 }} role="group" aria-label="カレンダー">
             <div className="flex items-center justify-between">
               <button type="button" onClick={() => shiftMonth(-1)} aria-label="前の月" className="bg-canvas text-ink-secondary flex h-8 w-8 items-center justify-center rounded-control border hover:bg-canvas-sunken" style={{ borderColor: 'var(--color-hairline)' }}><ChevronLeft size={16} /></button>
               <span className="text-base font-bold">{y}年{m}月</span>
@@ -580,7 +559,7 @@ export function HoursEditor({ accountId, mode, initialDate, go }: { accountId: s
                   const changed = Boolean(days[date])
                   const selected = date === selectedDate
                   const isToday = date === today.date
-                  const mark = changed ? (days[date].closed ? '休業（変更）' : '変更') : s ? (s.closed ? '休業' : formatPeriods(s.periods).replace(/:00/g, '')) : ''
+                  const mark = changed ? (days[date].remove ? '外す' : days[date].closed ? '休業（変更）' : '変更') : s ? (s.closed ? '休業' : formatPeriods(s.periods).replace(/:00/g, '')) : ''
                   return (
                     <button
                       key={date}
@@ -599,25 +578,33 @@ export function HoursEditor({ accountId, mode, initialDate, go }: { accountId: s
                 })}
               </div>
             ))}
-            <p className="text-caption flex flex-wrap gap-4"><span className="text-status-warn-deep">■ 特別営業時間あり</span><span className="text-ink-faint">枠線＝今日</span><span className="text-ink-faint">過去の日付は選べません</span></p>
+            <p className="text-caption flex flex-wrap gap-4"><span className="text-status-warn-deep">■ 特別営業時間あり</span><span className="text-status-warn-deep">■ 外す予定</span><span className="text-ink-faint">枠線＝今日</span><span className="text-ink-faint">過去の日付は選べません</span></p>
           </div>
 
-          {edited ? (
-            <div className="flex min-w-0 flex-col gap-3" role="group" aria-label={`${formatYmdJa(edited.date)}の営業時間`}>
+          {edited && original ? (
+            <section className="border-hairline bg-canvas flex min-w-0 flex-col gap-3 rounded-card border p-5" aria-label={`${formatYmdJa(edited.date)}の営業時間`}>
               <h4 className="text-base font-bold">{formatYmdJa(edited.date)}の営業時間</h4>
+              <p className="text-sm"><span className="text-ink-faint mr-2 text-caption">現在</span><span className="font-semibold">{describe(original, original.special ? '休業（特別営業時間）' : '定休日')}</span>{original.special ? <span className="text-status-warn-deep ml-2 text-caption">（特別営業時間として登録済み）</span> : null}</p>
+              {edited.remove ? (
+                <>
+                  <NoteBar tone="warn">この日の特別営業時間を外し、通常の営業時間（{describe(regularFor(edited.date), '定休日')}）に戻します。</NoteBar>
+                  <div><Button onClick={() => setDays((prev) => { const next = { ...prev }; delete next[edited.date]; return next })}>外すのをやめる</Button></div>
+                </>
+              ) : (
+                <>
               <div className="flex items-center gap-3">
-                <Toggle checked={edited.closed} label="この日は休業にする" onChange={(next) => setDay({ ...edited, closed: next, periods: next ? [] : (profile.regularHours[weekdayOf(edited.date)] ?? []) })} />
+                <span className="shrink-0"><Toggle checked={edited.closed} label="この日は休業にする" onChange={(next) => setDay({ ...edited, closed: next, periods: next ? [] : (profile.regularHours[weekdayOf(edited.date)] ?? []) })} /></span>
                 <span className="text-sm">この日は休業にする（時間の枠をすべて外します）</span>
               </div>
               {!edited.closed ? (
                 <>
                   {edited.periods.map((p, i) => (
-                    <div key={i} className="flex flex-wrap items-center gap-2">
-                      <span className="text-label w-6 font-semibold">枠{i + 1}</span>
+                    <div key={i} className="flex items-center gap-2">
+                      <span className="text-label w-6 shrink-0 font-semibold">枠{i + 1}</span>
                       <TimeSelect kind="open" label={`枠${i + 1}の開始`} value={p.open} onChange={(v) => setDay({ ...edited, periods: edited.periods.map((x, j) => (j === i ? { ...x, open: v } : x)) })} />
                       <span className="text-ink-faint">–</span>
                       <TimeSelect kind="close" label={`枠${i + 1}の終了`} value={p.close} onChange={(v) => setDay({ ...edited, periods: edited.periods.map((x, j) => (j === i ? { ...x, close: v } : x)) })} />
-                      <button type="button" aria-label={`枠${i + 1}を削除`} onClick={() => setDay({ ...edited, periods: edited.periods.filter((_, j) => j !== i) })} className="text-ink-faint flex h-8 w-8 items-center justify-center rounded-control hover:bg-canvas-sunken"><X size={16} /></button>
+                      <button type="button" aria-label={`枠${i + 1}を削除`} onClick={() => setDay({ ...edited, periods: edited.periods.filter((_, j) => j !== i) })} className="text-ink-faint flex h-8 w-8 shrink-0 items-center justify-center rounded-control hover:bg-canvas-sunken"><X size={16} /></button>
                     </div>
                   ))}
                   <div><Button onClick={() => setDay({ ...edited, periods: [...edited.periods, { open: edited.periods.length ? edited.periods[edited.periods.length - 1].close : '11:00', close: '22:00' }] })} disabled={edited.periods.length >= 3}><Plus size={16} />枠を追加（1日3枠まで）</Button></div>
@@ -626,53 +613,84 @@ export function HoursEditor({ accountId, mode, initialDate, go }: { accountId: s
                 </>
               ) : null}
               <p className="text-ink-faint text-caption">15分刻みで選べます。翌日にまたぐ時間（例：18:00–02:00）はそのまま入力できます。</p>
-              {days[edited.date] ? <div><Button size="field" onClick={() => setDays((prev) => { const next = { ...prev }; delete next[edited.date]; return next })}>この日の変更を取り消す</Button></div> : null}
-            </div>
+              {original.special ? (
+                <div data-design-node="Q9GwD2" className="border-hairline flex flex-wrap items-center gap-3 border-t pt-3">
+                  <Button onClick={() => setDay({ ...regularFor(edited.date), remove: true })}>特別営業時間を外す（通常の営業時間に戻す）</Button>
+                  <span className="text-ink-faint text-caption">通常の営業時間：{describe(regularFor(edited.date), '定休日')}</span>
+                </div>
+              ) : null}
+                </>
+              )}
+            </section>
           ) : null}
         </div>
+
+        {editedDates.length > 0 ? (
+          <section className="border-hairline bg-canvas flex flex-col gap-2 rounded-card border p-4" aria-label="変更する日の一覧">
+            <h4 className="text-sm font-bold">変更する日（{editedDates.length}日）</h4>
+            {editedDates.map((date) => (
+              <div key={date} className="flex flex-wrap items-center gap-3 text-sm">
+                <button type="button" className="font-semibold underline-offset-2 hover:underline" onClick={() => { setSelectedDate(date); setMonth(date.slice(0, 7)) }}>{formatYmdShort(date)}</button>
+                {days[date].remove ? (
+                  <>
+                    <span className="text-status-warn-deep font-bold">特別営業時間を外す</span>
+                    <span className="text-ink-faint">→</span>
+                    <span className="text-ink-faint">通常 {describe(regularFor(date), '定休日')}</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-ink-faint">{describe(originalFor(date), '定休日')}</span>
+                    <span className="text-ink-faint">→</span>
+                    <span className="text-accent-deep font-bold">{describe(days[date], '休業')}</span>
+                  </>
+                )}
+                <span className="grow" />
+                <Button size="field" onClick={() => setDays((prev) => { const next = { ...prev }; delete next[date]; return next })}>この日の変更を取り消す</Button>
+              </div>
+            ))}
+          </section>
+        ) : null}
         <InfoNote>ここで決めた内容は、その日だけの特別営業時間になります。「変更案を確認」を押すまでGoogleの営業時間は変わりません。</InfoNote>
       </div>
     )
   } else {
-    const maxCols = Math.max(2, ...WEEKDAYS.map((d) => (weekly[d] ?? []).length))
     const setDayPeriods = (d: GoogleWeekday, periods: GoogleHoursPeriod[]) => setWeekly({ ...weekly, [d]: periods })
     main = (
       <div className="flex min-w-0 flex-col gap-4">
         <h3 className="text-lead font-bold">毎週の営業時間（通常の営業時間）を決めます</h3>
+        <p className="text-ink-faint text-label">基準日：{formatYmdJa(today.date, true)}・{timeZone === 'Asia/Tokyo' ? '日本時間（Asia/Tokyo）' : timeZone}・{storeName}</p>
         <div className="border-hairline overflow-hidden rounded-card border" role="table" aria-label="曜日ごとの営業時間">
-          <div className="bg-surface-pearl text-ink-faint grid items-center px-4 text-caption font-semibold" style={{ height: 40, gridTemplateColumns: `72px 96px repeat(${maxCols}, minmax(0, 290px))` }} role="row">
-            <span role="columnheader">曜日</span><span role="columnheader">定休日</span>
-            {Array.from({ length: maxCols }, (_, i) => <span key={i} role="columnheader">枠{i + 1}{i === 0 ? '（昼など）' : i === 1 ? '（夜など）' : ''}</span>)}
+          <div className="bg-surface-pearl text-ink-faint flex items-center gap-3 px-4 text-caption font-semibold" style={{ height: 40 }} role="row">
+            <span role="columnheader" className="shrink-0" style={{ width: 72 }}>曜日</span><span role="columnheader" className="shrink-0" style={{ width: 64 }}>定休日</span><span role="columnheader">営業時間の枠（開始–終了、1日3枠まで）</span>
           </div>
           {WEEKDAYS.map((d) => {
             const periods = weekly[d] ?? []
             const closed = periods.length === 0
             const changed = weeklyChanged.includes(d)
             return (
-              <div key={d} role="row" className={`border-hairline grid items-center border-t px-4 ${changed ? 'bg-accent-soft' : 'bg-canvas'}`} style={{ minHeight: 56, gridTemplateColumns: `72px 96px repeat(${maxCols}, minmax(0, 290px))` }}>
-                <span role="rowheader" className={`flex items-center gap-2 text-sm font-bold ${d === 'SATURDAY' ? 'text-status-info' : d === 'SUNDAY' ? 'text-status-danger' : ''}`}>{WEEKDAY_JA[d]}曜{changed ? <span className="text-accent-deep text-nano font-semibold">変更</span> : null}</span>
-                <span role="cell"><Toggle checked={closed} label={`${WEEKDAY_JA[d]}曜を定休日にする`} onChange={(next) => setDayPeriods(d, next ? [] : (profile.regularHours[d]?.length ? profile.regularHours[d] : [{ open: '11:00', close: '22:00' }]))} /></span>
-                {Array.from({ length: maxCols }, (_, i) => {
-                  const p = periods[i]
-                  if (closed) return <span key={i} role="cell" className="text-ink-faint text-sm">定休日</span>
-                  if (!p) {
-                    return i === periods.length && periods.length < 3
-                      ? <span key={i} role="cell"><Button size="field" onClick={() => setDayPeriods(d, [...periods, { open: periods[periods.length - 1]?.close ?? '17:00', close: '22:00' }])}><Plus size={14} />枠を追加</Button></span>
-                      : <span key={i} role="cell" />
-                  }
-                  return (
-                    <span key={i} role="cell" className="flex items-center gap-2 py-2.5">
+              <div key={d} role="row" className={`border-hairline flex items-center gap-3 border-t px-4 py-2 ${changed ? 'bg-accent-soft' : 'bg-canvas'}`} style={{ minHeight: 54 }}>
+                <span role="rowheader" className={`flex shrink-0 items-center gap-1 text-sm font-bold ${d === 'SATURDAY' ? 'text-status-info' : d === 'SUNDAY' ? 'text-status-danger' : ''}`} style={{ width: 72 }}>{WEEKDAY_JA[d]}曜{changed ? <span className="text-accent-deep text-nano font-semibold">変更</span> : null}</span>
+                <span role="cell" className="shrink-0" style={{ width: 64 }}><Toggle checked={closed} label={`${WEEKDAY_JA[d]}曜を定休日にする`} onChange={(next) => setDayPeriods(d, next ? [] : (profile.regularHours[d]?.length ? profile.regularHours[d] : [{ open: '11:00', close: '22:00' }]))} /></span>
+                <span role="cell" className="flex min-w-0 grow flex-wrap items-center gap-4">
+                  {closed ? <span className="text-ink-faint text-sm">定休日</span> : periods.map((p, i) => (
+                    <span key={i} className="flex items-center gap-2">
                       <TimeSelect kind="open" label={`${WEEKDAY_JA[d]}曜 枠${i + 1}の開始`} value={p.open} onChange={(v) => setDayPeriods(d, periods.map((x, j) => (j === i ? { ...x, open: v } : x)))} />
                       <span className="text-ink-faint">–</span>
                       <TimeSelect kind="close" label={`${WEEKDAY_JA[d]}曜 枠${i + 1}の終了`} value={p.close} onChange={(v) => setDayPeriods(d, periods.map((x, j) => (j === i ? { ...x, close: v } : x)))} />
-                      {periods.length > 1 && i === periods.length - 1 ? <button type="button" aria-label={`${WEEKDAY_JA[d]}曜 枠${i + 1}を削除`} onClick={() => setDayPeriods(d, periods.filter((_, j) => j !== i))} className="text-ink-faint flex h-8 w-8 items-center justify-center rounded-control hover:bg-canvas-sunken"><X size={16} /></button> : null}
+                      {periods.length > 1 && i === periods.length - 1 ? <button type="button" aria-label={`${WEEKDAY_JA[d]}曜 枠${i + 1}を削除`} onClick={() => setDayPeriods(d, periods.filter((_, j) => j !== i))} className="text-ink-faint flex h-7 w-7 shrink-0 items-center justify-center rounded-control hover:bg-canvas-sunken"><X size={16} /></button> : null}
                     </span>
-                  )
-                })}
+                  ))}
+                  {!closed && periods.length < 3 ? <Button size="field" onClick={() => setDayPeriods(d, [...periods, { open: periods[periods.length - 1]?.close ?? '17:00', close: '22:00' }])}><Plus size={14} />枠を追加</Button> : null}
+                </span>
               </div>
             )
           })}
         </div>
+        <section className="border-hairline bg-canvas flex flex-col gap-2 rounded-card border p-4" aria-label="変更した曜日">
+          <h4 className="text-sm font-bold">変更した曜日（{weeklyChanged.length}）</h4>
+          {weeklyChanged.length === 0 ? <p className="text-ink-faint text-sm">まだ変更はありません。</p> : weeklyChanged.map((d) => { const [b, a] = periodDiff(profile.regularHours[d] ?? [], weekly[d] ?? []); return <p key={d} className="flex flex-wrap items-center gap-3 text-sm"><span className="font-semibold">{WEEKDAY_JA[d]}曜</span><span className="text-ink-faint">{b}</span><span className="text-ink-faint">→</span><span className="text-accent-deep font-bold">{a}</span></p> })}
+          <p className="text-ink-faint text-caption">変えていない曜日はそのままです。特定の日だけ変えたい場合は「カレンダーで指定」から設定してください。</p>
+        </section>
         <p className="text-ink-faint text-caption">15分刻みで選べます。翌日にまたぐ時間（例：18:00–02:00）はそのまま入力できます。特別営業時間が設定されている日は、そちらが優先されます。</p>
         <InfoNote>ここで変えた曜日は、毎週その時間になります。「変更案を確認」を押すまでGoogleの営業時間は変わりません。</InfoNote>
       </div>
@@ -686,10 +704,12 @@ export function HoursEditor({ accountId, mode, initialDate, go }: { accountId: s
       {modeTabs}
       {data.closed ? <NoteBar tone="danger">Google側で「臨時休業」または「閉業」になっているため、営業時間は変更できません。</NoteBar> : null}
       {actionError ? <NoteBar tone="danger">{actionError}</NoteBar> : null}
-      <div className="gb-profile-grid grid min-w-0 grid-cols-1 gap-6">
-        {main}
-        {side}
-      </div>
+      {mode === 'text' ? (
+        <div className="gb-profile-grid grid min-w-0 grid-cols-1 gap-6">
+          {main}
+          {side}
+        </div>
+      ) : main}
       <StickyBar actions={<><Button onClick={clear} disabled={busy || !dirty}>入力をクリア</Button><Button variant="primary" onClick={() => void submit()} disabled={!canSubmit}>{busy ? '確認中…' : '変更案を確認'}</Button></>} />
       <ConfirmDialog open={leaveTarget !== null} title="入力した内容があります" description="このまま移動すると、入力した営業時間の変更は失われます。Googleにはまだ何も送っていません。" confirmLabel="入力を捨てて移動" cancelLabel="入力を続ける" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
@@ -704,7 +724,8 @@ function describeHours(value: unknown, kind: GoogleChange['kind']): ReactNode {
     return days.map((d) => (
       <div key={d.date}>
         {days.length > 1 ? <p className="text-label font-normal">{formatYmdShort(d.date)}</p> : null}
-        {d.closed ? <p>休業</p> : d.periods.map((p, i) => <p key={i}>{p.open}–{p.close === '00:00' ? '24:00' : p.close}</p>)}
+        {d.remove ? <p className="text-status-warn-deep font-bold">特別営業時間を外す</p> : null}
+        {d.remove ? <p><span className="text-label mr-2 font-normal">通常</span>{d.closed ? '定休日' : d.periods.map((p) => `${p.open}–${p.close === '00:00' ? '24:00' : p.close}`).join(' ／ ')}</p> : d.closed ? <p>休業</p> : d.periods.map((p, i) => <p key={i}>{p.open}–{p.close === '00:00' ? '24:00' : p.close}</p>)}
       </div>
     ))
   }
@@ -817,7 +838,7 @@ export function ChangeConfirmScreen({ accountId, ids, go }: { accountId: string;
       ? '変えていない曜日・特別営業時間は変更しません。特別営業時間が設定されている日は、そちらが優先されます。'
       : `${['店舗名', '住所', '電話', '営業時間', '写真'].filter((x) => x !== FIELD_LABEL[field ?? '']).join('・')}は変更しません。${field === 'address' ? '住所を変えた場合は、Googleが本人確認（はがきの郵送など）を求めることがあります。' : ''}`
   const afterNote = change.kind === 'special_hours'
-    ? (() => { const days = change.after as GoogleDayHours[]; const before = (change.before as GoogleDayHours[] | null) ?? []; return days.length === 1 && before[0] ? (days[0].closed ? `この日の${before[0].periods.length}枠をすべて外し、休業にします。` : `この日の${before[0].closed ? '休業' : `${before[0].periods.length}枠`}を、上記の${days[0].periods.length}枠に置き換えます。`) : `${days.length}日分の特別営業時間を置き換えます。` })()
+    ? (() => { const days = change.after as GoogleDayHours[]; const before = (change.before as GoogleDayHours[] | null) ?? []; return days.every((d) => d.remove) ? `${days.length === 1 ? 'この日' : `${days.length}日分`}の特別営業時間をGoogleから外します。以後はその曜日の通常の営業時間になります。` : days.length === 1 && before[0] ? (days[0].closed ? `この日の${before[0].periods.length}枠をすべて外し、休業にします。` : `この日の${before[0].closed ? '休業' : `${before[0].periods.length}枠`}を、上記の${days[0].periods.length}枠に置き換えます。`) : `${days.length}日分の特別営業時間を置き換えます。` })()
     : change.kind === 'regular_hours'
       ? '対象の曜日だけを置き換え、毎週この時間になります。'
       : field === 'description'

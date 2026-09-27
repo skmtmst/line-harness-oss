@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { adminSessionHandoffPath, adminSessionHeaders, captureTwoFactorChallenge, clearTwoFactorChallenge, takeTwoFactorNextPath, storeAdminSession } from '@/lib/admin-session'
 import { useBrand } from '@/lib/use-brand'
+import Notice from '@/components/shared/notice'
 import OtpInput from '@/components/shared/otp-input'
 
 export default function TwoFactorLoginPage() {
@@ -77,7 +78,7 @@ export default function TwoFactorLoginPage() {
         <h1 className="mt-3 text-xl font-bold text-ink">二段階認証</h1>
         <p className="mt-2 text-xs text-ink-secondary">認証アプリに表示されている6桁コードを入力してください</p>
       </div>
-      {error && <p id="two-factor-error" role="alert" className="mt-5 rounded-control bg-danger-bg px-3 py-2 text-sm text-danger">{error}</p>}
+      {error && <Notice tone="danger" message={error} id="two-factor-error" className="mt-5" />}
       <p id="two-factor-code-label" className="mt-6 block text-xs font-semibold text-ink">認証コード</p>
       {/* ★V7 共通 認証コード入力（xHzFK）。貼り付け・自動入力も6マスへ振り分ける。 */}
       <div className="mt-2 flex justify-center">

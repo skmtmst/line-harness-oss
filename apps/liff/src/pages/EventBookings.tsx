@@ -6,6 +6,7 @@ import LoadErrorView from '../components/LoadErrorView.js';
 import LoadingView from '../components/LoadingView.js';
 import Card from '../components/ui/Card.js';
 import Badge from '../components/ui/Badge.js';
+import ConfirmDialog from '../components/ui/ConfirmDialog.js';
 import Icon from '../components/ui/Icon.js';
 import PageHeader from '../components/ui/PageHeader.js';
 import StatusView from '../components/ui/StatusView.js';
@@ -62,8 +63,14 @@ export default function EventBookings() {
     void refresh();
   }, [refresh]);
 
-  async function cancel(b: EventBookingMine) {
-    if (!confirm(`「${b.event_name}」の予約をキャンセルしますか？`)) return;
+  // 取り消す予約。開いている間だけ持つ。ブラウザの `confirm()` は使わず、
+  // 共通の確認窓で聞く (やめるを選ぶとここが空のまま終わる)。
+  const [pendingCancel, setPendingCancel] = useState<EventBookingMine | null>(null);
+
+  async function runCancel() {
+    const b = pendingCancel;
+    if (!b || busy) return;
+    setPendingCancel(null);
     setBusy(true);
     setActionError(null);
     try {
@@ -172,7 +179,10 @@ export default function EventBookings() {
                           <div className="mt-2 text-left">
                             <button
                               type="button"
-                              onClick={() => cancel(b)}
+                              onClick={() => {
+                                setActionError(null);
+                                setPendingCancel(b);
+                              }}
                               disabled={busy}
                               className="inline-flex min-h-11 items-center gap-0.5 text-sm font-semibold text-info-link focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-50"
                             >
@@ -190,6 +200,23 @@ export default function EventBookings() {
           </>
         )}
       </div>
+      <ConfirmDialog
+        open={pendingCancel !== null}
+        title={pendingCancel ? `「${pendingCancel.event_name}」の予約をキャンセルしますか？` : ''}
+        description={
+          pendingCancel
+            ? `${utcToJstMd(pendingCancel.slot_starts_at)} ${utcToJstHm(pendingCancel.slot_starts_at)}${pendingCancel.venue_name ? `・${pendingCancel.venue_name}` : ''}の予約を取り消します。`
+            : ''
+        }
+        confirmLabel="キャンセルする"
+        cancelLabel="やめる"
+        destructive
+        busy={busy}
+        onCancel={() => {
+          if (!busy) setPendingCancel(null);
+        }}
+        onConfirm={() => void runCancel()}
+      />
     </div>
   );
 }

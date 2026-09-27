@@ -8,9 +8,11 @@ import { api, ApiError } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
+import LinePreview from '@/components/shared/line-preview'
 import ListState from '@/components/shared/list-state'
 import TargetMissing from '@/components/shared/target-missing'
 import NoteBar from '@/components/shared/note-bar'
+import Notice from '@/components/shared/notice'
 import PageHeader from '@/components/shared/page-header'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { analyzeConnections, type ConnectionPage } from './connection-analysis'
@@ -151,9 +153,9 @@ function ConnectionsContent() {
 
   if (analysis.edges.length === 0) {
     return (
-      <div data-design-node="NXdDk" className="space-y-5 pb-24">
+      <div data-design-node="NXdDk" className="flex flex-col gap-4 pb-24">
         <ConnectionHeading group={group} />
-        <div className="grid gap-5 xl:grid-cols-3">
+        <div className="grid gap-4 xl:grid-cols-3">
           <section className="border-hairline bg-canvas rounded-card min-h-96 border p-6 shadow-sm xl:col-span-2">
             <div className="flex items-start justify-between gap-3">
               <div><h2 className="text-ink text-base font-bold">つながりの図</h2><p className="text-ink-faint mt-1 text-xs">切替先を足すと、ここに「どのメニューからどこへ移れるか」が出ます</p></div>
@@ -173,10 +175,10 @@ function ConnectionsContent() {
   }
 
   return (
-    <div data-design-node="DIUbO" className="space-y-5 pb-24">
+    <div data-design-node="DIUbO" className="flex flex-col gap-4 pb-24">
       <ConnectionHeading group={group} />
-      <div className="grid gap-5 xl:grid-cols-3">
-        <div className="space-y-5 xl:col-span-2">
+      <div className="grid gap-4 xl:grid-cols-3">
+        <div className="flex flex-col gap-4 xl:col-span-2">
           <section className="border-hairline bg-canvas rounded-card border p-6 shadow-sm">
             <div className="flex items-start justify-between gap-3"><div><h2 className="text-ink text-base font-bold">つながりの図</h2><p className="text-ink-faint mt-1 text-xs">緑のタブが「別のメニューへ移る」ボタン</p></div><Button href={`/rich-menus/edit?id=${encodeURIComponent(group.id)}`}>切替先のメニューを追加（最大10枚）</Button></div>
             <div className="mt-6 grid gap-4 md:grid-cols-3">
@@ -215,7 +217,7 @@ function ConnectionHeading({ group }: { group: RichMenuGroup }) {
 }
 
 function ConnectionAside() {
-  return <aside className="space-y-4"><section className="border-hairline bg-canvas rounded-card border p-5 shadow-sm"><h2 className="text-ink text-sm font-bold">LINEプレビュー</h2><p className="text-ink-faint mt-1 text-xs">「商品を見る」を開いたとき</p><div className="border-ink bg-canvas-sunken mt-4 overflow-hidden rounded-3xl border-4 p-3 shadow-inner"><div className="text-ink-faint flex min-h-60 items-center justify-center text-xs">トーク画面</div><div className="bg-canvas text-ink-secondary grid grid-cols-3 gap-1 rounded-lg p-2 text-center text-xs font-semibold"><span>トップ</span><span className="bg-accent-deep text-on-accent rounded px-2 py-1">商品</span><span>予約</span><span>新着</span><span>定番</span></div></div></section><section className="bg-warning-bg text-warning rounded-card p-5 text-xs leading-5"><h2 className="text-sm font-bold">切替メニューでよくある事故</h2><ul className="mt-2 space-y-1"><li>・戻るタブが無く、元のメニューに帰れない</li><li>・切替先が下書きのままで、押しても動かない</li><li>・切替先だけ「誰に出すか」が違う</li></ul></section></aside>
+  return <aside className="space-y-4"><LinePreview note="「商品を見る」を開いたときの見え方"><div className="rounded-card bg-canvas p-3"><div className="text-ink-faint flex min-h-60 items-center justify-center text-xs">トーク画面</div><div className="bg-canvas text-ink-secondary grid grid-cols-3 gap-1 rounded-lg p-2 text-center text-xs font-semibold"><span>トップ</span><span className="bg-accent-deep text-on-accent rounded px-2 py-1">商品</span><span>予約</span><span>新着</span><span>定番</span></div></div></LinePreview><Notice tone="warn"><h2 className="text-sm font-bold">切替メニューでよくある事故</h2><ul className="mt-2 space-y-1 text-xs"><li>・戻るタブが無く、元のメニューに帰れない</li><li>・切替先が下書きのままで、押しても動かない</li><li>・切替先だけ「誰に出すか」が違う</li></ul></Notice></aside>
 }
 
 function ConnectionFooter({ status, groupId }: { status: string; groupId: string }) {

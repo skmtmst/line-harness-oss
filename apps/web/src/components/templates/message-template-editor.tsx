@@ -5,6 +5,7 @@ import { useRef, type ReactNode } from 'react'
 import { listInterpolations, type CommonVar, type FriendField } from '@line-crm/shared'
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
 import Button from '@/components/shared/button'
+import LinePreview from '@/components/shared/line-preview'
 import { Field, TextArea } from '@/components/shared/form-controls'
 import DateField from '@/components/shared/date-field'
 import SelectField from '@/components/shared/select-field'
@@ -324,13 +325,14 @@ export function MessageTemplateEditor({
         {footer}
       </div>
       <div data-design="Right" className="w-full shrink-0 space-y-4 xl:w-96">
-        <section className="bg-line-preview rounded-card border-hairline border p-4">
-          <p className="text-on-accent text-center text-sm font-semibold">LINEプレビュー</p>
-          <p className="text-on-accent mx-auto mt-2 mb-2 w-fit rounded-pill bg-line-preview-label px-3 py-1 text-xs">差し込み後の見え方（山田 太郎さんの場合）</p>
-          <div className="bg-canvas-sunken rounded-card mt-3 p-3"><p className="text-ink-faint mb-1 text-xs">然-NEN-</p><TemplatePreviewMessage preview={preview} /></div>
-          <p className="text-on-accent mt-2 text-xs leading-relaxed">名前は山田 太郎さん、友だち情報は項目の既定値、共通情報は現在値で表示しています。</p>
-          <p className="text-on-accent mt-1 text-xs">URLは短縮され、クリックが計測されます</p>
-        </section>
+        <LinePreview
+          note="差し込み後の見え方（山田 太郎さんの場合）"
+          accountName="然-NEN-"
+        >
+          <div className="bg-canvas-sunken rounded-card p-3"><TemplatePreviewMessage preview={preview} /></div>
+          <p className="text-ink mt-2 text-xs leading-relaxed">名前は山田 太郎さん、友だち情報は項目の既定値、共通情報は現在値で表示しています。</p>
+          <p className="text-ink mt-1 text-xs">URLは短縮され、クリックが計測されます</p>
+        </LinePreview>
       </div>
     </div>
   )

@@ -1,11 +1,13 @@
 import { Hono } from 'hono';
+import type { Context } from 'hono';
 import {
   activatePlatformAdminIfAwaitingTotp,
   getStaffMembers, getStaffById, getStaffByInviteTokenHash, getStaffByEmailChangeTokenHash,
   createStaffMember, updateStaffMember, deleteStaffMember, countLoginAudit, getLastLoginByStaff,
   getStaffAccountScopeIds, getStaffAccountScopeMap, replaceStaffAccountScopes, revokeStaffAuthentication,
-  reserveTwoFactorSetupAttempt, clearTwoFactorSetupAttempts, consumeStepUpGrant,
+  reserveTwoFactorSetupAttempt, clearTwoFactorSetupAttempts,
 } from '@line-crm/db';
+import { sensitiveStepUpSatisfied } from '../lib/step-up.js';
 import type { StaffMember } from '@line-crm/db';
 import { requireRole } from '../middleware/role-guard.js';
 import { sha256Hex } from '../middleware/auth.js';
@@ -31,19 +33,14 @@ const EMAIL_CHANGE_TTL_MS = 24 * 60 * 60 * 1000;
 const TWO_FACTOR_ATTEMPT_LIMIT_ERROR = '入力回数を超えました。しばらく待ってからやり直してください';
 
 /**
- * 高危険な権限変更の直前再認証（N-427）。
+ * 高危険な権限変更の直前再認証（N-427 → V の共通仕組み）。
  *
- * X-Step-Up-Token の grant は 5 分・1 回限り。消費は atomic なので
- * 同じ token を 2 回使い回しても 2 回目は必ず失敗する。
+ * 同じセッションでの再確認は10分の窓で再利用する。いつもと違う端末・場所の
+ * セッションは窓を使わせず、操作ごとに X-Step-Up-Token の1回限り grant を
+ * 消費する（atomic なので同じ token は2回目に必ず失敗する）。
  */
-async function consumeStaffStepUp(c: { req: { header: (name: string) => string | undefined }; env: Env['Bindings']; get: (key: 'staff') => Env['Variables']['staff'] }, purpose: 'staff.permissions.change' | 'staff.two_factor.remove'): Promise<boolean> {
-  const token = c.req.header('X-Step-Up-Token')?.trim();
-  if (!token) return false;
-  return consumeStepUpGrant(c.env.DB, {
-    tokenHash: await sha256Hex(token),
-    staffId: c.get('staff').id,
-    purpose,
-  });
+async function consumeStaffStepUp(c: Context<Env>, purpose: 'staff.permissions.change' | 'staff.two_factor.remove'): Promise<boolean> {
+  return sensitiveStepUpSatisfied(c, purpose);
 }
 
 function invitationConfirmationUrl(c: { env: Env['Bindings']; req: { url: string } }, token: string): string {

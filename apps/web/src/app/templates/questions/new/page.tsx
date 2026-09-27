@@ -9,6 +9,8 @@ import QuestionEditor, {
   type ScenarioQuestion,
 } from '@/components/scenarios/question-editor'
 import Button from '@/components/shared/button'
+import LinePreview from '@/components/shared/line-preview'
+import Notice from '@/components/shared/notice'
 import StickyBar from '@/components/shared/sticky-bar'
 import ListState from '@/components/shared/list-state'
 import SelectField from '@/components/shared/select-field'
@@ -198,9 +200,7 @@ function QuestionTemplatePageInner() {
       </nav>
 
       {error && (
-        <div role="alert" className="bg-danger-bg text-danger rounded-control text-label mb-4 px-4 py-3">
-          {error}
-        </div>
+        <Notice tone="danger" message={error} className="mb-4" />
       )}
 
       <div className="grid min-w-0 gap-4 2xl:grid-cols-4">
@@ -246,12 +246,8 @@ function QuestionTemplatePageInner() {
         </div>
 
         <aside className="min-w-0 space-y-3 2xl:sticky 2xl:top-4 2xl:self-start">
-          <section className="rounded-card overflow-hidden bg-line-preview p-4 text-label text-on-accent">
-            <h2 className="text-center font-bold">LINEプレビュー</h2>
-            <p className="mx-auto mt-3 w-fit rounded-pill bg-line-preview-label px-3 py-1 text-xs">
-              質問の見え方（山田 太郎さんの場合）
-            </p>
-            <div className="rounded-card mt-4 overflow-hidden bg-canvas text-ink">
+          <LinePreview note="質問の見え方（山田 太郎さんの場合）">
+            <div className="rounded-card overflow-hidden bg-canvas text-ink">
               {question.intro?.trim() && (
                 <p className="border-hairline border-b px-4 py-3 leading-relaxed">
                   {displayText(question.intro)}
@@ -266,7 +262,7 @@ function QuestionTemplatePageInner() {
                 </div>
               ))}
             </div>
-          </section>
+          </LinePreview>
 
           <section className="rounded-card bg-line-answer-bg p-4 text-label text-line-answer">
             <h2 className="font-bold">答えをどこに残すか</h2>

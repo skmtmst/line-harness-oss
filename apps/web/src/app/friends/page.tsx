@@ -409,7 +409,7 @@ function FriendsPageInner({
   }, [loadFriends, onNotice])
 
   return (
-    <div data-friends-design="v6" className="space-y-3.5">
+    <div data-friends-design="v6" className="flex flex-col gap-4">
       <FriendKpis />
 
       {hasScoreRange ? (
@@ -756,13 +756,13 @@ function FriendsPageHost() {
   )
 
   return (
-    <div data-friends-page="v6" data-design-node="PhxG6">
+    <div data-friends-page="v6" data-design-node="PhxG6" className="flex flex-col gap-4">
       {/*
         画面名は共通トップバーだけに置く。本文側のタイトル・説明・マニュアルは
         重複させない（Pencil `PhxG6` / トップバー `cBSCb`）。
         操作は独立した見出し行にせず、タブ `JB0Ki` の右端へ置く。
       */}
-      <div className="mb-4" data-design="V6Tabs" data-design-node="JB0Ki">
+      <div data-design="V6Tabs" data-design-node="JB0Ki">
         <MergedTabs
           basePath="/friends"
           paramName="tab"

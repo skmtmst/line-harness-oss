@@ -616,8 +616,12 @@ describe('N-426: LINEログイン経路でも同じ門を通る', () => {
   it('セッションDBが古い場合はLINE callbackを安全に失敗させ、Cookieを出さない', async () => {
     seedStaff('legacy-schema', { role: 'staff' });
     testDb.raw.prepare(`UPDATE staff_members SET line_user_id = 'U-legacy-schema' WHERE id = 'legacy-schema'`).run();
-    testDb.raw.prepare(`ALTER TABLE admin_sessions DROP COLUMN user_agent`).run();
-    testDb.raw.prepare(`ALTER TABLE admin_sessions DROP COLUMN ip_prefix`).run();
+    // V の列（494・495）が載る前の古い形を再現する。列を参照する索引から先に落とす。
+    testDb.raw.prepare(`DROP INDEX IF EXISTS idx_admin_sessions_staff_device`).run();
+    testDb.raw.prepare(`DROP INDEX IF EXISTS idx_admin_sessions_staff_ip_prefix`).run();
+    for (const column of ['user_agent', 'ip_prefix', 'step_up_at', 'device_hash', 'unfamiliar_at']) {
+      testDb.raw.prepare(`ALTER TABLE admin_sessions DROP COLUMN ${column}`).run();
+    }
     lineFetchMock('U-legacy-schema');
     const res = await callback(callbackCookies());
     expect(res.headers.get('Location')).toBe('https://admin.example.com/login?error=line_login_failed');
@@ -632,8 +636,11 @@ describe('N-426: LINEログイン経路でも同じ門を通る', () => {
     lineFetchMock('U-session-failure');
     const callbackResponse = await callback(callbackCookies({ next: 'ops' }));
     const challengeToken = new URLSearchParams(new URL(callbackResponse.headers.get('Location')!).hash.slice(1)).get('lh_2fa')!;
-    testDb.raw.prepare(`ALTER TABLE admin_sessions DROP COLUMN user_agent`).run();
-    testDb.raw.prepare(`ALTER TABLE admin_sessions DROP COLUMN ip_prefix`).run();
+    testDb.raw.prepare(`DROP INDEX IF EXISTS idx_admin_sessions_staff_device`).run();
+    testDb.raw.prepare(`DROP INDEX IF EXISTS idx_admin_sessions_staff_ip_prefix`).run();
+    for (const column of ['user_agent', 'ip_prefix', 'step_up_at', 'device_hash', 'unfamiliar_at']) {
+      testDb.raw.prepare(`ALTER TABLE admin_sessions DROP COLUMN ${column}`).run();
+    }
 
     const verify = await call('POST', '/api/auth/two-factor/verify', {
       challengeToken,

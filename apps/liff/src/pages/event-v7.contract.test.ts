@@ -114,7 +114,9 @@ describe('承認待ちと確定は別の印と文', () => {
 
 describe('自分のイベントは期限まで取り消せる', () => {
   it('取り消しの確認を出してから消す', () => {
-    expect(bookings).toContain('confirm(`');
+    // ブラウザの confirm() は使わず、LIFF 共通の確認窓で聞く。
+    expect(bookings).toContain('ConfirmDialog');
+    expect(bookings).toContain('setPendingCancel(b)');
     expect(bookings).toContain('の予約をキャンセルしますか');
     expect(bookings).toContain('api.cancelMyEventBooking(b.id)');
   });

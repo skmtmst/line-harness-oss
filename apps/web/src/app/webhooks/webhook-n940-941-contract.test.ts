@@ -58,7 +58,10 @@ describe('N-387: まとめて再試行は上限を越えた残りを黙って置
     expect(INTERACTIONS).toContain('response.data.remaining')
     expect(INTERACTIONS).toContain('もう一度押すと続きをやり直します')
     // IDEA-26: 結果不明で送らなかった分(needsReview)も残件として成功扱いにしない。
-    expect(INTERACTIONS).toContain("response.data.remaining > 0 || response.data.needsReview > 0 ? 'error' : 'success'")
+    // 残件あり → 危険の帯に件数と続きの方法。残件なし → Toast（★V7 共通部品その2 §2）。
+    expect(INTERACTIONS).toContain('response.data.failed > 0 || response.data.skipped > 0 || response.data.remaining > 0 || response.data.needsReview > 0')
+    expect(INTERACTIONS).toContain("setNotice({ tone: 'danger', message: bulkMessage })")
+    expect(INTERACTIONS).toContain('notifyToast(bulkMessage)')
   })
 })
 

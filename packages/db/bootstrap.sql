@@ -192,7 +192,7 @@ CREATE TABLE admin_sessions (
   staff_id   TEXT NOT NULL,
   expires_at TEXT NOT NULL,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), selected_restaurant_store_id TEXT
-  REFERENCES rt_stores(id) ON DELETE SET NULL, user_agent TEXT, ip_prefix TEXT,
+  REFERENCES rt_stores(id) ON DELETE SET NULL, user_agent TEXT, ip_prefix TEXT, step_up_at TEXT, device_hash TEXT, unfamiliar_at TEXT,
   FOREIGN KEY (staff_id) REFERENCES staff_members(id) ON DELETE CASCADE
 );
 
@@ -2874,6 +2874,55 @@ CREATE TABLE google_calendar_connections (
   updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
+CREATE TABLE google_sheets_integrations (
+  id TEXT PRIMARY KEY,
+  line_account_id TEXT NOT NULL UNIQUE REFERENCES line_accounts(id) ON DELETE CASCADE,
+  tenant_id TEXT,
+  google_account_email TEXT,
+  refresh_token_enc TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending_target'
+    CHECK (status IN ('pending_target', 'connected', 'expired')),
+  spreadsheet_id TEXT,
+  spreadsheet_title TEXT,
+  -- データ種別ごとの再開点。{"friends": {"after": "...", "lastId": "..."}} の形。
+  -- 途中で止まった同期が前回の続きから書き直すためのもの。
+  sync_cursor_json TEXT NOT NULL DEFAULT '{}',
+  last_synced_at TEXT,
+  last_sync_status TEXT
+    CHECK (last_sync_status IN ('ok', 'partial', 'error') OR last_sync_status IS NULL),
+  last_sync_error TEXT,
+  consecutive_failures INTEGER NOT NULL DEFAULT 0,
+  connected_by_staff_id TEXT,
+  connected_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE google_sheets_oauth_states (
+  state TEXT PRIMARY KEY,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  staff_id TEXT NOT NULL,
+  mode TEXT NOT NULL CHECK (mode IN ('connect', 'reconnect')),
+  code_verifier_enc TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  used_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE google_sheets_sync_runs (
+  id TEXT PRIMARY KEY,
+  integration_id TEXT NOT NULL REFERENCES google_sheets_integrations(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL CHECK (kind IN ('manual', 'scheduled')),
+  data_type TEXT NOT NULL CHECK (data_type IN ('friends', 'form_answers')),
+  status TEXT NOT NULL CHECK (status IN ('running', 'ok', 'partial', 'error')),
+  rows_written INTEGER NOT NULL DEFAULT 0 CHECK (rows_written >= 0),
+  cursor_json TEXT,
+  error TEXT,
+  started_at TEXT NOT NULL,
+  finished_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE hq_support_messages (
   id               TEXT PRIMARY KEY,
   request_id       TEXT NOT NULL REFERENCES hq_support_requests(id) ON DELETE CASCADE,
@@ -3225,17 +3274,19 @@ CREATE TABLE incoming_webhook_steps (
   PRIMARY KEY (source_event_id, step_key)
 );
 
-CREATE TABLE incoming_webhook_unmatched_events (
+CREATE TABLE "incoming_webhook_unmatched_events" (
   id                    TEXT PRIMARY KEY,
   webhook_id            TEXT NOT NULL REFERENCES incoming_webhooks(id),
   line_account_id       TEXT NOT NULL REFERENCES line_accounts(id),
   source_event_id       TEXT NOT NULL,
-  kind                  TEXT NOT NULL CHECK (kind IN ('unmatched', 'candidate')),
+  kind                  TEXT NOT NULL CHECK (kind IN ('unmatched', 'candidate', 'ambiguous')),
   status                TEXT NOT NULL DEFAULT 'pending'
                         CHECK (status IN ('pending', 'resolved', 'dismissed')),
   identity_attempts_json TEXT NOT NULL DEFAULT '[]'
                         CHECK (json_valid(identity_attempts_json)),
   masked_shape_json     TEXT CHECK (masked_shape_json IS NULL OR json_valid(masked_shape_json)),
+  -- kind='ambiguous' の届物だけが持つ、一致した友だちIDの並び。
+  candidate_friend_ids_json TEXT CHECK (candidate_friend_ids_json IS NULL OR json_valid(candidate_friend_ids_json)),
   resolved_friend_id    TEXT REFERENCES friends(id),
   resolved_by           TEXT,
   resolved_at           TEXT,
@@ -3256,7 +3307,7 @@ CREATE TABLE incoming_webhooks (
   updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , version INTEGER NOT NULL DEFAULT 1
   CHECK (version > 0), identity_match_json TEXT NOT NULL DEFAULT
-  '{"methods":[],"onNotFound":"do_nothing"}', action_refs_json TEXT NOT NULL DEFAULT '[]', latest_masked_sample_json TEXT, latest_received_at TEXT, secret_encrypted TEXT, deleted_at TEXT, deleted_by_staff_id TEXT);
+  '{"methods":[],"onNotFound":"do_nothing"}', action_refs_json TEXT NOT NULL DEFAULT '[]', latest_masked_sample_json TEXT, latest_received_at TEXT, secret_encrypted TEXT, deleted_at TEXT, deleted_by_staff_id TEXT, secret_previous_encrypted TEXT, secret_rotated_at TEXT);
 
 CREATE TABLE integration_api_tokens (
   id              TEXT PRIMARY KEY,
@@ -6670,7 +6721,13 @@ CREATE INDEX idx_admin_sessions_restaurant_store
   ON admin_sessions(selected_restaurant_store_id)
   WHERE selected_restaurant_store_id IS NOT NULL;
 
+CREATE INDEX idx_admin_sessions_staff_device
+  ON admin_sessions(staff_id, device_hash);
+
 CREATE INDEX idx_admin_sessions_staff_id ON admin_sessions(staff_id);
+
+CREATE INDEX idx_admin_sessions_staff_ip_prefix
+  ON admin_sessions(staff_id, ip_prefix);
 
 CREATE INDEX idx_admin_two_factor_challenges_expires
   ON admin_two_factor_challenges(expires_at);
@@ -7435,6 +7492,16 @@ CREATE INDEX idx_funnels_line_account_created
 
 CREATE INDEX idx_google_calendar_connections_staff
   ON google_calendar_connections (line_account_id, staff_id, is_active);
+
+CREATE INDEX idx_google_sheets_oauth_states_expires
+  ON google_sheets_oauth_states(expires_at);
+
+CREATE INDEX idx_google_sheets_sync_runs_integration
+  ON google_sheets_sync_runs(integration_id, started_at DESC);
+
+CREATE INDEX idx_google_sheets_sync_runs_running
+  ON google_sheets_sync_runs(integration_id, status)
+  WHERE status = 'running';
 
 CREATE INDEX idx_handover_decisions_handover
   ON account_handover_decisions (handover_id);

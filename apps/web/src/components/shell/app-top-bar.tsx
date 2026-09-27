@@ -3,6 +3,7 @@
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import TopBar from '@/components/shared/top-bar'
+import Notice from '@/components/shared/notice'
 import { useAccount } from '@/contexts/account-context'
 import { usePageChrome } from './page-chrome'
 import { MENU_SECTIONS } from '@/lib/menu'
@@ -136,17 +137,21 @@ export default function AppTopBar() {
     />
     </div>
     {accountsLoadFailed ? (
-      <div role="alert" className="flex items-center justify-center gap-3 border-b border-hairline bg-danger-bg px-4 py-2 text-sm text-danger">
-        <span>LINEアカウントの一覧を読み込めませんでした。</span>
-        <button
-          type="button"
-          onClick={() => { void refreshAccounts() }}
-          disabled={refreshing}
-          className="font-semibold underline underline-offset-2 disabled:opacity-60"
-        >
-          {refreshing ? '読み込んでいます' : '再読み込み'}
-        </button>
-      </div>
+      <Notice
+        tone="danger"
+        action={(
+          <button
+            type="button"
+            onClick={() => { void refreshAccounts() }}
+            disabled={refreshing}
+            className="font-semibold underline underline-offset-2 disabled:opacity-60"
+          >
+            {refreshing ? '読み込んでいます' : '再読み込み'}
+          </button>
+        )}
+      >
+        LINEアカウントの一覧を読み込めませんでした。
+      </Notice>
     ) : null}
     </>
   )

@@ -5,8 +5,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import StickyBar from '@/components/shared/sticky-bar'
+import LinePreview from '@/components/shared/line-preview'
 import {
   api,
   ApiError,
@@ -617,15 +619,11 @@ export default function NewProxyBookingPage() {
       </nav>
 
       {error && step !== 'conflict' && (
-        <div className="border-danger bg-danger-bg text-danger rounded-card border px-4 py-3 text-sm">
-          {error}
-        </div>
+        <Notice tone="danger" message={error} onClose={() => setError('')} />
       )}
 
       {staffResolved && !canOperate ? (
-        <div className="border-warning bg-warning-bg text-warning rounded-card border px-4 py-3 text-sm">
-          予約を入れられるのは、予約の操作権限を持つ人だけです。閲覧のみの権限では操作ボタンは出ません。
-        </div>
+        <Notice tone="warn" message="予約を入れられるのは、予約の操作権限を持つ人だけです。閲覧のみの権限では操作ボタンは出ません。" />
       ) : null}
 
       {draftRestored && step === 'input' ? (
@@ -728,9 +726,9 @@ export default function NewProxyBookingPage() {
                 </Field>
               </div>
               {date && time && selectedStaff && menu ? (
-                <div className="border-success bg-success-bg text-success mt-3 rounded-control border px-3 py-2 text-xs font-semibold">
+                <Notice tone="success" className="mt-3">
                   {dateLabel(slotStartIso, slotTimeZone)} は空いています。{selectedStaff.duration_minutes}分のメニューです。
-                </div>
+                </Notice>
               ) : null}
             </Card>
 
@@ -779,15 +777,14 @@ export default function NewProxyBookingPage() {
                   LINEと結びついていないため、LINEのお知らせは届きません。
                 </p>
               ) : (
-                <div className="rounded-card bg-action-soft p-3">
-                  <p className="text-action mb-2 text-center text-xs font-semibold">LINEプレビュー</p>
+                <LinePreview>
                   <div className="rounded-card bg-canvas p-4 text-sm leading-6">
                     <p>{friend?.displayName ?? 'お客様'}さま</p>
                     <p className="font-semibold">ご予約を承りました。</p>
                     <p className="mt-3">{slotStartIso ? dateLabel(slotStartIso, slotTimeZone) : '日時を選ぶと表示されます'}</p>
                     <p>{menu?.name ?? 'メニューを選ぶと表示されます'} ／ 担当 {selectedStaff?.display_name ?? '—'}</p>
                   </div>
-                </div>
+                </LinePreview>
               )}
             </Card>
             <Card title="この方について">
@@ -853,13 +850,13 @@ export default function NewProxyBookingPage() {
                 </>
               )}
             </Card>
-            <p data-booking-slot-check="available" className="border-success bg-success-bg text-success rounded-card border px-4 py-3 text-xs">
+            <Notice tone="success" data-booking-slot-check="available">
               この日時は、確認画面を開く直前に空きを再確認しました。
-            </p>
+            </Notice>
           </div>
           <aside data-design="Right" className="space-y-4">
             <Card title={`${customerLabel}さんにはこう届きます`} note="送る前に、文面をそのまま確かめられます。">
-              <LinePreview friendName={customerLabel} menuName={menu.name} staffName={selectedStaff.display_name} timeZone={slotTimeZone} startUtc={slotStartIso} deliveryStatus={isLineLinked ? 'not_sent' : 'not_applicable'} />
+              <BookingConfirmPreview friendName={customerLabel} menuName={menu.name} staffName={selectedStaff.display_name} timeZone={slotTimeZone} startUtc={slotStartIso} deliveryStatus={isLineLinked ? 'not_sent' : 'not_applicable'} />
             </Card>
             <WarningCard title="気をつけること" lines={['LINEと結びついていない方には、自動のお知らせは届きません', 'あとで時間を変えたときは、もう一度お知らせを送ってください']} />
             <RelatedLinks includeConversion={false} />
@@ -869,18 +866,18 @@ export default function NewProxyBookingPage() {
 
       {step === 'conflict' && (friend || customer) && menu && selectedStaff && (
         <>
-          <section className="border-danger bg-danger-bg text-danger flex flex-wrap items-center justify-between gap-3 rounded-card border px-4 py-3">
-            <div>
-              <p className="text-sm font-semibold">{dateLabel(slotStartIso, slotTimeZone)} は {selectedStaff.display_name} がふさがっています</p>
-              <p className="mt-1 text-xs">
-                {conflictAlternatives
-                  ? `${scheduleLabel(conflictAlternatives.conflict.from, slotTimeZone)}〜${scheduleLabel(conflictAlternatives.conflict.to, slotTimeZone)}に${conflictAlternatives.conflict.count}件重なっています（${conflictAlternatives.conflict.source === 'internal_booking' ? '店内予約' : conflictAlternatives.conflict.source === 'google_calendar' ? 'Google予定' : '受付時間外'}）。`
-                  : ''}
-                時間か担当を変えてください。
-              </p>
-            </div>
-            <Button onClick={() => void recoverConflict()}>空いている時間を選び直す</Button>
-          </section>
+          <Notice
+            tone="danger"
+            action={<Button onClick={() => void recoverConflict()}>空いている時間を選び直す</Button>}
+          >
+            <p className="text-sm font-semibold">{dateLabel(slotStartIso, slotTimeZone)} は {selectedStaff.display_name} がふさがっています</p>
+            <p className="mt-1 text-xs">
+              {conflictAlternatives
+                ? `${scheduleLabel(conflictAlternatives.conflict.from, slotTimeZone)}〜${scheduleLabel(conflictAlternatives.conflict.to, slotTimeZone)}に${conflictAlternatives.conflict.count}件重なっています（${conflictAlternatives.conflict.source === 'internal_booking' ? '店内予約' : conflictAlternatives.conflict.source === 'google_calendar' ? 'Google予定' : '受付時間外'}）。`
+                : ''}
+              時間か担当を変えてください。
+            </p>
+          </Notice>
           <div data-design="Body" className="grid gap-4 xl:grid-cols-4">
             <div data-design="Left" className="min-w-0 space-y-4 xl:col-span-3">
               <Card title="だれの予約か"><Summary label="お客様" value={customerLabel} /><Summary label="LINEとの結びつき" value={friend ? '結びついています' : '未連携の電話客'} /></Card>
@@ -950,7 +947,7 @@ export default function NewProxyBookingPage() {
               </Card>
             </div>
             <aside data-design="Right" className="space-y-4">
-              <Card title="お客様に届くもの" note="案内処理の実績と同じ状態を表示しています。"><LinePreview friendName={customerLabel} menuName={menu.name} staffName={selectedStaff.display_name} timeZone={slotTimeZone} startUtc={slotStartIso} deliveryStatus={confirmationOperation?.status ?? result.line_notification} /></Card>
+              <Card title="お客様に届くもの" note="案内処理の実績と同じ状態を表示しています。"><BookingConfirmPreview friendName={customerLabel} menuName={menu.name} staffName={selectedStaff.display_name} timeZone={slotTimeZone} startUtc={slotStartIso} deliveryStatus={confirmationOperation?.status ?? result.line_notification} /></Card>
               <RelatedLinks includeConversion />
             </aside>
           </div>
@@ -1025,7 +1022,7 @@ function NotificationToggle({ checked, onChange, title, detail }: {
   )
 }
 
-function LinePreview({ friendName, menuName, staffName, timeZone, startUtc, deliveryStatus }: {
+function BookingConfirmPreview({ friendName, menuName, staffName, timeZone, startUtc, deliveryStatus }: {
   friendName: string
   menuName: string
   staffName: string
@@ -1040,16 +1037,18 @@ function LinePreview({ friendName, menuName, staffName, timeZone, startUtc, deli
           : deliveryStatus === 'not_applicable' ? 'LINE未連携のため送信しません'
             : '「予約を入れる」を押すと、すぐに届きます'
   return (
-    <div className="bg-action rounded-card p-4">
-      <p className="text-on-action text-center text-xs font-semibold">LINEプレビュー</p>
-      <p className="bg-ink/25 text-on-action mx-auto mt-3 w-fit rounded-pill px-3 py-1 text-xs">{deliveryLabel}</p>
-      <div className="bg-canvas rounded-card mt-3 p-4 text-sm leading-6">
+    <>
+    {/* 送信の状態は動く情報なので、枠の外に見えるまま残す（? には入れない）。 */}
+    <p className="text-ink-secondary mb-2 text-center text-xs">{deliveryLabel}</p>
+    <LinePreview>
+      <div className="bg-canvas rounded-card p-4 text-sm leading-6">
         <p>{friendName}さま</p>
         <p>{dateLabel(startUtc, timeZone)} から、{menuName}をお受けしました。</p>
         <p>担当は{staffName}です。ご来店をお待ちしています。</p>
         <Button href="/booking/bookings" variant="primary" className="mt-3 w-full">予約内容を確認する</Button>
       </div>
-    </div>
+    </LinePreview>
+    </>
   )
 }
 

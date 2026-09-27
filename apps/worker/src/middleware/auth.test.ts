@@ -73,6 +73,11 @@ vi.mock('@line-crm/db', () => ({
   deleteExpiredTwoFactorChallenges: vi.fn(async () => undefined),
   getTwoFactorChallenge: vi.fn(async () => null),
   getStaffById: vi.fn(async () => null),
+  // V: セッション行の再確認・見なれない判定。既定は「行なし・履歴なし」。
+  getAdminSessionByTokenHash: vi.fn(async () => null),
+  adminSessionFamiliarity: vi.fn(async () => ({
+    hasBaseline: false, deviceKnown: false, ipKnown: false,
+  })),
   incrementTwoFactorChallengeAttempts: vi.fn(async () => undefined),
   deleteTwoFactorChallenge: vi.fn(async () => undefined),
   claimStaffTotpStep: vi.fn(async () => true),

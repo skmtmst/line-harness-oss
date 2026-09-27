@@ -8,7 +8,6 @@
  * （帯や欄の下の文で見せる）。
  */
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
-import { CircleHelp } from 'lucide-react'
 import styles from './help-tip.module.css'
 
 const CLOSE_OTHERS_EVENT = 'help-tip-open'
@@ -90,7 +89,11 @@ export default function HelpTip({
         onClick={toggle}
         className={styles.button}
       >
-        <CircleHelp aria-hidden="true" />
+        {/*
+          ★V7 `LYs5d`「？ 補足の印」：18px の角丸の正方形の中に「?」。
+          丸・楕円・枠なしは使わない（2026-09-27 オーナー指摘）。
+        */}
+        <span aria-hidden="true" className={styles.mark}>?</span>
       </button>
       {open ? (
         <span role="note" id={tipId} className={styles.tip}>

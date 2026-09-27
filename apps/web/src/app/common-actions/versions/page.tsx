@@ -9,10 +9,11 @@ import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
+import Notice from '@/components/shared/notice'
 import TargetMissing from '@/components/shared/target-missing'
 import PageHeader from '@/components/shared/page-header'
 import StatusBadge from '@/components/shared/status-badge'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
 import { ActionCell, DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { useCanManageCommonActions } from '@/components/automations/use-common-action-permission'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -168,14 +169,17 @@ function CommonActionVersionsInner() {
   if (loading) {
     return <div className="border-hairline rounded-card border bg-canvas p-10 text-center text-sm text-ink-faint" aria-busy="true">版と利用先を読み込んでいます</div>
   }
+  // 空の案内もカード（白地・枠・角丸）の中に出す。灰色の地だけにしない。
   if (!selectedAccountId && !detail) {
     return (
-      <ListState
-        kind="empty"
-        title="LINE公式アカウントを選んでください"
-        description="選ぶと版と利用先を確認できます。"
-        action={<Button href="/common-actions">共通アクション一覧へ戻る</Button>}
-      />
+      <section className="bg-canvas rounded-card border-hairline border">
+        <ListState
+          kind="empty"
+          title="LINE公式アカウントを選んでください"
+          description="選ぶと版と利用先を確認できます。"
+          action={<Button href="/common-actions">共通アクション一覧へ戻る</Button>}
+        />
+      </section>
     )
   }
   if (!detail && loadFailure === 'missing') {
@@ -211,7 +215,7 @@ function CommonActionVersionsInner() {
   }
 
   return (
-    <div data-design-node="syWp4">
+    <div data-design-node="syWp4" className="flex flex-col gap-4">
       <PageHeader
         breadcrumb={[
           { label: '共通アクション', href: '/common-actions' },
@@ -242,21 +246,21 @@ function CommonActionVersionsInner() {
         )}
       />
 
-      <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-5">
-        <SummaryCard variant="v6" title="いまの版" value={published?.versionNumber ?? null} unit="" detail={published?.publishedAt ? `${new Date(published.publishedAt).toLocaleDateString('ja-JP')} に公開` : 'まだ公開していません'} />
-        <SummaryCard variant="v6" title="呼び出し元" value={detail.bindings.length} unit="" detail={usageSummaryDetail(detail.bindings)} />
-        <SummaryCard variant="v6" title="今月 動いた回数" value={summary?.executionCountThisMonth ?? null} unit="" detail="" help="実行記録から集計しています" />
-        <SummaryCard variant="v6" title="失敗" value={summary?.failureCountThisMonth ?? null} unit="" detail="" help="部分成功を含みます" />
-        <SummaryCard variant="v6" title="古い版のまま" value={detail.bindings.filter((binding) => binding.hasNewerVersion).length} unit="" detail="回答フォーム" badge={detail.bindings.some((binding) => binding.hasNewerVersion) ? '要確認' : undefined} />
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
+        <KpiCard variant="v6" title="いまの版" value={published?.versionNumber ?? null} unit="" detail={published?.publishedAt ? `${new Date(published.publishedAt).toLocaleDateString('ja-JP')} に公開` : 'まだ公開していません'} />
+        <KpiCard variant="v6" title="呼び出し元" value={detail.bindings.length} unit="" detail={usageSummaryDetail(detail.bindings)} />
+        <KpiCard variant="v6" title="今月 動いた回数" value={summary?.executionCountThisMonth ?? null} unit="" detail="" help="実行記録から集計しています" />
+        <KpiCard variant="v6" title="失敗" value={summary?.failureCountThisMonth ?? null} unit="" detail="" help="部分成功を含みます" />
+        <KpiCard variant="v6" title="古い版のまま" value={detail.bindings.filter((binding) => binding.hasNewerVersion).length} unit="" detail="回答フォーム" badge={detail.bindings.some((binding) => binding.hasNewerVersion) ? '要確認' : undefined} />
       </div>
 
       <NoteBar help="新版を公開しても、利用先は現在の版を使い続けます" helpLabel="版の切り替え">
         新版を公開しても、利用先は現在の版を使い続けます。差分を確認した利用先だけ切り替えてください。
       </NoteBar>
 
-      {error ? <p className="text-danger my-4 text-sm" role="alert">{error}</p> : null}
+      {error ? <p className="text-danger text-sm" role="alert">{error}</p> : null}
 
-      <section className="mt-4">
+      <section>
         <h2 className="text-ink font-semibold">どこから呼ばれているか</h2>
         <p className="text-ink-faint mt-1 text-sm">公開しても、呼び出し元は自動で変わりません。使う場所ごとに新しい版へ更新します。</p>
         {detail.bindings.length === 0 ? (
@@ -303,7 +307,7 @@ function CommonActionVersionsInner() {
         )}
       </section>
 
-      <section className="mt-4">
+      <section>
         <div className="mb-3 flex items-center justify-between">
           <div>
             <h2 className="text-ink font-semibold">版の履歴</h2>
@@ -371,15 +375,15 @@ function CommonActionVersionsInner() {
         </DataTable>
       </section>
 
-      <section className="mt-6 grid gap-3 sm:grid-cols-2">
-        <SummaryCard
+      <section className="grid gap-3 sm:grid-cols-2">
+        <KpiCard
           variant="v6"
           title="このアクションを実行中"
           value={detail.bindings.reduce((sum, binding) => sum + (binding.runningCount ?? 0), 0)}
           unit="件"
           detail="始まったときの版のまま最後まで進みます"
         />
-        <SummaryCard
+        <KpiCard
           variant="v6"
           title="待ち時間の途中"
           value={detail.bindings.reduce((sum, binding) => sum + (binding.waitingCount ?? 0), 0)}
@@ -417,9 +421,7 @@ function CommonActionVersionsInner() {
             <p className="text-ink-secondary mt-2 text-sm">{published?.actions.map((action) => ACTION_LABELS[action.type] ?? action.type).join(' → ') || '未取得'}</p>
           </section>
         </div>
-        <p className="bg-warning-bg text-warning rounded-control mt-3 p-3 text-sm">
-          影響：実行中 {pendingBinding?.runningCount ?? '—'}件、待機中 {pendingBinding?.waitingCount ?? '—'}件は現在の版のまま完了します。未取得の件数は、実行集計の接続後に表示します。
-        </p>
+        <Notice tone="warn" message={`影響：実行中 ${pendingBinding?.runningCount ?? '—'}件、待機中 ${pendingBinding?.waitingCount ?? '—'}件は現在の版のまま完了します。未取得の件数は、実行集計の接続後に表示します。`} className="mt-3" />
       </Dialog>
     </div>
   )

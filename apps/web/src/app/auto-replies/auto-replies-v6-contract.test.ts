@@ -77,9 +77,12 @@ describe('V6 自動応答一覧の契約', () => {
   it('URL編集は5段と設定内容・LINEプレビューを持つページ表示にする', () => {
     expect(EDIT_PAGE).toContain('<EditDialog')
     expect(EDIT_PAGE).toContain('page')
-    for (const word of ['基本設定', 'どんなときに動くか', '何を返すか', '優先順位', '確認', 'LINEプレビュー']) {
+    for (const word of ['基本設定', 'どんなときに動くか', '何を返すか', '優先順位', '確認']) {
       expect(EDITOR).toContain(word)
     }
+    // B-6: 題「LINEプレビュー」は共通部品が出す。画面側は使うだけ。
+    expect(EDITOR).toContain("@/components/shared/line-preview'")
+    expect(EDITOR).toContain('<LinePreview')
     expect(EDITOR).not.toContain('Flex（JSONを直接書く）')
     expect(EDITOR).not.toContain('画像（JSONを直接書く）')
   })
@@ -114,7 +117,8 @@ describe('V6 自動応答一覧の契約', () => {
       expect(PUBLISH).toContain(word)
     }
     expect(PUBLISH).toContain('conflicts.map((conflict, index)')
-    expect(PUBLISH).toContain('LINEプレビュー')
+    // B-6: 題「LINEプレビュー」は共通部品が出す。画面側は使うだけ。
+    expect(PUBLISH).toContain('<AutoReplyPreview')
   })
 
   it('試験結果は候補の優先順位・動かない理由・解除条件と対応中の抑止を説明する', () => {

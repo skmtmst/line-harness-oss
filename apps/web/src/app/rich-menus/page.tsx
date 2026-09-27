@@ -19,6 +19,7 @@ import FilterChip from '@/components/shared/filter-chip'
 import IconButton from '@/components/shared/icon-button'
 import ActionMenu from '@/components/shared/action-menu'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { TableHeadRow, Th } from '@/components/shared/table'
@@ -644,7 +645,7 @@ export default function RichMenusListPage() {
   }, [page, pageCount])
 
   return (
-    <div data-design-node="GO8RQ" className="mx-auto max-w-[1584px]">
+    <div data-design-node="GO8RQ" className="mx-auto flex max-w-[1584px] flex-col gap-4">
       <span hidden>メニュー名・ボタン名で検索・保存した条件・公開中のみ</span>
       {showExternal && selectedAccount ? (
         /*
@@ -669,18 +670,21 @@ export default function RichMenusListPage() {
         data-design="KPIs"
         data-group-kpi-state={groupKpiState}
         data-tap-kpi-state={tapKpiState}
-        className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"
+        className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"
       >
         <div className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-faint text-xs">メニュー</p>
+          {/* R12: 総数は「すべて」の行とページ送りだけにし、KPIの主数値は公開中にする。 */}
+          <p className="text-ink-faint text-xs">公開中</p>
           <p className={`${groupKpiReady ? 'text-ink' : 'text-ink-faint'} mt-1 text-2xl font-bold tabular-nums`}>
-            {groupKpiReady ? (groupFacets?.total ?? groupTotal) : '—'}
+            {groupKpiReady ? (groupFacets?.published ?? '—') : '—'}
             {groupKpiReady && <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>}
           </p>
           <p className="text-ink-faint mt-0.5 text-xs">
             {groupKpiReady
-              ? `公開中 ${groupFacets?.published ?? '—'}`
-              : `公開中 —・${groupKpiUnavailableText}`}
+              ? groupFacets?.published != null
+                ? `下書き ${(groupFacets?.total ?? groupTotal) - groupFacets.published}件`
+                : `下書き —`
+              : `下書き —・${groupKpiUnavailableText}`}
           </p>
         </div>
         <div className="bg-canvas rounded-card border-hairline border p-4">
@@ -730,11 +734,11 @@ export default function RichMenusListPage() {
 
       <div
         data-design="Bar"
-        className="bg-canvas rounded-card border-hairline mb-3 border p-3"
+        className="bg-canvas rounded-card border-hairline border p-3"
       >
         <div className="flex flex-wrap items-center gap-2">
           <Button href="/rich-menus/new" variant="primary">
-            メニューを作る
+            ＋ メニューを作る
           </Button>
           <Button
             onClick={() => {
@@ -787,7 +791,7 @@ export default function RichMenusListPage() {
         ★V7：「保存した検索」と書いていたが、中身は状態の絞り込み。保存はできないので名前を合わせる。
         「管理画面の外」は絞り込みではなく別の画面を開く操作なので、札の列から出して枠つきボタンにする。
       */}
-      <div data-design="Saved" className="mb-3 flex flex-wrap items-center gap-2">
+      <div data-design="Saved" className="flex flex-wrap items-center gap-2">
         <span className="text-ink-faint text-xs whitespace-nowrap">よく使う絞り込み</span>
         {SAVED_FILTERS.map((f) => (
           <FilterChip key={f.key} selected={savedFilter === f.key} onChange={() => setSavedFilter(savedFilter === f.key && f.key ? '' : f.key)}>
@@ -858,7 +862,7 @@ export default function RichMenusListPage() {
                 kind="empty"
                 title="まだリッチメニューがありません"
                 description="トークの下に出すメニューを作れます。"
-                action={<Button href="/rich-menus/new" variant="primary">メニューを作る</Button>}
+                action={<Button href="/rich-menus/new" variant="primary">＋ メニューを作る</Button>}
               />
             ) : (
               <section className="border-hairline bg-canvas rounded-card overflow-hidden border shadow-card">
@@ -1208,8 +1212,9 @@ function ExternalImportWorkspace({
   const areas = selected ? Array.from({ length: Math.min(selected.areasCount, 6) }, (_, index) => String.fromCharCode(65 + index)) : []
 
   return (
-    <div data-design-node="TL7tp" className="mx-auto max-w-[1584px]">
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+    <div data-design-node="TL7tp" className="mx-auto flex max-w-[1584px] flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <nav className="text-ink-faint text-xs">
           <button type="button" className="text-action hover:underline" onClick={onBack}>リッチメニュー</button>
           <span className="mx-2">›</span>
@@ -1221,7 +1226,9 @@ function ExternalImportWorkspace({
       {loading ? <ListState kind="loading" title="LINEのメニューを読み込んでいます" /> : null}
       {!loading && error && !external ? <ListState kind="error" title="LINEのメニューを表示できませんでした" onRetry={onReload} /> : null}
       {!loading && !error && unmanaged.length === 0 ? (
-        <ListState kind="empty" title="管理画面の外のメニューはありません" description="LINE側だけにあるメニューが見つかると、ここに表示します。" />
+        <div className="bg-canvas rounded-card border-hairline border">
+          <ListState kind="empty" title="管理画面の外のメニューはありません" description="LINE側だけにあるメニューが見つかると、ここに表示します。" />
+        </div>
       ) : null}
 
       {!loading && unmanaged.length > 0 ? (
@@ -1261,7 +1268,7 @@ function ExternalImportWorkspace({
                 <li>✓ 「誰に出すか」の条件を付けられます（いまは全員に出ています）</li>
                 <li>✓ 面ごとのタップ数が取れるようになります</li>
               </ul>
-              <p className="bg-info-bg text-info mt-4 rounded-control p-3 text-xs font-semibold">ⓘ 取り込んでも、お客さまに出ているメニューは変わりません。中身をこちらで持つようになるだけです。</p>
+              <Notice tone="info" className="mt-4">ⓘ 取り込んでも、お客さまに出ているメニューは変わりません。中身をこちらで持つようになるだけです。</Notice>
             </section>
           </div>
 
@@ -1290,11 +1297,11 @@ function ExternalImportWorkspace({
                 )}
                 <Button type="button" variant="primary" className="mt-4" onClick={() => onImport(selected)}>この内容で取り込む</Button>
               </section>
-              <section className="bg-warning-bg text-warning rounded-card p-4 text-xs leading-6">
-                <h2 className="mb-1 font-bold">気をつけること</h2>
-                <p>・LINE側で作られたメニューは、名前が無いことがあります</p>
-                <p>・取り込まずに「LINEから削除」すると、お客さまのメニューがすぐ消えます</p>
-              </section>
+              <Notice tone="warn">
+                <h2 className="mb-1 text-xs font-bold">気をつけること</h2>
+                <p className="text-xs">・LINE側で作られたメニューは、名前が無いことがあります</p>
+                <p className="text-xs">・取り込まずに「LINEから削除」すると、お客さまのメニューがすぐ消えます</p>
+              </Notice>
             </aside>
           ) : null}
         </div>

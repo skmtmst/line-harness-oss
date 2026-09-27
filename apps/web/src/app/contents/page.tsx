@@ -32,6 +32,7 @@ import FilterChip from '@/components/shared/filter-chip'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
+import { notifyToast } from '@/components/shared/toast'
 import SearchField from '@/components/shared/search-field'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import Select from '@/components/shared/select'
@@ -138,7 +139,6 @@ function MediaLibraryInner() {
   const [quota, setQuota] = useState<MediaQuota | null>(null)
   const [quotaFailed, setQuotaFailed] = useState(false)
   const [error, setError] = useState('')
-  const [successMessage, setSuccessMessage] = useState('')
   const [folders, setFolders] = useState<Folder[]>([])
   // #721: 未分類の件数は GET /api/folders の unfiledCount をそのまま出す。
   // kind=media は件数未対応のため来ない。来ないときは null（「—」表示）。
@@ -475,7 +475,6 @@ function MediaLibraryInner() {
     setBulkBusy(true)
     setBulkProgress({ done: 0, total: ids.length })
     setError('')
-    setSuccessMessage('')
     let deleted = 0
     const failedNames: string[] = []
     for (const id of ids) {
@@ -509,7 +508,7 @@ function MediaLibraryInner() {
     setBulkConfirm(null)
     setBulkBusy(false)
     setBulkProgress(null)
-    if (result.tone === 'success') setSuccessMessage(result.message)
+    if (result.tone === 'success') notifyToast(result.message)
     else setError(result.message)
     void load()
   }
@@ -669,7 +668,7 @@ function MediaLibraryInner() {
         return
       }
       setArchiveTarget(null)
-      setSuccessMessage(mode === 'archive'
+      notifyToast(mode === 'archive'
         ? `「${item.filename}」をアーカイブしました。使っている場所はそのまま動き、一覧と新規選択からだけ外れます。`
         : `「${item.filename}」を一覧へ戻しました。`)
       void load()
@@ -732,7 +731,7 @@ function MediaLibraryInner() {
         }}
         onVersionCreated={(message) => {
           setDetailUrl(null)
-          setSuccessMessage(message)
+          notifyToast(message)
           void load()
         }}
         onItemUpdated={(updated) => setDetailsFor(updated)}
@@ -741,25 +740,25 @@ function MediaLibraryInner() {
   }
 
   return (
-    <div data-design-node="g89Tc" data-media-design="v6">
+    <div data-design-node="g89Tc" data-media-design="v6" className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
 
       {!selectedAccountId && !accountLoading && (
-        <ListState kind="empty" title="LINEアカウントを選択してください" description="登録メディアはLINEアカウントごとに管理します。" />
+        <div className="bg-canvas rounded-card border-hairline border">
+          <ListState kind="empty" title="LINEアカウントを選択してください" description="登録メディアはLINEアカウントごとに管理します。" />
+        </div>
       )}
 
       {error && (
-        <Notice tone="error" message={error} onClose={() => setError('')} className="mb-4" />
+        <Notice tone="danger" message={error} onClose={() => setError('')} className="mb-4" />
       )}
       {!error && selectedAccountId ? (
         <div className="mb-4">
           <FileScanStoppedBanner accountId={selectedAccountId} />
         </div>
       ) : null}
-      {successMessage && (
-        <Notice tone="success" message={successMessage} onClose={() => setSuccessMessage('')} className="mb-4" />
-      )}
 
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <Button type="button" variant="primary" onClick={() => setUploadOpen(true)}>ファイルを入れる</Button>
         </div>
@@ -976,9 +975,9 @@ function MediaLibraryInner() {
         />
       </div>
 
-      <div data-design-node="h8pBZr">
+      <div data-design-node="h8pBZr" className="flex flex-col gap-4">
       {total > 200 ? (
-        <p className="text-ink-faint mb-3 text-xs">200件を超えるメディアも、ページを移動してすべて確認できます。</p>
+        <p className="text-ink-faint text-xs">200件を超えるメディアも、ページを移動してすべて確認できます。</p>
       ) : null}
       {loading ? (
         <ListState kind="loading" title="読み込んでいます" description="このまま少しお待ちください。" />
@@ -990,12 +989,14 @@ function MediaLibraryInner() {
           action={<Button variant="secondary" onClick={() => void load()}>もう一度読み込む</Button>}
         />
       ) : current.length === 0 ? (
-        <ListState
-          kind="empty"
-          title={total === 0 && !query && !folderFilter ? 'まだメディアがありません' : '条件に合うメディアはありません'}
-          description={total === 0 && !query && !folderFilter ? '配信で使う画像・動画・音声・ファイルの置き場です。' : '種類、フォルダ、または検索条件を変えてください。'}
-          action={total === 0 && !query && !folderFilter ? <Button variant="primary" onClick={() => setUploadOpen(true)}>メディアを登録</Button> : undefined}
-        />
+        <div className="bg-canvas rounded-card border-hairline border">
+          <ListState
+            kind="empty"
+            title={total === 0 && !query && !folderFilter ? 'まだメディアがありません' : '条件に合うメディアはありません'}
+            description={total === 0 && !query && !folderFilter ? '配信で使う画像・動画・音声・ファイルの置き場です。' : '種類、フォルダ、または検索条件を変えてください。'}
+            action={total === 0 && !query && !folderFilter ? <Button variant="primary" onClick={() => setUploadOpen(true)}>メディアを登録</Button> : undefined}
+          />
+        </div>
       ) : (
         <div
           className={
@@ -1380,7 +1381,7 @@ function MediaLibraryInner() {
         </label>
       </Dialog>
 
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
           <ListRange total={total} first={total === 0 ? 0 : (page - 1) * pageSize + 1} last={Math.min(page * pageSize, total)} />
           <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
@@ -1429,7 +1430,7 @@ function MediaLibraryInner() {
         initialFolderId={folderFilter}
         onClose={() => setUploadOpen(false)}
         onComplete={() => {
-          setSuccessMessage('登録できたメディアを一覧へ反映しました。')
+          notifyToast('登録できたメディアを一覧へ反映しました。')
           void load()
         }}
       />
@@ -1440,7 +1441,7 @@ function MediaLibraryInner() {
         onClose={() => setReplacementFor(null)}
         onComplete={(message) => {
           setReplacementFor(null)
-          setSuccessMessage(message)
+          notifyToast(message)
           void load()
         }}
       />

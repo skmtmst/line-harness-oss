@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import HqAccountList from '@/components/hq/account-list'
 import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount, type AccountWithStats } from '@/contexts/account-context'
 import { api } from '@/lib/api'
@@ -62,8 +63,9 @@ export default function HqOpenPage() {
   }
 
   return (
-    <div>
-      <header data-design="Head" className="mb-6 flex flex-wrap items-start justify-between gap-4">
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <header data-design="Head" className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="text-sm font-semibold text-ink-secondary">統括コンソール</p>
           <h1 className="mt-1 text-2xl font-bold tracking-tight text-ink">どのアカウントの{target.label}を開きますか</h1>
@@ -73,17 +75,19 @@ export default function HqOpenPage() {
       </header>
 
       {error ? (
-        <div className="rounded-card bg-danger-bg p-4 text-sm text-danger" role="alert">
-          <p>{error}</p>
-          <Button
-            type="button"
-            variant="secondary"
-            className="mt-3"
-            onClick={() => { setError(''); setLoading(true); setReloadKey((key) => key + 1) }}
-          >
-            再読み込み
-          </Button>
-        </div>
+        <Notice
+          tone="danger"
+          message={error}
+          action={
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => { setError(''); setLoading(true); setReloadKey((key) => key + 1) }}
+            >
+              再読み込み
+            </Button>
+          }
+        />
       ) : null}
       {!error && loading ? (
         <div className="flex min-h-64 items-center justify-center" role="status" aria-label="アカウントを読み込み中">

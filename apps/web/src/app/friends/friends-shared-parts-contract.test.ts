@@ -74,8 +74,8 @@ describe('友だち一覧(PhxG6)を共通部品へ載せ替える契約', () => 
 })
 
 describe('統合ユーザー(r7eSi)の指標カードを共通部品へ載せ替える契約', () => {
-  it('共通SummaryCardだけを描き、手書きの面と24pxの値を残さない', () => {
-    expect(SUMMARY).toContain("import SummaryCard from '@/components/shared/summary-card'")
+  it('共通KpiCardだけを描き、手書きの面と24pxの値を残さない', () => {
+    expect(SUMMARY).toContain("import KpiCard from '@/components/shared/kpi-card'")
     expect(SUMMARY_BODY, '値が24pxのまま').not.toContain('text-2xl')
     expect(SUMMARY_BODY, '手書きの角丸が残っている').not.toContain('rounded-[')
     expect(SUMMARY_BODY, '手書きの影が残っている').not.toContain('shadow-[')

@@ -120,7 +120,7 @@ describe('LINEアカウント作成ウィザード', () => {
       channelSecret: 'synthetic-secret',
       loginChannelId: '2007123456',
       loginChannelSecret: 'synthetic-login-secret',
-    })
+    }, undefined)
     expect(screen.getByRole('link', { name: '登録したアカウントを見る' }).getAttribute('href')).toBe('/accounts/detail?id=new-account')
     expect(screen.getByRole('link', { name: '統括コンソールへ' }).getAttribute('href')).toBe('/hq')
     expect(document.body.textContent).not.toContain('synthetic-secret')

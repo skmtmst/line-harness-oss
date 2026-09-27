@@ -13,12 +13,14 @@ import {
   type EventSlotInput,
 } from '@/lib/api'
 import ImageUploader from '@/components/shared/image-uploader'
+import LinePreview from '@/components/shared/line-preview'
 import { AsideCard, ChoiceCard, Field, FormSection, inputClass } from '@/components/shared/create-page'
 import { BULK_SLOT_LIMIT, generateBulkSlots } from './bulk-slot-generator'
 import { formatSlotJp, jstHHMMToUtcIso, splitBand, todayJst } from './jst'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { TextInput } from '@/components/shared/form-controls'
 import DateField from '@/components/shared/date-field'
+import Notice from '@/components/shared/notice'
 import { TimeField } from '@/components/shared/date-time-field'
 import Select from '@/components/shared/select'
 import EventQuestionsEditor, { parseEventQuestions } from '@/components/events/event-questions-editor'
@@ -350,7 +352,9 @@ export default function EventWizard({ accountId, eventId, step }: EventWizardPro
       <StepNav current={step} />
 
       {error && (
-        <div className="bg-danger-bg text-danger rounded-card mb-3 px-4 py-3 text-sm">{error}</div>
+        <Notice tone="danger" className="mb-3">
+          {error}
+        </Notice>
       )}
 
       {step === 1 && (
@@ -786,10 +790,9 @@ function OverviewStep({
       </div>
 
       <aside data-design="Right" className="w-full shrink-0 space-y-3 xl:w-96">
-        <div className="bg-canvas rounded-card border-hairline border p-4">
-          <h2 className="text-ink text-sm font-semibold">お客様のLINEではこう見えます</h2>
-          <div className="border-accent bg-accent-soft/30 mt-3 rounded-card border-8 p-3">
-            <div className="bg-canvas rounded-control border-hairline overflow-hidden border">
+        {/* LINEの見た目の枠は共通部品 `LinePreview`（B-6）。緑の二重枠はやめる。 */}
+        <LinePreview>
+          <div className="bg-canvas rounded-card border-hairline overflow-hidden border">
               <div className="bg-canvas-sunken flex h-24 items-center justify-center text-xs text-ink-faint">
                 {draft.image_url ? '設定した画像が表示されます' : 'イベント画像'}
               </div>
@@ -807,9 +810,8 @@ function OverviewStep({
                   申し込む
                 </span>
               </div>
-            </div>
           </div>
-        </div>
+        </LinePreview>
         <div className="bg-warning-bg rounded-card border-warning/30 border p-4">
           <h2 className="text-warning text-sm font-semibold">保存すると起きること</h2>
           <ul className="text-ink-secondary mt-2 space-y-2 text-xs">

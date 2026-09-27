@@ -50,7 +50,9 @@ describe('V6 1通目設定の契約', () => {
     expect(PAGE).toContain('label="シナリオ情報" state="done"')
     expect(PAGE).toContain('label="配信方式" state="done"')
     expect(PAGE).toContain('label="1通目を設定" state="current"')
-    expect(PREVIEW).toContain('LINEプレビュー')
+    // B-6: 題「LINEプレビュー」は共通部品が出す。画面側は使うだけ。
+    expect(PREVIEW).toContain('<LinePreview')
+    expect(PREVIEW).toContain('に届きます（1通目）')
     expect(PREVIEW).toContain('設定サマリー')
   })
 
