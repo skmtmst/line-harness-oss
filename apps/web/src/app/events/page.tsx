@@ -308,17 +308,18 @@ export default function EventsListPage() {
         <DataTable data-design="Table">
               <thead>
                 <TableHeadRow>
-                  <Th style={{ width: '24%' }}>イベント名</Th>
-                  <Th style={{ width: '18%' }}>開催日時</Th>
+                  {/*
+                    列幅の合計は 68%。操作列が固定 256px のため、割合を上げると
+                    狭い器（1152px で本文約816px）で表が器より広くなり、
+                    幅の無い列がつぶれて見出しが重なる。申込条件は状態の下へ畳み、
+                    幅の無い列を作らない。
+                  */}
+                  <Th style={{ width: '18%' }}>イベント名</Th>
+                  <Th style={{ width: '16%' }}>開催日時</Th>
                   <Th style={{ width: '12%' }} align="right">予約 / 定員</Th>
                   <Th style={{ width: '10%' }} align="right">承認待ち</Th>
-                  {/* タグ名は長さが読めないため幅を指定しない。残りを吸って表を器に合わせる。 */}
-                  <Th>申込条件</Th>
-                  <Th style={{ width: '10%' }}>状態</Th>
-                  {/*
-                    操作列は固定幅（256px）。割合にすると中身（2ボタン約242px）が
-                    器からはみ出す。残りは割合と自動の列で吸う。
-                  */}
+                  <Th style={{ width: '12%' }}>状態</Th>
+                  {/* 操作列は固定幅（256px）。割合にすると中身（2ボタン約242px）が器からはみ出す。 */}
                   <Th align="right" className="w-64">操作</Th>
                 </TableHeadRow>
               </thead>
@@ -358,26 +359,6 @@ export default function EventsListPage() {
                         <span className="text-ink-faint">0 件</span>
                       )}
                     </Td>
-                    {/* 申込条件。visible_tag_id が入っていると、そのタグの人にしか
-                        LIFF の一覧に出ない。「全員」と見分けがつかないと、公開した
-                        つもりで誰にも見えていない状態に気づけない。
-                        タグを消しても events 側の ID は残るので、その場合は名前が
-                        引けない＝もう誰にも見えない、と分かるように別の文言を出す。 */}
-                    {/*
-                      申込条件のタグ名は長さが読めない。列幅（自動）より広いと
-                      器からはみ出すので、1行で省略し全文は title で確認する。
-                    */}
-                    <Td className="text-ink-secondary">
-                      {!e.visible_tag_id ? (
-                        '全員'
-                      ) : e.visible_tag_name ? (
-                        <span className="block max-w-32 truncate" title={e.visible_tag_name}>
-                          {e.visible_tag_name}
-                        </span>
-                      ) : (
-                        <span className="text-warning">消えたタグ</span>
-                      )}
-                    </Td>
                     <Td>
                       {/*
                         R81: 公開済みでも今後の枠が無ければ「終了」。
@@ -412,6 +393,23 @@ export default function EventsListPage() {
                           </span>
                         )
                       })()}
+                      {/*
+                        申込条件は状態の札の下へ畳む。独立した列にすると狭い器で
+                        幅が足りず、見出しが重なり「全員」が縦に折れる。
+                        visible_tag_id があると、そのタグの人にしか LIFF の
+                        一覧に出ない。タグを消しても ID は残るので、名前が
+                        引けないときは別の文言で「もう誰にも見えない」と分かるようにする。
+                        タグ名は長いので1行で省略し、全文は title で確認する。
+                      */}
+                      {!e.visible_tag_id ? (
+                        <span className="text-ink-faint mt-1 block max-w-32 truncate text-xs">全員</span>
+                      ) : e.visible_tag_name ? (
+                        <span className="text-ink-faint mt-1 block max-w-32 truncate text-xs" title={e.visible_tag_name}>
+                          {e.visible_tag_name}
+                        </span>
+                      ) : (
+                        <span className="text-warning mt-1 block max-w-32 truncate text-xs">消えたタグ</span>
+                      )}
                     </Td>
                     <ActionCell>
                       <span className="inline-flex items-center justify-end gap-2">
