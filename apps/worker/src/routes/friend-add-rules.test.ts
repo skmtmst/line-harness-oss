@@ -244,6 +244,87 @@ describe('friend add rules API', () => {
     expect(response.status).toBe(201);
   });
 
+  test('R30: シナリオ未選択の未完成でも下書きは作れる', async () => {
+    const response = await app.request('/api/friend-add-rules/drafts', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'Idempotency-Key': 'friend-rule-create-r30' },
+      body: JSON.stringify({
+        accountId: 'account-1', friendKind: 'first_time', name: '仮の案内', priority: 1,
+        definition: { ...definition, routeIds: [], scenarioId: null },
+      }),
+    }, makeEnv());
+    expect(response.status).toBe(201);
+    expect(db.createFriendAddRuleDraft).toHaveBeenCalled();
+  });
+
+  test('R30: シナリオ未選択の未完成でも下書きへ上書き保存できる', async () => {
+    db.saveFriendAddRuleDraft.mockResolvedValue(rule);
+    const response = await app.request('/api/friend-add-rules/rule-1/draft?account_id=account-1', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json', 'Idempotency-Key': 'friend-rule-save-r30' },
+      body: JSON.stringify({
+        accountId: 'account-1', friendKind: 'first_time', name: '仮の案内', priority: 1, version: 1,
+        definition: { ...definition, routeIds: [], scenarioId: null },
+      }),
+    }, makeEnv());
+    expect(response.status).toBe(200);
+    expect(db.saveFriendAddRuleDraft).toHaveBeenCalled();
+  });
+
+  test('R30: 使えない参照先を入れた下書きは作らせない', async () => {
+    const prepare = vi.fn(() => ({
+      bind: vi.fn(() => ({
+        all: vi.fn().mockResolvedValue({ results: [] }),
+        first: vi.fn().mockResolvedValue(null),
+        run: vi.fn().mockResolvedValue({ success: true }),
+      })),
+    }));
+    const env = { DB: { prepare } } as unknown as Env['Bindings'];
+    const response = await app.request('/api/friend-add-rules/drafts', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'Idempotency-Key': 'friend-rule-create-r30-foreign' },
+      body: JSON.stringify({
+        accountId: 'account-1', friendKind: 'first_time', name: 'よその持ち物', priority: 1,
+        definition,
+      }),
+    }, env);
+    expect(response.status).toBe(400);
+    expect(db.createFriendAddRuleDraft).not.toHaveBeenCalled();
+  });
+
+  test('R30: 未完成の下書きはテストで理由付きで失敗する（公開ゲート）', async () => {
+    db.getFriendAddRule.mockResolvedValueOnce({
+      ...rule,
+      definition_snapshot: JSON.stringify({ ...definition, routeIds: [], scenarioId: null }),
+    });
+    const response = await app.request('/api/friend-add-rules/test', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ accountId: 'account-1', ruleId: 'rule-1' }),
+    }, makeEnv());
+    expect(response.status).toBe(200);
+    const body = await response.json() as { success: boolean; data: { matched: boolean; reasons: string[] } };
+    expect(body.success).toBe(false);
+    expect(body.data.matched).toBe(false);
+    expect(body.data.reasons.join('\n')).toContain('シナリオ');
+    expect(db.recordFriendAddRuleTest).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      ruleId: 'rule-1', succeeded: false,
+    }));
+  });
+
+  test('R31: 一覧のまとめは直近7日にそろえ、送信は実際に送った数で数える', async () => {
+    const env = makeEnv();
+    const response = await app.request('/api/friend-add-rules?account_id=account-1&kind=first_time', {}, env);
+    expect(response.status).toBe(200);
+    const statements = (env.DB.prepare as unknown as { mock: { calls: Array<[string]> } })
+      .mock.calls.map((args) => String(args[0]));
+    const summarySql = statements.find((sql) => sql.includes('recent_adds'));
+    expect(summarySql).toBeDefined();
+    const weekly = summarySql!.match(/occurred_at >= strftime\('%Y-%m-%dT%H:%M:%f', 'now', '\+9 hours', '-7 days'\)/g) ?? [];
+    expect(weekly.length).toBeGreaterThanOrEqual(5);
+    expect(summarySql).toContain('delivery_count');
+    expect(summarySql).toContain('partial_failed');
+  });
+
   test('公開は冪等キーをDB処理へ渡す', async () => {
     const response = await app.request('/api/friend-add-rules/rule-1/publish?account_id=account-1', {
       method: 'POST', headers: { 'Idempotency-Key': 'friend-rule-publish-0001' },
