@@ -37,6 +37,11 @@ interface Props {
    * 取り直さない。編集窓を開くたびの N+1 を無くす。
    */
   poolMemberNames?: Record<string, string[]>
+  /**
+   * R39: 新規作成時に所属させるLINEアカウント。一覧のヘッダー選択を渡す。
+   * 更新では所属を変えないので使わない。
+   */
+  accountId?: string | null
   onClose: () => void
   onSaved: (savedRoute: EntryRoute, created: boolean) => void
 }
@@ -51,6 +56,7 @@ export default function EditRouteModal({
   initialGenre,
   initialRefCode,
   poolMemberNames,
+  accountId,
   onClose,
   onSaved,
 }: Props) {
@@ -120,8 +126,13 @@ export default function EditRouteModal({
     setSubmitting(true)
     setError('')
     try {
+      // R39: 新規作成は所属が必須。選んでいなければ送らず理由を出す。
+      if (isNew && !accountId) {
+        setError('LINEアカウントを選んでください（画面上部で選べます）')
+        return
+      }
       const res = isNew
-        ? await api.entryRoutes.create(form)
+        ? await api.entryRoutes.create({ ...form, lineAccountId: accountId ?? null })
         : await api.entryRoutes.update(route!.id, form)
       if (res.success) onSaved(res.data, isNew)
       else setError(res.error ?? '保存に失敗しました。通信を確かめて、もう一度お試しください。')

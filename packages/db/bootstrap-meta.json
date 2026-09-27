@@ -430,7 +430,8 @@
     "498_line_account_lifecycle.sql",
     "499_account_handover_declared_rollback.sql",
     "500_ad_cost_ledger.sql",
-    "501_site_tracking_consent.sql"
+    "501_site_tracking_consent.sql",
+    "502_booking_liff_date_view.sql"
   ],
-  "migrationCount": 431
+  "migrationCount": 432
 }

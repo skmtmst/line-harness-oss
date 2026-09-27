@@ -506,6 +506,52 @@ describe('店舗共通の予約ルール', () => {
     expect((screen.getByRole('spinbutton', { name: '何日先まで受け付けるか' }) as HTMLInputElement).value).toBe('30')
     expect(screen.queryByRole('status')).toBeNull()
   })
+
+  test('日時を選ぶ画面の最初の形は2択で選び、保存に載る', async () => {
+    fixture.activeTab = 'rules'
+    render(<><MenusPage /><ToastHost /></>)
+    await screen.findByRole('spinbutton', { name: '何日先まで受け付けるか' })
+
+    // 見出しと？（お客さんは切り替えられる・ここは最初の形だけ）。
+    expect(screen.getByText('日時を選ぶ画面の最初の形')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '日時を選ぶ画面の最初の形の説明' }))
+    expect(screen.getByText(/お客さんは画面の上で切り替えられます/)).toBeTruthy()
+
+    // 既定はリスト。
+    const calendar = screen.getByRole('radio', { name: /カレンダー/ }) as HTMLInputElement
+    const list = screen.getByRole('radio', { name: /リスト/ }) as HTMLInputElement
+    expect(list.checked).toBe(true)
+    fireEvent.click(calendar)
+    expect(calendar.checked).toBe(true)
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '基本ルールを作成' }))
+    })
+    await waitFor(() => { expect(fixture.saveSettings).toHaveBeenCalled() })
+    expect(fixture.saveSettings).toHaveBeenCalledWith('account-a', expect.objectContaining({
+      liffDateView: 'calendar',
+    }))
+  })
+
+  test('保存済みがカレンダーならカレンダーが選ばれた状態で開く', async () => {
+    fixture.activeTab = 'rules'
+    fixture.getSettings = vi.fn(async () => ({ success: true, data: { ...SETTINGS, liffDateView: 'calendar' } }))
+    render(<><MenusPage /><ToastHost /></>)
+    await screen.findByRole('spinbutton', { name: '何日先まで受け付けるか' })
+    expect((screen.getByRole('radio', { name: /カレンダー/ }) as HTMLInputElement).checked).toBe(true)
+  })
+
+  test('0分前の説明は受付・キャンセルの時間の欄の下にあり、2択の見出しより前', async () => {
+    fixture.activeTab = 'rules'
+    render(<><MenusPage /><ToastHost /></>)
+    await screen.findByRole('spinbutton', { name: '何日先まで受け付けるか' })
+    const note = screen.getByText(/0分前は、開始直前まで/)
+    const cutoff = screen.getByRole('spinbutton', { name: '受付の締め切り' })
+    const viewHeading = screen.getByText('日時を選ぶ画面の最初の形')
+    // 文書の順番：時間の欄 → 説明 → 2択の見出し。
+    expect(cutoff.compareDocumentPosition(note) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(note.compareDocumentPosition(viewHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
 })
 
 describe('既存メニューの編集窓: 版管理と料金モード', () => {

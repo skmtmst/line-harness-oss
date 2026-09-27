@@ -7,6 +7,9 @@ import { groupTagsByFolder } from '../tag-options'
 import { api } from '@/lib/api'
 import { isPoolsFeatureAvailable } from '@/lib/pools-availability'
 import { qrToDataURL } from '@/lib/qr-image'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { useAccount } from '@/contexts/account-context'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import CreatePage, {
   AsideCard,
   Field,
@@ -35,6 +38,8 @@ function suggestRef(name: string): string {
 }
 
 export default function NewInflowLinkPage() {
+  const { selectedAccountId, selectedAccount } = useAccount()
+  const [saving, setSaving] = useState(false)
   const [name, setName] = useState('')
   const [genre, setGenre] = useState('')
   const [refCode, setRefCode] = useState('')
@@ -92,7 +97,9 @@ export default function NewInflowLinkPage() {
     return () => {
       cancelled = true
     }
-  }, [])
+    // R39: 候補（タグ・シナリオ・プール・テンプレート）はアカウントごとに
+    // 違う。切替後に古い候補のまま保存しないよう、取り直す。入力は残す。
+  }, [selectedAccountId])
 
   const validRef = REF_PATTERN.test(refCode)
   const workerBase = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '')
@@ -123,7 +130,19 @@ export default function NewInflowLinkPage() {
     }
   }, [previewUrl])
 
+  /*
+   * R18: 入力の途中で一覧リンク・左メニュー・戻る・再読込へ出るときは、
+   * 入力が消える前に確認を出す。保存が終わって詳細へ進む動きは
+   * プログラムの移動なので、この確認は出ない。
+   */
+  const dirty = Boolean(
+    name || genre || refCode || tagId || scenarioId || introTemplateId
+    || poolId || redirectUrl || !isActive,
+  )
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
+
   return (
+    <>
     <CreatePage
       title="流入リンクをつくる"
       description="流入経路ごとにURLを分けると、どこから友だちになったかが分かります。"
@@ -135,6 +154,7 @@ export default function NewInflowLinkPage() {
       variant="v6"
       statusLabel="まだ発行されていません。発行すると、すぐにこのURLが使えます。"
       validate={() => {
+        if (!selectedAccountId) return 'LINEアカウントを選んでください（画面上部で選べます）'
         if (!name.trim()) return 'リンク名を入力してください'
         if (!validRef) {
           return 'refコードは、半角英数字・_・ハイフンで1〜64文字にしてください'
@@ -142,19 +162,28 @@ export default function NewInflowLinkPage() {
         return null
       }}
       onSave={async () => {
-        const res = await api.entryRoutes.create({
-          name: name.trim(),
-          genre: genre.trim() || null,
-          refCode: refCode.trim(),
-          tagId: tagId || null,
-          scenarioId: scenarioId || null,
-          introTemplateId: introTemplateId || null,
-          poolId: poolId || null,
-          redirectUrl: redirectUrl.trim() || null,
-          isActive,
-        })
-        if (!res.success) throw new Error(res.error)
-        return res.data.id
+        if (!selectedAccountId) {
+          throw new Error('LINEアカウントを選んでください（画面上部で選べます）')
+        }
+        setSaving(true)
+        try {
+          const res = await api.entryRoutes.create({
+            name: name.trim(),
+            genre: genre.trim() || null,
+            refCode: refCode.trim(),
+            tagId: tagId || null,
+            scenarioId: scenarioId || null,
+            introTemplateId: introTemplateId || null,
+            poolId: poolId || null,
+            redirectUrl: redirectUrl.trim() || null,
+            isActive,
+            lineAccountId: selectedAccountId,
+          })
+          if (!res.success) throw new Error(res.error)
+          return res.data.id
+        } finally {
+          setSaving(false)
+        }
       }}
       aside={
         <>
@@ -333,6 +362,20 @@ export default function NewInflowLinkPage() {
 
       <FormSection step={4} label="どのLINEアカウントに入れるか">
         <Field
+          label="所属するLINEアカウント"
+          note="発行したリンクはこのアカウントに所属します。一覧では選んだアカウントの分だけ表示されます。"
+        >
+          {selectedAccountId ? (
+            <p className="rounded-control bg-canvas-sunken px-3 py-2 text-sm font-semibold text-ink">
+              {selectedAccount?.name ?? selectedAccountId}
+            </p>
+          ) : (
+            <p className="rounded-control bg-canvas-sunken px-3 py-2 text-sm text-ink-faint">
+              画面上部でLINEアカウントを選んでください
+            </p>
+          )}
+        </Field>
+        <Field
           label="入れるアカウント"
           htmlFor="ir-pool"
           note="選ばないと、全体の既定の振り分けに従います。"
@@ -355,6 +398,17 @@ export default function NewInflowLinkPage() {
       </FormSection>
 
     </CreatePage>
+
+    <ConfirmDialog
+      open={leaveTarget !== null}
+      title="保存していない変更があります"
+      description="このまま移動すると、入力した流入リンクは失われます。保存せずに移動しますか？"
+      confirmLabel="保存せずに移動"
+      cancelLabel="編集を続ける"
+      onConfirm={confirmLeave}
+      onCancel={cancelLeave}
+    />
+    </>
   )
 }
 

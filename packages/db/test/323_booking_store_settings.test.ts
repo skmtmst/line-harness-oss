@@ -32,6 +32,11 @@ const auditAndReminderMigration = readFileSync(
   join(import.meta.dirname, '..', 'migrations', '430_booking_audit_and_reminder_settings.sql'),
   'utf8',
 );
+// 502 で booking_settings に LIFF 日時表示の列が足された。書き側が参照するので同じく追従させる。
+const liffDateViewMigration = readFileSync(
+  join(import.meta.dirname, '..', 'migrations', '502_booking_liff_date_view.sql'),
+  'utf8',
+);
 
 describe('migration 323 店舗共通の予約設定', () => {
   let sqlite: Database.Database;
@@ -81,6 +86,7 @@ describe('migration 323 店舗共通の予約設定', () => {
     sqlite.exec(capacityMigration);
     sqlite.exec(businessHoursConfiguredMigration);
     sqlite.exec(auditAndReminderMigration);
+    sqlite.exec(liffDateViewMigration);
     sqlite.exec(`
       INSERT INTO booking_business_hours
         (id, booking_settings_id, weekday, start_time, end_time)
