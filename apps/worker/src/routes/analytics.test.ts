@@ -401,6 +401,18 @@ describe('V6分析の概要API', () => {
         toDate: '2026-08-30',
       }),
       50,
+      undefined,
+    );
+  });
+
+  it('URLクリックは検索語をそのまま渡す', async () => {
+    const res = await req(`/api/analytics/url-clicks?${ACCOUNT}&query=${encodeURIComponent('支店')}`);
+    expect(res.status).toBe(200);
+    expect(mocks.getAnalyticsUrlClicksOverview).toHaveBeenCalledWith(
+      env.DB,
+      expect.objectContaining({ lineAccountId: 'account-a' }),
+      200,
+      '支店',
     );
   });
 
