@@ -66,7 +66,7 @@ describe('一覧の状態とページ送り', () => {
 
   it('取れなかった数を 0 と出さない', () => {
     // 数の無いところに 0 を入れると、「数えて0だった」と読めてしまう。
-    const kpis = read('summary-card.tsx')
+    const kpis = read('kpi-card.tsx')
     expect(kpis).toMatch(/value === null \? '—'/)
   })
 })

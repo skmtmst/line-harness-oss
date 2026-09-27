@@ -14,6 +14,7 @@ import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 import StickyBar from '@/components/shared/sticky-bar'
 import TargetMissing from '@/components/shared/target-missing'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -486,9 +487,7 @@ function ProjectInner() {
           </div>
           <div className="border-t border-hairline" />
           {generationError ? (
-            <div className="mx-4 mt-4 rounded-card bg-status-danger-soft px-4 py-3 text-label text-danger" role="alert">
-              {generationError}
-            </div>
+            <Notice tone="danger" message={generationError} onClose={() => setGenerationError('')} className="mx-4 mt-4" />
           ) : null}
           <div data-design-node="TyPEb" className="p-4">
             {images.length === 0 && pendingCount === 0 ? (

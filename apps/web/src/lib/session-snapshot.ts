@@ -13,6 +13,10 @@ import type { OpsImpersonation } from '@/lib/api'
  */
 export interface SessionSnapshot {
   impersonation: OpsImpersonation | null
+  /** V-2: いつもと違う端末・場所からのログイン時刻。帯はこれが立っている間だけ出す。 */
+  unfamiliarAt: string | null
+  /** V-1: 再確認の聞き方。'totp' は認証アプリの6桁、'password' はパスワード。 */
+  stepUpMethod: 'totp' | 'password' | 'none'
 }
 
 let snapshot: SessionSnapshot | null = null

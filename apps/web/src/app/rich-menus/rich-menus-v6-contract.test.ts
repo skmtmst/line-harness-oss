@@ -45,9 +45,9 @@ describe('V6リッチメニューの画面契約', () => {
     expect(PAGE).toContain("const groupKpiState = !selectedAccount?.id")
     expect(PAGE).toContain("const groupKpiReady = groupKpiState === 'ready'")
     expect(PAGE).toContain('data-group-kpi-state={groupKpiState}')
-    expect(PAGE).toContain("groupKpiReady ? (groupFacets?.total ?? groupTotal) : '—'")
+    expect(PAGE).toContain("groupKpiReady ? (groupFacets?.published ?? '—') : '—'")
     expect(PAGE).toContain("groupKpiReady ? targetingCount : '—'")
-    expect(PAGE).toContain('公開中 —・${groupKpiUnavailableText}')
+    expect(PAGE).toContain('下書き —・${groupKpiUnavailableText}')
     expect(PAGE).toContain("'一覧を取得できませんでした'")
   })
 

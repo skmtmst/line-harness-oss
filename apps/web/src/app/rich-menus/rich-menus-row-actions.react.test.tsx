@@ -109,7 +109,8 @@ describe('#641 リッチメニュー一覧の行操作', () => {
     const more = host.querySelector('button[aria-label="通常メニューのその他操作"]') as HTMLButtonElement
     expect(more, 'その他ボタンが見つかりません').toBeTruthy()
     act(() => { more.click() })
-    const menu = host.querySelector('[role="menu"]')
+    // メニューは最上層（MenuPortal→document.body）に出る。器の中にはいない。
+    const menu = document.querySelector('[role="menu"]')
     expect(menu, 'メニューが開きません').toBeTruthy()
     expect(menu!.textContent).toContain('表示先')
     expect(menu!.textContent).toContain('複製')

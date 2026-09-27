@@ -3,11 +3,13 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import Image from 'next/image'
 import { api, type FollowerImportState, type LineAccountConnectData } from '@/lib/api'
+import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
 import Button from '@/components/shared/button'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import PageHeader from '@/components/shared/page-header'
 import StickyBar from '@/components/shared/sticky-bar'
 import StatusBadge from '@/components/shared/status-badge'
+import Notice from '@/components/shared/notice'
 import NoticeLineRegisterDialog from '@/components/hq/notice-line-register-dialog'
 import { CHECK_STATE_LABEL, canSave, stoppedAt, toSteps } from '../connection-check-view'
 
@@ -43,6 +45,7 @@ export default function NewLineAccountPage() {
   const [busyAction, setBusyAction] = useState<BusyAction>(null)
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [error, setError] = useState('')
+  const [stepUp, setStepUp] = useState<StepUpRequest | null>(null)
   const busyLock = useRef(false)
   const stepPanelRef = useRef<HTMLDivElement>(null)
 
@@ -149,7 +152,7 @@ export default function NewLineAccountPage() {
     }
   }
 
-  const save = async () => {
+  const save = async (stepUpToken?: string) => {
     if (!connectionPassed || busyLock.current) {
       setError('5段すべて通ってから保存してください。')
       return
@@ -158,7 +161,7 @@ export default function NewLineAccountPage() {
     setBusyAction('save')
     setError('')
     try {
-      const response = await api.lineAccounts.connect(input())
+      const response = await api.lineAccounts.connect(input(), stepUpToken)
       if (!response.success) {
         setError(response.error)
         return
@@ -166,7 +169,12 @@ export default function NewLineAccountPage() {
       setConnection(response.data)
       setForm((current) => ({ ...current, channelSecret: '', loginChannelSecret: '' }))
       setCurrentStep(5)
-    } catch {
+    } catch (caught) {
+      // LINEの接続は大事な操作。本人確認を求められたら窓を立ててやり直す（V-1）。
+      if (!stepUpToken && isStepUpRequired(caught)) {
+        setStepUp({ purpose: 'line_account.connect', action: 'LINEの接続を登録する', retry: save })
+        return
+      }
       setError('登録できませんでした。DBには保存していません。時間をおいて、もう一度お試しください。')
     } finally {
       busyLock.current = false
@@ -189,10 +197,10 @@ export default function NewLineAccountPage() {
   )
 
   return (
-    <div data-design-node="b2NGxk" className="w-full pb-24">
+    <div data-design-node="b2NGxk" className="flex w-full flex-col gap-4 pb-24">
       {/* ★V7: 登録専用の枠の幅いっぱいに広げる。中央寄せの狭い列にしない。 */}
       <div data-design="Head">
-        <div className="mb-4 flex justify-end"><Button href="/hq">統括コンソールへ戻る</Button></div>
+        <div className="flex justify-end"><Button href="/hq">統括コンソールへ戻る</Button></div>
         <PageHeader
           breadcrumb={[{ label: 'LINEアカウント', href: '/accounts' }, { label: '登録' }]}
           title="LINEアカウントを登録"
@@ -205,7 +213,7 @@ export default function NewLineAccountPage() {
         長かった。狭い画面では「いまの手順＋位置」だけを出し、全手順は
         開いて確認する形にする。640px 以上ではこれまでどおり5段で出す。
       */}
-      <nav data-design="Steps" aria-label="登録の進捗" className="bg-canvas rounded-card border-hairline mb-4 border p-4">
+      <nav data-design="Steps" aria-label="登録の進捗" className="bg-canvas rounded-card border-hairline border p-4">
         <ol className="hidden gap-2 sm:grid sm:grid-cols-5">
           {WIZARD_STEPS.map((step) => {
             const active = currentStep === step.number
@@ -286,8 +294,8 @@ export default function NewLineAccountPage() {
                     <StatusBadge tone={item.state === 'passed' ? 'success' : item.state === 'failed' ? 'warning' : 'neutral'}>{CHECK_STATE_LABEL[item.state]}</StatusBadge>
                   </li>)}
                 </ol>
-                {stopped && <p role="alert" className="bg-warning-bg text-warning rounded-control p-3 text-xs leading-relaxed">{stopped.message}</p>}
-                {connectionPassed && <p role="status" className="bg-success-bg text-success rounded-control p-3 text-xs">5段すべて通りました。保存できます。</p>}
+                {stopped && <Notice tone="warn" message={stopped.message} />}
+                {connectionPassed && <Notice tone="success" message="5段すべて通りました。保存できます。" />}
                 <Button type="button" variant="primary" disabled={Boolean(busyAction)} onClick={() => void checkConnection()}>{busyAction === 'check' ? '接続して設定しています…' : '接続して設定する'}</Button>
               </SetupSection>
             </div>
@@ -300,7 +308,7 @@ export default function NewLineAccountPage() {
 
           {currentStep === 5 && connection && <div data-design-node={importingIds ? 'VPh1U' : 't3Mlu'}>
             <SetupSection title="登録が完了しました" description="LINEアカウントの接続設定を自動で完了しました。">
-              {importingIds ? <p role="status" className="bg-action-soft text-action rounded-control p-4 text-sm">認証済みアカウントのため、既存の友だちを取り込んでいます（{importState?.received ?? 0}人 / 確認中）。取り込みが終わるまで、この画面でお待ちください。</p> : <p role="status" className="bg-success-bg text-success rounded-control p-4 text-sm">登録が完了しました</p>}
+              {importingIds ? <Notice tone="info">認証済みアカウントのため、既存の友だちを取り込んでいます（{importState?.received ?? 0}人 / 確認中）。取り込みが終わるまで、この画面でお待ちください。</Notice> : <Notice tone="success" message="登録が完了しました" />}
               <ReviewGroup title="LINEアカウント">
                 <ReviewRow label="表示名" value={`${connection.displayName ?? form.name}（LINEから取得）`} />
                 <ReviewRow label="LINE ID" value={connection.basicId ?? '取得できませんでした'} />
@@ -314,11 +322,11 @@ export default function NewLineAccountPage() {
           </div>}
         </div>
 
-        {error && <p role="alert" aria-live="assertive" className="bg-danger-bg text-danger rounded-control mt-4 p-3 text-sm">{error}</p>}
+        {error && <Notice tone="danger" message={error} onClose={() => setError('')} className="mt-4" />}
         <NoticeLineRegisterDialog open={noticeDialog === 'open'} onClose={() => setNoticeDialog('done')} />
+        {stepUp && <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} />}
         <div data-design="Actions">
           <StickyBar
-            className="mt-4"
             status={createdId ? (importingIds ? '既存の友だちを取り込んでいます' : '登録が完了しました') : busyAction === 'save' ? '接続して保存しています' : `手順 ${currentStep} / 5`}
             actions={createdId ? <>
               {importingIds ? <><Button type="button" disabled>登録したアカウントを見る</Button><Button type="button" variant="primary" disabled>統括コンソールへ</Button></> : <><Button href={`/accounts/detail?id=${encodeURIComponent(createdId)}`}>登録したアカウントを見る</Button><Button href="/hq" variant="primary">統括コンソールへ</Button></>}

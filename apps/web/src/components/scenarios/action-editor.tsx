@@ -38,6 +38,7 @@ import {
   type ScenarioActionType,
   type ScenarioDraftActionV6,
 } from '@/lib/api'
+import Notice from '@/components/shared/notice'
 import ConditionBuilder, {
   pruneCondition,
   type SegmentCondition,
@@ -403,7 +404,9 @@ export default function ActionEditor({
         ) : (
           <div className="flex-1 px-6 pb-5 pt-0">
             {error && (
-              <p className="rounded-card bg-danger-bg text-danger mb-4 px-4 py-3 text-sm">{error}</p>
+              <Notice tone="danger" className="mb-4">
+                {error}
+              </Notice>
             )}
             {loading ? (
               <p className="text-ink-faint py-8 text-center text-sm">読み込んでいます</p>

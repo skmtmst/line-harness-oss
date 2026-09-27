@@ -230,24 +230,25 @@ describe('NEN新規作成入口（#618）', () => {
     const trigger = scheduleLabel?.htmlFor ? container.querySelector(`#${scheduleLabel.htmlFor.replace(/:/g, '\\:')}`) : null
     if (!trigger) throw new Error('配信日時の入力欄が見つかりません')
     await click(trigger as HTMLElement)
-    const picker = container.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')
+    // 日時の選択箱は最上層（MenuPortal→document.body）に出る。器の中にはいない。
+    const picker = document.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')
     if (!picker) throw new Error('日時の選択箱が開きません')
     await click(picker.querySelector('button[aria-label="日付"]') as HTMLElement)
     for (let i = 0; i < 12; i += 1) {
-      const grid = container.querySelector('[role="grid"]')
+      const grid = document.querySelector('[role="grid"]')
       if (grid?.getAttribute('aria-label') === `${future.y}年${future.mo}月`) break
-      const next = Array.from(container.querySelectorAll('button')).find((b) => b.getAttribute('aria-label') === '次の月')
+      const next = Array.from(document.querySelectorAll('button')).find((b) => b.getAttribute('aria-label') === '次の月')
       if (!next) throw new Error('暦が見つかりません')
       await click(next as HTMLElement)
     }
-    const day = Array.from(container.querySelectorAll('button')).find((b) =>
+    const day = Array.from(document.querySelectorAll('button')).find((b) =>
       (b.getAttribute('aria-label') ?? '').startsWith(`${future.y}年${future.mo}月${future.d}日（${futureWeek}）`),
     )
     if (!day) throw new Error('未来の日が見つかりません')
     await click(day as HTMLElement)
     // 時刻は 10:30 のまま（日付を選ぶと時刻 10:00 になるので分だけ 30 にする）。
     await act(async () => {
-      const minute = container.querySelector('select[aria-label="分"]') as HTMLSelectElement
+      const minute = document.querySelector('select[aria-label="分"]') as HTMLSelectElement
       minute.value = '30'
       minute.dispatchEvent(new Event('change', { bubbles: true }))
     })

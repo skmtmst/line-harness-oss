@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, type CommonVarExportJob } from '@/lib/api'
 import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
 import StatusBadge from '@/components/shared/status-badge'
 import { formatJstDateTime } from '@/lib/presentation'
 import { onlyWhenVisible } from '@/lib/visible-polling'
@@ -176,9 +177,7 @@ export default function VarsExportPanel({ accountId, folderId, ungrouped = false
       </Button>
 
       {error ? (
-        <div className="bg-danger-bg border-danger-bg text-danger rounded-control border px-4 py-2 text-sm" role="alert">
-          {error}
-        </div>
+        <Notice tone="danger" message={error} onClose={() => setError('')} />
       ) : null}
 
       {active ? (

@@ -25,6 +25,7 @@ import { checkedAtText, placeholderText } from '../delete-impact'
 import Button from '@/components/shared/button'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 import StickyBar from '@/components/shared/sticky-bar'
 import TargetMissing from '@/components/shared/target-missing'
 import {
@@ -576,8 +577,9 @@ function EditCommonVarInner() {
   }
 
   return (
-    <div>
-      <nav className="text-ink-faint mb-3 text-xs">
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <nav className="text-ink-faint text-xs">
         <Link href="/contents/vars" className="text-info hover:underline">
           共通情報一覧
         </Link>
@@ -586,9 +588,7 @@ function EditCommonVarInner() {
       </nav>
 
       {error && item && (
-        <div className="bg-danger-bg border-danger-bg text-danger mb-4 max-w-3xl rounded-lg border p-4 text-sm">
-          {error}
-        </div>
+        <Notice tone="danger" message={error} onClose={() => setError('')} className="mb-4 max-w-3xl" />
       )}
 
       {loading || !item ? (

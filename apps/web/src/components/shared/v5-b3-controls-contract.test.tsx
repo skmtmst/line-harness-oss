@@ -1,12 +1,16 @@
+// @vitest-environment happy-dom
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { describe, expect, it, vi } from 'vitest'
+import { cleanup, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { TextArea, TextInput } from './form-controls'
 import SearchField from './search-field'
 import Select from './select'
+
+afterEach(() => cleanup())
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const SRC = join(HERE, '..', '..')
@@ -49,21 +53,24 @@ describe('V5 B3 入力・検索・選択部品', () => {
       { value: 'all', label: 'すべて' },
       { value: 'active', label: '有効' },
     ]
-    const html = renderToStaticMarkup(
+    const { container } = render(
       <div>
         <Select aria-label="状態" value="all" options={options} onChange={vi.fn()} />
         <Select aria-label="表示件数" value="all" options={options} onChange={vi.fn()} size="page-size" />
         <Select aria-label="開いた状態" label="状態" value="active" options={options} onChange={vi.fn()} defaultOpen name="status" />
       </div>,
     )
+    const html = container.innerHTML
     expect(html).toContain('data-design-node="rpot9"')
     expect(html).toContain('data-design-node="niGPF"')
     expect(html).toContain('data-design-node="Gfsb4"')
-    expect(html).toContain('role="listbox"')
-    expect(html).toContain('aria-expanded="true"')
-    expect(html).toContain('状態：有効')
-    expect(html).toContain('aria-selected="true"')
-    expect(html).toContain('type="hidden" name="status" value="active"')
+    // 開いた中身は最上層（MenuPortal→document.body）に出る。静的書き出しには載らない。
+    expect(screen.getByRole('listbox')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '開いた状態' }).getAttribute('aria-expanded')).toBe('true')
+    expect(screen.getByText('状態：有効')).toBeTruthy()
+    expect(document.body.innerHTML).toContain('aria-selected="true"')
+    const hidden = container.querySelector('input[type="hidden"][name="status"]')
+    expect(hidden?.getAttribute('value')).toBe('active')
   })
 
   it('代表画面は直書きではなく共通入力・検索・選択を使う', () => {

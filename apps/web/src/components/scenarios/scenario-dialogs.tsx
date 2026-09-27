@@ -13,6 +13,7 @@ import { shortDateTime } from '@/lib/hq-banners'
 import { scenarioReferenceData } from './scenario-reference-data'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
 import ConditionBuilder, {
   isEmptyCondition,
   isRuleComplete,
@@ -159,7 +160,7 @@ export function ConditionDialog({
       }
     >
       {error && (
-        <p className="rounded-panel bg-danger-bg text-danger mb-4 px-4 py-3 text-sm">{error}</p>
+        <Notice tone="danger" className="mb-4" message={error} />
       )}
       <span className="sr-only">{title}{description}</span>
       <section className="bg-canvas-sunken rounded-panel mb-4 px-4 py-5">
@@ -242,7 +243,7 @@ export function ConditionDialog({
         <p className="text-ink-secondary mt-3 text-xs font-medium">この画面だけの軸（6軸） <span className="text-ink-faint ml-2 font-normal">配信の絞り込みで使える追加の軸</span></p>
         <div className="mt-2 space-y-3">{[['担当者','流入経路','配信状況'],['予約状況','購入履歴','ブロック状態']].map((line) => <div key={line[0]} className="flex gap-2">{line.map((label) => <span key={label} className="border-hairline rounded-pill border px-2.5 py-1.5 text-xs text-ink-secondary">{label}</span>)}</div>)}</div>
       </section>
-      <p className="bg-info-bg text-ink-secondary mt-5 rounded-control px-4 py-3 text-xs">複数条件は「すべて一致（AND）」または「いずれか一致（OR）」で結合できます。</p>
+      <Notice tone="info" className="mt-5">複数条件は「すべて一致（AND）」または「いずれか一致（OR）」で結合できます。</Notice>
       <details className="mt-3"><summary className="text-action cursor-pointer text-xs">詳しい条件を編集</summary><div className="mt-3"><ConditionBuilder value={draft} onChange={setDraft} /></div></details>
     </Shell>
   )
@@ -391,7 +392,7 @@ export function OnCompleteDialog({
         </>
       }
     >
-      {error && <p className="rounded-panel bg-danger-bg text-danger mb-4 px-4 py-3 text-sm">{error}</p>}
+      {error && <Notice tone="danger" className="mb-4" message={error} />}
       <div className="space-y-3">
         {(
           [
@@ -840,15 +841,15 @@ export function TestSendDialog({
         */}
         <div className="fixed inset-0 z-10 flex items-start justify-center overflow-y-auto px-6 pb-6" style={{ paddingTop: 'min(265px, 30vh)', background: 'color-mix(in srgb, var(--color-ink) 35%, transparent)' }}>
           <div className="w-full rounded-panel shadow-xl" style={{ maxWidth: 672, background: 'var(--color-canvas)' }}><div className="border-hairline border-b px-6 py-5"><h2 className="text-lg font-bold">選択した1名へ実際に送信しますか？</h2><p className="text-ink-secondary mt-1 text-sm">{friendName}さん（{recipientLabel}）へ{confirmSteps.length}通をテスト送信します。実際のLINEメッセージとして届きます。</p></div><div className="space-y-3 px-6 py-5 text-sm">{requiredConfirmations.map((label, index) => (<label key={label} className="flex items-center gap-2"><input type="checkbox" checked={confirmChecks[index] === true} disabled={sending || result?.ok === true} onChange={(e) => setConfirmChecks((prev) => prev.map((v, i) => (i === index ? e.target.checked : v)))} />{label}</label>))}<p className="text-ink-faint text-xs">購読の登録は増えません。配信予定も作りません。</p>
-            {sending && <p className="rounded-panel bg-info-bg text-ink-secondary px-4 py-3 text-sm">送信中です。完了までこの画面のまま待ってください。</p>}
+            {sending && <Notice tone="info">送信中です。完了までこの画面のまま待ってください。</Notice>}
             {result && (
-              <div role="status" className={`rounded-panel px-4 py-3 text-sm ${result.ok ? 'bg-success-bg text-success' : 'bg-danger-bg text-danger'}`}>
+              <Notice tone={result.ok ? 'success' : 'danger'}>
                 <p className="font-bold">{result.ok ? '送信が完了しました' : result.partial ? '一部だけ届いた可能性があります' : '送信できませんでした'}</p>
                 <p className="mt-1">{result.message}</p>
                 {!result.ok && (
                   <p className="mt-1 text-xs">途中で止まった場合、それまでの通は届いています。同じ送信先への連続した送信は短い間隔では実行できません。原因を解決してから、もう一度実行してください。</p>
                 )}
-              </div>
+              </Notice>
             )}
           </div><div className="border-hairline flex justify-end gap-2 border-t px-6 py-4">{result?.ok ? (<><Button onClick={() => setConfirming(false)}>別の相手へ送る</Button><Button variant="primary" onClick={onClose}>完了</Button></>) : (<><Button onClick={() => setConfirming(false)} disabled={sending}>戻る</Button><Button variant="primary" disabled={!selected || sending || !allConfirmed} onClick={() => void sendTest()}>{sending ? '送信中…' : result ? 'もう一度送信' : 'テスト送信を開始'}</Button></>)}</div></div>
         </div>
@@ -891,17 +892,17 @@ export function TestSendDialog({
         **登録が増えるのか・配信予定が積まれるのか**が読み取れなかった。
         リマインダのテスト送信と同じ言い方でそろえる。
       */}
-      <p className="rounded-panel bg-warning-bg text-ink-secondary mb-4 px-4 py-3 text-xs leading-relaxed">
+      <Notice tone="warn" className="mb-4">
         本物のLINEメッセージが届きます。相手を間違えないでください。下書きの通もテストでは送ります。
         <span className="mt-1 block font-semibold">
           本番の登録は増えません。配信予定も作りません。
         </span>
-      </p>
+      </Notice>
 
       {lastTest ? (
-        <p className="bg-info-bg text-ink-secondary rounded-panel mb-4 px-4 py-3 text-xs">
+        <Notice tone="info" className="mb-4">
           前回のテスト送信：{new Date(lastTest.sentAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}・{lastTest.messageCount}通
-        </p>
+        </Notice>
       ) : null}
 
       {/* 送る内容。押す前に何通いくのかが読めないと、確かめようがない。 */}
@@ -1138,9 +1139,9 @@ export function FriendPlanDialog({
       onClose={onClose}
     >
       {!resolvedAccountId ? (
-        <p className="rounded-panel bg-warning-bg text-ink-secondary mb-4 px-4 py-3 text-xs">
+        <Notice tone="warn" className="mb-4">
           LINE公式アカウントを選ぶと、友だちごとの配信予定を確認できます。
-        </p>
+        </Notice>
       ) : null}
 
       <input
@@ -1178,7 +1179,7 @@ export function FriendPlanDialog({
         <p className="text-ink-faint mt-4 px-1 text-sm">配信予定を試算しています。</p>
       )}
       {planStatus === 'error' && (
-        <p className="rounded-panel bg-danger-bg text-danger mt-4 px-4 py-3 text-sm">{planError}</p>
+        <Notice tone="danger" className="mt-4" message={planError} />
       )}
 
       {planStatus === 'ready' && plan ? (
@@ -1228,22 +1229,22 @@ export function FriendPlanDialog({
           </dl>
 
           {plan.start.state === 'blocked' ? (
-            <div className="rounded-panel bg-warning-bg px-4 py-3 text-sm">
-              <p className="text-warning font-semibold">いまはこの友だちへ配信されません</p>
-              <ul className="text-ink-secondary mt-1 list-disc space-y-1 pl-5 text-xs">
+            <Notice tone="warn">
+              <p className="font-semibold">いまはこの友だちへ配信されません</p>
+              <ul className="mt-1 list-disc space-y-1 pl-5 text-xs">
                 {plan.start.reasons.map((reason) => (
                   <li key={reason}>{reason}</li>
                 ))}
               </ul>
-            </div>
+            </Notice>
           ) : plan.start.reasons.length > 0 ? (
-            <div className="rounded-panel bg-info-bg px-4 py-3 text-xs">
-              <ul className="text-ink-secondary list-disc space-y-1 pl-5">
+            <Notice tone="info">
+              <ul className="list-disc space-y-1 pl-5">
                 {plan.start.reasons.map((reason) => (
                   <li key={reason}>{reason}</li>
                 ))}
               </ul>
-            </div>
+            </Notice>
           ) : null}
 
           {plan.steps.length > 0 ? (
@@ -1257,13 +1258,13 @@ export function FriendPlanDialog({
           ) : null}
 
           {plan.warnings.length > 0 ? (
-            <div className="rounded-panel bg-info-bg px-4 py-3 text-xs">
-              <ul className="text-ink-secondary list-disc space-y-1 pl-5">
+            <Notice tone="info">
+              <ul className="list-disc space-y-1 pl-5">
                 {plan.warnings.map((warning) => (
                   <li key={warning}>{warning}</li>
                 ))}
               </ul>
-            </div>
+            </Notice>
           ) : null}
         </div>
       ) : null}

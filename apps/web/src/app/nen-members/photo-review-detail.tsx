@@ -6,6 +6,7 @@ import Card from '@/components/shared/card'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
+import Notice from '@/components/shared/notice'
 import { FeatureLinkCard } from '@/components/shared/side-cards'
 import StickyBar from '@/components/shared/sticky-bar'
 import type { PhotoAssetStatus, PhotoDerivatives } from '@/lib/api'
@@ -14,11 +15,12 @@ import { safePhotoSrc } from './photo-src'
 import { photoPetDisplayName } from '@/components/shared/photo-display-name'
 import { petAnimalTypeLabel } from '@/lib/nen-pets-api'
 import { photoReviewReasonLabel, mileStatusLabel, text } from './photo-text'
+import { readSessionSnapshot } from '@/lib/session-snapshot'
 
 const numberOrDash = (value: unknown) => Number.isFinite(Number(value)) ? Number(value).toLocaleString('ja-JP') : '—'
 
 export function PhotoReviewDetail({
-  photo, position, total, loading, loadKind, reviewing, notice, assetStatus, derivatives, assetsFailed, onReloadAssets, assetProcessing, rotationSaving,
+  photo, position, total, loading, loadKind, reviewing, notice, accountNotice, assetStatus, derivatives, assetsFailed, onReloadAssets, assetProcessing, rotationSaving,
   onBack, onMove, onApprove, onReturn, onProcessReviewAsset, onSaveRotation, onDownloadOriginal, onPointAction, pointActionBusy,
 }: {
   photo: Record<string, unknown> | null
@@ -28,6 +30,7 @@ export function PhotoReviewDetail({
   loadKind: 'ready' | 'empty' | 'error' | 'forbidden'
   reviewing: boolean
   notice: string
+  accountNotice: string
   assetStatus: PhotoAssetStatus | null
   derivatives: PhotoDerivatives | null
   assetsFailed: boolean
@@ -62,6 +65,9 @@ export function PhotoReviewDetail({
   const [downloadCode, setDownloadCode] = useState('')
   const [downloadBusy, setDownloadBusy] = useState(false)
   const [downloadError, setDownloadError] = useState('')
+  /* V-1: 2段階認証を使っている人は6桁、無い人はパスワードで確認する。 */
+  const stepUpMethod = readSessionSnapshot()?.stepUpMethod ?? 'totp'
+  const downloadReady = stepUpMethod === 'password' ? downloadCode.length > 0 : /^\d{6}$/.test(downloadCode)
   if (loading) return <div><ListState kind="loading" title="写真を読み込んでいます" /></div>
   if (loadKind === 'forbidden') return <div><ListState kind="forbidden" /></div>
   if (loadKind === 'error') return <div><ListState kind="error" title="写真を読み込めませんでした" /></div>
@@ -89,7 +95,8 @@ export function PhotoReviewDetail({
     ?? safePhotoSrc(photo.image_url)
   const latestAssetJob = assetStatus?.jobs[0] ?? null
   return <div data-photo-view="detail">
-    {notice && <div role="status" aria-live="polite" className="mb-4 rounded-control border border-accent-border bg-accent-soft px-4 py-3 text-sm text-accent-deep">{notice}</div>}
+    {notice && <Notice tone="danger" className="mb-4" message={notice} />}
+    {accountNotice && <Notice tone="warn" className="mb-4" message={accountNotice} />}
     <div className="flex items-center justify-between gap-2 max-md:flex-col max-md:items-start">
       <div>
         <p className="text-xs font-bold text-ink-faint">写真審査</p>
@@ -250,18 +257,36 @@ export function PhotoReviewDetail({
         </>}
       />
     </div>
-    <Dialog open={downloadOpen} title="もとの画像を保存" description="原本には個人情報が含まれる場合があります。6桁の再認証コードを入力すると、一度だけ保存できます。" busy={downloadBusy} error={downloadError} confirmLabel="再認証して保存" cancelLabel="やめる" onCancel={() => { setDownloadOpen(false); setDownloadError('') }} onConfirm={() => {
-      if (!/^\d{6}$/.test(downloadCode)) { setDownloadError('6桁の再認証コードを入力してください。'); return }
-      setDownloadBusy(true)
-      setDownloadError('')
-      void onDownloadOriginal(downloadCode)
-        .then(() => setDownloadOpen(false))
-        .catch((error: unknown) => setDownloadError(error instanceof Error ? error.message : '原本を保存できませんでした。'))
-        .finally(() => setDownloadBusy(false))
-    }}>
-      <label className="block text-sm font-semibold text-ink">再認証コード
-        <input value={downloadCode} onChange={(event) => { setDownloadCode(event.target.value.replace(/\D/g, '').slice(0, 6)); setDownloadError('') }} inputMode="numeric" autoComplete="one-time-code" placeholder="6桁のコード" className="mt-2 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-normal text-ink" />
-      </label>
+    <Dialog
+      open={downloadOpen}
+      title="もとの画像を保存"
+      description={stepUpMethod === 'none'
+        ? '原本には個人情報が含まれる場合があります。この操作には二段階認証またはパスワードの設定が必要です。'
+        : `原本には個人情報が含まれる場合があります。${stepUpMethod === 'password' ? 'パスワード' : '6桁の再認証コード'}を入力すると、一度だけ保存できます。`}
+      busy={downloadBusy}
+      error={downloadError}
+      confirmLabel="再認証して保存"
+      cancelLabel="やめる"
+      onCancel={() => { setDownloadOpen(false); setDownloadError('') }}
+      onConfirm={stepUpMethod === 'none' ? undefined : () => {
+        if (!downloadReady) { setDownloadError(stepUpMethod === 'password' ? 'パスワードを入力してください。' : '6桁の再認証コードを入力してください。'); return }
+        setDownloadBusy(true)
+        setDownloadError('')
+        void onDownloadOriginal(downloadCode)
+          .then(() => setDownloadOpen(false))
+          .catch((error: unknown) => setDownloadError(error instanceof Error ? error.message : '原本を保存できませんでした。'))
+          .finally(() => setDownloadBusy(false))
+      }}
+    >
+      {stepUpMethod === 'none' ? null : stepUpMethod === 'password' ? (
+        <label className="block text-sm font-semibold text-ink">パスワード
+          <input type="password" value={downloadCode} onChange={(event) => { setDownloadCode(event.target.value); setDownloadError('') }} autoComplete="current-password" className="mt-2 w-full rounded-control border border-surface-chrome bg-canvas px-3 py-2 text-sm font-normal text-ink outline-none focus:border-action" />
+        </label>
+      ) : (
+        <label className="block text-sm font-semibold text-ink">再認証コード
+          <input value={downloadCode} onChange={(event) => { setDownloadCode(event.target.value.replace(/\D/g, '').slice(0, 6)); setDownloadError('') }} inputMode="numeric" autoComplete="one-time-code" placeholder="6桁のコード" className="mt-2 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-normal text-ink" />
+        </label>
+      )}
     </Dialog>
   </div>
 }

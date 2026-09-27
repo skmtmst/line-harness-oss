@@ -15,6 +15,7 @@ import React from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { act } from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 
 const fixture = vi.hoisted(() => ({
   tagsList: null as null | ((...args: unknown[]) => Promise<unknown>),
@@ -130,7 +131,9 @@ afterEach(() => {
 
 /** 一覧を描き、削除の確認窓を開く。 */
 async function openDeleteDialog() {
-  render(<TagsPageV4 accountId="account-a" />)
+  // 整理の結果は Toast（右下・4秒）で出す。置き場所も一緒に描く。
+  clearToastsForTest()
+  render(<><TagsPageV4 accountId="account-a" /><ToastHost /></>)
   // 表と狭幅カードの両方に同じ操作が出るため、見えている側として先頭を取る。
   const rowButton = (await screen.findAllByRole('button', { name: '旧キャンペーン を削除' }))[0]
   await act(async () => { fireEvent.click(rowButton) })
