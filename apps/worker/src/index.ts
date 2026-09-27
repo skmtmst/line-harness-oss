@@ -1773,10 +1773,13 @@ async function scheduled(
   }
   if (lane !== 'delivery') return;
 
-  // 管理画面を開いていなくても、各LINEアカウントの6項目を5分窓ごとに保存する。
+  // 管理画面を開いていなくても、各LINEアカウントの確認項目を5分窓ごとに保存する。
   // 各checkと各accountは独立しており、失敗しても配信ジョブを止めない。
   try {
-    await runScheduledOperationHealthChecks(env.DB);
+    await runScheduledOperationHealthChecks(env.DB, {
+      r2: env.IMAGES,
+      queue: env.CODEX_MENTION_QUEUE,
+    });
   } catch (error) {
     console.error('operation health checks error:', error);
   }

@@ -629,7 +629,7 @@ describe('運用状態checkと配備履歴', () => {
     )).status).toBe(403);
   });
 
-  it('同じ5分窓の手動checkを冪等化し、6項目を実データで保存する', async () => {
+  it('同じ5分窓の手動checkを冪等化し、9項目を実データで保存する', async () => {
     const now = new Date().toISOString();
     testDb.raw.prepare(
       `INSERT INTO account_health_logs
@@ -660,7 +660,7 @@ describe('運用状態checkと配備履歴', () => {
     const first = await app('admin').request('/api/operations/health/runs', request, bindings());
     expect(first.status).toBe(201);
     const firstBody = await first.json() as { data: { latestRun: { id: string; results: unknown[] } } };
-    expect(firstBody.data.latestRun.results).toHaveLength(6);
+    expect(firstBody.data.latestRun.results).toHaveLength(9);
     const second = await app('admin').request('/api/operations/health/runs', request, bindings());
     expect(second.status).toBe(200);
     expect(await second.json()).toMatchObject({
@@ -1146,5 +1146,174 @@ describe('停止不可理由の機械コード(N-453/N-455)', () => {
       success: false,
       code: 'OPERATION_NOT_STOPPED',
     });
+  });
+});
+
+describe('W: 運用状態の確認項目の追加（v6-32）', () => {
+  it('月間配信数はLINEとHarnessの小さい方を送れる数にし、予定分と翌月1日(JST)のresetを返す', async () => {
+    const now = '2026-09-15T05:00:00.000Z';
+    testDb.raw.prepare(
+      `INSERT INTO tenants (id, name, plan_key, plan_status) VALUES ('tenant-1', '統括', 'light', 'active')`,
+    ).run();
+    testDb.raw.prepare("UPDATE line_accounts SET tenant_id = 'tenant-1' WHERE id = 'account-1'").run();
+    testDb.raw.prepare("INSERT INTO friends (id, line_account_id, line_user_id, display_name) VALUES ('f-1', 'account-1', 'U-f1', '友人1')").run();
+    // light は月5,000通。Harness側で4,900通送信済みなら Harness が小さい側になる。
+    const insertMessage = testDb.raw.prepare(
+      `INSERT INTO messages_log (id, friend_id, direction, message_type, content, line_account_id, created_at)
+       VALUES (?, 'f-1', 'outgoing', 'text', '{}', 'account-1', '2026-09-10T10:00:00')`,
+    );
+    for (let i = 0; i < 10; i += 1) insertMessage.run(`msg-${i}`);
+    // 予定済み配信の見込み通数
+    testDb.raw.prepare(
+      `INSERT INTO broadcasts (id, title, message_type, message_content, target_type, status, scheduled_at, created_at, line_account_id, total_count)
+       VALUES ('bc-scheduled', '予定', 'text', '{}', 'all', 'scheduled', '2026-09-16T01:00:00.000Z', '2026-09-15T01:00:00.000Z', 'account-1', 200)`,
+    ).run();
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.endsWith('/quota/consumption')) return Response.json({ totalUsage: 100 });
+      return Response.json({ type: 'limited', value: 1_000 });
+    }));
+
+    const checked = await import('../services/operations-health.js').then(({ runOperationHealthChecks }) =>
+      runOperationHealthChecks(testDb.db, { lineAccountId: 'account-1', source: 'manual', now }));
+    const quota = checked.run.results.find((result) => result.checkKey === 'message_quota');
+    // LINE: 残900。Harness: 5,000-10=4,990。小さい方はLINEの900。forecast=900-200=700。
+    expect(quota?.value).toMatchObject({
+      line: { used: 100, limit: 1_000, remaining: 900 },
+      harness: { used: 10, limit: 5_000, remaining: 4_990 },
+      sendable: 900,
+      scheduledPlanned: 200,
+      forecastRemaining: 700,
+      timezone: 'Asia/Tokyo',
+    });
+    expect(String(quota?.value?.resetAt)).toBe('2026-10-01T00:00:00+09:00');
+    expect(quota?.status).toBe('normal');
+  });
+
+  it('予定分を入れて送れる数がマイナスならdanger、Harness側が小さいならそちらで判定する', async () => {
+    const now = '2026-09-15T05:00:00.000Z';
+    testDb.raw.prepare(
+      `INSERT INTO tenants (id, name, plan_key, plan_status) VALUES ('tenant-1', '統括', 'light', 'active')`,
+    ).run();
+    testDb.raw.prepare("UPDATE line_accounts SET tenant_id = 'tenant-1' WHERE id = 'account-1'").run();
+    testDb.raw.prepare("INSERT INTO friends (id, line_account_id, line_user_id, display_name) VALUES ('f-1', 'account-1', 'U-f1', '友人1')").run();
+    const insertMessage = testDb.raw.prepare(
+      `INSERT INTO messages_log (id, friend_id, direction, message_type, content, line_account_id, created_at)
+       VALUES (?, 'f-1', 'outgoing', 'text', '{}', 'account-1', '2026-09-10T10:00:00')`,
+    );
+    for (let i = 0; i < 4_800; i += 1) insertMessage.run(`msg-${i}`);
+    testDb.raw.prepare(
+      `INSERT INTO broadcasts (id, title, message_type, message_content, target_type, status, scheduled_at, created_at, line_account_id, total_count)
+       VALUES ('bc-big', '予定', 'text', '{}', 'all', 'scheduled', '2026-09-16T01:00:00.000Z', '2026-09-15T01:00:00.000Z', 'account-1', 500)`,
+    ).run();
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.endsWith('/quota/consumption')) return Response.json({ totalUsage: 10 });
+      return Response.json({ type: 'limited', value: 100_000 });
+    }));
+
+    const checked = await import('../services/operations-health.js').then(({ runOperationHealthChecks }) =>
+      runOperationHealthChecks(testDb.db, { lineAccountId: 'account-1', source: 'manual', now }));
+    const quota = checked.run.results.find((result) => result.checkKey === 'message_quota');
+    // Harness: 残200。予定500で forecast=-300 → danger。
+    expect(quota?.status).toBe('danger');
+    expect(quota?.value).toMatchObject({ sendable: 200, forecastRemaining: -300 });
+  });
+
+  it('鍵の期限は切れていればdanger、14日以内ならwarning、未記録ならunknown', async () => {
+    const { runOperationHealthChecks } = await import('../services/operations-health.js');
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ type: 'unlimited' })));
+
+    testDb.raw.prepare("UPDATE line_accounts SET token_expires_at = '2026-09-01T00:00:00.000Z' WHERE id = 'account-1'").run();
+    let checked = await runOperationHealthChecks(testDb.db, { lineAccountId: 'account-1', source: 'manual', now: '2026-09-15T00:00:00.000Z' });
+    expect(checked.run.results.find((r) => r.checkKey === 'credential_expiry')).toMatchObject({ status: 'danger' });
+
+    testDb.raw.prepare("UPDATE line_accounts SET token_expires_at = '2026-09-25T05:00:00.000Z' WHERE id = 'account-1'").run();
+    checked = await runOperationHealthChecks(testDb.db, { lineAccountId: 'account-1', source: 'manual', now: '2026-09-15T05:00:00.000Z' });
+    expect(checked.run.results.find((r) => r.checkKey === 'credential_expiry')).toMatchObject({ status: 'warning', value: { daysLeft: 10 } });
+
+    testDb.raw.prepare('UPDATE line_accounts SET token_expires_at = NULL WHERE id = ?').bind('account-1').run();
+    checked = await runOperationHealthChecks(testDb.db, { lineAccountId: 'account-1', source: 'manual', now: '2026-09-15T10:00:00.000Z' });
+    expect(checked.run.results.find((r) => r.checkKey === 'credential_expiry')).toMatchObject({ status: 'unknown' });
+  });
+
+  it('裏の仕組みの試しは1-2回の失敗では知らせず、3回連続でdangerになる', async () => {
+    const { runOperationHealthChecks } = await import('../services/operations-health.js');
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ type: 'unlimited' })));
+    const failingR2 = {
+      put: async () => { throw new Error('r2 down'); },
+      get: async () => null,
+      delete: async () => undefined,
+    } as unknown as R2Bucket;
+    const deps = { r2: failingR2 };
+
+    const runAt = async (at: string) =>
+      (await runOperationHealthChecks(testDb.db, {
+        lineAccountId: 'account-1', source: 'scheduled', now: at, deps,
+      })).run.results.find((result) => result.checkKey === 'infra_canary');
+
+    // 5分窓をずらして3回実行。1・2回目は正常扱い（記録のみ）、3回目でdanger。
+    expect(await runAt('2026-09-15T00:00:00.000Z')).toMatchObject({ status: 'normal', value: { consecutive: 1 } });
+    expect(await runAt('2026-09-15T00:05:00.000Z')).toMatchObject({ status: 'normal', value: { consecutive: 2 } });
+    expect(await runAt('2026-09-15T00:10:00.000Z')).toMatchObject({ status: 'danger', value: { consecutive: 3 } });
+  });
+
+  it('見張り自体のheartbeatを別項目として返す', async () => {
+    const { runOperationHealthChecks } = await import('../services/operations-health.js');
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ type: 'unlimited' })));
+
+    // 完了した scheduled run が無い → unknown
+    let checked = await runOperationHealthChecks(testDb.db, { lineAccountId: 'account-1', source: 'manual', now: '2026-09-15T00:00:00.000Z' });
+    expect(checked.run.results.find((r) => r.checkKey === 'monitoring_heartbeat')).toMatchObject({ status: 'unknown' });
+
+    // 直近10分以内に完了していれば normal
+    testDb.raw.prepare(
+      `INSERT INTO operation_health_runs
+         (id, scope_key, line_account_id, window_started_at, source, status, overall_status, started_at, completed_at)
+       VALUES ('hb-1', 'account-1', 'account-1', '2026-09-15T00:10:00.000Z', 'scheduled', 'completed', 'normal', '2026-09-15T00:10:00.000Z', '2026-09-15T00:12:00.000Z')`,
+    ).run();
+    checked = await runOperationHealthChecks(testDb.db, { lineAccountId: 'account-1', source: 'manual', now: '2026-09-15T00:15:00.000Z' });
+    expect(checked.run.results.find((r) => r.checkKey === 'monitoring_heartbeat')).toMatchObject({ status: 'normal' });
+
+    // 最後の完了から10分超 → danger
+    checked = await runOperationHealthChecks(testDb.db, { lineAccountId: 'account-1', source: 'manual', now: '2026-09-15T00:30:00.000Z' });
+    expect(checked.run.results.find((r) => r.checkKey === 'monitoring_heartbeat')).toMatchObject({ status: 'danger' });
+  });
+
+  it('友だち変化は同曜日baselineが元に戻っていれば異常にせず、小規模な減少は人数下限で止める', async () => {
+    const { runOperationHealthChecks } = await import('../services/operations-health.js');
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ type: 'unlimited' })));
+
+    // 前日比 -6% だが絶対数6人 < 10 → normal（小規模は人数下限を併用）
+    testDb.raw.prepare(
+      `INSERT INTO friend_daily_snapshots (date, line_account_id, active, total, added, blocked)
+       VALUES ('2026-09-08', 'account-1', 100, 100, 1, 0),
+              ('2026-09-14', 'account-1', 100, 100, 1, 0),
+              ('2026-09-15', 'account-1', 94, 94, 0, 6)`,
+    ).run();
+    let checked = await runOperationHealthChecks(testDb.db, { lineAccountId: 'account-1', source: 'manual', now: '2026-09-15T00:00:00.000Z' });
+    expect(checked.run.results.find((r) => r.checkKey === 'friend_change')).toMatchObject({ status: 'normal' });
+
+    // 1,000→900（-10%・100人）だが同曜日(9/8)も900台で元に戻っている → webhook欠損ではなく推移としてbaseline内
+    testDb.raw.prepare('DELETE FROM friend_daily_snapshots').run();
+    testDb.raw.prepare(
+      `INSERT INTO friend_daily_snapshots (date, line_account_id, active, total, added, blocked)
+       VALUES ('2026-09-08', 'account-1', 905, 905, 1, 0),
+              ('2026-09-14', 'account-1', 1000, 1000, 1, 0),
+              ('2026-09-15', 'account-1', 900, 900, 0, 100)`,
+    ).run();
+    checked = await runOperationHealthChecks(testDb.db, { lineAccountId: 'account-1', source: 'manual', now: '2026-09-15T05:00:00.000Z' });
+    expect(checked.run.results.find((r) => r.checkKey === 'friend_change')).toMatchObject({ status: 'normal' });
+
+    // 前日比も同曜日比も大きな減少 → danger
+    testDb.raw.prepare('DELETE FROM friend_daily_snapshots').run();
+    testDb.raw.prepare(
+      `INSERT INTO friend_daily_snapshots (date, line_account_id, active, total, added, blocked)
+       VALUES ('2026-09-08', 'account-1', 1000, 1000, 1, 0),
+              ('2026-09-14', 'account-1', 1000, 1000, 1, 0),
+              ('2026-09-15', 'account-1', 890, 890, 0, 110)`,
+    ).run();
+    checked = await runOperationHealthChecks(testDb.db, { lineAccountId: 'account-1', source: 'manual', now: '2026-09-15T10:00:00.000Z' });
+    expect(checked.run.results.find((r) => r.checkKey === 'friend_change')).toMatchObject({ status: 'danger' });
   });
 });

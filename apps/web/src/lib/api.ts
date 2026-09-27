@@ -908,6 +908,9 @@ export type OperationHealthCheckKey =
   | 'webhook'
   | 'dispatch_jobs'
   | 'friend_change'
+  | 'monitoring_heartbeat'
+  | 'infra_canary'
+  | 'credential_expiry'
 
 export type OperationHealthResult = {
   id: string
