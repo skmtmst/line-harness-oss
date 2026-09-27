@@ -15,6 +15,7 @@ import Card from '@/components/shared/card'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
+import SelectField from '@/components/shared/select-field'
 import { notifyToast } from '@/components/shared/toast'
 import TargetMissing from '@/components/shared/target-missing'
 import { TableHeadRow, Th } from '@/components/shared/table'
@@ -562,19 +563,25 @@ function Handover() {
                         <td className="text-ink-secondary px-4 py-3 text-xs">{decision.evidenceLabel ?? decision.note ?? '未取得'}</td>
                         <td className="px-4 py-3">
                           {editable ? (
-                            <select
-                              className="border-hairline rounded-control px-2 py-1 text-xs"
+                            <SelectField
+                              size="compact"
+                              className="text-xs"
+                              aria-label="この人の判断"
                               value={shown}
                               disabled={savingDecisions}
                               onChange={(e) => setDecisionEdits((prev) => ({
                                 ...prev,
                                 [decision.id]: e.target.value as 'link' | 'new' | 'skip',
                               }))}
-                            >
-                              <option value="link" disabled={!decision.to_friend_id}>同じ人</option>
-                              <option value="new">新しく作る</option>
-                              <option value="skip">引き継がない</option>
-                            </select>
+                              options={[
+                                // 「同じ人」は結びつける候補がいるときだけ選べる。
+                                ...(decision.to_friend_id || shown === 'link'
+                                  ? [{ value: 'link', label: '同じ人' }]
+                                  : []),
+                                { value: 'new', label: '新しく作る' },
+                                { value: 'skip', label: '引き継がない' },
+                              ]}
+                            />
                           ) : (
                             <span className="border-hairline rounded-full border px-2 py-1 text-xs">
                               {shown === 'link' ? '同じ人' : shown === 'new' ? '新しく作る' : '引き継がない'}
