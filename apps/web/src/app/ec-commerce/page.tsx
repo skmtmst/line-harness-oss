@@ -66,6 +66,24 @@ const ACTION_LABEL: Record<string, string> = {
   'ec.customer.profile_updated': '会員情報を更新',
 }
 
+/*
+ * R166: LINEへ何も送らない処理（会員情報の更新・注文取り消し・返金の反映）が
+ * 成功しても「送信完了」と出すと、送っていない案内が送られたように見える。
+ * 送信しない出来事だけ、成功時の表示を処理内容に合わせる。
+ */
+const NON_SENDING_STATUS_LABEL: Record<string, string> = {
+  'ec.customer.profile_updated': '更新完了',
+  'ec.order.cancelled': '反映完了',
+  'ec.order.refunded': '反映完了',
+}
+
+function actionStatusLabel(action: { status: EcActionExecutionStatus; eventType: string }): string {
+  if (action.status === 'succeeded') {
+    return NON_SENDING_STATUS_LABEL[action.eventType] ?? ACTION_STATUS.succeeded.label
+  }
+  return ACTION_STATUS[action.status].label
+}
+
 const ACTION_PAGE_SIZE = 20
 
 type ActionTab = 'all' | 'succeeded' | 'processing' | 'skipped' | 'failed'
@@ -375,7 +393,7 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
       </div>
       <Tabs items={([
           ['all', 'すべて', overview?.total],
-          ['succeeded', '送信完了', actionSummary?.succeeded],
+          ['succeeded', '処理完了', actionSummary?.succeeded],
           ['processing', '処理中', (actionSummary?.pending ?? 0) + (actionSummary?.processing ?? 0)],
           ['skipped', '送信なし', actionSummary?.skipped],
           ['failed', '失敗', (actionSummary?.retryable_failed ?? 0) + (actionSummary?.permanent_failed ?? 0)],
@@ -443,7 +461,7 @@ function EventsPanel({ accountId }: { accountId: string | null }) {
                   : ACTION_LABEL[action.eventType] ?? `未対応の出来事（${action.eventType}）`}</Td>
               <Td>
                 <span className={styles.cellStack}>
-                  <span className={`${styles.status} ${statusInfo.tone}`}>{statusInfo.label}</span>
+                  <span className={`${styles.status} ${statusInfo.tone}`}>{actionStatusLabel(action)}</span>
                   {/* IDEA-23: 失敗・見送りの分類（未連携／権限・認証／通信の失敗など）を状態の下へ添える。 */}
                   {action.failureKind && action.status !== 'succeeded'
                     ? <span className={styles.cellSub}>{FAILURE_KIND_TEXT[action.failureKind].label}</span>

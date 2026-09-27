@@ -1673,6 +1673,8 @@ describe('N-383 送信eventTypesは実発火種別と照合する', () => {
   test.each([
     '*',                          // 全部送る明示規約
     'friend_add',                 // 実発火種別
+    'form_submitted',             // R150: フォーム回答の実発火種別
+    'booking_created',            // R150: 予約受付の実発火種別
     'ec.order.confirmed',         // EC連携の実発火種別
     'incoming_webhook.custom',    // 受信口ごとの実発火種別
   ])('有効な種別 %j は作成を通す', async (eventType) => {

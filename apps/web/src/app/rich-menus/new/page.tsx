@@ -10,7 +10,7 @@ import RichMenuCreateForm, {
   type RichMenuCreateValue,
   type RichMenuOption,
 } from '@/components/rich-menus/rich-menu-create-form'
-import { areaDraftsForCreate, createAreaDrafts, pruneStaleAreaTags, unsetAreaLabels } from '@/components/rich-menus/action-drafts'
+import { areaDraftsForCreate, createAreaDrafts, pruneStaleAreaTags, pruneStaleAreaTemplates, unsetAreaLabels } from '@/components/rich-menus/action-drafts'
 import type { Area } from '@/components/rich-menus/canvas-editor'
 import MediaPickerDialog from '@/app/contents/media-picker-dialog'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -95,7 +95,7 @@ export default function NewRichMenuPage() {
       const [folderRes, tagRes, templateRes, formRes, linkRes] = await Promise.allSettled([
         api.folders.list('rich_menu'),
         api.tags.list(selectedAccount ? { accountId: selectedAccount.id } : undefined),
-        api.templates.list(),
+        api.templates.list(undefined, selectedAccount?.id ?? undefined),
         selectedAccount ? api.forms.list(selectedAccount.id) : Promise.resolve({ success: true as const, data: [] }),
         api.trackedLinks.list(),
       ])
@@ -115,11 +115,20 @@ export default function NewRichMenuPage() {
    * 外すものがなければ何もしない（終わりがあるので繰り返さない）。
    */
   useEffect(() => {
-    const pruned = pruneStaleAreaTags(value.areaDraftsByTemplate, new Set(tags.map((tag) => tag.id)))
-    if (pruned.removed === 0) return
-    setValue({ ...value, areaDraftsByTemplate: pruned.next })
-    setTagPruneNotice(`選んでいたタグのうち${pruned.removed}件は、今のアカウントにないため外しました。選び直してください。`)
-  }, [tags, value])
+    const tagPruned = pruneStaleAreaTags(value.areaDraftsByTemplate, new Set(tags.map((tag) => tag.id)))
+    /*
+     * m18r: テンプレートも今のアカウントだけ。候補がまだ届いていない
+     * （空）と「このアカウントに無い」の区別が付かないため、空の間は
+     * 外さない。届いた候補に無い選択だけ外す。
+     */
+    const tplPruned = templates.length === 0
+      ? { next: tagPruned.next, removed: 0 }
+      : pruneStaleAreaTemplates(tagPruned.next, new Set(templates.map((template) => template.id)))
+    const removed = tagPruned.removed + tplPruned.removed
+    if (removed === 0) return
+    setValue({ ...value, areaDraftsByTemplate: tplPruned.next })
+    setTagPruneNotice(`選んでいた候補のうち${removed}件は、今のアカウントにないため外しました。選び直してください。`)
+  }, [tags, templates, value])
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()

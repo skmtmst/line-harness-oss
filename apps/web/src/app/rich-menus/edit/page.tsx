@@ -5,6 +5,8 @@ import Select from '@/components/shared/select'
 import Checkbox from '@/components/shared/checkbox'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import TargetMissing from '@/components/shared/target-missing'
@@ -605,7 +607,8 @@ function Editor({
       const [tagRes, tplRes, formRes, linkRes, folderRes] = await Promise.allSettled([
         // R23: このメニューのアカウントのタグだけを候補にする（別アカウントの同名混入防止）。
         api.tags.list(group?.accountId ? { accountId: group.accountId } : undefined),
-        api.templates.list(),
+        // m18r: テンプレートもこのメニューのアカウントだけ（流入リンク #914 と同じ形）。
+        api.templates.list(undefined, group?.accountId ?? undefined),
         group?.accountId
           ? api.forms.list(group.accountId)
           : Promise.resolve({ success: true as const, data: [] }),
@@ -1832,8 +1835,24 @@ function TargetingStep({
       <div className="grid gap-5 xl:grid-cols-3">
         <section className="border-hairline bg-canvas rounded-card border p-6 shadow-sm xl:col-span-2">
           <RadioCardGroup legend="このメニューを出す相手" legendVisible className="grid gap-3 sm:grid-cols-2">
-            <RadioCard name="audience" value="all" checked={!targetingEnabled} disabled={readOnly} onChange={() => onTargetingEnabled(false)} title="すべての友だち" note="ほかのメニューに当てはまらなかった人に出る、いちばん下の受け皿になります" />
-            <RadioCard name="audience" value="targeted" checked={targetingEnabled} disabled={readOnly} onChange={() => onTargetingEnabled(true)} title="条件に当てはまる友だちだけ" note="当てはまらない人には、これより下のメニューが出ます" />
+            <RadioCard
+              name="audience"
+              value="all"
+              checked={!targetingEnabled}
+              disabled={readOnly}
+              onChange={() => onTargetingEnabled(false)}
+              title="すべての友だち"
+              note="ほかのメニューに当てはまらなかった人に出る、いちばん下の受け皿になります"
+            />
+            <RadioCard
+              name="audience"
+              value="targeted"
+              checked={targetingEnabled}
+              disabled={readOnly}
+              onChange={() => onTargetingEnabled(true)}
+              title="条件に当てはまる友だちだけ"
+              note="当てはまらない人には、これより下のメニューが出ます"
+            />
           </RadioCardGroup>
 
           {targetingEnabled ? (
@@ -2021,7 +2040,15 @@ function PublishStep({
               ['scheduled', '日時を決めて出す', 'その時刻になったら自動で出ます。それまでは今のメニューのままです'],
               ['period', '期間を決める', '終わったら自動で元に戻します。キャンペーンはこれが安全です'],
             ].map(([value, label, note]) => (
-              <RadioCard key={value} name="publish-mode" value={value} checked={mode === value} onChange={() => onPublishChange({ mode: value as PublishPlanInput['mode'] })} title={label} note={note} />
+              <RadioCard
+                key={value}
+                name="publish-mode"
+                value={value}
+                checked={mode === value}
+                onChange={(next) => onPublishChange({ mode: next as PublishPlanInput['mode'] })}
+                title={label}
+                note={note}
+              />
             ))}
           </RadioCardGroup>
           {mode !== 'now' ? (
@@ -2040,8 +2067,8 @@ function PublishStep({
               ) : (
                 <li className="text-success">✓ 誰に出すかが決まっています（<MetricValue metric={preview?.matched} />{previewUnsaved ? '・未保存の条件で計算' : ''}）</li>
               )}
-              <li className={imageReady ? 'text-success' : 'text-danger'}>{imageReady ? '✓' : '⚠'} 画像が登録されています{imageReady ? '' : '（未設定のページがあります）'}</li>
-              <li className={unconfiguredAreas === 0 ? 'text-success' : 'text-danger'}>{unconfiguredAreas === 0 ? '✓ すべてのボタン名が設定されています' : `⚠ ボタン名が未設定の場所が ${unconfiguredAreas}件 あります`}</li>
+              <li className={imageReady ? 'text-success' : 'text-warning'}>{imageReady ? '✓' : '⚠'} 画像が登録されています{imageReady ? '' : '（未設定のページがあります）'}</li>
+              <li className={unconfiguredAreas === 0 ? 'text-success' : 'text-warning'}>{unconfiguredAreas === 0 ? '✓ すべてのボタン名が設定されています' : `⚠ ボタン名が未設定の場所が ${unconfiguredAreas}件 あります`}</li>
               {!conditionEmpty && preview?.overlap.value ? <li className="text-warning">⚠ 上の「{preview.higherMenus[0] ?? '優先メニュー'}」と {preview.overlap.value.toLocaleString('ja-JP')}人 が重なっています</li> : null}
             </ul>
           </div>
