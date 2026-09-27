@@ -355,8 +355,13 @@ function CarouselEditorInner() {
       return next
     })
 
-  const anyImage = panels.some((p) => p.thumbnailImageUrl.trim())
-  const textMax = anyImage ? TEXT_MAX_WITH_IMAGE : TEXT_MAX_WITHOUT_IMAGE
+  /*
+   * パネルごとの本文上限。タイトルか画像があるパネルは60文字、両方無ければ
+   * 120文字（LINE の決まり）。画面全体で1つの上限にすると、タイトルありで
+   * 61文字が通って保存時に弾かれる。
+   */
+  const textMaxFor = (panel: Panel) =>
+    panel.title.trim() || panel.thumbnailImageUrl.trim() ? TEXT_MAX_WITH_IMAGE : TEXT_MAX_WITHOUT_IMAGE
 
   const save = async () => {
     /*
@@ -591,7 +596,7 @@ function CarouselEditorInner() {
                 />
               </Field>
 
-              <Field label="パネルタイトル" htmlFor={`cr-panel-${i}-title`} note={`${TITLE_MAX}文字まで`}>
+              <Field label="パネルタイトル" htmlFor={`cr-panel-${i}-title`} note={`${TITLE_MAX}文字まで。タイトルは全部のパネルに入れるか、全部空にしてください。`}>
                 <input
                   id={`cr-panel-${i}-title`}
                   type="text"
@@ -611,9 +616,9 @@ function CarouselEditorInner() {
                 htmlFor={`cr-panel-${i}-text`}
                 required
                 note={
-                  anyImage
-                    ? `画像があるため${TEXT_MAX_WITH_IMAGE}文字までです。`
-                    : `${TEXT_MAX_WITHOUT_IMAGE}文字まで（画像を入れると${TEXT_MAX_WITH_IMAGE}文字になります）。`
+                  panel.title.trim() || panel.thumbnailImageUrl.trim()
+                    ? `タイトルか画像があるため${TEXT_MAX_WITH_IMAGE}文字までです。`
+                    : `${TEXT_MAX_WITHOUT_IMAGE}文字まで（タイトルか画像を入れると${TEXT_MAX_WITH_IMAGE}文字になります）。`
                 }
               >
                 <textarea
@@ -625,16 +630,16 @@ function CarouselEditorInner() {
                 />
                 <p
                   className={`mt-1 text-xs tabular-nums ${
-                    [...panel.text].length > textMax ? 'text-danger' : 'text-ink-faint'
+                    [...panel.text].length > textMaxFor(panel) ? 'text-danger' : 'text-ink-faint'
                   }`}
                 >
-                  {[...panel.text].length} / {textMax}
+                  {[...panel.text].length} / {textMaxFor(panel)}
                 </p>
               </Field>
 
               <div>
                 <p className="text-ink-secondary mb-2 text-sm font-medium">
-                  このパネルの選択肢（最大{MAX_ACTIONS}つ）
+                  このパネルの選択肢（最大{MAX_ACTIONS}つ・数は全部のパネルでそろえてください）
                 </p>
                 {panel.actions.map((action, ai) => (
                   <div key={ai} className="border-hairline mb-2 rounded-lg border p-3">

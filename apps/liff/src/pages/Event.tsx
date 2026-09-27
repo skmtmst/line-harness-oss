@@ -122,6 +122,15 @@ export default function Event() {
   const myCount = myActive.length;
   const max = event.max_bookings_per_friend;
   const overLimit = max != null && myCount >= max;
+  // 満席でも、このイベントがキャンセル待ちを受けるなら枠は選べる
+  // (選んだ満席の枠で申し込むと待ちに入る。サーバも 200 で返す)。
+  // 予約上限に達している人は、待ちにも入れないので選べない。
+  const waitlistOpen = event.waitlist_enabled === 1;
+  const isFull = (s: EventSlot): boolean => s.remaining != null && s.remaining <= 0;
+  // 選べる枠が1つも無い (枠自体が無い場合も含む)。
+  const allFull = !slots.some((s) => !isFull(s));
+  const selectedSlot = slots.find((s) => s.id === selectedId) ?? null;
+  const selectedFull = selectedSlot != null && isFull(selectedSlot);
 
   const starts = slots.map((s) => s.starts_at).sort();
   const ends = slots.map((s) => s.ends_at).sort();
@@ -208,8 +217,8 @@ export default function Event() {
           ) : (
             <ul className="space-y-2">
               {slots.map((s) => {
-                const full = s.remaining != null && s.remaining <= 0;
-                const disabled = full || overLimit;
+                const full = isFull(s);
+                const disabled = overLimit || (full && !waitlistOpen);
                 const selected = selectedId === s.id;
                 // 満席は押せない灰色の箱。白 (bg-canvas) と重ねると白く見えるので
                 // 押せない時は地を1つ (bg-shell-gray) だけにする。
@@ -262,11 +271,19 @@ export default function Event() {
       <BottomBar>
         <Button
           variant="primary"
-          disabled={!selectedId || overLimit}
+          disabled={overLimit || !selectedSlot || (!waitlistOpen && selectedFull)}
           onClick={goConfirm}
           aria-describedby={overLimit ? 'event-limit-note' : undefined}
         >
-          {selectedId ? 'この時間で申し込む' : '時間を選んでください'}
+          {overLimit
+            ? '予約上限に達しています'
+            : selectedSlot
+              ? selectedFull && waitlistOpen
+                ? 'キャンセル待ちに入る'
+                : 'この時間で申し込む'
+              : allFull
+                ? '満席です'
+                : '時間を選んでください'}
         </Button>
       </BottomBar>
     </div>

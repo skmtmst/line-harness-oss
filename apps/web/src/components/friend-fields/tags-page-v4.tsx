@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowDown, ArrowUp, MoreHorizontal, Palette, Pencil, Trash2, X } from 'lucide-react'
@@ -15,6 +15,7 @@ import Button from '@/components/shared/button'
 import FilterChip from '@/components/shared/filter-chip'
 import ListToolbar from '@/components/shared/list-toolbar'
 import { RowActions } from '@/components/shared/row-actions'
+import Disclosure from '@/components/shared/disclosure'
 import ListKpis from '@/components/shared/list-kpis'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
@@ -358,7 +359,7 @@ function FolderList({ groups, items, countsKnown, active, onSelect, onChanged }:
       <nav className="p-2">{rows.map((row) => {
         const group = groups.find((item) => item.id === row.id)
         const groupIndex = group ? groups.findIndex((item) => item.id === group.id) : -1
-        return <div key={row.id} className="group relative flex items-center"><button type="button" onClick={() => onSelect(row.id)} className={`flex min-w-0 flex-1 items-center gap-2 rounded-control px-3 py-2.5 text-left text-label ${active === row.id ? 'bg-accent-soft font-bold text-accent-deep' : 'font-semibold text-ink hover:bg-canvas-sunken'}`}><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: row.color }} /><span className="min-w-0 flex-1 truncate" title={row.name}>{row.name}</span><span className={`inline-flex h-[26px] shrink-0 items-center rounded-pill px-[9px] text-caption font-semibold tabular-nums ${active === row.id ? 'bg-canvas text-accent-deep' : 'bg-canvas-sunken text-ink-faint'}`}>{countsKnown ? row.count : '—'}</span></button>{group ? <button type="button" aria-label={`${group.name}の操作`} aria-expanded={menuId === group.id} onClick={() => setMenuId((current) => current === group.id ? null : group.id)} className={`ml-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-control text-ink-faint hover:bg-canvas-sunken focus-visible:outline ${active === row.id ? '' : 'invisible group-hover:visible'}`}><MoreHorizontal aria-hidden="true" size={16} /></button> : null}{group ? <ActionMenu open={menuId === group.id} onClose={() => setMenuId(null)} ariaLabel={`${group.name}の操作`} note="削除しても、中のタグは未分類に残ります。" items={[
+        return <div key={row.id} className="group relative flex items-center"><button type="button" onClick={() => onSelect(row.id)} className={`flex min-w-0 flex-1 items-center gap-2 rounded-control px-3 py-2.5 text-left text-label ${active === row.id ? 'bg-accent-soft font-bold text-accent-deep' : 'font-semibold text-ink hover:bg-canvas-sunken'}`}><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: row.color }} /><span className="min-w-0 flex-1 truncate" title={row.name}>{row.name}</span><span className={`inline-flex h-[26px] shrink-0 items-center rounded-pill px-[9px] text-caption font-semibold tabular-nums ${active === row.id ? 'bg-canvas text-accent-deep' : 'bg-canvas-sunken text-ink-faint'}`}>{countsKnown ? row.count : '—'}</span></button>{group ? <button type="button" aria-label={`${group.name}の操作`} aria-expanded={menuId === group.id} onClick={() => setMenuId((current) => current === group.id ? null : group.id)} className={`ml-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-control text-ink-faint hover:bg-canvas-sunken focus-visible:outline ${active === row.id ? '' : 'invisible group-hover:visible focus-visible:visible max-xl:visible'}`}><MoreHorizontal aria-hidden="true" size={16} /></button> : null}{group ? <ActionMenu open={menuId === group.id} onClose={() => setMenuId(null)} ariaLabel={`${group.name}の操作`} note="削除しても、中のタグは未分類に残ります。" items={[
           { id: 'rename', label: '名前を変更', icon: <Pencil size={15} />, onSelect: () => window.location.assign(`/tags/folders/new?id=${group.id}`) },
           { id: 'color', label: '色を変える', icon: <Palette size={15} />, onSelect: () => window.location.assign(`/tags/folders/new?id=${group.id}`) },
           { id: 'up', label: '並び順を上へ', icon: <ArrowUp size={15} />, disabled: busy || groupIndex === 0, onSelect: () => void move(group, -1) },
@@ -517,6 +518,8 @@ function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag: Tag; a
     自前で組むと毎回どれかが抜ける。実際、背景が裏で動いていた。
   */
   const dialogRef = useOverlayFocus(true, onCancel, false)
+  /* R138: 確認窓の名前として見出しを読ませる（共通 Dialog と同じ作法）。 */
+  const titleId = useId()
 
   const blocked = impactStatus !== 'ready' || !impact || !accountId || saving
   const blockedReason = impactStatus === 'loading'
@@ -527,7 +530,7 @@ function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag: Tag; a
 
   return (
     <div ref={dialogRef} className="fixed inset-0 z-[90] flex items-center justify-center bg-ink/35 p-4" data-qa-dialog="tag-delete" data-impact={impactStatus}>
-      <section className="relative w-full max-w-[670px] -translate-y-5 rounded-card border border-hairline bg-canvas p-7 shadow-2xl" role="alertdialog" aria-modal="true">
+      <section className="relative w-full max-w-[670px] -translate-y-5 rounded-card border border-hairline bg-canvas p-7 shadow-2xl" role="alertdialog" aria-modal="true" aria-labelledby={titleId}>
         <button type="button" onClick={onCancel} aria-label="閉じる" className="absolute right-4 top-4 rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
           <X aria-hidden="true" className="h-5 w-5" />
         </button>
@@ -537,7 +540,7 @@ function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag: Tag; a
             <TrashIcon />
           </span>
           <div className="mt-5 min-w-0">
-            <h2 className="text-xl font-bold text-ink">「{tag.name}」を削除しますか？</h2>
+            <h2 id={titleId} className="text-xl font-bold text-ink">「{tag.name}」を削除しますか？</h2>
             <p className="mt-1 text-sm text-ink-secondary">このタグを使っている場所と、外れる友だちを確認してください。</p>
           </div>
         </div>
@@ -947,6 +950,15 @@ export default function TagsPageV4({
               ]}
               size="full"
             />
+            {/*
+              R165: 1280px未満でもフォルダの名前変更・色・削除へ到達できる。
+              以前は操作のある帯が非表示で開く口も無く、作ったフォルダを
+              直せなかった。絞り込みは上のセレクトのまま、同じ管理操作を
+              開閉できる帯で出す（中身は PC と同じ `FolderList`）。
+            */}
+            <Disclosure title="フォルダを管理" hint={ready ? `${groups.length}件` : '—'} size="compact" className="mt-2">
+              <FolderList groups={groups} items={items} countsKnown={ready} active={folder} onSelect={setFolder} onChanged={() => void load()} />
+            </Disclosure>
           </div>
           <div className="hidden xl:block">
             <FolderList groups={groups} items={items} countsKnown={ready} active={folder} onSelect={setFolder} onChanged={() => void load()} />

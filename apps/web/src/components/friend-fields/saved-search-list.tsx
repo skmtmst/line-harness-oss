@@ -229,6 +229,11 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
     // 「未集計」を選んだときだけ未集計の行を出す。数字の絞り込みには混ぜない。
     if (matchFilter === 'unknown') return uncounted
     if (uncounted) return matchFilter === 'all'
+    /*
+     * R178: 「すべて」は0人も含めた全件。以前はここが `count > 0` だった
+     * ため、0人の検索が初期一覧から消え、保存失敗と誤認されていた。
+     */
+    if (matchFilter === 'all') return true
     return matchFilter === 'zero' ? count === 0 : count > 0
   })
 

@@ -6173,7 +6173,8 @@ export const api = {
       type: FriendFieldType
       folderId?: string | null
       options?: string[] | null
-      defaultValue?: string | null
+      /* R139: 複数選択の既定値は選択肢名の配列で渡す（サーバーがIDへ直す）。 */
+      defaultValue?: string | string[] | null
       ecFieldPath?: string | null
       ecIsMaster?: boolean
       isPersonal?: boolean
@@ -6191,19 +6192,26 @@ export const api = {
       id: string,
       accountId: string,
       data: Partial<
-        Pick<
-          FriendField,
-          | 'name'
-          | 'folderId'
-          | 'defaultValue'
-          | 'isPersonal'
-          | 'isStarred'
-          | 'displayOrder'
-          | 'ecFieldPath'
-          | 'ecIsMaster'
-          | 'version'
+        Omit<
+          Pick<
+            FriendField,
+            | 'name'
+            | 'folderId'
+            | 'defaultValue'
+            | 'isPersonal'
+            | 'isStarred'
+            | 'displayOrder'
+            | 'ecFieldPath'
+            | 'ecIsMaster'
+            | 'version'
+          >,
+          'defaultValue'
         >
-      > & { options?: string[] | null },
+      > & {
+        options?: string[] | null
+        /* R139: 複数選択の既定値は選択肢名の配列で渡す（サーバーがIDへ直す）。 */
+        defaultValue?: string | string[] | null
+      },
     ) =>
       fetchApi<ApiResponse<FriendField>>(`/api/friend-fields/${id}?lineAccountId=${encodeURIComponent(accountId)}`, {
         method: 'PATCH',
@@ -6355,7 +6363,8 @@ export const api = {
     archive: (
       markId: string,
       accountId: string,
-      data: { replacementMarkId: string; impactRevision: string; expectedVersion: number },
+      /* R180: 0人のときは置換先なし（null）で保管できる。 */
+      data: { replacementMarkId: string | null; impactRevision: string; expectedVersion: number },
       idempotencyKey: string,
     ) => fetchApi<ApiResponse<{
       archived: true
