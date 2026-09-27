@@ -17,6 +17,7 @@ import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
 import Select from '@/components/shared/select'
+import Checkbox from '@/components/shared/checkbox'
 import { Field, TextInput } from '@/components/shared/form-controls'
 import HelpTip from '@/components/shared/help-tip'
 import EventQuestionsEditor, { parseEventQuestions } from '@/components/events/event-questions-editor'
@@ -587,15 +588,13 @@ function OverviewTab({
           placeholder="開催趣旨、注意事項、持ち物などを記載..."
           className="w-full border border-hairline rounded-lg px-3 py-2 text-sm"
         />
-        <label className="flex items-center gap-2 mt-2 text-sm text-gray-600">
-          <input
-            type="checkbox"
-            checked={draft.description_centered === 1}
-            onChange={(e) => update('description_centered', e.target.checked ? 1 : 0)}
-            className="rounded border-hairline"
-          />
+        <Checkbox
+          className="mt-2"
+          checked={draft.description_centered === 1}
+          onCheckedChange={(checked) => update('description_centered', checked ? 1 : 0)}
+        >
           詳細を中央揃えで表示
-        </label>
+        </Checkbox>
       </div>
       <div className="border-t border-hairline pt-5">
         <div className="text-sm font-medium text-ink mb-1">申し込みのときに聞くこと</div>
@@ -682,32 +681,26 @@ function OverviewTab({
               const isCurrent = a.id === currentAccountId
               const checked = accountIds.includes(a.id) || isCurrent
               return (
-                <label
+                <Checkbox
                   key={a.id}
-                  className={`flex items-center gap-2 p-2 border border-gray-200 rounded-lg ${isCurrent ? 'opacity-90 bg-gray-50 cursor-not-allowed' : 'cursor-pointer hover:bg-gray-50'}`}
-                  title={isCurrent ? '現在ログイン中のアカウントは必須です' : undefined}
+                  className={`flex w-full gap-2 rounded-lg border border-hairline p-2 ${isCurrent ? 'opacity-90 bg-canvas-sunken cursor-not-allowed' : 'cursor-pointer hover:bg-canvas-sunken'}`}
+                  checked={checked}
+                  disabled={isCurrent}
+                  onCheckedChange={(next) => {
+                    if (isCurrent) return
+                    update('account_ids', (next
+                      ? [...accountIds, a.id]
+                      : accountIds.filter((x) => x !== a.id)) as unknown as EventDetail['account_ids'])
+                  }}
+                  description={isCurrent ? '今のアカウント・必須' : undefined}
                 >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    disabled={isCurrent}
-                    onChange={(e) => {
-                      if (isCurrent) return
-                      const next = e.target.checked
-                        ? [...accountIds, a.id]
-                        : accountIds.filter((x) => x !== a.id)
-                      update('account_ids', next as unknown as EventDetail['account_ids'])
-                    }}
-                    className="rounded border-hairline"
-                  />
-                  <span className="text-sm">
+                  <span title={isCurrent ? '現在ログイン中のアカウントは必須です' : undefined}>
                     {a.country ? a.country + ' ' : ''}{a.name}
-                    {isCurrent && <span className="ml-1 text-[10px] text-gray-500">（今のアカウント・必須）</span>}
                   </span>
-                </label>
+                </Checkbox>
               )
             })}
-            <div className="text-xs text-gray-500 mt-1">{accountIds.length} 件選択中</div>
+            <div className="text-ink-faint mt-1 text-xs">{accountIds.length} 件選択中</div>
           </div>
         )}
       </div>
@@ -1397,21 +1390,14 @@ function PublishTab({
   }, [tags])
   return (
     <div className="space-y-5">
-      <label className="flex items-start gap-3 p-3 border border-hairline rounded-lg cursor-pointer hover:bg-gray-50">
-        <input
-          type="checkbox"
-          checked={draft.requires_approval === 1}
-          onChange={(e) => update('requires_approval', e.target.checked ? 1 : 0)}
-          className="mt-0.5 rounded border-hairline"
-        />
-        <div>
-          <div className="text-sm font-medium text-ink">承認制</div>
-          <div className="text-xs text-gray-500 mt-0.5">
-            ON: 友だちが予約しても運営が「承認」するまで未確定（承認待ちの分も残席を使います）<br />
-            OFF: 定員空きがあれば即時確定
-          </div>
-        </div>
-      </label>
+      <Checkbox
+        className="flex w-full gap-3 rounded-lg border border-hairline p-3 cursor-pointer hover:bg-canvas-sunken"
+        checked={draft.requires_approval === 1}
+        onCheckedChange={(checked) => update('requires_approval', checked ? 1 : 0)}
+        description={<>ON: 友だちが予約しても運営が「承認」するまで未確定（承認待ちの分も残席を使います）<br />OFF: 定員空きがあれば即時確定</>}
+      >
+        承認制
+      </Checkbox>
 
       <Field
         label="承認の期限"
@@ -1429,23 +1415,14 @@ function PublishTab({
         />
       </Field>
 
-      <label className="flex items-start gap-3 p-3 border border-hairline rounded-lg cursor-pointer hover:bg-gray-50">
-        <input
-          type="checkbox"
-          checked={draft.waitlist_enabled === 1}
-          onChange={(e) => update('waitlist_enabled', e.target.checked ? 1 : 0)}
-          className="mt-0.5 rounded border-hairline"
-        />
-        <div>
-          <div className="text-sm font-medium text-ink">キャンセル待ちを受ける</div>
-          <div className="text-xs text-gray-500 mt-0.5">
-            ON: 定員に達したあとも申込を受け、待ちとして記録する<br />
-            OFF: 定員に達したら締め切る<br />
-            待ちの人は予約の件数に入りません。空きが出たら待ちの先頭へ自動で案内が送られ、
-            本人が期限内に承諾すると確定します。申込者の画面から手動で次の方へ案内することもできます。
-          </div>
-        </div>
-      </label>
+      <Checkbox
+        className="flex w-full gap-3 rounded-lg border border-hairline p-3 cursor-pointer hover:bg-canvas-sunken"
+        checked={draft.waitlist_enabled === 1}
+        onCheckedChange={(checked) => update('waitlist_enabled', checked ? 1 : 0)}
+        description={<>ON: 定員に達したあとも申込を受け、待ちとして記録する<br />OFF: 定員に達したら締め切る<br />待ちの人は予約の件数に入りません。空きが出たら待ちの先頭へ自動で案内が送られ、本人が期限内に承諾すると確定します。申込者の画面から手動で次の方へ案内することもできます。</>}
+      >
+        キャンセル待ちを受ける
+      </Checkbox>
 
       <div>
         {tagPruned ? (
@@ -1516,21 +1493,17 @@ function PublishTab({
         />
       </div>
 
-      <label className="flex items-start gap-3 p-3 border border-hairline rounded-lg cursor-pointer hover:bg-gray-50">
-        <input
-          type="checkbox"
-          checked={draft.reminder_day_before_enabled === 1}
-          onChange={(e) => update('reminder_day_before_enabled', e.target.checked ? 1 : 0)}
-          className="mt-0.5 rounded border-hairline"
-        />
-        <div>
-          <div className="text-sm font-medium text-ink">前日リマインダ</div>
-          <div className="text-xs text-gray-500 mt-0.5">前日 18:00 JST に LINE で通知</div>
-        </div>
-      </label>
+      <Checkbox
+        className="flex w-full gap-3 rounded-lg border border-hairline p-3 cursor-pointer hover:bg-canvas-sunken"
+        checked={draft.reminder_day_before_enabled === 1}
+        onCheckedChange={(checked) => update('reminder_day_before_enabled', checked ? 1 : 0)}
+        description="前日 18:00 JST に LINE で通知"
+      >
+        前日リマインダ
+      </Checkbox>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+        <label className="text-ink mb-1.5 block text-sm font-medium">
           開始 N 時間前リマインダ
         </label>
         <Select
