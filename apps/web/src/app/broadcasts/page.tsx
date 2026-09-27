@@ -461,6 +461,25 @@ function BroadcastList() {
     return true
   })
 
+  /**
+   * R173: 状態・フォルダ・検索・日付・保存した検索のいずれかが効いているか。
+   * 効いているときの0件は「まだありません」と言わず、条件を外す口を出す。
+   */
+  const broadcastFilterActive = statusFilter !== 'all'
+    || folderFilter !== ''
+    || titleQuery.trim() !== ''
+    || dateFrom !== ''
+    || dateTo !== ''
+    || savedViewId !== ''
+  const clearBroadcastFilters = () => {
+    setStatusFilter('all')
+    setFolderFilter('')
+    setTitleQuery('')
+    setDateFrom('')
+    setDateTo('')
+    setSavedViewId('')
+  }
+
   return (
     <div className="flex flex-col gap-4">
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
@@ -716,6 +735,15 @@ function BroadcastList() {
             description="再読み込みしても直らないときは、エラー報告へお知らせください。"
             onRetry={() => void load()}
           />
+        ) : broadcastFilterActive ? (
+          /* R173: 状態・フォルダ・検索・日付で絞った結果0件。元データ0件と分け、条件を外す口を出す。 */
+          <div className="bg-canvas rounded-card border border-hairline">
+            <ListState
+              kind="empty"
+              emptyPreset="filtered"
+              action={<Button variant="secondary" onClick={clearBroadcastFilters}>条件をクリア</Button>}
+            />
+          </div>
         ) : (
           /* 文言は設計 `TmHjF`（6-1-N）どおり。 */
           <div className="bg-canvas rounded-card border border-hairline">
@@ -723,11 +751,12 @@ function BroadcastList() {
           </div>
         )
       ) : visibleBroadcasts.length === 0 ? (
+        /* R173: タイトル・日付の絞り込みで0件。作る口ではなく条件を外す口を出す。 */
         <div className="bg-canvas rounded-card border border-hairline">
           <ListState
             kind="empty"
-            title="条件に該当する配信はありません"
-            description="絞り込みを変えるか、新しく作成してください。"
+            emptyPreset="filtered"
+            action={<Button variant="secondary" onClick={clearBroadcastFilters}>条件をクリア</Button>}
           />
         </div>
       ) : (

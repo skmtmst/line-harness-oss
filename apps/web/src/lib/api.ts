@@ -6170,7 +6170,8 @@ export const api = {
       type: FriendFieldType
       folderId?: string | null
       options?: string[] | null
-      defaultValue?: string | null
+      /* R139: 複数選択の既定値は選択肢名の配列で渡す（サーバーがIDへ直す）。 */
+      defaultValue?: string | string[] | null
       ecFieldPath?: string | null
       ecIsMaster?: boolean
       isPersonal?: boolean
@@ -6188,19 +6189,26 @@ export const api = {
       id: string,
       accountId: string,
       data: Partial<
-        Pick<
-          FriendField,
-          | 'name'
-          | 'folderId'
-          | 'defaultValue'
-          | 'isPersonal'
-          | 'isStarred'
-          | 'displayOrder'
-          | 'ecFieldPath'
-          | 'ecIsMaster'
-          | 'version'
+        Omit<
+          Pick<
+            FriendField,
+            | 'name'
+            | 'folderId'
+            | 'defaultValue'
+            | 'isPersonal'
+            | 'isStarred'
+            | 'displayOrder'
+            | 'ecFieldPath'
+            | 'ecIsMaster'
+            | 'version'
+          >,
+          'defaultValue'
         >
-      > & { options?: string[] | null },
+      > & {
+        options?: string[] | null
+        /* R139: 複数選択の既定値は選択肢名の配列で渡す（サーバーがIDへ直す）。 */
+        defaultValue?: string | string[] | null
+      },
     ) =>
       fetchApi<ApiResponse<FriendField>>(`/api/friend-fields/${id}?lineAccountId=${encodeURIComponent(accountId)}`, {
         method: 'PATCH',
@@ -6352,7 +6360,8 @@ export const api = {
     archive: (
       markId: string,
       accountId: string,
-      data: { replacementMarkId: string; impactRevision: string; expectedVersion: number },
+      /* R180: 0人のときは置換先なし（null）で保管できる。 */
+      data: { replacementMarkId: string | null; impactRevision: string; expectedVersion: number },
       idempotencyKey: string,
     ) => fetchApi<ApiResponse<{
       archived: true
@@ -7313,8 +7322,20 @@ export const api = {
       validUntil?: string | null
       fallbackValue?: string | null
       expiryBehavior?: 'stop' | 'fallback'
+      /** Q: 下書きとして作るとき 'draft'。省略は使用中で公開。 */
+      status?: 'draft' | 'active'
     }) =>
       fetchApi<ApiResponse<CommonVar>>('/api/common-vars', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    /** Q: 状態の切替（公開・止める・再開）。理由が必須。 */
+    setStatus: (id: string, accountId: string, data: {
+      to: 'active' | 'stopped'
+      changeReason: string
+      expectedVersion?: number
+    }) =>
+      fetchApi<ApiResponse<CommonVar>>(`/api/common-vars/${id}/status?accountId=${encodeURIComponent(accountId)}`, {
         method: 'POST',
         body: JSON.stringify(data),
       }),
@@ -7349,8 +7370,12 @@ export const api = {
       }),
     deleteImpact: (id: string, accountId: string) =>
       fetchApi<ApiResponse<CommonVarDeleteImpact>>(`/api/common-vars/${id}/delete-impact?accountId=${encodeURIComponent(accountId)}`),
-    delete: (id: string, accountId: string) =>
-      fetchApi<ApiResponse<null>>(`/api/common-vars/${id}?accountId=${encodeURIComponent(accountId)}`, { method: 'DELETE' }),
+    // Q: 消す理由が必須。版履歴に残る。
+    delete: (id: string, accountId: string, reason: string) =>
+      fetchApi<ApiResponse<null>>(
+        `/api/common-vars/${id}?accountId=${encodeURIComponent(accountId)}&reason=${encodeURIComponent(reason)}`,
+        { method: 'DELETE' },
+      ),
     replacementCandidates: (id: string, accountId: string) =>
       fetchApi<ApiResponse<CommonVarReplacementCandidates>>(`/api/common-vars/${id}/replace`, {
         method: 'POST',
@@ -7364,7 +7389,7 @@ export const api = {
     replace: (
       id: string,
       accountId: string,
-      input: { replacementId: string; expectedVersion: number; expectedRevision: string },
+      input: { replacementId: string; expectedVersion: number; expectedRevision: string; changeReason: string },
     ) => fetchApi<ApiResponse<CommonVarReplacementResult>>(`/api/common-vars/${id}/replace`, {
       method: 'POST',
       body: JSON.stringify({ accountId, ...input, apply: true }),

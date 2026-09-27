@@ -125,7 +125,7 @@ describe('migration 313 共通情報の使用数・履歴・差し替え', () =>
 
     const plan = await getCommonVarReplacementPlan(db, source, replacement);
     expect(plan).toMatchObject({ replaceableTotal: 2, blockedTotal: 0, historicalTotal: 0 });
-    const result = await applyCommonVarReplacementPlan(db, plan, 'staff-1');
+    const result = await applyCommonVarReplacementPlan(db, plan, 'staff-1', 'キー名の統一');
     expect(result.replacedUsageCount).toBe(2);
     expect(sqlite.prepare(`SELECT message_content FROM templates WHERE id = 'template-1'`).get())
       .toEqual({ message_content: '営業時間は{{var.new_hours}}です' });
@@ -153,7 +153,7 @@ describe('migration 313 共通情報の使用数・履歴・差し替え', () =>
 
     const plan = await getCommonVarReplacementPlan(db, source, replacement);
     expect(plan).toMatchObject({ usageTotal: 3, replaceableTotal: 2, blockedTotal: 1 });
-    await expect(applyCommonVarReplacementPlan(db, plan, 'staff-1'))
+    await expect(applyCommonVarReplacementPlan(db, plan, 'staff-1', 'キー名の統一'))
       .rejects.toThrow('Common variable replacement is blocked');
     expect(sqlite.prepare(
       `SELECT on_submit_message_content FROM form_versions WHERE form_id = 'published-form'`,
@@ -167,7 +167,7 @@ describe('migration 313 共通情報の使用数・履歴・差し替え', () =>
     sqlite.prepare(`UPDATE templates SET message_content = ? WHERE id = 'template-1'`)
       .run('別の担当者が編集中 {{var.old_hours}}');
 
-    await expect(applyCommonVarReplacementPlan(db, plan, 'staff-1')).rejects.toThrow();
+    await expect(applyCommonVarReplacementPlan(db, plan, 'staff-1', 'キー名の統一')).rejects.toThrow();
     expect(sqlite.prepare(`SELECT archived_at FROM common_vars WHERE id = 'source'`).get())
       .toEqual({ archived_at: null });
     expect(JSON.parse((sqlite.prepare(`SELECT config_json FROM scenario_actions WHERE id = 'action-1'`).get() as { config_json: string }).config_json))

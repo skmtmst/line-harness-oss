@@ -81,11 +81,13 @@ export function unavailableText(impact: CommonVarDeleteImpact): string | null {
 export function canDelete(input: {
   impact: CommonVarDeleteImpact | null
   typedKey: string
+  reason: string
   busy: boolean
 }): boolean {
   const impact = input.impact
   if (!impact || input.busy) return false
   if (!impact.canDelete) return false
+  if (!input.reason.trim()) return false
   return input.typedKey.trim() === placeholderText(impact.variable.varKey)
 }
 
@@ -93,6 +95,7 @@ export function canDelete(input: {
 export function blockedReason(input: {
   impact: CommonVarDeleteImpact | null
   typedKey: string
+  reason: string
 }): string | null {
   const impact = input.impact
   if (!impact) return '使用先をまだ読み込めていません。'
@@ -100,6 +103,7 @@ export function blockedReason(input: {
     return `${impact.blockingTotal.toLocaleString('ja-JP')}か所で使われているあいだは削除できません。`
       + '使用先から外してから、もう一度お試しください。'
   }
+  if (!input.reason.trim()) return '消した理由を入力してください。'
   if (input.typedKey.trim() !== placeholderText(impact.variable.varKey)) {
     return `確認のため ${placeholderText(impact.variable.varKey)} を入力してください。`
   }
