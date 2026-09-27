@@ -296,9 +296,14 @@ export default function EventsListPage() {
                   <Th style={{ width: '18%' }}>開催日時</Th>
                   <Th style={{ width: '12%' }} align="right">予約 / 定員</Th>
                   <Th style={{ width: '10%' }} align="right">承認待ち</Th>
-                  <Th style={{ width: '12%' }}>申込条件</Th>
+                  {/* タグ名は長さが読めないため幅を指定しない。残りを吸って表を器に合わせる。 */}
+                  <Th>申込条件</Th>
                   <Th style={{ width: '10%' }}>状態</Th>
-                  <Th style={{ width: '14%' }} align="right">操作</Th>
+                  {/*
+                    操作列は固定幅（256px）。割合にすると中身（2ボタン約242px）が
+                    器からはみ出す。残りは割合と自動の列で吸う。
+                  */}
+                  <Th align="right" className="w-64">操作</Th>
                 </TableHeadRow>
               </thead>
               <tbody>

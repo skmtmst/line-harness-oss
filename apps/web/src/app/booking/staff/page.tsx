@@ -158,12 +158,17 @@ export default function BookingStaffPage() {
         <DataTable data-design="Table">
               <thead>
                 <TableHeadRow>
-                  <Th style={{ width: '26%' }}>スタッフ</Th>
+                  {/* 名前は長さが読めないため幅を指定しない。残りを吸って表を器に合わせる。 */}
+                  <Th>スタッフ</Th>
                   <Th style={{ width: '16%' }}>役職</Th>
                   <Th style={{ width: '14%' }} align="center">指名なし枠</Th>
                   <Th style={{ width: '10%' }} align="right">並び順</Th>
                   <Th style={{ width: '10%' }} align="center">有効</Th>
-                  <Th style={{ width: '24%' }} align="right">操作</Th>
+                  {/*
+                    操作列は固定幅（128px）。割合（24%）では右に大きく空く。
+                    中身（編集＋…約118px）に合わせる。残りは割合と自動の列で吸う。
+                  */}
+                  <Th align="right" className="w-32">操作</Th>
                 </TableHeadRow>
               </thead>
               <tbody>

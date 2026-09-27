@@ -51,8 +51,9 @@ describe('対応が必要な受信の表の右端', () => {
     // 10% の割合指定では狭い幅で札が右の余白へ食い込む。
     expect(body).not.toContain('w-[10%]')
     expect(body).not.toContain('w-[40%]')
-    // 共通の表へ寄せたため、幅は Th の style で持つ（w-24 = 96px のまま）。
-    expect(body).toMatch(/<Th[^>]*width:\s*96[^>]*>状態/)
+    // 共通の表へ寄せたため、幅は Th の style で持つ。
+    // 96px では右に 35px 空くため、札（約52px＋余白）に合わせた 80px。
+    expect(body).toMatch(/<Th[^>]*width:\s*80[^>]*>状態/)
   })
 
   it('見出しと中身の余白は共通部品に任せ、両端をそろえる', () => {

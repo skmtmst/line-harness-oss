@@ -291,7 +291,8 @@ export default function PendingInboxCard({
                   <Th style={{ width: '36%' }}>お名前</Th>
                   <Th>内容</Th>
                   <Th style={{ width: '14%' }} align="right" className="whitespace-nowrap">待ち時間</Th>
-                  <Th style={{ width: 96 }} className="whitespace-nowrap">状態</Th>
+                  {/* 状態の札（約52px＋余白）に合わせた固定幅。96px では右に空く。 */}
+                  <Th style={{ width: 80 }} className="whitespace-nowrap">状態</Th>
                 </TableHeadRow>
               </thead>
               <tbody>

@@ -435,12 +435,17 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
                   <Th style={{ width: '26%' }}>メニュー</Th>
                   <Th style={{ width: '12%' }}>かかる時間</Th>
                   <Th style={{ width: '10%' }} align="right">金額</Th>
-                  <Th style={{ width: '18%' }}>だれが受けられるか</Th>
+                  {/* 担当者名は長さが読めないため幅を指定しない。残りを吸って表を器に合わせる。 */}
+                  <Th>だれが受けられるか</Th>
                   <Th style={{ width: '12%' }} align="right">
                     この30日
                   </Th>
-                  {/* #707: 390pxで表を横スクロールしても操作列を右端へ留める */}
-                  <Th style={{ width: '22%' }} align="right" className="sticky right-0 bg-canvas-sunken">操作</Th>
+                  {/*
+                    #707: 390pxで表を横スクロールしても操作列を右端へ留める。
+                    操作列は固定幅（192px）。割合にすると中身（3ボタン約178px）が
+                    器からはみ出す。残りは割合と自動の列で吸う。
+                  */}
+                  <Th align="right" className="sticky right-0 w-48 bg-canvas-sunken">操作</Th>
                 </TableHeadRow>
               </thead>
               <tbody>
