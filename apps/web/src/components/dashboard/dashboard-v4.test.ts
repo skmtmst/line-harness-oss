@@ -16,7 +16,7 @@ import {
   isDashboardNotificationData,
   markDashboardNotificationRead,
 } from './notification-summary'
-import { formatDate, formatTrendSources } from './friend-trend-table'
+import { formatDate } from './friend-trend-table'
 import { resolveOfficialProfileUrl } from './qr-dialog'
 import type { BookingRequest } from '@/lib/api'
 import type { NotificationCenterData, StaffMember } from '@line-crm/shared'
@@ -138,19 +138,18 @@ describe('ダッシュボードV4の初期表示', () => {
   })
 
   it('旧Workerが友だちの流入元を返さなくても推移表を描画できる', () => {
-    expect(formatTrendSources(undefined)).toEqual({ full: '', compact: '—' })
-    expect(formatTrendSources([{ name: '広告', count: 2 }])).toEqual({
-      full: '広告 2',
-      compact: '広告 2',
-    })
-  })
-
-  it('経路不明の塊は経路名ではなく — で出す（N-013）', () => {
-    // 「経路不明」を経路名として出すと、実在する経路と区別がつかない。
-    expect(formatTrendSources([{ name: null, count: 3 }, { name: '広告', count: 2 }])).toEqual({
-      full: '— 3、広告 2',
-      compact: '— 3、広告 2',
-    })
+    /*
+     * 流入元の列は置かない（2026-09-27 オーナー指摘。「さらに詳しく →」の
+     * 先で見る）。表は `row.sources` を読まないので、旧Workerの未返却でも
+     * 描画できる。`sources` 無しの描画は `friend-trend-table-react.test.tsx`
+     * で見る。ここでは表が流入元に触れないことを文字で固定する。
+     * `formatTrendSources`・N-013 の表示試験は、出す場所が無くなったため
+     * 削った（動きを守る試験ではなく、消えた列の見た目の試験）。
+     */
+    const trend = readFileSync(path.join(process.cwd(), 'src/components/dashboard/friend-trend-table.tsx'), 'utf8')
+    expect(trend).not.toContain('row.sources')
+    // 見出しセル（<th>…</th>）として出さない。設計メモの言及は許す。
+    expect(trend).not.toMatch(/<th[\s\S]*?流入元の内訳/)
   })
 
   it('壊れた日付はNaN表示にせず元の文字列をそのまま出す', () => {
