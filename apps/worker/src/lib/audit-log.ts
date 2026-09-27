@@ -52,6 +52,7 @@ export type AuditAction =
   | 'affiliate.statement.download'
   | 'affiliate.offer.create'
   | 'affiliate.offer.update'
+  | 'affiliate.offer.version.create'
   | 'dashboard.preference.update'
   | 'dashboard.preference.reset'
   | 'dashboard.preference.default.update'

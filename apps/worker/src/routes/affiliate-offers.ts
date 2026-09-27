@@ -248,6 +248,11 @@ affiliateOffers.put('/api/affiliate-offers/:id', requireRole('owner', 'admin'), 
         description?: string | null;
         rewardAmount?: number;
         rewardMiles?: number;
+        windowDays?: number;
+        capTotal?: number | null;
+        capMonthlyPerAffiliate?: number | null;
+        receptionFrom?: string | null;
+        receptionTo?: string | null;
         lineAccountId?: string | null;
         tagId?: string | null;
         scenarioId?: string | null;
@@ -267,6 +272,18 @@ affiliateOffers.put('/api/affiliate-offers/:id', requireRole('owner', 'admin'), 
     if (body.rewardMiles !== undefined && !isValidReward(body.rewardMiles)) {
       return c.json(
         { success: false, error: 'rewardMiles must be a non-negative integer' },
+        400,
+      );
+    }
+    if (body.windowDays !== undefined && !isValidWindowDays(body.windowDays)) {
+      return c.json(
+        { success: false, error: 'windowDays must be an integer between 1 and 365' },
+        400,
+      );
+    }
+    if (!isValidCap(body.capTotal) || !isValidCap(body.capMonthlyPerAffiliate)) {
+      return c.json(
+        { success: false, error: 'cap must be a positive integer or null' },
         400,
       );
     }
@@ -298,13 +315,22 @@ affiliateOffers.put('/api/affiliate-offers/:id', requireRole('owner', 'admin'), 
       return c.json({ success: false, error: refError }, 400);
     }
 
-    // 報酬の変更は、決まりの新しい版として残す(#823)。版を先に作り、
-    // 失敗したら案件の値も変えない。版が無い昔の案件は、この保存で初版が生まれる。
-    if (body.rewardAmount !== undefined || body.rewardMiles !== undefined) {
+    // 報酬・期間・上限・受付の変更は、決まりの新しい版として残す(#823)。
+    // 版を先に作り、失敗したら案件の値も変えない。版が無い昔の案件は、
+    // この保存で初版が生まれる。
+    if (body.rewardAmount !== undefined || body.rewardMiles !== undefined
+      || body.windowDays !== undefined || body.capTotal !== undefined
+      || body.capMonthlyPerAffiliate !== undefined
+      || body.receptionFrom !== undefined || body.receptionTo !== undefined) {
       await createOfferVersion(c.env.DB, {
         offerId: id,
         rewardAmount: body.rewardAmount,
         rewardMiles: body.rewardMiles,
+        windowDays: body.windowDays,
+        capTotal: body.capTotal,
+        capMonthlyPerAffiliate: body.capMonthlyPerAffiliate,
+        receptionFrom: body.receptionFrom,
+        receptionTo: body.receptionTo,
         createdBy: c.get('staff')?.id ?? null,
       });
     }
