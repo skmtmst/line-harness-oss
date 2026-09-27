@@ -112,6 +112,8 @@ Object.defineProperty(window, 'localStorage', {
 });
 
 beforeEach(() => {
+  // 「今日」は 2026-10-15（木）に固定する。部品が読む jstToday を
+  // 偽装しているので、実機の日付が何日でも選ばれる日は変わらない。
   todayOverride = '2026-10-15';
   memoryValues.clear();
   vi.clearAllMocks();
@@ -423,7 +425,14 @@ describe('カレンダーの見た目（設計合わせ）', () => {
 
   it('ます目は枠なし・高さが幅以下（h-10）で、塗るのは選んだ日だけ', async () => {
     await openCalendar();
-    await screen.findByRole('button', { name: '10月16日 空きあり' });
+    // 選んだ日のます目を探す。枠の読み込みと「選ぶ」は別の描画で来るので、
+    // あるだけ待つと塗る前のます目をつかんで落ちることがある（CIで再現）。
+    // 読み上げ名（aria-label）と押した状態（aria-pressed）の両方で待ち受ける。
+    // ます目は切り替え釦なので、選んだ状態は aria-pressed が持つ。
+    const selected = await screen.findByRole('button', {
+      name: '10月16日 空きあり',
+      pressed: true,
+    });
     const grid = screen.getByLabelText('2026年10月の日付');
     expect(grid.className).toContain('grid-cols-7');
     const cells = within(grid).getAllByRole('button');
@@ -435,7 +444,6 @@ describe('カレンダーの見た目（設計合わせ）', () => {
       expect(cell.className).toContain('h-10');
     }
     // 選んだ日（10-16）だけ濃い緑で塗る。ほかは塗らない。
-    const selected = screen.getByRole('button', { name: '10月16日 空きあり' });
     expect(selected.className).toContain('bg-accent-deep');
     expect(selected.className).toContain('rounded-lg');
     const others = cells.filter((cell) => cell !== selected);
