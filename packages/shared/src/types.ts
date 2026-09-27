@@ -222,6 +222,12 @@ export interface FriendField {
   type: FriendFieldType;
   /** select / multi_select のときの選択肢 */
   options: string[] | null;
+  /**
+   * R139: 選択肢のIDと表示名の対応（サーバーが実行時に付けている）。
+   * 既定値（IDの配列・IDで保存）を表示名へ戻すときに使う。無いときは
+   * 表示名の突き合わせに倒す。追加のみで既存の形は変えない。
+   */
+  optionDefinitions?: Array<{ id: string; label: string }> | null;
   defaultValue: string | null;
   source: "manual" | "form" | "ec" | "automation";
   ecFieldPath: string | null;
