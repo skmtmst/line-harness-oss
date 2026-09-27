@@ -37,7 +37,10 @@ describe('V6 リッチメニュー削除確認 szXsT', () => {
 
   it('公開中のメニューもブラウザ標準alertを使わず、取り下げの順番を窓で案内する', () => {
     expect(PAGE).toContain("setDeleteTarget({ kind: 'managed', group })")
-    expect(PAGE).toContain('data-qa-open={g.status === \'published\' ? \'szXsT\' : \'szXsT-draft\'}')
+    // ★V7 `Xn1Mz`（行の「…」統一）：削除口は共通 RowActions のメニューへそろえた。
+    // 公開中→szXsT・下書き→szXsT-draft の分け方は menuButtonProps で残す。
+    expect(PAGE).toContain('<RowActions')
+    expect(PAGE).toContain("'data-qa-open': g.status === 'published' ? 'szXsT' : 'szXsT-draft'")
     expect(PAGE).toContain("? await api.richMenuGroups.unpublish(deleteTarget.group.id)")
     expect(PAGE).toContain("? 'LINEから取り下げる'")
     expect(PAGE).toContain('取り下げたあと、管理画面から削除できます。')

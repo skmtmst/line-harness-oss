@@ -11,6 +11,7 @@ import { LayoutGrid, List as ListIcon } from 'lucide-react'
 import { api, ApiError, type MediaQuota } from '@/lib/api'
 import FeatureGate from '@/components/feature-gate'
 import Button from '@/components/shared/button'
+import ListToolbar from '@/components/shared/list-toolbar'
 import ActionMenu from '@/components/shared/action-menu'
 import { MoreAction } from '@/components/shared/row-actions'
 import { formatMediaSize } from './media-usage-display'
@@ -32,7 +33,6 @@ import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
-import SearchField from '@/components/shared/search-field'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import Select from '@/components/shared/select'
 import { useAccount } from '@/contexts/account-context'
@@ -836,143 +836,136 @@ function MediaLibraryInner() {
         <div className="min-w-0">
 
       {/*
-        検索は独立した全幅の行にする（U016）。表示切替・並び順・件数と
-        同じ行に押し込むと、狭い幅で入力文が読めないほど潰れる。
+        ★V7 `Xn1Mz`：検索は幅320で1行目、2行目は左に絞り込み・
+        右端に表示切替・並び順・表示件数。U016 の潰れ対策の意図は
+        そのまま（検索は320・下限240で折り返す）。
       */}
-      <div data-search-row className="mb-3">
-        <SearchField
-          value={query}
-          onChange={(value) => {
+      <ListToolbar
+        search={{
+          placeholder: 'ファイル名で検索',
+          value: query,
+          onChange: (value) => {
             setQuery(value)
             setPage(1)
-          }}
-          onClear={() => {
-            setQuery('')
-            setPage(1)
-          }}
-          placeholder="ファイル名で検索"
-          aria-label="ファイル名で検索"
-          className="w-full"
-        />
-      </div>
-
-      {/* 種別と使用状態。選ぶと必ず1ページ目へ戻る。 */}
-      <div className="mb-3 flex flex-wrap items-center gap-3">
-        <FilterChip
-          selected={kinds.size === KINDS.length && !showUnusedOnly && !showArchivedOnly}
-          onChange={() => {
-            setKinds(new Set(KINDS.map((kind) => kind.key)))
-            setShowUnusedOnly(false)
-            setShowNearLimitOnly(false)
-            setShowArchivedOnly(false)
-            setPage(1)
-          }}
-        >
-          すべて
-        </FilterChip>
-        {KINDS.map((kind) => (
-          <FilterChip
-            key={kind.key}
-            selected={kinds.size === 1 && kinds.has(kind.key) && !showArchivedOnly}
-            onChange={() => {
-              setKinds(new Set([kind.key]))
-              setShowUnusedOnly(false)
-              setShowNearLimitOnly(false)
-              setShowArchivedOnly(false)
-              setPage(1)
-            }}
-          >
-            {kind.label}
-          </FilterChip>
-        ))}
-        <FilterChip
-          selected={showUnusedOnly}
-          onChange={(selectedValue) => {
-            setShowUnusedOnly(selectedValue)
-            setShowNearLimitOnly(false)
-            setShowArchivedOnly(false)
-            if (selectedValue) setKinds(new Set(KINDS.map((kind) => kind.key)))
-            setPage(1)
-          }}
-        >
-          使っていない
-        </FilterChip>
-        <FilterChip
-          selected={showNearLimitOnly}
-          onChange={(selectedValue) => {
-            setShowNearLimitOnly(selectedValue)
-            setShowUnusedOnly(false)
-            setShowArchivedOnly(false)
-            if (selectedValue) setKinds(new Set(KINDS.map((kind) => kind.key)))
-            setPage(1)
-          }}
-        >
-          上限に近い
-        </FilterChip>
-        <FilterChip
-          selected={showArchivedOnly}
-          onChange={(selectedValue) => {
-            setShowArchivedOnly(selectedValue)
-            setShowUnusedOnly(false)
-            setShowNearLimitOnly(false)
-            if (selectedValue) setKinds(new Set(KINDS.map((kind) => kind.key)))
-            setPage(1)
-          }}
-        >
-          アーカイブ済み
-        </FilterChip>
-      </div>
-
-      {/*
-        表示の切り替え・並び順・件数は結果の見出し側へまとめる（U016）。
-        検索と同じ行にすると、狭い幅で検索欄が潰れる。
-      */}
-      <div className="mb-3 flex flex-wrap items-center justify-end gap-3">
-        {/* 設計 `g89Tc` の表示切替: 枠 高さ40・角丸8、各44幅、アイコン16。 */}
-        <div
-          role="group"
-          aria-label="並べ方"
-          className="border-hairline rounded-control flex h-10 items-center overflow-hidden border"
-        >
-          {([
-            ['grid', '格子で並べる', LayoutGrid],
-            ['list', '一覧で並べる', ListIcon],
-          ] as Array<[MediaView, string, typeof LayoutGrid]>).map(([value, label, Icon]) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => setView(value)}
-              aria-pressed={view === value}
-              aria-label={label}
-              title={label}
-              className={`flex h-full w-11 items-center justify-center ${
-                view === value ? 'bg-accent-soft text-accent-deep' : 'text-ink-faint hover:bg-canvas-sunken'
-              }`}
+          },
+        }}
+        filters={
+          <>
+            {/* 種別と使用状態。選ぶと必ず1ページ目へ戻る。 */}
+            <FilterChip
+              selected={kinds.size === KINDS.length && !showUnusedOnly && !showArchivedOnly}
+              onChange={() => {
+                setKinds(new Set(KINDS.map((kind) => kind.key)))
+                setShowUnusedOnly(false)
+                setShowNearLimitOnly(false)
+                setShowArchivedOnly(false)
+                setPage(1)
+              }}
             >
-              <Icon aria-hidden="true" size={16} />
-            </button>
-          ))}
-        </div>
-        <Select
-          aria-label="並び順"
-          value={sort}
-          options={SORT_OPTIONS}
-          onChange={(value) => {
-            setSort(value as MediaSort)
-            setPage(1)
-          }}
-        />
-        <Select
-          aria-label="表示件数"
-          value={String(pageSize)}
-          options={PAGE_SIZE_OPTIONS}
-          onChange={(value) => {
-            setPageSize(Number(value))
-            setPage(1)
-          }}
-          size="page-size"
-        />
-      </div>
+              すべて
+            </FilterChip>
+            {KINDS.map((kind) => (
+              <FilterChip
+                key={kind.key}
+                selected={kinds.size === 1 && kinds.has(kind.key) && !showArchivedOnly}
+                onChange={() => {
+                  setKinds(new Set([kind.key]))
+                  setShowUnusedOnly(false)
+                  setShowNearLimitOnly(false)
+                  setShowArchivedOnly(false)
+                  setPage(1)
+                }}
+              >
+                {kind.label}
+              </FilterChip>
+            ))}
+            <FilterChip
+              selected={showUnusedOnly}
+              onChange={(selectedValue) => {
+                setShowUnusedOnly(selectedValue)
+                setShowNearLimitOnly(false)
+                setShowArchivedOnly(false)
+                if (selectedValue) setKinds(new Set(KINDS.map((kind) => kind.key)))
+                setPage(1)
+              }}
+            >
+              使っていない
+            </FilterChip>
+            <FilterChip
+              selected={showNearLimitOnly}
+              onChange={(selectedValue) => {
+                setShowNearLimitOnly(selectedValue)
+                setShowUnusedOnly(false)
+                setShowArchivedOnly(false)
+                if (selectedValue) setKinds(new Set(KINDS.map((kind) => kind.key)))
+                setPage(1)
+              }}
+            >
+              上限に近い
+            </FilterChip>
+            <FilterChip
+              selected={showArchivedOnly}
+              onChange={(selectedValue) => {
+                setShowArchivedOnly(selectedValue)
+                setShowUnusedOnly(false)
+                setShowNearLimitOnly(false)
+                if (selectedValue) setKinds(new Set(KINDS.map((kind) => kind.key)))
+                setPage(1)
+              }}
+            >
+              アーカイブ済み
+            </FilterChip>
+          </>
+        }
+        trailing={
+          <>
+            {/* 設計 `g89Tc` の表示切替: 枠 高さ40・角丸8、各44幅、アイコン16。 */}
+            <div
+              role="group"
+              aria-label="並べ方"
+              className="border-hairline rounded-control flex h-10 items-center overflow-hidden border"
+            >
+              {([
+                ['grid', '格子で並べる', LayoutGrid],
+                ['list', '一覧で並べる', ListIcon],
+              ] as Array<[MediaView, string, typeof LayoutGrid]>).map(([value, label, Icon]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setView(value)}
+                  aria-pressed={view === value}
+                  aria-label={label}
+                  title={label}
+                  className={`flex h-full w-11 items-center justify-center ${
+                    view === value ? 'bg-accent-soft text-accent-deep' : 'text-ink-faint hover:bg-canvas-sunken'
+                  }`}
+                >
+                  <Icon aria-hidden="true" size={16} />
+                </button>
+              ))}
+            </div>
+            <Select
+              aria-label="並び順"
+              value={sort}
+              options={SORT_OPTIONS}
+              onChange={(value) => {
+                setSort(value as MediaSort)
+                setPage(1)
+              }}
+            />
+            <Select
+              aria-label="表示件数"
+              value={String(pageSize)}
+              options={PAGE_SIZE_OPTIONS}
+              onChange={(value) => {
+                setPageSize(Number(value))
+                setPage(1)
+              }}
+              size="page-size"
+            />
+          </>
+        }
+      />
 
       <div data-design-node="h8pBZr" className="flex flex-col gap-4">
       {total > 200 ? (
@@ -1151,6 +1144,7 @@ function MediaLibraryInner() {
                     <MoreAction
                       label={`${item.filename}のその他操作`}
                       aria-expanded={openMenuId === item.id}
+                      data-qa-open="YfTfJ"
                       onClick={() => setOpenMenuId((current) => (current === item.id ? null : item.id))}
                     />
                     <ActionMenu
@@ -1171,16 +1165,9 @@ function MediaLibraryInner() {
                         ...(canManageMedia
                           ? [{ id: 'archive', label: item.archivedAt ? '一覧へ戻す' : 'アーカイブ', onSelect: () => { setArchiveError(''); setArchiveReason(''); setArchiveTarget({ item, mode: item.archivedAt ? 'restore' : 'archive' }) } }]
                           : []),
+                        // 削除確認の窓の撮影は「…」→この項目の2手で開ける。
                         ...(canManageMedia && !item.archivedAt
-                          ? [{
-                            id: 'delete',
-                            label: '削除する',
-                            tone: 'danger' as const,
-                            dividerBefore: true,
-                            // 削除確認の窓の撮影は「…」→この項目の2手で開ける。
-                            qaOpen: 'YfTfJ',
-                            onSelect: () => { void openDelete(item) },
-                          }]
+                          ? [{ id: 'delete', label: '削除する', tone: 'danger' as const, dividerBefore: true, qaOpen: 'YfTfJ', onSelect: () => { void openDelete(item) } }]
                           : []),
                       ]}
                     />

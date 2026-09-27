@@ -260,7 +260,7 @@ export const FORM_OPTIONS_DEFAULT: FormOptions = {
   thanksText: "ご回答ありがとうございました。",
   restorePrevious: false,
   pageTitle: null,
-  submitLabel: "送信",
+  submitLabel: "送信する",
   prevLabel: "前へ",
   nextLabel: "次へ",
   sectionHeader: "pageNumber",

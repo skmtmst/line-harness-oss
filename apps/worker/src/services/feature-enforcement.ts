@@ -113,6 +113,14 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
     },
   },
   {
+    name: 'ad cost import',
+    classification: { kind: 'core', reason: '広告費の日次取込' },
+    enforcement: {
+      mode: 'exempt',
+      reason: '取込の可否はアカウント自身の広告設定(連携のis_active)だけで決まり、機能設定に属さない',
+    },
+  },
+  {
     name: 'ec event retry',
     classification: { kind: 'core', reason: 'ECイベント通知の再試行' },
     enforcement: {

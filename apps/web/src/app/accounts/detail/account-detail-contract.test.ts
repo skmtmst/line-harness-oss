@@ -96,14 +96,28 @@ describe('V6 33-3 LINEアカウントの詳細・編集', () => {
   it('できないことは押し口を出さず、理由を書く', () => {
     /*
       `v6-common-rules.md` §7-10「出す＝使える」。
-      写す口とアーカイブはまだ無い（台帳 #128）。
+      写す口だけはまだ無い（台帳 #128）。アーカイブは X-1 で繋いだ。
     */
     const actions = accountActions(account())
     const blocked = actions.filter((a) => a.blockedReason !== null).map((a) => a.key)
-    expect(blocked).toEqual(['copy', 'archive'])
+    expect(blocked).toEqual(['copy'])
     // 押せるものには理由を付けない。
     expect(actions.find((a) => a.key === 'stop')?.blockedReason).toBeNull()
     expect(actions.find((a) => a.key === 'handover')?.blockedReason).toBeNull()
+    expect(actions.find((a) => a.key === 'archive')?.blockedReason).toBeNull()
+  })
+
+  it('アーカイブ済みは「戻す」だけを出す', () => {
+    const actions = accountActions(account({ archivedAt: '2026-10-01 00:00:00+09:00' }))
+    expect(actions.map((a) => a.key)).toEqual(['restore'])
+    expect(actions[0].actionLabel).toBe('アーカイブから戻す')
+  })
+
+  it('止める・再開するには理由が必須', () => {
+    // X-1: 理由なしの停止を画面から送らせない。入力欄と必須表示が出る。
+    expect(PAGE).toContain('止める理由')
+    expect(PAGE).toContain('再開する理由')
+    expect(PAGE).toContain('（必須）')
   })
 
   it('止める・再開するで言葉が変わる', () => {

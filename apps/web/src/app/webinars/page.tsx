@@ -1,6 +1,6 @@
 'use client'
 
-import { Archive, X } from 'lucide-react'
+import { X } from 'lucide-react'
 import SortSelect from '@/components/ui/sort-select'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import ListRange from '@/components/ui/list-range'
@@ -10,7 +10,8 @@ import type { ReactNode } from 'react'
 import Link from 'next/link'
 import Button from '@/components/shared/button'
 import LinePreview from '@/components/shared/line-preview'
-import IconButton from '@/components/shared/icon-button'
+import ListToolbar from '@/components/shared/list-toolbar'
+import { RowActions } from '@/components/shared/row-actions'
 import Pagination from '@/components/shared/pagination'
 import ListState from '@/components/shared/list-state'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -306,8 +307,17 @@ function WebinarListTable({
             <div className="text-ink-secondary text-sm tabular-nums" title={w.registrationCount == null ? '申込人数は一覧APIに未接続です。' : undefined}><span className="text-ink-faint md:hidden">申込 </span>{measuredCount(w.registrationCount)}</div>
             <div className="text-ink-secondary text-sm tabular-nums" title={w.viewerCount == null ? '視聴人数は一覧APIに未接続です。' : undefined}><span className="text-ink-faint md:hidden">視聴 </span>{measuredCount(w.viewerCount)}</div>
             <div className="text-ink-secondary truncate text-sm md:col-span-2" title={publicationSummary(w)}>{publicationSummary(w)}</div>
-            {/* #641: 「編集」は枠つきボタン、アーカイブは撮影口を維持したままアイコン化（友だち追加時配信と同じ形） */}
-            <div className="flex items-center gap-1.5 md:col-span-2"><Button href={`/webinars/edit?id=${w.id}`} variant="secondary">編集</Button><IconButton data-qa-open={w.id === 'webinar-5' ? 'LKuAQ' : undefined} onClick={() => onArchive(w)} aria-label={`${w.title}をアーカイブ`} title="アーカイブ"><Archive aria-hidden /></IconButton></div>
+            {/*
+              ★V7 `Xn1Mz`：行の操作は「主な1つ（編集）＋…」。アーカイブは
+              メニューの中へ。箱のアイコンだけのボタンは行に直に置かない。
+              撮影口（LKuAQ）は「…」ボタンへ移す（2段操作の1段目）。
+            */}
+            <div className="flex items-center gap-1.5 md:col-span-2"><RowActions
+              subjectName={w.title}
+              edit={{ href: `/webinars/edit?id=${w.id}` }}
+              menuItems={[{ id: 'archive', label: 'アーカイブする', onSelect: () => onArchive(w) }]}
+              menuButtonProps={{ 'data-qa-open': w.id === 'webinar-5' ? 'LKuAQ' : undefined }}
+            /></div>
           </div>
         ))}
       </div>
@@ -794,26 +804,36 @@ function WebinarsPage() {
           />
 
           <section className="min-w-0">
-            <div data-design="Bar" className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3">
-              {/* #636: 390pxで min-w-0 の検索欄が w=41 まで潰れていた。
-                  min-w-45（180px）を下限にすると flex-wrap が効き、
-                  狭い幅では検索欄が1行・並び順と表示件数は次の行へ。 */}
-              <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="名前・内容で検索" aria-label="ウェビナー名で検索" className="border-hairline rounded-control focus:ring-accent min-w-45 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none" />
+            {/*
+              ★V7 `Xn1Mz`：検索は幅320で1行目、2行目は左に絞り込み・
+              右端に並び順と表示件数。#636/#668 の並びの意図はそのまま。
+              設計の Bar（検索行）・Saved（絞り込み行）は共通 ListToolbar の
+              1・2行目にいる。印だけここに残し、設計との突き合わせを保つ。
+            */}
+            <div data-design="Bar">
+            <div data-design="Saved">
+            <ListToolbar
+              search={{ placeholder: '名前・内容で検索', label: 'ウェビナー名で検索', value: query, onChange: setQuery }}
+              filters={
+                <>
+                  <span className="text-ink-faint text-xs whitespace-nowrap">よく使う絞り込み</span>
+                  {([{ key: 'active', label: '公開中のみ' }, { key: 'draft', label: '下書きのみ' }] as const).map(({ key, label }) => (
+                    <FilterChip key={key} selected={savedFilter === key} onChange={(next) => setSavedFilter(next ? key : '')}>{label}</FilterChip>
+                  ))}
+                </>
+              }
+              trailing={
+                <>
+                  <SortSelect
+                    value={sortKey}
+                    onChange={(value) => setSortKey(value as SortKey)}
+                    options={[{ value: 'updated', label: '更新が新しい順' }, { value: 'created', label: '作成が新しい順' }, { value: 'name', label: '名前順' }]}
+                  />
+                  <PageSizeSelect value={pageSize} onChange={setPageSize} />
+                </>
+              }
+            />
             </div>
-
-            {/* #668: 並びは「絞り込み → 並び順 → 表示件数」の1形。 */}
-            <div data-design="Saved" className="mb-3 flex flex-wrap items-center gap-2">
-              <span className="text-ink-faint text-xs whitespace-nowrap">よく使う絞り込み</span>
-              {([{ key: 'active', label: '公開中のみ' }, { key: 'draft', label: '下書きのみ' }] as const).map(({ key, label }) => (
-                <FilterChip key={key} selected={savedFilter === key} onChange={(next) => setSavedFilter(next ? key : '')}>{label}</FilterChip>
-              ))}
-              <SortSelect
-                className="ml-auto"
-                value={sortKey}
-                onChange={(value) => setSortKey(value as SortKey)}
-                options={[{ value: 'updated', label: '更新が新しい順' }, { value: 'created', label: '作成が新しい順' }, { value: 'name', label: '名前順' }]}
-              />
-              <PageSizeSelect value={pageSize} onChange={setPageSize} />
             </div>
 
             <WebinarListContent

@@ -368,11 +368,17 @@ async function validateTriggerConfig(
       throw new AutomationDraftError('trigger_config_invalid', '時刻は5分単位で入力してください', 'time');
     }
     if (eventType === 'weekly') {
+      /*
+       * R21: 曜日は0〜6の整数の配列だけを受け付ける。空の要素由来の
+       * 混入（"1,3," → [1,3,0]）を防ぐため、文字列・小数・範囲外・
+       * 空配列・重複はすべて受け付けず選び直しを求める。
+       */
       if (!Array.isArray(config.weekdays) || config.weekdays.length === 0
-        || config.weekdays.some((day) => !Number.isInteger(day) || Number(day) < 0 || Number(day) > 6)) {
+        || config.weekdays.some((day) => !Number.isInteger(day) || Number(day) < 0 || Number(day) > 6)
+        || new Set(config.weekdays as number[]).size !== (config.weekdays as unknown[]).length) {
         throw new AutomationDraftError('trigger_config_invalid', '曜日を1つ以上選んでください', 'weekdays');
       }
-      return { time, weekdays: [...new Set(config.weekdays as number[])], friendIds };
+      return { time, weekdays: [...(config.weekdays as number[])].sort((a, b) => a - b), friendIds };
     }
     return { time, friendIds };
   }
