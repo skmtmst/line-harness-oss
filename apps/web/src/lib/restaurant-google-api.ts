@@ -117,7 +117,7 @@ export type GoogleProfileData = {
 export type GoogleChangeKind = 'special_hours' | 'regular_hours' | 'profile' | 'photo'
 export type GoogleChangeStatus = 'draft' | 'pending_confirm' | 'accepted' | 'applied' | 'failed' | 'conflict' | 'cancelled'
 export type GoogleChangeTarget = { dates: string[] } | { weekdays: GoogleWeekday[] } | { field: 'title' | 'phone' | 'websiteUri' | 'description' | 'address' } | { field: 'photo'; action: 'add' | 'delete' }
-export type GoogleDayHours = { date: string; closed: boolean; periods: GoogleHoursPeriod[] }
+export type GoogleDayHours = { date: string; closed: boolean; periods: GoogleHoursPeriod[]; /** その日に特別営業時間が登録済みか（変更前の表示用） */ special?: boolean; /** true なら特別営業時間を外して通常に戻す。periods は戻り先の通常時間 */ remove?: boolean }
 
 export type GoogleChange = {
   id: string
