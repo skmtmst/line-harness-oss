@@ -207,21 +207,44 @@ export type IncomingWebhookDetail = IncomingWebhook & {
   templateFields: Array<{ path: string; type: string; token: string }>
   /** 人が見つからなかった届物の未確認件数(#939 N-367)。 */
   pendingUnmatched: number
+  /** S: 合言葉の入れ替え中だけ、前の合言葉が使える期限。併用期間外は null。 */
+  previousSecretUsableUntil: string | null
 }
 
 /**
  * 人が見つからなかった届物(#939 N-367)。生の本文は保存していないので、
  * 照合に使った値と形だけの見本だけが返る。
+ * S: kind='ambiguous' は同じ値の友だちが2人以上いて保留した届物。
+ * candidates に一致した友だちが入る(人がどれか選ぶ)。
  */
 export interface IncomingWebhookUnmatchedItem {
   id: string
-  kind: 'unmatched' | 'candidate'
+  kind: 'unmatched' | 'candidate' | 'ambiguous'
   status: 'pending' | 'resolved' | 'dismissed'
   identityAttempts: Array<{ kind: string; path: string; value: string }>
   maskedShape: { fields: Array<{ path: string; type: string; maskedValue: string }>; truncated: boolean } | null
+  candidates: Array<{ friendId: string; displayName: string | null }>
   resolvedFriendId: string | null
   resolvedAt: string | null
   receivedAt: string
+}
+
+/** S: 受け取りの試しの結果。照合と行動の組み立てまでで、実行はしない。 */
+export interface IncomingWebhookTestResult {
+  match:
+    | { status: 'matched'; friendId: string }
+    | { status: 'ambiguous'; friendIds: string[] }
+    | { status: 'not_found' }
+  identityAttempts: Array<{ kind: string; path: string; value: string }>
+  actions: Array<{
+    refIndex: number
+    refKind: string
+    refId: string
+    displayName: string
+    ok: boolean
+    plan?: Array<{ type: string }>
+    error?: string
+  }>
 }
 
 /**
@@ -11078,6 +11101,12 @@ export const api = {
         fetchApi<ApiResponse<{ id: string; status: string }>>(
           `/api/webhooks/unmatched/${encodeURIComponent(id)}/resolve?lineAccountId=${encodeURIComponent(lineAccountId)}`,
           { method: 'POST', body: JSON.stringify(data) },
+        ),
+      /* S (#939 機能26): 見本JSONで照合と行動の組み立てを試す口。実行はしない。 */
+      test: (id: string, lineAccountId: string, payload: unknown) =>
+        fetchApi<ApiResponse<IncomingWebhookTestResult>>(
+          `/api/webhooks/incoming/${encodeURIComponent(id)}/test?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+          { method: 'POST', body: JSON.stringify({ payload }) },
         ),
     },
     outgoing: {
