@@ -52,6 +52,8 @@ function serialize(row: EntryRoute) {
     introTemplateId: row.intro_template_id,
     runAccountFriendAddScenarios: row.run_account_friend_add_scenarios === 1,
     isActive: row.is_active === 1,
+    stoppedAt: row.stopped_at ?? null,
+    stoppedReason: row.stopped_reason ?? null,
     lineAccountId: row.line_account_id ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -254,6 +256,7 @@ entryRoutes.patch('/api/entry-routes/:id', requireEntryRouteManagement(), async 
         introTemplateId: string | null;
         runAccountFriendAddScenarios: boolean;
         isActive: boolean;
+        stoppedReason?: string | null;
       }>
     >();
     if (body.refCode !== undefined && body.refCode.trim() !== existing.ref_code) {
@@ -264,6 +267,10 @@ entryRoutes.patch('/api/entry-routes/:id', requireEntryRouteManagement(), async 
     }
     if (body.name !== undefined && (!body.name.trim() || body.name.trim().length > 120)) {
       return c.json({ success: false, error: '名前は1〜120文字で入力してください' }, 400);
+    }
+    if (body.stoppedReason !== undefined && body.stoppedReason !== null
+      && (typeof body.stoppedReason !== 'string' || body.stoppedReason.trim().length > 200)) {
+      return c.json({ success: false, error: '停止理由は200文字以内で入力してください' }, 400);
     }
     delete body.refCode;
     if (typeof body.genre === 'string') body.genre = body.genre.trim();
