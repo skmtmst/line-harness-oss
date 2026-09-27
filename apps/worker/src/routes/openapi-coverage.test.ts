@@ -552,6 +552,10 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'PUT /api/liff/nen/pets/{id}',
   'PUT /api/nen/feeding-products',
   'PUT /api/nen/rank-settings',
+  'GET /api/webinars/{id}/sessions/{startAt}',
+  'GET /api/webinars/{id}/video-asset',
+  'POST /api/webinars/{id}/video-asset/advance',
+  'PUT /api/webinars/{id}/sessions/{startAt}',
 ]);
 
 const ALLOWLIST = new Set<string>([
@@ -756,6 +760,7 @@ const ALLOWLIST = new Set<string>([
   'GET /api/affiliate-payments',
   'GET /api/affiliate-payments/{id}/preview',
   'GET /api/affiliate-payout-batches/{id}/download',
+  'GET /api/affiliate-settlements/current',
   'GET /api/affiliate-settlements/preview',
   'GET /api/affiliates-report',
   'GET /api/affiliates/{id}/archive-impact',

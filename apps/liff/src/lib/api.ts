@@ -145,6 +145,8 @@ export interface EventDetail {
   max_bookings_per_friend: number | null;
   requires_approval: number;
   cancel_deadline_hours_before: number | null;
+  /** 満席のあとキャンセル待ちを受けるか (GET /api/liff/events/:id が行ごと返す)。 */
+  waitlist_enabled?: number | null;
   /** 申込時のカスタム質問 (#841)。定義が無いイベントは空配列。 */
   questions?: EventQuestion[];
 }

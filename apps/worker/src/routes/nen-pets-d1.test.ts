@@ -177,6 +177,24 @@ describe('GET /api/nen/pets（★V6 37-3 マイペット）', () => {
     expect(all.body.data.kpis.total).toBe(3004);
   });
 
+  it('体重の更新は「測った日」で判断する。プロフィールの編集日では動かない（監査 R57）', async () => {
+    // 体重を測った日は古いまま、名前などの編集でプロフィールだけが
+    // 最近更新された状態を再現する。かつては更新日を見ていたため
+    // 名前の直しで「未更新」が外れてしまっていた。
+    sql.exec(`UPDATE nen_pet_profiles SET weight_updated_at = '${stamp(120)}', updated_at = '${stamp(1)}' WHERE id = 'pet-momo'`);
+
+    const { body } = await get(`/api/nen/pets?accountId=${ACCOUNT}`);
+    const momo = body.data.items.find((p: any) => p.name === 'モモ');
+    expect(momo.weightUpdatedAt.slice(0, 10)).toBe(day(120));
+    expect(momo.weightStale).toBe(true);
+    expect(body.data.kpis.staleWeight).toBe(2);
+
+    const fresh = await get(`/api/nen/pets?accountId=${ACCOUNT}&weight=fresh`);
+    expect(fresh.body.data.items.map((p: any) => p.name)).toEqual(['ハナ']);
+    const stale = await get(`/api/nen/pets?accountId=${ACCOUNT}&weight=stale`);
+    expect(stale.body.data.items.map((p: any) => p.name).sort()).toEqual(['タロウ', 'モモ']);
+  });
+
   it('accountId 無しは 400、別テナントのアカウントは 403', async () => {
     expect((await get('/api/nen/pets')).status).toBe(400);
     expect((await get('/api/nen/pets?accountId=account-other')).status).toBe(403);

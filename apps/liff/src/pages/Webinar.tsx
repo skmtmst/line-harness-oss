@@ -13,7 +13,7 @@ import Icon from '../components/ui/Icon.js';
 // シークバー・一時停止 UI は出さない (controls なし)。
 
 const DRIFT_TOLERANCE = 5;
-// J #821: 再生中だけ15秒ごとに送る。
+// J821: 再生中だけ15秒ごとに送る。
 const HEARTBEAT_MS = 15_000;
 
 interface ChatItem {
@@ -202,7 +202,7 @@ export default function Webinar() {
     return () => document.removeEventListener('visibilitychange', onVisible);
   }, [expectedPosition, ended]);
 
-  // ハートビート (配信終了後は送らない。J #821: 再生中だけ15秒ごと)。
+  // ハートビート (配信終了後は送らない。J821: 再生中だけ15秒ごと)。
   // 状態を区別する: 再生・一時停止・隠れた・読み込み待ち・位置の移動・速度。
   useEffect(() => {
     if (!state?.live || !slug || ended) return;
