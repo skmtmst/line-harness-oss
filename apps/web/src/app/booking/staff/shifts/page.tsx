@@ -243,7 +243,7 @@ function BusinessHoursEditor({ accountId, settings, canEdit, onSaved, onReload }
       </div>
       </fieldset>
       {/* R161 監査：営業時間の書きかけがある間の離脱確認。 */}
-      <ConfirmDialog open={leaveTarget !== null} title="保存していない変更があります" description="このまま移動すると、営業時間への変更は失われます。保存せずに移動しますか？" confirmLabel="保存せずに移動" cancelLabel="編集を続ける" onConfirm={confirmLeave} onCancel={cancelLeave} />
+      <ConfirmDialog primaryAction="cancel" open={leaveTarget !== null} title="保存していない変更があります" description="このまま移動すると、営業時間への変更は失われます。保存せずに移動しますか？" confirmLabel="保存せずに移動" cancelLabel="編集を続ける" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </section>
   )
 }
@@ -427,7 +427,7 @@ function ResourceEditor({ accountId, resource, canManage, onSaved, onDeleted }: 
         </div>
       ) : <p className="text-ink-faint mt-2 text-xs">閲覧のみです。変更はオーナーまたは管理者が行えます。</p>}
       {/* R161 監査：設備の書きかけがある間の離脱確認。 */}
-      <ConfirmDialog open={leaveTarget !== null} title="保存していない変更があります" description="このまま移動すると、設備への変更は失われます。保存せずに移動しますか？" confirmLabel="保存せずに移動" cancelLabel="編集を続ける" onConfirm={confirmLeave} onCancel={cancelLeave} />
+      <ConfirmDialog primaryAction="cancel" open={leaveTarget !== null} title="保存していない変更があります" description="このまま移動すると、設備への変更は失われます。保存せずに移動しますか？" confirmLabel="保存せずに移動" cancelLabel="編集を続ける" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )
 }
@@ -493,7 +493,7 @@ function NewResourceEditor({ accountId, onCreated }: {
       {error ? <p className="text-danger mt-2 text-xs" role="alert">{error}</p> : null}
       <Button className="mt-3" variant="primary" onClick={() => void create()} disabled={saving}>{saving ? '追加中…' : '設備を追加'}</Button>
       {/* R161 監査：追加欄の書きかけがある間の離脱確認。 */}
-      <ConfirmDialog open={leaveTarget !== null} title="保存していない変更があります" description="このまま移動すると、入力した設備は保存されません。保存せずに移動しますか？" confirmLabel="保存せずに移動" cancelLabel="入力を続ける" onConfirm={confirmLeave} onCancel={cancelLeave} />
+      <ConfirmDialog primaryAction="cancel" open={leaveTarget !== null} title="保存していない変更があります" description="このまま移動すると、入力した設備は保存されません。保存せずに移動しますか？" confirmLabel="保存せずに移動" cancelLabel="入力を続ける" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )
 }
@@ -1121,7 +1121,7 @@ function StoreShiftsView() {
         onConfirm={() => void removeException()}
       />
       {/* R161 監査：休業日の書きかけがある間の離脱確認。 */}
-      <ConfirmDialog open={leaveTarget !== null} title="保存していない変更があります" description="このまま移動すると、休業日への変更は失われます。保存せずに移動しますか？" confirmLabel="保存せずに移動" cancelLabel="編集を続ける" onConfirm={confirmLeave} onCancel={cancelLeave} />
+      <ConfirmDialog primaryAction="cancel" open={leaveTarget !== null} title="保存していない変更があります" description="このまま移動すると、休業日への変更は失われます。保存せずに移動しますか？" confirmLabel="保存せずに移動" cancelLabel="編集を続ける" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )
 }

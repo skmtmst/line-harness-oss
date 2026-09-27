@@ -333,7 +333,7 @@ function QuestionTemplatePageInner() {
         )}
       />
       {/* R136 監査：質問文などの書きかけがある間の離脱確認。 */}
-      <ConfirmDialog open={leaveTarget !== null} title="保存していない変更があります" description="このまま移動すると、質問への変更は失われます。保存せずに移動しますか？" confirmLabel="保存せずに移動" cancelLabel="編集を続ける" onConfirm={confirmLeave} onCancel={cancelLeave} />
+      <ConfirmDialog primaryAction="cancel" open={leaveTarget !== null} title="保存していない変更があります" description="このまま移動すると、質問への変更は失われます。保存せずに移動しますか？" confirmLabel="保存せずに移動" cancelLabel="編集を続ける" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )
 }

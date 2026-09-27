@@ -382,7 +382,7 @@ export default function EventWizard({ accountId, eventId, step }: EventWizardPro
       )}
 
       {/* R161 監査：概要・予約枠・公開設定の書きかけがある間の離脱確認。 */}
-      <ConfirmDialog open={leaveTarget !== null} title="保存していない変更があります" description="このまま移動すると、イベントへの変更は失われます。保存せずに移動しますか？" confirmLabel="保存せずに移動" cancelLabel="編集を続ける" onConfirm={confirmLeave} onCancel={cancelLeave} />
+      <ConfirmDialog primaryAction="cancel" open={leaveTarget !== null} title="保存していない変更があります" description="このまま移動すると、イベントへの変更は失われます。保存せずに移動しますか？" confirmLabel="保存せずに移動" cancelLabel="編集を続ける" onConfirm={confirmLeave} onCancel={cancelLeave} />
 
       {step === 1 && (
         <OverviewStep

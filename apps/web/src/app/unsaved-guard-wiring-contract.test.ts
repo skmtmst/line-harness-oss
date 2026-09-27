@@ -96,6 +96,14 @@ const EXEMPTIONS: Record<string, string> = {
     '費用の手入力はダイアログ内の dirty。閉じると元に戻る仕様で、画面離脱ガードの対象外',
   'components/shared/drawer.tsx':
     'dirty 印（*）を表示するだけの共通部品。編集画面ではない',
+  'components/shared/dialog.tsx':
+    '確認窓の共通部品。未保存の離脱確認では primaryAction="cancel" で残る方を主にする。窓自体は編集を持たない',
+  'components/shared/confirm-dialog.tsx':
+    '確認窓の共通部品。未保存の離脱確認では主が取消のとき印を付けない。窓自体は編集を持たない',
+  'components/shared/overlay-utils.ts':
+    '重なりの共通部品。初回フォーカスの寄せ先を呼出側で選べるだけで、編集を持たない',
+  'components/shared/button.tsx':
+    'ボタンの共通部品。開いた直後の標的用の ref を受けられるだけで、編集を持たない',
   'app/nen-members/photo-reward-policy.tsx':
     '棚（Drawer）の中の小さな操作。閉じると入力は戻る仕様で、画面離脱ガードの対象外。保存中・戻し中は棚を閉じられない',
   'app/form-submissions/page.tsx':

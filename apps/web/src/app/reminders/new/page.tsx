@@ -456,7 +456,7 @@ export default function NewReminderPage() {
         </div>
       </ReminderWorkspace>
       <ReminderFooter status={saveStatusLabel} primary={saving ? '保存中…' : '下書きを保存して対象設定へ'} primaryDisabled={saving || candidatesPending} onPrimary={() => void save()} />
-      <ConfirmDialog open={leaveTarget !== null} title="入力中の内容があります" description="このまま移動すると、入力した内容は保存されません。移動しますか？" confirmLabel="保存せずに移動" cancelLabel="入力を続ける" onConfirm={confirmLeave} onCancel={cancelLeave} />
+      <ConfirmDialog primaryAction="cancel" open={leaveTarget !== null} title="入力中の内容があります" description="このまま移動すると、入力した内容は保存されません。移動しますか？" confirmLabel="保存せずに移動" cancelLabel="入力を続ける" onConfirm={confirmLeave} onCancel={cancelLeave} />
       <ConfirmDialog open={pendingTemplate !== null} title="ひな形で入力を置き換えますか？" description={pendingTemplate ? `「${pendingTemplate.title}」を使うと、基準日・タイミング・本文の設定がひな形の内容に置き換わります。` : ''} confirmLabel="このひな形を使う" cancelLabel="やめる" onConfirm={() => { if (pendingTemplate) applyTemplate(pendingTemplate); setPendingTemplate(null) }} onCancel={() => setPendingTemplate(null)} />
     </div>
   )
