@@ -94,4 +94,42 @@ describe('カルーセルの検証', () => {
     const errors = validateCarousel([column({ title: 'あ'.repeat(41) })]);
     expect(errors.some((e) => e.message.includes('40文字'))).toBe(true);
   });
+
+  it('タイトルがあると本文は60文字まで（画像なしでも）', () => {
+    // LINE の決まり：タイトルか画像がある列の本文は60文字、両方無ければ120文字。
+    expect(validateCarousel([column({ title: '見出し', text: 'あ'.repeat(60) })])).toEqual([]);
+    const errors = validateCarousel([column({ title: '見出し', text: 'あ'.repeat(61) })]);
+    expect(errors.some((e) => e.message.includes('60文字'))).toBe(true);
+  });
+
+  it('タイトルも画像も無ければ120文字まで', () => {
+    expect(validateCarousel([column({ text: 'あ'.repeat(120) })])).toEqual([]);
+    const errors = validateCarousel([column({ text: 'あ'.repeat(121) })]);
+    expect(errors.some((e) => e.message.includes('120文字'))).toBe(true);
+  });
+
+  it('タイトルの有無が混ざっていたら弾く', () => {
+    // 列ごとに高さが違い、見た目が崩れる。
+    const errors = validateCarousel([
+      column({ title: '見出し', text: '本文' }),
+      column({ text: '本文' }),
+    ]);
+    expect(errors.some((e) => e.message.includes('タイトルは全部'))).toBe(true);
+  });
+
+  it('ボタンの数が混ざっていたら弾く', () => {
+    const two = [{ type: 'uri', label: 'a' }, { type: 'uri', label: 'b' }];
+    const errors = validateCarousel([
+      column({ actions: [{ type: 'uri', label: '見る' }] }),
+      column({ actions: two }),
+    ]);
+    expect(errors.some((e) => e.message.includes('ボタンの数'))).toBe(true);
+  });
+
+  it('タイトルもボタン数もそろっていれば通る', () => {
+    expect(validateCarousel([
+      column({ title: '見出し1', text: '本文' }),
+      column({ title: '見出し2', text: '本文' }),
+    ])).toEqual([]);
+  });
 });
