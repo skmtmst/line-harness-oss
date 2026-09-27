@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
+  assetBubbleError,
   bubbleLegacyMessage,
   bubblesForSave,
   contentTemplateToBubble,
@@ -139,5 +140,72 @@ describe('吹き出しを配信の中身に直す', () => {
       content: { state: emptyMessageKindState() },
     })
     expect(out.messageContent).toBe('')
+  })
+})
+
+/*
+ * 配信用素材の引用（監査 R144）。
+ *
+ * 中身の JSON を本文に落としていた頃は、作れた素材が「カルーセル・画像・
+ * クーポン案内・アンケート案内」として届かなかった。素材は対応する LINE の
+ * 種別へ明示的に直す。内部の管理名・ID は本文に入れない。
+ */
+describe('素材の引用を LINE の種別に直す', () => {
+  const cardContent = {
+    assetId: 'asset-1',
+    assetName: '夏の案内',
+    cards: [{ title: 'パネル', description: '説明です', actionLabel: '詳しく見る', actionUrl: 'https://example.com/a' }],
+    moreCard: false,
+  }
+
+  it('カルーセル素材はカルーセルの列に直す', () => {
+    const out = bubbleLegacyMessage({ id: 'b', type: 'card_message', content: cardContent })
+    expect(out.messageType).toBe('carousel')
+    const columns = JSON.parse(out.messageContent) as Array<Record<string, unknown>>
+    expect(columns[0]).toMatchObject({ title: 'パネル', text: '説明です' })
+    expect(out.messageContent).not.toContain('assetId')
+  })
+
+  it('リッチメッセージは Flex に直す', () => {
+    const out = bubbleLegacyMessage({
+      id: 'b', type: 'rich_message',
+      content: { assetId: 'a', assetName: '便り', imageUrl: 'https://example.com/a.png', description: '新米です', actionUrl: 'https://example.com/lp' },
+    })
+    expect(out.messageType).toBe('flex')
+    expect(JSON.parse(out.messageContent)).toMatchObject({ type: 'bubble' })
+    expect(out.messageContent).not.toContain('assetId')
+  })
+
+  it('クーポンは読める文に直す（JSON を本文にしない）', () => {
+    const out = bubbleLegacyMessage({
+      id: 'b', type: 'coupon',
+      content: { assetId: 'a', assetName: '夏クーポン', description: '500円引き', actionUrl: 'https://example.com/c' },
+    })
+    expect(out.messageType).toBe('text')
+    expect(out.messageContent).toBe('500円引き\nhttps://example.com/c')
+  })
+
+  it('リサーチは読める文に直す', () => {
+    const out = bubbleLegacyMessage({
+      id: 'b', type: 'research',
+      content: { assetId: 'a', assetName: '調査', description: '答えてください', actionUrl: 'https://example.com/f' },
+    })
+    expect(out.messageType).toBe('text')
+    expect(out.messageContent).toContain('答えてください')
+    expect(out.messageContent).not.toContain('assetId')
+  })
+
+  it('選んでいない素材は選び直しを求める', () => {
+    expect(assetBubbleError({ id: 'b', type: 'coupon', content: {} })).toContain('選択')
+  })
+
+  it('直せない素材は番号ではなく中身の直し方を返す', () => {
+    const error = assetBubbleError({ id: 'b', type: 'card_message', content: { ...cardContent, cards: [{ title: 'パネル' }] } })
+    expect(error).toContain('パネル1')
+    expect(error).toContain('リンク先')
+  })
+
+  it('直った素材は空文字（問題なし）を返す', () => {
+    expect(assetBubbleError({ id: 'b', type: 'card_message', content: cardContent })).toBe('')
   })
 })

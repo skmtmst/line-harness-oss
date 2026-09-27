@@ -61,3 +61,19 @@ describe('一斉配信の作成', () => {
     expect(FORM).toContain("?? 'その他'")
   })
 })
+
+/*
+ * 狭い幅での横はみ出し（監査 R149）。
+ *
+ * 素材を引用した吹き出しの見出し行（種類の選択肢＋移動・削除）が折れないと、
+ * 390px で解除や並べ替えが右側へ隠れる。段の列自体も縮める。
+ */
+describe('狭い幅で操作が隠れない', () => {
+  it('吹き出しの見出し行は折れる', () => {
+    expect(FORM).toContain('flex flex-wrap items-center gap-3 border-b border-hairline bg-canvas-sunken')
+  })
+
+  it('メッセージの段の列は狭い幅でも縮む', () => {
+    expect(FORM).toContain('min-w-0 space-y-5')
+  })
+})

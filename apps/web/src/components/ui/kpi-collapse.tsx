@@ -1,6 +1,6 @@
 'use client'
 
-import { Children, cloneElement, isValidElement, useState, type ReactNode } from 'react'
+import { Children, useState, type ReactElement, type ReactNode } from 'react'
 import Button from '@/components/shared/button'
 
 /**
@@ -35,22 +35,31 @@ export default function KpiCollapse({
   const items = Children.toArray(children)
   const tail = items.slice(mobileVisible)
 
+  const head = items.slice(0, mobileVisible)
+  const tailKeys = tail.map((item, tailIndex) =>
+    (item as ReactElement).key ?? `kpi-tail-${tailIndex}`,
+  )
+
   return (
     <div data-kpi-collapse className={className} {...rest}>
       {/*
         全件を1つのグリッドへ並べる。先頭と残りを別グリッドに分けると
         `lg:grid-cols-4` でも各グリッドへ2件しか入らず、PCでも2×2の
         左半分だけの表示になっていた（DASH-22）。狭い幅での非表示は
-        末尾の各カードへ `max-sm:hidden` を付けて表す。
+        共通部品側の包み div で制御する。各カードへ `className` を
+        付け足す方式だと、`className` を受け取らないカード（R171 の
+        Metric など）は隠せず4枚とも残ってしまう。
       */}
       <div className={gridClassName}>
-        {items.map((item, index) => {
-          if (index < mobileVisible || open || !isValidElement<{ className?: string }>(item)) {
-            return item
-          }
-          const classNames = [item.props.className, 'max-sm:hidden'].filter(Boolean).join(' ')
-          return cloneElement(item, { className: classNames })
-        })}
+        {head}
+        {tail.map((item, tailIndex) => (
+          <div
+            key={tailKeys[tailIndex]}
+            className={open ? 'min-w-0' : 'min-w-0 max-sm:hidden'}
+          >
+            {item}
+          </div>
+        ))}
       </div>
       {tail.length ? (
         // 表示制御は共通部品へ渡せない（display-class-on-part）。外側の div で狭い幅だけに見せる。

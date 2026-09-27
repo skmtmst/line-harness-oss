@@ -115,8 +115,10 @@ test('2000文字の検索語は上限へ切り詰めてサーバーへ届き、0
       && url.searchParams.get('query') === CLAMPED_QUERY)).toBe(true)
   })
   // 0件は障害ではなく空状態。「読み込んでいます」を残さない。
+  // R173: 検索語が効いている0件は「まだありません」と言わず、
+  // 条件に合うものが無い旨と条件クリアを出す。
   await eventually(() => {
-    expect(host.textContent).toContain('まだシナリオがありません')
+    expect(host.textContent).toContain('条件に合うものがありません')
   })
   expect(host.querySelector('[data-list-state="loading"]')).toBeNull()
 })

@@ -150,7 +150,12 @@ export const hqTemplatesApi = {
     }
     return { tenantId, actorId: id }
   },
-  list: (type: TemplateType) => request<HqTemplate[]>(`?type=${type}`),
+  /**
+   * 種類を指定すればその種類だけ、省けば全部の種類を返す（R119）。
+   * リッチメニューや回答フォームの編集では、別種類のタグやテンプレートを
+   * 参照先に選ぶため、一覧表示とは別に全部入りの目録が要る。
+   */
+  list: (type?: TemplateType) => request<HqTemplate[]>(type ? `?type=${type}` : ''),
   accounts: () => request<HqAccount[]>('/accounts'),
   get: (id: string) => request<TemplateDetail>(idPath(id)),
   create: (input: TemplateInput, requestId: string) => request<TemplateDetail>(

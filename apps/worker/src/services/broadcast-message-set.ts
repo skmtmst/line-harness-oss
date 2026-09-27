@@ -1,4 +1,5 @@
 import type { Message } from '@line-crm/line-sdk';
+import { convertBroadcastAsset, isBroadcastAssetKind } from '@line-crm/shared';
 import { autoTrackContent } from './auto-track.js';
 import { buildMessage } from './line-message.js';
 import {
@@ -16,6 +17,10 @@ export const MAX_BROADCAST_MESSAGES = 5;
 
 const SUPPORTED_TYPES = new Set([
   'text', 'image', 'flex', 'location', 'video', 'audio', 'sticker', 'carousel',
+  // 配信用素材（カルーセル・リッチ・クーポン・リサーチ）は、画面の保存と
+  // 同じ変換（`@line-crm/shared`）で LINE の種別に直してから送る。
+  // 画面では通るのに送信で断られる形にしない（監査 R144）。
+  'rich_message', 'card_message', 'coupon', 'research',
 ]);
 
 export interface BroadcastMessagePart {
@@ -145,8 +150,29 @@ export function parseBroadcastMessageParts(input: {
     const bubble = item as StoredBubble;
     const type = typeof bubble?.type === 'string' ? bubble.type : '';
     if (!SUPPORTED_TYPES.has(type)) throw new Error(`Unsupported broadcast bubble type: ${type || '(missing)'}`);
+    const id = typeof bubble.id === 'string' && bubble.id ? bubble.id : `bubble-${index + 1}`;
+    /*
+     * 配信用素材は、画面の保存（1吹き出し）と同じ変換で LINE の種別に直す。
+     * 直せない素材は、送信の直前で利用者への直し方とともに止める。
+     * 中身の JSON を本文に落とさない（監査 R144）。
+     */
+    if (isBroadcastAssetKind(type)) {
+      const content = record(bubble.content);
+      const converted = convertBroadcastAsset(
+        type,
+        typeof content.assetName === 'string' ? content.assetName : '',
+        content,
+      );
+      if (!converted.ok) throw new Error(converted.error);
+      return {
+        id,
+        messageType: converted.message.messageType,
+        messageContent: converted.message.messageContent,
+        altText: input.altText ?? converted.message.altText,
+      };
+    }
     return {
-      id: typeof bubble.id === 'string' && bubble.id ? bubble.id : `bubble-${index + 1}`,
+      id,
       messageType: type,
       messageContent: contentForBubble(type, bubble.content),
       altText: input.altText ?? undefined,
