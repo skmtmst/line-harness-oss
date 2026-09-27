@@ -15,7 +15,6 @@ vi.mock('next/navigation', () => ({
 }))
 vi.mock('next/link', () => ({
   default: ({ href, children, onClick, ...rest }: { href: string; children?: unknown; onClick?: (event: { stopPropagation: () => void }) => void }) => (
-    // eslint-disable-next-line @next/next/no-html-link-for-pages
     <a
       href={href}
       onClick={(event) => {
