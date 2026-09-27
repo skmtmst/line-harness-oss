@@ -2,6 +2,7 @@
 
 import Disclosure from '@/components/shared/disclosure'
 import FilterChip from '@/components/shared/filter-chip'
+import ListToolbar from '@/components/shared/list-toolbar'
 import SortSelect from '@/components/ui/sort-select'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
@@ -593,26 +594,8 @@ export default function AutoRepliesPage() {
         </div>
       </KpiCollapse>
 
-      <div data-design="Actions" className="mb-4 flex flex-wrap items-center gap-2">
-        <Button
-          variant="primary"
-          onClick={() => setEditing({
-            keyword: '',
-            matchType: 'exact',
-            responseType: 'text',
-            responseContent: '',
-            templateId: null,
-            lineAccountId: selectedAccountId,
-            // AUTOREPLY-08: 新しい応答は止まった状態で作る。動かすのは
-            // 一覧の「再開」や公開前の確認から、保存とは別の操作で。
-            isActive: false,
-          })}
-        >
-          ＋ ルールを作る
-        </Button>
-      </div>
-
       {/*
+        ★V7 `Xn1Mz`：上からの順は「数のカード → 説明の開閉 → ＋作る」。
         複数当てはまったときの挙動と、「適用アカウント」欄の札の読み方。書いていないと必ず問い合わせになるが、
         毎回2つの帯が一覧を押し下げていたので、閉じた欄にしまう（★V7：今は出さなくてよいもの）。
       */}
@@ -644,50 +627,60 @@ export default function AutoRepliesPage() {
         </div>
       </Disclosure>
 
-      <div
-        data-design="Bar"
-        className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3"
-      >
-        {/*
-          #636: 検索欄は min-w-45（180px）を下限にする。min-w-0 だと
-          390pxで右のセレクトに押されて w=57 まで潰れ、文字が読めない。
-          下限があると flex-wrap が効いて、狭い幅では検索欄が1行を
-          占め、並び順・表示は次の行へ折り返す。
-        */}
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="自動応答名で検索"
-          aria-label="自動応答名で検索"
-          className="border-hairline rounded-control focus:ring-accent min-w-45 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
-        />
+      <div data-design="Actions" className="mb-4 flex flex-wrap items-center gap-2">
+        <Button
+          variant="primary"
+          onClick={() => setEditing({
+            keyword: '',
+            matchType: 'exact',
+            responseType: 'text',
+            responseContent: '',
+            templateId: null,
+            lineAccountId: selectedAccountId,
+            // AUTOREPLY-08: 新しい応答は止まった状態で作る。動かすのは
+            // 一覧の「再開」や公開前の確認から、保存とは別の操作で。
+            isActive: false,
+          })}
+        >
+          ＋ ルールを作る
+        </Button>
       </div>
 
-      {/* #668: 並びは「絞り込み → 並び順 → 表示件数」の1形。 */}
-      <div data-design="Saved" className="mb-3 flex flex-wrap items-center gap-2">
-        <span className="text-ink-faint text-xs whitespace-nowrap">よく使う絞り込み</span>
-        {SAVED_FILTERS.map((f) => {
-          const on = savedFilter === f.key
-          return (
-            <FilterChip
-              key={f.key}
-              selected={on}
-              onChange={(next) => setSavedFilter(next ? f.key : '')}
-              title={f.note}
-            >
-              {f.label}
-            </FilterChip>
-          )
-        })}
-        <SortSelect
-          className="ml-auto"
-          value={sortKey}
-          onChange={(value) => setSortKey(value as SortKey)}
-          options={[{ value: 'hits', label: 'ヒット数が多い順' }, { value: 'priority', label: '評価順' }, { value: 'name', label: '名前順' }, { value: 'created', label: '作った順' }]}
-        />
-        <PageSizeSelect value={pageSize} onChange={setPageSize} />
-      </div>
+      {/*
+        ★V7 `Xn1Mz`：検索は幅320で1行目、2行目は左に絞り込み・
+        右端に並び順と表示件数。#636/#668 の並びの意図はそのまま。
+      */}
+      <ListToolbar
+        search={{ placeholder: '自動応答名で検索', value: query, onChange: setQuery }}
+        filters={
+          <>
+            <span className="text-ink-faint text-xs whitespace-nowrap">よく使う絞り込み</span>
+            {SAVED_FILTERS.map((f) => {
+              const on = savedFilter === f.key
+              return (
+                <FilterChip
+                  key={f.key}
+                  selected={on}
+                  onChange={(next) => setSavedFilter(next ? f.key : '')}
+                  title={f.note}
+                >
+                  {f.label}
+                </FilterChip>
+              )
+            })}
+          </>
+        }
+        trailing={
+          <>
+            <SortSelect
+              value={sortKey}
+              onChange={(value) => setSortKey(value as SortKey)}
+              options={[{ value: 'hits', label: 'ヒット数が多い順' }, { value: 'priority', label: '評価順' }, { value: 'name', label: '名前順' }, { value: 'created', label: '作った順' }]}
+            />
+            <PageSizeSelect value={pageSize} onChange={setPageSize} />
+          </>
+        }
+      />
 
       {folderDialogOpen && (
         <FolderAddDialog

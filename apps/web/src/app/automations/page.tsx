@@ -1,6 +1,7 @@
 'use client'
 
 import SelectField from '@/components/shared/select-field'
+import ListToolbar from '@/components/shared/list-toolbar'
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { api, ApiError } from '@/lib/api'
@@ -658,29 +659,32 @@ export default function AutomationsPage() {
         <Button href="/automations?tab=templates">見本から作る</Button>
       </div>
 
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <input
-          type="search"
-          value={searchQuery}
-          onChange={(event) => { setSearchQuery(event.target.value); setPage(1) }}
-          placeholder="ルール名・きっかけ・することで検索"
-          className="h-10 w-full max-w-lg rounded-control border border-hairline bg-canvas px-3 text-sm text-ink"
-        />
-        <div className="flex items-center gap-2">
-          <p className="text-sm text-ink-secondary">この30日</p>
-          <SelectField
-            aria-label="並び順"
-            value={sortOrder}
-            onChange={(event) => { setSortOrder(event.target.value as 'runs' | 'priority' | 'name'); setPage(1) }}
-            options={[
-              { value: 'runs', label: '動いた回数が多い順' },
-              { value: 'priority', label: '動く順' },
-              { value: 'name', label: '名前順' },
-            ]}
-            className="h-10 min-w-36"
-          />
-        </div>
-      </div>
+      {/*
+        ★V7 `Xn1Mz`：検索は幅320で1行目、2行目の右端に並び順。
+        状態の切替はタブが持つ（#734）。
+      */}
+      <ListToolbar
+        search={{
+          placeholder: 'ルール名・きっかけ・することで検索',
+          value: searchQuery,
+          onChange: (value) => { setSearchQuery(value); setPage(1) },
+        }}
+        trailing={
+          <>
+            <p className="text-sm text-ink-secondary">この30日</p>
+            <SelectField
+              aria-label="並び順"
+              value={sortOrder}
+              onChange={(event) => { setSortOrder(event.target.value as 'runs' | 'priority' | 'name'); setPage(1) }}
+              options={[
+                { value: 'runs', label: '動いた回数が多い順' },
+                { value: 'priority', label: '動く順' },
+                { value: 'name', label: '名前順' },
+              ]}
+            />
+          </>
+        }
+      />
 
       {/*
         #734: 状態の切替はタブ（動いているもの／止めているもの）の1機構に揃える。

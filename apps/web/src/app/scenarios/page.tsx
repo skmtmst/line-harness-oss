@@ -631,18 +631,6 @@ export default function ScenariosPage() {
       <p data-design="Head" className="bg-info-bg text-ink-secondary mb-4 rounded-control px-4 py-3 text-xs">
         作成しただけでは配信されません。開始条件を設定すると配信が始まります。
       </p>
-      {/*
-        SCENARIO-16: 下線だけの span は押せない。3手順の説明は
-        開閉欄へ移し、帯は1〜2文だけにする。
-      */}
-      <Disclosure size="compact" title="配信を始める方法" hint="3手順" className="mb-4">
-        <ol className="list-decimal space-y-1 pl-5 text-sm">
-          <li>一覧からシナリオを開き、「開始のきっかけ」（友だち追加時・タグが付いたときなど）を設定します。</li>
-          <li>詳細画面の「テスト送信」で、実際の届き方を確認します。</li>
-          <li>この一覧に戻り、行の「その他 → 再開する」から配信を開始します。</li>
-        </ol>
-      </Disclosure>
-
       {/* 設計の KPI 4枚。数は /api/list-stats から4画面ぶんまとめて来る。 */}
       <div data-design="KPIs">
       <ListKpis
@@ -682,6 +670,19 @@ export default function ScenariosPage() {
         ]}
       />
       </div>
+
+      {/*
+        ★V7 `Xn1Mz`：上からの順は「数のカード → 説明の開閉 → ＋作る」。
+        SCENARIO-16: 下線だけの span は押せない。3手順の説明は
+        開閉欄へ移し、帯は1〜2文だけにする。
+      */}
+      <Disclosure size="compact" title="配信を始める方法" hint="3手順" className="mb-4">
+        <ol className="list-decimal space-y-1 pl-5 text-sm">
+          <li>一覧からシナリオを開き、「開始のきっかけ」（友だち追加時・タグが付いたときなど）を設定します。</li>
+          <li>詳細画面の「テスト送信」で、実際の届き方を確認します。</li>
+          <li>この一覧に戻り、行の「その他 → 再開する」から配信を開始します。</li>
+        </ol>
+      </Disclosure>
 
       {folderDialogOpen && (
         <FolderAddDialog
@@ -764,52 +765,49 @@ export default function ScenariosPage() {
         <div className="hidden lg:block">{folderPanel}</div>
 
         <div>
-      <ListToolbar
-        searchPlaceholder="シナリオ名で検索"
-        searchValue={nameQuery}
-        // #625: 長い検索語は上限へ切り詰める。共有部品(ListToolbar)は
-        // 変えず、受け取る値をここで制限する。
-        onSearchChange={(value) => setNameQuery(clampSearchQuery(value))}
-      />
-
       {/*
+        ★V7 `Xn1Mz`：検索は幅320で1行目、2行目は左に絞り込み。
         よく使う絞り込み。数え方が決まっているのは「停止中のみ」だけ。
         離脱の大きさと作成月は、比べる相手を決める前に押せるようにすると、
         押した人ごとに違うものを想像する。
       */}
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <span className="text-ink-faint text-xs">よく使う絞り込み</span>
-        <button
-          onClick={() => setStoppedOnly((v) => !v)}
-          className={`rounded-pill px-3 py-1 text-xs transition-colors ${
-            stoppedOnly
-              ? 'bg-accent-soft text-accent-deep'
-              : 'border-hairline text-ink-secondary hover:bg-canvas-sunken border'
-          }`}
-        >
-          停止中のみ
-        </button>
-        {[
-          /* ★V7：押せないまま置かれていた「離脱が大きい」は外した（比較の基準が決まるまで出さない）。 */
-          {
-            label: '今月作成',
-            disabled: false,
-            active: createdThisMonthOnly,
-            title: undefined,
-            onClick: () => setCreatedThisMonthOnly((current) => !current),
-          },
-        ].map((filter) => (
-          <FilterChip
-            key={filter.label}
-            selected={filter.disabled ? false : filter.active}
-            onChange={() => {
-              if (!filter.disabled) filter.onClick()
-            }}
-          >
-            {filter.label}
-          </FilterChip>
-        ))}
-      </div>
+      <ListToolbar
+        search={{
+          placeholder: 'シナリオ名で検索',
+          value: nameQuery,
+          // #625: 長い検索語は上限へ切り詰める。共有部品(ListToolbar)は
+          // 変えず、受け取る値をここで制限する。
+          onChange: (value) => setNameQuery(clampSearchQuery(value)),
+        }}
+        filters={
+          <>
+            <span className="text-ink-faint text-xs">よく使う絞り込み</span>
+            <FilterChip selected={stoppedOnly} onChange={(next) => setStoppedOnly(next)}>
+              停止中のみ
+            </FilterChip>
+            {[
+              /* ★V7：押せないまま置かれていた「離脱が大きい」は外した（比較の基準が決まるまで出さない）。 */
+              {
+                label: '今月作成',
+                disabled: false,
+                active: createdThisMonthOnly,
+                title: undefined,
+                onClick: () => setCreatedThisMonthOnly((current) => !current),
+              },
+            ].map((filter) => (
+              <FilterChip
+                key={filter.label}
+                selected={filter.disabled ? false : filter.active}
+                onChange={() => {
+                  if (!filter.disabled) filter.onClick()
+                }}
+              >
+                {filter.label}
+              </FilterChip>
+            ))}
+          </>
+        }
+      />
 
 
       {/*

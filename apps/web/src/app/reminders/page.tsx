@@ -18,10 +18,10 @@ import Pagination from '@/components/shared/pagination'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import SortSelect from '@/components/ui/sort-select'
 import PageSizeSelect from '@/components/ui/page-size-select'
-import { TextInput } from '@/components/shared/form-controls'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { TableStateRow } from '@/components/shared/table'
 import FilterChip from '@/components/shared/filter-chip'
+import ListToolbar from '@/components/shared/list-toolbar'
 import ActionMenu from '@/components/shared/action-menu'
 import IconButton from '@/components/shared/icon-button'
 import { Pill } from '@/components/reminders/reminder-v6-ui'
@@ -205,11 +205,26 @@ export default function RemindersPage() {
         ) : null}
       </FolderPanel>
       <div className="min-w-0">
-        <div className="bg-canvas rounded-card border-hairline mb-3 border p-3">
-          <div className="flex items-center gap-2"><TextInput type="search" placeholder="名前・内容で検索" aria-label="名前・内容で検索" value={nameQuery} onChange={(event) => setNameQuery(event.target.value)} className="min-w-0 flex-1 text-xs" /></div>
-          {/* #668: 並びは「絞り込み → 並び順 → 表示件数」の1形。 */}
-          <div className="mt-2 flex flex-wrap items-center gap-2"><span className="text-ink-faint text-xs whitespace-nowrap">よく使う絞り込み</span>{['有効','下書き','停止中'].map((status) => <FilterChip key={status} selected={statusFilter === status} onChange={() => setStatusFilter(statusFilter === status ? '' : status)}>{status}</FilterChip>)}<FilterChip selected={statusFilter === '失敗あり'} onChange={() => setStatusFilter(statusFilter === '失敗あり' ? '' : '失敗あり')}>失敗あり</FilterChip><SortSelect className="ml-auto" value={sort} onChange={setSort} options={SORT_OPTIONS} /><PageSizeSelect value={perPage} onChange={setPerPage} options={PER_PAGE_OPTIONS} /></div>
-        </div>
+        {/*
+          ★V7 `Xn1Mz`：検索は幅320で1行目、2行目は左に絞り込み・
+          右端に並び順と表示件数。#668 の並びの意図はそのまま。
+        */}
+        <ListToolbar
+          search={{ placeholder: '名前・内容で検索', value: nameQuery, onChange: setNameQuery }}
+          filters={
+            <>
+              <span className="text-ink-faint text-xs whitespace-nowrap">よく使う絞り込み</span>
+              {['有効','下書き','停止中'].map((status) => <FilterChip key={status} selected={statusFilter === status} onChange={() => setStatusFilter(statusFilter === status ? '' : status)}>{status}</FilterChip>)}
+              <FilterChip selected={statusFilter === '失敗あり'} onChange={() => setStatusFilter(statusFilter === '失敗あり' ? '' : '失敗あり')}>失敗あり</FilterChip>
+            </>
+          }
+          trailing={
+            <>
+              <SortSelect value={sort} onChange={setSort} options={SORT_OPTIONS} />
+              <PageSizeSelect value={perPage} onChange={setPerPage} options={PER_PAGE_OPTIONS} />
+            </>
+          }
+        />
         <div className="bg-canvas rounded-card border-hairline overflow-hidden border">
           {/* #641: 操作列が広くなった分は表だけが横に流れる */}
           {/* @container: 谷間帯の列削減。表の幅が足りない間だけ「最終送信」を畳む。 */}

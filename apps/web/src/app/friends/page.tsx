@@ -438,11 +438,11 @@ function FriendsPageInner({
           className="flex min-w-0 flex-wrap items-center gap-2.5"
         >
           {/*
-            検索欄は共通 SearchField（設計 h42 / r8 / アイコン17 / 文字12）。
-            幅が足りないときは折り返す（★V7 修正方針 §3）。以前は幅320で
-            「詳細条件」と並び順が右で切れ、押せなかった。
+            検索欄は共通 SearchField。★V7 `Xn1Mz`：検索は幅320・
+            「保存した検索」と同じ行に置く。横いっぱいに伸ばさない。
+            狭い幅では240まで縮み、入りきらない分は折り返す。
           */}
-          <div className="min-w-60 flex-1 max-sm:basis-full">
+          <div className="w-80 max-w-full min-w-60 shrink-0">
             <SearchField
               className="w-full"
               aria-label="友だち名で検索"
@@ -477,26 +477,6 @@ function FriendsPageInner({
               保存した検索
             </button>
           ) : null}
-          {/*
-            並び順は共通 Select。設計の幅は未実測のため現行210pxを保つ。
-            #670 02: 値だけ(「友だち追加の新しい順」)だと何の操作か分からない
-            ため、見える見出しを付ける(ウェビナーと同形)。
-          */}
-          <div className="flex shrink-0 items-center gap-1.5">
-            <span className="shrink-0 text-sm font-semibold whitespace-nowrap text-ink-secondary">並び順</span>
-            <div className="w-52.5 shrink-0">
-              <Select
-                aria-label="並び順"
-                size="full"
-                value={sortMode}
-                onChange={(value) => resetPageWith(() => setSortMode(value as SortMode))}
-                options={[
-                  { value: 'recent', label: '友だち追加の新しい順' },
-                  { value: 'oldest', label: '友だち追加の古い順' },
-                ]}
-              />
-            </div>
-          </div>
           <button type="submit" className="inline-flex h-9.5 w-17.5 shrink-0 items-center justify-center whitespace-nowrap rounded-control bg-accent-deep text-label font-bold text-on-accent hover:brightness-92">検索</button>
         </form>
 
@@ -569,6 +549,25 @@ function FriendsPageInner({
             絞り込みの行の件数は出さない。一覧の見出しの横とページ送りの
             表示に同じ数があり、1画面に3回出ていた。件数はあの2か所で足りる。
           */}
+          {/*
+            ★V7 `Xn1Mz`：2行目の右端に並び順。#670 02 の見える見出しは残す。
+            幅は現行210pxを保つ。
+          */}
+          <div className="ml-auto flex shrink-0 items-center gap-1.5">
+            <span className="shrink-0 text-sm font-semibold whitespace-nowrap text-ink-secondary">並び順</span>
+            <div className="w-52.5 shrink-0">
+              <Select
+                aria-label="並び順"
+                size="full"
+                value={sortMode}
+                onChange={(value) => resetPageWith(() => setSortMode(value as SortMode))}
+                options={[
+                  { value: 'recent', label: '友だち追加の新しい順' },
+                  { value: 'oldest', label: '友だち追加の古い順' },
+                ]}
+              />
+            </div>
+          </div>
           {broadcastHandoffHref ? (
             <Link
               href={broadcastHandoffHref}

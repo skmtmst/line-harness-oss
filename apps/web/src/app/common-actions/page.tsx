@@ -9,7 +9,7 @@ import Button from '@/components/shared/button'
 import NoteBar from '@/components/shared/note-bar'
 import PageHeader from '@/components/shared/page-header'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import SearchField from '@/components/shared/search-field'
+import ListToolbar from '@/components/shared/list-toolbar'
 import StatusBadge from '@/components/shared/status-badge'
 import SummaryCard from '@/components/shared/summary-card'
 import ListState from '@/components/shared/list-state'
@@ -206,36 +206,44 @@ export default function CommonActionsPage() {
       <div className="my-3 flex flex-wrap items-center gap-2">
         {canManage ? <Button href="/common-actions/new" variant="primary">＋ 共通アクションを作る</Button> : null}
         {selectedAccountId ? <Button href={api.commonActions.csvUrl(selectedAccountId)}>CSVで書き出す</Button> : null}
-        <SearchField
-          value={query}
-          onChange={(value) => { setQuery(value); setPage(1) }}
-          onClear={() => { setQuery(''); setPage(1) }}
-          placeholder="アクション名・中の処理で探す"
-          aria-label="共通アクションを検索"
-          loading={loading && query !== deferredQuery}
-          className="min-w-72 flex-1"
-        />
-        <Button
-          onClick={() => void load()}
-        >
-          <RefreshCw size={16} aria-hidden />
-          一覧を更新
-        </Button>
       </div>
 
-      <div className="mb-3 flex flex-wrap gap-2" aria-label="状態で絞り込む">
-        {FILTERS.map((option) => (
-          <label
-            key={option.value}
-            className={filter === option.value
-              ? 'bg-success-bg text-success rounded-pill border border-success px-3 py-1.5 text-xs font-semibold'
-              : 'border-hairline text-ink-secondary rounded-pill border bg-canvas px-3 py-1.5 text-xs'}
+      {/*
+        ★V7 `Xn1Mz`：検索は幅320で1行目、2行目は左に絞り込み・
+        右端に一覧の更新。
+      */}
+      <ListToolbar
+        search={{
+          placeholder: 'アクション名・中の処理で探す',
+          label: '共通アクションを検索',
+          value: query,
+          onChange: (value) => { setQuery(value); setPage(1) },
+          loading: loading && query !== deferredQuery,
+        }}
+        filters={
+          <div className="flex flex-wrap gap-2" aria-label="状態で絞り込む">
+            {FILTERS.map((option) => (
+              <label
+                key={option.value}
+                className={filter === option.value
+                  ? 'bg-success-bg text-success rounded-pill border border-success px-3 py-1.5 text-xs font-semibold'
+                  : 'border-hairline text-ink-secondary rounded-pill border bg-canvas px-3 py-1.5 text-xs'}
+              >
+                <input className="sr-only" type="radio" name="common-action-filter" value={option.value} checked={filter === option.value} onChange={() => { setFilter(option.value); setPage(1) }} />
+                {option.label}{(() => { const count = filterCount(option.value); return count == null ? '' : ` ${count}` })()}
+              </label>
+            ))}
+          </div>
+        }
+        trailing={
+          <Button
+            onClick={() => void load()}
           >
-            <input className="sr-only" type="radio" name="common-action-filter" value={option.value} checked={filter === option.value} onChange={() => { setFilter(option.value); setPage(1) }} />
-            {option.label}{(() => { const count = filterCount(option.value); return count == null ? '' : ` ${count}` })()}
-          </label>
-        ))}
-      </div>
+            <RefreshCw size={16} aria-hidden />
+            一覧を更新
+          </Button>
+        }
+      />
 
       {error ? (
         // ★V7 `x63W5x`：口の文言（英語の `Failed to fetch` など）をそのまま

@@ -8,6 +8,7 @@ import { api, bookingApi, type BookingAdminDetail, type BookingMenu, type Bookin
 import { useAccount } from '@/contexts/account-context'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Button from '@/components/shared/button'
+import ListToolbar from '@/components/shared/list-toolbar'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
 import FolderPanel, { FOLDER_RAIL_WIDTH } from '@/components/shared/folder-panel'
@@ -805,84 +806,79 @@ export default function BookingsPage() {
         </div>
 
         <div className="min-w-0 flex-1">
-          <div
-            data-design="Bar"
-            className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3"
-          >
-            <input
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="お客さま名で検索"
-              aria-label="お客さま名で検索"
-              className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
-            />
-            {/* N-398: 担当者と種別（予約経路）の絞り込み。一覧と件数の両方に効く。 */}
-            <Select
-              aria-label="担当者で絞り込む"
-              value={staffFilter}
-              onChange={setStaffFilter}
-              options={[
-                { value: 'all', label: '担当: すべて' },
-                ...staffList.map((item) => ({ value: item.id, label: item.display_name })),
-              ]}
-            />
-            <Select
-              aria-label="予約経路で絞り込む"
-              value={sourceFilter}
-              onChange={setSourceFilter}
-              options={SOURCE_FILTERS.map((item) => ({ value: item.key, label: item.label }))}
-            />
-            {/* N-397: 今の絞り込みのままCSVへ。範囲の断りはCSV先頭行に入る。 */}
-            {selectedAccountId ? (
-              <Button variant="secondary" disabled={csvBusy} onClick={downloadLedgerCsv}>
-                {csvBusy ? '書き出しています…' : 'CSVで書き出す'}
-              </Button>
-            ) : null}
-            {/*
-              #670 17: 押せない「保存した条件」(準備中です)は置かない。
-              押せない口を並べると「まだ何かある」と読める。条件の保存が
-              要るときは、動く形で足し直す。
-            */}
-          </div>
-
-          <div data-design="Saved" className="mb-3 flex flex-wrap items-center gap-2">
-            <span className="text-ink-faint text-xs">よく使う</span>
-            {STATUS_TABS.map(({ key, label }) => (
-              <button
-                key={key}
-                onClick={() => setTab(key)}
-                className={`rounded-pill px-3 py-1 text-xs font-medium transition-colors ${
-                  tab === key
-                    ? 'bg-accent-deep text-on-accent'
-                    : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-            <span className="border-hairline mx-1 h-4 border-l" />
-            <button
-              onClick={() => setRange(range === 'today' ? 'all' : 'today')}
-              className={`rounded-pill px-3 py-1 text-xs font-medium ${
-                range === 'today'
-                  ? 'bg-accent-deep text-on-accent'
-                  : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
-              }`}
-            >
-              今日
-            </button>
-            <button
-              onClick={() => setRange(range === 'week' ? 'all' : 'week')}
-              className={`rounded-pill px-3 py-1 text-xs font-medium ${
-                range === 'week'
-                  ? 'bg-accent-deep text-on-accent'
-                  : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
-              }`}
-            >
-              今週
-            </button>
-          </div>
+          {/*
+            ★V7 `Xn1Mz`：検索は幅320で1行目、2行目は左に絞り込み・
+            右端にCSVで書き出す。
+            #670 17: 押せない「保存した条件」(準備中です)は置かない。
+            押せない口を並べると「まだ何かある」と読める。条件の保存が
+            要るときは、動く形で足し直す。
+          */}
+          <ListToolbar
+            search={{ placeholder: 'お客さま名で検索', value: query, onChange: setQuery }}
+            filters={
+              <>
+                <span className="text-ink-faint text-xs">よく使う</span>
+                {STATUS_TABS.map(({ key, label }) => (
+                  <button
+                    key={key}
+                    onClick={() => setTab(key)}
+                    className={`rounded-pill px-3 py-1 text-xs font-medium transition-colors ${
+                      tab === key
+                        ? 'bg-accent-deep text-on-accent'
+                        : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+                <span className="border-hairline mx-1 h-4 border-l" />
+                <button
+                  onClick={() => setRange(range === 'today' ? 'all' : 'today')}
+                  className={`rounded-pill px-3 py-1 text-xs font-medium ${
+                    range === 'today'
+                      ? 'bg-accent-deep text-on-accent'
+                      : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
+                  }`}
+                >
+                  今日
+                </button>
+                <button
+                  onClick={() => setRange(range === 'week' ? 'all' : 'week')}
+                  className={`rounded-pill px-3 py-1 text-xs font-medium ${
+                    range === 'week'
+                      ? 'bg-accent-deep text-on-accent'
+                      : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
+                  }`}
+                >
+                  今週
+                </button>
+                {/* N-398: 担当者と種別（予約経路）の絞り込み。一覧と件数の両方に効く。 */}
+                <Select
+                  aria-label="担当者で絞り込む"
+                  value={staffFilter}
+                  onChange={setStaffFilter}
+                  options={[
+                    { value: 'all', label: '担当: すべて' },
+                    ...staffList.map((item) => ({ value: item.id, label: item.display_name })),
+                  ]}
+                />
+                <Select
+                  aria-label="予約経路で絞り込む"
+                  value={sourceFilter}
+                  onChange={setSourceFilter}
+                  options={SOURCE_FILTERS.map((item) => ({ value: item.key, label: item.label }))}
+                />
+              </>
+            }
+            trailing={
+              /* N-397: 今の絞り込みのままCSVへ。範囲の断りはCSV先頭行に入る。 */
+              selectedAccountId ? (
+                <Button variant="secondary" disabled={csvBusy} onClick={downloadLedgerCsv}>
+                  {csvBusy ? '書き出しています…' : 'CSVで書き出す'}
+                </Button>
+              ) : null
+            }
+          />
 
           {!selectedAccountId ? (
             <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-12 text-center text-sm">
