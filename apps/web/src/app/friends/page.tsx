@@ -242,7 +242,8 @@ function FriendsPageInner({
     const requestedAccountId = selectedAccountId
     try {
       const [tagResponse, operatorResponse, scenarioResponse] = await Promise.all([
-        api.tags.list(),
+        // R23横展開: タグ候補も今のアカウントだけ（絞り込みの選択肢混入防止）。
+        api.tags.list(requestedAccountId ? { accountId: requestedAccountId } : undefined),
         // 友だち詳細の対応編集と同じ名簿を共有する。保存の可否はサーバ側。
         loadOperators(),
         api.scenarios.list(requestedAccountId ? { accountId: requestedAccountId } : undefined),
@@ -628,7 +629,7 @@ function FriendsPageInner({
           </div>
           {selectedIds.size === 1 ? (
             <div className="mt-2">
-              <SingleFriendActions friendId={[...selectedIds][0]} friendName={friends.find((friend) => friend.id === [...selectedIds][0])?.displayName ?? 'この友だち'} tags={allTags} onDone={loadFriends} />
+              <SingleFriendActions friendId={[...selectedIds][0]} friendName={friends.find((friend) => friend.id === [...selectedIds][0])?.displayName ?? 'この友だち'} tags={allTags} accountId={selectedAccountId} onDone={loadFriends} />
             </div>
           ) : null}
         </section>
