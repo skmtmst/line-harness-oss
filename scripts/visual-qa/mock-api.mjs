@@ -1455,7 +1455,7 @@ function visualQaWriteBody(method, pathname) {
 const RAW = {
   // `0.0.0-dev` のときはバナー自体を出さない。manifest も見に行かない。
   //（update-banner.tsx の DEV_VERSION と同じ値でないと効かない）
-  '/admin/version': { version: '2.6.4', worker_hash: '', admin_hash: '', liff_hash: '' },
+  '/admin/version': { version: '2.6.4', worker_hash: '', admin_hash: '', liff_hash: '', git_commit: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', deploy_env: 'staging', released_at: '2026-09-27T04:05:00.000Z' },
   '/admin/manifest': { releases: [], versions: [] },
 
   /*

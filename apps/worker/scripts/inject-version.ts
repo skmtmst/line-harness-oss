@@ -18,11 +18,13 @@
  *     --admin ../web/out \
  *     --liff ../liff/dist \
  *     --out src/_version.ts
+ *     --commit <sha> (optional; default: $GITHUB_SHA or `git rev-parse HEAD`, else 'unknown')
  *
- * Prints `{ workerHash, adminHash, liffHash }` JSON to stdout so GH Actions
+ * Prints `{ workerHash, adminHash, liffHash, commit }` JSON to stdout so GH Actions
  * can pipe it into the manifest generator.
  */
 
+import { execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
@@ -35,6 +37,7 @@ export interface VersionData {
   adminHash: string;
   liffHash: string;
   releasedAt: string;
+  commit: string;
 }
 
 function hashFile(filePath: string): string {
@@ -93,6 +96,7 @@ function write(outPath: string, v: VersionData): void {
     `export const ADMIN_HASH = ${JSON.stringify(v.adminHash)};`,
     `export const LIFF_HASH = ${JSON.stringify(v.liffHash)};`,
     `export const RELEASED_AT = ${JSON.stringify(v.releasedAt)};`,
+    `export const GIT_COMMIT = ${JSON.stringify(v.commit)};`,
     '',
   ].join('\n');
   writeFileSync(outPath, body, 'utf8');
@@ -114,6 +118,7 @@ interface CliArgs {
   liff?: string;
   out?: string;
   releasedAt?: string;
+  commit?: string;
 }
 
 function parseArgs(args: string[]): CliArgs {
@@ -148,6 +153,9 @@ function parseArgs(args: string[]): CliArgs {
       case 'releasedAt':
         out.releasedAt = value;
         break;
+      case 'commit':
+        out.commit = value;
+        break;
       default:
         stderr.write(`inject-version: unknown flag --${key}\n`);
         exit(2);
@@ -172,6 +180,25 @@ function hashArtifact(label: string, p: string): string {
   throw new Error(`inject-version: ${label} path is neither file nor directory: ${p}`);
 }
 
+/**
+ * 動いているのがどのコードか分かるように、組み立て時の git commit を埋める。
+ * CI では GITHUB_SHA があればそれを使い、なければ作業ツリーの HEAD を読む。
+ * どれも取れなければ 'unknown'（画面は「版の情報なし」と出す。仮値は置かない）。
+ */
+function readGitCommit(): string {
+  const fromEnv = process.env.GITHUB_SHA?.trim();
+  if (fromEnv) return fromEnv;
+  try {
+    const head = execSync('git rev-parse HEAD', { stdio: ['ignore', 'pipe', 'ignore'] })
+      .toString()
+      .trim();
+    if (/^[0-9a-f]{40}$/.test(head)) return head;
+  } catch {
+    // git が無い環境（配布 tarball からの組み立てなど）
+  }
+  return 'unknown';
+}
+
 function main(rawArgs: string[]): void {
   const args = parseArgs(rawArgs);
   const version = requireArg(args, 'version');
@@ -180,15 +207,16 @@ function main(rawArgs: string[]): void {
   const liffPath = requireArg(args, 'liff');
   const outPath = requireArg(args, 'out');
   const releasedAt = args.releasedAt ?? new Date().toISOString();
+  const commit = args.commit ?? readGitCommit();
 
   const workerHash = hashArtifact('worker', workerPath);
   const adminHash = hashArtifact('admin', adminPath);
   const liffHash = hashArtifact('liff', liffPath);
 
-  write(outPath, { version, workerHash, adminHash, liffHash, releasedAt });
+  write(outPath, { version, workerHash, adminHash, liffHash, releasedAt, commit });
 
   stdout.write(
-    JSON.stringify({ version, workerHash, adminHash, liffHash, releasedAt }) + '\n',
+    JSON.stringify({ version, workerHash, adminHash, liffHash, releasedAt, commit }) + '\n',
   );
 }
 
