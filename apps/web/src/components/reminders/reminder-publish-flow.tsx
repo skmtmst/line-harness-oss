@@ -87,6 +87,9 @@ export default function ReminderPublishFlow({ reminderId, stage }: { reminderId:
       const response = await api.reminders.getDraft(reminderId)
       if (seq !== requestSeq.current) return
       if (!response.success) throw new Error(response.error)
+      // 別IDの下書きが返ってもそのまま出さない。照合に落ちると
+      // いつまでも読み込み中になるので、失敗として再読み込みへ出す。
+      if (response.data.reminderId !== reminderId) throw new Error('下書きを読み込めませんでした。')
       setDraft(response.data); setSettings(response.data.settings)
     } catch { if (seq === requestSeq.current) setError('下書きを読み込めませんでした。') } finally { if (seq === requestSeq.current) setLoading(false) }
   }, [reminderId])
@@ -166,9 +169,9 @@ export default function ReminderPublishFlow({ reminderId, stage }: { reminderId:
 
   if (loading) return <ListState kind="loading" title="下書きを読み込んでいます" />
   if (!subjectDraft || !subjectSettings) {
-    return error
-      ? <ListState kind="error" title="下書きを表示できませんでした" description={error} action={<Button onClick={() => void loadDraft()}>再読み込み</Button>} />
-      : <ListState kind="loading" title="下書きを読み込んでいます" />
+    // 読み込みが終わっても本文が無いときは失敗として出す。ここで
+    // 読み込み中に戻すと、失敗・返事なしのときに永遠に止まる。
+    return <ListState kind="error" title="下書きを表示できませんでした" description={error || '下書きを読み込めませんでした。'} action={<Button onClick={() => void loadDraft()}>再読み込み</Button>} />
   }
 
   // 送信の失敗・結果不明は一つの状態で持つ。窓が開いている間は窓の中に出し、
