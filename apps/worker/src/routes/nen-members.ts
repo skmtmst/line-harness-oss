@@ -828,13 +828,15 @@ nenMembers.post('/api/liff/nen/pets', async (c) => {
       (id, friend_id, customer_id, name, animal_type, gender, birthday, breed, weight_kg, concerns,
        recommended_daily_grams, recommended_daily_min_grams, recommended_daily_max_grams,
        venison_daily_grams, food_cycle_days, image_r2_key, image_url, created_at, updated_at,
-       neutered, activity_level, feeding_product_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       weight_updated_at, neutered, activity_level, feeding_product_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).bind(
     id, friend.id, friend.user_id, name, animalType,
     gender,
     birthday, breed, weightKg, JSON.stringify(concerns), guide?.daily ?? null, guide?.min ?? null, guide?.max ?? null,
     guide?.venison ?? null, guide?.cycleDays ?? null, photoKey, imageUrl, now, now,
+    // 登録時に体重を入れているので、測った日＝登録日として記録する（監査 R57）。
+    now,
     feeding.neutered === undefined || feeding.neutered === null ? null : feeding.neutered ? 1 : 0,
     feeding.activityLevel ?? 'normal',
     feeding.feedingProductId ?? null,
@@ -866,6 +868,7 @@ nenMembers.put('/api/liff/nen/pets/:id', async (c) => {
 
   const sets: string[] = [];
   const values: unknown[] = [];
+  let weightChanged = false;
   if (body.name !== undefined) {
     const name = typeof body.name === 'string' ? body.name.trim() : '';
     if (!name || name.length > 80) return c.json({ success: false, error: '名前は1〜80文字で入力してください' }, 400);
@@ -889,6 +892,12 @@ nenMembers.put('/api/liff/nen/pets/:id', async (c) => {
     const weightKg = Number(body.weightKg);
     if (!Number.isFinite(weightKg) || weightKg < 0.2 || weightKg > 150) return c.json({ success: false, error: '体重は 0.2〜150kg で入力してください' }, 400);
     sets.push('weight_kg = ?'); values.push(Math.round(weightKg * 10) / 10);
+    // 監査 R57: 体重が変わったときだけ「体重の更新」を動かす。同じ値の再送や
+    // 名前だけの編集では日付を維持する。
+    const rounded = Math.round(weightKg * 10) / 10;
+    if (rounded !== Number(current.weight_kg)) {
+      weightChanged = true;
+    }
   }
   if (body.concerns !== undefined) {
     const concerns = Array.isArray(body.concerns) ? body.concerns.filter((v): v is string => typeof v === 'string' && CONCERNS.has(v)).slice(0, 10) : [];
@@ -913,6 +922,7 @@ nenMembers.put('/api/liff/nen/pets/:id', async (c) => {
 
   const now = jstNow();
   sets.push('updated_at = ?'); values.push(now);
+  if (weightChanged) { sets.push('weight_updated_at = ?'); values.push(now); }
   await c.env.DB.prepare(`UPDATE nen_pet_profiles SET ${sets.join(', ')} WHERE id = ? AND friend_id = ?`).bind(...values, petId, friend.id).run();
   // 誕生日が変わったら、古い日付へ予約済みの誕生日クーポン配信を取消し、
   // 次の日次走査で新しい誕生日から組み直させる。すでに発行済みの今年分は残る。
@@ -1001,7 +1011,8 @@ nenMembers.post('/api/liff/nen/health-logs', async (c) => {
         accountFeedingProducts(c, friend),
       ]);
       const now = jstNow();
-      await c.env.DB.prepare(`UPDATE nen_pet_profiles SET weight_kg = ?, updated_at = ? WHERE id = ?`).bind(weightKg, now, body!.petId).run();
+      // 監査 R57: 「体重の更新」には同期した瞬間ではなく日記の記録日（測った日）を入れる。
+      await c.env.DB.prepare(`UPDATE nen_pet_profiles SET weight_kg = ?, weight_updated_at = ?, updated_at = ? WHERE id = ?`).bind(weightKg, loggedOn, now, body!.petId).run();
       if (current) {
         const plan = planForPetRow({
           id: String(body!.petId), animal_type: String(current.animal_type), weight_kg: weightKg,
