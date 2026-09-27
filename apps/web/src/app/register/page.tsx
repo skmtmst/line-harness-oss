@@ -100,11 +100,11 @@ export default function RegisterPage() {
           </label>
           {/*
             R169: 文書の公開先が未設定の間は、開けない文書への同意を説明なしに求めない。
-            準備中であることと、確認の入口（お問い合わせはログイン不要）を添える。
+            まだ公開されていないことと、確認の入口（お問い合わせはログイン不要）を添える。
           */}
           {!LEGAL_LINKS.terms || !LEGAL_LINKS.privacy ? (
             <p className="text-micro text-ink-faint">
-              文書のページは公開の準備中です。公開までの間、内容は{' '}
+              文書のページはまだ公開されていません。公開までの間、内容は{' '}
               <a href={CONTACT_URL} target="_blank" rel="noreferrer" className="text-action underline underline-offset-2">
                 お問い合わせ
               </a>

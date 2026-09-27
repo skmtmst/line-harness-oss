@@ -81,10 +81,10 @@ describe('ログイン前の画面（0-1／36-4／36-6）', () => {
 
   it('文書の公開先が未設定のときは、説明なしに同意だけを求めない（R169）', () => {
     const page = read('app/register/page.tsx')
-    // 開けない文書への同意を求める代わりに、準備中であることと
+    // 開けない文書への同意を求める代わりに、まだ公開されていないことと
     // ログイン不要の確認口（お問い合わせ）を添える。
     expect(page).toContain('!LEGAL_LINKS.terms || !LEGAL_LINKS.privacy')
-    expect(page).toContain('文書のページは公開の準備中です')
+    expect(page).toContain('文書のページはまだ公開されていません')
     expect(page).toContain('href={CONTACT_URL}')
   })
 
