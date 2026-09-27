@@ -8,7 +8,9 @@ import type { SegmentCondition } from '@/lib/segment-condition'
 import ConditionBuilder from '@/components/shared/condition-builder'
 import InlineActionList, { useActionOptions } from './inline-action-list'
 import {
+  applyMatchType,
   emptyKeywordRule,
+  initialMatchType,
   readKeywordRules,
   readInlineActions,
   toKeywordPayload,
@@ -188,6 +190,21 @@ export function toVersionDraft(
  * なる（#494 軽13）。知らない値は内部値を出さず「その他のメッセージ」。
  */
 
+/**
+ * R28: 窓の中で見せる順番の手がかり。一覧が評価順に並べた中での位置と、
+ * 先に見るルールの名前だけを持つ。数字の入力は持たない。
+ */
+export interface AutoReplyOrderHint {
+  /** 評価順での1始まりの位置。新規・不明なら null。 */
+  position: number | null
+  /** 同じ並びの件数。不明なら null。 */
+  total: number | null
+  /** このルールより先に見るルール（近い3件まで）。 */
+  earlier: Array<{ id: string; name: string }>
+  /** 先に見るルールの全部の件数。 */
+  earlierTotal: number
+}
+
 interface Props {
   draft: AutoReplyDraft
   templates: Array<{ id: string; name: string; messageType: string; messageContent: string }>
@@ -198,18 +215,11 @@ interface Props {
   /** V6ページ表示では、1画面に1段だけ出す。一覧内の編集ダイアログは全項目を出す。 */
   step?: 'basic' | 'trigger' | 'response'
   onStepChange?: (step: 'basic' | 'trigger' | 'response') => void
+  /** 一覧から開いたときに渡す順番の手がかり。URL編集では未指定。 */
+  orderHint?: AutoReplyOrderHint | null
 }
 
 type ResponseMode = 'silent' | 'template' | 'inline-text' | 'inline-flex' | 'inline-image'
-
-/**
- * ページ表示の「優先順位」セレクトが出せる値。
- *
- * 保存値はこの範囲に限らない（旧画面やAPIから 30 のような値が入る）。
- * option に無い value を持つ select はブラウザが先頭候補を表示するため、
- * 候補外の保存値は別の option を足してそのまま見せる（AUTOREPLY-07）。
- */
-const PRIORITY_CANDIDATES = Array.from({ length: 14 }, (_, index) => index + 1)
 
 function detectMode(d: AutoReplyDraft): ResponseMode {
   if (d.responseType === 'silent') return 'silent'
@@ -274,9 +284,20 @@ export default function EditDialog({
   page = false,
   step = 'basic',
   onStepChange,
+  orderHint = null,
 }: Props) {
   const [keyword, setKeyword] = useState(draft.keyword)
-  const [matchType, setMatchType] = useState<'exact' | 'contains'>(draft.matchType)
+  /*
+   * R29: 開いたときは「効いている当て方」（保存された行があれば行）を出す。
+   * 行だけ古いまま選んだことにならないよう、選び直したら全行へ載せる。
+   */
+  const [matchType, setMatchType] = useState<'exact' | 'contains'>(() =>
+    initialMatchType(draft),
+  )
+  const changeMatchType = (next: 'exact' | 'contains') => {
+    setMatchType(next)
+    setKeywordRules((current) => applyMatchType(current, next))
+  }
   const [mode, setMode] = useState<ResponseMode>(detectMode(draft))
   const [templateId, setTemplateId] = useState<string | null>(draft.templateId)
   const [responseContent, setResponseContent] = useState(draft.responseContent)
@@ -291,7 +312,11 @@ export default function EditDialog({
   const [skipWhenOperatorActive, setSkipWhenOperatorActive] = useState(
     draft.skipWhenOperatorActive ?? false,
   )
-  const [priority, setPriority] = useState(String(draft.priority ?? 0))
+  /*
+   * R28: 順番の数字は窓の中では変えず、そのまま送り返す。順番を変えるのは
+   * 一覧の上下入れ替えだけ。保存時に値を落とすと並びが崩れるので残す。
+   */
+  const [priority] = useState(String(draft.priority ?? 0))
   const [messageKinds, setMessageKinds] = useState<string[]>(draft.messageKinds ?? [])
   const [receiveSources, setReceiveSources] = useState<Array<'line' | 'email'>>(
     draft.receiveSources?.length ? draft.receiveSources : ['line'],
@@ -365,8 +390,15 @@ export default function EditDialog({
   const imageTemplates = templates.filter((t) => t.messageType === 'image')
 
   const handleSave = async () => {
+    /*
+     * R29: 空の行は送らない（送るとAPIが400で断る）。
+     * 先頭の keyword / matchType は行と同じものを送る。判定側が読むのは
+     * 行のほうなので、ここが食い違うと選んだ当て方で動かない。
+     */
+    const effectiveRules = keywordRules.filter((rule) => rule.keyword.trim() !== '')
+    const firstKeyword = effectiveRules[0]?.keyword.trim() ?? ''
     // 一律で応答するならキーワードは要らない。
-    if (!respondToAll && !keyword.trim()) {
+    if (!respondToAll && !firstKeyword) {
       setError('キーワードを入力してください')
       return
     }
@@ -418,8 +450,8 @@ export default function EditDialog({
         folderId: string | null;
         internalMemo: string | null;
       } = {
-        keyword,
-        matchType,
+        keyword: firstKeyword || keyword,
+        matchType: effectiveRules[0]?.matchType ?? matchType,
         responseType:
           mode === 'silent' ? 'silent'
           : mode === 'inline-flex' ? 'flex'
@@ -448,8 +480,7 @@ export default function EditDialog({
         responseWeekdays: weekdays.length === 0 || weekdays.length === 7 ? null : weekdays,
         responseHolidayRule: holidayRule === 'ignore' ? null : holidayRule,
         oncePerFriend,
-        // 1行だけで、中身が上の「キーワード」と同じなら、複数行として持たない。
-        keywords: keywordRules.length > 0 ? keywordRules.map(toKeywordPayload) : null,
+        keywords: effectiveRules.length > 0 ? effectiveRules.map(toKeywordPayload) : null,
         friendConditions,
         respondToAll,
         name: ruleName.trim() || null,
@@ -692,25 +723,37 @@ export default function EditDialog({
               )}
             </div>
             <div className={page ? 'contents' : 'grid gap-3 md:grid-cols-2'}>
-              <label className="block">
-                <span className="text-ink-secondary text-xs">優先順位</span>
-                <select
-                  value={priority}
-                  onChange={(event) => setPriority(event.target.value)}
-                  className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm"
-                >
-                  {/*
-                    候補外の保存値は先頭の「1」へ化けさせず、そのまま出す。
-                    値は書き換えない。選び直したときだけ候補の値へ変わる。
-                  */}
-                  {priority !== '' && !PRIORITY_CANDIDATES.includes(Number(priority)) && (
-                    <option value={priority}>{priority}（現在の保存値・候補外）</option>
-                  )}
-                  {PRIORITY_CANDIDATES.map((value) => (
-                    <option key={value} value={value}>{value}（高いほど先に判定）</option>
-                  ))}
-                </select>
-              </label>
+              {/*
+                R28: 順番は数字で打たせず、一覧の並びで決める。ここでは
+                実際の判定順（Worker と同じ・上から1つだけ動く）での位置と、
+                先に当たるかもしれないルールだけ出す。
+              */}
+              <div className="block">
+                <span className="text-ink-secondary text-xs">動く順番</span>
+                <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
+                  一覧の上から順に1つだけ動きます。
+                  {orderHint?.position != null && orderHint?.total != null
+                    ? `このルールは上から ${orderHint.position} 番目（全${orderHint.total}件中）です。`
+                    : draft.id
+                      ? '順番は一覧の「評価順」で入れ替えます。'
+                      : '新しく作るルールは、一覧のいちばん下に足されます。'}
+                </p>
+                {orderHint && orderHint.earlier.length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-ink-secondary text-xs">このルールより先に当たるかもしれないルール</p>
+                    <ul className="text-ink-faint mt-1 list-disc space-y-0.5 pl-5 text-xs">
+                      {orderHint.earlier.slice(0, 3).map((rule) => (
+                        <li key={rule.id} className="truncate" title={rule.name}>
+                          {rule.name}
+                        </li>
+                      ))}
+                    </ul>
+                    {orderHint.earlierTotal > 3 && (
+                      <p className="text-ink-faint mt-0.5 text-xs">ほか {orderHint.earlierTotal - 3}件</p>
+                    )}
+                  </div>
+                )}
+              </div>
               <label className={page ? 'block xl:col-span-4' : 'block'}>
                 <span className="text-ink-secondary text-xs">社内メモ <span className="text-ink-faint">任意</span></span>
                 <textarea
@@ -843,7 +886,7 @@ export default function EditDialog({
                 ))}
                 <Button
                   type="button"
-                  onClick={() => setKeywordRules((current) => [...current, emptyKeywordRule()])}
+                  onClick={() => setKeywordRules((current) => [...current, emptyKeywordRule(matchType)])}
                 >
                   ＋ キーワードを追加
                 </Button>
@@ -883,7 +926,7 @@ export default function EditDialog({
                   key={mt}
                   type="button"
                   aria-pressed={matchType === mt}
-                  onClick={() => setMatchType(mt)}
+                  onClick={() => changeMatchType(mt)}
                   className={`rounded-control border px-3 py-1.5 text-xs ${matchType === mt ? 'border-accent bg-accent-soft text-ink font-bold' : 'border-transparent bg-canvas-sunken text-ink-secondary hover:bg-hairline'}`}
                 >
                   {mt === 'exact' ? '完全一致' : '部分一致'}
@@ -1330,24 +1373,10 @@ export default function EditDialog({
               返信はしません。応答したときに実行する処理だけを下で設定します。
             </p>
           )}
-          {!page && <div>
-            <label htmlFor="ar-priority" className="text-ink-faint mb-1 block text-xs">
-              評価順
-            </label>
-            <input
-              id="ar-priority"
-              type="number"
-              min={-9999}
-              max={9999}
-              value={priority}
-              onChange={(e) => setPriority(e.target.value)}
-              className="border-hairline rounded-control w-24 border px-2 py-1.5 text-sm tabular-nums"
-            />
-            <p className="text-ink-faint mt-1 text-[11px] leading-relaxed">
-              小さいほど先に見ます。上から順に見て、最初に当てはまった1つだけが動きます。
-              間に挿し込めるよう、10・20・30 のように間を空けておくと後で楽です。
-            </p>
-          </div>}
+          {/*
+            R28: 評価順の数字入力は置かない（基本設定の「動く順番」に一本化）。
+            順番を変えるときは一覧の「評価順」で上下を入れ替える。
+          */}
 
 
           {/*
@@ -1492,7 +1521,7 @@ export default function EditDialog({
               <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">状態</dt><dd className="text-ink font-medium">{isActive ? '有効' : '停止中'}</dd></div>
               {step === 'basic' && (
                 <>
-                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">優先順位</dt><dd className="text-ink font-medium">{priority || '未入力'}</dd></div>
+                  <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">動く順番</dt><dd className="text-ink font-medium">{orderHint?.position != null && orderHint?.total != null ? `上から ${orderHint.position} 番目` : '一覧の「評価順」のとおり'}</dd></div>
                   <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">過去28日の応答</dt><dd className="text-ink font-medium">{draft.matchedLast28Days == null ? '—（未取得）' : `${draft.matchedLast28Days}件`}</dd></div>
                   <div className="flex justify-between gap-3 py-3"><dt className="text-ink-faint">同時に当たるルール</dt><dd className="text-ink font-medium">{draft.conflictAttentionCount == null ? '—（未取得）' : draft.conflictAttentionCount === 0 ? 'なし' : `${draft.conflictAttentionCount}件`}</dd></div>
                 </>
