@@ -97,4 +97,3 @@ export const nextWeeklyRunText = (days: ReadonlyArray<number>, time: string): st
   }
   return null
 }
-
