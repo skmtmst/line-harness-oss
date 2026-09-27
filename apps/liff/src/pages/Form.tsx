@@ -59,15 +59,24 @@ function initialAnswers(layout: FormLayout): Answers {
 }
 
 /**
- * 必須の印。★V7 (4-a) は欄名の横の小さな文字。
- * 色はお店のテーマの error を使い、形は変えない (機能は残す)。
+ * 必須の印。★V7 (4-a) は欄名の横の小さな太字で、色は待ちの札と同じ琥珀。
+ * 入力の失敗の赤 (お店のテーマの error) とは分け、必須は常に琥珀にする。
  */
-function RequiredMark({ color }: { color: string }) {
+function RequiredMark() {
   return (
-    <span className="ml-1 text-xs font-bold whitespace-nowrap" style={{ color }}>
+    <span className="ml-1 text-xs font-bold whitespace-nowrap text-wait-ink">
       必須
     </span>
   );
+}
+
+/**
+ * 送信ボタンの文字。管理画面で決めた名前があればそれを使い、
+ * 決めていないとき (空・旧い既定の「送信」) は設計どおり「送信する」。
+ */
+function submitLabelText(label: string | undefined): string {
+  if (label && label !== '送信') return label;
+  return '送信する';
 }
 
 /** 'YYYY-MM-DD' を [年, 月, 日] に分ける。形でない値は空3つにする。 */
@@ -447,6 +456,11 @@ export default function Form() {
 
   const options = layout.options ?? {};
   const theme = normalizeFormTheme(options.theme);
+  /**
+   * デザイン設定でフォームの色を決めているときだけ true。
+   * 決めていなければ殻 (bg-ground) の灰色のままにし、既定の薄緑は付けない。
+   */
+  const hasCustomTheme = options.theme !== undefined && options.theme !== null;
 
   if (!form.isActive) {
     return (
@@ -478,7 +492,7 @@ export default function Form() {
         className="mx-auto min-h-screen w-full max-w-md px-4 pt-4 pb-28"
         style={{
           color: theme.text,
-          backgroundColor: theme.sub,
+          backgroundColor: hasCustomTheme ? theme.sub : undefined,
           backgroundImage: theme.backgroundImageUrl ? `url(${theme.backgroundImageUrl})` : undefined,
           backgroundPosition: 'center',
           backgroundSize: 'cover',
@@ -486,53 +500,62 @@ export default function Form() {
         }}
       >
         {options.pageTitle && (
-          <h1 className="text-base font-bold text-ink">{options.pageTitle}</h1>
+          <div className="-mx-4 -mt-4 border-b border-hairline bg-canvas px-4 py-3.5">
+            <h1 className="text-[17px] leading-[26px] font-bold text-ink">{options.pageTitle}</h1>
+          </div>
         )}
-        {multi && options.sectionHeader !== 'none' && (
-          <div className="mb-4 flex items-center justify-center gap-2">
-            {layout.sections.map((s, i) => (
-              <span
-                key={s.id}
-                className={`text-xs tabular-nums ${
-                  i === sectionIndex ? 'font-bold' : 'text-ink-faint'
-                }`}
-                style={i === sectionIndex ? { color: theme.main } : undefined}
-              >
-                {options.sectionHeader === 'name' ? s.name : i + 1}
-              </span>
+        <div className={options.pageTitle ? 'mt-4' : undefined}>
+          {form.description && (
+            <p className="mb-4 text-sm leading-relaxed whitespace-pre-wrap text-ink-secondary">
+              {form.description}
+            </p>
+          )}
+          {multi && options.sectionHeader !== 'none' && (
+            <div className="mb-4 flex items-center justify-center gap-2">
+              {layout.sections.map((s, i) => (
+                <span
+                  key={s.id}
+                  className={`text-xs tabular-nums ${
+                    i === sectionIndex ? 'font-bold' : 'text-ink-faint'
+                  }`}
+                  style={i === sectionIndex ? { color: theme.main } : undefined}
+                >
+                  {options.sectionHeader === 'name' ? s.name : i + 1}
+                </span>
+              ))}
+            </div>
+          )}
+
+          <div className="space-y-5">
+            {[...layout.header, ...(section?.blocks ?? [])].map((block) => (
+              <BlockView
+                key={block.id}
+                block={block}
+                answers={answers}
+                onChange={setValue}
+                onToggle={toggleCheckbox}
+                onUpload={uploadFile}
+                uploading={!!uploading[block.kind === 'input' ? block.name : '']}
+                error={block.kind === 'input' ? (fieldErrors[block.name] ?? null) : null}
+                errorColor={theme.error}
+              />
             ))}
           </div>
-        )}
 
-        <div className="space-y-5">
-          {[...layout.header, ...(section?.blocks ?? [])].map((block) => (
-            <BlockView
-              key={block.id}
-              block={block}
-              answers={answers}
-              onChange={setValue}
-              onToggle={toggleCheckbox}
-              onUpload={uploadFile}
-              uploading={!!uploading[block.kind === 'input' ? block.name : '']}
-              error={block.kind === 'input' ? (fieldErrors[block.name] ?? null) : null}
-              errorColor={theme.error}
-            />
-          ))}
+          {error && (
+            <p className="mt-4 rounded-lg border border-hairline bg-canvas px-3 py-2 text-sm font-bold text-danger">
+              {error}
+            </p>
+          )}
+
+          {conflict && (
+            <div className="mt-2">
+              <Button variant="secondary" onClick={resendWithFreshKey} disabled={sending}>
+                {conflict.code === 'idempotency_expired' ? 'もう一度送る' : '別の回答として送り直す'}
+              </Button>
+            </div>
+          )}
         </div>
-
-        {error && (
-          <p className="mt-4 rounded-lg border border-hairline bg-canvas px-3 py-2 text-sm font-bold text-danger">
-            {error}
-          </p>
-        )}
-
-        {conflict && (
-          <div className="mt-2">
-            <Button variant="secondary" onClick={resendWithFreshKey} disabled={sending}>
-              {conflict.code === 'idempotency_expired' ? 'もう一度送る' : '別の回答として送り直す'}
-            </Button>
-          </div>
-        )}
       </div>
 
       <BottomBar>
@@ -553,7 +576,7 @@ export default function Form() {
             className="flex-1 py-3 text-sm font-bold disabled:opacity-50"
             style={{ backgroundColor: theme.main, color: formThemeButtonText(theme), borderRadius: radius }}
           >
-            {sending ? '送信中...' : isLast ? options.submitLabel || '送信' : options.nextLabel || '次へ'}
+            {sending ? '送信中...' : isLast ? submitLabelText(options.submitLabel) : options.nextLabel || '次へ'}
           </button>
         </div>
       </BottomBar>
@@ -578,7 +601,7 @@ export default function Form() {
                 className="flex-1 py-2 text-sm font-bold"
                 style={{ backgroundColor: theme.main, color: formThemeButtonText(theme), borderRadius: radius }}
               >
-                {options.confirmDialog?.okLabel || '送信'}
+                {submitLabelText(options.confirmDialog?.okLabel)}
               </button>
             </div>
           </div>
@@ -669,7 +692,7 @@ function BlockView({
     <div>
       <label className="block text-sm font-medium text-ink">
         {block.label}
-        {block.required && <RequiredMark color={errorColor} />}
+        {block.required && <RequiredMark />}
       </label>
       {block.description && (
         <p className="mt-0.5 text-xs text-ink-faint">{block.description}</p>

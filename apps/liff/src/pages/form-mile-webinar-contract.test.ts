@@ -21,6 +21,16 @@ const form = () => page('Form.tsx');
 const affiliate = () => page('Affiliate.tsx');
 const webinar = () => page('Webinar.tsx');
 
+/**
+ * 直しを戻したときの赤化確認用。ふだんは作業ツリーの Form.tsx を読むが、
+ * `FORM_SRC=/tmp/旧Form.tsx` を付けると指定された中身を読む。
+ * (stash 禁止のため、作業ツリーを汚さず `git show HEAD:...` の書き出しで確かめる)
+ */
+const formSrc = () => {
+  const override = process.env.FORM_SRC;
+  return override ? readFileSync(override, 'utf8') : form();
+};
+
 describe('回答フォームは直し方を欄のすぐ下に出す (4-a)', () => {
   it('欄ごとの直し方を持ち、欄の下へ渡す', () => {
     const src = form();
@@ -139,6 +149,46 @@ describe('マイル・紹介は中身を全部残し、6-mile の順に並べる
 
   it('旧い af-* の箱を使わない', () => {
     expect(affiliate()).not.toContain('af-');
+  });
+});
+
+describe('回答フォーム3点 (m11c: 必須は琥珀・白い帯と説明・送信する)', () => {
+  it('必須は琥珀の小さな太字。赤は入力の失敗だけに残す', () => {
+    const src = formSrc();
+    // 必須の印は待ちの札と同じ琥珀 (設計 #94600a) の小さな太字
+    expect(src).toMatch(/function RequiredMark[\s\S]*?text-wait-ink/);
+    expect(src).toContain('<RequiredMark />');
+    // 必須に失敗の赤を渡さない
+    expect(src).not.toMatch(/<RequiredMark[^/]*color/);
+    // 入力の失敗 (欄の下の直し方・枠) はお店のテーマの error のまま
+    expect(src).toContain('errorColor={theme.error}');
+  });
+
+  it('題名は白い上の帯に、その下に説明を出す', () => {
+    const src = formSrc();
+    expect(src).toContain('options.pageTitle');
+    // 上の帯: 白地・下の hairline・画面いっぱい (設計 4-a)
+    expect(src).toContain('bg-canvas');
+    expect(src).toContain('border-b border-hairline');
+    expect(src).toContain('-mx-4 -mt-4');
+    // 帯の下の説明 (例「3分ほどで終わります」)
+    expect(src).toContain('form.description');
+  });
+
+  it('送信は「送信する」。管理画面で決めた名前があればそれを使う', () => {
+    const src = formSrc();
+    expect(src).toContain('submitLabelText(options.submitLabel)');
+    expect(src).toContain('送信する');
+    // 旧い既定の「送信」は決めていない扱いで「送信する」にする
+    expect(src).toContain("!== '送信'");
+  });
+
+  it('背景は決めた色だけ。決めていなければ殻の灰色のまま', () => {
+    const src = formSrc();
+    expect(src).toContain('hasCustomTheme');
+    expect(src).toContain('options.theme !== undefined');
+    expect(src).toContain('backgroundColor: hasCustomTheme ? theme.sub : undefined');
+    expect(src).toContain('bg-ground');
   });
 });
 
