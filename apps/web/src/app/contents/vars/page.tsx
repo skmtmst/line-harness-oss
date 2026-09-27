@@ -309,6 +309,14 @@ function VarsPageInner() {
   /** R37: スマホの選択欄で選んでいる利用者フォルダ。縦パネルの「…」と同じ操作へ届ける。 */
   const selectedUserFolder = folders.find((folder) => folder.id === folderFilter) ?? null
 
+  /** R38: 絞り込みの0件から条件を外す口。フォルダも含めて「すべて」へ戻す。 */
+  const clearVarFilters = () => {
+    setQuery('')
+    setFolderFilter('')
+    setStateFilter('all')
+    setPage(1)
+  }
+
   /*
     1件ずつの削除確認（設計 `yPkWe`）。**窓を開けてから読む。**
     一覧を出すたびに全件ぶん読むと、消さない人にも8種類の走査が走る。
@@ -879,6 +887,7 @@ function VarsPageInner() {
               <div className="text-ink-faint px-4 py-8 text-center text-sm">
                 <ListState
                   kind="empty"
+                  emptyPreset={items.length === 0 ? 'createable' : 'filtered'}
                   title={items.length === 0
                     ? 'まだ共通情報がありません'
                     : '条件に合う共通情報はありません'}
@@ -887,7 +896,7 @@ function VarsPageInner() {
                     : '検索語やフォルダを変えてください。'}
                   action={items.length === 0
                     ? <Button href="/contents/vars/new" variant="primary">共通情報を作る</Button>
-                    : undefined}
+                    : <Button type="button" onClick={clearVarFilters}>条件を外す</Button>}
                 />
               </div>
             ) : (

@@ -135,6 +135,11 @@ function MediaLibraryInner() {
   latestAccountRef.current = selectedAccountId
   const [items, setItems] = useState<MediaItem[]>([])
   const [total, setTotal] = useState(0)
+  /*
+    R38: `total` は絞り込み後の件数。フォルダ欄の「すべて」には絞り込み前の
+    総数を出すため、同じ棚（アーカイブの扱い）で数えた総数を別に持つ。
+  */
+  const [overallTotal, setOverallTotal] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadFailed, setLoadFailed] = useState(false)
   const [quota, setQuota] = useState<MediaQuota | null>(null)
@@ -367,7 +372,7 @@ function MediaLibraryInner() {
     setQuotaFailed(false)
     setError('')
     try {
-      const [res, folderResponse, quotaResponse] = await Promise.all([
+      const [res, folderResponse, quotaResponse, overallResponse] = await Promise.all([
         api.media.list(accountAtRequest, {
           kind: kinds.size === 1 ? [...kinds][0] : undefined,
           folderId: folderFilter || undefined,
@@ -382,12 +387,19 @@ function MediaLibraryInner() {
         // #730: 選択中の1件に閉じた母集団で数える。
         api.folders.list('media', accountAtRequest),
         api.media.quota(accountAtRequest).catch(() => null),
+        // R38: フォルダ欄の「すべて」は絞り込み前の総数。1件だけ取って数を読む。
+        api.media.list(accountAtRequest, {
+          archived: showArchivedOnly ? 'only' : undefined,
+          limit: 1,
+          offset: 0,
+        }).catch(() => null),
       ])
       if (accountAtRequest !== latestAccountRef.current) return
       if (res.success) {
         setItems(res.data.items)
         setTotal(res.data.total)
       }
+      if (overallResponse?.success) setOverallTotal(overallResponse.data.total)
       if (folderResponse.success) {
         setFolders(folderResponse.data)
         setUnfiledCount(folderResponse.unfiledCount ?? null)
@@ -723,6 +735,28 @@ function MediaLibraryInner() {
   const pageCount = Math.max(1, Math.ceil(total / pageSize))
   const current = items
 
+  /*
+    R38: 絞り込みが1つでも効いているか。「すべて」の選び方・0件表示・
+    フォルダ欄の件数を使い分ける。
+  */
+  const hasFilter = query.trim() !== ''
+    || folderFilter !== ''
+    || kinds.size !== KINDS.length
+    || showUnusedOnly
+    || showNearLimitOnly
+    || showArchivedOnly
+
+  /** R38: 「条件に合うものがありません」の次に置く、条件を外す口。 */
+  const clearFilters = () => {
+    setQuery('')
+    setFolderFilter('')
+    setKinds(new Set(KINDS.map((kind) => kind.key)))
+    setShowUnusedOnly(false)
+    setShowNearLimitOnly(false)
+    setShowArchivedOnly(false)
+    setPage(1)
+  }
+
   useEffect(() => {
     if (page > pageCount) setPage(pageCount)
   }, [page, pageCount])
@@ -824,7 +858,9 @@ function MediaLibraryInner() {
             <p className="text-ink-faint text-xs">{managementPermissionReason}。</p>
           )}
           rows={[
-            { id: '', label: 'すべて', count: total },
+            // R38: 「すべて」は絞り込み前の総数。絞り込み後の件数を
+            // 入れると「すべて0・未分類2」のように母集団が混ざる。
+            { id: '', label: 'すべて', count: overallTotal ?? total },
             ...folders.map((folder) => ({
               id: folder.id,
               label: folder.name,
@@ -889,7 +925,7 @@ function MediaLibraryInner() {
           <>
             {/* 種別と使用状態。選ぶと必ず1ページ目へ戻る。 */}
             <FilterChip
-              selected={kinds.size === KINDS.length && !showUnusedOnly && !showArchivedOnly}
+              selected={kinds.size === KINDS.length && !showUnusedOnly && !showNearLimitOnly && !showArchivedOnly}
               onChange={() => {
                 setKinds(new Set(KINDS.map((kind) => kind.key)))
                 setShowUnusedOnly(false)
@@ -1018,12 +1054,32 @@ function MediaLibraryInner() {
         />
       ) : current.length === 0 ? (
         <div className="bg-canvas rounded-card border-hairline border">
-          <ListState
-            kind="empty"
-            title={total === 0 && !query && !folderFilter ? 'まだメディアがありません' : '条件に合うメディアはありません'}
-            description={total === 0 && !query && !folderFilter ? '配信で使う画像・動画・音声・ファイルの置き場です。' : '種類、フォルダ、または検索条件を変えてください。'}
-            action={total === 0 && !query && !folderFilter ? <Button variant="primary" onClick={() => setUploadOpen(true)}>メディアを登録</Button> : undefined}
-          />
+          {/*
+            R38: まだ1件も無いときと、絞り込みで0件のときを分ける。
+            `total` は絞り込み後の件数のため、絞り込みの有無も見る。
+            絞り込みの0件に作る口を出すと、保存済みが消えたと誤読される。
+            代わりに「条件を外す」を置く。
+          */}
+          {total === 0 && !hasFilter ? (
+            <ListState
+              kind="empty"
+              title="まだメディアがありません"
+              description="配信で使う画像・動画・音声・ファイルの置き場です。"
+              action={<Button variant="primary" onClick={() => setUploadOpen(true)}>メディアを登録</Button>}
+            />
+          ) : (
+            <ListState
+              kind="empty"
+              emptyPreset="filtered"
+              title="条件に合うメディアはありません"
+              description="種類、フォルダ、または検索条件を変えてください。"
+              action={(
+                <Button type="button" onClick={clearFilters}>
+                  条件を外す
+                </Button>
+              )}
+            />
+          )}
         </div>
       ) : (
         <div
