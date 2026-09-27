@@ -116,7 +116,8 @@ describe('R23 作成画面のタグ候補は選択accountで絞る', () => {
       fireEvent.focus(combobox())
     })
     await settle(50)
-    const option = Array.from(host.querySelectorAll('[role="option"]')).find((el) => el.textContent?.includes('会員'))
+    // 候補の一覧は MenuPortal で document.body 直下に出る（host の中にはない）。
+    const option = Array.from(document.querySelectorAll('[role="option"]')).find((el) => el.textContent?.includes('会員'))
     expect(option).toBeTruthy()
     await act(async () => {
       fireEvent.click(option!)
