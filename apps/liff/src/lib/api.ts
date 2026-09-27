@@ -30,8 +30,24 @@ export interface AvailabilityResponse {
   by_staff: Array<{
     staff_id: string;
     display_name: string;
-    slots: Array<{ date: string; start: string; end: string }>;
+    slots: Array<{
+      date: string;
+      start: string;
+      end: string;
+      /** 残り枠。0 は埋まった枠（カレンダーの「満」の判定に使う）。無いときは空きありと扱う。 */
+      remaining?: number;
+      /** 枠の状態（Worker が付ける。'full' は埋まった枠）。 */
+      state?: 'available' | 'limited' | 'full' | 'closed';
+    }>;
   }>;
+  /** 休みの日（お店・担当が閉めている日）。カレンダーの「休」の印に使う。 */
+  closed_dates?: string[];
+}
+
+/** LIFF 予約の設定（日時を選ぶ段の最初の形と受付期間）。 */
+export interface LiffBookingSettings {
+  liff_date_view: 'list' | 'calendar';
+  booking_window_days: number;
 }
 
 export interface BookingHistoryItem {
@@ -228,6 +244,8 @@ export const api = {
     if (staffId) qs.set('staff_id', staffId);
     return get<AvailabilityResponse>(`/api/liff/booking/availability?${qs}`);
   },
+  /** 予約の設定を読む。読めないときは呼び側が既定（リスト・60日）に倒す。 */
+  bookingSettings: () => get<LiffBookingSettings>('/api/liff/booking/settings'),
   // Worker 側で id_token を verify するので lineUserId は body に入れない。
   createRequest: (
     body: { menu_id: string; staff_id: string; starts_at: string; customer_note?: string },

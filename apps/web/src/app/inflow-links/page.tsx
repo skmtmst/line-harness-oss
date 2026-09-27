@@ -1224,6 +1224,7 @@ function InflowLinksPageInner({
           tags={tags}
           existingGenres={genreOptions}
           poolMemberNames={poolMemberNames}
+          accountId={selectedAccountId}
           onClose={() => setEditing(null)}
           onSaved={(savedRoute, created) => {
             setEditing(null)
