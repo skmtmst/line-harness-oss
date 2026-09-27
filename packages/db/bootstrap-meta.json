@@ -420,6 +420,7 @@
     "459_broadcast_lifecycle_events.sql",
     "460_photo_reward_policies.sql",
     "461_photo_content_hash.sql",
+    "462_pet_weight_updated_at.sql",
     "463_error_messages_and_getting_started_dismiss.sql",
     "464_organization_recipes.sql",
     "466_template_versions.sql",
@@ -441,5 +442,5 @@
     "503_measurement_sites.sql",
     "504_conversion_reversal_ledger.sql"
   ],
-  "migrationCount": 440
+  "migrationCount": 441
 }
