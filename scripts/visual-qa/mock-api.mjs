@@ -2757,9 +2757,52 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (pathname === '/api/site/pages') return { success: true, data: SITE_TRACKING_PAGES }
   if (pathname === '/api/site/tracking-key') {
     // アカウントごとに違う鍵を返す。乱数は使わない(毎回同じ絵にする)。
-    const accountId = query.get('accountId') ?? 'visual-qa-account'
+    // 画面は account_id で送る（旧 accountId も受ける）。
+    const accountId = query.get('account_id') ?? query.get('accountId') ?? 'visual-qa-account'
     const trackingKey = `hk_${createHash('sha256').update(`site-tracking:${accountId}`).digest('hex').slice(0, 32)}`
     return { success: true, data: { accountId, trackingKey } }
+  }
+  // Google Sheets 連携の見本。名前は packages/shared の型どおり（data 包み）。
+  if (pathname === '/api/integrations/google-sheets/connection') {
+    return {
+      success: true,
+      data: {
+        connection: {
+          status: 'connected',
+          googleAccountEmail: 'owner@example.com',
+          spreadsheetId: 'sheet-123',
+          spreadsheetTitle: 'LINE連携シート',
+          spreadsheetUrl: 'https://docs.google.com/spreadsheets/d/sheet-123',
+          lastSyncedAt: '2026-09-26T03:00:00.000Z',
+          lastSyncStatus: 'ok',
+          lastSyncError: null,
+          consecutiveFailures: 0,
+          connectedAt: '2026-09-20T00:00:00.000Z',
+        },
+        oauthConfigured: true,
+        syncRunning: false,
+        canManage: true,
+      },
+    }
+  }
+  if (pathname === '/api/integrations/google-sheets/runs') {
+    return {
+      success: true,
+      data: {
+        runs: [
+          {
+            id: 'run-1',
+            kind: 'scheduled',
+            dataType: 'friends',
+            status: 'ok',
+            rowsWritten: 120,
+            error: null,
+            startedAt: '2026-09-26T03:00:00.000Z',
+            finishedAt: '2026-09-26T03:01:00.000Z',
+          },
+        ],
+      },
+    }
   }
   if (pathname === '/api/ad-platforms') return { success: true, data: AD_PLATFORMS }
   if (pathname === '/api/ad-platforms/logs') {
