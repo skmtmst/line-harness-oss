@@ -298,6 +298,17 @@ export async function updateReminder(
   const values: unknown[] = [];
   if (updates.name !== undefined) { sets.push('name = ?'); values.push(updates.name); }
   if (updates.description !== undefined) { sets.push('description = ?'); values.push(updates.description); }
+  if (updates.isActive === true) {
+    /*
+     * R146 監査：公開版の無い下書きを「再開」させない。通すと公開版IDが
+     * null のまま is_active=1・lifecycle_status=published になり、公開して
+     * いない設定が稼働中に見える。止める方（false）は従来どおり通す。
+     */
+    const current = await getReminderById(db, id);
+    if (current && current.current_published_version_id == null) {
+      throw new Error('REMINDER_NOT_PUBLISHED');
+    }
+  }
   if (updates.isActive !== undefined) {
     sets.push('is_active = ?');
     values.push(updates.isActive ? 1 : 0);
@@ -472,7 +483,7 @@ export async function saveReminderDraftVersion(
   db: D1Database,
   reminderId: string,
   settings: ReminderDraftSettings,
-  options: { expectedVersionId?: string | null } = {},
+  options: { expectedVersionId?: string | null; expectedUpdatedAt?: string | null } = {},
 ): Promise<ReminderVersionRow> {
   const reminder = await getReminderById(db, reminderId);
   if (!reminder) throw new Error('REMINDER_NOT_FOUND');
@@ -480,9 +491,17 @@ export async function saveReminderDraftVersion(
   const existing = await getReminderDraftVersion(db, reminderId);
   // N-080 (#869): 開いたときの版を指定されたら照合する。別タブで先に保存・
   // 公開された下書きへ、古い画面の内容をそのまま上書きさせない。
-  if (options.expectedVersionId !== undefined
-      && (existing?.id ?? null) !== options.expectedVersionId) {
-    throw new Error('REMINDER_DRAFT_CONFLICT');
+  // R148 監査：通常保存は版IDを付け替えないため、版IDだけでは A の保存後に
+  // B が古い内容で保存しても比較が通る。保存のたびに変わる updated_at も
+  // 合わせて照合し、ずれていれば 409 で止める（ミリ秒精度）。
+  if (options.expectedVersionId !== undefined) {
+    const idMatches = (existing?.id ?? null) === options.expectedVersionId;
+    const stampMatches = options.expectedUpdatedAt === undefined
+      || options.expectedUpdatedAt === null
+      || existing?.updated_at === options.expectedUpdatedAt;
+    if (!idMatches || !stampMatches) {
+      throw new Error('REMINDER_DRAFT_CONFLICT');
+    }
   }
   const versionId = existing?.id ?? crypto.randomUUID();
 
