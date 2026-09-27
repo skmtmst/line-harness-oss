@@ -286,7 +286,10 @@ describe('一覧の画面が置き換え表を通す', () => {
 
 describe('削除確認 Gy9OK の絵と、押せる形', () => {
   it('見出しの左に警告22px、削除ボタンの中にごみ箱16pxを置く', () => {
-    expect(PAGE).toContain("import { MoreHorizontal, Trash2, TriangleAlert } from 'lucide-react'")
+    // R28 で順番入れ替えの上下アイコン（ChevronUp/ChevronDown）を足したため、
+    // import 行の完全一致では見ない。使う図形と大きさが残っていることを見る。
+    expect(PAGE).toContain('TriangleAlert')
+    expect(PAGE).toContain('Trash2')
     expect(PAGE).toContain('titleIcon={<TriangleAlert size={22} />}')
     expect(PAGE).toContain('confirmIcon={<Trash2 size={16} />}')
   })
