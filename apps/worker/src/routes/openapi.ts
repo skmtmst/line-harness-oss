@@ -4920,6 +4920,22 @@ const spec = {
         responses: { '200': { description: 'OK' } },
       },
     },
+    // ── LIFF Booking settings（日時を選ぶ段の最初の形） ─────────────────────
+    '/api/liff/booking/settings': {
+      get: {
+        tags: ['Booking'],
+        summary: 'LIFF予約の日時表示の最初の形と受付期間を取得',
+        description: 'liffId で決まる店舗の設定だけを返す。設定行が無い・列が無い行は既定値（list・60日）。空き枠そのものは /api/liff/booking/availability を期間指定で呼ぶ。',
+        security: [],
+        parameters: [
+          { name: 'liffId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'liff_date_view（list/calendar）とbooking_window_days' },
+          '404': { description: 'Unknown LIFF ID' },
+        },
+      },
+    },
     // ── Booking settings (N-406 #754) ────────────────────────────────────────
     '/api/booking/admin/settings': {
       get: {
