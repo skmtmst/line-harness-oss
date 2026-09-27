@@ -32,16 +32,23 @@ const payload = {
 let host: HTMLDivElement
 let root: Root
 let urls: string[]
+let requests: Array<{ url: string; init?: RequestInit }>
 
 beforeEach(() => {
   urls = []
+  requests = []
   process.env.NEXT_PUBLIC_API_URL = 'https://api.example.test'
-  vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+  vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input)
     urls.push(url)
-    const body = url.includes('line-unregistered')
-      ? { success: true, data: { registered: 21, total: 24, people: [{ staffId: 's1', name: '木下 花', tenantName: 'カフェ ムスビ', hasEmail: true }] } }
-      : { success: true, data: { ...payload, periodLabel: url.includes('prev_month') ? '先月' : '今月' } }
+    requests.push({ url, init })
+    const body = url.endsWith('/api/ops/me')
+      ? { success: true, data: { id: 'staff-1', name: '運営', email: 'ops@example.test', readOnly: false, totpEnabled: true, lineLinked: true, legacy: false, impersonation: null } }
+      : url.endsWith('/api/ops/billing/sync')
+        ? { success: true, data: { tenants: 2, imported: 7, failed: 1, completed: false, since: '2025-09-27T00:00:00.000Z', syncedAt: null } }
+        : url.includes('line-unregistered')
+          ? { success: true, data: { registered: 21, total: 24, people: [{ staffId: 's1', name: '木下 花', tenantName: 'カフェ ムスビ', hasEmail: true }] } }
+          : { success: true, data: { ...payload, periodLabel: url.includes('prev_month') ? '先月' : '今月' } }
     return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } })
   }))
   host = document.createElement('div')
@@ -110,6 +117,76 @@ describe('画面', () => {
     expect(host.querySelector('[data-design-node="Xvofy"]')).not.toBeNull()
     expect(host.querySelector('[data-design-node="s7wSj"]')).not.toBeNull()
     expect(host.querySelector('[data-design-node="fyib5"]')).not.toBeNull()
+  })
+
+  it('書き込み権限がある運営マスターには Stripe 同期ボタンを出す', async () => {
+    await act(async () => { root.render(<OpsDashboardPage />) })
+    await flush()
+    const button = Array.from(host.querySelectorAll('button')).find((item) => item.textContent?.includes('Stripe と同期'))
+    expect(button).toBeTruthy()
+    expect(button?.getAttribute('data-design-node')).toBe('Fo4yb')
+  })
+
+  it('閲覧のみの運営メンバーには Stripe 同期ボタンを出さない', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      const body = url.endsWith('/api/ops/me')
+        ? { success: true, data: { id: 'staff-2', name: '閲覧担当', email: null, readOnly: true, totpEnabled: true, lineLinked: false, legacy: false, impersonation: null } }
+        : { success: true, data: payload }
+      return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    }))
+    await act(async () => { root.render(<OpsDashboardPage />) })
+    await flush()
+    expect(Array.from(host.querySelectorAll('button')).some((item) => item.textContent?.includes('Stripe と同期'))).toBe(false)
+  })
+
+  it('同期中はボタンを無効にし、12か月同期の完了後に結果を出してダッシュボードを読み直す', async () => {
+    let finishSync: ((response: Response) => void) | undefined
+    const deferredSync = new Promise<Response>((resolve) => { finishSync = resolve })
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      requests.push({ url, init })
+      if (url.endsWith('/api/ops/me')) {
+        return new Response(JSON.stringify({ success: true, data: { id: 'staff-1', name: '運営', email: null, readOnly: false, totpEnabled: true, lineLinked: false, legacy: false, impersonation: null } }), { status: 200 })
+      }
+      if (url.endsWith('/api/ops/billing/sync')) return deferredSync
+      return new Response(JSON.stringify({ success: true, data: payload }), { status: 200 })
+    }))
+    await act(async () => { root.render(<OpsDashboardPage />) })
+    await flush()
+    const dashboardCallsBefore = requests.filter((item) => item.url.includes('/api/ops/dashboard') && !item.url.includes('line-unregistered')).length
+    const button = Array.from(host.querySelectorAll('button')).find((item) => item.textContent?.includes('Stripe と同期')) as HTMLButtonElement
+    await act(async () => { button.click(); await Promise.resolve() })
+    expect(button.disabled).toBe(true)
+    const syncRequest = requests.find((item) => item.url.endsWith('/api/ops/billing/sync'))
+    expect(syncRequest?.init?.method).toBe('POST')
+    expect(syncRequest?.init?.body).toBe(JSON.stringify({ months: 12 }))
+    finishSync!(new Response(JSON.stringify({ success: true, data: { tenants: 2, imported: 7, failed: 1, completed: false, since: '2025-09-27T00:00:00.000Z', syncedAt: null } }), { status: 200 }))
+    await flush()
+    expect(button.disabled).toBe(false)
+    expect(host.querySelector('[role="status"]')?.textContent).toBe('Stripe から 7 件取り込みました（失敗 1 件）')
+    const dashboardCallsAfter = requests.filter((item) => item.url.includes('/api/ops/dashboard') && !item.url.includes('line-unregistered')).length
+    expect(dashboardCallsAfter).toBeGreaterThan(dashboardCallsBefore)
+  })
+
+  it('同期に失敗したら理由を alert で出す', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.endsWith('/api/ops/me')) {
+        return new Response(JSON.stringify({ success: true, data: { id: 'staff-1', name: '運営', email: null, readOnly: false, totpEnabled: true, lineLinked: false, legacy: false, impersonation: null } }), { status: 200 })
+      }
+      if (url.endsWith('/api/ops/billing/sync')) {
+        return new Response(JSON.stringify({ success: false, error: 'Stripe の接続設定がまだありません' }), { status: 503 })
+      }
+      return new Response(JSON.stringify({ success: true, data: payload }), { status: 200 })
+    }))
+    await act(async () => { root.render(<OpsDashboardPage />) })
+    await flush()
+    const button = Array.from(host.querySelectorAll('button')).find((item) => item.textContent?.includes('Stripe と同期')) as HTMLButtonElement
+    await act(async () => { button.click() })
+    await flush()
+    expect(host.querySelector('[role="alert"]')?.textContent).toBe('Stripe の接続設定がまだありません')
+    expect(button.disabled).toBe(false)
   })
 
   it('Stripe未設定時は定価の注記を同じ場所に出す', async () => {
