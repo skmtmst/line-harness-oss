@@ -23,6 +23,14 @@ const FILTERS: Array<{ key: string; label: string; actions: string }> = [
 ]
 
 const PAGE = 50
+/*
+ * CSV は「いまの条件に合う記録を全部」書き出す。画面は1ページ50件しか
+ * 持たないため、書き出す度に条件で取り直す（監査 R159：表示中の50件だけが
+ * 黙って出るのを直す）。上限は 20,000 件で区切り、切り詰めたときは件数と
+ * 一緒に明示する。
+ */
+const CSV_PAGE = 500
+const CSV_MAX = 20_000
 
 export default function OpsAuditPage() {
   const [rows, setRows] = useState<OpsAuditRow[]>([])
@@ -33,6 +41,8 @@ export default function OpsAuditPage() {
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [exporting, setExporting] = useState(false)
+  const [exportNote, setExportNote] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -47,9 +57,29 @@ export default function OpsAuditPage() {
 
   useEffect(() => { void load() }, [load])
 
-  const exportCsv = () => {
+  const exportCsv = async () => {
+    setExporting(true)
+    setExportNote('')
+    const actions = FILTERS.find((f) => f.key === filter)?.actions || undefined
+    const collected: OpsAuditRow[] = []
+    let expected = 0
+    let truncated = false
+    for (let offset = 0; ; offset += CSV_PAGE) {
+      const res = await opsCall(api.ops.audit({
+        action: actions,
+        from: from || undefined,
+        to: to ? `${to}T23:59:59` : undefined,
+        limit: CSV_PAGE,
+        offset,
+      }))
+      if (!res.success) { setError(res.error || '書き出せませんでした'); setExporting(false); return }
+      collected.push(...res.data)
+      expected = res.total
+      if (res.data.length < CSV_PAGE || collected.length >= res.total) break
+      if (collected.length >= CSV_MAX) { truncated = true; break }
+    }
     const header = ['日時', '運営者', '契約先', '操作', '理由', 'IP', '契約先に表示']
-    const lines = rows.map((r) => [
+    const lines = collected.map((r) => [
       r.created_at, r.staff_name, r.tenant_name ?? '', AUDIT_ACTION_LABEL[r.action]?.label ?? r.action, r.reason ?? '', r.ip ?? '', r.visible_to_tenant ? '表示' : '運営のみ',
     ].map((v) => `"${String(v).replace(/"/g, '""')}"`).join(','))
     const blob = new Blob([`﻿${[header.join(','), ...lines].join('\n')}`], { type: 'text/csv;charset=utf-8' })
@@ -59,6 +89,10 @@ export default function OpsAuditPage() {
     a.download = `musubo-audit-${new Date().toISOString().slice(0, 10)}.csv`
     a.click()
     URL.revokeObjectURL(url)
+    setExportNote(truncated
+      ? `いまの条件の ${collected.length} 件を書き出しました（${expected} 件中・上限 ${CSV_MAX.toLocaleString()} 件まで。全部を残すには期間で絞ってください）`
+      : `いまの条件の ${collected.length} 件を書き出しました`)
+    setExporting(false)
   }
 
   const pageCount = Math.max(1, Math.ceil(total / PAGE))
@@ -79,21 +113,31 @@ export default function OpsAuditPage() {
           ))}
         </div>
         <div className="flex-1" />
-        <div className="flex items-center gap-2 text-caption text-ink-secondary">
-          <div className="w-52">
+        {/*
+         * 狭い画面では日付範囲を2段に畳む。固定幅208px×2の1行だと
+         * 390px からはみ出す（監査 R158）。
+         */}
+        <div className="flex w-full min-w-0 flex-wrap items-center gap-2 text-caption text-ink-secondary sm:w-auto">
+          <div className="w-full min-w-0 sm:w-52">
             <DateField value={from} onChange={(value) => { setFrom(value); setPage(1) }} max={to || undefined} aria-label="開始日" />
           </div>
-          〜
-          <div className="w-52">
-            <DateField value={to} onChange={(value) => { setTo(value); setPage(1) }} min={from || undefined} aria-label="終了日" />
+          <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto">
+            <span className="shrink-0">〜</span>
+            <div className="min-w-0 flex-1 sm:w-52 sm:flex-none">
+              <DateField value={to} onChange={(value) => { setTo(value); setPage(1) }} min={from || undefined} aria-label="終了日" />
+            </div>
           </div>
         </div>
-        <Button onClick={exportCsv} disabled={rows.length === 0}>
-          <Download aria-hidden="true" className="h-4 w-4" />
-          CSVで書き出す
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button onClick={() => void exportCsv()} disabled={exporting || total === 0}>
+            <Download aria-hidden="true" className="h-4 w-4" />
+            {exporting ? '書き出しています…' : 'CSVで書き出す'}
+          </Button>
+          <span className="text-micro text-ink-faint">いまの条件の全{total}件</span>
+        </div>
       </div>
 
+      {exportNote ? <p role="status" className="mb-3 text-caption text-accent-deep">{exportNote}</p> : null}
       {error ? <p role="alert" className="mb-3 text-caption text-danger">{error}</p> : null}
 
       {loading ? (
