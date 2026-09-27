@@ -88,8 +88,8 @@ describe('V6 機能18の計測鍵の契約(#514-2)', () => {
     expect(SITE).toContain('.trackingKey(selectedAccountId')
     expect(SITE).toContain('[selectedAccountId, keyAttempt]')
     expect(SITE).toContain('data-key="${trackingKey}"')
-    // 口: GET /api/site/tracking-key?accountId=…。
-    expect(API).toContain('/api/site/tracking-key?accountId=${encodeURIComponent(accountId)}')
+    // 口: GET /api/site/tracking-key?account_id=…（集計・一覧と同じ約束。口は旧 accountId も受ける）。
+    expect(API).toContain('/api/site/tracking-key?account_id=${encodeURIComponent(accountId)}')
     expect(API).toContain('trackingKey: string')
   })
 

@@ -5494,6 +5494,18 @@ export const LINE_NOTIFICATION_METRICS = {
   coverage: { individualOpenAvailable: false, lineAggregateOnly: true, unavailableIsNull: true },
 }
 
+/** 機能24。送信履歴から数えたJSTの今日・この30日（`send-counts` の見本）。 */
+export const LINE_NOTIFICATION_SEND_COUNTS = {
+  sentToday: 34,
+  sentLast30d: 412,
+  byEventType: EC_NOTIFICATION_SETTINGS.map((setting, index) => ({
+    eventType: setting.eventType,
+    today: [12, 8, 6, 3, 2, 1, 1, 1, 0][index],
+    last30d: [148, 96, 74, 41, 23, 12, 9, 6, 3][index],
+  })),
+  period: { today: '2026-08-25', from30d: '2026-07-27', to: '2026-08-25' },
+}
+
 /** 機能24。LINE受付までの事実だけを持ち、届いた・既読は作らない。 */
 export const EC_NOTIFICATION_RUNS = {
   items: [

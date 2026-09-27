@@ -111,6 +111,9 @@ import type {
   DecideIdentityCandidateRequest,
   UndoIdentityCandidateRequest,
   RichMenuAreaIntent,
+  GoogleSheetsConnectionStatus,
+  GoogleSheetsConnection,
+  GoogleSheetsSyncRun,
 } from '@line-crm/shared'
 
 export type { RichMenuAreaIntent } from '@line-crm/shared'
@@ -267,31 +270,14 @@ export interface IssuedIntegrationApiToken extends IntegrationApiTokenInfo {
   token: string
 }
 
-/* #838 第2段: Google Sheets 連携。トークン類は応答に乗らない設計。 */
-export type GoogleSheetsConnectionStatus = 'disconnected' | 'pending_target' | 'connected' | 'expired'
-
-export interface GoogleSheetsConnection {
-  status: GoogleSheetsConnectionStatus
-  googleAccountEmail?: string | null
-  spreadsheetId?: string | null
-  spreadsheetTitle?: string | null
-  spreadsheetUrl?: string | null
-  lastSyncedAt?: string | null
-  lastSyncStatus?: 'ok' | 'partial' | 'error' | null
-  lastSyncError?: string | null
-  consecutiveFailures?: number
-  connectedAt?: string | null
-}
-
-export interface GoogleSheetsSyncRun {
-  id: string
-  kind: 'manual' | 'scheduled'
-  dataType: 'friends' | 'form_answers'
-  status: 'running' | 'ok' | 'partial' | 'error'
-  rowsWritten: number
-  error: string | null
-  startedAt: string
-  finishedAt: string | null
+/*
+ * #838 第2段: Google Sheets 連携。型の正本は packages/shared
+ *（Worker とこの画面で1つの型を使う）。トークン類は応答に乗らない設計。
+ */
+export type {
+  GoogleSheetsConnectionStatus,
+  GoogleSheetsConnection,
+  GoogleSheetsSyncRun,
 }
 
 export type AccessUserStatus = 'active' | 'invited' | 'expired' | 'suspended'
@@ -4503,6 +4489,18 @@ export type LineNotificationMetrics = {
   }
 }
 
+/**
+ * 顧客へのお知らせの送信件数。Workerが共通送信台帳の受け付け済みから
+ * JSTの今日・この30日で数えたもの。ECの取り込み件数でもLINE集計の
+ * 全期間合計でもない。
+ */
+export type LineNotificationSendCounts = {
+  sentToday: number
+  sentLast30d: number
+  byEventType: Array<{ eventType: string; today: number; last30d: number }>
+  period: { today: string; from30d: string; to: string }
+}
+
 export type EcShipment = {
   id: string
   eventType: string
@@ -6934,7 +6932,7 @@ export const api = {
     trackingKey: (accountId?: string) =>
       fetchApi<ApiResponse<{ accountId: string; trackingKey: string }>>(
         accountId
-          ? `/api/site/tracking-key?accountId=${encodeURIComponent(accountId)}`
+          ? `/api/site/tracking-key?account_id=${encodeURIComponent(accountId)}`
           : '/api/site/tracking-key',
       ),
     friendEvents: (friendId: string) =>
@@ -9990,6 +9988,9 @@ export const api = {
     },
     metrics: (lineAccountId: string) => fetchApi<ApiResponse<LineNotificationMetrics>>(
       `/api/line-notifications/metrics?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+    ),
+    sendCounts: (lineAccountId: string) => fetchApi<ApiResponse<LineNotificationSendCounts>>(
+      `/api/line-notifications/send-counts?lineAccountId=${encodeURIComponent(lineAccountId)}`,
     ),
     retryDelivery: (id: string, data: { lineAccountId: string; expectedVersion: number }) => fetchApi<ApiResponse<{
       id: string
