@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
@@ -98,6 +98,10 @@ beforeEach(() => {
   testDb.raw.prepare(
     `INSERT INTO staff_members (id, name, email, role, api_key, tenant_id) VALUES ('staff-1', '山田 太郎', 'masato@example.com', 'admin', 'key-1', ?)`,
   ).run(DEFAULT_TENANT_ID);
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 describe('契約状況（summary）', () => {
@@ -394,6 +398,42 @@ describe('課金 Webhook', () => {
     await webhook({ id: 'evt_paid_again', type: 'invoice.paid', data: { object: { ...invoice, status: 'paid', status_transitions: { paid_at: 1_760_000_100 } } } });
     await webhook({ id: 'evt_refund', type: 'charge.refunded', data: { object: { id: 'ch_1', customer: 'cus_1', invoice: 'in_status', amount_refunded: 4_000 } } });
     expect(testDb.raw.prepare(`SELECT status, amount_refunded FROM billing_invoices WHERE id = 'in_status'`).get()).toMatchObject({ status: 'paid', amount_refunded: 4_000 });
+  });
+
+  it('請求書のないEC-CUBE返金は対象外として記録し、請求書を変更しない', async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    const res = await webhook({
+      id: 'evt_ec_refund',
+      type: 'charge.refunded',
+      data: { object: { id: 'ch_ec', customer: 'cus_ec', invoice: null, amount_refunded: 2_530 } },
+    });
+
+    expect(res.status).toBe(200);
+    expect(await res.json<{ data: { matched: boolean } }>()).toMatchObject({ data: { matched: false } });
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM billing_invoices').get()).toMatchObject({ n: 0 });
+    expect(info).toHaveBeenCalledWith(JSON.stringify({
+      message: 'billing webhook: charge.refunded 対象外',
+      eventId: 'evt_ec_refund',
+      reason: 'Stripe Billing請求書でない',
+    }));
+  });
+
+  it('請求書IDがあっても更新対象がなければ警告する', async () => {
+    setTenant({ stripe_customer_id: 'cus_1' });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const res = await webhook({
+      id: 'evt_missing_invoice_refund',
+      type: 'charge.refunded',
+      data: { object: { id: 'ch_missing', customer: 'cus_1', invoice: 'in_missing', amount_refunded: 1_000 } },
+    });
+
+    expect(res.status).toBe(200);
+    expect(warn).toHaveBeenCalledWith(JSON.stringify({
+      message: 'billing webhook: charge.refunded 更新対象なし',
+      eventId: 'evt_missing_invoice_refund',
+      invoiceId: 'in_missing',
+      reason: 'billing_invoice_not_found',
+    }));
   });
 
   it('知らない顧客の請求書はイベントだけ記録し、請求書行は作らない', async () => {
