@@ -30,6 +30,20 @@ function statusView(status: FriendListItem['chatStatus']) {
   return { label: '対応済み', className: 'bg-accent-soft text-accent-deep' }
 }
 
+/*
+ * R112: 最終接触は受信・送信の新しい方。表の行と狭い画面のカードで
+ * 別の式を使うと、同じ相手の日付が幅で変わって見える。
+ * どちらもこの1つを読む（FRIEND-07 の受信・送信比較を共通化）。
+ */
+export function selectLastContactAt(friend: FriendListItem): string {
+  const incomingAt = friend.latestIncomingMessage?.createdAt
+  const outgoingAt = friend.latestOutgoingAt
+  if (incomingAt && outgoingAt) {
+    return new Date(incomingAt).getTime() >= new Date(outgoingAt).getTime() ? incomingAt : outgoingAt
+  }
+  return incomingAt ?? outgoingAt ?? friend.createdAt
+}
+
 export default function FriendListRow({
   friend,
   selected,
@@ -41,15 +55,7 @@ export default function FriendListRow({
   const router = useRouter()
   const status = statusView(friend.chatStatus)
   const latest = friend.latestIncomingMessage
-  /*
-   * FRIEND-07: 最終接触は受信・送信の新しい方。受信があると送信日時を
-   * 比較していなかったため、直前に送った返信があっても古い受信日が残った。
-   */
-  const incomingAt = latest?.createdAt
-  const outgoingAt = friend.latestOutgoingAt
-  const lastContact = incomingAt && outgoingAt
-    ? (new Date(incomingAt).getTime() >= new Date(outgoingAt).getTime() ? incomingAt : outgoingAt)
-    : incomingAt ?? outgoingAt ?? friend.createdAt
+  const lastContact = selectLastContactAt(friend)
   const attention = String(friend.metadata?.__attention ?? '') === '1'
 
   /*
@@ -229,7 +235,7 @@ export function FriendListCard({
   const router = useRouter()
   const status = statusView(friend.chatStatus)
   const latest = friend.latestIncomingMessage
-  const lastContact = latest?.createdAt ?? friend.latestOutgoingAt ?? friend.createdAt
+  const lastContact = selectLastContactAt(friend)
   const attention = String(friend.metadata?.__attention ?? '') === '1'
 
   const openChat = () => router.push(`/chats?friend=${friend.id}`)

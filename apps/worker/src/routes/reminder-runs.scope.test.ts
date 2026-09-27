@@ -265,3 +265,32 @@ describe('リマインダ実行記録のアカウント範囲', () => {
     expect(body.data).toEqual({ id: 'run-1', status: 'queued', replayed: true })
   })
 })
+
+describe('R146 監査：実行結果に公開版の有無を載せる', () => {
+  it('公開版が無い下書きは hasPublishedVersion=false で返す', async () => {
+    mocks.canAccess.mockResolvedValue(true)
+    mocks.getPublishedVersion.mockResolvedValue(null)
+
+    const response = await createApp().request('/api/reminders/reminder-1/runs')
+    const body = await response.json() as any
+
+    expect(response.status).toBe(200)
+    expect(body.data.reminder.hasPublishedVersion).toBe(false)
+  })
+
+  it('公開版があるときは hasPublishedVersion=true で返す', async () => {
+    mocks.canAccess.mockResolvedValue(true)
+    mocks.getPublishedVersion.mockResolvedValue({
+      id: 'pv-1',
+      reminder_id: 'reminder-1',
+      status: 'published',
+      settings_snapshot: JSON.stringify({ stopConditions: null }),
+    })
+
+    const response = await createApp().request('/api/reminders/reminder-1/runs')
+    const body = await response.json() as any
+
+    expect(response.status).toBe(200)
+    expect(body.data.reminder.hasPublishedVersion).toBe(true)
+  })
+})

@@ -387,7 +387,7 @@ function NewNenColumnInner() {
         )}
       />
       {/* #935 N-301: 入力途中で離れるときの確認。 */}
-      <ConfirmDialog
+      <ConfirmDialog primaryAction="cancel"
         open={leaveTarget !== null}
         title="入力中の内容があります"
         description="このまま移動すると、入力した内容は保存されません。移動しますか？"
