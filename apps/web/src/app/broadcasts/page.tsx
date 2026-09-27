@@ -743,15 +743,23 @@ function BroadcastList() {
               合わせる。「配信数」と「開封（率）」は設計では1つの列
               （配信・開封・クリック）にまとまっている。
             */}
+            {/*
+              列幅は % と操作列の固定幅の組み合わせ（m20i）。
+              操作の中身（詳細ボタン約56＋間8＋…32＋余白24＝約120）は
+              縮められないので、操作列だけ124pxで固定する（★V7：操作列は
+              固定幅）。% の合計は81に抑え、124pxを足してもいちばん狭い
+              帯（1280px時の表≈700px）に収まる。% だけだと操作列が
+              100pxを切り、中身が右へはみ出して枠が8px横に送れていた。
+            */}
             <thead>
               <TableHeadRow>
-                <Th style={{ width: '30%' }}>
+                <Th style={{ width: '24%' }}>
                   タイトル・内容
                 </Th>
-                <Th style={{ width: '12%' }}>
+                <Th style={{ width: '14%' }}>
                   状態
                 </Th>
-                <Th style={{ width: '14%' }}>
+                <Th style={{ width: '11%' }}>
                   配信条件
                 </Th>
                 {/*
@@ -765,7 +773,7 @@ function BroadcastList() {
                   配信・開封・クリック
                 </Th>
                 {/* #768: 表が横に流れる帯でも操作列は右端に留める。 */}
-                <Th style={{ width: '12%' }} align="right" className="sticky right-0 bg-canvas-sunken">
+                <Th style={{ width: 124 }} align="right" className="sticky right-0 bg-canvas-sunken">
                   操作
                 </Th>
               </TableHeadRow>
@@ -774,9 +782,17 @@ function BroadcastList() {
               {visibleBroadcasts.map((broadcast) => {
                 const statusInfo = (broadcast.displayStatus && displayStatusConfig[broadcast.displayStatus])
                   ?? statusConfig[broadcast.status]
+                /*
+                 * m20i: 状態の札と承認の札が同じ言葉になる組み合わせ。
+                 * このときだけ承認の札1つにまとめる（下の状態セル）。
+                 */
+                const approvalDuplicatesStatus = (broadcast.displayStatus === 'pending_approval' && broadcast.approvalStatus === 'pending')
+                  || (broadcast.displayStatus === 'expired' && broadcast.approvalStatus === 'expired')
                 const isDedup = broadcast.targetType === 'multi-account-dedup'
                 // 手動で取り直した値があればそれを、一覧同梱の集計があればそれを使う。
                 const insight = insights[broadcast.id] ?? summaryInsight(broadcast.insightSummary)
+                // 配信条件の1行表示と title 用。関数を2回呼ばない。
+                const audience = audienceSummary(broadcast, getTagName, getScenarioName)
 
                 return (
                   <Tr
@@ -808,7 +824,7 @@ function BroadcastList() {
                           {broadcast.title}
                         </a>
                         {isDedup && (
-                          <span className="inline-flex items-center px-1.5 py-0 rounded text-[10px] font-medium bg-purple-100 text-purple-700">
+                          <span className="inline-flex items-center whitespace-nowrap px-1.5 py-0 rounded text-[10px] font-medium bg-info-bg text-info">
                             複数アカウント
                           </span>
                         )}
@@ -823,26 +839,42 @@ function BroadcastList() {
                       </p>
                     </Td>
 
-                    {/* 状態。設計では2列目。承認待ちの札もここに出す（A-2）。 */}
+                    {/*
+                      状態。設計では2列目。承認待ちの札もここに出す（A-2）。
+                      m20i: 承認の札と状態の札が同じ言葉になる組み合わせ
+                      （承認待ち・期限切れ）は2つ出さず、承認の札（札＋?）
+                      1つにする。2つ出すと狭い列に収まらず「?」が下へ
+                      はみ出す。言葉が違う組み合わせは両方残す。
+                    */}
                     <Td>
-                      <span className="inline-flex flex-wrap items-center gap-1">
-                        <span className={`inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded-full text-xs font-medium ${statusInfo.className}`}>
-                          {statusInfo.label}
+                      {approvalDuplicatesStatus ? (
+                        <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                          <ApprovalBadge status={broadcast.approvalStatus} />
                         </span>
-                        <ApprovalBadge status={broadcast.approvalStatus} />
-                      </span>
+                      ) : (
+                        <span className="inline-flex flex-wrap items-center gap-1">
+                          <span className={`inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded-full text-xs font-medium ${statusInfo.className}`}>
+                            {statusInfo.label}
+                          </span>
+                          <ApprovalBadge status={broadcast.approvalStatus} />
+                        </span>
+                      )}
                     </Td>
 
                     {/*
                       配信条件。前は「全員」か「タグ指定」の2つしか見ていなかったので、
                       詳細条件で絞った配信も「タグ指定」と出ていた。送った相手を
                       後から確かめられないので、監査にならなかった。
+                      m20i: 「タグ：NEN会員（定期）」が3行に折れて行が高く
+                      なるので、1行で省略し全文は title で見せる。
                     */}
                     <Td className="text-ink-secondary">
-                      {audienceSummary(broadcast, getTagName, getScenarioName)}
+                      <span className="block truncate" title={audience}>
+                        {audience}
+                      </span>
                     </Td>
 
-                    <Td className="text-ink-faint tabular-nums">
+                    <Td className="text-ink-faint tabular-nums whitespace-nowrap">
                       {broadcast.status === 'sent'
                         ? formatDatetime(broadcast.sentAt)
                         : formatDatetime(broadcast.scheduledAt)}
@@ -901,7 +933,8 @@ function BroadcastList() {
                     */}
                     <ActionCell className="sticky right-0 bg-canvas group-hover:bg-canvas-sunken">
                       {/* 行を押すと詳細へ行くので、行の中の操作は行へ伝えない。 */}
-                      <span className="inline-flex" onClick={(event) => event.stopPropagation()}>
+                      {/* m20i: 操作列が固定幅で余るぶんは右へ寄せ、「…」を枠の端に置く。 */}
+                      <span className="inline-flex w-full justify-end" onClick={(event) => event.stopPropagation()}>
                         <RowActions
                           subjectName={broadcast.title}
                           detail={{ href: `/broadcasts/detail?id=${encodeURIComponent(broadcast.id)}` }}
