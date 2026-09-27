@@ -1138,6 +1138,48 @@ const spec = {
         responses: { '200': { description: 'Orders attributed to the ref code with status summary' }, '403': { description: 'LINEアカウントの表示権限なし' } },
       },
     },
+    // ── 広告費 (#818) ────────────────────────────────────────────────────
+    '/api/ad-costs': {
+      get: {
+        tags: ['Ads'], summary: '流入元ごとの広告費と取込状況（期間指定は日付。手入力分は source=manual）',
+        parameters: [
+          { name: 'accountId', in: 'query', schema: { type: 'string' } },
+          { name: 'from', in: 'query', schema: { type: 'string', example: '2026-09-01' } },
+          { name: 'to', in: 'query', schema: { type: 'string', example: '2026-09-30' } },
+        ],
+        responses: { '200': { description: 'Cost rows with per-platform import status' }, '400': { description: 'accountId・期間の指定が無い' } },
+      },
+      post: {
+        tags: ['Ads'], summary: '広告費の手入力（同じ流入元・同じ日は上書き）',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['sourceLabel', 'day', 'amountMinor'],
+                properties: {
+                  lineAccountId: { type: 'string' },
+                  sourceLabel: { type: 'string', maxLength: 100 },
+                  entryRouteId: { type: 'string' },
+                  day: { type: 'string', example: '2026-09-25' },
+                  amountMinor: { type: 'integer', minimum: 0, description: '最小通貨単位（JPYなら円）' },
+                  currency: { type: 'string', default: 'JPY' },
+                },
+              },
+            },
+          },
+        },
+        responses: { '201': { description: 'Recorded' }, '400': { description: 'Validation error' }, '404': { description: 'LINEアカウント・流入元が見つからない' } },
+      },
+    },
+    '/api/ad-platforms/{id}/cost-import': {
+      post: {
+        tags: ['Ads'], summary: 'その連携の前日分の広告費をいま取り込む（媒体側の未確定分は取り直せる）',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Imported (or skipped when already fetched)' }, '404': { description: 'Not found' }, '502': { description: '媒体から取り込めなかった' } },
+      },
+    },
     // ── Friends ─────────────────────────────────────────────────────────────
     '/api/friends': {
       get: {
