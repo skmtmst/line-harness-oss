@@ -40,3 +40,18 @@ export function toJstString(date: Date): string {
 export function isTimeBefore(a: string, b: string): boolean {
   return new Date(a).getTime() <= new Date(b).getTime();
 }
+
+/**
+ * JSTの暦日（YYYY-MM-DD）。DBへ入る時刻はJST文字列（`jstNow`）なので、
+ * 頭10文字と突き合わせて期間を切る。SQLiteの `date('now')` はUTCで
+ * 9時間ずれるため、「今日」の境目の集計には使わない。
+ */
+export function jstDateString(offsetDays = 0, nowMs = Date.now()): string {
+  const jst = new Date(nowMs + JST_OFFSET_MS + offsetDays * 86_400_000);
+  return jst.toISOString().slice(0, 10);
+}
+
+/** 暦日の翌日（YYYY-MM-DD）。`col >= day AND col < next` の半開区間に使う。 */
+export function nextDateString(day: string): string {
+  return new Date(Date.parse(`${day}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
+}

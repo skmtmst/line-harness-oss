@@ -236,6 +236,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/line-notifications/operator-rules',
   'GET /api/line-notifications/operator-rules/{id}',
   'GET /api/line-notifications/quota',
+  'GET /api/line-notifications/send-counts',
   'GET /api/media/{id}',
   'GET /api/media/{id}/content',
   'GET /api/media/{id}/download',
