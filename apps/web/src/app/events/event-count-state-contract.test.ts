@@ -28,7 +28,7 @@ describe('V6 イベント予約の件数状態', () => {
     expect(PAGE).toContain("title=\"あと少しで満席\"")
     expect(PAGE).toContain('声をかけると埋まります')
     expect(PAGE).toContain("title=\"申し込みが少ない\"")
-    expect(PAGE).toContain('daysUntilEvent(nearestLow)')
+    expect(PAGE).toContain('daysUntilIso(kpi.nearest_low_starts_at)')
     expect(PAGE).not.toContain('title="定員の充足"')
   })
 
