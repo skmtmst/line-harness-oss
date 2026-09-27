@@ -32,6 +32,7 @@ const dbMocks = vi.hoisted(() => ({
   listConversionReversals: vi.fn(),
   isConversionEventReversed: vi.fn(),
   appendConversionReversal: vi.fn(),
+  isExclusionSavable: vi.fn(() => true),
 }));
 const contractMocks = vi.hoisted(() => ({
   ConversionDefinitionError: class ConversionDefinitionError extends Error {
@@ -286,6 +287,22 @@ describe('conversion definition V6 routes', () => {
 
     accountMocks.canAccessAllLineAccounts.mockResolvedValueOnce(false);
     expect((await app().request('/api/conversions/definitions/preview', json({ ...body, lineAccountId: 'account-b' }))).status).toBe(404);
+  });
+
+  it('R40: 数えない条件が壊れている作成・試算は400で、保存も試算も実行しない', async () => {
+    const body = {
+      name: '壊れた条件', sourceType: 'ec_order_confirmed',
+      sourceConfig: { exclusion: { operator: 'AND' } }, lineAccountId: 'account-a',
+      deduplicationMode: 'once_per_friend', valueMode: 'source', reversalPolicy: 'manual',
+      usages: [],
+    };
+    dbMocks.isExclusionSavable.mockReturnValueOnce(false);
+    expect((await app().request('/api/conversions/definitions', json(body))).status).toBe(400);
+    expect(dbMocks.createConversionDefinition).not.toHaveBeenCalled();
+
+    dbMocks.isExclusionSavable.mockReturnValueOnce(false);
+    expect((await app().request('/api/conversions/definitions/preview', json(body))).status).toBe(400);
+    expect(dbMocks.previewConversionDefinition).not.toHaveBeenCalled();
   });
 
   it('削除影響、停止、差し替え、未使用削除を版付きで呼ぶ', async () => {

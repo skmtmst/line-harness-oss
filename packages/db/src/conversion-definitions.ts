@@ -1,6 +1,7 @@
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { jstNow } from './utils.js';
 import { resolveConversionPointTenantId } from './conversions.js';
+import { exclusionWhere, readConversionExclusion } from './conversion-exclusions.js';
 import { encryptWebhookSecret, resolveWebhookSecret, type WebhookKeyInput } from './webhooks.js';
 
 export type ConversionDefinitionStatus = 'active' | 'stopped' | 'draft';
@@ -895,18 +896,53 @@ export async function previewConversionDefinition(
   }
   conditions.push(account.sql);
   values.push(...account.values);
+  /*
+   * R40: 「数えない条件」は試算の過去集計にも効かせる。友だちの条件は
+   * friends を `f` で繋いで評価する(segment 条件の組み立てと同じ別名)。
+   * 壊れた条件は全件のままにし、理由だけ返す(記録側と同じ倒し方)。
+   */
+  const exclusion = readConversionExclusion(input.sourceConfig ?? null);
+  const exclusionSql = exclusion.condition ? exclusionWhere(exclusion.condition) : null;
+  const baseWhere = conditions.join(' AND ');
+  const baseValues = [...values];
+  if (exclusionSql) {
+    conditions.push(exclusionSql.sql);
+    values.push(...exclusionSql.bindings);
+  }
+  const joinFriends = exclusionSql ? 'JOIN friends f ON f.id = ce.friend_id' : '';
   const where = conditions.join(' AND ');
 
   const row = await db.prepare(`SELECT COUNT(ce.id) AS matched_count,
       COUNT(DISTINCT ce.friend_id) AS unique_friends,
-      COALESCE(SUM(COALESCE(ce.value_snapshot, 0)), 0) AS source_value
+      COALESCE(SUM(COALESCE(ce.value_snapshot, 0)), 0) AS source_value,
+      COUNT(ce.value_snapshot) AS valued_count
     FROM conversion_events ce
     JOIN conversion_points cp ON cp.id = ce.conversion_point_id
+    ${joinFriends}
     WHERE ${where}`)
     .bind(...values)
-    .first<{ matched_count: number; unique_friends: number; source_value: number }>();
+    .first<{ matched_count: number; unique_friends: number; source_value: number; valued_count: number }>();
   const matchedCount = Number(row?.matched_count ?? 0);
   const uniqueFriends = Number(row?.unique_friends ?? 0);
+  // R42: 金額の平均は金額のある成果だけで割る。金額なしの行を分母に
+  // 入れると、注文金額を使う設定の試算が小さく見える。
+  const valuedCount = Number(row?.valued_count ?? 0);
+  const missingValueCount = Math.max(0, matchedCount - valuedCount);
+
+  // R40: 除外で除いた過去の件数。試算の数字から消えている分を見せる。
+  let excludedPastCount = 0;
+  if (exclusionSql && exclusion.condition) {
+    const positive = exclusionWhere(exclusion.condition, { negate: false });
+    const excludedRow = await db.prepare(`SELECT COUNT(ce.id) AS excluded_count
+      FROM conversion_events ce
+      JOIN conversion_points cp ON cp.id = ce.conversion_point_id
+      JOIN friends f ON f.id = ce.friend_id
+      WHERE ${baseWhere}
+        AND ${positive.sql}`)
+      .bind(...baseValues, ...positive.bindings)
+      .first<{ excluded_count: number }>();
+    excludedPastCount = Number(excludedRow?.excluded_count ?? 0);
+  }
 
   let estimatedCount: number;
   if (input.deduplicationMode === 'every') {
@@ -918,6 +954,7 @@ export async function previewConversionDefinition(
     const rows = await db.prepare(`SELECT ce.friend_id, ce.created_at
       FROM conversion_events ce
       JOIN conversion_points cp ON cp.id = ce.conversion_point_id
+      ${joinFriends}
       WHERE ${where}
       ORDER BY ce.friend_id ASC, ce.created_at ASC, ce.id ASC`)
       .bind(...values)
@@ -941,14 +978,25 @@ export async function previewConversionDefinition(
 
   const excludedReasons: string[] = [];
   if (matchedCount === 0) excludedReasons.push('選んだ起点の過去データがありません');
-  // 除外条件は人が読む注記で、記録条件ではない。過去データへ適用できない
-  // ことを隠さず画面へ返す(入力したのに試算へ反映されないと見えない)。
-  if (typeof input.sourceConfig?.excludedCondition === 'string'
-    && input.sourceConfig.excludedCondition.trim()) {
-    excludedReasons.push('「数えない条件」は保存後の記録に効く注記のため、試算では全件を対象にしています');
+  // R40: 数えない条件は試算にも効く。効き方を隠さず画面へ返す。
+  if (exclusion.invalid) {
+    excludedReasons.push('「数えない条件」が読み取れないため、試算では全件を対象にしています');
+  } else if (exclusion.condition) {
+    if (excludedPastCount > 0) {
+      excludedReasons.push(`「数えない条件」に当てはまる過去の成果${excludedPastCount}件を除いています`);
+    } else if (matchedCount > 0) {
+      excludedReasons.push('「数えない条件」に当てはまる過去の成果はありませんでした');
+    }
+  } else if (exclusion.legacyMemoMigrated) {
+    excludedReasons.push('以前の「数えない条件」のメモは記録に影響しません。条件として効かせるには選び直してください');
+  }
+  // R42: 金額なしの成果があるときは、試算の金額が金額のある成果だけの
+  // 平均であることを隠さない。
+  if (missingValueCount > 0 && input.valueMode === 'source') {
+    excludedReasons.push(`金額のない過去の成果${missingValueCount}件は金額の試算に入っていません`);
   }
 
-  const sourceAverage = matchedCount > 0 ? Number(row?.source_value ?? 0) / matchedCount : 0;
+  const sourceAverage = valuedCount > 0 ? Number(row?.source_value ?? 0) / valuedCount : 0;
   const unitValue = input.valueMode === 'fixed'
     ? Number(input.fixedValue ?? 0)
     : input.valueMode === 'source' ? sourceAverage : 0;
@@ -960,6 +1008,7 @@ export async function previewConversionDefinition(
     duplicateExcludedCount: Math.max(0, matchedCount - estimatedCount),
     cancellationCount,
     excludedReasons,
+    missingValueCount,
     dailyAverage: Math.round((estimatedCount / 30) * 10) / 10,
     deduplicationWindowDays: input.deduplicationMode === 'window'
       ? input.deduplicationWindowDays ?? null : null,

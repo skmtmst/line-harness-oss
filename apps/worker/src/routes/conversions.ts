@@ -43,6 +43,7 @@ import {
   listConversionReversals,
   ConversionDefinitionError,
   CONVERSION_DEFINITION_USAGE_KINDS,
+  isExclusionSavable,
 } from '@line-crm/db';
 import { IDENTITY_KEY_SQL } from '../lib/identity-key.js';
 import { notifyAffiliateApproval } from '../services/affiliate-notifier.js';
@@ -272,7 +273,10 @@ function readDefinitionInput(body: Record<string, unknown>, options: { requireAc
     || (deduplicationMode === 'window' && (!Number.isInteger(windowDays) || windowDays! < 1 || windowDays! > 365))
     || (valueMode === 'fixed' && (fixedValue === null || !Number.isFinite(fixedValue) || fixedValue < 0))
     || (attributionDays !== null && (!Number.isInteger(attributionDays) || attributionDays < 1 || attributionDays > 365))
-    || (sourceType === 'url_reach' && (!targetUrl || !/^https?:\/\//.test(targetUrl)))) {
+    || (sourceType === 'url_reach' && (!targetUrl || !/^https?:\/\//.test(targetUrl)))
+    // R40: 壊れた数えない条件は保存させない。記録も試算も止まるか
+    // 全件数えるかに倒れてしまうため、入口で断つ。
+    || !isExclusionSavable(sourceConfig)) {
     return null;
   }
   return {
@@ -1017,6 +1021,15 @@ conversions.post('/api/conversions/ingest/:id', async (c) => {
         });
         return c.json({ success: false, error: 'Friend not found or out of scope' }, 422);
       }
+      // R40: 数えない条件に当てはまる受信は、失敗ではなく対象外として残す。
+      if (message === 'conversion_excluded') {
+        await log({
+          result: 'rejected', reason: 'excluded_by_condition',
+          sourceEventId: sourceEventId.trim().slice(0, 200),
+          friendId: resolvedFriendId, payloadShape, signatureSha256: signatureHash,
+        });
+        return c.json({ success: false, error: 'Excluded by the conversion point exclusion condition' }, 422);
+      }
       throw trackError;
     }
   } catch (error) {
@@ -1388,6 +1401,10 @@ conversions.post('/api/conversions/track', requireRole('owner', 'admin'), async 
     }
     if (err instanceof Error && err.message === 'conversion_friend_not_found') {
       return c.json({ success: false, error: 'このコンバージョンを記録する権限がありません' }, 403);
+    }
+    // R40: 数えない条件に当てはまる人は記録しない。失敗ではなく対象外。
+    if (err instanceof Error && err.message === 'conversion_excluded') {
+      return c.json({ success: false, error: '「数えない条件」に当てはまるため記録できません' }, 422);
     }
     console.error('POST /api/conversions/track error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);

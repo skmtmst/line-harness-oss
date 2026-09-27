@@ -62,7 +62,20 @@ const dbMocks = {
   maskAuditIp: vi.fn(() => null),
   auditDeviceFamily: vi.fn(() => 'unknown'),
 };
-vi.mock('@line-crm/db', () => dbMocks);
+vi.mock('@line-crm/db', async (importOriginal) => {
+  // segment-conditions は純粋関数。実体は packages/db にあり、
+  // services/segment-query.js から再公開される。ここで潰すと条件の
+  // 検証・評価が undefined になるため、5つだけ実物を使う。
+  const real = await importOriginal<typeof import('@line-crm/db')>();
+  return {
+    buildPublicSegmentQuery: real.buildPublicSegmentQuery,
+    buildSegmentQuery: real.buildSegmentQuery,
+    buildSegmentWhere: real.buildSegmentWhere,
+    matchesCondition: real.matchesCondition,
+    parseCondition: real.parseCondition,
+    ...dbMocks,
+  };
+});
 
 const accountAccessMocks = {
   canAccessAllLineAccounts: vi.fn(),
