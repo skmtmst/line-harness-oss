@@ -1,8 +1,15 @@
+import {
+  findRewardedAdoptedDuplicate,
+  getEffectivePhotoRewardPolicy,
+} from './photo-reward-policies.js';
+
 export type PhotoOperationSubject = {
   id: string;
   lineAccountId: string;
   originalObjectKey: string;
   contentType: string;
+  /** 中身の hash。古い投稿は null。null 同士を重複としない。 */
+  contentHash: string | null;
   reviewImageUrl: string | null;
   publicImageUrl: string | null;
   status: string;
@@ -18,6 +25,7 @@ type PhotoSubjectRow = {
   line_account_id: string;
   r2_key: string;
   content_type: string;
+  content_hash: string | null;
   review_image_url: string | null;
   public_image_url: string | null;
   status: string;
@@ -38,6 +46,7 @@ function mapSubject(row: PhotoSubjectRow): PhotoOperationSubject {
     publicImageUrl: row.public_image_url,
     status: row.status,
     reviewVersion: Number(row.review_version),
+    contentHash: row.content_hash ?? null,
     friendId: row.friend_id,
     customerId: row.customer_id,
     latestRiskFlag: row.latest_risk_flag,
@@ -50,7 +59,7 @@ export async function getPhotoOperationSubject(
   input: { photoId: string; lineAccountId: string },
 ): Promise<PhotoOperationSubject | null> {
   const row = await db.prepare(
-    `SELECT ps.id, ps.line_account_id, ps.r2_key, ps.content_type, ps.friend_id,
+    `SELECT ps.id, ps.line_account_id, ps.r2_key, ps.content_type, ps.content_hash, ps.friend_id,
             ps.review_image_url, ps.public_image_url, ps.status, ps.review_version,
             member.customer_id,
             (SELECT r.flag FROM nen_photo_risk_assessments r
@@ -334,6 +343,19 @@ export async function applyBulkPhotoDecisions(
     if (mismatchIndex >= 0) return { kind: 'not_found', photoId: input.decisions[mismatchIndex].photoId };
   }
   const now = input.now ?? new Date().toISOString();
+  // 採用する時点の報酬の決まりを写す。版を変えても過去の付与は変わらない。
+  const policy = await getEffectivePhotoRewardPolicy(db, now);
+  // 同じ写真が2回採用されても、報酬は1回だけ。報酬つきで採用済みの
+  // 重複がある写真は、点数を付けずに採用する。
+  const duplicateFlags = await Promise.all(input.decisions.map((decision, index) => (
+    decision.decision === 'approve'
+      ? findRewardedAdoptedDuplicate(db, {
+        contentHash: subjects[index]?.contentHash ?? null,
+        lineAccountId: input.lineAccountId,
+        excludePhotoId: decision.photoId,
+      })
+      : Promise.resolve(null)
+  )));
   const eventIds = input.decisions.map(() => crypto.randomUUID());
   const result: BulkPhotoDecisionResult = {
     updatedCount: input.decisions.length,
@@ -350,6 +372,8 @@ export async function applyBulkPhotoDecisions(
     const subject = subjects[index]!;
     const status = decision.decision === 'approve' ? 'adopted' : 'rejected';
     const eventId = eventIds[index];
+    // 重複の二重報酬を止める。報酬つきで採用済みなら点数は付けない。
+    const awarded = decision.decision === 'approve' && !duplicateFlags[index] ? policy.points : 0;
     statements.push(db.prepare(
       `INSERT INTO nen_photo_review_events
         (id, photo_id, line_account_id, from_status, to_status, reason_code, reason_note,
@@ -358,7 +382,7 @@ export async function applyBulkPhotoDecisions(
          FROM nen_photo_submissions
         WHERE id = ? AND line_account_id = ? AND status = 'pending' AND review_version = ?`,
     ).bind(eventId, status, decision.reasonCode, decision.reasonNote,
-      decision.decision === 'approve' ? 5 : 0, input.actorId, input.actorName,
+      awarded, input.actorId, input.actorName,
       now, now, decision.photoId, input.lineAccountId, decision.expectedVersion));
     statements.push(db.prepare(
       `UPDATE nen_photo_submissions
@@ -366,16 +390,16 @@ export async function applyBulkPhotoDecisions(
               reviewed_by = ?, reviewed_by_name = ?, review_notification_status = 'pending',
               reviewed_at = ?, review_version = review_version + 1, updated_at = ?
         WHERE id = ? AND line_account_id = ? AND status = 'pending' AND review_version = ?`,
-    ).bind(status, decision.decision === 'approve' ? 5 : 0, decision.reasonCode, decision.reasonNote,
+    ).bind(status, awarded, decision.reasonCode, decision.reasonNote,
       input.actorId, input.actorName, now, now, decision.photoId, input.lineAccountId, decision.expectedVersion));
-    if (decision.decision === 'approve' && subject.customerId) {
+    if (decision.decision === 'approve' && awarded > 0 && subject.customerId) {
       statements.push(db.prepare(
         `INSERT INTO nen_photo_reward_outbox
           (id, photo_id, line_account_id, friend_id, customer_id, provider_award_key,
            policy_version, points, status, next_attempt_at, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, 'legacy-5', 5, 'pending', ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)`,
       ).bind(crypto.randomUUID(), decision.photoId, input.lineAccountId, subject.friendId,
-        subject.customerId, `nen-photo:${decision.photoId}`, now, now, now));
+        subject.customerId, `nen-photo:${decision.photoId}`, policy.policyKey, awarded, now, now, now));
     }
   }
   statements.push(db.prepare(

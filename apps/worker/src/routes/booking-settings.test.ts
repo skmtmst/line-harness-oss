@@ -1014,9 +1014,21 @@ describe('LIFF 日時表示の最初の形 (liff_date_view)', () => {
   });
 
   test('LIFF の空き枠口は休みの日を closed_dates で返す', async () => {
+    // R92: 店舗の受付期間（60日）の内側の日で確かめる。期間の外は
+    // 休み印の対象外（枠自体が出ない）になる。
+    const jst = (offsetDays: number) =>
+      new Date(Date.now() + offsetDays * 86_400_000 + 9 * 3_600_000).toISOString().slice(0, 10);
+    const target = jst(10);
+    sqlite.exec(`
+      INSERT INTO booking_availability_exceptions
+        (id, line_account_id, scope_kind, date_from, date_to, kind, hours_json, reason)
+      VALUES
+        ('exception-test-closed', 'account-a', 'store', '${target}', '${target}',
+         'closed', '[]', '試験休業');
+    `);
     const { app, env } = makeApp(db);
     const res = await app.request(
-      '/api/liff/booking/availability?liffId=liff-a&menu_id=menu-a&staff_id=staff-a&from=2026-12-29&to=2026-12-31',
+      `/api/liff/booking/availability?liffId=liff-a&menu_id=menu-a&staff_id=staff-a&from=${jst(9)}&to=${jst(11)}`,
       {},
       env,
     );
@@ -1024,7 +1036,7 @@ describe('LIFF 日時表示の最初の形 (liff_date_view)', () => {
     const body = (await res.json()) as { by_staff: unknown[]; closed_dates: string[] };
     expect(Array.isArray(body.closed_dates)).toBe(true);
     // 店舗の休業日（例外日）は休み。枠の有無の判定自体は変えない。
-    expect(body.closed_dates).toContain('2026-12-30');
+    expect(body.closed_dates).toContain(target);
     expect(body.by_staff.length).toBeGreaterThan(0);
   });
 

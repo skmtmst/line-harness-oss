@@ -61,7 +61,7 @@ function ruleFixture() {
     draftVersion: 7,
     draftUpdatedAt: '2026-09-10T01:00:00.000Z',
     publishedVersion: 1,
-    metrics30d: { eligible: 10, granted: 8, excluded: 2 },
+    metrics30d: { eligible: 10, granted: 8, grantedMiles: 800, excluded: 2 },
   }
 }
 

@@ -164,6 +164,10 @@ interface StubData {
   }>;
   exceptions?: StubException[];
   timezone?: string | null;
+  store?: {
+    booking_window_days?: number | null;
+    cutoff_minutes_before?: number | null;
+  };
   calendarConnection?: {
     id: string;
     calendar_id: string;
@@ -182,7 +186,13 @@ function stubDB(data: StubData, seen?: Array<{ sql: string; args: unknown[] }>):
         },
         async first() {
           if (sql.includes('FROM booking_settings')) {
-            return data.timezone === undefined ? null : { timezone: data.timezone };
+            if (data.timezone === undefined && data.store === undefined) return null;
+            return {
+              timezone: data.timezone ?? null,
+              business_hours_configured: 0,
+              booking_window_days: data.store?.booking_window_days ?? null,
+              cutoff_minutes_before: data.store?.cutoff_minutes_before ?? null,
+            };
           }
           if (sql.includes('FROM menus')) return data.menu ?? null;
           if (sql.includes('FROM google_calendar_connections')) return data.calendarConnection ?? null;
@@ -1477,5 +1487,85 @@ describe('getAvailability の夏時間切替日（New York）', () => {
     });
     const dates = new Set(result.by_staff[0].slots.map((s) => s.date));
     expect(dates).toEqual(new Set(['2026-03-08']));
+  });
+});
+
+describe('getAvailability の店舗共通ルール（監査 R92）', () => {
+  const R92_MENU = {
+    duration_minutes: 60,
+    buffer_after_minutes: 0,
+    override_duration: null,
+    override_price: null,
+  };
+  // 監査の再現: 店舗ルールは24時間前・60日先まで。2026-09-27 の 18:30 JST
+  // （09:30Z）に翌 9/28 09:00 を見ると、店舗締切では取れない。
+  function r92db(over: Partial<StubData> = {}) {
+    return stubDB({
+      menu: { ...R92_MENU },
+      staff: STAFF_S1,
+      shifts: [{ staff_id: 'S1', work_date: '2026-09-28', start_time: '09:00', end_time: '12:00' }],
+      bookings: [],
+      store: { booking_window_days: 60, cutoff_minutes_before: 1440 },
+      ...over,
+    });
+  }
+
+  test('顧客向けは店舗の締切で翌朝の枠が塞がる', async () => {
+    const result = await getAvailability(r92db(), {
+      lineAccountId: 'A1',
+      menuId: 'M1',
+      from: '2026-09-28',
+      to: '2026-09-28',
+      now: new Date('2026-09-27T09:30:00Z'),
+      minLeadTimeMinutes: 60,
+      applyStoreRules: true,
+    });
+    expect(result.by_staff[0].slots).toEqual([]);
+  });
+
+  test('運用者向けは店舗の締切を適用しない（当日の電話予約を塞がない）', async () => {
+    const result = await getAvailability(r92db(), {
+      lineAccountId: 'A1',
+      menuId: 'M1',
+      from: '2026-09-28',
+      to: '2026-09-28',
+      now: new Date('2026-09-27T09:30:00Z'),
+      minLeadTimeMinutes: 0,
+    });
+    expect(result.by_staff[0].slots.map((s) => s.start)).toContain('09:00');
+  });
+
+  test('顧客向けは店舗の受付期間で61日先が塞がる', async () => {
+    const db = stubDB({
+      menu: { ...R92_MENU },
+      staff: STAFF_S1,
+      shifts: [{ staff_id: 'S1', work_date: '2026-11-27', start_time: '09:00', end_time: '12:00' }],
+      bookings: [],
+      store: { booking_window_days: 60, cutoff_minutes_before: 1440 },
+    });
+    const result = await getAvailability(db, {
+      lineAccountId: 'A1',
+      menuId: 'M1',
+      from: '2026-11-27',
+      to: '2026-11-27',
+      now: new Date('2026-09-27T09:30:00Z'),
+      minLeadTimeMinutes: 60,
+      applyStoreRules: true,
+    });
+    expect(result.by_staff[0].slots).toEqual([]);
+  });
+
+  test('メニューの個別指定は店舗より優先される', async () => {
+    const db = r92db({ menu: { ...R92_MENU, cutoff_hours_before: 0 } });
+    const result = await getAvailability(db, {
+      lineAccountId: 'A1',
+      menuId: 'M1',
+      from: '2026-09-28',
+      to: '2026-09-28',
+      now: new Date('2026-09-27T09:30:00Z'),
+      minLeadTimeMinutes: 60,
+      applyStoreRules: true,
+    });
+    expect(result.by_staff[0].slots.map((s) => s.start)).toContain('09:00');
   });
 });

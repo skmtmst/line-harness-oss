@@ -149,6 +149,7 @@ function StatusPanel({ friendId, busy, run }: { friendId: string; busy: boolean;
   const [status, setStatus] = useState<Chat['status']>('resolved')
   return (
     <Row>
+      {/* R117: 読み上げで何を変える欄か分かるよう、共通Selectでも固有の名前を付ける。 */}
       <Select
         aria-label="対応状況"
         value={status}
@@ -290,12 +291,14 @@ function FieldPanel({ friendId, busy, run }: { friendId: string; busy: boolean; 
   return (
     <Row>
       <input
+        aria-label="項目名"
         value={key}
         onChange={(e) => setKey(e.target.value)}
         placeholder="項目名"
         className={SELECT}
       />
       <input
+        aria-label="値"
         value={value}
         onChange={(e) => setValue(e.target.value)}
         placeholder="値"
