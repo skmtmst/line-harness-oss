@@ -392,13 +392,13 @@ export default function TriggerEditor({
         {/*
           開始回数（U006）。以前は「初回のみ開始／条件を満たすたびに開始」の
           選択カードに見えたが、入力も変更処理も無かった。実際の仕様は固定で、
-          配信中・一時停止中は重ねて登録せず、読み終えた人は条件を満たすと
+          稼働中・停止中は重ねて登録せず、読み終えた人は条件を満たすと
           もう一度始まる。選べないものを選択肢に見せないため、仕様の説明にする。
         */}
         <div className="border-hairline rounded-card mt-4 border p-4">
           <p className="text-ink text-sm font-bold">同じ友だちの開始回数</p>
           <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
-            同じシナリオへ同時に入れるのは1人1つまでです。配信中・一時停止中の人には重ねて開始しません。
+            同じシナリオへ同時に入れるのは1人1つまでです。稼働中・停止中の人には重ねて開始しません。
             最後まで読み終えた人が条件を満たすと、もう一度最初から始まります。
           </p>
         </div>
@@ -447,7 +447,7 @@ export default function TriggerEditor({
               </dd>
             </div>
             <div>
-              <dt className="text-ink-faint text-xs">新規開始予定</dt>
+              <dt className="text-ink-faint text-xs">予約中</dt>
               <dd className="text-success mt-0.5 text-xl font-bold tabular-nums">
                 {match.kind === 'ready'
                   ? `${match.newStartPlanned.toLocaleString('ja-JP')}人`
@@ -475,7 +475,7 @@ export default function TriggerEditor({
               : ' 試算では配信も購読も始まりません。'}
           </p>
         </div>
-        <Notice tone="warn" className="mt-4">保存後も配信は始まりません。テスト送信と開始確認を完了してから有効化します。</Notice>
+        <Notice tone="warn" className="mt-4">保存後も配信は始まりません。テスト送信と開始確認を完了してから稼働させます。</Notice>
       </div>
     </Dialog>
   )

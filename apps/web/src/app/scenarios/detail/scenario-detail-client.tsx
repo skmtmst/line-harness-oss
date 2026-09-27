@@ -53,6 +53,7 @@ import BulkPreviewModal from '@/components/scenarios/bulk-preview-modal'
 import ActionMenu from '@/components/shared/action-menu'
 import { MoreAction } from '@/components/shared/row-actions'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import StatusChip from '@/components/shared/status-chip'
 import Notice from '@/components/shared/notice'
 import { Th } from '@/components/shared/table'
 import Select from '@/components/shared/select'
@@ -1789,9 +1790,9 @@ export default function ScenarioDetailClient({
           <p className="font-semibold">
             配信を開始しました。
             {simulationRefreshing
-              ? '開始予定の人数を計算しています…'
+              ? '予約中の人数を計算しています…'
               : simulation
-                ? `新規開始予定${simulation.audience.newStartPlanned.toLocaleString('ja-JP')}人へ、条件を満たした時点から順に配信します。`
+                ? `予約中${simulation.audience.newStartPlanned.toLocaleString('ja-JP')}人へ、条件を満たした時点から順に配信します。`
                 : '条件を満たした友だちから順に配信します。'}
           </p>
           <Link href={`/scenarios/results?id=${encodeURIComponent(id)}`} className="font-semibold underline underline-offset-2">
@@ -1901,7 +1902,7 @@ export default function ScenarioDetailClient({
                 onChange={(e) => setEditForm({ ...editForm, isActive: e.target.checked })}
                 className="h-4 w-4 rounded border-hairline text-accent-deep focus:ring-accent"
               />
-              <label htmlFor="editIsActive" className="text-sm text-ink-secondary">有効</label>
+              <label htmlFor="editIsActive" className="text-sm text-ink-secondary">稼働する</label>
             </div>
             <div className="border-hairline rounded-card border p-3">
               <label className="flex cursor-pointer items-start gap-2">
@@ -1970,9 +1971,12 @@ export default function ScenarioDetailClient({
               </SettingCard>
 
               <SettingCard label="状態" action={showStarted ? '停止・変更' : '変更'} onAction={() => setEditing(true)}>
-                <p className={`text-sm font-bold ${showStarted || scenario.isActive ? 'text-success' : 'text-warning'}`}>
-                  {showStarted ? '配信中' : scenario.isActive ? '配信可' : '一時停止中'}
-                </p>
+                {/* 状態の札は共通の StatusChip（設計 B）。動いているものはどれも稼働中。 */}
+                <StatusChip
+                  status={showStarted || scenario.isActive ? 'running' : 'paused'}
+                  size="default"
+                  withHelp
+                />
                 <p className="text-ink-faint mt-0.5 text-xs">
                   {showStarted
                     ? latestStartedLabel
@@ -2032,9 +2036,9 @@ export default function ScenarioDetailClient({
                       古い人数を確定値として出さず「計算しています」と出す。
                     */}
                     {simulationRefreshing
-                      ? '新規開始予定を計算しています…'
+                      ? '予約中の人数を計算しています…'
                       : simulation
-                        ? `新規開始予定 ${simulation.audience.newStartPlanned.toLocaleString('ja-JP')}人`
+                        ? `予約中 ${simulation.audience.newStartPlanned.toLocaleString('ja-JP')}人`
                         : triggerCount === 0
                           ? 'アクションなどから開始できます'
                           : '押すと足せます'}

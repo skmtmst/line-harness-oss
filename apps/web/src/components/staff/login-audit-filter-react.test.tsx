@@ -31,6 +31,7 @@ const summary = {
   changed: 0,
   logins: 3,
   suspiciousLogins: 2,
+  attention: 2,
 }
 
 let host: HTMLDivElement
@@ -72,9 +73,10 @@ describe('login audit attention filter', () => {
     await act(async () => { attention?.click() })
     await settle()
 
+    // 監査 R69: 「気になるもの」は集計と同じ分類 group=attention で絞る。
     expect(fixture.events).toHaveBeenLastCalledWith(expect.objectContaining({
       lineAccountId: 'account-a',
-      attention: true,
+      group: 'attention',
       limit: 20,
       offset: 0,
     }))

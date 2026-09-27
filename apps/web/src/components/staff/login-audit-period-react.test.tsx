@@ -41,11 +41,12 @@ type Summary = {
   changed: number
   logins: number
   suspiciousLogins: number
+  attention: number
 }
 
 function summary(overrides: Partial<Summary> = {}): Summary {
   return {
-    periodDays: 30, total: 3, deleted: 0, sent: 0, changed: 0, logins: 3, suspiciousLogins: 0,
+    periodDays: 30, total: 3, deleted: 0, sent: 0, changed: 0, logins: 3, suspiciousLogins: 0, attention: 0,
     ...overrides,
   }
 }

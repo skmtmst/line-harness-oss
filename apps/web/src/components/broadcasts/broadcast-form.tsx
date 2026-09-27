@@ -1565,11 +1565,23 @@ export default function BroadcastForm({
   })
   const stepOrder: BroadcastStepKey[] = ['basic', 'audience', 'message', 'schedule', 'confirm']
   const currentStepIndex = currentStep ? stepOrder.indexOf(currentStep) : -1
+  /*
+   * 設計 C：いまいる所（URL の ?step=）と入力済みを分ける。
+   * 以前は居場所より前の段を全部 done にしていたので、「次へ」で進んでも
+   * 空の段に ✓ が付いた。state は入力済みかだけを表し、居場所は currentKey で渡す。
+   * 確認の段にいるとき、まだ埋まっていない段は直すところ（△）として出す。
+   */
   const steps = currentStep
-    ? progressSteps.map((step, index) => ({
-        ...step,
-        state: index < currentStepIndex ? 'done' as const : index === currentStepIndex ? 'current' as const : 'todo' as const,
-      }))
+    ? progressSteps.map((step) => {
+        const filled = step.state === 'done'
+        const needsFix = !filled && currentStep === 'confirm'
+        return {
+          ...step,
+          state: (needsFix ? 'attention' : filled ? 'done' : 'todo') as 'done' | 'todo' | 'attention',
+          // 段ごとの画面にいるときは、済み・要修正の段を押すとその段へ移る。
+          onSelect: (filled || needsFix) && onStepChange ? () => goToStep(step.key) : undefined,
+        }
+      })
     : progressSteps
   const shows = (step: BroadcastStepKey) => currentStep === null || currentStep === step
   const goToStep = (step: BroadcastStepKey) => onStepChange?.(step)
@@ -1670,7 +1682,7 @@ export default function BroadcastForm({
         </button>
       </div>
     )}
-    <BroadcastStepRail steps={steps} />
+    <BroadcastStepRail steps={steps} currentKey={currentStep ?? undefined} />
     {editingDraft ? (
       <p className="border-hairline bg-canvas-sunken text-ink-secondary mt-3 rounded-card border px-4 py-2 text-xs">
         保存済みの下書き「{editingDraft.title}」を開いています。保存すると、この下書きへ上書きします。
