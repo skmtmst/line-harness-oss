@@ -41,6 +41,11 @@ export interface HandoverRow {
   moved_count: number;
   failed_count: number;
   failure_reason: string | null;
+  /** 移し元システム側の申告件数（運用者入力）。事前確認と違うままでは本実行しない。 */
+  declared_friend_total?: number | null;
+  rolled_back_at?: string | null;
+  rolled_back_by?: string | null;
+  rollback_note?: string | null;
   created_by: string | null;
   created_at: string;
   linked_at: string | null;
@@ -124,7 +129,8 @@ export async function issueHandoverCode(
 
   const id = crypto.randomUUID();
   const now = jstNow();
-  const expires = new Date(Date.now() + (input.ttlMinutes ?? 60) * 60_000).toISOString();
+  // 引き継ぎコードは既定72時間・1回だけ（X の確定値）。
+  const expires = new Date(Date.now() + (input.ttlMinutes ?? 72 * 60) * 60_000).toISOString();
   await db
     .prepare(
       `INSERT INTO account_handovers (id, from_account_id, code, code_expires_at, created_by, created_at)
@@ -181,7 +187,7 @@ export async function linkHandover(
 export async function savePreview(
   db: D1Database,
   id: string,
-  input: { sourceFriendTotal: number; counts: MatchCounts },
+  input: { sourceFriendTotal: number; counts: MatchCounts; declaredFriendTotal?: number | null },
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!countsAddUp(input.counts, input.sourceFriendTotal)) {
     return { ok: false, error: '区分の合計が元の友だち数と合いません' };
@@ -190,7 +196,7 @@ export async function savePreview(
     .prepare(
       `UPDATE account_handovers
           SET source_friend_total = ?, auto_count = ?, review_count = ?,
-              unmatched_count = ?, lookalike_count = ?,
+              unmatched_count = ?, lookalike_count = ?, declared_friend_total = ?,
               status = 'previewed', previewed_at = ?
         WHERE id = ?`,
     )
@@ -200,11 +206,75 @@ export async function savePreview(
       input.counts.review,
       input.counts.unmatched,
       input.counts.lookalike,
+      input.declaredFriendTotal ?? null,
       jstNow(),
       id,
     )
     .run();
   return { ok: true };
+}
+
+/** 切り戻しできるのは本実行から7日間だけ（v6-33 §12-2、X の確定値）。 */
+export const HANDOVER_ROLLBACK_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
+export function rollbackDeadlineOf(handover: HandoverRow): string | null {
+  if (!handover.completed_at) return null;
+  return new Date(
+    new Date(handover.completed_at).getTime() + HANDOVER_ROLLBACK_WINDOW_MS,
+  ).toISOString();
+}
+
+/**
+ * 段6。切り戻し。本実行で動かした友だちを元のアカウントへ戻す。
+ *
+ * **戻せるのは7日以内・1回だけ。** 期限を過ぎた引き継ぎ、すでに戻した
+ * 引き継ぎは拒否する。戻す対象は decisions の link/new で動かした行で、
+ * いま受け取り先にいる人だけ（その後人が移した行は触らない）。
+ */
+export async function rollbackHandover(
+  db: D1Database,
+  id: string,
+  input: { rolledBackBy?: string | null; note?: string | null },
+): Promise<{ ok: true; restoredCount: number } | { ok: false; error: string }> {
+  const handover = await getHandoverById(db, id);
+  if (!handover) return { ok: false, error: 'その引き継ぎはありません' };
+  if (handover.status !== 'completed') {
+    return { ok: false, error: '本実行が終わっていない引き継ぎは戻せません' };
+  }
+  if (handover.rolled_back_at) {
+    return { ok: false, error: 'その引き継ぎはもう戻しています' };
+  }
+  const deadline = rollbackDeadlineOf(handover);
+  if (!deadline || deadline <= new Date().toISOString()) {
+    return { ok: false, error: '切り戻せる期限（7日間）を過ぎています' };
+  }
+  if (!handover.to_account_id) {
+    return { ok: false, error: '受け取り先が分からないため戻せません' };
+  }
+
+  const decisions = await listDecisions(db, id);
+  const moved = decisions.filter((d) => d.decision === 'link' || d.decision === 'new');
+  let restored = 0;
+  for (const d of moved) {
+    const result = await db
+      .prepare(
+        `UPDATE friends SET line_account_id = ?
+          WHERE id = ? AND line_account_id = ?`,
+      )
+      .bind(handover.from_account_id, d.from_friend_id, handover.to_account_id)
+      .run();
+    restored += result.meta.changes ?? 0;
+  }
+
+  await db
+    .prepare(
+      `UPDATE account_handovers
+          SET rolled_back_at = ?, rolled_back_by = ?, rollback_note = ?
+        WHERE id = ?`,
+    )
+    .bind(jstNow(), input.rolledBackBy ?? null, input.note ?? null, id)
+    .run();
+  return { ok: true, restoredCount: restored };
 }
 
 /** 段4。競合の判断を1件保存する。同じ人を2回決めたら上書きする。 */

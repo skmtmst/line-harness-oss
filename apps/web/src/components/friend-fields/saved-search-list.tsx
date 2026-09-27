@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { Trash2 } from 'lucide-react'
+import { RowActions } from '@/components/shared/row-actions'
 import ReorderGrip from './reorder-grip'
 import { mergeVisibleOrder } from './reorder-utils'
 import type { SavedSearch, SavedSearchCondition, Tag } from '@line-crm/shared'
@@ -440,18 +440,22 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
                   <p className="text-ink-faint">{new Date(search.updatedAt ?? search.createdAt).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
                 </td>
                 <td className="px-3 py-3 align-top">
-                  <div className="flex items-center gap-2">
-                    {search.lineAccountId ? <Link href={`/friends?savedSearch=${search.id}`} className="whitespace-nowrap text-xs font-semibold text-action hover:underline">友だち一覧へ</Link> : null}
-                  <button
-                    onClick={() => remove(search)}
-                    disabled={deleteDisabled}
-                    aria-label={`${search.name}を削除`}
-                    title={deleteTitle}
-                    className="rounded-md p-1 text-danger hover:bg-danger-bg disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    <Trash2 aria-hidden="true" size={16} />
-                  </button>
-                  </div>
+                  {/*
+                    ★V7 `Xn1Mz`：行の操作は「主な1つ＋…」。削除はメニューの
+                    中の危ない操作へ。ゴミ箱の印だけのボタンは行に直に置かない。
+                    押せない理由（使用中・未確認など）はメニューに出す。
+                  */}
+                  <RowActions
+                    subjectName={search.name}
+                    detail={search.lineAccountId ? { label: '友だち一覧へ', href: `/friends?savedSearch=${search.id}` } : undefined}
+                    destructiveItem={{
+                      id: 'delete',
+                      label: '削除する',
+                      disabled: deleteDisabled,
+                      disabledReason: deleteDisabled ? deleteTitle : undefined,
+                      onSelect: () => remove(search),
+                    }}
+                  />
                 </td>
               </tr>
             )
@@ -500,16 +504,21 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-2 pt-1">
-                      {search.lineAccountId ? <Link href={`/friends?savedSearch=${search.id}`} className="whitespace-nowrap text-xs font-semibold text-action hover:underline">一覧へ</Link> : null}
-                      <button
-                        onClick={() => remove(search)}
-                        disabled={deleteDisabled}
-                        aria-label={`${search.name}を削除`}
-                        title={deleteTitle}
-                        className="rounded-md p-1 text-danger hover:bg-danger-bg disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        <Trash2 aria-hidden="true" size={16} />
-                      </button>
+                      {/*
+                        ★V7 `Xn1Mz`：行の操作は「主な1つ＋…」。削除はメニューの
+                        中の危ない操作へ。ゴミ箱の印だけのボタンは行に直に置かない。
+                      */}
+                      <RowActions
+                        subjectName={search.name}
+                        detail={search.lineAccountId ? { label: '一覧へ', href: `/friends?savedSearch=${search.id}` } : undefined}
+                        destructiveItem={{
+                          id: 'delete',
+                          label: '削除する',
+                          disabled: deleteDisabled,
+                          disabledReason: deleteDisabled ? deleteTitle : undefined,
+                          onSelect: () => remove(search),
+                        }}
+                      />
                     </div>
                   </div>
                 </li>

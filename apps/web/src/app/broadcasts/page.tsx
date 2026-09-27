@@ -15,6 +15,8 @@ import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel
 import ListState from '@/components/shared/list-state'
 import { audienceSummary, rowExcerpt } from '@/lib/broadcast-summary'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
+import ListToolbar from '@/components/shared/list-toolbar'
+import { RowActions } from '@/components/shared/row-actions'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import SelectField from '@/components/shared/select-field'
 import Button from '@/components/shared/button'
@@ -569,32 +571,77 @@ function BroadcastList() {
               {/* 一覧列の縦の間隔も gap-4（16px）にそろえる。行ごとの mb-3 は付けない。 */}
 
           {/*
-            検索は独立した全幅の行にする（U014）。保存検索・表示件数と
-            同じ行に押し込むと、狭い幅で欄がほぼ四角形まで潰れて
-            入力した語が読めなくなる。
+            ★V7 `Xn1Mz`：検索は幅320で「保存した検索・この条件を保存」と
+            同じ行に置く。横いっぱいに伸ばさない。狭い幅では検索が240まで
+            縮み、入りきらない分は折り返す（潰して読めなくしない）。
           */}
-          <div data-search-row>
-            <input
-              type="search"
-              placeholder="タイトル・内容で検索"
-              aria-label="タイトル・内容で検索"
-              value={titleQuery}
-              onChange={(e) => setTitleQuery(e.target.value)}
-              className="border-hairline rounded-control bg-canvas focus:ring-accent h-10 w-full border px-3 text-sm focus:ring-2 focus:outline-none"
-            />
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <SelectField
-              aria-label="保存した検索"
-              defaultValue=""
-              onChange={(event) => applySavedView(event.target.value)}
-              options={[
-                { value: '', label: '保存した検索' },
-                ...savedViews.map((view) => ({ value: view.id, label: view.name })),
-              ]}
-            />
-            <Button type="button" onClick={() => setSavedViewOpen((open) => !open)}>この条件を保存</Button>
-          </div>
+          <ListToolbar
+            search={{ placeholder: 'タイトル・内容で検索', value: titleQuery, onChange: setTitleQuery }}
+            actions={
+              <>
+                <SelectField
+                  aria-label="保存した検索"
+                  defaultValue=""
+                  onChange={(event) => applySavedView(event.target.value)}
+                  options={[
+                    { value: '', label: '保存した検索' },
+                    ...savedViews.map((view) => ({ value: view.id, label: view.name })),
+                  ]}
+                />
+                <Button type="button" onClick={() => setSavedViewOpen((open) => !open)}>この条件を保存</Button>
+              </>
+            }
+            filters={
+              <>
+                <FilterChip selected={statusFilter === 'scheduled'} onChange={(on) => setStatusFilter(on ? 'scheduled' : 'all')}>予約中のみ</FilterChip>
+                <FilterChip selected={statusFilter === 'draft'} onChange={(on) => setStatusFilter(on ? 'draft' : 'all')}>下書き</FilterChip>
+                {/* ★V7：押せない「非表示」「開封率が低い」の札は外した（機能が無い・未接続のまま置かれていた）。 */}
+                <span className="text-ink-faint ml-1 text-xs whitespace-nowrap">配信日</span>
+                <div data-date-input><DateField value={dateFrom} onChange={setDateFrom} max={dateTo || undefined} aria-label="配信日（開始）" placeholder="開始日" /></div>
+                <span className="text-ink-faint text-xs">〜</span>
+                <div data-date-input><DateField value={dateTo} onChange={setDateTo} min={dateFrom || undefined} aria-label="配信日（終了）" placeholder="終了日" /></div>
+                {(dateFrom || dateTo) && <button type="button" className="text-xs font-semibold text-action" onClick={() => { setDateFrom(''); setDateTo('') }}>日付を外す</button>}
+              </>
+            }
+            trailing={
+              <>
+                {/*
+                  ★V7 `Xn1Mz`：2行目を1440px（中身の幅 ≈835px）で1行に収める。
+                  選ぶ欄は共通 ListToolbar の印（data-sort-select・
+                  data-per-page-select）で幅をそろえる（並び順150・表示件数96）。
+                  「〜が」を省いた短い文字にし、何の順かは aria-label、
+                  件数は左の見出しで分かるようにする。
+                */}
+                <div data-sort-select>
+                  <SelectField
+                    aria-label="並び順"
+                    className="w-full"
+                    value={sortKey}
+                    onChange={(event) => setSortKey(event.target.value === 'oldest' ? 'oldest' : 'newest')}
+                    options={[
+                      { value: 'newest', label: '新しい順' },
+                      { value: 'oldest', label: '古い順' },
+                    ]}
+                  />
+                </div>
+                <span className="text-ink-faint text-xs whitespace-nowrap">表示件数</span>
+                <div data-per-page-select>
+                  <SelectField
+                    aria-label="表示件数"
+                    className="w-full"
+                    value={String(pageSize)}
+                    size="compact"
+                    onChange={(event) => setPageSize(Number(event.target.value) || 20)}
+                    options={[
+                      { value: '20', label: '20件' },
+                      { value: '50', label: '50件' },
+                      { value: '100', label: '100件' },
+                    ]}
+                  />
+                </div>
+              </>
+            }
+          />
           {savedViewOpen && (
             <div className="border-hairline bg-canvas flex flex-wrap items-center gap-2 rounded-control border p-3">
               <input
@@ -621,26 +668,6 @@ function BroadcastList() {
             </p>
           )}
 
-          <div className="flex flex-wrap items-center gap-2">
-            <FilterChip selected={statusFilter === 'scheduled'} onChange={(on) => setStatusFilter(on ? 'scheduled' : 'all')}>予約中のみ</FilterChip>
-            <FilterChip selected={statusFilter === 'draft'} onChange={(on) => setStatusFilter(on ? 'draft' : 'all')}>下書き</FilterChip>
-            {/* ★V7：押せない「非表示」「開封率が低い」の札は外した（機能が無い・未接続のまま置かれていた）。 */}
-            <span className="text-ink-faint ml-1 text-xs whitespace-nowrap">配信日</span>
-            <div className="w-52"><DateField value={dateFrom} onChange={setDateFrom} max={dateTo || undefined} aria-label="配信日（開始）" /></div>
-            <span className="text-ink-faint text-xs">〜</span>
-            <div className="w-52"><DateField value={dateTo} onChange={setDateTo} min={dateFrom || undefined} aria-label="配信日（終了）" /></div>
-            <SelectField
-              aria-label="並び順"
-              value={sortKey}
-              onChange={(event) => setSortKey(event.target.value === 'oldest' ? 'oldest' : 'newest')}
-              options={[
-                { value: 'newest', label: '配信日が新しい順' },
-                { value: 'oldest', label: '配信日が古い順' },
-              ]}
-            />
-            {(dateFrom || dateTo) && <button type="button" className="text-xs font-semibold text-action" onClick={() => { setDateFrom(''); setDateTo('') }}>日付を外す</button>}
-          </div>
-
       {/*
         ★V7 `x63W5x`：読み込み失敗の帯は出さない。一覧の場所の ListState error
         だけにまとめる（同じ失敗を2回出さない。帯は生の口の文言をそのまま
@@ -662,25 +689,6 @@ function BroadcastList() {
           openTemplatePickerInitially={openTemplatePicker}
         />
       )}
-
-      {/*
-        表示件数は検索行ではなく結果の側へ置く（U014）。
-        一覧の直前なので、変えるとこの下の並びに効くと読める。
-      */}
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        <span className="text-ink-faint text-xs whitespace-nowrap">表示件数</span>
-        <SelectField
-          aria-label="表示件数"
-          value={String(pageSize)}
-          size="compact"
-          onChange={(event) => setPageSize(Number(event.target.value) || 20)}
-          options={[
-            { value: '20', label: '20件表示' },
-            { value: '50', label: '50件表示' },
-            { value: '100', label: '100件表示' },
-          ]}
-        />
-      </div>
 
       {/*
         Loading。**読み込み中であることを言葉で出す。** 骨だけのスケルトン
@@ -882,20 +890,24 @@ function BroadcastList() {
                       )}
                     </td>
 
-                    {/* 操作 */}
+                    {/*
+                      操作は共通 RowActions：主な1つ（詳細）＋「…」。
+                      削除はメニューの中の危ない操作へ。行にゴミ箱の
+                      アイコンだけのボタンは置かない（★V7 Xn1Mz）。
+                    */}
                     <td className="bg-canvas group-hover:bg-canvas-sunken sticky right-0 px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        {(broadcast.status === 'draft' || broadcast.status === 'scheduled') && (
-                          <button
-                            onClick={(event) => { event.stopPropagation(); setDeleteError(''); setDeleteTarget(broadcast) }}
-                            className="rounded-control p-2 text-ink-faint transition-colors hover:bg-danger-bg hover:text-danger focus-visible:text-danger"
-                            aria-label={`${broadcast.title}を削除`}
-                            title="削除"
-                          >
-                            <Trash2 size={16} aria-hidden="true" />
-                          </button>
-                        )}
-                      </div>
+                      {/* 行を押すと詳細へ行くので、行の中の操作は行へ伝えない。 */}
+                      <span className="inline-flex" onClick={(event) => event.stopPropagation()}>
+                        <RowActions
+                          subjectName={broadcast.title}
+                          detail={{ href: `/broadcasts/detail?id=${encodeURIComponent(broadcast.id)}` }}
+                          destructiveItem={(broadcast.status === 'draft' || broadcast.status === 'scheduled') ? {
+                            id: 'delete',
+                            label: '削除する',
+                            onSelect: () => { setDeleteError(''); setDeleteTarget(broadcast) },
+                          } : undefined}
+                        />
+                      </span>
                     </td>
                   </tr>
                 )

@@ -426,7 +426,9 @@
     "488_incoming_webhook_secret_grace.sql",
     "489_incoming_webhook_ambiguous_hold.sql",
     "494_session_step_up_and_unfamiliar.sql",
-    "495_session_familiarity_ip_index.sql"
+    "495_session_familiarity_ip_index.sql",
+    "498_line_account_lifecycle.sql",
+    "499_account_handover_declared_rollback.sql"
   ],
-  "migrationCount": 427
+  "migrationCount": 429
 }

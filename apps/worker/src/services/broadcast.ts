@@ -17,6 +17,7 @@ import {
   isOperationCapabilityStopped,
   listLineAccountsWithTenantStatus,
   recordBroadcastLifecycleEvent,
+  recordSkippedDelivery,
 } from '@line-crm/db';
 import type { Broadcast } from '@line-crm/db';
 import type { LineClient } from '@line-crm/line-sdk';
@@ -598,8 +599,14 @@ export async function processScheduledBroadcasts(
   workerUrl?: string,
 ): Promise<void> {
   const sendPermissions: SendPermissionCache = new Map();
+  const accountsWithStatus = await listLineAccountsWithTenantStatus(db);
   const tenantStatusByAccount = new Map(
-    (await listLineAccountsWithTenantStatus(db)).map((account) => [account.id, account.tenant_status]),
+    accountsWithStatus.map((account) => [account.id, account.tenant_status]),
+  );
+  // アカウントの稼働状態（X-1）。止めているアカウント宛の予約は
+  // 「送らなかった」記録にして下書きへ戻す。
+  const activeByAccount = new Map(
+    accountsWithStatus.map((account) => [account.id, Boolean(account.is_active)]),
   );
   const allBroadcasts = await getBroadcasts(db);
 
@@ -628,6 +635,27 @@ export async function processScheduledBroadcasts(
       if (ownerAccountId && isStoppedTenantStatus(tenantStatusByAccount.get(ownerAccountId))) {
         // Keep the content but remove the expired automatic schedule. Restoring
         // the tenant must never send a message whose due time passed while stopped.
+        await db.prepare(
+          `UPDATE broadcasts SET status = 'draft', scheduled_at = NULL WHERE id = ? AND status = 'scheduled'`,
+        ).bind(broadcast.id).run();
+        continue;
+      }
+      /*
+       * アカウント停止中（X-1、v6-33 §10-1）。予約 job は消さず、
+       * 「止めていたので送らなかった」として一覧に残し、内容は下書きへ
+       * 戻す。再開しても自動では送り直さない。
+       */
+      if (ownerAccountId && activeByAccount.get(ownerAccountId) === false) {
+        try {
+          await recordSkippedDelivery(db, {
+            lineAccountId: ownerAccountId,
+            kind: 'broadcast',
+            refId: broadcast.id,
+            title: broadcast.title ?? null,
+          });
+        } catch (skipError) {
+          console.error(`[broadcast] skipped ledger write failed for ${broadcast.id}:`, skipError);
+        }
         await db.prepare(
           `UPDATE broadcasts SET status = 'draft', scheduled_at = NULL WHERE id = ? AND status = 'scheduled'`,
         ).bind(broadcast.id).run();

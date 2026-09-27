@@ -70,7 +70,7 @@ CREATE TABLE account_handovers (
   resolved_at         TEXT,
   executed_at         TEXT,
   completed_at        TEXT
-);
+, declared_friend_total INTEGER, rolled_back_at TEXT, rolled_back_by TEXT, rollback_note TEXT);
 
 CREATE TABLE account_health_logs (
   id              TEXT PRIMARY KEY,
@@ -93,6 +93,16 @@ CREATE TABLE account_migrations (
   completed_at     TEXT
 );
 
+CREATE TABLE account_pool_switch_events (
+  id              TEXT PRIMARY KEY,
+  pool_id         TEXT NOT NULL REFERENCES traffic_pools(id) ON DELETE CASCADE,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  direction       TEXT NOT NULL CHECK (direction IN ('out', 'in')),
+  reason          TEXT NOT NULL,
+  actor           TEXT NOT NULL DEFAULT 'system',
+  created_at      TEXT NOT NULL
+);
+
 CREATE TABLE account_settings (
   id              TEXT PRIMARY KEY,
   line_account_id TEXT NOT NULL,
@@ -101,6 +111,17 @@ CREATE TABLE account_settings (
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   UNIQUE(line_account_id, key)
+);
+
+CREATE TABLE account_skipped_deliveries (
+  id              TEXT PRIMARY KEY,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  kind            TEXT NOT NULL,
+  ref_id          TEXT NOT NULL,
+  title           TEXT,
+  reason          TEXT NOT NULL DEFAULT 'account_inactive',
+  skipped_at      TEXT NOT NULL,
+  UNIQUE (kind, ref_id)
 );
 
 CREATE TABLE action_score_rule_sets (
@@ -3386,7 +3407,9 @@ CREATE TABLE line_accounts (
   official_profile_url   TEXT,
   created_at             TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at             TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, login_channel_id TEXT, login_channel_secret TEXT, liff_id TEXT, token_expires_at TEXT, friend_capacity INTEGER, capacity_warn_at INTEGER, icon_url TEXT, parent_line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL, tenant_id TEXT REFERENCES tenants(id), timezone TEXT NOT NULL DEFAULT 'Asia/Tokyo', provider_id TEXT, revision INTEGER NOT NULL DEFAULT 1, line_display_name TEXT, line_picture_url TEXT, line_basic_id TEXT, line_profile_synced_at TEXT);
+, login_channel_id TEXT, login_channel_secret TEXT, liff_id TEXT, token_expires_at TEXT, friend_capacity INTEGER, capacity_warn_at INTEGER, icon_url TEXT, parent_line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL, tenant_id TEXT REFERENCES tenants(id), timezone TEXT NOT NULL DEFAULT 'Asia/Tokyo', provider_id TEXT, revision INTEGER NOT NULL DEFAULT 1, line_display_name TEXT, line_picture_url TEXT, line_basic_id TEXT, line_profile_synced_at TEXT, inactive_reason TEXT
+  CHECK (inactive_reason IS NULL OR inactive_reason IN ('manual', 'ban_detected', 'credential_invalid')), inactive_reason_detail TEXT, inactivated_at TEXT, login_channel_secret_encrypted TEXT, last_webhook_received_at TEXT, webhook_silence_exempt INTEGER NOT NULL DEFAULT 0
+  CHECK (webhook_silence_exempt IN (0, 1)));
 
 CREATE TABLE line_message_unsends (
   line_message_account_key TEXT NOT NULL,
@@ -6693,6 +6716,12 @@ CREATE TABLE webinars (
 CREATE INDEX idx_account_handovers_from ON account_handovers (from_account_id);
 
 CREATE INDEX idx_account_handovers_status ON account_handovers (status);
+
+CREATE INDEX idx_account_pool_switch_events_account
+  ON account_pool_switch_events(line_account_id, created_at DESC);
+
+CREATE INDEX idx_account_skipped_deliveries_account
+  ON account_skipped_deliveries(line_account_id, skipped_at DESC);
 
 CREATE INDEX idx_action_score_rule_sets_account_status
   ON action_score_rule_sets(line_account_id, status);

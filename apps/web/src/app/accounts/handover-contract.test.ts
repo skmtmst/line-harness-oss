@@ -25,7 +25,7 @@ describe('V6 33-4 乗り換えの本実行', () => {
   })
 
   it('決め残しがある間は押せない', () => {
-    expect(PAGE).toContain('disabled={(handover.unresolvedReviews ?? 1) > 0}')
+    expect(PAGE).toContain('disabled={(handover.unresolvedReviews ?? 1) > 0')
   })
 
   it('実行ずみの再実行は口側の409をそのまま見せる', () => {
