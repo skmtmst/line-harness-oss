@@ -16,6 +16,7 @@ import {
   type AffiliatePaymentSummary,
   type AffiliatePayoutBatch,
 } from '@/lib/api'
+import { readSessionSnapshot } from '@/lib/session-snapshot'
 import { AffiliatePaymentConfirmDialog } from './action-dialogs'
 
 type PaymentFilter = 'all' | 'bank_missing' | 'ready'
@@ -172,6 +173,10 @@ function PayoutStepUpDialog({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [exportKey, setExportKey] = useState('')
+  /* V-1: 2段階認証を使っている人は6桁、無い人はパスワードで確認する。 */
+  const stepUpMethod = readSessionSnapshot()?.stepUpMethod ?? 'totp'
+  const usePassword = stepUpMethod === 'password'
+  const ready = usePassword ? code.length > 0 : /^\d{6}$/.test(code)
 
   useEffect(() => {
     if (!batch) return
@@ -181,11 +186,11 @@ function PayoutStepUpDialog({
   }, [batch])
 
   const exportCsv = async () => {
-    if (!batch || !/^\d{6}$/.test(code) || busy) return
+    if (!batch || !ready || busy || stepUpMethod === 'none') return
     setBusy(true)
     setError('')
     try {
-      const verified = await api.affiliates.payoutStepUp(code)
+      const verified = await api.affiliates.payoutStepUp({ method: usePassword ? 'password' : 'totp', value: code })
       if (!verified.success) throw new Error(verified.error)
       const exported = await api.affiliates.exportPayoutBatch(
         batch.id,
@@ -206,32 +211,51 @@ function PayoutStepUpDialog({
   return (
     <Dialog
       open={Boolean(batch)}
-      title="認証アプリで本人確認"
-      description="口座情報を含む銀行用CSVは、6桁コードで再認証したときだけ書き出せます。"
+      title={usePassword ? 'パスワードで本人確認' : '認証アプリで本人確認'}
+      description={usePassword
+        ? '口座情報を含む銀行用CSVは、パスワードで再認証したときだけ書き出せます。'
+        : '口座情報を含む銀行用CSVは、6桁コードで再認証したときだけ書き出せます。'}
       busy={busy}
-      error={error}
+      error={stepUpMethod === 'none' ? 'この操作には二段階認証またはパスワードの設定が必要です。' : error}
       onCancel={onClose}
       footer={(
         <div className="border-hairline flex justify-end gap-2 border-t pt-4">
           <Button type="button" onClick={onClose} disabled={busy}>戻る</Button>
-          <Button type="button" variant="primary" onClick={() => { void exportCsv() }} disabled={busy || !/^\d{6}$/.test(code)}>
-            {busy ? '確認中…' : '本人確認してCSVを書き出す'}
-          </Button>
+          {stepUpMethod !== 'none' && (
+            <Button type="button" variant="primary" onClick={() => { void exportCsv() }} disabled={busy || !ready}>
+              {busy ? '確認中…' : '本人確認してCSVを書き出す'}
+            </Button>
+          )}
         </div>
       )}
     >
-      <label className="text-ink block text-sm font-semibold" htmlFor="affiliate-payout-step-up">
-        認証アプリの6桁コード
-        <input
-          id="affiliate-payout-step-up"
-          value={code}
-          onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
-          inputMode="numeric"
-          autoFocus
-          className="border-hairline rounded-control mt-2 min-h-11 w-full border px-3 text-center text-lg font-bold tracking-widest"
-          placeholder="000000"
-        />
-      </label>
+      {usePassword ? (
+        <label className="text-ink block text-sm font-semibold" htmlFor="affiliate-payout-step-up">
+          パスワード
+          <input
+            id="affiliate-payout-step-up"
+            type="password"
+            value={code}
+            onChange={(event) => setCode(event.target.value)}
+            autoFocus
+            autoComplete="current-password"
+            className="border-surface-chrome rounded-control mt-2 min-h-11 w-full border bg-canvas px-3 text-sm font-normal text-ink outline-none focus:border-action"
+          />
+        </label>
+      ) : stepUpMethod === 'totp' ? (
+        <label className="text-ink block text-sm font-semibold" htmlFor="affiliate-payout-step-up">
+          認証アプリの6桁コード
+          <input
+            id="affiliate-payout-step-up"
+            value={code}
+            onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
+            inputMode="numeric"
+            autoFocus
+            className="border-hairline rounded-control mt-2 min-h-11 w-full border px-3 text-center text-lg font-bold tracking-widest"
+            placeholder="000000"
+          />
+        </label>
+      ) : null}
     </Dialog>
   )
 }

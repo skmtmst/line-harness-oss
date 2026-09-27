@@ -7,7 +7,7 @@ import Button from '@/components/shared/button'
 import Card, { CardHeader } from '@/components/shared/card'
 import ListState from '@/components/shared/list-state'
 import TargetMissing from '@/components/shared/target-missing'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
 import { DataTable, Td, Th, Tr } from '@/components/shared/table'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -212,17 +212,17 @@ function FriendMileageInner() {
       <Breadcrumb items={[{ label: 'マイル', href: '/mileage' }, { label: `${displayName}のマイル明細` }]} />
 
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
-        <SummaryCard variant="v6" title="利用可能" value={available} unit=" マイル" detail="" help="いま使える残高です" />
-        <SummaryCard variant="v6" title="確定待ち" value={v6Friend?.pending ?? mileage.summary.pending} unit=" マイル" detail="条件の確定を待っています" />
-        <SummaryCard variant="v6" title="30日以内に失効" value={v6Friend?.expiringMiles30d ?? null} unit=" マイル" detail={v6Friend ? (v6Friend.expiringMiles30d == null ? '期限付きの付与記録はありません' : '30日以内に期限を迎える分') : '友だち別失効の取得口を確認できませんでした'} />
-        <SummaryCard
+        <KpiCard variant="v6" title="利用可能" value={available} unit=" マイル" detail="" help="いま使える残高です" />
+        <KpiCard variant="v6" title="確定待ち" value={v6Friend?.pending ?? mileage.summary.pending} unit=" マイル" detail="条件の確定を待っています" />
+        <KpiCard variant="v6" title="30日以内に失効" value={v6Friend?.expiringMiles30d ?? null} unit=" マイル" detail={v6Friend ? (v6Friend.expiringMiles30d == null ? '期限付きの付与記録はありません' : '30日以内に期限を迎える分') : '友だち別失効の取得口を確認できませんでした'} />
+        <KpiCard
           variant="v6"
           title="生涯付与"
           value={v6Friend?.lifetimeEarned ?? mileage.summary.lifetimeEarned}
           unit=" マイル"
           detail={rewardedActions === null ? '付与記録の回数は未取得' : `${rewardedActions.toLocaleString('ja-JP')}回の付与記録`}
         />
-        <SummaryCard variant="v6" title="使用済み" value={v6Friend?.spent ?? mileage.summary.spent} unit=" マイル" detail={v6Friend ? `今月の増減 ${v6Friend.monthChange > 0 ? '+' : ''}${v6Friend.monthChange.toLocaleString('ja-JP')} マイル` : '交換などで使った合計'} />
+        <KpiCard variant="v6" title="使用済み" value={v6Friend?.spent ?? mileage.summary.spent} unit=" マイル" detail={v6Friend ? `今月の増減 ${v6Friend.monthChange > 0 ? '+' : ''}${v6Friend.monthChange.toLocaleString('ja-JP')} マイル` : '交換などで使った合計'} />
       </div>
 
       <Card overflow="hidden">

@@ -149,7 +149,8 @@ export default function OpsAnnouncementsPage() {
   const scheduled = form.publishAt.trim().length > 0
 
   return (
-    <div data-design-node="q2CokV">
+    <div data-design-node="q2CokV" className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       <OpsPageHeader
         title="お知らせ"
         actions={
@@ -162,10 +163,10 @@ export default function OpsAnnouncementsPage() {
           </>
         }
       />
-      <h2 className="mb-3 text-body font-bold text-ink">{editingId ? 'お知らせを直す' : 'お知らせを作る'}</h2>
+      <h2 className="text-body font-bold text-ink">{editingId ? 'お知らせを直す' : 'お知らせを作る'}</h2>
 
       {!lineConfigured ? (
-        <div className="mb-4"><NoteBar tone="warn">契約者専用LINEのアカウントが未設定です。メンバー管理の「運営の情報」で、運営会社に登録した公式アカウントを指定すると LINE で送れます。</NoteBar></div>
+        <div><NoteBar tone="warn">契約者専用LINEのアカウントが未設定です。メンバー管理の「運営の情報」で、運営会社に登録した公式アカウントを指定すると LINE で送れます。</NoteBar></div>
       ) : null}
       {notice ? <p role="status" className="mb-3 text-caption text-accent-deep">{notice}</p> : null}
       {error ? <p role="alert" className="mb-3 text-caption text-danger">{error}</p> : null}
@@ -231,7 +232,9 @@ export default function OpsAnnouncementsPage() {
             // 「まだ無い」と「読み込めなかった」を言い分ける。失敗時は空の案内ではなくエラーと再読み込みを出す。
             <ListState kind="error" title="お知らせを表示できませんでした" onRetry={() => void load()} />
           ) : rows.length === 0 ? (
-            <ListState kind="empty" title="まだお知らせはありません" description="左で作って「今すぐ送る」か「配信を予約する」を押すと、ここに並びます。" />
+            <div className="bg-canvas rounded-card border-hairline border">
+              <ListState kind="empty" title="まだお知らせはありません" description="左で作って「今すぐ送る」か「配信を予約する」を押すと、ここに並びます。" />
+            </div>
           ) : (
             <DataTable>
               <thead>

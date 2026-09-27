@@ -5,7 +5,7 @@ import Button from '@/components/shared/button'
 import LinePreview from '@/components/shared/line-preview'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import SelectField from '@/components/shared/select-field'
-import StepTrail from '@/components/shared/step-trail'
+import Stepper from '@/components/shared/stepper'
 import Notice from '@/components/shared/notice'
 import ConditionBuilder from '@/components/shared/condition-builder'
 import { AreaProperties } from './area-properties'
@@ -232,7 +232,7 @@ export default function RichMenuCreateForm({
         <p>リッチメニューを作る</p>
         <p>名前と土台のレイアウトを決めます。画像とタップ領域は、作成後の編集画面で設定します。</p>
       </section>
-      <StepTrail label="リッチメニュー作成の進み方" items={[{ label: '形とボタン', state: 'current' }, { label: '誰に出すか', state: 'todo' }, { label: '公開のしかた', state: 'todo' }]} />
+      <Stepper label="リッチメニュー作成の進み方" steps={[{ label: '形とボタン', state: 'current' }, { label: '誰に出すか', state: 'todo' }, { label: '公開のしかた', state: 'todo' }]} />
       {compatibilityError || validationError ? <Notice tone="danger" className="mt-4">{compatibilityError ?? validationError}</Notice> : null}
       <div className="mt-4 grid items-start gap-4 lg:grid-cols-4">
         <div className="border-hairline bg-canvas rounded-card min-w-0 space-y-4 border p-4 shadow-sm lg:col-span-3">

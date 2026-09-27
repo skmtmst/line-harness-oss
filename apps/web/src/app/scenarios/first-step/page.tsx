@@ -462,8 +462,8 @@ function FirstStepContent() {
   }
 
   return (
-    <div data-design-node="kk8dz">
-      <div data-design="Head" className="mb-7 flex items-center justify-between">
+    <div data-design-node="kk8dz" className="flex flex-col gap-4">
+      <div data-design="Head" className="flex items-center justify-between">
         <nav data-design="Crumb" className="text-ink-faint text-xs">
           <Link href="/scenarios" className="hover:underline">
             シナリオ配信
@@ -501,10 +501,10 @@ function FirstStepContent() {
           />
         )
       ) : (
-        <>
+        <div className="flex flex-col gap-4">
           <ol
             aria-label="シナリオ作成の進み方"
-            className="bg-canvas border-hairline mb-4 flex flex-wrap items-center gap-3 rounded-card border px-4 py-3 text-xs"
+            className="bg-canvas border-hairline flex flex-wrap items-center gap-3 rounded-card border px-4 py-3 text-xs"
           >
             <StepMark n={1} label="シナリオ情報" state="done" />
             <StepLine />
@@ -526,11 +526,11 @@ function FirstStepContent() {
              * 取得前に入力を許すと、届いた既存の1通目が入力を上書きするか、
              * まだ知らない既存通へ重ねて保存してしまう。
              */
-            <div className="bg-canvas rounded-card border-hairline mt-4 border p-8 text-center">
+            <div className="bg-canvas rounded-card border-hairline border p-8 text-center">
               <p className="text-ink-faint text-sm">シナリオを読み込んでいます…</p>
             </div>
           ) : (
-        <>
+        <div className="flex flex-col gap-4">
       {/*
         左に入力、右にプレビュー。プレビューは付いてくる（sticky）ので、
         下の選択肢を書いているあいだも、届く形と時刻が視界に残る。
@@ -841,7 +841,6 @@ function FirstStepContent() {
         空け、操作群は中央へ揃える。
       */}
       <StickyBar
-        className="mt-4"
         actions={(
           <>
             <button
@@ -863,9 +862,9 @@ function FirstStepContent() {
           </>
         )}
       />
-        </>
+        </div>
       )}
-        </>
+        </div>
       )}
 
       {/* 詳細条件。中身はシナリオ編集と同じ部品を使う。 */}

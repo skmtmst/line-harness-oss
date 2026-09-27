@@ -439,7 +439,8 @@ function BroadcastList() {
   })
 
   return (
-    <div>
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       {folderDialogOpen && (
         <FolderAddDialog
           kind="broadcast"
@@ -469,7 +470,7 @@ function BroadcastList() {
       />
       </div>
 
-      <div data-design="Head" className="mb-4 flex flex-wrap items-center gap-2">
+      <div data-design="Head" className="flex flex-wrap items-center gap-2">
         <Button
           type="button"
           variant="primary"
@@ -547,14 +548,15 @@ function BroadcastList() {
               ) : null}
             </FolderPanel>
 
-            <div>
+            <div className="flex flex-col gap-4">
+              {/* 一覧列の縦の間隔も gap-4（16px）にそろえる。行ごとの mb-3 は付けない。 */}
 
           {/*
             検索は独立した全幅の行にする（U014）。保存検索・表示件数と
             同じ行に押し込むと、狭い幅で欄がほぼ四角形まで潰れて
             入力した語が読めなくなる。
           */}
-          <div data-search-row className="mb-3">
+          <div data-search-row>
             <input
               type="search"
               placeholder="タイトル・内容で検索"
@@ -564,7 +566,7 @@ function BroadcastList() {
               className="border-hairline rounded-control bg-canvas focus:ring-accent h-10 w-full border px-3 text-sm focus:ring-2 focus:outline-none"
             />
           </div>
-          <div className="mb-3 flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <SelectField
               aria-label="保存した検索"
               defaultValue=""
@@ -577,7 +579,7 @@ function BroadcastList() {
             <Button type="button" onClick={() => setSavedViewOpen((open) => !open)}>この条件を保存</Button>
           </div>
           {savedViewOpen && (
-            <div className="border-hairline bg-canvas mb-3 flex flex-wrap items-center gap-2 rounded-control border p-3">
+            <div className="border-hairline bg-canvas flex flex-wrap items-center gap-2 rounded-control border p-3">
               <input
                 aria-label="保存する検索の名前"
                 placeholder="検索条件の名前"
@@ -594,7 +596,7 @@ function BroadcastList() {
             その場所に小さく1行だけ。赤字にしない。一覧は普通に出す。
           */}
           {savedViewError && (
-            <p role="alert" className="text-ink-secondary mb-3 text-xs">
+            <p role="alert" className="text-ink-secondary text-xs">
               {savedViewError}
               <button type="button" onClick={() => setSavedViewsSeq((n) => n + 1)} className="text-action ml-2 font-semibold hover:underline">
                 もう一度
@@ -602,7 +604,7 @@ function BroadcastList() {
             </p>
           )}
 
-          <div className="mb-3 flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <FilterChip selected={statusFilter === 'scheduled'} onChange={(on) => setStatusFilter(on ? 'scheduled' : 'all')}>予約中のみ</FilterChip>
             <FilterChip selected={statusFilter === 'draft'} onChange={(on) => setStatusFilter(on ? 'draft' : 'all')}>下書き</FilterChip>
             {/* ★V7：押せない「非表示」「開封率が低い」の札は外した（機能が無い・未接続のまま置かれていた）。 */}
@@ -648,7 +650,7 @@ function BroadcastList() {
         表示件数は検索行ではなく結果の側へ置く（U014）。
         一覧の直前なので、変えるとこの下の並びに効くと読める。
       */}
-      <div className="mb-3 flex flex-wrap items-center justify-end gap-2">
+      <div className="flex flex-wrap items-center justify-end gap-2">
         <span className="text-ink-faint text-xs whitespace-nowrap">表示件数</span>
         <SelectField
           aria-label="表示件数"
@@ -687,14 +689,18 @@ function BroadcastList() {
           />
         ) : (
           /* 文言は設計 `TmHjF`（6-1-N）どおり。 */
-          <ListState kind="empty" title="まだ配信がありません" description="最初の1つを作ると、ここに並びます。" />
+          <div className="bg-canvas rounded-card border border-hairline">
+            <ListState kind="empty" title="まだ配信がありません" description="最初の1つを作ると、ここに並びます。" />
+          </div>
         )
       ) : visibleBroadcasts.length === 0 ? (
-        <ListState
-          kind="empty"
-          title="条件に該当する配信はありません"
-          description="絞り込みを変えるか、新しく作成してください。"
-        />
+        <div className="bg-canvas rounded-card border border-hairline">
+          <ListState
+            kind="empty"
+            title="条件に該当する配信はありません"
+            description="絞り込みを変えるか、新しく作成してください。"
+          />
+        </div>
       ) : (
         <div className="bg-canvas rounded-card border border-hairline overflow-hidden">
           <div className="overflow-x-auto">

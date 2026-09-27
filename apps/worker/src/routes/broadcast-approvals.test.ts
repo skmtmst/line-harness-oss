@@ -55,6 +55,19 @@ function json(method: string, body: unknown) {
   return { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) };
 }
 
+// V: 配信の承認は大事な操作なので直前の再確認を求める。ここでは二者承認の
+// 流れを見たいため、再確認済み（10分の窓の内側）のセッションを用意して通す。
+async function steppedUpSession(db: SqliteD1, staffId: string, token: string) {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token));
+  const tokenHash = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  const now = new Date().toISOString();
+  db.raw.prepare(
+    `INSERT INTO admin_sessions (token_hash, staff_id, expires_at, created_at, step_up_at)
+     VALUES (?, ?, ?, ?, ?)`,
+  ).run(tokenHash, staffId, new Date(Date.now() + 3_600_000).toISOString(), now, now);
+  return { Authorization: `Bearer lh_session:${token}` };
+}
+
 function seedStaff(db: SqliteD1, id: string, name: string, role: string, permissionKeys: string[]) {
   db.raw.prepare(
     `INSERT INTO staff_members (id, name, role, api_key, is_active, permission_keys, invite_status)
@@ -168,12 +181,14 @@ describe('二者承認の依頼・承認・差し戻し', () => {
     expect(noKey.status).toBe(403);
 
     // 別の承認する人が承認すると通る。二重押しは409。
+    // 承認は大事な操作なので、再確認済みのセッションを持つ人で行う。
+    const steppedUp = await steppedUpSession(testDb, 'staff-approve', 'approve-session');
     const approved = await app(testDb.db, approver)
-      .request('/api/broadcasts/b1/approval-approve', json('POST', {}));
+      .request('/api/broadcasts/b1/approval-approve', { ...json('POST', {}), headers: { ...json('POST', {}).headers, ...steppedUp } });
     expect(approved.status).toBe(200);
     expect(approvalOf(testDb, 'b1')).toBe('approved');
     const again = await app(testDb.db, approver)
-      .request('/api/broadcasts/b1/approval-approve', json('POST', {}));
+      .request('/api/broadcasts/b1/approval-approve', { ...json('POST', {}), headers: { ...json('POST', {}).headers, ...steppedUp } });
     expect(again.status).toBe(409);
   });
 

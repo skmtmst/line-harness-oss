@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { api } from '@/lib/api'
+import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
 import {
   AccountFormSections,
   emptyAccountFormState,
@@ -67,6 +68,7 @@ export default function AccountEditModal({
   const [iconUrl, setIconUrl] = useState(initialIconUrl ?? '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [stepUp, setStepUp] = useState<StepUpRequest | null>(null)
 
   // Lock background scroll while modal open. Restore on unmount so navigation
   // away mid-edit doesn't leave the page in a non-scrollable state.
@@ -81,7 +83,7 @@ export default function AccountEditModal({
   const update = (partial: Partial<AccountFormState>) =>
     setState((s) => ({ ...s, ...partial }))
 
-  const handleSave = async (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent, stepUpToken?: string) => {
     e.preventDefault()
     setSaving(true)
     setError('')
@@ -149,14 +151,19 @@ export default function AccountEditModal({
     }
 
     try {
-      const res = await api.lineAccounts.update(accountId, payload)
+      const res = await api.lineAccounts.update(accountId, payload, stepUpToken)
       if (res.success) {
         onSaved()
         onClose()
       } else {
         setError(res.error || '保存に失敗しました。通信を確かめて、もう一度お試しください。')
       }
-    } catch {
+    } catch (caught) {
+      // 接続情報の書き換えは大事な操作。本人確認を求められたら窓を立てる（V-1）。
+      if (!stepUpToken && isStepUpRequired(caught)) {
+        setStepUp({ purpose: 'line_account.credentials', action: '接続情報を変更する', retry: (token) => handleSave(e, token) })
+        return
+      }
       setError('保存に失敗しました。通信を確かめて、もう一度お試しください。')
     } finally {
       setSaving(false)
@@ -300,6 +307,7 @@ export default function AccountEditModal({
           </div>
         </form>
       </div>
+      {stepUp && <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} />}
     </div>
   )
 }

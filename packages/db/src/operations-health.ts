@@ -897,6 +897,13 @@ export async function clearTwoFactorSetupAttempts(
   ).bind(staffId).run();
 }
 
+/** 再確認（step-up）に成功したとき、失敗を含む試行枠を解放する。 */
+export async function clearStepUpAttempts(db: D1Database, staffId: string): Promise<void> {
+  await db.prepare(
+    `DELETE FROM auth_step_up_attempts WHERE staff_id = ?`,
+  ).bind(staffId).run();
+}
+
 export async function consumeStepUpGrant(
   db: D1Database,
   input: { tokenHash: string; staffId: string; purpose: string; now?: string },

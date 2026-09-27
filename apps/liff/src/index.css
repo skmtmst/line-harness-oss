@@ -23,6 +23,8 @@
   --color-danger: #b3261e;
   --color-skeleton: #e9ebef;
   --color-state-mark: #ebedf1;
+  /* 押せない枠の地。設計の満席の枠 (2-event.png の 14:00〜15:00) の灰色。 */
+  --color-shell-gray: #ebedf1;
 }
 
 body {

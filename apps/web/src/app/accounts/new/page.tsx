@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import Image from 'next/image'
 import { api, type FollowerImportState, type LineAccountConnectData } from '@/lib/api'
+import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
 import Button from '@/components/shared/button'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import PageHeader from '@/components/shared/page-header'
@@ -44,6 +45,7 @@ export default function NewLineAccountPage() {
   const [busyAction, setBusyAction] = useState<BusyAction>(null)
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [error, setError] = useState('')
+  const [stepUp, setStepUp] = useState<StepUpRequest | null>(null)
   const busyLock = useRef(false)
   const stepPanelRef = useRef<HTMLDivElement>(null)
 
@@ -150,7 +152,7 @@ export default function NewLineAccountPage() {
     }
   }
 
-  const save = async () => {
+  const save = async (stepUpToken?: string) => {
     if (!connectionPassed || busyLock.current) {
       setError('5段すべて通ってから保存してください。')
       return
@@ -159,7 +161,7 @@ export default function NewLineAccountPage() {
     setBusyAction('save')
     setError('')
     try {
-      const response = await api.lineAccounts.connect(input())
+      const response = await api.lineAccounts.connect(input(), stepUpToken)
       if (!response.success) {
         setError(response.error)
         return
@@ -167,7 +169,12 @@ export default function NewLineAccountPage() {
       setConnection(response.data)
       setForm((current) => ({ ...current, channelSecret: '', loginChannelSecret: '' }))
       setCurrentStep(5)
-    } catch {
+    } catch (caught) {
+      // LINEの接続は大事な操作。本人確認を求められたら窓を立ててやり直す（V-1）。
+      if (!stepUpToken && isStepUpRequired(caught)) {
+        setStepUp({ purpose: 'line_account.connect', action: 'LINEの接続を登録する', retry: save })
+        return
+      }
       setError('登録できませんでした。DBには保存していません。時間をおいて、もう一度お試しください。')
     } finally {
       busyLock.current = false
@@ -190,10 +197,10 @@ export default function NewLineAccountPage() {
   )
 
   return (
-    <div data-design-node="b2NGxk" className="w-full pb-24">
+    <div data-design-node="b2NGxk" className="flex w-full flex-col gap-4 pb-24">
       {/* ★V7: 登録専用の枠の幅いっぱいに広げる。中央寄せの狭い列にしない。 */}
       <div data-design="Head">
-        <div className="mb-4 flex justify-end"><Button href="/hq">統括コンソールへ戻る</Button></div>
+        <div className="flex justify-end"><Button href="/hq">統括コンソールへ戻る</Button></div>
         <PageHeader
           breadcrumb={[{ label: 'LINEアカウント', href: '/accounts' }, { label: '登録' }]}
           title="LINEアカウントを登録"
@@ -206,7 +213,7 @@ export default function NewLineAccountPage() {
         長かった。狭い画面では「いまの手順＋位置」だけを出し、全手順は
         開いて確認する形にする。640px 以上ではこれまでどおり5段で出す。
       */}
-      <nav data-design="Steps" aria-label="登録の進捗" className="bg-canvas rounded-card border-hairline mb-4 border p-4">
+      <nav data-design="Steps" aria-label="登録の進捗" className="bg-canvas rounded-card border-hairline border p-4">
         <ol className="hidden gap-2 sm:grid sm:grid-cols-5">
           {WIZARD_STEPS.map((step) => {
             const active = currentStep === step.number
@@ -317,9 +324,9 @@ export default function NewLineAccountPage() {
 
         {error && <Notice tone="danger" message={error} onClose={() => setError('')} className="mt-4" />}
         <NoticeLineRegisterDialog open={noticeDialog === 'open'} onClose={() => setNoticeDialog('done')} />
+        {stepUp && <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} />}
         <div data-design="Actions">
           <StickyBar
-            className="mt-4"
             status={createdId ? (importingIds ? '既存の友だちを取り込んでいます' : '登録が完了しました') : busyAction === 'save' ? '接続して保存しています' : `手順 ${currentStep} / 5`}
             actions={createdId ? <>
               {importingIds ? <><Button type="button" disabled>登録したアカウントを見る</Button><Button type="button" variant="primary" disabled>統括コンソールへ</Button></> : <><Button href={`/accounts/detail?id=${encodeURIComponent(createdId)}`}>登録したアカウントを見る</Button><Button href="/hq" variant="primary">統括コンソールへ</Button></>}

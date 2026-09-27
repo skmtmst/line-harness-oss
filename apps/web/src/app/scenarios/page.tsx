@@ -636,7 +636,7 @@ export default function ScenariosPage() {
         SCENARIO-16: 下線だけの span は押せない。3手順の説明は
         開閉欄へ移し、帯は1〜2文だけにする。
       */}
-      <Disclosure size="compact" title="配信を始める方法" hint="3手順" className="mb-4">
+      <Disclosure size="compact" title="配信を始める方法" hint="3手順">
         <ol className="list-decimal space-y-1 pl-5 text-sm">
           <li>一覧からシナリオを開き、「開始のきっかけ」（友だち追加時・タグが付いたときなど）を設定します。</li>
           <li>詳細画面の「テスト送信」で、実際の届き方を確認します。</li>
@@ -735,7 +735,7 @@ export default function ScenariosPage() {
 
       {/* 一覧本体（設計 `Body`）。 */}
       <div data-design="Body">
-      <div className="mb-4 flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <Button
           variant="primary"
           onClick={handleCreate}
@@ -849,7 +849,7 @@ export default function ScenariosPage() {
         />
       )}
       {scenarioList.pageCount > 1 ? (
-        <div className="mt-4 flex items-center justify-end gap-3 text-sm">
+        <div className="flex items-center justify-end gap-3 text-sm">
           <Button disabled={scenarioList.page <= 1 || scenarioList.loading} onClick={() => scenarioList.setPage(scenarioList.page - 1)}>
             前へ
           </Button>

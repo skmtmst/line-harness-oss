@@ -27,6 +27,7 @@ import { PhotoPublications } from './photo-publications'
 import { safePhotoSrc } from './photo-src'
 import { photoPetDisplayName } from '@/components/shared/photo-display-name'
 import { photoNoticeFor } from './photo-notice'
+import { readSessionSnapshot } from '@/lib/session-snapshot'
 import { photoReviewEntryFrom, photoReviewSearch } from './photo-review-query'
 import { mileStatusLabel, reviewVersionOf, text } from './photo-text'
 import KpiCollapse from '@/components/ui/kpi-collapse'
@@ -656,9 +657,11 @@ export default function PhotoReviewsPage() {
 
   const downloadOriginal = async (code: string) => {
     if (!selectedAccountId || !detailPhoto) throw new Error('写真を読み直してください。')
+    /* V-1: 2段階認証を使っている人は6桁、無い人はパスワードで確認する。 */
+    const method = readSessionSnapshot()?.stepUpMethod === 'password' ? 'password' : 'totp'
     let grant
     try {
-      grant = await api.nenMembers.photoOriginalStepUp(code)
+      grant = await api.nenMembers.photoOriginalStepUp({ method, value: code })
     } catch (error) {
       if (error instanceof ApiError && (error.status === 400 || error.status === 401)) {
         throw new Error('再認証コードを確認してください。')
@@ -906,8 +909,8 @@ export default function PhotoReviewsPage() {
       </div>
 
       <div className={styles.body}>
-      <div className="min-w-0 space-y-6">
-      {!selectedAccountId ? <ListState kind="empty" title="LINEアカウントを選んでください" description="上のバーから、写真審査を行うLINEアカウントを選びます。" /> : loading ? <ListState kind="loading" title="写真を読み込んでいます" /> : loadForbidden ? <ListState kind="forbidden" title="写真を見る権限がありません" description="管理者へ写真審査の閲覧権限を確認してください。" /> : loadError ? <ListState kind="error" title="写真を読み込めませんでした" description="通信状態を確認して、もう一度読み込んでください。" onRetry={() => void load()} /> : visiblePhotos.length === 0 ? <ListState kind="empty" title="この状態の写真はありません" description="別の状態を選ぶか、新しい写真が届くまでお待ちください。" /> : <section className="grid grid-cols-1 gap-2.5 md:grid-cols-2 2xl:grid-cols-4">
+      <div className="flex min-w-0 flex-col gap-4">
+      {!selectedAccountId ? <div className="bg-canvas rounded-card border-hairline border"><ListState kind="empty" title="LINEアカウントを選んでください" description="上のバーから、写真審査を行うLINEアカウントを選びます。" /></div> : loading ? <ListState kind="loading" title="写真を読み込んでいます" /> : loadForbidden ? <ListState kind="forbidden" title="写真を見る権限がありません" description="管理者へ写真審査の閲覧権限を確認してください。" /> : loadError ? <ListState kind="error" title="写真を読み込めませんでした" description="通信状態を確認して、もう一度読み込んでください。" onRetry={() => void load()} /> : visiblePhotos.length === 0 ? <div className="bg-canvas rounded-card border-hairline border"><ListState kind="empty" title="この状態の写真はありません" description="別の状態を選ぶか、新しい写真が届くまでお待ちください。" /></div> : <section className="grid grid-cols-1 gap-2.5 md:grid-cols-2 2xl:grid-cols-4">
         {visiblePhotos.map((photo) => {
           const photoId = text(photo.id)
           const selected = selectedPhotoIds.includes(photoId)

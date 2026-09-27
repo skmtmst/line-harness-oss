@@ -6,7 +6,7 @@ import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
 import { ApiError, api, type EcConnector, type EcConnectorOverview } from '@/lib/api'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { formatEcDateTimeWithYear as dateTime } from './ec-datetime'
@@ -206,10 +206,10 @@ export default function ConnectorPanel({ accountId }: { accountId: string | null
           <section className={styles.card}>
             <h2 className={styles.cardTitle}>取り込みのようす</h2>
             <div className={styles.compactKpis}>
-              <SummaryCard variant="v6" title="今日" value={data?.health.today ?? null} unit="件" detail="" help="今日届いた出来事の件数です" />
-              <SummaryCard variant="v6" title="この30日" value={data?.health.last30Days ?? null} unit="件" detail="" help="この30日に届いた出来事の件数です" />
-              <SummaryCard variant="v6" title="失敗" value={data?.health.failed ?? null} unit="件" detail="確認が必要" />
-              <SummaryCard variant="v6" title="最後に成功" value={null} unit="" detail={dateTime(data?.health.lastSucceededAt ?? null)} badge="日時" badgeTone="neutral" />
+              <KpiCard variant="v6" title="今日" value={data?.health.today ?? null} unit="件" detail="" help="今日届いた出来事の件数です" />
+              <KpiCard variant="v6" title="この30日" value={data?.health.last30Days ?? null} unit="件" detail="" help="この30日に届いた出来事の件数です" />
+              <KpiCard variant="v6" title="失敗" value={data?.health.failed ?? null} unit="件" detail="確認が必要" />
+              <KpiCard variant="v6" title="最後に成功" value={null} unit="" detail={dateTime(data?.health.lastSucceededAt ?? null)} badge="日時" badgeTone="neutral" />
             </div>
           </section>
           <section className={styles.card}>

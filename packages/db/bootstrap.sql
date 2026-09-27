@@ -192,7 +192,7 @@ CREATE TABLE admin_sessions (
   staff_id   TEXT NOT NULL,
   expires_at TEXT NOT NULL,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), selected_restaurant_store_id TEXT
-  REFERENCES rt_stores(id) ON DELETE SET NULL, user_agent TEXT, ip_prefix TEXT,
+  REFERENCES rt_stores(id) ON DELETE SET NULL, user_agent TEXT, ip_prefix TEXT, step_up_at TEXT, device_hash TEXT, unfamiliar_at TEXT,
   FOREIGN KEY (staff_id) REFERENCES staff_members(id) ON DELETE CASCADE
 );
 
@@ -3275,17 +3275,19 @@ CREATE TABLE incoming_webhook_steps (
   PRIMARY KEY (source_event_id, step_key)
 );
 
-CREATE TABLE incoming_webhook_unmatched_events (
+CREATE TABLE "incoming_webhook_unmatched_events" (
   id                    TEXT PRIMARY KEY,
   webhook_id            TEXT NOT NULL REFERENCES incoming_webhooks(id),
   line_account_id       TEXT NOT NULL REFERENCES line_accounts(id),
   source_event_id       TEXT NOT NULL,
-  kind                  TEXT NOT NULL CHECK (kind IN ('unmatched', 'candidate')),
+  kind                  TEXT NOT NULL CHECK (kind IN ('unmatched', 'candidate', 'ambiguous')),
   status                TEXT NOT NULL DEFAULT 'pending'
                         CHECK (status IN ('pending', 'resolved', 'dismissed')),
   identity_attempts_json TEXT NOT NULL DEFAULT '[]'
                         CHECK (json_valid(identity_attempts_json)),
   masked_shape_json     TEXT CHECK (masked_shape_json IS NULL OR json_valid(masked_shape_json)),
+  -- kind='ambiguous' の届物だけが持つ、一致した友だちIDの並び。
+  candidate_friend_ids_json TEXT CHECK (candidate_friend_ids_json IS NULL OR json_valid(candidate_friend_ids_json)),
   resolved_friend_id    TEXT REFERENCES friends(id),
   resolved_by           TEXT,
   resolved_at           TEXT,
@@ -3306,7 +3308,7 @@ CREATE TABLE incoming_webhooks (
   updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , version INTEGER NOT NULL DEFAULT 1
   CHECK (version > 0), identity_match_json TEXT NOT NULL DEFAULT
-  '{"methods":[],"onNotFound":"do_nothing"}', action_refs_json TEXT NOT NULL DEFAULT '[]', latest_masked_sample_json TEXT, latest_received_at TEXT, secret_encrypted TEXT, deleted_at TEXT, deleted_by_staff_id TEXT);
+  '{"methods":[],"onNotFound":"do_nothing"}', action_refs_json TEXT NOT NULL DEFAULT '[]', latest_masked_sample_json TEXT, latest_received_at TEXT, secret_encrypted TEXT, deleted_at TEXT, deleted_by_staff_id TEXT, secret_previous_encrypted TEXT, secret_rotated_at TEXT);
 
 CREATE TABLE integration_api_tokens (
   id              TEXT PRIMARY KEY,
@@ -6720,7 +6722,13 @@ CREATE INDEX idx_admin_sessions_restaurant_store
   ON admin_sessions(selected_restaurant_store_id)
   WHERE selected_restaurant_store_id IS NOT NULL;
 
+CREATE INDEX idx_admin_sessions_staff_device
+  ON admin_sessions(staff_id, device_hash);
+
 CREATE INDEX idx_admin_sessions_staff_id ON admin_sessions(staff_id);
+
+CREATE INDEX idx_admin_sessions_staff_ip_prefix
+  ON admin_sessions(staff_id, ip_prefix);
 
 CREATE INDEX idx_admin_two_factor_challenges_expires
   ON admin_two_factor_challenges(expires_at);

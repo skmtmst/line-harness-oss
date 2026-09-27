@@ -2,7 +2,7 @@ import Link from 'next/link'
 import type { ReactNode } from 'react'
 import type { BookingRequest, DashboardOverview } from '@/lib/api'
 import Card from '@/components/shared/card'
-import { HelpTip } from '@/components/dashboard/help-tip'
+import HelpTip from '@/components/shared/help-tip'
 
 /**
  * 右カラムのカード。
@@ -44,10 +44,17 @@ export function SideCard({
     <Card padding="roomy">
       <div className="flex flex-col gap-2.5">
         <div className="flex items-start justify-between gap-3">
-          <h2 className="text-ink min-w-0 text-base leading-normal font-bold">{title}</h2>
-          {helpTip ? <HelpTip text={helpTip} /> : null}
-          {/* 期間は常に1行にする（DASH-23）。折り返すとカード間で見出しの高さがずれる。 */}
-          {period ? <span className="text-ink-faint flex-1 pt-0.5 text-[11px] font-normal whitespace-nowrap">{period}</span> : null}
+          {/*
+            題と「？」・期間はひとかたまりにし、文字の縦の中央でそろえる
+            （★V7・2026-09-27）。ばらばらに置くと「？」だけ右端へ飛び、
+            上にずれて見える。
+          */}
+          <div className="flex min-w-0 items-center gap-1">
+            <h2 className="text-ink min-w-0 text-base leading-normal font-bold">{title}</h2>
+            {helpTip ? <HelpTip label={`${title}の説明`}>{helpTip}</HelpTip> : null}
+            {/* 期間は常に1行にする（DASH-23）。折り返すとカード間で見出しの高さがずれる。 */}
+            {period ? <span className="text-ink-faint shrink-0 text-[11px] font-normal whitespace-nowrap">{period}</span> : null}
+          </div>
           {/*
             行き先リンクは CardHeader の action（actionTone="info"）と
             同じ見た目にする。ダッシュボードの行き先リンクはこの1つに

@@ -11,8 +11,8 @@ import Chip from '@/components/shared/chip'
 import Dialog from '@/components/shared/dialog'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
+import KpiCard from '@/components/shared/kpi-card'
 import Notice from '@/components/shared/notice'
-import SummaryCard from '@/components/shared/summary-card'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { contractDetail, minutesLabel, revenueDetail, revenueSourceLabel } from './format'
 
@@ -88,10 +88,11 @@ export default function OpsDashboardPage() {
   const loading = data === null && !error
 
   return (
-    <div data-design-node="Xvofy">
+    <div data-design-node="Xvofy" className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       <OpsPageHeader title="ダッシュボード" />
 
-      <div className="mb-4 flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <h2 className="text-body font-bold text-ink">{label}のようす</h2>
         <div className="flex items-center gap-1.5">
           {PERIODS.map((p) => (
@@ -106,21 +107,21 @@ export default function OpsDashboardPage() {
 
       {/* 初回の読み込みに失敗したときは、各セクションが「読み込んでいます」のまま残らないよう1枚のエラー表示にまとめる。 */}
       {!data && error ? (
-        <div className="mb-4 rounded-card border border-hairline bg-canvas">
+        <div className="rounded-card border border-hairline bg-canvas">
           <ListState kind="error" title="ダッシュボードを表示できませんでした" onRetry={() => void load()} />
         </div>
       ) : (
       <>
-      <div data-design-node="s7wSj" className="mb-4 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-        <div data-design-node="nPbgn"><SummaryCard variant="v6" title="今月の売上（入金済み）" value={null} unit="" valueText={k ? formatYen(k.revenueThisMonth) : undefined} detail={k ? revenueDetail(k.revenueDelta, k.refundsThisMonth) : '—'} loading={loading} /></div>
-        <div data-design-node="BaoAQ"><SummaryCard variant="v6" title="契約中の月額合計" value={null} unit="" valueText={k ? formatYen(k.contractMonthlyTotal) : undefined} detail={k ? contractDetail(k.active, k.byPlan, k.filledByListPriceCount) : '—'} loading={loading} /></div>
-        <SummaryCard variant="v6" title="トライアル中" value={k ? k.trialing : null} unit="" detail={k ? `${label}の新規 ${k.newInPeriod}` : '—'} loading={loading} />
-        <SummaryCard variant="v6" title={`${label}の解約`} value={k ? k.churnInPeriod : null} unit="" detail={k ? `解約率 ${k.churnRate.toFixed(1)}%` : '—'} badge={k && k.churnInPeriod > 0 ? '確認' : undefined} badgeTone="danger" loading={loading} />
-        <div data-design-node="G0vK7"><SummaryCard variant="v6" title="今月の AI 利用" value={data?.ai?.callsThisMonth ?? null} unit="回" detail={data?.ai ? `返信の下書き${data.ai.draftsThisMonth}回・記事化${data.ai.callsThisMonth - data.ai.draftsThisMonth}回` : '—'} loading={loading} /></div>
+      <div data-design-node="s7wSj" className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+        <div data-design-node="nPbgn"><KpiCard variant="v6" title="今月の売上（入金済み）" value={null} unit="" valueText={k ? formatYen(k.revenueThisMonth) : undefined} detail={k ? revenueDetail(k.revenueDelta, k.refundsThisMonth) : '—'} loading={loading} /></div>
+        <div data-design-node="BaoAQ"><KpiCard variant="v6" title="契約中の月額合計" value={null} unit="" valueText={k ? formatYen(k.contractMonthlyTotal) : undefined} detail={k ? contractDetail(k.active, k.byPlan, k.filledByListPriceCount) : '—'} loading={loading} /></div>
+        <KpiCard variant="v6" title="トライアル中" value={k ? k.trialing : null} unit="" detail={k ? `${label}の新規 ${k.newInPeriod}` : '—'} loading={loading} />
+        <KpiCard variant="v6" title={`${label}の解約`} value={k ? k.churnInPeriod : null} unit="" detail={k ? `解約率 ${k.churnRate.toFixed(1)}%` : '—'} badge={k && k.churnInPeriod > 0 ? '確認' : undefined} badgeTone="danger" loading={loading} />
+        <div data-design-node="G0vK7"><KpiCard variant="v6" title="今月の AI 利用" value={data?.ai?.callsThisMonth ?? null} unit="回" detail={data?.ai ? `返信の下書き${data.ai.draftsThisMonth}回・記事化${data.ai.callsThisMonth - data.ai.draftsThisMonth}回` : '—'} loading={loading} /></div>
       </div>
 
       {/* グラフ帯 */}
-      <div className="mb-4 grid gap-4 xl:grid-cols-5">
+      <div className="grid gap-4 xl:grid-cols-5">
         <section data-design-node="fyib5" aria-label="月ごとの売上" className="rounded-card border border-hairline bg-canvas px-5 py-4 xl:col-span-3">
           <div data-design-node="MVufa" className="mb-2 flex items-center gap-2">
             <h3 className="text-label font-bold text-ink">月ごとの売上</h3>
@@ -156,7 +157,7 @@ export default function OpsDashboardPage() {
       </div>
 
       {/* 要対応帯 */}
-      <div className="mb-4 grid gap-4 xl:grid-cols-5">
+      <div className="grid gap-4 xl:grid-cols-5">
         <section aria-label="要対応" className="rounded-card border border-hairline bg-canvas px-5 py-4 xl:col-span-3">
           <h3 className="mb-2 text-label font-bold text-ink">要対応</h3>
           {data ? (

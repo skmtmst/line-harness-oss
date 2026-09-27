@@ -29,7 +29,7 @@ const PATHS = {
     <path key="h" d="M12 18h.01" />,
     <path key="i" d="M16 18h.01" />,
   ],
-  /** 一覧（リスト表示の切り替え用。lucide list と同じ線） */
+  /** 一覧（リスト表示の切り替え・自分のイベントへ戻る。lucide list と同じ線） */
   list: [
     <path key="a" d="M3 12h.01" />,
     <path key="b" d="M3 18h.01" />,
@@ -48,6 +48,24 @@ const PATHS = {
     <circle key="c" cx="12" cy="12" r="10" />,
     <path key="a" d="M12 16v-4" />,
     <path key="b" d="M12 8h.01" />,
+  ],
+  /** 画像が無いときの印 (イベント詳細) */
+  image: [
+    <rect key="r" width="18" height="18" x="3" y="3" rx="2" />,
+    <circle key="c" cx="9" cy="9" r="2" />,
+    <path key="p" d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />,
+  ],
+  /** 場所 (イベント詳細) */
+  'map-pin': [
+    <path key="p" d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />,
+    <circle key="c" cx="12" cy="10" r="3" />,
+  ],
+  /** 待ち (キャンセル待ち・承認待ちの印) */
+  hourglass: [
+    <path key="a" d="M5 22h14" />,
+    <path key="b" d="M5 2h14" />,
+    <path key="c" d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12 7.586 16.414A2 2 0 0 0 7 17.828V22" />,
+    <path key="d" d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2" />,
   ],
   /** 送信した */
   send: [
