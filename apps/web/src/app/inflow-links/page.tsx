@@ -737,11 +737,12 @@ function InflowLinksPageInner({
   }
 
   return (
-    <div>
-      <p data-design="Head" className="mb-4 text-sm text-ink-faint">
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <p data-design="Head" className="text-sm text-ink-faint">
         どこから友だちが来たかを計測します。発行したURLごとにクリック・友だち追加・その後の成果まで追えます。
       </p>
-      <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div data-design="KPIs" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard
           title="流入元"
           value={routeCountAvailable ? accountRouteCount : null}
@@ -793,7 +794,7 @@ function InflowLinksPageInner({
         毎回読むものではないので、開閉する欄に畳む。表と数字を先に見せる。
         未計測の注文を0件と読ませないための件数は、開けば必ず読める。
       */}
-      <Disclosure size="compact" className="mb-4" title="数え方と経路の分かり方" hint="累計・はじめて来た経路に数えます">
+      <Disclosure size="compact" title="数え方と経路の分かり方" hint="累計・はじめて来た経路に数えます">
         <div className="text-ink-secondary space-y-2 text-xs leading-relaxed">
           <p>        LINEの「友だち追加」だけでは、その人がどこから来たのかは分かりません。
         ここで発行したURLをいったん通ってもらうことで、はじめて経路が分かります。QRコードも同じURLから作れます。
@@ -807,9 +808,9 @@ function InflowLinksPageInner({
         </div>
       </Disclosure>
 
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2"><Button href="/inflow-links/new" variant="primary">＋ 流入リンクを作る</Button><div className="flex gap-2"><Button variant="secondary" onClick={() => setBulkOpen(true)}>まとめて操作{selectedRouteIds.size > 0 ? `（${selectedRouteIds.size}件選択中）` : ''}</Button></div></div>
+      <div className="flex flex-wrap items-center justify-between gap-2"><Button href="/inflow-links/new" variant="primary">＋ 流入リンクを作る</Button><div className="flex gap-2"><Button variant="secondary" onClick={() => setBulkOpen(true)}>まとめて操作{selectedRouteIds.size > 0 ? `（${selectedRouteIds.size}件選択中）` : ''}</Button></div></div>
 
-      <div style={FOLDER_RAIL_STYLE} className="grid gap-5 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
+      <div style={FOLDER_RAIL_STYLE} className="grid gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
         <FolderPanel
           total={`${accountFilteredRows.length}件`}
           activeId={selectedGenre}
@@ -827,8 +828,8 @@ function InflowLinksPageInner({
           ]}
         />
 
-        <section className="min-w-0">
-          <div className="mb-3 flex flex-col gap-3 rounded-xl border border-hairline bg-canvas p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+        <section className="flex min-w-0 flex-col gap-4">
+          <div className="flex flex-col gap-3 rounded-xl border border-hairline bg-canvas p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
             <div>
               <p className="text-xs font-medium text-ink-faint">選択中のフォルダ</p>
               <h2 className="mt-0.5 text-lg font-bold text-ink">{selectedGenreLabel || 'フォルダを選んでください'}</h2>
@@ -881,7 +882,7 @@ function InflowLinksPageInner({
             </div>
           </div>
 
-          <div className="mb-3 flex flex-wrap items-center gap-2" aria-label="流入経路の絞り込み">
+          <div className="flex flex-wrap items-center gap-2" aria-label="流入経路の絞り込み">
             {([
               ['all', 'すべて', genreRows.length],
               ['has-friends', '友だち追加あり', genreRows.filter((row) => (row.stats?.friendCount ?? 0) > 0).length],

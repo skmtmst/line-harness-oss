@@ -144,6 +144,16 @@ export interface EventSlot {
   remaining: number | null;
 }
 
+/**
+ * 申込の返し。席が取れたときは {id, status} (status は requested=承認待ち /
+ * confirmed=確定)。満席で待ちに入ったときは 200 で {waitlisted: true} が
+ * 返る (Worker events.ts runBookingFlow/enterWaitlist)。409 だと画面側が
+ * 失敗として扱い「キャンセル待ちに入りました」を出せないための形。
+ */
+export type CreateEventBookingResponse =
+  | { id: string; status: string }
+  | { waitlisted: true; slot_id: string };
+
 export interface EventBookingMine {
   id: string;
   event_id: string;
@@ -243,7 +253,7 @@ export const api = {
     },
     idempotencyKey: string,
   ) =>
-    post<{ id: string; status: string }>(
+    post<CreateEventBookingResponse>(
       `/api/liff/events/${eventId}/bookings`,
       body,
       { 'Idempotency-Key': idempotencyKey },

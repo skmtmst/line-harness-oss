@@ -26,9 +26,10 @@ function sliceBetween(source: string, start: string, end: string): string {
 }
 
 const OFFERS_TAB = sliceBetween(TABS, 'export function OffersTab() {', '\nfunction SettlementEditor')
+// KPI帯と前後の間隔は親の gap-4 にそろえる（m13h。帯の中身の意図は変えない）。
 const KPI_BAND = sliceBetween(
   OFFERS_TAB,
-  '<div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">',
+  '<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">',
   '</div>\n\n      <div',
 )
 

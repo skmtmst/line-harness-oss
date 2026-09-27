@@ -1,6 +1,10 @@
-.createActions,
-.body {
+.createActions {
   margin-top: 18px;
+}
+
+.body {
+  /* 親の gap-4（16px）で間隔を作るため、ここでは余白を足さない。 */
+  margin-top: 0;
 }
 
 .contentLayout {

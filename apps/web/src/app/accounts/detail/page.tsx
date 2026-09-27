@@ -143,8 +143,9 @@ function AccountDetail() {
   const webhook = webhookLabel(account)
 
   return (
-    <div data-design-node="T9rA9">
-      <div data-design="Head" className="mb-4">
+    <div data-design-node="T9rA9" className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <div data-design="Head">
         <Breadcrumb items={[{ label: 'LINEアカウント', href: '/accounts' }, { label: account.name }]} />
       </div>
 
@@ -158,7 +159,7 @@ function AccountDetail() {
       />
 
       {tab === 'overview' && (
-        <div className="mt-4 grid gap-4 xl:grid-cols-4">
+        <div className="grid gap-4 xl:grid-cols-4">
           <div className="space-y-4 xl:col-span-3">
             <Card padding="roomy">
               <div className="flex items-start justify-between gap-3">
@@ -293,7 +294,7 @@ function AccountDetail() {
       )}
 
       {tab === 'connection' && (
-        <Card padding="roomy" className="mt-4">
+        <Card padding="roomy">
           <p className="text-ink text-sm font-bold">Webhookの突合</p>
           <dl className="mt-3 grid gap-x-6 gap-y-3 sm:grid-cols-2">
             <Row label="LINE側に登録したURL" value={account.webhook?.actualUrl ?? '—'} />
@@ -320,7 +321,7 @@ function AccountDetail() {
       )}
 
       {tab === 'credentials' && (
-        <Card padding="roomy" className="mt-4">
+        <Card padding="roomy">
           <p className="text-ink text-sm font-bold">資格情報</p>
           <dl className="mt-3 space-y-3">
             <Row label="チャネルシークレット" value={credentialLabel(account.channelSecretConfigured)} />
@@ -335,7 +336,7 @@ function AccountDetail() {
       )}
 
       {tab === 'handover' && (
-        <Card padding="roomy" className="mt-4">
+        <Card padding="roomy">
           <p className="text-ink text-sm font-bold">乗り換え</p>
           <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
             別のLINEアカウントへ、友だちと設定を引き継ぎます。事前確認をしてから本実行します。
