@@ -512,6 +512,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'PUT /api/scenarios/{id}/steps/{stepId}',
   'PUT /api/users/{id}',
   'PUT /api/nen/lifetime-milestones',
+  'GET /api/liff/booking/settings',
   'GET /api/liff/nen/health-logs/summary',
   'PUT /api/liff/nen/pets/{id}',
   'PUT /api/nen/feeding-products',
