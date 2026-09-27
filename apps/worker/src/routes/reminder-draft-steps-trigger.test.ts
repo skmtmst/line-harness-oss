@@ -190,6 +190,20 @@ describe('下書き保存の楽観ロック', () => {
       error: 'この下書きは別の画面で先に更新されました。最新の内容を読み込み直してください',
     })
   })
+
+  it('R148: 開いたときの版時刻も保存層へ渡す（対象設定の保存と同じ条件）', async () => {
+    mocks.saveDraft.mockResolvedValue(versionRow())
+    const response = await createApp(dbWithEvent(null)).request('/api/reminders/r-1/draft', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ...draft(), expectedVersionId: 'version-1', expectedUpdatedAt: '2026-09-27T10:00:00.000+09:00' }),
+    })
+    expect(response.status).toBe(200)
+    expect(mocks.saveDraft).toHaveBeenCalledWith(
+      expect.anything(), 'r-1', expect.anything(),
+      { expectedVersionId: 'version-1', expectedUpdatedAt: '2026-09-27T10:00:00.000+09:00' },
+    )
+  })
 })
 
 describe('2月29日の扱い（3択）', () => {

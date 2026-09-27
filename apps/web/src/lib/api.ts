@@ -3514,6 +3514,11 @@ export type ReminderDeliveryRunsResponse = {
     lifecycleStatus: 'draft' | 'published' | 'stopped'
     /** 公開版の停止条件。公開版が無いときは null（未取得と区別する）。 */
     stopConditions: ReminderStopConditions | null
+    /**
+     * 公開版があるか（R146 監査）。無い下書きは「停止中」ではなく
+     * 「下書き」と出し、再開はさせない。
+     */
+    hasPublishedVersion: boolean
   }
   summary: {
     sent: number
@@ -10900,12 +10905,14 @@ export const api = {
     /**
      * `expectedVersionId` を渡すと楽観ロックになる——画面を開いたときの
      * 版とずれていれば409。別タブでの先勝ち保存を古い内容で上書きしない。
+     * R148 監査：通常保存は版IDを付け替えないため、保存のたびに変わる
+     * `expectedUpdatedAt`（開いたときの版時刻）も合わせて送る。
      */
-    saveDraft: (id: string, settings: ReminderDraftSettings, options: { expectedVersionId?: string } = {}) =>
+    saveDraft: (id: string, settings: ReminderDraftSettings, options: { expectedVersionId?: string; expectedUpdatedAt?: string } = {}) =>
       fetchApi<ApiResponse<ReminderDraftVersion>>(`/api/reminders/${id}/draft`, {
         method: 'PUT',
         body: JSON.stringify(options.expectedVersionId
-          ? { ...settings, expectedVersionId: options.expectedVersionId }
+          ? { ...settings, expectedVersionId: options.expectedVersionId, ...(options.expectedUpdatedAt ? { expectedUpdatedAt: options.expectedUpdatedAt } : {}) }
           : settings),
       }),
     validateDraft: (id: string) =>
@@ -13719,6 +13726,13 @@ export const bookingApi = {
        */
       todayActiveTotal?: number
       weekTotal: number
+      /**
+       * 表示タブ（今日・今週・今月）の数。取消・拒否・期限切れを除いた
+       * 有効な予約だけ（カレンダーと同じ基準）。段階配備中の旧Workerでは未返却。
+       */
+      todayTabTotal?: number
+      weekTabTotal?: number
+      monthTabTotal?: number
       byMenu: Array<{ name: string; total: number }>
     }>(withAccount(`/api/booking/admin/requests-summary?${query.toString()}`, accountId))
   },

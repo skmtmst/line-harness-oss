@@ -670,7 +670,7 @@ function NewCommonVarInner() {
         )}
       />
 
-      <ConfirmDialog
+      <ConfirmDialog primaryAction="cancel"
         open={leaveTarget !== null}
         title="保存していない変更があります"
         description="このまま移動すると、入力した共通情報は失われます。保存せずに移動しますか？"

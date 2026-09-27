@@ -106,4 +106,18 @@ describe('#641 ウェビナー一覧の行操作', () => {
     expect(menu, 'メニューが開きません').toBeTruthy()
     expect(menu!.textContent).toContain('アーカイブする')
   })
+
+  it('R94 一覧の「…」から参加者・分析・コメント演出へ入れる', async () => {
+    await act(async () => { root.render(<WebinarsPage />) })
+    await flush()
+
+    const more = host.querySelector('button[data-qa-open="LKuAQ"]') as HTMLButtonElement
+    expect(more, '「…」の撮影口が消えています').toBeTruthy()
+    act(() => { more.click() })
+    const menu = document.querySelector('[role="menu"]')
+    expect(menu, 'メニューが開きません').toBeTruthy()
+    expect(menu!.textContent).toContain('参加者を見る')
+    expect(menu!.textContent).toContain('分析を見る')
+    expect(menu!.textContent).toContain('コメント演出を開く')
+  })
 })
