@@ -105,6 +105,10 @@ const mocks = {
       if (value === '') return value;
       return value.length <= 200 && /^https:\/\/\S+$/.test(value) ? value : null;
     }
+    if (type === 'url') {
+      if (value === '') return value;
+      return value.length <= 200 && /^https?:\/\/\S+$/.test(value) ? value : null;
+    }
     if (type === 'date' || type === 'datetime') {
       const match = type === 'date'
         ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
@@ -1765,6 +1769,7 @@ describe('共通情報', () => {
       ['boolean', 'true'],
       // 既存型も新しい分岐で退行していない。
       ['text', 'これまでの文字列'],
+      ['url', 'https://example.com/shop'],
     ] as const;
 
     for (const [type, value] of postCases) {
@@ -1783,6 +1788,8 @@ describe('共通情報', () => {
       ['date', '2026-02-30'],
       ['datetime', '2026-02-30T24:00'],
       ['boolean', 'yes'],
+      // R36: URL型にURLでない文章は登録させない。
+      ['url', 'これはURLではありません'],
     ] as const;
     for (const [type, value] of rejectedCreates) {
       const response = await req('/api/common-vars', 'POST', {
@@ -1829,6 +1836,40 @@ describe('共通情報', () => {
       value: '2026-02-30', impactProof: 'forged', expectedVersion: 3,
     });
     expect(invalidPatch.status).toBe(400);
+
+    // R36: URL型は新規・編集・予約のすべてで http/https のURLだけを受ける。
+    const urlBad = await req('/api/common-vars', 'POST', {
+      accountId: 'account-1', name: '店舗リンク', varKey: 'shop_link', type: 'url',
+      value: 'これはURLではありません',
+    });
+    expect(urlBad.status).toBe(400);
+    expect(await urlBad.json()).toMatchObject({
+      error: 'URLの値は http:// または https:// からはじまる形で入力してください',
+    });
+    mocks.getCommonVarById.mockResolvedValueOnce({ ...VAR, type: 'url', value: 'https://example.com/old' });
+    const urlBadPatch = await req('/api/common-vars/cv-1?accountId=account-1', 'PATCH', {
+      value: 'これはURLではありません', impactProof: 'forged', expectedVersion: 3,
+    });
+    expect(urlBadPatch.status).toBe(400);
+    expect(await urlBadPatch.json()).toMatchObject({
+      error: 'URLの値は http:// または https:// からはじまる形で入力してください',
+    });
+    // 直前の正常な更新の1回きりで、URLでない値はDBへ渡さない。
+    expect(mocks.updateCommonVar).toHaveBeenCalledTimes(1);
+    // 代替値も同じ確かめを通る。
+    const urlBadFallback = await req('/api/common-vars', 'POST', {
+      accountId: 'account-1', name: '店舗リンク2', varKey: 'shop_link2', type: 'url',
+      value: 'https://example.com/shop',
+      expiryBehavior: 'fallback', fallbackValue: 'これはURLではありません',
+    });
+    expect(urlBadFallback.status).toBe(400);
+    mocks.getCommonVarById.mockResolvedValueOnce({ ...VAR, type: 'url', value: 'https://example.com/old' });
+    const urlBadSchedule = await req('/api/common-vars/cv-1/schedules?accountId=account-1', 'POST', {
+      effectiveFrom: '2099-01-01T00:00',
+      value: 'これはURLではありません',
+    });
+    expect(urlBadSchedule.status).toBe(400);
+    expect(mocks.createCommonVarSchedule).not.toHaveBeenCalled();
 
     // Account access and stale versions are rejected before a write. This remains
     // true for a newly added type, not only for the legacy text fixture.

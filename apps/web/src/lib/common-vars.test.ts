@@ -39,6 +39,17 @@ describe('commonVarValueError（送信前の型検査）', () => {
     expect(commonVarValueError('image', 'http://example.com/a.png')).toContain('https://')
   })
 
+  it('URL型は http/https のURLだけを受ける（R36）', () => {
+    expect(commonVarValueError('url', '')).toBeNull()
+    expect(commonVarValueError('url', 'https://example.com/shop')).toBeNull()
+    expect(commonVarValueError('url', 'http://example.com/shop')).toBeNull()
+    // 監査で保存できてしまった文章は止める。
+    expect(commonVarValueError('url', 'これはURLではありません')).toContain('http://')
+    expect(commonVarValueError('url', 'ftp://example.com/a')).toContain('http://')
+    expect(commonVarValueError('url', 'example.com/a')).toContain('http://')
+    expect(commonVarValueError('url', 'https://')).toContain('http://')
+  })
+
   it('代替値・更新後の値では呼び名を変えて同じ判定をする', () => {
     expect(commonVarValueError('boolean', 'yes', '代替値'))
       .toBe('代替値は種別に合う値を入力してください')

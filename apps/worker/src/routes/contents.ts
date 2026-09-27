@@ -2087,12 +2087,15 @@ contents.post('/api/common-vars', requireRole('owner', 'admin'), async (c) => {
       return c.json({ success: false, error: '名前は200文字までで入力してください' }, 400);
     }
     if (value === null) {
-      // VAR-06: 何が悪いかを画面へ返す。画像はURL形だけを受ける（VAR-03）。
+      // VAR-06: 何が悪いかを画面へ返す。画像はURL形だけを受け（VAR-03）、
+      // URL型は http/https のURLだけを受ける（R36）。
       return c.json({
         success: false,
         error: type === 'image'
           ? '画像には https:// からはじまるURLを入力してください'
-          : '種別に合う値を入力してください',
+          : type === 'url'
+            ? 'URLの値は http:// または https:// からはじまる形で入力してください'
+            : '種別に合う値を入力してください',
       }, 400);
     }
     if (memo.length > 1000) {
@@ -2180,7 +2183,9 @@ contents.patch('/api/common-vars/:id', requireRole('owner', 'admin'), async (c) 
         success: false,
         error: existing.type === 'image'
           ? '画像には https:// からはじまるURLを入力してください'
-          : '種別に合う値を入力してください',
+          : existing.type === 'url'
+            ? 'URLの値は http:// または https:// からはじまる形で入力してください'
+            : '種別に合う値を入力してください',
       }, 400);
     }
     const patchMemo = body.memo === undefined ? undefined : String(body.memo);
