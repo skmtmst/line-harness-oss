@@ -31,6 +31,24 @@ type Geometry = {
   width: number | undefined
   minWidth: number | undefined
   placement: MenuPortalPlacement
+  /** 開く方向に使える高さ（画面 − ボタン − 余白8px）。器の最大の高さ。 */
+  maxHeight: number
+}
+
+/** 画面端の余白。上下左右とも 8px。 */
+export const MENU_PORTAL_MARGIN = 8
+
+/** 下に続きがあるか（1px の誤差は無視）。 */
+export function hasMoreBelow({
+  scrollHeight,
+  scrollTop,
+  clientHeight,
+}: {
+  scrollHeight: number
+  scrollTop: number
+  clientHeight: number
+}): boolean {
+  return scrollHeight - scrollTop - clientHeight > 1
 }
 
 /**
@@ -40,9 +58,12 @@ type Geometry = {
  * カード・表・ダイアログ・固定の帯の中にあっても、親の
  * `overflow: hidden` や重なり順（`z-index`）に切られない。
  * 下に場所が無ければ上へ開き、右に無ければ左へ寄せる。
- * 長い中身は子の側（`max-height`＋`overflow-y: auto`）でスクロールする。
+ * 高さは開く方向に使える分（画面 − ボタン − 余白8px）まで使い、
+ * 入るなら全部出し、入りきらない時だけ器の中でスクロールする。
+ * その時は下端に影（続きの目印）を付ける。
  *
- * 見た目は持たない。白地・角丸・影は子が持つ。
+ * 見た目は持たない。白地・角丸・浮きの影は子が持つ。
+ * （下端の続きの影だけは器が付ける。）
  */
 export default function MenuPortal({
   open,
@@ -55,6 +76,7 @@ export default function MenuPortal({
 }: MenuPortalProps) {
   const [mounted, setMounted] = useState(false)
   const [geometry, setGeometry] = useState<Geometry | null>(null)
+  const [hasMore, setHasMore] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
   const closeRef = useRef(onClose)
   closeRef.current = onClose
@@ -74,22 +96,26 @@ export default function MenuPortal({
       const anchorRect = anchor.getBoundingClientRect()
       const panelWidth = matchWidth === true ? anchorRect.width : panel.offsetWidth
       const minWidth = matchWidth === 'min' ? anchorRect.width : undefined
-      const panelHeight = panel.offsetHeight
+      // 上限で切った後の高さではなく中身の全部の高さで開く向きを決める。
+      const contentHeight = panel.scrollHeight || panel.offsetHeight
       const viewportWidth = window.innerWidth
       const viewportHeight = window.innerHeight
-      const margin = 8
+      const margin = MENU_PORTAL_MARGIN
       const spaceBelow = viewportHeight - anchorRect.bottom - gap - margin
       const spaceAbove = anchorRect.top - gap - margin
-      let top: number
       let placement: MenuPortalPlacement
-      if (panelHeight <= spaceBelow || spaceBelow >= spaceAbove) {
+      if (contentHeight <= spaceBelow || spaceBelow >= spaceAbove) {
         placement = 'down'
-        top = anchorRect.bottom + gap
       } else {
         placement = 'up'
-        top = anchorRect.top - gap - panelHeight
       }
-      top = Math.max(margin, Math.min(top, viewportHeight - panelHeight - margin))
+      // 開く方向に使える高さまで使う。入るなら全部、足りなければここで切る。
+      const maxHeight = Math.max(0, placement === 'down' ? spaceBelow : spaceAbove)
+      const shownHeight = Math.min(contentHeight || maxHeight, maxHeight)
+      const top =
+        placement === 'down'
+          ? anchorRect.bottom + gap
+          : Math.max(margin, anchorRect.top - gap - shownHeight)
       const rawLeft = align === 'end' ? anchorRect.right - panelWidth : anchorRect.left
       const left = Math.max(margin, Math.min(rawLeft, viewportWidth - panelWidth - margin))
       setGeometry({
@@ -98,6 +124,7 @@ export default function MenuPortal({
         width: matchWidth === true ? Math.max(0, panelWidth) : undefined,
         minWidth,
         placement,
+        maxHeight,
       })
     }
     measure()
@@ -109,6 +136,33 @@ export default function MenuPortal({
       window.removeEventListener('scroll', measure, true)
     }
   }, [open, mounted, align, gap, matchWidth, children])
+
+  // 下に続きがある間だけ下端の影を出す。入りきる時は影なし。
+  useLayoutEffect(() => {
+    if (!open || !mounted) return
+    const panel = panelRef.current
+    if (!panel) return
+    const update = () => {
+      setHasMore(
+        hasMoreBelow({
+          scrollHeight: panel.scrollHeight,
+          scrollTop: panel.scrollTop,
+          clientHeight: panel.clientHeight,
+        }),
+      )
+    }
+    update()
+    panel.addEventListener('scroll', update, { passive: true })
+    const observer =
+      typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(update)
+    if (observer) observer.observe(panel)
+    window.addEventListener('resize', update)
+    return () => {
+      panel.removeEventListener('scroll', update)
+      observer?.disconnect()
+      window.removeEventListener('resize', update)
+    }
+  }, [open, mounted, geometry?.maxHeight, children])
 
   useLayoutEffect(() => {
     if (!open || !mounted) return
@@ -134,10 +188,12 @@ export default function MenuPortal({
     <div
       ref={panelRef}
       // 静的に読める形にする（直書き借金の見張り）。重なりの数字と
-      // 画面端の上限は style へ。見た目（白地・角丸・影）は子が持つ。
+      // 画面端の上限は style へ。見た目（白地・角丸・浮きの影）は子が持つ。
+      // 高さの上限と続きの影だけは器が持つ（子は自分の上限を外す）。
       className="fixed min-w-0"
       data-menu-portal=""
       data-placement={geometry?.placement ?? 'down'}
+      data-has-more={hasMore ? 'true' : 'false'}
       style={{
         top: geometry?.top ?? 0,
         left: geometry?.left ?? 0,
@@ -145,6 +201,12 @@ export default function MenuPortal({
         minWidth: geometry?.minWidth,
         zIndex: 120,
         maxWidth: 'calc(100vw - 16px)',
+        // 開く方向に使える高さまで。入るなら全部、足りなければ中でスクロール。
+        maxHeight: geometry?.maxHeight,
+        overflowY: 'auto',
+        overscrollBehavior: 'contain',
+        // 下に続きがある間だけ下端の影（続きの目印）。
+        boxShadow: hasMore ? 'inset 0 -16px 12px -12px rgb(0 0 0 / 22%)' : undefined,
         // 測る前の一瞬だけ隠す（左上へのちらつき防止）。
         visibility: geometry ? undefined : 'hidden',
       }}

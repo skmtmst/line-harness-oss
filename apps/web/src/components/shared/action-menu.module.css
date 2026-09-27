@@ -159,7 +159,10 @@
 
 /*
  * 最上層（portal）の中での姿。白地・角丸・影などの見た目は
- * `.menu` のまま。場所の決め方だけ portal の器に任せる。
+ * `.menu` のまま。場所・高さの上限・中のスクロール・続きの影は
+ * portal の器に任せる（器が使える高さまで広げる）。
+ * ここで高さを切ると器が広げても 7 項目で止まるので、上限なしにする。
+ * 器を使わない並べ置き（`.inline`）の上限は `.menu` に残す。
  */
 .menuPortal {
   position: static;
@@ -168,6 +171,8 @@
   bottom: auto;
   left: auto;
   z-index: auto;
+  max-height: none;
+  overflow: visible;
 }
 
 /* portal の位置の目印。箱を持たず、並びに影響しない。 */
