@@ -57,7 +57,10 @@ shared-button-importer app/ec-commerce/page.tsx
 shared-button-importer app/ec-commerce/subscriptions-panel.tsx
 shared-button-importer app/emergency/page.tsx
 shared-button-importer app/events/bookings/page.tsx
+shared-button-importer app/events/change-review/page.tsx
+shared-button-importer app/events/edit/page.tsx
 shared-button-importer app/events/page.tsx
+shared-button-importer app/events/preview/page.tsx
 shared-button-importer app/form-submissions/edit/form-design-settings.tsx
 shared-button-importer app/form-submissions/edit/page.tsx
 shared-button-importer app/form-submissions/page.tsx

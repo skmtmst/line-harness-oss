@@ -22,10 +22,11 @@ const SRC = path.join(__dirname, '..')
  * 「まだ動きません」を吹き出しや注記で言い添えて、押せない操作を
  * 置いたままにする書き方がこれにあたる。
  *
- * **裸の `準備中` は禁じない。** イベントの状態（まだ公開していない）は
- * 設計そのものが `準備中` と呼んでいて、`src/lib/design-structure.json` の
- * `/events` にもその言葉が入っている。設計にある状態名まで消すと、
- * 実装が設計から離れる。ただし例外は `DESIGN_WORDS` に書いた場所だけで、
+ * **裸の `準備中` は禁じない。** 2026-09-28（U）より前は、イベントの状態
+ * （まだ公開していない）を設計そのものが `準備中` と呼んでいて、
+ * `src/lib/design-structure.json` の `/events` にもその言葉が入っていた。
+ * U で状態名を「下書き」に変えたので、今はどちらの言葉も設計にある状態名
+ * として扱う。ただし例外は `DESIGN_WORDS` に書いた場所だけで、
  * 数も固定する（言い回しを変えて言い訳を逃がさないため）。
  */
 
@@ -68,11 +69,11 @@ const ANY = /準備中/g
 /**
  * 設計そのものにある状態名。**言い訳ではないので直さない。**
  *
- * イベントの `is_published !== 1`（まだ公開していない）を、設計は `準備中` と呼ぶ。
+ * 2026-09-28（U）より前は、イベントの `is_published !== 1`（まだ公開して
+ * いない）を設計が `準備中` と呼んでいた。U で状態名を「下書き」に変えた
+ * ので、この表は空になった（0 になったら行ごと消す決まり）。
  */
-const DESIGN_WORDS: Record<string, number> = {
-  'app/events/page.tsx': 1,
-}
+const DESIGN_WORDS: Record<string, number> = {}
 
 /**
  * まだ残っている言い訳。**担当（S1〜S3）が機能ごとに消す。**
@@ -106,7 +107,7 @@ describe('画面に「準備中」を置かない', () => {
     // 数え漏れ（読む場所を間違えて 0 件になる）だけを見張る。
     // ちょうどの枚数は画面が増えるたびに動くので、下限をゆるく取る。
     expect(FILES.length).toBeGreaterThan(300)
-    expect(FILES.filter((f) => /^app\/.*\/page\.tsx$/.test(f.p) || f.p === 'app/page.tsx')).toHaveLength(186)  // 情報欄の編集画面と運営専用ナレッジ（37-11）、★V7見本（v7-progress-filedrop・v7-combobox・v7-target-missing）、設定の中のファイルの検査を含む実測値。2026-09-25 に比較用 /tags-v2・/tags-v3 の2画面を撤去。
+    expect(FILES.filter((f) => /^app\/.*\/page\.tsx$/.test(f.p) || f.p === 'app/page.tsx')).toHaveLength(188)  // 情報欄の編集画面と運営専用ナレッジ（37-11）、★V7見本（v7-progress-filedrop・v7-combobox・v7-target-missing）、設定の中のファイルの検査を含む実測値。2026-09-25 に比較用 /tags-v2・/tags-v3 の2画面を撤去。2026-09-28 にイベントの変更の確認・お客様表示の確認の2画面を追加（U）。
   })
 
   it('共通部品に「準備中」が1つも無い', () => {
@@ -147,13 +148,14 @@ describe('画面に「準備中」を置かない', () => {
     }
   })
 
-  it('設計にある状態名だけは残す（イベントの未公開）', () => {
+  it('設計にある状態名だけは残す（イベントの下書き）', () => {
     const events = FILES.find((f) => f.p === 'app/events/page.tsx')!
-    expect(count(events.s, ANY) - count(events.s, EXCUSE)).toBe(DESIGN_WORDS['app/events/page.tsx'])
+    // U で状態名を「下書き」に変えたので、「準備中」は0件のはず。
+    expect(count(events.s, ANY)).toBe(0)
     // 設計の書き出しにも同じ言葉がある（状態の列の値）。実装だけの言い訳ではない。
     const structure = JSON.parse(fs.readFileSync(path.join(SRC, 'lib', 'design-structure.json'), 'utf8'))
     const parts: string[] = structure.screens['/events'].parts
     expect(parts).toContain('状態')
-    expect(parts).toContain('準備中')
+    expect(parts).toContain('下書き')
   })
 })
