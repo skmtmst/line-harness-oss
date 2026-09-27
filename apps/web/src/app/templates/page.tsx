@@ -85,7 +85,13 @@ interface TemplateDetail {
   updatedAt: string
 }
 
-type TypeFilter = 'all' | 'single' | 'multiple' | 'variables' | 'question' | 'unused'
+/*
+ * R135: 種類タブ（メッセージ／質問）と絞り込み札（すべて／未使用など）は
+ * 別の状態で持つ。以前は1つの `typeFilter` で両方を表していたため、
+ * 質問タブで「未使用」を押すと種類が上書きされ、メッセージタブへ
+ * 切り替わって質問以外が混ざっていた。札は種類を変えない。
+ */
+type TypeFilter = 'all' | 'single' | 'multiple' | 'variables' | 'unused'
 
 /*
  * 種類の名前は `./template-message-type` に一本化した。
@@ -151,6 +157,8 @@ export default function TemplatesPage() {
   // 案内どおり、名前・本文・差し込んでいる項目を同じ検索欄で絞る。
   const [templateQuery, setTemplateQuery] = useState('')
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
+  /* R135: 質問タブが選ばれているか。絞り込み札とは独立に動く。 */
+  const [questionTab, setQuestionTab] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [form, setForm] = useState({ name: '', category: 'general', messageType: 'text', messageContent: '' })
   /*
@@ -254,24 +262,34 @@ export default function TemplatesPage() {
   useEffect(() => { load() }, [load])
 
   /*
-   * PERF-04: 種類タブの件数は集計専用の口で1回だけ取る。
+   * PERF-04: 種類タブの件数は集計専用の口で取る。
    * 以前は4種類それぞれの素材一覧（各行のpayload込み）を取って
    * 件数を数えていた。中身は種類の節を開いたとき loadAssets が取る。
+   *
+   * R135: 作った直後はタブの件数を取り直す。以前はアカウントを
+   * 切り替えるまで取り直さず、9枚のカルーセルを作ってもタブが
+   * 0件のままだった。素材の管理（`BroadcastAssetManager`）が
+   * 変わったことを `onChanged` で知らせる。
    */
-  useEffect(() => {
-    let cancelled = false
-    if (!selectedAccountId) {
+  const loadAssetCounts = useCallback(async () => {
+    const accountId = selectedAccountId
+    if (!accountId) {
       setAssetCounts({})
-      return () => { cancelled = true }
+      return
     }
-    void api.broadcastMessageAssets.counts({ accountId: selectedAccountId })
-      .then((result) => {
-        if (cancelled || !result.success) return
-        setAssetCounts(result.data)
-      })
-      .catch(() => undefined)
-    return () => { cancelled = true }
+    try {
+      const result = await api.broadcastMessageAssets.counts({ accountId })
+      // 切り替えた後に前の要求が返ってきても採用しない（N-147）。
+      if (activeAccountRef.current !== accountId) return
+      if (result.success) setAssetCounts(result.data)
+    } catch {
+      /* 件数が取れなくても一覧は出す。黙って古い件数のままにする。 */
+    }
   }, [selectedAccountId])
+
+  useEffect(() => {
+    void loadAssetCounts()
+  }, [loadAssetCounts])
 
   // Drawer fetch
   useEffect(() => {
@@ -325,13 +343,15 @@ export default function TemplatesPage() {
     */
     if (selectedCategory === 'unfiled' && t.folderId !== null) return []
     if (selectedCategory !== 'all' && selectedCategory !== 'unfiled' && t.folderId !== selectedCategory) return []
+    /* R135: 種類タブの絞り込み。メッセージタブに質問を混ぜない。 */
+    if (questionTab && !t.question) return []
+    if (!questionTab && t.question) return []
     if (typeFilter === 'unused' && t.usageCount !== 0) return []
-    if (typeFilter === 'question' && !t.question) return []
     if (typeFilter === 'single' && (t.question !== null || t.messageType === 'carousel')) return []
     if (typeFilter === 'multiple' && t.messageType !== 'carousel' && !t.messageContent.includes('\n\n')) return []
     if (typeFilter === 'variables' && !t.messageContent.includes('{{')) return []
     return [t]
-  }), [normalizedTemplateQuery, selectedCategory, templateSearchIndex, typeFilter])
+  }), [normalizedTemplateQuery, questionTab, selectedCategory, templateSearchIndex, typeFilter])
 
   /** フォルダを読み直す。並び順は API の `displayOrder` に従う。アカウント単位。 */
   const loadFolders = useCallback(async () => {
@@ -633,8 +653,8 @@ export default function TemplatesPage() {
             {
               label: 'メッセージ',
               count: loading ? undefined : templates.filter((item) => !item.question).length,
-              current: activeSection === 'message' && typeFilter !== 'question',
-              onClick: () => { setActiveSection('message'); setTypeFilter('all'); setShowCreate(false) },
+              current: activeSection === 'message' && !questionTab,
+              onClick: () => { setActiveSection('message'); setQuestionTab(false); setTypeFilter('all'); setShowCreate(false) },
             },
             {
               label: 'カルーセル',
@@ -651,8 +671,8 @@ export default function TemplatesPage() {
             {
               label: '質問',
               count: loading ? undefined : templates.filter((item) => Boolean(item.question)).length,
-              current: activeSection === 'message' && typeFilter === 'question',
-              onClick: () => { setActiveSection('message'); setTypeFilter('question'); setShowCreate(false) },
+              current: activeSection === 'message' && questionTab,
+              onClick: () => { setActiveSection('message'); setQuestionTab(true); setTypeFilter('all'); setShowCreate(false) },
             },
             {
               label: 'クーポン',
@@ -1514,7 +1534,7 @@ export default function TemplatesPage() {
       </div>
       </div>
       </> : canMutateTemplates ? (
-        <BroadcastAssetManager kind={activeSection} />
+        <BroadcastAssetManager kind={activeSection} onChanged={() => void loadAssetCounts()} />
       ) : (
         /*
          * N-144: 資産タブの作成・編集・削除APIも owner/admin 限定。

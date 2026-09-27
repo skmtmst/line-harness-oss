@@ -25,6 +25,7 @@ import {
   messageLengthNotice,
 } from './message-limits'
 import {
+  assetBubbleError,
   bubbleLegacyMessage,
   bubblesForSave,
   contentTemplateToBubble,
@@ -126,16 +127,16 @@ export function typeLabel(type: string): string {
 }
 
 /*
- * まだ送れない種別と、その理由。
+ * 直接は選べない種別と、その理由。
  *
  * ここに無い種別は、シナリオと同じ組み立て（`line-message.ts`）を通って
- * そのまま LINE へ渡る。ここに載っているものは `bubbleLegacyMessage` が
- * 「テキストに JSON を入れたもの」に落とすので、**中身の JSON がそのまま
- * 相手のトークに届く**。送って初めて分かる壊れ方なので、選ばせない。
+ * そのまま LINE へ渡る。ここに載っているものは手書きの中身が無いので、
+ * 種別の選択肢からは選ばせない。送って初めて分かる壊れ方にしない。
  *
- * リッチメッセージ・カードタイプ・クーポン・リサーチは、こちらで作った
- * 独自の型で、LINE に対応する種別が無い。Flex かカルーセルへ組み立て直す
- * 必要があるので、まだ蓋をしてある。
+ * リッチメッセージ・カードタイプ・クーポン・リサーチは、コンテンツの素材
+ * からのみ引用する。引用時は画面の保存と Worker の解析が同じ変換
+ *（`@line-crm/shared` の素材変換）で LINE の種別に直すので、中身の JSON が
+ * そのまま相手のトークに届かない（監査 R144）。
  */
 const UNSENDABLE_TYPES: Partial<Record<BroadcastBubbleType, string>> = {
   rich_message: 'リッチメッセージには未対応です。いまは写真かFlexで作れます',
@@ -304,7 +305,12 @@ function BubbleEditor({ bubble, index, total, assets, assetsStatus, accountId, o
   // 差し込みをカーソルの位置に入れるために、入力欄そのものを渡す。
   const textRef = useRef<HTMLTextAreaElement>(null)
   return <section className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-sm">
-    <div className="flex items-center gap-3 border-b border-hairline bg-canvas-sunken px-4 py-3">
+    {/*
+      吹き出しの見出し行。狭い幅では2段に折る。折らないと、種類の選択肢と
+      移動・削除ボタンが横に並んだまま表示域をはみ出し、解除や並べ替えが
+      右側へ隠れる（監査 R149）。
+    */}
+    <div className="flex flex-wrap items-center gap-3 border-b border-hairline bg-canvas-sunken px-4 py-3">
       <span className="flex h-7 w-7 items-center justify-center rounded-full bg-accent-deep text-xs font-bold text-on-accent">{index + 1}</span>
       <Select
         aria-label={`吹き出し${index + 1}の種類`}
@@ -517,7 +523,15 @@ function bubblesError(bubbles: BroadcastBubble[]): string {
     if (bubble.type === 'flex') {
       try { JSON.parse(String(bubble.content.flexJson ?? '')) } catch { return `吹き出し${index + 1}のFlex JSONを確認してください` }
     }
-    if (isContentTemplateType(bubble.type) && !bubble.content.assetId) return `吹き出し${index + 1}のテンプレートを選択してください`
+    /*
+     * 素材の引用は、選んでいないときも選んだ中身が送れる形に直せないときも
+     * ここで止める。保存の検査と Worker の解析が同じ変換を見るので、
+     * 画面では通るのに送信で断られる形にならない（監査 R144）。
+     */
+    if (isContentTemplateType(bubble.type)) {
+      const problem = assetBubbleError(bubble)
+      if (problem) return `吹き出し${index + 1}の${problem}`
+    }
   }
   return ''
 }
@@ -1689,7 +1703,7 @@ export default function BroadcastForm({
       </p>
     ) : null}
     <div className="mt-2.5 grid gap-4 xl:grid-cols-[minmax(0,1fr)_390px]">
-      <div className={`space-y-5 ${preflightDialogOpen ? 'broadcast-preflight-page-open' : ''}`}>
+      <div className={`min-w-0 space-y-5 ${preflightDialogOpen ? 'broadcast-preflight-page-open' : ''}`}>
         {preflightDialogOpen ? (
           <section className="broadcast-preflight-page space-y-3">
             <section className="rounded-card border border-hairline bg-canvas p-5">
