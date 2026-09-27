@@ -122,6 +122,11 @@ const HOST = '127.0.0.1'
 // 機能10専用。フォルダ操作後の再取得でも、同じプロセス内では保存結果を返す。
 let webinarFolders = WEBINAR_FOLDERS.map((folder) => ({ ...folder }))
 
+// R37 撮影用。登録メディア・共通情報のフォルダ名変更・削除を同じ
+// プロセス内で保存結果として返す。
+let mediaFolders = MEDIA_FOLDERS.map((folder) => ({ ...folder }))
+let commonVarFolders = COMMON_VAR_FOLDERS.map((folder) => ({ ...folder }))
+
 // 機能15専用。版追加の撮影では、差し替え用セッションの確定が本番口と同じ
 // `verified` を返す必要がある。申告時に受けた targetMediaId を覚えておく。
 const mediaUploadSessionTargets = new Map()
@@ -2391,10 +2396,10 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     return { success: true, data: AUTO_REPLY_FOLDERS }
   }
   if (pathname === '/api/folders' && query.get('kind') === 'common_var') {
-    return { success: true, data: COMMON_VAR_FOLDERS }
+    return { success: true, data: commonVarFolders }
   }
   if (pathname === '/api/folders' && query.get('kind') === 'media') {
-    return { success: true, data: MEDIA_FOLDERS }
+    return { success: true, data: mediaFolders }
   }
   if (pathname === '/api/folders' && query.get('kind') === 'webinar') {
     const accountId = query.get('account_id')
@@ -4010,6 +4015,42 @@ const server = createServer((req, res) => {
       return
     }
     const webinarFolderPath = /^\/api\/folders\/([^/]+)$/.exec(url.pathname)
+    // R37 撮影用。登録メディア・共通情報のフォルダ名変更・削除。
+    // 本番口と同じ形（PATCH は更新後、DELETE は data: null）で返す。
+    // ウェビナー用の口より前で、ウェビナーの箱は後の口へ通す。
+    if ((method === 'PATCH' || method === 'DELETE') && webinarFolderPath) {
+      const mediaCommonId = decodeURIComponent(webinarFolderPath[1])
+      const isWebinarFolder = webinarFolders.some((item) => item.id === mediaCommonId)
+      if (!isWebinarFolder) {
+        const target = mediaFolders.find((item) => item.id === mediaCommonId)
+          ?? commonVarFolders.find((item) => item.id === mediaCommonId)
+        if (!target) {
+          res.writeHead(404).end(JSON.stringify({ success: false, error: 'Not found' }))
+          return
+        }
+        if (method === 'DELETE') {
+          mediaFolders = mediaFolders.filter((item) => item.id !== mediaCommonId)
+          commonVarFolders = commonVarFolders.filter((item) => item.id !== mediaCommonId)
+          res.writeHead(200).end(JSON.stringify({ success: true, data: null }))
+          return
+        }
+        let mediaCommonRaw = ''
+        req.on('data', (chunk) => { mediaCommonRaw += chunk })
+        req.on('end', () => {
+          let body = {}
+          try { body = JSON.parse(mediaCommonRaw || '{}') } catch { body = {} }
+          const name = String(body.name ?? '').trim()
+          if (!name) {
+            res.writeHead(400).end(JSON.stringify({ success: false, error: 'フォルダ名を入力してください' }))
+            return
+          }
+          target.name = name
+          target.updatedAt = '2026-09-27T10:00:00.000Z'
+          res.writeHead(200).end(JSON.stringify({ success: true, data: { ...target } }))
+        })
+        return
+      }
+    }
     if (method === 'PATCH' && webinarFolderPath) {
       let raw = ''
       req.on('data', (chunk) => { raw += chunk })

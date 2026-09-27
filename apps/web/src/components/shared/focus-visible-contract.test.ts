@@ -75,7 +75,6 @@ describe('押せる部品のフォーカスが見える', () => {
     // 白地で 3:1 未満の緑枠だけの変化はやめる。
     const targets = [
       'text-field.module.css',
-      'select-field.module.css',
       'form-controls.module.css',
       'select.module.css',
       'date-field.module.css',

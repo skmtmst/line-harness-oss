@@ -1,7 +1,7 @@
 'use client'
 
 import { X } from 'lucide-react'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import { TimeField } from '@/components/shared/date-time-field'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
@@ -13,6 +13,8 @@ import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
 import Pagination from '@/components/shared/pagination'
+import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { RowActions } from '@/components/shared/row-actions'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import {
   api,
@@ -229,9 +231,9 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
 
   /**
    * #709残件: 28の行頭の持ち手飾りは掴めないため置かず、
-   * 代わりに操作列の↑↓で隣と並び順を入れ替える。専用の並び替えAPIや
-   * dnd実装は無いので、既存の updateMenu（PUT・版つき）で2件の
-   * sort_order を交換する。仕様書の一括更新口は未実装のため作らない。
+   * 代わりに操作列の「…」の中の上へ・下へで隣と並び順を入れ替える。
+   * 専用の並び替えAPIやdnd実装は無いので、既存の updateMenu（PUT・版つき）で
+   * 2件の sort_order を交換する。仕様書の一括更新口は未実装のため作らない。
    */
   async function moveMenu(menu: BookingMenu, delta: -1 | 1) {
     if (!selectedAccountId || reorderBusy) return
@@ -385,7 +387,7 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
         />
       </div>
 
-      <Notice data-design="Bar" tone="info" message="上から並んだ順に、お客様の画面に出ます。順番は操作列の↑↓で変えられます。" className="mb-4" />
+      <Notice data-design="Bar" tone="info" message="上から並んだ順に、お客様の画面に出ます。順番は操作列の「…」から変えられます。" className="mb-4" />
       <Disclosure size="compact" title="時間と金額の決め方" hint="2項目" className="mb-4">
         <ul className="list-disc space-y-1 pl-5 text-sm">
           <li>かかる時間を長めにしておくと、あとの予約とぶつかりません。</li>
@@ -429,37 +431,38 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
         {reorderError && (
           <Notice tone="danger" message={reorderError} onClose={() => setReorderError(null)} className="mb-3" />
         )}
-        <div
-          data-design="Table"
-          className="bg-canvas rounded-card border border-hairline overflow-hidden"
-        >
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[880px]">
+        <DataTable data-design="Table">
               <thead>
-                <tr className="bg-canvas-sunken border-b border-hairline">
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint">メニュー</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint">かかる時間</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-ink-faint">金額</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint">だれが受けられるか</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-ink-faint">
+                <TableHeadRow>
+                  <Th style={{ width: '26%' }}>メニュー</Th>
+                  <Th style={{ width: '12%' }}>かかる時間</Th>
+                  <Th style={{ width: '10%' }} align="right">金額</Th>
+                  {/* 担当者名は長さが読めないため幅を指定しない。残りを吸って表を器に合わせる。 */}
+                  <Th>だれが受けられるか</Th>
+                  <Th style={{ width: '12%' }} align="right">
                     この30日
-                  </th>
-                  {/* #707: 390pxで表を横スクロールしても操作列を右端へ留める */}
-                  <th className="sticky right-0 bg-canvas-sunken px-4 py-3 text-right text-xs font-semibold text-ink-faint">操作</th>
-                </tr>
+                  </Th>
+                  {/*
+                    #707: 390pxで表を横スクロールしても操作列を右端へ留める。
+                    操作列は固定幅（176px）。割合にすると中身
+                    （「中身を見る」＋「…」約138px）が器からはみ出す。
+                    残りは割合と自動の列で吸う。
+                  */}
+                  <Th align="right" className="sticky right-0 w-44 bg-canvas-sunken">操作</Th>
+                </TableHeadRow>
               </thead>
-              <tbody className="divide-hairline divide-y">
+              <tbody>
                 {visible.map((m) => {
                   const orderIndex = shown.findIndex((item) => item.id === m.id)
                   const canMoveUp = orderIndex > 0
                   const canMoveDown = orderIndex >= 0 && orderIndex < shown.length - 1
                   return (
-                  <tr key={m.id} className={`hover:bg-canvas-sunken ${m.is_active ? '' : 'text-ink-faint'}`}>
-                    <td className="px-4 py-3 text-sm font-medium">
+                  <Tr key={m.id} interactive className={m.is_active ? '' : 'text-ink-faint'}>
+                    <Td className="font-medium">
                       {/*
                         行頭の持ち手の飾りは置かない。ドラッグで並び替えられる
                         ように見えるが実際は押せない印になる（監査 A12・#709）。
-                        並び順は操作列の↑↓で変える。
+                        並び順は操作列の「…」の中の上へ・下へで変える。
                       */}
                       {m.name}{m.is_active ? '' : '（休止中）'}
                       {m.description && <span className="text-ink-faint mt-1 block max-w-72 truncate text-xs" title={m.description}>{m.description}</span>}
@@ -468,14 +471,14 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
                           {m.category_label}
                         </span>
                       )}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-ink-secondary tabular-nums">
+                    </Td>
+                    <Td className="text-ink-secondary tabular-nums">
                       {m.duration_minutes} 分
-                    </td>
-                    <td className={`px-4 py-3 text-sm text-right tabular-nums ${menuPriceLabel(m) === '無料' ? 'text-ink font-semibold' : ''}`}>
+                    </Td>
+                    <Td align="right" className={`tabular-nums ${menuPriceLabel(m) === '無料' ? 'text-ink font-semibold' : ''}`}>
                       {menuPriceLabel(m)}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-ink-secondary">
+                    </Td>
+                    <Td className="text-ink-secondary">
                       {/*
                        * #953 E-05: 休止中でも担当の割当は残る。is_active を先に見て
                        * 「だれもいません」と出すと、割当済みなのに未割当に見える。
@@ -488,53 +491,48 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
                       ) : (
                         <span className="text-xs">{(menuStaff.get(m.id) ?? []).join('・')}</span>
                       )}
-                    </td>
-                    <td className="px-4 py-3 text-right text-sm tabular-nums">
+                    </Td>
+                    <Td align="right" className="tabular-nums">
                       {`${bookingCounts.get(m.id) ?? 0} 件`}
-                    </td>
-                    <td className="sticky right-0 bg-canvas px-4 py-3 text-right">
-                      <div className="inline-flex gap-2 text-xs">
-                        {/* QSLEH の行操作は共通Button（高さ36px）より小さいため、
-                            表の行高を設計どおり保つ専用の小ボタンにする。 */}
-                        <button onClick={() => setEditing(m)} className="border-hairline rounded-control border px-2 py-1 font-semibold">
-                          中身を見る
-                        </button>
-                        {canEditMenus && (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => void moveMenu(m, -1)}
-                              disabled={reorderBusy || !canMoveUp}
-                              aria-label={`${m.name}を上へ`}
-                              title="上へ移動"
-                              className="border-hairline rounded-control border px-2 py-1 font-semibold disabled:opacity-40"
-                            >
-                              ↑
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => void moveMenu(m, 1)}
-                              disabled={reorderBusy || !canMoveDown}
-                              aria-label={`${m.name}を下へ`}
-                              title="下へ移動"
-                              className="border-hairline rounded-control border px-2 py-1 font-semibold disabled:opacity-40"
-                            >
-                              ↓
-                            </button>
-                            <button onClick={() => setVisibilityTarget(m)} className="border-hairline rounded-control border px-2 py-1 font-semibold">
-                              止める・出す
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
+                    </Td>
+                    <ActionCell className="sticky right-0 bg-canvas">
+                      {/*
+                        ★V7 行の操作の決まり：主な1つ＋「…」。共通の RowActions を使う。
+                        4つ並べると1440pxで器から72pxはみ出す。上へ・下へ・止める／再開は
+                        「…」の中へ集め、キーボード操作はメニューの ↑↓・Enter で行う。
+                      */}
+                      <RowActions
+                        subjectName={m.name}
+                        detail={{ label: '中身を見る', onClick: () => setEditing(m) }}
+                        menuItems={canEditMenus ? [
+                          {
+                            id: 'move-up',
+                            label: '上へ',
+                            disabled: reorderBusy || !canMoveUp,
+                            disabledReason: !canMoveUp ? 'いちばん上です' : '並び替えを保存中です',
+                            onSelect: () => void moveMenu(m, -1),
+                          },
+                          {
+                            id: 'move-down',
+                            label: '下へ',
+                            disabled: reorderBusy || !canMoveDown,
+                            disabledReason: !canMoveDown ? 'いちばん下です' : '並び替えを保存中です',
+                            onSelect: () => void moveMenu(m, 1),
+                          },
+                          {
+                            id: 'visibility',
+                            label: m.is_active ? '止める' : '再開',
+                            dividerBefore: true,
+                            onSelect: () => setVisibilityTarget(m),
+                          },
+                        ] : []}
+                      />
+                    </ActionCell>
+                  </Tr>
                   )
                 })}
               </tbody>
-            </table>
-          </div>
-        </div>
+        </DataTable>
       </>)}
 
       <div className="mt-3 flex items-center justify-between gap-3">
@@ -622,25 +620,23 @@ function BookingRulesSummary({ accountId, settings, items, loading, error, canMa
           <p className="text-ink-faint mt-1 text-xs">個別に値を入れたメニューは、下の値が優先されます。</p>
         </div>
         {/*
-          #734: 390pxでは列が多くて入りきらない。w-full だけだと表が容器幅に
-          潰れて右列の文字が途中で切れるため、内容が必要とする最小幅を持たせて
-          容器側の横スクロールで読めるようにする。
+          #734: 390pxでは列が多くて入りきらない。共通の表は外枠で横スクロールし、
+          列幅を均等に分ける（以前の最小幅 560px の指定はやめた）。
         */}
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[560px] text-sm">
-            <thead className="bg-canvas-sunken text-ink-secondary">
-              <tr><th className="px-4 py-3 text-left font-medium">メニュー</th>{rows.map((row) => <th key={row.key} className="px-4 py-3 text-left font-medium whitespace-nowrap">{row.label}</th>)}</tr>
+        {/* 外のカードが枠線を持つため、表の枠は消して二重線にしない。 */}
+        <DataTable className="rounded-none border-0">
+            <thead>
+              <TableHeadRow><Th>メニュー</Th>{rows.map((row) => <Th key={row.key} className="whitespace-nowrap">{row.label}</Th>)}</TableHeadRow>
             </thead>
-            <tbody className="divide-hairline divide-y">
+            <tbody>
               {items.map((menu) => (
-                <tr key={menu.id}>
-                  <td className="px-4 py-3 font-medium whitespace-nowrap">{menu.name}</td>
-                  {rows.map((row) => <td key={row.key} className="text-ink-secondary px-4 py-3 tabular-nums whitespace-nowrap">{menu[row.key] == null ? row.none : `${menu[row.key]}${row.unit}`}</td>)}
-                </tr>
+                <Tr key={menu.id}>
+                  <Td className="font-medium whitespace-nowrap">{menu.name}</Td>
+                  {rows.map((row) => <Td key={row.key} className="text-ink-secondary tabular-nums whitespace-nowrap">{menu[row.key] == null ? row.none : `${menu[row.key]}${row.unit}`}</Td>)}
+                </Tr>
               ))}
             </tbody>
-          </table>
-        </div>
+        </DataTable>
       </div>}
     </section>
   )
@@ -739,9 +735,10 @@ function BookingRulesEditor({ accountId, initial, canEdit, onRetry, onSaved }: {
            * IANA名の自由入力は綴り違いで予約全体がずれるため、候補から選ぶ形へ。
            * 保存済みの値が候補に無いときは先頭に足して、黙って書き換えない。
            */}
-          <SelectField
+          <Select
+            aria-label="タイムゾーン"
             value={draft.timeZone}
-            onChange={(event) => set('timeZone', event.target.value)}
+            onChange={(value) => set('timeZone', value)}
             options={(TIME_ZONE_CHOICES.includes(draft.timeZone)
               ? TIME_ZONE_CHOICES
               : [draft.timeZone, ...TIME_ZONE_CHOICES]
@@ -756,19 +753,21 @@ function BookingRulesEditor({ accountId, initial, canEdit, onRetry, onSaved }: {
         <RuleNumberField label="キャンセルの期限" unit="分前" min={0} max={43200} value={draft.cancelDeadlineMinutesBefore} onChange={(value) => set('cancelDeadlineMinutesBefore', value)} humanize={minutesBeforeLabel} />
         <RuleNumberField label="1人が同時に持てる予約" unit="件" min={1} max={100} value={draft.maxActiveBookingsPerFriend} onChange={(value) => set('maxActiveBookingsPerFriend', value)} />
         <Field label="予約の承認" required>
-          <SelectField
+          <Select
+            aria-label="予約の承認"
             value={draft.approvalMode}
-            onChange={(event) => set('approvalMode', event.target.value as 'automatic' | 'manual')}
+            onChange={(value) => set('approvalMode', value as 'automatic' | 'manual')}
             options={[{ value: 'automatic', label: '自動で確定' }, { value: 'manual', label: '確認してから確定' }]}
           />
         </Field>
         <RuleNumberField label="仮押さえの保持時間" unit="分" min={1} max={1440} value={draft.holdMinutes} onChange={(value) => set('holdMinutes', value)} humanize={formatMinutesLengthHint} />
         <Field label="予約枠の間隔" required>
-          <SelectField
+          <Select
+            aria-label="予約枠の間隔"
             value={String(draft.slotGranularityMinutes)}
-            onChange={(event) => set(
+            onChange={(value) => set(
               'slotGranularityMinutes',
-              Number(event.target.value) as BookingSettings['slotGranularityMinutes'],
+              Number(value) as BookingSettings['slotGranularityMinutes'],
             )}
             options={[5, 10, 15, 30, 60].map((value) => ({ value: String(value), label: `${value}分` }))}
           />
@@ -1128,11 +1127,11 @@ function EditMenuModal({
             />
           </Field>
           <Field label="料金の形" required>
-            <SelectField
+            <Select
               aria-label="料金の形"
               value={form.price_mode ?? 'fixed'}
-              onChange={(e) => {
-                const mode = e.target.value as NonNullable<BookingMenu['price_mode']>
+              onChange={(value) => {
+                const mode = value as NonNullable<BookingMenu['price_mode']>
                 // 無料・お問い合わせは金額を持たない。DB CHECK と Worker の
                 // readPriceModeAndAmount に合わせて base_price=0 にそろえる。
                 setForm((current) => ({
@@ -1175,9 +1174,10 @@ function EditMenuModal({
             />
           </div>
           <Field label="予約申込時に自動付与するタグ">
-            <SelectField
+            <Select
+              aria-label="予約申込時に自動付与するタグ"
               value={form.auto_tag_id ?? ''}
-              onChange={(e) => set('auto_tag_id', e.target.value === '' ? null : e.target.value)}
+              onChange={(value) => set('auto_tag_id', value === '' ? null : value)}
               options={[
                 { value: '', label: '— なし —' },
                 ...(danglingAutoTag

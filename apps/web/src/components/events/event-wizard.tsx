@@ -23,6 +23,7 @@ import DateField from '@/components/shared/date-field'
 import Notice from '@/components/shared/notice'
 import { TimeField } from '@/components/shared/date-time-field'
 import Select from '@/components/shared/select'
+import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import EventQuestionsEditor, { parseEventQuestions } from '@/components/events/event-questions-editor'
 // #740: 下書きの初期値と字数上限は編集画面と共有する。片方だけ変えないこと。
 import {
@@ -647,23 +648,25 @@ function OverviewStep({
           htmlFor="ev-max"
           note="同じ友だちが何回まで申し込めるかを決めます。"
         >
-          <select
+          <Select
+            aria-label="1人あたりの予約回数"
+            size="full"
             id="ev-max"
-            value={draft.max_bookings_per_friend ?? 'unlimited'}
-            onChange={(e) =>
+            value={draft.max_bookings_per_friend == null ? 'unlimited' : String(draft.max_bookings_per_friend)}
+            onChange={(value) =>
               update(
                 'max_bookings_per_friend',
-                e.target.value === 'unlimited' ? null : Number(e.target.value),
+                value === 'unlimited' ? null : Number(value),
               )
             }
-            className={inputClass}
-          >
-            <option value="unlimited">制限なし</option>
-            <option value="1">1回まで</option>
-            <option value="2">2回まで</option>
-            <option value="3">3回まで</option>
-            <option value="5">5回まで</option>
-          </select>
+            options={[
+              { value: 'unlimited', label: '制限なし' },
+              { value: '1', label: '1回まで' },
+              { value: '2', label: '2回まで' },
+              { value: '3', label: '3回まで' },
+              { value: '5', label: '5回まで' },
+            ]}
+          />
         </Field>
       </FormSection>
 
@@ -1131,18 +1134,14 @@ function SlotsStep({
               />
             </Field>
             <Field label="1枠の長さ" htmlFor="slot-min">
-              <select
+              <Select
+                aria-label="1枠の長さ"
+                size="full"
                 id="slot-min"
-                value={slotMinutes}
-                onChange={(e) => setSlotMinutes(Number(e.target.value))}
-                className={inputClass}
-              >
-                {[30, 45, 60, 90, 120].map((m) => (
-                  <option key={m} value={m}>
-                    {m}分
-                  </option>
-                ))}
-              </select>
+                value={String(slotMinutes)}
+                onChange={(value) => setSlotMinutes(Number(value))}
+                options={[30, 45, 60, 90, 120].map((m) => ({ value: String(m), label: `${m}分` }))}
+              />
             </Field>
             <Field label="各枠の定員" htmlFor="bulk-cap">
               <input
@@ -1174,35 +1173,34 @@ function SlotsStep({
               まだ枠がありません。枠を1つも作らないと公開できません。
             </p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[420px] text-sm">
+            <DataTable>
                 <thead>
-                  <tr className="border-hairline text-ink-faint border-b text-xs">
-                    <th className="px-2 py-2 text-left font-semibold">日時</th>
-                    <th className="px-2 py-2 text-right font-semibold">定員</th>
-                    <th className="px-2 py-2 text-right font-semibold">申込</th>
-                    <th className="px-2 py-2 text-right font-semibold">残り</th>
-                    <th className="px-2 py-2 text-right font-semibold">操作</th>
-                  </tr>
+                  <TableHeadRow>
+                    <Th style={{ width: '32%' }}>日時</Th>
+                    <Th style={{ width: '14%' }} align="right">定員</Th>
+                    <Th style={{ width: '14%' }} align="right">申込</Th>
+                    <Th style={{ width: '14%' }} align="right">残り</Th>
+                    <Th style={{ width: '26%' }} align="right">操作</Th>
+                  </TableHeadRow>
                 </thead>
                 <tbody>
                   {slots.map((s) => {
                     const taken = s.active_count ?? 0
                     return (
-                      <tr key={s.id} className="border-hairline border-b last:border-b-0">
-                        <td className="text-ink px-2 py-2">
+                      <Tr key={s.id}>
+                        <Td>
                           {formatSlotJp(s.starts_at, s.ends_at)}
-                        </td>
-                        <td className="text-ink-secondary px-2 py-2 text-right tabular-nums">
+                        </Td>
+                        <Td align="right" className="text-ink-secondary tabular-nums">
                           {s.capacity == null ? '無制限' : `${s.capacity}名`}
-                        </td>
-                        <td className="text-ink-secondary px-2 py-2 text-right tabular-nums">
+                        </Td>
+                        <Td align="right" className="text-ink-secondary tabular-nums">
                           {taken}名
-                        </td>
-                        <td className="text-ink-secondary px-2 py-2 text-right tabular-nums">
+                        </Td>
+                        <Td align="right" className="text-ink-secondary tabular-nums">
                           {s.capacity == null ? '—' : `${Math.max(0, s.capacity - taken)}名`}
-                        </td>
-                        <td className="px-2 py-2 text-right">
+                        </Td>
+                        <ActionCell>
                           <button
                             onClick={() => { setRemoveError(''); setRemoveTarget(s) }}
                             disabled={busy || taken > 0}
@@ -1211,13 +1209,12 @@ function SlotsStep({
                           >
                             削除
                           </button>
-                        </td>
-                      </tr>
+                        </ActionCell>
+                      </Tr>
                     )
                   })}
                 </tbody>
-              </table>
-            </div>
+            </DataTable>
           )}
         </FormSection>
 
@@ -1233,41 +1230,39 @@ function SlotsStep({
                 null=不可、0=開始直前まで、正数=開始N時間前。
                 選択肢は event-draft-shared で共有し、編集と食い違わせない。
               */}
-              <select
+              <Select
+                aria-label="キャンセルできる期限"
+                size="full"
                 id="cancel-deadline"
                 value={deadlineSelectValue(draft.cancel_deadline_hours_before)}
-                onChange={(e) =>
-                  update('cancel_deadline_hours_before', parseDeadlineSelect(e.target.value))
+                onChange={(value) =>
+                  update('cancel_deadline_hours_before', parseDeadlineSelect(value))
                 }
-                className={inputClass}
-              >
-                {deadlineOptionsWithSaved(
+                options={deadlineOptionsWithSaved(
                   EVENT_CANCEL_DEADLINE_OPTIONS,
                   draft.cancel_deadline_hours_before,
-                ).map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
+                )}
+              />
             </Field>
             <Field label="開始前のお知らせ" htmlFor="reminder-hours">
-              <select
+              <Select
+                aria-label="開始前のお知らせ"
+                size="full"
                 id="reminder-hours"
-                value={draft.reminder_hours_before ?? ''}
-                onChange={(e) =>
+                value={draft.reminder_hours_before == null ? '' : String(draft.reminder_hours_before)}
+                onChange={(value) =>
                   update(
                     'reminder_hours_before',
-                    e.target.value === '' ? null : Number(e.target.value),
+                    value === '' ? null : Number(value),
                   )
                 }
-                className={inputClass}
-              >
-                <option value="">送らない</option>
-                <option value="1">開始の1時間前に送る</option>
-                <option value="2">開始の2時間前に送る</option>
-                <option value="3">開始の3時間前に送る</option>
-              </select>
+                options={[
+                  { value: '', label: '送らない' },
+                  { value: '1', label: '開始の1時間前に送る' },
+                  { value: '2', label: '開始の2時間前に送る' },
+                  { value: '3', label: '開始の3時間前に送る' },
+                ]}
+              />
             </Field>
           </div>
           <label className="text-ink-secondary flex items-center gap-2 text-sm">
@@ -1465,19 +1460,17 @@ function PublishStep({
           </div>
           {draft.visible_tag_id && (
             <Field label="対象のタグ" htmlFor="visible-tag">
-              <select
+              <Select
+                aria-label="対象のタグ"
+                size="full"
                 id="visible-tag"
                 value={draft.visible_tag_id ?? ''}
-                onChange={(e) => update('visible_tag_id', e.target.value || null)}
-                className={inputClass}
-              >
-                {tags.length === 0 && <option value="">（タグがありません）</option>}
-                {tags.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
+                onChange={(value) => update('visible_tag_id', value || null)}
+                options={[
+                  ...(tags.length === 0 ? [{ value: '', label: '（タグがありません）' }] : []),
+                  ...tags.map((t) => ({ value: t.id, label: t.name })),
+                ]}
+              />
             </Field>
           )}
         </FormSection>
@@ -1490,23 +1483,19 @@ function PublishStep({
                 無いときは「保存済み：…」として出し、先頭項目を選んだように
                 見せない。
               */}
-              <select
+              <Select
+                aria-label="申込の締め切り"
+                size="full"
                 id="entry-cutoff"
                 value={deadlineSelectValue(draft.entry_cutoff_hours_before)}
-                onChange={(e) =>
-                  update('entry_cutoff_hours_before', parseDeadlineSelect(e.target.value))
+                onChange={(value) =>
+                  update('entry_cutoff_hours_before', parseDeadlineSelect(value))
                 }
-                className={inputClass}
-              >
-                {deadlineOptionsWithSaved(
+                options={deadlineOptionsWithSaved(
                   EVENT_ENTRY_CUTOFF_OPTIONS,
                   draft.entry_cutoff_hours_before,
-                ).map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
+                )}
+              />
             </Field>
           </div>
         </FormSection>

@@ -33,6 +33,24 @@ vi.mock('@/contexts/account-context', () => ({
   }),
 }))
 
+/*
+ * 時刻の選び欄は共通 Select（listbox）。ここで見たいのは選んだ後の
+ * 予約の判断なので、素の <select> に置き換える。
+ */
+vi.mock('@/components/shared/select', () => ({
+  default: ({ 'aria-label': label, id, value, onChange, options }: {
+    'aria-label'?: string
+    id?: string
+    value: string
+    onChange: (value: string) => void
+    options: Array<{ value: string; label: string }>
+  }) => React.createElement(
+    'select',
+    { 'aria-label': label, id, value, onChange: (e: { target: { value: string } }) => onChange(e.target.value) },
+    options.map((option) => React.createElement('option', { key: option.value, value: option.value }, option.label)),
+  ),
+}))
+
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), {
   status,
   headers: { 'Content-Type': 'application/json' },
@@ -142,7 +160,7 @@ async function eventually(check: () => void, timeout = 1_500): Promise<void> {
 }
 
 async function typeText(host: HTMLElement, text: string) {
-  const textarea = host.querySelector('textarea[aria-label="メッセージを入力"]') as HTMLTextAreaElement
+  const textarea = document.querySelector('textarea[aria-label="メッセージを入力"]') as HTMLTextAreaElement
   await act(async () => {
     const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')!.set!
     setter.call(textarea, text)
@@ -184,15 +202,15 @@ describe('N-025 引用返信と送信予約', () => {
       expect(host.textContent).toContain('値段はいくらですか？')
     })
 
-    const quoteButtons = Array.from(host.querySelectorAll<HTMLElement>('[data-inbox-v6="quote-reply"]'))
+    const quoteButtons = Array.from(document.querySelectorAll<HTMLElement>('[data-inbox-v6="quote-reply"]'))
     expect(quoteButtons.length).toBeGreaterThan(0)
     await act(async () => { quoteButtons[0].click() })
     await eventually(() => {
-      expect(host.querySelector('[data-inbox-v6="quote-preview"]')?.textContent).toContain('値段はいくらですか？')
+      expect(document.querySelector('[data-inbox-v6="quote-preview"]')?.textContent).toContain('値段はいくらですか？')
     })
 
     await typeText(host, '1,980円です')
-    const sendButton = Array.from(host.querySelectorAll('button')).find((b) => b.textContent === '送信')!
+    const sendButton = Array.from(document.querySelectorAll('button')).find((b) => b.textContent === '送信')!
     await act(async () => { sendButton.click() })
     await eventually(() => {
       expect(fixture.sentBodies).toHaveLength(1)
@@ -200,33 +218,33 @@ describe('N-025 引用返信と送信予約', () => {
     })
     // 送ったら引用は外れる。
     await eventually(() => {
-      expect(host.querySelector('[data-inbox-v6="quote-preview"]')).toBeNull()
+      expect(document.querySelector('[data-inbox-v6="quote-preview"]')).toBeNull()
     })
   })
 
   it('引用の×で外せる', async () => {
     await act(async () => { root.render(<ChatsPage />) })
     await eventually(() => {
-      expect(host.querySelector('[data-inbox-v6="quote-reply"]')).toBeTruthy()
+      expect(document.querySelector('[data-inbox-v6="quote-reply"]')).toBeTruthy()
     })
     await act(async () => {
-      host.querySelector<HTMLElement>('[data-inbox-v6="quote-reply"]')!.click()
+      document.querySelector<HTMLElement>('[data-inbox-v6="quote-reply"]')!.click()
     })
     await eventually(() => {
-      expect(host.querySelector('[data-inbox-v6="quote-preview"]')).toBeTruthy()
+      expect(document.querySelector('[data-inbox-v6="quote-preview"]')).toBeTruthy()
     })
     await act(async () => {
-      host.querySelector<HTMLElement>('[data-inbox-v6="quote-preview"] button')!.click()
+      document.querySelector<HTMLElement>('[data-inbox-v6="quote-preview"] button')!.click()
     })
     await eventually(() => {
-      expect(host.querySelector('[data-inbox-v6="quote-preview"]')).toBeNull()
+      expect(document.querySelector('[data-inbox-v6="quote-preview"]')).toBeNull()
     })
   })
 
   it('引用つき送信済みメッセージには引用元の要約が出る', async () => {
     await act(async () => { root.render(<ChatsPage />) })
     await eventually(() => {
-      const quoted = host.querySelector('[data-inbox-v6="quoted-message"]')
+      const quoted = document.querySelector('[data-inbox-v6="quoted-message"]')
       expect(quoted?.textContent).toContain('値段はいくらですか？')
     })
   })
@@ -239,27 +257,27 @@ describe('N-025 引用返信と送信予約', () => {
 
     await typeText(host, '明日の朝に送ります')
     await act(async () => {
-      host.querySelector<HTMLElement>('[data-inbox-v6="schedule-toggle"]')!.click()
+      document.querySelector<HTMLElement>('[data-inbox-v6="schedule-toggle"]')!.click()
     })
     await eventually(() => {
-      expect(host.querySelector('[data-inbox-v6="schedule-panel"]')).toBeTruthy()
+      expect(document.querySelector('[data-inbox-v6="schedule-panel"]')).toBeTruthy()
     })
 
     // 日時の選択（★V7）で 2027-09-17 09:00 を選ぶ。値は今までどおり日本時間の文字列。
-    await act(async () => { host.querySelector<HTMLElement>('#schedule-at')!.click() })
-    const dialog = () => host.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
+    await act(async () => { document.querySelector<HTMLElement>('#schedule-at')!.click() })
+    const dialog = () => document.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
     await act(async () => {
       dialog().querySelector<HTMLButtonElement>('button[aria-label="日付"]')!.click()
     })
     for (let i = 0; i < 36; i += 1) {
-      const grid = host.querySelector('[role="grid"]')
+      const grid = document.querySelector('[role="grid"]')
       if (grid?.getAttribute('aria-label') === '2027年9月') break
       await act(async () => {
-        Array.from(host.querySelectorAll('button')).find((b) => b.getAttribute('aria-label') === '次の月')!.click()
+        Array.from(document.querySelectorAll('button')).find((b) => b.getAttribute('aria-label') === '次の月')!.click()
       })
     }
     await act(async () => {
-      Array.from(host.querySelectorAll('button')).find((b) => (b.getAttribute('aria-label') ?? '').startsWith('2027年9月17日（金）'))!.click()
+      Array.from(document.querySelectorAll('button')).find((b) => (b.getAttribute('aria-label') ?? '').startsWith('2027年9月17日（金）'))!.click()
     })
     await act(async () => {
       const hour = dialog().querySelector<HTMLSelectElement>('select[aria-label="時"]')!
@@ -267,7 +285,7 @@ describe('N-025 引用返信と送信予約', () => {
       hour.dispatchEvent(new Event('change', { bubbles: true }))
     })
 
-    const scheduleButton = Array.from(host.querySelectorAll('button'))
+    const scheduleButton = Array.from(document.querySelectorAll('button'))
       .find((b) => b.textContent === 'この日時で予約する')!
     await act(async () => { scheduleButton.click() })
     await eventually(() => {
@@ -277,18 +295,18 @@ describe('N-025 引用返信と送信予約', () => {
 
     // パネルは閉じる。もう一度開くと予約一覧に出る。
     await act(async () => {
-      host.querySelector<HTMLElement>('[data-inbox-v6="schedule-toggle"]')!.click()
+      document.querySelector<HTMLElement>('[data-inbox-v6="schedule-toggle"]')!.click()
     })
     await eventually(() => {
-      const row = host.querySelector('[data-inbox-v6="scheduled-row"]')
+      const row = document.querySelector('[data-inbox-v6="scheduled-row"]')
       expect(row?.textContent).toContain('明日の朝に送ります')
     })
 
-    const cancelButton = Array.from(host.querySelectorAll('button')).find((b) => b.textContent === '取消')!
+    const cancelButton = Array.from(document.querySelectorAll('button')).find((b) => b.textContent === '取消')!
     await act(async () => { cancelButton.click() })
     await eventually(() => {
       expect(fixture.scheduled).toHaveLength(0)
-      expect(host.querySelector('[data-inbox-v6="scheduled-row"]')).toBeNull()
+      expect(document.querySelector('[data-inbox-v6="scheduled-row"]')).toBeNull()
     })
   })
 })

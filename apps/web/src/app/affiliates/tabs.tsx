@@ -13,6 +13,7 @@ import {
 import type { Tag, Scenario, LineAccount } from '@line-crm/shared'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import ActionMenu from '@/components/shared/action-menu'
+import MenuPortal from '@/components/shared/menu-portal'
 import { MoreAction } from '@/components/shared/row-actions'
 import Button from '@/components/shared/button'
 import type { ButtonProps } from '@/components/shared/button'
@@ -1105,6 +1106,8 @@ export function CreateAffiliateModal({
   const [search, setSearch] = useState('')
   const [options, setOptions] = useState<FriendOption[]>([])
   const [searching, setSearching] = useState(false)
+  const [suggestDismissed, setSuggestDismissed] = useState(false)
+  const searchInputRef = useRef<HTMLInputElement>(null)
   const [selected, setSelected] = useState<FriendOption | null>(null)
   const [commissionRate, setCommissionRate] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -1249,14 +1252,25 @@ export function CreateAffiliateModal({
               ) : (
                 <div className="relative">
                   <input
+                    ref={searchInputRef}
                     id="aff-friend-search"
                     value={search}
-                    onChange={(e) => setSearch(e.target.value)}
+                    onChange={(e) => { setSearch(e.target.value); setSuggestDismissed(false) }}
                     placeholder="名前で検索..."
                     className="w-full rounded-control border border-hairline px-3 py-2 text-sm"
                   />
-                  {(searching || options.length > 0) && search.trim() && (
-                    <div className="absolute z-10 mt-1 max-h-56 w-full overflow-y-auto rounded-control border border-hairline bg-canvas shadow-lg">
+                  <MenuPortal
+                    open={!suggestDismissed && (searching || options.length > 0) && Boolean(search.trim())}
+                    align="start"
+                    matchWidth
+                    getAnchor={() => searchInputRef.current}
+                    onClose={() => setSuggestDismissed(true)}
+                  >
+                    <div
+                      className="max-h-56 overflow-y-auto rounded-control border border-hairline bg-canvas shadow-lg"
+                      // 最上層では absolute 指定を無効にする（位置は器が決める）。
+                      style={{ position: 'static', width: '100%' }}
+                    >
                       {searching ? (
                         <div className="px-3 py-2 text-sm text-ink-faint">検索中...</div>
                       ) : options.length === 0 ? (
@@ -1274,7 +1288,7 @@ export function CreateAffiliateModal({
                         ))
                       )}
                     </div>
-                  )}
+                  </MenuPortal>
                 </div>
               )}
             </div>
@@ -1522,60 +1536,46 @@ function OfferFormModal({ initial, accounts, tags, scenarios, onClose, onSaved }
 
         <div>
           <label className="text-ink-secondary mb-1 block text-xs font-medium">誘導 LINE アカウント</label>
-          <select
+          <Select
+            aria-label="誘導 LINE アカウント"
             value={lineAccountId}
-            onChange={(e) => setLineAccountId(e.target.value)}
-            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus:outline-none"
-          >
-            <option value="">— 選択しない —</option>
-            {accounts.map((acc) => (
-              <option key={acc.id} value={acc.id}>
-                {acc.name}
-              </option>
-            ))}
-          </select>
+            onChange={(value) => setLineAccountId(value)}
+            options={[{ value: '', label: '— 選択しない —' }, ...accounts.map((acc) => ({ value: acc.id, label: acc.name }))]}
+            className="w-full"
+            size="full"
+          />
         </div>
 
         <div>
           <label className="text-ink-secondary mb-1 block text-xs font-medium">タグ</label>
-          <select
+          <Select
+            aria-label="タグ"
             value={tagId}
-            onChange={(e) => setTagId(e.target.value)}
-            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus:outline-none"
-          >
-            <option value="">— 選択しない —</option>
-            {accountTags.map((tag) => (
-              <option key={tag.id} value={tag.id}>
-                {tag.name}
-              </option>
-            ))}
-            {tagIdStale && (
-              <option value={tagId}>
-                {staleTagName ?? tagId}（このアカウントでは使えません）
-              </option>
-            )}
-          </select>
+            onChange={(value) => setTagId(value)}
+            options={[
+              { value: '', label: '— 選択しない —' },
+              ...accountTags.map((tag) => ({ value: tag.id, label: tag.name })),
+              ...(tagIdStale ? [{ value: tagId, label: `${staleTagName ?? tagId}（このアカウントでは使えません）` }] : []),
+            ]}
+            className="w-full"
+            size="full"
+          />
         </div>
 
         <div>
           <label className="text-ink-secondary mb-1 block text-xs font-medium">シナリオ</label>
-          <select
+          <Select
+            aria-label="シナリオ"
             value={scenarioId}
-            onChange={(e) => setScenarioId(e.target.value)}
-            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus:outline-none"
-          >
-            <option value="">— 選択しない —</option>
-            {accountScenarios.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-            {scenarioIdStale && (
-              <option value={scenarioId}>
-                {staleScenarioName ?? scenarioId}（このアカウントでは使えません）
-              </option>
-            )}
-          </select>
+            onChange={(value) => setScenarioId(value)}
+            options={[
+              { value: '', label: '— 選択しない —' },
+              ...accountScenarios.map((s) => ({ value: s.id, label: s.name })),
+              ...(scenarioIdStale ? [{ value: scenarioId, label: `${staleScenarioName ?? scenarioId}（このアカウントでは使えません）` }] : []),
+            ]}
+            className="w-full"
+            size="full"
+          />
         </div>
 
         {isEdit && (

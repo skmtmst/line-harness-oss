@@ -27,6 +27,30 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(''),
   useRouter: () => ({ push: () => {}, replace: () => {} }),
 }))
+/*
+ * 共通の Select は listbox の部品で、その操作は部品自身の試験が持つ。
+ * ここで見たいのは選んだ日時の中身なので、素の <select> に置き換える。
+ */
+vi.mock('@/components/shared/select', () => ({
+  default: ({ 'aria-label': label, value, onChange, options }: {
+    'aria-label'?: string
+    value: string
+    onChange: (value: string) => void
+    options: Array<{ value: string; label: string }>
+  }) => (
+    <select
+      aria-label={label}
+      value={value}
+      onChange={(e: { target: { value: string } }) => onChange(e.target.value)}
+    >
+      {options.map((option) => (
+        <option key={option.value} value={option.value}>
+          {option.label}
+        </option>
+      ))}
+    </select>
+  ),
+}))
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
@@ -172,16 +196,17 @@ async function pickStartsAt(startsAt: string) {
   await act(async () => {
     container.querySelector<HTMLElement>('button[aria-label="出しはじめ"]')!.click()
   })
-  const picker = container.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
+  // 日時の選択箱は最上層（MenuPortal→document.body）に出る。器の中にはいない。
+  const picker = document.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
   await act(async () => {
     picker.querySelector<HTMLButtonElement>('button[aria-label="日付"]')!.click()
   })
   for (let i = 0; i < 24; i += 1) {
-    const grid = container.querySelector('[role="grid"]')
+    const grid = document.querySelector('[role="grid"]')
     if (grid?.getAttribute('aria-label') === `${y}年${mo}月`) break
     const currentLabel = /^(\d+)年(\d+)月$/.exec(grid?.getAttribute('aria-label') ?? '')
     const current = currentLabel ? Number(currentLabel[1]) * 12 + Number(currentLabel[2]) : y * 12 + mo
-    const nav = [...container.querySelectorAll('button')].find(
+    const nav = [...document.querySelectorAll('button')].find(
       (b) => b.getAttribute('aria-label') === (y * 12 + mo >= current ? '次の月' : '前の月'),
     )!
     await act(async () => {
@@ -189,11 +214,11 @@ async function pickStartsAt(startsAt: string) {
     })
   }
   await act(async () => {
-    [...container.querySelectorAll('button')].find((b) =>
+    [...document.querySelectorAll('button')].find((b) =>
       (b.getAttribute('aria-label') ?? '').startsWith(`${y}年${mo}月${d}日（${week}）`),
     )!.click()
   })
-  const reopened = container.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
+  const reopened = document.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
   await act(async () => {
     const hourSelect = reopened.querySelector('select[aria-label="時"]') as HTMLSelectElement
     hourSelect.value = hour

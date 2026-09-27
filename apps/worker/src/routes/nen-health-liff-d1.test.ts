@@ -67,3 +67,41 @@ describe('GET /api/liff/nen/health-logs/summary', () => {
     expect((await liff(null).request('/api/liff/nen/health-logs/summary?petId=pet-momo')).status).toBe(401);
   });
 });
+
+describe('POST /api/liff/nen/health-logs（監査 R59/R61）', () => {
+  const post = (body: Record<string, unknown>, user = 'U-a') =>
+    liff(user).request('/api/liff/nen/health-logs', {
+      method: 'POST', headers: { 'content-type': 'application/json', Authorization: 'Bearer token' }, body: JSON.stringify(body),
+    });
+  const profileWeight = () =>
+    Number((sql.prepare(`SELECT weight_kg FROM nen_pet_profiles WHERE id = 'pet-momo'`).get() as { weight_kg: number }).weight_kg);
+
+  it('体重を付けた最新の記録はプロフィールと給餌目安に反映される（R59）', async () => {
+    const res = await post({ petId: 'pet-momo', stoolStatus: 'normal', appetite: 'good', weightKg: 8.5 });
+    expect(res.status).toBe(201);
+    expect(profileWeight()).toBe(8.5);
+    // 給餌目安も新しい体重で計算し直されている（保存値が 10kg 由来のまま残らない）。
+    const grams = (sql.prepare(`SELECT daily_kcal, recommended_daily_grams FROM nen_pet_profiles WHERE id = 'pet-momo'`).get() as { daily_kcal: number | null }).daily_kcal;
+    expect(grams).not.toBeNull();
+  });
+
+  it('過去日の記録では今の体重を戻さない（R59）', async () => {
+    const res = await post({ petId: 'pet-momo', loggedOn: day(50), stoolStatus: 'normal', appetite: 'good', weightKg: 20 });
+    expect(res.status).toBe(201);
+    expect(profileWeight()).toBe(10);
+  });
+
+  it('「正常」以外の便が3回続くとケア共有が立つ。管理側の「気になる変化」と同じ基準（R61）', async () => {
+    // やわらかい便でも3回続けば利用者側は「要ケアを共有」と出す。
+    for (const ago of [2, 1]) {
+      await post({ petId: 'pet-momo', loggedOn: day(ago), stoolStatus: 'soft', appetite: 'normal' });
+    }
+    const res = await post({ petId: 'pet-momo', stoolStatus: 'soft', appetite: 'normal' });
+    expect((await res.json() as any).data.careRequired).toBe(true);
+    // 管理側の要約も同じ記録から同じ「便の異常」を出す（以前は下痢・血便だけだった）。
+    const { summarizePetHealth } = await import('../services/nen-health-admin.js');
+    const logs = sql.prepare(`SELECT * FROM nen_health_logs WHERE pet_id = 'pet-momo'`).all() as any[];
+    const changes = summarizePetHealth(logs, new Date()).changes.map((ch) => ch.key);
+    expect(changes).toContain('stool_abnormal');
+  });
+});

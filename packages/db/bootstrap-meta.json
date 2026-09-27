@@ -433,7 +433,9 @@
     "499_account_handover_declared_rollback.sql",
     "500_ad_cost_ledger.sql",
     "501_site_tracking_consent.sql",
-    "502_booking_liff_date_view.sql"
+    "502_booking_liff_date_view.sql",
+    "503_measurement_sites.sql",
+    "504_conversion_reversal_ledger.sql"
   ],
-  "migrationCount": 434
+  "migrationCount": 436
 }

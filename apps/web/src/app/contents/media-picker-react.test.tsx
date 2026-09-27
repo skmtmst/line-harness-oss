@@ -215,7 +215,7 @@ describe('登録メディア選択窓（N-193 / N-205）', () => {
   it('読込中・0件・失敗を分けて出し、失敗は読み直せる', async () => {
     fixture.listQueue.push(pendingList())
     await renderPicker()
-    expect(dialog().textContent).toContain('メディアを読み込んでいます…')
+    expect(dialog().textContent).toContain('メディアを読み込んでいます')
 
     // 0件は失敗とは別の案内。
     await act(async () => {
@@ -237,7 +237,8 @@ describe('登録メディア選択窓（N-193 / N-205）', () => {
     await waitForDialogText('メディアを読み込めませんでした')
 
     fixture.listQueue.push(ok([media('m-9', '復帰後の画像.png')]))
-    const retry = [...dialog().querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === '読み直す')!
+    // 読み直し口は共通部品の「もう一度読み込む」。
+    const retry = [...dialog().querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === 'もう一度読み込む')!
     await act(async () => { retry.click(); await settle() })
     await waitForDialogText('復帰後の画像.png')
   })

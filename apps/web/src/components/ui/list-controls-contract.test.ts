@@ -63,9 +63,9 @@ describe('フィルターバー統一（監査6 #668）', () => {
     ({ path }) => {
       const source = read(path)
       expect(source, `${path} に SortSelect がない`).toContain('SortSelect')
-      // 部品の外で素の SelectField を「並び順」用に置かない
+      // 部品の外で素の Select を「並び順」用に置かない
       expect(source, `${path} に素の並び順セレクトが残っている`).not.toMatch(
-        /SelectField[^)]*aria-label="並び順"/,
+        /<Select[^)]*aria-label="並び順"/,
       )
     },
   )
@@ -76,7 +76,7 @@ describe('フィルターバー統一（監査6 #668）', () => {
       const source = read(path)
       expect(source, `${path} に PageSizeSelect がない`).toContain('PageSizeSelect')
       expect(source, `${path} に素の表示件数セレクトが残っている`).not.toMatch(
-        /SelectField[^)]*aria-label="表示件数"/,
+        /<Select[^)]*aria-label="表示件数"/,
       )
     },
   )

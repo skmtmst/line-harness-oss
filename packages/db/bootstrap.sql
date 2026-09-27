@@ -1752,6 +1752,14 @@ CREATE TABLE "common_vars" (
   UNIQUE(line_account_id, var_key)
 );
 
+CREATE TABLE conversion_anonymous_days (
+  conversion_point_id TEXT NOT NULL REFERENCES conversion_points(id) ON DELETE CASCADE,
+  day                 TEXT NOT NULL,
+  anonymous_count     INTEGER NOT NULL DEFAULT 0,
+  updated_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')),
+  PRIMARY KEY (conversion_point_id, day)
+);
+
 CREATE TABLE conversion_definition_operations (
   id                  TEXT PRIMARY KEY,
   conversion_point_id TEXT NOT NULL,
@@ -1804,6 +1812,16 @@ CREATE TABLE conversion_event_dedup_claims (
   PRIMARY KEY (conversion_point_id, friend_id),
   CHECK ((mode = 'lifetime' AND window_days IS NULL)
       OR (mode = 'window' AND window_days IS NOT NULL))
+);
+
+CREATE TABLE conversion_event_reversals (
+  id                  TEXT PRIMARY KEY,
+  conversion_event_id TEXT NOT NULL REFERENCES conversion_events(id) ON DELETE CASCADE,
+  kind                TEXT NOT NULL CHECK (kind IN ('reverse', 'restore')),
+  reason              TEXT NOT NULL,
+  actor_id            TEXT,
+  actor_name          TEXT,
+  created_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours'))
 );
 
 CREATE TABLE conversion_events (
@@ -1867,7 +1885,7 @@ CREATE TABLE "conversion_points" (
   tenant_id  TEXT REFERENCES tenants(id),
   ingest_secret_encrypted TEXT,
   ingest_disabled_at TEXT
-);
+, count_anonymous INTEGER NOT NULL DEFAULT 0);
 
 CREATE TABLE customer_notification_definitions (
   id                    TEXT PRIMARY KEY,
@@ -3520,6 +3538,29 @@ CREATE TABLE manual_links (
   updated_at    TEXT NOT NULL
 , version INTEGER NOT NULL DEFAULT 1
   CHECK (version > 0), last_http_status INTEGER);
+
+CREATE TABLE measurement_domain_rejections (
+  site_id        TEXT NOT NULL REFERENCES measurement_sites(id) ON DELETE CASCADE,
+  host           TEXT NOT NULL,
+  rejected_count INTEGER NOT NULL DEFAULT 0,
+  last_seen_at   TEXT NOT NULL,
+  PRIMARY KEY (site_id, host)
+);
+
+CREATE TABLE measurement_site_domains (
+  site_id    TEXT NOT NULL REFERENCES measurement_sites(id) ON DELETE CASCADE,
+  host       TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')),
+  PRIMARY KEY (site_id, host)
+);
+
+CREATE TABLE measurement_sites (
+  id              TEXT PRIMARY KEY,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  label           TEXT NOT NULL,
+  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')),
+  updated_at      TEXT
+);
 
 CREATE TABLE media (
   id          TEXT PRIMARY KEY,
@@ -7252,6 +7293,9 @@ CREATE UNIQUE INDEX idx_conversion_definition_usages_reference
 CREATE INDEX idx_conversion_event_dedup_claims_event
   ON conversion_event_dedup_claims(last_event_id);
 
+CREATE INDEX idx_conversion_event_reversals_event
+  ON conversion_event_reversals(conversion_event_id, created_at DESC);
+
 CREATE INDEX idx_conversion_events_affiliate ON conversion_events (affiliate_code);
 
 CREATE INDEX idx_conversion_events_created_friend ON conversion_events(created_at, friend_id);
@@ -7744,6 +7788,8 @@ CREATE INDEX idx_manual_link_check_history_v316_key_time
   ON manual_link_check_history(link_key, checked_at DESC);
 
 CREATE INDEX idx_manual_links_status ON manual_links (status);
+
+CREATE INDEX idx_measurement_sites_account ON measurement_sites(line_account_id);
 
 CREATE INDEX idx_media_account_archived_v424
   ON media(line_account_id, archived_at);

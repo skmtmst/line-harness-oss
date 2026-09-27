@@ -2,6 +2,8 @@
 
 import InboxRow, { type InboxRowData } from './inbox-row'
 import ListRange from '@/components/ui/list-range'
+import Pagination from '@/components/shared/pagination'
+import ListState from '@/components/shared/list-state'
 
 
 
@@ -29,9 +31,11 @@ export default function InboxList({
   return (
     <div className="overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-gray-200">
       {rows.length === 0 && !loading ? (
-        <div className="px-4 py-12 text-center text-sm text-gray-400">
-          未対応はありません
-        </div>
+        <ListState
+          kind="empty"
+          title="未対応はありません"
+          description="新しい受信があると、ここに並びます。"
+        />
       ) : (
         <div>
           {rows.map((row) => (
@@ -42,27 +46,7 @@ export default function InboxList({
       {total > 0 && (
         <div className="flex items-center justify-between border-t border-gray-100 px-4 py-3 text-sm text-gray-600">
           <ListRange total={total} first={start} last={end} />
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => onPageChange(page - 1)}
-              disabled={page <= 1 || loading}
-              className="rounded-md border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-            >
-              前へ
-            </button>
-            <span className="tabular-nums text-xs text-gray-500">
-              {page} / {totalPages}
-            </span>
-            <button
-              type="button"
-              onClick={() => onPageChange(page + 1)}
-              disabled={page >= totalPages || loading}
-              className="rounded-md border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-            >
-              次へ
-            </button>
-          </div>
+          <Pagination page={page} pageCount={totalPages} onPageChange={onPageChange} disabled={loading} />
         </div>
       )}
     </div>

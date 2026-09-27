@@ -848,9 +848,10 @@ export default function PhotoReviewsPage() {
           <p className="mt-0.5 text-xs text-ink-faint">{reviewedStatsReady ? (reviewedIn30Days > 0 ? '採用・見送りの合計' : 'この30日に見た写真はまだありません') : 'まだ記録がありません'}</p>
         </div>
         <div className="rounded-card border border-hairline bg-canvas p-4">
-          <p className="text-xs font-semibold text-ink-secondary">1枚にかかる時間</p>
+          {/* 監査 R62: 集計は「投稿されてから採用・見送りが決まるまで」。審査の作業時間ではないので名前を実態に合わせる。 */}
+          <p className="text-xs font-semibold text-ink-secondary">投稿から審査までの日数</p>
           <p className="mt-1 text-2xl font-bold text-ink"><MetricValue prefix="平均" text={averageReviewDurationText(reviewMetrics?.averageReviewMinutes)} /></p>
-          <p className="mt-0.5 text-xs text-ink-faint">{reviewMetrics?.averageReviewMinutes != null ? '審査を始めてから保存するまでの平均' : 'まだ記録がありません'}</p>
+          <p className="mt-0.5 text-xs text-ink-faint">{reviewMetrics?.averageReviewMinutes != null ? '投稿されてから採用・見送りが決まるまでの平均' : 'まだ記録がありません'}</p>
         </div>
         <div className="rounded-card border border-hairline bg-canvas p-4">
           <p className="text-xs font-semibold text-ink-secondary">気をつけたい写真</p>

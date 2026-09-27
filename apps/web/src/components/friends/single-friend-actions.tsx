@@ -5,6 +5,7 @@ import type { Chat, Reminder, Scenario, Tag, Template } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import DateTimeField from '@/components/shared/date-time-field'
+import Select from '@/components/shared/select'
 
 /**
  * 1人だけ選んだときの操作（設計 `BulkBar` の6つ）。
@@ -145,11 +146,16 @@ function StatusPanel({ friendId, busy, run }: { friendId: string; busy: boolean;
   const [status, setStatus] = useState<Chat['status']>('resolved')
   return (
     <Row>
-      <select value={status} onChange={(e) => setStatus(e.target.value as Chat['status'])} className={SELECT}>
-        <option value="unread">未対応</option>
-        <option value="in_progress">対応中</option>
-        <option value="resolved">対応済み</option>
-      </select>
+      <Select
+        aria-label="対応状況"
+        value={status}
+        onChange={(value) => setStatus(value as Chat['status'])}
+        options={[
+          { value: 'unread', label: '未対応' },
+          { value: 'in_progress', label: '対応中' },
+          { value: 'resolved', label: '対応済み' },
+        ]}
+      />
       {/* 友だちIDでも引ける（resolveOrCreateChat）。トークが無い人にも当てられる。 */}
       <Go busy={busy} onClick={() => void run(() => api.chats.update(friendId, { status }), '対応状況を変えました')} />
     </Row>
@@ -183,12 +189,12 @@ function TemplatePanel({ friendId, busy, run }: { friendId: string; busy: boolea
   return (
     <div className="space-y-2">
       <Row>
-        <select value={id} onChange={(e) => setId(e.target.value)} className={SELECT}>
-          <option value="">テンプレートを選ぶ</option>
-          {templates.map((t) => (
-            <option key={t.id} value={t.id}>{t.name}</option>
-          ))}
-        </select>
+        <Select
+          aria-label="テンプレート"
+          value={id}
+          onChange={setId}
+          options={[{ value: '', label: 'テンプレートを選ぶ' }, ...templates.map((t) => ({ value: t.id, label: t.name }))]}
+        />
         <Go
           busy={busy || !picked}
           onClick={() =>
@@ -217,12 +223,12 @@ function ScenarioPanel({ friendId, busy, run }: { friendId: string; busy: boolea
   }, [])
   return (
     <Row>
-      <select value={id} onChange={(e) => setId(e.target.value)} className={SELECT}>
-        <option value="">シナリオを選ぶ</option>
-        {items.map((s) => (
-          <option key={s.id} value={s.id}>{s.name}</option>
-        ))}
-      </select>
+      <Select
+        aria-label="シナリオ"
+        value={id}
+        onChange={setId}
+        options={[{ value: '', label: 'シナリオを選ぶ' }, ...items.map((s) => ({ value: s.id, label: s.name }))]}
+      />
       <Go
         busy={busy || !id}
         onClick={() => void run(() => api.scenarios.enroll(id, friendId), 'シナリオを開始しました')}
@@ -246,12 +252,12 @@ function TagPanel({
   const [id, setId] = useState('')
   return (
     <Row>
-      <select value={id} onChange={(e) => setId(e.target.value)} className={SELECT}>
-        <option value="">タグを選ぶ</option>
-        {tags.map((t) => (
-          <option key={t.id} value={t.id}>{t.name}</option>
-        ))}
-      </select>
+      <Select
+        aria-label="タグ"
+        value={id}
+        onChange={setId}
+        options={[{ value: '', label: 'タグを選ぶ' }, ...tags.map((t) => ({ value: t.id, label: t.name }))]}
+      />
       <Go
         busy={busy || !id}
         onClick={() => void run(() => api.friends.addTag(friendId, id), 'タグを付けました')}
@@ -313,12 +319,12 @@ function ReminderPanel({ friendId, busy, run }: { friendId: string; busy: boolea
   }, [])
   return (
     <Row>
-      <select value={id} onChange={(e) => setId(e.target.value)} className={SELECT}>
-        <option value="">リマインダを選ぶ</option>
-        {items.map((r) => (
-          <option key={r.id} value={r.id}>{r.name}</option>
-        ))}
-      </select>
+      <Select
+        aria-label="リマインダ"
+        value={id}
+        onChange={setId}
+        options={[{ value: '', label: 'リマインダを選ぶ' }, ...items.map((r) => ({ value: r.id, label: r.name }))]}
+      />
       <DateTimeField
         value={targetDate}
         onChange={setTargetDate}

@@ -112,7 +112,10 @@ describe('V6 成果地点一覧の契約', () => {
     expect(NEW_PAGE).toContain("eventType: 'webinar_completed'")
     expect(NEW_PAGE).toContain("eventType: 'tag_added'")
     expect(NEW_PAGE).toContain("setDeduplicationMode('window')")
-    expect(NEW_PAGE).toContain("value: 'source', label: '注文の金額をそのまま使う'")
+    // 金額の出し方の選択肢は対応表(origin-labels)の valueModes から作る。
+    // 注文の金額が無い起点では 'source' を出さないため、3択の直書きはしない。
+    expect(NEW_PAGE).toContain('origin.valueModes')
+    expect(NEW_PAGE).toContain("source: '注文の金額をそのまま使う'")
     expect(NEW_PAGE).toContain("value: 'source_cancelled', label: '返品されたら取り消す'")
     expect(NEW_PAGE).toContain('api.conversions.createDefinition({')
     // N-258: 送る利用先は実在するオブジェクトの実IDだけ。仮IDの固定一覧はない。

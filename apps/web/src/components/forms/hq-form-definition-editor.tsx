@@ -11,9 +11,10 @@ import { normalizeSectionName } from './section-name'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
 import StickyBar from '@/components/shared/sticky-bar'
+import ActionMenu from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import { Field, TextArea, TextInput } from '@/components/shared/form-controls'
 import {
   formJumpsInto,
@@ -59,6 +60,7 @@ export default function HqFormDefinitionEditor({
   const [tab, setTab] = useState(0)
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null)
   const [showAddMenu, setShowAddMenu] = useState(false)
+  const addMenuWrapRef = useRef<HTMLDivElement>(null)
   const [showOptions, setShowOptions] = useState(false)
   const [renameSectionIndex, setRenameSectionIndex] = useState<number | null>(null)
   const [renameSectionName, setRenameSectionName] = useState('')
@@ -209,7 +211,7 @@ export default function HqFormDefinitionEditor({
     <div className="mb-4 grid gap-4 rounded-card border border-hairline bg-canvas p-4 sm:grid-cols-2 xl:grid-cols-4">
       <Field label="フォーム名" htmlFor="hq-form-name" required><TextInput id="hq-form-name" value={value.name} onChange={event => setValue(current => ({ ...current, name: event.target.value }))} /></Field>
       <Field label="公開状態"><p className="rounded-control border border-hairline bg-canvas-sunken px-3 py-2 text-sm">配布先へ非公開の下書きとして保存</p></Field>
-      <Field label="回答したときに付けるタグ" htmlFor="hq-form-tag"><SelectField id="hq-form-tag" value={value.onSubmitTagId} onChange={event => setValue(current => ({ ...current, onSubmitTagId: event.target.value }))} options={[{ value: '', label: '— 付けない —' }, ...portableRefs.tags.map(tag => ({ value: tag.id, label: tag.name }))]} /></Field>
+      <Field label="回答したときに付けるタグ" htmlFor="hq-form-tag"><Select aria-label="回答したときに付けるタグ" id="hq-form-tag" value={value.onSubmitTagId} onChange={tagId => setValue(current => ({ ...current, onSubmitTagId: tagId }))} options={[{ value: '', label: '— 付けない —' }, ...portableRefs.tags.map(tag => ({ value: tag.id, label: tag.name }))]} /></Field>
       <Field label="回答用URL"><p className="rounded-control border border-hairline bg-canvas-sunken px-3 py-2 text-sm text-ink-faint">配布先で発行</p></Field>
     </div>
     <div className="grid gap-4 xl:grid-cols-3">
@@ -224,7 +226,7 @@ export default function HqFormDefinitionEditor({
           <button type="button" onClick={undo} className="rounded-control px-2 py-1 text-xs">元に戻す</button><button type="button" onClick={redo} className="rounded-control px-2 py-1 text-xs">やり直す</button>
           <button type="button" onClick={() => moveBlock(-1)} disabled={selectedIndex < 0} className="rounded-control px-2 py-1 text-xs disabled:opacity-40">上に移動</button><button type="button" onClick={() => moveBlock(1)} disabled={selectedIndex < 0} className="rounded-control px-2 py-1 text-xs disabled:opacity-40">下に移動</button>
           <button type="button" onClick={duplicateBlock} disabled={selectedIndex < 0} className="rounded-control px-2 py-1 text-xs disabled:opacity-40">複製</button><button type="button" onClick={removeBlock} disabled={selectedIndex < 0} className="rounded-control px-2 py-1 text-xs text-danger disabled:opacity-40">削除</button>
-          <div className="relative"><Button type="button" variant="primary" onClick={() => setShowAddMenu(open => !open)}>＋ ブロックを追加（12種）</Button>{showAddMenu && <div className="absolute right-0 z-20 mt-1 w-48 rounded-card border border-hairline bg-canvas py-1 shadow-lg">{BLOCK_MENU.map(item => <button type="button" key={`${item.kind}-${item.type ?? ''}`} onClick={() => addBlock(item.kind, item.type)} className="block w-full px-3 py-1.5 text-left text-sm hover:bg-canvas-sunken">{item.label}</button>)}</div>}</div>
+          <div className="relative" ref={addMenuWrapRef}><Button type="button" variant="primary" aria-expanded={showAddMenu} aria-haspopup="menu" onClick={() => setShowAddMenu(open => !open)}>＋ ブロックを追加（12種）</Button><ActionMenu open={showAddMenu} ariaLabel="追加するブロック" onClose={() => setShowAddMenu(false)} anchorRef={addMenuWrapRef} items={['飾り', '入力'].flatMap(group => BLOCK_MENU.filter(menu => menu.group === group).map((menu, index) => ({ id: `${menu.kind}-${menu.type ?? ''}`, label: menu.label, sectionBefore: index === 0 ? group : undefined, onSelect: () => addBlock(menu.kind, menu.type) })))} /></div>
           <Button type="button" onClick={() => setShowOptions(true)}>オプション設定</Button>
         </div></div>
         <div className="space-y-3">{blocks.length === 0 ? <p className="rounded-card border border-dashed border-hairline bg-canvas p-8 text-center text-sm text-ink-faint">「ブロックを追加」から作ってください</p> : blocks.map((block, index) => <BlockEditor key={block.id} block={block} index={index} sections={layout.sections} refs={portableRefs} inHeader={tab === HEADER_TAB} selected={block.id === selectedBlockId} onSelect={() => setSelectedBlockId(block.id)} onChange={patch => patchBlock(block.id, patch)} />)}</div>

@@ -51,9 +51,14 @@ vi.mock('@/components/shared/list-state', () => ({
   default: ({ kind }: { kind: string }) => <div>{kind}</div>,
 }))
 vi.mock('@/components/shared/pagination', () => ({ default: () => <div>ページ送り</div> }))
-vi.mock('@/components/shared/select-field', () => ({
-  default: ({ options, ...props }: React.ComponentProps<'select'> & { options: Array<{ value: string; label: string }> }) => (
-    <select {...props}>
+vi.mock('@/components/shared/select', () => ({
+  default: ({ value, onChange, options, size: _size, ...props }: {
+    value: string
+    onChange?: (value: string) => void
+    options: Array<{ value: string; label: string }>
+    size?: string
+  } & React.ComponentProps<'select'>) => (
+    <select value={value} onChange={(event) => onChange?.(event.target.value)} {...props}>
       {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
     </select>
   ),

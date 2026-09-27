@@ -3,6 +3,7 @@
 import { Check, ChevronDown, ChevronUp } from 'lucide-react'
 import React, { useEffect, useId, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
+import MenuPortal from './menu-portal'
 import styles from './select.module.css'
 
 export interface SelectOption {
@@ -45,6 +46,7 @@ export default function Select({
   const buttonId = id ?? `${generatedId}-button`
   const listboxId = `${generatedId}-listbox`
   const rootRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
   const [open, setOpen] = useState(defaultOpen)
   const enabledOptions = options.filter((option) => !option.disabled)
   const selectedIndex = Math.max(0, enabledOptions.findIndex((option) => option.value === value))
@@ -108,6 +110,7 @@ export default function Select({
     >
       {name ? <input type="hidden" name={name} value={value} disabled={disabled} /> : null}
       <button
+        ref={triggerRef}
         id={buttonId}
         type="button"
         className={`${styles.trigger} ${open ? styles.openTrigger : styles.closedTrigger}`}
@@ -120,7 +123,8 @@ export default function Select({
         onClick={() => setOpen((current) => !current)}
         onKeyDown={onButtonKeyDown}
       >
-        <span className={styles.value}>
+        {/* 省略表示（…）のとき、ホバーで全文を確認できる（#640）。 */}
+        <span className={styles.value} title={selected?.label ?? undefined}>
           {label ? `${label}：` : ''}{selected?.label ?? ''}
         </span>
         {open ? (
@@ -130,7 +134,23 @@ export default function Select({
         )}
       </button>
       {open ? (
-        <ul id={listboxId} role="listbox" aria-labelledby={buttonId} className={styles.listbox}>
+        <MenuPortal
+          open={open}
+          align="start"
+          matchWidth
+          getAnchor={() => triggerRef.current}
+          onClose={() => setOpen(false)}
+        >
+          <ul
+            id={listboxId}
+            role="listbox"
+            aria-labelledby={buttonId}
+            className={styles.listbox}
+            // 最上層では absolute 指定を無効にする（位置は器が決める）。
+            // 欄に焦点を残したまま押せるよう、押す前に焦点を移さない。
+            style={{ position: 'static', width: '100%' }}
+            onMouseDown={(event) => event.preventDefault()}
+          >
           {options.map((option) => {
             const optionIndex = enabledOptions.findIndex((candidate) => candidate.value === option.value)
             const isSelected = option.value === value
@@ -154,7 +174,8 @@ export default function Select({
               </li>
             )
           })}
-        </ul>
+          </ul>
+        </MenuPortal>
       ) : null}
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
     </div>

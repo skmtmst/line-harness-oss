@@ -1,7 +1,7 @@
 'use client'
 
 import DateTimeField from '@/components/shared/date-time-field'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -1251,9 +1251,10 @@ function Editor({
             </label>
             <label className="block">
               <span className="text-ink-secondary text-xs font-medium">フォルダ</span>
-              <SelectField
+              <Select
+                aria-label="フォルダ"
                 value={folderId}
-                onChange={(e) => setFolderId(e.target.value)}
+                onChange={(value) => setFolderId(value)}
                 options={[{ value: '', label: '未分類' }, ...folders.map((f) => ({ value: f.id, label: f.name }))]}
               />
             </label>
@@ -2044,7 +2045,7 @@ function PublishStep({
             <div className="border-hairline mt-5 grid gap-4 border-t pt-5 sm:grid-cols-2">
               <span className="text-ink-secondary text-xs font-semibold">出しはじめ<DateTimeField aria-label="出しはじめ" value={startsAt} onChange={(v) => onPublishChange({ startsAt: v })} className="mt-1" /></span>
               {mode === 'period' ? <span className="text-ink-secondary text-xs font-semibold">出しおわり<DateTimeField aria-label="出しおわり" value={endsAt} onChange={(v) => onPublishChange({ endsAt: v })} className="mt-1" /></span> : null}
-              {mode === 'period' ? <label className="text-ink-secondary text-xs font-semibold sm:col-span-2">終わったらどうする<SelectField aria-label="終わったらどうする" value={restoreGroupId} onChange={(event) => onPublishChange({ restoreGroupId: event.target.value })} options={[{ value: '', label: '前のメニューに戻す（実行開始時に確定）' }, ...restoreMenus.map((item) => ({ value: item.id, label: item.name }))]} className="mt-1" /><span className="text-ink-faint mt-1 block text-xs">{restoreGroupId ? '終了時に選んだメニューへ戻します。' : '「前のメニューに戻す」は実行開始の直前、そのときに表示中のメニューに確定します。表示中のメニューが無い場合は終了時に表示を外します。'}</span></label> : null}
+              {mode === 'period' ? <label className="text-ink-secondary text-xs font-semibold sm:col-span-2">終わったらどうする<Select aria-label="終わったらどうする" value={restoreGroupId} onChange={(value) => onPublishChange({ restoreGroupId: value })} options={[{ value: '', label: '前のメニューに戻す（実行開始時に確定）' }, ...restoreMenus.map((item) => ({ value: item.id, label: item.name }))]} className="mt-1" /><span className="text-ink-faint mt-1 block text-xs">{restoreGroupId ? '終了時に選んだメニューへ戻します。' : '「前のメニューに戻す」は実行開始の直前、そのときに表示中のメニューに確定します。表示中のメニューが無い場合は終了時に表示を外します。'}</span></label> : null}
             </div>
           ) : null}
 

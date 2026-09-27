@@ -22,7 +22,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import DateField from '@/components/shared/date-field'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import TargetMissing from '@/components/shared/target-missing'
 import { usePageTitle } from '@/components/shell/page-chrome'
 
@@ -827,20 +827,10 @@ function BookingDetailInner() {
                 <h2 className="text-ink mb-3 text-sm font-semibold">予約内容を変更する</h2>
                 <div className="grid gap-3 md:grid-cols-2">
                   <EditField label="予約メニュー">
-                    <SelectField
-                      value={editMenuId}
-                      onChange={(event) => { setEditMenuId(event.target.value); setEditTime('') }}
-                      className="w-full"
-                      options={editMenus.map((item) => ({ value: item.id, label: item.name }))}
-                    />
+                    <Select size="full" aria-label="予約メニュー" value={editMenuId} onChange={(value) => { setEditMenuId(value); setEditTime('') }} options={editMenus.map((item) => ({ value: item.id, label: item.name }))} />
                   </EditField>
                   <EditField label="担当者">
-                    <SelectField
-                      value={editStaffId}
-                      onChange={(event) => { setEditStaffId(event.target.value); setEditTime('') }}
-                      className="w-full"
-                      options={editStaff.map((item) => ({ value: item.id, label: item.display_name }))}
-                    />
+                    <Select size="full" aria-label="担当者" value={editStaffId} onChange={(value) => { setEditStaffId(value); setEditTime('') }} options={editStaff.map((item) => ({ value: item.id, label: item.display_name }))} />
                   </EditField>
                   <EditField label="日付">
                     <DateField
@@ -850,23 +840,7 @@ function BookingDetailInner() {
                     />
                   </EditField>
                   <EditField label="時間">
-                    <SelectField
-                      value={editTime}
-                      onChange={(event) => setEditTime(event.target.value)}
-                      disabled={editSlotsLoading}
-                      className="w-full"
-                      options={[
-                        { value: '', label: editSlotsLoading ? '確認中です' : '選択してください' },
-                        ...editSlots.map((slot) => ({
-                          value: slot.start,
-                          label: `${slot.start}〜${slot.end}${
-                            slot.date === jstDate(detail.startsAt) && slot.start === jstHHMM(detail.startsAt)
-                              ? '（現在）'
-                              : ''
-                          }`,
-                        })),
-                      ]}
-                    />
+                    <Select size="full" aria-label="時間" value={editTime} onChange={(value) => setEditTime(value)} disabled={editSlotsLoading} options={[ { value: '', label: editSlotsLoading ? '確認中です' : '選択してください' }, ...editSlots.map((slot) => ({ value: slot.start, label: `${slot.start}〜${slot.end}${ slot.date === jstDate(detail.startsAt) && slot.start === jstHHMM(detail.startsAt) ? '（現在）' : '' }`, })), ]} />
                   </EditField>
                   <EditField label="料金（円・税込）">
                     <input

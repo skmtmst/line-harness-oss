@@ -44,7 +44,6 @@ const CHANNEL_OPTIONS: { value: InboxFilterValue['channel']; label: string }[] =
 const MESSAGE_KINDS = ['受信', '送信', '自動応答', 'シナリオ・配信', 'フォロー / ブロック', 'システム通知']
 
 const labelClass = 'text-ink-secondary text-xs font-medium'
-const fieldClass = 'border-hairline rounded-control bg-canvas text-ink mt-1.5 h-10 w-full border px-3 text-sm outline-none disabled:cursor-not-allowed disabled:opacity-50'
 
 export default function InboxFilterPanel({
   open,
@@ -106,14 +105,13 @@ export default function InboxFilterPanel({
         <div className="flex-1 space-y-4 overflow-y-auto p-5">
           <div>
             <span className={labelClass}>対応状況</span>
-            <select
+            <Select
               aria-label="対応状況で絞り込む"
+              size="full"
               value={value.status}
-              onChange={(event) => set({ status: event.target.value as InboxFilterValue['status'] })}
-              className={fieldClass}
-            >
-              {STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-            </select>
+              onChange={(next) => set({ status: next as InboxFilterValue['status'] })}
+              options={STATUS_OPTIONS}
+            />
           </div>
 
           <div>
@@ -166,9 +164,14 @@ export default function InboxFilterPanel({
             <div className="mt-3 space-y-4">
               <div>
                 <span className={labelClass}>期限</span>
-                <select aria-label="期限で絞り込む" className={fieldClass} disabled defaultValue="all">
-                  <option value="all">すべて</option>
-                </select>
+                <Select
+                  aria-label="期限で絞り込む"
+                  size="full"
+                  value="all"
+                  disabled
+                  onChange={() => {}}
+                  options={[{ value: 'all', label: 'すべて' }]}
+                />
                 <p className="text-ink-faint mt-1 text-micro">対応期限はまだ記録していないため、この条件では絞り込めません</p>
               </div>
 

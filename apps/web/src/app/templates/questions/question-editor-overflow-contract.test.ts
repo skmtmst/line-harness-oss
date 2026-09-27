@@ -16,25 +16,29 @@ const EDITOR = readFileSync(
  */
 describe('質問エディタのはみ出し（#973 U022）', () => {
   it('select はコンテナ幅を上限にし、狭い行では縮む', () => {
-    const selectClass = EDITOR.match(/const selectClass =\s*'([^']+)'/)
-    expect(selectClass, 'selectClass が見つからない').not.toBeNull()
-    expect(selectClass![1]).toContain('min-w-0')
-    expect(selectClass![1]).toContain('max-w-full')
+    // 選び欄は共通 Select。幅は部品の size="full"（親いっぱい）で持たせ、
+    // 最長選択肢まで広がる素の select と selectClass の上書きは置かない。
+    expect(EDITOR).not.toMatch(/const selectClass =/)
+    expect(EDITOR).not.toContain('<select')
+    expect(EDITOR).toContain('size="full"')
   })
 
   it('友だち情報欄は選択と値を同じ行に押し込まない', () => {
     // ラベル・選択・値は全幅の縦配置。横並びの flex 行ではない。
     // 2026-09-25: 見出しの span を label へ（読み上げ対応）。見張りは配置のまま。
+    // 選び欄は共通 Select の size="full"、値は w-full の入力欄
+    // （placeholder と className の順で置くため、値は別に見張る）。
     const block = EDITOR.match(/友だち情報欄<\/(span|label)>[\s\S]{0,1600}?セットする値（既存の値は上書き）/)
     expect(block, '友だち情報欄のブロックが見つからない').not.toBeNull()
     expect(block![0]).not.toContain('flex flex-wrap items-center')
-    expect(block![0]).toContain('w-full')
+    expect(block![0]).toContain('size="full"')
+    const valueInput = EDITOR.match(/友だち情報欄にセットする値[\s\S]{0,1200}?w-full/)
+    expect(valueInput, '値の入力欄が全幅でない').not.toBeNull()
   })
 
   it('タグの選択欄は全幅の独立した行で、長いタグ名でカードを広げない', () => {
-    const tagSelect = EDITOR.match(/aria-label=\{label\}[\s\S]{0,600}?className="([^"]+)"/)
+    // U022: タグの選択は全幅の独立行。共通 Select の size="full" で持たせる。
+    const tagSelect = EDITOR.match(/aria-label=\{label\}[\s\S]{0,600}?size="full"/)
     expect(tagSelect, 'タグ選択欄が見つからない').not.toBeNull()
-    expect(tagSelect![1]).toContain('w-full')
-    expect(tagSelect![1]).toContain('max-w-full')
   })
 })

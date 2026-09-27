@@ -15,6 +15,7 @@ const FRIEND_TREND = join(ROOT, '..', 'dashboard', 'friend-trend-table.tsx')
 const CHATS = join(ROOT, '..', '..', 'app', 'chats', 'page.tsx')
 const MENU = join(ROOT, '..', '..', 'lib', 'menu.ts')
 const CARD = join(ROOT, '..', 'shared', 'card.module.css')
+const DATA_TABLE_CSS = join(ROOT, '..', 'shared', 'data-table.module.css')
 
 // 描画して数えるための見本。1行だけ推定（行に「推定」の文字が残る形）。
 const TREND_SAMPLE = [
@@ -156,15 +157,19 @@ describe('Pen.dev V6を共通レイアウトの正本にする', () => {
       こと（`overflow-x-auto`）で同じ意図を守る。案内文と流入元列
       （「すべて表示」）は ★V7 で外れた。
     */
-    const headers = body.match(/<th[\s>][^>]*>/g) ?? []
+    // 見出しは共通 Th（大文字）で書く。素の th も同じ形とみなす。
+    const headers = body.match(/<[tT]h[\s>][^>]*>/g) ?? []
     expect(headers).toHaveLength(5)
     for (const header of headers) expect(header).toContain('whitespace-nowrap')
     for (const label of ['日付', '前日比', '登録', 'ブロック', '有効友だち']) {
       expect(body).toContain(label)
     }
-    expect(body).toContain('overflow-x-auto')
+    // 表は共通 DataTable。狭い幅の横スクロールは外枠（frame）が持つ。
+    expect(body).toContain('<DataTable')
+    const frame = readFileSync(DATA_TABLE_CSS, 'utf8')
+    expect(frame).toContain('overflow-x: auto')
     // 日付の見出しは「？」と一緒でも折り返さない：日付を含む th が nowrap で HelpTip を持つ。
-    const cells = body.match(/<th[^>]*>[\s\S]*?<\/th>/g) ?? []
+    const cells = body.match(/<[tT]h[^>]*>[\s\S]*?<\/[tT]h>/g) ?? []
     const dateCell = cells.find((cell) => cell.includes('日付')) ?? ''
     expect(dateCell).toContain('whitespace-nowrap')
     expect(dateCell).toContain('日付の推定値の説明')
