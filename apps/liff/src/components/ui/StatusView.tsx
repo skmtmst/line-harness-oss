@@ -2,8 +2,9 @@ import Icon, { type IconName } from './Icon.js';
 import Button from './Button.js';
 
 /**
- * ★V7 の中央寄せの状態 (完了・空・開けない)。
+ * ★V7 の中央寄せの状態 (完了・待ち・空・開けない)。
  * 丸い印＋題＋本文＋ボタン1つ。ボタンは action があるときだけ1つ出す。
+ * 待ち (キャンセル待ち・承認待ち) は tone="wait" で黄土色の印にする。
  */
 export default function StatusView({
   icon,
@@ -13,7 +14,7 @@ export default function StatusView({
   action,
 }: {
   icon: IconName;
-  tone?: 'neutral' | 'success';
+  tone?: 'neutral' | 'success' | 'wait';
   title: string;
   body?: string;
   action?: { label: string; onClick: () => void };
@@ -22,7 +23,11 @@ export default function StatusView({
     <div className="flex flex-col items-center px-6 py-10 text-center">
       <span
         className={`flex h-16 w-16 items-center justify-center rounded-full ${
-          tone === 'success' ? 'bg-ok-bg text-ok-ink' : 'bg-state-mark text-ink-faint'
+          tone === 'success'
+            ? 'bg-ok-bg text-ok-ink'
+            : tone === 'wait'
+              ? 'bg-wait-bg text-wait-ink'
+              : 'bg-state-mark text-ink-faint'
         }`}
         aria-hidden="true"
       >
