@@ -5,14 +5,13 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import KpiCard from './kpi-card'
-import SummaryCard from './summary-card'
 
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const WEB = join(SRC, '..')
 const readSource = (path: string) => readFileSync(join(SRC, path), 'utf8')
 
-describe('SummaryCardへの移行契約', () => {
-  it('既存KpiCardの呼び出し方を保ち、V6へ転送する', () => {
+describe('KpiCardへの一本化契約', () => {
+  it('数のカードはKpiCardだけを使い、V6の見せ方にする', () => {
     const html = renderToStaticMarkup(
       <KpiCard
         title="成果"
@@ -30,16 +29,15 @@ describe('SummaryCardへの移行契約', () => {
 
   it('配信告知をbroadcast variantとして明示する', () => {
     const html = renderToStaticMarkup(
-      <SummaryCard title="今週の配信" value={3} unit="通" detail="過去7日" variant="broadcast" />,
+      <KpiCard title="今週の配信" value={3} unit="通" detail="過去7日" variant="broadcast" />,
     )
 
     expect(html).toContain('data-design-version="broadcast"')
     expect(html).toContain('3通')
   })
 
-  it('3系統の実装元が共通SummaryCardだけを描画する', () => {
+  it('3系統の実装元が共通KpiCardだけを描画する', () => {
     const files = [
-      'components/shared/kpi-card.tsx',
       'components/friends/friend-kpis.tsx',
       'components/shared/list-kpis.tsx',
       'components/users/summary-bar.tsx',
@@ -47,7 +45,7 @@ describe('SummaryCardへの移行契約', () => {
 
     for (const file of files) {
       const source = readSource(file)
-      expect(source, `${file} がSummaryCardを使っていない`).toMatch(/import SummaryCard/)
+      expect(source, `${file} がKpiCardを使っていない`).toMatch(/import KpiCard/)
       expect(source, `${file} に旧カードの影が残っている`).not.toContain('shadow-[')
       expect(source, `${file} に旧カードの任意角丸が残っている`).not.toContain('rounded-[')
     }
@@ -55,9 +53,23 @@ describe('SummaryCardへの移行契約', () => {
     expect(readSource('components/dashboard/kpi-card.tsx')).toContain("from '@/components/shared/kpi-card'")
   })
 
+  it('旧SummaryCardの入口が残っていない', () => {
+    const files = [
+      'components/friends/friend-kpis.tsx',
+      'components/shared/list-kpis.tsx',
+      'components/users/summary-bar.tsx',
+    ]
+
+    for (const file of files) {
+      const source = readSource(file)
+      expect(source, `${file} に旧名が残っている`).not.toContain('SummaryCard')
+    }
+    expect(readSource('components/shared/kpi-card.tsx')).not.toMatch(/function SummaryCard/)
+  })
+
   it('V5基準・V6優先と9ルートの影響範囲を契約へ残す', () => {
     const contract = JSON.parse(readFileSync(join(WEB, 'design', 'design-parts.json'), 'utf8'))
-    const part = contract.parts['summary-card']
+    const part = contract.parts['kpi-card']
 
     expect(part.status).toBe('active')
     expect(part.pencilNodes).toEqual(expect.arrayContaining(['XywGr', 'mNUQ3']))

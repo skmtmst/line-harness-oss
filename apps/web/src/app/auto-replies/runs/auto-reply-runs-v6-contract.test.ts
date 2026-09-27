@@ -13,7 +13,7 @@ const sharedTypes = readFileSync(join(here, '../../../../../../packages/shared/s
 describe('V6 自動応答・実行結果 t7UtYQ', () => {
   it('Pencilの実Nodeと共通部品を正本にする', () => {
     expect(page).toContain('data-design-node="t7UtYQ"')
-    for (const component of ['SummaryCard', 'Card', 'ListState', 'Pagination', 'StatusBadge', 'StickyBar']) {
+    for (const component of ['KpiCard', 'Card', 'ListState', 'Pagination', 'StatusBadge', 'StickyBar']) {
       expect(page).toContain(component)
     }
     expect(page).toContain('usePageTitle')

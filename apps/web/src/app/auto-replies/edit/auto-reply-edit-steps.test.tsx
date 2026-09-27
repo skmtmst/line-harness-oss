@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /**
- * Issue #967 / U049: /auto-replies/edit の手順表示を共通の StepTrail に寄せる。
+ * Issue #967 / U049: /auto-replies/edit の手順表示を共通の Stepper に寄せる。
  *
  * 390px でも現在地の追い方がウェビナー作成（/webinars/new）と同じになるよう、
  * 同じ部品・同じ置き場で出す。
@@ -63,7 +63,7 @@ const flush = () =>
   })
 
 describe('U049: 自動応答編集の手順表示を共通化', () => {
-  it('ウェビナー作成と同じ StepTrail 部品で5段を出す', async () => {
+  it('ウェビナー作成と同じ Stepper 部品で5段を出す', async () => {
     await act(async () => { root.render(<AutoReplyEditPage />) })
     await flush()
     const trail = host.querySelector('[data-design="Steps"]')
