@@ -1,7 +1,15 @@
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 
-import { ApiError } from './api'
-import { resolveFailureCopy, type ErrorMessageEntry } from './error-messages'
+import type { ErrorMessageEntry } from './error-messages'
+
+let ApiError: typeof import('./api').ApiError
+let resolveFailureCopy: typeof import('./error-messages').resolveFailureCopy
+
+beforeAll(async () => {
+  process.env.NEXT_PUBLIC_API_URL = 'https://worker.example.com'
+  ;({ ApiError } = await import('./api'))
+  ;({ resolveFailureCopy } = await import('./error-messages'))
+})
 
 /**
  * 失敗の文面を対応表から引く（要件 v6-34 §9）。
