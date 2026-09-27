@@ -57,6 +57,7 @@ import {
   BROADCASTS, BROADCAST_FOLDERS, BROADCAST_INSIGHTS, BROADCAST_LIST_META,
   BROADCAST_NOTIFICATION_SETTINGS,
   BROADCAST_APPROVAL_CONFIG, BROADCAST_APPROVAL_CANDIDATES, BROADCAST_APPROVAL_STATE,
+  BROADCAST_RECIPIENTS, BROADCAST_ACTIVITY,
   BROADCAST_PREFLIGHT, BROADCAST_SAVED_VIEWS, CHATS, FRIEND_FIELDS, FRIEND_ATTRIBUTE_FIELDS, FRIEND_FIELD_FOLDERS,
   FRIEND_ATTRIBUTE_SAVED_SEARCH_DETAIL, FRIEND_ATTRIBUTE_SAVED_SEARCH_RESPONSE, FRIEND_FIELD_MIGRATION_PREVIEW,
   INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS,
@@ -2606,6 +2607,25 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   const broadcastInsight = pathname.match(/^\/api\/broadcasts\/([^/]+)\/insight$/)
   if (broadcastInsight) {
     return { success: true, data: BROADCAST_INSIGHTS[broadcastInsight[1]] ?? null }
+  }
+  const broadcastRecipients = pathname.match(/^\/api\/broadcasts\/([^/]+)\/recipients$/)
+  if (broadcastRecipients) {
+    const wanted = query.get('result') ?? 'all'
+    const groupFor = { delivered: 'delivered', temporary: 'failed_temporary', permanent: 'failed_permanent', unknown: 'unknown', inflight: 'inflight' }[wanted]
+    const rows = groupFor ? BROADCAST_RECIPIENTS.rows.filter((row) => row.group === groupFor) : BROADCAST_RECIPIENTS.rows
+    return {
+      success: true,
+      data: { rows, summary: BROADCAST_RECIPIENTS.summary, aggregateOnly: false, aggregateReason: null, legacySuccessCount: null },
+      pagination: { total: rows.length, limit: 50, cursor: 0, nextCursor: null },
+    }
+  }
+  const broadcastActivity = pathname.match(/^\/api\/broadcasts\/([^/]+)\/activity$/)
+  if (broadcastActivity) {
+    return {
+      success: true,
+      data: BROADCAST_ACTIVITY,
+      pagination: { limit: 50, cursor: 0, nextCursor: null },
+    }
   }
   const broadcastOne = pathname.match(/^\/api\/broadcasts\/([^/]+)$/)
   if (broadcastOne) {
