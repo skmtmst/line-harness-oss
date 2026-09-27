@@ -20,7 +20,7 @@ const numberOrDash = (value: unknown) => Number.isFinite(Number(value)) ? Number
 
 export function PhotoReviewDetail({
   photo, position, total, loading, loadKind, reviewing, notice, accountNotice, assetStatus, derivatives, assetsFailed, onReloadAssets, assetProcessing, rotationSaving,
-  onBack, onMove, onApprove, onReturn, onProcessReviewAsset, onSaveRotation, onDownloadOriginal, onPointAction, pointActionBusy,
+  onBack, onMove, onApprove, onReturn, onAdoptWithoutReward, onProcessReviewAsset, onSaveRotation, onDownloadOriginal, onPointAction, pointActionBusy,
 }: {
   photo: Record<string, unknown> | null
   position: number
@@ -40,6 +40,8 @@ export function PhotoReviewDetail({
   onMove: (direction: -1 | 1) => void
   onApprove: () => void
   onReturn: () => void
+  // #817: 重複のときの「報酬なしで採用」。無いときは通常の採用へ倒す。
+  onAdoptWithoutReward?: () => void
   onProcessReviewAsset: () => void
   onSaveRotation: (rotation: 0 | 90 | 180 | 270) => void
   onDownloadOriginal: (code: string) => Promise<void>
@@ -90,6 +92,21 @@ export function PhotoReviewDetail({
   const reviewUrl = safePhotoSrc(derivatives?.knownUrls.find((item) => item.kind === 'review')?.url)
     ?? safePhotoSrc(photo.image_url)
   const latestAssetJob = assetStatus?.jobs[0] ?? null
+  /*
+   * #817: 同じ中身の写真で、すでに採用されて報酬が付いた前の投稿。
+   * 前の投稿と並べて見せ、選べるのは「却下」か「報酬なしで採用」。
+   * 似ている写真は自動で却下せず、注意候補の札だけに留める。
+   */
+  const duplicate = photo.duplicate && typeof photo.duplicate === 'object'
+    ? photo.duplicate as Record<string, unknown>
+    : null
+  const adoptWithoutReward = onAdoptWithoutReward ?? onApprove
+  const duplicateDate = (() => {
+    const date = new Date(String(duplicate?.createdAt ?? duplicate?.created_at ?? ''))
+    if (Number.isNaN(date.getTime())) return '—'
+    return new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric' }).format(date)
+  })()
+  const duplicateImageUrl = safePhotoSrc(duplicate ? text(duplicate.imageUrl ?? duplicate.image_url) : '')
   return <div data-photo-view="detail">
     {notice && <Notice tone="danger" className="mb-4" message={notice} />}
     {accountNotice && <Notice tone="warn" className="mb-4" message={accountNotice} />}
@@ -105,6 +122,48 @@ export function PhotoReviewDetail({
         <Button onClick={onBack}>並べて見るへ戻る</Button>
       </div>
     </div>
+
+    {duplicate && <section aria-label="重複の確認" className="mt-4 rounded-card border border-hairline bg-canvas p-4">
+      <Notice
+        tone="warn"
+        helpLabel="重複の意味"
+        help="完全に同じ中身の写真だけを重複とします。似ている写真は自動で却下せず、注意候補の札だけに留めます。決めるのは人です。"
+      >
+        同じ写真がすでに採用されています（{duplicateDate}）。報酬を二重に付けないよう、却下か、報酬なしで採用を選んでください。
+      </Notice>
+      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <figure>
+          <div className="grid h-48 place-items-center overflow-hidden rounded-card bg-canvas-sunken">
+            {reviewUrl ? <img
+              src={reviewUrl}
+              alt="今回の投稿の写真"
+              className="h-full w-full object-contain"
+            /> : <p className="text-xs font-bold text-ink-faint">審査用の画像を作成中です</p>}
+          </div>
+          <figcaption className="mt-1 truncate text-xs font-bold text-ink" title={`今回の投稿 ${formatPhotoReceivedAt(photo.created_at)}`}>
+            今回の投稿
+          </figcaption>
+          <p className="truncate text-xs text-ink-secondary" title={`${photoPetDisplayName(photo.pet_name, { callName: photo.pet_call_name, gender: photo.pet_gender })} ${formatPhotoReceivedAt(photo.created_at)}`}>
+            {formatPhotoReceivedAt(photo.created_at)}・{photoPetDisplayName(photo.pet_name, { callName: photo.pet_call_name, gender: photo.pet_gender })}
+          </p>
+        </figure>
+        <figure>
+          <div className="grid h-48 place-items-center overflow-hidden rounded-card bg-canvas-sunken">
+            {duplicateImageUrl ? <img
+              src={duplicateImageUrl}
+              alt="前に採用された同じ写真"
+              className="h-full w-full object-contain"
+            /> : <p className="text-xs font-bold text-ink-faint">前の写真を読み込めませんでした</p>}
+          </div>
+          <figcaption className="mt-1 truncate text-xs font-bold text-ink" title="前の投稿（採用済み）">
+            前の投稿（採用済み）
+          </figcaption>
+          <p className="truncate text-xs text-ink-secondary" title={`${text(duplicate.petName ?? duplicate.pet_name)} ${formatPhotoReceivedAt(duplicate.createdAt ?? duplicate.created_at)}`}>
+            {formatPhotoReceivedAt(duplicate.createdAt ?? duplicate.created_at)}・{text(duplicate.petName ?? duplicate.pet_name) || '名前未取得'}
+          </p>
+        </figure>
+      </div>
+    </section>}
 
     {hasFaceRisk && <div className="mt-4"><NoteBar tone="warn">うしろに人の顔が写っている可能性があります（自動で見つけました）</NoteBar></div>}
 
@@ -245,8 +304,14 @@ export function PhotoReviewDetail({
     </div>
     <div className="mt-4">
       <StickyBar
-        status={`${total}枚のうち ${position + 1}枚目。あと${Math.max(0, total - position - 1)}枚あります。`}
-        actions={<>
+        status={duplicate
+          ? `${total}枚のうち ${position + 1}枚目。重複のため、却下か報酬なしで採用を選んでください。`
+          : `${total}枚のうち ${position + 1}枚目。あと${Math.max(0, total - position - 1)}枚あります。`}
+        actions={duplicate ? <>
+        <Button disabled={reviewing} onClick={onReturn}>却下する</Button>
+        <Button disabled title="切り取り版の生成口を接続後に使えます">切り取ってから採用</Button>
+        <Button variant="primary" disabled={reviewing} onClick={adoptWithoutReward}>{reviewing ? '処理中...' : '報酬なしで採用'}</Button>
+        </> : <>
         <Button disabled={reviewing} onClick={onReturn}>見送る（理由を選ぶ）</Button>
         <Button disabled title="切り取り版の生成口を接続後に使えます">切り取ってから採用</Button>
         <Button variant="primary" disabled={reviewing} onClick={onApprove}>{reviewing ? '処理中...' : 'このまま採用'}</Button>

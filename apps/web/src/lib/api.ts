@@ -4730,10 +4730,43 @@ export type NenPhotoPublicationRecord = {
 }
 
 /** GET /api/nen-members/photos/:id の応答本体。 */
+/**
+ * #817: 同じ中身の写真で、すでに採用されて報酬が付いた前の投稿。
+ * 詳細口が返す。無ければ null。
+ */
+export type NenPhotoDuplicate = {
+  photoId: string
+  imageUrl: string
+  petName: string
+  createdAt: string
+  awardedPoints: number
+}
+
+/** #817: 採用する時点で使っている報酬の決まり（版の写し）。 */
+export type PhotoRewardPolicyInfo = {
+  versionNumber: number
+  policyKey: string
+  points: number
+}
+
 export type NenPhotoDetail = Record<string, unknown> & {
   history?: NenPhotoReviewHistoryEntry[]
   reward?: NenPhotoRewardState | null
   publication?: NenPhotoPublicationRecord | null
+  duplicate?: NenPhotoDuplicate | null
+  rewardPolicy?: PhotoRewardPolicyInfo | null
+}
+
+/** #817: 報酬の決まりの版の1行。 */
+export type PhotoRewardPolicyVersion = {
+  versionNumber: number
+  policyKey: string
+  points: number
+  summary: string
+  effectiveFrom: string | null
+  createdBy: string | null
+  createdAt: string
+  status: 'in_use' | 'reserved' | 'past'
 }
 
 /**
@@ -10296,16 +10329,54 @@ export const api = {
       // 差戻し画面の2つの約束（#931 N-312）。省略時は従来どおり案内あり・印なし。
       resubmitInvite?: boolean
       watchSubmitter?: boolean
+      // #817: 重複のときの「報酬なしで採用」。点数を付けずに採用だけ残す。
+      withoutReward?: boolean
     }, idempotencyKey: string) => fetchApi<ApiResponse<{
       awardedPoints: number
       pointBalance: number | null
       pointSync: string
       notificationStatus: 'sent' | 'failed'
+      // #817: 点数を付けなかった理由。重複の二重報酬止め・選んだ報酬なし。
+      rewardSkipped?: 'duplicate' | 'requested' | null
     }>>(`/api/nen-members/photos/${encodeURIComponent(id)}/review`, {
       method: 'PUT',
       headers: { 'Idempotency-Key': idempotencyKey },
       body: JSON.stringify(data),
     }),
+    /**
+     * #817: 報酬の決まりの版。保存するたびに版を1つ足し、前の版は変えない。
+     * 確認キーは自動で振る。
+     */
+    photoRewardPolicyVersions: () => fetchApi<ApiResponse<PhotoRewardPolicyVersion[]>>(
+      '/api/nen-members/photo-reward-policy/versions',
+    ),
+    createPhotoRewardPolicyVersion: (data: {
+      points: number
+      summary?: string
+      effectiveFrom?: string | null
+      expectedVersion?: number
+    }) => fetchApi<ApiResponse<{
+      created: boolean
+      version: Omit<PhotoRewardPolicyVersion, 'status' | 'createdBy'>
+    }>>(
+      '/api/nen-members/photo-reward-policy/versions',
+      {
+        method: 'POST',
+        headers: { 'Idempotency-Key': crypto.randomUUID() },
+        body: JSON.stringify(data),
+      },
+    ),
+    revertPhotoRewardPolicyVersion: (data: { versionNumber: number }) => fetchApi<ApiResponse<{
+      created: boolean
+      version: Omit<PhotoRewardPolicyVersion, 'status' | 'createdBy'>
+    }>>(
+      '/api/nen-members/photo-reward-policy/revert',
+      {
+        method: 'POST',
+        headers: { 'Idempotency-Key': crypto.randomUUID() },
+        body: JSON.stringify(data),
+      },
+    ),
     retryPhotoReviewNotification: (id: string, accountId: string, idempotencyKey: string) => fetchApi<ApiResponse<{
       notificationStatus: 'sent' | 'failed'
       resent?: boolean

@@ -24,6 +24,7 @@ import { formatPhotoReceivedAt } from './photo-review-time'
 import { formatMinutesRough } from '@/lib/format-duration'
 import { PhotoReviewDetail } from './photo-review-detail'
 import { PhotoPublications } from './photo-publications'
+import { PhotoRewardPolicyCard } from './photo-reward-policy'
 import { safePhotoSrc } from './photo-src'
 import { photoPetDisplayName } from '@/components/shared/photo-display-name'
 import { photoNoticeFor } from './photo-notice'
@@ -83,6 +84,8 @@ export default function PhotoReviewsPage() {
   const [hasMorePhotos, setHasMorePhotos] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [selectedPhotoIds, setSelectedPhotoIds] = useState<string[]>([])
+  // #817: いま使っている報酬の決まりの点数。まとめ採用の合計に使う。未取得は null。
+  const [policyPoints, setPolicyPoints] = useState<number | null>(null)
   const [reviewing, setReviewing] = useState<string | null>(null)
   const [rejectingPhotoId, setRejectingPhotoId] = useState<string | null>(null)
   const [rejectingPhotoDetail, setRejectingPhotoDetail] = useState<Record<string, unknown> | null>(null)
@@ -443,6 +446,8 @@ export default function PhotoReviewsPage() {
     id: string,
     nextStatus: 'adopted' | 'rejected',
     rejection?: { reasonCode: ReviewReasonCode; reasonNote: string; resubmitInvite: boolean; watchSubmitter: boolean },
+    // #817: 重複のときの「報酬なしで採用」。点数を付けずに採用だけ残す。
+    options?: { withoutReward?: boolean },
   ) => {
     if (!selectedAccountId) {
       setAccountNotice('LINEアカウントを選んでください。')
@@ -470,6 +475,7 @@ export default function PhotoReviewsPage() {
               watchSubmitter: rejection.watchSubmitter,
             }
           : {}),
+        ...(options?.withoutReward ? { withoutReward: true } : {}),
       }, idempotencyKey)
       if (generation !== accountGeneration.current) return
       if (!response.success) throw new Error(response.error)
@@ -482,11 +488,15 @@ export default function PhotoReviewsPage() {
        * つながっていない採用に「手続きを始めました」と伝えるのは、
        * できていない約束をすることになる（#931 N-307）。
        */
-      const adoptedNote = response.data.pointSync === 'pending'
-        ? `ECへ${response.data.awardedPoints}マイルを付ける手続きを始めました。`
-        : response.data.pointSync === 'needs_attention'
-          ? 'EC会員とつながっていないため、マイルの手続きはまだ始まっていません。'
-          : ''
+      const adoptedNote = response.data.rewardSkipped === 'duplicate'
+        ? '同じ写真はすでに報酬付きで採用されているため、点数は付けずに採用しました。'
+        : response.data.rewardSkipped === 'requested'
+          ? '報酬なしで採用しました。点数は付けていません。'
+          : response.data.pointSync === 'pending'
+            ? `ECへ${response.data.awardedPoints}マイルを付ける手続きを始めました。`
+            : response.data.pointSync === 'needs_attention'
+              ? 'EC会員とつながっていないため、マイルの手続きはまだ始まっていません。'
+              : ''
       notifyToast(nextStatus === 'adopted'
         ? `写真を採用しました。${adoptedNote}公開は本人の同意がある場合だけ行います。${notification}`
         : `見送り理由を保存しました。${notification}`)
@@ -716,6 +726,7 @@ export default function PhotoReviewsPage() {
         if (next) void openDetail(text(next.id))
       }}
       onApprove={() => { if (detailPhoto) void review(text(detailPhoto.id), 'adopted') }}
+      onAdoptWithoutReward={() => { if (detailPhoto) void review(text(detailPhoto.id), 'adopted', undefined, { withoutReward: true }) }}
       onReturn={() => {
         if (!detailPhoto) return
         writeEntryToUrl({ view: 'list', status, q: searchQuery || undefined })
@@ -985,6 +996,8 @@ export default function PhotoReviewsPage() {
           </p>
         </section>
 
+        <PhotoRewardPolicyCard onCurrentPointsChange={setPolicyPoints} />
+
         <FeatureLinkCard
           items={[
             { label: '受信箱', note: '写真が届いたやりとり', href: '/chats' },
@@ -1000,7 +1013,7 @@ export default function PhotoReviewsPage() {
     <Dialog open={bulkApproveOpen} title={`${selectedPendingPhotos.length}枚をまとめて採用`} description="選択した写真の件数、マイル、公開範囲を確認してください。" busy={bulkReviewing} confirmLabel="まとめて採用" cancelLabel="審査へ戻る" onCancel={() => setBulkApproveOpen(false)} onConfirm={() => void bulkReview('approve')}>
       <dl className="space-y-3 rounded-control bg-surface-pearl p-4 text-sm text-ink-secondary">
         <div className="flex justify-between gap-4"><dt>写真</dt><dd className="font-semibold text-ink">{selectedPendingPhotos.length}枚</dd></div>
-        <div className="flex justify-between gap-4"><dt>付与するマイル</dt><dd className="font-semibold text-ink">合計 {selectedPendingPhotos.length * 5}マイル</dd></div>
+        <div className="flex justify-between gap-4"><dt>付与するマイル</dt><dd className="font-semibold text-ink">合計 {policyPoints == null ? '—' : `${selectedPendingPhotos.length * policyPoints}マイル`}</dd></div>
         <div className="flex justify-between gap-4"><dt>公開範囲</dt><dd className="font-semibold text-ink">公開しない</dd></div>
       </dl>
       <p className="mt-3 text-xs text-ink-faint">写真を採用しても自動公開しません。本人の公開同意を確認したあと、公式サイト掲載画面で公開先を選びます。</p>

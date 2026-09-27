@@ -83,6 +83,8 @@ const EXEMPTIONS: Record<string, string> = {
     'ダイアログ内の dirty。閉じると元に戻る仕様で、画面離脱ガードの対象外',
   'components/shared/drawer.tsx':
     'dirty 印（*）を表示するだけの共通部品。編集画面ではない',
+  'app/nen-members/photo-reward-policy.tsx':
+    '棚（Drawer）の中の小さな操作。閉じると入力は戻る仕様で、画面離脱ガードの対象外。保存中・戻し中は棚を閉じられない',
 }
 
 /*
