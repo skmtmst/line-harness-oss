@@ -91,6 +91,24 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'acc-1', loading: false }),
 }))
 
+/*
+ * フォルダの欄は共通 Select（listbox）。ここで見たいのは選んだ後の
+ * テンプレートの判断なので、素の <select> に置き換える。
+ */
+vi.mock('@/components/shared/select', () => ({
+  default: ({ 'aria-label': label, id, value, onChange, options }: {
+    'aria-label'?: string
+    id?: string
+    value: string
+    onChange: (value: string) => void
+    options: Array<{ value: string; label: string }>
+  }) => React.createElement(
+    'select',
+    { 'aria-label': label, id, value, onChange: (e: { target: { value: string } }) => onChange(e.target.value) },
+    options.map((option) => React.createElement('option', { key: option.value, value: option.value }, option.label)),
+  ),
+}))
+
 import BroadcastForm from './broadcast-form'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true

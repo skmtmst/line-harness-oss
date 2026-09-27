@@ -52,6 +52,24 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: fixture.accountId, loading: false }),
 }))
 
+/*
+ * 共通の Select は listbox の部品で、その操作は部品自身の試験が持つ。
+ * ここで見たいのは選んだ後の共通情報の判断なので、素の <select> に置き換える。
+ */
+vi.mock('@/components/shared/select', () => ({
+  default: ({ 'aria-label': label, id, value, onChange, options }: {
+    'aria-label'?: string
+    id?: string
+    value: string
+    onChange: (value: string) => void
+    options: Array<{ value: string; label: string }>
+  }) => React.createElement(
+    'select',
+    { 'aria-label': label, id, value, onChange: (e: { target: { value: string } }) => onChange(e.target.value) },
+    options.map((option) => React.createElement('option', { key: option.value, value: option.value }, option.label)),
+  ),
+}))
+
 import NewCommonVarPage from './page'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -332,6 +350,33 @@ describe('共通情報の新規作成: 型別の入力エラー(VAR-06, 実React
 
     expect(api.create).not.toHaveBeenCalled()
     expect(host.textContent).toContain('https://')
+  })
+
+  it('URL型にURLでない文章を入れると止め、欄のすぐ下にも理由を出す(R36)', async () => {
+    await render()
+    await setValue(byId('cv-name'), '店舗リンク')
+    await setValue(byId('cv-key'), 'shop_link')
+    await click(host.querySelector('input[name="cv-type"][value="url"]') as HTMLInputElement)
+    await setValue(byId('cv-value'), 'これはURLではありません')
+    await click(byExactText('button', '登録'))
+
+    expect(api.create).not.toHaveBeenCalled()
+    // 欄のすぐ下に出る。
+    const valueField = byId('cv-value').closest('div')
+    expect(valueField?.textContent).toContain('http://')
+    expect((document.activeElement as HTMLElement | null)?.id).toBe('cv-value')
+  })
+
+  it('URL型は http/https のURLなら通す(R36)', async () => {
+    await render()
+    await setValue(byId('cv-name'), '店舗リンク')
+    await setValue(byId('cv-key'), 'shop_link2')
+    await click(host.querySelector('input[name="cv-type"][value="url"]') as HTMLInputElement)
+    await setValue(byId('cv-value'), 'https://example.com/shop')
+    await click(byExactText('button', '登録'))
+
+    expect(api.create).toHaveBeenCalledTimes(1)
+    expect(api.create.mock.calls[0][0]).toMatchObject({ type: 'url', value: 'https://example.com/shop' })
   })
 
   it('期間外の代替値が種別に合わないと止める', async () => {

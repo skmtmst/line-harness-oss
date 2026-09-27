@@ -1,7 +1,7 @@
 'use client'
 
-import SelectField from '@/components/shared/select-field'
 import MultiSelect from '@/components/shared/multi-select'
+import Select from '@/components/shared/select'
 import type { Area } from './canvas-editor'
 import { RICH_MENU_ACTION_TYPE_BY_INTENT, type RichMenuAreaIntent } from '@line-crm/shared'
 
@@ -233,11 +233,12 @@ export function AreaProperties({
       ) : null}
 
       <Field label="押したときの動き" hint="タップしたときに何が起きるかを決めます。">
-        <SelectField
+        <Select
+          aria-label="押したときの動き"
+          size="full"
           value={intent}
-          onChange={(e) => changeIntent(e.target.value as RichMenuAreaIntent)}
+          onChange={(value) => changeIntent(value as RichMenuAreaIntent)}
           options={intentOptions.map((o) => ({ value: o.value, label: o.label }))}
-          className={inputClass}
         />
         <p className="text-ink-faint mt-1 text-[11px]">
           {intentOptions.find((o) => o.value === intent)?.hint}
@@ -250,18 +251,16 @@ export function AreaProperties({
             label="計測リンクを使う"
             hint="選ぶと、押された回数が数えられます。計測リンク側にタグを設定していれば、それも付きます。"
           >
-            <select
+            <Select
               value={area.trackedLinkId ?? ''}
-              onChange={(e) => onUpdate({ trackedLinkId: e.target.value || null })}
-              className={inputClass}
-            >
-              <option value="">使わない（下のURLをそのまま開く）</option>
-              {trackedLinks.map((l) => (
-                <option key={l.id} value={l.id}>
-                  {l.name}
-                </option>
-              ))}
-            </select>
+              onChange={(value) => onUpdate({ trackedLinkId: value || null })}
+              aria-label="計測リンクを使う"
+              options={[
+                { value: '', label: '使わない（下のURLをそのまま開く）' },
+                ...trackedLinks.map((l) => ({ value: l.id, label: l.name })),
+              ]}
+              size="full"
+            />
           </Field>
 
           {area.trackedLinkId ? (
@@ -309,18 +308,16 @@ export function AreaProperties({
 
       {intent === 'template' && (
         <Field label="送るテンプレート" hint="押されたら、こちらからこのメッセージを送ります。">
-          <select
+          <Select
             value={area.templateId ?? ''}
-            onChange={(e) => onUpdate({ templateId: e.target.value || null })}
-            className={inputClass}
-          >
-            <option value="">選択...</option>
-            {templates.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </select>
+            onChange={(value) => onUpdate({ templateId: value || null })}
+            aria-label="送るテンプレート"
+            options={[
+              { value: '', label: '選択...' },
+              ...templates.map((t) => ({ value: t.id, label: t.name })),
+            ]}
+            size="full"
+          />
           {templates.length === 0 && (
             <p className="mt-1 text-[11px] text-amber-600">
               テンプレートがまだありません。先に「テンプレート」で作ってください。
@@ -331,18 +328,16 @@ export function AreaProperties({
 
       {intent === 'form' && (
         <Field label="開く回答フォーム">
-          <select
+          <Select
             value={area.formId ?? ''}
-            onChange={(e) => onUpdate({ formId: e.target.value || null })}
-            className={inputClass}
-          >
-            <option value="">選択...</option>
-            {forms.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.name}
-              </option>
-            ))}
-          </select>
+            onChange={(value) => onUpdate({ formId: value || null })}
+            aria-label="開く回答フォーム"
+            options={[
+              { value: '', label: '選択...' },
+              ...forms.map((f) => ({ value: f.id, label: f.name })),
+            ]}
+            size="full"
+          />
           {forms.length === 0 && (
             <p className="mt-1 text-[11px] text-amber-600">
               回答フォームがまだありません。先に「回答フォーム」で作ってください。
@@ -353,18 +348,16 @@ export function AreaProperties({
 
       {intent === 'switch' && (
         <Field label="切り替え先のページ">
-          <select
+          <Select
             value={(data.targetPageId as string) ?? ''}
-            onChange={(e) => onUpdate({ actionData: { ...data, targetPageId: e.target.value } })}
-            className={inputClass}
-          >
-            <option value="">選択...</option>
-            {pages.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
+            onChange={(value) => onUpdate({ actionData: { ...data, targetPageId: value } })}
+            aria-label="切り替え先のページ"
+            options={[
+              { value: '', label: '選択...' },
+              ...pages.map((p) => ({ value: p.id, label: p.name })),
+            ]}
+            size="full"
+          />
           {pages.length < 2 && (
             <p className="mt-1 text-[11px] text-amber-600">
               タブの切り替えには2ページ以上必要です。先にページを追加してください。

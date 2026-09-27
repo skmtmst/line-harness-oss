@@ -6,7 +6,7 @@ import type { EntryRoute } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { qrToDataURL } from '@/lib/qr-image'
 import Button from '@/components/shared/button'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 
 /**
@@ -301,12 +301,14 @@ export default function QrDialog({
               <label htmlFor="qr-route" className="text-ink-secondary mb-1 block text-xs font-medium">
                 発行中の追加URL
               </label>
-              <SelectField
+              <Select
+                aria-label="発行中の追加URL"
+                size="full"
                 id="qr-route"
                 value={routeId}
-                onChange={(e) => {
-                  setRouteId(e.target.value)
-                  onRouteIdChange?.(e.target.value)
+                onChange={(value) => {
+                  setRouteId(value)
+                  onRouteIdChange?.(value)
                 }}
                 className="w-full"
                 options={[
@@ -330,10 +332,12 @@ export default function QrDialog({
                 <label htmlFor="qr-size" className="text-ink-secondary mb-1 block text-xs font-medium">
                   画像の大きさ
                 </label>
-                <SelectField
+                <Select
+                  aria-label="画像の大きさ"
+                  size="full"
                   id="qr-size"
                   value={size}
-                  onChange={(e) => setSize(e.target.value)}
+                  onChange={(value) => setSize(value)}
                   className="w-full"
                   options={SIZES.map((s) => ({ value: s.value, label: s.label }))}
                 />

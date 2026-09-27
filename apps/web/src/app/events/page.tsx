@@ -13,7 +13,8 @@ import ListToolbar from '@/components/shared/list-toolbar'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
-import SelectField from '@/components/shared/select-field'
+import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import Select from '@/components/shared/select'
 // #740: bookings の EventKpi と一字一句同じだったため、機能内共有の1部品へ統合した。
 import EventKpi from '@/components/events/event-kpi'
 import { daysUntilEvent, summarizeEventAttention } from './event-attention'
@@ -245,9 +246,9 @@ export default function EventsListPage() {
         trailing={
           <label className="text-ink-faint flex items-center gap-2 text-xs whitespace-nowrap">
             並び順
-            <SelectField
+            <Select
               value={sort}
-              onChange={(event) => setSort(event.target.value as 'soon' | 'name')}
+              onChange={(value) => setSort(value as 'soon' | 'name')}
               aria-label="イベントの並び順"
               options={[
                 { value: 'soon', label: '日付が近い順' },
@@ -286,27 +287,27 @@ export default function EventsListPage() {
           条件に合うイベントはありません
         </div>
       ) : (
-        <div
-          data-design="Table"
-          className="bg-canvas rounded-card border-hairline overflow-hidden border"
-        >
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[820px]">
+        <DataTable data-design="Table">
               <thead>
-                <tr className="bg-canvas-sunken border-hairline border-b">
-                  <Th>イベント名</Th>
-                  <Th>開催日時</Th>
-                  <Th className="text-right">予約 / 定員</Th>
-                  <Th className="text-right">承認待ち</Th>
+                <TableHeadRow>
+                  <Th style={{ width: '24%' }}>イベント名</Th>
+                  <Th style={{ width: '18%' }}>開催日時</Th>
+                  <Th style={{ width: '12%' }} align="right">予約 / 定員</Th>
+                  <Th style={{ width: '10%' }} align="right">承認待ち</Th>
+                  {/* タグ名は長さが読めないため幅を指定しない。残りを吸って表を器に合わせる。 */}
                   <Th>申込条件</Th>
-                  <Th>状態</Th>
-                  <Th className="text-right">操作</Th>
-                </tr>
+                  <Th style={{ width: '10%' }}>状態</Th>
+                  {/*
+                    操作列は固定幅（256px）。割合にすると中身（2ボタン約242px）が
+                    器からはみ出す。残りは割合と自動の列で吸う。
+                  */}
+                  <Th align="right" className="w-64">操作</Th>
+                </TableHeadRow>
               </thead>
-              <tbody className="divide-hairline divide-y">
+              <tbody>
                 {items.map((e) => (
-                  <tr key={e.id} className="hover:bg-canvas-sunken">
-                    <td className="px-4 py-3 text-sm">
+                  <Tr key={e.id} interactive>
+                    <Td>
                       <Link
                         href={`/events/edit?id=${e.id}`}
                         className="text-ink font-medium hover:underline"
@@ -316,18 +317,18 @@ export default function EventsListPage() {
                       {e.venue_name && (
                         <span className="text-ink-faint block text-xs">{e.venue_name}</span>
                       )}
-                    </td>
-                    <td className="px-4 py-3 text-sm whitespace-nowrap tabular-nums">
+                    </Td>
+                    <Td className="whitespace-nowrap tabular-nums">
                       {formatJpDate(e.next_slot_starts_at)}
-                    </td>
-                    <td className="px-4 py-3 text-right text-sm tabular-nums">
+                    </Td>
+                    <Td align="right" className="tabular-nums">
                       {e.total_active}
                       <span className="text-ink-faint">
                         {' / '}
                         {e.total_capacity ?? '—'}
                       </span>
-                    </td>
-                    <td className="px-4 py-3 text-right text-sm tabular-nums">
+                    </Td>
+                    <Td align="right" className="tabular-nums">
                       {e.pending_count > 0 ? (
                         <Link
                           href={`/events/bookings?id=${e.id}`}
@@ -338,22 +339,28 @@ export default function EventsListPage() {
                       ) : (
                         <span className="text-ink-faint">0 件</span>
                       )}
-                    </td>
+                    </Td>
                     {/* 申込条件。visible_tag_id が入っていると、そのタグの人にしか
                         LIFF の一覧に出ない。「全員」と見分けがつかないと、公開した
                         つもりで誰にも見えていない状態に気づけない。
                         タグを消しても events 側の ID は残るので、その場合は名前が
                         引けない＝もう誰にも見えない、と分かるように別の文言を出す。 */}
-                    <td className="text-ink-secondary px-4 py-3 text-sm">
+                    {/*
+                      申込条件のタグ名は長さが読めない。列幅（自動）より広いと
+                      器からはみ出すので、1行で省略し全文は title で確認する。
+                    */}
+                    <Td className="text-ink-secondary">
                       {!e.visible_tag_id ? (
                         '全員'
                       ) : e.visible_tag_name ? (
-                        e.visible_tag_name
+                        <span className="block max-w-32 truncate" title={e.visible_tag_name}>
+                          {e.visible_tag_name}
+                        </span>
                       ) : (
                         <span className="text-warning">消えたタグ</span>
                       )}
-                    </td>
-                    <td className="px-4 py-3 text-sm">
+                    </Td>
+                    <Td>
                       {e.is_published !== 1 ? (
                         <span className="bg-canvas-sunken text-ink-faint rounded-pill px-2 py-0.5 text-xs">
                           準備中
@@ -367,8 +374,8 @@ export default function EventsListPage() {
                           受付中
                         </span>
                       )}
-                    </td>
-                    <td className="px-4 py-3 text-right text-sm whitespace-nowrap">
+                    </Td>
+                    <ActionCell>
                       <span className="inline-flex items-center justify-end gap-2">
                         <Button href={'/events/edit?id=' + e.id} variant="secondary">
                           中身を見る
@@ -377,13 +384,11 @@ export default function EventsListPage() {
                           申込者を見る
                         </Button>
                       </span>
-                    </td>
-                  </tr>
+                    </ActionCell>
+                  </Tr>
                 ))}
               </tbody>
-            </table>
-          </div>
-        </div>
+        </DataTable>
       )}
 
       <div data-design="tf" className="flex flex-wrap items-center justify-between gap-2">
@@ -408,13 +413,5 @@ export default function EventsListPage() {
         {dataReady ? <Pagination page={current} pageCount={pageCount} onPageChange={setPage} /> : null}
       </div>
     </div>
-  )
-}
-
-function Th({ children, className = '' }: { children: React.ReactNode; className?: string }) {
-  return (
-    <th className={`text-ink-faint px-4 py-3 text-left text-xs font-semibold ${className}`}>
-      {children}
-    </th>
   )
 }

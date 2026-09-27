@@ -6,7 +6,7 @@ import Button from '@/components/shared/button'
 import Chip, { type ChipTone } from '@/components/shared/chip'
 import HelpTip from '@/components/shared/help-tip'
 import ListState from '@/components/shared/list-state'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 
 const RESULT_OPTIONS = [
   { value: 'all', label: 'すべて' },
@@ -178,13 +178,14 @@ export default function BroadcastRecipients({
           <div className="flex flex-wrap items-end justify-between gap-3">
             <label className="text-ink-faint text-xs">
               絞り込み
-              <SelectField
-                aria-label="宛先の絞り込み"
-                value={result}
-                onChange={(event) => setResult(event.target.value)}
-                options={RESULT_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
-                className="mt-1 block"
-              />
+              <span className="mt-1 block">
+                <Select
+                  aria-label="宛先の絞り込み"
+                  value={result}
+                  onChange={(value) => setResult(value)}
+                  options={RESULT_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
+                />
+              </span>
             </label>
             <div className="flex flex-wrap gap-2">
               <Button variant="secondary" onClick={handleRetry} disabled={retryBusy || summary.retryableCount === 0}>

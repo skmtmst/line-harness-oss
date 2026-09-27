@@ -15,7 +15,7 @@ import Card from '@/components/shared/card'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import { notifyToast } from '@/components/shared/toast'
 import TargetMissing from '@/components/shared/target-missing'
 import { TableHeadRow, Th } from '@/components/shared/table'
@@ -563,15 +563,15 @@ function Handover() {
                         <td className="text-ink-secondary px-4 py-3 text-xs">{decision.evidenceLabel ?? decision.note ?? '未取得'}</td>
                         <td className="px-4 py-3">
                           {editable ? (
-                            <SelectField
-                              size="compact"
+                            <Select
+                              size="page-size"
                               className="text-xs"
                               aria-label="この人の判断"
                               value={shown}
                               disabled={savingDecisions}
-                              onChange={(e) => setDecisionEdits((prev) => ({
+                              onChange={(value) => setDecisionEdits((prev) => ({
                                 ...prev,
-                                [decision.id]: e.target.value as 'link' | 'new' | 'skip',
+                                [decision.id]: value as 'link' | 'new' | 'skip',
                               }))}
                               options={[
                                 // 「同じ人」は結びつける候補がいるときだけ選べる。

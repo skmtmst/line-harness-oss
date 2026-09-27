@@ -13,6 +13,20 @@ const LOOKUP_CHUNK = 90;
 const MEDIA_USAGE_WRITE_CHUNK = 20;
 
 /**
+ * 表が無いときの読み口失敗（R34）。
+ *
+ * 古い検証環境などで機能の表がまだ無いと、D1 は `no such table` で
+ * 落ちる。使用先の確認は「読めなかったら例外」が原則だが、表そのものが
+ * 無い読み口まで例外にすると、どの画像でも取得が失敗し、読み直しても
+ * 直らない（監査 R34）。表が無い読み口は「未確認」として残し、ほかの
+ * 読み口は続ける。一時的なD1障害はここでは救わず、例外のままにする。
+ */
+export function isMissingTableError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes('no such table');
+}
+
+/**
  * メディアライブラリ。
  *
  * これまで画像は使う場所ごとにアップロードしていて、同じ画像が
@@ -590,6 +604,28 @@ async function describeMediaUsage(
   usage: MediaUsage,
   lineAccountId: string,
 ): Promise<MediaDeleteImpactReference> {
+  try {
+    return await describeMediaUsageInner(db, usage, lineAccountId);
+  } catch (err) {
+    // 表そのものが無い読み口は、その参照だけ「未確認」に倒す。全体を
+    // 503にすると、どの画像でも取得が失敗する（R34）。参照自体は落とさず
+    // 残すため、削除は止まったままになる。
+    if (!isMissingTableError(err)) throw err;
+    return {
+      kind: usage.ref_kind as MediaDeleteImpactReferenceKind,
+      name: null,
+      href: null,
+      state: 'unavailable',
+      scannedAt: usage.scanned_at,
+    };
+  }
+}
+
+async function describeMediaUsageInner(
+  db: D1Database,
+  usage: MediaUsage,
+  lineAccountId: string,
+): Promise<MediaDeleteImpactReference> {
   let row: NamedReference | null = null;
   let href: string | null = null;
 
@@ -711,6 +747,9 @@ export async function getMediaDeleteImpactSnapshot(
       references,
       checkedAt,
       lastScannedAt,
+      // 台帳の読み切りはここで確定する。走査の読み残し（表が無い読み口）は
+      // 呼び出し側（Workerの口）が走査結果から判定して上書きする（R34）。
+      verified: true,
       canDelete: references.length === 0,
       recommendedAction: references.length === 0 ? 'delete' : 'review_references',
     },
@@ -1282,9 +1321,15 @@ export async function getMediaUsageReferenceStates(
   },
 ): Promise<MediaUsageReferenceState[]> {
   return Promise.all(input.usages.map(async (usage) => {
-    const row = await loadUsageContent(db, usage, input.lineAccountId);
-    if (!row) return { mode: 'unavailable' as const, versionNo: null };
-    return detectUsageReferenceState(input.media.id, input.versions, row.columns);
+    try {
+      const row = await loadUsageContent(db, usage, input.lineAccountId);
+      if (!row) return { mode: 'unavailable' as const, versionNo: null };
+      return detectUsageReferenceState(input.media.id, input.versions, row.columns);
+    } catch (err) {
+      // 表そのものが無い読み口は「未確認」に倒し、全体を503にしない（R34）。
+      if (!isMissingTableError(err)) throw err;
+      return { mode: 'unavailable' as const, versionNo: null };
+    }
   }));
 }
 

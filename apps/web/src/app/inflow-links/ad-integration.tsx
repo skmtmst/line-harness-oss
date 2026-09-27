@@ -11,7 +11,6 @@ import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
-import SelectField from '@/components/shared/select-field'
 import Dialog from '@/components/shared/dialog'
 import DateField from '@/components/shared/date-field'
 import { TextField } from '@/components/shared/text-field'
@@ -775,12 +774,13 @@ export default function AdIntegration({
           </div>
           <div>
             <label className="mb-1 block text-xs font-semibold text-ink-secondary" htmlFor="ad-cost-route">計測リンク（分かれば）</label>
-            <SelectField
+            <Select
               id="ad-cost-route"
+              aria-label="計測リンク"
               value={manualRouteId}
-              onChange={(event) => {
-                setManualRouteId(event.target.value)
-                const route = entryRoutes.find((item) => item.id === event.target.value)
+              onChange={(value) => {
+                setManualRouteId(value)
+                const route = entryRoutes.find((item) => item.id === value)
                 if (route && !manualLabel.trim()) setManualLabel(route.name)
               }}
               options={[

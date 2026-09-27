@@ -8,7 +8,7 @@ import type { Folder } from '@line-crm/shared'
 import { Field, inputClass } from '@/components/shared/create-page'
 import LinePreview from '@/components/shared/line-preview'
 import Notice from '@/components/shared/notice'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import InlineActionList, { useActionOptions } from '@/components/auto-replies/inline-action-list'
 import { useAccount } from '@/contexts/account-context'
 import { isOwnerOrAdmin } from '@/lib/staff-capability'
@@ -496,10 +496,10 @@ function CarouselEditorInner() {
             <div className="mt-3 flex flex-wrap items-center gap-3 text-xs">
               <label className="text-ink-faint">
                 置き場：
-                <SelectField
+                <Select
                   aria-label="置き場"
                   value={folderId ?? ''}
-                  onChange={(e) => setFolderId(e.target.value || null)}
+                  onChange={(value) => setFolderId(value || null)}
                   options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]}
                 />
               </label>

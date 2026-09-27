@@ -35,9 +35,14 @@ vi.mock('@/contexts/account-context', () => ({
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
 vi.mock('@/components/webinars/webinar-form', () => ({ default: () => <div>基本設定</div> }))
 vi.mock('@/components/webinars/webinar-notifications', () => ({ default: () => <div>通知設定</div> }))
-vi.mock('@/components/shared/select-field', () => ({
-  default: ({ options, ...props }: React.ComponentProps<'select'> & { options: Array<{ value: string; label: string }> }) => (
-    <select {...props}>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
+vi.mock('@/components/shared/select', () => ({
+  default: ({ value, onChange, options, size: _size, ...props }: {
+    value: string
+    onChange?: (value: string) => void
+    options: Array<{ value: string; label: string }>
+    size?: string
+  } & React.ComponentProps<'select'>) => (
+    <select value={value} onChange={(event) => onChange?.(event.target.value)} {...props}>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
   ),
 }))
 vi.mock('@/components/shared/sticky-bar', () => ({
