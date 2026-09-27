@@ -47,11 +47,16 @@ export async function consumeStepUpToken(
   const staff = c.get('staff');
   const token = c.req.header('X-Step-Up-Token')?.trim();
   if (!staff || !token) return false;
-  return consumeStepUpGrant(c.env.DB, {
-    tokenHash: await sha256Hex(token),
-    staffId: staff.id,
-    purpose,
-  });
+  try {
+    return await consumeStepUpGrant(c.env.DB, {
+      tokenHash: await sha256Hex(token),
+      staffId: staff.id,
+      purpose,
+    });
+  } catch {
+    // grant 台帳が読めないときも止める側に倒す（fail closed）。
+    return false;
+  }
 }
 
 /**
@@ -65,9 +70,18 @@ export async function sensitiveStepUpSatisfied(
   const staff = c.get('staff');
   if (!staff) return false;
   const tokenHash = await adminSessionTokenHashFromRequest(c);
-  const session = tokenHash ? await getAdminSessionByTokenHash(c.env.DB, tokenHash) : null;
+  let session: Awaited<ReturnType<typeof getAdminSessionByTokenHash>> | null = null;
+  if (tokenHash) {
+    try {
+      session = await getAdminSessionByTokenHash(c.env.DB, tokenHash);
+    } catch {
+      // セッション行が読めないときは窓を効かせず grant 側へ倒す。
+      session = null;
+    }
+  }
   // いつもと違うセッションは窓を使わせず、操作ごとに1回限りの grant を求める。
-  if (!session?.unfamiliar_at && session?.step_up_at
+  // 窓を効かせるのは本人のセッションに限る（他人のセッション行で通さない）。
+  if (session?.staff_id === staff.id && !session.unfamiliar_at && session.step_up_at
     && Date.parse(session.step_up_at) > Date.now() - STEP_UP_WINDOW_MS) {
     return true;
   }

@@ -681,9 +681,15 @@ adminAuth.get('/api/auth/session', async (c) => {
    * 表示を止めないため失敗は null に畳む。
    */
   const sessionTokenHash = await adminSessionTokenHashFromRequest(c);
-  const currentSession = sessionTokenHash
-    ? await getAdminSessionByTokenHash(c.env.DB, sessionTokenHash).catch(() => null)
-    : null;
+  let currentSession = null;
+  if (sessionTokenHash) {
+    try {
+      currentSession = await getAdminSessionByTokenHash(c.env.DB, sessionTokenHash);
+    } catch {
+      // セッション行が読めなくても本人確認情報の表示を止めない。
+      currentSession = null;
+    }
+  }
   /*
    * 再確認の聞き方（V-1 ダイアログの表示切替）。2段階認証の設定があれば
    * 認証アプリの6桁、無ければパスワード。どちらも無い人は大事な操作の前に
