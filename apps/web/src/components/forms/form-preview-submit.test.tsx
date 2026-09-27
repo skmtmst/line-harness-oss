@@ -22,6 +22,6 @@ describe('回答プレビューの送信口', () => {
   it('ボタン箱がない面では固定の送信口を出す', () => {
     const layout = emptyLayout()
     const view = render(<FormPreview layout={layout} sectionIndex={0} />)
-    expect(view.getByText('送信')).toBeTruthy()
+    expect(view.getByText('送信する')).toBeTruthy()
   })
 })
