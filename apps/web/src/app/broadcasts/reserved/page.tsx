@@ -126,7 +126,12 @@ function ReservedBroadcastContent() {
       // 宛先が絞り込みのときだけ、条件に出すタグ名・シナリオ名を取る。
       // 取れなくても予約の表示自体は出し続ける（型だけの表記に残る）。
       if (result.data.targetType === 'tag' || result.data.targetType === 'segment') {
-        void Promise.allSettled([api.tags.list(), api.scenarios.list()])
+        // R23横展開: この予約のアカウントの候補だけで名前を解決する。
+        const audienceAccountId = result.data.lineAccountId
+        void Promise.allSettled([
+          api.tags.list(audienceAccountId ? { accountId: audienceAccountId } : undefined),
+          api.scenarios.list(audienceAccountId ? { accountId: audienceAccountId } : undefined),
+        ])
           .then(([tagsRes, scenariosRes]) => {
             if (!isCurrent()) return
             const tags = tagsRes.status === 'fulfilled' && tagsRes.value.success ? tagsRes.value.data : null

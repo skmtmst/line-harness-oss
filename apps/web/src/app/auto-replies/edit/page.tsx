@@ -45,11 +45,14 @@ function AutoReplyEditInner() {
     let active = true
     void (async () => {
       try {
-        const [tplRes, draftRes, liveRes] = await Promise.all([
-          api.templates.list(),
+        const [draftRes, liveRes] = await Promise.all([
           id ? api.autoReplies.getDraft(id) : Promise.resolve(null),
           id ? api.autoReplies.get(id).catch(() => null) : Promise.resolve(null),
         ])
+        if (!active) return
+        // R23横展開: 返す文の候補は、この応答のアカウントだけ。新規は全体。
+        const draftAccountId = draftRes?.success ? draftRes.data.settings.lineAccountId : null
+        const tplRes = await api.templates.list(undefined, draftAccountId ?? undefined)
         if (!active) return
         if (tplRes.success) {
           setTemplates(

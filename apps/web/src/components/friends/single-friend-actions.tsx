@@ -45,11 +45,14 @@ export default function SingleFriendActions({
   friendId,
   friendName,
   tags,
+  accountId,
   onDone,
 }: {
   friendId: string
   friendName: string
   tags: Tag[]
+  /** この友だちの所属アカウント。候補はこのアカウントだけに絞る（R23横展開）。 */
+  accountId: string | null
   onDone: () => void
 }) {
   const [open, setOpen] = useState<Action | null>(null)
@@ -106,8 +109,8 @@ export default function SingleFriendActions({
             {friendName} に「{LABELS[open]}」
           </p>
           {open === 'status' && <StatusPanel friendId={friendId} busy={busy} run={run} />}
-          {open === 'template' && <TemplatePanel friendId={friendId} busy={busy} run={run} />}
-          {open === 'scenario' && <ScenarioPanel friendId={friendId} busy={busy} run={run} />}
+          {open === 'template' && <TemplatePanel friendId={friendId} accountId={accountId} busy={busy} run={run} />}
+          {open === 'scenario' && <ScenarioPanel friendId={friendId} accountId={accountId} busy={busy} run={run} />}
           {open === 'tag' && <TagPanel friendId={friendId} tags={tags} busy={busy} run={run} />}
           {open === 'field' && <FieldPanel friendId={friendId} busy={busy} run={run} />}
           {open === 'reminder' && <ReminderPanel friendId={friendId} busy={busy} run={run} />}
@@ -146,6 +149,7 @@ function StatusPanel({ friendId, busy, run }: { friendId: string; busy: boolean;
   const [status, setStatus] = useState<Chat['status']>('resolved')
   return (
     <Row>
+      {/* R117: 読み上げで何を変える欄か分かるよう、共通Selectでも固有の名前を付ける。 */}
       <Select
         aria-label="対応状況"
         value={status}
@@ -162,18 +166,21 @@ function StatusPanel({ friendId, busy, run }: { friendId: string; busy: boolean;
   )
 }
 
-function TemplatePanel({ friendId, busy, run }: { friendId: string; busy: boolean; run: Run }) {
+function TemplatePanel({ friendId, accountId, busy, run }: { friendId: string; accountId: string | null; busy: boolean; run: Run }) {
   const [templates, setTemplates] = useState<Template[]>([])
   const [id, setId] = useState('')
   const sendKeysRef = useRef(new IdempotencyKeyStore())
   useEffect(() => {
-    void api.templates.list().then((res) => {
+    // R23横展開: 送る文の候補はこの友だちのアカウントだけ。切替で取り直し、残った選択は外す。
+    setTemplates([])
+    setId('')
+    void api.templates.list(undefined, accountId ?? undefined).then((res) => {
       if (res.success) {
         // 文字のものだけ。画像やカードは中身がJSONで、そのまま送ると文字になる。
         setTemplates((res.data as unknown as Template[]).filter((t) => t.messageType === 'text'))
       }
     })
-  }, [])
+  }, [accountId])
   const picked = templates.find((t) => t.id === id)
   const sendPicked = async () => {
     if (!picked) return { success: false, error: 'テンプレートを選んでください' }
@@ -213,14 +220,17 @@ function TemplatePanel({ friendId, busy, run }: { friendId: string; busy: boolea
   )
 }
 
-function ScenarioPanel({ friendId, busy, run }: { friendId: string; busy: boolean; run: Run }) {
+function ScenarioPanel({ friendId, accountId, busy, run }: { friendId: string; accountId: string | null; busy: boolean; run: Run }) {
   const [items, setItems] = useState<Scenario[]>([])
   const [id, setId] = useState('')
   useEffect(() => {
-    void api.scenarios.list().then((res) => {
+    // R23横展開: 始めるシナリオの候補はこの友だちのアカウントだけ。切替で取り直し、残った選択は外す。
+    setItems([])
+    setId('')
+    void api.scenarios.list(accountId ? { accountId } : undefined).then((res) => {
       if (res.success) setItems(res.data)
     })
-  }, [])
+  }, [accountId])
   return (
     <Row>
       <Select
@@ -281,12 +291,14 @@ function FieldPanel({ friendId, busy, run }: { friendId: string; busy: boolean; 
   return (
     <Row>
       <input
+        aria-label="項目名"
         value={key}
         onChange={(e) => setKey(e.target.value)}
         placeholder="項目名"
         className={SELECT}
       />
       <input
+        aria-label="値"
         value={value}
         onChange={(e) => setValue(e.target.value)}
         placeholder="値"

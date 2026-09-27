@@ -29,8 +29,11 @@ describe('V6 予約管理の時間台帳', () => {
   })
 
   test('電話予約はLINE予約と同じ格子へ出し、未連携の理由も隠さない', () => {
+    // R88: 受付経路は source で分ける。担当者の代理入力
+    // （source=operator＋friend_idあり）をLINEに数えない。
+    expect(CALENDAR).toContain('function isLineBooking')
+    expect(CALENDAR).toContain("booking.source === 'liff'")
     expect(CALENDAR).toContain('function isPhoneBooking')
-    expect(CALENDAR).toContain("!booking.friend_id")
     expect(CALENDAR).toContain('電話予約のお客さま')
     expect(CALENDAR).toContain('LINE未連携の方には当日の連絡ができません。')
   })
@@ -71,8 +74,11 @@ describe('V6 予約管理の時間台帳', () => {
     expect(CALENDAR).toContain('aria-label="この空き枠に予約を入れる"')
     // 操作できない人（canCreate=false）は「あき」の文字だけ。押せる形に見せない。
     expect(CALENDAR).toContain('if (!href) {')
-    expect(CALENDAR).toContain('canCreate && slot ? newBookingHref({ day, time: slot.start, staffName: name, menuId: slot.menuId }) : undefined')
-    expect(CALENDAR).toContain('canCreate && slot ? newBookingHref({ day, time: slot.start, staffName: slot.staffName, menuId: slot.menuId }) : undefined')
+    // R87: 予約ありのマスでも重ならない枠の入口は残す。重なりは時刻で確かめる。
+    expect(CALENDAR).toContain('function slotOverlapsBookings')
+    expect(CALENDAR).toContain('cell.length === 0 || !slotOverlapsBookings(slot, cell)')
+    expect(CALENDAR).toContain("newBookingHref({ day, time: slot.start, staffName: name, menuId: slot.menuId })")
+    expect(CALENDAR).toContain("newBookingHref({ day, time: slot.start, staffName: slot.staffName, menuId: slot.menuId })")
   })
 
   test('BOOKING-01: 空きはマス数ではなく空き枠APIの実績から計算する', () => {
@@ -108,6 +114,17 @@ describe('V6 予約管理の時間台帳', () => {
     // メニュー候補のない入口へ遷移させない。
     expect(CALENDAR).toContain("params.set('menu', input.menuId)")
     expect(CALENDAR).toContain('time: slot.start')
+  })
+
+  test('R86: 取消・拒否・期限切れは件数・売上見込みから外しカードに状態を出す', () => {
+    expect(CALENDAR).toContain('HISTORY_STATUSES')
+    expect(CALENDAR).toContain('activeItems')
+    expect(CALENDAR).toContain('（{statusMark}）')
+  })
+
+  test('R85: 週表は狭い画面で横スクロールし日付を重ねない', () => {
+    expect(CALENDAR).toContain('overflow-x-auto')
+    expect(CALENDAR).toContain('minWidth: 560')
   })
 
   test('URLの日付・時刻・担当は下書きより優先して事前入力する (#933 N-399)', () => {

@@ -63,7 +63,7 @@ function FriendsPageInner({
   onNotice: (notice: Notice) => void
   onExportReady: (exporter: (() => void) | null) => void
 }) {
-  const { selectedAccountId, selectedAccount, loading: accountLoading } = useAccount()
+  const { selectedAccountId, loading: accountLoading } = useAccount()
   /*
     保存した検索・対応マークは任意機能。オフのaccountではAPIを呼ばず、
     入口も出さない（呼ぶと 403 で画面全体が共通ゲートへ切り替わる）。
@@ -74,6 +74,24 @@ function FriendsPageInner({
   const savedSearchEnabled = featureVisibility.enabled('saved_searches')
   /* 一括操作はオーナーと管理者だけ。個別操作の権限を越えるため。 */
   const [bulkOpen, setBulkOpen] = useState(false)
+  /*
+   * R115: できるかは入り直した本人の役割（`api.staff.me()`）で決める。
+   * 選んでいるLINEアカウントの「役割メモ」（`selectedAccount.role`）は
+   * 自由記述のメモで、ログイン担当者の権限ではない。そちらで判定すると、
+   * 権限のある管理者が一括操作を始められなくなる。
+   * 確認が終わるまで（staffRole === null）は押し口も理由も出さない。
+   */
+  const [staffRole, setStaffRole] = useState<string | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    void api.staff.me()
+      .then((response) => {
+        if (cancelled || !response.success) return
+        setStaffRole(response.data.role)
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
   const searchParams = useSearchParams()
   const scoreMin = scoreBoundary(searchParams.get('scoreMin'))
   const scoreMax = scoreBoundary(searchParams.get('scoreMax'))
@@ -204,7 +222,7 @@ function FriendsPageInner({
     [searchSubmitted, selectedTagId, responseFilter, operatorId, scenarioId, attentionOnly, scoreMin, scoreMax, audienceId, advanced],
   )
   const broadcastHandoffHref =
-    broadcastHandoff.kind === 'ready' && canRunBulk(selectedAccount?.role)
+    broadcastHandoff.kind === 'ready' && canRunBulk(staffRole)
       ? `/broadcasts/new?condition=${encodeURIComponent(JSON.stringify(broadcastHandoff.condition))}`
       : null
 
@@ -224,7 +242,8 @@ function FriendsPageInner({
     const requestedAccountId = selectedAccountId
     try {
       const [tagResponse, operatorResponse, scenarioResponse] = await Promise.all([
-        api.tags.list(),
+        // R23横展開: タグ候補も今のアカウントだけ（絞り込みの選択肢混入防止）。
+        api.tags.list(requestedAccountId ? { accountId: requestedAccountId } : undefined),
         // 友だち詳細の対応編集と同じ名簿を共有する。保存の可否はサーバ側。
         loadOperators(),
         api.scenarios.list(requestedAccountId ? { accountId: requestedAccountId } : undefined),
@@ -593,7 +612,7 @@ function FriendsPageInner({
           <div className="flex flex-wrap items-center gap-2">
             <strong className="text-sm text-ink">{selectedIds.size}人を選択中</strong>
             <span className="text-xs text-ink-secondary">対象を確認してから操作を選んでください</span>
-            {selectedIds.size > 1 && canRunBulk(selectedAccount?.role) ? (
+            {selectedIds.size > 1 && canRunBulk(staffRole) ? (
               <Button
                 variant="primary"
                 className="ml-auto"
@@ -603,14 +622,14 @@ function FriendsPageInner({
                 操作を選ぶ
               </Button>
             ) : null}
-            {selectedIds.size > 1 && !canRunBulk(selectedAccount?.role) ? (
+            {selectedIds.size > 1 && staffRole !== null && !canRunBulk(staffRole) ? (
               /* 権限が無いときは押し口を出さない。理由だけ書く。 */
               <span className="text-ink-faint ml-auto text-xs">一括操作ができるのはオーナーと管理者だけです</span>
             ) : null}
           </div>
           {selectedIds.size === 1 ? (
             <div className="mt-2">
-              <SingleFriendActions friendId={[...selectedIds][0]} friendName={friends.find((friend) => friend.id === [...selectedIds][0])?.displayName ?? 'この友だち'} tags={allTags} onDone={loadFriends} />
+              <SingleFriendActions friendId={[...selectedIds][0]} friendName={friends.find((friend) => friend.id === [...selectedIds][0])?.displayName ?? 'この友だち'} tags={allTags} accountId={selectedAccountId} onDone={loadFriends} />
             </div>
           ) : null}
         </section>

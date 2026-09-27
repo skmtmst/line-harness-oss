@@ -20,6 +20,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import { canOperateBookings } from '../lib/booking-permissions'
 import { fetchAllPages } from './fetch-all-pages'
 import BookingCalendar, {
+  isLineBooking,
   moveDay,
   startOfWeek,
   type CalendarAvailability,
@@ -134,6 +135,12 @@ function monthKey(offset: number): string {
   return d.toISOString().slice(0, 7)
 }
 
+/** R90: 「2026-09」→「2026年9月」。対象期間の明示に使う。 */
+function monthLabel(key: string): string {
+  const [year, month] = key.split('-').map(Number)
+  return `${year}年${month}月`
+}
+
 export default function BookingsPage() {
   usePageTitle('予約管理')
   const { selectedAccountId, selectedAccount } = useAccount()
@@ -185,10 +192,15 @@ export default function BookingsPage() {
    */
   const [candidatesStatus, setCandidatesStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [availability, setAvailability] = useState<CalendarAvailability>({ status: 'loading', slots: [] })
-  const [summary, setSummary] = useState({
+  const [summary, setSummary] = useState<{
+    total: number; requested: number; monthTotal: number; monthConfirmed: number;
+    monthCancelled: number; lastMonthTotal: number; todayTotal: number; weekTotal: number;
+    todayTabTotal?: number; weekTabTotal?: number; monthTabTotal?: number;
+    byMenu: Array<{ name: string; total: number }>;
+  }>({
     total: 0, requested: 0, monthTotal: 0, monthConfirmed: 0,
     monthCancelled: 0, lastMonthTotal: 0, todayTotal: 0, weekTotal: 0,
-    byMenu: [] as Array<{ name: string; total: number }>,
+    byMenu: [],
   })
   const [menus, setMenus] = useState<BookingMenu[]>([])
   // 集計の読み込み失敗は0表示と分ける。黙って0のままだと運用者が気づけない。
@@ -196,6 +208,8 @@ export default function BookingsPage() {
   // ★V7 `x63W5x`：集計が取れていない間、KPI に 0 を出さない。「—」と出す。
   const [summaryReady, setSummaryReady] = useState(false)
   const [summarySeq, setSummarySeq] = useState(0)
+  // R89: 承認・取消の後にカレンダーの表示範囲の予約も読み直す合図。
+  const [calendarSeq, setCalendarSeq] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   // copied 状態は URL 単位で持つ。アカウント切替で shareUrl が変わると
@@ -271,17 +285,27 @@ export default function BookingsPage() {
   }
 
   // 一覧とCSVで同じ期間になるよう、from/to の計算は1か所にする (N-397)。
+  // R90: 「今月」の表示では今月の初め〜来月の初めを条件へ入れる。
+  // 「今日」「今週」と重なったら狭い方へ寄せる（ISO8601は辞書式で比べられる）。
   const rangeFilterParams = useCallback((): { from?: string; to?: string } => {
-    if (range === 'all') return {}
-    const today = jstDay(new Date().toISOString())
-    const weekTo = jstDay(new Date(Date.now() + 7 * 86_400_000).toISOString())
-    return {
-      from: new Date(`${today}T00:00:00+09:00`).toISOString(),
-      to: range === 'today'
-        ? new Date(`${jstDay(new Date(Date.now() + 86_400_000).toISOString())}T00:00:00+09:00`).toISOString()
-        : new Date(`${weekTo}T00:00:00+09:00`).toISOString(),
+    let from: string | undefined
+    let to: string | undefined
+    if (view === 'month') {
+      from = new Date(`${monthKey(0)}-01T00:00:00+09:00`).toISOString()
+      to = new Date(`${monthKey(1)}-01T00:00:00+09:00`).toISOString()
     }
-  }, [range])
+    if (range !== 'all') {
+      const today = jstDay(new Date().toISOString())
+      const weekTo = jstDay(new Date(Date.now() + 7 * 86_400_000).toISOString())
+      const rangeFrom = new Date(`${today}T00:00:00+09:00`).toISOString()
+      const rangeTo = range === 'today'
+        ? new Date(`${jstDay(new Date(Date.now() + 86_400_000).toISOString())}T00:00:00+09:00`).toISOString()
+        : new Date(`${weekTo}T00:00:00+09:00`).toISOString()
+      from = from && from > rangeFrom ? from : rangeFrom
+      to = to && to < rangeTo ? to : rangeTo
+    }
+    return { ...(from ? { from } : {}), ...(to ? { to } : {}) }
+  }, [range, view])
 
   const load = useCallback(async () => {
     if (!selectedAccountId) return
@@ -446,7 +470,7 @@ export default function BookingsPage() {
       if (alive && listAccountRef.current === requestedAccountId) setError('カレンダーの読み込みに失敗しました。もう一度読み込んでください。')
     })
     return () => { alive = false }
-  }, [selectedAccountId, view, calendarFrom, calendarTo])
+  }, [selectedAccountId, view, calendarFrom, calendarTo, calendarSeq])
 
   /*
    * BOOKING-01: 空き枠の実績を空き枠APIから取る。受付可能な時間は
@@ -552,6 +576,10 @@ export default function BookingsPage() {
       if (listAccountRef.current === decideAccountId) {
         setDecideTarget(null)
         await load()
+        // R89: 一覧だけでなく集計・カレンダー・空き枠も読み直す。
+        // 集計の取り直しが届くと空き枠の取得も連動して走り直す。
+        setSummarySeq((n) => n + 1)
+        setCalendarSeq((n) => n + 1)
       }
     } catch (e) {
       if (listAccountRef.current === decideAccountId) {
@@ -605,10 +633,10 @@ export default function BookingsPage() {
   }
 
   // 絞り込みが変わったら1ページ目に戻す。3ページ目のまま条件を狭めると
-  // 「該当なし」に見えてしまう。
+  // 「該当なし」に見えてしまう。R90: 表示の切り替え（今月など）も条件。
   useEffect(() => {
     setPage(1)
-  }, [tab, menuFilter, query, range, staffFilter, sourceFilter])
+  }, [tab, menuFilter, query, range, staffFilter, sourceFilter, view])
 
   // タブ切替やアカウント切替で items が入れ替わったとき、開いていた予約が
   // 一覧から消えることがある。その場合はパネルを閉じる。
@@ -621,8 +649,11 @@ export default function BookingsPage() {
     }
   }, [calendarItems, items, detailId])
 
-  const todayCount = summary.todayTotal
-  const weekCount = summary.weekTotal
+  // タブの数はその期間の有効な予約だけ（取消・拒否・期限切れを除く）。
+  // 旧Worker（タブ用未返却）では従来の集計に倒す。
+  const todayCount = summary.todayTabTotal ?? summary.todayTotal
+  const weekCount = summary.weekTabTotal ?? summary.weekTotal
+  const monthCount = summary.monthTabTotal ?? kpi.total
 
   const pageHead = (
     <>
@@ -640,7 +671,7 @@ export default function BookingsPage() {
         {([
           ['day', summaryReady ? `今日 ${todayCount}` : '今日'],
           ['week', summaryReady ? `今週 ${weekCount}` : '今週'],
-          ['month', summaryReady ? `今月 ${kpi.total}` : '今月'],
+          ['month', summaryReady ? `今月 ${monthCount}` : '今月'],
           ['list', '一覧'],
         ] as const).map(([key, label]) => (
           <button
@@ -786,6 +817,13 @@ export default function BookingsPage() {
       </div>
 
       {createRow}
+
+      {/* R90: 今月の表示では対象の期間と状態を明示する。 */}
+      {view === 'month' ? (
+        <p className="text-ink-secondary text-xs" role="status">
+          今月（{monthLabel(monthKey(0))}）の予約を「{STATUS_TABS.find((item) => item.key === tab)?.label ?? ''}」で表示しています。
+        </p>
+      ) : null}
 
       <div
         data-design="Body"
@@ -957,10 +995,11 @@ export default function BookingsPage() {
                         <Td>{b.menu_name}</Td>
                         <Td className="cq-hide-below-830">{b.staff_name}</Td>
                         <Td>
+                          {/* R88: 受付経路は source で分ける。担当者の代理入力をLINEにしない。 */}
                           <span
-                            className={`${b.friend_id ? 'bg-success-bg text-success' : 'bg-info-bg text-info'} rounded-pill px-2 py-0.5 text-xs`}
+                            className={`${isLineBooking(b) ? 'bg-success-bg text-success' : 'bg-info-bg text-info'} rounded-pill px-2 py-0.5 text-xs`}
                           >
-                            {b.friend_id ? 'LINE' : '電話'}
+                            {isLineBooking(b) ? 'LINE' : '電話'}
                           </span>
                         </Td>
                         <Td align="right" className="tabular-nums">
@@ -1193,7 +1232,7 @@ function BookingDetailPanel({
           {detailError ? <Notice tone="danger" message={detailError} onClose={() => setDetailError('')} className="mb-4" /> : null}
           <section className="mb-6">
             <div className="bg-success-bg text-success mb-3 w-fit rounded-pill px-3 py-1 text-xs font-semibold">予約が入っています</div>
-            <p className="text-ink-secondary mb-3 text-sm">{formatJpDateTime(b.starts_at)}〜{formatJpTime(b.ends_at)} ／ 担当 {b.staff_name} ／ {isLinked ? 'LINEから入りました。' : '電話・店頭で受け付けました。'}</p>
+            <p className="text-ink-secondary mb-3 text-sm">{formatJpDateTime(b.starts_at)}〜{formatJpTime(b.ends_at)} ／ 担当 {b.staff_name} ／ {isLineBooking(b) ? 'LINEから入りました。' : '電話・店頭で受け付けました。'}</p>
             <div className="bg-canvas rounded-card border-hairline border p-5">
             <h3 className="text-ink mb-1 text-base font-semibold">予約の中身</h3>
             <DetailRow label="メニュー">{b.menu_name}</DetailRow>

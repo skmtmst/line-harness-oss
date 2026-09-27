@@ -18,9 +18,14 @@ describe('V6 友だち一括操作（IAf7j）の配線', () => {
       **押し口を出す条件そのものを見る。** `canRunBulk` がファイルの
       どこかにあるだけでは、押し口の分岐から外されても気づけない
       （実際に、条件から外しても落ちない試験になっていた）。
+      R115: 判定は本人の役割（`api.staff.me()`）で見る。選んでいる
+      LINEアカウントの「役割メモ」（`selectedAccount.role`）は自由記述で、
+      ログイン担当者の権限ではないので使わない。
     */
-    expect(PAGE).toContain('{selectedIds.size > 1 && canRunBulk(selectedAccount?.role) ? (')
-    expect(PAGE).toContain('{selectedIds.size > 1 && !canRunBulk(selectedAccount?.role) ? (')
+    expect(PAGE).toContain('{selectedIds.size > 1 && canRunBulk(staffRole) ? (')
+    expect(PAGE).toContain('{selectedIds.size > 1 && staffRole !== null && !canRunBulk(staffRole) ? (')
+    expect(PAGE).toContain('api.staff.me()')
+    expect(PAGE).not.toContain('canRunBulk(selectedAccount')
     expect(PAGE).toContain('一括操作ができるのはオーナーと管理者だけです')
   })
 

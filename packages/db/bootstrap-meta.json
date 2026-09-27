@@ -418,6 +418,8 @@
     "457_file_scan_config.sql",
     "458_broadcast_recipient_request_id.sql",
     "459_broadcast_lifecycle_events.sql",
+    "460_photo_reward_policies.sql",
+    "461_photo_content_hash.sql",
     "466_template_versions.sql",
     "467_template_references.sql",
     "468_event_custom_questions.sql",
@@ -435,5 +437,5 @@
     "503_measurement_sites.sql",
     "504_conversion_reversal_ledger.sql"
   ],
-  "migrationCount": 434
+  "migrationCount": 436
 }
