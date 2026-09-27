@@ -3226,7 +3226,7 @@ describe('V6 occurrence applicants / waitlist promotion routes', () => {
     expect(forbidden.status).toBe(403);
   });
 
-  test('conflict: expectedVersionを必須にし、版違いを409で返す', async () => {
+  test('conflict: expectedVersionと理由を必須にし、版違いを409で返す', async () => {
     const app = setupApp(structuredClone(state));
     const missingVersion = await app.request(
       '/api/events/admin/occurrences/s1/waitlist/promote?account_id=la1',
@@ -3234,13 +3234,25 @@ describe('V6 occurrence applicants / waitlist promotion routes', () => {
     );
     expect(missingVersion.status).toBe(422);
 
+    // U: 手動の繰り上げは理由が必須。版より先に見る。
+    const noReason = await app.request(
+      '/api/events/admin/occurrences/s1/waitlist/promote?account_id=la1',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ expectedVersion: 2 }),
+      },
+    );
+    expect(noReason.status).toBe(422);
+    await expect(noReason.json()).resolves.toEqual({ error: 'waitlist_reason_required' });
+
     waitlistMocks.promoteEventWaitlist.mockResolvedValueOnce({ kind: 'conflict', currentVersion: 3 });
     const conflict = await app.request(
       '/api/events/admin/occurrences/s1/waitlist/promote?account_id=la1',
       {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ expectedVersion: 2 }),
+        body: JSON.stringify({ expectedVersion: 2, reason: '空きが出たため' }),
       },
     );
     expect(conflict.status).toBe(409);
