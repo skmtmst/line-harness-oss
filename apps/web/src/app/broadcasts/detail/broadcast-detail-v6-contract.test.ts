@@ -6,8 +6,12 @@ import { describe, expect, it } from 'vitest'
 const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
 
 describe('V6 一斉配信詳細の契約', () => {
-  it('概要から配信内容まで、同じ結果画面のタブとして示す', () => {
-    expect(PAGE).toContain("['概要', 'クリック', '友だち', 'エラー', '配信内容']")
+  it('概要・宛先・記録を押せるタブとして示す', () => {
+    // #816（★V7 C-2）。押せない5連の飾り（概要・クリック・友だち・エラー・
+    // 配信内容）は、押せる3つのタブ（概要・宛先・記録）へ置き換えた。
+    // 押せない飾りは出さない（★V7の決まり）。
+    expect(PAGE).toContain('<DetailTabs')
+    expect(PAGE).not.toContain("['概要', 'クリック', '友だち', 'エラー', '配信内容']")
     expect(PAGE).toContain('id="broadcast-content"')
     expect(PAGE).not.toContain('配信内容の別画面は準備中です')
   })

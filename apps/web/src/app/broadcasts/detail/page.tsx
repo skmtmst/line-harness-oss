@@ -4,12 +4,16 @@ import { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import type { Tag } from '@line-crm/shared'
-import { ApiError, api, type ApiBroadcast, type BroadcastInsight, type BroadcastApprovalState } from '@/lib/api'
+import { ApiError, api, type ApiBroadcast, type BroadcastDisplayStatus, type BroadcastInsight, type BroadcastApprovalState } from '@/lib/api'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import Progress from '@/components/shared/progress'
 import StickyBar from '@/components/shared/sticky-bar'
+import { Tabs } from '@/components/shared/tabs'
 import TargetMissing from '@/components/shared/target-missing'
+import BroadcastStatusRail from './broadcast-status-rail'
+import BroadcastRecipients from './broadcast-recipients'
+import BroadcastActivity from './broadcast-activity'
 import {
   ApprovalBadge,
   ApprovalRequestFields,
@@ -59,6 +63,24 @@ function BroadcastDetailInner() {
   // 承認の依頼を出し直すときの入力（差し戻し・期限切れのあと）。
   const [reApproverId, setReApproverId] = useState('')
   const [reApprovalNote, setReApprovalNote] = useState('')
+  /*
+   * 詳細のタブ（#816 概要・宛先・記録）。?tab= から開く。
+   * 履歴に積まず置き換える（戻るで一覧へ戻れるように）。
+   */
+  const initialTab = params.get('tab')
+  const [tab, setTab] = useState<'overview' | 'recipients' | 'activity'>(
+    initialTab === 'recipients' || initialTab === 'activity' ? initialTab : 'overview',
+  )
+  const selectTab = (next: 'overview' | 'recipients' | 'activity') => {
+    setTab(next)
+    try {
+      const url = new URL(window.location.href)
+      url.searchParams.set('tab', next)
+      window.history.replaceState(null, '', url.toString())
+    } catch {
+      // URLが触れなくてもタブは切り替わる。
+    }
+  }
 
   const exportCsv = () => {
     if (!broadcast) return
@@ -404,9 +426,10 @@ function BroadcastDetailInner() {
       {loadState === 'loading' || !broadcast ? (
         <ListState kind="loading" title="配信を読み込んでいます" />
       ) : String(broadcast.status) === 'sent' ? (
-        <SentResult broadcast={broadcast} insight={insight} insightState={insightState} contentRef={contentRef} />
+        <SentResult broadcast={broadcast} insight={insight} insightState={insightState} contentRef={contentRef} tab={tab} selectTab={selectTab} />
       ) : (
         <div className="space-y-4">
+          <DetailStatusRail broadcast={broadcast} />
           {/*
             二者承認（設計 A-2）。配信の題の横に承認待ちの札を出す。
             題自体は枠の見出しに出るので、ここでは札と並べるだけにする。
@@ -478,6 +501,13 @@ function BroadcastDetailInner() {
               </div>
             </section>
           ) : null}
+          <DetailTabs tab={tab} selectTab={selectTab} recipientCount={broadcast.totalCount} />
+          {tab === 'recipients' ? (
+            <BroadcastRecipients broadcastId={broadcast.id} total={broadcast.totalCount} version={broadcast.version ?? 1} />
+          ) : tab === 'activity' ? (
+            <BroadcastActivity broadcastId={broadcast.id} formatDateTime={formatBroadcastDateTime} />
+          ) : (
+          <>
           {/* ★V7: 予約・下書きも共通の枠の幅いっぱいに広げる。絞ると 1920px で右が大きく空く。 */}
           <section className="bg-canvas rounded-card border-hairline border p-5">
             <p className="text-ink text-sm font-semibold">送信の進み具合</p>
@@ -689,6 +719,8 @@ function BroadcastDetailInner() {
           >
             一覧へ戻る
           </Link>
+          </>
+          )}
         </div>
       )}
       {/*
@@ -728,11 +760,15 @@ function SentResult({
   insight,
   insightState,
   contentRef,
+  tab,
+  selectTab,
 }: {
   broadcast: ApiBroadcast
   insight: (BroadcastInsight & { suppressedByAudienceSize: boolean }) | null
   insightState: 'loading' | 'ready' | 'error'
   contentRef: { current: HTMLElement | null }
+  tab: 'overview' | 'recipients' | 'activity'
+  selectTab: (next: 'overview' | 'recipients' | 'activity') => void
 }) {
   const delivered = insight?.delivered ?? broadcast.successCount
   const opened = insight?.opens?.count ?? insight?.uniqueImpression ?? null
@@ -741,11 +777,14 @@ function SentResult({
 
   return (
     <div className="space-y-4">
-      <nav aria-label="配信内容を見る" className="bg-canvas-sunken rounded-card grid grid-cols-5 p-1 text-center text-sm font-semibold">
-        {['概要', 'クリック', '友だち', 'エラー', '配信内容'].map((label, index) => (
-          <span key={label} className={index === 0 ? 'bg-canvas text-accent-deep rounded-control px-3 py-2' : 'text-ink-secondary px-3 py-2'}>{label}</span>
-        ))}
-      </nav>
+      <DetailStatusRail broadcast={broadcast} />
+      <DetailTabs tab={tab} selectTab={selectTab} recipientCount={broadcast.totalCount} />
+      {tab === 'recipients' ? (
+        <BroadcastRecipients broadcastId={broadcast.id} total={broadcast.totalCount} version={broadcast.version ?? 1} />
+      ) : tab === 'activity' ? (
+        <BroadcastActivity broadcastId={broadcast.id} formatDateTime={formatBroadcastDateTime} />
+      ) : (
+      <>
 
       <div className="grid gap-4 xl:grid-cols-3">
         <div className="space-y-4 xl:col-span-2">
@@ -837,7 +876,59 @@ function SentResult({
       </div>
 
       {insightState === 'error' && <p role="alert" className="text-danger text-xs">開封・クリックを読み込めませんでした。</p>}
+      </>
+      )}
     </div>
+  )
+}
+
+/**
+ * 10の状態が無い古い応答の読み替え（#816）。
+ * 新しい口は displayStatus を返すので、ここは予備。
+ */
+function fallbackDisplayStatus(broadcast: ApiBroadcast): BroadcastDisplayStatus {
+  if (broadcast.approvalStatus === 'pending') return 'pending_approval'
+  if (broadcast.approvalStatus === 'expired') return 'expired'
+  if (broadcast.stopped) return 'stopped'
+  if (broadcast.status === 'sending') return 'sending'
+  if (broadcast.status === 'scheduled') return 'scheduled'
+  if (broadcast.status === 'sent') return 'sent'
+  return 'draft'
+}
+
+function DetailStatusRail({ broadcast }: { broadcast: ApiBroadcast }) {
+  const displayStatus = broadcast.displayStatus ?? fallbackDisplayStatus(broadcast)
+  return (
+    <BroadcastStatusRail
+      displayStatus={displayStatus}
+      approvalInvolved={broadcast.approvalStatus != null && broadcast.approvalStatus !== 'none'}
+      scheduled={broadcast.status === 'scheduled' || broadcast.scheduledAt != null}
+      ledger={broadcast.ledger ?? null}
+      total={broadcast.totalCount}
+      formatDateTime={formatBroadcastDateTime}
+      scheduledAt={broadcast.scheduledAt}
+    />
+  )
+}
+
+function DetailTabs({
+  tab,
+  selectTab,
+  recipientCount,
+}: {
+  tab: 'overview' | 'recipients' | 'activity'
+  selectTab: (next: 'overview' | 'recipients' | 'activity') => void
+  recipientCount: number
+}) {
+  return (
+    <Tabs
+      label="配信の詳細"
+      items={[
+        { label: '概要', current: tab === 'overview', onClick: () => selectTab('overview') },
+        { label: '宛先', count: recipientCount, current: tab === 'recipients', onClick: () => selectTab('recipients') },
+        { label: '記録', current: tab === 'activity', onClick: () => selectTab('activity') },
+      ]}
+    />
   )
 }
 
