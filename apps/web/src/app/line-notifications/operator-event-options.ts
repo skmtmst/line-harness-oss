@@ -29,6 +29,7 @@ export const OPERATOR_EVENT_OPTIONS: readonly OperatorEventOption[] = [
   { value: 'form_submitted', label: 'フォームに回答があったとき' },
   { value: 'ec_order_received', label: '注文を受け取ったとき' },
   { value: 'nen_birthday_coupon_failed', label: '誕生日クーポンの発行に失敗したとき' },
+  { value: 'manual_link_broken', label: 'マニュアルのリンクが開けなくなったとき' },
 ]
 
 /** 作成画面の初期選択。一覧の並びの先頭にそろえる。 */

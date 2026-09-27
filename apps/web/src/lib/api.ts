@@ -2384,13 +2384,19 @@ export class ApiError extends Error {
   readonly code: string | undefined
   /** 409などで画面を最新状態へ描き直すための機械データ。利用者へ直接表示しない。 */
   readonly data: unknown
+  /**
+   * 追跡番号（incidentId / requestId）。失敗の問い合わせに使う番号で、
+   * 画面は「（追跡番号 …）」として添える（要件 v6-34 §9-1）。
+   */
+  readonly trackingId: string | undefined
 
-  constructor(status: number, message?: string, code?: string, data?: unknown) {
+  constructor(status: number, message?: string, code?: string, data?: unknown, trackingId?: string) {
     super(message || `API error: ${status}`)
     this.name = 'ApiError'
     this.status = status
     this.code = code
     this.data = data
+    this.trackingId = trackingId
   }
 }
 
@@ -2540,6 +2546,25 @@ function isSessionLostExempt(code: string | undefined): boolean {
 }
 
 /** エラー本文の `data` だけを機械処理用に保持する。本文の文言は表示契約と分ける。 */
+/**
+ * 失敗応答の追跡番号を取り出す。
+ *
+ * `incidentId`（未処理エラーは index.ts が毎回採番する）と
+ * `requestId`（共通基盤 §10 の応答形式）の両方を見る。
+ * 無い応答では何も返さない——画面は追跡番号を添えないだけ。
+ */
+export function extractApiErrorTrackingId(raw: string): string | undefined {
+  if (!raw) return undefined
+  try {
+    const body = JSON.parse(raw) as { incidentId?: unknown; requestId?: unknown }
+    if (typeof body.incidentId === 'string' && body.incidentId) return body.incidentId
+    if (typeof body.requestId === 'string' && body.requestId) return body.requestId
+    return undefined
+  } catch {
+    return undefined
+  }
+}
+
 export function extractApiErrorData(raw: string): unknown {
   if (!raw) return undefined
   try {
@@ -2646,6 +2671,7 @@ export async function fetchApi<T>(path: string, options?: FetchApiOptions): Prom
       res.status === 409 || res.status === 429 || res.status === 502
         ? extractApiErrorData(raw)
         : undefined,
+      extractApiErrorTrackingId(raw),
     )
   }
   if (res.status === 204) return undefined as T
@@ -2670,6 +2696,8 @@ async function fetchApiBlob(path: string): Promise<Blob> {
       res.status,
       extractApiErrorMessage(raw, res.status),
       code,
+      undefined,
+      extractApiErrorTrackingId(raw),
     )
   }
   return res.blob()
@@ -2703,6 +2731,8 @@ export async function downloadApiFile(path: string, fallbackFilename: string): P
       res.status,
       extractApiErrorMessage(raw, res.status),
       code,
+      undefined,
+      extractApiErrorTrackingId(raw),
     )
   }
   const disposition = res.headers.get('Content-Disposition') ?? ''
@@ -8507,10 +8537,33 @@ export const api = {
         doneCount: number
         total: number
         allDone: boolean
+        /** 進捗帯を閉じたか（本人単位）。**完了判定には使わない。** */
+        dismissed: boolean
       }>>(`/api/getting-started${accountId ? `?account_id=${encodeURIComponent(accountId)}` : ''}`),
+    /** 進捗帯を閉じる。**閉じた日時は帯を出さないためだけの記憶。** */
+    dismiss: () =>
+      fetchApi<ApiResponse<{ dismissed: boolean }>>('/api/getting-started/dismiss', {
+        method: 'POST',
+      }),
   },
   /** レシピ。台帳 #134。 */
   recipes: {
+    /**
+     * 組織レシピを作る（owner/admin）。**静的な見本を置くだけ**で、
+     * ここでは定義を作らない。
+     */
+    create: (input: {
+      name: string
+      purpose: string
+      createsSummary: string
+      accountId: string
+      requiredFeatures?: string[]
+      items?: Array<{ kind: string; name: string; note: string }> | null
+    }) =>
+      fetchApi<ApiResponse<Recipe>>('/api/recipes', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
     list: (accountId?: string) =>
       fetchApi<ApiResponse<Recipe[]>>(
         `/api/recipes${accountId ? `?account_id=${encodeURIComponent(accountId)}` : ''}`,
@@ -8571,6 +8624,22 @@ export const api = {
         '/api/manual-links/check',
         { method: 'POST' },
       ),
+  },
+  /**
+   * 失敗文面の対応表。設計 ★V6 34（要件 v6-34 §9）。
+   *
+   * **起動時に一度取って版ごとキャッシュする**（`lib/error-messages.ts`）。
+   * 表に無いコードは汎用文面と追跡番号に落とす——原文を出さない。
+   */
+  errorMessages: {
+    list: () =>
+      fetchApi<ApiResponse<Array<{
+        code: string
+        message: string
+        nextAction: { kind: 'navigate' | 'retry' | 'contact_admin' | 'none'; target: string | null }
+        source: string
+        version: number
+      }>>>('/api/error-messages'),
   },
   /**
    * LINEアカウントの乗り換え（引き継ぎ）。設計 ★V6 33-4（`nx3XW`）。台帳 #133。
