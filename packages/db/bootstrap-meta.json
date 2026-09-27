@@ -429,6 +429,8 @@
     "489_incoming_webhook_ambiguous_hold.sql",
     "494_session_step_up_and_unfamiliar.sql",
     "495_session_familiarity_ip_index.sql",
+    "496_operation_health_check_keys.sql",
+    "497_operation_infra_probes.sql",
     "498_line_account_lifecycle.sql",
     "499_account_handover_declared_rollback.sql",
     "500_ad_cost_ledger.sql",
@@ -437,5 +439,5 @@
     "503_measurement_sites.sql",
     "504_conversion_reversal_ledger.sql"
   ],
-  "migrationCount": 436
+  "migrationCount": 438
 }

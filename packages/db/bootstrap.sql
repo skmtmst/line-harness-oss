@@ -4651,12 +4651,13 @@ CREATE TABLE operation_alert_notification_outbox (
   UNIQUE (event_id, staff_id, channel)
 );
 
-CREATE TABLE operation_alerts (
+CREATE TABLE "operation_alerts" (
   id                   TEXT PRIMARY KEY,
   line_account_id      TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
   check_key            TEXT NOT NULL CHECK (check_key IN (
     'line_connection', 'message_quota', 'external_integrations',
-    'webhook', 'dispatch_jobs', 'friend_change'
+    'webhook', 'dispatch_jobs', 'friend_change',
+    'monitoring_heartbeat', 'infra_canary', 'credential_expiry'
   )),
   status               TEXT NOT NULL CHECK (status IN ('open', 'acknowledged', 'resolved')),
   severity             TEXT NOT NULL CHECK (severity IN ('unknown', 'warning', 'danger')),
@@ -4733,12 +4734,13 @@ CREATE TABLE operation_dispatcher_heartbeats (
   updated_at       TEXT NOT NULL
 );
 
-CREATE TABLE operation_health_results (
+CREATE TABLE "operation_health_results" (
   id             TEXT PRIMARY KEY,
   run_id         TEXT NOT NULL REFERENCES operation_health_runs(id) ON DELETE CASCADE,
   check_key      TEXT NOT NULL CHECK (check_key IN (
     'line_connection', 'message_quota', 'external_integrations',
-    'webhook', 'dispatch_jobs', 'friend_change'
+    'webhook', 'dispatch_jobs', 'friend_change',
+    'monitoring_heartbeat', 'infra_canary', 'credential_expiry'
   )),
   status         TEXT NOT NULL CHECK (status IN ('normal', 'warning', 'danger', 'unknown')),
   summary        TEXT NOT NULL,
@@ -4786,6 +4788,13 @@ CREATE TABLE operation_incidents (
 , stopped_definitions_json TEXT
   CHECK (stopped_definitions_json IS NULL OR json_valid(stopped_definitions_json)), restore_report_json TEXT
   CHECK (restore_report_json IS NULL OR json_valid(restore_report_json)));
+
+CREATE TABLE operation_infra_probes (
+  id         TEXT PRIMARY KEY,
+  kind       TEXT NOT NULL CHECK (kind IN ('d1')),
+  payload    TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
 
 CREATE TABLE operation_notification_outbox (
   id              TEXT PRIMARY KEY,
@@ -8080,7 +8089,7 @@ CREATE INDEX idx_operation_alert_events_alert_created
 CREATE INDEX idx_operation_alert_notification_due
   ON operation_alert_notification_outbox(status, next_attempt_at);
 
-CREATE INDEX idx_operation_alerts_account_status
+CREATE INDEX idx_operation_alerts_account_status_v496
   ON operation_alerts(line_account_id, status, updated_at DESC);
 
 CREATE INDEX idx_operation_audit_kind_date
@@ -8089,7 +8098,7 @@ CREATE INDEX idx_operation_audit_kind_date
 CREATE INDEX idx_operation_deployment_events_occurred
   ON operation_deployment_events(occurred_at DESC, id DESC);
 
-CREATE INDEX idx_operation_health_results_run
+CREATE INDEX idx_operation_health_results_run_v496
   ON operation_health_results(run_id, check_key);
 
 CREATE INDEX idx_operation_health_runs_scope_started
