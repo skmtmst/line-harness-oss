@@ -19,7 +19,7 @@
 /*
  * 見た目の箱は 18px の正方形に固定し、題の行の高さに入れない。
  * globals の button{min-height:32px}・表の中の button の決まりに負けない
- * よう、width/height/min-*/max-* をすべて 18px にし、aspect-ratio: 1 で
+ * よう、幅・高さ・最小・最大をすべて 18px にし、aspect-ratio: 1 で
  * 縦横を同じに保つ。押せる範囲は位置を持たない ::before で広げる
  * （28px・指では 44px）。狭い行（表見出し・札の横）で潰れないよう
  * 縮小を止める。
