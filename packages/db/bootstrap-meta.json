@@ -416,11 +416,13 @@
     "455_broadcast_approval_events.sql",
     "456_media_file_scans.sql",
     "457_file_scan_config.sql",
+    "460_photo_reward_policies.sql",
+    "461_photo_content_hash.sql",
     "466_template_versions.sql",
     "467_template_references.sql",
     "468_event_custom_questions.sql",
     "469_manual_link_screens.sql",
     "470_google_sheets_integrations.sql"
   ],
-  "migrationCount": 421
+  "migrationCount": 423
 }

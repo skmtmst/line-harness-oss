@@ -4340,7 +4340,7 @@ CREATE TABLE nen_photo_submissions (
   CHECK (public_pet_name IN (0, 1)), review_reason_code TEXT
   CHECK (review_reason_code IS NULL OR review_reason_code IN ('quality', 'privacy', 'unrelated', 'duplicate', 'other')), review_reason_note TEXT, reviewed_by TEXT, reviewed_by_name TEXT, review_notification_status TEXT NOT NULL DEFAULT 'not_required'
   CHECK (review_notification_status IN ('not_required', 'pending', 'sent', 'failed')), review_image_url TEXT, public_image_url TEXT, image_width INTEGER CHECK (image_width IS NULL OR image_width > 0), image_height INTEGER CHECK (image_height IS NULL OR image_height > 0), image_byte_size INTEGER CHECK (image_byte_size IS NULL OR image_byte_size >= 0), captured_device TEXT, review_version INTEGER NOT NULL DEFAULT 1 CHECK (review_version > 0), display_rotation INTEGER NOT NULL DEFAULT 0
-  CHECK (display_rotation IN (0, 90, 180, 270)), rotation_idempotency_key TEXT, notification_retry_key TEXT);
+  CHECK (display_rotation IN (0, 90, 180, 270)), rotation_idempotency_key TEXT, notification_retry_key TEXT, content_hash TEXT);
 
 CREATE TABLE nen_point_ledger (
   id TEXT PRIMARY KEY,
@@ -4781,6 +4781,24 @@ CREATE TABLE outgoing_webhooks (
   created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , max_retries INTEGER NOT NULL DEFAULT 0, consecutive_failures INTEGER NOT NULL DEFAULT 0, last_failed_at TEXT, line_account_id TEXT REFERENCES line_accounts(id), secret_encrypted TEXT, auto_stopped_at TEXT, deleted_at TEXT, deleted_by_staff_id TEXT);
+
+CREATE TABLE photo_reward_policies (
+  id TEXT PRIMARY KEY,
+  version_number INTEGER NOT NULL UNIQUE,
+  -- 付与の記録に写す鍵。第1版は既存の 'legacy-5' と同じ鍵にする。
+  -- 第2版からは 'v2' 'v3' …と付ける。
+  policy_key TEXT NOT NULL UNIQUE,
+  -- 採用1枚につき付けるポイント数。
+  points INTEGER NOT NULL CHECK (points > 0 AND points <= 100000),
+  -- 版の中身のひとこと。「報酬を5pt→10ptに」など。
+  summary TEXT NOT NULL DEFAULT '',
+  -- 使い始めの日時。空は「公開と同時」。未来の日時は「予約」の札で見せる。
+  effective_from TEXT,
+  created_by_staff_id TEXT,
+  -- 同じ確認キーの再送では版を増やさないための鍵。
+  idempotency_key TEXT UNIQUE,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 
 CREATE TABLE pii_reveal_logs (
   id                        TEXT PRIMARY KEY,
@@ -7963,6 +7981,12 @@ CREATE INDEX idx_outgoing_webhook_deliveries_webhook
 
 CREATE INDEX idx_outgoing_webhooks_line_account
   ON outgoing_webhooks(line_account_id, is_active, updated_at DESC);
+
+CREATE INDEX idx_photo_reward_policies_version
+  ON photo_reward_policies (version_number DESC);
+
+CREATE INDEX idx_photo_submissions_content_hash
+  ON nen_photo_submissions (line_account_id, content_hash);
 
 CREATE INDEX idx_pii_reveal_logs_tenant
   ON pii_reveal_logs(tenant_id, created_at DESC);

@@ -39,6 +39,7 @@ export * from './scoring';
 export * from './action-score-rules';
 export * from './templates';
 export * from './template-versions';
+export * from './photo-reward-policies';
 export * from './chats';
 export * from './inbox-reads';
 export * from './notifications';
