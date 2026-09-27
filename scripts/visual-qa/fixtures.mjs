@@ -5792,6 +5792,8 @@ export const NEN_PHOTO_DETAIL = {
   caption: 'はじめて海に行きました', image_width: 2048, image_height: 1536,
   image_byte_size: 1887437, captured_device: 'iPhone 15', animal_type: 'dog',
   breed: 'ラブラドール', birthday: '2025-08-24', submission_count: 3, returned_count: 0,
+  // #817: 重複なし・いま使っている報酬の決まり（第3版・10pt）。
+  duplicate: null, rewardPolicy: { versionNumber: 3, policyKey: 'v3', points: 10 },
   risks: [
     { flag: 'face', confidence: 0.78, note: 'うしろに人の顔', provider: 'visual-qa', model_version: 'fixture-1', assessed_at: '2026-08-25T08:10:00.000Z' },
     { flag: 'blur', confidence: 0.04, note: '明るさ・ぶれは問題ありません', provider: 'visual-qa', model_version: 'fixture-1', assessed_at: '2026-08-25T08:10:00.000Z' },
@@ -5849,6 +5851,25 @@ export const NEN_PHOTO_BULK_DECISION_RESULT = {
     { photoId: 'ph-3', decision: 'approve', reviewVersion: 2 },
   ],
 }
+
+/** #817: 報酬の決まりの版。新しい版から返す。status は in_use / reserved / past。 */
+export const NEN_PHOTO_REWARD_POLICY_VERSIONS = [
+  {
+    versionNumber: 4, policyKey: 'v4', points: 10, summary: '報酬を5pt→10ptに',
+    effectiveFrom: '2026-10-01T00:00:00+09:00', createdBy: 'visual-qa-owner',
+    createdAt: '2026-09-25T20:40:00+09:00', status: 'reserved',
+  },
+  {
+    versionNumber: 3, policyKey: 'v3', points: 10, summary: '審査の決まりに「顔が写る写真は不可」を追加',
+    effectiveFrom: null, createdBy: 'visual-qa-owner',
+    createdAt: '2026-09-10T11:02:00+09:00', status: 'in_use',
+  },
+  {
+    versionNumber: 2, policyKey: 'v2', points: 5, summary: '最初の報酬の決まり',
+    effectiveFrom: null, createdBy: 'visual-qa-owner',
+    createdAt: '2026-08-01T10:00:00+09:00', status: 'past',
+  },
+]
 
 const publicationPhoto = (id, photoId, petName, ownerName, count, label, type = 'column') => ({
   id, photo_id: photoId, status: 'published', show_owner_name: ownerName ? 1 : 0,
