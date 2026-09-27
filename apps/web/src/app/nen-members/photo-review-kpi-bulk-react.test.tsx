@@ -7,7 +7,7 @@ import PhotoReviewsPage from './page'
 /*
  * Issue #666（監査6・実画面検証 P1）の2件を、本物のReactで確かめる。
  *
- * 1. 指標カード「1枚にかかる時間」が分の生値（平均 55975分 ≒ 38.8日）で
+ * 1. 指標カード「投稿から審査までの日数」が分の生値（平均 55975分 ≒ 38.8日）で
  *    出ていた。59分/61分/1439分/1441分/43200分超の境界で、
  *    分・約○時間・約○日・約○ヶ月へ切り替わることを見る。
  * 2. 「0枚を選択中」でも「まとめて採用」が緑のままに見えた。
@@ -129,14 +129,14 @@ async function selectPhoto(index: number) {
   await act(async () => { target.click() })
 }
 
-/** 「1枚にかかる時間」カードの大きな値（ラベルの直後の要素）を取る。 */
+/** 「投稿から審査までの日数」カードの大きな値（ラベルの直後の要素）を取る。 */
 function averageTimeValue(): string | undefined {
   const label = Array.from(host.querySelectorAll('p'))
-    .find((p) => p.textContent?.trim() === '1枚にかかる時間')
+    .find((p) => p.textContent?.trim() === '投稿から審査までの日数')
   return label?.nextElementSibling?.textContent?.trim()
 }
 
-describe('「1枚にかかる時間」の読みやすい単位（Issue #666）', () => {
+describe('「投稿から審査までの日数」の読みやすい単位（Issue #666）', () => {
   it.each([
     [59, '平均 59分'],
     [61, '平均 約1時間'],
