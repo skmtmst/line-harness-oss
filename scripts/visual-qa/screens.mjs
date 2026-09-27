@@ -1489,7 +1489,8 @@ export const SCREENS = [
     verdictSource: 'webinars-v6/LKuAQ.png（Pencil HTML） + webinars-v6/LKuAQ.txt + LKuAQ-1920.png（実装） + Issue #474',
     verdictHead: 'd3bcf1f75',
     route: '/webinars', mode: 'viewport', height: 1080,
-    steps: [{ qaOpen: 'LKuAQ' }],
+    // m17i: アーカイブは行の「…」の中へ（★V7 Xn1Mz）。RUxNf と同じ2段操作。
+    steps: [{ qaOpen: 'LKuAQ', after: 500 }, { click: 'アーカイブする', role: 'menuitem', after: 900 }],
   },
   {
     ...WEBINAR, node: 'zCQXe', name: '10-1-L 一覧の状態（空・読込・エラー）',
@@ -1699,7 +1700,8 @@ export const SCREENS = [
     */
     ...RICH_MENU, node: 'szXsT', name: '12-1-F リッチメニューの削除確認',
     route: '/rich-menus', mode: 'viewport', height: 1080,
-    steps: [{ click: '削除', nth: 0 }],
+    // m17i: 削除は行の「…」の中へ（★V7 Xn1Mz）。RUxNf と同じ2段操作。
+    steps: [{ qaOpen: 'szXsT', after: 500 }, { click: '削除する', role: 'menuitem', after: 900 }],
     verdict: "match",
     verdictNote: "**2026-09-07 Issue #430 / #1194 の固定応答で再判定。** 削除影響APIから公開中メニューの影響、現在の割当8,140人、次に出る候補、切替元、配信・自動処理の参照を表示し、公開中は取り下げ後に削除する安全導線を確認した。1440・1920とも横スクロールはない。",
     verdictHead: "49484d5ab",
@@ -1885,7 +1887,8 @@ export const SCREENS = [
   {
     ...MEDIA, node: 'YfTfJ', name: '15-1-C メディアの削除確認',
     mode: 'viewport', height: 1080,
-    steps: [{ qaOpen: 'YfTfJ', after: 900 }],
+    // m17i: 削除は行の「…」の中へ（★V7 Xn1Mz）。RUxNf と同じ2段操作。
+    steps: [{ qaOpen: 'YfTfJ', after: 500 }, { click: '削除する', role: 'menuitem', after: 900 }],
     variants: [
       /*
         比較対象はPencilと同じ使用中の削除不可状態。削除可能な確認窓も別状態に残す。

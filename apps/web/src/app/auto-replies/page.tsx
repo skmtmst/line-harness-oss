@@ -2,17 +2,19 @@
 
 import Disclosure from '@/components/shared/disclosure'
 import FilterChip from '@/components/shared/filter-chip'
+import ListToolbar from '@/components/shared/list-toolbar'
 import SortSelect from '@/components/ui/sort-select'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { MoreHorizontal, Trash2, TriangleAlert } from 'lucide-react'
+import { ChevronDown, ChevronUp, MoreHorizontal, Trash2, TriangleAlert } from 'lucide-react'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import { toDraft } from '@/components/auto-replies/edit-dialog'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import type { Folder } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
-import EditDialog, { type AutoReplyDraft } from '@/components/auto-replies/edit-dialog'
+import EditDialog, { type AutoReplyDraft, type AutoReplyOrderHint } from '@/components/auto-replies/edit-dialog'
+import { inEvaluationOrder, movePriorityUpdates } from './auto-reply-order'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import { TableStateRow } from '@/components/shared/table'
@@ -199,6 +201,9 @@ export default function AutoRepliesPage() {
   const [toggleError, setToggleError] = useState('')
   // 行の「その他」メニューの開き先（#641: 停止・再開はここへ集約）
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  /** 上下入れ替えの実行中は同じ行のボタンを押せないようにする。 */
+  const [reorderingId, setReorderingId] = useState<string | null>(null)
+  const [reorderError, setReorderError] = useState('')
   const selectedAccountIdRef = useRef(selectedAccountId)
   selectedAccountIdRef.current = selectedAccountId
   const loadGenerationRef = useRef(0)
@@ -452,6 +457,56 @@ export default function AutoRepliesPage() {
   }
 
   /*
+   * R28: 順番は一覧で上下を入れ替えて決める。窓の中では数字を打たせない。
+   * 入れ替えは隣との数字の交換（同点だけ1ずらし）で、既存の更新口を使う。
+   * 新しい口は足さない。
+   */
+  const evaluationOrdered = useMemo(() => inEvaluationOrder(items), [items])
+
+  const handleMove = async (id: string, delta: -1 | 1, ordered: Array<{ id: string; priority: number; createdAt: string }>) => {
+    const updates = movePriorityUpdates(ordered, id, delta)
+    if (!updates || reorderingId) return
+    setReorderingId(id)
+    setReorderError('')
+    try {
+      for (const update of updates) {
+        const result = await api.autoReplies.update(update.id, { priority: update.priority })
+        if (!result.success) throw new Error('reorder_failed')
+      }
+      await load()
+    } catch {
+      setReorderError('順番を変えられませんでした。画面を読み直してからお試しください。')
+    } finally {
+      setReorderingId(null)
+    }
+  }
+
+  /** 編集中の窓へ渡す順番の手がかり。評価順での位置と先に見る名前だけ。 */
+  const editingOrderHint: AutoReplyOrderHint | null = useMemo(() => {
+    if (!editing) return null
+    if (!editing.id) {
+      return { position: null, total: evaluationOrdered.length, earlier: [], earlierTotal: 0 }
+    }
+    const index = evaluationOrdered.findIndex((item) => item.id === editing.id)
+    if (index < 0) return null
+    const earlier = evaluationOrdered.slice(0, index).map((item) => ({
+      id: item.id,
+      name: item.name || (item.respondToAll ? 'すべてのメッセージ' : item.keyword),
+    }))
+    return {
+      position: index + 1,
+      total: evaluationOrdered.length,
+      earlier: earlier.slice(-3),
+      earlierTotal: earlier.length,
+    }
+  }, [editing, evaluationOrdered])
+
+  /** 新しく作るルールは一覧のいちばん下へ。窓の中では順番を変えられない。 */
+  const nextPriority = items.length === 0
+    ? 0
+    : Math.min(9999, Math.max(...items.map((item) => item.priority)) + 1)
+
+  /*
     ヒット数の合計（152）。KPI に出す。
 
     **1つでもヒット数を持たないルールがあると、合計は足りない。**
@@ -596,26 +651,8 @@ export default function AutoRepliesPage() {
         </div>
       </KpiCollapse>
 
-      <div data-design="Actions" className="flex flex-wrap items-center gap-2">
-        <Button
-          variant="primary"
-          onClick={() => setEditing({
-            keyword: '',
-            matchType: 'exact',
-            responseType: 'text',
-            responseContent: '',
-            templateId: null,
-            lineAccountId: selectedAccountId,
-            // AUTOREPLY-08: 新しい応答は止まった状態で作る。動かすのは
-            // 一覧の「再開」や公開前の確認から、保存とは別の操作で。
-            isActive: false,
-          })}
-        >
-          ＋ ルールを作る
-        </Button>
-      </div>
-
       {/*
+        ★V7 `Xn1Mz`：上からの順は「数のカード → 説明の開閉 → ＋作る」。
         複数当てはまったときの挙動と、「適用アカウント」欄の札の読み方。書いていないと必ず問い合わせになるが、
         毎回2つの帯が一覧を押し下げていたので、閉じた欄にしまう（★V7：今は出さなくてよいもの）。
       */}
@@ -623,7 +660,8 @@ export default function AutoRepliesPage() {
         <div className="text-ink-secondary mb-3 text-xs leading-relaxed">
           上にあるルールから順に見て、<strong>最初に当てはまった1つだけ</strong>が動きます。
           時間帯や連投の設定で見送られたときは、その次のルールを見ます。
-          並び順は「評価順」の数字で決まり、小さいほど先に見ます。
+          並び順は「評価順」のとおりで、小さいほど先に見ます。
+          順番を変えるときは「評価順」の並びで上下のボタンを使います。
         </div>
 
         {/* 「適用アカウント」欄の札の読み方。札の見た目と1対1で並べる。 */}
@@ -647,49 +685,67 @@ export default function AutoRepliesPage() {
         </div>
       </Disclosure>
 
-      <div
-        data-design="Bar"
-        className="bg-canvas rounded-card border-hairline flex flex-wrap items-center gap-2 border p-3"
-      >
-        {/*
-          #636: 検索欄は min-w-45（180px）を下限にする。min-w-0 だと
-          390pxで右のセレクトに押されて w=57 まで潰れ、文字が読めない。
-          下限があると flex-wrap が効いて、狭い幅では検索欄が1行を
-          占め、並び順・表示は次の行へ折り返す。
-        */}
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="自動応答名で検索"
-          aria-label="自動応答名で検索"
-          className="border-hairline rounded-control focus:ring-accent min-w-45 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
-        />
+      <div data-design="Actions" className="mb-4 flex flex-wrap items-center gap-2">
+        <Button
+          variant="primary"
+          onClick={() => setEditing({
+            keyword: '',
+            matchType: 'exact',
+            responseType: 'text',
+            responseContent: '',
+            templateId: null,
+            lineAccountId: selectedAccountId,
+            // AUTOREPLY-08: 新しい応答は止まった状態で作る。動かすのは
+            // 一覧の「再開」や公開前の確認から、保存とは別の操作で。
+            isActive: false,
+            // R28: 新しいルールは一覧のいちばん下へ。順番は窓の中では変えない。
+            priority: nextPriority,
+          })}
+        >
+          ＋ ルールを作る
+        </Button>
       </div>
 
-      {/* #668: 並びは「絞り込み → 並び順 → 表示件数」の1形。 */}
-      <div data-design="Saved" className="flex flex-wrap items-center gap-2">
-        <span className="text-ink-faint text-xs whitespace-nowrap">よく使う絞り込み</span>
-        {SAVED_FILTERS.map((f) => {
-          const on = savedFilter === f.key
-          return (
-            <FilterChip
-              key={f.key}
-              selected={on}
-              onChange={(next) => setSavedFilter(next ? f.key : '')}
-              title={f.note}
-            >
-              {f.label}
-            </FilterChip>
-          )
-        })}
-        <SortSelect
-          className="ml-auto"
-          value={sortKey}
-          onChange={(value) => setSortKey(value as SortKey)}
-          options={[{ value: 'hits', label: 'ヒット数が多い順' }, { value: 'priority', label: '評価順' }, { value: 'name', label: '名前順' }, { value: 'created', label: '作った順' }]}
-        />
-        <PageSizeSelect value={pageSize} onChange={setPageSize} />
+      {/*
+        ★V7 `Xn1Mz`：検索は幅320で1行目、2行目は左に絞り込み・
+        右端に並び順と表示件数。#636/#668 の並びの意図はそのまま。
+        設計の Bar（検索行）・Saved（絞り込み行）は共通 ListToolbar の
+        1・2行目にいる。印だけここに残し、設計との突き合わせを保つ。
+      */}
+      <div data-design="Bar">
+      <div data-design="Saved">
+      <ListToolbar
+        search={{ placeholder: '自動応答名で検索', value: query, onChange: setQuery }}
+        filters={
+          <>
+            <span className="text-ink-faint text-xs whitespace-nowrap">よく使う絞り込み</span>
+            {SAVED_FILTERS.map((f) => {
+              const on = savedFilter === f.key
+              return (
+                <FilterChip
+                  key={f.key}
+                  selected={on}
+                  onChange={(next) => setSavedFilter(next ? f.key : '')}
+                  title={f.note}
+                >
+                  {f.label}
+                </FilterChip>
+              )
+            })}
+          </>
+        }
+        trailing={
+          <>
+            <SortSelect
+              value={sortKey}
+              onChange={(value) => setSortKey(value as SortKey)}
+              options={[{ value: 'hits', label: 'ヒット数が多い順' }, { value: 'priority', label: '評価順' }, { value: 'name', label: '名前順' }, { value: 'created', label: '作った順' }]}
+            />
+            <PageSizeSelect value={pageSize} onChange={setPageSize} />
+          </>
+        }
+      />
+      </div>
       </div>
 
       {folderDialogOpen && (
@@ -748,7 +804,7 @@ export default function AutoRepliesPage() {
                   #774: 右端の操作列は sticky で留める。幅は中身（編集＋
                   その他の 32px 級 2つ）に合わせた固定 144。
                 */}
-                <th title="編集・停止または再開・削除" className="bg-canvas-sunken sticky right-0 w-36 px-4 py-3 text-right text-xs font-semibold text-ink-faint">操作</th>
+                <th title="編集・停止または再開・削除" className={`bg-canvas-sunken sticky right-0 px-4 py-3 text-right text-xs font-semibold text-ink-faint ${sortKey === 'priority' ? 'w-52' : 'w-36'}`}>操作</th>
                 <th className="hidden px-4 py-3">テンプレート</th>
                 <th className="hidden px-4 py-3">応答条件</th>
                 <th className="hidden px-4 py-3">適用アカウント</th>
@@ -787,7 +843,7 @@ export default function AutoRepliesPage() {
                   description="絞り込みを外すか、「自動応答を作成」から追加してください。"
                 />
               ) : (
-                shownInFolder.map((r) => (
+                shownInFolder.map((r, viewIndex) => (
                   <tr key={r.id} className="group hover:bg-canvas-sunken">
                     <td className="px-4 py-3 text-sm font-medium text-ink">
                       {/* 名前があればそれを出す。無ければキーワード。
@@ -864,6 +920,28 @@ export default function AutoRepliesPage() {
                           N-086: 行から止められる。下書き（未公開）は公開の前段なので、
                           動かす口は出さず、公開の流れに任せる。 */}
                       <div className="relative inline-flex items-center justify-end gap-1.5">
+                        {/*
+                          R28: 順番は「評価順」の並びで上下を入れ替えて決める。
+                          ほかの並びでは順番と関係ないので出さない。
+                        */}
+                        {sortKey === 'priority' && (
+                          <>
+                            <IconButton
+                              aria-label={`自動応答「${r.name || (r.respondToAll ? 'すべてのメッセージ' : r.keyword)}」を1つ上へ`}
+                              disabled={viewIndex === 0 || reorderingId !== null}
+                              onClick={() => void handleMove(r.id, -1, sortedItems)}
+                            >
+                              <ChevronUp aria-hidden />
+                            </IconButton>
+                            <IconButton
+                              aria-label={`自動応答「${r.name || (r.respondToAll ? 'すべてのメッセージ' : r.keyword)}」を1つ下へ`}
+                              disabled={viewIndex === sortedItems.length - 1 || reorderingId !== null}
+                              onClick={() => void handleMove(r.id, 1, sortedItems)}
+                            >
+                              <ChevronDown aria-hidden />
+                            </IconButton>
+                          </>
+                        )}
                         <Button
                           variant="secondary"
                           size="compact"
@@ -940,7 +1018,14 @@ export default function AutoRepliesPage() {
           templates={templates}
           onClose={() => setEditing(null)}
           onSaved={() => { setEditing(null); load() }}
+          orderHint={editingOrderHint}
         />
+      )}
+
+      {reorderError && (
+        <p role="alert" className="text-danger text-center text-xs">
+          {reorderError}
+        </p>
       )}
 
       {/*

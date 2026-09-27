@@ -1109,6 +1109,16 @@ export interface LineAccount {
   isDefault: boolean;
   /** アーカイブ日時。null なら通常利用中。 */
   archivedAt: string | null;
+  /** 止めた理由の区分（manual | ban_detected | credential_invalid）。動いていれば null。 */
+  inactiveReason?: string | null;
+  /** 止めた理由の本文。動いていれば null。 */
+  inactiveReasonDetail?: string | null;
+  /** 止めた日時。 */
+  inactivatedAt?: string | null;
+  /** 最後にWebhookを受け取った日時。届かない警告の判定に使う。 */
+  lastWebhookReceivedAt?: string | null;
+  /** Webhook届かない警告を出さないアカウントか。 */
+  webhookSilenceExempt?: boolean;
   /** 友だち数の上限。null なら上限を管理しない */
   friendCapacity?: number | null;
   /** 何人で警告を出すか。null なら警告しない */
@@ -1199,6 +1209,8 @@ export interface EntryRoute {
   introTemplateId: string | null;
   runAccountFriendAddScenarios: boolean;
   isActive: boolean;
+  /** 所属するLINEアカウント。未割当の古い行では null のことがある。 */
+  lineAccountId?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -1221,6 +1233,8 @@ export interface CreateEntryRouteInput {
   introTemplateId?: string | null;
   runAccountFriendAddScenarios?: boolean;
   isActive?: boolean;
+  /** 作成時に所属させるLINEアカウント。Worker の必須検査と保存に使う。 */
+  lineAccountId?: string | null;
 }
 
 export interface EntryRouteFunnel {

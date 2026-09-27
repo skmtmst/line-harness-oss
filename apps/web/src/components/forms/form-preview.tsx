@@ -278,7 +278,7 @@ export default function FormPreview({
                 className="flex-1 py-2 text-center text-sm font-medium"
                 style={{ backgroundColor: theme.main, color: formThemeButtonText(theme), borderRadius: radiusOf(theme) }}
               >
-                {isLast ? options.submitLabel || '送信' : options.nextLabel || '次へ'}
+                {isLast ? options.submitLabel || '送信する' : options.nextLabel || '次へ'}
               </div>
             )}
           </div>

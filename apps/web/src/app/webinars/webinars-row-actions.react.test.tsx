@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 /*
- * #641: ウェビナー一覧の行操作を「枠つき編集ボタン＋アーカイブアイコン」へ統一。
- * 文字リンク＋裸ボタンをやめ、撮影口（LKuAQ）は保ったままの形を実マウントで確かめる。
+ * #641 → ★V7 `Xn1Mz`：ウェビナー一覧の行操作は「枠つき編集ボタン＋「…」」。
+ * アーカイブはメニューの中へ。箱のアイコンだけのボタンは行に直に置かない。
+ * 撮影口（LKuAQ）は「…」ボタンへ移し、メニューを開いて確かめる。
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -85,7 +86,7 @@ async function flush() {
 }
 
 describe('#641 ウェビナー一覧の行操作', () => {
-  it('「編集」が枠つきボタンで、アーカイブは撮影口つきのアイコンボタン', async () => {
+  it('「編集」が枠つきボタンで、アーカイブは撮影口つき「…」の中', async () => {
     await act(async () => { root.render(<WebinarsPage />) })
     await flush()
 
@@ -93,8 +94,16 @@ describe('#641 ウェビナー一覧の行操作', () => {
       .find((el) => el.getAttribute('href') === '/webinars/edit?id=webinar-5' && el.textContent?.includes('編集'))
     expect(edit, '枠つき「編集」ボタンが見つかりません').toBeTruthy()
 
-    const archive = host.querySelector('button[data-qa-open="LKuAQ"]')
-    expect(archive, 'アーカイブの撮影口が消えています').toBeTruthy()
-    expect(archive!.getAttribute('aria-label')).toBe('旧機能説明会をアーカイブ')
+    // 行に箱アイコンだけのボタンは置かない。
+    expect(host.querySelector('button[aria-label="旧機能説明会をアーカイブ"]'), '箱アイコンの直置きが残っています').toBeNull()
+
+    const more = host.querySelector('button[data-qa-open="LKuAQ"]') as HTMLButtonElement
+    expect(more, '「…」の撮影口が消えています').toBeTruthy()
+    expect(more.getAttribute('aria-label')).toBe('旧機能説明会のその他操作')
+    act(() => { more.click() })
+    // メニューは最上層（MenuPortal→document.body）に出る。器の中にはいない。
+    const menu = document.querySelector('[role="menu"]')
+    expect(menu, 'メニューが開きません').toBeTruthy()
+    expect(menu!.textContent).toContain('アーカイブする')
   })
 })

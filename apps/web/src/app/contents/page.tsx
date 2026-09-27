@@ -7,11 +7,11 @@ import type {
   MediaDeleteImpactReference,
   MediaItem,
 } from '@line-crm/shared'
-import { LayoutGrid, List as ListIcon, Trash2 } from 'lucide-react'
+import { LayoutGrid, List as ListIcon } from 'lucide-react'
 import { api, ApiError, type MediaQuota } from '@/lib/api'
 import FeatureGate from '@/components/feature-gate'
 import Button from '@/components/shared/button'
-import IconButton from '@/components/shared/icon-button'
+import ListToolbar from '@/components/shared/list-toolbar'
 import ActionMenu from '@/components/shared/action-menu'
 import { MoreAction } from '@/components/shared/row-actions'
 import { formatMediaSize } from './media-usage-display'
@@ -33,7 +33,6 @@ import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
-import SearchField from '@/components/shared/search-field'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import Select from '@/components/shared/select'
 import { useAccount } from '@/contexts/account-context'
@@ -837,143 +836,136 @@ function MediaLibraryInner() {
         <div className="min-w-0">
 
       {/*
-        検索は独立した全幅の行にする（U016）。表示切替・並び順・件数と
-        同じ行に押し込むと、狭い幅で入力文が読めないほど潰れる。
+        ★V7 `Xn1Mz`：検索は幅320で1行目、2行目は左に絞り込み・
+        右端に表示切替・並び順・表示件数。U016 の潰れ対策の意図は
+        そのまま（検索は320・下限240で折り返す）。
       */}
-      <div data-search-row className="mb-3">
-        <SearchField
-          value={query}
-          onChange={(value) => {
+      <ListToolbar
+        search={{
+          placeholder: 'ファイル名で検索',
+          value: query,
+          onChange: (value) => {
             setQuery(value)
             setPage(1)
-          }}
-          onClear={() => {
-            setQuery('')
-            setPage(1)
-          }}
-          placeholder="ファイル名で検索"
-          aria-label="ファイル名で検索"
-          className="w-full"
-        />
-      </div>
-
-      {/* 種別と使用状態。選ぶと必ず1ページ目へ戻る。 */}
-      <div className="mb-3 flex flex-wrap items-center gap-3">
-        <FilterChip
-          selected={kinds.size === KINDS.length && !showUnusedOnly && !showArchivedOnly}
-          onChange={() => {
-            setKinds(new Set(KINDS.map((kind) => kind.key)))
-            setShowUnusedOnly(false)
-            setShowNearLimitOnly(false)
-            setShowArchivedOnly(false)
-            setPage(1)
-          }}
-        >
-          すべて
-        </FilterChip>
-        {KINDS.map((kind) => (
-          <FilterChip
-            key={kind.key}
-            selected={kinds.size === 1 && kinds.has(kind.key) && !showArchivedOnly}
-            onChange={() => {
-              setKinds(new Set([kind.key]))
-              setShowUnusedOnly(false)
-              setShowNearLimitOnly(false)
-              setShowArchivedOnly(false)
-              setPage(1)
-            }}
-          >
-            {kind.label}
-          </FilterChip>
-        ))}
-        <FilterChip
-          selected={showUnusedOnly}
-          onChange={(selectedValue) => {
-            setShowUnusedOnly(selectedValue)
-            setShowNearLimitOnly(false)
-            setShowArchivedOnly(false)
-            if (selectedValue) setKinds(new Set(KINDS.map((kind) => kind.key)))
-            setPage(1)
-          }}
-        >
-          使っていない
-        </FilterChip>
-        <FilterChip
-          selected={showNearLimitOnly}
-          onChange={(selectedValue) => {
-            setShowNearLimitOnly(selectedValue)
-            setShowUnusedOnly(false)
-            setShowArchivedOnly(false)
-            if (selectedValue) setKinds(new Set(KINDS.map((kind) => kind.key)))
-            setPage(1)
-          }}
-        >
-          上限に近い
-        </FilterChip>
-        <FilterChip
-          selected={showArchivedOnly}
-          onChange={(selectedValue) => {
-            setShowArchivedOnly(selectedValue)
-            setShowUnusedOnly(false)
-            setShowNearLimitOnly(false)
-            if (selectedValue) setKinds(new Set(KINDS.map((kind) => kind.key)))
-            setPage(1)
-          }}
-        >
-          アーカイブ済み
-        </FilterChip>
-      </div>
-
-      {/*
-        表示の切り替え・並び順・件数は結果の見出し側へまとめる（U016）。
-        検索と同じ行にすると、狭い幅で検索欄が潰れる。
-      */}
-      <div className="mb-3 flex flex-wrap items-center justify-end gap-3">
-        {/* 設計 `g89Tc` の表示切替: 枠 高さ40・角丸8、各44幅、アイコン16。 */}
-        <div
-          role="group"
-          aria-label="並べ方"
-          className="border-hairline rounded-control flex h-10 items-center overflow-hidden border"
-        >
-          {([
-            ['grid', '格子で並べる', LayoutGrid],
-            ['list', '一覧で並べる', ListIcon],
-          ] as Array<[MediaView, string, typeof LayoutGrid]>).map(([value, label, Icon]) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => setView(value)}
-              aria-pressed={view === value}
-              aria-label={label}
-              title={label}
-              className={`flex h-full w-11 items-center justify-center ${
-                view === value ? 'bg-accent-soft text-accent-deep' : 'text-ink-faint hover:bg-canvas-sunken'
-              }`}
+          },
+        }}
+        filters={
+          <>
+            {/* 種別と使用状態。選ぶと必ず1ページ目へ戻る。 */}
+            <FilterChip
+              selected={kinds.size === KINDS.length && !showUnusedOnly && !showArchivedOnly}
+              onChange={() => {
+                setKinds(new Set(KINDS.map((kind) => kind.key)))
+                setShowUnusedOnly(false)
+                setShowNearLimitOnly(false)
+                setShowArchivedOnly(false)
+                setPage(1)
+              }}
             >
-              <Icon aria-hidden="true" size={16} />
-            </button>
-          ))}
-        </div>
-        <Select
-          aria-label="並び順"
-          value={sort}
-          options={SORT_OPTIONS}
-          onChange={(value) => {
-            setSort(value as MediaSort)
-            setPage(1)
-          }}
-        />
-        <Select
-          aria-label="表示件数"
-          value={String(pageSize)}
-          options={PAGE_SIZE_OPTIONS}
-          onChange={(value) => {
-            setPageSize(Number(value))
-            setPage(1)
-          }}
-          size="page-size"
-        />
-      </div>
+              すべて
+            </FilterChip>
+            {KINDS.map((kind) => (
+              <FilterChip
+                key={kind.key}
+                selected={kinds.size === 1 && kinds.has(kind.key) && !showArchivedOnly}
+                onChange={() => {
+                  setKinds(new Set([kind.key]))
+                  setShowUnusedOnly(false)
+                  setShowNearLimitOnly(false)
+                  setShowArchivedOnly(false)
+                  setPage(1)
+                }}
+              >
+                {kind.label}
+              </FilterChip>
+            ))}
+            <FilterChip
+              selected={showUnusedOnly}
+              onChange={(selectedValue) => {
+                setShowUnusedOnly(selectedValue)
+                setShowNearLimitOnly(false)
+                setShowArchivedOnly(false)
+                if (selectedValue) setKinds(new Set(KINDS.map((kind) => kind.key)))
+                setPage(1)
+              }}
+            >
+              使っていない
+            </FilterChip>
+            <FilterChip
+              selected={showNearLimitOnly}
+              onChange={(selectedValue) => {
+                setShowNearLimitOnly(selectedValue)
+                setShowUnusedOnly(false)
+                setShowArchivedOnly(false)
+                if (selectedValue) setKinds(new Set(KINDS.map((kind) => kind.key)))
+                setPage(1)
+              }}
+            >
+              上限に近い
+            </FilterChip>
+            <FilterChip
+              selected={showArchivedOnly}
+              onChange={(selectedValue) => {
+                setShowArchivedOnly(selectedValue)
+                setShowUnusedOnly(false)
+                setShowNearLimitOnly(false)
+                if (selectedValue) setKinds(new Set(KINDS.map((kind) => kind.key)))
+                setPage(1)
+              }}
+            >
+              アーカイブ済み
+            </FilterChip>
+          </>
+        }
+        trailing={
+          <>
+            {/* 設計 `g89Tc` の表示切替: 枠 高さ40・角丸8、各44幅、アイコン16。 */}
+            <div
+              role="group"
+              aria-label="並べ方"
+              className="border-hairline rounded-control flex h-10 items-center overflow-hidden border"
+            >
+              {([
+                ['grid', '格子で並べる', LayoutGrid],
+                ['list', '一覧で並べる', ListIcon],
+              ] as Array<[MediaView, string, typeof LayoutGrid]>).map(([value, label, Icon]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setView(value)}
+                  aria-pressed={view === value}
+                  aria-label={label}
+                  title={label}
+                  className={`flex h-full w-11 items-center justify-center ${
+                    view === value ? 'bg-accent-soft text-accent-deep' : 'text-ink-faint hover:bg-canvas-sunken'
+                  }`}
+                >
+                  <Icon aria-hidden="true" size={16} />
+                </button>
+              ))}
+            </div>
+            <Select
+              aria-label="並び順"
+              value={sort}
+              options={SORT_OPTIONS}
+              onChange={(value) => {
+                setSort(value as MediaSort)
+                setPage(1)
+              }}
+            />
+            <Select
+              aria-label="表示件数"
+              value={String(pageSize)}
+              options={PAGE_SIZE_OPTIONS}
+              onChange={(value) => {
+                setPageSize(Number(value))
+                setPage(1)
+              }}
+              size="page-size"
+            />
+          </>
+        }
+      />
 
       <div data-design-node="h8pBZr" className="flex flex-col gap-4">
       {total > 200 ? (
@@ -1130,34 +1122,29 @@ function MediaLibraryInner() {
                   </>
                 )}
 
-                <div className="mt-auto flex flex-wrap items-center justify-end gap-1 pt-1">
+                {/*
+                  ★V7：札の操作は「使用箇所」＋「…」の1行にそろえる。
+                  ダウンロード・アーカイブ・削除は「…」の中へ集める。
+                  ゴミ箱の印だけのボタンは札に直に置かない。
+                  退避は消去ではない。使用中でも止めないが、理由を必ず聞く。
+                  退避済みは編集・削除の押し口を出さず、戻す口だけを残す。
+                  読み取り専用の人にも「…」でダウンロードを渡す。
+                */}
+                <div className="mt-auto flex items-center justify-end gap-1 pt-1">
                   <button
                     onClick={() => setDetailUrl(item.id)}
                     disabled={!canManageMedia}
                     title={canManageMedia ? '使用箇所を見る' : managementPermissionReason}
                     aria-label={`${item.filename}の使用箇所`}
-                    className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-2.5 py-1 text-xs whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50"
+                    className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control shrink-0 border px-2.5 py-1 text-xs whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     使用箇所
                   </button>
-                  {/*
-                    取得は読取権限でも使う操作なので「…」に隠さず、見えるボタンで出す。
-                    読み上げ名は「＜ファイル名＞をダウンロード」のまま保つ。
-                  */}
-                  <button
-                    onClick={() => void downloadItem(item)}
-                    disabled={downloadingIds.has(item.id)}
-                    title={downloadingIds.has(item.id) ? 'ファイルを取り出しています' : 'ダウンロード'}
-                    aria-label={`${item.filename}をダウンロード`}
-                    className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-2.5 py-1 text-xs whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {downloadingIds.has(item.id) ? '取得中…' : 'ダウンロード'}
-                  </button>
-                  {canManageMedia ? (
-                  <span className="relative inline-flex items-center">
+                  <span className="relative inline-flex shrink-0 items-center">
                     <MoreAction
                       label={`${item.filename}のその他操作`}
                       aria-expanded={openMenuId === item.id}
+                      data-qa-open="YfTfJ"
                       onClick={() => setOpenMenuId((current) => (current === item.id ? null : item.id))}
                     />
                     <ActionMenu
@@ -1165,29 +1152,26 @@ function MediaLibraryInner() {
                       ariaLabel={`${item.filename}の操作`}
                       onClose={() => setOpenMenuId(null)}
                       items={[
-                        ...(!item.archivedAt ? [{ id: 'rename', label: '編集', onSelect: () => { setRenameError(''); setRenaming({ id: item.id, value: item.filename }) } }] : []),
-                        { id: 'archive', label: item.archivedAt ? '一覧へ戻す' : 'アーカイブ', onSelect: () => { setArchiveError(''); setArchiveReason(''); setArchiveTarget({ item, mode: item.archivedAt ? 'restore' : 'archive' }) } },
+                        {
+                          id: 'download',
+                          label: downloadingIds.has(item.id) ? '取得中…' : 'ダウンロード',
+                          disabled: downloadingIds.has(item.id),
+                          disabledReason: downloadingIds.has(item.id) ? 'ファイルを取り出しています' : undefined,
+                          onSelect: () => { void downloadItem(item) },
+                        },
+                        ...(canManageMedia && !item.archivedAt
+                          ? [{ id: 'rename', label: '編集', onSelect: () => { setRenameError(''); setRenaming({ id: item.id, value: item.filename }) } }]
+                          : []),
+                        ...(canManageMedia
+                          ? [{ id: 'archive', label: item.archivedAt ? '一覧へ戻す' : 'アーカイブ', onSelect: () => { setArchiveError(''); setArchiveReason(''); setArchiveTarget({ item, mode: item.archivedAt ? 'restore' : 'archive' }) } }]
+                          : []),
+                        // 削除確認の窓の撮影は「…」→この項目の2手で開ける。
+                        ...(canManageMedia && !item.archivedAt
+                          ? [{ id: 'delete', label: '削除する', tone: 'danger' as const, dividerBefore: true, qaOpen: 'YfTfJ', onSelect: () => { void openDelete(item) } }]
+                          : []),
                       ]}
                     />
                   </span>
-                  ) : null}
-                  {/*
-                    退避は消去ではない。使用中でも止めないが、理由を必ず聞く。
-                    退避済みは編集・削除の押し口を出さず、戻す口だけを残す。
-                    ★V7：札の操作は「使用箇所＋ダウンロード＋…」の1行。編集・
-                    アーカイブは「…」の中、削除はゴミ箱の印のまま残す。
-                    権限のない人には「…」自体を出さない（空の飾りにしない）。
-                  */}
-                  {canManageMedia && !item.archivedAt ? (
-                  <IconButton
-                    onClick={() => void openDelete(item)}
-                    data-qa-open="YfTfJ"
-                    aria-label={`${item.filename}を削除`}
-                    title="削除"
-                  >
-                    <Trash2 aria-hidden />
-                  </IconButton>
-                  ) : null}
                 </div>
 
               </div>

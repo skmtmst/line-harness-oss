@@ -71,18 +71,19 @@ function seedClaim(
   db: SqliteD1,
   friendId: string,
   state: string,
-  opts: { dispatched?: boolean; broadcastId?: string } = {},
+  opts: { dispatched?: boolean; broadcastId?: string; errorCode?: string | null } = {},
 ): void {
   db.raw.prepare(
     `INSERT INTO broadcast_send_claims
-       (broadcast_id, friend_id, line_account_id, attempt_no, state, dispatched_at, settled_at, created_at, updated_at)
-     VALUES (?, ?, 'account-1', 1, ?, ?, ?, '2026-09-11T09:00:00.000', '2026-09-11T09:00:00.000')`,
+       (broadcast_id, friend_id, line_account_id, attempt_no, state, dispatched_at, settled_at, error_code, created_at, updated_at)
+     VALUES (?, ?, 'account-1', 1, ?, ?, ?, ?, '2026-09-11T09:00:00.000', '2026-09-11T09:00:00.000')`,
   ).run(
     opts.broadcastId ?? 'b1',
     friendId,
     state,
     opts.dispatched === false ? null : '2026-09-11T09:30:00.000',
     state === 'claimed' ? null : '2026-09-11T09:31:00.000',
+    opts.errorCode ?? null,
   );
 }
 
@@ -264,7 +265,8 @@ describe('一斉配信の停止・再開・失敗分再送（#662）', () => {
     it('失敗した相手だけ開け直し、送達済みと送達不明には触れない', async () => {
       seedBroadcast(testDb, 'b1', { status: 'sent', sent_at: '2026-09-11T10:00:00.000' });
       seedClaim(testDb, 'f1', 'sent');
-      seedClaim(testDb, 'f2', 'failed');
+      // #816: 一時的な失敗（混み合い）だけ送り直す。
+      seedClaim(testDb, 'f2', 'failed', { errorCode: 'line_http_429' });
       seedClaim(testDb, 'f3', 'unknown');
 
       const res = await app(testDb.db).request(
@@ -293,7 +295,7 @@ describe('一斉配信の停止・再開・失敗分再送（#662）', () => {
 
     it('版が食い違えば送らない', async () => {
       seedBroadcast(testDb, 'b1', { status: 'sent', sent_at: '2026-09-11T10:00:00.000', lock_version: 4 });
-      seedClaim(testDb, 'f2', 'failed');
+      seedClaim(testDb, 'f2', 'failed', { errorCode: 'line_http_429' });
       const res = await app(testDb.db).request(
         '/api/broadcasts/b1/retry-failed',
         post({ expectedVersion: 3 }, CONFIRM_HEADERS),
@@ -308,7 +310,7 @@ describe('一斉配信の停止・再開・失敗分再送（#662）', () => {
     it('届いた・届かなかった・送達不明・送信中を分けて返す', async () => {
       seedBroadcast(testDb, 'b1');
       seedClaim(testDb, 'f1', 'sent');
-      seedClaim(testDb, 'f2', 'failed');
+      seedClaim(testDb, 'f2', 'failed', { errorCode: 'line_http_429' });
       seedClaim(testDb, 'f3', 'unknown');
 
       const res = await app(testDb.db).request('/api/broadcasts/b1/progress');
@@ -318,7 +320,10 @@ describe('一斉配信の停止・再開・失敗分再送（#662）', () => {
       };
       // 「送信成功 N人」だけだと「残りは失敗」と読めてしまい、送達不明の
       // 相手を再送してよいものと誤解させる。
-      expect(body.data.ledger).toEqual({ sent: 1, failed: 1, unknown: 1, inFlight: 0, retryableCount: 1 });
+      expect(body.data.ledger).toEqual({
+        sent: 1, failed: 1, failedTemporary: 1, failedPermanent: 0,
+        unknown: 1, inFlight: 0, retryableCount: 1,
+      });
       expect(body.data.stopped).toBe(false);
       expect(body.data.sendAttemptNo).toBe(1);
     });

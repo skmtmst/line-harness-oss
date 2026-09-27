@@ -275,7 +275,7 @@ async function openFriend(friendId: string) {
 }
 
 function textarea(): HTMLTextAreaElement | null {
-  return host.querySelector('textarea[aria-label="メッセージを入力"]')
+  return document.querySelector('textarea[aria-label="メッセージを入力"]')
 }
 
 async function typeMessage(text: string) {
@@ -296,20 +296,20 @@ async function typeDatetime(text: string) {
   const month = Number(match[2])
   const day = Number(match[3])
   const week = '日月火水木金土'[new Date(year, month - 1, day).getDay()]
-  const dialog = () => host.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')
-  const trigger = host.querySelector<HTMLElement>('#schedule-at')
+  const dialog = () => document.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')
+  const trigger = document.querySelector<HTMLElement>('#schedule-at')
   if (!trigger) throw new Error('予約日時の入力が見つからない')
   if (!dialog()) await click(trigger)
   const dateButton = dialog()?.querySelector('button[aria-label="日付"]')
   if (dateButton) await click(dateButton)
   for (let i = 0; i < 36; i += 1) {
-    const grid = host.querySelector('[role="grid"]')
+    const grid = document.querySelector('[role="grid"]')
     const label = grid?.getAttribute('aria-label')
     if (label === `${year}年${month}月`) break
     const target = year * 12 + month
     const currentLabel = /^(\d+)年(\d+)月$/.exec(label ?? '')
     const current = currentLabel ? Number(currentLabel[1]) * 12 + Number(currentLabel[2]) : target
-    const nav = [...host.querySelectorAll('button')].find(
+    const nav = [...document.querySelectorAll('button')].find(
       (b) => b.getAttribute('aria-label') === (target > current ? '次の月' : '前の月'),
     )
     if (!nav) throw new Error('暦が見つからない')
@@ -317,7 +317,7 @@ async function typeDatetime(text: string) {
   }
   // 今日の日付には「、今日」が付くので前方一致で探す。
   await click(
-    [...host.querySelectorAll('button')].find((b) =>
+    [...document.querySelectorAll('button')].find((b) =>
       (b.getAttribute('aria-label') ?? '').startsWith(`${year}年${month}月${day}日（${week}）`),
     ) ?? null,
   )
@@ -339,20 +339,20 @@ async function click(el: Element | null) {
 }
 
 function talkPaneText(): string {
-  const pane = host.querySelector('[data-inbox-v4="talk-pane"]')
+  const pane = document.querySelector('[data-inbox-v4="talk-pane"]')
   return pane?.textContent ?? ''
 }
 
 function scheduleToggleText(): string {
-  return host.querySelector('[data-inbox-v6="schedule-toggle"]')?.textContent ?? ''
+  return document.querySelector('[data-inbox-v6="schedule-toggle"]')?.textContent ?? ''
 }
 
 function scheduledRowsText(): string {
-  return [...host.querySelectorAll('[data-inbox-v6="scheduled-row"]')].map((row) => row.textContent).join('\n')
+  return [...document.querySelectorAll('[data-inbox-v6="scheduled-row"]')].map((row) => row.textContent).join('\n')
 }
 
 async function openSchedulePanel() {
-  const toggle = host.querySelector('[data-inbox-v6="schedule-toggle"]')
+  const toggle = document.querySelector('[data-inbox-v6="schedule-toggle"]')
   if (toggle?.getAttribute('aria-expanded') !== 'true') await click(toggle)
 }
 
@@ -414,7 +414,7 @@ describe('受信箱の遅延応答の対象照合(#962)と予約の冪等キー(
 
     // 0件として黙るのではなく、読み込めなかったことと再読み込み口が出る。
     expect(host.textContent).toContain('予約の一覧を読み込めませんでした。')
-    expect(host.querySelector('[data-inbox-v6="scheduled-retry"]')).not.toBeNull()
+    expect(document.querySelector('[data-inbox-v6="scheduled-retry"]')).not.toBeNull()
     expect(scheduleToggleText()).toBe('予約')
   })
 
@@ -436,7 +436,7 @@ describe('受信箱の遅延応答の対象照合(#962)と予約の冪等キー(
     expect(talkPaneText()).toContain('Aの最新')
 
     // 「前のメッセージ」を押す → Aの過去分の要求がpendingで残る。
-    const olderButton = [...host.querySelectorAll('button')].find((b) => b.textContent === '前のメッセージ')
+    const olderButton = [...document.querySelectorAll('button')].find((b) => b.textContent === '前のメッセージ')
     await click(olderButton ?? null)
     await flush()
     expect(net.calls.some((c) => c.startsWith('GET /api/chats/friend-a?') && c.includes('beforeId='))).toBe(true)
@@ -475,7 +475,7 @@ describe('受信箱の遅延応答の対象照合(#962)と予約の冪等キー(
 
     // Aへ送信を開始し、応答は保留のまま。(ダイレクト送信パネルにも
     // 「送信」ボタンがあるので、トーク画面の中に限定する)
-    const pane = host.querySelector('[data-inbox-v4="talk-pane"]')
+    const pane = document.querySelector('[data-inbox-v4="talk-pane"]')
     const sendButton = [...(pane?.querySelectorAll('button') ?? [])].find((b) => b.textContent === '送信')
     await click(sendButton ?? null)
     await flush()
@@ -540,7 +540,7 @@ describe('受信箱の遅延応答の対象照合(#962)と予約の冪等キー(
     await typeDatetime('2026-09-25T10:30')
 
     const scheduleButton = () =>
-      [...host.querySelectorAll('button')].find((b) => b.textContent === 'この日時で予約する' || b.textContent === '予約中...')
+      [...document.querySelectorAll('button')].find((b) => b.textContent === 'この日時で予約する' || b.textContent === '予約中...')
 
     // 1回目: 通信中に保留 → 失敗させる。
     await click(scheduleButton() ?? null)

@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef } from 'react'
 import { ChevronRight, Settings } from 'lucide-react'
+import MenuPortal from './menu-portal'
 import styles from './notification-panel.module.css'
 
 export type NotificationFilter = { id: string; label: string; count: number | null }
@@ -28,6 +29,8 @@ export type NotificationPanelProps = {
   onViewAll?: () => void
   onOpenSettings?: () => void
   inline?: boolean
+  /** 開くボタンの器。渡すと最上層（portal）に出す。 */
+  getAnchor?: () => HTMLElement | null
 }
 
 /** Pencil V5 `z6TmF` を正本にした通知センターの開状態。 */
@@ -45,11 +48,13 @@ export default function NotificationPanel({
   onViewAll,
   onOpenSettings,
   inline = false,
+  getAnchor,
 }: NotificationPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null)
 
+  // 最上層（portal）のときは MenuPortal が外側・Esc を見る。
   useEffect(() => {
-    if (!open || inline || !onClose) return
+    if (!open || inline || !onClose || getAnchor) return
     const closeOutside = (event: PointerEvent) => {
       if (!panelRef.current?.contains(event.target as Node)) onClose()
     }
@@ -62,13 +67,24 @@ export default function NotificationPanel({
       document.removeEventListener('pointerdown', closeOutside)
       document.removeEventListener('keydown', closeEscape)
     }
-  }, [inline, onClose, open])
+  }, [getAnchor, inline, onClose, open])
 
   if (!open) return null
   const shown = activeFilter === 'all' ? items : items.filter((item) => item.filterId === activeFilter)
+  // 参照画像の固定比較（`inline`）・基準が無いとき以外は、最上層に出す。
+  const portal = !inline && getAnchor && onClose
 
-  return (
-    <section ref={panelRef} className={`${styles.panel} ${inline ? styles.inline : ''}`} aria-label="通知" tabIndex={-1} data-design-part="notification-panel" data-design-node="z6TmF">
+  const body = (
+    <section
+      ref={panelRef}
+      className={`${styles.panel} ${inline ? styles.inline : ''}`}
+      aria-label="通知"
+      tabIndex={-1}
+      data-design-part="notification-panel"
+      data-design-node="z6TmF"
+      // 最上層では absolute 指定を無効にする（位置は器が決める）。
+      style={portal ? { position: 'static' } : undefined}
+    >
       <header className={styles.header}>
         <h2 className={styles.title}>通知</h2>
         <button type="button" className={styles.linkButton} onClick={onMarkAllRead} disabled={unreadCount === 0}>すべて既読にする</button>
@@ -85,4 +101,13 @@ export default function NotificationPanel({
       </footer>
     </section>
   )
+
+  if (portal && getAnchor && onClose) {
+    return (
+      <MenuPortal open={open} getAnchor={getAnchor} onClose={onClose}>
+        {body}
+      </MenuPortal>
+    )
+  }
+  return body
 }

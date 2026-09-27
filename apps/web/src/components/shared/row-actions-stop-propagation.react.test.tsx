@@ -41,7 +41,8 @@ describe('RowActions R13: 行の中でも行へ伝えない', () => {
     })
     const more = host.querySelector('button[aria-label="来店お礼のその他操作"]') as HTMLButtonElement
     await act(async () => { more.click() })
-    expect(host.querySelector('[role="menu"]'), 'メニューが開きません').toBeTruthy()
+    // メニューは最上層（MenuPortal→document.body）に出る。器の中にはいない。
+    expect(document.querySelector('[role="menu"]'), 'メニューが開きません').toBeTruthy()
     expect(onRow).not.toHaveBeenCalled()
   })
 
@@ -61,7 +62,8 @@ describe('RowActions R13: 行の中でも行へ伝えない', () => {
     })
     const more = host.querySelector('button[aria-label="来店お礼のその他操作"]') as HTMLButtonElement
     await act(async () => { more.click() })
-    const item = host.querySelector('[role="menuitem"]') as HTMLButtonElement
+    // メニューは最上層（MenuPortal→document.body）に出る。器の中にはいない。
+    const item = document.querySelector('[role="menuitem"]') as HTMLButtonElement
     await act(async () => { item.click() })
     expect(onSelect).toHaveBeenCalledTimes(1)
     expect(onRow).not.toHaveBeenCalled()

@@ -30,10 +30,12 @@ import {
   deleteBookingResourceSafely,
   updateBookingResourceSafely,
   replaceBookingMenuResources,
+  normalizeLiffDateView,
   type BookingExceptionKind,
   type BookingExceptionScope,
   type BookingInterval,
   type BookingPriceMode,
+  type LiffDateView,
 } from '@line-crm/db';
 import { parseBookingStaffInput, BOOKING_SETTINGS_KEY, BOOKING_STAFF_OWN_KEY, BOOKING_MENUS_KEY } from '@line-crm/shared';
 import type { Env } from '../index.js';
@@ -597,6 +599,27 @@ booking.get('/api/liff/booking/availability', async (c) => {
   return c.json(result);
 });
 
+// LIFF 予約「日時を選ぶ」段の最初の形と受付期間を返す読み口。
+// 空き枠そのものは /availability を期間指定で呼ぶ（月の分は28日ずつ）。
+// liffId で店舗が決まる既存の LIFF 口と同じ構え：不明な liffId は 404、
+// 他店舗の設定は読めない。migration 前の行は既定値（list・60日）を返す。
+booking.get('/api/liff/booking/settings', async (c) => {
+  const accountId = await resolveAccountIdFromLiff(c);
+  if (!accountId) return c.json({ error: 'unknown_liff' }, 404);
+  // SELECT * で読む。liff_date_view 列が無い migration 前の DB でも
+  // 既定値を返せるよう、列名の指定はしない。
+  const row = await c.env.DB
+    .prepare(`SELECT * FROM booking_settings WHERE line_account_id = ?`)
+    .bind(accountId)
+    .first<Record<string, unknown>>();
+  const windowDays = Number(row?.booking_window_days);
+  return c.json({
+    liff_date_view: normalizeLiffDateView(row?.liff_date_view),
+    booking_window_days:
+      Number.isInteger(windowDays) && windowDays >= 1 && windowDays <= 365 ? windowDays : 60,
+  });
+});
+
 booking.post('/api/liff/booking/requests', async (c) => {
   const accountId = await resolveAccountIdFromLiff(c);
   if (!accountId) return c.json({ error: 'unknown_liff' }, 404);
@@ -1114,6 +1137,7 @@ function readBookingAdminSettings(input: Record<string, unknown>):
       slotGranularityMinutes: 5 | 10 | 15 | 30 | 60;
       reminderDayBeforeTime: string | null;
       reminderHoursBefore: number | null;
+      liffDateView?: LiffDateView;
       businessHours?: BookingBusinessHours;
     };
   }
@@ -1140,6 +1164,13 @@ function readBookingAdminSettings(input: Record<string, unknown>):
   const reminderHoursBefore = input.reminderHoursBefore === undefined || input.reminderHoursBefore === null
     ? null
     : integerInRange(input.reminderHoursBefore, 1, 72);
+  // LIFF 予約「日時を選ぶ」段の最初の形。省いたら今の値を保つ
+  // （営業時間だけの保存で黙って戻さない）。あるのに形が違えば拒否する。
+  const liffDateView = input.liffDateView === undefined
+    ? undefined
+    : input.liffDateView === 'list' || input.liffDateView === 'calendar'
+      ? input.liffDateView
+      : 'invalid';
 
   if (expectedVersion === null) return { ok: false, error: 'expectedVersionが正しくありません' };
   if (!isValidTimeZone(timeZone)) return { ok: false, error: 'タイムゾーンが正しくありません' };
@@ -1161,6 +1192,9 @@ function readBookingAdminSettings(input: Record<string, unknown>):
   if (input.reminderHoursBefore !== undefined && input.reminderHoursBefore !== null && reminderHoursBefore === null) {
     return { ok: false, error: '当日のお知らせは1〜72時間前で指定してください' };
   }
+  if (liffDateView === 'invalid') {
+    return { ok: false, error: '日時を選ぶ画面の最初の形が正しくありません' };
+  }
   if (businessHours && !businessHours.ok) return businessHours;
   return {
     ok: true,
@@ -1176,6 +1210,7 @@ function readBookingAdminSettings(input: Record<string, unknown>):
       slotGranularityMinutes: slotGranularityMinutes as 5 | 10 | 15 | 30 | 60,
       reminderDayBeforeTime: reminderDayBeforeTime === 'invalid' ? null : reminderDayBeforeTime,
       reminderHoursBefore,
+      ...(liffDateView !== undefined ? { liffDateView } : {}),
       ...(businessHours ? { businessHours: businessHours.value } : {}),
     },
   };

@@ -22,6 +22,8 @@ import {
   createCustomerTestInstance,
   recordCustomerTestDelivery,
   recordCustomerTestAudit,
+  jstDateString,
+  nextDateString,
   type CustomerNotificationDefinitionRow,
   type CustomerNotificationVersionRow,
   type NotificationDeliveryListRow,
@@ -548,6 +550,58 @@ lineNotifications.get(
           lineAggregateOnly: true,
           unavailableIsNull: true,
         },
+      },
+    });
+  },
+);
+
+/*
+ * 顧客へのお知らせの「今日」「この30日」は、実際の送信履歴（共通送信台帳の
+ * 受け付け済み）から数える。ECの出来事の取り込み件数（`ec_events`）や、
+ * LINE集計の全期間合計（`metrics` の無期間呼び出し）は混ぜない。
+ *
+ * 期間はJSTの暦日。`accepted_at` はJST文字列で入るので頭の日付で切る。
+ * 試し送り（`execution_mode = 'test'`）はお客さまへの送信ではないので除く。
+ */
+lineNotifications.get(
+  '/api/line-notifications/send-counts',
+  requireRole('owner', 'admin', 'staff'),
+  async (c) => {
+    const lineAccountId = c.req.query('lineAccountId')?.trim();
+    if (!lineAccountId) {
+      return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    }
+    const denied = await requireAccount(c, lineAccountId);
+    if (denied) return denied;
+    const today = jstDateString(0);
+    const tomorrow = nextDateString(today);
+    const windowStart = jstDateString(-29);
+    const rows = await c.env.DB.prepare(
+      `SELECT i.source_event_type AS event_type,
+         SUM(CASE WHEN d.accepted_at >= ? AND d.accepted_at < ? THEN 1 ELSE 0 END) AS today_count,
+         SUM(CASE WHEN d.accepted_at >= ? AND d.accepted_at < ? THEN 1 ELSE 0 END) AS last_30d_count
+       FROM notification_deliveries d
+       JOIN notification_instances i ON i.id = d.instance_id
+      WHERE d.line_account_id = ?
+        AND d.audience_type = 'customer'
+        AND d.status = 'provider_accepted'
+        AND d.execution_mode != 'test'
+      GROUP BY i.source_event_type
+      ORDER BY last_30d_count DESC, event_type ASC`,
+    ).bind(today, tomorrow, windowStart, tomorrow, lineAccountId)
+      .all<{ event_type: string; today_count: number; last_30d_count: number }>();
+    const byEventType = rows.results.map((row) => ({
+      eventType: row.event_type,
+      today: Number(row.today_count ?? 0),
+      last30d: Number(row.last_30d_count ?? 0),
+    }));
+    return c.json({
+      success: true,
+      data: {
+        sentToday: byEventType.reduce((sum, item) => sum + item.today, 0),
+        sentLast30d: byEventType.reduce((sum, item) => sum + item.last30d, 0),
+        byEventType,
+        period: { today, from30d: windowStart, to: today },
       },
     });
   },

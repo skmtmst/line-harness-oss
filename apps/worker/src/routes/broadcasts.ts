@@ -15,10 +15,17 @@ import {
   reopenFailedClaims,
   getRetryableRecipientIds,
   countBroadcastLedger,
+  isTemporaryLedgerErrorCode,
+  classifyBroadcastRecipient,
+  deriveBroadcastDisplayStatus,
+  listBroadcastActivity,
+  recordBroadcastLifecycleEvent,
+  BROADCAST_DISPLAY_STATUS_LABELS,
   recordAuditEvent,
   maskAuditIp,
   auditDeviceFamily,
 } from '@line-crm/db';
+import type { BroadcastDisplayStatus } from '@line-crm/db';
 import type { Broadcast as DbBroadcast, BroadcastMessageType, BroadcastTargetType } from '@line-crm/db';
 import { LineClient } from '@line-crm/line-sdk';
 import { getSendPermissionForAccount } from '../services/send-entitlements.js';
@@ -450,6 +457,146 @@ function serializeBroadcast(row: DbBroadcast) {
   };
 }
 
+/**
+ * 一斉配信の10の状態（#816）。
+ *
+ * `status` の CHECK は変えられないので、status・承認・停止・台帳の集計から
+ * 組み立てる。二者承認（#A）の軸（承認待ち・期限切れ）と整合させる。
+ */
+export interface BroadcastStatusView {
+  displayStatus: BroadcastDisplayStatus;
+  displayStatusLabel: string;
+  ledger: {
+    sent: number;
+    failed: number;
+    failedTemporary: number;
+    failedPermanent: number;
+    unknown: number;
+    inFlight: number;
+    retryableCount: number;
+  };
+}
+
+async function failedBreakdown(db: D1Database, id: string): Promise<{ temporary: number; permanent: number }> {
+  const rows = await db
+    .prepare(
+      `SELECT error_code, COUNT(*) AS cnt FROM broadcast_send_claims
+        WHERE broadcast_id = ? AND state = 'failed' GROUP BY error_code`,
+    )
+    .bind(id)
+    .all<{ error_code: string | null; cnt: number }>();
+  let temporary = 0;
+  let permanent = 0;
+  for (const row of rows.results ?? []) {
+    if (isTemporaryLedgerErrorCode(row.error_code)) temporary += Number(row.cnt);
+    else permanent += Number(row.cnt);
+  }
+  return { temporary, permanent };
+}
+
+async function broadcastStatusView(
+  db: D1Database,
+  row: Record<string, unknown>,
+): Promise<BroadcastStatusView> {
+  const id = String(row.id);
+  const [counts, breakdown] = await Promise.all([
+    countBroadcastLedger(db, id),
+    failedBreakdown(db, id),
+  ]);
+  const ledgerRows = counts.sent + counts.failed + counts.unknown + counts.claimed;
+  const displayStatus = deriveBroadcastDisplayStatus({
+    status: String(row.status ?? 'draft'),
+    approvalStatus: (row.approval_status as string | null | undefined) ?? 'none',
+    scheduledAt: (row.scheduled_at as string | null | undefined) ?? null,
+    stopped: !!(row.stopped_at),
+    sent: counts.sent,
+    failed: counts.failed,
+    unknown: counts.unknown,
+    ledgerRows,
+  });
+  return {
+    displayStatus,
+    displayStatusLabel: BROADCAST_DISPLAY_STATUS_LABELS[displayStatus],
+    ledger: {
+      sent: counts.sent,
+      failed: counts.failed,
+      failedTemporary: breakdown.temporary,
+      failedPermanent: breakdown.permanent,
+      unknown: counts.unknown,
+      inFlight: counts.claimed,
+      retryableCount: breakdown.temporary,
+    },
+  };
+}
+
+/**
+ * 一覧ぶんの台帳集計を1〜2回の問い合わせで取る。
+ * D1 のバインド上限（100）に当てないよう50件ずつに分ける。
+ */
+async function ledgerCountsForBroadcasts(
+  db: D1Database,
+  ids: string[],
+): Promise<Map<string, { sent: number; failed: number; unknown: number; claimed: number; temp: number; perm: number }>> {
+  const map = new Map<string, { sent: number; failed: number; unknown: number; claimed: number; temp: number; perm: number }>();
+  for (const id of ids) {
+    map.set(id, { sent: 0, failed: 0, unknown: 0, claimed: 0, temp: 0, perm: 0 });
+  }
+  for (let i = 0; i < ids.length; i += 50) {
+    const chunk = ids.slice(i, i + 50);
+    const placeholders = chunk.map(() => '?').join(', ');
+    const [states, failed] = await Promise.all([
+      db.prepare(
+        `SELECT broadcast_id, state, COUNT(*) AS cnt FROM broadcast_send_claims
+          WHERE broadcast_id IN (${placeholders}) GROUP BY broadcast_id, state`,
+      ).bind(...chunk).all<{ broadcast_id: string; state: string; cnt: number }>(),
+      db.prepare(
+        `SELECT broadcast_id, error_code, COUNT(*) AS cnt FROM broadcast_send_claims
+          WHERE broadcast_id IN (${placeholders}) AND state = 'failed' GROUP BY broadcast_id, error_code`,
+      ).bind(...chunk).all<{ broadcast_id: string; error_code: string | null; cnt: number }>(),
+    ]);
+    for (const row of states.results ?? []) {
+      const entry = map.get(row.broadcast_id);
+      if (!entry) continue;
+      const count = Number(row.cnt);
+      if (row.state === 'sent') entry.sent = count;
+      else if (row.state === 'failed') entry.failed = count;
+      else if (row.state === 'unknown') entry.unknown = count;
+      else if (row.state === 'claimed') entry.claimed = count;
+    }
+    for (const row of failed.results ?? []) {
+      const entry = map.get(row.broadcast_id);
+      if (!entry) continue;
+      if (isTemporaryLedgerErrorCode(row.error_code)) entry.temp += Number(row.cnt);
+      else entry.perm += Number(row.cnt);
+    }
+  }
+  return map;
+}
+
+/**
+ * 操作の記録（#816 / migration 459）。書けなくても本処理は止めない。
+ * 止めると「止めたのに記録が無い」より「記録が無いのに止まった」になる——
+ * どちらも困るが、送信の安全を優先し、失敗は console に残す。
+ */
+async function recordLifecycle(
+  db: D1Database,
+  broadcastId: string,
+  actorStaffId: string | null | undefined,
+  action: 'created' | 'updated' | 'scheduled' | 'send_started' | 'stopped' | 'resumed' | 'retried' | 'cancelled',
+  detail?: Record<string, unknown>,
+): Promise<void> {
+  try {
+    await recordBroadcastLifecycleEvent(db, {
+      broadcastId,
+      actorStaffId: actorStaffId ?? null,
+      action,
+      detail: detail ?? null,
+    });
+  } catch (err) {
+    console.error(`[broadcast-lifecycle] ${action} record failed:`, err);
+  }
+}
+
 // GET /api/broadcasts - list all
 broadcasts.get('/api/broadcasts', async (c) => {
   try {
@@ -472,9 +619,34 @@ broadcasts.get('/api/broadcasts', async (c) => {
     const pageItems = filtered.slice(cursor, cursor + limit);
     const { getBroadcastStats } = await import('@line-crm/db');
     const stats = await getBroadcastStats(c.env.DB, lineAccountId || undefined, scope);
+    // 一覧の状態（10の状態・#816）は台帳の集計と合わせて読む。N+1にしない。
+    const ledgerMap = await ledgerCountsForBroadcasts(
+      c.env.DB,
+      pageItems.map((item) => String((item as unknown as Record<string, unknown>).id)),
+    );
+    const data = pageItems.map((item) => {
+      const raw = item as unknown as Record<string, unknown>;
+      const counts = ledgerMap.get(String(raw.id)) ?? { sent: 0, failed: 0, unknown: 0, claimed: 0, temp: 0, perm: 0 };
+      const ledgerRows = counts.sent + counts.failed + counts.unknown + counts.claimed;
+      const displayStatus = deriveBroadcastDisplayStatus({
+        status: String(raw.status ?? 'draft'),
+        approvalStatus: (raw.approval_status as string | null | undefined) ?? 'none',
+        scheduledAt: (raw.scheduled_at as string | null | undefined) ?? null,
+        stopped: !!(raw.stopped_at),
+        sent: counts.sent,
+        failed: counts.failed,
+        unknown: counts.unknown,
+        ledgerRows,
+      });
+      return {
+        ...serializeBroadcast(item),
+        displayStatus,
+        displayStatusLabel: BROADCAST_DISPLAY_STATUS_LABELS[displayStatus],
+      };
+    });
     return c.json({
       success: true,
-      data: pageItems.map(serializeBroadcast),
+      data,
       kpis: {
         scheduled: stats.scheduled,
         drafts: allItems.filter((item) => item.status === 'draft').length,
@@ -645,9 +817,168 @@ broadcasts.get('/api/broadcasts/:id', async (c) => {
       return c.json({ success: false, error: 'Broadcast not found' }, 404);
     }
 
-    return c.json({ success: true, data: serializeBroadcast(broadcast) });
+    const view = await broadcastStatusView(c.env.DB, broadcast as unknown as Record<string, unknown>);
+    return c.json({
+      success: true,
+      data: {
+        ...serializeBroadcast(broadcast),
+        displayStatus: view.displayStatus,
+        displayStatusLabel: view.displayStatusLabel,
+        ledger: view.ledger,
+      },
+    });
   } catch (err) {
     console.error('GET /api/broadcasts/:id error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// GET /api/broadcasts/:id/recipients — 宛先台帳（#816）
+//
+// 宛先ごとに結果（届いた・失敗の理由・送る前）・時刻・LINEの要求IDを返す。
+// 失敗の理由は人の言葉に直して返す（classifyBroadcastRecipient）。
+// 台帳の行が無い相手（まだ送っていない）は名前が無いので、件数だけ返す。
+// 完了済みの旧配信は台帳を捏造せず、集約だけ返す。
+const RECIPIENT_TEMPORARY_CODES = "('line_http_429', 'stopped_before_dispatch')";
+
+function recipientResultFilter(result: string): string {
+  switch (result) {
+    case 'delivered':
+      return ` AND c.state = 'sent'`;
+    case 'temporary':
+      return ` AND c.state = 'failed' AND c.error_code IN ${RECIPIENT_TEMPORARY_CODES}`;
+    case 'permanent':
+      return ` AND c.state = 'failed' AND (c.error_code NOT IN ${RECIPIENT_TEMPORARY_CODES} OR c.error_code IS NULL)`;
+    case 'unknown':
+      return ` AND c.state = 'unknown'`;
+    case 'inflight':
+      return ` AND c.state = 'claimed'`;
+    default:
+      return '';
+  }
+}
+
+broadcasts.get('/api/broadcasts/:id/recipients', async (c) => {
+  try {
+    const id = c.req.param('id');
+    const broadcast = await getBroadcastById(c.env.DB, id);
+    if (!broadcast || !await canAccessBroadcast(c.env.DB, c.get('staff'), broadcast)) {
+      return c.json({ success: false, error: 'Broadcast not found' }, 404);
+    }
+    const raw = broadcast as unknown as Record<string, unknown>;
+    const result = c.req.query('result') ?? 'all';
+    if (!['all', 'delivered', 'temporary', 'permanent', 'unknown', 'inflight'].includes(result)) {
+      return c.json({ success: false, error: 'result が正しくありません' }, 400);
+    }
+    const cursor = Math.max(0, Number.parseInt(c.req.query('cursor') ?? '0', 10) || 0);
+    const limit = Math.min(100, Math.max(1, Number.parseInt(c.req.query('limit') ?? '50', 10) || 50));
+    const filter = recipientResultFilter(result);
+
+    const totalRow = await c.env.DB.prepare(
+      `SELECT COUNT(*) AS cnt FROM broadcast_send_claims c WHERE c.broadcast_id = ?${filter}`,
+    ).bind(id).first<{ cnt: number }>();
+    const total = Number(totalRow?.cnt ?? 0);
+
+    // 全員配信は宛先の一覧を持たない。旧配信（送り終えているのに行が無い）は
+    // 集約だけを返し、宛先の行を作らない。
+    const isAll = broadcast.target_type === 'all';
+    const aggregateOnly = isAll || (broadcast.status === 'sent' && total === 0);
+    interface RecipientRow {
+      friend_id: string; line_account_id: string | null; state: string;
+      error_code: string | null; line_request_id: string | null;
+      dispatched_at: string | null; settled_at: string | null; display_name: string | null;
+    }
+    const queryResult = aggregateOnly
+      ? { results: [] as RecipientRow[] }
+      : await c.env.DB.prepare(
+        `SELECT c.friend_id, c.line_account_id, c.state, c.error_code,
+                c.line_request_id, c.dispatched_at, c.settled_at,
+                f.display_name
+           FROM broadcast_send_claims c
+           LEFT JOIN friends f ON f.id = c.friend_id
+          WHERE c.broadcast_id = ?${filter}
+          ORDER BY COALESCE(f.display_name, ''), c.friend_id
+          LIMIT ? OFFSET ?`,
+      ).bind(id, limit + 1, cursor).all<RecipientRow>();
+    const allRows = queryResult.results ?? [];
+    const page = allRows.slice(0, limit);
+    const [counts, breakdown] = await Promise.all([
+      countBroadcastLedger(c.env.DB, id),
+      failedBreakdown(c.env.DB, id),
+    ]);
+    const ledgerRows = counts.sent + counts.failed + counts.unknown + counts.claimed;
+    const totalCount = raw.total_count as number | null | undefined;
+    const summary = {
+      sent: counts.sent,
+      failedTemporary: breakdown.temporary,
+      failedPermanent: breakdown.permanent,
+      unknown: counts.unknown,
+      inFlight: counts.claimed,
+      pending: totalCount == null ? null : Math.max(0, Number(totalCount) - ledgerRows),
+      total: totalCount == null ? ledgerRows : Number(totalCount),
+      retryableCount: breakdown.temporary,
+    };
+    return c.json({
+      success: true,
+      data: {
+        rows: page.map((row) => {
+          const view = classifyBroadcastRecipient(row.state, row.error_code);
+          return {
+            friendId: row.friend_id,
+            displayName: row.display_name || '名前がありません',
+            lineAccountId: row.line_account_id,
+            group: view.group,
+            label: view.label,
+            detail: view.detail,
+            retryable: view.retryable,
+            lineRequestId: row.line_request_id,
+            errorCode: row.error_code,
+            dispatchedAt: row.dispatched_at,
+            settledAt: row.settled_at,
+          };
+        }),
+        summary,
+        aggregateOnly,
+        aggregateReason: aggregateOnly ? (isAll ? 'all' : 'legacy') : null,
+        // 旧配信は集約（成功数）だけ分かっているので返す。捏造はしない。
+        legacySuccessCount: aggregateOnly && !isAll
+          ? Number(raw.success_count ?? 0)
+          : null,
+      },
+      pagination: {
+        total,
+        limit,
+        cursor,
+        nextCursor: allRows.length > limit ? String(cursor + limit) : null,
+      },
+    });
+  } catch (err) {
+    console.error('GET /api/broadcasts/:id/recipients error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// GET /api/broadcasts/:id/activity — 操作の記録（#816）
+//
+// 作成・編集・予約・送信・停止・再送と、承認の依頼・承認・差し戻しを
+// 時刻順（新しい順）に混ぜて返す。記録は消せない（追記だけ）。
+broadcasts.get('/api/broadcasts/:id/activity', async (c) => {
+  try {
+    const id = c.req.param('id');
+    const broadcast = await getBroadcastById(c.env.DB, id);
+    if (!broadcast || !await canAccessBroadcast(c.env.DB, c.get('staff'), broadcast)) {
+      return c.json({ success: false, error: 'Broadcast not found' }, 404);
+    }
+    const cursor = Math.max(0, Number.parseInt(c.req.query('cursor') ?? '0', 10) || 0);
+    const limit = Math.min(100, Math.max(1, Number.parseInt(c.req.query('limit') ?? '50', 10) || 50));
+    const { entries, nextCursor } = await listBroadcastActivity(c.env.DB, id, { limit, cursor });
+    return c.json({
+      success: true,
+      data: entries,
+      pagination: { limit, cursor, nextCursor },
+    });
+  } catch (err) {
+    console.error('GET /api/broadcasts/:id/activity error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1181,6 +1512,7 @@ broadcasts.post('/api/broadcasts', async (c) => {
       return c.json({ success: true, data: serializeBroadcast(existing) }, 200);
     }
 
+    await recordLifecycle(c.env.DB, broadcast.id, c.get('staff')?.id, 'created');
     return c.json({ success: true, data: serializeBroadcast(broadcast) }, 201);
   } catch (err) {
     console.error('POST /api/broadcasts error:', err);
@@ -1510,6 +1842,9 @@ broadcasts.put('/api/broadcasts/:id', async (c) => {
       `DELETE FROM broadcast_insights WHERE broadcast_id = ?`,
     ).bind(id).run();
 
+    await recordLifecycle(
+      c.env.DB, id, c.get('staff')?.id, makesNewReservation ? 'scheduled' : 'updated',
+    );
     return c.json({ success: true, data: updated ? serializeBroadcast(updated) : null });
   } catch (err) {
     console.error('PUT /api/broadcasts/:id error:', err);
@@ -1546,6 +1881,7 @@ broadcasts.post('/api/broadcasts/:id/cancel', requirePermission(BROADCAST_DEFINI
     if (!updated) {
       return c.json({ success: false, error: 'Broadcast not found after cancellation' }, 500);
     }
+    await recordLifecycle(c.env.DB, id, c.get('staff')?.id, 'cancelled');
     return c.json({ success: true, data: serializeBroadcast(updated) });
   } catch (err) {
     console.error('POST /api/broadcasts/:id/cancel error:', err);
@@ -1646,13 +1982,19 @@ async function recordBroadcastControlAudit(
 
 /** 台帳の数え上げと再送対象数。画面と応答で同じ数を使う。 */
 async function broadcastLedgerSummary(db: D1Database, id: string) {
-  const counts = await countBroadcastLedger(db, id);
+  const [counts, breakdown] = await Promise.all([
+    countBroadcastLedger(db, id),
+    failedBreakdown(db, id),
+  ]);
   return {
     sent: counts.sent,
     failed: counts.failed,
+    failedTemporary: breakdown.temporary,
+    failedPermanent: breakdown.permanent,
     unknown: counts.unknown,
     inFlight: counts.claimed,
-    retryableCount: counts.failed,
+    // 再送できるのは一時的な失敗だけ（#816）。
+    retryableCount: breakdown.temporary,
   };
 }
 
@@ -1755,6 +2097,10 @@ broadcasts.post('/api/broadcasts/:id/stop', requirePermission(BROADCAST_JOB_STOP
       releasedForRetry: closed.failed,
       sent: ledger.sent,
     });
+    await recordLifecycle(c.env.DB, id, c.get('staff')?.id, 'stopped', {
+      undeliveredUnknown: closed.unknown,
+      sent: ledger.sent,
+    });
     return c.json({
       success: true,
       data: { ...serializeBroadcast(updated ?? existing), ledger },
@@ -1809,6 +2155,7 @@ broadcasts.post('/api/broadcasts/:id/resume', requirePermission(BROADCAST_JOB_ST
     const updated = await getBroadcastById(c.env.DB, id);
     const ledger = await broadcastLedgerSummary(c.env.DB, id);
     await recordBroadcastControlAudit(c, 'broadcast.resume', existing, { sent: ledger.sent });
+    await recordLifecycle(c.env.DB, id, c.get('staff')?.id, 'resumed');
     kickQueueProcessing(c, 'resume');
     return c.json({ success: true, data: { ...serializeBroadcast(updated ?? existing), ledger } });
   } catch (err) {
@@ -1849,11 +2196,13 @@ broadcasts.post(
         }, 409);
       }
 
+      // 再送できるのは一時的な失敗だけ（#816）。恒常的な失敗（ブロックなど）は
+      // 送り直しても通らないので対象にしない。
       const retryable = await getRetryableRecipientIds(c.env.DB, id);
       if (retryable.length === 0) {
         return c.json({
           success: false,
-          error: '再送できる相手がいません。送達不明の相手は、二重に届くのを避けるため再送しません。',
+          error: '再送できる相手がいません。一時的な失敗だけを送り直します（送達不明・届けられなかった相手は送りません）。',
           code: 'NO_RETRY_TARGET',
         }, 409);
       }
@@ -1890,6 +2239,10 @@ broadcasts.post(
         attemptNo: attempt.attemptNo,
         retryTargets: reopened,
         skippedUnknown: ledger.unknown,
+      });
+      await recordLifecycle(c.env.DB, id, c.get('staff')?.id, 'retried', {
+        attemptNo: attempt.attemptNo,
+        retryTargets: reopened,
       });
       kickQueueProcessing(c, 'retry-failed');
       return c.json({
@@ -2331,6 +2684,7 @@ broadcasts.post('/api/broadcasts/:id/send', requireIrreversibleConfirmation('bro
     if (!claimedStatus) {
       return c.json({ success: false, error: 'Broadcast is already sent or sending' }, 409);
     }
+    await recordLifecycle(c.env.DB, id, c.get('staff')?.id, 'send_started', { fromStatus: claimedStatus });
 
     // processBroadcastSend は内部の try/catch で multicast 失敗を 'draft' に戻すが、
     // 冒頭 (updateBroadcastStatus / getBroadcastById / autoTrackContent / buildMessage) で
@@ -2957,11 +3311,27 @@ broadcasts.get('/api/broadcasts/:id/progress', async (c) => {
    * `successCount` だけだと「残りは失敗」と読めてしまい、送達不明の相手を
    * 再送してよいものと誤解させる。
    */
-  const ledger = await countBroadcastLedger(c.env.DB, id);
+  const [ledger, breakdown] = await Promise.all([
+    countBroadcastLedger(c.env.DB, id),
+    failedBreakdown(c.env.DB, id),
+  ]);
+  const ledgerRows = ledger.sent + ledger.failed + ledger.unknown + ledger.claimed;
+  const displayStatus = deriveBroadcastDisplayStatus({
+    status: broadcast.status,
+    approvalStatus: (raw.approval_status as string | null | undefined) ?? 'none',
+    scheduledAt: broadcast.scheduled_at ?? null,
+    stopped: !!(raw.stopped_at),
+    sent: ledger.sent,
+    failed: ledger.failed,
+    unknown: ledger.unknown,
+    ledgerRows,
+  });
   return c.json({
     success: true,
     data: {
       status: broadcast.status,
+      displayStatus,
+      displayStatusLabel: BROADCAST_DISPLAY_STATUS_LABELS[displayStatus],
       stopped: !!raw.stopped_at,
       stoppedAt: (raw.stopped_at as string | null | undefined) ?? null,
       sendAttemptNo: Number(raw.send_attempt_no ?? 1),
@@ -2971,9 +3341,11 @@ broadcasts.get('/api/broadcasts/:id/progress', async (c) => {
       ledger: {
         sent: ledger.sent,
         failed: ledger.failed,
+        failedTemporary: breakdown.temporary,
+        failedPermanent: breakdown.permanent,
         unknown: ledger.unknown,
         inFlight: ledger.claimed,
-        retryableCount: ledger.failed,
+        retryableCount: breakdown.temporary,
       },
       perAccountStats,
     },

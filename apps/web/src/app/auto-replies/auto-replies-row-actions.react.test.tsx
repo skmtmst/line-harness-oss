@@ -116,7 +116,8 @@ describe('自動応答一覧の行操作', () => {
     const more = host.querySelector('button[aria-label="自動応答「旧キーワードルール」のその他操作"]') as HTMLButtonElement
     expect(more, 'その他ボタンが見つかりません').toBeTruthy()
     act(() => { more.click() })
-    const menu = host.querySelector('[role="menu"]')
+    // メニューは最上層（MenuPortal→document.body）に出る。器の中にはいない。
+    const menu = document.querySelector('[role="menu"]')
     expect(menu, 'メニューが開きません').toBeTruthy()
     expect(menu!.textContent).toContain('停止する')
     expect(menu!.textContent).toContain('削除する')
@@ -132,7 +133,8 @@ describe('自動応答一覧の行操作', () => {
     const more = host.querySelector('button[aria-label="自動応答「旧キーワードルール」のその他操作"]') as HTMLButtonElement
     expect(more, '下書き行にもその他ボタンがある').toBeTruthy()
     act(() => { more.click() })
-    const menu = host.querySelector('[role="menu"]')
+    // メニューは最上層（MenuPortal→document.body）に出る。器の中にはいない。
+    const menu = document.querySelector('[role="menu"]')
     expect(menu, 'メニューが開きません').toBeTruthy()
     expect(menu!.textContent).toContain('削除する')
     expect(menu!.textContent).not.toContain('停止する')
