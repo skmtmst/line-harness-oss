@@ -2907,6 +2907,46 @@ export type MileageAdjustmentResult = {
     errorCode: string | null
   } | null
 }
+
+/*
+ * R: 高額調整の承認依頼。境界以上の調整は実行せず依頼票として残り、
+ * 依頼した人とは別のオーナーが承認した時点で台帳へ記録される。
+ */
+export type MileageAdjustmentApprovalRequest = {
+  id: string
+  line_account_id: string
+  friend_id: string
+  friend_display_name?: string | null
+  direction: 'increase' | 'decrease'
+  amount: number
+  reason_category: string
+  reason: string
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled'
+  requested_by_staff_id: string
+  requested_by_staff_name: string
+  decided_by_staff_name: string | null
+  decided_at: string | null
+  decision_reason: string | null
+  created_at: string
+}
+
+/** 境界以上の調整を頼んだときの返事。台帳にはまだ書かれていない。 */
+export type MileageAdjustmentApprovalResult = {
+  approvalRequired: true
+  approvalThreshold: number
+  request: MileageAdjustmentApprovalRequest
+}
+
+/** 決めごとの事前テスト（実際には付与しない） */
+export type MileageEarningRuleTestResult = {
+  matchedEvents: number
+  matchedFriends: number
+  estimatedTotalMiles: number
+  maxPerFriend: number
+  overlappingRuleNames: string[]
+  initialStatus: 'available' | 'pending'
+  expirationExampleAt: string | null
+}
 /*
  * マイルの使い道（`/api/mileage/rewards`）。#772 で口が入った。
  *
@@ -11265,7 +11305,7 @@ export const api = {
       sourceReferenceId?: string
       expiresAt?: string
       notifyFriend?: boolean
-    }, idempotencyKey: string) => fetchApi<ApiResponse<MileageAdjustmentResult>>('/api/mileage/adjustments', {
+    }, idempotencyKey: string) => fetchApi<ApiResponse<MileageAdjustmentResult | MileageAdjustmentApprovalResult>>('/api/mileage/adjustments', {
       method: 'POST',
       headers: {
         'Idempotency-Key': idempotencyKey,
@@ -11273,6 +11313,44 @@ export const api = {
       },
       body: JSON.stringify(data),
     }),
+    adjustmentApprovals: (accountId: string, status?: 'pending' | 'approved' | 'rejected' | 'cancelled') =>
+      fetchApi<ApiResponse<MileageAdjustmentApprovalRequest[]>>(
+        `/api/mileage/adjustment-approvals?accountId=${encodeURIComponent(accountId)}${status ? `&status=${status}` : ''}`,
+      ),
+    approveAdjustment: (requestId: string, accountId: string) =>
+      fetchApi<ApiResponse<{ request: MileageAdjustmentApprovalRequest; entryId: string }>>(
+        `/api/mileage/adjustment-approvals/${encodeURIComponent(requestId)}/approve`,
+        { method: 'POST', body: JSON.stringify({ accountId }) },
+      ),
+    rejectAdjustment: (requestId: string, accountId: string, reason?: string) =>
+      fetchApi<ApiResponse<{ request: MileageAdjustmentApprovalRequest }>>(
+        `/api/mileage/adjustment-approvals/${encodeURIComponent(requestId)}/reject`,
+        { method: 'POST', body: JSON.stringify({ accountId, reason }) },
+      ),
+    cancelAdjustment: (requestId: string, accountId: string) =>
+      fetchApi<ApiResponse<{ request: MileageAdjustmentApprovalRequest }>>(
+        `/api/mileage/adjustment-approvals/${encodeURIComponent(requestId)}/cancel`,
+        { method: 'POST', body: JSON.stringify({ accountId }) },
+      ),
+    confirmMileageEntry: (entryId: string, data: { accountId: string; reason: string }) =>
+      fetchApi<ApiResponse<{ entry: unknown; alreadyConfirmed: boolean }>>(
+        `/api/mileage/entries/${encodeURIComponent(entryId)}/confirm`,
+        { method: 'POST', body: JSON.stringify(data) },
+      ),
+    voidMileageEntry: (entryId: string, data: { accountId: string; reason: string }) =>
+      fetchApi<ApiResponse<{ entry: unknown; reversalEntryId: string }>>(
+        `/api/mileage/entries/${encodeURIComponent(entryId)}/void`,
+        {
+          method: 'POST',
+          headers: { 'X-Confirm-Irreversible': 'mileage-entry-void' },
+          body: JSON.stringify(data),
+        },
+      ),
+    testEarningRule: (accountId: string, draft: unknown) =>
+      fetchApi<ApiResponse<MileageEarningRuleTestResult>>('/api/mileage/earning-rules/test', {
+        method: 'POST',
+        body: JSON.stringify({ accountId, draft }),
+      }),
     rules: () => fetchApi<ApiResponse<MileageRule[]>>('/api/mileage/rules'),
     createRule: (data: {
       name: string

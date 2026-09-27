@@ -36,6 +36,9 @@ import {
 } from '../../mileage-display'
 import { mileageConnectedAccounts, mileageRewardedActions } from '../../mileage-response-state'
 import MileageAdjustmentDialog from './mileage-adjustment-dialog'
+import Dialog from '@/components/shared/dialog'
+import Notice from '@/components/shared/notice'
+import { Field, TextArea } from '@/components/shared/form-controls'
 
 type MileageDetail = {
   summary: MileageSummary
@@ -61,6 +64,11 @@ function FriendMileageInner() {
   const [canAdjust, setCanAdjust] = useState(false)
   const [canConfigureAdjustmentPolicy, setCanConfigureAdjustmentPolicy] = useState(false)
   const [adjustmentOpen, setAdjustmentOpen] = useState(false)
+  /** R: 確定待ちの確定・取消。理由を必須で集めてから実行する。 */
+  const [pendingAction, setPendingAction] = useState<{ entryId: string; kind: 'confirm' | 'void'; label: string } | null>(null)
+  const [pendingReason, setPendingReason] = useState('')
+  const [pendingBusy, setPendingBusy] = useState(false)
+  const [pendingError, setPendingError] = useState('')
   usePageTitle(friend?.displayName ? `${friend.displayName}のマイル明細` : null)
 
   const load = useCallback(async () => {
@@ -135,6 +143,30 @@ function FriendMileageInner() {
   useEffect(() => {
     if (openAdjustment && canAdjust && friend && mileage) setAdjustmentOpen(true)
   }, [canAdjust, friend, mileage, openAdjustment])
+
+  const runPendingAction = async () => {
+    if (!pendingAction || !selectedAccountId) return
+    const reason = pendingReason.trim()
+    if (!reason) {
+      setPendingError('理由を入力してください')
+      return
+    }
+    setPendingBusy(true)
+    setPendingError('')
+    try {
+      const response = pendingAction.kind === 'confirm'
+        ? await api.mileage.confirmMileageEntry(pendingAction.entryId, { accountId: selectedAccountId, reason })
+        : await api.mileage.voidMileageEntry(pendingAction.entryId, { accountId: selectedAccountId, reason })
+      if (!response.success) throw new ApiError(500, response.error || '失敗しました')
+      setPendingAction(null)
+      setPendingReason('')
+      await load()
+    } catch (caught) {
+      setPendingError(caught instanceof ApiError ? caught.message : '処理できませんでした。もう一度お試しください。')
+    } finally {
+      setPendingBusy(false)
+    }
+  }
 
   if (accountLoading || loading) {
     return <div data-design-node="HIU5O"><ListState kind="loading" title="マイル明細を読み込んでいます" /></div>
@@ -298,7 +330,7 @@ function FriendMileageInner() {
           <ListState kind="empty" title="マイルの履歴はありません" description="付与や使用が記録されると、ここに理由と日時が表示されます。" />
         ) : (
           <DataTable>
-            <thead><tr><Th>発生日時</Th><Th>種類・状態</Th><Th align="right">増減</Th><Th align="right">変更後残高</Th><Th>理由</Th><Th>発生元</Th><Th>ルール・実行者</Th></tr></thead>
+            <thead><tr><Th>発生日時</Th><Th>種類・状態</Th><Th align="right">増減</Th><Th align="right">変更後残高</Th><Th>理由</Th><Th>発生元</Th><Th>ルール・実行者</Th>{canAdjust ? <Th align="right">操作</Th> : null}</tr></thead>
             <tbody>
               {displayedHistory.map((item) => (
                 <Tr key={item.id}>
@@ -314,6 +346,30 @@ function FriendMileageInner() {
                     </p>
                   </Td>
                   <Td><p>{item.ruleName ?? '—'}</p><p className="mt-1 text-xs text-ink-faint">{item.mode === 'manual' ? item.executedByStaffName ?? '実行者は未取得' : '自動処理'}</p></Td>
+                  {canAdjust ? (
+                    <Td align="right">
+                      {item.status === 'pending' ? (
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="secondary"
+                            onClick={() => {
+                              setPendingAction({ entryId: item.id, kind: 'confirm', label: item.reason })
+                              setPendingReason('')
+                              setPendingError('')
+                            }}
+                          >確定する</Button>
+                          <Button
+                            variant="secondary"
+                            onClick={() => {
+                              setPendingAction({ entryId: item.id, kind: 'void', label: item.reason })
+                              setPendingReason('')
+                              setPendingError('')
+                            }}
+                          >取消す</Button>
+                        </div>
+                      ) : null}
+                    </Td>
+                  ) : null}
                 </Tr>
               ))}
             </tbody>
@@ -330,6 +386,36 @@ function FriendMileageInner() {
         onCompleted={load}
         canConfigurePolicy={canConfigureAdjustmentPolicy}
       />
+      <Dialog
+        open={pendingAction !== null}
+        title={pendingAction?.kind === 'void' ? 'この記録を取り消します' : '確定待ちを確定します'}
+        description={pendingAction?.kind === 'void'
+          ? '元の記録は消さず、逆向きの記録を追加して残高を戻します。'
+          : '確定すると利用可能な残高へ移ります。'}
+        tone={pendingAction?.kind === 'void' ? 'destructive' : 'default'}
+        busy={pendingBusy}
+        error={pendingError}
+        confirmLabel={pendingAction?.kind === 'void' ? 'この理由で取消す' : 'この理由で確定する'}
+        cancelLabel="やめる"
+        onConfirm={() => void runPendingAction()}
+        onCancel={() => { if (!pendingBusy) { setPendingAction(null); setPendingReason(''); setPendingError('') } }}
+      >
+        <div className="space-y-4">
+          <div className="rounded-control bg-canvas-sunken p-3">
+            <p className="text-xs font-semibold text-ink-faint">対象の記録</p>
+            <p className="mt-1 text-sm font-semibold text-ink">{pendingAction?.label}</p>
+          </div>
+          <Field label="理由" htmlFor="mileage-pending-reason" required>
+            <TextArea
+              id="mileage-pending-reason"
+              rows={3}
+              value={pendingReason}
+              onChange={(event) => setPendingReason(event.target.value)}
+            />
+          </Field>
+          <Notice tone="info">理由は履歴に残り、あとから実行者と一緒に確認できます。</Notice>
+        </div>
+      </Dialog>
     </div>
   )
 }
