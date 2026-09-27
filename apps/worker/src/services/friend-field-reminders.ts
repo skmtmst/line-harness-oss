@@ -6,6 +6,8 @@ import {
 } from '@line-crm/db';
 import { nextAnniversary, isSameJstDay, toJstParts } from '@line-crm/shared';
 import { featureJobCanRun } from './feature-enforcement.js';
+import { getReminderTargetCondition } from './reminder-trigger.js';
+import { matchesCondition } from './segment-query.js';
 
 /**
  * 友だち情報欄の日付を見て、リマインダのゴール日を立てる。
@@ -64,6 +66,9 @@ export async function processFriendFieldReminders(
       scanned += friends.length;
       remaining -= friends.length;
       const candidates: Array<{ friendId: string; targetDate: string }> = [];
+      // 公開版の対象条件はこのリマインダで1回だけ読む。友だちごとに
+      // 読み直すと、走査のたびに同じ行を何千回も読むことになる。
+      const targetCondition = await getReminderTargetCondition(db, reminder.id);
 
       for (const friend of friends) {
         // 毎年くり返すなら「次に来るその日」、くり返さないなら「その日が今日か」。
@@ -76,6 +81,20 @@ export async function processFriendFieldReminders(
         if (!targetDate) {
           skipped++;
           continue;
+        }
+        // 条件に外れる友だちは登録しない。判定で転んでも走査は止めず、
+        // その1人だけ飛ばす。カーソルは進めるので、後続は止まらない。
+        if (targetCondition) {
+          let matched = false;
+          try {
+            matched = await matchesCondition(db, friend.friend_id, targetCondition);
+          } catch (err) {
+            console.error(`[friendFieldReminders] target condition failed for reminder ${reminder.id}`, err);
+          }
+          if (!matched) {
+            skipped++;
+            continue;
+          }
         }
 
         // ゴール日は日本時間の 0:00 として持つ。何時にするかは通ごとの設定で決まる。

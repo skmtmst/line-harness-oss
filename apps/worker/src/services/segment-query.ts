@@ -603,6 +603,20 @@ function buildRuleClause(rule: SegmentRule): { sql: string; bindings: unknown[] 
  * 条件が1つも無いときは 1=1 を返す。ここで 1=0 にしてしまうと、
  * 「絞り込みなし＝全員」の意味が反転して誰にも届かなくなる。
  */
+/**
+ * 条件が実質空か。空なら「絞り込みなし」と同じ扱いにする。
+ *
+ * 空の条件を持たせたまま数えると、画面は絞り込んでいるように見えて
+ * 全員が対象になる。保存時もここで空を落とす。
+ */
+export function isEmptySegmentCondition(
+  condition: SegmentCondition | null | undefined,
+): boolean {
+  if (!condition) return true;
+  if ((condition.rules?.length ?? 0) > 0) return false;
+  return !(condition.groups ?? []).some((group) => !isEmptySegmentCondition(group));
+}
+
 export function buildSegmentWhere(condition: SegmentCondition): { sql: string; bindings: unknown[] } {
   const bindings: unknown[] = []
   const clauses: string[] = []
