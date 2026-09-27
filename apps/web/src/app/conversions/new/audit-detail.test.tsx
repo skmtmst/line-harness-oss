@@ -201,14 +201,41 @@ describe('R40/R41 数えない条件と起点の説明', () => {
 })
 
 describe('起点に合わない金額の出し方は選べない', () => {
-  function valueSelect(): HTMLSelectElement {
-    const select = host.querySelector('#cv-value-mode')
-    expect(select).not.toBeNull()
-    return select as HTMLSelectElement
+  // 共通 Select は button＋listbox（MenuPortalでbodyへ出す）。素<select>ではない。
+  const LABEL_TO_VALUE: Record<string, string> = {
+    '注文の金額をそのまま使う': 'source',
+    '決まった額を使う': 'fixed',
+    '金額を集計しない': 'none',
   }
-
-  function optionValues(): string[] {
-    return [...valueSelect().querySelectorAll('option')].map((option) => option.value)
+  function valueButton(): HTMLButtonElement {
+    const button = host.querySelector('#cv-value-mode')
+    expect(button?.tagName).toBe('BUTTON')
+    return button as HTMLButtonElement
+  }
+  function valueOf(): string {
+    const text = valueButton().textContent ?? ''
+    for (const [label, value] of Object.entries(LABEL_TO_VALUE)) {
+      if (text.includes(label)) return value
+    }
+    return ''
+  }
+  async function optionValues(): Promise<string[]> {
+    await act(async () => {
+      fireEvent.click(valueButton())
+    })
+    const listbox = document.body.querySelector('[role="listbox"]')
+    expect(listbox).not.toBeNull()
+    const labels = [...listbox!.querySelectorAll('[role="option"]')].map((option) => option.textContent ?? '')
+    const values = labels.map((text) => {
+      for (const [label, value] of Object.entries(LABEL_TO_VALUE)) {
+        if (text.includes(label)) return value
+      }
+      return text
+    })
+    await act(async () => {
+      fireEvent.keyDown(valueButton(), { key: 'Escape' })
+    })
+    return values
   }
 
   function clickTrigger(value: string) {
@@ -222,35 +249,35 @@ describe('起点に合わない金額の出し方は選べない', () => {
   it('タグ起点に切り替えると注文の金額から既定へ戻り、知らせる', async () => {
     await render()
     // 初期は注文起点なので注文の金額が選ばれている。
-    expect(valueSelect().value).toBe('source')
-    expect(optionValues()).toContain('source')
+    expect(valueOf()).toBe('source')
+    expect(await optionValues()).toContain('source')
     await clickTrigger('tag')
     // 注文の金額は選べなくなり、既定(金額を集計しない)へ戻る。
-    expect(valueSelect().value).toBe('none')
-    expect(optionValues()).not.toContain('source')
-    expect(optionValues()).toEqual(expect.arrayContaining(['fixed', 'none']))
+    expect(valueOf()).toBe('none')
+    expect(await optionValues()).not.toContain('source')
+    expect(await optionValues()).toEqual(expect.arrayContaining(['fixed', 'none']))
     // 戻したことを知らせる。消さずに残すと次の撮影で気づける。
-    const notice = host.querySelector('#cv-value-mode')?.parentElement?.querySelector('[role="status"]')
-    expect(notice?.textContent).toContain('金額の出し方を')
-    expect(notice?.textContent).toContain('戻しました')
+    const notices = [...host.querySelectorAll('[role="status"]')].map((el) => el.textContent ?? '')
+    expect(notices.join('\n')).toContain('金額の出し方を')
+    expect(notices.join('\n')).toContain('戻しました')
   })
 
   it('注文起点に戻すと注文の金額がまた選べる', async () => {
     await render()
     await clickTrigger('tag')
-    expect(valueSelect().value).toBe('none')
+    expect(valueOf()).toBe('none')
     await clickTrigger('order')
     // 注文起点では注文の金額が復活する。今の選択(金額なし)は有効なので変えない。
-    expect(optionValues()).toContain('source')
-    expect(valueSelect().value).toBe('none')
+    expect(await optionValues()).toContain('source')
+    expect(valueOf()).toBe('none')
   })
 
   it('フォーム・予約・ページ・動画の起点でも注文の金額は出ない', async () => {
     await render()
     for (const trigger of ['form', 'booking', 'page', 'video']) {
       await clickTrigger(trigger)
-      expect(optionValues()).not.toContain('source')
-      expect(['fixed', 'none']).toContain(valueSelect().value)
+      expect(await optionValues()).not.toContain('source')
+      expect(['fixed', 'none']).toContain(valueOf())
     }
   })
 })

@@ -1,6 +1,6 @@
 'use client'
 
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import ListToolbar from '@/components/shared/list-toolbar'
 import { MoreAction } from '@/components/shared/row-actions'
@@ -838,7 +838,7 @@ export default function TemplatesPage() {
             </div>
             <div>
               <label className="block text-xs font-medium text-ink-secondary mb-1">タイプ</label>
-              <SelectField value={form.messageType} onChange={(e) => setForm({ ...form, messageType: e.target.value })} options={[{ value: "text", label: "テキスト" }, { value: "flex", label: "カード型" }, { value: "image", label: "画像" }]} className="w-full border border-hairline rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-canvas" />
+              <Select aria-label="タイプ" value={form.messageType} onChange={(value) => setForm({ ...form, messageType: value })} options={[{ value: "text", label: "テキスト" }, { value: "flex", label: "カード型" }, { value: "image", label: "画像" }]} size="full" />
             </div>
             <div>
               <label className="block text-xs font-medium text-ink-secondary mb-1">内容 / JSON <span className="text-red-500">*</span></label>
@@ -1139,14 +1139,14 @@ export default function TemplatesPage() {
                       <label className="mb-1.5 block text-[11px] font-medium text-ink-faint" htmlFor="template-folder-select">
                         置き場
                       </label>
-                      <SelectField
+                      <Select
                         id="template-folder-select"
                         aria-label="置き場"
                         value={drawerData.folderId ?? ''}
                         disabled={movingId === drawerData.id}
-                        onChange={(event) => void moveTemplate(
+                        onChange={(value) => void moveTemplate(
                           drawerData,
-                          event.target.value === '' ? null : event.target.value,
+                          value === '' ? null : value,
                         )}
                         options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]}
                       />

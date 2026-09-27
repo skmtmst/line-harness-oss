@@ -11,7 +11,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import HelpTip from '@/components/shared/help-tip'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import { RowActions } from '@/components/shared/row-actions'
 import { DataTable, Td, Th, TableHeadRow, Tr } from '@/components/shared/table'
 import { TextField, TextArea } from '@/components/shared/text-field'
@@ -216,10 +216,10 @@ export default function FileScanSettingsPage() {
         </h2>
         <Chip tone="warn">{`${total}件`}</Chip>
         <span className="ml-auto">
-          <SelectField
+          <Select
             aria-label="検査の状態"
             value={statusFilter}
-            onChange={(event) => setStatusFilter(event.target.value)}
+            onChange={(value) => setStatusFilter(value)}
             options={[
               { value: 'quarantined', label: '状態：しまったもの' },
               { value: 'pending', label: '状態：確かめています' },

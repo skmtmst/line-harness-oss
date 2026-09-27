@@ -44,7 +44,7 @@ import {
   refreshStoredFeeding,
 } from '../services/nen-feeding.js';
 import { attachTagAndFireSideEffects } from '../services/friend-tag-attach.js';
-import { APPETITE_LABELS, STOOL_LABELS, thirtyDaySummary, type HealthLogRow } from '../services/nen-health-admin.js';
+import { APPETITE_LABELS, STOOL_LABELS, isCareStoolStatus, thirtyDaySummary, type HealthLogRow } from '../services/nen-health-admin.js';
 import {
   attemptPhotoRewardForPhoto,
   ecPhotoPointClientFromEnv,
@@ -986,10 +986,39 @@ nenMembers.post('/api/liff/nen/health-logs', async (c) => {
        appetite=excluded.appetite, skin_status=excluded.skin_status, tear_stain_status=excluded.tear_stain_status, note=excluded.note`,
   ).bind(id, body!.petId, friend.id, loggedOn, weightKg, heartRateBpm, respiratoryRateBpm, stool, appetite, skin, tear, String(body?.note || '').slice(0, 500), jstNow()).run();
 
+  // 監査 R59: 日記につけた体重が「今日の目安」に反映されない穴を塞ぐ。
+  // この記録が体重を持つ記録の中でいちばん新しい日付なら、プロフィールの体重を
+  // その値に揃えて給餌目安も計算し直す（過去日の記録で今の体重を戻さない）。
+  if (weightKg != null) {
+    const newestWeightLog = await c.env.DB.prepare(
+      `SELECT MAX(logged_on) AS d FROM nen_health_logs WHERE pet_id = ? AND weight_kg IS NOT NULL`,
+    ).bind(body!.petId).first<{ d: string | null }>();
+    if (newestWeightLog?.d && loggedOn >= newestWeightLog.d) {
+      const [current, catalog] = await Promise.all([
+        c.env.DB.prepare(
+          `SELECT animal_type, birthday, neutered, activity_level, feeding_product_id FROM nen_pet_profiles WHERE id = ?`,
+        ).bind(body!.petId).first<Record<string, unknown>>(),
+        accountFeedingProducts(c, friend),
+      ]);
+      const now = jstNow();
+      await c.env.DB.prepare(`UPDATE nen_pet_profiles SET weight_kg = ?, updated_at = ? WHERE id = ?`).bind(weightKg, now, body!.petId).run();
+      if (current) {
+        const plan = planForPetRow({
+          id: String(body!.petId), animal_type: String(current.animal_type), weight_kg: weightKg,
+          birthday: (current.birthday as string | null) ?? null,
+          neutered: current.neutered as number | null,
+          activity_level: (current.activity_level as string | null) ?? null,
+          feeding_product_id: (current.feeding_product_id as string | null) ?? null,
+        }, catalog.products, new Date(), catalog.treatLimitPercent);
+        await refreshStoredFeeding(c.env.DB, String(body!.petId), plan, now);
+      }
+    }
+  }
+
   const latest = await c.env.DB.prepare(`SELECT appetite, stool_status FROM nen_health_logs WHERE pet_id = ? ORDER BY logged_on DESC LIMIT 3`).bind(body!.petId).all<{ appetite: string; stool_status: string }>();
   const checks = [
     { type: 'poor_appetite', hit: latest.results.length === 3 && latest.results.every((r) => r.appetite === 'poor') },
-    { type: 'abnormal_stool', hit: latest.results.length === 3 && latest.results.every((r) => r.stool_status !== 'normal') },
+    { type: 'abnormal_stool', hit: latest.results.length === 3 && latest.results.every((r) => isCareStoolStatus(r.stool_status)) },
   ];
   for (const check of checks) {
     if (check.hit) {

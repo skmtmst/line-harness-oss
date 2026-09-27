@@ -179,6 +179,31 @@ export async function getStaffById(
     .first<StaffMember>();
 }
 
+/**
+ * 担当者の表示名をまとめて引く（R35）。
+ *
+ * 登録メディアの `uploaded_by` は内部ID（UUID）のまま残し、画面には
+ * この名前を出す。退職・削除済みで引けないIDは載せない（呼び出し側が
+ * 「削除された担当者」と出す）。空・重複は取り除いて1回で引く。
+ */
+export async function getStaffNameMap(
+  db: D1Database,
+  ids: Array<string | null | undefined>,
+): Promise<Map<string, string>> {
+  const unique = [...new Set(
+    ids.filter((id): id is string => typeof id === 'string' && id.length > 0),
+  )];
+  const names = new Map<string, string>();
+  if (unique.length === 0) return names;
+  const placeholders = unique.map(() => '?').join(',');
+  const rows = await db
+    .prepare(`SELECT id, name FROM staff_members WHERE id IN (${placeholders})`)
+    .bind(...unique)
+    .all<{ id: string; name: string }>();
+  for (const row of rows.results ?? []) names.set(row.id, row.name);
+  return names;
+}
+
 export async function createStaffMember(
   db: D1Database,
   input: CreateStaffInput,

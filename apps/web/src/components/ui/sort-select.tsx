@@ -1,12 +1,12 @@
 'use client'
 
-import SelectField, { type SelectOption } from '@/components/shared/select-field'
+import Select, { type SelectOption } from '@/components/shared/select'
 
 /**
  * 一覧ツールバーの並び替え（監査 #668）。
  *
  * 「並び順」の字ラベルと、選択中の語が切れない幅をセットにする。
- * 画面ごとに素の SelectField を置くと、ラベルの有無や幅がばらける
+ * 画面ごとに選び欄を素で置くと、ラベルの有無や幅がばらける
  * ——共通情報は既定幅 176px のままで「使われている数が多い順」が
  * 「使われている数が多…」と切れていた。
  *
@@ -27,9 +27,9 @@ export default function SortSelect({
   return (
     <label className={['flex min-w-0 items-center gap-2', className].filter(Boolean).join(' ')}>
       <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
-      <SelectField
+      <Select
         value={value}
-        onChange={(event) => onChange(event.target.value)}
+        onChange={onChange}
         aria-label="並び順"
         options={options}
         className="w-auto min-w-40 max-w-full"

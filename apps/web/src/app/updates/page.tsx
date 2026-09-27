@@ -6,6 +6,7 @@ import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import Notice from '@/components/shared/notice'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
+import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL!
 // self-update を構成した環境 (create-line-harness セットアップ) でのみ設定される。
@@ -88,20 +89,19 @@ export default function UpdatesPage() {
         <p className="text-ink-faint text-sm">履歴はまだありません。</p>
       )}
       {rows.length > 0 && (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="text-ink-faint border-hairline border-b text-left">
-              <tr>
-                <th className="py-2 pr-4 font-medium">開始</th>
-                <th className="py-2 pr-4 font-medium">From → To</th>
-                <th className="py-2 pr-4 font-medium">Status</th>
-                <th className="py-2 font-medium">Rollback</th>
-              </tr>
+        <DataTable>
+            <thead>
+              <TableHeadRow>
+                <Th style={{ width: '25%' }}>開始</Th>
+                <Th style={{ width: '30%' }}>From → To</Th>
+                <Th style={{ width: '20%' }}>Status</Th>
+                <Th style={{ width: '25%' }}>Rollback</Th>
+              </TableHeadRow>
             </thead>
-            <tbody className="divide-hairline divide-y">
+            <tbody>
               {rows.map((r) => (
-                <tr key={r.id}>
-                  <td className="text-ink-secondary whitespace-nowrap px-0 py-2 pr-4 tabular-nums">
+                <Tr key={r.id}>
+                  <Td className="text-ink-secondary whitespace-nowrap tabular-nums">
                     {new Date(r.started_at).toLocaleString('ja-JP', {
                       year: 'numeric',
                       month: '2-digit',
@@ -109,18 +109,18 @@ export default function UpdatesPage() {
                       hour: '2-digit',
                       minute: '2-digit',
                     })}
-                  </td>
-                  <td className="py-2 pr-4 font-mono text-xs">
+                  </Td>
+                  <Td className="font-mono text-xs">
                     <span className="block truncate" title={`${r.from_version} → ${r.to_version}`}>
                       {r.from_version} → {r.to_version}
                     </span>
-                  </td>
-                  <td className="py-2 pr-4">
+                  </Td>
+                  <Td>
                     <StatusBadge tone={statusTone(r.status)} size="compact">
                       {r.status}
                     </StatusBadge>
-                  </td>
-                  <td className="py-2">
+                  </Td>
+                  <Td>
                     {r.status === 'success' &&
                     r.rollback_expires_at &&
                     Date.now() < r.rollback_expires_at ? (
@@ -136,12 +136,11 @@ export default function UpdatesPage() {
                     ) : (
                       <span className="text-ink-faint text-xs">—</span>
                     )}
-                  </td>
-                </tr>
+                  </Td>
+                </Tr>
               ))}
             </tbody>
-          </table>
-        </div>
+        </DataTable>
       )}
     </div>
   )

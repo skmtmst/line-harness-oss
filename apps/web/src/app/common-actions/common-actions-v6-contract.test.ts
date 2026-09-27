@@ -81,7 +81,8 @@ describe('V6共通アクションの画面契約', () => {
     expect(LIST).toContain('古い版あり')
     expect(LIST).toContain('limit: PAGE_SIZE')
     expect(LIST).toContain('offset: (page - 1) * PAGE_SIZE')
-    expect(LIST).toContain("aria-label=\"ページ送り\"")
+    // ページ送りは共通の Pagination が担う（`aria-label="ページ送り"` は部品側にある）。
+    expect(LIST).toContain('<Pagination')
   })
 
   it('閲覧権限と編集権限を画面でも分ける', () => {

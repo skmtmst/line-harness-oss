@@ -84,7 +84,8 @@ describe('FRIEND-04/32 適用した条件を一覧と編集画面で一致させ
 
 describe('FRIEND-05 対応状況は固定4状態', () => {
   it('保留を選べる', () => {
-    expect(DIALOG).toContain('<option value="on_hold">保留</option>')
+    // 対応状況の選び欄は共通 Select。選択肢の配列に「保留」がある。
+    expect(DIALOG).toContain("{ value: 'on_hold', label: '保留' }")
   })
 })
 

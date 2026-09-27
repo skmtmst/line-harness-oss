@@ -3,6 +3,8 @@
 import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { api, ApiError } from '@/lib/api'
+import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
 import CreatePage, { Field, inputClass } from '@/components/shared/create-page'
 import TargetMissing from '@/components/shared/target-missing'
 import { useAccount } from '@/contexts/account-context'
@@ -26,6 +28,21 @@ function EditWebhookPageInner() {
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error' | 'not-found'>('loading')
   /** 失敗したあとの「もう一度読み込む」で取り直すための番号。 */
   const [reloadKey, setReloadKey] = useState(0)
+  /*
+   * 送り先の変更は統括だけ（R32）。口側が `requireRole('owner')` で守っている。
+   * 直接URLで開いた管理者には作らず、統括への依頼を案内する。
+   */
+  const [staffRole, setStaffRole] = useState<string | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    void api.staff.me()
+      .then((response) => {
+        if (cancelled || !response.success) return
+        setStaffRole(response.data.role)
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -88,6 +105,19 @@ function EditWebhookPageInner() {
     )
   }
 
+  if (staffRole !== null && staffRole !== 'owner') {
+    return (
+      <div className="flex flex-col gap-4">
+        <Notice tone="info">
+          送り先の変更は統括だけができます。必要なときは統括に頼んでください。
+        </Notice>
+        <div>
+          <Button variant="secondary" href="/webhooks">外部連携の一覧へ戻る</Button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <CreatePage
       title="送り先を直す"
@@ -107,16 +137,24 @@ function EditWebhookPageInner() {
       }}
       onSave={async () => {
         if (!selectedAccountId) throw new Error('LINEアカウントを選択してください')
-        const res = await api.webhooks.outgoing.update(id, selectedAccountId, {
-          name: name.trim(),
-          url: url.trim(),
-          eventTypes: eventTypes
-            .split(',')
-            .map((value) => value.trim())
-            .filter(Boolean),
-          maxRetries: Number(maxRetries) || 0,
-        })
-        if (!res.success) throw new Error(res.error)
+        try {
+          const res = await api.webhooks.outgoing.update(id, selectedAccountId, {
+            name: name.trim(),
+            url: url.trim(),
+            eventTypes: eventTypes
+              .split(',')
+              .map((value) => value.trim())
+              .filter(Boolean),
+            maxRetries: Number(maxRetries) || 0,
+          })
+          if (!res.success) throw new Error(res.error)
+        } catch (caught) {
+          // 変更は統括だけ。権限不足は生の `API error: 403` ではなく依頼の案内にする（R32）。
+          if (caught instanceof ApiError && caught.status === 403) {
+            throw new Error('送り先の変更は統括だけができます。必要なときは統括に頼んでください。')
+          }
+          throw caught
+        }
       }}
     >
       {loadState === 'loading' ? (

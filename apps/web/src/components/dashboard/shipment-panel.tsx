@@ -7,6 +7,7 @@ import Card, { CardHeader } from '@/components/shared/card'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import { STATE_TEXT } from '@/components/shared/not-connected'
 import { dashboardLocalUpdatedAt } from '@/components/dashboard/freshness'
+import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 
 /**
  * 出荷予定。
@@ -176,27 +177,26 @@ export default function ShipmentPanel({
               「今日のぶんが何件で、どれが遅れているか」を見る画面なので、
               列で揃っている方が速い。
             */
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+            <DataTable className="rounded-none border-0">
                 <thead>
-                  <tr className="text-ink-faint border-hairline border-b text-left text-xs">
-                    <th className="py-2 pr-3 font-medium">注文番号</th>
-                    <th className="py-2 pr-3 font-medium">お客様</th>
-                    <th className="py-2 pr-3 font-medium">商品</th>
-                    <th className="py-2 pr-3 text-right font-medium">数量</th>
-                    <th className="py-2 pr-3 font-medium whitespace-nowrap">出荷予定</th>
-                    <th className="py-2 font-medium">状態</th>
-                  </tr>
+                  <TableHeadRow>
+                    <Th style={{ width: '16%' }}>注文番号</Th>
+                    <Th style={{ width: '16%' }}>お客様</Th>
+                    <Th style={{ width: '28%' }}>商品</Th>
+                    <Th style={{ width: '10%' }} align="right">数量</Th>
+                    <Th style={{ width: '16%' }} className="whitespace-nowrap">出荷予定</Th>
+                    <Th style={{ width: '14%' }}>状態</Th>
+                  </TableHeadRow>
                 </thead>
-                <tbody className="divide-hairline divide-y">
+                <tbody>
                   {rows.map((row) => {
                     const { label, tone } = formatShipDate(row.shipDate, data.today, data.tomorrow)
                     return (
-                      <tr key={row.id}>
-                        <td className="text-ink-faint py-2.5 pr-3 font-mono text-xs whitespace-nowrap">
+                      <Tr key={row.id}>
+                        <Td className="text-ink-faint font-mono text-xs whitespace-nowrap">
                           {row.orderNumber || '—'}
-                        </td>
-                        <td className="text-ink py-2.5 pr-3 whitespace-nowrap">
+                        </Td>
+                        <Td className="text-ink whitespace-nowrap">
                           {row.friendId ? (
                             <Link href={`/chats?friend=${row.friendId}`} className="hover:underline">
                               {row.friendName ?? '名前未設定'}
@@ -204,30 +204,31 @@ export default function ShipmentPanel({
                           ) : (
                             (row.friendName ?? '名前未設定')
                           )}
-                        </td>
-                        <td className="text-ink-secondary max-w-0 truncate py-2.5 pr-3">
-                          {row.items || '商品情報なし'}
-                        </td>
+                        </Td>
+                        <Td className="text-ink-secondary">
+                          <span className="block truncate" title={row.items || undefined}>
+                            {row.items || '商品情報なし'}
+                          </span>
+                        </Td>
                         {/*
                           数量は ec_events.payload に入っているが、
                           出荷予定の API が返していない。列だけ出して
                           入ったら繋ぐ。docs/v025-open-questions.md に残す。
                         */}
-                        <td className="text-ink-faint py-2.5 pr-3 text-right tabular-nums">
+                        <Td align="right" className="text-ink-faint tabular-nums">
                           {row.quantity > 0 ? row.quantity.toLocaleString('ja-JP') : '—'}
-                        </td>
-                        <td className="py-2.5 pr-3 whitespace-nowrap">
+                        </Td>
+                        <Td className="whitespace-nowrap">
                           <StatusBadge tone={statusTone[tone]} size="compact">{label}</StatusBadge>
-                        </td>
-                        <td className="text-ink-secondary py-2.5 text-xs whitespace-nowrap">
+                        </Td>
+                        <Td className="text-ink-secondary text-xs whitespace-nowrap">
                           {row.shipDateSource === 'subscription' ? '定期便' : '注文'}
-                        </td>
-                      </tr>
+                        </Td>
+                      </Tr>
                     )
                   })}
                 </tbody>
-              </table>
-            </div>
+            </DataTable>
             )}
 
             {/* 走査上限に張り付いているときだけ、取りこぼしがありうる旨を出す。 */}

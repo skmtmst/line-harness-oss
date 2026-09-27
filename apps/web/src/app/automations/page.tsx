@@ -1,6 +1,6 @@
 'use client'
 
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import ListToolbar from '@/components/shared/list-toolbar'
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
@@ -18,6 +18,8 @@ import Chip from '@/components/shared/chip'
 import Disclosure from '@/components/shared/disclosure'
 import Notice from '@/components/shared/notice'
 import ListState from '@/components/shared/list-state'
+import Pagination from '@/components/shared/pagination'
+import ListRange from '@/components/ui/list-range'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import KpiCollapse from '@/components/ui/kpi-collapse'
 import MetricValue from '@/components/ui/metric-value'
@@ -670,10 +672,10 @@ export default function AutomationsPage() {
         trailing={
           <>
             <p className="text-sm text-ink-secondary">この30日</p>
-            <SelectField
+            <Select
               aria-label="並び順"
               value={sortOrder}
-              onChange={(event) => { setSortOrder(event.target.value as 'runs' | 'priority' | 'name'); setPage(1) }}
+              onChange={(value) => { setSortOrder(value as 'runs' | 'priority' | 'name'); setPage(1) }}
               options={[
                 { value: 'runs', label: '動いた回数が多い順' },
                 { value: 'priority', label: '動く順' },
@@ -748,17 +750,10 @@ export default function AutomationsPage() {
             </div>
           ))}
           <div className="flex items-center justify-between border-t border-hairline px-4 py-3 text-xs text-ink-faint">
-            <span>オートメーション {visibleAutomations.length}本中 {(currentPage - 1) * AUTOMATION_PAGE_SIZE + 1}〜{Math.min(currentPage * AUTOMATION_PAGE_SIZE, visibleAutomations.length)}本を表示</span>
+            {/* 件数の数え方は共通の ListRange（助数は「件」にそろえる）。 */}
+            <ListRange label="オートメーション" total={visibleAutomations.length} first={(currentPage - 1) * AUTOMATION_PAGE_SIZE + 1} last={Math.min(currentPage * AUTOMATION_PAGE_SIZE, visibleAutomations.length)} />
             {/* #670 9: 送る先が1ページだけならページ送りは出さない。押せない口が並ぶと「まだ何かある」と読める。 */}
-            {listPageCount > 1 ? (
-              <div className="flex items-center gap-3" aria-label="ページ送り">
-                <button type="button" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)} className="inline-flex min-h-6 min-w-6 items-center justify-center text-action disabled:text-ink-faint">前へ</button>
-                {Array.from({ length: listPageCount }, (_, index) => index + 1).map((pageNumber) => (
-                  <button key={pageNumber} type="button" aria-current={pageNumber === currentPage ? 'page' : undefined} onClick={() => setPage(pageNumber)} className={`inline-flex min-h-6 min-w-6 items-center justify-center ${pageNumber === currentPage ? 'text-action font-bold' : ''}`}>{pageNumber}</button>
-                ))}
-                <button type="button" disabled={currentPage >= listPageCount} onClick={() => setPage(currentPage + 1)} className="inline-flex min-h-6 min-w-6 items-center justify-center text-action disabled:text-ink-faint">次へ</button>
-              </div>
-            ) : null}
+            <Pagination page={currentPage} pageCount={listPageCount} onPageChange={setPage} />
           </div>
         </div>
       )}
