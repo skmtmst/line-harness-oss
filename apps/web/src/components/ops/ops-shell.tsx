@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import { api, type OpsMe } from '@/lib/api'
 import Button from '@/components/shared/button'
+import MenuPortal from '@/components/shared/menu-portal'
 import { adminSessionHeaders, captureAdminSessionHandoff } from '@/lib/admin-session'
 import { logoutAndGoToLogin } from '@/lib/logout'
 import OpsEnvBar from './ops-env-bar'
@@ -260,31 +261,28 @@ function OpsSidebar({ me, meError, onRetryMe, pathname, open, onClose }: { me: O
 /** 左下のログイン中アカウント。押すと上にメニューが開く（★V6 37-9 `pxiUt`）。 */
 function OpsAccountMenu({ me }: { me: OpsMe }) {
   const [open, setOpen] = useState(false)
-  const rootRef = useRef<HTMLDivElement | null>(null)
+  const triggerRef = useRef<HTMLButtonElement | null>(null)
 
-  useEffect(() => {
-    if (!open) return
-    const onPointer = (event: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(event.target as Node)) setOpen(false)
-    }
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setOpen(false) }
-    document.addEventListener('mousedown', onPointer)
-    document.addEventListener('keydown', onKey)
-    return () => {
-      document.removeEventListener('mousedown', onPointer)
-      document.removeEventListener('keydown', onKey)
-    }
-  }, [open])
+  // 外側を押したとき・Esc の扱いは MenuPortal に任せる。
+  // 下に場所が無ければ上へ開く（場所の判断も器がする）。
 
   const initial = me.name.trim().charAt(0) || 'M'
 
   return (
-    <div ref={rootRef} className="relative px-3 py-3">
+    <div className="relative px-3 py-3">
       {open ? (
+        <MenuPortal
+          open={open}
+          align="start"
+          getAnchor={() => triggerRef.current}
+          onClose={() => setOpen(false)}
+        >
         <div
           role="menu"
           data-design-node="RmC2T"
-          className="absolute bottom-full left-3 z-20 mb-2 w-60 rounded-md border border-hairline bg-canvas py-2 shadow-lg"
+          className="w-60 rounded-md border border-hairline bg-canvas py-2 shadow-lg"
+          // 最上層では absolute 指定を無効にする（位置は器が決める）。
+          style={{ position: 'static' }}
         >
           <div className="px-3.5 pb-2.5 pt-1.5">
             <p className="text-label font-bold text-ink">{me.name}</p>
@@ -309,8 +307,10 @@ function OpsAccountMenu({ me }: { me: OpsMe }) {
             ログアウト
           </button>
         </div>
+        </MenuPortal>
       ) : null}
       <button
+        ref={triggerRef}
         type="button"
         aria-haspopup="menu"
         aria-expanded={open}

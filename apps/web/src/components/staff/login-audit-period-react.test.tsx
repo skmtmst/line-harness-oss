@@ -99,10 +99,10 @@ async function render() {
 
 /** 期間の Select を開いて label の選択肢を押す。 */
 async function choosePeriod(label: string) {
-  const trigger = host.querySelector('button[aria-label="期間で絞り込む"]') as HTMLButtonElement
+  const trigger = document.querySelector('button[aria-label="期間で絞り込む"]') as HTMLButtonElement
   expect(trigger).toBeTruthy()
   await act(async () => { trigger.click() })
-  const option = [...host.querySelectorAll('ul[role="listbox"] button')]
+  const option = [...document.querySelectorAll('ul[role="listbox"] button')]
     .find((button) => button.textContent?.trim().endsWith(label)) as HTMLButtonElement | undefined
   expect(option, `期間の選択肢「${label}」`).toBeTruthy()
   await act(async () => { option!.click() })

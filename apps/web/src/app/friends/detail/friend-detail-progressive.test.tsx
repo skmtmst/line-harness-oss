@@ -244,13 +244,13 @@ async function eventually(check: () => void, timeout = 1_500): Promise<void> {
 }
 
 function buttonByText(text: string): HTMLButtonElement {
-  const button = Array.from(host.querySelectorAll('button')).find((b) => b.textContent === text)
+  const button = Array.from(document.querySelectorAll('button')).find((b) => b.textContent === text)
   if (!button) throw new Error(`ボタンが見つかりません: ${text}`)
   return button
 }
 
 function menuItems(): HTMLButtonElement[] {
-  return Array.from(host.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'))
+  return Array.from(document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'))
 }
 
 describe('NEXT-11 遅い補助パネルが顧客名の表示を止めない', () => {
@@ -265,7 +265,7 @@ describe('NEXT-11 遅い補助パネルが顧客名の表示を止めない', ()
     await eventually(() => expect(host.textContent).toContain('テスト太郎'))
     expect(host.textContent).not.toContain('読み込み中...')
     // 戻る導線（友だち一覧へのリンク）が使える
-    const back = Array.from(host.querySelectorAll('a')).find((a) => a.getAttribute('href') === '/friends')
+    const back = Array.from(document.querySelectorAll('a')).find((a) => a.getAttribute('href') === '/friends')
     expect(back).toBeTruthy()
 
     // マイルが失敗で返ってきても、顧客名は出たまま・失敗表示はマイル欄だけ
@@ -325,7 +325,7 @@ describe('NEXT-08 「個別操作」「…」が操作メニューにつなが�
       buttonByText('個別操作').click()
     })
     await act(async () => {
-      host.querySelector<HTMLButtonElement>('button[aria-label="その他の操作"]')!.click()
+      document.querySelector<HTMLButtonElement>('button[aria-label="その他の操作"]')!.click()
     })
     // 「戻る」は戻る操作なので矢印が無い（絵だけ）。
     const back = menuItems().find((b) => b.textContent?.includes('友だち一覧へ戻る'))!
@@ -335,7 +335,7 @@ describe('NEXT-08 「個別操作」「…」が操作メニューにつなが�
   it('「…」を押すと関連画面への移動が出て、選ぶと画面遷移する', async () => {
     await render()
     await act(async () => {
-      host.querySelector<HTMLButtonElement>('button[aria-label="その他の操作"]')!.click()
+      document.querySelector<HTMLButtonElement>('button[aria-label="その他の操作"]')!.click()
     })
     const labels = menuItems().map((b) => b.textContent)
     expect(labels).toContain('友だち一覧へ戻る')
@@ -354,12 +354,12 @@ describe('NEXT-09 対象の友だちを引き継ぐ操作', () => {
     await act(async () => {
       buttonByText('シナリオに登録').click()
     })
-    await eventually(() => expect(host.querySelector('[data-scenario-picker]')).toBeTruthy())
+    await eventually(() => expect(document.querySelector('[data-scenario-picker]')).toBeTruthy())
     // 表示中アカウントのシナリオを選択肢として取る
     const listCall = net.calls.find((c) => c.name === 'scenarios.list')
     expect(listCall).toBeTruthy()
 
-    const select = host.querySelector<HTMLSelectElement>('select[aria-label="登録するシナリオを選ぶ"]')!
+    const select = document.querySelector<HTMLSelectElement>('select[aria-label="登録するシナリオを選ぶ"]')!
     const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')!.set!
     await act(async () => {
       setter.call(select, 'sc-1')
@@ -382,7 +382,7 @@ describe('NEXT-09 対象の友だちを引き継ぐ操作', () => {
   // ★V7（2026-09-24）：この友だちに関係の無い「〜一覧を見る」は操作節に置かない（左のメニューから行ける）。
   it('操作節に汎用一覧へ行くだけの入口を置かず、対象を引き継がない「送信」「設定」も名乗らない', async () => {
     await render()
-    const hrefs = Array.from(host.querySelectorAll('a')).map((a) => ({
+    const hrefs = Array.from(document.querySelectorAll('a')).map((a) => ({
       text: a.textContent,
       href: a.getAttribute('href'),
     }))

@@ -129,8 +129,9 @@ describe('V6 友だち追加時配信の点検・中の再発防止(#501)', () =
   })
 
   it('実際に配信するシナリオを編集画面で選べる(FRIENDADD-01)', () => {
-    // scenarioId は保存の必須項目だが、以前は変更する入力が無かった。
-    // 「次に流すシナリオ」欄で、このアカウントのシナリオだけを選ぶ。
+    // scenarioId は公開・テストの必須項目だが、以前は変更する入力が無かった。
+    // 下書きの保存では後からでよい(R30)。「次に流すシナリオ」欄で、
+    // このアカウントのシナリオだけを選ぶ。
     expect(EDITOR).toContain('次に流すシナリオ')
     expect(EDITOR).toContain('value={definition.scenarioId ??')
     expect(EDITOR).toContain('scenarioId: event.target.value || null')

@@ -4575,6 +4575,8 @@ export const CONVERSION_DEFINITION_PREVIEW = {
   duplicateExcludedCount: 172,
   cancellationCount: 4,
   excludedReasons: [],
+  // R42: 金額のない過去の成果の件数。撮影用の見本は0件のまま。
+  missingValueCount: 0,
   dailyAverage: 7.1,
   deduplicationWindowDays: null,
 }
@@ -5046,6 +5048,7 @@ export const BOOKING_SETTINGS = {
   organizationName: '然-NEN- 本店', version: 1, timeZone: 'Asia/Tokyo',
   bookingWindowDays: 60, cutoffMinutesBefore: 1440, cancelDeadlineMinutesBefore: 1440,
   maxActiveBookingsPerFriend: 2, approvalMode: 'manual', holdMinutes: 15, slotGranularityMinutes: 15,
+  liffDateView: 'list',
   menuCount: 8, activeMenuCount: 6, inactiveMenuCount: 2,
   businessHours: [
     { weekday: 0, intervals: [{ start: '10:00', end: '17:00', capacity: 2 }] },
@@ -5180,6 +5183,8 @@ export const BOOKING_AVAILABILITY = {
       ],
     },
   ],
+  // LIFFカレンダーの「休」の印の見本（枠が無い日と区別する）。
+  closed_dates: ['2026-09-05', '2026-09-06'],
 }
 
 /* #414 の availability 契約。予約枠ごとの定員・残数・状態を固定する。 */
