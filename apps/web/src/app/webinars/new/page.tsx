@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import SelectField from '@/components/shared/select-field'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import Stepper from '@/components/shared/stepper'
@@ -12,6 +13,7 @@ import LinePreview from '@/components/shared/line-preview'
 import Notice from '@/components/shared/notice'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { webinarApi, type WebinarFolder } from '@/lib/api'
 /* 段の並びは編集画面と同じ定義を使う。作る画面と直す画面で段がずれないようにする。 */
 import { STEPS } from '@/app/webinars/edit/edit-steps'
@@ -28,6 +30,14 @@ export default function NewWebinarPage() {
   const [folderId, setFolderId] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  /*
+   * R18: 名前・開催形式・フォルダのいずれかを触っていたら未保存とみなす。
+   * リッチメニュー作成と同じ共通の番兵（離れる・Esc・保存せず移動）で守る。
+   * 保存成功後の router.push は番兵の対象外（リンク押下・戻る・再読込だけ止める）。
+   */
+  const dirty = title.trim() !== '' || deliveryKind !== 'on-demand' || folderId !== ''
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
 
   useEffect(() => {
     if (!selectedAccountId) {
@@ -186,6 +196,15 @@ export default function NewWebinarPage() {
             <Button variant="primary" disabled={saving} onClick={() => void save('video')}>動画設定へ</Button>
           </>
         )}
+      />
+      <ConfirmDialog
+        open={leaveTarget !== null}
+        title="保存していない変更があります"
+        description="このまま移動すると、入力した内容は保存されません。移動しますか？"
+        confirmLabel="保存せずに移動"
+        cancelLabel="入力を続ける"
+        onConfirm={confirmLeave}
+        onCancel={cancelLeave}
       />
     </div>
   )
