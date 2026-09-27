@@ -211,28 +211,33 @@ export default function Event() {
                 const full = s.remaining != null && s.remaining <= 0;
                 const disabled = full || overLimit;
                 const selected = selectedId === s.id;
+                // 満席は押せない灰色の箱。白 (bg-canvas) と重ねると白く見えるので
+                // 押せない時は地を1つ (bg-shell-gray) だけにする。
+                const tone = disabled
+                  ? 'border-hairline bg-shell-gray'
+                  : selected
+                    ? 'border-accent-deep bg-ok-bg'
+                    : 'border-hairline bg-canvas';
+                const timeText = `${utcToJstMd(s.starts_at)}(${utcToJstWeekday(s.starts_at)}) ${utcToJstHm(s.starts_at)}〜${utcToJstHm(s.ends_at)}`;
                 return (
                   <li key={s.id}>
                     <button
                       type="button"
                       disabled={disabled}
                       aria-pressed={selected}
+                      aria-label={full ? `${timeText} 満席` : undefined}
                       onClick={() => setSelectedId(s.id)}
                       title={formatJstEventAt(s.starts_at)}
-                      className={`flex min-h-12 w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left focus-visible:outline-2 focus-visible:outline-ink disabled:cursor-not-allowed ${
-                        selected
-                          ? 'border-accent-deep bg-ok-bg'
-                          : 'border-hairline bg-canvas'
-                      } ${disabled ? 'bg-ground text-ink-faint' : ''}`}
+                      className={`flex min-h-12 w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left focus-visible:outline-2 focus-visible:outline-ink disabled:cursor-not-allowed ${tone}`}
                     >
                       <span
-                        className={`text-sm font-semibold whitespace-nowrap ${selected ? 'text-ok-ink' : disabled ? 'text-ink-faint' : 'text-ink'}`}
+                        className={`text-sm font-semibold whitespace-nowrap ${disabled ? 'text-ink-faint' : selected ? 'text-ok-ink' : 'text-ink'}`}
                       >
                         {utcToJstMd(s.starts_at)}({utcToJstWeekday(s.starts_at)}) {utcToJstHm(s.starts_at)}〜
                         {utcToJstHm(s.ends_at)}
                       </span>
                       <span
-                        className={`shrink-0 text-xs whitespace-nowrap ${selected ? 'text-ok-ink' : 'text-ink-secondary'}`}
+                        className={`shrink-0 text-xs whitespace-nowrap ${disabled ? 'text-ink-faint' : selected ? 'text-ok-ink' : 'text-ink-secondary'}`}
                       >
                         {seatLabel(s)}
                       </span>
@@ -243,14 +248,24 @@ export default function Event() {
             </ul>
           )}
           {overLimit && (
-            <p role="alert" className="mt-2 text-xs leading-5 text-danger">
-              このイベントへの予約上限（{max}）に達しています。
-            </p>
+            <div
+              id="event-limit-note"
+              role="status"
+              className="mt-2 flex gap-2 rounded-lg bg-info-bg p-3 text-xs leading-5 text-ink-secondary"
+            >
+              <Icon name="info" className="h-4 w-4 shrink-0" />
+              <p>このイベントへの予約上限（{max}）に達しています。</p>
+            </div>
           )}
         </div>
       </div>
       <BottomBar>
-        <Button variant="primary" disabled={!selectedId || overLimit} onClick={goConfirm}>
+        <Button
+          variant="primary"
+          disabled={!selectedId || overLimit}
+          onClick={goConfirm}
+          aria-describedby={overLimit ? 'event-limit-note' : undefined}
+        >
           {selectedId ? 'この時間で申し込む' : '時間を選んでください'}
         </Button>
       </BottomBar>

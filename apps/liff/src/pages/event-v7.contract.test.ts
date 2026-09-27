@@ -163,3 +163,39 @@ describe('案内の帯は1画面に1本', () => {
     expect(confirm).not.toContain('bg-yellow');
   });
 });
+
+describe('詳細の満席と上限のお知らせ (m11b 仕上げ)', () => {
+  it('満席の枠は押せない・灰色の地・薄い文字・hairline の枠・満席の読み上げ', () => {
+    // 押せない枠は disabled。満席の読み上げ (aria-label に「満席」) がある。
+    expect(event).toContain('disabled={disabled}');
+    expect(event).toContain('aria-label={full ?');
+    expect(event).toContain('満席');
+    // 押せない時の地は1つだけ (bg-shell-gray)。白と重ねると白く見える。
+    const disabledTone = event.match(/disabled\s*\?\s*'[^']*'/)?.[0] ?? '';
+    expect(disabledTone).toContain('bg-shell-gray');
+    expect(disabledTone).not.toContain('bg-canvas');
+    expect(disabledTone).toContain('border-hairline');
+    // 押せない時の文字は薄い色。
+    expect(event).toContain('text-ink-faint');
+  });
+
+  it('選んだ時間は薄い緑の地＋濃い緑の枠', () => {
+    expect(event).toContain('bg-ok-bg');
+    expect(event).toContain('border-accent-deep');
+    expect(event).toContain('setSelectedId(s.id)');
+  });
+
+  it('上限のお知らせは赤を使わず info の帯 (主ボタンと紐づく)', () => {
+    expect(event).toContain('このイベントへの予約上限');
+    expect(event).toContain('bg-info-bg');
+    expect(event).toContain('text-ink-secondary');
+    expect(event).toContain('name="info"');
+    // 赤は失敗の時だけ。上限のお知らせには使わない。
+    expect(event).not.toContain('text-danger');
+    expect(event).not.toContain('text-red-');
+    expect(event).not.toContain('bg-red-');
+    // 下の主ボタンが押せない理由として読めるよう、帯とボタンを紐づける。
+    expect(event).toContain('event-limit-note');
+    expect(event).toContain('aria-describedby');
+  });
+});
