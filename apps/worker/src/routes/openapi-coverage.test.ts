@@ -1153,7 +1153,7 @@ const ALLOWLIST = new Set<string>([
   'POST /api/chats/{id}/send',
   'PUT /api/chats/{id}',
 
-  // 機能「common_vars」の管理画面用API（OpenAPI未記載・順次記載）（11件）
+  // 機能「common_vars」の管理画面用API（OpenAPI未記載・順次記載）（12件）
   'DELETE /api/common-vars/{id}',
   'DELETE /api/common-vars/{id}/schedules/{scheduleId}',
   'GET /api/common-vars',
@@ -1165,6 +1165,7 @@ const ALLOWLIST = new Set<string>([
   'POST /api/common-vars/{id}/impact-preview',
   'POST /api/common-vars/{id}/replace',
   'POST /api/common-vars/{id}/schedules',
+  'POST /api/common-vars/{id}/status',
 
   // 機能「templates」の管理画面用API（OpenAPI未記載・順次記載）（11件）
   'DELETE /api/message-templates/{id}',

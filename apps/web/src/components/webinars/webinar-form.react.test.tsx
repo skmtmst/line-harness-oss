@@ -7,6 +7,8 @@ const fixture = vi.hoisted(() => ({
   mediaList: vi.fn(),
   create: vi.fn(),
   update: vi.fn(),
+  editor: vi.fn(),
+  publish: vi.fn(),
   routerPush: vi.fn(),
 }))
 
@@ -38,7 +40,17 @@ vi.mock('@/components/shared/sticky-bar', () => ({
   default: ({ actions }: { actions: React.ReactNode }) => <div>{actions}</div>,
 }))
 vi.mock('@/components/shared/confirm-dialog', () => ({
-  default: () => null,
+  default: ({ open, onConfirm, onCancel, confirmLabel }: {
+    open: boolean
+    onConfirm: () => void
+    onCancel: () => void
+    confirmLabel: string
+  }) => open
+    ? React.createElement('div', null,
+      React.createElement('button', { onClick: onConfirm }, confirmLabel),
+      React.createElement('button', { onClick: onCancel }, 'キャンセル'),
+    )
+    : null,
 }))
 vi.mock('@/lib/api', () => {
   class MockApiError extends Error {
@@ -51,7 +63,7 @@ vi.mock('@/lib/api', () => {
     ApiError: MockApiError,
     extractApiErrorCode: () => null,
     api: { media: { list: fixture.mediaList } },
-    webinarApi: { create: fixture.create, update: fixture.update },
+    webinarApi: { create: fixture.create, update: fixture.update, editor: fixture.editor, publish: fixture.publish },
   }
 })
 
@@ -89,9 +101,13 @@ beforeEach(() => {
   fixture.mediaList.mockReset()
   fixture.create.mockReset()
   fixture.update.mockReset()
+  fixture.editor.mockReset()
+  fixture.publish.mockReset()
   fixture.routerPush.mockReset()
   fixture.mediaList.mockResolvedValue({ success: true, data: { items: [MEDIA_VIDEO_1, MEDIA_VIDEO_2], total: 2, limit: 100, offset: 0 } })
   fixture.update.mockResolvedValue({ success: true, data: { id: 'w1' } })
+  fixture.editor.mockResolvedValue({ success: true, data: { version: 7 } })
+  fixture.publish.mockResolvedValue({ success: true, data: {} })
 })
 
 afterEach(cleanup)
@@ -157,5 +173,38 @@ describe('ウェビナー基本設定の動画選択 (N-115) と旧CTA撤去 (N-
     fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
     await waitFor(() => expect(fixture.mediaList).toHaveBeenCalledTimes(2))
     await screen.findByRole('combobox', { name: '配信動画' })
+  })
+})
+
+describe('R95 基本設定からの公開は公開専用口を通す', () => {
+  it('公開中を選んだ保存は通常更新にactiveを送らず公開専用口を呼ぶ', async () => {
+    render(<WebinarForm initial={baseWebinar()} />)
+
+    const statusSelect = await screen.findByRole('combobox', { name: '公開状態' })
+    const videoSelect = await screen.findByRole('combobox', { name: '配信動画' })
+    fireEvent.change(statusSelect, { target: { value: 'active' } })
+    fireEvent.change(videoSelect, { target: { value: 'med-1' } })
+    // 公開の足切り（動画・枠）を満たすため枠を1件足す
+    fireEvent.click(screen.getByRole('button', { name: '＋ ルール追加' }))
+    fireEvent.click(screen.getByRole('button', { name: '公開する' }))
+
+    // 確認ダイアログで「この内容で公開する」を押す
+    fireEvent.click(await screen.findByRole('button', { name: 'この内容で公開する' }))
+
+    await waitFor(() => expect(fixture.update).toHaveBeenCalled())
+    const [, input] = fixture.update.mock.calls[0] as [string, Record<string, unknown>]
+    expect(input.status).toBe('draft')
+    await waitFor(() => expect(fixture.publish).toHaveBeenCalledWith('w1', 7))
+    expect(fixture.routerPush).toHaveBeenCalledWith('/webinars/published?id=w1')
+  })
+
+  it('下書きのままの保存は公開専用口を呼ばない', async () => {
+    render(<WebinarForm initial={baseWebinar()} />)
+    await screen.findByRole('combobox', { name: '配信動画' })
+    fireEvent.click(screen.getByRole('button', { name: '変更を保存' }))
+
+    await waitFor(() => expect(fixture.update).toHaveBeenCalled())
+    expect(fixture.publish).not.toHaveBeenCalled()
+    expect(fixture.routerPush).toHaveBeenCalledWith('/webinars')
   })
 })

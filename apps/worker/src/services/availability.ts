@@ -83,6 +83,29 @@ function mergeIntervals(intervals: Interval[]): Interval[] {
   return merged.map((m) => ({ start: fromMin(m.s), end: fromMin(m.e) }));
 }
 
+/** 稼働区間から休憩などの除外区間を差し引く（R164）。 */
+function subtractIntervals(working: Interval[], excluded: Interval[]): Interval[] {
+  let out = mergeIntervals(working);
+  const cuts = mergeIntervals(excluded);
+  for (const cut of cuts) {
+    const cs = toMin(cut.start);
+    const ce = toMin(cut.end);
+    const next: Interval[] = [];
+    for (const w of out) {
+      const ws = toMin(w.start);
+      const we = toMin(w.end);
+      if (ce <= ws || we <= cs) {
+        next.push(w);
+        continue;
+      }
+      if (ws < cs) next.push({ start: fromMin(ws), end: fromMin(cs) });
+      if (ce < we) next.push({ start: fromMin(ce), end: fromMin(we) });
+    }
+    out = next;
+  }
+  return mergeIntervals(out);
+}
+
 /** 稼働区間と店舗例外時間の共通部分だけを残す（短縮営業用）。 */
 function intersectIntervals(a: Interval[], b: Interval[]): Interval[] {
   const out: Interval[] = [];
@@ -340,6 +363,22 @@ interface RuleRow {
   end_time: string;
 }
 
+/** 曜日指定の休憩（staff_breaks）。勤務時間内の休み時間。 */
+interface BreakRow {
+  staff_id: string;
+  weekday: number;
+  start_time: string;
+  end_time: string;
+}
+
+/** 日付指定の休憩（staff_break_dates）。その日だけの休み時間。 */
+interface BreakDateRow {
+  staff_id: string;
+  work_date: string;
+  start_time: string;
+  end_time: string;
+}
+
 interface BookingRow {
   staff_id: string;
   menu_id: string;
@@ -393,6 +432,8 @@ interface LoadedAvailability {
   timeZone: string;
   shiftRows: ShiftRow[];
   ruleRows: RuleRow[];
+  breakRows: BreakRow[];
+  breakDateRows: BreakDateRow[];
   bookingRows: BookingRow[];
   resourceBookingRows: ResourceBookingRow[];
   minLeadAt: Date;
@@ -675,6 +716,28 @@ async function loadAvailabilityData(
     .bind(...staffIds)
     .all<{ staff_id: string; weekday: number; start_time: string; end_time: string }>();
 
+  // R164: 曜日指定・日付指定の休憩。勤務区間から差し引くため、
+  // 空きの列挙と確定前判定の両方で同じく読む。
+  const [weeklyBreaks, datedBreaks] = await Promise.all([
+    db.prepare(
+      `SELECT staff_id, weekday, start_time, end_time
+         FROM staff_breaks
+        WHERE staff_id IN (${placeholders})`,
+    )
+      .bind(...staffIds)
+      .all<BreakRow>(),
+    db.prepare(
+      `SELECT staff_id, work_date, start_time, end_time
+         FROM staff_break_dates
+        WHERE staff_id IN (${placeholders})
+          AND work_date BETWEEN ? AND ?`,
+      )
+      .bind(...staffIds, params.from, params.to)
+      .all<BreakDateRow>(),
+  ]);
+  const breaks = weeklyBreaks.results ?? [];
+  const breakDates = datedBreaks.results ?? [];
+
   // 既存予約を読む範囲は、店舗タイムゾーンの暦日の境界そのものにする。
   // 暦日を UTC の 00:00 と見なして前後 1 日ずつ足す形だと、UTC より
   // 遅れた店舗（America/New_York = UTC-5）の夜の予約が範囲から落ちる。
@@ -815,6 +878,8 @@ async function loadAvailabilityData(
       timeZone,
       shiftRows: shifts.results ?? [],
       ruleRows: rules.results ?? [],
+      breakRows: breaks,
+      breakDateRows: breakDates,
       bookingRows: bookings.results ?? [],
       resourceBookingRows: resourceBookings.results ?? [],
       minLeadAt,
@@ -968,6 +1033,28 @@ function computeDayWorking(
   for (const hours of resourceHoursById.values()) {
     workingList = intersectIntervals(workingList, mergeIntervals(hours));
     if (workingList.length === 0) break;
+  }
+  // R164: 休憩を勤務区間から差し引く。その日だけの休憩と、その曜日の
+  // いつもの休憩の両方を見る。壊れた行は保存口で弾くため、ここでは
+  // 時刻の形が正しいものだけを差し引く。
+  if (workingList.length > 0) {
+    const weekday = weekdayForDate(date);
+    const cuts: Interval[] = [];
+    for (const row of d.breakDateRows) {
+      if (row.staff_id === staffId && row.work_date === date
+        && isHhmm(row.start_time) && isHhmm(row.end_time)
+        && row.start_time < row.end_time) {
+        cuts.push({ start: row.start_time, end: row.end_time });
+      }
+    }
+    for (const row of d.breakRows) {
+      if (row.staff_id === staffId && row.weekday === weekday
+        && isHhmm(row.start_time) && isHhmm(row.end_time)
+        && row.start_time < row.end_time) {
+        cuts.push({ start: row.start_time, end: row.end_time });
+      }
+    }
+    if (cuts.length > 0) workingList = subtractIntervals(workingList, cuts);
   }
   return { working: workingList, block: null };
 }

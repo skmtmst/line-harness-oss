@@ -727,6 +727,13 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
     return Array.from({ length: 14 }, (_, index) => addDays(from, index))
   }, [timeZone])
 
+  // R163: 14日は「今日から」並ぶため、月曜始まりの7列とそのままでは
+  // ずれる。初日の曜日（月=0…日=6）ぶん空きマスを置き、日付を正しい
+  // 曜日の列へ置く。どの曜日に開いても日付と曜日が一致する。
+  const previewLeadBlanks = previewDates.length === 0
+    ? 0
+    : (weekdayOf(previewDates[0]) + 6) % 7
+
   const previewMarks = useMemo(() => previewDates.map((date) => {
     const exception = storeExceptions.find((item) => item.dateFrom <= date && date <= item.dateTo)
     if (exception?.kind === 'closed') return { date, mark: '休' as const }
@@ -904,7 +911,7 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
 
           <section className="bg-canvas border-hairline rounded-card border p-4">
             <h2 className="text-ink font-semibold">休憩</h2>
-            <p className="text-ink-faint mt-1 text-xs">いつもの勤務時間の中での休み時間です。保存はできますが、まだ予約枠には反映されません。</p>
+            <p className="text-ink-faint mt-1 text-xs">いつもの勤務時間の中での休み時間です。休憩の時間は予約枠から除きます。</p>
             <div className="mt-4 space-y-2">
               {breakRows.length === 0 ? (
                 <p className="text-ink-faint text-sm">休憩はありません。</p>
@@ -971,7 +978,7 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
             </div>
 
             <h3 className="text-ink mt-6 text-sm font-semibold">この日だけの休憩</h3>
-            <p className="text-ink-faint mt-1 text-xs">その日だけ休むときに足します。その日の出る時間の中に入れてください。保存はできますが、まだ予約枠には反映されません。</p>
+            <p className="text-ink-faint mt-1 text-xs">その日だけ休むときに足します。その日の出る時間の中に入れてください。休憩の時間は予約枠から除きます。</p>
             <div className="mt-4 space-y-2">
               {dateRows.length === 0 ? (
                 <p className="text-ink-faint text-sm">この日だけの休憩はありません。</p>
@@ -1148,12 +1155,23 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
             ) : (
               <div className="text-ink-faint mt-3 grid grid-cols-7 gap-1 text-center text-xs">
                 {['月', '火', '水', '木', '金', '土', '日'].map((day) => <span key={day} className="font-medium">{day}</span>)}
-                {previewMarks.map((item) => (
-                  <span key={item.date} className="bg-canvas-sunken rounded-control py-1" title={item.date}>
-                    <span className="block tabular-nums">{Number(item.date.slice(8, 10))}</span>
-                    <span className={item.mark === '○' ? 'text-success' : item.mark === '休' ? 'text-ink-faint' : 'text-danger'}>{item.mark}</span>
-                  </span>
+                {Array.from({ length: previewLeadBlanks }).map((_, index) => (
+                  <span key={`blank-${index}`} aria-hidden="true" />
                 ))}
+                {previewMarks.map((item, index) => {
+                  // R163: 月をまたぐ位置が分かるよう、月の初めと先頭の日は
+                  // 「月/日」で出す（それ以外は日のみ）。枠の title には
+                  // 日付と曜日を添え、列の曜日と読み違えないようにする。
+                  const day = Number(item.date.slice(8, 10))
+                  const showMonth = index === 0 || day === 1
+                  const label = showMonth ? `${Number(item.date.slice(5, 7))}/${day}` : `${day}`
+                  return (
+                    <span key={item.date} className="bg-canvas-sunken rounded-control py-1" title={`${item.date}（${weekdayLabel(item.date)}）`}>
+                      <span className="block tabular-nums">{label}</span>
+                      <span className={item.mark === '○' ? 'text-success' : item.mark === '休' ? 'text-ink-faint' : 'text-danger'}>{item.mark}</span>
+                    </span>
+                  )
+                })}
               </div>
             )}
             {previewError ? <p className="text-danger mt-3 text-xs">予約枠だけ読み込めませんでした。</p> : null}

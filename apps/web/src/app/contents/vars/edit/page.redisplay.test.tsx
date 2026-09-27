@@ -239,10 +239,11 @@ describe('共通情報: 保存した社内メモの再表示(実React)', () => {
     expect(byId('cv-valid-until').textContent).toContain('2026年9月16日（水）12:00')
     await setValue(byId('cv-expiry-behavior'), 'fallback')
     await setValue(byId('cv-fallback-value'), '受付終了')
+    await setValue(byId('cv-change-reason'), '期間の修正')
     await click(byExactText('button', '共通情報を保存'))
     expect(api.update).toHaveBeenCalledWith('var-1', 'account-1', expect.objectContaining({
       expectedVersion: 3, validFrom: '2026-09-16T10:00', validUntil: '2026-09-16T12:00',
-      expiryBehavior: 'fallback', fallbackValue: '受付終了',
+      expiryBehavior: 'fallback', fallbackValue: '受付終了', changeReason: '期間の修正',
     }))
   })
 
@@ -273,10 +274,11 @@ describe('共通情報: 保存した社内メモの再表示(実React)', () => {
       expect((control as HTMLInputElement).value).toBe(originalValue)
       await setValue(control, nextValue)
     }
+    await setValue(byId('cv-change-reason'), '値の更新')
     await click(byExactText('button', '共通情報を保存'))
 
     expect(api.update).toHaveBeenCalledWith('var-1', 'account-1', expect.objectContaining({
-      value: nextValue, expectedVersion: 1, impactProof: 'proof-1',
+      value: nextValue, expectedVersion: 1, impactProof: 'proof-1', changeReason: '値の更新',
     }))
   })
 

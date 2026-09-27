@@ -544,6 +544,11 @@ friendMigrations.post('/api/friends/exports', requireRole('owner', 'admin'), asy
     if (!accountId || columns.some((column) => !EXPORT_COLUMNS.includes(column))) {
       return c.json({ success: false, error: '対象アカウントと書き出す項目を選んでください' }, 400);
     }
+    // R114: タグ・友だち情報と対応情報の書き出しは未接続。選べたのに出ない
+    // 5列だけのCSVを渡すより、作る前に理由を返して止める（Shift_JISと同じ扱い）。
+    if (columns.some((column) => column !== 'basic')) {
+      return c.json({ success: false, error: 'タグ・友だち情報、対応情報の書き出しはまだ使えません。基本だけ選んでください' }, 422);
+    }
     if (body.encoding === 'shift_jis') {
       return c.json({ success: false, error: 'Shift_JIS書き出しはまだ接続されていません。UTF-8を選んでください' }, 422);
     }

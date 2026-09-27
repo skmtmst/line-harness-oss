@@ -376,3 +376,25 @@ describe('一部失敗からの再実行（FRIEND-34）', () => {
     expect(body.data.decisionCounts).toMatchObject({ link: 3, exclude: 2 });
   });
 });
+
+describe('R114 書き出す項目の選択', () => {
+  it('未対応の項目は作らせず理由を返す', async () => {
+    for (const columns of [['basic', 'tags_fields'], ['support'], ['basic', 'tags_fields', 'support']]) {
+      const response = await appFor().fetch(post('/api/friends/exports', {
+        accountId: 'from', columns, encoding: 'utf-8',
+      }), env);
+      expect(response.status).toBe(422);
+      expect(await response.json()).toMatchObject({ error: expect.stringContaining('まだ使えません') });
+    }
+  });
+
+  it('基本だけは作れる', async () => {
+    first.mockResolvedValue({ count: 3 });
+    const response = await appFor().fetch(post('/api/friends/exports', {
+      accountId: 'from', columns: ['basic'], encoding: 'utf-8',
+    }), env);
+    expect(response.status).toBe(201);
+    const body = await response.json() as { success: boolean; data: { rowCount: number } };
+    expect(body.data.rowCount).toBe(3);
+  });
+});
