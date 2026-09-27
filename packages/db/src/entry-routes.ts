@@ -76,6 +76,11 @@ export interface CreateEntryRouteInput {
   runAccountFriendAddScenarios?: boolean;
   isActive?: boolean;
   tenantId?: string;
+  /**
+   * R39: 作成時に所属させるLINEアカウント。migration 308 の
+   * line_account_id 列へ保存する。未指定は未割当のまま残す。
+   */
+  lineAccountId?: string | null;
 }
 
 export interface EntryRouteFunnel {
@@ -137,8 +142,8 @@ export async function createEntryRoute(
       `INSERT INTO entry_routes
          (id, ref_code, genre, name, tag_id, scenario_id, redirect_url,
           pool_id, intro_template_id, run_account_friend_add_scenarios,
-          is_active, tenant_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          is_active, tenant_id, line_account_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -153,6 +158,7 @@ export async function createEntryRoute(
       runAccount,
       isActive,
       input.tenantId ?? DEFAULT_TENANT_ID,
+      input.lineAccountId ?? null,
       now,
       now,
     )

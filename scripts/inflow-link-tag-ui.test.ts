@@ -42,8 +42,9 @@ describe('inflow link tag auto-assignment UI wiring', () => {
     expect(modal).toContain('options={tags.map((tag) => ({ value: tag.id, label: tag.name }))}');
     expect(modal).toContain('placeholder="— 設定なし —"');
     // 選んだ id が form に入り、「なし」は null になる。form ごと作成・更新で送る
+    // （R39: 新規は選択中アカウントの所属を付けて作る）
     expect(modal).toContain('tagId: next || null');
-    expect(modal).toContain('api.entryRoutes.create(form)');
+    expect(modal).toContain('api.entryRoutes.create({ ...form, lineAccountId: accountId ?? null })');
     expect(modal).toContain('api.entryRoutes.update(route!.id, form)');
     expect(modal).toContain('友だち追加時にこのタグを自動付与します');
     expect(modal).toContain('tags.map((tag) => (');
