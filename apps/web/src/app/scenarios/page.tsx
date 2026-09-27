@@ -24,6 +24,8 @@ import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Disclosure from '@/components/shared/disclosure'
 import ListState from '@/components/shared/list-state'
+import Pagination from '@/components/shared/pagination'
+import ListRange from '@/components/ui/list-range'
 import Notice from '@/components/shared/notice'
 import ScenarioList from '@/components/scenarios/scenario-list'
 import { ON_COMPLETE_LABEL, type OnCompleteMode } from '@/components/scenarios/scenario-dialogs'
@@ -258,7 +260,7 @@ function StartScenarioDialog({
             <dl className="space-y-3 text-sm">
               <div className="flex justify-between gap-4"><dt className="text-ink-faint">シナリオ</dt><dd className="text-ink text-right font-medium">{scenario.name}</dd></div>
               <div className="border-hairline flex justify-between gap-4 border-t pt-3"><dt className="text-ink-faint">LINEアカウント</dt><dd className="text-ink text-right font-medium">{accountLabel}</dd></div>
-              <div className="border-hairline flex justify-between gap-4 border-t pt-3"><dt className="text-ink-faint">開始対象</dt><dd className="text-ink text-right font-medium">{simulation ? `新規開始予定 ${simulation.audience.newStartPlanned.toLocaleString('ja-JP')}人` : preflightLoading ? '—（試算中）' : '—（取得できません）'}</dd></div>
+              <div className="border-hairline flex justify-between gap-4 border-t pt-3"><dt className="text-ink-faint">開始対象</dt><dd className="text-ink text-right font-medium">{simulation ? `予約中 ${simulation.audience.newStartPlanned.toLocaleString('ja-JP')}人` : preflightLoading ? '—（試算中）' : '—（取得できません）'}</dd></div>
               <div className="border-hairline flex justify-between gap-4 border-t pt-3"><dt className="text-ink-faint">開始のきっかけ</dt><dd className="text-ink text-right font-medium">{triggerSummary}</dd></div>
               <div className="border-hairline flex justify-between gap-4 border-t pt-3"><dt className="text-ink-faint">配信ステップ</dt><dd className="text-ink text-right font-medium">{simulation ? `${simulation.steps.length}通` : scenario.stepCount === undefined ? '—通' : `${scenario.stepCount}通`}</dd></div>
               <div className="border-hairline flex justify-between gap-4 border-t pt-3"><dt className="text-ink-faint">終了後</dt><dd className="text-ink text-right font-medium">{completeSummary}</dd></div>
@@ -295,7 +297,7 @@ function StartScenarioDialog({
 
         <Notice tone="warn" className="mx-6 mb-5">
           <p className="text-sm font-bold">開始後に起きること</p>
-          <ul className="mt-2 space-y-1 text-xs"><li>・条件に一致した{simulation?.audience.newStartPlanned.toLocaleString('ja-JP') ?? '—'}人が購読を開始します</li><li>・配信中の友だちは停止するまで次のステップへ進みます</li><li>・一度届いたメッセージは取り消せません。間違いに気づいたらすぐ停止してください</li></ul>
+          <ul className="mt-2 space-y-1 text-xs"><li>・条件に一致した{simulation?.audience.newStartPlanned.toLocaleString('ja-JP') ?? '—'}人が購読を開始します</li><li>・稼働中の友だちは停止するまで次のステップへ進みます</li><li>・一度届いたメッセージは取り消せません。間違いに気づいたらすぐ停止してください</li></ul>
         </Notice>
         <label className={`mx-6 mb-4 flex items-center gap-2 text-sm font-medium ${preflightLoading ? 'opacity-60' : ''}`}><input type="checkbox" checked={confirmed} disabled={preflightState !== 'ready'} onChange={(event) => setConfirmed(event.target.checked)} />対象人数・内容・送信枠を確認しました</label>
         {error ? <Notice tone="danger" message={error} className="mx-6 mb-4" /> : null}
@@ -665,7 +667,7 @@ export default function ScenariosPage() {
               unit: '件',
               detail: `稼働中 ${s.scenarios.active}${sharedScenarioCount > 0 ? `・共通 ${sharedScenarioCount}件を含む` : ''}`,
             },
-            { title: '購読中', value: s.scenarios.subscribers, unit: '人', detail: '現在配信中・重複を含む' },
+            { title: '購読中', value: s.scenarios.subscribers, unit: '人', detail: '現在稼働中・重複を含む' },
             {
               title: '読了済',
               value: s.scenarios.completed,
@@ -858,14 +860,13 @@ export default function ScenariosPage() {
         />
       )}
       {scenarioList.pageCount > 1 ? (
-        <div className="flex items-center justify-end gap-3 text-sm">
-          <Button disabled={scenarioList.page <= 1 || scenarioList.loading} onClick={() => scenarioList.setPage(scenarioList.page - 1)}>
-            前へ
-          </Button>
-          <span className="text-ink-secondary">{scenarioList.page} / {scenarioList.pageCount}ページ</span>
-          <Button disabled={scenarioList.page >= scenarioList.pageCount || scenarioList.loading} onClick={() => scenarioList.setPage(scenarioList.page + 1)}>
-            次へ
-          </Button>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+          <ListRange
+            total={scenarioList.total}
+            first={(scenarioList.page - 1) * scenarioList.limit + 1}
+            last={Math.min(scenarioList.page * scenarioList.limit, scenarioList.total)}
+          />
+          <Pagination page={scenarioList.page} pageCount={scenarioList.pageCount} onPageChange={scenarioList.setPage} />
         </div>
       ) : null}
         </div>

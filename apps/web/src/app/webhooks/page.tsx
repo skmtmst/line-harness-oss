@@ -12,7 +12,7 @@ import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Notice from '@/components/shared/notice'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import WebhookInteractions from './webhook-interactions'
 import GoogleSheetsPanel from './google-sheets-panel'
 import { IncomingOverview, OutgoingKpis, OutgoingOverview } from './webhook-overviews'
@@ -904,16 +904,16 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
             </div>
             <div>
               <label className="block text-sm font-medium text-ink-secondary mb-1">どこから来るか</label>
-              <SelectField
+              <Select
                 value={sourceIsOther ? SOURCE_OTHER : inForm.sourceType}
-                onChange={(e) => {
-                  const next = e.target.value
+                onChange={(value) => {
+                  const next = value
                   if (next === SOURCE_OTHER) { setSourceIsOther(true); setInForm({ ...inForm, sourceType: '' }); return }
                   setSourceIsOther(false)
                   setInForm({ ...inForm, sourceType: next })
                 }}
                 aria-label="受信元の種類"
-                className="w-full border border-hairline rounded-lg px-3 py-2 text-sm"
+                size="full"
                 options={[
                   { value: '', label: '選んでください' },
                   ...SOURCE_PRESETS.map((preset) => ({ value: preset.value, label: preset.label })),

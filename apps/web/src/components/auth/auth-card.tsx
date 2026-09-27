@@ -1,8 +1,7 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import Link from 'next/link'
-import { LEGAL_LINKS } from '@/lib/auth-email'
+import { CONTACT_URL, LEGAL_LINKS } from '@/lib/auth-email'
 
 /**
  * ログイン前の画面の入れ物。★V6 0-1／36-4／36-6 の「登録カード」（幅 520）。
@@ -48,7 +47,13 @@ export default function AuthCard({
         <LegalLink href={LEGAL_LINKS.terms}>利用規約</LegalLink>
         <LegalLink href={LEGAL_LINKS.privacy}>プライバシーポリシー</LegalLink>
         <LegalLink href={LEGAL_LINKS.commerce}>特定商取引法に基づく表記</LegalLink>
-        <Link href="/hq/support" className="hover:underline">お問い合わせ</Link>
+        {/*
+          ログインしていない人のお問い合わせは、サービスサイトの /contact/ へ。
+          /hq/support はログインが要り、ログイン画面へ戻されてしまう（監査 m18e）。
+        */}
+        <a href={CONTACT_URL} target="_blank" rel="noreferrer" className="hover:underline">
+          お問い合わせ
+        </a>
       </footer>
     </main>
   )

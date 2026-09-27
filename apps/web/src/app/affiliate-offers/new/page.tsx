@@ -1,6 +1,6 @@
 'use client'
 
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import { useEffect, useRef, useState } from 'react'
 import type { Tag, Scenario } from '@line-crm/shared'
 import { api } from '@/lib/api'
@@ -301,11 +301,13 @@ export default function NewAffiliateOfferPage() {
       >
         <div className="grid gap-3 lg:grid-cols-2">
         <Field label="付けるタグ" htmlFor="of-tag" note="あとで配信の絞り込みに使えます。">
-          <SelectField
+          <Select
+            aria-label="付けるタグ"
             id="of-tag"
             value={tagId}
-            onChange={(e) => setTagId(e.target.value)}
+            onChange={(value) => setTagId(value)}
             options={[{ value: '', label: '（なし）' }, ...tags.map((t) => ({ value: t.id, label: t.name }))]}
+            size="standard"
           />
         </Field>
 
@@ -314,11 +316,13 @@ export default function NewAffiliateOfferPage() {
           htmlFor="of-scenario"
           note="選ばなければ何も送りません。"
         >
-          <SelectField
+          <Select
+            aria-label="開始するシナリオ"
             id="of-scenario"
             value={scenarioId}
-            onChange={(e) => setScenarioId(e.target.value)}
+            onChange={(value) => setScenarioId(value)}
             options={[{ value: '', label: '（なし）' }, ...scenarios.map((s) => ({ value: s.id, label: s.name }))]}
+            size="standard"
           />
         </Field>
         </div>

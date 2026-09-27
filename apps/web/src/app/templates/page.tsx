@@ -1,6 +1,6 @@
 'use client'
 
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import ListToolbar from '@/components/shared/list-toolbar'
 import { MoreAction } from '@/components/shared/row-actions'
@@ -12,6 +12,7 @@ import ImageUploader from '@/components/shared/image-uploader'
 import BroadcastAssetManager from '@/components/broadcasts/broadcast-asset-manager'
 import StaffAssetList from './staff-asset-list'
 import { TableHeadRow, Th } from '@/components/shared/table'
+import MobileTableCards from '@/components/shared/mobile-table-cards'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -98,6 +99,15 @@ const typeBadgeColor: Record<string, string> = {
   image: 'bg-info-bg text-info',
   carousel: 'bg-amber-100 text-amber-700',
   question: 'bg-accent-soft text-accent-deep',
+}
+
+/** 種別の札。一覧の表とスマホのカードで同じ顔にする。 */
+function TemplateKindBadge({ kind }: { kind: string }) {
+  return (
+    <span className={`inline-flex items-center rounded px-2 py-0.5 text-[10px] font-medium ${typeBadgeColor[kind] ?? 'bg-canvas-sunken text-ink-secondary'}`}>
+      {messageTypeText(kind)}
+    </span>
+  )
 }
 
 /** 今年は「1月13日」、それ以外は「2025年1月13日」。時刻は title で見せる（★V7：1行に収める）。 */
@@ -838,7 +848,7 @@ export default function TemplatesPage() {
             </div>
             <div>
               <label className="block text-xs font-medium text-ink-secondary mb-1">タイプ</label>
-              <SelectField value={form.messageType} onChange={(e) => setForm({ ...form, messageType: e.target.value })} options={[{ value: "text", label: "テキスト" }, { value: "flex", label: "カード型" }, { value: "image", label: "画像" }]} className="w-full border border-hairline rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-canvas" />
+              <Select aria-label="タイプ" value={form.messageType} onChange={(value) => setForm({ ...form, messageType: value })} options={[{ value: "text", label: "テキスト" }, { value: "flex", label: "カード型" }, { value: "image", label: "画像" }]} size="full" />
             </div>
             <div>
               <label className="block text-xs font-medium text-ink-secondary mb-1">内容 / JSON <span className="text-red-500">*</span></label>
@@ -941,12 +951,52 @@ export default function TemplatesPage() {
           description={`${templates.length}件のうち0件が一致しました。検索語か絞り込みを変えてください。`}
         />
       ) : (
-        <div className="bg-canvas rounded-card border border-hairline overflow-hidden">
-          {/* U044: 767px以下は data-template-list 宛の畳み込みCSSで
-              1件ずつのカードに変わる（templates-v6.module.css）。
-              右端が画面外へ逃げる表をそのまま小さくしても、項目と操作を
-              同時に読めないため。 */}
-          <div className="overflow-x-auto" data-template-list>
+        <>
+        {/*
+          ★V7 監査の直し A（`LD96g`）：768px 以上は表、767px 以下は共通の
+          一覧カード（`MobileTableCards`）。以前のCSS畳み込みは、名前欄の
+          `max-w-0` が残って名前が消える原因だったのでやめる。
+        */}
+        <MobileTableCards
+          items={filteredTemplates.map((t) => ({
+            id: t.id,
+            name: t.name,
+            status: <TemplateKindBadge kind={t.question ? 'question' : t.messageType} />,
+            summary: `${t.messageContent.slice(0, 60)}${t.messageContent.length > 60 ? '...' : ''}`,
+            metric: typeof t.usageCount !== 'number' ? '使用先を確認できません' : t.usageCount === 0 ? 'なし' : `${t.usageCount}件で使用`,
+            primaryAction: canMutateTemplates ? (
+              <Button
+                href={
+                  t.question
+                    ? `/templates/questions/new?id=${encodeURIComponent(t.id)}`
+                    : `/templates/edit?id=${encodeURIComponent(t.id)}`
+                }
+              >
+                編集
+              </Button>
+            ) : undefined,
+            moreAction: (
+              <span className="relative flex h-9 w-9 items-center justify-center">
+                <MoreAction
+                  label={`${t.name}のその他操作`}
+                  aria-expanded={openRowMenuId === t.id}
+                  onClick={() =>
+                    setOpenRowMenuId((current) => (current === t.id ? null : t.id))
+                  }
+                />
+                <ActionMenu
+                  open={openRowMenuId === t.id}
+                  ariaLabel={`${t.name}の操作`}
+                  onClose={() => setOpenRowMenuId(null)}
+                  items={rowMenuItems(t)}
+                />
+              </span>
+            ),
+            onSelect: () => setDrawerId(t.id),
+          }))}
+        />
+        <div className="bg-canvas rounded-card border border-hairline overflow-hidden hidden md:block">
+          <div className="overflow-x-auto">
             <table className="w-full min-w-[640px]">
               <thead>
                 <TableHeadRow>
@@ -984,9 +1034,7 @@ export default function TemplatesPage() {
                       </p>
                     </td>
                     <td className="px-3 py-3">
-                      <span className={`inline-flex items-center rounded px-2 py-0.5 text-[10px] font-medium ${typeBadgeColor[t.question ? 'question' : t.messageType] ?? 'bg-canvas-sunken text-ink-secondary'}`}>
-                        {messageTypeText(t.question ? 'question' : t.messageType)}
-                      </span>
+                      <TemplateKindBadge kind={t.question ? 'question' : t.messageType} />
                       {/*
                         **`category` は内部の値**（`text` `general` など）。
                         そのまま出すと、種類の欄に英語が2つ並ぶ。
@@ -1055,16 +1103,28 @@ export default function TemplatesPage() {
             </table>
           </div>
         </div>
+        </>
       )}
 
       {/* Drawer */}
       {drawerId && !blockedDelete && (
         <>
+          {/*
+            ★V7 監査の直し：この面の重なり順は共通の最上層の器にそろえる。
+            固定のモバイル帯（`sidebar.module.css` の `.mobileHeader`・z 50）より
+            下（z-30/z-40）だったので、スマホで面いっぱいに開いたときに上の帯が
+            頭（×のある行）に被さっていた。共通の右面（`drawer.module.css` の
+            `.overlay`）と同じ 80 に上げ、閉じる操作をいつも見える所に残す。
+          */}
           <div
-            className="fixed inset-0 bg-black/30 z-30 lg:hidden"
+            className="fixed inset-0 bg-black/30 lg:hidden"
+            style={{ zIndex: 80 }}
             onClick={() => setDrawerId(null)}
           />
-          <div className="fixed inset-y-0 right-0 w-full lg:w-[480px] bg-canvas shadow-xl border-l border-hairline z-40 overflow-y-auto">
+          <div
+            className="fixed inset-y-0 right-0 w-full lg:w-[480px] bg-canvas shadow-xl border-l border-hairline overflow-y-auto"
+            style={{ zIndex: 80 }}
+          >
             <div className="px-4 py-3 border-b border-hairline flex items-center justify-between sticky top-0 bg-canvas z-10">
               <div className="flex items-center gap-2 min-w-0 flex-1">
                 {editName !== null ? (
@@ -1139,14 +1199,14 @@ export default function TemplatesPage() {
                       <label className="mb-1.5 block text-[11px] font-medium text-ink-faint" htmlFor="template-folder-select">
                         置き場
                       </label>
-                      <SelectField
+                      <Select
                         id="template-folder-select"
                         aria-label="置き場"
                         value={drawerData.folderId ?? ''}
                         disabled={movingId === drawerData.id}
-                        onChange={(event) => void moveTemplate(
+                        onChange={(value) => void moveTemplate(
                           drawerData,
-                          event.target.value === '' ? null : event.target.value,
+                          value === '' ? null : value,
                         )}
                         options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]}
                       />

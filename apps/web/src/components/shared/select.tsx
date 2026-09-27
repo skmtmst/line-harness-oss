@@ -123,7 +123,8 @@ export default function Select({
         onClick={() => setOpen((current) => !current)}
         onKeyDown={onButtonKeyDown}
       >
-        <span className={styles.value}>
+        {/* 省略表示（…）のとき、ホバーで全文を確認できる（#640）。 */}
+        <span className={styles.value} title={selected?.label ?? undefined}>
           {label ? `${label}：` : ''}{selected?.label ?? ''}
         </span>
         {open ? (

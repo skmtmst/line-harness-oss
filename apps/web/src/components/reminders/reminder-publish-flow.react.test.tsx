@@ -10,6 +10,16 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }))
 vi.mock('@/lib/api', () => ({ api: { reminders: {} } }))
+/*
+ * R15: TargetStage に共通の条件部品を置いたため、描画にアカウントの
+ * 文脈が要る。条件なしの描画では数え直し口を叩かない。
+ */
+vi.mock('@/contexts/account-context', () => ({
+  useAccount: () => ({ selectedAccountId: 'account-1', loading: false }),
+}))
+vi.mock('@/lib/use-feature-visibility', () => ({
+  useFeatureVisibility: () => ({ status: 'ready' as const, features: null, enabled: () => false }),
+}))
 
 import { ConfirmStage, DoneStage, PreviewStage, TargetStage, TestStage } from './reminder-publish-flow'
 
@@ -195,7 +205,7 @@ describe('リマインダ公開フローの実データ表示', () => {
   // REMINDER-08: 取得失敗は「確認中」のままにせず、失敗表示と再試行を出す。
   it('TargetStage は事前チェックの失敗を確認中と分け、再試行できる', () => {
     const retry = vi.fn()
-    render(<TargetStage settings={SETTINGS} validation={null} validationFailed onRetryValidation={retry} onChange={() => {}} onNext={() => {}} busy={false} />)
+    render(<TargetStage reminderId="rem-1" settings={SETTINGS} validation={null} validationFailed onRetryValidation={retry} onChange={() => {}} onNext={() => {}} busy={false} />)
     expect(screen.getByText(/公開前チェックを実行できませんでした/)).toBeTruthy()
     expect(screen.queryByText(/公開前チェックを実行しています/)).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '再読み込み' }))
@@ -203,7 +213,7 @@ describe('リマインダ公開フローの実データ表示', () => {
   })
 
   it('TargetStage は取得中のままでは人数を0と見せない', () => {
-    render(<TargetStage settings={SETTINGS} validation={null} onChange={() => {}} onNext={() => {}} busy={false} />)
+    render(<TargetStage reminderId="rem-1" settings={SETTINGS} validation={null} onChange={() => {}} onNext={() => {}} busy={false} />)
     expect(screen.getByText(/公開前チェックを実行しています/)).toBeTruthy()
     expect(screen.getAllByText('—人').length).toBeGreaterThanOrEqual(1)
     expect(screen.queryByText('0人')).toBeNull()
@@ -236,7 +246,7 @@ describe('リマインダ公開フローの実データ表示', () => {
   // REMINDER-09: 対象設定の次は通知ステップ。保存後は編集画面へ戻る。
   it('TargetStage の主ボタンは通知ステップへ進む', () => {
     const next = vi.fn()
-    render(<TargetStage settings={SETTINGS} validation={VALIDATION} onChange={() => {}} onNext={next} busy={false} />)
+    render(<TargetStage reminderId="rem-1" settings={SETTINGS} validation={VALIDATION} onChange={() => {}} onNext={next} busy={false} />)
     fireEvent.click(screen.getByRole('button', { name: '通知ステップへ' }))
     expect(next).toHaveBeenCalledTimes(1)
   })

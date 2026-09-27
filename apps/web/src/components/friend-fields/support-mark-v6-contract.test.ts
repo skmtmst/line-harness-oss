@@ -16,7 +16,9 @@ describe('V6 対応マーク', () => {
     // 見出しは表の中だけを見る。注釈や他の行に同じ言葉があっても通さない。
     const thead = element(LIST, 'thead')
     for (const label of ['順番', 'マーク', '使用中', '初期値', '自動変更', '表示先', '操作']) expect(thead).toContain(label)
-    expect(LIST).toContain('利用状態：すべて')
+    // 絞り込みは共通 Select。題と「すべて」の選択肢が分かれている。
+    expect(LIST).toContain('label="利用状態"')
+    expect(LIST).toContain("{ value: 'all', label: 'すべて' }")
     // ATTR-01: 取得時のアカウントを退避し、応答が届いた時点の選択と照合する。
     expect(LIST).toContain('api.supportMarks.list(account)')
   })

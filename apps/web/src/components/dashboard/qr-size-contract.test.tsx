@@ -9,11 +9,11 @@ import QrDialog from './qr-dialog'
  * 文字合わせではなく Worker 本体の関数（`normalizeQrSize` / `normalizeQrFormat`）で確かめる。
  * 画面側だけで同じ数字を書き写すと、Worker が上限を変えたときに気づけない。
  *
- * `SelectField` は共通部品で、この試験の対象ではない。共通部品側は React を
+ * `Select` は共通部品で、この試験の対象ではない。共通部品側は React を
  * import していないため旧JSX変換のこの環境では描けない。選択肢の値は画面から
  * 渡ってくるので、素の `select` へ置き換えても確かめたいことは変わらない。
  */
-vi.mock('@/components/shared/select-field', () => ({
+vi.mock('@/components/shared/select', () => ({
   default: ({ id, value, options }: {
     id?: string
     value?: string

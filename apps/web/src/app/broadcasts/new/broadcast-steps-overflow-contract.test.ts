@@ -30,6 +30,7 @@ describe('配信作成の手順表示（#973 U048）', () => {
 
   it('広い幅ではこれまでどおり5段の帯を共通部品で出す', () => {
     expect(RAIL).toContain('hidden sm:block')
-    expect(RAIL).toContain('<Stepper label="配信作成の進み" steps={steps} />')
+    // 設計 C：いまいる所は currentKey（URL の ?step=）で渡す。入力済みの数で決めない。
+    expect(RAIL).toContain('<Stepper label="配信作成の進み" steps={steps} currentKey={currentKey} />')
   })
 })

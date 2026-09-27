@@ -46,7 +46,8 @@ describe('飲食店向け店舗とLINE公式アカウントの紐づけ画面', 
     ]) {
       expect(consoleSource).toContain(label)
     }
-    expect(consoleSource).toContain('disabled={usedElsewhere}')
+    // 選び欄は共通 Select。選択肢の配列で使用中を使えなくする。
+    expect(consoleSource).toContain('disabled: usedElsewhere')
     expect(consoleSource).not.toMatch(/店舗を削除|deleteStore/)
   })
 })
