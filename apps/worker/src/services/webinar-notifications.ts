@@ -2,6 +2,8 @@ import {
   activeTenantLineAccountSql,
   isOperationCapabilityStopped,
   resolveLineCredential,
+  reserveWebinarSeat,
+  releaseWebinarSeat,
   jstNow,
 } from '@line-crm/db';
 import { stoppedTenantLineAccountSql } from './tenant-runtime-status.js';
@@ -43,14 +45,18 @@ export type WebinarNotificationSettings = {
   startEnabled: boolean;
   missedEnabled: boolean;
   missedTime: string;
+  /** 見逃し配信の期限（開催からの日数。1〜30、既定7）。N。 */
+  missedWindowDays: number;
   completedEnabled: boolean;
   updatedAt: string;
 };
 
 export type WebinarNotificationSettingsInput = Omit<
   WebinarNotificationSettings,
-  'webinarId' | 'version' | 'updatedAt'
->;
+  'webinarId' | 'version' | 'updatedAt' | 'missedWindowDays'
+> & {
+  missedWindowDays?: number;
+};
 
 type SettingsRow = {
   webinar_id: string;
@@ -63,6 +69,7 @@ type SettingsRow = {
   start_enabled: number;
   missed_enabled: number;
   missed_time_minutes: number;
+  missed_window_days: number | null;
   completed_enabled: number;
   updated_at: string;
 };
@@ -99,6 +106,7 @@ type DueJobRow = {
   channel_access_token_encrypted: string | null;
   line_account_active: number | null;
   viewed: number;
+  missed_window_days: number | null;
 };
 
 export type WebinarNotificationDeliveryOptions = {
@@ -186,6 +194,7 @@ function serializeSettings(row: SettingsRow): WebinarNotificationSettings {
     startEnabled: Boolean(row.start_enabled),
     missedEnabled: Boolean(row.missed_enabled),
     missedTime: formatTime(row.missed_time_minutes),
+    missedWindowDays: row.missed_window_days ?? 7,
     completedEnabled: Boolean(row.completed_enabled),
     updatedAt: row.updated_at,
   };
@@ -262,15 +271,20 @@ export async function saveWebinarNotificationSettings(
     throw new Error('invalid_hour_before');
   }
   const previous = await getWebinarNotificationSettings(db, webinarId);
+  // N: 見逃し配信の期限（開催からの日数）。省略時は従来の設定を残し、無ければ7日。
+  const missedWindowDays = input.missedWindowDays ?? previous?.missedWindowDays ?? 7;
+  if (!Number.isInteger(missedWindowDays) || missedWindowDays < 1 || missedWindowDays > 30) {
+    throw new Error('invalid_missed_window');
+  }
   const version = (previous?.version ?? 0) + 1;
   const nowIso = now.toISOString();
   await db.prepare(
     `INSERT INTO webinar_notification_settings
        (webinar_id, version, registration_enabled, day_before_enabled,
         day_before_time_minutes, hour_before_enabled, hour_before_minutes,
-        start_enabled, missed_enabled, missed_time_minutes, completed_enabled,
-        created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        start_enabled, missed_enabled, missed_time_minutes, missed_window_days,
+        completed_enabled, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(webinar_id) DO UPDATE SET
        version=excluded.version,
        registration_enabled=excluded.registration_enabled,
@@ -281,6 +295,7 @@ export async function saveWebinarNotificationSettings(
        start_enabled=excluded.start_enabled,
        missed_enabled=excluded.missed_enabled,
        missed_time_minutes=excluded.missed_time_minutes,
+       missed_window_days=excluded.missed_window_days,
        completed_enabled=excluded.completed_enabled,
        updated_at=excluded.updated_at`,
   ).bind(
@@ -294,6 +309,7 @@ export async function saveWebinarNotificationSettings(
     input.startEnabled ? 1 : 0,
     input.missedEnabled ? 1 : 0,
     missedMinutes,
+    missedWindowDays,
     input.completedEnabled ? 1 : 0,
     nowIso,
     nowIso,
@@ -339,6 +355,12 @@ export async function registerWebinarSession(
     return { registration: existing, created: false, rescheduled: false };
   }
 
+  // N: 開催回の定員は申込の時に条件付き更新で確保する。満員なら既存の
+  // 申込に手を付けず断る（先に席を取り、取れたら古い席を空ける）。
+  if ((await reserveWebinarSeat(db, webinarId, sessionStartAt)) === 'full') {
+    throw new Error('session_full');
+  }
+
   const nowIso = now.toISOString();
   if (existing) {
     await db.prepare(
@@ -351,6 +373,7 @@ export async function registerWebinarSession(
           SET status='cancelled', cancelled_at=?, updated_at=?
         WHERE registration_id=? AND status IN ('queued','retry_wait')`,
     ).bind(nowIso, nowIso, existing.id).run();
+    await releaseWebinarSeat(db, webinarId, existing.session_start_at);
   }
 
   const previous = await db.prepare(
@@ -549,7 +572,8 @@ export async function processWebinarNotificationJobs(
               SELECT 1 FROM webinar_viewers v
                WHERE v.webinar_id=j.webinar_id AND v.friend_id=j.friend_id
                  AND v.session_start_at=j.session_start_at
-            ) AS viewed
+            ) AS viewed,
+            s.missed_window_days AS missed_window_days
        FROM webinar_notification_jobs j
        JOIN webinar_notification_settings s
          ON s.webinar_id=j.webinar_id AND s.version=j.settings_version
@@ -650,11 +674,16 @@ export async function processWebinarNotificationJobs(
       // 停止確認とclaimの間に切り替わった場合も、期限切れなどの確定処理へ進めない。
       if (await holdClaimIfStopped()) continue;
       const isMissedButViewed = row.kind === 'missed' && Boolean(row.viewed);
+      // N: 見逃し配信は「する」を選んだ時だけ、期限つき。期限切れは送らない。
+      const isMissedWindowExpired = row.kind === 'missed'
+        && nowEpoch > row.session_start_at + (row.missed_window_days ?? 7) * 86400;
       const isLateReminder = ['day_before', 'hour_before', 'session_start'].includes(row.kind)
         && nowEpoch >= row.session_start_at + row.duration_seconds;
       const skip = isMissedButViewed
         ? { code: 'already_viewed', message: 'すでに視聴済みのため送信しませんでした。' }
-        : isLateReminder
+        : isMissedWindowExpired
+          ? { code: 'missed_window_expired', message: '見逃し配信の期限を過ぎたため送信しませんでした。' }
+          : isLateReminder
           ? { code: 'notification_expired', message: '対象回が終了済みのため送信しませんでした。' }
           : !row.is_following
             ? { code: 'friend_not_following', message: 'ブロックまたは友だち解除のため送信しませんでした。' }
@@ -753,6 +782,7 @@ export async function processWebinarNotificationJobs(
  */
 const SKIP_REASON_LABELS: Record<string, string> = {
   already_viewed: 'すでに視聴済み',
+  missed_window_expired: '見逃し配信の期限切れ',
   notification_expired: '対象回が終了済み',
   friend_not_following: 'ブロック・友だち解除',
   line_account_mismatch: 'LINEアカウントの不一致',
