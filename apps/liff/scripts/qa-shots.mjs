@@ -86,6 +86,29 @@ try {
         await p.getByRole('button', { name: '日時を選ぶ' }).click();
       },
     });
+    await shot(page, viewport, 'booking-calendar', '/booking?liffId=qa', {
+      waitMs: 2000,
+      after: async (p) => {
+        await p.getByRole('button', { name: 'QA カット' }).click();
+        await p.getByRole('button', { name: '担当を選ぶ' }).click();
+        await p.getByRole('button', { name: /QA スタッフ/ }).click();
+        await p.getByRole('button', { name: '日時を選ぶ' }).click();
+        await p.getByRole('radio', { name: 'カレンダー' }).click();
+      },
+    });
+    await shot(page, viewport, 'booking-calendar-selected', '/booking?liffId=qa', {
+      waitMs: 2000,
+      after: async (p) => {
+        await p.getByRole('button', { name: 'QA カット' }).click();
+        await p.getByRole('button', { name: '担当を選ぶ' }).click();
+        await p.getByRole('button', { name: /QA スタッフ/ }).click();
+        await p.getByRole('button', { name: '日時を選ぶ' }).click();
+        await p.getByRole('radio', { name: 'カレンダー' }).click();
+        // 2番目に早い空き日を選び、その日の時刻を選んだ状態で撮る。
+        await p.getByRole('button', { name: /空きあり/ }).nth(1).click();
+        await p.getByRole('button', { name: '11:00' }).click();
+      },
+    });
     await shot(page, viewport, 'booking-loading', '/booking?liffId=qa', {
       mock: { delayMs: 5000 },
       waitMs: 1200,

@@ -256,7 +256,7 @@ function CalendarPreview({
                 type="button"
                 disabled
                 aria-pressed={active}
-                className={`flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-lg border py-1 text-sm ${
+                className={`flex min-h-14 flex-col items-center justify-center gap-1 rounded-lg border py-1 text-sm ${
                   active
                     ? 'border-accent-deep bg-accent-deep text-on-accent'
                     : open

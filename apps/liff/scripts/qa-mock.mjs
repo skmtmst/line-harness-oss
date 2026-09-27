@@ -268,19 +268,36 @@ const server = createServer(async (req, res) => {
       return;
     }
   }
+  if (method === 'GET' && pathname === '/api/liff/booking/settings') {
+    json(res, 200, { liff_date_view: 'list', booking_window_days: 60 });
+    return;
+  }
   if (method === 'GET' && pathname === '/api/liff/booking/availability') {
     const staffId = url.searchParams.get('staff_id') ?? 'qa-staff-1';
+    // カレンダー撮影のため、求められた期間ぶんを動的に作る。
+    // 火曜はお休み（closed_dates）、期間先頭から4日ごとの4日目は満席（枠なし）。
+    const from = url.searchParams.get('from') ?? '2026-10-01';
+    const to = url.searchParams.get('to') ?? '2026-10-01';
+    const slots = [];
+    const closed = [];
+    const base = new Date(`${from}T00:00:00Z`);
+    const end = new Date(`${to}T00:00:00Z`);
+    for (let d = new Date(base); d <= end; d.setUTCDate(d.getUTCDate() + 1)) {
+      const date = d.toISOString().slice(0, 10);
+      const offset = Math.round((d - base) / 86400000);
+      if (d.getUTCDay() === 2) {
+        closed.push(date);
+        continue;
+      }
+      if (offset % 4 === 3) continue;
+      for (const start of ['10:00', '11:00', '12:00', '14:00']) {
+        const [h, m] = start.split(':').map(Number);
+        slots.push({ date, start, end: `${String(h + 1).padStart(2, '0')}:${String(m).padStart(2, '0')}` });
+      }
+    }
     json(res, 200, {
-      by_staff: [
-        {
-          staff_id: staffId,
-          display_name: 'QA スタッフ',
-          slots: [
-            { date: '2026-10-01', start: '10:00', end: '11:00' },
-            { date: '2026-10-01', start: '11:00', end: '12:00' },
-          ],
-        },
-      ],
+      by_staff: [{ staff_id: staffId, display_name: 'QA スタッフ', slots }],
+      closed_dates: closed,
     });
     return;
   }
