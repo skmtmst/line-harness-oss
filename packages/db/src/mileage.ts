@@ -2498,7 +2498,9 @@ export async function syncAffiliateConversionMileage(
               beneficiary.line_account_id AS beneficiary_line_account_id,
               off.id AS offer_id,
               off.name AS offer_name,
-              off.reward_miles,
+              -- 付けた時点の版があれば、その版の決まりを優先する(#823)。
+              -- 版が無い昔の成果は、従来どおり今の案件の値を使う。
+              COALESCE(ov.reward_miles, off.reward_miles) AS reward_miles,
               off.mileage_program_id
          FROM conversion_events ce
          JOIN affiliates a ON a.id = ce.affiliate_id
@@ -2508,6 +2510,9 @@ export async function syncAffiliateConversionMileage(
            ON al.ref_code = ce.attributed_ref_code
           AND al.affiliate_id = ce.affiliate_id
          LEFT JOIN affiliate_offers off ON off.id = al.offer_id
+         LEFT JOIN affiliate_attribution_decisions dad
+           ON dad.conversion_event_id = ce.id
+         LEFT JOIN affiliate_offer_versions ov ON ov.id = dad.offer_version_id
         WHERE ce.id = ? AND ce.affiliate_id IS NOT NULL`,
     )
     .bind(eventId)

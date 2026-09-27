@@ -103,7 +103,9 @@ export async function ensureConversionRewardSnapshot(
             off.line_account_id AS offer_account_id,
             off.id AS offer_id,
             COALESCE(off.name, ce.point_name_snapshot, cp.name, '') AS offer_name,
-            off.reward_amount AS fixed_reward
+            -- 付けた時点の版があれば、その版の決まりを優先する(#823)。
+            -- 版が無い昔の成果は、従来どおり今の案件の値を使う。
+            COALESCE(ov.reward_amount, off.reward_amount) AS fixed_reward
        FROM conversion_events ce
        JOIN affiliates a ON a.id = ce.affiliate_id
        JOIN friends f ON f.id = ce.friend_id
@@ -112,6 +114,9 @@ export async function ensureConversionRewardSnapshot(
          ON al.ref_code = ce.attributed_ref_code
         AND al.affiliate_id = a.id
        LEFT JOIN affiliate_offers off ON off.id = al.offer_id
+       LEFT JOIN affiliate_attribution_decisions dad
+         ON dad.conversion_event_id = ce.id
+       LEFT JOIN affiliate_offer_versions ov ON ov.id = dad.offer_version_id
       WHERE ce.id = ?
         AND ce.affiliate_id IS NOT NULL
         AND COALESCE(ce.approval_status, 'pending') = 'approved'`,
