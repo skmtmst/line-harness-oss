@@ -1,5 +1,20 @@
 import { Check } from 'lucide-react'
-import type { BroadcastDisplayStatus, BroadcastLedger } from '@/lib/api'
+import type { ApiBroadcast, BroadcastApprovalState, BroadcastDisplayStatus, BroadcastLedger } from '@/lib/api'
+
+/**
+ * 承認が絡む配信か（段に「承認待ち」を出す条件）。
+ *
+ * 承認を通った（approved）・頼んだ（pending）・期限切れなど、記録に残る
+ * ものは絡む。承認の要らない配信（none・未設定）は出さない。
+ * 配信本体の field が古い応答で無いときは、承認の今の状態で補う。
+ */
+export function isApprovalInvolved(
+  broadcastApprovalStatus: ApiBroadcast['approvalStatus'],
+  approval: BroadcastApprovalState | null,
+): boolean {
+  if (broadcastApprovalStatus != null && broadcastApprovalStatus !== 'none') return true
+  return approval != null && approval.approval.status !== 'none'
+}
 import Chip from '@/components/shared/chip'
 import HelpTip from '@/components/shared/help-tip'
 
@@ -15,6 +30,19 @@ const MAIN_STEPS = [
 ] as const
 
 type StepKey = (typeof MAIN_STEPS)[number]['key']
+
+/**
+ * 終わった状態（送り終わり・分かれ道の確定）。
+ * 終わった段に「いまいる所」の輪は出さない。途中の時だけ輪を出す
+ * （設計 C-1・共通の手順の決まり）。
+ */
+const FINISHED: ReadonlySet<StatusRailStatus> = new Set([
+  'sent',
+  'partial_failed',
+  'failed',
+  'stopped',
+  'expired',
+])
 
 const BRANCH_LABELS: Partial<Record<StatusRailStatus, string>> = {
   partial_failed: '一部失敗',
@@ -63,13 +91,15 @@ export default function BroadcastStatusRail({
     : displayStatus
   const currentIndex = Math.max(0, order.indexOf(progressKey))
   const branchLabel = BRANCH_LABELS[displayStatus]
+  // 終わった状態は着いた段までを済み（✓）にし、輪はどこにも出さない。
+  const finished = FINISHED.has(displayStatus)
 
   return (
     <section aria-label="配信の状態" className="bg-canvas rounded-card border-hairline border p-5">
       <ol className="flex flex-wrap items-center gap-x-2 gap-y-2">
         {steps.map((step, index) => {
-          const done = index < currentIndex
-          const current = index === currentIndex
+          const done = finished ? index <= currentIndex : index < currentIndex
+          const current = !finished && index === currentIndex
           return (
             <li key={step.key} className="flex items-center gap-2">
               {index > 0 ? <span aria-hidden="true" className="bg-hairline h-px w-6" /> : null}

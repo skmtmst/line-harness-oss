@@ -2602,6 +2602,40 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   }
   const broadcastApproval = pathname.match(/^\/api\/broadcasts\/([^/]+)\/approval$/)
   if (broadcastApproval) {
+    const approvalId = broadcastApproval[1]
+    // 記録の見本と合わせる。2行目は承認を通って送信済み。
+    // 承認の無い配信は 'none'（段に承認待ちを出さない）。
+    if (approvalId === 'broadcast-2') {
+      return {
+        success: true,
+        data: {
+          ...BROADCAST_APPROVAL_STATE,
+          approval: {
+            ...BROADCAST_APPROVAL_STATE.approval,
+            status: 'approved',
+            decidedByStaffId: 'staff-approver',
+            decidedAt: '2026-09-25T21:02:00+09:00',
+          },
+        },
+      }
+    }
+    if (approvalId !== 'broadcast-0' && approvalId !== 'broadcast-visual') {
+      return {
+        success: true,
+        data: {
+          ...BROADCAST_APPROVAL_STATE,
+          approval: {
+            ...BROADCAST_APPROVAL_STATE.approval,
+            status: 'none',
+            requestedByStaffId: null,
+            requestedAt: null,
+            approverStaffId: null,
+            note: null,
+          },
+          gate: { ...BROADCAST_APPROVAL_STATE.gate, required: false, recipientCount: 0 },
+        },
+      }
+    }
     return { success: true, data: BROADCAST_APPROVAL_STATE }
   }
   const broadcastInsight = pathname.match(/^\/api\/broadcasts\/([^/]+)\/insight$/)

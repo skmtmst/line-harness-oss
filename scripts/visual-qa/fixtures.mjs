@@ -3171,9 +3171,13 @@ export const BROADCASTS = [
   afterActionVersionId: index === 1 ? 'common-action-version-broadcast-tagged' : null,
   version: 1,
   createdAt: '2026-08-16T00:00:00.000Z',
-  // 10の状態（#816）。見本の4行は分かれ道が無いので status と同じ札。
-  displayStatus: String(status),
-  displayStatusLabel: { draft: '下書き', scheduled: '予約済み', sent: '送信済み' }[status] ?? String(status),
+  // 承認の絡み（#816 C）。0行目は依頼中、2行目は承認を通って送信済み。
+  // 記録の見本（BROADCAST_ACTIVITY）と合わせる。無い行は 'none'。
+  approvalStatus: index === 0 ? 'pending' : index === 2 ? 'approved' : 'none',
+  // 10の状態（#816）。承認待ちは承認の軸が先（deriveBroadcastDisplayStatus
+  // と同じ）。0行目は status が予約済みでも「承認待ち」で見せる。
+  displayStatus: index === 0 ? 'pending_approval' : String(status),
+  displayStatusLabel: { draft: '下書き', pending_approval: '承認待ち', scheduled: '予約済み', sent: '送信済み' }[index === 0 ? 'pending_approval' : status] ?? String(status),
   ledger: status === 'sent'
     ? {
       sent: Number(successCount), failed: 0, failedTemporary: 0, failedPermanent: 0,

@@ -8,10 +8,9 @@ import { ApiError, api, type ApiBroadcast, type BroadcastDisplayStatus, type Bro
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import Progress from '@/components/shared/progress'
-import StickyBar from '@/components/shared/sticky-bar'
 import { Tabs } from '@/components/shared/tabs'
 import TargetMissing from '@/components/shared/target-missing'
-import BroadcastStatusRail from './broadcast-status-rail'
+import BroadcastStatusRail, { isApprovalInvolved } from './broadcast-status-rail'
 import BroadcastRecipients from './broadcast-recipients'
 import BroadcastActivity from './broadcast-activity'
 import {
@@ -426,10 +425,10 @@ function BroadcastDetailInner() {
       {loadState === 'loading' || !broadcast ? (
         <ListState kind="loading" title="配信を読み込んでいます" />
       ) : String(broadcast.status) === 'sent' ? (
-        <SentResult broadcast={broadcast} insight={insight} insightState={insightState} contentRef={contentRef} tab={tab} selectTab={selectTab} />
+        <SentResult broadcast={broadcast} insight={insight} insightState={insightState} contentRef={contentRef} tab={tab} selectTab={selectTab} approval={approvalState} onExportCsv={exportCsv} />
       ) : (
         <div className="space-y-4">
-          <DetailStatusRail broadcast={broadcast} />
+          <DetailStatusRail broadcast={broadcast} approval={approvalState} />
           {/*
             二者承認（設計 A-2）。配信の題の横に承認待ちの札を出す。
             題自体は枠の見出しに出るので、ここでは札と並べるだけにする。
@@ -713,26 +712,25 @@ function BroadcastDetailInner() {
             </ul>
           </section>
 
-          <Link
-            href="/broadcasts"
-            className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken inline-block border px-4 py-2 text-sm font-medium"
-          >
-            一覧へ戻る
-          </Link>
+          {/*
+            書き出しは概要のタブの中に1つ。宛先のタブの書き出しとは別物
+            （概要の実測値の1行）で、下の追従バーには置かない（#816 C）。
+          */}
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href="/broadcasts"
+              className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken inline-block border px-4 py-2 text-sm font-medium"
+            >
+              一覧へ戻る
+            </Link>
+            <Button variant="secondary" onClick={exportCsv}>
+              CSVで書き出す
+            </Button>
+          </div>
           </>
           )}
         </div>
       )}
-      {/*
-        ★V7 `x63W5x`：読み込み中は押せないボタンだけのバーを出さない。
-        配信が読めてから出す。
-      */}
-      {broadcast ? (
-        <StickyBar
-          className="mt-6"
-          actions={<Button onClick={exportCsv}>CSVで書き出す</Button>}
-        />
-      ) : null}
       {approvalStepUp && <StepUpPrompt request={approvalStepUp} onDone={() => setApprovalStepUp(null)} onClose={() => setApprovalStepUp(null)} />}
     </div>
   )
@@ -762,6 +760,8 @@ function SentResult({
   contentRef,
   tab,
   selectTab,
+  approval,
+  onExportCsv,
 }: {
   broadcast: ApiBroadcast
   insight: (BroadcastInsight & { suppressedByAudienceSize: boolean }) | null
@@ -769,6 +769,8 @@ function SentResult({
   contentRef: { current: HTMLElement | null }
   tab: 'overview' | 'recipients' | 'activity'
   selectTab: (next: 'overview' | 'recipients' | 'activity') => void
+  approval: BroadcastApprovalState | null
+  onExportCsv: () => void
 }) {
   const delivered = insight?.delivered ?? broadcast.successCount
   const opened = insight?.opens?.count ?? insight?.uniqueImpression ?? null
@@ -777,7 +779,7 @@ function SentResult({
 
   return (
     <div className="space-y-4">
-      <DetailStatusRail broadcast={broadcast} />
+      <DetailStatusRail broadcast={broadcast} approval={approval} />
       <DetailTabs tab={tab} selectTab={selectTab} recipientCount={broadcast.totalCount} />
       {tab === 'recipients' ? (
         <BroadcastRecipients broadcastId={broadcast.id} total={broadcast.totalCount} version={broadcast.version ?? 1} />
@@ -876,6 +878,15 @@ function SentResult({
       </div>
 
       {insightState === 'error' && <p role="alert" className="text-danger text-xs">開封・クリックを読み込めませんでした。</p>}
+      {/*
+        書き出しは概要のタブの中に1つ。宛先のタブの書き出しとは別物
+        （概要の実測値の1行）で、下の追従バーには置かない（#816 C）。
+      */}
+      <div>
+        <Button variant="secondary" onClick={onExportCsv}>
+          CSVで書き出す
+        </Button>
+      </div>
       </>
       )}
     </div>
@@ -896,12 +907,12 @@ function fallbackDisplayStatus(broadcast: ApiBroadcast): BroadcastDisplayStatus 
   return 'draft'
 }
 
-function DetailStatusRail({ broadcast }: { broadcast: ApiBroadcast }) {
+function DetailStatusRail({ broadcast, approval }: { broadcast: ApiBroadcast; approval: BroadcastApprovalState | null }) {
   const displayStatus = broadcast.displayStatus ?? fallbackDisplayStatus(broadcast)
   return (
     <BroadcastStatusRail
       displayStatus={displayStatus}
-      approvalInvolved={broadcast.approvalStatus != null && broadcast.approvalStatus !== 'none'}
+      approvalInvolved={isApprovalInvolved(broadcast.approvalStatus, approval)}
       scheduled={broadcast.status === 'scheduled' || broadcast.scheduledAt != null}
       ledger={broadcast.ledger ?? null}
       total={broadcast.totalCount}
