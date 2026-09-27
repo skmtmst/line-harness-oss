@@ -4915,9 +4915,24 @@ booking.get('/api/booking/admin/requests-summary', async (c) => {
             SUM(CASE WHEN date(datetime(starts_at, '+9 hours')) = ?
                      AND status NOT IN ('rejected','cancelled','canceled','completed','no_show')
                      THEN 1 ELSE 0 END) AS today_active_total,
-            SUM(CASE WHEN date(datetime(starts_at, '+9 hours')) BETWEEN ? AND ? THEN 1 ELSE 0 END) AS week_total
+            SUM(CASE WHEN date(datetime(starts_at, '+9 hours')) BETWEEN ? AND ? THEN 1 ELSE 0 END) AS week_total,
+            /*
+             * 表示タブ（今日・今週・今月）の数。カレンダーと同じ基準で
+             * 取消・拒否・期限切れを除いた「有効な予約」だけ数える。
+             * KPI・解約率に使う従来の集計（month_total 等）は変えない。
+             */
+            SUM(CASE WHEN date(datetime(starts_at, '+9 hours')) = ?
+                     AND status NOT IN ('cancelled','canceled','rejected','expired')
+                     THEN 1 ELSE 0 END) AS today_tab_total,
+            SUM(CASE WHEN date(datetime(starts_at, '+9 hours')) BETWEEN ? AND ?
+                     AND status NOT IN ('cancelled','canceled','rejected','expired')
+                     THEN 1 ELSE 0 END) AS week_tab_total,
+            SUM(CASE WHEN substr(datetime(starts_at, '+9 hours'), 1, 7) = ?
+                     AND status NOT IN ('cancelled','canceled','rejected','expired')
+                     THEN 1 ELSE 0 END) AS month_tab_total
        FROM bookings WHERE line_account_id = ?`,
-  ).bind(thisMonth, thisMonth, thisMonth, lastMonth, today, today, today, weekTo, accountId).first<Record<string, number>>();
+  ).bind(thisMonth, thisMonth, thisMonth, lastMonth, today, today, today, weekTo,
+    today, today, weekTo, thisMonth, accountId).first<Record<string, number>>();
   const byMenu = await c.env.DB.prepare(
     `SELECT m.name, COUNT(*) AS total FROM bookings b
        INNER JOIN menus m ON m.id = b.menu_id
@@ -4930,6 +4945,9 @@ booking.get('/api/booking/admin/requests-summary', async (c) => {
     todayTotal: Number(totals?.today_total ?? 0),
     todayActiveTotal: Number(totals?.today_active_total ?? 0),
     weekTotal: Number(totals?.week_total ?? 0),
+    todayTabTotal: Number(totals?.today_tab_total ?? 0),
+    weekTabTotal: Number(totals?.week_tab_total ?? 0),
+    monthTabTotal: Number(totals?.month_tab_total ?? 0),
     byMenu: byMenu.results.map((row) => ({ name: row.name, total: Number(row.total) })),
   });
 });

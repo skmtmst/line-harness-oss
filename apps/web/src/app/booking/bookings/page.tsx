@@ -192,10 +192,15 @@ export default function BookingsPage() {
    */
   const [candidatesStatus, setCandidatesStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [availability, setAvailability] = useState<CalendarAvailability>({ status: 'loading', slots: [] })
-  const [summary, setSummary] = useState({
+  const [summary, setSummary] = useState<{
+    total: number; requested: number; monthTotal: number; monthConfirmed: number;
+    monthCancelled: number; lastMonthTotal: number; todayTotal: number; weekTotal: number;
+    todayTabTotal?: number; weekTabTotal?: number; monthTabTotal?: number;
+    byMenu: Array<{ name: string; total: number }>;
+  }>({
     total: 0, requested: 0, monthTotal: 0, monthConfirmed: 0,
     monthCancelled: 0, lastMonthTotal: 0, todayTotal: 0, weekTotal: 0,
-    byMenu: [] as Array<{ name: string; total: number }>,
+    byMenu: [],
   })
   const [menus, setMenus] = useState<BookingMenu[]>([])
   // 集計の読み込み失敗は0表示と分ける。黙って0のままだと運用者が気づけない。
@@ -644,8 +649,11 @@ export default function BookingsPage() {
     }
   }, [calendarItems, items, detailId])
 
-  const todayCount = summary.todayTotal
-  const weekCount = summary.weekTotal
+  // タブの数はその期間の有効な予約だけ（取消・拒否・期限切れを除く）。
+  // 旧Worker（タブ用未返却）では従来の集計に倒す。
+  const todayCount = summary.todayTabTotal ?? summary.todayTotal
+  const weekCount = summary.weekTabTotal ?? summary.weekTotal
+  const monthCount = summary.monthTabTotal ?? kpi.total
 
   const pageHead = (
     <>
@@ -663,7 +671,7 @@ export default function BookingsPage() {
         {([
           ['day', summaryReady ? `今日 ${todayCount}` : '今日'],
           ['week', summaryReady ? `今週 ${weekCount}` : '今週'],
-          ['month', summaryReady ? `今月 ${kpi.total}` : '今月'],
+          ['month', summaryReady ? `今月 ${monthCount}` : '今月'],
           ['list', '一覧'],
         ] as const).map(([key, label]) => (
           <button

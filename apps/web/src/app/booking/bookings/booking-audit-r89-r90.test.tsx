@@ -126,6 +126,23 @@ describe('監査 R90: 今月は今月の予約に絞る', () => {
   })
 })
 
+describe('タブの数は期間の有効な予約だけ（取消・拒否・期限切れを除く）', () => {
+  it('集計のタブ用があれば従来の総数より絞って出す', async () => {
+    // 撮影の「今日 6・今週 6・今月 6」と0件のずれ。タブは未絞りの総数ではなく
+    // 有効な予約の数を出す。旧Worker（タブ用なし）では従来の数に倒す。
+    fixture.requestsSummary.mockResolvedValue({
+      ...summary,
+      todayTotal: 5, todayTabTotal: 2,
+      weekTotal: 6, weekTabTotal: 3,
+      monthTotal: 7, monthTabTotal: 4,
+    })
+    render(<BookingsPage />)
+    expect(await screen.findByRole('button', { name: '今日 2' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '今週 3' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '今月 4' })).toBeTruthy()
+  })
+})
+
 describe('監査 R89: 承認の後は集計・カレンダーも更新する', () => {
   it('状態の確定で一覧・集計・カレンダーの取得が走り直す', async () => {
     // 日の表示のまま。カレンダーのマス→詳細→完了の順に押す。
