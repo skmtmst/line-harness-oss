@@ -1290,6 +1290,8 @@ export type ConversionDefinitionListItem = {
     recordedCount: number
     netCount: number
     reversedCount: number | null
+    /** #819: 取消分の金額の合計(追記台帳+アフィリエイト調整)。 */
+    reversedValue: number | null
     netValue: number
     reversalState: 'available' | 'unavailable'
     reversalReason: string
@@ -1367,9 +1369,34 @@ export type ConversionDefinitionEvent = {
   status: ConversionDefinitionEventStatus
   approvalStatus: 'pending' | 'approved' | 'rejected' | null
   cancelled: boolean
+  /**
+   * #819: 取消追記台帳でいま取り消しか。アフィリエイト調整の取消とは
+   * 別に持ち、「取消を戻す」操作の対象はこの印が立つ行だけ。
+   */
+  reversed: boolean
   value: number | null
   source: string | null
   sourceEventId: string | null
+  createdAt: string
+}
+
+/** #819: 計測サイト。公開ID・許可ドメイン・許可外ドメインの拒否集計。 */
+export type MeasurementSite = {
+  id: string
+  label: string
+  domains: string[]
+  createdAt: string
+  rejectedCount: number
+  lastRejectedHost: string | null
+  lastRejectedAt: string | null
+}
+
+/** #819: 成果1件の取消・取消の取消の履歴行。 */
+export type ConversionReversal = {
+  id: string
+  kind: 'reverse' | 'restore'
+  reason: string
+  actorName: string | null
   createdAt: string
 }
 
@@ -6956,6 +6983,26 @@ export const api = {
         >
       >(`/api/friends/${friendId}/site-events`),
   },
+  /**
+   * #819: 計測サイト。成果を数えてよいドメインをサイトごとに決める。
+   * サイトIDは公開識別子で、秘密の鍵はタグに埋め込まない。
+   */
+  measurementSites: {
+    list: (accountId?: string) =>
+      fetchApi<ApiResponse<MeasurementSite[]>>(
+        `/api/measurement-sites${rangeQuery({ accountId })}`,
+      ),
+    create: (data: { accountId?: string; label: string; domains: string[] }) =>
+      fetchApi<ApiResponse<{ id: string; label: string; domains: string[] }>>(
+        '/api/measurement-sites',
+        { method: 'POST', body: JSON.stringify(data) },
+      ),
+    update: (id: string, data: { label?: string; domains?: string[] }) =>
+      fetchApi<ApiResponse<{ id: string }>>(
+        `/api/measurement-sites/${encodeURIComponent(id)}`,
+        { method: 'PATCH', body: JSON.stringify(data) },
+      ),
+  },
   funnels: {
     list: (accountId: string) =>
       fetchApi<ApiResponse<Array<{ id: string; name: string; windowDays: number; createdAt: string }>>>(
@@ -8902,6 +8949,17 @@ export const api = {
     definitionEvents: (id: string, limit = 50) =>
       fetchApi<ApiResponse<{ items: ConversionDefinitionEvent[] }>>(
         `/api/conversions/definitions/${encodeURIComponent(id)}/events?limit=${limit}`,
+      ),
+    /** #819: 成果1件の取消履歴(新しい順)。 */
+    reversals: (eventId: string) =>
+      fetchApi<ApiResponse<ConversionReversal[]>>(
+        `/api/conversions/events/${encodeURIComponent(eventId)}/reversals`,
+      ),
+    /** #819: 取消・取消の取消を理由付きで追記。元の成果行は消えない。 */
+    appendReversal: (eventId: string, data: { kind: 'reverse' | 'restore'; reason: string }) =>
+      fetchApi<ApiResponse<{ id: string; kind: 'reverse' | 'restore'; createdAt: string }>>(
+        `/api/conversions/events/${encodeURIComponent(eventId)}/reversals`,
+        { method: 'POST', body: JSON.stringify(data) },
       ),
     definitionReport: (params: { from: string; to: string; lineAccountId?: string }) => {
       const query = Object.fromEntries(

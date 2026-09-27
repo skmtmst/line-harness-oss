@@ -28,6 +28,10 @@ const dbMocks = vi.hoisted(() => ({
   listConversionDefinitionsForExport: vi.fn(),
   listConversionDefinitionEvents: vi.fn(),
   listConversionIngestionEvents: vi.fn(),
+  getReversedEventIds: vi.fn(),
+  listConversionReversals: vi.fn(),
+  isConversionEventReversed: vi.fn(),
+  appendConversionReversal: vi.fn(),
 }));
 const contractMocks = vi.hoisted(() => ({
   ConversionDefinitionError: class ConversionDefinitionError extends Error {
@@ -99,6 +103,9 @@ beforeEach(() => {
   accountMocks.getVisibleLineAccountScope.mockResolvedValue({
     allowedAccountIds: ['account-a'], canSeeUnassigned: false,
   });
+  dbMocks.getReversedEventIds.mockResolvedValue(new Set());
+  dbMocks.listConversionReversals.mockResolvedValue([]);
+  dbMocks.isConversionEventReversed.mockResolvedValue(false);
   dbMocks.listConversionDefinitions.mockResolvedValue(LIST_RESULT);
   dbMocks.getConversionDefinitionDetail.mockResolvedValue(null);
   dbMocks.getConversionDefinitionReport.mockResolvedValue({

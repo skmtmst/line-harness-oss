@@ -39,6 +39,11 @@ export interface ConversionPoint {
   created_at: string;
   /** 金額の決め方(N-252)。source のときは起点イベントの申告値を写す。 */
   value_mode?: 'source' | 'fixed' | 'none' | null;
+  /**
+   * 友だちと結び付かない成果を匿名の合計として数えるか(#819)。
+   * 0=数えない(既定)。1=conversion_anonymous_days へ日別の件数だけ残す。
+   */
+  count_anonymous?: number;
 }
 
 export interface ConversionEvent {

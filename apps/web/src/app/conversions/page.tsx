@@ -376,6 +376,17 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
    */
   const [definitionEvents, setDefinitionEvents] = useState<ConversionDefinitionEvent[]>([])
   const [eventsFailed, setEventsFailed] = useState(false)
+  /*
+   * #819: 成果の取り消し。元の行は消さず、理由つきの追記を台帳へ足す。
+   * 「取消を戻す」も同じ追記で、純数は最新の追記から引き直される。
+   * 取り消しの操作は owner/admin だけに出す。
+   */
+  const [reversalTarget, setReversalTarget] = useState<ConversionDefinitionEvent | null>(null)
+  const [reversalKind, setReversalKind] = useState<'reverse' | 'restore'>('reverse')
+  const [reversalReason, setReversalReason] = useState('')
+  const [reversalBusy, setReversalBusy] = useState(false)
+  const [reversalError, setReversalError] = useState('')
+  const [canReverse, setCanReverse] = useState(false)
 
   /**
    * 一覧は検索・並びを口へ渡し、続く頁をすべて読む(#513 M2・M3)。
@@ -539,6 +550,59 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
       })
       .catch(() => undefined)
   }, [detailTarget])
+
+  // 成果の取り消しは owner/admin だけ。staff には操作を出さない。
+  useEffect(() => {
+    let active = true
+    void api.staff.me().then((response) => {
+      if (!active) return
+      setCanReverse(response.success && (response.data.role === 'owner' || response.data.role === 'admin'))
+    }).catch(() => undefined)
+    return () => { active = false }
+  }, [])
+
+  const openReversal = (event: ConversionDefinitionEvent, kind: 'reverse' | 'restore') => {
+    setReversalTarget(event)
+    setReversalKind(kind)
+    setReversalReason('')
+    setReversalError('')
+  }
+
+  const submitReversal = async () => {
+    if (!reversalTarget || !detailTarget) return
+    if (!reversalReason.trim()) {
+      setReversalError('理由を入れてください')
+      return
+    }
+    setReversalBusy(true)
+    setReversalError('')
+    try {
+      const res = await api.conversions.appendReversal(reversalTarget.id, {
+        kind: reversalKind,
+        reason: reversalReason.trim(),
+      })
+      if (!res.success) throw new Error(res.error || '記録できませんでした')
+      const targetId = detailTarget.id
+      setReversalTarget(null)
+      setReversalReason('')
+      // 一覧の状態と「この30日」の数を取り直す。
+      void api.conversions.definitionEvents(targetId, 10)
+        .then((ev) => { if (ev.success) setDefinitionEvents(ev.data.items) })
+        .catch(() => undefined)
+      void api.conversions
+        .definitions({ ...definitionRange(30), lineAccountId: accountId ?? undefined })
+        .then((list) => {
+          if (!list.success) return
+          const fresh = list.data.items.find((item) => item.id === targetId)
+          if (fresh) setDetailTarget((current) => (current && current.id === targetId ? { ...current, ...fresh } : current))
+        })
+        .catch(() => undefined)
+    } catch (err) {
+      setReversalError(err instanceof Error ? err.message : '記録できませんでした')
+    } finally {
+      setReversalBusy(false)
+    }
+  }
 
   /** N-268: 下書きを計測中へ。開いた時点の版を渡す。 */
   const publishDraft = async (target: ConversionDefinitionListItem) => {
@@ -1026,7 +1090,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
               <div><dt className="text-ink-faint">数え方</dt><dd className="text-ink mt-1 font-semibold">{deduplicationLabel(detailTarget.deduplicationMode, detailTarget.deduplicationWindowDays)}</dd></div>
               <div><dt className="text-ink-faint">この30日</dt><dd className="text-ink mt-1 font-semibold">{detailTarget.metrics.netCount.toLocaleString('ja-JP')}件</dd></div>
               <div><dt className="text-ink-faint">利用先</dt><dd className="text-ink mt-1 font-semibold">{usageLabel(detailTarget)}</dd></div>
-              <div><dt className="text-ink-faint">取消内訳</dt><dd className="text-ink mt-1 font-semibold">{detailTarget.metrics.cancellationCount == null ? '取消台帳は未接続' : `${detailTarget.metrics.cancellationCount}件・¥${(detailTarget.metrics.cancellationValue ?? 0).toLocaleString('ja-JP')}`}</dd></div>
+              <div><dt className="text-ink-faint">取消内訳</dt><dd className="text-ink mt-1 font-semibold">{detailTarget.metrics.reversedCount == null ? '取消台帳は未接続' : `${detailTarget.metrics.reversedCount}件・¥${(detailTarget.metrics.reversedValue ?? 0).toLocaleString('ja-JP')}`}</dd></div>
             </dl>
             {detailTarget.stateReason ? (
               <Notice tone="warn" message={detailTarget.stateReason} />
@@ -1069,7 +1133,30 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                           <span className="text-ink-faint ml-2 tabular-nums">¥{event.value.toLocaleString('ja-JP')}</span>
                         ) : null}
                       </span>
-                      <span className="text-ink-faint shrink-0 tabular-nums">
+                      <span className="text-ink-faint flex shrink-0 items-baseline gap-3 tabular-nums">
+                        {/*
+                         * #819: 取消は追記なので元の行は残る。取り消せるのは
+                         * 台帳で取り消されていない成果だけ。「取消を戻す」は
+                         * この台帳で取り消したものに限る（連携元の取消は
+                         * ここから戻せない）。
+                         */}
+                        {canReverse && event.reversed ? (
+                          <button
+                            type="button"
+                            className="text-action underline"
+                            onClick={() => openReversal(event, 'restore')}
+                          >
+                            取消を戻す
+                          </button>
+                        ) : canReverse && !event.cancelled ? (
+                          <button
+                            type="button"
+                            className="text-action underline"
+                            onClick={() => openReversal(event, 'reverse')}
+                          >
+                            取り消す
+                          </button>
+                        ) : null}
                         {event.createdAt.slice(0, 16).replace('T', ' ')}
                       </span>
                     </li>
@@ -1133,6 +1220,37 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
             ) : null}
           </div>
         ) : null}
+      </Dialog>
+
+      {/*
+       * #819: 成果の取消/取消の取消。元の成果行は消えず、理由つきの
+       * 追記として台帳へ残る。二重取消・未取消への取消の取消は口が 409 で返す。
+       */}
+      <Dialog
+        open={reversalTarget !== null}
+        title={reversalKind === 'restore' ? 'この成果の取消を戻す' : 'この成果を取り消す'}
+        description={
+          reversalKind === 'restore'
+            ? '取り消しを戻すと、この成果はふたたび数えます。操作は理由と一緒に記録として残ります。'
+            : '取り消すと、この成果は「取消」となり純数から引かれます。もとの記録は残り、あとから戻せます。'
+        }
+        tone={reversalKind === 'restore' ? 'default' : 'destructive'}
+        busy={reversalBusy}
+        error={reversalError || undefined}
+        confirmLabel={reversalKind === 'restore' ? '取消を戻す' : '取り消す'}
+        onConfirm={() => void submitReversal()}
+        onCancel={() => setReversalTarget(null)}
+      >
+        <label className="block">
+          <span className="text-ink text-xs font-semibold">理由</span>
+          <TextField
+            className="mt-1"
+            value={reversalReason}
+            maxLength={500}
+            placeholder="例: 重複して届いた成果だったため"
+            onChange={(e) => setReversalReason(e.target.value)}
+          />
+        </label>
       </Dialog>
 
       <Dialog
