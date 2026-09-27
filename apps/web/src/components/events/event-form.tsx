@@ -84,6 +84,17 @@ export function formatJpSlotRange(startsAt: string, endsAt: string): string {
   return `${start} 〜 ${sameDay ? end.slice(-5) : end}`
 }
 
+/**
+ * 保存・読込の応答を draft の形へ戻す（R82）。
+ *
+ * Worker は質問の定義を questions_json の文字列で返す。ほぐさず
+ * `setDraft` すると questions が消え、次の保存で questions:null を送って
+ * 定義ごと消してしまう。読み込み時と同じほぐし方を保存後にも使う。
+ */
+export function toEventDraft(row: EventDetail): EventDetail {
+  return { ...row, questions: parseEventQuestions(row.questions_json) }
+}
+
 export default function EventForm({ accountId, eventId }: EventFormProps) {
   const router = useRouter()
   const { selectedAccount, accounts } = useAccount()
@@ -149,7 +160,7 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
         if (cancelled) return
         // Worker は質問定義を questions_json の文字列で返す。フォームは
         // 配列で触るので、ここでほぐしてから draft に載せる。
-        setDraft({ ...ev, questions: parseEventQuestions(ev.questions_json) })
+        setDraft(toEventDraft(ev))
         setSlots(slotsRes.items)
       } catch (e) {
         // 生の `API error: 404` を主文にしない。消えたものと通信の失敗を言い分ける。
@@ -231,7 +242,9 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
       }
       if (eventId) {
         const updated = await eventsApi.updateEvent(accountId, eventId, payload, draft.version ?? 1)
-        setDraft(updated)
+        // 応答は questions_json の文字列で返る。ほぐさず載せると次の保存で
+        // questions:null を送り、質問を消してしまう（R82）。
+        setDraft(toEventDraft(updated))
         notifyToast('保存しました')
         if (nextTab) setTab(nextTab)
       } else {
