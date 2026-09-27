@@ -4514,6 +4514,21 @@ const spec = {
         },
       },
     },
+    '/api/line-notifications/send-counts': {
+      get: {
+        tags: ['Customer notifications'],
+        summary: '顧客通知の送信件数（今日・この30日）',
+        description: '共通送信台帳の受け付け済みをJSTの今日・今日を含む30日で数える。ECの取り込み件数でもLINE集計の全期間合計でもない。試し送りは除く。',
+        parameters: [
+          { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '送信件数（合計・出来事の種類別・期間）' },
+          '400': { description: 'lineAccountId が無い' },
+          '403': { description: 'このLINEアカウントを表示する権限がない' },
+        },
+      },
+    },
     '/api/line-notifications/deliveries/{id}/resend': {
       post: {
         tags: ['Customer notifications'],
