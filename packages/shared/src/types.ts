@@ -326,6 +326,11 @@ export interface MediaItem {
   durationMs: number | null;
   url: string;
   uploadedBy: string | null;
+  /**
+   * 入れた人の表示名（R35）。uploadedBy は内部ID（UUID）のまま残し、
+   * 画面にはこちらを出す。退職・削除済みで引けないときは null。
+   */
+  uploadedByName?: string | null;
   createdAt: string;
   /** アーカイブ済みなら退避した時刻・実行者・理由。使用中でも触れない消去ではない。 */
   archivedAt?: string | null;
@@ -382,6 +387,13 @@ export interface MediaDeleteImpact {
   /** 7種類すべてを削除直前に読み切った時刻。0件でも必ず入る。 */
   checkedAt: string;
   lastScannedAt: string | null;
+  /**
+   * 7種類すべてを読み切れたか（R34）。表が無い環境などで一部を読めな
+   * かったときは false。false のとき usageCount 0 は「どこでも使って
+   * いない」ではなく「確かめられなかった」で、canDelete も false
+   * （確かめられないものは消させない）。
+   */
+  verified: boolean;
   canDelete: boolean;
   recommendedAction: "delete" | "review_references";
 }
@@ -2205,6 +2217,18 @@ export interface ReminderDraftStep {
   action?: Record<string, unknown>;
 }
 
+/**
+ * リマインダの対象条件。一斉配信・シナリオと同じ絞り込みの形。
+ *
+ * settings_snapshot の JSON にだけ持つので列の追加は要らない。
+ * 空 (rules・groups ともに0件) は「絞り込みなし」と同じく扱う。
+ */
+export interface ReminderTargetCondition {
+  operator: 'AND' | 'OR';
+  rules: Array<{ type: string; value: unknown }>;
+  groups?: ReminderTargetCondition[];
+}
+
 export interface ReminderDraftSettings {
   name: string;
   description?: string | null;
@@ -2220,6 +2244,8 @@ export interface ReminderDraftSettings {
   triggerOffsetMinutes?: number | null;
   sendAtTime?: string | null;
   targetTagId?: string | null;
+  /** 対象の絞り込み条件。あるときは targetTagId よりこちらが勝つ。 */
+  targetCondition?: ReminderTargetCondition | null;
   folderId?: string | null;
   stopConditions: ReminderStopConditions;
   steps: ReminderDraftStep[];

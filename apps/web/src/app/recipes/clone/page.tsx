@@ -2,13 +2,13 @@
 
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { Suspense, useCallback, useEffect, useState } from 'react'
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { api, ApiError, type Recipe } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import ListState from '@/components/shared/list-state'
 import TargetMissing from '@/components/shared/target-missing'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import StickyBar from '@/components/shared/sticky-bar'
 import { TextField } from '@/components/shared/text-field'
@@ -43,6 +43,8 @@ function RecipeClone() {
   const [missing, setMissing] = useState(false)
   const [prefix, setPrefix] = useState('')
   const [cloneState, setCloneState] = useState<'idle' | 'saving' | 'success' | 'error'>('idle')
+  /** 同じ作成意図の再送で使い回すキー（監査 R126）。 */
+  const cloneKeyRef = useRef<{ intent: string; key: string } | null>(null)
 
   usePageTitle(recipe ? `${recipe.name}を作る` : null)
 
@@ -124,11 +126,21 @@ function RecipeClone() {
   const clone = async () => {
     if (!selectedAccountId || !canClone || cloneState === 'saving') return
     setCloneState('saving')
+    /*
+      監査 R126: 同じ作成のやり直しには同じ再送キーを使う。
+      応答だけが切れたあと新しいキーで送ると別の依頼になり、先に作った
+      下書きと名前がぶつかって失敗する。宛先・名前のあたま・レシピが
+      変わったら別の依頼なので、その時だけ新しいキーにする。
+    */
+    const intent = `${recipe.id}:${selectedAccountId}:${prefix}`
+    if (cloneKeyRef.current?.intent !== intent) {
+      cloneKeyRef.current = { intent, key: crypto.randomUUID() }
+    }
     try {
       const result = await api.recipes.clone(
         recipe.id,
         { accountId: selectedAccountId, namePrefix: prefix || null, expectedVersion: recipe.version },
-        crypto.randomUUID(),
+        cloneKeyRef.current.key,
       )
       setCloneState(result.success ? 'success' : 'error')
     } catch {
@@ -164,11 +176,13 @@ function RecipeClone() {
                 <label className={styles.accountLabel} htmlFor="recipe-clone-account">
                   どのLINEアカウントに作るか<RequiredBadge />
                 </label>
-                <SelectField
+                <Select
+                  aria-label="どのLINEアカウントに作るか"
                   id="recipe-clone-account"
-                  className={styles.accountSelect}
+                  size="full"
                   value={selectedAccountId ?? ''}
                   disabled={!selectedAccountId}
+                  onChange={() => undefined}
                   options={[{
                     value: selectedAccountId ?? '',
                     label: selectedAccount?.name ?? 'アカウントが選ばれていません',

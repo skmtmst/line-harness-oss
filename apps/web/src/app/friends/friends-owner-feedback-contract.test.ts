@@ -53,6 +53,8 @@ describe('友だち画面のオーナー指摘契約', () => {
     expect(USER_FILTERS).toContain('<SearchField')
     expect(USER_FILTERS).toContain('min-w-0 flex-1')
     expect(USER_FILTERS).not.toContain('rounded-[14px] border')
-    expect(USER_FILTERS.match(/h-10/g)?.length).toBeGreaterThanOrEqual(2)
+    // 高さは部品側が持つ（SearchField・Select ともに40px。寸法の契約試験が守る）。
+    // ここでは操作行がその3部品でそろっていることだけ見る。
+    expect(USER_FILTERS.match(/<Select/g)?.length).toBeGreaterThanOrEqual(2)
   })
 })

@@ -30,6 +30,8 @@ import Pagination from '@/components/shared/pagination'
 import ListRange from '@/components/ui/list-range'
 import FilterChip from '@/components/shared/filter-chip'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
+import FolderAddDialog from '@/components/shared/folder-add-dialog'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
@@ -133,6 +135,11 @@ function MediaLibraryInner() {
   latestAccountRef.current = selectedAccountId
   const [items, setItems] = useState<MediaItem[]>([])
   const [total, setTotal] = useState(0)
+  /*
+    R38: `total` は絞り込み後の件数。フォルダ欄の「すべて」には絞り込み前の
+    総数を出すため、同じ棚（アーカイブの扱い）で数えた総数を別に持つ。
+  */
+  const [overallTotal, setOverallTotal] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadFailed, setLoadFailed] = useState(false)
   const [quota, setQuota] = useState<MediaQuota | null>(null)
@@ -146,6 +153,14 @@ function MediaLibraryInner() {
   const [addingFolder, setAddingFolder] = useState(false)
   const [folderName, setFolderName] = useState('')
   const [savingFolder, setSavingFolder] = useState(false)
+  /*
+    R37: フォルダの名前変更・削除を FolderPanel の「…」へ接続する。
+    追加だけあって直し・消しが無いと、整理し直す手段が無い。
+  */
+  const [editingFolder, setEditingFolder] = useState<Folder | null>(null)
+  const [deletingFolder, setDeletingFolder] = useState<Folder | null>(null)
+  const [folderBusy, setFolderBusy] = useState(false)
+  const [folderError, setFolderError] = useState('')
   const [uploadOpen, setUploadOpen] = useState(false)
   /* ★V7: 札の操作を並べない。「使用箇所＋ダウンロード＋…」の1行に収め、削除の印は残す。取得は読取権限でも使うので「…」に隠さない。 */
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
@@ -357,7 +372,7 @@ function MediaLibraryInner() {
     setQuotaFailed(false)
     setError('')
     try {
-      const [res, folderResponse, quotaResponse] = await Promise.all([
+      const [res, folderResponse, quotaResponse, overallResponse] = await Promise.all([
         api.media.list(accountAtRequest, {
           kind: kinds.size === 1 ? [...kinds][0] : undefined,
           folderId: folderFilter || undefined,
@@ -372,12 +387,19 @@ function MediaLibraryInner() {
         // #730: 選択中の1件に閉じた母集団で数える。
         api.folders.list('media', accountAtRequest),
         api.media.quota(accountAtRequest).catch(() => null),
+        // R38: フォルダ欄の「すべて」は絞り込み前の総数。1件だけ取って数を読む。
+        api.media.list(accountAtRequest, {
+          archived: showArchivedOnly ? 'only' : undefined,
+          limit: 1,
+          offset: 0,
+        }).catch(() => null),
       ])
       if (accountAtRequest !== latestAccountRef.current) return
       if (res.success) {
         setItems(res.data.items)
         setTotal(res.data.total)
       }
+      if (overallResponse?.success) setOverallTotal(overallResponse.data.total)
       if (folderResponse.success) {
         setFolders(folderResponse.data)
         setUnfiledCount(folderResponse.unfiledCount ?? null)
@@ -446,6 +468,26 @@ function MediaLibraryInner() {
       setError(caught instanceof Error ? caught.message : 'フォルダを追加できませんでした')
     } finally {
       setSavingFolder(false)
+    }
+  }
+
+  /** R37: フォルダを消す。中身は消えず未分類に戻る。消した先を選んでいたら「すべて」へ戻す。 */
+  async function removeFolder() {
+    if (!deletingFolder || !selectedAccountId || folderBusy) return
+    const accountAtRequest = selectedAccountId
+    setFolderBusy(true)
+    setFolderError('')
+    try {
+      const response = await api.folders.delete(deletingFolder.id, accountAtRequest)
+      if (!response.success) throw new Error(response.error)
+      if (accountAtRequest !== latestAccountRef.current) return
+      setDeletingFolder(null)
+      if (folderFilter === deletingFolder.id) setFolderFilter('')
+      void load()
+    } catch {
+      if (accountAtRequest === latestAccountRef.current) setFolderError('フォルダを削除できませんでした。')
+    } finally {
+      setFolderBusy(false)
     }
   }
 
@@ -693,6 +735,28 @@ function MediaLibraryInner() {
   const pageCount = Math.max(1, Math.ceil(total / pageSize))
   const current = items
 
+  /*
+    R38: 絞り込みが1つでも効いているか。「すべて」の選び方・0件表示・
+    フォルダ欄の件数を使い分ける。
+  */
+  const hasFilter = query.trim() !== ''
+    || folderFilter !== ''
+    || kinds.size !== KINDS.length
+    || showUnusedOnly
+    || showNearLimitOnly
+    || showArchivedOnly
+
+  /** R38: 「条件に合うものがありません」の次に置く、条件を外す口。 */
+  const clearFilters = () => {
+    setQuery('')
+    setFolderFilter('')
+    setKinds(new Set(KINDS.map((kind) => kind.key)))
+    setShowUnusedOnly(false)
+    setShowNearLimitOnly(false)
+    setShowArchivedOnly(false)
+    setPage(1)
+  }
+
   useEffect(() => {
     if (page > pageCount) setPage(pageCount)
   }, [page, pageCount])
@@ -794,7 +858,9 @@ function MediaLibraryInner() {
             <p className="text-ink-faint text-xs">{managementPermissionReason}。</p>
           )}
           rows={[
-            { id: '', label: 'すべて', count: total },
+            // R38: 「すべて」は絞り込み前の総数。絞り込み後の件数を
+            // 入れると「すべて0・未分類2」のように母集団が混ざる。
+            { id: '', label: 'すべて', count: overallTotal ?? total },
             ...folders.map((folder) => ({
               id: folder.id,
               label: folder.name,
@@ -803,10 +869,16 @@ function MediaLibraryInner() {
               // 数える計算は、黙って別の母集団にすり替わるため廃止。
               count: folder.itemCount ?? null,
               color: folder.color,
+              // R37: 名前変更・削除を「…」へ接続する。権限の無い人には
+              // 押して失敗する口を見せない。
+              onEdit: canManageMedia ? () => setEditingFolder(folder) : undefined,
+              onDelete: canManageMedia ? () => { setFolderError(''); setDeletingFolder(folder) } : undefined,
+              deleteNote: '削除しても、中のメディアは未分類に残ります。',
             })),
             { id: UNGROUPED, label: '未分類', count: unfiledCount },
           ]}
         >
+          {folderError ? <p role="alert" className="text-ink-secondary text-xs">{folderError}</p> : null}
           {addingFolder ? (
             <div className="space-y-2">
               <input
@@ -853,7 +925,7 @@ function MediaLibraryInner() {
           <>
             {/* 種別と使用状態。選ぶと必ず1ページ目へ戻る。 */}
             <FilterChip
-              selected={kinds.size === KINDS.length && !showUnusedOnly && !showArchivedOnly}
+              selected={kinds.size === KINDS.length && !showUnusedOnly && !showNearLimitOnly && !showArchivedOnly}
               onChange={() => {
                 setKinds(new Set(KINDS.map((kind) => kind.key)))
                 setShowUnusedOnly(false)
@@ -982,12 +1054,32 @@ function MediaLibraryInner() {
         />
       ) : current.length === 0 ? (
         <div className="bg-canvas rounded-card border-hairline border">
-          <ListState
-            kind="empty"
-            title={total === 0 && !query && !folderFilter ? 'まだメディアがありません' : '条件に合うメディアはありません'}
-            description={total === 0 && !query && !folderFilter ? '配信で使う画像・動画・音声・ファイルの置き場です。' : '種類、フォルダ、または検索条件を変えてください。'}
-            action={total === 0 && !query && !folderFilter ? <Button variant="primary" onClick={() => setUploadOpen(true)}>メディアを登録</Button> : undefined}
-          />
+          {/*
+            R38: まだ1件も無いときと、絞り込みで0件のときを分ける。
+            `total` は絞り込み後の件数のため、絞り込みの有無も見る。
+            絞り込みの0件に作る口を出すと、保存済みが消えたと誤読される。
+            代わりに「条件を外す」を置く。
+          */}
+          {total === 0 && !hasFilter ? (
+            <ListState
+              kind="empty"
+              title="まだメディアがありません"
+              description="配信で使う画像・動画・音声・ファイルの置き場です。"
+              action={<Button variant="primary" onClick={() => setUploadOpen(true)}>メディアを登録</Button>}
+            />
+          ) : (
+            <ListState
+              kind="empty"
+              emptyPreset="filtered"
+              title="条件に合うメディアはありません"
+              description="種類、フォルダ、または検索条件を変えてください。"
+              action={(
+                <Button type="button" onClick={clearFilters}>
+                  条件を外す
+                </Button>
+              )}
+            />
+          )}
         </div>
       ) : (
         <div
@@ -1234,15 +1326,24 @@ function MediaLibraryInner() {
         {impactPhase === 'loading' ? (
           <p className="text-ink-faint text-xs">使われている場所を確認しています…</p>
         ) : impactPhase === 'error' ? (
-          <p className="text-danger text-xs font-semibold" role="alert">
-            使われている場所を確認できませんでした。読み直してから、もう一度お試しください。
-          </p>
+          <div className="space-y-2">
+            <p className="text-danger text-xs font-semibold" role="alert">
+              使われている場所を確認できませんでした。読み直してから、もう一度お試しください。
+            </p>
+            {/* R34: 詳細と同じように、確認時刻と読み直しを一覧でも出す。 */}
+            <Button type="button" onClick={() => { if (deleting) void openDelete(deleting) }}>読み直す</Button>
+          </div>
         ) : impact ? (
           <div className="space-y-3">
             <p className={impact.canDelete ? 'text-ink-secondary text-sm' : 'text-danger text-sm font-semibold'}>
               {usageText(impact)}
               {blockedReason(impact) ? ` ${blockedReason(impact)}` : ''}
             </p>
+            {impact.verified === false ? (
+              <div>
+                <Button type="button" onClick={() => { if (deleting) void openDelete(deleting) }}>読み直す</Button>
+              </div>
+            ) : null}
 
             {impact.references.length > 0 ? (
               <div>
@@ -1428,6 +1529,36 @@ function MediaLibraryInner() {
           notifyToast(message)
           void load()
         }}
+      />
+
+      {editingFolder && (
+        <FolderAddDialog
+          kind="media"
+          folder={editingFolder}
+          accountId={selectedAccountId}
+          note="メディアを分けてしまう箱です。削除しても、中のメディアは未分類に残ります。"
+          placeholder="例: 01_商品写真"
+          onClose={() => setEditingFolder(null)}
+          onAdded={() => { setEditingFolder(null); void load() }}
+        />
+      )}
+
+      {/*
+        R37: 消す前に、中身がどうなるかを本文で読ませる。
+        「中身は未分類に戻ります」の確認を ConfirmDialog で行う。
+      */}
+      <ConfirmDialog
+        open={deletingFolder !== null}
+        title={`フォルダ「${deletingFolder?.name ?? ''}」を削除しますか？`}
+        description={deletingFolder?.itemCount != null
+          ? `削除しても、中のメディアは未分類に残ります。いまこのフォルダに入っているのは${deletingFolder.itemCount}件です。`
+          : '削除しても、中のメディアは未分類に残ります。'}
+        confirmLabel="削除する"
+        destructive
+        busy={folderBusy}
+        error={folderError || undefined}
+        onCancel={() => { if (!folderBusy) { setDeletingFolder(null); setFolderError('') } }}
+        onConfirm={() => void removeFolder()}
       />
 
       {preview && (

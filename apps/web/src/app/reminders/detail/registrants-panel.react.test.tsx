@@ -15,6 +15,23 @@ const apiMock = vi.hoisted(() => ({
 }))
 
 vi.mock('next/link', () => ({ default: ({ children }: { children: unknown }) => <>{children}</> }))
+
+/*
+ * 共通の Select は listbox の部品で、その操作は部品自身の試験が持つ。
+ * ここで見たいのは選んだ後の登録者の判断なので、素の <select> に置き換える。
+ */
+vi.mock('@/components/shared/select', () => ({
+  default: ({ 'aria-label': label, value, onChange, options }: {
+    'aria-label'?: string
+    value: string
+    onChange: (value: string) => void
+    options: Array<{ value: string; label: string }>
+  }) => React.createElement(
+    'select',
+    { 'aria-label': label, value, onChange: (e: { target: { value: string } }) => onChange(e.target.value) },
+    options.map((option) => React.createElement('option', { key: option.value, value: option.value }, option.label)),
+  ),
+}))
 const account = vi.hoisted(() => ({ selectedAccountId: 'account-a' }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: account.selectedAccountId }) }))
 vi.mock('@/lib/api', () => ({

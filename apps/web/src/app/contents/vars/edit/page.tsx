@@ -3,7 +3,7 @@
 import { X } from 'lucide-react'
 import DateField from '@/components/shared/date-field'
 import DateTimeField, { TimeField } from '@/components/shared/date-time-field'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -94,9 +94,18 @@ function EditCommonVarInner() {
   const [validUntil, setValidUntil] = useState('')
   const [expiryBehavior, setExpiryBehavior] = useState<'stop' | 'fallback'>('stop')
   const [fallbackValue, setFallbackValue] = useState('')
+  /** R36: 直し方は欄のすぐ下にも出す。全体の失敗文だけではどの欄か分からない。 */
+  const [valueFieldError, setValueFieldError] = useState('')
+  const [fallbackFieldError, setFallbackFieldError] = useState('')
+  const [scheduleFieldError, setScheduleFieldError] = useState('')
 
   /** 予約を足す窓。開いていない間は null。 */
   const [draft, setDraft] = useState<{ date: string; time: string; value: string } | null>(null)
+
+  // 直したら欄の下の文言は消す。残ると直ったのに怒られているように見える。
+  useEffect(() => { setValueFieldError('') }, [value])
+  useEffect(() => { setFallbackFieldError('') }, [fallbackValue])
+  useEffect(() => { setScheduleFieldError('') }, [draft?.value])
 
   /**
    * 変える前の影響確認（設計 `uNBlA`）。
@@ -274,9 +283,11 @@ function EditCommonVarInner() {
       return
     }
     // VAR-06: 新規画面と同じ型検査を保存前に行い、理由を出して欄へ戻す。
+    // 理由は欄のすぐ下にも出す（R36）。
     const valueError = commonVarValueError(item.type, value)
     if (valueError) {
       setError(valueError)
+      setValueFieldError(valueError)
       document.getElementById('cv-value')?.focus()
       return
     }
@@ -293,6 +304,7 @@ function EditCommonVarInner() {
       const fallbackError = commonVarValueError(item.type, fallbackValue, '代替値')
       if (fallbackError) {
         setError(fallbackError)
+        setFallbackFieldError(fallbackError)
         document.getElementById('cv-fallback-value')?.focus()
         return
       }
@@ -329,6 +341,9 @@ function EditCommonVarInner() {
       if (accountAtRequest !== latestAccountRef.current) return
       if (!res.success) {
         setError(res.error)
+        // 口で止まった理由も欄のすぐ下に映す（R36）。
+        if (res.error.includes('代替値')) setFallbackFieldError(res.error)
+        else if (res.error.includes('値')) setValueFieldError(res.error)
         return
       }
       setSaved(true)
@@ -484,6 +499,7 @@ function EditCommonVarInner() {
     const scheduleValueError = commonVarValueError(item.type, draft.value, '更新後の値')
     if (scheduleValueError) {
       setError(scheduleValueError)
+      setScheduleFieldError(scheduleValueError)
       return
     }
     setError('')
@@ -494,6 +510,9 @@ function EditCommonVarInner() {
       })
       if (!res.success) {
         setError(res.error)
+        if (res.error.includes('更新後の値') || res.error.includes('種別')) {
+          setScheduleFieldError(res.error)
+        }
         return
       }
       setDraft(null)
@@ -624,10 +643,11 @@ function EditCommonVarInner() {
                   </div>
                   <div>
                     <label htmlFor="cv-folder" className="text-ink-secondary mb-1 block text-sm font-medium">フォルダ</label>
-                    <SelectField
+                    <Select
+                      aria-label="フォルダ"
                       id="cv-folder"
                       value={folderId}
-                      onChange={(e) => { setSaved(false); setFolderId(e.target.value) }}
+                      onChange={(value) => { setSaved(false); setFolderId(value) }}
                       options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]}
                     />
                   </div>
@@ -638,7 +658,7 @@ function EditCommonVarInner() {
                     <label htmlFor="cv-value" className="text-ink-secondary text-sm font-medium">差し込まれる文字</label>
                     <span className="text-ink-faint text-xs tabular-nums">{value.length} / {item.type === 'long_text' ? 10000 : 200}</span>
                   </div>
-                  {item.type === 'boolean' ? <SelectField id="cv-value" value={value} onChange={(e) => { setSaved(false); setValue(e.target.value) }} options={[{ value: 'true', label: 'true' }, { value: 'false', label: 'false' }]} className="w-full" /> : (item.type as string) === 'long_text' ? <textarea id="cv-value" maxLength={10000} value={value} onChange={(e) => { setSaved(false); setValue(e.target.value) }} className="border-hairline rounded-control w-full border px-3 py-3 text-sm" rows={5} /> : (item.type as string) === 'date' ? <DateField id="cv-value" value={value} onChange={(v) => { setSaved(false); setValue(v) }} /> : (item.type as string) === 'datetime' ? <DateTimeField id="cv-value" value={value} onChange={(v) => { setSaved(false); setValue(v) }} /> : <input
+                  {item.type === 'boolean' ? <Select size="full" aria-label="差し込まれる文字" id="cv-value" value={value} onChange={(value) => { setSaved(false); setValue(value) }} options={[{ value: 'true', label: 'true' }, { value: 'false', label: 'false' }]} /> : (item.type as string) === 'long_text' ? <textarea id="cv-value" maxLength={10000} value={value} onChange={(e) => { setSaved(false); setValue(e.target.value) }} className="border-hairline rounded-control w-full border px-3 py-3 text-sm" rows={5} /> : (item.type as string) === 'date' ? <DateField id="cv-value" value={value} onChange={(v) => { setSaved(false); setValue(v) }} /> : (item.type as string) === 'datetime' ? <DateTimeField id="cv-value" value={value} onChange={(v) => { setSaved(false); setValue(v) }} /> : <input
                     id="cv-value"
                     type={item.type === 'number' ? 'number' : 'text'}
                     maxLength={item.type === 'number' ? undefined : 200}
@@ -646,6 +666,7 @@ function EditCommonVarInner() {
                     onChange={(e) => { setSaved(false); setValue(e.target.value) }}
                     className="border-hairline rounded-control w-full border px-3 py-3 text-sm"
                   />}
+                  {valueFieldError ? <p className="text-danger mt-1 text-xs">{valueFieldError}</p> : null}
                 </div>
 
                 {/*
@@ -699,16 +720,17 @@ function EditCommonVarInner() {
                   </div>
                   <div>
                     <label htmlFor="cv-expiry-behavior" className="text-ink-secondary mb-1 block text-xs font-medium">期間外の動作</label>
-                    <SelectField id="cv-expiry-behavior" value={expiryBehavior} onChange={(e) => { setSaved(false); setExpiryBehavior(e.target.value as 'stop' | 'fallback') }} options={[{ value: 'stop', label: '配信を止める' }, { value: 'fallback', label: '代替値を使う' }]} />
+                    <Select aria-label="期間外の動作" id="cv-expiry-behavior" value={expiryBehavior} onChange={(value) => { setSaved(false); setExpiryBehavior(value as 'stop' | 'fallback') }} options={[{ value: 'stop', label: '配信を止める' }, { value: 'fallback', label: '代替値を使う' }]} />
                   </div>
                   {expiryBehavior === 'fallback' && (
                     <div>
                       <label htmlFor="cv-fallback-value" className="text-ink-secondary mb-1 block text-xs font-medium">代替値</label>
                       {item.type === 'boolean' ? (
-                        <SelectField
+                        <Select
+                          aria-label="代替値"
                           id="cv-fallback-value"
                           value={fallbackValue}
-                          onChange={(e) => { setSaved(false); setFallbackValue(e.target.value) }}
+                          onChange={(value) => { setSaved(false); setFallbackValue(value) }}
                           options={[{ value: '', label: '選んでください' }, { value: 'true', label: 'true' }, { value: 'false', label: 'false' }]}
                         />
                       ) : (item.type as string) === 'date' ? (
@@ -724,6 +746,7 @@ function EditCommonVarInner() {
                           className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
                         />
                       )}
+                      {fallbackFieldError ? <p className="text-danger mt-1 text-xs">{fallbackFieldError}</p> : null}
                     </div>
                   )}
                 </fieldset>
@@ -1038,13 +1061,7 @@ function EditCommonVarInner() {
                 更新後の値
               </label>
               {item?.type === 'boolean' ? (
-                <SelectField
-                  id="sc-value"
-                  value={draft.value}
-                  onChange={(e) => setDraft({ ...draft, value: e.target.value })}
-                  options={[{ value: '', label: '選んでください' }, { value: 'true', label: 'true' }, { value: 'false', label: 'false' }]}
-                  className="w-full"
-                />
+                <Select size="full" aria-label="更新後の値" id="sc-value" value={draft.value} onChange={(value) => setDraft({ ...draft, value: value })} options={[{ value: '', label: '選んでください' }, { value: 'true', label: 'true' }, { value: 'false', label: 'false' }]} />
               ) : (item?.type as string) === 'date' ? (
                 <DateField id="sc-value" value={draft.value} onChange={(v) => setDraft({ ...draft, value: v })} />
               ) : (item?.type as string) === 'datetime' ? (
@@ -1058,6 +1075,7 @@ function EditCommonVarInner() {
                   className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
                 />
               )}
+              {scheduleFieldError ? <p className="text-danger mt-1 text-xs">{scheduleFieldError}</p> : null}
             </div>
             <div className="flex justify-end gap-2">
               <button

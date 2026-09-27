@@ -12,6 +12,9 @@ import ListToolbar from '@/components/shared/list-toolbar'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
+import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import Pagination from '@/components/shared/pagination'
+import ListRange from '@/components/ui/list-range'
 import FolderPanel, { FOLDER_RAIL_WIDTH } from '@/components/shared/folder-panel'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { canOperateBookings } from '../lib/booking-permissions'
@@ -924,58 +927,53 @@ export default function BookingsPage() {
               )}
             </div>
           ) : (
-            <div
-              data-design="Table"
-              className="bg-canvas rounded-card border-hairline overflow-hidden border"
-            >
+            <DataTable className="@container" data-design="Table">
               {/* @container: 谷間帯の列削減。表の幅が足りない間だけ「担当」を畳む。
                   担当は予約の詳細で読める補助情報。畳んでいる間も操作列は右端に留める。 */}
-              <div className="overflow-x-auto @container">
-                <table className="w-full min-w-[720px] @[830px]:min-w-[820px]">
                   <thead>
-                    <tr className="bg-canvas-sunken border-hairline border-b">
-                      <Th>日時</Th>
-                      <Th>お客さま</Th>
-                      <Th>メニュー</Th>
-                      <Th className="cq-hide-below-830">担当</Th>
-                      <Th>予約経路</Th>
-                      <Th className="text-right">料金</Th>
-                      <Th>状態</Th>
-                      <Th className="bg-canvas-sunken sticky right-0 text-right">操作</Th>
-                    </tr>
+                    <TableHeadRow>
+                      <Th style={{ width: '12%' }}>日時</Th>
+                      <Th style={{ width: '16%' }}>お客さま</Th>
+                      <Th style={{ width: '16%' }}>メニュー</Th>
+                      <Th style={{ width: '12%' }} className="cq-hide-below-830">担当</Th>
+                      <Th style={{ width: '10%' }}>予約経路</Th>
+                      <Th style={{ width: '10%' }} align="right">料金</Th>
+                      <Th style={{ width: '12%' }}>状態</Th>
+                      <Th style={{ width: '12%' }} align="right" className="sticky right-0 bg-canvas-sunken">操作</Th>
+                    </TableHeadRow>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody>
                     {shown.map((b) => (
-                      <tr key={b.id} className="group hover:bg-canvas-sunken">
-                        <td className="px-4 py-3 text-sm whitespace-nowrap">
+                      <Tr key={b.id} interactive className="group">
+                        <Td className="whitespace-nowrap">
                           {formatShort(b.starts_at)}
-                        </td>
-                        <td className="px-4 py-3 text-sm">
+                        </Td>
+                        <Td>
                           {/* R11: 行の物は予約のため、お客さま名から別画面へ飛ばさない。名前は黒文字。 */}
                           <span className="text-ink" title={b.friend_name ?? undefined}>
                             {b.friend_name ?? (b.friend_id ? '-' : 'LINE未連携のお客さま')}
                           </span>
-                        </td>
-                        <td className="px-4 py-3 text-sm">{b.menu_name}</td>
-                        <td className="cq-hide-below-830 px-4 py-3 text-sm">{b.staff_name}</td>
-                        <td className="px-4 py-3 text-sm">
+                        </Td>
+                        <Td>{b.menu_name}</Td>
+                        <Td className="cq-hide-below-830">{b.staff_name}</Td>
+                        <Td>
                           <span
                             className={`${b.friend_id ? 'bg-success-bg text-success' : 'bg-info-bg text-info'} rounded-pill px-2 py-0.5 text-xs`}
                           >
                             {b.friend_id ? 'LINE' : '電話'}
                           </span>
-                        </td>
-                        <td className="px-4 py-3 text-right text-sm tabular-nums">
+                        </Td>
+                        <Td align="right" className="tabular-nums">
                           ¥{b.price_at_booking.toLocaleString()}
-                        </td>
-                        <td className="px-4 py-3 text-sm">
+                        </Td>
+                        <Td>
                           <span
                             className={`inline-block rounded px-2 py-0.5 text-xs ${statusBadgeColor[b.status] ?? 'bg-canvas-sunken'}`}
                           >
                             {statusLabel[b.status] ?? b.status}
                           </span>
-                        </td>
-                        <td className="bg-canvas group-hover:bg-canvas-sunken sticky right-0 px-4 py-3 text-right">
+                        </Td>
+                        <ActionCell className="sticky right-0 bg-canvas group-hover:bg-canvas-sunken">
                           <div className="inline-flex items-center gap-1">
                             <button
                               onClick={() => setDetailId(b.id)}
@@ -1001,13 +999,11 @@ export default function BookingsPage() {
                               />
                             ) : null}
                           </div>
-                        </td>
-                      </tr>
+                        </ActionCell>
+                      </Tr>
                     ))}
                   </tbody>
-                </table>
-              </div>
-            </div>
+            </DataTable>
           )}
 
           <div data-design="note" className="bg-canvas-sunken rounded-card mt-3 p-3">
@@ -1076,40 +1072,18 @@ export default function BookingsPage() {
           </div>
 
           <div data-design="tf" className="mt-3 flex flex-wrap items-center justify-between gap-2">
-            <span className="text-ink-faint text-xs">全 {total} 件</span>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={current <= 1}
-                className="border-hairline rounded-control border px-3 py-1 text-xs disabled:opacity-40"
-              >
-                前へ
-              </button>
-              <span className="text-ink-secondary px-2 text-xs tabular-nums">
-                {current} / {pageCount}
-              </span>
-              <button
-                onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
-                disabled={current >= pageCount}
-                className="border-hairline rounded-control border px-3 py-1 text-xs disabled:opacity-40"
-              >
-                次へ
-              </button>
-            </div>
+            <ListRange
+              total={total}
+              first={(current - 1) * PAGE_SIZE + 1}
+              last={Math.min(current * PAGE_SIZE, total)}
+            />
+            <Pagination page={current} pageCount={pageCount} onPageChange={setPage} />
           </div>
         </div>
       </div>
 
       {dialogs}
     </div>
-  )
-}
-
-function Th({ children, className = '' }: { children: React.ReactNode; className?: string }) {
-  return (
-    <th className={`text-ink-faint px-4 py-3 text-left text-xs font-semibold ${className}`}>
-      {children}
-    </th>
   )
 }
 

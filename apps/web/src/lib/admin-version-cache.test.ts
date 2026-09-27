@@ -7,7 +7,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { clearAdminVersionCache, loadAdminVersion, loadAdminVersionDetail } from './admin-version-cache'
 
-const body = { version: '2.6.4', worker_hash: 'w', admin_hash: 'a', liff_hash: 'l' }
+const body = {
+  version: '2.6.4',
+  worker_hash: 'w',
+  admin_hash: 'a',
+  liff_hash: 'l',
+  git_commit: 'a1b2c3d4e5f6',
+  deploy_env: 'staging',
+  released_at: '2026-09-27T04:05:00Z',
+}
 
 function versionOk() {
   return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } })

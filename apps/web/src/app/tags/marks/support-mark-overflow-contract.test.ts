@@ -32,7 +32,11 @@ describe('対応マーク作成のはみ出し（#973 U020/U021）', () => {
 
   it('U021: きっかけと変更先は縦に並べ、矢印は飾りにする', () => {
     // 横並びの → は消え、縦配置の ↓（aria-hidden）になる。
-    expect(EDITOR).toContain('w-full rounded-control border border-hairline bg-canvas px-3 text-sm font-semibold')
+    // きっかけの欄は共通 Select（全幅）。素の select は置かない。
+    expect(EDITOR).toContain('<Select')
+    expect(EDITOR).toContain('aria-label="きっかけ"')
+    expect(EDITOR).toContain('size="full"')
+    expect(EDITOR).not.toContain('<select')
     expect(EDITOR).toMatch(/aria-hidden="true"[^>]*>\s*↓/)
     expect(EDITOR).toContain('「{name || \'このマーク\'}」に変更')
     // 変更先は折り返せる。長いマーク名でも行を広げない。

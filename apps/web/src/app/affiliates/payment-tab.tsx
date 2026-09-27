@@ -491,12 +491,10 @@ export default function AffiliatePaymentTab({ accountId }: { accountId: string }
           className="border-hairline rounded-control min-w-0 flex-1 border px-3 py-2 text-sm"
           style={{ maxWidth: 460 }}
         />
-        <select aria-label="支払い一覧の表示件数" className="border-hairline rounded-control border px-3 py-2 text-sm" defaultValue="20">
-          <option value="20">20件表示</option>
-        </select>
-        <FilterChip selected={filter === 'ready'} onChange={() => setFilter(filter === 'all' ? 'ready' : 'all')} count={`${rowCountLabel}人`}>今回の締め</FilterChip>
+        {/* 選べる件数が1つだけで何も変わらない飾りは置かない（★V7の決まり）。絞り込みの札は共通 FilterChip（本線）。 */}
+        <FilterChip selected={filter === 'ready'} onChange={(on) => setFilter(on ? 'ready' : 'all')} count={`${rowCountLabel}人`}>今回の締め</FilterChip>
         <FilterChip selected={false} onChange={() => {}} disabled title="支払履歴APIが未接続です">過去の支払い</FilterChip>
-        <FilterChip selected={filter === 'bank_missing'} onChange={() => setFilter(filter === 'bank_missing' ? 'all' : 'bank_missing')} count={`${missingBankLabel}人`}>振込先が未登録</FilterChip>
+        <FilterChip selected={filter === 'bank_missing'} onChange={(on) => setFilter(on ? 'bank_missing' : 'all')} count={`${missingBankLabel}人`}>振込先が未登録</FilterChip>
       </div>
 
       {loading ? (

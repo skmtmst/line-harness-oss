@@ -15,7 +15,7 @@ import { useState } from 'react'
 import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
 import HelpTip from '@/components/shared/help-tip'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import type {
   ApiBroadcast,
@@ -117,11 +117,13 @@ export function ApprovalRequestFields({
           ) : candidatesState === 'error' ? (
             <p className="text-danger text-xs">承認できる人を読み込めませんでした。開き直してください。</p>
           ) : (
-            <SelectField
+            <Select
+              aria-label="承認をお願いする人"
+              size="full"
               id="approval-approver"
               className="w-full"
               value={approverId}
-              onChange={(event) => onApproverChange(event.target.value)}
+              onChange={(value) => onApproverChange(value)}
               options={[
                 { value: '', label: candidates.length === 0 ? '承認できる人がいません' : '選んでください' },
                 ...candidates.map((item) => ({ value: item.id, label: item.name })),

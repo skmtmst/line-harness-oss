@@ -9,7 +9,7 @@ import {
 } from '@line-crm/shared'
 import type { MediaItem } from '@line-crm/shared'
 import Button from '@/components/shared/button'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import { Field, TextArea, TextInput } from '@/components/shared/form-controls'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { useRouter } from 'next/navigation'
@@ -246,10 +246,11 @@ export default function FormDesignSettings({
           <h3 className="text-ink text-sm font-medium">文字と角の丸み</h3>
           <div className="mt-3 grid gap-4 sm:grid-cols-3">
           <Field label="文字の書体" htmlFor="form-theme-font">
-            <SelectField
+            <Select
+              aria-label="文字の書体"
               id="form-theme-font"
               value={theme.fontFamily}
-              onChange={(event) => patch('fontFamily', event.target.value as FormFontFamily)}
+              onChange={(value) => patch('fontFamily', value as FormFontFamily)}
               options={[
                 { value: 'sans', label: 'ゴシック体' },
                 { value: 'serif', label: '明朝体' },
@@ -257,10 +258,11 @@ export default function FormDesignSettings({
             />
           </Field>
           <Field label="角の丸み" htmlFor="form-theme-radius">
-            <SelectField
+            <Select
+              aria-label="角の丸み"
               id="form-theme-radius"
               value={theme.cornerRadius}
-              onChange={(event) => patch('cornerRadius', event.target.value as FormCornerRadius)}
+              onChange={(value) => patch('cornerRadius', value as FormCornerRadius)}
               options={[
                 { value: 'none', label: 'なし' },
                 { value: 'medium', label: 'ふつう' },
