@@ -17,6 +17,7 @@ import type {
   SearchConsoleSetup,
 } from '@/lib/api'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { ANALYTICS_TABS } from './analytics-tabs'
 
 /**
  * Google検索の分析画面。要件 v6-20 §2: Search Console を「Google Analytics」と呼ばない。
@@ -24,13 +25,6 @@ import { usePageTitle } from '@/components/shell/page-chrome'
  * 設計では「分析」の5タブのうちの1枚。実体だけ別ルートに残っているので、
  * 同じタブの帯をここにも出して、行き来できるようにしてある。
  */
-const ANALYTICS_TABS = [
-  { key: 'messages', label: '送信数' },
-  { key: 'funnel', label: 'ファネル' },
-  { key: 'cross', label: 'クロス集計' },
-  { key: 'clicks', label: 'URLクリック' },
-  { key: 'search', label: 'Search Console', href: '/search-console' },
-]
 
 const ranges = [7, 28, 90] as const
 type RangeDays = typeof ranges[number]
