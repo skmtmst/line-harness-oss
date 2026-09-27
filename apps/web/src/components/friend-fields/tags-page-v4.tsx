@@ -13,6 +13,8 @@ import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
 import Button from '@/components/shared/button'
 import FilterChip from '@/components/shared/filter-chip'
+import ListToolbar from '@/components/shared/list-toolbar'
+import { RowActions } from '@/components/shared/row-actions'
 import ListKpis from '@/components/shared/list-kpis'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
@@ -956,32 +958,38 @@ export default function TagsPageV4({
           </div>
           <section className="min-w-0">
             {/*
-              検索・選択は最長の表示内容と矢印余白を確保し、残る幅は検索欄へ渡す。
-              狭いときだけ折り返し、文字と矢印を重ねない。
+              ★V7 `Xn1Mz`：検索は幅320で1行目、2行目は左に絞り込み・
+              右端に表示件数。狭いときだけ折り返す。
             */}
-            <div className="mb-[10px] flex flex-wrap items-center gap-2">
-              <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="タグ名・用途で検索" className="h-10 min-w-45 flex-1 rounded-control border border-hairline bg-canvas px-3 text-label" />
-              <select aria-label="使用状態で絞り込む" value={usageFilter} onChange={(event) => setUsageFilter(event.target.value)} className="v6-select h-10 min-w-44 rounded-control border border-hairline bg-canvas pl-3 text-label font-semibold text-ink"><option value="all">使用状態：すべて</option><option value="linked">連動あり</option><option value="unused">未使用</option></select>
-              <select aria-label="付与元で絞り込む" value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)} className="v6-select h-10 min-w-38 rounded-control border border-hairline bg-canvas pl-3 text-label font-semibold text-ink"><option value="all">付与元：すべて</option>{Object.entries(SOURCE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
-              <select aria-label="表示件数" value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))} className="v6-select ml-auto h-10 min-w-32 rounded-control border border-hairline bg-canvas pl-3 text-label font-semibold text-ink">{[20,30,40,50].map((size) => <option key={size} value={size}>{size}件表示</option>)}</select>
-              <span className="text-xs tabular-nums text-ink-faint">{ready ? `${filtered.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, filtered.length)} / ${filtered.length}件` : '—'}</span>
-            </div>
-            {/* 設計 `UOmne`。**5つ。押した数だけ重ねて絞る。** */}
-            <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
-              <span className="text-ink-faint">よく使う</span>
-              {QUICK_FILTERS.map(([key, label]) => {
-                const on = quick.includes(key)
-                return (
-                  <FilterChip
-                    key={key}
-                    selected={on}
-                    onChange={(next) => setQuick((current) => next ? [...current, key] : current.filter((k) => k !== key))}
-                  >
-                    {label}
-                  </FilterChip>
-                )
-              })}
-            </div>
+            <ListToolbar
+              search={{ placeholder: 'タグ名・用途で検索', value: query, onChange: setQuery }}
+              filters={
+                <>
+                  <select aria-label="使用状態で絞り込む" value={usageFilter} onChange={(event) => setUsageFilter(event.target.value)} className="v6-select h-10 min-w-44 rounded-control border border-hairline bg-canvas pl-3 text-label font-semibold text-ink"><option value="all">使用状態：すべて</option><option value="linked">連動あり</option><option value="unused">未使用</option></select>
+                  <select aria-label="付与元で絞り込む" value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)} className="v6-select h-10 min-w-38 rounded-control border border-hairline bg-canvas pl-3 text-label font-semibold text-ink"><option value="all">付与元：すべて</option>{Object.entries(SOURCE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+                  {/* 設計 `UOmne`。**5つ。押した数だけ重ねて絞る。** */}
+                  <span className="text-ink-faint text-xs">よく使う</span>
+                  {QUICK_FILTERS.map(([key, label]) => {
+                    const on = quick.includes(key)
+                    return (
+                      <FilterChip
+                        key={key}
+                        selected={on}
+                        onChange={(next) => setQuick((current) => next ? [...current, key] : current.filter((k) => k !== key))}
+                      >
+                        {label}
+                      </FilterChip>
+                    )
+                  })}
+                </>
+              }
+              trailing={
+                <>
+                  <select aria-label="表示件数" value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))} className="v6-select h-10 min-w-32 rounded-control border border-hairline bg-canvas pl-3 text-label font-semibold text-ink">{[20,30,40,50].map((size) => <option key={size} value={size}>{size}件表示</option>)}</select>
+                  <span className="text-xs tabular-nums text-ink-faint">{ready ? `${filtered.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, filtered.length)} / ${filtered.length}件` : '—'}</span>
+                </>
+              }
+            />
             {/*
               中身が詰まったら**表だけ**横スクロールさせる。
               画面ごと横に伸ばすと、共通ルール §1-8 の「1440でも横スクロールを
@@ -1109,10 +1117,21 @@ export default function TagsPageV4({
                           </button>
                         </td>
                         <td className="bg-canvas group-hover:bg-canvas-sunken sticky right-0 px-3 py-3" onClick={(event) => event.stopPropagation()}>
-                          {/* 設計 `E2NC4`。赤いゴミ箱だけ。文字の「削除」は置かない。 */}
-                          <button type="button" onClick={() => setDeleteTarget(tag)} aria-label={`${tag.name} を削除`} className="text-danger hover:opacity-70">
-                            <TrashIcon />
-                          </button>
+                          {/*
+                            ★V7 `Xn1Mz`：行の操作は「主な1つ（編集）＋…」。
+                            削除はメニューの中の危ない操作へ。赤いゴミ箱だけの
+                            ボタンは行に直に置かない（設計 `E2NC4` の見た目指定は
+                            使いやすさの直しのため外す。確認窓の動きは残す）。
+                          */}
+                          <RowActions
+                            subjectName={tag.name}
+                            edit={{ href: `/tags/edit?id=${tag.id}` }}
+                            destructiveItem={{
+                              id: 'delete',
+                              label: '削除する',
+                              onSelect: () => setDeleteTarget(tag),
+                            }}
+                          />
                         </td>
                       </tr>
                     )
@@ -1174,9 +1193,17 @@ export default function TagsPageV4({
                               >
                                 <StarIcon filled={Boolean(tag.isStarred)} />
                               </button>
-                              <button type="button" onClick={(event) => { event.stopPropagation(); setDeleteTarget(tag) }} aria-label={`${tag.name} を削除`} className="text-danger hover:opacity-70">
-                                <TrashIcon />
-                              </button>
+                              <span onClick={(event) => event.stopPropagation()}>
+                                <RowActions
+                                  subjectName={tag.name}
+                                  edit={{ href: `/tags/edit?id=${tag.id}` }}
+                                  destructiveItem={{
+                                    id: 'delete',
+                                    label: '削除する',
+                                    onSelect: () => setDeleteTarget(tag),
+                                  }}
+                                />
+                              </span>
                             </div>
                           </div>
                         </li>

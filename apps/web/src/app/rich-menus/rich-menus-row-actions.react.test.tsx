@@ -1,8 +1,9 @@
 // @vitest-environment happy-dom
 /*
- * #641: リッチメニュー一覧の行操作を「枠つき編集ボタン＋削除アイコン＋・・・」へ統一。
- * 文字リンク5個をやめ、表示先・複製・切替のつながりは「その他」メニューへ集約した
- * ことを実マウントで確かめる。削除の撮影口（szXsT）は維持する。
+ * #641 → ★V7 `Xn1Mz`：リッチメニュー一覧の行操作は「枠つき編集ボタン＋「…」」。
+ * 文字リンク5個をやめ、表示先・複製・切替のつながり・削除は「…」メニューへ集約した
+ * ことを実マウントで確かめる。ゴミ箱アイコンの直置きはやめ、削除の撮影口
+ * （szXsT）は「…」ボタンへ移す。
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -94,7 +95,7 @@ async function flush() {
 }
 
 describe('#641 リッチメニュー一覧の行操作', () => {
-  it('「編集」が枠つきボタン、削除は撮影口つきアイコン、残りは「・・・」メニュー', async () => {
+  it('「編集」が枠つきボタン、表示先・複製・切替・削除は撮影口つき「・・・」メニュー', async () => {
     await act(async () => { root.render(<RichMenusPage />) })
     await flush()
 
@@ -102,17 +103,18 @@ describe('#641 リッチメニュー一覧の行操作', () => {
       .find((el) => el.getAttribute('href') === '/rich-menus/edit?id=g-1' && el.textContent?.includes('編集'))
     expect(edit, '枠つき「編集」ボタンが見つかりません').toBeTruthy()
 
-    const del = host.querySelector('button[data-qa-open="szXsT"]')
-    expect(del, '削除の撮影口が消えています').toBeTruthy()
-    expect(del!.getAttribute('aria-label')).toBe('通常メニューを削除')
+    // 行にゴミ箱アイコンだけのボタンは置かない。
+    expect(host.querySelector('button[aria-label="通常メニューを削除"]'), 'ゴミ箱アイコンの直置きが残っています').toBeNull()
 
-    const more = host.querySelector('button[aria-label="通常メニューのその他操作"]') as HTMLButtonElement
-    expect(more, 'その他ボタンが見つかりません').toBeTruthy()
+    const more = host.querySelector('button[data-qa-open="szXsT"]') as HTMLButtonElement
+    expect(more, '「…」の撮影口が消えています').toBeTruthy()
+    expect(more.getAttribute('aria-label')).toBe('通常メニューのその他操作')
     act(() => { more.click() })
     const menu = host.querySelector('[role="menu"]')
     expect(menu, 'メニューが開きません').toBeTruthy()
     expect(menu!.textContent).toContain('表示先')
     expect(menu!.textContent).toContain('複製')
     expect(menu!.textContent).toContain('切替のつながりを見る')
+    expect(menu!.textContent).toContain('削除する')
   })
 })
