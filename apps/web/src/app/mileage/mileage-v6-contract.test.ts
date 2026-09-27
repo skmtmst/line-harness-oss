@@ -139,7 +139,7 @@ describe('V6 マイルの正本URLと概念分離', () => {
   it('手動増減はV6実Node・確認段階・冪等キーを通して追記する', () => {
     expect(FRIEND_DETAIL).toContain('<MileageAdjustmentDialog')
     expect(ADJUSTMENT).toContain('designNode="vz0Ji"')
-    expect(ADJUSTMENT).toContain("useState<'input' | 'confirm'>('input')")
+    expect(ADJUSTMENT).toContain("useState<'input' | 'confirm' | 'requested'>('input')")
     expect(ADJUSTMENT).toContain('変更前')
     expect(ADJUSTMENT).toContain('変更量')
     expect(ADJUSTMENT).toContain('変更後')
@@ -161,6 +161,35 @@ describe('V6 マイルの正本URLと概念分離', () => {
     expect(API).toContain('notifyFriend?: boolean')
     expect(ADJUSTMENT).toContain('変更後の残高が0未満になる操作は実行しません')
     expect(ADJUSTMENT).not.toContain('API error:')
+  })
+
+  it('R: 確定待ちの確定・取消は理由を取って履歴の操作列から行う', () => {
+    expect(HISTORY).toContain('確定する')
+    expect(HISTORY).toContain('取り消す')
+    expect(HISTORY).toContain('理由（必須）')
+    expect(HISTORY).toContain("api.mileage.confirmMileageEntry")
+    expect(HISTORY).toContain("api.mileage.voidMileageEntry")
+    expect(HISTORY).toContain("item.status === 'pending'")
+    expect(API).toContain('/api/mileage/entries/')
+    expect(API).toContain("'X-Confirm-Irreversible': 'mileage-entry-void'")
+  })
+
+  it('R: 高額調整は実行せず承認依頼へ回し、一覧から別オーナーが決める', () => {
+    expect(ADJUSTMENT).toContain('承認を依頼')
+    expect(ADJUSTMENT).toContain("'requested'")
+    expect(PAGE).toContain('承認待ちのマイル変更')
+    expect(PAGE).toContain('api.mileage.adjustmentApprovals')
+    expect(PAGE).toContain('api.mileage.approveAdjustment')
+    expect(PAGE).toContain('api.mileage.rejectAdjustment')
+    expect(PAGE).toContain('差し戻す')
+    expect(API).toContain('/api/mileage/adjustment-approvals')
+  })
+
+  it('R: 決めごとのテストは付与せず見通しだけを返す', () => {
+    expect(PAGE).toContain('この内容をテスト')
+    expect(PAGE).toContain('api.mileage.testEarningRule')
+    expect(PAGE).toContain('実際には付与されず、履歴も増えません')
+    expect(API).toContain('/api/mileage/earning-rules/test')
   })
 
   it('行動スコアを既存の現在値・履歴から選択アカウント単位で表示する', () => {
