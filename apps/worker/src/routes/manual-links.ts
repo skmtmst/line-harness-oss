@@ -4,11 +4,11 @@ import {
   getManualLink,
   listManualLinks,
   ManualLinkVersionConflictError,
-  recordCheck,
   upsertManualLink,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
+import { checkAllManualLinks, isSafePublicHttpsUrl } from '../services/manual-link-check.js';
 
 /**
  * マニュアルの正本表。設計 ★V6 34-4（`f9oUm`）。台帳 #134。
@@ -41,32 +41,6 @@ function serialize(row: Awaited<ReturnType<typeof getManualLink>>) {
     lastError: row.last_error,
     version: row.version,
   };
-}
-
-function isSafePublicHttpsUrl(value: string): boolean {
-  try {
-    const url = new URL(value);
-    if (url.protocol !== 'https:' || url.username || url.password) return false;
-    const host = url.hostname.toLowerCase().replace(/\.$/, '').replace(/^\[|\]$/g, '');
-    if (
-      host === 'localhost'
-      || host.endsWith('.localhost')
-      || host.endsWith('.local')
-      || host.endsWith('.internal')
-      || /^(127\.|10\.|0\.|169\.254\.|192\.168\.)/.test(host)
-    ) return false;
-    const ipv4 = host.split('.').map(Number);
-    if (ipv4.length === 4 && ipv4.every(Number.isInteger)) {
-      if (ipv4[0] === 172 && ipv4[1]! >= 16 && ipv4[1]! <= 31) return false;
-      if (ipv4[0] === 100 && ipv4[1]! >= 64 && ipv4[1]! <= 127) return false;
-    }
-    if (host === '::1' || host.startsWith('fc') || host.startsWith('fd') || host.startsWith('fe80:')) {
-      return false;
-    }
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 async function lookup(c: AppContext, key: string | undefined) {
@@ -186,51 +160,18 @@ manualLinks.put('/api/manual-links/:key', requireRole('owner', 'admin', 'staff')
 manualLinks.post('/api/manual-links/check', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     if (!canOperate(c)) return forbidden(c);
-    const rows = await listManualLinks(c.env.DB);
-    const targets = rows.filter((row) => row.url && isSafePublicHttpsUrl(row.url));
-    let ok = 0;
-    let broken = 0;
-    for (const row of targets) {
-      try {
-        const res = await fetch(row.url!, {
-          method: 'HEAD',
-          redirect: 'manual',
-          signal: AbortSignal.timeout(10_000),
-        });
-        if (res.ok) {
-          await recordCheck(c.env.DB, row.key, {
-            ok: true,
-            httpStatus: res.status,
-            checkedBy: c.get('staff')?.id ?? null,
-          });
-          ok += 1;
-        } else {
-          await recordCheck(c.env.DB, row.key, {
-            ok: false,
-            httpStatus: res.status,
-            errorCode: `HTTP_${res.status}`,
-            checkedBy: c.get('staff')?.id ?? null,
-          });
-          broken += 1;
-        }
-      } catch {
-        await recordCheck(c.env.DB, row.key, {
-          ok: false,
-          errorCode: 'NETWORK_ERROR',
-          checkedBy: c.get('staff')?.id ?? null,
-        });
-        broken += 1;
-      }
-    }
+    const result = await checkAllManualLinks(c.env.DB, {
+      checkedBy: c.get('staff')?.id ?? null,
+    });
     return c.json({
       success: true,
       data: {
-        checked: targets.length,
-        ok,
-        broken,
+        checked: result.checked,
+        ok: result.ok,
+        broken: result.broken,
         /** URL が決まっていないものは確かめようがない。**broken に混ぜない。** */
-        unset: rows.filter((row) => !row.url).length,
-        unsafe: rows.length - targets.length - rows.filter((row) => !row.url).length,
+        unset: result.unset,
+        unsafe: result.unsafe,
       },
     });
   } catch (err) {

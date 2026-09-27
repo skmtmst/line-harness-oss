@@ -2154,6 +2154,23 @@ CREATE TABLE entry_routes (
   updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
 , pool_id TEXT REFERENCES traffic_pools (id) ON DELETE SET NULL, intro_template_id TEXT REFERENCES message_templates (id) ON DELETE SET NULL, run_account_friend_add_scenarios INTEGER NOT NULL DEFAULT 1, genre TEXT, tenant_id TEXT REFERENCES tenants(id), line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE);
 
+CREATE TABLE error_messages (
+  -- エラーコード。code が無い現行 route は error 文字列そのものを鍵にする（§9-1）。
+  code               TEXT PRIMARY KEY,
+  -- 運用者向け文面。{incidentId} {n} {max} などの差し込みは画面側で埋める。
+  message            TEXT NOT NULL,
+  -- 次の行動の種類。押せるものだけを出す。
+  next_action_kind   TEXT NOT NULL DEFAULT 'none'
+                       CHECK (next_action_kind IN ('navigate', 'retry', 'contact_admin', 'none')),
+  -- navigate の行き先（管理画面のパス）。navigate 以外は NULL。
+  next_action_target TEXT,
+  -- 出典（route または service）。追加するときは必ず埋める（§9-2）。
+  source             TEXT NOT NULL,
+  version            INTEGER NOT NULL DEFAULT 1,
+  created_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
 CREATE TABLE event_booking_idempotency_keys (
   key              TEXT PRIMARY KEY,
   line_account_id  TEXT NOT NULL,
@@ -5169,7 +5186,7 @@ CREATE TABLE recipes (
   display_order  INTEGER NOT NULL DEFAULT 0,
   created_at     TEXT NOT NULL,
   updated_at     TEXT NOT NULL
-);
+, line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL, created_by_staff_id TEXT);
 
 CREATE TABLE ref_tracking (
   id              TEXT PRIMARY KEY,
@@ -6187,7 +6204,7 @@ CREATE TABLE staff_members (
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , line_user_id TEXT, totp_secret_enc TEXT, totp_pending_secret_enc TEXT, totp_enabled_at TEXT, totp_last_used_step INTEGER, assigned_line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL, can_access_descendant_accounts INTEGER NOT NULL DEFAULT 0, tenant_id TEXT REFERENCES tenants(id), account_scope TEXT NOT NULL DEFAULT 'all'
-  CHECK (account_scope IN ('all', 'accounts')), policy_version INTEGER NOT NULL DEFAULT 1, password_hash TEXT, password_updated_at TEXT, role_bundle TEXT, view_permission_keys TEXT, email_mask TEXT, notice_friend_id TEXT, notice_linked_at TEXT, email_change_new TEXT, email_change_token_hash TEXT, email_change_expires_at TEXT);
+  CHECK (account_scope IN ('all', 'accounts')), policy_version INTEGER NOT NULL DEFAULT 1, password_hash TEXT, password_updated_at TEXT, role_bundle TEXT, view_permission_keys TEXT, email_mask TEXT, notice_friend_id TEXT, notice_linked_at TEXT, email_change_new TEXT, email_change_token_hash TEXT, email_change_expires_at TEXT, getting_started_dismissed_at TEXT);
 
 CREATE TABLE staff_menus (
   staff_id                  TEXT NOT NULL,
@@ -8228,6 +8245,8 @@ CREATE INDEX idx_recipe_clone_runs_v316_account
 
 CREATE INDEX idx_recipe_clone_runs_v316_recipe
   ON recipe_clone_runs(recipe_id, created_at DESC);
+
+CREATE INDEX idx_recipes_v464_account ON recipes(line_account_id);
 
 CREATE INDEX idx_ref_tracking_ad_click_scope
   ON ref_tracking(friend_id, line_account_id, created_at DESC);

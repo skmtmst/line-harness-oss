@@ -67,6 +67,8 @@ export function dashboardNotificationDestination(
   }
   // 一斉配信(送信枠不足を含む)の通知は配信一覧へ。
   if (item.eventType.startsWith('broadcast')) return '/broadcasts'
+  // マニュアル導線の切断は正本表へ。直す場所が押してすぐ分かるようにする。
+  if (item.eventType === 'manual_link_broken') return '/settings/manual-links'
   /*
     知らない種類はお知らせ一覧へ。行き先なし(null)にすると、
     押したのに何も起きない(既読だけ付く)死に tap になる。

@@ -242,25 +242,25 @@ describe('運用者へのお知らせの送信と実行記録', () => {
     });
   });
 
-  it('登録簿の口から代表6件がすべて接続済みと分かる', async () => {
+  it('登録簿の口から代表7件がすべて接続済みと分かる', async () => {
     const response = await app(testDb.db).request(
       '/api/notifications/operator-event-types?lineAccountId=account-1',
     );
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
       data: {
-        summary: { total: 6, connected: 6, unconnected: 0 },
+        summary: { total: 7, connected: 7, unconnected: 0 },
       },
     });
     const body = await (await app(testDb.db).request(
       '/api/notifications/operator-event-types?lineAccountId=account-1',
     )).json() as { data: { items: Array<{ eventType: string; connected: boolean }> } };
     expect(body.data.items.map((item) => item.eventType).sort()).toEqual([
-      'booking_created', 'broadcast_completed', 'common_var_expiry', 'ec_order_received', 'form_submitted', 'nen_birthday_coupon_failed',
+      'booking_created', 'broadcast_completed', 'common_var_expiry', 'ec_order_received', 'form_submitted', 'manual_link_broken', 'nen_birthday_coupon_failed',
     ]);
     const connected = body.data.items.filter((item) => item.connected).map((item) => item.eventType).sort();
     expect(connected).toEqual([
-      'booking_created', 'broadcast_completed', 'common_var_expiry', 'ec_order_received', 'form_submitted', 'nen_birthday_coupon_failed',
+      'booking_created', 'broadcast_completed', 'common_var_expiry', 'ec_order_received', 'form_submitted', 'manual_link_broken', 'nen_birthday_coupon_failed',
     ]);
     const unconnected = body.data.items.filter((item) => !item.connected).map((item) => item.eventType).sort();
     expect(unconnected).toEqual([]);

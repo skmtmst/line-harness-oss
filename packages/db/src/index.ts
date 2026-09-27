@@ -95,6 +95,7 @@ export function createDb(d1: D1Database): D1Database {
 export * from './folders';
 export * from './getting-started';
 export * from './manual-links';
+export * from './error-messages';
 export * from './recipes';
 export * from './account-handovers';
 export * from './friend-migrations';
