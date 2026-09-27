@@ -10,7 +10,7 @@
  */
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 
 const templateGet = vi.hoisted(() => vi.fn())
 const searchParams = vi.hoisted(() => ({ value: new URLSearchParams() }))
@@ -175,16 +175,23 @@ describe('テンプレート詳細の使用先リンク (#891 N-143)', () => {
 })
 
 describe('テンプレート一覧の差し替え導線 (#891 N-135)', () => {
+  /*
+   * 一覧の行の操作は表側で見る。767px以下のカード（`MobileTableCards`）
+   * にも同じ文・操作が出るので、画面全体では1件に定まらない。
+   */
+  const table = () => within(screen.getByRole('table'))
   async function openBlockedDelete() {
     stubTemplateGet(USED_BY)
     render(<TemplatesPage />)
     await act(async () => { await Promise.resolve() })
     await act(async () => { await Promise.resolve() })
-    await screen.findByText('来店お礼')
+    await within(await screen.findByRole('table')).findByText('来店お礼')
 
     // U043: 副操作は行の「…」メニューへ。押してから項目を選ぶ。
-    fireEvent.click(screen.getByLabelText('来店お礼のその他操作'))
-    fireEvent.click(screen.getByRole('menuitem', { name: '使用先を見る' }))
+    // メニューは最上層の器（MenuPortal）に出る。表とカードの両方の分が出るので
+    // 先頭を選ぶ（どちらも同じ操作へつながる）。
+    fireEvent.click(table().getByLabelText('来店お礼のその他操作'))
+    fireEvent.click(screen.getAllByRole('menuitem', { name: '使用先を見る' })[0])
     await act(async () => { await Promise.resolve() })
     await act(async () => { await Promise.resolve() })
     await screen.findByText('使用中のテンプレートは削除できません')
@@ -214,9 +221,9 @@ describe('テンプレート一覧の差し替え導線 (#891 N-135)', () => {
     render(<TemplatesPage />)
     await act(async () => { await Promise.resolve() })
     await act(async () => { await Promise.resolve() })
-    await screen.findByText('来店お礼')
+    await within(await screen.findByRole('table')).findByText('来店お礼')
 
-    fireEvent.keyDown(screen.getByRole('link', { name: '来店お礼の詳細を開く' }), { key: 'Enter' })
+    fireEvent.keyDown(table().getByRole('link', { name: '来店お礼の詳細を開く' }), { key: 'Enter' })
     await act(async () => { await Promise.resolve() })
     await act(async () => { await Promise.resolve() })
     await screen.findByText(/使用箇所/)

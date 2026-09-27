@@ -2,7 +2,7 @@
 
 import React from 'react'
 
-export type StepperState = 'done' | 'current' | 'todo'
+export type StepperState = 'done' | 'current' | 'todo' | 'attention'
 
 /** 旧名。Stepper に寄せたので、新しくは StepperState を使う。 */
 export type StepState = StepperState
@@ -13,54 +13,77 @@ export interface StepperStep {
   label: string
   /** 1始まりの表示番号。省略時は上からの順番。 */
   order?: number
+  /**
+   * 入力が済んだか（done／まだか todo／直すところがあるか attention）。
+   * 「いまいる所」はここでは決めない。`currentKey`（段の居場所）と分ける（設計 C）。
+   * `currentKey` を渡さない昔の呼び方は、そのまま state の `current` を居場所にする。
+   */
   state: StepperState
-  /** 押したときに飛ぶ節の id。済みの段だけに付ける。 */
+  /** 押したときに飛ぶ節の id。済み・要修正の段だけに付ける。 */
   anchor?: string
-  /** anchor の代わりに押したときの動き。済みの段だけに付ける。 */
+  /** anchor の代わりに押したときの動き。済み・要修正の段だけに付ける。 */
   onSelect?: () => void
 }
 
 /**
- * 手順の進み表示（★V7 共通部品その2 `uR9s8` §4）。
- * StepRail と StepTrail を1本にしたもの。
+ * 手順の進み表示（★V7 共通部品その2 `uR9s8` §4・「監査の直し」設計 C）。
  *
- * - 済みはチェック（緑の丸＋白の ✓）
- * - 今は濃い緑の丸＋番号
+ * - 入力済みはチェック（緑の丸＋白の ✓）。押すと戻れる
+ * - いまいる所は白地に緑の太い輪＋番号・名前は太字（読み上げ「現在の手順」）
  * - まだは灰色の丸＋番号
- * - 押して戻れるのは済みの段だけ（いま・まだは飾りでなく本文の案内に従う）
+ * - 直すところがある段は琥珀色の △。押すとその手順へ戻る
+ * - 「次へ」で進んだら、いまいる所の印は必ず進んだ先に付く（入力済みの数で決めない）
  */
 export default function Stepper({
   steps,
   label,
+  currentKey,
 }: {
   /** 何の進みか（例：「配信作成の進み」）。nav の読み上げ名。 */
   label: string
   steps: ReadonlyArray<StepperStep>
+  /**
+   * いまいる段の key（例：URL の `?step=`）。
+   * 渡すと居場所はここで決まり、state は「入力済みか」だけを表す。
+   * 渡さないときは state の `current` を居場所にする（昔の呼び方）。
+   */
+  currentKey?: string
 }) {
   return (
     <nav aria-label={label} className="border-hairline bg-canvas rounded-card mb-4 border p-4">
       <ol data-design="Steps" aria-label={label} className="flex flex-wrap items-center gap-y-3">
         {steps.map((raw, index) => {
           const step = { ...raw, key: raw.key ?? raw.label, order: raw.order ?? index + 1 }
-          const clickable = step.state === 'done' && (step.anchor || step.onSelect)
+          const isCurrent = currentKey !== undefined
+            ? step.key === currentKey
+            : step.state === 'current'
+          const filled = step.state === 'done'
+          const needsFix = step.state === 'attention'
+          const clickable = (filled || needsFix) && !isCurrent && (step.anchor || step.onSelect)
           const circle = (
             <span
               className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-                step.state === 'done'
-                  ? 'bg-accent-deep text-on-accent'
-                  : step.state === 'current'
-                    ? 'bg-accent-deep text-on-accent'
-                    : 'border-hairline text-ink-faint border'
+                filled
+                  ? isCurrent
+                    ? 'bg-accent-deep text-on-accent outline-accent-deep outline-2 outline-offset-2'
+                    : 'bg-accent-deep text-on-accent'
+                  : needsFix
+                    ? 'bg-warning-bg text-warning'
+                    : isCurrent
+                      ? 'bg-canvas text-accent-deep outline-accent-deep outline-2'
+                      : 'border-hairline text-ink-faint border'
               }`}
+              title={needsFix ? '直すところがあります' : undefined}
             >
-              {step.state === 'done' ? '✓' : step.order}
+              {filled ? '✓' : needsFix ? <span aria-hidden="true">△</span> : step.order}
+              {needsFix ? <span className="sr-only">（直すところあり）</span> : null}
             </span>
           )
           const text = (
             <span className="min-w-0">
               <span
-                className={`block truncate text-sm font-bold ${
-                  step.state === 'todo' ? 'text-ink-faint' : 'text-ink'
+                className={`block truncate text-sm ${
+                  isCurrent ? 'text-ink font-bold' : step.state === 'todo' ? 'text-ink-faint' : 'text-ink'
                 }`}
               >
                 {step.label}
@@ -98,7 +121,7 @@ export default function Stepper({
               ) : (
                 <span
                   className="flex min-w-0 items-center gap-2"
-                  aria-current={step.state === 'current' ? 'step' : undefined}
+                  aria-current={isCurrent ? 'step' : undefined}
                 >
                   {circle}
                   {text}

@@ -97,11 +97,15 @@ describe('#615 テンプレート画面が React console error を出さない',
       起こした例外を作るので、この画面の大きさだと待つだけで20秒かかる。
       `queryBy*` は見つからなければ null を返すだけなので速い。
     */
-    for (let attempt = 0; attempt < 200 && !screen.queryByText('来店お礼'); attempt += 1) {
+    /*
+     * `queryAllByText` で待つ。767px以下のカードにも同じ文が出るので
+     * `queryByText` は複数一致で投げる。空のときは例外を作らない点は同じ。
+     */
+    for (let attempt = 0; attempt < 200 && screen.queryAllByText('来店お礼').length === 0; attempt += 1) {
       await act(async () => { await new Promise((resolve) => setTimeout(resolve, 10)) })
     }
     expect(screen.queryByLabelText('名前・本文・差し込んでいる項目で検索')).toBeTruthy()
-    expect(screen.queryByText('来店お礼')).toBeTruthy()
+    expect(screen.queryAllByText('来店お礼').length).toBeGreaterThan(0)
 
     expect(consoleErrors).toEqual([])
     // 押せる部品として残っていないこと（DOM で見る）。

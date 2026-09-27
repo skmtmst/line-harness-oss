@@ -391,9 +391,12 @@ analytics.get('/api/analytics/url-clicks', async (c) => {
     if (!Number.isInteger(limit) || limit < 1 || limit > 200) {
       return c.json({ success: false, error: '表示件数は1〜200で指定してください' }, 400);
     }
+    // 監査 R72: 検索語はSQL側で絞る。取得済みの上位200件の中だけを探していた時期は、
+    // それより先のURLに辿り着けなかった。
+    const query = (c.req.query('query') ?? '').trim().slice(0, 200) || undefined;
     return c.json({
       success: true,
-      data: await getAnalyticsUrlClicksOverview(c.env.DB, context.value, limit),
+      data: await getAnalyticsUrlClicksOverview(c.env.DB, context.value, limit, query),
     });
   } catch (error) {
     console.error('GET /api/analytics/url-clicks error:', error);

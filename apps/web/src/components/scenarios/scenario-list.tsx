@@ -2,12 +2,12 @@ import Checkbox from '@/components/shared/checkbox'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ListPlus } from 'lucide-react'
 import type { Scenario, DeliveryMode, Folder } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import StatusChip from '@/components/shared/status-chip'
 import ListState from '@/components/shared/list-state'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import { MoreAction } from '@/components/shared/row-actions'
@@ -603,16 +603,9 @@ export default function ScenarioList({
                     </Link>
                   )}
                 </td>
-                {/* 列が狭いと「配信可」が「配信 / 可」の2行になる。
-                    札の中で折り返させない。 */}
+                {/* 状態の札は共通の StatusChip（設計 B）。札の中で折り返させない。 */}
                 <td className="px-4 py-3 whitespace-nowrap">
-                  <span
-                    className={`rounded-pill inline-block px-2 py-0.5 text-[11px] font-medium whitespace-nowrap ${
-                      s.isActive ? 'bg-success-bg text-success' : 'bg-warning-bg text-warning'
-                    }`}
-                  >
-                    {s.isActive ? '配信可' : '停止中'}
-                  </span>
+                  <StatusChip status={s.isActive ? 'running' : 'paused'} />
                 </td>
                 {/*
                   操作は「編集」＋「その他（…）」の2口だけ（NEXT-25）。
