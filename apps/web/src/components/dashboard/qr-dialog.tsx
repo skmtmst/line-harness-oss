@@ -513,7 +513,7 @@ export default function QrDialog({
                   onClick={() => void downloadPdf()}
                   disabled={pdfState === 'working'}
                 >
-                  {pdfState === 'working' ? 'PDFを準備中…' : 'PDFで印刷'}
+                  PDFで印刷
                 </Button>
               ) : (
                 <Button
