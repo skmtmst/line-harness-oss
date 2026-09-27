@@ -37,6 +37,17 @@ describe('R32 作成の操作は権限に合わせる', () => {
     expect(EDIT_PAGE).toContain('送り先の変更は統括だけができます。必要なときは統括に頼んでください。')
   })
 
+  it('見本から作る・見本タブの作成も統括だけに出す（戻したら赤）', () => {
+    // 一覧の「見本から作る」は作成の入口なので、無条件表示に戻すと落ちる。
+    expect(PAGE).toContain('見本から作る')
+    expect(PAGE).toMatch(/\{canCreate \? \(\s*<Button variant="secondary" href="\/webhooks\?tab=notify">見本から作る/)
+    // 見本タブの中の作成も同じく統括だけ。役割の確認なしに戻すと落ちる。
+    expect(PAGE).toContain('canCreateSamples')
+    expect(PAGE).toContain('api.staff.me()')
+    expect(PAGE).toContain('この見本で作る')
+    expect(PAGE).toContain('送り先を作る')
+  })
+
   it('一覧の変更操作（開始・停止・合言葉・削除・直す）も統括だけに出す', () => {
     expect(PAGE).toContain('canManage={canCreate}')
     expect(OVERVIEWS).toContain('canManage: boolean')

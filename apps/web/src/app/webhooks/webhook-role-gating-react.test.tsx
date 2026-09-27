@@ -136,4 +136,70 @@ describe('R32/C33 外部連携の権限連動と受け取りURL', () => {
     expect(base).not.toBe('')
     expect(host.textContent).toContain(`${base}/api/webhooks/incoming/iwh-1/receive`)
   })
+
+  it('統括には見本から作るを出す（受け取る・送るの両方）', async () => {
+    staffRole = 'owner'
+    for (const tabQuery of ['', 'tab=incoming']) {
+      query = tabQuery
+      await act(async () => {
+        root.render(<WebhooksPage />)
+      })
+      await settle()
+      expect(host.textContent, `owner ${tabQuery || 'outgoing'}`).toContain('見本から作る')
+      act(() => {
+        root.unmount()
+      })
+      host.remove()
+      host = document.createElement('div')
+      document.body.appendChild(host)
+      root = createRoot(host)
+    }
+  })
+
+  it('管理者には見本から作るを出さず、統括への依頼だけ出す', async () => {
+    for (const [tabQuery, guidance] of [
+      ['', '送り先の作成は統括だけができます。必要なときは統括に頼んでください。'],
+      ['tab=incoming', '受け取り口の作成は統括だけができます。必要なときは統括に頼んでください。'],
+    ] as const) {
+      query = tabQuery
+      staffRole = 'admin'
+      await act(async () => {
+        root.render(<WebhooksPage />)
+      })
+      await settle()
+      expect(host.textContent, `admin ${tabQuery || 'outgoing'}`).not.toContain('見本から作る')
+      expect(host.textContent, `admin ${tabQuery || 'outgoing'}`).toContain(guidance)
+      act(() => {
+        root.unmount()
+      })
+      host.remove()
+      host = document.createElement('div')
+      document.body.appendChild(host)
+      root = createRoot(host)
+    }
+  })
+
+  it('統括には見本タブの作成を出す', async () => {
+    query = 'tab=notify'
+    staffRole = 'owner'
+    await act(async () => {
+      root.render(<WebhooksPage />)
+    })
+    await settle()
+    expect(host.textContent).toContain('この見本で作る')
+    expect(host.textContent).toContain('送り先を作る')
+  })
+
+  it('管理者には見本タブの作成を出さず、統括への依頼だけ出す', async () => {
+    query = 'tab=notify'
+    staffRole = 'admin'
+    await act(async () => {
+      root.render(<WebhooksPage />)
+    })
+    await settle()
+    expect(host.textContent).not.toContain('この見本で作る')
+    expect(host.textContent).not.toContain('送り先を作る')
+    expect(host.textContent).toContain('受け取り口の作成は統括だけができます。必要なときは統括に頼んでください。')
+    expect(host.textContent).toContain('送り先の作成は統括だけができます。必要なときは統括に頼んでください。')
+  })
 })

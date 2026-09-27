@@ -126,6 +126,23 @@ const MERGED_TABS = [
   それぞれ作成の入口へつなげる。通知機能への導線は置かない。
 */
 function WebhookSamples() {
+  /*
+   * 見本からの作成も受け取り口・送り先の作成（R32）。口側が
+   * `requireRole('owner')` で守っているので、統括でなければ
+   * 作成ボタンは出さず、統括への依頼だけ出す。
+   */
+  const [staffRole, setStaffRole] = useState<string | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    void api.staff.me()
+      .then((response) => {
+        if (cancelled || !response.success) return
+        setStaffRole(response.data.role)
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
+  const canCreateSamples = staffRole === null || staffRole === 'owner'
   return (
     <div>
       <Notice tone="info" className="mb-4">
@@ -135,36 +152,44 @@ function WebhookSamples() {
         <section className="bg-canvas border-hairline rounded-card border p-5" aria-label="受け取る見本">
           <h2 className="text-ink mb-1 text-lg font-bold">受け取る見本</h2>
           <p className="text-ink-secondary mb-4 text-sm">相手のサービスで起きたことをうちに取り込みます。</p>
-          <ul className="space-y-3">
-            {SOURCE_PRESETS.map((preset) => (
-              <li key={preset.value} className="bg-canvas-sunken rounded-control flex flex-wrap items-center justify-between gap-3 p-4">
-                <div className="min-w-0">
-                  <strong className="text-ink block text-sm">{preset.label}</strong>
-                  <span className="text-ink-secondary mt-1 block text-xs">{preset.hint}</span>
-                </div>
-                <Button variant="secondary" href={`/webhooks?tab=incoming&source=${preset.value}`}>
-                  この見本で作る
-                </Button>
-              </li>
-            ))}
-          </ul>
+          {canCreateSamples ? (
+            <ul className="space-y-3">
+              {SOURCE_PRESETS.map((preset) => (
+                <li key={preset.value} className="bg-canvas-sunken rounded-control flex flex-wrap items-center justify-between gap-3 p-4">
+                  <div className="min-w-0">
+                    <strong className="text-ink block text-sm">{preset.label}</strong>
+                    <span className="text-ink-secondary mt-1 block text-xs">{preset.hint}</span>
+                  </div>
+                  <Button variant="secondary" href={`/webhooks?tab=incoming&source=${preset.value}`}>
+                    この見本で作る
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-ink-secondary text-sm">受け取り口の作成は統括だけができます。必要なときは統括に頼んでください。</p>
+          )}
         </section>
         <section className="bg-canvas border-hairline rounded-card border p-5" aria-label="送る見本">
           <h2 className="text-ink mb-1 text-lg font-bold">送る見本</h2>
           <p className="text-ink-secondary mb-4 text-sm">うちで起きたことを相手のサービスに知らせます。</p>
-          <ul className="space-y-3">
-            {OUTGOING_SAMPLES.map((sample) => (
-              <li key={sample.event} className="bg-canvas-sunken rounded-control flex flex-wrap items-center justify-between gap-3 p-4">
-                <div className="min-w-0">
-                  <strong className="text-ink block text-sm">{sample.when}</strong>
-                  <span className="text-ink-secondary mt-1 block text-xs">送るもの：{sample.payload}</span>
-                </div>
-                <Button variant="secondary" href="/webhooks/new">
-                  送り先を作る
-                </Button>
-              </li>
-            ))}
-          </ul>
+          {canCreateSamples ? (
+            <ul className="space-y-3">
+              {OUTGOING_SAMPLES.map((sample) => (
+                <li key={sample.event} className="bg-canvas-sunken rounded-control flex flex-wrap items-center justify-between gap-3 p-4">
+                  <div className="min-w-0">
+                    <strong className="text-ink block text-sm">{sample.when}</strong>
+                    <span className="text-ink-secondary mt-1 block text-xs">送るもの：{sample.payload}</span>
+                  </div>
+                  <Button variant="secondary" href="/webhooks/new">
+                    送り先を作る
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-ink-secondary text-sm">送り先の作成は統括だけができます。必要なときは統括に頼んでください。</p>
+          )}
         </section>
       </div>
     </div>
@@ -676,7 +701,8 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
       <MergedTabs basePath="/webhooks" paramName="tab" tabs={countedTabs} active={tab} />
       {/*
         作る操作は数字のカードの下・一覧のすぐ上の左にそろえる。
-        「見本から作る」も作る操作なので同じ並びの副ボタンへ。
+        「見本から作る」も作る操作なので同じ並びの副ボタンへ、
+        統括だけに出す（R32）。管理者には統括への依頼だけ出す。
         数字のカード（こちらから送るタブの KPI 帯）の下に置く。
       */}
       {tab === 'outgoing' ? (
@@ -704,7 +730,9 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
         ) : (
           <p className="text-ink-secondary text-sm">{createGuidance}</p>
         )}
-        <Button variant="secondary" href="/webhooks?tab=notify">見本から作る</Button>
+        {canCreate ? (
+          <Button variant="secondary" href="/webhooks?tab=notify">見本から作る</Button>
+        ) : null}
       </div>
 
       {/* Rotate-secret modal — used to recover legacy webhooks or rotate. */}
