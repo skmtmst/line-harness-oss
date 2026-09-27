@@ -298,4 +298,3 @@ export function ApplyToTagModal({ groupId, groupName, onClose }: Props) {
     </div>
   )
 }
-
