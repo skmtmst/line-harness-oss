@@ -23,8 +23,9 @@ describe('スコアのルール：失敗の文言', () => {
     expect(PAGE).not.toMatch(/if \(error instanceof ApiError\) return error\.message/)
   })
 
-  it('400 だけ本文を通し、ほかは番号ごとに日本語へ置き換える', () => {
-    expect(PAGE).toContain('if (error.status === 400) return error.message')
+  it('400 と 422 は本文を通し、ほかは番号ごとに日本語へ置き換える', () => {
+    // R130: 422の本文はWorkerが付けた日本語の検証文だけ。400と同じく通す。
+    expect(PAGE).toMatch(/if \(error\.status === 400 \|\| error\.status === 422\) return error\.message/)
     for (const status of [403, 404, 405, 409]) {
       expect(PAGE).toMatch(new RegExp(`if \\(error\\.status === ${status}\\) return '[^']+'`))
     }
