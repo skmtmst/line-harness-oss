@@ -14037,7 +14037,7 @@ export const eventsApi = {
       { method: 'DELETE' },
     ),
 
-  /** キャンセル待ち。自動では繰り上げない。誰を通すかは運用の判断。 */
+  /** キャンセル待ち。空きが出たら先頭へ自動で案内し、本人の承諾で確定する。手動の案内もできる。 */
   listWaitlist: (accountId: string, eventId: string) =>
     fetchApi<{ waitlist: EventWaitlistItem[] }>(
       withAccount(`/api/events/admin/events/${eventId}/waitlist`, accountId),
