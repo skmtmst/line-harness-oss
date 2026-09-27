@@ -4994,6 +4994,13 @@ export interface AccountHandover {
   movedCount: number
   failedCount: number
   failureReason: string | null
+  /** 移し元システム側の申告件数。事前確認の合計と違うままでは本実行できない。 */
+  declaredFriendTotal?: number | null
+  /** 切り戻せる期限（本実行から7日間）。本実行前は null。 */
+  rollbackDeadline?: string | null
+  rolledBackAt?: string | null
+  rolledBackBy?: string | null
+  rollbackNote?: string | null
   createdAt: string
   linkedAt: string | null
   previewedAt: string | null
@@ -5655,6 +5662,7 @@ export type StepUpPurpose =
   | 'line_account.connect'
   | 'line_account.credentials'
   | 'line_account.archive'
+  | 'account_handover.execute'
   | 'broadcast.approval'
   | 'webhook.api_token'
   | 'webhook.secret'
@@ -8404,7 +8412,7 @@ export const api = {
      */
     preview: (
       id: string,
-      input: { sourceFriendTotal: number; counts: HandoverMatchCounts },
+      input: { sourceFriendTotal: number; counts: HandoverMatchCounts; declaredFriendTotal?: number | null },
     ) =>
       fetchApi<ApiResponse<AccountHandover>>(`/api/account-handovers/${id}/preview`, {
         method: 'POST',
@@ -8425,16 +8433,29 @@ export const api = {
         `/api/account-handovers/${id}/decisions`,
         { method: 'PUT', body: JSON.stringify({ decisions }) },
       ),
-    /** 段5。本実行と照合。要確認がのこっていると 422 で止まる。 */
-    execute: (id: string) =>
+    /** 段5。本実行と照合。要確認がのこっていると 422 で止まる。本人確認（step-up）が要る。 */
+    execute: (id: string, stepUpToken?: string) =>
       fetchApi<ApiResponse<AccountHandover & { plannedCount: number }>>(
         `/api/account-handovers/${id}/execute`,
-        { method: 'POST' },
+        {
+          method: 'POST',
+          headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
+        },
       ),
     cancel: (id: string) =>
       fetchApi<ApiResponse<AccountHandover>>(`/api/account-handovers/${id}/cancel`, {
         method: 'POST',
       }),
+    /** 段6。切り戻し。本実行から7日間だけ。本人確認（step-up）が要る。 */
+    rollback: (id: string, note?: string, stepUpToken?: string) =>
+      fetchApi<ApiResponse<AccountHandover & { restoredCount: number }>>(
+        `/api/account-handovers/${id}/rollback`,
+        {
+          method: 'POST',
+          headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
+          body: JSON.stringify({ note: note ?? null }),
+        },
+      ),
   },
   friendMigrations: {
     list: () => fetchApi<ApiResponse<UidMigrationRun[]>>('/api/friends/migrations'),
@@ -8570,6 +8591,46 @@ export const api = {
     delete: (id: string, stepUpToken?: string) =>
       fetchApi<ApiResponse<null>>(`/api/line-accounts/${id}`, {
         method: 'DELETE',
+        headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
+      }),
+    // 送受信の停止・再開（X-1）。理由は必須。再開は接続確認を内包する。
+    deactivate: (id: string, reason: string, stepUpToken?: string) =>
+      fetchApi<ApiResponse<LineAccount>>(`/api/line-accounts/${id}/deactivate`, {
+        method: 'POST',
+        headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
+        body: JSON.stringify({ reason }),
+      }),
+    activate: (id: string, reason: string, stepUpToken?: string) =>
+      fetchApi<ApiResponse<LineAccount & { checks?: unknown[] }>>(
+        `/api/line-accounts/${id}/activate`,
+        {
+          method: 'POST',
+          headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
+          body: JSON.stringify({ reason }),
+        },
+      ),
+    // 「止めていたので送らなかった」の一覧（X-1）。再開の確認に使う。
+    skippedDeliveries: (id: string) =>
+      fetchApi<ApiResponse<Array<{
+        id: string;
+        kind: string;
+        refId: string;
+        title: string | null;
+        reason: string;
+        skippedAt: string;
+      }>>>(`/api/line-accounts/${id}/skipped-deliveries`),
+    // アーカイブ（X-1）。止まっている・既定でない・配送が走っていない
+    // アカウントだけ。一覧から外れ、記録は残る。
+    archive: (id: string, reason?: string, stepUpToken?: string) =>
+      fetchApi<ApiResponse<LineAccount>>(`/api/line-accounts/${id}/archive`, {
+        method: 'POST',
+        headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
+        body: JSON.stringify({ reason: reason ?? null }),
+      }),
+    // アーカイブから戻す。戻った直後は「止まっている」状態。
+    restore: (id: string, stepUpToken?: string) =>
+      fetchApi<ApiResponse<LineAccount>>(`/api/line-accounts/${id}/restore`, {
+        method: 'POST',
         headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
       }),
     updateOrder: (ordered: Array<{ id: string; displayOrder: number }>) =>

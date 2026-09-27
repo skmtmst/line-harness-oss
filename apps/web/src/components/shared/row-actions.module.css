@@ -88,9 +88,26 @@
   white-space: nowrap;
 }
 
+/*
+ * 「⋯」が無い行の場所取り。「⋯」ボタン（32×32）と同じ大きさの
+ * 空きを置き、主ボタン（詳細）の位置を全行でそろえる。
+ * 見せないが幅は取る（display:none や幅0にしない）。
+ */
+.morePlaceholder {
+  width: 32px;
+  height: 32px;
+  flex: none;
+}
+
 /* タッチ端末は指の当たり判定のため44pxを確保する（LAY-18）。 */
 @media (pointer: coarse) {
   .action {
+    width: 44px;
+    height: 44px;
+  }
+
+  /* 場所取りも「⋯」と同じ44pxにする（そろえた位置がずれない）。 */
+  .morePlaceholder {
     width: 44px;
     height: 44px;
   }

@@ -16,6 +16,10 @@ import type { Env } from '../index.js';
  */
 
 export type AuditAction =
+  | 'line_account.deactivate'
+  | 'line_account.activate'
+  | 'line_account.pool_switch'
+  | 'account_handover.rollback'
   | 'mileage.rule.export'
   | 'mileage.rule.create'
   | 'mileage.rule.update'

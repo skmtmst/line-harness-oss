@@ -34,9 +34,10 @@ describe('04-C-横1: 友だち属性のタグ表は1440pxに収まる', () => {
 
 describe('08-C-狭1 / 10-C-狭1: 狭幅で検索欄を実用幅に保つ', () => {
   /*
-   * 帯は flex-wrap 済みだが、min-w-0 の入力は縮む側になるため
-   * 390pxで実用幅を割いていた。min-w-45（180px）を下限にすると
-   * 入力が1行を占め、並び順・表示件数は次の行へ折り返す。
+   * 旧処方は帯の直書き（min-w-45＝180px下限の input）だったが、
+   * ★V7 `Xn1Mz` で共通 ListToolbar へそろえた。検索は幅320・下限240を
+   * 部品が持ち（ListToolbar の契約テストで実数を守る）、狭い幅では
+   * 折り返す。画面側に潰れる直書きの検索帯を戻さないことを見る。
    */
   const cases = [
     ['auto-replies/page.tsx', '自動応答'],
@@ -46,8 +47,9 @@ describe('08-C-狭1 / 10-C-狭1: 狭幅で検索欄を実用幅に保つ', () =>
   for (const [path, name] of cases) {
     it(`${name}の検索帯は折り返し前提で、検索欄は min-w-45 を下限にする`, () => {
       const page = read(path)
-      expect(page).toContain('flex flex-wrap items-center gap-2 border p-3')
-      expect(page).toContain('min-w-45 flex-1')
+      expect(page).toContain('<ListToolbar')
+      expect(page).not.toContain('type="search"')
+      expect(page).not.toContain('data-search-row')
       expect(page).not.toContain('min-w-0 flex-1 border px-3 py-2 text-sm')
     })
   }

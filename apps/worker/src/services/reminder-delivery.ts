@@ -137,8 +137,14 @@ export async function processReminderDeliveries(
   const nowIso = now.toISOString();
   const leaseExpiresAt = new Date(now.getTime() + LEASE_MINUTES * 60_000).toISOString();
   const pending = await getPendingReminderDeliveries(db);
+  const accountsWithStatus = await listLineAccountsWithTenantStatus(db);
   const tenantStatusByAccount = new Map(
-    (await listLineAccountsWithTenantStatus(db)).map((account) => [account.id, account.tenant_status]),
+    accountsWithStatus.map((account) => [account.id, account.tenant_status]),
+  );
+  // アカウントの稼働状態（X-1）。止めているアカウント宛の通は
+  // 「送らなかった」記録にして積まない。
+  const activeByAccount = new Map(
+    accountsWithStatus.map((account) => [account.id, Boolean(account.is_active)]),
   );
   const result: ReminderDeliveryResult = { succeeded: 0, skipped: 0, retrying: 0, failed: 0, held: 0 };
   const sendPermissions: SendPermissionCache = new Map();
@@ -195,6 +201,43 @@ export async function processReminderDeliveries(
           id: run.id,
           code: 'tenant_suspended',
           message: '契約先の利用停止中に配信時刻を過ぎたため送信しませんでした。',
+          now: nowIso,
+        });
+        result.skipped++;
+      }
+      continue;
+    }
+    /*
+     * アカウント停止中（X-1、v6-33 §10-1）。期限の来た通は skipped の
+     * 実行行として残すので、再開しても自動では送り直さない。
+     */
+    if (accountId && activeByAccount.get(accountId) === false) {
+      for (const step of enrollment.steps) {
+        const sendAt = resolveReminderSendAt(
+          new Date(enrollment.target_date),
+          {
+            offsetDays: step.offset_days,
+            sendAtTime: step.send_at_time,
+            offsetMinutes: step.offset_minutes,
+          },
+          enrollment.delivery_mode === 'time' ? 'time' : 'countdown',
+        );
+        if (sendAt.getTime() > now.getTime()) continue;
+        const run = await claimReminderDeliveryRun(db, {
+          lineAccountId: accountId,
+          reminderId: enrollment.reminder_id,
+          friendReminderId: enrollment.id,
+          friendId: enrollment.friend_id,
+          reminderStepId: step.id,
+          scheduledAt: sendAt.toISOString(),
+          now: nowIso,
+          leaseExpiresAt,
+        });
+        if (!run) continue;
+        await skipReminderDeliveryRun(db, {
+          id: run.id,
+          code: 'account_inactive',
+          message: 'アカウントの送受信を止めている間に配信時刻を過ぎたため送信しませんでした。',
           now: nowIso,
         });
         result.skipped++;

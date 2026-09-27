@@ -1,7 +1,6 @@
 'use client'
 
 import SelectField from '@/components/shared/select-field'
-import SearchField from '@/components/shared/search-field'
 import ListRange from '@/components/ui/list-range'
 import { useDeferredValue, useEffect, useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
@@ -13,11 +12,10 @@ import type { RichMenuDeleteImpact, RichMenuTapStats } from '@/lib/api'
 import { RICH_MENU_DIMENSIONS, type Folder } from '@line-crm/shared'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
-import { MoreHorizontal, Trash2 } from 'lucide-react'
 import Button from '@/components/shared/button'
 import FilterChip from '@/components/shared/filter-chip'
-import IconButton from '@/components/shared/icon-button'
-import ActionMenu from '@/components/shared/action-menu'
+import ListToolbar from '@/components/shared/list-toolbar'
+import { RowActions } from '@/components/shared/row-actions'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
@@ -245,8 +243,6 @@ export default function RichMenusListPage() {
   const [deleteError, setDeleteError] = useState<string | null>(null)
   /** N-154: 複製。押した行と実行中・失敗を別に持つ。 */
   const [duplicateTarget, setDuplicateTarget] = useState<RichMenuGroupListItem | null>(null)
-  // 行の「その他」メニューの開き先（#641: 表示先・複製・切替のつながりはここへ集約）
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [duplicateBusy, setDuplicateBusy] = useState(false)
   const [duplicateError, setDuplicateError] = useState<string | null>(null)
   const deferredQuery = useDeferredValue(query.trim())
@@ -754,36 +750,42 @@ export default function RichMenusListPage() {
           </Button>
         </div>
         {/*
-          検索は独立した全幅の行にする（U015）。作成操作・並び順と
-          同じ行に押し込むと、狭い幅で入力した語が読めないほど潰れる。
+          ★V7 `Xn1Mz`：検索は幅320で1行目、2行目は左に絞り込み・
+          右端に並び順と表示件数。U015 の潰れ対策の意図はそのまま
+          （検索は320・下限240で折り返す）。
         */}
-        <div data-search-row className="mt-2">
-          <SearchField
-            value={query}
-            onChange={setQuery}
-            onClear={() => setQuery('')}
-            placeholder="メニュー名・ボタン名で検索"
-            aria-label="メニュー名・ボタン名で検索"
-            className="w-full"
-          />
-        </div>
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
-          <SelectField value={sortKey} onChange={(e) => setSortKey(e.target.value as SortKey)} aria-label="並び順" options={[{ value: "priority", label: "出す順番（自分で決めた順）" }, { value: "taps", label: "タップ数が多い順" }, { value: "updated", label: "更新が新しい順" }, { value: "name", label: "名前順" }]} className="border-hairline rounded-control focus:ring-accent min-w-60 border px-2 py-2 text-sm focus:ring-2 focus:outline-none" />
-          <span className="text-ink-faint text-xs whitespace-nowrap">表示</span>
-          <SelectField
-            size="compact"
-            value={pageSize}
-            onChange={(e) => setPageSize(Number(e.target.value))}
-            aria-label="表示件数"
-            options={[{ value: '20', label: '20件表示' }, { value: '50', label: '50件表示' }, { value: '100', label: '100件表示' }]}
-          />
-          {/* ★V7：緑の帯は「正常」と読めるので、並び順の横の注記にする。 */}
-          <p className="text-ink-faint min-w-0 text-xs leading-relaxed">
-            上にあるものが優先されます。同じ友だちが複数のメニューに当てはまるときは、
-            いちばん上の1つだけが出ます。
-          </p>
-        </div>
+        <ListToolbar
+          search={{ placeholder: 'メニュー名・ボタン名で検索', value: query, onChange: setQuery }}
+          filters={
+            <>
+              <span className="text-ink-faint text-xs whitespace-nowrap">よく使う絞り込み</span>
+              {SAVED_FILTERS.map((f) => (
+                <FilterChip key={f.key} selected={savedFilter === f.key} onChange={() => setSavedFilter(savedFilter === f.key && f.key ? '' : f.key)}>
+                  {f.label}
+                </FilterChip>
+              ))}
+            </>
+          }
+          trailing={
+            <>
+              <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
+              <SelectField value={sortKey} onChange={(e) => setSortKey(e.target.value as SortKey)} aria-label="並び順" options={[{ value: "priority", label: "出す順番（自分で決めた順）" }, { value: "taps", label: "タップ数が多い順" }, { value: "updated", label: "更新が新しい順" }, { value: "name", label: "名前順" }]} />
+              <span className="text-ink-faint text-xs whitespace-nowrap">表示</span>
+              <SelectField
+                size="compact"
+                value={pageSize}
+                onChange={(e) => setPageSize(Number(e.target.value))}
+                aria-label="表示件数"
+                options={[{ value: '20', label: '20件表示' }, { value: '50', label: '50件表示' }, { value: '100', label: '100件表示' }]}
+              />
+            </>
+          }
+        />
+        {/* ★V7：緑の帯は「正常」と読めるので、並び順の横の注記にする。 */}
+        <p className="text-ink-faint mb-3 min-w-0 text-xs leading-relaxed">
+          上にあるものが優先されます。同じ友だちが複数のメニューに当てはまるときは、
+          いちばん上の1つだけが出ます。
+        </p>
       </div>
 
 
@@ -791,7 +793,7 @@ export default function RichMenusListPage() {
         ★V7：「保存した検索」と書いていたが、中身は状態の絞り込み。保存はできないので名前を合わせる。
         「管理画面の外」は絞り込みではなく別の画面を開く操作なので、札の列から出して枠つきボタンにする。
       */}
-      <div data-design="Saved" className="flex flex-wrap items-center gap-2">
+      <div data-design="Saved" className="mb-3 flex flex-wrap items-center gap-2">
         <span className="text-ink-faint text-xs whitespace-nowrap">よく使う絞り込み</span>
         {SAVED_FILTERS.map((f) => (
           <FilterChip key={f.key} selected={savedFilter === f.key} onChange={() => setSavedFilter(savedFilter === f.key && f.key ? '' : f.key)}>
@@ -937,29 +939,17 @@ export default function RichMenusListPage() {
                           {new Date(g.updatedAt).toLocaleDateString('ja-JP', { month: 'long', day: 'numeric' })}
                         </td>
                         <td className="bg-canvas sticky right-0 py-3 pr-5 pl-4">
-                          {/* #641: 「編集」＋「削除」＋「その他（…）」の形にそろえる。表示先・複製・切替はメニューへ集約。 */}
+                          {/*
+                            ★V7 `Xn1Mz`：行の操作は「主な1つ（編集）＋…」。
+                            削除はメニューの中の危ない操作へ。ゴミ箱のアイコン
+                            だけのボタンは行に直に置かない。撮影口（szXsT）は
+                            「…」ボタンへ移す（2段操作の1段目）。
+                          */}
                           <div className="relative inline-flex items-center justify-end gap-1.5">
-                            <Button href={`/rich-menus/edit?id=${g.id}`} variant="secondary">編集</Button>
-                            <IconButton
-                              aria-label={`${g.name}を削除`}
-                              title={g.status === 'published' ? 'LINE から取り下げてから削除' : '削除'}
-                              data-qa-open={g.status === 'published' ? 'szXsT' : 'szXsT-draft'}
-                              onClick={() => handleDelete(g)}
-                            >
-                              <Trash2 aria-hidden />
-                            </IconButton>
-                            <IconButton
-                              aria-label={`${g.name}のその他操作`}
-                              aria-expanded={openMenuId === g.id}
-                              onClick={() => setOpenMenuId((current) => (current === g.id ? null : g.id))}
-                            >
-                              <MoreHorizontal aria-hidden />
-                            </IconButton>
-                            <ActionMenu
-                              open={openMenuId === g.id}
-                              ariaLabel={`${g.name}の操作`}
-                              onClose={() => setOpenMenuId(null)}
-                              items={[
+                            <RowActions
+                              subjectName={g.name}
+                              edit={{ href: `/rich-menus/edit?id=${g.id}` }}
+                              menuItems={[
                                 ...(g.status === 'published'
                                   ? [{ id: 'apply', label: '表示先', onSelect: () => setApplyTo(g) }]
                                   : []),
@@ -974,6 +964,12 @@ export default function RichMenusListPage() {
                                   onSelect: () => router.push(`/rich-menus/connections?id=${encodeURIComponent(g.id)}`),
                                 },
                               ]}
+                              destructiveItem={{
+                                id: 'delete',
+                                label: '削除する',
+                                onSelect: () => handleDelete(g),
+                              }}
+                              menuButtonProps={{ 'data-qa-open': g.status === 'published' ? 'szXsT' : 'szXsT-draft' }}
                             />
                           </div>
                         </td>

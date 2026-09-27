@@ -129,14 +129,18 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-/** 一覧を描き、削除の確認窓を開く。 */
+/** 一覧を描き、行の「…」から削除の確認窓を開く。 */
 async function openDeleteDialog() {
   // 整理の結果は Toast（右下・4秒）で出す。置き場所も一緒に描く。
   clearToastsForTest()
   render(<><TagsPageV4 accountId="account-a" /><ToastHost /></>)
   // 表と狭幅カードの両方に同じ操作が出るため、見えている側として先頭を取る。
-  const rowButton = (await screen.findAllByRole('button', { name: '旧キャンペーン を削除' }))[0]
-  await act(async () => { fireEvent.click(rowButton) })
+  // ★V7 `Xn1Mz`：削除は「…」メニューの中の危ない操作へ。赤いゴミ箱だけの
+  // ボタンは行に直に置かない。確認窓の動き（#708）はそのまま守る。
+  const moreButton = (await screen.findAllByRole('button', { name: '旧キャンペーンのその他操作' }))[0]
+  await act(async () => { fireEvent.click(moreButton) })
+  const deleteItem = await screen.findByRole('menuitem', { name: '削除する' })
+  await act(async () => { fireEvent.click(deleteItem) })
   await screen.findByText('「旧キャンペーン」を削除しますか？')
   const input = screen.getByPlaceholderText('旧キャンペーン')
   await act(async () => { fireEvent.change(input, { target: { value: '旧キャンペーン' } }) })

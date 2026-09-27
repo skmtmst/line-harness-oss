@@ -3298,7 +3298,256 @@ const spec = {
         responses: { '200': { description: 'Updated' } },
       },
       put: { tags: ['LINE Accounts'], summary: 'LINEアカウント更新', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Updated' } } },
-      delete: { tags: ['LINE Accounts'], summary: 'LINEアカウント削除', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Deleted' } } },
+      delete: { tags: ['LINE Accounts'], summary: 'LINEアカウント削除（内部ではアーカイブとして記録を残す）', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Archived' } } },
+    },
+    '/api/line-accounts/{id}/deactivate': {
+      post: {
+        tags: ['LINE Accounts'],
+        summary: '送受信を止める',
+        description: '理由は必須。止めている間は受信も予約配信も止まり、'
+          + '送らなかった分は「止めていたので送らなかった」一覧に残る（X-1）。'
+          + '本人確認（step-up）が要る。',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['reason'],
+                properties: { reason: { type: 'string', maxLength: 500 } },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: '止めた' },
+          '401': { description: 'STEP_UP_REQUIRED' },
+          '409': { description: '既定アカウント・アーカイブ済み' },
+          '422': { description: '理由が無い・長すぎる' },
+        },
+      },
+    },
+    '/api/line-accounts/{id}/activate': {
+      post: {
+        tags: ['LINE Accounts'],
+        summary: '送受信を再開する',
+        description: '理由は必須。再開の前に接続を確かめ、LINEとの接続（bot_info）が'
+          + '通らないときは再開しない（X-1）。確かめた結果は台帳にも残す。'
+          + '本人確認（step-up）が要る。',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['reason'],
+                properties: { reason: { type: 'string', maxLength: 500 } },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: '再開した' },
+          '401': { description: 'STEP_UP_REQUIRED' },
+          '409': { description: 'アーカイブ済み' },
+          '422': { description: '理由が無い・接続を確認できない' },
+        },
+      },
+    },
+    '/api/line-accounts/{id}/skipped-deliveries': {
+      get: {
+        tags: ['LINE Accounts'],
+        summary: '止めている間に送らなかった配信の一覧',
+        description: '再開の画面で運用者が確認するための一覧（X-1）。再実行は別途選ぶ。',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: '一覧' }, '404': { description: 'Not found' } },
+      },
+    },
+    '/api/line-accounts/{id}/archive': {
+      post: {
+        tags: ['LINE Accounts'],
+        summary: 'アーカイブする',
+        description: '一覧から外して記録を残す。動いている・既定・配送中・'
+          + '振り分けの組に入っているアカウントは断る（409）。本人確認が要る。',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: {
+          '200': { description: 'Archived' },
+          '401': { description: 'STEP_UP_REQUIRED' },
+          '409': { description: 'ACCOUNT_ARCHIVED / LINE_ACCOUNT_ARCHIVE_BLOCKED' },
+        },
+      },
+    },
+    '/api/line-accounts/{id}/restore': {
+      post: {
+        tags: ['LINE Accounts'],
+        summary: 'アーカイブから戻す',
+        description: '戻った直後は「止まっている」状態。送受信を始めるには別途再開が要る。',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Restored' }, '401': { description: 'STEP_UP_REQUIRED' } },
+      },
+    },
+    '/api/line-accounts/{id}/connection-checks': {
+      post: {
+        tags: ['LINE Accounts'],
+        summary: '接続を確かめる',
+        description: 'Idempotency-Key と expectedRevision が要る。'
+          + 'bot情報・Webhook・LIFF の突合結果を台帳へ残す。',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: {
+          '200': { description: '確かめた結果' },
+          '409': { description: 'REVISION_CONFLICT / ACCOUNT_ARCHIVED' },
+          '422': { description: 'Idempotency-Key・expectedRevision が要る' },
+        },
+      },
+    },
+    '/api/line-accounts/verify-connection': {
+      post: {
+        tags: ['LINE Accounts'],
+        summary: '接続確認（登録前の試し）',
+        responses: { '200': { description: '確認結果' } },
+      },
+    },
+    '/api/line-accounts/default': {
+      put: {
+        tags: ['LINE Accounts'],
+        summary: '既定アカウントを切り替える',
+        responses: { '200': { description: '切り替えた' }, '409': { description: '停止中・保管済みは既定にできない' } },
+      },
+    },
+    '/api/line-accounts/summary': {
+      get: {
+        tags: ['LINE Accounts'],
+        summary: 'アカウントの合計（重複なし友だち数など）',
+        responses: { '200': { description: '合計' } },
+      },
+    },
+    '/api/line-accounts/{id}/handovers': {
+      get: {
+        tags: ['LINE Accounts'],
+        summary: 'そのアカウントの引き継ぎ一覧',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: '一覧' } },
+      },
+    },
+    // ── アカウントの乗り換え（引き継ぎ。X-3・設計 ★V6 33-4）──────────────
+    '/api/account-handovers': {
+      post: {
+        tags: ['LINE Accounts'],
+        summary: '段1。引き継ぎコードを出す',
+        description: 'コードの期限は72時間で1回だけ使える（X-3）。',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['fromAccountId'],
+                properties: { fromAccountId: { type: 'string' } },
+              },
+            },
+          },
+        },
+        responses: { '201': { description: '発行した' }, '400': { description: 'Invalid request' } },
+      },
+    },
+    '/api/account-handovers/link': {
+      post: {
+        tags: ['LINE Accounts'],
+        summary: '段2。受け取り先でコードを読む',
+        parameters: [],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['code', 'toAccountId'],
+                properties: {
+                  code: { type: 'string' },
+                  toAccountId: { type: 'string' },
+                },
+              },
+            },
+          },
+        },
+        responses: { '200': { description: 'つないだ' }, '422': { description: '期限切れ・使用済み' } },
+      },
+    },
+    '/api/account-handovers/{id}': {
+      get: {
+        tags: ['LINE Accounts'],
+        summary: '引き継ぎの詳細（判断の一覧つき）',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: '詳細' }, '404': { description: 'Not found' } },
+      },
+    },
+    '/api/account-handovers/{id}/preview': {
+      post: {
+        tags: ['LINE Accounts'],
+        summary: '段3。事前確認の結果を保存する',
+        description: '**事前確認だけでは元のアカウントは何も変わらない。** '
+          + '4区分の合計が元の友だち数と合わない・実際の友だち数と違うときは断る。'
+          + '移し元システム側の申告件数（declaredFriendTotal）もここで受ける。',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: '保存した' }, '422': { description: '合計が合わない' } },
+      },
+    },
+    '/api/account-handovers/{id}/decisions': {
+      put: {
+        tags: ['LINE Accounts'],
+        summary: '段4。競合の判断を保存する',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: '保存した' } },
+      },
+    },
+    '/api/account-handovers/{id}/execute': {
+      post: {
+        tags: ['LINE Accounts'],
+        summary: '段5。本実行と照合',
+        description: '要確認がのこっている・申告件数と事前確認が違うままでは止まる。'
+          + '本人確認（step-up）が要る（X-3）。',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: {
+          '200': { description: '実行した（照合結果つき）' },
+          '401': { description: 'STEP_UP_REQUIRED' },
+          '409': { description: 'もう実行済み' },
+          '422': { description: '要確認がのこっている・件数が違う' },
+        },
+      },
+    },
+    '/api/account-handovers/{id}/cancel': {
+      post: {
+        tags: ['LINE Accounts'],
+        summary: '進行中の引き継ぎを取り消す',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: '取り消した' }, '409': { description: '終わった引き継ぎは消せない' } },
+      },
+    },
+    '/api/account-handovers/{id}/rollback': {
+      post: {
+        tags: ['LINE Accounts'],
+        summary: '段6。切り戻し（本実行から7日間だけ）',
+        description: '動かした友だちを元のアカウントへ戻す（X-3）。'
+          + '期限を過ぎた引き継ぎ・もう戻した引き継ぎは断る。本人確認（step-up）が要る。',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: { note: { type: 'string', nullable: true } },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: '切り戻した（restoredCountつき）' },
+          '401': { description: 'STEP_UP_REQUIRED' },
+          '422': { description: '期限切れ・実行前・戻し済み' },
+        },
+      },
     },
     '/api/accounts/health-summary': {
       get: {
