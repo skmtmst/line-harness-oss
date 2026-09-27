@@ -720,9 +720,13 @@ function MileagePageInner() {
                           ? `利用対象：条件 ${rule.draft.targetConditions.rules.length + (rule.draft.targetConditions.groups?.reduce((sum, group) => sum + group.rules.length, 0) ?? 0)}件・下書き v${rule.draftVersion}`
                           : `利用対象：すべての友だち・下書き v${rule.draftVersion}`}
                       </span>
-                      <details className="relative shrink-0 text-ink-secondary">
+                      {/*
+                        表の枠は横に動かせる（`overflow-x: auto`）ので、絶対位置の
+                        吹き出しは枠に切られる。開いた分は行の中でそのまま伸ばす。
+                      */}
+                      <details className="min-w-0 shrink-0 text-ink-secondary">
                         <summary className="cursor-pointer font-semibold text-action">公開版の中身を見る</summary>
-                        <p className="absolute left-0 top-full z-10 mt-1 w-72 rounded-control border border-hairline bg-canvas p-2 shadow-card" title={`${rule.published.name} / ${ruleEventLabel(rule.published.eventType, EVENT_LABELS)} / ${formatMileageNumber(rule.published.amount)}マイル`}>
+                        <p className="mt-1 rounded-control border border-hairline bg-canvas p-2 shadow-card" title={`${rule.published.name} / ${ruleEventLabel(rule.published.eventType, EVENT_LABELS)} / ${formatMileageNumber(rule.published.amount)}マイル`}>
                           {rule.published.name}・{ruleEventLabel(rule.published.eventType, EVENT_LABELS)}・{formatMileageNumber(rule.published.amount)}マイル
                         </p>
                       </details>
