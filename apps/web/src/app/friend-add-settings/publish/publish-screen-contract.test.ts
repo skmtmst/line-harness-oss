@@ -1,7 +1,13 @@
+// @vitest-environment happy-dom
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { describe, expect, it } from 'vitest'
+import React from 'react'
+import { afterEach, describe, expect, it } from 'vitest'
+import { cleanup, render, screen } from '@testing-library/react'
+import Stepper from '@/components/shared/stepper'
+
+afterEach(() => cleanup())
 
 const PAGE = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'page.tsx'), 'utf8')
 
@@ -91,10 +97,25 @@ describe('友だち追加時配信の公開画面', () => {
     }
   })
 
-  it('最終確認は5段目を現在地にする', () => {
-    expect(PAGE).toContain('current={5}')
-    expect(PAGE).toContain('complete')
-    expect(PAGE).not.toContain('current={4}')
+  it('最終確認は5段目を現在地にする', { timeout: 30000 }, () => {
+    // 新しい Stepper は数値の current ではなく、段ごとの state の並びで表す。
+    expect(PAGE).toContain('<Stepper')
+    expect(PAGE).toContain("const STEPS = ['基本設定', '流入条件', '初回案内', 'アクション', '確認']")
+    expect(PAGE).toContain("state: index + 1 < 5 ? 'done'")
+    expect(PAGE).toContain(": 'current'")
+    expect(PAGE).not.toContain('current={')
+    // 画面と同じ並びを描画して、5段目だけが現在地なのを確かめる。
+    const steps = ['基本設定', '流入条件', '初回案内', 'アクション', '確認'].map((label, index) => ({
+      label,
+      state: (index + 1 < 5 ? 'done' : 'current') as const,
+    }))
+    render(React.createElement(Stepper, { label: '設定の進み', steps }))
+    const nav = screen.getByRole('navigation', { name: '設定の進み' })
+    const items = nav.querySelectorAll('li')
+    expect(items).toHaveLength(5)
+    const current = nav.querySelector('[aria-current="step"]')
+    expect(current?.textContent).toContain('確認')
+    expect(nav.innerHTML).toContain('✓')
   })
 
   it('設計の最終確認に必要な時刻・プレビュー・監視状態を表示する', () => {

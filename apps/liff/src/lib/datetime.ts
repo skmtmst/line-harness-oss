@@ -46,6 +46,28 @@ export function utcToJstHm(utcIso: string): string {
   return jstParts(utcIso).slice(11, 16);
 }
 
+const WEEKDAY_JA = '日月火水木金土';
+
+/** UTC ISO → JST の曜日1文字。イベントの日時の見出しで使う。 */
+export function utcToJstWeekday(utcIso: string): string {
+  return WEEKDAY_JA[new Date(jstParts(utcIso)).getUTCDay()];
+}
+
+/** UTC ISO → '10月12日（日）13:00' (JST)。イベント詳細・確定画面で使う。 */
+export function formatJstEventAt(utcIso: string): string {
+  const d = jstParts(utcIso);
+  return `${Number(d.slice(5, 7))}月${Number(d.slice(8, 10))}日（${utcToJstWeekday(utcIso)}）${d.slice(11, 16)}`;
+}
+
+/** 開始〜終了が JST の同じ日なら '13:00〜14:00'、日またぎなら両日を出す。 */
+export function formatJstEventSpan(startsAt: string, endsAt: string): string {
+  const s = jstParts(startsAt);
+  const e = jstParts(endsAt);
+  const head = formatJstEventAt(startsAt);
+  if (s.slice(0, 10) === e.slice(0, 10)) return `${head}〜${e.slice(11, 16)}`;
+  return `${head} 〜 ${formatJstEventAt(endsAt)}`;
+}
+
 export function jstStartsAtIso(date: string, hhmm: string): string {
   // `+09:00` suffix tells JS to treat the wall-clock time as JST.
   return new Date(`${date}T${hhmm}:00+09:00`).toISOString();

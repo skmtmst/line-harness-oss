@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Notice from '@/components/shared/notice'
+import { notifyToast } from '@/components/shared/toast'
 import PageHeader from '@/components/shared/page-header'
 import { TextField } from '@/components/shared/text-field'
 import Toggle from '@/components/shared/toggle'
@@ -460,7 +462,6 @@ export default function SettingsPage() {
   /** GET で受けた版。保存時に送り返し、競合(409)を検出する。 */
   const [settingsVersion, setSettingsVersion] = useState(0)
   const [error, setError] = useState('')
-  const [notice, setNotice] = useState('')
   /**
    * 変更理由。サーバーが必須化しており、保存と同じ単位で監査へ残る。
    * 保存成功・取り消し・アカウント切替で空に戻す。
@@ -525,7 +526,6 @@ export default function SettingsPage() {
       setUsageFailed(false)
       setOrdering(false)
       setError('')
-      setNotice('')
       setImpactOpen(false)
       setImpactGroups([])
       setImpactError('')
@@ -632,7 +632,6 @@ export default function SettingsPage() {
       for (const key of item.keys) changed[key] = next
       return changed
     })
-    setNotice('')
   }
 
   const toggleGroup = (group: FeatureGroup, next: boolean) => {
@@ -644,7 +643,6 @@ export default function SettingsPage() {
       }
       return changed
     })
-    setNotice('')
   }
 
   /**
@@ -658,7 +656,6 @@ export default function SettingsPage() {
     if (!group) return
     const ids = group.items.map((item) => item.id)
     setItemOrder((current) => ({ ...current, [groupId]: moveItemWithinGroup(ids, itemId, direction) }))
-    setNotice('')
   }
 
   /** 最後に取得または保存成功した、現在のアカウントの状態へだけ戻す。 */
@@ -668,7 +665,7 @@ export default function SettingsPage() {
     setItemOrder({ ...savedItemOrder })
     setReason('')
     setError('')
-    setNotice('保存済みの機能設定に戻しました。')
+    notifyToast('保存済みの機能設定に戻しました。')
   }
 
   /** 既定値を下書きへ入れる。ここではAPIを呼ばず、保存を押すまでサーバーは変えない。 */
@@ -677,7 +674,7 @@ export default function SettingsPage() {
     setFeatures({ ...CATALOG_DEFAULT_FEATURES })
     setItemOrder({})
     setError('')
-    setNotice('初期値を下書きに入れました。保存すると反映されます。')
+    notifyToast('初期値を下書きに入れました。保存すると反映されます。')
     setResetToDefaultsOpen(false)
   }
 
@@ -752,7 +749,6 @@ export default function SettingsPage() {
     const ticket = accountGuard.issue(selectedAccountId)
     setSaving(true)
     setError('')
-    setNotice('')
     try {
       const response = await fetchApi<FeatureSaveResponse>(
         `/api/settings/features?account_id=${encodeURIComponent(selectedAccountId)}`,
@@ -805,7 +801,7 @@ export default function SettingsPage() {
         setItemOrder(currentOrder)
       }
       setReason('')
-      setNotice('機能設定を保存しました。サイドメニューにも反映されています。')
+      notifyToast('機能設定を保存しました。サイドメニューにも反映されています。')
       window.dispatchEvent(new CustomEvent(FEATURE_SETTINGS_UPDATED_EVENT, { detail: { accountId: selectedAccountId } }))
       return true
     } catch (error) {
@@ -907,7 +903,8 @@ export default function SettingsPage() {
     .join('、')
 
   return (
-    <div>
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       {/*
         U034: 390px・768pxでは右の操作（並び替え・保存など）が見出しを
         押しつぶし、題が1文字ずつ縦に割れていた。共通の PageHeader の形は
@@ -916,7 +913,6 @@ export default function SettingsPage() {
       */}
       <div data-page-header-wrap>
       <PageHeader
-        className="mb-5"
         breadcrumb={[{ label: '設定' }, { label: '機能設定' }]}
         title="機能設定"
         description=""
@@ -965,13 +961,9 @@ export default function SettingsPage() {
       `}</style>
       </div>
 
-      <div className="bg-info-bg text-ink-secondary mb-4 flex items-start gap-3 rounded-card px-5 py-2.5 text-xs leading-relaxed">
-        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="mt-px h-4 w-4 shrink-0 text-info">
-          <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.7" />
-          <path d="M12 10.5v6M12 7.5h.01" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
-        </svg>
-        <p>使わない機能をオフにすると、サイドメニューから消えます。オフにしても作ったデータは削除されません。公開中のページや動いている配信・予約は、それぞれの画面で止めてからオフにしてください。並び順はここでは変えません。「並びを変える」から入れ替えてください。</p>
-      </div>
+      <Notice tone="info" className="mb-4">
+        使わない機能をオフにすると、サイドメニューから消えます。オフにしても作ったデータは削除されません。公開中のページや動いている配信・予約は、それぞれの画面で止めてからオフにしてください。並び順はここでは変えません。「並びを変える」から入れ替えてください。
+      </Notice>
 
       {!selectedAccountId ? (
         <p className="border-hairline bg-canvas text-ink-faint rounded-card border p-8 text-center text-sm">
@@ -980,12 +972,11 @@ export default function SettingsPage() {
       ) : (
         <>
           <div aria-live="polite">
-            {error && <div className="border-danger bg-danger-bg text-danger mb-4 rounded-control border p-4 text-sm">{error}</div>}
-            {notice && <div className="border-success bg-success-bg text-success mb-4 rounded-control border p-4 text-sm">{notice}</div>}
+            {error && <Notice tone="danger" message={error} className="mb-4" />}
           </div>
 
           {dirty && (
-            <div className="border-hairline bg-canvas rounded-card mb-4 flex flex-col gap-2 border p-4 sm:flex-row sm:items-center">
+            <div className="border-hairline bg-canvas rounded-card flex flex-col gap-2 border p-4 sm:flex-row sm:items-center">
               <label htmlFor="feature-settings-reason" className="text-ink shrink-0 text-sm font-bold">
                 変更理由<RequiredBadge />
               </label>
@@ -1003,14 +994,14 @@ export default function SettingsPage() {
           {loading ? (
             <div className="border-hairline bg-canvas text-ink-faint rounded-card border p-10 text-center text-sm">読み込み中…</div>
           ) : (
-            <div className={ordering ? 'grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_20rem]' : ''}>
+            <div className={ordering ? 'grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]' : 'grid gap-4'}>
               {/*
                 利用状況の取得自体に失敗したとき。バッジは付かないので、
                 無表示のままにせず一覧の先頭で理由とやり直しを出す。
                 設定の切替はこの間も触れるままにする。
               */}
               {usageFailed && (
-                <div className="border-hairline bg-canvas-sunken text-ink-faint mb-4 flex items-center gap-2 rounded-card border px-4 py-2 text-xs">
+                <div className="border-hairline bg-canvas-sunken text-ink-faint flex items-center gap-2 rounded-card border px-4 py-2 text-xs">
                   <span>機能の利用状況を読めませんでした。設定の切替はそのまま使えます。</span>
                   <button
                     type="button"

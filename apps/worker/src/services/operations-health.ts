@@ -78,13 +78,25 @@ async function collectChecks(
                 COALESCE(MAX(consecutive_failures), 0) AS max_failures
            FROM outgoing_webhooks WHERE line_account_id = ? AND is_active = 1 AND deleted_at IS NULL`,
       ).bind(account.id).first<{ active_count: number; failing_count: number; max_failures: number }>();
-      const failing = Number(row?.failing_count ?? 0);
-      const maxFailures = Number(row?.max_failures ?? 0);
+      // #838 第2段: Google Sheets 連携の連続失敗・要再接続も同じ確認に畳む。
+      // 要再接続（expired）は連続失敗カウンタと別系のため、警告側の件数に足す。
+      const sheets = await db.prepare(
+        `SELECT COUNT(*) AS active_count,
+                COALESCE(SUM(CASE WHEN consecutive_failures > 0 OR status = 'expired' THEN 1 ELSE 0 END), 0) AS failing_count,
+                COALESCE(MAX(consecutive_failures), 0) AS max_failures
+           FROM google_sheets_integrations WHERE line_account_id = ?`,
+      ).bind(account.id).first<{ active_count: number; failing_count: number; max_failures: number }>();
+      const failing = Number(row?.failing_count ?? 0) + Number(sheets?.failing_count ?? 0);
+      const maxFailures = Math.max(Number(row?.max_failures ?? 0), Number(sheets?.max_failures ?? 0));
       const status: OperationHealthStatus = maxFailures >= 3 ? 'danger' : failing > 0 ? 'warning' : 'normal';
       return result('external_integrations', status,
         status === 'normal' ? '外部連携に連続失敗はありません' : '外部連携に連続失敗があります',
         'outgoing_webhooks', observedAt,
-        { activeCount: Number(row?.active_count ?? 0), failingCount: failing, maxConsecutiveFailures: maxFailures },
+        {
+          activeCount: Number(row?.active_count ?? 0) + Number(sheets?.active_count ?? 0),
+          failingCount: failing,
+          maxConsecutiveFailures: maxFailures,
+        },
         { warningFailures: 1, dangerFailures: 3 });
     }),
     isolate('webhook', observedAt, async () => {

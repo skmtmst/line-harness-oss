@@ -31,6 +31,8 @@
   /* 暗い地での会話の名前。ほか・自分を文字色で分ける */
   --color-night-name: #8fb8ff;
   --color-night-mine: #7ee2a8;
+  /* 押せない枠の地。設計の満席の枠 (2-event.png の 14:00〜15:00) の灰色。 */
+  --color-shell-gray: #ebedf1;
 }
 
 body {

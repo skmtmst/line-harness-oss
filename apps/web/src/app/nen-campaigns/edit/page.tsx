@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { api, type NenColumn } from '@/lib/api'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Notice from '@/components/shared/notice'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import CampaignEditor from './campaign-editor'
 import { useAccount } from '@/contexts/account-context'
@@ -103,8 +104,9 @@ function NenColumnEditInner() {
   if (campaignKey) return <CampaignEditor campaignKey={campaignKey} />
 
   return (
-    <div>
-      <nav className="text-ink-faint mb-4 text-xs">
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <nav className="text-ink-faint text-xs">
         <Link href="/nen-campaigns" className="hover:underline">
           フォロー配信
         </Link>
@@ -112,14 +114,12 @@ function NenColumnEditInner() {
         <span>コラムの編集</span>
       </nav>
 
-      <p className="text-ink-secondary mb-4 text-sm">
+      <p className="text-ink-secondary text-sm">
         コラムの本文はEC側にあります。ここで直せるのは、LINEで配るときに前に付ける一言だけです。
       </p>
 
       {error && (
-        <div className="bg-danger-bg border-danger-bg text-danger mb-4 rounded-lg border p-4 text-sm">
-          {error}
-        </div>
+        <Notice tone="danger" message={error} className="mb-4" />
       )}
 
       {loading ? (
@@ -131,7 +131,7 @@ function NenColumnEditInner() {
           コラムがまだありません。EC側で公開されると、ここに出ます。
         </div>
       ) : (
-        <div className="max-w-3xl space-y-3">
+        <div className="flex max-w-3xl flex-col gap-4">
           {columns.map((column) => (
             <div key={column.id} className="bg-canvas rounded-card border-hairline border p-4">
               <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">

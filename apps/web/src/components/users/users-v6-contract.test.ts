@@ -63,7 +63,7 @@ describe('統合ユーザーV6の画面契約', () => {
   })
 
   it('KPI名を統合ユーザーの業務用語へそろえる', () => {
-    /* 面は共通SummaryCardへ移したので、名前は title= で渡す。 */
+    /* 面は共通KpiCardへ移したので、名前は title= で渡す。 */
     for (const label of ['統合ユーザー', '紐付く友だち', 'UID連携済み']) {
       expect(SUMMARY).toContain(`title="${label}"`)
     }

@@ -255,10 +255,10 @@ describe('一覧の画面が置き換え表を通す', () => {
   })
 
   it('4指標を実APIから数え、未取得を 0 と出さない', () => {
-    // #721: 指標1は visualTotal 経由で読む。visualTotal は読み込んだ一覧の
-    // 件数そのもの（到達不能なキャスト分岐を消したため1行になった）。
+    // #721: 指標1は visualActive（有効なルール）経由で読む。総数は
+    // 「すべて」の行とページ送りだけにし、KPIでは重ねて出さない（R12）。
     // 2文で「呼ぶ側」と「数える元」の両方を固定する。
-    expect(PAGE).toContain('metricWord(visibleLoadState, visualTotal)')
+    expect(PAGE).toContain('metricWord(visibleLoadState, visualActive)')
     expect(PAGE).toContain('const visualTotal = items.length')
     expect(PAGE).toContain('metricWord(visibleLoadState, visualMonthly)')
     expect(PAGE).toContain('const visualMonthly = monthlyHits')
@@ -276,6 +276,11 @@ describe('一覧の画面が置き換え表を通す', () => {
 
   it('開く先が無いテンプレートをリンクにしない', () => {
     expect(PAGE).toContain('if (!word.linked)')
+  })
+
+  it('R11: テンプレート名から別画面へ飛ばさない（名前は黒文字）', () => {
+    expect(PAGE).not.toContain('href="/templates"')
+    expect(PAGE).not.toContain('text-blue-600')
   })
 })
 

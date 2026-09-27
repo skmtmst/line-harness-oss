@@ -6,7 +6,7 @@ import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import Pagination from '@/components/shared/pagination'
 import Select from '@/components/shared/select'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { TextField } from '@/components/shared/text-field'
 import { ApiError } from '@/lib/api'
@@ -65,9 +65,9 @@ export default function MembersTab({
   return (
     <>
       <KpiCollapse data-design="KPIs" data-design-node="THwtN" gridClassName="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard variant="v6" title="LINE連携済みの会員" value={ready ? kpis!.members : null} unit="人" detail="" help="ECの会員と結びついた友だちです" loading={!ready && settingsStatus === 'loading'} />
-        <SummaryCard variant="v6" title="通年 合計" value={ready ? kpis!.annualTotalYen : null} unit="円" detail="" help="1月1日から今日までの購入額です" loading={!ready && settingsStatus === 'loading'} />
-        <SummaryCard
+        <KpiCard variant="v6" title="LINE連携済みの会員" value={ready ? kpis!.members : null} unit="人" detail="" help="ECの会員と結びついた友だちです" loading={!ready && settingsStatus === 'loading'} />
+        <KpiCard variant="v6" title="通年 合計" value={ready ? kpis!.annualTotalYen : null} unit="円" detail="" help="1月1日から今日までの購入額です" loading={!ready && settingsStatus === 'loading'} />
+        <KpiCard
           variant="v6"
           title={topTwo.map((r) => r.name).join('・') || '上位ランク'}
           value={ready && topTwo[0] ? (kpis!.byRank[topTwo[0].key] ?? 0) : null}
@@ -75,7 +75,7 @@ export default function MembersTab({
           detail={ready && topTwo[1] ? `${topTwo[1].name} ${kpis!.byRank[topTwo[1].key] ?? 0}人` : '—'}
           loading={!ready && settingsStatus === 'loading'}
         />
-        <SummaryCard variant="v6" title="マイル残高 合計" value={ready ? kpis!.balanceTotal : null} unit="マイル" detail={ready ? `今月 使われた ${kpis!.usedThisMonth.toLocaleString('ja-JP')}マイル` : '—'} loading={!ready && settingsStatus === 'loading'} />
+        <KpiCard variant="v6" title="マイル残高 合計" value={ready ? kpis!.balanceTotal : null} unit="マイル" detail={ready ? `今月 使われた ${kpis!.usedThisMonth.toLocaleString('ja-JP')}マイル` : '—'} loading={!ready && settingsStatus === 'loading'} />
       </KpiCollapse>
 
       <div data-design="Note" data-design-node="G9TVE">

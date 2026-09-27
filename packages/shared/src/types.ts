@@ -1367,6 +1367,9 @@ export interface IncomingWebhook {
   // The raw secret is never exposed on list/get/update responses. Callers can
   // only know whether one is currently configured.
   hasSecret: boolean;
+  // S: while a rotation grace window is open, when the previous secret stops
+  // being accepted. Null once the window has passed or there is no previous key.
+  previousSecretUsableUntil?: string | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;

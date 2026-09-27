@@ -1,7 +1,8 @@
 .root {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  /* カード同士の縦の間隔は 16px（gap-4）にそろえる。 */
+  gap: 16px;
   min-width: 0;
   padding-top: 14px;
 }

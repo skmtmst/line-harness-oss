@@ -25,6 +25,7 @@ import TagBadge from '@/components/friends/tag-badge'
 import { FIELD_TYPE_LABELS } from '@/components/friend-fields/field-list'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
 import TargetMissing from '@/components/shared/target-missing'
 import SelectField from '@/components/shared/select-field'
 import ListRange from '@/components/ui/list-range'
@@ -1267,8 +1268,8 @@ function FriendDetailInner() {
   }
 
   return (
-    <div data-friends-detail-design="v4">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+    <div data-friends-detail-design="v4" className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <nav className="text-ink-faint text-xs" data-design="Crumb">
           <Link href="/friends" className="hover:underline">
             友だち
@@ -1328,9 +1329,7 @@ function FriendDetailInner() {
 
       {/* 本体が取れている途中の失敗（保存など）は帯で出す。本体の失敗は下のカードが出す。 */}
       {error && friend && (
-        <div className="bg-danger-bg border-danger-bg text-danger mb-4 rounded-lg border p-4 text-sm">
-          {error}
-        </div>
+        <Notice tone="danger" message={error} onClose={() => setError('')} className="mb-4" />
       )}
 
       {/*
@@ -1677,14 +1676,14 @@ function FriendDetailInner() {
             画面からはみ出していた。grid の子に min-w-0 を付け、幅の決定を
             グリッドに任せてタブ帯だけ中で横に流す。
           */}
-          <div data-design="Right" className="min-w-0">
+          <div data-design="Right" className="flex min-w-0 flex-col gap-4">
             {/*
               ★V7: 10個のタブが 1440px で2段に折れていた。折らずに1段にし、
               入り切らない分は横に送る。リンクで移動するタブなので
               aria-current="page" で現在地を示す（role="tab" は付けない）。
             */}
             <div className="relative">
-              <div ref={tabsRowRef} className="border-hairline mb-4 flex gap-1 overflow-x-auto border-b">
+              <div ref={tabsRowRef} className="border-hairline flex gap-1 overflow-x-auto border-b">
                 {visibleTabs.map((t) => (
                   <Link
                     key={t.key}

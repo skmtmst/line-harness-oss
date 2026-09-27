@@ -23,6 +23,7 @@ import { audienceSummary, messageTypeLabel } from '@/lib/broadcast-summary'
 import { broadcastBelongsToSelectedAccount } from './broadcast-detail-account'
 import { clickInsightDetail, formatBroadcastDateTime, openInsightDetail } from './broadcast-insight-display'
 import { broadcastDetailCsv } from './broadcast-detail-export'
+import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
 import { broadcastCsvFilename } from '@/components/broadcasts/broadcast-csv-filename'
 import { usePageTitle } from '@/components/shell/page-chrome'
 
@@ -54,6 +55,7 @@ function BroadcastDetailInner() {
   const [approvalCandidates, setApprovalCandidates] = useState<BroadcastApprovalCandidate[]>([])
   const [approvalBusy, setApprovalBusy] = useState(false)
   const [approvalMessage, setApprovalMessage] = useState<string | null>(null)
+  const [approvalStepUp, setApprovalStepUp] = useState<StepUpRequest | null>(null)
   // 承認の依頼を出し直すときの入力（差し戻し・期限切れのあと）。
   const [reApproverId, setReApproverId] = useState('')
   const [reApprovalNote, setReApprovalNote] = useState('')
@@ -309,13 +311,13 @@ function BroadcastDetailInner() {
   const handleApprovalRemind = () => void runApprovalAction(() => api.broadcasts.approval.remind(id))
   const handleApprovalReject = (reason: string) =>
     void runApprovalAction(() => api.broadcasts.approval.reject(id, reason))
-  const handleApprovalApprove = () =>
+  const handleApprovalApprove = (stepUpToken?: string) =>
     void (async () => {
       if (approvalBusy) return
       setApprovalBusy(true)
       setApprovalMessage(null)
       try {
-        const approved = await api.broadcasts.approval.approve(id)
+        const approved = await api.broadcasts.approval.approve(id, stepUpToken)
         if (!approved.success) {
           setApprovalMessage(approved.error)
           return
@@ -332,7 +334,12 @@ function BroadcastDetailInner() {
           return
         }
         await reloadApproval()
-      } catch {
+      } catch (caught) {
+        // 一斉配信の承認は大事な操作。本人確認を求められたら窓を立てる（V-1）。
+        if (!stepUpToken && isStepUpRequired(caught)) {
+          setApprovalStepUp({ purpose: 'broadcast.approval', action: '一斉配信を承認する', retry: (token) => Promise.resolve(handleApprovalApprove(token)) })
+          return
+        }
         setApprovalMessage('操作できませんでした。状態を読み直してから、もう一度お試しください。')
       } finally {
         setApprovalBusy(false)
@@ -383,8 +390,9 @@ function BroadcastDetailInner() {
     && ['none', 'rejected', 'cancelled', 'expired'].includes(approvalState.approval.status)
 
   return (
-    <div>
-      <nav data-design="Crumb" className="text-ink-faint mb-4 text-xs">
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <nav data-design="Crumb" className="text-ink-faint text-xs">
         <Link href="/broadcasts" className="hover:underline">
           ← 一斉配信一覧
         </Link>
@@ -690,10 +698,10 @@ function BroadcastDetailInner() {
       */}
       {broadcast ? (
         <StickyBar
-          className="mt-6"
           actions={<Button onClick={exportCsv}>CSVで書き出す</Button>}
         />
       ) : null}
+      {approvalStepUp && <StepUpPrompt request={approvalStepUp} onDone={() => setApprovalStepUp(null)} onClose={() => setApprovalStepUp(null)} />}
     </div>
   )
 }

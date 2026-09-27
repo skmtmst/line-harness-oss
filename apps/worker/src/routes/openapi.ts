@@ -429,9 +429,9 @@ const spec = {
     },
     '/api/auth/step-up': {
       post: {
-        tags: ['Auth'], summary: '高危険操作用の5分・1回限り再認証grantを発行',
-        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['code', 'purpose'], properties: { code: { type: 'string' }, purpose: { type: 'string', enum: ['operations.control', 'affiliate.payout.export', 'photo.original.download', 'staff.permissions.change', 'staff.two_factor.remove'] } } } } } },
-        responses: { '201': { description: 'Step-up grant issued' }, '400': { description: 'Invalid or wrong code' }, '403': { description: 'TOTP not configured' }, '409': { description: 'Code already used' }, '429': { description: 'Attempt limit exceeded' } },
+        tags: ['Auth'], summary: '高危険操作用の5分・1回限り再認証grantを発行（V: パスワード経路あり）',
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['purpose'], properties: { code: { type: 'string', description: '6桁コード（2段階認証の設定がある人）' }, password: { type: 'string', description: 'パスワード（2段階認証の設定が無い人）' }, purpose: { type: 'string', enum: ['operations.control', 'affiliate.payout.export', 'photo.original.download', 'staff.permissions.change', 'staff.two_factor.remove', 'line_account.connect', 'line_account.credentials', 'line_account.archive', 'broadcast.approval', 'webhook.api_token', 'webhook.secret'] } } } } } },
+        responses: { '201': { description: 'Step-up grant issued' }, '400': { description: 'Invalid or wrong credential' }, '401': { description: 'Not authenticated (STEP_UP_UNAUTHORIZED)' }, '403': { description: 'Neither TOTP nor password configured' }, '409': { description: 'Code already used' }, '429': { description: 'Attempt limit exceeded' } },
       },
     },
     // ── HQ Banners ─────────────────────────────────────────────────────────
@@ -1786,7 +1786,7 @@ const spec = {
     '/api/chats/{id}/send-combined': {
       post: {
         tags: ['Chats'],
-        summary: '画像と本文を1回で送信',
+        summary: '画像と本文（複数可）を1回で送信',
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
         requestBody: {
           required: true,
@@ -1803,6 +1803,11 @@ const spec = {
                     },
                   },
                   text: { type: 'string' },
+                  texts: {
+                    type: 'array',
+                    items: { type: 'string' },
+                    description: 'パック送信の本文（挿入順）。text と合わせて画像含め最大5通',
+                  },
                   revision: { type: 'integer' },
                   quotedMessageId: { type: 'string' },
                 },
@@ -2881,6 +2886,118 @@ const spec = {
         },
       },
     },
+    '/api/integrations/google-sheets/connection': {
+      get: {
+        tags: ['External integrations'],
+        summary: 'Google Sheets連携の接続状態（接続中・要再接続・未接続）と直近の同期状況',
+        parameters: [
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'Connection status' },
+          '403': { description: 'owner/admin required' },
+          '404': { description: 'Account not in scope' },
+        },
+      },
+    },
+    '/api/integrations/google-sheets/runs': {
+      get: {
+        tags: ['External integrations'],
+        summary: 'Google Sheets同期の直近10件（手動・定期・結果・書き込み行数）',
+        parameters: [
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'Recent sync runs' },
+          '403': { description: 'owner/admin required' },
+          '404': { description: 'Account not in scope' },
+        },
+      },
+    },
+    '/api/integrations/google-sheets/connect/start': {
+      post: {
+        tags: ['External integrations'],
+        summary: 'Google Sheets連携の認可を開始（state発行＋Google認可URLを返す）',
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object',
+          required: ['accountId'],
+          properties: { accountId: { type: 'string' } },
+        } } } },
+        responses: {
+          '200': { description: 'Authorize URL issued' },
+          '403': { description: '統括の管理者権限が必要' },
+          '404': { description: 'Account not in scope' },
+          '503': { description: 'OAuth client not configured' },
+        },
+      },
+    },
+    '/api/integrations/google-sheets/oauth/callback': {
+      get: {
+        tags: ['External integrations'],
+        summary: 'Google認可の戻り口。stateを検証してトークンを暗号化保存し、管理画面へ戻す',
+        parameters: [
+          { name: 'state', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'code', in: 'query', required: false, schema: { type: 'string' } },
+        ],
+        responses: {
+          '302': { description: '成功・失敗どちらも結果クエリ付きで管理画面へ302で戻す' },
+          '403': { description: '統括の管理者権限が必要' },
+          // 契約上2xxまたはdefaultが要るため明記。実際は常に302で、本体のJSON応答は無い。
+          'default': { description: '302リダイレクトのみ返す' },
+        },
+      },
+    },
+    '/api/integrations/google-sheets/disconnect': {
+      post: {
+        tags: ['External integrations'],
+        summary: 'Google Sheets連携を解除（Google側revoke＋連携行の削除）',
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object',
+          required: ['accountId', 'confirmed'],
+          properties: { accountId: { type: 'string' }, confirmed: { type: 'boolean' } },
+        } } } },
+        responses: {
+          '200': { description: 'Disconnected' },
+          '400': { description: 'Confirmation required' },
+          '403': { description: '統括の管理者権限が必要' },
+          '409': { description: 'Not connected' },
+        },
+      },
+    },
+    '/api/integrations/google-sheets/target': {
+      put: {
+        tags: ['External integrations'],
+        summary: '書き出し先スプレッドシートを設定（URLまたはID。保存前にアクセス可否を検証）',
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object',
+          required: ['accountId', 'spreadsheet'],
+          properties: { accountId: { type: 'string' }, spreadsheet: { type: 'string' } },
+        } } } },
+        responses: {
+          '200': { description: 'Target saved' },
+          '400': { description: 'Invalid spreadsheet URL/ID' },
+          '403': { description: '統括の管理者権限が必要' },
+          '404': { description: 'Spreadsheet not found' },
+          '409': { description: 'Not connected or permission denied' },
+        },
+      },
+    },
+    '/api/integrations/google-sheets/sync': {
+      post: {
+        tags: ['External integrations'],
+        summary: 'Google Sheetsへ今すぐ同期（全データ種別・増分upsert）',
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object',
+          required: ['accountId'],
+          properties: { accountId: { type: 'string' } },
+        } } } },
+        responses: {
+          '200': { description: 'Sync result per data type' },
+          '403': { description: '統括の管理者権限が必要' },
+          '409': { description: 'Not connected / auth expired' },
+        },
+      },
+    },
     '/api/ec-commerce/orders/{id}': {
       get: {
         tags: ['NEN delivery'],
@@ -3204,12 +3321,42 @@ const spec = {
         responses: { '200': { description: '詳細' }, '404': { description: 'Not found' } },
       },
     },
+    '/api/webhooks/incoming/{id}/test': {
+      post: {
+        tags: ['Webhook'],
+        summary: '受信Webhookの受け取りの試し',
+        description: '見本のJSONを人の照合と行動の組み立てまで試し、結果を返す(S #939 機能26)。'
+          + '届物の受領・行動の実行・箱への記録は行わない。結果はやり取り台帳へ test 種別で分けて残す。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['payload'],
+                properties: { payload: { description: '届いたつもりのJSON' } },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: '照合結果と行動の組み立て結果' },
+          '400': { description: 'Invalid request' },
+          '404': { description: 'Not found' },
+        },
+      },
+    },
     '/api/webhooks/incoming/{id}/unmatched': {
       get: {
         tags: ['Webhook'],
-        summary: '人が見つからなかった届物の一覧',
-        description: '受信Webhookの「未照合時の扱い」で unmatched_box / create_candidate を選んだ口に'
-          + '届いた未確認の一覧(#939 N-367)。照合に使った値と形だけの見本を返し、生の本文は返さない。',
+        summary: '人が見つからなかった・複数一致で保留した届物の一覧',
+        description: '受信Webhookの「未照合時の扱い」で unmatched_box / create_candidate を選んだ口と、'
+          + '同じ値の友だちが2人以上いて保留した届物の一覧(S #939 機能26)。'
+          + '照合に使った値と形だけの見本・複数一致の候補を返し、生の本文は返さない。',
         parameters: [
           { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
           { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },

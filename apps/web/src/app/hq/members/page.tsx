@@ -5,12 +5,12 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import type { LineAccount, StaffMember } from '@line-crm/shared'
 import MemberDialog, { type MemberDialogValue } from '@/components/hq/members/member-dialog'
-import StepUpDialog from '@/components/shared/step-up-dialog'
+import StepUpPrompt from '@/components/step-up-prompt'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import StickyBar from '@/components/shared/sticky-bar'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
 import KpiCollapse from '@/components/ui/kpi-collapse'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import ScrollableTabs from '@/components/layout/scrollable-tabs'
@@ -62,10 +62,8 @@ function MembersInner() {
   const [actionError, setActionError] = useState('')
   const [notice, setNotice] = useState('')
   const [resendingId, setResendingId] = useState<string | null>(null)
-  /* 権限変更が 428 で止まったときの本人確認。通ったら grant を付けて同じ保存をやり直す。 */
+  /* 権限変更が STEP_UP_REQUIRED で止まったときの本人確認。通ったら grant を付けて同じ保存をやり直す。 */
   const [stepUp, setStepUp] = useState<null | { retry: (token: string) => Promise<void> }>(null)
-  const [stepUpBusy, setStepUpBusy] = useState(false)
-  const [stepUpError, setStepUpError] = useState('')
 
   const load = useCallback(async () => {
     setStatus('loading')
@@ -138,22 +136,6 @@ function MembersInner() {
     }
   }
 
-  const submitStepUp = async (code: string) => {
-    if (!stepUp || stepUpBusy) return
-    setStepUpBusy(true)
-    setStepUpError('')
-    try {
-      const grant = await api.staff.stepUp(code, 'staff.permissions.change')
-      if (!grant.success) throw new Error(grant.error)
-      await stepUp.retry(grant.data.token)
-      setStepUp(null)
-    } catch (caught) {
-      setStepUpError(caught instanceof Error && caught.message ? caught.message : '本人確認できませんでした。')
-    } finally {
-      setStepUpBusy(false)
-    }
-  }
-
   const resend = async (member: StaffMember) => {
     setResendingId(member.id)
     setActionError('')
@@ -197,10 +179,10 @@ function MembersInner() {
         <>
           {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}
           <KpiCollapse data-design="KPIs" data-design-node="kCaRU" gridClassName="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <SummaryCard variant="v6" title="権限者" value={status === 'ready' ? kpis.total : null} unit="人" detail={status === 'ready' ? `有効 ${kpis.active}人` : '—'} loading={status === 'loading'} />
-            <SummaryCard variant="v6" title="招待中" value={status === 'ready' ? kpis.invited : null} unit="人" detail="" help="まだ承諾していない招待です" loading={status === 'loading'} />
-            <SummaryCard variant="v6" title="閲覧のみ" value={status === 'ready' ? kpis.viewers : null} unit="人" detail="" help="編集できない権限者です" loading={status === 'loading'} />
-            <SummaryCard variant="v6" title="担当アカウントの割り当て" value={status === 'ready' ? kpis.scopedAccounts : null} unit="アカウント" detail={status === 'ready' ? `全アカウントを担当 ${kpis.allScope}人` : '—'} loading={status === 'loading'} />
+            <KpiCard variant="v6" title="権限者" value={status === 'ready' ? kpis.total : null} unit="人" detail={status === 'ready' ? `有効 ${kpis.active}人` : '—'} loading={status === 'loading'} />
+            <KpiCard variant="v6" title="招待中" value={status === 'ready' ? kpis.invited : null} unit="人" detail="" help="まだ承諾していない招待です" loading={status === 'loading'} />
+            <KpiCard variant="v6" title="閲覧のみ" value={status === 'ready' ? kpis.viewers : null} unit="人" detail="" help="編集できない権限者です" loading={status === 'loading'} />
+            <KpiCard variant="v6" title="担当アカウントの割り当て" value={status === 'ready' ? kpis.scopedAccounts : null} unit="アカウント" detail={status === 'ready' ? `全アカウントを担当 ${kpis.allScope}人` : '—'} loading={status === 'loading'} />
           </KpiCollapse>
 
           <div data-design="Note" data-design-node="Y1EarL">
@@ -422,14 +404,13 @@ function MembersInner() {
               setDialog({ open: false, member: null })
             }}
           />
-          <StepUpDialog
-            open={stepUp !== null}
-            action="メンバーの権限を変更する"
-            busy={stepUpBusy}
-            error={stepUpError}
-            onSubmit={(code) => void submitStepUp(code)}
-            onCancel={() => { if (stepUpBusy) return; setStepUp(null); setStepUpError('') }}
-          />
+          {stepUp ? (
+            <StepUpPrompt
+              request={{ purpose: 'staff.permissions.change', action: 'メンバーの権限を変更する', retry: stepUp.retry }}
+              onDone={() => setStepUp(null)}
+              onClose={() => setStepUp(null)}
+            />
+          ) : null}
         </>
       )}
     </div>
