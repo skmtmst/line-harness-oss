@@ -12335,6 +12335,8 @@ export interface BookingSettings {
   approvalMode: 'automatic' | 'manual';
   holdMinutes: number;
   slotGranularityMinutes: 5 | 10 | 15 | 30 | 60;
+  /** LIFF 予約「日時を選ぶ」段の最初の形。 */
+  liffDateView: 'list' | 'calendar';
   /** 前日お知らせの送信時刻（店舗タイムゾーン）。null は予約24時間前。 */
   reminderDayBeforeTime: string | null;
   /** 当日お知らせを開始の何時間前に送るか。 */
@@ -12363,6 +12365,8 @@ export type SaveBookingSettings = Pick<
   | 'slotGranularityMinutes'
 > & {
   expectedVersion: number;
+  /** LIFF 予約「日時を選ぶ」段の最初の形。省いたら今の値を保つ。 */
+  liffDateView?: 'list' | 'calendar';
   /** 前日お知らせの送信時刻（HH:MM）。null で従来の24時間前。 */
   reminderDayBeforeTime: string | null;
   /** 当日お知らせを何時間前に送るか（1〜72）。null で従来の2時間前。 */
@@ -12525,6 +12529,8 @@ export interface BookingAvailabilityResponse {
     display_name: string;
     slots: BookingAvailabilitySlot[];
   }>;
+  /** 休みの日（お店・担当が閉めている日）。LIFFプレビューの「休」の印に使う。 */
+  closed_dates?: string[];
 }
 
 /** #1060: `menu_ids` 一括モードの応答。各要素は単独応答へ menu_id を添えた形。 */

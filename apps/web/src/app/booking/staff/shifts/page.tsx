@@ -652,7 +652,8 @@ function StoreShiftsView() {
     status: LiffPreviewStatus
     staffName: string | null
     slots: BookingAvailabilitySlot[]
-  }>({ status: 'loading', staffName: null, slots: [] })
+    closedDates: string[]
+  }>({ status: 'loading', staffName: null, slots: [], closedDates: [] })
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
   const [reloadKey, setReloadKey] = useState(0)
   const [addingClosed, setAddingClosed] = useState(false)
@@ -698,12 +699,12 @@ function StoreShiftsView() {
       setSettings(null)
       setMenus([])
       setResources([])
-      setPreview({ status: 'ready', staffName: null, slots: [] })
+      setPreview({ status: 'ready', staffName: null, slots: [], closedDates: [] })
       setLoadStatus('ready')
       return
     }
     if (loadedAccountRef.current !== selectedAccountId) setLoadStatus('loading')
-    setPreview({ status: 'loading', staffName: null, slots: [] })
+    setPreview({ status: 'loading', staffName: null, slots: [], closedDates: [] })
     setSaveError(null)
 
     void Promise.all([
@@ -722,7 +723,7 @@ function StoreShiftsView() {
 
       const menu = menuResult.menus.find((item) => item.is_active)
       if (!menu) {
-        setPreview({ status: 'ready', staffName: null, slots: [] })
+        setPreview({ status: 'ready', staffName: null, slots: [], closedDates: [] })
         return
       }
       try {
@@ -739,17 +740,18 @@ function StoreShiftsView() {
           status: 'ready',
           staffName: first?.display_name ?? null,
           slots: first?.slots ?? [],
+          closedDates: availability.closed_dates ?? [],
         })
       } catch {
         if (requestId !== requestRef.current) return
-        setPreview({ status: 'error', staffName: null, slots: [] })
+        setPreview({ status: 'error', staffName: null, slots: [], closedDates: [] })
       }
     }).catch(() => {
       if (requestId !== requestRef.current) return
       setSettings(null)
       setMenus([])
       setResources([])
-      setPreview({ status: 'ready', staffName: null, slots: [] })
+      setPreview({ status: 'ready', staffName: null, slots: [], closedDates: [] })
       setLoadStatus('error')
     })
 
@@ -1014,6 +1016,8 @@ function StoreShiftsView() {
                 slots={preview.slots}
                 menuName={previewMenuName}
                 staffName={preview.staffName}
+                initialView={settings.liffDateView ?? 'list'}
+                closedDates={preview.closedDates}
               />
             </section>
 

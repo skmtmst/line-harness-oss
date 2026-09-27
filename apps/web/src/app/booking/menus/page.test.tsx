@@ -489,6 +489,40 @@ describe('店舗共通の予約ルール', () => {
     expect((screen.getByRole('spinbutton', { name: '何日先まで受け付けるか' }) as HTMLInputElement).value).toBe('30')
     expect(screen.queryByRole('status')).toBeNull()
   })
+
+  test('日時を選ぶ画面の最初の形は2択で選び、保存に載る', async () => {
+    fixture.activeTab = 'rules'
+    render(<><MenusPage /><ToastHost /></>)
+    await screen.findByRole('spinbutton', { name: '何日先まで受け付けるか' })
+
+    // 見出しと？（お客さんは切り替えられる・ここは最初の形だけ）。
+    expect(screen.getByText('日時を選ぶ画面の最初の形')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '日時を選ぶ画面の最初の形の説明' }))
+    expect(screen.getByText(/お客さんは画面の上で切り替えられます/)).toBeTruthy()
+
+    // 既定はリスト。
+    const calendar = screen.getByRole('radio', { name: /カレンダー/ }) as HTMLInputElement
+    const list = screen.getByRole('radio', { name: /リスト/ }) as HTMLInputElement
+    expect(list.checked).toBe(true)
+    fireEvent.click(calendar)
+    expect(calendar.checked).toBe(true)
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '基本ルールを作成' }))
+    })
+    await waitFor(() => { expect(fixture.saveSettings).toHaveBeenCalled() })
+    expect(fixture.saveSettings).toHaveBeenCalledWith('account-a', expect.objectContaining({
+      liffDateView: 'calendar',
+    }))
+  })
+
+  test('保存済みがカレンダーならカレンダーが選ばれた状態で開く', async () => {
+    fixture.activeTab = 'rules'
+    fixture.getSettings = vi.fn(async () => ({ success: true, data: { ...SETTINGS, liffDateView: 'calendar' } }))
+    render(<><MenusPage /><ToastHost /></>)
+    await screen.findByRole('spinbutton', { name: '何日先まで受け付けるか' })
+    expect((screen.getByRole('radio', { name: /カレンダー/ }) as HTMLInputElement).checked).toBe(true)
+  })
 })
 
 describe('既存メニューの編集窓: 版管理と料金モード', () => {
