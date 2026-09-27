@@ -10824,6 +10824,15 @@ export const api = {
       fetchApi<ApiResponse<ReminderValidationResult>>(`/api/reminders/${id}/validate`, {
         method: 'POST',
       }),
+    /**
+     * 未保存の条件で人数を数え直す (R15)。条件を送らなければ保存済みの
+     * まま数える。顔ぶれ (先頭20人) も同じ条件で切って返す。
+     */
+    audience: (id: string, condition?: unknown) =>
+      fetchApi<ApiResponse<{ matched: number; excluded: number; sample: Array<{ id: string; displayName: string }> }>>(`/api/reminders/${id}/audience`, {
+        method: 'POST',
+        body: JSON.stringify(condition === undefined ? {} : { condition }),
+      }),
     previewDraft: (id: string, targetDate?: string) =>
       fetchApi<ApiResponse<ReminderPreviewResult>>(`/api/reminders/${id}/preview`, {
         method: 'POST',
