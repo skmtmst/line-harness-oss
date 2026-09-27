@@ -38,6 +38,9 @@ import {
   listConversionDefinitionEvents,
   getConversionDefinitionReport,
   listConversionDefinitionsForExport,
+  appendConversionReversal,
+  getReversedEventIds,
+  listConversionReversals,
   ConversionDefinitionError,
   CONVERSION_DEFINITION_USAGE_KINDS,
   isExclusionSavable,
@@ -1432,6 +1435,10 @@ conversions.get('/api/conversions/events', conversionPermission('view'), async (
       offset: listOffset(c.req.query('offset')),
     });
 
+    // #819: 取消は追記の台帳。最新の追記が 'reverse' のものだけを
+    // 「取り消し中」として返す。
+    const reversedIds = await getReversedEventIds(c.env.DB, events.map((e) => e.id));
+
     return c.json({
       success: true,
       data: events.map((e) => ({
@@ -1442,6 +1449,7 @@ conversions.get('/api/conversions/events', conversionPermission('view'), async (
         affiliateCode: e.affiliate_code,
         metadata: e.metadata,
         createdAt: e.created_at,
+        reversed: reversedIds.has(e.id),
       })),
     });
   } catch (err) {
@@ -1449,6 +1457,118 @@ conversions.get('/api/conversions/events', conversionPermission('view'), async (
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
+
+// GET /api/conversions/events/:id/reversals — 取消の履歴（新しい順）
+conversions.get(
+  '/api/conversions/events/:id/reversals',
+  conversionPermission('view'),
+  async (c) => {
+    try {
+      const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+      const eventId = c.req.param('id');
+      const event = await c.env.DB
+        .prepare(
+          `SELECT ce.id, cp.line_account_id
+             FROM conversion_events ce
+             JOIN conversion_points cp ON cp.id = ce.conversion_point_id
+            WHERE ce.id = ?`,
+        )
+        .bind(eventId)
+        .first<{ id: string; line_account_id: string | null }>();
+      if (!event) return c.json({ success: false, error: 'Event not found' }, 404);
+      if (
+        event.line_account_id !== null
+        && !scope.allowedAccountIds.includes(event.line_account_id)
+      ) {
+        return c.json({ success: false, error: 'Event not found' }, 404);
+      }
+      const rows = await listConversionReversals(c.env.DB, eventId);
+      return c.json({
+        success: true,
+        data: rows.map((r) => ({
+          id: r.id,
+          kind: r.kind,
+          reason: r.reason,
+          actorName: r.actor_name,
+          createdAt: r.created_at,
+        })),
+      });
+    } catch (err) {
+      console.error('GET /api/conversions/events/:id/reversals error:', err);
+      return c.json({ success: false, error: 'Internal server error' }, 500);
+    }
+  },
+);
+
+// POST /api/conversions/events/:id/reversals — 取消と取消の取消を理由付きで追記
+conversions.post(
+  '/api/conversions/events/:id/reversals',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    try {
+      const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+      const eventId = c.req.param('id');
+      const event = await c.env.DB
+        .prepare(
+          `SELECT ce.id, cp.line_account_id
+             FROM conversion_events ce
+             JOIN conversion_points cp ON cp.id = ce.conversion_point_id
+            WHERE ce.id = ?`,
+        )
+        .bind(eventId)
+        .first<{ id: string; line_account_id: string | null }>();
+      if (!event) return c.json({ success: false, error: 'Event not found' }, 404);
+      if (
+        event.line_account_id !== null
+        && !scope.allowedAccountIds.includes(event.line_account_id)
+      ) {
+        return c.json({ success: false, error: 'Event not found' }, 404);
+      }
+
+      const body = await c.req.json<{ kind?: unknown; reason?: unknown }>();
+      const kind = body.kind === 'restore' ? 'restore' : body.kind === 'reverse' ? 'reverse' : null;
+      if (!kind) {
+        return c.json({ success: false, error: 'kind は reverse か restore で指定してください' }, 400);
+      }
+      const reason = String(body.reason ?? '').trim();
+      if (!reason || reason.length > 500) {
+        return c.json({ success: false, error: '理由を入れてください（500文字以内）' }, 400);
+      }
+      const staff = c.get('staff');
+      try {
+        const row = await appendConversionReversal(c.env.DB, {
+          conversionEventId: eventId,
+          kind,
+          reason,
+          actorId: staff?.id ?? null,
+          actorName: staff?.name ?? null,
+        });
+        auditLog(
+          c,
+          kind === 'reverse' ? 'conversion.event.reverse' : 'conversion.event.restore',
+          { kind: 'conversion_event', id: eventId },
+          { lineAccountId: event.line_account_id },
+        );
+        return c.json({
+          success: true,
+          data: { id: row.id, kind: row.kind, createdAt: row.created_at },
+        });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : '';
+        if (message === 'conversion_event_already_reversed') {
+          return c.json({ success: false, error: 'この成果はすでに取り消されています' }, 409);
+        }
+        if (message === 'conversion_event_not_reversed') {
+          return c.json({ success: false, error: 'この成果は取り消されていません' }, 409);
+        }
+        throw err;
+      }
+    } catch (err) {
+      console.error('POST /api/conversions/events/:id/reversals error:', err);
+      return c.json({ success: false, error: 'Internal server error' }, 500);
+    }
+  },
+);
 
 // GET /api/conversions/report - V6 report; keep the old date-query response for the current screen
 conversions.get('/api/conversions/report', conversionPermission('view'), async (c) => {

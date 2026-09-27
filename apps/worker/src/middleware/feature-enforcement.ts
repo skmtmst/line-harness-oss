@@ -118,6 +118,8 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
   feature('/api/booking', 'booking'),
   feature('/api/meet-consultations', 'booking'),
   feature('/api/conversions', 'affiliates'),
+  // #819: 計測サイトの管理は成果計測(affiliates)の一部。公開口は /api/public で公開分類済み。
+  feature('/api/measurement-sites', 'affiliates'),
   feature('/api/affiliates', 'affiliates'),
   feature('/api/affiliate-', 'affiliates'),
   feature('/api/affiliates-report', 'affiliates'),

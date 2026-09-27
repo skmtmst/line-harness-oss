@@ -228,7 +228,7 @@ const STAFF_API_PERMISSIONS: Array<[string, string]> = [
   // (fail-closed。N-423 の残課題として司令塔へ報告する)。
   ['/api/dashboard', '/'],
   ['/api/getting-started', '/getting-started'],
-  ['/api/conversions', '/conversions'], ['/api/scoring', '/scoring'], ['/api/scoring-rules', '/scoring'],
+  ['/api/conversions', '/conversions'], ['/api/measurement-sites', '/conversions'], ['/api/scoring', '/scoring'], ['/api/scoring-rules', '/scoring'],
   ['/api/tracked-links', '/inflow-links'], ['/api/analytics', '/analytics'],
   ['/api/mileage', '/mileage'], ['/api/action-scores', '/mileage'],
   ['/api/automations', '/automations'], ['/api/automation-runs', '/automations'],
@@ -454,6 +454,9 @@ export function isPublicApiBoundary(method: string, path: string): boolean {
     path === '/api/public/nen/gallery-preview' ||
     path === '/api/site/collect' ||
     path === '/api/site/script.js' ||
+    // #819: 計測タグからの成果受信。サイトIDと許可ドメインで検証する
+    // 公開口で、管理画面の認証は通さない(OPTIONSの事前確認も含む)。
+    path === '/api/public/web-conversions' ||
     path.startsWith('/t/') ||
     path.startsWith('/r/') ||
     path.startsWith('/pool/') ||
