@@ -1004,14 +1004,15 @@ function VarsPageInner() {
                             {(() => {
                               const state = item.state ?? 'active'
                               const label = COMMON_VAR_STATE_LABELS[state] ?? '使用中'
-                              const tone = state === 'active'
-                                ? 'text-ink-faint'
-                                : state === 'expired'
-                                  ? 'text-status-warning'
-                                  : 'text-status-info'
                               return (
                                 <span
-                                  className={`rounded-control bg-canvas-sunken px-2 py-0.5 text-xs font-semibold ${tone}`}
+                                  className={`rounded-control bg-canvas-sunken px-2 py-0.5 text-xs font-semibold ${
+                                    state === 'active'
+                                      ? 'text-ink-faint'
+                                      : state === 'expired'
+                                        ? 'text-status-warning'
+                                        : 'text-status-info'
+                                  }`}
                                   title={`状態：${label}`}
                                 >
                                   {label}
