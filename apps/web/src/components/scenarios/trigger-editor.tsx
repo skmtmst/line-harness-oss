@@ -23,6 +23,7 @@ import { pruneCondition, type SegmentCondition } from '@/lib/segment-condition'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import Notice from '@/components/shared/notice'
+import Select from '@/components/shared/select'
 import { describeCondition } from './scenario-dialogs'
 import { scenarioReferenceData } from './scenario-reference-data'
 
@@ -343,21 +344,20 @@ export default function TriggerEditor({
             >
               ＋ 友だち追加時
             </Button>
-            <select
-              value={addingTagId}
-              onChange={(e) => setAddingTagId(e.target.value)}
-              aria-label="きっかけにするタグ"
-              className="border-hairline rounded-control bg-canvas text-ink h-10 min-w-0 flex-1 border px-3 text-sm"
-            >
-              <option value="">タグを選ぶ</option>
-              {tags
-                .filter((tag) => !usedTagIds.has(tag.id))
-                .map((tag) => (
-                  <option key={tag.id} value={tag.id}>
-                    {tag.name}
-                  </option>
-                ))}
-            </select>
+            <div className="min-w-0 flex-1">
+              <Select
+                aria-label="きっかけにするタグ"
+                size="full"
+                value={addingTagId}
+                onChange={(value) => setAddingTagId(value)}
+                options={[
+                  { value: '', label: 'タグを選ぶ' },
+                  ...tags
+                    .filter((tag) => !usedTagIds.has(tag.id))
+                    .map((tag) => ({ value: tag.id, label: tag.name })),
+                ]}
+              />
+            </div>
             <Button
               size="field"
               onClick={() => addingTagId && draftAdd('tag_added', addingTagId)}

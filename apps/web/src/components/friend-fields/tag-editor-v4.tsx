@@ -12,6 +12,7 @@ import Combobox from '@/components/shared/combobox'
 import Drawer from '@/components/shared/drawer'
 import IconButton from '@/components/shared/icon-button'
 import Notice from '@/components/shared/notice'
+import Select from '@/components/shared/select'
 import { notifyToast } from '@/components/shared/toast'
 import StickyBar from '@/components/shared/sticky-bar'
 import { RequiredBadge } from '@/components/shared/form-controls'
@@ -149,6 +150,8 @@ function ActionDrawer({ accountId, suppliedResources, allowedActionTypes, onClos
   const [timing, setTiming] = useState<'immediate' | 'delay'>('immediate')
   const [delay, setDelay] = useState(referenceState ? '24' : '1')
   const [delayUnit, setDelayUnit] = useState<'minutes' | 'hours' | 'days'>(referenceState ? 'hours' : 'minutes')
+  // 共通Selectはvalue/onChange必須のため表示保持用の状態を持つ。元の素のselectも非制御で値はどこからも読まれていなかったので、動きは変えない。
+  const [position, setPosition] = useState('last')
   const [message, setMessage] = useState('ご登録ありがとうございます。')
   const [amount, setAmount] = useState('100')
   const [resources, setResources] = useState<CommonActionResources | null>(suppliedResources ?? null)
@@ -237,7 +240,16 @@ function ActionDrawer({ accountId, suppliedResources, allowedActionTypes, onClos
             </div>
               <div className={`mt-3 flex items-center gap-2 ${timing === 'immediate' ? 'opacity-55' : ''}`}>
                 <input type="number" min={1} value={delay} onChange={(event) => setDelay(event.target.value)} className={`${inputClass} max-w-28`} />
-                <select value={delayUnit} onChange={(event) => setDelayUnit(event.target.value as typeof delayUnit)} className={`${inputClass} max-w-32`}><option value="minutes">分後</option><option value="hours">時間後</option><option value="days">日後</option></select>
+                <Select
+                  aria-label="遅延の単位"
+                  value={delayUnit}
+                  onChange={(value) => setDelayUnit(value as typeof delayUnit)}
+                  options={[
+                    { value: 'minutes', label: '分後' },
+                    { value: 'hours', label: '時間後' },
+                    { value: 'days', label: '日後' },
+                  ]}
+                />
               </div>
             <p className="mt-2 text-xs leading-5 text-ink-faint">待機を挟むと、その時間が経ってから実行されます。待機中にタグが外れた場合は実行されません。</p>
           </section>
@@ -258,7 +270,16 @@ function ActionDrawer({ accountId, suppliedResources, allowedActionTypes, onClos
 
           <section className="mt-7 border-t border-hairline pt-6">
             <label className="mb-1 block text-sm font-semibold text-ink">4. 追加する位置</label>
-            <select className={inputClass}><option>いちばん最後に追加</option><option>選択中のアクションの前</option></select>
+            <Select
+              aria-label="追加する位置"
+              value={position}
+              onChange={setPosition}
+              options={[
+                { value: 'last', label: 'いちばん最後に追加' },
+                { value: 'before', label: '選択中のアクションの前' },
+              ]}
+              size="full"
+            />
           </section>
     </Drawer>
   )
@@ -506,7 +527,7 @@ export default function TagEditorV4({
           <section className={cardClass}>
             <StepTitle number={1} title="どのタグか" />
             <div className="grid gap-4 md:grid-cols-[320px_minmax(0,1fr)]">
-              <label><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">所属フォルダ</span><select value={groupId} onChange={(event) => setGroupId(event.target.value)} className={inputClass}><option value="">未分類</option>{groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</select></label>
+              <label><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">所属フォルダ</span><Select aria-label="所属フォルダ" value={groupId} onChange={setGroupId} options={[{ value: '', label: '未分類' }, ...groups.map((group) => ({ value: group.id, label: group.name }))]} size="full" /></label>
               <label><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">タグ名 <RequiredBadge /></span><input value={name} onChange={(event) => setName(event.target.value)} placeholder="例: 定期購入者" className={inputClass} /><DuplicateNameNote duplicates={nameDuplicates} kindLabel="タグ" /></label>
             </div>
             <p className="mt-3 text-xs leading-5 text-ink-faint">どの分類に入れるかを選びます。未選択なら「未分類」になります。フォルダの色がタグの印になります。</p>
@@ -546,8 +567,8 @@ export default function TagEditorV4({
                 <div className="grid gap-3 md:grid-cols-2">
                   <label><span className="mb-1 block text-xs font-semibold text-ink-secondary">本人へのマイル付与</span><div className="flex items-center gap-2"><input type="number" min={0} value={reward} onChange={(event) => setReward(event.target.value)} className={inputClass} /><span className="text-sm text-ink-faint">mile</span></div><span className="mt-1 block text-[11px] leading-4 text-ink-faint">このタグが付いた本人へ、一度だけ積みます。</span></label>
                   <label><span className="mb-1 block text-xs font-semibold text-ink-secondary">紹介者へのマイル付与</span><div className="flex items-center gap-2"><input type="number" min={0} value={referralReward} onChange={(event) => setReferralReward(event.target.value)} className={inputClass} /><span className="text-sm text-ink-faint">mile</span></div><span className="mt-1 block text-[11px] leading-4 text-ink-faint">紹介経由の友だちなら、その紹介者にも積みます。</span></label>
-                  <label><span className="mb-1 block text-xs font-semibold text-ink-secondary">今後のマイル倍率</span><select value={multiplier} onChange={(event) => setMultiplier(event.target.value)} className={inputClass}>{MULTIPLIERS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select><span className="mt-1 block text-[11px] leading-4 text-ink-faint">このタグが付いている間、次回以降の付与倍率に使います。</span></label>
-                  <label><span className="mb-1 block text-xs font-semibold text-ink-secondary">倍率の優先度</span><select value={priority} onChange={(event) => setPriority(event.target.value)} className={inputClass}>{[0,1,2,3,4,5].map((value) => <option key={value} value={value}>{value === 0 ? '標準' : `優先度 ${value}`}</option>)}</select><span className="mt-1 block text-[11px] leading-4 text-ink-faint">倍率タグが複数ある場合、数字が大きい設定を優先します。</span></label>
+                  <label><span className="mb-1 block text-xs font-semibold text-ink-secondary">今後のマイル倍率</span><Select aria-label="今後のマイル倍率" value={multiplier} onChange={setMultiplier} options={MULTIPLIERS.map((option) => ({ value: option.value, label: option.label }))} size="full" /><span className="mt-1 block text-[11px] leading-4 text-ink-faint">このタグが付いている間、次回以降の付与倍率に使います。</span></label>
+                  <label><span className="mb-1 block text-xs font-semibold text-ink-secondary">倍率の優先度</span><Select aria-label="倍率の優先度" value={priority} onChange={setPriority} options={[0, 1, 2, 3, 4, 5].map((value) => ({ value: String(value), label: value === 0 ? '標準' : `優先度 ${value}` }))} size="full" /><span className="mt-1 block text-[11px] leading-4 text-ink-faint">倍率タグが複数ある場合、数字が大きい設定を優先します。</span></label>
                 </div>
                 <fieldset className="rounded-control border border-hairline bg-canvas-sunken px-3 py-2">
                   <legend className="px-1 text-xs font-semibold text-ink-secondary">タグを外して付け直したときの扱い</legend>

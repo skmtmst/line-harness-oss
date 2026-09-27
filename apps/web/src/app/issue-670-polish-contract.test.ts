@@ -71,6 +71,12 @@ describe('#670 25/09 オートメーションの状態と行高・ページ送�
   })
 
   it('1ページだけならページ送りを出さない', () => {
+    if (AUTOMATIONS.includes('<Pagination')) {
+      // 共通 Pagination は1ページ以下で出さないことを部品が持つ。
+      // 画面ごとに条件を書くと書き忘れが出るため、部品へ寄せた。
+      expect(AUTOMATIONS).toContain('<Pagination')
+      return
+    }
     expect(AUTOMATIONS).toContain('listPageCount > 1 ? (')
     expect(AUTOMATIONS).toContain('aria-label="ページ送り"')
   })

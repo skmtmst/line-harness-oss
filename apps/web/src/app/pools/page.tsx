@@ -1,7 +1,7 @@
 'use client'
 
 import { X } from 'lucide-react'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import { useEffect, useState } from 'react'
 import { api, ApiError, describeSaveFailure } from '@/lib/api'
 import type { TrafficPool, PoolAccount, LineAccount } from '@line-crm/shared'
@@ -349,12 +349,12 @@ function PoolAccountList({
       )}
       {candidates.length > 0 && (
         <div className="mt-2">
-          <SelectField
-            defaultValue=""
-            onChange={(e) => {
-              if (e.target.value) {
-                void onAdd(e.target.value)
-                e.target.value = ''
+          <Select
+            aria-label="追加するアカウント"
+            value=""
+            onChange={(value) => {
+              if (value) {
+                void onAdd(value)
               }
             }}
             options={[{ value: '', label: '＋ アカウントを追加' }, ...candidates.map((a) => ({ value: a.id, label: a.name }))]}
@@ -436,9 +436,10 @@ function CreatePoolModal({
           placeholder="表示名 (例: ブランドA)"
           className="border-hairline bg-canvas text-ink rounded-control w-full border px-3 py-2 text-sm"
         />
-        <SelectField
+        <Select
+          aria-label="最初の所属アカウント"
           value={activeAccountId}
-          onChange={(e) => setActiveAccountId(e.target.value)}
+          onChange={(value) => setActiveAccountId(value)}
           options={[{ value: '', label: '最初の所属アカウントを選択' }, ...accounts.map((a) => ({ value: a.id, label: a.name }))]}
         />
         <div className="border-hairline flex justify-end gap-2 border-t pt-2">

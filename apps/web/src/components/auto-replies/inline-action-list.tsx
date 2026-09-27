@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { api } from '@/lib/api'
 import type { ScenarioActionType } from '@/lib/api'
 import { ActionConfigEditor, ACTION_KINDS } from '@/components/scenarios/action-editor'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import { newActionKey, type InlineAction } from './draft-fields'
 import { useAccount } from '@/contexts/account-context'
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
@@ -178,9 +178,9 @@ export default function InlineActionList({
           <div className="space-y-2">
             <label className="flex items-center gap-2 text-xs">
               <span className="text-ink-faint shrink-0">失敗したら</span>
-              <SelectField
+              <Select
                 value={action.onFailure}
-                onChange={(e) => updateOnFailure(action.key, e.target.value === 'stop' ? 'stop' : 'continue')}
+                onChange={(value) => updateOnFailure(action.key, value === 'stop' ? 'stop' : 'continue')}
                 aria-label={`${index + 1}つ目の失敗したときの動き`}
                 className="w-36"
                 options={[

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import HqAccountList from '@/components/hq/account-list'
 import Button from '@/components/shared/button'
+import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount, type AccountWithStats } from '@/contexts/account-context'
@@ -95,11 +96,13 @@ export default function HqOpenPage() {
         </div>
       ) : null}
       {!error && !loading && accounts.length === 0 ? (
-        <section data-design="Empty" className="rounded-card border border-hairline bg-canvas px-6 py-16 text-center shadow-sm">
-          <h2 className="text-xl font-bold text-ink">まだアカウントがありません</h2>
-          <p className="mt-2 text-sm text-ink-secondary">最初のLINE公式アカウントを登録してください。</p>
-          <Button href="/accounts/new" variant="primary" className="mt-6">＋LINEアカウントを新規登録</Button>
-        </section>
+        <ListState
+          kind="empty"
+          data-design="Empty"
+          title="まだアカウントがありません"
+          description="最初のLINE公式アカウントを登録してください。"
+          action={<Button href="/accounts/new" variant="primary">＋LINEアカウントを新規登録</Button>}
+        />
       ) : null}
       {!error && !loading && accounts.length > 0 ? (
         <HqAccountList accounts={accounts} onSelect={openStorePage} selectLabel="このアカウントを選ぶ" />

@@ -34,6 +34,24 @@ vi.mock('./inline-action-list', () => ({
   useActionOptions: () => ({ tags: [], fields: [], marks: [], scenarios: [], vars: [] }),
 }))
 vi.mock('@/components/shared/condition-builder', () => ({ default: () => null }))
+
+/*
+ * 共通の Select は listbox の部品で、その操作は部品自身の試験が持つ。
+ * ここで見たいのは選んだ後の応答の判断なので、素の <select> に置き換える。
+ */
+vi.mock('@/components/shared/select', () => ({
+  default: ({ 'aria-label': label, id, value, onChange, options }: {
+    'aria-label'?: string
+    id?: string
+    value: string
+    onChange: (value: string) => void
+    options: Array<{ value: string; label: string }>
+  }) => (
+    <select aria-label={label} id={id} value={value} onChange={(e) => onChange((e.target as HTMLSelectElement).value)}>
+      {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+    </select>
+  ),
+}))
 vi.mock('@/components/shared/image-uploader', () => ({
   default: ({ value, onChange, label }: {
     value: { originalContentUrl: string; previewImageUrl: string } | null

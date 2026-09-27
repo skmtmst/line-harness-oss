@@ -5,8 +5,10 @@ import { useRouter } from 'next/navigation'
 import { ListPlus } from 'lucide-react'
 import type { Scenario, DeliveryMode, Folder } from '@line-crm/shared'
 import Button from '@/components/shared/button'
+import Select from '@/components/shared/select'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import ListState from '@/components/shared/list-state'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import { MoreAction } from '@/components/shared/row-actions'
 import ReorderGrip from '@/components/friend-fields/reorder-grip'
@@ -359,19 +361,17 @@ export default function ScenarioList({
     >
       <label className="block">
         <span className="text-ink-secondary mb-1 block text-xs font-medium">移動先のフォルダ</span>
-        <select
+        <Select
+          aria-label="移動先のフォルダ"
+          size="full"
           value={moveDraft}
-          onChange={(event) => setMoveDraft(event.target.value)}
+          onChange={(value) => setMoveDraft(value)}
           disabled={moving}
-          className="v6-select h-9 w-full rounded-control border border-hairline bg-canvas pl-3 text-sm font-semibold text-ink"
-        >
-          <option value="">未分類</option>
-          {folders.map((folder) => (
-            <option key={folder.id} value={folder.id}>
-              {folder.name}
-            </option>
-          ))}
-        </select>
+          options={[
+            { value: '', label: '未分類' },
+            ...folders.map((folder) => ({ value: folder.id, label: folder.name })),
+          ]}
+        />
       </label>
     </ConfirmDialog>
   )
@@ -379,20 +379,16 @@ export default function ScenarioList({
   if (scenarios.length === 0) {
     return (
       <>
-        <div className="bg-canvas rounded-card border-hairline border p-12 text-center">
-          <ListPlus aria-hidden className="text-ink-faint mx-auto" size={24} />
-          <p className="text-ink mt-3 text-sm font-bold">まだシナリオがありません</p>
-          <p className="text-ink-faint mt-1 text-xs">1つ作ると、順番に届く配信をここで管理できます。</p>
-          {onCreate ? (
-            <Button
-              variant="primary"
-              onClick={onCreate}
-              className="mt-3"
-            >
+        <ListState
+          kind="empty"
+          title="まだシナリオがありません"
+          description="1つ作ると、順番に届く配信をここで管理できます。"
+          action={onCreate ? (
+            <Button variant="primary" onClick={onCreate}>
               ＋ シナリオを作る
             </Button>
-          ) : null}
-        </div>
+          ) : undefined}
+        />
         {moveDialog}
         {confirmDialog}
       </>

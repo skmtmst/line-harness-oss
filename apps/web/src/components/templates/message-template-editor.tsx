@@ -8,7 +8,7 @@ import Button from '@/components/shared/button'
 import LinePreview from '@/components/shared/line-preview'
 import { Field, TextArea } from '@/components/shared/form-controls'
 import DateField from '@/components/shared/date-field'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 
 export const MESSAGE_TEMPLATE_TYPES = [
   { value: 'text', label: 'テキスト' },
@@ -184,13 +184,13 @@ export function TemplateInsertControls({
       <div className="flex flex-wrap gap-2">
         <Button size="field" disabled={disabled} onClick={() => onInsert('{{name}}')}>名前</Button>
         {fieldsEnabled && (
-          <SelectField aria-label="友だち情報を差し込む" value="" disabled={disabled || !accountId || state !== 'ready' || friendFields.length === 0} onChange={(event) => choose(event.target.value)} options={[{ value: '', label: state === 'loading' ? '友だち情報を読込中' : '友だち情報を選ぶ' }, ...friendFields.map((field) => ({ value: `{{field.${field.fieldKey}}}`, label: field.name }))]} />
+          <Select aria-label="友だち情報を差し込む" value="" disabled={disabled || !accountId || state !== 'ready' || friendFields.length === 0} onChange={(value) => choose(value)} options={[{ value: '', label: state === 'loading' ? '友だち情報を読込中' : '友だち情報を選ぶ' }, ...friendFields.map((field) => ({ value: `{{field.${field.fieldKey}}}`, label: field.name }))]} />
         )}
         {varsEnabled && (
-          <SelectField aria-label="共通情報を差し込む" value="" disabled={disabled || !accountId || state !== 'ready' || commonVars.length === 0} onChange={(event) => choose(event.target.value)} options={[{ value: '', label: state === 'loading' ? '共通情報を読込中' : '共通情報を選ぶ' }, ...commonVars.map((item) => ({ value: `{{var.${item.varKey}}}`, label: item.name }))]} />
+          <Select aria-label="共通情報を差し込む" value="" disabled={disabled || !accountId || state !== 'ready' || commonVars.length === 0} onChange={(value) => choose(value)} options={[{ value: '', label: state === 'loading' ? '共通情報を読込中' : '共通情報を選ぶ' }, ...commonVars.map((item) => ({ value: `{{var.${item.varKey}}}`, label: item.name }))]} />
         )}
-        <SelectField aria-label="配信日を差し込む" value="" disabled={disabled} onChange={(event) => choose(event.target.value)} options={[{ value: '', label: '配信日を選ぶ' }, ...DATE_OPTIONS]} />
-        <SelectField aria-label="その他の差し込みを選ぶ" value="" disabled={disabled} onChange={(event) => choose(event.target.value)} options={[{ value: '', label: 'その他を選ぶ' }, ...OTHER_OPTIONS]} />
+        <Select aria-label="配信日を差し込む" value="" disabled={disabled} onChange={(value) => choose(value)} options={[{ value: '', label: '配信日を選ぶ' }, ...DATE_OPTIONS]} />
+        <Select aria-label="その他の差し込みを選ぶ" value="" disabled={disabled} onChange={(value) => choose(value)} options={[{ value: '', label: 'その他を選ぶ' }, ...OTHER_OPTIONS]} />
         <span className="flex items-center gap-2 text-xs text-ink-secondary">
           目標日
           <DateField aria-label="日数を数える目標日" value={targetDate} disabled={disabled} onChange={onTargetDateChange} className="w-48" />
@@ -285,7 +285,7 @@ export function MessageTemplateEditor({
       <div data-design="Left" className="bg-canvas rounded-card border-hairline min-w-0 flex-1 space-y-5 border p-6">
         {beforeType}
         <Field label="種類" htmlFor="tp-type" note={typeNote}>
-          <SelectField id="tp-type" aria-label="メッセージ形式" value={value.messageType} disabled={disabled} onChange={(event) => onChange({ ...value, messageType: event.target.value })} options={[...typeOptions]} />
+          <Select id="tp-type" aria-label="メッセージ形式" value={value.messageType} disabled={disabled} onChange={(messageType) => onChange({ ...value, messageType })} options={[...typeOptions]} />
         </Field>
         {afterType}
         {/*

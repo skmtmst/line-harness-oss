@@ -85,7 +85,9 @@ describe('V6 シナリオ編集の契約', () => {
     expect(LIST).toContain("api.scenarios.update(id, { folderId: folderId || null })")
     expect(LIST).toContain('onMoveFolders={handleMoveFolders}')
     expect(LIST_TABLE).toContain('フォルダ')
-    expect(LIST_TABLE).toContain('className="v6-select')
+    // 移動先の選び欄は共通 Select（素の select・v6-select は置かない）。
+    expect(LIST_TABLE).toContain('<Select')
+    expect(LIST_TABLE).toContain('aria-label="移動先のフォルダ"')
     expect(LIST_TABLE).toContain("label: 'フォルダを移動'")
     expect(LIST_TABLE).toContain('onMoveFolders(moveIds, moveDraft)')
   })

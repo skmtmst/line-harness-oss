@@ -24,7 +24,7 @@ vi.mock('@/components/shared/condition-builder', () => ({ default: () => null })
 vi.mock('@/components/shared/dialog', () => ({ default: () => null }))
 vi.mock('@/components/shared/icon-button', () => ({ default: () => null }))
 vi.mock('@/components/shared/list-state', () => ({ default: ({ title }: { title: string }) => <div>{title}</div> }))
-vi.mock('@/components/shared/select-field', () => ({ default: () => null }))
+vi.mock('@/components/shared/select', () => ({ default: () => null }))
 vi.mock('@/components/shared/sticky-bar', () => ({ default: () => null }))
 vi.mock('@/components/shared/text-field', () => ({
   TextField: (props: any) => <input {...props} />,

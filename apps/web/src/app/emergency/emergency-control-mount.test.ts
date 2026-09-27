@@ -78,6 +78,27 @@ vi.mock('next/link', async () => {
   }
 })
 
+/*
+ * 共通の Select は listbox の部品で、その操作は部品自身の試験が持つ。
+ * ここで見たいのは選んだ後の緊急操作の判断なので、素の <select> に置き換える。
+ */
+vi.mock('@/components/shared/select', async () => {
+  const react = await import('react')
+  return {
+    default: ({ 'aria-label': label, id, value, onChange, options }: {
+      'aria-label'?: string
+      id?: string
+      value: string
+      onChange: (value: string) => void
+      options: Array<{ value: string; label: string }>
+    }) => react.createElement(
+      'select',
+      { 'aria-label': label, id, value, onChange: (e: { target: { value: string } }) => onChange(e.target.value) },
+      options.map((option) => react.createElement('option', { key: option.value, value: option.value }, option.label)),
+    ),
+  }
+})
+
 vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
   return {

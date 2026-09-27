@@ -89,6 +89,18 @@ const EXEMPTIONS: Record<string, string> = {
     '費用の手入力はダイアログ内の dirty。閉じると元に戻る仕様で、画面離脱ガードの対象外',
   'components/shared/drawer.tsx':
     'dirty 印（*）を表示するだけの共通部品。編集画面ではない',
+  'app/form-submissions/page.tsx':
+    '一覧と絞り込みが中心。作る操作は下書きを作って編集画面（GUARDED）へ渡すため、この画面に残る下書きを持たない',
+  'app/inflow-links/page.tsx':
+    '一覧の一括操作（移動・再開）は押した直後に即時保存し、下書きを持たない',
+  'app/inflow-links/detail/page.tsx':
+    '転送先の編集は保存ボタン確定式。下書き・dirty 管理がなく番兵の扱いは別途検討',
+  'app/mileage/score-rules/page.tsx':
+    '下書き保存式の編集画面。番兵の扱いは別途検討',
+  'components/friend-attributes-v2/tag-list-v2.tsx':
+    '分類の変更は選んだ直後に即時保存し、下書きを持たない',
+  'components/friend-fields/tags-page-v4.tsx':
+    '一覧上の操作（表示切替・分類・並び替え）は押した直後に即時保存し、下書きを持たない',
 }
 
 /*
@@ -100,7 +112,7 @@ const EXEMPTIONS: Record<string, string> = {
  * 画面を編集画面とみなし、分類を求める。
  */
 const EDITOR_SAVE_SIGNATURE = /(?:\bapi(?:\.[A-Za-z]+)+|\b[a-z][A-Za-z]*Api)\.(?:create|update|save|patch|upsert)[A-Za-z]*\(/
-const EDITOR_INPUT_SIGNATURE = /<(input|textarea|TextField|TextArea|SelectField|DateField|DateTimeField|TimeField)\b/g
+const EDITOR_INPUT_SIGNATURE = /<(input|textarea|TextField|TextArea|Select|DateField|DateTimeField|TimeField)\b/g
 const EDITOR_MIN_INPUTS = 3
 
 /*

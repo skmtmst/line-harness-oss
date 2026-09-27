@@ -12,6 +12,7 @@ import {
 } from '@/lib/api'
 import FilterChip from '@/components/shared/filter-chip'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
+import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import { formatStamp } from '@/lib/common-vars'
 import Pagination from '@/components/shared/pagination'
 import Button from '@/components/shared/button'
@@ -35,7 +36,7 @@ import SortSelect from '@/components/ui/sort-select'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import FeatureGate from '@/components/feature-gate'
 import { useAccount } from '@/contexts/account-context'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import {
   filterAndSortCommonVars,
   type CommonVarFilter,
@@ -143,6 +144,30 @@ function VarsPageInner() {
 
   const [addingFolder, setAddingFolder] = useState(false)
   const [folderName, setFolderName] = useState('')
+  /*
+    R37: フォルダの名前変更・削除を FolderPanel の「…」へ接続する。
+    権限の無い人には押して失敗する口を見せない（canManageFolders）。
+  */
+  const [editingFolder, setEditingFolder] = useState<Folder | null>(null)
+  const [deletingFolder, setDeletingFolder] = useState<Folder | null>(null)
+  const [folderBusy, setFolderBusy] = useState(false)
+  const [folderError, setFolderError] = useState('')
+  const [canManageFolders, setCanManageFolders] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    void api.staff.me().then((response) => {
+      if (!active) return
+      setCanManageFolders(
+        response.success && (response.data.role === 'owner' || response.data.role === 'admin'),
+      )
+    }).catch(() => {
+      if (active) setCanManageFolders(false)
+    })
+    return () => {
+      active = false
+    }
+  }, [])
   const [savingFolder, setSavingFolder] = useState(false)
 
   const load = useCallback(async () => {
@@ -259,6 +284,37 @@ function VarsPageInner() {
     } finally {
       setSavingFolder(false)
     }
+  }
+
+  /** R37: フォルダを消す。中身は消えず未分類に戻る。消した先を選んでいたら「すべて」へ戻す。 */
+  const removeFolder = async () => {
+    if (!deletingFolder || !selectedAccountId || folderBusy) return
+    const accountAtRequest = selectedAccountId
+    setFolderBusy(true)
+    setFolderError('')
+    try {
+      const res = await api.folders.delete(deletingFolder.id, accountAtRequest)
+      if (!res.success) throw new Error(res.error)
+      if (accountAtRequest !== latestAccountRef.current) return
+      setDeletingFolder(null)
+      if (folderFilter === deletingFolder.id) setFolderFilter('')
+      void load()
+    } catch {
+      if (accountAtRequest === latestAccountRef.current) setFolderError('フォルダを削除できませんでした。')
+    } finally {
+      setFolderBusy(false)
+    }
+  }
+
+  /** R37: スマホの選択欄で選んでいる利用者フォルダ。縦パネルの「…」と同じ操作へ届ける。 */
+  const selectedUserFolder = folders.find((folder) => folder.id === folderFilter) ?? null
+
+  /** R38: 絞り込みの0件から条件を外す口。フォルダも含めて「すべて」へ戻す。 */
+  const clearVarFilters = () => {
+    setQuery('')
+    setFolderFilter('')
+    setStateFilter('all')
+    setPage(1)
   }
 
   /*
@@ -678,19 +734,26 @@ function VarsPageInner() {
           <label className="text-ink-secondary block text-xs font-semibold" htmlFor="vars-folder-filter">
             フォルダ
           </label>
-          <SelectField
-            id="vars-folder-filter"
-            aria-label="フォルダ"
-            value={folderFilter}
-            onChange={(event) => setFolderFilter(event.target.value)}
-            className="w-full"
-            options={folderOptions}
-          />
+          <Select size="full" id="vars-folder-filter" aria-label="フォルダ" value={folderFilter} onChange={(value) => setFolderFilter(value)} options={folderOptions} />
           {addingFolder ? (
             folderForm
           ) : (
             <Button type="button" onClick={() => setAddingFolder(true)}>フォルダを追加</Button>
           )}
+          {/*
+            R37: 狭い幅では縦パネルが出ないため、選んでいるフォルダの
+            名前変更・削除を選べる口をここに置く。PCの「…」と同じ窓へ届く。
+          */}
+          {canManageFolders && selectedUserFolder && !addingFolder ? (
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" onClick={() => setEditingFolder(selectedUserFolder)}>
+                フォルダ名を変える
+              </Button>
+              <Button type="button" onClick={() => { setFolderError(''); setDeletingFolder(selectedUserFolder) }}>
+                フォルダを削除
+              </Button>
+            </div>
+          ) : null}
         </div>
         <div className="hidden space-y-3 lg:block">
           <FolderPanel
@@ -714,9 +777,15 @@ function VarsPageInner() {
                 // すり替わるため廃止。
                 count: folder.itemCount ?? null,
                 color: folder.color,
+                // R37: 名前変更・削除を「…」へ接続する。権限の無い人には
+                // 押して失敗する口を見せない。
+                onEdit: canManageFolders ? () => setEditingFolder(folder) : undefined,
+                onDelete: canManageFolders ? () => { setFolderError(''); setDeletingFolder(folder) } : undefined,
+                deleteNote: '削除しても、入っていた共通情報は未分類として残ります。',
               })),
             ]}
           >
+            {folderError ? <p role="alert" className="text-ink-secondary text-xs">{folderError}</p> : null}
             {addingFolder ? (
               folderForm
             ) : (
@@ -811,6 +880,7 @@ function VarsPageInner() {
               <div className="text-ink-faint px-4 py-8 text-center text-sm">
                 <ListState
                   kind="empty"
+                  emptyPreset={items.length === 0 ? 'createable' : 'filtered'}
                   title={items.length === 0
                     ? 'まだ共通情報がありません'
                     : '条件に合う共通情報はありません'}
@@ -819,7 +889,7 @@ function VarsPageInner() {
                     : '検索語やフォルダを変えてください。'}
                   action={items.length === 0
                     ? <Button href="/contents/vars/new" variant="primary">共通情報を作る</Button>
-                    : undefined}
+                    : <Button type="button" onClick={clearVarFilters}>条件を外す</Button>}
                 />
               </div>
             ) : (
@@ -1071,13 +1141,12 @@ function VarsPageInner() {
                     </p>
                     <label className="text-ink-secondary mt-2 block text-xs font-semibold">
                       差し替え先
-                      <SelectField
+                      <Select size="full"
                         value={replacementId}
                         disabled={singleBusy || replacementCandidates.length === 0}
-                        onChange={(event) => void selectReplacement(event.target.value)}
+                        onChange={(value) => void selectReplacement(value)}
                         aria-label="差し替え先"
-                        className="mt-1 w-full"
-                        style={{ width: '100%' }}
+                        className="mt-1"
                         options={replacementCandidates.length > 0
                           ? replacementCandidates.map((candidate) => ({
                               value: candidate.id,
@@ -1192,6 +1261,36 @@ function VarsPageInner() {
           setDeleteError('')
           setDeleteTargets([])
         }}
+      />
+
+      {editingFolder && (
+        <FolderAddDialog
+          kind="common_var"
+          folder={editingFolder}
+          accountId={selectedAccountId}
+          note="共通情報を分けてしまう箱です。削除しても、入っていた共通情報は未分類として残ります。"
+          placeholder="例: 01_店舗案内"
+          onClose={() => setEditingFolder(null)}
+          onAdded={() => { setEditingFolder(null); void load() }}
+        />
+      )}
+
+      {/*
+        R37: 消す前に、中身がどうなるかを本文で読ませる。
+        「中身は未分類に戻ります」の確認を ConfirmDialog で行う。
+      */}
+      <ConfirmDialog
+        open={deletingFolder !== null}
+        title={`フォルダ「${deletingFolder?.name ?? ''}」を削除しますか？`}
+        description={deletingFolder?.itemCount != null
+          ? `削除しても、入っていた共通情報は未分類として残ります。いまこのフォルダに入っているのは${deletingFolder.itemCount}件です。`
+          : '削除しても、入っていた共通情報は未分類として残ります。'}
+        confirmLabel="削除する"
+        destructive
+        busy={folderBusy}
+        error={folderError || undefined}
+        onCancel={() => { if (!folderBusy) { setDeletingFolder(null); setFolderError('') } }}
+        onConfirm={() => void removeFolder()}
       />
     </div>
   )
