@@ -5,7 +5,7 @@ import { ApiError, api, type ManualLink } from '@/lib/api'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import ListToolbar from '@/components/shared/list-toolbar'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import { DataTable, Td, Th, TableHeadRow, Tr } from '@/components/shared/table'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -190,10 +190,10 @@ export default function ManualLinksPage() {
       <ListToolbar
         search={{ placeholder: '画面ID・画面名で検索', value: query, onChange: setQuery }}
         filters={
-          <SelectField
+          <Select
             aria-label="リンクの状態"
             value={filter}
-            onChange={(event) => setFilter(event.target.value as StatusFilter)}
+            onChange={(value) => setFilter(value as StatusFilter)}
             options={STATUS_FILTERS.map((f) => ({ value: f.value, label: `状態：${f.label}` }))}
           />
         }

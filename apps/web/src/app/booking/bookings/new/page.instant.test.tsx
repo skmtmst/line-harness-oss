@@ -116,7 +116,8 @@ async function mount() {
 }
 
 function all(tag: string): HTMLElement[] {
-  return Array.from(container.querySelectorAll(tag)) as HTMLElement[]
+  // 友だち候補・暦は最上層（MenuPortal→document.body）に出る。器の中にはいない。
+  return Array.from(document.querySelectorAll(tag)) as HTMLElement[]
 }
 
 function byText(tag: string, text: string): HTMLElement {
@@ -159,7 +160,7 @@ async function pickDate(value: string) {
   const [y, m, d] = value.split('-').map(Number)
   await click(all('button').find((element) => element.getAttribute('aria-label') === '日付')!)
   for (let i = 0; i < 48; i += 1) {
-    const grid = container.querySelector('[role="grid"]')!
+    const grid = document.querySelector('[role="grid"]')!
     const [gy, gm] = (grid.getAttribute('aria-label') ?? '').match(/\d+/g)!.map(Number)
     if (gy === y && gm === m) break
     await act(async () => {

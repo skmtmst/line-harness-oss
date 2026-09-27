@@ -153,7 +153,11 @@ siteTracking.get('/api/site/script.js', (c) => {
   // 差し込めない（環境ごとに違うため）。
   const script = `(function () {
   var ENDPOINT = ${JSON.stringify(`${origin}/api/site/collect`)};
+  // #819: 成果の計測口。タグの data-site にサイトIDを書くと、
+  // 許可ドメイン上の到達を成果として数える。同意が無い間は送らない。
+  var CV_ENDPOINT = ${JSON.stringify(`${origin}/api/public/web-conversions`)};
   var TRACKING_KEY = document.currentScript && document.currentScript.getAttribute('data-key');
+  var SITE_ID = document.currentScript && document.currentScript.getAttribute('data-site');
   var COOKIE = 'lh_visitor';
   var CONSENT_COOKIE = 'lh_consent';
   var YEAR = 365 * 24 * 60 * 60;
@@ -197,6 +201,27 @@ siteTracking.get('/api/site/script.js', (c) => {
     fetch(ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body, keepalive: true }).catch(function () {});
   }
 
+  // 成果の計測 (#819)。サイトIDがあるタグだけが呼ぶ。
+  // 許可ドメイン・同意・友だちとの結び付きの判定は受け口側で行う。
+  function sendConversion(path) {
+    if (!SITE_ID) return;
+    if (readConsent() !== 'granted') return;
+    var payload = {
+      siteId: SITE_ID,
+      visitorId: visitorId(),
+      host: location.hostname,
+      path: path,
+      consent: 'granted',
+      sourceEventId: null,
+    };
+    var body = JSON.stringify(payload);
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon(CV_ENDPOINT, new Blob([body], { type: 'application/json' }));
+      return;
+    }
+    fetch(CV_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body, keepalive: true }).catch(function () {});
+  }
+
   // 同意の案内。答えるまで計測しない。サイト側で独自に同意を取る場合は
   // window.lhConsent(true/false) を呼べばこの案内は出ない。
   function answer(decision) {
@@ -204,6 +229,8 @@ siteTracking.get('/api/site/script.js', (c) => {
     var bar = document.getElementById('lh-consent');
     if (bar) bar.parentNode.removeChild(bar);
     send({ eventType: 'page_view', consentDecision: decision, host: location.hostname, path: location.pathname });
+    // 同意した瞬間の閲覧も成果の対象にする(許可ドメインなら)。
+    if (decision === 'granted') sendConversion(location.pathname);
   }
   function showConsentBanner() {
     if (readConsent() || document.getElementById('lh-consent') || !document.body) return;
@@ -237,6 +264,7 @@ siteTracking.get('/api/site/script.js', (c) => {
   // 訪問。ホストとパスだけを送る。クエリ文字列はサーバー側でも落とすが、
   // 送らないに越したことはない。
   send({ eventType: 'page_view', host: location.hostname, path: location.pathname, referrer: document.referrer || null });
+  sendConversion(location.pathname);
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', showConsentBanner);
   } else {

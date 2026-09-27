@@ -138,7 +138,12 @@ export type AuditAction =
   | 'restaurant.google.change.send'
   // #818: 広告費の手入力と、管理画面からの取り直し
   | 'ad_cost.manual_entry'
-  | 'ad_cost.import';
+  | 'ad_cost.import'
+  // #819: 計測サイトの管理と成果の取り消し
+  | 'measurement_site.create'
+  | 'measurement_site.update'
+  | 'conversion.event.reverse'
+  | 'conversion.event.restore';
 
 function commonAuditWriter(): typeof recordAuditEvent | null {
   try {

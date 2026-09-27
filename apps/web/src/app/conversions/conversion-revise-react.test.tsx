@@ -241,6 +241,99 @@ describe('成果地点の編集（N-252）', () => {
     expect(document.body.textContent).toContain('名前を入れてください')
   })
 
+describe('編集も起点に合う金額の決め方にする', () => {
+  const TAG_SOURCE = {
+    ...DEFINITION,
+    id: 'point-tag',
+    name: 'タグ付け',
+    sourceType: 'tag_added',
+    valueMode: 'source',
+    value: 200,
+    deduplicationMode: 'once_per_friend',
+  }
+  const ORDER_SOURCE = {
+    ...DEFINITION,
+    id: 'point-order',
+    name: '注文',
+    sourceType: 'ec_order_confirmed',
+    valueMode: 'source',
+    value: null,
+  }
+
+  /** 一覧の口が返す成果地点を差し替える。版上げの口は成功のまま。 */
+  function stubList(items: unknown[]) {
+    vi.stubGlobal('fetch', async (input: unknown, init?: RequestInit) => {
+      const raw = typeof input === 'string' ? input : String(input)
+      const path = raw.startsWith('http') ? raw.slice(new URL(raw).origin.length) : raw
+      let body: unknown = null
+      try { body = init?.body ? JSON.parse(String(init.body)) : null } catch { body = init?.body ?? null }
+      net.calls.push({ path, method: init?.method ?? 'GET', body })
+      if (/^\/api\/conversions\/definitions\/[^/]+\/revise/.test(path)) {
+        return new Response(JSON.stringify(net.reviseBody ?? {
+          success: true, data: { id: 'point-x', version: 4, revisionId: 'rev-1', movedUsages: 1, updatedAt: '' },
+        }), { status: net.reviseStatus, headers: { 'Content-Type': 'application/json' } })
+      }
+      if (path.startsWith('/api/conversions/definitions')) {
+        return new Response(JSON.stringify({ ...listBody(), data: { ...listBody().data, items } }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }
+      if (path.startsWith('/api/conversions/report') || path.startsWith('/api/conversions/definition-report')) {
+        return new Response(JSON.stringify({ success: true, data: { kpis: {}, daily: [], byDefinition: [], byRoute: [] } }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }
+      return new Response(JSON.stringify({ success: true, data: {} }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    })
+  }
+
+  async function openEditDialogFor(name: string) {
+    await click(byLabel(`${name}のその他操作`))
+    await click(byText('中身を見る'))
+    await click(byText('編集'))
+  }
+
+  /** 金額の決め方欄の知らせ。窓が開いていないときは落ちる。 */
+  function amountNotice(): string | null {
+    const trigger = byLabel('金額の決め方')
+    expect(trigger, '編集の窓が開いていません').toBeTruthy()
+    return trigger!.closest('label')?.querySelector('[role="status"]')?.textContent ?? null
+  }
+
+  /** 金額の決め方の候補を開いて文字を全部読む。 */
+  async function openOptions(): Promise<string> {
+    await click(byLabel('金額の決め方'))
+    return [...document.body.querySelectorAll('li[role="option"]')]
+      .map((node) => node.textContent ?? '').join('')
+  }
+
+  it('起点に合わない決め方は開いたときに既定へ戻して知らせ、注文の金額は出さない', async () => {
+    stubList([TAG_SOURCE])
+    await mount()
+    await openEditDialogFor('タグ付け')
+    // 昔の版に残っていた注文の金額は、合う既定(金額を数えない)へ戻る。
+    expect(byLabel('金額の決め方')?.textContent).toContain('金額を数えない')
+    expect(amountNotice()).toContain('金額の決め方を')
+    expect(amountNotice()).toContain('戻しました')
+    // 候補に連携元の金額は出ない。
+    expect(await openOptions()).not.toContain('連携元の金額を使う')
+    // 閉じて保存すると既定が送られる。
+    await click(byLabel('金額の決め方'))
+    await click(byText('この内容にする'))
+    const revise = net.calls.find((call) => call.path.includes('/revise'))
+    expect(revise, '編集の口が呼ばれていません').toBeTruthy()
+    expect(revise!.body).toMatchObject({ valueMode: 'none', fixedValue: null })
+  })
+
+  it('注文起点の注文の金額はそのまま残り、知らせも出ない', async () => {
+    stubList([ORDER_SOURCE])
+    await mount()
+    await openEditDialogFor('注文')
+    expect(byLabel('金額の決め方')?.textContent).toContain('連携元の金額を使う')
+    expect(amountNotice()).toBeNull()
+    expect(await openOptions()).toContain('連携元の金額を使う')
+  })
+})
+
+describe('停止済み成果地点の編集導線', () => {
   it('停止済みの成果地点には編集の導線を出さない', async () => {
     const stopped = { ...DEFINITION, status: 'stopped', stoppedAt: '2026-09-02T00:00:00.000+09:00' }
     vi.stubGlobal('fetch', async (input: unknown, init?: RequestInit) => {
@@ -262,4 +355,5 @@ describe('成果地点の編集（N-252）', () => {
     expect(byLabel('閉じる')).toBeTruthy()
     expect(byText('編集')).toBeUndefined()
   })
+})
 })

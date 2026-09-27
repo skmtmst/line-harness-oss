@@ -22,7 +22,12 @@ import styles from './list-state.module.css'
  * 専用の部品が描かれたら、ここを合わせ直す。
  */
 export type ListStateKind = 'loading' | 'empty' | 'error' | 'forbidden'
-export type EmptyListPreset = 'createable' | 'readonly'
+/**
+ * 空の内訳。`createable` はまだ1件も無い（作る口を出す）、`readonly` は
+ * 画面から作れない記録、`filtered` は絞り込みの結果が0件（R38）。
+ * 0件の絞り込みに作る口を出すと、保存済みが消えたと誤読される。
+ */
+export type EmptyListPreset = 'createable' | 'readonly' | 'filtered'
 
 /**
  * 設計 `hqTfD` / `u2ArlH`。24px の線画。
@@ -56,6 +61,9 @@ export const PRESETS: Record<ListStateKind, { title: string; description: string
 export const EMPTY_PRESETS: Record<EmptyListPreset, { title: string; description: string }> = {
   createable: PRESETS.empty,
   readonly: { title: '記録はありません', description: '記録が増えると、ここに表示されます。' },
+  // R38: 絞り込みの結果が0件。「まだありません」と言わず、条件を外す口と
+  // 一緒に使う（action に「条件を外す」ボタンを渡す）。
+  filtered: { title: '条件に合うものがありません', description: '条件を変えるか、絞り込みを外してください。' },
 }
 
 export default function ListState({
@@ -67,6 +75,7 @@ export default function ListState({
   retrying = false,
   emptyPreset = 'createable',
   className,
+  'data-design': dataDesign,
 }: {
   kind: ListStateKind
   /** 設計どおりの文言で足りないとき（「まだタグがありません」など）だけ渡す。 */
@@ -81,6 +90,8 @@ export default function ListState({
   /** 画面から作れない記録一覧では、作成を促さない文言にする。 */
   emptyPreset?: EmptyListPreset
   className?: string
+  /** 設計の節の印の受け口。共通化で印を落とさないため。 */
+  'data-design'?: string
 }) {
   const preset = kind === 'empty' ? EMPTY_PRESETS[emptyPreset] : PRESETS[kind]
 
@@ -89,7 +100,7 @@ export default function ListState({
   // className は付けない（見た目は TargetMissing が持つ。余白は親で付ける）。
   if (kind === 'error') {
     return (
-      <div data-list-state="error" role="alert">
+      <div data-list-state="error" role="alert" data-design={dataDesign}>
         <TargetMissing
           kind="error"
           title={title ?? preset.title}
@@ -115,6 +126,7 @@ export default function ListState({
     <div
       className={rootClass}
       data-list-state={kind}
+      data-design={dataDesign}
       // 読み込み中は読み上げにも伝える。権限不足はその場で読ませる。
       aria-busy={kind === 'loading' || undefined}
       role={kind === 'forbidden' ? 'alert' : undefined}

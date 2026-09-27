@@ -139,7 +139,8 @@ async function renderDialog(item: MediaItem = ITEM, canManage = true) {
 }
 
 function dialog(): HTMLElement {
-  return host
+  // 日付の選択箱は最上層（MenuPortal→document.body）に出る。器の中にはいない。
+  return document.body
 }
 
 async function clickButton(text: string, index = 0) {

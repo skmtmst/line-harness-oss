@@ -3,7 +3,8 @@
 import { Calendar, Clock, X } from 'lucide-react'
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
 import DateField, { formatLabel as formatDateLabel, parseDate } from './date-field'
-import SelectField from './select-field'
+import MenuPortal from './menu-portal'
+import Select from './select'
 import dateStyles from './date-field.module.css'
 import styles from './date-time-field.module.css'
 
@@ -84,17 +85,7 @@ export default function DateTimeField({
     onChange?.(next)
   }
 
-  useEffect(() => {
-    if (!open) return
-    const onPointerDown = (event: PointerEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) {
-        setOpen(false)
-        setTimeDraft(null)
-      }
-    }
-    document.addEventListener('pointerdown', onPointerDown)
-    return () => document.removeEventListener('pointerdown', onPointerDown)
-  }, [open ])
+  // 外側を押したときの扱いは MenuPortal に任せる（箱の中の日付押しで閉じない）。
 
   useEffect(() => {
     if (!open) return
@@ -182,12 +173,20 @@ export default function DateTimeField({
       ) : null}
 
       {open ? (
+        <MenuPortal
+          open={open}
+          align="start"
+          getAnchor={() => triggerRef.current}
+          onClose={() => { setOpen(false); setTimeDraft(null) }}
+        >
         <div
           ref={popoverRef}
           id={dialogId}
           role="dialog"
           aria-label="日時を選ぶ"
           className={styles.popover}
+          // 最上層では absolute 指定を無効にする（位置は器が決める）。
+          style={{ position: 'static' }}
           // 箱の中の押下はここで止める。呼び出し側が `<label>` で欄全体を包んでいると、
           // 箱の中の押下がラベル経由で欄本体へ再送達して開閉が裏返る（公開日時の試験で発生）。
           onClick={(event) => event.stopPropagation()}
@@ -204,19 +203,19 @@ export default function DateTimeField({
           <div className={styles.timeRow}>
             <label className={styles.timeLabel}>
               時
-              <SelectField
+              <Select
                 aria-label="時"
                 value={pad(shownTime.hours)}
-                onChange={(event) => chooseTime(Number(event.target.value), shownTime.minutes)}
+                onChange={(value) => chooseTime(Number(value), shownTime.minutes)}
                 options={HOURS.map((hour) => ({ value: pad(hour), label: `${hour}時` }))}
               />
             </label>
             <label className={styles.timeLabel}>
               分
-              <SelectField
+              <Select
                 aria-label="分"
                 value={pad(shownTime.minutes)}
-                onChange={(event) => chooseTime(shownTime.hours, Number(event.target.value))}
+                onChange={(value) => chooseTime(shownTime.hours, Number(value))}
                 options={MINUTES.map((minute) => ({ value: pad(minute), label: `${minute}分` }))}
               />
             </label>
@@ -226,6 +225,7 @@ export default function DateTimeField({
             <button type="button" className={styles.clearBtn} onClick={() => { emit(''); close() }}>消す</button>
           </div>
         </div>
+        </MenuPortal>
       ) : null}
     </div>
   )
@@ -287,14 +287,7 @@ export function TimeField({
     onChange?.(next)
   }
 
-  useEffect(() => {
-    if (!open) return
-    const onPointerDown = (event: PointerEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false)
-    }
-    document.addEventListener('pointerdown', onPointerDown)
-    return () => document.removeEventListener('pointerdown', onPointerDown)
-  }, [open ])
+  // 外側を押したときの扱いは MenuPortal に任せる（箱の中の時刻押しで閉じない）。
 
   const openDialog = () => {
     if (disabled) return
@@ -360,32 +353,40 @@ export function TimeField({
       ) : null}
 
       {open ? (
+        <MenuPortal
+          open={open}
+          align="start"
+          getAnchor={() => triggerRef.current}
+          onClose={() => setOpen(false)}
+        >
         <div
           id={dialogId}
           role="dialog"
           aria-label="時刻を選ぶ"
           className={styles.popover}
+          // 最上層では absolute 指定を無効にする（位置は器が決める）。
+          style={{ position: 'static' }}
           // 日時の選択と同じく、箱の中の押下はここで止める（包んだ `<label>` への再送達を防ぐ）。
           onClick={(event) => event.stopPropagation()}
         >
           <div className={styles.timeRow}>
             <label className={styles.timeLabel}>
               時
-              <SelectField
+              <Select
                 aria-label="時"
                 value={pad(shownHours)}
                 disabled={disabled}
-                onChange={(event) => chooseTime(Number(event.target.value), shownMinutes)}
+                onChange={(value) => chooseTime(Number(value), shownMinutes)}
                 options={HOURS.map((hour) => ({ value: pad(hour), label: `${hour}時` }))}
               />
             </label>
             <label className={styles.timeLabel}>
               分
-              <SelectField
+              <Select
                 aria-label="分"
                 value={pad(shownMinutes)}
                 disabled={disabled}
-                onChange={(event) => chooseTime(shownHours, Number(event.target.value))}
+                onChange={(value) => chooseTime(shownHours, Number(value))}
                 options={MINUTES.map((minute) => ({ value: pad(minute), label: `${minute}分` }))}
               />
             </label>
@@ -395,6 +396,7 @@ export function TimeField({
             <button type="button" className={styles.clearBtn} onClick={() => { emit(''); close() }}>消す</button>
           </div>
         </div>
+        </MenuPortal>
       ) : null}
     </div>
   )

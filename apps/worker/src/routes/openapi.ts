@@ -4205,6 +4205,137 @@ const spec = {
         responses: { '200': { description: 'Events' } },
       },
     },
+    '/api/conversions/events/{id}/reversals': {
+      get: {
+        tags: ['Conversions'],
+        summary: '成果の取消履歴(#819)',
+        description: '取消・取消の取消を新しい順に返す。元の成果行は消えない。',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: {
+          '200': { description: '取消履歴' },
+          '404': { description: '成果が見つからない' },
+        },
+      },
+      post: {
+        tags: ['Conversions'],
+        summary: '成果の取消・取消の取消を追記(#819)',
+        description: '追記型の台帳。kind=reverse は取り消し、kind=restore は'
+          + '取り消しの取消。連投・未取り消しへの restore は 409。',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['kind', 'reason'],
+                properties: {
+                  kind: { type: 'string', enum: ['reverse', 'restore'] },
+                  reason: { type: 'string', maxLength: 500 },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: '追記した台帳行' },
+          '400': { description: 'kindが不正・理由が空' },
+          '404': { description: '成果が見つからない' },
+          '409': { description: 'すでに取り消し済み・取り消されていない' },
+        },
+      },
+    },
+    '/api/measurement-sites': {
+      get: {
+        tags: ['Conversions'],
+        summary: '計測サイトと許可ドメイン・拒否の内訳(#819)',
+        parameters: [{ name: 'account_id', in: 'query', schema: { type: 'string' } }],
+        responses: { '200': { description: '計測サイト一覧' }, '400': { description: 'account_id が無い・権限外' } },
+      },
+      post: {
+        tags: ['Conversions'],
+        summary: '計測サイトを足す(#819)',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['label', 'domains'],
+                properties: {
+                  accountId: { type: 'string' },
+                  label: { type: 'string', maxLength: 100 },
+                  domains: { type: 'array', items: { type: 'string' }, minItems: 1 },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: '作成したサイト(公開ID含む)' },
+          '400': { description: '名前が無い・ドメインが0件' },
+        },
+      },
+    },
+    '/api/measurement-sites/{id}': {
+      patch: {
+        tags: ['Conversions'],
+        summary: '計測サイトの名前・許可ドメインを更新(#819)',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  label: { type: 'string', maxLength: 100 },
+                  domains: { type: 'array', items: { type: 'string' }, minItems: 1 },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: '更新した' },
+          '400': { description: '入力が不正' },
+          '404': { description: 'サイトが見つからない' },
+        },
+      },
+    },
+    '/api/public/web-conversions': {
+      post: {
+        tags: ['Conversions'],
+        summary: '計測タグからの成果受信(公開口・サイトID+許可ドメイン)', security: [],
+        description: '管理認証を通さない公開口。サイトIDは公開識別子で秘密ではない。'
+          + '許可にないドメイン・同意が無い送信は数えず、常に204を返す'
+          + '(設定の有無を外から推測させない)。許可外の来た先は件数と'
+          + '最後の送信元だけ管理画面へ出す。友だちと結び付かない成果は'
+          + '地点の「匿名を数える」設定が立つときだけ日別の合計へ足す。',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['siteId'],
+                properties: {
+                  siteId: { type: 'string', description: 'site_ ではじまる公開ID' },
+                  visitorId: { type: 'string' },
+                  host: { type: 'string' },
+                  path: { type: 'string' },
+                  value: { type: ['number', 'null'] },
+                  sourceEventId: { type: 'string', description: '再送を捌くイベントID' },
+                  consent: { type: 'string', enum: ['granted'] },
+                  consentDecision: { type: 'string', enum: ['granted', 'declined'] },
+                },
+              },
+            },
+          },
+        },
+        responses: { '204': { description: '受け取った(成否は内部台帳のみ)' } },
+      },
+    },
     '/api/conversions/report': {
       get: {
         tags: ['Conversions'],

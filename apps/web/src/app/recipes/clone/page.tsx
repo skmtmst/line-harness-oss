@@ -8,7 +8,7 @@ import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import ListState from '@/components/shared/list-state'
 import TargetMissing from '@/components/shared/target-missing'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import StickyBar from '@/components/shared/sticky-bar'
 import { TextField } from '@/components/shared/text-field'
@@ -164,11 +164,13 @@ function RecipeClone() {
                 <label className={styles.accountLabel} htmlFor="recipe-clone-account">
                   どのLINEアカウントに作るか<RequiredBadge />
                 </label>
-                <SelectField
+                <Select
+                  aria-label="どのLINEアカウントに作るか"
                   id="recipe-clone-account"
-                  className={styles.accountSelect}
+                  size="full"
                   value={selectedAccountId ?? ''}
                   disabled={!selectedAccountId}
+                  onChange={() => undefined}
                   options={[{
                     value: selectedAccountId ?? '',
                     label: selectedAccount?.name ?? 'アカウントが選ばれていません',

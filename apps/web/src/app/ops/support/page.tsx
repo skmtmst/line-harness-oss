@@ -21,7 +21,7 @@ import Button from '@/components/shared/button'
 import Chip, { type ChipTone } from '@/components/shared/chip'
 import ListState from '@/components/shared/list-state'
 import SearchField from '@/components/shared/search-field'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import KpiCard from '@/components/shared/kpi-card'
 import { Tabs } from '@/components/shared/tabs'
 import { TextArea, TextField } from '@/components/shared/text-field'
@@ -318,8 +318,8 @@ export default function OpsSupportPage() {
               <span className="w-64">
                 <SearchField value={q} onChange={setQ} onClear={() => setQ('')} placeholder="チケット番号・契約先・件名" aria-label="チケットを探す" />
               </span>
-              <SelectField size="compact" aria-label="優先度で絞る" options={PRIORITY_OPTIONS} value={priority} onChange={(e) => setPriority(e.target.value as '' | OpsSupportPriority)} />
-              <SelectField aria-label="並び替え" options={SORT_OPTIONS} value={sort} onChange={(e) => setSort(e.target.value as typeof sort)} />
+              <Select size="page-size" aria-label="優先度で絞る" options={PRIORITY_OPTIONS} value={priority} onChange={(value) => setPriority(value as '' | OpsSupportPriority)} />
+              <Select aria-label="並び替え" options={SORT_OPTIONS} value={sort} onChange={(value) => setSort(value as typeof sort)} />
             </span>
           }
         />
@@ -352,14 +352,14 @@ export default function OpsSupportPage() {
         <form onSubmit={(event) => void create(event)} className="mb-4 grid gap-3 rounded-card border border-hairline bg-canvas px-4 py-4 md:grid-cols-2">
           <label className="grid gap-1 text-caption text-ink-secondary">
             契約先
-            <SelectField className="w-full" aria-label="契約先" required value={form.tenantId} onChange={(e) => setForm((f) => ({ ...f, tenantId: e.target.value }))}
+            <Select size="full" aria-label="契約先" value={form.tenantId} onChange={(value) => setForm((f) => ({ ...f, tenantId: value }))}
               options={[{ value: '', label: '契約先を選ぶ' }, ...tenants.map((t) => ({ value: t.id, label: t.name }))]} />
           </label>
           <label className="grid gap-1 text-caption text-ink-secondary">
             種類・優先度
             <span className="flex gap-2">
-              <SelectField className="w-full" aria-label="種類" value={form.kind} onChange={(e) => setForm((f) => ({ ...f, kind: e.target.value }))} options={KIND_OPTIONS} />
-              <SelectField size="compact" aria-label="優先度" value={form.priority} onChange={(e) => setForm((f) => ({ ...f, priority: e.target.value as OpsSupportPriority }))} options={PRIORITY_OPTIONS.slice(1)} />
+              <Select size="full" aria-label="種類" value={form.kind} onChange={(value) => setForm((f) => ({ ...f, kind: value }))} options={KIND_OPTIONS} />
+              <Select size="page-size" aria-label="優先度" value={form.priority} onChange={(value) => setForm((f) => ({ ...f, priority: value as OpsSupportPriority }))} options={PRIORITY_OPTIONS.slice(1)} />
             </span>
           </label>
           <label className="grid gap-1 text-caption text-ink-secondary md:col-span-2">
@@ -458,7 +458,7 @@ export default function OpsSupportPage() {
                 {priorityChip(ticket.priority, ticket.priorityLabel)}
                 {stageChip(ticket.stage, ticket.stageLabel)}
                 <span className="ml-auto flex items-center gap-2">
-                  <SelectField size="compact" aria-label="優先度を変える" value={ticket.priority} onChange={(e) => void changePriority(e.target.value as OpsSupportPriority)} options={PRIORITY_OPTIONS.slice(1)} />
+                  <Select size="page-size" aria-label="優先度を変える" value={ticket.priority} onChange={(value) => void changePriority(value as OpsSupportPriority)} options={PRIORITY_OPTIONS.slice(1)} />
                   {ticket.stage === 'resolved' || ticket.stage === 'closed' ? (
                     <Button size="field" disabled={busy} onClick={() => void changeStage('in_progress')}>対応中に戻す</Button>
                   ) : (

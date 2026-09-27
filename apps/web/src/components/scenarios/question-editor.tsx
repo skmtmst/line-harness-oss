@@ -12,6 +12,7 @@
 
 import { useEffect, useId, useState } from 'react'
 import { useAccount } from '@/contexts/account-context'
+import Select from '@/components/shared/select'
 import { scenarioReferenceData } from './scenario-reference-data'
 
 export type ChoiceBehavior = 'none' | 'url' | 'tel' | 'add_friend' | 'mail' | 'form' | 'scenario'
@@ -108,13 +109,6 @@ export function clearDeadAnswerSettings(choice: QuestionChoice): QuestionChoice 
  */
 const inputClass =
   'border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none'
-/*
- * ネイティブの select は最長の option の幅まで広がる。#973 U022:
- * 詳しい設定を開いたとき、長いタグ名・項目名でカードごと右へはみ出さないよう、
- * コンテナ幅を上限にし、狭い行では縮められるようにする。
- */
-const selectClass =
-  'border-hairline rounded-control bg-canvas text-ink focus:ring-accent min-w-0 max-w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none'
 const areaClass =
   'border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full resize-y border px-3 py-2 text-sm focus:ring-2 focus:outline-none'
 
@@ -212,15 +206,16 @@ export default function QuestionEditor({
 
       <div className="flex flex-wrap items-center gap-3">
         <label htmlFor={`${fieldBase}-tapmode`} className="text-ink-secondary text-xs font-medium">質問の回答は</label>
-        <select
+        <Select
+          aria-label="質問の回答は"
           id={`${fieldBase}-tapmode`}
           value={value.tapMode}
-          onChange={(e) => onChange({ ...value, tapMode: e.target.value as 'single' | 'multiple' })}
-          className={selectClass}
-        >
-          <option value="single">1つのみタップ可能</option>
-          <option value="multiple">すべてタップ可能</option>
-        </select>
+          onChange={(next) => onChange({ ...value, tapMode: next as 'single' | 'multiple' })}
+          options={[
+            { value: 'single', label: '1つのみタップ可能' },
+            { value: 'multiple', label: 'すべてタップ可能' },
+          ]}
+        />
       </div>
 
       <div className={choiceColumns ? 'grid gap-3 xl:grid-cols-2' : 'space-y-3'}>
@@ -299,18 +294,13 @@ export default function QuestionEditor({
 
                 <div className="flex flex-wrap items-center gap-2">
                   <label htmlFor={`${fieldBase}-choice-${index}-behavior`} className="text-ink-secondary text-xs font-medium">選択後の挙動</label>
-                  <select
+                  <Select
+                    aria-label="選択後の挙動"
                     id={`${fieldBase}-choice-${index}-behavior`}
                     value={choice.behavior}
-                    onChange={(e) => setChoice(index, { behavior: e.target.value as ChoiceBehavior })}
-                    className={selectClass}
-                  >
-                    {BEHAVIORS.map((b) => (
-                      <option key={b.value} value={b.value}>
-                        {b.label}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(next) => setChoice(index, { behavior: next as ChoiceBehavior })}
+                    options={BEHAVIORS.map((b) => ({ value: b.value, label: b.label }))}
+                  />
                 </div>
 
                 {(choice.behavior === 'url' || choice.behavior === 'add_friend' || choice.behavior === 'form') && (
@@ -343,42 +333,39 @@ export default function QuestionEditor({
                 {choice.behavior === 'scenario' && (
                   <div className="bg-canvas-sunken rounded-card space-y-2 px-3 py-3">
                     <div className="flex flex-wrap items-center gap-2">
-                      <select
+                      <Select
                         aria-label={`選択肢${index + 1}のシナリオ操作`}
                         value={choice.scenario?.op ?? 'start'}
-                        onChange={(e) =>
+                        onChange={(next) =>
                           setChoice(index, {
-                            scenario: { ...choice.scenario, op: e.target.value as 'start' | 'stop' },
+                            scenario: { ...choice.scenario, op: next as 'start' | 'stop' },
                           })
                         }
-                        className={selectClass}
-                      >
-                        <option value="start">購読を始める</option>
-                        <option value="stop">購読を止める</option>
-                      </select>
-                      <select
+                        options={[
+                          { value: 'start', label: '購読を始める' },
+                          { value: 'stop', label: '購読を止める' },
+                        ]}
+                      />
+                      <Select
                         aria-label={`選択肢${index + 1}の移動先シナリオ`}
                         value={choice.scenario?.scenarioId ?? ''}
-                        onChange={(e) =>
+                        onChange={(next) =>
                           setChoice(index, {
                             scenario: {
                               op: choice.scenario?.op ?? 'start',
                               ...choice.scenario,
-                              scenarioId: e.target.value,
+                              scenarioId: next,
                             },
                           })
                         }
-                        className={selectClass}
-                      >
-                        <option value="">
-                          {choice.scenario?.op === 'stop' ? 'このシナリオ' : 'シナリオを選ぶ'}
-                        </option>
-                        {scenarios.map((s) => (
-                          <option key={s.id} value={s.id}>
-                            {s.name}
-                          </option>
-                        ))}
-                      </select>
+                        options={[
+                          {
+                            value: '',
+                            label: choice.scenario?.op === 'stop' ? 'このシナリオ' : 'シナリオを選ぶ',
+                          },
+                          ...scenarios.map((s) => ({ value: s.id, label: s.name })),
+                        ]}
+                      />
                     </div>
                     {(choice.scenario?.op ?? 'start') === 'start' && (
                       <>
@@ -533,25 +520,24 @@ export default function QuestionEditor({
                     */}
                     <div>
                       <label htmlFor={`${fieldBase}-choice-${index}-field`} className="text-ink-secondary text-xs font-medium">友だち情報欄</label>
-                      <select
+                      <Select
+                        aria-label="友だち情報欄"
                         id={`${fieldBase}-choice-${index}-field`}
                         value={choice.field?.fieldId ?? ''}
-                        onChange={(e) =>
+                        onChange={(next) =>
                           setChoice(index, {
-                            field: e.target.value
-                              ? { fieldId: e.target.value, value: choice.field?.value ?? '' }
+                            field: next
+                              ? { fieldId: next, value: choice.field?.value ?? '' }
                               : undefined,
                           })
                         }
-                        className={`${selectClass} mt-1.5 w-full`}
-                      >
-                        <option value="">設定しない</option>
-                        {fields.map((f) => (
-                          <option key={f.id} value={f.id}>
-                            {f.name}
-                          </option>
-                        ))}
-                      </select>
+                        options={[
+                          { value: '', label: '設定しない' },
+                          ...fields.map((f) => ({ value: f.id, label: f.name })),
+                        ]}
+                        size="full"
+                        className="mt-1.5"
+                      />
                       {choice.field?.fieldId && (
                         <input
                           aria-label={`選択肢${index + 1}の友だち情報欄にセットする値`}
@@ -643,19 +629,18 @@ function TagPicker({
         {tags.length > 0 ? (
           /* #973 U022: タグの選択は全幅の独立行にする。長いタグ名でも
              カードを広げず、選んだタグの行と重ならない。 */
-          <select
+          <Select
             aria-label={label}
             value=""
-            onChange={(event) => {
-              if (event.target.value) onChange([...selected, event.target.value])
+            onChange={(next) => {
+              if (next) onChange([...selected, next])
             }}
-            className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full max-w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
-          >
-            <option value="">{selected.length > 0 ? 'ほかのタグを選ぶ' : 'タグを選ぶ'}</option>
-            {availableTags.map((tag) => (
-              <option key={tag.id} value={tag.id}>{tag.name}</option>
-            ))}
-          </select>
+            options={[
+              { value: '', label: selected.length > 0 ? 'ほかのタグを選ぶ' : 'タグを選ぶ' },
+              ...availableTags.map((tag) => ({ value: tag.id, label: tag.name })),
+            ]}
+            size="full"
+          />
         ) : (
           <span className="text-ink-faint text-xs">タグがまだありません</span>
         )}

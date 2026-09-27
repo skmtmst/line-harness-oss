@@ -1,8 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { EC_EVENT_TYPES, ecEventLabel } from '@line-crm/shared'
-import { api } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
+import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
 import CreatePage, { AsideCard, Field, inputClass } from '@/components/shared/create-page'
 import { isStepUpRequired, useStepUpGate } from '@/components/step-up-prompt'
 import { RequiredBadge } from '@/components/shared/form-controls'
@@ -59,10 +61,38 @@ export default function NewWebhookPage() {
   const [secret, setSecret] = useState(generateSecret)
   const [maxRetries, setMaxRetries] = useState('0')
   const { gate, prompt: stepUpPrompt } = useStepUpGate()
+  /*
+   * 送り先の作成は統括だけ（R32）。口側が `requireRole('owner')` で守っている。
+   * 直接URLで開いた管理者には作らず、統括への依頼を案内する。
+   */
+  const [staffRole, setStaffRole] = useState<string | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    void api.staff.me()
+      .then((response) => {
+        if (cancelled || !response.success) return
+        setStaffRole(response.data.role)
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
 
   const toggleEvent = (value: string) => {
     setSelectedEvents((current) =>
       current.includes(value) ? current.filter((item) => item !== value) : [...current, value],
+    )
+  }
+
+  if (staffRole !== null && staffRole !== 'owner') {
+    return (
+      <div className="flex flex-col gap-4">
+        <Notice tone="info">
+          送り先の作成は統括だけができます。必要なときは統括に頼んでください。
+        </Notice>
+        <div>
+          <Button variant="secondary" href="/webhooks">外部連携の一覧へ戻る</Button>
+        </div>
+      </div>
     )
   }
 
@@ -118,7 +148,13 @@ export default function NewWebhookPage() {
         } catch (caught) {
           // 秘密の値の登録は大事な操作。本人確認を求められたらその場で窓を立て、
           // 確認が済んだgrantを付けて同じ保存をやり直す（V-1）。
-          if (!isStepUpRequired(caught)) throw caught
+          // 作成は統括だけ。権限不足は生の `API error: 403` ではなく依頼の案内にする（R32）。
+          if (!isStepUpRequired(caught)) {
+            if (caught instanceof ApiError && caught.status === 403) {
+              throw new Error('送り先の作成は統括だけができます。必要なときは統括に頼んでください。')
+            }
+            throw caught
+          }
           const token = await gate('webhook.secret', 'Webhookを登録する')
           if (!token) throw caught
           res = await create(token)

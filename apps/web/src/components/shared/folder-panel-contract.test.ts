@@ -22,4 +22,8 @@ describe('共通フォルダ欄', () => {
     expect(PANEL).toContain('aria-label="フォルダ"')
     expect(PANEL).toContain('>{heading}</p>')
   })
+
+  it('R37: 狭い幅では操作メニューを常に出す（スマホでも名前変更・削除に届く）', () => {
+    expect(PANEL).toContain('max-lg:opacity-100')
+  })
 })

@@ -10,6 +10,23 @@ import { previewLabel, toLocalInput, toPublishAt } from './format'
 
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a> }))
 
+/*
+ * 共通の Select は listbox の部品で、その操作は部品自身の試験が持つ。
+ * ここで見たいのは選んだ後の配信予約の判断なので、素の <select> に置き換える。
+ */
+vi.mock('@/components/shared/select', () => ({
+  default: ({ 'aria-label': label, value, onChange, options }: {
+    'aria-label'?: string
+    value: string
+    onChange: (value: string) => void
+    options: Array<{ value: string; label: string }>
+  }) => React.createElement(
+    'select',
+    { 'aria-label': label, value, onChange: (e: { target: { value: string } }) => onChange(e.target.value) },
+    options.map((option) => React.createElement('option', { key: option.value, value: option.value }, option.label)),
+  ),
+}))
+
 /** ★V6 37-7 お知らせ配信。作成欄・送り方・宛先の見込み・一覧（LINE送達／画面で既読）が API の形どおりに出ること。 */
 
 const sent = {
@@ -89,16 +106,16 @@ describe('画面', () => {
     expect(text).toContain('5 / 24')
     expect(text).toContain('下書き')
     expect(text).toContain('12件の契約先・24人の権限者')
-    expect(Array.from(host.querySelectorAll('button')).filter((b) => b.textContent === '直す')).toHaveLength(1)
+    expect(Array.from(document.querySelectorAll('button')).filter((b) => b.textContent === '直す')).toHaveLength(1)
     expect(calls.some((c) => c.url.endsWith('/api/ops/announcements/preview') && c.method === 'POST')).toBe(true)
-    expect(host.querySelector('[data-design-node="q2CokV"]')).not.toBeNull()
+    expect(document.querySelector('[data-design-node="q2CokV"]')).not.toBeNull()
   })
 
   it('件名・本文を入れて「今すぐ送る」→確認の窓→送信。mode=send と送り方が API に渡る', async () => {
     await act(async () => { root.render(<OpsAnnouncementsPage />) })
     await flush()
-    const subject = host.querySelector<HTMLInputElement>('input[placeholder^="例："]')!
-    const body = host.querySelector<HTMLTextAreaElement>('textarea')!
+    const subject = document.querySelector<HTMLInputElement>('input[placeholder^="例："]')!
+    const body = document.querySelector<HTMLTextAreaElement>('textarea')!
     await act(async () => { setValue(subject, 'メンテナンスのお知らせ'); setValue(body, '本文です') })
     await act(async () => { button('今すぐ送る')!.click() })
     await flush()
@@ -114,19 +131,19 @@ describe('画面', () => {
     await act(async () => { root.render(<OpsAnnouncementsPage />) })
     await flush()
     await act(async () => {
-      setValue(host.querySelector<HTMLInputElement>('input[placeholder^="例："]')!, '予約のお知らせ')
-      setValue(host.querySelector<HTMLTextAreaElement>('textarea')!, '本文')
+      setValue(document.querySelector<HTMLInputElement>('input[placeholder^="例："]')!, '予約のお知らせ')
+      setValue(document.querySelector<HTMLTextAreaElement>('textarea')!, '本文')
     })
     // 公開日時の選択（★V7）で 2026-09-20 02:00 を選ぶ。値は今までどおり日本時間の文字列。
     await act(async () => {
-      host.querySelector<HTMLButtonElement>('button[aria-label="公開日時（日本時間）"]')!.click()
+      document.querySelector<HTMLButtonElement>('button[aria-label="公開日時（日本時間）"]')!.click()
     })
-    const picker = host.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
+    const picker = document.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
     await act(async () => {
       picker.querySelector<HTMLButtonElement>('button[aria-label="日付"]')!.click()
     })
     await act(async () => {
-      Array.from(host.querySelectorAll('button')).find((b) =>
+      Array.from(document.querySelectorAll('button')).find((b) =>
         (b.getAttribute('aria-label') ?? '').startsWith('2026年9月20日（日）'),
       )!.click()
     })
@@ -148,14 +165,14 @@ describe('画面', () => {
     await flush()
     expect(host.textContent).toContain('契約者専用LINEのアカウントが未設定です')
     await act(async () => {
-      setValue(host.querySelector<HTMLInputElement>('input[placeholder^="例："]')!, 'x')
-      setValue(host.querySelector<HTMLTextAreaElement>('textarea')!, 'y')
+      setValue(document.querySelector<HTMLInputElement>('input[placeholder^="例："]')!, 'x')
+      setValue(document.querySelector<HTMLTextAreaElement>('textarea')!, 'y')
     })
     await act(async () => { button('今すぐ送る')!.click() })
     await flush()
     await act(async () => { button('送る')!.click() })
     await flush()
-    expect(host.querySelector('[role="alert"]')?.textContent).toContain('契約者専用LINEのアカウントが未設定です。メンバー管理の「運営の情報」で指定してください')
+    expect(document.querySelector('[role="alert"]')?.textContent).toContain('契約者専用LINEのアカウントが未設定です。メンバー管理の「運営の情報」で指定してください')
     expect(calls.some((c) => c.method === 'POST' && c.url.endsWith('/api/ops/announcements'))).toBe(false)
   })
 })

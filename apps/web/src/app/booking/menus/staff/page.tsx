@@ -11,6 +11,7 @@ import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Notice from '@/components/shared/notice'
 import StatusBadge from '@/components/shared/status-badge'
+import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { notifyToast } from '@/components/shared/toast'
 
 /**
@@ -297,24 +298,18 @@ function MenuStaffMatrixContent() {
           先にスタッフを登録してください
         </div>
       ) : (
-        <div
-          data-design="Table"
-          className="bg-canvas rounded-card border-hairline overflow-hidden border"
-        >
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px]">
+        <DataTable data-design="Table">
               <thead>
-                <tr className="bg-canvas-sunken border-hairline border-b">
-                  <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">
+                <TableHeadRow>
+                  <Th>
                     メニュー
-                  </th>
-                  <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">
+                  </Th>
+                  <Th>
                     標準の設定
-                  </th>
+                  </Th>
                   {staff.map((s) => (
-                    <th
+                    <Th
                       key={s.id}
-                      className="text-ink-faint px-4 py-3 text-left text-xs font-semibold"
                     >
                       {s.display_name || s.name}
                       {s.is_designation_optional === 1 && (
@@ -322,21 +317,21 @@ function MenuStaffMatrixContent() {
                           指名なし
                         </span>
                       )}
-                    </th>
+                    </Th>
                   ))}
-                  <th className="text-ink-faint px-4 py-3 text-right text-xs font-semibold">
+                  <Th align="right">
                     提供できる数
-                  </th>
-                </tr>
+                  </Th>
+                </TableHeadRow>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody>
                 {menus.map((m) => (
-                  <tr
+                  <Tr
                     key={m.id}
                     id={`menu-${m.id}`}
                     className={focusMenuId === m.id ? 'bg-accent-soft' : undefined}
                   >
-                    <td className="px-4 py-3 align-top text-sm">
+                    <Td className="align-top">
                       <p className="text-ink font-medium">{m.name}</p>
                       <p className="mt-1">
                         {m.is_active ? (
@@ -349,18 +344,18 @@ function MenuStaffMatrixContent() {
                           </span>
                         )}
                       </p>
-                    </td>
-                    <td className="text-ink-secondary px-4 py-3 align-top text-xs tabular-nums">
+                    </Td>
+                    <Td className="text-ink-secondary align-top text-xs tabular-nums">
                       {m.duration_minutes} 分
                       <br />¥{m.base_price.toLocaleString()}
-                    </td>
+                    </Td>
                     {staff.map((s) => {
                       const row = grid[s.id]?.[m.id]
                       const offered = Boolean(row?.is_offered)
                       const overridden =
                         row?.override_duration_minutes != null || row?.override_price != null
                       return (
-                        <td key={s.id} className="px-4 py-3 align-top">
+                        <Td key={s.id} className="align-top">
                           <label className="flex cursor-pointer items-center gap-1.5 text-xs">
                             <input
                               type="checkbox"
@@ -417,10 +412,10 @@ function MenuStaffMatrixContent() {
                           ) : (
                             <p className="text-ink-faint mt-1.5 text-xs">—</p>
                           )}
-                        </td>
+                        </Td>
                       )
                     })}
-                    <td className="px-4 py-3 text-right align-top text-sm tabular-nums">
+                    <Td align="right" className="align-top text-sm tabular-nums">
                       <span
                         className={
                           (offeredCounts.get(m.id) ?? 0) === 0 ? 'text-warning' : 'text-ink'
@@ -428,13 +423,11 @@ function MenuStaffMatrixContent() {
                       >
                         {offeredCounts.get(m.id) ?? 0} 人
                       </span>
-                    </td>
-                  </tr>
+                    </Td>
+                  </Tr>
                 ))}
               </tbody>
-            </table>
-          </div>
-        </div>
+        </DataTable>
       )}
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">

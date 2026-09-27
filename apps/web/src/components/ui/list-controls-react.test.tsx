@@ -26,25 +26,28 @@ describe('SortSelect（監査6 #668: 並び順の統一）', () => {
   it('「並び順」の字ラベルつきの選び口を出す', () => {
     render(<SortSelect value="usage_desc" onChange={() => {}} options={options} />)
     expect(screen.getByText('並び順')).toBeTruthy()
+    // 選び口は共通 Select（開くボタン）。読み上げ名で結び付く。
     const select = screen.getByLabelText('並び順')
-    expect(select.tagName).toBe('SELECT')
-    // 字ラベルはラッパの label 要素でセレクトと結び付く（押すとセレクトへ）
+    expect(select.tagName).toBe('BUTTON')
+    // 字ラベルはラッパの label 要素で選び口と結び付く
     expect(select.closest('label')?.textContent).toContain('並び順')
   })
 
   it('選択中の語が切れないよう幅は内容・下限あり（w-auto min-w-40）', () => {
     render(<SortSelect value="usage_desc" onChange={() => {}} options={options} />)
     const select = screen.getByLabelText('並び順')
-    expect(select.className).toContain('w-auto')
-    expect(select.className).toContain('min-w-40')
-    // 長い選択肢の全文が<option>に入っている
-    expect(screen.getByText('使われている数が多い順')).toBeTruthy()
+    // 幅は選び欄の器（ボタンの親）が持つ
+    expect(select.parentElement?.className).toContain('w-auto')
+    expect(select.parentElement?.className).toContain('min-w-40')
+    // 選んでいる語がボタンに出ている
+    expect(select.textContent).toContain('使われている数が多い順')
   })
 
   it('選ぶと onChange へ新しい値を渡す', () => {
     const onChange = vi.fn()
     render(<SortSelect value="usage_desc" onChange={onChange} options={options} />)
-    fireEvent.change(screen.getByLabelText('並び順'), { target: { value: 'updated_desc' } })
+    fireEvent.click(screen.getByLabelText('並び順'))
+    fireEvent.click(screen.getByRole('listbox').querySelectorAll('button')[1])
     expect(onChange).toHaveBeenCalledWith('updated_desc')
   })
 })
@@ -53,23 +56,34 @@ describe('PageSizeSelect（監査6 #668: 表示件数の統一）', () => {
   it('「表示件数」の字ラベルつきで、選択肢は「N件表示」の1形', () => {
     render(<PageSizeSelect value={20} onChange={() => {}} />)
     expect(screen.getByText('表示件数')).toBeTruthy()
-    const select = screen.getByLabelText('表示件数') as HTMLSelectElement
-    expect(select.tagName).toBe('SELECT')
+    // 選び口は共通 Select（開くボタン）。
     // 「20件」でも「20件を表示」でもなく設計の語「20件表示」
-    expect(select.options[0].textContent).toBe('20件表示')
+    fireEvent.click(screen.getByLabelText('表示件数'))
+    const listbox = screen.getByRole('listbox')
+    expect(listbox.textContent).toContain('20件表示')
+    expect(listbox.textContent).toContain('50件表示')
+    expect(listbox.textContent).toContain('100件表示')
   })
 
   it('件数の選択肢は画面が渡すものを使う（既定は 20・50・100）', () => {
     render(<PageSizeSelect value={30} onChange={() => {}} options={[10, 30, 50]} />)
-    const select = screen.getByLabelText('表示件数') as HTMLSelectElement
-    expect([...select.options].map((o) => o.value)).toEqual(['10', '30', '50'])
-    expect(select.value).toBe('30')
+    // 開く前に掴む（開いた後は字ラベルとボタンの両方に当たることがある）。
+    const select = screen.getByLabelText('表示件数')
+    fireEvent.click(select)
+    const listbox = screen.getByRole('listbox')
+    expect(listbox.textContent).toContain('10件表示')
+    expect(listbox.textContent).toContain('30件表示')
+    expect(listbox.textContent).toContain('50件表示')
+    // 選んでいる値がボタンに出ている
+    expect(select.textContent).toContain('30件表示')
   })
 
   it('選ぶと onChange へ数値で渡す', () => {
     const onChange = vi.fn()
     render(<PageSizeSelect value={20} onChange={onChange} />)
-    fireEvent.change(screen.getByLabelText('表示件数'), { target: { value: '50' } })
+    fireEvent.click(screen.getByLabelText('表示件数'))
+    // 既定の選択肢は 20・50・100（[1] が 50）。
+    fireEvent.click(screen.getByRole('listbox').querySelectorAll('button')[1])
     expect(onChange).toHaveBeenCalledWith(50)
   })
 })

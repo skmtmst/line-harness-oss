@@ -3,6 +3,7 @@
 import { ChevronsUpDown, Plus, X } from 'lucide-react'
 import { useId, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
+import MenuPortal from './menu-portal'
 import styles from './combobox.module.css'
 
 export type ComboboxDot = 'green' | 'blue' | 'amber' | 'gray'
@@ -79,6 +80,7 @@ export default function Combobox({
   const statusId = `${generatedId}-status`
   const rootRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const fieldRef = useRef<HTMLDivElement>(null)
   const [open, setOpen] = useState(defaultOpen)
   const [activeIndex, setActiveIndex] = useState(0)
 
@@ -170,7 +172,10 @@ export default function Combobox({
       data-design-node="WUVcz"
     >
       {name ? <input type="hidden" name={name} value={value} disabled={disabled} /> : null}
-      <div className={[styles.field, open ? styles.open : null, error ? styles.invalid : null, disabled ? styles.disabled : null].filter(Boolean).join(' ')}>
+      <div
+        ref={fieldRef}
+        className={[styles.field, open ? styles.open : null, error ? styles.invalid : null, disabled ? styles.disabled : null].filter(Boolean).join(' ')}
+      >
         <input
           ref={inputRef}
           id={inputId}
@@ -220,7 +225,22 @@ export default function Combobox({
         )}
       </div>
       {open ? (
-        <div className={styles.popup}>
+        <MenuPortal
+          open={open}
+          align="start"
+          matchWidth
+          getAnchor={() => fieldRef.current}
+          onClose={() => setOpen(false)}
+        >
+        <div
+          className={styles.popup}
+          // 最上層では absolute 指定を無効にする（位置は器が決める）。
+          style={{ position: 'static', width: '100%' }}
+          onMouseDown={(event) => {
+            // 候補の押下で欄の焦点が移ると、押す前に閉じてしまう。
+            if ((event.target as HTMLElement).closest('button,li')) event.preventDefault()
+          }}
+        >
           {loading ? (
             <p className={styles.loading}>
               <span aria-hidden="true" className={styles.spinner} />
@@ -270,6 +290,7 @@ export default function Combobox({
             </div>
           )}
         </div>
+        </MenuPortal>
       ) : null}
       {/* 件数は見た目に出さず、読み上げにだけ渡す。 */}
       {open ? (

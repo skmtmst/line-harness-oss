@@ -140,6 +140,56 @@ describe('NEN campaign tenant scope', () => {
     expect(mocks.push).toHaveBeenCalled();
   });
 
+  test('test-send delivers the editing draft instead of the saved body (監査 R65)', async () => {
+    mocks.getNenCampaign.mockResolvedValue({
+      campaign_key: 'column', body_text: '保存済み本文', title: '保存済みの題',
+      button_label: '保存済みボタン', button_url: 'https://example.com/saved', image_url: null,
+    });
+    mocks.getLineAccountById.mockResolvedValue({ channel_access_token: 'token' });
+    mocks.prepare.mockImplementation((sql: string) => {
+      const statement = {
+        bind: () => statement,
+        first: vi.fn(async () => sql.includes("s.key = 'test_recipients'")
+          ? { id: 'friend-1', line_user_id: 'U1' }
+          : null),
+      };
+      return statement;
+    });
+
+    const response = await app().request('/api/nen-campaigns/test-send', json({
+      campaignKey: 'column', accountId: 'own-account', friendId: 'friend-1',
+      draft: { bodyText: '書きかけの本文', title: '書きかけの題' },
+    }));
+
+    expect(response.status).toBe(200);
+    const { buildNenDeliveryMessages } = await import('../services/nen-engagement.js');
+    // 下書きで上書きした設定で文面を組み立て、保存済みの本文・題は使わない。
+    expect(buildNenDeliveryMessages).toHaveBeenCalledWith(
+      expect.objectContaining({ body_text: '書きかけの本文', title: '書きかけの題' }),
+      expect.anything(),
+    );
+  });
+
+  test('test-send rejects an invalid draft like the save validation does (監査 R65)', async () => {
+    mocks.getNenCampaign.mockResolvedValue({ campaign_key: 'column', body_text: '本文', title: '題', button_label: null, button_url: null, image_url: null });
+    mocks.getLineAccountById.mockResolvedValue({ channel_access_token: 'token' });
+    mocks.prepare.mockImplementation((sql: string) => {
+      const statement = {
+        bind: () => statement,
+        first: vi.fn(async () => sql.includes("s.key = 'test_recipients'") ? { id: 'friend-1', line_user_id: 'U1' } : null),
+      };
+      return statement;
+    });
+
+    const response = await app().request('/api/nen-campaigns/test-send', json({
+      campaignKey: 'column', accountId: 'own-account', friendId: 'friend-1',
+      draft: { bodyText: '   ' },
+    }));
+
+    expect(response.status).toBe(400);
+    expect(mocks.push).not.toHaveBeenCalled();
+  });
+
   test('read/completion events reject another account before recording or tagging', async () => {
     mocks.canAccess.mockResolvedValue(false);
     const response = await app().request('/api/nen-campaigns/columns/column-1/read-events', json({

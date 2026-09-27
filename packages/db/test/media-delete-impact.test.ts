@@ -88,6 +88,8 @@ describe('getMediaDeleteImpact', () => {
       references: [],
       checkedAt: '2026-08-31T10:00:00.000',
       lastScannedAt: null,
+      // R34: 0件と確定した = 読み切れた（verified）。読み残しは別試験で守る。
+      verified: true,
       canDelete: true,
       recommendedAction: 'delete',
     });

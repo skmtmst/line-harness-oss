@@ -109,10 +109,10 @@ describe('V6 オートメーション一覧の状態', () => {
 
   it('ページ送りは操作でき、7件目以降へ行ける（#554 点検#519中1・中9）', () => {
     expect(PAGE).toContain('pagedAutomations')
-    expect(PAGE).toContain('aria-label="ページ送り"')
-    expect(PAGE).toContain('setPage(currentPage - 1)')
-    expect(PAGE).toContain('setPage(currentPage + 1)')
-    expect(PAGE).toContain('本中')
+    // 共通のページ送りへ寄せたため、操作は Pagination・件数は ListRange が担う。
+    expect(PAGE).toContain('<Pagination')
+    expect(PAGE).toContain('onPageChange={setPage}')
+    expect(PAGE).toContain('<ListRange')
     expect(PAGE).not.toContain('slice(0, 6)')
     expect(PAGE).not.toContain('2　3　次へ')
   })

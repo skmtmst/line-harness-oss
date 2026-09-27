@@ -2,6 +2,7 @@
 
 import Checkbox from '@/components/shared/checkbox'
 import SearchField from '@/components/shared/search-field'
+import Select from '@/components/shared/select'
 
 interface AccountOption {
   id: string
@@ -42,29 +43,25 @@ export default function UsersFilters({
       >
         複数アカウントのみ
       </Checkbox>
-      <select
-        value={uid}
-        onChange={(e) => onChange({ uid: e.target.value })}
+      <Select
         aria-label="UID連携で絞り込む"
-        className="v6-select h-10 min-w-44 rounded-control border border-hairline bg-canvas pl-3 text-sm text-ink"
-      >
-        <option value="">UID：すべて</option>
-        <option value="linked">UID：連携済み</option>
-        <option value="unlinked">UID：未連携・要確認</option>
-      </select>
-      <select
-        value={account}
-        onChange={(e) => onChange({ account: e.target.value })}
+        value={uid}
+        onChange={(value) => onChange({ uid: value })}
+        options={[
+          { value: '', label: 'UID：すべて' },
+          { value: 'linked', label: 'UID：連携済み' },
+          { value: 'unlinked', label: 'UID：未連携・要確認' },
+        ]}
+      />
+      <Select
         aria-label="所属アカウントで絞り込む"
-        className="v6-select h-10 min-w-44 rounded-control border border-hairline bg-canvas pl-3 text-sm text-ink"
-      >
-        <option value="">所属：すべて</option>
-        {accountOptions.map((a) => (
-          <option key={a.id} value={a.id}>
-            {a.name}
-          </option>
-        ))}
-      </select>
+        value={account}
+        onChange={(value) => onChange({ account: value })}
+        options={[
+          { value: '', label: '所属：すべて' },
+          ...accountOptions.map((a) => ({ value: a.id, label: a.name })),
+        ]}
+      />
     </div>
   )
 }

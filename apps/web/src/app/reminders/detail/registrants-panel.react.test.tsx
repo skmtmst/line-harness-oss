@@ -15,6 +15,23 @@ const apiMock = vi.hoisted(() => ({
 }))
 
 vi.mock('next/link', () => ({ default: ({ children }: { children: unknown }) => <>{children}</> }))
+
+/*
+ * 共通の Select は listbox の部品で、その操作は部品自身の試験が持つ。
+ * ここで見たいのは選んだ後の登録者の判断なので、素の <select> に置き換える。
+ */
+vi.mock('@/components/shared/select', () => ({
+  default: ({ 'aria-label': label, value, onChange, options }: {
+    'aria-label'?: string
+    value: string
+    onChange: (value: string) => void
+    options: Array<{ value: string; label: string }>
+  }) => React.createElement(
+    'select',
+    { 'aria-label': label, value, onChange: (e: { target: { value: string } }) => onChange(e.target.value) },
+    options.map((option) => React.createElement('option', { key: option.value, value: option.value }, option.label)),
+  ),
+}))
 const account = vi.hoisted(() => ({ selectedAccountId: 'account-a' }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: account.selectedAccountId }) }))
 vi.mock('@/lib/api', () => ({
@@ -66,7 +83,7 @@ async function render() {
   })
 }
 async function click(label: string) {
-  const button = Array.from(host.querySelectorAll('button')).find((item) => item.textContent === label)
+  const button = Array.from(document.querySelectorAll('button')).find((item) => item.textContent === label)
   if (!button) throw new Error(`${label} が見つかりません`)
   await act(async () => { button.click(); await Promise.resolve(); await Promise.resolve() })
 }
@@ -78,22 +95,22 @@ async function pickTargetDate(label: string, iso: string) {
   const [y, mo, d] = date.split('-').map(Number)
   const week = '日月火水木金土'[new Date(y, mo - 1, d).getDay()]
   await act(async () => {
-    host.querySelector<HTMLElement>(`button[aria-label="${label}"]`)!.click()
+    document.querySelector<HTMLElement>(`button[aria-label="${label}"]`)!.click()
     await Promise.resolve()
     await Promise.resolve()
   })
-  const picker = host.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
+  const picker = document.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
   await act(async () => {
     picker.querySelector<HTMLButtonElement>('button[aria-label="日付"]')!.click()
     await Promise.resolve()
     await Promise.resolve()
   })
   for (let i = 0; i < 24; i += 1) {
-    const grid = host.querySelector('[role="grid"]')
+    const grid = document.querySelector('[role="grid"]')
     if (grid?.getAttribute('aria-label') === `${y}年${mo}月`) break
     const currentLabel = /^(\d+)年(\d+)月$/.exec(grid?.getAttribute('aria-label') ?? '')
     const current = currentLabel ? Number(currentLabel[1]) * 12 + Number(currentLabel[2]) : y * 12 + mo
-    const nav = [...host.querySelectorAll('button')].find(
+    const nav = [...document.querySelectorAll('button')].find(
       (b) => b.getAttribute('aria-label') === (y * 12 + mo >= current ? '次の月' : '前の月'),
     )!
     await act(async () => {
@@ -103,13 +120,13 @@ async function pickTargetDate(label: string, iso: string) {
     })
   }
   await act(async () => {
-    [...host.querySelectorAll('button')].find((b) =>
+    [...document.querySelectorAll('button')].find((b) =>
       (b.getAttribute('aria-label') ?? '').startsWith(`${y}年${mo}月${d}日（${week}）`),
     )!.click()
     await Promise.resolve()
     await Promise.resolve()
   })
-  const reopened = host.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
+  const reopened = document.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
   await act(async () => {
     const hourSelect = reopened.querySelector('select[aria-label="時"]') as HTMLSelectElement
     hourSelect.value = hour
@@ -185,7 +202,7 @@ describe('リマインダ詳細の登録者管理 (#868)', () => {
     const jstRegistrant = { ...registrant, targetDate: '2026-09-16T01:00:00.000Z' }
     apiMock.list.mockResolvedValueOnce({ success: true, data: [jstRegistrant] })
     await render()
-    const trigger = host.querySelector('button[aria-label="田中 花子の基準日"]')
+    const trigger = document.querySelector('button[aria-label="田中 花子の基準日"]')
     // 実行端末はUTC+7でも、01:00ZはJST 10:00として画面に出す（日本語の見せ方）。
     expect(trigger?.textContent).toContain('2026年9月16日（水）10:00')
     await click('基準日を保存')

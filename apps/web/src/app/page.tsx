@@ -36,7 +36,7 @@ import IconButton from '@/components/shared/icon-button'
 import NotificationPanel from '@/components/shared/notification-panel'
 import KpiCollapse from '@/components/ui/kpi-collapse'
 import HelpTip from '@/components/shared/help-tip'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import { STATE_TEXT } from '@/components/shared/not-connected'
 import {
@@ -281,11 +281,11 @@ function FriendAddLinkCard({
         <div className="flex flex-wrap items-center gap-2">
           <label className="flex min-w-[220px] items-center gap-2">
             <span className="text-ink-faint shrink-0 text-[10px] font-medium">発行中</span>
-            <SelectField
+            <Select
               value={routeId}
-              onChange={(event) => setRouteId(event.target.value)}
+              onChange={(value) => setRouteId(value)}
               aria-label="発行中の追加URL"
-              className="text-ink min-w-0 flex-1 bg-transparent text-xs font-medium focus:outline-none"
+              className="min-w-0 flex-1"
               options={[
                 { value: '', label: '基本の追加URL' },
                 ...(routes ?? []).map((entry) => ({ value: entry.id, label: entry.name })),
@@ -692,6 +692,7 @@ function DashboardPageInner() {
   const [twoFactorSummary, setTwoFactorSummary] = useState<TwoFactorSummary | null>(null)
   const [supportMarkAutoOnInbound, setSupportMarkAutoOnInbound] = useState<boolean | null>(null)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const notificationBellRef = useRef<HTMLDivElement>(null)
   const [notificationFilter, setNotificationFilter] = useState<DashboardNotificationFilter>('all')
   const [notificationData, setNotificationData] = useState<NotificationCenterData | null>(null)
   const [notificationAccountId, setNotificationAccountId] = useState<string | null>(null)
@@ -1447,7 +1448,7 @@ function DashboardPageInner() {
             ))}
           </div>
           {/* 選択中のLINEアカウントの通知だけを表示し、未取得を0件に見せない。 */}
-          <div className="relative">
+          <div className="relative" ref={notificationBellRef}>
             <IconButton
               aria-label={unreadNotificationCount > 0 ? `通知、未読${unreadNotificationCount}件` : '通知'}
               aria-expanded={notificationsOpen}
@@ -1486,6 +1487,7 @@ function DashboardPageInner() {
                 setNotificationsOpen(false)
                 router.push('/line-notifications')
               }}
+              getAnchor={() => notificationBellRef.current}
             />
           </div>
         </div>

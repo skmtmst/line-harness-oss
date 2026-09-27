@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { fetchApi } from '@/lib/api'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import TemplatePicker from '@/components/chats/template-picker'
+import ListState from '@/components/shared/list-state'
 import { describeSendFailure } from '@/app/chats/send-failure'
 
 /**
@@ -170,11 +171,13 @@ export default function FriendTimeline({ friendId }: { friendId: string }) {
       {/* 本体 */}
       <div className="flex-1 space-y-3 overflow-y-auto p-4">
         {loading ? (
-          <p className="text-ink-faint text-center text-sm">読み込み中...</p>
+          <ListState kind="loading" title="やり取りを読み込んでいます" />
         ) : shown.length === 0 ? (
-          <p className="text-ink-faint text-center text-sm">
-            {messages.length === 0 ? 'やり取りはまだありません' : 'この絞り込みに当てはまるものはありません'}
-          </p>
+          <ListState
+            kind="empty"
+            title={messages.length === 0 ? 'やり取りはまだありません' : 'この絞り込みに当てはまるものはありません'}
+            description={messages.length === 0 ? 'メッセージを送ると、ここに並びます。' : '絞り込みを変えてください。'}
+          />
         ) : (
           shown.map((msg) => {
             const day = dayLabel(msg.createdAt)

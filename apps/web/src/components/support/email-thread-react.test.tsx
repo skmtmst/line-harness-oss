@@ -34,6 +34,23 @@ vi.mock('../../lib/api', async (importOriginal: () => Promise<typeof import('../
 
 vi.mock('../chats/template-picker', () => ({ default: () => null }))
 
+/*
+ * 「対応」欄は共通 Select（listbox）。ここで見たいのは選んだ後の
+ * 会話の判断なので、素の <select> に置き換える。
+ */
+vi.mock('@/components/shared/select', () => ({
+  default: ({ 'aria-label': label, value, onChange, options }: {
+    'aria-label'?: string
+    value: string
+    onChange: (value: string) => void
+    options: Array<{ value: string; label: string }>
+  }) => React.createElement(
+    'select',
+    { 'aria-label': label, value, onChange: (e: { target: { value: string } }) => onChange(e.target.value) },
+    options.map((option) => React.createElement('option', { key: option.value, value: option.value }, option.label)),
+  ),
+}))
+
 function threadBody(id: string, status: ThreadStatus, subject: string) {
   return {
     success: true,

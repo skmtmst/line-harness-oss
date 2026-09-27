@@ -34,7 +34,7 @@ import CharCounter, { LINE_TEXT_LIMIT, isOverCharLimit } from '@/components/scen
 import styles from './first-step.module.css'
 import type { SegmentCondition } from '@/components/shared/condition-builder'
 import { pruneCondition } from '@/lib/segment-condition'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import TargetMissing from '@/components/shared/target-missing'
@@ -577,11 +577,12 @@ function FirstStepContent() {
               <span className="text-ink-secondary mb-1 block text-xs font-medium">
                 タグで絞り込み <span className="text-danger">*</span>
               </span>
-              <SelectField
+              <Select
                 value={targetTagId}
-                onChange={e => setTargetTagId(e.target.value)}
+                onChange={value => setTargetTagId(value)}
                 aria-label="絞り込みに使うタグ"
-                className="border-hairline rounded-control bg-canvas text-ink w-full max-w-md border px-3 py-2 text-sm"
+                size="full"
+                className="max-w-md"
                 options={[
                   { value: '', label: '-- 選んでください --' },
                   ...tags.map((tag) => ({ value: tag.id, label: tag.name })),
@@ -760,11 +761,12 @@ function FirstStepContent() {
               <div>
                 <label className="block">
                   <span className="text-ink-secondary mb-1 block text-xs font-medium">テンプレート</span>
-                  <SelectField
+                  <Select
                     value={templateId}
-                    onChange={e => editTemplateId(e.target.value)}
+                    onChange={value => editTemplateId(value)}
                     aria-label="配信するテンプレート"
-                    className="border-hairline rounded-control bg-canvas text-ink w-full max-w-md border px-3 py-2 text-sm"
+                    size="full"
+                    className="max-w-md"
                     options={[
                       { value: '', label: '選んでください' },
                       ...templates.map((template) => ({
