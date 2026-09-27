@@ -57,7 +57,7 @@ describe('V6 代理予約の接続契約', () => {
   test('アカウントや予約対象が変わったあとの古い返事を画面へ反映しない', () => {
     expect(PAGE).toContain("const selectionKey = [selectedAccountId ?? '', friend?.id ?? customer?.id ?? '', menuId, staffId, date, time]")
     expect(PAGE).toContain('latestSelectionKey.current = selectionKey')
-    expect(PAGE).toContain('const requestKey = [selectedAccountId, friend?.id ?? selectedCustomer?.id ?? \'\', menuId, staffId, date, time]')
+    expect(PAGE).toContain('const requestKey = [selectedAccountId, friend?.id ?? \'\', menuId, staffId, date, time]')
     expect(PAGE).toContain('if (latestSelectionKey.current !== requestKey) return')
     expect(PAGE).toContain('if (latestSelectionKey.current === requestKey) setLoading(false)')
     expect(PAGE).toContain("setIdempotencyKey('')")
@@ -95,7 +95,8 @@ describe('V6 代理予約の接続契約', () => {
     // `customer!` では将来の分岐変更でnullが紛れ込む。空キーで送ると400になる。
     expect(PAGE).not.toContain('customer!.id')
     expect(PAGE).toContain('bookingCustomerId: customer.id')
-    expect(PAGE).toContain('booking_customer_id: customer.id')
+    // R147: 確定時に束ね直した客を使う。断言(!)は使わない。
+    expect(PAGE).toContain('booking_customer_id: bookingCustomer.id')
     expect(PAGE).toContain('idempotencyKey || crypto.randomUUID()')
   })
 
@@ -125,6 +126,22 @@ describe('V6 代理予約の接続契約', () => {
     expect(PAGE).toContain('確認した開始時刻が見つかりません。日時を選び直してください。')
     // 選択が変わったら確認済みの枠を捨てる。
     expect(PAGE).toContain('setConfirmedSlot(null)\n  }, [selectionKey])')
+  })
+
+  test('電話客の台帳は確定時に作り、確認の往復では直した値を見せる(R147)', () => {
+    // 確認へ進むときに作ると、入力へ戻って直した値が反映されない。
+    // 台帳は「この内容で予約を入れる」の直前に1件だけ作る。
+    expect(PAGE).toContain('await ensureCustomerForBooking()')
+    expect(PAGE).not.toContain('selectedCustomer = await ensureCustomer')
+    // 保存済みと同じ入力なら作り直さない（二重作成なし）。
+    expect(PAGE).toContain('customerSavedInput')
+    expect(PAGE).toContain('bookingBusy')
+    // 保存後に入力を直したとき、確認画面は直した値を見せる。
+    expect(PAGE).toContain('savedMatchesInput')
+    expect(PAGE).toContain('customerPhoneLast4')
+    expect(PAGE).toContain('customerPetLabel')
+    // 台帳がなくても確認画面が出る（電話客は確定時に作るため）。
+    expect(PAGE).toContain("step === 'confirm' && (friend || customer || phoneCustomer)")
   })
 
   test('電話番号は桁を先に確かめ、再送中の通知状態を取りこぼさない(点検#516の中3・中4)', () => {
