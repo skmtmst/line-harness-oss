@@ -821,7 +821,13 @@ export default function FormSubmissionsPage() {
                   <Th>フォーム</Th>
                   <Th className="w-20">状態</Th>
                   <Th className="w-32">回答の保存先</Th>
-                  <Th className="w-36" align="right">回答数</Th>
+                  <Th className="w-36" align="right">
+                    回答数
+                    {' '}
+                    <HelpTip label="今月の完了率の説明">
+                      今月の件数は日本時間の1日から数えています。完了率は今月の回答完了を今月開いた人で割った割合で、試しの回答は入れていません。
+                    </HelpTip>
+                  </Th>
                   <Th className="cq-hide-below-800 w-20">更新</Th>
                   {/* #768: 表が横に流れる帯でも操作列は右端に留める。 */}
                   <Th className="bg-surface-pearl sticky right-0 w-32" align="right">操作</Th>
@@ -888,7 +894,7 @@ export default function FormSubmissionsPage() {
                       P（一覧の数）：今月は日本時間の1日から数える。
                       完了率 ＝ 今月の回答完了 ÷ 今月開いた人。試しの回答は入れない。
                       取れていない数は「—」だけ出す（0 とは言わない）。
-                      定義・分母は見出し横の「？」に入れ、行は高くしない。
+                      定義・分母は見出しの「？」に1つだけ置き、行には置かない。
                     */}
                     <span className="text-ink-faint block">
                       {form.monthlySubmitCount == null
@@ -899,10 +905,6 @@ export default function FormSubmissionsPage() {
                       {form.monthlyCompletionRate == null
                         ? '完了率 —'
                         : `完了率 ${form.monthlyCompletionRate.toLocaleString('ja-JP')}%`}
-                      {' '}
-                      <HelpTip label="今月の完了率の説明">
-                        日本時間の1日から数えた今月の回答完了を、今月開いた人で割った割合です。試しの回答は入れていません。
-                      </HelpTip>
                     </span>
                   </td>
                   <td className="cq-hide-below-800 px-3 py-2.5 text-xs tabular-nums" title={form.updatedAt ? undefined : '更新日時を取得できません'}>{displayUpdatedAt(form.updatedAt)}</td>

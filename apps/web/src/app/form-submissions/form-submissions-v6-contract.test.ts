@@ -324,13 +324,15 @@ describe('V6回答フォームの中項目(#503 M3・M9)', () => {
 })
 
 describe('P 一覧の数・公開前の試し・読みにくい色', () => {
-  it('一覧の行に今月の件数と完了率を出し、定義は「？」に入れる', () => {
+  it('一覧の行に今月の件数と完了率を出し、「？」は見出しに1つだけ置く', () => {
     expect(PAGE).toContain('今月 ${form.monthlySubmitCount')
     expect(PAGE).toContain('完了率 ${form.monthlyCompletionRate')
     expect(PAGE).toContain('今月 —')
     expect(PAGE).toContain('完了率 —')
     expect(PAGE).toContain('今月の完了率の説明')
     expect(PAGE).toContain('試しの回答は入れていません')
+    // 「？」の説明は見出しに1つだけ。行に並べない。
+    expect((PAGE.match(/今月の完了率の説明/g) ?? []).length).toBe(1)
     // 死んでいた今週表示は出さない。数はサーバーが数える。
     expect(PAGE).not.toContain('今週')
     expect(PAGE).not.toContain('weeklySubmitCount')
