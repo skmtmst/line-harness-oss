@@ -325,6 +325,9 @@ const STAFF_SELF_ENDPOINTS: Array<[method: string, path: string]> = [
   // 共通アップローダ。受信箱の 1 対 1 返信など staff の付与機能から使う。
   // 読み取りは公開の /images/* 経由で、鍵は機能 API の応答で渡る。
   ['POST', '/api/images'],
+  // 失敗文面の対応表。エラー表示は役割を問わず全スタッフに必要な
+  // シェル機能で、内容は文言の対応表だけ（秘密値・個人情報を含まない）。
+  ['GET', '/api/error-messages'],
 ];
 
 /**

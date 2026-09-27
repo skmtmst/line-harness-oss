@@ -9,6 +9,7 @@ import Breadcrumb from '@/components/shared/breadcrumb'
 import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Dialog from '@/components/shared/dialog'
 import FilterChip from '@/components/shared/filter-chip'
 import IconButton from '@/components/shared/icon-button'
 import ListState from '@/components/shared/list-state'
@@ -22,7 +23,9 @@ import { TableHeadRow, Th } from '@/components/shared/table'
 import { useAccount } from '@/contexts/account-context'
 import {
   api,
+  type MileageAdjustmentApprovalRequest,
   type MileageAdminHistory,
+  type MileageEarningRuleTestResult,
   type MileageEarningRuleV6,
   type MileageEarningRulesV6Overview,
   type MileageFriendsV6Overview,
@@ -187,6 +190,18 @@ function MileagePageInner() {
   const [rulePage, setRulePage] = useState(1)
   const [tabCounts, setTabCounts] = useState<{ balances: number | null; rules: number | null; rewards: number | null }>({ balances: null, rules: null, rewards: null })
   const [canAdjustMileage, setCanAdjustMileage] = useState(false)
+  const [isOwner, setIsOwner] = useState(false)
+  /** R: 高額調整の承認待ち。依頼した人とは別のオーナーが決める。 */
+  const [approvalRequests, setApprovalRequests] = useState<MileageAdjustmentApprovalRequest[] | null>(null)
+  const [approvalBusyId, setApprovalBusyId] = useState<string | null>(null)
+  const [rejectTarget, setRejectTarget] = useState<MileageAdjustmentApprovalRequest | null>(null)
+  const [rejectReason, setRejectReason] = useState('')
+  const [approvalError, setApprovalError] = useState('')
+  /** R: 決めごとの事前テスト。付与もキューも動かさず見通しだけ返す。 */
+  const [ruleTestTarget, setRuleTestTarget] = useState<MileageEarningRuleV6 | null>(null)
+  const [ruleTestResult, setRuleTestResult] = useState<MileageEarningRuleTestResult | null>(null)
+  const [ruleTestBusy, setRuleTestBusy] = useState(false)
+  const [ruleTestError, setRuleTestError] = useState('')
   /*
    * 並び順の未保存変更がある間、画面を離れる操作を止める共通の番兵（DETAIL-04系）。
    * 左メニュー・画面内リンク・戻る操作・再読込を同じ確認対話へ寄せる。
@@ -341,11 +356,66 @@ function MileagePageInner() {
     void api.staff.me().then((response) => {
       if (!current || !response.success) return
       setCanAdjustMileage(response.data.role === 'owner' || response.data.role === 'admin')
+      setIsOwner(response.data.role === 'owner')
     }).catch(() => {
       if (current) setCanAdjustMileage(false)
     })
     return () => { current = false }
   }, [])
+
+  const loadApprovalRequests = useCallback(async () => {
+    if (!selectedAccountId) {
+      setApprovalRequests(null)
+      return
+    }
+    try {
+      const response = await api.mileage.adjustmentApprovals(selectedAccountId, 'pending')
+      setApprovalRequests(response.success ? response.data : null)
+    } catch {
+      setApprovalRequests(null)
+    }
+  }, [selectedAccountId])
+
+  useEffect(() => {
+    void loadApprovalRequests()
+  }, [loadApprovalRequests])
+
+  const runRuleTest = async (rule: MileageEarningRuleV6) => {
+    if (!selectedAccountId || ruleTestBusy) return
+    setRuleTestTarget(rule)
+    setRuleTestResult(null)
+    setRuleTestError('')
+    setRuleTestBusy(true)
+    try {
+      const response = await api.mileage.testEarningRule(selectedAccountId, rule.draft)
+      if (!response.success) throw new Error(response.error)
+      setRuleTestResult(response.data)
+    } catch (caught) {
+      setRuleTestError(caught instanceof Error ? caught.message : 'テストできませんでした。もう一度お試しください。')
+    } finally {
+      setRuleTestBusy(false)
+    }
+  }
+
+  const decideApproval = async (requestId: string, action: 'approve' | 'reject', reason?: string) => {
+    if (!selectedAccountId || approvalBusyId) return
+    setApprovalBusyId(requestId)
+    setApprovalError('')
+    try {
+      const response = action === 'approve'
+        ? await api.mileage.approveAdjustment(requestId, selectedAccountId)
+        : await api.mileage.rejectAdjustment(requestId, selectedAccountId, reason)
+      if (!response.success) throw new Error(response.error)
+      setRejectTarget(null)
+      setRejectReason('')
+      await loadApprovalRequests()
+      await loadOverview()
+    } catch (caught) {
+      setApprovalError(caught instanceof Error ? caught.message : '処理できませんでした。もう一度お試しください。')
+    } finally {
+      setApprovalBusyId(null)
+    }
+  }
 
   const toggleRule = async (rule: MileageEarningRuleV6) => {
     setSavingRuleId(rule.id)
@@ -549,6 +619,55 @@ function MileagePageInner() {
       ) : null}
 
       {tab === 'balances' && !loading && !loadError && <>
+      {/*
+        R: 承認境界以上の手動調整はここに依頼として残る。依頼した人とは
+        別のオーナーだけが承認・差し戻しできる（依頼票の staff id と
+        画面の担当者をサーバが突き合わせる）。
+      */}
+      {approvalRequests && approvalRequests.length > 0 ? (
+        <section className="overflow-hidden rounded-card border border-hairline bg-canvas" aria-label="承認待ちのマイル変更">
+          <div className="flex items-center justify-between border-b border-hairline px-4 py-3">
+            <h2 className="text-base font-bold text-ink">承認待ちのマイル変更</h2>
+            <span className="text-xs text-ink-faint">{approvalRequests.length}件</span>
+          </div>
+          {approvalError ? <Notice tone="warn">{approvalError}</Notice> : null}
+          <ul className="divide-y divide-hairline">
+            {approvalRequests.map((request) => (
+              <li key={request.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-ink">
+                    {request.friend_display_name ?? request.friend_id} に
+                    {request.direction === 'increase' ? ' +' : ' −'}
+                    {request.amount.toLocaleString('ja-JP')} マイル
+                  </p>
+                  <p className="mt-0.5 truncate text-xs text-ink-secondary" title={request.reason}>
+                    {request.reason}
+                  </p>
+                  <p className="mt-0.5 text-xs text-ink-faint">
+                    依頼：{request.requested_by_staff_name} ・ {formatMileageDate(request.created_at)}
+                  </p>
+                </div>
+                {isOwner ? (
+                  <div className="flex gap-2">
+                    <Button
+                      variant="primary"
+                      disabled={approvalBusyId !== null}
+                      onClick={() => void decideApproval(request.id, 'approve')}
+                    >承認する</Button>
+                    <Button
+                      variant="secondary"
+                      disabled={approvalBusyId !== null}
+                      onClick={() => { setRejectTarget(request); setRejectReason(''); setApprovalError('') }}
+                    >差し戻す</Button>
+                  </div>
+                ) : (
+                  <span className="text-xs text-ink-faint">オーナーが対応します</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <KpiCard variant="v6" title="マイルを持っている友だち" value={summary?.withBalanceCount ?? null} unit="人" detail={summary ? `選択中 ${summary.totalMembers.toLocaleString('ja-JP')}人のうち` : '選択中のLINEアカウント'} />
         <KpiCard variant="v6" title="たまっているマイル" value={summary?.available ?? null} unit=" マイル" detail={`確定待ち ${summary?.pending.toLocaleString('ja-JP') ?? '—'} マイル`} />
@@ -786,6 +905,13 @@ function MileagePageInner() {
                         onClose={() => setRuleMenuId(null)}
                         items={[
                           {
+                            id: 'test',
+                            label: 'この内容をテスト',
+                            disabled: ruleTestBusy,
+                            disabledReason: 'テストを実行しています',
+                            onSelect: () => void runRuleTest(rule),
+                          },
+                          {
                             id: 'toggle',
                             label: rule.published.status === 'published' ? '決めごとを停止' : '決めごとを再開',
                             disabled: savingRuleId === rule.id,
@@ -836,6 +962,57 @@ function MileagePageInner() {
         onConfirm={() => { if (publishTarget) void publishRule(publishTarget) }}
       />
 
+      <Dialog
+        open={ruleTestTarget !== null}
+        title={ruleTestTarget ? `「${ruleTestTarget.draft.name}」をテスト` : '決めごとをテスト'}
+        description="この30日の記録に当てはめて、何人に・合計いくら付きそうかを見ます。実際には付与されず、履歴も増えません。"
+        confirmLabel="閉じる"
+        onConfirm={() => setRuleTestTarget(null)}
+        onCancel={() => setRuleTestTarget(null)}
+        busy={ruleTestBusy}
+      >
+        {ruleTestError ? (
+          <Notice tone="danger" message={ruleTestError} />
+        ) : ruleTestResult ? (
+          <dl className="grid gap-2 rounded-control bg-canvas-sunken p-4 text-sm">
+            <div className="grid grid-cols-3 gap-3"><dt className="text-ink-faint">条件に合う行動</dt><dd className="col-span-2 text-ink">{formatMileageNumber(ruleTestResult.matchedEvents)}回</dd></div>
+            <div className="grid grid-cols-3 gap-3"><dt className="text-ink-faint">対象になる友だち</dt><dd className="col-span-2 text-ink">{formatMileageNumber(ruleTestResult.matchedFriends)}人</dd></div>
+            <div className="grid grid-cols-3 gap-3"><dt className="text-ink-faint">付与見込みの合計</dt><dd className="col-span-2 font-semibold text-ink">{formatMileageNumber(ruleTestResult.estimatedTotalMiles)} マイル</dd></div>
+            <div className="grid grid-cols-3 gap-3"><dt className="text-ink-faint">1人あたり最大</dt><dd className="col-span-2 text-ink">{formatMileageNumber(ruleTestResult.maxPerFriend)} マイル</dd></div>
+            <div className="grid grid-cols-3 gap-3"><dt className="text-ink-faint">付いた直後の状態</dt><dd className="col-span-2 text-ink">{ruleTestResult.initialStatus === 'pending' ? '確定待ち' : 'すぐ使える'}</dd></div>
+            <div className="grid grid-cols-3 gap-3"><dt className="text-ink-faint">失効の例</dt><dd className="col-span-2 text-ink">{ruleTestResult.expirationExampleAt ? formatMileageDate(ruleTestResult.expirationExampleAt) : '失効なし'}</dd></div>
+            {ruleTestResult.overlappingRuleNames.length > 0 ? (
+              <div className="grid grid-cols-3 gap-3"><dt className="text-ink-faint">同じきっかけの決めごと</dt><dd className="col-span-2 text-ink">{ruleTestResult.overlappingRuleNames.join('、')}</dd></div>
+            ) : null}
+          </dl>
+        ) : (
+          <ListState kind="loading" title="テストしています" description="実際の付与は行いません。" />
+        )}
+      </Dialog>
+
+      <Dialog
+        open={rejectTarget !== null}
+        title="この変更依頼を差し戻しますか？"
+        description={rejectTarget ? `${rejectTarget.friend_display_name ?? rejectTarget.friend_id} への変更は行われず、台帳は変わりません。` : undefined}
+        tone="destructive"
+        confirmLabel="差し戻す"
+        cancelLabel="戻る"
+        busy={approvalBusyId !== null}
+        error={approvalError || undefined}
+        onCancel={() => { if (approvalBusyId === null) setRejectTarget(null) }}
+        onConfirm={() => { if (rejectTarget) void decideApproval(rejectTarget.id, 'reject', rejectReason.trim() || undefined) }}
+      >
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="font-semibold text-ink">差し戻す理由</span>
+          <textarea
+            className="min-h-20 rounded border border-hairline px-3 py-2 text-sm"
+            value={rejectReason}
+            onChange={(event) => setRejectReason(event.target.value)}
+            placeholder="例：調整の根拠となる資料を確認できませんでした"
+          />
+        </label>
+      </Dialog>
+
       <ConfirmDialog primaryAction="cancel"
         open={leaveTarget !== null}
         title="保存していない変更があります"
@@ -846,7 +1023,7 @@ function MileagePageInner() {
         onCancel={cancelLeave}
       />
 
-      {tab === 'history' && selectedAccountId ? <MileageHistoryTab key={selectedAccountId} accountId={selectedAccountId} /> : null}
+      {tab === 'history' && selectedAccountId ? <MileageHistoryTab key={selectedAccountId} accountId={selectedAccountId} canOperate={canAdjustMileage} /> : null}
 
       {tab === 'rewards' ? <MileageRewardsTab key={selectedAccountId ?? 'none'} accountId={selectedAccountId} /> : null}
       {tab === 'score' && selectedAccountId ? <ActionScoreTab key={selectedAccountId} accountId={selectedAccountId} /> : null}

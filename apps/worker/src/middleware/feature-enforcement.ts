@@ -177,6 +177,7 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
   exempt('/api/hq/templates', 'core', '統括ひな形。ルート内でtenantと統括編集権限を検証'),
   exempt('/api/recipes', 'core', '設定テンプレート'),
   exempt('/api/manual-links', 'core', 'ヘルプ導線設定'),
+  exempt('/api/error-messages', 'core', '失敗文面の対応表。全画面の失敗表示が引く共通基盤'),
   exempt('/api/account-handovers', 'core', 'アカウント引継ぎ'),
   exempt('/api/friend-bulk-runs', 'core', '複数機能から使う友だち操作'),
   exempt('/api/friend-migrations', 'core', '友だち移行'),
