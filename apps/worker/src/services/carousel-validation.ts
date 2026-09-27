@@ -62,9 +62,10 @@ export function validateCarousel(raw: unknown): CarouselError[] {
     const col = item as CarouselColumn;
 
     const hasImage = Boolean(col.thumbnailImageUrl);
-    // 画像があると本文に使える文字数が半分になる。ここを取り違えると、
-    // 画面では収まって見えるのに送信時に弾かれる。
-    const textMax = hasImage ? CAROUSEL_TEXT_MAX_WITH_IMAGE : CAROUSEL_TEXT_MAX_WITHOUT_IMAGE;
+    const hasTitle = Boolean(col.title?.trim());
+    // タイトルか画像がある列の本文は60文字、両方無ければ120文字（LINE の決まり）。
+    // ここを取り違えると、画面では収まって見えるのに送信時に弾かれる。
+    const textMax = hasImage || hasTitle ? CAROUSEL_TEXT_MAX_WITH_IMAGE : CAROUSEL_TEXT_MAX_WITHOUT_IMAGE;
 
     const text = col.text ?? '';
     if (!text.trim()) {
@@ -72,9 +73,10 @@ export function validateCarousel(raw: unknown): CarouselError[] {
     } else if ([...text].length > textMax) {
       errors.push({
         column,
-        message: hasImage
-          ? `${column}枚目の本文は${textMax}文字までです（画像があるため。いまは${[...text].length}文字）`
-          : `${column}枚目の本文は${textMax}文字までです（いまは${[...text].length}文字）`,
+        message:
+          hasImage || hasTitle
+            ? `${column}枚目の本文は${textMax}文字までです（タイトルか画像があるため。いまは${[...text].length}文字）`
+            : `${column}枚目の本文は${textMax}文字までです（いまは${[...text].length}文字）`,
       });
     }
 
@@ -114,6 +116,36 @@ export function validateCarousel(raw: unknown): CarouselError[] {
     errors.push({
       column: null,
       message: '画像は全部のパネルに入れるか、全部に入れないかのどちらかにしてください',
+    });
+  }
+
+  // タイトルの有無も全部そろえる。ある列と無い列が混ざると、列ごとに
+  // 高さが違って崩れるうえ、本文に使える文字数（60か120か）も列ごとに変わる。
+  const withTitle = raw.filter(
+    (item) =>
+      typeof item === 'object' &&
+      item !== null &&
+      Boolean((item as CarouselColumn).title?.trim()),
+  ).length;
+  if (withTitle > 0 && withTitle < raw.length) {
+    errors.push({
+      column: null,
+      message: 'タイトルは全部のパネルに入れるか、全部に入れないかのどちらかにしてください',
+    });
+  }
+
+  // ボタンの数も全部そろえる。数が違う列があると、その列だけ押せる数が
+  // 違って見える。
+  const actionCounts = new Set(
+    raw
+      .filter((item) => typeof item === 'object' && item !== null)
+      .map((item) => ((item as CarouselColumn).actions ?? []).length),
+  );
+  if (actionCounts.size > 1) {
+    const counts = [...actionCounts].sort((a, b) => a - b).join('個と');
+    errors.push({
+      column: null,
+      message: `ボタンの数は全部のパネルでそろえてください（いまは${counts}個が混ざっています）`,
     });
   }
 
