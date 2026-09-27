@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { classifyEcErrorCode, encryptCredential, getLineAccountById, jstNow } from '@line-crm/db';
+import { classifyEcErrorCode, encryptCredential, getLineAccountById, jstDateString, jstNow, nextDateString } from '@line-crm/db';
 import { EC_EVENT_TYPES, ecEventLabel, addDays, resolveShipDate, toJstMoment } from '@line-crm/shared';
 import { LineClient } from '@line-crm/line-sdk';
 import type { Env } from '../index.js';
@@ -185,6 +185,14 @@ ecCommerce.get(
       ? `(line_account_id IN (${scope.allowedAccountIds.map(() => '?').join(',')})${scope.canSeeUnassigned ? ' OR line_account_id IS NULL' : ''})`
       : scope?.canSeeUnassigned ? 'line_account_id IS NULL' : '1 = 0';
   const accountBindings = lineAccountId ? [lineAccountId] : scope?.allowedAccountIds ?? [];
+  /*
+   * 「今日」はJSTの0時から。`received_at` はJST文字列（`jstNow`）で入るので、
+   * 頭の日付で半開区間を切る。SQLiteの `datetime('now', '-1 day')` はUTCの
+   * 直前24時間で、前日夜の分が「今日」に混ざっていた。遅延の平均だけは
+   * 画面が「直近24時間」と書いているので、UTCの直前24時間のまま残す。
+   */
+  const todayStart = jstDateString(0);
+  const tomorrowStart = nextDateString(todayStart);
   const summary = await c.env.DB.prepare(
     `SELECT
        COUNT(*) AS total,
@@ -192,7 +200,7 @@ ecCommerce.get(
        SUM(CASE WHEN status = 'identity_pending' THEN 1 ELSE 0 END) AS identity_pending,
        SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failed,
        SUM(CASE WHEN status = 'skipped' THEN 1 ELSE 0 END) AS skipped,
-       SUM(CASE WHEN datetime(received_at) >= datetime('now', '-1 day') THEN 1 ELSE 0 END) AS last_24h,
+       SUM(CASE WHEN received_at >= ? AND received_at < ? THEN 1 ELSE 0 END) AS last_24h,
        MAX(received_at) AS last_received_at,
        AVG(CASE
          WHEN datetime(received_at) >= datetime('now', '-1 day')
@@ -207,15 +215,17 @@ ecCommerce.get(
          THEN 1 ELSE 0
        END) AS latency_sample_count
      FROM ec_events WHERE ${accountWhere}`,
-  ).bind(...accountBindings).first<{
+  ).bind(todayStart, tomorrowStart, ...accountBindings).first<{
     total: number; processed: number; identity_pending: number; failed: number; skipped: number;
     last_24h: number; last_received_at: string | null;
     average_delivery_seconds: number | null; latency_sample_count: number;
   }>();
+  /* 種類別の内訳も「今日」の範囲にそろえる。EC画面の「今日 取り込んだ」の明細になる。 */
   const types = await c.env.DB.prepare(
     `SELECT event_type, COUNT(*) AS count FROM ec_events
-      WHERE ${accountWhere} GROUP BY event_type ORDER BY count DESC`,
-  ).bind(...accountBindings).all<{ event_type: string; count: number }>();
+      WHERE ${accountWhere} AND received_at >= ? AND received_at < ?
+      GROUP BY event_type ORDER BY count DESC`,
+  ).bind(...accountBindings, todayStart, tomorrowStart).all<{ event_type: string; count: number }>();
   /*
    * 定期便の契約数(#731)。タブの数字はここから取る。
    *
@@ -246,6 +256,7 @@ ecCommerce.get(
       identityPending: summary?.identity_pending ?? 0,
       failed: summary?.failed ?? 0,
       skipped: summary?.skipped ?? 0,
+      /** JSTの今日0時から取り込んだ件数。名は互換のため残す。 */
       last24h: summary?.last_24h ?? 0,
       lastReceivedAt: summary?.last_received_at ?? null,
       averageDeliverySeconds: summary?.average_delivery_seconds == null
@@ -759,6 +770,13 @@ ecCommerce.get(
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
     return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
   }
+  /*
+   * healthの「今日」「この30日」もJSTの暦日で切る。`date('now')` はUTCで、
+   * JSTの朝9時前は「昨日」になり、月末も9時間ずれる。
+   */
+  const healthTodayStart = jstDateString(0);
+  const healthWindowStart = jstDateString(-29);
+  const healthWindowEnd = nextDateString(healthTodayStart);
   const [connector, health, impactRows] = await Promise.all([
     c.env.DB.prepare(
       `SELECT id, provider, shop_domain, status, inbound_secret_encrypted,
@@ -768,13 +786,13 @@ ecCommerce.get(
     ).bind(lineAccountId).first<Record<string, unknown>>(),
     c.env.DB.prepare(
       `SELECT
-         SUM(CASE WHEN date(received_at) = date('now') THEN 1 ELSE 0 END) AS today,
-         SUM(CASE WHEN datetime(received_at) >= datetime('now', '-30 days') THEN 1 ELSE 0 END) AS last_30_days,
+         SUM(CASE WHEN received_at >= ? AND received_at < ? THEN 1 ELSE 0 END) AS today,
+         SUM(CASE WHEN received_at >= ? AND received_at < ? THEN 1 ELSE 0 END) AS last_30_days,
          SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failed,
          MAX(received_at) AS last_received_at,
          MAX(CASE WHEN status = 'processed' THEN processed_at END) AS last_succeeded_at
        FROM ec_events WHERE line_account_id = ?`,
-    ).bind(lineAccountId).first<Record<string, unknown>>(),
+    ).bind(healthTodayStart, healthWindowEnd, healthWindowStart, healthWindowEnd, lineAccountId).first<Record<string, unknown>>(),
     /*
      * #948 N-320: 「止めると影響する数」は EC の出来事を起点にする設定だけを
      * 数える。コラム・誕生日など EC と無関係なNEN配信、手動のマイル・項目を

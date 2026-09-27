@@ -1,9 +1,12 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { Plug } from 'lucide-react'
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
+import Chip from '@/components/shared/chip'
+import Disclosure from '@/components/shared/disclosure'
 import ListState from '@/components/shared/list-state'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import Notice from '@/components/shared/notice'
@@ -47,10 +50,14 @@ export default function SiteScript() {
     if (pagesResult.status === 'fulfilled' && pagesResult.value.success) {
       setPages(pagesResult.value.data)
     }
+    /*
+     * 計測状況の正本は集計。集計が読めないときは「未接続」にせず
+     * 読み込めなかった表示にする（選んだ値が無視されて400になる事故で、
+     * 届いているのに「まだ届いていません」と出ていた）。
+     */
     if (summaryResult.status === 'fulfilled' && summaryResult.value.success) {
       setSummary(summaryResult.value.data)
-    }
-    if (pagesResult.status === 'rejected' && summaryResult.status === 'rejected') {
+    } else {
       setFailed(true)
     }
     setLoading(false)
@@ -97,9 +104,16 @@ export default function SiteScript() {
   }
 
   const receiving = summary?.lastEventAt != null
-  const lastSeen = summary?.lastEventAt
-    ? summary.lastEventAt.slice(0, 16).replace('T', ' ').replaceAll('-', '/')
-    : null
+  const lastSeen = formatLastReceived(summary?.lastEventAt)
+  // 初回の読み込み中は、未接続とも失敗とも決めつけず読み込み表示にする。
+  const showInitialLoading = loading && !failed && summary == null
+
+  const scrollToCode = () => {
+    const code = document.getElementById('site-script-code')
+    if (code && typeof code.scrollIntoView === 'function') {
+      code.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }
 
   return (
     <div className="space-y-4" data-design-node="IhSBB">
@@ -107,34 +121,63 @@ export default function SiteScript() {
         見ているページを数えるためのコードです。サイトに貼ると、どのページを見た人が友だちになったかが分かります。入力フォームの中身など、個人が特定できる情報は送りません。
       </Notice>
 
-      <section className={`rounded-card border p-4 ${receiving ? 'border-success-bg bg-success-bg' : 'border-hairline bg-canvas'}`}>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className={`text-sm font-semibold ${receiving ? 'text-success' : 'text-ink'}`}>
-              {receiving ? `動いています。最後にデータが届いたのは ${lastSeen} です。` : 'まだデータが届いていません。'}
-            </p>
-            <p className="mt-1 text-xs text-ink-faint">
-              {receiving
-                ? `今日は ${summary?.todayEvents.toLocaleString('ja-JP')}件、${summary?.pathCount.toLocaleString('ja-JP')}種類のページから届いています。`
-                : 'コードを貼ったあと、サイトを1ページ開いてから確かめてください。'}
-            </p>
+      {showInitialLoading ? (
+        <ListState kind="loading" title="サイトの計測状況を読み込んでいます" />
+      ) : failed ? (
+        <section className="rounded-card border border-hairline bg-canvas p-5" aria-label="サイトの計測を読み込めませんでした">
+          <h2 className="text-sm font-bold text-ink">サイトの計測を読み込めませんでした</h2>
+          <p className="mt-1 text-xs leading-relaxed text-ink-secondary">
+            {lastSeen ? `最後に受け取ったのは ${lastSeen} です。` : ''}
+            タグが外れていないか、サイトの公開先が変わっていないかを確かめてください。
+          </p>
+          <div className="mt-2">
+            <button type="button" onClick={() => void load()} className="text-action text-xs underline">
+              もう一度読み込む
+            </button>
           </div>
-          <Button onClick={() => void load()}>いま届いているか確かめる</Button>
-        </div>
-      </section>
-
-      {failed && (
-        <ListState
-          kind="error"
-          title="サイトの計測状況を表示できませんでした"
-          description="計測データは消えていません。通信状態を確認して、もう一度お試しください。"
-          action={<Button onClick={() => void load()}>もう一度読み込む</Button>}
-        />
+          <Disclosure title="確かめ方を見る" size="compact" className="mt-2">
+            <ul className="list-disc space-y-1 pl-5 text-xs leading-relaxed text-ink-secondary">
+              <li>タグを貼ったあと、サイトを1ページ開いてから確かめてください。</li>
+              <li>テーマの更新などでタグが外れていないか確かめてください。</li>
+              <li>サイトの公開先（アドレス）が変わっていないか確かめてください。</li>
+            </ul>
+          </Disclosure>
+        </section>
+      ) : receiving ? (
+        <section className="rounded-card border border-success-bg bg-success-bg p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-success">
+                {`動いています。最後にデータが届いたのは ${lastSeen} です。`}
+              </p>
+              <p className="mt-1 text-xs text-ink-faint">
+                {`今日は ${summary?.todayEvents.toLocaleString('ja-JP')}件、${summary?.pathCount.toLocaleString('ja-JP')}種類のページから届いています。`}
+              </p>
+            </div>
+            <Button onClick={() => void load()}>いま届いているか確かめる</Button>
+          </div>
+        </section>
+      ) : (
+        <section className="rounded-card border border-hairline bg-canvas-sunken p-5" aria-label="サイトの計測は未接続">
+          <div className="flex items-start justify-between gap-3">
+            <h2 className="flex items-center gap-2 text-sm font-bold text-ink">
+              <Plug aria-hidden="true" className="h-4 w-4 shrink-0" />
+              サイトの計測
+            </h2>
+            <Chip tone="neutral">未接続</Chip>
+          </div>
+          <p className="mt-1 text-xs leading-relaxed text-ink-secondary">
+            計測用のタグをサイトに入れると、ここに訪問と成果が出ます。数字は出しません（0と書かない）。
+          </p>
+          <div className="mt-3">
+            <Button variant="secondary" onClick={scrollToCode}>つなぎ方を見る</Button>
+          </div>
+        </section>
       )}
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-4">
-          <section className="rounded-card border border-hairline bg-canvas p-5">
+          <section id="site-script-code" className="rounded-card border border-hairline bg-canvas p-5">
             <h2 className="text-base font-bold text-ink">サイトに貼るコード</h2>
             <p className="mt-1 text-xs leading-relaxed text-ink-faint">ホームページの &lt;/head&gt; の直前に、この1行をそのまま貼ってください。ページごとに書き換える必要はありません。</p>
             {keyLoading ? (
@@ -225,6 +268,20 @@ export default function SiteScript() {
       </div>
     </div>
   )
+}
+
+/** 最後に受け取った時刻を「9/26 18:02」の形にする（日本時間）。読めない値は出さない。 */
+function formatLastReceived(value: string | null | undefined): string | null {
+  if (!value) return null
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+  return date.toLocaleString('ja-JP', {
+    timeZone: 'Asia/Tokyo',
+    month: 'numeric',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
 }
 
 function Capability({ title, description }: { title: string; description: string }) {
