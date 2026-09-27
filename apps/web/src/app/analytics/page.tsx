@@ -2472,8 +2472,9 @@ function ReactionsOverviewTab({ accountId }: { accountId: string }) {
     <AnalyticsNotice>配信ごとの開かれ方・押され方です。20人未満など取得できない数は、0ではなく「—」と理由で示します。</AnalyticsNotice>
     {truncationNote && <AnalyticsNotice>{truncationNote}までを表示しています。それより古い配信は一覧にもCSVの書き出しにも入りません。</AnalyticsNotice>}
     <section className="bg-canvas rounded-card border-hairline border p-4">
-      <h2 className="font-semibold text-ink">送った時間ごとの「押された回数」</h2>
-      <p className="mt-1 text-xs text-ink-faint">こちらで作った中継URLのクリックを、時間帯ごとに並べています。</p>
+      {/* 監査 R71: 集計はクリックされた時刻の時間帯。送った時刻ではないので名前を実態に合わせる。 */}
+      <h2 className="font-semibold text-ink">押された時間帯ごとの回数</h2>
+      <p className="mt-1 text-xs text-ink-faint">こちらで作った中継URLを、相手が押した時刻で時間帯ごとに並べています。送った時刻ではありません。</p>
       <div className="mt-4 flex h-28 items-end gap-2">
         {Array.from({ length: 24 }, (_, hour) => {
           const clicks = overview.trackedClickHours.find((item) => item.hour === hour)?.clicks ?? 0
@@ -2638,13 +2639,19 @@ function UrlClicksOverviewTab({ accountId }: { accountId: string }) {
   const [days, setDays] = useState(30)
   const range = useMemo(() => rangeFor(days - 1), [days])
   const [query, setQuery] = useState('')
+  // 監査 R72: 検索語はAPIへ渡し、200件を超えたURLにも届くようにする。
+  const [debouncedQuery, setDebouncedQuery] = useState('')
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 300)
+    return () => window.clearTimeout(timer)
+  }, [query])
   const state = useOverview<AnalyticsUrlClicksOverview>(
-    () => api.analytics.urlClicksOverview(accountId, { ...range, limit: 200 }),
-    `${accountId}:${range.from}:${range.to}:url-clicks`,
+    () => api.analytics.urlClicksOverview(accountId, { ...range, limit: 200, query: debouncedQuery || undefined }),
+    `${accountId}:${range.from}:${range.to}:${debouncedQuery}:url-clicks`,
   )
   if (!state.data) return <div className="space-y-4"><AnalyticsPeriodControl days={days} onChange={setDays} /><OverviewState loading={state.loading} error={state.error} onRetry={state.retry} /></div>
   const overview = state.data.data
-  const visibleLinks = overview.links.filter((item) => `${item.name} ${item.originalUrl} ${item.usageLocations.join(' ')}`.toLowerCase().includes(query.trim().toLowerCase()))
+  const visibleLinks = overview.links
   const clicks = metricSum(overview.links.map((item) => item.clicks))
   const people = metricSum(overview.links.map((item) => item.knownClickPeople))
   const zeroLinks = overview.links.filter((item) => shownValue(item.clicks) === 0).length
@@ -2662,7 +2669,8 @@ function UrlClicksOverviewTab({ accountId }: { accountId: string }) {
     </div>
     <AnalyticsNotice>数えているのは、こちらで作った中継URLだけです。直接貼ったURLは数えられません。同じURLを同じ人が何度押しても「押した人」は1人と数えます。</AnalyticsNotice>
     {overview.stateReason && <Notice tone="warn">{overview.stateReason}</Notice>}
-    {overview.hasMore && <AnalyticsNotice>200件まで表示しています。探す言葉を足して絞ってください。CSVの書き出しも、表示している範囲だけが入ります。</AnalyticsNotice>}
+    {overview.hasMore && <AnalyticsNotice>条件に合うもののうち200件までを表示しています。探す言葉で絞るとこの中だけではなく全体から探します。CSVの書き出しも、表示している範囲だけが入ります。</AnalyticsNotice>}
+    {debouncedQuery && <p className="text-ink-faint text-xs">「{debouncedQuery}」で絞り込んでいます。上の件数とCSVの書き出しは、この絞り込みの結果が対象です。</p>}
     <div className="flex flex-wrap items-center gap-2">
       <label htmlFor="url-click-search" className="sr-only">URL・配信名・リンク名で探す</label>
       <input id="url-click-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="URL・配信名・リンク名で探す" className="h-10 min-w-64 flex-1 rounded-control border border-hairline bg-canvas px-3 text-sm" />
