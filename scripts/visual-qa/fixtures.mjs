@@ -4575,6 +4575,8 @@ export const CONVERSION_DEFINITION_PREVIEW = {
   duplicateExcludedCount: 172,
   cancellationCount: 4,
   excludedReasons: [],
+  // R42: 金額のない過去の成果の件数。撮影用の見本は0件のまま。
+  missingValueCount: 0,
   dailyAverage: 7.1,
   deduplicationWindowDays: null,
 }

@@ -110,12 +110,12 @@ async function renderForm() {
 }
 
 function button(text: string): HTMLButtonElement | undefined {
-  return [...host.querySelectorAll('button')].find((b) => b.textContent === text && !b.disabled)
+  return [...document.querySelectorAll('button')].find((b) => b.textContent === text && !b.disabled)
 }
 
 /** タブは見出し＋補足が1つのボタンに入っているので先頭一致で探す。 */
 function tabButton(label: string): HTMLButtonElement | undefined {
-  return [...host.querySelectorAll('button')].find((b) => b.textContent?.startsWith(label) && !b.disabled)
+  return [...document.querySelectorAll('button')].find((b) => b.textContent?.startsWith(label) && !b.disabled)
 }
 
 async function click(target: Element) {
@@ -132,7 +132,7 @@ function setInput(input: HTMLInputElement, value: string) {
 }
 
 function dialog(): HTMLElement | null {
-  return host.querySelector('.fixed.inset-0')
+  return document.querySelector('.fixed.inset-0')
 }
 
 function dialogInput(kind: string, index = 0): HTMLInputElement {
@@ -161,7 +161,8 @@ async function pickTime(trigger: Element, value: string) {
     trigger.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     for (let step = 0; step < 10; step += 1) await Promise.resolve()
   })
-  const picker = dialog()?.querySelector('[role="dialog"][aria-label="時刻を選ぶ"]')
+  // 時刻の選択箱は最上層（MenuPortal→document.body）に出る。窓の中にはいない。
+  const picker = document.querySelector('[role="dialog"][aria-label="時刻を選ぶ"]')
   expect(picker, '時刻の選択箱がある').toBeTruthy()
   await act(async () => {
     fireEvent.change(picker!.querySelector('select[aria-label="時"]')!, { target: { value: hour } })

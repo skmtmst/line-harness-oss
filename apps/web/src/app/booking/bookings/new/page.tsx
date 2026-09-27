@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
+import MenuPortal from '@/components/shared/menu-portal'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -51,6 +52,35 @@ interface ProxyBookingDraft {
 }
 
 const DRAFT_KEY_PREFIX = 'booking:new-draft:'
+
+/**
+ * R14: 下書きに「書きかけ」と呼べる中身があるか。全部が初期値なら
+ * 保存しない（破棄直後の空書き込みを残さない）。復元時も同じ物差しで、
+ * 空の下書きには復元バナーを出さない。
+ */
+function draftHasContent(value: {
+  phoneCustomer: boolean
+  customerName: string
+  customerPhone: string
+  petName: string
+  friend: { id: string } | null
+  customer: { id: string } | null
+  menuId: string
+  staffId: string
+  date: string
+  time: string
+  customerNote: string
+  notification: { send_line_confirmation: boolean; day_before: boolean; hours_before: boolean }
+}): boolean {
+  return (
+    value.phoneCustomer ||
+    value.customerName !== '' || value.customerPhone !== '' || value.petName !== '' ||
+    value.friend != null || value.customer != null ||
+    value.menuId !== '' || value.staffId !== '' || value.date !== '' || value.time !== '' ||
+    value.customerNote !== '' ||
+    !value.notification.send_line_confirmation || !value.notification.day_before || !value.notification.hours_before
+  )
+}
 
 const NODE_BY_STEP: Record<Step, string> = {
   input: 'cpdDi',
@@ -126,6 +156,8 @@ export default function NewProxyBookingPage() {
   const [slotsReady, setSlotsReady] = useState(false)
   const [friends, setFriends] = useState<FriendListItem[]>([])
   const [friendQuery, setFriendQuery] = useState('')
+  const [friendSuggestOpen, setFriendSuggestOpen] = useState(false)
+  const friendInputRef = useRef<HTMLInputElement>(null)
   const [friend, setFriend] = useState<FriendListItem | null>(null)
   const [customer, setCustomer] = useState<BookingCustomerSummary | null>(null)
   const [phoneCustomer, setPhoneCustomer] = useState(false)
@@ -207,6 +239,11 @@ export default function NewProxyBookingPage() {
     setStaffId('')
     setDate('')
     setTime('')
+    // R14: 「お客様からの要望」も破棄の対象。前の予約のメモを
+    // 次の予約へ持ち越さない（アカウント切替も同じ関数を通る）。
+    setCustomerNote('')
+    // 確認済みの枠も捨てる。古い instant が次の確定に乗らないようにする。
+    setConfirmedSlot(null)
     setResult(null)
     setCustomerContext(null)
     setConflictAlternatives(null)
@@ -231,29 +268,48 @@ export default function NewProxyBookingPage() {
       const raw = window.sessionStorage.getItem(`${DRAFT_KEY_PREFIX}${selectedAccountId}`)
       if (raw) {
         const draft = JSON.parse(raw) as Partial<ProxyBookingDraft>
-        if (draft.friend?.id) setFriend({ id: draft.friend.id, displayName: String(draft.friend.displayName ?? '') } as FriendListItem)
-        if (draft.customer?.id) setCustomer(draft.customer as BookingCustomerSummary)
-        setPhoneCustomer(draft.phoneCustomer === true)
-        setCustomerName(typeof draft.customerName === 'string' ? draft.customerName : '')
-        setCustomerPhone(typeof draft.customerPhone === 'string' ? draft.customerPhone : '')
-        setPetName(typeof draft.petName === 'string' ? draft.petName : '')
-        setMenuId(typeof draft.menuId === 'string' ? draft.menuId : '')
-        setDate(typeof draft.date === 'string' ? draft.date : '')
-        setCustomerNote(typeof draft.customerNote === 'string' ? draft.customerNote : '')
-        if (draft.notification && typeof draft.notification === 'object') {
-          setNotification({
+        const notification = draft.notification && typeof draft.notification === 'object'
+          ? {
             send_line_confirmation: draft.notification.send_line_confirmation !== false,
             day_before: draft.notification.day_before !== false,
             hours_before: draft.notification.hours_before !== false,
-          })
+          }
+          : { send_line_confirmation: true, day_before: true, hours_before: true }
+        if (draftHasContent({
+          phoneCustomer: draft.phoneCustomer === true,
+          customerName: typeof draft.customerName === 'string' ? draft.customerName : '',
+          customerPhone: typeof draft.customerPhone === 'string' ? draft.customerPhone : '',
+          petName: typeof draft.petName === 'string' ? draft.petName : '',
+          friend: draft.friend?.id ? { id: draft.friend.id } : null,
+          customer: draft.customer?.id ? { id: draft.customer.id } : null,
+          menuId: typeof draft.menuId === 'string' ? draft.menuId : '',
+          staffId: typeof draft.staffId === 'string' ? draft.staffId : '',
+          date: typeof draft.date === 'string' ? draft.date : '',
+          time: typeof draft.time === 'string' ? draft.time : '',
+          customerNote: typeof draft.customerNote === 'string' ? draft.customerNote : '',
+          notification,
+        })) {
+          if (draft.friend?.id) setFriend({ id: draft.friend.id, displayName: String(draft.friend.displayName ?? '') } as FriendListItem)
+          if (draft.customer?.id) setCustomer(draft.customer as BookingCustomerSummary)
+          setPhoneCustomer(draft.phoneCustomer === true)
+          setCustomerName(typeof draft.customerName === 'string' ? draft.customerName : '')
+          setCustomerPhone(typeof draft.customerPhone === 'string' ? draft.customerPhone : '')
+          setPetName(typeof draft.petName === 'string' ? draft.petName : '')
+          setMenuId(typeof draft.menuId === 'string' ? draft.menuId : '')
+          setDate(typeof draft.date === 'string' ? draft.date : '')
+          setCustomerNote(typeof draft.customerNote === 'string' ? draft.customerNote : '')
+          setNotification(notification)
+          // 担当・時刻は一覧の到着後に存在を確かめてから選ぶ。
+          pendingSelect.current = {
+            staffId: typeof draft.staffId === 'string' && draft.staffId ? draft.staffId : undefined,
+            date: typeof draft.date === 'string' ? draft.date : undefined,
+            time: typeof draft.time === 'string' ? draft.time : undefined,
+          }
+          setDraftRestored(true)
+        } else {
+          // 空の下書き（破棄直後の残りなど）は捨て、復元バナーは出さない。
+          try { window.sessionStorage.removeItem(`${DRAFT_KEY_PREFIX}${selectedAccountId}`) } catch { /* noop */ }
         }
-        // 担当・時刻は一覧の到着後に存在を確かめてから選ぶ。
-        pendingSelect.current = {
-          staffId: typeof draft.staffId === 'string' && draft.staffId ? draft.staffId : undefined,
-          date: typeof draft.date === 'string' ? draft.date : undefined,
-          time: typeof draft.time === 'string' ? draft.time : undefined,
-        }
-        setDraftRestored(true)
       }
     } catch {
       // 壊れた下書きは捨てる
@@ -309,6 +365,8 @@ export default function NewProxyBookingPage() {
 
   // N-400: 入力中の内容をアカウント別に sessionStorage へ書く。
   // 完了・破棄で消す。書き込みに失敗しても入力自体は止めない。
+  // R14: 全部が初期値のときは「書きかけ」が無いので書かず、残りを消す。
+  // 破棄直後の空書き込みが残ると、開き直したときに復元バナーが出てしまう。
   useEffect(() => {
     if (!selectedAccountId || step === 'done') return
     const draft: ProxyBookingDraft = {
@@ -326,7 +384,11 @@ export default function NewProxyBookingPage() {
       notification,
     }
     try {
-      window.sessionStorage.setItem(`${DRAFT_KEY_PREFIX}${selectedAccountId}`, JSON.stringify(draft))
+      if (draftHasContent(draft)) {
+        window.sessionStorage.setItem(`${DRAFT_KEY_PREFIX}${selectedAccountId}`, JSON.stringify(draft))
+      } else {
+        window.sessionStorage.removeItem(`${DRAFT_KEY_PREFIX}${selectedAccountId}`)
+      }
     } catch {
       // 容量超過などは無視する
     }
@@ -442,7 +504,10 @@ export default function NewProxyBookingPage() {
     const timer = window.setTimeout(() => {
       void api.friends.list({ accountId: selectedAccountId, search: query, limit: 20 })
         .then((response) => {
-          if (active && response.success) setFriends(response.data.items)
+          if (active && response.success) {
+            setFriends(response.data.items)
+            setFriendSuggestOpen(response.data.items.length > 0)
+          }
         })
         .catch(() => {
           if (active) setError('友だちを検索できませんでした')
@@ -664,23 +729,38 @@ export default function NewProxyBookingPage() {
               ) : (
                 <div className="relative">
                   <input
+                    ref={friendInputRef}
                     value={friendQuery}
-                    onChange={(event) => setFriendQuery(event.target.value)}
+                    onChange={(event) => {
+                      setFriendQuery(event.target.value)
+                      setFriendSuggestOpen(true)
+                    }}
                     placeholder="名前・電話番号で探す"
                     className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
                   />
-                  {friends.length > 0 && (
-                    <div className="border-hairline bg-canvas absolute z-20 mt-1 max-h-64 w-full divide-y overflow-y-auto rounded-control border shadow-lg">
+                  <MenuPortal
+                    open={friendSuggestOpen && friends.length > 0}
+                    align="start"
+                    matchWidth
+                    getAnchor={() => friendInputRef.current}
+                    onClose={() => setFriendSuggestOpen(false)}
+                  >
+                    <div
+                      className="border-hairline bg-canvas max-h-64 divide-y overflow-y-auto rounded-control border shadow-lg"
+                      // 最上層では absolute 指定を無効にする（位置は器が決める）。
+                      style={{ position: 'static', width: '100%' }}
+                    >
                       {friends.map((item) => (
                         <button key={item.id} type="button" onClick={() => {
                           setFriend(item)
                           setFriendQuery(item.displayName)
+                          setFriendSuggestOpen(false)
                         }} className="hover:bg-canvas-sunken block w-full px-3 py-2 text-left text-sm">
                           {item.displayName}
                         </button>
                       ))}
                     </div>
-                  )}
+                  </MenuPortal>
                 </div>
               )}
               {!phoneCustomer ? <p className="text-ink-faint mt-2 text-xs">別の友だちへ推測で結び付けず、選んだ相手だけに予約を記録します。</p> : null}
@@ -733,7 +813,7 @@ export default function NewProxyBookingPage() {
             </Card>
 
             <Card title="お客様からの要望">
-              <textarea value={customerNote} onChange={(event) => setCustomerNote(event.target.value)} rows={4} className="border-hairline rounded-control w-full border px-3 py-2 text-sm" placeholder="予約時に確認した内容を入力" />
+              <textarea aria-label="お客様からの要望" value={customerNote} onChange={(event) => setCustomerNote(event.target.value)} rows={4} className="border-hairline rounded-control w-full border px-3 py-2 text-sm" placeholder="予約時に確認した内容を入力" />
             </Card>
 
             <Card title="お客様に何を送りますか" note="LINEと結びついている方には、予約後の案内を送ります。送らない選択もできます。">

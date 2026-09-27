@@ -79,6 +79,12 @@ beforeEach(() => {
         { status: 200, headers: { 'Content-Type': 'application/json' } },
       )
     }
+    if (url.pathname === '/api/measurement-sites') {
+      return new Response(
+        JSON.stringify({ success: true, data: [] }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      )
+    }
     if (url.pathname === '/api/site/tracking-key') {
       return new Response(
         JSON.stringify({ success: true, data: { accountId: 'acc-1', trackingKey: 'hk_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' } }),
