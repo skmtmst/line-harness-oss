@@ -3,9 +3,12 @@
 -- 付けなかった紹介には、その理由を残す。
 -- conversion_event_id は一意。同じ成果に2人分は付けない。
 -- 付け直しはこの行を書き換えず、理由付きの調整(adjustment)で足す。
+-- conversion_event_id の外部キーは ON DELETE CASCADE。
+-- 一括操作が成果を消すときは、付随する付け方の記録も一緒に消える
+--（504 の取消台帳と同じ形）。付け直しは調整で足し、ここを書き換えない。
 CREATE TABLE IF NOT EXISTS affiliate_attribution_decisions (
   id TEXT PRIMARY KEY,
-  conversion_event_id TEXT NOT NULL UNIQUE REFERENCES conversion_events(id),
+  conversion_event_id TEXT NOT NULL UNIQUE REFERENCES conversion_events(id) ON DELETE CASCADE,
   friend_id TEXT NOT NULL,
   conversion_point_id TEXT NOT NULL,
   -- 付けた先。付けなかったときは空。

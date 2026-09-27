@@ -281,7 +281,7 @@ CREATE TABLE affiliate_adjustments (
 
 CREATE TABLE affiliate_attribution_decisions (
   id TEXT PRIMARY KEY,
-  conversion_event_id TEXT NOT NULL UNIQUE REFERENCES conversion_events(id),
+  conversion_event_id TEXT NOT NULL UNIQUE REFERENCES conversion_events(id) ON DELETE CASCADE,
   friend_id TEXT NOT NULL,
   conversion_point_id TEXT NOT NULL,
   -- 付けた先。付けなかったときは空。

@@ -1,4 +1,4 @@
-import { jstNow } from './utils.js';
+import { dbTableExists, jstNow } from './utils.js';
 // =============================================================================
 // Affiliate Attribution — last-touch resolution (ASP)
 // =============================================================================
@@ -139,6 +139,49 @@ function asValidWindowDays(v: unknown): number | null {
   return typeof v === 'number' && Number.isInteger(v) && v > 0 ? v : null;
 }
 
+interface TouchRow {
+  ref_code: string;
+  touched_at: string;
+  affiliate_id: string;
+  offer_id: string | null;
+  link_active: number;
+  link_account: string | null;
+  aff_active: number;
+  aff_friend_id: string | null;
+  aff_account: string | null;
+}
+
+async function loadTouches(
+  db: D1Database,
+  friendId: string,
+  now: string,
+  full: boolean,
+): Promise<TouchRow[]> {
+  // full では案件・所属も見る。列が無い古いスキーマ（最小構成の単体試験など）
+  // では従来の列だけに戻す。
+  const offerSelect = full ? 'al.offer_id AS offer_id' : 'NULL AS offer_id';
+  const linkAccountSelect = full ? 'al.line_account_id AS link_account' : 'NULL AS link_account';
+  const affAccountSelect = full ? 'a.line_account_id AS aff_account' : 'NULL AS aff_account';
+  const touches = await db
+    .prepare(
+      `SELECT rt.ref_code AS ref_code, rt.created_at AS touched_at,
+              al.affiliate_id AS affiliate_id, ${offerSelect},
+              al.is_active AS link_active, ${linkAccountSelect},
+              a.is_active AS aff_active, a.friend_id AS aff_friend_id,
+              ${affAccountSelect}
+         FROM ref_tracking rt
+         JOIN affiliate_links al ON al.ref_code = rt.ref_code
+         JOIN affiliates a ON a.id = al.affiliate_id
+        WHERE rt.friend_id = ?
+          AND julianday(rt.created_at) <= julianday(?)
+        ORDER BY julianday(rt.created_at) DESC
+        LIMIT 20`,
+    )
+    .bind(friendId, now)
+    .all<TouchRow>();
+  return touches.results;
+}
+
 /**
  * 友だちの紹介候補を新しい順に並べ、決まりに沿って1件を選ぶ。
  * 新しい順に、最初に決まりをすべて満たした紹介が勝つ(last-touch)。
@@ -152,40 +195,23 @@ export async function explainAffiliateAttribution(
   const now = at ?? jstNow();
   const pointWindow = asValidWindowDays(opts?.windowDays);
   const lineAccountId = opts?.lineAccountId ?? null;
-  const touches = await db
-    .prepare(
-      `SELECT rt.ref_code AS ref_code, rt.created_at AS touched_at,
-              al.affiliate_id AS affiliate_id, al.offer_id AS offer_id,
-              al.is_active AS link_active, al.line_account_id AS link_account,
-              a.is_active AS aff_active, a.friend_id AS aff_friend_id,
-              a.line_account_id AS aff_account
-         FROM ref_tracking rt
-         JOIN affiliate_links al ON al.ref_code = rt.ref_code
-         JOIN affiliates a ON a.id = al.affiliate_id
-        WHERE rt.friend_id = ?
-          AND julianday(rt.created_at) <= julianday(?)
-        ORDER BY julianday(rt.created_at) DESC
-        LIMIT 20`,
-    )
-    .bind(friendId, now)
-    .all<{
-      ref_code: string;
-      touched_at: string;
-      affiliate_id: string;
-      offer_id: string | null;
-      link_active: number;
-      link_account: string | null;
-      aff_active: number;
-      aff_friend_id: string | null;
-      aff_account: string | null;
-    }>();
+  // 決まりの列が無い古いスキーマ（最小構成の単体試験など）では、
+  // 案件の期間・上限・受付を見ずに従来の付け方に落とす。
+  let touches: TouchRow[];
+  try {
+    touches = await loadTouches(db, friendId, now, true);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (!/no such (column|table)/i.test(msg)) throw err;
+    touches = await loadTouches(db, friendId, now, false);
+  }
   const candidates: AttributionCandidate[] = [];
   let decision: AttributionExplanation['decision'] = null;
   let reason: AttributionReason = 'no_touch';
   // 案件の無い汎用リンクは、従来の 90 日を legacy として使う。
   let usedWindow = ATTRIBUTION_WINDOW_DAYS;
   const versionCache = new Map<string, Awaited<ReturnType<typeof getCurrentOfferVersion>>>();
-  for (const touch of touches.results) {
+  for (const touch of touches) {
     let version = null;
     if (touch.offer_id) {
       if (!versionCache.has(touch.offer_id)) {
@@ -342,6 +368,9 @@ export async function recordAttributionDecision(
   conversionPointId: string,
   explanation: AttributionExplanation,
 ): Promise<void> {
+  // 記録の表が無い古いスキーマ（最小構成の単体試験など）では書かない。
+  // 成果自体は残し、記録の欠落を選ぶ（conversions.ts の方針と同じ）。
+  if (!(await dbTableExists(db, 'affiliate_attribution_decisions'))) return;
   // 候補の名前は判断の時点で写す。後から紹介者名・案件名が変わっても、
   // この記録の表示は動かない。
   const snapshots: AttributionCandidateSnapshot[] = [];

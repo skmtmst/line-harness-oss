@@ -1,3 +1,5 @@
+import { dbTableExists } from './utils.js';
+
 export type AffiliateLifecycle = 'active' | 'paused' | 'archived';
 
 export interface AffiliateArchiveImpact {
@@ -87,6 +89,19 @@ export async function ensureConversionRewardSnapshot(
   eventId: string,
   now = new Date().toISOString(),
 ): Promise<AffiliateRewardCalculation | null> {
+  // 付けた時点の版があれば、その版の決まりを優先する(#823)。
+  // 版の表が無い古いスキーマ（最小構成の単体試験など）では、
+  // 従来どおり今の案件の値を使う。
+  const hasVersionTables = (await dbTableExists(db, 'affiliate_offer_versions'))
+    && (await dbTableExists(db, 'affiliate_attribution_decisions'));
+  const fixedRewardSelect = hasVersionTables
+    ? 'COALESCE(ov.reward_amount, off.reward_amount) AS fixed_reward'
+    : 'off.reward_amount AS fixed_reward';
+  const versionJoins = hasVersionTables
+    ? `LEFT JOIN affiliate_attribution_decisions dad
+         ON dad.conversion_event_id = ce.id
+       LEFT JOIN affiliate_offer_versions ov ON ov.id = dad.offer_version_id`
+    : '';
   const row = await db.prepare(
     `SELECT ce.id AS conversion_event_id,
             ce.value_snapshot AS value_snapshot,
@@ -103,9 +118,7 @@ export async function ensureConversionRewardSnapshot(
             off.line_account_id AS offer_account_id,
             off.id AS offer_id,
             COALESCE(off.name, ce.point_name_snapshot, cp.name, '') AS offer_name,
-            -- 付けた時点の版があれば、その版の決まりを優先する(#823)。
-            -- 版が無い昔の成果は、従来どおり今の案件の値を使う。
-            COALESCE(ov.reward_amount, off.reward_amount) AS fixed_reward
+            ${fixedRewardSelect}
        FROM conversion_events ce
        JOIN affiliates a ON a.id = ce.affiliate_id
        JOIN friends f ON f.id = ce.friend_id
@@ -114,9 +127,7 @@ export async function ensureConversionRewardSnapshot(
          ON al.ref_code = ce.attributed_ref_code
         AND al.affiliate_id = a.id
        LEFT JOIN affiliate_offers off ON off.id = al.offer_id
-       LEFT JOIN affiliate_attribution_decisions dad
-         ON dad.conversion_event_id = ce.id
-       LEFT JOIN affiliate_offer_versions ov ON ov.id = dad.offer_version_id
+       ${versionJoins}
       WHERE ce.id = ?
         AND ce.affiliate_id IS NOT NULL
         AND COALESCE(ce.approval_status, 'pending') = 'approved'`,
