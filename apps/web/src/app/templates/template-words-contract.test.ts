@@ -80,7 +80,8 @@ describe('V6の作成画面', () => {
 
   it('カルーセルをパネルとして最大10枚まで扱う', () => {
     expect(CAROUSEL_PAGE).toContain('const MAX_COLUMNS = 10')
-    expect(CAROUSEL_PAGE).toContain('このパネルの選択肢（最大{MAX_ACTIONS}つ）')
+    // 選択肢の上限は直書きせず MAX_ACTIONS。数は全部のパネルでそろえる決まりも添える。
+    expect(CAROUSEL_PAGE).toContain('このパネルの選択肢（最大{MAX_ACTIONS}つ・数は全部のパネルでそろえてください）')
     expect(CAROUSEL_PAGE).toContain('画像は横1024 × 縦678pxを推奨')
     // B-6: 題「LINEプレビュー」は共通部品が出す。画面側は使うだけ。
     expect(CAROUSEL_PAGE).toContain('<LinePreview')

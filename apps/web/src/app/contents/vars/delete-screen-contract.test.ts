@@ -17,7 +17,7 @@ describe('共通情報の削除確認', () => {
   it('使用先が読めないときは消させない', () => {
     // 「参照0件」と読み違えて消すと、差し込んでいた文が空欄のまま送られ続ける。
     expect(PAGE).toContain('使用先を確認できませんでした')
-    expect(PAGE).toContain('canDeleteVar({ impact: singleImpact, typedKey, busy: singleBusy })')
+    expect(PAGE).toContain('canDeleteVar({ impact: singleImpact, typedKey, reason: singleReason, busy: singleBusy })')
   })
 
   it('差し込みキーを打つまで押し口を出さない', () => {
@@ -26,7 +26,7 @@ describe('共通情報の削除確認', () => {
      * 取り消せないので、対象を取り違えたまま押せる形にしない。
      */
     expect(PAGE).toContain('削除する場合は、差し込みキーを入力してください')
-    expect(PAGE).toContain('typedKey, busy: singleBusy }) ? (')
+    expect(PAGE).toContain('typedKey, reason: singleReason, busy: singleBusy }) ? (')
   })
 
   it('送信済みを消せない理由に混ぜない', () => {
