@@ -358,15 +358,43 @@ nenCampaigns.put('/api/nen-campaigns/settings/:campaignKey/enabled', requireRole
   return c.json({ success: true });
 });
 
+type NenCampaignDraft = {
+  title?: string; bodyText?: string; buttonLabel?: string; buttonUrl?: string; imageUrl?: string;
+};
+
+/**
+ * テスト送信に乗せる編集中の下書き。保存済みの値を上書きするだけで、本配信の設定は変えない。
+ * 保存と同じ検査を通す（監査 R65: プレビューと違う保存済み本文が飛んでいた）。
+ */
+function applyCampaignDraft(campaign: CampaignRow, draft: NenCampaignDraft | undefined): CampaignRow | { error: string } {
+  if (!draft) return campaign;
+  const title = draft.title === undefined ? campaign.title : draft.title.trim();
+  const bodyText = draft.bodyText === undefined ? campaign.body_text : draft.bodyText;
+  const buttonLabel = draft.buttonLabel === undefined ? campaign.button_label ?? '' : draft.buttonLabel.trim();
+  const buttonUrl = draft.buttonUrl === undefined ? campaign.button_url ?? '' : draft.buttonUrl.trim();
+  const imageUrl = draft.imageUrl === undefined ? campaign.image_url ?? '' : draft.imageUrl.trim();
+  if (!title || title.length > 120 || !bodyText.trim()) {
+    return { error: 'Invalid campaign values' };
+  }
+  const bodyCheck = checkNenCampaignBodyLength(bodyText);
+  if (!bodyCheck.fits) {
+    return { error: `本文は${NEN_CAMPAIGN_BODY_MAX_LENGTH.toLocaleString('ja-JP')}字以内で入力してください（現在${bodyCheck.length.toLocaleString('ja-JP')}字）` };
+  }
+  if (buttonLabel.length > 20 || !isUrl(buttonUrl) || !isUrl(imageUrl)) {
+    return { error: 'Invalid campaign values' };
+  }
+  return { ...campaign, title, body_text: bodyText, button_label: buttonLabel, button_url: buttonUrl, image_url: imageUrl };
+}
+
 nenCampaigns.post('/api/nen-campaigns/test-send', requireRole('owner', 'admin'), async (c) => {
-  const body = await c.req.json<{ campaignKey?: string; accountId?: string; friendId?: string }>().catch(() => null);
+  const body = await c.req.json<{ campaignKey?: string; accountId?: string; friendId?: string; draft?: NenCampaignDraft }>().catch(() => null);
   if (!body?.campaignKey || !CAMPAIGN_KEYS.has(body.campaignKey) || !body.accountId || !body.friendId) {
     return c.json({ success: false, error: 'campaignKey, accountId and friendId are required' }, 400);
   }
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
     return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
   }
-  const [campaign, account, friend] = await Promise.all([
+  const [savedCampaign, account, friend] = await Promise.all([
     getNenCampaign(c.env.DB, body.campaignKey, body.accountId),
     getLineAccountById(c.env.DB, body.accountId),
     getTestRecipient(c, body.accountId, body.friendId),
@@ -374,7 +402,9 @@ nenCampaigns.post('/api/nen-campaigns/test-send', requireRole('owner', 'admin'),
   // テスト送信先は「設定 › アカウント › テスト送信先」に登録され、かつ友だち追加中の人だけ。
   // 画面が理由を言えるよう、送信先の問題は code で分ける。
   if (!friend) return c.json({ success: false, code: 'test_recipient_unavailable', error: 'テスト送信先が登録されていないか、友だち追加されていません' }, 404);
-  if (!campaign || !account) return c.json({ success: false, error: 'Test target not found' }, 404);
+  if (!savedCampaign || !account) return c.json({ success: false, error: 'Test target not found' }, 404);
+  const campaign = applyCampaignDraft(savedCampaign, body.draft);
+  if ('error' in campaign) return c.json({ success: false, error: campaign.error }, 400);
   const sample = {
     event: {
       event_id: `test-${crypto.randomUUID()}`, event_type: 'ec.order.shipped', occurred_at: new Date().toISOString(),
