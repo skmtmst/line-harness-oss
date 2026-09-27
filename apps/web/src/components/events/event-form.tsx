@@ -118,10 +118,11 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
 
   // 公開対象のプルダウンに出すタグ。新規作成のときも要るので、
   // イベントの読み込みとは分けて取る。
+  // R23横展開: 候補はこのイベントのアカウントだけ。切替で取り直す。
   useEffect(() => {
     let cancelled = false
     void api.tags
-      .list()
+      .list(accountId ? { accountId } : undefined)
       .then((res) => {
         if (!cancelled && res.success) setTags(res.data.map((t) => ({ id: t.id, name: t.name })))
       })
@@ -131,7 +132,7 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [accountId])
 
   useEffect(() => {
     let cancelled = false
@@ -1376,6 +1377,16 @@ function PublishTab({
   update: <K extends keyof EventDetail>(k: K, v: EventDetail[K]) => void
   tags: Array<{ id: string; name: string }>
 }) {
+  // R23横展開(m18hと同じ形): 新しい候補にない公開対象タグは外して知らせる。
+  const [tagPruned, setTagPruned] = useState(false)
+  useEffect(() => {
+    if (tags.length === 0 || draft.visible_tag_id == null) return
+    if (!tags.some((t) => t.id === draft.visible_tag_id)) {
+      update('visible_tag_id', null)
+      setTagPruned(true)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tags])
   return (
     <div className="space-y-5">
       <label className="flex items-start gap-3 p-3 border border-hairline rounded-lg cursor-pointer hover:bg-gray-50">
@@ -1429,6 +1440,14 @@ function PublishTab({
       </label>
 
       <div>
+        {tagPruned ? (
+          <Notice
+            tone="warn"
+            message="選んでいたタグは、今のアカウントにないため外しました。選び直してください。"
+            onClose={() => setTagPruned(false)}
+            className="mb-2"
+          />
+        ) : null}
         <label htmlFor="ev-visible-tag" className="mb-1.5 block text-sm font-medium text-gray-700">
           公開対象
         </label>

@@ -10,6 +10,7 @@ import { qrToDataURL } from '@/lib/qr-image'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { useAccount } from '@/contexts/account-context'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Notice from '@/components/shared/notice'
 import CreatePage, {
   AsideCard,
   Field,
@@ -63,6 +64,8 @@ export default function NewInflowLinkPage() {
   const [pools, setPools] = useState<TrafficPool[]>([])
   const [templates, setTemplates] = useState<Template[]>([])
   const [qrDataUrl, setQrDataUrl] = useState('')
+  // R23横展開: アカウントを切り替えたら、前の候補にしかない選択を外して知らせる。
+  const [pruneNotice, setPruneNotice] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -74,12 +77,14 @@ export default function NewInflowLinkPage() {
         ? api.pools.list({ suppressFeatureDisabledEvent: true })
         : { success: false as const, error: 'feature_disabled' },
     )
+    // R23横展開: 候補は今のアカウントだけ。別アカウントの同名タグ混入防止。
+    const accountParams = selectedAccountId ? { accountId: selectedAccountId } : undefined
     void Promise.allSettled([
-      api.tags.list(),
-      api.scenarios.list(),
+      api.tags.list(accountParams),
+      api.scenarios.list(accountParams),
       poolsRequest,
-      api.templates.list(),
-      api.tagGroups.list(),
+      api.templates.list(undefined, selectedAccountId ?? undefined),
+      api.tagGroups.list(selectedAccountId),
     ]).then(([t, s, p, tp, tg]) => {
       if (cancelled) return
       if (t.status === 'fulfilled' && t.value.success) setTags(t.value.data)
@@ -100,6 +105,24 @@ export default function NewInflowLinkPage() {
     // R39: 候補（タグ・シナリオ・プール・テンプレート）はアカウントごとに
     // 違う。切替後に古い候補のまま保存しないよう、取り直す。入力は残す。
   }, [selectedAccountId])
+
+  /*
+   * R23横展開(m18hと同じ形): 新しい候補にない選択は外す。
+   * 外すものがなければ何もしない。選び直しが必要なときだけ帯で知らせる。
+   */
+  useEffect(() => {
+    const tagIds = new Set(tags.map((tag) => tag.id))
+    const scenarioIds = new Set(scenarios.map((scenario) => scenario.id))
+    const templateIds = new Set(templates.map((template) => template.id))
+    let removed = 0
+    if (tagId && !tagIds.has(tagId)) { setTagId(''); removed += 1 }
+    if (scenarioId && !scenarioIds.has(scenarioId)) { setScenarioId(''); removed += 1 }
+    if (introTemplateId && !templateIds.has(introTemplateId)) { setIntroTemplateId(''); removed += 1 }
+    if (removed > 0) {
+      setPruneNotice(`選んでいた候補のうち${removed}件は、今のアカウントにないため外しました。選び直してください。`)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tags, scenarios, templates])
 
   const validRef = REF_PATTERN.test(refCode)
   const workerBase = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '')
@@ -214,6 +237,7 @@ export default function NewInflowLinkPage() {
         </>
       }
     >
+      {pruneNotice ? <Notice tone="warn" message={pruneNotice} onClose={() => setPruneNotice(null)} className="mb-3" /> : null}
       <FormSection step={1} label="どこに置くリンクですか">
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Field label="流入元の名前" htmlFor="ir-name" required note="管理画面で見分けるための名前です。">
