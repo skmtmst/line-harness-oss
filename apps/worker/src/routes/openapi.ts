@@ -2780,6 +2780,31 @@ const spec = {
         responses: { '200': { description: '知らせ直した' }, '409': { description: '依頼中でない' } },
       },
     },
+    '/api/broadcasts/{id}/recipients': {
+      get: {
+        tags: ['Broadcasts'],
+        summary: '宛先ごとの結果の台帳',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'result', in: 'query', schema: { type: 'string', enum: ['all', 'delivered', 'temporary', 'permanent', 'unknown', 'inflight'], default: 'all' } },
+          { name: 'cursor', in: 'query', schema: { type: 'integer', minimum: 0, default: 0 } },
+          { name: 'limit', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 100, default: 50 } },
+        ],
+        responses: { '200': { description: 'rows, summary, pagination（全員配信・旧配信は集約だけ）' }, '400': { description: 'result が正しくない' }, '404': { description: 'Broadcast not found' } },
+      },
+    },
+    '/api/broadcasts/{id}/activity': {
+      get: {
+        tags: ['Broadcasts'],
+        summary: '配信への操作の記録（新しい順）',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'cursor', in: 'query', schema: { type: 'integer', minimum: 0, default: 0 } },
+          { name: 'limit', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 100, default: 50 } },
+        ],
+        responses: { '200': { description: 'entries, pagination（追記だけ。消せない）' }, '404': { description: 'Broadcast not found' } },
+      },
+    },
     // ── NEN delivery ────────────────────────────────────────────────────────
     '/api/nen-campaigns/metrics/flows': {
       get: {
