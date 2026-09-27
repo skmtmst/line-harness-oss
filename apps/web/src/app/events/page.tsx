@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { eventsApi, type EventListItem } from '@/lib/api'
+import { eventsApi, type EventListItem, type EventListSummary } from '@/lib/api'
 import { clampSearchQuery, SEARCH_QUERY_MAX_LENGTH } from '@/lib/search-query'
 import { withRequestTimeout } from '@/lib/request-timeout'
 import { useAccount } from '@/contexts/account-context'
@@ -17,7 +17,7 @@ import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/sh
 import Select from '@/components/shared/select'
 // #740: bookings の EventKpi と一字一句同じだったため、機能内共有の1部品へ統合した。
 import EventKpi from '@/components/events/event-kpi'
-import { daysUntilEvent, summarizeEventAttention } from './event-attention'
+import { daysUntilIso, eventRowState, summarizeEventAttention } from './event-attention'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -67,6 +67,7 @@ export default function EventsListPage() {
   const { selectedAccountId } = useAccount()
   const [items, setItems] = useState<EventListItem[]>([])
   const [listTotal, setListTotal] = useState(0)
+  const [summary, setSummary] = useState<EventListSummary | null>(null)
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<'all' | 'open' | 'pending' | 'full'>('all')
@@ -78,12 +79,14 @@ export default function EventsListPage() {
     const requestId = ++loadRequestRef.current
     if (!selectedAccountId) {
       setItems([])
+      setSummary(null)
       setLoadStatus('ready')
       return
     }
     setLoadStatus('loading')
     setItems([])
     setListTotal(0)
+    setSummary(null)
     try {
       /*
        * #625: 応答なしの要求は時間切れの失敗にして、一覧を
@@ -100,11 +103,13 @@ export default function EventsListPage() {
       if (requestId !== loadRequestRef.current) return
       setItems(res.items)
       setListTotal(res.total ?? res.items.length)
+      setSummary(res.summary ?? null)
       setLoadStatus('ready')
     } catch {
       if (requestId !== loadRequestRef.current) return
       setItems([])
       setListTotal(0)
+      setSummary(null)
       setLoadStatus('error')
     }
   }, [selectedAccountId, page, query, filter, sort])
@@ -120,13 +125,22 @@ export default function EventsListPage() {
     setPage(1)
   }, [query, filter, sort])
 
-  function isFull(e: EventListItem): boolean {
-    return e.total_capacity != null && e.total_active >= e.total_capacity
-  }
-
   const attention = useMemo(() => summarizeEventAttention(items), [items])
-  const nearest = attention.upcoming[0]
-  const nearestLow = attention.lowApplications[0]
+  /*
+   * R79/R80: 数値カードは応答の全体集計（絞り込みに合う全件の今後の枠）を使う。
+   * ページ内の行だけを数えると、21件目以降があるときに全体が小さく見える。
+   * 古い応答には集計が無いので、そのときだけ今までどおりページ内の行で数える。
+   */
+  const kpi: EventListSummary = summary ?? {
+    upcoming_slots: attention.upcoming.length,
+    upcoming_active: attention.applied,
+    upcoming_capacity: attention.capacity,
+    fill_rate: attention.fillRate,
+    nearly_full: attention.nearlyFull.length,
+    low_applications: attention.lowApplications.length,
+    nearest_upcoming_starts_at: attention.upcoming[0]?.next_slot_starts_at ?? null,
+    nearest_low_starts_at: attention.lowApplications[0]?.next_slot_starts_at ?? null,
+  }
 
   const pageCount = Math.max(1, Math.ceil(listTotal / PAGE_SIZE))
   const current = Math.min(page, pageCount)
@@ -155,47 +169,51 @@ export default function EventsListPage() {
       <div data-design="KPIs" className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <EventKpi
           title="これからの回"
-          value={dataReady ? attention.upcoming.length : null}
+          value={dataReady ? kpi.upcoming_slots : null}
           unit="回"
           detail={loadDetail(
             Boolean(selectedAccountId),
             loadStatus,
-            nearest ? `いちばん近いのは ${formatShortJpDate(nearest.next_slot_starts_at)}` : '予定されている回はありません',
+            kpi.nearest_upcoming_starts_at ? `いちばん近いのは ${formatShortJpDate(kpi.nearest_upcoming_starts_at)}` : '予定されている回はありません',
           )}
+          help={{ label: 'これからの回の数え方の説明', text: '絞り込みに合うイベントの、今後の開催枠だけを数えています。終わった回は含みません。' }}
         />
         <EventKpi
           title="申込"
-          value={dataReady ? attention.applied : null}
+          value={dataReady ? kpi.upcoming_active : null}
           unit="人"
           detail={loadDetail(
             Boolean(selectedAccountId),
             loadStatus,
-            attention.fillRate === null
+            kpi.fill_rate === null
               ? '定員を確認できません'
-              : `定員${attention.capacity}人に対して ${attention.fillRate}%`,
+              : `定員${kpi.upcoming_capacity}人に対して ${kpi.fill_rate}%`,
           )}
+          help={{ label: '申込の数え方の説明', text: '今後の開催枠への申込人数です。終わった回の申込は含みません。' }}
         />
         <EventKpi
           title="あと少しで満席"
-          value={dataReady ? attention.nearlyFull.length : null}
+          value={dataReady ? kpi.nearly_full : null}
           unit="回"
           detail={loadDetail(
             Boolean(selectedAccountId),
             loadStatus,
-            attention.nearlyFull.length > 0 ? '声をかけると埋まります' : '該当する回はありません',
+            kpi.nearly_full > 0 ? '声をかけると埋まります' : '該当する回はありません',
           )}
+          help={{ label: 'あと少しで満席の説明', text: '今後の開催枠のうち、残りが1〜3席の回を数えています。' }}
         />
         <EventKpi
           title="申し込みが少ない"
-          value={dataReady ? attention.lowApplications.length : null}
+          value={dataReady ? kpi.low_applications : null}
           unit="回"
           detail={loadDetail(
             Boolean(selectedAccountId),
             loadStatus,
-            nearestLow
-              ? `${formatShortJpDate(nearestLow.next_slot_starts_at)}の回。あと${daysUntilEvent(nearestLow) ?? '—'}日です`
+            kpi.nearest_low_starts_at
+              ? `${formatShortJpDate(kpi.nearest_low_starts_at)}の回。あと${daysUntilIso(kpi.nearest_low_starts_at) ?? '—'}日です`
               : '該当する回はありません',
           )}
+          help={{ label: '申し込みが少ないの説明', text: '7日以内に始まる回のうち、定員の半分に満たない回を数えています。' }}
         />
       </div>
 
@@ -361,19 +379,39 @@ export default function EventsListPage() {
                       )}
                     </Td>
                     <Td>
-                      {e.is_published !== 1 ? (
-                        <span className="bg-canvas-sunken text-ink-faint rounded-pill px-2 py-0.5 text-xs">
-                          準備中
-                        </span>
-                      ) : isFull(e) ? (
-                        <span className="bg-warning-bg text-warning rounded-pill px-2 py-0.5 text-xs">
-                          満席
-                        </span>
-                      ) : (
-                        <span className="bg-success-bg text-success rounded-pill px-2 py-0.5 text-xs">
-                          受付中
-                        </span>
-                      )}
+                      {/*
+                        R81: 公開済みでも今後の枠が無ければ「終了」。
+                        受付中と出すと、終わった会を募集中として選んでしまう。
+                      */}
+                      {(() => {
+                        const state = eventRowState(e)
+                        if (state === 'draft') {
+                          return (
+                            <span className="bg-canvas-sunken text-ink-faint rounded-pill px-2 py-0.5 text-xs">
+                              準備中
+                            </span>
+                          )
+                        }
+                        if (state === 'ended') {
+                          return (
+                            <span className="bg-canvas-sunken text-ink-faint rounded-pill px-2 py-0.5 text-xs">
+                              終了
+                            </span>
+                          )
+                        }
+                        if (state === 'full') {
+                          return (
+                            <span className="bg-warning-bg text-warning rounded-pill px-2 py-0.5 text-xs">
+                              満席
+                            </span>
+                          )
+                        }
+                        return (
+                          <span className="bg-success-bg text-success rounded-pill px-2 py-0.5 text-xs">
+                            受付中
+                          </span>
+                        )
+                      })()}
                     </Td>
                     <ActionCell>
                       <span className="inline-flex items-center justify-end gap-2">

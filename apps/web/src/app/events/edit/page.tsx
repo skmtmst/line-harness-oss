@@ -11,6 +11,7 @@ import {
   eventsApi,
   type EventBookingSummary,
   type EventDetail,
+  type EventSlot,
 } from '@/lib/api'
 import { usePageTitle } from '@/components/shell/page-chrome'
 
@@ -28,6 +29,8 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 function BookingStatus({ accountId, eventId }: { accountId: string; eventId: string }) {
   const [event, setEvent] = useState<EventDetail | null>(null)
   const [summary, setSummary] = useState<EventBookingSummary | null>(null)
+  // R81: 公開済みでも今後の枠が無ければ「終了」と出すための枠一覧。
+  const [slots, setSlots] = useState<EventSlot[] | null>(null)
   const [loading, setLoading] = useState(true)
   // どれか落ちても残りは出すが、黙って0件表示にしない。全部落ちたら
   // 枠が0件に見え、申込なしと読み違えて定員判断を誤る(点検#520の中10)。
@@ -40,16 +43,19 @@ function BookingStatus({ accountId, eventId }: { accountId: string; eventId: str
     setLoadError(false)
     setEvent(null)
     setSummary(null)
+    setSlots(null)
     void (async () => {
       // どれか落ちても残りは出す。数えられなかったものは「—」になる。
-      const [e, s] = await Promise.allSettled([
+      const [e, s, sl] = await Promise.allSettled([
         eventsApi.getEvent(accountId, eventId),
         eventsApi.getBookingSummary(accountId, eventId),
+        eventsApi.listSlots(accountId, eventId),
       ])
       if (cancelled) return
       if (e.status === 'fulfilled') setEvent(e.value)
       if (s.status === 'fulfilled') setSummary(s.value)
-      if ([e, s].some((r) => r.status === 'rejected')) setLoadError(true)
+      if (sl.status === 'fulfilled') setSlots(sl.value.items)
+      if ([e, s, sl].some((r) => r.status === 'rejected')) setLoadError(true)
       setLoading(false)
     })()
     return () => {
@@ -78,17 +84,35 @@ function BookingStatus({ accountId, eventId }: { accountId: string; eventId: str
       )}
       <div className="mb-2 flex items-center gap-2">
         <h2 className="text-ink text-sm font-bold">申込の状況</h2>
-        {event && (
-          <span
-            className={`rounded-pill px-2 py-0.5 text-[10px] font-medium ${
-              event.is_published
-                ? 'bg-success-bg text-success'
-                : 'bg-canvas-sunken text-ink-faint'
-            }`}
-          >
-            {event.is_published ? '受付中' : '下書き'}
-          </span>
-        )}
+        {event && (() => {
+          /*
+           * R81: 公開済みでも今後の枠が無ければ「終了」。
+           * 枠が読めていないときは断定せず、旧来どおり受付中と出す。
+           */
+          const nowMs = Date.now()
+          const hasFuture = slots === null
+            ? null
+            : slots.some((s) => s.is_active === 1 && Date.parse(s.starts_at) >= nowMs)
+          if (!event.is_published) {
+            return (
+              <span className="rounded-pill bg-canvas-sunken text-ink-faint px-2 py-0.5 text-[10px] font-medium">
+                下書き
+              </span>
+            )
+          }
+          if (hasFuture === false) {
+            return (
+              <span className="rounded-pill bg-canvas-sunken text-ink-faint px-2 py-0.5 text-[10px] font-medium">
+                終了
+              </span>
+            )
+          }
+          return (
+            <span className="rounded-pill bg-success-bg text-success px-2 py-0.5 text-[10px] font-medium">
+              受付中
+            </span>
+          )
+        })()}
         <Link
           href={`/events/bookings?id=${eventId}`}
           className="text-action ml-auto text-xs hover:underline"
