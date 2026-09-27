@@ -30,6 +30,12 @@ import type { Env } from '../index.js';
 
 const dispatchOperatorEvent = vi.hoisted(() => vi.fn());
 vi.mock('../services/operator-notification-dispatch.js', () => ({ dispatchOperatorEvent }));
+// R150: 送信Webhookへの発火だけ差し替える。他の公開口(自動化・スコア)は本物。
+const fireOutgoingWebhooks = vi.hoisted(() => vi.fn());
+vi.mock('../services/event-bus.js', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  fireOutgoingWebhooks,
+}));
 // 本人確認と LINE 送信は対象外。回答の成否と運用者通知だけを見る。
 vi.mock('../services/liff-auth.js', () => ({
   verifyCallerLineIdentity: vi.fn(async (auth: string | undefined) => {
@@ -123,6 +129,8 @@ describe('N-327 #663 フォームの回答から運用者通知を自動発火�
   beforeEach(() => {
     dispatchOperatorEvent.mockReset();
     dispatchOperatorEvent.mockResolvedValue(undefined);
+    fireOutgoingWebhooks.mockReset();
+    fireOutgoingWebhooks.mockResolvedValue(undefined);
 
     sqlite = new Database(':memory:');
     sqlite.exec(BOOTSTRAP);
@@ -289,4 +297,84 @@ describe('N-327 #663 フォームの回答から運用者通知を自動発火�
     expect(submissionRows()).toHaveLength(0);
     expect(dispatchOperatorEvent).not.toHaveBeenCalled();
   });
+
+/*
+ * R150: 回答の送信Webhook発火。運用者通知と同じ成否境界で、回答を
+ * 受理したときだけ form_submitted を購読者へ届ける。回答の中身は
+ * 個人情報なので封筒には載せない。
+ */
+describe('R150 フォームの回答を送信Webhookへ発火する', () => {
+  const KEY_C = 'aaaaaaaa-1111-4333-8444-666666666603';
+  const KEY_D = 'aaaaaaaa-1111-4333-8444-666666666604';
+
+  test('受理した回答は回答IDを発生元に form_submitted を1回発火する', async () => {
+    const { ctx, settle } = collectingExecCtx();
+
+    const response = await submit(ctx, { key: KEY_C });
+    await settle();
+
+    expect(response.status).toBe(201);
+    const rows = submissionRows();
+    expect(rows).toHaveLength(1);
+    expect(fireOutgoingWebhooks).toHaveBeenCalledTimes(1);
+    const [db, eventType, payload, accountId] = fireOutgoingWebhooks.mock.calls[0] as [
+      unknown, string, Record<string, unknown>, string,
+    ];
+    expect(db).toBe(env.DB);
+    expect(eventType).toBe('form_submitted');
+    expect(accountId).toBe(ACCOUNT);
+    // 冪等キーの元になる発生元は回答IDで固定する（再送で積み増さない）。
+    expect(payload).toMatchObject({
+      sourceKind: 'form',
+      sourceEventId: rows[0].id,
+      friendId: 'friend-a',
+    });
+    const eventData = payload.eventData as Record<string, unknown>;
+    expect(eventData).toMatchObject({ formId: 'form-a', submissionId: rows[0].id });
+    // 回答の中身（個人情報）は封筒に載せない。
+    expect(eventData).not.toHaveProperty('data');
+    expect(JSON.stringify(eventData)).not.toContain('山田');
+  });
+
+  test('同じ Idempotency-Key の再送では送信Webhookも増えない', async () => {
+    const first = collectingExecCtx();
+    expect((await submit(first.ctx, { key: KEY_D })).status).toBe(201);
+    await first.settle();
+
+    const second = collectingExecCtx();
+    expect((await submit(second.ctx, { key: KEY_D })).status).toBe(200);
+    await second.settle();
+
+    expect(fireOutgoingWebhooks).toHaveBeenCalledTimes(1);
+  });
+
+  test('受理しなかった回答（必須未入力・Webhook却下）は発火しない', async () => {
+    const missing = collectingExecCtx();
+    expect((await submit(missing.ctx, { key: KEY_C, data: {} })).status).toBe(400);
+    await missing.settle();
+    expect(fireOutgoingWebhooks).not.toHaveBeenCalled();
+
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(
+      JSON.stringify({ eligible: false }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    )));
+    const denied = collectingExecCtx();
+    expect((await submit(denied.ctx, { key: KEY_D, formId: 'form-webhook' })).status).toBe(201);
+    await denied.settle();
+    expect(fireOutgoingWebhooks).not.toHaveBeenCalled();
+  });
+
+  test('送信Webhookが落ちても回答は保存し、拒否を外へ漏らさない', async () => {
+    fireOutgoingWebhooks.mockRejectedValueOnce(new Error('webhook dispatch unavailable'));
+    const { ctx, settle } = collectingExecCtx();
+
+    const response = await submit(ctx, { key: KEY_C });
+    const escaped = await settle();
+
+    expect(response.status).toBe(201);
+    expect(submissionRows()).toHaveLength(1);
+    expect(escaped).toEqual([]);
+  });
+});
+
 });

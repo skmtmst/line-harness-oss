@@ -24,7 +24,18 @@ describe('N-381 見本タブは外部連携の中で開く', () => {
 
   test('送る見本は送り先の作成へつなげる', () => {
     expect(source).toContain('OUTGOING_SAMPLES')
-    expect(source).toContain('href="/webhooks/new"')
+    // R150: 見本は作られる出来事の種類IDを持ち、作成画面へ ?event= で渡す。
+    // イベント指定なしのリンクは「すべて送る」の初期値を選んだことに
+    // なるので、見本からの導線では使わない。
+    expect(source).toContain('href={`/webhooks/new?event=${sample.event}`}')
+  })
+
+  test('送る見本の出来事は実際に購読できる種別コード', () => {
+    // KNOWN_OUTGOING_EVENT_TYPES（packages/db/src/webhooks.ts）と一致する
+    // ものだけ。作られない出来事を見せると「全イベント送信」の誤設定を生む。
+    for (const event of ['friend_add', 'form_submitted', 'booking_created', 'ec.order.confirmed']) {
+      expect(source).toContain(`event: '${event}'`)
+    }
   })
 })
 
