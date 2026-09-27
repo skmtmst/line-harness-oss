@@ -92,9 +92,10 @@ describe('connect/start', () => {
     firstQueue.push(null);
     const response = await appFor().fetch(post('/api/integrations/google-sheets/connect/start', { accountId: 'acc-1' }), env);
     expect(response.status).toBe(200);
-    const body = await response.json() as { authorizeUrl: string; mode: string };
-    expect(body.mode).toBe('connect');
-    const url = new URL(body.authorizeUrl);
+    // 応答は data 包み（packages/shared が正本）。包みが無いと画面が止まる。
+    const body = await response.json() as { data: { authorizeUrl: string; mode: string } };
+    expect(body.data.mode).toBe('connect');
+    const url = new URL(body.data.authorizeUrl);
     expect(url.searchParams.get('scope')).toBe('https://www.googleapis.com/auth/spreadsheets openid email');
     expect(url.searchParams.get('access_type')).toBe('offline');
     expect(url.searchParams.get('code_challenge')).toBeTruthy();
@@ -117,6 +118,50 @@ describe('connect/start', () => {
     accountAccess.getVisibleLineAccountScope.mockResolvedValue({ ids: ['other'], accounts: [] });
     const response = await appFor().fetch(post('/api/integrations/google-sheets/connect/start', { accountId: 'acc-1' }), env);
     expect(response.status).toBe(404);
+  });
+});
+
+describe('connection・runs の応答の形', () => {
+  it('未接続でも data 包みで disconnected を返す', async () => {
+    firstQueue.push(null); // integration なし
+    firstQueue.push(null); // counts なし
+    const response = await appFor().fetch(
+      new Request('https://worker.example.com/api/integrations/google-sheets/connection?account_id=acc-1'),
+      env,
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json() as {
+      success: boolean;
+      data: {
+        connection: { status: string };
+        oauthConfigured: boolean; syncRunning: boolean; canManage: boolean;
+      };
+    };
+    expect(body.success).toBe(true);
+    expect(body.data.connection.status).toBe('disconnected');
+    expect(body.data.oauthConfigured).toBe(true);
+    expect(body.data.syncRunning).toBe(false);
+    expect(body.data.canManage).toBe(true);
+  });
+
+  it('連携なしの runs は data 包みの空配列', async () => {
+    firstQueue.push(null); // integration なし
+    const response = await appFor().fetch(
+      new Request('https://worker.example.com/api/integrations/google-sheets/runs?account_id=acc-1'),
+      env,
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json() as { data: { runs: unknown[] } };
+    expect(body.data.runs).toEqual([]);
+  });
+
+  it('一般staffは connection を読めない（403）', async () => {
+    const staff: AuthenticatedStaff = { id: 'staff-1', name: '担当', role: 'staff', readOnly: false } as AuthenticatedStaff;
+    const response = await appFor(staff).fetch(
+      new Request('https://worker.example.com/api/integrations/google-sheets/connection?account_id=acc-1'),
+      env,
+    );
+    expect(response.status).toBe(403);
   });
 });
 
@@ -224,8 +269,8 @@ describe('disconnect', () => {
     googleBusiness.revokeToken.mockResolvedValue(true);
     const response = await appFor().fetch(post('/api/integrations/google-sheets/disconnect', { accountId: 'acc-1', confirmed: true }), env);
     expect(response.status).toBe(200);
-    const body = await response.json() as { revoked: boolean };
-    expect(body.revoked).toBe(true);
+    const body = await response.json() as { data: { revoked: boolean } };
+    expect(body.data.revoked).toBe(true);
     expect(googleBusiness.revokeToken).toHaveBeenCalledWith({ token: 'rt-1', fetch: expect.anything() });
     expect(statements.some((s) => s.sql.includes('DELETE FROM google_sheets_integrations'))).toBe(true);
     expect(auditLogMod.auditLog).toHaveBeenCalledWith(
