@@ -56,6 +56,12 @@ export function Issue469ReminderStepEditor({ reminderId }: { reminderId: string 
   const [settings, setSettings] = useState<ReminderDraftSettings | null>(null)
   const [savedSettings, setSavedSettings] = useState<ReminderDraftSettings | null>(null)
   const [versionId, setVersionId] = useState<string | null>(null)
+  /*
+   * R148 監査：開いたときの版時刻。通常保存は版IDを付け替えないため、
+   * 版IDだけでは別の画面の先勝ちを見逃す。保存のたびに変わるこの時刻も
+   * 送り、ずれていれば 409 で止める。
+   */
+  const [versionUpdatedAt, setVersionUpdatedAt] = useState<string | null>(null)
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null)
   // 差し込みをカーソルの位置に入れるために、本文の入力欄そのものを渡す。
   const bodyRef = useRef<HTMLTextAreaElement>(null)
@@ -85,6 +91,7 @@ export function Issue469ReminderStepEditor({ reminderId }: { reminderId: string 
       setSettings(response.data.settings)
       setSavedSettings(response.data.settings)
       setVersionId(response.data.versionId)
+      setVersionUpdatedAt(response.data.updatedAt)
       setConflict(false)
       setSelectedStepId((current) => current
         && response.data.settings.steps.some((step) => step.stableStepId === current)
@@ -193,7 +200,9 @@ export function Issue469ReminderStepEditor({ reminderId }: { reminderId: string 
       const response = await api.reminders.saveDraft(
         reminderId,
         settings,
-        versionId ? { expectedVersionId: versionId } : {},
+        // R148 監査：版IDに加え、開いたときの版時刻も送る。別の画面が先に
+        // 保存していたら 409 になり、古い内容で上書きしない。
+        versionId ? { expectedVersionId: versionId, ...(versionUpdatedAt ? { expectedUpdatedAt: versionUpdatedAt } : {}) } : {},
       )
       if (seq !== requestSeq.current) return
       if (!response.success) throw new Error(response.error)
@@ -201,6 +210,7 @@ export function Issue469ReminderStepEditor({ reminderId }: { reminderId: string 
       setSettings(response.data.settings)
       setSavedSettings(response.data.settings)
       setVersionId(response.data.versionId)
+      setVersionUpdatedAt(response.data.updatedAt)
       router.push(`/reminders/edit?id=${encodeURIComponent(reminderId)}&stage=preview`)
     } catch (saveError) {
       if (seq !== requestSeq.current) return

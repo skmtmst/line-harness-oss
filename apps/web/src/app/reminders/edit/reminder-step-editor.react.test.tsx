@@ -224,6 +224,19 @@ describe('通知ステップの複数通編集', () => {
     await waitFor(() => expect(fixture.routerPush).toHaveBeenCalledWith('/reminders'))
   })
 
+  it('R148: 開いたときの版時刻も保存時に送り、版IDが同じでも先勝ちを見逃さない', async () => {
+    fixture.getDraft.mockResolvedValue(draftResponse({ updatedAt: '2026-09-27T10:00:00.000+09:00' }))
+    const { container } = render(<Issue469ReminderStepEditor reminderId="r-1" />)
+    await waitFor(() => expect(bodyTextarea(container).value).toBe('前日のお知らせ本文'))
+
+    fireEvent.change(bodyTextarea(container), { target: { value: '改稿' } })
+    fireEvent.click(screen.getByRole('button', { name: '送信設定へ' }))
+    await waitFor(() => expect(fixture.saveDraft).toHaveBeenCalled())
+
+    const options = fixture.saveDraft.mock.calls[0][2]
+    expect(options).toEqual({ expectedVersionId: 'v-1', expectedUpdatedAt: '2026-09-27T10:00:00.000+09:00' })
+  })
+
   it('別画面で先に更新されていたら409を知らせ、読み直しを案内する', async () => {
     fixture.saveDraft.mockRejectedValue(new TestApiError(409, 'この下書きは別の画面で先に更新されました'))
     const { container } = render(<Issue469ReminderStepEditor reminderId="r-1" />)
