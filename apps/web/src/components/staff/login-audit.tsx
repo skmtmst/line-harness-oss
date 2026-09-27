@@ -273,4 +273,3 @@ export default function LoginAudit({ userId }: { userId?: string }) {
 function AuditKpi({ label, value, note, attention = false }: { label: string; value: number | null; note: string; attention?: boolean }) {
   return <div className="flex h-28 flex-col gap-1 rounded-card border border-hairline bg-canvas p-4"><p className="text-xs font-semibold leading-normal text-ink-faint">{label}</p><p className={`text-xl font-bold leading-normal tabular-nums ${attention ? 'text-danger' : 'text-ink'}`}>{value === null ? '—' : <>{value.toLocaleString()}<span className="ml-1 text-xs font-medium text-ink-faint">件</span></>}</p><p className="text-xs leading-normal text-ink-faint">{note}</p></div>
 }
-

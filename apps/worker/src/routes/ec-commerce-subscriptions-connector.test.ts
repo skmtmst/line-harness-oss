@@ -15,6 +15,9 @@ vi.mock('@line-crm/db', () => ({
   encryptCredential: mocks.encryptCredential,
   getLineAccountById: vi.fn(),
   jstNow: () => '2026-09-06T12:00:00+09:00',
+  // connector の健康集計がJSTの暦日で「今日」を切るようになったため足す。
+  jstDateString: () => '2026-09-06',
+  nextDateString: () => '2026-09-07',
 }))
 
 const { ecCommerce } = await import('./ec-commerce.js')

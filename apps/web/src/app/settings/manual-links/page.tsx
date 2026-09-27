@@ -188,20 +188,21 @@ export default function ManualLinksPage() {
       </div>
 
       <ListToolbar
-        searchPlaceholder="画面ID・画面名で検索"
-        searchValue={query}
-        onSearchChange={setQuery}
-      >
-        <Select
-          aria-label="リンクの状態"
-          value={filter}
-          onChange={(value) => setFilter(value as StatusFilter)}
-          options={STATUS_FILTERS.map((f) => ({ value: f.value, label: `状態：${f.label}` }))}
-        />
-        <Button disabled={checking} onClick={() => void checkAll()}>
-          {checking ? '確かめています…' : 'いま全部を確かめる'}
-        </Button>
-      </ListToolbar>
+        search={{ placeholder: '画面ID・画面名で検索', value: query, onChange: setQuery }}
+        filters={
+          <Select
+            aria-label="リンクの状態"
+            value={filter}
+            onChange={(value) => setFilter(value as StatusFilter)}
+            options={STATUS_FILTERS.map((f) => ({ value: f.value, label: `状態：${f.label}` }))}
+          />
+        }
+        trailing={
+          <Button disabled={checking} onClick={() => void checkAll()}>
+            {checking ? '確かめています…' : 'いま全部を確かめる'}
+          </Button>
+        }
+      />
 
       {actionError && (
         <p role="alert" className={styles.actionError}>

@@ -274,6 +274,34 @@ describe('管理画面のアカウント境界', () => {
     expect(mocks.getSiteTrackingSummary).not.toHaveBeenCalled();
   });
 
+  it('管理画面の account_id（rangeQueryの約束）で選んだアカウントを読む', async () => {
+    // 監査の再現：複数アカウントの担当者が選んだ値を口が無視し、
+    // 400で計測状況がエラーになっていた。account_id を受ければ直る。
+    mocks.getVisibleScope.mockResolvedValue({
+      accounts: [], allowedAccountIds: ['account-a', 'account-b'], canSeeUnassigned: false,
+      ids: ['account-a', 'account-b'], isAccountScoped: false,
+    });
+    const summary = await app.fetch(
+      new Request('https://example.com/api/site/summary?account_id=account-a'),
+      env as unknown as Env['Bindings'],
+    );
+    expect(summary.status).toBe(200);
+    expect(mocks.getSiteTrackingSummary).toHaveBeenCalledWith(env.DB, 'account-a');
+
+    const pages = await app.fetch(
+      new Request('https://example.com/api/site/pages?account_id=account-a'),
+      env as unknown as Env['Bindings'],
+    );
+    expect(pages.status).toBe(200);
+
+    const key = await app.fetch(
+      new Request('https://example.com/api/site/tracking-key?account_id=account-a'),
+      env as unknown as Env['Bindings'],
+    );
+    expect(key.status).toBe(200);
+    expect(mocks.getOrCreateSiteTrackingKey).toHaveBeenCalledWith(env.DB, 'account-a');
+  });
+
   it('集計とページ閲覧を選択アカウントで絞る', async () => {
     expect((await app.fetch(
       new Request('https://example.com/api/site/summary?accountId=account-a'),

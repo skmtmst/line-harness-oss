@@ -13,6 +13,8 @@ import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
 import Button from '@/components/shared/button'
 import FilterChip from '@/components/shared/filter-chip'
+import ListToolbar from '@/components/shared/list-toolbar'
+import { RowActions } from '@/components/shared/row-actions'
 import ListKpis from '@/components/shared/list-kpis'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
@@ -951,32 +953,39 @@ export default function TagsPageV4({
           </div>
           <section className="min-w-0">
             {/*
-              検索・選択は最長の表示内容と矢印余白を確保し、残る幅は検索欄へ渡す。
-              狭いときだけ折り返し、文字と矢印を重ねない。
+              ★V7 `Xn1Mz`：検索は幅320で1行目、2行目は左に絞り込み・
+              右端に表示件数。狭いときだけ折り返す。
             */}
-            <div className="mb-[10px] flex flex-wrap items-center gap-2">
-              <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="タグ名・用途で検索" className="h-10 min-w-45 flex-1 rounded-control border border-hairline bg-canvas px-3 text-label" />
-              <Select aria-label="使用状態で絞り込む" value={usageFilter} onChange={setUsageFilter} options={[{ value: 'all', label: '使用状態：すべて' }, { value: 'linked', label: '連動あり' }, { value: 'unused', label: '未使用' }]} />
-              <Select aria-label="付与元で絞り込む" value={sourceFilter} onChange={setSourceFilter} options={[{ value: 'all', label: '付与元：すべて' }, ...Object.entries(SOURCE_LABELS).map(([value, label]) => ({ value, label }))]} />
-              <Select aria-label="表示件数" value={String(pageSize)} onChange={(value) => setPageSize(Number(value))} options={[20, 30, 40, 50].map((size) => ({ value: String(size), label: `${size}件表示` }))} size="page-size" className="ml-auto" />
-              <span className="text-xs tabular-nums text-ink-faint">{ready ? `${filtered.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, filtered.length)} / ${filtered.length}件` : '—'}</span>
-            </div>
-            {/* 設計 `UOmne`。**5つ。押した数だけ重ねて絞る。** */}
-            <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
-              <span className="text-ink-faint">よく使う</span>
-              {QUICK_FILTERS.map(([key, label]) => {
-                const on = quick.includes(key)
-                return (
-                  <FilterChip
-                    key={key}
-                    selected={on}
-                    onChange={(next) => setQuick((current) => next ? [...current, key] : current.filter((k) => k !== key))}
-                  >
-                    {label}
-                  </FilterChip>
-                )
-              })}
-            </div>
+            <ListToolbar
+              search={{ placeholder: 'タグ名・用途で検索', value: query, onChange: setQuery }}
+              filters={
+                <>
+                  {/* 素の select は置かない（#640）。選び口は共通 Select。幅は部品の既定（176px）。 */}
+                  <Select aria-label="使用状態で絞り込む" value={usageFilter} onChange={setUsageFilter} options={[{ value: 'all', label: '使用状態：すべて' }, { value: 'linked', label: '連動あり' }, { value: 'unused', label: '未使用' }]} />
+                  <Select aria-label="付与元で絞り込む" value={sourceFilter} onChange={setSourceFilter} options={[{ value: 'all', label: '付与元：すべて' }, ...Object.entries(SOURCE_LABELS).map(([value, label]) => ({ value, label }))]} />
+                  {/* 設計 `UOmne`。**5つ。押した数だけ重ねて絞る。** */}
+                  <span className="text-ink-faint text-xs">よく使う</span>
+                  {QUICK_FILTERS.map(([key, label]) => {
+                    const on = quick.includes(key)
+                    return (
+                      <FilterChip
+                        key={key}
+                        selected={on}
+                        onChange={(next) => setQuick((current) => next ? [...current, key] : current.filter((k) => k !== key))}
+                      >
+                        {label}
+                      </FilterChip>
+                    )
+                  })}
+                </>
+              }
+              trailing={
+                <>
+                  <Select aria-label="表示件数" value={String(pageSize)} onChange={(value) => setPageSize(Number(value))} options={[20, 30, 40, 50].map((size) => ({ value: String(size), label: `${size}件表示` }))} size="page-size" />
+                  <span className="text-xs tabular-nums text-ink-faint">{ready ? `${filtered.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, filtered.length)} / ${filtered.length}件` : '—'}</span>
+                </>
+              }
+            />
             {/*
               中身が詰まったら**表だけ**横スクロールさせる。
               画面ごと横に伸ばすと、共通ルール §1-8 の「1440でも横スクロールを
@@ -1104,11 +1113,22 @@ export default function TagsPageV4({
                           </button>
                         </Td>
                         <ActionCell className="sticky right-0 bg-canvas group-hover:bg-canvas-sunken">
-                          {/* 設計 `E2NC4`。赤いゴミ箱だけ。文字の「削除」は置かない。 */}
+                          {/*
+                            ★V7 `Xn1Mz`：行の操作は「主な1つ（編集）＋…」。
+                            削除はメニューの中の危ない操作へ。赤いゴミ箱だけの
+                            ボタンは行に直に置かない（設計 `E2NC4` の見た目指定は
+                            使いやすさの直しのため外す。確認窓の動きは残す）。
+                          */}
                           <span onClick={(event) => event.stopPropagation()}>
-                            <button type="button" onClick={() => setDeleteTarget(tag)} aria-label={`${tag.name} を削除`} className="text-danger hover:opacity-70">
-                              <TrashIcon />
-                            </button>
+                          <RowActions
+                            subjectName={tag.name}
+                            edit={{ href: `/tags/edit?id=${tag.id}` }}
+                            destructiveItem={{
+                              id: 'delete',
+                              label: '削除する',
+                              onSelect: () => setDeleteTarget(tag),
+                            }}
+                          />
                           </span>
                         </ActionCell>
                       </Tr>
@@ -1171,9 +1191,17 @@ export default function TagsPageV4({
                               >
                                 <StarIcon filled={Boolean(tag.isStarred)} />
                               </button>
-                              <button type="button" onClick={(event) => { event.stopPropagation(); setDeleteTarget(tag) }} aria-label={`${tag.name} を削除`} className="text-danger hover:opacity-70">
-                                <TrashIcon />
-                              </button>
+                              <span onClick={(event) => event.stopPropagation()}>
+                                <RowActions
+                                  subjectName={tag.name}
+                                  edit={{ href: `/tags/edit?id=${tag.id}` }}
+                                  destructiveItem={{
+                                    id: 'delete',
+                                    label: '削除する',
+                                    onSelect: () => setDeleteTarget(tag),
+                                  }}
+                                />
+                              </span>
                             </div>
                           </div>
                         </li>

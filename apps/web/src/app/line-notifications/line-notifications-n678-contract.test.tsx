@@ -31,6 +31,7 @@ const fixture = vi.hoisted(() => ({
   getTestRecipients: vi.fn(),
   definitions: vi.fn(),
   metrics: vi.fn(),
+  sendCounts: vi.fn(),
   quota: vi.fn(),
   updateDraft: vi.fn(),
   createDefinition: vi.fn(),
@@ -111,6 +112,7 @@ vi.mock('@/lib/api', () => {
       lineNotifications: {
         definitions: fixture.definitions,
         metrics: fixture.metrics,
+        sendCounts: fixture.sendCounts,
         updateDraft: fixture.updateDraft,
         createDefinition: fixture.createDefinition,
         publishDefinition: fixture.publishDefinition,
@@ -279,6 +281,10 @@ beforeEach(() => {
   fixture.overview.mockResolvedValue({ success: true, data: { last24h: 0, failed: 0, byType: [] } })
   fixture.definitions.mockResolvedValue({ success: true, data: [] })
   fixture.metrics.mockResolvedValue({ success: true, data: { items: [] } })
+  fixture.sendCounts.mockResolvedValue({
+    success: true,
+    data: { sentToday: 0, sentLast30d: 0, byEventType: [], period: { today: '2026-09-15', from30d: '2026-08-17', to: '2026-09-15' } },
+  })
   fixture.quota.mockResolvedValue({
     success: true,
     data: {
@@ -1159,6 +1165,48 @@ describe('#678 実DOMへマウントした画面全体', () => {
 
     await waitFor(() => expect(screen.getByText('注文を受け付けました')).toBeTruthy())
     expect(screen.getByText('運用者へのお知らせ 0')).toBeTruthy()
+  })
+
+  it('今日・この30日は送信履歴の数（取り込み累計やLINE集計の合計ではない）', async () => {
+    fixture.settings.mockResolvedValue({ success: true, data: [setting()] })
+    // 取り込みは5件・LINE集計の合計は9件でも、行には出さない。
+    fixture.overview.mockResolvedValue({
+      success: true,
+      data: { last24h: 5, failed: 0, byType: [{ eventType: 'order.confirmed', label: '注文受付', count: 5 }] },
+    })
+    fixture.metrics.mockResolvedValue({
+      success: true,
+      data: {
+        items: [{
+          definitionId: 'definition-a',
+          notificationName: '注文受付',
+          accepted: { value: 9 },
+          displayed: { state: 'available', value: 8, reason: null },
+          clicked: { value: 1 },
+        }],
+        coverage: { individualOpenAvailable: false, lineAggregateOnly: true, unavailableIsNull: true },
+      },
+    })
+    fixture.sendCounts.mockResolvedValue({
+      success: true,
+      data: {
+        sentToday: 2,
+        sentLast30d: 7,
+        byEventType: [{ eventType: 'order.confirmed', today: 2, last30d: 7 }],
+        period: { today: '2026-09-15', from30d: '2026-08-17', to: '2026-09-15' },
+      },
+    })
+
+    render(<LineNotificationsPage />)
+
+    await waitFor(() => expect(screen.getByText('注文を受け付けました')).toBeTruthy())
+    // 行の「今日」「この30日」は送信履歴の2通・7通。
+    expect(screen.getByText('2通')).toBeTruthy()
+    expect(screen.getByText('7通')).toBeTruthy()
+    expect(screen.queryByText('5通')).toBeNull()
+    expect(screen.queryByText('9通')).toBeNull()
+    // KPIの「今日 送った」も送信履歴の合計。
+    expect(screen.getByText('今日 送った')).toBeTruthy()
   })
 
   it('403: 顧客のお知らせは「表示する権限がありません」を出し、読み直す口は出さない', async () => {

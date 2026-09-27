@@ -32,11 +32,18 @@ const PAGE_SIZE_SELECT_USERS: Array<[string, string]> = [
   ['友だち一覧', '../friends/friend-list-table.tsx'],
 ]
 
-/** 「検索 → 絞り込み → 並び順 → 表示件数」の順で並ぶ画面。 */
+/**
+ * 「検索 → 絞り込み → 並び順 → 表示件数」の順で並ぶ画面。
+ *
+ * 共通 ListToolbar へそろえた画面は、検索が部品の1行目にあることを
+ * `<ListToolbar` の位置で見る（検索 input は部品の中にあり、画面側に
+ * `type="search"` の直書きを残さない。統一の契約テストで禁止）。
+ * 幅の実数（320・下限240）は ListToolbar の契約テストで守る。
+ */
 const TOOLBAR_ORDER: Array<[string, string, string[]]> = [
-  ['リマインダ', '../../app/reminders/page.tsx', ['type="search"', '>よく使う絞り込み<', '<SortSelect', '<PageSizeSelect']],
-  ['自動応答', '../../app/auto-replies/page.tsx', ['type="search"', '>よく使う絞り込み<', '<SortSelect', '<PageSizeSelect']],
-  ['ウェビナー', '../../app/webinars/page.tsx', ['type="search"', '>よく使う絞り込み<', '<SortSelect', '<PageSizeSelect']],
+  ['リマインダ', '../../app/reminders/page.tsx', ['<ListToolbar', '>よく使う絞り込み<', '<SortSelect', '<PageSizeSelect']],
+  ['自動応答', '../../app/auto-replies/page.tsx', ['<ListToolbar', '>よく使う絞り込み<', '<SortSelect', '<PageSizeSelect']],
+  ['ウェビナー', '../../app/webinars/page.tsx', ['<ListToolbar', '>よく使う絞り込み<', '<SortSelect', '<PageSizeSelect']],
   ['共通情報', '../../app/contents/vars/page.tsx', ['data-search-row', '>よく使う絞り込み<', '<SortSelect', '<PageSizeSelect']],
 ]
 

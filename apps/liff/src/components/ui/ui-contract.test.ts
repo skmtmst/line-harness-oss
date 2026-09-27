@@ -21,7 +21,7 @@ function ui(name: string): string {
   return readFileSync(join(UI, name), 'utf8');
 }
 
-/** 今回作り替えた予約まわりの文面。Event・Form・Webinar は次の PR なので外す。 */
+/** ★V7 に作り替えた文面。Event 系は別 PR なので外す。 */
 const V7_FILES = [
   ui('Icon.tsx'),
   ui('Button.tsx'),
@@ -42,6 +42,9 @@ const V7_FILES = [
   src('pages', 'Booking.tsx'),
   src('pages', 'BookingHistory.tsx'),
   src('components', 'HistoryCard.tsx'),
+  src('pages', 'Form.tsx'),
+  src('pages', 'Affiliate.tsx'),
+  src('pages', 'Webinar.tsx'),
 ];
 
 describe('★V7 の色はトークンだけ', () => {

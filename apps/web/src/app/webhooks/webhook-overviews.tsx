@@ -336,35 +336,36 @@ export function OutgoingOverview({
       ) : null}
 
       <ListToolbar
-        searchPlaceholder="つなぎ先・送るタイミングで検索"
-        searchValue={query}
-        onSearchChange={setQuery}
-      >
-        <Select
-          aria-label="外部連携の状態"
-          value={filter}
-          onChange={(value) => setFilter(value as OutgoingFilter)}
-          // ★V7 `x63W5x`：取れていない間の件数は出さない（0 と読めるため）。
-          options={(() => {
-            const count = (n: number) => (status === 'ready' ? ` ${n}` : '')
-            return [
-              { value: 'all', label: `すべて${count(items.length + incomingCount)}` },
-              { value: 'active', label: `動いている${count(activeCount)}` },
-              { value: 'paused', label: `止めている${count(pausedCount)}` },
-              { value: 'failed', label: `失敗あり${count(failedCount)}` },
-            ]
-          })()}
-        />
-        <Select
-          aria-label="外部連携の並び順"
-          value={sort}
-          onChange={(value) => setSort(value as OutgoingSort)}
-          options={[
-            { value: 'volume', label: '送った回数が多い順' },
-            { value: 'name', label: '名前順' },
-          ]}
-        />
-      </ListToolbar>
+        search={{ placeholder: 'つなぎ先・送るタイミングで検索', value: query, onChange: setQuery }}
+        filters={
+          <Select
+            aria-label="外部連携の状態"
+            value={filter}
+            onChange={(value) => setFilter(value as OutgoingFilter)}
+            // ★V7 `x63W5x`：取れていない間の件数は出さない（0 と読めるため）。
+            options={(() => {
+              const count = (n: number) => (status === 'ready' ? ` ${n}` : '')
+              return [
+                { value: 'all', label: `すべて${count(items.length + incomingCount)}` },
+                { value: 'active', label: `動いている${count(activeCount)}` },
+                { value: 'paused', label: `止めている${count(pausedCount)}` },
+                { value: 'failed', label: `失敗あり${count(failedCount)}` },
+              ]
+            })()}
+          />
+        }
+        trailing={
+          <Select
+            aria-label="外部連携の並び順"
+            value={sort}
+            onChange={(value) => setSort(value as OutgoingSort)}
+            options={[
+              { value: 'volume', label: '送った回数が多い順' },
+              { value: 'name', label: '名前順' },
+            ]}
+          />
+        }
+      />
 
       {status === 'loading' ? (
         <ListState kind="loading" title="こちらから送る設定を読み込んでいます" />

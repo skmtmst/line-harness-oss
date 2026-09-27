@@ -118,11 +118,14 @@ describe('友だち属性の一覧（設計 hqrOv）', () => {
 
   it('ツールバーを枠付きカードで包まず、フォルダは240で置く', () => {
     const source = read('components/friend-fields/tags-page-v4.tsx')
-    // Issue #456 で Pencil `XchZz` も更新。検索は余白を使い、選択欄は
-    // 最長文字＋矢印余白を確保する。すべて h=40 で文字を切らない。
-    expect(source).toContain('mb-[10px] flex flex-wrap items-center gap-2')
-    expect(source).toContain('h-10 min-w-45 flex-1 rounded-control')
-    // 絞り込みと表示件数は共通 Select（高さ40pxは部品側が持つ）。
+    // Issue #456 で Pencil `XchZz` も更新。検索は余白を使い、選び口は
+    // 共通 Select（素の select は置かない #640）。幅・高さは部品が持つ。
+    // ★V7 `Xn1Mz`：道具の並びは共通 ListToolbar へそろえた。
+    // 枠付きカードで包んだ直書きの帯に戻さない。
+    expect(source).toContain('<ListToolbar')
+    expect(source).not.toContain('type="search"')
+    expect(source).not.toContain('<select')
+    expect(source).not.toContain('mb-[10px] flex flex-wrap items-center gap-2')
     expect(source).toContain('aria-label="使用状態で絞り込む"')
     expect(source).toContain('aria-label="付与元で絞り込む"')
     expect(source).toContain('aria-label="表示件数"')

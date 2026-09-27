@@ -29,6 +29,7 @@ export const STEP_UP_PURPOSES = [
   'line_account.connect',
   'line_account.credentials',
   'line_account.archive',
+  'account_handover.execute',
   'broadcast.approval',
   'webhook.api_token',
   'webhook.secret',
