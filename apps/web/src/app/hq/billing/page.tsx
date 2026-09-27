@@ -49,6 +49,12 @@ function BillingInner() {
   const [status, setStatus] = useState<LoadStatus>('loading')
   const [summary, setSummary] = useState<BillingSummary | null>(null)
   const [invoices, setInvoices] = useState<BillingInvoice[] | null>(null)
+  /*
+   * R118: 履歴だけの取得失敗は概要と分けて持つ。失敗を `[]` に畳むと
+   * 「まだ支払いはありません」と出て、記録が無いと誤読される。
+   * `null` は読み込み前の初期値なので、失敗は別の旗で見る。
+   */
+  const [invoiceFailed, setInvoiceFailed] = useState(false)
   const [role, setRole] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState('')
@@ -56,11 +62,14 @@ function BillingInner() {
 
   const load = useCallback(async () => {
     setStatus('loading')
+    setInvoiceFailed(false)
     try {
       const [summaryRes, invoiceRes] = await Promise.all([api.hqBilling.summary(), api.hqBilling.invoices().catch(() => null)])
       if (!summaryRes.success) throw new Error(summaryRes.error)
       setSummary(summaryRes.data)
-      setInvoices(invoiceRes?.success ? invoiceRes.data : [])
+      // R118: 履歴の失敗は空配列にしない。概要は出して履歴欄だけ失敗表示にする。
+      setInvoices(invoiceRes?.success ? invoiceRes.data : null)
+      setInvoiceFailed(!invoiceRes?.success)
       setStatus('ready')
     } catch (caught) {
       setStatus(caught instanceof ApiError && caught.status === 403 ? 'forbidden' : 'error')
@@ -230,7 +239,11 @@ function BillingInner() {
       <section data-design="History" data-design-node={interval === 'year' ? 'N4u2jV' : 'x6Xjm'} className="flex flex-col rounded-card border border-hairline bg-canvas">
         <h2 className="px-4 py-3 text-body font-bold text-ink">支払い履歴</h2>
         <div className="border-t border-hairline" />
-        {invoices === null || invoices.length === 0 ? (
+        {invoiceFailed ? (
+          <div className="px-4 py-5">
+            <ListState kind="error" title="支払い履歴を読み込めませんでした" onRetry={() => void load()} />
+          </div>
+        ) : invoices === null || invoices.length === 0 ? (
           <p className="px-4 py-5 text-caption text-ink-faint">まだ支払いはありません。プランを選ぶと、ここに請求と支払いの記録が並びます。</p>
         ) : (
           <DataTable>
