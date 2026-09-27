@@ -174,6 +174,41 @@ describe('ActionMenu ★V7 のキーボード', () => {
   })
 })
 
+describe('ActionMenu R13: 行の中でも行へ伝えない', () => {
+  it('項目の押下は、行の詳細遷移（tr onClick）まで届かない', async () => {
+    const onRow = vi.fn()
+    const onSelect = vi.fn()
+    await act(async () => {
+      root.render(
+        <table><tbody><tr onClick={onRow}><td>
+          <ActionMenu open inline onClose={vi.fn()} items={[{ id: 'delete', label: '削除する', tone: 'danger', onSelect }]} />
+        </td></tr></tbody></table>,
+      )
+    })
+    await act(async () => {
+      menuButtons()[0].click()
+    })
+    expect(onSelect).toHaveBeenCalledTimes(1)
+    expect(onRow).not.toHaveBeenCalled()
+  })
+
+  it('メニュー内の押下（容器の余白など）も行へ届かない', async () => {
+    const onRow = vi.fn()
+    await act(async () => {
+      root.render(
+        <table><tbody><tr onClick={onRow}><td>
+          <ActionMenu open inline onClose={vi.fn()} items={[{ id: 'a', label: '対応状況を編集', onSelect: vi.fn() }]} note="補足" />
+        </td></tr></tbody></table>,
+      )
+    })
+    const menu = host.querySelector('[role="menu"]') as HTMLElement
+    await act(async () => {
+      menu.click()
+    })
+    expect(onRow).not.toHaveBeenCalled()
+  })
+})
+
 describe('ActionMenu ★V7 の見た目', () => {
   it('白地・角丸12・枠・影、項目36（補足つき52）・文字14・触った時の地は shell', () => {
     const css = read('action-menu.module.css')

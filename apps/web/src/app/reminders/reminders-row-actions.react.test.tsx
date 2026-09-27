@@ -12,10 +12,17 @@ vi.hoisted(() => {
 })
 
 const fetchApi = vi.hoisted(() => vi.fn())
+const routerPush = vi.hoisted(() => vi.fn())
+const remindersDelete = vi.hoisted(() => vi.fn())
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
-  return { ...actual, fetchApi }
+  return {
+    ...actual,
+    fetchApi,
+    // 削除の口は api.ts の中で内部 fetch を使うため、口ごと差し替える。
+    api: { ...actual.api, reminders: { ...actual.api.reminders, delete: remindersDelete } },
+  }
 })
 
 vi.mock('next/link', () => ({
@@ -24,7 +31,7 @@ vi.mock('next/link', () => ({
 }))
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn(), replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
+  useRouter: () => ({ push: routerPush, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   useSearchParams: () => new URLSearchParams(''),
 }))
 
@@ -48,6 +55,8 @@ let host: HTMLDivElement
 let root: Root
 
 beforeEach(() => {
+  routerPush.mockClear()
+  remindersDelete.mockResolvedValue({ success: true, data: null })
   fetchApi.mockImplementation(async (url: string) => {
     if (url.startsWith('/api/folders')) {
       return { success: true, data: [], unfiledCount: 0 }
@@ -106,5 +115,41 @@ describe('リマインダ一覧の行操作', () => {
     expect(menu!.textContent).toContain('登録者を管理')
     expect(menu!.textContent).toContain('配信予定を確認')
     expect(menu!.textContent).toContain('削除する')
+  })
+
+  it('R13: メニューの「削除する」は確認の窓を出し、詳細へは移動しない', async () => {
+    await act(async () => { root.render(<RemindersPage />) })
+    await flush()
+    const more = host.querySelector('button[aria-label="予約前のお知らせのその他操作"]') as HTMLButtonElement
+    act(() => { more.click() })
+    // メニューは最上層（MenuPortal→document.body）に出る。器の中にはいない。
+    const item = [...document.querySelectorAll('[role="menuitem"]')]
+      .find((el) => el.textContent?.includes('削除する')) as HTMLButtonElement
+    await act(async () => { item.click() })
+    await flush()
+    // 削除の確認が出る（確認の窓は body 直下の portal）。行の詳細遷移（router.push）は動かない。
+    expect(document.body.textContent).toContain('「予約前のお知らせ」を削除しますか？')
+    expect(routerPush).not.toHaveBeenCalled()
+  })
+
+  it('R13: 確認で「削除する」を押すと、その行だけ消える', async () => {
+    await act(async () => { root.render(<RemindersPage />) })
+    await flush()
+    const more = host.querySelector('button[aria-label="予約前のお知らせのその他操作"]') as HTMLButtonElement
+    act(() => { more.click() })
+    // メニューは最上層（MenuPortal→document.body）に出る。器の中にはいない。
+    const item = [...document.querySelectorAll('[role="menuitem"]')]
+      .find((el) => el.textContent?.includes('削除する')) as HTMLButtonElement
+    await act(async () => { item.click() })
+    await flush()
+    const confirm = [...document.body.querySelectorAll('button')]
+      .find((el) => el.textContent === '削除する') as HTMLButtonElement
+    expect(confirm, '確認の窓の「削除する」が見つかりません').toBeTruthy()
+    await act(async () => { confirm.click() })
+    await flush()
+    // その行（r-1）だけを消しに行く。確認の窓は閉じる。
+    expect(remindersDelete).toHaveBeenCalledTimes(1)
+    expect(remindersDelete).toHaveBeenCalledWith('r-1')
+    expect(document.body.textContent).not.toContain('を削除しますか？')
   })
 })
