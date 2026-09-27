@@ -17,6 +17,7 @@ import GoogleSheetsPanel from './google-sheets-panel'
 import { IncomingOverview, OutgoingKpis, OutgoingOverview } from './webhook-overviews'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { MIN_SECRET_LENGTH, generateSecret } from './secret'
+import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
 
 type Tab = 'incoming' | 'outgoing'
 type LoadStatus = 'loading' | 'ready' | 'error'
@@ -184,6 +185,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
     ? requestedSource
     : ''
   const [showCreate, setShowCreate] = useState(initialSource !== '')
+  const [stepUp, setStepUp] = useState<StepUpRequest | null>(null)
 
   const [inForm, setInForm] = useState({ name: '', sourceType: initialSource, secret: '' })
   // 見本に無いものを選んだときだけ、自由入力に切り替える。
@@ -461,7 +463,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
     }
   }
 
-  const handleCreateIncoming = async (e: React.FormEvent) => {
+  const handleCreateIncoming = async (e: React.FormEvent, stepUpToken?: string) => {
     e.preventDefault()
     setError('')
     const requestAccountId = selectedAccountId
@@ -477,7 +479,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
         name: inForm.name,
         sourceType: inForm.sourceType || undefined,
         secret: inForm.secret,
-      })
+      }, stepUpToken)
       if (!res.success) {
         if (selectedAccountIdRef.current !== requestAccountId) return
         setError(res.error)
@@ -490,7 +492,12 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
       setSourceIsOther(false)
       setShowCreate(false)
       await load()
-    } catch {
+    } catch (caught) {
+      // 秘密の値の登録は大事な操作。本人確認を求められたら窓を立てる（V-1）。
+      if (!stepUpToken && isStepUpRequired(caught)) {
+        setStepUp({ purpose: 'webhook.secret', action: '受け取り口を登録する', retry: (token) => handleCreateIncoming(e, token) })
+        return
+      }
       if (selectedAccountIdRef.current !== requestAccountId) return
       setError('作成に失敗しました。通信を確かめて、もう一度お試しください。')
     }
@@ -505,7 +512,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
     }
   }
 
-  const handleRotateSubmit = async (e: React.FormEvent) => {
+  const handleRotateSubmit = async (e: React.FormEvent, stepUpToken?: string) => {
     e.preventDefault()
     setError('')
     const requestAccountId = selectedAccountId
@@ -521,8 +528,8 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
       const payload = { secret: rotateSecretValue, isActive: rotateTarget.activate || undefined }
       const res =
         rotateTarget.kind === 'incoming'
-          ? await api.webhooks.incoming.update(rotateTarget.id, requestAccountId, payload)
-          : await api.webhooks.outgoing.update(rotateTarget.id, requestAccountId, payload)
+          ? await api.webhooks.incoming.update(rotateTarget.id, requestAccountId, payload, stepUpToken)
+          : await api.webhooks.outgoing.update(rotateTarget.id, requestAccountId, payload, stepUpToken)
       if (selectedAccountIdRef.current !== requestAccountId) return
       if (!res.success) {
         setError(res.error)
@@ -531,7 +538,12 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
       setRotateTarget(null)
       setRotateSecretValue('')
       load()
-    } catch {
+    } catch (caught) {
+      // シークレットの差し替えは大事な操作。本人確認を求められたら窓を立てる（V-1）。
+      if (!stepUpToken && isStepUpRequired(caught)) {
+        setStepUp({ purpose: 'webhook.secret', action: 'シークレットを更新する', retry: (token) => handleRotateSubmit(e, token) })
+        return
+      }
       if (selectedAccountIdRef.current !== requestAccountId) return
       setError('シークレットの更新に失敗しました。通信を確かめて、もう一度お試しください。')
     }
@@ -883,6 +895,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
           setDeleteError('')
         }}
       />
+      {stepUp && <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} />}
     </div>
   )
 }

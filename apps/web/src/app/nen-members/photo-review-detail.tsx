@@ -15,6 +15,7 @@ import { safePhotoSrc } from './photo-src'
 import { photoPetDisplayName } from '@/components/shared/photo-display-name'
 import { petAnimalTypeLabel } from '@/lib/nen-pets-api'
 import { photoReviewReasonLabel, mileStatusLabel, text } from './photo-text'
+import { readSessionSnapshot } from '@/lib/session-snapshot'
 
 const numberOrDash = (value: unknown) => Number.isFinite(Number(value)) ? Number(value).toLocaleString('ja-JP') : '—'
 
@@ -64,6 +65,9 @@ export function PhotoReviewDetail({
   const [downloadCode, setDownloadCode] = useState('')
   const [downloadBusy, setDownloadBusy] = useState(false)
   const [downloadError, setDownloadError] = useState('')
+  /* V-1: 2段階認証を使っている人は6桁、無い人はパスワードで確認する。 */
+  const stepUpMethod = readSessionSnapshot()?.stepUpMethod ?? 'totp'
+  const downloadReady = stepUpMethod === 'password' ? downloadCode.length > 0 : /^\d{6}$/.test(downloadCode)
   if (loading) return <div><ListState kind="loading" title="写真を読み込んでいます" /></div>
   if (loadKind === 'forbidden') return <div><ListState kind="forbidden" /></div>
   if (loadKind === 'error') return <div><ListState kind="error" title="写真を読み込めませんでした" /></div>
@@ -253,18 +257,36 @@ export function PhotoReviewDetail({
         </>}
       />
     </div>
-    <Dialog open={downloadOpen} title="もとの画像を保存" description="原本には個人情報が含まれる場合があります。6桁の再認証コードを入力すると、一度だけ保存できます。" busy={downloadBusy} error={downloadError} confirmLabel="再認証して保存" cancelLabel="やめる" onCancel={() => { setDownloadOpen(false); setDownloadError('') }} onConfirm={() => {
-      if (!/^\d{6}$/.test(downloadCode)) { setDownloadError('6桁の再認証コードを入力してください。'); return }
-      setDownloadBusy(true)
-      setDownloadError('')
-      void onDownloadOriginal(downloadCode)
-        .then(() => setDownloadOpen(false))
-        .catch((error: unknown) => setDownloadError(error instanceof Error ? error.message : '原本を保存できませんでした。'))
-        .finally(() => setDownloadBusy(false))
-    }}>
-      <label className="block text-sm font-semibold text-ink">再認証コード
-        <input value={downloadCode} onChange={(event) => { setDownloadCode(event.target.value.replace(/\D/g, '').slice(0, 6)); setDownloadError('') }} inputMode="numeric" autoComplete="one-time-code" placeholder="6桁のコード" className="mt-2 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-normal text-ink" />
-      </label>
+    <Dialog
+      open={downloadOpen}
+      title="もとの画像を保存"
+      description={stepUpMethod === 'none'
+        ? '原本には個人情報が含まれる場合があります。この操作には二段階認証またはパスワードの設定が必要です。'
+        : `原本には個人情報が含まれる場合があります。${stepUpMethod === 'password' ? 'パスワード' : '6桁の再認証コード'}を入力すると、一度だけ保存できます。`}
+      busy={downloadBusy}
+      error={downloadError}
+      confirmLabel="再認証して保存"
+      cancelLabel="やめる"
+      onCancel={() => { setDownloadOpen(false); setDownloadError('') }}
+      onConfirm={stepUpMethod === 'none' ? undefined : () => {
+        if (!downloadReady) { setDownloadError(stepUpMethod === 'password' ? 'パスワードを入力してください。' : '6桁の再認証コードを入力してください。'); return }
+        setDownloadBusy(true)
+        setDownloadError('')
+        void onDownloadOriginal(downloadCode)
+          .then(() => setDownloadOpen(false))
+          .catch((error: unknown) => setDownloadError(error instanceof Error ? error.message : '原本を保存できませんでした。'))
+          .finally(() => setDownloadBusy(false))
+      }}
+    >
+      {stepUpMethod === 'none' ? null : stepUpMethod === 'password' ? (
+        <label className="block text-sm font-semibold text-ink">パスワード
+          <input type="password" value={downloadCode} onChange={(event) => { setDownloadCode(event.target.value); setDownloadError('') }} autoComplete="current-password" className="mt-2 w-full rounded-control border border-surface-chrome bg-canvas px-3 py-2 text-sm font-normal text-ink outline-none focus:border-action" />
+        </label>
+      ) : (
+        <label className="block text-sm font-semibold text-ink">再認証コード
+          <input value={downloadCode} onChange={(event) => { setDownloadCode(event.target.value.replace(/\D/g, '').slice(0, 6)); setDownloadError('') }} inputMode="numeric" autoComplete="one-time-code" placeholder="6桁のコード" className="mt-2 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-normal text-ink" />
+        </label>
+      )}
     </Dialog>
   </div>
 }

@@ -27,6 +27,7 @@ import { PhotoPublications } from './photo-publications'
 import { safePhotoSrc } from './photo-src'
 import { photoPetDisplayName } from '@/components/shared/photo-display-name'
 import { photoNoticeFor } from './photo-notice'
+import { readSessionSnapshot } from '@/lib/session-snapshot'
 import { photoReviewEntryFrom, photoReviewSearch } from './photo-review-query'
 import { mileStatusLabel, reviewVersionOf, text } from './photo-text'
 import KpiCollapse from '@/components/ui/kpi-collapse'
@@ -656,9 +657,11 @@ export default function PhotoReviewsPage() {
 
   const downloadOriginal = async (code: string) => {
     if (!selectedAccountId || !detailPhoto) throw new Error('写真を読み直してください。')
+    /* V-1: 2段階認証を使っている人は6桁、無い人はパスワードで確認する。 */
+    const method = readSessionSnapshot()?.stepUpMethod === 'password' ? 'password' : 'totp'
     let grant
     try {
-      grant = await api.nenMembers.photoOriginalStepUp(code)
+      grant = await api.nenMembers.photoOriginalStepUp({ method, value: code })
     } catch (error) {
       if (error instanceof ApiError && (error.status === 400 || error.status === 401)) {
         throw new Error('再認証コードを確認してください。')

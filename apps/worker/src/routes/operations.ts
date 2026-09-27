@@ -3,7 +3,6 @@ import type { Context, Next } from 'hono';
 import {
   OPERATION_CAPABILITIES,
   acknowledgeOperationAlert,
-  consumeStepUpGrant,
   enqueuePendingOperationAlertNotifications,
   enqueueOperationNotifications,
   getLatestOperationHealthRun,
@@ -26,6 +25,7 @@ import {
 
 import type { Env } from '../index.js';
 import { sha256Hex } from '../middleware/auth.js';
+import { sensitiveStepUpSatisfied } from '../lib/step-up.js';
 import { requireIrreversibleConfirmation, requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { getOperationImpactPreview } from '../services/operation-impact-preview.js';
@@ -85,7 +85,7 @@ function historyLimit(raw: string | undefined): number {
   return Number.isInteger(value) ? Math.min(Math.max(value, 1), 200) : 100;
 }
 
-const STEP_UP_PURPOSE = 'operations.control';
+const STEP_UP_PURPOSE = 'operations.control' as const;
 
 function requiredIdempotencyKey(c: Context<Env>): string | null {
   const key = c.req.header('Idempotency-Key')?.trim() ?? '';
@@ -93,13 +93,7 @@ function requiredIdempotencyKey(c: Context<Env>): string | null {
 }
 
 async function consumeOperationStepUp(c: Context<Env>): Promise<boolean> {
-  const token = c.req.header('X-Step-Up-Token')?.trim();
-  if (!token) return false;
-  return consumeStepUpGrant(c.env.DB, {
-    tokenHash: await sha256Hex(token),
-    staffId: c.get('staff')!.id,
-    purpose: STEP_UP_PURPOSE,
-  });
+  return sensitiveStepUpSatisfied(c, STEP_UP_PURPOSE);
 }
 
 async function queueOperationNotifications(
