@@ -209,7 +209,7 @@ describe('カレンダー', () => {
   it('過去・期間の外・お休み・満席の日は押せない', async () => {
     await openCalendar();
     await screen.findByRole('button', { name: '10月16日 空きあり' });
-    expect(screen.getByRole('button', { name: '10月14日 選択できません' }).hasAttribute('disabled')).toBe(true);
+    expect(screen.getByRole('button', { name: '10月14日 過ぎた日' }).hasAttribute('disabled')).toBe(true);
     expect(screen.getByRole('button', { name: '10月17日 満席' }).hasAttribute('disabled')).toBe(true);
     expect(screen.getByRole('button', { name: '10月21日 お休み' }).hasAttribute('disabled')).toBe(true);
     expect(screen.getByRole('button', { name: '10月16日 空きあり' }).hasAttribute('disabled')).toBe(false);
@@ -289,5 +289,51 @@ describe('dayStateLabel', () => {
     expect(dayStateLabel('2026-10-01', 'open')).toBe('10月1日 空きあり');
     expect(dayStateLabel('2026-10-07', 'closed')).toBe('10月7日 お休み');
     expect(dayStateLabel('2026-09-30', 'off')).toBe('9月30日 選択できません');
+    expect(dayStateLabel('2026-10-14', 'past')).toBe('10月14日 過ぎた日');
+  });
+});
+
+describe('カレンダーの見た目（設計合わせ）', () => {
+  it('過ぎた日は押せず、枠が無く、薄い文字で「過ぎた日」と読む', async () => {
+    await openCalendar();
+    const past = await screen.findByRole('button', { name: '10月14日 過ぎた日' });
+    // 押せない。
+    expect(past.hasAttribute('disabled')).toBe(true);
+    // 枠なし（border 系の見せ方を残さない）・薄い文字。
+    expect(past.className).not.toContain('border');
+    expect(past.className).toContain('text-ink-faint');
+  });
+
+  it('ます目は枠なし・高さが幅以下（h-10）で、塗るのは選んだ日だけ', async () => {
+    await openCalendar();
+    await screen.findByRole('button', { name: '10月16日 空きあり' });
+    const grid = screen.getByLabelText('2026年10月の日付');
+    expect(grid.className).toContain('grid-cols-7');
+    const cells = within(grid).getAllByRole('button');
+    expect(cells.length).toBeGreaterThan(0);
+    for (const cell of cells) {
+      // 枠なし・縦長にしない（h-10 = 40px。375px幅で1ます≈42px）。
+      expect(cell.className).not.toContain('border');
+      expect(cell.className).not.toContain('min-h-14');
+      expect(cell.className).toContain('h-10');
+    }
+    // 選んだ日（10-16）だけ濃い緑で塗る。ほかは塗らない。
+    const selected = screen.getByRole('button', { name: '10月16日 空きあり' });
+    expect(selected.className).toContain('bg-accent-deep');
+    expect(selected.className).toContain('rounded-lg');
+    const others = cells.filter((cell) => cell !== selected);
+    expect(others.length).toBeGreaterThan(0);
+    for (const cell of others) {
+      expect(cell.className).not.toContain('bg-accent-deep');
+    }
+  });
+
+  it('空きありは点・満席は「満」・お休みは「休」の印が出る', async () => {
+    await openCalendar();
+    await screen.findByRole('button', { name: '10月16日 空きあり' });
+    // 空きありのますには点、満席・お休みのますには文字の印。
+    expect(screen.getByRole('button', { name: '10月16日 空きあり' }).textContent).toContain('●');
+    expect(screen.getByRole('button', { name: '10月17日 満席' }).textContent).toContain('満');
+    expect(screen.getByRole('button', { name: '10月21日 お休み' }).textContent).toContain('休');
   });
 });

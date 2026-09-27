@@ -788,6 +788,7 @@ function BookingRulesEditor({ accountId, initial, canEdit, onRetry, onSaved }: {
         </Field>
         <RuleNumberField label="当日のお知らせを送るタイミング" unit="時間前" min={1} max={72} value={draft.reminderHoursBefore} onChange={(value) => set('reminderHoursBefore', value)} humanize={formatHoursBeforeHint} />
       </div>
+      <p className="text-ink-faint mt-4 text-xs">0分前は、開始直前まで受け付ける・キャンセルできる設定です。</p>
       <div className="border-hairline mt-5 border-t pt-4">
         <div className="flex items-center gap-1">
           <span id="liff-date-view-label" className="text-ink-secondary text-xs font-medium">
@@ -829,7 +830,6 @@ function BookingRulesEditor({ accountId, initial, canEdit, onRetry, onSaved }: {
           })}
         </div>
       </div>
-      <p className="text-ink-faint mt-4 text-xs">0分前は、開始直前まで受け付ける・キャンセルできる設定です。</p>
       {saveError && (
         <Notice
           tone="danger"

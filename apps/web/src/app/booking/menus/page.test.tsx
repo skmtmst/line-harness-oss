@@ -523,6 +523,18 @@ describe('店舗共通の予約ルール', () => {
     await screen.findByRole('spinbutton', { name: '何日先まで受け付けるか' })
     expect((screen.getByRole('radio', { name: /カレンダー/ }) as HTMLInputElement).checked).toBe(true)
   })
+
+  test('0分前の説明は受付・キャンセルの時間の欄の下にあり、2択の見出しより前', async () => {
+    fixture.activeTab = 'rules'
+    render(<><MenusPage /><ToastHost /></>)
+    await screen.findByRole('spinbutton', { name: '何日先まで受け付けるか' })
+    const note = screen.getByText(/0分前は、開始直前まで/)
+    const cutoff = screen.getByRole('spinbutton', { name: '受付の締め切り' })
+    const viewHeading = screen.getByText('日時を選ぶ画面の最初の形')
+    // 文書の順番：時間の欄 → 説明 → 2択の見出し。
+    expect(cutoff.compareDocumentPosition(note) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(note.compareDocumentPosition(viewHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
 })
 
 describe('既存メニューの編集窓: 版管理と料金モード', () => {

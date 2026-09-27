@@ -68,11 +68,12 @@ function splitRange(from: string, to: string): Array<[string, string]> {
   return chunks;
 }
 
-type DayState = 'open' | 'full' | 'closed' | 'off';
+type DayState = 'open' | 'full' | 'closed' | 'past' | 'off';
 
 /**
  * 読み上げ文。「10月4日 満席」のように日付と状態だけにする。
  * 色・印だけでは伝わらない人に、状態を言葉で渡す。
+ * 過ぎた日は「過ぎた日」と読む（期間の外の未来日は「選択できません」）。
  */
 export function dayStateLabel(date: string, state: DayState): string {
   const d = new Date(`${date}T00:00:00Z`);
@@ -80,6 +81,7 @@ export function dayStateLabel(date: string, state: DayState): string {
   if (state === 'open') return `${base} 空きあり`;
   if (state === 'full') return `${base} 満席`;
   if (state === 'closed') return `${base} お休み`;
+  if (state === 'past') return `${base} 過ぎた日`;
   return `${base} 選択できません`;
 }
 
@@ -312,7 +314,8 @@ export default function DateTimePicker({
   for (let d = monthStart(month); d <= monthEnd(month); d = addDays(d, 1)) monthDays.push(d);
 
   function calendarState(date: string): DayState {
-    if (date < today || date > windowEnd) return 'off';
+    if (date < today) return 'past';
+    if (date > windowEnd) return 'off';
     if (calClosed[date]) return 'closed';
     return (calByDate[date]?.length ?? 0) > 0 ? 'open' : 'full';
   }
@@ -462,6 +465,8 @@ export default function DateTimePicker({
                     const dayNum = Number(d.slice(8, 10));
                     const selectable = state === 'open';
                     const active = d === calDay;
+                    // 設計どおり枠なしのます目にする。高さは h-10（40px。375px幅で
+                    // 1ます≈42pxなので幅以下に収まる）。塗るのは選んだ日だけ。
                     return (
                       <button
                         key={d}
@@ -470,16 +475,16 @@ export default function DateTimePicker({
                         disabled={!selectable}
                         aria-pressed={active}
                         aria-label={dayStateLabel(d, state)}
-                        className={`flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-lg border py-1 text-sm focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-100 ${
+                        className={`flex h-10 flex-col items-center justify-center rounded-lg text-sm focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-100 ${
                           active
-                            ? 'border-accent-deep bg-accent-deep text-white'
+                            ? 'bg-accent-deep font-bold text-white'
                             : selectable
-                              ? 'border-hairline bg-canvas text-ink'
-                              : 'border-hairline bg-canvas text-ink-faint'
+                              ? 'text-ink'
+                              : 'text-ink-faint'
                         }`}
                       >
-                        <span className="font-bold">{dayNum}</span>
-                        <span className="flex h-4 items-center text-[11px] leading-none">
+                        <span className="font-bold leading-tight">{dayNum}</span>
+                        <span className="flex h-3 items-center text-[10px] leading-none">
                           {state === 'open' ? (
                             <span className={active ? 'text-white' : 'text-accent-deep'}>●</span>
                           ) : state === 'full' ? (
