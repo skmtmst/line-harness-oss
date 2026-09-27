@@ -203,7 +203,9 @@ export default function DateTimeField({
           <div className={styles.timeRow}>
             <label className={styles.timeLabel}>
               時
+              {/* size="full" で箱の内幅へ追従させる。固定176pxだと狭い画面で分欄がはみ出す（監査 R156）。 */}
               <Select
+                size="full"
                 aria-label="時"
                 value={pad(shownTime.hours)}
                 onChange={(value) => chooseTime(Number(value), shownTime.minutes)}
@@ -213,6 +215,7 @@ export default function DateTimeField({
             <label className={styles.timeLabel}>
               分
               <Select
+                size="full"
                 aria-label="分"
                 value={pad(shownTime.minutes)}
                 onChange={(value) => chooseTime(shownTime.hours, Number(value))}
@@ -372,7 +375,9 @@ export function TimeField({
           <div className={styles.timeRow}>
             <label className={styles.timeLabel}>
               時
+              {/* size="full" で箱の内幅へ追従させる。固定176pxだと狭い画面で分欄がはみ出す（監査 R156）。 */}
               <Select
+                size="full"
                 aria-label="時"
                 value={pad(shownHours)}
                 disabled={disabled}
@@ -383,6 +388,7 @@ export function TimeField({
             <label className={styles.timeLabel}>
               分
               <Select
+                size="full"
                 aria-label="分"
                 value={pad(shownMinutes)}
                 disabled={disabled}

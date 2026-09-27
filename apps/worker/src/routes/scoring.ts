@@ -47,6 +47,15 @@ import {
   publishMileageEarningRule,
   ensureDefaultMileageProgram,
   jstNow,
+  confirmPendingMileageEntry,
+  voidMileageLedgerEntry,
+  createMileageAdjustmentApprovalRequest,
+  listMileageAdjustmentApprovalRequests,
+  approveMileageAdjustmentRequest,
+  rejectMileageAdjustmentRequest,
+  cancelMileageAdjustmentRequest,
+  testMileageEarningRuleDraft,
+  validateMileageEarningRuleDraft,
 } from '@line-crm/db';
 import type {
   ActionScoreFilter,
@@ -912,16 +921,40 @@ scoring.post(
           code: 'ADJUSTMENT_POLICY_REQUIRED',
         }, 400);
       }
+      const staff = c.get('staff');
       if (amount >= policy.approvalThreshold) {
+        /*
+         * R: 境界以上の調整は実行せず、別のオーナーへの承認依頼として残す
+         * （一斉配信の二者承認と同じ形）。依頼票は同じ Idempotency-Key の
+         * 再送で重複しない。
+         */
+        const { request } = await createMileageAdjustmentApprovalRequest(c.env.DB, {
+          lineAccountId: accountId,
+          friendId,
+          direction,
+          amount,
+          reasonCategory,
+          reason,
+          sourceReferenceId: sourceReferenceId || null,
+          expiresAt: expiresAt?.toISOString() ?? null,
+          notifyFriend,
+          idempotencyKey,
+          staffId: staff.id,
+          staffName: staff.name,
+        });
+        auditLog(c, 'mileage.adjustment.approval.request', {
+          kind: 'mileage_adjustment_approval_requests', id: request.id,
+        });
         return c.json({
-          success: false,
-          error: `${policy.approvalThreshold.toLocaleString('ja-JP')} mile以上は別のオーナー承認が必要です。`,
-          code: 'OWNER_APPROVAL_REQUIRED',
-          data: { approvalThreshold: policy.approvalThreshold },
-        }, 400);
+          success: true,
+          data: {
+            approvalRequired: true as const,
+            approvalThreshold: policy.approvalThreshold,
+            request,
+          },
+        }, 202);
       }
 
-      const staff = c.get('staff');
       const signedAmount = direction === 'decrease' ? -amount : amount;
       const result = await postMileageAdjustment(c.env.DB, {
         friendId,
@@ -982,6 +1015,218 @@ scoring.post(
       }
       console.error('POST /api/mileage/adjustments error:', err);
       return c.json({ success: false, error: 'Internal server error' }, 500);
+    }
+  },
+);
+
+/*
+ * R: 高額調整の承認依頼の一覧・承認・差し戻し・取り下げ。
+ * 承認は「依頼した人とは別のオーナー」だけが行える（二者承認）。
+ */
+scoring.get('/api/mileage/adjustment-approvals', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const accountId = c.req.query('accountId')?.trim() ?? '';
+    if (!await canUseMileageAccount(c, accountId)) {
+      return c.json({ success: false, error: 'LINE account not found' }, accountId ? 404 : 400);
+    }
+    const rawStatus = c.req.query('status')?.trim() ?? '';
+    const status = ['pending', 'approved', 'rejected', 'cancelled'].includes(rawStatus)
+      ? rawStatus as 'pending' | 'approved' | 'rejected' | 'cancelled'
+      : undefined;
+    const requests = await listMileageAdjustmentApprovalRequests(c.env.DB, {
+      lineAccountId: accountId,
+      status,
+    });
+    return c.json({ success: true, data: requests });
+  } catch (error) {
+    return mileageV6Error(c, error);
+  }
+});
+
+scoring.post(
+  '/api/mileage/adjustment-approvals/:id/approve',
+  requireRole('owner'),
+  async (c) => {
+    try {
+      const body = await c.req.json<{ accountId?: unknown; reason?: unknown }>()
+        .catch(() => ({} as { accountId?: unknown; reason?: unknown }));
+      const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
+      if (!await canUseMileageAccount(c, accountId)) {
+        return c.json({ success: false, error: 'LINE account not found' }, accountId ? 404 : 400);
+      }
+      const staff = c.get('staff');
+      const { request, entry } = await approveMileageAdjustmentRequest(c.env.DB, {
+        requestId: c.req.param('id'),
+        lineAccountId: accountId,
+        staffId: staff.id,
+        staffName: staff.name,
+        decisionReason: typeof body.reason === 'string' ? body.reason.trim() || null : null,
+      });
+      auditLog(c, 'mileage.adjustment.approval.approve', {
+        kind: 'mileage_adjustment_approval_requests', id: request.id,
+      });
+      return c.json({ success: true, data: { request, entryId: entry.id } });
+    } catch (error) {
+      return mileageV6Error(c, error);
+    }
+  },
+);
+
+scoring.post(
+  '/api/mileage/adjustment-approvals/:id/reject',
+  requireRole('owner'),
+  async (c) => {
+    try {
+      const body = await c.req.json<{ accountId?: unknown; reason?: unknown }>()
+        .catch(() => ({} as { accountId?: unknown; reason?: unknown }));
+      const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
+      if (!await canUseMileageAccount(c, accountId)) {
+        return c.json({ success: false, error: 'LINE account not found' }, accountId ? 404 : 400);
+      }
+      const staff = c.get('staff');
+      const request = await rejectMileageAdjustmentRequest(c.env.DB, {
+        requestId: c.req.param('id'),
+        lineAccountId: accountId,
+        staffId: staff.id,
+        staffName: staff.name,
+        decisionReason: typeof body.reason === 'string' ? body.reason.trim() || null : null,
+      });
+      auditLog(c, 'mileage.adjustment.approval.reject', {
+        kind: 'mileage_adjustment_approval_requests', id: request.id,
+      });
+      return c.json({ success: true, data: { request } });
+    } catch (error) {
+      return mileageV6Error(c, error);
+    }
+  },
+);
+
+scoring.post(
+  '/api/mileage/adjustment-approvals/:id/cancel',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    try {
+      const body = await c.req.json<{ accountId?: unknown }>()
+        .catch(() => ({} as { accountId?: unknown }));
+      const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
+      if (!await canUseMileageAccount(c, accountId)) {
+        return c.json({ success: false, error: 'LINE account not found' }, accountId ? 404 : 400);
+      }
+      const request = await cancelMileageAdjustmentRequest(c.env.DB, {
+        requestId: c.req.param('id'),
+        lineAccountId: accountId,
+        staffId: c.get('staff').id,
+      });
+      auditLog(c, 'mileage.adjustment.approval.cancel', {
+        kind: 'mileage_adjustment_approval_requests', id: request.id,
+      });
+      return c.json({ success: true, data: { request } });
+    } catch (error) {
+      return mileageV6Error(c, error);
+    }
+  },
+);
+
+/*
+ * R: 確定待ちの確定・取消。どちらも理由が必須。確定は pending→available、
+ * 取消は逆向きの記録を足す（台帳の行は消さない）。
+ */
+scoring.post(
+  '/api/mileage/entries/:id/confirm',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    try {
+      const body = await c.req.json<{ accountId?: unknown; reason?: unknown }>()
+        .catch(() => ({} as { accountId?: unknown; reason?: unknown }));
+      const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
+      const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
+      if (!accountId) {
+        return c.json({ success: false, error: 'accountId is required' }, 400);
+      }
+      if (!reason) {
+        return c.json({ success: false, error: '理由を入力してください', code: 'reason_required' }, 400);
+      }
+      if (!await canUseMileageAccount(c, accountId)) {
+        return c.json({ success: false, error: 'LINE account not found' }, 404);
+      }
+      const staff = c.get('staff');
+      const { entry, alreadyConfirmed } = await confirmPendingMileageEntry(c.env.DB, {
+        entryId: c.req.param('id'),
+        lineAccountId: accountId,
+        staffId: staff.id,
+        staffName: staff.name,
+        reason,
+      });
+      if (!alreadyConfirmed) {
+        auditLog(c, 'mileage.entry.confirm', { kind: 'mileage_ledger', id: entry.id });
+      }
+      return c.json({ success: true, data: { entry, alreadyConfirmed } });
+    } catch (error) {
+      return mileageV6Error(c, error);
+    }
+  },
+);
+
+scoring.post(
+  '/api/mileage/entries/:id/void',
+  requireRole('owner', 'admin'),
+  requireIrreversibleConfirmation('mileage-entry-void'),
+  async (c) => {
+    try {
+      const body = await c.req.json<{ accountId?: unknown; reason?: unknown }>()
+        .catch(() => ({} as { accountId?: unknown; reason?: unknown }));
+      const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
+      const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
+      if (!accountId) {
+        return c.json({ success: false, error: 'accountId is required' }, 400);
+      }
+      if (!reason) {
+        return c.json({ success: false, error: '理由を入力してください', code: 'reason_required' }, 400);
+      }
+      if (!await canUseMileageAccount(c, accountId)) {
+        return c.json({ success: false, error: 'LINE account not found' }, 404);
+      }
+      const staff = c.get('staff');
+      const result = await voidMileageLedgerEntry(c.env.DB, {
+        entryId: c.req.param('id'),
+        lineAccountId: accountId,
+        staffId: staff.id,
+        staffName: staff.name,
+        reason,
+      });
+      if (!result.replayed) {
+        auditLog(c, 'mileage.entry.void', { kind: 'mileage_ledger', id: result.entry.id });
+      }
+      return c.json({ success: true, data: result });
+    } catch (error) {
+      return mileageV6Error(c, error);
+    }
+  },
+);
+
+/*
+ * R: 「決めごとをテスト」。下書きの内容を直近30日のイベントへ当てはめて
+ * 何人に・合計いくら付きそうかだけを返す。台帳・キューには何も書かない。
+ */
+scoring.post(
+  '/api/mileage/earning-rules/test',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    try {
+      const body = await c.req.json<{ accountId?: unknown; draft?: unknown }>()
+        .catch(() => ({} as { accountId?: unknown; draft?: unknown }));
+      const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
+      if (!await canUseMileageAccount(c, accountId)) {
+        return c.json({ success: false, error: 'LINE account not found' }, accountId ? 404 : 400);
+      }
+      const draft = validateMileageEarningRuleDraft(body.draft);
+      const data = await testMileageEarningRuleDraft(c.env.DB, {
+        lineAccountId: accountId,
+        draft,
+      });
+      return c.json({ success: true, data });
+    } catch (error) {
+      return mileageV6Error(c, error);
     }
   },
 );

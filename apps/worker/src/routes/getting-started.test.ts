@@ -34,6 +34,7 @@ const state = {
   anyRule: true,
   scenarios: 1,
   linkedScenario: true,
+  dismissedAt: null as string | null,
   rules: [{
     is_unknown_route_fallback: 1,
     definition_snapshot: JSON.stringify({ scenarioId: 'scenario-1', actions: [] }),
@@ -70,7 +71,16 @@ function database(): D1Database {
             expect(bindings[0]).toBe('account-1');
             return (state.linkedScenario ? { hit: 1 } : null) as T | null;
           }
+          if (sql.includes('FROM staff_members')) {
+            return { dismissed_at: state.dismissedAt } as T | null;
+          }
           return null;
+        },
+        async run() {
+          if (sql.includes('UPDATE staff_members') && sql.includes('getting_started_dismissed_at')) {
+            state.dismissedAt = '2026-09-28T12:00:00+09:00';
+          }
+          return { meta: { changes: 1 } } as D1Result;
         },
       });
       return make([]);
@@ -92,6 +102,7 @@ function makeApp(role: 'owner' | 'admin' | 'staff' = 'owner', permissionKeys: st
 
 beforeEach(() => {
   state.tags = 1;
+  state.dismissedAt = null;
   state.fields = 0;
   state.anyRule = true;
   state.scenarios = 1;
@@ -237,5 +248,37 @@ describe('GET /api/getting-started', () => {
     );
     expect(response.status).toBe(404);
     expect(db.hasFirstDeliveredMessage).not.toHaveBeenCalledWith(expect.anything(), 'account-2');
+  });
+
+  it('閉じていなければ dismissed=false を返す', async () => {
+    const response = await makeApp().fetch(
+      new Request('https://example.com/api/getting-started?account_id=account-1'),
+      { DB: database() },
+    );
+    const body = await response.json() as { data: { dismissed: boolean } };
+    expect(body.data.dismissed).toBe(false);
+  });
+
+  it('閉じた本人には dismissed=true を返す', async () => {
+    state.dismissedAt = '2026-09-28T12:00:00+09:00';
+    const response = await makeApp().fetch(
+      new Request('https://example.com/api/getting-started?account_id=account-1'),
+      { DB: database() },
+    );
+    const body = await response.json() as { data: { dismissed: boolean } };
+    expect(body.data.dismissed).toBe(true);
+  });
+});
+
+describe('POST /api/getting-started/dismiss', () => {
+  it('本人の「閉じた」日時を記録する', async () => {
+    const response = await makeApp().fetch(
+      new Request('https://example.com/api/getting-started/dismiss', { method: 'POST' }),
+      { DB: database() },
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json() as { data: { dismissed: boolean } };
+    expect(body.data.dismissed).toBe(true);
+    expect(state.dismissedAt).not.toBeNull();
   });
 });

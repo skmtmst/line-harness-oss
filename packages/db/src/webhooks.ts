@@ -23,6 +23,10 @@ export const KNOWN_OUTGOING_EVENT_TYPES: readonly string[] = [
   'cv_fire',
   'staff_assigned',
   'manual_reply_sent',
+  // R150: 見本にある出来事は実際に購読できるようにする。
+  // 送信側は forms.ts / booking.ts の発火点。
+  'form_submitted',
+  'booking_created',
   ...EC_EVENT_TYPES,
 ];
 
