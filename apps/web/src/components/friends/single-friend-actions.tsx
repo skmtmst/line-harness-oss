@@ -145,7 +145,8 @@ function StatusPanel({ friendId, busy, run }: { friendId: string; busy: boolean;
   const [status, setStatus] = useState<Chat['status']>('resolved')
   return (
     <Row>
-      <select value={status} onChange={(e) => setStatus(e.target.value as Chat['status'])} className={SELECT}>
+      {/* R117: 読み上げで何を変える欄か分かるよう、選択欄に固有の名前を付ける。 */}
+      <select aria-label="対応状況" value={status} onChange={(e) => setStatus(e.target.value as Chat['status'])} className={SELECT}>
         <option value="unread">未対応</option>
         <option value="in_progress">対応中</option>
         <option value="resolved">対応済み</option>
@@ -183,7 +184,7 @@ function TemplatePanel({ friendId, busy, run }: { friendId: string; busy: boolea
   return (
     <div className="space-y-2">
       <Row>
-        <select value={id} onChange={(e) => setId(e.target.value)} className={SELECT}>
+        <select aria-label="テンプレート" value={id} onChange={(e) => setId(e.target.value)} className={SELECT}>
           <option value="">テンプレートを選ぶ</option>
           {templates.map((t) => (
             <option key={t.id} value={t.id}>{t.name}</option>
@@ -217,7 +218,7 @@ function ScenarioPanel({ friendId, busy, run }: { friendId: string; busy: boolea
   }, [])
   return (
     <Row>
-      <select value={id} onChange={(e) => setId(e.target.value)} className={SELECT}>
+      <select aria-label="シナリオ" value={id} onChange={(e) => setId(e.target.value)} className={SELECT}>
         <option value="">シナリオを選ぶ</option>
         {items.map((s) => (
           <option key={s.id} value={s.id}>{s.name}</option>
@@ -246,7 +247,7 @@ function TagPanel({
   const [id, setId] = useState('')
   return (
     <Row>
-      <select value={id} onChange={(e) => setId(e.target.value)} className={SELECT}>
+      <select aria-label="タグ" value={id} onChange={(e) => setId(e.target.value)} className={SELECT}>
         <option value="">タグを選ぶ</option>
         {tags.map((t) => (
           <option key={t.id} value={t.id}>{t.name}</option>
@@ -275,12 +276,14 @@ function FieldPanel({ friendId, busy, run }: { friendId: string; busy: boolean; 
   return (
     <Row>
       <input
+        aria-label="項目名"
         value={key}
         onChange={(e) => setKey(e.target.value)}
         placeholder="項目名"
         className={SELECT}
       />
       <input
+        aria-label="値"
         value={value}
         onChange={(e) => setValue(e.target.value)}
         placeholder="値"
@@ -313,7 +316,7 @@ function ReminderPanel({ friendId, busy, run }: { friendId: string; busy: boolea
   }, [])
   return (
     <Row>
-      <select value={id} onChange={(e) => setId(e.target.value)} className={SELECT}>
+      <select aria-label="リマインダ" value={id} onChange={(e) => setId(e.target.value)} className={SELECT}>
         <option value="">リマインダを選ぶ</option>
         {items.map((r) => (
           <option key={r.id} value={r.id}>{r.name}</option>
