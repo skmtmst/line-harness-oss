@@ -24,11 +24,11 @@ import { usePageTitle } from '@/components/shell/page-chrome'
  * 設計では「分析」の5タブのうちの1枚。実体だけ別ルートに残っているので、
  * 同じタブの帯をここにも出して、行き来できるようにしてある。
  */
-const ANALYTICS_TABS = [
+export const ANALYTICS_TABS = [
   { key: 'messages', label: '送信数' },
   { key: 'funnel', label: 'ファネル' },
   { key: 'cross', label: 'クロス集計' },
-  { key: 'clicks', label: 'URLクリック' },
+  { key: 'url-clicks', label: 'URLクリック' },
   { key: 'search', label: 'Search Console', href: '/search-console' },
 ]
 
