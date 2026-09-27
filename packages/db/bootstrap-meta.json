@@ -421,8 +421,10 @@
     "468_event_custom_questions.sql",
     "469_manual_link_screens.sql",
     "470_google_sheets_integrations.sql",
+    "488_incoming_webhook_secret_grace.sql",
+    "489_incoming_webhook_ambiguous_hold.sql",
     "494_session_step_up_and_unfamiliar.sql",
     "495_session_familiarity_ip_index.sql"
   ],
-  "migrationCount": 423
+  "migrationCount": 425
 }

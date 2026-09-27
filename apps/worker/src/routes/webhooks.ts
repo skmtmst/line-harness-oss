@@ -23,6 +23,8 @@ import {
   backfillWebhookSecrets,
   hasWebhookSecret,
   resolveWebhookSecret,
+  resolvePreviousWebhookSecret,
+  WEBHOOK_SECRET_PREVIOUS_GRACE_MS,
   isKnownOutgoingEventType,
   KNOWN_OUTGOING_EVENT_TYPES,
   WEBHOOK_SECRET_MIN_LENGTH as MIN_SECRET_LENGTH,
@@ -56,7 +58,11 @@ import {
   webhookResponseLabel,
 } from '../services/webhook-interactions.js';
 import { buildOutgoingWebhookBody, deliverWebhook } from '../services/outgoing-webhook-delivery.js';
-import { executeIncomingWebhookActions, maskedPayloadShape } from '../services/incoming-webhook-actions.js';
+import {
+  executeIncomingWebhookActions,
+  maskedPayloadShape,
+  previewIncomingWebhook,
+} from '../services/incoming-webhook-actions.js';
 
 const webhooks = new Hono<Env>();
 
@@ -271,6 +277,21 @@ function webhookKeysOf(c: Context<Env>): { current?: string; previous?: string }
   };
 }
 
+/**
+ * S (#939 機能26): 前の合言葉があといつまで受け付けるか。
+ * 併用期間(24時間)を過ぎた・前の値が無い行は null。
+ */
+function previousSecretUsableUntil(
+  row: { secret_previous_encrypted?: string | null; secret_rotated_at?: string | null },
+  now = Date.now(),
+): string | null {
+  if (!row.secret_previous_encrypted || !row.secret_rotated_at) return null;
+  const rotatedAt = Date.parse(row.secret_rotated_at);
+  if (!Number.isFinite(rotatedAt)) return null;
+  const until = rotatedAt + WEBHOOK_SECRET_PREVIOUS_GRACE_MS;
+  return until > now ? new Date(until).toISOString() : null;
+}
+
 
 
 // ========== 受信Webhook ==========
@@ -341,6 +362,8 @@ webhooks.get('/api/webhooks/incoming/:id', requireRole('owner', 'admin', 'staff'
         name: item.name,
         sourceType: item.source_type,
         hasSecret: hasWebhookSecret(item),
+        // S: 入れ替え中なら「前の合言葉が使える期限」。併用期間外は null。
+        previousSecretUsableUntil: previousSecretUsableUntil(item),
         isActive: Boolean(item.is_active),
         version: Number(item.version ?? 1),
         identityMatching,
@@ -534,6 +557,7 @@ webhooks.put('/api/webhooks/incoming/:id', requireRole('owner'), async (c) => {
         name: updated.name,
         sourceType: updated.source_type,
         hasSecret: hasWebhookSecret(updated),
+        previousSecretUsableUntil: previousSecretUsableUntil(updated),
         isActive: Boolean(updated.is_active),
       },
     });
@@ -589,23 +613,130 @@ webhooks.get('/api/webhooks/incoming/:id/unmatched', requireRole('owner', 'admin
       c.env.DB, webhook.id, lineAccountId,
       status === 'resolved' || status === 'dismissed' ? status : 'pending',
     );
+    /*
+     * S: 複数一致で保留した届物は、人が選べるよう候補の友だちを
+     * 名前つきで返す。候補に載っていない友だちが選ばれても構わない
+     * (運用者が別途確かめた場合を塞がない)。
+     */
+    const candidateIds = [...new Set(items.flatMap((item) =>
+      safeJson<string[]>(item.candidate_friend_ids_json, [])))];
+    const candidateNames = new Map<string, string | null>();
+    if (candidateIds.length > 0) {
+      const placeholders = candidateIds.map(() => '?').join(', ');
+      const rows = await c.env.DB.prepare(
+        `SELECT id, display_name FROM friends WHERE line_account_id = ? AND id IN (${placeholders})`,
+      ).bind(lineAccountId, ...candidateIds).all<{ id: string; display_name: string | null }>();
+      for (const row of rows.results ?? []) candidateNames.set(row.id, row.display_name);
+    }
     return c.json({
       success: true,
-      data: items.map((item) => ({
-        id: item.id,
-        kind: item.kind,
-        status: item.status,
-        identityAttempts: safeJson<Array<{ kind: string; path: string; value: string }>>(
-          item.identity_attempts_json, [],
-        ),
-        maskedShape: safeJson<unknown>(item.masked_shape_json, null),
-        resolvedFriendId: item.resolved_friend_id,
-        resolvedAt: item.resolved_at,
-        receivedAt: item.received_at,
-      })),
+      data: items.map((item) => {
+        const friendIds = item.kind === 'ambiguous'
+          ? safeJson<string[]>(item.candidate_friend_ids_json, [])
+          : [];
+        return {
+          id: item.id,
+          kind: item.kind,
+          status: item.status,
+          identityAttempts: safeJson<Array<{ kind: string; path: string; value: string }>>(
+            item.identity_attempts_json, [],
+          ),
+          maskedShape: safeJson<unknown>(item.masked_shape_json, null),
+          candidates: friendIds.map((friendId) => ({
+            friendId,
+            displayName: candidateNames.get(friendId) ?? null,
+          })),
+          resolvedFriendId: item.resolved_friend_id,
+          resolvedAt: item.resolved_at,
+          receivedAt: item.received_at,
+        };
+      }),
     });
   } catch (err) {
     console.error('GET /api/webhooks/incoming/:id/unmatched error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/**
+ * S (#939 機能26): 受け取りの試し。見本のJSONを照合と行動の組み立てまで
+ * 試して結果を返す。届物の受領・行動の実行・箱への記録は一切行わない。
+ * 結果だけはやり取り台帳へ「試し」として分けて残す(v6-26 §9)。
+ */
+webhooks.post('/api/webhooks/incoming/:id/test', requireRole('owner', 'admin', 'staff'), async (c) => {
+  try {
+    const lineAccountId = c.req.query('lineAccountId')?.trim();
+    if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    const staff = c.get('staff');
+    if (staff?.role === 'staff' && !staff.permissionKeys?.includes('/webhooks')) {
+      return c.json({ success: false, error: 'この機能を表示する権限がありません' }, 403);
+    }
+    if (!await canAccessAllLineAccounts(c.env.DB, staff, [lineAccountId])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    const declaredLength = Number(c.req.header('content-length') ?? '');
+    if (Number.isFinite(declaredLength) && declaredLength > MAX_INCOMING_BODY_BYTES) {
+      return c.json({ success: false, error: 'Payload too large' }, 413);
+    }
+    const body = await c.req.json<{ payload?: unknown }>().catch(() => null);
+    if (!body || body.payload === undefined) {
+      return c.json({ success: false, error: '試すJSONを payload に入れてください' }, 400);
+    }
+    const webhook = await getIncomingWebhookById(c.env.DB, c.req.param('id'), lineAccountId);
+    if (!webhook) return c.json({ success: false, error: 'Not found' }, 404);
+    const preview = await previewIncomingWebhook(c.env.DB, {
+      lineAccountId,
+      payload: body.payload,
+      identityMatching: safeJson<IncomingWebhookIdentityMatch>(webhook.identity_match_json, {
+        methods: [], onNotFound: 'do_nothing',
+      }),
+      actions: safeJson<IncomingWebhookActionRef[]>(webhook.action_refs_json, []),
+    });
+    // 試しの結果はやり取り台帳へ test 種別で分けて残す。本文は残さない。
+    const started = Date.now();
+    try {
+      const interaction = await createWebhookInteraction(c.env.DB, {
+        lineAccountId,
+        direction: 'incoming',
+        webhookId: webhook.id,
+        webhookName: webhook.name,
+        eventType: 'incoming_webhook.test',
+        triggerSummary: `${webhook.name}の受け取りを試した`,
+        requestBodyJson: null,
+      });
+      await finishWebhookInteraction(c.env.DB, interaction.id, lineAccountId, {
+        status: 'succeeded',
+        responseStatus: 200,
+        attemptCount: 1,
+        durationMs: Date.now() - started,
+      });
+    } catch (logError) {
+      // 台帳の一時障害で試し自体を止めない。
+      console.error('受け取りの試しの記録に失敗:', logError);
+    }
+    auditLog(c, 'webhook.incoming.test', { kind: 'incoming_webhook', id: webhook.id }, { lineAccountId });
+    return c.json({
+      success: true,
+      data: {
+        match: preview.match.status === 'matched'
+          ? { status: 'matched' as const, friendId: preview.match.friendId }
+          : preview.match.status === 'ambiguous'
+            ? { status: 'ambiguous' as const, friendIds: preview.match.friendIds }
+            : { status: 'not_found' as const },
+        identityAttempts: preview.identityAttempts,
+        actions: await Promise.all(preview.actions.map(async (action) => ({
+          refIndex: action.refIndex,
+          refKind: action.ref.refKind,
+          refId: action.ref.refId,
+          displayName: await incomingActionDisplayName(c.env.DB, action.ref),
+          ok: action.ok,
+          plan: action.ok ? action.plan : undefined,
+          error: action.ok ? undefined : action.error,
+        }))),
+      },
+    });
+  } catch (err) {
+    console.error('POST /api/webhooks/incoming/:id/test error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1288,9 +1419,26 @@ webhooks.post('/api/webhooks/incoming/:id/receive', async (c) => {
     if (new TextEncoder().encode(rawBody).byteLength > MAX_INCOMING_BODY_BYTES) {
       return c.json({ success: false, error: 'Payload too large' }, 413);
     }
-    const expected = await computeHmacSha256Hex(verifySecret, rawBody);
+    /*
+     * S (#939 機能26): 合言葉を入れ替えてから24時間は前の合言葉でも
+     * 署名が通る。相手のサービス側の切り替えに猶予を持たせるため。
+     * 前の合言葉で通した届物はログに残して追えるようにする。
+     */
+    let expected = await computeHmacSha256Hex(verifySecret, rawBody);
     if (!safeEqualHex(signatureHeader.toLowerCase(), expected)) {
-      return c.json({ success: false, error: 'Invalid signature' }, 401);
+      const previousSecret = await resolvePreviousWebhookSecret(wh, webhookKeysOf(c));
+      if (!previousSecret || previousSecret.length < MIN_SECRET_LENGTH) {
+        return c.json({ success: false, error: 'Invalid signature' }, 401);
+      }
+      const previousExpected = await computeHmacSha256Hex(previousSecret, rawBody);
+      if (!safeEqualHex(signatureHeader.toLowerCase(), previousExpected)) {
+        return c.json({ success: false, error: 'Invalid signature' }, 401);
+      }
+      expected = previousExpected;
+      console.log(JSON.stringify({
+        event: 'incoming_webhook_previous_secret_used',
+        webhookId: wh.id,
+      }));
     }
 
     let payload: unknown;
@@ -1378,8 +1526,9 @@ webhooks.post('/api/webhooks/incoming/:id/receive', async (c) => {
         console.error('受信Webhookの記録開始に失敗:', logError);
       }
     }
-    let actionResult: { matchedFriendId: string | null; executed: number; failed: number } =
-      { matchedFriendId: null, executed: 0, failed: 0 };
+    let actionResult: { matchedFriendId: string | null; executed: number; failed: number;
+      matchStatus: 'matched' | 'not_found' | 'ambiguous' | 'skipped' } =
+      { matchedFriendId: null, executed: 0, failed: 0, matchStatus: 'skipped' };
     try {
       const identityMatching = safeJson<IncomingWebhookIdentityMatch>(wh.identity_match_json, {
         methods: [], onNotFound: 'do_nothing',
@@ -1448,6 +1597,8 @@ webhooks.post('/api/webhooks/incoming/:id/receive', async (c) => {
         // N-378: 「受理したが処理対象がいない」を送り主が判別できるよう、
         // 照合結果と実行件数を添える。received:true の契約はそのまま。
         matched: actionResult.matchedFriendId !== null,
+        // S: 複数一致で保留になった届物を送り主が判別できるよう照合結果も返す。
+        matchStatus: actionResult.matchStatus,
         executed: actionResult.executed,
         failed: actionResult.failed,
       },
