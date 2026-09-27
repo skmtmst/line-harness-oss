@@ -91,11 +91,16 @@ const SOURCE_OTHER = '__other__'
   送る側の見本（いつ送るか・何を送るか）。一覧の表示文言とそろえている。
   送り先の作成は /webhooks/new で行うので、ここでは行き先の案内だけ持つ。
 */
+/*
+ * R150: event は送信Webhookが実際に購読できる種類ID
+ * (packages/db KNOWN_OUTGOING_EVENT_TYPES)。作られない出来事を
+ * 見本に書くと「全イベント送信」の設定が意図せず作られる。
+ */
 const OUTGOING_SAMPLES = [
-  { event: 'friend.added', when: '友だちが追加されたとき', payload: '名前・追加日・流入元' },
-  { event: 'form.submitted', when: 'フォームが送られたとき', payload: '回答のすべて' },
-  { event: 'booking.created', when: '予約が入ったとき', payload: '予約日時・メニュー・担当' },
-  { event: 'conversion.confirmed', when: '注文が確定したとき', payload: '注文番号・金額・お客様名' },
+  { event: 'friend_add', when: '友だちが追加されたとき', payload: '名前・追加日・流入元' },
+  { event: 'form_submitted', when: 'フォームが送られたとき', payload: 'フォーム名・回答ID' },
+  { event: 'booking_created', when: '予約が入ったとき', payload: '予約ID・メニュー・担当' },
+  { event: 'ec.order.confirmed', when: '注文が確定したとき', payload: '注文番号・金額・お客様名' },
 ] as const
 
 /*
@@ -181,7 +186,7 @@ function WebhookSamples() {
                     <strong className="text-ink block text-sm">{sample.when}</strong>
                     <span className="text-ink-secondary mt-1 block text-xs">送るもの：{sample.payload}</span>
                   </div>
-                  <Button variant="secondary" href="/webhooks/new">
+                  <Button variant="secondary" href={`/webhooks/new?event=${sample.event}`}>
                     送り先を作る
                   </Button>
                 </li>

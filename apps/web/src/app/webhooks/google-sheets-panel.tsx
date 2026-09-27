@@ -91,9 +91,14 @@ export default function GoogleSheetsPanel() {
     }
     setStatus('loading')
     setLoadError('')
+    /*
+     * R151: 応答の無い通信はブラウザもいつまでも待つ。30秒で打ち切って
+     * 「読み込めなかった」表示と再試行へ逃がす（読み込み中のまま止めない）。
+     */
+    const signal = AbortSignal.timeout(30_000)
     const [connectionResult, runsResult] = await Promise.allSettled([
-      api.webhooks.googleSheets.connection(requestAccountId),
-      api.webhooks.googleSheets.runs(requestAccountId),
+      api.webhooks.googleSheets.connection(requestAccountId, { signal }),
+      api.webhooks.googleSheets.runs(requestAccountId, { signal }),
     ])
     if (
       loadGenerationRef.current !== requestGeneration
