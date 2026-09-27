@@ -29,6 +29,15 @@ const PATHS = {
     <path key="h" d="M12 18h.01" />,
     <path key="i" d="M16 18h.01" />,
   ],
+  /** 一覧（リスト表示の切り替え用。lucide list と同じ線） */
+  list: [
+    <path key="a" d="M3 12h.01" />,
+    <path key="b" d="M3 18h.01" />,
+    <path key="c" d="M3 6h.01" />,
+    <path key="d" d="M8 12h13" />,
+    <path key="e" d="M8 18h13" />,
+    <path key="f" d="M8 6h13" />,
+  ],
   /** 時刻 */
   clock: [
     <circle key="c" cx="12" cy="12" r="10" />,
