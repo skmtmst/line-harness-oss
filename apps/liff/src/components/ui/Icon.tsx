@@ -29,6 +29,15 @@ const PATHS = {
     <path key="h" d="M12 18h.01" />,
     <path key="i" d="M16 18h.01" />,
   ],
+  /** 一覧（リスト表示の切り替え・自分のイベントへ戻る。lucide list と同じ線） */
+  list: [
+    <path key="a" d="M3 12h.01" />,
+    <path key="b" d="M3 18h.01" />,
+    <path key="c" d="M3 6h.01" />,
+    <path key="d" d="M8 12h13" />,
+    <path key="e" d="M8 18h13" />,
+    <path key="f" d="M8 6h13" />,
+  ],
   /** 時刻 */
   clock: [
     <circle key="c" cx="12" cy="12" r="10" />,
@@ -57,15 +66,6 @@ const PATHS = {
     <path key="b" d="M5 2h14" />,
     <path key="c" d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12 7.586 16.414A2 2 0 0 0 7 17.828V22" />,
     <path key="d" d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2" />,
-  ],
-  /** 一覧へ戻る (自分のイベントを見る) */
-  list: [
-    <path key="a" d="M3 12h.01" />,
-    <path key="b" d="M3 18h.01" />,
-    <path key="c" d="M3 6h.01" />,
-    <path key="d" d="M8 12h13" />,
-    <path key="e" d="M8 18h13" />,
-    <path key="f" d="M8 6h13" />,
   ],
   /** 送信した */
   send: [

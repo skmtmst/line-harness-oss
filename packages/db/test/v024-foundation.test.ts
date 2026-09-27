@@ -49,6 +49,8 @@ import {
   sanitizeHost,
   sanitizePath,
   sanitizeReferrer,
+  getSiteConsentSummary,
+  recordSiteConsentDecision,
 } from '../src/site-tracking.js';
 import {
   createCommonVar,
@@ -777,8 +779,8 @@ describe('サイトの記録', () => {
 
   test('友だちと結びつくと、それまでの行動も紐づく', async () => {
     insertFriend('f-1');
-    await recordSiteEvent(db, { visitorId: 'v-1', lineAccountId: 'account-1', eventType: 'page_view', path: '/a' });
-    await recordSiteEvent(db, { visitorId: 'v-1', lineAccountId: 'account-1', eventType: 'page_view', path: '/b' });
+    await recordSiteEvent(db, { visitorId: 'v-1', lineAccountId: 'account-1', eventType: 'page_view', path: '/a', consent: 'granted' });
+    await recordSiteEvent(db, { visitorId: 'v-1', lineAccountId: 'account-1', eventType: 'page_view', path: '/b', consent: 'granted' });
     expect(await linkVisitorToFriend(db, 'v-1', 'account-1', 'f-1', 'liff')).toBe(true);
     const { c } = sqlite
       .prepare(`SELECT COUNT(*) AS c FROM site_events WHERE friend_id = 'f-1'`)
@@ -790,7 +792,7 @@ describe('サイトの記録', () => {
     insertFriend('f-host');
     await recordSiteEvent(db, {
       visitorId: 'v-host', lineAccountId: 'account-1', eventType: 'page_view',
-      host: 'shop.example.com', path: '/thanks',
+      host: 'shop.example.com', path: '/thanks', consent: 'granted',
     });
     await linkVisitorToFriend(db, 'v-host', 'account-1', 'f-host', 'liff');
 
@@ -805,7 +807,7 @@ describe('サイトの記録', () => {
   test('一度結びついたら上書きしない', async () => {
     insertFriend('f-1');
     insertFriend('f-2');
-    await recordSiteEvent(db, { visitorId: 'v-1', lineAccountId: 'account-1', eventType: 'page_view', path: '/a' });
+    await recordSiteEvent(db, { visitorId: 'v-1', lineAccountId: 'account-1', eventType: 'page_view', path: '/a', consent: 'granted' });
     await linkVisitorToFriend(db, 'v-1', 'account-1', 'f-1', 'liff');
     // 同じ端末を家族で使う場合など、後から別の人に付け替わると
     // 過去の行動まで別人のものになる。
@@ -824,10 +826,10 @@ describe('サイトの記録', () => {
     expect(await getSiteTrackingAccountId(db, 'hk_9f3a2c81b4')).toBeNull();
 
     await recordSiteEvent(db, {
-      visitorId: 'shared-cookie', lineAccountId: 'account-1', eventType: 'page_view', path: '/a',
+      visitorId: 'shared-cookie', lineAccountId: 'account-1', eventType: 'page_view', path: '/a', consent: 'granted',
     });
     await recordSiteEvent(db, {
-      visitorId: 'shared-cookie', lineAccountId: 'account-2', eventType: 'page_view', path: '/b',
+      visitorId: 'shared-cookie', lineAccountId: 'account-2', eventType: 'page_view', path: '/b', consent: 'granted',
     });
     expect(await linkVisitorToFriend(db, 'shared-cookie', 'account-1', 'f-1', 'liff')).toBe(true);
     const visitors = sqlite.prepare(
@@ -837,6 +839,65 @@ describe('サイトの記録', () => {
       { id: 'account-1:shared-cookie', line_account_id: 'account-1', friend_id: 'f-1' },
       { id: 'account-2:shared-cookie', line_account_id: 'account-2', friend_id: null },
     ]);
+  });
+
+  // #818 合格条件: 同意していない閲覧は1件も記録されない
+  test('同意が無い閲覧は1件も記録されず、件数だけ数える', async () => {
+    const unset = await recordSiteEvent(db, {
+      visitorId: 'v-new', lineAccountId: 'account-1', eventType: 'page_view', path: '/a',
+    });
+    const declined = await recordSiteEvent(db, {
+      visitorId: 'v-new', lineAccountId: 'account-1', eventType: 'page_view', path: '/a',
+      consent: 'declined',
+    });
+    expect(unset).toBe('suppressed');
+    expect(declined).toBe('suppressed');
+    const { events } = sqlite
+      .prepare('SELECT COUNT(*) AS events FROM site_events')
+      .get() as { events: number };
+    const { visitors } = sqlite
+      .prepare('SELECT COUNT(*) AS visitors FROM site_visitors')
+      .get() as { visitors: number };
+    expect(events).toBe(0);
+    // 訪問者の行(閲覧した時刻)も残さない。
+    expect(visitors).toBe(0);
+
+    const consent = await getSiteConsentSummary(db, 'account-1');
+    expect(consent.suppressed).toBe(2);
+  });
+
+  test('同意した閲覧は記録され、訪問者に同意した日時が残る', async () => {
+    const result = await recordSiteEvent(db, {
+      visitorId: 'v-ok', lineAccountId: 'account-1', eventType: 'page_view', path: '/a',
+      consent: 'granted',
+    });
+    expect(result).toBe('recorded');
+    const visitor = sqlite
+      .prepare(`SELECT consent_state, consent_at FROM site_visitors WHERE id = 'account-1:v-ok'`)
+      .get() as { consent_state: string; consent_at: string };
+    expect(visitor.consent_state).toBe('granted');
+    expect(visitor.consent_at).toBeTruthy();
+  });
+
+  test('同意した割合と数えなかった件数を返す', async () => {
+    await recordSiteConsentDecision(db, 'account-1', 'granted');
+    await recordSiteConsentDecision(db, 'account-1', 'granted');
+    await recordSiteConsentDecision(db, 'account-1', 'declined');
+    await recordSiteEvent(db, {
+      visitorId: 'v-x', lineAccountId: 'account-1', eventType: 'page_view', path: '/x',
+      consent: 'unset',
+    });
+
+    const consent = await getSiteConsentSummary(db, 'account-1');
+    expect(consent.granted).toBe(2);
+    expect(consent.declined).toBe(1);
+    expect(consent.suppressed).toBe(1);
+    expect(consent.grantedRate).toBeCloseTo(2 / 3);
+
+    // 他のアカウントの数は混ざらない
+    const other = await getSiteConsentSummary(db, 'account-2');
+    expect(other.grantedRate).toBeNull();
+    expect(other.suppressed).toBe(0);
   });
 });
 

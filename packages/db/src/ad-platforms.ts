@@ -27,19 +27,21 @@ const AD_PLATFORM_COMMON_KEYS: readonly string[] = [
   'failed_count',
   'retry_success_count',
   'connection_error',
+  // 広告費の取込 (#818)。取込費用を帰属させる流入元。
+  'entry_route_id',
 ];
 
 export const AD_PLATFORM_CONFIG_KEYS: Record<string, ReadonlySet<string>> = {
-  meta: new Set(['pixel_id', 'access_token', 'test_event_code', ...AD_PLATFORM_COMMON_KEYS]),
+  meta: new Set(['pixel_id', 'access_token', 'test_event_code', 'ad_account_id', ...AD_PLATFORM_COMMON_KEYS]),
   x: new Set([
     'api_key', 'api_secret', 'x_oauth_token', 'x_oauth_token_secret',
-    'pixel_id', 'conversion_id', ...AD_PLATFORM_COMMON_KEYS,
+    'pixel_id', 'conversion_id', 'account_id', ...AD_PLATFORM_COMMON_KEYS,
   ]),
   google: new Set([
     'customer_id', 'conversion_action_id', 'oauth_token', 'developer_token',
     ...AD_PLATFORM_COMMON_KEYS,
   ]),
-  tiktok: new Set(['pixel_code', 'access_token', ...AD_PLATFORM_COMMON_KEYS]),
+  tiktok: new Set(['pixel_code', 'access_token', 'advertiser_id', ...AD_PLATFORM_COMMON_KEYS]),
 };
 
 /**
@@ -187,6 +189,14 @@ export interface AdPlatformConfig {
   developer_token?: string;
   // TikTok
   pixel_code?: string;
+  /** 表示に使う通貨コード(JPYなど)。費用の換算はしない。 */
+  currency?: string;
+  /** 費用取込に使う媒体側のアカウントID (#818) */
+  ad_account_id?: string;
+  account_id?: string;
+  advertiser_id?: string;
+  /** 取り込んだ費用を帰属させる流入元 */
+  entry_route_id?: string;
 }
 
 export interface AdConversionLog {

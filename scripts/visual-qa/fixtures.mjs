@@ -3171,7 +3171,51 @@ export const BROADCASTS = [
   afterActionVersionId: index === 1 ? 'common-action-version-broadcast-tagged' : null,
   version: 1,
   createdAt: '2026-08-16T00:00:00.000Z',
+  // 承認の絡み（#816 C）。0行目は依頼中、2行目は承認を通って送信済み。
+  // 記録の見本（BROADCAST_ACTIVITY）と合わせる。無い行は 'none'。
+  approvalStatus: index === 0 ? 'pending' : index === 2 ? 'approved' : 'none',
+  // 10の状態（#816）。承認待ちは承認の軸が先（deriveBroadcastDisplayStatus
+  // と同じ）。0行目は status が予約済みでも「承認待ち」で見せる。
+  displayStatus: index === 0 ? 'pending_approval' : String(status),
+  displayStatusLabel: { draft: '下書き', pending_approval: '承認待ち', scheduled: '予約済み', sent: '送信済み' }[index === 0 ? 'pending_approval' : status] ?? String(status),
+  ledger: status === 'sent'
+    ? {
+      sent: Number(successCount), failed: 0, failedTemporary: 0, failedPermanent: 0,
+      unknown: 0, inFlight: 0, retryableCount: 0,
+    }
+    : { sent: 0, failed: 0, failedTemporary: 0, failedPermanent: 0, unknown: 0, inFlight: 0, retryableCount: 0 },
 }))
+
+/**
+ * 一斉配信の宛先台帳の見本（#816 / C-2）。
+ *
+ * 行がある8人（届いた5・一時的1・届けられなかった1・送達不明1）と、
+ * まだ送っていない20人（名前の一覧は無い）。
+ */
+export const BROADCAST_RECIPIENTS = {
+  rows: [
+    { friendId: 'friend-1', displayName: '山田花子', lineAccountId: 'visual-qa-account', group: 'delivered', label: '届いた', detail: 'LINEが受け付けました', retryable: false, lineRequestId: 'req-9a1', errorCode: null, dispatchedAt: '2026-10-01T10:00:00+09:00', settledAt: '2026-10-01T10:00:05+09:00' },
+    { friendId: 'friend-2', displayName: '佐々木健', lineAccountId: 'visual-qa-account', group: 'failed_permanent', label: '失敗：届けられませんでした', detail: 'ブロック・友だち解除などで受け付けられませんでした。送り直しません', retryable: false, lineRequestId: null, errorCode: 'line_http_400', dispatchedAt: '2026-10-01T10:00:00+09:00', settledAt: '2026-10-01T10:00:06+09:00' },
+    { friendId: 'friend-3', displayName: '鈴木一郎', lineAccountId: 'visual-qa-account', group: 'failed_temporary', label: '失敗：一時的（あとで再送できます）', detail: '混み合いなどで送れませんでした。時間を置いて送り直せます', retryable: true, lineRequestId: null, errorCode: 'line_http_429', dispatchedAt: '2026-10-01T10:01:00+09:00', settledAt: '2026-10-01T10:01:07+09:00' },
+    { friendId: 'friend-4', displayName: '高橋美香', lineAccountId: 'visual-qa-account', group: 'delivered', label: '届いた', detail: 'LINEが受け付けました', retryable: false, lineRequestId: 'req-9a1', errorCode: null, dispatchedAt: '2026-10-01T10:00:00+09:00', settledAt: '2026-10-01T10:00:05+09:00' },
+    { friendId: 'friend-5', displayName: '田中太郎', lineAccountId: 'visual-qa-account', group: 'delivered', label: '届いた', detail: 'LINEが受け付けました', retryable: false, lineRequestId: 'req-9a2', errorCode: null, dispatchedAt: '2026-10-01T10:00:30+09:00', settledAt: '2026-10-01T10:00:35+09:00' },
+    { friendId: 'friend-6', displayName: '伊藤さくら', lineAccountId: 'visual-qa-account', group: 'delivered', label: '届いた', detail: 'LINEが受け付けました', retryable: false, lineRequestId: 'req-9a2', errorCode: null, dispatchedAt: '2026-10-01T10:00:30+09:00', settledAt: '2026-10-01T10:00:35+09:00' },
+    { friendId: 'friend-7', displayName: '渡辺大輔', lineAccountId: 'visual-qa-account', group: 'delivered', label: '届いた', detail: 'LINEが受け付けました', retryable: false, lineRequestId: 'req-9a2', errorCode: null, dispatchedAt: '2026-10-01T10:00:30+09:00', settledAt: '2026-10-01T10:00:35+09:00' },
+    { friendId: 'friend-8', displayName: '中村恵子', lineAccountId: 'visual-qa-account', group: 'unknown', label: '送達不明', detail: '外へ出たかもしれません。二重に届くのを避けるため送り直しません', retryable: false, lineRequestId: null, errorCode: 'line_no_response', dispatchedAt: '2026-10-01T10:00:30+09:00', settledAt: '2026-10-01T10:01:35+09:00' },
+  ],
+  summary: {
+    sent: 5, failedTemporary: 1, failedPermanent: 1, unknown: 1, inFlight: 0,
+    pending: 20, total: 28, retryableCount: 1,
+  },
+}
+
+/** 一斉配信の操作の記録の見本（#816 / C-3）。新しい順。消せない。 */
+export const BROADCAST_ACTIVITY = [
+  { kind: 'lifecycle', action: 'send_started', label: '送信を始めた', actorStaffId: null, actorName: '自動', reason: null, createdAt: '2026-10-01T10:00:00+09:00' },
+  { kind: 'approval', action: 'approved', label: '承認した', actorStaffId: 'staff-approver', actorName: '佐藤 美咲', reason: null, createdAt: '2026-09-25T21:02:00+09:00' },
+  { kind: 'approval', action: 'requested', label: '承認を依頼した', actorStaffId: 'staff-sender', actorName: '川野 健太', reason: null, createdAt: '2026-09-25T20:10:00+09:00' },
+  { kind: 'lifecycle', action: 'created', label: '下書きを作った', actorStaffId: 'staff-sender', actorName: '川野 健太', reason: null, createdAt: '2026-09-25T20:05:00+09:00' },
+]
 
 /** 機能6の一覧が本番口と同じく、行・KPI・ページ情報を一度に読むための固定値。 */
 export const BROADCAST_LIST_META = {
@@ -5002,6 +5046,7 @@ export const BOOKING_SETTINGS = {
   organizationName: '然-NEN- 本店', version: 1, timeZone: 'Asia/Tokyo',
   bookingWindowDays: 60, cutoffMinutesBefore: 1440, cancelDeadlineMinutesBefore: 1440,
   maxActiveBookingsPerFriend: 2, approvalMode: 'manual', holdMinutes: 15, slotGranularityMinutes: 15,
+  liffDateView: 'list',
   menuCount: 8, activeMenuCount: 6, inactiveMenuCount: 2,
   businessHours: [
     { weekday: 0, intervals: [{ start: '10:00', end: '17:00', capacity: 2 }] },
@@ -5136,6 +5181,8 @@ export const BOOKING_AVAILABILITY = {
       ],
     },
   ],
+  // LIFFカレンダーの「休」の印の見本（枠が無い日と区別する）。
+  closed_dates: ['2026-09-05', '2026-09-06'],
 }
 
 /* #414 の availability 契約。予約枠ごとの定員・残数・状態を固定する。 */
