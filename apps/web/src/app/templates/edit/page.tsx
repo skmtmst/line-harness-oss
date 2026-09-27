@@ -1,6 +1,6 @@
 'use client'
 
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import React, { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -629,7 +629,7 @@ function TemplateEditInner() {
                 <input id="tp-name" type="text" value={name} onChange={(event) => updateDraft({ name: event.target.value })} className={inputClass} />
               </Field>
               <Field label="置き場" htmlFor="tp-folder" note="一覧のフォルダ分けと絞り込みに使います。">
-                <SelectField id="tp-folder" value={folderId ?? ''} onChange={(event) => updateDraft({ folderId: event.target.value || null })} options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]} />
+                <Select aria-label="置き場" id="tp-folder" value={folderId ?? ''} onChange={(value) => updateDraft({ folderId: value || null })} options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]} />
               </Field>
             </>
           )}

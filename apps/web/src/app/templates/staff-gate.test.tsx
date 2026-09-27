@@ -165,7 +165,7 @@ describe('テンプレート一覧のstaffゲート (N-144)', () => {
 
     // hasDraft=true でも公開ボタンは出ない
     expect(screen.queryByText('公開する')).toBeNull()
-    // 置き場は読み取り表示（SelectField ではない）
+    // 置き場は読み取り表示（選び欄ではない）
     expect(screen.queryByLabelText('置き場')).toBeNull()
     expect(screen.getAllByText('未分類').length).toBeGreaterThan(0)
     // 名前を押しても編集欄は開かない

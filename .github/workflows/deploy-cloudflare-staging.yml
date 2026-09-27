@@ -23,6 +23,30 @@ on:
           - all
           - worker
           - admin
+      worker_config_replay:
+        description: 未適用D1を避け、現在配備中と同じWorkerコードへ最新の検証設定だけを重ねる
+        type: boolean
+        required: true
+        default: false
+      worker_source_sha:
+        description: config replayで再利用する、現在配備中Workerの40桁Git SHA
+        type: string
+        required: false
+        default: ''
+      expected_worker_version_id:
+        description: config replay開始前に一致を確認する、現在配備中WorkerのVersion ID
+        type: string
+        required: false
+        default: ''
+      expected_google_business_write_enabled:
+        description: 配備後にVersionの実効値を照合する（今回の試験はtrue、戻す時はfalse）
+        type: choice
+        required: true
+        default: skip
+        options:
+          - skip
+          - 'true'
+          - 'false'
 
 permissions:
   contents: write
@@ -44,6 +68,10 @@ jobs:
     env:
       DELIVERY_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || vars.NEN_STAGING_DELIVERY_MODE }}
       DELIVERY_TARGET: ${{ github.event_name == 'workflow_dispatch' && inputs.target || 'all' }}
+      WORKER_CONFIG_REPLAY: ${{ github.event_name == 'workflow_dispatch' && inputs.worker_config_replay || false }}
+      WORKER_SOURCE_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.worker_source_sha || '' }}
+      EXPECTED_WORKER_VERSION_ID: ${{ github.event_name == 'workflow_dispatch' && inputs.expected_worker_version_id || '' }}
+      EXPECTED_GOOGLE_BUSINESS_WRITE_ENABLED: ${{ github.event_name == 'workflow_dispatch' && inputs.expected_google_business_write_enabled || 'skip' }}
       GH_TOKEN: ${{ github.token }}
       WORKER_API_TOKEN: ${{ secrets.CLOUDFLARE_WORKERS_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN || secrets.CF_API_TOKEN }}
       PAGES_API_TOKEN: ${{ secrets.CLOUDFLARE_PAGES_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN || secrets.CF_API_TOKEN }}
@@ -130,10 +158,43 @@ jobs:
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
-          if [ "$DELIVERY_MODE" = "apply" ] && [ "$pending_count" -ne 0 ]; then
+          if [ "$DELIVERY_MODE" = "apply" ] && [ "$pending_count" -ne 0 ] && [ "$WORKER_CONFIG_REPLAY" != "true" ]; then
             echo "::error::検証D1に未適用マイグレーションが ${pending_count} 件あります。Migrate D1を先に実行してください。"
             exit 1
           fi
+
+      - name: Prepare the deployed Worker source for config replay
+        id: worker_source
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ env.WORKER_API_TOKEN }}
+        run: |
+          worker_root="$GITHUB_WORKSPACE"
+          if [ "$WORKER_CONFIG_REPLAY" = "true" ]; then
+            test "$GITHUB_EVENT_NAME" = "workflow_dispatch"
+            test "$DELIVERY_TARGET" = "worker"
+            printf '%s' "$WORKER_SOURCE_SHA" | grep -Eq '^[0-9a-f]{40}$'
+            printf '%s' "$EXPECTED_WORKER_VERSION_ID" | grep -Eq '^[0-9a-f-]{36}$'
+
+            deployments=$(curl --fail-with-body --silent --show-error \
+              -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/nen-line-stg/deployments")
+            active_version=$(printf '%s' "$deployments" | jq -r \
+              '.result.deployments | max_by(.created_on) | .versions[] | select(.percentage == 100) | .version_id')
+            test "$active_version" = "$EXPECTED_WORKER_VERSION_ID"
+
+            git fetch --no-tags --deepen=200 origin codex/development
+            git cat-file -e "$WORKER_SOURCE_SHA^{commit}"
+            git merge-base --is-ancestor "$WORKER_SOURCE_SHA" "$GITHUB_SHA"
+            worker_root="$RUNNER_TEMP/worker-source"
+            git worktree add --detach "$worker_root" "$WORKER_SOURCE_SHA"
+            cp apps/worker/wrangler.staging.toml "$worker_root/apps/worker/wrangler.staging.toml"
+            pnpm --dir "$worker_root" install --frozen-lockfile
+
+            # replay元のWorkerコードを保ち、版管理された検証設定だけを重ねる。
+            test -z "$(git -C "$worker_root" status --porcelain -- . ':(exclude)apps/worker/wrangler.staging.toml')"
+            test -n "$(git -C "$worker_root" diff -- apps/worker/wrangler.staging.toml)"
+          fi
+          echo "root=$worker_root" >> "$GITHUB_OUTPUT"
 
       - name: Acquire the shared staging lock
         id: staging_lock
@@ -148,27 +209,69 @@ jobs:
 
       - name: Bind the staging Cloudflare account
         run: |
+          worker_root="${{ steps.worker_source.outputs.root }}"
           sed -i -E \
             "s/^account_id[[:space:]]*=.*/account_id = \"$CLOUDFLARE_ACCOUNT_ID\"/" \
-            apps/worker/wrangler.staging.toml
+            "$worker_root/apps/worker/wrangler.staging.toml"
           grep -q "^account_id = \"$CLOUDFLARE_ACCOUNT_ID\"$" \
-            apps/worker/wrangler.staging.toml
+            "$worker_root/apps/worker/wrangler.staging.toml"
 
       - name: Build Worker and LIFF assets
         if: env.DELIVERY_TARGET != 'admin'
-        run: pnpm --filter worker build
+        run: |
+          cd "${{ steps.worker_source.outputs.root }}"
+          pnpm --filter worker build
 
       - name: Check Worker bundle without publishing
         if: env.DELIVERY_MODE == 'dry-run' && env.DELIVERY_TARGET != 'admin'
         env:
           CLOUDFLARE_API_TOKEN: ${{ env.WORKER_API_TOKEN }}
-        run: npx wrangler deploy --config apps/worker/wrangler.staging.toml --dry-run
+        run: |
+          cd "${{ steps.worker_source.outputs.root }}"
+          npx wrangler deploy --config apps/worker/wrangler.staging.toml --dry-run
 
       - name: Deploy Worker to staging
+        id: worker_deploy
         if: env.DELIVERY_MODE == 'apply' && env.DELIVERY_TARGET != 'admin'
         env:
           CLOUDFLARE_API_TOKEN: ${{ env.WORKER_API_TOKEN }}
-        run: npx wrangler deploy --config apps/worker/wrangler.staging.toml
+        run: |
+          set -o pipefail
+          cd "${{ steps.worker_source.outputs.root }}"
+          if [ "$WORKER_CONFIG_REPLAY" = "true" ]; then
+            npx wrangler deploy --config apps/worker/wrangler.staging.toml \
+              --message "staging config replay from $WORKER_SOURCE_SHA" 2>&1 \
+              | tee "$RUNNER_TEMP/worker-deploy.log"
+          else
+            npx wrangler deploy --config apps/worker/wrangler.staging.toml 2>&1 \
+              | tee "$RUNNER_TEMP/worker-deploy.log"
+          fi
+          version_id=$(sed -n 's/.*Current Version ID: //p' "$RUNNER_TEMP/worker-deploy.log" | tail -1)
+          printf '%s' "$version_id" | grep -Eq '^[0-9a-f-]{36}$'
+          echo "version_id=$version_id" >> "$GITHUB_OUTPUT"
+
+      - name: Verify the deployed Worker version and Google write setting
+        if: env.DELIVERY_MODE == 'apply' && env.DELIVERY_TARGET != 'admin'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ env.WORKER_API_TOKEN }}
+        run: |
+          version_id="${{ steps.worker_deploy.outputs.version_id }}"
+          version=$(curl --fail-with-body --silent --show-error \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/nen-line-stg/versions/$version_id")
+          active=$(curl --fail-with-body --silent --show-error \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/nen-line-stg/deployments")
+          active_version=$(printf '%s' "$active" | jq -r \
+            '.result.deployments | max_by(.created_on) | .versions[] | select(.percentage == 100) | .version_id')
+          test "$active_version" = "$version_id"
+
+          if [ "$EXPECTED_GOOGLE_BUSINESS_WRITE_ENABLED" != "skip" ]; then
+            actual=$(printf '%s' "$version" | jq -r \
+              '.result.resources.bindings[] | select(.name == "GOOGLE_BUSINESS_WRITE_ENABLED") | .text')
+            test "$actual" = "$EXPECTED_GOOGLE_BUSINESS_WRITE_ENABLED"
+            echo "GOOGLE_BUSINESS_WRITE_ENABLED=$actual" >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Build Admin Panel dependencies
         if: env.DELIVERY_TARGET != 'worker'
@@ -204,6 +307,8 @@ jobs:
             echo "- target: \`$DELIVERY_TARGET\`"
             echo "- commit: \`$GITHUB_SHA\`"
             echo "- Worker: \`nen-line-stg\`"
+            echo "- Worker Version ID: \`${{ steps.worker_deploy.outputs.version_id || '未配備' }}\`"
+            echo "- Worker config replay: \`$WORKER_CONFIG_REPLAY\`"
             echo "- Admin: \`nen-line-stg-admin\`"
             echo "- D1 migration: 未適用 ${{ steps.pending_migrations.outputs.count || '確認失敗' }} 件（このWorkflowでは適用しません）"
           } >> "$GITHUB_STEP_SUMMARY"

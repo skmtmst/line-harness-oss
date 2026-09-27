@@ -13,7 +13,7 @@ import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import StickyBar from '@/components/shared/sticky-bar'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import { Tabs } from '@/components/shared/tabs'
@@ -513,8 +513,8 @@ function ReviewsTab({ accountId, data, canPublish, onOpen, onSynced }: { account
         }))}
         actions={(
           <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
-            <SelectField size="compact" aria-label="評価で絞り込み" value={rating} onChange={(event) => { setRating(event.target.value); setPage(1) }} options={[{ value: '', label: '評価：すべて' }, ...[5, 4, 3, 2, 1].map((n) => ({ value: String(n), label: `★${n}` }))]} />
-            <SelectField size="compact" aria-label="並び順" value={order} onChange={(event) => { setOrder(event.target.value as GoogleReviewOrder); setPage(1) }} options={ORDER_OPTIONS} />
+            <Select size="page-size" aria-label="評価で絞り込み" value={rating} onChange={(value) => { setRating(value); setPage(1) }} options={[{ value: '', label: '評価：すべて' }, ...[5, 4, 3, 2, 1].map((n) => ({ value: String(n), label: `★${n}` }))]} />
+            <Select size="page-size" aria-label="並び順" value={order} onChange={(value) => { setOrder(value as GoogleReviewOrder); setPage(1) }} options={ORDER_OPTIONS} />
             <SearchField placeholder="口コミを検索" aria-label="口コミを検索" value={search} onChange={setSearch} onClear={() => setSearch('')} />
           </div>
         )}

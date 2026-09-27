@@ -10436,7 +10436,11 @@ export const api = {
       fetchApi<{ success: boolean }>(`/api/nen-campaigns/settings/${encodeURIComponent(campaignKey)}/enabled?lineAccountId=${encodeURIComponent(accountId)}`, {
         method: 'PUT', body: JSON.stringify({ isEnabled }),
       }),
-    testSend: (data: { campaignKey: string; accountId: string; friendId: string }) =>
+    testSend: (data: {
+      campaignKey: string; accountId: string; friendId: string
+      /** 編集中の下書き。渡した項目だけ保存済み設定に重ねて試送する（本配信設定は変わらない）。 */
+      draft?: { title?: string; bodyText?: string; buttonLabel?: string; buttonUrl?: string; imageUrl?: string }
+    }) =>
       fetchApi<{ success: boolean }>('/api/nen-campaigns/test-send', { method: 'POST', body: JSON.stringify(data) }),
     jobs: (accountId: string) => fetchApi<ApiResponse<Array<{
       id: string; campaignKey: string; label: string; friendName: string | null

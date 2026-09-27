@@ -7,7 +7,7 @@ import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import NoticeLineRegisterDialog from '@/components/hq/notice-line-register-dialog'
 import NoteBar from '@/components/shared/note-bar'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import StickyBar from '@/components/shared/sticky-bar'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import { RequiredBadge } from '@/components/shared/form-controls'
@@ -204,13 +204,13 @@ export default function HqSupportPage() {
           <h2 className="text-body font-bold text-ink">問い合わせ内容</h2>
 
           <Field label="種類" required htmlFor={`${uid}-kind`}>
-            <SelectField
+            <Select
+              aria-label="種類"
               id={`${uid}-kind`}
-              className="w-full"
-              style={{ width: '100%' }}
+              size="full"
               value={input.kind}
               disabled={sending}
-              onChange={(e) => set('kind', e.target.value as HqSupportKind | '')}
+              onChange={(value) => set('kind', value as HqSupportKind | '')}
               options={[{ value: '', label: '種類を選んでください' }, ...kinds.map((k) => ({ value: k.key, label: k.label }))]}
             />
           </Field>
@@ -241,13 +241,13 @@ export default function HqSupportPage() {
           </Field>
 
           <Field label="関係する店舗" note="任意" htmlFor={`${uid}-account`}>
-            <SelectField
+            <Select
+              aria-label="関係する店舗"
               id={`${uid}-account`}
-              className="w-full"
-              style={{ width: '100%' }}
+              size="full"
               value={input.lineAccountId}
               disabled={sending}
-              onChange={(e) => set('lineAccountId', e.target.value)}
+              onChange={(value) => set('lineAccountId', value)}
               options={[{ value: '', label: '指定しない' }, ...accounts.map((a) => ({ value: a.id, label: a.name }))]}
             />
           </Field>

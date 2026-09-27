@@ -27,7 +27,7 @@ import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
 import { TimeField } from '@/components/shared/date-time-field'
 import ListState from '@/components/shared/list-state'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import { shortDate } from '../../lib/format-time'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
@@ -567,11 +567,11 @@ function SlotCheckCard({ accountId, menus }: { accountId: string; menus: Booking
       <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <label className="text-ink-secondary text-xs">
           メニュー
-          <SelectField
+          <Select size="full"
             aria-label="確認するメニュー"
             value={menuId}
-            onChange={(event) => { setMenuId(event.target.value); setResult(null) }}
-            className="mt-1 w-full"
+            onChange={(value) => { setMenuId(value); setResult(null) }}
+            className="mt-1"
             options={[
               ...(activeMenus.length === 0 ? [{ value: '', label: '受付中のメニューがありません' }] : []),
               ...activeMenus.map((menu) => ({ value: menu.id, label: menu.name })),
@@ -589,11 +589,11 @@ function SlotCheckCard({ accountId, menus }: { accountId: string; menus: Booking
         {staffOptions.length > 0 ? (
           <label className="text-ink-secondary text-xs">
             担当
-            <SelectField
+            <Select size="full"
               aria-label="確認する担当"
               value={staffId}
-              onChange={(event) => { setStaffId(event.target.value); setResult(null) }}
-              className="mt-1 w-full"
+              onChange={(value) => { setStaffId(value); setResult(null) }}
+              className="mt-1"
               options={[
                 { value: '', label: '指定しない（誰かが取れれば可）' },
                 ...staffOptions.map((staff) => ({ value: staff.id, label: staff.display_name })),

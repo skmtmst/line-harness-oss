@@ -51,11 +51,17 @@ describe('対応が必要な受信の表の右端', () => {
     // 10% の割合指定では狭い幅で札が右の余白へ食い込む。
     expect(body).not.toContain('w-[10%]')
     expect(body).not.toContain('w-[40%]')
-    expect(body).toContain('w-24 px-5')
+    // 共通の表へ寄せたため、幅は Th の style で持つ。
+    // 96px では右に 35px 空くため、札（約52px＋余白）に合わせた 80px。
+    expect(body).toMatch(/<Th[^>]*width:\s*80[^>]*>状態/)
   })
 
-  it('右端の列の右の余白は見出しと同じ px-5 のまま', () => {
+  it('見出しと中身の余白は共通部品に任せ、両端をそろえる', () => {
     const body = code(CARD)
-    expect(body).toContain('<th className="w-[36%] px-5')
+    // 手書きの th/td をやめ、共通の表（DataTable/Th/Td）で余白を持つ。
+    expect(body).toContain("from '@/components/shared/table'")
+    expect(body).toContain('<DataTable')
+    expect(body).not.toContain('<th ')
+    expect(body).not.toContain('<td ')
   })
 })

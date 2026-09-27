@@ -202,7 +202,9 @@ export default function FolderPanel({
                     aria-haspopup="menu"
                     aria-expanded={openMenuId === row.id}
                     title={`フォルダ「${row.label}」の操作`}
-                    className="text-ink-faint hover:bg-canvas-sunken hover:text-action rounded-control min-h-8 min-w-8 text-lg leading-none opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100"
+                    // R37: 狭い幅ではホバーが無いため「…」を常に出す。
+                    // 出さないとスマホから名前変更・削除に届かない。
+                    className="text-ink-faint hover:bg-canvas-sunken hover:text-action rounded-control min-h-8 min-w-8 text-lg leading-none opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100 max-lg:opacity-100"
                   >
                     …
                   </button>

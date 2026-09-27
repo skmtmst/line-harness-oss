@@ -26,6 +26,16 @@ export function normalizeCommonVarValue(type: CommonVarType, value: string): str
     if (value === '') return value;
     return value.length <= 200 && /^https:\/\/\S+$/.test(value) ? value : null;
   }
+  /*
+   * URL型はリンク先として差し込まれる。URLでない文章は配信・予約導線で
+   * 壊れるため、口で止める（R36）。画像と違い、社内・検証環境の http
+   * リンクも運用するため http/https の両方を受ける。空は「空のまま」
+   * 運用があるため通す。
+   */
+  if (type === 'url') {
+    if (value === '') return value;
+    return value.length <= 200 && /^https?:\/\/\S+$/.test(value) ? value : null;
+  }
   if (type === 'date' || type === 'datetime') {
     const match = type === 'date'
       ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)

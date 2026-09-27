@@ -23,6 +23,23 @@ const net = vi.hoisted(() => ({
 
 vi.mock('next/link', () => ({ default: () => null }))
 
+/*
+ * 共通の Select は listbox の部品で、その操作は部品自身の試験が持つ。
+ * ここで見たいのは選んだ後の受信箱の判断なので、素の <select> に置き換える。
+ */
+vi.mock('@/components/shared/select', () => ({
+  default: ({ 'aria-label': label, value, onChange, options }: {
+    'aria-label': string
+    value: string
+    onChange: (value: string) => void
+    options: Array<{ value: string; label: string }>
+  }) => React.createElement(
+    'select',
+    { 'aria-label': label, value, onChange: (e: { target: { value: string } }) => onChange(e.target.value) },
+    options.map((option) => React.createElement('option', { key: option.value, value: option.value }, option.label)),
+  ),
+}))
+
 vi.mock('../../lib/api', async (importOriginal: () => Promise<typeof import('../../lib/api')>) => {
   const actual = await importOriginal()
   return {
@@ -213,7 +230,7 @@ describe('問い合わせ受信箱の実React動作(#630)', () => {
     await render()
     await wait(30_000)
     expect(inboxCalls('open')).toBe(0)
-    expect(host.textContent).toContain('読み込み中')
+    expect(host.textContent).toContain('対応待ちを読み込んでいます')
 
     hidden = false
     await act(async () => {

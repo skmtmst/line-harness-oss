@@ -1,7 +1,7 @@
 'use client'
 
 import Disclosure from '@/components/shared/disclosure'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   api,
@@ -599,15 +599,16 @@ export default function NewConversionPointPage() {
         <div className="grid gap-3 md:grid-cols-3">
           {/* 起点に金額が無いもの(タグ・フォーム・予約・ページ・動画など)では注文の金額を出さない。選択肢は対応表が持つ。 */}
           <Field label="金額の出し方" htmlFor="cv-value-mode" help={origin.amount}>
-            <SelectField
+            <Select
+              size="full"
+              aria-label="金額の出し方"
               id="cv-value-mode"
               value={valueMode}
-              onChange={(event) => {
-                setValueMode(event.target.value as ConversionValueMode)
+              onChange={(value) => {
+                setValueMode(value as ConversionValueMode)
                 setValueModeNotice(null)
               }}
               options={origin.valueModes.map((mode) => ({ value: mode, label: VALUE_MODE_LABELS[mode] }))}
-              className="w-full"
             />
             {valueModeNotice ? (
               <p className="text-warning mt-1 text-xs" role="status">
@@ -627,17 +628,7 @@ export default function NewConversionPointPage() {
             />
           </Field>
           <Field label="取り消しの扱い" htmlFor="cv-reversal-policy" help="元の成果は消さず、取消記録を追加します。">
-            <SelectField
-              id="cv-reversal-policy"
-              value={reversalPolicy}
-              onChange={(event) => setReversalPolicy(event.target.value as ConversionReversalPolicy)}
-              options={[
-                { value: 'source_cancelled', label: '返品されたら取り消す' },
-                { value: 'manual', label: '担当者が取り消す' },
-                { value: 'none', label: '取り消しを数えない' },
-              ]}
-              className="w-full"
-            />
+            <Select size="full" aria-label="取り消しの扱い" id="cv-reversal-policy" value={reversalPolicy} onChange={(value) => setReversalPolicy(value as ConversionReversalPolicy)} options={[ { value: 'source_cancelled', label: '返品されたら取り消す' }, { value: 'manual', label: '担当者が取り消す' }, { value: 'none', label: '取り消しを数えない' }, ]} />
           </Field>
         </div>
       </FormSection>

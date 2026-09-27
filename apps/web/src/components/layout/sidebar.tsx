@@ -12,6 +12,7 @@ import { HQ_TEMPLATE_DISTRIBUTION_ENABLED } from '@/lib/hq-template-availability
 import { usePageChrome } from '@/components/shell/page-chrome'
 import { defaultTitleForPath } from '@/components/shell/app-top-bar'
 import SidebarIdentity from './sidebar-identity'
+import SidebarVersion from './sidebar-version'
 import Notice from '@/components/shared/notice'
 import HqAccountMenu from '@/components/hq/account-menu'
 import {
@@ -627,6 +628,13 @@ export default function Sidebar({
           </div>
         ))}
       </nav>
+
+      {/*
+        メニューの下の版の表示（★V7 監査の直し E）。いま動いている版・
+        commit・配備日時と環境。取れないときは「版の情報なし」。
+        移行中の見た目承認（preview）は版の取得をしない。
+      */}
+      {preview ? null : <SidebarVersion />}
 
       {/*
         名前・権限・ログアウトは、2026-08-26 に共通トップバーへ移した。

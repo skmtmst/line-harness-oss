@@ -9,6 +9,7 @@ import type {
 } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
+import Select from '@/components/shared/select'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import {
   canSubmitDecision,
@@ -142,18 +143,14 @@ export default function IdentityDecisionDialog({
             <label className={styles.fieldLabel} htmlFor="identity-reprocess">
               過去の扱い
             </label>
-            <select
+            <Select
+              aria-label="過去の扱い"
               id="identity-reprocess"
-              className={styles.reason}
               value={mode}
-              onChange={(event) => setMode(event.target.value as IdentityReprocessMode)}
-            >
-              {REPROCESS_MODES.map((item) => (
-                <option key={item} value={item}>
-                  {reprocessText(item)}
-                </option>
-              ))}
-            </select>
+              onChange={(value) => setMode(value as IdentityReprocessMode)}
+              options={REPROCESS_MODES.map((item) => ({ value: item, label: reprocessText(item) }))}
+              size="full"
+            />
           </div>
         ) : null}
 
@@ -163,17 +160,16 @@ export default function IdentityDecisionDialog({
             {profileCandidates.map((field) => (
               <label key={field.fieldKey} className={styles.fieldLabel}>
                 {field.fieldLabel}
-                <select
-                  className={styles.reason}
+                <Select
+                  aria-label={field.fieldLabel}
                   value={profileSelections[field.fieldKey] ?? ''}
-                  onChange={(event) => setProfileSelections((current) => ({ ...current, [field.fieldKey]: event.target.value }))}
-                >
-                  {field.options.map((option) => (
-                    <option key={option.sourceFriendId} value={option.sourceFriendId}>
-                      {option.sourceLabel}：{option.valuePreview ?? '未登録'}{option.verified ? '（確認済み）' : ''}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(value) => setProfileSelections((current) => ({ ...current, [field.fieldKey]: value }))}
+                  options={field.options.map((option) => ({
+                    value: option.sourceFriendId,
+                    label: `${option.sourceLabel}：${option.valuePreview ?? '未登録'}${option.verified ? '（確認済み）' : ''}`,
+                  }))}
+                  size="full"
+                />
               </label>
             ))}
           </div>

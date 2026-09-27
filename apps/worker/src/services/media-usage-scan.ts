@@ -56,6 +56,8 @@ export interface ScanResult {
   source?: MediaRefKind;
   sourceRows?: number;
   cycleCompleted?: boolean;
+  /** 表そのものが無くて読めなかった読み口（R34）。空なら7種類すべて読めた。 */
+  skippedTables?: string[];
 }
 
 type MediaToScan = { id: string; r2_key: string };
@@ -85,31 +87,45 @@ function usageMatchTokens(item: MediaToScan, versionTokens: string[]): string[] 
 async function findMatches(
   db: D1Database,
   tokens: string[],
-): Promise<Array<{ refKind: MediaRefKind; refId: string }>> {
+): Promise<{
+  matches: Array<{ refKind: MediaRefKind; refId: string }>;
+  /** 表そのものが無くて読めなかった読み口（R34）。 */
+  skippedTables: string[];
+}> {
   const matches: Array<{ refKind: MediaRefKind; refId: string }> = [];
+  const skippedTables: string[] = [];
   const seen = new Set<string>();
   for (const source of SOURCES) {
-    for (let index = 0; index < tokens.length; index += MATCH_TOKEN_CHUNK) {
-      const chunk = tokens.slice(index, index + MATCH_TOKEN_CHUNK);
-      const conditions = source.columns
-        .flatMap((col) => chunk.map(() => `${col} LIKE ?`))
-        .join(' OR ');
-      const binds = source.columns.flatMap(() => chunk.map((token) => `%${token}%`));
-      const rows = await db
-        .prepare(
-          `SELECT ${source.idColumn} AS ref_id FROM ${source.table} WHERE ${conditions}`,
-        )
-        .bind(...binds)
-        .all<{ ref_id: string }>();
-      for (const row of rows.results) {
-        const key = `${source.refKind}:${row.ref_id}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        matches.push({ refKind: source.refKind, refId: row.ref_id });
+    try {
+      for (let index = 0; index < tokens.length; index += MATCH_TOKEN_CHUNK) {
+        const chunk = tokens.slice(index, index + MATCH_TOKEN_CHUNK);
+        const conditions = source.columns
+          .flatMap((col) => chunk.map(() => `${col} LIKE ?`))
+          .join(' OR ');
+        const binds = source.columns.flatMap(() => chunk.map((token) => `%${token}%`));
+        const rows = await db
+          .prepare(
+            `SELECT ${source.idColumn} AS ref_id FROM ${source.table} WHERE ${conditions}`,
+          )
+          .bind(...binds)
+          .all<{ ref_id: string }>();
+        for (const row of rows.results) {
+          const key = `${source.refKind}:${row.ref_id}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          matches.push({ refKind: source.refKind, refId: row.ref_id });
+        }
       }
+    } catch (err) {
+      // 表そのものが無い読み口だけ飛ばす。全部を例外にすると、どの画像でも
+      // 取得が失敗し、読み直しても直らない（R34）。一時的なD1障害は
+      // 例外のままにして、0件と偽らない。
+      if (!isMissingSourceTable(err, source.table)) throw err;
+      console.error(`media usage single scan skipped ${source.table}:`, err);
+      skippedTables.push(source.table);
     }
   }
-  return matches;
+  return { matches, skippedTables };
 }
 
 /**
@@ -123,19 +139,35 @@ export async function scanSingleMediaUsage(
   now: string,
   item: MediaToScan,
 ): Promise<ScanResult> {
-  const matches = await findMatches(
-    db,
-    usageMatchTokens(item, await getMediaUsageMatchTokens(db, item.id)),
-  );
-  for (const match of matches) {
+  // 版の表が無い環境では旧版の固定参照まで拾えない。現行キーとライブ参照
+  // だけでも走査は続け、その読み残しを呼び出し側へ返す（R34）。
+  let versionTokens: string[] = [];
+  const skippedTables: string[] = [];
+  try {
+    versionTokens = await getMediaUsageMatchTokens(db, item.id);
+  } catch (err) {
+    if (!isMissingSourceTable(err, 'media_versions')) throw err;
+    console.error('media usage single scan skipped media_versions:', err);
+    skippedTables.push('media_versions');
+  }
+  const found = await findMatches(db, usageMatchTokens(item, versionTokens));
+  skippedTables.push(...found.skippedTables);
+  for (const match of found.matches) {
     await recordMediaUsage(db, {
       mediaId: item.id,
       refKind: match.refKind,
       refId: match.refId,
     });
   }
-  const pruned = await pruneStaleMediaUsages(db, now, [item.id]);
-  return { scanned: 1, matched: matches.length, pruned };
+  /*
+   * 読み残しがあるときは古い記録を整理しない。読めなかった読み口の使用先を
+   * 消すと、使われているのに0件と偽って削除させてしまう。見つけた使用先の
+   * 記録（足す側）は安全なので続ける。
+   */
+  const pruned = skippedTables.length === 0
+    ? await pruneStaleMediaUsages(db, now, [item.id])
+    : 0;
+  return { scanned: 1, matched: found.matches.length, pruned, skippedTables };
 }
 
 /**

@@ -29,7 +29,9 @@ describe('V6 質問テンプレート', () => {
   })
 
   it('タグは全件を展開せず、閉じた選択欄と選択済みの札だけを表示する', () => {
-    expect(editor).toContain('<select')
+    // 選び欄は共通 Select（閉じた選択欄）。素の <select> は置かない。
+    expect(editor).toContain('<Select')
+    expect(editor).not.toContain('<select')
     expect(editor).toContain('aria-label={label}')
     expect(editor).toContain("'タグを選ぶ'")
     expect(editor).toContain('selectedTags.map')

@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import type { DeliveryMode, Folder, Scenario } from '@line-crm/shared'
 import { ApiError, api } from '@/lib/api'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -325,24 +325,25 @@ function ScenarioModeContent() {
 
           <label className="block">
             <span className="text-ink-secondary mb-1 block text-xs font-medium">フォルダ：</span>
-            <SelectField
+            <span title={selectedFolderName} className="block">
+            <Select
               value={folderId}
-              title={selectedFolderName}
               disabled={(Boolean(id) && !scenario) || folderState !== 'ready' || detailsSaving || saving !== null}
-              onChange={(event) => {
-                const nextFolderId = event.target.value
+              onChange={(value) => {
+                const nextFolderId = value
                 setFolderId(nextFolderId)
                 void saveDetails(nextFolderId)
               }}
               aria-label="シナリオのフォルダ"
-              className="v6-select border-hairline rounded-control bg-canvas text-ink focus:ring-accent disabled:bg-canvas-sunken disabled:text-ink-faint w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+              size="full"
               options={[
                 { value: '', label: '未分類' },
                 ...(selectedFolderMissing ? [{ value: folderId, label: '名前を確認できません' }] : []),
                 ...folders.map((folder) => ({ value: folder.id, label: folder.name })),
               ]}
             />
-            {folderState !== 'ready' || detailsSaving ? (
+
+            </span>            {folderState !== 'ready' || detailsSaving ? (
               <span className="text-ink-faint mt-1 block text-xs">
                 {folderState === 'loading'
                   ? 'フォルダを読み込んでいます。'

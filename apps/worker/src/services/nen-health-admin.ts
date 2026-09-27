@@ -4,7 +4,7 @@
  * 記録はお客様がマイページで付ける（体重・心拍・呼吸・便・食いつき・皮膚・涙やけ・メモ）。
  * ここでは医療判断はせず、次の 3 つを「気になる変化」として印を付けるだけ：
  *  - 体重が 8 週間で ±10% 以上変わった
- *  - 便の異常（下痢・血が混じる）が 3 回続いた
+ *  - 便が「正常」以外で 3 回続いた（利用者側のケア共有と同じ基準）
  *  - 食いつき「不良」が 3 回続いた
  * それとは別に「30 日以上 記録なし」を続けるきっかけ（配信）の対象として数える。
  */
@@ -46,7 +46,15 @@ export const APPETITE_LABELS: Record<string, string> = { good: '良好', normal:
 export const SKIN_LABELS: Record<string, string> = { normal: '問題なし', itchy: 'かゆそう', red: '赤み', other: 'その他' };
 export const TEAR_LABELS: Record<string, string> = { normal: '問題なし', mild: '少し気になる', concern: '気になる' };
 
-const ABNORMAL_STOOL = new Set(['diarrhea', 'bloody']);
+/**
+ * 「気になる便」の判定。利用者側のケア共有（nen-members.ts の health-logs POST が
+ * `stool_status !== 'normal'` で3回連続を立てる）と同じ基準をここでも使う。
+ * 以前は管理側だけが下痢・血便に限っていたため、利用者に「要ケアを共有しました」と
+ * 出ても管理画面の「気になる変化」が空のままだった（監査 R61）。
+ */
+export function isCareStoolStatus(status: string | null | undefined): boolean {
+  return status != null && status !== 'normal';
+}
 export const WEIGHT_CHANGE_THRESHOLD_PERCENT = 10;
 export const CONSECUTIVE_ABNORMAL = 3;
 export const SILENT_DAYS = 30;
@@ -88,7 +96,7 @@ export function summarizePetHealth(logs: HealthLogRow[], today: Date): PetHealth
       : { key: 'weight_gain', label: `体重 +${weightChangePercent}%（8週）`, tone: 'warn' });
   }
   const recent = sorted.slice(-CONSECUTIVE_ABNORMAL);
-  if (recent.length === CONSECUTIVE_ABNORMAL && recent.every((log) => ABNORMAL_STOOL.has(log.stool_status))) {
+  if (recent.length === CONSECUTIVE_ABNORMAL && recent.every((log) => isCareStoolStatus(log.stool_status))) {
     changes.push({ key: 'stool_abnormal', label: `便の異常が${CONSECUTIVE_ABNORMAL}回続く`, tone: 'warn' });
   }
   if (recent.length === CONSECUTIVE_ABNORMAL && recent.every((log) => log.appetite === 'poor')) {

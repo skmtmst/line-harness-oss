@@ -23,6 +23,7 @@ import {
 } from './draft-fields'
 import ImageUploader from '@/components/shared/image-uploader'
 import Button from '@/components/shared/button'
+import Select from '@/components/shared/select'
 import { TimeField } from '@/components/shared/date-time-field'
 import StickyBar from '@/components/shared/sticky-bar'
 import LinePreview from '@/components/shared/line-preview'
@@ -683,33 +684,37 @@ export default function EditDialog({
                 フォルダ
               </label>
               <div className="mt-1 flex items-center gap-2">
-                <select
+                <Select
                   id="auto-reply-folder"
+                  aria-label="フォルダ"
                   value={folderId}
-                  onChange={(e) => setFolderId(e.target.value)}
+                  onChange={setFolderId}
                   disabled={foldersLoadState !== 'ready'}
-                  className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
-                >
-                  <option value="">
-                    {foldersLoadState === 'loading'
-                      ? 'フォルダを読み込み中'
-                      : foldersLoadState === 'error'
-                        ? 'フォルダを読み込めませんでした'
-                        : '未分類'}
-                  </option>
-                  {folderId && !folders.some((folder) => folder.id === folderId) && (
-                    <option value={folderId}>
-                      {foldersLoadState === 'ready'
-                        ? '現在のフォルダ（一覧にありません）'
-                        : '現在のフォルダ（名前を確認できません）'}
-                    </option>
-                  )}
-                  {folders.map((f) => (
-                    <option key={f.id} value={f.id}>
-                      {f.name}
-                    </option>
-                  ))}
-                </select>
+                  options={[
+                    {
+                      value: '',
+                      label:
+                        foldersLoadState === 'loading'
+                          ? 'フォルダを読み込み中'
+                          : foldersLoadState === 'error'
+                            ? 'フォルダを読み込めませんでした'
+                            : '未分類',
+                    },
+                    ...(folderId && !folders.some((folder) => folder.id === folderId)
+                      ? [
+                          {
+                            value: folderId,
+                            label:
+                              foldersLoadState === 'ready'
+                                ? '現在のフォルダ（一覧にありません）'
+                                : '現在のフォルダ（名前を確認できません）',
+                          },
+                        ]
+                      : []),
+                    ...folders.map((f) => ({ value: f.id, label: f.name })),
+                  ]}
+                  size="full"
+                />
                 {foldersLoadState === 'error' && (
                   <Button onClick={() => setFoldersReloadToken((value) => value + 1)}>
                     再読み込み
@@ -727,6 +732,7 @@ export default function EditDialog({
                 R28: 順番は数字で打たせず、一覧の並びで決める。ここでは
                 実際の判定順（Worker と同じ・上から1つだけ動く）での位置と、
                 先に当たるかもしれないルールだけ出す。
+                m15c の共通 Select への1本化はフォルダ欄で活かす。
               */}
               <div className="block">
                 <span className="text-ink-secondary text-xs">動く順番</span>
@@ -1256,35 +1262,23 @@ export default function EditDialog({
           {mode === 'template' && (
             <div className={page ? 'rounded-card border-hairline space-y-3 border bg-canvas-sunken p-3' : ''}>
               <label htmlFor="auto-reply-template" className="text-ink-secondary mb-1 block text-xs">テンプレート</label>
-              <select
+              {/*
+                共通の選び欄は束見出しを持てないため、種類を名前の頭に付けて
+                1列に並べる（カード／テキスト／画像の区別は残す）。
+              */}
+              <Select
                 id="auto-reply-template"
+                aria-label="テンプレート"
                 value={templateId ?? ''}
-                onChange={(e) => setTemplateId(e.target.value || null)}
-                className="border-hairline rounded-control focus:ring-accent w-full border bg-canvas px-3 py-2 text-sm focus:ring-2 focus:outline-none"
-              >
-                <option value="">-- 選択 --</option>
-                {flexTemplates.length > 0 && (
-                  <optgroup label="カード">
-                    {flexTemplates.map((t) => (
-                      <option key={t.id} value={t.id}>{t.name}</option>
-                    ))}
-                  </optgroup>
-                )}
-                {textTemplates.length > 0 && (
-                  <optgroup label="テキスト">
-                    {textTemplates.map((t) => (
-                      <option key={t.id} value={t.id}>{t.name}</option>
-                    ))}
-                  </optgroup>
-                )}
-                {imageTemplates.length > 0 && (
-                  <optgroup label="画像">
-                    {imageTemplates.map((t) => (
-                      <option key={t.id} value={t.id}>{t.name}</option>
-                    ))}
-                  </optgroup>
-                )}
-              </select>
+                onChange={(value) => setTemplateId(value || null)}
+                options={[
+                  { value: '', label: '-- 選択 --' },
+                  ...flexTemplates.map((t) => ({ value: t.id, label: `カード：${t.name}` })),
+                  ...textTemplates.map((t) => ({ value: t.id, label: `テキスト：${t.name}` })),
+                  ...imageTemplates.map((t) => ({ value: t.id, label: `画像：${t.name}` })),
+                ]}
+                size="full"
+              />
               {templates.length === 0 && (
                 <p className="text-warning mt-1 text-xs">
                   テンプレートがありません。<a href="/templates" className="underline">/templates</a> で作成してください。
@@ -1409,17 +1403,19 @@ export default function EditDialog({
             <div className="border-hairline grid gap-3 rounded-card border p-4 md:grid-cols-2">
               <label className="block">
                 <span className="text-ink-secondary text-xs">返信を待つ時間</span>
-                <select
+                <Select
+                  aria-label="返信を待つ時間"
                   value={replyDelaySeconds}
-                  onChange={(event) => setReplyDelaySeconds(event.target.value)}
-                  className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm"
-                >
-                  <option value="0">すぐに返信</option>
-                  <option value="10">10秒後</option>
-                  <option value="30">30秒後</option>
-                  <option value="60">1分後</option>
-                  <option value="300">5分後</option>
-                </select>
+                  onChange={setReplyDelaySeconds}
+                  options={[
+                    { value: '0', label: 'すぐに返信' },
+                    { value: '10', label: '10秒後' },
+                    { value: '30', label: '30秒後' },
+                    { value: '60', label: '1分後' },
+                    { value: '300', label: '5分後' },
+                  ]}
+                  size="full"
+                />
               </label>
               <label className="block">
                 <span className="text-ink-secondary text-xs">同じ人への連続返信</span>
