@@ -13,7 +13,7 @@ import {
 import FilterChip from '@/components/shared/filter-chip'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
-import { formatStamp } from '@/lib/common-vars'
+import { formatStamp, COMMON_VAR_STATE_LABELS } from '@/lib/common-vars'
 import Pagination from '@/components/shared/pagination'
 import Button from '@/components/shared/button'
 import SearchField from '@/components/shared/search-field'
@@ -129,6 +129,9 @@ function VarsPageInner() {
   const [replacementPhase, setReplacementPhase] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   /** 確認のために打ってもらう差し込みキー。 */
   const [typedKey, setTypedKey] = useState('')
+  /** 消した理由。版履歴に残すので必須。 */
+  const [singleReason, setSingleReason] = useState('')
+  const [batchReason, setBatchReason] = useState('')
   /** いま影響を読んでいるアカウント・対象・世代。遅れて返った別の結果を捨てるために持つ。 */
   const singleRequestRef = useRef({ accountId: selectedAccountId, itemId: null as string | null, generation: 0 })
   const [deleting, setDeleting] = useState(false)
@@ -224,6 +227,7 @@ function VarsPageInner() {
     setSingleBusy(false)
     setSingleError('')
     setTypedKey('')
+    setSingleReason('')
     setReplacementCandidates([])
     setReplacementId('')
     setReplacementImpact(null)
@@ -324,6 +328,7 @@ function VarsPageInner() {
   const openSingleDelete = async (item: CommonVar) => {
     setSingleTarget(item)
     setTypedKey('')
+    setSingleReason('')
     setSingleError('')
     setSingleImpact(null)
     setSinglePhase('loading')
@@ -413,6 +418,10 @@ function VarsPageInner() {
 
   const confirmReplacement = async () => {
     if (!singleTarget || !selectedAccountId || !replacementImpact?.canReplace || singleBusy) return
+    if (!singleReason.trim()) {
+      setSingleError('消した理由を入力してください。')
+      return
+    }
     const request = {
       accountId: selectedAccountId,
       itemId: singleTarget.id,
@@ -426,6 +435,7 @@ function VarsPageInner() {
         replacementId: replacementImpact.replacement.id,
         expectedVersion: replacementImpact.source.version,
         expectedRevision: replacementImpact.revision,
+        changeReason: singleReason.trim(),
       })
       if (singleRequestRef.current.generation !== request.generation) return
       if (!res.success) throw new Error('replace_failed')
@@ -472,7 +482,7 @@ function VarsPageInner() {
     setSingleBusy(true)
     setSingleError('')
     try {
-      const res = await api.commonVars.delete(request.itemId, request.accountId)
+      const res = await api.commonVars.delete(request.itemId, request.accountId, singleReason.trim())
       if (!isCurrentRequest()) return
       if (!res.success) throw new Error('delete_failed')
       setSingleTarget(null)
@@ -514,6 +524,7 @@ function VarsPageInner() {
     setSinglePhase('idle')
     setSingleError('')
     setTypedKey('')
+    setSingleReason('')
     setReplacementCandidates([])
     setReplacementId('')
     setReplacementImpact(null)
@@ -563,11 +574,16 @@ function VarsPageInner() {
       setError('選択した共通情報を確認できませんでした。状態を読み直してから、もう一度お試しください。')
       return
     }
+    setBatchReason('')
     setDeleteTargets(targets)
   }
 
   const removeSelected = async () => {
     if (deleteTargets.length === 0 || !selectedAccountId || deleting) return
+    if (!batchReason.trim()) {
+      setDeleteError('消した理由を入力してください。')
+      return
+    }
     const request = {
       accountId: selectedAccountId,
       generation: deleteRequestRef.current.generation + 1,
@@ -582,7 +598,7 @@ function VarsPageInner() {
     const failed: CommonVar[] = []
     for (const target of targets) {
       try {
-        const result = await api.commonVars.delete(target.id, request.accountId)
+        const result = await api.commonVars.delete(target.id, request.accountId, batchReason.trim())
         if (!result.success) throw new Error(result.error)
       } catch {
         failed.push(target)
@@ -605,6 +621,7 @@ function VarsPageInner() {
       }
 
       setDeleteTargets([])
+      setBatchReason('')
       setSelected(new Set())
       await load()
     } finally {
@@ -825,6 +842,9 @@ function VarsPageInner() {
               ['empty', '空のまま'],
               ['scheduled', '期限つき'],
               ['unused', '使われていない'],
+              ['draft', '下書き'],
+              ['stopped', '止めた'],
+              ['expired', '期限切れ'],
             ] as const).map(([value, label]) => (
               <FilterChip
                 key={value}
@@ -924,6 +944,10 @@ function VarsPageInner() {
                     <Th className="w-40 px-4 py-3" title="差し込みキー">
                       差し込みキー
                     </Th>
+                    {/* Q: 状態は安全に関わるので谷間帯でも畳まない。 */}
+                    <Th className="w-20 px-4 py-3" title="状態">
+                      状態
+                    </Th>
                     <Th className="px-4 py-3" title="中身">中身</Th>
                     <Th className="w-32 px-4 py-3" title="使われている場所">
                       使われている場所
@@ -973,6 +997,27 @@ function VarsPageInner() {
                                 aria-label={`${item.name}の差し込みキーをコピー`}
                               />
                             </div>
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-3">
+                            {/* Q: 状態の札。使用中は静かな色、止めた・期限切れ・下書きは
+                                運用者が気づけるように札で出す。 */}
+                            {(() => {
+                              const state = item.state ?? 'active'
+                              const label = COMMON_VAR_STATE_LABELS[state] ?? '使用中'
+                              const tone = state === 'active'
+                                ? 'text-ink-faint'
+                                : state === 'expired'
+                                  ? 'text-status-warning'
+                                  : 'text-status-info'
+                              return (
+                                <span
+                                  className={`rounded-control bg-canvas-sunken px-2 py-0.5 text-xs font-semibold ${tone}`}
+                                  title={`状態：${label}`}
+                                >
+                                  {label}
+                                </span>
+                              )
+                            })()}
                           </td>
                           <td title={formatVarValue(item.type, item.value) || '（空）'} className="text-ink truncate px-4 py-3 text-sm">
                             {formatVarValue(item.type, item.value) || <span className="text-ink-faint">（空）</span>}
@@ -1091,7 +1136,7 @@ function VarsPageInner() {
                   type="button"
                   variant="primary"
                   onClick={() => void confirmReplacement()}
-                  disabled={singleBusy || replacementPhase !== 'ready'}
+                  disabled={singleBusy || replacementPhase !== 'ready' || !singleReason.trim()}
                 >
                   {singleBusy ? '差し替え中…' : '差し替えて削除'}
                 </Button>
@@ -1106,7 +1151,7 @@ function VarsPageInner() {
                 </Button>
               ) : null}
               {/* 消せないときは押し口ごと出さない。押せるように見えて何も起きない形にしない。 */}
-              {canDeleteVar({ impact: singleImpact, typedKey, busy: singleBusy }) ? (
+              {canDeleteVar({ impact: singleImpact, typedKey, reason: singleReason, busy: singleBusy }) ? (
                 <Button type="button" variant="primary" onClick={() => void confirmSingleDelete()}>
                   {singleBusy ? '処理中…' : 'このまま削除する'}
                 </Button>
@@ -1214,6 +1259,22 @@ function VarsPageInner() {
                 **差し込みキーを打ってもらう。** 空欄のまま送られる場所がある
                 操作を、ボタン1つで通さない。
               */}
+              {/*
+                Q: 消す・差し替えて保管する、どちらでも理由が必須。
+                版履歴に「誰が・なぜ」を残すため。
+              */}
+              <label className="block">
+                <span className="text-ink-secondary text-xs font-semibold">
+                  消した理由 <span className="text-danger">必須</span>
+                </span>
+                <input
+                  value={singleReason}
+                  onChange={(e) => setSingleReason(e.target.value)}
+                  placeholder="例: 店舗情報の変更のため"
+                  className="border-hairline rounded-control bg-canvas text-ink mt-1 w-full border px-3 py-2 text-sm"
+                />
+              </label>
+
               {singleImpact.canDelete ? (
                 <label className="block">
                   <span className="text-ink-secondary text-xs font-semibold">
@@ -1228,8 +1289,8 @@ function VarsPageInner() {
                 </label>
               ) : null}
 
-              {blockedReason({ impact: singleImpact, typedKey }) ? (
-                <p className="text-ink-faint text-micro">{blockedReason({ impact: singleImpact, typedKey })}</p>
+              {blockedReason({ impact: singleImpact, typedKey, reason: singleReason }) ? (
+                <p className="text-ink-faint text-micro">{blockedReason({ impact: singleImpact, typedKey, reason: singleReason })}</p>
               ) : null}
 
               <p className="text-ink-faint text-micro leading-5">
@@ -1259,9 +1320,23 @@ function VarsPageInner() {
             generation: deleteRequestRef.current.generation + 1,
           }
           setDeleteError('')
+          setBatchReason('')
           setDeleteTargets([])
         }}
-      />
+      >
+        {/* Q: 消す理由は版履歴に残すので必須。 */}
+        <label className="block">
+          <span className="text-ink-secondary text-xs font-semibold">
+            消した理由 <span className="text-danger">必須</span>
+          </span>
+          <input
+            value={batchReason}
+            onChange={(e) => setBatchReason(e.target.value)}
+            placeholder="例: 店舗情報の変更のため"
+            className="border-hairline rounded-control bg-canvas text-ink mt-1 w-full border px-3 py-2 text-sm"
+          />
+        </label>
+      </ConfirmDialog>
 
       {editingFolder && (
         <FolderAddDialog

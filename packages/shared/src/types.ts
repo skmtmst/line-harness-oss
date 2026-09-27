@@ -462,6 +462,11 @@ export interface CommonVar {
   validUntil: string | null;
   fallbackValue: string | null;
   expiryBehavior: "stop" | "fallback";
+  /** Q: 保存した状態（下書き draft / 使用中 active / 止めた stopped）。 */
+  status?: "draft" | "active" | "stopped";
+  /** 画面に出す状態。期限切れは時刻から計算した表示用の状態。 */
+  state?: "draft" | "active" | "stopped" | "expired";
+  stoppedAt?: string | null;
   createdAt: string;
   updatedAt: string;
   nextSchedule?: {

@@ -50,6 +50,39 @@ export function normalizeCommonVarValue(type: CommonVarType, value: string): str
   return value.length <= 200 ? value : null;
 }
 
+/*
+ * Q: 鍵の形・長い乱数は共通情報に保存させない。
+ * APIキーやトークンを本文差し込みへ置くと、配信・フォーム・公開画面の
+ * どこへでも漏れる。秘密情報は外部連携の保管場所へ入れる決まり。
+ *
+ * 見立ては2系統。有名な鍵の形（Stripe/AWS/Google/JWT/PEM/Slack）と、
+ * 空白を含まない長い乱数（32文字以上で英数字の混ざったもの）。電話番号や
+ * 営業時間のような普通の文はどちらにも当たらない。
+ */
+const SECRET_SHAPED_PATTERNS: readonly RegExp[] = [
+  /sk[-_](live|test|prod)?[-_]?[A-Za-z0-9]{10,}/i,
+  /AKIA[0-9A-Z]{16}/,
+  /AIza[0-9A-Za-z_-]{35}/,
+  /eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{4,}/,
+  /-----BEGIN [A-Z ]*PRIVATE KEY-----/,
+  /xox[baprs]-[0-9A-Za-z-]{10,}/,
+  /ya29\.[0-9A-Za-z_-]{10,}/,
+  // 32桁以上の16進数はチャネルシークレットやハッシュの形。
+  /^[0-9a-f]{32,}$/i,
+];
+
+export function isSecretLikeValue(value: string): boolean {
+  if (SECRET_SHAPED_PATTERNS.some((pattern) => pattern.test(value))) return true;
+  // URL はパスやクエリに英数字が混ざるだけで、鍵とは別物として扱う。
+  if (/^https?:\/\//i.test(value)) return false;
+  // 空白なしで32文字以上。全部が同じ字種（数字だけ・小文字だけの記念日等）なら
+  // 乱数とは言えないので、字種が3種以上混ざるものだけを鍵らしいと見る。
+  if (value.length < 32 || /\s/.test(value)) return false;
+  const classes = [/[a-z]/, /[A-Z]/, /[0-9]/, /[^a-zA-Z0-9]/]
+    .filter((pattern) => pattern.test(value)).length;
+  return classes >= 3;
+}
+
 /** datetime-local は管理画面のJST入力として受け、DBでは比較可能なUTC ISOにそろえる。 */
 export function normalizeCommonVarValidityAt(value: unknown): string | null {
   if (value === null || value === undefined || value === '') return null;
@@ -81,6 +114,10 @@ export interface CommonVar {
   updated_by: string | null;
   archived_at: string | null;
   replacement_run_id: string | null;
+  status: CommonVarStatus;
+  stopped_at: string | null;
+  expiry_notice_14_at: string | null;
+  expiry_notice_3_at: string | null;
   valid_from: string | null;
   valid_until: string | null;
   fallback_value: string | null;
@@ -98,12 +135,20 @@ export interface CommonVar {
 
 export type CommonVarExpiryBehavior = 'stop' | 'fallback';
 
+/**
+ * 共通情報の状態（Q）。「期限切れ」は列に持たず、有効終了と現在時刻から
+ * 表示のたびに計算する。止めた・下書きは差し込みに答えられない。
+ */
+export type CommonVarStatus = 'draft' | 'active' | 'stopped';
+
 export type CommonVarResolutionFailureReason =
   | 'missing'
   | 'not_started'
   | 'expired'
   | 'fallback_missing'
-  | 'invalid_window';
+  | 'invalid_window'
+  | 'stopped'
+  | 'draft';
 
 export interface CommonVarResolutionEntry {
   id: string;
@@ -141,12 +186,12 @@ export async function resolveCommonVarValuesAt(
   }
   const rows = await db.prepare(
     `SELECT id, var_key, value, fallback_value, valid_from, valid_until,
-            expiry_behavior, version
+            expiry_behavior, version, status
        FROM common_vars
       WHERE line_account_id = ? AND archived_at IS NULL`,
   ).bind(lineAccountId).all<Pick<
     CommonVar,
-    'id' | 'var_key' | 'value' | 'fallback_value' | 'valid_from' | 'valid_until' | 'expiry_behavior' | 'version'
+    'id' | 'var_key' | 'value' | 'fallback_value' | 'valid_from' | 'valid_until' | 'expiry_behavior' | 'version' | 'status'
   >>();
   const byKey = new Map(rows.results.map((row) => [row.var_key, row]));
   const values: Record<string, string> = {};
@@ -157,6 +202,12 @@ export async function resolveCommonVarValuesAt(
     const row = byKey.get(varKey);
     if (!row) {
       failures.push({ varKey, reason: 'missing' });
+      continue;
+    }
+    // 止めた・下書きは差し込みに答えられない。代替値も使わず、
+    // 配信を止めて運用者へ知らせる失敗にする（Q）。
+    if (row.status === 'stopped' || row.status === 'draft') {
+      failures.push({ varKey, reason: row.status });
       continue;
     }
     const fromMs = row.valid_from === null ? null : Date.parse(row.valid_from);
@@ -717,6 +768,18 @@ export class CommonVarKeyConflictError extends Error {
   }
 }
 
+export class CommonVarReasonRequiredError extends Error {
+  constructor() {
+    super('Common variable change reason is required');
+  }
+}
+
+export class CommonVarStatusTransitionError extends Error {
+  constructor(readonly from: string, readonly to: string) {
+    super(`Common variable cannot move from ${from} to ${to}`);
+  }
+}
+
 /**
  * フォルダの存在と種別を確認する。
  *
@@ -744,12 +807,15 @@ export async function createCommonVar(
     validUntil?: string | null;
     fallbackValue?: string | null;
     expiryBehavior?: CommonVarExpiryBehavior;
+    /** 下書きとして作るとき 'draft'。省略は従来どおり 'active'（すぐ使える）。 */
+    status?: 'draft' | 'active';
   },
 ): Promise<CommonVar> {
   const id = crypto.randomUUID();
   const now = jstNow();
   const memo = input.memo ?? '';
   const value = input.value ?? '';
+  const status = input.status ?? 'active';
   if (input.folderId) await assertCommonVarFolder(db, input.folderId);
   const duplicate = await db.prepare(
     `SELECT id FROM common_vars
@@ -763,20 +829,21 @@ export async function createCommonVar(
         `INSERT INTO common_vars
            (id, line_account_id, folder_id, name, var_key, type, value, memo, version,
             updated_by, created_at, updated_at, valid_from, valid_until, fallback_value,
-            expiry_behavior)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)`,
+            expiry_behavior, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).bind(
         id, input.lineAccountId, input.folderId ?? null, input.name, input.varKey,
         input.type ?? 'text', value, memo, input.actorId ?? null, now, now,
         input.validFrom ?? null, input.validUntil ?? null, input.fallbackValue ?? null,
-        input.expiryBehavior ?? 'stop',
+        input.expiryBehavior ?? 'stop', status,
       ),
       db.prepare(
         `INSERT INTO common_var_versions
            (id, common_var_id, version_no, name, value, memo, change_reason, actor_id, created_at)
          VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?)`,
       ).bind(
-        crypto.randomUUID(), id, input.name, value, memo, '作成', input.actorId ?? null, now,
+        crypto.randomUUID(), id, input.name, value, memo,
+        status === 'draft' ? '下書きとして作成' : '作成', input.actorId ?? null, now,
       ),
     ]);
   } catch (error) {
@@ -812,6 +879,11 @@ export async function updateCommonVar(
   if (input.expectedVersion !== undefined && input.expectedVersion !== existing.version) {
     throw new CommonVarVersionConflictError(existing.version);
   }
+  // Q: 変える理由は必須。「編集」のような自動補完だと、後から
+  // なぜ変えたか追えなくなる。予約適用のような内部呼出しは
+  // この関数を通さず、専用の履歴文言を直接書き込む。
+  const changeReason = input.changeReason?.trim();
+  if (!changeReason) throw new CommonVarReasonRequiredError();
   const sets: string[] = [];
   const values: unknown[] = [];
   if (input.name !== undefined) {
@@ -838,6 +910,11 @@ export async function updateCommonVar(
   if ('validUntil' in input) {
     sets.push('valid_until = ?');
     values.push(input.validUntil ?? null);
+    // 期限を延ばした・直したときは、新しい期限へ向けて14日前・3日前の
+    // 知らせをやり直す（Q）。送った印だけ消し、値が変わらないときは触らない。
+    if ((input.validUntil ?? null) !== existing.valid_until) {
+      sets.push('expiry_notice_14_at = NULL', 'expiry_notice_3_at = NULL');
+    }
   }
   if ('fallbackValue' in input) {
     sets.push('fallback_value = ?');
@@ -866,7 +943,7 @@ export async function updateCommonVar(
         input.name ?? existing.name,
         input.value ?? existing.value,
         input.memo ?? existing.memo,
-        input.changeReason?.trim() || '編集',
+        changeReason,
         input.actorId ?? null,
         now,
       ),
@@ -878,6 +955,115 @@ export async function updateCommonVar(
     }
   }
   return getCommonVarById(db, id, lineAccountId);
+}
+
+/**
+ * 状態の切替（Q）。下書き→使用中（公開）、使用中→止めた、止めた→使用中（再開）。
+ * 使用中へ戻る経路は使える状態を作るので理由を必須にし、止める経路は
+ * 「なぜ止めたか」を後から追えるよう同じく理由を必須にする。
+ * 版を1つ足して履歴に残す。既にアーカイブ済み・存在しないものは null。
+ */
+export async function setCommonVarStatus(
+  db: D1Database,
+  id: string,
+  lineAccountId: string,
+  input: {
+    to: 'active' | 'stopped';
+    actorId?: string | null;
+    changeReason?: string;
+    expectedVersion?: number;
+  },
+): Promise<CommonVar | null> {
+  const existing = await getCommonVarById(db, id, lineAccountId);
+  if (!existing) return null;
+  if (input.expectedVersion !== undefined && input.expectedVersion !== existing.version) {
+    throw new CommonVarVersionConflictError(existing.version);
+  }
+  const changeReason = input.changeReason?.trim();
+  if (!changeReason) throw new CommonVarReasonRequiredError();
+  const from = existing.status;
+  const allowed =
+    (input.to === 'active' && (from === 'draft' || from === 'stopped'))
+    || (input.to === 'stopped' && from === 'active');
+  if (!allowed) throw new CommonVarStatusTransitionError(from, input.to);
+  const now = jstNow();
+  const nextVersion = existing.version + 1;
+  const results = await db.batch([
+    db.prepare(
+      `UPDATE common_vars
+          SET status = ?, stopped_at = ?, version = ?, updated_by = ?, updated_at = ?
+        WHERE id = ? AND line_account_id = ? AND version = ? AND archived_at IS NULL`,
+    ).bind(input.to, input.to === 'stopped' ? now : null, nextVersion,
+      input.actorId ?? null, now, id, lineAccountId, existing.version),
+    db.prepare(
+      `INSERT INTO common_var_versions
+         (id, common_var_id, version_no, name, value, memo, change_reason, actor_id, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(
+      crypto.randomUUID(), id, nextVersion,
+      existing.name, existing.value, existing.memo,
+      changeReason, input.actorId ?? null, now,
+    ),
+  ]);
+  if (Number(results[0]?.meta.changes ?? 0) === 0) {
+    throw new CommonVarVersionConflictError(
+      (await getCommonVarById(db, id, lineAccountId))?.version ?? existing.version,
+    );
+  }
+  return getCommonVarById(db, id, lineAccountId);
+}
+
+export interface CommonVarExpiryCandidate {
+  id: string;
+  line_account_id: string;
+  name: string;
+  var_key: string;
+  valid_until: string;
+  expiry_notice_14_at: string | null;
+  expiry_notice_3_at: string | null;
+}
+
+/**
+ * 期限14日前・3日前の知らせがまだの共通情報を拾う（Q）。
+ * 使用中で有効終了が未来のものだけ。止めた・下書き・アーカイブ済みは
+ * 送っても動かせないので対象にしない。
+ */
+export async function listCommonVarExpiryCandidates(
+  db: D1Database,
+  nowIso: string,
+): Promise<CommonVarExpiryCandidate[]> {
+  const in14Days = new Date(Date.parse(nowIso) + 14 * 24 * 3600_000).toISOString();
+  const result = await db.prepare(
+    `SELECT id, line_account_id, name, var_key, valid_until,
+            expiry_notice_14_at, expiry_notice_3_at
+       FROM common_vars
+      WHERE archived_at IS NULL
+        AND status = 'active'
+        AND valid_until IS NOT NULL
+        AND valid_until > ?
+        AND valid_until <= ?
+        AND (expiry_notice_14_at IS NULL OR expiry_notice_3_at IS NULL)`,
+  ).bind(nowIso, in14Days).all<CommonVarExpiryCandidate>();
+  return result.results;
+}
+
+/**
+ * 知らせを出した印を打つ。印がまだの行だけ更新するので、
+ * 同じ知らせを2回出す競合が起きても1回しか記録されない。
+ * 戻り値が0なら別の実行が先に印を打っている。
+ */
+export async function markCommonVarExpiryNotice(
+  db: D1Database,
+  id: string,
+  kind: '14d' | '3d',
+  sentAt: string,
+): Promise<boolean> {
+  const column = kind === '14d' ? 'expiry_notice_14_at' : 'expiry_notice_3_at';
+  const result = await db.prepare(
+    `UPDATE common_vars SET ${column} = ?
+      WHERE id = ? AND ${column} IS NULL`,
+  ).bind(sentAt, id).run();
+  return Number(result.meta.changes ?? 0) > 0;
 }
 
 export async function getCommonVarVersions(
@@ -903,10 +1089,12 @@ export async function deleteCommonVar(
   id: string,
   lineAccountId: string,
   actorId: string | null,
-  changeReason = '未使用のため削除（アーカイブ）',
+  changeReason: string,
 ): Promise<void> {
   const existing = await getCommonVarById(db, id, lineAccountId);
   if (!existing) return;
+  const reason = changeReason.trim();
+  if (!reason) throw new CommonVarReasonRequiredError();
   const now = jstNow();
   const nextVersion = existing.version + 1;
   const results = await db.batch([
@@ -925,7 +1113,7 @@ export async function deleteCommonVar(
         )`,
     ).bind(
       crypto.randomUUID(), id, nextVersion, existing.name, existing.value, existing.memo,
-      changeReason.trim() || '削除（アーカイブ）', actorId, now,
+      reason, actorId, now,
       id, lineAccountId, nextVersion, now,
     ),
   ]);
@@ -1093,7 +1281,10 @@ export async function applyCommonVarReplacementPlan(
   db: D1Database,
   plan: CommonVarReplacementPlan,
   actorId: string | null,
+  changeReason: string,
 ): Promise<{ runId: string; replacedUsageCount: number; archivedVersion: number }> {
+  const reason = changeReason.trim();
+  if (!reason) throw new CommonVarReasonRequiredError();
   if (!plan.source.line_account_id || plan.blockedTotal > 0) {
     throw new Error('Common variable replacement is blocked');
   }
@@ -1147,7 +1338,7 @@ export async function applyCommonVarReplacementPlan(
         )`,
     ).bind(
       crypto.randomUUID(), plan.source.id, archivedVersion, plan.source.name,
-      plan.source.value, plan.source.memo, `「${plan.replacement.name}」へ差し替えてアーカイブ`,
+      plan.source.value, plan.source.memo, `${reason}（「${plan.replacement.name}」へ差し替えてアーカイブ）`,
       actorId, now, plan.source.id, runId, archivedVersion,
     ),
     db.prepare(
