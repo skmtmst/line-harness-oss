@@ -31,10 +31,12 @@ describe('summarizePetHealth', () => {
     expect(s.changes[0].tone).toBe('warn');
   });
 
-  it('便の異常（下痢・血）が 3 回続くと印。2 回では付かない', () => {
+  it('「正常」以外の便が 3 回続くと印。2 回では付かない（監査 R61: 利用者側のケア共有と同じ基準）', () => {
     expect(summarizePetHealth([log(0, null, 'diarrhea'), log(1, null, 'bloody'), log(2, null, 'diarrhea')], today).changes.map((c) => c.key)).toEqual(['stool_abnormal']);
     expect(summarizePetHealth([log(0, null, 'diarrhea'), log(1, null, 'diarrhea'), log(2, null, 'normal')], today).changes).toEqual([]);
-    expect(summarizePetHealth([log(0, null, 'soft'), log(1, null, 'soft'), log(2, null, 'soft')], today).changes).toEqual([]);
+    // やわらかい便だけでも3回続けば印が立つ（以前は管理側だけ下痢・血便に限っていた）。
+    expect(summarizePetHealth([log(0, null, 'soft'), log(1, null, 'soft'), log(2, null, 'soft')], today).changes.map((c) => c.key)).toEqual(['stool_abnormal']);
+    expect(summarizePetHealth([log(0, null, 'soft'), log(1, null, 'soft')], today).changes).toEqual([]);
   });
 
   it('食いつき不良が 3 回続くと印', () => {

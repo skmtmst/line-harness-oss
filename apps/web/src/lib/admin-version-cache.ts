@@ -23,9 +23,25 @@ export interface AdminVersionDetail {
   worker_hash: string
   admin_hash: string
   liff_hash: string
+  /** 組み立て時の git commit（フル）。取れなければ 'unknown'。 */
+  git_commit: string
+  /** wrangler の [vars] の DEPLOY_ENV。未設定なら null。 */
+  deploy_env: string | null
+  /** 配備（組み立て）の日時。ISO。 */
+  released_at: string
 }
 
 let entry: { at: number; promise: Promise<AdminVersionDetail> } | null = null
+
+const EMPTY_DETAIL: AdminVersionDetail = {
+  version: '',
+  worker_hash: '',
+  admin_hash: '',
+  liff_hash: '',
+  git_commit: '',
+  deploy_env: null,
+  released_at: '',
+}
 
 function fetchVersion(apiUrl: string): Promise<AdminVersionDetail> {
   return fetch(`${apiUrl}/admin/version`).then(async (res) => {
@@ -35,19 +51,25 @@ function fetchVersion(apiUrl: string): Promise<AdminVersionDetail> {
       worker_hash?: string
       admin_hash?: string
       liff_hash?: string
+      git_commit?: string
+      deploy_env?: string | null
+      released_at?: string
     }
     return {
       version: body?.version ?? '',
       worker_hash: body?.worker_hash ?? '',
       admin_hash: body?.admin_hash ?? '',
       liff_hash: body?.liff_hash ?? '',
+      git_commit: body?.git_commit ?? '',
+      deploy_env: body?.deploy_env ?? null,
+      released_at: body?.released_at ?? '',
     }
   })
 }
 
 function load(): Promise<AdminVersionDetail> {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL
-  if (!apiUrl) return Promise.resolve({ version: '', worker_hash: '', admin_hash: '', liff_hash: '' })
+  if (!apiUrl) return Promise.resolve({ ...EMPTY_DETAIL })
   const now = Date.now()
   if (entry && now - entry.at < SHARE_MS) return entry.promise
   const promise = fetchVersion(apiUrl)

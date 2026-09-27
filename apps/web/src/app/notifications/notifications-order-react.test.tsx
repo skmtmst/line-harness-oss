@@ -85,6 +85,7 @@ describe('通知一覧の並び順（R16）', () => {
       data: { items: [], counts: { all: 0, error: 0, update: 0, unread: 0 }, unreadCount: 0 },
     })
     const rendered = render(<NotificationsPage />)
-    expect(await rendered.findByText('通知はまだありません。')).toBeTruthy()
+    // 空の案内は共通 ListState。題の末尾に「。」は付けない。
+    expect(await rendered.findByText('通知はまだありません')).toBeTruthy()
   })
 })

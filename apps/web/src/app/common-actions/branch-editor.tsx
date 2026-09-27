@@ -3,7 +3,7 @@
 import type { CommonActionResources, CommonActionStep } from '@/lib/api'
 import { newCommonActionStep, newStepId } from '@/components/automations/common-action-editor'
 import Button from '@/components/shared/button'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 
 export function newBranchStep(): CommonActionStep {
   return {
@@ -68,13 +68,13 @@ export default function BranchEditors({
         </div>
         <div className="mt-3 grid gap-3 lg:grid-cols-3">
           <label className="text-ink-secondary text-sm">条件のタグ
-            <SelectField className="mt-1 w-full" value={String(condition.rules[0]?.value ?? '')} onChange={(event) => onUpdate(branch.id, { tagId: event.target.value })} options={[{ value: '', label: 'タグを選ぶ' }, ...resources.tags.map((tag) => ({ value: tag.id, label: tag.name }))]} />
+            <Select size="full" aria-label="条件のタグ" className="mt-1" value={String(condition.rules[0]?.value ?? '')} onChange={(value) => onUpdate(branch.id, { tagId: value })} options={[{ value: '', label: 'タグを選ぶ' }, ...resources.tags.map((tag) => ({ value: tag.id, label: tag.name }))]} />
           </label>
           <label className="text-ink-secondary text-sm">当てはまるとき
-            <SelectField className="mt-1 w-full" value={String(thenSteps[0]?.params.commonActionId ?? '')} onChange={(event) => onUpdate(branch.id, { thenId: event.target.value })} options={commonActionOptions} />
+            <Select size="full" aria-label="当てはまるとき" className="mt-1" value={String(thenSteps[0]?.params.commonActionId ?? '')} onChange={(value) => onUpdate(branch.id, { thenId: value })} options={commonActionOptions} />
           </label>
           <label className="text-ink-secondary text-sm">当てはまらないとき
-            <SelectField className="mt-1 w-full" value={String(elseSteps[0]?.params.commonActionId ?? '')} onChange={(event) => onUpdate(branch.id, { elseId: event.target.value })} options={commonActionOptions} />
+            <Select size="full" aria-label="当てはまらないとき" className="mt-1" value={String(elseSteps[0]?.params.commonActionId ?? '')} onChange={(value) => onUpdate(branch.id, { elseId: value })} options={commonActionOptions} />
           </label>
         </div>
         <p className="text-ink-faint mt-2 text-xs">タグ条件を判定し、選んだ公開版の共通アクションだけを実行します。選ばなかった側は実行記録へ「分岐対象外」と残ります。</p>

@@ -277,7 +277,7 @@ describe('削除直前の厳密な走査', () => {
 
     const result = await scanSingleMediaUsage(db, '2026-08-16T00:00:00.000', item);
 
-    expect(result).toEqual({ scanned: 1, matched: 1, pruned: 0 });
+    expect(result).toEqual({ scanned: 1, matched: 1, pruned: 0, skippedTables: [] });
     expect(dbMocks.recordMediaUsage).toHaveBeenCalledWith(
       db,
       { mediaId: 'md-1', refKind: 'template', refId: 'tpl-1' },
@@ -289,15 +289,35 @@ describe('削除直前の厳密な走査', () => {
     );
   });
 
-  it('1種類でも読めなければ0件にせず、記録も整理もしない', async () => {
+  it('表が無い読み口があっても503にせず、読み残しを返す（R34）', async () => {
     const item = { id: 'md-1', r2_key: 'media/a.png' };
     const { db } = makeDb([item], {
       templates: [{ ref_id: 'tpl-1', message_content: 'media/a.png' }],
     }, ['webinars']);
 
+    // どの画像でも取得が失敗し、読み直しても直らなかった原因。
+    // 表が無い読み口だけ飛ばし、読めた使用先は記録する。
+    const result = await scanSingleMediaUsage(db, '2026-08-16T00:00:00.000', item);
+
+    expect(result).toEqual({ scanned: 1, matched: 1, pruned: 0, skippedTables: ['webinars'] });
+    expect(dbMocks.recordMediaUsage).toHaveBeenCalledWith(
+      db,
+      { mediaId: 'md-1', refKind: 'template', refId: 'tpl-1' },
+    );
+    // 読み残しがあるときは古い記録を整理しない。読めなかった読み口の
+    // 使用先を消すと、使われているのに0件と偽ってしまう。
+    expect(dbMocks.pruneStaleMediaUsages).not.toHaveBeenCalled();
+  });
+
+  it('一時的なD1エラーでは0件にせず、記録も整理もしない', async () => {
+    const item = { id: 'md-1', r2_key: 'media/a.png' };
+    const { db } = makeDb([item], {
+      templates: [{ ref_id: 'tpl-1', message_content: 'media/a.png' }],
+    }, [], new Error('D1_ERROR: network timeout'));
+
     await expect(
       scanSingleMediaUsage(db, '2026-08-16T00:00:00.000', item),
-    ).rejects.toThrow('no such table: webinars');
+    ).rejects.toThrow('network timeout');
     expect(dbMocks.recordMediaUsage).not.toHaveBeenCalled();
     expect(dbMocks.pruneStaleMediaUsages).not.toHaveBeenCalled();
   });

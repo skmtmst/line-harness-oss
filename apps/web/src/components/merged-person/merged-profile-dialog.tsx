@@ -5,7 +5,7 @@ import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import Dialog from '@/components/shared/dialog'
 import { Field } from '@/components/shared/form-controls'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import type { FriendProfileCandidate } from '@/lib/api'
 
 export type ProfileCandidateDraft = Record<string, {
@@ -89,13 +89,14 @@ export default function MergedProfileDialog({
               <div className="grid grid-cols-1 items-end gap-3 md:grid-cols-3">
                 <p className="text-sm font-bold leading-5 text-ink">{field.fieldLabel}</p>
                 <Field label="採用する値">
-                  <SelectField
+                  <Select
+                    size="full"
                     className="w-full"
                     aria-label={`${field.fieldLabel}の採用値`}
                     value={row.optionIndex}
-                    onChange={(event) => onChange({
+                    onChange={(value) => onChange({
                       ...draft,
-                      [field.fieldKey]: { ...row, optionIndex: event.target.value },
+                      [field.fieldKey]: { ...row, optionIndex: value },
                     })}
                     options={[
                       { value: '', label: '変更しない' },
@@ -107,16 +108,17 @@ export default function MergedProfileDialog({
                   />
                 </Field>
                 <Field label="これからの更新">
-                  <SelectField
+                  <Select
+                    size="full"
                     className="w-full"
                     aria-label={`${field.fieldLabel}の更新方法`}
                     value={row.updateMode}
                     disabled={row.optionIndex === ''}
-                    onChange={(event) => onChange({
+                    onChange={(value) => onChange({
                       ...draft,
                       [field.fieldKey]: {
                         ...row,
-                        updateMode: event.target.value as 'auto' | 'fixed',
+                        updateMode: value as 'auto' | 'fixed',
                       },
                     })}
                     options={[

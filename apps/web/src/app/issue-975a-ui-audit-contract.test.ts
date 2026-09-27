@@ -125,19 +125,16 @@ describe('U058: 差し込み操作は本文の欄より後に置く', () => {
 })
 
 describe('U063: 長い選択肢のプルダウンは欄いっぱいに広げる', () => {
-  it('共有部品の SelectField には触らず、画面側の属性スコープで幅を上書きする', () => {
-    // shared/ は Claude 所有領域。size="full" のような部品改変はしない。
-    const component = read('../components/shared/select-field.tsx')
-    expect(component).not.toContain("'full'")
+  it('運用者通知の選び欄は欄いっぱいに広げる（部品の full 指定）', () => {
+    // 選び欄は Select 1 本化済み。幅は部品の size="full" で持たせる。
     const operator = read('line-notifications/operator/new/page.tsx')
-    expect(operator).not.toContain('size="full"')
-    expect(operator).toContain('data-selects-wide')
-    expect(operator).toContain('[data-selects-wide] select { width: 100%; }')
+    expect(operator.match(/size="full"/g)?.length).toBeGreaterThanOrEqual(7)
+    expect(operator).not.toContain('[data-selects-wide] select')
   })
   it('共通アクションの見本選択は内容に合わせて広がる', () => {
     const page = read('common-actions/new/page.tsx')
     expect(page).toContain('data-example-select')
-    expect(page).toContain('[data-example-select] select { width: auto; max-width: 100%; }')
+    expect(page).toContain('[data-example-select] .min-w-48 { width: auto; max-width: 100%; }')
   })
   it('特典の選択は部品が持つ full 指定を使う（Select側は既存のprop）', () => {
     const rewards = read('mileage/rewards/edit/page.tsx')

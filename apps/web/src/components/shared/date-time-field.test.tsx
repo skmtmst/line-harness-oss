@@ -15,6 +15,23 @@ import DateTimeField, {
   parseTime,
 } from './date-time-field'
 
+/*
+ * 中の時刻の選び欄は共通 Select（listbox）。ここで見たいのは選んだ後の
+ * 日時の判断なので、素の <select> に置き換える。
+ */
+vi.mock('./select', () => ({
+  default: ({ 'aria-label': label, value, onChange, options }: {
+    'aria-label'?: string
+    value: string
+    onChange: (value: string) => void
+    options: Array<{ value: string; label: string }>
+  }) => React.createElement(
+    'select',
+    { 'aria-label': label, value, onChange: (e: { target: { value: string } }) => onChange(e.target.value) },
+    options.map((option) => React.createElement('option', { key: option.value, value: option.value }, option.label)),
+  ),
+}))
+
 afterEach(() => cleanup())
 
 function DateTimeHarness({ initial = '2026-10-01T10:00' }: { initial?: string }) {

@@ -61,6 +61,24 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-1', loading: false }),
 }))
 
+/*
+ * 共通の Select は listbox の部品で、その操作は部品自身の試験が持つ。
+ * ここで見たいのは選んだ後の共通情報の判断なので、素の <select> に置き換える。
+ */
+vi.mock('@/components/shared/select', () => ({
+  default: ({ 'aria-label': label, id, value, onChange, options }: {
+    'aria-label'?: string
+    id?: string
+    value: string
+    onChange: (value: string) => void
+    options: Array<{ value: string; label: string }>
+  }) => React.createElement(
+    'select',
+    { 'aria-label': label, id, value, onChange: (e: { target: { value: string } }) => onChange(e.target.value) },
+    options.map((option) => React.createElement('option', { key: option.value, value: option.value }, option.label)),
+  ),
+}))
+
 import NewCommonVarPage from '../new/page'
 import EditCommonVarPage from './page'
 
@@ -338,5 +356,26 @@ describe('共通情報の編集: 型別の入力エラー(VAR-06, 実React)', ()
 
     expect(api.update).not.toHaveBeenCalled()
     expect(host.textContent).toContain('代替値は https:// からはじまるURLで入力してください')
+  })
+
+  it('URL型にURLでない文章を入れると止め、欄のすぐ下にも理由を出す(R36)', async () => {
+    api.detail.mockResolvedValue({
+      success: true,
+      data: {
+        id: 'var-1', name: '店舗リンク', varKey: 'shop_link', type: 'url',
+        value: 'https://example.com/old', memo: '', folderId: null,
+        version: 1, history: [],
+      },
+    })
+    await mount(React.createElement(EditCommonVarPage))
+    await settle()
+
+    await setValue(byId('cv-value'), 'これはURLではありません')
+    await click(byExactText('button', '共通情報を保存'))
+
+    expect(api.update).not.toHaveBeenCalled()
+    expect(host.textContent).toContain('http://')
+    const valueField = byId('cv-value').closest('div')
+    expect(valueField?.textContent).toContain('http://')
   })
 })

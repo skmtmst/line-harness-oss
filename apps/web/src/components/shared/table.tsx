@@ -82,11 +82,23 @@ export function Th({
   )
 }
 
-/** Pencil V6 `RwC76` を正本にした一覧表の外枠。 */
-export function DataTable({ children, className }: { children: ReactNode; className?: string }) {
+/**
+ * Pencil V6 `RwC76` を正本にした一覧表の外枠。
+ * 設計の節の印は表へ写す（data-design 受け口）。共通化で印を落とすと、
+ * 画面の骨格の契約試験が節を見失う。
+ */
+export function DataTable({
+  children,
+  className,
+  'data-design': dataDesign,
+}: {
+  children: ReactNode
+  className?: string
+  'data-design'?: string
+}) {
   return (
     <div className={[shell.frame, className].filter(Boolean).join(' ')}>
-      <table className={shell.table}>{children}</table>
+      <table className={shell.table} data-design={dataDesign}>{children}</table>
     </div>
   )
 }

@@ -33,12 +33,14 @@ describe('U011-U013 詳細検索の狭幅対応', () => {
      * 画面側の scoped style では `div:has(> input[list=...])` を書いていたが、
      * 入力は label の子なので実DOMに当たらず、狭い幅でも潰れたままだった。
      * パネルを @container にして、パネル幅 @3xl(768px) 未満で縦に積む。
+     * 比較方法の欄は共通 Select。幅は部品が親いっぱいに広げる。
      */
     expect(DIALOG).toContain('@container')
     expect(DIALOG).toContain('list="friend-field-names"')
     expect(DIALOG).toContain('flex flex-col items-stretch gap-2 @3xl:flex-row @3xl:items-end')
     expect(DIALOG).toContain('min-w-0 @3xl:flex-1')
-    expect(DIALOG).toContain('w-full border px-3 py-2 text-sm @3xl:w-auto')
+    expect(DIALOG).toContain('aria-label="比較方法"')
+    expect(DIALOG).toContain('<Select')
   })
 
   it('U012: タグ選択を全幅にし、選択済みタグは折り返して全文読める', () => {

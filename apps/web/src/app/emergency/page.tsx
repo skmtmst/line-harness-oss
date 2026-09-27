@@ -1,7 +1,7 @@
 'use client'
 
 import { X } from 'lucide-react'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import Button from '@/components/shared/button'
 import Link from 'next/link'
 import React, { Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
@@ -1099,7 +1099,7 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
 
           <section className={`border-hairline rounded-card border bg-canvas p-4 ${isStopped || needsReload ? 'pointer-events-none opacity-50' : ''}`}>
             <h2 className="text-base font-bold text-ink">どのアカウントを、なぜ止めますか</h2>
-            <div className="mt-4 grid grid-cols-1 gap-5 lg:grid-cols-2"><div><label className="text-xs font-bold text-ink-secondary" htmlFor="emergency-account">対象アカウント</label><SelectField id="emergency-account" value={targetAccountId} onChange={(event) => handleTargetAccountChange(event.target.value)} disabled={mutationLocked || isStopped} aria-label="緊急停止の対象アカウント" className="border-hairline rounded-control mt-2 min-h-11 w-full border bg-canvas px-3 text-sm" options={[{ value: 'all', label: 'すべてのアカウント' }, ...accounts.map((account) => ({ value: account.id, label: account.name }))]} /></div><div><label className="text-xs font-bold text-ink-secondary" htmlFor="emergency-reason">停止理由</label><SelectField id="emergency-reason" value={reason} onChange={(event) => setReason(event.target.value)} disabled={mutationLocked || isStopped} aria-label="緊急停止の理由" className="border-hairline rounded-control mt-2 min-h-11 w-full border bg-canvas px-3 text-sm" options={['障害対応', '誤配信の防止', 'アカウント異常', 'メンテナンス', 'その他'].map((label) => ({ value: label, label }))} /></div></div>
+            <div className="mt-4 grid grid-cols-1 gap-5 lg:grid-cols-2"><div><label className="text-xs font-bold text-ink-secondary" htmlFor="emergency-account">対象アカウント</label><Select size="full" id="emergency-account" value={targetAccountId} onChange={(value) => handleTargetAccountChange(value)} disabled={mutationLocked || isStopped} aria-label="緊急停止の対象アカウント" className="mt-2" options={[{ value: 'all', label: 'すべてのアカウント' }, ...accounts.map((account) => ({ value: account.id, label: account.name }))]} /></div><div><label className="text-xs font-bold text-ink-secondary" htmlFor="emergency-reason">停止理由</label><Select size="full" id="emergency-reason" value={reason} onChange={(value) => setReason(value)} disabled={mutationLocked || isStopped} aria-label="緊急停止の理由" className="mt-2" options={['障害対応', '誤配信の防止', 'アカウント異常', 'メンテナンス', 'その他'].map((label) => ({ value: label, label }))} /></div></div>
           </section>
 
           <section className={`border-hairline rounded-card border bg-canvas p-4 ${isStopped || needsReload ? 'pointer-events-none opacity-50' : ''}`}>
@@ -1306,7 +1306,7 @@ function HistoryPanel() {
   return (
     <div className="space-y-4" data-design="V3 Update history">
       <div className="flex flex-wrap justify-end gap-2">
-        <SelectField aria-label="表示期間" value={period} onChange={(event) => setPeriod(event.target.value as typeof period)} options={[{ value: 'year', label: 'この1年' }, { value: '30days', label: 'この30日' }]} className="border-hairline rounded-control min-h-9 border bg-canvas px-3 text-xs" />
+        <Select aria-label="表示期間" value={period} onChange={(value) => setPeriod(value as typeof period)} options={[{ value: 'year', label: 'この1年' }, { value: '30days', label: 'この30日' }]} />
         <button type="button" onClick={downloadCsv} className="rounded-control min-h-9 px-3 text-xs font-bold text-action hover:bg-action-soft">CSVで書き出す</button>
       </div>
       {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}

@@ -31,7 +31,7 @@ describe('種類の呼び方', () => {
     /* 一覧の上の札と、作る画面の選び口。どちらも運用の言葉にする。 */
     expect(PAGE).toContain("{ key: 'multiple', label: '複数通' },")
     expect(PAGE).toContain("{ key: 'variables', label: '差し込みあり' },")
-    /* 選び口は共通の `SelectField` へ寄せたので、options で並ぶ。 */
+    /* 選び口は共通の `Select` へ寄せたので、options で並ぶ。 */
     expect(PAGE).toContain("{ value: \"flex\", label: \"カード型\" }")
     expect(PAGE, '失敗の文に内部の語が出ている').not.toContain('Flex JSON parse 失敗')
   })

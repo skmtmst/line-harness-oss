@@ -12,9 +12,10 @@ import ListToolbar from '@/components/shared/list-toolbar'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
 import Pagination from '@/components/shared/pagination'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import KpiCard from '@/components/shared/kpi-card'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { ActionCell, DataTable, NameCell, Td, Th, TableHeadRow, Tr } from '@/components/shared/table'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
@@ -165,6 +166,7 @@ export function OutgoingOverview({
   togglingIds,
   onRotate,
   onDelete,
+  canManage,
 }: {
   items: OutgoingWebhookOverview[]
   status: LoadStatus
@@ -179,6 +181,12 @@ export function OutgoingOverview({
   togglingIds: string[]
   onRotate: (item: OutgoingWebhookOverview) => void
   onDelete: (item: OutgoingWebhookOverview) => void
+  /**
+   * 送り先の変更（開始・停止・直す・合言葉・削除）は統括だけ（R32）。
+   * 口側が `requireRole('owner')` で守っている。試し送信とやり取りの記録は
+   * 管理者も使えるので残す。
+   */
+  canManage: boolean
 }) {
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<OutgoingFilter>('all')
@@ -338,10 +346,10 @@ export function OutgoingOverview({
       <ListToolbar
         search={{ placeholder: 'つなぎ先・送るタイミングで検索', value: query, onChange: setQuery }}
         filters={
-          <SelectField
+          <Select
             aria-label="外部連携の状態"
             value={filter}
-            onChange={(event) => setFilter(event.target.value as OutgoingFilter)}
+            onChange={(value) => setFilter(value as OutgoingFilter)}
             // ★V7 `x63W5x`：取れていない間の件数は出さない（0 と読めるため）。
             options={(() => {
               const count = (n: number) => (status === 'ready' ? ` ${n}` : '')
@@ -355,10 +363,10 @@ export function OutgoingOverview({
           />
         }
         trailing={
-          <SelectField
+          <Select
             aria-label="外部連携の並び順"
             value={sort}
-            onChange={(event) => setSort(event.target.value as OutgoingSort)}
+            onChange={(value) => setSort(value as OutgoingSort)}
             options={[
               { value: 'volume', label: '送った回数が多い順' },
               { value: 'name', label: '名前順' },
@@ -381,7 +389,9 @@ export function OutgoingOverview({
           <ListState
             kind="empty"
             title="まだ連携がありません"
-            description="うちで起きたことを、ほかのサービスに知らせられます。「＋ 送り先を作る」から作成してください。"
+            description={canManage
+              ? 'うちで起きたことを、ほかのサービスに知らせられます。「＋ 送り先を作る」から作成してください。'
+              : 'うちで起きたことを、ほかのサービスに知らせられます。送り先の作成は統括に頼んでください。'}
           />
         </div>
       ) : visible.length === 0 ? (
@@ -517,24 +527,28 @@ export function OutgoingOverview({
                             押下前後の座標で見張る。押した指の下でボタンの大きさが
                             変わらなくなる利点も兼ねる。
                           */}
-                          <Button
-                            variant="secondary"
-                            role="menuitem"
-                            className="min-w-36"
-                            onClick={() => onToggle(item.id, item.isActive)}
-                            disabled={!item.isActive && !canActivate}
-                            aria-busy={toggling || undefined}
-                            data-webhook-toggle-pending={toggling ? `outgoing:${item.id}` : undefined}
-                            title={!item.isActive && !canActivate ? 'URLと合言葉を確かめてください' : undefined}
-                          >
-                            {toggling
-                              ? (item.isActive ? '止めています…' : '動かしています…')
-                              : (item.isActive ? '止める' : '動かす')}
-                          </Button>
-                          {/* N-363: 名前・URL・いつ送るか・送り直す回数を直す画面へ。 */}
-                          <Button variant="secondary" role="menuitem" href={`/webhooks/edit?id=${item.id}`}>直す</Button>
-                          <Button variant="secondary" role="menuitem" onClick={() => onRotate(item)}>合言葉</Button>
-                          <Button variant="secondary" role="menuitem" onClick={() => onDelete(item)}>削除</Button>
+                          {canManage ? (
+                            <>
+                              <Button
+                                variant="secondary"
+                                role="menuitem"
+                                className="min-w-36"
+                                onClick={() => onToggle(item.id, item.isActive)}
+                                disabled={!item.isActive && !canActivate}
+                                aria-busy={toggling || undefined}
+                                data-webhook-toggle-pending={toggling ? `outgoing:${item.id}` : undefined}
+                                title={!item.isActive && !canActivate ? 'URLと合言葉を確かめてください' : undefined}
+                              >
+                                {toggling
+                                  ? (item.isActive ? '止めています…' : '動かしています…')
+                                  : (item.isActive ? '止める' : '動かす')}
+                              </Button>
+                              {/* N-363: 名前・URL・いつ送るか・送り直す回数を直す画面へ。 */}
+                              <Button variant="secondary" role="menuitem" href={`/webhooks/edit?id=${item.id}`}>直す</Button>
+                              <Button variant="secondary" role="menuitem" onClick={() => onRotate(item)}>合言葉</Button>
+                              <Button variant="secondary" role="menuitem" onClick={() => onDelete(item)}>削除</Button>
+                            </>
+                          ) : null}
                           {/*
                             試し送信は本物のURLへ届くので、押しただけでは送らず
                             確認ダイアログへ回す(N-388)。確認を開くと同時に
@@ -617,6 +631,7 @@ export function IncomingOverview({
   togglingIds,
   onRotate,
   onDelete,
+  canManage,
 }: {
   items: IncomingWebhook[]
   status: LoadStatus
@@ -624,6 +639,12 @@ export function IncomingOverview({
   lineAccountId: string | null
   endpointUrl: (id: string) => string
   onReload: () => void
+  /**
+   * 受け取り口の変更（開始・停止・合言葉・削除）は統括だけ（R32）。
+   * 口側が `requireRole('owner')` で守っている。「届いたつもりで試す」は
+   * 管理者も使えるので残す。
+   */
+  canManage: boolean
   onToggle: (id: string, active: boolean) => void
   /**
    * 開始・停止の応答を待っている行のID(#707)。
@@ -765,8 +786,11 @@ export function IncomingOverview({
         return
       }
       setTestResult(res.data)
-    } catch {
-      setTestError('試せませんでした。通信を確かめて、もう一度お試しください。')
+    } catch (caught) {
+      // 試す口は管理者も使える。失敗は原因どおりに（R32）。
+      setTestError(describeApiFailure(caught, '試し', {
+        forbidden: 'この操作を行う権限がありません。統括に頼んでください。',
+      }))
       setTestResult(null)
     } finally {
       setTestBusy(false)
@@ -791,7 +815,9 @@ export function IncomingOverview({
       <ListState
         kind="empty"
         title="まだ受け取り口がありません"
-        description="相手のサービスから知らせを受け取るURLを、「＋ 受け取り口を作る」から作成してください。"
+        description={canManage
+          ? '相手のサービスから知らせを受け取るURLを、「＋ 受け取り口を作る」から作成してください。'
+          : '相手のサービスから知らせを受け取るURLは、まだありません。受け取り口の作成は統括に頼んでください。'}
       />
     )
   }
@@ -854,19 +880,23 @@ export function IncomingOverview({
               </div>
             </dl>
             <div className="mt-2 flex flex-wrap gap-2">
-              <Button
-                variant="secondary"
-                className="min-w-36"
-                onClick={() => onToggle(selected.id, selected.isActive)}
-                disabled={!selected.hasSecret && !selected.isActive}
-                aria-busy={togglingIds.includes(selected.id) || undefined}
-                data-webhook-toggle-pending={togglingIds.includes(selected.id) ? `incoming:${selected.id}` : undefined}
-              >
-                {togglingIds.includes(selected.id)
-                  ? (selected.isActive ? '止めています…' : '動かしています…')
-                  : (selected.isActive ? '止める' : '動かす')}
-              </Button>
-              <Button variant="secondary" onClick={() => onRotate(selected)}>合言葉を更新</Button>
+              {canManage ? (
+                <>
+                  <Button
+                    variant="secondary"
+                    className="min-w-36"
+                    onClick={() => onToggle(selected.id, selected.isActive)}
+                    disabled={!selected.hasSecret && !selected.isActive}
+                    aria-busy={togglingIds.includes(selected.id) || undefined}
+                    data-webhook-toggle-pending={togglingIds.includes(selected.id) ? `incoming:${selected.id}` : undefined}
+                  >
+                    {togglingIds.includes(selected.id)
+                      ? (selected.isActive ? '止めています…' : '動かしています…')
+                      : (selected.isActive ? '止める' : '動かす')}
+                  </Button>
+                  <Button variant="secondary" onClick={() => onRotate(selected)}>合言葉を更新</Button>
+                </>
+              ) : null}
               <Button
                 variant="secondary"
                 onClick={() => {
@@ -880,8 +910,13 @@ export function IncomingOverview({
               >
                 届いたつもりで試す
               </Button>
-              <Button variant="secondary" onClick={() => onDelete(selected)}>削除</Button>
+              {canManage ? (
+                <Button variant="secondary" onClick={() => onDelete(selected)}>削除</Button>
+              ) : null}
             </div>
+            {canManage ? null : (
+              <p className="text-ink-secondary mt-2 text-xs">止める・合言葉の更新・削除は統括だけができます。</p>
+            )}
           <div className="border-hairline mt-4 border-t pt-3.5">
             <h2 className="text-ink mb-3 text-lg font-bold">届いたらすること</h2>
             {detailStatus === 'loading' ? (
