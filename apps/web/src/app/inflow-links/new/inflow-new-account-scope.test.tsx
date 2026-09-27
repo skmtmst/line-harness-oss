@@ -98,16 +98,35 @@ function stubCandidates() {
   api.tagGroupsList.mockResolvedValue({ success: true as const, data: [] })
 }
 
-async function settle() {
+async function settle(milliseconds = 50) {
   await act(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 50))
+    await new Promise((resolve) => setTimeout(resolve, milliseconds))
   })
 }
 
-function selectById(id: string): HTMLSelectElement {
+/** 共通部品 Select はボタンの見た目で、候補は body 直下の [role="option"] に出る。 */
+function triggerById(id: string): HTMLElement {
   const el = host.querySelector(`#${id}`)
   if (!el) throw new Error(`見つかりません: #${id}`)
-  return el as HTMLSelectElement
+  return el as HTMLElement
+}
+
+async function chooseOption(triggerId: string, label: string) {
+  await act(async () => {
+    fireEvent.click(triggerById(triggerId))
+  })
+  await settle(50)
+  // 候補の一覧は MenuPortal で document.body 直下に出る（host の中にはない）。
+  const option = Array.from(document.querySelectorAll('[role="option"]')).find((el) =>
+    el.textContent?.includes(label),
+  )
+  if (!option) throw new Error(`候補が見つかりません: ${label}`)
+  // 押すのは中のボタン（共通部品 Select の onChange はボタンの onClick）。
+  const target = option.querySelector('button') ?? option
+  await act(async () => {
+    fireEvent.click(target!)
+  })
+  await settle(50)
 }
 
 beforeEach(() => {
@@ -136,21 +155,19 @@ describe('R23横展開 流入リンク作成の候補は選択accountで絞る',
 
   it('切り替えたら前の候補にしかない選択を外して知らせる', async () => {
     await act(async () => { root.render(React.createElement(NewInflowLinkPage)) })
-    await settle()
-    // account-1 の候補を選ぶ
-    await act(async () => {
-      fireEvent.change(selectById('ir-tag'), { target: { value: 'tag-a1' } })
-      fireEvent.change(selectById('ir-scenario'), { target: { value: 'sc-a1' } })
-      fireEvent.change(selectById('ir-intro'), { target: { value: 'tpl-a1' } })
-    })
-    expect(selectById('ir-tag').value).toBe('tag-a1')
+    await settle(100)
+    // account-1 の候補を選ぶ（共通部品 Select はボタンの見た目）
+    await chooseOption('ir-tag', '会員')
+    await chooseOption('ir-scenario', '案内A')
+    await chooseOption('ir-intro', '挨拶A')
+    expect(triggerById('ir-tag').textContent).toContain('会員')
     // account-2 へ切り替えると候補が変わり、前の選択は外れる
     fixture.accountId = 'account-2'
     await act(async () => { root.render(React.createElement(NewInflowLinkPage)) })
-    await settle()
-    expect(selectById('ir-tag').value).toBe('')
-    expect(selectById('ir-scenario').value).toBe('')
-    expect(selectById('ir-intro').value).toBe('')
+    await settle(150)
+    expect(triggerById('ir-tag').textContent).toContain('（なし）')
+    expect(triggerById('ir-scenario').textContent).toContain('（なし）')
+    expect(triggerById('ir-intro').textContent).toContain('送らない')
     expect(host.textContent).toContain('今のアカウントにないため外しました')
   })
 
