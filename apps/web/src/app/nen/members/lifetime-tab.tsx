@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Chip from '@/components/shared/chip'
@@ -47,6 +47,21 @@ export default function LifetimeTab({
   const [notice, setNotice] = useState('')
   /** 下書きがどのアカウントのものか。編集状態はアカウントに固定する（DEEP-21）。 */
   const [draftAccountId, setDraftAccountId] = useState(accountId)
+  // 真因の直し：「追加」の行の列結合は見えている列の数にする。table-layout: fixed
+  // では colSpan=6 が畳んだ列（特典・到達した人）を作り直し、残り幅を吸収列と
+  // 見えない列で分け合って帯と線が手前で切れて見える。表の器（この区画）の実幅を
+  // ResizeObserver で見て結合数を合わせる（畳む幅 800px・1010px と同じ境目）。
+  const tableSectionRef = useRef<HTMLElement | null>(null)
+  const [tableWidth, setTableWidth] = useState(Number.POSITIVE_INFINITY)
+  useEffect(() => {
+    const el = tableSectionRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const update = () => setTableWidth(el.getBoundingClientRect().width)
+    update()
+    const observer = new ResizeObserver(update)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
 
   /*
    * 未保存の変更がある間、画面を離れる操作を止める共通の番兵（DETAIL-04系）。
@@ -134,7 +149,7 @@ export default function LifetimeTab({
       {notice ? <p className="text-label text-accent-deep" role="status">{notice}</p> : null}
       {error ? <p className="text-label text-danger" role="alert">{error}</p> : null}
 
-      <section data-design="Table" data-design-node="USBTi">
+      <section data-design="Table" data-design-node="USBTi" ref={tableSectionRef}>
         {/*
           R55: @container＋谷間帯の列削減は会員一覧と同じ形。768pxでは
           固定幅の合計が表を超え、特典列が0px・説明文が隣へ重なっていた。
@@ -180,7 +195,7 @@ export default function LifetimeTab({
               </Tr>
             ))}
             <Tr>
-              <Td colSpan={6}>
+              <Td colSpan={tableWidth < 800 ? 4 : tableWidth < 1010 ? 5 : 6}>
                 <button
                   type="button"
                   className="text-label font-semibold text-action"
