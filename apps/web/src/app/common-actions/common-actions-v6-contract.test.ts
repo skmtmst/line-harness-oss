@@ -115,9 +115,18 @@ describe('V6共通アクションの画面契約', () => {
     // 作る操作は見出しの右ではなく一覧の上の行へ。マニュアルは見出しに残す。
     expect(LIST).toContain('＋ 共通アクションを作る')
     expect(LIST).not.toContain('共通アクションをつくる')
-    expect(LIST).toContain('<Button href="/support">マニュアル</Button>')
+    expect(LIST).toContain('manualHref ? <Button href={manualHref}>マニュアル</Button>')
     expect(LIST.indexOf('＋ 共通アクションを作る')).toBeGreaterThan(LIST.indexOf('<NoteBar>'))
     expect(VERSIONS.indexOf('マニュアル')).toBeGreaterThan(VERSIONS.indexOf('前の版から新版を作る'))
+  })
+
+  it('「マニュアル」は正本表の画面IDを引き、/supportへ固定で飛ばさない (監査R128)', () => {
+    // /support はメール問い合わせの受信箱。説明書ではないので、画面内の
+    // マニュアル導線は正本表（/settings/manual-links）が返すURLを使う。
+    expect(LIST).toContain('useManualHref')
+    expect(VERSIONS).toContain('useManualHref')
+    expect(LIST).not.toContain('href="/support"')
+    expect(VERSIONS).not.toContain('href="/support"')
   })
 })
 

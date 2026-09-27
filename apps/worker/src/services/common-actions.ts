@@ -513,6 +513,39 @@ async function assertNoCycle(
   }
 }
 
+/*
+ * 監査 R125: 実行回数・失敗数・最終実行を行ごとの相関副問合せ3本で取ると、
+ * 実行履歴の増加に応じて一覧と集計の両方が遅くなっていた。アカウント内の
+ * 実行台帳を1回だけ走査してアクション単位に集計し、一覧側は結合で受ける。
+ * 一覧と集計で同じ式を共有し、内訳がずれないようにする。
+ *   execution_count_this_month: 今月始めた本番の実行数（1人テストを含まない）
+ *   failure_count_this_month:   今月のうち、その目印の下の手順が失敗した実行数
+ *   last_run_at:                全期間の最終実行
+ */
+const COMMON_ACTION_RUN_METRICS_SQL = `
+       SELECT metric_version.common_action_id AS action_id,
+              COUNT(DISTINCT CASE
+                WHEN strftime('%Y-%m', r.created_at) = strftime('%Y-%m', 'now') THEN r.id END
+              ) AS execution_count_this_month,
+              COUNT(DISTINCT CASE
+                WHEN strftime('%Y-%m', r.created_at) = strftime('%Y-%m', 'now')
+                 AND failed_step.id IS NOT NULL THEN r.id END
+              ) AS failure_count_this_month,
+              MAX(r.created_at) AS last_run_at
+         FROM automation_run_steps marker
+         JOIN automation_runs r ON r.id = marker.automation_run_id
+         JOIN common_action_versions metric_version
+           ON metric_version.id = marker.common_action_version_id
+         LEFT JOIN automation_run_steps failed_step
+           ON failed_step.automation_run_id = r.id
+          AND failed_step.status = 'failed'
+          AND substr(failed_step.step_key, 1, length(marker.step_key) + 1)
+              = marker.step_key || '/'
+        WHERE marker.action_type = 'common_action_marker'
+          AND r.is_test = 0
+          AND r.line_account_id = ?
+        GROUP BY metric_version.common_action_id`;
+
 export async function listCommonActions(
   db: D1Database,
   input: { lineAccountId: string; status?: string; query?: string; limit?: number; offset?: number },
@@ -533,9 +566,17 @@ export async function listCommonActions(
     }
   }
   if (input.query?.trim()) {
-    where.push(`(ca.name LIKE ? ESCAPE '\\' OR COALESCE(ca.description, '') LIKE ? ESCAPE '\\')`);
+    /*
+     * 監査 R124: 画面は「アクション名・中の処理で探す」と案内しているので、
+     * 名前と説明だけでなく各版の処理内容（action_config）も検索対象にする。
+     * 版は増えても数件程度なので EXISTS で済ませ、一覧の件数と同じ条件を使う。
+     */
+    where.push(`(ca.name LIKE ? ESCAPE '\\' OR COALESCE(ca.description, '') LIKE ? ESCAPE '\\'
+      OR EXISTS (SELECT 1 FROM common_action_versions cv
+                  WHERE cv.common_action_id = ca.id
+                    AND cv.action_config LIKE ? ESCAPE '\\'))`);
     const escaped = input.query.trim().replace(/[\\%_]/g, '\\$&');
-    binds.push(`%${escaped}%`, `%${escaped}%`);
+    binds.push(`%${escaped}%`, `%${escaped}%`, `%${escaped}%`);
   }
   const total = await db.prepare(
     `SELECT COUNT(*) AS count FROM common_actions ca WHERE ${where.join(' AND ')}`,
@@ -550,50 +591,18 @@ export async function listCommonActions(
             COUNT(DISTINCT CASE
               WHEN ca.current_published_version_id IS NOT NULL
                AND b.common_action_version_id <> ca.current_published_version_id THEN b.id END) AS old_binding_count
-            ,(SELECT COUNT(DISTINCT r.id)
-                FROM automation_run_steps marker
-                JOIN automation_runs r ON r.id = marker.automation_run_id
-                JOIN common_action_versions metric_version
-                  ON metric_version.id = marker.common_action_version_id
-               WHERE metric_version.common_action_id = ca.id
-                 AND marker.action_type = 'common_action_marker'
-                 AND r.is_test = 0
-                 AND r.line_account_id = ca.line_account_id
-                 AND strftime('%Y-%m', r.created_at) = strftime('%Y-%m', 'now')) AS execution_count_this_month
-            ,(SELECT COUNT(DISTINCT r.id)
-                FROM automation_run_steps marker
-                JOIN automation_runs r ON r.id = marker.automation_run_id
-                JOIN common_action_versions metric_version
-                  ON metric_version.id = marker.common_action_version_id
-               WHERE metric_version.common_action_id = ca.id
-                 AND marker.action_type = 'common_action_marker'
-                 AND r.is_test = 0
-                 AND r.line_account_id = ca.line_account_id
-                 AND EXISTS (
-                   SELECT 1 FROM automation_run_steps failed_step
-                    WHERE failed_step.automation_run_id = r.id
-                      AND failed_step.status = 'failed'
-                      AND substr(failed_step.step_key, 1, length(marker.step_key) + 1)
-                          = marker.step_key || '/'
-                 )
-                 AND strftime('%Y-%m', r.created_at) = strftime('%Y-%m', 'now')) AS failure_count_this_month
-            ,(SELECT MAX(r.created_at)
-                FROM automation_run_steps marker
-                JOIN automation_runs r ON r.id = marker.automation_run_id
-                JOIN common_action_versions metric_version
-                  ON metric_version.id = marker.common_action_version_id
-               WHERE metric_version.common_action_id = ca.id
-                 AND marker.action_type = 'common_action_marker'
-                 AND r.is_test = 0
-                 AND r.line_account_id = ca.line_account_id) AS last_run_at
+            ,COALESCE(run_metrics.execution_count_this_month, 0) AS execution_count_this_month
+            ,COALESCE(run_metrics.failure_count_this_month, 0) AS failure_count_this_month
+            ,run_metrics.last_run_at AS last_run_at
        FROM common_actions ca
        LEFT JOIN common_action_versions dv ON dv.id = ca.current_draft_version_id
        LEFT JOIN common_action_versions pv ON pv.id = ca.current_published_version_id
        LEFT JOIN common_action_bindings b ON b.common_action_id = ca.id
+       LEFT JOIN (${COMMON_ACTION_RUN_METRICS_SQL}) run_metrics ON run_metrics.action_id = ca.id
       WHERE ${where.join(' AND ')}
       GROUP BY ca.id
       ORDER BY ca.updated_at DESC, ca.id DESC${paginationSql}`,
-  ).bind(...binds, ...paginationBinds).all<{
+  ).bind(input.lineAccountId, ...binds, ...paginationBinds).all<{
     id: string; name: string; description: string | null; status: CommonActionSummary['status'];
     updated_at: string; draft_version: number | null; published_version: number | null;
     action_count: number; binding_count: number; old_binding_count: number;
@@ -646,7 +655,10 @@ export async function getCommonActionsSummary(
             SUM(CASE WHEN status = 'published' THEN 1 ELSE 0 END) AS published,
             SUM(CASE WHEN status = 'draft' THEN 1 ELSE 0 END) AS draft,
             SUM(CASE WHEN old_binding_count > 0 THEN 1 ELSE 0 END) AS old_version,
-            SUM(CASE WHEN status = 'published' AND binding_count = 0 THEN 1 ELSE 0 END) AS unused,
+            /* 監査 R123: 「呼ばれていない」の件数は一覧の絞り込み（呼び出し元なし）と
+               同じ定義に揃える。以前は公開中だけを数えたため、下書き・保管の未使用が
+               札の数だけ増えて一覧と合わなかった。 */
+            SUM(CASE WHEN binding_count = 0 THEN 1 ELSE 0 END) AS unused,
             SUM(action_count) AS actions,
             SUM(binding_count) AS bindings,
             SUM(old_binding_count) AS outdated,
@@ -659,40 +671,16 @@ export async function getCommonActionsSummary(
                     COUNT(DISTINCT CASE
                       WHEN ca.current_published_version_id IS NOT NULL
                        AND b.common_action_version_id <> ca.current_published_version_id THEN b.id END) AS old_binding_count
-                    ,(SELECT COUNT(DISTINCT r.id)
-                        FROM automation_run_steps marker
-                        JOIN automation_runs r ON r.id = marker.automation_run_id
-                        JOIN common_action_versions metric_version
-                          ON metric_version.id = marker.common_action_version_id
-                       WHERE metric_version.common_action_id = ca.id
-                         AND marker.action_type = 'common_action_marker'
-                         AND r.is_test = 0
-                         AND r.line_account_id = ca.line_account_id
-                         AND strftime('%Y-%m', r.created_at) = strftime('%Y-%m', 'now')) AS execution_count_this_month
-                    ,(SELECT COUNT(DISTINCT r.id)
-                        FROM automation_run_steps marker
-                        JOIN automation_runs r ON r.id = marker.automation_run_id
-                        JOIN common_action_versions metric_version
-                          ON metric_version.id = marker.common_action_version_id
-                       WHERE metric_version.common_action_id = ca.id
-                         AND marker.action_type = 'common_action_marker'
-                         AND r.is_test = 0
-                         AND r.line_account_id = ca.line_account_id
-                         AND EXISTS (
-                           SELECT 1 FROM automation_run_steps failed_step
-                            WHERE failed_step.automation_run_id = r.id
-                              AND failed_step.status = 'failed'
-                              AND substr(failed_step.step_key, 1, length(marker.step_key) + 1)
-                                  = marker.step_key || '/'
-                         )
-                         AND strftime('%Y-%m', r.created_at) = strftime('%Y-%m', 'now')) AS failure_count_this_month
+                    ,COALESCE(run_metrics.execution_count_this_month, 0) AS execution_count_this_month
+                    ,COALESCE(run_metrics.failure_count_this_month, 0) AS failure_count_this_month
                FROM common_actions ca
                LEFT JOIN common_action_versions dv ON dv.id = ca.current_draft_version_id
                LEFT JOIN common_action_versions pv ON pv.id = ca.current_published_version_id
                LEFT JOIN common_action_bindings b ON b.common_action_id = ca.id
+               LEFT JOIN (${COMMON_ACTION_RUN_METRICS_SQL}) run_metrics ON run_metrics.action_id = ca.id
               WHERE ca.line_account_id = ?
               GROUP BY ca.id)`,
-  ).bind(lineAccountId).first<{
+  ).bind(lineAccountId, lineAccountId).first<{
     total: number; published: number | null; draft: number | null; old_version: number | null;
     unused: number | null; actions: number | null; bindings: number | null; outdated: number | null;
     outdated_items: number | null; executions: number | null; failures: number | null;
