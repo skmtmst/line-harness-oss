@@ -33,7 +33,9 @@ describe('予約管理の一覧上限', () => {
     expect(LIST).toContain('LINEと結びついていないため、お客様への自動連絡はありません')
     // 未連携でも無条件に出る文言が残っていないこと
     expect(LIST).not.toContain('>ここでの状態変更は、お客様のLINEにも自動で知らせます。<')
-    expect(LIST).toContain("isLinked ? 'LINEから入りました。' : '電話・店頭で受け付けました。'")
+    // R88: 受付経路の文言は source で分ける（担当者の代理入力をLINEにしない）。
+    // 文言の分け方自体（N-390）は残す。
+    expect(LIST).toContain("isLineBooking(b) ? 'LINEから入りました。' : '電話・店頭で受け付けました。'")
   })
 
   it('「準備中」の変更ボタンを残さず詳細ページの変更フォームへ誘導する (N-389 独立審査必修2)', () => {
