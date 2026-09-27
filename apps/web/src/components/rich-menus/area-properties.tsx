@@ -1,5 +1,6 @@
 'use client'
 
+import MultiSelect from '@/components/shared/multi-select'
 import Select from '@/components/shared/select'
 import type { Area } from './canvas-editor'
 import { RICH_MENU_ACTION_TYPE_BY_INTENT, type RichMenuAreaIntent } from '@line-crm/shared'
@@ -160,13 +161,6 @@ export function AreaProperties({
       formId: next === 'form' ? area.formId : null,
       trackedLinkId: next === 'url' ? area.trackedLinkId : null,
     })
-  }
-
-  function toggleTag(tagId: string) {
-    const next = selectedTagIds.includes(tagId)
-      ? selectedTagIds.filter((t) => t !== tagId)
-      : [...selectedTagIds, tagId]
-    onUpdate({ tagIds: next })
   }
 
   // タグ付けとスコアは、押されたことがこちらに届くボタンでしか使えない。
@@ -405,24 +399,27 @@ export function AreaProperties({
           </p>
         ) : (
           <>
-            <Field label="タグを付ける">
+            {/*
+              R19/R20: 検索なしの小さな選択枠を、共通の複数選択（★V7 WUVcz §2）へ。
+              外側の label で包むと各項目の label と入れ子になり、先頭項目の
+              読み上げに全タグ名が混ざる。見出しは span、欄の名前は
+              MultiSelect の aria-label、各項目は個別の名前だけにする。
+            */}
+            <div>
+              <span className="text-ink-secondary text-xs font-medium">タグを付ける</span>
               {tags.length === 0 ? (
-                <p className="text-ink-faint text-[11px]">タグがまだありません。</p>
+                <p className="text-ink-faint mt-1 text-[11px]">タグがまだありません。</p>
               ) : (
-                <div className="border-hairline max-h-32 space-y-1 overflow-y-auto rounded border p-2">
-                  {tags.map((t) => (
-                    <label key={t.id} className="flex cursor-pointer items-center gap-2 text-xs">
-                      <input
-                        type="checkbox"
-                        checked={selectedTagIds.includes(t.id)}
-                        onChange={() => toggleTag(t.id)}
-                      />
-                      <span className="truncate">{t.name}</span>
-                    </label>
-                  ))}
-                </div>
+                <MultiSelect
+                  aria-label="タグを付ける"
+                  options={tags.map((t) => ({ value: t.id, label: t.name }))}
+                  values={selectedTagIds}
+                  onChange={(next) => onUpdate({ tagIds: next })}
+                  placeholder="タグを選ぶ"
+                  className="mt-1 w-full"
+                />
               )}
-            </Field>
+            </div>
 
             <Field label="スコアを足す" hint="マイナスを入れると減ります。空欄なら何もしません。">
               <input

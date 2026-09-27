@@ -10,6 +10,7 @@ import {
 import { resolveReminderSendAt } from '@line-crm/shared';
 import { LineClient } from '@line-crm/line-sdk';
 import { buildReminderStepMessage } from './reminder-delivery.js';
+import { buildPublicSegmentQuery, buildSegmentWhere, isEmptySegmentCondition } from './segment-query.js';
 import {
   completeOutboundSendStatement,
   hashOutboundPayload,
@@ -60,6 +61,14 @@ export async function countReminderAudience(
   const total = await db.prepare(
     `SELECT COUNT(*) AS count FROM friends WHERE line_account_id = ?`,
   ).bind(settings.lineAccountId).first<{ count: number }>();
+  const totalCount = Number(total?.count ?? 0);
+  // 条件があるときは条件が勝つ。無いときだけ従来のタグ・全員へ倒す。
+  if (!isEmptySegmentCondition(settings.targetCondition as never)) {
+    const { matched } = await countReminderAudienceByCondition(
+      db, settings.lineAccountId, settings.targetCondition,
+    );
+    return { matched, excluded: Math.max(0, totalCount - matched) };
+  }
   const matched = settings.targetTagId
     ? await db.prepare(
         `SELECT COUNT(DISTINCT f.id) AS count
@@ -71,9 +80,82 @@ export async function countReminderAudience(
         `SELECT COUNT(*) AS count FROM friends
           WHERE line_account_id = ? AND is_following = 1`,
       ).bind(settings.lineAccountId).first<{ count: number }>();
-  const totalCount = Number(total?.count ?? 0);
   const matchedCount = Number(matched?.count ?? 0);
   return { matched: matchedCount, excluded: Math.max(0, totalCount - matchedCount) };
+}
+
+/**
+ * 条件に当てはまる送信可能者 (フォロー中) を数える。
+ *
+ * 形の検査は保存時に済ませている。ここで組み立てに失敗したら
+ * 例外を投げ、呼び出し側で 422 にする。0 を返すと「誰もいない」と
+ * 見えて、そのまま公開へ進めてしまう。
+ */
+export async function countReminderAudienceByCondition(
+  db: D1Database,
+  lineAccountId: string,
+  condition: ReminderDraftSettings['targetCondition'],
+): Promise<{ matched: number }> {
+  // friend_id_in は内部スナップショット専用。保存口では受け付けない。
+  buildPublicSegmentQuery(condition as never);
+  const where = buildSegmentWhere(condition as never);
+  const row = await db.prepare(
+    `SELECT COUNT(*) AS count FROM friends f
+      WHERE f.line_account_id = ? AND f.is_following = 1 AND (${where.sql})`,
+  ).bind(lineAccountId, ...where.bindings).first<{ count: number }>();
+  return { matched: Number(row?.count ?? 0) };
+}
+
+/**
+ * 「顔ぶれを見る」の中身。条件に当てはまる送信可能者を先頭から数件返す。
+ *
+ * 名前だけ返し、本文・連絡先は返さない。人数の数え直しと同じ条件・範囲で
+ * 切るので、「数」と「顔ぶれ」がずれない。
+ */
+export async function sampleReminderAudience(
+  db: D1Database,
+  settings: ReminderDraftSettings,
+  limit = 20,
+): Promise<Array<{ id: string; displayName: string }>> {
+  const capped = Number.isInteger(limit) ? Math.min(100, Math.max(1, limit)) : 20;
+  if (!isEmptySegmentCondition(settings.targetCondition as never)) {
+    buildPublicSegmentQuery(settings.targetCondition as never);
+    const where = buildSegmentWhere(settings.targetCondition as never);
+    const rows = await db.prepare(
+      `SELECT f.id AS id, f.display_name AS displayName FROM friends f
+        WHERE f.line_account_id = ? AND f.is_following = 1 AND (${where.sql})
+        ORDER BY f.created_at ASC, f.id ASC LIMIT ?`,
+    ).bind(settings.lineAccountId, ...where.bindings, capped)
+      .all<{ id: string; displayName: string | null }>();
+    return (rows.results ?? []).map((row) => ({
+      id: row.id,
+      displayName: row.displayName ?? '（名前なし）',
+    }));
+  }
+  if (settings.targetTagId) {
+    const rows = await db.prepare(
+      `SELECT DISTINCT f.id AS id, f.display_name AS displayName
+         FROM friends f
+         JOIN friend_tags ft ON ft.friend_id = f.id AND ft.tag_id = ?
+        WHERE f.line_account_id = ? AND f.is_following = 1
+        ORDER BY f.id ASC LIMIT ?`,
+    ).bind(settings.targetTagId, settings.lineAccountId, capped)
+      .all<{ id: string; displayName: string | null }>();
+    return (rows.results ?? []).map((row) => ({
+      id: row.id,
+      displayName: row.displayName ?? '（名前なし）',
+    }));
+  }
+  const rows = await db.prepare(
+    `SELECT f.id AS id, f.display_name AS displayName FROM friends f
+      WHERE f.line_account_id = ? AND f.is_following = 1
+      ORDER BY f.created_at ASC, f.id ASC LIMIT ?`,
+  ).bind(settings.lineAccountId, capped)
+    .all<{ id: string; displayName: string | null }>();
+  return (rows.results ?? []).map((row) => ({
+    id: row.id,
+    displayName: row.displayName ?? '（名前なし）',
+  }));
 }
 
 export async function validateReminderDraft(

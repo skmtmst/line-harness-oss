@@ -8,6 +8,7 @@ import {
   createCommonActionDraft,
   duplicateCommonAction,
   getCommonActionDetail,
+  getCommonActionsSummary,
   listCommonActionResources,
   listCommonActions,
   publishCommonActionDraft,
@@ -468,5 +469,63 @@ describe('V6共通アクション', () => {
       version: 1,
       currentPublishedVersionId: published.draftVersionId,
     });
+  });
+
+  /*
+   * 監査 R123: 「呼ばれていない」の札の件数は、一覧の絞り込みと同じ
+   * 「呼び出し元なし」で数える。以前は集計が公開中に限られ、下書き・保管の
+   * 未使用があると件数と一覧がずれた。
+   */
+  it('「呼ばれていない」の件数は一覧の絞り込みと同じ対象を数える', async () => {
+    const published = await createCommonAction(testDb.db, {
+      lineAccountId: 'account-1', name: '呼ばれない公開中', actions: tagAction('tag-1'),
+    });
+    await publishCommonActionDraft(testDb.db, {
+      id: published.id, lineAccountId: 'account-1', draftVersionId: published.draftVersionId,
+    });
+    // 下書きのままのものと、保管に回したもの。どちらも呼び出し元なし。
+    await createCommonAction(testDb.db, {
+      lineAccountId: 'account-1', name: '呼ばれない下書き', actions: tagAction('tag-1'),
+    });
+    const archived = await createCommonAction(testDb.db, {
+      lineAccountId: 'account-1', name: '呼ばれない保管', actions: tagAction('tag-1'),
+    });
+    await publishCommonActionDraft(testDb.db, {
+      id: archived.id, lineAccountId: 'account-1', draftVersionId: archived.draftVersionId,
+    });
+    testDb.raw.prepare(`UPDATE common_actions SET status = 'archived' WHERE id = ?`).run(archived.id);
+
+    const [summary, unusedList] = [
+      await getCommonActionsSummary(testDb.db, 'account-1'),
+      await listCommonActions(testDb.db, { lineAccountId: 'account-1', status: 'unused' }),
+    ];
+    expect(unusedList.total).toBe(3);
+    expect(summary.unused).toBe(unusedList.total);
+  });
+
+  /*
+   * 監査 R124: 一覧の検索欄は「アクション名・中の処理で探す」と案内する。
+   * 名前・説明だけでなく各版の処理内容（手順の本文など）も対象にする。
+   */
+  it('「中の処理で探す」は版の処理内容の文字にも届く', async () => {
+    const created = await createCommonAction(testDb.db, {
+      lineAccountId: 'account-1',
+      name: '配送後のお知らせ',
+      actions: [{
+        id: 'msg-step',
+        type: 'send_message',
+        params: { content: 'synthetic notice をお送りします' },
+        onFailure: 'stop',
+      }],
+    });
+    await createCommonAction(testDb.db, {
+      lineAccountId: 'account-1', name: '無関係の処理', actions: tagAction('tag-1'),
+    });
+
+    const found = await listCommonActions(testDb.db, {
+      lineAccountId: 'account-1', query: 'synthetic notice',
+    });
+    expect(found.items.map((row) => row.id)).toEqual([created.id]);
+    expect(found.total).toBe(1);
   });
 });

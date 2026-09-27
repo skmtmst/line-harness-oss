@@ -394,7 +394,8 @@
       "sections": [
         "TypeTabs",
         "CreateActions",
-        "Body"
+        "Body",
+        "MobileCards"
       ],
       "parts": [
         "メッセージ",
@@ -970,6 +971,7 @@
         "Bar",
         "KPIs",
         "Table",
+        "MobileCards",
         "tf"
       ],
       "parts": [
@@ -1745,7 +1747,7 @@
         "編集",
         "配信方式",
         "状態",
-        "配信可",
+        "稼働中",
         "対象の絞り込み",
         "最終ステップ後の処理",
         "次のシナリオへ",

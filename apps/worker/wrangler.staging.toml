@@ -47,6 +47,7 @@ max_retries = 5
 retry_delay = 60
 
 [vars]
+DEPLOY_ENV = "staging"
 RESTAURANT_TEST_ENABLED = "true"
 GOOGLE_BUSINESS_OAUTH_CLIENT_ID = "904803281314-ufqj5bmmhqnl9hv58uigo4ct6jvfmdkg.apps.googleusercontent.com"
 GOOGLE_BUSINESS_WRITE_ENABLED = "true"
