@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { api, type NenColumn } from '@/lib/api'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Notice from '@/components/shared/notice'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import CampaignEditor from './campaign-editor'
 import { useAccount } from '@/contexts/account-context'
@@ -117,9 +118,7 @@ function NenColumnEditInner() {
       </p>
 
       {error && (
-        <div className="bg-danger-bg border-danger-bg text-danger mb-4 rounded-lg border p-4 text-sm">
-          {error}
-        </div>
+        <Notice tone="danger" message={error} className="mb-4" />
       )}
 
       {loading ? (

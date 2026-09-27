@@ -12,11 +12,12 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import FilterChip from '@/components/shared/filter-chip'
 import IconButton from '@/components/shared/icon-button'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 import NoteBar from '@/components/shared/note-bar'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { useAccount } from '@/contexts/account-context'
 import {
@@ -542,10 +543,10 @@ function MileagePageInner() {
 
       {tab === 'balances' && !loading && !loadError && <>
       <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <SummaryCard variant="v6" title="マイルを持っている友だち" value={summary?.withBalanceCount ?? null} unit="人" detail={summary ? `選択中 ${summary.totalMembers.toLocaleString('ja-JP')}人のうち` : '選択中のLINEアカウント'} />
-        <SummaryCard variant="v6" title="たまっているマイル" value={summary?.available ?? null} unit=" マイル" detail={`確定待ち ${summary?.pending.toLocaleString('ja-JP') ?? '—'} マイル`} />
-        <SummaryCard variant="v6" title="今月の増減" value={summary?.monthChange ?? null} unit=" マイル" detail="" help="選択中の友だち全体の増減です" />
-        <SummaryCard
+        <KpiCard variant="v6" title="マイルを持っている友だち" value={summary?.withBalanceCount ?? null} unit="人" detail={summary ? `選択中 ${summary.totalMembers.toLocaleString('ja-JP')}人のうち` : '選択中のLINEアカウント'} />
+        <KpiCard variant="v6" title="たまっているマイル" value={summary?.available ?? null} unit=" マイル" detail={`確定待ち ${summary?.pending.toLocaleString('ja-JP') ?? '—'} マイル`} />
+        <KpiCard variant="v6" title="今月の増減" value={summary?.monthChange ?? null} unit=" マイル" detail="" help="選択中の友だち全体の増減です" />
+        <KpiCard
           variant="v6"
           title="もうすぐ消えるマイル"
           value={summary?.expiringMiles30d ?? null}
@@ -604,11 +605,11 @@ function MileagePageInner() {
         {/* 設計 N46cQ に本文見出しは無い。画面名はタブが持っているので、
             ここで見出しをもう一度書かない。 */}
         {!loading && !loadError ? <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <SummaryCard variant="v6" title="動いている決めごと" value={activeRules.length} unit="つ" detail={`止めているもの ${rules.length - activeRules.length}つ`} />
-          <SummaryCard variant="v6" title="この30日で付いたマイル" value={ruleSummary?.grantedMiles ?? null} unit="マイル" detail={`のべ ${formatMileageNumber(ruleSummary?.grantedCount ?? 0)}回`} />
-          <SummaryCard variant="v6" title="いちばん付いている" value={topRule ? grantedMiles30d(topRule) : null} unit="マイル" detail={topRule ? `${topRule.draft.name}・${formatMileageNumber(topRule.metrics30d.granted)}回` : 'まだ付与記録はありません'} />
+          <KpiCard variant="v6" title="動いている決めごと" value={activeRules.length} unit="つ" detail={`止めているもの ${rules.length - activeRules.length}つ`} />
+          <KpiCard variant="v6" title="この30日で付いたマイル" value={ruleSummary?.grantedMiles ?? null} unit="マイル" detail={`のべ ${formatMileageNumber(ruleSummary?.grantedCount ?? 0)}回`} />
+          <KpiCard variant="v6" title="いちばん付いている" value={topRule ? grantedMiles30d(topRule) : null} unit="マイル" detail={topRule ? `${topRule.draft.name}・${formatMileageNumber(topRule.metrics30d.granted)}回` : 'まだ付与記録はありません'} />
           {/* MILEAGE-05: 分母の人数は計算と同じ口の値を見せる。数字そのものなので「？」へ移さない。 */}
-          <SummaryCard variant="v6" title="1人あたりの平均" value={ruleSummary?.averageBalance ?? null} unit="マイル" detail={ruleSummary?.averageDenominator ? `残高0の人は除き、持っている人 ${formatMileageNumber(ruleSummary.averageDenominator)}人で割った数` : '残高がある人がいないため計算していません'} />
+          <KpiCard variant="v6" title="1人あたりの平均" value={ruleSummary?.averageBalance ?? null} unit="マイル" detail={ruleSummary?.averageDenominator ? `残高0の人は除き、持っている人 ${formatMileageNumber(ruleSummary.averageDenominator)}人で割った数` : '残高がある人がいないため計算していません'} />
         </div> : null}
         <NoteBar>
           どんなことをしたら何マイル付けるかを決めます。付与数を変えると、変更後に起きた行動から新しい値を使います。
@@ -632,7 +633,7 @@ function MileagePageInner() {
             kind="empty"
             title="まだ決めごとがありません"
             description="どんなことをしたら何マイル付けるかを決めます。"
-            action={<Button href="/mileage/earning-rules/new" variant="primary">決めごとを作る</Button>}
+            action={<Button href="/mileage/earning-rules/new" variant="primary">＋ 決めごとを作る</Button>}
           />
         ) : (
         <>
@@ -662,9 +663,7 @@ function MileagePageInner() {
         </div>
 
         {ruleActionError ? (
-          <p role="alert" className="border-status-danger bg-status-danger-soft text-danger mb-3 rounded-control border px-3 py-2 text-sm">
-            {ruleActionError}
-          </p>
+          <Notice tone="danger" message={ruleActionError} className="mb-3" />
         ) : null}
 
         <div className="mb-3 flex flex-wrap items-center gap-2">

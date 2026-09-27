@@ -29,6 +29,9 @@ const dbMocks = {
   getStaffAccountScopeIds: vi.fn(),
   CredentialEncryptionKeyError: class CredentialEncryptionKeyError extends Error {},
   LineAccountRevisionConflictError: class LineAccountRevisionConflictError extends Error {},
+  // V: 接続・鍵・停止の直前再確認。ここでは本体の検証を見たいので確認済みとして通す。
+  consumeStepUpGrant: vi.fn(async () => true),
+  getAdminSessionByTokenHash: vi.fn(async () => null),
   jstNow: vi.fn(() => '2026-08-10T12:00:00.000+09:00'),
 };
 vi.mock('@line-crm/db', () => dbMocks);
@@ -71,6 +74,8 @@ function setupApp(
   app.use('*', async (c, next) => {
     c.set('staff', { id: 'test-staff', name: 'Test', role, readOnly: false, ...staffOverride });
     c.env = { DB: dbStub };
+    // V: 大事な操作の直前再確認。ここでは本体の検証を見たいので確認済みとして通す。
+    c.req.raw.headers.set('x-step-up-token', 'test-step-up');
     await next();
   });
   app.route('/', lineAccounts);

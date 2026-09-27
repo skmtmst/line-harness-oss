@@ -429,7 +429,7 @@ export function HoursEditor({ accountId, mode, initialDate, go }: { accountId: s
     if (mode === 'text') proposal = { source: 'text', text: text.trim() }
     else if (mode === 'calendar') {
       const list = Object.values(days)
-      const bad = list.map((d) => (d.closed ? null : d.periods.length === 0 ? '営業する日は枠を1つ以上入れてください' : periodsProblem(d.periods))).find(Boolean)
+      const bad = list.map((d) => (d.remove || d.closed ? null : d.periods.length === 0 ? '営業する日は枠を1つ以上入れてください' : periodsProblem(d.periods))).find(Boolean)
       if (bad) { setActionError(bad); return }
       proposal = { source: 'calendar', days: list }
     } else {
@@ -526,7 +526,8 @@ export function HoursEditor({ accountId, mode, initialDate, go }: { accountId: s
     const maxDate = addDays(today.date, 366)
     const shiftMonth = (delta: number) => { const d = new Date(Date.UTC(y, m - 1 + delta, 1)); setMonth(`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`) }
     const special = (date: string) => profile.specialHours.find((s) => s.date === date) ?? null
-    const originalFor = (date: string): GoogleDayHours => { const s = special(date); return s ? { date, closed: s.closed, periods: s.periods } : { date, closed: false, periods: profile.regularHours[weekdayOf(date)] ?? [] } }
+    const regularFor = (date: string): GoogleDayHours => ({ date, closed: (profile.regularHours[weekdayOf(date)] ?? []).length === 0, periods: profile.regularHours[weekdayOf(date)] ?? [] })
+    const originalFor = (date: string): GoogleDayHours => { const s = special(date); return s ? { date, closed: s.closed, periods: s.periods, special: true } : { ...regularFor(date), special: false } }
     const currentFor = (date: string): GoogleDayHours => days[date] ?? originalFor(date)
     const edited = selectedDate ? currentFor(selectedDate) : null
     const original = selectedDate ? originalFor(selectedDate) : null
@@ -558,7 +559,7 @@ export function HoursEditor({ accountId, mode, initialDate, go }: { accountId: s
                   const changed = Boolean(days[date])
                   const selected = date === selectedDate
                   const isToday = date === today.date
-                  const mark = changed ? (days[date].closed ? '休業（変更）' : '変更') : s ? (s.closed ? '休業' : formatPeriods(s.periods).replace(/:00/g, '')) : ''
+                  const mark = changed ? (days[date].remove ? '外す' : days[date].closed ? '休業（変更）' : '変更') : s ? (s.closed ? '休業' : formatPeriods(s.periods).replace(/:00/g, '')) : ''
                   return (
                     <button
                       key={date}
@@ -577,13 +578,20 @@ export function HoursEditor({ accountId, mode, initialDate, go }: { accountId: s
                 })}
               </div>
             ))}
-            <p className="text-caption flex flex-wrap gap-4"><span className="text-status-warn-deep">■ 特別営業時間あり</span><span className="text-ink-faint">枠線＝今日</span><span className="text-ink-faint">過去の日付は選べません</span></p>
+            <p className="text-caption flex flex-wrap gap-4"><span className="text-status-warn-deep">■ 特別営業時間あり</span><span className="text-status-warn-deep">■ 外す予定</span><span className="text-ink-faint">枠線＝今日</span><span className="text-ink-faint">過去の日付は選べません</span></p>
           </div>
 
           {edited && original ? (
             <section className="border-hairline bg-canvas flex min-w-0 flex-col gap-3 rounded-card border p-5" aria-label={`${formatYmdJa(edited.date)}の営業時間`}>
               <h4 className="text-base font-bold">{formatYmdJa(edited.date)}の営業時間</h4>
-              <p className="text-sm"><span className="text-ink-faint mr-2 text-caption">現在</span><span className="font-semibold">{describe(original, original.closed && special(edited.date) ? '休業（特別営業時間）' : '定休日')}</span></p>
+              <p className="text-sm"><span className="text-ink-faint mr-2 text-caption">現在</span><span className="font-semibold">{describe(original, original.special ? '休業（特別営業時間）' : '定休日')}</span>{original.special ? <span className="text-status-warn-deep ml-2 text-caption">（特別営業時間として登録済み）</span> : null}</p>
+              {edited.remove ? (
+                <>
+                  <NoteBar tone="warn">この日の特別営業時間を外し、通常の営業時間（{describe(regularFor(edited.date), '定休日')}）に戻します。</NoteBar>
+                  <div><Button onClick={() => setDays((prev) => { const next = { ...prev }; delete next[edited.date]; return next })}>外すのをやめる</Button></div>
+                </>
+              ) : (
+                <>
               <div className="flex items-center gap-3">
                 <span className="shrink-0"><Toggle checked={edited.closed} label="この日は休業にする" onChange={(next) => setDay({ ...edited, closed: next, periods: next ? [] : (profile.regularHours[weekdayOf(edited.date)] ?? []) })} /></span>
                 <span className="text-sm">この日は休業にする（時間の枠をすべて外します）</span>
@@ -605,6 +613,14 @@ export function HoursEditor({ accountId, mode, initialDate, go }: { accountId: s
                 </>
               ) : null}
               <p className="text-ink-faint text-caption">15分刻みで選べます。翌日にまたぐ時間（例：18:00–02:00）はそのまま入力できます。</p>
+              {original.special ? (
+                <div data-design-node="Q9GwD2" className="border-hairline flex flex-wrap items-center gap-3 border-t pt-3">
+                  <Button onClick={() => setDay({ ...regularFor(edited.date), remove: true })}>特別営業時間を外す（通常の営業時間に戻す）</Button>
+                  <span className="text-ink-faint text-caption">通常の営業時間：{describe(regularFor(edited.date), '定休日')}</span>
+                </div>
+              ) : null}
+                </>
+              )}
             </section>
           ) : null}
         </div>
@@ -615,9 +631,19 @@ export function HoursEditor({ accountId, mode, initialDate, go }: { accountId: s
             {editedDates.map((date) => (
               <div key={date} className="flex flex-wrap items-center gap-3 text-sm">
                 <button type="button" className="font-semibold underline-offset-2 hover:underline" onClick={() => { setSelectedDate(date); setMonth(date.slice(0, 7)) }}>{formatYmdShort(date)}</button>
-                <span className="text-ink-faint">{describe(originalFor(date), '定休日')}</span>
-                <span className="text-ink-faint">→</span>
-                <span className="text-accent-deep font-bold">{describe(days[date], '休業')}</span>
+                {days[date].remove ? (
+                  <>
+                    <span className="text-status-warn-deep font-bold">特別営業時間を外す</span>
+                    <span className="text-ink-faint">→</span>
+                    <span className="text-ink-faint">通常 {describe(regularFor(date), '定休日')}</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-ink-faint">{describe(originalFor(date), '定休日')}</span>
+                    <span className="text-ink-faint">→</span>
+                    <span className="text-accent-deep font-bold">{describe(days[date], '休業')}</span>
+                  </>
+                )}
                 <span className="grow" />
                 <Button size="field" onClick={() => setDays((prev) => { const next = { ...prev }; delete next[date]; return next })}>この日の変更を取り消す</Button>
               </div>
@@ -698,7 +724,8 @@ function describeHours(value: unknown, kind: GoogleChange['kind']): ReactNode {
     return days.map((d) => (
       <div key={d.date}>
         {days.length > 1 ? <p className="text-label font-normal">{formatYmdShort(d.date)}</p> : null}
-        {d.closed ? <p>休業</p> : d.periods.map((p, i) => <p key={i}>{p.open}–{p.close === '00:00' ? '24:00' : p.close}</p>)}
+        {d.remove ? <p className="text-status-warn-deep font-bold">特別営業時間を外す</p> : null}
+        {d.remove ? <p><span className="text-label mr-2 font-normal">通常</span>{d.closed ? '定休日' : d.periods.map((p) => `${p.open}–${p.close === '00:00' ? '24:00' : p.close}`).join(' ／ ')}</p> : d.closed ? <p>休業</p> : d.periods.map((p, i) => <p key={i}>{p.open}–{p.close === '00:00' ? '24:00' : p.close}</p>)}
       </div>
     ))
   }
@@ -811,7 +838,7 @@ export function ChangeConfirmScreen({ accountId, ids, go }: { accountId: string;
       ? '変えていない曜日・特別営業時間は変更しません。特別営業時間が設定されている日は、そちらが優先されます。'
       : `${['店舗名', '住所', '電話', '営業時間', '写真'].filter((x) => x !== FIELD_LABEL[field ?? '']).join('・')}は変更しません。${field === 'address' ? '住所を変えた場合は、Googleが本人確認（はがきの郵送など）を求めることがあります。' : ''}`
   const afterNote = change.kind === 'special_hours'
-    ? (() => { const days = change.after as GoogleDayHours[]; const before = (change.before as GoogleDayHours[] | null) ?? []; return days.length === 1 && before[0] ? (days[0].closed ? `この日の${before[0].periods.length}枠をすべて外し、休業にします。` : `この日の${before[0].closed ? '休業' : `${before[0].periods.length}枠`}を、上記の${days[0].periods.length}枠に置き換えます。`) : `${days.length}日分の特別営業時間を置き換えます。` })()
+    ? (() => { const days = change.after as GoogleDayHours[]; const before = (change.before as GoogleDayHours[] | null) ?? []; return days.every((d) => d.remove) ? `${days.length === 1 ? 'この日' : `${days.length}日分`}の特別営業時間をGoogleから外します。以後はその曜日の通常の営業時間になります。` : days.length === 1 && before[0] ? (days[0].closed ? `この日の${before[0].periods.length}枠をすべて外し、休業にします。` : `この日の${before[0].closed ? '休業' : `${before[0].periods.length}枠`}を、上記の${days[0].periods.length}枠に置き換えます。`) : `${days.length}日分の特別営業時間を置き換えます。` })()
     : change.kind === 'regular_hours'
       ? '対象の曜日だけを置き換え、毎週この時間になります。'
       : field === 'description'

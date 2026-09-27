@@ -8,11 +8,12 @@ import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import ListToolbar from '@/components/shared/list-toolbar'
-import Notice, { type NoticeTone } from '@/components/shared/notice'
+import Notice from '@/components/shared/notice'
+import { notifyToast } from '@/components/shared/toast'
 import Pagination from '@/components/shared/pagination'
 import SelectField from '@/components/shared/select-field'
 import StatusBadge from '@/components/shared/status-badge'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
 import { ActionCell, DataTable, NameCell, Td, Th, TableHeadRow, Tr } from '@/components/shared/table'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
@@ -112,7 +113,7 @@ export function OutgoingKpis({
 
   return (
     <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4" data-design="KPIs">
-      <SummaryCard
+      <KpiCard
         title="こちらから送る"
         value={status === 'ready' ? items.length : null}
         unit="本"
@@ -120,7 +121,7 @@ export function OutgoingKpis({
         loading={listLoading}
         variant="v6"
       />
-      <SummaryCard
+      <KpiCard
         title="この30日に送った"
         value={summaryMissing ? null : summary?.outgoing ?? null}
         unit="回"
@@ -128,7 +129,7 @@ export function OutgoingKpis({
         loading={summaryLoading}
         variant="v6"
       />
-      <SummaryCard
+      <KpiCard
         title="返事がなかった"
         value={summaryMissing ? null : summary?.failed ?? null}
         unit="回"
@@ -138,7 +139,7 @@ export function OutgoingKpis({
         loading={summaryLoading}
         variant="v6"
       />
-      <SummaryCard
+      <KpiCard
         title="受け取った"
         value={summaryMissing ? null : summary?.incoming ?? null}
         unit="回"
@@ -207,7 +208,7 @@ export function OutgoingOverview({
    * 以前は口の戻り値を読まず、成功も失敗も画面に何も出なかった。
    * 成功は届いた旨、失敗は「やり取りの記録」タブへの案内を出す。
    */
-  const [testNotice, setTestNotice] = useState<{ tone: NoticeTone; message: string } | null>(null)
+  const [testNotice, setTestNotice] = useState<{ tone: 'danger'; message: string } | null>(null)
 
   const runTest = async (item: OutgoingWebhookOverview) => {
     if (!lineAccountId || testingId !== null) return
@@ -218,20 +219,17 @@ export function OutgoingOverview({
       const response = await api.webhooks.outgoing.test(item.id, lineAccountId)
       if (response.success && response.data.delivered) {
         const status = response.data.responseStatus
-        setTestNotice({
-          tone: 'success',
-          message: `「${item.name}」への試し送信が届きました${status === null ? '' : `(相手の応答 ${status})`}。`,
-        })
+        notifyToast(`「${item.name}」への試し送信が届きました${status === null ? '' : `(相手の応答 ${status})`}。`)
       } else {
         const status = response.success ? response.data.responseStatus : null
         setTestNotice({
-          tone: 'error',
+          tone: 'danger',
           message: `「${item.name}」への試し送信は届きませんでした${status === null ? '' : `(相手の応答 ${status})`}。「やり取りの記録」タブで詳しく確認できます。`,
         })
       }
     } catch {
       setTestNotice({
-        tone: 'error',
+        tone: 'danger',
         message: `「${item.name}」への試し送信に失敗しました。「やり取りの記録」タブで詳しく確認できます。`,
       })
     } finally {
@@ -326,13 +324,13 @@ export function OutgoingOverview({
 
   return (
     <section aria-label="こちらから送る一覧">
-      <p className="bg-info-bg text-ink-secondary rounded-card mb-3 px-4 py-3 text-xs leading-6">
+      <Notice tone="info" className="mb-3">
         「こちらから送る」は、うちで起きたことを相手に知らせます。「こちらで受け取る」は、相手で起きたことをうちに取り込みます。受け取る側のURLは、相手のサービスに貼ってください。
-      </p>
+      </Notice>
 
       {testNotice ? (
         <div className="mb-3">
-          <Notice tone={testNotice.tone} message={testNotice.message} onClose={() => setTestNotice(null)} />
+          <Notice tone="danger" message={testNotice.message} onClose={() => setTestNotice(null)} />
         </div>
       ) : null}
 

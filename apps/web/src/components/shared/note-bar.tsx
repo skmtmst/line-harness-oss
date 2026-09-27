@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react'
-import HelpTip from './help-tip'
-import styles from './note-bar.module.css'
+import Notice, { type NoticeTone } from './notice'
 
 export type NoteTone = 'info' | 'success' | 'warn' | 'danger'
 
@@ -12,6 +11,10 @@ export type NoteTone = 'info' | 'success' | 'warn' | 'danger'
  *
  * 一覧型・ボード型には必ず1本置く。作成型・詳細型には置かない
  * （右カラムの「つながる先」「気をつけること」が説明を担うため）。
+ *
+ * @deprecated 新しく書くときは `Notice`（`./notice`）を使う。
+ * 4つの種類・左のアイコン・右の操作1つ・「？」の入れ口は同じ。
+ * ここは互換のためだけに残し、中身は `Notice` が持つ。
  */
 export default function NoteBar({
   tone = 'info',
@@ -37,38 +40,16 @@ export default function NoteBar({
   helpHref?: string
   children: ReactNode
 }) {
-  const hasHelp = help !== undefined && help !== null
   return (
-    <div className={[styles.note, styles[tone], className].filter(Boolean).join(' ')} role="note">
-      {tone === 'info' || tone === 'success' ? <InfoIcon /> : <AlertIcon />}
-      <span>
-        {children}
-        {hasHelp ? (
-          <HelpTip label={`${helpLabel ?? 'この案内'}の説明`}>
-            {help}
-            {helpHref ? <a href={helpHref}>くわしく</a> : null}
-          </HelpTip>
-        ) : null}
-      </span>
-      {action ? <span className={styles.action}>{action}</span> : null}
-    </div>
-  )
-}
-
-function InfoIcon() {
-  return (
-    <svg className={styles.icon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
-      <circle cx="12" cy="12" r="9" />
-      <path d="M12 11v5M12 8h.01" strokeLinecap="round" />
-    </svg>
-  )
-}
-
-function AlertIcon() {
-  return (
-    <svg className={styles.icon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
-      <path d="M12 4l9 16H3l9-16z" strokeLinejoin="round" />
-      <path d="M12 10v4M12 17h.01" strokeLinecap="round" />
-    </svg>
+    <Notice
+      tone={tone as NoticeTone}
+      action={action}
+      className={className}
+      help={help}
+      helpLabel={helpLabel}
+      helpHref={helpHref}
+    >
+      {children}
+    </Notice>
   )
 }

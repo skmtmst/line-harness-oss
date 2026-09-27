@@ -9,9 +9,10 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import FileDropzone, { AttachmentRow } from '@/components/shared/file-drop'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 import SelectField from '@/components/shared/select-field'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { TextField } from '@/components/shared/text-field'
 import MergedTabs from '@/components/layout/merged-tabs'
@@ -502,7 +503,7 @@ export default function AccountMigration() {
         実行前後の判断を誤らせる。
       */}
       {(!active || ['dry_run', 'review', 'ready'].includes(active.status)) && (
-        <div className="bg-info-bg text-ink-secondary mb-4 rounded-control px-4 py-3 text-xs">本移行まで、既存ユーザー・配信・シナリオには影響しません。</div>
+        <Notice tone="info" message="本移行まで、既存ユーザー・配信・シナリオには影響しません。" className="mb-4" />
       )}
       {/*
         #984 LAY-13: 段組みと寸法をそろえる。
@@ -759,10 +760,10 @@ function ActiveMigration({
   const statusView = runStatusView(active, unresolved)
   return (<>
     <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
-      <SummaryCard variant="v6" title="読み込み" value={active.counts.total} unit="件" detail="" help="対応表の全件です" />
-      <SummaryCard variant="v6" title="自動一致" value={active.counts.auto} unit="件" detail={active.counts.total ? `${Math.round(active.counts.auto / active.counts.total * 1000) / 10}%` : '0%'} />
-      <SummaryCard variant="v6" title="要確認・競合" value={active.counts.review + active.counts.conflict} unit="件" detail="すべて判断が必要" />
-      <SummaryCard variant="v6" title="未一致" value={active.counts.unmatched} unit="件" detail="除外（新規作成は取り込みで）" />
+      <KpiCard variant="v6" title="読み込み" value={active.counts.total} unit="件" detail="" help="対応表の全件です" />
+      <KpiCard variant="v6" title="自動一致" value={active.counts.auto} unit="件" detail={active.counts.total ? `${Math.round(active.counts.auto / active.counts.total * 1000) / 10}%` : '0%'} />
+      <KpiCard variant="v6" title="要確認・競合" value={active.counts.review + active.counts.conflict} unit="件" detail="すべて判断が必要" />
+      <KpiCard variant="v6" title="未一致" value={active.counts.unmatched} unit="件" detail="除外（新規作成は取り込みで）" />
     </div>
     <div className="bg-canvas rounded-card border-hairline mb-4 overflow-hidden border">
       {/*

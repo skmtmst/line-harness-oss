@@ -53,6 +53,10 @@ vi.mock('@line-crm/db', async (importOriginal) => {
     return (row?.secret as string | null) ?? null;
   }),
   WEBHOOK_SECRET_MIN_LENGTH: 32,
+  // V: 秘密の値の登録・APIトークン操作は直前の再確認が必要。ここでは
+  // 入力検証を見たいので、再確認済みとして通す。
+  consumeStepUpGrant: vi.fn(async () => true),
+  getAdminSessionByTokenHash: vi.fn(async () => null),
   };
 });
 
@@ -161,6 +165,8 @@ function setupApp(
     c.set('staff', {
       id: 'staff-1', name: 'Staff', role, readOnly: false, tenantId, permissionKeys,
     });
+    // V: 大事な操作の直前再確認。ここでは入力検証を見たいので確認済みとして通す。
+    c.req.raw.headers.set('x-step-up-token', 'test-step-up');
     return next();
   });
   app.route('/', webhooks);

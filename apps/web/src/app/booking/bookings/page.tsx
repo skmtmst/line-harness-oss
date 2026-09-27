@@ -9,6 +9,7 @@ import { useAccount } from '@/contexts/account-context'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import FolderPanel, { FOLDER_RAIL_WIDTH } from '@/components/shared/folder-panel'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -949,16 +950,10 @@ export default function BookingsPage() {
                           {formatShort(b.starts_at)}
                         </td>
                         <td className="px-4 py-3 text-sm">
-                          {b.friend_id ? (
-                            <Link
-                              href={`/chats?friend=${b.friend_id}`}
-                              className="text-blue-600 hover:underline"
-                            >
-                              {b.friend_name ?? '-'}
-                            </Link>
-                          ) : (
-                            <span>{b.friend_name ?? 'LINE未連携のお客さま'}</span>
-                          )}
+                          {/* R11: 行の物は予約のため、お客さま名から別画面へ飛ばさない。名前は黒文字。 */}
+                          <span className="text-ink" title={b.friend_name ?? undefined}>
+                            {b.friend_name ?? (b.friend_id ? '-' : 'LINE未連携のお客さま')}
+                          </span>
                         </td>
                         <td className="px-4 py-3 text-sm">{b.menu_name}</td>
                         <td className="cq-hide-below-830 px-4 py-3 text-sm">{b.staff_name}</td>
@@ -987,6 +982,16 @@ export default function BookingsPage() {
                             >
                               詳細
                             </button>
+                            {/* R11: 受信箱への行き先は名前ではなく操作列の明示のボタンから。 */}
+                            {b.friend_id ? (
+                              <Link
+                                href={`/chats?friend=${b.friend_id}`}
+                                aria-label={`${b.friend_name ?? 'お客さま'}さんとの会話を受信箱で開く`}
+                                className="text-ink-secondary bg-canvas-sunken rounded-md px-3 py-1 text-xs font-medium hover:bg-hairline"
+                              >
+                                会話
+                              </Link>
+                            ) : null}
                             {/* N-401: 閲覧のみの人には状態を変えるボタンを出さない */}
                             {canOperate ? (
                               <ActionButtons
@@ -1210,7 +1215,7 @@ function BookingDetailPanel({
 
         <div data-design="Body" className="grid gap-4 px-6 py-4 xl:grid-cols-4">
           <div className="min-w-0 xl:col-span-3">
-          {detailError ? <p className="border-danger bg-danger-bg text-danger mb-4 rounded-card border px-4 py-3 text-sm">{detailError}</p> : null}
+          {detailError ? <Notice tone="danger" message={detailError} onClose={() => setDetailError('')} className="mb-4" /> : null}
           <section className="mb-6">
             <div className="bg-success-bg text-success mb-3 w-fit rounded-pill px-3 py-1 text-xs font-semibold">予約が入っています</div>
             <p className="text-ink-secondary mb-3 text-sm">{formatJpDateTime(b.starts_at)}〜{formatJpTime(b.ends_at)} ／ 担当 {b.staff_name} ／ {isLinked ? 'LINEから入りました。' : '電話・店頭で受け付けました。'}</p>

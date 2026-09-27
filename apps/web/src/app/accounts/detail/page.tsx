@@ -6,11 +6,13 @@ import { Suspense, useCallback, useEffect, useState } from 'react'
 import type { LineAccount } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import Button from '@/components/shared/button'
+import Card from '@/components/shared/card'
 import ListState from '@/components/shared/list-state'
 import TargetMissing from '@/components/shared/target-missing'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import StatusBadge from '@/components/shared/status-badge'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
 import TestRecipientsSetting from '@/components/accounts/test-recipients-setting'
 import { Tabs } from '@/components/shared/tabs'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -46,6 +48,7 @@ function AccountDetail() {
   /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
   const [missing, setMissing] = useState(false)
   const [stopTarget, setStopTarget] = useState<LineAccount | null>(null)
+  const [stepUp, setStepUp] = useState<StepUpRequest | null>(null)
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState('')
 
@@ -73,16 +76,25 @@ function AccountDetail() {
   usePageTitle(account?.name)
 
   /** 送受信の停止・再開。**何が止まって何が残るかを、押す前に読ませる。** */
-  const toggleActive = async () => {
+  const toggleActive = async (stepUpToken?: string) => {
     if (!stopTarget) return
     setBusy(true)
     setActionError('')
     try {
-      const res = await api.lineAccounts.update(stopTarget.id, { isActive: !stopTarget.isActive })
+      const res = await api.lineAccounts.update(stopTarget.id, { isActive: !stopTarget.isActive }, stepUpToken)
       if (!res.success) throw new Error(res.error)
       setStopTarget(null)
       await load()
-    } catch {
+    } catch (caught) {
+      // 送受信の停止は大事な操作。本人確認を求められたら窓を立ててやり直す（V-1）。
+      if (!stepUpToken && isStepUpRequired(caught)) {
+        setStepUp({
+          purpose: 'line_account.credentials',
+          action: stopTarget.isActive ? 'アカウントの送受信を止める' : 'アカウントの送受信を再開する',
+          retry: toggleActive,
+        })
+        return
+      }
       setActionError('変えられませんでした。しばらくおいてから、もう一度お試しください。')
     } finally {
       setBusy(false)
@@ -148,7 +160,7 @@ function AccountDetail() {
       {tab === 'overview' && (
         <div className="mt-4 grid gap-4 xl:grid-cols-4">
           <div className="space-y-4 xl:col-span-3">
-            <section className="bg-canvas rounded-card border-hairline border p-5">
+            <Card padding="roomy">
               <div className="flex items-start justify-between gap-3">
                 <p className="text-ink text-base font-bold">登録の内容</p>
                 <Button href={`/accounts/detail?id=${account.id}&tab=credentials`}>編集する</Button>
@@ -168,9 +180,9 @@ function AccountDetail() {
                 />
                 <InlineRow label="状態" value={connection.label} tone={account.isActive ? 'success' : 'muted'} />
               </dl>
-            </section>
+            </Card>
 
-            <section className="bg-canvas rounded-card border-hairline border p-5">
+            <Card padding="roomy">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-ink text-sm font-bold">資格情報</p>
@@ -209,9 +221,9 @@ function AccountDetail() {
                 <p className="text-ink text-xs font-bold">値そのものは、ここにも出しません</p>
                 <p className="text-ink-secondary mt-1 text-xs">差し替えるときは、新しい値を入れて保存し直します。今の値を見たり直したりはできません。</p>
               </div>
-            </section>
+            </Card>
 
-            <section className="bg-canvas rounded-card border-hairline border p-5">
+            <Card padding="roomy">
               <p className="text-ink text-sm font-bold">このアカウントでできること</p>
               <div className="mt-3 space-y-2">
                 {accountActions(account).map((action) => (
@@ -229,19 +241,19 @@ function AccountDetail() {
                 ))}
               </div>
               {actionError && <p role="alert" className="text-danger mt-3 text-xs">{actionError}</p>}
-            </section>
+            </Card>
 
-            <section className="bg-canvas rounded-card border-hairline border p-5">
+            <Card padding="roomy">
               <p className="text-ink text-sm font-bold">テスト送信先</p>
               <p className="text-ink-secondary mt-1 text-xs">
                 リマインダや配信のテスト送信が届く先です。変更はこのアカウントだけに効きます。
               </p>
               <TestRecipientsSetting accountId={account.id} />
-            </section>
+            </Card>
           </div>
 
           <aside className="space-y-4">
-            <section className="bg-canvas rounded-card border-hairline border p-5">
+            <Card padding="roomy">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-ink text-sm font-bold">Webhookの突合</p>
                 <StatusBadge tone={webhook.tone}>{webhook.label}</StatusBadge>
@@ -256,9 +268,9 @@ function AccountDetail() {
               <Button href={`/accounts/detail?id=${account.id}&tab=connection`} className="mt-4">
                 いまの状態をもう一度確かめる
               </Button>
-            </section>
+            </Card>
 
-            <section className="bg-canvas rounded-card border-hairline border p-5">
+            <Card padding="roomy">
               <p className="text-ink text-sm font-bold">つながる先</p>
               <ul className="text-ink-secondary mt-3 space-y-3 text-xs">
                 <li><Link className="text-action hover:underline" href="/">ダッシュボード</Link><p className="mt-1">友だち追加URLとQRはここに出ます。</p></li>
@@ -266,22 +278,22 @@ function AccountDetail() {
                 <li><Link className="text-action hover:underline" href="/emergency">運用状態</Link><p className="mt-1">接続の異常や停止は、ここで見張ります。</p></li>
                 <li><Link className="text-action hover:underline" href="/friends">友だち</Link><p className="mt-1">このアカウントの友だち{account.stats ? `${account.stats.friendCount.toLocaleString('ja-JP')}人` : 'は未取得'}はここに並びます。</p></li>
               </ul>
-            </section>
+            </Card>
 
-            <section className="bg-canvas rounded-card border-hairline border p-5">
+            <Card padding="roomy">
               <p className="text-ink text-sm font-bold">気をつけること</p>
               <ul className="text-ink-secondary mt-2 space-y-2 text-xs leading-relaxed">
                 <li>・停止しても、友だちと履歴は消えません。</li>
                 <li>・資格情報を差し替える前に接続を確かめます。</li>
                 <li>・アーカイブした記録はあとから戻せます。</li>
               </ul>
-            </section>
+            </Card>
           </aside>
         </div>
       )}
 
       {tab === 'connection' && (
-        <section className="bg-canvas rounded-card border-hairline mt-4 border p-5">
+        <Card padding="roomy" className="mt-4">
           <p className="text-ink text-sm font-bold">Webhookの突合</p>
           <dl className="mt-3 grid gap-x-6 gap-y-3 sm:grid-cols-2">
             <Row label="LINE側に登録したURL" value={account.webhook?.actualUrl ?? '—'} />
@@ -304,11 +316,11 @@ function AccountDetail() {
           <p className="text-ink-faint mt-3 text-xs leading-relaxed">
             最後のテストと最後の受信の記録は、まだ繋がっていません。
           </p>
-        </section>
+        </Card>
       )}
 
       {tab === 'credentials' && (
-        <section className="bg-canvas rounded-card border-hairline mt-4 border p-5">
+        <Card padding="roomy" className="mt-4">
           <p className="text-ink text-sm font-bold">資格情報</p>
           <dl className="mt-3 space-y-3">
             <Row label="チャネルシークレット" value={credentialLabel(account.channelSecretConfigured)} />
@@ -319,11 +331,11 @@ function AccountDetail() {
             値そのものは、ここにも出しません。差し替えるときは、新しい値を入れて保存し直します。
             今の値を見たり直したりはできません。差し替える前に接続を確かめ、通らなければ保存しません。
           </p>
-        </section>
+        </Card>
       )}
 
       {tab === 'handover' && (
-        <section className="bg-canvas rounded-card border-hairline mt-4 border p-5">
+        <Card padding="roomy" className="mt-4">
           <p className="text-ink text-sm font-bold">乗り換え</p>
           <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
             別のLINEアカウントへ、友だちと設定を引き継ぎます。事前確認をしてから本実行します。
@@ -331,7 +343,7 @@ function AccountDetail() {
           <Button href={`/accounts/handover?id=${account.id}`} variant="primary" className="mt-3">
             乗り換えを始める
           </Button>
-        </section>
+        </Card>
       )}
 
       <ConfirmDialog
@@ -348,6 +360,7 @@ function AccountDetail() {
         onCancel={() => { if (!busy) setStopTarget(null) }}
         onConfirm={() => void toggleActive()}
       />
+      {stepUp && <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} />}
     </div>
   )
 }

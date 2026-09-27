@@ -16,6 +16,7 @@ import SearchField from '@/components/shared/search-field'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 import { canEditFeature } from '@/lib/staff-capability'
 import { bookingMenuError } from '../menu-validation'
 
@@ -398,18 +399,18 @@ export default function NewBookingMenuPage() {
       }
     >
       {createdMenuNeedingStaff && (
-        <div className="border-warning bg-warning-bg text-warning rounded-control border p-3 text-sm">
-          <p>
-            メニューは作成済みです。もう一度押しても新しいメニューは増えません。
-            担当にチェックを付けたまま「担当の設定をやり直す」を押すと、
-            残りの担当設定だけをやり直します。
-          </p>
-          <div className="mt-2">
+        <Notice
+          tone="warn"
+          action={
             <Button href={`/booking/menus?tab=staff&menu=${encodeURIComponent(createdMenuNeedingStaff.menuId)}`}>
               担当スタッフを一覧で設定する
             </Button>
-          </div>
-        </div>
+          }
+        >
+          メニューは作成済みです。もう一度押しても新しいメニューは増えません。
+          担当にチェックを付けたまま「担当の設定をやり直す」を押すと、
+          残りの担当設定だけをやり直します。
+        </Notice>
       )}
       <FormSection step={1} label="お客様に見える情報">
         <Field label="メニュー名" htmlFor="bm-name" required>

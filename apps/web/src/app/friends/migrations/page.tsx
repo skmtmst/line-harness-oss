@@ -7,6 +7,7 @@ import { api, type FriendMigrationJob } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import Disclosure from '@/components/shared/disclosure'
+import Notice from '@/components/shared/notice'
 import FileDropzone, { AttachmentRow } from '@/components/shared/file-drop'
 import HelpTip from '@/components/shared/help-tip'
 import ListState from '@/components/shared/list-state'
@@ -14,7 +15,7 @@ import PageHeader from '@/components/shared/page-header'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import SelectField from '@/components/shared/select-field'
 import StatusBadge from '@/components/shared/status-badge'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { parseFriendCsv, type FriendImportRow } from './friend-csv'
 
@@ -129,7 +130,7 @@ export default function FriendMigrationsPage() {
       <Link href="/accounts?tab=migration" className="text-ink-secondary pb-3">UIDの移行</Link>
       <span className="border-action text-action border-b-2 pb-3 font-semibold">CSVで書き出す・取り込む</span>
     </nav>
-    <div className="bg-info-bg text-ink-secondary mb-4 rounded-control px-4 py-3 text-xs">書き出しても友だちの情報は変わりません。取り込みは、まず確認だけを実行できます。</div>
+    <Notice tone="info" message="書き出しても友だちの情報は変わりません。取り込みは、まず確認だけを実行できます。" className="mb-4" />
     <Disclosure size="compact" title="取り込みの内訳の見方" hint="追加・更新など5区分" className="mb-4">
       <p className="text-sm">取り込みは「追加・更新・変更なし・競合・エラー」の内訳を先に見せます。反映後も、いつ誰が操作したかを履歴に残します。</p>
     </Disclosure>
@@ -170,7 +171,7 @@ export default function FriendMigrationsPage() {
           </div>
         ) : null}
         <div className="mt-4 flex items-center gap-3"><Button variant="primary" disabled={busy} onClick={() => void previewImport()}>まず確認だけする</Button><span className="text-ink-faint text-xs">確認の結果を見てから反映</span></div>
-        {summary && <><h3 className="text-ink mt-5 text-sm font-bold">確認の結果</h3><div className="mt-2 grid grid-cols-5 gap-2"><SummaryCard variant="v6" title="追加" value={summary.add} unit="件" detail="" help="新しく登録する件数です" /><SummaryCard variant="v6" title="更新" value={summary.update} unit="件" detail="" help="値を変更する件数です" /><SummaryCard variant="v6" title="変更なし" value={summary.unchanged} unit="件" detail="" help="同じ内容の件数です" /><SummaryCard variant="v6" title="競合" value={summary.conflict} unit="件" detail="判断が必要" /><SummaryCard variant="v6" title="エラー" value={summary.error} unit="件" detail="直して再確認" /></div>{importId && <div className="mt-4"><Button disabled={summary.conflict + summary.error > 0 || busy} onClick={async () => { setBusy(true); const response = await api.friendMigrations.executeImport(importId); setMessage(response.success ? `${response.data.applied ?? 0}件を反映しました。` : response.error); setBusy(false); await load() }}>確認した内容を反映</Button></div>}</>}
+        {summary && <><h3 className="text-ink mt-5 text-sm font-bold">確認の結果</h3><div className="mt-2 grid grid-cols-5 gap-2"><KpiCard variant="v6" title="追加" value={summary.add} unit="件" detail="" help="新しく登録する件数です" /><KpiCard variant="v6" title="更新" value={summary.update} unit="件" detail="" help="値を変更する件数です" /><KpiCard variant="v6" title="変更なし" value={summary.unchanged} unit="件" detail="" help="同じ内容の件数です" /><KpiCard variant="v6" title="競合" value={summary.conflict} unit="件" detail="判断が必要" /><KpiCard variant="v6" title="エラー" value={summary.error} unit="件" detail="直して再確認" /></div>{importId && <div className="mt-4"><Button disabled={summary.conflict + summary.error > 0 || busy} onClick={async () => { setBusy(true); const response = await api.friendMigrations.executeImport(importId); setMessage(response.success ? `${response.data.applied ?? 0}件を反映しました。` : response.error); setBusy(false); await load() }}>確認した内容を反映</Button></div>}</>}
         <p className="text-ink-faint mt-4 text-xs leading-relaxed">LINEのユーザーIDとLINEアカウントは、既存行の取り込みでは変わりません。同じファイルをもう一度入れても二重には反映しません。</p>
       </section>
     </div>

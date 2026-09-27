@@ -18,7 +18,7 @@ import TargetMissing from '@/components/shared/target-missing'
 import NoteBar from '@/components/shared/note-bar'
 import SelectField from '@/components/shared/select-field'
 import StatusBadge from '@/components/shared/status-badge'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
 import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import styles from './scenario-results.module.css'
 import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
@@ -434,8 +434,8 @@ function ResultsInner() {
           <div className={styles.main}>
             <Panel title="配信結果" lead="開始・完了・どの通まで届いたかを確認します。">
               <div className={styles.resultSummary}>
-                <SummaryCard variant="v6" title="開始" value={stats.enrolledTotal} unit="人" detail="" help="このシナリオに参加した人数です" />
-                <SummaryCard variant="v6" title="完了" value={stats.completed} unit="人" detail={percentLabel(stats.completed, stats.enrolledTotal)} />
+                <KpiCard variant="v6" title="開始" value={stats.enrolledTotal} unit="人" detail="" help="このシナリオに参加した人数です" />
+                <KpiCard variant="v6" title="完了" value={stats.completed} unit="人" detail={percentLabel(stats.completed, stats.enrolledTotal)} />
               </div>
             </Panel>
 

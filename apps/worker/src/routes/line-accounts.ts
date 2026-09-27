@@ -28,6 +28,7 @@ import type {
 } from '@line-crm/db';
 import { CredentialEncryptionKeyError } from '@line-crm/db';
 import { requireRole } from '../middleware/role-guard.js';
+import { sensitiveStepUpSatisfied, stepUpRequiredResponse } from '../lib/step-up.js';
 import { fetchBotProfile, type BotProfile } from '../lib/bot-profile.js';
 import {
   detectFollowerImportCapability,
@@ -623,6 +624,11 @@ async function archiveAccountResponse(
   if (!account) {
     return c.json({ success: false, error: 'LINE account not found' }, 404);
   }
+  // アカウントの停止・削除は大事な操作（V）。セッションの10分窓か、
+  // この操作専用の1回限り grant が必要。
+  if (!await sensitiveStepUpSatisfied(c, 'line_account.archive')) {
+    return stepUpRequiredResponse(c, 'アカウントの停止・削除には本人確認が必要です');
+  }
   if (account.archived_at) {
     return c.json({ success: false, error: 'ACCOUNT_ARCHIVED' }, 409);
   }
@@ -661,6 +667,10 @@ lineAccounts.post('/api/line-accounts/:id/archive', requireRole('owner'), async 
 
 lineAccounts.post('/api/line-accounts/:id/restore', requireRole('owner'), async (c) => {
   try {
+    // 止めたアカウントの再有効化は接続の変更（V）。停止・削除と同じ確認を求める。
+    if (!await sensitiveStepUpSatisfied(c, 'line_account.credentials')) {
+      return stepUpRequiredResponse(c, 'アカウントの再開には本人確認が必要です');
+    }
     const id = c.req.param('id')!;
     const account = await getAuthorizedLineAccount(c, id);
     if (!account) {
@@ -1034,6 +1044,10 @@ lineAccounts.post('/api/line-accounts/connect/check', requireRole('owner'), asyn
 
 // UI用の自動接続・保存。5段目が完了しなければ作成途中の行を必ず巻き戻す。
 lineAccounts.post('/api/line-accounts/connect', requireRole('owner'), async (c) => {
+  // LINE の接続（新しいアカウントの接続）は大事な操作（V）。
+  if (!await sensitiveStepUpSatisfied(c, 'line_account.connect')) {
+    return stepUpRequiredResponse(c, 'LINEの接続には本人確認が必要です');
+  }
   const parsed = await readConnectRequest(c);
   if (!parsed.ok) return c.json({ success: false, error: parsed.error }, 422);
   const baseUrl = (c.env.WORKER_PUBLIC_URL || c.env.WORKER_URL || new URL(c.req.url).origin).replace(/\/$/, '');
@@ -1139,6 +1153,10 @@ lineAccounts.post('/api/line-accounts/connect', requireRole('owner'), async (c) 
 
 // POST /api/line-accounts - create
 lineAccounts.post('/api/line-accounts', requireRole('owner'), async (c) => {
+  // LINE の接続の追加は大事な操作（V）。
+  if (!await sensitiveStepUpSatisfied(c, 'line_account.connect')) {
+    return stepUpRequiredResponse(c, 'LINEの接続には本人確認が必要です');
+  }
   try {
     let body: {
       channelId: string;
@@ -1540,6 +1558,16 @@ lineAccounts.patch(
       const touchesLogin =
         loginChannelId !== undefined || loginChannelSecret !== undefined;
       const touchesLoginOrLiff = touchesLogin || liffId !== undefined;
+      /*
+       * Login鍵の書き換え・送受信の有効/停止は大事な操作（V）。
+       * 名前やOG情報だけの更新は対象外なので、触った項目で分ける。
+       */
+      if (
+        (touchesLoginOrLiff || body.isActive !== undefined)
+        && !await sensitiveStepUpSatisfied(c, 'line_account.credentials')
+      ) {
+        return stepUpRequiredResponse(c, '接続情報・有効状態の変更には本人確認が必要です');
+      }
       if (touchesLoginOrLiff) {
         if (touchesLogin) {
           const pairError = validateLoginChannelPair(
@@ -1701,6 +1729,11 @@ lineAccounts.put('/api/line-accounts/:id', requireRole('owner'), async (c) => {
       liffId !== undefined ||
       body.isActive !== undefined;
     const officialProfileUrlTouched = officialProfileUrl.value !== undefined;
+
+    // 鍵・トークンの書き換え（接続情報・有効/無効の切替）は大事な操作（V）。
+    if (credentialsTouched && !await sensitiveStepUpSatisfied(c, 'line_account.credentials')) {
+      return stepUpRequiredResponse(c, '接続情報の変更には本人確認が必要です');
+    }
 
     let updated = credentialsTouched
       ? await updateLineAccount(c.env.DB, id, {

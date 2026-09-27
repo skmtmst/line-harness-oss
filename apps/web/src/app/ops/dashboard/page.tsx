@@ -11,7 +11,8 @@ import Chip from '@/components/shared/chip'
 import Dialog from '@/components/shared/dialog'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
+import Notice from '@/components/shared/notice'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { contractDetail, minutesLabel, revenueDetail, revenueSourceLabel } from './format'
 
@@ -32,6 +33,10 @@ export default function OpsDashboardPage() {
   const [period, setPeriod] = useState<OpsDashboardPeriod>('month')
   const [data, setData] = useState<OpsDashboard | null>(null)
   const [error, setError] = useState('')
+  const [canSyncBilling, setCanSyncBilling] = useState(false)
+  const [syncingBilling, setSyncingBilling] = useState(false)
+  const [billingSyncNotice, setBillingSyncNotice] = useState('')
+  const [billingSyncError, setBillingSyncError] = useState('')
   const [unregistered, setUnregistered] = useState<OpsLineUnregistered | null>(null)
   const [unregisteredError, setUnregisteredError] = useState('')
   const [showUnregistered, setShowUnregistered] = useState(false)
@@ -44,6 +49,30 @@ export default function OpsDashboardPage() {
   }, [period])
 
   useEffect(() => { void load() }, [load])
+
+  useEffect(() => {
+    let active = true
+    void (async () => {
+      const res = await opsCall(api.ops.me())
+      if (active) setCanSyncBilling(Boolean(res.success && !res.data.readOnly))
+    })()
+    return () => { active = false }
+  }, [])
+
+  const syncBilling = async () => {
+    setSyncingBilling(true)
+    setBillingSyncNotice('')
+    setBillingSyncError('')
+    const res = await opsCall(api.ops.billingSync())
+    if (!res.success) {
+      setBillingSyncError(res.error || 'Stripe と同期できませんでした')
+      setSyncingBilling(false)
+      return
+    }
+    setBillingSyncNotice(`Stripe から ${res.data.imported} 件取り込みました（失敗 ${res.data.failed} 件）`)
+    await load()
+    setSyncingBilling(false)
+  }
 
   const openUnregistered = async () => {
     setShowUnregistered(true)
@@ -83,11 +112,11 @@ export default function OpsDashboardPage() {
       ) : (
       <>
       <div data-design-node="s7wSj" className="mb-4 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-        <div data-design-node="nPbgn"><SummaryCard variant="v6" title="今月の売上（入金済み）" value={null} unit="" valueText={k ? formatYen(k.revenueThisMonth) : undefined} detail={k ? revenueDetail(k.revenueDelta, k.refundsThisMonth) : '—'} loading={loading} /></div>
-        <div data-design-node="BaoAQ"><SummaryCard variant="v6" title="契約中の月額合計" value={null} unit="" valueText={k ? formatYen(k.contractMonthlyTotal) : undefined} detail={k ? contractDetail(k.active, k.byPlan, k.filledByListPriceCount) : '—'} loading={loading} /></div>
-        <SummaryCard variant="v6" title="トライアル中" value={k ? k.trialing : null} unit="" detail={k ? `${label}の新規 ${k.newInPeriod}` : '—'} loading={loading} />
-        <SummaryCard variant="v6" title={`${label}の解約`} value={k ? k.churnInPeriod : null} unit="" detail={k ? `解約率 ${k.churnRate.toFixed(1)}%` : '—'} badge={k && k.churnInPeriod > 0 ? '確認' : undefined} badgeTone="danger" loading={loading} />
-        <div data-design-node="G0vK7"><SummaryCard variant="v6" title="今月の AI 利用" value={data?.ai?.callsThisMonth ?? null} unit="回" detail={data?.ai ? `返信の下書き${data.ai.draftsThisMonth}回・記事化${data.ai.callsThisMonth - data.ai.draftsThisMonth}回` : '—'} loading={loading} /></div>
+        <div data-design-node="nPbgn"><KpiCard variant="v6" title="今月の売上（入金済み）" value={null} unit="" valueText={k ? formatYen(k.revenueThisMonth) : undefined} detail={k ? revenueDetail(k.revenueDelta, k.refundsThisMonth) : '—'} loading={loading} /></div>
+        <div data-design-node="BaoAQ"><KpiCard variant="v6" title="契約中の月額合計" value={null} unit="" valueText={k ? formatYen(k.contractMonthlyTotal) : undefined} detail={k ? contractDetail(k.active, k.byPlan, k.filledByListPriceCount) : '—'} loading={loading} /></div>
+        <KpiCard variant="v6" title="トライアル中" value={k ? k.trialing : null} unit="" detail={k ? `${label}の新規 ${k.newInPeriod}` : '—'} loading={loading} />
+        <KpiCard variant="v6" title={`${label}の解約`} value={k ? k.churnInPeriod : null} unit="" detail={k ? `解約率 ${k.churnRate.toFixed(1)}%` : '—'} badge={k && k.churnInPeriod > 0 ? '確認' : undefined} badgeTone="danger" loading={loading} />
+        <div data-design-node="G0vK7"><KpiCard variant="v6" title="今月の AI 利用" value={data?.ai?.callsThisMonth ?? null} unit="回" detail={data?.ai ? `返信の下書き${data.ai.draftsThisMonth}回・記事化${data.ai.callsThisMonth - data.ai.draftsThisMonth}回` : '—'} loading={loading} /></div>
       </div>
 
       {/* グラフ帯 */}
@@ -96,7 +125,14 @@ export default function OpsDashboardPage() {
           <div data-design-node="MVufa" className="mb-2 flex items-center gap-2">
             <h3 className="text-label font-bold text-ink">月ごとの売上</h3>
             <span data-design-node="xaUOz" className="ml-auto text-nano text-ink-faint">{data ? revenueSourceLabel(data.pricing, data.lastSyncedAt) : '—'}</span>
+            {canSyncBilling ? (
+              <Button data-design-node="Fo4yb" size="field" disabled={syncingBilling} onClick={() => void syncBilling()}>
+                Stripe と同期
+              </Button>
+            ) : null}
           </div>
+          {billingSyncNotice ? <p role="status" className="mb-2 text-caption text-accent-deep">{billingSyncNotice}</p> : null}
+          {billingSyncError ? <p role="alert" className="mb-2 text-caption text-danger">{billingSyncError}</p> : null}
           {data ? <RevenueBars rows={data.revenueByMonth} /> : <ListState kind="loading" title="読み込んでいます" />}
         </section>
         <section aria-label="プラン別の契約" className="rounded-card border border-hairline bg-canvas px-5 py-4 xl:col-span-2">
@@ -145,14 +181,16 @@ export default function OpsDashboardPage() {
                 <MiniStat label="平均の初回返信" value={minutesLabel(data.tickets.avgFirstReplyMinutes)} />
                 <MiniStat label={`${label}クローズ`} value={String(data.tickets.closedInPeriod)} />
               </div>
-              <div className="mt-3 flex flex-wrap items-center gap-2 rounded-control bg-accent-soft px-4 py-3">
-                <span className="text-caption text-ink">契約者専用LINEの登録　{data.lineRegistration.registered}人 / {data.lineRegistration.total}人</span>
-                <span className="ml-auto">
+              <Notice
+                tone="success"
+                className="mt-3"
+                message={`契約者専用LINEの登録　${data.lineRegistration.registered}人 / ${data.lineRegistration.total}人`}
+                action={(
                   <Button size="field" onClick={() => void openUnregistered()} disabled={data.lineRegistration.unregisteredCount === 0}>
                     未登録の{data.lineRegistration.unregisteredCount}人へ案内
                   </Button>
-                </span>
-              </div>
+                )}
+              />
             </>
           ) : <ListState kind="loading" title="読み込んでいます" />}
         </section>

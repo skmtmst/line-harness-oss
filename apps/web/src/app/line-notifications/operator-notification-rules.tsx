@@ -7,7 +7,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
 import { DataTable, NameCell, Td, Th, Tr } from '@/components/shared/table'
 import { ApiError, api, type OperatorNotificationRule } from '@/lib/api'
 import ListRange from '@/components/ui/list-range'
@@ -137,10 +137,10 @@ export default function OperatorNotificationRules({ lineAccountId }: { lineAccou
   return <section data-design-node="DpxOK" data-list-state={listState} className="space-y-4">
     <NoteBar>この画面の宛先はお店の人だけです。お客様へ送るものは「顧客へのお知らせ」で設定します。</NoteBar>
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      <SummaryCard title="出しているお知らせ" value={state === 'ready' ? summary?.published ?? null : null} unit="件" detail={state === 'ready' ? `うち止めている ${summary?.stopped ?? '—'}` : undefined} variant="v6" />
-      <SummaryCard title="受け取る人" value={state === 'ready' ? summary?.recipients ?? null : null} unit="人" detail={state === 'ready' ? `受け取れる人がいない ${summary?.missingRecipients ?? '—'}件` : undefined} variant="v6" />
-      <SummaryCard title="今日届いた数" value={state === 'ready' ? summary?.acceptedToday ?? null : null} unit="件" detail="" help="重複を除いた件数です" variant="v6" />
-      <SummaryCard title="届かなかった" value={state === 'ready' ? summary?.excludedToday ?? null : null} unit="件" detail="受け取る人がいません" badge={(summary?.excludedToday ?? 0) > 0 ? '要確認' : undefined} badgeTone="danger" variant="v6" />
+      <KpiCard title="出しているお知らせ" value={state === 'ready' ? summary?.published ?? null : null} unit="件" detail={state === 'ready' ? `うち止めている ${summary?.stopped ?? '—'}` : undefined} variant="v6" />
+      <KpiCard title="受け取る人" value={state === 'ready' ? summary?.recipients ?? null : null} unit="人" detail={state === 'ready' ? `受け取れる人がいない ${summary?.missingRecipients ?? '—'}件` : undefined} variant="v6" />
+      <KpiCard title="今日届いた数" value={state === 'ready' ? summary?.acceptedToday ?? null : null} unit="件" detail="" help="重複を除いた件数です" variant="v6" />
+      <KpiCard title="届かなかった" value={state === 'ready' ? summary?.excludedToday ?? null : null} unit="件" detail="受け取る人がいません" badge={(summary?.excludedToday ?? 0) > 0 ? '要確認' : undefined} badgeTone="danger" variant="v6" />
     </div>
 
     {notice ? <p role="status" className="rounded-control border border-hairline bg-canvas px-4 py-3 text-sm text-ink-secondary">{notice}</p> : null}

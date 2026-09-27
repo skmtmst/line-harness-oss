@@ -36,6 +36,7 @@ import type { SegmentCondition } from '@/components/shared/condition-builder'
 import { pruneCondition } from '@/lib/segment-condition'
 import SelectField from '@/components/shared/select-field'
 import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
 import TargetMissing from '@/components/shared/target-missing'
 import StickyBar from '@/components/shared/sticky-bar'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -513,10 +514,10 @@ function FirstStepContent() {
           </ol>
 
           <div data-design="Notice" className="space-y-2">
-            <p className="bg-success-bg text-success rounded-card px-4 py-3 text-sm">
+            <Notice tone="success">
               配信方式：{modeLabel[mode]}　・　シナリオ：{scenario?.name ?? '読み込み中'}
-            </p>
-            {error && <p className="bg-danger-bg text-danger rounded-card px-4 py-3 text-sm">{error}</p>}
+            </Notice>
+            {error && <Notice tone="danger" message={error} />}
           </div>
 
           {loadState !== 'ready' ? (
@@ -691,9 +692,7 @@ function FirstStepContent() {
             </div>
 
             {preserved && restoreNotice && (
-              <p className="bg-warning-bg text-ink-secondary rounded-card mb-3 px-4 py-3 text-xs leading-relaxed">
-                {restoreNotice}
-              </p>
+              <Notice tone="warn" message={restoreNotice} className="mb-3" />
             )}
 
             {contentMode === 'compose' ? (
@@ -830,10 +829,10 @@ function FirstStepContent() {
         理由を操作のそばに置く。「押したのに何も起きない」を作らない。
       */}
       {bodyOverLimit && (
-        <p className="bg-danger-bg text-danger rounded-card mt-4 px-4 py-3 text-sm">
+        <Notice tone="danger" className="mt-4">
           本文が {LINE_TEXT_LIMIT.toLocaleString('en-US')} 字を超えています。
           LINEが受け付けないため、この状態では保存できません。
-        </p>
+        </Notice>
       )}
 
       {/*

@@ -420,7 +420,9 @@
     "467_template_references.sql",
     "468_event_custom_questions.sql",
     "469_manual_link_screens.sql",
-    "470_google_sheets_integrations.sql"
+    "470_google_sheets_integrations.sql",
+    "494_session_step_up_and_unfamiliar.sql",
+    "495_session_familiarity_ip_index.sql"
   ],
-  "migrationCount": 421
+  "migrationCount": 423
 }

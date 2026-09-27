@@ -12,6 +12,7 @@ import CreatePage, {
   FormSection,
 } from '@/components/shared/create-page'
 import { TextInput } from '@/components/shared/form-controls'
+import Notice from '@/components/shared/notice'
 import SelectField from '@/components/shared/select-field'
 
 /**
@@ -309,18 +310,19 @@ export default function NewAffiliatePage() {
     >
       <FormSection step={1} label="だれを登録するか">
         {partialSave && createdId ? (
-          <div role="alert" className="border-warning bg-warning-bg rounded-control border px-3 py-2 text-sm">
-            <p className="text-ink font-semibold">基本情報は保存済みです</p>
-            <p className="text-ink-secondary mt-1">
+          <Notice
+            tone="warn"
+            action={
+              <a href={`${AFFILIATE_LIST_PATH}&highlight=${encodeURIComponent(createdId)}`}>
+                未保存の追加情報を破棄して一覧へ戻る
+              </a>
+            }
+          >
+            <p className="font-semibold">基本情報は保存済みです</p>
+            <p className="mt-1">
               下の「追加情報の保存を再開する」で続けるか、未保存の追加情報を破棄して一覧へ戻れます。
             </p>
-            <a
-              href={`${AFFILIATE_LIST_PATH}&highlight=${encodeURIComponent(createdId)}`}
-              className="text-danger mt-2 inline-block font-semibold underline"
-            >
-              未保存の追加情報を破棄して一覧へ戻る
-            </a>
-          </div>
+          </Notice>
         ) : null}
         <div className="grid gap-3 lg:grid-cols-3">
         <Field label="名前・屋号" htmlFor="af-name" required>

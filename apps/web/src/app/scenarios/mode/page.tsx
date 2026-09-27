@@ -1,6 +1,6 @@
 'use client'
 
-import StepTrail from '@/components/shared/step-trail'
+import Stepper from '@/components/shared/stepper'
 import { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -8,6 +8,7 @@ import type { DeliveryMode, Folder, Scenario } from '@line-crm/shared'
 import { ApiError, api } from '@/lib/api'
 import SelectField from '@/components/shared/select-field'
 import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
@@ -273,9 +274,9 @@ function ScenarioModeContent() {
         <Button href="/scenarios">✕ キャンセル</Button>
       </div>
 
-      <StepTrail
+      <Stepper
         label="シナリオ作成の進み方"
-        items={[
+        steps={[
           // id なしは「これから作る」。名前と方式をこの画面でまとめて決める。
           { label: 'シナリオ情報', state: id ? 'done' : 'current' },
           { label: '配信方式', state: 'current' },
@@ -285,22 +286,22 @@ function ScenarioModeContent() {
 
       <div data-design="Notice" className="mt-4 space-y-2">
         {scenarioState === 'loading' && (
-          <p className="bg-info-bg text-info rounded-card px-4 py-3 text-sm">
+          <Notice tone="info">
             シナリオを読み込んでいます。
-          </p>
+          </Notice>
         )}
         {scenarioState === 'ready' && scenario && (
-          <p className="bg-success-bg text-success rounded-card px-4 py-3 text-sm">
+          <Notice tone="success">
             「{scenario.name}」の下書きを作成しました。続けて配信方式を選んでください。
-          </p>
+          </Notice>
         )}
         {/* id なしはまだ作っていない。確定するまで行は作らない（#949 N-055）。 */}
         {!id && (
-          <p className="bg-info-bg text-info rounded-card px-4 py-3 text-sm">
+          <Notice tone="info">
             シナリオ名と配信方式を決めると作成されます。途中で閉じても一覧には残りません。
-          </p>
+          </Notice>
         )}
-        {error && <p className="bg-danger-bg text-danger rounded-card px-4 py-3 text-sm">{error}</p>}
+        {error && <Notice tone="danger" message={error} />}
       </div>
 
       <div data-design="Name" className="bg-canvas rounded-card border-hairline mt-4 mb-4 border p-4">

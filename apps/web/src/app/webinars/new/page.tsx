@@ -6,9 +6,10 @@ import { useRouter } from 'next/navigation'
 import Button from '@/components/shared/button'
 import SelectField from '@/components/shared/select-field'
 import { RequiredBadge } from '@/components/shared/form-controls'
-import StepTrail from '@/components/shared/step-trail'
+import Stepper from '@/components/shared/stepper'
 import StickyBar from '@/components/shared/sticky-bar'
 import LinePreview from '@/components/shared/line-preview'
+import Notice from '@/components/shared/notice'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { webinarApi, type WebinarFolder } from '@/lib/api'
@@ -87,13 +88,13 @@ export default function NewWebinarPage() {
         <Link href="/webinars" className="text-action hover:underline">← ウェビナー一覧</Link>
       </nav>
 
-      <StepTrail
+      <Stepper
         label="ウェビナー作成の進み方"
-        items={STEPS.map((step, index) => ({ label: step.title, state: index === 0 ? 'current' as const : 'todo' as const }))}
+        steps={STEPS.map((step, index) => ({ label: step.title, state: index === 0 ? 'current' as const : 'todo' as const }))}
       />
 
       {error ? (
-        <p className="bg-danger-bg text-danger mt-4 rounded-control border border-danger p-3 text-sm" role="alert">{error}</p>
+        <Notice tone="danger" className="mt-4">{error}</Notice>
       ) : null}
 
       <div className="mt-4 grid items-start gap-4 xl:grid-cols-4">

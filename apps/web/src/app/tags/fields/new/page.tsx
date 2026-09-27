@@ -9,6 +9,7 @@ import FeatureGate from '@/components/feature-gate'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import StickyBar from '@/components/shared/sticky-bar'
 import SelectField from '@/components/shared/select-field'
@@ -127,7 +128,7 @@ function NewFriendFieldForm() {
         <Button href={back ?? '/tags?tab=fields'}>友だち情報欄へ</Button>
       </div>
 
-      {error ? <p role="alert" className="mb-4 rounded-control border border-danger/20 bg-danger-bg p-3 text-sm text-danger">{error}</p> : null}
+      {error ? <Notice tone="danger" message={error} className="mb-4" /> : null}
 
       <div className="grid gap-4 xl:grid-cols-2">
         <section data-design="Basic" className="rounded-card border border-hairline bg-canvas p-5 shadow-card">

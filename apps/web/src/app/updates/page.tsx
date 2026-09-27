@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
+import Notice from '@/components/shared/notice'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL!
@@ -76,9 +77,9 @@ export default function UpdatesPage() {
         </>
       )}
       {state.kind === 'error' && (
-        <div className="bg-status-warn-soft text-status-warn-deep mb-4 rounded-control p-3 text-sm">
+        <Notice tone="warn" className="mb-4">
           履歴を取得できませんでした（{state.message}）。時間をおいて再読み込みしてください。
-        </div>
+        </Notice>
       )}
       {state.kind === 'ready' && rows.length === 0 && (
         <p className="text-ink-faint text-sm">履歴はまだありません。</p>

@@ -122,6 +122,11 @@
   font-size: var(--text-metric);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+  /*
+   * 数の行の高さは1行ぶんにそろえる。題の行（.head 20px）と合わせて、
+   * 「？」の有無や補足の長さで数字の位置がずれないようにする。
+   */
+  min-height: 1lh;
 }
 
 .valueWarning {
@@ -135,6 +140,8 @@
 .detail {
   color: var(--color-ink-faint);
   font-size: var(--text-micro);
+  /* 補足の行の高さは1行ぶんにそろえる。空でも潰さない。 */
+  min-height: 1lh;
 }
 
 .detailV6 {
@@ -153,10 +160,10 @@
   height: var(--text-metric);
   border-radius: 4px;
   background: var(--color-canvas-sunken);
-  animation: summary-card-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  animation: kpi-card-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-@keyframes summary-card-pulse {
+@keyframes kpi-card-pulse {
   50% {
     opacity: 0.5;
   }
