@@ -11563,7 +11563,7 @@ export const api = {
     },
     /* #838 第2段: Google Sheets への直接書き出し。接続はOAuthの別画面へ飛ばす。 */
     googleSheets: {
-      connection: (lineAccountId: string) =>
+      connection: (lineAccountId: string, request?: { signal?: AbortSignal }) =>
         fetchApi<ApiResponse<{
           connection: GoogleSheetsConnection
           oauthConfigured: boolean
@@ -11571,10 +11571,12 @@ export const api = {
           canManage: boolean
         }>>(
           `/api/integrations/google-sheets/connection?account_id=${encodeURIComponent(lineAccountId)}`,
+          request,
         ),
-      runs: (lineAccountId: string) =>
+      runs: (lineAccountId: string, request?: { signal?: AbortSignal }) =>
         fetchApi<ApiResponse<{ runs: GoogleSheetsSyncRun[] }>>(
           `/api/integrations/google-sheets/runs?account_id=${encodeURIComponent(lineAccountId)}`,
+          request,
         ),
       connectStart: (lineAccountId: string) =>
         fetchApi<ApiResponse<{ authorizeUrl: string; mode: 'connect' | 'reconnect' }>>(
