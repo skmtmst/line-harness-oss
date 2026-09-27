@@ -1,3 +1,5 @@
+import type { D1Database } from '@cloudflare/workers-types';
+
 /** JST offset: UTC+9 in milliseconds */
 const JST_OFFSET_MS = 9 * 60 * 60_000;
 
