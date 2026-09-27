@@ -3487,6 +3487,7 @@ export const REMINDER_DRAFT = {
     triggerOffsetMinutes: null,
     sendAtTime: null,
     targetTagId: null,
+    targetCondition: null,
     folderId: 'rf-booking',
     stopConditions: {
       bookingCancelled: true,
@@ -3514,6 +3515,16 @@ export const REMINDER_VALIDATE = {
     { key: 'test_send', label: 'テスト送信', status: 'passed', message: '直近のテストは成功しています' },
   ],
   audience: { matched: 398, excluded: 28 },
+}
+
+/** 機能7の対象者数え直し（`POST /api/reminders/:id/audience` の固定の返事）。R15。 */
+export const REMINDER_AUDIENCE = {
+  matched: 5,
+  excluded: 2,
+  sample: [
+    { id: 'visual-friend-1', displayName: '山田花子' },
+    { id: 'visual-friend-2', displayName: '佐藤太郎' },
+  ],
 }
 
 /** 機能7の配信予定（`POST /api/reminders/:id/preview` の固定の返事）。 */
