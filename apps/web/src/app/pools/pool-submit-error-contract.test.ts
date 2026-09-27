@@ -72,6 +72,7 @@ describe('プール所属アカウントの読み込み・追加 (#1058)', () =>
   })
 
   it('選択からの呼び出しもPromiseを宙に浮かせない', () => {
-    expect(PAGE).toContain('void onAdd(e.target.value)')
+    // 選び欄は共通 Select。onChange は値そのものを受け取る。
+    expect(PAGE).toContain('void onAdd(value)')
   })
 })

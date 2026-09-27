@@ -23,8 +23,15 @@ describe('04-C-横1: 友だち属性のタグ表は1440pxに収まる', () => {
   const page = read('../components/friend-fields/tags-page-v4.tsx')
 
   it('表の最小幅を内容実幅（833px）以下の800pxへ下げる', () => {
-    expect(page).toContain('min-w-[800px]')
     expect(page).not.toContain('min-w-[880px]')
+    if (page.includes('<DataTable')) {
+      // 共通 DataTable へ寄せた後は、表に最小幅を直書きしない。
+      // 幅は中身に合わせ、1440pxで横スクロールを出さない。
+      const mins = [...page.matchAll(/min-w-\[(\d+)px\]/g)].map((m) => Number(m[1]))
+      expect(mins.filter((n) => n > 833), '内容実幅833pxを超える最小幅がある').toEqual([])
+      return
+    }
+    expect(page).toContain('min-w-[800px]')
   })
 
   it('狭い幅で情報を落とさない逃げ道（表だけ横スクロール）は残す', () => {

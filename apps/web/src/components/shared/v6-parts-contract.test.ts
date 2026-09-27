@@ -13,7 +13,7 @@ const modules = [
   'breadcrumb.module.css',
   'chip.module.css',
   'toggle.module.css',
-  'select-field.module.css',
+  'select.module.css',
   'text-field.module.css',
   'row-actions.module.css',
   'data-table.module.css',
@@ -59,7 +59,7 @@ describe('V6共通部品の主要寸法', () => {
   })
 
   it('標準プルダウンは高さ40px、標準176px・件数128px', () => {
-    const css = read('select-field.module.css')
+    const css = read('select.module.css')
     /* #976 U083: 42px だった高さを入力欄・ボタンと同じ40pxへそろえた */
     expect(css).toContain('height: 40px;')
     expect(css).toContain('width: 176px;')
@@ -93,7 +93,7 @@ describe('V6共通部品の実装境界', () => {
       'tabs.module.css',
       'breadcrumb.module.css',
       'toggle.module.css',
-      'select-field.module.css',
+      'select.module.css',
       'text-field.module.css',
       'row-actions.module.css',
       'side-cards.module.css',
@@ -109,7 +109,7 @@ describe('V6共通部品の実装境界', () => {
       'breadcrumb.tsx',
       'chip.tsx',
       'toggle.tsx',
-      'select-field.tsx',
+      'select.tsx',
       'text-field.tsx',
       'row-actions.tsx',
       'page-header.tsx',

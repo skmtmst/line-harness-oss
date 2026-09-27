@@ -50,23 +50,29 @@ describe('共通部品の影響範囲', () => {
     expect(directImporters(files, paginationCss, importIndex)).toEqual([pagination])
   })
 
-  it('共通Paginationを直接importする38ファイルだけを利用先に数える', () => {
+  it('共通Paginationを直接importする52ファイルだけを利用先に数える', () => {
     // ダッシュボードの受信カードが自前の「前へ／次へ」をやめて共通へ寄せた。
     // 設計（`vUXKb` / `NjK9q`）は表の下にページ送りがあり、番号で飛べる。
     // 2026-09-02: 成果地点と流入経路の押せない「前へ／次へ」も共通へ寄せた。
     expect(directImporters(files, pagination, importIndex).map((file) => relative(SRC, file))).toEqual([
+      // m15c: 手書きのページ送りを共通 Pagination へ置き換えた10画面を足す。
+      'app/accounts/migration.tsx',
       // 2026-09-02: 案件一覧が自前のページ送りを持たないまま全件を出していた。
       // 設計 `GH8VL` は表の下にページ送りがある。共通へ寄せた。
       'app/affiliates/tabs.tsx',
       // 2026-09-04: 自動応答の実行結果が入った。表の下にページ送りがある。
       'app/auto-replies/runs/page.tsx',
+      'app/automations/page.tsx',
       // 2026-09-27 R24: 実行記録が先頭20件に固定で21件目以降へ届かなかった。
       // 20件ずつのページ送りに寄せた。
       'app/automations/runs/page.tsx',
+      'app/booking/bookings/page.tsx',
       // #370: 予約メニュー8件を設計どおり1ページ6件に区切る。
       'app/booking/menus/page.tsx',
+      'app/common-actions/page.tsx',
       // N-193/N-205: 登録メディア選択窓。20件ずつのページ送りを共通へ寄せた。
       'app/contents/media-picker-dialog.tsx',
+      'app/contents/media-replacement-dialog.tsx',
       'app/contents/page.tsx',
       // #973: 共通情報の変更影響を1件ずつ確認する一覧にページ送りを追加した。
       'app/contents/vars/impact-review.tsx',
@@ -116,13 +122,18 @@ describe('共通部品の影響範囲', () => {
       // Googleビジネス第2段: 変更履歴（GB-17 w7ZTml）の表の下にページ送りがある。
       'app/restaurant-test/google/google-profile.tsx',
       'app/rich-menus/page.tsx',
+      'app/scenarios/page.tsx',
+      'app/staff/page.tsx',
       'app/webhooks/webhook-interactions.tsx',
       'app/webhooks/webhook-overviews.tsx',
       'app/webinars/page.tsx',
       'components/friend-attributes-v2/tag-list-v2.tsx',
       'components/friend-fields/tags-page-v4.tsx',
       'components/friends/friend-list-table.tsx',
+      'components/inbox/inbox-list.tsx',
       'components/line-notifications/notification-run-list.tsx',
+      'components/ops/knowledge-list.tsx',
+      'components/staff/login-audit.tsx',
       'components/support/pending-inbox-card.tsx',
       'components/users/users-table.tsx',
     ])

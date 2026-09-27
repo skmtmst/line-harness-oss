@@ -7,7 +7,7 @@ import Button from '@/components/shared/button'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
 import SearchField from '@/components/shared/search-field'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import { api, ApiError } from '@/lib/api'
 import type { BannerImage, BannerProject, BannerUsage } from '@/lib/hq-banners'
 import LimitState from './limit-state'
@@ -172,10 +172,10 @@ export default function ProjectsSection({
           <FilterChip selected={filter === 'running'} onChange={(on) => setFilter(on ? 'running' : 'all')}>生成中</FilterChip>
           <label className="flex items-center gap-2 text-caption text-ink-faint">
             並び順
-            <SelectField
+            <Select
               aria-label="並び順"
               value={sort}
-              onChange={(event) => setSort(event.target.value as Sort)}
+              onChange={(value) => setSort(value as Sort)}
               options={SORT_OPTIONS}
             />
           </label>

@@ -112,7 +112,12 @@ test('見本リンクの選択を初回読込後も保ち、実アカウント�
   await openWebhooks(page, '/webhooks?tab=incoming&source=booking')
 
   await expect(page.getByRole('heading', { name: '受け取る設定を追加' })).toBeVisible()
-  await expect(page.getByLabel('受信元の種類')).toHaveValue('booking')
+  /*
+   * 「受信元の種類」は共通 Select（button＋listbox）になったので、
+   * 素の `<select>` 専用の `toHaveValue` は使えない。開く前の釦に
+   * 選ばれている候補の名前が出る（`?source=booking` なら「予約サービス」）。
+   */
+  await expect(page.getByLabel('受信元の種類')).toContainText('予約サービス')
 
   await page.getByLabel('LINEアカウント').selectOption('visual-qa-account-2')
   await expect(page.getByLabel('LINEアカウント')).toHaveValue('visual-qa-account-2')

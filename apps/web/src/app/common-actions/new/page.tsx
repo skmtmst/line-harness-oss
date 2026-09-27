@@ -14,7 +14,7 @@ import Button from '@/components/shared/button'
 import StickyBar from '@/components/shared/sticky-bar'
 import { useCanManageCommonActions } from '@/components/automations/use-common-action-permission'
 import { TextField } from '@/components/shared/text-field'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import BranchEditors, { newBranchStep, updateBranchStep } from '../branch-editor'
 
@@ -34,6 +34,8 @@ export default function NewCommonActionPage() {
   const [resourcesLoading, setResourcesLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  /* 見本の選び欄の表示値。選ぶと受け渡す（素の select の defaultValue 相当）。 */
+  const [exampleId, setExampleId] = useState('')
 
   useEffect(() => {
     if (accountLoading || canManage !== true || !selectedAccountId) {
@@ -165,7 +167,7 @@ export default function NewCommonActionPage() {
               {resources.commonActions.length > 0 ? (
                 <label className="text-ink-secondary flex items-center gap-2 text-sm" data-example-select>
                   <span>見本から受け渡す</span>
-                  <SelectField className="min-w-48" defaultValue="" onChange={(event) => addExample(event.target.value)} options={[{ value: '', label: '選ぶ' }, ...resources.commonActions.map((item) => ({ value: item.id, label: `${item.name} v${item.version}` }))]} />
+                  <Select aria-label="見本から受け渡す" className="min-w-48" value={exampleId} onChange={(value) => { setExampleId(value); addExample(value) }} options={[{ value: '', label: '選ぶ' }, ...resources.commonActions.map((item) => ({ value: item.id, label: `${item.name} v${item.version}` }))]} />
                 </label>
               ) : null}
             </div>
@@ -223,8 +225,8 @@ export default function NewCommonActionPage() {
         .compact-common-action-editor section { background: var(--color-canvas-sunken); padding: 12px; }
         .compact-common-action-editor section > div:first-child { margin-bottom: 8px; }
         .compact-common-action-editor textarea { min-height: 64px; }
-        /* U063: 選択肢の長さに合わせる。共有部品には触らない。 */
-        [data-example-select] select { width: auto; max-width: 100%; }
+        /* U063: 選択肢の長さに合わせる。共有部品には触らない。共通Selectは div のため select 指定では当たらない。 */
+        [data-example-select] .min-w-48 { width: auto; max-width: 100%; }
       `}</style>
     </div>
   )

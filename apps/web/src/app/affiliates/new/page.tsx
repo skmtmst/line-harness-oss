@@ -13,7 +13,7 @@ import CreatePage, {
 } from '@/components/shared/create-page'
 import { TextInput } from '@/components/shared/form-controls'
 import Notice from '@/components/shared/notice'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 
 /**
  * 入力欄の幅。
@@ -399,16 +399,16 @@ export default function NewAffiliatePage() {
                   検索
                 </button>
               </form>
-              <SelectField
+              <Select
                 id="af-friend"
                 aria-label="LINEの友だちと結びつける"
                 value={friendId}
-                onChange={(event) => {
-                  const nextId = event.target.value
+                onChange={(nextId) => {
                   setFriendId(nextId)
                   setSelectedFriend(friendOptions.find((friend) => friend.id === nextId) ?? null)
                 }}
                 className="w-full max-w-lg"
+                size="full"
                 options={[
                   { value: '', label: friendLoading ? '読み込んでいます' : '結びつけない' },
                   ...friendOptions.map((friend) => ({ value: friend.id, label: friend.displayName })),
@@ -431,13 +431,14 @@ export default function NewAffiliatePage() {
                     {friendLoading ? '友だちを読み込んでいます' : `全${friendTotal.toLocaleString('ja-JP')}件`}
                   </p>
                   {friendPageCount > 1 ? (
-                    <SelectField
+                    <Select
                       id="af-friend-page"
                       aria-label="友だち候補のページ"
                       value={String(friendPage)}
-                      onChange={(event) => setFriendPage(Number(event.target.value))}
+                      onChange={(value) => setFriendPage(Number(value))}
                       disabled={friendLoading}
                       className="w-40"
+                      size="standard"
                       options={Array.from({ length: friendPageCount }, (_, index) => ({
                         value: String(index + 1),
                         label: `${index + 1} / ${friendPageCount}ページ`,
