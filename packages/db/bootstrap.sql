@@ -1416,7 +1416,7 @@ CREATE TABLE "bookings" (
   cancelled_at                 TEXT,
   completed_at                 TEXT,
   created_at                   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
-  updated_at                   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at                   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), menu_version_number INTEGER CHECK (menu_version_number IS NULL OR menu_version_number > 0), menu_snapshot_json TEXT CHECK (menu_snapshot_json IS NULL OR json_valid(menu_snapshot_json)),
   FOREIGN KEY (line_account_id) REFERENCES line_accounts(id),
   FOREIGN KEY (friend_id) REFERENCES friends(id),
   FOREIGN KEY (staff_id) REFERENCES staff(id),
@@ -3713,6 +3713,30 @@ CREATE TABLE meet_consultations (
                     CHECK (status IN ('confirmed', 'cancelled', 'completed')),
   created_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
+CREATE TABLE menu_versions (
+  id TEXT PRIMARY KEY,
+  menu_id TEXT NOT NULL
+    REFERENCES menus(id) ON DELETE CASCADE,
+  version_number INTEGER NOT NULL CHECK (version_number > 0),
+  name TEXT NOT NULL,
+  category_label TEXT,
+  description TEXT,
+  duration_minutes INTEGER NOT NULL,
+  buffer_after_minutes INTEGER NOT NULL DEFAULT 0,
+  base_price INTEGER NOT NULL,
+  price_mode TEXT NOT NULL DEFAULT 'fixed'
+    CHECK (price_mode IN ('fixed', 'free', 'inquiry')),
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  is_active INTEGER NOT NULL DEFAULT 1,
+  -- 受付条件の上書き（booking_window_days / cutoff_hours_before /
+  -- cancel_deadline_hours_before / intake_question / concurrent_capacity）。
+  -- 空は「店舗の決まりを使う」。
+  rules_json TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(rules_json)),
+  created_by_staff_id TEXT,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  UNIQUE (menu_id, version_number)
 );
 
 CREATE TABLE menus (
@@ -7165,6 +7189,9 @@ CREATE INDEX idx_booking_resource_consumptions_resource
 CREATE INDEX idx_booking_resources_account_active
   ON booking_resources(line_account_id, is_active, id);
 
+CREATE INDEX idx_bookings_menu_version
+  ON bookings (menu_id, menu_version_number);
+
 CREATE INDEX idx_bookings_v298_account_status_starts
   ON bookings(line_account_id, status, starts_at);
 
@@ -7831,6 +7858,9 @@ CREATE INDEX idx_meet_consultation_reminders_due
 CREATE INDEX idx_meet_consultations_friend ON meet_consultations (friend_id);
 
 CREATE INDEX idx_meet_consultations_start ON meet_consultations (status, starts_at);
+
+CREATE INDEX idx_menu_versions_menu
+  ON menu_versions (menu_id, version_number DESC);
 
 CREATE INDEX idx_menus_account_sort ON menus (line_account_id, sort_order);
 
