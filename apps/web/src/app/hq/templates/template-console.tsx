@@ -104,6 +104,14 @@ export default function TemplateConsole({ type, useCanonicalEditors = true }: { 
   const [uploadBusy, setUploadBusy] = useState(false)
   const busy = requestBusy || uploadBusy
   const [ready, setReady] = useState(false)
+  /*
+   * R119: 参照先に選べる別種類の目録。一覧の `templates` は編集中の種類だけ
+   * しか持たないため、そこから別種類で絞ると常に空になる。種類を指定せず
+   * 取った全部入りを別に持ち、参照候補はここから作る。`null` は未取得か
+   * 取得失敗（0件とは区別する）。
+   */
+  const [catalog, setCatalog] = useState<HqTemplate[] | null>(null)
+  const [catalogFailed, setCatalogFailed] = useState(false)
   const [error, setError] = useState('')
   const [conflict, setConflict] = useState(false)
   const [message, setMessage] = useState('')
@@ -135,6 +143,12 @@ export default function TemplateConsole({ type, useCanonicalEditors = true }: { 
         setTemplates(rows); setAccounts(stores); setReady(true)
       }
     }).catch(e => { if (current) setError(errorText(e)) }).finally(() => { if (current) setBusy(false) })
+    // R119: 目録だけの失敗で一覧や保存まで止めない。失敗は `catalogFailed`
+    // として編集欄の上で知らせ、候補が0件のときとは文を分ける。
+    void hqTemplatesApi.list().then(
+      (rows) => { if (current) { setCatalog(rows); setCatalogFailed(false) } },
+      () => { if (current) { setCatalog(null); setCatalogFailed(true) } },
+    )
     return () => { current = false }
   }, [type])
   useEffect(() => {
@@ -155,6 +169,16 @@ export default function TemplateConsole({ type, useCanonicalEditors = true }: { 
     finally { lock.current = false; if (alive.current) setBusy(false) }
   }
   const toList = () => { if (createUncertain) return; createAttempt.current = null; setStage('list'); setSearch(''); setPreflight(null); setChoices({}); setPendingRun(null); setResult(null); setError(''); setConflict(false); window.history.replaceState(null, '', window.location.pathname + window.location.search) }
+  /** R119: 目録の読み直し。編集中身は残し、候補だけ取り直す。 */
+  const reloadCatalog = () => {
+    setCatalogFailed(false)
+    void hqTemplatesApi.list().then(
+      (rows) => { if (alive.current) { setCatalog(rows); setCatalogFailed(false) } },
+      () => { if (alive.current) { setCatalog(null); setCatalogFailed(true) } },
+    )
+  }
+  /** R119: 参照候補は全部入りの目録から種類別に取り出す。一覧の `templates` は使わない。 */
+  const referenceOptions = (kind: TemplateType) => (catalog ?? []).filter(item => item.template_type === kind).map(item => ({ id: item.id, name: item.name }))
   const loadDetailIntoForm = (loaded: TemplateDetail) => {
     if (loaded.template.template_type !== type || loaded.definition.schemaVersion !== 1 || !definitionName(type, loaded.definition)) throw new Error('ひな形の種類または保存内容を確認できません。')
     setDetail(loaded); setName(loaded.template.name); setDescription(loaded.template.description ?? ''); setDefinition(loaded.definition)
@@ -322,6 +346,13 @@ export default function TemplateConsole({ type, useCanonicalEditors = true }: { 
     </>}
     {stage === 'edit' && <>
       <div className={styles.grid}><div className={styles.stack}><section className={styles.panel}>
+        {catalogFailed ? (
+          <Notice
+            tone="warn"
+            message="参照先の候補を読み込めませんでした。タグ・テンプレート・回答フォームは選べません。"
+            action={<Button onClick={reloadCatalog}>もう一度読み込む</Button>}
+          />
+        ) : null}
         {!canonicalEditorOwnsSave && (!useCanonicalEditors || type !== 'rich_menu') && <>
           <label className={styles.field}><span>種類</span><input className={styles.input} value={LABELS[type]} readOnly /></label>
           <label className={styles.field}><span>名前</span><input className={styles.input} value={name} maxLength={200} disabled={busy || createUncertain} onChange={e => setName(e.target.value)} /></label>
@@ -342,12 +373,12 @@ export default function TemplateConsole({ type, useCanonicalEditors = true }: { 
           onCanonicalSave={useCanonicalEditors ? saveCanonicalDefinition : undefined}
           onRichMenuNameChange={setName}
           richMenuReferences={{
-            tags: templates.filter(item => item.template_type === 'tag').map(item => ({ id: item.id, name: item.name })),
-            templates: templates.filter(item => item.template_type === 'template').map(item => ({ id: item.id, name: item.name })),
-            forms: templates.filter(item => item.template_type === 'form').map(item => ({ id: item.id, name: item.name })),
+            tags: referenceOptions('tag'),
+            templates: referenceOptions('template'),
+            forms: referenceOptions('form'),
           }}
           formReferences={{
-            tags: templates.filter(item => item.template_type === 'tag').map(item => ({ id: item.id, name: item.name })),
+            tags: referenceOptions('tag'),
             friendFields: [], scenarios: [], reminders: [], templates: [],
           }}
         />}
