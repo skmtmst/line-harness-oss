@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState, type ReactNode } from 'react'
+import { cloneElement, isValidElement, useEffect, useId, useState, type ReactNode } from 'react'
 import { useAccount } from '@/contexts/account-context'
 import { TERMS_DOCUMENT } from '@/content/terms/musubo-terms'
 import { MANUAL_LINKS } from '@/lib/manual-links'
@@ -51,11 +51,29 @@ function Field({
   error?: string
   children: ReactNode
 }) {
+  /*
+   * R174: 見出しと入力を `htmlFor`・`id` で結ぶ。結ばないと4つの入力欄
+   * （店舗名・略称・チャネルID・チャネルシークレット）が読み上げ用の
+   * 項目名を持たない textbox になる。補足とエラーも `aria-describedby`
+   * で結ぶ（WCAG 3.3.2・1.3.1）。
+   */
+  const baseId = useId()
+  const inputId = `${baseId}-input`
+  const helpId = `${baseId}-help`
+  const errorId = `${baseId}-error`
+  const describedBy = error ? `${helpId} ${errorId}` : helpId
+  const field = isValidElement<{ id?: string; 'aria-describedby'?: string; 'aria-invalid'?: boolean }>(children)
+    ? cloneElement(children, {
+      id: inputId,
+      'aria-describedby': describedBy,
+      ...(error ? { 'aria-invalid': true as const } : null),
+    })
+    : children
   return <div>
-    <div className="mb-2 flex items-center gap-2"><label className="text-sm font-semibold text-ink">{label}</label><span className={`rounded-pill px-2 py-1 text-[10px] font-semibold ${required ? 'bg-danger-bg text-danger' : 'bg-canvas-sunken text-ink-secondary'}`}>{required ? '必須' : '任意'}</span></div>
-    {children}
-    <p className="mt-2 text-xs leading-5 text-ink-secondary">{help}</p>
-    {error && <p role="alert" className="mt-1 text-xs font-semibold text-danger">{error}</p>}
+    <div className="mb-2 flex items-center gap-2"><label htmlFor={inputId} className="text-sm font-semibold text-ink">{label}</label><span className={`rounded-pill px-2 py-1 text-[10px] font-semibold ${required ? 'bg-danger-bg text-danger' : 'bg-canvas-sunken text-ink-secondary'}`}>{required ? '必須' : '任意'}</span></div>
+    {field}
+    <p id={helpId} className="mt-2 text-xs leading-5 text-ink-secondary">{help}</p>
+    {error && <p id={errorId} role="alert" className="mt-1 text-xs font-semibold text-danger">{error}</p>}
   </div>
 }
 
