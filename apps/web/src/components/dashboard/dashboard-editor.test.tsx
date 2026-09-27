@@ -72,6 +72,6 @@ describe('R116 上下ボタンでの並べ替え', () => {
         onApply={() => undefined}
       />,
     )
-    expect(screen.getByText('上下ボタン・ドラッグ・キーボードで順番を変更。スイッチで表示を切り替えます。')).toBeTruthy()
+    expect(screen.getByText('持ち手をドラッグして移動。上下ボタン・キーボードでも順番を変更。スイッチで表示を切り替えます。')).toBeTruthy()
   })
 })

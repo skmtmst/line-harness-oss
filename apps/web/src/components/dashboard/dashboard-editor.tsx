@@ -430,7 +430,7 @@ export default function DashboardEditor({ open, preferences, saving = false, sav
             <button type="button" onClick={onCancel} disabled={saving} aria-label="閉じる" className="text-ink-faint hover:text-ink rounded-control p-1.5"><CloseIcon /></button>
           </div>
           <div className="mt-4 flex items-center justify-between gap-4">
-            <p className="text-ink-secondary text-xs">上下ボタン・ドラッグ・キーボードで順番を変更。スイッチで表示を切り替えます。</p>
+            <p className="text-ink-secondary text-xs">持ち手をドラッグして移動。上下ボタン・キーボードでも順番を変更。スイッチで表示を切り替えます。</p>
             {/*
               「初期状態に戻す」は個人配置の削除なので、パネル内の確認を
               挟んでから実行する（A01-02）。1回目のクリックは確認を出すだけで、
