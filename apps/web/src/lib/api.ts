@@ -1212,6 +1212,68 @@ export type AffiliateOffer = {
   createdAt: string
 }
 
+/** 案件の決まりの版 (#823)。保存するたびに増え、前の版は変わらない。 */
+export type OfferVersion = {
+  id: string
+  offerId: string
+  versionNumber: number
+  rewardAmount: number
+  rewardMiles: number
+  windowDays: number
+  capTotal: number | null
+  capMonthlyPerAffiliate: number | null
+  receptionFrom: string | null
+  receptionTo: string | null
+  effectiveFrom: string | null
+  createdAt: string
+}
+
+/** 今の決まりと上限の残り (#823)。空は「上限なし」。 */
+export type OfferCapStatus = {
+  version: OfferVersion | null
+  capped: boolean
+  capTotal: number | null
+  totalUsed: number
+  totalRemaining: number | null
+  capMonthlyPerAffiliate: number | null
+  monthlyUsed: number
+  monthlyRemaining: number | null
+}
+
+/** 付け方の判断の理由。画面には人の言葉で出す。#823 */
+export type AttributionSkipReason =
+  | 'out_of_window'
+  | 'self_referral'
+  | 'inactive_link'
+  | 'inactive_affiliate'
+  | 'other_account'
+  | 'reception_closed'
+  | 'capped_total'
+  | 'capped_monthly'
+
+/** 成果の付け方の記録 (#823)。候補1件ずつの結果を持つ。 */
+export type AttributionDecisionView = {
+  conversionEventId: string
+  affiliateId: string | null
+  refCode: string | null
+  offerId: string | null
+  offerVersionId: string | null
+  reason: string
+  windowDays: number
+  candidates: Array<{
+    affiliateId: string
+    affiliateName: string
+    refCode: string
+    touchedAt: string
+    offerId: string | null
+    offerName: string | null
+    chosen: boolean
+    skipReason: AttributionSkipReason | null
+    windowDays: number
+  }>
+  createdAt: string
+}
+
 /** Approval queue row as returned by /api/conversions/approvals */
 export type ConversionApprovalItem = {
   eventId: string
@@ -12350,6 +12412,11 @@ export const api = {
       description?: string | null
       rewardAmount?: number
       rewardMiles?: number
+      windowDays?: number
+      capTotal?: number | null
+      capMonthlyPerAffiliate?: number | null
+      receptionFrom?: string | null
+      receptionTo?: string | null
       lineAccountId?: string | null
       tagId?: string | null
       scenarioId?: string | null
@@ -12367,6 +12434,11 @@ export const api = {
       description: string | null
       rewardAmount: number
       rewardMiles: number
+      windowDays: number
+      capTotal: number | null
+      capMonthlyPerAffiliate: number | null
+      receptionFrom: string | null
+      receptionTo: string | null
       lineAccountId: string | null
       tagId: string | null
       scenarioId: string | null
@@ -12376,6 +12448,34 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
+    /** 決まりの版の履歴（新しい順）。#823 */
+    versions: (id: string) =>
+      fetchApi<{ success: boolean; data: OfferVersion[] }>(
+        `/api/affiliate-offers/${encodeURIComponent(id)}/versions`,
+      ),
+    /** 今の決まりと上限の残り。#823 */
+    capStatus: (id: string, affiliateId?: string) => {
+      const qs = affiliateId ? `?affiliateId=${encodeURIComponent(affiliateId)}` : ''
+      return fetchApi<{ success: boolean; data: OfferCapStatus }>(
+        `/api/affiliate-offers/${encodeURIComponent(id)}/cap-status${qs}`,
+      )
+    },
+    /** 決まりの新しい版を保存する。前の版は変わらない。#823 */
+    createVersion: (id: string, data: {
+      rewardAmount?: number
+      rewardMiles?: number
+      windowDays?: number
+      capTotal?: number | null
+      capMonthlyPerAffiliate?: number | null
+      receptionFrom?: string | null
+      receptionTo?: string | null
+      effectiveFrom?: string | null
+      idempotencyKey?: string
+    }) =>
+      fetchApi<{ success: boolean; data: OfferVersion }>(
+        `/api/affiliate-offers/${encodeURIComponent(id)}/versions`,
+        { method: 'POST', body: JSON.stringify(data) },
+      ),
   },
   conversionApprovals: {
     list: (params?: { status?: 'pending' | 'approved' | 'rejected'; limit?: number; offset?: number }) => {
@@ -12407,6 +12507,11 @@ export const api = {
       }; error?: string }>(
         '/api/conversions/approvals/bulk',
         { method: 'POST', body: JSON.stringify({ items }) },
+      ),
+    /** どの紹介に成果を付けたかの記録。無い昔の成果は success:false。#823 */
+    attribution: (eventId: string) =>
+      fetchApi<{ success: boolean; data: AttributionDecisionView; error?: string }>(
+        `/api/conversions/events/${encodeURIComponent(eventId)}/attribution`,
       ),
   },
   /**
