@@ -99,6 +99,7 @@ const ACCOUNT_LOAD_PATHS = new Set([
   '/api/ec-commerce/overview',
   '/api/line-notifications/customer-definitions',
   '/api/line-notifications/metrics',
+  '/api/line-notifications/send-counts',
 ])
 
 function notificationSetting(accountId) {
@@ -234,6 +235,21 @@ async function openHarness(browser) {
       return json({ success: true, data: [customerDefinition(accountId)] })
     }
     if (path === '/api/line-notifications/metrics') return json({ success: true, data: { items: [] } })
+    /*
+     * この枝で足した送信件数の口（今日・この30日）の見本。
+     * 無いと画面側が undefined のまま .map して落ちる。
+     */
+    if (path === '/api/line-notifications/send-counts') {
+      return json({
+        success: true,
+        data: {
+          sentToday: 3,
+          sentLast30d: 12,
+          byEventType: [{ eventType: EVENT_TYPE, today: 3, last30d: 12 }],
+          period: { today: '2026-09-01', from30d: '2026-08-03', to: '2026-09-01' },
+        },
+      })
+    }
     if (/\/customer-definitions\/[^/]+\/draft$/.test(path) && request.method() === 'PATCH') {
       const body = request.postDataJSON()
       state.draftSaves.push(body?.draft?.introText ?? null)

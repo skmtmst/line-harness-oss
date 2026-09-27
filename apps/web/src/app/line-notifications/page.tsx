@@ -131,6 +131,23 @@ function sortCustomerSettingsBySentCount(
   return [...settings].sort((a, b) => (countOf(b.eventType) ?? -1) - (countOf(a.eventType) ?? -1))
 }
 
+/**
+ * send-counts の形の見張り。偽APIや段階配備中の旧Workerが想定外の形
+ * （配列・byEventTypeなし）を返しても `.map` で落ちないようにする。
+ * 形が違うときは「読み込めなかった」として null 扱いにする。
+ */
+function isSendCountsData(value: unknown): value is LineNotificationSendCounts {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false
+  const data = value as Record<string, unknown>
+  if (typeof data.sentToday !== 'number' || typeof data.sentLast30d !== 'number') return false
+  if (!Array.isArray(data.byEventType)) return false
+  return (data.byEventType as unknown[]).every((item) => {
+    if (typeof item !== 'object' || item === null || Array.isArray(item)) return false
+    const row = item as Record<string, unknown>
+    return typeof row.eventType === 'string' && typeof row.today === 'number' && typeof row.last30d === 'number'
+  })
+}
+
 /** N-340: 編集中の下書きは入力欄の6項目だけを残す。出・止めの切替は即保存なので入れない。 */
 type CustomerEditorDraft = Pick<
   EcNotificationSetting, 'title' | 'introText' | 'outroText' | 'buttonLabel' | 'buttonUrl' | 'imageUrl'
@@ -646,6 +663,8 @@ function LineNotificationsPage() {
   const [definitions, setDefinitions] = useState<LineNotificationDefinition[]>([])
   const [metrics, setMetrics] = useState<LineNotificationMetric[]>([])
   const [sendCounts, setSendCounts] = useState<LineNotificationSendCounts | null>(null)
+  // send-countsだけ取れなかった・形が違ったときの印。一覧全体は表示を続ける。
+  const [sendCountsFailed, setSendCountsFailed] = useState(false)
   const [quota, setQuota] = useState<LineNotificationQuota | null>(null)
   const [filter, setFilter] = useState<CustomerFilter>('all')
   const [customerPage, setCustomerPage] = useState(1)
@@ -688,6 +707,7 @@ function LineNotificationsPage() {
     setDefinitions([])
     setMetrics([])
     setSendCounts(null)
+    setSendCountsFailed(false)
     setQuota(null)
     setNotice(null)
     setCloseConfirmOpen(false)
@@ -813,7 +833,18 @@ function LineNotificationsPage() {
       setOverview(overviewRes.data)
       setDefinitions(loadedDefinitions)
       setMetrics(metricRes?.success ? metricRes.data.items : [])
-      setSendCounts(sendCountsRes?.success ? sendCountsRes.data : null)
+      if (sendCountsRes?.success && isSendCountsData(sendCountsRes.data)) {
+        setSendCounts(sendCountsRes.data)
+        setSendCountsFailed(false)
+      } else if (needCustomer) {
+        // 顧客タブで読もうとして取れなかった・形が違ったときだけ「読み込めなかった」にする。
+        // 運用者・記録タブでは読んでいないので失敗扱いにしない。
+        setSendCounts(null)
+        setSendCountsFailed(true)
+      } else {
+        setSendCounts(null)
+        setSendCountsFailed(false)
+      }
       setQuota(quotaRes?.success ? quotaRes.data.quota : null)
       setExpanded((current) => withDrafts.some((setting) => setting.eventType === current) ? current : null)
       if (restoredEvents.length > 0) {
@@ -836,10 +867,14 @@ function LineNotificationsPage() {
    * ECの取り込み件数（overview.byType）やLINE集計の全期間合計（metrics）は
    * 混ぜない。口がまだ返っていないときだけ null（「—」表示）にする。
    */
-  const sendCountMaps = useMemo(() => ({
-    today: new Map(sendCounts?.byEventType.map((item) => [item.eventType, item.today]) ?? []),
-    last30d: new Map(sendCounts?.byEventType.map((item) => [item.eventType, item.last30d]) ?? []),
-  }), [sendCounts])
+  const sendCountMaps = useMemo(() => {
+    // 形が違う値が混ざっても落ちないよう、配列のときだけ数える。
+    const rows = Array.isArray(sendCounts?.byEventType) ? sendCounts.byEventType : []
+    return {
+      today: new Map(rows.map((item) => [item.eventType, item.today])),
+      last30d: new Map(rows.map((item) => [item.eventType, item.last30d])),
+    }
+  }, [sendCounts])
   // N-338: 行の「今日」列と同じ数で多い順に並べ、説明文と一致させる。
   const sentCountOf = useCallback((eventType: string): number | null =>
     sendCounts ? (sendCountMaps.today.get(eventType) ?? 0) : null, [sendCounts, sendCountMaps])
@@ -869,7 +904,7 @@ function LineNotificationsPage() {
     return settings.length
   }
   const sentBreakdown = useMemo(() => {
-    if (!sendCounts) return ''
+    if (!sendCounts || !Array.isArray(sendCounts.byEventType)) return ''
     const labelOf = new Map(settings.map((setting) => [setting.eventType, setting.label]))
     const ranked = [...sendCounts.byEventType]
       .filter((item) => item.today > 0)
@@ -881,11 +916,19 @@ function LineNotificationsPage() {
     ready: loadState === 'ready' && overview !== null,
     settingsCount: settings.length,
     enabledCount: settings.filter((setting) => setting.isEnabled).length,
-    sentToday: sendCounts?.sentToday ?? null,
+    sentToday: typeof sendCounts?.sentToday === 'number' ? sendCounts.sentToday : null,
     sentBreakdown,
     failed: overview?.failed ?? null,
     quota,
   })
+  /*
+   * send-countsだけ取れなかったときは、そのカードだけ「取得できませんでした」にする。
+   * 一覧全体は ListState error にしない（設定・定義は表示を続ける）。
+   * 見た目は共通の失敗の1枚と同じ中立（赤を使わない。★V7 `x63W5x`）。
+   */
+  const kpisWithSendCountsState = sendCountsFailed
+    ? kpis.map((kpi) => kpi.label === '今日 送った' ? { ...kpi, note: '送信件数を取得できませんでした' } : kpi)
+    : kpis
   const tabsWithCounts = TABS.map((item) => {
     if (item.key === 'customer') return { ...item, label: `${item.label} ${loadState === 'ready' ? settings.length : '—'}` }
     // N-341: 運用者タブの件数は実データ。取れなかったときは「取得失敗」と区別する。
@@ -1176,15 +1219,23 @@ function LineNotificationsPage() {
       KpiCollapseの中に入れるのは、狭い幅で畳む対象から外さないため。
     */}
     <KpiCollapse data-design="KPIs" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      {kpis.filter((kpi) => kpi.group === 'notice').map(renderKpiCard)}
+      {kpisWithSendCountsState.filter((kpi) => kpi.group === 'notice').map(renderKpiCard)}
       <section className="sm:col-span-2 xl:col-span-4" aria-label="今月の送信枠">
         <p className="text-ink-faint mb-2 text-xs font-semibold">今月の送信枠（LINE公式アカウントの月間上限）</p>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          {kpis.filter((kpi) => kpi.group === 'quota').map(renderKpiCard)}
+          {kpisWithSendCountsState.filter((kpi) => kpi.group === 'quota').map(renderKpiCard)}
         </div>
       </section>
     </KpiCollapse>
     <div><NoteBar help="お知らせは売り込みではなく取引に必要な連絡です" helpLabel="お知らせの意味">これは「お知らせ」であって「売り込みの配信」ではありません。顧客が配信を止めていても、取引に必要な連絡は届きます。</NoteBar></div>
+    {/*
+      send-countsだけ読み込めなかったときの部分表示。一覧全体は残す。
+      共通ボタン（副・小）で読み直せる。赤は使わない（★V7 `x63W5x`）。
+    */}
+    {sendCountsFailed && loadState === 'ready' ? <div className="flex flex-wrap items-center gap-2">
+      <p className="text-xs text-ink-faint">送信件数を読み込めませんでした。時間をおいて、もう一度お試しください。</p>
+      <Button variant="secondary" size="compact" onClick={() => void load()}>もう一度読み込む</Button>
+    </div> : null}
 
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="grid w-full max-w-[48rem] grid-cols-2 gap-2 lg:grid-cols-4" aria-label="お知らせの絞り込み">
@@ -1213,8 +1264,8 @@ function LineNotificationsPage() {
               <p className="mt-0.5 truncate text-xs text-ink-faint">{formatUpdatedAt(setting.updatedAt)}</p>
             </div>
             <span className="text-sm text-ink-secondary">{timingLabel(setting)}</span>
-            <span className="text-sm tabular-nums text-ink-secondary">{sentCountOf(setting.eventType) ?? '—'}通</span>
-            <span className="text-sm tabular-nums text-ink-secondary">{sent30dOf(setting.eventType) ?? '—'}通</span>
+            <span className="text-sm tabular-nums text-ink-secondary">{sendCountsFailed ? '取得失敗' : `${sentCountOf(setting.eventType) ?? '—'}通`}</span>
+            <span className="text-sm tabular-nums text-ink-secondary">{sendCountsFailed ? '取得失敗' : `${sent30dOf(setting.eventType) ?? '—'}通`}</span>
             <span className="text-sm text-ink-faint">{(() => {
               const displayed = metricByEvent.get(setting.eventType)?.displayed
               if (!displayed || displayed.value === null) return displayed?.state === 'pending' ? '集計待ち' : '— 未取得'
