@@ -25,6 +25,7 @@ import { checkedAtText, placeholderText } from '../delete-impact'
 import Button from '@/components/shared/button'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 import StickyBar from '@/components/shared/sticky-bar'
 import TargetMissing from '@/components/shared/target-missing'
 import {
@@ -586,9 +587,7 @@ function EditCommonVarInner() {
       </nav>
 
       {error && item && (
-        <div className="bg-danger-bg border-danger-bg text-danger mb-4 max-w-3xl rounded-lg border p-4 text-sm">
-          {error}
-        </div>
+        <Notice tone="danger" message={error} onClose={() => setError('')} className="mb-4 max-w-3xl" />
       )}
 
       {loading || !item ? (

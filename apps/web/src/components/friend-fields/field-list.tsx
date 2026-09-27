@@ -12,6 +12,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import SummaryCard from '@/components/shared/summary-card'
+import Notice from '@/components/shared/notice'
 import { STATE_TEXT, notConnectedText } from '@/components/shared/not-connected'
 import { Th } from '@/components/shared/table'
 
@@ -282,12 +283,13 @@ export default function FriendFieldList({ accountId }: { accountId: string | nul
       </div>
 
       {status === 'ready' && actionError ? (
-        <p role="alert" className="mb-4 rounded-control border border-danger/20 bg-danger-bg p-3 text-sm text-danger">
-          {actionError}
-          {retryOrder ? (
+        <Notice
+          tone="danger"
+          className="mb-4"
+          action={retryOrder ? (
             <button
               type="button"
-              className="ml-2 font-semibold underline underline-offset-2"
+              className="font-semibold underline underline-offset-2"
               onClick={() => {
                 const next = retryOrder
                 setRetryOrder(null)
@@ -296,8 +298,10 @@ export default function FriendFieldList({ accountId }: { accountId: string | nul
             >
               再試行
             </button>
-          ) : null}
-        </p>
+          ) : undefined}
+        >
+          {actionError}
+        </Notice>
       ) : null}
 
       <div className="overflow-hidden rounded-card border border-hairline bg-canvas [box-shadow:1px_1px_2px_rgba(15,23,42,0.10)]">

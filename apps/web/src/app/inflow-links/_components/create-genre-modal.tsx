@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { X } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
+import Notice from '@/components/shared/notice'
 import type { EntryRouteGenre } from '@line-crm/shared'
 
 export default function GenreModal({
@@ -55,7 +56,7 @@ export default function GenreModal({
         <p className="mt-1 text-sm text-ink-secondary">
           協力会社名や媒体グループなど、リンクをまとめる名前を入力してください。
         </p>
-        {error && <p className="mt-4 rounded-lg bg-status-danger-soft p-3 text-sm text-danger">{error}</p>}
+        {error && <Notice tone="danger" message={error} className="mt-4" />}
         <label className="mt-5 block text-sm font-medium text-ink" htmlFor="new-referral-genre">
           ジャンル名
         </label>

@@ -14,6 +14,7 @@ import FeatureGate from '@/components/feature-gate'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Notice from '@/components/shared/notice'
 import StickyBar from '@/components/shared/sticky-bar'
 
 /**
@@ -331,9 +332,7 @@ function NewCommonVarInner() {
   return (
     <div>
       {!accountLoading && !selectedAccountId && (
-        <div className="bg-warning-bg text-warning mb-4 rounded-card p-4 text-sm">
-          共通情報を登録するLINEアカウントを選択してください。
-        </div>
+        <Notice tone="warn" message="共通情報を登録するLINEアカウントを選択してください。" className="mb-4" />
       )}
       <nav className="text-ink-faint mb-3 text-xs">
         <Link href="/contents/vars" className="text-info underline">
@@ -346,13 +345,13 @@ function NewCommonVarInner() {
       {/* ★V7: ほかの新規画面と同じ「本体＋右の案内」の2列にする。右の文は画面内の既存の文だけを使う。注意は入力より先に読ませる（読み上げ順もこの順）。 */}
       <div className="grid items-start gap-4 xl:grid-cols-3">
       <aside className="space-y-4 xl:col-start-3 xl:row-start-1" aria-label="登録の案内">
-        <div className="bg-warning-bg text-warning rounded-card border border-current/20 p-4 text-sm" role="note">
+        <Notice tone="warn">
           <p className="font-semibold">秘密値は保存しないでください</p>
           <p className="mt-1 leading-relaxed">
             パスワード、APIトークン、秘密鍵などは共通情報に入力しないでください。
             配信文へ誤って差し込まれるおそれがあります。
           </p>
-        </div>
+        </Notice>
         <section className="bg-canvas rounded-card border-hairline border p-4">
           <h2 className="text-ink text-sm font-bold">差し込み名の決めかた</h2>
           <p className="text-ink-faint mt-1 text-xs leading-relaxed">

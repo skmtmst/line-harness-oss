@@ -7,6 +7,7 @@ import Progress from '@/components/shared/progress'
 import SelectField from '@/components/shared/select-field'
 import Avatar from '@/components/shared/avatar'
 import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
 import { ChevronDown } from 'lucide-react'
 
 interface LineAccount {
@@ -212,9 +213,7 @@ export default function HealthPage() {
 
       {/* Error */}
       {error && (
-        <div className="mb-4 p-4 bg-danger-bg border border-danger/30 rounded-card text-danger text-sm">
-          {error}
-        </div>
+        <Notice tone="danger" message={error} onClose={() => setError('')} className="mb-4" />
       )}
 
       {/* Loading */}
@@ -397,16 +396,19 @@ export default function HealthPage() {
                 移行履歴を読み込んでいます...
               </div>
             ) : migrationLoadState === 'error' ? (
-              <div className="border-danger bg-danger-bg text-danger rounded-card border p-8 text-center">
-                <p>移行履歴を取得できませんでした。</p>
-                <button
-                  type="button"
-                  onClick={() => void loadMigrations()}
-                  className="text-action mt-3 text-sm font-medium underline underline-offset-2"
-                >
-                  再読み込み
-                </button>
-              </div>
+              <Notice
+                tone="danger"
+                message="移行履歴を取得できませんでした。"
+                action={
+                  <button
+                    type="button"
+                    onClick={() => void loadMigrations()}
+                    className="text-sm font-medium underline underline-offset-2"
+                  >
+                    再読み込み
+                  </button>
+                }
+              />
             ) : migrations.length === 0 ? (
               <div className="bg-canvas rounded-card border border-hairline p-8 text-center text-ink-faint">
                 移行履歴はありません

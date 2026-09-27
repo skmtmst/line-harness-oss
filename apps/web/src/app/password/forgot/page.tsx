@@ -6,6 +6,7 @@ import { useCallback, useRef, useState, type FormEvent } from 'react'
 import AuthCard, { AuthField } from '@/components/auth/auth-card'
 import Turnstile, { type TurnstileHandle } from '@/components/auth/turnstile'
 import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
 import { TextField } from '@/components/shared/text-field'
 import { authRequest, emailError, TURNSTILE_SITE_KEY } from '@/lib/auth-email'
 
@@ -81,9 +82,7 @@ export default function PasswordForgotPage() {
     >
       <form onSubmit={(event) => void submit(event)} noValidate className="flex w-full flex-col gap-4">
         {error ? (
-          <p role="alert" className="rounded-control bg-status-danger-soft px-4 py-3 text-label text-danger">
-            {error}
-          </p>
+          <Notice tone="danger" message={error} />
         ) : null}
         <AuthField label="メールアドレス" hint="登録時のメールアドレス" htmlFor="forgot-email" error={emailMessage}>
           <TextField

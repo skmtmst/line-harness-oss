@@ -17,6 +17,7 @@ import { canEditFeature } from '@/lib/staff-capability'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import DateField from '@/components/shared/date-field'
+import Notice from '@/components/shared/notice'
 import { TimeField } from '@/components/shared/date-time-field'
 import ListState from '@/components/shared/list-state'
 import { shortDate } from '../../lib/format-time'
@@ -839,9 +840,9 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
         </label>
       </div>
 
-      <div className="bg-info-bg text-info rounded-card px-4 py-3 text-sm">
+      <Notice tone="info">
         {staff.display_name}の出る時間と外の予定です。下の予約枠にすぐ反映されます。時間は店舗の時間（{timeZone}）で入れます。
-      </div>
+      </Notice>
 
       {/* N-411: 本人勤務が閲覧のみのときは全編集部品をまとめて無効化する。
           fieldset disabled で配下の入力・ボタンを一括で止める（API 側も 403 で拒否）。 */}
@@ -1120,7 +1121,7 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
             <h2 className="text-ink font-semibold">外の予定</h2>
             <p className="text-ink-faint mt-1 text-xs">Googleカレンダーの予定がある時間は、予約枠を閉じます。</p>
             {!serviceConfigured ? (
-              <p className="bg-warning-bg text-warning mt-3 rounded-control p-3 text-xs">Googleの接続設定がまだなのでつなげません。管理者に連絡してください。</p>
+              <Notice tone="warn" message="Googleの接続設定がまだなのでつなげません。管理者に連絡してください。" className="mt-3" />
             ) : null}
             {calendarId ? (
               <div className="mt-3 space-y-2 text-sm">

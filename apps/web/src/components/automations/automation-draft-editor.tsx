@@ -11,6 +11,7 @@ import ListState from '@/components/shared/list-state'
 import TargetMissing from '@/components/shared/target-missing'
 import Select from '@/components/shared/select'
 import { useCanManageAutomations } from './use-automation-permission'
+import Notice from '@/components/shared/notice'
 
 // #734: きっかけ・処理の選択肢は共有の正本から描画する。新規作成と同じ一覧。
 const EVENTS: Array<{ value: AutomationDraftDetail['eventType']; label: string }> = AUTOMATION_DRAFT_TRIGGER_OPTIONS.map(
@@ -436,9 +437,9 @@ export default function AutomationDraftEditor({ draftId }: { draftId: string }) 
           <TextArea id="au-message" rows={4} value={actionMessage} onChange={(event) => setActionMessage(event.target.value)} />
         </Field>
       )}
-      <p className="rounded-control bg-warning-bg px-3 py-2 text-xs leading-5 text-warning">
+      <Notice tone="warn">
         保存しても自動では動きません。公開するまでは下書きのままです。
-      </p>
+      </Notice>
     </CreatePage>
   )
 }
