@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useParams } from 'react-router-dom';
 import liff from '@line/liff';
 import { api, type WebinarState, type WebinarSakuraComment } from '../lib/api.js';
 import { logFailure } from '../lib/user-message.js';
-import LoadErrorView from '../components/LoadErrorView.js';
 import LoadingView from '../components/LoadingView.js';
+import StatusView from '../components/ui/StatusView.js';
+import Icon from '../components/ui/Icon.js';
 
 // 疑似ライブプレーヤー。時刻の権威はサーバー:
 //   期待位置 = state.offsetSeconds + (performance.now() - t0) / 1000
@@ -27,14 +28,24 @@ function formatJp(epoch: number): string {
   });
 }
 
+/**
+ * ウェビナー (7-webinar)。
+ * 動画に集中できる暗い地はそのまま。途中で出るボタン (名前は管理画面で
+ * 決める) と送信は濃い緑、残り時間は大きく出す。
+ *
+ * 時刻の同期・ハートビート・CTA の計測は変えない。見た目だけ ★V7 にする。
+ */
 export default function Webinar() {
   const { slug } = useParams<{ slug: string }>();
   const [state, setState] = useState<WebinarState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
+  /** この端末では再生できない (HLS 非対応など)。読み直しても直らない。 */
+  const [unplayable, setUnplayable] = useState(false);
   const [ended, setEnded] = useState(false);
   const [needsTap, setNeedsTap] = useState(false);
-  const [countdown, setCountdown] = useState('');
+  /** 開始までの残り秒。箱 (7-a) に分・秒で出す。 */
+  const [remainSec, setRemainSec] = useState(0);
   const [chat, setChat] = useState<ChatItem[]>([]);
   const [input, setInput] = useState('');
   const [ctaVisible, setCtaVisible] = useState(false);
@@ -78,24 +89,20 @@ export default function Webinar() {
     void load();
   }, [load]);
 
-  // 待機画面: カウントダウン + 開始時刻到達で自動リロード
+  // 待機画面: 残り秒を数える + 開始時刻到達で自動リロード
   useEffect(() => {
     if (!state || state.live) return;
     if (state.nextSessionAt === null) return;
-    const timer = setInterval(() => {
+    const tick = () => {
       const remain = state.nextSessionAt! - Math.floor(Date.now() / 1000);
       if (remain <= 0) {
-        clearInterval(timer);
         void load();
         return;
       }
-      const h = Math.floor(remain / 3600);
-      const m = Math.floor((remain % 3600) / 60);
-      const s = remain % 60;
-      setCountdown(
-        h > 0 ? `${h}時間${String(m).padStart(2, '0')}分` : `${m}分${String(s).padStart(2, '0')}秒`,
-      );
-    }, 1000);
+      setRemainSec(remain);
+    };
+    tick();
+    const timer = setInterval(tick, 1000);
     return () => clearInterval(timer);
   }, [state, load]);
 
@@ -116,7 +123,7 @@ export default function Webinar() {
         const { default: Hls } = await import('hls.js');
         if (cancelled) return;
         if (!Hls.isSupported()) {
-          setError('この端末では再生できません。');
+          setUnplayable(true);
           return;
         }
         const instance = new Hls();
@@ -229,42 +236,152 @@ export default function Webinar() {
     else window.open(url, '_blank', 'noopener');
   };
 
-  if (loadFailed) return <LoadErrorView onRetry={() => void load()} />;
-  if (error) return <LoadErrorView message={error} onRetry={() => void load()} />;
-  if (!state) return <LoadingView />;
+  // ---- 暗い地の共通の殻 ----
+  const shell = (content: ReactNode) => (
+    <div className="min-h-screen bg-night text-white">
+      <div className="mx-auto w-full max-w-md px-4 pt-4 pb-12">{content}</div>
+    </div>
+  );
 
-  // ---- 待機画面 ----
-  if (!state.live) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-gray-900 p-6 text-white">
-        <p className="mb-2 text-sm text-gray-400">次回のライブ配信</p>
-        <h1 className="mb-6 text-center text-xl font-bold">{state.title}</h1>
-        {state.nextSessionAt !== null ? (
-          <>
-            <p className="text-lg">{formatJp(state.nextSessionAt)} 開始</p>
-            <p className="mt-4 text-3xl font-mono font-bold">{countdown}</p>
-            <p className="mt-6 text-sm text-gray-400">開始時刻になると自動的に始まります</p>
-          </>
-        ) : (
-          <p className="text-gray-400">次回の開催は未定です</p>
-        )}
-      </div>
+  // 読み込めなかった時 (7 の注記: 5-b と同じ文面。暗い地なので白文字で出す)。
+  if (loadFailed) {
+    return shell(
+      <StatusView
+        dark
+        icon="cloud-off"
+        title="読み込めませんでした"
+        body="電波の良いところで、もう一度お試しください。"
+        action={{ label: 'もう一度読み込む', onClick: () => void load() }}
+      />,
+    );
+  }
+  // 友だち追加前 (7-e)。足す操作は LINE 側なのでボタンは出さない。
+  if (error) {
+    return shell(
+      <StatusView
+        dark
+        icon="user-plus"
+        title="友だち追加すると見られます"
+        body="この配信は、LINEで友だち追加した方だけが見られます。友だち追加のあと、もう一度開いてください。"
+      />,
+    );
+  }
+  // この端末では再生できない。読み直しても直らないので再試行は出さない。
+  if (unplayable) {
+    return shell(
+      <StatusView
+        dark
+        icon="info"
+        title="この端末では再生できません"
+        body="別の端末かブラウザで開いてください。"
+      />,
+    );
+  }
+  if (!state) {
+    return shell(
+      <div role="status" aria-live="polite" aria-busy="true" aria-label="読み込み中">
+        <div className="space-y-3" aria-hidden="true">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="flex animate-pulse gap-3 rounded-xl bg-night-soft p-4">
+              <div className="h-12 w-12 shrink-0 rounded-lg bg-night-line" />
+              <div className="flex flex-1 flex-col justify-center gap-2">
+                <div className="h-3 w-2/5 rounded bg-night-line" />
+                <div className="h-3 w-4/5 rounded bg-night-line" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>,
     );
   }
 
-  // ---- ライブ / 終了画面 ----
+  // ---- 待機画面 (7-a) ----
+  if (!state.live) {
+    if (state.nextSessionAt === null) {
+      return shell(
+        <StatusView
+          dark
+          icon="clock"
+          title={state.title}
+          body="次回の開催は未定です。"
+        />,
+      );
+    }
+    const h = Math.floor(remainSec / 3600);
+    const m = Math.floor((remainSec % 3600) / 60);
+    const s = remainSec % 60;
+    const boxes =
+      h > 0
+        ? [
+            { value: h, unit: '時間' },
+            { value: m, unit: '分' },
+            { value: s, unit: '秒' },
+          ]
+        : [
+            { value: m, unit: '分' },
+            { value: s, unit: '秒' },
+          ];
+    return shell(
+      <div className="flex flex-col items-center px-6 py-10 text-center">
+        <span
+          className="flex h-16 w-16 items-center justify-center rounded-full bg-night-soft text-night-faint"
+          aria-hidden="true"
+        >
+          <Icon name="clock" className="h-7 w-7" />
+        </span>
+        <p className="mt-4 text-sm text-night-faint">次のライブ配信</p>
+        <h1 className="mt-1 text-xl font-bold text-white">{state.title}</h1>
+        <p className="mt-3 text-sm font-bold text-white">{formatJp(state.nextSessionAt)} 開始</p>
+        <div
+          className="mt-4 flex gap-2"
+          role="timer"
+          aria-label={`開始まであと${h > 0 ? `${h}時間` : ''}${m}分${s}秒`}
+        >
+          {boxes.map((box) => (
+            <div
+              key={box.unit}
+              className="flex min-w-20 flex-col items-center rounded-xl bg-night-soft px-4 py-3"
+            >
+              <span className="text-3xl font-bold text-white tabular-nums">
+                {String(box.value).padStart(2, '0')}
+              </span>
+              <span className="mt-1 text-xs text-night-faint">{box.unit}</span>
+            </div>
+          ))}
+        </div>
+        <p className="mt-6 text-xs leading-relaxed text-night-faint">
+          時間になると、この画面のまま自動で始まります。
+          <br />
+          閉じずにお待ちください。
+        </p>
+      </div>,
+    );
+  }
+
+  // ---- 終了 (7-d) ----
+  if (ended) {
+    return shell(
+      <StatusView
+        dark
+        icon="circle-check"
+        title="ご視聴ありがとうございました"
+        body="配信は終了しました"
+      />,
+    );
+  }
+
+  // ---- ライブ中 (7-b・7-c) ----
   return (
-    <div className="flex h-screen flex-col bg-gray-900 text-white">
+    <div className="flex h-screen flex-col bg-night text-white">
       <div className="relative">
         <video ref={videoRef} className="w-full" playsInline />
-        {!ended && (
-          <span className="absolute left-2 top-2 rounded bg-red-600 px-2 py-0.5 text-xs font-bold">
-            ● LIVE
-          </span>
-        )}
-        {needsTap && videoRef.current?.muted && !ended && (
+        <span className="absolute top-2 left-2 rounded bg-danger px-2 py-0.5 text-xs font-bold text-white">
+          ● ライブ
+        </span>
+        {needsTap && (
           <button
-            className="absolute inset-0 flex items-center justify-center bg-black/60"
+            type="button"
+            className="absolute right-2 bottom-2 inline-flex min-h-11 items-center gap-1 rounded-full bg-night-soft px-3 text-xs font-bold text-white"
             onClick={() => {
               const v = videoRef.current;
               if (v) {
@@ -274,59 +391,55 @@ export default function Webinar() {
               setNeedsTap(false);
             }}
           >
-            <span className="rounded-full bg-white px-6 py-3 font-bold text-gray-900">
-              タップして音声をON
-            </span>
+            <Icon name="volume-x" className="h-4 w-4" />
+            タップで音声ON
           </button>
-        )}
-        {ended && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80">
-            <p className="text-lg font-bold">配信は終了しました</p>
-            <p className="mt-2 text-sm text-gray-300">ご視聴ありがとうございました</p>
-          </div>
         )}
       </div>
 
       <div ref={chatBoxRef} className="flex-1 overflow-y-auto p-3 text-sm">
         {chat.map((item) => (
           <div key={item.key} className="mb-2">
-            <span className={item.mine ? 'font-bold text-green-400' : 'font-bold text-blue-300'}>
+            <span className={item.mine ? 'font-bold text-night-mine' : 'font-bold text-night-name'}>
               {item.authorName}
             </span>{' '}
-            <span className="text-gray-100">{item.body}</span>
+            <span className="text-white">{item.body}</span>
           </div>
         ))}
       </div>
 
       {ctaVisible && state.cta && (
         <button
+          type="button"
           onClick={clickCta}
-          className="mx-3 mb-2 rounded-lg bg-orange-500 py-3 text-center font-bold text-white shadow-lg"
+          className="mx-3 mb-2 flex items-center justify-center gap-2 rounded-lg bg-accent-deep py-3 text-center text-sm font-bold text-white"
         >
+          <Icon name="send" className="h-4 w-4" />
           {state.cta.label}
         </button>
       )}
 
-      {!ended && (
-        <div className="flex gap-2 border-t border-gray-700 p-2">
-          <input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') void sendComment();
-            }}
-            placeholder="コメントを入力..."
-            maxLength={500}
-            className="flex-1 rounded bg-gray-800 px-3 py-2 text-sm text-white placeholder-gray-500"
-          />
-          <button
-            onClick={() => void sendComment()}
-            className="rounded bg-blue-600 px-4 py-2 text-sm font-bold"
-          >
-            送信
-          </button>
-        </div>
-      )}
+      <div className="flex items-center gap-2 border-t border-night-line p-2">
+        <input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') void sendComment();
+          }}
+          placeholder="コメントを書く"
+          maxLength={500}
+          aria-label="コメントを書く"
+          className="min-h-11 flex-1 rounded-full bg-night-soft px-4 text-sm text-white placeholder-night-faint"
+        />
+        <button
+          type="button"
+          onClick={() => void sendComment()}
+          aria-label="送信"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent-deep text-white"
+        >
+          <Icon name="send" className="h-4 w-4" />
+        </button>
+      </div>
     </div>
   );
 }

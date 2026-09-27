@@ -3,7 +3,6 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import {
   PREFECTURES,
   collectInputs,
-  formThemeButtonText,
   isOtherFreeText,
   nextSectionIndex,
   normalizeFormTheme,
@@ -12,6 +11,7 @@ import {
   type FormInputBlock,
   type FormLayout,
 } from '@line-crm/shared';
+import { submitButtonText } from '../lib/form-button-text.js';
 import { api, type PublicForm } from '../lib/api.js';
 import {
   conflictMessage,
@@ -21,6 +21,10 @@ import {
 import { logFailure } from '../lib/user-message.js';
 import LoadErrorView from '../components/LoadErrorView.js';
 import LoadingView from '../components/LoadingView.js';
+import Button from '../components/ui/Button.js';
+import BottomBar from '../components/ui/BottomBar.js';
+import StatusView from '../components/ui/StatusView.js';
+import Icon from '../components/ui/Icon.js';
 
 /**
  * 回答フォーム（友だちが実際に入力する画面）。
@@ -54,8 +58,25 @@ function initialAnswers(layout: FormLayout): Answers {
   return answers;
 }
 
-function Asterisk() {
-  return <span className="ml-1 rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] text-red-700">必須</span>;
+/**
+ * 必須の印。★V7 (4-a) は欄名の横の小さな太字で、色は待ちの札と同じ琥珀。
+ * 入力の失敗の赤 (お店のテーマの error) とは分け、必須は常に琥珀にする。
+ */
+function RequiredMark() {
+  return (
+    <span className="ml-1 text-xs font-bold whitespace-nowrap text-wait-ink">
+      必須
+    </span>
+  );
+}
+
+/**
+ * 送信ボタンの文字。管理画面で決めた名前があればそれを使い、
+ * 決めていないとき (空・旧い既定の「送信」) は設計どおり「送信する」。
+ */
+function submitLabelText(label: string | undefined): string {
+  if (label && label !== '送信') return label;
+  return '送信する';
 }
 
 /** 'YYYY-MM-DD' を [年, 月, 日] に分ける。形でない値は空3つにする。 */
@@ -126,7 +147,7 @@ function DateYmdField({
             className={partClass}
             style={{ width: i === 0 ? '4.5rem' : '3.25rem' }}
           />
-          <span className="text-sm text-gray-500">{spec.label}</span>
+          <span className="text-sm text-ink-faint">{spec.label}</span>
         </span>
       ))}
     </div>
@@ -173,6 +194,11 @@ export default function Form() {
   const [sending, setSending] = useState(false);
   const [done, setDone] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  /**
+   * 欄ごとの直し方。★V7 (4-a) は欄のすぐ下に出す。
+   * 画面下の `error` はサーバの失敗 (送信・画像) だけに使い、検証とは分ける。
+   */
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   /** 送信中のファイル欄。二重に押させないため欄ごとに持つ */
   const [uploading, setUploading] = useState<Record<string, boolean>>({});
   const [reloadKey, setReloadKey] = useState(0);
@@ -236,10 +262,21 @@ export default function Form() {
     return nextSectionIndex(layout, sectionIndex, answers) >= layout.sections.length;
   }, [layout, sectionIndex, answers]);
 
-  const setValue = (name: string, value: unknown) =>
-    setAnswers((prev) => ({ ...prev, [name]: value }));
+  /** 欄を直したら、その欄の直し方を消す (直したのに残らないため)。 */
+  const clearFieldError = (name: string) =>
+    setFieldErrors((prev) => {
+      if (!(name in prev)) return prev;
+      const next = { ...prev };
+      delete next[name];
+      return next;
+    });
 
-  const toggleCheckbox = (name: string, label: string) =>
+  const setValue = (name: string, value: unknown) => {
+    setAnswers((prev) => ({ ...prev, [name]: value }));
+    clearFieldError(name);
+  };
+
+  const toggleCheckbox = (name: string, label: string) => {
     setAnswers((prev) => {
       const current = Array.isArray(prev[name]) ? (prev[name] as string[]) : [];
       return {
@@ -249,6 +286,8 @@ export default function Form() {
           : [...current, label],
       };
     });
+    clearFieldError(name);
+  };
 
   /**
    * 画像を預けて、回答にはURLを入れる。
@@ -263,6 +302,7 @@ export default function Form() {
     try {
       const res = await api.uploadFormFile(id, file);
       setValue(name, res.data.url);
+      clearFieldError(name);
     } catch (err) {
       logFailure('form-upload', err);
       setError('画像を送れませんでした。もう一度お試しください。');
@@ -271,21 +311,24 @@ export default function Form() {
     }
   };
 
-  /** このページだけを見る。次のページの必須は、そこへ着くまで問わない。 */
-  const validateCurrent = (): string | null => {
+  /**
+   * このページだけを見る。次のページの必須は、そこへ着くまで問わない。
+   * 直し方は欄ごとに返し、呼び出し側が欄の下へ出す。
+   */
+  const validateVisible = (): { errors: Record<string, string>; first: string | null } => {
+    const errors: Record<string, string> = {};
     for (const block of visibleInputs) {
+      if (block.name in errors) continue;
       const message = validateAnswer(block, answers[block.name]);
-      if (message) return message;
+      if (message) errors[block.name] = message;
     }
-    return null;
+    return { errors, first: Object.values(errors)[0] ?? null };
   };
 
   const goNext = () => {
-    const message = validateCurrent();
-    if (message) {
-      setError(message);
-      return;
-    }
+    const { errors, first } = validateVisible();
+    setFieldErrors(errors);
+    if (first) return;
     setError(null);
     if (!layout) return;
     const to = nextSectionIndex(layout, sectionIndex, answers);
@@ -371,11 +414,9 @@ export default function Form() {
 
   const submit = async (keyOverride?: string) => {
     if (!id || !layout) return;
-    const message = validateCurrent();
-    if (message) {
-      setError(message);
-      return;
-    }
+    const { errors, first } = validateVisible();
+    setFieldErrors(errors);
+    if (first) return;
     if (layout.options?.confirmDialog?.enabled && !confirming && !keyOverride) {
       setConfirming(true);
       return;
@@ -413,124 +454,154 @@ export default function Form() {
 
   if (!form || !layout) return null;
 
+  const options = layout.options ?? {};
+  const theme = normalizeFormTheme(options.theme);
+  /**
+   * デザイン設定でフォームの色を決めているときだけ true。
+   * 決めていなければ殻 (bg-ground) の灰色のままにし、既定の薄緑は付けない。
+   */
+  const hasCustomTheme = options.theme !== undefined && options.theme !== null;
+
   if (!form.isActive) {
     return (
-      <div className="p-8 text-center text-sm text-gray-500">
-        このフォームは、いま回答を受け付けていません。
+      <div className="mx-auto max-w-md" style={{ backgroundColor: theme.sub }}>
+        <StatusView icon="calendar" title="このフォームは、いま回答を受け付けていません。" />
       </div>
     );
   }
 
   if (done) {
     return (
-      <div className="mx-auto max-w-md p-8 text-center">
-        <p className="text-base font-bold text-gray-900">送信しました</p>
-        <p className="mt-2 text-sm whitespace-pre-wrap text-gray-600">
-          {layout.options?.thanksText || 'ご回答ありがとうございました。'}
-        </p>
+      <div className="mx-auto max-w-md" style={{ backgroundColor: theme.sub }}>
+        <StatusView
+          icon="check"
+          tone="success"
+          title="送信しました"
+          body={layout.options?.thanksText || 'ご回答ありがとうございました。'}
+        />
       </div>
     );
   }
 
-  const options = layout.options ?? {};
-  const theme = normalizeFormTheme(options.theme);
   const multi = layout.sections.length > 1;
   const radius = theme.cornerRadius === 'none' ? '0' : theme.cornerRadius === 'round' ? '1rem' : '0.5rem';
 
   return (
-    <div
-      className="mx-auto min-h-screen max-w-md p-4 pb-24"
-      style={{
-        color: theme.text,
-        backgroundColor: theme.sub,
-        backgroundImage: theme.backgroundImageUrl ? `url(${theme.backgroundImageUrl})` : undefined,
-        backgroundPosition: 'center',
-        backgroundSize: 'cover',
-        fontFamily: theme.fontFamily === 'serif' ? 'serif' : 'sans-serif',
-      }}
-    >
-      {multi && options.sectionHeader !== 'none' && (
-        <div className="mb-4 flex items-center justify-center gap-2">
-          {layout.sections.map((s, i) => (
-            <span
-              key={s.id}
-              className={`text-xs tabular-nums ${
-                i === sectionIndex ? 'font-bold' : 'text-gray-400'
-              }`}
-              style={i === sectionIndex ? { color: theme.main } : undefined}
-            >
-              {options.sectionHeader === 'name' ? s.name : i + 1}
-            </span>
-          ))}
-        </div>
-      )}
-
-      <div className="space-y-5">
-        {[...layout.header, ...(section?.blocks ?? [])].map((block) => (
-          <BlockView
-            key={block.id}
-            block={block}
-            answers={answers}
-            onChange={setValue}
-            onToggle={toggleCheckbox}
-            onUpload={uploadFile}
-            uploading={!!uploading[block.kind === 'input' ? block.name : '']}
-          />
-        ))}
-      </div>
-
-      {error && (
-        <p className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
-      )}
-
-      {conflict && (
-        <button
-          onClick={resendWithFreshKey}
-          disabled={sending}
-          className="mt-2 w-full rounded-lg border border-gray-300 py-3 text-sm font-bold text-gray-700 disabled:opacity-50"
-        >
-          {conflict.code === 'idempotency_expired' ? 'もう一度送る' : '別の回答として送り直す'}
-        </button>
-      )}
-
-      <div className="mt-6 flex gap-2">
-        {trail.length > 0 && (
-          <button
-            onClick={goBack}
-            className="flex-1 rounded-lg border border-gray-300 py-3 text-sm font-medium text-gray-700"
-          >
-            {options.prevLabel || '前へ'}
-          </button>
+    <div className="min-h-screen bg-ground">
+      <div
+        className="mx-auto min-h-screen w-full max-w-md px-4 pt-4 pb-28"
+        style={{
+          color: theme.text,
+          backgroundColor: hasCustomTheme ? theme.sub : undefined,
+          backgroundImage: theme.backgroundImageUrl ? `url(${theme.backgroundImageUrl})` : undefined,
+          backgroundPosition: 'center',
+          backgroundSize: 'cover',
+          fontFamily: theme.fontFamily === 'serif' ? 'serif' : 'sans-serif',
+        }}
+      >
+        {options.pageTitle && (
+          <div className="-mx-4 -mt-4 border-b border-hairline bg-canvas px-4 py-3.5">
+            <h1 className="text-[17px] leading-[26px] font-bold text-ink">{options.pageTitle}</h1>
+          </div>
         )}
-        <button
-          onClick={() => (isLast ? submit() : goNext())}
-          disabled={sending}
-          className="flex-1 py-3 text-sm font-bold disabled:opacity-50"
-          style={{ backgroundColor: theme.main, color: formThemeButtonText(theme), borderRadius: radius }}
-        >
-          {sending ? '送信中...' : isLast ? options.submitLabel || '送信' : options.nextLabel || '次へ'}
-        </button>
+        <div className={options.pageTitle ? 'mt-4' : undefined}>
+          {form.description && (
+            <p className="mb-4 text-sm leading-relaxed whitespace-pre-wrap text-ink-secondary">
+              {form.description}
+            </p>
+          )}
+          {multi && options.sectionHeader !== 'none' && (
+            <div className="mb-4 flex items-center justify-center gap-2">
+              {layout.sections.map((s, i) => (
+                <span
+                  key={s.id}
+                  className={`text-xs tabular-nums ${
+                    i === sectionIndex ? 'font-bold' : 'text-ink-faint'
+                  }`}
+                  style={i === sectionIndex ? { color: theme.main } : undefined}
+                >
+                  {options.sectionHeader === 'name' ? s.name : i + 1}
+                </span>
+              ))}
+            </div>
+          )}
+
+          <div className="space-y-5">
+            {[...layout.header, ...(section?.blocks ?? [])].map((block) => (
+              <BlockView
+                key={block.id}
+                block={block}
+                answers={answers}
+                onChange={setValue}
+                onToggle={toggleCheckbox}
+                onUpload={uploadFile}
+                uploading={!!uploading[block.kind === 'input' ? block.name : '']}
+                error={block.kind === 'input' ? (fieldErrors[block.name] ?? null) : null}
+                errorColor={theme.error}
+              />
+            ))}
+          </div>
+
+          {error && (
+            <p className="mt-4 rounded-lg border border-hairline bg-canvas px-3 py-2 text-sm font-bold text-danger">
+              {error}
+            </p>
+          )}
+
+          {conflict && (
+            <div className="mt-2">
+              <Button variant="secondary" onClick={resendWithFreshKey} disabled={sending}>
+                {conflict.code === 'idempotency_expired' ? 'もう一度送る' : '別の回答として送り直す'}
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
+
+      <BottomBar>
+        <div className="flex gap-2">
+          {trail.length > 0 && (
+            <button
+              type="button"
+              onClick={goBack}
+              className="flex-1 rounded-lg border border-hairline bg-canvas py-3 text-sm font-medium text-ink disabled:opacity-50"
+            >
+              {options.prevLabel || '前へ'}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => (isLast ? submit() : goNext())}
+            disabled={sending}
+            className="flex-1 py-3 text-sm font-bold disabled:opacity-50"
+            style={{ backgroundColor: theme.main, color: submitButtonText(theme, hasCustomTheme), borderRadius: radius }}
+          >
+            {sending ? '送信中...' : isLast ? submitLabelText(options.submitLabel) : options.nextLabel || '次へ'}
+          </button>
+        </div>
+      </BottomBar>
 
       {confirming && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-6">
-          <div className="w-full max-w-xs rounded-xl bg-white p-5 text-center">
-            <p className="text-sm text-gray-900">
+          <div className="w-full max-w-xs rounded-xl bg-canvas p-5 text-center">
+            <p className="text-sm text-ink">
               {options.confirmDialog?.text || '送信してよろしいですか？'}
             </p>
             <div className="mt-4 flex gap-2">
               <button
+                type="button"
                 onClick={() => setConfirming(false)}
-                className="flex-1 rounded-lg border border-gray-300 py-2 text-sm text-gray-700"
+                className="flex-1 rounded-lg border border-hairline bg-canvas py-2 text-sm text-ink"
               >
                 {options.confirmDialog?.cancelLabel || 'キャンセル'}
               </button>
               <button
+                type="button"
                 onClick={() => submit()}
                 className="flex-1 py-2 text-sm font-bold"
-                style={{ backgroundColor: theme.main, color: formThemeButtonText(theme), borderRadius: radius }}
+                style={{ backgroundColor: theme.main, color: submitButtonText(theme, hasCustomTheme), borderRadius: radius }}
               >
-                {options.confirmDialog?.okLabel || '送信'}
+                {submitLabelText(options.confirmDialog?.okLabel)}
               </button>
             </div>
           </div>
@@ -540,7 +611,10 @@ export default function Form() {
   );
 }
 
-/** ブロック1つを描く。 */
+/**
+ * ブロック1つを描く。
+ * 直し方 (error) は欄のすぐ下に出す (★V7 4-a)。枠の色も直しの色にする。
+ */
 function BlockView({
   block,
   answers,
@@ -548,6 +622,8 @@ function BlockView({
   onToggle,
   onUpload,
   uploading,
+  error,
+  errorColor,
 }: {
   block: FormBlock;
   answers: Answers;
@@ -555,14 +631,16 @@ function BlockView({
   onToggle: (name: string, label: string) => void;
   onUpload: (name: string, file: File) => void;
   uploading: boolean;
+  error: string | null;
+  errorColor: string;
 }) {
   if (block.kind === 'heading') {
     const size = block.level === 1 ? 'text-xl' : block.level === 3 ? 'text-sm' : 'text-lg';
-    return <h2 className={`font-bold text-gray-900 ${size}`}>{block.text}</h2>;
+    return <h2 className={`font-bold text-ink ${size}`}>{block.text}</h2>;
   }
 
   if (block.kind === 'text') {
-    return <p className="text-sm leading-relaxed whitespace-pre-wrap text-gray-600">{block.text}</p>;
+    return <p className="text-sm leading-relaxed whitespace-pre-wrap text-ink-secondary">{block.text}</p>;
   }
 
   if (block.kind === 'image') {
@@ -589,10 +667,10 @@ function BlockView({
         href={block.url}
         target="_blank"
         rel="noreferrer"
-        className={`block rounded-lg py-3 text-center text-sm font-medium ${
+        className={`block rounded-lg py-3 text-center text-sm font-bold ${
           block.style === 'outline'
-            ? 'border border-emerald-500 text-emerald-600'
-            : 'bg-emerald-500 text-white'
+            ? 'border border-accent-deep text-accent-deep'
+            : 'bg-accent-deep text-white'
         }`}
       >
         {block.label}
@@ -606,16 +684,18 @@ function BlockView({
   const text = typeof value === 'string' ? value : '';
   const checked = Array.isArray(value) ? (value as string[]) : [];
   const inputClass =
-    'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none';
+    'w-full rounded-lg border border-hairline bg-canvas px-3 py-2 text-sm text-ink focus:border-accent-deep focus:outline-none';
+  /** 直しがある欄は枠を直しの色にする (お店のテーマの error)。 */
+  const invalidStyle = error ? { borderColor: errorColor } : undefined;
 
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-900">
+      <label className="block text-sm font-medium text-ink">
         {block.label}
-        {block.required && <Asterisk />}
+        {block.required && <RequiredMark />}
       </label>
       {block.description && (
-        <p className="mt-0.5 text-xs text-gray-500">{block.description}</p>
+        <p className="mt-0.5 text-xs text-ink-faint">{block.description}</p>
       )}
 
       <div className="mt-1.5">
@@ -627,6 +707,8 @@ function BlockView({
             maxLength={block.limit?.max}
             onChange={(e) => onChange(block.name, e.target.value)}
             className={inputClass}
+            style={invalidStyle}
+            aria-invalid={!!error}
           />
         )}
 
@@ -638,6 +720,8 @@ function BlockView({
             maxLength={block.limit?.max}
             onChange={(e) => onChange(block.name, e.target.value)}
             className={`${inputClass} resize-y`}
+            style={invalidStyle}
+            aria-invalid={!!error}
           />
         )}
 
@@ -654,6 +738,8 @@ function BlockView({
               value={text}
               onChange={(e) => onChange(block.name, e.target.value)}
               className={inputClass}
+              style={invalidStyle}
+              aria-invalid={!!error}
             />
           ))}
 
@@ -662,6 +748,8 @@ function BlockView({
             value={text}
             onChange={(e) => onChange(block.name, e.target.value)}
             className={inputClass}
+            style={invalidStyle}
+            aria-invalid={!!error}
           >
             <option value="">都道府県を選択</option>
             {PREFECTURES.map((p) => (
@@ -679,6 +767,8 @@ function BlockView({
               value={isOtherFreeText(block, text) ? otherLabel(block) : text}
               onChange={(e) => onChange(block.name, e.target.value)}
               className={inputClass}
+              style={invalidStyle}
+              aria-invalid={!!error}
             >
               <option value="">選択してください</option>
               {(block.choices ?? []).map((choice) => (
@@ -707,12 +797,13 @@ function BlockView({
                 : text === choice.label;
               return (
                 <div key={choice.id}>
-                  <label className="flex items-center gap-2 text-sm text-gray-700">
+                  <label className="flex min-h-11 items-center gap-2 text-sm text-ink-secondary">
                     <input
                       type="radio"
                       name={block.name}
                       checked={checkedRadio}
                       onChange={() => onChange(block.name, choice.label)}
+                      className="h-4 w-4 accent-accent-deep"
                     />
                     {choice.label}
                   </label>
@@ -738,10 +829,11 @@ function BlockView({
                 : checked.includes(choice.label);
               return (
                 <div key={choice.id}>
-                  <label className="flex items-center gap-2 text-sm text-gray-700">
+                  <label className="flex min-h-11 items-center gap-2 text-sm text-ink-secondary">
                     <input
                       type="checkbox"
                       checked={isChecked}
+                      className="h-4 w-4 accent-accent-deep"
                       onChange={() => {
                         if (!choice.isOther) {
                           onToggle(block.name, choice.label);
@@ -800,21 +892,22 @@ function BlockView({
                 const file = e.target.files?.[0];
                 if (file) onUpload(block.name, file);
               }}
-              className="w-full text-sm text-gray-700 file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-500 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white disabled:opacity-50"
+              className="w-full text-sm text-ink-secondary file:mr-3 file:rounded-lg file:border-0 file:bg-accent-deep file:px-3 file:py-2 file:text-sm file:font-medium file:text-white disabled:opacity-50"
             />
-            {uploading && <p className="mt-1 text-xs text-gray-500">送っています...</p>}
+            {uploading && <p className="mt-1 text-xs text-ink-faint">送っています...</p>}
             {text && (
               <div className="mt-2">
                 <img src={text} alt="送った画像" className="max-h-40 rounded-lg" />
                 <button
+                  type="button"
                   onClick={() => onChange(block.name, '')}
-                  className="mt-1 text-xs text-gray-500 underline"
+                  className="mt-1 min-h-11 text-xs text-ink-faint underline"
                 >
                   選び直す
                 </button>
               </div>
             )}
-            <p className="mt-1 text-xs text-gray-400">jpg・png・gif・webp・heic、10MBまで</p>
+            <p className="mt-1 text-xs text-ink-faint">jpg・png・gif・webp・heic、10MBまで</p>
           </div>
         )}
 
@@ -822,11 +915,18 @@ function BlockView({
         {(block.type === 'text' || block.type === 'textarea') &&
           block.limit?.max &&
           !block.limit.hideCounter && (
-            <p className="mt-1 text-right text-xs text-gray-400 tabular-nums">
+            <p className="mt-1 text-right text-xs text-ink-faint tabular-nums">
               {text.length}/{block.limit.max}
             </p>
           )}
       </div>
+
+      {error && (
+        <p className="mt-1 flex items-center gap-1 text-xs font-bold" style={{ color: errorColor }}>
+          <Icon name="info" className="h-3.5 w-3.5 shrink-0" />
+          {error}
+        </p>
+      )}
     </div>
   );
 }
