@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Star } from 'lucide-react'
 import type { FriendListItem } from '@/lib/api'
+import MenuPortal from '@/components/shared/menu-portal'
 import Pagination from '@/components/shared/pagination'
 import Checkbox from '@/components/shared/checkbox'
 import ListState from '@/components/shared/list-state'
@@ -62,6 +63,8 @@ export default function FriendListTable({
 }: Props) {
   const [visible, setVisible] = useState<Set<FriendListColumn>>(() => new Set(COLUMN_LABELS.map((column) => column.key)))
   const [preferencesReady, setPreferencesReady] = useState(false)
+  const [columnsOpen, setColumnsOpen] = useState(false)
+  const columnsButtonRef = useRef<HTMLButtonElement>(null)
   const selectedCount = friends.filter((friend) => selectedIds?.has(friend.id)).length
   const allSelected = friends.length > 0 && selectedCount === friends.length
 
@@ -120,29 +123,46 @@ export default function FriendListTable({
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
           {/* 選んでいる時だけ出す（★V7：0件の時は意味が無い）。 */}
           {selectedCount > 0 ? <span className="whitespace-nowrap font-semibold text-accent-deep">{selectedCount}件選択中</span> : null}
-          <details className="relative">
-            <summary className="flex h-9 cursor-pointer list-none items-center gap-2 whitespace-nowrap font-semibold text-action">
+          <span className="relative inline-flex">
+            <button
+              ref={columnsButtonRef}
+              type="button"
+              aria-expanded={columnsOpen}
+              onClick={() => setColumnsOpen((current) => !current)}
+              className="flex h-9 cursor-pointer items-center gap-2 whitespace-nowrap font-semibold text-action"
+            >
               表示項目を編集
-            </summary>
-            <div className="absolute right-0 z-20 mt-1 w-52 rounded-card border border-hairline bg-canvas p-2 shadow-float">
-              {COLUMN_LABELS.map((column) => (
-                <div key={column.key} className="rounded-control px-2 py-2 hover:bg-canvas-sunken">
-                  {/* ★V7 共通 チェックボックス（gvjpx）。 */}
-                  <Checkbox
-                    checked={visible.has(column.key)}
-                    onCheckedChange={(checked) => setVisible((previous) => {
-                      const next = new Set(previous)
-                      if (checked) next.add(column.key)
-                      else next.delete(column.key)
-                      return next
-                    })}
-                  >
-                    {column.label}
-                  </Checkbox>
-                </div>
-              ))}
-            </div>
-          </details>
+            </button>
+            <MenuPortal
+              open={columnsOpen}
+              align="end"
+              getAnchor={() => columnsButtonRef.current}
+              onClose={() => setColumnsOpen(false)}
+            >
+              <div
+                className="w-52 rounded-card border border-hairline bg-canvas p-2 shadow-float"
+                // 最上層では absolute 指定を無効にする（位置は器が決める）。
+                style={{ position: 'static' }}
+              >
+                {COLUMN_LABELS.map((column) => (
+                  <div key={column.key} className="rounded-control px-2 py-2 hover:bg-canvas-sunken">
+                    {/* ★V7 共通 チェックボックス（gvjpx）。 */}
+                    <Checkbox
+                      checked={visible.has(column.key)}
+                      onCheckedChange={(checked) => setVisible((previous) => {
+                        const next = new Set(previous)
+                        if (checked) next.add(column.key)
+                        else next.delete(column.key)
+                        return next
+                      })}
+                    >
+                      {column.label}
+                    </Checkbox>
+                  </div>
+                ))}
+              </div>
+            </MenuPortal>
+          </span>
           {/* #668: 件数の選び口は他の一覧と同じ「表示件数」セレクト。 */}
           <PageSizeSelect
             data-qa-open="LT8RS"
