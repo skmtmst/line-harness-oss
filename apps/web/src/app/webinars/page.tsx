@@ -8,6 +8,7 @@ import ListRange from '@/components/ui/list-range'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import Button from '@/components/shared/button'
 import LinePreview from '@/components/shared/line-preview'
 import ListToolbar from '@/components/shared/list-toolbar'
@@ -294,6 +295,7 @@ function WebinarListTable({
   items: WebinarListItem[]
   onArchive: (target: WebinarListItem) => void
 }) {
+  const router = useRouter()
   return (
     <>
       <div className="bg-canvas-sunken text-ink-faint hidden grid-cols-12 gap-3 px-4 py-3 text-xs font-semibold md:grid">
@@ -315,7 +317,12 @@ function WebinarListTable({
             <div className="flex items-center gap-1.5 md:col-span-2"><RowActions
               subjectName={w.title}
               edit={{ href: `/webinars/edit?id=${w.id}` }}
-              menuItems={[{ id: 'archive', label: 'アーカイブする', onSelect: () => onArchive(w) }]}
+              menuItems={[
+                { id: 'participants', label: '参加者を見る', onSelect: () => router.push(`/webinars/edit?id=${encodeURIComponent(w.id)}&pane=participants`) },
+                { id: 'analytics', label: '分析を見る', onSelect: () => router.push(`/webinars/edit?id=${encodeURIComponent(w.id)}&pane=analytics`) },
+                { id: 'comments', label: 'コメント演出を開く', onSelect: () => router.push(`/webinars/edit?id=${encodeURIComponent(w.id)}&pane=comments`) },
+                { id: 'archive', label: 'アーカイブする', onSelect: () => onArchive(w) },
+              ]}
               menuButtonProps={{ 'data-qa-open': w.id === 'webinar-5' ? 'LKuAQ' : undefined }}
             /></div>
           </div>
