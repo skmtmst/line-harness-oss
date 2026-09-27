@@ -266,7 +266,7 @@ export default function RankSettingsTab({
         )}
       />
 
-      <ConfirmDialog
+      <ConfirmDialog primaryAction="cancel"
         open={leaveTarget !== null}
         title="保存していない変更があります"
         description="このまま移動すると、ランク設定への変更は失われます。保存せずに移動しますか？"

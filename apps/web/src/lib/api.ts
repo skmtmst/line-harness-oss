@@ -3517,6 +3517,11 @@ export type ReminderDeliveryRunsResponse = {
     lifecycleStatus: 'draft' | 'published' | 'stopped'
     /** 公開版の停止条件。公開版が無いときは null（未取得と区別する）。 */
     stopConditions: ReminderStopConditions | null
+    /**
+     * 公開版があるか（R146 監査）。無い下書きは「停止中」ではなく
+     * 「下書き」と出し、再開はさせない。
+     */
+    hasPublishedVersion: boolean
   }
   summary: {
     sent: number
@@ -7311,8 +7316,20 @@ export const api = {
       validUntil?: string | null
       fallbackValue?: string | null
       expiryBehavior?: 'stop' | 'fallback'
+      /** Q: 下書きとして作るとき 'draft'。省略は使用中で公開。 */
+      status?: 'draft' | 'active'
     }) =>
       fetchApi<ApiResponse<CommonVar>>('/api/common-vars', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    /** Q: 状態の切替（公開・止める・再開）。理由が必須。 */
+    setStatus: (id: string, accountId: string, data: {
+      to: 'active' | 'stopped'
+      changeReason: string
+      expectedVersion?: number
+    }) =>
+      fetchApi<ApiResponse<CommonVar>>(`/api/common-vars/${id}/status?accountId=${encodeURIComponent(accountId)}`, {
         method: 'POST',
         body: JSON.stringify(data),
       }),
@@ -7347,8 +7364,12 @@ export const api = {
       }),
     deleteImpact: (id: string, accountId: string) =>
       fetchApi<ApiResponse<CommonVarDeleteImpact>>(`/api/common-vars/${id}/delete-impact?accountId=${encodeURIComponent(accountId)}`),
-    delete: (id: string, accountId: string) =>
-      fetchApi<ApiResponse<null>>(`/api/common-vars/${id}?accountId=${encodeURIComponent(accountId)}`, { method: 'DELETE' }),
+    // Q: 消す理由が必須。版履歴に残る。
+    delete: (id: string, accountId: string, reason: string) =>
+      fetchApi<ApiResponse<null>>(
+        `/api/common-vars/${id}?accountId=${encodeURIComponent(accountId)}&reason=${encodeURIComponent(reason)}`,
+        { method: 'DELETE' },
+      ),
     replacementCandidates: (id: string, accountId: string) =>
       fetchApi<ApiResponse<CommonVarReplacementCandidates>>(`/api/common-vars/${id}/replace`, {
         method: 'POST',
@@ -7362,7 +7383,7 @@ export const api = {
     replace: (
       id: string,
       accountId: string,
-      input: { replacementId: string; expectedVersion: number; expectedRevision: string },
+      input: { replacementId: string; expectedVersion: number; expectedRevision: string; changeReason: string },
     ) => fetchApi<ApiResponse<CommonVarReplacementResult>>(`/api/common-vars/${id}/replace`, {
       method: 'POST',
       body: JSON.stringify({ accountId, ...input, apply: true }),
@@ -10887,12 +10908,14 @@ export const api = {
     /**
      * `expectedVersionId` を渡すと楽観ロックになる——画面を開いたときの
      * 版とずれていれば409。別タブでの先勝ち保存を古い内容で上書きしない。
+     * R148 監査：通常保存は版IDを付け替えないため、保存のたびに変わる
+     * `expectedUpdatedAt`（開いたときの版時刻）も合わせて送る。
      */
-    saveDraft: (id: string, settings: ReminderDraftSettings, options: { expectedVersionId?: string } = {}) =>
+    saveDraft: (id: string, settings: ReminderDraftSettings, options: { expectedVersionId?: string; expectedUpdatedAt?: string } = {}) =>
       fetchApi<ApiResponse<ReminderDraftVersion>>(`/api/reminders/${id}/draft`, {
         method: 'PUT',
         body: JSON.stringify(options.expectedVersionId
-          ? { ...settings, expectedVersionId: options.expectedVersionId }
+          ? { ...settings, expectedVersionId: options.expectedVersionId, ...(options.expectedUpdatedAt ? { expectedUpdatedAt: options.expectedUpdatedAt } : {}) }
           : settings),
       }),
     validateDraft: (id: string) =>

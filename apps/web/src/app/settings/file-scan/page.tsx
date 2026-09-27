@@ -452,7 +452,7 @@ export default function FileScanSettingsPage() {
         </ConfirmDialog>
       ) : null}
 
-      <ConfirmDialog
+      <ConfirmDialog primaryAction="cancel"
         open={leaveTarget !== null}
         title="保存していない変更があります"
         description="保存せずに移動すると、外の検査の設定の変更は失われます。"

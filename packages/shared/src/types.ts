@@ -462,6 +462,11 @@ export interface CommonVar {
   validUntil: string | null;
   fallbackValue: string | null;
   expiryBehavior: "stop" | "fallback";
+  /** Q: 保存した状態（下書き draft / 使用中 active / 止めた stopped）。 */
+  status?: "draft" | "active" | "stopped";
+  /** 画面に出す状態。期限切れは時刻から計算した表示用の状態。 */
+  state?: "draft" | "active" | "stopped" | "expired";
+  stoppedAt?: string | null;
   createdAt: string;
   updatedAt: string;
   nextSchedule?: {
@@ -2260,6 +2265,11 @@ export interface ReminderDraftVersion {
   lastTestStatus: "succeeded" | "failed" | null;
   lastTestedAt: string | null;
   publishedAt: string | null;
+  /**
+   * 版の更新時刻（R148 監査）。保存のたびに変わるため、開いたときの値と
+   * ずれていれば別の画面が先に保存したと分かる。保存時に送り返す。
+   */
+  updatedAt: string;
 }
 
 export interface ReminderValidationResult {
@@ -2403,6 +2413,11 @@ export interface ReminderDeliveryRunsResponse {
     lifecycleStatus: "draft" | "published" | "stopped";
     /** 公開版スナップショットの停止条件。公開版が無いときは null（未取得と区別する）。 */
     stopConditions: ReminderStopConditions | null;
+    /**
+     * 公開版があるか（R146 監査）。無い下書きは「停止中」ではなく
+     * 「下書き」と出し、再開はさせない。
+     */
+    hasPublishedVersion: boolean;
   };
   summary: {
     sent: number;

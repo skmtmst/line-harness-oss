@@ -1,6 +1,6 @@
 import type { CommonVar } from '@line-crm/shared'
 
-export type CommonVarFilter = 'all' | 'empty' | 'scheduled' | 'unused'
+export type CommonVarFilter = 'all' | 'empty' | 'scheduled' | 'unused' | 'draft' | 'stopped' | 'expired'
 export type CommonVarOrder = 'usage_desc' | 'updated_desc' | 'name_asc'
 
 export function filterAndSortCommonVars(
@@ -21,6 +21,10 @@ export function filterAndSortCommonVars(
       if (input.filter === 'scheduled'
         && !item.nextSchedule && item.validFrom === null && item.validUntil === null) return false
       if (input.filter === 'unused' && item.usageCount !== 0) return false
+      // Q: 状態（下書き・止めた・期限切れ）で絞る。サーバの計算した
+      // state をそのまま見る（期限切れは時刻からの計算済み）。
+      if ((input.filter === 'draft' || input.filter === 'stopped' || input.filter === 'expired')
+        && (item.state ?? 'active') !== input.filter) return false
       if (!needle) return true
       return [item.name, item.varKey, item.value]
         .some((value) => value.toLocaleLowerCase('ja-JP').includes(needle))

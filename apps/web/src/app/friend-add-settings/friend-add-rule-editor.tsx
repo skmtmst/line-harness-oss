@@ -455,7 +455,7 @@ export default function FriendAddRuleEditor({ ruleId }: { ruleId?: string }) {
         </div>
       )}
 
-      <ConfirmDialog
+      <ConfirmDialog primaryAction="cancel"
         open={leaveTarget !== null}
         title="保存していない変更があります"
         description="このまま移動すると、保存していない変更は失われます。保存せずに移動しますか？"

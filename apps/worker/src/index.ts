@@ -1693,6 +1693,17 @@ async function runSixHourlyHeavyJobs(
       },
     },
     {
+      // Q: 共通情報の期限の14日前・3日前に運用者へ知らせる。
+      name: 'common var expiry notices',
+      run: async () => {
+        const { sweepCommonVarExpiryNotices } = await import('./services/common-var-expiry-sweep.js');
+        const result = await sweepCommonVarExpiryNotices(env.DB, env, new Date());
+        if (result.notified > 0 || result.errors > 0) {
+          console.log(JSON.stringify({ event: 'common_var_expiry_sweep', ...result }));
+        }
+      },
+    },
+    {
       name: 'billing invoice sync',
       run: async () => {
         const { syncBillingInvoicesDaily } = await import('./services/billing-invoices-sync.js');

@@ -17,7 +17,7 @@ import type {
 import { api, ApiError, type CommonVarDetail } from '@/lib/api'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import FeatureGate from '@/components/feature-gate'
-import { VAR_TYPE_LABELS, commonVarValueError, formatStamp } from '@/lib/common-vars'
+import { VAR_TYPE_LABELS, commonVarValueError, formatStamp, isSecretLikeVarValue, COMMON_VAR_STATE_LABELS } from '@/lib/common-vars'
 import { useAccount } from '@/contexts/account-context'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { NOT_AVAILABLE, STATE_TEXT } from '@/components/shared/not-connected'
@@ -90,6 +90,14 @@ function EditCommonVarInner() {
   const [folderId, setFolderId] = useState('')
   const [value, setValue] = useState('')
   const [memo, setMemo] = useState('')
+  // Q: 変える理由は必須。履歴を見た人が「なぜ変えたか」を追えるようにする。
+  const [changeReason, setChangeReason] = useState('')
+  const [reasonFieldError, setReasonFieldError] = useState('')
+  // Q: 状態の切替（公開・止める・再開）。窓を開いている間だけ理由欄を出す。
+  const [statusAction, setStatusAction] = useState<'stop' | 'resume' | 'publish' | null>(null)
+  const [statusReason, setStatusReason] = useState('')
+  const [statusBusy, setStatusBusy] = useState(false)
+  const [statusError, setStatusError] = useState('')
   const [validFrom, setValidFrom] = useState('')
   const [validUntil, setValidUntil] = useState('')
   const [expiryBehavior, setExpiryBehavior] = useState<'stop' | 'fallback'>('stop')
@@ -309,6 +317,30 @@ function EditCommonVarInner() {
         return
       }
     }
+    // Q: 鍵の形・長い乱数はサーバでも422で止まる。確認を通しても
+    // 保存できないものはここで止め、理由を欄のすぐ下へ出す。
+    if (isSecretLikeVarValue(value)) {
+      const message = '鍵やトークンのような秘密の値は共通情報に保存できません'
+      setError(message)
+      setValueFieldError(message)
+      document.getElementById('cv-value')?.focus()
+      return
+    }
+    if (expiryBehavior === 'fallback' && isSecretLikeVarValue(fallbackValue)) {
+      const message = '鍵やトークンのような秘密の値は代替値にも保存できません'
+      setError(message)
+      setFallbackFieldError(message)
+      document.getElementById('cv-fallback-value')?.focus()
+      return
+    }
+    // Q: 変える理由は必須。理由なしの保存は口が400で止める。
+    if (!changeReason.trim()) {
+      const message = '変える理由を入力してください'
+      setError(message)
+      setReasonFieldError(message)
+      document.getElementById('cv-change-reason')?.focus()
+      return
+    }
     setSaving(true)
     setError('')
     setSaved(false)
@@ -332,6 +364,7 @@ function EditCommonVarInner() {
         memo,
         folderId: folderId || null,
         expectedVersion: item.version,
+        changeReason: changeReason.trim(),
         impactProof: preview.data.impactProof,
         validFrom: validFrom || null,
         validUntil: validUntil || null,
@@ -347,6 +380,8 @@ function EditCommonVarInner() {
         return
       }
       setSaved(true)
+      // 理由はその保存のものだけ。次の変更は新しい理由を書く。
+      setChangeReason('')
       setShowImpactReview(false)
       void load()
     } catch (e) {
@@ -380,6 +415,8 @@ function EditCommonVarInner() {
    * ものを消すことになる。切り替わったら窓は消さず、選び直してもらう。
    */
   const [deleteTarget, setDeleteTarget] = useState<{ item: CommonVar; accountId: string } | null>(null)
+  // Q: 消した理由は版履歴に残すので必須。
+  const [deleteReason, setDeleteReason] = useState('')
   const [deletePhase, setDeletePhase] = useState<'loading' | 'ready' | 'error'>('loading')
   const [deleteImpact, setDeleteImpact] = useState<CommonVarDeleteImpact | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -416,7 +453,7 @@ function EditCommonVarInner() {
    * 「保存せずに移動」を選ぶ手段がなくなる。
    */
   const leaveConfirmDialog = (
-    <ConfirmDialog
+    <ConfirmDialog primaryAction="cancel"
       open={leaveTarget !== null}
       title="保存していない変更があります"
       description="このまま移動すると、共通情報への変更は失われます。保存せずに移動しますか？"
@@ -433,6 +470,7 @@ function EditCommonVarInner() {
     setDeleteTarget(target)
     setDeleteImpact(null)
     setDeleteError('')
+    setDeleteReason('')
     setDeletePhase('loading')
     try {
       const res = await api.commonVars.deleteImpact(target.item.id, target.accountId)
@@ -453,6 +491,7 @@ function EditCommonVarInner() {
     setDeleteTarget(null)
     setDeleteImpact(null)
     setDeleteError('')
+    setDeleteReason('')
     setDeletePhase('loading')
   }
 
@@ -463,7 +502,7 @@ function EditCommonVarInner() {
     setDeleting(true)
     setDeleteError('')
     try {
-      const res = await api.commonVars.delete(deleteTarget.item.id, deleteTarget.accountId)
+      const res = await api.commonVars.delete(deleteTarget.item.id, deleteTarget.accountId, deleteReason.trim())
       // 失敗を握りつぶさない。返事を見ずに一覧へ戻すと、消えていないのに
       // 消えたように見える。
       if (!res.success) throw new Error(res.error)
@@ -531,6 +570,44 @@ function EditCommonVarInner() {
       void load()
     } catch {
       setError('予約の削除に失敗しました。通信を確かめて、もう一度お試しください。')
+    }
+  }
+
+  /**
+   * Q: 状態の切替。公開・止める・再開は理由が必須。
+   * 止めると差し込みへ答えられなくなり、使っている配信は止まって
+   * 運用者へ知らせる（空文字を送らない決まり）。
+   */
+  const applyStatus = async () => {
+    if (!item || !selectedAccountId || !statusAction) return
+    const reason = statusReason.trim()
+    if (!reason) {
+      setStatusError('変える理由を入力してください')
+      return
+    }
+    setStatusBusy(true)
+    setStatusError('')
+    try {
+      const res = await api.commonVars.setStatus(item.id, selectedAccountId, {
+        to: statusAction === 'stop' ? 'stopped' : 'active',
+        changeReason: reason,
+        expectedVersion: item.version,
+      })
+      if (!res.success) {
+        setStatusError(res.error)
+        return
+      }
+      setStatusAction(null)
+      setStatusReason('')
+      await load()
+    } catch (e) {
+      setStatusError(
+        e instanceof ApiError && e.status === 409
+          ? '別の担当者が先に更新しました。最新内容を読み直してください。'
+          : '状態を変えられませんでした。通信を確かめて、もう一度お試しください。',
+      )
+    } finally {
+      setStatusBusy(false)
     }
   }
 
@@ -618,6 +695,67 @@ function EditCommonVarInner() {
         <>
           <div className="grid gap-4 xl:grid-cols-3" data-design-node="gBtaK">
             <div className="space-y-4 xl:col-span-2">
+              {/* Q: いまの状態と切替。止めると差し込みに答えられなくなる。 */}
+              <section className="bg-canvas rounded-card border-hairline border p-4">
+                <div className="flex flex-wrap items-center gap-3">
+                  <p className="text-ink-secondary text-sm font-medium">状態</p>
+                  <span className="rounded-control bg-canvas-sunken px-2 py-0.5 text-xs font-semibold">
+                    {COMMON_VAR_STATE_LABELS[item.state ?? item.status ?? 'active'] ?? '使用中'}
+                  </span>
+                  {(item.state ?? 'active') === 'expired' && (
+                    <span className="text-status-warning text-xs">期限を延ばすと再び使えます</span>
+                  )}
+                  <span className="ml-auto">
+                    {(item.status ?? 'active') === 'active' && (
+                      <Button type="button" onClick={() => { setStatusAction('stop'); setStatusReason(''); setStatusError('') }}>
+                        止める
+                      </Button>
+                    )}
+                    {item.status === 'stopped' && (
+                      <Button type="button" onClick={() => { setStatusAction('resume'); setStatusReason(''); setStatusError('') }}>
+                        再開する
+                      </Button>
+                    )}
+                    {item.status === 'draft' && (
+                      <Button type="button" variant="primary" onClick={() => { setStatusAction('publish'); setStatusReason(''); setStatusError('') }}>
+                        公開する
+                      </Button>
+                    )}
+                  </span>
+                </div>
+                {(item.status ?? 'active') === 'draft' && (
+                  <p className="text-ink-faint mt-2 text-xs">下書きは差し込みに使われません。公開すると配信で使えるようになります。</p>
+                )}
+                {item.status === 'stopped' && (
+                  <p className="text-ink-faint mt-2 text-xs">止めている間、この共通情報を使う配信は止まります。</p>
+                )}
+                {statusAction && (
+                  <div className="border-hairline mt-3 space-y-2 border-t pt-3">
+                    <label htmlFor="cv-status-reason" className="text-ink-secondary block text-sm font-medium">
+                      {statusAction === 'stop' ? '止める理由' : statusAction === 'resume' ? '再開する理由' : '公開する理由'}
+                      <RequiredBadge />
+                    </label>
+                    <input
+                      id="cv-status-reason"
+                      type="text"
+                      value={statusReason}
+                      onChange={(event) => { setStatusError(''); setStatusReason(event.target.value) }}
+                      maxLength={200}
+                      className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
+                      placeholder={statusAction === 'stop' ? '例：キャンペーンが終わったため' : '例：新しい期間の案内を始めるため'}
+                    />
+                    {statusError ? <p className="text-danger text-xs">{statusError}</p> : null}
+                    <div className="flex flex-wrap gap-2">
+                      <Button type="button" variant="primary" disabled={statusBusy} onClick={() => void applyStatus()}>
+                        {statusBusy ? '変更中…' : statusAction === 'stop' ? '止める' : statusAction === 'resume' ? '再開する' : '公開する'}
+                      </Button>
+                      <Button type="button" disabled={statusBusy} onClick={() => setStatusAction(null)}>
+                        やめる
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </section>
               <section className="bg-canvas rounded-card border-hairline space-y-5 border p-5">
                 <div className="grid gap-4 md:grid-cols-3">
                   <div>
@@ -703,6 +841,24 @@ function EditCommonVarInner() {
                     className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
                     placeholder="運用上の注意や、この値の使い方を書きます"
                   />
+                </div>
+
+                {/* Q: 変える理由は必須。履歴へ残り、後から見た人が意図を追える。 */}
+                <div>
+                  <label htmlFor="cv-change-reason" className="text-ink-secondary mb-1 block text-sm font-medium">
+                    変える理由<RequiredBadge />
+                  </label>
+                  <input
+                    id="cv-change-reason"
+                    type="text"
+                    value={changeReason}
+                    onChange={(event) => { setSaved(false); setReasonFieldError(''); setChangeReason(event.target.value) }}
+                    maxLength={200}
+                    required
+                    className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
+                    placeholder="例：住所が変わったため"
+                  />
+                  {reasonFieldError ? <p className="text-danger mt-1 text-xs">{reasonFieldError}</p> : null}
                 </div>
 
                 <fieldset className="border-hairline rounded-control space-y-3 border p-4">
@@ -1120,6 +1276,7 @@ function EditCommonVarInner() {
         */
         onConfirm={
           deleteAccountSwitched || deletePhase !== 'ready' || !deleteImpact?.canDelete
+            || !deleteReason.trim()
             ? undefined
             : () => void remove()
         }
@@ -1167,6 +1324,18 @@ function EditCommonVarInner() {
                 と書いてある場所は、これから空欄で送られます。
               </p>
               <p className="text-ink-secondary">・残ること: すでに送ったものは変わりません。</p>
+              {/* Q: 消した理由は版履歴に残る。理由が無いと確認ボタンを出さない。 */}
+              <label className="block">
+                <span className="text-ink-secondary font-semibold">
+                  消した理由 <span className="text-danger">必須</span>
+                </span>
+                <input
+                  value={deleteReason}
+                  onChange={(event) => setDeleteReason(event.target.value)}
+                  placeholder="例: 店舗情報の変更のため"
+                  className="border-hairline rounded-control bg-canvas text-ink mt-1 w-full border px-3 py-2 text-sm"
+                />
+              </label>
             </>
           ) : null}
         </div>
