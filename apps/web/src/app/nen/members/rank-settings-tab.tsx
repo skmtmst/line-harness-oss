@@ -192,20 +192,25 @@ export default function RankSettingsTab({
               </TableHeadRow>
             </thead>
             <tbody>
+              {/*
+                m18s: 幅を固定しない列はタグの1列だけにする。見出しだけでなく
+                行の側にも同じ幅を持たせ、どの行も同じ列幅で合うようにする。
+                タグが残りを受け取り、表が枠いっぱいに広がる。
+              */}
               {drafts.map((row, index) => {
                 const isBase = index === 0 && row.threshold.replace(/[,，]/g, '') === '0'
                 return (
                   <Tr key={row.id ?? `new-${index}`}>
-                    <Td>
+                    <Td className="w-44">
                       <TextField aria-label={`ランク名 ${index + 1}`} value={row.name} maxLength={20} onChange={(event) => update(index, { name: event.target.value })} />
                     </Td>
-                    <Td>
+                    <Td className="w-40">
                       <span className="flex items-center gap-2">
                         <TextField aria-label={`しきい値 ${index + 1}`} inputMode="numeric" value={row.threshold} onChange={(event) => update(index, { threshold: event.target.value })} disabled={isBase} />
                         <span className="shrink-0 text-caption font-semibold text-ink-faint">円〜</span>
                       </span>
                     </Td>
-                    <Td>
+                    <Td className="w-28">
                       <span className="flex items-center gap-2">
                         <TextField aria-label={`マイル還元 ${index + 1}`} inputMode="decimal" value={row.rate} onChange={(event) => update(index, { rate: event.target.value })} />
                         <span className="shrink-0 text-caption font-semibold text-ink-faint">%</span>
@@ -216,8 +221,8 @@ export default function RankSettingsTab({
                         {row.tagName ?? (row.name.trim() ? `[会員] ランク：${row.name.trim()}（保存すると作られます）` : '—')}
                       </span>
                     </Td>
-                    <Td align="right" className="cq-hide-below-800"><span className="text-label font-semibold tabular-nums text-ink">{row.memberCount.toLocaleString('ja-JP')}人</span></Td>
-                    <Td align="right">
+                    <Td align="right" className="cq-hide-below-800 w-24"><span className="text-label font-semibold tabular-nums text-ink">{row.memberCount.toLocaleString('ja-JP')}人</span></Td>
+                    <Td align="right" className="w-14">
                       {isBase ? null : row.id === null ? (
                         /* まだ保存していない行の取り消しは、確認なしの文字ボタン。 */
                         <button

@@ -80,6 +80,30 @@ describe('m18s ランク表の行操作は一覧共通の形', () => {
     expect(last.textContent).toContain('操作')
   })
 
+  it('行の列幅は見出しと合う（吸収列はタグの1列だけ）', async () => {
+    await renderTab()
+    await settle(50)
+    // 1440px・1152px・1920px のどの幅でも列幅の合計が表の幅になる形。
+    // 幅指定なしはタグの1列だけ。戻すと赤。
+    const rows = Array.from(host.querySelectorAll('tbody tr')).filter(
+      (tr) => tr.querySelectorAll(':scope > td').length === 6,
+    )
+    expect(rows.length).toBeGreaterThan(0)
+    for (const tr of rows) {
+      const classes = Array.from(tr.querySelectorAll(':scope > td')).map((td) => td.className)
+      expect(classes[0]).toContain('w-44')
+      expect(classes[1]).toContain('w-40')
+      expect(classes[2]).toContain('w-28')
+      expect(classes[3].split(' ')).not.toContain('w-44')
+      expect(classes[3].split(' ')).not.toContain('w-40')
+      expect(classes[3].split(' ')).not.toContain('w-28')
+      expect(classes[3].split(' ')).not.toContain('w-24')
+      expect(classes[3].split(' ')).not.toContain('w-14')
+      expect(classes[4]).toContain('w-24')
+      expect(classes[5]).toContain('w-14')
+    }
+  })
+
   it('保存済みの行は「…」に削除を集約し、直置きのゴミ箱は出さない', async () => {
     await renderTab()
     await settle(50)
