@@ -15,6 +15,7 @@ import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import { formatStamp } from '@/lib/common-vars'
 import Pagination from '@/components/shared/pagination'
+import ListRange from '@/components/ui/list-range'
 import Button from '@/components/shared/button'
 import SearchField from '@/components/shared/search-field'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -757,7 +758,7 @@ function VarsPageInner() {
         </div>
         <div className="hidden space-y-3 lg:block">
           <FolderPanel
-            total={`${items.length} 件`}
+            /* m18s: 見出しの総数は「すべて」の行と同じ数なので出さない（回答フォーム #m18k と同じ形）。絞り込み後の件数は一覧側の ListRange に出す。 */
             activeId={folderFilter}
             onSelect={setFolderFilter}
             onAddFolder={() => setAddingFolder(true)}
@@ -1047,6 +1048,12 @@ function VarsPageInner() {
           </div>
 
           <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+            {/* m18s: 絞り込み後の件数は一覧の側に出す。見出しには出さない。 */}
+            <ListRange
+              total={filtered.length}
+              first={filtered.length === 0 ? 0 : (page - 1) * pageSize + 1}
+              last={Math.min(page * pageSize, filtered.length)}
+            />
             <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
 
             <button
