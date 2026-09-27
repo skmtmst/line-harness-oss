@@ -10,6 +10,8 @@ const mocks = vi.hoisted(() => ({
   getOrCreateSiteTrackingKey: vi.fn(),
   getSiteTrackingAccountId: vi.fn(),
   getSiteTrackingSummary: vi.fn(),
+  getSiteConsentSummary: vi.fn(),
+  recordSiteConsentDecision: vi.fn(),
   canAccess: vi.fn(),
   getVisibleScope: vi.fn(),
   SITE_EVENT_TYPES: ['page_view', 'click', 'scroll_depth', 'custom', 'purchase'],
@@ -66,6 +68,8 @@ beforeEach(() => {
   mocks.getSiteTrackingAccountId.mockResolvedValue('account-a');
   mocks.getOrCreateSiteTrackingKey.mockResolvedValue('hk_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
   mocks.getSiteTrackingSummary.mockResolvedValue({});
+  mocks.getSiteConsentSummary.mockResolvedValue({ granted: 0, declined: 0, suppressed: 0, grantedRate: null });
+  mocks.recordSiteConsentDecision.mockResolvedValue(undefined);
   mocks.canAccess.mockResolvedValue(true);
   mocks.getVisibleScope.mockResolvedValue({
     accounts: [], allowedAccountIds: ['account-a'], canSeeUnassigned: false,
@@ -160,6 +164,50 @@ describe('収集の受け口', () => {
   });
 });
 
+describe('同意 (#818)', () => {
+  it('断られた・未回答の閲覧は、そのまま consent を渡して記録側に任せる', async () => {
+    for (const consent of ['declined', 'unset'] as const) {
+      await post('/api/site/collect', {
+        visitorId: VALID_ID,
+        trackingKey: 'hk_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        eventType: 'page_view',
+        path: '/thanks',
+        consent,
+      });
+    }
+    const sent = mocks.recordSiteEvent.mock.calls.map(([, input]) => input.consent);
+    expect(sent).toEqual(['declined', 'unset']);
+  });
+
+  it('知らない同意の値は unset として渡す', async () => {
+    await post('/api/site/collect', {
+      visitorId: VALID_ID,
+      trackingKey: 'hk_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      eventType: 'page_view',
+      path: '/thanks',
+      consent: 'sure-i-consent',
+    });
+    const [, input] = mocks.recordSiteEvent.mock.calls[0];
+    expect(input.consent).toBe('unset');
+  });
+
+  it('同意の答えは専用の箱に数え、行動は同意済みとして送る', async () => {
+    await post('/api/site/collect', {
+      visitorId: VALID_ID,
+      trackingKey: 'hk_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      eventType: 'page_view',
+      path: '/thanks',
+      consent: 'granted',
+      consentDecision: 'granted',
+    });
+    expect(mocks.recordSiteConsentDecision).toHaveBeenCalledWith(env.DB, 'account-a', 'granted');
+    expect(mocks.recordSiteEvent).toHaveBeenCalledWith(
+      env.DB,
+      expect.objectContaining({ consent: 'granted' }),
+    );
+  });
+});
+
 describe('埋め込むJS', () => {
   it('WorkerのURLが差し込まれる', async () => {
     const res = await app.fetch(
@@ -184,6 +232,19 @@ describe('埋め込むJS', () => {
     expect(body).toContain('location.pathname');
     expect(body).toContain('host: location.hostname');
     expect(body).not.toContain('location.search');
+  });
+
+  it('同意の案内と答えを送る仕組みが入っている', async () => {
+    const res = await app.fetch(
+      new Request('https://example.com/api/site/script.js'),
+      env as unknown as Env['Bindings'],
+    );
+    const body = await res.text();
+    // 答えるまでは consent が unset で送られ、サーバー側は記録しない。
+    expect(body).toContain("readConsent() || 'unset'");
+    expect(body).toContain('lh-consent');
+    expect(body).toContain('window.lhConsent');
+    expect(body).toContain('consentDecision');
   });
 });
 

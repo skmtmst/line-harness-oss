@@ -135,7 +135,10 @@ export type AuditAction =
   | 'restaurant.google.reconnect'
   | 'restaurant.google.disconnect'
   | 'restaurant.google.review.reply'
-  | 'restaurant.google.change.send';
+  | 'restaurant.google.change.send'
+  // #818: 広告費の手入力と、管理画面からの取り直し
+  | 'ad_cost.manual_entry'
+  | 'ad_cost.import';
 
 function commonAuditWriter(): typeof recordAuditEvent | null {
   try {

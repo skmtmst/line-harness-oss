@@ -426,7 +426,9 @@
     "494_session_step_up_and_unfamiliar.sql",
     "495_session_familiarity_ip_index.sql",
     "498_line_account_lifecycle.sql",
-    "499_account_handover_declared_rollback.sql"
+    "499_account_handover_declared_rollback.sql",
+    "500_ad_cost_ledger.sql",
+    "501_site_tracking_consent.sql"
   ],
-  "migrationCount": 427
+  "migrationCount": 429
 }
