@@ -23,6 +23,14 @@
   --color-danger: #b3261e;
   --color-skeleton: #e9ebef;
   --color-state-mark: #ebedf1;
+  /* ── ウェビナーの暗い地 (7-webinar。値は liff-v7.html の書き出しから) ── */
+  --color-night: #15181d;
+  --color-night-soft: #23272e;
+  --color-night-line: #2c3038;
+  --color-night-faint: #aab1bb;
+  /* 暗い地での会話の名前。ほか・自分を文字色で分ける */
+  --color-night-name: #8fb8ff;
+  --color-night-mine: #7ee2a8;
 }
 
 body {
