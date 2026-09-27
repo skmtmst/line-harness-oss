@@ -37,7 +37,9 @@ describe('一斉配信の検索行（U014 → ★V7 Xn1Mz）', () => {
   it('検索を横いっぱいに伸ばさない（裸の全幅 input を置かない）', () => {
     expect(PAGE).not.toContain('data-search-row')
     expect(PAGE).not.toContain('type="search"')
-    expect(PAGE).not.toMatch(/<input[\s\S]*?w-full/)
+    // 同じ input タグの中に全幅指定があるものだけを見る。
+    // 離れた表の w-full（別タグ）は対象外。
+    expect(PAGE).not.toMatch(/<input[^>]*w-full/)
   })
 
   it('絞り込みは2行目の左（filters）、並び順と表示件数は2行目の右（trailing）に置く', () => {

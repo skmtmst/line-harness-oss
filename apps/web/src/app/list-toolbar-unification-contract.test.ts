@@ -89,7 +89,16 @@ describe('一覧の道具と行の操作の統一（★V7 Xn1Mz）', () => {
     for (const rel of ROW_PAGES) {
       const src = read(rel)
       expect(src, `${rel} に行直置きのアイコンボタンが残っています`).not.toContain('<IconButton')
-      expect(src, `${rel} に行直置きの箱アイコンが残っています`).not.toContain('<Archive')
+      // 箱・ゴミ箱アイコン（lucide の <Archive …> <Trash2 …>）の JSX 使用を
+      // 行ごとに見て、確認の窓の題名アイコン（titleIcon）やメニューの中の
+      // icon は許す。<ArchiveReviewBackdrop> のような箱始まりの部品名は
+      // そもそも合致しない。
+      const directIconRows = src
+        .split('\n')
+        .filter((line) => /<(Archive|Trash2)[\s>/]/.test(line))
+        .filter((line) => !/titleIcon/.test(line))
+        .filter((line) => !/icon:\s*</.test(line))
+      expect(directIconRows, `${rel} に行直置きの箱・ゴミ箱アイコンが残っています`).toEqual([])
     }
   })
 
