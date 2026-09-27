@@ -5005,7 +5005,7 @@ export interface GettingStartedStep {
   href: string | null
   reason: string | null
   /** 段1だけ。Webhook をアカウントごとに確かめた結果。 */
-  webhook?: Array<{ id: string; status: 'matched' | 'mismatched' | 'unconfigured' | 'unknown' }>
+  webhook?: Array<{ id: string; status: 'matched' | 'mismatched' | 'unconfigured' | 'unknown'; active?: boolean | null }>
 }
 
 /** レシピ。設計 ★V6 34-2（`y0P0Qx`）。 */

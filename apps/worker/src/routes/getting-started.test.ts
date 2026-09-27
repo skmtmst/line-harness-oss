@@ -131,6 +131,44 @@ describe('GET /api/getting-started', () => {
     expect(body.data.steps.find((step) => step.key === 'accounts')?.state).toBe('stalled');
   });
 
+  it('R74: URL一致でもWebhook利用オフは完了にしない', async () => {
+    // 監査の再現: endpoint一致・active=false の実応答で usable=1 になっていた。
+    webhook.fetchWebhookEndpoint.mockResolvedValue({
+      expectedUrl: 'https://worker.example.com/webhook',
+      actualUrl: 'https://worker.example.com/webhook',
+      active: false,
+      status: 'matched',
+    });
+    const response = await makeApp().fetch(
+      new Request('https://example.com/api/getting-started?account_id=account-1'),
+      { DB: database() },
+    );
+    const body = await response.json() as {
+      data: {
+        steps: Array<{ key: string; state: string; reason: string | null; webhook: Array<{ id: string; active: boolean | null }> }>;
+      };
+    };
+    const accounts = body.data.steps.find((step) => step.key === 'accounts');
+    expect(accounts?.state).toBe('stalled');
+    expect(accounts?.reason).toContain('利用設定');
+    expect(accounts?.webhook).toEqual([{ id: 'account-1', status: 'matched', active: false }]);
+  });
+
+  it('R74: URL一致かつWebhook利用オンは完了になる', async () => {
+    webhook.fetchWebhookEndpoint.mockResolvedValue({
+      expectedUrl: 'https://worker.example.com/webhook',
+      actualUrl: 'https://worker.example.com/webhook',
+      active: true,
+      status: 'matched',
+    });
+    const response = await makeApp().fetch(
+      new Request('https://example.com/api/getting-started?account_id=account-1'),
+      { DB: database() },
+    );
+    const body = await response.json() as { data: { steps: Array<{ key: string; state: string }> } };
+    expect(body.data.steps.find((step) => step.key === 'accounts')?.state).toBe('done');
+  });
+
   it('設定が空なら未完了と理由を返す', async () => {
     state.tags = 0;
     state.fields = 0;

@@ -112,6 +112,17 @@ describe('段1 LINEアカウント', () => {
     expect(steps[0].state).toBe('stalled')
   })
 
+  it('R74: URL一致でも利用オフなら終わりにしない', () => {
+    const steps = buildSteps({ ...EMPTY, accounts: [account({ webhook: { status: 'matched', active: false } })] })
+    expect(steps[0].state).toBe('stalled')
+    expect(steps[0].next).toContain('利用設定')
+  })
+
+  it('R74: URL一致かつ利用オンなら終わり', () => {
+    const steps = buildSteps({ ...EMPTY, accounts: [account({ webhook: { status: 'matched', active: true } })] })
+    expect(steps[0].state).toBe('done')
+  })
+
   it('シークレットが未確認なら終わりにしない', () => {
     const steps = buildSteps({ ...EMPTY, accounts: [account({ channelSecretConfigured: false })] })
     expect(steps[0].state).toBe('stalled')
