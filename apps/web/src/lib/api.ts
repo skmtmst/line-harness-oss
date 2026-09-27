@@ -3188,7 +3188,7 @@ export type MileageEarningRuleV6 = {
   draftUpdatedAt: string
   /** N-231 案1: いま公開中の版。null は未公開。 */
   publishedVersion: number | null
-  metrics30d: { eligible: number; granted: number; excluded: number }
+  metrics30d: { eligible: number; granted: number; grantedMiles: number; excluded: number }
 }
 
 export type MileageEarningRulesV6Overview = {
