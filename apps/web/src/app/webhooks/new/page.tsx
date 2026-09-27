@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { EC_EVENT_TYPES, ecEventLabel } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import CreatePage, { AsideCard, Field, inputClass } from '@/components/shared/create-page'
+import { isStepUpRequired, useStepUpGate } from '@/components/step-up-prompt'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import { useAccount } from '@/contexts/account-context'
 import { MIN_SECRET_LENGTH, generateSecret } from '../secret'
@@ -57,6 +58,7 @@ export default function NewWebhookPage() {
   const [incomingSources, setIncomingSources] = useState('')
   const [secret, setSecret] = useState(generateSecret)
   const [maxRetries, setMaxRetries] = useState('0')
+  const { gate, prompt: stepUpPrompt } = useStepUpGate()
 
   const toggleEvent = (value: string) => {
     setSelectedEvents((current) =>
@@ -92,7 +94,7 @@ export default function NewWebhookPage() {
       }}
       onSave={async () => {
         if (!selectedAccountId) throw new Error('LINEアカウントを選択してください')
-        const res = await api.webhooks.outgoing.create({
+        const payload = {
           lineAccountId: selectedAccountId,
           name: name.trim(),
           url: url.trim(),
@@ -108,7 +110,19 @@ export default function NewWebhookPage() {
               ],
           secret,
           maxRetries: Number(maxRetries) || 0,
-        })
+        }
+        const create = (stepUpToken?: string) => api.webhooks.outgoing.create(payload, stepUpToken)
+        let res
+        try {
+          res = await create()
+        } catch (caught) {
+          // 秘密の値の登録は大事な操作。本人確認を求められたらその場で窓を立て、
+          // 確認が済んだgrantを付けて同じ保存をやり直す（V-1）。
+          if (!isStepUpRequired(caught)) throw caught
+          const token = await gate('webhook.secret', 'Webhookを登録する')
+          if (!token) throw caught
+          res = await create(token)
+        }
         if (!res.success) throw new Error(res.error)
         return res.data.id
       }}
@@ -254,6 +268,7 @@ export default function NewWebhookPage() {
           <span className="text-ink-faint text-xs">回まで</span>
         </div>
       </Field>
+      {stepUpPrompt}
     </CreatePage>
   )
 }

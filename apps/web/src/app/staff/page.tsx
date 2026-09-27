@@ -15,7 +15,7 @@ import { TableHeadRow, TableStateRow, Th } from '@/components/shared/table'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
-import StepUpDialog from '@/components/shared/step-up-dialog'
+import StepUpPrompt, { isStepUpRequired, type StepUpRequest as SharedStepUpRequest } from '@/components/step-up-prompt'
 import NotificationSwitch from '@/components/ui/notification-switch'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
@@ -143,32 +143,8 @@ function LoginHistoryNote({ count, loading, failed = false }: { count: number | 
   return <p className="text-xs font-medium text-ink-secondary">{count ? `このユーザーにはログイン履歴が ${count} 件あります` : 'ログイン履歴はありません'}</p>
 }
 
-/* 高危険操作が 428 で止まったとき、直前に立てる本人確認の窓（N-427）。 */
-type StepUpPurpose = 'staff.permissions.change' | 'staff.two_factor.remove'
-type StepUpRequest = { purpose: StepUpPurpose; retry: (token: string) => Promise<void> }
-
-function isStepUpRequired(error: unknown): boolean {
-  return error instanceof ApiError && error.code === 'STEP_UP_REQUIRED'
-}
-
-function StepUpPrompt({ request, onDone, onClose }: { request: StepUpRequest; onDone: () => void; onClose: () => void }) {
-  const [busy, setBusy] = useState(false), [error, setError] = useState('')
-  const submit = async (code: string) => {
-    if (busy) return
-    setBusy(true); setError('')
-    try {
-      const res = await api.staff.stepUp(code, request.purpose)
-      if (!res.success) throw new Error(res.error)
-      await request.retry(res.data.token)
-      onDone()
-    } catch (caught) {
-      setError(messageOf(caught))
-    } finally {
-      setBusy(false)
-    }
-  }
-  return <StepUpDialog open action={request.purpose === 'staff.two_factor.remove' ? '二段階認証を解除する' : '権限を変更する'} busy={busy} error={error} onSubmit={(code) => void submit(code)} onCancel={onClose} />
-}
+/* 高危険操作が STEP_UP_REQUIRED で止まったとき、直前に立てる本人確認の窓（N-427 → V-1共通部品）。 */
+type StepUpRequest = SharedStepUpRequest
 
 /** 本人がいまログインしている端末の一覧と失効（N-427）。 */
 function SessionsCard() {
@@ -342,7 +318,7 @@ function PermissionScopeView({ user, memberId, canSave, copyCandidates, roleCoun
       onClose()
     } catch (caught) {
       if (!stepUpToken && isStepUpRequired(caught)) {
-        setStepUp({ purpose: 'staff.permissions.change', retry: save })
+        setStepUp({ purpose: 'staff.permissions.change', action: '権限を変更する', retry: save })
         return
       }
       const message = messageOf(caught)
@@ -458,7 +434,7 @@ function EditModal({ member, administrator, currentUserId, activeAdministratorCo
     return () => { active = false }
   }, [administrator, member.id])
   const toggleNotification = (key: string, channel: keyof Channel) => setNotifications((current) => ({ ...current, [key]: { ...current[key], [channel]: !current[key][channel] } }))
-  const save = async (stepUpToken?: string) => { if (!email.trim()) return setError('メールアドレスを入力してください'); if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return setError('正しいメールアドレスを入力してください'); setSaving(true); setError(''); try { const res = await api.staff.update(member.id, { name: administrator ? name.trim() : undefined, email: email.trim(), role: administrator ? role : undefined, permissionKeys: administrator && role === 'staff' ? normalizeStaffPermissionKeys(permissions) : undefined, notificationPreferences: notifications }, stepUpToken); await onSaved(); if (res.success && res.data.emailChangePending && res.data.pendingEmail) { setEmailNotice(`${res.data.pendingEmail} へ確認メールを送りました。届いたメールのリンクを開くと変更が完了します。`); return } onClose() } catch (caught) { if (!stepUpToken && isStepUpRequired(caught)) { setStepUp({ purpose: 'staff.permissions.change', retry: save }); return } setError(messageOf(caught)) } finally { setSaving(false) } }
+  const save = async (stepUpToken?: string) => { if (!email.trim()) return setError('メールアドレスを入力してください'); if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return setError('正しいメールアドレスを入力してください'); setSaving(true); setError(''); try { const res = await api.staff.update(member.id, { name: administrator ? name.trim() : undefined, email: email.trim(), role: administrator ? role : undefined, permissionKeys: administrator && role === 'staff' ? normalizeStaffPermissionKeys(permissions) : undefined, notificationPreferences: notifications }, stepUpToken); await onSaved(); if (res.success && res.data.emailChangePending && res.data.pendingEmail) { setEmailNotice(`${res.data.pendingEmail} へ確認メールを送りました。届いたメールのリンクを開くと変更が完了します。`); return } onClose() } catch (caught) { if (!stepUpToken && isStepUpRequired(caught)) { setStepUp({ purpose: 'staff.permissions.change', action: '権限を変更する', retry: save }); return } setError(messageOf(caught)) } finally { setSaving(false) } }
   /**
    * LINE連携を外す。
    *
@@ -466,8 +442,8 @@ function EditModal({ member, administrator, currentUserId, activeAdministratorCo
    * 失敗は握りつぶさず、窓の中に運用者の言葉で出す。生のAPIエラーだと
    * 次に何をすればよいか読み取れない。
    */
-  const unlinkLine = async (stepUpToken?: string) => { if (unlinking) return; setUnlinking(true); setUnlinkError(''); try { const res = await api.staff.update(member.id, { lineLinked: false }, stepUpToken); if (!res.success) throw new Error(res.error); setUnlinkOpen(false); await onSaved(); onClose() } catch (caught) { if (!stepUpToken && isStepUpRequired(caught)) { setStepUp({ purpose: 'staff.permissions.change', retry: unlinkLine }); return } setUnlinkError('LINE連携を解除できませんでした。状態を読み直してから、もう一度お試しください。') } finally { setUnlinking(false) } }
-  const toggleActive = async (stepUpToken?: string) => { if (policy.statusBlockedReason) return; setStatusSaving(true); setError(''); try { await api.staff.update(member.id, { isActive: !member.isActive }, stepUpToken); await onSaved(); onClose() } catch (caught) { if (!stepUpToken && isStepUpRequired(caught)) { setStepUp({ purpose: 'staff.permissions.change', retry: toggleActive }); return } setError(messageOf(caught)) } finally { setStatusSaving(false) } }
+  const unlinkLine = async (stepUpToken?: string) => { if (unlinking) return; setUnlinking(true); setUnlinkError(''); try { const res = await api.staff.update(member.id, { lineLinked: false }, stepUpToken); if (!res.success) throw new Error(res.error); setUnlinkOpen(false); await onSaved(); onClose() } catch (caught) { if (!stepUpToken && isStepUpRequired(caught)) { setStepUp({ purpose: 'staff.permissions.change', action: '権限を変更する', retry: unlinkLine }); return } setUnlinkError('LINE連携を解除できませんでした。状態を読み直してから、もう一度お試しください。') } finally { setUnlinking(false) } }
+  const toggleActive = async (stepUpToken?: string) => { if (policy.statusBlockedReason) return; setStatusSaving(true); setError(''); try { await api.staff.update(member.id, { isActive: !member.isActive }, stepUpToken); await onSaved(); onClose() } catch (caught) { if (!stepUpToken && isStepUpRequired(caught)) { setStepUp({ purpose: 'staff.permissions.change', action: '権限を変更する', retry: toggleActive }); return } setError(messageOf(caught)) } finally { setStatusSaving(false) } }
   return <Modal onClose={onClose} wide><div data-design-node="EOTS4"><div className="flex items-start justify-between"><div><h2 className="text-xl font-bold text-ink">見せる範囲を決める</h2><p className="mt-1 text-xs text-ink-secondary">役割・表示機能・担当範囲を確認し、このユーザーに必要な範囲だけを設定します。</p></div></div>
     <div className="mt-5 rounded-control bg-canvas-sunken p-3"><p className="font-semibold text-ink">{member.name}</p><p className="text-xs text-ink-secondary">{ROLE_LABEL[member.role]}</p></div>{error && <p className="mt-4 rounded-control bg-danger-bg p-3 text-sm text-danger">{error}</p>}{emailNotice && <p role="status" className="mt-4 rounded-control bg-accent-soft p-3 text-sm text-accent-deep">{emailNotice}</p>}
     {policy.showAccountActions && <section className={`mt-5 rounded-card border p-4 ${member.isActive ? 'border-accent bg-accent-soft' : 'border-warning bg-warning-bg'}`} aria-label="ユーザーの利用状態"><div className="flex flex-wrap items-center justify-between gap-4"><div><p className="text-sm font-bold text-ink">ログイン状態：{member.isActive ? '有効' : '無効'}</p><p className="mt-1 text-xs leading-5 text-ink-secondary">{member.isActive ? '無効にすると、このユーザーはログインできなくなります。' : '有効にすると、このユーザーは再びログインできます。'}</p><div className="mt-2"><LoginHistoryNote count={loginCount} loading={loginHistoryLoading} failed={loginHistoryFailed} /></div></div><button type="button" onClick={() => void toggleActive()} disabled={statusSaving || Boolean(policy.statusBlockedReason)} className={`min-w-48 rounded-control px-4 py-2.5 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-40 ${member.isActive ? 'border border-warning bg-canvas text-warning hover:bg-warning-bg' : 'bg-accent-deep text-on-accent hover:brightness-90'}`}>{statusSaving ? '変更中…' : member.isActive ? 'このユーザーを無効にする' : 'このユーザーを有効にする'}</button></div>{policy.statusBlockedReason && <p className="mt-3 rounded-control bg-canvas p-3 text-xs font-medium text-warning">{policy.statusBlockedReason}</p>}</section>}
@@ -633,7 +609,7 @@ function StaffPageHost() {
    *
    * 処理中は受け付けない。失敗は握りつぶさず、窓の中に運用者の言葉で出す。
    */
-  const runDisableTwoFactor = async (stepUpToken?: string) => { if (!disablingTarget || disablingTwoFactor) return; setDisablingTwoFactor(true); setDisableError(''); try { const res = await api.staff.disableTwoFactor(disablingTarget.id, stepUpToken); if (!res.success) throw new Error(res.error); setDisablingTarget(null); await load() } catch (caught) { if (!stepUpToken && isStepUpRequired(caught)) { setStepUp({ purpose: 'staff.two_factor.remove', retry: runDisableTwoFactor }); return } setDisableError('二段階認証を解除できませんでした。状態を読み直してから、もう一度お試しください。') } finally { setDisablingTwoFactor(false) } }
+  const runDisableTwoFactor = async (stepUpToken?: string) => { if (!disablingTarget || disablingTwoFactor) return; setDisablingTwoFactor(true); setDisableError(''); try { const res = await api.staff.disableTwoFactor(disablingTarget.id, stepUpToken); if (!res.success) throw new Error(res.error); setDisablingTarget(null); await load() } catch (caught) { if (!stepUpToken && isStepUpRequired(caught)) { setStepUp({ purpose: 'staff.two_factor.remove', action: '二段階認証を解除する', retry: runDisableTwoFactor }); return } setDisableError('二段階認証を解除できませんでした。状態を読み直してから、もう一度お試しください。') } finally { setDisablingTwoFactor(false) } }
   /**
    * ログインユーザーを外す。
    *
@@ -651,7 +627,7 @@ function StaffPageHost() {
       setRemovingTarget(null)
       await load()
     } catch (caught) {
-      if (!stepUpToken && isStepUpRequired(caught)) { setStepUp({ purpose: 'staff.permissions.change', retry: runRemove }); return }
+      if (!stepUpToken && isStepUpRequired(caught)) { setStepUp({ purpose: 'staff.permissions.change', action: 'スタッフを削除する', retry: runRemove }); return }
       setRemoveError(messageOf(caught))
     } finally {
       removingRef.current = false

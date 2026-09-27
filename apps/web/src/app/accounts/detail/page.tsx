@@ -11,6 +11,7 @@ import TargetMissing from '@/components/shared/target-missing'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import StatusBadge from '@/components/shared/status-badge'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
 import TestRecipientsSetting from '@/components/accounts/test-recipients-setting'
 import { Tabs } from '@/components/shared/tabs'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -46,6 +47,7 @@ function AccountDetail() {
   /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
   const [missing, setMissing] = useState(false)
   const [stopTarget, setStopTarget] = useState<LineAccount | null>(null)
+  const [stepUp, setStepUp] = useState<StepUpRequest | null>(null)
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState('')
 
@@ -73,16 +75,25 @@ function AccountDetail() {
   usePageTitle(account?.name)
 
   /** 送受信の停止・再開。**何が止まって何が残るかを、押す前に読ませる。** */
-  const toggleActive = async () => {
+  const toggleActive = async (stepUpToken?: string) => {
     if (!stopTarget) return
     setBusy(true)
     setActionError('')
     try {
-      const res = await api.lineAccounts.update(stopTarget.id, { isActive: !stopTarget.isActive })
+      const res = await api.lineAccounts.update(stopTarget.id, { isActive: !stopTarget.isActive }, stepUpToken)
       if (!res.success) throw new Error(res.error)
       setStopTarget(null)
       await load()
-    } catch {
+    } catch (caught) {
+      // 送受信の停止は大事な操作。本人確認を求められたら窓を立ててやり直す（V-1）。
+      if (!stepUpToken && isStepUpRequired(caught)) {
+        setStepUp({
+          purpose: 'line_account.credentials',
+          action: stopTarget.isActive ? 'アカウントの送受信を止める' : 'アカウントの送受信を再開する',
+          retry: toggleActive,
+        })
+        return
+      }
       setActionError('変えられませんでした。しばらくおいてから、もう一度お試しください。')
     } finally {
       setBusy(false)
@@ -348,6 +359,7 @@ function AccountDetail() {
         onCancel={() => { if (!busy) setStopTarget(null) }}
         onConfirm={() => void toggleActive()}
       />
+      {stepUp && <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} />}
     </div>
   )
 }
