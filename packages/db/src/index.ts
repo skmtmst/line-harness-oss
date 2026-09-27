@@ -32,6 +32,7 @@ export * from './booking-audit';
 export * from './booking-settings';
 export * from './booking-resources';
 export * from './booking-menu-resources';
+export * from './menu-versions';
 export * from './line-webhook-events';
 export * from './line-message-unsends';
 export * from './friend-add-events';
