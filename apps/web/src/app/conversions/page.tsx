@@ -90,11 +90,15 @@ function valueModeLine(item: Pick<ConversionDefinitionListItem, 'sourceType' | '
   return '金額を集計しない'
 }
 
-const VALUE_MODE_OPTIONS = [
-  { value: 'fixed', label: '1件あたりの金額を決める' },
-  { value: 'source', label: '連携元の金額を使う' },
-  { value: 'none', label: '金額を数えない' },
-]
+/**
+ * 編集の金額の決め方の表示名。選べるものは対応表(origin-labels)の
+ * valueModes から作り、ここでは名前だけを持つ。作成と同じ動きにする。
+ */
+const EDIT_VALUE_MODE_LABELS: Record<EditForm['valueMode'], string> = {
+  fixed: '1件あたりの金額を決める',
+  source: '連携元の金額を使う',
+  none: '金額を数えない',
+}
 const DEDUP_OPTIONS = [
   { value: 'every', label: deduplicationLabel('every', null) },
   { value: 'once_per_friend', label: deduplicationLabel('once_per_friend', null) },
@@ -391,6 +395,8 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
   const [editForm, setEditForm] = useState<EditForm | null>(null)
   const [editSaving, setEditSaving] = useState(false)
   const [editError, setEditError] = useState('')
+  // 起点に合わない金額の決め方を開いたときに既定へ戻した知らせ。選び直したら消える。
+  const [editValueModeNotice, setEditValueModeNotice] = useState<string | null>(null)
   // N-268: 下書きの公開。版は開いた時点のものを渡し、409は読み直しで返す。
   const [publishing, setPublishing] = useState(false)
   /**
@@ -481,7 +487,20 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
   const openEdit = (target: ConversionDefinitionListItem) => {
     setDetailTarget(null)
     setEditTarget(target)
-    setEditForm(toEditForm(target))
+    const form = toEditForm(target)
+    // 起点に金額が無いものは注文の金額を選べない(作成と同じ動き)。昔の版に
+    // 合わない決め方が残っていたら、合う既定へ戻して知らせる。
+    const allowed = originInfoOf(form.sourceType).valueModes
+    if (!allowed.includes(form.valueMode)) {
+      const fallback = originInfoOf(form.sourceType).defaultValueMode
+      setEditForm({ ...form, valueMode: fallback })
+      setEditValueModeNotice(
+        `起点に注文の金額が無いため、金額の決め方を「${EDIT_VALUE_MODE_LABELS[fallback]}」に戻しました。`,
+      )
+    } else {
+      setEditForm(form)
+      setEditValueModeNotice(null)
+    }
     setEditError('')
   }
 
@@ -497,6 +516,11 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
     const name = editForm.name.trim()
     if (!name) {
       setEditError('名前を入れてください')
+      return
+    }
+    // 起点に金額が無いのに注文の金額が残っていたら先に言う(通常は選べない)。
+    if (!originInfoOf(editForm.sourceType).valueModes.includes(editForm.valueMode)) {
+      setEditError('この起点には注文の金額が無いため、金額の決め方を選び直してください')
       return
     }
     if (editForm.valueMode === 'fixed' && !editForm.fixedValue.trim()) {
@@ -538,6 +562,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
       if (!res.success) throw new Error(res.error)
       setEditTarget(null)
       setEditForm(null)
+      setEditValueModeNotice(null)
       await load()
     } catch (error) {
       const message = error instanceof Error ? error.message : ''
@@ -1187,10 +1212,10 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
         open={editTarget !== null && editForm !== null}
         title={editTarget ? `「${editTarget.name}」を編集` : ''}
         description="直すと次の版になります。過去に数えた成果と金額は、そのまま残ります。"
-        onCancel={() => { setEditTarget(null); setEditForm(null) }}
+        onCancel={() => { setEditTarget(null); setEditForm(null); setEditValueModeNotice(null) }}
         footer={(
           <div className="flex justify-end gap-2">
-            <Button onClick={() => { setEditTarget(null); setEditForm(null) }}>やめる</Button>
+            <Button onClick={() => { setEditTarget(null); setEditForm(null); setEditValueModeNotice(null) }}>やめる</Button>
             <Button variant="primary" disabled={editSaving} onClick={() => void submitEdit()}>
               {editSaving ? '保存中...' : 'この内容にする'}
             </Button>
@@ -1212,14 +1237,26 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                 onChange={(event) => setEditForm({ ...editForm, name: event.target.value })}
               />
             </label>
+            {/* 起点に金額が無いものは注文の金額を出さない。選択肢は対応表が持つ(作成と同じ)。 */}
             <label className="block">
               <span className="text-ink-faint text-xs">金額の決め方</span>
               <Select
                 aria-label="金額の決め方"
                 value={editForm.valueMode}
-                options={VALUE_MODE_OPTIONS}
-                onChange={(value) => setEditForm({ ...editForm, valueMode: value as EditForm['valueMode'] })}
+                options={originInfoOf(editForm.sourceType).valueModes.map((mode) => ({
+                  value: mode,
+                  label: EDIT_VALUE_MODE_LABELS[mode],
+                }))}
+                onChange={(value) => {
+                  setEditForm({ ...editForm, valueMode: value as EditForm['valueMode'] })
+                  setEditValueModeNotice(null)
+                }}
               />
+              {editValueModeNotice ? (
+                <span className="text-warning mt-1 block text-xs" role="status">
+                  {editValueModeNotice}
+                </span>
+              ) : null}
             </label>
             {editForm.valueMode === 'fixed' ? (
               <label className="block">

@@ -68,6 +68,14 @@ describe('起点に合う金額の出し方', () => {
     expect(NEW_PAGE).toContain('valueModeNotice')
     expect(NEW_PAGE).toContain('role="status"')
   })
+
+  it('編集も金額の決め方を対応表から作る', () => {
+    expect(LIST_PAGE).toContain('originInfoOf(editForm.sourceType).valueModes')
+    expect(LIST_PAGE).toContain('EDIT_VALUE_MODE_LABELS')
+    expect(LIST_PAGE).toContain('editValueModeNotice')
+    // 3択の固定一覧は残さない(起点に金額が無いとき注文の金額が出てしまう)。
+    expect(LIST_PAGE).not.toContain('VALUE_MODE_OPTIONS')
+  })
 })
 
 /**
