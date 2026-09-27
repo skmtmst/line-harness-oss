@@ -66,7 +66,7 @@ export default function ActionEditor({
           <select
             value={action.kind}
             onChange={(e) => patch(index, emptyAction(e.target.value as FormAction['kind']))}
-            className={fieldSelect}
+            className={`${fieldSelect} min-w-0 max-w-full`}
             aria-label="動作の種類"
           >
             {ACTION_LABELS.map((a) => (
@@ -82,7 +82,7 @@ export default function ActionEditor({
               value={action.text}
               onChange={(e) => patch(index, { ...action, text: e.target.value })}
               placeholder="送る文面"
-              className={`${cellInput} min-w-[16rem] flex-1`}
+              className={`${cellInput} min-w-0 flex-1 sm:min-w-[16rem]`}
             />
           )}
 
@@ -90,7 +90,7 @@ export default function ActionEditor({
             <select
               value={action.templateId}
               onChange={(e) => patch(index, { ...action, templateId: e.target.value })}
-              className={fieldSelect}
+              className={`${fieldSelect} min-w-0 max-w-full`}
             >
               <option value="">— 選んでください —</option>
               {refs.templates
@@ -110,7 +110,7 @@ export default function ActionEditor({
                 onChange={(e) =>
                   patch(index, { ...action, op: e.target.value as 'add' | 'remove' })
                 }
-                className={fieldSelect}
+                className={`${fieldSelect} min-w-0 max-w-full`}
               >
                 <option value="add">付ける</option>
                 <option value="remove">外す</option>
@@ -120,7 +120,7 @@ export default function ActionEditor({
                 onChange={(e) =>
                   patch(index, { ...action, tagIds: e.target.value ? [e.target.value] : [] })
                 }
-                className={fieldSelect}
+                className={`${fieldSelect} min-w-0 max-w-full`}
               >
                 <option value="">— タグ —</option>
                 {refs.tags.map((t) => (
@@ -137,7 +137,7 @@ export default function ActionEditor({
               <select
                 value={action.fieldId}
                 onChange={(e) => patch(index, { ...action, fieldId: e.target.value })}
-                className={fieldSelect}
+                className={`${fieldSelect} min-w-0 max-w-full`}
               >
                 <option value="">— 情報欄 —</option>
                 {refs.friendFields.map((f) => (
@@ -152,7 +152,7 @@ export default function ActionEditor({
                 value={action.value}
                 onChange={(e) => patch(index, { ...action, value: e.target.value })}
                 placeholder="書き込む値"
-                className={`${cellInput} min-w-[10rem] flex-1`}
+                className={`${cellInput} min-w-0 flex-1 sm:min-w-[10rem]`}
               />
             </>
           )}
@@ -164,7 +164,7 @@ export default function ActionEditor({
                 onChange={(e) =>
                   patch(index, { ...action, op: e.target.value as 'start' | 'stop' })
                 }
-                className={fieldSelect}
+                className={`${fieldSelect} min-w-0 max-w-full`}
               >
                 <option value="start">開始する</option>
                 <option value="stop">停止する</option>
@@ -172,7 +172,7 @@ export default function ActionEditor({
               <select
                 value={action.scenarioId}
                 onChange={(e) => patch(index, { ...action, scenarioId: e.target.value })}
-                className={fieldSelect}
+                className={`${fieldSelect} min-w-0 max-w-full`}
               >
                 <option value="">— シナリオ —</option>
                 {refs.scenarios.map((s) => (
@@ -188,7 +188,7 @@ export default function ActionEditor({
             <select
               value={action.reminderId}
               onChange={(e) => patch(index, { ...action, reminderId: e.target.value })}
-              className={fieldSelect}
+              className={`${fieldSelect} min-w-0 max-w-full`}
             >
               <option value="">— リマインダ —</option>
               {refs.reminders.map((r) => (
