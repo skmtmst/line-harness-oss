@@ -47,6 +47,7 @@ import { conflictMessage } from './form-conflict-message'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { EMPTY_REFS, type FormRefs } from '@/components/forms/form-refs'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import ActionMenu from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
 import {
   formJumpsInto as jumpsInto,
@@ -107,7 +108,6 @@ function FormEditInner() {
   const [refs, setRefs] = useState<FormRefs>(EMPTY_REFS)
   const [showOptions, setShowOptions] = useState(editorTab === 'options')
   const [showAddMenu, setShowAddMenu] = useState(false)
-  const [addMenuUp, setAddMenuUp] = useState(false)
   const addMenuButtonRef = useRef<HTMLButtonElement>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -803,7 +803,7 @@ function FormEditInner() {
 
           <div className="grid gap-4 xl:grid-cols-[minmax(320px,26rem)_minmax(0,1fr)]">
             {/* ---- 出来上がり ---- */}
-            <section data-design="Preview" className="xl:sticky xl:top-4 xl:self-start">
+            <section data-design="Preview" className="min-w-0 xl:sticky xl:top-4 xl:self-start">
               <h2 className="text-ink-secondary mb-1 text-xs font-medium">お客さまに見える形</h2>
               <p className="mb-2 text-xs text-ink-faint">実際にお客さまが見る画面です</p>
               <FormPreview layout={layout} sectionIndex={tab === HEADER_TAB ? 0 : tab} />
@@ -941,54 +941,27 @@ function FormEditInner() {
                   <div className="relative">
                     <button
                       ref={addMenuButtonRef}
-                      onClick={() => {
-                        // 下の固定バーに隠れるときは上へ開く
-                        if (!showAddMenu && addMenuButtonRef.current) {
-                          const rect = addMenuButtonRef.current.getBoundingClientRect()
-                          setAddMenuUp(window.innerHeight - rect.bottom < 380)
-                        }
-                        setShowAddMenu((v) => !v)
-                      }}
+                      onClick={() => setShowAddMenu((v) => !v)}
+                      aria-expanded={showAddMenu}
+                      aria-haspopup="menu"
                       className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-3 py-1.5 text-xs font-medium"
                     >
                       ＋ ブロックを追加（12種）
                     </button>
-                    {showAddMenu && (
-                      <>
-                        {/* 外を押したら閉じる */}
-                        <button
-                          className="fixed inset-0 z-10 cursor-default"
-                          onClick={() => setShowAddMenu(false)}
-                          aria-label="閉じる"
-                        />
-                        <div
-                          className={`bg-canvas rounded-card border-hairline absolute right-0 z-20 w-48 border py-1 shadow-lg max-h-[70vh] overflow-y-auto ${
-                            addMenuUp ? 'bottom-full mb-1' : 'mt-1'
-                          }`}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Escape') {
-                              setShowAddMenu(false)
-                              addMenuButtonRef.current?.focus()
-                            }
-                          }}
-                        >
-                          {['飾り', '入力'].map((group) => (
-                            <div key={group}>
-                              <p className="text-ink-faint px-3 py-1 text-[11px]">{group}</p>
-                              {BLOCK_MENU.filter((m) => m.group === group).map((m) => (
-                                <button
-                                  key={`${m.kind}-${m.type ?? ''}`}
-                                  onClick={() => addBlock(m.kind, m.type)}
-                                  className="text-ink hover:bg-canvas-sunken block w-full px-3 py-1.5 text-left text-sm"
-                                >
-                                  {m.label}
-                                </button>
-                              ))}
-                            </div>
-                          ))}
-                        </div>
-                      </>
-                    )}
+                    <ActionMenu
+                      open={showAddMenu}
+                      ariaLabel="追加するブロック"
+                      onClose={() => setShowAddMenu(false)}
+                      anchorRef={addMenuButtonRef}
+                      items={['飾り', '入力'].flatMap((group) =>
+                        BLOCK_MENU.filter((m) => m.group === group).map((m, index) => ({
+                          id: `${m.kind}-${m.type ?? ''}`,
+                          label: m.label,
+                          sectionBefore: index === 0 ? group : undefined,
+                          onSelect: () => addBlock(m.kind, m.type),
+                        })),
+                      )}
+                    />
                   </div>
                 </div>
               </div>

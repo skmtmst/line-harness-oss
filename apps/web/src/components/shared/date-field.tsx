@@ -1,7 +1,8 @@
 'use client'
 
 import { Calendar, ChevronLeft, ChevronRight, X } from 'lucide-react'
-import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import MenuPortal from './menu-portal'
 import styles from './date-field.module.css'
 
 /**
@@ -55,6 +56,19 @@ export default function DateField({
   const rootRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const gridRef = useRef<HTMLDivElement>(null)
+  const openRef = useRef(open)
+  openRef.current = open
+  /*
+   * 暦は最上層（MenuPortal）へ遅れて装着される。開いた直後の effect では
+   * まだ節が無く焦点を移せないので、付いた時点で選んだ日へ焦点を移す。
+   * 月送りの付け替えは下の effect（[open, focused]）が担う。
+   */
+  const gridCallbackRef = useCallback((node: HTMLDivElement | null) => {
+    gridRef.current = node
+    if (node && openRef.current) {
+      node.querySelector<HTMLButtonElement>('button[tabindex="0"]')?.focus()
+    }
+  }, [])
 
   const month = useMemo(() => new Date(focused.getFullYear(), focused.getMonth(), 1), [focused])
   const days = useMemo(() => sixWeeks(month), [month])
@@ -62,14 +76,7 @@ export default function DateField({
   const maxDate = parseDate(max ?? '')
   const isDisabled = (day: Date) => Boolean((minDate && day < minDate) || (maxDate && day > maxDate))
 
-  useEffect(() => {
-    if (!open) return
-    const onPointerDown = (event: PointerEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false)
-    }
-    document.addEventListener('pointerdown', onPointerDown)
-    return () => document.removeEventListener('pointerdown', onPointerDown)
-  }, [open])
+  // 外側を押したときの扱いは MenuPortal に任せる（箱の中の日付押しで閉じない）。
 
   useEffect(() => {
     if (!open) return
@@ -87,6 +94,16 @@ export default function DateField({
     setOpen(false)
     triggerRef.current?.focus()
   }
+
+  // Esc は欄へ戻すため、箱の中に焦点があっても欄側で閉じる。
+  useEffect(() => {
+    if (!open) return
+    const onKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === 'Escape') close()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [open])
 
   const moveTo = (next: Date) => {
     if (next.getFullYear() !== focused.getFullYear() || next.getMonth() !== focused.getMonth()) {
@@ -165,11 +182,19 @@ export default function DateField({
       ) : null}
 
       {open ? (
+        <MenuPortal
+          open={open}
+          align="start"
+          getAnchor={() => triggerRef.current}
+          onClose={() => setOpen(false)}
+        >
         <div
           id={dialogId}
           role="dialog"
           aria-label="日付を選ぶ"
           className={styles.popover}
+          // 最上層では absolute 指定を無効にする（位置は器が決める）。
+          style={{ position: 'static' }}
           // 箱の中の押下はここで止める。呼び出し側が `<label>` で欄全体を包んでいると、
           // 箱の中の押下がラベル経由で欄本体へ再送達して開閉が裏返る。
           onClick={(event) => event.stopPropagation()}
@@ -189,7 +214,7 @@ export default function DateField({
             ))}
           </div>
           <div
-            ref={gridRef}
+            ref={gridCallbackRef}
             role="grid"
             aria-label={`${month.getFullYear()}年${month.getMonth() + 1}月`}
             className={styles.grid}
@@ -230,6 +255,7 @@ export default function DateField({
             <button type="button" className={styles.reset} onClick={() => { onChange(''); close() }}>消す</button>
           </div>
         </div>
+        </MenuPortal>
       ) : null}
     </div>
   )

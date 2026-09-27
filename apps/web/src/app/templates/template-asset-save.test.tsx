@@ -108,7 +108,7 @@ function setSelectValue(el: HTMLSelectElement, value: string) {
 }
 
 function input(selector: string): HTMLInputElement {
-  const el = host.querySelector<HTMLInputElement>(selector)
+  const el = document.querySelector<HTMLInputElement>(selector)
   if (!el) throw new Error(`入力欄がありません: ${selector}`)
   return el
 }
@@ -122,20 +122,20 @@ async function setDateTime(label: string, iso: string) {
   const [y, mo, d] = date.split('-').map(Number)
   const week = WEEK[new Date(y, mo - 1, d).getDay()]
   await act(async () => {
-    host.querySelector<HTMLElement>(`button[aria-label="${label}"]`)!.click()
+    document.querySelector<HTMLElement>(`button[aria-label="${label}"]`)!.click()
     await settle()
   })
-  const picker = host.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
+  const picker = document.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
   await act(async () => {
     picker.querySelector<HTMLButtonElement>('button[aria-label="日付"]')!.click()
     await settle()
   })
   for (let i = 0; i < 24; i += 1) {
-    const grid = host.querySelector('[role="grid"]')
+    const grid = document.querySelector('[role="grid"]')
     const currentLabel = /^(\d+)年(\d+)月$/.exec(grid?.getAttribute('aria-label') ?? '')
     const current = currentLabel ? Number(currentLabel[1]) * 12 + Number(currentLabel[2]) : y * 12 + mo
     if (grid?.getAttribute('aria-label') === `${y}年${mo}月`) break
-    const nav = Array.from(host.querySelectorAll('button')).find(
+    const nav = Array.from(document.querySelectorAll('button')).find(
       (b) => b.getAttribute('aria-label') === (y * 12 + mo >= current ? '次の月' : '前の月'),
     )!
     await act(async () => {
@@ -144,12 +144,12 @@ async function setDateTime(label: string, iso: string) {
     })
   }
   await act(async () => {
-    Array.from(host.querySelectorAll('button')).find((b) =>
+    Array.from(document.querySelectorAll('button')).find((b) =>
       (b.getAttribute('aria-label') ?? '').startsWith(`${y}年${mo}月${d}日（${week}）`),
     )!.click()
     await settle()
   })
-  const reopened = host.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
+  const reopened = document.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
   await act(async () => {
     const hourSelect = reopened.querySelector('select[aria-label="時"]') as HTMLSelectElement
     hourSelect.value = hour
@@ -167,14 +167,14 @@ async function setDateTime(label: string, iso: string) {
 }
 
 function selectByLabel(label: string): HTMLSelectElement {
-  const el = host.querySelector<HTMLSelectElement>(`select[aria-label="${label}"]`)
+  const el = document.querySelector<HTMLSelectElement>(`select[aria-label="${label}"]`)
   if (!el) throw new Error(`選択欄がありません: ${label}`)
   return el
 }
 
 /** 名前を入れて保存する。 */
 async function nameAndSave() {
-  const nameInput = host.querySelector<HTMLInputElement>('input[type="text"]')!
+  const nameInput = document.querySelector<HTMLInputElement>('input[type="text"]')!
   await act(async () => {
     setInputValue(nameInput, '監査用テンプレート')
     await settle()
@@ -216,8 +216,8 @@ describe('NEXT-17: クーポンの設定が保存値へ入る', () => {
     })
 
     // 抽選なしでは確率・当選上限の入力欄自体が出ない（有効な設定に見せない）。
-    expect(host.querySelector('input[aria-label="当たる確率"]')).toBeNull()
-    expect(host.querySelector('input[aria-label="当選人数の上限"]')).toBeNull()
+    expect(document.querySelector('input[aria-label="当たる確率"]')).toBeNull()
+    expect(document.querySelector('input[aria-label="当選人数の上限"]')).toBeNull()
 
     await nameAndSave()
     expect(fixture.createCalls).toHaveLength(1)
@@ -272,7 +272,7 @@ describe('NEXT-18: リッチメッセージの面数と保存値が一致する'
       await settle()
     })
 
-    const areaSelects = [...host.querySelectorAll<HTMLSelectElement>('select[aria-label^="面 "]')]
+    const areaSelects = [...document.querySelectorAll<HTMLSelectElement>('select[aria-label^="面 "]')]
     expect(areaSelects).toHaveLength(6)
     // 未設定の面は警告に数える（A〜F全部）。
     expect(host.textContent).toContain('面 A・面 B・面 C・面 D・面 E・面 Fのアクションが未設定です')
@@ -323,14 +323,14 @@ describe('NEXT-18: リッチメッセージの面数と保存値が一致する'
     const dialog = document.body.querySelector('[role="alertdialog"], [role="dialog"]')
     expect(dialog?.textContent).toContain('面 C')
     // まだ形状は変わっていない（設定欄が6つ→ではなく3つのまま）。
-    expect(host.querySelectorAll('select[aria-label^="面 "]')).toHaveLength(3)
+    expect(document.querySelectorAll('select[aria-label^="面 "]')).toHaveLength(3)
 
     await act(async () => {
       buttonByText('面の数を変える', dialog as HTMLElement).click()
       await settle()
     })
-    expect(host.querySelectorAll('select[aria-label^="面 "]')).toHaveLength(2)
-    expect(host.querySelector('input[aria-label="面 C のURL"]')).toBeNull()
+    expect(document.querySelectorAll('select[aria-label^="面 "]')).toHaveLength(2)
+    expect(document.querySelector('input[aria-label="面 C のURL"]')).toBeNull()
 
     await act(async () => {
       setInputValue(input('input[placeholder="画像URL"]'), 'https://cdn.example.test/rich.png')
@@ -354,7 +354,7 @@ describe('NEXT-19: リサーチの質問が保存値へ入る', () => {
 
     // 2問目（選択中）を「いくつでも選ぶ・任意」にし、選択肢を入れる。
     await act(async () => {
-      setInputValue(host.querySelector<HTMLTextAreaElement>('textarea[aria-label="質問文"]')!, 'よく使っている商品を教えてください')
+      setInputValue(document.querySelector<HTMLTextAreaElement>('textarea[aria-label="質問文"]')!, 'よく使っている商品を教えてください')
       setSelectValue(selectByLabel('答え方'), 'multiple')
       await settle()
     })
@@ -363,7 +363,7 @@ describe('NEXT-19: リサーチの質問が保存値へ入る', () => {
       requiredCheckbox.click()
       await settle()
     })
-    const choices = [...host.querySelectorAll<HTMLInputElement>('input[placeholder^="選択肢"]')]
+    const choices = [...document.querySelectorAll<HTMLInputElement>('input[placeholder^="選択肢"]')]
     await act(async () => {
       setInputValue(choices[0], 'フード')
       setInputValue(choices[1], 'おやつ')
@@ -376,10 +376,10 @@ describe('NEXT-19: リサーチの質問が保存値へ入る', () => {
       await settle()
     })
     await act(async () => {
-      setInputValue(host.querySelector<HTMLTextAreaElement>('textarea[aria-label="質問文"]')!, '来月も定期便を続けたいと思いますか？')
+      setInputValue(document.querySelector<HTMLTextAreaElement>('textarea[aria-label="質問文"]')!, '来月も定期便を続けたいと思いますか？')
       await settle()
     })
-    const firstChoices = [...host.querySelectorAll<HTMLInputElement>('input[placeholder^="選択肢"]')]
+    const firstChoices = [...document.querySelectorAll<HTMLInputElement>('input[placeholder^="選択肢"]')]
     await act(async () => {
       setInputValue(firstChoices[0], '続けたい')
       setInputValue(firstChoices[1], '止めたい')
@@ -403,7 +403,7 @@ describe('NEXT-19: リサーチの質問が保存値へ入る', () => {
     })
     expect(host.textContent).toContain('2 / 10 問')
     await act(async () => {
-      host.querySelector<HTMLButtonElement>('button[aria-label="質問 2 を消す"]')!.click()
+      document.querySelector<HTMLButtonElement>('button[aria-label="質問 2 を消す"]')!.click()
       await settle()
     })
     expect(host.textContent).toContain('1 / 10 問')

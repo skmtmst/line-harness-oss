@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useAccount } from '@/contexts/account-context'
+import MenuPortal from '@/components/shared/menu-portal'
 
 export interface AccountSwitchTarget {
   id: string
@@ -71,6 +72,7 @@ export default function AccountSwitcher() {
   const { accounts, selectedAccount, setSelectedAccountId, loading, error, refreshing, refreshAccounts } = useAccount()
   const [open, setOpen] = useState(false)
   const [target, setTarget] = useState<AccountSwitchTarget | null>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
 
   const confirmSwitch = () => {
     if (!target) return
@@ -101,24 +103,36 @@ export default function AccountSwitcher() {
           <span className="rounded-pill bg-accent-soft px-1 py-1 text-nano font-semibold text-accent-deep">選択</span>
         </Link>
       ) : (
-        <button type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open} className="flex h-16 w-full items-center gap-1.5 rounded-xl border border-hairline bg-canvas px-2 text-left hover:border-accent">
+        <button ref={triggerRef} type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open} className="flex h-16 w-full items-center gap-1.5 rounded-xl border border-hairline bg-canvas px-2 text-left hover:border-accent">
           <AccountMark account={selectedAccount} compact />
           <span className="min-w-0 flex-1"><span className="block truncate text-[13px] font-bold text-ink">{accountLabel(selectedAccount)}</span><span className="mt-0.5 block truncate text-[10px] text-ink-faint">{selectedAccount.plan?.label || selectedAccount.basicId || 'LINE情報を確認中'}</span></span>
           <span className="rounded-pill bg-accent-soft px-1.25 py-0.75 text-nano font-semibold text-accent-deep">表示中</span>
           <span className={`text-[10px] text-ink-faint transition-transform ${open ? 'rotate-180' : ''}`}>▼</span>
         </button>
       )}
-      {open && <div className="absolute left-0 right-0 top-full z-30 mt-2 max-h-72 overflow-y-auto rounded-card border border-hairline bg-canvas p-2 shadow-xl">
-        <p className="px-2 pb-2 pt-1 text-[10px] font-semibold text-ink-faint">切り替えるアカウント</p>
-        {accounts.map((account) => {
-          const current = account.id === selectedAccount?.id
-          return <button key={account.id} type="button" disabled={current} onClick={() => { setTarget(account); setOpen(false) }} className={`flex w-full items-center gap-2 rounded-control px-2 py-2 text-left ${current ? 'bg-accent-soft' : 'hover:bg-canvas-sunken'}`}>
-            <AccountMark account={account} />
-            <span className="min-w-0 flex-1"><span className="block truncate text-xs font-semibold text-ink">{accountLabel(account)}</span><span className="block truncate text-[10px] text-ink-faint">{account.plan?.label || account.basicId || 'プラン取得中'}</span></span>
-            <span className={`text-[10px] font-semibold ${current ? 'text-success' : 'text-action'}`}>{current ? '表示中' : '選択'}</span>
-          </button>
-        })}
-      </div>}
+      {open && <MenuPortal
+        open={open}
+        align="start"
+        matchWidth
+        getAnchor={() => triggerRef.current}
+        onClose={() => setOpen(false)}
+      >
+        <div
+          className="max-h-72 overflow-y-auto rounded-card border border-hairline bg-canvas p-2 shadow-xl"
+          // 最上層では absolute 指定を無効にする（位置は器が決める）。
+          style={{ position: 'static', width: '100%' }}
+        >
+          <p className="px-2 pb-2 pt-1 text-[10px] font-semibold text-ink-faint">切り替えるアカウント</p>
+          {accounts.map((account) => {
+            const current = account.id === selectedAccount?.id
+            return <button key={account.id} type="button" disabled={current} onClick={() => { setTarget(account); setOpen(false) }} className={`flex w-full items-center gap-2 rounded-control px-2 py-2 text-left ${current ? 'bg-accent-soft' : 'hover:bg-canvas-sunken'}`}>
+              <AccountMark account={account} />
+              <span className="min-w-0 flex-1"><span className="block truncate text-xs font-semibold text-ink">{accountLabel(account)}</span><span className="block truncate text-[10px] text-ink-faint">{account.plan?.label || account.basicId || 'プラン取得中'}</span></span>
+              <span className={`text-[10px] font-semibold ${current ? 'text-success' : 'text-action'}`}>{current ? '表示中' : '選択'}</span>
+            </button>
+          })}
+        </div>
+      </MenuPortal>}
     </div>
     {target && <AccountSwitchDialog current={selectedAccount} target={target} onClose={() => setTarget(null)} onConfirm={confirmSwitch} />}
   </>

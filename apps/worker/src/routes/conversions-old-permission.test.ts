@@ -19,6 +19,10 @@ const dbMocks = {
   getConversionApprovalNotifyInfo: vi.fn().mockResolvedValue(null),
   // N-212 の案件動作はここでは対象外 — 案件なしとして通す。
   getConversionOfferActionPlan: vi.fn().mockResolvedValue(null),
+  // #819: 取消台帳。権限試験では「取り消し無し」にする。
+  getReversedEventIds: vi.fn().mockResolvedValue(new Set<string>()),
+  listConversionReversals: vi.fn().mockResolvedValue([]),
+  appendConversionReversal: vi.fn(),
   ConversionDefinitionError: class ConversionDefinitionError extends Error {},
   CONVERSION_DEFINITION_USAGE_KINDS: [],
 };

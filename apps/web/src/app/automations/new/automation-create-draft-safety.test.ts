@@ -524,16 +524,34 @@ async function openSecondTab(context: BrowserContext, worker: WorkerHarness, sto
 
 // ========== 画面操作 ==========
 
+/*
+ * 共通 Select（m15cで素<select>から置き換え）は button＋listbox の自前実装。
+ * Playwright の selectOption は素<select>専用なので、ラベルの釦を押して
+ * 出た一覧から目的の釦を押す。
+ */
+async function selectCustomOption(page: Page, label: string, optionLabel: string) {
+  const trigger = page.getByLabel(label)
+  await waitUntil(() => trigger.isEnabled(), `${label}が使える状態になりませんでした`)
+  await trigger.click()
+  const listbox = page.getByRole('listbox')
+  await listbox.waitFor()
+  await listbox.getByRole('button', { name: optionLabel }).click()
+}
+
 async function fillTagRule(page: Page, name: string) {
   await page.locator('#au-name').fill(name)
-  const tag = page.getByLabel('自動化で付けるタグ')
-  await waitUntil(() => tag.isEnabled(), 'タグ選択が使える状態になりませんでした')
-  await tag.selectOption({ label: 'VIP' })
+  const current = await page.getByLabel('自動化で付けるタグ').innerText().catch(() => '')
+  if (!current.includes('VIP')) {
+    await selectCustomOption(page, '自動化で付けるタグ', 'VIP')
+  }
 }
 
 async function fillMessageRule(page: Page, name: string, message: string) {
   await page.locator('#au-name').fill(name)
-  await page.locator('select[id^="au-action-"]').selectOption('send_message')
+  const current = await page.getByLabel('すること').innerText().catch(() => '')
+  if (!current.includes('メッセージを送る')) {
+    await selectCustomOption(page, 'すること', 'メッセージを送る')
+  }
   await page.locator('textarea').fill(message)
 }
 
@@ -717,9 +735,12 @@ describe('V6 ルールを作る（Rv8Jv）の誤操作防止（#679）', () => {
     await page.getByRole('button', { name: 'タグが付いた・外れたとき' }).click()
     await page.getByText('選んだタグが付いたとき・外れたときに動きます。下でどちらかを選びます。').waitFor()
     const action = page.getByLabel('付いたとき・外れたとき')
-    expect(await action.locator('option').allTextContents()).toEqual(['付いたとき', '外れたとき'])
-    await action.selectOption('remove')
-    expect(await action.inputValue()).toBe('remove')
+    await action.click()
+    const listbox = page.getByRole('listbox')
+    await listbox.waitFor()
+    expect(await listbox.getByRole('option').allTextContents()).toEqual(['付いたとき', '外れたとき'])
+    await listbox.getByRole('button', { name: '外れたとき' }).click()
+    await expect.poll(async () => action.innerText(), { timeout: 10_000 }).toContain('外れたとき')
   }, 60_000)
 })
 

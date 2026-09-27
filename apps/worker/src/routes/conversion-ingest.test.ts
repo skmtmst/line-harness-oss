@@ -252,6 +252,13 @@ describe('POST /api/conversions/ingest/:id (N-270)', () => {
     expect(lastLog()).toMatchObject({ result: 'rejected', reason: 'idempotency_conflict' });
   });
 
+  it('数えない条件に当てはまる受信は422で、excluded_by_condition を台帳へ残す(R40)', async () => {
+    dbMocks.trackConversion.mockRejectedValue(new Error('conversion_excluded'));
+    const response = await signedRequest({ friendId: 'f1' }, { eventId: 'e-excluded' });
+    expect(response.status).toBe(422);
+    expect(lastLog()).toMatchObject({ result: 'rejected', reason: 'excluded_by_condition' });
+  });
+
   it('台帳の書き込みに失敗しても受信処理自体は止めない', async () => {
     dbMocks.recordConversionIngestionEvent.mockRejectedValue(new Error('ledger down'));
     const response = await signedRequest({ friendId: 'f1' }, { eventId: 'e1' });

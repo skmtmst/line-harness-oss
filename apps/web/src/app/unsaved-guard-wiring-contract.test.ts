@@ -45,6 +45,7 @@ const GUARDED = [
   'app/tags/fields/new/page.tsx',
   'app/tags/searches/edit/page.tsx',
   'app/webinars/edit/page.tsx',
+  'app/webinars/new/page.tsx',
   'components/accounts/account-ordering.tsx',
 ] as const
 
@@ -205,8 +206,6 @@ const UNTRIAGED: Record<string, string> = {
     's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'app/webhooks/page.tsx':
     's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
-  'app/webinars/new/page.tsx':
-    's2: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'components/accounts/account-edit-modal.tsx':
     'hq: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'components/auto-replies/edit-dialog.tsx':

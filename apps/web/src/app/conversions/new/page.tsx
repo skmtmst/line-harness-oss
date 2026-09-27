@@ -30,6 +30,9 @@ import CreatePage, {
   inputClass,
 } from '@/components/shared/create-page'
 import Button from '@/components/shared/button'
+import ConditionBuilder, { pruneCondition } from '@/components/shared/condition-builder'
+import type { SegmentCondition } from '@/lib/segment-condition'
+import { originInfoOf } from '../origin-labels'
 import { useAccount } from '@/contexts/account-context'
 import { createLatestPreviewRequestGate, type LatestPreviewRequest } from './latest-preview-request'
 
@@ -67,6 +70,17 @@ const TRIGGER_CHOICES: TriggerChoice[] = [
   { value: 'video', label: '動画を見終えた', note: 'ウェビナー', eventType: 'webinar_completed', measureMethod: 'webhook', icon: Video, connected: true },
   { value: 'tag', label: 'タグが付いた', note: '友だち属性', eventType: 'tag_added', measureMethod: 'webhook', icon: Tag, connected: true },
 ]
+
+/**
+ * 金額の出し方の表示名。選択肢は対応表(origin-labels)の valueModes
+ * から作り、ここでは名前だけを持つ。起点に金額が無いものは 'source'
+ * を選択肢に出さない。
+ */
+const VALUE_MODE_LABELS: Record<ConversionValueMode, string> = {
+  source: '注文の金額をそのまま使う',
+  fixed: '決まった額を使う',
+  none: '金額を集計しない',
+}
 
 /**
  * 「使う場所」の種類(N-258)。
@@ -149,9 +163,14 @@ export default function NewConversionPointPage() {
   const [eventType, setEventType] = useState('ec_order_confirmed')
   const [value, setValue] = useState('')
   const [valueMode, setValueMode] = useState<ConversionValueMode>('source')
+  // 起点切替で金額の出し方を戻したときの知らせ。自分で選び直したら消える。
+  const [valueModeNotice, setValueModeNotice] = useState<string | null>(null)
   const [measureMethod, setMeasureMethod] = useState<'url_reach' | 'webhook'>('webhook')
   const [targetUrl, setTargetUrl] = useState('')
-  const [excludedCondition, setExcludedCondition] = useState('')
+  // R40: 自由文のメモと実効する除外条件を分ける。条件は共通の条件部品で
+  // 選び、試算・記録の両方に効く。メモは数え方に影響しない。
+  const [exclusion, setExclusion] = useState<SegmentCondition | null>(null)
+  const [exclusionMemo, setExclusionMemo] = useState('')
   const [deduplicationMode, setDeduplicationMode] = useState<ConversionDeduplicationMode>('once_per_friend')
   const [reversalPolicy, setReversalPolicy] = useState<ConversionReversalPolicy>('source_cancelled')
   const [attributionDays, setAttributionDays] = useState('')
@@ -250,6 +269,8 @@ export default function NewConversionPointPage() {
   }, [name, points, lineAccountId])
 
   const yen = value ? Number(value) : null
+  // R41: 起点ごとの名前・対象・金額の説明は対応表から引く。
+  const origin = originInfoOf(eventType)
 
   useEffect(() => {
     if (!lineAccountId) return
@@ -260,7 +281,11 @@ export default function NewConversionPointPage() {
       setPreviewFailed(false)
       void api.conversions.previewDefinition({
         sourceType: eventType,
-        sourceConfig: { triggerKind, excludedCondition: excludedCondition.trim() || null },
+        sourceConfig: {
+          triggerKind,
+          exclusion: pruneCondition(exclusion),
+          exclusionMemo: exclusionMemo.trim() || null,
+        },
         targetUrl: measureMethod === 'url_reach' ? targetUrl.trim() : null,
         lineAccountId,
         deduplicationMode,
@@ -282,7 +307,7 @@ export default function NewConversionPointPage() {
       window.clearTimeout(timer)
       request?.abort()
     }
-  }, [deduplicationMode, eventType, excludedCondition, lineAccountId, measureMethod, reversalPolicy, targetUrl, triggerKind, valueMode, yen])
+  }, [deduplicationMode, eventType, exclusion, exclusionMemo, lineAccountId, measureMethod, reversalPolicy, targetUrl, triggerKind, valueMode, yen])
 
   const toggleUsage = (target: UsageTarget) => {
     setSelectedUsageKeys((current) => {
@@ -296,10 +321,21 @@ export default function NewConversionPointPage() {
 
   const selectTrigger = (choice: TriggerChoice) => {
     if (!choice.connected) return
+    // 起点に金額が無いもの(タグ・フォーム・予約・ページ・動画など)では
+    // 注文の金額を選べない。今の選択が合わなければ合う既定へ戻して知らせる。
+    const nextOrigin = originInfoOf(choice.eventType)
     setTriggerKind(choice.value)
     setEventType(choice.eventType)
     setMeasureMethod(choice.measureMethod)
     if (choice.measureMethod !== 'url_reach') setTargetUrl('')
+    if (!nextOrigin.valueModes.includes(valueMode)) {
+      setValueMode(nextOrigin.defaultValueMode)
+      setValueModeNotice(
+        `起点に注文の金額が無いため、金額の出し方を「${VALUE_MODE_LABELS[nextOrigin.defaultValueMode]}」に戻しました。`,
+      )
+    } else {
+      setValueModeNotice(null)
+    }
   }
 
   return (
@@ -319,6 +355,11 @@ export default function NewConversionPointPage() {
           return '指定ページへの到達で数えるときは、対象のURLが要ります'
         }
         if (!lineAccountId) return '集計対象のLINEアカウントを選んでください（画面上部で選べます）'
+        if (exclusionMemo.trim().length > 500) return '数えない条件のメモは500文字以内で入力してください'
+        // 起点に金額が無いのに注文の金額が残っていたら先に言う(通常は選べない)。
+        if (!origin.valueModes.includes(valueMode)) {
+          return 'この起点には注文の金額が無いため、金額の出し方は「決まった額を使う」か「金額を集計しない」を選んでください'
+        }
         // 保存側(400)と同じ条件を先に言う。素通りすると汎用失敗文になる(#513 L3)。
         if (valueMode === 'fixed' && (yen === null || !Number.isFinite(yen) || yen < 0)) {
           return '固定で付ける金額は0以上の数値で入力してください'
@@ -334,9 +375,12 @@ export default function NewConversionPointPage() {
       onReset={() => {
         setName('')
         setValue('')
-        setValueMode('source')
+        // 今の起点に合う既定へ戻す(タグ起点などで注文の金額に戻さない)。
+        setValueMode(originInfoOf(eventType).defaultValueMode)
+        setValueModeNotice(null)
         setTargetUrl('')
-        setExcludedCondition('')
+        setExclusion(null)
+        setExclusionMemo('')
         setDeduplicationMode('once_per_friend')
         setReversalPolicy('source_cancelled')
         setSelectedUsageKeys(new Set())
@@ -345,7 +389,11 @@ export default function NewConversionPointPage() {
         const res = await api.conversions.createDefinition({
           name: name.trim(),
           sourceType: eventType,
-          sourceConfig: { triggerKind, excludedCondition: excludedCondition.trim() || null },
+          sourceConfig: {
+            triggerKind,
+            exclusion: pruneCondition(exclusion),
+            exclusionMemo: exclusionMemo.trim() || null,
+          },
           targetUrl: measureMethod === 'url_reach' ? targetUrl.trim() : null,
           lineAccountId,
           deduplicationMode,
@@ -388,6 +436,14 @@ export default function NewConversionPointPage() {
                   ? `入力中の条件だけで試算しています。重複除外 ${preview.duplicateExcludedCount}件・取消 ${preview.cancellationCount}件。試算では成果を追加しません。`
                   : '入力中の条件を試算しています。'}
             </p>
+            {/* R40: 試算の注意(excludedReasons)は画面に出す。無いときは出さない。 */}
+            {preview && !previewFailed && preview.excludedReasons.length > 0 ? (
+              <ul className="text-ink-secondary mt-2 space-y-1 text-xs leading-relaxed">
+                {preview.excludedReasons.map((reason) => (
+                  <li key={reason}>{reason}</li>
+                ))}
+              </ul>
+            ) : null}
           </section>
 
           <AsideCard title="つながる先">
@@ -449,7 +505,7 @@ export default function NewConversionPointPage() {
           ) : null
         })()}
 
-        <div className="grid gap-3 md:grid-cols-3">
+        <div className="grid gap-3 md:grid-cols-2">
           <Field
             label="成果地点の名前"
             htmlFor="cv-name"
@@ -488,21 +544,43 @@ export default function NewConversionPointPage() {
               />
             </Field>
           ) : (
-            <Field label="どの注文を数えるか" htmlFor="cv-order-scope" help="すべての注文を対象に保存します。">
-              <Select size="full" aria-label="どの注文を数えるか" id="cv-order-scope" value="all" disabled onChange={() => undefined} options={[{ value: 'all', label: 'すべての注文' }]} />
+            // R41: 起点ごとに対象を言う。タグ起点で「注文」と出さない。
+            <Field label={origin.targetLabel} help={origin.target}>
+              <p className="bg-canvas-sunken text-ink rounded-control px-3 py-2 text-sm">
+                {origin.target}
+              </p>
             </Field>
           )}
-
-          <Field label="数えない条件（任意）" htmlFor="cv-excluded-condition" note="空欄なら、除外せずに数えます。">
-            <input
-              id="cv-excluded-condition"
-              value={excludedCondition}
-              onChange={(event) => setExcludedCondition(event.target.value)}
-              placeholder="例：テスト用アカウントの注文をのぞく"
-              className={inputClass}
-            />
-          </Field>
         </div>
+
+        {/* R40: 数えない条件は共通の条件部品で選ぶ。自由文のメモとは分ける。 */}
+        <Field
+          label="数えない条件"
+          help="条件に当てはまる人は数えません。選ばないままなら、除外せずに数えます。試算の数字にも反映します。"
+          note="条件に当てはまる人は、保存後の記録から除きます。"
+        >
+          <ConditionBuilder
+            value={exclusion}
+            onChange={setExclusion}
+            label="数えない条件"
+            showCount={false}
+          />
+        </Field>
+        <Field
+          label="数えない条件のメモ（任意）"
+          htmlFor="cv-exclusion-memo"
+          note="運用の引き継ぎ用です。数え方には影響しません。"
+        >
+          <input
+            id="cv-exclusion-memo"
+            type="text"
+            value={exclusionMemo}
+            onChange={(event) => setExclusionMemo(event.target.value)}
+            placeholder="例：テスト用の注文は条件で除いています"
+            maxLength={500}
+            className={inputClass}
+          />
+        </Field>
       </FormSection>
 
       <FormSection
@@ -519,8 +597,24 @@ export default function NewConversionPointPage() {
 
       <FormSection step={3} label="金額をどう出すか">
         <div className="grid gap-3 md:grid-cols-3">
-          <Field label="金額の出し方" htmlFor="cv-value-mode">
-            <Select size="full" aria-label="金額の出し方" id="cv-value-mode" value={valueMode} onChange={(value) => setValueMode(value as ConversionValueMode)} options={[ { value: 'source', label: '注文の金額をそのまま使う' }, { value: 'fixed', label: '決まった額を使う' }, { value: 'none', label: '金額を集計しない' }, ]} />
+          {/* 起点に金額が無いもの(タグ・フォーム・予約・ページ・動画など)では注文の金額を出さない。選択肢は対応表が持つ。 */}
+          <Field label="金額の出し方" htmlFor="cv-value-mode" help={origin.amount}>
+            <Select
+              size="full"
+              aria-label="金額の出し方"
+              id="cv-value-mode"
+              value={valueMode}
+              onChange={(value) => {
+                setValueMode(value as ConversionValueMode)
+                setValueModeNotice(null)
+              }}
+              options={origin.valueModes.map((mode) => ({ value: mode, label: VALUE_MODE_LABELS[mode] }))}
+            />
+            {valueModeNotice ? (
+              <p className="text-warning mt-1 text-xs" role="status">
+                {valueModeNotice}
+              </p>
+            ) : null}
           </Field>
           <Field label="決まった金額（円）" htmlFor="cv-value" help="1件ごとの金額です。">
             <input
