@@ -17,6 +17,7 @@ import Pagination from '@/components/shared/pagination'
 import ListRange from '@/components/ui/list-range'
 import { Tabs } from '@/components/shared/tabs'
 import { useCanManageCommonActions } from '@/components/automations/use-common-action-permission'
+import { useManualHref } from '@/lib/use-manual-href'
 import IconButton from '@/components/shared/icon-button'
 import ActionMenu from '@/components/shared/action-menu'
 import { ActionCell, DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
@@ -40,6 +41,8 @@ const STATUS_LABEL: Record<CommonActionSummary['status'], string> = {
 
 export default function CommonActionsPage() {
   const canManage = useCanManageCommonActions()
+  /* 監査 R128: 正本表に登録があるときだけ出す。無ければボタン自体を出さない。 */
+  const manualHref = useManualHref('/common-actions')
   // /common-actions はメニューの接頭辞に当たらず上部バーが空になるため、画面名を明示する。
   usePageTitle('共通アクション')
   const { selectedAccountId, loading: accountLoading } = useAccount()
@@ -161,7 +164,7 @@ export default function CommonActionsPage() {
         description=""
         actions={(
           <>
-            <Button href="/support">マニュアル</Button>
+            {manualHref ? <Button href={manualHref}>マニュアル</Button> : null}
           </>
         )}
       />
@@ -197,8 +200,13 @@ export default function CommonActionsPage() {
         <KpiCard variant="v6" title="古い版のまま" value={loading || error ? null : totals.outdatedItems} unit="" detail={error ? '読み込めませんでした' : loading ? '読み込んでいます' : `呼び出し元 ${totals.outdated}か所`} loading={loading} badge={!error && totals.outdatedItems > 0 ? '要確認' : undefined} badgeTone="warning" />
       </div>
 
+      {/*
+        監査 R122: 「直すとすべてに効く」は実動作と違う。公開しても利用先は
+        いまの版のまま動き、使う場所ごとに新版へ切り替えたときだけ効く
+        （「版と利用先」画面で確認・切り替え）。作成画面の説明と揃える。
+      */}
       <NoteBar>
-        ここを直すと、呼び出している機能すべてに効きます。動いている途中のものは、始まったときの版のまま最後まで進みます。
+        直した内容は、公開したあと使う場所ごとに新しい版へ切り替えたときだけ効きます。動いている途中のものは、始まったときの版のまま最後まで進みます。
       </NoteBar>
 
       {/*

@@ -8,8 +8,7 @@ import { useAccount } from '@/contexts/account-context'
 import { usePageChrome } from './page-chrome'
 import { MENU_SECTIONS } from '@/lib/menu'
 import { logoutAndGoToLogin } from '@/lib/logout'
-import { api } from '@/lib/api'
-import { manualScreenKeyForPath } from '@/lib/manual-screen-key'
+import { useManualHref } from '@/lib/use-manual-href'
 
 /**
  * 共通トップバーを、いまの画面の値へつなぐ層。
@@ -68,19 +67,7 @@ export default function AppTopBar() {
    * 画面IDでURLを登録したときだけ出す。未登録・開けない・読み取れない
    * ときはリンク自体を出さない（「押したら無い」を作らない）。
    */
-  const [manualHref, setManualHref] = useState<string | null>(null)
-  useEffect(() => {
-    const screen = manualScreenKeyForPath(pathname)
-    if (!screen) {
-      setManualHref(null)
-      return
-    }
-    let live = true
-    api.manualLinks.lookup(screen)
-      .then((res) => { if (live) setManualHref(res.success ? res.data.url : null) })
-      .catch(() => { if (live) setManualHref(null) })
-    return () => { live = false }
-  }, [pathname])
+  const manualHref = useManualHref(pathname)
 
   const shownTitle = title ?? defaultTitleForPath(pathname)
   const isHq = pathname === '/hq' || pathname.startsWith('/hq/')
