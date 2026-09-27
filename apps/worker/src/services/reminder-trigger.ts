@@ -12,10 +12,13 @@
 import {
   cancelV6RemindersForSource,
   enrollFriendInReminder,
+  getReminderPublishedVersion,
+  parseReminderVersionSettings,
   rescheduleV6RemindersForSource,
   type CancelV6RemindersResult,
   type RescheduleV6RemindersResult,
 } from '@line-crm/db';
+import { matchesCondition, parseCondition } from './segment-query.js';
 
 export type ReminderTriggerType = 'manual' | 'booking' | 'event';
 
@@ -31,6 +34,53 @@ export interface ReminderTriggerRow {
 }
 
 const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
+
+/**
+ * 公開版の対象条件を読む。無い・読めないときは null を返す。
+ *
+ * 読めない条件で登録を止めると、壊れた1件のためにそのリマインダ全体が
+ * 黙って止まる。保存時に組み立て検査を通しているので、ここでは
+ * 「無いもの」として従来どおり登録する。数え直し・公開前検査は
+ * 別口で壊れた条件を止める。
+ */
+export async function getReminderTargetCondition(
+  db: D1Database,
+  reminderId: string,
+): Promise<ReturnType<typeof parseCondition>> {
+  try {
+    const published = await getReminderPublishedVersion(db, reminderId);
+    if (!published) return null;
+    const settings = parseReminderVersionSettings(published);
+    const raw = settings.targetCondition;
+    if (!raw || typeof raw !== 'object') return null;
+    return parseCondition(JSON.stringify(raw));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 公開版の対象条件に友だちが当てはまるか。
+ *
+ * 条件が無いときは true (従来どおり登録する)。組み立て・判定で
+ * 例外が出たときは false にしてその1件だけ登録しない。例外を
+ * 投げると、その予約に結びつく全リマインダの登録が止まる。
+ * 予約そのものは呼び出し側が続ける。
+ */
+export async function matchesReminderTargetCondition(
+  db: D1Database,
+  reminderId: string,
+  friendId: string,
+): Promise<boolean> {
+  const condition = await getReminderTargetCondition(db, reminderId);
+  if (!condition) return true;
+  try {
+    return await matchesCondition(db, friendId, condition);
+  } catch (err) {
+    console.error(`[reminder-trigger] target condition failed for reminder ${reminderId}`, err);
+    return false;
+  }
+}
 
 /**
  * 起点の時刻を決める。
@@ -125,6 +175,8 @@ export async function enrollByTrigger(
         .first<{ 1: number }>();
       if (!tagged) continue;
     }
+    // 公開版の対象条件。条件に外れる友だちのきっかけでは登録しない。
+    if (!await matchesReminderTargetCondition(db, rule.id, input.friendId)) continue;
 
     const anchor = resolveAnchor(rule, input.startsAtIso);
     if (!anchor) continue;
@@ -275,6 +327,8 @@ export async function rescheduleByTrigger(
         .first<{ 1: number }>();
       if (!tagged) continue;
     }
+    // 登録時と同じく、条件に外れる友だちの予定は移さない。
+    if (input.friendId && !await matchesReminderTargetCondition(db, rule.id, input.friendId)) continue;
     const from = resolveAnchor(rule, input.oldStartsAtIso);
     const to = resolveAnchor(rule, input.newStartsAtIso);
     if (!from || !to || from === to) continue;

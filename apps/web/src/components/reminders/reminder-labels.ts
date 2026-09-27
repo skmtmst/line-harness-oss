@@ -62,7 +62,73 @@ function placeholderSource(key: string): string {
   return '送信日時を起点に計算'
 }
 
-const PLACEHOLDER_PATTERN = /\{\{(name|uid|friend_id|ref|date|days_until:[^}]+|field\.[a-z0-9_]+|var\.[a-z0-9_]+|metadata\.[^}]+)\}\}/g
+/*
+ * 本文に書ける差し込み。worker の expandVariables と同じ範囲を拾う。
+ * date は `{{date}}` のほか `{{date:ymd}}` などの書き方・`{{date+7}}` も
+ * 届く日時に置き換わるので、確認表から落とさない。
+ */
+const PLACEHOLDER_PATTERN = /\{\{(name|uid|friend_id|ref|date(?::[a-z_]+)?|date\+\d+|days_until:[^}]+|field\.[a-z0-9_]+|var\.[a-z0-9_]+|metadata\.[^}]+)\}\}/g
+
+/*
+ * 見本の基準日。2026-10-01 は木曜日。送信のたびに変わる値を
+ * 固定の見本で出すための起点で、実際の届く日時ではない。
+ */
+const SAMPLE_BASE = new Date(2026, 9, 1, 10, 0, 0)
+const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土']
+
+function formatSampleDate(base: Date, style: string | null): string {
+  const month = base.getMonth() + 1
+  const day = base.getDate()
+  const weekday = WEEKDAYS[base.getDay()]
+  const year = base.getFullYear()
+  if (style === 'ymd_w') return `${year}年${month}月${day}日(${weekday})`
+  if (style === 'md') return `${month}月${day}日`
+  if (style === 'ymd') return `${year}年${month}月${day}日`
+  if (style === 'slash_md_w') return `${month}/${day}(${weekday})`
+  if (style === 'slash_ymd_w') return `${year}/${month}/${day}(${weekday})`
+  if (style === 'slash_md') return `${month}/${day}`
+  if (style === 'slash_ymd') return `${year}/${month}/${day}`
+  return `${month}月${day}日(${weekday})`
+}
+
+/**
+ * 本文を見本の値で読んだ文にする (F-2)。
+ *
+ * worker の expandVariables と同じ置き換えを見本値でなぞる。実装に無い
+ * 変数名は置き換わらずそのまま届くので、ここでもそのまま残す。
+ * 日時は固定の見本日 (2026-10-01) 起点で、実際の届く日時ではない。
+ */
+export function renderReminderBodySample(content: string): string {
+  return content.replace(
+    /\{\{(name|uid|friend_id|ref|date(?::[a-z_]+)?|date\+\d+|days_until:[^}]+|field\.[a-z0-9_]+|var\.[a-z0-9_]+|metadata\.[^}]+)\}\}/g,
+    (token, key: string) => {
+      if (key === 'name') return '山田花子'
+      if (key === 'uid') return 'U00000000000000000000000000000001'
+      if (key === 'friend_id') return '11111111-1111-1111-1111-111111111111'
+      if (key === 'ref') return 'mihon01'
+      if (key === 'date' || key.startsWith('date:')) {
+        return formatSampleDate(SAMPLE_BASE, key === 'date' ? null : key.slice(5))
+      }
+      if (key.startsWith('date+')) {
+        const next = new Date(SAMPLE_BASE)
+        next.setDate(next.getDate() + Number(key.slice(5)))
+        return formatSampleDate(next, null)
+      }
+      if (key.startsWith('days_until:')) {
+        const target = new Date(key.slice(11))
+        if (Number.isNaN(target.getTime())) return token
+        const baseDay = new Date(SAMPLE_BASE.getFullYear(), SAMPLE_BASE.getMonth(), SAMPLE_BASE.getDate())
+        const targetDay = new Date(target.getFullYear(), target.getMonth(), target.getDate())
+        const days = Math.max(0, Math.round((targetDay.getTime() - baseDay.getTime()) / 86_400_000))
+        return `あと${days}日`
+      }
+      if (key.startsWith('field.')) return '見本の登録値'
+      if (key.startsWith('var.')) return '見本の共通値'
+      if (key.startsWith('metadata.')) return '見本の値'
+      return token
+    },
+  )
+}
 
 /**
  * 本文に実際に書かれている差し込みだけを拾う。

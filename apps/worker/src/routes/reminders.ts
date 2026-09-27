@@ -46,11 +46,14 @@ import {
   reserveOutboundSend,
 } from '../services/outbound-idempotency.js';
 import {
+  countReminderAudience,
   previewReminderDraft,
   resolveReminderTestRecipient,
+  sampleReminderAudience,
   testReminderDraft,
   validateReminderDraft,
 } from '../services/reminder-draft.js';
+import { buildPublicSegmentQuery, isEmptySegmentCondition } from '../services/segment-query.js';
 import { buildOffsetListResponse, parseOffsetPaging } from '../lib/list-paging.js';
 
 const reminders = new Hono<Env>();
@@ -488,6 +491,45 @@ const REMINDER_MESSAGE_TYPES = new Set([
   'text', 'image', 'flex', 'location', 'video', 'audio', 'sticker', 'carousel',
 ]);
 
+/**
+ * 対象の絞り込み条件を読む。保存してよい形かもここで見る。
+ *
+ * 組み立てを実際に走らせ、例外が出たら 422 で止める。形だけ見ると、
+ * 保存はできるのに数え直し・登録で落ちる条件が作れてしまう。
+ * 空 (rules・groups ともに0件) は「条件なし」として null に倒す。
+ */
+function readTargetCondition(
+  raw: unknown,
+): { ok: true; value: ReminderDraftSettings['targetCondition'] } | { ok: false; error: string } {
+  if (raw === null || raw === undefined) return { ok: true, value: null };
+  if (typeof raw !== 'object' || Array.isArray(raw)) {
+    return { ok: false, error: '対象の条件の形が正しくありません' };
+  }
+  const condition = raw as { operator?: unknown; rules?: unknown; groups?: unknown };
+  if (condition.operator !== 'AND' && condition.operator !== 'OR') {
+    return { ok: false, error: '対象の条件は operator に AND / OR が要ります' };
+  }
+  if (!Array.isArray(condition.rules)) {
+    return { ok: false, error: '対象の条件は rules の配列が要ります' };
+  }
+  if (condition.groups !== undefined && !Array.isArray(condition.groups)) {
+    return { ok: false, error: '対象の条件は groups の配列が要ります' };
+  }
+  const groups = Array.isArray(condition.groups) ? condition.groups : [];
+  if (condition.rules.length === 0 && groups.length === 0) {
+    return { ok: true, value: null };
+  }
+  try {
+    buildPublicSegmentQuery(condition as never);
+  } catch (err) {
+    return { ok: false, error: `対象の条件を読めません: ${(err as Error).message}` };
+  }
+  return {
+    ok: true,
+    value: condition as ReminderDraftSettings['targetCondition'],
+  };
+}
+
 function readDraftSettings(
   raw: unknown,
 ): { ok: true; value: ReminderDraftSettings } | { ok: false; error: string; status?: number } {
@@ -596,6 +638,10 @@ function readDraftSettings(
   if (body.leapYearPolicy != null && leapYearPolicy === undefined) {
     return { ok: false, error: '2月29日の扱いが正しくありません' };
   }
+  const targetCondition = readTargetCondition(body.targetCondition);
+  if (!targetCondition.ok) {
+    return { ok: false, error: targetCondition.error, status: 422 };
+  }
   return {
     ok: true,
     value: {
@@ -611,6 +657,7 @@ function readDraftSettings(
       triggerOffsetMinutes,
       sendAtTime,
       targetTagId: typeof body.targetTagId === 'string' && body.targetTagId ? body.targetTagId : null,
+      targetCondition: targetCondition.value ?? null,
       folderId: typeof body.folderId === 'string' && body.folderId ? body.folderId : null,
       stopConditions: {
         bookingCancelled: stop.bookingCancelled !== false,
@@ -632,6 +679,15 @@ async function validateReminderDraftReferences(
       `SELECT id FROM tags WHERE id = ? AND (line_account_id = ? OR line_account_id IS NULL)`,
     ).bind(settings.targetTagId, settings.lineAccountId).first<{ id: string }>();
     if (!tag) return '対象タグが見つかりません';
+  }
+  // 保存時に形は見ているが、公開・検証・送信の口でも組み立て直す。
+  // 壊れた条件のまま数えると「誰もいない」と見え、公開へ進めてしまう。
+  if (!isEmptySegmentCondition(settings.targetCondition as never)) {
+    try {
+      buildPublicSegmentQuery(settings.targetCondition as never);
+    } catch {
+      return '対象の条件を読めません';
+    }
   }
   if (settings.triggerFieldId) {
     const field = await db.prepare(
@@ -1032,6 +1088,47 @@ reminders.post('/api/reminders/:id/validate', requireRole('owner', 'admin'), asy
   } catch (err) {
     console.error('POST /api/reminders/:id/validate error:', err);
     return c.json({ success: false, error: '検証できませんでした' }, 500);
+  }
+});
+
+/*
+ * POST /api/reminders/:id/audience — 未保存の条件で人数を数え直す。
+ *
+ * 対象ステージで条件を書き換えるたびに呼ぶ。保存前の試算なので
+ * 下書きは触らない。顔ぶれ (先頭20人) も同じ条件・範囲で切る。
+ * 権限は検証の口と同じ (owner/admin + この店舗が見えること)。
+ */
+reminders.post('/api/reminders/:id/audience', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const draft = await getReminderDraftVersion(c.env.DB, c.req.param('id'));
+    if (!draft) return c.json({ success: false, error: '下書きが見つかりません' }, 404);
+    const settings = parseReminderVersionSettings(draft);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [settings.lineAccountId])) {
+      return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
+    }
+    const body = await c.req.json<{ condition?: unknown }>();
+    // 条件が送られなければ保存済みのまま数える。送られたら (空を含む)
+    // その通りに数える。空は「絞りなし」で、保存済みの条件は使わない。
+    if (body.condition === undefined) {
+      const audience = await countReminderAudience(c.env.DB, settings);
+      const sample = await sampleReminderAudience(c.env.DB, settings);
+      return c.json({
+        success: true,
+        data: { matched: audience.matched, excluded: audience.excluded, sample },
+      });
+    }
+    const checked = readTargetCondition(body.condition);
+    if (!checked.ok) return c.json({ success: false, error: checked.error }, 422);
+    const effective: ReminderDraftSettings = { ...settings, targetCondition: checked.value };
+    const audience = await countReminderAudience(c.env.DB, effective);
+    const sample = await sampleReminderAudience(c.env.DB, effective);
+    return c.json({
+      success: true,
+      data: { matched: audience.matched, excluded: audience.excluded, sample },
+    });
+  } catch (err) {
+    console.error('POST /api/reminders/:id/audience error:', err);
+    return c.json({ success: false, error: '対象者を数え直せませんでした' }, 500);
   }
 });
 
