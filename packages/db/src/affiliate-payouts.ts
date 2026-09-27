@@ -188,6 +188,14 @@ export interface AffiliateAccountSettlementPreview {
     count: number;
     rows: AffiliateSettlementExcludedRow[];
   };
+  /**
+   * 期間の始まりより前に承認され、まだ締められていない繰越分。
+   * 月をまたいで保留が明けた成果や前月の積み残しをここで数える。
+   */
+  carriedOver: {
+    count: number;
+    amount: number;
+  };
   previewVersion: string;
 }
 
@@ -232,7 +240,15 @@ async function eligibleRewardRows(
         AND bp.line_account_id = a.line_account_id
       WHERE COALESCE(ce.approval_status, 'pending') = 'approved'
         AND ce.approved_at IS NOT NULL
-        AND ce.approved_at >= ? AND ce.approved_at <= ?
+        /*
+         * R44/R45:
+         * - 左側の下限は付けない。前の締めに間に合わなかった承認済み・
+         *   未クレジットの成果は繰越として今回の対象に含める。
+         * - 境界の比較は julianday で時刻値に揃える。approved_at は
+         *   JST(+09:00)文字列、期間の端は UTC(Z)文字列が来るため、
+         *   文字列どうしの比較だと月またぎで誤判定する。
+         */
+        AND julianday(ce.approved_at) <= julianday(?)
         AND julianday(ce.approved_at) <= julianday(?, '-' || COALESCE(a.hold_days, 0) || ' days')
         AND NOT EXISTS (
           SELECT 1 FROM affiliate_reward_entries re
@@ -241,7 +257,7 @@ async function eligibleRewardRows(
       ORDER BY a.id, ce.approved_at, ce.id`,
   ).bind(
     input.lineAccountId, input.tenantId, input.lineAccountId,
-    input.periodFrom, input.periodTo, input.periodTo,
+    input.periodTo, input.periodTo,
   ).all<EligibleRewardRow>();
   return result.results;
 }
@@ -304,6 +320,10 @@ export async function previewAffiliateAccountSettlement(
     current.conversionCount += 1;
     grouped.set(row.affiliate_id, current);
   }
+  // 期間の始まりより前の承認分は「繰越」として別に数える。
+  // 時刻は julianday 相当の瞬時比較(new Date の時刻値)で揃える。
+  const periodFromMs = new Date(input.periodFrom).getTime();
+  const carried = rows.filter((row) => new Date(row.approved_at).getTime() < periodFromMs);
   return {
     lineAccountId: input.lineAccountId,
     periodFrom: input.periodFrom,
@@ -315,6 +335,10 @@ export async function previewAffiliateAccountSettlement(
     excludedZeroAmount: {
       count: excluded.length,
       rows: excluded.slice(0, EXCLUDED_ZERO_AMOUNT_PREVIEW_ROWS),
+    },
+    carriedOver: {
+      count: carried.length,
+      amount: carried.reduce((sum, row) => sum + Math.round(Number(row.reward_amount)), 0),
     },
     previewVersion: await accountPreviewVersion(rows),
   };
@@ -768,4 +792,107 @@ export async function getAffiliateStatementDownload(
     input.now ?? new Date().toISOString(),
   ).first<StatementRow>();
   return row ? { statement: affiliateStatement(row), objectKey: row.pdf_object_key, checksum: row.file_checksum } : null;
+}
+
+/**
+ * R43: 締め済み台帳の再開情報。画面を離れても `closed` 状態が消えるだけで
+ * 台帳自体は残るため、期間で引き直して明細発行・CSV準備を再開できる
+ * ようにする。
+ */
+export interface AffiliateSettlementResume {
+  settlementId: string;
+  state: string;
+  version: number;
+  closedAt: string | null;
+  totalAmount: number;
+  conversionCount: number;
+  periodFrom: string;
+  periodTo: string;
+  affiliates: Array<{
+    affiliateId: string;
+    affiliateName: string;
+    code: string;
+    amount: number;
+    conversionCount: number;
+    statementIssued: boolean;
+    bankProfileRegistered: boolean;
+  }>;
+  batch: { id: string; state: string; lineCount: number } | null;
+}
+
+export async function getClosedAccountSettlement(
+  db: D1Database,
+  input: { tenantId: string; lineAccountId: string; periodFrom: string; periodTo: string },
+): Promise<AffiliateSettlementResume | null> {
+  // 期間文字列の書式は書き込んだ時期で揺れる(JST/UTC)ため、julianday で
+  // 同じ時刻範囲かを照合する。
+  const settlement = await db.prepare(
+    `SELECT s.id, s.state, s.version, s.closed_at, s.total_amount_minor,
+            s.period_from, s.period_to,
+            (SELECT COUNT(*) FROM affiliate_settlement_lines sl
+              WHERE sl.settlement_id = s.id AND sl.status = 'included') AS line_count
+       FROM affiliate_settlements s
+      WHERE s.organization_id = ? AND s.line_account_id = ?
+        AND julianday(s.period_from) = julianday(?) AND julianday(s.period_to) = julianday(?)
+        AND s.state IN ('closed', 'exported', 'paid', 'partial')
+      ORDER BY s.closed_at DESC, s.id DESC
+      LIMIT 1`,
+  ).bind(input.tenantId, input.lineAccountId, input.periodFrom, input.periodTo).first<{
+    id: string; state: string; version: number; closed_at: string | null;
+    total_amount_minor: number; period_from: string; period_to: string; line_count: number;
+  }>();
+  if (!settlement) return null;
+
+  const lines = await db.prepare(
+    `SELECT sl.affiliate_id, a.name AS affiliate_name, a.code AS affiliate_code,
+            SUM(sl.amount_minor) AS amount, COUNT(sl.id) AS line_count,
+            MAX(EXISTS(
+              SELECT 1 FROM affiliate_statements st
+               WHERE st.settlement_id = sl.settlement_id
+                 AND st.affiliate_id = sl.affiliate_id
+                 AND st.status = 'generated')) AS statement_issued,
+            MAX(bp.version IS NOT NULL) AS bank_profile_registered
+       FROM affiliate_settlement_lines sl
+       JOIN affiliates a ON a.id = sl.affiliate_id
+       LEFT JOIN affiliate_bank_profiles bp
+         ON bp.affiliate_id = sl.affiliate_id
+        AND bp.organization_id = ? AND bp.line_account_id = ?
+      WHERE sl.settlement_id = ? AND sl.status = 'included'
+      GROUP BY sl.affiliate_id
+      ORDER BY a.name, sl.affiliate_id`,
+  ).bind(input.tenantId, input.lineAccountId, settlement.id).all<{
+    affiliate_id: string; affiliate_name: string; affiliate_code: string;
+    amount: number; line_count: number; statement_issued: number; bank_profile_registered: number;
+  }>();
+
+  const batch = await db.prepare(
+    `SELECT id, state, line_count FROM affiliate_payout_batches
+      WHERE organization_id = ? AND line_account_id = ? AND settlement_id = ?
+      ORDER BY created_at DESC, id DESC LIMIT 1`,
+  ).bind(input.tenantId, input.lineAccountId, settlement.id).first<{
+    id: string; state: string; line_count: number;
+  }>();
+
+  return {
+    settlementId: settlement.id,
+    state: settlement.state,
+    version: Number(settlement.version),
+    closedAt: settlement.closed_at,
+    totalAmount: Number(settlement.total_amount_minor),
+    conversionCount: Number(settlement.line_count),
+    periodFrom: settlement.period_from,
+    periodTo: settlement.period_to,
+    affiliates: lines.results.map((line) => ({
+      affiliateId: line.affiliate_id,
+      affiliateName: line.affiliate_name,
+      code: line.affiliate_code,
+      amount: Number(line.amount),
+      conversionCount: Number(line.line_count),
+      statementIssued: line.statement_issued === 1,
+      bankProfileRegistered: line.bank_profile_registered === 1,
+    })),
+    batch: batch
+      ? { id: batch.id, state: batch.state, lineCount: Number(batch.line_count) }
+      : null,
+  };
 }
