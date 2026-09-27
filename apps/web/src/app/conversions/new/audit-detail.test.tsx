@@ -76,6 +76,14 @@ vi.mock('@/lib/api', () => {
       nenCampaigns: {
         settings: async () => respond('nen_campaign', [{ campaignKey: 'nen-1', label: '定期便の案内' }]),
       },
+      // R40: 数えない条件の共通部品が使う口。候補が空でも条件の入力行は残る。
+      featureSettings: {
+        visibility: async () => ({ success: true, data: { features: {} } }),
+      },
+      tags: { list: async () => ({ success: true, data: [] }) },
+      friendFields: { list: async () => ({ success: true, data: [] }) },
+      supportMarks: { list: async () => ({ success: true, data: [] }) },
+      scenarios: { list: async () => ({ success: true, data: [] }) },
     },
   }
 })
@@ -166,5 +174,28 @@ describe('DETAIL-17 集計対象は画面上部のアカウントに固定', () 
     st.accountId = 'account-b'
     await act(async () => root.render(<NewConversionPage />))
     expect(host.querySelector('#cv-account')?.textContent).toBe('B店')
+  })
+})
+
+describe('R40/R41 数えない条件と起点の説明', () => {
+  it('数えない条件は共通部品で選び、メモ欄は別にある', async () => {
+    await render()
+    expect(host.textContent).toContain('数えない条件')
+    // 共通の条件部品(ConditionBuilder)の入力行。
+    expect(host.textContent).toContain('絞り込む項目を更に追加できます')
+    // 自由文のメモは別の欄。条件として効く入力と混ぜない。
+    expect(host.querySelector('#cv-exclusion-memo')).not.toBeNull()
+    expect(host.querySelector('#cv-excluded-condition')).toBeNull()
+  })
+
+  it('タグ起点を選ぶと対象がタグの説明になり、注文の言葉が出ない', async () => {
+    await render()
+    const tagRadio = host.querySelector('input[name="conversion-trigger"][value="tag"]')
+    expect(tagRadio).not.toBeNull()
+    await act(async () => {
+      fireEvent.click(tagRadio!)
+    })
+    expect(host.textContent).toContain('どのタグが付いても')
+    expect(host.textContent).not.toContain('すべての注文')
   })
 })

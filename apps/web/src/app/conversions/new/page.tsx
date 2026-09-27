@@ -30,6 +30,9 @@ import CreatePage, {
   inputClass,
 } from '@/components/shared/create-page'
 import Button from '@/components/shared/button'
+import ConditionBuilder, { pruneCondition } from '@/components/shared/condition-builder'
+import type { SegmentCondition } from '@/lib/segment-condition'
+import { originInfoOf } from '../origin-labels'
 import { useAccount } from '@/contexts/account-context'
 import { createLatestPreviewRequestGate, type LatestPreviewRequest } from './latest-preview-request'
 
@@ -151,7 +154,10 @@ export default function NewConversionPointPage() {
   const [valueMode, setValueMode] = useState<ConversionValueMode>('source')
   const [measureMethod, setMeasureMethod] = useState<'url_reach' | 'webhook'>('webhook')
   const [targetUrl, setTargetUrl] = useState('')
-  const [excludedCondition, setExcludedCondition] = useState('')
+  // R40: 自由文のメモと実効する除外条件を分ける。条件は共通の条件部品で
+  // 選び、試算・記録の両方に効く。メモは数え方に影響しない。
+  const [exclusion, setExclusion] = useState<SegmentCondition | null>(null)
+  const [exclusionMemo, setExclusionMemo] = useState('')
   const [deduplicationMode, setDeduplicationMode] = useState<ConversionDeduplicationMode>('once_per_friend')
   const [reversalPolicy, setReversalPolicy] = useState<ConversionReversalPolicy>('source_cancelled')
   const [attributionDays, setAttributionDays] = useState('')
@@ -250,6 +256,8 @@ export default function NewConversionPointPage() {
   }, [name, points, lineAccountId])
 
   const yen = value ? Number(value) : null
+  // R41: 起点ごとの名前・対象・金額の説明は対応表から引く。
+  const origin = originInfoOf(eventType)
 
   useEffect(() => {
     if (!lineAccountId) return
@@ -260,7 +268,11 @@ export default function NewConversionPointPage() {
       setPreviewFailed(false)
       void api.conversions.previewDefinition({
         sourceType: eventType,
-        sourceConfig: { triggerKind, excludedCondition: excludedCondition.trim() || null },
+        sourceConfig: {
+          triggerKind,
+          exclusion: pruneCondition(exclusion),
+          exclusionMemo: exclusionMemo.trim() || null,
+        },
         targetUrl: measureMethod === 'url_reach' ? targetUrl.trim() : null,
         lineAccountId,
         deduplicationMode,
@@ -282,7 +294,7 @@ export default function NewConversionPointPage() {
       window.clearTimeout(timer)
       request?.abort()
     }
-  }, [deduplicationMode, eventType, excludedCondition, lineAccountId, measureMethod, reversalPolicy, targetUrl, triggerKind, valueMode, yen])
+  }, [deduplicationMode, eventType, exclusion, exclusionMemo, lineAccountId, measureMethod, reversalPolicy, targetUrl, triggerKind, valueMode, yen])
 
   const toggleUsage = (target: UsageTarget) => {
     setSelectedUsageKeys((current) => {
@@ -319,6 +331,7 @@ export default function NewConversionPointPage() {
           return '指定ページへの到達で数えるときは、対象のURLが要ります'
         }
         if (!lineAccountId) return '集計対象のLINEアカウントを選んでください（画面上部で選べます）'
+        if (exclusionMemo.trim().length > 500) return '数えない条件のメモは500文字以内で入力してください'
         // 保存側(400)と同じ条件を先に言う。素通りすると汎用失敗文になる(#513 L3)。
         if (valueMode === 'fixed' && (yen === null || !Number.isFinite(yen) || yen < 0)) {
           return '固定で付ける金額は0以上の数値で入力してください'
@@ -336,7 +349,8 @@ export default function NewConversionPointPage() {
         setValue('')
         setValueMode('source')
         setTargetUrl('')
-        setExcludedCondition('')
+        setExclusion(null)
+        setExclusionMemo('')
         setDeduplicationMode('once_per_friend')
         setReversalPolicy('source_cancelled')
         setSelectedUsageKeys(new Set())
@@ -345,7 +359,11 @@ export default function NewConversionPointPage() {
         const res = await api.conversions.createDefinition({
           name: name.trim(),
           sourceType: eventType,
-          sourceConfig: { triggerKind, excludedCondition: excludedCondition.trim() || null },
+          sourceConfig: {
+            triggerKind,
+            exclusion: pruneCondition(exclusion),
+            exclusionMemo: exclusionMemo.trim() || null,
+          },
           targetUrl: measureMethod === 'url_reach' ? targetUrl.trim() : null,
           lineAccountId,
           deduplicationMode,
@@ -388,6 +406,14 @@ export default function NewConversionPointPage() {
                   ? `入力中の条件だけで試算しています。重複除外 ${preview.duplicateExcludedCount}件・取消 ${preview.cancellationCount}件。試算では成果を追加しません。`
                   : '入力中の条件を試算しています。'}
             </p>
+            {/* R40: 試算の注意(excludedReasons)は画面に出す。無いときは出さない。 */}
+            {preview && !previewFailed && preview.excludedReasons.length > 0 ? (
+              <ul className="text-ink-secondary mt-2 space-y-1 text-xs leading-relaxed">
+                {preview.excludedReasons.map((reason) => (
+                  <li key={reason}>{reason}</li>
+                ))}
+              </ul>
+            ) : null}
           </section>
 
           <AsideCard title="つながる先">
@@ -449,7 +475,7 @@ export default function NewConversionPointPage() {
           ) : null
         })()}
 
-        <div className="grid gap-3 md:grid-cols-3">
+        <div className="grid gap-3 md:grid-cols-2">
           <Field
             label="成果地点の名前"
             htmlFor="cv-name"
@@ -488,21 +514,43 @@ export default function NewConversionPointPage() {
               />
             </Field>
           ) : (
-            <Field label="どの注文を数えるか" htmlFor="cv-order-scope" help="すべての注文を対象に保存します。">
-              <SelectField id="cv-order-scope" value="all" disabled options={[{ value: 'all', label: 'すべての注文' }]} className="w-full" />
+            // R41: 起点ごとに対象を言う。タグ起点で「注文」と出さない。
+            <Field label={origin.targetLabel} help={origin.target}>
+              <p className="bg-canvas-sunken text-ink rounded-control px-3 py-2 text-sm">
+                {origin.target}
+              </p>
             </Field>
           )}
-
-          <Field label="数えない条件（任意）" htmlFor="cv-excluded-condition" note="空欄なら、除外せずに数えます。">
-            <input
-              id="cv-excluded-condition"
-              value={excludedCondition}
-              onChange={(event) => setExcludedCondition(event.target.value)}
-              placeholder="例：テスト用アカウントの注文をのぞく"
-              className={inputClass}
-            />
-          </Field>
         </div>
+
+        {/* R40: 数えない条件は共通の条件部品で選ぶ。自由文のメモとは分ける。 */}
+        <Field
+          label="数えない条件"
+          help="条件に当てはまる人は数えません。選ばないままなら、除外せずに数えます。試算の数字にも反映します。"
+          note="条件に当てはまる人は、保存後の記録から除きます。"
+        >
+          <ConditionBuilder
+            value={exclusion}
+            onChange={setExclusion}
+            label="数えない条件"
+            showCount={false}
+          />
+        </Field>
+        <Field
+          label="数えない条件のメモ（任意）"
+          htmlFor="cv-exclusion-memo"
+          note="運用の引き継ぎ用です。数え方には影響しません。"
+        >
+          <input
+            id="cv-exclusion-memo"
+            type="text"
+            value={exclusionMemo}
+            onChange={(event) => setExclusionMemo(event.target.value)}
+            placeholder="例：テスト用の注文は条件で除いています"
+            maxLength={500}
+            className={inputClass}
+          />
+        </Field>
       </FormSection>
 
       <FormSection
@@ -519,7 +567,8 @@ export default function NewConversionPointPage() {
 
       <FormSection step={3} label="金額をどう出すか">
         <div className="grid gap-3 md:grid-cols-3">
-          <Field label="金額の出し方" htmlFor="cv-value-mode">
+          {/* R41: 起点ごとに金額の出どころを言う。起点に金額が無いものは金額なしになる。 */}
+          <Field label="金額の出し方" htmlFor="cv-value-mode" help={origin.amount}>
             <SelectField
               id="cv-value-mode"
               value={valueMode}
