@@ -1,7 +1,7 @@
 'use client'
 
 import type { SelectHTMLAttributes } from 'react'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 
 /**
  * 一覧ツールバーの表示件数（監査 #668）。
@@ -25,17 +25,21 @@ export default function PageSizeSelect({
   options?: number[]
   className?: string
 } & Omit<SelectHTMLAttributes<HTMLSelectElement>, 'value' | 'onChange' | 'className' | 'size'>) {
+  // Select は素の select の属性を全部は受けない。呼び出し側は value/onChange
+  // だけ使っているが、公開Propsの型は変えず、id/name/disabled だけ中へ渡す。
+  const { disabled, id, name } = rest
   return (
     <label className={['flex min-w-0 items-center gap-2', className].filter(Boolean).join(' ')}>
       <span className="text-ink-faint text-xs whitespace-nowrap">表示件数</span>
-      <SelectField
-        size="compact"
+      <Select
+        size="page-size"
         value={String(value)}
-        onChange={(event) => onChange(Number(event.target.value))}
+        onChange={(next) => onChange(Number(next))}
         aria-label="表示件数"
         options={options.map((n) => ({ value: String(n), label: `${n}件表示` }))}
-        className="w-auto min-w-24 max-w-full"
-        {...rest}
+        id={id}
+        name={name}
+        disabled={disabled}
       />
     </label>
   )

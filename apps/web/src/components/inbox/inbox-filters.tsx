@@ -1,5 +1,7 @@
 'use client'
 
+import Select from '@/components/shared/select'
+
 interface AccountOption {
   id: string
   name: string
@@ -37,18 +39,15 @@ export default function InboxFilters({
         />
         1時間以上のみ
       </label>
-      <select
+      <Select
         value={account}
-        onChange={(e) => onChange({ account: e.target.value })}
-        className="rounded-md border border-gray-300 px-3 py-2 text-sm"
-      >
-        <option value="">全アカウント</option>
-        {accountOptions.map((a) => (
-          <option key={a.id} value={a.id}>
-            {a.name}
-          </option>
-        ))}
-      </select>
+        onChange={(value) => onChange({ account: value })}
+        aria-label="アカウント"
+        options={[
+          { value: '', label: '全アカウント' },
+          ...accountOptions.map((a) => ({ value: a.id, label: a.name })),
+        ]}
+      />
     </div>
   )
 }

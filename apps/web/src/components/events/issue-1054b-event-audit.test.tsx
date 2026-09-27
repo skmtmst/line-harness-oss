@@ -43,6 +43,33 @@ vi.mock('@/lib/api', async (importOriginal) => {
   }
 })
 vi.mock('@/components/shared/image-uploader', () => ({ default: () => null }))
+/*
+ * 共通の Select は listbox の部品で、その操作は部品自身の試験が持つ。
+ * ここで見たいのは選んだ期限の値なので、素の <select> に置き換える。
+ * 試験は id（#cancel-deadline・#entry-cutoff）で探すため id も通す。
+ */
+vi.mock('@/components/shared/select', () => ({
+  default: ({ 'aria-label': label, id, value, onChange, options }: {
+    'aria-label'?: string
+    id?: string
+    value: string
+    onChange: (value: string) => void
+    options: Array<{ value: string; label: string }>
+  }) => (
+    <select
+      aria-label={label}
+      id={id}
+      value={value}
+      onChange={(e: { target: { value: string } }) => onChange(e.target.value)}
+    >
+      {options.map((option) => (
+        <option key={option.value} value={option.value}>
+          {option.label}
+        </option>
+      ))}
+    </select>
+  ),
+}))
 
 let host: HTMLDivElement, root: Root
 const ev = { ...EVENT_DEFAULT_DRAFT, id: 'event-1', name: 'Audit Event' }

@@ -20,6 +20,7 @@ import DateField from '@/components/shared/date-field'
 import Notice from '@/components/shared/notice'
 import { TimeField } from '@/components/shared/date-time-field'
 import ListState from '@/components/shared/list-state'
+import Select from '@/components/shared/select'
 import { shortDate } from '../../lib/format-time'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
@@ -827,16 +828,12 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
         </nav>
         <label className="text-ink-secondary ml-auto flex items-center gap-2 text-xs">
           担当者を切り替える
-          <select
+          <Select
             aria-label="担当者を切り替える"
             value={staffId}
-            onChange={(event) => router.push(`/booking/staff/shifts?staff_id=${event.target.value}`)}
-            className="border-hairline rounded-control border bg-canvas px-3 py-2 text-sm"
-          >
-            {staffList.map((item) => (
-              <option key={item.id} value={item.id}>{item.display_name}</option>
-            ))}
-          </select>
+            onChange={(value) => router.push(`/booking/staff/shifts?staff_id=${value}`)}
+            options={staffList.map((item) => ({ value: item.id, label: item.display_name }))}
+          />
         </label>
       </div>
 
@@ -915,16 +912,13 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
                 <div key={row.key} className="border-hairline flex flex-wrap items-center gap-3 rounded-control border p-3 text-sm">
                   <label className="flex items-center gap-1 text-xs">
                     曜日
-                    <select
+                    <Select
                       aria-label="休憩の曜日"
-                      value={row.weekday}
-                      onChange={(event) => updateBreakRow(row.key, { weekday: Number(event.target.value) })}
-                      className="border-hairline rounded-control border bg-canvas px-2 py-1 text-sm"
-                    >
-                      {STAFF_DAYS.map((day) => (
-                        <option key={day.weekday} value={day.weekday}>{day.short}</option>
-                      ))}
-                    </select>
+                      value={String(row.weekday)}
+                      onChange={(value) => updateBreakRow(row.key, { weekday: Number(value) })}
+                      options={STAFF_DAYS.map((day) => ({ value: String(day.weekday), label: day.short }))}
+                      size="page-size"
+                    />
                   </label>
                   <span className="flex items-center gap-1 text-xs">
                     始め
@@ -954,11 +948,7 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
             <div className="border-hairline bg-canvas-sunken mt-4 grid gap-3 rounded-control border p-3 sm:grid-cols-4">
               <label className="text-ink-secondary text-xs">
                 曜日
-                <select aria-label="足す休憩の曜日" value={newBreakWeekday} onChange={(event) => setNewBreakWeekday(event.target.value)} className="border-hairline rounded-control mt-1 w-full border bg-canvas px-3 py-2 text-sm">
-                  {STAFF_DAYS.map((day) => (
-                    <option key={day.weekday} value={day.weekday}>{day.label}</option>
-                  ))}
-                </select>
+                <Select size="full" aria-label="足す休憩の曜日" value={newBreakWeekday} onChange={(value) => setNewBreakWeekday(value)} options={STAFF_DAYS.map((day) => ({ value: String(day.weekday), label: day.label }))} className="mt-1" />
               </label>
               <span className="text-ink-secondary text-xs">
                 始め

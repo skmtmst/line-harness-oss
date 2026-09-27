@@ -5,6 +5,8 @@ import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
+import Pagination from '@/components/shared/pagination'
+import { ActionCell, DataTable, Td, Tr } from '@/components/shared/table'
 import { Tabs } from '@/components/shared/tabs'
 import { TableHeadRow, TableStateRow, Th } from '@/components/shared/table'
 import { useAccount } from '@/contexts/account-context'
@@ -244,12 +246,12 @@ export default function LoginAudit({ userId }: { userId?: string }) {
     </div>
     {error
       ? <Notice tone="danger" action={<Button onClick={() => void load()}>もう一度読み込む</Button>}>{error}</Notice>
-      : <div className="overflow-hidden rounded-card border border-hairline bg-canvas"><table className="w-full table-fixed text-sm"><thead><TableHeadRow><Th className="w-1/4">いつ・だれが</Th><Th className="w-1/5">何をしたか</Th><Th className="w-1/5">対象</Th><Th className="w-1/5">元の値 → 新しい値</Th><Th>場所</Th><Th align="right">操作</Th></TableHeadRow></thead><tbody className="divide-y divide-hairline">{loading
+      : <div className="overflow-hidden rounded-card border border-hairline bg-canvas"><DataTable className="rounded-none border-0"><thead><TableHeadRow><Th className="w-1/4">いつ・だれが</Th><Th className="w-1/5">何をしたか</Th><Th className="w-1/5">対象</Th><Th className="w-1/5">元の値 → 新しい値</Th><Th>場所</Th><Th align="right">操作</Th></TableHeadRow></thead><tbody>{loading
         ? <TableStateRow colSpan={6} kind="loading" title="記録を読み込んでいます…" />
         : visible.length === 0
           ? <TableStateRow colSpan={6} kind="empty" title="条件に合う記録はありません。条件を変えてお試しください。" />
-          : visible.map((row) => <tr key={row.id} className="hover:bg-canvas-sunken"><td className="px-3 py-3"><p className="truncate font-semibold text-ink" title={`${formatDate(row.createdAt)} ／ ${row.actor.name ?? '名前未取得'}`}>{formatDate(row.createdAt)} ／ {row.actor.name ?? '名前未取得'}</p><p className="mt-1 text-xs text-ink-faint">{row.actor.role ? ROLE_LABELS[row.actor.role] ?? row.actor.role : '権限を取得できませんでした'}</p></td><td className={`truncate px-3 py-3 font-medium ${isAttention(row) ? 'text-danger' : 'text-ink'}`} title={actionLabel(row)}>{actionLabel(row)}</td><td className="truncate px-3 py-3 text-ink-secondary" title={targetLabel(row)}>{targetLabel(row)}</td><td className="truncate px-3 py-3 text-ink-secondary" title={changeLabel(row)}>{changeLabel(row)}</td><td className={`truncate px-3 py-3 ${isAttention(row) ? 'text-danger' : 'text-ink-secondary'}`} title={locationLabel(row)}>{locationLabel(row)}</td><td className="px-3 py-3 text-right"><Button variant="secondary" onClick={() => setDetail(row)}>詳細を見る</Button></td></tr>)}</tbody></table></div>}
-    {!loading && !error && total > 0 && <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-ink-faint"><ListRange label="記録" total={total} first={first} last={last} />{pageCount > 1 && <nav aria-label="入った記録のページ送り" className="flex items-center gap-2"><AuditPageLink disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}>前へ</AuditPageLink><span className="font-semibold text-ink">{currentPage} / {pageCount}</span><AuditPageLink disabled={currentPage === pageCount} onClick={() => setPage(currentPage + 1)}>次へ</AuditPageLink></nav>}</div>}
+          : visible.map((row) => <Tr key={row.id} interactive><Td><p className="truncate font-semibold text-ink" title={`${formatDate(row.createdAt)} ／ ${row.actor.name ?? '名前未取得'}`}>{formatDate(row.createdAt)} ／ {row.actor.name ?? '名前未取得'}</p><p className="mt-1 text-xs text-ink-faint">{row.actor.role ? ROLE_LABELS[row.actor.role] ?? row.actor.role : '権限を取得できませんでした'}</p></Td><Td className={`truncate font-medium ${isAttention(row) ? 'text-danger' : 'text-ink'}`} title={actionLabel(row)}>{actionLabel(row)}</Td><Td className="truncate text-ink-secondary" title={targetLabel(row)}>{targetLabel(row)}</Td><Td className="truncate text-ink-secondary" title={changeLabel(row)}>{changeLabel(row)}</Td><Td className={`truncate ${isAttention(row) ? 'text-danger' : 'text-ink-secondary'}`} title={locationLabel(row)}>{locationLabel(row)}</Td><ActionCell><Button variant="secondary" onClick={() => setDetail(row)}>詳細を見る</Button></ActionCell></Tr>)}</tbody></DataTable></div>}
+    {!loading && !error && total > 0 && <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-ink-faint"><ListRange label="記録" total={total} first={first} last={last} /><Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} /></div>}
     <Dialog
       open={detail !== null}
       title="操作記録の詳細"
@@ -263,8 +265,4 @@ export default function LoginAudit({ userId }: { userId?: string }) {
 
 function AuditKpi({ label, value, note, attention = false }: { label: string; value: number | null; note: string; attention?: boolean }) {
   return <div className="flex h-28 flex-col gap-1 rounded-card border border-hairline bg-canvas p-4"><p className="text-xs font-semibold leading-normal text-ink-faint">{label}</p><p className={`text-xl font-bold leading-normal tabular-nums ${attention ? 'text-danger' : 'text-ink'}`}>{value === null ? '—' : <>{value.toLocaleString()}<span className="ml-1 text-xs font-medium text-ink-faint">件</span></>}</p><p className="text-xs leading-normal text-ink-faint">{note}</p></div>
-}
-
-function AuditPageLink({ children, disabled, onClick }: { children: React.ReactNode; disabled: boolean; onClick: () => void }) {
-  return <Button disabled={disabled} onClick={onClick}>{children}</Button>
 }

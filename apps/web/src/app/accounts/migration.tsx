@@ -9,11 +9,13 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import FileDropzone, { AttachmentRow } from '@/components/shared/file-drop'
 import ListState from '@/components/shared/list-state'
+import Select from '@/components/shared/select'
 import Notice from '@/components/shared/notice'
-import SelectField from '@/components/shared/select-field'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import KpiCard from '@/components/shared/kpi-card'
-import { TableHeadRow, Th } from '@/components/shared/table'
+import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import Pagination from '@/components/shared/pagination'
+import ListRange from '@/components/ui/list-range'
 import { TextField } from '@/components/shared/text-field'
 import MergedTabs from '@/components/layout/merged-tabs'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -513,21 +515,18 @@ export default function AccountMigration() {
         1段目「移行元 → 移行先」は同幅の2欄（狭い幅では1列）、
         2段目は全幅の利用目的、3段目はCSVとファイル状態、最後は操作行。
         ラベルと入力の間は8px、入力の高さは40pxでそろえる。
-        プルダウンの既定幅176pxは部品側のCSS（レイヤなし）なので、
-        Tailwind の w-full では上書きできない。共有部品には触らず、
-        U063と同じ属性スコープ（data-selects-wide）でこの画面の
-        select だけを欄いっぱいに広げる。
+        移行元・移行先の選び欄は欄いっぱいに広げる（部品の size="full" を使う）。
       */}
       <section data-selects-wide className="bg-canvas rounded-card border-hairline border p-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
           <label className="text-ink-secondary block min-w-0 flex-1 text-xs font-semibold">
             <span className="mb-2 block">移行元</span>
-            <SelectField aria-label="移行元アカウント" value={fromAccountId} onChange={(event) => setFromAccountId(event.target.value)} options={[{ value: '', label: '移行元アカウントを選択' }, ...accounts.map((account) => ({ value: account.id, label: account.name }))]} />
+            <Select aria-label="移行元アカウント" value={fromAccountId} onChange={(value) => setFromAccountId(value)} options={[{ value: '', label: '移行元アカウントを選択' }, ...accounts.map((account) => ({ value: account.id, label: account.name }))]} size="full" />
           </label>
           <span aria-hidden="true" className="text-ink-faint hidden h-10 items-center sm:flex">→</span>
           <label className="text-ink-secondary block min-w-0 flex-1 text-xs font-semibold">
             <span className="mb-2 block">移行先</span>
-            <SelectField aria-label="移行先アカウント" value={toAccountId} onChange={(event) => setToAccountId(event.target.value)} options={[{ value: '', label: '移行先アカウントを選択' }, ...accounts.map((account) => ({ value: account.id, label: account.name }))]} />
+            <Select aria-label="移行先アカウント" value={toAccountId} onChange={(value) => setToAccountId(value)} options={[{ value: '', label: '移行先アカウントを選択' }, ...accounts.map((account) => ({ value: account.id, label: account.name }))]} size="full" />
           </label>
         </div>
         <label className="text-ink-secondary mt-3 block text-xs font-semibold">
@@ -722,14 +721,7 @@ export default function AccountMigration() {
                     : { tone: 'neutral', label: '確認中' }
         return <button key={run.id} className="hover:bg-canvas-sunken flex w-full items-center justify-between px-4 py-3 text-left" onClick={() => { setPage(0); setClassification(''); setPendingOnly(false); void loadDetail(run.id, 0, '', false) }}><span><span className="text-ink block text-sm font-medium">{run.purpose}</span><span className="text-ink-faint text-xs">{new Date(run.createdAt).toLocaleString('ja-JP')} ・ {run.counts.total.toLocaleString()}件</span></span><StatusBadge tone={badge.tone}>{badge.label}</StatusBadge></button>
       })}</div>}</section>
-      {/*
-        #984 LAY-13: SelectField の既定幅176pxは部品側のCSS（レイヤなし）なので、
-        Tailwind の w-full では上書きできない。共有部品には触らず、
-        U063と同じ属性スコープでこの画面の select へだけ届く全幅指定にする。
-      */}
-      <style jsx global>{`
-        [data-selects-wide] select { width: 100%; }
-      `}</style>
+      {/* #984 LAY-13: 移行元・移行先の選び欄は欄いっぱいに広げる（部品の size="full" を使う）。 */}
     </div>
   )
 }
@@ -787,34 +779,32 @@ function ActiveMigration({
       <div className="border-hairline flex items-center justify-between border-b px-4 py-3"><div><h2 className="text-ink text-sm font-bold">{statusView.heading}</h2><p className="text-ink-faint text-xs">{statusView.description}</p></div><StatusBadge tone={statusView.badgeTone}>{statusView.badgeLabel}</StatusBadge></div>
       {detailBusy && <p role="status" className="text-ink-faint border-hairline border-b px-4 py-2 text-xs">対応表を読み込んでいます…</p>}
       <div className="border-hairline flex flex-wrap items-center gap-3 border-b px-4 py-3">
-        <SelectField aria-label="分類で絞り込む" value={classification} onChange={(event) => onFilterChange(event.target.value as '' | ItemClassification, pendingOnly)} options={[{ value: '', label: 'すべての分類' }, ...ITEM_CLASSIFICATIONS.map((value) => ({ value, label: classLabel[value] }))]} />
+        <Select aria-label="分類で絞り込む" value={classification} onChange={(value) => onFilterChange(value as '' | ItemClassification, pendingOnly)} options={[{ value: '', label: 'すべての分類' }, ...ITEM_CLASSIFICATIONS.map((value) => ({ value, label: classLabel[value] }))]} size="standard" />
         <label className="text-ink-secondary flex cursor-pointer items-center gap-2 text-xs font-semibold"><input type="checkbox" checked={pendingOnly} onChange={(event) => onFilterChange(classification, event.target.checked)} className="size-4" />未判断のみ</label>
         <span className="text-ink-faint ml-auto text-xs">全 {total.toLocaleString()} 件</span>
       </div>
-      {(active.items?.length ?? 0) === 0 ? <ListState kind="empty" title="対応表に結果がありません" description="絞り込みを変えるか、別のCSVを選んでテスト移行してください。" /> : <table className="w-full table-fixed">
+      {(active.items?.length ?? 0) === 0 ? <ListState kind="empty" title="対応表に結果がありません" description="絞り込みを変えるか、別のCSVを選んでテスト移行してください。" /> : <DataTable className="rounded-none border-0">
         <thead><TableHeadRow><Th className="w-1/6">旧UID</Th><Th className="w-1/6">候補ユーザー</Th><Th className="w-1/6">一致根拠</Th><Th>競合内容</Th><Th className="w-1/12">判断</Th><Th className="w-1/6">操作</Th></TableHeadRow></thead>
-        <tbody>{active.items?.map((item) => <tr key={item.id} className="border-hairline border-t align-top">
-          <td className="truncate px-4 py-3 text-sm" title={item.oldUid}>{item.oldUid}</td><td className="px-4 py-3 text-sm">{item.candidateName ?? '候補なし'}</td>
-          <td className="px-4 py-3"><StatusBadge tone={item.classification === 'auto' ? 'success' : item.classification === 'unmatched' ? 'neutral' : 'warning'}>{classLabel[item.classification]}</StatusBadge></td>
-          <td className="text-ink-secondary px-4 py-3 text-sm">{item.conflictReason ?? '—'}</td><td className="px-4 py-3 text-sm">{item.decision === 'pending' ? '要確認' : decisionLabel[item.decision]}</td>
+        <tbody>{active.items?.map((item) => <Tr key={item.id} className="align-top">
+          <Td className="truncate text-sm" title={item.oldUid}>{item.oldUid}</Td><Td className="text-sm">{item.candidateName ?? '候補なし'}</Td>
+          <Td><StatusBadge tone={item.classification === 'auto' ? 'success' : item.classification === 'unmatched' ? 'neutral' : 'warning'}>{classLabel[item.classification]}</StatusBadge></Td>
+          <Td className="text-ink-secondary text-sm">{item.conflictReason ?? '—'}</Td><Td className="text-sm">{item.decision === 'pending' ? '要確認' : decisionLabel[item.decision]}</Td>
           {/*
             FRIEND-14: 「詳細を見る」は読み取り専用のダイアログを開くだけ。
             以前の「移行内容を確認」はクリックした時点で結び付けを保存して
             いたため、読むつもりの操作が書き込みになっていた。
           */}
-          <td className="px-4 py-3"><div className="flex flex-wrap items-center gap-2">
+          <ActionCell><div className="flex flex-wrap items-center gap-2">
             {/* #641: 行操作は共通の枠つきボタン */}
             <Button type="button" variant="secondary" disabled={busy || detailBusy} onClick={() => onShowDetail(item)}>詳細を見る</Button>
             {!item.newUid && <span className="text-ink-faint text-xs">一致先なし（新規作成は「CSVで書き出す・取り込む」で行ってください）</span>}
-          </div></td>
-        </tr>)}</tbody>
-      </table>}
+          </div></ActionCell>
+        </Tr>)}</tbody>
+      </DataTable>}
       {showPager && <div className="border-hairline flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3">
-        <p className="text-ink-secondary text-xs">{from.toLocaleString()}–{to.toLocaleString()} 件目 / 全 {total.toLocaleString()} 件</p>
-        <div className="flex gap-2">
-          <Button type="button" disabled={busy || detailBusy || page === 0} onClick={() => onPageChange(page - 1)}>前へ</Button>
-          <Button type="button" disabled={busy || detailBusy || to >= total} onClick={() => onPageChange(page + 1)}>次へ</Button>
-        </div>
+        {/* 0始まりの page を1始まりに直して渡す。読み込み中は Pagination ごと止める。 */}
+        <ListRange total={total} first={from} last={to} />
+        <Pagination page={page + 1} pageCount={Math.max(1, Math.ceil(total / ITEM_PAGE_SIZE))} onPageChange={(next) => onPageChange(next - 1)} disabled={busy || detailBusy} />
       </div>}
     </div>
     {/*

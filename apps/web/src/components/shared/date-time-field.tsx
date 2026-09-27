@@ -4,7 +4,7 @@ import { Calendar, Clock, X } from 'lucide-react'
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
 import DateField, { formatLabel as formatDateLabel, parseDate } from './date-field'
 import MenuPortal from './menu-portal'
-import SelectField from './select-field'
+import Select from './select'
 import dateStyles from './date-field.module.css'
 import styles from './date-time-field.module.css'
 
@@ -203,19 +203,19 @@ export default function DateTimeField({
           <div className={styles.timeRow}>
             <label className={styles.timeLabel}>
               時
-              <SelectField
+              <Select
                 aria-label="時"
                 value={pad(shownTime.hours)}
-                onChange={(event) => chooseTime(Number(event.target.value), shownTime.minutes)}
+                onChange={(value) => chooseTime(Number(value), shownTime.minutes)}
                 options={HOURS.map((hour) => ({ value: pad(hour), label: `${hour}時` }))}
               />
             </label>
             <label className={styles.timeLabel}>
               分
-              <SelectField
+              <Select
                 aria-label="分"
                 value={pad(shownTime.minutes)}
-                onChange={(event) => chooseTime(shownTime.hours, Number(event.target.value))}
+                onChange={(value) => chooseTime(shownTime.hours, Number(value))}
                 options={MINUTES.map((minute) => ({ value: pad(minute), label: `${minute}分` }))}
               />
             </label>
@@ -372,21 +372,21 @@ export function TimeField({
           <div className={styles.timeRow}>
             <label className={styles.timeLabel}>
               時
-              <SelectField
+              <Select
                 aria-label="時"
                 value={pad(shownHours)}
                 disabled={disabled}
-                onChange={(event) => chooseTime(Number(event.target.value), shownMinutes)}
+                onChange={(value) => chooseTime(Number(value), shownMinutes)}
                 options={HOURS.map((hour) => ({ value: pad(hour), label: `${hour}時` }))}
               />
             </label>
             <label className={styles.timeLabel}>
               分
-              <SelectField
+              <Select
                 aria-label="分"
                 value={pad(shownMinutes)}
                 disabled={disabled}
-                onChange={(event) => chooseTime(shownHours, Number(event.target.value))}
+                onChange={(value) => chooseTime(shownHours, Number(value))}
                 options={MINUTES.map((minute) => ({ value: pad(minute), label: `${minute}分` }))}
               />
             </label>

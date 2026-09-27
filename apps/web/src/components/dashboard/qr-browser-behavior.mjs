@@ -23,6 +23,7 @@ import {
   normalizeQrSize,
   qrResponseHeaders,
 } from '../../../../worker/src/lib/qr-response.ts'
+import { selectOptionIn } from '../../test-utils/select-helpers.ts'
 
 const PORT = 3158
 const outDir = join(process.cwd(), 'apps/web/out')
@@ -156,14 +157,25 @@ try {
   await dialog.waitFor()
 
   // 既定は「大」。1200pxの案内が残っていたら、押しても保存できない人が出る。
+  // 「画像の大きさ」は共通 Select（button＋listbox）なので、値ではなく
+  // 開く前の釦の文字で見る。
   const sizeSelect = dialog.getByLabel('画像の大きさ')
-  assert.equal(await sizeSelect.inputValue(), '1024x1024', '既定の大きさがWorker上限を超えている')
+  assert.ok((await sizeSelect.innerText()).includes('大（1024px）'), '既定の大きさがWorker上限を超えている')
   const dialogText = await dialog.innerText()
   assert.ok(!dialogText.includes('1200px'), '画面に届かない大きさの案内が残っている')
   assert.ok(dialogText.includes('大（1024px）'), '「大」の表示が1024pxになっていない')
 
   // 選べる大きさ全てが、実際の受け口で200になる。
-  const sizes = await sizeSelect.locator('option').evaluateAll((nodes) => nodes.map((node) => node.value))
+  // 候補は一覧を開いたときだけ出るので、開いて名前を読み、閉じる。
+  // 一覧は画面の最上層に出るので、画面全体から探す。
+  await sizeSelect.click()
+  const sizeNames = await page.getByRole('listbox').getByRole('button').allTextContents()
+  await sizeSelect.click()
+  const sizes = sizeNames.map((name) => {
+    const match = name.match(/(\d+)px/)
+    assert.ok(match, `大きさの候補が読めません: ${name}`)
+    return `${match[1]}x${match[1]}`
+  })
   assert.deepEqual(sizes, ['1024x1024', '600x600', '300x300'])
   for (const size of sizes) {
     const probe = await page.request.get(`${baseUrl}/api/qr?size=${size}&format=png&data=${encodeURIComponent('https://line.me/R/ti/p/@nen-a')}`)
@@ -195,8 +207,10 @@ try {
   }
 
   // 経路を選ぶと保存名と対象URLがその経路になる（既存の動きを壊していない）。
+  // 「発行中の追加URL」は共通 Select なので共有の手助けで選ぶ。
+  // 作り物の経路 route-1 の名前は「店頭POP」。
   await dialog.getByRole('button', { name: 'PNG', exact: true }).click()
-  await dialog.getByLabel('発行中の追加URL').selectOption('route-1')
+  await selectOptionIn(page, '発行中の追加URL', '店頭POP')
   const [routeDownload] = await Promise.all([
     page.waitForEvent('download'),
     dialog.getByRole('link', { name: '画像をダウンロード' }).click(),

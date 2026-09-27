@@ -3,7 +3,7 @@
 import { useEffect, useId, useState, type ReactNode } from 'react'
 import type { LineAccount, StaffMember } from '@line-crm/shared'
 import Dialog from '@/components/shared/dialog'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import { TextField } from '@/components/shared/text-field'
 
 export type MemberDialogValue = {
@@ -101,13 +101,14 @@ export default function MemberDialog({
 
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="役割" htmlFor={`${uid}-role`} note={isSelf ? '自分の役割は変えられません' : undefined}>
-            <SelectField
+            <Select
+              aria-label="役割"
+              size="full"
               id={`${uid}-role`}
               className="w-full"
-              style={{ width: '100%' }}
               value={value.role}
               disabled={busy || isSelf}
-              onChange={(e) => set('role', e.target.value as 'admin' | 'viewer')}
+              onChange={(value) => set('role', value as 'admin' | 'viewer')}
               options={[
                 { value: 'admin', label: '管理者（すべて操作できる）' },
                 { value: 'viewer', label: '閲覧のみ（見るだけ）' },
@@ -116,25 +117,27 @@ export default function MemberDialog({
           </Field>
           {!member ? (
             <Field label="最初に表示するアカウント" htmlFor={`${uid}-assigned`}>
-              <SelectField
+              <Select
+                aria-label="最初に表示するアカウント"
+                size="full"
                 id={`${uid}-assigned`}
                 className="w-full"
-                style={{ width: '100%' }}
                 value={value.assignedLineAccountId}
                 disabled={busy}
-                onChange={(e) => set('assignedLineAccountId', e.target.value)}
+                onChange={(value) => set('assignedLineAccountId', value)}
                 options={accounts.map((a) => ({ value: a.id, label: a.name }))}
               />
             </Field>
           ) : (
             <Field label="状態" htmlFor={`${uid}-active`} note={isSelf ? '自分の状態は変えられません' : undefined}>
-              <SelectField
+              <Select
+                aria-label="状態"
+                size="full"
                 id={`${uid}-active`}
                 className="w-full"
-                style={{ width: '100%' }}
                 value={value.isActive ? 'active' : 'inactive'}
                 disabled={busy || isSelf}
-                onChange={(e) => set('isActive', e.target.value === 'active')}
+                onChange={(value) => set('isActive', value === 'active')}
                 options={[
                   { value: 'active', label: '有効（ログインできる）' },
                   { value: 'inactive', label: '無効（ログインできない）' },

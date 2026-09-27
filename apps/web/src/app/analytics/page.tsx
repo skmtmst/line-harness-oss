@@ -1,6 +1,6 @@
 'use client'
 
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import type { FriendField } from '@line-crm/shared'
@@ -789,18 +789,19 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
         <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
           <div>
             <label className="text-ink-secondary mb-1 block text-xs font-medium">たての軸</label>
-            <SelectField value={rowKind} onChange={(event) => setRowKind(event.target.value as typeof rowKind)} options={[{ value: "tag", label: "タグ" }, { value: "route", label: "流入経路" }, { value: "score_band", label: "スコア帯" }, { value: "conversion_point", label: "成果地点" }, { value: "booking_status", label: "予約状態" }, { value: "purchase_status", label: "購入状態" }]} className="v6-select w-full" />
+            <Select aria-label="たての軸" value={rowKind} onChange={(value) => setRowKind(value as typeof rowKind)} options={[{ value: "tag", label: "タグ" }, { value: "route", label: "流入経路" }, { value: "score_band", label: "スコア帯" }, { value: "conversion_point", label: "成果地点" }, { value: "booking_status", label: "予約状態" }, { value: "purchase_status", label: "購入状態" }]} className="v6-select w-full" size="full" />
           </div>
           <div>
             <label htmlFor="cross-field" className="text-ink-secondary mb-1 block text-xs font-medium">
               よこの軸
             </label>
-            <SelectField
+            <Select
               id="cross-field"
               value={fieldId}
-              onChange={(e) => setFieldId(e.target.value)}
+              onChange={(value) => setFieldId(value)}
               aria-label="よこの軸"
               className="v6-select w-full"
+              size="full"
               options={fields.map((field) => ({
                 value: field.id,
                 label: `友だち情報 / ${field.name}`,
@@ -815,24 +816,26 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
           <div>
             <dt className="mb-1 text-xs font-medium text-ink-secondary"><label htmlFor="cross-measure">数えるもの</label></dt>
             <dd className="grid gap-1">
-              <SelectField
+              <Select
                 id="cross-measure"
                 value={measureKind}
-                onChange={(e) => setMeasureKind(e.target.value as 'unique_friends' | 'events')}
+                onChange={(value) => setMeasureKind(value as 'unique_friends' | 'events')}
                 aria-label="数えるもの"
                 className="v6-select w-full"
+                size="full"
                 options={[
                   { value: 'unique_friends', label: '友だちの人数（重複なし）' },
                   { value: 'events', label: 'イベントの回数' },
                 ]}
               />
               {measureKind === 'events' && (
-                <SelectField
+                <Select
                   id="cross-measure-event"
                   value={measureEventType}
-                  onChange={(e) => setMeasureEventType(e.target.value)}
+                  onChange={(value) => setMeasureEventType(value)}
                   aria-label="数えるイベント"
                   className="v6-select w-full"
+                  size="full"
                   options={CROSS_MEASURE_EVENT_OPTIONS}
                 />
               )}
@@ -1495,12 +1498,13 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
               <label htmlFor="funnel-select" className="text-ink-secondary mb-1 block text-xs font-medium">
                 ファネル
               </label>
-              <SelectField
+              <Select
                 id="funnel-select"
                 value={selected}
-                onChange={(e) => setSelected(e.target.value)}
+                onChange={(value) => setSelected(value)}
                 aria-label="ファネル"
                 className="border-hairline rounded-control w-full border px-3 py-2 text-sm sm:w-72"
+                size="full"
                 options={
                   funnels.some((funnel) => funnel.status === 'active' || funnel.id === selected)
                     ? funnels
@@ -1625,12 +1629,13 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
             {run && run.groups.length > 1 && (
               <div className="mt-3 max-w-xs">
                 <label htmlFor="funnel-group" className="text-ink-secondary mb-1 block text-xs font-medium">比較する条件</label>
-                <SelectField
+                <Select
                   id="funnel-group"
                   value={groupKey}
-                  onChange={(event) => setGroupKey(event.target.value)}
+                  onChange={(value) => setGroupKey(value)}
                   aria-label="比較する条件"
                   className="v6-select w-full"
+                  size="full"
                   options={run.groups.map((group) => ({
                     value: group.key,
                     label: `${group.label}（入口 ${group.entrants}人）`,
@@ -1750,12 +1755,13 @@ function FunnelTab({ accountId, canManage, presetConversion }: {
                   selectedFunnel?.status === 'active' ? (
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="space-y-2">
-                        <SelectField
+                        <Select
                           id="funnel-audience-selection"
                           value={audienceSelection}
-                          onChange={(event) => setAudienceSelection(event.target.value as 'reached' | 'stopped' | 'in_progress')}
+                          onChange={(value) => setAudienceSelection(value as 'reached' | 'stopped' | 'in_progress')}
                           aria-label="対象者の種類"
                           className="v6-select w-full sm:w-64"
+                          size="full"
                           options={[
                             { value: 'reached', label: 'この段まで到達した人' },
                             { value: 'stopped', label: 'この段で止まった人' },
@@ -2071,10 +2077,11 @@ function FunnelForm({
         <label htmlFor="fn-window" className="text-ink-secondary mb-1 block text-sm font-medium">
           何日以内の通過で数えるか
         </label>
-        <SelectField
+        <Select
           id="fn-window"
+          aria-label="何日以内の通過で数えるか"
           value={windowDays}
-          onChange={(e) => setWindowDays(e.target.value)}
+          onChange={(value) => setWindowDays(value)}
           options={[
             // API経由で7/30/90以外の日数が付いたファネルも、編集で値を失わないよう現在値を足す
             ...(['7', '30', '90'].includes(windowDays)
@@ -2085,6 +2092,7 @@ function FunnelForm({
             { value: '90', label: '90日以内' },
           ]}
           className="max-w-md"
+          size="standard"
         />
       </div>
 
@@ -2109,16 +2117,17 @@ function FunnelForm({
             </div>
             <div>
               <label className="text-ink-faint mb-1 block text-xs">何をしたら</label>
-              <SelectField
+              <Select
                 value={step.kind}
-                onChange={(e) =>
+                onChange={(value) =>
                   setSteps((prev) =>
                     // 種類を変えた段は旧条件のmatchを引き継がない（別種類のキーが残ると誤集計になる）
-                    prev.map((s, j) => (i === j ? { ...s, kind: e.target.value, matchBase: undefined } : s)),
+                    prev.map((s, j) => (i === j ? { ...s, kind: value, matchBase: undefined } : s)),
                   )
                 }
                 aria-label={`${i + 1}段目で何をしたら進むか`}
                 className="border-hairline rounded-control border px-2 py-1.5 text-sm"
+                size="standard"
                 options={FUNNEL_STEP_KIND_OPTIONS.map((kind) => ({ value: kind.key, label: kind.label }))}
               />
             </div>
