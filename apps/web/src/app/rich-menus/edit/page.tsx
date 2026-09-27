@@ -32,6 +32,8 @@ import {
 } from './publish-plan-draft'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { PublishHistorySection } from './publish-history'
+import { PublishProgressSection } from './publish-progress-section'
+import { PrepublishCheckSection } from './prepublish-check-section'
 import { TestApplySection } from './test-apply-section'
 
 /**
@@ -2070,6 +2072,8 @@ function PublishStep({
           <Notice tone="info"><h2 className="text-sm font-bold">公開すると何が変わるか</h2><p className="mt-2 text-xs">{conditionEmpty ? '0人' : <MetricValue metric={preview?.effective} />} のトーク画面のメニューが入れ替わります。</p><p className="mt-2 text-xs">LINEへの反映は数分かかることがあります。</p></Notice>
           {/* N-152: 全員へ出す前に、自分のLINEだけで見え方を確かめる。 */}
           {canOperate ? <TestApplySection groupId={group.id} /> : null}
+          {/* O-1: 公開の前の確認。プレビューだけでは公開できない。 */}
+          {canOperate ? <PrepublishCheckSection groupId={group.id} /> : null}
         </aside>
       </div>
       <section aria-label="公開予約の一覧" className="border-hairline bg-canvas rounded-card mt-5 border p-6">
@@ -2110,6 +2114,8 @@ function PublishStep({
           </ul>
         )) : null}
       </section>
+      {/* K-1: 公開の進み。失敗した段だけ「失敗」にし、もう一度公開できる。 */}
+      {canOperate ? <PublishProgressSection groupId={group.id} onRetry={submit} /> : null}
       {/* N-151: 公開の履歴・失敗だけの再試行・LINEとの照合修復。 */}
       {canOperate ? <PublishHistorySection groupId={group.id} onChanged={onChanged} /> : null}
       {/* N-156: staff は公開・保存を押せない（サーバ側も 403 で止める）。 */}
