@@ -1,5 +1,6 @@
 import { getActionScoreBands } from './action-score-rules';
 import { publishedRuleContentFromDraft } from './mileage.js';
+import type { SegmentCondition } from './segment-conditions.js';
 import { jstNow } from './utils.js';
 
 const CONDITION_TYPES = new Set([
@@ -737,6 +738,12 @@ export async function publishMileageEarningRule(
       initialStatus: draft.initialStatus,
       validFrom: draft.validFrom,
       validUntil: draft.validUntil,
+      /*
+       * R52: 下書きの対象条件を公開版へ載せる。載せないと公開版だけ
+       * 条件が消え、対象外へ付与される。保存時に型を絞ってあるので
+       * 絞り込み部品の形と一致する。
+       */
+      targetConditions: draft.targetConditions as SegmentCondition | null,
     },
     live.conditions,
   );
