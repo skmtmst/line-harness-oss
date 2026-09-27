@@ -7,8 +7,11 @@ import {
   getOrCreateSiteTrackingKey,
   getSiteTrackingAccountId,
   SITE_EVENT_TYPES,
+  type SiteConsent,
   type SiteEventType,
   getSiteTrackingSummary,
+  getSiteConsentSummary,
+  recordSiteConsentDecision,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
@@ -83,6 +86,8 @@ siteTracking.post('/api/site/collect', async (c) => {
       valueNum?: unknown;
       referrer?: unknown;
       trackingKey?: unknown;
+      consent?: unknown;
+      consentDecision?: unknown;
     }>();
 
     const visitorId = String(body.visitorId ?? '');
@@ -99,6 +104,16 @@ siteTracking.post('/api/site/collect', async (c) => {
       return c.body(null, 204, corsHeaders());
     }
 
+    // 同意 (#818)。granted のときだけ行動を記録する。
+    // declined/unset は件数だけ数えて、閲覧そのものは1件も残さない。
+    const consent = (['granted', 'declined', 'unset'] as const)
+      .includes(body.consent as SiteConsent)
+      ? (body.consent as SiteConsent)
+      : 'unset';
+    if (body.consentDecision === 'granted' || body.consentDecision === 'declined') {
+      await recordSiteConsentDecision(c.env.DB, lineAccountId, body.consentDecision);
+    }
+
     const eventType = String(body.eventType ?? 'page_view');
     if (!(SITE_EVENT_TYPES as readonly string[]).includes(eventType)) {
       return c.body(null, 204, corsHeaders());
@@ -108,6 +123,7 @@ siteTracking.post('/api/site/collect', async (c) => {
       visitorId,
       lineAccountId,
       eventType: eventType as SiteEventType,
+      consent,
       host: body.host,
       // クエリ文字列の除去は recordSiteEvent の中で行う。
       // 受け口ごとに書くと、必ずどこかで忘れる。
@@ -139,11 +155,19 @@ siteTracking.get('/api/site/script.js', (c) => {
   var ENDPOINT = ${JSON.stringify(`${origin}/api/site/collect`)};
   var TRACKING_KEY = document.currentScript && document.currentScript.getAttribute('data-key');
   var COOKIE = 'lh_visitor';
+  var CONSENT_COOKIE = 'lh_consent';
   var YEAR = 365 * 24 * 60 * 60;
 
   function readCookie() {
     var m = document.cookie.match(/(?:^|; )lh_visitor=([^;]*)/);
     return m ? m[1] : null;
+  }
+  function readConsent() {
+    var m = document.cookie.match(/(?:^|; )lh_consent=([^;]*)/);
+    return m && (m[1] === 'granted' || m[1] === 'declined') ? m[1] : null;
+  }
+  function writeConsent(value) {
+    document.cookie = CONSENT_COOKIE + '=' + value + ';path=/;max-age=' + YEAR + ';SameSite=Lax';
   }
   function makeId() {
     // crypto があれば使う。無い環境でも動くよう時刻と乱数で作る。
@@ -162,6 +186,8 @@ siteTracking.get('/api/site/script.js', (c) => {
     if (!TRACKING_KEY) return;
     payload.visitorId = visitorId();
     payload.trackingKey = TRACKING_KEY;
+    // 同意の状態 (#818)。granted 以外はサーバー側で記録せず件数だけ数える。
+    payload.consent = readConsent() || 'unset';
     var body = JSON.stringify(payload);
     // ページを離れる瞬間でも送れるよう sendBeacon を優先する。
     if (navigator.sendBeacon) {
@@ -171,9 +197,51 @@ siteTracking.get('/api/site/script.js', (c) => {
     fetch(ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body, keepalive: true }).catch(function () {});
   }
 
+  // 同意の案内。答えるまで計測しない。サイト側で独自に同意を取る場合は
+  // window.lhConsent(true/false) を呼べばこの案内は出ない。
+  function answer(decision) {
+    writeConsent(decision);
+    var bar = document.getElementById('lh-consent');
+    if (bar) bar.parentNode.removeChild(bar);
+    send({ eventType: 'page_view', consentDecision: decision, host: location.hostname, path: location.pathname });
+  }
+  function showConsentBanner() {
+    if (readConsent() || document.getElementById('lh-consent') || !document.body) return;
+    var bar = document.createElement('div');
+    bar.id = 'lh-consent';
+    bar.setAttribute('role', 'dialog');
+    bar.setAttribute('aria-label', '閲覧の記録について');
+    bar.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:2147483000;background:#fff;border-top:1px solid #ddd;padding:12px 16px;font:13px/1.6 sans-serif;color:#333;display:flex;flex-wrap:wrap;align-items:center;gap:10px;justify-content:flex-end;box-shadow:0 -2px 8px rgba(0,0,0,.08)';
+    var text = document.createElement('span');
+    text.style.cssText = 'flex:1;min-width:200px';
+    text.textContent = '広告の効果を知るため、この端末での閲覧を記録してよいですか？';
+    var no = document.createElement('button');
+    no.type = 'button';
+    no.textContent = '記録しない';
+    no.style.cssText = 'padding:8px 16px;border:1px solid #ccc;border-radius:6px;background:#fff;cursor:pointer;font-size:13px';
+    var yes = document.createElement('button');
+    yes.type = 'button';
+    yes.textContent = '記録してよい';
+    yes.style.cssText = 'padding:8px 16px;border:none;border-radius:6px;background:#06c755;color:#fff;cursor:pointer;font-size:13px';
+    no.addEventListener('click', function () { answer('declined'); });
+    yes.addEventListener('click', function () { answer('granted'); });
+    bar.appendChild(text);
+    bar.appendChild(no);
+    bar.appendChild(yes);
+    document.body.appendChild(bar);
+  }
+  window.lhConsent = function (granted) {
+    answer(granted ? 'granted' : 'declined');
+  };
+
   // 訪問。ホストとパスだけを送る。クエリ文字列はサーバー側でも落とすが、
   // 送らないに越したことはない。
   send({ eventType: 'page_view', host: location.hostname, path: location.pathname, referrer: document.referrer || null });
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', showConsentBanner);
+  } else {
+    showConsentBanner();
+  }
 
   // data-lh-event を付けた要素のクリック。
   document.addEventListener('click', function (e) {
@@ -245,8 +313,11 @@ siteTracking.get('/api/site/summary', requireRole('owner', 'admin', 'staff'), as
   const accountId = await visibleAccountId(c);
   if (typeof accountId !== 'string') return accountId;
   try {
-    const summary = await getSiteTrackingSummary(c.env.DB, accountId);
-    return c.json({ success: true, data: summary });
+    const [summary, consent] = await Promise.all([
+      getSiteTrackingSummary(c.env.DB, accountId),
+      getSiteConsentSummary(c.env.DB, accountId),
+    ]);
+    return c.json({ success: true, data: { ...summary, consent } });
   } catch (err) {
     console.error('GET /api/site/summary error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);

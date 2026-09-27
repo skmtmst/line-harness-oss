@@ -83,6 +83,8 @@ const EXEMPTIONS: Record<string, string> = {
     '自動化ウィザードの段内エディタ。下書きはサーバーへ保存し、離脱の扱いは app/automations/new/page.tsx と同じく別途検討',
   'components/scenarios/trigger-editor.tsx':
     'ダイアログ内の dirty。閉じると元に戻る仕様で、画面離脱ガードの対象外',
+  'app/inflow-links/ad-integration.tsx':
+    '費用の手入力はダイアログ内の dirty。閉じると元に戻る仕様で、画面離脱ガードの対象外',
   'components/shared/drawer.tsx':
     'dirty 印（*）を表示するだけの共通部品。編集画面ではない',
   'app/form-submissions/page.tsx':

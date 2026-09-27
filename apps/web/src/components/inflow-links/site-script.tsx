@@ -20,6 +20,13 @@ type TrackingSummary = {
   pathCount: number
   eventTypeCount: number
   lastEventAt: string | null
+  /** #818: 同意した割合と、同意がなくて数えなかった件数 */
+  consent?: {
+    granted: number
+    declined: number
+    suppressed: number
+    grantedRate: number | null
+  }
 }
 
 export default function SiteScript() {
@@ -200,6 +207,42 @@ export default function SiteScript() {
                 </p>
                 <div className="mt-2">
                   <Button onClick={() => setKeyAttempt((n) => n + 1)}>コードをもう一度取得する</Button>
+                </div>
+              </div>
+            )}
+          </section>
+
+          <section className="rounded-card border border-hairline bg-canvas p-5">
+            <h2 className="text-base font-bold text-ink">閲覧の記録への同意</h2>
+            <p className="mt-1 text-xs leading-relaxed text-ink-faint">
+              計測コードを貼ると、サイトの下に記録の案内が出ます。選ぶまでは閲覧を記録せず、数えなかった分だけここに出します。
+            </p>
+            <div className="mt-3 rounded-control border border-hairline bg-canvas-sunken p-4" aria-label="サイトに出る案内の見本">
+              <p className="text-xs text-ink-secondary">サイトの下に出る案内（見本）</p>
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-control bg-canvas p-3 shadow-sm">
+                <p className="text-xs text-ink">広告の効果を知るため、この端末での閲覧を記録してよいですか？</p>
+                <div className="flex gap-2">
+                  <span className="rounded-control border border-hairline px-3 py-1.5 text-xs text-ink-secondary">記録しない</span>
+                  <span className="rounded-control bg-accent-deep px-3 py-1.5 text-xs font-semibold text-on-accent">記録してよい</span>
+                </div>
+              </div>
+            </div>
+            {summary?.consent && (
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                <div className="rounded-control border border-hairline p-4">
+                  <p className="text-xs text-ink-faint">同意した</p>
+                  <p className="mt-1 text-2xl font-bold tabular-nums text-ink">
+                    {summary.consent.grantedRate == null ? '—' : `${Math.round(summary.consent.grantedRate * 100)}%`}
+                  </p>
+                  <p className="mt-1 text-xs text-ink-faint">
+                    {summary.consent.granted.toLocaleString('ja-JP')}件が記録を許可
+                    {summary.consent.declined > 0 ? `・${summary.consent.declined.toLocaleString('ja-JP')}件が拒否` : ''}
+                  </p>
+                </div>
+                <div className="rounded-control border border-hairline p-4">
+                  <p className="text-xs text-ink-faint">数えなかった</p>
+                  <p className="mt-1 text-2xl font-bold tabular-nums text-ink">{summary.consent.suppressed.toLocaleString('ja-JP')}件</p>
+                  <p className="mt-1 text-xs text-ink-faint">同意がなかったため記録していません</p>
                 </div>
               </div>
             )}

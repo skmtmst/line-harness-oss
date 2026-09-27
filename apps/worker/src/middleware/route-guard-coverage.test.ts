@@ -337,6 +337,7 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'POST /api/account-handovers/link',
     'POST /api/accounts/:id/migrate',
     'POST /api/ad-platforms',
+    'POST /api/ad-platforms/:id/cost-import',
     'POST /api/ad-platforms/test',
     'POST /api/admin/broadcast-coverage',
     'POST /api/admin/broadcasts/:id/reset-to-draft',

@@ -3,6 +3,7 @@
 import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { api } from '@/lib/api'
 import type { AdConversionLog, AdPlatform } from '@/lib/api'
+import type { EntryRoute } from '@line-crm/shared'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
@@ -10,6 +11,9 @@ import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
+import Dialog from '@/components/shared/dialog'
+import DateField from '@/components/shared/date-field'
+import { TextField } from '@/components/shared/text-field'
 import { TableHeadRow, Th } from '@/components/shared/table'
 
 type AdView = 'metrics' | 'connections' | 'history'
@@ -39,6 +43,69 @@ const STATUS_OPTIONS = [
   { value: 'failed', label: '断られたもの' },
 ]
 
+/** #818: /api/ad-costs が返す1行。 */
+type AdCostRow = {
+  sourceLabel: string
+  adPlatformId: string | null
+  entryRouteId: string | null
+  source: 'import' | 'manual'
+  totals: Array<{ currency: string; amountMinor: number }>
+  friendAdds: number | null
+  costPerFriendMinor: number | null
+  lastImportedAt: string | null
+}
+
+/** #818: 媒体ごとの取込状況。 */
+type AdCostPlatformStatus = {
+  id: string
+  name: string
+  displayName: string | null
+  lastSuccessAt: string | null
+  lastRunStatus: 'success' | 'failed' | null
+  lastRunAt: string | null
+  lastError: string | null
+}
+
+/** 費用の表示。最小通貨単位で来るので通貨に合わせて戻す。 */
+function formatMinor(amountMinor: number, currency: string): string {
+  const zeroDecimal = currency === 'JPY'
+  const major = zeroDecimal ? amountMinor : amountMinor / 100
+  return new Intl.NumberFormat('ja-JP', { style: 'currency', currency }).format(major)
+}
+
+function formatCostTotals(totals: Array<{ currency: string; amountMinor: number }>): ReactNode {
+  if (totals.length === 0) return '—'
+  return (
+    <span className="flex flex-wrap gap-x-2">
+      {totals.map((total) => <span key={total.currency}>{formatMinor(total.amountMinor, total.currency)}</span>)}
+    </span>
+  )
+}
+
+/** 取込日時の短い表示(9/25 06:00)。 */
+function shortDateTime(value: string | null): string {
+  if (!value) return '—'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '—'
+  return `${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+}
+
+function currencyCode(platform: AdPlatform): string | null {
+  const value = platform.config.currency
+  if (typeof value !== 'string' || !/^[A-Z]{3}$/.test(value.trim().toUpperCase())) return null
+  return value.trim().toUpperCase()
+}
+
+function formatCurrency(value: number, currency: string): string {
+  return new Intl.NumberFormat('ja-JP', { style: 'currency', currency }).format(value)
+}
+
+function platformCost(platform: AdPlatform | undefined): string {
+  if (!platform || typeof platform.config.monthly_cost !== 'number' || !Number.isFinite(platform.config.monthly_cost)) return '未設定'
+  const currency = currencyCode(platform)
+  return currency ? formatCurrency(platform.config.monthly_cost, currency) : '通貨を確認'
+}
+
 function platformLabel(platform: AdPlatform): string {
   return PROVIDERS.find((provider) => provider.key === platform.name)?.label
     ?? platform.displayName
@@ -59,41 +126,6 @@ function configNumber(platforms: AdPlatform[], key: string): number | null {
     if (typeof value === 'number' && Number.isFinite(value)) return value
   }
   return null
-}
-
-function currencyCode(platform: AdPlatform): string | null {
-  const value = platform.config.currency
-  if (typeof value !== 'string' || !/^[A-Z]{3}$/.test(value.trim().toUpperCase())) return null
-  return value.trim().toUpperCase()
-}
-
-function formatCurrency(value: number, currency: string): string {
-  return new Intl.NumberFormat('ja-JP', { style: 'currency', currency }).format(value)
-}
-
-function currencyAmounts(platforms: AdPlatform[]): { value: ReactNode; detail: string } {
-  const totals = new Map<string, number>()
-  let unknown = false
-  for (const platform of platforms) {
-    const amount = platform.config.monthly_cost
-    if (typeof amount !== 'number' || !Number.isFinite(amount)) continue
-    const currency = currencyCode(platform)
-    if (!currency) { unknown = true; continue }
-    totals.set(currency, (totals.get(currency) ?? 0) + amount)
-  }
-  if (totals.size === 0 && !unknown) return { value: '未設定', detail: '広告費が設定されていません' }
-  const values = [...totals].map(([currency, total]) => formatCurrency(total, currency))
-  if (unknown) values.push('通貨を確認')
-  return {
-    value: <span className="flex flex-wrap gap-x-2 gap-y-1">{values.map((value) => <span key={value}>{value}</span>)}</span>,
-    detail: unknown ? '通貨が不明な設定があります。通貨ごとに合算せず表示しています' : '通貨ごとに分けて表示しています',
-  }
-}
-
-function platformCost(platform: AdPlatform | undefined): string {
-  if (!platform || typeof platform.config.monthly_cost !== 'number' || !Number.isFinite(platform.config.monthly_cost)) return '未設定'
-  const currency = currencyCode(platform)
-  return currency ? formatCurrency(platform.config.monthly_cost, currency) : '通貨を確認'
 }
 
 /**
@@ -161,6 +193,20 @@ export default function AdIntegration({
   const [logPage, setLogPage] = useState(1)
   // #514-13: 失敗理由は口の errorMessage を開いて見せる(「理由を見る」を効かせる)。
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null)
+  // #818: 広告費の台帳。取込分と手入力分を同じ一覧で見せる。
+  const [costRows, setCostRows] = useState<AdCostRow[]>([])
+  const [costPlatforms, setCostPlatforms] = useState<AdCostPlatformStatus[]>([])
+  const [costFailed, setCostFailed] = useState(false)
+  const [manualOpen, setManualOpen] = useState(false)
+  const [manualBusy, setManualBusy] = useState(false)
+  const [manualError, setManualError] = useState('')
+  const [manualLabel, setManualLabel] = useState('')
+  const [manualRouteId, setManualRouteId] = useState('')
+  const [manualDay, setManualDay] = useState('')
+  const [manualAmount, setManualAmount] = useState('')
+  const [entryRoutes, setEntryRoutes] = useState<EntryRoute[]>([])
+  const [importingId, setImportingId] = useState<string | null>(null)
+  const [importError, setImportError] = useState('')
 
   const load = useCallback(async () => {
     const generation = ++loadGenerationRef.current
@@ -169,6 +215,8 @@ export default function AdIntegration({
       setPlatforms([])
       setLogs([])
       setLogTotal(0)
+      setCostRows([])
+      setCostPlatforms([])
       setFailed(false)
       setLoading(false)
       return
@@ -177,9 +225,10 @@ export default function AdIntegration({
     setLoading(true)
     setFailed(false)
     try {
-      const [platformResponse, logResponse] = await Promise.all([
+      const [platformResponse, logResponse, costResponse] = await Promise.all([
         api.adPlatforms.list(accountAtRequest),
         api.adPlatforms.logsPage({ page: logPage, limit: LOG_PAGE_SIZE, status, query, lineAccountId: accountAtRequest }),
+        api.adCosts.list({ accountId: accountAtRequest }),
       ])
       if (!isCurrent()) return
       if (!platformResponse.success || !logResponse.success) {
@@ -189,6 +238,15 @@ export default function AdIntegration({
       setPlatforms(platformResponse.data)
       setLogs(logResponse.data.items)
       setLogTotal(logResponse.data.total)
+      if (costResponse.success) {
+        setCostRows(costResponse.data.rows ?? [])
+        setCostPlatforms(costResponse.data.platforms ?? [])
+        setCostFailed(false)
+      } else {
+        setCostRows([])
+        setCostPlatforms([])
+        setCostFailed(true)
+      }
     } catch {
       if (!isCurrent()) return
       setFailed(true)
@@ -230,7 +288,64 @@ export default function AdIntegration({
   const visibleLogs = logs
   const logPageCount = Math.max(1, Math.ceil(logTotal / LOG_PAGE_SIZE))
   const safeLogPage = Math.min(logPage, logPageCount)
-  const monthlyCost = currencyAmounts(platforms)
+
+  // #818: 手入力の窓を開くときに、そのアカウントの流入元を取る。
+  // 既に取ってあれば取り直さない。
+  const openManualEntry = useCallback(() => {
+    setManualError('')
+    setManualOpen(true)
+    if (entryRoutes.length === 0 && selectedAccountId) {
+      void api.entryRoutes.list(selectedAccountId)
+        .then((res) => { if (res.success) setEntryRoutes(res.data) })
+        .catch(() => {})
+    }
+  }, [entryRoutes.length, selectedAccountId])
+
+  const submitManualEntry = useCallback(async () => {
+    if (!selectedAccountId || manualBusy) return
+    const amount = Number(manualAmount)
+    if (!manualLabel.trim()) { setManualError('流入元の名前を入れてください'); return }
+    if (!manualDay) { setManualError('費用の日付を選んでください'); return }
+    if (!Number.isInteger(amount) || amount < 0) { setManualError('費用は0以上の整数(円)で入れてください'); return }
+    setManualBusy(true)
+    setManualError('')
+    try {
+      const res = await api.adCosts.create({
+        lineAccountId: selectedAccountId,
+        sourceLabel: manualLabel.trim(),
+        entryRouteId: manualRouteId || undefined,
+        day: manualDay,
+        amountMinor: amount,
+        currency: 'JPY',
+      })
+      if (!res.success) { setManualError(res.error ?? '記録できませんでした'); return }
+      setManualOpen(false)
+      setManualLabel('')
+      setManualRouteId('')
+      setManualDay('')
+      setManualAmount('')
+      void load()
+    } catch {
+      setManualError('記録できませんでした。通信状態を確かめて、もう一度お試しください。')
+    } finally {
+      setManualBusy(false)
+    }
+  }, [selectedAccountId, manualBusy, manualLabel, manualDay, manualAmount, manualRouteId, load])
+
+  const runImportNow = useCallback(async (platformId: string) => {
+    if (importingId) return
+    setImportingId(platformId)
+    setImportError('')
+    try {
+      const res = await api.adPlatforms.importCost(platformId)
+      if (!res.success) setImportError(res.error ?? '取り込めませんでした')
+      void load()
+    } catch {
+      setImportError('取り込めませんでした。接続設定を確かめて、もう一度お試しください。')
+    } finally {
+      setImportingId(null)
+    }
+  }, [importingId, load])
 
   const exportLogs = () => {
     const blob = new Blob([`\uFEFF${safeCsv(visibleLogs)}`], { type: 'text/csv;charset=utf-8' })
@@ -480,36 +595,217 @@ export default function AdIntegration({
     )
   }
 
+  // #818: 広告費の一覧。流入元ごとに友だち追加と1人あたりを足す。
+  // 取れていない日は費用を「—」にして、最後に取れた日時を残す。
+  const totalCostByCurrency = new Map<string, number>()
+  for (const row of costRows) {
+    for (const total of row.totals) {
+      totalCostByCurrency.set(total.currency, (totalCostByCurrency.get(total.currency) ?? 0) + total.amountMinor)
+    }
+  }
+  const linkedFriendAdds = costRows.reduce((sum, row) => sum + (row.friendAdds ?? 0), 0)
+  const jpyCost = totalCostByCurrency.get('JPY')
+  const avgCostPerFriend = jpyCost != null && linkedFriendAdds > 0 ? Math.round(jpyCost / linkedFriendAdds) : null
+
   return (
     <div className="space-y-4" data-design-node="v0HaI">
       <Notice tone="info">
-        広告の管理画面では「クリック数」までしか分かりません。ここでは、そのクリックが友だちになり、成果になったところまで1本でつながって見えます。
+        広告の管理画面では「クリック数」までしか分かりません。ここでは、かかった費用と友だち追加がつながって見えます。
       </Notice>
 
-      {/*
-        #514-13: 広告費の内訳・1人あたり・1件あたり・まとまり別の表は口に無い。
-        直書きの数と効かない操作ボタンは出さず、取れる数(つないだ広告・
-        今月の広告費の合計)だけ残す。
-      */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Metric label="つないだ広告" value={connected.length} detail={connected.length > 0 ? connected.map(platformLabel).join('・') : 'まだ接続がありません'} />
-        <Metric label="今月の広告費" value={monthlyCost.value} detail={monthlyCost.detail} />
-        <Metric label="友だち1人あたり" value={null} detail="広告ごとの費用と人数は未接続のため表示できません" prefix="¥" />
+        <Metric
+          label="この30日の広告費"
+          value={totalCostByCurrency.size > 0
+            ? <span className="flex flex-wrap gap-x-2">{[...totalCostByCurrency].map(([currency, amount]) => <span key={currency}>{formatMinor(amount, currency)}</span>)}</span>
+            : '—'}
+          detail={totalCostByCurrency.size > 0 ? '取込分と手入力分の合計です' : 'まだ費用の記録がありません'}
+        />
+        <Metric label="友だち1人あたり" value={avgCostPerFriend} detail="費用÷友だち追加。人数が取れる流入元だけで割ります" prefix="¥" />
         <Metric label="成果1件あたり" value={null} detail="認めた成果の件数は未接続のため表示できません" prefix="¥" />
       </div>
 
-      <section className="grid grid-cols-1 gap-3 lg:grid-cols-3">{['google','meta','yahoo'].map((name) => { const platform = platforms.find((item) => item.name === name); const label = name === 'google' ? 'Google広告' : name === 'meta' ? 'Meta広告' : 'Yahoo!広告'; const synced = platform ? syncLabel(platform) : null; return <div key={name} className="rounded-card border border-hairline bg-canvas p-4"><div className="flex items-center justify-between"><div><p className="text-sm font-semibold text-ink">{label}</p><p className="text-xs text-ink-faint">{platform?.isActive ? (synced ? `つながっています ／ ${synced} に取り込みました` : 'つながっています ／ 取り込み日時は取得できません') : 'つないでいません'}</p></div><span className="font-bold text-ink">{platformCost(platform)}</span></div></div> })}</section>
+      {/*
+        N-251: 媒体ごとの予算(月額)は設定した通貨のまま出す。
+        通貨を推測・混合しない。実績の費用は下の台帳を見る。
+      */}
+      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {PROVIDERS.map((provider) => {
+          const platform = platforms.find((item) => item.name === provider.key)
+          const synced = platform ? syncLabel(platform) : null
+          return (
+            <div key={provider.key} className="rounded-card border border-hairline bg-canvas p-4">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-ink">{provider.label}</p>
+                  <p className="text-xs text-ink-faint">
+                    {platform?.isActive
+                      ? synced
+                        ? `つながっています ／ ${synced} に取り込みました`
+                        : 'つながっています ／ 取り込み日時は取得できません'
+                      : 'つないでいません'}
+                  </p>
+                </div>
+                <span className="whitespace-nowrap font-bold text-ink" title={platform ? `月額予算: ${platformCost(platform)}` : undefined}>
+                  {platformCost(platform)}
+                </span>
+              </div>
+            </div>
+          )
+        })}
+      </section>
 
-      <section className="rounded-card border border-hairline bg-canvas p-4">
-        <h3 className="text-sm font-bold text-ink">広告のまとまり別の成果</h3>
-        <div className="mt-3">
+      <section className="overflow-hidden rounded-card border border-hairline bg-canvas">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-hairline px-4 py-3">
+          <div>
+            <h3 className="text-sm font-bold text-ink">流入元ごとの費用</h3>
+            <p className="mt-1 text-xs text-ink-faint">取り込んだ費用と手入力の分です。取れない日は「—」になります。</p>
+          </div>
+          <Button variant="secondary" onClick={openManualEntry}>費用を手で入れる</Button>
+        </div>
+        {costFailed ? (
+          <ListState
+            kind="error"
+            title="広告費を読み込めませんでした"
+            description="記録は消えていません。もう一度読み込んでください。"
+            action={<Button onClick={() => void load()}>もう一度読み込む</Button>}
+          />
+        ) : costRows.length === 0 ? (
           <ListState
             kind="empty"
-            title="まとまり別の成果はまだ表示できません"
-            description="広告ごとの費用・クリック・友だち追加を取れていないため、数は表示しません。取れたらここに並びます。"
+            title="まだ費用の記録がありません"
+            description="広告をつなぐと毎日自動で取り込みます。取り込めない分は「費用を手で入れる」から足せます。"
           />
-        </div>
+        ) : (
+          <table className="w-full table-fixed text-xs">
+            <thead className="border-b border-hairline bg-canvas-sunken text-ink-faint">
+              <TableHeadRow>
+                <Th>流入元</Th>
+                <Th align="right">友だち追加</Th>
+                <Th align="right">費用</Th>
+                <Th align="right">1人あたり</Th>
+                <Th>取り込み</Th>
+              </TableHeadRow>
+            </thead>
+            <tbody className="divide-y divide-hairline">
+              {costRows.map((row) => (
+                <tr key={`${row.sourceLabel}|${row.adPlatformId ?? ''}|${row.entryRouteId ?? ''}`}>
+                  <td className="truncate px-4 py-3 font-semibold text-ink" title={row.sourceLabel}>
+                    {row.sourceLabel}
+                    {row.source === 'manual' && (
+                      <span className="ml-2 rounded-pill bg-canvas-sunken px-2 py-0.5 text-micro font-semibold text-ink-faint">手入力</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-right tabular-nums text-ink-secondary">
+                    {row.friendAdds == null ? '—' : `${row.friendAdds.toLocaleString('ja-JP')}人`}
+                  </td>
+                  <td className="px-4 py-3 text-right tabular-nums text-ink">{formatCostTotals(row.totals)}</td>
+                  <td className="px-4 py-3 text-right tabular-nums text-ink-secondary">
+                    {row.costPerFriendMinor == null ? '—' : formatMinor(row.costPerFriendMinor, row.totals[0]?.currency ?? 'JPY')}
+                  </td>
+                  <td className="px-4 py-3 text-ink-faint">
+                    {row.source === 'manual' ? '手入力' : `最終 ${shortDateTime(row.lastImportedAt)}`}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </section>
+
+      {costPlatforms.length > 0 && (
+        <section className="rounded-card border border-hairline bg-canvas p-4">
+          <h3 className="text-sm font-bold text-ink">広告からの取り込み</h3>
+          <p className="mt-1 text-xs leading-relaxed text-ink-faint">
+            つないだ広告から前日分までを毎日取り込みます。取り込めない日は費用が「—」のままになります。
+          </p>
+          {importError && <p className="mt-2 text-xs text-danger">{importError}</p>}
+          <ul className="mt-3 divide-y divide-hairline">
+            {costPlatforms.map((platform) => (
+              <li key={platform.id} className="flex flex-wrap items-center justify-between gap-2 py-3">
+                <div>
+                  <p className="text-sm font-semibold text-ink">
+                    {PROVIDERS.find((provider) => provider.key === platform.name)?.label
+                      ?? platform.displayName ?? platform.name}
+                  </p>
+                  <p className="mt-0.5 text-xs text-ink-faint">
+                    {platform.lastSuccessAt
+                      ? `最後に取り込んだのは ${shortDateTime(platform.lastSuccessAt)} です`
+                      : 'まだ一度も取り込めていません'}
+                    {platform.lastRunStatus === 'failed' && platform.lastError
+                      ? ` ／ 直近は取り込めませんでした（${platform.lastError}）`
+                      : ''}
+                  </p>
+                </div>
+                <Button
+                  variant="secondary"
+                  disabled={importingId === platform.id}
+                  onClick={() => void runImportNow(platform.id)}
+                >
+                  {importingId === platform.id ? '取り込んでいます…' : 'いま取り込む'}
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <Dialog
+        open={manualOpen}
+        title="広告費を手で入れる"
+        description="媒体から取り込めない分（チラシや看板など）を日ごとに記録します。同じ流入元・同じ日に入れ直すと上書きになります。"
+        confirmLabel="記録する"
+        busy={manualBusy}
+        error={manualError}
+        onConfirm={() => void submitManualEntry()}
+        onCancel={() => { if (!manualBusy) setManualOpen(false) }}
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-ink-secondary" htmlFor="ad-cost-label">流入元の名前</label>
+            <TextField
+              id="ad-cost-label"
+              value={manualLabel}
+              onChange={(event) => setManualLabel(event.target.value)}
+              placeholder="例: チラシ"
+              maxLength={100}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-ink-secondary" htmlFor="ad-cost-route">計測リンク（分かれば）</label>
+            <Select
+              id="ad-cost-route"
+              aria-label="計測リンク"
+              value={manualRouteId}
+              onChange={(value) => {
+                setManualRouteId(value)
+                const route = entryRoutes.find((item) => item.id === value)
+                if (route && !manualLabel.trim()) setManualLabel(route.name)
+              }}
+              options={[
+                { value: '', label: '結びつけない' },
+                ...entryRoutes.map((route) => ({ value: route.id, label: route.name })),
+              ]}
+            />
+            <p className="mt-1 text-xs text-ink-faint">結びつけると友だち追加の人数で「1人あたり」が出ます。</p>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-ink-secondary" htmlFor="ad-cost-day">費用の日付</label>
+            <DateField id="ad-cost-day" value={manualDay} onChange={setManualDay} />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-ink-secondary" htmlFor="ad-cost-amount">費用（円）</label>
+            <TextField
+              id="ad-cost-amount"
+              inputMode="numeric"
+              value={manualAmount}
+              onChange={(event) => setManualAmount(event.target.value)}
+              placeholder="例: 20000"
+            />
+          </div>
+        </div>
+      </Dialog>
     </div>
   )
 }

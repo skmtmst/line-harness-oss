@@ -73,6 +73,27 @@ describe('素の <select> を画面に書かない', () => {
     }
   })
 
+  it('消した SelectField を呼び戻さない', () => {
+    // 旧 `SelectField` は 2026-09-26 に Select へ統一し、部品ごと消した。
+    // 取り込みで古い枝が戻すと型検査が落ちる。呼び出しの復活を見張る。
+    const sources = (dir: string, out: string[] = []): string[] => {
+      for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+        const p = path.join(dir, e.name)
+        if (e.isDirectory()) sources(p, out)
+        else if (/\.(ts|tsx)$/.test(e.name)) out.push(p)
+      }
+      return out
+    }
+    const self = path.relative(SRC, __filename).split(path.sep).join('/')
+    const revived = sources(SRC)
+      .filter((p) => {
+        const rel = path.relative(SRC, p).split(path.sep).join('/')
+        return rel !== self && fs.readFileSync(p, 'utf8').includes('shared/select-field')
+      })
+      .map((p) => path.relative(SRC, p).split(path.sep).join('/'))
+    expect(revived, '消した SelectField の呼び出しが戻った。Select を使う').toEqual([])
+  })
+
   it('共通部品は素の <select> を持たない', () => {
     // 例外は1つだけ。「ブラウザ標準を使う」ことに理由がある。
     const shared = fs.readdirSync(path.join(SRC, 'components', 'shared'))

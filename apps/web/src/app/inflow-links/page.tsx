@@ -988,10 +988,10 @@ function InflowLinksPageInner({
                 <Th>
                   <span title="同時に動く配信">同時配信</span>
                 </Th>
-                <Th align="right" className="whitespace-nowrap">
+                <Th align="right">
                   友だち追加
                 </Th>
-                <Th align="right" className="whitespace-nowrap">
+                <Th align="right">
                   クリック
                 </Th>
                 <Th>

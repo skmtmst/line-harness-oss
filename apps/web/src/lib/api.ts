@@ -6918,6 +6918,13 @@ export const api = {
           pathCount: number
           eventTypeCount: number
           lastEventAt: string | null
+          /** #818: 同意した割合と、同意がなくて数えなかった件数 */
+          consent: {
+            granted: number
+            declined: number
+            suppressed: number
+            grantedRate: number | null
+          }
         }>
       >(`/api/site/summary${rangeQuery({ accountId })}`),
     pages: (params?: { from?: string; to?: string; accountId?: string }) =>
@@ -12485,6 +12492,58 @@ export const api = {
     },
     logs: (id: string, limit = 20) =>
       fetchApi<ApiResponse<AdConversionLog[]>>(`/api/ad-platforms/${id}/logs?limit=${limit}`),
+    /** #818: その連携の前日分の広告費をいま取り込む */
+    importCost: (id: string) =>
+      fetchApi<ApiResponse<{ status: 'success' | 'failed' | 'skipped' }>>(
+        `/api/ad-platforms/${id}/cost-import`,
+        { method: 'POST' },
+      ),
+  },
+  /**
+   * #818: 流入元ごとの広告費の台帳。
+   * 取込分と手入力分を同じ一覧で返し、手入力分は source が 'manual'。
+   */
+  adCosts: {
+    list: (params?: { accountId?: string; from?: string; to?: string }) => {
+      const query = new URLSearchParams()
+      if (params?.accountId) query.set('accountId', params.accountId)
+      if (params?.from) query.set('from', params.from)
+      if (params?.to) query.set('to', params.to)
+      const suffix = query.size > 0 ? `?${query.toString()}` : ''
+      return fetchApi<ApiResponse<{
+        rows: Array<{
+          sourceLabel: string
+          adPlatformId: string | null
+          entryRouteId: string | null
+          source: 'import' | 'manual'
+          totals: Array<{ currency: string; amountMinor: number }>
+          friendAdds: number | null
+          costPerFriendMinor: number | null
+          lastImportedAt: string | null
+        }>
+        platforms: Array<{
+          id: string
+          name: string
+          displayName: string | null
+          lastSuccessAt: string | null
+          lastRunStatus: 'success' | 'failed' | null
+          lastRunAt: string | null
+          lastError: string | null
+        }>
+      }>>(`/api/ad-costs${suffix}`)
+    },
+    create: (data: {
+      lineAccountId?: string
+      sourceLabel: string
+      entryRouteId?: string
+      day: string
+      amountMinor: number
+      currency?: string
+    }) =>
+      fetchApi<ApiResponse<unknown>>('/api/ad-costs', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
   },
   uploads: {
     /**

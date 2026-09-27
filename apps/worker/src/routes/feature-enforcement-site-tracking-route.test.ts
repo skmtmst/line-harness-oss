@@ -62,6 +62,8 @@ function collectBody(account: 'account-1' | 'account-2') {
     eventType: 'page_view',
     host: 'example.com',
     path: '/',
+    // #818: 同意済みの閲覧として送る。未同意は収集口が何も書かない。
+    consent: 'granted',
   };
 }
 

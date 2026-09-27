@@ -78,9 +78,10 @@ describe('表は器の幅にぴったり収める', () => {
     expect(page).not.toContain('<col className="w-[7%]" />')
     const values = [...page.matchAll(/w-\[(\d+(?:\.\d+)?)%\]/g)].map((m) => Number(m[1]))
     expect(values.reduce((sum, value) => sum + value, 0)).toBe(86)
-    // 見出しは折り返さず1行。狭い列に戻しても割れないようにする。
-    expect(page).toMatch(/<Th align="right" className="whitespace-nowrap">\s*友だち追加/)
-    expect(page).toMatch(/<Th align="right" className="whitespace-nowrap">\s*クリック/)
+    // 見出しは折り返さず1行（共通 Th が white-space:nowrap を持つ）。
+    // 狭い列に戻しても割れないようにする。重ね書きはしない。
+    expect(page).toMatch(/<Th align="right"[^>]*>\s*友だち追加/)
+    expect(page).toMatch(/<Th align="right"[^>]*>\s*クリック/)
   })
 
   it('/booking/staff: 操作列は固定幅で、右に大きく空けない', () => {
