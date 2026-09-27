@@ -112,7 +112,7 @@ export function OutgoingKpis({
   const listDetail = listFailed ? '読み込めませんでした' : listLoading ? '読み込んでいます' : `止めているもの ${paused}本`
 
   return (
-    <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4" data-design="KPIs">
+    <div className="grid grid-cols-2 gap-3 xl:grid-cols-4" data-design="KPIs">
       <KpiCard
         title="こちらから送る"
         value={status === 'ready' ? items.length : null}
@@ -375,17 +375,21 @@ export function OutgoingOverview({
           onRetry={onReload}
         />
       ) : items.length === 0 && !showCreate ? (
-        <ListState
-          kind="empty"
-          title="まだ連携がありません"
-          description="うちで起きたことを、ほかのサービスに知らせられます。「＋ 送り先を作る」から作成してください。"
-        />
+        <div className="bg-canvas rounded-card border-hairline border">
+          <ListState
+            kind="empty"
+            title="まだ連携がありません"
+            description="うちで起きたことを、ほかのサービスに知らせられます。「＋ 送り先を作る」から作成してください。"
+          />
+        </div>
       ) : visible.length === 0 ? (
-        <ListState
-          kind="empty"
-          title="当てはまる送り先がありません"
-          description="検索の言葉か、状態の絞り込みを変えてください。"
-        />
+        <div className="bg-canvas rounded-card border-hairline border">
+          <ListState
+            kind="empty"
+            title="当てはまる送り先がありません"
+            description="検索の言葉か、状態の絞り込みを変えてください。"
+          />
+        </div>
       ) : (
         <DataTable>
           <thead>
@@ -739,12 +743,12 @@ export function IncomingOverview({
   if (!selected) return null
 
   return (
-    <section aria-label="こちらで受け取る詳細">
-      <p className="bg-info-bg text-info rounded-card mb-4 px-4 py-3 text-sm leading-6">
+    <section aria-label="こちらで受け取る詳細" className="flex flex-col gap-4">
+      <p className="bg-info-bg text-info rounded-card px-4 py-3 text-sm leading-6">
         相手のサービスで起きたことを、うちに取り込みます。下のURLを相手に貼ってもらってください。合言葉は人に見せないでください。
       </p>
 
-      <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-4">
+      <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-4">
         <div className="space-y-4 xl:col-span-3">
           <section className="bg-canvas border-hairline rounded-card border p-5">
             <div className="mb-4 flex flex-wrap items-start justify-between gap-3">

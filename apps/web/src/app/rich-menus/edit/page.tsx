@@ -1088,8 +1088,9 @@ function Editor({
 
   {/* ★V7: 左右の余白と幅は共通の枠が持つ。画面側の `p-6 max-w-7xl mx-auto` を外し、ほかの画面と同じ幅いっぱいにした。 */}
   return (
-    <div>
-      <nav data-design="Crumb" className="text-ink-faint mb-2 text-xs">
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <nav data-design="Crumb" className="text-ink-faint text-xs">
         <Link href="/rich-menus" className="hover:underline">
           リッチメニュー
         </Link>
@@ -1109,7 +1110,7 @@ function Editor({
       )}
 
       {/* タブバー */}
-      <div className="flex items-center gap-1.5 mb-5 flex-wrap">
+      <div className="flex items-center gap-1.5 flex-wrap">
         {pages.map((p) => {
           const active = p.id === activePageId
           return (
@@ -1141,7 +1142,7 @@ function Editor({
         </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4">
         {/* 中央: キャンバス */}
         <section>
           <div className="mb-3">
