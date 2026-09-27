@@ -121,7 +121,7 @@ function FriendAddRunsInner() {
   const [csvBusy, setCsvBusy] = useState(false)
   const [csvNote, setCsvNote] = useState('')
   const [filterOpen, setFilterOpen] = useState(false)
-  const filterButtonRef = useRef<HTMLButtonElement>(null)
+  const filterAnchorRef = useRef<HTMLSpanElement>(null)
   const [stopBusy, setStopBusy] = useState(false)
   const [stopDialogOpen, setStopDialogOpen] = useState(false)
   const [stopMessage, setStopMessage] = useState('')
@@ -326,26 +326,24 @@ function FriendAddRunsInner() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Link className="text-sm font-bold text-action hover:underline" href="/friend-add-settings">← 友だち追加時の配信</Link>
         <div className="flex gap-2">
-          <span className="relative inline-flex">
-            <button
-              ref={filterButtonRef}
-              type="button"
+          <span ref={filterAnchorRef} className="relative inline-flex">
+            <Button
               aria-expanded={filterOpen}
               onClick={() => setFilterOpen((current) => !current)}
-              className="cursor-pointer rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-bold"
             >
               絞り込み
-            </button>
+            </Button>
             <MenuPortal
               open={filterOpen}
               align="end"
-              getAnchor={() => filterButtonRef.current}
+              getAnchor={() => filterAnchorRef.current}
               onClose={() => setFilterOpen(false)}
             >
             <div
-              className="flex w-[min(48rem,calc(100vw-16px))] max-w-3xl flex-wrap items-end gap-3 rounded-card border border-hairline bg-canvas p-4 shadow-panel"
+              className="flex max-w-3xl flex-wrap items-end gap-3 rounded-card border border-hairline bg-canvas p-4 shadow-panel"
               // 最上層では absolute 指定を無効にする（位置は器が決める）。
-              style={{ position: 'static' }}
+              // 幅の上限は style へ（任意値記法の直書きにしない）。
+              style={{ position: 'static', width: 'min(48rem, calc(100vw - 16px))' }}
             >
               <Select
                 aria-label="追加の種類"

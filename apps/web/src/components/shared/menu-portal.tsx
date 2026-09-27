@@ -2,7 +2,6 @@
 
 import { createPortal } from 'react-dom'
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
-import styles from './menu-portal.module.css'
 
 export type MenuPortalAlign = 'start' | 'end'
 export type MenuPortalPlacement = 'down' | 'up'
@@ -134,7 +133,9 @@ export default function MenuPortal({
   return createPortal(
     <div
       ref={panelRef}
-      className={styles.portal}
+      // 静的に読める形にする（直書き借金の見張り）。重なりの数字と
+      // 画面端の上限は style へ。見た目（白地・角丸・影）は子が持つ。
+      className="fixed min-w-0"
       data-menu-portal=""
       data-placement={geometry?.placement ?? 'down'}
       style={{
@@ -142,6 +143,8 @@ export default function MenuPortal({
         left: geometry?.left ?? 0,
         width: geometry?.width,
         minWidth: geometry?.minWidth,
+        zIndex: 120,
+        maxWidth: 'calc(100vw - 16px)',
         // 測る前の一瞬だけ隠す（左上へのちらつき防止）。
         visibility: geometry ? undefined : 'hidden',
       }}

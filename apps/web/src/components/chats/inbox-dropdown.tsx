@@ -80,7 +80,8 @@ function Check() {
   )
 }
 
-const panelClass = 'border-hairline rounded-control bg-canvas absolute z-30 mt-1 min-w-full overflow-hidden border shadow-lg'
+/* 位置（absolute・z・mt）は器（MenuPortal）が決める。ここは箱の見た目だけ。 */
+const panelClass = 'border-hairline rounded-control bg-canvas min-w-full overflow-hidden border shadow-lg'
 const rowClass = 'flex w-full items-center gap-2 px-3 py-2 text-left text-xs'
 
 // ─────────────────────────────────────────────────────────────
