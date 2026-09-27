@@ -69,6 +69,7 @@ export * from './rich-menus';
 export * from './rich-menu-schedules';
 export * from './scheduled-chat-sends';
 export * from './rich-menu-manual-publish';
+export * from './rich-menu-publish-ledger';
 export * from './rich-menu-test-apply';
 export * from './affiliate-links';
 export * from './affiliate-offers';

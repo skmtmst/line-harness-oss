@@ -5306,6 +5306,17 @@ CREATE TABLE rich_menu_assignments (
   UNIQUE (line_account_id, friend_id)
 );
 
+CREATE TABLE rich_menu_device_confirmations (
+  id                     TEXT PRIMARY KEY,
+  group_id               TEXT NOT NULL REFERENCES rich_menu_groups(id) ON DELETE CASCADE,
+  -- 確認した時点の下書きの fingerprint。公開時は今の下書きと突き合わせる。
+  definition_fingerprint TEXT NOT NULL,
+  version_id             TEXT REFERENCES rich_menu_versions(id) ON DELETE SET NULL,
+  staff_id               TEXT NOT NULL,
+  confirmed_at           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')),
+  created_at             TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours'))
+);
+
 CREATE TABLE rich_menu_duplicate_requests (
   id                TEXT PRIMARY KEY,
   account_id        TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
@@ -5380,6 +5391,45 @@ CREATE TABLE rich_menu_pages (
   UNIQUE (group_id, order_index)
 );
 
+CREATE TABLE rich_menu_publish_run_pages (
+  id                  TEXT PRIMARY KEY,
+  run_id              TEXT NOT NULL REFERENCES rich_menu_publish_runs(id) ON DELETE CASCADE,
+  page_id             TEXT NOT NULL,
+  order_index         INTEGER NOT NULL,
+  alias_id            TEXT NOT NULL,
+  old_line_richmenu_id TEXT,
+  new_line_richmenu_id TEXT,
+  create_status       TEXT NOT NULL DEFAULT 'pending'
+    CHECK (create_status IN ('pending', 'succeeded', 'failed')),
+  image_status        TEXT NOT NULL DEFAULT 'pending'
+    CHECK (image_status IN ('pending', 'succeeded', 'failed')),
+  alias_status        TEXT NOT NULL DEFAULT 'pending'
+    CHECK (alias_status IN ('pending', 'succeeded', 'failed')),
+  cleanup_status      TEXT NOT NULL DEFAULT 'pending'
+    CHECK (cleanup_status IN ('pending', 'succeeded', 'failed', 'skipped')),
+  last_error_code     TEXT,
+  created_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')),
+  updated_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours'))
+);
+
+CREATE TABLE rich_menu_publish_runs (
+  id                    TEXT PRIMARY KEY,
+  group_id              TEXT NOT NULL REFERENCES rich_menu_groups(id) ON DELETE CASCADE,
+  version_id            TEXT REFERENCES rich_menu_versions(id) ON DELETE SET NULL,
+  idempotency_key       TEXT NOT NULL,
+  mode                  TEXT NOT NULL
+    CHECK (mode IN ('publish', 'unpublish', 'retry', 'reconcile', 'scheduled_reconcile')),
+  status                TEXT NOT NULL DEFAULT 'running'
+    CHECK (status IN ('running', 'succeeded', 'failed')),
+  requested_by_staff_id TEXT,
+  -- 照合のときだけ使う。見つかったずれの一覧（JSON配列）。
+  diffs_json            TEXT,
+  last_error_code       TEXT,
+  started_at            TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')),
+  completed_at          TEXT,
+  created_at            TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours'))
+);
+
 CREATE TABLE rich_menu_schedule_publications (
   schedule_id      TEXT NOT NULL REFERENCES rich_menu_schedules(id) ON DELETE CASCADE,
   kind             TEXT NOT NULL DEFAULT 'publish' CHECK (kind IN ('publish', 'restore')),
@@ -5435,6 +5485,22 @@ CREATE TABLE rich_menu_test_applies (
   created_at            TEXT NOT NULL,
   updated_at            TEXT NOT NULL,
   UNIQUE (account_id, idempotency_key)
+);
+
+CREATE TABLE rich_menu_versions (
+  id                   TEXT PRIMARY KEY,
+  group_id             TEXT NOT NULL REFERENCES rich_menu_groups(id) ON DELETE CASCADE,
+  version_number       INTEGER NOT NULL CHECK (version_number >= 1),
+  -- 公開を実行した時点の下書きの中身（ページ・領域・割当条件の写し）。
+  definition_snapshot  TEXT NOT NULL,
+  -- 下書きの要約と公開版の照合に使う。下書きが変わると変わる。
+  definition_fingerprint TEXT NOT NULL,
+  status               TEXT NOT NULL DEFAULT 'draft'
+    CHECK (status IN ('draft', 'published', 'archived')),
+  created_by_staff_id  TEXT,
+  published_at         TEXT,
+  created_at           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')),
+  updated_at           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours'))
 );
 
 CREATE TABLE rt_approval_requests (
@@ -8235,6 +8301,12 @@ CREATE INDEX idx_rich_menu_assignment_runs_monthly
 CREATE INDEX idx_rich_menu_assignments_group
   ON rich_menu_assignments (line_account_id, group_id);
 
+CREATE INDEX idx_rich_menu_device_confirmations_group
+  ON rich_menu_device_confirmations(group_id, confirmed_at DESC);
+
+CREATE UNIQUE INDEX idx_rich_menu_device_confirmations_group_fp_staff
+  ON rich_menu_device_confirmations(group_id, definition_fingerprint, staff_id);
+
 CREATE INDEX idx_rich_menu_duplicate_requests_source
   ON rich_menu_duplicate_requests(source_group_id);
 
@@ -8244,6 +8316,18 @@ CREATE INDEX idx_rich_menu_manual_publish_requests_group
   ON rich_menu_manual_publish_requests (group_id, created_at DESC);
 
 CREATE INDEX idx_rich_menu_pages_group    ON rich_menu_pages(group_id, order_index);
+
+CREATE INDEX idx_rich_menu_publish_run_pages_run
+  ON rich_menu_publish_run_pages(run_id, order_index);
+
+CREATE UNIQUE INDEX idx_rich_menu_publish_run_pages_run_page
+  ON rich_menu_publish_run_pages(run_id, page_id);
+
+CREATE INDEX idx_rich_menu_publish_runs_group
+  ON rich_menu_publish_runs(group_id, started_at DESC);
+
+CREATE UNIQUE INDEX idx_rich_menu_publish_runs_idem
+  ON rich_menu_publish_runs(group_id, idempotency_key);
 
 CREATE INDEX idx_rich_menu_schedules_due
   ON rich_menu_schedules (status, starts_at, ends_at);
@@ -8259,6 +8343,12 @@ CREATE INDEX idx_rich_menu_schedules_retry
 
 CREATE INDEX idx_rich_menu_test_applies_group
   ON rich_menu_test_applies(group_id, staff_id, status);
+
+CREATE UNIQUE INDEX idx_rich_menu_versions_group_number
+  ON rich_menu_versions(group_id, version_number);
+
+CREATE INDEX idx_rich_menu_versions_group_status
+  ON rich_menu_versions(group_id, status);
 
 CREATE INDEX idx_rt_approvals_queue ON rt_approval_requests(organization_id, status, created_at DESC);
 
