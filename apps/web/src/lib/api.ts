@@ -13781,6 +13781,13 @@ export const bookingApi = {
        */
       todayActiveTotal?: number
       weekTotal: number
+      /**
+       * 表示タブ（今日・今週・今月）の数。取消・拒否・期限切れを除いた
+       * 有効な予約だけ（カレンダーと同じ基準）。段階配備中の旧Workerでは未返却。
+       */
+      todayTabTotal?: number
+      weekTabTotal?: number
+      monthTabTotal?: number
       byMenu: Array<{ name: string; total: number }>
     }>(withAccount(`/api/booking/admin/requests-summary?${query.toString()}`, accountId))
   },

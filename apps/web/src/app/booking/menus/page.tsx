@@ -1437,6 +1437,13 @@ function MenusPageHost() {
   const tab = useMergedTab(MERGED_TABS)
   const { selectedAccount } = useAccount()
   const [menuCount, setMenuCount] = useState<number | null>(null)
+  // R91: メニューがあるときも作れるよう、見出しに常設の入口を置く。
+  // 編集権限の判定は一覧の中と同じ実効permissionで揃える。
+  // 緑の塗りは1画面1つ。空のときは空状態が主役なので見出し側は脇役にする。
+  const [canEditMenus, setCanEditMenus] = useState(false)
+  useEffect(() => {
+    setCanEditMenus(canEditFeature('/booking/menus'))
+  }, [])
   const workerBase = process.env.NEXT_PUBLIC_API_URL ?? ''
   const previewUrl = selectedAccount?.liffId
     ? `${workerBase}/o?liffId=${encodeURIComponent(selectedAccount.liffId)}&page=salon-book`
@@ -1446,7 +1453,12 @@ function MenusPageHost() {
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       <div data-design="Head" className="flex min-h-10 flex-wrap items-center justify-between gap-3">
         <Breadcrumb items={[{ label: '予約' }, { label: '予約設定' }]} />
-        {previewUrl && <Button href={previewUrl}>お客様に見える画面を確かめる</Button>}
+        <div className="flex flex-wrap items-center gap-2">
+          {tab === 'menus' && canEditMenus
+            ? <Button variant={menuCount ? 'primary' : 'secondary'} href="/booking/menus/new">＋ 予約メニューを作る</Button>
+            : null}
+          {previewUrl && <Button href={previewUrl}>お客様に見える画面を確かめる</Button>}
+        </div>
       </div>
       {/* 既存の2タブはこの画面の中で切り替わり、
           受付時間は別URLへ移動する。
