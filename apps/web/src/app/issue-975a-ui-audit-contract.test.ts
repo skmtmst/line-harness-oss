@@ -36,15 +36,17 @@ describe('U044: 767px以下ではテンプレート一覧をカードへ畳む',
   const page = read('templates/page.tsx')
   const styles = read('templates/templates-v6.module.css')
 
-  it('表のマークアップは残し、CSSでカードに変える', () => {
-    expect(page).toContain('data-template-list')
-    expect(styles).toContain('@media (max-width: 767.98px)')
-    // CSS module はpureモード（各セレクタにローカルクラスが必須）。
-    // 属性セレクタを行頭に書くと next build が止まるので `.body` を起点にする。
-    expect(styles).toMatch(/\.body \[data-template-list\] tbody tr \{\s*display: flex/)
-    expect(styles).toMatch(/\.body \[data-template-list\] thead \{\s*display: none/)
-    expect(styles).toMatch(/\.body \[data-template-list\] table \{\s*min-width: 0/)
-    expect(styles).not.toMatch(/^\s*\[data-template-list\]/m)
+  /*
+   * ★V7 監査の直し A（`LD96g`・m18c）で書き換え。以前の「表のままCSSで
+   * 畳む」形は、名前欄の `max-w-0` が残ってスマホで名前が消える原因だった。
+   * 共通の一覧カード（`MobileTableCards`・767px以下だけ）に任せ、表は
+   * 768px 以上だけ出す。見た目の固定の書き換えで、動きの約束は変えない。
+   */
+  it('表のマークアップは残し、767px以下は共通カードに任せる', () => {
+    expect(page).toContain('MobileTableCards')
+    expect(page).toContain('hidden md:block')
+    expect(page).not.toContain('data-template-list')
+    expect(styles).not.toContain('[data-template-list]')
     expect(styles).not.toMatch(/^\s*:global\(/m)
   })
 })
