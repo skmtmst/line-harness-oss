@@ -53,7 +53,12 @@ describe('V6 成果地点一覧の契約', () => {
   })
 
   it('検索と並び順を共通部品にし、数えられる並びだけを載せる', () => {
-    expect(PAGE).toContain("import SearchField from '@/components/shared/search-field'")
+    // ★V7 `Xn1Mz`：検索は共通 ListToolbar の1行目へそろえた（SearchField は
+    // 部品の中にある）。素の input 検索に戻さない。
+    expect(PAGE).toContain("import ListToolbar from '@/components/shared/list-toolbar'")
+    expect(PAGE).toContain('<ListToolbar')
+    expect(PAGE).toContain('search={{')
+    expect(PAGE).not.toContain("import SearchField from '@/components/shared/search-field'")
     expect(PAGE).toContain("import Select from '@/components/shared/select'")
     expect(PAGE).toContain('const [sort, setSort] = useState<PointSort>')
     expect(PAGE).toContain('CV数が多い順')

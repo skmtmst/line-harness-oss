@@ -125,7 +125,7 @@ export default function OptionsDialog({
                 type="text"
                 value={value.submitLabel ?? ''}
                 onChange={(e) => patch({ submitLabel: e.target.value })}
-                placeholder="送信"
+                placeholder="送信する"
                 className={fieldInput}
                 style={{ maxWidth: '10rem' }}
                 aria-label="送信ボタンの文字"

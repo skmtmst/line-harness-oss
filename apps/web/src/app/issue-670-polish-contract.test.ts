@@ -40,14 +40,18 @@ describe('#670 15 登録メディアの札の操作5個は同じ寸法', () => {
     // ★V7 監査D：札にボタン5つは多すぎる。「使用箇所＋…」の1行にまとめ、
     // 編集・取得・アーカイブは「…」の中へ。#670 の狙い（段違いに積まない）は
     // 1行化で継ぐ。削除の印（YfTfJ の押し口）は残す。
+    // ★V7 `Xn1Mz`（行の「…」統一）：行直置きの IconButton は MoreAction＋
+    // ActionMenu へそろえた。削除の押し口は「…」の YfTfJ と、メニューの中の
+    // 危ない操作（label: '削除する'）で残す。行にゴミ箱ボタンを戻さない。
     const footerStart = CONTENTS.indexOf('mt-auto flex flex-wrap items-center justify-end')
     expect(footerStart).toBeGreaterThan(-1)
     const footer = CONTENTS.slice(footerStart, CONTENTS.indexOf('</div>', footerStart))
     expect(footer).toContain('使用箇所')
     expect(footer).toContain('<MoreAction')
     expect(footer).toContain('<ActionMenu')
-    expect(footer).toContain('<IconButton')
+    expect(footer).not.toContain('<IconButton')
     expect(footer).toContain('data-qa-open="YfTfJ"')
+    expect(footer).toContain("label: '削除する'")
   })
 })
 
