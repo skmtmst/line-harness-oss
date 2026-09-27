@@ -93,6 +93,8 @@ export type AuditAction =
   | 'common_var_export.download'
   | 'photo.original.issue'
   | 'photo.original.download'
+  | 'photo.reward.policy.create'
+  | 'photo.reward.policy.revert'
   | 'webinar.archive'
   | 'webinar.publish'
   | 'webinar.pause'

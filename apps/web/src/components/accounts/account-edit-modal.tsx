@@ -22,6 +22,12 @@ interface Props {
   initialFriendCapacity?: number | null
   initialCapacityWarnAt?: number | null
   initialIconUrl?: string | null
+  /**
+   * R73。詳細画面の「編集する」は `basic`（名前などの登録内容）、
+   * 「差し替える」は `credentials`（Messaging の鍵・トークンの入力欄を
+   * 開いた状態）で開く。どちらも同じ保存口（PATCH/PUT 振り分け）を使う。
+   */
+  initialSection?: 'basic' | 'credentials'
   onClose: () => void
   onSaved: () => void
 }
@@ -43,6 +49,7 @@ export default function AccountEditModal({
   initialFriendCapacity = null,
   initialCapacityWarnAt = null,
   initialIconUrl = null,
+  initialSection = 'basic',
   onClose,
   onSaved,
 }: Props) {
@@ -180,7 +187,7 @@ export default function AccountEditModal({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-200 bg-white px-4 py-4 sm:px-6">
-          <h2 className="text-base font-bold text-gray-900">アカウント編集</h2>
+          <h2 className="text-base font-bold text-gray-900">{initialSection === 'credentials' ? '資格情報を差し替える' : '登録の内容を編集する'}</h2>
           <button
             type="button"
             onClick={onClose}
@@ -208,7 +215,7 @@ export default function AccountEditModal({
             showMessagingRequired={false}
             channelIdEditable={false}
             defaultOpen={{
-              messaging: false,
+              messaging: initialSection === 'credentials',
               // Open Login/LIFF by default in edit mode if they're empty,
               // since "I want to fill these in" is the most common edit
               // intent now that they were previously SQL-only.

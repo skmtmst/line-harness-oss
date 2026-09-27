@@ -89,7 +89,8 @@ describe('V6 写真審査一覧（cqWo8）の骨格', () => {
     expect(PAGE).toContain("onConfirm={() => void bulkReview('approve')}")
     expect(PAGE).toContain('setBulkReturnOpen(true)')
     expect(PAGE).toContain('crypto.randomUUID()')
-    expect(PAGE).toContain('合計 {selectedPendingPhotos.length * 5}マイル')
+    // #817: 合計は固定の5ptではなく、その時点で使っている報酬の決まりの版を見る。未取得は「—」。
+    expect(PAGE).toContain("合計 {policyPoints == null ? '—' : `${selectedPendingPhotos.length * policyPoints}マイル`}")
     expect(PAGE).toContain('公開しない')
   })
 })

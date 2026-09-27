@@ -1312,17 +1312,24 @@ describe('POST /api/rich-menu-groups/:groupId/publish', () => {
     dbMocks.getLineAccountById.mockResolvedValue({ channel_access_token: 'tk' });
     dbMocks.isPublishLeaseHeld.mockResolvedValue(false);
     dbMocks.acquirePublishLease.mockResolvedValue(1);
+    // LINE への到達は環境で変わる（遮断なら投げる・通れば 401 が返る）ため、
+    // 「fetch が投げる」前提はここで固定し、実網に触れず決定論的に落とす。
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('LINE fetch failed'));
 
     const app = setupApp();
-    const res = await app.request('/api/rich-menu-groups/gid12345-aaaa/publish', {
-      method: 'POST', headers: { 'Idempotency-Key': 'manual-publish-3' },
-    });
-    expect(res.status).toBe(500);
-    expect(dbMocks.releasePublishLease).toHaveBeenCalledWith(
-      expect.anything(),
-      'gid12345-aaaa',
-      { owner: expect.stringMatching(/^manual-/), generation: 1 },
-    );
+    try {
+      const res = await app.request('/api/rich-menu-groups/gid12345-aaaa/publish', {
+        method: 'POST', headers: { 'Idempotency-Key': 'manual-publish-3' },
+      });
+      expect(res.status).toBe(500);
+      expect(dbMocks.releasePublishLease).toHaveBeenCalledWith(
+        expect.anything(),
+        'gid12345-aaaa',
+        { owner: expect.stringMatching(/^manual-/), generation: 1 },
+      );
+    } finally {
+      fetchSpy.mockRestore();
+    }
   });
 });
 

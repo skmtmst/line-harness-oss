@@ -14,6 +14,10 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@line-crm/db', () => ({
   getFriendByLineUserIdForAccount: vi.fn(),
+  // 重複と報酬の決まりは本物でなく通す（重複なし・5pt固定）。
+  // 本物は nen-photo-duplicate-reward-817.test.ts で見る。
+  findRewardedAdoptedDuplicate: vi.fn(async () => null),
+  getEffectivePhotoRewardPolicy: vi.fn(async () => ({ versionNumber: 1, policyKey: 'legacy-5', points: 5 })),
   jstNow: mocks.jstNow,
   toJstString: (date: Date) => date.toISOString().replace('Z', '+09:00'),
   resolveLineCredential: mocks.resolveCredential,
@@ -507,9 +511,10 @@ describe('NEN photo review', () => {
     );
     expect(submissionUpdate?.bindings).toContain('adopted');
     const outbox = batches[0].find((entry) => entry.query.includes('INSERT INTO nen_photo_reward_outbox'));
+    // 版の鍵は SQL の文字から束縛へ移った (#817)。値は同じ legacy-5・5pt。
     expect(outbox?.bindings).toEqual([
       expect.any(String), 'photo-1', 'account-a', 'friend-1', 'customer-1',
-      'nen-photo:photo-1', 5,
+      'nen-photo:photo-1', 'legacy-5', 5,
       '2026-08-28 03:00:00', '2026-08-28 03:00:00', '2026-08-28 03:00:00',
     ]);
   });
