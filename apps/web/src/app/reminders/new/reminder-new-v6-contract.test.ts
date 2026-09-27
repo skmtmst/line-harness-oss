@@ -9,7 +9,8 @@ describe('V6 リマインダ作成の契約', () => {
   it('既存のリマインダ用フォルダを読み、作成時に選択を保存する', () => {
     expect(PAGE).toContain("api.folders.list('reminder')")
     expect(PAGE).toContain('folderId: folderId || null')
-    expect(PAGE).toContain('setFolderId(event.target.value)')
+    // 選び欄は共通 Select。onChange は値そのものを受け取る。
+    expect(PAGE).toContain('setFolderId(value)')
   })
 
   it('選択中のLINEアカウントへ作り、未取得のフォルダを0件として見せない', () => {

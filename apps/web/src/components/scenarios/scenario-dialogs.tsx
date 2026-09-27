@@ -14,6 +14,7 @@ import { scenarioReferenceData } from './scenario-reference-data'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
+import Select from '@/components/shared/select'
 import ConditionBuilder, {
   isEmptyCondition,
   isRuleComplete,
@@ -471,27 +472,26 @@ export function OnCompleteDialog({
             </p>
           ) : (
             <>
-              <select
+              <Select
+                aria-label="移動先のシナリオ"
                 id="on-complete-move-target"
                 value={draftTarget ?? ''}
-                onChange={(e) => setDraftTarget(e.target.value || null)}
+                onChange={(next) => setDraftTarget(next || null)}
                 disabled={candidatesState === 'loading'}
-                className="border-hairline rounded-control text-ink mt-1.5 h-10 w-full border bg-white px-3 text-sm"
-              >
-                <option value="">
-                  {candidatesState === 'loading' ? '候補を読み込んでいます' : '選んでください'}
-                </option>
-                {scenarios.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-                {savedTargetMissing && targetScenarioId ? (
-                  <option value={targetScenarioId}>
-                    {savedTargetName ?? '現在の保存値（名前を取得できません）'}
-                  </option>
-                ) : null}
-              </select>
+                options={[
+                  {
+                    value: '',
+                    label: candidatesState === 'loading' ? '候補を読み込んでいます' : '選んでください',
+                  },
+                  ...scenarios.map((s) => ({ value: s.id, label: s.name })),
+                  // SCENARIO-14: 保存済みの移動先が候補に無いときは、現在の保存値を選択肢に残す。
+                  ...(savedTargetMissing && targetScenarioId
+                    ? [{ value: targetScenarioId, label: savedTargetName ?? '現在の保存値（名前を取得できません）' }]
+                    : []),
+                ]}
+                size="full"
+                className="mt-1.5"
+              />
               {savedTargetMissing ? (
                 <p className="text-warning mt-1.5 text-xs">
                   保存されている移動先はこのアカウントの候補にありません（別アカウント・削除済み・権限外の可能性）。そのまま保存すると現在の値が維持されます。

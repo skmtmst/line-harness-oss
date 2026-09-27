@@ -12,7 +12,7 @@ import ListToolbar from '@/components/shared/list-toolbar'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
 import Pagination from '@/components/shared/pagination'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import KpiCard from '@/components/shared/kpi-card'
 import { describeApiFailure } from '@/components/shared/api-error-message'
@@ -346,10 +346,10 @@ export function OutgoingOverview({
       <ListToolbar
         search={{ placeholder: 'つなぎ先・送るタイミングで検索', value: query, onChange: setQuery }}
         filters={
-          <SelectField
+          <Select
             aria-label="外部連携の状態"
             value={filter}
-            onChange={(event) => setFilter(event.target.value as OutgoingFilter)}
+            onChange={(value) => setFilter(value as OutgoingFilter)}
             // ★V7 `x63W5x`：取れていない間の件数は出さない（0 と読めるため）。
             options={(() => {
               const count = (n: number) => (status === 'ready' ? ` ${n}` : '')
@@ -363,10 +363,10 @@ export function OutgoingOverview({
           />
         }
         trailing={
-          <SelectField
+          <Select
             aria-label="外部連携の並び順"
             value={sort}
-            onChange={(event) => setSort(event.target.value as OutgoingSort)}
+            onChange={(value) => setSort(value as OutgoingSort)}
             options={[
               { value: 'volume', label: '送った回数が多い順' },
               { value: 'name', label: '名前順' },

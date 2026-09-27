@@ -1,6 +1,7 @@
 'use client'
 
-import SelectField from '@/components/shared/select-field'
+import MultiSelect from '@/components/shared/multi-select'
+import Select from '@/components/shared/select'
 import type { Area } from './canvas-editor'
 import { RICH_MENU_ACTION_TYPE_BY_INTENT, type RichMenuAreaIntent } from '@line-crm/shared'
 
@@ -162,13 +163,6 @@ export function AreaProperties({
     })
   }
 
-  function toggleTag(tagId: string) {
-    const next = selectedTagIds.includes(tagId)
-      ? selectedTagIds.filter((t) => t !== tagId)
-      : [...selectedTagIds, tagId]
-    onUpdate({ tagIds: next })
-  }
-
   // タグ付けとスコアは、押されたことがこちらに届くボタンでしか使えない。
   // URL・電話・フォームは LINE の中で完結してしまい、押されたことが分からない。
   const sideEffectsAvailable = intent === 'text' || intent === 'template' || intent === 'postback'
@@ -239,11 +233,12 @@ export function AreaProperties({
       ) : null}
 
       <Field label="押したときの動き" hint="タップしたときに何が起きるかを決めます。">
-        <SelectField
+        <Select
+          aria-label="押したときの動き"
+          size="full"
           value={intent}
-          onChange={(e) => changeIntent(e.target.value as RichMenuAreaIntent)}
+          onChange={(value) => changeIntent(value as RichMenuAreaIntent)}
           options={intentOptions.map((o) => ({ value: o.value, label: o.label }))}
-          className={inputClass}
         />
         <p className="text-ink-faint mt-1 text-[11px]">
           {intentOptions.find((o) => o.value === intent)?.hint}
@@ -256,18 +251,16 @@ export function AreaProperties({
             label="計測リンクを使う"
             hint="選ぶと、押された回数が数えられます。計測リンク側にタグを設定していれば、それも付きます。"
           >
-            <select
+            <Select
               value={area.trackedLinkId ?? ''}
-              onChange={(e) => onUpdate({ trackedLinkId: e.target.value || null })}
-              className={inputClass}
-            >
-              <option value="">使わない（下のURLをそのまま開く）</option>
-              {trackedLinks.map((l) => (
-                <option key={l.id} value={l.id}>
-                  {l.name}
-                </option>
-              ))}
-            </select>
+              onChange={(value) => onUpdate({ trackedLinkId: value || null })}
+              aria-label="計測リンクを使う"
+              options={[
+                { value: '', label: '使わない（下のURLをそのまま開く）' },
+                ...trackedLinks.map((l) => ({ value: l.id, label: l.name })),
+              ]}
+              size="full"
+            />
           </Field>
 
           {area.trackedLinkId ? (
@@ -315,18 +308,16 @@ export function AreaProperties({
 
       {intent === 'template' && (
         <Field label="送るテンプレート" hint="押されたら、こちらからこのメッセージを送ります。">
-          <select
+          <Select
             value={area.templateId ?? ''}
-            onChange={(e) => onUpdate({ templateId: e.target.value || null })}
-            className={inputClass}
-          >
-            <option value="">選択...</option>
-            {templates.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </select>
+            onChange={(value) => onUpdate({ templateId: value || null })}
+            aria-label="送るテンプレート"
+            options={[
+              { value: '', label: '選択...' },
+              ...templates.map((t) => ({ value: t.id, label: t.name })),
+            ]}
+            size="full"
+          />
           {templates.length === 0 && (
             <p className="mt-1 text-[11px] text-amber-600">
               テンプレートがまだありません。先に「テンプレート」で作ってください。
@@ -337,18 +328,16 @@ export function AreaProperties({
 
       {intent === 'form' && (
         <Field label="開く回答フォーム">
-          <select
+          <Select
             value={area.formId ?? ''}
-            onChange={(e) => onUpdate({ formId: e.target.value || null })}
-            className={inputClass}
-          >
-            <option value="">選択...</option>
-            {forms.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.name}
-              </option>
-            ))}
-          </select>
+            onChange={(value) => onUpdate({ formId: value || null })}
+            aria-label="開く回答フォーム"
+            options={[
+              { value: '', label: '選択...' },
+              ...forms.map((f) => ({ value: f.id, label: f.name })),
+            ]}
+            size="full"
+          />
           {forms.length === 0 && (
             <p className="mt-1 text-[11px] text-amber-600">
               回答フォームがまだありません。先に「回答フォーム」で作ってください。
@@ -359,18 +348,16 @@ export function AreaProperties({
 
       {intent === 'switch' && (
         <Field label="切り替え先のページ">
-          <select
+          <Select
             value={(data.targetPageId as string) ?? ''}
-            onChange={(e) => onUpdate({ actionData: { ...data, targetPageId: e.target.value } })}
-            className={inputClass}
-          >
-            <option value="">選択...</option>
-            {pages.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
+            onChange={(value) => onUpdate({ actionData: { ...data, targetPageId: value } })}
+            aria-label="切り替え先のページ"
+            options={[
+              { value: '', label: '選択...' },
+              ...pages.map((p) => ({ value: p.id, label: p.name })),
+            ]}
+            size="full"
+          />
           {pages.length < 2 && (
             <p className="mt-1 text-[11px] text-amber-600">
               タブの切り替えには2ページ以上必要です。先にページを追加してください。
@@ -412,24 +399,27 @@ export function AreaProperties({
           </p>
         ) : (
           <>
-            <Field label="タグを付ける">
+            {/*
+              R19/R20: 検索なしの小さな選択枠を、共通の複数選択（★V7 WUVcz §2）へ。
+              外側の label で包むと各項目の label と入れ子になり、先頭項目の
+              読み上げに全タグ名が混ざる。見出しは span、欄の名前は
+              MultiSelect の aria-label、各項目は個別の名前だけにする。
+            */}
+            <div>
+              <span className="text-ink-secondary text-xs font-medium">タグを付ける</span>
               {tags.length === 0 ? (
-                <p className="text-ink-faint text-[11px]">タグがまだありません。</p>
+                <p className="text-ink-faint mt-1 text-[11px]">タグがまだありません。</p>
               ) : (
-                <div className="border-hairline max-h-32 space-y-1 overflow-y-auto rounded border p-2">
-                  {tags.map((t) => (
-                    <label key={t.id} className="flex cursor-pointer items-center gap-2 text-xs">
-                      <input
-                        type="checkbox"
-                        checked={selectedTagIds.includes(t.id)}
-                        onChange={() => toggleTag(t.id)}
-                      />
-                      <span className="truncate">{t.name}</span>
-                    </label>
-                  ))}
-                </div>
+                <MultiSelect
+                  aria-label="タグを付ける"
+                  options={tags.map((t) => ({ value: t.id, label: t.name }))}
+                  values={selectedTagIds}
+                  onChange={(next) => onUpdate({ tagIds: next })}
+                  placeholder="タグを選ぶ"
+                  className="mt-1 w-full"
+                />
               )}
-            </Field>
+            </div>
 
             <Field label="スコアを足す" hint="マイナスを入れると減ります。空欄なら何もしません。">
               <input

@@ -12,7 +12,7 @@ import Notice from '@/components/shared/notice'
 import ListState from '@/components/shared/list-state'
 import StickyBar from '@/components/shared/sticky-bar'
 import TargetMissing from '@/components/shared/target-missing'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { ApiError, api } from '@/lib/api'
 import type { FriendFieldMigrationPreview, FriendFieldMigrationRun } from '@/lib/api'
@@ -358,22 +358,22 @@ function MigrateFriendField() {
                     <input value={targetKey} onChange={(event) => { setTargetKey(event.target.value); resetConfirmation() }} className="mt-1.5 h-10 w-full rounded-control border border-hairline bg-canvas px-3 font-mono font-normal" />
                   </label>
                   <label className="mt-3 block text-sm font-semibold text-ink">種類
-                    <SelectField
+                    <Select
                       value={targetType}
-                      onChange={(event) => { setTargetType(event.target.value as FriendFieldType); resetConfirmation() }}
+                      onChange={(value) => { setTargetType(value as FriendFieldType); resetConfirmation() }}
                       aria-label="移行後の友だち情報欄の種類"
-                      className="v6-select mt-1.5 h-10 w-full rounded-control border border-hairline bg-canvas px-3 font-normal"
+                      size="full"
                       options={TYPES.map((type) => ({ value: type, label: `${FIELD_TYPE_LABELS[type]} — ${FIELD_TYPE_HINTS[type]}` }))}
                     />
                   </label>
                 </>
               ) : (
                 <label className="mt-3 block text-sm font-semibold text-ink">移行先
-                  <SelectField
+                  <Select
                     value={existingTargetId}
-                    onChange={(event) => { setExistingTargetId(event.target.value); resetConfirmation() }}
+                    onChange={(value) => { setExistingTargetId(value); resetConfirmation() }}
                     aria-label="移行先の既存項目"
-                    className="v6-select mt-1.5 h-10 w-full rounded-control border border-hairline bg-canvas px-3 font-normal"
+                    size="full"
                     options={[
                       { value: '', label: '項目を選ぶ' },
                       ...fields

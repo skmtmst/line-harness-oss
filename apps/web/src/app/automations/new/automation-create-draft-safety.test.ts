@@ -4,6 +4,7 @@ import { createServer } from 'node:net'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { chromium, type Browser, type BrowserContext, type Page, type Route } from '@playwright/test'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { selectOptionIn } from '../../../test-utils/select-helpers'
 
 /**
  * ルールを作る（★V6 `Rv8Jv`）の実挙動試験（#679）。
@@ -524,16 +525,27 @@ async function openSecondTab(context: BrowserContext, worker: WorkerHarness, sto
 
 // ========== 画面操作 ==========
 
+/*
+ * 共通 Select（button＋listbox の自前実装）を選ぶ操作は、共有の
+ * `selectOptionIn`（`src/test-utils/select-helpers.ts`）へ寄せる。
+ * Playwright の `selectOption` は素の `<select>` 専用なので使わない。
+ * なお上部の LINEアカウント切り替えは素の `<select>` のままなので、
+ * あちらは `selectOption` のまま使う。
+ */
 async function fillTagRule(page: Page, name: string) {
   await page.locator('#au-name').fill(name)
-  const tag = page.getByLabel('自動化で付けるタグ')
-  await waitUntil(() => tag.isEnabled(), 'タグ選択が使える状態になりませんでした')
-  await tag.selectOption({ label: 'VIP' })
+  const current = await page.getByLabel('自動化で付けるタグ').innerText().catch(() => '')
+  if (!current.includes('VIP')) {
+    await selectOptionIn(page, '自動化で付けるタグ', 'VIP')
+  }
 }
 
 async function fillMessageRule(page: Page, name: string, message: string) {
   await page.locator('#au-name').fill(name)
-  await page.locator('select[id^="au-action-"]').selectOption('send_message')
+  const current = await page.getByLabel('すること').innerText().catch(() => '')
+  if (!current.includes('メッセージを送る')) {
+    await selectOptionIn(page, 'すること', 'メッセージを送る')
+  }
   await page.locator('textarea').fill(message)
 }
 
@@ -717,9 +729,12 @@ describe('V6 ルールを作る（Rv8Jv）の誤操作防止（#679）', () => {
     await page.getByRole('button', { name: 'タグが付いた・外れたとき' }).click()
     await page.getByText('選んだタグが付いたとき・外れたときに動きます。下でどちらかを選びます。').waitFor()
     const action = page.getByLabel('付いたとき・外れたとき')
-    expect(await action.locator('option').allTextContents()).toEqual(['付いたとき', '外れたとき'])
-    await action.selectOption('remove')
-    expect(await action.inputValue()).toBe('remove')
+    await action.click()
+    const listbox = page.getByRole('listbox')
+    await listbox.waitFor()
+    expect(await listbox.getByRole('option').allTextContents()).toEqual(['付いたとき', '外れたとき'])
+    await listbox.getByRole('button', { name: '外れたとき' }).click()
+    await expect.poll(async () => action.innerText(), { timeout: 10_000 }).toContain('外れたとき')
   }, 60_000)
 })
 

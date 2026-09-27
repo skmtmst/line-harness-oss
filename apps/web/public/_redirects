@@ -12,6 +12,10 @@
 # /pools/new や /affiliates/new のような作成画面は残す。親のパスだけを
 # 対象にしているので、下の階層は素通りする。
 #
+# /pools はここに書かない。プール管理は /pools の専用画面に戻ったので
+# （監査 R127）、旧URLから /accounts?tab=pools へ飛ばすと画面と合わず、
+# 直接URLや再読み込みでアカウント一覧に落ちてしまう。
+#
 # /affiliates はここに書かない。_redirects はクエリを条件にできず、
 # /affiliates?tab=offers へ来た人を tab=affiliates へ落としてしまうため。
 # /affiliates の画面側（page.tsx）が ?tab= を保ったまま /conversions へ
@@ -21,7 +25,6 @@
 /users           /friends?tab=merged         308
 /support         /chats?channel=email        308
 /updates         /emergency?tab=history      308
-/pools           /accounts?tab=pools         308
 /booking/staff   /booking/menus?tab=staff    308
 
 # Issue #638: サイトマップ/案内URLとして出回ったが実体の無い5本。

@@ -226,7 +226,9 @@ describe('一覧の集計口（#554 点検#519中2）', () => {
       published: 2,
       draft: 1,
       oldVersion: 1,
-      unused: 1,
+      /* 監査 R123: 一覧の「呼ばれていない」は状態を問わず呼び出し元なし。
+         c2（下書き・呼び出しなし）も c3 と同じく未使用なので 2 件。 */
+      unused: 2,
       actions: 3,
       bindings: 2,
       outdated: 1,

@@ -4,7 +4,7 @@ import { useMemo, useState, type ReactNode } from 'react'
 import Button from '@/components/shared/button'
 import LinePreview from '@/components/shared/line-preview'
 import { RequiredBadge } from '@/components/shared/form-controls'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import Stepper from '@/components/shared/stepper'
 import Notice from '@/components/shared/notice'
 import ConditionBuilder from '@/components/shared/condition-builder'
@@ -244,7 +244,7 @@ export default function RichMenuCreateForm({
             </div>
             <div className="lg:col-span-1">
               <label className="text-ink-secondary mb-1 block text-sm font-medium" htmlFor="rich-menu-folder">フォルダ</label>
-              <SelectField id="rich-menu-folder" aria-label="フォルダ" value={value.folderId} disabled={locked || folders.length === 0} onChange={(event) => patch({ folderId: event.target.value })} options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]} />
+              <Select id="rich-menu-folder" aria-label="フォルダ" value={value.folderId} disabled={locked || folders.length === 0} onChange={(value) => patch({ folderId: value })} options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]} />
             </div>
             <div className="lg:col-span-2">
               <label className="text-ink-secondary mb-1 block text-sm font-medium" htmlFor="rich-menu-chat-bar-text">トーク画面下の文言</label>
@@ -285,12 +285,12 @@ export default function RichMenuCreateForm({
               {value.tabCount > 0 ? (
                 <div>
                   <label className="text-ink-secondary mb-1 block text-sm font-medium" htmlFor="rich-menu-default-page">最初に見せるページ</label>
-                  <SelectField
+                  <Select
                     id="rich-menu-default-page"
                     aria-label="最初に見せるページ"
                     value={String(value.defaultPageIndex)}
                     disabled={locked}
-                    onChange={(event) => patch({ defaultPageIndex: Number(event.target.value) })}
+                    onChange={(value) => patch({ defaultPageIndex: Number(value) })}
                     options={createPages.map((page) => ({ value: page.id, label: page.name }))}
                   />
                   <p className="text-ink-faint mt-1 text-xs">タブを切り替えていない人が最初に見るページです。</p>
