@@ -13,7 +13,8 @@ import Icon from '../components/ui/Icon.js';
 // シークバー・一時停止 UI は出さない (controls なし)。
 
 const DRIFT_TOLERANCE = 5;
-const HEARTBEAT_MS = 30_000;
+// J #821: 再生中だけ15秒ごとに送る。
+const HEARTBEAT_MS = 15_000;
 
 interface ChatItem {
   key: string;
@@ -201,13 +202,30 @@ export default function Webinar() {
     return () => document.removeEventListener('visibilitychange', onVisible);
   }, [expectedPosition, ended]);
 
-  // ハートビート (配信終了後は送らない)
+  // ハートビート (配信終了後は送らない。J #821: 再生中だけ15秒ごと)。
+  // 状態を区別する: 再生・一時停止・隠れた・読み込み待ち・位置の移動・速度。
   useEffect(() => {
     if (!state?.live || !slug || ended) return;
     const src = state;
     const timer = setInterval(() => {
+      const video = videoRef.current;
+      const playerState = !video
+        ? 'playing'
+        : document.visibilityState === 'hidden'
+          ? 'hidden'
+          : video.seeking
+            ? 'seeking'
+            : video.readyState < 3 && !video.paused
+              ? 'buffering'
+              : video.paused
+                ? 'paused'
+                : 'playing';
       const pos = Math.min(Math.floor(expectedPosition()), src.durationSeconds);
-      void api.webinarHeartbeat(slug, src.sessionStartAt, pos).catch(() => undefined);
+      void api.webinarHeartbeat(slug, src.sessionStartAt, pos, {
+        playerState,
+        playbackRate: video?.playbackRate ?? 1,
+        clientAtMs: Date.now(),
+      }).catch(() => undefined);
     }, HEARTBEAT_MS);
     return () => clearInterval(timer);
   }, [state, slug, expectedPosition, ended]);
