@@ -961,9 +961,12 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
     if (quickFilter) {
       conditions.push(`COALESCE(c.status, 'resolved') = 'unread'`);
       if (quickFilter === 'overdue') {
-        // Keep the existing UI definition: one hour since the displayed latest message.
+        // R111: 一覧に表示する最新時刻と同じ定義（受信時刻 line_event_at があれば
+        // そちらを正とし、無ければ保存時刻。件数側の overdue_count と共通）。
+        // created_at だけを見ると、遅れて届いた受信の待ち時間を短く数え、
+        // 札の件数を押しても対象が一覧に出なくなる。
         conditions.push(`julianday(COALESCE((
-          SELECT MAX(latest.created_at) FROM messages_log latest
+          SELECT MAX(COALESCE(latest.line_event_at, latest.created_at)) FROM messages_log latest
           WHERE latest.friend_id = f.id
             AND (latest.delivery_type IS NULL OR latest.delivery_type != 'test')
         ), d.last_message_at)) <= julianday(?)`);
