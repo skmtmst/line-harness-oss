@@ -1,16 +1,20 @@
 'use client'
 
-import { FormEvent, ReactNode, useCallback, useEffect, useState } from 'react'
+import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
 import Header from '@/components/layout/header'
 import { useAccount, type AccountWithStats } from '@/contexts/account-context'
 import { ApiError } from '@/lib/api'
 import StoreContextBanner from './stores/store-context-banner'
+import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import HelpTip from '@/components/shared/help-tip'
+import Pagination from '@/components/shared/pagination'
 import Select from '@/components/shared/select'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import DateTimeField from '@/components/shared/date-time-field'
 import {
   restaurantTestApi,
+  type ReservationQuery,
   type RestaurantApproval,
   type RestaurantIntakeAddress,
   type RestaurantInventory,
@@ -81,9 +85,9 @@ function TestBoundary() {
   </div>
 }
 
-function Metric({ label, value, note, tone = 'normal' }: { label: string; value: ReactNode; note: string; tone?: 'normal' | 'warning' | 'danger' }) {
+function Metric({ label, value, note, tone = 'normal', helpLabel, help }: { label: string; value: ReactNode; note: string; tone?: 'normal' | 'warning' | 'danger'; helpLabel?: string; help?: ReactNode }) {
   return <div className="rounded-card border border-hairline bg-canvas p-4 shadow-sm">
-    <p className="text-xs font-semibold text-ink-faint">{label}</p>
+    <p className="flex items-center gap-1 text-xs font-semibold text-ink-faint">{label}{help && helpLabel ? <HelpTip label={helpLabel}>{help}</HelpTip> : null}</p>
     <p className={`mt-2 text-2xl font-bold tabular-nums ${tone === 'danger' ? 'text-danger' : tone === 'warning' ? 'text-warning' : 'text-ink'}`}>{value}</p>
     <p className="mt-1 text-xs text-ink-faint">{note}</p>
   </div>
@@ -114,19 +118,27 @@ export default function RestaurantConsole({ view }: { view: string }) {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState<{ tone: 'success' | 'error'; text: string } | null>(null)
+  // R103: 台帳の絞り込み条件は台帳画面が持ち、ダッシュボードは今後の有効予約だけを読む。
+  const [todayStartIso] = useState(() => { const day = new Date(); day.setHours(0, 0, 0, 0); return day.toISOString() })
+  const [ledgerQuery, setLedgerQuery] = useState<ReservationQuery | null>(null)
+  const effectiveQuery = useMemo(() => activeView === 'reservations'
+    ? (ledgerQuery ?? { from: todayStartIso, limit: 100, offset: 0 })
+    : activeView === 'dashboard'
+      ? { from: todayStartIso, status: 'pending,confirmed,seated,visited', limit: 500, offset: 0 }
+      : undefined, [activeView, ledgerQuery, todayStartIso])
 
   const load = useCallback(async () => {
     if (!selectedAccountId) { setSnapshot(null); setLoading(false); return }
     setLoading(true)
     try {
-      const res = await restaurantTestApi.snapshot(selectedAccountId)
+      const res = await restaurantTestApi.snapshot(selectedAccountId, effectiveQuery)
       setSnapshot(res.data)
       setSelectedStoreId((current) => res.data.stores.some((item) => item.id === current)
         ? current
         : res.data.stores[0]?.id || '')
     } catch { setNotice({ tone: 'error', text: '飲食店向けテストデータを読み込めませんでした。' }) }
     finally { setLoading(false) }
-  }, [selectedAccountId])
+  }, [selectedAccountId, effectiveQuery])
   useEffect(() => { void load() }, [load])
 
   const mutate = async (action: () => Promise<unknown>, success: string) => {
@@ -151,12 +163,12 @@ export default function RestaurantConsole({ view }: { view: string }) {
         data={snapshot}
         selectedStoreId={selectedStoreId}
         busy={busy}
-        create={(body) => mutate(() => restaurantTestApi.createMembership(selectedAccountId!, body), 'ログインユーザーを飲食店向け領域へ追加しました。')}
+        create={(body) => mutate(() => restaurantTestApi.createMembership(selectedAccountId!, body), '飲食店向けの名簿へ追加しました。この登録だけではログイン権限は変わりません。')}
         createStore={(body) => mutate(() => restaurantTestApi.createStore(selectedAccountId!, body), '店舗を追加しました。')}
         updateStore={(id, body) => mutate(() => restaurantTestApi.updateStore(selectedAccountId!, id, body), '店舗情報を更新しました。')}
       />
       : activeView === 'approvals' ? <Approvals data={snapshot} busy={busy} decide={(id, action) => mutate(() => restaurantTestApi.decideApproval(selectedAccountId!, id, action), action === 'approve' ? '承認しました。外部公開は行っていません。' : '差し戻しました。')} />
-      : activeView === 'reservations' ? <Reservations data={snapshot} store={store} busy={busy} create={(body) => mutate(() => restaurantTestApi.createReservation(selectedAccountId!, body), '予約台帳へ登録しました。')} importInbound={(body) => mutate(() => restaurantTestApi.importReservation(selectedAccountId!, body), '受信専用データとして取り込みました。')} />
+      : activeView === 'reservations' ? <Reservations data={snapshot} store={store} busy={busy} query={effectiveQuery ?? { limit: 100, offset: 0 }} total={snapshot.reservationTotal ?? 0} todayStartIso={todayStartIso} onQueryChange={setLedgerQuery} create={(body) => mutate(() => restaurantTestApi.createReservation(selectedAccountId!, body), '予約台帳へ登録しました。')} importInbound={(body) => mutate(() => restaurantTestApi.importReservation(selectedAccountId!, body), '受信専用データとして取り込みました。')} update={(id, body, success) => mutate(() => restaurantTestApi.updateReservation(selectedAccountId!, id, body), success)} />
       : activeView === 'tables' ? <Tables data={snapshot} store={store} busy={busy} create={(body) => mutate(() => restaurantTestApi.createTable(selectedAccountId!, body), '卓を追加しました。')} />
       : activeView === 'inventory' ? <Inventory data={snapshot} store={store} busy={busy} save={(row, body) => mutate(() => restaurantTestApi.updateInventory(selectedAccountId!, row.id, body), '予約枠を更新しました。外部媒体へは反映していません。')} />
       : activeView === 'menu' ? <Menu data={snapshot} store={store} busy={busy} create={(body) => mutate(() => restaurantTestApi.createMenu(selectedAccountId!, body), 'メニューを追加しました。')} />
@@ -167,22 +179,29 @@ export default function RestaurantConsole({ view }: { view: string }) {
 function scoped<T extends { store_id: string }>(rows: T[], storeId: string) { return storeId ? rows.filter((row) => row.store_id === storeId) : rows }
 
 function Dashboard({ data }: { data: RestaurantSnapshot }) {
-  const activeReservations = data.reservations.filter((r) => !['cancelled', 'no_show'].includes(r.status))
-  const guestCount = activeReservations.reduce((sum, r) => sum + r.guest_count, 0)
+  // R104: 集計は今日以降の有効予約だけを見る。過去の来店済みは含めない。
+  const nowIso = new Date().toISOString()
+  const upcoming = data.reservations.filter((r) => r.starts_at >= nowIso && !['cancelled', 'no_show'].includes(r.status))
+  const guestCount = upcoming.reduce((sum, r) => sum + r.guest_count, 0)
   const totalCapacity = data.stores.reduce((sum, item) => sum + item.capacity, 0)
   const unreplied = data.reviews.filter((r) => r.reply_status === 'unreplied').length
-  const issues = data.connectors.filter((c) => ['error', 'warning'].includes(c.status)).length
+  const priceOf = (courseId: string | null) => data.menuItems.find((m) => m.id === courseId)?.price ?? null
+  const priced = upcoming.filter((r) => priceOf(r.course_id) !== null)
+  const revenue = priced.reduce((sum, r) => sum + r.guest_count * (priceOf(r.course_id) || 0), 0)
+  const lineIssues = data.stores.filter((item) => item.line_status === 'error').length
+  const connectorIssues = data.connectors.filter((c) => ['error', 'warning'].includes(c.status)).length
+  const issues = lineIssues + connectorIssues
   return <div className="space-y-5">
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-      <Metric label="予約数" value={`${activeReservations.length}件`} note="台帳にある有効予約" />
-      <Metric label="ご来店予定" value={`${guestCount}名`} note="予約人数の合計" />
-      <Metric label="空席率" value={`${Math.max(0, Math.round((1 - guestCount / Math.max(totalCapacity, 1)) * 100))}%`} note="全店舗の概算" />
-      <Metric label="売上予測" value={yen(guestCount * 8800)} note="予約人数×平均客単価" />
+      <Metric label="予約数" value={`${upcoming.length}件`} note="今日以降の有効予約" helpLabel="予約数の説明" help="今日以降に開始する、取消・無断キャンセルでない予約の件数です。" />
+      <Metric label="ご来店予定" value={`${guestCount}名`} note="今日以降の人数合計" helpLabel="ご来店予定の説明" help="今日以降の有効予約の人数の合計です。来店済みの過去分は含みません。" />
+      <Metric label="空席率" value={`${Math.max(0, Math.round((1 - guestCount / Math.max(totalCapacity, 1)) * 100))}%`} note="全店舗の概算" helpLabel="空席率の説明" help="分母は全店舗の収容数の合計、分子は今日以降の有効予約の人数の合計です。時間帯ごとの空きではありません。" />
+      <Metric label="売上予測" value={priced.length ? yen(revenue) : '—'} note={priced.length ? `コース設定 ${priced.length}件分` : 'コース設定がありません'} helpLabel="売上予測の説明" help="コース単価×人数の合計です。席のみ（コース未設定）の予約は含みません。固定の客単価では計算しません。" />
       <Metric label="未返信口コミ" value={`${unreplied}件`} note="Google口コミ" tone={unreplied ? 'warning' : 'normal'} />
     </div>
     <Panel title="店舗一覧" description="本部から全店の予約と接続状態を確認します。" action={<span className={`text-xs font-bold ${issues ? 'text-warning' : 'text-success'}`}>{issues ? `${issues}件の要確認` : 'すべて正常'}</span>}>
       <DataTable className="rounded-none border-0"><thead><TableHeadRow>{['店舗', 'エリア', '予約', '予定人数', '収容数', 'LINE', 'Google', '予約媒体'].map((h) => <Th key={h}>{h}</Th>)}</TableHeadRow></thead><tbody>{data.stores.map((item) => {
-        const reservations = data.reservations.filter((r) => r.store_id === item.id && !['cancelled', 'no_show'].includes(r.status))
+        const reservations = upcoming.filter((r) => r.store_id === item.id)
         const connector = data.connectors.find((c) => c.store_id === item.id && c.provider === 'restaurant_board')
         return <Tr key={item.id} interactive><Td className="font-bold text-action">{item.name}<p className="mt-0.5 text-xs font-normal text-ink-faint">{item.code}</p></Td><Td>{item.area || '—'}</Td><Td className="font-bold">{reservations.length}件</Td><Td>{reservations.reduce((s, r) => s + r.guest_count, 0)}名</Td><Td>{item.capacity}席</Td><Td><Status value={item.line_status} /></Td><Td><Status value={item.google_status} /></Td><Td><Status value={connector?.status || 'unconfigured'} /></Td></Tr>
       })}</tbody></DataTable>
@@ -421,11 +440,11 @@ function Organization({ accountId, accounts, data, selectedStoreId, busy, create
   const submit = (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); const fd = new FormData(event.currentTarget); create({ storeId: fd.get('storeId') || null, staffName: fd.get('staffName'), email: fd.get('email'), role: fd.get('role'), lineUid: fd.get('lineUid'), googleEmail: fd.get('googleEmail') }) }
   return <div className="grid gap-5 xl:grid-cols-[280px_minmax(0,1fr)]">
     <Panel title="組織階層"><div className="p-4"><p className="mb-2 text-xs font-semibold text-ink-faint">統括: {data.organization?.tenant_name || '未設定'}</p><div className="rounded-control bg-accent-soft px-4 py-3 font-bold text-accent-deep">{data.organization?.name}</div><div className="ml-5 border-l border-hairline pl-4 pt-2">{data.stores.map((s) => <div key={s.id} className="my-2 rounded-control border border-hairline px-3 py-2 text-sm"><span className="font-semibold">{s.name}</span><Status value={s.status} /></div>)}</div></div></Panel>
-    <div className="space-y-5"><StoreManagement accounts={accounts} data={data} busy={busy} createStore={createStore} updateStore={updateStore} /><IntakeAddressPanel accountId={accountId} store={selectedStore} /><div className="grid gap-4 sm:grid-cols-3"><Metric label="所属ユーザー" value={`${members.length}名`} note="本部・店舗の合計" /><Metric label="店舗管理者" value={`${members.filter((m) => m.role === 'store_manager').length}名`} note="承認権限あり" /><Metric label="連携アカウント" value={`${members.filter((m) => m.line_uid || m.google_email).length}件`} note="LINE UID / Google" /></div>
+    <div className="space-y-5"><StoreManagement accounts={accounts} data={data} busy={busy} createStore={createStore} updateStore={updateStore} /><IntakeAddressPanel accountId={accountId} store={selectedStore} /><div className="grid gap-4 sm:grid-cols-3"><Metric label="所属ユーザー" value={`${members.length}名`} note="名簿に載っている人数" /><Metric label="店舗管理者" value={`${members.filter((m) => m.role === 'store_manager').length}名`} note="名簿上の役割（操作権限は別）" /><Metric label="連携アカウント" value={`${members.filter((m) => m.line_uid || m.google_email).length}件`} note="LINE UID / Google" /></div>
       <div className="flex justify-end"><button onClick={() => setShowForm(!showForm)} className="rounded-control bg-accent-deep px-4 py-2 text-sm font-bold text-on-accent">ユーザーを追加</button></div>
       {showForm && <InlineForm title="飲食店向けユーザー"><form onSubmit={submit} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6"><Field label="氏名" name="staffName" required /><Field label="メール" name="email" type="email" /><label className="text-xs font-bold text-ink-secondary">役割<DefaultSelect name="role" ariaLabel="役割" defaultValue="staff" options={[{ value: 'staff', label: 'Staff' }, { value: 'store_manager', label: 'StoreManager' }, { value: 'super_admin', label: 'SuperAdmin' }]} /></label><label className="text-xs font-bold text-ink-secondary">担当店舗<DefaultSelect name="storeId" ariaLabel="担当店舗" defaultValue="" options={[{ value: '', label: '全店舗' }, ...data.stores.map((s) => ({ value: s.id, label: s.name }))]} /></label><Field label="LINE通知UID" name="lineUid" /><Field label="Googleメール" name="googleEmail" type="email" /><div className="sm:col-span-2 xl:col-span-6 flex justify-end"><button disabled={busy} className="rounded-control bg-accent-deep px-5 py-2 text-sm font-bold text-on-accent">追加</button></div></form></InlineForm>}
-      <Panel title="アカウント一覧" description="権限は飲食店向け領域の中だけに適用します。"><DataTable className="rounded-none border-0"><thead><TableHeadRow>{['氏名', '役割', '担当店舗', 'LINE通知UID', 'Google連携', '状態'].map((h) => <Th key={h}>{h}</Th>)}</TableHeadRow></thead><tbody>{members.map((m) => <Tr key={m.id}><Td className="font-bold">{m.staff_name}<p className="text-xs font-normal text-ink-faint">{m.email || 'メール未設定'}</p></Td><Td><span className="rounded-pill bg-action-soft px-2 py-1 text-xs font-bold text-action">{roleLabel[m.role]}</span></Td><Td>{data.stores.find((s) => s.id === m.store_id)?.name || '全店舗'}</Td><Td>{m.line_uid ? '設定済' : '未設定'}</Td><Td>{m.google_email || '未設定'}</Td><Td><Status value={m.status} /></Td></Tr>)}</tbody></DataTable></Panel>
-      <Panel title="権限マトリクス"><DataTable className="rounded-none border-0"><thead><TableHeadRow><Th>操作</Th><Th>SuperAdmin</Th><Th>StoreManager</Th><Th>Staff</Th></TableHeadRow></thead><tbody>{[['全店閲覧・契約設定', true, false, false], ['担当店舗の設定・承認', true, true, false], ['予約入力・配席', true, true, true], ['Google/LINE公開承認', true, true, false]].map(([label, ...values]) => <Tr key={String(label)}><Td>{label}</Td>{values.map((v, i) => <Td key={i} align="center" className="font-bold">{v ? <span className="text-success">✓</span> : <span className="text-ink-faint">—</span>}</Td>)}</Tr>)}</tbody></DataTable></Panel>
+      <Panel title="アカウント一覧" description="この一覧は名簿です。ここでの役割・担当店舗の登録だけではログイン権限は変わりません。実際の操作は、ログイン中のスタッフの役割（オーナー・管理者・スタッフ）で決まります。"><DataTable className="rounded-none border-0"><thead><TableHeadRow>{['氏名', '役割', '担当店舗', 'LINE通知UID', 'Google連携', '状態'].map((h) => <Th key={h}>{h}</Th>)}</TableHeadRow></thead><tbody>{members.map((m) => <Tr key={m.id}><Td className="font-bold">{m.staff_name}<p className="text-xs font-normal text-ink-faint">{m.email || 'メール未設定'}</p></Td><Td><span className="rounded-pill bg-action-soft px-2 py-1 text-xs font-bold text-action">{roleLabel[m.role]}</span></Td><Td>{data.stores.find((s) => s.id === m.store_id)?.name || '全店舗'}</Td><Td>{m.line_uid ? '設定済' : '未設定'}</Td><Td>{m.google_email || '未設定'}</Td><Td><Status value={m.status} /></Td></Tr>)}</tbody></DataTable></Panel>
+      <Panel title="権限マトリクス" description="想定の役割分担です。実際の操作可否は、ログイン中のスタッフの役割（オーナー・管理者・スタッフ）で決まります。"><DataTable className="rounded-none border-0"><thead><TableHeadRow><Th>操作</Th><Th>SuperAdmin</Th><Th>StoreManager</Th><Th>Staff</Th></TableHeadRow></thead><tbody>{[['全店閲覧・契約設定', true, false, false], ['担当店舗の設定・承認', true, true, false], ['予約入力・配席', true, true, true], ['Google/LINE公開承認', true, true, false]].map(([label, ...values]) => <Tr key={String(label)}><Td>{label}</Td>{values.map((v, i) => <Td key={i} align="center" className="font-bold">{v ? <span className="text-success">✓</span> : <span className="text-ink-faint">—</span>}</Td>)}</Tr>)}</tbody></DataTable></Panel>
     </div>
   </div>
 }
@@ -433,19 +452,81 @@ function Organization({ accountId, accounts, data, selectedStoreId, busy, create
 function Approvals({ data, busy, decide }: { data: RestaurantSnapshot; busy: boolean; decide: (id: string, action: 'approve' | 'return') => void }) {
   const pending = data.approvals.filter((item) => item.status === 'pending')
   return <div className="space-y-5"><div className="grid gap-4 sm:grid-cols-4"><Metric label="承認待ち" value={pending.length} note="対応が必要" tone={pending.length ? 'warning' : 'normal'} /><Metric label="Google投稿" value={data.approvals.filter((a) => a.kind === 'gbp_post').length} note="投稿下書き" /><Metric label="LINE配信" value={data.approvals.filter((a) => a.kind === 'line_message').length} note="配信下書き" /><Metric label="メニュー改定" value={data.approvals.filter((a) => a.kind === 'menu_change').length} note="価格・内容変更" /></div>
-    <div className="space-y-3">{data.approvals.map((item) => <ApprovalCard key={item.id} item={item} store={data.stores.find((s) => s.id === item.store_id)} busy={busy} decide={decide} />)}{data.approvals.length === 0 && <Panel title="承認キュー"><p className="p-8 text-center text-sm text-ink-faint">承認待ちはありません。</p></Panel>}</div>
+    <div className="space-y-3">{data.approvals.map((item) => <ApprovalCard key={item.id} item={item} data={data} store={data.stores.find((s) => s.id === item.store_id)} busy={busy} decide={decide} />)}{data.approvals.length === 0 && <Panel title="承認キュー"><p className="p-8 text-center text-sm text-ink-faint">承認待ちはありません。</p></Panel>}</div>
     <Panel title="公開境界" description="承認しても検証中は外部公開しません。"><p className="p-5 text-sm leading-6 text-ink-secondary">状態は「承認済」まで進みます。Google投稿、LINE送信、メニュー媒体反映は、接続承認後に別工程として有効化します。</p></Panel>
   </div>
 }
-function ApprovalCard({ item, store, busy, decide }: { item: RestaurantApproval; store?: RestaurantStore; busy: boolean; decide: (id: string, action: 'approve' | 'return') => void }) {
-  const kind = { gbp_post: 'Google投稿', line_message: 'LINE配信', menu_change: 'メニュー改定' }[item.kind]
-  return <article className={`rounded-card border bg-canvas p-5 ${item.status === 'pending' ? 'border-accent' : 'border-hairline'}`}><div className="flex flex-wrap items-start justify-between gap-4"><div><div className="flex flex-wrap items-center gap-2"><span className="rounded-pill bg-accent-soft px-2 py-1 text-xs font-bold text-accent-deep">{kind}</span><Status value={item.status} /><span className="text-xs text-ink-faint">{store?.name || '全店舗'}</span></div><h3 className="mt-3 font-bold text-ink">{item.title}</h3><p className="mt-1 text-xs text-ink-faint">申請: {item.requested_by || '—'} ・ {formatDate(item.created_at)}</p>{item.review_comment && <p className="mt-3 rounded-control bg-warning-bg px-3 py-2 text-sm text-warning">{item.review_comment}</p>}</div>{item.status === 'pending' && <div className="flex gap-2"><button disabled={busy} onClick={() => decide(item.id, 'return')} className="rounded-control border border-danger px-4 py-2 text-sm font-bold text-danger disabled:opacity-50">差戻し</button><button disabled={busy} onClick={() => decide(item.id, 'approve')} className="rounded-control bg-accent-deep px-4 py-2 text-sm font-bold text-on-accent disabled:opacity-50">承認する</button></div>}</div></article>
+function approvalPayload(item: RestaurantApproval): Record<string, unknown> {
+  try {
+    const parsed = item.payload_json ? JSON.parse(item.payload_json) : {}
+    return parsed && typeof parsed === 'object' ? parsed as Record<string, unknown> : {}
+  } catch { return {} }
 }
 
-function Reservations({ data, store, busy, create, importInbound }: { data: RestaurantSnapshot; store: RestaurantStore | null; busy: boolean; create: (body: Record<string, unknown>) => void; importInbound: (body: Record<string, unknown>) => void }) {
+/** R105: 承認する中身（投稿文・配信文・改定前後）を見せてから判断できるようにする。 */
+function ApprovalContent({ item, data }: { item: RestaurantApproval; data: RestaurantSnapshot }) {
+  const payload = approvalPayload(item)
+  if (item.kind === 'gbp_post' && typeof payload.postId === 'string') {
+    const post = data.posts.find((p) => p.id === payload.postId)
+    if (!post) return <p className="text-sm text-ink-secondary">投稿の内容を読み込めませんでした。</p>
+    const typeLabel = { standard: '通常の投稿', event: 'イベント', offer: 'クーポン' }[post.post_type] || post.post_type
+    return <div className="space-y-2"><p className="text-xs font-bold text-ink-secondary">種別: {typeLabel}</p><p className="text-sm font-bold text-ink">{post.title}</p><p className="whitespace-pre-line text-sm leading-6 text-ink-secondary">{post.body}</p></div>
+  }
+  if (item.kind === 'line_message' && typeof payload.flowId === 'string') {
+    const flow = data.lineFlows.find((f) => f.id === payload.flowId)
+    if (!flow) return <p className="text-sm text-ink-secondary">配信の内容を読み込めませんでした。</p>
+    return <div className="space-y-2"><p className="text-sm font-bold text-ink">{flow.title}</p><p className="whitespace-pre-line text-sm leading-6 text-ink-secondary">{flow.body}</p></div>
+  }
+  if (item.kind === 'menu_change') {
+    const before = typeof payload.before === 'string' ? payload.before : null
+    const after = typeof payload.after === 'string' ? payload.after : null
+    if (before === null && after === null) return <p className="text-sm text-ink-secondary">改定の前後が記録されていません。申請者に確認してください。</p>
+    return <div className="space-y-2"><div className="flex flex-wrap items-center gap-2 text-sm"><span className="text-ink-faint">変更前:</span><span className="text-ink-secondary">{before || '—'}</span><span className="text-ink-faint">→</span><span className="font-bold text-ink">{after || '—'}</span></div></div>
+  }
+  return <p className="text-sm text-ink-secondary">内容の詳細は申請者に確認してください。</p>
+}
+
+function ApprovalCard({ item, data, store, busy, decide }: { item: RestaurantApproval; data: RestaurantSnapshot; store?: RestaurantStore; busy: boolean; decide: (id: string, action: 'approve' | 'return') => void }) {
+  const kind = { gbp_post: 'Google投稿', line_message: 'LINE配信', menu_change: 'メニュー改定' }[item.kind]
+  return <article className={`rounded-card border bg-canvas p-5 ${item.status === 'pending' ? 'border-accent' : 'border-hairline'}`}><div className="flex flex-wrap items-start justify-between gap-4"><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><span className="rounded-pill bg-accent-soft px-2 py-1 text-xs font-bold text-accent-deep">{kind}</span><Status value={item.status} /><span className="text-xs text-ink-faint">{store?.name || '全店舗'}</span></div><h3 className="mt-3 font-bold text-ink">{item.title}</h3><p className="mt-1 text-xs text-ink-faint">申請: {item.requested_by || '—'} ・ {formatDate(item.created_at)}</p><div className="mt-3 rounded-control border border-hairline bg-canvas-sunken p-4"><p className="mb-2 text-xs font-bold text-ink-secondary">変更内容</p><ApprovalContent item={item} data={data} /></div>{item.review_comment && <p className="mt-3 rounded-control bg-warning-bg px-3 py-2 text-sm text-warning">{item.review_comment}</p>}</div>{item.status === 'pending' && <div className="flex shrink-0 gap-2"><button disabled={busy} onClick={() => decide(item.id, 'return')} className="rounded-control border border-danger px-4 py-2 text-sm font-bold text-danger disabled:opacity-50">差戻し</button><button disabled={busy} onClick={() => decide(item.id, 'approve')} className="rounded-control bg-accent-deep px-4 py-2 text-sm font-bold text-on-accent disabled:opacity-50">承認する</button></div>}</div></article>
+}
+
+function toLocalInput(iso: string): string {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return ''
+  const pad = (value: number) => String(value).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+const LEDGER_STATUS_OPTIONS = [
+  { value: 'all', label: 'すべての状態' },
+  { value: 'pending,confirmed,seated,visited', label: '有効のみ' },
+  { value: 'cancelled,no_show', label: '取消・無断のみ' },
+]
+
+function Reservations({ data, store, busy, query, total, todayStartIso, onQueryChange, create, importInbound, update }: {
+  data: RestaurantSnapshot; store: RestaurantStore | null; busy: boolean;
+  query: ReservationQuery; total: number; todayStartIso: string;
+  onQueryChange: (query: ReservationQuery) => void;
+  create: (body: Record<string, unknown>) => void; importInbound: (body: Record<string, unknown>) => void;
+  update: (id: string, body: Record<string, unknown>, success: string) => void;
+}) {
   const rows = scoped(data.reservations, store?.id || '')
   const [showForm, setShowForm] = useState(false)
   const [showImport, setShowImport] = useState(false)
+  const [editingId, setEditingId] = useState('')
+  const [cancelId, setCancelId] = useState('')
+  const editing = rows.find((r) => r.id === editingId) || null
+  const limit = query.limit ?? 100
+  const page = Math.floor((query.offset ?? 0) / limit) + 1
+  const pageCount = Math.max(1, Math.ceil(total / limit))
+  const periodValue = query.to && !query.from ? 'past' : query.from ? 'upcoming' : 'all'
+  const changePeriod = (value: string) => {
+    if (value === 'past') onQueryChange({ ...query, from: undefined, to: todayStartIso, offset: 0 })
+    else if (value === 'upcoming') onQueryChange({ ...query, from: todayStartIso, to: undefined, offset: 0 })
+    else onQueryChange({ ...query, from: undefined, to: undefined, offset: 0 })
+  }
+  const changeStatus = (value: string) => onQueryChange({ ...query, status: value === 'all' ? undefined : value, offset: 0 })
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault(); if (!store) return
     const fd = new FormData(event.currentTarget)
@@ -459,14 +540,38 @@ function Reservations({ data, store, busy, create, importInbound }: { data: Rest
     const startsAt = new Date(String(fd.get('startsAt'))).toISOString()
     importInbound({ storeId: store.id, provider: fd.get('provider'), eventId: `ui-${Date.now()}`, reservation: { externalId: String(fd.get('externalId')), customerName: String(fd.get('customerName')), guestCount: Number(fd.get('guestCount')), startsAt, endsAt: new Date(new Date(startsAt).getTime() + 120 * 60_000).toISOString() } })
   }
-  return <div className="space-y-5"><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5"><Metric label="予約" value={`${rows.length}件`} note="表示範囲" /><Metric label="ご来店人数" value={`${rows.reduce((s, r) => s + r.guest_count, 0)}名`} note="取消を含む" /><Metric label="LINE予約" value={rows.filter((r) => r.source === 'line').length} note="自社導線" /><Metric label="媒体予約" value={rows.filter((r) => !['line', 'phone', 'manual'].includes(r.source)).length} note="受信した予約" /><Metric label="未配席" value={rows.filter((r) => !r.table_id).length} note="卓の割当が必要" tone={rows.some((r) => !r.table_id) ? 'warning' : 'normal'} /></div>
-    <div className="flex flex-wrap justify-end gap-2"><button onClick={() => setShowImport(!showImport)} className="rounded-control border border-nen-border bg-nen-ivory px-4 py-2 text-sm font-bold text-nen-green">受信データを試す</button><button onClick={() => setShowForm(!showForm)} className="rounded-control bg-accent-deep px-4 py-2 text-sm font-bold text-on-accent">手動予約を登録</button></div>
+  const submitEdit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault(); if (!editing) return
+    const fd = new FormData(event.currentTarget)
+    const startsAt = new Date(String(fd.get('startsAt'))).toISOString()
+    const endsAt = new Date(String(fd.get('endsAt'))).toISOString()
+    const tableId = String(fd.get('tableId') || '')
+    update(editing.id, {
+      customerName: fd.get('customerName'), customerPhone: fd.get('customerPhone') || null,
+      guestCount: Number(fd.get('guestCount')), startsAt, endsAt,
+      tableId: tableId || null, courseId: String(fd.get('courseId') || '') || null,
+      allergyNote: fd.get('allergyNote') || null,
+    }, '予約を変更しました。')
+    setEditingId('')
+  }
+  const storeTables = data.tables.filter((t) => !store || t.store_id === store.id)
+  return <div className="space-y-5"><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5"><Metric label="予約" value={`${total}件`} note={`表示中 ${rows.length}件`} helpLabel="予約件数の説明" help="条件に合う予約の総件数です。表には1ページ分だけを表示します。" /><Metric label="ご来店人数" value={`${rows.reduce((s, r) => s + r.guest_count, 0)}名`} note="表示中の合計" /><Metric label="LINE予約" value={rows.filter((r) => r.source === 'line').length} note="自社導線" /><Metric label="媒体予約" value={rows.filter((r) => !['line', 'phone', 'manual'].includes(r.source)).length} note="受信した予約" /><Metric label="未配席" value={rows.filter((r) => !r.table_id).length} note="卓の割当が必要" tone={rows.some((r) => !r.table_id) ? 'warning' : 'normal'} /></div>
+    <div className="flex flex-wrap items-end justify-between gap-3">
+      <div className="flex flex-wrap items-end gap-3">
+        <label className="text-xs font-bold text-ink-secondary">期間<Select aria-label="期間" value={periodValue} onChange={changePeriod} size="full" className="mt-1" options={[{ value: 'upcoming', label: '今後の予約' }, { value: 'all', label: 'すべての期間' }, { value: 'past', label: '過去の予約' }]} /></label>
+        <label className="text-xs font-bold text-ink-secondary">状態<Select aria-label="状態" value={query.status ?? 'all'} onChange={changeStatus} size="full" className="mt-1" options={LEDGER_STATUS_OPTIONS} /></label>
+      </div>
+      <div className="flex flex-wrap justify-end gap-2"><button onClick={() => setShowImport(!showImport)} className="rounded-control border border-nen-border bg-nen-ivory px-4 py-2 text-sm font-bold text-nen-green">受信データを試す</button><button onClick={() => setShowForm(!showForm)} className="rounded-control bg-accent-deep px-4 py-2 text-sm font-bold text-on-accent">手動予約を登録</button></div>
+    </div>
     {showForm && <InlineForm title="手動予約"><form onSubmit={submit} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6"><Field label="お客様名" name="customerName" required /><Field label="電話番号" name="phone" /><Field label="人数" name="guestCount" type="number" defaultValue="2" required /><Field label="開始日時" name="startsAt" type="datetime-local" required /><label className="text-xs font-bold text-ink-secondary">コース<DefaultSelect name="courseId" ariaLabel="コース" defaultValue="" options={[{ value: '', label: '未選択' }, ...data.menuItems.filter((m) => !store || m.store_id === store.id).map((m) => ({ value: m.id, label: m.name }))]} /></label><Field label="アレルギー・特記事項" name="allergyNote" /><div className="sm:col-span-2 xl:col-span-6 flex justify-end"><button disabled={busy} className="rounded-control bg-accent-deep px-5 py-2 text-sm font-bold text-on-accent">台帳へ登録</button></div></form></InlineForm>}
     {showImport && <InlineForm title="媒体受信シミュレーター（外部への書戻しなし）"><form onSubmit={importSubmit} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6"><label className="text-xs font-bold text-ink-secondary">受信元<DefaultSelect name="provider" ariaLabel="受信元" defaultValue="restaurant_board" options={[{ value: 'restaurant_board', label: 'レストランボード' }, { value: 'hotpepper', label: 'Hot Pepper' }, { value: 'tabelog', label: '食べログ' }]} /></label><Field label="外部予約ID" name="externalId" defaultValue={`DEMO-${Date.now()}`} required /><Field label="お客様名" name="customerName" required /><Field label="人数" name="guestCount" type="number" defaultValue="2" required /><Field label="開始日時" name="startsAt" type="datetime-local" required /><div className="flex items-end"><button disabled={busy} className="w-full rounded-control bg-nen-green px-4 py-2 text-sm font-bold text-on-accent">受信として取込</button></div></form></InlineForm>}
-    <Panel title="予約タイムライン" description="媒体別の色と、配席・コースを同時に確認します。"><DataTable className="rounded-none border-0"><thead><TableHeadRow>{['時刻', '予約元', 'お客様', '人数', '卓', 'コース', '注意事項', '状態'].map((h) => <Th key={h}>{h}</Th>)}</TableHeadRow></thead><tbody>{rows.map((r) => <Tr key={r.id}><Td className="font-bold">{formatDate(r.starts_at)}</Td><Td><span className={`rounded-pill px-2 py-1 text-xs font-bold ${sourceTone[r.source] || 'bg-canvas-sunken text-ink-secondary'}`}>{sourceLabel[r.source] || r.source}</span></Td><Td className="font-bold">{r.customer_name}<p className="text-xs font-normal text-ink-faint">{r.customer_phone || '電話未登録'}</p></Td><Td>{r.guest_count}名</Td><Td>{r.table_label || <span className="text-warning">未配席</span>}</Td><Td>{r.course_name || '席のみ'}</Td><Td className="max-w-48 truncate text-xs text-danger" title={r.allergy_note || undefined}>{r.allergy_note || '—'}</Td><Td><Status value={r.status} /></Td></Tr>)}</tbody></DataTable></Panel>
+    {editing && <InlineForm title={`${editing.customer_name}の予約を変更`}><form key={editing.id} onSubmit={submitEdit} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6"><Field label="お客様名" name="customerName" defaultValue={editing.customer_name} required /><Field label="電話番号" name="customerPhone" defaultValue={editing.customer_phone || ''} /><Field label="人数" name="guestCount" type="number" defaultValue={String(editing.guest_count)} required /><Field label="開始日時" name="startsAt" type="datetime-local" defaultValue={toLocalInput(editing.starts_at)} required /><Field label="終了日時" name="endsAt" type="datetime-local" defaultValue={toLocalInput(editing.ends_at)} required /><label className="text-xs font-bold text-ink-secondary">卓<DefaultSelect name="tableId" ariaLabel="卓" defaultValue={editing.table_id || ''} options={[{ value: '', label: '未配席' }, ...storeTables.map((t) => ({ value: t.id, label: `${t.code}・${t.label}（${t.min_capacity}〜${t.max_capacity}名）` }))]} /></label><label className="text-xs font-bold text-ink-secondary">コース<DefaultSelect name="courseId" ariaLabel="コース" defaultValue={editing.course_id || ''} options={[{ value: '', label: '席のみ' }, ...data.menuItems.filter((m) => !store || m.store_id === store.id).map((m) => ({ value: m.id, label: m.name }))]} /></label><Field label="アレルギー・特記事項" name="allergyNote" defaultValue={editing.allergy_note || ''} /><div className="sm:col-span-2 xl:col-span-6 flex justify-end gap-2"><Button onClick={() => setEditingId('')}>やめる</Button><Button variant="primary" type="submit" disabled={busy}>変更を保存</Button></div></form></InlineForm>}
+    <Panel title="予約タイムライン" description="媒体別の色と、配席・コースを同時に確認します。"><DataTable className="rounded-none border-0"><colgroup><col className="w-32" /><col className="w-28" /><col /><col className="w-16" /><col className="w-24" /><col className="w-24" /><col className="w-32" /><col className="w-24" /><col className="w-32" /></colgroup><thead><TableHeadRow>{['時刻', '予約元', 'お客様', '人数', '卓', 'コース', '注意事項', '状態', '操作'].map((h) => <Th key={h}>{h}</Th>)}</TableHeadRow></thead><tbody>{rows.map((r) => <Tr key={r.id}><Td className="whitespace-nowrap font-bold">{formatDate(r.starts_at)}</Td><Td><span className={`rounded-pill px-2 py-1 text-xs font-bold ${sourceTone[r.source] || 'bg-canvas-sunken text-ink-secondary'}`}>{sourceLabel[r.source] || r.source}</span></Td><Td className="truncate font-bold" title={`${r.customer_name} ${r.customer_phone || ''}`}>{r.customer_name}<p className="truncate text-xs font-normal text-ink-faint">{r.customer_phone || '電話未登録'}</p></Td><Td className="whitespace-nowrap">{r.guest_count}名</Td><Td className="truncate" title={r.table_label || undefined}>{r.table_label || <span className="text-warning">未配席</span>}</Td><Td className="truncate" title={r.course_name || undefined}>{r.course_name || '席のみ'}</Td><Td className="truncate text-xs text-danger" title={r.allergy_note || undefined}>{r.allergy_note || '—'}</Td><Td><Status value={r.status} /></Td><Td><div className="flex gap-1"><button type="button" onClick={() => { setEditingId(r.id); setShowForm(false) }} className="whitespace-nowrap rounded-control border border-action px-2 py-1 text-xs font-bold text-action">変更</button>{['cancelled', 'no_show'].includes(r.status) ? <Button size="compact" disabled={busy} onClick={() => update(r.id, { status: 'confirmed' }, '予約を有効に戻しました。')}>復活</Button> : <button type="button" onClick={() => setCancelId(r.id)} className="whitespace-nowrap rounded-control border border-danger px-2 py-1 text-xs font-bold text-danger">取消</button>}</div></Td></Tr>)}</tbody></DataTable>{rows.length === 0 && <p className="p-8 text-center text-sm text-ink-faint">条件に合う予約はありません。</p>}<div className="flex justify-center p-4"><Pagination page={page} pageCount={pageCount} onPageChange={(next) => onQueryChange({ ...query, offset: (next - 1) * limit })} ariaLabel="予約台帳のページ送り" /></div></Panel>
+    <ConfirmDialog open={cancelId !== ''} title="この予約を取り消しますか？" description="台帳には取消として残ります。時間帯の在庫は人数分だけ戻ります。" confirmLabel="取り消す" busy={busy} onCancel={() => setCancelId('')} onConfirm={() => { if (cancelId) update(cancelId, { status: 'cancelled' }, '予約を取り消しました。'); setCancelId('') }} />
     <Panel title="顧客カルテ" description="電話番号またはLINE UIDで名寄せする設計です。"><div className="grid gap-3 p-5 sm:grid-cols-2 xl:grid-cols-3">{rows.slice(0, 6).map((r) => <div key={r.id} className="rounded-control border border-hairline p-4"><p className="font-bold">{r.customer_name}</p><p className="mt-1 text-xs text-ink-faint">{r.customer_phone || r.line_uid || '連絡先未登録'}</p><p className="mt-3 text-sm text-ink-secondary">直近: {formatDate(r.starts_at)} / {r.guest_count}名</p></div>)}</div></Panel>
   </div>
 }
+
 
 function Field({ label, name, type = 'text', defaultValue, required = false }: { label: string; name: string; type?: string; defaultValue?: string; required?: boolean }) {
   if (type === 'datetime-local') {

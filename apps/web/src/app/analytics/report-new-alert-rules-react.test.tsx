@@ -16,6 +16,7 @@ import ReportNewPage from './reports/new/page'
 const fixture = vi.hoisted(() => ({
   editId: null as string | null,
   role: 'owner' as 'owner' | 'staff',
+  pushes: [] as string[],
 }))
 
 const net = vi.hoisted(() => ({
@@ -34,7 +35,7 @@ vi.mock('next/link', () => ({
 vi.mock('next/navigation', () => ({
   useSearchParams: () => ({ get: (key: string) => (key === 'id' ? fixture.editId : null) }),
   usePathname: () => '/analytics/reports/new',
-  useRouter: () => ({ push: () => undefined, replace: () => undefined, back: () => undefined }),
+  useRouter: () => ({ push: (url: string) => { fixture.pushes.push(url) }, replace: () => undefined, back: () => undefined }),
 }))
 
 vi.mock('@/components/shell/page-chrome', () => ({
@@ -117,6 +118,7 @@ let root: Root
 beforeEach(() => {
   fixture.editId = null
   fixture.role = 'owner'
+  fixture.pushes.length = 0
   fixtureSchedule.value = schedule()
   net.calls.length = 0
   net.handler = defaultHandler
@@ -306,5 +308,32 @@ describe('定期レポートの「知らせの決めごと」(N-285)', () => {
     const rules = (put?.body as { alertRules: Array<{ metric: string; operator: string }> }).alertRules
     expect(rules).toContainEqual({ metric: 'conversions', operator: 'greater_than', threshold: 2, minimumSample: 5 })
     expect(rules).toContainEqual({ metric: 'block_rate', operator: 'greater_than', threshold: 0.5, minimumSample: 20 })
+  })
+})
+
+describe('定期レポートの作成後(R76)', () => {
+  async function selectRecipient() {
+    const personCheck = Array.from(host.querySelectorAll('input[type="checkbox"]')).find((item) => !(item as HTMLInputElement).disabled && item.closest('label')?.textContent?.includes('テスト')) as HTMLInputElement
+    await act(async () => { personCheck.click(); await Promise.resolve() })
+  }
+
+  it('新規作成の成功後は作りたての編集画面へ移す（再操作で増やさない）', async () => {
+    await render()
+    await selectRecipient()
+    await act(async () => { button('つくって動かす').click(); await Promise.resolve(); await Promise.resolve() })
+
+    expect(writeCalls('POST')).toHaveLength(1)
+    // 作ったIDの編集画面へ移る。次に押す保存は更新（PUT）になる。
+    expect(fixture.pushes).toEqual(['/analytics/reports/new?id=report-new'])
+  })
+
+  it('1回だけ送る成功後は一覧へ移す（同じ依頼を二重に押せない）', async () => {
+    await render()
+    await selectRecipient()
+    await act(async () => { button('いますぐ1回だけ送ってみる').click(); await Promise.resolve(); await Promise.resolve() })
+
+    expect(writeCalls('POST')).toHaveLength(1)
+    expect((writeCalls('POST').at(-1)?.body as { sendOnce: boolean }).sendOnce).toBe(true)
+    expect(fixture.pushes).toEqual(['/analytics?tab=saved'])
   })
 })

@@ -370,6 +370,9 @@ const DIFF_FIELD_JA: Record<string, string> = {
   profile: '店舗紹介',
   openInfo: '営業状態',
   categories: 'カテゴリ',
+  attributes: '属性',
+  relationshipData: '店舗の属性',
+  serviceAreas: 'サービス提供地域',
 };
 
 export function diffFieldLabel(mask: string): string {

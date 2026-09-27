@@ -1487,13 +1487,13 @@ friendAttributes.post('/api/folders', requireRole('owner', 'admin'), async (c) =
     const name = typeof body.name === 'string' ? body.name.trim() : '';
     if (!name) return c.json({ success: false, error: 'フォルダ名を入力してください' }, 400);
 
-    const accountId = body.kind === 'webinar' || body.kind === 'tag' || body.kind === 'template'
+    const accountId = body.kind === 'webinar' || body.kind === 'tag' || body.kind === 'template' || body.kind === 'form'
       ? (typeof body.accountId === 'string' ? body.accountId.trim() : '')
       : '';
     // テンプレートのフォルダはアカウント単位（N-147）。accountId なしで作れるのは
     // 全アカウントを見られる人だけ（タグと同じ決まり）。画面は必ず選択中の
-    // アカウントを送る。
-    if ((body.kind === 'tag' || body.kind === 'template') && !accountId) {
+    // アカウントを送る。回答フォームの箱（R25）も同じく選択中のアカウントに付ける。
+    if ((body.kind === 'tag' || body.kind === 'template' || body.kind === 'form') && !accountId) {
       const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
       if (!scope.canSeeUnassigned) return c.json({ success: false, error: 'account_id_required' }, 400);
     }
