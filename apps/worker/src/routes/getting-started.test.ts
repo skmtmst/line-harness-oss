@@ -21,7 +21,10 @@ vi.mock('../services/account-access.js', () => accountAccess);
 
 const webhook = {
   expectedWebhookUrl: vi.fn(() => 'https://worker.example.com/webhook'),
-  fetchWebhookEndpoint: vi.fn(async () => ({ status: 'matched' as const })),
+  fetchWebhookEndpoint: vi.fn(async (): Promise<{
+    expectedUrl: string; actualUrl: string | null; active: boolean | null;
+    status: 'matched' | 'mismatched' | 'unconfigured' | 'unknown';
+  }> => ({ expectedUrl: '', actualUrl: null, active: null, status: 'matched' })),
 };
 vi.mock('../lib/webhook-endpoint.js', () => webhook);
 
@@ -98,7 +101,12 @@ beforeEach(() => {
     definition_snapshot: JSON.stringify({ scenarioId: 'scenario-1', actions: [] }),
   }];
   db.hasFirstDeliveredMessage.mockResolvedValue(true);
-  webhook.fetchWebhookEndpoint.mockResolvedValue({ status: 'matched' });
+  webhook.fetchWebhookEndpoint.mockResolvedValue({
+    expectedUrl: 'https://worker.example.com/webhook',
+    actualUrl: 'https://worker.example.com/webhook',
+    active: true,
+    status: 'matched',
+  });
   accountAccess.getVisibleLineAccountScope.mockResolvedValue({
     allowedAccountIds: ['account-1'],
     accounts: [{ id: 'account-1' }],
@@ -152,6 +160,22 @@ describe('GET /api/getting-started', () => {
     expect(accounts?.state).toBe('stalled');
     expect(accounts?.reason).toContain('利用設定');
     expect(accounts?.webhook).toEqual([{ id: 'account-1', status: 'matched', active: false }]);
+  });
+
+  it('R74: 利用の読み取りが空でも一致は完了のままにする', async () => {
+    // `active: null`（読めなかった）を利用オフと混ぜない。従来どおり完了に数える。
+    webhook.fetchWebhookEndpoint.mockResolvedValue({
+      expectedUrl: 'https://worker.example.com/webhook',
+      actualUrl: 'https://worker.example.com/webhook',
+      active: null,
+      status: 'matched',
+    });
+    const response = await makeApp().fetch(
+      new Request('https://example.com/api/getting-started?account_id=account-1'),
+      { DB: database() },
+    );
+    const body = await response.json() as { data: { steps: Array<{ key: string; state: string }> } };
+    expect(body.data.steps.find((step) => step.key === 'accounts')?.state).toBe('done');
   });
 
   it('R74: URL一致かつWebhook利用オンは完了になる', async () => {
