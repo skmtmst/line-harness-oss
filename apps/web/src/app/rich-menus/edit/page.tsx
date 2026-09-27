@@ -601,7 +601,8 @@ function Editor({
     let cancelled = false
     void (async () => {
       const [tagRes, tplRes, formRes, linkRes, folderRes] = await Promise.allSettled([
-        api.tags.list(),
+        // R23: このメニューのアカウントのタグだけを候補にする（別アカウントの同名混入防止）。
+        api.tags.list(group?.accountId ? { accountId: group.accountId } : undefined),
         api.templates.list(),
         group?.accountId
           ? api.forms.list(group.accountId)
