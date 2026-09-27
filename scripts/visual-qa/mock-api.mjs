@@ -91,6 +91,7 @@ import {
   OPERATOR_NOTIFICATION_RECIPIENTS, OPERATOR_NOTIFICATION_RULES, ADMIN_EVENTS, EVENT_DETAIL, EVENT_SLOTS, EVENT_WAITLIST, EVENT_BOOKINGS, NEN_PHOTOS, NEN_PHOTO_DETAIL,
   NEN_PHOTO_REVIEW_METRICS, NEN_PHOTO_ASSET_STATUS, NEN_PHOTO_DERIVATIVES,
   NEN_PHOTO_ASSET_PROCESS_RESULT, NEN_PHOTO_BULK_DECISION_RESULT,
+  NEN_PHOTO_REWARD_POLICY_VERSIONS,
   NEN_PHOTO_PUBLICATIONS, EC_EVENTS, EC_OVERVIEW, EC_ORDERS, EC_ACTION_EXECUTIONS, EC_IDENTITY_CANDIDATES, MILEAGE_RULES,
   FORM_FOLDERS, FORMS, FORM_LIST, FORM_DETAIL, FORM_SUBMISSIONS,
   LINE_ACCOUNTS, LINE_ACCOUNT_DETAIL, LINE_ACCOUNT_VERIFY_CONNECTION, ACCOUNT_HANDOVER, ACCOUNT_HANDOVER_DECISIONS,
@@ -3177,6 +3178,37 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     return { success: true, data: NEN_PHOTO_DERIVATIVES }
   }
   if (/^\/api\/nen-members\/photos\/[^/]+$/.test(pathname)) return { success: true, data: NEN_PHOTO_DETAIL }
+  // #817: 報酬の決まりの版。新しい版から返す。
+  if (pathname === '/api/nen-members/photo-reward-policy/versions') {
+    return { success: true, data: NEN_PHOTO_REWARD_POLICY_VERSIONS }
+  }
+  // #817: 新しい版を作る・この版に戻す。過去の版は変えず、新しい版を作る。
+  if (method === 'POST' && pathname === '/api/nen-members/photo-reward-policy/versions') {
+    return {
+      success: true,
+      data: {
+        created: true,
+        version: {
+          versionNumber: 5, policyKey: 'v5', points: 10,
+          summary: '報酬を5pt→10ptに', effectiveFrom: null,
+          createdAt: '2026-09-27T10:00:00+09:00',
+        },
+      },
+    }
+  }
+  if (method === 'POST' && pathname === '/api/nen-members/photo-reward-policy/revert') {
+    return {
+      success: true,
+      data: {
+        created: true,
+        version: {
+          versionNumber: 5, policyKey: 'v5', points: 5,
+          summary: '最初の報酬の決まり', effectiveFrom: null,
+          createdAt: '2026-09-27T10:00:00+09:00',
+        },
+      },
+    }
+  }
   if (pathname === '/api/ec-commerce/overview') return { success: true, data: EC_OVERVIEW }
   /* 取り込みの記録。`?view=actions` は処理1件ずつの形（`ec-commerce.ts`）。 */
   if (pathname === '/api/ec-commerce/events') {
