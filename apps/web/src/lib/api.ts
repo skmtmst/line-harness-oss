@@ -7188,10 +7188,11 @@ export const api = {
   },
   /** 危険なファイルの検査。確かめ終わるまで中身は出さない。 */
   fileScan: {
-    list: (accountId: string, params?: { status?: string; limit?: number; offset?: number }) => {
+    list: (accountId: string, params?: { status?: string; q?: string; limit?: number; offset?: number }) => {
       const q = new URLSearchParams()
       q.set('accountId', accountId)
       if (params?.status) q.set('status', params.status)
+      if (params?.q) q.set('q', params.q)
       if (params?.limit) q.set('limit', String(params.limit))
       if (params?.offset) q.set('offset', String(params.offset))
       return fetchApi<ApiResponse<{ items: FileScanItem[]; total: number; limit: number; offset: number }>>(
