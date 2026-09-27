@@ -271,13 +271,14 @@ export default function NewMileageRulePage() {
 
   useEffect(() => {
     let cancelled = false
-    void api.tags.list().then((res) => {
+    // R23横展開: 倍率つきタグの表示は今のアカウントだけ。切替で取り直す。
+    void api.tags.list(selectedAccountId ? { accountId: selectedAccountId } : undefined).then((res) => {
       if (!cancelled && res.success) setTags(res.data)
     })
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [selectedAccountId])
 
   const selected = EVENT_TYPES.find((t) => t.value === eventType) ?? EVENT_TYPES[0]
   const value = Number(amount)

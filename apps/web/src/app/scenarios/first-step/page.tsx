@@ -198,6 +198,17 @@ function FirstStepContent() {
           return
         }
         setScenario(res.data)
+        // R23横展開: 対象タグ・テンプレートの候補はこのシナリオのアカウントだけ。
+        // 読み直したシナリオから所属を取る（取り直しは1回だけ）。
+        const candidateAccountId = res.data.lineAccountId ?? undefined
+        void scenarioReferenceData.tags(candidateAccountId).then((tagRes) => {
+          if (seq !== loadSeq.current) return
+          if (tagRes.success) setTags(tagRes.data)
+        })
+        void scenarioReferenceData.templates(candidateAccountId).then((tplRes) => {
+          if (seq !== loadSeq.current) return
+          if (tplRes.success) setTemplates(tplRes.data as unknown as Template[])
+        })
         const first = [...res.data.steps].sort((a, b) => a.stepOrder - b.stepOrder)[0]
         if (first) {
           // 作成フローを途中で閉じて戻った場合は、既存の1通目を再表示する。
@@ -235,12 +246,6 @@ function FirstStepContent() {
         setLoadState('error')
       }
     })()
-    void scenarioReferenceData.tags().then(res => {
-      if (res.success) setTags(res.data)
-    })
-    void scenarioReferenceData.templates().then(res => {
-      if (res.success) setTemplates(res.data as unknown as Template[])
-    })
   }, [id, reloadKey])
 
   const mode: DeliveryMode = scenario?.deliveryMode ?? 'absolute_time'

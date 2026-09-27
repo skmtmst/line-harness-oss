@@ -307,9 +307,10 @@ function BroadcastList() {
           folderId: folderFilter === UNFILED ? 'unfiled' : folderFilter || undefined,
           sort: sortKey,
         }),
-        append ? null : api.tags.list(),
+        // R23横展開: 宛先要約の名前解決も今のアカウントだけ（別アカウント混入防止）。
+        append ? null : api.tags.list(selectedAccountId ? { accountId: selectedAccountId } : undefined),
         // 宛先要約のシナリオ名。取れなくても一覧は出す（名前は「指定のシナリオ」のまま）。
-        append ? null : api.scenarios.list().catch(() => null),
+        append ? null : api.scenarios.list(selectedAccountId ? { accountId: selectedAccountId } : undefined).catch(() => null),
       ])
       if (broadcastsRes.success) {
         if (append) {

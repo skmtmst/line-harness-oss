@@ -372,15 +372,17 @@ function InflowLinksPageInner({
             }))
             : { success: false as const, error: 'feature_disabled' },
         )
+      // R23横展開: 行の名前解決に使う候補は今のアカウントだけ。
+      const candidateParams = accountAtRequest ? { accountId: accountAtRequest } : undefined
       const [p, s, t, tagRes] = await Promise.all([
         poolsPromise,
         featureAllowed('scenarios')
-          ? api.scenarios.list().catch(() => ({ success: false as const, data: [] as Scenario[] }))
+          ? api.scenarios.list(candidateParams).catch(() => ({ success: false as const, data: [] as Scenario[] }))
           : Promise.resolve({ success: false as const, data: [] as Scenario[] }),
         featureAllowed('templates')
           ? api.messageTemplates.list().catch(() => ({ success: false as const, data: [] as MessageTemplate[] }))
           : Promise.resolve({ success: false as const, data: [] as MessageTemplate[] }),
-        api.tags.list().catch(() => ({ success: false, data: [] as Tag[] })),
+        api.tags.list(candidateParams).catch(() => ({ success: false, data: [] as Tag[] })),
       ])
       if (!isCurrent()) return
       if (p.success) setPools(p.data)

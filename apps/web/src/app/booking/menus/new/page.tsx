@@ -111,8 +111,9 @@ export default function NewBookingMenuPage() {
   useEffect(() => {
     let cancelled = false
     setTagLoadState('loading')
+    // R23横展開: 候補は今のアカウントだけ。切替で取り直す（選択のリセットは切替効果で済み）。
     api.tags
-      .list()
+      .list(selectedAccountId ? { accountId: selectedAccountId } : undefined)
       .then((r) => {
         if (cancelled) return
         // 取得失敗はタグなし保存の妨げにしない。候補が出ないだけで残す。
@@ -129,7 +130,7 @@ export default function NewBookingMenuPage() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [selectedAccountId])
 
   // アカウントを変えたら前の選択を残さない。別アカウントのタグを
   // そのまま送ると Worker が tag_not_found で落とすうえ、意図しない結び付きになる。
