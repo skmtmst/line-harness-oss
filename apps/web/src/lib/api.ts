@@ -207,21 +207,44 @@ export type IncomingWebhookDetail = IncomingWebhook & {
   templateFields: Array<{ path: string; type: string; token: string }>
   /** 人が見つからなかった届物の未確認件数(#939 N-367)。 */
   pendingUnmatched: number
+  /** S: 合言葉の入れ替え中だけ、前の合言葉が使える期限。併用期間外は null。 */
+  previousSecretUsableUntil: string | null
 }
 
 /**
  * 人が見つからなかった届物(#939 N-367)。生の本文は保存していないので、
  * 照合に使った値と形だけの見本だけが返る。
+ * S: kind='ambiguous' は同じ値の友だちが2人以上いて保留した届物。
+ * candidates に一致した友だちが入る(人がどれか選ぶ)。
  */
 export interface IncomingWebhookUnmatchedItem {
   id: string
-  kind: 'unmatched' | 'candidate'
+  kind: 'unmatched' | 'candidate' | 'ambiguous'
   status: 'pending' | 'resolved' | 'dismissed'
   identityAttempts: Array<{ kind: string; path: string; value: string }>
   maskedShape: { fields: Array<{ path: string; type: string; maskedValue: string }>; truncated: boolean } | null
+  candidates: Array<{ friendId: string; displayName: string | null }>
   resolvedFriendId: string | null
   resolvedAt: string | null
   receivedAt: string
+}
+
+/** S: 受け取りの試しの結果。照合と行動の組み立てまでで、実行はしない。 */
+export interface IncomingWebhookTestResult {
+  match:
+    | { status: 'matched'; friendId: string }
+    | { status: 'ambiguous'; friendIds: string[] }
+    | { status: 'not_found' }
+  identityAttempts: Array<{ kind: string; path: string; value: string }>
+  actions: Array<{
+    refIndex: number
+    refKind: string
+    refId: string
+    displayName: string
+    ok: boolean
+    plan?: Array<{ type: string }>
+    error?: string
+  }>
 }
 
 /**
@@ -5610,10 +5633,43 @@ export type OpsSupportDetail = {
   ai: { available: boolean }
 }
 
+/** 大事な操作の直前再確認（V）が対象にする操作の名前。Workerの STEP_UP_PURPOSES と一致させる。 */
+export type StepUpPurpose =
+  | 'operations.control'
+  | 'affiliate.payout.export'
+  | 'photo.original.download'
+  | 'staff.permissions.change'
+  | 'staff.two_factor.remove'
+  | 'line_account.connect'
+  | 'line_account.credentials'
+  | 'line_account.archive'
+  | 'broadcast.approval'
+  | 'webhook.api_token'
+  | 'webhook.secret'
+
 export const api = {
   system: {
     health: () =>
       fetchApi<ApiResponse<{ status: 'ok' }>>('/api/health'),
+  },
+  auth: {
+    /*
+     * 大事な操作の直前再確認（V-1）。2段階認証を使っている人は method 'totp' +
+     * 6桁コード、使っていない人は method 'password' + パスワードを送る。
+     * 成功したら返ってきた token を X-Step-Up-Token で本操作へ付ける。
+     */
+    stepUp: (input: { method: 'totp' | 'password'; value: string; purpose: StepUpPurpose }) =>
+      fetchApi<ApiResponse<{ token: string; purpose: string; expiresAt: string }>>(
+        '/api/auth/step-up',
+        {
+          method: 'POST',
+          body: JSON.stringify(
+            input.method === 'totp'
+              ? { code: input.value, purpose: input.purpose }
+              : { password: input.value, purpose: input.purpose },
+          ),
+        },
+      ),
   },
   searchConsole: {
     performance: (days: 7 | 28 | 90) =>
@@ -7713,9 +7769,12 @@ export const api = {
         fetchApi<ApiResponse<{ approval: BroadcastApprovalState['approval'] }>>(
           `/api/broadcasts/${id}/approval-request`, { method: 'POST', body: JSON.stringify(data) },
         ),
-      approve: (id: string) =>
+      approve: (id: string, stepUpToken?: string) =>
         fetchApi<ApiResponse<{ approval: BroadcastApprovalState['approval']; needsSend: boolean }>>(
-          `/api/broadcasts/${id}/approval-approve`, { method: 'POST' },
+          `/api/broadcasts/${id}/approval-approve`, {
+            method: 'POST',
+            headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
+          },
         ),
       reject: (id: string, reason: string) =>
         fetchApi<ApiResponse<{ approval: BroadcastApprovalState['approval'] }>>(
@@ -8008,8 +8067,18 @@ export const api = {
     /** ダッシュボード ★V6 37-2。 */
     dashboard: (period?: OpsDashboardPeriod) =>
       fetchApi<ApiResponse<OpsDashboard>>(`/api/ops/dashboard${period ? `?period=${period}` : ''}`),
-    billingSync: (months = 12) =>
-      fetchApi<ApiResponse<{ tenants: number; imported: number; failed: number; completed: boolean; since: string; syncedAt: string | null }>>('/api/ops/billing/sync', { method: 'POST', body: JSON.stringify({ months }) }),
+    billingSync: async (months = 12) => {
+      try {
+        return await fetchApi<ApiResponse<{ tenants: number; imported: number; failed: number; completed: boolean; since: string; syncedAt: string | null }>>('/api/ops/billing/sync', { method: 'POST', body: JSON.stringify({ months }) })
+      } catch (error) {
+        // 5xx の本文は共通 fetchApi が画面へ出さない。同期APIの 503 は
+        // Stripe 未設定だけなので、利用者が直せる既知の案内へ言い換える。
+        if (error instanceof ApiError && error.status === 503) {
+          throw new Error('Stripe の接続設定がまだありません')
+        }
+        throw error
+      }
+    },
     lineUnregistered: () => fetchApi<ApiResponse<OpsLineUnregistered>>('/api/ops/dashboard/line-unregistered'),
     /** 運営専用ナレッジ ★V6 37-11。 */
     knowledge: {
@@ -8419,9 +8488,10 @@ export const api = {
       ogDefaultDescription?: string | null;
       copyFromAccountId?: string | null;
       copyItems?: Array<'accountSettings' | 'scenarios' | 'autoReplies'>;
-    }) =>
+    }, stepUpToken?: string) =>
       fetchApi<ApiResponse<LineAccount>>('/api/line-accounts', {
         method: 'POST',
+        headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
         body: JSON.stringify(data),
       }),
     connectCheck: (data: {
@@ -8439,8 +8509,10 @@ export const api = {
       channelSecret: string
       loginChannelId: string
       loginChannelSecret: string
-    }) => fetchApi<ApiResponse<LineAccountConnectData>>('/api/line-accounts/connect', {
-      method: 'POST', body: JSON.stringify(data),
+    }, stepUpToken?: string) => fetchApi<ApiResponse<LineAccountConnectData>>('/api/line-accounts/connect', {
+      method: 'POST',
+      headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
+      body: JSON.stringify(data),
     }),
     // Smart method routing:
     //   - rotating Messaging credentials (channelAccessToken / channelSecret)
@@ -8473,16 +8545,21 @@ export const api = {
           | 'iconUrl'
         >
       >,
+      stepUpToken?: string,
     ) => {
       const touchesMessagingCredentials =
         data.channelAccessToken !== undefined || data.channelSecret !== undefined
       return fetchApi<ApiResponse<LineAccount>>(`/api/line-accounts/${id}`, {
         method: touchesMessagingCredentials ? 'PUT' : 'PATCH',
+        headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
         body: JSON.stringify(data),
       })
     },
-    delete: (id: string) =>
-      fetchApi<ApiResponse<null>>(`/api/line-accounts/${id}`, { method: 'DELETE' }),
+    delete: (id: string, stepUpToken?: string) =>
+      fetchApi<ApiResponse<null>>(`/api/line-accounts/${id}`, {
+        method: 'DELETE',
+        headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
+      }),
     updateOrder: (ordered: Array<{ id: string; displayOrder: number }>) =>
       fetchApi<{ success: boolean; error?: string }>('/api/line-accounts/order', {
         method: 'PATCH',
@@ -8902,10 +8979,15 @@ export const api = {
       headers: { 'Idempotency-Key': idempotencyKey },
       body: JSON.stringify(data),
     }),
-    payoutStepUp: (code: string) =>
+    /* 直前再確認（V-1）。2段階認証がある人は 'totp'、無い人は 'password'。 */
+    payoutStepUp: (input: { method: 'totp' | 'password'; value: string }) =>
       fetchApi<ApiResponse<{ token: string; purpose: 'affiliate.payout.export'; expiresAt: string }>>(
         '/api/auth/step-up',
-        { method: 'POST', body: JSON.stringify({ code, purpose: 'affiliate.payout.export' }) },
+        { method: 'POST', body: JSON.stringify(
+          input.method === 'totp'
+            ? { code: input.value, purpose: 'affiliate.payout.export' }
+            : { password: input.value, purpose: 'affiliate.payout.export' },
+        ) },
       ),
     exportPayoutBatch: (
       batchId: string,
@@ -10240,12 +10322,17 @@ export const api = {
       '/api/nen-members/photos/decisions/bulk',
       { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey }, body: JSON.stringify(data) },
     ),
-    photoOriginalStepUp: (code: string) => fetchApi<ApiResponse<{
+    /* 直前再確認（V-1）。2段階認証がある人は 'totp'、無い人は 'password'。 */
+    photoOriginalStepUp: (input: { method: 'totp' | 'password'; value: string }) => fetchApi<ApiResponse<{
       token: string
       purpose: 'photo.original.download'
       expiresAt: string
     }>>('/api/auth/step-up', {
-      method: 'POST', body: JSON.stringify({ code, purpose: 'photo.original.download' }),
+      method: 'POST', body: JSON.stringify(
+        input.method === 'totp'
+          ? { code: input.value, purpose: 'photo.original.download' }
+          : { password: input.value, purpose: 'photo.original.download' },
+      ),
     }),
     issuePhotoOriginalDownload: (
       id: string,
@@ -10988,14 +11075,16 @@ export const api = {
         fetchApi<ApiResponse<IncomingWebhookDetail>>(
           `/api/webhooks/incoming/${encodeURIComponent(id)}?lineAccountId=${encodeURIComponent(lineAccountId)}`,
         ),
-      create: (data: { lineAccountId: string; name: string; sourceType?: string; secret: string }) =>
+      create: (data: { lineAccountId: string; name: string; sourceType?: string; secret: string }, stepUpToken?: string) =>
         fetchApi<ApiResponse<IncomingWebhookCreated>>('/api/webhooks/incoming', {
           method: 'POST',
+          headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
           body: JSON.stringify(data),
         }),
-      update: (id: string, lineAccountId: string, data: Partial<Pick<IncomingWebhook, 'name' | 'sourceType' | 'isActive'>> & { secret?: string }) =>
+      update: (id: string, lineAccountId: string, data: Partial<Pick<IncomingWebhook, 'name' | 'sourceType' | 'isActive'>> & { secret?: string }, stepUpToken?: string) =>
         fetchApi<ApiResponse<IncomingWebhook>>(`/api/webhooks/incoming/${id}?lineAccountId=${encodeURIComponent(lineAccountId)}`, {
           method: 'PUT',
+          headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
           body: JSON.stringify(data),
         }),
       delete: (id: string, lineAccountId: string) =>
@@ -11013,6 +11102,12 @@ export const api = {
           `/api/webhooks/unmatched/${encodeURIComponent(id)}/resolve?lineAccountId=${encodeURIComponent(lineAccountId)}`,
           { method: 'POST', body: JSON.stringify(data) },
         ),
+      /* S (#939 機能26): 見本JSONで照合と行動の組み立てを試す口。実行はしない。 */
+      test: (id: string, lineAccountId: string, payload: unknown) =>
+        fetchApi<ApiResponse<IncomingWebhookTestResult>>(
+          `/api/webhooks/incoming/${encodeURIComponent(id)}/test?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+          { method: 'POST', body: JSON.stringify({ payload }) },
+        ),
     },
     outgoing: {
       list: (lineAccountId: string) =>
@@ -11024,18 +11119,21 @@ export const api = {
         fetchApi<ApiResponse<OutgoingWebhook>>(
           `/api/webhooks/outgoing/${encodeURIComponent(id)}?lineAccountId=${encodeURIComponent(lineAccountId)}`,
         ),
-      create: (data: { lineAccountId: string; name: string; url: string; eventTypes: string[]; secret: string; maxRetries?: number }) =>
+      create: (data: { lineAccountId: string; name: string; url: string; eventTypes: string[]; secret: string; maxRetries?: number }, stepUpToken?: string) =>
         fetchApi<ApiResponse<OutgoingWebhookCreated>>('/api/webhooks/outgoing', {
           method: 'POST',
+          headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
           body: JSON.stringify(data),
         }),
       update: (
         id: string,
         lineAccountId: string,
         data: Partial<Pick<OutgoingWebhook, 'name' | 'url' | 'eventTypes' | 'isActive' | 'maxRetries'>> & { secret?: string },
+        stepUpToken?: string,
       ) =>
         fetchApi<ApiResponse<OutgoingWebhook>>(`/api/webhooks/outgoing/${id}?lineAccountId=${encodeURIComponent(lineAccountId)}`, {
           method: 'PUT',
+          headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
           body: JSON.stringify(data),
         }),
       delete: (id: string, lineAccountId: string) =>
@@ -11089,20 +11187,21 @@ export const api = {
         fetchApi<ApiResponse<IntegrationApiTokenInfo[]>>(
           `/api/webhooks/api-tokens?lineAccountId=${encodeURIComponent(lineAccountId)}`,
         ),
-      create: (lineAccountId: string, data: { name: string; scopes: string[] }) =>
+      create: (lineAccountId: string, data: { name: string; scopes: string[] }, stepUpToken?: string) =>
         fetchApi<ApiResponse<IssuedIntegrationApiToken>>('/api/webhooks/api-tokens', {
           method: 'POST',
+          headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
           body: JSON.stringify({ ...data, lineAccountId }),
         }),
-      revoke: (id: string, lineAccountId: string) =>
+      revoke: (id: string, lineAccountId: string, stepUpToken?: string) =>
         fetchApi<ApiResponse<{ id: string }>>(
           `/api/webhooks/api-tokens/${encodeURIComponent(id)}/revoke?lineAccountId=${encodeURIComponent(lineAccountId)}`,
-          { method: 'POST', body: '{}' },
+          { method: 'POST', headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined, body: '{}' },
         ),
-      rotate: (id: string, lineAccountId: string) =>
+      rotate: (id: string, lineAccountId: string, stepUpToken?: string) =>
         fetchApi<ApiResponse<IssuedIntegrationApiToken>>(
           `/api/webhooks/api-tokens/${encodeURIComponent(id)}/rotate?lineAccountId=${encodeURIComponent(lineAccountId)}`,
-          { method: 'POST', body: '{}' },
+          { method: 'POST', headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined, body: '{}' },
         ),
     },
     /* #838 第2段: Google Sheets への直接書き出し。接続はOAuthの別画面へ飛ばす。 */
@@ -11283,12 +11382,7 @@ export const api = {
         method: 'DELETE',
         headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
       }),
-    /** 高危険操作の直前再認証。権限変更・二段階認証の解除用。 */
-    stepUp: (code: string, purpose: 'staff.permissions.change' | 'staff.two_factor.remove') =>
-      fetchApi<ApiResponse<{ token: string; purpose: string; expiresAt: string }>>(
-        '/api/auth/step-up',
-        { method: 'POST', body: JSON.stringify({ code, purpose }) },
-      ),
+    /* 直前再確認は api.auth.stepUp に一本化（StepUpPrompt が目的を渡す）。 */
     acceptInvitation: (token: string) =>
       fetchApi<ApiResponse<{ status: 'pending_line' }>>('/api/staff/invitations/confirm/verify', {
         method: 'POST',
@@ -12141,10 +12235,15 @@ export const api = {
       fetchApi<ApiResponse<{ retried: number }>>(`/api/operations/alerts/${encodeURIComponent(id)}/notifications/retry`, {
         method: 'POST', body: JSON.stringify({ lineAccountId }),
       }),
-    stepUp: (code: string) =>
+    /* 直前再確認（V-1）。2段階認証がある人は 'totp'、無い人は 'password'。 */
+    stepUp: (input: { method: 'totp' | 'password'; value: string }) =>
       fetchApi<ApiResponse<{ token: string; purpose: 'operations.control'; expiresAt: string }>>(
         '/api/auth/step-up',
-        { method: 'POST', body: JSON.stringify({ code, purpose: 'operations.control' }) },
+        { method: 'POST', body: JSON.stringify(
+          input.method === 'totp'
+            ? { code: input.value, purpose: 'operations.control' }
+            : { password: input.value, purpose: 'operations.control' },
+        ) },
       ),
     preview: (accountId: string | null) => {
       const query = accountId ? `?account_id=${encodeURIComponent(accountId)}` : ''

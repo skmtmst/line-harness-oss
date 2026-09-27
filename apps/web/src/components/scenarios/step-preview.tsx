@@ -13,6 +13,7 @@
 
 import { Clock } from 'lucide-react'
 import LinePreview from '@/components/shared/line-preview'
+import Notice from '@/components/shared/notice'
 import styles from './step-preview.module.css'
 import type { DeliveryMode } from '@line-crm/shared'
 import type { ScenarioQuestion } from './question-editor'
@@ -363,10 +364,10 @@ export default function StepPreview({
         疑うことになる。理由をその場に出す。
       */}
       {rolled && (
-        <p className="text-warning bg-warning-bg rounded-control mt-2 px-2 py-1.5 text-micro leading-relaxed">
+        <Notice tone="warn" className="mt-2">
           いまはもう {deliveryTime} を過ぎているため、翌日になります。
           購読開始が {deliveryTime} より前なら、その日のうちに届きます。
-        </p>
+        </Notice>
       )}
 
       {/*

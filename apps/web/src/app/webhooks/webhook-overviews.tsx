@@ -3,16 +3,18 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { IncomingWebhook, WebhookInteractionSummary } from '@line-crm/shared'
-import { api, type IncomingWebhookDetail, type IncomingWebhookUnmatchedItem, type OutgoingWebhookOverview } from '@/lib/api'
+import { api, type IncomingWebhookDetail, type IncomingWebhookTestResult, type IncomingWebhookUnmatchedItem, type OutgoingWebhookOverview } from '@/lib/api'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import ListToolbar from '@/components/shared/list-toolbar'
-import Notice, { type NoticeTone } from '@/components/shared/notice'
+import Notice from '@/components/shared/notice'
+import { notifyToast } from '@/components/shared/toast'
 import Pagination from '@/components/shared/pagination'
 import SelectField from '@/components/shared/select-field'
 import StatusBadge from '@/components/shared/status-badge'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
 import { ActionCell, DataTable, NameCell, Td, Th, TableHeadRow, Tr } from '@/components/shared/table'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
@@ -111,8 +113,8 @@ export function OutgoingKpis({
   const listDetail = listFailed ? '読み込めませんでした' : listLoading ? '読み込んでいます' : `止めているもの ${paused}本`
 
   return (
-    <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4" data-design="KPIs">
-      <SummaryCard
+    <div className="grid grid-cols-2 gap-3 xl:grid-cols-4" data-design="KPIs">
+      <KpiCard
         title="こちらから送る"
         value={status === 'ready' ? items.length : null}
         unit="本"
@@ -120,7 +122,7 @@ export function OutgoingKpis({
         loading={listLoading}
         variant="v6"
       />
-      <SummaryCard
+      <KpiCard
         title="この30日に送った"
         value={summaryMissing ? null : summary?.outgoing ?? null}
         unit="回"
@@ -128,7 +130,7 @@ export function OutgoingKpis({
         loading={summaryLoading}
         variant="v6"
       />
-      <SummaryCard
+      <KpiCard
         title="返事がなかった"
         value={summaryMissing ? null : summary?.failed ?? null}
         unit="回"
@@ -138,7 +140,7 @@ export function OutgoingKpis({
         loading={summaryLoading}
         variant="v6"
       />
-      <SummaryCard
+      <KpiCard
         title="受け取った"
         value={summaryMissing ? null : summary?.incoming ?? null}
         unit="回"
@@ -207,7 +209,7 @@ export function OutgoingOverview({
    * 以前は口の戻り値を読まず、成功も失敗も画面に何も出なかった。
    * 成功は届いた旨、失敗は「やり取りの記録」タブへの案内を出す。
    */
-  const [testNotice, setTestNotice] = useState<{ tone: NoticeTone; message: string } | null>(null)
+  const [testNotice, setTestNotice] = useState<{ tone: 'danger'; message: string } | null>(null)
 
   const runTest = async (item: OutgoingWebhookOverview) => {
     if (!lineAccountId || testingId !== null) return
@@ -218,20 +220,17 @@ export function OutgoingOverview({
       const response = await api.webhooks.outgoing.test(item.id, lineAccountId)
       if (response.success && response.data.delivered) {
         const status = response.data.responseStatus
-        setTestNotice({
-          tone: 'success',
-          message: `「${item.name}」への試し送信が届きました${status === null ? '' : `(相手の応答 ${status})`}。`,
-        })
+        notifyToast(`「${item.name}」への試し送信が届きました${status === null ? '' : `(相手の応答 ${status})`}。`)
       } else {
         const status = response.success ? response.data.responseStatus : null
         setTestNotice({
-          tone: 'error',
+          tone: 'danger',
           message: `「${item.name}」への試し送信は届きませんでした${status === null ? '' : `(相手の応答 ${status})`}。「やり取りの記録」タブで詳しく確認できます。`,
         })
       }
     } catch {
       setTestNotice({
-        tone: 'error',
+        tone: 'danger',
         message: `「${item.name}」への試し送信に失敗しました。「やり取りの記録」タブで詳しく確認できます。`,
       })
     } finally {
@@ -326,13 +325,13 @@ export function OutgoingOverview({
 
   return (
     <section aria-label="こちらから送る一覧">
-      <p className="bg-info-bg text-ink-secondary rounded-card mb-3 px-4 py-3 text-xs leading-6">
+      <Notice tone="info" className="mb-3">
         「こちらから送る」は、うちで起きたことを相手に知らせます。「こちらで受け取る」は、相手で起きたことをうちに取り込みます。受け取る側のURLは、相手のサービスに貼ってください。
-      </p>
+      </Notice>
 
       {testNotice ? (
         <div className="mb-3">
-          <Notice tone={testNotice.tone} message={testNotice.message} onClose={() => setTestNotice(null)} />
+          <Notice tone="danger" message={testNotice.message} onClose={() => setTestNotice(null)} />
         </div>
       ) : null}
 
@@ -378,17 +377,21 @@ export function OutgoingOverview({
           onRetry={onReload}
         />
       ) : items.length === 0 && !showCreate ? (
-        <ListState
-          kind="empty"
-          title="まだ連携がありません"
-          description="うちで起きたことを、ほかのサービスに知らせられます。「＋ 送り先を作る」から作成してください。"
-        />
+        <div className="bg-canvas rounded-card border-hairline border">
+          <ListState
+            kind="empty"
+            title="まだ連携がありません"
+            description="うちで起きたことを、ほかのサービスに知らせられます。「＋ 送り先を作る」から作成してください。"
+          />
+        </div>
       ) : visible.length === 0 ? (
-        <ListState
-          kind="empty"
-          title="当てはまる送り先がありません"
-          description="検索の言葉か、状態の絞り込みを変えてください。"
-        />
+        <div className="bg-canvas rounded-card border-hairline border">
+          <ListState
+            kind="empty"
+            title="当てはまる送り先がありません"
+            description="検索の言葉か、状態の絞り込みを変えてください。"
+          />
+        </div>
       ) : (
         <DataTable>
           <thead>
@@ -644,6 +647,15 @@ export function IncomingOverview({
   const [unmatched, setUnmatched] = useState<IncomingWebhookUnmatchedItem[]>([])
   const [unmatchedStatus, setUnmatchedStatus] = useState<LoadStatus>('ready')
   const [dismissingId, setDismissingId] = useState<string | null>(null)
+  /*
+    S (#939 機能26): 届いたつもりで試す窓。見本のJSONを入れて
+    「どの人に届くか・何が動くか」を確かめる。実行はしない。
+  */
+  const [testOpen, setTestOpen] = useState(false)
+  const [testJson, setTestJson] = useState('')
+  const [testBusy, setTestBusy] = useState(false)
+  const [testError, setTestError] = useState('')
+  const [testResult, setTestResult] = useState<IncomingWebhookTestResult | null>(null)
   const selected = items.find((item) => item.id === selectedId) ?? items[0] ?? null
   const selectedDetailId = selected?.id ?? null
 
@@ -717,6 +729,50 @@ export function IncomingOverview({
     }
   }
 
+  /* S: 複数一致で保留した届物から、運用者が友だちを1人選んで結び付ける。 */
+  const linkUnmatched = async (item: IncomingWebhookUnmatchedItem, friendId: string) => {
+    if (!lineAccountId || dismissingId !== null) return
+    setDismissingId(item.id)
+    try {
+      const res = await api.webhooks.incoming.resolveUnmatched(item.id, lineAccountId, { action: 'link', friendId })
+      if (res.success) {
+        setUnmatched((current) => current.filter((entry) => entry.id !== item.id))
+        setDetail((current) => current
+          ? { ...current, pendingUnmatched: Math.max(0, current.pendingUnmatched - 1) }
+          : current)
+      }
+    } finally {
+      setDismissingId(null)
+    }
+  }
+
+  const runIncomingTest = async () => {
+    if (!lineAccountId || !selectedDetailId || testBusy) return
+    let payload: unknown
+    try {
+      payload = JSON.parse(testJson) as unknown
+    } catch {
+      setTestError('JSONの形が正しくありません。見本を確かめてください。')
+      return
+    }
+    setTestBusy(true)
+    setTestError('')
+    try {
+      const res = await api.webhooks.incoming.test(selectedDetailId, lineAccountId, payload)
+      if (!res.success) {
+        setTestError(res.error)
+        setTestResult(null)
+        return
+      }
+      setTestResult(res.data)
+    } catch {
+      setTestError('試せませんでした。通信を確かめて、もう一度お試しください。')
+      setTestResult(null)
+    } finally {
+      setTestBusy(false)
+    }
+  }
+
   if (status === 'loading') {
     return <ListState kind="loading" title="こちらで受け取る設定を読み込んでいます" />
   }
@@ -742,12 +798,12 @@ export function IncomingOverview({
   if (!selected) return null
 
   return (
-    <section aria-label="こちらで受け取る詳細">
-      <p className="bg-info-bg text-info rounded-card mb-4 px-4 py-3 text-sm leading-6">
+    <section aria-label="こちらで受け取る詳細" className="flex flex-col gap-4">
+      <p className="bg-info-bg text-info rounded-card px-4 py-3 text-sm leading-6">
         相手のサービスで起きたことを、うちに取り込みます。下のURLを相手に貼ってもらってください。合言葉は人に見せないでください。
       </p>
 
-      <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-4">
+      <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-4">
         <div className="space-y-4 xl:col-span-3">
           <section className="bg-canvas border-hairline rounded-card border p-5">
             <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
@@ -789,6 +845,12 @@ export function IncomingOverview({
               <div>
                 <dt className="text-ink-faint text-xs">合言葉（相手にも同じものを入れてもらう）</dt>
                 <dd className="mt-1"><StatusBadge tone={selected.hasSecret ? 'success' : 'warning'} size="compact">{selected.hasSecret ? '設定済み（再表示しません）' : '未設定'}</StatusBadge></dd>
+                {/* S: 入れ替えたばかりなら、前の合言葉が切れる時刻を示す。 */}
+                {detail?.previousSecretUsableUntil ? (
+                  <dd className="text-ink-faint mt-1 text-xs">
+                    前の合言葉は {formatReceivedAt(detail.previousSecretUsableUntil)} まで使えます
+                  </dd>
+                ) : null}
               </div>
             </dl>
             <div className="mt-2 flex flex-wrap gap-2">
@@ -805,6 +867,19 @@ export function IncomingOverview({
                   : (selected.isActive ? '止める' : '動かす')}
               </Button>
               <Button variant="secondary" onClick={() => onRotate(selected)}>合言葉を更新</Button>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setTestJson(detail?.latestSample
+                    ? `{\n  "friendId": "ここに届くデータの形を入れてください"\n}`
+                    : '')
+                  setTestResult(null)
+                  setTestError('')
+                  setTestOpen(true)
+                }}
+              >
+                届いたつもりで試す
+              </Button>
               <Button variant="secondary" onClick={() => onDelete(selected)}>削除</Button>
             </div>
           <div className="border-hairline mt-4 border-t pt-3.5">
@@ -860,20 +935,46 @@ export function IncomingOverview({
                     <li key={item.id} className="bg-canvas-sunken rounded-control flex flex-wrap items-center justify-between gap-3 px-4 py-2">
                       <div className="min-w-0">
                         <strong className="text-ink block text-sm">
-                          {item.kind === 'candidate' ? '友だち候補' : '未照合'}・{formatReceivedAt(item.receivedAt)}
+                          {item.kind === 'candidate'
+                            ? '友だち候補'
+                            : item.kind === 'ambiguous'
+                              ? '2人以上に一致'
+                              : '未照合'}・{formatReceivedAt(item.receivedAt)}
                         </strong>
                         <span className="text-ink-secondary mt-1 block text-xs">
                           {item.identityAttempts.length > 0
                             ? item.identityAttempts.map((attempt) => `${identityKindLabel(attempt.kind)}：${attempt.value}`).join('、')
                             : '照合に使える値が届いていません'}
                         </span>
+                        {/*
+                          S: 同じ値で2人以上に一致した届物は自動では動かさない。
+                          どの友だちか候補から人が選ぶ。どれでもなければ閉じる。
+                        */}
+                        {item.kind === 'ambiguous' && item.candidates.length > 0 ? (
+                          <ul className="mt-2 space-y-1">
+                            {item.candidates.map((candidate) => (
+                              <li key={candidate.friendId} className="flex items-center gap-2">
+                                <span className="text-ink text-xs">{candidate.displayName ?? candidate.friendId}</span>
+                                <Button
+                                  variant="secondary"
+                                  disabled={dismissingId !== null}
+                                  onClick={() => void linkUnmatched(item, candidate.friendId)}
+                                >
+                                  {dismissingId === item.id ? '結び付けています…' : 'この人に結び付ける'}
+                                </Button>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : null}
                       </div>
                       <Button
                         variant="secondary"
                         disabled={dismissingId !== null}
                         onClick={() => void dismissUnmatched(item)}
                       >
-                        {dismissingId === item.id ? '閉じています…' : '確認した'}
+                        {dismissingId === item.id
+                          ? '閉じています…'
+                          : item.kind === 'ambiguous' ? 'どれでもない' : '確認した'}
                       </Button>
                     </li>
                   ))}
@@ -957,6 +1058,67 @@ export function IncomingOverview({
           </GuideCard>
         </aside>
       </div>
+
+      {/*
+        S (#939 機能26): 届いたつもりで試す窓。見本のJSONで「どの人に届くか・
+        何が動くか」を確かめるだけで、実際の処理は動かない。閉じ方は右上の×。
+      */}
+      <Dialog
+        open={testOpen}
+        title="届いたつもりで試す"
+        description="見本のJSONで、どの人に届くかと何が動くかを確かめます。実際の処理は動きません。"
+        onCancel={() => setTestOpen(false)}
+        footer={
+          <div className="flex justify-end">
+            <Button variant="primary" onClick={() => void runIncomingTest()} disabled={testBusy || !testJson.trim()}>
+              {testBusy ? '試しています…' : '試す'}
+            </Button>
+          </div>
+        }
+      >
+        <label className="text-ink-secondary block text-xs" htmlFor="incoming-test-json">
+          届いたつもりのJSON
+        </label>
+        <textarea
+          id="incoming-test-json"
+          className="border-hairline text-ink mt-1 h-36 w-full rounded-lg border p-3 font-mono text-sm"
+          value={testJson}
+          onChange={(event) => setTestJson(event.target.value)}
+          placeholder='{"friendId": "…"}'
+        />
+        {testError ? <p className="text-danger mt-2 text-sm" role="alert">{testError}</p> : null}
+        {testResult ? (
+          <div className="mt-4 space-y-3">
+            <div>
+              <strong className="text-ink text-sm">だれに届くか</strong>
+              <p className="text-ink-secondary mt-1 text-sm">
+                {testResult.match.status === 'matched'
+                  ? '1人の友だちに一致しました'
+                  : testResult.match.status === 'ambiguous'
+                    ? `同じ値の友だちが${testResult.match.friendIds.length}人います。実際に届くと保留になり、人が選びます。`
+                    : '一致する友だちがいません'}
+              </p>
+            </div>
+            <div>
+              <strong className="text-ink text-sm">動く予定の処理</strong>
+              {testResult.actions.length > 0 ? (
+                <ul className="mt-1 space-y-1">
+                  {testResult.actions.map((action) => (
+                    <li key={action.refIndex} className="text-sm">
+                      <span className="text-ink">{incomingActionLabel(action.refKind)}：{action.displayName}</span>
+                      {action.ok
+                        ? <span className="text-ink-faint ml-2 text-xs">({action.plan?.length ?? 0}件の処理)</span>
+                        : <span className="text-danger ml-2 text-xs">{action.error}</span>}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-ink-secondary mt-1 text-sm">動く処理はまだ設定されていません</p>
+              )}
+            </div>
+          </div>
+        ) : null}
+      </Dialog>
     </section>
   )
 }

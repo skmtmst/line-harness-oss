@@ -40,6 +40,33 @@ const PATHS = {
     <path key="a" d="M12 16v-4" />,
     <path key="b" d="M12 8h.01" />,
   ],
+  /** 画像が無いときの印 (イベント詳細) */
+  image: [
+    <rect key="r" width="18" height="18" x="3" y="3" rx="2" />,
+    <circle key="c" cx="9" cy="9" r="2" />,
+    <path key="p" d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />,
+  ],
+  /** 場所 (イベント詳細) */
+  'map-pin': [
+    <path key="p" d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />,
+    <circle key="c" cx="12" cy="10" r="3" />,
+  ],
+  /** 待ち (キャンセル待ち・承認待ちの印) */
+  hourglass: [
+    <path key="a" d="M5 22h14" />,
+    <path key="b" d="M5 2h14" />,
+    <path key="c" d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12 7.586 16.414A2 2 0 0 0 7 17.828V22" />,
+    <path key="d" d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2" />,
+  ],
+  /** 一覧へ戻る (自分のイベントを見る) */
+  list: [
+    <path key="a" d="M3 12h.01" />,
+    <path key="b" d="M3 18h.01" />,
+    <path key="c" d="M3 6h.01" />,
+    <path key="d" d="M8 12h13" />,
+    <path key="e" d="M8 18h13" />,
+    <path key="f" d="M8 6h13" />,
+  ],
   /** 送信した */
   send: [
     <path
@@ -52,6 +79,15 @@ const PATHS = {
   'rotate-cw': [
     <path key="a" d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />,
     <path key="b" d="M21 3v5h-5" />,
+  ],
+  /** 取り消せない操作の確認窓の印 (警告の三角) */
+  'alert-triangle': [
+    <path
+      key="a"
+      d="m21.73 18-8-14a2 2 0 0 0-3.46 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"
+    />,
+    <path key="b" d="M12 9v4" />,
+    <path key="c" d="M12 17h.01" />,
   ],
   /** 読み込めなかった時の印 (雲＋斜線) */
   'cloud-off': [

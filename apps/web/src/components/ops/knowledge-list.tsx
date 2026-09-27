@@ -12,6 +12,7 @@ import ListState from '@/components/shared/list-state'
 import SelectField from '@/components/shared/select-field'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { TextField } from '@/components/shared/text-field'
+import Notice from '@/components/shared/notice'
 import styles from '@/components/ops/knowledge.module.css'
 
 /** Canonical V6 37-11 list, shared with the review/edit feature parts. */
@@ -71,7 +72,7 @@ export default function KnowledgeList() {
       <span className={styles.count}>{loaded && !error ? `${total}件` : '—'}</span>
     </div>
     {/* ★V7: 緑は「正常」だけ。説明の帯は枠なしの info の小さい帯にする。 */}
-    <div role="note" className="rounded-control bg-info-bg px-4 py-3 text-xs text-ink-secondary">解決した問い合わせを自動確認し、根拠が揃ったものだけ下書きにします。AI の返信に使うのは承認済みの記事だけです。</div>
+    <Notice tone="info">解決した問い合わせを自動確認し、根拠が揃ったものだけ下書きにします。AI の返信に使うのは承認済みの記事だけです。</Notice>
     {actionError && <p role="alert" className={styles.error}>{actionError}</p>}
     {!loaded ? <ListState kind="loading" /> : error ? <ListState kind="error" description={error} onRetry={() => void load()} /> : rows.length === 0
       ? <ListState kind="empty" emptyPreset="readonly" title="記事はありません" description="解決した問い合わせの確認結果がここに並びます。" />

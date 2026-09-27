@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import EventForm from '@/components/events/event-form'
+import Notice from '@/components/shared/notice'
 import TargetMissing from '@/components/shared/target-missing'
 import { useAccount } from '@/contexts/account-context'
 import {
@@ -68,10 +69,12 @@ function BookingStatus({ accountId, eventId }: { accountId: string; eventId: str
   return (
     <div data-design="Status" className="mb-5">
       {loadError && (
-        <p className="bg-warning-bg border-warning text-warning mb-3 rounded-control border px-4 py-3 text-xs" role="alert">
-          一部を取得できませんでした。取得できなかった数は「—」で表示しています。
-          <button className="ml-2 font-semibold underline" onClick={() => { setLoading(true); setReloadSeq((n) => n + 1) }}>読み直す</button>
-        </p>
+        <Notice
+          tone="warn"
+          message="一部を取得できませんでした。取得できなかった数は「—」で表示しています。"
+          action={<button className="font-semibold underline" onClick={() => { setLoading(true); setReloadSeq((n) => n + 1) }}>読み直す</button>}
+          className="mb-3"
+        />
       )}
       <div className="mb-2 flex items-center gap-2">
         <h2 className="text-ink text-sm font-bold">申込の状況</h2>
@@ -125,8 +128,9 @@ function EditEventInner() {
   }
 
   return (
-    <div>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <nav className="text-ink-faint text-xs" data-design="Crumb" aria-label="パンくず">
           <Link href="/events" className="hover:underline">
             イベント予約
@@ -153,7 +157,7 @@ function EditEventInner() {
             <EventForm accountId={selectedAccountId} eventId={id} />
           </div>
 
-          <section className="bg-canvas-sunken rounded-card border-hairline mt-5 border p-4">
+          <section className="bg-canvas-sunken rounded-card border-hairline border p-4">
             <h2 className="text-ink text-sm font-bold">気をつけること</h2>
             <ul className="text-ink-faint mt-2 space-y-1 text-xs leading-relaxed">
               <li>

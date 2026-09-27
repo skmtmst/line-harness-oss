@@ -66,9 +66,10 @@ export default function OpsAuditPage() {
   const last = Math.min(page * PAGE, total)
 
   return (
-    <div data-design-node="oEzZz">
+    <div data-design-node="oEzZz" className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       <OpsPageHeader title="監査ログ" />
-      <div className="mb-4 flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <h2 className="text-lead font-bold text-ink">運営が行った操作の記録</h2>
         <div className="flex flex-wrap items-center gap-1.5">
           {FILTERS.map((f) => (
@@ -101,7 +102,9 @@ export default function OpsAuditPage() {
         // 「記録が無い」と「読み込めなかった」を言い分ける。失敗時は空の案内ではなくエラーと再読み込みを出す。
         <ListState kind="error" title="記録を表示できませんでした" onRetry={() => void load()} />
       ) : rows.length === 0 ? (
-        <ListState kind="empty" title="記録がありません" description="運営が操作を行うと、ここに残ります。" />
+        <div className="bg-canvas rounded-card border-hairline border">
+          <ListState kind="empty" title="記録がありません" description="運営が操作を行うと、ここに残ります。" />
+        </div>
       ) : (
         <DataTable>
           <thead>
@@ -130,7 +133,7 @@ export default function OpsAuditPage() {
         </DataTable>
       )}
 
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-caption text-ink-faint">
+      <div className="flex flex-wrap items-center justify-between gap-3 text-caption text-ink-faint">
         <ListRange total={total} first={first} last={last} />
         <Pagination page={page} pageCount={pageCount} onPageChange={setPage} ariaLabel="監査ログのページ" disabled={loading} />
       </div>

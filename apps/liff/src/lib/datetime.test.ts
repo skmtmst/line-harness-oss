@@ -2,12 +2,15 @@ import { describe, expect, it } from 'vitest';
 import {
   addDays,
   formatJp,
+  formatJstEventAt,
+  formatJstEventSpan,
   formatMd,
   formatWeekday,
   jstStartsAtIso,
   utcToJstDisplay,
   utcToJstHm,
   utcToJstMd,
+  utcToJstWeekday,
 } from './datetime.js';
 
 describe('予約の日付の見せ方', () => {
@@ -33,5 +36,26 @@ describe('予約の日付の見せ方', () => {
   it('送る時刻は JST の壁時計で ISO 化する (動きはそのまま)', () => {
     expect(jstStartsAtIso('2026-10-01', '10:00')).toBe('2026-10-01T01:00:00.000Z');
     expect(addDays('2026-10-01', 13)).toBe('2026-10-14');
+  });
+});
+
+describe('イベントの日時の見せ方', () => {
+  it('1時点は M月D日（曜）HH:MM', () => {
+    // 2026-10-11 は日曜。04:00Z は JST の 13:00。
+    expect(formatJstEventAt('2026-10-11T04:00:00Z')).toBe('10月11日（日）13:00');
+    expect(utcToJstWeekday('2026-10-11T04:00:00Z')).toBe('日');
+  });
+
+  it('同じ日なら終わりの時刻だけ足す', () => {
+    expect(formatJstEventSpan('2026-10-11T04:00:00Z', '2026-10-11T06:00:00Z')).toBe(
+      '10月11日（日）13:00〜15:00',
+    );
+  });
+
+  it('日またぎは両日を出す (UTC の日付をそのまま出さない)', () => {
+    // JST の 10/11 23:00 〜 10/12 01:00。
+    expect(formatJstEventSpan('2026-10-11T14:00:00Z', '2026-10-11T16:00:00Z')).toBe(
+      '10月11日（日）23:00 〜 10月12日（月）01:00',
+    );
   });
 });

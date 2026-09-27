@@ -361,10 +361,11 @@ export default function AutoRepliesPage() {
     if (!word.linked) {
       return <span className="text-[11px] text-ink-faint" title={word.note}>{word.label}</span>
     }
+    // R11: テンプレートはこの行の物とは別物のため、別画面へ飛ばさない。名前は黒文字。
     return (
-      <a href="/templates" className="text-blue-600 hover:underline text-xs" title={word.note}>
+      <span className="text-ink text-xs" title={word.note}>
         {word.label}
-      </a>
+      </span>
     )
   }
 
@@ -541,18 +542,20 @@ export default function AutoRepliesPage() {
   const visualMonthly = monthlyHits
 
   return (
-    <div>
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}
-      <KpiCollapse data-design="KPIs" className="mb-4" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <KpiCollapse data-design="KPIs" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-faint text-xs">ルール数</p>
+          {/* R12: 総数は「すべて」の行とページ送りだけにし、KPIの主数値は有効にする。 */}
+          <p className="text-ink-faint text-xs">有効</p>
           <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-            {metricWord(visibleLoadState, visualTotal)}
+            {metricWord(visibleLoadState, visualActive)}
             {ready && <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>}
           </p>
           <p className="text-ink-faint mt-0.5 text-xs">
             {ready
-              ? `有効 ${visualActive}件`
+              ? `動いていない ${visualTotal - visualActive}件`
               : LOAD_STATE_WORDS[visibleLoadState].label}
           </p>
         </div>
@@ -599,7 +602,7 @@ export default function AutoRepliesPage() {
         複数当てはまったときの挙動と、「適用アカウント」欄の札の読み方。書いていないと必ず問い合わせになるが、
         毎回2つの帯が一覧を押し下げていたので、閉じた欄にしまう（★V7：今は出さなくてよいもの）。
       */}
-      <Disclosure size="compact" title="ルールの動き方と札の見方" hint="上から順に1つだけ動きます" className="mb-4">
+      <Disclosure size="compact" title="ルールの動き方と札の見方" hint="上から順に1つだけ動きます">
         <div className="text-ink-secondary mb-3 text-xs leading-relaxed">
           上にあるルールから順に見て、<strong>最初に当てはまった1つだけ</strong>が動きます。
           時間帯や連投の設定で見送られたときは、その次のルールを見ます。
@@ -649,7 +652,11 @@ export default function AutoRepliesPage() {
       {/*
         ★V7 `Xn1Mz`：検索は幅320で1行目、2行目は左に絞り込み・
         右端に並び順と表示件数。#636/#668 の並びの意図はそのまま。
+        設計の Bar（検索行）・Saved（絞り込み行）は共通 ListToolbar の
+        1・2行目にいる。印だけここに残し、設計との突き合わせを保つ。
       */}
+      <div data-design="Bar">
+      <div data-design="Saved">
       <ListToolbar
         search={{ placeholder: '自動応答名で検索', value: query, onChange: setQuery }}
         filters={
@@ -681,6 +688,8 @@ export default function AutoRepliesPage() {
           </>
         }
       />
+      </div>
+      </div>
 
       {folderDialogOpen && (
         <FolderAddDialog

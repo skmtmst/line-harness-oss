@@ -16,6 +16,7 @@ import AutomationTemplateGallery from '@/components/automations/automation-templ
 import { useCanManageAutomations } from '@/components/automations/use-automation-permission'
 import Chip from '@/components/shared/chip'
 import Disclosure from '@/components/shared/disclosure'
+import Notice from '@/components/shared/notice'
 import ListState from '@/components/shared/list-state'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import KpiCollapse from '@/components/ui/kpi-collapse'
@@ -523,9 +524,7 @@ export default function AutomationsPage() {
         <div className="mb-4">
           <MergedTabs basePath="/automations" paramName="tab" tabs={tabs} active={tab} />
         </div>
-        <div className="bg-info-bg text-ink-secondary mb-4 rounded-control px-4 py-3 text-xs">
-          見本を選ぶと、そのまま「つくる」画面が開きます。中身は自由に直せます。よく使われている順に並べています。
-        </div>
+        <Notice tone="info" message="見本を選ぶと、そのまま「つくる」画面が開きます。中身は自由に直せます。よく使われている順に並べています。" className="mb-4" />
         <AutomationTemplateGallery accountId={selectedAccountId} canManage={canManageAutomations} />
         <style jsx global>{`
           [data-design-node="WjYAC"] [aria-label="きっかけで絞り込む"] { display: none; }
@@ -593,8 +592,9 @@ export default function AutomationsPage() {
   )
 
   return (
-    <div>
-      <div className="mb-4">
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <div>
         <MergedTabs basePath="/automations" paramName="tab" tabs={tabs} active={tab} />
       </div>
       {/*
@@ -602,7 +602,7 @@ export default function AutomationsPage() {
         見出しの行の右端には、たまに使う「共通アクションを見る」
         「マニュアル」だけを残す。
       */}
-      <div data-design="Head" className="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <div data-design="Head" className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-ink-faint">自動化 ＞ オートメーション</p>
         <div className="flex flex-wrap gap-2">
           <Button href="/common-actions">共通アクションを見る</Button>
@@ -611,16 +611,14 @@ export default function AutomationsPage() {
         </div>
       </div>
       {viewerOnly ? (
-        <p className="bg-status-warn-soft text-status-warn-deep mb-4 rounded-control px-4 py-3 text-xs" role="note">
-          閲覧のみのため、ルールの作成・変更はできません。操作する権限がありません。
-        </p>
+        <Notice tone="warn" message="閲覧のみのため、ルールの作成・変更はできません。操作する権限がありません。" className="mb-4" />
       ) : (
-        <p className="bg-info-bg text-ink-secondary mb-4 rounded-control px-4 py-3 text-xs">「〜のとき、〜する」を登録して自動で実行します。友だち一覧から手で実行したり、毎日決まった時刻に動かすこともできます。</p>
+        <Notice tone="info" message="「〜のとき、〜する」を登録して自動で実行します。友だち一覧から手で実行したり、毎日決まった時刻に動かすこともできます。" className="mb-4" />
       )}
       <p className="sr-only">共通アクションは友だち一覧からの手動実行にも使えます。</p>
 
       {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}
-      <KpiCollapse data-design="KPIs" className="mb-4" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <KpiCollapse data-design="KPIs" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">動いているもの</p>
           <p className="text-ink mt-1 text-2xl font-bold">
@@ -646,7 +644,7 @@ export default function AutomationsPage() {
         </div>
       </KpiCollapse>
 
-      <Disclosure size="compact" title="動く順番の見方" hint="上から順に確認" className="mb-4">
+      <Disclosure size="compact" title="動く順番の見方" hint="上から順に確認">
         <p>上から順に見て、当てはまったものが動きます。同じきっかけで2本が当てはまると両方が動くため、片方だけにしたいときは条件をずらしてください。</p>
       </Disclosure>
 
@@ -654,7 +652,7 @@ export default function AutomationsPage() {
         作る操作は数字のカードの下・一覧のすぐ上の左。
         「見本から作る」も作る操作なので同じ並びの副ボタンへ。
       */}
-      <div className="mb-3 flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {canManageAutomations ? <Button href="/automations/new" variant="primary">＋ ルールを作る</Button> : null}
         <Button href="/automations?tab=templates">見本から作る</Button>
       </div>
@@ -694,9 +692,7 @@ export default function AutomationsPage() {
 
       {/* Error */}
       {error && (
-        <div className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
-          {error}
-        </div>
+        <Notice tone="danger" message={error} onClose={() => setError('')} className="mb-4" />
       )}
 
       {loadStatus === 'loading' ? (
@@ -709,14 +705,16 @@ export default function AutomationsPage() {
           action={<Button variant="secondary" onClick={() => void loadAutomations()}>オートメーションを再読み込み</Button>}
         />
       ) : visibleAutomations.length === 0 ? (
-        <ListState
-          kind="empty"
-          title={automations.length === 0
-            ? (tab === 'stopped' ? '止めているオートメーションはありません。' : '動いているオートメーションはありません。')
-            : '条件に合うオートメーションはありません。'}
-          description={automations.length === 0 ? 'きっかけ・だれに・することの3つを決めると動きます。' : '検索語や絞り込みを変えてください。'}
-          action={tab === 'active' && canManageAutomations ? <Button href="/automations/new" variant="primary">＋ ルールを作る</Button> : undefined}
-        />
+        <div className="bg-canvas rounded-card border-hairline border">
+          <ListState
+            kind="empty"
+            title={automations.length === 0
+              ? (tab === 'stopped' ? '止めているオートメーションはありません。' : '動いているオートメーションはありません。')
+              : '条件に合うオートメーションはありません。'}
+            description={automations.length === 0 ? 'きっかけ・だれに・することの3つを決めると動きます。' : '検索語や絞り込みを変えてください。'}
+            action={tab === 'active' && canManageAutomations ? <Button href="/automations/new" variant="primary">＋ ルールを作る</Button> : undefined}
+          />
+        </div>
       ) : (
         <div className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-sm">
           <div className="grid grid-cols-6 gap-3 bg-canvas-sunken px-4 py-3 text-xs font-semibold text-ink-faint">

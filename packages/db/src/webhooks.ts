@@ -49,6 +49,13 @@ export interface IncomingWebhookRow {
   secret: string | null;
   /** AES-GCM 暗号文。#650 以降の正本。旧スキーマの行には無いことがある。 */
   secret_encrypted?: string | null;
+  /**
+   * S (#939 機能26): 入れ替え前の合言葉の暗号文。入れ替えから24時間だけ
+   * 署名の照合に使える。期限は secret_rotated_at から数える。
+   */
+  secret_previous_encrypted?: string | null;
+  /** 合言葉を最後に入れ替えた時刻。入れ替えたことが無い行は NULL。 */
+  secret_rotated_at?: string | null;
   is_active: number;
   line_account_id: string | null;
   version: number;
@@ -458,7 +465,17 @@ export type WebhookSecretColumns = {
   id?: string;
   secret: string | null;
   secret_encrypted?: string | null;
+  /** S: 入れ替え前の合言葉の暗号文。併用期間の照合だけに使う。 */
+  secret_previous_encrypted?: string | null;
+  /** S: 合言葉を最後に入れ替えた時刻。入れ替えたことが無い行は NULL。 */
+  secret_rotated_at?: string | null;
 };
+
+/**
+ * S (#939 機能26): 入れ替えた前の合言葉を受け付ける併用期間。
+ * 新しい合言葉を保存した時点から24時間だけ、前の合言葉の署名も通す。
+ */
+export const WEBHOOK_SECRET_PREVIOUS_GRACE_MS = 24 * 60 * 60 * 1000;
 
 /** 呼び出し側が渡す鍵。文字列1件は現行鍵だけの指定とみなす。 */
 export interface WebhookKeyInput {
@@ -588,6 +605,33 @@ export async function resolveWebhookSecret(
     throw new Error('Unable to decrypt webhook secret');
   }
   return row.secret;
+}
+
+/**
+ * S (#939 機能26): 併用期間内の前の合言葉を返す。
+ * 期限切れ・未設定・前の値が無い行は null。復号に失敗しても例外にせず、
+ * 「前の合言葉では通せない」だけにする(現行の合言葉の判定は別で行う)。
+ */
+export async function resolvePreviousWebhookSecret(
+  row: WebhookSecretColumns,
+  keys?: WebhookKeyInput | string,
+  now = Date.now(),
+): Promise<string | null> {
+  if (!row.secret_previous_encrypted || !row.secret_rotated_at) return null;
+  const rotatedAt = Date.parse(row.secret_rotated_at);
+  if (!Number.isFinite(rotatedAt) || now - rotatedAt > WEBHOOK_SECRET_PREVIOUS_GRACE_MS) return null;
+  try {
+    return await resolveWebhookSecret(
+      { id: row.id, secret: null, secret_encrypted: row.secret_previous_encrypted },
+      keys,
+    );
+  } catch {
+    console.error(JSON.stringify({
+      event: 'webhook_secret_previous_decrypt_failed',
+      webhookId: row.id ?? null,
+    }));
+    return null;
+  }
 }
 
 /** 一覧・詳細の hasSecret 判定。秘密値そのものは返さない。 */
@@ -930,6 +974,22 @@ export async function updateIncomingWebhook(
   if (updates.sourceType !== undefined) { sets.push('source_type = ?'); values.push(updates.sourceType); }
   if (updates.secret !== undefined) {
     // 入れ直しは暗号化して保存し、旧平文を消す。鍵がなければ例外にする。
+    /*
+     * S (#939 機能26): 入れ替え前の合言葉は secret_previous_encrypted へ移し、
+     * 入れ替え時刻と一緒に残す。受信側は入れ替えから24時間だけ前の
+     * 合言葉の署名も受け付ける(相手側の切り替えに猶予を持たせる)。
+     * 前の値が暗号文ならそのまま移す。旧平文だけ残る行は暗号化して移す。
+     */
+    const before = await db
+      .prepare(`SELECT secret, secret_encrypted FROM incoming_webhooks WHERE id = ? AND line_account_id = ?`)
+      .bind(id, lineAccountId)
+      .first<{ secret: string | null; secret_encrypted: string | null }>();
+    const previous = before?.secret_encrypted
+      ?? (before?.secret ? await encryptWebhookSecret(before.secret, keys) : null);
+    sets.push('secret_previous_encrypted = ?');
+    values.push(previous);
+    sets.push('secret_rotated_at = ?');
+    values.push(jstNow());
     sets.push('secret_encrypted = ?');
     values.push(await encryptWebhookSecret(updates.secret, keys));
     sets.push('secret = NULL');
@@ -1108,7 +1168,9 @@ export async function getActiveOutgoingWebhooksByEvent(
 //                        相手の名乗りをそのまま友だちにすると成り済ませるため）
 // 同じ受信の再送は (webhook_id, source_event_id) の UNIQUE で増やさない。
 
-export type IncomingWebhookUnmatchedKind = 'unmatched' | 'candidate';
+//   ambiguous        … 同じ値の友だちが2人以上いて自動では決められない
+//                      (S #939 機能26)。人が候補から選ぶまで保留する。
+export type IncomingWebhookUnmatchedKind = 'unmatched' | 'candidate' | 'ambiguous';
 export type IncomingWebhookUnmatchedStatus = 'pending' | 'resolved' | 'dismissed';
 
 export interface IncomingWebhookUnmatchedEventRow {
@@ -1122,6 +1184,8 @@ export interface IncomingWebhookUnmatchedEventRow {
   identity_attempts_json: string;
   /** 届いた本文の形だけの見本。値は •••• に伏せる。 */
   masked_shape_json: string | null;
+  /** S: kind='ambiguous' の届物が持つ、一致した友だちIDの並び。 */
+  candidate_friend_ids_json?: string | null;
   resolved_friend_id: string | null;
   resolved_by: string | null;
   resolved_at: string | null;
@@ -1139,27 +1203,38 @@ export async function recordIncomingWebhookUnmatched(
     kind: IncomingWebhookUnmatchedKind;
     identityAttempts: Array<{ kind: string; path: string; value: string }>;
     maskedShape?: unknown;
+    /** kind='ambiguous' のとき、一致した友だちIDの並び(人が選ぶ元)。 */
+    candidateFriendIds?: string[];
     receivedAt?: string;
   },
 ): Promise<IncomingWebhookUnmatchedEventRow> {
   const id = crypto.randomUUID();
   const now = jstNow();
+  /*
+   * S: candidate_friend_ids_json は入れ替えた表(migration 489)にだけある。
+   * 値を渡されたときだけ列名をSQLに含める。移行前の旧表でも unmatched /
+   * candidate の記録は動き続ける。
+   */
+  const candidateColumn = input.candidateFriendIds === undefined
+    ? ''
+    : ', candidate_friend_ids_json';
+  const candidateValue = input.candidateFriendIds === undefined ? '' : ', ?';
+  const binds: unknown[] = [
+    id,
+    input.webhookId,
+    input.lineAccountId,
+    input.sourceEventId,
+    input.kind,
+    JSON.stringify(input.identityAttempts),
+    input.maskedShape === undefined ? null : JSON.stringify(input.maskedShape),
+  ];
+  if (input.candidateFriendIds !== undefined) binds.push(JSON.stringify(input.candidateFriendIds));
+  binds.push(input.receivedAt ?? now, now, now);
   await db.prepare(`INSERT OR IGNORE INTO incoming_webhook_unmatched_events
       (id, webhook_id, line_account_id, source_event_id, kind, status,
-       identity_attempts_json, masked_shape_json, received_at, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)`)
-    .bind(
-      id,
-      input.webhookId,
-      input.lineAccountId,
-      input.sourceEventId,
-      input.kind,
-      JSON.stringify(input.identityAttempts),
-      input.maskedShape === undefined ? null : JSON.stringify(input.maskedShape),
-      input.receivedAt ?? now,
-      now,
-      now,
-    )
+       identity_attempts_json, masked_shape_json${candidateColumn}, received_at, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, 'pending', ?, ?${candidateValue}, ?, ?, ?)`)
+    .bind(...binds)
     .run();
   return (await db.prepare(`SELECT * FROM incoming_webhook_unmatched_events
       WHERE webhook_id = ? AND source_event_id = ?`)

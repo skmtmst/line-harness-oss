@@ -469,8 +469,9 @@ export default function FormSubmissionsPage() {
   }, [loadError, loading, page, pageCount])
 
   return (
-    <div data-design-node="EMBIK">
-      <div data-design="Bar" className="mb-4 flex flex-wrap items-center justify-between gap-2">
+    <div data-design-node="EMBIK" className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <div data-design="Bar" className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap gap-2">
           <Button variant="primary" onClick={createDraft} disabled={creating}>
             {creating ? '下書きを作成中' : '＋ フォームを作る'}
@@ -480,7 +481,7 @@ export default function FormSubmissionsPage() {
 
       <div style={FOLDER_RAIL_STYLE} className="grid items-start gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
         <FolderPanel
-          total={loading || loadError ? '— 件' : `${folderTotal} 件`}
+          /* R12: 総数は「すべて」の行と同じ数なので見出しには出さない。 */
           activeId={activeFolderId}
           onSelect={(folder) => {
             setActiveFolderId(folder)
@@ -509,7 +510,11 @@ export default function FormSubmissionsPage() {
           {/*
             ★V7 `Xn1Mz`：検索は幅320で1行目、2行目は左に絞り込み・
             右端に並び順と表示件数。管理者確認の切り替えは2行目の右へ。
+            設計の Saved（絞り込み行）は共通 ListToolbar の2行目にいる。
+            印だけここに残し、設計との突き合わせを保つ（Bar の印は上の
+            作成行にある）。
           */}
+          <div data-design="Saved">
           <ListToolbar
             search={{
               placeholder: 'フォーム名・質問文で検索',
@@ -560,22 +565,25 @@ export default function FormSubmissionsPage() {
               </>
             }
           />
+          </div>
           {reviewMode && (
-            <div className="border-hairline rounded-card mb-3 border bg-white p-3 text-xs text-ink-secondary">
+            <div className="border-hairline rounded-card border bg-white p-3 text-xs text-ink-secondary">
               <p><span className="font-bold text-ink">管理者確認中のフォーム</span> — 担当アカウントが決まっていない旧フォームだけを出しています。公開URLは生きているため回答は入り続けます。</p>
               <p className="mt-1">担当の割り当ては後続の対応（#771）で行います。この画面では割り当て操作はできません。</p>
             </div>
           )}
 
-          {createError && <p className="mb-3 text-sm text-danger">{createError}</p>}
+          {createError && <p className="text-sm text-danger">{createError}</p>}
           {accountLoading ? (
           <ListState kind="loading" title="LINE公式アカウントを確認しています" />
         ) : !selectedAccountId ? (
-          <ListState
-            kind="empty"
-            title="LINE公式アカウントを選んでください"
-            description="上のアカウント切替から、回答フォームを使う公式アカウントを選びます。"
-          />
+          <div className="bg-canvas rounded-card border-hairline border">
+            <ListState
+              kind="empty"
+              title="LINE公式アカウントを選んでください"
+              description="上のアカウント切替から、回答フォームを使う公式アカウントを選びます。"
+            />
+          </div>
         ) : loading ? (
           <ListState
             kind="loading"
@@ -590,35 +598,43 @@ export default function FormSubmissionsPage() {
             onRetry={() => void loadForms()}
           />
         ) : reviewMode && reviewForbidden ? (
-          <ListState
-            kind="empty"
-            title="確認できる未割り当てフォームはありません"
-            description="管理者確認は既定テナントの管理者のみ利用できます。"
-          />
+          <div className="bg-canvas rounded-card border-hairline border">
+            <ListState
+              kind="empty"
+              title="確認できる未割り当てフォームはありません"
+              description="管理者確認は既定テナントの管理者のみ利用できます。"
+            />
+          </div>
         ) : reviewMode && forms.length === 0 ? (
-          <ListState
-            kind="empty"
-            title="担当未割り当てのフォームはありません"
-            description="担当の決まっていない旧フォームはここに出ます。"
-          />
+          <div className="bg-canvas rounded-card border-hairline border">
+            <ListState
+              kind="empty"
+              title="担当未割り当てのフォームはありません"
+              description="担当の決まっていない旧フォームはここに出ます。"
+            />
+          </div>
         ) : folderTotal === 0 ? (
-          <ListState
-            kind="empty"
-            title="まだフォームがありません"
-            description="最初の1つを作ると、集まった回答もここから見られます。"
+          <div className="bg-canvas rounded-card border-hairline border">
+            <ListState
+              kind="empty"
+              title="まだフォームがありません"
+              description="最初の1つを作ると、集まった回答もここから見られます。"
             action={(
               <Button variant="primary" onClick={createDraft} disabled={creating}>
                 {creating ? '下書きを作成中' : '＋ フォームを作る'}
               </Button>
             )}
-          />
+            />
+          </div>
         ) : (
           listTotal === 0 ? (
-            <ListState
-              kind="empty"
-              title="条件に合うフォームはありません"
-              description="検索語や絞り込み条件を変えてください。"
-            />
+            <div className="bg-canvas rounded-card border-hairline border">
+              <ListState
+                kind="empty"
+                title="条件に合うフォームはありません"
+                description="検索語や絞り込み条件を変えてください。"
+              />
+            </div>
           ) : (
           <div className="border-hairline rounded-card overflow-hidden border bg-white">
             {/*

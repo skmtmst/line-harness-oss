@@ -7,7 +7,7 @@ import { ApiError } from '@/lib/api'
 /**
  * 運営コンソール（★V6 37）だけで使う小さな部品と表記の決まり。
  *
- * 札は共通の `Chip`、数値カードは共通の `SummaryCard`、表は共通の `DataTable`
+ * 札は共通の `Chip`、数値カードは共通の `KpiCard`、表は共通の `DataTable`
  * を使う。ここには「状態をどの札で出すか」と「日付・プランの表記」だけを置く。
  */
 

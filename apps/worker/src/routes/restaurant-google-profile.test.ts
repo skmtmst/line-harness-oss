@@ -228,7 +228,7 @@ describe('Googleビジネス：営業時間の変更案（GB-11）', () => {
     const r = await propose({ source: 'shortcut', shortcut: 'close_today' });
     expect(r.status).toBe(200);
     expect(r.json.change).toMatchObject({ kind: 'special_hours', summary: '9/23（水）を休業に', status: 'draft', reservationImpactCount: 1 });
-    expect(r.json.change!.before).toEqual([{ date: '2026-09-23', closed: false, periods: [{ open: '11:00', close: '15:00' }, { open: '17:00', close: '22:00' }] }]);
+    expect(r.json.change!.before).toEqual([{ date: '2026-09-23', closed: false, periods: [{ open: '11:00', close: '15:00' }, { open: '17:00', close: '22:00' }], special: false }]);
     expect(r.json.change!.after).toEqual([{ date: '2026-09-23', closed: true, periods: [] }]);
     expect(JSON.stringify(r.json)).not.toContain('予約者');
   });
@@ -253,6 +253,21 @@ describe('Googleビジネス：営業時間の変更案（GB-11）', () => {
     const ok = await propose({ source: 'calendar', days: [{ date: '2026-09-25', closed: false, periods: [{ open: '09:00', close: '17:00' }] }] });
     expect(ok.status).toBe(200);
     expect(ok.json.change!.summary).toBe('9/25（金）を09:00–17:00に');
+  });
+
+  it('特別営業時間を外す：登録済みの日だけ受け付け、送信では原文からその日を除いた全件を送る', async () => {
+    const none = await propose({ source: 'calendar', days: [{ date: '2026-09-25', remove: true, closed: false, periods: [] }] });
+    expect(none.status).toBe(409); // 9/25 は特別営業時間なし
+    const r = await propose({ source: 'calendar', days: [{ date: '2026-10-01', remove: true, closed: false, periods: [] }] });
+    expect(r.status).toBe(200);
+    expect(r.json.change).toMatchObject({ kind: 'special_hours', summary: '10/1（木）の特別営業時間を外す' });
+    expect(r.json.change!.before).toEqual([{ date: '2026-10-01', closed: true, periods: [], special: true }]);
+    expect(r.json.change!.after).toEqual([{ date: '2026-10-01', remove: true, closed: false, periods: [{ open: '11:00', close: '15:00' }, { open: '17:00', close: '22:00' }] }]);
+    const s = await send(r.json.change!.id);
+    expect(s.status).toBe(200);
+    expect(s.json.change!.status).toBe('applied');
+    const body = JSON.parse(String(patchCalls()[0].init?.body)) as { specialHours: { specialHourPeriods: unknown[] } };
+    expect(body.specialHours.specialHourPeriods).toEqual([]); // 10/1 が唯一の登録だったので空リスト
   });
 
   it('毎週：変わった曜日だけを対象にし、深夜またぎも受け付ける', async () => {
@@ -350,7 +365,7 @@ describe('Googleビジネス：変更の送信（GB-12 / GB-15）', () => {
     const s = await send(r.json.change!.id);
     expect(s.status).toBe(409);
     expect(s.json.code).toBe('conflict');
-    expect(s.json.current).toEqual([{ date: '2026-09-23', closed: false, periods: [{ open: '10:00', close: '20:00' }] }]);
+    expect(s.json.current).toEqual([{ date: '2026-09-23', closed: false, periods: [{ open: '10:00', close: '20:00' }], special: false }]);
     expect(patchCalls()).toHaveLength(0);
     expect(s.json.change!.status).toBe('conflict');
   });

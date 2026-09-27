@@ -28,6 +28,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { TextInput } from '@/components/shared/form-controls'
 import DateField from '@/components/shared/date-field'
 import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import { optionsWithCurrent } from './reference-options'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -569,7 +570,7 @@ function SavedSearchEditInner() {
         <Button href="/tags?tab=searches">保存した検索へ</Button>
       </div>
 
-      {error ? <p role="alert" className="mb-4 rounded-control border border-status-danger-border bg-status-danger-soft p-3 text-sm text-danger">{error}</p> : null}
+      {error ? <Notice tone="danger" message={error} className="mb-4" /> : null}
 
       {/*
         ATTR-16: グリッド子は `min-w-0` で縮める。無いと中身の最小幅が
@@ -636,11 +637,11 @@ function SavedSearchEditInner() {
             {previewError ? (
               <p role="alert" className="mt-2 text-xs text-danger">{previewError}</p>
             ) : previewStale ? (
-              <div className="mt-2 rounded-control border border-warning/30 bg-warning-bg p-2 text-xs leading-5 text-status-warn-deep">
-                <p className="font-semibold">条件を変更しました。上の人数は変更前の条件のもので、変更後の条件は未計算です。</p>
-                <p className="mt-1"><span className="font-semibold">変更前：</span>{beforeSummary.length ? beforeSummary.join('・') : '条件なし'}</p>
-                <p className="mt-1"><span className="font-semibold">変更後：</span>{afterSummary.length ? afterSummary.join('・') : '条件なし'}</p>
-              </div>
+              <Notice tone="warn" className="mt-2">
+                <p className="text-xs font-semibold">条件を変更しました。上の人数は変更前の条件のもので、変更後の条件は未計算です。</p>
+                <p className="mt-1 text-xs"><span className="font-semibold">変更前：</span>{beforeSummary.length ? beforeSummary.join('・') : '条件なし'}</p>
+                <p className="mt-1 text-xs"><span className="font-semibold">変更後：</span>{afterSummary.length ? afterSummary.join('・') : '条件なし'}</p>
+              </Notice>
             ) : (
               <p className="mt-2 text-xs text-ink-faint">{preview ? `LINE ${preview.byChannel.line ?? '—'}人・MAIL ${preview.byChannel.mail ?? '—'}人` : '保存済み条件で集計'}</p>
             )}
@@ -650,7 +651,7 @@ function SavedSearchEditInner() {
           <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card">
             <h2 className="text-base font-bold text-ink">使うときの参照の仕方</h2>
             <div className="mt-3 space-y-2 text-sm text-ink-secondary"><p><strong className="text-ink">ライブ参照</strong>　使うたびに条件で数え直し、人の出入りを反映します。</p><p><strong className="text-ink">固定</strong>　保存した時点の人を使い、あとから条件を変えても対象は変えません。</p></div>
-            <p className="mt-3 rounded-control bg-warning-bg p-3 text-xs text-warning">{original.usedIn?.some((usage) => usage.mode === 'live') ? 'ライブ参照の使用先は、条件を変えると次回実行から対象が変わります。' : '現在、ライブ参照の使用先はありません。'}</p>
+            <Notice tone="warn" className="mt-3">{original.usedIn?.some((usage) => usage.mode === 'live') ? 'ライブ参照の使用先は、条件を変えると次回実行から対象が変わります。' : '現在、ライブ参照の使用先はありません。'}</Notice>
           </section>
 
           <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card">

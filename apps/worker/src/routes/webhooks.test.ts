@@ -52,7 +52,14 @@ vi.mock('@line-crm/db', async (importOriginal) => {
     }
     return (row?.secret as string | null) ?? null;
   }),
+  // S: 前の合言葉の併用。個別の試験で立てる場合は mockResolvedValue で差し替える。
+  resolvePreviousWebhookSecret: vi.fn(async () => null),
+  WEBHOOK_SECRET_PREVIOUS_GRACE_MS: actual.WEBHOOK_SECRET_PREVIOUS_GRACE_MS,
   WEBHOOK_SECRET_MIN_LENGTH: 32,
+  // V: 秘密の値の登録・APIトークン操作は直前の再確認が必要。ここでは
+  // 入力検証を見たいので、再確認済みとして通す。
+  consumeStepUpGrant: vi.fn(async () => true),
+  getAdminSessionByTokenHash: vi.fn(async () => null),
   };
 });
 
@@ -74,8 +81,9 @@ vi.mock('../services/incoming-webhook-actions.js', async (importOriginal) => {
   return {
     ...actual,
     executeIncomingWebhookActions: vi.fn().mockResolvedValue({
-      matchedFriendId: null, executed: 0, failed: 0,
+      matchedFriendId: null, executed: 0, failed: 0, matchStatus: 'not_found',
     }),
+    previewIncomingWebhook: vi.fn(),
   };
 });
 
@@ -117,11 +125,13 @@ import {
   backfillWebhookSecrets,
   hasWebhookSecret,
   resolveWebhookSecret,
+  resolvePreviousWebhookSecret,
+  listIncomingWebhookUnmatched,
 } from '@line-crm/db';
 import { retryWebhookInteraction } from '../services/webhook-interactions.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { fireEvent } from '../services/event-bus.js';
-import { executeIncomingWebhookActions } from '../services/incoming-webhook-actions.js';
+import { executeIncomingWebhookActions, previewIncomingWebhook } from '../services/incoming-webhook-actions.js';
 import { deliverWebhook } from '../services/outgoing-webhook-delivery.js';
 import type { Env } from '../index.js';
 import { webhooks } from './webhooks.js';
@@ -161,6 +171,8 @@ function setupApp(
     c.set('staff', {
       id: 'staff-1', name: 'Staff', role, readOnly: false, tenantId, permissionKeys,
     });
+    // V: 大事な操作の直前再確認。ここでは入力検証を見たいので確認済みとして通す。
+    c.req.raw.headers.set('x-step-up-token', 'test-step-up');
     return next();
   });
   app.route('/', webhooks);
@@ -181,7 +193,14 @@ const receiptPrepare = (sql: string) => ({ bind: () => ({
   first: async () => sql.includes('SELECT source_event_id,status,received_at')
     ? { source_event_id: 'receipt-event-1', status: 'processing', received_at: '2026-09-12T00:00:00.000Z' }
     : null,
+  // S: 複数一致の届物が候補の友だち名を引く口（/unmatched の一覧）。
+  all: async () => ({
+    results: sql.includes('display_name FROM friends')
+      ? friendNameRows
+      : [],
+  }),
 }) });
+let friendNameRows: Array<{ id: string; display_name: string | null }> = [];
 const baseEnv = {
   DB: {
     prepare: receiptPrepare,
@@ -220,7 +239,7 @@ beforeEach(() => {
   vi.mocked(getOutgoingWebhookDeliverySummaries).mockResolvedValue([]);
   vi.mocked(updateIncomingWebhookMaskedSample).mockResolvedValue(undefined);
   vi.mocked(executeIncomingWebhookActions).mockResolvedValue({
-    matchedFriendId: null, executed: 0, failed: 0,
+    matchedFriendId: null, executed: 0, failed: 0, matchStatus: 'not_found',
   });
   vi.mocked(deliverWebhook).mockResolvedValue({ ok: true, attempts: 1, lastStatus: 204 });
   vi.mocked(getIncomingWebhookById).mockResolvedValue(incomingWebhookRow());
@@ -1102,7 +1121,7 @@ describe('POST /api/webhooks/incoming/:id/receive — signature', () => {
       action_refs_json: '[{"refKind":"tag","refId":"tag-a","refVersionId":null}]',
     }));
     vi.mocked(executeIncomingWebhookActions).mockResolvedValue({
-      matchedFriendId: 'friend-a', executed: 1, failed: 0,
+      matchedFriendId: 'friend-a', executed: 1, failed: 0, matchStatus: 'matched',
     });
     const body = JSON.stringify({ friendId: 'friend-a' });
     const res = await setupApp().request(
@@ -1153,6 +1172,130 @@ describe('POST /api/webhooks/incoming/:id/receive — signature', () => {
     );
     expect(res.status).toBe(200);
     expect(fireEvent).toHaveBeenCalledOnce();
+  });
+});
+
+describe('S: 合言葉の併用期間・受け取りの試し・複数一致の保留', () => {
+  test('入れ替えから24時間は前の合言葉の署名も受け付ける', async () => {
+    // 現行の合言葉では合わないが、併用期間内の前の合言葉では通る。
+    vi.mocked(resolvePreviousWebhookSecret).mockResolvedValue('o'.repeat(32));
+    const body = JSON.stringify({ ping: true });
+    const res = await setupApp().request(
+      '/api/webhooks/incoming/iwh-1/receive',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Webhook-Signature': await signedWith('o'.repeat(32), body),
+        },
+        body,
+      },
+      baseEnv,
+    );
+    expect(res.status).toBe(200);
+    expect(resolvePreviousWebhookSecret).toHaveBeenCalled();
+  });
+
+  test('併用期間を過ぎた前の合言葉は受け付けない', async () => {
+    // 期限切れ・無い前の合言葉は resolvePreviousWebhookSecret が null を返す。
+    vi.mocked(resolvePreviousWebhookSecret).mockResolvedValue(null);
+    const body = JSON.stringify({ ping: true });
+    const res = await setupApp().request(
+      '/api/webhooks/incoming/iwh-1/receive',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Webhook-Signature': await signedWith('o'.repeat(32), body),
+        },
+        body,
+      },
+      baseEnv,
+    );
+    expect(res.status).toBe(401);
+  });
+
+  test('受け取りの試しは照合と行動の組み立てを返し、実行はしない', async () => {
+    vi.mocked(previewIncomingWebhook).mockResolvedValue({
+      match: { status: 'matched', friendId: 'friend-a' },
+      identityAttempts: [{ kind: 'harness_friend_id', path: '$.friendId', value: 'friend-a' }],
+      actions: [{
+        refIndex: 0,
+        ref: { refKind: 'tag', refId: 'tag-a', refVersionId: null },
+        ok: true,
+        plan: [{ type: 'add_tag' }],
+      }],
+    });
+    const res = await setupApp().request(
+      `/api/webhooks/incoming/iwh-1/test?lineAccountId=${ACCOUNT_ID}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ payload: { friendId: 'friend-a' } }),
+      },
+      baseEnv,
+    );
+    expect(res.status).toBe(200);
+    const json = await res.json() as { data: { match: { status: string }; actions: Array<{ ok: boolean }> } };
+    expect(json.data.match.status).toBe('matched');
+    expect(json.data.actions[0]!.ok).toBe(true);
+    // 試しは実行しない。行動の実行と受領の予約は呼ばれない。
+    expect(executeIncomingWebhookActions).not.toHaveBeenCalled();
+    // 結果はやり取り台帳へ test 種別で分けて残る(v6-26 §9)。
+    expect(createWebhookInteraction).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ eventType: 'incoming_webhook.test', direction: 'incoming' }),
+    );
+  });
+
+  test('受け取りの試しは payload が無ければ400', async () => {
+    const res = await setupApp().request(
+      `/api/webhooks/incoming/iwh-1/test?lineAccountId=${ACCOUNT_ID}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      },
+      baseEnv,
+    );
+    expect(res.status).toBe(400);
+    expect(previewIncomingWebhook).not.toHaveBeenCalled();
+  });
+
+  test('複数一致で保留した届物は候補の友だちつきで一覧に出る', async () => {
+    vi.mocked(listIncomingWebhookUnmatched).mockResolvedValue([{
+      id: 'unmatched-1',
+      webhook_id: 'iwh-1',
+      line_account_id: ACCOUNT_ID,
+      source_event_id: 'evt-1',
+      kind: 'ambiguous',
+      status: 'pending',
+      identity_attempts_json: '[{"kind":"verified_email","path":"$.email","value":"a@example.com"}]',
+      masked_shape_json: null,
+      candidate_friend_ids_json: '["f-1","f-2"]',
+      resolved_friend_id: null,
+      resolved_by: null,
+      resolved_at: null,
+      received_at: '2026-09-27T00:00:00.000+09:00',
+      created_at: '2026-09-27T00:00:00.000+09:00',
+      updated_at: '2026-09-27T00:00:00.000+09:00',
+    }]);
+    friendNameRows = [
+      { id: 'f-1', display_name: '田中' },
+      { id: 'f-2', display_name: '佐藤' },
+    ];
+    const res = await setupApp().request(
+      `/api/webhooks/incoming/iwh-1/unmatched?lineAccountId=${ACCOUNT_ID}`,
+      {},
+      baseEnv,
+    );
+    expect(res.status).toBe(200);
+    const json = await res.json() as { data: Array<{ kind: string; candidates: Array<{ friendId: string; displayName: string | null }> }> };
+    expect(json.data[0]!.kind).toBe('ambiguous');
+    expect(json.data[0]!.candidates).toEqual([
+      { friendId: 'f-1', displayName: '田中' },
+      { friendId: 'f-2', displayName: '佐藤' },
+    ]);
   });
 });
 

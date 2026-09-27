@@ -5,10 +5,11 @@ import { Download, Send, Users } from 'lucide-react'
 import Button from '@/components/shared/button'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
 import { ActionCell, DataTable, Td, Th, TableHeadRow, Tr } from '@/components/shared/table'
 import ActionScoreAdjustmentDialog from './action-score-adjustment-dialog'
 import ActionScoreHistoryDialog from './action-score-history-dialog'
@@ -188,22 +189,22 @@ export default function ActionScoreTab({ accountId }: { accountId: string }) {
 
   return (
     <section data-design-node="z3PB2" className="space-y-3.5">
-      <div className="rounded-control border border-status-warn-deep/25 bg-status-warn-soft px-4 py-3 text-xs text-ink-secondary">
+      <Notice tone="warn">
         {/*
           設計 `z3PB2` の文そのまま。**「顧客には表示されず」だけでは足りない。**
           「マイルが減るのでは」と聞かれたときに答えられる形にする——
           交換できないこと、残高が動かないことを先に言う。
         */}
-        <strong className="text-ink">スコアはマイルではありません。</strong>
+        <strong>スコアはマイルではありません。</strong>
         お客様には見せず、交換もできません。マイル残高はスコアで増えも減りもしません。
         反応の目安として、配信や対応の順番を決めるために使います。
-      </div>
+      </Notice>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <SummaryCard variant="v6" title="点数がついている人" value={summary?.scoredFriends ?? null} unit="人" detail="" help="選択中のLINEアカウントの人数です" />
-        <SummaryCard variant="v6" title={`高い（${summary?.highMin ?? 70}点以上）`} value={summary?.high ?? null} unit="人" detail="" help="よく反応している帯です" />
-        <SummaryCard variant="v6" title={`ふつう（${summary?.normalMin ?? 30}〜${(summary?.highMin ?? 70) - 1}点）`} value={summary?.normal ?? null} unit="人" detail="" help="反応が続いている帯です" />
-        <SummaryCard variant="v6" title={`低い（${(summary?.normalMin ?? 30) - 1}点以下）`} value={summary?.low ?? null} unit="人" detail="" help="直近の反応が少ない帯です" />
+        <KpiCard variant="v6" title="点数がついている人" value={summary?.scoredFriends ?? null} unit="人" detail="" help="選択中のLINEアカウントの人数です" />
+        <KpiCard variant="v6" title={`高い（${summary?.highMin ?? 70}点以上）`} value={summary?.high ?? null} unit="人" detail="" help="よく反応している帯です" />
+        <KpiCard variant="v6" title={`ふつう（${summary?.normalMin ?? 30}〜${(summary?.highMin ?? 70) - 1}点）`} value={summary?.normal ?? null} unit="人" detail="" help="反応が続いている帯です" />
+        <KpiCard variant="v6" title={`低い（${(summary?.normalMin ?? 30) - 1}点以下）`} value={summary?.low ?? null} unit="人" detail="" help="直近の反応が少ない帯です" />
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">

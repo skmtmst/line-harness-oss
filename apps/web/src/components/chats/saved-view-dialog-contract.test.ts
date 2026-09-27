@@ -56,8 +56,8 @@ describe('受信箱 保存した検索の完了判定', () => {
     expect(DIALOG).toContain("${nameInvalid ? 'border-danger' : 'border-hairline'}")
     expect(DIALOG).toContain('（必須）')
     expect(DIALOG).toContain('検索名は必須です。入力すると保存できるようになります。')
-    // 失敗・削除後の断りは従来どおり共通の赤い帯で出す。
-    expect(DIALOG).toContain('tone="error"')
+    // 失敗・削除後の断りは従来どおり共通の赤い帯で出す（呼び名は danger）。
+    expect(DIALOG).toContain('tone="danger"')
     expect(DIALOG).toContain("message={error || '検索名を入力してください。'}")
     // 初期未入力を赤枠・aria-invalid にする形へ戻さない。
     expect(DIALOG).not.toContain('aria-invalid={Boolean(error) || nameMissing}')
@@ -88,7 +88,7 @@ describe('受信箱 保存した検索の完了判定', () => {
   it('保存内容の注意を入力済みでも残し、設計と同じ濃さで背景を暗くする', () => {
     expect(DIALOG).toContain('bg-ink/35')
     expect(DIALOG).toContain('保存されるのは検索条件です。受信件数は最新の状態に自動更新されます。')
-    expect(DIALOG).toContain('tone="validation"')
+    expect(DIALOG).toContain('tone="warn"')
   })
 
   it('顧客情報を開いても会話一覧の幅を保つ', () => {

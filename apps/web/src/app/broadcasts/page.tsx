@@ -441,7 +441,8 @@ function BroadcastList() {
   })
 
   return (
-    <div>
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       {folderDialogOpen && (
         <FolderAddDialog
           kind="broadcast"
@@ -471,7 +472,7 @@ function BroadcastList() {
       />
       </div>
 
-      <div data-design="Head" className="mb-4 flex flex-wrap items-center gap-2">
+      <div data-design="Head" className="flex flex-wrap items-center gap-2">
         <Button
           type="button"
           variant="primary"
@@ -549,7 +550,8 @@ function BroadcastList() {
               ) : null}
             </FolderPanel>
 
-            <div>
+            <div className="flex flex-col gap-4">
+              {/* 一覧列の縦の間隔も gap-4（16px）にそろえる。行ごとの mb-3 は付けない。 */}
 
           {/*
             ★V7 `Xn1Mz`：検索は幅320で「保存した検索・この条件を保存」と
@@ -624,7 +626,7 @@ function BroadcastList() {
             }
           />
           {savedViewOpen && (
-            <div className="border-hairline bg-canvas mb-3 flex flex-wrap items-center gap-2 rounded-control border p-3">
+            <div className="border-hairline bg-canvas flex flex-wrap items-center gap-2 rounded-control border p-3">
               <input
                 aria-label="保存する検索の名前"
                 placeholder="検索条件の名前"
@@ -641,7 +643,7 @@ function BroadcastList() {
             その場所に小さく1行だけ。赤字にしない。一覧は普通に出す。
           */}
           {savedViewError && (
-            <p role="alert" className="text-ink-secondary mb-3 text-xs">
+            <p role="alert" className="text-ink-secondary text-xs">
               {savedViewError}
               <button type="button" onClick={() => setSavedViewsSeq((n) => n + 1)} className="text-action ml-2 font-semibold hover:underline">
                 もう一度
@@ -695,14 +697,18 @@ function BroadcastList() {
           />
         ) : (
           /* 文言は設計 `TmHjF`（6-1-N）どおり。 */
-          <ListState kind="empty" title="まだ配信がありません" description="最初の1つを作ると、ここに並びます。" />
+          <div className="bg-canvas rounded-card border border-hairline">
+            <ListState kind="empty" title="まだ配信がありません" description="最初の1つを作ると、ここに並びます。" />
+          </div>
         )
       ) : visibleBroadcasts.length === 0 ? (
-        <ListState
-          kind="empty"
-          title="条件に該当する配信はありません"
-          description="絞り込みを変えるか、新しく作成してください。"
-        />
+        <div className="bg-canvas rounded-card border border-hairline">
+          <ListState
+            kind="empty"
+            title="条件に該当する配信はありません"
+            description="絞り込みを変えるか、新しく作成してください。"
+          />
+        </div>
       ) : (
         <div className="bg-canvas rounded-card border border-hairline overflow-hidden">
           <div className="overflow-x-auto">

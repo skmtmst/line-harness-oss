@@ -11,6 +11,7 @@ import Button from '@/components/shared/button'
 import FilterChip from '@/components/shared/filter-chip'
 import ListToolbar from '@/components/shared/list-toolbar'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import SelectField from '@/components/shared/select-field'
 // #740: bookings の EventKpi と一字一句同じだったため、機能内共有の1部品へ統合した。
@@ -135,21 +136,22 @@ export default function EventsListPage() {
   const dataReady = Boolean(selectedAccountId) && loadStatus === 'ready'
 
   return (
-    <div>
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       <div data-design="Head">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <nav className="text-ink-faint text-xs">
             <span className="text-ink font-medium">予約</span>
             <span className="mx-1.5">/</span>
             <span>イベント予約</span>
           </nav>
         </div>
-        <p className="text-ink-faint mb-4 text-sm">
+        <p className="text-ink-faint text-sm">
           開催するイベントの申込を管理します。定員と承認制の設定ができます。
         </p>
       </div>
 
-      <div data-design="KPIs" className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
+      <div data-design="KPIs" className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <EventKpi
           title="これからの回"
           value={dataReady ? attention.upcoming.length : null}
@@ -196,9 +198,7 @@ export default function EventsListPage() {
         />
       </div>
 
-      <div className="bg-info-bg text-ink-secondary mb-4 rounded-control px-4 py-3 text-xs">
-        定員に達すると、お客様の画面では自動で「満席」になります。キャンセルが出たら、キャンセル待ちの人に自動で順番が回ります。
-      </div>
+      <Notice tone="info" message="定員に達すると、お客様の画面では自動で「満席」になります。キャンセルが出たら、キャンセル待ちの人に自動で順番が回ります。" className="mb-4" />
 
       {/*
         作る操作は一覧のすぐ上の左。見出しの行の右端には置かない。
@@ -210,7 +210,11 @@ export default function EventsListPage() {
       {/*
         ★V7 `Xn1Mz`：検索は幅320で1行目、2行目は左に絞り込み・
         右端に並び順。押せない選び口は描かない（§5-5）。
+        設計の Bar（検索行）・Saved（絞り込み行）は共通 ListToolbar の
+        1・2行目にいる。印だけここに残し、設計との突き合わせを保つ。
       */}
+      <div data-design="Bar">
+      <div data-design="Saved">
       <ListToolbar
         search={{
           placeholder: 'イベント名で検索',
@@ -253,9 +257,13 @@ export default function EventsListPage() {
           </label>
         }
       />
+      </div>
+      </div>
 
       {!selectedAccountId ? (
-        <ListState kind="empty" title="LINEアカウントを選択してください" description="サイドバーで運用するLINEアカウントを選んでください。" />
+        <div className="bg-canvas rounded-card border-hairline border">
+          <ListState kind="empty" title="LINEアカウントを選択してください" description="サイドバーで運用するLINEアカウントを選んでください。" />
+        </div>
       ) : loadStatus === 'loading' ? (
         <ListState kind="loading" />
       ) : loadStatus === 'error' ? (
@@ -378,7 +386,7 @@ export default function EventsListPage() {
         </div>
       )}
 
-      <div data-design="tf" className="mt-3 flex flex-wrap items-center justify-between gap-2">
+      <div data-design="tf" className="flex flex-wrap items-center justify-between gap-2">
         {/*
           **「全 0 件」と言い切らない。** 取れていないときの 0件は
           「イベントが無い」に読める。`—` と読み込み中を分ける。
