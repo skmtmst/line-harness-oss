@@ -9,6 +9,7 @@ import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
 import FilterChip from '@/components/shared/filter-chip'
+import ListToolbar from '@/components/shared/list-toolbar'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
@@ -206,60 +207,57 @@ export default function EventsListPage() {
         <Button variant="primary" href="/events/new">＋ イベントを作る</Button>
       </div>
 
-      <div
-        data-design="Bar"
-        className="bg-canvas rounded-card border-hairline flex flex-wrap items-center gap-2 border p-3"
-      >
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(clampSearchQuery(e.target.value))}
-          maxLength={SEARCH_QUERY_MAX_LENGTH}
-          placeholder="イベント名で検索"
-          aria-label="イベント名で検索"
-          className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
-        />
-        <label className="text-ink-faint flex items-center gap-2 text-xs whitespace-nowrap">
-          並び順
-          <SelectField
-            value={sort}
-            onChange={(event) => setSort(event.target.value as 'soon' | 'name')}
-            aria-label="イベントの並び順"
-            options={[
-              { value: 'soon', label: '日付が近い順' },
-              { value: 'name', label: 'イベント名順' },
-            ]}
-          />
-        </label>
-        {/*
-          **押しても何も起きない選び口を出さない**（`v6-common-rules` §5-5
-          「動くまで描かない」）。押せない形で位置だけ見せても、いつ使える
-          ようになるのか読む人には分からない。
-        */}
-        {/*
-          **押しても何も起きない選び口を出さない**（`v6-common-rules` §5-5
-          「動くまで描かない」）。押せない形で位置だけ見せても、いつ使える
-          ようになるのか読む人には分からない。
-        */}
+      {/*
+        ★V7 `Xn1Mz`：検索は幅320で1行目、2行目は左に絞り込み・
+        右端に並び順。押せない選び口は描かない（§5-5）。
+        設計の Bar（検索行）・Saved（絞り込み行）は共通 ListToolbar の
+        1・2行目にいる。印だけここに残し、設計との突き合わせを保つ。
+      */}
+      <div data-design="Bar">
+      <div data-design="Saved">
+      <ListToolbar
+        search={{
+          placeholder: 'イベント名で検索',
+          value: query,
+          onChange: (value) => setQuery(clampSearchQuery(value)),
+          maxLength: SEARCH_QUERY_MAX_LENGTH,
+        }}
+        filters={
+          <>
+            <span className="text-ink-faint text-xs">よく使う</span>
+            {(
+              [
+                ['open', '受付中のみ'],
+                ['pending', '承認待ちあり'],
+                ['full', '満席'],
+              ] as const
+            ).map(([key, label]) => (
+              <FilterChip
+                key={key}
+                selected={filter === key}
+                onChange={(selected) => setFilter(selected ? key : 'all')}
+              >
+                {label}
+              </FilterChip>
+            ))}
+          </>
+        }
+        trailing={
+          <label className="text-ink-faint flex items-center gap-2 text-xs whitespace-nowrap">
+            並び順
+            <SelectField
+              value={sort}
+              onChange={(event) => setSort(event.target.value as 'soon' | 'name')}
+              aria-label="イベントの並び順"
+              options={[
+                { value: 'soon', label: '日付が近い順' },
+                { value: 'name', label: 'イベント名順' },
+              ]}
+            />
+          </label>
+        }
+      />
       </div>
-
-      <div data-design="Saved" className="flex flex-wrap items-center gap-2">
-        <span className="text-ink-faint text-xs">よく使う</span>
-        {(
-          [
-            ['open', '受付中のみ'],
-            ['pending', '承認待ちあり'],
-            ['full', '満席'],
-          ] as const
-        ).map(([key, label]) => (
-          <FilterChip
-            key={key}
-            selected={filter === key}
-            onChange={(selected) => setFilter(selected ? key : 'all')}
-          >
-            {label}
-          </FilterChip>
-        ))}
       </div>
 
       {!selectedAccountId ? (

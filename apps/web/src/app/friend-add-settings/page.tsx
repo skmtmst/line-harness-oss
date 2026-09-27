@@ -2,15 +2,14 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { FlaskConical, History, MoreHorizontal, Rocket, Trash2 } from 'lucide-react'
+import { FlaskConical, History, Rocket, Trash2 } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import ActionMenu from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Notice from '@/components/shared/notice'
-import IconButton from '@/components/shared/icon-button'
 import ListToolbar from '@/components/shared/list-toolbar'
+import { RowActions } from '@/components/shared/row-actions'
 import ListState from '@/components/shared/list-state'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import StatusBadge from '@/components/shared/status-badge'
@@ -80,7 +79,6 @@ function FriendAddSettingsList() {
   const [appliedSearch, setAppliedSearch] = useState('')
   const [folder, setFolder] = useState<string | null>(null)
   const { cursor, page: cursorPage, canPrev, reset: resetCursor, goPrev, goNext } = useCursorStack()
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [folderBusy, setFolderBusy] = useState(false)
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   const [folderName, setFolderName] = useState('')
@@ -297,7 +295,7 @@ function FriendAddSettingsList() {
         <section data-design="Rule" aria-label={`${KIND_LABELS[kind]}の設定`} className="min-w-0">
           <span className="sr-only">判定の基準。はじめての人の判定。ブロック解除の判定。ブロック解除の回数が1回以上。</span>
           {/* ★V7：件数は選べないので「20件表示」の文字だけを置かない。 */}
-          <ListToolbar searchPlaceholder="設定名で検索" searchValue={search} onSearchChange={setSearch} />
+          <ListToolbar search={{ placeholder: '設定名で検索', value: search, onChange: setSearch }} />
           {!data || data.items.length === 0 ? (
             appliedSearch.trim() || folder ? (
               <ListState kind="empty" title="条件に合う設定はありません" description="検索やフォルダの絞り込みを変えてください。" />
@@ -327,46 +325,44 @@ function FriendAddSettingsList() {
                       <Td><span className="block truncate" title={deliverySummary(rule)}>{deliverySummary(rule)}</span></Td>
                       <Td>{countText(rule.matchedLast7Days, '人')}</Td>
                       <ActionCell>
+                        {/*
+                          ★V7 `Xn1Mz`：行の操作は「主な1つ（編集）＋…」。
+                          削除はメニューの中の危ない操作へ。ゴミ箱のアイコン
+                          だけのボタンは行に直に置かない。消せない行（共通の
+                          あいさつ）は「…」を出さない。
+                          その他操作は実画面へつなぐメニューを開く。行き先のない
+                          ボタンを置くと、押しても何も起きない死に操作になる。
+                        */}
                         <div className="flex items-center gap-1">
-                          <Button href={`/friend-add-settings?view=edit&id=${encodeURIComponent(rule.id)}`} variant="secondary">編集</Button>
-                          {/* 消せない行も「…」の位置をそろえるため、削除と同じ幅の空きを置く。 */}
-                          {rule.isFallback ? <span aria-hidden="true" className="inline-block size-8 shrink-0" /> : <IconButton aria-label={`${rule.name}を削除`} onClick={() => setDeleting(rule)}><Trash2 size={16} /></IconButton>}
-                          {/*
-                            その他操作は実画面へつなぐメニューを開く。行き先のない
-                            ボタンを置くと、押しても何も起きない死に操作になる。
-                          */}
-                          <div className="relative inline-flex items-center justify-center">
-                            <IconButton
-                              aria-label={`${rule.name}のその他操作`}
-                              aria-expanded={openMenuId === rule.id}
-                              onClick={() => setOpenMenuId((current) => (current === rule.id ? null : rule.id))}
-                            ><MoreHorizontal size={18} /></IconButton>
-                            <ActionMenu
-                              open={openMenuId === rule.id}
-                              ariaLabel={`${rule.name}の操作`}
-                              onClose={() => setOpenMenuId(null)}
-                              items={[
-                                {
-                                  id: 'test',
-                                  label: 'テストを実行',
-                                  icon: <FlaskConical size={16} />,
-                                  onSelect: () => router.push(`/friend-add-settings?view=edit&id=${encodeURIComponent(rule.id)}&step=preview`),
-                                },
-                                ...(rule.status === 'draft' ? [{
-                                  id: 'publish',
-                                  label: '最終確認・有効化へ進む',
-                                  icon: <Rocket size={16} />,
-                                  onSelect: () => router.push(`/friend-add-settings/publish?id=${encodeURIComponent(rule.id)}`),
-                                }] : []),
-                                {
-                                  id: 'runs',
-                                  label: 'この設定の実行結果',
-                                  icon: <History size={16} />,
-                                  onSelect: () => router.push(`/friend-add-settings/runs?rule_id=${encodeURIComponent(rule.id)}`),
-                                },
-                              ]}
-                            />
-                          </div>
+                          <RowActions
+                            subjectName={rule.name}
+                            edit={{ href: `/friend-add-settings?view=edit&id=${encodeURIComponent(rule.id)}` }}
+                            menuItems={[
+                              {
+                                id: 'test',
+                                label: 'テストを実行',
+                                icon: <FlaskConical size={16} />,
+                                onSelect: () => router.push(`/friend-add-settings?view=edit&id=${encodeURIComponent(rule.id)}&step=preview`),
+                              },
+                              ...(rule.status === 'draft' ? [{
+                                id: 'publish',
+                                label: '最終確認・有効化へ進む',
+                                icon: <Rocket size={16} />,
+                                onSelect: () => router.push(`/friend-add-settings/publish?id=${encodeURIComponent(rule.id)}`),
+                              }] : []),
+                              {
+                                id: 'runs',
+                                label: 'この設定の実行結果',
+                                icon: <History size={16} />,
+                                onSelect: () => router.push(`/friend-add-settings/runs?rule_id=${encodeURIComponent(rule.id)}`),
+                              },
+                            ]}
+                            destructiveItem={rule.isFallback ? undefined : {
+                              id: 'delete',
+                              label: '削除する',
+                              onSelect: () => setDeleting(rule),
+                            }}
+                          />
                         </div>
                       </ActionCell>
                     </Tr>

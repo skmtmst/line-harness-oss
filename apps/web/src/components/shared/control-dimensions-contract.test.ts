@@ -68,9 +68,13 @@ describe('Pencil V6 の入力・選択・押し口規定', () => {
     expect(users).not.toContain('className="h-9')
     expect(users).toContain('v6-select h-10 min-w-44')
     expect(tags).not.toContain('v6-select-tight h-9')
-    expect(tags).toContain('h-10 min-w-45 flex-1')
+    // ★V7 `Xn1Mz`：検索は共通 ListToolbar の1行目へそろえた（検索の高さ・幅は
+    // 部品が持つ）。画面側の直書き検索 input（h-10 min-w-45 flex-1）に戻さない。
+    expect(tags).toContain('<ListToolbar')
+    expect(tags).not.toContain('type="search"')
     expect(tags).toContain('h-10 min-w-44')
     expect(tags).toContain('h-10 min-w-38')
-    expect(broadcasts).toContain('bg-canvas focus:ring-accent h-10')
+    expect(broadcasts).toContain('<ListToolbar')
+    expect(broadcasts).not.toContain('type="search"')
   })
 })
