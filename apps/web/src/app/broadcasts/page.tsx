@@ -578,34 +578,48 @@ function BroadcastList() {
                 <FilterChip selected={statusFilter === 'draft'} onChange={(on) => setStatusFilter(on ? 'draft' : 'all')}>下書き</FilterChip>
                 {/* ★V7：押せない「非表示」「開封率が低い」の札は外した（機能が無い・未接続のまま置かれていた）。 */}
                 <span className="text-ink-faint ml-1 text-xs whitespace-nowrap">配信日</span>
-                <div data-date-input><DateField value={dateFrom} onChange={setDateFrom} max={dateTo || undefined} aria-label="配信日（開始）" /></div>
+                <div data-date-input><DateField value={dateFrom} onChange={setDateFrom} max={dateTo || undefined} aria-label="配信日（開始）" placeholder="開始日" /></div>
                 <span className="text-ink-faint text-xs">〜</span>
-                <div data-date-input><DateField value={dateTo} onChange={setDateTo} min={dateFrom || undefined} aria-label="配信日（終了）" /></div>
+                <div data-date-input><DateField value={dateTo} onChange={setDateTo} min={dateFrom || undefined} aria-label="配信日（終了）" placeholder="終了日" /></div>
                 {(dateFrom || dateTo) && <button type="button" className="text-xs font-semibold text-action" onClick={() => { setDateFrom(''); setDateTo('') }}>日付を外す</button>}
               </>
             }
             trailing={
               <>
-                <SelectField
-                  aria-label="並び順"
-                  value={sortKey}
-                  onChange={(event) => setSortKey(event.target.value === 'oldest' ? 'oldest' : 'newest')}
-                  options={[
-                    { value: 'newest', label: '配信日が新しい順' },
-                    { value: 'oldest', label: '配信日が古い順' },
-                  ]}
-                />
-                <SelectField
-                  aria-label="表示件数"
-                  value={String(pageSize)}
-                  size="compact"
-                  onChange={(event) => setPageSize(Number(event.target.value) || 20)}
-                  options={[
-                    { value: '20', label: '20件表示' },
-                    { value: '50', label: '50件表示' },
-                    { value: '100', label: '100件表示' },
-                  ]}
-                />
+                {/*
+                  ★V7 `Xn1Mz`：2行目を1440px（中身の幅 ≈835px）で1行に収める。
+                  選ぶ欄は共通 ListToolbar の印（data-sort-select・
+                  data-per-page-select）で幅をそろえる（並び順150・表示件数96）。
+                  「〜が」を省いた短い文字にし、何の順かは aria-label、
+                  件数は左の見出しで分かるようにする。
+                */}
+                <div data-sort-select>
+                  <SelectField
+                    aria-label="並び順"
+                    className="w-full"
+                    value={sortKey}
+                    onChange={(event) => setSortKey(event.target.value === 'oldest' ? 'oldest' : 'newest')}
+                    options={[
+                      { value: 'newest', label: '新しい順' },
+                      { value: 'oldest', label: '古い順' },
+                    ]}
+                  />
+                </div>
+                <span className="text-ink-faint text-xs whitespace-nowrap">表示件数</span>
+                <div data-per-page-select>
+                  <SelectField
+                    aria-label="表示件数"
+                    className="w-full"
+                    value={String(pageSize)}
+                    size="compact"
+                    onChange={(event) => setPageSize(Number(event.target.value) || 20)}
+                    options={[
+                      { value: '20', label: '20件' },
+                      { value: '50', label: '50件' },
+                      { value: '100', label: '100件' },
+                    ]}
+                  />
+                </div>
               </>
             }
           />

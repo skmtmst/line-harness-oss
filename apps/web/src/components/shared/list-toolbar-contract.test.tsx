@@ -97,17 +97,40 @@ describe('ListToolbar 一覧の上の道具の並び（★V7 Xn1Mz）', () => {
   it('日付の範囲の入力はListToolbarの中で狭くそろえる（1440で2行目に収める）', () => {
     /*
      * 一斉配信の2行目で日付2つが各208px（w-52）あり、1440pxで
-     * 並び順と表示件数が3行目へ落ちた。各150px（計300px・116px減）
-     * なら同じ行に収まる。「日付を選ぶ」（5文字・14px＝約70px＋
-     * 暦の絵16px＋余白）は150pxで欠けずに入る。
+     * 並び順と表示件数が3行目へ落ちた。各132px（計264px・152px減）
+     * なら同じ行に収まる。132pxは中の文字を「開始日」「終了日」
+     * （3文字・14px＝約42px＋暦の絵16px＋余白＝約116px）に
+     * 短くした最小。「日付を選ぶ」（約70px）のままでは欠ける。
      * 1152px以下での折り返しは .row2 の flex-wrap のまま許す。
      */
     const css = read('list-toolbar.module.css')
     const rule = css.match(/\.filters\s*>\s*\[data-date-input\]\s*{[^}]*}/s)
     expect(rule, '日付入力の幅指定がありません').toBeTruthy()
-    expect(rule![0]).toContain('150px')
+    expect(rule![0]).toContain('132px')
     expect(rule![0]).not.toContain('208px')
+    expect(rule![0]).not.toContain('150px')
     // 縮めて潰さない（flex:none・入りきらない幅では行ごと折り返す）。
     expect(rule![0]).toMatch(/flex:\s*none/)
+  })
+
+  it('並び順・表示件数の選ぶ欄は2行目の中で狭くそろえる（1440で1行に収める）', () => {
+    /*
+     * 既定幅（176px・128px）のままでは一斉配信の2行目が1440px
+     * （中身の幅 ≈835px）で3行目へ落ちた。並び順150px・表示件数96px
+     * にそろえる。「配信日が新しい順」「20件表示」のままでは欠けるので、
+     * 呼び出し側で「新しい順」「20件」へ短くする（2行目の見出し・
+     * aria-labelで意味は分かる）。印（data-sort-select・
+     * data-per-page-select）を付けた画面だけが対象で、他の一覧の
+     * 既定幅は変えない。1152px以下での折り返しは許す。
+     */
+    const css = read('list-toolbar.module.css')
+    const sortRule = css.match(/\.trailing\s*>\s*\[data-sort-select\]\s*{[^}]*}/s)
+    expect(sortRule, '並び順の幅指定がありません').toBeTruthy()
+    expect(sortRule![0]).toContain('150px')
+    expect(sortRule![0]).toMatch(/flex:\s*none/)
+    const perPageRule = css.match(/\.trailing\s*>\s*\[data-per-page-select\]\s*{[^}]*}/s)
+    expect(perPageRule, '表示件数の幅指定がありません').toBeTruthy()
+    expect(perPageRule![0]).toContain('96px')
+    expect(perPageRule![0]).toMatch(/flex:\s*none/)
   })
 })

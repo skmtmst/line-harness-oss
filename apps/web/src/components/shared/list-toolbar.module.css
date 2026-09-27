@@ -55,14 +55,15 @@
   /*
    * 日付の範囲の入力（開始・終了）はこの幅にそろえる。
    * 208px（w-52）では2つで416pxになり、1440pxで並び順と
-   * 表示件数が3行目へ落ちた。150pxなら「日付を選ぶ」
-   * （5文字・14px＝約70px＋暦の絵16px＋余白）が欠けずに入る。
+   * 表示件数が3行目へ落ちた。132pxは中の文字を「開始日」
+   * 「終了日」（3文字・14px＝約42px＋暦の絵16px＋余白＝約116px）
+   * に短くした最小。「日付を選ぶ」（約70px）のままでは欠ける。
    * 選んだ日が長いときは DateField 側の省略＋titleで読める。
    * 1152px以下での折り返しは .row2 の flex-wrap のまま。
    * 印は呼び出し側が付ける：<div data-date-input><DateField … /></div>
    */
   .filters > [data-date-input] {
-    width: 150px;
+    width: 132px;
     flex: none;
     max-width: 100%;
   }
@@ -73,5 +74,30 @@
     align-items: center;
     gap: 8px;
     margin-left: auto;
+  }
+
+  /*
+   * 並び順・表示件数の選ぶ欄はこの幅にそろえる。
+   * 既定（176px・128px）のままでは一斉配信の2行目が1440px
+   * （中身の幅 ≈835px）で3行目へ落ちた。並び順150pxは
+   * 「新しい順」（4文字・14px＝約56px＋矢印の余白＝約105px）、
+   * 表示件数96pxは「100件表示」→「100件」（約41px＋余白＝約90px）
+   * に短くした最小。中の選ぶ欄は w-full で箱いっぱいに広げる
+   * （size の既定幅は utilities 層で上書きする決まり）。
+   * 1152px以下での折り返しは .row2/.trailing の flex-wrap のまま。
+   * 印は呼び出し側が付ける：
+   * <div data-sort-select><SelectField … /></div>
+   * <div data-per-page-select><SelectField … /></div>
+   */
+  .trailing > [data-sort-select] {
+    width: 150px;
+    flex: none;
+    max-width: 100%;
+  }
+
+  .trailing > [data-per-page-select] {
+    width: 96px;
+    flex: none;
+    max-width: 100%;
   }
 }
