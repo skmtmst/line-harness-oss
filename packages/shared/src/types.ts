@@ -1209,6 +1209,8 @@ export interface EntryRoute {
   introTemplateId: string | null;
   runAccountFriendAddScenarios: boolean;
   isActive: boolean;
+  /** 所属するLINEアカウント。未割当の古い行では null のことがある。 */
+  lineAccountId?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -1231,6 +1233,8 @@ export interface CreateEntryRouteInput {
   introTemplateId?: string | null;
   runAccountFriendAddScenarios?: boolean;
   isActive?: boolean;
+  /** 作成時に所属させるLINEアカウント。Worker の必須検査と保存に使う。 */
+  lineAccountId?: string | null;
 }
 
 export interface EntryRouteFunnel {
