@@ -178,6 +178,7 @@ describe('PATCH /api/conversions/events/:id/approval', () => {
       affiliateId: 'aff-1',
       offerName: '案件X',
       rewardAmount: 5000,
+      notifyOnConversion: true,
     });
     const res = await req('PATCH', '/api/conversions/events/ev-1/approval', {
       status: 'approved',
@@ -205,6 +206,7 @@ describe('PATCH /api/conversions/events/:id/approval', () => {
       affiliateId: 'aff-1',
       offerName: '案件X',
       rewardAmount: 5000,
+      notifyOnConversion: true,
     });
     await req('PATCH', '/api/conversions/events/ev-1/approval', { status: 'approved', expectedStatus: 'pending' });
     expect(notifyAffiliateApproval).toHaveBeenCalledWith(
