@@ -41,6 +41,7 @@ import {
   appendConversionReversal,
   getReversedEventIds,
   listConversionReversals,
+  getAttributionDecisionView,
   ConversionDefinitionError,
   CONVERSION_DEFINITION_USAGE_KINDS,
   isExclusionSavable,
@@ -1916,6 +1917,45 @@ function offerActionFailureMessage(failures: OfferActionFailure[]): string {
       : 'もう一度送ると完了していない分だけやり直します。')
   );
 }
+
+// GET /api/conversions/events/:id/attribution - どの紹介に成果を付けたかの記録(#823)
+// 候補になった紹介を並べ、付けた先と付けなかった理由を1件ずつ返す。
+// 記録が無い昔の成果は 404。
+conversions.get('/api/conversions/events/:id/attribution', conversionPermission('view'), requireVisibleConversionEvent, async (c) => {
+  try {
+    const view = await getAttributionDecisionView(c.env.DB, c.req.param('id'));
+    if (!view) {
+      return c.json({ success: false, error: 'この成果の付け方の記録がありません' }, 404);
+    }
+    return c.json({
+      success: true,
+      data: {
+        conversionEventId: view.conversionEventId,
+        affiliateId: view.affiliateId,
+        refCode: view.refCode,
+        offerId: view.offerId,
+        offerVersionId: view.offerVersionId,
+        reason: view.reason,
+        windowDays: view.windowDays,
+        candidates: view.candidates.map((candidate) => ({
+          affiliateId: candidate.affiliateId,
+          affiliateName: candidate.affiliateName,
+          refCode: candidate.refCode,
+          touchedAt: candidate.touchedAt,
+          offerId: candidate.offerId,
+          offerName: candidate.offerName,
+          chosen: candidate.chosen,
+          skipReason: candidate.skipReason,
+          windowDays: candidate.windowDays,
+        })),
+        createdAt: view.createdAt,
+      },
+    });
+  } catch (err) {
+    console.error('GET /api/conversions/events/:id/attribution error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
 
 // PATCH /api/conversions/events/:id/approval - approve/reject an attributed CV
 conversions.patch('/api/conversions/events/:id/approval', requireApprovalPermission, requireVisibleConversionEvent, async (c) => {
