@@ -31,6 +31,7 @@ const V7_FILES = [
   ui('BottomBar.tsx'),
   ui('Stepper.tsx'),
   ui('StatusView.tsx'),
+  ui('ConfirmDialog.tsx'),
   src('components', 'LoadingView.tsx'),
   src('components', 'LoadErrorView.tsx'),
   src('components', 'MenuList.tsx'),

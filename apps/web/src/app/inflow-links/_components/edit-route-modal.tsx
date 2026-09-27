@@ -6,6 +6,7 @@ import Select from '@/components/shared/select'
 import { api, describeSaveFailure } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
+import Notice from '@/components/shared/notice'
 import type {
   EntryRoute,
   CreateEntryRouteInput,
@@ -288,17 +289,18 @@ export default function EditRouteModal({
         </label>
 
         {warning && (
-          <div className="bg-status-warn-soft text-status-warn-deep rounded-control p-3 text-sm">
-            {warning}
-            <div className="mt-2">
+          <Notice
+            tone="warn"
+            message={warning}
+            action={(
               <Button
                 onClick={doSave}
                 disabled={submitting}
               >
                 それでも保存
               </Button>
-            </div>
-          </div>
+            )}
+          />
         )}
       </div>
     </Dialog>

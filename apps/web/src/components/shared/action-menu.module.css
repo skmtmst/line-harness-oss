@@ -1,15 +1,24 @@
 @layer components {
+/*
+ * ★V7 `xifuV`（Pencil「★V7 メニュー」）。V5 `hGpFq` から移行。
+ * 白地・角丸12・枠・影。項目は高さ36（補足つき52）・
+ * アイコン16＋文字14・折り返さない。
+ */
 .menu {
   position: absolute;
   top: calc(100% + 6px);
   right: 0;
   z-index: 60;
   display: flex;
-  width: 200px;
+  width: max-content;
+  min-width: 224px;
+  max-width: min(320px, calc(100vw - 16px));
+  max-height: min(70dvh, 20rem);
   flex-direction: column;
   gap: 2px;
+  overflow-y: auto;
   border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-control);
+  border-radius: 12px;
   background: var(--color-canvas);
   box-shadow: var(--shadow-float);
   padding: 6px;
@@ -22,7 +31,7 @@
 .item {
   display: flex;
   width: 100%;
-  height: 34px;
+  height: 36px;
   align-items: center;
   gap: 9px;
   border: 0;
@@ -30,41 +39,60 @@
   background: transparent;
   padding: 0 10px;
   color: var(--color-ink);
-  font-size: var(--text-label);
+  font-size: var(--text-body);
   font-weight: 400;
   text-align: left;
+  white-space: nowrap;
   cursor: pointer;
 }
 
 /*
- * #985 LAY-18: 「押せない理由」を添える項目だけ高さを伸ばす。
- * 設計 hGpFq の item（34px / padding 0 10px）は据え置き、
- * 理由のある行はこのクラスで2行にする。
+ * 補足（description）か「押せない理由」のある行だけ2行・高さ52にする。
+ * #985 LAY-18: 理由のある行は2行にする考え方はそのまま。
  */
-.itemWithReason {
-  height: auto;
-  min-height: 34px;
-  padding-top: 6px;
-  padding-bottom: 6px;
+.itemTall {
+  height: 52px;
 }
 
-/* ラベルと「押せない理由」を縦に載せる器。 */
+/* ラベルと補足（・押せない理由）を縦に載せる器。折り返さず省略する。 */
 .itemBody {
   display: flex;
   min-width: 0;
+  flex: 1;
   flex-direction: column;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.description {
+  overflow: hidden;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  font-weight: 400;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .reason {
+  overflow: hidden;
   color: var(--color-ink-faint);
   font-size: var(--text-nano);
   font-weight: 400;
   line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .item:hover:not(:disabled),
 .item:focus-visible {
-  background: var(--color-surface-pearl);
+  background: var(--color-shell);
 }
 
 .item:focus-visible {
@@ -78,11 +106,17 @@
 
 .icon {
   display: inline-flex;
-  width: 15px;
-  height: 15px;
-  flex: 0 0 15px;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
   align-items: center;
   justify-content: center;
+  color: var(--color-ink-faint);
+}
+
+/* 別画面へ行く項目の ↗。危ない操作では文字と同じ赤にする。 */
+.externalIcon {
+  flex-shrink: 0;
   color: var(--color-ink-faint);
 }
 
@@ -90,13 +124,27 @@
   color: var(--color-status-danger);
 }
 
-.danger .icon {
+.danger .icon,
+.danger .externalIcon {
   color: inherit;
+}
+
+/* 小さな見出し。区切り線の下に置く分類名。 */
+.section {
+  overflow: hidden;
+  margin: 0;
+  padding: 6px 10px 2px;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  font-weight: 400;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .divider {
   height: 1px;
-  margin: 0;
+  margin: 4px 0;
   border: 0;
   background: var(--color-hairline);
 }

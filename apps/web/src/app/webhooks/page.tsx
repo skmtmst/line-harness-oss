@@ -10,11 +10,14 @@ import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import WebhookInteractions from './webhook-interactions'
+import GoogleSheetsPanel from './google-sheets-panel'
 import { IncomingOverview, OutgoingKpis, OutgoingOverview } from './webhook-overviews'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { MIN_SECRET_LENGTH, generateSecret } from './secret'
+import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
 
 type Tab = 'incoming' | 'outgoing'
 type LoadStatus = 'loading' | 'ready' | 'error'
@@ -84,6 +87,8 @@ const MERGED_TABS = [
   { key: 'outgoing', label: 'こちらから送る' },
   { key: 'incoming', label: 'こちらで受け取る' },
   { key: 'interactions', label: 'やり取りの記録' },
+  // #838 第2段: Sheets連携のOAuth戻り先もこのタブ（?tab=sheets&sheets=…）。
+  { key: 'sheets', label: 'Google Sheets' },
   { key: 'notify', label: `見本 ${SOURCE_PRESETS.length + OUTGOING_SAMPLES.length}` },
 ]
 
@@ -95,9 +100,9 @@ const MERGED_TABS = [
 function WebhookSamples() {
   return (
     <div>
-      <p className="bg-info-bg text-ink-secondary mb-4 rounded-control px-4 py-3 text-xs">
+      <Notice tone="info" className="mb-4">
         よくあるつなぎ方の見本です。使いたい見本を選ぶと、作成画面がその内容で開きます。
-      </p>
+      </Notice>
       <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-2">
         <section className="bg-canvas border-hairline rounded-card border p-5" aria-label="受け取る見本">
           <h2 className="text-ink mb-1 text-lg font-bold">受け取る見本</h2>
@@ -180,6 +185,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
     ? requestedSource
     : ''
   const [showCreate, setShowCreate] = useState(initialSource !== '')
+  const [stepUp, setStepUp] = useState<StepUpRequest | null>(null)
 
   const [inForm, setInForm] = useState({ name: '', sourceType: initialSource, secret: '' })
   // 見本に無いものを選んだときだけ、自由入力に切り替える。
@@ -457,7 +463,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
     }
   }
 
-  const handleCreateIncoming = async (e: React.FormEvent) => {
+  const handleCreateIncoming = async (e: React.FormEvent, stepUpToken?: string) => {
     e.preventDefault()
     setError('')
     const requestAccountId = selectedAccountId
@@ -473,7 +479,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
         name: inForm.name,
         sourceType: inForm.sourceType || undefined,
         secret: inForm.secret,
-      })
+      }, stepUpToken)
       if (!res.success) {
         if (selectedAccountIdRef.current !== requestAccountId) return
         setError(res.error)
@@ -486,7 +492,12 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
       setSourceIsOther(false)
       setShowCreate(false)
       await load()
-    } catch {
+    } catch (caught) {
+      // 秘密の値の登録は大事な操作。本人確認を求められたら窓を立てる（V-1）。
+      if (!stepUpToken && isStepUpRequired(caught)) {
+        setStepUp({ purpose: 'webhook.secret', action: '受け取り口を登録する', retry: (token) => handleCreateIncoming(e, token) })
+        return
+      }
       if (selectedAccountIdRef.current !== requestAccountId) return
       setError('作成に失敗しました。通信を確かめて、もう一度お試しください。')
     }
@@ -501,7 +512,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
     }
   }
 
-  const handleRotateSubmit = async (e: React.FormEvent) => {
+  const handleRotateSubmit = async (e: React.FormEvent, stepUpToken?: string) => {
     e.preventDefault()
     setError('')
     const requestAccountId = selectedAccountId
@@ -517,8 +528,8 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
       const payload = { secret: rotateSecretValue, isActive: rotateTarget.activate || undefined }
       const res =
         rotateTarget.kind === 'incoming'
-          ? await api.webhooks.incoming.update(rotateTarget.id, requestAccountId, payload)
-          : await api.webhooks.outgoing.update(rotateTarget.id, requestAccountId, payload)
+          ? await api.webhooks.incoming.update(rotateTarget.id, requestAccountId, payload, stepUpToken)
+          : await api.webhooks.outgoing.update(rotateTarget.id, requestAccountId, payload, stepUpToken)
       if (selectedAccountIdRef.current !== requestAccountId) return
       if (!res.success) {
         setError(res.error)
@@ -527,7 +538,12 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
       setRotateTarget(null)
       setRotateSecretValue('')
       load()
-    } catch {
+    } catch (caught) {
+      // シークレットの差し替えは大事な操作。本人確認を求められたら窓を立てる（V-1）。
+      if (!stepUpToken && isStepUpRequired(caught)) {
+        setStepUp({ purpose: 'webhook.secret', action: 'シークレットを更新する', retry: (token) => handleRotateSubmit(e, token) })
+        return
+      }
       if (selectedAccountIdRef.current !== requestAccountId) return
       setError('シークレットの更新に失敗しました。通信を確かめて、もう一度お試しください。')
     }
@@ -556,8 +572,9 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
   })
 
   return (
-    <div>
-      <div data-design="Crumb" className="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <div data-design="Crumb" className="flex flex-wrap items-center justify-between gap-3">
         <nav className="text-ink-faint text-xs" aria-label="パンくず">
           <span className="text-action font-semibold">自動化</span>
           <span className="mx-2">›</span>
@@ -616,6 +633,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
               新しいシークレットを設定します。
               <strong className="text-danger">設定後は今回限り画面に表示されません。</strong>
               控えておいてから「保存」を押してください。
+              保存後も前の合言葉は24時間だけ使えるので、相手側の切り替え中も届物は止まりません。
             </p>
             <div className="flex gap-2 mb-4">
               <input
@@ -706,19 +724,19 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
 
       {/* Error */}
       {error && (
-        <div className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
+        <Notice tone="danger" className="mb-4">
           {error}
-        </div>
+        </Notice>
       )}
       {Object.entries(toggleFailures).map(([key, failure]) => (
-        <div
+        <Notice
           key={key}
-          role="alert"
+          tone="danger"
+          className="mb-4"
           data-webhook-toggle-error={key}
-          className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm"
         >
           「{failure.name}」を{failure.kind === 'incoming' ? '受け取る設定' : '送る設定'}：{failure.message}
-        </div>
+        </Notice>
       ))}
       {/*
         送信中の再押下に返す案内(#707)。`disabled` で押せなくすると、二重押しが
@@ -727,19 +745,19 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
         黙って落とさずここへ出す。失敗案内と同じ場所へ置いて、見る所を増やさない。
       */}
       {Object.entries(toggleBusyNotices).map(([key, busy]) => (
-        <div
+        <Notice
           key={key}
-          role="status"
+          tone="warn"
+          className="mb-4"
           data-webhook-toggle-busy={key}
-          className="bg-status-warning-soft text-status-warning rounded-control mb-4 px-4 py-3 text-sm"
         >
           「{busy.name}」を{busy.kind === 'incoming' ? '受け取る設定' : '送る設定'}：いま切り替えを送っています。返事が来るまでお待ちください。
-        </div>
+        </Notice>
       ))}
 
       {/* Create forms */}
       {showCreate && tab === 'incoming' && (
-        <form onSubmit={handleCreateIncoming} className="bg-canvas rounded-lg border border-hairline p-6 mb-6">
+        <form onSubmit={handleCreateIncoming} className="bg-canvas rounded-lg border border-hairline p-6">
           <h3 className="text-sm font-semibold text-ink mb-4">受け取る設定を追加</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
@@ -879,6 +897,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
           setDeleteError('')
         }}
       />
+      {stepUp && <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} />}
     </div>
   )
 }
@@ -888,9 +907,10 @@ function WebhooksPageHost() {
   usePageTitle('外部連携')
   if (tab === 'incoming' || tab === 'outgoing') return <WebhooksPageInner key={tab} tab={tab} />
   return (
-    <div>
+    <div className="flex flex-col gap-4">
       <MergedTabs basePath="/webhooks" paramName="tab" tabs={MERGED_TABS} active={tab} />
       {tab === 'interactions' && <WebhookInteractions />}
+      {tab === 'sheets' && <GoogleSheetsPanel />}
       {tab === 'notify' && <WebhookSamples />}
     </div>
   )

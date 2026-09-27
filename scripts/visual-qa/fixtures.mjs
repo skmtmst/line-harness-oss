@@ -1706,6 +1706,51 @@ export const MEDIA_ITEMS = [
   })),
 ]
 
+export const FILE_SCAN_ITEMS = [
+  {
+    id: 'scan-quarantine-1', lineAccountId: 'visual-qa-account',
+    subjectKind: 'media', subjectId: 'media-delete-target', mediaId: 'media-delete-target',
+    filename: '請求書.pdf', mimeType: 'application/pdf', sizeBytes: 225280,
+    status: 'quarantined', reasonCode: 'pdf_active_content',
+    reasonLabel: '危険な仕掛けが見つかりました', uploaderLabel: '川野',
+    attempts: 0, nextRetryAt: null,
+    scannedAt: '2026-09-25T10:00:00+09:00', quarantinedAt: '2026-09-25T10:00:00+09:00',
+    releasedAt: null, releaseReason: null,
+    createdAt: '2026-09-25T10:00:00+09:00', updatedAt: '2026-09-25T10:00:00+09:00',
+  },
+  {
+    id: 'scan-quarantine-2', lineAccountId: 'visual-qa-account',
+    subjectKind: 'photo', subjectId: 'photo-3', mediaId: null,
+    filename: 'photo_03.jpg', mimeType: 'image/jpeg', sizeBytes: 655360,
+    status: 'quarantined', reasonCode: 'trailing_data',
+    reasonLabel: '画像の後ろに別のデータがあります', uploaderLabel: 'お客さん',
+    attempts: 0, nextRetryAt: null,
+    scannedAt: '2026-09-25T09:30:00+09:00', quarantinedAt: '2026-09-25T09:30:00+09:00',
+    releasedAt: null, releaseReason: null,
+    createdAt: '2026-09-25T09:30:00+09:00', updatedAt: '2026-09-25T09:30:00+09:00',
+  },
+  {
+    id: 'scan-pending-1', lineAccountId: 'visual-qa-account',
+    subjectKind: 'media', subjectId: 'media-banner', mediaId: 'media-banner',
+    filename: '会員証バナー.png', mimeType: 'image/png', sizeBytes: 839680,
+    status: 'pending', reasonCode: null, reasonLabel: null, uploaderLabel: '川野',
+    attempts: 1, nextRetryAt: '2026-09-25T11:00:00+09:00',
+    scannedAt: null, quarantinedAt: null,
+    releasedAt: null, releaseReason: null,
+    createdAt: '2026-09-25T10:55:00+09:00', updatedAt: '2026-09-25T10:55:00+09:00',
+  },
+]
+
+export const FILE_SCAN_CONFIG = {
+  externalProvider: null,
+  externalEndpointUrl: null,
+  externalSecretRef: null,
+  externalTimeoutMs: 10000,
+  maxBytesOverride: null,
+  maxPixelsOverride: null,
+  updatedAt: '2026-09-25T10:00:00+09:00',
+}
+
 export const MEDIA_DELETE_IMPACT = {
   media: { id: 'media-delete-target', filename: '夏の定番セット.jpg', kind: 'image' },
   usageCount: 3,

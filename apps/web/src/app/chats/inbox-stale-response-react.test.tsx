@@ -56,6 +56,24 @@ vi.mock('@/contexts/account-context', () => ({
   }),
 }))
 
+/*
+ * 時刻の選び欄は共通 Select（listbox）。ここで見たいのは選んだ後の
+ * 予約の判断なので、素の <select> に置き換える。
+ */
+vi.mock('@/components/shared/select', () => ({
+  default: ({ 'aria-label': label, id, value, onChange, options }: {
+    'aria-label'?: string
+    id?: string
+    value: string
+    onChange: (value: string) => void
+    options: Array<{ value: string; label: string }>
+  }) => React.createElement(
+    'select',
+    { 'aria-label': label, id, value, onChange: (e: { target: { value: string } }) => onChange(e.target.value) },
+    options.map((option) => React.createElement('option', { key: option.value, value: option.value }, option.label)),
+  ),
+}))
+
 /** 通信そのものを差し替える。api・fetchApiは実物を通す。 */
 function installFetch() {
   vi.stubGlobal('fetch', async (input: unknown, init?: RequestInit) => {

@@ -9,9 +9,14 @@ const FORM = readFileSync(
 )
 
 describe('一斉配信の画素比較対象', () => {
-  it('作成画面の列幅とLINEプレビュー色を設計にそろえる', () => {
+  it('作成画面の列幅を設計にそろえ、LINEプレビューは共通部品にする', () => {
+    // B-6: 画面ごとの枠色（V6 の青い地）はやめ、共通の LinePreview に寄せた。
+    // 見た目の正本は `components/shared/line-preview` が持つ。
     expect(FORM).toContain('grid gap-4 xl:grid-cols-[minmax(0,1fr)_390px]')
-    expect(FORM).toContain('background: var(--color-line-preview)')
+    expect(FORM).toContain("@/components/shared/line-preview'")
+    expect(FORM).toContain('<LinePreview')
+    expect(FORM).not.toContain('broadcast-line-preview')
+    expect(FORM).not.toContain('LINE_MOCK')
   })
 
   it('テンプレート選択は設計の確認項目だけをダイアログへ置く', () => {

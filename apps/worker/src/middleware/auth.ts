@@ -212,6 +212,9 @@ const STAFF_API_PERMISSIONS: Array<[string, string]> = [
   ['/api/templates', '/templates'], ['/api/rich-menu', '/rich-menus'], ['/api/rich-menus', '/rich-menus'],
   ['/api/rich-menu-groups', '/rich-menus'], ['/api/rich-menu-images', '/rich-menus'],
   ['/api/forms', '/form-submissions'], ['/api/contents', '/contents'], ['/api/media', '/contents'],
+  // 危険なファイルの検査は登録メディアと同じ contents の鍵で守る。
+  // 一覧・設定・戻し・消去は route 側で owner/admin に絞っている。
+  ['/api/file-scans', '/contents'],
   // 共通情報は登録メディアと同じ contents.ts 配下。メニューの href と同じ鍵を使う。
   ['/api/common-vars', '/contents/vars'],
   // 流入計測の入口経路と文面は /inflow-links 画面が呼ぶ。

@@ -122,8 +122,10 @@ describe('友だち属性の一覧（設計 hqrOv）', () => {
     // 最長文字＋矢印余白を確保する。すべて h=40 で文字を切らない。
     expect(source).toContain('mb-[10px] flex flex-wrap items-center gap-2')
     expect(source).toContain('h-10 min-w-45 flex-1 rounded-control')
-    expect(source).toContain('h-10 min-w-44 rounded-control')
-    expect(source).toContain('h-10 min-w-38 rounded-control')
+    // 絞り込みと表示件数は共通 Select（高さ40pxは部品側が持つ）。
+    expect(source).toContain('aria-label="使用状態で絞り込む"')
+    expect(source).toContain('aria-label="付与元で絞り込む"')
+    expect(source).toContain('aria-label="表示件数"')
     // 設計 `DgeL8` はフォルダ 240 固定。
     expect(source).toContain('xl:grid-cols-[240px_minmax(0,1fr)]')
   })

@@ -40,6 +40,7 @@ const GUARDED = [
   'app/rich-menus/edit/page.tsx',
   'app/rich-menus/new/page.tsx',
   'app/settings/page.tsx',
+  'app/settings/file-scan/page.tsx',
   'app/tags/fields/new/page.tsx',
   'app/tags/searches/edit/page.tsx',
   'app/webinars/edit/page.tsx',
@@ -60,6 +61,8 @@ const COVERED_BY_PARENT: Record<string, string> = {
  * 番兵を付けられるようになったら EXEMPTIONS から GUARDED へ移す。
  */
 const EXEMPTIONS: Record<string, string> = {
+  'app/affiliates/payment-tab.tsx':
+    '支払いCSV出力の確認窓（Vの本人確認入力を含む）。保存する編集画面ではなく番兵の対象外',
   'app/affiliates/new/page.tsx':
     '「未保存の追加情報を破棄して一覧へ戻る」明示フロー。dirty管理ではなく部分保存の案内',
   'app/automations/new/page.tsx':

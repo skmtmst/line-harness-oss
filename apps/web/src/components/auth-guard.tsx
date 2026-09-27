@@ -114,7 +114,13 @@ export default function AuthGuard({ children, suspendedSupport }: { children: Re
         localStorage.setItem('lh_staff_view_permissions', JSON.stringify(data.data.viewPermissionKeys ?? []))
         if (data.csrfToken) localStorage.setItem('lh_csrf', data.csrfToken)
         // 代理ログイン帯はこの結果を読む。同じ応答をもう一度取りに行かせない（V6R-S0-a）。
-        rememberSessionSnapshot({ impersonation: (data.data.impersonation as OpsImpersonation | null | undefined) ?? null })
+        rememberSessionSnapshot({
+          impersonation: (data.data.impersonation as OpsImpersonation | null | undefined) ?? null,
+          unfamiliarAt: typeof data.data.unfamiliarAt === 'string' ? data.data.unfamiliarAt : null,
+          stepUpMethod: data.data.stepUpMethod === 'totp' || data.data.stepUpMethod === 'password'
+            ? data.data.stepUpMethod
+            : 'none',
+        })
         // 「消した」印の正本は共有の localStorage。新規タブ・再読込では
         // 印が残るので他タブの店舗選択を消さず、ログインし直しのときだけ
         // 一度だけ消える（NEXT-07）。sessionStorage の残存印も残存扱いにする。

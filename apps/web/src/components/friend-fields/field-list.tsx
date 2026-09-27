@@ -11,7 +11,8 @@ import { createResponseGate } from '@/lib/latest-request'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
+import Notice from '@/components/shared/notice'
 import { STATE_TEXT, notConnectedText } from '@/components/shared/not-connected'
 import { Th } from '@/components/shared/table'
 import Select from '@/components/shared/select'
@@ -269,7 +270,7 @@ export default function FriendFieldList({ accountId }: { accountId: string | nul
 
   return (
     <div data-design-node="HBTk0">
-      <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">{cards.map((card) => <SummaryCard key={card.title} {...card} loading={statsStatus === 'loading'} variant="v6" />)}</div>
+      <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">{cards.map((card) => <KpiCard key={card.title} {...card} loading={statsStatus === 'loading'} variant="v6" />)}</div>
       <NoteBar className="mb-4">既定値は友だち情報が空欄のときの送信値です。種類は新規登録後に変更せず、回答フォーム・友だち詳細・変数挿入で同じ定義を使います。</NoteBar>
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -286,12 +287,13 @@ export default function FriendFieldList({ accountId }: { accountId: string | nul
       </div>
 
       {status === 'ready' && actionError ? (
-        <p role="alert" className="mb-4 rounded-control border border-danger/20 bg-danger-bg p-3 text-sm text-danger">
-          {actionError}
-          {retryOrder ? (
+        <Notice
+          tone="danger"
+          className="mb-4"
+          action={retryOrder ? (
             <button
               type="button"
-              className="ml-2 font-semibold underline underline-offset-2"
+              className="font-semibold underline underline-offset-2"
               onClick={() => {
                 const next = retryOrder
                 setRetryOrder(null)
@@ -300,8 +302,10 @@ export default function FriendFieldList({ accountId }: { accountId: string | nul
             >
               再試行
             </button>
-          ) : null}
-        </p>
+          ) : undefined}
+        >
+          {actionError}
+        </Notice>
       ) : null}
 
       <div className="overflow-hidden rounded-card border border-hairline bg-canvas [box-shadow:1px_1px_2px_rgba(15,23,42,0.10)]">

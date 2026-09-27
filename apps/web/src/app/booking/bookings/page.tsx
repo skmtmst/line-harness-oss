@@ -9,6 +9,7 @@ import { useAccount } from '@/contexts/account-context'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import Pagination from '@/components/shared/pagination'
@@ -624,14 +625,14 @@ export default function BookingsPage() {
 
   const pageHead = (
     <>
-      <div data-design="Toolbar" className="mb-2 flex flex-wrap items-center justify-between gap-3">
+      <div data-design="Toolbar" className="flex flex-wrap items-center justify-between gap-3">
         <nav className="text-ink-faint text-xs" aria-label="パンくず">
           <span>予約</span>
           <span className="mx-1.5">/</span>
           <span>予約管理</span>
         </nav>
       </div>
-      <nav aria-label="予約の表示" className="border-hairline mb-4 flex items-center gap-7 border-b">
+      <nav aria-label="予約の表示" className="border-hairline flex items-center gap-7 border-b">
         {/*
           ★V7：集計が取れていない間、タブの件数に 0 を出さない。件数は出さない。
         */}
@@ -696,9 +697,10 @@ export default function BookingsPage() {
     </>
   )
 
+  {/* 帯同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
   if (view === 'day' || view === 'week') {
     return (
-      <div>
+      <div className="flex flex-col gap-4">
         {pageHead}
         {createRow}
         {/*
@@ -706,14 +708,12 @@ export default function BookingsPage() {
           出す（#634 の読み直す口は保つ）。一覧が読めている間はカレンダーを出す。
         */}
         {error ? (
-          <div className="mb-4">
-            <ListState
-              kind="error"
-              title="予約を読み込めませんでした"
-              description="通信が切れたか、サーバが応えませんでした。登録した内容は消えていません。"
-              onRetry={() => void load()}
-            />
-          </div>
+          <ListState
+            kind="error"
+            title="予約を読み込めませんでした"
+            description="通信が切れたか、サーバが応えませんでした。登録した内容は消えていません。"
+            onRetry={() => void load()}
+          />
         ) : (
           <BookingCalendar
             mode={view}
@@ -739,7 +739,7 @@ export default function BookingsPage() {
   }
 
   return (
-    <div>
+    <div className="flex flex-col gap-4">
       {pageHead}
 
       {/*
@@ -750,7 +750,7 @@ export default function BookingsPage() {
       {summaryError && (
         // ★V7 `x63W5x`：補助のデータ（集計）だけ取れないときは、その場所に
         // 小さく1行だけ。一覧はそのまま使える。文言は契約試験が守る。
-        <p className="text-ink-secondary mb-4 text-xs" role="status">
+        <p className="text-ink-secondary text-xs" role="status">
           集計を読み込めませんでした。一覧はそのまま使えます。
           <button type="button" className="text-action ml-2 font-semibold hover:underline" onClick={() => setSummarySeq((n) => n + 1)}>もう一度読み込む</button>
         </p>
@@ -760,7 +760,7 @@ export default function BookingsPage() {
         ★V7 `x63W5x`：取れない KPI は「—」。読み込み中は「読み込んでいます」、
         失敗は「読み込めませんでした」と言い分け、0（本当に0件）と混ぜない。
       */}
-      <div data-design="KPIs" className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
+      <div data-design="KPIs" className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <Kpi
           title="今月の予約"
           value={summaryReady ? kpi.total : null}
@@ -925,7 +925,7 @@ export default function BookingsPage() {
               )}
             </div>
           ) : (
-            <DataTable className="@container">
+            <DataTable className="@container" data-design="Table">
               {/* @container: 谷間帯の列削減。表の幅が足りない間だけ「担当」を畳む。
                   担当は予約の詳細で読める補助情報。畳んでいる間も操作列は右端に留める。 */}
                   <thead>
@@ -947,16 +947,10 @@ export default function BookingsPage() {
                           {formatShort(b.starts_at)}
                         </Td>
                         <Td>
-                          {b.friend_id ? (
-                            <Link
-                              href={`/chats?friend=${b.friend_id}`}
-                              className="text-blue-600 hover:underline"
-                            >
-                              {b.friend_name ?? '-'}
-                            </Link>
-                          ) : (
-                            <span>{b.friend_name ?? 'LINE未連携のお客さま'}</span>
-                          )}
+                          {/* R11: 行の物は予約のため、お客さま名から別画面へ飛ばさない。名前は黒文字。 */}
+                          <span className="text-ink" title={b.friend_name ?? undefined}>
+                            {b.friend_name ?? (b.friend_id ? '-' : 'LINE未連携のお客さま')}
+                          </span>
                         </Td>
                         <Td>{b.menu_name}</Td>
                         <Td className="cq-hide-below-830">{b.staff_name}</Td>
@@ -985,6 +979,16 @@ export default function BookingsPage() {
                             >
                               詳細
                             </button>
+                            {/* R11: 受信箱への行き先は名前ではなく操作列の明示のボタンから。 */}
+                            {b.friend_id ? (
+                              <Link
+                                href={`/chats?friend=${b.friend_id}`}
+                                aria-label={`${b.friend_name ?? 'お客さま'}さんとの会話を受信箱で開く`}
+                                className="text-ink-secondary bg-canvas-sunken rounded-md px-3 py-1 text-xs font-medium hover:bg-hairline"
+                              >
+                                会話
+                              </Link>
+                            ) : null}
                             {/* N-401: 閲覧のみの人には状態を変えるボタンを出さない */}
                             {canOperate ? (
                               <ActionButtons
@@ -1184,7 +1188,7 @@ function BookingDetailPanel({
 
         <div data-design="Body" className="grid gap-4 px-6 py-4 xl:grid-cols-4">
           <div className="min-w-0 xl:col-span-3">
-          {detailError ? <p className="border-danger bg-danger-bg text-danger mb-4 rounded-card border px-4 py-3 text-sm">{detailError}</p> : null}
+          {detailError ? <Notice tone="danger" message={detailError} onClose={() => setDetailError('')} className="mb-4" /> : null}
           <section className="mb-6">
             <div className="bg-success-bg text-success mb-3 w-fit rounded-pill px-3 py-1 text-xs font-semibold">予約が入っています</div>
             <p className="text-ink-secondary mb-3 text-sm">{formatJpDateTime(b.starts_at)}〜{formatJpTime(b.ends_at)} ／ 担当 {b.staff_name} ／ {isLinked ? 'LINEから入りました。' : '電話・店頭で受け付けました。'}</p>
@@ -1205,7 +1209,7 @@ function BookingDetailPanel({
             </div>
           </section>
 
-          <section className="bg-canvas rounded-card border-hairline mb-4 border p-5">
+          <section className="bg-canvas rounded-card border-hairline border p-5">
             <h3 className="text-ink text-base font-semibold">この方のこれまで</h3>
             <p className="text-ink-faint mt-1 text-xs">顧客カルテの履歴は、友だち詳細で確認できます。前回のことを覚えていると、話が早くなります。</p>
             <div className="border-hairline mt-4 grid grid-cols-4 gap-3 border-b pb-2 text-xs text-ink-faint"><span>いつ・何を</span><span>担当</span><span>金額</span><span>メモ</span></div>

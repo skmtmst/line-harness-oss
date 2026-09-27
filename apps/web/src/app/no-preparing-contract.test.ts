@@ -106,7 +106,7 @@ describe('画面に「準備中」を置かない', () => {
     // 数え漏れ（読む場所を間違えて 0 件になる）だけを見張る。
     // ちょうどの枚数は画面が増えるたびに動くので、下限をゆるく取る。
     expect(FILES.length).toBeGreaterThan(300)
-    expect(FILES.filter((f) => /^app\/.*\/page\.tsx$/.test(f.p) || f.p === 'app/page.tsx')).toHaveLength(185)  // 情報欄の編集画面と運営専用ナレッジ（37-11）、★V7見本（v7-progress-filedrop・v7-combobox・v7-target-missing）を含む実測値。2026-09-25 に比較用 /tags-v2・/tags-v3 の2画面を撤去。
+    expect(FILES.filter((f) => /^app\/.*\/page\.tsx$/.test(f.p) || f.p === 'app/page.tsx')).toHaveLength(186)  // 情報欄の編集画面と運営専用ナレッジ（37-11）、★V7見本（v7-progress-filedrop・v7-combobox・v7-target-missing）、設定の中のファイルの検査を含む実測値。2026-09-25 に比較用 /tags-v2・/tags-v3 の2画面を撤去。
   })
 
   it('共通部品に「準備中」が1つも無い', () => {

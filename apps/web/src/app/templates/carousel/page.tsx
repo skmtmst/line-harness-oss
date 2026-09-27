@@ -6,6 +6,8 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { api } from '@/lib/api'
 import type { Folder } from '@line-crm/shared'
 import { Field, inputClass } from '@/components/shared/create-page'
+import LinePreview from '@/components/shared/line-preview'
+import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import InlineActionList, { useActionOptions } from '@/components/auto-replies/inline-action-list'
 import { useAccount } from '@/contexts/account-context'
@@ -427,8 +429,9 @@ function CarouselEditorInner() {
   }
 
   return (
-    <div>
-      <nav data-design="Crumb" className="text-ink-faint mb-2 text-xs">
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <nav data-design="Crumb" className="text-ink-faint text-xs">
         <Link href="/templates" className="hover:underline">
           テンプレート
         </Link>
@@ -448,10 +451,8 @@ function CarouselEditorInner() {
             右が大きく空いて見えた。読み上げ順は変えない（案内が先）。
           */}
           <aside className="hidden w-full shrink-0 xl:order-2 xl:block xl:w-96">
-            <section className="rounded-card bg-line-preview p-4 text-on-accent">
-              <h2 className="text-center text-sm font-bold">LINEプレビュー</h2>
-              <p className="mx-auto mt-2 w-fit rounded-pill bg-line-preview-label px-3 py-1 text-xs">カルーセルの見え方（横にスクロールします）</p>
-              <div className="rounded-card mt-4 overflow-hidden bg-canvas text-ink">
+            <LinePreview note="カルーセルの見え方（横にスクロールします）">
+              <div className="rounded-card overflow-hidden bg-canvas text-ink">
                 <div className="bg-canvas-sunken h-36" />
                 <div className="p-4">
                   <p className="font-bold">{panels[1]?.title || panels[0]?.title || '（タイトル）'}</p>
@@ -459,6 +460,7 @@ function CarouselEditorInner() {
                   {(panels[1]?.actions || panels[0]?.actions || []).map((action, index) => <p key={index} className="border-hairline mt-2 rounded-control border p-2 text-center text-sm text-accent-deep">{action.label}</p>)}
                 </div>
               </div>
+            </LinePreview>
               {/*
                 NEXT-24: テンプレートのテスト送信口はまだ無い。押せる見た目の
                 まま置くと「送れた」と誤解するので、押せない形にして理由と
@@ -473,13 +475,12 @@ function CarouselEditorInner() {
                 自分に送って確かめる
               </button>
               {/*
-                80% の白字だと帯の上で 4.5:1 に届かない。100% の白字にする。
                 NEXT-24: 押せない形＋理由＋代替手順のまま残す（無反応に見せない）。
+                枠の外に置く。枠の中は届く見た目だけにする（B-6）。
               */}
-              <p className="text-on-accent mt-2 text-xs leading-relaxed">
+              <p className="text-ink-faint mt-2 text-xs leading-relaxed">
                 この画面からのテスト送信にはまだ対応していません。保存して一斉配信に組み込むと、配信の画面からテスト送信できます。
               </p>
-            </section>
           </aside>
           <div className="min-w-0 flex-1 space-y-4 xl:order-1">
           <div className="bg-canvas rounded-card border-hairline border p-5">
@@ -806,15 +807,16 @@ function CarouselEditorInner() {
           )}
 
           {error && (
-            <div role="alert" className="bg-danger-bg border-danger-bg text-danger rounded-lg border p-4 text-sm">
-              <p>{error}</p>
-              {saveFailed && (
+            <Notice
+              tone="danger"
+              message={error}
+              action={saveFailed ? (
                 /*
                  * N-149: 原因だけ出して止めると、人は「入力が消えたか」と
                  * 不安になる。残っていることと、やり直す口を一緒に出す。
                  */
-                <p className="mt-2">
-                  <span className="text-ink-secondary">入力した内容はそのまま残っています。</span>
+                <span className="text-xs">
+                  <span>入力した内容はそのまま残っています。</span>
                   <button
                     type="button"
                     onClick={save}
@@ -823,9 +825,9 @@ function CarouselEditorInner() {
                   >
                     もう一度保存する
                   </button>
-                </p>
-              )}
-            </div>
+                </span>
+              ) : undefined}
+            />
           )}
 
           <section className="bg-canvas rounded-card border-hairline border p-5">

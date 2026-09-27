@@ -64,9 +64,13 @@ describe('#640 省略表示の全文確認（title）', () => {
   })
 
   it('/tags: フォルダ札・フォルダ行・使用先セルに title', () => {
-    expect(TAGS).toMatch(/rounded-mini border border-hairline bg-canvas px-2" title=\{group\?\.name/)
+    // フォルダの札は共通 Select。選んだ値が省略表示のとき、全文は
+    // 部品の title で確認できる（#640 の意図は部品側が持つ）。
+    expect(TAGS).toContain('aria-label={`${tag.name} のフォルダ`}')
+    expect(TAGS).not.toContain('<select')
     expect(TAGS).toMatch(/min-w-0 flex-1 truncate" title=\{row\.name\}/)
-    expect(TAGS).toMatch(/truncate px-3 py-3 text-label text-ink" title=\{usageLabel\(tag\)\}/)
+    // 使用先セルは共通 Td（余白は部品側）。全文確認の title は残す。
+    expect(TAGS).toMatch(/truncate text-label text-ink" title=\{usageLabel\(tag\)\}/)
   })
 })
 

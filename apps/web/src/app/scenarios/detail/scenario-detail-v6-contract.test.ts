@@ -85,7 +85,9 @@ describe('V6 シナリオ編集の契約', () => {
     expect(LIST).toContain("api.scenarios.update(id, { folderId: folderId || null })")
     expect(LIST).toContain('onMoveFolders={handleMoveFolders}')
     expect(LIST_TABLE).toContain('フォルダ')
-    expect(LIST_TABLE).toContain('className="v6-select')
+    // 移動先の選び欄は共通 Select（素の select・v6-select は置かない）。
+    expect(LIST_TABLE).toContain('<Select')
+    expect(LIST_TABLE).toContain('aria-label="移動先のフォルダ"')
     expect(LIST_TABLE).toContain("label: 'フォルダを移動'")
     expect(LIST_TABLE).toContain('onMoveFolders(moveIds, moveDraft)')
   })
@@ -93,7 +95,8 @@ describe('V6 シナリオ編集の契約', () => {
   it('「今月作成」は日本時間の月初を共通一覧APIへ渡して絞り込む', () => {
     expect(LIST).toContain("timeZone: 'Asia/Tokyo'")
     expect(LIST).toContain('active: createdThisMonthOnly')
-    expect(LIST).toContain('aria-pressed={filter.disabled ? undefined : filter.active}')
+    // m13i: 札は共通 FilterChip になった（選択表示は部品が持つ）。絞りの動きは同じ。
+    expect(LIST).toContain('今月作成')
     expect(LIST).toContain('createdFrom: createdThisMonthOnly ? currentMonthStart() : undefined')
     expect(LIST).not.toContain('createdThisMonthOnly ? isCreatedThisMonth(sc.createdAt) : true')
   })

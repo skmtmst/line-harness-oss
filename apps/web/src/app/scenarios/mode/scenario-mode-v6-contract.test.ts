@@ -18,12 +18,12 @@ describe('V6 シナリオ作成・配信方式 cCB7r', () => {
   it('Pencilの実Nodeと3段の進み方を表示する', () => {
     expect(page).toContain('data-design-node="cCB7r"')
     /*
-      段の見た目は共通部品（`components/shared/step-trail`）へ移した。
+      段の見た目は共通部品（`components/shared/stepper`）へ移した。
       **同じ形を2か所で別々に書かない**ため。`aria-label` と ✓ の出し方は
-      部品側の試験（`step-trail.test.tsx`）が見張る。ここでは
+      部品側の試験（`stepper.test.tsx`）が見張る。ここでは
       **この画面が3段を、正しい名前と状態で渡しているか**を見る。
     */
-    expect(page).toContain("import StepTrail from '@/components/shared/step-trail'")
+    expect(page).toContain("import Stepper from '@/components/shared/stepper'")
     expect(page).toContain('label="シナリオ作成の進み方"')
     // id なし（新規）は名前と方式をこの画面でまとめて決めるので1段目は current。
     // id あり（既存の下書きを開いた）は1段目は済んでいる（#949 N-055）。

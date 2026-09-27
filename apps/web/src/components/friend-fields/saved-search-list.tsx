@@ -12,7 +12,8 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Select from '@/components/shared/select'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
+import Notice from '@/components/shared/notice'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { describeSavedCondition, type SavedSearchConditionLabels } from '@/components/friends/saved-search-utils'
 import {
@@ -233,10 +234,10 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
   return (
     <div data-design-node="QKx8Q">
       <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <SummaryCard title="保存した条件" value={kpis.total} unit="件" detail="上限50件" loading={loading} variant="v6" />
-        <SummaryCard title="配信で使用中" value={kpis.usedInBroadcasts} unit="件" detail="変更時は影響確認" loading={loading} variant="v6" />
-        <SummaryCard title="該当者0人" value={kpis.zeroMatches} unit="件" detail="条件の見直し候補" loading={loading} variant="v6" />
-        <SummaryCard title="今月の呼び出し" value={kpis.callsThisMonth} unit="回" detail={kpis.callsThisMonth === null ? '呼び出し記録は未接続' : '配信・自動処理'} loading={loading} variant="v6" />
+        <KpiCard title="保存した条件" value={kpis.total} unit="件" detail="上限50件" loading={loading} variant="v6" />
+        <KpiCard title="配信で使用中" value={kpis.usedInBroadcasts} unit="件" detail="変更時は影響確認" loading={loading} variant="v6" />
+        <KpiCard title="該当者0人" value={kpis.zeroMatches} unit="件" detail="条件の見直し候補" loading={loading} variant="v6" />
+        <KpiCard title="今月の呼び出し" value={kpis.callsThisMonth} unit="回" detail={kpis.callsThisMonth === null ? '呼び出し記録は未接続' : '配信・自動処理'} loading={loading} variant="v6" />
       </div>
 
       {/*
@@ -248,18 +249,19 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
       </p>
 
       {!accountId && (
-        <div className="bg-info-bg text-info mb-4 rounded-lg p-4 text-sm">
+        <Notice tone="info" className="mb-4">
           上部でLINE公式アカウントを選んでください。
-        </div>
+        </Notice>
       )}
 
       {error && (
-        <div className="bg-danger-bg border-danger-bg text-danger mb-4 rounded-lg border p-4 text-sm">
-          {error}
-          {retryOrder ? (
+        <Notice
+          tone="danger"
+          className="mb-4"
+          action={retryOrder ? (
             <button
               type="button"
-              className="ml-2 font-semibold underline underline-offset-2"
+              className="font-semibold underline underline-offset-2"
               onClick={() => {
                 const next = retryOrder
                 setRetryOrder(null)
@@ -268,8 +270,10 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
             >
               再試行
             </button>
-          ) : null}
-        </div>
+          ) : undefined}
+        >
+          {error}
+        </Notice>
       )}
 
       {/*

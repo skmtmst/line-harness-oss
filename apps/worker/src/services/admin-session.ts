@@ -1,7 +1,17 @@
 import type { Context } from 'hono';
 import type { Env } from '../index.js';
 import { adminSessionCookie, csrfCookie, SESSION_DEFAULT_MAX_AGE, SESSION_REMEMBER_MAX_AGE, sha256Hex } from '../middleware/auth.js';
-import { createAdminSession, createTwoFactorChallenge, deleteExpiredTwoFactorChallenges, type StaffMember, type TwoFactorChallengePurpose } from '@line-crm/db';
+import {
+  adminSessionFamiliarity,
+  createAdminSession,
+  createTwoFactorChallenge,
+  deleteExpiredTwoFactorChallenges,
+  getStaffById,
+  recordAuditEvent,
+  type StaffMember,
+  type TwoFactorChallengePurpose,
+} from '@line-crm/db';
+import { sendPlainMail } from './plain-mail.js';
 
 /**
  * 権限者のセッション発行と、それに付随する小さな道具。
@@ -53,14 +63,109 @@ export function maskIpPrefix(ip: string | null): string | null {
   return parts.length >= 3 ? `${parts.slice(0, 3).join(':')}::*` : null;
 }
 
+/**
+ * 端末の指紋に使う User-Agent の正規化。版番号（Chrome 129 → 130 のような
+ * 自動更新）で別端末扱いにならないよう、数字と版番号だけを除く。
+ */
+export function normalizeUserAgentForDevice(userAgent: string): string {
+  return userAgent.toLowerCase().replace(/\d+(\.\d+)*/g, '').replace(/\s+/g, ' ').trim();
+}
+
+export function deviceHashFromUserAgent(userAgent: string | null): Promise<string | null> {
+  if (!userAgent) return Promise.resolve(null);
+  return sha256Hex(normalizeUserAgentForDevice(userAgent));
+}
+
+/**
+ * いつもと違う端末・場所からのログインを本人へ知らせる（v6-30 §14、V-2）。
+ *
+ * 管理画面の帯は session の unfamiliar_at が担う。ここでは監査（要確認の行）と
+ * メールを出す。通知の失敗でログイン自体を止めない。
+ */
+async function notifyUnfamiliarLogin(
+  c: Context<Env>,
+  staffId: string,
+  device: { ipPrefix: string | null; userAgent: string | null },
+): Promise<void> {
+  const staff = await getStaffById(c.env.DB, staffId).catch(() => null);
+  try {
+    await recordAuditEvent(c.env.DB, {
+      category: 'auth',
+      action: 'auth.login_unfamiliar',
+      actorPrincipalId: staffId,
+      actorRole: staff?.access_level === 'read_only'
+        ? 'view_only'
+        : staff?.role === 'owner' || staff?.role === 'admin' ? 'administrator' : 'operations',
+      targetKind: 'staff',
+      targetId: staffId,
+      tenantId: staff?.tenant_id ?? null,
+      result: 'success',
+      riskLevel: 'suspicious',
+      retentionClass: 'security',
+      ipPrefix: device.ipPrefix,
+      after: { note: 'いつもと違う端末・場所からのログイン' },
+    });
+  } catch (error) {
+    console.error('[admin-session] unfamiliar login audit failed', error instanceof Error ? error.name : 'unknown');
+  }
+  try {
+    if (!staff?.email) return;
+    const deviceLabel = device.userAgent
+      ? (/iPhone|iPad/.test(device.userAgent) ? 'iPhone / iPad'
+        : /Android/.test(device.userAgent) ? 'Android'
+          : /Windows/.test(device.userAgent) ? 'Windows'
+            : /Mac OS|Macintosh/.test(device.userAgent) ? 'Mac'
+              : /Linux/.test(device.userAgent) ? 'Linux' : '不明な端末')
+      : '不明な端末';
+    await sendPlainMail(c.env, {
+      to: staff.email,
+      subject: '【musubo】いつもと違う端末・場所からのログインがありました',
+      body: [
+        `${staff.name} 様`,
+        '',
+        'musubo の管理画面に、いつもと違う端末または場所からのログインがありました。',
+        `日時: ${new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}`,
+        `端末: ${deviceLabel}`,
+        `接続元: ${device.ipPrefix ?? '不明'}`,
+        '',
+        'このログインに心当たりがない場合は、パスワードの変更と他の端末のログイン解除を行い、管理者へ連絡してください。',
+      ].join('\n'),
+    });
+  } catch (error) {
+    console.error('[admin-session] unfamiliar login mail failed', error instanceof Error ? error.name : 'unknown');
+  }
+}
+
 export async function issueSession(c: Context<Env>, staffId: string, sameSite: 'Strict' | 'Lax' | 'None', remember = false) {
   const sessionToken = randomToken();
   const maxAge = remember ? SESSION_REMEMBER_MAX_AGE : SESSION_DEFAULT_MAX_AGE;
   const expiresAt = new Date(Date.now() + maxAge * 1000).toISOString();
+  const userAgent = c.req.header('user-agent')?.slice(0, 300) ?? null;
+  const ipPrefix = maskIpPrefix(clientIp(c));
+  const deviceHash = await deviceHashFromUserAgent(userAgent);
+  /*
+   * いつもと違う判定。過去のセッションに同じ端末・同じ場所の形跡が無いときだけ
+   * 立てる。検知クエリが失敗しても発行は止めない（未確認フラグは無いまま
+   * 通すが、監査側のログイン記録は別途残る）。
+   */
+  let unfamiliarAt: string | null = null;
+  try {
+    const familiarity = await adminSessionFamiliarity(c.env.DB, staffId, { deviceHash, ipPrefix });
+    if (familiarity.hasBaseline && (!familiarity.deviceKnown || !familiarity.ipKnown)) {
+      unfamiliarAt = new Date().toISOString();
+    }
+  } catch (error) {
+    console.error('[admin-session] unfamiliar check failed', error instanceof Error ? error.name : 'unknown');
+  }
   await createAdminSession(c.env.DB, await sha256Hex(sessionToken), staffId, expiresAt, {
-    userAgent: c.req.header('user-agent')?.slice(0, 300) ?? null,
-    ipPrefix: maskIpPrefix(clientIp(c)),
+    userAgent,
+    ipPrefix,
+    deviceHash,
+    unfamiliarAt,
   });
+  if (unfamiliarAt) {
+    await notifyUnfamiliarLogin(c, staffId, { ipPrefix, userAgent });
+  }
   const csrfToken = randomToken();
   c.header('Set-Cookie', adminSessionCookie(sessionToken, sameSite, maxAge), { append: true });
   c.header('Set-Cookie', csrfCookie(csrfToken, sameSite, maxAge), { append: true });

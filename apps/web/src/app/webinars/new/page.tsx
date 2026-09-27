@@ -6,8 +6,10 @@ import { useRouter } from 'next/navigation'
 import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
 import { RequiredBadge } from '@/components/shared/form-controls'
-import StepTrail from '@/components/shared/step-trail'
+import Stepper from '@/components/shared/stepper'
 import StickyBar from '@/components/shared/sticky-bar'
+import LinePreview from '@/components/shared/line-preview'
+import Notice from '@/components/shared/notice'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { webinarApi, type WebinarFolder } from '@/lib/api'
@@ -80,22 +82,22 @@ export default function NewWebinarPage() {
       data-design-node="lvaY5"
       // U054: 外側の左右余白は app-shell が持つ（16px/24px/40px）。
       // ここで px を重ねるとスマホで入力幅が二重に削られる。
-      className="mx-auto max-w-screen-2xl pb-28 pt-4"
+      className="mx-auto flex max-w-screen-2xl flex-col gap-4 pb-28 pt-4"
     >
-      <nav data-design="Crumb" className="text-ink-faint mb-5 text-xs">
+      <nav data-design="Crumb" className="text-ink-faint text-xs">
         <Link href="/webinars" className="text-action hover:underline">← ウェビナー一覧</Link>
       </nav>
 
-      <StepTrail
+      <Stepper
         label="ウェビナー作成の進み方"
-        items={STEPS.map((step, index) => ({ label: step.title, state: index === 0 ? 'current' as const : 'todo' as const }))}
+        steps={STEPS.map((step, index) => ({ label: step.title, state: index === 0 ? 'current' as const : 'todo' as const }))}
       />
 
       {error ? (
-        <p className="bg-danger-bg text-danger mt-4 rounded-control border border-danger p-3 text-sm" role="alert">{error}</p>
+        <Notice tone="danger" className="mt-4">{error}</Notice>
       ) : null}
 
-      <div className="mt-4 grid items-start gap-4 xl:grid-cols-4">
+      <div className="grid items-start gap-4 xl:grid-cols-4">
         <div className="space-y-4 xl:col-span-3">
           <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card">
             <h2 className="text-ink text-base font-bold">基本設定</h2>
@@ -161,14 +163,15 @@ export default function NewWebinarPage() {
             <p className="text-ink mt-3 text-xs font-semibold">タグ「配信済み」は確認画面で追加できます</p>
           </section>
 
-          <section className="bg-line-preview rounded-card p-4 text-on-accent shadow-card">
-            <h2 className="text-center text-sm font-bold">LINEプレビュー</h2>
-            <p className="bg-line-preview-label mx-auto mt-3 w-fit rounded-pill px-3 py-1 text-micro">実際のLINE表示に近いプレビューです</p>
-            <div className="bg-canvas text-ink mt-4 min-h-12 rounded-control p-4 text-sm font-medium">
+          <div className="shadow-card">
+          <LinePreview
+            note="実際のLINE表示に近いプレビューです"
+          >
+            <div className="bg-canvas text-ink min-h-12 rounded-control p-4 text-sm font-medium">
               {title.trim() ? `${title.trim()}へようこそ。` : 'ウェビナー名を入れると、案内文をここで確認できます。'}
             </div>
-            <div className="mt-52" aria-hidden="true" />
-          </section>
+          </LinePreview>
+          </div>
           <div className="flex gap-2">
             <Button disabled title="下書き保存後に使えます">テスト送信</Button>
             <Button disabled title="公開後に使えます">公開ページを見る</Button>

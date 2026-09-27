@@ -37,6 +37,7 @@ import {
   isValidDate,
   isValidTime,
   listMedia,
+  mergeSpecialHours,
   parseHoursResponse,
   patchProfile,
   todayIn,
@@ -49,7 +50,6 @@ import {
   type HoursPeriod,
   type ProfileAddress,
   type ProfilePatch,
-  type SpecialDay,
   type Weekday,
   type WeeklyHours,
 } from '../services/google-business-profile.js';
@@ -131,6 +131,16 @@ interface DayHours {
   date: string;
   closed: boolean;
   periods: HoursPeriod[];
+  /** その日に Google の特別営業時間が登録されているか（before / 照合用）。 */
+  special?: boolean;
+  /** true なら「特別営業時間を外す」（Google から削除して通常の営業時間に戻す）。periods は戻り先の通常時間。 */
+  remove?: boolean;
+}
+
+/** その日の実効営業時間（照合用の切り出し）。 */
+function daySlice(profile: GoogleProfile, date: string): DayHours {
+  const h = effectiveHoursFor(profile, date);
+  return { date, closed: h.closed, periods: h.periods, special: h.special };
 }
 
 function parseJson<T>(text: string | null, fallback: T): T {
@@ -356,6 +366,8 @@ function fmtDate(date: string): string {
 function summaryForSpecial(days: DayHours[]): string {
   const dates = days.map((d) => fmtDate(d.date)).join('・');
   const first = days[0];
+  if (days.every((d) => d.remove)) return `${dates}の特別営業時間を外す`;
+  if (days.some((d) => d.remove)) return `${dates}の営業時間を変更`;
   const allSame = days.every((d) => d.closed === first.closed && formatPeriods(d.periods) === formatPeriods(first.periods));
   return allSame ? `${dates}を${first.closed ? '休業' : formatPeriods(first.periods)}に` : `${dates}の営業時間を変更`;
 }
@@ -431,15 +443,21 @@ async function proposeSpecial(
   for (const d of days) {
     if (seen.has(d.date)) return fail(c, 400, `同じ日付が2回あります（${d.date}）`, { code: 'invalid_request' });
     seen.add(d.date);
+    if (d.remove) {
+      if (!isValidDate(d.date)) return fail(c, 400, '日付の形式が正しくありません', { code: 'invalid_request' });
+      if (d.date < today) return fail(c, 400, `${fmtDate(d.date)}：過去の日付は変更できません`, { code: 'invalid_request' });
+      if (!profile.specialHours.some((sp) => sp.date === d.date)) return fail(c, 409, `${fmtDate(d.date)}には特別営業時間が登録されていません`, { code: 'unchanged' });
+      continue;
+    }
     const v = validateSpecialDay({ date: d.date, closed: d.closed, periods: d.periods }, today);
     if (!v.ok) return fail(c, 400, `${fmtDate(d.date)}：${v.reason}`, { code: 'invalid_request' });
   }
-  const sorted = [...days].sort((a, b) => a.date.localeCompare(b.date)).map((d) => ({ date: d.date, closed: d.closed, periods: d.closed ? [] : d.periods }));
-  const before: DayHours[] = sorted.map((d) => {
-    const h = effectiveHoursFor(profile, d.date);
-    return { date: d.date, closed: h.closed, periods: h.periods };
-  });
-  const unchanged = sorted.every((d, i) => d.closed === before[i].closed && formatPeriods(d.periods) === formatPeriods(before[i].periods));
+  // 「外す」日は戻り先（通常の営業時間）を periods に持たせて表示・予約影響に使う。
+  const sorted: DayHours[] = [...days]
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map((d) => (d.remove ? { date: d.date, remove: true, closed: (profile.regularHours[weekdayOf(d.date)] ?? []).length === 0, periods: profile.regularHours[weekdayOf(d.date)] ?? [] } : { date: d.date, closed: d.closed, periods: d.closed ? [] : d.periods }));
+  const before: DayHours[] = sorted.map((d) => daySlice(profile, d.date));
+  const unchanged = sorted.every((d, i) => !d.remove && d.closed === before[i].closed && formatPeriods(d.periods) === formatPeriods(before[i].periods));
   if (unchanged) return fail(c, 409, 'すでにその営業時間になっています', { code: 'unchanged' });
   const impact = await countReservationImpact(c, store.id, timeZone, new Map(sorted.map((d) => [d.date, { closed: d.closed, periods: d.periods }])));
   return insertChange(c, store, {
@@ -600,10 +618,10 @@ restaurantGoogleProfile.post('/api/restaurant-test/google/hours/propose', async 
     if (!Array.isArray(body.days) || body.days.length === 0) return fail(c, 400, '日付を選んでください', { code: 'invalid_request' });
     const days: DayHours[] = [];
     for (const raw of body.days) {
-      const d = raw as { date?: unknown; closed?: unknown; periods?: unknown };
+      const d = raw as { date?: unknown; closed?: unknown; periods?: unknown; remove?: unknown };
       const periods = parsePeriods(d.periods ?? []);
       if (typeof d.date !== 'string' || !isValidDate(d.date) || !periods) return fail(c, 400, '日付か時刻の形式が正しくありません', { code: 'invalid_request' });
-      days.push({ date: d.date, closed: d.closed === true, periods });
+      days.push(d.remove === true ? { date: d.date, remove: true, closed: false, periods: [] } : { date: d.date, closed: d.closed === true, periods });
     }
     const change = await proposeSpecial(c, store, profile, timeZone, 'calendar', days, null);
     return change instanceof Response ? change : c.json({ success: true, change: publicChange(change) });
@@ -922,10 +940,7 @@ restaurantGoogleProfile.post('/api/restaurant-test/google/changes/:id/cancel', a
 function sliceOf(profile: GoogleProfile, row: ChangeRow): unknown {
   const target = parseJson<ChangeTarget>(row.target_json, { dates: [] });
   if (row.kind === 'special_hours' && 'dates' in target) {
-    return target.dates.map((date) => {
-      const h = effectiveHoursFor(profile, date);
-      return { date, closed: h.closed, periods: h.periods };
-    });
+    return target.dates.map((date) => daySlice(profile, date));
   }
   if (row.kind === 'regular_hours' && 'weekdays' in target) {
     const out: Partial<WeeklyHours> = {};
@@ -974,7 +989,7 @@ function expectedSlice(row: ChangeRow): unknown {
     return out;
   }
   if (row.kind === 'special_hours') {
-    return (after as DayHours[]).map((d) => ({ date: d.date, closed: d.closed, periods: d.closed ? [] : d.periods }));
+    return (after as DayHours[]).map((d) => ({ date: d.date, closed: d.closed, periods: d.closed ? [] : d.periods, special: !d.remove }));
   }
   return after;
 }
@@ -984,9 +999,16 @@ function buildSendPatch(latest: GoogleProfile, row: ChangeRow): ProfilePatch {
   const after = parseJson<unknown>(row.after_json, null);
   if (row.kind === 'special_hours') {
     const days = after as DayHours[];
-    const byDate = new Map<string, SpecialDay>(latest.specialHours.map((s) => [s.date, s]));
-    for (const d of days) byDate.set(d.date, { date: d.date, closed: d.closed, periods: d.closed ? [] : d.periods });
-    return { field: 'specialHours', value: [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date)) };
+    // 変更する日だけを作り直し、それ以外の日は Google の原文をそのまま送り返す（他の日を絶対に変えない）。
+    // 「外す」日は原文から取り除くだけ（新しい項目は作らない）。
+    return {
+      field: 'specialHoursMerged',
+      value: mergeSpecialHours(
+        latest.rawSpecialHours ?? [],
+        days.filter((d) => !d.remove).map((d) => ({ date: d.date, closed: d.closed, periods: d.closed ? [] : d.periods })),
+        days.filter((d) => d.remove).map((d) => d.date),
+      ),
+    };
   }
   if (row.kind === 'regular_hours') {
     const target = parseJson<ChangeTarget>(row.target_json, { weekdays: [] });

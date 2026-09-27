@@ -125,6 +125,24 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', selectedAccount: null }),
 }))
 
+/*
+ * 共通の Select は listbox の部品で、その操作は部品自身の試験が持つ。
+ * ここで見たいのは選んだ後の引き継ぎの判断なので、素の <select> に置き換える。
+ */
+vi.mock('@/components/shared/select', () => ({
+  default: ({ 'aria-label': label, id, value, onChange, options }: {
+    'aria-label'?: string
+    id?: string
+    value: string
+    onChange: (value: string) => void
+    options: Array<{ value: string; label: string }>
+  }) => React.createElement(
+    'select',
+    { 'aria-label': label, id, value, onChange: (e: { target: { value: string } }) => onChange(e.target.value) },
+    options.map((option) => React.createElement('option', { key: option.value, value: option.value }, option.label)),
+  ),
+}))
+
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
   return {
@@ -299,13 +317,37 @@ describe('NEXT-08 「個別操作」「…」が操作メニューにつなが�
     })
     expect(host.innerHTML).not.toBe(before)
     const labels = menuItems().map((b) => b.textContent)
-    expect(labels).toContain('受信箱で開く')
+    // ★V7（m13g）：「受信箱で開く」は画面右上のボタンにあるので、メニューには重ねない。
+    expect(labels.some((text) => text === '受信箱で開く')).toBe(false)
+    expect(labels.some((text) => text?.includes('テンプレートを送る'))).toBe(true)
     expect(labels).toContain('シナリオに登録')
 
     await act(async () => {
-      menuItems().find((b) => b.textContent === '受信箱で開く')!.click()
+      menuItems().find((b) => b.textContent?.includes('テンプレートを送る'))!.click()
     })
     expect(net.pushed).toContain('/chats?friend=friend-1')
+  })
+
+  it('項目に絵が付き、別画面へ行く項目にだけ矢印が付く', async () => {
+    await render()
+    await act(async () => {
+      buttonByText('個別操作').click()
+    })
+    // どれも左に絵（16px）を持つ。「テンプレートを送る」は別画面なので矢印も持つ。
+    for (const item of menuItems()) {
+      expect(item.querySelector('svg')).toBeTruthy()
+    }
+    const template = menuItems().find((b) => b.textContent?.includes('テンプレートを送る'))!
+    expect(template.querySelectorAll('svg')).toHaveLength(2)
+    await act(async () => {
+      buttonByText('個別操作').click()
+    })
+    await act(async () => {
+      host.querySelector<HTMLButtonElement>('button[aria-label="その他の操作"]')!.click()
+    })
+    // 「戻る」は戻る操作なので矢印が無い（絵だけ）。
+    const back = menuItems().find((b) => b.textContent?.includes('友だち一覧へ戻る'))!
+    expect(back.querySelectorAll('svg')).toHaveLength(1)
   })
 
   it('「…」を押すと関連画面への移動が出て、選ぶと画面遷移する', async () => {

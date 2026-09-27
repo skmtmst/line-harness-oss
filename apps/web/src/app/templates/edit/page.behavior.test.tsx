@@ -28,6 +28,23 @@ vi.mock('@/lib/use-feature-visibility', () => ({
   }),
 }))
 
+/*
+ * 共通の Select は listbox の部品で、その操作は部品自身の試験が持つ。
+ * ここで見たいのは選んだ後のテンプレートの判断なので、素の <select> に置き換える。
+ */
+vi.mock('@/components/shared/select', () => ({
+  default: ({ 'aria-label': label, value, onChange, options }: {
+    'aria-label'?: string
+    value: string
+    onChange: (value: string) => void
+    options: Array<{ value: string; label: string }>
+  }) => React.createElement(
+    'select',
+    { 'aria-label': label, value, onChange: (e: { target: { value: string } }) => onChange(e.target.value) },
+    options.map((option) => React.createElement('option', { key: option.value, value: option.value }, option.label)),
+  ),
+}))
+
 type PageModule = typeof import('./page')
 type Testing = PageModule['default']['__testing']
 
@@ -553,8 +570,9 @@ describe('差し込みボタンの押下', () => {
       .toEqual(['', '{{field.a_pet}}'])
     const select = findElement(controls, (element) =>
       (element.props as { 'aria-label'?: string })['aria-label'] === '友だち情報を差し込む')
-    ;(select?.props as { onChange: (event: unknown) => void })
-      .onChange({ target: { value: '{{field.a_pet}}' } })
+    // 共通 Select の onChange は値そのものを受け取る（イベントではない）。
+    ;(select?.props as { onChange: (value: string) => void })
+      .onChange('{{field.a_pet}}')
 
     expect(inserted).toEqual(['{{field.a_pet}}'])
   })

@@ -6,7 +6,9 @@ import { X } from 'lucide-react'
 import type { Folder } from '@line-crm/shared'
 import { ApiError, api } from '@/lib/api'
 import Button from '@/components/shared/button'
+import Chip from '@/components/shared/chip'
 import FileDropzone, { AttachmentRow } from '@/components/shared/file-drop'
+import Notice from '@/components/shared/notice'
 import Progress from '@/components/shared/progress'
 import Select from '@/components/shared/select'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
@@ -21,6 +23,16 @@ type UploadEntry = {
   message: string
   retryable: boolean
   progress: number
+  mediaId?: string | null
+  /** 検査の状態。確かめ終わるまで中身は出さない。 */
+  scanStatus?: 'pending' | 'clean' | 'rejected' | 'quarantined' | null
+}
+
+function scanChipProps(status: NonNullable<UploadEntry['scanStatus']>): { tone: 'info' | 'ok' | 'danger' | 'warn'; label: string } {
+  if (status === 'clean') return { tone: 'ok', label: '使えます' }
+  if (status === 'rejected') return { tone: 'danger', label: '使えません' }
+  if (status === 'quarantined') return { tone: 'warn', label: '確認のため使えません' }
+  return { tone: 'info', label: '確かめています' }
 }
 
 const LIMITS = [
@@ -137,9 +149,24 @@ export default function MediaUploadDialog({
           const response = await api.media.completeUpload(session.id, { accountId, etag })
           if (!response.success || response.data.status !== 'completed') throw new Error('登録を完了できませんでした')
           completed += 1
+          const mediaId = response.data.mediaId ?? null
           setEntries((current) => current.map((item, entryIndex) => (
-            entryIndex === index ? { ...item, state: 'done', message: '入りました', retryable: false, progress: 100 } : item
+            entryIndex === index
+              ? { ...item, state: 'done', message: '入りました', retryable: false, progress: 100, mediaId, scanStatus: 'pending' }
+              : item
           )))
+          // 検査の状態を読む。確かめ終わるまで配信・公開には出さない。
+          if (mediaId) {
+            try {
+              const scan = await api.fileScan.forMedia(mediaId, accountId)
+              const status = scan.success ? scan.data.scan?.status ?? null : null
+              setEntries((current) => current.map((item, entryIndex) => (
+                entryIndex === index ? { ...item, scanStatus: status ?? 'pending' } : item
+              )))
+            } catch {
+              // 読めなくても登録自体は済んでいる。確かめ中として置く。
+            }
+          }
         } catch (caught) {
           const message = caught instanceof ApiError || caught instanceof Error
             ? caught.message
@@ -205,13 +232,13 @@ export default function MediaUploadDialog({
           onFiles={stage}
         />
 
-        <div className="bg-info-bg text-info rounded-control p-3 text-xs leading-5">
+        <Notice tone="info">
           <p className="font-bold">LINEで送れる大きさ（超えると入れられません）</p>
           {LIMITS.map((limit) => <p key={limit.label}>{limit.label} {limit.note}</p>)}
           <p className="mt-2 font-semibold">大きなファイルも管理画面を経由せず、保存先へ直接送ります。</p>
           <p className="mt-2 font-semibold">中身の形式とファイル名の拡張子が食い違うものは保存できません。</p>
           <p className="font-semibold">公開リンクが作られるため、個人情報の取り扱いに注意してください。</p>
-        </div>
+        </Notice>
 
         {entries.length > 0 ? (
           <div>
@@ -288,6 +315,7 @@ export default function MediaUploadDialog({
                     </li>
                   )
                 }
+                const scan = entry.state === 'done' ? scanChipProps(entry.scanStatus ?? 'pending') : null
                 return (
                   <li key={`${entry.file.name}-${entry.file.size}-${index}`} aria-live="polite">
                     <AttachmentRow
@@ -296,6 +324,14 @@ export default function MediaUploadDialog({
                       tone={tone}
                       onRemove={busy ? undefined : () => removeEntry(index)}
                     />
+                    {scan ? (
+                      <p className="mt-1 flex items-center gap-2">
+                        <Chip tone={scan.tone}>{scan.label}</Chip>
+                        {entry.scanStatus === 'pending' ? (
+                          <span className="text-ink-faint text-xs">確かめ終わるまで配信・公開には出ません</span>
+                        ) : null}
+                      </p>
+                    ) : null}
                   </li>
                 )
               })}
@@ -313,7 +349,7 @@ export default function MediaUploadDialog({
           />
         </div>
         </div>
-        {error ? <p className="bg-danger-bg text-danger mx-6 mb-4 rounded-control p-3 text-xs" role="alert">{error}</p> : null}
+        {error ? <Notice tone="danger" message={error} className="mx-6 mb-4" /> : null}
         <div className="border-hairline flex flex-wrap items-center justify-between gap-3 border-t px-6 py-4">
           <p className={errorCount > 0 ? 'text-danger text-xs font-semibold' : 'text-ink-faint text-xs'}>
             {errorCount > 0 ? `${errorCount}件は登録できません` : `${entries.length}件を選択中`}

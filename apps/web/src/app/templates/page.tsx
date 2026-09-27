@@ -13,6 +13,7 @@ import StaffAssetList from './staff-asset-list'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import ListRange from '@/components/ui/list-range'
@@ -614,7 +615,7 @@ export default function TemplatesPage() {
     : 0
 
   return (
-    <div data-design-node="W7LBc">
+    <div data-design-node="W7LBc" className="flex flex-col gap-4">
       <div data-design="TypeTabs" data-design-node="W7LBc kcmGB">
         <Tabs
           items={[
@@ -754,7 +755,7 @@ export default function TemplatesPage() {
       {/* ★V7：常に出ていた説明の帯は外し、フォルダ欄の下の説明へ短くまとめた。 */}
 
       {/* 検索と並び順（設計 `Body` の上）。 */}
-      <div className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3">
+      <div className="bg-canvas rounded-card border-hairline flex flex-wrap items-center gap-2 border p-3">
         <input
           type="search"
           placeholder="テンプレート名で検索（本文・差し込んでいる項目も対象）"
@@ -791,7 +792,7 @@ export default function TemplatesPage() {
       */}
       {error && view !== 'error' && (
         <div
-          className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm"
+          className="p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm"
           role="alert"
         >
           {error}
@@ -822,7 +823,7 @@ export default function TemplatesPage() {
 
       {/* Create form */}
       {showCreate && (
-        <div className="mb-6 bg-canvas rounded-card border border-hairline p-6">
+        <div className="bg-canvas rounded-card border border-hairline p-6">
           <h2 className="text-sm font-semibold text-ink mb-4">新規テンプレートを作成</h2>
           <div className="space-y-4 max-w-lg">
             <div>
@@ -1110,7 +1111,7 @@ export default function TemplatesPage() {
                 <p className="text-xs text-ink-faint">{drawerError}</p>
               </div>
             ) : !drawerData ? null : (
-              <div className="p-4 space-y-5">
+              <div className="flex flex-col gap-4 p-4">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium ${typeBadgeColor[drawerData.question ? 'question' : drawerData.messageType] ?? 'bg-canvas-sunken text-ink-secondary'}`}>
                     {messageTypeText(drawerData.question ? 'question' : drawerData.messageType)}
@@ -1378,10 +1379,10 @@ export default function TemplatesPage() {
               </div>
               <div>
                 <p className="mb-2 text-sm font-bold text-ink">どうしますか</p>
-                <div className="rounded-lg border border-accent-soft bg-accent-soft px-4 py-3 text-accent-deep">
+                <Notice tone="success">
                   <p className="text-sm font-bold">上の使用先を1か所ずつ開いて、別のテンプレートへ差し替えてください</p>
-                  <p className="mt-1 text-xs text-ink-faint">差し替えが終わるまで、このテンプレートは一覧に残ります。</p>
-                </div>
+                  <p className="mt-1 text-xs">差し替えが終わるまで、このテンプレートは一覧に残ります。</p>
+                </Notice>
               </div>
             </div>
             <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-hairline px-6 py-4">

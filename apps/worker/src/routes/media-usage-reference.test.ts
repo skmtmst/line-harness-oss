@@ -9,6 +9,10 @@ import { featureEnforcementMiddleware } from '../middleware/feature-enforcement.
 import { contents } from './contents.js';
 import { images } from './images.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
+vi.mock('../services/file-scan.js', () => ({
+  checkMediaGate: async () => ({ allowed: true }),
+  getMediaGateInfo: async () => ({ lineAccountId: 'acc-1', sizeBytes: 100, width: 1, height: 1 }),
+}));
 
 /**
  * N-202 (#832): 使用先ごとの版固定参照・ライブ参照切替。

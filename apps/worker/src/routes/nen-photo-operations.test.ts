@@ -43,6 +43,7 @@ vi.mock('@line-crm/db', () => ({
 }));
 vi.mock('../services/account-access.js', () => ({ canAccessAllLineAccounts: mocks.accountAccess }));
 vi.mock('../services/line-proxy-send.js', () => ({ pushViaHarnessProxy: mocks.push }));
+vi.mock('../services/file-scan.js', () => ({ getFileScanBySubject: async () => ({ status: 'clean' }) }));
 
 const { nenPhotoOperations } = await import('./nen-photo-operations.js');
 

@@ -8,6 +8,7 @@ import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import Select from '@/components/shared/select'
 import Avatar from '@/components/shared/avatar'
 import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
 import { ChevronDown } from 'lucide-react'
 
 interface LineAccount {
@@ -209,13 +210,12 @@ export default function HealthPage() {
   }
 
   return (
-    <div>
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
 
       {/* Error */}
       {error && (
-        <div className="mb-4 p-4 bg-danger-bg border border-danger/30 rounded-card text-danger text-sm">
-          {error}
-        </div>
+        <Notice tone="danger" message={error} onClose={() => setError('')} className="mb-4" />
       )}
 
       {/* Loading */}
@@ -229,9 +229,9 @@ export default function HealthPage() {
           <p className="text-xs text-ink-faint">先にアカウント管理からLINEアカウントを登録してください</p>
         </div>
       ) : (
-        <>
+        <div className="flex flex-col gap-4">
           {/* Account Health Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {accounts.map((account) => {
               const risk = latestRisk[account.id] ?? 'unknown'
               const config = riskConfig[risk]
@@ -346,7 +346,7 @@ export default function HealthPage() {
 
           {/* Migration Form Modal */}
           {migrateFrom && (
-            <div className="mb-8 bg-canvas rounded-card border border-danger/30 p-6">
+            <div className="bg-canvas rounded-card border border-danger/30 p-6">
               <h2 className="text-sm font-bold text-ink mb-4">
                 友だち移行: {getAccountName(migrateFrom)}
               </h2>
@@ -394,16 +394,19 @@ export default function HealthPage() {
                 移行履歴を読み込んでいます...
               </div>
             ) : migrationLoadState === 'error' ? (
-              <div className="border-danger bg-danger-bg text-danger rounded-card border p-8 text-center">
-                <p>移行履歴を取得できませんでした。</p>
-                <button
-                  type="button"
-                  onClick={() => void loadMigrations()}
-                  className="text-action mt-3 text-sm font-medium underline underline-offset-2"
-                >
-                  再読み込み
-                </button>
-              </div>
+              <Notice
+                tone="danger"
+                message="移行履歴を取得できませんでした。"
+                action={
+                  <button
+                    type="button"
+                    onClick={() => void loadMigrations()}
+                    className="text-sm font-medium underline underline-offset-2"
+                  >
+                    再読み込み
+                  </button>
+                }
+              />
             ) : migrations.length === 0 ? (
               <div className="bg-canvas rounded-card border border-hairline p-8 text-center text-ink-faint">
                 移行履歴はありません
@@ -476,7 +479,7 @@ export default function HealthPage() {
               </DataTable>
             )}
           </div>
-        </>
+        </div>
       )}
     </div>
   )

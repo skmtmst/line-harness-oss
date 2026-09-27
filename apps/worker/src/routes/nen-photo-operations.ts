@@ -27,6 +27,7 @@ import {
 } from './nen-members.js';
 import type { Env } from '../index.js';
 import { auditLog } from '../lib/audit-log.js';
+import { getFileScanBySubject } from '../services/file-scan.js';
 import { sha256Hex } from '../middleware/auth.js';
 import { hasStaffPermission, requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
@@ -247,6 +248,22 @@ nenPhotoOperations.post(
     }
     const lineAccountId = body.lineAccountId.trim();
     if (!await accountVisible(c, lineAccountId)) return c.json({ success: false, error: '写真が見つかりません' }, 404);
+    // 検査が終わっていない写真は一括採用の対象にできない（v6-22 §4）。
+    const approveTargets = decisions.filter((decision) => decision.decision === 'approve');
+    if (approveTargets.length > 0) {
+      for (const target of approveTargets) {
+        const scan = await getFileScanBySubject(c.env.DB, 'photo', target.photoId);
+        if (!scan || scan.status !== 'clean') {
+          const message = !scan || scan.status === 'pending'
+            ? '確かめ終わっていない写真があるため一括採用できません'
+            : '確認のため採用できない写真があるため一括採用できません';
+          return c.json(
+            { success: false, code: 'file_scan_blocked', error: message, photoId: target.photoId },
+            409,
+          );
+        }
+      }
+    }
     auditLog(c, 'photo.review.bulk', { kind: 'nen-photo' });
     try {
       const requestFingerprint = await sha256Hex(JSON.stringify({ lineAccountId, decisions }));

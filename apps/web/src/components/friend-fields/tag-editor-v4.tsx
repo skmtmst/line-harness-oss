@@ -13,6 +13,7 @@ import Drawer from '@/components/shared/drawer'
 import IconButton from '@/components/shared/icon-button'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
+import { notifyToast } from '@/components/shared/toast'
 import StickyBar from '@/components/shared/sticky-bar'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import { AttributeKindGuide, DuplicateNameNote, findDuplicateNames } from './attribute-kind-guide'
@@ -408,6 +409,10 @@ export default function TagEditorV4({
   allowedActionTypes?: readonly TagEditorActionLabel[]
 }) {
   usePageTitle(mode === 'create' ? 'タグを作る' : 'タグを編集')
+  // 親から渡る保存の知らせは、画面の中の文で出さず Toast（右下・4秒）へ送る。
+  useEffect(() => {
+    if (notice) notifyToast(notice)
+  }, [notice])
   const [name, setName] = useState(initialValues?.name ?? tag?.name ?? '')
   const [groupId, setGroupId] = useState(initialValues?.groupId ?? tag?.groupId ?? '')
   const [isStarred, setIsStarred] = useState(initialValues?.isStarred ?? tag?.isStarred ?? false)
@@ -515,8 +520,7 @@ export default function TagEditorV4({
         <Breadcrumb items={[{ label: '友だち属性', href: '/tags' }, { label: mode === 'create' ? 'タグを作る' : 'タグを編集' }]} />
       </div>}
 
-      {error && <Notice className="mb-4" tone="error" message={error} />}
-      {notice && <Notice className="mb-4" tone="success" message={notice} />}
+      {error && <Notice className="mb-4" tone="danger" message={error} />}
 
       <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_470px]">
         <section className="min-w-0 space-y-4">

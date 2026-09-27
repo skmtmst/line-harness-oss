@@ -1,6 +1,7 @@
 'use client'
 
 import Avatar from '@/components/shared/avatar'
+import { ArrowLeft, CircleDot, Copy, List, ListPlus, PencilLine, Send, Star } from 'lucide-react'
 import { Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -24,6 +25,7 @@ import TagBadge from '@/components/friends/tag-badge'
 import { FIELD_TYPE_LABELS } from '@/components/friend-fields/field-list'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
 import TargetMissing from '@/components/shared/target-missing'
 import Select from '@/components/shared/select'
 import ListRange from '@/components/ui/list-range'
@@ -1087,15 +1089,12 @@ function FriendDetailInner() {
    * 移動。どちらも選んだ先で操作・取消・完了まで辿れるものだけを並べる。
    */
   const primaryActions: ActionMenuItem[] = [
-    {
-      id: 'inbox',
-      label: '受信箱で開く',
-      onSelect: () => router.push(inboxHrefForFriend(friendId)),
-    },
+    // 「受信箱で開く」は画面右上のボタンにあるので、メニューには重ねない（★V7）。
     ...(canEditSupport
       ? [{
           id: 'support',
           label: '対応状況を編集',
+          icon: <CircleDot size={16} />,
           onSelect: () => void openSupportEditor(),
         }]
       : []),
@@ -1103,6 +1102,7 @@ function FriendDetailInner() {
       ? [{
           id: 'fields',
           label: '情報欄を編集',
+          icon: <PencilLine size={16} />,
           onSelect: () =>
             router.push(`/friends/detail?id=${encodeURIComponent(friendId)}&tab=info`),
         }]
@@ -1112,24 +1112,30 @@ function FriendDetailInner() {
       ? [{
           id: 'scenario-enroll',
           label: 'シナリオに登録',
+          icon: <ListPlus size={16} />,
           onSelect: () => void openScenarioPicker(),
         }]
       : []),
     {
       id: 'send-template',
-      label: 'テンプレートを送る（受信箱で選択）',
+      label: 'テンプレートを送る',
+      icon: <Send size={16} />,
+      description: '受信箱で選んで送ります',
+      external: true,
       onSelect: () => router.push(inboxHrefForFriend(friendId)),
     },
   ]
+  // 別画面への移動には ↗ を付ける（★V7）。「戻る」は戻る操作なので付けない。
   const secondaryActions: ActionMenuItem[] = [
-    { id: 'templates', label: 'テンプレート一覧を見る', onSelect: () => router.push('/templates') },
-    { id: 'scenarios', label: 'シナリオ一覧を見る', onSelect: () => router.push('/scenarios') },
-    { id: 'reminders', label: 'リマインダ一覧を見る', onSelect: () => router.push('/reminders') },
-    { id: 'mileage', label: 'マイルを確認', onSelect: () => router.push('/mileage') },
-    { id: 'duplicates', label: '重複候補を確認', onSelect: () => router.push('/duplicates') },
+    { id: 'templates', label: 'テンプレート一覧を見る', icon: <List size={16} />, external: true, onSelect: () => router.push('/templates') },
+    { id: 'scenarios', label: 'シナリオ一覧を見る', icon: <List size={16} />, external: true, onSelect: () => router.push('/scenarios') },
+    { id: 'reminders', label: 'リマインダ一覧を見る', icon: <List size={16} />, external: true, onSelect: () => router.push('/reminders') },
+    { id: 'mileage', label: 'マイルを確認', icon: <Star size={16} />, external: true, onSelect: () => router.push('/mileage') },
+    { id: 'duplicates', label: '重複候補を確認', icon: <Copy size={16} />, external: true, onSelect: () => router.push('/duplicates') },
     {
       id: 'back-to-list',
       label: '友だち一覧へ戻る',
+      icon: <ArrowLeft size={16} />,
       dividerBefore: true,
       onSelect: () => router.push('/friends'),
     },
@@ -1262,8 +1268,8 @@ function FriendDetailInner() {
   }
 
   return (
-    <div data-friends-detail-design="v4">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+    <div data-friends-detail-design="v4" className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <nav className="text-ink-faint text-xs" data-design="Crumb">
           <Link href="/friends" className="hover:underline">
             友だち
@@ -1323,9 +1329,7 @@ function FriendDetailInner() {
 
       {/* 本体が取れている途中の失敗（保存など）は帯で出す。本体の失敗は下のカードが出す。 */}
       {error && friend && (
-        <div className="bg-danger-bg border-danger-bg text-danger mb-4 rounded-lg border p-4 text-sm">
-          {error}
-        </div>
+        <Notice tone="danger" message={error} onClose={() => setError('')} className="mb-4" />
       )}
 
       {/*
@@ -1672,14 +1676,14 @@ function FriendDetailInner() {
             画面からはみ出していた。grid の子に min-w-0 を付け、幅の決定を
             グリッドに任せてタブ帯だけ中で横に流す。
           */}
-          <div data-design="Right" className="min-w-0">
+          <div data-design="Right" className="flex min-w-0 flex-col gap-4">
             {/*
               ★V7: 10個のタブが 1440px で2段に折れていた。折らずに1段にし、
               入り切らない分は横に送る。リンクで移動するタブなので
               aria-current="page" で現在地を示す（role="tab" は付けない）。
             */}
             <div className="relative">
-              <div ref={tabsRowRef} className="border-hairline mb-4 flex gap-1 overflow-x-auto border-b">
+              <div ref={tabsRowRef} className="border-hairline flex gap-1 overflow-x-auto border-b">
                 {visibleTabs.map((t) => (
                   <Link
                     key={t.key}

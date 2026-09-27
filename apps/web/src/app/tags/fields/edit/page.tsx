@@ -9,6 +9,7 @@ import FeatureGate from '@/components/feature-gate'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
 import StickyBar from '@/components/shared/sticky-bar'
 import Select from '@/components/shared/select'
 import ListState from '@/components/shared/list-state'
@@ -163,17 +164,18 @@ function EditFriendFieldForm() {
 
   // 編集画面のPencilノードは未定。新規作成の A1ZYeP を仮に名乗ると誤比較されるので付けない。
   return (
-    <div>
-      <div className="mb-4 flex items-center justify-between gap-4">
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <div className="flex items-center justify-between gap-4">
         <Breadcrumb items={[{ label: '友だち情報欄', href: '/tags?tab=fields' }, { label: field.name }]} />
         <Button href="/tags?tab=fields">友だち情報欄へ</Button>
       </div>
 
-      {error ? <p role="alert" className="mb-4 rounded-control border border-danger/20 bg-danger-bg p-3 text-sm text-danger">{error}</p> : null}
+      {error ? <Notice tone="danger" message={error} className="mb-4" /> : null}
       {locked ? (
-        <p className="mb-4 rounded-control border border-warning/30 bg-warning-bg p-3 text-sm text-warning">
+        <Notice tone="warn" className="mb-4">
           共通項目はこのアカウントから直接変更できません。新しい項目へ移行してから編集してください。
-        </p>
+        </Notice>
       ) : null}
 
       <div className="grid gap-4 xl:grid-cols-2">

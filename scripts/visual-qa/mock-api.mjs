@@ -48,6 +48,8 @@ import {
   MEDIA_FOLDERS,
   MEDIA_ITEMS,
   MEDIA_QUOTA,
+  FILE_SCAN_ITEMS,
+  FILE_SCAN_CONFIG,
   FRIEND_ADD_RUNS,
   AUTO_REPLIES, AUTO_REPLY_FOLDERS, AUTO_REPLY_RUNS, AUTO_REPLY_CONFLICT_SUMMARY,
   AUTO_REPLY_PUBLISH_CONFLICTS, AUTO_REPLY_PUBLISH_DRAFT,
@@ -2217,8 +2219,47 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     // 設計 `xGLVe` のトーク欄。載っていない友だちは空で返す（実際に空の人もいる）。
     return { success: true, data: FRIEND_MESSAGES[messages[1]] ?? [] }
   }
-  // テンプレート選択（設計 `NfgOs` / `NWbuF`）。空だと選ぶものが1つも出ない。
-  if (pathname === '/api/templates') return { success: true, data: TEMPLATES }
+  /*
+   * テンプレート選択（設計 `NfgOs` / `NWbuF`）。空だと選ぶものが1つも出ない。
+   *
+   * 実Workerは口を2つに分けている。`page` か `limit` が付くとページ区切りの
+   * `{ items, total, limit, sort }` を返し、無ければ配列のまま返す
+   * （`apps/worker/src/routes/templates.ts`）。受信箱のテンプレート選択は
+   * 区切り形だけを読むので、ここも同じ分け方にする。ずれていると
+   * `items` が undefined になって画面ごと落ちる。
+   */
+  if (pathname === '/api/templates') {
+    if (query.has('page') || query.has('limit')) {
+      const q = query.get('q')?.toLowerCase()
+      const folderId = query.get('folder_id')
+      const messageType = query.get('message_type')
+      const filtered = TEMPLATES.filter((item) =>
+        (messageType ? item.messageType === messageType : true)
+        && (folderId ? (folderId === '__none__' ? !item.folderId : item.folderId === folderId) : true)
+        && (q ? item.name.toLowerCase().includes(q) || item.messageContent.toLowerCase().includes(q) : true))
+      const limit = Math.max(1, Number(query.get('limit') ?? 100) || 100)
+      const page = Math.max(1, Number(query.get('page') ?? 1) || 1)
+      const items = filtered.slice((page - 1) * limit, page * limit)
+      const folderCounts = query.get('folder_counts') === '1'
+        ? filtered.reduce((acc, item) => {
+            const key = item.folderId ?? ''
+            acc[key] = (acc[key] ?? 0) + 1
+            return acc
+          }, {})
+        : undefined
+      return {
+        success: true,
+        data: {
+          items,
+          total: filtered.length,
+          limit,
+          sort: [{ field: 'created_at', direction: 'desc' }, { field: 'id', direction: 'asc' }],
+          ...(folderCounts ? { folderCounts } : {}),
+        },
+      }
+    }
+    return { success: true, data: TEMPLATES }
+  }
   const templateDetail = /^\/api\/templates\/(template-\d+)$/.exec(pathname)
   if (templateDetail) {
     const template = TEMPLATES.find((item) => item.id === templateDetail[1])
@@ -3667,6 +3708,32 @@ const server = createServer((req, res) => {
     return
   }
 
+  if (method === 'GET' && url.pathname === '/api/file-scans') {
+    const status = url.searchParams.get('status')
+    const filtered = FILE_SCAN_ITEMS.filter((item) => !status || item.status === status)
+    res.writeHead(200).end(JSON.stringify({ success: true, data: { items: filtered, total: filtered.length, limit: 50, offset: 0 } }))
+    return
+  }
+  if (method === 'GET' && url.pathname === '/api/file-scans/by-subject') {
+    const id = url.searchParams.get('id')
+    const scan = FILE_SCAN_ITEMS.find((item) => item.subjectId === id) ?? null
+    res.writeHead(200).end(JSON.stringify({ success: true, data: { scan } }))
+    return
+  }
+  if (method === 'GET' && url.pathname === '/api/file-scans/for-media') {
+    const mediaId = url.searchParams.get('mediaId')
+    const scan = FILE_SCAN_ITEMS.find((item) => item.mediaId === mediaId) ?? null
+    res.writeHead(200).end(JSON.stringify({ success: true, data: { scan } }))
+    return
+  }
+  if (method === 'GET' && url.pathname === '/api/file-scans/health') {
+    res.writeHead(200).end(JSON.stringify({ success: true, data: { stopped: false, pendingCount: 1, oldestPendingAt: null } }))
+    return
+  }
+  if (method === 'GET' && url.pathname === '/api/file-scans/config') {
+    res.writeHead(200).end(JSON.stringify({ success: true, data: { config: FILE_SCAN_CONFIG } }))
+    return
+  }
   if (method === 'GET' && url.pathname === '/api/media') {
     const limit = Math.min(100, Math.max(1, Number(url.searchParams.get('limit') || 20)))
     const offset = Math.max(0, Number(url.searchParams.get('offset') || 0))

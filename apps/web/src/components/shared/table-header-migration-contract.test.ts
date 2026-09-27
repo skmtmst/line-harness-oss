@@ -30,8 +30,10 @@ describe('表見出しの第1段階移行', () => {
     expect(migrated).toBeGreaterThan(0)
 
     for (const [path, source] of Object.entries(sources)) {
-      expect(source, `${path} が共通表部品をimportしていない`).toContain(
-        "import { TableHeadRow, Th } from '@/components/shared/table'",
+      // 見出しだけでなく行・セルまで共通化した画面は、同じ入口から
+      // { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } の形で入れる。
+      expect(source, `${path} が共通表部品をimportしていない`).toMatch(
+        /import \{[^}]*\bTh\b[^}]*\} from '@\/components\/shared\/table'/,
       )
       expect(source, `${path} が見出し行を共通化していない`).toContain('<TableHeadRow>')
       expect(source.match(/<Th\b/g), `${path} に共通Thの利用箇所が無い`).not.toBeNull()

@@ -77,6 +77,8 @@ import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { imageDimensions, IMAGE_METADATA_PREFIX_BYTES } from '../services/media-metadata.js';
 import { scanSingleMediaUsage } from '../services/media-usage-scan.js';
 import { createR2PresignedPutUrl } from '../services/r2-presigned-upload.js';
+import { checkMediaGate, getMediaGateInfo, runScanForStoredObject } from '../services/file-scan.js';
+import { ensureFileScanForUpload } from './file-scan.js';
 import type { MediaReplacementImpact } from '@line-crm/shared';
 
 /**
@@ -634,12 +636,52 @@ contents.post(
       );
       if (!session) throw new Error('verified upload session is unavailable');
       if (session.target_media_id) {
+        // 版の差し替えも検査の対象にする。検査が終わるまで版は出さない。
+        // 記録に失敗しても確定自体は返す（門番は出す前にその場で回す）。
+        const versionScan = await ensureFileScanForUpload({
+          db: c.env.DB,
+          lineAccountId: accountId,
+          subjectKind: 'upload_session',
+          subjectId: session.id,
+          mediaId: session.target_media_id,
+          filename: session.filename,
+          mimeType: session.expected_mime,
+          sizeBytes: session.expected_size,
+        }).catch((err) => {
+          console.error('upload session scan record error:', session.id, err);
+          return null;
+        });
+        if (versionScan) {
+          await runScanForStoredObject(c.env.DB, c.env.IMAGES, versionScan, session.r2_key, {
+            width: session.width, height: session.height,
+          }).catch((err) => console.error('upload session scan error:', session.id, err));
+        }
         return c.json({
           success: true,
           data: { uploadSessionId: session.id, status: 'verified', targetMediaId: session.target_media_id },
         });
       }
       const media = await completeNewMediaUpload(c.env.DB, session);
+      // 保存の直後に検査の段を入れる。clean になるまで中身は出さない。
+      // 記録に失敗しても確定自体は返す（門番は出す前にその場で回す）。
+      const newScan = await ensureFileScanForUpload({
+        db: c.env.DB,
+        lineAccountId: accountId,
+        subjectKind: 'media',
+        subjectId: media.id,
+        mediaId: media.id,
+        filename: media.filename,
+        mimeType: media.mime_type,
+        sizeBytes: media.size_bytes,
+      }).catch((err) => {
+        console.error('new media scan record error:', media.id, err);
+        return null;
+      });
+      if (newScan) {
+        await runScanForStoredObject(c.env.DB, c.env.IMAGES, newScan, session.r2_key, {
+          width: media.width, height: media.height,
+        }).catch((err) => console.error('new media scan error:', media.id, err));
+      }
       return c.json({
         success: true,
         data: { uploadSessionId: session.id, status: 'completed', mediaId: media.id },
@@ -899,6 +941,23 @@ async function serveMediaFile(
     }
     return c.json({ success: false, error: 'Not found' }, 404);
   }
+  // 検査が終わるまで中身は出さない。URL だけ返して中身を渡さない、はしない。
+  const gate = await checkMediaGate(c.env.DB, c.env.IMAGES, {
+    id: media.id,
+    lineAccountId: media.line_account_id,
+    r2Key: media.r2_key,
+    filename: media.filename,
+    mimeType: media.mime_type,
+    sizeBytes: media.size_bytes,
+    width: media.width,
+    height: media.height,
+  });
+  if (!gate.allowed) {
+    if (opts.auditDownload) {
+      auditLog(c, 'media.download', { kind: 'media', id }, { result: 'denied', lineAccountId: accountId });
+    }
+    return c.json({ success: false, code: gate.code, error: gate.message }, 409);
+  }
   const object = await c.env.IMAGES.get(media.r2_key);
   if (!object) return c.json({ success: false, error: 'Not found' }, 404);
   if (opts.auditDownload) {
@@ -974,6 +1033,20 @@ contents.get('/api/media/:id/versions/:versionNo/download', requireRole('owner',
       auditLog(c, 'media.download', { kind: 'media', id }, { result: 'denied', lineAccountId: accountId });
       return c.json({ success: false, error: 'Not found' }, 404);
     }
+    const versionGate = await checkMediaGate(c.env.DB, c.env.IMAGES, {
+      id: media.id,
+      lineAccountId: media.line_account_id,
+      r2Key: media.r2_key,
+      filename: media.filename,
+      mimeType: media.mime_type,
+      sizeBytes: media.size_bytes,
+      width: media.width,
+      height: media.height,
+    });
+    if (!versionGate.allowed) {
+      auditLog(c, 'media.download', { kind: 'media', id }, { result: 'denied', lineAccountId: accountId });
+      return c.json({ success: false, code: versionGate.code, error: versionGate.message }, 409);
+    }
     const object = await c.env.IMAGES.get(version.r2_key);
     if (!object) return c.json({ success: false, error: 'Not found' }, 404);
     auditLog(c, 'media.download', { kind: 'media', id }, { result: 'success', lineAccountId: accountId });
@@ -1010,6 +1083,22 @@ contents.get('/media/:id/content', async (c) => {
   try {
     const media = await getMediaLiveTarget(c.env.DB, c.req.param('id'));
     if (!media) return c.json({ success: false, error: 'Not found' }, 404);
+    // 配信の本文に埋まる公開URLも、clean の版だけ出す。
+    const liveFull = await getMediaGateInfo(c.env.DB, media.id);
+    if (!liveFull) return c.json({ success: false, error: 'Not found' }, 404);
+    const liveGate = await checkMediaGate(c.env.DB, c.env.IMAGES, {
+      id: media.id,
+      lineAccountId: liveFull.lineAccountId,
+      r2Key: media.r2_key,
+      filename: media.filename,
+      mimeType: media.mime_type,
+      sizeBytes: liveFull.sizeBytes,
+      width: liveFull.width,
+      height: liveFull.height,
+    });
+    if (!liveGate.allowed) {
+      return c.json({ success: false, code: liveGate.code, error: liveGate.message }, 409);
+    }
     const object = await c.env.IMAGES.get(media.r2_key);
     if (!object) return c.json({ success: false, error: 'Not found' }, 404);
     const etag = typeof object.etag === 'string' && object.etag ? object.etag : null;

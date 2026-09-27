@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { Bookmark, Check, Circle, Megaphone, SlidersHorizontal, Star } from 'lucide-react'
+import { Bookmark, Megaphone, SlidersHorizontal } from 'lucide-react'
 import type { Scenario, Tag } from '@line-crm/shared'
 import { api, ApiError, fetchApi, type FriendListItem, type SupportMarkListItem } from '@/lib/api'
 import FriendKpis from '@/components/friends/friend-kpis'
@@ -21,6 +21,7 @@ import MergedUsersPage from '@/app/users/page'
 import { EmbeddedPageProvider } from '@/components/layout/embedded-page-context'
 import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
+import FilterChip from '@/components/shared/filter-chip'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import { emptyMessageOf } from './friend-list-empty'
@@ -408,7 +409,7 @@ function FriendsPageInner({
   }, [loadFriends, onNotice])
 
   return (
-    <div data-friends-design="v6" className="space-y-3.5">
+    <div data-friends-design="v6" className="flex flex-col gap-4">
       <FriendKpis />
 
       {hasScoreRange ? (
@@ -558,18 +559,12 @@ function FriendsPageInner({
               options={[{ value: '', label: 'すべて' }, ...scenarios.map((scenario) => ({ value: scenario.id, label: scenario.name }))]}
             />
           </div>
-          <button type="button" data-filter-chip="unhandled" aria-pressed={responseFilter === 'unhandled'} onClick={() => resetPageWith(() => setResponseFilter(responseFilter === 'unhandled' ? 'all' : 'unhandled'))} className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 text-xs font-bold transition-colors ${responseFilter === 'unhandled' ? 'border-status-danger-border bg-status-danger-selected text-danger shadow-sm' : 'border-transparent bg-status-danger-soft text-danger hover:bg-status-danger-selected'}`}>
-            {responseFilter === 'unhandled'
-              ? <Check aria-hidden="true" className="h-3.5 w-3.5" />
-              : <Circle aria-hidden="true" className="h-2.5 w-2.5 fill-current" />}
+          <FilterChip selected={responseFilter === 'unhandled'} onChange={() => resetPageWith(() => setResponseFilter(responseFilter === 'unhandled' ? 'all' : 'unhandled'))}>
             未対応
-          </button>
-          <button type="button" data-filter-chip="attention" aria-pressed={attentionOnly} onClick={() => resetPageWith(() => setAttentionOnly(!attentionOnly))} className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border bg-status-warn-soft px-3 text-xs font-bold text-status-warn-deep transition-colors ${attentionOnly ? 'border-status-warn-deep shadow-sm' : 'border-transparent hover:brightness-95'}`}>
-            {attentionOnly
-              ? <Check aria-hidden="true" className="h-3.5 w-3.5" />
-              : <Star aria-hidden="true" className="h-3.5 w-3.5" />}
+          </FilterChip>
+          <FilterChip selected={attentionOnly} onChange={() => resetPageWith(() => setAttentionOnly(!attentionOnly))}>
             注目のみ
-          </button>
+          </FilterChip>
           {/*
             絞り込みの行の件数は出さない。一覧の見出しの横とページ送りの
             表示に同じ数があり、1画面に3回出ていた。件数はあの2か所で足りる。
@@ -761,13 +756,13 @@ function FriendsPageHost() {
   )
 
   return (
-    <div data-friends-page="v6" data-design-node="PhxG6">
+    <div data-friends-page="v6" data-design-node="PhxG6" className="flex flex-col gap-4">
       {/*
         画面名は共通トップバーだけに置く。本文側のタイトル・説明・マニュアルは
         重複させない（Pencil `PhxG6` / トップバー `cBSCb`）。
         操作は独立した見出し行にせず、タブ `JB0Ki` の右端へ置く。
       */}
-      <div className="mb-4" data-design="V6Tabs" data-design-node="JB0Ki">
+      <div data-design="V6Tabs" data-design-node="JB0Ki">
         <MergedTabs
           basePath="/friends"
           paramName="tab"

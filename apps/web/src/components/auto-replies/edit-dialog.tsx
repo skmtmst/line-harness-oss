@@ -24,6 +24,7 @@ import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
 import { TimeField } from '@/components/shared/date-time-field'
 import StickyBar from '@/components/shared/sticky-bar'
+import LinePreview from '@/components/shared/line-preview'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import {
   MESSAGE_KIND_WORDS,
@@ -574,7 +575,7 @@ export default function EditDialog({
       }}
     >
       {/*
-       * 手順表示（StepTrail）は edit/page.tsx が出す。
+       * 手順表示（Stepper）は edit/page.tsx が出す。
        * この窓は一覧のダイアログとページの両方で使うため、ここに置くと
        * 手順の無い一覧にも Steps の節が混入する。
        */}
@@ -1515,9 +1516,9 @@ export default function EditDialog({
             </dl>
           </div>
           {step !== 'trigger' && (
-            <div style={{ minHeight: 388 }} className={`bg-line-preview overflow-hidden rounded-card border-hairline border ${step === 'response' ? 'order-1' : 'order-2'}`}>
-              <p className="text-on-accent py-4 text-center text-sm font-semibold">LINEプレビュー</p>
-              <div className="bg-canvas mx-4 mb-4 rounded-card p-4 text-sm leading-relaxed text-ink">
+            <div style={{ minHeight: 388 }} className={step === 'response' ? 'order-1' : 'order-2'}>
+            <LinePreview>
+              <div className="rounded-card bg-canvas p-4 text-sm leading-relaxed text-ink">
                 {mode === 'silent'
                   ? '返信はせず、設定したアクションだけを実行します。'
                   : mode === 'template'
@@ -1545,7 +1546,7 @@ export default function EditDialog({
                         : responseContent || '返信内容を入力すると、ここに表示されます。'}
               </div>
               {step === 'response' && (
-                <div className="mx-4 mb-4 rounded-card bg-canvas p-3">
+                <div className="rounded-card mt-3 bg-canvas p-3">
                   <p className="text-ink-faint text-micro">表示見本 — ボタン付きメッセージの見え方</p>
                   <div className="mt-2 space-y-1.5" aria-hidden="true">
                     {['予約を確認', '日程を変更', 'キャンセル'].map((label) => (
@@ -1559,6 +1560,7 @@ export default function EditDialog({
                   </div>
                 </div>
               )}
+            </LinePreview>
             </div>
           )}
           <div className="order-3 bg-canvas rounded-card border-hairline border p-4 text-xs">

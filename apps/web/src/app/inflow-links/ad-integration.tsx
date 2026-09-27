@@ -6,6 +6,7 @@ import type { AdConversionLog, AdPlatform } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
@@ -284,9 +285,9 @@ export default function AdIntegration({
           <Metric label="やり直して成功" value={retrySuccessCount} detail="二重にはなっていません" />
         </div>
 
-        <p className="rounded-card bg-info-bg px-4 py-3 text-xs leading-relaxed text-ink-secondary">
+        <Notice tone="info">
           送るのは、成果と広告のクリックが結びついたものだけです。結びつかないものは送りません。
-        </p>
+        </Notice>
 
         {/*
           #514-13: まとめてやり直す口は無い。効かないボタンは出さない。
@@ -391,9 +392,9 @@ export default function AdIntegration({
           <Button href="/inflow-links?tab=connections&view=history">送信履歴を見る</Button>
         </div>
 
-        <p className="rounded-card bg-info-bg px-4 py-3 text-xs leading-relaxed text-ink-secondary">
+        <Notice tone="info">
           広告をつながなくても流入リンクの計測は使えます。つなぐと、成果を広告側へ安全に返せるようになります。
-        </p>
+        </Notice>
 
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_390px]">
         <div className="space-y-4">
@@ -481,9 +482,9 @@ export default function AdIntegration({
 
   return (
     <div className="space-y-4" data-design-node="v0HaI">
-      <p className="rounded-card bg-info-bg px-4 py-3 text-xs leading-relaxed text-ink-secondary">
+      <Notice tone="info">
         広告の管理画面では「クリック数」までしか分かりません。ここでは、そのクリックが友だちになり、成果になったところまで1本でつながって見えます。
-      </p>
+      </Notice>
 
       {/*
         #514-13: 広告費の内訳・1人あたり・1件あたり・まとまり別の表は口に無い。

@@ -5,6 +5,7 @@ import type { Env } from '../index.js';
 import type { AuthenticatedStaff } from '../middleware/auth.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
+import { sensitiveStepUpSatisfied, stepUpRequiredResponse } from '../lib/step-up.js';
 import { resolveRequestBoundaries } from '../services/request-boundary.js';
 import {
   canApproveBroadcast,
@@ -321,6 +322,10 @@ broadcastApprovals.post('/api/broadcasts/:id/approval-approve', async (c) => {
     const requestedBy = (raw.approval_requested_by_staff_id as string | null | undefined) ?? null;
     if (requestedBy && requestedBy === staff?.id) {
       return c.json({ success: false, error: '自分の依頼は承認できません', code: 'SELF_APPROVAL' }, 403);
+    }
+    // 一斉配信の承認は大事な操作（V）。二者承認の承認も同じ再確認の枠に乗せる。
+    if (!await sensitiveStepUpSatisfied(c, 'broadcast.approval')) {
+      return stepUpRequiredResponse(c, '配信の承認には本人確認が必要です');
     }
     const now = new Date().toISOString();
     // pending のときだけ承認済みにする。二重押し・取り消し後の承認を防ぐ。

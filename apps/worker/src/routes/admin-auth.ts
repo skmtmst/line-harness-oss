@@ -9,6 +9,7 @@ import {
   SESSION_REMEMBER_MAX_AGE,
   adminSessionCookie,
   adminSessionTokenFromCookie,
+  adminSessionTokenHashFromRequest,
   authenticateApiToken,
   csrfCookie,
   csrfTokenFromCookie,
@@ -21,12 +22,15 @@ import { recordAuditEvent, recordLoginAudit } from '@line-crm/db';
 import {
   activatePlatformAdminIfAwaitingTotp,
   claimStaffTotpStep,
+  clearStepUpAttempts,
   createStepUpGrant,
   deleteAdminSession,
   deleteAdminSessionForStaff,
   deleteOtherAdminSessions,
   deleteTwoFactorChallenge,
   listAdminSessionsByStaff,
+  markAdminSessionStepUp,
+  getAdminSessionByTokenHash,
   getStaffById,
   getStaffByInviteTokenHash,
   getStaffByLineUserId,
@@ -40,6 +44,8 @@ import {
   updateStaffMember,
 } from '@line-crm/db';
 import { buildTotpUri, decryptTotpSecret, encryptTotpSecret, generateTotpSecret, verifyTotp } from '../lib/totp.js';
+import { isStepUpPurpose } from '../lib/step-up.js';
+import { verifyPassword } from '../services/password-hash.js';
 import { toImpersonationContext } from '../middleware/impersonation.js';
 import { candidateFromStaffRow, isPlatformAdmin, isPlatformAdminRow } from '../middleware/platform-admin.js';
 
@@ -469,35 +475,71 @@ adminAuth.post('/api/auth/step-up', async (c) => {
    * 機械コードを付ける（#1058）。
    */
   if (!staffContext) return c.json({ success: false, error: 'Unauthorized', code: 'STEP_UP_UNAUTHORIZED' }, 401);
-  const body = await c.req.json<{ code?: string; purpose?: string }>()
-    .catch(() => ({} as { code?: string; purpose?: string }));
+  const body = await c.req.json<{ code?: string; password?: string; purpose?: string }>()
+    .catch(() => ({} as { code?: string; password?: string; purpose?: string }));
+  if (!isStepUpPurpose(body.purpose)) {
+    return c.json({ success: false, error: '確認する操作を指定してください' }, 400);
+  }
+  const purpose = body.purpose;
+  const staff = await getStaffById(c.env.DB, staffContext.id);
+  if (!staff?.is_active) {
+    return c.json({ success: false, error: 'このアカウントでは再確認を受け付けられません' }, 403);
+  }
+  /*
+   * 確認の手段は本人の設定で決まる（V）：二段階認証を使っている人は6桁の
+   * コード、使っていない人はパスワード。手段ごとに「何を聞くか」の文言を
+   * 分けるため、どちらの経路かを先に確定する。
+   * 形式の検査は試行枠の確保より先に行う。形になっていない入力で
+   * 試行回数を消費させないため。
+   */
+  const useTotp = Boolean(staff.totp_enabled_at && staff.totp_secret_enc && c.env.TOTP_ENCRYPTION_KEY);
   const code = body.code?.trim() ?? '';
-  if (!['operations.control', 'affiliate.payout.export', 'photo.original.download', 'staff.permissions.change', 'staff.two_factor.remove'].includes(body.purpose ?? '')
-      || !/^\d{6}$/.test(code)) {
+  const password = body.password ?? '';
+  if (useTotp && !/^\d{6}$/.test(code)) {
     return c.json({ success: false, error: '6桁の認証コードを入力してください' }, 400);
   }
-  const purpose = body.purpose!;
-  const staff = await getStaffById(c.env.DB, staffContext.id);
-  const masterKey = c.env.TOTP_ENCRYPTION_KEY;
-  if (!staff?.is_active || !staff.totp_enabled_at || !staff.totp_secret_enc || !masterKey) {
-    return c.json({ success: false, error: '重要操作には二段階認証の設定が必要です' }, 403);
+  if (!useTotp && staff.password_hash && !password) {
+    return c.json({ success: false, error: 'パスワードを入力してください' }, 400);
+  }
+  if (!useTotp && !staff.password_hash) {
+    return c.json({ success: false, error: '重要操作には二段階認証またはパスワードの設定が必要です' }, 403);
   }
   const attempt = await reserveStepUpAttempt(c.env.DB, staff.id);
   if (!attempt) {
     return c.json({ success: false, error: STEP_UP_ATTEMPT_LIMIT_ERROR }, 429);
   }
-  const verified = await verifyTotp(
-    await decryptTotpSecret(staff.totp_secret_enc, masterKey),
-    code,
-    Date.now(),
-    staff.totp_last_used_step,
-  );
-  if (!verified.valid || verified.step === null) {
-    if (attempt.attempts >= attempt.maxAttempts) {
-      return c.json({ success: false, error: STEP_UP_ATTEMPT_LIMIT_ERROR }, 429);
+  let totpStep: number | undefined;
+  if (useTotp) {
+    const verified = await verifyTotp(
+      await decryptTotpSecret(staff.totp_secret_enc!, c.env.TOTP_ENCRYPTION_KEY!),
+      code,
+      Date.now(),
+      staff.totp_last_used_step,
+    );
+    if (!verified.valid || verified.step === null) {
+      if (attempt.attempts >= attempt.maxAttempts) {
+        return c.json({ success: false, error: STEP_UP_ATTEMPT_LIMIT_ERROR }, 429);
+      }
+      return c.json({ success: false, error: '認証コードが正しくありません' }, 400);
     }
-    return c.json({ success: false, error: '認証コードが正しくありません' }, 400);
+    totpStep = verified.step;
+  } else {
+    if (!await verifyPassword(password, staff.password_hash!)) {
+      if (attempt.attempts >= attempt.maxAttempts) {
+        return c.json({ success: false, error: STEP_UP_ATTEMPT_LIMIT_ERROR }, 429);
+      }
+      return c.json({ success: false, error: 'パスワードが正しくありません' }, 400);
+    }
   }
+  /*
+   * 再確認済みの時刻をセッションへ刻む。同じセッションは10分の窓で
+   * 何度も聞かれない。APIキー経路（セッション行が無い）は何もしない。
+   */
+  const sessionTokenHash = await adminSessionTokenHashFromRequest(c);
+  if (sessionTokenHash) {
+    await markAdminSessionStepUp(c.env.DB, sessionTokenHash, new Date().toISOString());
+  }
+  if (totpStep === undefined) await clearStepUpAttempts(c.env.DB, staff.id);
   const token = randomToken();
   const expiresAt = new Date(Date.now() + 5 * 60_000).toISOString();
   if (!await createStepUpGrant(c.env.DB, {
@@ -505,7 +547,7 @@ adminAuth.post('/api/auth/step-up', async (c) => {
     staffId: staff.id,
     purpose,
     expiresAt,
-    totpStep: verified.step,
+    totpStep,
   })) {
     return c.json({ success: false, error: 'この認証コードは使用済みです' }, 409);
   }
@@ -633,6 +675,31 @@ adminAuth.get('/api/auth/session', async (c) => {
   // /api/auth/* は代理ログインの差し替え対象外なので、ここで直接引く。
   const active = platformAdmin ? await getActiveImpersonation(c.env.DB, staff.id) : null;
   const impersonation = active ? toImpersonationContext(active) : null;
+  /*
+   * いつもと違う端末・場所からのログインか（V-2 の帯）。セッション行が
+   * 無いAPIキー経路では null のまま。取れないときもログイン画面と同じく
+   * 表示を止めないため失敗は null に畳む。
+   */
+  const sessionTokenHash = await adminSessionTokenHashFromRequest(c);
+  let currentSession = null;
+  if (sessionTokenHash) {
+    try {
+      currentSession = await getAdminSessionByTokenHash(c.env.DB, sessionTokenHash);
+    } catch {
+      // セッション行が読めなくても本人確認情報の表示を止めない。
+      currentSession = null;
+    }
+  }
+  /*
+   * 再確認の聞き方（V-1 ダイアログの表示切替）。2段階認証の設定があれば
+   * 認証アプリの6桁、無ければパスワード。どちらも無い人は大事な操作の前に
+   * 設定へ誘導するため 'none'。staff文脈にはTOTP・パスワード列が無いので
+   * 本体を引き直す。
+   */
+  const staffRecord = staff.id === 'env-owner' ? null : await getStaffById(c.env.DB, staff.id).catch(() => null);
+  const stepUpMethod = staffRecord?.totp_enabled_at && staffRecord.totp_secret_enc
+    ? 'totp'
+    : staffRecord?.password_hash ? 'password' : 'none';
   return c.json({
     success: true,
     data: {
@@ -641,6 +708,8 @@ adminAuth.get('/api/auth/session', async (c) => {
       platformAdmin,
       platformAdminState,
       impersonation,
+      unfamiliarAt: currentSession?.unfamiliar_at ?? null,
+      stepUpMethod,
     },
     csrfToken,
   });

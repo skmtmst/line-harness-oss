@@ -18,6 +18,12 @@ import { verifyCallerLineIdentity } from '../services/liff-auth.js';
 import { pushViaHarnessProxy } from '../services/line-proxy-send.js';
 import { dispatchLineProxyLocally } from '../services/local-line-proxy.js';
 import { imageDimensions, stripImageMetadata } from '../services/media-metadata.js';
+import {
+  getFileScanBySubject,
+  runBuiltinScanAndStore,
+  runScanForStoredObject,
+} from '../services/file-scan.js';
+import { ensureFileScanForUpload } from './file-scan.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { installNenRichMenu } from '../services/nen-rich-menu.js';
 import {
@@ -1085,6 +1091,30 @@ nenMembers.post('/api/liff/nen/photos', async (c) => {
       String(body.caption || '').trim().slice(0, 300), now, now, friend.line_account_id,
       reviewImageUrl, reviewImageUrl, dimensions.width, dimensions.height, bytes.byteLength,
     ).run();
+  // 保存の直後に検査の段を入れる。clean になるまで審査へは流さない。
+  // 記録に失敗しても投稿自体は返す（門番は出す前にその場で回す）。
+  const photoScan = await ensureFileScanForUpload({
+    db: c.env.DB,
+    lineAccountId: String(friend.line_account_id),
+    subjectKind: 'photo',
+    subjectId: id,
+    mediaId: null,
+    filename: `photo.${extension}`,
+    mimeType: body.mimeType,
+    sizeBytes: bytes.byteLength,
+  }).catch((err) => {
+    console.error('photo scan record error:', id, err);
+    return null;
+  });
+  if (photoScan) {
+    await runBuiltinScanAndStore(c.env.DB, photoScan, bytes, {
+      filename: `photo.${extension}`,
+      mimeType: body.mimeType,
+      sizeBytes: bytes.byteLength,
+      width: dimensions.width,
+      height: dimensions.height,
+    }).catch((err) => console.error('photo scan error:', id, err));
+  }
   await syncNenPhotoTags(c.env.DB, friend.id);
   return c.json({ success: true, data: { id, imageUrl: reviewImageUrl, status: 'pending' } }, 201);
 });
@@ -1763,6 +1793,47 @@ nenMembers.put('/api/nen-members/photos/:id/review', requireRole('owner', 'admin
   }
   if (photo.status !== 'pending' || Number(photo.review_version) !== body!.expectedVersion) {
     return c.json({ success: false, error: 'Already reviewed' }, 409);
+  }
+  if (status === 'adopted') {
+    // 検査が終わるまで採用しない。失敗時は審査へ流さない（v6-22 §4）。
+    const targetPhotoId = c.req.param('id');
+    let photoScan = await getFileScanBySubject(c.env.DB, 'photo', targetPhotoId);
+    if (!photoScan) {
+      const row = await c.env.DB.prepare(
+        `SELECT r2_key, content_type, image_width, image_height, image_byte_size, line_account_id
+           FROM nen_photo_submissions WHERE id = ?`,
+      ).bind(targetPhotoId).first<{
+        r2_key: string; content_type: string; image_width: number | null;
+        image_height: number | null; image_byte_size: number | null; line_account_id: string;
+      }>();
+      // 大きさが分からない古い行では検査の記録を作れない。作らず門番に
+      // 409 で止めてもらい、500 にしない。
+      if (row && Number.isSafeInteger(row.image_byte_size) && (row.image_byte_size as number) >= 0) {
+        try {
+          const created = await ensureFileScanForUpload({
+            db: c.env.DB,
+            lineAccountId: row.line_account_id,
+            subjectKind: 'photo',
+            subjectId: targetPhotoId,
+            mediaId: null,
+            filename: `photo.${targetPhotoId}`,
+            mimeType: row.content_type,
+            sizeBytes: row.image_byte_size as number,
+          });
+          photoScan = await runScanForStoredObject(c.env.DB, c.env.IMAGES, created, row.r2_key, {
+            width: row.image_width, height: row.image_height,
+          }).catch(() => created);
+        } catch {
+          photoScan = null;
+        }
+      }
+    }
+    if (!photoScan || photoScan.status !== 'clean') {
+      const message = !photoScan || photoScan.status === 'pending'
+        ? '確かめています。確かめ終わるまで採用できません'
+        : '確認のため採用できません。管理者が確かめるまで、どこにも出ません';
+      return c.json({ success: false, code: 'file_scan_blocked', error: message }, 409);
+    }
   }
   const awarded = status === 'adopted' ? PHOTO_ADOPTION_POINTS : 0;
   const pointSync: 'pending' | 'needs_attention' | 'not_required' = status !== 'adopted'
