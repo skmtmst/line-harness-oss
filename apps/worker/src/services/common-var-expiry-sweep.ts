@@ -7,6 +7,7 @@
 // 二重に出さないための請求（claim）である。
 
 import {
+  isCommonVarsEnabled,
   listCommonVarExpiryCandidates,
   markCommonVarExpiryNotice,
   type CommonVarExpiryCandidate,
@@ -28,7 +29,14 @@ export async function sweepCommonVarExpiryNotices(
   now: Date = new Date(),
 ): Promise<CommonVarExpirySweepResult> {
   const nowIso = now.toISOString();
-  const candidates = await listCommonVarExpiryCandidates(db, nowIso);
+  const rawCandidates = await listCommonVarExpiryCandidates(db, nowIso);
+  // 機能設定で共通情報を止めているアカウントには期限の知らせを出さない。
+  const candidates: CommonVarExpiryCandidate[] = [];
+  for (const candidate of rawCandidates) {
+    if (await isCommonVarsEnabled(db, candidate.line_account_id)) {
+      candidates.push(candidate);
+    }
+  }
   const result: CommonVarExpirySweepResult = {
     notified: 0,
     candidates: candidates.length,
