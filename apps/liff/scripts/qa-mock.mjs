@@ -275,7 +275,8 @@ const server = createServer(async (req, res) => {
   if (method === 'GET' && pathname === '/api/liff/booking/availability') {
     const staffId = url.searchParams.get('staff_id') ?? 'qa-staff-1';
     // カレンダー撮影のため、求められた期間ぶんを動的に作る。
-    // 火曜はお休み（closed_dates）、期間先頭から4日ごとの4日目は満席（枠なし）。
+    // 火曜はお休み（closed_dates）。期間先頭から4日ごとの4日目は満席
+    // （枠はあって残り0）、3日目は枠なし（印なしの空きなし）。
     const from = url.searchParams.get('from') ?? '2026-10-01';
     const to = url.searchParams.get('to') ?? '2026-10-01';
     const slots = [];
@@ -289,10 +290,17 @@ const server = createServer(async (req, res) => {
         closed.push(date);
         continue;
       }
-      if (offset % 4 === 3) continue;
+      if (offset % 4 === 2) continue;
+      const full = offset % 4 === 3;
       for (const start of ['10:00', '11:00', '12:00', '14:00']) {
         const [h, m] = start.split(':').map(Number);
-        slots.push({ date, start, end: `${String(h + 1).padStart(2, '0')}:${String(m).padStart(2, '0')}` });
+        slots.push({
+          date,
+          start,
+          end: `${String(h + 1).padStart(2, '0')}:${String(m).padStart(2, '0')}`,
+          remaining: full ? 0 : 3,
+          state: full ? 'full' : 'available',
+        });
       }
     }
     json(res, 200, {

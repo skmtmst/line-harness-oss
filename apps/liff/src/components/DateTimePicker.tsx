@@ -41,6 +41,38 @@ function monthOf(date: string): string {
   return date.slice(0, 7);
 }
 
+type AvailSlot = { date: string; start: string; remaining?: number; state?: string };
+
+/**
+ * 空き読み出しのまとめ役（リスト・カレンダー共通）。
+ * 月をまたいで28日ずつに割って読むと、同じ日の同じ枠が二重に入ることが
+ * ある（口が期間を広めに返す・同じ枠を二口が返す）。同じ枠（担当＋開始
+ * 時刻）は1つにまとめる。埋まった枠（残り0）は時刻には出さず、「満」の
+ * 判定だけに使う。
+ */
+function groupSlots(
+  buckets: Array<{ staff_id: string; slots: AvailSlot[] }>,
+): { byDate: Record<string, string[]>; fullDates: Record<string, true> } {
+  const seen = new Set<string>();
+  const byDate: Record<string, string[]> = {};
+  const hasSlot: Record<string, true> = {};
+  for (const bucket of buckets) {
+    for (const s of bucket.slots ?? []) {
+      hasSlot[s.date] = true;
+      if ((s.remaining ?? 1) <= 0 || s.state === 'full' || s.state === 'closed') continue;
+      const key = `${bucket.staff_id}\0${s.date}\0${s.start}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      (byDate[s.date] ??= []).push(s.start);
+    }
+  }
+  const fullDates: Record<string, true> = {};
+  for (const d of Object.keys(hasSlot)) {
+    if ((byDate[d]?.length ?? 0) === 0) fullDates[d] = true;
+  }
+  return { byDate, fullDates };
+}
+
 function addMonths(month: string, count: number): string {
   const year = Number(month.slice(0, 4));
   const mon = Number(month.slice(5, 7));
@@ -82,12 +114,13 @@ function splitRange(from: string, to: string): Array<[string, string]> {
   return chunks;
 }
 
-type DayState = 'open' | 'full' | 'closed' | 'past' | 'off';
+type DayState = 'open' | 'full' | 'closed' | 'past' | 'off' | 'empty';
 
 /**
  * 読み上げ文。「10月4日 満席」のように日付と状態だけにする。
  * 色・印だけでは伝わらない人に、状態を言葉で渡す。
  * 過ぎた日は「過ぎた日」と読む（期間の外の未来日は「選択できません」）。
+ * 枠が1つも無い日は「空きなし」と読む（「満席」は枠があって全部埋まった日だけ）。
  */
 export function dayStateLabel(date: string, state: DayState): string {
   const d = new Date(`${date}T00:00:00Z`);
@@ -96,6 +129,7 @@ export function dayStateLabel(date: string, state: DayState): string {
   if (state === 'full') return `${base} 満席`;
   if (state === 'closed') return `${base} お休み`;
   if (state === 'past') return `${base} 過ぎた日`;
+  if (state === 'empty') return `${base} 空きなし`;
   return `${base} 選択できません`;
 }
 
@@ -145,7 +179,7 @@ function DaySlots({
 /**
  * 1-c 日時を選ぶ。手順の下に「リスト｜カレンダー」の切り替えがある。
  * リストは日付の横並び札（空きが無い日は「満席」）＋選んだ日の時刻3列。
- * カレンダーは月の表（●空きあり／満／休）＋選んだ日の時刻3列（同じ部品）。
+ * カレンダーは月の表（●空きあり／満／休／枠なしは印なしの空きなし）＋選んだ日の時刻3列（同じ部品）。
  * 時刻の札を押すと選ばれるだけで、進むのは下の操作の帯。
  * (撮影: 時刻のボタン名は「10:00」のまま。qa-shots.mjs が名前で押す)
  */
@@ -186,6 +220,8 @@ export default function DateTimePicker({
   // カレンダー用。月を送っても読んだぶんは足していく。
   const [calByDate, setCalByDate] = useState<Record<string, string[]>>({});
   const [calClosed, setCalClosed] = useState<Record<string, true>>({});
+  // 枠があって全部埋まった日（「満」の印を付ける日）。
+  const [calFull, setCalFull] = useState<Record<string, true>>({});
   const [loadedMonths, setLoadedMonths] = useState<string[]>([]);
   const loadingMonthsRef = useRef<Set<string>>(new Set());
   const [month, setMonth] = useState(monthOf(today));
@@ -225,9 +261,7 @@ export default function DateTimePicker({
     api
       .availability(menuId, staffId, listFrom, listTo)
       .then((r) => {
-        const slots = r.by_staff[0]?.slots ?? [];
-        const grouped: Record<string, string[]> = {};
-        for (const s of slots) (grouped[s.date] ??= []).push(s.start);
+        const grouped = groupSlots(r.by_staff[0] ? [r.by_staff[0]] : []).byDate;
         setListByDate(grouped);
         setListDay((prev) => (prev && grouped[prev] ? prev : Object.keys(grouped)[0] ?? null));
       })
@@ -258,14 +292,15 @@ export default function DateTimePicker({
     )
       .then((results) => {
         if (cancelled) return;
-        const grouped: Record<string, string[]> = {};
+        const buckets = results.flatMap((r) => (r.by_staff[0] ? [r.by_staff[0]] : []));
+        const { byDate: grouped, fullDates } = groupSlots(buckets);
         const closed: Record<string, true> = {};
         for (const r of results) {
-          for (const s of r.by_staff[0]?.slots ?? []) (grouped[s.date] ??= []).push(s.start);
           for (const d of r.closed_dates ?? []) closed[d] = true;
         }
         setCalByDate((prev) => ({ ...prev, ...grouped }));
         setCalClosed((prev) => ({ ...prev, ...closed }));
+        setCalFull((prev) => ({ ...prev, ...fullDates }));
         setLoadedMonths((prev) => (prev.includes(month) ? prev : [...prev, month]));
       })
       .catch((e) => {
@@ -349,7 +384,10 @@ export default function DateTimePicker({
     if (date < today) return 'past';
     if (date > windowEnd) return 'off';
     if (calClosed[date]) return 'closed';
-    return (calByDate[date]?.length ?? 0) > 0 ? 'open' : 'full';
+    if ((calByDate[date]?.length ?? 0) > 0) return 'open';
+    // 「満」は枠があって全部埋まった日だけ。枠が1つも無い日は印なしの「空きなし」。
+    if (calFull[date]) return 'full';
+    return 'empty';
   }
 
   const monthLabel = `${Number(month.slice(0, 4))}年${Number(month.slice(5, 7))}月`;
@@ -446,6 +484,7 @@ export default function DateTimePicker({
           setCalFailed(false);
           setCalByDate({});
           setCalClosed({});
+          setCalFull({});
           setLoadedMonths([]);
           setCalDay(null);
           // 読み直しは今月から探し直す。

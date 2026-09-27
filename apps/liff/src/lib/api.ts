@@ -30,7 +30,15 @@ export interface AvailabilityResponse {
   by_staff: Array<{
     staff_id: string;
     display_name: string;
-    slots: Array<{ date: string; start: string; end: string }>;
+    slots: Array<{
+      date: string;
+      start: string;
+      end: string;
+      /** 残り枠。0 は埋まった枠（カレンダーの「満」の判定に使う）。無いときは空きありと扱う。 */
+      remaining?: number;
+      /** 枠の状態（Worker が付ける。'full' は埋まった枠）。 */
+      state?: 'available' | 'limited' | 'full' | 'closed';
+    }>;
   }>;
   /** 休みの日（お店・担当が閉めている日）。カレンダーの「休」の印に使う。 */
   closed_dates?: string[];
