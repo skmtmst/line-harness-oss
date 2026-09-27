@@ -36,7 +36,12 @@ function formatAssetBytes(bytes: number): string {
   return `${Math.max(1, Math.round(bytes / 1024))}KB`
 }
 
-export default function BroadcastAssetManager({ kind }: { kind: BroadcastAssetKind }) {
+/*
+ * R135: 素材を作り・直し・消ししたあと、親（テンプレート一覧の種類タブの
+ * 件数）へ知らせる口。以前は件数の取り直しがアカウント切替のときだけで、
+ * 作った直後のタブが0件のままになっていた。渡さなければ今までどおり。
+ */
+export default function BroadcastAssetManager({ kind, onChanged }: { kind: BroadcastAssetKind; onChanged?: () => void }) {
   const { selectedAccountId } = useAccount()
   const [items, setItems] = useState<BroadcastMessageAsset[]>([])
   const [editing, setEditing] = useState<BroadcastMessageAsset | null>(null)
@@ -88,6 +93,7 @@ export default function BroadcastAssetManager({ kind }: { kind: BroadcastAssetKi
       if (!res.success) throw new Error(res.error)
       setDeleteTarget(null)
       await load()
+      onChanged?.()
     } catch {
       // 生のAPIエラーは出さない。運用者が次に何をすればよいかだけを書く。
       setDeleteError('削除できませんでした。状態を読み直してから、もう一度お試しください。')
@@ -142,6 +148,7 @@ export default function BroadcastAssetManager({ kind }: { kind: BroadcastAssetKi
         : await api.broadcastMessageAssets.create({ lineAccountId: selectedAccountId || null, kind, name: name.trim(), payload })
       if (!res.success) { setError(res.error); return }
       reset(); await load()
+      onChanged?.()
     } catch { setError('保存できませんでした') } finally { setSaving(false) }
   }
 

@@ -666,7 +666,7 @@ export class SupportMarkArchiveError extends Error {
 export interface SupportMarkArchiveResult {
   archived: true;
   markId: string;
-  replacementMarkId: string;
+  replacementMarkId: string | null;
   replacedFriendCount: number;
   version: number;
 }
@@ -674,13 +674,19 @@ export interface SupportMarkArchiveResult {
 /**
  * V6の確認版に一致する場合だけ、友だちの置換と保管を一括で行う。
  * 同じIdempotency-Keyの再送は保存済み結果を返す。
+ *
+ * R180: 使っている友だちが0人のときは置換先なし（null）で保管できる。
+ * 以前は0人でも置換先が必須で、独自マーク1件だけのアカウントでは候補が
+ * 空（共有マークは除外・自身も除外）になり保管できなかった。友だちが
+ * いるのに置換先が無い要求は `replacement_invalid` で止める。使用中・
+ * 参照ありの保護（canArchive）と初期値・共有の禁止は変えない。
  */
 export async function archiveSupportMarkWithReplacement(
   db: D1Database,
   scope: SupportMarkScope,
   input: {
     markId: string;
-    replacementMarkId: string;
+    replacementMarkId: string | null;
     expectedVersion: number;
     impactRevision: string;
     idempotencyKey: string;
@@ -711,15 +717,22 @@ export async function archiveSupportMarkWithReplacement(
     return JSON.parse(previous.response_json) as SupportMarkArchiveResult;
   }
 
-  if (input.markId === input.replacementMarkId) {
+  if (input.replacementMarkId !== null && input.markId === input.replacementMarkId) {
     throw new SupportMarkArchiveError('replacement_invalid', '置換先は別のマークを指定してください');
   }
   const [impact, replacement] = await Promise.all([
     getSupportMarkArchiveImpact(db, scope, input.markId),
-    getSupportMarkById(db, input.replacementMarkId, scope),
+    input.replacementMarkId === null
+      ? Promise.resolve(null)
+      : getSupportMarkById(db, input.replacementMarkId, scope),
   ]);
   if (!impact) throw new SupportMarkArchiveError('not_found', '対応マークが見つかりません');
-  if (!replacement || replacement.archived_at) {
+  if (input.replacementMarkId === null) {
+    // 置換先なしは0人のときだけ。友だちがいるのに置換先が無いと付け替え先を失う。
+    if (Number(impact.mark.friend_count) !== 0) {
+      throw new SupportMarkArchiveError('replacement_invalid', '使っている友だちがいるため置換先を指定してください');
+    }
+  } else if (!replacement || replacement.archived_at) {
     throw new SupportMarkArchiveError('replacement_invalid', '置換先の対応マークが見つかりません');
   }
   if (impact.mark.is_default === 1) {
@@ -753,26 +766,10 @@ export async function archiveSupportMarkWithReplacement(
   const detail = JSON.stringify({
     previousMarkId: input.markId,
     replacementMarkId: input.replacementMarkId,
-    reason: 'archived_mark_replacement',
+    reason: input.replacementMarkId === null ? 'archived_mark_no_replacement' : 'archived_mark_replacement',
   });
-  const results = await db.batch([
-    db.prepare(
-      `UPDATE support_marks
-          SET archived_at = ?, is_default = 0, auto_on_inbound = 0,
-              version = version + 1, updated_at = ?, updated_by = ?
-        WHERE id = ? AND archived_at IS NULL AND version = ?
-          AND (SELECT COUNT(*) FROM friends
-                WHERE support_mark_id = ? AND line_account_id = ?) = ?`,
-    ).bind(
-      archivedAt,
-      archivedAt,
-      input.actorId,
-      input.markId,
-      input.expectedVersion,
-      input.markId,
-      scope.lineAccountId,
-      impact.mark.friend_count,
-    ),
+  // 置換先なし（0人のときだけ）は友だちの付け替え文を積まない。
+  const replacementStatements = input.replacementMarkId === null ? [] : [
     db.prepare(
       `INSERT INTO operation_audit
          (id, target_kind, target_id, action, actor_id, friend_id, detail_json)
@@ -798,6 +795,26 @@ export async function archiveSupportMarkWithReplacement(
       input.markId,
       archivedAt,
     ),
+  ];
+  const results = await db.batch([
+    db.prepare(
+      `UPDATE support_marks
+          SET archived_at = ?, is_default = 0, auto_on_inbound = 0,
+              version = version + 1, updated_at = ?, updated_by = ?
+        WHERE id = ? AND archived_at IS NULL AND version = ?
+          AND (SELECT COUNT(*) FROM friends
+                WHERE support_mark_id = ? AND line_account_id = ?) = ?`,
+    ).bind(
+      archivedAt,
+      archivedAt,
+      input.actorId,
+      input.markId,
+      input.expectedVersion,
+      input.markId,
+      scope.lineAccountId,
+      impact.mark.friend_count,
+    ),
+    ...replacementStatements,
     db.prepare(
       `INSERT INTO operation_audit
          (id, target_kind, target_id, action, actor_id, friend_id, detail_json)
