@@ -2652,8 +2652,9 @@ export async function fetchApi<T>(path: string, options?: FetchApiOptions): Prom
   return res.json() as Promise<T>
 }
 
-async function fetchApiBlob(path: string): Promise<Blob> {
+async function fetchApiBlob(path: string, init?: { method?: string }): Promise<Blob> {
   const res = await fetch(`${API_URL}${path}`, {
+    method: init?.method ?? 'GET',
     credentials: 'include',
     headers: adminSessionHeaders(),
   })
@@ -4123,6 +4124,35 @@ export type DashboardPreferenceResponse = {
   version: number
   cards: unknown
   updatedAt: string | null
+}
+
+/** M (今後の予定): 7日分の束ね。種類ごとの一覧への行き先を持つ。 */
+export type DashboardUpcomingItem = {
+  kind: 'broadcast' | 'reminder' | 'booking'
+  id: string
+  title: string
+  startsAt: string
+  href: string
+}
+
+export type DashboardUpcoming = {
+  items: DashboardUpcomingItem[]
+  asOf: string
+  rangeDays: number
+}
+
+/** L (#824 数字の出どころ): 出どころ別の失敗の数。台帳の件数と一致する。 */
+export type DeliveryFailureOrigin = {
+  source: string | null
+  failures: number
+  latestFailedAt: string | null
+  sampleDeliveryIds: string[]
+}
+
+export type DeliveryFailureOrigins = {
+  total: number
+  asOf: string | null
+  origins: DeliveryFailureOrigin[]
 }
 
 export type EcCommerceOverview = {
@@ -10066,6 +10096,18 @@ export const api = {
       const suffix = query.size ? `?${query}` : ''
       return fetchApi<ApiResponse<DashboardOverview>>(`/api/dashboard/organization-overview${suffix}`)
     },
+    /** M (今後の予定): 7日分の束ね。読むだけ。 */
+    upcoming: (accountId: string, days = 7) =>
+      fetchApi<ApiResponse<DashboardUpcoming>>(
+        `/api/dashboard/upcoming?account_id=${encodeURIComponent(accountId)}&days=${encodeURIComponent(String(days))}`,
+      ),
+    /** L (#824 数字の出どころ): 出どころ別の失敗の数。 */
+    deliveryFailureOrigins: (accountId: string, since?: string) => {
+      const query = new URLSearchParams()
+      query.set('account_id', accountId)
+      if (since) query.set('since', since)
+      return fetchApi<ApiResponse<DeliveryFailureOrigins>>(`/api/dashboard/delivery-failure-origins?${query}`)
+    },
     preferences: {
       get: (accountId: string) => fetchApi<ApiResponse<DashboardPreferenceResponse>>(
         `/api/dashboard/preferences?account_id=${encodeURIComponent(accountId)}`,
@@ -12271,6 +12313,9 @@ export const api = {
       }),
     delete: (id: string) =>
       fetchApi<ApiResponse<null>>(`/api/entry-routes/${id}`, { method: 'DELETE' }),
+    /** M (止めた経路のQR): 印刷用PDFをサーバーで作る。止めた経路は409。 */
+    qrPdf: (id: string): Promise<Blob> =>
+      fetchApiBlob(`/api/entry-routes/${encodeURIComponent(id)}/qr-pdf`, { method: 'POST' }),
     funnel: (id: string) =>
       fetchApi<ApiResponse<EntryRouteFunnel>>(`/api/entry-routes/${id}/funnel`),
     /** クリックがどこから来ているか。utm_source > 参照元のホスト > 直接アクセス */

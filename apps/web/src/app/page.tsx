@@ -17,6 +17,7 @@ import DashboardFreshness, { dashboardLocalUpdatedAt, dashboardPeriodLabel } fro
 import {
   FriendStatusCard,
   SupportMarkStatusCard,
+  DeliveryFailuresCard,
   MonthlyDeliveryCard,
   RecentResultsCard,
   SideCard,
@@ -1375,7 +1376,8 @@ function DashboardPageInner() {
     />
     if (id === 'operational-alerts') return <OperationalAlertsCard risk={displayedHealthRisk} healthIssues={healthIssueCount} oldestWaitMinutes={pendingOldest} twoFactor={displayedTwoFactor} referenceCount={reference?.operationalAlerts} failed={healthFailed} updatedAt={supplementLoadedAt} />
     if (id === 'connection-status') return <ConnectionStatusCard account={selectedAccount} risk={displayedHealthRisk} activeFriends={activeFriends} healthFailed={healthFailed} updatedAt={supplementLoadedAt} />
-    if (id === 'upcoming') return <UpcomingCard bookings={displayedBookings} loading={supplementLoading} updatedAt={bookingsFailed ? null : supplementLoadedAt} />
+    if (id === 'upcoming') return <UpcomingCard accountId={selectedAccountId} bookings={displayedBookings} loading={supplementLoading} updatedAt={bookingsFailed ? null : supplementLoadedAt} />
+    if (id === 'delivery-failures') return <DeliveryFailuresCard accountId={selectedAccountId} />
     if (id === 'monthly-delivery') return data && !sectionAvailable('delivery')
       ? <UnavailableDataCard title="今月の配信" section={data.sections?.delivery} onRetry={() => void load()} />
       : data ? <MonthlyDeliveryCard delivery={data.delivery} freshness={<DashboardFreshness freshness={data.sections?.delivery?.freshness} asOf={data.sections?.delivery?.asOf} reason={data.sections?.delivery?.reason} />} />
