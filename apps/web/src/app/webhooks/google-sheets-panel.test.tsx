@@ -221,6 +221,32 @@ describe('#838 Google Sheets 連携パネル', () => {
     expect(text()).toContain('もう一度最初からお試しください')
   })
 
+  it('形の違う応答でも読み込み中のままにせず、読み直せる', async () => {
+    // 監査の再現：包みなしの古い形が来ると例外で止まり「読み込んでいます…」のままだった。
+    // 判定で弾いて読み込めなかった表示へ逃がし、読み直しで復帰できる。
+    let legacy = true
+    handler = async (path) => {
+      if (path.startsWith('/api/integrations/google-sheets/connection')) {
+        return legacy
+          ? { success: true, connection: { status: 'connected' } }
+          : connectionBody('connected')
+      }
+      if (path.startsWith('/api/integrations/google-sheets/runs')) return { success: true, data: { runs: [] } }
+      return { success: false, error: 'unhandled' }
+    }
+    await render()
+
+    expect(text()).not.toContain('読み込んでいます…')
+    expect(text()).toContain('連携の状態を読み込めませんでした')
+    expect(text()).toContain('確かめ方')
+    expect(button('もう一度読み込む')).toBeTruthy()
+
+    legacy = false
+    await act(async () => { button('もう一度読み込む')!.click() })
+    await settle()
+    expect(text()).toContain('接続中')
+  })
+
   it('解除は確認ダイアログを通し、confirmed 付きでPOSTする', async () => {
     handler = async (path, method) => {
       if (path.startsWith('/api/integrations/google-sheets/connection')) return connectionBody('connected')
