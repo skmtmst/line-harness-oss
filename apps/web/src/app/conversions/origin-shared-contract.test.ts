@@ -53,6 +53,24 @@ describe('数えない条件の共通化(R40)', () => {
 })
 
 /**
+ * 起点に合う金額の出し方: 使える出し方と既定は対応表が持ち、作成は
+ * そこから選ぶ。起点を切り替えて合わなくなったら既定へ戻して知らせる。
+ */
+describe('起点に合う金額の出し方', () => {
+  it('作成は金額の出し方を対応表から作る', () => {
+    expect(NEW_PAGE).toContain('origin.valueModes')
+    expect(NEW_PAGE).toContain('defaultValueMode')
+    // 3択の直書きは残さない(起点に金額が無いとき注文の金額が出てしまう)。
+    expect(NEW_PAGE).not.toContain("{ value: 'source', label: '注文の金額をそのまま使う' }")
+  })
+
+  it('作成は起点切替で合わない選択を既定へ戻して知らせる', () => {
+    expect(NEW_PAGE).toContain('valueModeNotice')
+    expect(NEW_PAGE).toContain('role="status"')
+  })
+})
+
+/**
  * R42: 金額なしは0円と区別して出す。
  */
 describe('金額なしの区別(R42)', () => {

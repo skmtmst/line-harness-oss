@@ -50,6 +50,64 @@ describe('起点の説明の対応表(R41)', () => {
 })
 
 /**
+ * 起点ごとの使える金額の出し方。注文の金額が無い起点(タグ・フォーム・
+ * 予約・ページ・動画など)では「注文の金額」を選べない。既定は必ず
+ * 使えるものの中から選ぶ。
+ */
+describe('起点ごとの使える金額の出し方', () => {
+  it('6起点すべてに使える金額の出し方と既定がある', () => {
+    for (const key of [
+      'ec_order_confirmed',
+      'form_submitted',
+      'reservation_confirmed',
+      'url_reach',
+      'webinar_completed',
+      'tag_added',
+    ]) {
+      const info = originInfoOf(key)
+      expect(info.valueModes.length).toBeGreaterThan(0)
+      expect(info.valueModes).toContain(info.defaultValueMode)
+    }
+  })
+
+  it('注文起点だけが注文の金額を使える', () => {
+    expect(originInfoOf('ec_order_confirmed').valueModes).toContain('source')
+    for (const key of [
+      'form_submitted',
+      'reservation_confirmed',
+      'url_reach',
+      'webinar_completed',
+      'tag_added',
+    ]) {
+      expect(originInfoOf(key).valueModes).not.toContain('source')
+    }
+  })
+
+  it('注文の金額が無い起点の既定は決まった額か金額なし', () => {
+    for (const key of [
+      'form_submitted',
+      'reservation_confirmed',
+      'url_reach',
+      'webinar_completed',
+      'tag_added',
+    ]) {
+      const info = originInfoOf(key)
+      expect(['fixed', 'none']).toContain(info.defaultValueMode)
+    }
+  })
+
+  it('注文起点の既定は注文の金額', () => {
+    expect(originInfoOf('ec_order_confirmed').defaultValueMode).toBe('source')
+  })
+
+  it('知らない起点は注文の金額を使わせない', () => {
+    const info = originInfoOf('unknown_future_type')
+    expect(info.valueModes).not.toContain('source')
+    expect(info.valueModes).toContain(info.defaultValueMode)
+  })
+})
+
+/**
  * R40: 自由文のメモと実効する除外条件を分けて読む。
  * 旧 excludedCondition 文字列は条件に格上げしない。
  */

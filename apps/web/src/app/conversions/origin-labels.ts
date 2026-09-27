@@ -6,6 +6,8 @@
  * 新しい起点を足すときはここ1か所に足す。
  */
 
+import type { ConversionValueMode } from '@/lib/api'
+
 export interface ConversionOriginInfo {
   /** 起点のキー(event_type)。 */
   key: string;
@@ -19,6 +21,10 @@ export interface ConversionOriginInfo {
   target: string;
   /** 金額の説明(作成フォームの金額欄の補足・詳細の金額行)。 */
   amount: string;
+  /** 選べる金額の出し方。注文の金額が無い起点は 'source' を含めない。 */
+  valueModes: ConversionValueMode[];
+  /** 起点を選んだ直後の金額の出し方。必ず valueModes の中から選ぶ。 */
+  defaultValueMode: ConversionValueMode;
 }
 
 const ORIGINS: Record<string, ConversionOriginInfo> = {
@@ -29,6 +35,8 @@ const ORIGINS: Record<string, ConversionOriginInfo> = {
     targetLabel: 'どの注文を数えるか',
     target: 'すべての注文。EC連携で受け取った注文確定を数えます。',
     amount: '注文の金額をそのまま記録します。合計の無い注文は金額なしになります。',
+    valueModes: ['source', 'fixed', 'none'],
+    defaultValueMode: 'source',
   },
   form_submitted: {
     key: 'form_submitted',
@@ -37,6 +45,8 @@ const ORIGINS: Record<string, ConversionOriginInfo> = {
     targetLabel: 'どのフォームを数えるか',
     target: 'すべての回答フォーム。どのフォームの送信でも1件数えます。',
     amount: '起点に金額が無いため、金額は金額なしで記録します。',
+    valueModes: ['fixed', 'none'],
+    defaultValueMode: 'none',
   },
   reservation_confirmed: {
     key: 'reservation_confirmed',
@@ -45,6 +55,8 @@ const ORIGINS: Record<string, ConversionOriginInfo> = {
     targetLabel: 'どの予約を数えるか',
     target: '確定したすべての予約。仮の申込は数えません。',
     amount: '起点に金額が無いため、金額は金額なしで記録します。',
+    valueModes: ['fixed', 'none'],
+    defaultValueMode: 'none',
   },
   url_reach: {
     key: 'url_reach',
@@ -53,6 +65,8 @@ const ORIGINS: Record<string, ConversionOriginInfo> = {
     targetLabel: '数えてよいページ',
     target: '指定したページに着いた人を数えます。',
     amount: '起点に金額が無いため、金額は金額なしで記録します。',
+    valueModes: ['fixed', 'none'],
+    defaultValueMode: 'none',
   },
   webinar_completed: {
     key: 'webinar_completed',
@@ -61,6 +75,8 @@ const ORIGINS: Record<string, ConversionOriginInfo> = {
     targetLabel: 'どの動画を数えるか',
     target: '最後まで見たすべての視聴。途中でやめた人は数えません。',
     amount: '起点に金額が無いため、金額は金額なしで記録します。',
+    valueModes: ['fixed', 'none'],
+    defaultValueMode: 'none',
   },
   tag_added: {
     key: 'tag_added',
@@ -69,6 +85,8 @@ const ORIGINS: Record<string, ConversionOriginInfo> = {
     targetLabel: 'どのタグを数えるか',
     target: 'すべてのタグ。どのタグが付いても1件数えます。',
     amount: '起点に金額が無いため、金額は金額なしで記録します。',
+    valueModes: ['fixed', 'none'],
+    defaultValueMode: 'none',
   },
   // 過去に作られた行の種別。いまは選べないが、一覧・詳細では今の言葉で出す。
   ec_subscription_confirmed: {
@@ -78,6 +96,8 @@ const ORIGINS: Record<string, ConversionOriginInfo> = {
     targetLabel: 'どの定期を数えるか',
     target: 'すべての定期。EC連携で受け取った定期確定を数えます。',
     amount: '定期の金額をそのまま記録します。合計の無い定期は金額なしになります。',
+    valueModes: ['source', 'fixed', 'none'],
+    defaultValueMode: 'source',
   },
   purchase: {
     key: 'purchase',
@@ -86,6 +106,8 @@ const ORIGINS: Record<string, ConversionOriginInfo> = {
     targetLabel: 'どの購入を数えるか',
     target: 'すべての購入。',
     amount: '記録した金額を使います。金額の無い記録は金額なしになります。',
+    valueModes: ['source', 'fixed', 'none'],
+    defaultValueMode: 'source',
   },
   form_submit: {
     key: 'form_submit',
@@ -94,6 +116,8 @@ const ORIGINS: Record<string, ConversionOriginInfo> = {
     targetLabel: 'どのフォームを数えるか',
     target: 'すべての回答フォーム。どのフォームの送信でも1件数えます。',
     amount: '起点に金額が無いため、金額は金額なしで記録します。',
+    valueModes: ['fixed', 'none'],
+    defaultValueMode: 'none',
   },
   visit: {
     key: 'visit',
@@ -102,6 +126,8 @@ const ORIGINS: Record<string, ConversionOriginInfo> = {
     targetLabel: 'どの来店を数えるか',
     target: 'すべての来店・参加。',
     amount: '起点に金額が無いため、金額は金額なしで記録します。',
+    valueModes: ['fixed', 'none'],
+    defaultValueMode: 'none',
   },
 };
 
@@ -112,6 +138,9 @@ const FALLBACK: ConversionOriginInfo = {
   targetLabel: '何を数えるか',
   target: '起点の設定を確認してください。',
   amount: '金額の設定を確認してください。',
+  // 知らない起点は注文の金額を使わせない。金額がある起点だと分かってから足す。
+  valueModes: ['fixed', 'none'],
+  defaultValueMode: 'none',
 };
 
 /** 起点キーから説明を引く。知らないキーは「その他」で返す(空の表示にしない)。 */

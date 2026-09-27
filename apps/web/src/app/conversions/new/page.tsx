@@ -72,6 +72,17 @@ const TRIGGER_CHOICES: TriggerChoice[] = [
 ]
 
 /**
+ * 金額の出し方の表示名。選択肢は対応表(origin-labels)の valueModes
+ * から作り、ここでは名前だけを持つ。起点に金額が無いものは 'source'
+ * を選択肢に出さない。
+ */
+const VALUE_MODE_LABELS: Record<ConversionValueMode, string> = {
+  source: '注文の金額をそのまま使う',
+  fixed: '決まった額を使う',
+  none: '金額を集計しない',
+}
+
+/**
  * 「使う場所」の種類(N-258)。
  *
  * 以前は `conversion-overview` などの**実在しない仮ID**をそのまま保存して
@@ -152,6 +163,8 @@ export default function NewConversionPointPage() {
   const [eventType, setEventType] = useState('ec_order_confirmed')
   const [value, setValue] = useState('')
   const [valueMode, setValueMode] = useState<ConversionValueMode>('source')
+  // 起点切替で金額の出し方を戻したときの知らせ。自分で選び直したら消える。
+  const [valueModeNotice, setValueModeNotice] = useState<string | null>(null)
   const [measureMethod, setMeasureMethod] = useState<'url_reach' | 'webhook'>('webhook')
   const [targetUrl, setTargetUrl] = useState('')
   // R40: 自由文のメモと実効する除外条件を分ける。条件は共通の条件部品で
@@ -308,10 +321,21 @@ export default function NewConversionPointPage() {
 
   const selectTrigger = (choice: TriggerChoice) => {
     if (!choice.connected) return
+    // 起点に金額が無いもの(タグ・フォーム・予約・ページ・動画など)では
+    // 注文の金額を選べない。今の選択が合わなければ合う既定へ戻して知らせる。
+    const nextOrigin = originInfoOf(choice.eventType)
     setTriggerKind(choice.value)
     setEventType(choice.eventType)
     setMeasureMethod(choice.measureMethod)
     if (choice.measureMethod !== 'url_reach') setTargetUrl('')
+    if (!nextOrigin.valueModes.includes(valueMode)) {
+      setValueMode(nextOrigin.defaultValueMode)
+      setValueModeNotice(
+        `起点に注文の金額が無いため、金額の出し方を「${VALUE_MODE_LABELS[nextOrigin.defaultValueMode]}」に戻しました。`,
+      )
+    } else {
+      setValueModeNotice(null)
+    }
   }
 
   return (
@@ -332,6 +356,10 @@ export default function NewConversionPointPage() {
         }
         if (!lineAccountId) return '集計対象のLINEアカウントを選んでください（画面上部で選べます）'
         if (exclusionMemo.trim().length > 500) return '数えない条件のメモは500文字以内で入力してください'
+        // 起点に金額が無いのに注文の金額が残っていたら先に言う(通常は選べない)。
+        if (!origin.valueModes.includes(valueMode)) {
+          return 'この起点には注文の金額が無いため、金額の出し方は「決まった額を使う」か「金額を集計しない」を選んでください'
+        }
         // 保存側(400)と同じ条件を先に言う。素通りすると汎用失敗文になる(#513 L3)。
         if (valueMode === 'fixed' && (yen === null || !Number.isFinite(yen) || yen < 0)) {
           return '固定で付ける金額は0以上の数値で入力してください'
@@ -347,7 +375,9 @@ export default function NewConversionPointPage() {
       onReset={() => {
         setName('')
         setValue('')
-        setValueMode('source')
+        // 今の起点に合う既定へ戻す(タグ起点などで注文の金額に戻さない)。
+        setValueMode(originInfoOf(eventType).defaultValueMode)
+        setValueModeNotice(null)
         setTargetUrl('')
         setExclusion(null)
         setExclusionMemo('')
@@ -567,19 +597,23 @@ export default function NewConversionPointPage() {
 
       <FormSection step={3} label="金額をどう出すか">
         <div className="grid gap-3 md:grid-cols-3">
-          {/* R41: 起点ごとに金額の出どころを言う。起点に金額が無いものは金額なしになる。 */}
+          {/* 起点に金額が無いもの(タグ・フォーム・予約・ページ・動画など)では注文の金額を出さない。選択肢は対応表が持つ。 */}
           <Field label="金額の出し方" htmlFor="cv-value-mode" help={origin.amount}>
             <SelectField
               id="cv-value-mode"
               value={valueMode}
-              onChange={(event) => setValueMode(event.target.value as ConversionValueMode)}
-              options={[
-                { value: 'source', label: '注文の金額をそのまま使う' },
-                { value: 'fixed', label: '決まった額を使う' },
-                { value: 'none', label: '金額を集計しない' },
-              ]}
+              onChange={(event) => {
+                setValueMode(event.target.value as ConversionValueMode)
+                setValueModeNotice(null)
+              }}
+              options={origin.valueModes.map((mode) => ({ value: mode, label: VALUE_MODE_LABELS[mode] }))}
               className="w-full"
             />
+            {valueModeNotice ? (
+              <p className="text-warning mt-1 text-xs" role="status">
+                {valueModeNotice}
+              </p>
+            ) : null}
           </Field>
           <Field label="決まった金額（円）" htmlFor="cv-value" help="1件ごとの金額です。">
             <input

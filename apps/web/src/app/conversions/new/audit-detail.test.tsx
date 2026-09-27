@@ -199,3 +199,58 @@ describe('R40/R41 数えない条件と起点の説明', () => {
     expect(host.textContent).not.toContain('すべての注文')
   })
 })
+
+describe('起点に合わない金額の出し方は選べない', () => {
+  function valueSelect(): HTMLSelectElement {
+    const select = host.querySelector('#cv-value-mode')
+    expect(select).not.toBeNull()
+    return select as HTMLSelectElement
+  }
+
+  function optionValues(): string[] {
+    return [...valueSelect().querySelectorAll('option')].map((option) => option.value)
+  }
+
+  function clickTrigger(value: string) {
+    const radio = host.querySelector(`input[name="conversion-trigger"][value="${value}"]`)
+    expect(radio).not.toBeNull()
+    return act(async () => {
+      fireEvent.click(radio!)
+    })
+  }
+
+  it('タグ起点に切り替えると注文の金額から既定へ戻り、知らせる', async () => {
+    await render()
+    // 初期は注文起点なので注文の金額が選ばれている。
+    expect(valueSelect().value).toBe('source')
+    expect(optionValues()).toContain('source')
+    await clickTrigger('tag')
+    // 注文の金額は選べなくなり、既定(金額を集計しない)へ戻る。
+    expect(valueSelect().value).toBe('none')
+    expect(optionValues()).not.toContain('source')
+    expect(optionValues()).toEqual(expect.arrayContaining(['fixed', 'none']))
+    // 戻したことを知らせる。消さずに残すと次の撮影で気づける。
+    const notice = host.querySelector('#cv-value-mode')?.parentElement?.querySelector('[role="status"]')
+    expect(notice?.textContent).toContain('金額の出し方を')
+    expect(notice?.textContent).toContain('戻しました')
+  })
+
+  it('注文起点に戻すと注文の金額がまた選べる', async () => {
+    await render()
+    await clickTrigger('tag')
+    expect(valueSelect().value).toBe('none')
+    await clickTrigger('order')
+    // 注文起点では注文の金額が復活する。今の選択(金額なし)は有効なので変えない。
+    expect(optionValues()).toContain('source')
+    expect(valueSelect().value).toBe('none')
+  })
+
+  it('フォーム・予約・ページ・動画の起点でも注文の金額は出ない', async () => {
+    await render()
+    for (const trigger of ['form', 'booking', 'page', 'video']) {
+      await clickTrigger(trigger)
+      expect(optionValues()).not.toContain('source')
+      expect(['fixed', 'none']).toContain(valueSelect().value)
+    }
+  })
+})
