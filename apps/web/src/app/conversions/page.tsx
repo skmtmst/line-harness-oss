@@ -18,14 +18,19 @@ import {
 } from '@/lib/api'
 import type { ConversionPoint } from '@line-crm/shared'
 import { deduplicationLabel } from './dedup'
+import { originInfoOf } from './origin-labels'
+import { readExclusionCondition, readExclusionMemo, readExclusionView, type ExclusionCondition } from './conversion-exclusion'
+import { pruneCondition } from '@/components/shared/condition-builder'
+import ConditionBuilder from '@/components/shared/condition-builder'
 import KpiCard from '@/components/shared/kpi-card'
 
 /**
  * 数え方を運用者の言葉にする。既定（manual）も省略せずに出す。
  *
- * 設計は「指定ページへの到達 / EC連携からの通知」と、何が起きたら数えるのかを
- * そのまま書いている。「URL到達」だと、誰がどのURLに来たときの話なのかが
- * 読み取れない。
+ * R41: 「何が起きたら数えるか」は起点の対応表(origin-labels)が正本。
+ * 以前は webhook を一律に注文の説明で書いていたため、タグ起点でも注文の
+ * 説明になっていた。「URL到達」だと、誰がどのURLに来たときの話なのかが
+ * 読み取れないので、URL到達だけ対象URLを添える。
  */
 /**
  * 編集の入力（N-252）。
@@ -43,6 +48,9 @@ type EditForm = {
   reversalPolicy: 'source_cancelled' | 'manual' | 'none'
   attributionDays: string
   targetUrl: string
+  /** R40: 数えない条件とメモも版上げで直せる。 */
+  exclusion: ExclusionCondition | null
+  exclusionMemo: string
 }
 
 function toEditForm(item: ConversionDefinitionListItem): EditForm {
@@ -56,14 +64,41 @@ function toEditForm(item: ConversionDefinitionListItem): EditForm {
     reversalPolicy: item.reversalPolicy,
     attributionDays: item.attributionDays == null ? '' : String(item.attributionDays),
     targetUrl: item.targetUrl ?? '',
+    exclusion: readExclusionCondition(item.sourceConfig),
+    exclusionMemo: readExclusionMemo(item.sourceConfig),
   }
 }
 
-const VALUE_MODE_OPTIONS = [
-  { value: 'fixed', label: '1件あたりの金額を決める' },
-  { value: 'source', label: '連携元の金額を使う' },
-  { value: 'none', label: '金額を数えない' },
-]
+/** R40: 詳細の「数えない条件」行の1行。条件・メモ・壊れを言い分ける。 */
+function exclusionLine(sourceConfig: Record<string, unknown>): string {
+  const view = readExclusionView(sourceConfig)
+  if (view.invalid) return '条件が読み取れません（全件数えています）'
+  if (view.hasCondition) {
+    return `条件あり（${view.summary ?? '条件'}を除く）${view.memo ? `・メモ：${view.memo}` : ''}`
+  }
+  if (view.legacyMemo) return `メモのみ（記録に影響しません）：${view.memo ?? ''}`
+  if (view.memo) return `メモ：${view.memo}（記録に影響しません）`
+  return '除外なし'
+}
+
+/** R41: 詳細の「金額」行の1行。起点の対応表と同じ言葉を使う。 */
+function valueModeLine(item: Pick<ConversionDefinitionListItem, 'sourceType' | 'valueMode' | 'value'>): string {
+  if (item.valueMode === 'fixed') {
+    return item.value == null ? '決まった額（金額なし）' : `決まった額（1件 ¥${item.value.toLocaleString('ja-JP')}）`
+  }
+  if (item.valueMode === 'source') return `起点の金額を使う（${originInfoOf(item.sourceType).amount}）`
+  return '金額を集計しない'
+}
+
+/**
+ * 編集の金額の決め方の表示名。選べるものは対応表(origin-labels)の
+ * valueModes から作り、ここでは名前だけを持つ。作成と同じ動きにする。
+ */
+const EDIT_VALUE_MODE_LABELS: Record<EditForm['valueMode'], string> = {
+  fixed: '1件あたりの金額を決める',
+  source: '連携元の金額を使う',
+  none: '金額を数えない',
+}
 const DEDUP_OPTIONS = [
   { value: 'every', label: deduplicationLabel('every', null) },
   { value: 'once_per_friend', label: deduplicationLabel('once_per_friend', null) },
@@ -77,7 +112,9 @@ const REVERSAL_OPTIONS = [
 
 function measureLabel(method: ConversionPoint['measureMethod']): string {
   if (method === 'url_reach') return '指定ページへの到達'
-  if (method === 'webhook') return 'EC連携からの通知'
+  // R41: webhook は注文・タグ・フォームなど起点が違う。起点の説明は
+  // 上の行(originInfoOf)が出すので、ここは起点に依らない言葉にする。
+  if (method === 'webhook') return '自動で検知'
   return '手動で記録'
 }
 
@@ -155,6 +192,7 @@ const INGEST_REASON_LABELS: Record<string, string> = {
   friend_not_found: '指定された友だちが見つかりませんでした',
   account_mismatch: 'このアカウントの友だちではないため、数えませんでした',
   idempotency_conflict: '同じイベントIDで違う内容が届いたため、受け取りませんでした',
+  excluded_by_condition: '「数えない条件」に当てはまるため、数えませんでした',
 }
 
 /** 受信履歴1件を運用者の言葉にする。検証の受信は本番実績と区別して出す。 */
@@ -224,19 +262,16 @@ function rangeLabel(days: number): string {
   return `この${days}日（${format(from)}〜${format(to)}）`
 }
 
+/**
+ * R41: 起点の説明は対応表(origin-labels)が正本。ここでは URL 到達だけ
+ * 対象URLを添える。タグ起点で「EC連携」と出ていた取り違えを直す。
+ */
 function sourceTriggerLabel(point: Pick<ConversionDefinitionListItem, 'measureMethod' | 'sourceType' | 'targetUrl'>): string {
   if (point.measureMethod === 'url_reach') {
     return point.targetUrl ? `サイトの「${point.targetUrl}」に到達` : '指定したページに到達'
   }
-  if (point.measureMethod === 'webhook') {
-    if (point.sourceType === 'purchase' || point.sourceType === 'ec_order_confirmed') return 'EC連携の「注文が確定」'
-    if (point.sourceType === 'ec_subscription_confirmed') return 'EC連携の「定期が確定」'
-    if (point.sourceType === 'form_submit' || point.sourceType === 'form_submitted') return '回答フォームの送信'
-    if (point.sourceType === 'visit' || point.sourceType === 'reservation_confirmed') return '予約管理の「予約が確定」'
-    if (point.sourceType === 'webinar_completed') return 'ウェビナーの「視聴完了」'
-    return '接続したシステムから成果の通知を受信'
-  }
-  return '管理画面から担当者が記録'
+  if (point.measureMethod === 'manual') return '管理画面から担当者が記録'
+  return originInfoOf(point.sourceType).trigger
 }
 
 function usageLabel(point: ConversionDefinitionListItem): string {
@@ -360,6 +395,8 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
   const [editForm, setEditForm] = useState<EditForm | null>(null)
   const [editSaving, setEditSaving] = useState(false)
   const [editError, setEditError] = useState('')
+  // 起点に合わない金額の決め方を開いたときに既定へ戻した知らせ。選び直したら消える。
+  const [editValueModeNotice, setEditValueModeNotice] = useState<string | null>(null)
   // N-268: 下書きの公開。版は開いた時点のものを渡し、409は読み直しで返す。
   const [publishing, setPublishing] = useState(false)
   /**
@@ -450,7 +487,20 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
   const openEdit = (target: ConversionDefinitionListItem) => {
     setDetailTarget(null)
     setEditTarget(target)
-    setEditForm(toEditForm(target))
+    const form = toEditForm(target)
+    // 起点に金額が無いものは注文の金額を選べない(作成と同じ動き)。昔の版に
+    // 合わない決め方が残っていたら、合う既定へ戻して知らせる。
+    const allowed = originInfoOf(form.sourceType).valueModes
+    if (!allowed.includes(form.valueMode)) {
+      const fallback = originInfoOf(form.sourceType).defaultValueMode
+      setEditForm({ ...form, valueMode: fallback })
+      setEditValueModeNotice(
+        `起点に注文の金額が無いため、金額の決め方を「${EDIT_VALUE_MODE_LABELS[fallback]}」に戻しました。`,
+      )
+    } else {
+      setEditForm(form)
+      setEditValueModeNotice(null)
+    }
     setEditError('')
   }
 
@@ -468,12 +518,21 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
       setEditError('名前を入れてください')
       return
     }
+    // 起点に金額が無いのに注文の金額が残っていたら先に言う(通常は選べない)。
+    if (!originInfoOf(editForm.sourceType).valueModes.includes(editForm.valueMode)) {
+      setEditError('この起点には注文の金額が無いため、金額の決め方を選び直してください')
+      return
+    }
     if (editForm.valueMode === 'fixed' && !editForm.fixedValue.trim()) {
       setEditError('1件あたりの金額を入れてください')
       return
     }
     if (editForm.deduplicationMode === 'window' && !editForm.deduplicationWindowDays.trim()) {
       setEditError('数えない日数を入れてください')
+      return
+    }
+    if (editForm.exclusionMemo.trim().length > 500) {
+      setEditError('数えない条件のメモは500文字以内で入力してください')
       return
     }
     setEditSaving(true)
@@ -484,7 +543,12 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
         expectedVersion: editTarget.version,
         name,
         sourceType: editForm.sourceType,
-        sourceConfig: editTarget.sourceConfig,
+        // R40: 数えない条件とメモも次の版に入れる。書きかけの行は落とす。
+        sourceConfig: {
+          ...editTarget.sourceConfig,
+          exclusion: pruneCondition(editForm.exclusion),
+          exclusionMemo: editForm.exclusionMemo.trim() || null,
+        },
         deduplicationMode: editForm.deduplicationMode,
         deduplicationWindowDays: editForm.deduplicationMode === 'window'
           ? Number(editForm.deduplicationWindowDays) : null,
@@ -498,6 +562,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
       if (!res.success) throw new Error(res.error)
       setEditTarget(null)
       setEditForm(null)
+      setEditValueModeNotice(null)
       await load()
     } catch (error) {
       const message = error instanceof Error ? error.message : ''
@@ -1023,6 +1088,11 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
             <dl className="grid grid-cols-2 gap-3 text-sm">
               <div><dt className="text-ink-faint">状態</dt><dd className="text-ink mt-1 font-semibold">{STATE_LABELS[detailTarget.state]}</dd></div>
               <div><dt className="text-ink-faint">何が起きたら数えるか</dt><dd className="text-ink mt-1 font-semibold">{sourceTriggerLabel(detailTarget)}</dd></div>
+              {/* R41: 対象・金額の説明も対応表と同じものを使う。 */}
+              <div><dt className="text-ink-faint">対象</dt><dd className="text-ink mt-1 font-semibold">{originInfoOf(detailTarget.sourceType).target}</dd></div>
+              <div><dt className="text-ink-faint">金額</dt><dd className="text-ink mt-1 font-semibold">{valueModeLine(detailTarget)}</dd></div>
+              {/* R40: 数えない条件とメモを詳細でも確認できる。 */}
+              <div className="col-span-2"><dt className="text-ink-faint">数えない条件</dt><dd className="text-ink mt-1 font-semibold">{exclusionLine(detailTarget.sourceConfig)}</dd></div>
               <div><dt className="text-ink-faint">数え方</dt><dd className="text-ink mt-1 font-semibold">{deduplicationLabel(detailTarget.deduplicationMode, detailTarget.deduplicationWindowDays)}</dd></div>
               <div><dt className="text-ink-faint">この30日</dt><dd className="text-ink mt-1 font-semibold">{detailTarget.metrics.netCount.toLocaleString('ja-JP')}件</dd></div>
               <div><dt className="text-ink-faint">利用先</dt><dd className="text-ink mt-1 font-semibold">{usageLabel(detailTarget)}</dd></div>
@@ -1065,9 +1135,12 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                         >
                           {EVENT_STATUS_LABELS[event.status]}
                         </span>
+                        {/* R42: 金額なしは0円と区別して出す。 */}
                         {event.value !== null ? (
                           <span className="text-ink-faint ml-2 tabular-nums">¥{event.value.toLocaleString('ja-JP')}</span>
-                        ) : null}
+                        ) : (
+                          <span className="text-ink-faint ml-2">金額なし</span>
+                        )}
                       </span>
                       <span className="text-ink-faint shrink-0 tabular-nums">
                         {event.createdAt.slice(0, 16).replace('T', ' ')}
@@ -1139,10 +1212,10 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
         open={editTarget !== null && editForm !== null}
         title={editTarget ? `「${editTarget.name}」を編集` : ''}
         description="直すと次の版になります。過去に数えた成果と金額は、そのまま残ります。"
-        onCancel={() => { setEditTarget(null); setEditForm(null) }}
+        onCancel={() => { setEditTarget(null); setEditForm(null); setEditValueModeNotice(null) }}
         footer={(
           <div className="flex justify-end gap-2">
-            <Button onClick={() => { setEditTarget(null); setEditForm(null) }}>やめる</Button>
+            <Button onClick={() => { setEditTarget(null); setEditForm(null); setEditValueModeNotice(null) }}>やめる</Button>
             <Button variant="primary" disabled={editSaving} onClick={() => void submitEdit()}>
               {editSaving ? '保存中...' : 'この内容にする'}
             </Button>
@@ -1151,6 +1224,10 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
       >
         {editForm ? (
           <div className="space-y-3 text-sm">
+            {/* R41: 編集でも起点を確認できる。起点自体は変えられない。 */}
+            <p className="bg-canvas-sunken rounded-control px-3 py-2 text-xs text-ink-secondary">
+              起点：{originInfoOf(editForm.sourceType).trigger}／{originInfoOf(editForm.sourceType).target}
+            </p>
             <label className="block">
               <span className="text-ink-faint text-xs">名前</span>
               <TextField
@@ -1160,14 +1237,26 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                 onChange={(event) => setEditForm({ ...editForm, name: event.target.value })}
               />
             </label>
+            {/* 起点に金額が無いものは注文の金額を出さない。選択肢は対応表が持つ(作成と同じ)。 */}
             <label className="block">
               <span className="text-ink-faint text-xs">金額の決め方</span>
               <Select
                 aria-label="金額の決め方"
                 value={editForm.valueMode}
-                options={VALUE_MODE_OPTIONS}
-                onChange={(value) => setEditForm({ ...editForm, valueMode: value as EditForm['valueMode'] })}
+                options={originInfoOf(editForm.sourceType).valueModes.map((mode) => ({
+                  value: mode,
+                  label: EDIT_VALUE_MODE_LABELS[mode],
+                }))}
+                onChange={(value) => {
+                  setEditForm({ ...editForm, valueMode: value as EditForm['valueMode'] })
+                  setEditValueModeNotice(null)
+                }}
               />
+              {editValueModeNotice ? (
+                <span className="text-warning mt-1 block text-xs" role="status">
+                  {editValueModeNotice}
+                </span>
+              ) : null}
             </label>
             {editForm.valueMode === 'fixed' ? (
               <label className="block">
@@ -1207,6 +1296,27 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                 value={editForm.reversalPolicy}
                 options={REVERSAL_OPTIONS}
                 onChange={(value) => setEditForm({ ...editForm, reversalPolicy: value as EditForm['reversalPolicy'] })}
+              />
+            </label>
+            {/* R40: 数えない条件とメモも編集できる。条件は作成と同じ共通部品。 */}
+            <div>
+              <span className="text-ink-faint text-xs">数えない条件</span>
+              <span className="mt-1 block">
+                <ConditionBuilder
+                  value={editForm.exclusion}
+                  onChange={(next) => setEditForm({ ...editForm, exclusion: next })}
+                  label="数えない条件"
+                  showCount={false}
+                />
+              </span>
+            </div>
+            <label className="block">
+              <span className="text-ink-faint text-xs">数えない条件のメモ（任意）</span>
+              <TextField
+                aria-label="数えない条件のメモ"
+                value={editForm.exclusionMemo}
+                maxLength={500}
+                onChange={(event) => setEditForm({ ...editForm, exclusionMemo: event.target.value })}
               />
             </label>
             <p className="text-ink-faint text-xs leading-5">
