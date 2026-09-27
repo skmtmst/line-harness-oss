@@ -874,6 +874,59 @@ async function releaseLock(db: D1Database, key: string, owner: string): Promise<
   await db.prepare('DELETE FROM rt_resource_locks WHERE resource_key = ? AND owner_token = ?').bind(key, owner).run();
 }
 
+const INACTIVE_RESERVATION_STATUSES = ['cancelled', 'no_show'];
+
+function reservationSlotActive(status: string | null | undefined): boolean {
+  return !INACTIVE_RESERVATION_STATUSES.includes(status || '');
+}
+
+/**
+ * 同じ卓に時間が重なる有効予約があるかを調べる（R100）。
+ * 終了ちょうどの入替（ends_at = starts_at）は重なりとみなさない。
+ */
+async function overlappingReservationExists(
+  db: D1Database,
+  storeId: string,
+  tableId: string,
+  startsAt: string,
+  endsAt: string,
+  excludeId?: string | null,
+): Promise<boolean> {
+  const params: unknown[] = [storeId, tableId, endsAt, startsAt];
+  let sql = `SELECT 1 AS ok FROM rt_reservations
+    WHERE store_id = ? AND table_id = ?
+      AND status NOT IN ('cancelled', 'no_show')
+      AND starts_at < ? AND ends_at > ?`;
+  if (excludeId) {
+    sql += ' AND id != ?';
+    params.push(excludeId);
+  }
+  const row = await db.prepare(`${sql} LIMIT 1`).bind(...params).first();
+  return Boolean(row);
+}
+
+/** 時間帯在庫の予約済数を人数分だけ動かす（R100）。枠が無ければ何もしない。 */
+async function adjustInventoryReservedCount(
+  db: D1Database,
+  storeId: string,
+  startsAt: string,
+  guestDelta: number,
+): Promise<void> {
+  if (!guestDelta) return;
+  if (guestDelta > 0) {
+    await db.prepare(`UPDATE rt_inventory_slots SET reserved_count = reserved_count + ?,
+      updated_at = datetime('now') WHERE store_id = ? AND starts_at = ?`).bind(
+        guestDelta, storeId, startsAt,
+      ).run();
+    return;
+  }
+  await db.prepare(`UPDATE rt_inventory_slots SET
+      reserved_count = CASE WHEN reserved_count + ? < 0 THEN 0 ELSE reserved_count + ? END,
+      updated_at = datetime('now') WHERE store_id = ? AND starts_at = ?`).bind(
+      guestDelta, guestDelta, storeId, startsAt,
+    ).run();
+}
+
 restaurantTest.post('/api/restaurant-test/reservations/manual', requireRole('owner', 'admin', 'staff'), async (c) => {
   if (!hasOrganizationSelector(c)) return requiredAccount(c);
   const organization = await organizationFor(c);
@@ -889,6 +942,9 @@ restaurantTest.post('/api/restaurant-test/reservations/manual', requireRole('own
   try {
     const tables = await dbFor(c.env, storeId).prepare('SELECT id, min_capacity, max_capacity, is_active FROM rt_tables WHERE store_id = ?').bind(storeId).all<{ id: string; min_capacity: number; max_capacity: number; is_active: number }>();
     const tableId = checked.value.tableId || chooseRestaurantTable(tables.results.map((row) => ({ id: row.id, minCapacity: row.min_capacity, maxCapacity: row.max_capacity, isActive: row.is_active === 1 })), checked.value.guestCount);
+    if (tableId && await overlappingReservationExists(dbFor(c.env, storeId), storeId, tableId, checked.value.startsAt, checked.value.endsAt)) {
+      return c.json({ success: false, error: '同じ卓に重なる時間の予約があるため登録できません' }, 409);
+    }
     const id = crypto.randomUUID();
     await dbFor(c.env, storeId).prepare(`INSERT INTO rt_reservations
       (id, store_id, source, external_id, customer_name, customer_phone, line_uid, guest_count, starts_at, ends_at, table_id, course_id, status, allergy_note, note)
@@ -897,6 +953,9 @@ restaurantTest.post('/api/restaurant-test/reservations/manual', requireRole('own
         checked.value.lineUid, checked.value.guestCount, checked.value.startsAt, checked.value.endsAt,
         tableId, checked.value.courseId, checked.value.status, checked.value.allergyNote, checked.value.note,
       ).run();
+    if (reservationSlotActive(checked.value.status)) {
+      await adjustInventoryReservedCount(dbFor(c.env, storeId), storeId, checked.value.startsAt, checked.value.guestCount);
+    }
     return c.json({ success: true, data: { id, tableId, syncDirection: 'inbound_only' } }, 201);
   } finally {
     await releaseLock(dbFor(c.env, storeId), lockKey, lockOwner);
@@ -923,9 +982,45 @@ restaurantTest.post('/api/restaurant-test/inbound/reservations', requireRole('ow
     VALUES (?, ?, ?, ?, ?, 'received') ON CONFLICT(store_id, provider, external_event_id) DO NOTHING`).bind(
       eventDbId, body.storeId, body.provider, body.eventId.trim(), JSON.stringify(body.reservation),
     ).run();
-  if (!inserted.meta.changes) return c.json({ success: true, data: { duplicate: true, direction: 'inbound' } });
+  // R101: 処理済みだけを重複終了にする。失敗・受信中の再送は取り込み直す。
+  let syncEventId = eventDbId;
+  if (!inserted.meta.changes) {
+    const existing = await dbFor(c.env, body.storeId).prepare(
+      `SELECT id, status FROM rt_sync_events
+       WHERE store_id = ? AND provider = ? AND external_event_id = ? LIMIT 1`,
+    ).bind(body.storeId, body.provider, body.eventId.trim())
+      .first<{ id: string; status: string }>();
+    if (!existing) return c.json({ success: true, data: { duplicate: true, direction: 'inbound' } });
+    if (existing.status === 'processed' || existing.status === 'duplicate') {
+      return c.json({ success: true, data: { duplicate: true, direction: 'inbound' } });
+    }
+    syncEventId = existing.id;
+    await dbFor(c.env, body.storeId).prepare(
+      `UPDATE rt_sync_events SET payload_json = ?, status = 'received', error_message = NULL,
+        received_at = datetime('now') WHERE id = ?`,
+    ).bind(JSON.stringify(body.reservation), existing.id).run();
+  }
   try {
     const value = checked.value;
+    const current = await dbFor(c.env, body.storeId).prepare(
+      `SELECT id, starts_at, guest_count, status, source_updated_at FROM rt_reservations
+       WHERE store_id = ? AND source = ? AND external_id = ? LIMIT 1`,
+    ).bind(body.storeId, body.provider, value.externalId)
+      .first<{ id: string; starts_at: string; guest_count: number; status: string; source_updated_at: string | null }>();
+    // R102: 媒体側の更新時刻が古い通知は記録だけ残して反映しない。
+    if (current?.source_updated_at && value.sourceUpdatedAt
+      && value.sourceUpdatedAt <= current.source_updated_at) {
+      await dbFor(c.env, body.storeId).prepare(
+        "UPDATE rt_sync_events SET status = 'processed', processed_at = datetime('now') WHERE id = ?",
+      ).bind(syncEventId).run();
+      return c.json({ success: true, data: { duplicate: false, stale: true, direction: 'inbound', outboundWrites: 0 } }, 200);
+    }
+    // R100: 同じ卓に重なる有効予約があれば取り込まない（自分自身の更新は除く）。
+    if (value.tableId && await overlappingReservationExists(
+      dbFor(c.env, body.storeId), body.storeId, value.tableId, value.startsAt, value.endsAt, current?.id ?? null,
+    )) {
+      throw new Error('同じ卓に重なる時間の予約があります');
+    }
     const id = crypto.randomUUID();
     await dbFor(c.env, body.storeId).prepare(`INSERT INTO rt_reservations
       (id, store_id, source, external_id, hub_source, customer_name, customer_phone, line_uid, guest_count, starts_at, ends_at, table_id, course_id, status, allergy_note, note, source_updated_at)
@@ -941,10 +1036,31 @@ restaurantTest.post('/api/restaurant-test/inbound/reservations', requireRole('ow
           value.customerName, value.customerPhone, value.lineUid, value.guestCount, value.startsAt, value.endsAt,
           value.tableId, value.courseId, value.status, value.allergyNote, value.note, value.sourceUpdatedAt,
         ).run();
-    await dbFor(c.env, body.storeId).prepare("UPDATE rt_sync_events SET status = 'processed', processed_at = datetime('now') WHERE id = ?").bind(eventDbId).run();
+    // R100: 時間帯在庫の予約済数を人数分だけ動かす（更新時は差分・枠移動を調整）。
+    if (!current) {
+      if (reservationSlotActive(value.status)) {
+        await adjustInventoryReservedCount(dbFor(c.env, body.storeId), body.storeId, value.startsAt, value.guestCount);
+      }
+    } else {
+      const wasActive = reservationSlotActive(current.status);
+      const isActive = reservationSlotActive(value.status);
+      if (wasActive && !isActive) {
+        await adjustInventoryReservedCount(dbFor(c.env, body.storeId), body.storeId, current.starts_at, -current.guest_count);
+      } else if (!wasActive && isActive) {
+        await adjustInventoryReservedCount(dbFor(c.env, body.storeId), body.storeId, value.startsAt, value.guestCount);
+      } else if (wasActive && isActive) {
+        if (current.starts_at === value.startsAt) {
+          await adjustInventoryReservedCount(dbFor(c.env, body.storeId), body.storeId, value.startsAt, value.guestCount - current.guest_count);
+        } else {
+          await adjustInventoryReservedCount(dbFor(c.env, body.storeId), body.storeId, current.starts_at, -current.guest_count);
+          await adjustInventoryReservedCount(dbFor(c.env, body.storeId), body.storeId, value.startsAt, value.guestCount);
+        }
+      }
+    }
+    await dbFor(c.env, body.storeId).prepare("UPDATE rt_sync_events SET status = 'processed', processed_at = datetime('now') WHERE id = ?").bind(syncEventId).run();
     return c.json({ success: true, data: { duplicate: false, direction: 'inbound', outboundWrites: 0 } }, 201);
   } catch (error) {
-    await dbFor(c.env, body.storeId).prepare("UPDATE rt_sync_events SET status = 'failed', error_message = ? WHERE id = ?").bind(error instanceof Error ? error.message.slice(0, 500) : 'unknown', eventDbId).run();
+    await dbFor(c.env, body.storeId).prepare("UPDATE rt_sync_events SET status = 'failed', error_message = ? WHERE id = ?").bind(error instanceof Error ? error.message.slice(0, 500) : 'unknown', syncEventId).run();
     throw error;
   }
 });

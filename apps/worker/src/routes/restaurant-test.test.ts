@@ -780,4 +780,115 @@ describe('飲食店向けテストAPI', () => {
     const response = await request('/api/restaurant-test/snapshot?account_id=account-unknown');
     expect(response.status).toBe(403);
   });
+
+  it('R100: 同じ卓・重なる時間の予約は2件目を409にし、在庫を人数分だけ増やす', async () => {
+    seedRestaurantFixture();
+    const store = testDb.raw.prepare("SELECT id FROM rt_stores WHERE code = 'GINZA'").get() as { id: string };
+    testDb.raw.prepare(
+      'INSERT INTO rt_tables (id, store_id, code, label, seat_type, min_capacity, max_capacity) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    ).run('table-2seat', store.id, 'T-02', 'テーブル2', 'table', 1, 2);
+    testDb.raw.prepare(
+      'INSERT INTO rt_inventory_slots (id, store_id, starts_at, total_capacity, ota_capacity, line_capacity, walk_in_capacity) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    ).run('slot-r100', store.id, '2026-09-10T10:00:00.000Z', 10, 4, 4, 2);
+    const body = {
+      storeId: store.id, customerName: '重複 太郎', guestCount: 2,
+      startsAt: '2026-09-10T10:00:00.000Z', endsAt: '2026-09-10T12:00:00.000Z',
+    };
+    const first = await request('/api/restaurant-test/reservations/manual?account_id=account-1', body);
+    expect(first.status).toBe(201);
+    const second = await request('/api/restaurant-test/reservations/manual?account_id=account-1', {
+      ...body, customerName: '重複 次郎',
+    });
+    expect(second.status).toBe(409);
+    const count = testDb.raw.prepare(
+      'SELECT COUNT(*) AS count FROM rt_reservations WHERE store_id = ? AND starts_at = ?',
+    ).get(store.id, '2026-09-10T10:00:00.000Z') as { count: number };
+    expect(count.count).toBe(1);
+    const slot = testDb.raw.prepare(
+      'SELECT reserved_count FROM rt_inventory_slots WHERE id = ?',
+    ).get('slot-r100') as { reserved_count: number };
+    expect(slot.reserved_count).toBe(2);
+  });
+
+  it('R100: 重ならない時間・別の卓の予約は登録できる', async () => {
+    seedRestaurantFixture();
+    const store = testDb.raw.prepare("SELECT id FROM rt_stores WHERE code = 'GINZA'").get() as { id: string };
+    const first = await request('/api/restaurant-test/reservations/manual?account_id=account-1', {
+      storeId: store.id, customerName: '昼 太郎', guestCount: 2,
+      startsAt: '2026-09-10T10:00:00.000Z', endsAt: '2026-09-10T12:00:00.000Z',
+    });
+    expect(first.status).toBe(201);
+    const later = await request('/api/restaurant-test/reservations/manual?account_id=account-1', {
+      storeId: store.id, customerName: '夜 花子', guestCount: 2,
+      startsAt: '2026-09-10T12:00:00.000Z', endsAt: '2026-09-10T14:00:00.000Z',
+    });
+    expect(later.status).toBe(201);
+  });
+
+  it('R101: 失敗した連携イベントの再送は予約を取り込む', async () => {
+    seedRestaurantFixture();
+    const store = testDb.raw.prepare("SELECT id FROM rt_stores WHERE code = 'GINZA'").get() as { id: string };
+    testDb.raw.prepare(
+      'INSERT INTO rt_sync_events (id, store_id, provider, external_event_id, payload_json, status, error_message) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    ).run('event-failed', store.id, 'restaurant_board', 'event-retry-1', '{}', 'failed', 'boom');
+    const retry = await request('/api/restaurant-test/inbound/reservations?account_id=account-1', {
+      storeId: store.id, provider: 'restaurant_board', eventId: 'event-retry-1',
+      reservation: {
+        externalId: 'RB-RETRY', customerName: '再送 太郎', guestCount: 2,
+        startsAt: '2026-09-11T10:00:00.000Z', endsAt: '2026-09-11T12:00:00.000Z',
+      },
+    });
+    expect(retry.status).toBe(201);
+    const count = testDb.raw.prepare("SELECT COUNT(*) AS count FROM rt_reservations WHERE external_id = 'RB-RETRY'").get() as { count: number };
+    expect(count.count).toBe(1);
+    const event = testDb.raw.prepare('SELECT status FROM rt_sync_events WHERE id = ?').get('event-failed') as { status: string };
+    expect(event.status).toBe('processed');
+  });
+
+  it('R102: 古い連携通知は取消済み予約を確定に戻さない', async () => {
+    seedRestaurantFixture();
+    const store = testDb.raw.prepare("SELECT id FROM rt_stores WHERE code = 'GINZA'").get() as { id: string };
+    const cancel = await request('/api/restaurant-test/inbound/reservations?account_id=account-1', {
+      storeId: store.id, provider: 'restaurant_board', eventId: 'event-new-1',
+      reservation: {
+        externalId: 'RB-STALE', customerName: '取消 太郎', guestCount: 2,
+        startsAt: '2026-09-12T10:00:00.000Z', endsAt: '2026-09-12T12:00:00.000Z',
+        status: 'cancelled', sourceUpdatedAt: '2026-09-12T10:00:00.000Z',
+      },
+    });
+    expect(cancel.status).toBe(201);
+    const stale = await request('/api/restaurant-test/inbound/reservations?account_id=account-1', {
+      storeId: store.id, provider: 'restaurant_board', eventId: 'event-old-1',
+      reservation: {
+        externalId: 'RB-STALE', customerName: '取消 太郎', guestCount: 2,
+        startsAt: '2026-09-12T10:00:00.000Z', endsAt: '2026-09-12T12:00:00.000Z',
+        status: 'confirmed', sourceUpdatedAt: '2026-09-12T09:00:00.000Z',
+      },
+    });
+    expect(stale.status).toBe(200);
+    expect(await stale.json()).toMatchObject({ data: { stale: true } });
+    const row = testDb.raw.prepare("SELECT status FROM rt_reservations WHERE external_id = 'RB-STALE'").get() as { status: string };
+    expect(row.status).toBe('cancelled');
+  });
+
+  it('R102: 新しい連携通知は予約を更新する', async () => {
+    seedRestaurantFixture();
+    const store = testDb.raw.prepare("SELECT id FROM rt_stores WHERE code = 'GINZA'").get() as { id: string };
+    const base = {
+      storeId: store.id, provider: 'restaurant_board',
+      reservation: {
+        externalId: 'RB-FRESH', customerName: '更新 太郎', guestCount: 2,
+        startsAt: '2026-09-13T10:00:00.000Z', endsAt: '2026-09-13T12:00:00.000Z',
+        status: 'confirmed', sourceUpdatedAt: '2026-09-13T09:00:00.000Z',
+      },
+    };
+    expect((await request('/api/restaurant-test/inbound/reservations?account_id=account-1', { ...base, eventId: 'event-fresh-1' })).status).toBe(201);
+    const newer = await request('/api/restaurant-test/inbound/reservations?account_id=account-1', {
+      ...base, eventId: 'event-fresh-2',
+      reservation: { ...base.reservation, guestCount: 4, sourceUpdatedAt: '2026-09-13T10:00:00.000Z' },
+    });
+    expect(newer.status).toBe(201);
+    const row = testDb.raw.prepare("SELECT guest_count FROM rt_reservations WHERE external_id = 'RB-FRESH'").get() as { guest_count: number };
+    expect(row.guest_count).toBe(4);
+  });
 });
