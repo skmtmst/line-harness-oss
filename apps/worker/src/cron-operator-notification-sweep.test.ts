@@ -52,10 +52,17 @@ const NOW = new Date('2026-11-02T03:00:00.000Z');
 
 function seed(db: SqliteD1): void {
   db.raw.prepare(`INSERT INTO tenants (id, name) VALUES ('tenant-1', '統括1')`).run();
+  // 有効期限・看板の同期時刻を入れておく。空だと delivery レーンの scheduled が
+  // 実ネットワーク(LINE API)へ取りに行き、CI で 5 秒制限に当たることがある。
+  // 回収の見張りには無関係なので、ここでは外す。
+  const freshExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60_000).toISOString();
+  const justSyncedAt = new Date().toISOString();
   db.raw.prepare(`
     INSERT INTO line_accounts
-      (id, channel_id, name, channel_access_token, channel_secret, is_active, tenant_id)
-    VALUES ('${ACCOUNT}', 'channel-1', '店舗1', 'token-1', 'secret-1', 1, 'tenant-1')
+      (id, channel_id, name, channel_access_token, channel_secret, is_active, tenant_id,
+       token_expires_at, line_profile_synced_at)
+    VALUES ('${ACCOUNT}', 'channel-1', '店舗1', 'token-1', 'secret-1', 1, 'tenant-1',
+            '${freshExpiresAt}', '${justSyncedAt}')
   `).run();
   db.raw.prepare(`
     INSERT INTO staff_members

@@ -394,7 +394,8 @@
       "sections": [
         "TypeTabs",
         "CreateActions",
-        "Body"
+        "Body",
+        "MobileCards"
       ],
       "parts": [
         "メッセージ",
@@ -970,6 +971,7 @@
         "Bar",
         "KPIs",
         "Table",
+        "MobileCards",
         "tf"
       ],
       "parts": [
