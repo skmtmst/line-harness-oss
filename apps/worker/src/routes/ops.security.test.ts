@@ -298,3 +298,21 @@ describe('伏せ字と禁止操作', () => {
     expect(isForbiddenWhileImpersonating('PATCH', '/api/tags/abc')).toBe(false);
   });
 });
+
+describe('一覧の集計（監査 R153）', () => {
+  it('「契約中」は請求状態だけで数える。請求解約・課金対象外は入れない', async () => {
+    // tenant-a（active・既定 exempt）→ 契約中に数えない
+    // tenant-z（archived・exempt）→ 契約中に数えない
+    testDb.raw.prepare(`UPDATE tenants SET plan_status = 'active' WHERE id = 'tenant-a'`).run();
+    testDb.raw.prepare(`INSERT INTO tenants (id, name, status, plan_status) VALUES ('t-pd', '決済失敗の会社', 'active', 'past_due')`).run();
+    testDb.raw.prepare(`INSERT INTO tenants (id, name, status, plan_status) VALUES ('t-cn', '請求解約の会社', 'active', 'canceled')`).run();
+    testDb.raw.prepare(`INSERT INTO tenants (id, name, status, plan_status) VALUES ('t-tr', 'トライアルの会社', 'active', 'trialing')`).run();
+    testDb.raw.prepare(`INSERT INTO tenants (id, name, status, plan_status) VALUES ('t-ex', '課金対象外の会社', 'active', 'exempt')`).run();
+    const res = await app(master).request('/api/ops/tenants', {}, environment());
+    expect(res.status).toBe(200);
+    const body = await res.json() as { summary: { active: number; trialing: number; suspended: number; pastDue: number } };
+    // 契約中＝請求が生きているもの（active＋past_due）：tenant-a と t-pd の 2 社。
+    // 請求解約・課金対象外・トライアルは含めない。
+    expect(body.summary).toEqual({ active: 2, trialing: 1, suspended: 0, pastDue: 1 });
+  });
+});

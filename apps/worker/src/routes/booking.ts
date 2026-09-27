@@ -68,6 +68,7 @@ import {
 } from '../services/booking-idempotency.js';
 import { sendBookingNotification, type NotificationKind } from '../services/booking-notifier.js';
 import { dispatchOperatorEvent } from '../services/operator-notification-dispatch.js';
+import { fireOutgoingWebhooks } from '../services/event-bus.js';
 import {
   buildConfirmationReminderSchedule,
   getReminderTiming,
@@ -877,6 +878,24 @@ booking.post('/api/liff/booking/requests', async (c) => {
       message: '新しい予約が入りました',
       executionMode: 'automatic',
     }).catch((err) => console.error('booking operator notification failed:', err)),
+  );
+
+  // R150: 「予約が入ったとき」を購読する送信Webhookへも届ける。
+  // 通知が落ちても予約は成立させるため、他の副作用と同じく応答の後ろで捌く。
+  c.executionCtx.waitUntil(
+    fireOutgoingWebhooks(c.env.DB, 'booking_created', {
+      friendId,
+      sourceKind: 'booking',
+      sourceEventId: bookingId,
+      occurredAt: nowIso,
+      eventData: {
+        bookingId,
+        bookingType: 'salon',
+        menuId: body.menu_id,
+        staffId: body.staff_id,
+        startsAt: startsAt.toISOString(),
+      },
+    }, accountId).catch((err) => console.error('booking outgoing webhook failed:', err)),
   );
 
   // notifyForBooking と同じく fire-and-forget。タグ付与失敗は予約成功扱い。
@@ -3601,6 +3620,22 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
         })
         .catch((error) => console.error('booking automation event failed:', error)),
     );
+    // R150: 「予約が入ったとき」の送信Webhook購読者へも届ける。
+    c.executionCtx.waitUntil(
+      fireOutgoingWebhooks(c.env.DB, 'booking_created', {
+        friendId,
+        sourceKind: 'booking',
+        sourceEventId: bookingId,
+        occurredAt: new Date().toISOString(),
+        eventData: {
+          bookingId,
+          bookingType: 'salon',
+          menuId: body.menu_id,
+          staffId: body.staff_id,
+          startsAt: startsAt.toISOString(),
+        },
+      }, accountId).catch((err) => console.error('booking outgoing webhook failed:', err)),
+    );
   }
   const [reminderRows, operationRows, customerContext] = await Promise.all([
     c.env.DB.prepare(
@@ -5145,6 +5180,22 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
         },
       })
         .catch((error) => console.error('booking automation event failed:', error)),
+    );
+    // R150: 「予約が入ったとき」の送信Webhook購読者へも届ける。
+    c.executionCtx.waitUntil(
+      fireOutgoingWebhooks(c.env.DB, 'booking_created', {
+        friendId: row.friend_id ?? undefined,
+        sourceKind: 'booking',
+        sourceEventId: id,
+        occurredAt: new Date().toISOString(),
+        eventData: {
+          bookingId: id,
+          bookingType: 'salon',
+          menuId: row.menu_id,
+          staffId: row.staff_id,
+          startsAt: row.starts_at,
+        },
+      }, accountId).catch((err) => console.error('booking outgoing webhook failed:', err)),
     );
   } else if (next === 'rejected') {
     // N-065: 却下でも V6 の未送信予定は止める (通知だけでは送り続ける)。

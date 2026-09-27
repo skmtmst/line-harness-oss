@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Area } from '@/components/rich-menus/canvas-editor'
-import { isAreaActionConfigured, pruneStaleAreaTags, saveAreaDraft, unsetAreaLabels } from './action-drafts'
+import { isAreaActionConfigured, pruneStaleAreaTags, pruneStaleAreaTemplates, saveAreaDraft, unsetAreaLabels } from './action-drafts'
 
 function textArea(id: string, text = ''): Area {
   return {
@@ -60,5 +60,35 @@ describe('R23 アカウント切替で前の候補にしかないタグを外す
 
   it('下書きが空でも壊れない', () => {
     expect(pruneStaleAreaTags({}, new Set(['tag-keep']))).toEqual({ next: {}, removed: 0 })
+  })
+})
+
+describe('m18r アカウント切替で前の候補にしかないテンプレートを外す', () => {
+  function templateArea(id: string, templateId: string | null): Area {
+    return { ...textArea(id, ''), intent: 'template', templateId }
+  }
+
+  it('新しい候補にない選択だけを外し、件数を返す', () => {
+    const drafts = {
+      large: [templateArea('a', 'tpl-keep'), templateArea('b', 'tpl-gone')],
+    }
+    const { next, removed } = pruneStaleAreaTemplates(drafts, new Set(['tpl-keep']))
+    expect(removed).toBe(1)
+    expect(next.large[0].templateId).toBe('tpl-keep')
+    expect(next.large[1].templateId).toBeNull()
+  })
+
+  it('外すものがなければ面を作り直さない', () => {
+    const area = templateArea('a', 'tpl-keep')
+    const { next, removed } = pruneStaleAreaTemplates({ large: [area] }, new Set(['tpl-keep']))
+    expect(removed).toBe(0)
+    expect(next.large[0]).toBe(area)
+  })
+
+  it('選んでいない面はそのままにする', () => {
+    const area = templateArea('a', null)
+    const { next, removed } = pruneStaleAreaTemplates({ large: [area] }, new Set(['tpl-keep']))
+    expect(removed).toBe(0)
+    expect(next.large[0]).toBe(area)
   })
 })

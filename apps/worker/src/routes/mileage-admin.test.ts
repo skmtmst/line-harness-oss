@@ -32,6 +32,15 @@ const dbMocks = {
   getMileageManualAdjustmentPolicy: vi.fn(),
   setMileageManualAdjustmentPolicy: vi.fn(),
   postMileageAdjustment: vi.fn(),
+  confirmPendingMileageEntry: vi.fn(),
+  voidMileageLedgerEntry: vi.fn(),
+  createMileageAdjustmentApprovalRequest: vi.fn(),
+  listMileageAdjustmentApprovalRequests: vi.fn(),
+  approveMileageAdjustmentRequest: vi.fn(),
+  rejectMileageAdjustmentRequest: vi.fn(),
+  cancelMileageAdjustmentRequest: vi.fn(),
+  testMileageEarningRuleDraft: vi.fn(),
+  validateMileageEarningRuleDraft: vi.fn((draft: unknown) => draft),
   getActionScoreOverview: vi.fn(),
   getActionScoreBands: vi.fn().mockResolvedValue({ min: 0, max: 100, normalMin: 30, highMin: 70 }),
   createMileageRewardDraft: vi.fn(),
@@ -810,6 +819,9 @@ describe('mileage admin API', () => {
 
   it('blocks high-value and cross-account adjustments before writing the ledger', async () => {
     dbMocks.getMileageManualAdjustmentPolicy.mockResolvedValueOnce({ approvalThreshold: 500 });
+    dbMocks.createMileageAdjustmentApprovalRequest.mockResolvedValueOnce({
+      request: { id: 'req-1', status: 'pending' }, replayed: false,
+    });
     const high = await call('/api/mileage/adjustments', {
       method: 'POST',
       headers: {
@@ -821,8 +833,11 @@ describe('mileage admin API', () => {
         reasonCategory: 'campaign', reason: 'キャンペーン調整',
       }),
     });
-    expect(high.status).toBe(400);
-    expect(await high.json()).toMatchObject({ code: 'OWNER_APPROVAL_REQUIRED' });
+    // R: 境界以上は実行せず承認依頼を作る（台帳は書かない）
+    expect(high.status).toBe(202);
+    expect(await high.json()).toMatchObject({ data: { approvalRequired: true } });
+    expect(dbMocks.createMileageAdjustmentApprovalRequest).toHaveBeenCalled();
+    expect(dbMocks.postMileageAdjustment).not.toHaveBeenCalled();
 
     d1.prepare.mockImplementationOnce(() => ({
       bind: () => ({ first: vi.fn().mockResolvedValue(null) }),
@@ -976,5 +991,91 @@ describe('mileage earning rule publish (N-231 案1)', () => {
     });
     expect(response.status).toBe(409);
     expect(await response.json()).toMatchObject({ success: false });
+  });
+});
+
+describe('R: 確定待ち・承認・決めごとテストのルート', () => {
+  it('確定は理由なしで400、ありなら台帳を進める', async () => {
+    const missing = await call('/api/mileage/entries/entry-1/confirm', {
+      method: 'POST',
+      body: JSON.stringify({ accountId: 'account-1' }),
+    });
+    expect(missing.status).toBe(400);
+    expect(await missing.json()).toMatchObject({ code: 'reason_required' });
+
+    dbMocks.confirmPendingMileageEntry.mockResolvedValueOnce({
+      entry: { id: 'entry-1', status: 'available' }, alreadyConfirmed: false,
+    });
+    const ok = await call('/api/mileage/entries/entry-1/confirm', {
+      method: 'POST',
+      body: JSON.stringify({ accountId: 'account-1', reason: '来店確認' }),
+    });
+    expect(ok.status).toBe(200);
+    expect(dbMocks.confirmPendingMileageEntry).toHaveBeenCalledWith(
+      env.DB, expect.objectContaining({ entryId: 'entry-1', reason: '来店確認' }),
+    );
+  });
+
+  it('取消は画面の確認手順と理由の両方が要る', async () => {
+    const noConfirm = await call('/api/mileage/entries/entry-1/void', {
+      method: 'POST',
+      body: JSON.stringify({ accountId: 'account-1', reason: 'キャンセル' }),
+    });
+    expect(noConfirm.status).toBe(428);
+    const noReason = await call('/api/mileage/entries/entry-1/void', {
+      method: 'POST',
+      headers: { 'X-Confirm-Irreversible': 'mileage-entry-void' },
+      body: JSON.stringify({ accountId: 'account-1' }),
+    });
+    expect(noReason.status).toBe(400);
+    dbMocks.voidMileageLedgerEntry.mockResolvedValueOnce({
+      entry: { id: 'entry-1', status: 'void' }, reversalEntryId: 'rev-1', replayed: false,
+    });
+    const ok = await call('/api/mileage/entries/entry-1/void', {
+      method: 'POST',
+      headers: { 'X-Confirm-Irreversible': 'mileage-entry-void' },
+      body: JSON.stringify({ accountId: 'account-1', reason: '注文キャンセル' }),
+    });
+    expect(ok.status).toBe(200);
+  });
+
+  it('承認の一覧と承認実行を受け付ける', async () => {
+    dbMocks.listMileageAdjustmentApprovalRequests.mockResolvedValueOnce([
+      { id: 'req-1', status: 'pending', amount: 5000 },
+    ]);
+    const list = await call('/api/mileage/adjustment-approvals?accountId=account-1&status=pending');
+    expect(list.status).toBe(200);
+    expect(dbMocks.listMileageAdjustmentApprovalRequests).toHaveBeenCalledWith(
+      env.DB, { lineAccountId: 'account-1', status: 'pending' },
+    );
+
+    dbMocks.approveMileageAdjustmentRequest.mockResolvedValueOnce({
+      request: { id: 'req-1', status: 'approved' }, entry: { id: 'entry-9' },
+    });
+    const approve = await call('/api/mileage/adjustment-approvals/req-1/approve', {
+      method: 'POST', body: JSON.stringify({ accountId: 'account-1' }),
+    });
+    expect(approve.status).toBe(200);
+    expect(await approve.json()).toMatchObject({ data: { entryId: 'entry-9' } });
+  });
+
+  it('決めごとテストは下書きを検証してから試す', async () => {
+    dbMocks.testMileageEarningRuleDraft.mockResolvedValueOnce({
+      matchedEvents: 2, matchedFriends: 1, estimatedTotalMiles: 200,
+      maxPerFriend: 200, overlappingRuleNames: [], initialStatus: 'available',
+      expirationExampleAt: null,
+    });
+    const response = await call('/api/mileage/earning-rules/test', {
+      method: 'POST',
+      body: JSON.stringify({
+        accountId: 'account-1',
+        draft: { name: 'テスト', eventType: 'booking_completed', amount: 100, initialStatus: 'available' },
+      }),
+    });
+    expect(response.status).toBe(200);
+    expect(dbMocks.validateMileageEarningRuleDraft).toHaveBeenCalled();
+    expect(dbMocks.testMileageEarningRuleDraft).toHaveBeenCalledWith(
+      env.DB, expect.objectContaining({ lineAccountId: 'account-1' }),
+    );
   });
 });

@@ -154,6 +154,21 @@ describe('V6 EC integration screens', () => {
     expect(subscriptions).not.toContain('function shortDate(')
   })
 
+  /*
+   * R166: LINEへ何も送らない処理（会員情報の更新・注文取り消し・返金の
+   * 反映）の成功を「送信完了」と出さない。データ反映とLINE送信を
+   * 見分けられないと「お客さまへ連絡済み」と誤認する。
+   */
+  it('LINE送信をしない出来事の成功は送信完了と表示しない（R166）', () => {
+    expect(page).toContain('NON_SENDING_STATUS_LABEL')
+    expect(page).toContain("'ec.customer.profile_updated': '更新完了'")
+    expect(page).toContain("'ec.order.cancelled': '反映完了'")
+    expect(page).toContain("'ec.order.refunded': '反映完了'")
+    expect(page).toContain('actionStatusLabel(action)')
+    // 集計タブも送信を含まない完了数なので「送信完了」とは名付けない。
+    expect(page).toContain("['succeeded', '処理完了', actionSummary?.succeeded]")
+  })
+
   it('filters subscriptions with the shared Tabs and types impact metrics (#580)', () => {
     expect(subscriptions).toContain("from '@/components/shared/tabs'")
     expect(subscriptions).toContain('<Tabs items={FILTERS.map(')

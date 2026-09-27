@@ -845,7 +845,7 @@ function MediaLibraryInner() {
       <div style={FOLDER_RAIL_STYLE} className="grid gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
         <div className="min-w-0">
         <FolderPanel
-          total={`${total} 件`}
+          /* m18s: 見出しの総数は「すべて」の行と同じ数なので出さない（回答フォーム #m18k と同じ形）。絞り込み後の件数は一覧側の ListRange に出す。 */
           activeId={folderFilter}
           onSelect={(id) => {
             setFolderFilter(id)
