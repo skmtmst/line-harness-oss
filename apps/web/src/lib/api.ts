@@ -1646,6 +1646,63 @@ export type ApiBroadcast = Omit<Broadcast, 'targetType'> & {
   approvalDecidedByStaffId?: string | null;
   approvalDecidedAt?: string | null;
   approvalRejectReason?: string | null;
+  /**
+   * 10の状態（#816）。status・承認・停止・台帳から組み立てた見せ方の状態。
+   * 無いとき（古い応答）は status から読み替える。
+   */
+  displayStatus?: BroadcastDisplayStatus;
+  displayStatusLabel?: string;
+  ledger?: BroadcastLedger;
+};
+
+/** 一斉配信の10の状態（#816）。 */
+export type BroadcastDisplayStatus =
+  | 'draft'
+  | 'pending_approval'
+  | 'scheduled'
+  | 'preparing'
+  | 'sending'
+  | 'sent'
+  | 'partial_failed'
+  | 'failed'
+  | 'stopped'
+  | 'expired';
+
+/** 宛先台帳の1行（GET /:id/recipients）。札の言葉は Worker が直して返す。 */
+export type BroadcastRecipientRow = {
+  friendId: string
+  displayName: string
+  lineAccountId: string | null
+  group: 'delivered' | 'failed_temporary' | 'failed_permanent' | 'unknown' | 'inflight'
+  label: string
+  detail: string
+  retryable: boolean
+  lineRequestId: string | null
+  errorCode: string | null
+  dispatchedAt: string | null
+  settledAt: string | null
+};
+
+export type BroadcastRecipientsSummary = {
+  sent: number
+  failedTemporary: number
+  failedPermanent: number
+  unknown: number
+  inFlight: number
+  pending: number | null
+  total: number
+  retryableCount: number
+};
+
+/** 操作の記録の1件（GET /:id/activity）。操作と承認を混ぜて新しい順に返す。 */
+export type BroadcastActivityEntry = {
+  kind: 'lifecycle' | 'approval'
+  action: string
+  label: string
+  actorStaffId: string | null
+  actorName: string | null
+  reason: string | null
+  createdAt: string
 };
 
 /** 承認の依頼先の候補（承認できる人だけ。自分は除く）。 */
@@ -1692,13 +1749,17 @@ export type BroadcastApprovalState = {
 export type BroadcastLedger = {
   /** 届いた人。 */
   sent: number
-  /** 届かなかったと断定できた人。**再送の対象**。 */
+  /** 届かなかったと断定できた人（一時的＋恒常的）。 */
   failed: number
+  /** 一時的な失敗（混み合い・止める前で未送信）。**再送の対象**。 */
+  failedTemporary?: number
+  /** 恒常的な失敗（ブロックなど）。送り直さない。 */
+  failedPermanent?: number
   /** 外へ出たかもしれないが確かめられない人。**再送しない**。 */
   unknown: number
   /** いま送っている途中の人。 */
   inFlight: number
-  /** 再送の対象人数（= failed）。 */
+  /** 再送の対象人数（= 一時的な失敗）。 */
   retryableCount: number
 };
 
@@ -7824,8 +7885,9 @@ export const api = {
         { method: 'POST', body: JSON.stringify({ expectedVersion }) },
       ),
     /**
-     * 失敗した相手だけ送り直す。**送達不明の相手は含まれない**（二重に
-     * 届くのを避けるため）。相手へ実際に届くので、送信と同じ確認を要求する。
+     * 一時的な失敗の相手だけ送り直す（#816）。**送達不明と恒常的な失敗
+     * （ブロックなど）は含まれない**。相手へ実際に届くので、送信と同じ
+     * 確認を要求する。
      */
     retryFailed: (id: string, expectedVersion: number) =>
       fetchApi<ApiResponse<ApiBroadcast & { ledger: BroadcastLedger }> & { attemptNo?: number; retryTargets?: number }>(
@@ -7836,6 +7898,46 @@ export const api = {
           body: JSON.stringify({ expectedVersion }),
         },
       ),
+    /**
+     * 宛先台帳（#816）。宛先ごとに結果・時刻・LINEの要求IDを返す。
+     * `result` で絞れる（all・delivered・temporary・permanent・unknown・inflight）。
+     * 旧配信は集約だけ（aggregateOnly）で、行は捏造しない。
+     */
+    recipients: (id: string, params?: { result?: string; cursor?: string; limit?: number }) => {
+      const query = new URLSearchParams()
+      if (params?.result) query.set('result', params.result)
+      if (params?.cursor) query.set('cursor', params.cursor)
+      if (params?.limit) query.set('limit', String(params.limit))
+      const qs = query.toString()
+      return fetchApi<{
+        success: boolean
+        data?: {
+          rows: BroadcastRecipientRow[]
+          summary: BroadcastRecipientsSummary
+          aggregateOnly: boolean
+          aggregateReason: 'all' | 'legacy' | null
+          legacySuccessCount: number | null
+        }
+        error?: string
+        pagination?: { total: number; limit: number; cursor: number; nextCursor: string | null }
+      }>(`/api/broadcasts/${id}/recipients${qs ? `?${qs}` : ''}`)
+    },
+    /**
+     * 操作の記録（#816）。作成・編集・予約・送信・停止・再送と、承認の
+     * 依頼・承認・差し戻しを新しい順に混ぜて返す。追記だけで消せない。
+     */
+    activity: (id: string, params?: { cursor?: string; limit?: number }) => {
+      const query = new URLSearchParams()
+      if (params?.cursor) query.set('cursor', params.cursor)
+      if (params?.limit) query.set('limit', String(params.limit))
+      const qs = query.toString()
+      return fetchApi<{
+        success: boolean
+        data?: BroadcastActivityEntry[]
+        error?: string
+        pagination?: { limit: number; cursor: number; nextCursor: string | null }
+      }>(`/api/broadcasts/${id}/activity${qs ? `?${qs}` : ''}`)
+    },
     getProgress: (id: string) =>
       fetchApi<{ success: boolean; data?: {
         status: string

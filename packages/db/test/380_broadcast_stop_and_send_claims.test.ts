@@ -206,7 +206,8 @@ describe('380 一斉配信の停止と送達台帳', () => {
       ]);
 
       await settleBroadcastRecipients(db, { broadcastId: 'b1', friendIds: ['f1'], state: 'sent' });
-      await settleBroadcastRecipients(db, { broadcastId: 'b1', friendIds: ['f2'], state: 'failed', errorCode: 'line_http_400' });
+      // #816: 再送できるのは一時的な失敗だけなので、429（速度制限）で落とす。
+      await settleBroadcastRecipients(db, { broadcastId: 'b1', friendIds: ['f2'], state: 'failed', errorCode: 'line_http_429' });
       expect(await countBroadcastLedger(db, 'b1')).toEqual({ sent: 1, failed: 1, unknown: 0, claimed: 0 });
       expect([...await getBlockedRecipientIds(db, 'b1')]).toEqual(['f1']);
       expect(await getRetryableRecipientIds(db, 'b1')).toEqual(['f2']);
@@ -276,7 +277,8 @@ describe('380 一斉配信の停止と送達台帳', () => {
         broadcastId: 'b1', attemptNo: 1, lineAccountId: 'account-1', friendIds: ['f1', 'f2', 'f3'],
       });
       await settleBroadcastRecipients(db, { broadcastId: 'b1', friendIds: ['f1'], state: 'sent' });
-      await settleBroadcastRecipients(db, { broadcastId: 'b1', friendIds: ['f2'], state: 'failed', errorCode: 'line_http_400' });
+      // #816: 開け直すのは一時的な失敗だけなので、429（速度制限）で落とす。
+      await settleBroadcastRecipients(db, { broadcastId: 'b1', friendIds: ['f2'], state: 'failed', errorCode: 'line_http_429' });
       await settleBroadcastRecipients(db, { broadcastId: 'b1', friendIds: ['f3'], state: 'unknown', errorCode: 'line_no_response' });
 
       await expect(reopenFailedClaims(db, 'b1', 2)).resolves.toBe(1);
