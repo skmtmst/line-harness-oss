@@ -88,15 +88,17 @@ describe('一覧画面の容量の絞り込みと案内（N-198/N-204・実マ�
     fixture.quotaState = 'notice'
     render(<ContentsPage />)
     expect(await screen.findByText(/80%以上を使っています/)).toBeTruthy()
-    const before = fixture.listCalls.length
-    expect(before).toBeGreaterThan(0)
-    expect(fixture.listCalls[before - 1]?.params).not.toMatchObject({ nearLimitOnly: true })
+    expect(fixture.listCalls.length).toBeGreaterThan(0)
+    // R38: フォルダ欄の「すべて」用に絞り込みなしの総数を別口で読むため、
+    // 一覧の取得は1回の読み込みで複数回走る。「最後の1回」ではなく、
+    // nearLimitOnly が載った取得があるかで見る。
+    const flagged = (params: unknown) => (params as { nearLimitOnly?: boolean } | undefined)?.nearLimitOnly === true
+    expect(fixture.listCalls.some((call) => flagged(call.params))).toBe(false)
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: '上限に近いものを見る' }))
     })
     await waitFor(() => {
-      const last = fixture.listCalls[fixture.listCalls.length - 1]?.params as { nearLimitOnly?: boolean } | undefined
-      expect(last?.nearLimitOnly).toBe(true)
+      expect(fixture.listCalls.some((call) => flagged(call.params))).toBe(true)
     })
   })
 

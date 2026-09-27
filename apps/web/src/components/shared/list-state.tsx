@@ -22,7 +22,12 @@ import styles from './list-state.module.css'
  * 専用の部品が描かれたら、ここを合わせ直す。
  */
 export type ListStateKind = 'loading' | 'empty' | 'error' | 'forbidden'
-export type EmptyListPreset = 'createable' | 'readonly'
+/**
+ * 空の内訳。`createable` はまだ1件も無い（作る口を出す）、`readonly` は
+ * 画面から作れない記録、`filtered` は絞り込みの結果が0件（R38）。
+ * 0件の絞り込みに作る口を出すと、保存済みが消えたと誤読される。
+ */
+export type EmptyListPreset = 'createable' | 'readonly' | 'filtered'
 
 /**
  * 設計 `hqTfD` / `u2ArlH`。24px の線画。
@@ -56,6 +61,9 @@ export const PRESETS: Record<ListStateKind, { title: string; description: string
 export const EMPTY_PRESETS: Record<EmptyListPreset, { title: string; description: string }> = {
   createable: PRESETS.empty,
   readonly: { title: '記録はありません', description: '記録が増えると、ここに表示されます。' },
+  // R38: 絞り込みの結果が0件。「まだありません」と言わず、条件を外す口と
+  // 一緒に使う（action に「条件を外す」ボタンを渡す）。
+  filtered: { title: '条件に合うものがありません', description: '条件を変えるか、絞り込みを外してください。' },
 }
 
 export default function ListState({

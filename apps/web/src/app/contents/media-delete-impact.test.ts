@@ -16,7 +16,7 @@ const impact = (over: Record<string, unknown> = {}) =>
   ({
     media: { id: 'm1', filename: '夏の定番セット.jpg', kind: 'image' },
     usageCount: 0, references: [], checkedAt: '2026-08-30T01:00:00.000Z',
-    lastScannedAt: null, canDelete: true, recommendedAction: 'delete',
+    lastScannedAt: null, verified: true, canDelete: true, recommendedAction: 'delete',
     ...over,
   }) as never
 
@@ -28,6 +28,16 @@ describe('使用中の言い方', () => {
 
   it('件数をそのまま出す', () => {
     expect(usageText(impact({ usageCount: 3 }))).toBe('いま 3か所で使われています。')
+  })
+
+  it('R34: 未確認の0件は「使っていない」にしない', () => {
+    expect(usageText(impact({ verified: false, usageCount: 0, canDelete: false })))
+      .toBe('使われている場所を確かめられませんでした。')
+  })
+
+  it('R34: 未確認でも見つかった使用先は数え、未確認がある旨を添える', () => {
+    expect(usageText(impact({ verified: false, usageCount: 2, canDelete: false })))
+      .toBe('いま 2か所で使われています（ほかに確認できていない場所があります）。')
   })
 })
 
@@ -85,6 +95,10 @@ describe('消せない理由', () => {
   it('消せるときは理由を出さない', () => {
     expect(blockedReason(impact())).toBeNull()
   })
+
+  it('R34: 未確認は読み直しを促す', () => {
+    expect(blockedReason(impact({ verified: false, canDelete: false }))).toContain('読み直して')
+  })
 })
 
 describe('確かめた時刻', () => {
@@ -129,5 +143,10 @@ describe('消してよいか', () => {
   it('読み込めていないときと送信中は押せない', () => {
     expect(canDelete({ impact: null, busy: false })).toBe(false)
     expect(canDelete({ impact: impact(), busy: true })).toBe(false)
+  })
+
+  it('R34: 未確認は確かめられないので押せない', () => {
+    // canDelete が立っていても、未確認なら通さない。
+    expect(canDelete({ impact: impact({ verified: false, canDelete: true }), busy: false })).toBe(false)
   })
 })
