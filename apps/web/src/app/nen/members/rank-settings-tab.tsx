@@ -7,7 +7,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Chip from '@/components/shared/chip'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
-import { DeleteAction } from '@/components/shared/row-actions'
+import { RowActions } from '@/components/shared/row-actions'
 import StickyBar from '@/components/shared/sticky-bar'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { TextField } from '@/components/shared/text-field'
@@ -51,6 +51,8 @@ export default function RankSettingsTab({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  /** 削除の確認を開いている行。null の間は確認を出さない。 */
+  const [removeTarget, setRemoveTarget] = useState<number | null>(null)
   /** 下書きがどのアカウントのものか。編集状態はアカウントに固定する（DEEP-21）。 */
   const [draftAccountId, setDraftAccountId] = useState(accountId)
 
@@ -71,6 +73,7 @@ export default function RankSettingsTab({
     setDrafts([])
     setDirty(false)
     setError('')
+    setRemoveTarget(null)
     cancelLeave()
     setNotice(hadUnsaved ? 'LINEアカウントを切り替えたため、保存していない変更は破棄しました。' : '')
   }
@@ -181,7 +184,7 @@ export default function RankSettingsTab({
                 <Th className="w-28">マイル還元</Th>
                 <Th>友だち属性タグ</Th>
                 <Th className="cq-hide-below-800 w-24" align="right">会員数</Th>
-                <Th className="w-14" align="right"><span className="sr-only">削除</span></Th>
+                <Th className="w-14" align="right"><span className="sr-only">操作</span></Th>
               </TableHeadRow>
             </thead>
             <tbody>
@@ -211,7 +214,26 @@ export default function RankSettingsTab({
                     </Td>
                     <Td align="right" className="cq-hide-below-800"><span className="text-label font-semibold tabular-nums text-ink">{row.memberCount.toLocaleString('ja-JP')}人</span></Td>
                     <Td align="right">
-                      {isBase ? null : <DeleteAction label={`${row.name || 'このランク'}を削除する`} onClick={() => remove(index)} />}
+                      {isBase ? null : row.id === null ? (
+                        /* まだ保存していない行の取り消しは、確認なしの文字ボタン。 */
+                        <button
+                          type="button"
+                          className="text-label font-semibold text-action"
+                          onClick={() => remove(index)}
+                        >
+                          行を外す
+                        </button>
+                      ) : (
+                        /* ほかの一覧と同じ形（主な操作＋「…」）。削除は確認つき。 */
+                        <RowActions
+                          subjectName={row.name.trim() || `ランク ${index + 1}`}
+                          destructiveItem={{
+                            id: `rank-delete-${row.id}`,
+                            label: 'ランクを削除',
+                            onSelect: () => setRemoveTarget(index),
+                          }}
+                        />
+                      )}
                     </Td>
                   </Tr>
                 )
@@ -274,6 +296,20 @@ export default function RankSettingsTab({
         cancelLabel="編集を続ける"
         onConfirm={confirmLeave}
         onCancel={cancelLeave}
+      />
+      {/* 行の削除は確認つき（ほかの一覧と同じ形）。外すだけでは消えず、保存で確定する。 */}
+      <ConfirmDialog
+        open={removeTarget !== null}
+        title={`「${removeTarget !== null ? drafts[removeTarget]?.name.trim() || `ランク ${removeTarget + 1}` : ''}」を削除しますか？`}
+        description="行を外すと、保存したときにこのランクは消えます。保存する前なら下のキャンセルで元に戻せます。"
+        confirmLabel="削除する"
+        cancelLabel="やめる"
+        destructive
+        onConfirm={() => {
+          if (removeTarget !== null) remove(removeTarget)
+          setRemoveTarget(null)
+        }}
+        onCancel={() => setRemoveTarget(null)}
       />
     </>
   )
