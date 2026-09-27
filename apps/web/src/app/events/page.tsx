@@ -14,7 +14,7 @@ import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 // #740: bookings の EventKpi と一字一句同じだったため、機能内共有の1部品へ統合した。
 import EventKpi from '@/components/events/event-kpi'
 import { daysUntilEvent, summarizeEventAttention } from './event-attention'
@@ -246,9 +246,9 @@ export default function EventsListPage() {
         trailing={
           <label className="text-ink-faint flex items-center gap-2 text-xs whitespace-nowrap">
             並び順
-            <SelectField
+            <Select
               value={sort}
-              onChange={(event) => setSort(event.target.value as 'soon' | 'name')}
+              onChange={(value) => setSort(value as 'soon' | 'name')}
               aria-label="イベントの並び順"
               options={[
                 { value: 'soon', label: '日付が近い順' },
