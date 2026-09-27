@@ -47,9 +47,11 @@ describe('一斉配信の一覧の幅（m20i・その1）', () => {
     const opHead = THEAD.match(/<Th style=\{\{\s*width:\s*(\d+)\s*\}\}[^>]*>\s*操作/)
     expect(opHead, '操作列の固定幅が無い').not.toBeNull()
     const opWidth = Number((opHead as RegExpMatchArray)[1])
-    expect(opWidth, '操作列が狭く中身がはみ出す').toBeGreaterThanOrEqual(112)
-    expect(opWidth, '操作列が広すぎて他が潰れる').toBeLessThanOrEqual(140)
+    expect(opWidth, '操作列が狭く中身がはみ出す').toBeGreaterThanOrEqual(104)
+    expect(opWidth, '操作列が広すぎて条件が潰れる').toBeLessThanOrEqual(120)
     expect(THEAD, '操作列に % が残っている').not.toMatch(/操作[\s\S]{0,80}width:\s*'\d+%/)
+    // 操作列の余白は8pxに詰める（中身96＋余白16＝112まで収まる）。
+    expect(TBODY, '操作セルの余白を詰めていない').toContain('px-2')
   })
 
   it('% の列と操作列の固定幅を足してもいちばん狭い帯に収まる', () => {
@@ -58,7 +60,7 @@ describe('一斉配信の一覧の幅（m20i・その1）', () => {
     const percents = [...THEAD.matchAll(/width:\s*'(\d+)%'/g)].map((m) => Number(m[1]))
     expect(percents.length, '% の列が見つかりません').toBeGreaterThan(0)
     const percentSum = percents.reduce((n, v) => n + v, 0)
-    const op = THEAD.match(/width:\s*(12\d)/)
+    const op = THEAD.match(/width:\s*(\d{3})/)
     expect(op, '操作列の固定幅が見つかりません').not.toBeNull()
     const narrowest = 700
     expect(
@@ -95,7 +97,23 @@ describe('一斉配信の一覧の状態の札（m20i・その2）', () => {
   })
 })
 
-describe('一斉配信の一覧の配信条件と日時（m20i・その3）', () => {
+describe('一斉配信の一覧の配信条件の幅（m20i・その3）', () => {
+  it('1440pxで「友だち全員」は全文、タグ名は8文字以上見える', () => {
+    // 条件列が11%だと「友だち全員」すら省略されていた。開封列と
+    // 操作列を詰めたぶんを条件へ回し、1440px（表約835px）で読める幅にする。
+    const condHead = THEAD.match(/<Th style=\{\{\s*width:\s*'(\d+)%'\s*\}\}[^>]*>\s*配信条件/)
+    expect(condHead, '配信条件の列幅が無い').not.toBeNull()
+    const condPercent = Number((condHead as RegExpMatchArray)[1])
+    expect(condPercent, '配信条件が狭く中身が読めない').toBeGreaterThanOrEqual(14)
+    // 「タグ：NEN会員」の8文字分（約91px）＋余白24が1440pxの表に収まる。
+    expect(
+      (condPercent / 100) * 835 - 24,
+      `配信条件 ${condPercent}% では1440pxでタグ名8文字が見えない`,
+    ).toBeGreaterThanOrEqual(90)
+  })
+})
+
+describe('一斉配信の一覧の配信条件と日時（m20i・その3つづき）', () => {
   it('配信条件は1行で省略し、全文は title で見せる', () => {
     // 「タグ：NEN会員（定期）」が3行に折れて行が高くなっていた。
     // 短い文字列は途中で折らず、1行省略＋title（共通ルール）。

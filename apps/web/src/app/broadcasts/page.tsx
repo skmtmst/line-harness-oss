@@ -745,21 +745,23 @@ function BroadcastList() {
             */}
             {/*
               列幅は % と操作列の固定幅の組み合わせ（m20i）。
-              操作の中身（詳細ボタン約56＋間8＋…32＋余白24＝約120）は
-              縮められないので、操作列だけ124pxで固定する（★V7：操作列は
-              固定幅）。% の合計は81に抑え、124pxを足してもいちばん狭い
-              帯（1280px時の表≈700px）に収まる。% だけだと操作列が
-              100pxを切り、中身が右へはみ出して枠が8px横に送れていた。
+              操作の中身（詳細ボタン約56＋間8＋…32）は縮められないので、
+              操作列だけ116pxで固定する（★V7：操作列は固定幅）。余白は
+              12px→8pxに詰める（下の ActionCell の px-2）。% の合計は81に
+              抑え、116pxを足してもいちばん狭い帯（1280px時の表≈700px）
+              に収まる。配信・開封・クリックは中身が折れるので15%に詰め、
+              空いたぶんを配信条件へ回す（1440pxで「友だち全員」は全文、
+              タグ名は8文字以上見える）。
             */}
             <thead>
               <TableHeadRow>
-                <Th style={{ width: '24%' }}>
+                <Th style={{ width: '23%' }}>
                   タイトル・内容
                 </Th>
                 <Th style={{ width: '14%' }}>
                   状態
                 </Th>
-                <Th style={{ width: '11%' }}>
+                <Th style={{ width: '15%' }}>
                   配信条件
                 </Th>
                 {/*
@@ -769,11 +771,11 @@ function BroadcastList() {
                 <Th style={{ width: '14%' }}>
                   配信日時
                 </Th>
-                <Th style={{ width: '18%' }}>
+                <Th style={{ width: '15%' }}>
                   配信・開封・クリック
                 </Th>
                 {/* #768: 表が横に流れる帯でも操作列は右端に留める。 */}
-                <Th style={{ width: 124 }} align="right" className="sticky right-0 bg-canvas-sunken">
+                <Th style={{ width: 116 }} align="right" className="sticky right-0 bg-canvas-sunken">
                   操作
                 </Th>
               </TableHeadRow>
@@ -931,7 +933,7 @@ function BroadcastList() {
                       削除はメニューの中の危ない操作へ。行にゴミ箱の
                       アイコンだけのボタンは置かない（★V7 Xn1Mz）。
                     */}
-                    <ActionCell className="sticky right-0 bg-canvas group-hover:bg-canvas-sunken">
+                    <ActionCell className="sticky right-0 bg-canvas px-2 group-hover:bg-canvas-sunken">
                       {/* 行を押すと詳細へ行くので、行の中の操作は行へ伝えない。 */}
                       {/* m20i: 操作列が固定幅で余るぶんは右へ寄せ、「…」を枠の端に置く。 */}
                       <span className="inline-flex w-full justify-end" onClick={(event) => event.stopPropagation()}>
