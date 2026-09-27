@@ -12,6 +12,7 @@ import {
 import {
   explainAffiliateAttribution,
   getAttributionDecision,
+  getAttributionDecisionView,
   recordAttributionDecision,
 } from '../src/affiliate-attribution.js';
 import { decideConversionApproval } from '../src/affiliate-offers.js';
@@ -355,6 +356,24 @@ describe('473 付け方の記録', () => {
     expect(calc).toMatchObject({ fixed_reward_snapshot: 1000, amount_minor: 1000 });
     const decision = await getAttributionDecision(db, event.id);
     expect(decision?.offer_version_id).toBe(v1.id);
+  });
+
+  test('候補の写しが残り、名前が後から変わっても表示は動かない', async () => {
+    await createOfferVersion(db, { offerId: 'offer-1' });
+    insertTouch('t1', 'ref-2', 'friend-1', jstDaysAgo(5));
+    insertTouch('t2', 'ref-1', 'friend-1', jstDaysAgo(1));
+    const event = await trackConversion(
+      db, { conversionPointId: 'point-1', friendId: 'friend-1' }, { now: NOW_MS },
+    );
+    sqlite.prepare(`UPDATE affiliates SET name = '改名後' WHERE id = 'aff-1'`).run();
+    const view = await getAttributionDecisionView(db, event.id);
+    expect(view?.candidates).toHaveLength(1);
+    expect(view?.candidates[0]).toMatchObject({
+      affiliateId: 'aff-1',
+      affiliateName: 'はなこ',
+      chosen: true,
+      skipReason: null,
+    });
   });
 
   test('recordAttributionDecision の再送は最初の記録を保つ', async () => {

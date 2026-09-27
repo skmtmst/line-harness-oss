@@ -302,7 +302,33 @@ export interface AttributionDecisionRow {
   offer_version_id: string | null;
   reason: AttributionReason;
   window_days: number;
+  candidates_json: string;
   created_at: string;
+}
+
+/** 候補1件の写し。判断の時点で残し、後から書き換えない。 */
+export interface AttributionCandidateSnapshot {
+  affiliateId: string;
+  affiliateName: string;
+  refCode: string;
+  touchedAt: string;
+  offerId: string | null;
+  offerName: string | null;
+  chosen: boolean;
+  skipReason: AttributionSkipReason | null;
+  windowDays: number;
+}
+
+export interface AttributionDecisionView {
+  conversionEventId: string;
+  affiliateId: string | null;
+  refCode: string | null;
+  offerId: string | null;
+  offerVersionId: string | null;
+  reason: AttributionReason;
+  windowDays: number;
+  candidates: AttributionCandidateSnapshot[];
+  createdAt: string;
 }
 
 /**
@@ -316,12 +342,38 @@ export async function recordAttributionDecision(
   conversionPointId: string,
   explanation: AttributionExplanation,
 ): Promise<void> {
+  // 候補の名前は判断の時点で写す。後から紹介者名・案件名が変わっても、
+  // この記録の表示は動かない。
+  const snapshots: AttributionCandidateSnapshot[] = [];
+  for (const candidate of explanation.candidates) {
+    const names = await db
+      .prepare(
+        `SELECT a.name AS affiliate_name, off.name AS offer_name
+           FROM affiliates a
+           LEFT JOIN affiliate_offers off ON off.id = ?
+          WHERE a.id = ?`,
+      )
+      .bind(candidate.offerId, candidate.affiliateId)
+      .first<{ affiliate_name: string | null; offer_name: string | null }>();
+    snapshots.push({
+      affiliateId: candidate.affiliateId,
+      affiliateName: names?.affiliate_name ?? '',
+      refCode: candidate.refCode,
+      touchedAt: candidate.touchedAt,
+      offerId: candidate.offerId,
+      offerName: names?.offer_name ?? null,
+      chosen: candidate.chosen,
+      skipReason: candidate.skipReason,
+      windowDays: candidate.windowDays,
+    });
+  }
   await db
     .prepare(
       `INSERT OR IGNORE INTO affiliate_attribution_decisions
          (id, conversion_event_id, friend_id, conversion_point_id,
-          affiliate_id, ref_code, offer_id, offer_version_id, reason, window_days, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          affiliate_id, ref_code, offer_id, offer_version_id, reason, window_days,
+          candidates_json, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       crypto.randomUUID(),
@@ -334,9 +386,37 @@ export async function recordAttributionDecision(
       explanation.decision?.offerVersionId ?? null,
       explanation.reason,
       explanation.windowDays,
+      JSON.stringify(snapshots),
       jstNow(),
     )
     .run();
+}
+
+/** 成果の付け方の記録を、画面に出す形で返す。無い成果は null。 */
+export async function getAttributionDecisionView(
+  db: D1Database,
+  conversionEventId: string,
+): Promise<AttributionDecisionView | null> {
+  const row = await getAttributionDecision(db, conversionEventId);
+  if (!row) return null;
+  let candidates: AttributionCandidateSnapshot[] = [];
+  try {
+    const parsed: unknown = JSON.parse(row.candidates_json);
+    if (Array.isArray(parsed)) candidates = parsed as AttributionCandidateSnapshot[];
+  } catch {
+    candidates = [];
+  }
+  return {
+    conversionEventId: row.conversion_event_id,
+    affiliateId: row.affiliate_id,
+    refCode: row.ref_code,
+    offerId: row.offer_id,
+    offerVersionId: row.offer_version_id,
+    reason: row.reason,
+    windowDays: row.window_days,
+    candidates,
+    createdAt: row.created_at,
+  };
 }
 
 export async function getAttributionDecision(

@@ -305,6 +305,9 @@ CREATE TABLE affiliate_attribution_decisions (
   )),
   -- 判断に使った数える期間(日)。案件の版があればその値、なければ全体の既定。
   window_days INTEGER NOT NULL CHECK (window_days BETWEEN 1 AND 365),
+  -- 候補になった紹介の写し(JSON)。紹介者名・案件名・開いた時刻・結果を
+  -- 判断の時点で残す。後から名前が変わっても、この記録は書き換えない。
+  candidates_json TEXT NOT NULL DEFAULT '[]',
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
