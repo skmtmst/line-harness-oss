@@ -745,17 +745,17 @@ function BroadcastList() {
             */}
             {/*
               列幅は % と操作列の固定幅の組み合わせ（m20i）。
-              操作の中身（詳細ボタン約56＋間8＋…32）は縮められないので、
-              操作列だけ116pxで固定する（★V7：操作列は固定幅）。余白は
-              12px→8pxに詰める（下の ActionCell の px-2）。% の合計は81に
-              抑え、116pxを足してもいちばん狭い帯（1280px時の表≈700px）
-              に収まる。結果は中身が折れるので14%に詰め、タイトルも
-              20%に詰めて、空いたぶんを配信条件20%へ回す（1440pxで
-              「友だち全員」は全文、タグ名は8文字以上見える）。
+              操作は中身（詳細＋…約90＋余白16）だけの110pxに固定する
+              （★V7：操作列は固定幅）。余白は12px→8pxに詰める（下の
+              ActionCell の px-2）。% の合計は83に抑え、110pxを足しても
+              いちばん狭い帯（1280px時の表≈700px）に収まる。タイトルも
+              17%に詰めて、空いたぶんを結果18%へ回す。結果の各行は
+              1440pxで1行に収まる。狭い帯ではラベルと数字の間で折れて
+              よい（数字と率は離さない）。横には送らない。
             */}
             <thead>
               <TableHeadRow>
-                <Th style={{ width: '20%' }}>
+                <Th style={{ width: '17%' }}>
                   タイトル・内容
                 </Th>
                 <Th style={{ width: '14%' }}>
@@ -771,11 +771,11 @@ function BroadcastList() {
                 <Th style={{ width: '14%' }}>
                   配信日時
                 </Th>
-                <Th style={{ width: '14%' }}>
+                <Th style={{ width: '18%' }}>
                   結果
                 </Th>
                 {/* #768: 表が横に流れる帯でも操作列は右端に留める。 */}
-                <Th style={{ width: 116 }} align="right" className="sticky right-0 bg-canvas-sunken">
+                <Th style={{ width: 110 }} align="right" className="sticky right-0 bg-canvas-sunken">
                   操作
                 </Th>
               </TableHeadRow>
@@ -893,12 +893,12 @@ function BroadcastList() {
                       ) : (
                         <div>
                           {broadcast.totalCount > 0 && (
-                            <p>{broadcast.successCount.toLocaleString('ja-JP')} / {broadcast.totalCount.toLocaleString('ja-JP')} 件</p>
+                            <p className="whitespace-nowrap">{broadcast.successCount.toLocaleString('ja-JP')} / {broadcast.totalCount.toLocaleString('ja-JP')} 件</p>
                           )}
                           {insight ? (
                             <div className="mt-1 space-y-0.5">
                               {insight.delivered != null && (
-                                <p className="text-xs">配信: <span className="font-medium text-ink-secondary">{insight.delivered.toLocaleString('ja-JP')}</span></p>
+                                <p className="whitespace-nowrap text-xs">配信: <span className="font-medium text-ink-secondary">{insight.delivered.toLocaleString('ja-JP')}</span></p>
                               )}
                               {insight.uniqueImpression != null && (
                                 <p className="text-xs">開封: <span className="whitespace-nowrap"><span className="font-medium text-info">{insight.uniqueImpression.toLocaleString('ja-JP')}</span>

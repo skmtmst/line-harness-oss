@@ -47,8 +47,8 @@ describe('一斉配信の一覧の幅（m20i・その1）', () => {
     const opHead = THEAD.match(/<Th style=\{\{\s*width:\s*(\d+)\s*\}\}[^>]*>\s*操作/)
     expect(opHead, '操作列の固定幅が無い').not.toBeNull()
     const opWidth = Number((opHead as RegExpMatchArray)[1])
-    expect(opWidth, '操作列が狭く中身がはみ出す').toBeGreaterThanOrEqual(104)
-    expect(opWidth, '操作列が広すぎて条件が潰れる').toBeLessThanOrEqual(120)
+    expect(opWidth, '操作列が狭く中身がはみ出す').toBeGreaterThanOrEqual(100)
+    expect(opWidth, '操作列が広すぎて結果が潰れる').toBeLessThanOrEqual(114)
     expect(THEAD, '操作列に % が残っている').not.toMatch(/操作[\s\S]{0,80}width:\s*'\d+%/)
     // 操作列の余白は8pxに詰める（中身96＋余白16＝112まで収まる）。
     expect(TBODY, '操作セルの余白を詰めていない').toContain('px-2')
@@ -124,6 +124,20 @@ describe('一斉配信の一覧の配信条件の幅（m20i・その3）', () =>
     expect(openRow, '開封の率が折れる').toContain('whitespace-nowrap')
     const clickRow = between(PAGE, 'クリック:', '</p>')
     expect(clickRow, 'クリックの率が折れる').toContain('whitespace-nowrap')
+  })
+
+  it('結果の列は各行が1440pxで1行に収まる幅にする', () => {
+    // 結果列が14%だと「開封:」の後で数字が折れていた。操作列を
+    // 中身幅（110px）まで詰めたぶんを結果へ回す。
+    const statsHead = THEAD.match(/<Th style=\{\{\s*width:\s*'(\d+)%'\s*\}\}[^>]*>\s*結果/)
+    expect(statsHead, '結果の列幅が無い').not.toBeNull()
+    const statsPercent = Number((statsHead as RegExpMatchArray)[1])
+    expect(statsPercent, '結果が狭く行が折れる').toBeGreaterThanOrEqual(17)
+    // 「クリック: 96 (15.4%)」1行分＋余白24が1440pxの表に収まる。
+    expect(
+      (statsPercent / 100) * 835 - 24,
+      `結果 ${statsPercent}% では1440pxで各行が1行に収まらない`,
+    ).toBeGreaterThanOrEqual(108)
   })
 })
 
