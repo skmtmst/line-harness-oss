@@ -905,6 +905,14 @@ describe('Issue #684 イベント予約の実操作', () => {
     ))
     expect(kpis).toBeDefined()
     expect(kpis?.textContent).toContain('これからの回')
-    expect(kpis && elements(kpis).some((element) => ['BUTTON', 'A'].includes(element.tagName))).toBe(false)
+    /*
+     * R79/R80: 数の数え方は見出し横の「？」へ入れる（共通ルール 2-1b）。
+     * 「？」は補足の開閉だけで、数自体を押させはしない。タブ・リンク・
+     * 操作ボタンは引き続き置かない。
+     */
+    const pressable = kpis ? elements(kpis).filter((element) => ['BUTTON', 'A'].includes(element.tagName)) : []
+    const nonHelp = pressable.filter((element) => element.getAttribute('aria-label')?.endsWith('の説明') !== true)
+    expect(nonHelp).toHaveLength(0)
+    expect(pressable.length).toBeGreaterThan(0)
   })
 })

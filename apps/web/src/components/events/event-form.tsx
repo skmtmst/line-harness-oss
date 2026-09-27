@@ -12,6 +12,7 @@ import { useAccount } from '@/contexts/account-context'
 import { BULK_SLOT_LIMIT, generateBulkSlots, type BulkSlotInput } from './bulk-slot-generator'
 import { jstHHMMToUtcIso, utcIsoToJstDate, utcIsoToJstHHMM } from './jst'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Dialog from '@/components/shared/dialog'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
@@ -84,6 +85,17 @@ export function formatJpSlotRange(startsAt: string, endsAt: string): string {
   return `${start} 〜 ${sameDay ? end.slice(-5) : end}`
 }
 
+/**
+ * 保存・読込の応答を draft の形へ戻す（R82）。
+ *
+ * Worker は質問の定義を questions_json の文字列で返す。ほぐさず
+ * `setDraft` すると questions が消え、次の保存で questions:null を送って
+ * 定義ごと消してしまう。読み込み時と同じほぐし方を保存後にも使う。
+ */
+export function toEventDraft(row: EventDetail): EventDetail {
+  return { ...row, questions: parseEventQuestions(row.questions_json) }
+}
+
 export default function EventForm({ accountId, eventId }: EventFormProps) {
   const router = useRouter()
   const { selectedAccount, accounts } = useAccount()
@@ -150,7 +162,7 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
         if (cancelled) return
         // Worker は質問定義を questions_json の文字列で返す。フォームは
         // 配列で触るので、ここでほぐしてから draft に載せる。
-        setDraft({ ...ev, questions: parseEventQuestions(ev.questions_json) })
+        setDraft(toEventDraft(ev))
         setSlots(slotsRes.items)
       } catch (e) {
         // 生の `API error: 404` を主文にしない。消えたものと通信の失敗を言い分ける。
@@ -232,7 +244,9 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
       }
       if (eventId) {
         const updated = await eventsApi.updateEvent(accountId, eventId, payload, draft.version ?? 1)
-        setDraft(updated)
+        // 応答は questions_json の文字列で返る。ほぐさず載せると次の保存で
+        // questions:null を送り、質問を消してしまう（R82）。
+        setDraft(toEventDraft(updated))
         notifyToast('保存しました')
         if (nextTab) setTab(nextTab)
       } else {
@@ -1220,7 +1234,13 @@ function EditSlotDialog({
   )
 }
 
-function BulkSlotDialog({
+/*
+ * R84: 予約枠の一括追加の窓は共通 Dialog を使う。
+ * 以前は手作りの fixed  overlay で、入力欄が増えると窓が画面より高くなり、
+ * 閉じる・生成・キャンセルが画面外へ出た。Escape でも閉じなかった。
+ * 共通 Dialog は overlay のスクロール・Escape・フォーカス閉じ込めを持つ。
+ */
+export function BulkSlotDialog({
   onClose,
   onSubmit,
 }: {
@@ -1261,15 +1281,16 @@ function BulkSlotDialog({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-canvas rounded-lg shadow-xl p-6 w-full max-w-lg mx-4">
-        <div className="mb-4 flex items-start justify-between gap-3">
-          <h3 className="text-lg font-bold text-ink">予約枠の一括追加</h3>
-          <button type="button" onClick={onClose} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
-            <X aria-hidden="true" className="h-5 w-5" />
-          </button>
-        </div>
-        {err && <div className="bg-red-50 border border-red-200 text-red-700 p-2 rounded-lg mb-3 text-sm">{err}</div>}
+    <Dialog
+      open
+      title="予約枠の一括追加"
+      onCancel={onClose}
+      onConfirm={() => void submit()}
+      confirmLabel="生成"
+      cancelLabel="キャンセル"
+      busy={busy}
+      error={err ?? undefined}
+    >
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <label>
@@ -1347,20 +1368,7 @@ function BulkSlotDialog({
             />
           </label>
         </div>
-        <div className="flex justify-end gap-2 mt-5">
-          <Button onClick={onClose}>
-            キャンセル
-          </Button>
-          <button
-            onClick={submit}
-            disabled={busy}
-            className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-          >
-            生成
-          </button>
-        </div>
-      </div>
-    </div>
+    </Dialog>
   )
 }
 
@@ -1433,8 +1441,8 @@ function PublishTab({
           <div className="text-xs text-gray-500 mt-0.5">
             ON: 定員に達したあとも申込を受け、待ちとして記録する<br />
             OFF: 定員に達したら締め切る<br />
-            待ちの人は予約の件数に入りません。空きが出ても自動では繰り上げず、
-            誰を通すかは一覧から運営が決めます。
+            待ちの人は予約の件数に入りません。空きが出たら待ちの先頭へ自動で案内が送られ、
+            本人が期限内に承諾すると確定します。申込者の画面から手動で次の方へ案内することもできます。
           </div>
         </div>
       </label>

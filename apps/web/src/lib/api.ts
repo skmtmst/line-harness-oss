@@ -13841,11 +13841,29 @@ export interface EventBookingSummary {
   totalCapacity: number | null;
 }
 
+/**
+ * イベント一覧の全体集計（R79/R80）。ページ切りとは別に、絞り込み条件に合う
+ * 全イベントの「今後の開催枠」だけを数えたもの。Worker の
+ * summarizeFutureEventSlots が作る。
+ */
+export interface EventListSummary {
+  upcoming_slots: number;
+  upcoming_active: number;
+  upcoming_capacity: number | null;
+  fill_rate: number | null;
+  nearly_full: number;
+  low_applications: number;
+  nearest_upcoming_starts_at: string | null;
+  nearest_low_starts_at: string | null;
+}
+
 type EventListResponse<T> = {
   items: T[];
   total: number;
   limit: number;
   sort: Array<{ field: string; direction: 'asc' | 'desc' }>;
+  /** 全体集計。古い応答には無いため optional。無いときはページ内の行で数える。 */
+  summary?: EventListSummary;
 };
 
 export interface EventWaitlistItem {
@@ -14037,7 +14055,7 @@ export const eventsApi = {
       { method: 'DELETE' },
     ),
 
-  /** キャンセル待ち。自動では繰り上げない。誰を通すかは運用の判断。 */
+  /** キャンセル待ち。空きが出たら先頭へ自動で案内し、本人の承諾で確定する。手動の案内もできる。 */
   listWaitlist: (accountId: string, eventId: string) =>
     fetchApi<{ waitlist: EventWaitlistItem[] }>(
       withAccount(`/api/events/admin/events/${eventId}/waitlist`, accountId),

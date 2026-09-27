@@ -524,6 +524,90 @@ events.post('/api/events/admin/events', requireRole('owner', 'admin'), async (c)
   return c.json(row, 201);
 });
 
+export interface FutureEventSlotSummary {
+  /** 今後の有効な開催枠の数（R79: イベント数ではなく枠数）。 */
+  upcoming_slots: number;
+  /** 今後の枠への有効な申込席数（requested+confirmed+offered+accepted）。 */
+  upcoming_active: number;
+  /** 今後の枠の定員合計。定員なしの枠が混ざるときは null。 */
+  upcoming_capacity: number | null;
+  /** 申込率（%）。定員が分からないときは null。 */
+  fill_rate: number | null;
+  /** 残り1〜3席の今後の枠の数。 */
+  nearly_full: number;
+  /** 7日以内で定員の半分未満の今後の枠の数。 */
+  low_applications: number;
+  /** いちばん近い今後の枠の開始日時。無いときは null。 */
+  nearest_upcoming_starts_at: string | null;
+  /** いちばん近い「申込が少ない」枠の開始日時。無いときは null。 */
+  nearest_low_starts_at: string | null;
+}
+
+/**
+ * 今後の開催枠だけを数える（R79/R80）。
+ *
+ * 目安の決めごとは画面の summarizeEventAttention と同じ:
+ * あと少しで満席 = 残り1〜3席、申し込みが少ない = 7日以内で定員の半分未満。
+ */
+export function summarizeFutureEventSlots(
+  slots: ReadonlyArray<{
+    starts_at: string;
+    capacity: number | null;
+    active_count: number | null;
+  }>,
+  nowMs = Date.now(),
+): FutureEventSlotSummary {
+  const weekMs = 7 * 24 * 60 * 60 * 1000;
+  let upcomingActive = 0;
+  let upcomingCapacity = 0;
+  let capacityUnknown = false;
+  let nearlyFull = 0;
+  let lowApplications = 0;
+  let nearestUpcoming: string | null = null;
+  let nearestLow: string | null = null;
+  for (const slot of slots) {
+    const active = slot.active_count ?? 0;
+    const capacity = slot.capacity;
+    upcomingActive += active;
+    if (capacity == null) {
+      capacityUnknown = true;
+    } else {
+      upcomingCapacity += capacity;
+    }
+    if (nearestUpcoming === null || slot.starts_at < nearestUpcoming) {
+      nearestUpcoming = slot.starts_at;
+    }
+    if (capacity != null && capacity > 0) {
+      if (capacity - active >= 1 && capacity - active <= 3) nearlyFull += 1;
+      const startMs = Date.parse(slot.starts_at);
+      if (
+        Number.isFinite(startMs) &&
+        startMs <= nowMs + weekMs &&
+        active / capacity < 0.5
+      ) {
+        lowApplications += 1;
+        if (nearestLow === null || slot.starts_at < nearestLow) {
+          nearestLow = slot.starts_at;
+        }
+      }
+    }
+  }
+  const capacity = capacityUnknown ? null : upcomingCapacity;
+  return {
+    upcoming_slots: slots.length,
+    upcoming_active: upcomingActive,
+    upcoming_capacity: capacity,
+    fill_rate:
+      capacity !== null && capacity > 0
+        ? Math.round((upcomingActive / capacity) * 100)
+        : null,
+    nearly_full: nearlyFull,
+    low_applications: lowApplications,
+    nearest_upcoming_starts_at: nearestUpcoming,
+    nearest_low_starts_at: nearestLow,
+  };
+}
+
 events.get('/api/events/admin/events', async (c) => {
   const account_id = getAccountId(c);
   if (!account_id) return bad(c, 'account_id_required', 400);
@@ -553,7 +637,15 @@ events.get('/api/events/admin/events', async (c) => {
     conditions.push(`instr(lower(e.name), lower(?)) > 0`);
     params.push(q);
   }
-  if (filter === 'open') conditions.push(`e.is_published = 1`);
+  /*
+   * R81: 「受付中のみ」は公開済みだけでなく、今後の有効な枠がある行だけ。
+   * 終わった回しかない行を返すと、一覧の状態も受付中になり、終わった
+   * イベントを募集中として選んでしまう。
+   */
+  if (filter === 'open') conditions.push(`e.is_published = 1
+    AND EXISTS (SELECT 1 FROM event_slots s
+                 WHERE s.event_id = e.id AND s.deleted_at IS NULL AND s.is_active = 1
+                   AND s.starts_at >= strftime('%Y-%m-%dT%H:%M:%fZ','now'))`);
   if (filter === 'pending') conditions.push(`EXISTS (
     SELECT 1 FROM event_bookings pending WHERE pending.event_id = e.id AND pending.status = 'requested'
   )`);
@@ -617,14 +709,54 @@ events.get('/api/events/admin/events', async (c) => {
     )
     .bind(...params, paging.limit, paging.offset)
     .all();
-  return c.json(buildOffsetListResponse({
-    items: results ?? [],
-    total: counted?.c ?? 0,
-    paging,
-    sort: sort === 'name'
-      ? [{ field: 'name', direction: 'asc' }, { field: 'id', direction: 'asc' }]
-      : [{ field: 'next_slot_starts_at', direction: 'asc' }, { field: 'id', direction: 'asc' }],
-  }));
+  /*
+   * R79/R80: 上部の数値カードは「今後の開催回」の全体像を出す。
+   * ページ内の行だけを数えると、20件目以降があるときに全体が小さく見える
+   * (R80)。イベント単位の合計（過去の回を含む）を開催回の数として出すと、
+   * 集客すべき回を見誤る (R79)。絞り込み条件に合う全イベントの「今後の枠」
+   * だけを数え直し、ページ切りとは別の summary として返す。
+   * 残り1〜3席・7日以内で半分未満の目安は、画面の summarizeEventAttention
+   * と同じ値にすること。片方だけ変えると数が食い違う。
+   */
+  const { results: futureSlots } = await c.env.DB
+    .prepare(
+      `SELECT
+         s.id, s.event_id, s.starts_at, s.capacity,
+         ((SELECT COALESCE(SUM(b.party_size), 0)
+             FROM event_bookings b
+            WHERE b.slot_id = s.id AND b.status IN ('requested','confirmed'))
+          + (SELECT COALESCE(SUM(w.party_size), 0)
+               FROM event_waitlist w
+              WHERE w.slot_id = s.id AND w.status IN ('offered','accepted'))
+         ) AS active_count
+       FROM event_slots s
+       WHERE s.deleted_at IS NULL
+         AND s.is_active = 1
+         AND s.starts_at >= strftime('%Y-%m-%dT%H:%M:%fZ','now')
+         -- 数値カードは受付の見通し。下書きの枠を混ぜると、まだ出せない回まで
+         -- 「これからの回」に数えてしまう。画面の summarizeEventAttention と
+         -- 同じく公開済みだけを数える。
+         AND EXISTS (SELECT 1 FROM events e WHERE e.id = s.event_id AND e.is_published = 1 AND ${conditions.join(' AND ')})`,
+    )
+    .bind(...params)
+    .all<{
+      id: string;
+      event_id: string;
+      starts_at: string;
+      capacity: number | null;
+      active_count: number;
+    }>();
+  return c.json({
+    ...buildOffsetListResponse({
+      items: results ?? [],
+      total: counted?.c ?? 0,
+      paging,
+      sort: sort === 'name'
+        ? [{ field: 'name', direction: 'asc' }, { field: 'id', direction: 'asc' }]
+        : [{ field: 'next_slot_starts_at', direction: 'asc' }, { field: 'id', direction: 'asc' }],
+    }),
+    summary: summarizeFutureEventSlots(futureSlots ?? []),
+  });
 });
 
 events.get('/api/events/admin/events/:id', async (c) => {
