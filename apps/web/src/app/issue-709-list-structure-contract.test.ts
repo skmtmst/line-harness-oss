@@ -88,11 +88,19 @@ describe('Issue #709: リッチメニューの状態表示は共有StatusBadge�
   })
 })
 
+/*
+ * R25 で箱を接続したため、「止まっている理由」の表明は外す。
+ * 止めていないので理由も要らない。残すのは意図：押せない飾りの口を
+ * 置かず（addFolderDisabled を戻さない）、消す前の注意は常時表示にする。
+ */
 describe('Issue #709: フォームのフォルダ追加は止まっている理由を常時表示する', () => {
-  it('hover限定のtitleだけでなくaddFolderNoteで説明する', () => {
+  it('止めずにつなぐ。押せない飾りの口は置かない', () => {
     const src = read('form-submissions/page.tsx')
-    expect(src).toContain('addFolderNote={')
-    expect(src).toContain('フォルダ保存先はまだ接続されていません')
+    expect(src).toContain('onAddFolder=')
+    expect(src).not.toContain('addFolderDisabled')
+    expect(src).not.toContain('フォルダ保存先はまだ接続されていません')
+    // 消す前の注意（中身は未分類に残る）は常時表示の文で伝える。
+    expect(src).toContain('フォルダを消しても、入っていたフォームは未分類として残ります。')
   })
 })
 

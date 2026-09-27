@@ -121,6 +121,9 @@ const HOST = '127.0.0.1'
 // 機能10専用。フォルダ操作後の再取得でも、同じプロセス内では保存結果を返す。
 let webinarFolders = WEBINAR_FOLDERS.map((folder) => ({ ...folder }))
 
+// R25専用。回答フォームの箱も作る・直す・消すを見本で返す。
+let formFolders = FORM_FOLDERS.map((folder) => ({ ...folder }))
+
 // 機能15専用。版追加の撮影では、差し替え用セッションの確定が本番口と同じ
 // `verified` を返す必要がある。申告時に受けた targetMediaId を覚えておく。
 const mediaUploadSessionTargets = new Map()
@@ -2365,7 +2368,8 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     return { success: true, data: { ...FORM_SUBMISSIONS, items: FORM_SUBMISSIONS.items.slice(start, start + safeLimit), page: safePage, limit: safeLimit } }
   }
   if (pathname === '/api/folders' && query.get('kind') === 'form') {
-    return { success: true, data: FORM_FOLDERS }
+    // R25: 作った箱も同じプロセス内では返す（webinar と同じ流儀）。
+    return { success: true, data: formFolders }
   }
   if (pathname === '/api/folders' && query.get('kind') === 'template') {
     return { success: true, data: TEMPLATE_FOLDERS }
@@ -3952,6 +3956,27 @@ const server = createServer((req, res) => {
       req.on('end', () => {
         let body = {}
         try { body = JSON.parse(raw || '{}') } catch { body = {} }
+        // R25: 回答フォームの箱も見本で作れるようにする（本物と同じ器）。
+        if (body.kind === 'form') {
+          if (!body.accountId || !String(body.name ?? '').trim()) {
+            res.writeHead(400).end(JSON.stringify({ success: false, error: 'フォルダの内容を確認してください' }))
+            return
+          }
+          const folder = {
+            id: `form-folder-${formFolders.length + 1}`,
+            kind: 'form',
+            accountId: body.accountId,
+            name: String(body.name).trim(),
+            parentId: null,
+            displayOrder: formFolders.length,
+            color: body.color ?? null,
+            createdAt: '2026-09-27T00:00:00.000Z',
+            updatedAt: '2026-09-27T00:00:00.000Z',
+          }
+          formFolders = [...formFolders, folder]
+          res.writeHead(201).end(JSON.stringify({ success: true, data: folder }))
+          return
+        }
         if (body.kind !== 'webinar') {
           res.writeHead(405).end(JSON.stringify({ success: false, error: '画面確認用のため、更新はできません' }))
           return
@@ -3978,7 +4003,11 @@ const server = createServer((req, res) => {
       return
     }
     const webinarFolderPath = /^\/api\/folders\/([^/]+)$/.exec(url.pathname)
-    if (method === 'PATCH' && webinarFolderPath) {
+    // R25: webinar の箱と回答フォームの箱で見本を分ける。IDだけでは
+    // 種類が分からないため、先にどちら側の箱かを見てから振り分ける。
+    const webinarFolderId = webinarFolderPath ? decodeURIComponent(webinarFolderPath[1]) : null
+    const isWebinarFolder = webinarFolderId !== null && webinarFolders.some((folder) => folder.id === webinarFolderId)
+    if (method === 'PATCH' && webinarFolderPath && isWebinarFolder) {
       let raw = ''
       req.on('data', (chunk) => { raw += chunk })
       req.on('end', () => {
@@ -4002,7 +4031,7 @@ const server = createServer((req, res) => {
       })
       return
     }
-    if (method === 'DELETE' && webinarFolderPath) {
+    if (method === 'DELETE' && webinarFolderPath && isWebinarFolder) {
       const id = decodeURIComponent(webinarFolderPath[1])
       const accountId = url.searchParams.get('account_id')
       const folder = webinarFolders.find((item) => item.id === id && item.accountId === accountId)
@@ -4012,6 +4041,48 @@ const server = createServer((req, res) => {
       }
       webinarFolders = webinarFolders.filter((item) => item.id !== id)
       res.writeHead(200).end(JSON.stringify({ success: true, data: null }))
+      return
+    }
+    // R25: 回答フォームの箱の直し・消し・並べ替えの見本（本物と同じ器）。
+    const formFolderPath = /^\/api\/folders\/([^/]+)(\/swap-order)?$/.exec(url.pathname)
+    if (method === 'PATCH' && formFolderPath && !formFolderPath[2]) {
+      let raw = ''
+      req.on('data', (chunk) => { raw += chunk })
+      req.on('end', () => {
+        let body = {}
+        try { body = JSON.parse(raw || '{}') } catch { body = {} }
+        const id = decodeURIComponent(formFolderPath[1])
+        const index = formFolders.findIndex((folder) => folder.id === id)
+        if (index < 0) {
+          res.writeHead(404).end(JSON.stringify({ success: false, error: 'Not found' }))
+          return
+        }
+        const folder = {
+          ...formFolders[index],
+          ...(typeof body.name === 'string' && body.name.trim() ? { name: body.name.trim() } : {}),
+          ...('color' in body ? { color: body.color ?? null } : {}),
+          updatedAt: '2026-09-27T00:01:00.000Z',
+        }
+        formFolders = formFolders.map((item, itemIndex) => itemIndex === index ? folder : item)
+        res.writeHead(200).end(JSON.stringify({ success: true, data: folder }))
+      })
+      return
+    }
+    if (method === 'DELETE' && formFolderPath && !formFolderPath[2]) {
+      const id = decodeURIComponent(formFolderPath[1])
+      // 中身（フォーム）は消さず、箱だけ消す。本物と同じく未分類に戻る。
+      formFolders = formFolders.filter((item) => item.id !== id)
+      res.writeHead(200).end(JSON.stringify({ success: true, data: null }))
+      return
+    }
+    if (method === 'POST' && formFolderPath && formFolderPath[2] === '/swap-order') {
+      let raw = ''
+      req.on('data', (chunk) => { raw += chunk })
+      req.on('end', () => {
+        let body = {}
+        try { body = JSON.parse(raw || '{}') } catch { body = {} }
+        res.writeHead(200).end(JSON.stringify({ success: true, data: { swapped: [decodeURIComponent(formFolderPath[1]), body.withId ?? null] } }))
+      })
       return
     }
     if (method === 'POST' && url.pathname === '/api/conversions/definitions/preview') {
