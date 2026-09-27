@@ -1348,6 +1348,8 @@ export type ConversionDefinitionPreview = {
   duplicateExcludedCount: number
   cancellationCount: number
   excludedReasons: string[]
+  /** R42: 金額のない過去の成果の件数。金額の試算には入っていない。 */
+  missingValueCount: number
   dailyAverage: number
   deduplicationWindowDays: number | null
 }
