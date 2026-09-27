@@ -22,7 +22,7 @@ import { useAccount } from '@/contexts/account-context'
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
 import DateField from './date-field'
 import { TextField } from './text-field'
-import SelectField from './select-field'
+import Select from './select'
 import {
   isEmptyCondition,
   pruneCondition,
@@ -437,8 +437,6 @@ interface RuleEditorProps {
   scenarios: Option[]
 }
 
-const selectClass =
-  'border-hairline rounded-control text-ink h-9 border bg-white px-2 text-sm min-w-0'
 const inputClass =
   'border-hairline rounded-control text-ink h-9 border px-3 text-sm min-w-0 flex-1'
 
@@ -457,11 +455,11 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
       <>
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-ink text-sm font-medium">タグ</span>
-          <SelectField
+          <Select
             aria-label="タグの条件"
             value={rule.type}
-            onChange={(e) => {
-              const nextType = e.target.value
+            onChange={(value) => {
+              const nextType = value
               const nextMulti = nextType === 'tag_all' || nextType === 'tag_not_all'
               onChange({
                 type: nextType,
@@ -469,7 +467,6 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
               })
             }}
             options={TAG_OPS.map((op) => ({ value: op.value, label: op.label }))}
-            className={selectClass}
           />
         </div>
         <TagPicker
@@ -576,17 +573,16 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
         <>
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-ink text-sm font-medium">対応マーク</span>
-            <SelectField
+            <Select
               aria-label="マークの含め方"
               value={v.exclude ? 'exclude' : 'include'}
-              onChange={(e) =>
-                onChange({ type: rule.type, value: { ...v, exclude: e.target.value === 'exclude' } })
+              onChange={(value) =>
+                onChange({ type: rule.type, value: { ...v, exclude: value === 'exclude' } })
               }
               options={[
                 { value: 'include', label: '選択したマークのいずれかに一致' },
                 { value: 'exclude', label: '選択したマークを除外' },
               ]}
-              className={selectClass}
             />
           </div>
           <div className="flex flex-wrap gap-1.5">
@@ -624,19 +620,17 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
       return (
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-ink text-sm font-medium">友だち情報</span>
-          <SelectField
+          <Select
             aria-label="友だち情報の項目"
             value={String(v.fieldId ?? '')}
-            onChange={(e) => onChange({ type: rule.type, value: { ...v, fieldId: e.target.value } })}
+            onChange={(value) => onChange({ type: rule.type, value: { ...v, fieldId: value } })}
             options={[{ value: '', label: '項目を選ぶ' }, ...fields.map((f) => ({ value: f.id, label: f.name }))]}
-            className={selectClass}
           />
-          <SelectField
+          <Select
             aria-label="項目の比べ方"
             value={op}
-            onChange={(e) => onChange({ type: rule.type, value: { ...v, op: e.target.value } })}
+            onChange={(value) => onChange({ type: rule.type, value: { ...v, op: value } })}
             options={FIELD_OPS.map((o) => ({ value: o.value, label: o.label }))}
-            className={selectClass}
           />
           {needsText && (
             <input
@@ -654,10 +648,10 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
       return (
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-ink text-sm font-medium">シナリオ購読</span>
-          <SelectField
+          <Select
             aria-label="購読中のシナリオ"
             value={String(rule.value ?? '')}
-            onChange={(e) => onChange({ type: rule.type, value: e.target.value })}
+            onChange={(value) => onChange({ type: rule.type, value: value })}
             options={[{ value: '', label: 'シナリオを選ぶ' }, ...scenarios.map((sc) => ({ value: sc.id, label: sc.name }))]}
           />
         </div>
@@ -667,19 +661,17 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
       return (
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-ink text-sm font-medium">シナリオ</span>
-          <SelectField
+          <Select
             aria-label="シナリオ"
             value={String(v.scenarioId ?? '')}
-            onChange={(e) => onChange({ type: rule.type, value: { ...v, scenarioId: e.target.value } })}
+            onChange={(value) => onChange({ type: rule.type, value: { ...v, scenarioId: value } })}
             options={[{ value: '', label: 'シナリオを選ぶ' }, ...scenarios.map((sc) => ({ value: sc.id, label: sc.name }))]}
-            className={selectClass}
           />
-          <SelectField
+          <Select
             aria-label="シナリオの状態"
             value={String(v.state ?? 'subscribed')}
-            onChange={(e) => onChange({ type: rule.type, value: { ...v, state: e.target.value } })}
+            onChange={(value) => onChange({ type: rule.type, value: { ...v, state: value } })}
             options={SCENARIO_STATES.map((st) => ({ value: st.value, label: st.label }))}
-            className={selectClass}
           />
         </div>
       )
@@ -702,12 +694,11 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
       return (
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-ink text-sm font-medium">反応状態</span>
-          <SelectField
+          <Select
             aria-label="反応の種類"
             value={String(rule.value ?? 'reply_or_postback')}
-            onChange={(e) => onChange({ type: rule.type, value: e.target.value })}
+            onChange={(value) => onChange({ type: rule.type, value: value })}
             options={REACTION_STATES.map((st) => ({ value: st.value, label: st.label }))}
-            className={selectClass}
           />
         </div>
       )
@@ -744,10 +735,10 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
           <span className="text-ink text-sm font-medium">
             {rule.type === 'is_following' ? 'ブロック状態' : '表示状態'}
           </span>
-          <SelectField
+          <Select
             aria-label={rule.type === 'is_following' ? '友だちの状態' : '一覧での表示'}
             value={rule.value === true ? 'true' : 'false'}
-            onChange={(e) => onChange({ type: rule.type, value: e.target.value === 'true' })}
+            onChange={(value) => onChange({ type: rule.type, value: value === 'true' })}
             options={rule.type === 'is_following'
               ? [
                 { value: 'true', label: '友だちのまま（ブロックしていない）' },
@@ -757,7 +748,6 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
                 { value: 'false', label: '表示中の友だち' },
                 { value: 'true', label: '非表示にした友だち' },
               ]}
-            className={selectClass}
           />
         </div>
       )

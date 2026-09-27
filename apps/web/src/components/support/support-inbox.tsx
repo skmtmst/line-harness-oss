@@ -4,7 +4,9 @@ import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Avatar from '@/components/shared/avatar'
 import Notice from '@/components/shared/notice'
+import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
+import ListState from '@/components/shared/list-state'
 import { ApiError, fetchApi } from '@/lib/api'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import { createPollGeneration, startVisiblePoll } from '@/lib/visible-polling'
@@ -314,17 +316,22 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
           <div className="space-y-3 border-b border-hairline bg-canvas-sunken/70 p-4">
             <div className="flex gap-2">
               <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="名前・メール・件名で検索" aria-label="名前・メール・件名で検索" className="min-w-0 flex-1 rounded-lg border border-hairline bg-canvas px-3 py-2 text-sm" />
-              <select value={status} onChange={(event) => setStatus(event.target.value as typeof status)} aria-label="対応状況で絞り込む" className="rounded-lg border border-hairline bg-canvas px-2 text-xs font-medium">
-                <option value="open">未解決</option>
-                <option value="unread">未対応</option>
-                <option value="in_progress">対応中</option>
-                <option value="resolved">対応済み</option>
-                <option value="all">すべて</option>
-              </select>
+              <Select
+                aria-label="対応状況で絞り込む"
+                value={status}
+                onChange={(value) => setStatus(value as typeof status)}
+                options={[
+                  { value: 'open', label: '未解決' },
+                  { value: 'unread', label: '未対応' },
+                  { value: 'in_progress', label: '対応中' },
+                  { value: 'resolved', label: '対応済み' },
+                  { value: 'all', label: 'すべて' },
+                ]}
+              />
             </div>
           </div>
           <div className="max-h-[520px] divide-y divide-divider-soft overflow-y-auto lg:max-h-none lg:h-[calc(100%-116px)]">
-            {loading ? <div className="p-10 text-center text-sm text-ink-faint">読み込み中...</div> : items.length === 0 ? <div className="p-10 text-center text-sm text-ink-faint">対応待ちはありません</div> : items.map((item) => (
+            {loading ? <ListState kind="loading" title="対応待ちを読み込んでいます" /> : items.length === 0 ? <ListState kind="empty" title="対応待ちはありません" description="新しい受信があると、ここに並びます。" /> : items.map((item) => (
               <button key={item.id} onClick={() => choose(item)} className={`w-full p-4 text-left transition-colors hover:bg-canvas-sunken ${selected?.id === item.id ? 'bg-success-bg ring-1 ring-inset ring-success' : ''}`}>
                 <div className="flex items-start gap-3">
                   <Avatar name={item.customerName} src={item.pictureUrl ?? null} size={40} />

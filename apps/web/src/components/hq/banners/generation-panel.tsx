@@ -3,7 +3,7 @@
 import { Images, Plus, Sparkles, Upload, X } from 'lucide-react'
 import { useId, useRef, type ReactNode } from 'react'
 import Button from '@/components/shared/button'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import {
   CUSTOM_PROMPT_MAX,
@@ -94,13 +94,14 @@ export default function GenerationPanel({
 
       <div data-design-node="E8oZc" className="flex flex-col gap-4 p-4">
         <Field label="用途" note="LINE と SNS の規格から選ぶ" htmlFor={`${uid}-preset`}>
-          <SelectField
+          <Select
+            aria-label="用途"
+            size="full"
             id={`${uid}-preset`}
             className="w-full"
-            style={{ width: '100%' }}
             value={value.presetKey}
             disabled={disabled}
-            onChange={(event) => set('presetKey', event.target.value)}
+            onChange={(value) => set('presetKey', value)}
             options={value.presetKey ? presetOptions : [{ value: '', label: '用途を選んでください' }, ...presetOptions]}
           />
           {selectedPreset ? <p className="text-micro text-ink-faint">{selectedPreset.note}</p> : null}

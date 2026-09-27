@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useBrand } from '@/lib/use-brand'
 import { loadAdminVersion } from '@/lib/admin-version-cache'
+import { isRealVersion } from '@/lib/deploy-info'
 import styles from './sidebar-identity.module.css'
 
 /**
@@ -41,7 +42,7 @@ export default function SidebarIdentity() {
       <span className={styles.mark} aria-hidden="true">{initial}</span>
       <span className={styles.text}>
         <span className={styles.name} title={name}>{name}</span>
-        {version && <span className={styles.version}>Ver. {version}</span>}
+        {isRealVersion(version) && <span className={styles.version}>Ver. {version.trim()}</span>}
       </span>
     </div>
   )

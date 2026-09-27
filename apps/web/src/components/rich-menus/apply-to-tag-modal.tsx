@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
 import { api } from '@/lib/api'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Select from '@/components/shared/select'
 
 type Tag = { id: string; name: string; color: string }
 
@@ -162,25 +163,20 @@ export function ApplyToTagModal({ groupId, groupName, onClose }: Props) {
                 >
                   {mode.kind === 'tag' && (
                     <>
-                      <select
+                      <Select
                         value={mode.tagId}
-                        onChange={(e) =>
-                          pickMode({ kind: 'tag', tagId: e.target.value })
+                        onChange={(value) =>
+                          pickMode({ kind: 'tag', tagId: value })
                         }
-                        className="mt-2 block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                      >
-                        {tags.length === 0 ? (
-                          <option value="">
-                            {tagsLoading ? 'タグを読み込んでいます' : 'タグがありません'}
-                          </option>
-                        ) : (
-                          tags.map((t) => (
-                            <option key={t.id} value={t.id}>
-                              {t.name}
-                            </option>
-                          ))
-                        )}
-                      </select>
+                        aria-label="適用するタグ"
+                        options={
+                          tags.length === 0
+                            ? [{ value: '', label: tagsLoading ? 'タグを読み込んでいます' : 'タグがありません' }]
+                            : tags.map((t) => ({ value: t.id, label: t.name }))
+                        }
+                        size="full"
+                        className="mt-2"
+                      />
                       {tagsLoadError && (
                         <p className="text-ink-faint mt-2 text-xs">
                           タグを読み込めませんでした。タグの絞り込みは使えません。

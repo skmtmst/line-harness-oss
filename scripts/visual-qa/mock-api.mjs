@@ -68,7 +68,7 @@ import {
   FRIEND_SAVED_VIEWS, MERGED_PERSON_DETAIL, MERGED_PERSON_EMPTY, MERGED_PERSON_ERROR,
   LIST_STATS, NEN_BIRTHDAY_COUPON, NEN_CAMPAIGN_SETTINGS, NEN_COLUMN_CREATE, NEN_COLUMN_OPERATIONS, NEN_COLUMNS, NEN_JOBS, NEN_PETS,
   NEN_FLOW_METRICS, NEN_COLUMN_METRICS, NEN_PET_METRICS, NEN_DELIVERIES, NEN_DELIVERY_DETAILS,
-  OPERATORS, REMINDERS, REMINDER_DRAFT, REMINDER_FOLDERS, REMINDER_VALIDATE, REMINDER_PREVIEW, REMINDER_TEST_SEND, REMINDER_PUBLISH, SCENARIO_ACTIONS, SCENARIO_DRAFT, SCENARIO_FOLDERS, SCENARIO_STATS, SCENARIO_STEPS, SCENARIO_SIMULATION, SCENARIO_RUNS, USERS_GROUPED,
+  OPERATORS, REMINDERS, REMINDER_DRAFT, REMINDER_FOLDERS, REMINDER_VALIDATE, REMINDER_AUDIENCE, REMINDER_PREVIEW, REMINDER_TEST_SEND, REMINDER_PUBLISH, SCENARIO_ACTIONS, SCENARIO_DRAFT, SCENARIO_FOLDERS, SCENARIO_STATS, SCENARIO_STEPS, SCENARIO_SIMULATION, SCENARIO_RUNS, USERS_GROUPED,
   RICH_MENU_DELETE_IMPACT, RICH_MENU_DELETE_IMPACT_EMPTY,
   RICH_MENU_GROUPS, RICH_MENU_GROUP_DETAILS, RICH_MENU_EXTERNAL, RICH_MENU_TAP_STATS,
   TAGS, TAG_GROUPS, TAG_DEFINITION_NEN_SUBSCRIPTION, TAG_DEPENDENCIES_NEN_SUBSCRIPTION,
@@ -120,6 +120,11 @@ const HOST = '127.0.0.1'
 
 // 機能10専用。フォルダ操作後の再取得でも、同じプロセス内では保存結果を返す。
 let webinarFolders = WEBINAR_FOLDERS.map((folder) => ({ ...folder }))
+
+// R37 撮影用。登録メディア・共通情報のフォルダ名変更・削除を同じ
+// プロセス内で保存結果として返す。
+let mediaFolders = MEDIA_FOLDERS.map((folder) => ({ ...folder }))
+let commonVarFolders = COMMON_VAR_FOLDERS.map((folder) => ({ ...folder }))
 
 // 機能15専用。版追加の撮影では、差し替え用セッションの確定が本番口と同じ
 // `verified` を返す必要がある。申告時に受けた targetMediaId を覚えておく。
@@ -1287,8 +1292,18 @@ function visualQaWriteBody(method, pathname) {
    * 読みの `/draft` と `/runs` は従来のGET側にある。ここは書き込み側で、
    * 本番と同じ器（`{success:true,data}`）で固定の返事を返す。
    */
-  if (method === 'PUT' && /^\/api\/reminders\/[^/]+\/draft$/.test(pathname)) return REMINDER_DRAFT
+  /*
+   * 対象者ステップはどのIDで開いても描けるように、要求のIDをそのまま返す。
+   * 固定の `reminder-3` を返すと、別ID（例 `reminder-1`）では画面の
+   * 照合（`draft.reminderId === reminderId`）に落ち、いつまでも
+   * 「下書きを読み込んでいます」になる。F-1 の撮影は ID を変えて行う。
+   */
+  if (method === 'PUT' && /^\/api\/reminders\/[^/]+\/draft$/.test(pathname)) {
+    const draftId = decodeURIComponent(pathname.split('/')[3] ?? '')
+    return { ...REMINDER_DRAFT, reminderId: draftId || REMINDER_DRAFT.reminderId }
+  }
   if (method === 'POST' && /^\/api\/reminders\/[^/]+\/validate$/.test(pathname)) return REMINDER_VALIDATE
+  if (method === 'POST' && /^\/api\/reminders\/[^/]+\/audience$/.test(pathname)) return REMINDER_AUDIENCE
   if (method === 'POST' && /^\/api\/reminders\/[^/]+\/preview$/.test(pathname)) return REMINDER_PREVIEW
   if (method === 'POST' && /^\/api\/reminders\/[^/]+\/test-send$/.test(pathname)) return REMINDER_TEST_SEND
   if (method === 'POST' && /^\/api\/reminders\/[^/]+\/publish$/.test(pathname)) return REMINDER_PUBLISH
@@ -1449,7 +1464,7 @@ function visualQaWriteBody(method, pathname) {
 const RAW = {
   // `0.0.0-dev` のときはバナー自体を出さない。manifest も見に行かない。
   //（update-banner.tsx の DEV_VERSION と同じ値でないと効かない）
-  '/admin/version': { version: '2.6.4', worker_hash: '', admin_hash: '', liff_hash: '' },
+  '/admin/version': { version: '2.6.4', worker_hash: '', admin_hash: '', liff_hash: '', git_commit: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', deploy_env: 'staging', released_at: '2026-09-27T04:05:00.000Z' },
   '/admin/manifest': { releases: [], versions: [] },
 
   /*
@@ -2390,10 +2405,10 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     return { success: true, data: AUTO_REPLY_FOLDERS }
   }
   if (pathname === '/api/folders' && query.get('kind') === 'common_var') {
-    return { success: true, data: COMMON_VAR_FOLDERS }
+    return { success: true, data: commonVarFolders }
   }
   if (pathname === '/api/folders' && query.get('kind') === 'media') {
-    return { success: true, data: MEDIA_FOLDERS }
+    return { success: true, data: mediaFolders }
   }
   if (pathname === '/api/folders' && query.get('kind') === 'webinar') {
     const accountId = query.get('account_id')
@@ -2473,8 +2488,16 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       },
     }
   }
+  /*
+   * 対象者の画面が読む口（条件・人数・顔ぶれ・数え直し）の見本。
+   * 下書きは要求のIDをそのまま返す。固定IDだと別IDの撮影が
+   * 照合に落ち、F-1（条件を足す・変える・消す・人数がすぐ変わる・
+   * 顔ぶれを見る）を確かめられない。人数・顔ぶれ・数え直しは
+   * `REMINDER_VALIDATE` / `REMINDER_AUDIENCE` が固定で返す。
+   */
   if (/^\/api\/reminders\/[^/]+\/draft$/.test(pathname)) {
-    return { success: true, data: REMINDER_DRAFT }
+    const draftId = decodeURIComponent(pathname.split('/')[3] ?? '')
+    return { success: true, data: { ...REMINDER_DRAFT, reminderId: draftId || REMINDER_DRAFT.reminderId } }
   }
   const reminderOne = /^\/api\/reminders\/([^/]+)$/.exec(pathname)
   if (reminderOne) {
@@ -3978,6 +4001,42 @@ const server = createServer((req, res) => {
       return
     }
     const webinarFolderPath = /^\/api\/folders\/([^/]+)$/.exec(url.pathname)
+    // R37 撮影用。登録メディア・共通情報のフォルダ名変更・削除。
+    // 本番口と同じ形（PATCH は更新後、DELETE は data: null）で返す。
+    // ウェビナー用の口より前で、ウェビナーの箱は後の口へ通す。
+    if ((method === 'PATCH' || method === 'DELETE') && webinarFolderPath) {
+      const mediaCommonId = decodeURIComponent(webinarFolderPath[1])
+      const isWebinarFolder = webinarFolders.some((item) => item.id === mediaCommonId)
+      if (!isWebinarFolder) {
+        const target = mediaFolders.find((item) => item.id === mediaCommonId)
+          ?? commonVarFolders.find((item) => item.id === mediaCommonId)
+        if (!target) {
+          res.writeHead(404).end(JSON.stringify({ success: false, error: 'Not found' }))
+          return
+        }
+        if (method === 'DELETE') {
+          mediaFolders = mediaFolders.filter((item) => item.id !== mediaCommonId)
+          commonVarFolders = commonVarFolders.filter((item) => item.id !== mediaCommonId)
+          res.writeHead(200).end(JSON.stringify({ success: true, data: null }))
+          return
+        }
+        let mediaCommonRaw = ''
+        req.on('data', (chunk) => { mediaCommonRaw += chunk })
+        req.on('end', () => {
+          let body = {}
+          try { body = JSON.parse(mediaCommonRaw || '{}') } catch { body = {} }
+          const name = String(body.name ?? '').trim()
+          if (!name) {
+            res.writeHead(400).end(JSON.stringify({ success: false, error: 'フォルダ名を入力してください' }))
+            return
+          }
+          target.name = name
+          target.updatedAt = '2026-09-27T10:00:00.000Z'
+          res.writeHead(200).end(JSON.stringify({ success: true, data: { ...target } }))
+        })
+        return
+      }
+    }
     if (method === 'PATCH' && webinarFolderPath) {
       let raw = ''
       req.on('data', (chunk) => { raw += chunk })

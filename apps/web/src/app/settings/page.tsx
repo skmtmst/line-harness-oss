@@ -265,12 +265,13 @@ function FeatureRow({ item, features, ordering, usage, featureUsage, usageRetry,
 }) {
   const enabled = itemIsEnabled(item, features)
   return (
-    <li className="flex min-h-14 items-center justify-between gap-3 px-3 py-2">
+    <li className="flex min-h-14 flex-wrap items-center justify-between gap-x-3 gap-y-2 px-3 py-2">
       <div className="flex min-w-0 items-start gap-2.5">
         {ordering && <span className="mt-0.5"><GripIcon /></span>}
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <p className="whitespace-nowrap text-sm font-bold text-ink">{item.label}</p>
+            {/* 監査 R66: 並び替え中は上下ボタンが増えて行幅が伸びる。狭い幅ではラベルを省略し、操作を下へ回す。 */}
+            <p className="truncate text-sm font-bold text-ink" title={item.label}>{item.label}</p>
             {sharedSwitch && (
               <span className="rounded-pill border-hairline whitespace-nowrap border px-1.5 py-0.5 text-micro font-bold text-ink-faint">
                 同じスイッチ
@@ -1026,7 +1027,7 @@ export default function SettingsPage() {
               */}
               <div
                 data-design="機能の一覧"
-                className={ordering ? 'space-y-4' : 'grid min-w-0 grid-cols-1 items-start gap-4 xl:grid-cols-3'}
+                className={ordering ? 'min-w-0 space-y-4' : 'grid min-w-0 grid-cols-1 items-start gap-4 xl:grid-cols-3'}
               >
                 {(ordering ? [groups] : groupColumns).map((column, columnIndex) => (
                   <div key={columnIndex} className="min-w-0 space-y-3">

@@ -9,7 +9,7 @@
  */
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', accounts: [], loading: false }),
@@ -76,23 +76,30 @@ beforeEach(() => {
 
 afterEach(() => cleanup())
 
+/*
+ * 行の操作は表側で見る。767px以下のカード（`MobileTableCards`）にも同じ
+ * `role="link"` の行が出るので、画面全体では1件に定まらない。
+ */
+const tableRow = (name: string) =>
+  within(screen.getByRole('table')).getByRole('link', { name })
+
 async function renderAndWait() {
   render(<TemplatesPage />)
   await act(async () => { await Promise.resolve() })
   await act(async () => { await Promise.resolve() })
-  await screen.findByText('来店お礼')
+  await within(await screen.findByRole('table')).findByText('来店お礼')
 }
 
 describe('テンプレート一覧行のキーボード操作 (N-140)', () => {
   test('行はTabでフォーカスできる', async () => {
     await renderAndWait()
-    const row = screen.getByRole('link', { name: '来店お礼の詳細を開く' })
+    const row = tableRow('来店お礼の詳細を開く')
     expect(row.getAttribute('tabindex')).toBe('0')
   })
 
   test('行にフォーカスしてEnterで詳細を開く', async () => {
     await renderAndWait()
-    const row = screen.getByRole('link', { name: '来店お礼の詳細を開く' })
+    const row = tableRow('来店お礼の詳細を開く')
     fireEvent.keyDown(row, { key: 'Enter' })
     await act(async () => { await Promise.resolve() })
     expect(templateGet).toHaveBeenCalledWith('tpl-1')
@@ -100,7 +107,7 @@ describe('テンプレート一覧行のキーボード操作 (N-140)', () => {
 
   test('行にフォーカスしてSpaceでも詳細を開く', async () => {
     await renderAndWait()
-    const row = screen.getByRole('link', { name: '予約確認の詳細を開く' })
+    const row = tableRow('予約確認の詳細を開く')
     fireEvent.keyDown(row, { key: ' ' })
     await act(async () => { await Promise.resolve() })
     expect(templateGet).toHaveBeenCalledWith('tpl-2')
@@ -108,7 +115,7 @@ describe('テンプレート一覧行のキーボード操作 (N-140)', () => {
 
   test('行内のリンク・ボタン上のEnterでは詳細を誤作動させない', async () => {
     await renderAndWait()
-    const row = screen.getByRole('link', { name: '来店お礼の詳細を開く' })
+    const row = tableRow('来店お礼の詳細を開く')
     const innerLink = row.querySelector('a') as HTMLElement
     expect(innerLink).toBeTruthy()
     // 行内の操作にフォーカスがあるとき、キーは行へ伝搬するが行は開かない。

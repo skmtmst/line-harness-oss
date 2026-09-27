@@ -11,7 +11,7 @@ import CreatePage, {
   FormSection,
   inputClass,
 } from '@/components/shared/create-page'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import SearchField from '@/components/shared/search-field'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
@@ -663,14 +663,7 @@ export default function NewBookingMenuPage() {
                 maxLength={100}
                 aria-label="タグを検索"
               />
-              <SelectField
-                id="bm-auto-tag"
-                aria-label="予約後に付けるタグ"
-                value={autoTagId ?? ''}
-                onChange={(e) => setAutoTagId(e.target.value === '' ? null : e.target.value)}
-                options={[{ value: '', label: '— なし —' }, ...tagOptions.map((t) => ({ value: t.id, label: t.name }))]}
-                className="w-full"
-              />
+              <Select size="full" id="bm-auto-tag" aria-label="予約後に付けるタグ" value={autoTagId ?? ''} onChange={(value) => setAutoTagId(value === '' ? null : value)} options={[{ value: '', label: '— なし —' }, ...tagOptions.map((t) => ({ value: t.id, label: t.name }))]} />
               {trimmedQuery !== '' && visibleTagCandidates.length === 0 && (
                 <p className="text-ink-faint text-xs">
                   「{trimmedQuery}」に合うタグがありません。

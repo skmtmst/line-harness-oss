@@ -27,6 +27,30 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(''),
   useRouter: () => ({ push: () => {}, replace: () => {} }),
 }))
+/*
+ * 共通の Select は listbox の部品で、その操作は部品自身の試験が持つ。
+ * ここで見たいのは選んだ日時の中身なので、素の <select> に置き換える。
+ */
+vi.mock('@/components/shared/select', () => ({
+  default: ({ 'aria-label': label, value, onChange, options }: {
+    'aria-label'?: string
+    value: string
+    onChange: (value: string) => void
+    options: Array<{ value: string; label: string }>
+  }) => (
+    <select
+      aria-label={label}
+      value={value}
+      onChange={(e: { target: { value: string } }) => onChange(e.target.value)}
+    >
+      {options.map((option) => (
+        <option key={option.value} value={option.value}>
+          {option.label}
+        </option>
+      ))}
+    </select>
+  ),
+}))
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()

@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import Stepper from '@/components/shared/stepper'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -127,10 +127,11 @@ export default function NewWebinarPage() {
               </div>
               <div>
                 <label htmlFor="webinar-folder" className="text-ink-secondary mb-1 block text-sm font-medium">フォルダ</label>
-                <SelectField
+                <Select
                   id="webinar-folder"
+                  aria-label="フォルダ"
                   value={folderId}
-                  onChange={(event) => setFolderId(event.target.value)}
+                  onChange={(value) => setFolderId(value)}
                   options={[
                     { value: '', label: '未分類' },
                     ...folders.map((folder) => ({ value: folder.id, label: `${folder.name}（${folder.count}件）` })),

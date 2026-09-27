@@ -59,7 +59,7 @@ describe('V6 予約設定', () => {
     expect(LIST).not.toContain('準備中')
     expect(LIST).toContain('bookingApi.getSettings(accountId)')
     expect(LIST).toContain('<Pagination page={page} pageCount={pageCount}')
-    expect(LIST).toContain('止める・出す')
+    expect(LIST).toContain("label: m.is_active ? '止める' : '再開'")
     expect(LIST).toContain('bookingApi.patchMenu(selectedAccountId, menu.id, version')
     expect(LIST).toContain('error={visibilityError ?? undefined}')
     expect(LIST).not.toContain('メニュー名で検索')

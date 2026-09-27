@@ -10,7 +10,8 @@
  */
 
 import type { FormAction } from '@line-crm/shared'
-import { cellInput, fieldSelect, miniButton, type FormRefs } from './form-refs'
+import Select from '@/components/shared/select'
+import { cellInput, miniButton, type FormRefs } from './form-refs'
 
 const ACTION_LABELS: { kind: FormAction['kind']; label: string }[] = [
   { kind: 'send_text', label: 'テキストを送る' },
@@ -63,18 +64,12 @@ export default function ActionEditor({
           key={index}
           className="border-hairline rounded-control bg-canvas-sunken flex flex-wrap items-center gap-2 border p-2"
         >
-          <select
+          <Select
             value={action.kind}
-            onChange={(e) => patch(index, emptyAction(e.target.value as FormAction['kind']))}
-            className={fieldSelect}
+            onChange={(value) => patch(index, emptyAction(value as FormAction['kind']))}
             aria-label="動作の種類"
-          >
-            {ACTION_LABELS.map((a) => (
-              <option key={a.kind} value={a.kind}>
-                {a.label}
-              </option>
-            ))}
-          </select>
+            options={ACTION_LABELS.map((a) => ({ value: a.kind, label: a.label }))}
+          />
 
           {action.kind === 'send_text' && (
             <input
@@ -87,66 +82,61 @@ export default function ActionEditor({
           )}
 
           {action.kind === 'send_template' && (
-            <select
+            <Select
               value={action.templateId}
-              onChange={(e) => patch(index, { ...action, templateId: e.target.value })}
-              className={fieldSelect}
-            >
-              <option value="">— 選んでください —</option>
-              {refs.templates
-                .filter((t) => t.type === 'text')
-                .map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-            </select>
+              onChange={(value) => patch(index, { ...action, templateId: value })}
+              aria-label="送るテンプレート"
+              options={[
+                { value: '', label: '— 選んでください —' },
+                ...refs.templates
+                  .filter((t) => t.type === 'text')
+                  .map((t) => ({ value: t.id, label: t.name })),
+              ]}
+            />
           )}
 
           {action.kind === 'tag' && (
             <>
-              <select
+              <Select
                 value={action.op}
-                onChange={(e) =>
-                  patch(index, { ...action, op: e.target.value as 'add' | 'remove' })
+                onChange={(value) =>
+                  patch(index, { ...action, op: value as 'add' | 'remove' })
                 }
-                className={fieldSelect}
-              >
-                <option value="add">付ける</option>
-                <option value="remove">外す</option>
-              </select>
-              <select
+                aria-label="タグの付け外し"
+                options={[
+                  { value: 'add', label: '付ける' },
+                  { value: 'remove', label: '外す' },
+                ]}
+              />
+              <Select
                 value={action.tagIds[0] ?? ''}
-                onChange={(e) =>
-                  patch(index, { ...action, tagIds: e.target.value ? [e.target.value] : [] })
+                onChange={(value) =>
+                  patch(index, { ...action, tagIds: value ? [value] : [] })
                 }
-                className={fieldSelect}
-              >
-                <option value="">— タグ —</option>
-                {refs.tags.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
+                aria-label="タグ"
+                options={[
+                  { value: '', label: '— タグ —' },
+                  ...refs.tags.map((t) => ({ value: t.id, label: t.name })),
+                ]}
+              />
             </>
           )}
 
           {action.kind === 'friend_field' && (
             <>
-              <select
+              <Select
                 value={action.fieldId}
-                onChange={(e) => patch(index, { ...action, fieldId: e.target.value })}
-                className={fieldSelect}
-              >
-                <option value="">— 情報欄 —</option>
-                {refs.friendFields.map((f) => (
-                  <option key={f.id} value={f.id} disabled={f.ecIsMaster}>
-                    {f.name}
-                    {f.ecIsMaster ? '（EC側が正）' : ''}
-                  </option>
-                ))}
-              </select>
+                onChange={(value) => patch(index, { ...action, fieldId: value })}
+                aria-label="書き込む友だち情報欄"
+                options={[
+                  { value: '', label: '— 情報欄 —' },
+                  ...refs.friendFields.map((f) => ({
+                    value: f.id,
+                    label: `${f.name}${f.ecIsMaster ? '（EC側が正）' : ''}`,
+                    disabled: f.ecIsMaster,
+                  })),
+                ]}
+              />
               <input
                 type="text"
                 value={action.value}
@@ -159,44 +149,39 @@ export default function ActionEditor({
 
           {action.kind === 'scenario' && (
             <>
-              <select
+              <Select
                 value={action.op}
-                onChange={(e) =>
-                  patch(index, { ...action, op: e.target.value as 'start' | 'stop' })
+                onChange={(value) =>
+                  patch(index, { ...action, op: value as 'start' | 'stop' })
                 }
-                className={fieldSelect}
-              >
-                <option value="start">開始する</option>
-                <option value="stop">停止する</option>
-              </select>
-              <select
+                aria-label="シナリオの操作"
+                options={[
+                  { value: 'start', label: '開始する' },
+                  { value: 'stop', label: '停止する' },
+                ]}
+              />
+              <Select
                 value={action.scenarioId}
-                onChange={(e) => patch(index, { ...action, scenarioId: e.target.value })}
-                className={fieldSelect}
-              >
-                <option value="">— シナリオ —</option>
-                {refs.scenarios.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
+                onChange={(value) => patch(index, { ...action, scenarioId: value })}
+                aria-label="シナリオ"
+                options={[
+                  { value: '', label: '— シナリオ —' },
+                  ...refs.scenarios.map((s) => ({ value: s.id, label: s.name })),
+                ]}
+              />
             </>
           )}
 
           {action.kind === 'reminder' && (
-            <select
+            <Select
               value={action.reminderId}
-              onChange={(e) => patch(index, { ...action, reminderId: e.target.value })}
-              className={fieldSelect}
-            >
-              <option value="">— リマインダ —</option>
-              {refs.reminders.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.name}
-                </option>
-              ))}
-            </select>
+              onChange={(value) => patch(index, { ...action, reminderId: value })}
+              aria-label="リマインダ"
+              options={[
+                { value: '', label: '— リマインダ —' },
+                ...refs.reminders.map((r) => ({ value: r.id, label: r.name })),
+              ]}
+            />
           )}
 
           <button

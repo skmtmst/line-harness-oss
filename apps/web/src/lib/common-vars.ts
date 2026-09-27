@@ -87,6 +87,15 @@ export function commonVarValueError(type: string, value: string, label = '値'):
       ? null
       : `${label}は https:// からはじまるURLで入力してください`
   }
+  // URL型はリンク先として差し込まれる。URLでない文章は配信・予約導線で
+  // 壊れるため、画面でも止める（R36。サーバも同じ判定）。画像と違い
+  // http も受ける。
+  if (type === 'url') {
+    if (value === '') return null
+    return value.length <= 200 && /^https?:\/\/\S+$/.test(value)
+      ? null
+      : `${label}は http:// または https:// からはじまるURLで入力してください`
+  }
   return value.length <= 200 ? null : `${label}は200文字までで入力してください`
 }
 
