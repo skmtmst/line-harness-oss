@@ -3,7 +3,7 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import MergedTabs, { useMergedTab } from './merged-tabs'
-import { ANALYTICS_TABS as SEARCH_CONSOLE_TABS } from '@/app/search-console/page'
+import { ANALYTICS_TABS as SEARCH_CONSOLE_TABS } from '@/app/search-console/analytics-tabs'
 
 /**
  * R75: Search Console の「URLクリック」タブが別の分析（友だちの増減）を
