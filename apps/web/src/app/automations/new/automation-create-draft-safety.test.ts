@@ -4,6 +4,7 @@ import { createServer } from 'node:net'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { chromium, type Browser, type BrowserContext, type Page, type Route } from '@playwright/test'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { selectOptionIn } from '../../../test-utils/select-helpers'
 
 /**
  * ルールを作る（★V6 `Rv8Jv`）の実挙動試験（#679）。
@@ -525,24 +526,17 @@ async function openSecondTab(context: BrowserContext, worker: WorkerHarness, sto
 // ========== 画面操作 ==========
 
 /*
- * 共通 Select（m15cで素<select>から置き換え）は button＋listbox の自前実装。
- * Playwright の selectOption は素<select>専用なので、ラベルの釦を押して
- * 出た一覧から目的の釦を押す。
+ * 共通 Select（button＋listbox の自前実装）を選ぶ操作は、共有の
+ * `selectOptionIn`（`src/test-utils/select-helpers.ts`）へ寄せる。
+ * Playwright の `selectOption` は素の `<select>` 専用なので使わない。
+ * なお上部の LINEアカウント切り替えは素の `<select>` のままなので、
+ * あちらは `selectOption` のまま使う。
  */
-async function selectCustomOption(page: Page, label: string, optionLabel: string) {
-  const trigger = page.getByLabel(label)
-  await waitUntil(() => trigger.isEnabled(), `${label}が使える状態になりませんでした`)
-  await trigger.click()
-  const listbox = page.getByRole('listbox')
-  await listbox.waitFor()
-  await listbox.getByRole('button', { name: optionLabel }).click()
-}
-
 async function fillTagRule(page: Page, name: string) {
   await page.locator('#au-name').fill(name)
   const current = await page.getByLabel('自動化で付けるタグ').innerText().catch(() => '')
   if (!current.includes('VIP')) {
-    await selectCustomOption(page, '自動化で付けるタグ', 'VIP')
+    await selectOptionIn(page, '自動化で付けるタグ', 'VIP')
   }
 }
 
@@ -550,7 +544,7 @@ async function fillMessageRule(page: Page, name: string, message: string) {
   await page.locator('#au-name').fill(name)
   const current = await page.getByLabel('すること').innerText().catch(() => '')
   if (!current.includes('メッセージを送る')) {
-    await selectCustomOption(page, 'すること', 'メッセージを送る')
+    await selectOptionIn(page, 'すること', 'メッセージを送る')
   }
   await page.locator('textarea').fill(message)
 }
