@@ -1138,6 +1138,48 @@ const spec = {
         responses: { '200': { description: 'Orders attributed to the ref code with status summary' }, '403': { description: 'LINEアカウントの表示権限なし' } },
       },
     },
+    // ── 広告費 (#818) ────────────────────────────────────────────────────
+    '/api/ad-costs': {
+      get: {
+        tags: ['Ads'], summary: '流入元ごとの広告費と取込状況（期間指定は日付。手入力分は source=manual）',
+        parameters: [
+          { name: 'accountId', in: 'query', schema: { type: 'string' } },
+          { name: 'from', in: 'query', schema: { type: 'string', example: '2026-09-01' } },
+          { name: 'to', in: 'query', schema: { type: 'string', example: '2026-09-30' } },
+        ],
+        responses: { '200': { description: 'Cost rows with per-platform import status' }, '400': { description: 'accountId・期間の指定が無い' } },
+      },
+      post: {
+        tags: ['Ads'], summary: '広告費の手入力（同じ流入元・同じ日は上書き）',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['sourceLabel', 'day', 'amountMinor'],
+                properties: {
+                  lineAccountId: { type: 'string' },
+                  sourceLabel: { type: 'string', maxLength: 100 },
+                  entryRouteId: { type: 'string' },
+                  day: { type: 'string', example: '2026-09-25' },
+                  amountMinor: { type: 'integer', minimum: 0, description: '最小通貨単位（JPYなら円）' },
+                  currency: { type: 'string', default: 'JPY' },
+                },
+              },
+            },
+          },
+        },
+        responses: { '201': { description: 'Recorded' }, '400': { description: 'Validation error' }, '404': { description: 'LINEアカウント・流入元が見つからない' } },
+      },
+    },
+    '/api/ad-platforms/{id}/cost-import': {
+      post: {
+        tags: ['Ads'], summary: 'その連携の前日分の広告費をいま取り込む（媒体側の未確定分は取り直せる）',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Imported (or skipped when already fetched)' }, '404': { description: 'Not found' }, '502': { description: '媒体から取り込めなかった' } },
+      },
+    },
     // ── Friends ─────────────────────────────────────────────────────────────
     '/api/friends': {
       get: {
@@ -2778,6 +2820,31 @@ const spec = {
         summary: 'もう一度知らせる',
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
         responses: { '200': { description: '知らせ直した' }, '409': { description: '依頼中でない' } },
+      },
+    },
+    '/api/broadcasts/{id}/recipients': {
+      get: {
+        tags: ['Broadcasts'],
+        summary: '宛先ごとの結果の台帳',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'result', in: 'query', schema: { type: 'string', enum: ['all', 'delivered', 'temporary', 'permanent', 'unknown', 'inflight'], default: 'all' } },
+          { name: 'cursor', in: 'query', schema: { type: 'integer', minimum: 0, default: 0 } },
+          { name: 'limit', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 100, default: 50 } },
+        ],
+        responses: { '200': { description: 'rows, summary, pagination（全員配信・旧配信は集約だけ）' }, '400': { description: 'result が正しくない' }, '404': { description: 'Broadcast not found' } },
+      },
+    },
+    '/api/broadcasts/{id}/activity': {
+      get: {
+        tags: ['Broadcasts'],
+        summary: '配信への操作の記録（新しい順）',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'cursor', in: 'query', schema: { type: 'integer', minimum: 0, default: 0 } },
+          { name: 'limit', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 100, default: 50 } },
+        ],
+        responses: { '200': { description: 'entries, pagination（追記だけ。消せない）' }, '404': { description: 'Broadcast not found' } },
       },
     },
     // ── NEN delivery ────────────────────────────────────────────────────────
@@ -4763,6 +4830,21 @@ const spec = {
         },
       },
     },
+    '/api/line-notifications/send-counts': {
+      get: {
+        tags: ['Customer notifications'],
+        summary: '顧客通知の送信件数（今日・この30日）',
+        description: '共通送信台帳の受け付け済みをJSTの今日・今日を含む30日で数える。ECの取り込み件数でもLINE集計の全期間合計でもない。試し送りは除く。',
+        parameters: [
+          { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '送信件数（合計・出来事の種類別・期間）' },
+          '400': { description: 'lineAccountId が無い' },
+          '403': { description: 'このLINEアカウントを表示する権限がない' },
+        },
+      },
+    },
     '/api/line-notifications/deliveries/{id}/resend': {
       post: {
         tags: ['Customer notifications'],
@@ -4836,6 +4918,22 @@ const spec = {
         description: 'LINE プラットフォームからのWebhookイベントを受信。署名検証あり、常に200を返す。',
         security: [],
         responses: { '200': { description: 'OK' } },
+      },
+    },
+    // ── LIFF Booking settings（日時を選ぶ段の最初の形） ─────────────────────
+    '/api/liff/booking/settings': {
+      get: {
+        tags: ['Booking'],
+        summary: 'LIFF予約の日時表示の最初の形と受付期間を取得',
+        description: 'liffId で決まる店舗の設定だけを返す。設定行が無い・列が無い行は既定値（list・60日）。空き枠そのものは /api/liff/booking/availability を期間指定で呼ぶ。',
+        security: [],
+        parameters: [
+          { name: 'liffId', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: 'liff_date_view（list/calendar）とbooking_window_days' },
+          '404': { description: 'Unknown LIFF ID' },
+        },
       },
     },
     // ── Booking settings (N-406 #754) ────────────────────────────────────────

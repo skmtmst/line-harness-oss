@@ -86,6 +86,9 @@ function baseHandler(routes: unknown[], platforms: unknown[] = []) {
       return { success: true, data: { items: [], total: 0, page: 1, limit: 20, sort: [] } }
     }
     if (path.startsWith('/api/ad-platforms')) return { success: true, data: platforms }
+    if (path.startsWith('/api/ad-costs')) {
+      return { success: true, data: { rows: [], platforms: [] } }
+    }
     return { success: true, data: [] }
   }
 }

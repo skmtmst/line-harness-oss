@@ -16,6 +16,7 @@ import {
   isBroadcastStopped,
   isOperationCapabilityStopped,
   listLineAccountsWithTenantStatus,
+  recordBroadcastLifecycleEvent,
   recordSkippedDelivery,
 } from '@line-crm/db';
 import type { Broadcast } from '@line-crm/db';
@@ -442,7 +443,7 @@ export async function processBroadcastSend(
             ...sendableIds,
             JSON.stringify(batchMessages),
           );
-          await lineClient.multicast(lineUserIds, batchMessages, aggregationUnits(unit), retryKey);
+          const { requestId } = await lineClient.multicast(lineUserIds, batchMessages, aggregationUnits(unit), retryKey);
           successCount += sendable.length;
 
           // Log only successfully sent messages (batch insert for performance)
@@ -461,6 +462,7 @@ export async function processBroadcastSend(
               broadcastId,
               friendIds: sendableIds,
               state: 'sent',
+              lineRequestId: requestId,
             }),
           ]);
           for (const id of sendableIds) blocked.add(id);
@@ -687,6 +689,17 @@ export async function processScheduledBroadcasts(
         .bind(broadcast.id)
         .run();
       if (!lockResult.meta.changes || lockResult.meta.changes === 0) continue;
+      // 予約の自動送信も記録に残す（#816）。誰の操作でもないので担当者は空＝「自動」。
+      try {
+        await recordBroadcastLifecycleEvent(db, {
+          broadcastId: broadcast.id,
+          actorStaffId: null,
+          action: 'send_started',
+          detail: { fromStatus: 'scheduled', trigger: 'schedule' },
+        });
+      } catch (lifecycleError) {
+        console.error(`[broadcast-lifecycle] send_started record failed:`, lifecycleError);
+      }
 
       // Resolve correct lineClient for this broadcast's account
       let deliveryClient = lineClient;
@@ -1143,7 +1156,7 @@ async function processQueuedBroadcastBatches(
             lineAccountId: accountId,
             friendIds: [friend.id],
           });
-          await lineClient.pushMessage(friend.line_user_id, personalizedMessages, retryKey, aggregationUnits(unit));
+          const { requestId: pushRequestId } = await lineClient.pushMessageWithRequestId(friend.line_user_id, personalizedMessages, retryKey, aggregationUnits(unit));
 
           await db.batch([
             ...renderedParts.map((part) => db.prepare(
@@ -1163,6 +1176,7 @@ async function processQueuedBroadcastBatches(
               broadcastId: broadcast.id,
               friendIds: [friend.id],
               state: 'sent',
+              lineRequestId: pushRequestId,
             }),
           ]);
           blocked.add(friend.id);
@@ -1252,6 +1266,7 @@ async function processQueuedBroadcastBatches(
       lineAccountId: accountId,
       friendIds: sendableIds,
     });
+    let queuedRequestId: string | null = null;
     try {
       const retryKey = await createBroadcastRetryKey(
         broadcast.id,
@@ -1260,7 +1275,7 @@ async function processQueuedBroadcastBatches(
         ...sendableIds,
         JSON.stringify(batchMessages),
       );
-      await lineClient.multicast(lineUserIds, batchMessages, aggregationUnits(unit), retryKey);
+      ({ requestId: queuedRequestId } = await lineClient.multicast(lineUserIds, batchMessages, aggregationUnits(unit), retryKey));
     } catch (err) {
       console.error(`Queued broadcast batch ${batchIndex} send failed:`, err);
       const outcome = classifyDeliveryFailure(err);
@@ -1283,6 +1298,7 @@ async function processQueuedBroadcastBatches(
       broadcastId: broadcast.id,
       friendIds: sendableIds,
       state: 'sent',
+      lineRequestId: queuedRequestId,
     });
     try {
       const stmts = [

@@ -9,6 +9,8 @@ const dbMocks = vi.hoisted(() => ({
   encryptCredential: vi.fn(),
   getLineAccountById: vi.fn(),
   jstNow: vi.fn(() => '2026-09-08T00:00:00+09:00'),
+  jstDateString: vi.fn(() => '2026-09-08'),
+  nextDateString: vi.fn(() => '2026-09-09'),
 }));
 const accessMocks = vi.hoisted(() => ({
   canAccessAllLineAccounts: vi.fn(),
