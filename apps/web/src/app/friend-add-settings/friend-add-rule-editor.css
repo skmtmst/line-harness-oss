@@ -29,3 +29,5 @@
 [data-design-node="txMO9"] [data-design-part="dialog"] { width: min(600px, calc(100% - 32px)); }
 @media (max-width: 1100px) { .friend-add-editor-layout { grid-template-columns: 1fr; }.friend-add-editor-summary { grid-template-columns: repeat(4, 1fr); }.friend-add-editor-summary h2 { grid-column: 1 / -1; }.friend-add-editor-previewGrid { grid-template-columns: 1fr; } }
 @media (max-width: 760px) { .friend-add-editor-steps { grid-template-columns: 1fr; }.friend-add-editor-steps button { min-height: 52px; }.friend-add-editor-twoCols, .friend-add-editor-routeList { grid-template-columns: 1fr; }.friend-add-editor-panel { padding: 18px; }.friend-add-editor-summary { grid-template-columns: 1fr 1fr; }.friend-add-editor-messageTabs { overflow-x: auto; }.friend-add-editor-previewGrid { grid-template-columns: 1fr; }.friend-add-editor-dialog { padding: 18px; } }
+/* R30: 段移動で止めたときの直し方は欄の下に出す。本文に補足を書いて箱を高くしない。 */
+.friend-add-editor-fieldError { color: var(--color-danger); font-size: 11px; line-height: 1.7; }

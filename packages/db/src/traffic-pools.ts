@@ -29,7 +29,7 @@ export interface TrafficPoolWithAccount extends TrafficPool {
 export async function getTrafficPools(db: D1Database): Promise<TrafficPoolWithAccount[]> {
   const result = await db
     .prepare(
-      `SELECT tp.*, la.name as account_name, la.liff_id, la.login_channel_id, la.login_channel_secret, la.channel_access_token, la.channel_access_token_encrypted, la.channel_id
+      `SELECT tp.*, la.name as account_name, la.liff_id, la.login_channel_id, la.login_channel_secret, la.login_channel_secret_encrypted, la.channel_access_token, la.channel_access_token_encrypted, la.channel_id
        FROM traffic_pools tp
        JOIN line_accounts la ON la.id = tp.active_account_id
        ORDER BY tp.created_at DESC`,
@@ -44,7 +44,7 @@ export async function getTrafficPoolById(
 ): Promise<TrafficPoolWithAccount | null> {
   const row = await db
     .prepare(
-      `SELECT tp.*, la.name as account_name, la.liff_id, la.login_channel_id, la.login_channel_secret, la.channel_access_token, la.channel_access_token_encrypted, la.channel_id
+      `SELECT tp.*, la.name as account_name, la.liff_id, la.login_channel_id, la.login_channel_secret, la.login_channel_secret_encrypted, la.channel_access_token, la.channel_access_token_encrypted, la.channel_id
        FROM traffic_pools tp
        JOIN line_accounts la ON la.id = tp.active_account_id
        WHERE tp.id = ?`,
@@ -60,7 +60,7 @@ export async function getTrafficPoolBySlug(
 ): Promise<TrafficPoolWithAccount | null> {
   const row = await db
     .prepare(
-      `SELECT tp.*, la.name as account_name, la.liff_id, la.login_channel_id, la.login_channel_secret, la.channel_access_token, la.channel_access_token_encrypted, la.channel_id
+      `SELECT tp.*, la.name as account_name, la.liff_id, la.login_channel_id, la.login_channel_secret, la.login_channel_secret_encrypted, la.channel_access_token, la.channel_access_token_encrypted, la.channel_id
        FROM traffic_pools tp
        JOIN line_accounts la ON la.id = tp.active_account_id
        WHERE tp.slug = ? AND tp.is_active = 1`,
@@ -176,7 +176,7 @@ export interface PoolAccountWithDetails extends PoolAccount {
 }
 
 const POOL_ACCOUNT_JOIN = `
-  SELECT pa.*, la.name as account_name, la.liff_id, la.login_channel_id, la.login_channel_secret, la.channel_access_token, la.channel_access_token_encrypted, la.channel_id
+  SELECT pa.*, la.name as account_name, la.liff_id, la.login_channel_id, la.login_channel_secret, la.login_channel_secret_encrypted, la.channel_access_token, la.channel_access_token_encrypted, la.channel_id
   FROM pool_accounts pa
   JOIN line_accounts la ON la.id = pa.line_account_id`;
 
@@ -200,22 +200,35 @@ async function hydratePoolCredential<
   T extends {
     channel_access_token: string | null;
     channel_access_token_encrypted?: string | null;
+    login_channel_secret?: string | null;
+    login_channel_secret_encrypted?: string | null;
   } & ({ active_account_id: string } | { line_account_id: string }),
 >(
   row: T,
 ): Promise<T> {
-  if (!row.channel_access_token && !row.channel_access_token_encrypted) return row;
+  const hasAccessToken = Boolean(row.channel_access_token || row.channel_access_token_encrypted);
+  const hasLoginSecret = 'login_channel_secret_encrypted' in row
+    && Boolean(row.login_channel_secret_encrypted || row.login_channel_secret);
+  if (!hasAccessToken && !hasLoginSecret) return row;
   const lineAccountId = 'line_account_id' in row
     ? row.line_account_id
     : row.active_account_id;
-  return {
-    ...row,
-    channel_access_token: await resolveLineCredential(
+  const next: Record<string, unknown> = { ...row };
+  if (hasAccessToken) {
+    next.channel_access_token = await resolveLineCredential(
       row.channel_access_token_encrypted,
       row.channel_access_token,
       { lineAccountId, field: 'channel_access_token' },
-    ),
-  };
+    );
+  }
+  if (hasLoginSecret) {
+    next.login_channel_secret = await resolveLineCredential(
+      row.login_channel_secret_encrypted,
+      row.login_channel_secret,
+      { lineAccountId, field: 'login_channel_secret' },
+    );
+  }
+  return next as T;
 }
 
 export async function addPoolAccount(db: D1Database, poolId: string, lineAccountId: string): Promise<PoolAccount> {

@@ -8,6 +8,7 @@ import {
   SCHEDULED_CHAT_SEND_MAX_ATTEMPTS,
   type ScheduledChatSendRow,
   activeTenantLineAccountSql,
+  recordSkippedDelivery,
 } from '@line-crm/db';
 import { stoppedTenantLineAccountSql } from './tenant-runtime-status.js';
 import { resolveLineToken } from './line-token.js';
@@ -28,7 +29,12 @@ const RETRY_BACKOFF_MS = 5 * 60_000;
 async function resolveSendTarget(
   env: ScheduleDispatchEnv,
   row: ScheduledChatSendRow,
-): Promise<{ friend: NonNullable<Awaited<ReturnType<typeof getFriendById>>>; accessToken: string; liffId: string | null } | null> {
+): Promise<{
+  friend: NonNullable<Awaited<ReturnType<typeof getFriendById>>>;
+  account: Awaited<ReturnType<typeof getLineAccountById>>;
+  accessToken: string;
+  liffId: string | null;
+} | null> {
   const friend = await getFriendById(env.DB, row.friend_id);
   if (!friend) return null;
   const account = friend.line_account_id
@@ -40,7 +46,7 @@ async function resolveSendTarget(
     accountId: friend.line_account_id,
     context: 'scheduled-chat-send',
   });
-  return { friend, accessToken, liffId: account?.liff_id ?? null };
+  return { friend, account, accessToken, liffId: account?.liff_id ?? null };
 }
 
 /**
@@ -62,6 +68,33 @@ async function dispatchOne(
       retryable: false,
       now: nowIso,
     });
+    return;
+  }
+
+  /*
+   * アカウント停止中（X-1、v6-33 §10-1）。既定アカウントのトークンへ
+   * 逃がすと別名義で届いてしまうので、送らずに失敗行として残す。
+   * 再開しても自動では送り直さない（retryable=false）。
+   */
+  if (target.account && !target.account.is_active) {
+    await markScheduledChatSendFailed(env.DB, {
+      id: row.id,
+      leaseToken: row.lease_token!,
+      errorCode: 'account_inactive',
+      error: 'アカウントの送受信を止めている間に送信時刻を過ぎたため送信しませんでした',
+      retryable: false,
+      now: nowIso,
+    });
+    try {
+      await recordSkippedDelivery(env.DB, {
+        lineAccountId: target.account.id,
+        kind: 'chat_send',
+        refId: row.id,
+        title: null,
+      });
+    } catch (skipError) {
+      console.error('[scheduled-chat-sends] skipped ledger write failed:', skipError);
+    }
     return;
   }
 

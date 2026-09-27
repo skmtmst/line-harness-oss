@@ -1172,10 +1172,10 @@ function diagnoseRejectedStart(
 export async function getAvailability(
   db: D1Database,
   params: GetAvailabilityParams,
-): Promise<{ by_staff: AvailabilityByStaff[] }> {
+): Promise<{ by_staff: AvailabilityByStaff[]; closed_dates: string[] }> {
   const loaded = await loadAvailabilityData(db, params);
   if (loaded.kind === 'no_menu' || loaded.kind === 'no_staff') {
-    return { by_staff: [] };
+    return { by_staff: [], closed_dates: [] };
   }
   if (loaded.kind === 'invalid_resource') {
     return {
@@ -1184,12 +1184,17 @@ export async function getAvailability(
         display_name: staff.display_name,
         slots: [],
       })),
+      closed_dates: [],
     };
   }
   const d = loaded.data;
   // Staff/menu concurrency is distinct from the store-wide seat budget.
   const staffCapacity = Math.max(1, d.concurrentCapacity);
   const by_staff: AvailabilityByStaff[] = [];
+  // LIFF カレンダーの「休」の印用。担当ごとに閉まっている日を集め、
+  // 全担当で閉まっている日だけを返す（外部カレンダー故障で読めない
+  // 担当は除外し、休みと決めつけない）。枠の有無の判定は変えない。
+  const closedSets: Array<Set<string>> = [];
   for (const s of d.staffRows) {
     const slots: AvailabilityByStaff['slots'] = [];
     const syncState = d.calendarSync.find((state) => state.staff_id === s.id);
@@ -1197,10 +1202,14 @@ export async function getAvailability(
       by_staff.push({ staff_id: s.id, display_name: s.display_name, slots });
       continue;
     }
+    const closed = new Set<string>();
     for (const date of eachDate(params.from, params.to)) {
       if (d.windowLastDate && date > d.windowLastDate) continue;
       const day = computeDayWorking(d, s.id, date);
-      if (day.block !== null || day.working.length === 0) continue;
+      if (day.block !== null || day.working.length === 0) {
+        closed.add(date);
+        continue;
+      }
       const workingList = day.working;
       const { dayBookings, busyMs } = buildDayBusy(d, s.id, date);
       const daySlots = computeSlots({
@@ -1226,10 +1235,15 @@ export async function getAvailability(
         });
       }
     }
+    closedSets.push(closed);
     by_staff.push({ staff_id: s.id, display_name: s.display_name, slots });
   }
-  return { by_staff, calendar_sync: d.calendarSync } as {
+  const closed_dates = [...(closedSets[0] ?? [])]
+    .filter((date) => closedSets.every((set) => set.has(date)))
+    .sort();
+  return { by_staff, closed_dates, calendar_sync: d.calendarSync } as {
     by_staff: AvailabilityByStaff[];
+    closed_dates: string[];
     calendar_sync: CalendarSyncState[];
   };
 }

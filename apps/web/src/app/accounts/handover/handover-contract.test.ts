@@ -63,7 +63,7 @@ describe('V6 33-4 乗り換え・引き継ぎ', () => {
   it('事前確認をやり直す操作を実APIへつなぐ', () => {
     expect(PAGE).toContain('api.accountHandovers.preview(handover.id')
     expect(PAGE).toContain('事前確認をやり直す')
-    expect(PAGE).toContain('disabled={(handover.unresolvedReviews ?? 1) > 0}')
+    expect(PAGE).toContain('disabled={(handover.unresolvedReviews ?? 1) > 0')
   })
 
   it('プロバイダーが違うときの断りを持つ', () => {

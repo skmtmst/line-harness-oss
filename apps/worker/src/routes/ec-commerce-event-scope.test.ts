@@ -10,7 +10,13 @@ vi.mock('../services/account-access.js', () => ({
   getVisibleLineAccountScope: mocks.getScope,
 }));
 vi.mock('@line-crm/line-sdk', () => ({ LineClient: vi.fn() }));
-vi.mock('@line-crm/db', () => ({ getLineAccountById: vi.fn(), jstNow: vi.fn() }));
+vi.mock('@line-crm/db', () => ({
+  getLineAccountById: vi.fn(),
+  jstNow: vi.fn(),
+  // overview がJSTの暦日で「今日」を切るようになったため、日付の口も足す。
+  jstDateString: () => '2026-09-06',
+  nextDateString: () => '2026-09-07',
+}));
 
 const { ecCommerce } = await import('./ec-commerce.js');
 
@@ -59,7 +65,8 @@ describe('EC event admin account scope', () => {
     expect(statements).toHaveLength(3);
     for (const statement of statements) {
       expect(statement.query).toContain('line_account_id = ?');
-      expect(statement.bindings).toEqual(['account-a']);
+      // 集計はJSTの日付も渡すので、値の全部一致ではなく含みで見る。
+      expect(statement.bindings).toContain('account-a');
     }
   });
 
@@ -84,7 +91,8 @@ describe('EC event admin account scope', () => {
     expect((await app.request('/api/ec-commerce/overview')).status).toBe(200);
     for (const statement of statements) {
       expect(statement.query).toContain('line_account_id IN (?)');
-      expect(statement.bindings).toEqual(['account-a']);
+      // 集計はJSTの日付も渡すので、値の全部一致ではなく含みで見る。
+      expect(statement.bindings).toContain('account-a');
     }
   });
 });

@@ -35,8 +35,41 @@ export interface KeywordRuleDraft {
   caseSensitive: boolean
 }
 
-export function emptyKeywordRule(): KeywordRuleDraft {
-  return { keyword: '', matchType: 'exact', minLength: '', caseSensitive: true }
+export function emptyKeywordRule(matchType: 'exact' | 'contains' = 'exact'): KeywordRuleDraft {
+  return { keyword: '', matchType, minLength: '', caseSensitive: true }
+}
+
+/**
+ * 開いたときに「効いている当て方」として出す値（R29）。
+ *
+ * 保存された複数行があればそれを見る（判定側が読むのは行のほう）。
+ * 行がそろっていればその当て方、ばらばらなら先頭の行（行自体は残す）。
+ * 行が無ければこれまでの1行（keyword / matchType）を見る。
+ */
+export function initialMatchType(draft: {
+  keyword: string
+  matchType: 'exact' | 'contains'
+  keywords?: unknown[] | null
+}): 'exact' | 'contains' {
+  const rules = readKeywordRules(draft)
+  const fromStored =
+    Array.isArray(draft.keywords) && draft.keywords.length > 0 && rules.length > 0
+  if (fromStored) return rules[0].matchType
+  return draft.matchType
+}
+
+/**
+ * 選んだ当て方を全行へ載せる（R29）。
+ *
+ * 「一致のしかた」の選択は行ごとのものとして1つに持つ。選ぶたびに
+ * 全行を書き換えるので、選んだのに行だけ古いまま、が起きない。
+ * 元の配列は壊さない。
+ */
+export function applyMatchType(
+  rules: KeywordRuleDraft[],
+  matchType: 'exact' | 'contains',
+): KeywordRuleDraft[] {
+  return rules.map((rule) => ({ ...rule, matchType }))
 }
 
 /**

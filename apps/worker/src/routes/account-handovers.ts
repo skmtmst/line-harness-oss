@@ -11,6 +11,8 @@ import {
   listHandoversForAccount,
   markExecuting,
   markResolved,
+  rollbackDeadlineOf,
+  rollbackHandover,
   saveDecision,
   savePreview,
   unresolvedReviewCount,
@@ -21,6 +23,8 @@ import {
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
+import { auditLog } from '../lib/audit-log.js';
+import { sensitiveStepUpSatisfied, stepUpRequiredResponse } from '../lib/step-up.js';
 
 /**
  * LINEアカウントの乗り換え（引き継ぎ）。設計 ★V6 33-4（`nx3XW`）。台帳 #133。
@@ -31,6 +35,7 @@ import { canAccessAllLineAccounts } from '../services/account-access.js';
  *   3 事前確認               POST /api/account-handovers/:id/preview
  *   4 競合の判断             PUT  /api/account-handovers/:id/decisions
  *   5 本実行と照合           POST /api/account-handovers/:id/execute
+ *   6 切り戻し（7日以内）    POST /api/account-handovers/:id/rollback
  *
  * **事前確認だけでは元のアカウントを何も変えない。**
  * 段3が触るのは `account_handovers` の数の列だけで、`friends` には書かない。
@@ -63,6 +68,12 @@ function serialize(row: HandoverRow) {
     movedCount: row.moved_count,
     failedCount: row.failed_count,
     failureReason: row.failure_reason,
+    // 移し元システム側の申告件数と、切り戻しの期限・記録（X-3）。
+    declaredFriendTotal: row.declared_friend_total ?? null,
+    rollbackDeadline: rollbackDeadlineOf(row),
+    rolledBackAt: row.rolled_back_at ?? null,
+    rolledBackBy: row.rolled_back_by ?? null,
+    rollbackNote: row.rollback_note ?? null,
     createdAt: row.created_at,
     linkedAt: row.linked_at,
     previewedAt: row.previewed_at,
@@ -196,6 +207,7 @@ accountHandovers.post('/api/account-handovers/:id/preview', requireRole('owner',
     const body = await c.req.json<{
       sourceFriendTotal?: number;
       counts?: Record<string, number>;
+      declaredFriendTotal?: number | null;
     }>();
     const total = body.sourceFriendTotal;
     const counts = body.counts;
@@ -234,9 +246,15 @@ accountHandovers.post('/api/account-handovers/:id/preview', requireRole('owner',
         422,
       );
     }
+    const declaredTotal = body.declaredFriendTotal;
+    if (declaredTotal !== undefined && declaredTotal !== null
+      && (!Number.isInteger(declaredTotal) || declaredTotal < 0)) {
+      return c.json({ success: false, error: 'declaredFriendTotal は0以上の整数で入れてください' }, 422);
+    }
     const saved = await savePreview(c.env.DB, handover.id, {
       sourceFriendTotal: total,
       counts: value,
+      declaredFriendTotal: declaredTotal ?? null,
     });
     if (!saved.ok) return c.json({ success: false, error: saved.error }, 422);
     return c.json({ success: true, data: serialize((await getHandoverById(c.env.DB, handover.id))!) });
@@ -317,8 +335,29 @@ accountHandovers.post('/api/account-handovers/:id/execute', requireRole('owner',
   try {
     const handover = await loadAccessible(c.env.DB, c.get('staff'), c.req.param('id'));
     if (!handover) return c.json({ success: false, error: 'Not found' }, 404);
+    // 友だちを実際に動かす本実行は大事な操作（V・X-3）。本人確認を求める。
+    if (!await sensitiveStepUpSatisfied(c, 'account_handover.execute')) {
+      return stepUpRequiredResponse(c, '引き継ぎの本実行には本人確認が必要です');
+    }
     if (handover.source_friend_total === null) {
       return c.json({ success: false, error: '先に事前確認をしてください' }, 422);
+    }
+    /*
+      件数照合（X-3、v6-33 §12-6）。移し元システム側の申告件数が
+      事前確認の合計と違うままでは本実行しない。
+    */
+    if (
+      handover.declared_friend_total !== null
+      && handover.declared_friend_total !== undefined
+      && handover.declared_friend_total !== handover.source_friend_total
+    ) {
+      return c.json(
+        {
+          success: false,
+          error: `申告された友だち数（${handover.declared_friend_total}人）と事前確認の合計（${handover.source_friend_total}人）が違います。差の理由を確かめてから、件数を直して進めてください`,
+        },
+        422,
+      );
     }
     const unresolved = await unresolvedReviewCount(c.env.DB, handover.id);
     if (unresolved !== null && unresolved > 0) {
@@ -382,6 +421,40 @@ accountHandovers.post('/api/account-handovers/:id/cancel', requireRole('owner', 
     return c.json({ success: true, data: serialize((await getHandoverById(c.env.DB, handover.id))!) });
   } catch (err) {
     console.error('POST /api/account-handovers/:id/cancel error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/**
+ * 段6。切り戻し（X-3、v6-33 §12-2）。
+ * 本実行から7日間だけ。動かした友だちを元のアカウントへ戻す。
+ */
+accountHandovers.post('/api/account-handovers/:id/rollback', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const handover = await loadAccessible(c.env.DB, c.get('staff'), c.req.param('id'));
+    if (!handover) return c.json({ success: false, error: 'Not found' }, 404);
+    // 切り戻しも友だちを動かす。本実行と同じ確認を求める。
+    if (!await sensitiveStepUpSatisfied(c, 'account_handover.execute')) {
+      return stepUpRequiredResponse(c, '引き継ぎの切り戻しには本人確認が必要です');
+    }
+    const body = await c.req
+      .json<{ note?: string | null }>()
+      .catch(() => ({} as { note?: string | null }));
+    const result = await rollbackHandover(c.env.DB, handover.id, {
+      rolledBackBy: c.get('staff')?.id ?? null,
+      note: typeof body.note === 'string' ? body.note : null,
+    });
+    if (!result.ok) return c.json({ success: false, error: result.error }, 422);
+    auditLog(c, 'account_handover.rollback', { id: handover.id, kind: 'account_handover' });
+    return c.json({
+      success: true,
+      data: {
+        ...serialize((await getHandoverById(c.env.DB, handover.id))!),
+        restoredCount: result.restoredCount,
+      },
+    });
+  } catch (err) {
+    console.error('POST /api/account-handovers/:id/rollback error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

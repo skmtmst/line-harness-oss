@@ -39,7 +39,7 @@ describe('notifyAffiliate', () => {
       line_user_id: 'Uaaa',
       line_account_id: 'acct-1',
     });
-    dbMocks.getLineAccountById.mockResolvedValue({ channel_access_token: 'acct-token' });
+    dbMocks.getLineAccountById.mockResolvedValue({ channel_access_token: 'acct-token', is_active: 1 });
 
     await notifyAffiliate(DB, env, 'aff-1', 'hello');
 
