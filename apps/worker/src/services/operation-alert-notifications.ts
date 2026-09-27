@@ -37,6 +37,21 @@ export async function processOperationAlertNotificationOutbox(
 ): Promise<{ sent: number; failed: number }> {
   const now = new Date().toISOString();
   const leaseExpiresAt = new Date(Date.parse(now) + OPERATION_ALERT_NOTIFICATION_LEASE_MS).toISOString();
+  /*
+   * アカウント停止中（X-1）。そのアカウントの経路では通知を出さない。
+   * 滞留させると再開時に古い通知がまとめて出るので、送れなかった分は
+   * 失敗行として残す。
+   */
+  await env.DB.prepare(
+    `UPDATE operation_alert_notification_outbox
+        SET status = 'failed', last_error = 'account_inactive', updated_at = ?
+      WHERE status IN ('queued', 'failed', 'sending')
+        AND EXISTS (
+          SELECT 1 FROM line_accounts la
+           WHERE la.id = operation_alert_notification_outbox.line_account_id
+             AND la.is_active = 0
+        )`,
+  ).bind(now).run();
   const rows = await env.DB.prepare(
     `SELECT o.id, o.channel, o.staff_id, sm.email, sm.line_user_id, la.channel_access_token,
             e.action, e.severity, e.summary

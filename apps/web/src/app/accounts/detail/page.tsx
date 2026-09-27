@@ -4,7 +4,7 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Suspense, useCallback, useEffect, useState } from 'react'
 import type { LineAccount } from '@line-crm/shared'
-import { api, ApiError } from '@/lib/api'
+import { api, ApiError, describeSaveFailure } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import ListState from '@/components/shared/list-state'
@@ -12,6 +12,7 @@ import TargetMissing from '@/components/shared/target-missing'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import StatusBadge from '@/components/shared/status-badge'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { TextArea } from '@/components/shared/form-controls'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
 import TestRecipientsSetting from '@/components/accounts/test-recipients-setting'
 import { Tabs } from '@/components/shared/tabs'
@@ -48,9 +49,19 @@ function AccountDetail() {
   /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
   const [missing, setMissing] = useState(false)
   const [stopTarget, setStopTarget] = useState<LineAccount | null>(null)
+  const [stopReason, setStopReason] = useState('')
+  const [archiveTarget, setArchiveTarget] = useState<LineAccount | null>(null)
+  const [archiveReason, setArchiveReason] = useState('')
+  const [restoreTarget, setRestoreTarget] = useState<LineAccount | null>(null)
   const [stepUp, setStepUp] = useState<StepUpRequest | null>(null)
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState('')
+  /** ダイアログ内のエラー（必須漏れ・接続失敗など）。窓を閉じずに見せる。 */
+  const [dialogError, setDialogError] = useState('')
+  /** 止めている間に送らなかった配信の一覧（X-1）。 */
+  const [skippedDeliveries, setSkippedDeliveries] = useState<Array<{
+    id: string; kind: string; title: string | null; skippedAt: string
+  }> | null>(null)
 
   const load = useCallback(async () => {
     if (!id) return
@@ -61,6 +72,14 @@ function AccountDetail() {
       if (!one.success) { setStatus('error'); return }
       setAccount(one.data)
       if (list.success) setAll(list.data)
+      // 止まっているアカウントでは「送らなかった」一覧も読む（X-1）。
+      if (!one.data.isActive && !one.data.archivedAt) {
+        api.lineAccounts.skippedDeliveries(id)
+          .then((res) => { if (res.success) setSkippedDeliveries(res.data) })
+          .catch(() => { /* 一覧が読めなくても詳細は使える。 */ })
+      } else {
+        setSkippedDeliveries(null)
+      }
       setStatus('ready')
     } catch (caught) {
       if (caught instanceof ApiError && caught.status === 404) {
@@ -75,15 +94,27 @@ function AccountDetail() {
   useEffect(() => { void load() }, [load])
   usePageTitle(account?.name)
 
-  /** 送受信の停止・再開。**何が止まって何が残るかを、押す前に読ませる。** */
+  /**
+   * 送受信の停止・再開（X-1）。**理由は必須。**
+   * 再開はサーバ側で接続確認をしてから動き出す。
+   */
   const toggleActive = async (stepUpToken?: string) => {
     if (!stopTarget) return
+    const reason = stopReason.trim()
+    if (!reason) {
+      setDialogError('理由を入れてください。あとから「なぜ止めたか」を追えるようにします。')
+      return
+    }
     setBusy(true)
     setActionError('')
+    setDialogError('')
     try {
-      const res = await api.lineAccounts.update(stopTarget.id, { isActive: !stopTarget.isActive }, stepUpToken)
+      const res = stopTarget.isActive
+        ? await api.lineAccounts.deactivate(stopTarget.id, reason, stepUpToken)
+        : await api.lineAccounts.activate(stopTarget.id, reason, stepUpToken)
       if (!res.success) throw new Error(res.error)
       setStopTarget(null)
+      setStopReason('')
       await load()
     } catch (caught) {
       // 送受信の停止は大事な操作。本人確認を求められたら窓を立ててやり直す（V-1）。
@@ -95,7 +126,62 @@ function AccountDetail() {
         })
         return
       }
-      setActionError('変えられませんでした。しばらくおいてから、もう一度お試しください。')
+      // 接続が通らなくて再開できない等の理由は、APIの言葉をそのまま見せる。
+      setDialogError(describeSaveFailure(caught))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /** アーカイブ（X-1）。止まっている・既定でない・配送が走っていない時だけ。 */
+  const runArchive = async (stepUpToken?: string) => {
+    if (!archiveTarget) return
+    setBusy(true)
+    setActionError('')
+    setDialogError('')
+    try {
+      const res = await api.lineAccounts.archive(
+        archiveTarget.id, archiveReason.trim() || undefined, stepUpToken)
+      if (!res.success) throw new Error(res.error)
+      setArchiveTarget(null)
+      setArchiveReason('')
+      await load()
+    } catch (caught) {
+      if (!stepUpToken && isStepUpRequired(caught)) {
+        setStepUp({
+          purpose: 'line_account.archive',
+          action: `「${archiveTarget.name}」をアーカイブする`,
+          retry: runArchive,
+        })
+        return
+      }
+      setDialogError(archiveFailureMessage(caught))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /** アーカイブから戻す（X-1）。戻った直後は「止まっている」状態。 */
+  const runRestore = async (stepUpToken?: string) => {
+    if (!restoreTarget) return
+    setBusy(true)
+    setActionError('')
+    setDialogError('')
+    try {
+      const res = await api.lineAccounts.restore(restoreTarget.id, stepUpToken)
+      if (!res.success) throw new Error(res.error)
+      setRestoreTarget(null)
+      await load()
+    } catch (caught) {
+      if (!stepUpToken && isStepUpRequired(caught)) {
+        setStepUp({
+          purpose: 'line_account.credentials',
+          action: `「${restoreTarget.name}」をアーカイブから戻す`,
+          retry: runRestore,
+        })
+        return
+      }
+      setDialogError(describeSaveFailure(caught))
     } finally {
       setBusy(false)
     }
@@ -235,14 +321,61 @@ function AccountDetail() {
                     </div>
                     {action.blockedReason ? null : action.key === 'handover' ? (
                       <Button href={`/accounts/handover?id=${account.id}`}>{action.actionLabel}</Button>
+                    ) : action.key === 'archive' ? (
+                      <Button
+                        type="button"
+                        variant="danger"
+                        onClick={() => { setDialogError(''); setArchiveReason(''); setArchiveTarget(account) }}
+                      >{action.actionLabel}</Button>
+                    ) : action.key === 'restore' ? (
+                      <Button
+                        type="button"
+                        onClick={() => { setDialogError(''); setRestoreTarget(account) }}
+                      >{action.actionLabel}</Button>
                     ) : (
-                      <Button type="button" onClick={() => setStopTarget(account)}>{action.actionLabel}</Button>
+                      <Button
+                        type="button"
+                        onClick={() => { setDialogError(''); setStopReason(''); setStopTarget(account) }}
+                      >{action.actionLabel}</Button>
                     )}
                   </div>
                 ))}
               </div>
               {actionError && <p role="alert" className="text-danger mt-3 text-xs">{actionError}</p>}
             </Card>
+
+            {!account.isActive && !account.archivedAt && (
+              <Card padding="roomy">
+                <p className="text-ink text-sm font-bold">止まっている間に送らなかったもの</p>
+                {account.inactivatedAt && (
+                  <p className="text-ink-secondary mt-1 text-xs">
+                    {formatMonthDayTime(account.inactivatedAt)} から止まっています
+                    {account.inactiveReasonDetail ? `（理由: ${account.inactiveReasonDetail}）` : ''}
+                  </p>
+                )}
+                {skippedDeliveries === null ? (
+                  <p className="text-ink-faint mt-2 text-xs">読み込んでいます…</p>
+                ) : skippedDeliveries.length === 0 ? (
+                  <p className="text-ink-secondary mt-2 text-xs">送らなかった配信はありません。</p>
+                ) : (
+                  <ul className="mt-2 space-y-1.5">
+                    {skippedDeliveries.map((row) => (
+                      <li key={row.id} className="border-hairline rounded-control flex items-baseline justify-between gap-3 border px-3 py-2">
+                        <span className="text-ink min-w-0 truncate text-xs" title={row.title ?? row.kind}>
+                          {row.title ?? skippedKindLabel(row.kind)}
+                        </span>
+                        <span className="text-ink-faint shrink-0 text-xs">
+                          {skippedKindLabel(row.kind)}・{formatMonthDayTime(row.skippedAt)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <p className="text-ink-faint mt-2 text-xs leading-relaxed">
+                  再開しても、ここに並んだ配信は自動では送り直しません。
+                </p>
+              </Card>
+            )}
 
             <Card padding="roomy">
               <p className="text-ink text-sm font-bold">テスト送信先</p>
@@ -354,16 +487,107 @@ function AccountDetail() {
           : `「${stopTarget?.name}」の送受信を再開しますか？`}
         description={stopTarget?.isActive
           ? '止めているあいだ、配信も受信もしません。友だちと履歴はそのまま残ります。予約している配信は止まります。いつでも戻せます。'
-          : '再開すると、配信と受信が動き始めます。止めているあいだに予約していた配信は、自動で送り直しません。'}
+          : '再開の前にLINEとの接続を確かめます。止めているあいだに予約していた配信は、自動で送り直しません。'}
         confirmLabel={stopTarget?.isActive ? '送受信を止める' : '送受信を再開する'}
         destructive={stopTarget?.isActive}
         busy={busy}
-        onCancel={() => { if (!busy) setStopTarget(null) }}
+        error={dialogError || undefined}
+        onCancel={() => { if (!busy) { setStopTarget(null); setStopReason(''); setDialogError('') } }}
         onConfirm={() => void toggleActive()}
+      >
+        {/* 理由は必須（X-1）。あとから「なぜ止めたか」を追うため。 */}
+        <label className="mt-3 block">
+          <span className="text-ink-secondary text-xs">
+            {stopTarget?.isActive ? '止める理由' : '再開する理由'}（必須）
+          </span>
+          <TextArea
+            className="mt-1"
+            rows={2}
+            maxLength={500}
+            placeholder={stopTarget?.isActive
+              ? '例: LINE側の表示がおかしいので、確認するまで止める'
+              : '例: 接続を直したので再開する'}
+            value={stopReason}
+            onChange={(e) => setStopReason(e.target.value)}
+            disabled={busy}
+          />
+        </label>
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={archiveTarget !== null}
+        title={`「${archiveTarget?.name}」をアーカイブしますか？`}
+        description="一覧から外します。送受信は止まり、友だちと履歴は残ります。あとから「アーカイブから戻す」で戻せます。動いているアカウント・既定のアカウント・配送中のアカウントはアーカイブできません。"
+        confirmLabel="アーカイブする"
+        destructive
+        busy={busy}
+        error={dialogError || undefined}
+        onCancel={() => { if (!busy) { setArchiveTarget(null); setArchiveReason(''); setDialogError('') } }}
+        onConfirm={() => void runArchive()}
+      >
+        <label className="mt-3 block">
+          <span className="text-ink-secondary text-xs">アーカイブの理由（任意）</span>
+          <TextArea
+            className="mt-1"
+            rows={2}
+            maxLength={500}
+            placeholder="例: 使わなくなった旧店舗のアカウント"
+            value={archiveReason}
+            onChange={(e) => setArchiveReason(e.target.value)}
+            disabled={busy}
+          />
+        </label>
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={restoreTarget !== null}
+        title={`「${restoreTarget?.name}」をアーカイブから戻しますか？`}
+        description="一覧へ戻します。戻った直後は「止まっている」状態です。送受信を始めるには、接続を確かめてから「送受信を再開する」を使います。"
+        confirmLabel="アーカイブから戻す"
+        busy={busy}
+        error={dialogError || undefined}
+        onCancel={() => { if (!busy) { setRestoreTarget(null); setDialogError('') } }}
+        onConfirm={() => void runRestore()}
       />
       {stepUp && <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} />}
     </div>
   )
+}
+
+/** 「止めていたので送らなかった」の種類を、運用者の言葉で。 */
+function skippedKindLabel(kind: string): string {
+  switch (kind) {
+  case 'broadcast': return '一斉配信'
+  case 'scenario_step': return 'ステップ配信'
+  case 'reminder': return 'リマインダ'
+  case 'auto_reply': return '自動応答'
+  case 'notification': return '通知'
+  case 'automation': return 'オートメーション'
+  default: return kind
+  }
+}
+
+/**
+ * アーカイブできない理由（API の blockers）を、運用者の言葉で。
+ * 理由が読めないときは API のメッセージか汎用文を返す。
+ */
+function archiveFailureMessage(caught: unknown): string {
+  if (caught instanceof ApiError && caught.code === 'LINE_ACCOUNT_ARCHIVE_BLOCKED') {
+    const blockers = (caught.data as { blockers?: string[] } | undefined)?.blockers ?? []
+    const messages = blockers
+      .map((key) => ARCHIVE_BLOCKER_MESSAGES[key])
+      .filter((message): message is string => Boolean(message))
+    if (messages.length > 0) return messages.join(' / ')
+    return 'このアカウントはいまアーカイブできません。止まっているか、既定でないかを確かめてください。'
+  }
+  return describeSaveFailure(caught)
+}
+
+const ARCHIVE_BLOCKER_MESSAGES: Record<string, string> = {
+  account_active: '送受信がまだ動いています。先に「送受信を止める」で止めてください',
+  default_account: '既定のアカウントです。先にほかのアカウントを既定にしてください',
+  delivery_job_running: '予約・送信中の配信があります。終わるか取り消してからアーカイブしてください',
+  traffic_pool_member: 'アクセス振り分けの組に入っています。組から外してからアーカイブしてください',
 }
 
 function Row({ label, value }: { label: string; value: string }) {

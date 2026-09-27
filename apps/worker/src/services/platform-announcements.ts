@@ -38,7 +38,8 @@ export async function loadNoticeLineAccount(env: Env['Bindings']): Promise<Notic
   const id = await getPlatformSetting(env.DB, NOTICE_LINE_ACCOUNT_KEY);
   if (!id) return null;
   const account = await getLineAccountById(env.DB, id);
-  if (!account || account.archived_at) return null;
+  // 止めている・保管済みのアカウントからは通知を出さない（X-1）。
+  if (!account || account.archived_at || !account.is_active) return null;
   const basicId = account.line_basic_id ? account.line_basic_id.replace(/^@/, '') : null;
   return {
     id: account.id,
