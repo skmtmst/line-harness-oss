@@ -135,13 +135,19 @@ export default function LifetimeTab({
       {error ? <p className="text-label text-danger" role="alert">{error}</p> : null}
 
       <section data-design="Table" data-design-node="USBTi">
-        <DataTable>
+        {/*
+          R55: @container＋谷間帯の列削減は会員一覧と同じ形。768pxでは
+          固定幅の合計が表を超え、特典列が0px・説明文が隣へ重なっていた。
+          到達した人は狭い表で畳み、特典はさらに狭い表で畳む。
+          畳むまでの間は説明文を1行省略＋titleで読めるようにする。
+        */}
+        <DataTable className="@container">
           <thead>
             <TableHeadRow>
               <Th className="w-52">節目（累計）</Th>
               <Th className="w-56">称号</Th>
-              <Th>特典</Th>
-              <Th className="w-28" align="right">到達した人</Th>
+              <Th className="cq-hide-below-800">特典</Th>
+              <Th className="cq-hide-below-1010 w-28" align="right">到達した人</Th>
               <Th className="w-44">到達時のLINE通知</Th>
               <Th className="w-14" align="right"><span className="sr-only">削除</span></Th>
             </TableHeadRow>
@@ -156,13 +162,13 @@ export default function LifetimeTab({
                   </span>
                 </Td>
                 <Td><TextField aria-label={`称号 ${index + 1}`} value={row.title} maxLength={30} onChange={(event) => update(index, { title: event.target.value })} /></Td>
-                <Td>
-                  <span className="flex items-center gap-2.5">
-                    <Chip tone="neutral">未設定</Chip>
-                    <span className="text-label text-ink-faint">限定グッズは決まり次第ここで設定します</span>
+                <Td className="cq-hide-below-800">
+                  <span className="flex min-w-0 items-center gap-2.5">
+                    <Chip tone="neutral" className="shrink-0">未設定</Chip>
+                    <span className="min-w-0 truncate text-label text-ink-faint" title="限定グッズは決まり次第ここで設定します">限定グッズは決まり次第ここで設定します</span>
                   </span>
                 </Td>
-                <Td align="right"><span className="text-label font-semibold tabular-nums text-ink">{row.reachedCount.toLocaleString('ja-JP')}人</span></Td>
+                <Td align="right" className="cq-hide-below-1010"><span className="text-label font-semibold tabular-nums text-ink">{row.reachedCount.toLocaleString('ja-JP')}人</span></Td>
                 <Td>
                   <Toggle checked={row.notify} onChange={(checked) => update(index, { notify: checked })} label={row.notify ? '通知する' : '通知しない'} />
                 </Td>

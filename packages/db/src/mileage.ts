@@ -1,4 +1,5 @@
 import { accountFeatureOffExclusionSql, isAccountFeatureEnabled } from './account-settings.js';
+import { matchesCondition, parseCondition, type SegmentCondition } from './segment-conditions.js';
 import { jstNow } from './utils.js';
 
 export const DEFAULT_MILEAGE_PROGRAM_ID = 'default';
@@ -1019,6 +1020,12 @@ export interface MileageRuleRow {
   amount: number;
   initial_status: 'pending' | 'available';
   conditions: string | null;
+  /**
+   * R52: 公開版が持つ対象条件(JSON文字列)。live の `mileage_rules` に列はなく、
+   * 公開版から組み立てた行だけが持つ(実行時のみ)。live 読みの行は
+   * undefined で、従来どおり条件なしとして付与する。
+   */
+  target_conditions?: string | null;
   /** 334(#521): 帰属アカウント。NULL は変更不可の既存全店ルール。 */
   line_account_id?: string | null;
   is_active: number;
@@ -1192,7 +1199,11 @@ export async function getPublishedVersionContent(
   }
 }
 
-/** 公開版の中身。is_active は含めない。停止・再開は live の稼働で見る。 */
+/**
+ * 公開版の中身。is_active は含めない。停止・再開は live の稼働で見る。
+ * R52: 下書きの対象条件(target_conditions)もここへ載せる。載せないと
+ * 公開版だけ条件が消え、対象外の友だちへ付与される。
+ */
 export interface PublishedEarningRuleContent {
   name: string;
   event_type: string;
@@ -1200,6 +1211,7 @@ export interface PublishedEarningRuleContent {
   amount: number;
   initial_status: 'pending' | 'available';
   conditions: string | null;
+  target_conditions: SegmentCondition | null;
   valid_from: string | null;
   valid_until: string | null;
 }
@@ -1213,6 +1225,8 @@ export function publishedRuleContentFromDraft(
     initialStatus: 'pending' | 'available';
     validFrom: string | null;
     validUntil: string | null;
+    /** R52: 下書きの対象条件。そのまま公開版へ載せる(条件なしは null)。 */
+    targetConditions?: SegmentCondition | null;
   },
   /** 下書きが持たない実行条件は、いまの live を引き継ぐ(消さない)。 */
   currentConditions: string | null,
@@ -1224,6 +1238,7 @@ export function publishedRuleContentFromDraft(
     amount: draft.amount,
     initial_status: draft.initialStatus,
     conditions: currentConditions,
+    target_conditions: draft.targetConditions ?? null,
     valid_from: draft.validFrom,
     valid_until: draft.validUntil,
   };
@@ -1253,6 +1268,8 @@ export async function resolvePinnedRuleRow(
       amount: v0.amount,
       initial_status: v0.initial_status,
       conditions: v0.conditions,
+      // R52: 旧公開版の対象条件も引き継ぐ。無ければ null(条件なし)。
+      target_conditions: v0.target_conditions ? JSON.stringify(v0.target_conditions) : null,
       valid_from: v0.valid_from,
       valid_until: v0.valid_until,
     };
@@ -1267,6 +1284,8 @@ export async function resolvePinnedRuleRow(
     amount: content.amount,
     initial_status: content.initial_status,
     conditions: content.conditions,
+    // R52: 公開版の対象条件を実行時の行へ載せる。無ければ null(条件なし)。
+    target_conditions: content.target_conditions ? JSON.stringify(content.target_conditions) : null,
     valid_from: content.valid_from,
     valid_until: content.valid_until,
   };
@@ -1600,6 +1619,22 @@ async function applyMileageRulesImmediately(
     let conditions: MileageRuleConditions = {};
     if (rule.conditions) {
       try { conditions = JSON.parse(rule.conditions) as MileageRuleConditions; } catch { conditions = {}; }
+    }
+
+    /*
+     * R52: 公開版の対象条件に合わない友だちには付けない。
+     * 条件が壊れて読めないとき・評価で失敗したときも付けない。
+     * 「壊れているのに全員へ配る」のがいちばん困るため、閉じる側へ倒す。
+     */
+    if (rule.target_conditions !== undefined && rule.target_conditions !== null) {
+      let eligible = false;
+      try {
+        const target = parseCondition(rule.target_conditions);
+        eligible = target !== null && await matchesCondition(db, friend.id, target);
+      } catch {
+        eligible = false;
+      }
+      if (!eligible) continue;
     }
 
     const referrer = conditions.beneficiary === 'referrer'
