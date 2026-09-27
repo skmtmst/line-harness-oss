@@ -462,6 +462,25 @@ function BroadcastList() {
     return true
   })
 
+  /**
+   * R173: 状態・フォルダ・検索・日付・保存した検索のいずれかが効いているか。
+   * 効いているときの0件は「まだありません」と言わず、条件を外す口を出す。
+   */
+  const broadcastFilterActive = statusFilter !== 'all'
+    || folderFilter !== ''
+    || titleQuery.trim() !== ''
+    || dateFrom !== ''
+    || dateTo !== ''
+    || savedViewId !== ''
+  const clearBroadcastFilters = () => {
+    setStatusFilter('all')
+    setFolderFilter('')
+    setTitleQuery('')
+    setDateFrom('')
+    setDateTo('')
+    setSavedViewId('')
+  }
+
   return (
     <div className="flex flex-col gap-4">
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
@@ -715,6 +734,15 @@ function BroadcastList() {
             description="再読み込みしても直らないときは、エラー報告へお知らせください。"
             onRetry={() => void load()}
           />
+        ) : broadcastFilterActive ? (
+          /* R173: 状態・フォルダ・検索・日付で絞った結果0件。元データ0件と分け、条件を外す口を出す。 */
+          <div className="bg-canvas rounded-card border border-hairline">
+            <ListState
+              kind="empty"
+              emptyPreset="filtered"
+              action={<Button variant="secondary" onClick={clearBroadcastFilters}>条件をクリア</Button>}
+            />
+          </div>
         ) : (
           /* 文言は設計 `TmHjF`（6-1-N）どおり。 */
           <div className="bg-canvas rounded-card border border-hairline">
@@ -722,11 +750,12 @@ function BroadcastList() {
           </div>
         )
       ) : visibleBroadcasts.length === 0 ? (
+        /* R173: タイトル・日付の絞り込みで0件。作る口ではなく条件を外す口を出す。 */
         <div className="bg-canvas rounded-card border border-hairline">
           <ListState
             kind="empty"
-            title="条件に該当する配信はありません"
-            description="絞り込みを変えるか、新しく作成してください。"
+            emptyPreset="filtered"
+            action={<Button variant="secondary" onClick={clearBroadcastFilters}>条件をクリア</Button>}
           />
         </div>
       ) : (
@@ -742,7 +771,7 @@ function BroadcastList() {
         <DataTable>
             {/*
               列は設計 `q76C35`（V6 6-1 一斉配信）の6列。
-              タイトル・内容／状態／配信条件／配信日時／配信・開封・クリック／操作。
+              タイトル・内容／状態／配信条件／配信日時／結果／操作。
 
               前は見出しが8つ、中身が7つで**1列ずれていた**。「開封（率）」の
               下に状態バッジ、「状態」の下に削除ボタンが並んでいて、表として
@@ -750,15 +779,25 @@ function BroadcastList() {
               合わせる。「配信数」と「開封（率）」は設計では1つの列
               （配信・開封・クリック）にまとまっている。
             */}
+            {/*
+              列幅は % と操作列の固定幅の組み合わせ（m20i）。
+              操作は中身（詳細＋…約90＋余白16）だけの110pxに固定する
+              （★V7：操作列は固定幅）。余白は12px→8pxに詰める（下の
+              ActionCell の px-2）。% の合計は83に抑え、110pxを足しても
+              いちばん狭い帯（1280px時の表≈700px）に収まる。タイトルも
+              17%に詰めて、空いたぶんを結果18%へ回す。結果の各行は
+              1440pxで1行に収まる。狭い帯ではラベルと数字の間で折れて
+              よい（数字と率は離さない）。横には送らない。
+            */}
             <thead>
               <TableHeadRow>
-                <Th style={{ width: '30%' }}>
+                <Th style={{ width: '17%' }}>
                   タイトル・内容
                 </Th>
-                <Th style={{ width: '12%' }}>
+                <Th style={{ width: '14%' }}>
                   状態
                 </Th>
-                <Th style={{ width: '14%' }}>
+                <Th style={{ width: '20%' }}>
                   配信条件
                 </Th>
                 {/*
@@ -769,10 +808,10 @@ function BroadcastList() {
                   配信日時
                 </Th>
                 <Th style={{ width: '18%' }}>
-                  配信・開封・クリック
+                  結果
                 </Th>
                 {/* #768: 表が横に流れる帯でも操作列は右端に留める。 */}
-                <Th style={{ width: '12%' }} align="right" className="sticky right-0 bg-canvas-sunken">
+                <Th style={{ width: 110 }} align="right" className="sticky right-0 bg-canvas-sunken">
                   操作
                 </Th>
               </TableHeadRow>
@@ -781,9 +820,17 @@ function BroadcastList() {
               {visibleBroadcasts.map((broadcast) => {
                 const statusInfo = (broadcast.displayStatus && displayStatusConfig[broadcast.displayStatus])
                   ?? statusConfig[broadcast.status]
+                /*
+                 * m20i: 状態の札と承認の札が同じ言葉になる組み合わせ。
+                 * このときだけ承認の札1つにまとめる（下の状態セル）。
+                 */
+                const approvalDuplicatesStatus = (broadcast.displayStatus === 'pending_approval' && broadcast.approvalStatus === 'pending')
+                  || (broadcast.displayStatus === 'expired' && broadcast.approvalStatus === 'expired')
                 const isDedup = broadcast.targetType === 'multi-account-dedup'
                 // 手動で取り直した値があればそれを、一覧同梱の集計があればそれを使う。
                 const insight = insights[broadcast.id] ?? summaryInsight(broadcast.insightSummary)
+                // 配信条件の1行表示と title 用。関数を2回呼ばない。
+                const audience = audienceSummary(broadcast, getTagName, getScenarioName)
 
                 return (
                   <Tr
@@ -815,7 +862,7 @@ function BroadcastList() {
                           {broadcast.title}
                         </a>
                         {isDedup && (
-                          <span className="inline-flex items-center px-1.5 py-0 rounded text-[10px] font-medium bg-purple-100 text-purple-700">
+                          <span className="inline-flex items-center whitespace-nowrap px-1.5 py-0 rounded text-[10px] font-medium bg-info-bg text-info">
                             複数アカウント
                           </span>
                         )}
@@ -830,26 +877,42 @@ function BroadcastList() {
                       </p>
                     </Td>
 
-                    {/* 状態。設計では2列目。承認待ちの札もここに出す（A-2）。 */}
+                    {/*
+                      状態。設計では2列目。承認待ちの札もここに出す（A-2）。
+                      m20i: 承認の札と状態の札が同じ言葉になる組み合わせ
+                      （承認待ち・期限切れ）は2つ出さず、承認の札（札＋?）
+                      1つにする。2つ出すと狭い列に収まらず「?」が下へ
+                      はみ出す。言葉が違う組み合わせは両方残す。
+                    */}
                     <Td>
-                      <span className="inline-flex flex-wrap items-center gap-1">
-                        <span className={`inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded-full text-xs font-medium ${statusInfo.className}`}>
-                          {statusInfo.label}
+                      {approvalDuplicatesStatus ? (
+                        <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                          <ApprovalBadge status={broadcast.approvalStatus} />
                         </span>
-                        <ApprovalBadge status={broadcast.approvalStatus} />
-                      </span>
+                      ) : (
+                        <span className="inline-flex flex-wrap items-center gap-1">
+                          <span className={`inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded-full text-xs font-medium ${statusInfo.className}`}>
+                            {statusInfo.label}
+                          </span>
+                          <ApprovalBadge status={broadcast.approvalStatus} />
+                        </span>
+                      )}
                     </Td>
 
                     {/*
                       配信条件。前は「全員」か「タグ指定」の2つしか見ていなかったので、
                       詳細条件で絞った配信も「タグ指定」と出ていた。送った相手を
                       後から確かめられないので、監査にならなかった。
+                      m20i: 「タグ：NEN会員（定期）」が3行に折れて行が高く
+                      なるので、1行で省略し全文は title で見せる。
                     */}
                     <Td className="text-ink-secondary">
-                      {audienceSummary(broadcast, getTagName, getScenarioName)}
+                      <span className="block truncate" title={audience}>
+                        {audience}
+                      </span>
                     </Td>
 
-                    <Td className="text-ink-faint tabular-nums">
+                    <Td className="text-ink-faint tabular-nums whitespace-nowrap">
                       {broadcast.status === 'sent'
                         ? formatDatetime(broadcast.sentAt)
                         : formatDatetime(broadcast.scheduledAt)}
@@ -866,26 +929,26 @@ function BroadcastList() {
                       ) : (
                         <div>
                           {broadcast.totalCount > 0 && (
-                            <p>{broadcast.successCount.toLocaleString('ja-JP')} / {broadcast.totalCount.toLocaleString('ja-JP')} 件</p>
+                            <p className="whitespace-nowrap">{broadcast.successCount.toLocaleString('ja-JP')} / {broadcast.totalCount.toLocaleString('ja-JP')} 件</p>
                           )}
                           {insight ? (
                             <div className="mt-1 space-y-0.5">
                               {insight.delivered != null && (
-                                <p className="text-xs">配信: <span className="font-medium text-ink-secondary">{insight.delivered.toLocaleString('ja-JP')}</span></p>
+                                <p className="whitespace-nowrap text-xs">配信: <span className="font-medium text-ink-secondary">{insight.delivered.toLocaleString('ja-JP')}</span></p>
                               )}
                               {insight.uniqueImpression != null && (
-                                <p className="text-xs">開封: <span className="font-medium text-info">{insight.uniqueImpression.toLocaleString('ja-JP')}</span>
+                                <p className="text-xs">開封: <span className="whitespace-nowrap"><span className="font-medium text-info">{insight.uniqueImpression.toLocaleString('ja-JP')}</span>
                                   {insight.openRate != null && (
                                     <span className="text-ink-faint"> ({(insight.openRate * 100).toFixed(1)}%)</span>
                                   )}
-                                </p>
+                                </span></p>
                               )}
                               {insight.uniqueClick != null && (
-                                <p className="text-xs">クリック: <span className="font-medium text-success">{insight.uniqueClick.toLocaleString('ja-JP')}</span>
+                                <p className="text-xs">クリック: <span className="whitespace-nowrap"><span className="font-medium text-success">{insight.uniqueClick.toLocaleString('ja-JP')}</span>
                                   {insight.clickRate != null && (
                                     <span className="text-ink-faint"> ({(insight.clickRate * 100).toFixed(1)}%)</span>
                                   )}
-                                </p>
+                                </span></p>
                               )}
                             </div>
                           ) : (
@@ -906,9 +969,10 @@ function BroadcastList() {
                       削除はメニューの中の危ない操作へ。行にゴミ箱の
                       アイコンだけのボタンは置かない（★V7 Xn1Mz）。
                     */}
-                    <ActionCell className="sticky right-0 bg-canvas group-hover:bg-canvas-sunken">
+                    <ActionCell className="sticky right-0 bg-canvas px-2 group-hover:bg-canvas-sunken">
                       {/* 行を押すと詳細へ行くので、行の中の操作は行へ伝えない。 */}
-                      <span className="inline-flex" onClick={(event) => event.stopPropagation()}>
+                      {/* m20i: 操作列が固定幅で余るぶんは右へ寄せ、「…」を枠の端に置く。 */}
+                      <span className="inline-flex w-full justify-end" onClick={(event) => event.stopPropagation()}>
                         <RowActions
                           subjectName={broadcast.title}
                           detail={{ href: `/broadcasts/detail?id=${encodeURIComponent(broadcast.id)}` }}

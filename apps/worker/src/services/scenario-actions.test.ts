@@ -580,7 +580,7 @@ describe('共通情報', () => {
     seedV1History()
     addAction('a1', 'common_var', { varKey: 'stock', op: 'add', value: '5' })
     const sdb = serializedDb()
-    const screen = updateCommonVar(sdb, 'v1', 'account-1', { value: '100' }).then(
+    const screen = updateCommonVar(sdb, 'v1', 'account-1', { value: '100', changeReason: '在庫補正' }).then(
       () => ({ ok: true as const }),
       () => ({ ok: false as const }),
     )

@@ -348,6 +348,24 @@ describe('店舗営業時間の編集', () => {
     await waitFor(() => expect(fixture.getSettings.mock.calls.length).toBeGreaterThanOrEqual(2))
   })
 
+  test('R161: 曜日を変えたまま別画面へ移ると確認を出し、編集継続で入力が残る', async () => {
+    await renderEditor()
+    fireEvent.click(screen.getByRole('checkbox', { name: '月曜日を受け付ける' }))
+    await screen.findByLabelText('月曜日 1件目の開始')
+    fireEvent.click(screen.getByRole('link', { name: /予約管理/ }))
+    await screen.findByText('保存していない変更があります')
+    fireEvent.click(screen.getByRole('button', { name: '編集を続ける' }))
+    await waitFor(() => expect(screen.queryByText('保存していない変更があります')).toBeNull())
+    expect((screen.getByRole('checkbox', { name: '月曜日を受け付ける' }) as HTMLInputElement).checked).toBe(true)
+  })
+
+  test('R161: 変えていなければ離脱確認を出さない', async () => {
+    await renderEditor()
+    const event = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(event)
+    expect(event.defaultPrevented).toBe(false)
+  })
+
   test('保存待ち中にaccountを切り替えたら旧accountの応答を親画面へ反映しない', async () => {
     let resolveSave!: (value: unknown) => void
     fixture.saveSettings.mockImplementationOnce(() => new Promise((resolve) => { resolveSave = resolve }))
@@ -533,6 +551,16 @@ describe('登録済みの休業日の修正・削除 (#953 E-09)', () => {
     await screen.findByText('年末休業')
     expect(screen.queryByRole('button', { name: '修正する' })).toBeNull()
     expect(screen.queryByRole('button', { name: '削除する' })).toBeNull()
+  })
+
+  test('R161: 休業日の修正欄を開いたまま別画面へ移ると確認を出す', async () => {
+    await renderWithException()
+    fireEvent.click(screen.getByRole('button', { name: '修正する' }))
+    await screen.findByLabelText('休業日の理由')
+    fireEvent.click(screen.getByRole('link', { name: /予約管理/ }))
+    await screen.findByText('保存していない変更があります')
+    expect(screen.getByRole('button', { name: '保存せずに移動' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '編集を続ける' })).toBeTruthy()
   })
 })
 

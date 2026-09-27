@@ -212,6 +212,8 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'GET /api/affiliate-payments',
     'GET /api/affiliate-payments/:id/preview',
     'GET /api/affiliate-payout-batches/:id/download',
+    // R43: 締め済み台帳の再開照会。preview と同じく owner/admin 専用。
+    'GET /api/affiliate-settlements/current',
     'GET /api/affiliate-settlements/preview',
     'GET /api/affiliates',
     'GET /api/affiliates-report',
@@ -425,6 +427,8 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'POST /api/ops/support/tickets',
     'POST /api/ops/support/tickets/:id/draft/ai',
     'POST /api/ops/support/tickets/:id/reply',
+    // 組織ローカルのレシピ作成は owner/admin 専用（route 側の requireRole と一致）。
+    'POST /api/recipes',
     'POST /api/recipes/:id/clone',
     'POST /api/restaurant-test/gbp/posts',
     'POST /api/restaurant-test/google/changes/:id/send',

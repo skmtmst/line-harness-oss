@@ -73,7 +73,13 @@ export default function NewAffiliateOfferPage() {
     let cancelled = false
     // N-211: 選択accountのタグ・シナリオだけを選べるようにする。
     // 保存時の所属再検査はサーバーが済ませている(案件routeの参照検査)。
-    const accountParams = selectedAccountId ? { accountId: selectedAccountId } : undefined
+    // R50: アカウントを切り替えたら旧アカウントの候補を捨てて取り直す。
+    if (!selectedAccountId) {
+      setTags([])
+      setScenarios([])
+      return () => { cancelled = true }
+    }
+    const accountParams = { accountId: selectedAccountId }
     void Promise.allSettled([api.tags.list(accountParams), api.scenarios.list(accountParams)]).then(
       ([t, s]) => {
         if (cancelled) return
@@ -86,7 +92,7 @@ export default function NewAffiliateOfferPage() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [selectedAccountId])
 
   const yen = rewardAmount ? Number(rewardAmount) : 0
   const miles = rewardMiles ? Number(rewardMiles) : 0

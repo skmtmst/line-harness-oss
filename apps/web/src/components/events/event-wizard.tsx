@@ -18,6 +18,7 @@ import { AsideCard, ChoiceCard, Field, FormSection, inputClass } from '@/compone
 import { BULK_SLOT_LIMIT, generateBulkSlots } from './bulk-slot-generator'
 import { formatSlotJp, jstHHMMToUtcIso, splitBand, todayJst } from './jst'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { TextInput } from '@/components/shared/form-controls'
 import DateField from '@/components/shared/date-field'
 import Notice from '@/components/shared/notice'
@@ -104,6 +105,10 @@ export interface EventWizardProps {
   step: 1 | 2 | 3
 }
 
+function wizardSnapshot(draft: EventDetail, firstSlot: FirstSlotDraft): string {
+  return JSON.stringify({ draft, firstSlot })
+}
+
 export default function EventWizard({ accountId, eventId, step }: EventWizardProps) {
   const router = useRouter()
   const [draft, setDraft] = useState<EventDetail>(DEFAULT_DRAFT)
@@ -119,6 +124,14 @@ export default function EventWizard({ accountId, eventId, step }: EventWizardPro
     入れ替わるため、更新対象の識別には使えない。
   */
   const [firstSlotId, setFirstSlotId] = useState<string | null>(null)
+  /*
+   * R161 監査：名前・質問を入れたままパンくずで一覧へ戻ると、確認なく
+   * 空欄に戻る。保存済み（読み込み・保存の直後）の姿との差を未保存とし、
+   * 離れる操作では確認を出す。
+   */
+  const [savedSnapshot, setSavedSnapshot] = useState<string>(() => wizardSnapshot(DEFAULT_DRAFT, DEFAULT_FIRST_SLOT))
+  const dirty = wizardSnapshot(draft, firstSlot) !== savedSnapshot
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
 
   // ②③は①を保存したあとにしか入れない。URL を直接叩かれても①へ戻す。
   useEffect(() => {
@@ -152,12 +165,14 @@ export default function EventWizard({ accountId, eventId, step }: EventWizardPro
         if (cancelled) return
         // Worker は質問定義を questions_json の文字列で返す。フォームは
         // 配列で触るので、ここでほぐしてから draft に載せる。
-        setDraft({ ...ev, questions: parseEventQuestions(ev.questions_json) })
+        const loadedDraft = { ...ev, questions: parseEventQuestions(ev.questions_json) }
+        setDraft(loadedDraft)
         setSlots(slotsRes.items)
         const first = slotsRes.items[0]
         // フォームへ写した枠のIDを記録する。あとで一覧が並び替わっても
         // 「最初の予約枠」の保存先はこの枠のまま(DETAIL-09)。
         setFirstSlotId(first?.id ?? null)
+        let loadedFirstSlot: FirstSlotDraft | null = null
         if (first) {
           const startsAt = new Date(first.starts_at)
           const endsAt = new Date(first.ends_at)
@@ -166,13 +181,16 @@ export default function EventWizard({ accountId, eventId, step }: EventWizardPro
             hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: 'Asia/Tokyo',
           }).formatToParts(startsAt)
           const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((x) => x.type === type)?.value ?? ''
-          setFirstSlot({
+          loadedFirstSlot = {
             date: `${part('year')}-${part('month')}-${part('day')}`,
             startTime: `${part('hour')}:${part('minute')}`,
             durationMinutes: Math.max(15, Math.round((endsAt.getTime() - startsAt.getTime()) / 60_000)),
             capacity: first.capacity == null ? '' : String(first.capacity),
-          })
+          }
+          setFirstSlot(loadedFirstSlot)
         }
+        // R161 監査：読み込んだ直後の姿を「保存済み」とし、変えた分だけ未保存にする。
+        setSavedSnapshot(wizardSnapshot(loadedDraft, loadedFirstSlot ?? DEFAULT_FIRST_SLOT))
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e))
       } finally {
@@ -261,9 +279,11 @@ export default function EventWizard({ accountId, eventId, step }: EventWizardPro
     let eventSaved = false
     try {
       let id = eventId
+      let savedDraft = draft
       if (id) {
         const updated = await eventsApi.updateEvent(accountId, id, payloadOf(draft), draft.version ?? 1)
         setDraft(updated)
+        savedDraft = updated
       } else {
         const created = await eventsApi.createEvent(accountId, payloadOf(draft))
         id = created.id
@@ -304,6 +324,9 @@ export default function EventWizard({ accountId, eventId, step }: EventWizardPro
           }
         }
       }
+      // R161 監査：保存の直後の姿を「保存済み」とし、確認が出ないようにする。
+      // 枠の保存で例外になったときはここへ来ないため、書きかけは残る。
+      setSavedSnapshot(wizardSnapshot(savedDraft, firstSlot))
       if (goto === null) {
         router.push(`/events?highlight=${id}`)
         return
@@ -357,6 +380,9 @@ export default function EventWizard({ accountId, eventId, step }: EventWizardPro
           {error}
         </Notice>
       )}
+
+      {/* R161 監査：概要・予約枠・公開設定の書きかけがある間の離脱確認。 */}
+      <ConfirmDialog primaryAction="cancel" open={leaveTarget !== null} title="保存していない変更があります" description="このまま移動すると、イベントへの変更は失われます。保存せずに移動しますか？" confirmLabel="保存せずに移動" cancelLabel="編集を続ける" onConfirm={confirmLeave} onCancel={cancelLeave} />
 
       {step === 1 && (
         <OverviewStep

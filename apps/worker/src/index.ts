@@ -68,6 +68,7 @@ import { gettingStarted } from './routes/getting-started.js';
 import { recipes } from './routes/recipes.js';
 import { hqTemplates } from './routes/hq-templates.js';
 import { manualLinks } from './routes/manual-links.js';
+import { errorMessages } from './routes/error-messages.js';
 import { accountHandovers } from './routes/account-handovers.js';
 import { brand } from './routes/brand.js';
 import { conversions } from './routes/conversions.js';
@@ -452,6 +453,7 @@ app.route('/', recipes);
 app.route('/', hqTemplates);
 app.route('/', ops);
 app.route('/', manualLinks);
+app.route('/', errorMessages);
 app.route('/', accountHandovers);
 app.route('/', friendBulkRuns);
 app.route('/', friendMigrations);
@@ -1460,6 +1462,28 @@ async function runFrequentHeavyJobs(
       },
     },
     {
+      // マニュアル導線の週1回の点検（要件 v6-34 §8-4）。cron自体は
+      // 短い間隔で回るので、最終確認から7日を経るまで関数側で何もしない。
+      // 新たに broken になったリンクだけ、運営へ1回だけ知らせる。
+      name: 'manual link weekly check',
+      run: async () => {
+        const { runWeeklyManualLinkCheck, notifyBrokenManualLinks } = await import(
+          './services/manual-link-check.js'
+        );
+        const result = await runWeeklyManualLinkCheck(env.DB);
+        if (!result) return;
+        if (result.newlyBroken.length > 0) {
+          await notifyBrokenManualLinks(env.DB, env, result.newlyBroken);
+        }
+        console.log(JSON.stringify({
+          event: 'manual_link_weekly_check',
+          checked: result.checked,
+          broken: result.broken,
+          newlyBroken: result.newlyBroken.length,
+        }));
+      },
+    },
+    {
       name: 'ad conversion outbox retry',
       run: async () => {
         const { drainAdConversionOutbox } = await import('./services/ad-conversion.js');
@@ -1693,6 +1717,17 @@ async function runSixHourlyHeavyJobs(
       },
     },
     {
+      // Q: 共通情報の期限の14日前・3日前に運用者へ知らせる。
+      name: 'common var expiry notices',
+      run: async () => {
+        const { sweepCommonVarExpiryNotices } = await import('./services/common-var-expiry-sweep.js');
+        const result = await sweepCommonVarExpiryNotices(env.DB, env, new Date());
+        if (result.notified > 0 || result.errors > 0) {
+          console.log(JSON.stringify({ event: 'common_var_expiry_sweep', ...result }));
+        }
+      },
+    },
+    {
       name: 'billing invoice sync',
       run: async () => {
         const { syncBillingInvoicesDaily } = await import('./services/billing-invoices-sync.js');
@@ -1762,10 +1797,13 @@ async function scheduled(
   }
   if (lane !== 'delivery') return;
 
-  // 管理画面を開いていなくても、各LINEアカウントの6項目を5分窓ごとに保存する。
+  // 管理画面を開いていなくても、各LINEアカウントの確認項目を5分窓ごとに保存する。
   // 各checkと各accountは独立しており、失敗しても配信ジョブを止めない。
   try {
-    await runScheduledOperationHealthChecks(env.DB);
+    await runScheduledOperationHealthChecks(env.DB, {
+      r2: env.IMAGES,
+      queue: env.CODEX_MENTION_QUEUE,
+    });
   } catch (error) {
     console.error('operation health checks error:', error);
   }

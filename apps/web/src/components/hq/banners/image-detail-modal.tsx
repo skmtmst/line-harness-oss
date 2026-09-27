@@ -66,15 +66,23 @@ export default function ImageDetailModal({
   const toggle = (id: string) =>
     setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
 
+  /*
+   * R121: 背が高い中身は中央寄せのままでは上が画面外へ切れ、指では
+   * 先頭へ戻れない（flex の `items-center` と `overflow` の重ね置き）。
+   * 外はただの縦スクロール、内は `min-h-full`＋窓の `my-auto` にして、
+   * 余白があれば中央、無ければ上から読める「安全な中央寄せ」にする。
+   * 小画面では上の余白を無くして上端の紙にし、見出しを固定する。
+   */
   const overlay = (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-scrim p-4"
+      className="fixed inset-0 z-50 overflow-y-auto bg-scrim"
       role="presentation"
       data-design-node="g4MyEA"
       onMouseDown={(event) => {
         if (!busy && event.target === event.currentTarget) onClose()
       }}
     >
+    <div className="flex min-h-full justify-center p-0 sm:p-4">
       <div
         ref={panelRef}
         role="dialog"
@@ -83,10 +91,15 @@ export default function ImageDetailModal({
         aria-busy={busy || undefined}
         tabIndex={-1}
         data-design-node="k0JKm"
-        className="flex w-full flex-col rounded-panel border border-hairline bg-canvas shadow-card"
+        className="my-auto flex w-full flex-col rounded-none border border-hairline bg-canvas shadow-card sm:rounded-panel"
         style={{ maxWidth: 1160 }}
       >
-        <div className="flex items-center gap-3 px-5 py-4">
+        {/*
+          R121: 見出しと閉じるボタンは上に固定したまま、本文だけ流す。
+          窓自体に `overflow` を付けると固定が効かなくなるため、角丸は
+          見出し側に `rounded-t-panel` で付ける。
+        */}
+        <div className="bg-canvas sticky top-0 z-10 flex items-center gap-3 rounded-t-none border-b border-hairline px-5 py-4 sm:rounded-t-panel">
           <h2 id="banner-image-detail-title" className="text-heading font-bold text-ink">画像の詳細</h2>
           <p className="text-caption text-ink-faint">
             {projectName}
@@ -103,7 +116,6 @@ export default function ImageDetailModal({
             <X aria-hidden="true" className="h-5 w-5" />
           </button>
         </div>
-        <div className="border-t border-hairline" />
 
         <div className="grid gap-5 p-5 lg:grid-cols-2">
           <div className="flex flex-col gap-3">
@@ -247,6 +259,7 @@ export default function ImageDetailModal({
           onCancel={() => setConfirmRemove(false)}
         />
       ) : null}
+      </div>
     </div>
   )
 

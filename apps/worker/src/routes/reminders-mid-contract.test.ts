@@ -220,6 +220,31 @@ describe('作成後のきっかけ変更の拒否（#489 中11）', () => {
   })
 })
 
+describe('R146 監査：未公開の下書きは再開できない', () => {
+  const put = (body: unknown) => request('/api/reminders/reminder-1', {
+    method: 'PUT', body: JSON.stringify(body),
+  })
+
+  it('公開版の無い再開は409で止め、文面で公開へ案内する', async () => {
+    dbMocks.updateReminder.mockRejectedValue(new Error('REMINDER_NOT_PUBLISHED'))
+    const response = await put({ isActive: true })
+    expect(response.status).toBe(409)
+    expect(await response.json()).toMatchObject({
+      success: false,
+      error: 'まだ公開していない下書きは再開できません。先に公開してください',
+    })
+  })
+
+  it('止める方は従来どおり通す', async () => {
+    dbMocks.updateReminder.mockResolvedValue(undefined)
+    dbMocks.getReminderById.mockResolvedValue({
+      id: 'reminder-1', name: '予約前日', is_active: 0, line_account_id: 'account-1', trigger_type: 'booking',
+    })
+    const response = await put({ isActive: false })
+    expect(response.status).toBe(200)
+  })
+})
+
 describe('下書き保存時の空本文の拒否（#489 中16）', () => {
   const putDraft = (settings: unknown) => request('/api/reminders/reminder-1/draft', {
     method: 'PUT', body: JSON.stringify(settings),

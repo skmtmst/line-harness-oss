@@ -65,6 +65,11 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
     enforcement: { mode: 'exempt', reason: '受信箱の基本動作で、機能カタログの個別スイッチに属さない' },
   },
   {
+    name: 'manual link weekly check',
+    classification: { kind: 'core', reason: '画面横断のマニュアル導線の健全性点検' },
+    enforcement: { mode: 'exempt', reason: '機能別スイッチに属さない共通ヘルプ導線の週次確認で、off対象の機能がない' },
+  },
+  {
     name: 'mileage reward delivery retry',
     classification: { kind: 'feature', featureId: 'mileage' },
     enforcement: {
@@ -412,6 +417,15 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
       mode: 'gated',
       sources: ['packages/db/src/common-vars.ts'],
       markers: ['isCommonVarsEnabled(db, current.line_account_id)'],
+    },
+  },
+  {
+    name: 'common var expiry notices',
+    classification: { kind: 'feature', featureId: 'common_vars' },
+    enforcement: {
+      mode: 'gated',
+      sources: ['apps/worker/src/services/common-var-expiry-sweep.ts'],
+      markers: ['isCommonVarsEnabled(db, candidate.line_account_id)'],
     },
   },
   {

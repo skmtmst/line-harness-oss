@@ -1723,9 +1723,7 @@ CREATE TABLE "common_var_resolution_failures" (
   )),
   source_id       TEXT NOT NULL,
   var_key         TEXT NOT NULL,
-  reason          TEXT NOT NULL CHECK (reason IN ('missing', 'not_started', 'expired', 'fallback_missing', 'invalid_window')),
-  -- 1 = 共通情報を直せば同じ送信を重複なく再試行できる。0 = 再試行しても
-  -- 治らない失敗（今のところ解決失敗はすべて 1。将来の恒久的失敗用の印）。
+  reason          TEXT NOT NULL CHECK (reason IN ('missing', 'not_started', 'expired', 'fallback_missing', 'invalid_window', 'stopped', 'draft')),
   retryable       INTEGER NOT NULL DEFAULT 1 CHECK (retryable IN (0, 1)),
   execution_at    TEXT NOT NULL,
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')),
@@ -1748,7 +1746,8 @@ CREATE TABLE "common_vars" (
   line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE,
   memo TEXT NOT NULL DEFAULT '', version INTEGER NOT NULL DEFAULT 1,
   updated_by TEXT, archived_at TEXT, replacement_run_id TEXT, valid_from TEXT, valid_until TEXT, fallback_value TEXT, expiry_behavior TEXT NOT NULL DEFAULT 'stop'
-  CHECK (expiry_behavior IN ('stop', 'fallback')),
+  CHECK (expiry_behavior IN ('stop', 'fallback')), status TEXT NOT NULL DEFAULT 'active'
+  CHECK (status IN ('draft', 'active', 'stopped')), stopped_at TEXT, expiry_notice_14_at TEXT, expiry_notice_3_at TEXT,
   UNIQUE(line_account_id, var_key)
 );
 
@@ -2154,6 +2153,23 @@ CREATE TABLE entry_routes (
   created_at  TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
 , pool_id TEXT REFERENCES traffic_pools (id) ON DELETE SET NULL, intro_template_id TEXT REFERENCES message_templates (id) ON DELETE SET NULL, run_account_friend_add_scenarios INTEGER NOT NULL DEFAULT 1, genre TEXT, tenant_id TEXT REFERENCES tenants(id), line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE);
+
+CREATE TABLE error_messages (
+  -- エラーコード。code が無い現行 route は error 文字列そのものを鍵にする（§9-1）。
+  code               TEXT PRIMARY KEY,
+  -- 運用者向け文面。{incidentId} {n} {max} などの差し込みは画面側で埋める。
+  message            TEXT NOT NULL,
+  -- 次の行動の種類。押せるものだけを出す。
+  next_action_kind   TEXT NOT NULL DEFAULT 'none'
+                       CHECK (next_action_kind IN ('navigate', 'retry', 'contact_admin', 'none')),
+  -- navigate の行き先（管理画面のパス）。navigate 以外は NULL。
+  next_action_target TEXT,
+  -- 出典（route または service）。追加するときは必ず埋める（§9-2）。
+  source             TEXT NOT NULL,
+  version            INTEGER NOT NULL DEFAULT 1,
+  created_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
 
 CREATE TABLE event_booking_idempotency_keys (
   key              TEXT PRIMARY KEY,
@@ -3762,6 +3778,42 @@ CREATE TABLE messages_log (
   created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , origin_kind TEXT, origin_id TEXT, scenario_version_step_id TEXT, line_message_id TEXT, line_message_account_key TEXT, unsent_at TEXT, quote_token TEXT, quoted_message_id TEXT);
 
+CREATE TABLE mileage_adjustment_approval_events (
+  id              TEXT PRIMARY KEY,
+  request_id      TEXT NOT NULL REFERENCES mileage_adjustment_approval_requests (id) ON DELETE CASCADE,
+  actor_staff_id  TEXT NOT NULL,
+  action          TEXT NOT NULL CHECK (action IN ('requested', 'approved', 'rejected', 'cancelled')),
+  reason          TEXT,
+  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
+CREATE TABLE mileage_adjustment_approval_requests (
+  id                     TEXT PRIMARY KEY,
+  line_account_id        TEXT NOT NULL,
+  program_id             TEXT NOT NULL DEFAULT 'default',
+  friend_id              TEXT NOT NULL,
+  direction              TEXT NOT NULL CHECK (direction IN ('increase', 'decrease')),
+  amount                 INTEGER NOT NULL CHECK (amount > 0),
+  reason_category        TEXT NOT NULL,
+  reason                 TEXT NOT NULL,
+  source_reference_id    TEXT,
+  expires_at             TEXT,
+  notify_friend          INTEGER NOT NULL DEFAULT 0,
+  idempotency_key        TEXT NOT NULL,
+  status                 TEXT NOT NULL DEFAULT 'pending'
+                           CHECK (status IN ('pending', 'approved', 'rejected', 'cancelled')),
+  requested_by_staff_id  TEXT NOT NULL,
+  requested_by_staff_name TEXT NOT NULL,
+  decided_by_staff_id    TEXT,
+  decided_by_staff_name  TEXT,
+  decided_at             TEXT,
+  decision_reason        TEXT,
+  ledger_entry_id        TEXT,
+  created_at             TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at             TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  UNIQUE (line_account_id, idempotency_key)
+);
+
 CREATE TABLE mileage_adjustment_notifications (
   id                TEXT PRIMARY KEY,
   line_account_id   TEXT NOT NULL REFERENCES line_accounts(id),
@@ -4256,7 +4308,7 @@ CREATE TABLE nen_pet_profiles (
   birthday TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
-, breed TEXT, weight_kg REAL, concerns TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(concerns)), recommended_daily_grams INTEGER, recommended_daily_min_grams INTEGER, recommended_daily_max_grams INTEGER, venison_daily_grams INTEGER, food_cycle_days INTEGER, image_r2_key TEXT, image_url TEXT, neutered INTEGER CHECK (neutered IN (0, 1)), activity_level TEXT NOT NULL DEFAULT 'normal' CHECK (activity_level IN ('low', 'normal', 'high')), daily_kcal INTEGER, feeding_product_id TEXT);
+, breed TEXT, weight_kg REAL, concerns TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(concerns)), recommended_daily_grams INTEGER, recommended_daily_min_grams INTEGER, recommended_daily_max_grams INTEGER, venison_daily_grams INTEGER, food_cycle_days INTEGER, image_r2_key TEXT, image_url TEXT, neutered INTEGER CHECK (neutered IN (0, 1)), activity_level TEXT NOT NULL DEFAULT 'normal' CHECK (activity_level IN ('low', 'normal', 'high')), daily_kcal INTEGER, feeding_product_id TEXT, weight_updated_at TEXT);
 
 CREATE TABLE nen_photo_assessment_runs (
   id TEXT PRIMARY KEY,
@@ -4651,12 +4703,13 @@ CREATE TABLE operation_alert_notification_outbox (
   UNIQUE (event_id, staff_id, channel)
 );
 
-CREATE TABLE operation_alerts (
+CREATE TABLE "operation_alerts" (
   id                   TEXT PRIMARY KEY,
   line_account_id      TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
   check_key            TEXT NOT NULL CHECK (check_key IN (
     'line_connection', 'message_quota', 'external_integrations',
-    'webhook', 'dispatch_jobs', 'friend_change'
+    'webhook', 'dispatch_jobs', 'friend_change',
+    'monitoring_heartbeat', 'infra_canary', 'credential_expiry'
   )),
   status               TEXT NOT NULL CHECK (status IN ('open', 'acknowledged', 'resolved')),
   severity             TEXT NOT NULL CHECK (severity IN ('unknown', 'warning', 'danger')),
@@ -4733,12 +4786,13 @@ CREATE TABLE operation_dispatcher_heartbeats (
   updated_at       TEXT NOT NULL
 );
 
-CREATE TABLE operation_health_results (
+CREATE TABLE "operation_health_results" (
   id             TEXT PRIMARY KEY,
   run_id         TEXT NOT NULL REFERENCES operation_health_runs(id) ON DELETE CASCADE,
   check_key      TEXT NOT NULL CHECK (check_key IN (
     'line_connection', 'message_quota', 'external_integrations',
-    'webhook', 'dispatch_jobs', 'friend_change'
+    'webhook', 'dispatch_jobs', 'friend_change',
+    'monitoring_heartbeat', 'infra_canary', 'credential_expiry'
   )),
   status         TEXT NOT NULL CHECK (status IN ('normal', 'warning', 'danger', 'unknown')),
   summary        TEXT NOT NULL,
@@ -4786,6 +4840,13 @@ CREATE TABLE operation_incidents (
 , stopped_definitions_json TEXT
   CHECK (stopped_definitions_json IS NULL OR json_valid(stopped_definitions_json)), restore_report_json TEXT
   CHECK (restore_report_json IS NULL OR json_valid(restore_report_json)));
+
+CREATE TABLE operation_infra_probes (
+  id         TEXT PRIMARY KEY,
+  kind       TEXT NOT NULL CHECK (kind IN ('d1')),
+  payload    TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
 
 CREATE TABLE operation_notification_outbox (
   id              TEXT PRIMARY KEY,
@@ -5125,7 +5186,7 @@ CREATE TABLE recipes (
   display_order  INTEGER NOT NULL DEFAULT 0,
   created_at     TEXT NOT NULL,
   updated_at     TEXT NOT NULL
-);
+, line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL, created_by_staff_id TEXT);
 
 CREATE TABLE ref_tracking (
   id              TEXT PRIMARY KEY,
@@ -6143,7 +6204,7 @@ CREATE TABLE staff_members (
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , line_user_id TEXT, totp_secret_enc TEXT, totp_pending_secret_enc TEXT, totp_enabled_at TEXT, totp_last_used_step INTEGER, assigned_line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL, can_access_descendant_accounts INTEGER NOT NULL DEFAULT 0, tenant_id TEXT REFERENCES tenants(id), account_scope TEXT NOT NULL DEFAULT 'all'
-  CHECK (account_scope IN ('all', 'accounts')), policy_version INTEGER NOT NULL DEFAULT 1, password_hash TEXT, password_updated_at TEXT, role_bundle TEXT, view_permission_keys TEXT, email_mask TEXT, notice_friend_id TEXT, notice_linked_at TEXT, email_change_new TEXT, email_change_token_hash TEXT, email_change_expires_at TEXT);
+  CHECK (account_scope IN ('all', 'accounts')), policy_version INTEGER NOT NULL DEFAULT 1, password_hash TEXT, password_updated_at TEXT, role_bundle TEXT, view_permission_keys TEXT, email_mask TEXT, notice_friend_id TEXT, notice_linked_at TEXT, email_change_new TEXT, email_change_token_hash TEXT, email_change_expires_at TEXT, getting_started_dismissed_at TEXT);
 
 CREATE TABLE staff_menus (
   staff_id                  TEXT NOT NULL,
@@ -7258,7 +7319,7 @@ CREATE INDEX idx_common_var_export_jobs_account
 
 CREATE INDEX idx_common_var_replacement_runs_v403_source ON common_var_replacement_runs(source_common_var_id, created_at DESC);
 
-CREATE INDEX idx_common_var_resolution_failures_source_v423
+CREATE INDEX idx_common_var_resolution_failures_source_v485
   ON common_var_resolution_failures(source_kind, source_id, created_at DESC);
 
 CREATE INDEX idx_common_var_schedules_v403_pending ON common_var_schedules(var_id, effective_from) WHERE applied_at IS NULL;
@@ -7869,6 +7930,15 @@ CREATE INDEX idx_messages_log_version_step
   ON messages_log (friend_id, scenario_version_step_id)
   WHERE scenario_version_step_id IS NOT NULL;
 
+CREATE INDEX idx_mileage_adj_approval_account
+  ON mileage_adjustment_approval_requests (line_account_id, status, created_at DESC);
+
+CREATE INDEX idx_mileage_adj_approval_events_request
+  ON mileage_adjustment_approval_events (request_id, created_at DESC);
+
+CREATE INDEX idx_mileage_adj_approval_friend
+  ON mileage_adjustment_approval_requests (friend_id, created_at DESC);
+
 CREATE INDEX idx_mileage_adjustment_notifications_retry
   ON mileage_adjustment_notifications(status, updated_at)
   WHERE status = 'failed';
@@ -8080,7 +8150,7 @@ CREATE INDEX idx_operation_alert_events_alert_created
 CREATE INDEX idx_operation_alert_notification_due
   ON operation_alert_notification_outbox(status, next_attempt_at);
 
-CREATE INDEX idx_operation_alerts_account_status
+CREATE INDEX idx_operation_alerts_account_status_v496
   ON operation_alerts(line_account_id, status, updated_at DESC);
 
 CREATE INDEX idx_operation_audit_kind_date
@@ -8089,7 +8159,7 @@ CREATE INDEX idx_operation_audit_kind_date
 CREATE INDEX idx_operation_deployment_events_occurred
   ON operation_deployment_events(occurred_at DESC, id DESC);
 
-CREATE INDEX idx_operation_health_results_run
+CREATE INDEX idx_operation_health_results_run_v496
   ON operation_health_results(run_id, check_key);
 
 CREATE INDEX idx_operation_health_runs_scope_started
@@ -8175,6 +8245,8 @@ CREATE INDEX idx_recipe_clone_runs_v316_account
 
 CREATE INDEX idx_recipe_clone_runs_v316_recipe
   ON recipe_clone_runs(recipe_id, created_at DESC);
+
+CREATE INDEX idx_recipes_v464_account ON recipes(line_account_id);
 
 CREATE INDEX idx_ref_tracking_ad_click_scope
   ON ref_tracking(friend_id, line_account_id, created_at DESC);

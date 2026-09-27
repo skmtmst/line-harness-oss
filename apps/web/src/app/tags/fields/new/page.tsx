@@ -16,6 +16,7 @@ import Select from '@/components/shared/select'
 import { Field, TextInput, TextArea } from '@/components/shared/form-controls'
 import { FIELD_TYPE_HINTS, FIELD_TYPE_LABELS } from '@/components/friend-fields/field-list'
 import { AttributeKindGuide, DuplicateNameNote, findDuplicateNames } from '@/components/friend-fields/attribute-kind-guide'
+import DefaultValueInput from '@/components/friend-fields/default-value-input'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 
 const TYPES = Object.keys(FIELD_TYPE_LABELS) as FriendFieldType[]
@@ -50,6 +51,8 @@ function NewFriendFieldForm() {
   const [type, setType] = useState<FriendFieldType>('text')
   const [options, setOptions] = useState('')
   const [defaultValue, setDefaultValue] = useState('')
+  /* R139: 複数選択の既定値（選択肢名の配列）。文字列欄では指定できない。 */
+  const [defaultOptions, setDefaultOptions] = useState<string[]>([])
   const [isPersonal, setIsPersonal] = useState(false)
   const [isStarred, setIsStarred] = useState(true)
   const [ecIsMaster, setEcIsMaster] = useState(false)
@@ -79,7 +82,7 @@ function NewFriendFieldForm() {
    * この下書きはどこにも自動保存されないので、離脱前に必ず確認する。
    */
   const dirty = Boolean(
-    name || fieldKey || keyTouched || type !== 'text' || options || defaultValue
+    name || fieldKey || keyTouched || type !== 'text' || options || defaultValue || defaultOptions.length > 0
       || isPersonal || !isStarred || ecIsMaster || ecFieldPath || folderId,
   )
   /*
@@ -104,13 +107,31 @@ function NewFriendFieldForm() {
     if (!fieldKey.trim()) return setError('差し込み名を入力してください')
     if (NEEDS_OPTIONS.has(type) && optionList.length === 0) return setError('選択肢を1つ以上入力してください')
     if (ecIsMaster && !ecFieldPath.trim()) return setError('EC側の項目名を入力してください')
+    /*
+     * R139: 選択肢を変えたあとに残った既定値は送る前に止める。
+     * サーバーの「存在しない選択肢」422を先に言葉にする。
+     */
+    if (type === 'multi_select') {
+      const missing = defaultOptions.filter((item) => !optionList.includes(item))
+      if (missing.length > 0) return setError(`既定値の「${missing[0]}」は選択肢にありません。選択肢か既定値を直してください`)
+    }
+    if (type === 'select' && defaultValue && !optionList.includes(defaultValue)) {
+      return setError(`既定値の「${defaultValue}」は選択肢にありません。選択肢か既定値を直してください`)
+    }
     setSaving(true); setError('')
     try {
       const res = await api.friendFields.create(selectedAccountId, {
         name: name.trim(), fieldKey: fieldKey.trim(), type, folderId: folderId || null,
         options: NEEDS_OPTIONS.has(type) ? optionList : null,
         // 画像・PDFは既定値を送らない（#1014 ATTR-07）。種類切替で値は捨てているが、念のため送り側でも止める。
-        defaultValue: FILE_TYPES.has(type) ? null : defaultValue.trim() || null,
+        // R139: 複数選択は選択肢名の配列で渡す。文字列では422になる。
+        defaultValue: FILE_TYPES.has(type)
+          ? null
+          : type === 'multi_select'
+            ? (defaultOptions.length > 0 ? defaultOptions : null)
+            : type === 'select'
+              ? (defaultValue || null)
+              : defaultValue.trim() || null,
         isPersonal, isStarred,
         ecIsMaster, ecFieldPath: ecIsMaster ? ecFieldPath.trim() : null,
       })
@@ -123,9 +144,12 @@ function NewFriendFieldForm() {
 
   return (
     <div data-design-node="A1ZYeP" className="flex flex-col gap-4">
+      {/* R177: 同じ見出し行の形。パンくずを縮め、ボタンは残す。 */}
       <div className="flex items-center justify-between gap-4">
-        <Breadcrumb items={[{ label: '友だち情報欄', href: '/tags?tab=fields' }, { label: '項目を作る' }]} />
-        <Button href={back ?? '/tags?tab=fields'}>友だち情報欄へ</Button>
+        <div className="min-w-0 flex-1">
+          <Breadcrumb items={[{ label: '友だち情報欄', href: '/tags?tab=fields' }, { label: '項目を作る' }]} />
+        </div>
+        <Button href={back ?? '/tags?tab=fields'} className="shrink-0">友だち情報欄へ</Button>
       </div>
 
       {error ? <Notice tone="danger" message={error} className="mb-4" /> : null}
@@ -156,9 +180,10 @@ function NewFriendFieldForm() {
                     ATTR-07: 種類を変えたら既定値は捨てる。
                     入力欄は画像・PDFで無効化するだけだと、見えない古い値が
                     そのまま送信されて422で弾かれていた。テキスト系に
-                    戻しても古い値を復活させない。
+                    戻しても古い値を復活させない。R139: 選択式の既定値も捨てる。
                   */
                   setDefaultValue('')
+                  setDefaultOptions([])
                 }}
                 aria-label="友だち情報欄の種類"
                 size="full"
@@ -201,7 +226,18 @@ function NewFriendFieldForm() {
               htmlFor="ff-default"
               note={FILE_TYPES.has(type) ? '画像・PDFはファイルとして保存し、本文へ文字として差し込みません。' : '友だち情報が空欄のとき、この値が代わりに送信されます。'}
             >
-              <TextInput id="ff-default" value={FILE_TYPES.has(type) ? '' : defaultValue} onChange={(event) => setDefaultValue(event.target.value)} disabled={FILE_TYPES.has(type)} placeholder={FILE_TYPES.has(type) ? '画像・PDFには設定できません' : '未設定'} />
+              {/* R139: 複数選択は登録済みの選択肢から複数選ぶ。単一選択は一覧から1つ選ぶ。 */}
+              <DefaultValueInput
+                mode={FILE_TYPES.has(type) ? 'file' : type === 'multi_select' ? 'multi' : type === 'select' ? 'single' : 'text'}
+                options={optionList}
+                textValue={defaultValue}
+                onTextChange={setDefaultValue}
+                singleValue={defaultValue}
+                onSingleChange={setDefaultValue}
+                multiValue={defaultOptions}
+                onMultiChange={setDefaultOptions}
+                inputId="ff-default"
+              />
             </Field>
             <div className="mt-4 divide-y divide-hairline">
               <Toggle checked={isStarred} onChange={setIsStarred} label="友だち一覧に表示" hint="よく見る項目だけを列に追加" />
@@ -222,7 +258,7 @@ function NewFriendFieldForm() {
 
       {/* #976 U084/U085: 追従バーの操作は共通Button。左キャンセル→右確定の並びはStickyBarが持つ。 */}
       <StickyBar status={saving ? '項目を保存しています' : '未保存'} actions={<><Button href={back ?? '/tags?tab=fields'}>キャンセル</Button><Button type="button" variant="primary" disabled={saving} onClick={() => void save()}>{saving ? '作成中…' : '項目を作成'}</Button></>} />
-      <ConfirmDialog
+      <ConfirmDialog primaryAction="cancel"
         open={leaveTarget !== null}
         title="入力中の内容があります"
         description="このまま移動すると、入力した内容は保存されません。移動しますか？"

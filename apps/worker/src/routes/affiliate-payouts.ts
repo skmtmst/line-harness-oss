@@ -8,6 +8,7 @@ import {
   getAffiliatePayoutBatchExport,
   getAffiliatePayoutDownload,
   getAffiliateStatementReplay,
+  getClosedAccountSettlement,
   markAffiliatePayoutExported,
   prepareAffiliateStatement,
   previewAffiliateAccountSettlement,
@@ -123,6 +124,35 @@ affiliatePayouts.get(
     } catch (error) {
       console.error('GET /api/affiliate-settlements/preview error:', error);
       return c.json({ success: false, error: '締め対象を確認できませんでした' }, 500);
+    }
+  },
+);
+
+/*
+ * R43: 締めたあと画面を離れても、明細発行・CSV準備を再開できるよう、
+ * 期間で締め済み台帳を引き直す口。締め直しではなく既存台帳の読み出し。
+ */
+affiliatePayouts.get(
+  '/api/affiliate-settlements/current',
+  affiliatePermission('affiliate.report.view'),
+  async (c) => {
+    const lineAccountId = c.req.query('lineAccountId')?.trim();
+    const periodFrom = c.req.query('periodFrom');
+    const periodTo = c.req.query('periodTo');
+    if (!lineAccountId || !validIso(periodFrom) || !validIso(periodTo) || Date.parse(periodFrom) > Date.parse(periodTo)) {
+      return c.json({ success: false, error: '対象アカウントと正しい締め期間を指定してください' }, 400);
+    }
+    if (!await accountVisible(c, lineAccountId)) {
+      return c.json({ success: false, error: '締め対象が見つかりません' }, 404);
+    }
+    try {
+      const data = await getClosedAccountSettlement(c.env.DB, {
+        tenantId: tenantId(c), lineAccountId, periodFrom, periodTo,
+      });
+      return c.json({ success: true, data });
+    } catch (error) {
+      console.error('GET /api/affiliate-settlements/current error:', error);
+      return c.json({ success: false, error: '締め済みの記録を確認できませんでした' }, 500);
     }
   },
 );

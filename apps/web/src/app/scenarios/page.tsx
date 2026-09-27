@@ -457,6 +457,19 @@ export default function ScenariosPage() {
   }
 
   /**
+   * R173: 絞り込み0件の1枚から条件を外す。検索語（送信用の確定値も
+   * 含む）と3つの絞り込み・フォルダをまとめて戻す。
+   */
+  const clearScenarioFilters = () => {
+    setNameQuery('')
+    setServerQuery('')
+    setStoppedOnly(false)
+    setCreatedThisMonthOnly(false)
+    setFolderFilter('')
+  }
+  const scenarioFilterActive = Boolean(serverQuery || stoppedOnly || createdThisMonthOnly || folderFilter)
+
+  /**
    * 掴んで入れ替えた並びを保存する。
    *
    * 画面はすぐ入れ替える。往復を待つと、掴んだ手応えが無い。
@@ -851,6 +864,8 @@ export default function ScenariosPage() {
       ) : (
         <ScenarioList
           scenarios={scenarios}
+          isFiltered={scenarioFilterActive}
+          onClearFilter={clearScenarioFilters}
           onReorder={handleReorder}
           folders={folders}
           onMoveFolders={handleMoveFolders}

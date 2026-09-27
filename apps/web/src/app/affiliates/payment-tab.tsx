@@ -15,11 +15,12 @@ import {
   type AffiliateAccountSettlementResult,
   type AffiliatePaymentSummary,
   type AffiliatePayoutBatch,
+  type AffiliateSettlementResume,
 } from '@/lib/api'
 import { readSessionSnapshot } from '@/lib/session-snapshot'
 import { AffiliatePaymentConfirmDialog } from './action-dialogs'
 
-type PaymentFilter = 'all' | 'bank_missing' | 'ready'
+type PaymentFilter = 'all' | 'bank_missing' | 'bank_ok'
 
 function yen(value: number): string {
   return `¥${Math.round(value).toLocaleString('ja-JP')}`
@@ -29,21 +30,33 @@ function dateLabel(value: string | null): string {
   if (!value) return '—'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '—'
-  return date.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' })
+  return date.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', timeZone: 'Asia/Tokyo' })
 }
 
 function monthDay(value: string | null): { month: number | null; dayUnit: string } {
   if (!value) return { month: null, dayUnit: '' }
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return { month: null, dayUnit: '' }
-  return { month: date.getMonth() + 1, dayUnit: `/${date.getDate()}` }
+  // 期間の表示は締めの時差(Asia/Tokyo)に揃える。端末の現地時間で
+  // 月名がずれると「何月の締めか」を誤認する。
+  const jst = new Date(date.getTime() + 9 * 60 * 60 * 1000)
+  return { month: jst.getUTCMonth() + 1, dayUnit: `/${jst.getUTCDate()}` }
 }
 
-/** ブラウザの現地月を、Workerが比較できるISO期間へする。 */
+/**
+ * 締め期間は業務上の時差(Asia/Tokyo)の暦月で固定する(R45)。
+ * 端末のタイムゾーンで月初を取ると、見る場所で締めの範囲が変わる。
+ */
 export function currentAffiliateSettlementPeriod(now = new Date()): { periodFrom: string; periodTo: string } {
+  const jstParts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Tokyo', year: 'numeric', month: 'numeric',
+  }).formatToParts(now)
+  const year = Number(jstParts.find((part) => part.type === 'year')?.value)
+  const month = Number(jstParts.find((part) => part.type === 'month')?.value)
+  const JST_MS = 9 * 60 * 60 * 1000
   return {
-    periodFrom: new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0).toISOString(),
-    periodTo: new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999).toISOString(),
+    periodFrom: new Date(Date.UTC(year, month - 1, 1) - JST_MS).toISOString(),
+    periodTo: new Date(Date.UTC(year, month, 1) - JST_MS - 1).toISOString(),
   }
 }
 
@@ -272,31 +285,59 @@ export default function AffiliatePaymentTab({ accountId }: { accountId: string }
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null)
   const [closeOpen, setCloseOpen] = useState(false)
   const [closed, setClosed] = useState<AffiliateAccountSettlementResult | null>(null)
+  const [resumed, setResumed] = useState<AffiliateSettlementResume | null>(null)
   const [batch, setBatch] = useState<AffiliatePayoutBatch | null>(null)
   const [operationError, setOperationError] = useState('')
   const [operationBusy, setOperationBusy] = useState(false)
   const [payoutKey, setPayoutKey] = useState('')
   const statementKeysRef = useRef(new Map<string, string>())
+  // R46: アカウント切替で前のアカウントの応答が遅れて戻っても、
+  // 選択中の表示を上書きしないよう世代番号で捨てる。
+  const loadSeq = useRef(0)
 
   const load = useCallback(async () => {
+    const seq = ++loadSeq.current
     setLoading(true)
     setError(false)
+    // 切替直後の表示は前アカウントの残りで進まないよう状態を戻す。
+    setPreview(null)
+    setClosed(null)
+    setResumed(null)
+    setBatch(null)
+    setPayoutKey('')
+    setOperationError('')
     try {
-      const [settlement, summaries] = await Promise.all([
+      const [settlement, summaries, current] = await Promise.all([
         api.affiliates.settlementPreview(accountId, period),
         api.affiliates.paymentSummaries(accountId).catch(() => null),
+        // R43: この期間に締め済みの台帳があれば、明細・CSVの続きを再開する。
+        api.affiliates.settlementCurrent(accountId, period).catch(() => null),
       ])
+      if (seq !== loadSeq.current) return // 遅れて戻った前アカウントの応答は捨てる
       if (!settlement.success || !Array.isArray(settlement.data.affiliates)) {
         throw new Error('payment data malformed')
       }
       setItems(summaries?.success && Array.isArray(summaries.data) ? summaries.data : [])
       setPreview(settlement.data)
+      const found = current?.success ? current.data : null
+      setResumed(found)
+      if (found) {
+        setClosed({
+          kind: 'created',
+          settlementId: found.settlementId,
+          totalAmount: found.totalAmount,
+          conversionCount: found.conversionCount,
+          version: found.version,
+          closedAt: found.closedAt ?? '',
+        })
+      }
     } catch {
+      if (seq !== loadSeq.current) return
       setItems([])
       setPreview(null)
       setError(true)
     } finally {
-      setLoading(false)
+      if (seq === loadSeq.current) setLoading(false)
     }
   }, [accountId, period])
 
@@ -313,19 +354,33 @@ export default function AffiliatePaymentTab({ accountId }: { accountId: string }
     return rows.filter((item) => {
       if (normalized && !`${item.affiliateName} ${item.code}`.toLocaleLowerCase('ja-JP').includes(normalized)) return false
       if (filter === 'bank_missing') return !item.bankProfileRegistered
-      if (filter === 'ready') return item.bankProfileRegistered
+      // R47: 「振込先登録済み」は独立の条件。今回の締め(対象全員)とは分ける。
+      if (filter === 'bank_ok') return item.bankProfileRegistered
       return true
     })
   }, [filter, query, rows])
 
+  // R43: 締め済み台帳から再開したときはプレビューが空になるため、
+  // 明細の対象は台帳の内訳(再開情報)から取る。
+  const statementTargets = useMemo<Array<{ affiliateId: string; affiliateName: string }>>(() => {
+    if (resumed) {
+      return resumed.affiliates
+        .filter((item) => !item.statementIssued)
+        .map((item) => ({ affiliateId: item.affiliateId, affiliateName: item.affiliateName }))
+    }
+    return (preview?.affiliates ?? []).map((item) => ({
+      affiliateId: item.affiliateId, affiliateName: item.affiliateName,
+    }))
+  }, [preview, resumed])
+
   const issueStatements = async () => {
-    if (!closed || !preview || operationBusy) return
+    if (!closed || operationBusy || statementTargets.length === 0) return
     setOperationBusy(true)
     setOperationError('')
     try {
       // 1人失敗で全体失敗にしない。人ごとに結果を分けて出す。
       // 合言葉は人ごとに使い回すので、押し直しは失敗分だけ試せる。
-      const settled = await Promise.allSettled(preview.affiliates.map((item) => {
+      const settled = await Promise.allSettled(statementTargets.map((item) => {
         const key = statementKeysRef.current.get(item.affiliateId) ?? crypto.randomUUID()
         statementKeysRef.current.set(item.affiliateId, key)
         return api.affiliates.createStatement({
@@ -339,16 +394,18 @@ export default function AffiliatePaymentTab({ accountId }: { accountId: string }
       let succeeded = 0
       settled.forEach((result, index) => {
         if (result.status === 'fulfilled' && result.value.success) succeeded += 1
-        else failedNames.push(preview.affiliates[index].affiliateName)
+        else failedNames.push(statementTargets[index].affiliateName)
       })
       if (failedNames.length === 0) {
-        notifyToast(`${preview.affiliates.length.toLocaleString('ja-JP')}人分の支払明細を発行し、LINE通知を依頼しました。`)
+        notifyToast(`${statementTargets.length.toLocaleString('ja-JP')}人分の支払明細を発行し、LINE通知を依頼しました。`)
       } else {
         if (succeeded > 0) notifyToast(`${succeeded.toLocaleString('ja-JP')}人分の支払明細を発行しました。`)
         const shown = failedNames.slice(0, 5).join('、')
         const rest = failedNames.length > 5 ? `ほか${failedNames.length - 5}人` : ''
         setOperationError(`${failedNames.length}人分を発行できませんでした（${shown}${rest}）。もう一度押すと失敗分を試し直せます。`)
       }
+      // 発行済みの人を再送対象から外すため、再開情報を取り直す。
+      if (resumed && succeeded > 0) void load()
     } catch (cause) {
       setOperationError(cause instanceof Error ? cause.message : '支払明細を発行できませんでした')
     } finally {
@@ -358,11 +415,10 @@ export default function AffiliatePaymentTab({ accountId }: { accountId: string }
 
   const preparePayout = async () => {
     if (!closed || operationBusy) return
-    // 合言葉が空のまま送らない（二重発行の不安を残さない）。
-    if (!payoutKey) {
-      setOperationError('振込用CSVの合言葉がありません。締め直してからお試しください。')
-      return
-    }
+    // 合言葉（再実行キー）は締め直後だけでなく再開時も必要。
+    // 画面を離れて戻った場合はここで払い出す（二重発行の不安を残さない）。
+    const key = payoutKey || crypto.randomUUID()
+    setPayoutKey(key)
     setOperationBusy(true)
     setOperationError('')
     try {
@@ -371,7 +427,7 @@ export default function AffiliatePaymentTab({ accountId }: { accountId: string }
         settlementId: closed.settlementId,
         expectedVersion: closed.version,
         bankFormat: 'zengin_csv',
-      }, payoutKey)
+      }, key)
       if (!response.success) throw new Error(response.error)
       setBatch(response.data)
     } catch (cause) {
@@ -392,7 +448,10 @@ export default function AffiliatePaymentTab({ accountId }: { accountId: string }
   const summaryUnavailable = error && !loading
   const closeDate = monthDay(preview?.periodTo ?? null)
   const rowCountLabel = loading || error ? '—' : rows.length.toLocaleString('ja-JP')
+  const bankOkCount = rows.filter((item) => item.bankProfileRegistered).length
+  const bankOkLabel = loading || error ? '—' : bankOkCount.toLocaleString('ja-JP')
   const missingBankLabel = loading || error ? '—' : missingBanks.toLocaleString('ja-JP')
+  const issuedCount = resumed?.affiliates.filter((item) => item.statementIssued).length ?? 0
 
   return (
     <div className="space-y-4" data-payment-ledger="settlement-connected">
@@ -431,6 +490,13 @@ export default function AffiliatePaymentTab({ accountId }: { accountId: string }
 
       <Notice tone="info" message="締める前なら、成果を却下すると今回の支払いから外れます。締めたあとの取消は次の支払いで差し引きます。" />
 
+      {/* R44: 前の締めに間に合わなかった分が含まれることを明記する。 */}
+      {preview?.carriedOver && preview.carriedOver.count > 0 ? (
+        <Notice tone="info">
+          前の締めから持ち越した分 {preview.carriedOver.count.toLocaleString('ja-JP')}件・{yen(preview.carriedOver.amount)} を含んでいます。締める期間は {dateLabel(preview.periodFrom)}〜{dateLabel(preview.periodTo)} です。
+        </Notice>
+      ) : null}
+
       {preview?.excludedZeroAmount && preview.excludedZeroAmount.count > 0 ? (
         <Notice tone="warn">
           報酬が0円の成果 {preview.excludedZeroAmount.count.toLocaleString('ja-JP')}件は、支払えないため今回の締め対象から外れています。対象は「{dateLabel(preview.periodTo)} で締める」の確認画面で見られます。
@@ -439,7 +505,9 @@ export default function AffiliatePaymentTab({ accountId }: { accountId: string }
 
       {closed ? (
         <Notice tone="success">
-          {dateLabel(closed.closedAt)} に {yen(closed.totalAmount)}・{closed.conversionCount.toLocaleString('ja-JP')}件を締めました。明細と銀行用CSVを準備できます。
+          {resumed
+            ? `${dateLabel(closed.closedAt)} に締めた記録を読み出しました。${issuedCount > 0 ? `明細は ${resumed!.affiliates.length.toLocaleString('ja-JP')}人中 ${issuedCount.toLocaleString('ja-JP')}人分が発行済みです。` : ''}${resumed!.batch ? ' 振込用CSVの準備も作成済みです。' : ' 明細と銀行用CSVの準備を続けられます。'}`
+            : `${dateLabel(closed.closedAt)} に ${yen(closed.totalAmount)}・${closed.conversionCount.toLocaleString('ja-JP')}件を締めました。明細と銀行用CSVを準備できます。`}
         </Notice>
       ) : null}
       {operationError ? <Notice tone="danger" message={operationError} onClose={() => setOperationError('')} /> : null}
@@ -473,10 +541,10 @@ export default function AffiliatePaymentTab({ accountId }: { accountId: string }
         >
           {preview ? `${dateLabel(preview.periodTo)} で締める` : '期間を締める'}
         </Button>
-        <Button onClick={() => { void issueStatements() }} disabled={!closed || operationBusy}>
-          支払明細をまとめて出す
+        <Button onClick={() => { void issueStatements() }} disabled={!closed || operationBusy || statementTargets.length === 0}>
+          {resumed && issuedCount > 0 ? `支払明細をまとめて出す（残り${statementTargets.length.toLocaleString('ja-JP')}人）` : '支払明細をまとめて出す'}
         </Button>
-        <Button onClick={() => { void preparePayout() }} disabled={!closed || operationBusy || !payoutKey} title={missingBanks > 0 ? '振込先が未登録の人がいる場合は、誰に依頼するかを確認できます' : undefined}>
+        <Button onClick={() => { void preparePayout() }} disabled={!closed || operationBusy || Boolean(resumed?.batch)} title={resumed?.batch ? '振込用CSVの準備は作成済みです' : missingBanks > 0 ? '振込先が未登録の人がいる場合は、誰に依頼するかを確認できます' : undefined}>
           振込用CSVを書き出す
         </Button>
       </div>
@@ -492,7 +560,9 @@ export default function AffiliatePaymentTab({ accountId }: { accountId: string }
           style={{ maxWidth: 460 }}
         />
         {/* 選べる件数が1つだけで何も変わらない飾りは置かない（★V7の決まり）。絞り込みの札は共通 FilterChip（本線）。 */}
-        <FilterChip selected={filter === 'ready'} onChange={(on) => setFilter(on ? 'ready' : 'all')} count={`${rowCountLabel}人`}>今回の締め</FilterChip>
+        {/* R47: 「今回の締め」は締め対象の全員を指す。口座登録の有無で数を絞らない。 */}
+        <FilterChip selected={filter === 'all'} onChange={() => setFilter('all')} count={`${rowCountLabel}人`}>今回の締め</FilterChip>
+        <FilterChip selected={filter === 'bank_ok'} onChange={(on) => setFilter(on ? 'bank_ok' : 'all')} count={`${bankOkLabel}人`}>振込先登録済み</FilterChip>
         <FilterChip selected={false} onChange={() => {}} disabled title="支払履歴APIが未接続です">過去の支払い</FilterChip>
         <FilterChip selected={filter === 'bank_missing'} onChange={(on) => setFilter(on ? 'bank_missing' : 'all')} count={`${missingBankLabel}人`}>振込先が未登録</FilterChip>
       </div>
