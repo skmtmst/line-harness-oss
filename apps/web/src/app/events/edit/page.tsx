@@ -95,20 +95,20 @@ function BookingStatus({ accountId, eventId }: { accountId: string; eventId: str
             : slots.some((s) => s.is_active === 1 && Date.parse(s.starts_at) >= nowMs)
           if (!event.is_published) {
             return (
-              <span className="rounded-pill bg-canvas-sunken text-ink-faint px-2 py-0.5 text-[10px] font-medium">
+              <span className="rounded-pill bg-canvas-sunken text-ink-faint px-2 py-0.5 text-nano font-medium">
                 下書き
               </span>
             )
           }
           if (hasFuture === false) {
             return (
-              <span className="rounded-pill bg-canvas-sunken text-ink-faint px-2 py-0.5 text-[10px] font-medium">
+              <span className="rounded-pill bg-canvas-sunken text-ink-faint px-2 py-0.5 text-nano font-medium">
                 終了
               </span>
             )
           }
           return (
-            <span className="rounded-pill bg-success-bg text-success px-2 py-0.5 text-[10px] font-medium">
+            <span className="rounded-pill bg-success-bg text-success px-2 py-0.5 text-nano font-medium">
               受付中
             </span>
           )
