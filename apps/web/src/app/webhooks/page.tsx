@@ -632,6 +632,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
               新しいシークレットを設定します。
               <strong className="text-danger">設定後は今回限り画面に表示されません。</strong>
               控えておいてから「保存」を押してください。
+              保存後も前の合言葉は24時間だけ使えるので、相手側の切り替え中も届物は止まりません。
             </p>
             <div className="flex gap-2 mb-4">
               <input
