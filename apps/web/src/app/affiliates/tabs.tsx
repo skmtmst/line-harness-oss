@@ -2221,9 +2221,12 @@ export function ApprovalQueue() {
                   <td className="text-ink-secondary px-4 py-3 text-sm">
                     <span className="text-ink block font-medium">{item.offerName ?? '未設定'}</span>
                     <span className="text-ink-faint mt-0.5 block text-xs">{item.conversionPointName ?? '成果地点は未設定'}</span>
+                    {/* R51: 成果金額と確定報酬は別項目。ここは成果の金額。 */}
+                    <span className="text-ink-faint mt-0.5 block text-xs">成果額 {formatYenNullable(item.value)}</span>
                   </td>
                   <td className="text-ink px-4 py-3 text-right text-sm font-semibold tabular-nums">
-                    {formatYenNullable(item.value)}
+                    {/* R51: 報酬列は確定した報酬額。まだ決まっていなければ「未確定」。 */}
+                    {item.rewardAmount != null ? formatYenNullable(item.rewardAmount) : '未確定'}
                   </td>
                   <td className="px-4 py-3 text-center">
                     {needsReview ? (

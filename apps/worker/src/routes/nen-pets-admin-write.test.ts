@@ -170,6 +170,25 @@ describe('NEN ペット編集（PUT /api/nen-campaigns/pets/:id）', () => {
     expect(pending?.status).toBe('pending');
   });
 
+  it('体重を変えたときだけ「体重の更新」の日付が動く（監査 R57）', async () => {
+    // 体重を測った日は古いまま、プロフィールだけ直近で編集された行を作る。
+    sql.exec(`UPDATE nen_pet_profiles SET weight_kg = 8, weight_updated_at = '2026-06-01 00:00:00' WHERE id = 'pet-1'`);
+
+    // 名前だけの編集では「体重の更新」は動かない。
+    const nameOnly = await harness().request(`/api/nen-campaigns/pets/pet-1?lineAccountId=${ACCOUNT}`, json({ name: 'モモ改' }, 'PUT'));
+    expect(nameOnly.status).toBe(200);
+    const kept = sql.prepare(`SELECT weight_updated_at FROM nen_pet_profiles WHERE id = 'pet-1'`).get() as { weight_updated_at: string | null };
+    expect(kept.weight_updated_at).toBe('2026-06-01 00:00:00');
+
+    // 体重を変えると「測った日」として更新される。
+    const weighed = await harness().request(`/api/nen-campaigns/pets/pet-1?lineAccountId=${ACCOUNT}`, json({ weightKg: 9 }, 'PUT'));
+    expect(weighed.status).toBe(200);
+    const row = sql.prepare(`SELECT weight_kg, weight_updated_at FROM nen_pet_profiles WHERE id = 'pet-1'`).get() as { weight_kg: number; weight_updated_at: string | null };
+    expect(row.weight_kg).toBe(9);
+    expect(row.weight_updated_at).not.toBe('2026-06-01 00:00:00');
+    expect(row.weight_updated_at).toBeTruthy();
+  });
+
   it('別アカウントのペットは 404、staff は書けない（403）', async () => {
     const res = await harness().request(`/api/nen-campaigns/pets/pet-x?lineAccountId=${ACCOUNT}`, json({
       name: 'ヨソ改',

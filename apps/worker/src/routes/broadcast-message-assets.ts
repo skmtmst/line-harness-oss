@@ -10,6 +10,7 @@ import {
   type BroadcastMessageAssetKind,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
+import { validateAssetPayload } from '@line-crm/shared';
 import { requireRole } from '../middleware/role-guard.js';
 import { storeBroadcastMedia } from '../services/broadcast-media-storage.js';
 import { builtinFileScan, checkKeyGate } from '../services/file-scan.js';
@@ -118,16 +119,16 @@ function serialize(row: BroadcastMessageAsset) {
   };
 }
 
+/**
+ * 素材の保存時の形の検査。
+ *
+ * 枚数・必須項目の数え方は画面と Worker で1つ（`@line-crm/shared`）。
+ * 2か所に散ると、画面では10枚まで作れるのに API が9枚で止める、
+ * という作り終えてから保存できない形になる（監査 R141）。
+ */
 function validatePayload(kind: BroadcastMessageAssetKind, payload: unknown): string | null {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return 'payload must be an object';
-  const value = payload as Record<string, unknown>;
-  if (kind === 'card_message') {
-    if (!Array.isArray(value.cards) || value.cards.length < 1 || value.cards.length > 9) {
-      return 'カードは1〜9枚で設定してください';
-    }
-  }
-  if (kind === 'rich_message' && typeof value.imageUrl !== 'string') return '画像を設定してください';
-  return null;
+  return validateAssetPayload(kind, payload as Record<string, unknown>);
 }
 
 broadcastMessageAssets.get('/api/broadcast-message-assets', async (c) => {

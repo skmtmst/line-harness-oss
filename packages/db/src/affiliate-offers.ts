@@ -512,8 +512,10 @@ export interface ConversionApprovalNotifyInfo {
   affiliateId: string;
   /** Offer name resolved via attributed_ref_code → link.offer_id, or null. */
   offerName: string | null;
-  /** Fixed reward for the offer (0 when offer-less). */
+  /** 確定した報酬額（計算版を優先し、無ければ案件の設定額）。 */
   rewardAmount: number;
+  /** 紹介者の「成果の通知を受け取る」設定。false のとき送信しない。 */
+  notifyOnConversion: boolean;
 }
 
 /**
@@ -531,9 +533,24 @@ export async function getConversionApprovalNotifyInfo(
 ): Promise<ConversionApprovalNotifyInfo | null> {
   const row = await db
     .prepare(
+      /*
+       * R48/R49:
+       * - 紹介者の通知設定(notify_on_conversion)を一緒に取る。呼び出し側は
+       *   0 のとき送信処理へ進まない。
+       * - 通知の額は案件の設定額ではなく、承認時に固定された計算版の
+       *   報酬額を優先する(率の案件で設定額を見せる事故を防ぐ)。
+       */
       `SELECT ce.affiliate_id AS affiliate_id,
               off.name AS offer_name,
-              off.reward_amount AS reward_amount
+              off.reward_amount AS offer_reward_amount,
+              (SELECT calc.amount_minor
+                 FROM affiliate_reward_calculations calc
+                WHERE calc.conversion_event_id = ce.id
+                  AND calc.affiliate_id = ce.affiliate_id
+                  AND calc.formula IN ('rate', 'fixed')
+                ORDER BY calc.id DESC LIMIT 1) AS calculated_reward_amount,
+              (SELECT a.notify_on_conversion
+                 FROM affiliates a WHERE a.id = ce.affiliate_id) AS notify_on_conversion
          FROM conversion_events ce
          LEFT JOIN affiliate_links al ON al.ref_code = ce.attributed_ref_code
          LEFT JOIN affiliate_offers off ON off.id = al.offer_id
@@ -543,13 +560,16 @@ export async function getConversionApprovalNotifyInfo(
     .first<{
       affiliate_id: string;
       offer_name: string | null;
-      reward_amount: number | null;
+      offer_reward_amount: number | null;
+      calculated_reward_amount: number | null;
+      notify_on_conversion: number | null;
     }>();
   if (!row) return null;
   return {
     affiliateId: row.affiliate_id,
     offerName: row.offer_name,
-    rewardAmount: row.reward_amount ?? 0,
+    rewardAmount: row.calculated_reward_amount ?? row.offer_reward_amount ?? 0,
+    notifyOnConversion: row.notify_on_conversion !== 0,
   };
 }
 
