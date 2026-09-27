@@ -49,7 +49,13 @@ export async function getBlockedRecipientIds(
   return new Set((rows.results ?? []).map((row) => row.friend_id));
 }
 
-/** 再送の対象（failed だけ）。unknown と sent は入らない。 */
+/**
+ * 再送の対象（#816: 一時的な失敗だけ）。
+ *
+ * failed のうち、送り直す意味がある理由（混み合い・止める前で未送信）だけ。
+ * ブロック・友だち解除などの恒常的な失敗は送り直しても通らないので入れない。
+ * unknown と sent は入らない（at-most-once）。
+ */
 export async function getRetryableRecipientIds(
   db: D1Database,
   broadcastId: string,
@@ -58,6 +64,7 @@ export async function getRetryableRecipientIds(
     .prepare(
       `SELECT friend_id FROM broadcast_send_claims
         WHERE broadcast_id = ? AND state = 'failed'
+          AND error_code IN ('line_http_429', 'stopped_before_dispatch')
         ORDER BY friend_id`,
     )
     .bind(broadcastId)
@@ -148,6 +155,11 @@ export interface SettleInput {
    */
   state: Extract<BroadcastSendClaimState, 'sent' | 'failed' | 'unknown'>;
   errorCode?: string | null;
+  /**
+   * LINE の要求 ID（応答ヘッダー）。`sent` のときだけ書き込む。
+   * 応答に無いときは null のまま残し、代わりの値を作らない。
+   */
+  lineRequestId?: string | null;
   at?: string;
 }
 
@@ -174,14 +186,25 @@ export function buildBroadcastSettleStatements(
 ): D1PreparedStatement[] {
   const now = input.at ?? jstNow();
   const allowed = input.state === 'sent' ? "'claimed', 'unknown'" : "'claimed'";
+  // 要求 ID は「届いた」ときだけ残す。失敗・不明の行に要求 ID を書くと、
+  // 「送った証拠があるのに失敗」と読めてしまう。
+  const stampRequestId = input.state === 'sent' && input.lineRequestId != null;
   return input.friendIds.map((friendId) =>
     db
       .prepare(
-        `UPDATE broadcast_send_claims
-            SET state = ?, settled_at = ?, error_code = ?, updated_at = ?
-          WHERE broadcast_id = ? AND friend_id = ? AND state IN (${allowed})`,
+        stampRequestId
+          ? `UPDATE broadcast_send_claims
+              SET state = ?, settled_at = ?, error_code = ?, line_request_id = ?, updated_at = ?
+            WHERE broadcast_id = ? AND friend_id = ? AND state IN (${allowed})`
+          : `UPDATE broadcast_send_claims
+              SET state = ?, settled_at = ?, error_code = ?, updated_at = ?
+            WHERE broadcast_id = ? AND friend_id = ? AND state IN (${allowed})`,
       )
-      .bind(input.state, now, input.errorCode ?? null, now, input.broadcastId, friendId),
+      .bind(
+        ...(stampRequestId
+          ? [input.state, now, input.errorCode ?? null, input.lineRequestId, now, input.broadcastId, friendId]
+          : [input.state, now, input.errorCode ?? null, now, input.broadcastId, friendId]),
+      ),
   );
 }
 
@@ -232,10 +255,11 @@ export async function closeClaimsForStop(
 }
 
 /**
- * 再送の試行を開始する。failed の行だけを新しい試行番号で押さえ直す。
+ * 再送の試行を開始する（#816: 一時的な失敗だけを新しい試行番号で押さえ直す）。
  *
  * `dispatched_at` を NULL に戻すのは、この行が**まだ外へ出ていない**から。
- * sent / unknown の行には触れない（`state = 'failed'` で絞る）。
+ * sent / unknown の行には触れない。恒常的な失敗（ブロックなど）も触れない——
+ * 送り直しても通らない相手へ送らない。
  */
 export async function reopenFailedClaims(
   db: D1Database,
@@ -249,7 +273,8 @@ export async function reopenFailedClaims(
       `UPDATE broadcast_send_claims
           SET state = 'claimed', attempt_no = ?, dispatched_at = NULL,
               settled_at = NULL, error_code = NULL, updated_at = ?
-        WHERE broadcast_id = ? AND state = 'failed'`,
+        WHERE broadcast_id = ? AND state = 'failed'
+          AND error_code IN ('line_http_429', 'stopped_before_dispatch')`,
     )
     .bind(attemptNo, now, broadcastId)
     .run();

@@ -196,7 +196,8 @@ describe('NEN-07: つなぐ回答フォームが使えない設定（実mount）
     expect(toggle).toBeDefined()
     await click(toggle!)
 
-    const options = Array.from(container.querySelectorAll('[role="option"]'))
+    // 候補は最上層（MenuPortal→document.body）に出る。器の中にはいない。
+    const options = Array.from(document.querySelectorAll('[role="option"]'))
     const live = options.find((option) => option.textContent?.includes('公開中のフォーム'))
     const draft = options.find((option) => option.textContent?.includes('下書きフォーム'))
     expect(live?.getAttribute('aria-disabled')).toBeNull()

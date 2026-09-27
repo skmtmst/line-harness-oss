@@ -1,5 +1,6 @@
 import { FEATURE_IDS, type FeatureId } from '@line-crm/shared';
 import { getTrackedLinkStats } from './analytics.js';
+import { getAdCostTotalsByRoute } from './ad-costs.js';
 
 export type AnalyticsMetricState =
   | 'available'
@@ -501,34 +502,69 @@ export async function getAnalyticsRoutesOverview(
     connected: number; reactions: number; approved: number; pending: number;
     rejected: number; revenue: number;
   }>();
-  const [missing, attribution] = await Promise.all([
+  const [missing, attribution, costTotals] = await Promise.all([
     db.prepare(
       `SELECT COUNT(*) AS adds FROM friend_add_events
         WHERE line_account_id = ? AND attribution_status = 'unavailable'
           AND julianday(occurred_at) >= julianday(?) AND julianday(occurred_at) < julianday(?)`,
     ).bind(context.lineAccountId, context.from, context.toExclusive).first<{ adds: number }>(),
     getCoverage(db, context.lineAccountId, 'friend_add', context.from),
+    getAdCostTotalsByRoute(db, {
+      lineAccountId: context.lineAccountId,
+      from: context.fromDate,
+      to: context.toDate,
+    }),
   ]);
-  const costReason = '広告費の取込台帳は「18 流入と計測」で接続予定です';
-  const routes: AnalyticsRouteOverviewItem[] = rows.results.map((row) => ({
-    id: row.id,
-    refCode: row.ref_code,
-    name: row.name,
-    clicks: metric(Number(row.clicks), 'partial', 'ログイン・LIFF・短縮リンクで識別できた接触のみです'),
-    friendAdds: metric(Number(row.friend_adds), attribution.state, attribution.reason),
-    currentFriends: metric(Number(row.connected), attribution.state, attribution.reason),
-    reactionPeople: metric(Number(row.reactions), 'partial', '記録開始後の受信・ボタン・URL反応です'),
-    conversions: {
-      approved: metric(Number(row.approved)),
-      pending: metric(Number(row.pending)),
-      rejected: metric(Number(row.rejected)),
-      revenue: metric(Number(row.revenue)),
-    },
-    adCost: metric<number>(null, 'unavailable', costReason),
-    costPerFriend: metric<number>(null, 'unavailable', costReason),
-    costPerConversion: metric<number>(null, 'unavailable', costReason),
-    profitAfterAdCost: metric<number>(null, 'unavailable', costReason),
-  }));
+  // 広告費は最小通貨単位で来る。表示は円だけ扱うので、JPY以外や
+  // 複数通貨が混ざる経路は換算根拠がない旨を理由にして出さない。
+  const costMetric = (routeId: string) => {
+    const totals = costTotals.get(routeId);
+    if (!totals || totals.length === 0) {
+      return metric<number>(null, 'unavailable', 'この経路の広告費は取り込まれていません');
+    }
+    if (totals.length > 1 || totals[0].currency !== 'JPY') {
+      return metric<number>(null, 'unavailable', '通貨が複数あるか円以外のため、換算なしでは合計できません');
+    }
+    return metric<number>(totals[0].amountMinor, 'available', null);
+  };
+  const costPerFriendMetric = (routeId: string, friendAdds: number, state: AnalyticsMetricState, reason: string | null) => {
+    const cost = costMetric(routeId);
+    if (cost.value === null) return metric<number>(null, cost.state, cost.reason);
+    if (state !== 'available') return metric<number>(null, state, reason);
+    if (friendAdds === 0) return metric<number>(null, 'unavailable', 'この期間の友だち追加が0件のため割れません');
+    return metric<number>(Math.round((cost.value / friendAdds) * 100) / 100, 'available', null);
+  };
+  const routes: AnalyticsRouteOverviewItem[] = rows.results.map((row) => {
+    const adCost = costMetric(row.id);
+    const costPerFriend = costPerFriendMetric(row.id, Number(row.friend_adds), attribution.state, attribution.reason);
+    const approved = Number(row.approved);
+    const revenue = Number(row.revenue);
+    return {
+      id: row.id,
+      refCode: row.ref_code,
+      name: row.name,
+      clicks: metric(Number(row.clicks), 'partial', 'ログイン・LIFF・短縮リンクで識別できた接触のみです'),
+      friendAdds: metric(Number(row.friend_adds), attribution.state, attribution.reason),
+      currentFriends: metric(Number(row.connected), attribution.state, attribution.reason),
+      reactionPeople: metric(Number(row.reactions), 'partial', '記録開始後の受信・ボタン・URL反応です'),
+      conversions: {
+        approved: metric(approved),
+        pending: metric(Number(row.pending)),
+        rejected: metric(Number(row.rejected)),
+        revenue: metric(revenue),
+      },
+      adCost,
+      costPerFriend,
+      costPerConversion: adCost.value === null
+        ? metric<number>(null, adCost.state, adCost.reason)
+        : approved === 0
+          ? metric<number>(null, 'unavailable', 'この期間の成果が0件のため割れません')
+          : metric<number>(Math.round((adCost.value / approved) * 100) / 100, 'available', null),
+      profitAfterAdCost: adCost.value === null
+        ? metric<number>(null, adCost.state, adCost.reason)
+        : metric<number>(revenue - adCost.value, 'available', null),
+    };
+  });
   if (Number(missing?.adds ?? 0) > 0) {
     routes.push({
       id: '__unknown__', refCode: null, name: '経路不明',
@@ -542,10 +578,10 @@ export async function getAnalyticsRoutesOverview(
         rejected: metric<number>(null, 'partial', '第一接触が不明なため経路へ帰属できません'),
         revenue: metric<number>(null, 'partial', '第一接触が不明なため経路へ帰属できません'),
       },
-      adCost: metric<number>(null, 'unavailable', costReason),
-      costPerFriend: metric<number>(null, 'unavailable', costReason),
-      costPerConversion: metric<number>(null, 'unavailable', costReason),
-      profitAfterAdCost: metric<number>(null, 'unavailable', costReason),
+      adCost: metric<number>(null, 'unavailable', '経路が分からない分には広告費を帰属できません'),
+      costPerFriend: metric<number>(null, 'unavailable', '経路が分からない分には広告費を帰属できません'),
+      costPerConversion: metric<number>(null, 'unavailable', '経路が分からない分には広告費を帰属できません'),
+      profitAfterAdCost: metric<number>(null, 'unavailable', '経路が分からない分には広告費を帰属できません'),
     });
   }
   return envelope(context, {

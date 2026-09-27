@@ -53,7 +53,7 @@ function hold() {
   pending.push({ resolve })
   return { promise, resolve }
 }
-const list = () => host.querySelector<HTMLElement>('[data-inbox-v4="conversation-list"]')!
+const list = () => document.querySelector<HTMLElement>('[data-inbox-v4="conversation-list"]')!
 const state = (kind: string) => list().querySelector(`[data-inbox-list-state="${kind}"]`)
 async function settle() {
   await act(async () => { await Promise.resolve(); await Promise.resolve() })
@@ -68,7 +68,7 @@ async function eventually(check: () => void, timeout = 1000) {
   }
 }
 async function click(label: string) {
-  const button = [...host.querySelectorAll('button')].find((item) => item.textContent?.trim().startsWith(label))
+  const button = [...document.querySelectorAll('button')].find((item) => item.textContent?.trim().startsWith(label))
   expect(button, label).toBeTruthy()
   await act(async () => { button!.click() })
 }
@@ -91,7 +91,7 @@ async function renderWithRowsUnlessFiltered() {
 async function applySingleFilter(kind: 'search' | 'status' | 'quick' | 'assignee' | 'unread') {
   if (kind === 'search') {
     await act(async () => {
-      const input = host.querySelector<HTMLInputElement>('[aria-label="名前・メールアドレス・内容で検索"]')!
+      const input = document.querySelector<HTMLInputElement>('[aria-label="名前・メールアドレス・内容で検索"]')!
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '該当なし')
       input.dispatchEvent(new Event('input', { bubbles: true }))
     })
@@ -106,18 +106,18 @@ async function applySingleFilter(kind: 'search' | 'status' | 'quick' | 'assignee
   if (kind === 'assignee') {
     // 担当者の選択は候補つき入力へ移した。表示名を打って候補を押す。
     await act(async () => {
-      const field = host.querySelector<HTMLInputElement>('[aria-label="担当者で絞り込む（パネル）"]')!
+      const field = document.querySelector<HTMLInputElement>('[aria-label="担当者で絞り込む（パネル）"]')!
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(field, '担当A')
       field.dispatchEvent(new Event('input', { bubbles: true }))
     })
     await act(async () => {
-      const option = [...host.querySelectorAll('li[role="option"]')].find((li) => li.textContent?.includes('担当A'))
+      const option = [...document.querySelectorAll('li[role="option"]')].find((li) => li.textContent?.includes('担当A'))
       expect(option, '担当A').toBeTruthy()
       ;(option as HTMLElement).click()
     })
     return
   }
-  await act(async () => { host.querySelector<HTMLInputElement>('[aria-label="未読だけ表示"]')!.click() })
+  await act(async () => { document.querySelector<HTMLInputElement>('[aria-label="未読だけ表示"]')!.click() })
 }
 beforeEach(() => {
   calls = []; pending = []; handler = base
@@ -229,7 +229,7 @@ test('条件変更の描画から新条件取得開始まで旧0件を空状態�
   expect(state('empty')).toBeTruthy()
   const next = hold()
   handler = (url) => isFilteredRequest(url) ? next.promise.then((value) => value.clone()) : base(url)
-  const button = [...host.querySelectorAll('button')].find((item) => item.textContent?.trim() === '未対応')!
+  const button = [...document.querySelectorAll('button')].find((item) => item.textContent?.trim() === '未対応')!
   act(() => {
     flushSync(() => button.click())
     expect(state('loading')).toBeTruthy()
@@ -249,7 +249,7 @@ test('条件解除の描画から再取得開始まで旧0件を通常0件とし
 
   const next = hold()
   handler = (url) => isFilteredRequest(url) ? base(url) : next.promise.then((value) => value.clone())
-  const button = [...host.querySelectorAll('button')].find((item) => item.textContent?.trim() === '絞り込みを解除')!
+  const button = [...document.querySelectorAll('button')].find((item) => item.textContent?.trim() === '絞り込みを解除')!
   act(() => {
     flushSync(() => button.click())
     expect(state('loading')).toBeTruthy()
@@ -268,7 +268,7 @@ test('全条件の結果0件を区別し、解除後に会話を戻す', async (
   await act(async () => root.render(<ChatsPage />))
 
   await act(async () => {
-    const input = host.querySelector<HTMLInputElement>('[aria-label="名前・メールアドレス・内容で検索"]')!
+    const input = document.querySelector<HTMLInputElement>('[aria-label="名前・メールアドレス・内容で検索"]')!
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '見つからない')
     input.dispatchEvent(new Event('input', { bubbles: true }))
   })
@@ -279,12 +279,12 @@ test('全条件の結果0件を区別し、解除後に会話を戻す', async (
   await click('未対応')
   await click('絞り込み')
   await act(async () => {
-    const field = host.querySelector<HTMLInputElement>('[aria-label="担当者で絞り込む（パネル）"]')!
+    const field = document.querySelector<HTMLInputElement>('[aria-label="担当者で絞り込む（パネル）"]')!
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(field, '担当A')
     field.dispatchEvent(new Event('input', { bubbles: true }))
   })
   await act(async () => {
-    const option = [...host.querySelectorAll('li[role="option"]')].find((li) => li.textContent?.includes('担当A'))
+    const option = [...document.querySelectorAll('li[role="option"]')].find((li) => li.textContent?.includes('担当A'))
     expect(option, '担当A').toBeTruthy()
     ;(option as HTMLElement).click()
   })
@@ -293,7 +293,7 @@ test('全条件の結果0件を区別し、解除後に会話を戻す', async (
     expect(assigneeCall.searchParams.get('operatorId')).toBe('operator-a')
   })
   await click('1時間以上待ち')
-  await act(async () => { host.querySelector<HTMLInputElement>('[aria-label="未読だけ表示"]')!.click() })
+  await act(async () => { document.querySelector<HTMLInputElement>('[aria-label="未読だけ表示"]')!.click() })
 
   await eventually(() => expect(state('filtered-empty')).toBeTruthy())
   expect(list().textContent).toContain('条件に一致する会話がありません')

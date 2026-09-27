@@ -153,7 +153,8 @@ function dialog(): HTMLElement {
 }
 
 function buttons(): HTMLButtonElement[] {
-  return [...dialog().querySelectorAll<HTMLButtonElement>('button')]
+  // 候補の選択肢は最上層（MenuPortal→document.body）に出る。窓の中にはいない。
+  return [...document.querySelectorAll<HTMLButtonElement>('button')]
 }
 
 async function chooseReplacement() {

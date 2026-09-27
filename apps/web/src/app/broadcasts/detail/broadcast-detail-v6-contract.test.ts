@@ -6,18 +6,30 @@ import { describe, expect, it } from 'vitest'
 const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
 
 describe('V6 一斉配信詳細の契約', () => {
-  it('概要から配信内容まで、同じ結果画面のタブとして示す', () => {
-    expect(PAGE).toContain("['概要', 'クリック', '友だち', 'エラー', '配信内容']")
+  it('概要・宛先・記録を押せるタブとして示す', () => {
+    // #816（★V7 C-2）。押せない5連の飾り（概要・クリック・友だち・エラー・
+    // 配信内容）は、押せる3つのタブ（概要・宛先・記録）へ置き換えた。
+    // 押せない飾りは出さない（★V7の決まり）。
+    expect(PAGE).toContain('<DetailTabs')
+    expect(PAGE).not.toContain("['概要', 'クリック', '友だち', 'エラー', '配信内容']")
     expect(PAGE).toContain('id="broadcast-content"')
     expect(PAGE).not.toContain('配信内容の別画面は準備中です')
   })
 
-  it('配信が読めるまでは押せないバーだけを出さない', () => {
-    // ★V7 `x63W5x`：読み込み中は押せないボタンだけのバーを出さない。
-    // 配信が読めてから StickyBar を出す。
-    expect(PAGE).not.toContain('disabled={!broadcast}')
-    expect(PAGE).toContain('{broadcast ? (')
+  it('書き出しはタブの中に置き、下の追従バーは出さない', () => {
+    // #816 C。書き出しは宛先のタブの中の1つと概要のタブの中の1つだけ。
+    // 画面の一番下の箱（StickyBar）は消す。二重になるとどちらを押せば
+    // よいか分からなくなる。
+    expect(PAGE).not.toContain('StickyBar')
     expect(PAGE).toContain('CSVで書き出す')
+  })
+
+  it('承認が絡む配信は段に承認待ちを出す', () => {
+    // 記録に「承認を依頼した」「承認した」がある配信は、
+    // 送り終わっても段に承認待ちを出す。承認の要らない配信は出さない。
+    // 配信本体が古い応答のときは承認の今の状態で補う。
+    expect(PAGE).toContain('isApprovalInvolved(broadcast.approvalStatus, approval)')
+    expect(PAGE).toContain('approval={approvalState}')
   })
 
   it('取得失敗を配信なしと混ぜず、同じ画面で再読込できる', () => {

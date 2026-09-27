@@ -480,4 +480,71 @@ describe('オートメーション下書きAPI', () => {
       "SELECT COUNT(*) AS count FROM automation_definitions WHERE status = 'draft'",
     ).get()).toEqual({ count: 2 });
   });
+
+  /*
+   * R21: 毎週の曜日は0〜6の整数の重複なし配列だけを受け付ける。
+   * 以前は画面が "1,3," を [1,3,0]（Number("") === 0）へ変えて送り、
+   * 日曜にも動く下書きが保存できていた。保存側でも空・文字列・
+   * 小数・範囲外・重複をすべて断る。直しを戻すと赤くなる。
+   */
+  it('毎週の曜日は空・文字・範囲外・重複を断り正しい配列だけを通す', async () => {
+    testDb.raw.prepare(
+      `INSERT INTO tags (id, name, line_account_id) VALUES ('tag-1', '会員', 'account-1')`,
+    ).run();
+    testDb.raw.prepare(
+      `INSERT INTO friends
+         (id, line_user_id, display_name, line_account_id, metadata, created_at, updated_at)
+       VALUES ('friend-1', 'U-friend-1', '田中さん', 'account-1', '{}', datetime('now'), datetime('now'))`,
+    ).run();
+    const adminApp = app(testDb.db, admin);
+    const created = await adminApp.request(
+      '/api/automation-templates/received-message-tag/drafts?account_id=account-1',
+      {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ operationKey: 'op-weekday-strict' }),
+      },
+    );
+    expect(created.status).toBe(201);
+    const createdBody = await created.json() as { data: { id: string; draftVersionId: string } };
+    const revision = createdBody.data.draftVersionId;
+    const put = (weekdays: unknown) => adminApp.request(
+      `/api/automation-drafts/${createdBody.data.id}?account_id=account-1`,
+      {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          expectedDraftVersionId: revision,
+          name: '毎週の曜日', eventType: 'weekly',
+          triggerConfig: { time: '09:00', weekdays, friendIds: ['friend-1'] },
+          conditions: {},
+          actions: [{ id: 'tag', type: 'add_tag', params: { tagId: 'tag-1' }, onFailure: 'stop' }],
+        }),
+      },
+    );
+    // 空の要素由来の0が混ざる前の形・あり得ない値はすべて断る。
+    const bad: Array<[string, unknown]> = [
+      ['空のままの文字列', ''],
+      ['余分なカンマ付きの文字列', '1,3,'],
+      ['空配列', []],
+      ['空文字の要素', ['1', '']],
+      ['文字列の要素', ['1', '3']],
+      ['小数の要素', [1, 3.5]],
+      ['範囲外（7）', [1, 7]],
+      ['範囲外（-1）', [-1, 3]],
+      ['範囲外の日曜の裏番号', [1, 3, 0, 8]],
+      ['重複', [1, 1, 3]],
+    ];
+    for (const [label, weekdays] of bad) {
+      const response = await put(weekdays);
+      expect(response.status, label).toBe(422);
+      await expect(response.json(), label).resolves.toMatchObject({ code: 'trigger_config_invalid' });
+    }
+    // 正しい配列は通り、小さい順に整えて保存する。
+    const saved = await put([3, 1]);
+    expect(saved.status).toBe(200);
+    const savedBody = await saved.json() as { data: { draftVersionId: string } };
+    const stored = testDb.raw.prepare(
+      `SELECT trigger_config AS config FROM automation_versions WHERE id = ?`,
+    ).get(versionRowId(savedBody.data.draftVersionId)) as { config: string };
+    expect(JSON.parse(stored.config)).toEqual({ time: '09:00', weekdays: [1, 3], friendIds: ['friend-1'] });
+  });
 });

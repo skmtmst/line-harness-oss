@@ -437,7 +437,13 @@ describe('V6 friend-add rule data contracts', () => {
     expect(hidden.status).toBe(404);
   });
 
-  it('再追加の「何も配信しない」はシナリオなしで保存でき、それ以外は必須のまま', async () => {
+  /*
+   * R30(監査・2026-09-27): 下書きは未完成のまま保存できる。「それ以外は必須」
+   * だった従来の契約は、基本設定の段から次へ進めない原因だったため変える。
+   * 全体の必須はテスト・公開前確認で見る。公開はテスト成功が鍵のため、
+   * 未完成のまま公開できないことをここで守る。
+   */
+  it('再追加の「何も配信しない」はシナリオなしで保存でき、未完成の下書きは公開前に止まる', async () => {
     seedRuleAndRun(testDb);
     const base = {
       accountId: 'account-1', friendKind: 'returning', name: '再追加なし', priority: 5,
@@ -452,14 +458,29 @@ describe('V6 friend-add rule data contracts', () => {
     ));
     expect(noneOk.status).toBe(201);
 
-    const missing = await app(testDb.db).request('/api/friend-add-rules/drafts', json(
+    const incomplete = await app(testDb.db).request('/api/friend-add-rules/drafts', json(
       'POST', { ...base, name: '再追加あり', definition: { ...base.definition, returningMode: undefined } },
       'friend-add-none-00002',
     ));
-    expect(missing.status).toBe(400);
-    await expect(missing.json()).resolves.toMatchObject({
-      success: false, error: '実際に配信するシナリオを決めてください。',
-    });
+    expect(incomplete.status).toBe(201);
+    const draftId = ((await incomplete.json()) as { data: { id: string } }).data.id;
+
+    const tested = await app(testDb.db).request('/api/friend-add-rules/test', json(
+      'POST', { accountId: 'account-1', ruleId: draftId },
+    ));
+    expect(tested.status).toBe(200);
+    const testedBody = (await tested.json()) as {
+      success: boolean; data: { matched: boolean; reasons: string[] };
+    };
+    expect(testedBody.success).toBe(false);
+    expect(testedBody.data.matched).toBe(false);
+    expect(testedBody.data.reasons.join('\n')).toContain('実際に配信するシナリオを決めてください。');
+
+    const published = await app(testDb.db).request(
+      `/api/friend-add-rules/${draftId}/publish?account_id=account-1`,
+      { method: 'POST', headers: { 'Idempotency-Key': 'friend-add-none-publish-1' } },
+    );
+    expect(published.status).toBe(409);
   });
 
   /*

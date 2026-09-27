@@ -15,7 +15,10 @@ const mocks = vi.hoisted(() => ({
   dbRun: vi.fn(),
 }));
 
-vi.mock('@line-crm/db', () => ({
+vi.mock('@line-crm/db', async (importOriginal) => ({
+  // 台帳・記録・状態の純粋な部品と集計は本物を使う（#816）。
+  // 境界の判定対象（取得・作成・更新・削除）だけ差し替える。
+  ...(await importOriginal<typeof import('@line-crm/db')>()),
   getBroadcasts: mocks.getBroadcasts,
   getBroadcastById: mocks.getBroadcastById,
   createBroadcast: mocks.createBroadcast,

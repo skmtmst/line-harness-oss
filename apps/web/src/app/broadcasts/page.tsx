@@ -33,6 +33,23 @@ const statusConfig: Record<
 }
 
 /**
+ * 一覧の状態の札（#816・10の状態）。displayStatus があればこちらを出し、
+ * 無ければ statusConfig（上の4つ）へ戻す。
+ */
+const displayStatusConfig: Record<string, { label: string; className: string }> = {
+  draft: { label: '下書き', className: 'bg-canvas-sunken text-ink-secondary' },
+  pending_approval: { label: '承認待ち', className: 'bg-info-bg text-info' },
+  scheduled: { label: '予約済み', className: 'bg-info-bg text-info' },
+  preparing: { label: '送信準備', className: 'bg-info-bg text-info' },
+  sending: { label: '送信中', className: 'bg-warning-bg text-warning' },
+  sent: { label: '送信済み', className: 'bg-success-bg text-success' },
+  partial_failed: { label: '一部失敗', className: 'bg-warning-bg text-warning' },
+  failed: { label: '失敗', className: 'bg-danger-bg text-danger' },
+  stopped: { label: '停止', className: 'bg-canvas-sunken text-ink-secondary' },
+  expired: { label: '期限切れ', className: 'bg-canvas-sunken text-ink-secondary' },
+}
+
+/**
  * 配信日時。**JSTで書く。**
  *
  * `timeZone` を渡さないと、動かしている端末の時計で書き出す。開発機が
@@ -752,7 +769,8 @@ function BroadcastList() {
             </thead>
             <tbody className="divide-y divide-hairline">
               {visibleBroadcasts.map((broadcast) => {
-                const statusInfo = statusConfig[broadcast.status]
+                const statusInfo = (broadcast.displayStatus && displayStatusConfig[broadcast.displayStatus])
+                  ?? statusConfig[broadcast.status]
                 const isDedup = broadcast.targetType === 'multi-account-dedup'
                 // 手動で取り直した値があればそれを、一覧同梱の集計があればそれを使う。
                 const insight = insights[broadcast.id] ?? summaryInsight(broadcast.insightSummary)

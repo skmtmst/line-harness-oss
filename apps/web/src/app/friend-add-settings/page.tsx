@@ -233,12 +233,16 @@ function FriendAddSettingsList() {
       */}
       <Notice data-design="Alert" tone="info" message="経路を確定できるのは「流入と計測」で発行したリンクから来た人だけです。素のQR・検索から来た人は「経路が分からなかった人」の設定が動きます。" className="mb-4" />
 
-      <section data-design="Flow" className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="この7日の状況">
-        <span className="sr-only">どう振り分けられるか。友だち追加された。この1か月の実績。</span>
-        <KpiCard title="初回案内" value={data?.summary.rules ?? 0} unit="件" detail={`有効 ${data?.summary.active ?? 0}件`} variant="v6" />
-        <KpiCard title="直近7日の友だち追加" value={data?.summary.recentAdds ?? null} unit="人" detail={`経路が取れた ${countText(data?.summary.captured ?? null, '人')}`} variant="v6" />
-        <KpiCard title="送信成功" value={data?.summary.delivered ?? null} unit="通" detail={successRate(data?.summary.delivered ?? null, data?.summary.failed ?? null)} variant="v6" />
-        <KpiCard title="経路が分からなかった人" value={data?.summary.unknownRoute ?? null} unit="人" detail="共通の案内が動いた" badge={(data?.summary.unknownRoute ?? 0) > 0 ? '要確認' : undefined} badgeTone="warning" variant="v6" />
+      {/*
+        R31: まとめの数はすべて直近7日にそろえる。設定の数（初回案内）は
+        いまの数なので、期間の数と混ざらないよう「？」で補足する。
+      */}
+      <section data-design="Flow" className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="直近7日の状況">
+        <span className="sr-only">どう振り分けられるか。友だち追加された。直近7日の実績。</span>
+        <KpiCard title="初回案内" value={data?.summary.rules ?? 0} unit="件" detail={`有効 ${data?.summary.active ?? 0}件`} help="いまある初回案内の設定数です。右の3つ（直近7日）とは期間がちがいます。" variant="v6" />
+        <KpiCard title="直近7日の友だち追加" value={data?.summary.recentAdds ?? null} unit="人" detail={`経路が取れた ${countText(data?.summary.captured ?? null, '人')}`} help="直近7日に友だち追加された人数と、そのうち流入リンクが分かった人数です。" variant="v6" />
+        <KpiCard title="直近7日の送信成功" value={data?.summary.delivered ?? null} unit="通" detail={successRate(data?.summary.delivered ?? null, data?.summary.failed ?? null)} help="直近7日に実際に送った通数です。送信履歴の累計配信と同じ数え方です。" variant="v6" />
+        <KpiCard title="直近7日の経路不明" value={data?.summary.unknownRoute ?? null} unit="人" detail="直近7日の人数です。共通の案内が動きます。" help="直近7日に追加され、流入リンクが分からなかった人数です。経路が分からなかった人へ共通の案内が動きます。" badge={(data?.summary.unknownRoute ?? 0) > 0 ? '要確認' : undefined} badgeTone="warning" variant="v6" />
       </section>
 
       {/* 作る操作は数字のカードの下・一覧のすぐ上の左。 */}
