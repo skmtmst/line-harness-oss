@@ -54,6 +54,16 @@ function overlaps(aStart: number, aEnd: number, bStart: number, bEnd: number): b
   return aStart < bEnd && bStart < aEnd;
 }
 
+/**
+ * R92: 店舗共通ルールの値を範囲検査して読む。手編集で壊れた値・
+ * 型違いは「未設定」と同じ扱いにし、メニュー値だけを見る。
+ */
+function intInRange(value: unknown, min: number, max: number): number | null {
+  return typeof value === 'number' && Number.isInteger(value) && value >= min && value <= max
+    ? value
+    : null;
+}
+
 function isHhmm(value: string): boolean {
   return /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value);
 }
@@ -251,6 +261,12 @@ export interface GetAvailabilityParams {
   to: string;
   now: Date;
   minLeadTimeMinutes: number;
+  /**
+   * R92: お客さま向けの判定では店舗共通ルール（受付締切・受付期間）を
+   * メニューの個別指定が無いときの既定値として使う。運用者向け
+   * （当日の電話予約など）は付けず、従来どおりメニュー値だけを見る。
+   */
+  applyStoreRules?: boolean;
   googleCredentials?: GoogleServiceAccountCredentials;
   /**
    * 予約内容の変更で、変更対象そのものを空き枠計算から外す。
@@ -613,9 +629,9 @@ async function loadAvailabilityData(
         AND date_to >= ?`)
       .bind(params.lineAccountId, params.to, params.from)
       .all<AvailabilityExceptionRow>(),
-    db.prepare(`SELECT timezone, business_hours_configured FROM booking_settings WHERE line_account_id = ?`)
+    db.prepare(`SELECT timezone, business_hours_configured, booking_window_days, cutoff_minutes_before FROM booking_settings WHERE line_account_id = ?`)
       .bind(params.lineAccountId)
-      .first<{ timezone: string | null; business_hours_configured: number }>(),
+      .first<{ timezone: string | null; business_hours_configured: number; booking_window_days: number | null; cutoff_minutes_before: number | null }>(),
   ]);
   // 店舗のタイムゾーンで日付・時刻を読む。未設定・壊れた値は Asia/Tokyo。
   const timeZone = normalizeTimeZone(settingsRow?.timezone ?? FALLBACK_TIME_ZONE);
@@ -720,19 +736,32 @@ async function loadAvailabilityData(
   };
   // 受付の締め切り。全体の最短リード時間とメニューごとの締め切りの、
   // 遅い方を採る。片方だけを見ると、どちらかの設定が黙って無視される。
+  // R92: メニューの個別指定が無いとき、お客さま向け (applyStoreRules) は
+  // 店舗共通ルールを既定値として使う。要件 v6-28 §受付期間・締切:
+  // 「店舗既定値を持ち、メニューは必要な項目だけ上書きする」。
+  // 手編集で壊れた店舗値は無視し、メニュー値だけを見る（従来どおり）。
+  const storeCutoffMinutes = intInRange(settingsRow?.cutoff_minutes_before, 0, 43_200);
+  const menuCutoffMinutes = menu.cutoff_hours_before == null ? null : menu.cutoff_hours_before * 60;
   const cutoffMinutes = Math.max(
     params.minLeadTimeMinutes,
-    (menu.cutoff_hours_before ?? 0) * 60,
+    params.applyStoreRules
+      ? (menuCutoffMinutes ?? storeCutoffMinutes ?? 0)
+      : (menuCutoffMinutes ?? 0),
   );
   const minLeadAt = new Date(params.now.getTime() + cutoffMinutes * 60_000);
 
   // 何日先まで受けるか。未設定なら制限しない。日付で切る。
   // 24 時間の倍数の加算では夏時間の切替日（23 時間・25 時間の日）に
   // 暦日がずれるため、暦日で足す。
+  // R92: お客さま向けはメニュー未指定のとき店舗の受付期間を使う。
+  const storeWindowDays = intInRange(settingsRow?.booking_window_days, 1, 365);
+  const effectiveWindowDays = params.applyStoreRules
+    ? (menu.booking_window_days ?? storeWindowDays)
+    : menu.booking_window_days;
   const windowLastDate =
-    menu.booking_window_days == null
+    effectiveWindowDays == null
       ? null
-      : addDays(tzDateStr(timeZone, params.now), menu.booking_window_days);
+      : addDays(tzDateStr(timeZone, params.now), effectiveWindowDays);
 
   const googleBusyByStaff = new Map<string, Array<{ start: string; end: string }> | null>();
   const calendarSync: CalendarSyncState[] = [];
@@ -1262,6 +1291,8 @@ export interface ExplainSlotParams {
   time: string;
   now: Date;
   minLeadTimeMinutes: number;
+  /** R92: お客さま向けの説明では店舗共通ルールを既定値として使う。 */
+  applyStoreRules?: boolean;
   googleCredentials?: GoogleServiceAccountCredentials;
 }
 
@@ -1304,6 +1335,7 @@ export async function explainBookingSlot(
     to: params.date,
     now: params.now,
     minLeadTimeMinutes: params.minLeadTimeMinutes,
+    applyStoreRules: params.applyStoreRules,
     googleCredentials: params.googleCredentials,
   });
   const result = (partial: Partial<SlotCheckResult>): SlotCheckResult => ({

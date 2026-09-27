@@ -125,6 +125,9 @@ describe('共通部品の影響範囲', () => {
       'app/restaurant-test/restaurant-console.tsx',
       'app/rich-menus/page.tsx',
       'app/scenarios/page.tsx',
+      // 監査 R132: ファイル検査の一覧が先頭50件固定で検索・ページ送りが
+      // なかった。サーバが数えた総数でページ送りを出すため共通へ寄せた。
+      'app/settings/file-scan/page.tsx',
       'app/staff/page.tsx',
       'app/webhooks/webhook-interactions.tsx',
       'app/webhooks/webhook-overviews.tsx',

@@ -15,6 +15,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { TextArea } from '@/components/shared/form-controls'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
 import TestRecipientsSetting from '@/components/accounts/test-recipients-setting'
+import AccountEditModal from '@/components/accounts/account-edit-modal'
 import { Tabs } from '@/components/shared/tabs'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { connectionLabel, webhookLabel } from '../account-list-view'
@@ -56,6 +57,14 @@ function AccountDetail() {
   const [stepUp, setStepUp] = useState<StepUpRequest | null>(null)
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState('')
+  /**
+   * R73。「編集する」「差し替える」は、入力欄も保存操作も無い資格情報タブへ
+   * 飛ばすだけだった。既存の編集窓（PATCH/PUT 振り分け・本人確認つき）を
+   * ここから開く。`null` は閉じている状態。
+   */
+  const [editSection, setEditSection] = useState<null | 'basic' | 'credentials'>(null)
+  /** 保存口は統括・管理者だけ。運用担当には入力の入口を見せない。 */
+  const [canManage, setCanManage] = useState(false)
   /** ダイアログ内のエラー（必須漏れ・接続失敗など）。窓を閉じずに見せる。 */
   const [dialogError, setDialogError] = useState('')
   /** 止めている間に送らなかった配信の一覧（X-1）。 */
@@ -92,6 +101,13 @@ function AccountDetail() {
   }, [id])
 
   useEffect(() => { void load() }, [load])
+  useEffect(() => {
+    let active = true
+    void api.staff.me().then((response) => {
+      if (active && response.success) setCanManage(response.data.role === 'owner' || response.data.role === 'admin')
+    })
+    return () => { active = false }
+  }, [])
   usePageTitle(account?.name)
 
   /**
@@ -250,7 +266,9 @@ function AccountDetail() {
             <Card padding="roomy">
               <div className="flex items-start justify-between gap-3">
                 <p className="text-ink text-base font-bold">登録の内容</p>
-                <Button href={`/accounts/detail?id=${account.id}&tab=credentials`}>編集する</Button>
+                {canManage && (
+                  <Button type="button" onClick={() => setEditSection('basic')}>編集する</Button>
+                )}
               </div>
               <dl className="mt-3">
                 <InlineRow label="表示名" value={account.name} />
@@ -275,7 +293,9 @@ function AccountDetail() {
                   <p className="text-ink text-sm font-bold">資格情報</p>
                   <p className="text-ink-secondary mt-1 text-xs">秘密値そのものは表示しません。</p>
                 </div>
-                <Button href={`/accounts/detail?id=${account.id}&tab=credentials`}>差し替える</Button>
+                {canManage && (
+                  <Button type="button" onClick={() => setEditSection('credentials')}>差し替える</Button>
+                )}
               </div>
               <dl className="mt-3">
                 <CredentialRow
@@ -418,7 +438,7 @@ function AccountDetail() {
               <p className="text-ink text-sm font-bold">気をつけること</p>
               <ul className="text-ink-secondary mt-2 space-y-2 text-xs leading-relaxed">
                 <li>・停止しても、友だちと履歴は消えません。</li>
-                <li>・資格情報を差し替える前に接続を確かめます。</li>
+                <li>・資格情報を差し替えたら、接続の表示を確かめます。</li>
                 <li>・アーカイブした記録はあとから戻せます。</li>
               </ul>
             </Card>
@@ -463,8 +483,11 @@ function AccountDetail() {
           </dl>
           <p className="text-ink-secondary mt-3 text-xs leading-relaxed">
             値そのものは、ここにも出しません。差し替えるときは、新しい値を入れて保存し直します。
-            今の値を見たり直したりはできません。差し替える前に接続を確かめ、通らなければ保存しません。
+            今の値を見たり直したりはできません。
           </p>
+          {canManage && (
+            <Button type="button" className="mt-3" onClick={() => setEditSection('credentials')}>資格情報を差し替える</Button>
+          )}
         </Card>
       )}
 
@@ -549,6 +572,24 @@ function AccountDetail() {
         onCancel={() => { if (!busy) { setRestoreTarget(null); setDialogError('') } }}
         onConfirm={() => void runRestore()}
       />
+      {editSection !== null && (
+        <AccountEditModal
+          accountId={account.id}
+          initialName={account.name}
+          initialChannelId={account.channelId}
+          initialLoginChannelId={account.loginChannelId ?? null}
+          initialLiffId={account.liffId ?? null}
+          initialOgSiteName={account.ogSiteName ?? null}
+          initialOgDefaultDescription={account.ogDefaultDescription ?? null}
+          initialOgDefaultImageUrl={account.ogDefaultImageUrl ?? null}
+          initialFriendCapacity={account.friendCapacity ?? null}
+          initialCapacityWarnAt={account.capacityWarnAt ?? null}
+          initialIconUrl={account.iconUrl ?? null}
+          initialSection={editSection}
+          onClose={() => setEditSection(null)}
+          onSaved={() => { void load() }}
+        />
+      )}
       {stepUp && <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} />}
     </div>
   )
