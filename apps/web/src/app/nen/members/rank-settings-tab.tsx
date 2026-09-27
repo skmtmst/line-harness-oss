@@ -168,14 +168,19 @@ export default function RankSettingsTab({
 
       <div data-design="Body" data-design-node="Y4zWdG" className="grid gap-4 xl:grid-cols-3">
         <section data-design="Table" data-design-node="C0WaS" className="min-w-0 xl:col-span-2">
-          <DataTable>
+          {/*
+            R55: @container＋谷間帯の列削減は会員一覧と同じ形。1440pxでは
+            2/3幅の表に固定幅が収まらず、タグ見出しが会員数へ重なっていた。
+            入力3列を少し絞り、会員数は狭い表のとき畳む。
+          */}
+          <DataTable className="@container">
             <thead>
               <TableHeadRow>
-                <Th className="w-52">ランク名</Th>
-                <Th className="w-48">通年のしきい値</Th>
-                <Th className="w-32">マイル還元</Th>
+                <Th className="w-44">ランク名</Th>
+                <Th className="w-40">通年のしきい値</Th>
+                <Th className="w-28">マイル還元</Th>
                 <Th>友だち属性タグ</Th>
-                <Th className="w-24" align="right">会員数</Th>
+                <Th className="cq-hide-below-800 w-24" align="right">会員数</Th>
                 <Th className="w-14" align="right"><span className="sr-only">削除</span></Th>
               </TableHeadRow>
             </thead>
@@ -204,7 +209,7 @@ export default function RankSettingsTab({
                         {row.tagName ?? (row.name.trim() ? `[会員] ランク：${row.name.trim()}（保存すると作られます）` : '—')}
                       </span>
                     </Td>
-                    <Td align="right"><span className="text-label font-semibold tabular-nums text-ink">{row.memberCount.toLocaleString('ja-JP')}人</span></Td>
+                    <Td align="right" className="cq-hide-below-800"><span className="text-label font-semibold tabular-nums text-ink">{row.memberCount.toLocaleString('ja-JP')}人</span></Td>
                     <Td align="right">
                       {isBase ? null : <DeleteAction label={`${row.name || 'このランク'}を削除する`} onClick={() => remove(index)} />}
                     </Td>

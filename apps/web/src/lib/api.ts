@@ -3190,7 +3190,7 @@ export type MileageEarningRuleV6 = {
   draftUpdatedAt: string
   /** N-231 案1: いま公開中の版。null は未公開。 */
   publishedVersion: number | null
-  metrics30d: { eligible: number; granted: number; excluded: number }
+  metrics30d: { eligible: number; granted: number; grantedMiles: number; excluded: number }
 }
 
 export type MileageEarningRulesV6Overview = {
@@ -5038,7 +5038,7 @@ export interface GettingStartedStep {
   href: string | null
   reason: string | null
   /** 段1だけ。Webhook をアカウントごとに確かめた結果。 */
-  webhook?: Array<{ id: string; status: 'matched' | 'mismatched' | 'unconfigured' | 'unknown' }>
+  webhook?: Array<{ id: string; status: 'matched' | 'mismatched' | 'unconfigured' | 'unknown'; active?: boolean | null }>
 }
 
 /** レシピ。設計 ★V6 34-2（`y0P0Qx`）。 */

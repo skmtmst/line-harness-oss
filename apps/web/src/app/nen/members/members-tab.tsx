@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import Pagination from '@/components/shared/pagination'
@@ -37,15 +37,24 @@ export default function MembersTab({
   const [pet, setPet] = useState<'any' | 'with' | 'without'>('any')
   const [sort, setSort] = useState<NenMemberSort>('annual_desc')
   const [page, setPage] = useState(1)
+  /*
+   * R56: アカウント切替で新旧2つの読み込みが走り、遅い旧応答が
+   * 新しい一覧を上書きしていた。世代番号で古い応答は捨てる
+   * （友だち明細と同じ形）。
+   */
+  const requestRef = useRef(0)
 
   const load = useCallback(async () => {
+    const request = ++requestRef.current
     setStatus('loading')
     try {
       const res = await nenRanksApi.members(accountId, { q: query, rank, pet, sort, page })
+      if (request !== requestRef.current) return
       if (!res.success) throw new Error(res.error)
       setData(res.data)
       setStatus('ready')
     } catch (caught) {
+      if (request !== requestRef.current) return
       setStatus(caught instanceof ApiError && caught.status === 403 ? 'forbidden' : 'error')
     }
   }, [accountId, query, rank, pet, sort, page])

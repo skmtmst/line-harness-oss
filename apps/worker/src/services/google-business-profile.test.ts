@@ -3,6 +3,7 @@ import {
   addDays,
   buildHoursParsePrompt,
   buildPatch,
+  diffFieldLabel,
   effectiveHoursFor,
   emptyWeekly,
   getProfile,
@@ -160,6 +161,13 @@ describe('プロフィールAPI', () => {
   it('403 は no_permission、400 はメッセージ付きの invalid_request', async () => {
     const fetch: FetchLike = async () => jsonResponse({ error: { message: 'Invalid hours' } }, 400);
     await expect(getProfile({ fetch: fetch as unknown as F, accessToken: 'at' }, LOCATION)).rejects.toMatchObject({ kind: 'invalid_request', message: 'Invalid hours' });
+  });
+
+  it('R108: 変更提案の項目名を日本語にし、画面で扱わない項目も素のままにしない', () => {
+    expect(diffFieldLabel('title')).toBe('店舗名');
+    expect(diffFieldLabel('regularHours')).toBe('通常の営業時間');
+    expect(diffFieldLabel('relationshipData')).toBe('店舗の属性');
+    expect(diffFieldLabel('relationshipData.someField')).toBe('店舗の属性');
   });
 });
 
