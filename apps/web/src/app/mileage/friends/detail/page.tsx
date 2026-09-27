@@ -157,7 +157,7 @@ function FriendMileageInner() {
       const response = pendingAction.kind === 'confirm'
         ? await api.mileage.confirmMileageEntry(pendingAction.entryId, { accountId: selectedAccountId, reason })
         : await api.mileage.voidMileageEntry(pendingAction.entryId, { accountId: selectedAccountId, reason })
-      if (!response.success) throw new ApiError(500, response.error || '失敗しました')
+      if (!response.success) throw new ApiError(500, response.error || '処理できませんでした。もう一度お試しください。')
       setPendingAction(null)
       setPendingReason('')
       await load()

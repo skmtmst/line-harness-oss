@@ -965,7 +965,7 @@ function MileagePageInner() {
       <Dialog
         open={ruleTestTarget !== null}
         title={ruleTestTarget ? `「${ruleTestTarget.draft.name}」をテスト` : '決めごとをテスト'}
-        description="直近30日の記録に当てはめて、何人に・合計いくら付きそうかを見ます。実際には付与されず、履歴も増えません。"
+        description="この30日の記録に当てはめて、何人に・合計いくら付きそうかを見ます。実際には付与されず、履歴も増えません。"
         confirmLabel="閉じる"
         onConfirm={() => setRuleTestTarget(null)}
         onCancel={() => setRuleTestTarget(null)}
