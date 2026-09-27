@@ -125,6 +125,7 @@ export * from './analytics-overviews';
 export * from './analytics-url-exposures';
 export * from './dashboard';
 export * from './dashboard-preferences';
+export * from './dashboard-upcoming';
 export * from './booking-customers';
 export * from './operation-audit';
 export * from './operations';

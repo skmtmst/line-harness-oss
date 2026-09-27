@@ -2,6 +2,7 @@ import { Hono, type MiddlewareHandler } from 'hono';
 import {
   getEntryRoutes,
   getEntryRouteById,
+  getLineAccountById,
   createEntryRoute,
   updateEntryRoute,
   deleteEntryRoute,
@@ -11,6 +12,8 @@ import {
   createEntryRouteGenre,
   updateEntryRouteGenre,
 } from '@line-crm/db';
+import { QrCapacityError, encodeQr } from '../lib/qr-matrix.js';
+import { QrPdfError, buildQrPrintPdf } from '../lib/qr-print-pdf.js';
 import type { EntryRoute, EntryRouteGenre } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
@@ -326,6 +329,62 @@ entryRoutes.delete('/api/entry-routes/:id', requireRole('owner', 'admin'), async
     return c.json({ success: true });
   } catch (err) {
     console.error('DELETE /api/entry-routes/:id error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// POST /api/entry-routes/:id/qr-pdf — printing sheet (A4, 1 page)
+entryRoutes.post('/api/entry-routes/:id/qr-pdf', requireEntryRouteManagement(), async (c) => {
+  try {
+    const id = c.req.param('id');
+    const staff = c.get('staff');
+    const tenantId = staff.tenantId ?? DEFAULT_TENANT_ID;
+    const existing = await getEntryRouteById(c.env.DB, id);
+    if (!existing || !canAccessEntryRoute(existing, tenantId)) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    if (!await canAccessEntryRouteAccount(c.env.DB, staff, existing)) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    // 止めた経路は QR も印刷も出さない。画面も同じ文を見せる。
+    if (existing.is_active !== 1) {
+      return c.json({ success: false, error: 'この経路は停止しています' }, 409);
+    }
+    const url = `${new URL(c.req.url).origin}/r/${existing.ref_code}`;
+    let symbol;
+    try {
+      symbol = encodeQr(url);
+    } catch (err) {
+      if (err instanceof QrCapacityError) {
+        return c.json({ success: false, error: 'URLが長すぎてQRにできません' }, 400);
+      }
+      throw err;
+    }
+    const account = existing.line_account_id
+      ? await getLineAccountById(c.env.DB, existing.line_account_id)
+      : null;
+    const accountName = account?.name?.trim() || existing.name;
+    const jst = new Date(Date.now() + 9 * 3_600_000).toISOString();
+    const issuedAt = `${jst.slice(0, 10)} ${jst.slice(11, 16)}`;
+    let pdf: Uint8Array;
+    try {
+      pdf = buildQrPrintPdf({ accountName, url, issuedAt, qr: symbol });
+    } catch (err) {
+      if (err instanceof QrPdfError) {
+        return c.json({ success: false, error: '印刷用PDFを作れませんでした' }, 400);
+      }
+      throw err;
+    }
+    // ref_code は半角英数字だけなので、そのままファイル名に使える。
+    return new Response(pdf, {
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="qr-${existing.ref_code}.pdf"`,
+        'Cache-Control': 'no-store',
+      },
+    });
+  } catch (err) {
+    console.error('POST /api/entry-routes/:id/qr-pdf error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
