@@ -2361,6 +2361,11 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (method === 'DELETE' && pathname === `/api/forms/${FORM_DETAIL.id}`) {
     return { success: true, data: null }
   }
+  // P: 公開前の試し合言葉の発行。生の値はこの応答でしか返らない。
+  const formTestToken = method === 'POST' && /^\/api\/forms\/([^/]+)\/test-token$/.exec(pathname)
+  if (formTestToken) {
+    return { success: true, data: { token: 'test-token-qa', expiresAt: '2026-09-28T15:00:00.000+09:00' } }
+  }
   if (pathname === '/api/forms') {
     return { success: true, data: query.get('with_list_summary') === '1' ? FORM_LIST : FORMS }
   }

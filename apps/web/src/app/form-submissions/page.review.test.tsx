@@ -140,8 +140,11 @@ describe('回答フォーム一覧の管理者確認(#724)', () => {
     expect(host.textContent).toContain('旧フォーム要確認')
     expect(host.textContent).toContain('管理者確認')
     expect(host.textContent).toContain('#771')
-    // 割り当て操作は置かない
-    expect(host.querySelector('td button')).toBeNull()
+    // 割り当て操作は置かない（「？」の説明は操作ではないため除く）
+    const rowActions = [...host.querySelectorAll('td button')].filter(
+      (button) => !(button.getAttribute('aria-label') ?? '').endsWith('の説明'),
+    )
+    expect(rowActions).toEqual([])
   })
 
   it('専用口が403なら確認できるものは無いと案内する', async () => {
