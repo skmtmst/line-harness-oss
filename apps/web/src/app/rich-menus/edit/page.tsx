@@ -5,8 +5,6 @@ import Select from '@/components/shared/select'
 import Checkbox from '@/components/shared/checkbox'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Button from '@/components/shared/button'
-import Checkbox from '@/components/shared/checkbox'
-import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import TargetMissing from '@/components/shared/target-missing'
@@ -1834,26 +1832,29 @@ function TargetingStep({
 
       <div className="grid gap-5 xl:grid-cols-3">
         <section className="border-hairline bg-canvas rounded-card border p-6 shadow-sm xl:col-span-2">
-          <RadioCardGroup legend="このメニューを出す相手" legendVisible className="grid gap-3 sm:grid-cols-2">
-            <RadioCard
-              name="audience"
-              value="all"
-              checked={!targetingEnabled}
-              disabled={readOnly}
-              onChange={() => onTargetingEnabled(false)}
-              title="すべての友だち"
-              note="ほかのメニューに当てはまらなかった人に出る、いちばん下の受け皿になります"
-            />
-            <RadioCard
-              name="audience"
-              value="targeted"
-              checked={targetingEnabled}
-              disabled={readOnly}
-              onChange={() => onTargetingEnabled(true)}
-              title="条件に当てはまる友だちだけ"
-              note="当てはまらない人には、これより下のメニューが出ます"
-            />
-          </RadioCardGroup>
+          <h2 className="text-ink text-base font-bold">このメニューを出す相手</h2>
+          <div className="mt-4">
+            <RadioCardGroup legend="出す相手の選択" className="grid gap-3 sm:grid-cols-2">
+              <RadioCard
+                name="audience"
+                value="all"
+                checked={!targetingEnabled}
+                disabled={readOnly}
+                onChange={() => onTargetingEnabled(false)}
+                title="すべての友だち"
+                note="ほかのメニューに当てはまらなかった人に出る、いちばん下の受け皿になります"
+              />
+              <RadioCard
+                name="audience"
+                value="targeted"
+                checked={targetingEnabled}
+                disabled={readOnly}
+                onChange={() => onTargetingEnabled(true)}
+                title="条件に当てはまる友だちだけ"
+                note="当てはまらない人には、これより下のメニューが出ます"
+              />
+            </RadioCardGroup>
+          </div>
 
           {targetingEnabled ? (
             <div className="border-hairline mt-5 rounded-card border p-4">
@@ -2034,23 +2035,26 @@ function PublishStep({
       <StepHeader active={3} groupId={group.id} />
       <div className="grid gap-5 xl:grid-cols-3">
         <section className="border-hairline bg-canvas rounded-card border p-6 shadow-sm xl:col-span-2">
-          <RadioCardGroup legend="いつ出すか" legendVisible className="space-y-3">
-            {[
-              ['now', 'いますぐ出す', '保存したらすぐ、条件に当てはまる人のトーク画面に出ます'],
-              ['scheduled', '日時を決めて出す', 'その時刻になったら自動で出ます。それまでは今のメニューのままです'],
-              ['period', '期間を決める', '終わったら自動で元に戻します。キャンペーンはこれが安全です'],
-            ].map(([value, label, note]) => (
-              <RadioCard
-                key={value}
-                name="publish-mode"
-                value={value}
-                checked={mode === value}
-                onChange={(next) => onPublishChange({ mode: next as PublishPlanInput['mode'] })}
-                title={label}
-                note={note}
-              />
-            ))}
-          </RadioCardGroup>
+          <h2 className="text-ink text-base font-bold">いつ出すか</h2>
+          <div className="mt-4">
+            <RadioCardGroup legend="公開時期の選択" className="grid gap-3">
+              {[
+                ['now', 'いますぐ出す', '保存したらすぐ、条件に当てはまる人のトーク画面に出ます'],
+                ['scheduled', '日時を決めて出す', 'その時刻になったら自動で出ます。それまでは今のメニューのままです'],
+                ['period', '期間を決める', '終わったら自動で元に戻します。キャンペーンはこれが安全です'],
+              ].map(([value, label, note]) => (
+                <RadioCard
+                  key={value}
+                  name="publish-mode"
+                  value={value}
+                  checked={mode === value}
+                  onChange={(next) => onPublishChange({ mode: next as PublishPlanInput['mode'] })}
+                  title={label}
+                  note={note}
+                />
+              ))}
+            </RadioCardGroup>
+          </div>
           {mode !== 'now' ? (
             <div className="border-hairline mt-5 grid gap-4 border-t pt-5 sm:grid-cols-2">
               <span className="text-ink-secondary text-xs font-semibold">出しはじめ<DateTimeField aria-label="出しはじめ" value={startsAt} onChange={(v) => onPublishChange({ startsAt: v })} className="mt-1" /></span>
