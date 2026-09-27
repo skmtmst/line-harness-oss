@@ -99,17 +99,31 @@ describe('一斉配信の一覧の状態の札（m20i・その2）', () => {
 
 describe('一斉配信の一覧の配信条件の幅（m20i・その3）', () => {
   it('1440pxで「友だち全員」は全文、タグ名は8文字以上見える', () => {
-    // 条件列が11%だと「友だち全員」すら省略されていた。開封列と
-    // 操作列を詰めたぶんを条件へ回し、1440px（表約835px）で読める幅にする。
+    // 条件列が15%だとタグ名が4文字しか見えなかった。タイトルと
+    // 結果を詰めたぶんを条件へ回し、1440px（表約835px）で読める幅にする。
     const condHead = THEAD.match(/<Th style=\{\{\s*width:\s*'(\d+)%'\s*\}\}[^>]*>\s*配信条件/)
     expect(condHead, '配信条件の列幅が無い').not.toBeNull()
     const condPercent = Number((condHead as RegExpMatchArray)[1])
-    expect(condPercent, '配信条件が狭く中身が読めない').toBeGreaterThanOrEqual(14)
-    // 「タグ：NEN会員」の8文字分（約91px）＋余白24が1440pxの表に収まる。
+    expect(condPercent, '配信条件が狭く中身が読めない').toBeGreaterThanOrEqual(19)
+    // 「タグ：」＋タグ名8文字分（約127px）＋余白24が1440pxの表に収まる。
     expect(
       (condPercent / 100) * 835 - 24,
       `配信条件 ${condPercent}% では1440pxでタグ名8文字が見えない`,
-    ).toBeGreaterThanOrEqual(90)
+    ).toBeGreaterThanOrEqual(120)
+  })
+
+  it('見出しは短い「結果」で、中身の3行はそのまま', () => {
+    // 見出しが「配信・開封・クリック」だと「クリッ」で切れていた。
+    expect(THEAD, '見出しが長いまま').toContain('結果')
+    expect(THEAD, '長い見出しが残っている').not.toContain('配信・開封・クリック')
+  })
+
+  it('率は数字と同じ行に置く', () => {
+    // 「(15.4%)」だけ次の行へ折れていた。数字と率を1つの nowrap にする。
+    const openRow = between(PAGE, '開封:', 'uniqueClick')
+    expect(openRow, '開封の率が折れる').toContain('whitespace-nowrap')
+    const clickRow = between(PAGE, 'クリック:', '</p>')
+    expect(clickRow, 'クリックの率が折れる').toContain('whitespace-nowrap')
   })
 })
 

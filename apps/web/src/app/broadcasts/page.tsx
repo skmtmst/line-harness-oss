@@ -735,7 +735,7 @@ function BroadcastList() {
         <DataTable>
             {/*
               列は設計 `q76C35`（V6 6-1 一斉配信）の6列。
-              タイトル・内容／状態／配信条件／配信日時／配信・開封・クリック／操作。
+              タイトル・内容／状態／配信条件／配信日時／結果／操作。
 
               前は見出しが8つ、中身が7つで**1列ずれていた**。「開封（率）」の
               下に状態バッジ、「状態」の下に削除ボタンが並んでいて、表として
@@ -749,19 +749,19 @@ function BroadcastList() {
               操作列だけ116pxで固定する（★V7：操作列は固定幅）。余白は
               12px→8pxに詰める（下の ActionCell の px-2）。% の合計は81に
               抑え、116pxを足してもいちばん狭い帯（1280px時の表≈700px）
-              に収まる。配信・開封・クリックは中身が折れるので15%に詰め、
-              空いたぶんを配信条件へ回す（1440pxで「友だち全員」は全文、
-              タグ名は8文字以上見える）。
+              に収まる。結果は中身が折れるので14%に詰め、タイトルも
+              20%に詰めて、空いたぶんを配信条件20%へ回す（1440pxで
+              「友だち全員」は全文、タグ名は8文字以上見える）。
             */}
             <thead>
               <TableHeadRow>
-                <Th style={{ width: '23%' }}>
+                <Th style={{ width: '20%' }}>
                   タイトル・内容
                 </Th>
                 <Th style={{ width: '14%' }}>
                   状態
                 </Th>
-                <Th style={{ width: '15%' }}>
+                <Th style={{ width: '20%' }}>
                   配信条件
                 </Th>
                 {/*
@@ -771,8 +771,8 @@ function BroadcastList() {
                 <Th style={{ width: '14%' }}>
                   配信日時
                 </Th>
-                <Th style={{ width: '15%' }}>
-                  配信・開封・クリック
+                <Th style={{ width: '14%' }}>
+                  結果
                 </Th>
                 {/* #768: 表が横に流れる帯でも操作列は右端に留める。 */}
                 <Th style={{ width: 116 }} align="right" className="sticky right-0 bg-canvas-sunken">
@@ -901,18 +901,18 @@ function BroadcastList() {
                                 <p className="text-xs">配信: <span className="font-medium text-ink-secondary">{insight.delivered.toLocaleString('ja-JP')}</span></p>
                               )}
                               {insight.uniqueImpression != null && (
-                                <p className="text-xs">開封: <span className="font-medium text-info">{insight.uniqueImpression.toLocaleString('ja-JP')}</span>
+                                <p className="text-xs">開封: <span className="whitespace-nowrap"><span className="font-medium text-info">{insight.uniqueImpression.toLocaleString('ja-JP')}</span>
                                   {insight.openRate != null && (
                                     <span className="text-ink-faint"> ({(insight.openRate * 100).toFixed(1)}%)</span>
                                   )}
-                                </p>
+                                </span></p>
                               )}
                               {insight.uniqueClick != null && (
-                                <p className="text-xs">クリック: <span className="font-medium text-success">{insight.uniqueClick.toLocaleString('ja-JP')}</span>
+                                <p className="text-xs">クリック: <span className="whitespace-nowrap"><span className="font-medium text-success">{insight.uniqueClick.toLocaleString('ja-JP')}</span>
                                   {insight.clickRate != null && (
                                     <span className="text-ink-faint"> ({(insight.clickRate * 100).toFixed(1)}%)</span>
                                   )}
-                                </p>
+                                </span></p>
                               )}
                             </div>
                           ) : (
