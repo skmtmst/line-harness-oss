@@ -3,7 +3,6 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import {
   PREFECTURES,
   collectInputs,
-  formThemeButtonText,
   isOtherFreeText,
   nextSectionIndex,
   normalizeFormTheme,
@@ -12,6 +11,7 @@ import {
   type FormInputBlock,
   type FormLayout,
 } from '@line-crm/shared';
+import { submitButtonText } from '../lib/form-button-text.js';
 import { api, type PublicForm } from '../lib/api.js';
 import {
   conflictMessage,
@@ -574,7 +574,7 @@ export default function Form() {
             onClick={() => (isLast ? submit() : goNext())}
             disabled={sending}
             className="flex-1 py-3 text-sm font-bold disabled:opacity-50"
-            style={{ backgroundColor: theme.main, color: formThemeButtonText(theme), borderRadius: radius }}
+            style={{ backgroundColor: theme.main, color: submitButtonText(theme, hasCustomTheme), borderRadius: radius }}
           >
             {sending ? '送信中...' : isLast ? submitLabelText(options.submitLabel) : options.nextLabel || '次へ'}
           </button>
@@ -599,7 +599,7 @@ export default function Form() {
                 type="button"
                 onClick={() => submit()}
                 className="flex-1 py-2 text-sm font-bold"
-                style={{ backgroundColor: theme.main, color: formThemeButtonText(theme), borderRadius: radius }}
+                style={{ backgroundColor: theme.main, color: submitButtonText(theme, hasCustomTheme), borderRadius: radius }}
               >
                 {submitLabelText(options.confirmDialog?.okLabel)}
               </button>
