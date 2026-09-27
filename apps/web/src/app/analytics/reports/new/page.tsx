@@ -52,7 +52,7 @@ const ALERT_RULE_DEFS: Array<{
   {
     id: 'block_rate', metric: 'block_rate', operator: 'greater_than',
     name: 'ブロック増の条件',
-    lead: 'ブロックが ', tail: ' % をこえたら、その場で知らせる',
+    lead: 'ブロックが ', tail: ' % をこえたら、レポートに含めて知らせる',
     detail: '配信の事故に早く気づけます。',
     threshold: '0.5', minimumSample: '20', step: '0.1',
     thresholdLabel: 'ブロック率のしきい値（%）', sampleLabel: 'ブロック条件の判定に必要な最低件数',
@@ -60,14 +60,14 @@ const ALERT_RULE_DEFS: Array<{
   {
     id: 'friend_adds', metric: 'friend_adds', operator: 'decrease_percent',
     name: '友だち減少の条件',
-    lead: '友だちが前の週より ', tail: ' % 減ったら、その場で知らせる',
+    lead: '友だちが前の週より ', tail: ' % 減ったら、レポートに含めて知らせる',
     threshold: '20', minimumSample: '20', step: '1',
     thresholdLabel: '友だち減少のしきい値（%）', sampleLabel: '友だち減少条件の判定に必要な最低件数',
   },
   {
     id: 'conversions', metric: 'conversions', operator: 'zero_streak_days',
     name: '成果0件がつづく条件',
-    lead: '成果が0件の日が ', tail: ' 日つづいたら、その場で知らせる',
+    lead: '成果が0件の日が ', tail: ' 日つづいたら、レポートに含めて知らせる',
     detail: '計測が壊れていることに気づけます。',
     threshold: '3', minimumSample: '20', step: '1',
     thresholdLabel: '成果0件がつづく日数のしきい値', sampleLabel: '成果0件条件の判定に必要な最低件数',
@@ -421,7 +421,7 @@ function AnalyticsReportFormPage() {
 
           <section className="border-hairline bg-canvas rounded-card border p-4 sm:p-6">
             <h2 className="text-lg font-semibold">知らせの決めごと</h2>
-            <p className="text-ink-secondary mb-4 mt-1 text-sm">数字がふだんと大きくちがうときだけ、待たずに知らせます。</p>
+            <p className="text-ink-secondary mb-4 mt-1 text-sm">レポートを作るときに前の期間と比べ、条件に合えばレポートに含めて知らせます。</p>
             <label className="mb-3 flex items-center gap-2 text-sm font-semibold"><input className="accent-accent size-5" type="checkbox" checked={alertsEnabled} onChange={(event) => setAlertsEnabled(event.target.checked)} />大きな変化を知らせる</label>
             <ul className="grid list-none gap-3 p-0">
               {ALERT_RULE_DEFS.map((def) => {
