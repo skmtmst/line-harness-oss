@@ -429,6 +429,8 @@
     "485_common_var_failure_reasons.sql",
     "488_incoming_webhook_secret_grace.sql",
     "489_incoming_webhook_ambiguous_hold.sql",
+    "492_event_lifecycle_status.sql",
+    "493_event_change_logs.sql",
     "494_session_step_up_and_unfamiliar.sql",
     "495_session_familiarity_ip_index.sql",
     "498_line_account_lifecycle.sql",
@@ -439,5 +441,5 @@
     "503_measurement_sites.sql",
     "504_conversion_reversal_ledger.sql"
   ],
-  "migrationCount": 438
+  "migrationCount": 440
 }
