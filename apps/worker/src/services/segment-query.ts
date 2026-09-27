@@ -9,6 +9,7 @@ export {
   buildPublicSegmentQuery,
   buildSegmentQuery,
   buildSegmentWhere,
+  isEmptySegmentCondition,
   matchesCondition,
   parseCondition,
   type ChatStatus,

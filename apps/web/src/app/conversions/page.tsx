@@ -216,6 +216,7 @@ import { AffiliatorsTab, OffersTab, ApprovalQueue } from '@/app/affiliates/tabs'
 import AffiliatePaymentTab from '@/app/affiliates/payment-tab'
 import { useAccount } from '@/contexts/account-context'
 import { TableHeadRow, Th } from '@/components/shared/table'
+import MobileTableCards from '@/components/shared/mobile-table-cards'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -1005,7 +1006,60 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
           }
         />
       ) : (
-        <div data-design="Table" className="bg-canvas rounded-card border-hairline border">
+        <>
+        {/*
+          ★V7 監査の直し A（`LD96g`）：768px 以上は表、767px 以下は共通の
+          一覧カード（`MobileTableCards`）。表のままだと390pxで6列が潰れて
+          名前が見出しに重なっていた。
+        */}
+        <MobileTableCards
+          items={current.map((point) => ({
+            id: point.id,
+            name: point.name,
+            status: point.state !== 'active' && STATE_LABELS[point.state] ? (
+              <span
+                className={`inline-block rounded px-1.5 py-0.5 text-xs font-semibold ${
+                  point.state === 'draft' ? 'bg-info-bg text-info'
+                    : point.state === 'invalid' || point.state === 'sourceStopped' ? 'bg-warning-bg text-warning'
+                    : 'bg-canvas-sunken text-ink-faint'
+                }`}
+                title={point.stateReason ?? undefined}
+              >
+                {STATE_LABELS[point.state]}
+              </span>
+            ) : undefined,
+            summary: sourceTriggerLabel(point),
+            metric: `この30日 ${point.metrics.netCount.toLocaleString('ja-JP')}件`,
+            primaryAction: (
+              <Button
+                href={`/analytics?tab=funnel&conversionPointId=${encodeURIComponent(point.id)}&conversionPointName=${encodeURIComponent(point.name)}`}
+                variant="secondary"
+              >
+                使う場所を足す
+              </Button>
+            ),
+            moreAction: (
+              <span className="relative flex h-9 w-9 items-center justify-center">
+                <IconButton
+                  aria-label={`${point.name}のその他操作`}
+                  title={`${point.name}のその他操作`}
+                  onClick={() => setPointMenuId((currentId) => (currentId === point.id ? null : point.id))}
+                >
+                  <MoreHorizontal />
+                </IconButton>
+                <ActionMenu
+                  open={pointMenuId === point.id}
+                  ariaLabel={`${point.name}の操作`}
+                  onClose={() => setPointMenuId(null)}
+                  items={[
+                    { id: 'detail', label: '中身を見る', onSelect: () => setDetailTarget(point) },
+                  ]}
+                />
+              </span>
+            ),
+          }))}
+        />
+        <div data-design="Table" className="bg-canvas rounded-card border-hairline border hidden md:block">
           <table className="w-full table-fixed">
             <thead>
               <TableHeadRow>
@@ -1102,6 +1156,7 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
             </tbody>
           </table>
         </div>
+        </>
       )}
 
       <div data-design="tf" className="mt-3 flex flex-wrap items-center justify-between gap-2">

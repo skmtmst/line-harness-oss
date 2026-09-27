@@ -98,7 +98,8 @@ describe('V6 自動応答一覧の契約', () => {
   it('URL編集は5段と設定内容・LINEプレビューを持つページ表示にする', () => {
     expect(EDIT_PAGE).toContain('<EditDialog')
     expect(EDIT_PAGE).toContain('page')
-    for (const word of ['基本設定', 'どんなときに動くか', '何を返すか', '優先順位', '確認']) {
+    // R28・監査の直し：窓の中の順番は「優先順位」ではなく「動く順番」（一覧の上下で決める）。
+    for (const word of ['基本設定', 'どんなときに動くか', '何を返すか', '動く順番', '確認']) {
       expect(EDITOR).toContain(word)
     }
     // B-6: 題「LINEプレビュー」は共通部品が出す。画面側は使うだけ。

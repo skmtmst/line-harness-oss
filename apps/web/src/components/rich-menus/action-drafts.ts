@@ -52,6 +52,28 @@ export function unsetAreaLabels(areas: Area[]): string[] {
     .map(({ label }) => label)
 }
 
+/**
+ * R23: アカウントを切り替えたらタグの候補が変わる。前のアカウントにしか
+ * ないタグの選択は新しいアカウントに存在しないため、面の下書きから外す。
+ * 純粋関数。外した件数を返すので、呼び出し側で知らせの文に使える。
+ */
+export function pruneStaleAreaTags(
+  drafts: Record<string, Area[]>,
+  validIds: ReadonlySet<string>,
+): { next: Record<string, Area[]>; removed: number } {
+  let removed = 0
+  const next: Record<string, Area[]> = {}
+  for (const [key, areas] of Object.entries(drafts)) {
+    next[key] = areas.map((area) => {
+      const before = area.tagIds ?? []
+      const kept = before.filter((id) => validIds.has(id))
+      removed += before.length - kept.length
+      return kept.length === before.length ? area : { ...area, tagIds: kept }
+    })
+  }
+  return { next, removed }
+}
+
 export function areaDraftsForCreate(areas: Area[]) {
   return areas.map((area) => ({
     boundsX: area.boundsX,

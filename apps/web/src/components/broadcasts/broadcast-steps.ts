@@ -13,7 +13,8 @@
 
 export type BroadcastStepKey = 'basic' | 'audience' | 'message' | 'schedule' | 'confirm'
 
-export type BroadcastStepState = 'done' | 'current' | 'todo'
+/** 段の入力の様子。いまいる所は含まない（居場所は呼ぶ側の currentKey。設計 C）。 */
+export type BroadcastStepState = 'done' | 'current' | 'todo' | 'attention'
 
 export interface BroadcastStep {
   key: BroadcastStepKey
