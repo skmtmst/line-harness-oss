@@ -217,7 +217,8 @@ export default function AutoRepliesPage() {
     try {
       const [arRes, tplRes, summaryRes] = await Promise.all([
         api.autoReplies.list({ accountId: selectedAccountId || undefined }),
-        api.templates.list(),
+        // R23横展開: 返す文の候補は今のアカウントだけ（別アカウント混入防止）。
+        api.templates.list(undefined, selectedAccountId || undefined),
         selectedAccountId
           ? api.autoReplies.summary(selectedAccountId).catch(() => null)
           : Promise.resolve(null),
