@@ -68,6 +68,23 @@ describe('宛先のタブ', () => {
     await waitFor(() => expect(screen.getByText('宛先の結果はまだありません')).toBeTruthy())
   })
 
+  it('書き出しは宛先のタブの中に1つだけある', async () => {
+    fixture.recipients.mockResolvedValue({
+      success: true,
+      data: {
+        rows: [row('山田花子', 'delivered', '届いた')],
+        summary: SUMMARY,
+        aggregateOnly: false,
+        aggregateReason: null,
+        legacySuccessCount: null,
+      },
+    })
+    render(<BroadcastRecipients broadcastId="b1" total={3} version={1} />)
+    await waitFor(() => expect(screen.getByText('山田花子')).toBeTruthy())
+    // 下の追従バーと二重にならない。タブの中の1つだけ。
+    expect(screen.getAllByRole('button', { name: 'CSVに書き出す' })).toHaveLength(1)
+  })
+
   it('宛先ごとに札と件数を出す', async () => {
     fixture.recipients.mockResolvedValue({
       success: true,
