@@ -17,6 +17,7 @@ import KpiCard from '@/components/shared/kpi-card'
 import { ActionCell, DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { useCanManageCommonActions } from '@/components/automations/use-common-action-permission'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { useManualHref } from '@/lib/use-manual-href'
 
 const ACTION_LABELS: Record<string, string> = {
   add_tag: 'タグを付ける', remove_tag: 'タグを外す', set_metadata: '友だち情報を設定する',
@@ -57,6 +58,8 @@ function CommonActionVersionsInner() {
   // ★V7: 画面の題は上の帯だけ。本文の PageHeader は説明だけ残し、見出しは帯と同じ言葉にして隠す。
   usePageTitle('版と使われている場所')
   const canManage = useCanManageCommonActions()
+  /* 監査 R128: 正本表に登録があるときだけ出す。無ければボタン自体を出さない。 */
+  const manualHref = useManualHref('/common-actions/versions')
   const searchParams = useSearchParams()
   const id = searchParams.get('id') ?? ''
   const { selectedAccountId, loading: accountLoading } = useAccount()
@@ -241,7 +244,7 @@ function CommonActionVersionsInner() {
                 前の版から新版を作る
               </Button>
             ) : null}
-            <Button href="/support">マニュアル</Button>
+            {manualHref ? <Button href={manualHref}>マニュアル</Button> : null}
           </>
         )}
       />

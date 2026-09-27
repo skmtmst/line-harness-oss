@@ -62,8 +62,10 @@ describe('表は器の幅にぴったり収める', () => {
 
   it('/events: 申込条件は1行で省略し、全文は title で確認する', () => {
     const page = read('events/page.tsx')
-    // タグ名は長さが読めない。列幅（自動・実測31px）より広い中身（60px）が
-    // そのまま出ると器からはみ出す。省略を外して素の文字に戻さない。
+    // 申込条件は状態の札の下へ畳む。独立した列に戻すと、狭い器で見出しが
+    // 重なり「全員」が縦に折れる（m19d の撮影指摘）。
+    expect(page).not.toContain('>申込条件</Th>')
+    // タグ名は長さが読めない。省略を外して素の文字に戻さない。
     expect(page).toContain('max-w-32 truncate')
     expect(page).toContain('title={e.visible_tag_name}')
   })

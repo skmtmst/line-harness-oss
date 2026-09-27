@@ -2107,6 +2107,51 @@ const spec = {
         },
       },
     },
+    '/api/reminders/{id}/audience': {
+      post: {
+        tags: ['Reminders'], summary: '未保存の対象条件で人数を数え直し、先頭の顔ぶれを返す',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { content: { 'application/json': { schema: {
+          type: 'object',
+          properties: {
+            condition: { type: ['object', 'null'], description: '未保存の対象条件。送らなければ保存済みのまま数える。空は絞りなし' },
+          },
+        } } } },
+        responses: {
+          '200': {
+            description: 'Audience counts and sample members',
+            content: { 'application/json': { schema: {
+              type: 'object', required: ['success', 'data'],
+              properties: {
+                success: { type: 'boolean', const: true },
+                data: {
+                  type: 'object', required: ['matched', 'excluded', 'sample'],
+                  properties: {
+                    matched: { type: 'integer', minimum: 0 },
+                    excluded: { type: 'integer', minimum: 0 },
+                    sample: {
+                      type: 'array', maxItems: 20,
+                      items: {
+                        type: 'object', required: ['id', 'displayName'],
+                        properties: {
+                          id: { type: 'string' },
+                          displayName: { type: 'string' },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            } } },
+          },
+          '401': { description: 'Bearer [REDACTED] required' },
+          '403': { description: 'Owner or admin role required' },
+          '404': { description: 'Reminder not found in account scope' },
+          '422': { description: 'Invalid target condition' },
+          '500': { description: 'Failed to count reminder audience' },
+        },
+      },
+    },
     '/api/reminders/{id}/registrants/{enrollmentId}/cancel': {
       post: {
         tags: ['Reminders'], summary: '登録者を取り消し、未送信予定だけを止める',

@@ -186,10 +186,11 @@ describe('SCENARIO-15 開始前試算の取り直し', () => {
   })
 
   it('取り直し中は古い人数ではなく計算中と出す', () => {
-    expect(detail).toContain('新規開始予定を計算しています…')
+    // 設計 B：試算の人数は「予約中」にそろえる（旧「新規開始予定」）。
+    expect(detail).toContain('予約中の人数を計算しています…')
     const banner = slice(detail, 'data-design-node="NrBkW"', '</div>')
     expect(banner).toContain('simulationRefreshing')
-    expect(banner).toContain('開始予定の人数を計算しています…')
+    expect(banner).toContain('予約中の人数を計算しています…')
   })
 })
 
@@ -314,12 +315,12 @@ describe('EvVO5 開始条件', () => {
     expect(triggerEditor).toContain('await api.scenarios.simulate(scenarioId, lineAccountId)')
     expect(matchBlock).toContain('一致')
     expect(matchBlock).toContain('すでに購読中')
-    expect(matchBlock).toContain('新規開始予定')
+    expect(matchBlock).toContain('予約中')
     expect(matchBlock).toContain('対象を再計算')
   })
 
-  it('新規開始予定を引き算で作らない', () => {
-    const planned = slice(matchBlock, '<dt className="text-ink-faint text-xs">新規開始予定</dt>', '</dd>')
+  it('予約中の人数を引き算で作らない', () => {
+    const planned = slice(matchBlock, '<dt className="text-ink-faint text-xs">予約中</dt>', '</dd>')
     expect(planned).toContain('match.newStartPlanned')
     expect(planned).not.toMatch(/activeNow|match\.matched\s*-/)
     expect(triggerEditor).toContain('試算では配信も購読も始まりません。')

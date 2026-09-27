@@ -355,6 +355,8 @@ export type AuditEventSummary = {
   changed: number
   logins: number
   suspiciousLogins: number
+  /** 「気になるもの」タブと同じ条件（失敗・要確認）の件数。タブの件数は一覧と同じ分類で数える（監査 R69）。 */
+  attention: number
 }
 
 export type FriendProfileCandidateOption = {
@@ -6550,13 +6552,14 @@ export const api = {
       ),
     urlClicksOverview: (
       accountId: string,
-      params?: { from?: string; to?: string; limit?: number },
+      params?: { from?: string; to?: string; limit?: number; query?: string },
     ) => {
       const query = new URLSearchParams()
       query.set('account_id', accountId)
       if (params?.from) query.set('from', params.from)
       if (params?.to) query.set('to', params.to)
       if (params?.limit) query.set('limit', String(params.limit))
+      if (params?.query) query.set('query', params.query)
       return fetchApi<ApiResponse<AnalyticsUrlClicksOverview>>(
         `/api/analytics/url-clicks?${query.toString()}`,
       )
@@ -6825,6 +6828,10 @@ export const api = {
       category?: 'auth' | 'business'
       result?: 'success' | 'denied' | 'failed'
       attention?: boolean
+      /** 集計タブと同じ分類での絞り込み（監査 R69）。 */
+      group?: 'deleted' | 'sent' | 'changed' | 'login' | 'attention'
+      /** ページ分割もこの順序で行う（監査 R68）。 */
+      sort?: 'asc' | 'desc'
       actorId?: string
       action?: string
       query?: string
@@ -6838,6 +6845,8 @@ export const api = {
       if (params?.category) q.set('category', params.category)
       if (params?.result) q.set('result', params.result)
       if (params?.attention !== undefined) q.set('attention', String(params.attention))
+      if (params?.group) q.set('group', params.group)
+      if (params?.sort) q.set('sort', params.sort)
       if (params?.actorId) q.set('actorId', params.actorId)
       if (params?.action) q.set('action', params.action)
       if (params?.query) q.set('query', params.query)
@@ -10886,6 +10895,15 @@ export const api = {
       fetchApi<ApiResponse<ReminderValidationResult>>(`/api/reminders/${id}/validate`, {
         method: 'POST',
       }),
+    /**
+     * 未保存の条件で人数を数え直す (R15)。条件を送らなければ保存済みの
+     * まま数える。顔ぶれ (先頭20人) も同じ条件で切って返す。
+     */
+    audience: (id: string, condition?: unknown) =>
+      fetchApi<ApiResponse<{ matched: number; excluded: number; sample: Array<{ id: string; displayName: string }> }>>(`/api/reminders/${id}/audience`, {
+        method: 'POST',
+        body: JSON.stringify(condition === undefined ? {} : { condition }),
+      }),
     previewDraft: (id: string, targetDate?: string) =>
       fetchApi<ApiResponse<ReminderPreviewResult>>(`/api/reminders/${id}/preview`, {
         method: 'POST',
@@ -13894,11 +13912,29 @@ export interface EventBookingSummary {
   totalCapacity: number | null;
 }
 
+/**
+ * イベント一覧の全体集計（R79/R80）。ページ切りとは別に、絞り込み条件に合う
+ * 全イベントの「今後の開催枠」だけを数えたもの。Worker の
+ * summarizeFutureEventSlots が作る。
+ */
+export interface EventListSummary {
+  upcoming_slots: number;
+  upcoming_active: number;
+  upcoming_capacity: number | null;
+  fill_rate: number | null;
+  nearly_full: number;
+  low_applications: number;
+  nearest_upcoming_starts_at: string | null;
+  nearest_low_starts_at: string | null;
+}
+
 type EventListResponse<T> = {
   items: T[];
   total: number;
   limit: number;
   sort: Array<{ field: string; direction: 'asc' | 'desc' }>;
+  /** 全体集計。古い応答には無いため optional。無いときはページ内の行で数える。 */
+  summary?: EventListSummary;
 };
 
 export interface EventWaitlistItem {
@@ -14090,7 +14126,7 @@ export const eventsApi = {
       { method: 'DELETE' },
     ),
 
-  /** キャンセル待ち。自動では繰り上げない。誰を通すかは運用の判断。 */
+  /** キャンセル待ち。空きが出たら先頭へ自動で案内し、本人の承諾で確定する。手動の案内もできる。 */
   listWaitlist: (accountId: string, eventId: string) =>
     fetchApi<{ waitlist: EventWaitlistItem[] }>(
       withAccount(`/api/events/admin/events/${eventId}/waitlist`, accountId),

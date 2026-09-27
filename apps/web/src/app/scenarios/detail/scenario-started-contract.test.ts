@@ -18,7 +18,9 @@ describe('V6 シナリオ開始完了', () => {
     expect(DETAIL).toContain('api.scenarios.runs(id, lineAccountId, { limit: 50 })')
     expect(DETAIL).toContain('simulation.audience.newStartPlanned.toLocaleString')
     expect(DETAIL).toContain('開始履歴を確認')
-    expect(DETAIL).toContain("showStarted ? '配信中'")
+    // 設計 B：状態の札は共通の StatusChip（旧「配信中」「配信可」「一時停止中」の直書き）。
+    expect(DETAIL).toContain('<StatusChip')
+    expect(DETAIL).not.toContain("? '配信中'")
     expect(DETAIL).toContain('runs?.subscriptions[0]?.startedAt')
     expect(DETAIL).toContain('開始日時を取得できませんでした')
     expect(DETAIL).toContain('/scenarios/results?id=')

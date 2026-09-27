@@ -9,6 +9,7 @@ import Select from '@/components/shared/select'
 import KpiCard from '@/components/shared/kpi-card'
 import KpiCollapse from '@/components/ui/kpi-collapse'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import MobileTableCards from '@/components/shared/mobile-table-cards'
 import { TextField } from '@/components/shared/text-field'
 import { ApiError } from '@/lib/api'
 import {
@@ -144,6 +145,36 @@ export default function HealthTab({
           )
         ) : data ? (
           <>
+            {/*
+              ★V7 監査の直し：390pxで8列（約981px）が横にはみ出すので、
+              767px 以下は日付・ペット・状態・主な記録に絞った共通カードにし、
+              表は768px 以上だけ出す。体重の推移グラフは表側に残す。
+            */}
+            <MobileTableCards
+              items={data.items.map((row) => {
+                const petName = row.pet.callName || row.pet.name || '（名前なし）'
+                const kindAge = row.pet.ageLabel === '—'
+                  ? petAnimalTypeLabel(row.pet.animalType)
+                  : `${petAnimalTypeLabel(row.pet.animalType)}・${row.pet.ageLabel}`
+                return {
+                  id: row.pet.id,
+                  name: petName,
+                  status: row.changes.length === 0 ? undefined : (
+                    <span className="flex max-w-40 flex-wrap justify-end gap-1">
+                      {row.changes.map((c) => <Chip key={c.key} tone={c.tone === 'warn' ? 'warn' : 'neutral'}>{c.label}</Chip>)}
+                    </span>
+                  ),
+                  summary: `${kindAge}・最終記録 ${row.lastLoggedLabel}・${row.owner.name || '（名前なし）'}`,
+                  metric: `30日 ${row.count30d}件${row.latestStool && row.latestAppetite ? `・${row.latestStool}・${row.latestAppetite}` : ''}`,
+                  primaryAction: (
+                    <button type="button" onClick={() => onOpenSummary(row.pet.id)} className="text-label font-semibold text-action">
+                      30日のまとめ
+                    </button>
+                  ),
+                }
+              })}
+            />
+            <div className="hidden md:block">
             <DataTable>
               <thead>
                 <TableHeadRow>
@@ -161,6 +192,7 @@ export default function HealthTab({
                 {data.items.map((row) => <HealthRow key={row.pet.id} row={row} onOpenSummary={onOpenSummary} />)}
               </tbody>
             </DataTable>
+            </div>
             {pageCount > 1 ? <Pagination page={data.page} pageCount={pageCount} onPageChange={setPage} /> : null}
           </>
         ) : null}

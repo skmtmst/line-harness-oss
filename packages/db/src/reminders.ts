@@ -96,6 +96,13 @@ export interface ReminderDraftStepInput {
   action?: Record<string, unknown>;
 }
 
+/** 対象の絞り込み条件。SegmentCondition と同じ形 (operator/rules/groups)。 */
+export interface ReminderTargetCondition {
+  operator: 'AND' | 'OR';
+  rules: Array<{ type: string; value: unknown }>;
+  groups?: ReminderTargetCondition[];
+}
+
 export interface ReminderDraftSettings {
   name: string;
   description?: string | null;
@@ -111,6 +118,11 @@ export interface ReminderDraftSettings {
   triggerOffsetMinutes?: number | null;
   sendAtTime?: string | null;
   targetTagId?: string | null;
+  /**
+   * 対象の絞り込み条件 (SegmentCondition と同じ形)。あるときは
+   * targetTagId よりこちらが勝つ。settings_snapshot の JSON にだけ持つ。
+   */
+  targetCondition?: ReminderTargetCondition | null;
   folderId?: string | null;
   stopConditions: {
     bookingCancelled: boolean;

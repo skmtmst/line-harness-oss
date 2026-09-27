@@ -154,7 +154,14 @@ export async function getTrackedLinkStats(
   lineAccountId: string,
   range: DateRange,
   limit = 200,
+  query?: string,
 ): Promise<TrackedLinkStat[]> {
+  /*
+   * 監査 R72: 検索語は取得前のSQLへ渡す。上位200件を取ってから画面で絞ると、
+   * 201件目以降は検索しても見つからなかった。利用場所はタグ名・シナリオ名に
+   * 対応するので、リンク名・URL・紐づく名前を対象にする。
+   */
+  const needle = query?.trim().toLowerCase() ?? '';
   const result = await db
     .prepare(
       `SELECT l.id AS tracked_link_id,
@@ -175,11 +182,21 @@ export async function getTrackedLinkStats(
          LEFT JOIN tags t ON t.id = l.tag_id
          LEFT JOIN scenarios s ON s.id = l.scenario_id
         WHERE l.line_account_id = ?
+          ${needle ? `AND (
+            instr(lower(l.name), ?) > 0
+            OR instr(lower(l.original_url), ?) > 0
+            OR instr(lower(COALESCE(t.name, '')), ?) > 0
+            OR instr(lower(COALESCE(s.name, '')), ?) > 0
+          )` : ''}
         GROUP BY l.id
         ORDER BY clicks DESC, l.name ASC
         LIMIT ?`,
     )
-    .bind(range.from, range.to, lineAccountId, limit)
+    .bind(
+      range.from, range.to, lineAccountId,
+      ...(needle ? [needle, needle, needle, needle] : []),
+      limit,
+    )
     .all<{
       tracked_link_id: string;
       name: string;

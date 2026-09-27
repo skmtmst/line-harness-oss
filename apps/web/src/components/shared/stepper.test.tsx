@@ -52,4 +52,57 @@ describe('Stepper（手順の1本化）', () => {
     const out = html()
     expect(out).toContain('aria-label="配信作成の進み"')
   })
+
+  test('いまいる所は currentKey で決まる（入力済みの数で決めない）', () => {
+    // 「次へ」で3段目へ進んだが、入力済みは1段目だけ。印は3段目に付く。
+    const out = renderToStaticMarkup(
+      <Stepper
+        label="配信作成の進み"
+        currentKey="message"
+        steps={[
+          { key: 'basic', label: '基本設定', order: 1, state: 'done', anchor: 'sec-basic' },
+          { key: 'audience', label: '対象者', order: 2, state: 'todo' },
+          { key: 'message', label: 'メッセージ', order: 3, state: 'todo' },
+        ]}
+      />,
+    )
+    expect((out.match(/aria-current="step"/g) ?? []).length).toBe(1)
+    expect(out).toContain('✓')
+    // いまいる段（メッセージ）は番号のまま。済みの段（基本設定）だけ ✓。
+    expect(out).toContain('>3<')
+    // いまいる段は押せない。済みの段は押して戻れる。
+    expect(out).not.toContain('メッセージへ戻る')
+    expect(out).toContain('基本設定へ戻る')
+  })
+
+  test('直すところがある段は △ で、その段へ戻れる', () => {
+    const out = renderToStaticMarkup(
+      <Stepper
+        label="配信作成の進み"
+        currentKey="confirm"
+        steps={[
+          { key: 'basic', label: '基本設定', order: 1, state: 'done', anchor: 'sec-basic' },
+          { key: 'message', label: 'メッセージ', order: 2, state: 'attention', anchor: 'sec-message' },
+          { key: 'confirm', label: '確認', order: 3, state: 'todo' },
+        ]}
+      />,
+    )
+    expect(out).toContain('△')
+    expect(out).toContain('メッセージへ戻る')
+    expect(out).toContain('直すところがあります')
+  })
+
+  test('入力済みの段にいるときは、輪と ✓ の両方を出す', () => {
+    const out = renderToStaticMarkup(
+      <Stepper
+        label="配信作成の進み"
+        currentKey="basic"
+        steps={[{ key: 'basic', label: '基本設定', order: 1, state: 'done', anchor: 'sec-basic' }]}
+      />,
+    )
+    expect(out).toContain('✓')
+    expect(out).toContain('aria-current="step"')
+    // 自分がいる段は押しても何も起きないので、戻るボタンにしない。
+    expect(out).not.toContain('<button')
+  })
 })

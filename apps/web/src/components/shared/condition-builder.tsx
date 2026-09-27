@@ -137,14 +137,15 @@ export default function ConditionBuilder({ value, onChange, label, showCount = t
     void (async () => {
       try {
         const [tagRes, fieldRes, markRes, scenarioRes] = await Promise.all([
-          api.tags.list(),
+          // R23横展開: 条件の選択肢は今のアカウントだけ（別アカウント混入防止）。
+          api.tags.list({ accountId: selectedAccountId }),
           fieldsEnabled
             ? api.friendFields.list(selectedAccountId, undefined, { suppressFeatureDisabledEvent: true })
             : Promise.resolve({ success: true as const, data: [] }),
           marksEnabled
             ? api.supportMarks.list(selectedAccountId, { suppressFeatureDisabledEvent: true })
             : Promise.resolve({ success: true as const, data: [] }),
-          api.scenarios.list(),
+          api.scenarios.list({ accountId: selectedAccountId }),
         ])
         if (cancelled) return
         if (tagRes.success && Array.isArray(tagRes.data)) setTags(tagRes.data.map((t) => ({ id: t.id, name: t.name })))

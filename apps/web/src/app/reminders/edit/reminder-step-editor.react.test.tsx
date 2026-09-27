@@ -14,6 +14,21 @@ vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn() }))
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: fixture.routerPush }),
 }))
+/*
+ * R16: 本文欄に差し込みボタン (InsertToolbar) を置いたため、
+ * 描画にアカウントの文脈が要る。本体では提供者が渡す。
+ * ここでは選び中のアカウントがあるものとして描く。
+ */
+vi.mock('@/contexts/account-context', () => ({
+  useAccount: () => ({ selectedAccountId: 'account-1', loading: false }),
+}))
+/*
+ * R16: 差し込みボタンは任意機能の有無で出し分けるが、読み込みの成否は
+ * この試験の対象外。名前・配信日・その他だけ出す状態で描く。
+ */
+vi.mock('@/lib/use-feature-visibility', () => ({
+  useFeatureVisibility: () => ({ status: 'ready' as const, features: null, enabled: () => false }),
+}))
 vi.mock('@/lib/api', () => {
   class MockApiError extends Error {
     constructor(public status: number, message: string) {
