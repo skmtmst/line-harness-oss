@@ -200,8 +200,9 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
 
   useEffect(() => {
     let cancelled = false
+    // R23横展開: 候補は今のアカウントだけ。切替で取り直す（窓側の絞りは安全網として残す）。
     api.tags
-      .list()
+      .list(selectedAccountId ? { accountId: selectedAccountId } : undefined)
       .then((r) => {
         if (!cancelled && r.success) setTags(r.data)
       })
@@ -211,7 +212,7 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [selectedAccountId])
 
   /**
    * モーダル保存は読み込んだ版を expectedVersion として送る。

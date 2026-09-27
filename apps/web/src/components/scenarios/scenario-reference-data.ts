@@ -67,9 +67,22 @@ export const scenarioReferenceData = {
     cache.delete(`scenario:${id}`)
     cache.delete(`scenario-stats:${id}`)
   },
-  tags: (_accountId?: string | null) => cache.load('tags:visible', () => api.tags.list()),
-  templates: (_accountId?: string | null) =>
-    cache.load('templates:visible', () => api.templates.list()),
+  /*
+   * R23 横展開: タグ・テンプレートの候補は今のアカウントだけ。
+   * 引数を無視して共通鍵で取ると、別アカウントの同名タグが混ざる。
+   * アカウントごとに鍵を分け、取得にも渡す。未指定は従来どおり全体。
+   */
+  /*
+   * R23 横展開: タグ・テンプレートの候補は今のアカウントだけ。
+   * 引数を無視して共通鍵で取ると、別アカウントの同名タグが混ざる。
+   * アカウントごとに鍵を分け、取得にも渡す。未指定は従来どおり全体。
+   */
+  tags: (accountId?: string | null) =>
+    cache.load(`tags:${scopeKey(accountId)}`, () =>
+      api.tags.list(accountId ? { accountId } : undefined)),
+  templates: (accountId?: string | null) =>
+    cache.load(`templates:${scopeKey(accountId)}`, () =>
+      api.templates.list(undefined, accountId ?? undefined)),
   friendFields: (accountId: string) =>
     cache.load(`friend-fields:${accountId}`, () =>
       api.friendFields.list(accountId, undefined, { suppressFeatureDisabledEvent: true }).catch(emptyWhenFeatureDisabled)),

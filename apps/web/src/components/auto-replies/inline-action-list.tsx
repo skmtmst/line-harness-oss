@@ -51,10 +51,11 @@ export function useActionOptions(): ActionOptions {
     }
     void (async () => {
       const [tags, fields, marks, scenarios, vars] = await Promise.allSettled([
-        api.tags.list(),
+        // R23横展開: タグ・シナリオの候補は今のアカウントだけ（別アカウント混入防止）。
+        api.tags.list({ accountId: selectedAccountId }),
         api.friendFields.list(selectedAccountId, undefined, { suppressFeatureDisabledEvent: true }),
         api.supportMarks.list(selectedAccountId, { suppressFeatureDisabledEvent: true }),
-        api.scenarios.list(),
+        api.scenarios.list({ accountId: selectedAccountId }),
         api.commonVars.list(selectedAccountId, undefined, { suppressFeatureDisabledEvent: true }),
       ])
       if (cancelled) return
