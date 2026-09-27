@@ -8008,8 +8008,18 @@ export const api = {
     /** ダッシュボード ★V6 37-2。 */
     dashboard: (period?: OpsDashboardPeriod) =>
       fetchApi<ApiResponse<OpsDashboard>>(`/api/ops/dashboard${period ? `?period=${period}` : ''}`),
-    billingSync: (months = 12) =>
-      fetchApi<ApiResponse<{ tenants: number; imported: number; failed: number; completed: boolean; since: string; syncedAt: string | null }>>('/api/ops/billing/sync', { method: 'POST', body: JSON.stringify({ months }) }),
+    billingSync: async (months = 12) => {
+      try {
+        return await fetchApi<ApiResponse<{ tenants: number; imported: number; failed: number; completed: boolean; since: string; syncedAt: string | null }>>('/api/ops/billing/sync', { method: 'POST', body: JSON.stringify({ months }) })
+      } catch (error) {
+        // 5xx の本文は共通 fetchApi が画面へ出さない。同期APIの 503 は
+        // Stripe 未設定だけなので、利用者が直せる既知の案内へ言い換える。
+        if (error instanceof ApiError && error.status === 503) {
+          throw new Error('Stripe の接続設定がまだありません')
+        }
+        throw error
+      }
+    },
     lineUnregistered: () => fetchApi<ApiResponse<OpsLineUnregistered>>('/api/ops/dashboard/line-unregistered'),
     /** 運営専用ナレッジ ★V6 37-11。 */
     knowledge: {
