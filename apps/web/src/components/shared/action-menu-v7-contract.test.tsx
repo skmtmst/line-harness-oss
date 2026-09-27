@@ -268,6 +268,20 @@ describe('ActionMenu の最上層（portal）', () => {
     }
   })
 
+  it('撮影の印（qaOpen）を項目に出せる', async () => {
+    await act(async () => {
+      root.render(
+        <ActionMenu
+          open
+          onClose={vi.fn()}
+          items={[{ id: 'delete', label: '削除する', tone: 'danger', dividerBefore: true, qaOpen: 'YfTfJ', onSelect: vi.fn() }]}
+        />,
+      )
+    })
+    const item = menuButtons().find((b) => b.textContent?.includes('削除する'))
+    expect(item?.getAttribute('data-qa-open')).toBe('YfTfJ')
+  })
+
   it('開くボタンの押し直しで閉じられる', async () => {
     const onClose = vi.fn()
     await act(async () => {

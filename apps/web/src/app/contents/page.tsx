@@ -7,11 +7,10 @@ import type {
   MediaDeleteImpactReference,
   MediaItem,
 } from '@line-crm/shared'
-import { LayoutGrid, List as ListIcon, Trash2 } from 'lucide-react'
+import { LayoutGrid, List as ListIcon } from 'lucide-react'
 import { api, ApiError, type MediaQuota } from '@/lib/api'
 import FeatureGate from '@/components/feature-gate'
 import Button from '@/components/shared/button'
-import IconButton from '@/components/shared/icon-button'
 import ActionMenu from '@/components/shared/action-menu'
 import { MoreAction } from '@/components/shared/row-actions'
 import { formatMediaSize } from './media-usage-display'
@@ -1129,31 +1128,25 @@ function MediaLibraryInner() {
                   </>
                 )}
 
-                <div className="mt-auto flex flex-wrap items-center justify-end gap-1 pt-1">
+                {/*
+                  ★V7：札の操作は「使用箇所」＋「…」の1行にそろえる。
+                  ダウンロード・アーカイブ・削除は「…」の中へ集める。
+                  ゴミ箱の印だけのボタンは札に直に置かない。
+                  退避は消去ではない。使用中でも止めないが、理由を必ず聞く。
+                  退避済みは編集・削除の押し口を出さず、戻す口だけを残す。
+                  読み取り専用の人にも「…」でダウンロードを渡す。
+                */}
+                <div className="mt-auto flex items-center justify-end gap-1 pt-1">
                   <button
                     onClick={() => setDetailUrl(item.id)}
                     disabled={!canManageMedia}
                     title={canManageMedia ? '使用箇所を見る' : managementPermissionReason}
                     aria-label={`${item.filename}の使用箇所`}
-                    className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-2.5 py-1 text-xs whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50"
+                    className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control shrink-0 border px-2.5 py-1 text-xs whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     使用箇所
                   </button>
-                  {/*
-                    取得は読取権限でも使う操作なので「…」に隠さず、見えるボタンで出す。
-                    読み上げ名は「＜ファイル名＞をダウンロード」のまま保つ。
-                  */}
-                  <button
-                    onClick={() => void downloadItem(item)}
-                    disabled={downloadingIds.has(item.id)}
-                    title={downloadingIds.has(item.id) ? 'ファイルを取り出しています' : 'ダウンロード'}
-                    aria-label={`${item.filename}をダウンロード`}
-                    className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-2.5 py-1 text-xs whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {downloadingIds.has(item.id) ? '取得中…' : 'ダウンロード'}
-                  </button>
-                  {canManageMedia ? (
-                  <span className="relative inline-flex items-center">
+                  <span className="relative inline-flex shrink-0 items-center">
                     <MoreAction
                       label={`${item.filename}のその他操作`}
                       aria-expanded={openMenuId === item.id}
@@ -1164,29 +1157,33 @@ function MediaLibraryInner() {
                       ariaLabel={`${item.filename}の操作`}
                       onClose={() => setOpenMenuId(null)}
                       items={[
-                        ...(!item.archivedAt ? [{ id: 'rename', label: '編集', onSelect: () => { setRenameError(''); setRenaming({ id: item.id, value: item.filename }) } }] : []),
-                        { id: 'archive', label: item.archivedAt ? '一覧へ戻す' : 'アーカイブ', onSelect: () => { setArchiveError(''); setArchiveReason(''); setArchiveTarget({ item, mode: item.archivedAt ? 'restore' : 'archive' }) } },
+                        {
+                          id: 'download',
+                          label: downloadingIds.has(item.id) ? '取得中…' : 'ダウンロード',
+                          disabled: downloadingIds.has(item.id),
+                          disabledReason: downloadingIds.has(item.id) ? 'ファイルを取り出しています' : undefined,
+                          onSelect: () => { void downloadItem(item) },
+                        },
+                        ...(canManageMedia && !item.archivedAt
+                          ? [{ id: 'rename', label: '編集', onSelect: () => { setRenameError(''); setRenaming({ id: item.id, value: item.filename }) } }]
+                          : []),
+                        ...(canManageMedia
+                          ? [{ id: 'archive', label: item.archivedAt ? '一覧へ戻す' : 'アーカイブ', onSelect: () => { setArchiveError(''); setArchiveReason(''); setArchiveTarget({ item, mode: item.archivedAt ? 'restore' : 'archive' }) } }]
+                          : []),
+                        ...(canManageMedia && !item.archivedAt
+                          ? [{
+                            id: 'delete',
+                            label: '削除する',
+                            tone: 'danger' as const,
+                            dividerBefore: true,
+                            // 削除確認の窓の撮影は「…」→この項目の2手で開ける。
+                            qaOpen: 'YfTfJ',
+                            onSelect: () => { void openDelete(item) },
+                          }]
+                          : []),
                       ]}
                     />
                   </span>
-                  ) : null}
-                  {/*
-                    退避は消去ではない。使用中でも止めないが、理由を必ず聞く。
-                    退避済みは編集・削除の押し口を出さず、戻す口だけを残す。
-                    ★V7：札の操作は「使用箇所＋ダウンロード＋…」の1行。編集・
-                    アーカイブは「…」の中、削除はゴミ箱の印のまま残す。
-                    権限のない人には「…」自体を出さない（空の飾りにしない）。
-                  */}
-                  {canManageMedia && !item.archivedAt ? (
-                  <IconButton
-                    onClick={() => void openDelete(item)}
-                    data-qa-open="YfTfJ"
-                    aria-label={`${item.filename}を削除`}
-                    title="削除"
-                  >
-                    <Trash2 aria-hidden />
-                  </IconButton>
-                  ) : null}
                 </div>
 
               </div>

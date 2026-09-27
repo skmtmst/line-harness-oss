@@ -32,6 +32,11 @@ export type ActionMenuItem = {
    * 同じ見出しを2回出さないのは呼ぶ側の責任。
    */
   sectionBefore?: string
+  /**
+   * 撮影の押し口（`data-qa-open`）。メニューの中の項目を開ける手順の
+   * 印にする。1画面に1つだけ。
+   */
+  qaOpen?: string
   onSelect: () => void
 }
 
@@ -126,6 +131,7 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
             className={`${styles.item} ${item.description || (item.disabled && item.disabledReason) ? styles.itemTall : ''} ${item.tone === 'danger' ? styles.danger : ''}`}
             disabled={item.disabled}
             title={item.label}
+            data-qa-open={item.qaOpen}
             onClick={() => { item.onSelect(); onClose() }}
           >
             {item.icon ? <span className={styles.icon} aria-hidden="true">{item.icon}</span> : null}
