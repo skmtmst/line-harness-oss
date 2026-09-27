@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import React, { act } from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
 const fixture = vi.hoisted(() => ({
@@ -190,6 +191,7 @@ beforeEach(() => {
   })
   window.localStorage.clear()
   window.localStorage.setItem('lh_staff_role', 'owner')
+  clearToastsForTest()
   fixture.selectedAccountId = 'account-a'
   fixture.getSettings.mockImplementation(async (accountId: string) => ({ success: true, data: settings(accountId) }))
   fixture.saveSettings.mockImplementation(async (accountId: string, body: Record<string, unknown>) => ({
@@ -259,7 +261,7 @@ afterEach(() => {
 
 async function renderEditor(viewOnly = false) {
   const availabilityCallsBeforeRender = fixture.getAvailability.mock.calls.length
-  render(<StaffShiftsPage />)
+  render(<><StaffShiftsPage /><ToastHost /></>)
   // N-411: 閲覧のみの人には保存ボタンを出さない。代わりに閲覧注記を待つ。
   await (viewOnly
     ? screen.findByText('閲覧のみです。変更には予約設定の権限が必要です。')

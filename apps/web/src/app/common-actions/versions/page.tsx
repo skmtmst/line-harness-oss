@@ -9,6 +9,7 @@ import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
+import Notice from '@/components/shared/notice'
 import TargetMissing from '@/components/shared/target-missing'
 import PageHeader from '@/components/shared/page-header'
 import StatusBadge from '@/components/shared/status-badge'
@@ -417,9 +418,7 @@ function CommonActionVersionsInner() {
             <p className="text-ink-secondary mt-2 text-sm">{published?.actions.map((action) => ACTION_LABELS[action.type] ?? action.type).join(' → ') || '未取得'}</p>
           </section>
         </div>
-        <p className="bg-warning-bg text-warning rounded-control mt-3 p-3 text-sm">
-          影響：実行中 {pendingBinding?.runningCount ?? '—'}件、待機中 {pendingBinding?.waitingCount ?? '—'}件は現在の版のまま完了します。未取得の件数は、実行集計の接続後に表示します。
-        </p>
+        <Notice tone="warn" message={`影響：実行中 ${pendingBinding?.runningCount ?? '—'}件、待機中 ${pendingBinding?.waitingCount ?? '—'}件は現在の版のまま完了します。未取得の件数は、実行集計の接続後に表示します。`} className="mt-3" />
       </Dialog>
     </div>
   )

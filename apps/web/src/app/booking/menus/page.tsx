@@ -9,6 +9,8 @@ import Button from '@/components/shared/button'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import Disclosure from '@/components/shared/disclosure'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
+import { notifyToast } from '@/components/shared/toast'
 import Pagination from '@/components/shared/pagination'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import {
@@ -382,9 +384,7 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
         />
       </div>
 
-      <div data-design="Bar" className="bg-info-bg text-ink-secondary mb-4 rounded-control px-4 py-3 text-xs">
-        上から並んだ順に、お客様の画面に出ます。順番は操作列の↑↓で変えられます。
-      </div>
+      <Notice data-design="Bar" tone="info" message="上から並んだ順に、お客様の画面に出ます。順番は操作列の↑↓で変えられます。" className="mb-4" />
       <Disclosure size="compact" title="時間と金額の決め方" hint="2項目" className="mb-4">
         <ul className="list-disc space-y-1 pl-5 text-sm">
           <li>かかる時間を長めにしておくと、あとの予約とぶつかりません。</li>
@@ -426,9 +426,7 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
         </div>
       ) : (<>
         {reorderError && (
-          <p role="alert" className="border-warning-bg bg-warning-bg text-ink mb-3 rounded-control border px-4 py-2 text-xs font-semibold">
-            {reorderError}
-          </p>
+          <Notice tone="danger" message={reorderError} onClose={() => setReorderError(null)} className="mb-3" />
         )}
         <div
           data-design="Table"
@@ -692,17 +690,17 @@ function BookingRulesEditor({ accountId, initial, canEdit, onRetry, onSaved }: {
   const [draft, setDraft] = useState(initial)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
-  const [saved, setSaved] = useState(false)
+  // 店舗切替でこの画面は作り直される（key=accountId）。外れた応答は何も残さない。
+  const mountedRef = useRef(true)
+  useEffect(() => () => { mountedRef.current = false }, [])
 
   function set<K extends keyof BookingSettings>(key: K, value: BookingSettings[K]) {
     setDraft((current) => ({ ...current, [key]: value }))
-    setSaved(false)
   }
 
   async function submit() {
     setSaving(true)
     setSaveError(null)
-    setSaved(false)
     try {
       const response = await bookingApi.saveSettings(accountId, {
         expectedVersion: draft.version,
@@ -718,8 +716,10 @@ function BookingRulesEditor({ accountId, initial, canEdit, onRetry, onSaved }: {
         reminderHoursBefore: draft.reminderHoursBefore,
       })
       if (!response.success) throw new Error('booking_settings_save_failed')
+      // 保存待ちに店舗が変わっていたら、旧店舗の応答を新店舗へ反映しない。
+      if (!mountedRef.current) return
       setDraft(response.data)
-      setSaved(true)
+      notifyToast('予約の基本ルールを保存しました。')
       onSaved(response.data)
     } catch (saveFailure) {
       setSaveError(bookingRulesErrorMessage(saveFailure, '保存'))
@@ -788,12 +788,14 @@ function BookingRulesEditor({ accountId, initial, canEdit, onRetry, onSaved }: {
       </div>
       <p className="text-ink-faint mt-4 text-xs">0分前は、開始直前まで受け付ける・キャンセルできる設定です。</p>
       {saveError && (
-        <div className="bg-danger-bg text-danger mt-4 rounded-control p-3 text-sm" role="alert">
-          <p>{saveError}</p>
-          {saveError.includes('先に保存') && <button type="button" onClick={onRetry} className="mt-2 font-semibold underline">最新の内容を読み直す</button>}
-        </div>
+        <Notice
+          tone="danger"
+          message={saveError}
+          onClose={() => setSaveError(null)}
+          className="mt-4"
+          action={saveError.includes('先に保存') ? <button type="button" onClick={onRetry} className="font-semibold underline">最新の内容を読み直す</button> : undefined}
+        />
       )}
-      {saved && <p className="text-success mt-4 text-sm font-semibold" role="status">予約の基本ルールを保存しました。</p>}
       </fieldset>
       {canEdit ? (
         <div className="border-hairline mt-5 flex justify-end border-t pt-4">

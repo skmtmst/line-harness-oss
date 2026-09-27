@@ -12,6 +12,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import FilterChip from '@/components/shared/filter-chip'
 import IconButton from '@/components/shared/icon-button'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 import NoteBar from '@/components/shared/note-bar'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
@@ -662,9 +663,7 @@ function MileagePageInner() {
         </div>
 
         {ruleActionError ? (
-          <p role="alert" className="border-status-danger bg-status-danger-soft text-danger mb-3 rounded-control border px-3 py-2 text-sm">
-            {ruleActionError}
-          </p>
+          <Notice tone="danger" message={ruleActionError} className="mb-3" />
         ) : null}
 
         <div className="mb-3 flex flex-wrap items-center gap-2">

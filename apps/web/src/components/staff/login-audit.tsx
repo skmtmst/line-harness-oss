@@ -10,6 +10,7 @@ import { TableHeadRow, TableStateRow, Th } from '@/components/shared/table'
 import { useAccount } from '@/contexts/account-context'
 import { api, ApiError, type AuditEventItem, type AuditEventSummary } from '@/lib/api'
 import ListRange from '@/components/ui/list-range'
+import Notice from '@/components/shared/notice'
 
 const EMPTY_SUMMARY: AuditEventSummary = {
   periodDays: null,
@@ -231,7 +232,7 @@ export default function LoginAudit({ userId }: { userId?: string }) {
       <AuditKpi label="配信した操作" value={summaryValue(summary.sent)} note="送信・公開として記録された操作" />
       <AuditKpi label="いつもと違う場所から" value={summaryValue(summary.suspiciousLogins)} note="見なれない場所からのログイン" attention={summary.suspiciousLogins > 0} />
     </div>
-    <div className="mb-4 rounded-control bg-info-bg px-4 py-3 text-sm font-medium text-info">だれが、いつ、何をしたかの記録です。いつもと違う場所からのログインは赤く出します。消した・配信した・設定を変えたで絞れます。</div>
+    <Notice tone="info" className="mb-4">だれが、いつ、何をしたかの記録です。いつもと違う場所からのログインは赤く出します。消した・配信した・設定を変えたで絞れます。</Notice>
     <div className="mb-3 flex flex-wrap items-center gap-3">
       <SearchField aria-label="人の名前・操作の内容で検索" value={query} onChange={setQuery} placeholder="人の名前・操作の内容で検索" className="min-w-64 flex-1" />
       <Select aria-label="期間で絞り込む" value={periodFilter} onChange={setPeriodFilter} options={PERIOD_OPTIONS} />
@@ -249,7 +250,7 @@ export default function LoginAudit({ userId }: { userId?: string }) {
       <Select aria-label="並び順" value={sort} onChange={setSort} options={SORT_OPTIONS} />
     </div>
     {error
-      ? <div className="rounded-card border border-danger bg-danger-bg p-8 text-center"><p className="mb-4 font-semibold text-danger">{error}</p><Button onClick={() => void load()}>もう一度読み込む</Button></div>
+      ? <Notice tone="danger" action={<Button onClick={() => void load()}>もう一度読み込む</Button>}>{error}</Notice>
       : <div className="overflow-hidden rounded-card border border-hairline bg-canvas"><table className="w-full table-fixed text-sm"><thead><TableHeadRow><Th className="w-1/4">いつ・だれが</Th><Th className="w-1/5">何をしたか</Th><Th className="w-1/5">対象</Th><Th className="w-1/5">元の値 → 新しい値</Th><Th>場所</Th><Th align="right">操作</Th></TableHeadRow></thead><tbody className="divide-y divide-hairline">{loading
         ? <TableStateRow colSpan={6} kind="loading" title="記録を読み込んでいます…" />
         : visible.length === 0

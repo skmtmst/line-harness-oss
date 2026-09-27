@@ -12,7 +12,9 @@ import Dialog from '@/components/shared/dialog'
 import { Field, TextInput } from '@/components/shared/form-controls'
 import DateTimeField from '@/components/shared/date-time-field'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
+import { notifyToast } from '@/components/shared/toast'
 import Toggle from '@/components/shared/toggle'
 import { useAccount } from '@/contexts/account-context'
 import {
@@ -137,7 +139,6 @@ export default function ActionScoreRulesPage() {
   const [forbidden, setForbidden] = useState(false)
   const [loadError, setLoadError] = useState('')
   const [actionError, setActionError] = useState('')
-  const [notice, setNotice] = useState('')
   const [busy, setBusy] = useState(false)
   const [canEdit, setCanEdit] = useState(false)
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null)
@@ -197,7 +198,6 @@ export default function ActionScoreRulesPage() {
   useEffect(() => void load(), [load])
 
   const updateRule = (index: number, updates: Partial<ActionScoreRule>) => {
-    setNotice('')
     setTestResult(null)
     setBundle((current) => current ? {
       ...current,
@@ -208,7 +208,6 @@ export default function ActionScoreRulesPage() {
   }
 
   const updateBands = (updates: Partial<ActionScoreBands>) => {
-    setNotice('')
     setTestResult(null)
     setBandPreview(null)
     setBundle((current) => current ? { ...current, bands: { ...current.bands, ...updates } } : current)
@@ -258,7 +257,6 @@ export default function ActionScoreRulesPage() {
       }],
     })
     setEditRuleIndex(nextIndex)
-    setNotice('')
   }
 
   const removeRule = (index: number) => {
@@ -266,7 +264,6 @@ export default function ActionScoreRulesPage() {
       ...current,
       rules: current.rules.filter((_, position) => position !== index),
     } : current)
-    setNotice('')
   }
 
   const saveDraft = async () => {
@@ -274,7 +271,6 @@ export default function ActionScoreRulesPage() {
     const accountAtRequest = selectedAccountId
     setBusy(true)
     setActionError('')
-    setNotice('')
     try {
       const response = await api.actionScores.saveDraft({
         accountId: accountAtRequest,
@@ -285,7 +281,7 @@ export default function ActionScoreRulesPage() {
       if (!response.success) throw new Error(response.error)
       setConfiguration(response.data)
       setBundle(cloneBundle(response.data))
-      setNotice(`下書き（第${response.data.editableVersion.versionNumber}版）を保存しました。`)
+      notifyToast(`下書き（第${response.data.editableVersion.versionNumber}版）を保存しました。`)
       return response.data
     } catch (error) {
       setActionError(fieldError(error))
@@ -314,7 +310,7 @@ export default function ActionScoreRulesPage() {
       setConfiguration(response.data)
       setBundle(cloneBundle(response.data))
       setConfirmAction(null)
-      setNotice(`第${response.data.publishedVersion?.versionNumber ?? '—'}版を公開しました。利用先は公開した版に固定されます。`)
+      notifyToast(`第${response.data.publishedVersion?.versionNumber ?? '—'}版を公開しました。利用先は公開した版に固定されます。`)
     } catch (error) {
       setActionError(fieldError(error))
     } finally {
@@ -334,7 +330,7 @@ export default function ActionScoreRulesPage() {
       setConfiguration(response.data)
       setBundle(cloneBundle(response.data))
       setConfirmAction(null)
-      setNotice('公開中のルールを止めました。過去の点数と履歴は残ります。')
+      notifyToast('公開中のルールを止めました。過去の点数と履歴は残ります。')
     } catch (error) {
       setActionError(fieldError(error))
     } finally {
@@ -451,8 +447,8 @@ export default function ActionScoreRulesPage() {
           </div>
 
           <aside className="grid content-start gap-3">
-            <section className="rounded-card border border-status-warn bg-status-warn-soft p-4 text-xs text-status-warn-deep">
-              <p className="font-semibold">マイルとの違い</p>
+            <Notice tone="warn">
+              <p className="text-xs font-semibold">マイルとの違い</p>
               <div className="mt-3 grid gap-3">
                 <div className="flex gap-2"><EyeOff className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" /><p><strong>お客様には見えません</strong><br />顧客カルテにも出しません</p></div>
                 <div className="flex gap-2"><WalletCards className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" /><p><strong>マイル残高は動きません</strong><br />点が下がっても、マイルは減りません</p></div>
@@ -460,7 +456,7 @@ export default function ActionScoreRulesPage() {
                 <div className="flex gap-2"><MailX className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" /><p><strong>「メッセージを開いた」は使えません</strong><br />LINEは既読を返さないため、ルールにできません</p></div>
                 <div className="flex gap-2"><Ban className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" /><p><strong>マイル専用のきっかけは出しません</strong><br />タグ付与・ウェビナー視聴・継続フォロー日数・紹介成果などは、マイルの決めごとから選べます</p></div>
               </div>
-            </section>
+            </Notice>
 
             <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card">
               <p className="text-sm font-semibold text-ink">つながる先</p>
@@ -475,8 +471,7 @@ export default function ActionScoreRulesPage() {
           </aside>
         </div>
 
-        {notice ? <p className="rounded-control border border-accent-border bg-accent-soft px-4 py-3 text-sm text-accent-deep" role="status">{notice}</p> : null}
-        {actionError ? <p className="rounded-control border border-status-danger-border bg-danger-bg px-4 py-3 text-sm text-danger" role="alert">{actionError}</p> : null}
+        {actionError ? <Notice tone="danger" message={actionError} /> : null}
 
         {/*
           #973 U046: 4列固定はやめ、上に状態文を全幅、下に押し口を折り返しで
@@ -503,10 +498,10 @@ export default function ActionScoreRulesPage() {
           <Field label="テスト前の点数" htmlFor="test-score"><TextInput id="test-score" type="number" value={testScore} onChange={(event) => setTestScore(event.target.value)} /></Field>
           <Field label="試す行動"><Select aria-label="テストする行動" value={testEvent} onChange={setTestEvent} options={[...EVENT_OPTIONS]} size="full" /></Field>
           {testResult ? (
-            <div className="rounded-control border border-accent-border bg-accent-soft p-3 text-xs text-ink-secondary" role="status">
-              <p className="font-semibold text-ink">{testResult.scoreBefore}点 → {testResult.scoreAfter}点</p>
-              <p className="mt-1">合ったルール：{testResult.matched.length ? testResult.matched.map((item) => item.ruleName).join('、') : 'なし'}</p>
-            </div>
+            <Notice tone="success">
+              <p className="text-xs font-semibold">{testResult.scoreBefore}点 → {testResult.scoreAfter}点</p>
+              <p className="mt-1 text-xs">合ったルール：{testResult.matched.length ? testResult.matched.map((item) => item.ruleName).join('、') : 'なし'}</p>
+            </Notice>
           ) : null}
         </div>
       </Dialog>

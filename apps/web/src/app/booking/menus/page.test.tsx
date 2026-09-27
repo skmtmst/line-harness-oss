@@ -16,6 +16,7 @@ import React from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { act } from 'react'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 
 const localStorageValues = new Map<string, string>()
 Object.defineProperty(window, 'localStorage', {
@@ -145,6 +146,7 @@ function optionLabels(select: HTMLSelectElement): string[] {
 
 beforeEach(() => {
   window.localStorage.setItem('lh_staff_role', 'owner')
+  clearToastsForTest()
   fixture.selectedAccountId = 'account-a'
   fixture.activeTab = 'menus'
   fixture.tagsList = async () => ({ success: true, data: TAGS })
@@ -189,7 +191,7 @@ describe('既存メニューの編集窓: 共有設備の割当', () => {
 
   async function openEditor() {
     fixture.listMenus = vi.fn(async () => ({ menus: [menu()] }))
-    render(<MenusPage />)
+    render(<><MenusPage /><ToastHost /></>)
     fireEvent.click(await screen.findByRole('button', { name: '中身を見る' }))
     await screen.findByText('メニュー編集')
   }
@@ -281,7 +283,7 @@ describe('既存メニューの編集窓: 予約申込時に自動付与する�
   /** 一覧を描き、「中身を見る」で編集窓まで開く。 */
   async function openEditor(target: Record<string, unknown>) {
     fixture.listMenus = vi.fn(async () => ({ menus: [menu(target)] }))
-    render(<MenusPage />)
+    render(<><MenusPage /><ToastHost /></>)
     const row = await screen.findByRole('button', { name: '中身を見る' })
     await act(async () => { fireEvent.click(row) })
     const dialog = await screen.findByText('メニュー編集')
@@ -369,7 +371,7 @@ describe('既存メニューの編集窓: 予約申込時に自動付与する�
 describe('店舗共通の予約ルール', () => {
   test('行が無い店舗の既定値を編集し、version=0で初回保存する', async () => {
     fixture.activeTab = 'rules'
-    render(<MenusPage />)
+    render(<><MenusPage /><ToastHost /></>)
 
     const windowDays = await screen.findByRole('spinbutton', { name: '何日先まで受け付けるか' })
     expect((windowDays as HTMLInputElement).value).toBe('60')
@@ -397,7 +399,7 @@ describe('店舗共通の予約ルール', () => {
     fixture.saveSettings = vi.fn(async () => {
       throw new ApiError(409, 'version_conflict', 'version_conflict')
     })
-    render(<MenusPage />)
+    render(<><MenusPage /><ToastHost /></>)
 
     await screen.findByRole('button', { name: '変更を保存' })
     await act(async () => {
@@ -415,7 +417,7 @@ describe('店舗共通の予約ルール', () => {
       success: true,
       data: { ...SETTINGS, ...body, id: 'settings-a', version: 4 },
     }))
-    render(<MenusPage />)
+    render(<><MenusPage /><ToastHost /></>)
 
     const holdMinutes = await screen.findByRole('spinbutton', { name: '仮押さえの保持時間' })
     fireEvent.change(holdMinutes, { target: { value: '30' } })
@@ -436,7 +438,7 @@ describe('店舗共通の予約ルール', () => {
     fixture.getSettings = vi.fn(async () => ({ success: true, data: {
       ...SETTINGS, holdMinutes: 1440, reminderHoursBefore: 72,
     } }))
-    render(<MenusPage />)
+    render(<><MenusPage /><ToastHost /></>)
 
     await screen.findByRole('spinbutton', { name: '受付の締め切り' })
     // 受付の締め切り・キャンセルの期限（どちらも1440分）
@@ -450,7 +452,7 @@ describe('店舗共通の予約ルール', () => {
   test('IANAに無いタイムゾーンには綴り確認の注意が出る（Issue #710）', async () => {
     fixture.activeTab = 'rules'
     fixture.getSettings = vi.fn(async () => ({ success: true, data: { ...SETTINGS, timeZone: 'Asia/Tokoyo' } }))
-    render(<MenusPage />)
+    render(<><MenusPage /><ToastHost /></>)
 
     await screen.findByRole('spinbutton', { name: '受付の締め切り' })
     expect(screen.getByText(/綴りを確認してください/)).toBeTruthy()
@@ -466,7 +468,7 @@ describe('店舗共通の予約ルール', () => {
     }))
     let resolveOldSave!: (value: unknown) => void
     fixture.saveSettings = vi.fn(() => new Promise((resolve) => { resolveOldSave = resolve }))
-    render(<MenusPage />)
+    render(<><MenusPage /><ToastHost /></>)
 
     await screen.findByRole('button', { name: '基本ルールを作成' })
     await act(async () => {
@@ -516,7 +518,7 @@ describe('既存メニューの編集窓: 版管理と料金モード', () => {
 
   async function openEditor(target: Record<string, unknown> = {}) {
     fixture.listMenus = vi.fn(async () => ({ menus: [menu(target)] }))
-    render(<MenusPage />)
+    render(<><MenusPage /><ToastHost /></>)
     const row = await screen.findByRole('button', { name: '中身を見る' })
     await act(async () => { fireEvent.click(row) })
     await screen.findByText('メニュー編集')
@@ -602,7 +604,7 @@ describe('既存メニューの編集窓: 版管理と料金モード', () => {
         menu({ id: 'menu-fixed', name: 'カット', price_mode: 'fixed', base_price: 8000 }),
       ],
     }))
-    render(<MenusPage />)
+    render(<><MenusPage /><ToastHost /></>)
 
     // 名前はKPI「いちばん選ばれた」にも出るので、表の行の中で探す。
     await waitFor(() => {
@@ -658,7 +660,7 @@ describe('一覧の担当欄 (#953 E-05)', () => {
         menu({ id: 'menu-active-empty', name: '公開で未割当', is_active: 1 }),
       ],
     }))
-    render(<MenusPage />)
+    render(<><MenusPage /><ToastHost /></>)
 
     await waitFor(() => {
       const rows = screen.getAllByRole('row')

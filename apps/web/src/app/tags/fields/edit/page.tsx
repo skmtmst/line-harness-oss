@@ -9,6 +9,7 @@ import FeatureGate from '@/components/feature-gate'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
 import StickyBar from '@/components/shared/sticky-bar'
 import SelectField from '@/components/shared/select-field'
 import ListState from '@/components/shared/list-state'
@@ -169,11 +170,11 @@ function EditFriendFieldForm() {
         <Button href="/tags?tab=fields">友だち情報欄へ</Button>
       </div>
 
-      {error ? <p role="alert" className="mb-4 rounded-control border border-danger/20 bg-danger-bg p-3 text-sm text-danger">{error}</p> : null}
+      {error ? <Notice tone="danger" message={error} className="mb-4" /> : null}
       {locked ? (
-        <p className="mb-4 rounded-control border border-warning/30 bg-warning-bg p-3 text-sm text-warning">
+        <Notice tone="warn" className="mb-4">
           共通項目はこのアカウントから直接変更できません。新しい項目へ移行してから編集してください。
-        </p>
+        </Notice>
       ) : null}
 
       <div className="grid gap-4 xl:grid-cols-2">

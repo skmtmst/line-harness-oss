@@ -92,8 +92,9 @@ describe('V6 たまる決めごと（N46cQ）の画面', () => {
   })
 
   it('停止・再開の失敗は一覧を消さず行内の帯で出す', () => {
+    // 失敗は共通 Notice の危険の帯（role=alert は部品が付ける。★V7 共通部品その2 §1）。
     expect(PAGE).toContain('ruleActionError')
-    expect(PAGE).toContain('role="alert"')
+    expect(PAGE).toContain('<Notice tone="danger"')
     expect(PAGE).not.toContain("setLoadError('たまる決めごとを更新できませんでした")
   })
 
