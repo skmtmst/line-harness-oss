@@ -78,4 +78,16 @@ describe('ログイン前の画面（0-1／36-4／36-6）', () => {
     expect(lib).toContain('NEXT_PUBLIC_PRIVACY_URL')
     expect(read('components/auth/auth-card.tsx')).toContain('if (!href) return <span>')
   })
+
+  it('ログイン前のお問い合わせはサービスサイトの /contact/ へ（監査 m18e）', () => {
+    // /hq/support はログインが要り、未ログインではログイン画面へ戻される。
+    // 新しい公開フォームは作らない。URL は環境変数で変えられる。
+    const lib = read('lib/auth-email.ts')
+    expect(lib).toContain('NEXT_PUBLIC_CONTACT_URL')
+    expect(lib).toContain('/contact/')
+    const card = read('components/auth/auth-card.tsx')
+    expect(card).toContain('CONTACT_URL')
+    expect(card).toContain('target="_blank"')
+    expect(card).not.toContain('href="/hq/support"')
+  })
 })

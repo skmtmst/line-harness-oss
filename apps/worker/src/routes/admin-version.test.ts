@@ -18,12 +18,28 @@ describe('GET /admin/version', () => {
       admin_hash: string;
       liff_hash: string;
       released_at: string;
+      git_commit: string;
+      deploy_env: string | null;
     };
     expect(j.version).toMatch(/^\d+\.\d+\.\d+(-\w+)?$/);
     expect(j.worker_hash).toMatch(/^sha256:[a-f0-9]{64}$/);
     expect(j.admin_hash).toMatch(/^sha256:[a-f0-9]{64}$/);
     expect(j.liff_hash).toMatch(/^sha256:[a-f0-9]{64}$/);
     expect(j.released_at).toMatch(/^\d{4}-\d{2}-\d{2}/);
+    expect(typeof j.git_commit).toBe('string');
+  });
+
+  it('returns the deploy env from wrangler vars (null when unset)', async () => {
+    const app = new Hono();
+    app.route('/admin', adminVersion);
+    const withEnv = await app.request('/admin/version', {}, { DEPLOY_ENV: 'staging' });
+    expect(withEnv.status).toBe(200);
+    const staged = (await withEnv.json()) as { deploy_env: string | null };
+    expect(staged.deploy_env).toBe('staging');
+
+    const bare = await app.request('/admin/version');
+    const unset = (await bare.json()) as { deploy_env: string | null };
+    expect(unset.deploy_env).toBeNull();
   });
 });
 
