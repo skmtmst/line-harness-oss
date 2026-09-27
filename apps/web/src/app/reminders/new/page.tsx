@@ -302,7 +302,7 @@ export default function NewReminderPage() {
         triggerEventId: triggerType === 'event' ? triggerEventId || null : null,
         repeatYearly: triggerType === 'friend_field' ? repeatYearly : false,
         leapYearPolicy,
-        triggerOffsetMinutes: null, sendAtTime: appliedTemplate?.step.sendAtTime ?? null, targetTagId: null,
+        triggerOffsetMinutes: null, sendAtTime: appliedTemplate?.step.sendAtTime ?? null, targetTagId: null, targetCondition: null,
         stopConditions: { bookingCancelled: true, supportMarkCompleted: true, daysAfterTarget: 7, friendBlocked: true },
         steps: firstStep ? [firstStep] : [],
       }

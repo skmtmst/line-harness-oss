@@ -11,9 +11,12 @@ import { useReminderTestSend } from './use-reminder-test-send'
 import { TestRecipientGuidance, testRecipientDestinationLabel, testRecipientNote, testSendConfirmDescription, type ReminderTestRecipientKind } from './test-recipient-guidance'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Dialog from '@/components/shared/dialog'
+import HelpTip from '@/components/shared/help-tip'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import { TableHeadRow, Th } from '@/components/shared/table'
+import ConditionBuilder, { pruneCondition, type SegmentCondition } from '@/components/shared/condition-builder'
 import { LinePreview, Pill, ReminderFooter, ReminderPanel, ReminderWizard, ReminderWorkspace, SummaryCard } from './reminder-v6-ui'
 import { usePageTitle } from '@/components/shell/page-chrome'
 
@@ -178,7 +181,7 @@ export default function ReminderPublishFlow({ reminderId, stage }: { reminderId:
     <div data-reminder-publish-stage={stage}>
       <ReminderWizard current={current} />
       {(error || (!testConfirm && testIssue)) ? <Notice tone="danger" className="mb-3">{error || testIssue}</Notice> : null}
-      {stage === 'target' ? <TargetStage settings={subjectSettings} validation={validation} validationFailed={validationState === 'error'} onRetryValidation={retryValidation} onChange={setSettings} onNext={() => void saveTarget()} busy={busy} /> : null}
+      {stage === 'target' ? <TargetStage reminderId={reminderId} settings={subjectSettings} validation={validation} validationFailed={validationState === 'error'} onRetryValidation={retryValidation} onChange={setSettings} onNext={() => void saveTarget()} busy={busy} /> : null}
       {stage === 'preview' ? <PreviewStage settings={subjectSettings} preview={preview} previewFailed={previewState === 'error'} onRetryPreview={retryPreview} editHref={`/reminders/edit?id=${encodeURIComponent(reminderId)}`} onNext={() => go('test')} /> : null}
       {stage === 'test' ? <TestStage draft={subjectDraft} recipientName={testSend.phase.kind === 'succeeded' ? testSend.phase.recipientName : null} recipientKind={testSend.phase.kind === 'succeeded' ? testSend.phase.recipientKind : null} recipientView={testRecipient.view} onRecipientRecheck={() => void testRecipient.reload()} onConfirm={() => { testSend.beginAttempt(); setTestConfirm(true) }} onNext={() => go('confirm')} /> : null}
       {stage === 'confirm' ? <ConfirmStage draft={subjectDraft} settings={subjectSettings} validation={validation} validationFailed={validationState === 'error'} onRetryValidation={retryValidation} onPublish={() => void publishDraft()} busy={busy} /> : null}
@@ -188,16 +191,118 @@ export default function ReminderPublishFlow({ reminderId, stage }: { reminderId:
   )
 }
 
-export function TargetStage({ settings, validation, validationFailed = false, onRetryValidation, onChange, onNext, busy }: { settings: ReminderDraftSettings; validation: ReminderValidationResult | null; validationFailed?: boolean; onRetryValidation?: () => void; onChange: (value: ReminderDraftSettings) => void; onNext: () => void; busy: boolean }) {
+export function TargetStage({ reminderId, settings, validation, validationFailed = false, onRetryValidation, onChange, onNext, busy }: { reminderId: string; settings: ReminderDraftSettings; validation: ReminderValidationResult | null; validationFailed?: boolean; onRetryValidation?: () => void; onChange: (value: ReminderDraftSettings) => void; onNext: () => void; busy: boolean }) {
   const stop = settings.stopConditions
-  const audience = reminderAudienceCounts(validation)
+  const savedAudience = reminderAudienceCounts(validation)
   const stopCount = Object.values(stop).filter((value) => value === true || typeof value === 'number').length
+  /*
+   * R15: 未保存の条件で数え直した人数。条件が空なら保存済みの
+   * 検査結果のまま出す。数えている間は「数えています」と出す。
+   */
+  const [recount, setRecount] = useState<{ matched: number; excluded: number; sample: Array<{ id: string; displayName: string }> } | null>(null)
+  const [counting, setCounting] = useState(false)
+  const [recountError, setRecountError] = useState('')
+  const [recountRetryToken, setRecountRetryToken] = useState(0)
+  const [facesOpen, setFacesOpen] = useState(false)
+  const [faces, setFaces] = useState<{ loading: boolean; error: string; sample: Array<{ id: string; displayName: string }>; matched: number | null } | null>(null)
+  const condition = (settings.targetCondition ?? null) as SegmentCondition | null
+  useEffect(() => {
+    const pruned = pruneCondition(condition)
+    if (!pruned) {
+      setRecount(null)
+      setRecountError('')
+      setCounting(false)
+      return
+    }
+    setCounting(true)
+    setRecountError('')
+    let active = true
+    const timer = setTimeout(() => {
+      void api.reminders.audience(reminderId, pruned).then((response) => {
+        if (!active) return
+        setCounting(false)
+        if (response.success) {
+          setRecount(response.data)
+        } else {
+          setRecountError(response.error)
+        }
+      }).catch(() => {
+        if (!active) return
+        setCounting(false)
+        setRecountError('対象者を数え直せませんでした。')
+      })
+    }, 400)
+    return () => {
+      active = false
+      clearTimeout(timer)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reminderId, JSON.stringify(condition), recountRetryToken])
+  // 保存済みの検査結果か、未保存の条件の数え直しか。数え直しがあるときはそちらが勝つ。
+  const audience = recount
+    ? { matched: recount.matched, excluded: recount.excluded, total: recount.matched + recount.excluded }
+    : savedAudience
+  /*
+   * 顔ぶれを見る。未保存の条件の数え直しがあればその顔ぶれを出し、
+   * 無ければ保存済みのまま数えた顔ぶれを取り直す。どちらも
+   * 人数と同じ条件・範囲で切っているので、数と顔ぶれがずれない。
+   */
+  function openFaces() {
+    if (recount) {
+      setFaces({ loading: false, error: '', sample: recount.sample, matched: recount.matched })
+    } else {
+      setFaces({ loading: true, error: '', sample: [], matched: null })
+      void api.reminders.audience(reminderId).then((response) => {
+        if (response.success) {
+          setFaces({ loading: false, error: '', sample: response.data.sample, matched: response.data.matched })
+        } else {
+          setFaces({ loading: false, error: response.error, sample: [], matched: null })
+        }
+      }).catch(() => {
+        setFaces({ loading: false, error: '対象者を確認できませんでした。', sample: [], matched: null })
+      })
+    }
+    setFacesOpen(true)
+  }
   return <div data-design-node="s7T2dz"><ReminderWorkspace aside={<><SummaryCard rows={[["基準日", '予約日時（Google Meet相談）'], ['対象者', countLabel(audience.matched, '人')], ['通知ステップ', `${settings.steps.length}件`], ['停止条件', `${stopCount}件`]]} /><ReminderPanel title="安全な運用" note="誤送信を防ぐための設定です。"><ul className="text-ink-secondary space-y-2 text-xs"><li>● 基準日が空欄なら開始しない</li><li>● 過去日時の通知は送らない</li><li>● 同じ時刻の重複送信をまとめる</li></ul></ReminderPanel></>}>
-    <ReminderPanel title="対象者の条件" note="どの友だちにリマインダを開始するか設定します。"><div className="rounded-lg border border-hairline p-3 text-xs"><b>下書きに保存した対象条件</b><div className="mt-3 grid grid-cols-3 gap-2"><Metric label="条件一致" value={countLabel(audience.total, '人')} /><Metric label="開始予定" value={countLabel(audience.matched, '人')} success /><Metric label="除外" value={countLabel(audience.excluded, '人')} warning /></div>{validation
-      ? <p className="text-info mt-3">公開前チェックの最新結果です。基準日が登録・変更された時点で対象を自動再判定します。</p>
-      : validationFailed
-        ? <p className="text-danger mt-3">公開前チェックを実行できませんでした。人数は未取得のままです。<button type="button" className="ml-2 underline" onClick={onRetryValidation}>再読み込み</button></p>
-        : <p className="text-info mt-3">公開前チェックを実行しています。基準日が登録・変更された時点で対象を自動再判定します。</p>}</div></ReminderPanel>
+    <ReminderPanel title="対象者の条件" note="どの友だちにリマインダを開始するか設定します。">
+      <ConditionBuilder
+        value={condition}
+        showCount={false}
+        onChange={(next) => onChange({ ...settings, targetCondition: next })}
+      />
+      <div className="mt-3 rounded-lg border border-hairline p-3 text-xs">
+        <p className="flex items-center gap-1 font-bold">対象者の人数
+          <HelpTip label="対象者の人数の説明">当てはまる人はこの店舗の友だち全員の中での一致数、送る予定はそのうちフォローを続けている人数です。</HelpTip>
+        </p>
+        {counting
+          ? <p className="text-ink-faint mt-3">数えています…</p>
+          : recountError
+            ? <p className="text-ink-secondary mt-3">対象者を数え直せませんでした。保存済みの人数を表示しています。<button type="button" className="ml-2 underline" onClick={() => setRecountRetryToken((value) => value + 1)}>数え直す</button></p>
+            : null}
+        <div className="mt-3 grid grid-cols-3 gap-2"><Metric label="当てはまる" value={countLabel(audience.total, '人')} /><Metric label="送る予定" value={countLabel(audience.matched, '人')} success /><Metric label="除く" value={countLabel(audience.excluded, '人')} warning /></div>
+        <div className="mt-3 flex justify-end"><Button variant="secondary" onClick={openFaces} disabled={counting}>顔ぶれを見る</Button></div>
+        {validation
+          ? <p className="text-info mt-3">公開前チェックの最新結果です。基準日が登録・変更された時点で対象を自動再判定します。</p>
+          : validationFailed
+            ? <p className="text-danger mt-3">公開前チェックを実行できませんでした。人数は未取得のままです。<button type="button" className="ml-2 underline" onClick={onRetryValidation}>再読み込み</button></p>
+            : <p className="text-info mt-3">公開前チェックを実行しています。基準日が登録・変更された時点で対象を自動再判定します。</p>}
+      </div>
+      <Dialog
+        open={facesOpen}
+        title="対象者を確認"
+        description={faces?.matched != null ? `送る予定 ${countLabel(faces.matched, '人')}の先頭${faces.sample.length}人です。` : undefined}
+        onCancel={() => setFacesOpen(false)}
+      >
+        {!faces || faces.loading
+          ? <p className="text-ink-faint text-xs">数えています…</p>
+          : faces.error
+            ? <p className="text-ink-secondary text-xs">{faces.error}</p>
+            : faces.sample.length === 0
+              ? <p className="text-ink-faint text-xs">条件に当てはまる人がまだいません。条件をゆるめるとここに出ます。</p>
+              : <ul className="max-h-64 space-y-1 overflow-y-auto text-xs">{faces.sample.map((friend) => <li key={friend.id} className="border-b border-hairline py-1.5">{friend.displayName}</li>)}</ul>}
+      </Dialog>
+    </ReminderPanel>
     <ReminderPanel title="終了・停止条件" note="不要になった通知を自動で止めます。"><div className="divide-y divide-hairline">{[["bookingCancelled",'予約がキャンセルされた','即時停止'],['supportMarkCompleted','対応マークが「完了」になった','残りを停止'],['daysAfterTarget','基準日を過ぎて7日経過','自動終了'],['friendBlocked','友だちがブロックした','即時停止']].map(([key,label,result]) => <label key={key} className="flex items-center gap-3 py-3 text-xs"><input type="checkbox" checked={key === 'daysAfterTarget' ? stop.daysAfterTarget != null : Boolean(stop[key as keyof typeof stop])} onChange={(event) => onChange({ ...settings, stopConditions: { ...stop, [key]: key === 'daysAfterTarget' ? event.target.checked ? 7 : null : event.target.checked } })} /><span className="flex-1 font-medium">{label}</span><Pill tone="success">{result}</Pill></label>)}</div></ReminderPanel>
     {/* REMINDER-09: 次は通知ステップ（STEP 3）。配信予定は通知を保存してから。 */}
     <ReminderFooter primary={busy ? '保存中…' : '通知ステップへ'} primaryDisabled={busy} onPrimary={onNext} />
