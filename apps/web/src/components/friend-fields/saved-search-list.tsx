@@ -108,7 +108,8 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
       一覧そのものは使える。
     */
     void Promise.allSettled([
-      api.tags.list(),
+      // R23横展開: タグ候補も今のアカウントだけ（表示名の取り違え防止）。
+      api.tags.list({ accountId }),
       api.supportMarks.list(accountId, { suppressFeatureDisabledEvent: true }),
       api.scenarios.list({ accountId }),
       api.friendFields.list(accountId, undefined, { suppressFeatureDisabledEvent: true }),
