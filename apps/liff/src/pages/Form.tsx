@@ -11,6 +11,7 @@ import {
   type FormBlock,
   type FormInputBlock,
   type FormLayout,
+  type FormTheme,
 } from '@line-crm/shared';
 import { api, type PublicForm } from '../lib/api.js';
 import {
@@ -21,6 +22,10 @@ import {
 import { logFailure } from '../lib/user-message.js';
 import LoadErrorView from '../components/LoadErrorView.js';
 import LoadingView from '../components/LoadingView.js';
+import Button from '../components/ui/Button.js';
+import BottomBar from '../components/ui/BottomBar.js';
+import StatusView from '../components/ui/StatusView.js';
+import Icon from '../components/ui/Icon.js';
 
 /**
  * 回答フォーム（友だちが実際に入力する画面）。
@@ -54,8 +59,16 @@ function initialAnswers(layout: FormLayout): Answers {
   return answers;
 }
 
-function Asterisk() {
-  return <span className="ml-1 rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] text-red-700">必須</span>;
+/**
+ * 必須の印。★V7 (4-a) は欄名の横の小さな文字。
+ * 色はお店のテーマの error を使い、形は変えない (機能は残す)。
+ */
+function RequiredMark({ color }: { color: string }) {
+  return (
+    <span className="ml-1 text-xs font-bold whitespace-nowrap" style={{ color }}>
+      必須
+    </span>
+  );
 }
 
 /** 'YYYY-MM-DD' を [年, 月, 日] に分ける。形でない値は空3つにする。 */
@@ -173,6 +186,11 @@ export default function Form() {
   const [sending, setSending] = useState(false);
   const [done, setDone] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  /**
+   * 欄ごとの直し方。★V7 (4-a) は欄のすぐ下に出す。
+   * 画面下の `error` はサーバの失敗 (送信・画像) だけに使い、検証とは分ける。
+   */
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   /** 送信中のファイル欄。二重に押させないため欄ごとに持つ */
   const [uploading, setUploading] = useState<Record<string, boolean>>({});
   const [reloadKey, setReloadKey] = useState(0);
@@ -236,10 +254,21 @@ export default function Form() {
     return nextSectionIndex(layout, sectionIndex, answers) >= layout.sections.length;
   }, [layout, sectionIndex, answers]);
 
-  const setValue = (name: string, value: unknown) =>
-    setAnswers((prev) => ({ ...prev, [name]: value }));
+  /** 欄を直したら、その欄の直し方を消す (直したのに残らないため)。 */
+  const clearFieldError = (name: string) =>
+    setFieldErrors((prev) => {
+      if (!(name in prev)) return prev;
+      const next = { ...prev };
+      delete next[name];
+      return next;
+    });
 
-  const toggleCheckbox = (name: string, label: string) =>
+  const setValue = (name: string, value: unknown) => {
+    setAnswers((prev) => ({ ...prev, [name]: value }));
+    clearFieldError(name);
+  };
+
+  const toggleCheckbox = (name: string, label: string) => {
     setAnswers((prev) => {
       const current = Array.isArray(prev[name]) ? (prev[name] as string[]) : [];
       return {
@@ -249,6 +278,8 @@ export default function Form() {
           : [...current, label],
       };
     });
+    clearFieldError(name);
+  };
 
   /**
    * 画像を預けて、回答にはURLを入れる。
@@ -263,6 +294,7 @@ export default function Form() {
     try {
       const res = await api.uploadFormFile(id, file);
       setValue(name, res.data.url);
+      clearFieldError(name);
     } catch (err) {
       logFailure('form-upload', err);
       setError('画像を送れませんでした。もう一度お試しください。');
@@ -271,21 +303,24 @@ export default function Form() {
     }
   };
 
-  /** このページだけを見る。次のページの必須は、そこへ着くまで問わない。 */
-  const validateCurrent = (): string | null => {
+  /**
+   * このページだけを見る。次のページの必須は、そこへ着くまで問わない。
+   * 直し方は欄ごとに返し、呼び出し側が欄の下へ出す。
+   */
+  const validateVisible = (): { errors: Record<string, string>; first: string | null } => {
+    const errors: Record<string, string> = {};
     for (const block of visibleInputs) {
+      if (block.name in errors) continue;
       const message = validateAnswer(block, answers[block.name]);
-      if (message) return message;
+      if (message) errors[block.name] = message;
     }
-    return null;
+    return { errors, first: Object.values(errors)[0] ?? null };
   };
 
   const goNext = () => {
-    const message = validateCurrent();
-    if (message) {
-      setError(message);
-      return;
-    }
+    const { errors, first } = validateVisible();
+    setFieldErrors(errors);
+    if (first) return;
     setError(null);
     if (!layout) return;
     const to = nextSectionIndex(layout, sectionIndex, answers);
@@ -371,11 +406,9 @@ export default function Form() {
 
   const submit = async (keyOverride?: string) => {
     if (!id || !layout) return;
-    const message = validateCurrent();
-    if (message) {
-      setError(message);
-      return;
-    }
+    const { errors, first } = validateVisible();
+    setFieldErrors(errors);
+    if (first) return;
     if (layout.options?.confirmDialog?.enabled && !confirming && !keyOverride) {
       setConfirming(true);
       return;
@@ -413,27 +446,30 @@ export default function Form() {
 
   if (!form || !layout) return null;
 
+  const options = layout.options ?? {};
+  const theme = normalizeFormTheme(options.theme);
+
   if (!form.isActive) {
     return (
-      <div className="p-8 text-center text-sm text-gray-500">
-        このフォームは、いま回答を受け付けていません。
+      <div className="mx-auto max-w-md" style={{ backgroundColor: theme.sub }}>
+        <StatusView icon="calendar" title="このフォームは、いま回答を受け付けていません。" />
       </div>
     );
   }
 
   if (done) {
     return (
-      <div className="mx-auto max-w-md p-8 text-center">
-        <p className="text-base font-bold text-gray-900">送信しました</p>
-        <p className="mt-2 text-sm whitespace-pre-wrap text-gray-600">
-          {layout.options?.thanksText || 'ご回答ありがとうございました。'}
-        </p>
+      <div className="mx-auto max-w-md" style={{ backgroundColor: theme.sub }}>
+        <StatusView
+          icon="check"
+          tone="success"
+          title="送信しました"
+          body={layout.options?.thanksText || 'ご回答ありがとうございました。'}
+        />
       </div>
     );
   }
 
-  const options = layout.options ?? {};
-  const theme = normalizeFormTheme(options.theme);
   const multi = layout.sections.length > 1;
   const radius = theme.cornerRadius === 'none' ? '0' : theme.cornerRadius === 'round' ? '1rem' : '0.5rem';
 
