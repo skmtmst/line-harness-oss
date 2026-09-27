@@ -212,6 +212,16 @@ gettingStarted.get('/api/getting-started', requireRole('owner', 'admin', 'staff'
       withAccess(staff, 'firstMessage', firstMessage ? 'done' : 'todo'),
     ];
 
+    /*
+      「閉じた」は本人単位の記憶。**完了判定には使わない**（要件 §15）。
+      帯を出すかは `dismissed` と `allDone` を画面が見て決める。
+    */
+    const dismissedRow = staff?.id
+      ? await c.env.DB.prepare(
+          `SELECT getting_started_dismissed_at AS dismissed_at FROM staff_members WHERE id = ?`,
+        ).bind(staff.id).first<{ dismissed_at: string | null }>()
+      : null;
+
     return c.json({
       success: true,
       data: {
@@ -221,10 +231,35 @@ gettingStarted.get('/api/getting-started', requireRole('owner', 'admin', 'staff'
         total: steps.length,
         /** 全部終わったら、ダッシュボードの帯を出さない。 */
         allDone: steps.every((s) => s.state === 'done'),
+        dismissed: dismissedRow?.dismissed_at != null,
       },
     });
   } catch (err) {
     console.error('GET /api/getting-started error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/**
+ * 進捗帯を閉じる（本人単位）。要件 §12。
+ *
+ * **完了ではない。** 閉じた日時は帯を出さないためだけの記憶で、
+ * 段の判定には一切入れない（§15）。
+ */
+gettingStarted.post('/api/getting-started/dismiss', requireRole('owner', 'admin', 'staff'), async (c) => {
+  try {
+    const staff = c.get('staff');
+    if (!staff?.id) {
+      return c.json({ success: false, error: 'Unauthorized', code: 'UNAUTHORIZED' }, 401);
+    }
+    await c.env.DB.prepare(
+      `UPDATE staff_members
+          SET getting_started_dismissed_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
+        WHERE id = ?`,
+    ).bind(staff.id).run();
+    return c.json({ success: true, data: { dismissed: true } });
+  } catch (err) {
+    console.error('POST /api/getting-started/dismiss error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import DateField from '@/components/shared/date-field'
+import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import Pagination from '@/components/shared/pagination'
@@ -35,9 +36,17 @@ function historyView(item: MileageAdminHistoryItem) {
   }
 }
 
-export default function MileageHistoryTab({ accountId }: { accountId: string }) {
+export default function MileageHistoryTab({ accountId, canOperate = false }: { accountId: string; canOperate?: boolean }) {
   const requestRef = useRef(0)
   const [result, setResult] = useState<MileageAdminHistory | null>(null)
+  /*
+   * R: 確定待ちの行に「確定」「取消」を出す。取消は逆向きの記録を足すだけで
+   * 元の行は消えない。どちらも理由が必須。
+   */
+  const [pendingAction, setPendingAction] = useState<{ kind: 'confirm' | 'void'; item: MileageAdminHistoryItem } | null>(null)
+  const [pendingReason, setPendingReason] = useState('')
+  const [pendingBusy, setPendingBusy] = useState(false)
+  const [pendingError, setPendingError] = useState('')
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
   const [entryType, setEntryType] = useState<EntryTypeFilter>('')
@@ -122,6 +131,30 @@ export default function MileageHistoryTab({ accountId }: { accountId: string }) 
     anchor.download = `mileage-history-${new Date().toISOString().slice(0, 10)}.csv`
     anchor.click()
     URL.revokeObjectURL(url)
+  }
+
+  const runPendingAction = async () => {
+    if (!pendingAction || pendingBusy) return
+    const reason = pendingReason.trim()
+    if (!reason) {
+      setPendingError('理由を入力してください。')
+      return
+    }
+    setPendingBusy(true)
+    setPendingError('')
+    try {
+      const response = pendingAction.kind === 'confirm'
+        ? await api.mileage.confirmMileageEntry(pendingAction.item.id, { accountId, reason })
+        : await api.mileage.voidMileageEntry(pendingAction.item.id, { accountId, reason })
+      if (!response.success) throw new Error(response.error)
+      setPendingAction(null)
+      setPendingReason('')
+      await load()
+    } catch (caught) {
+      setPendingError(caught instanceof Error ? caught.message : '処理できませんでした。もう一度お試しください。')
+    } finally {
+      setPendingBusy(false)
+    }
   }
 
   return (
@@ -241,7 +274,17 @@ export default function MileageHistoryTab({ accountId }: { accountId: string }) 
                   </Td>
                   <Td align="right" className="tabular-nums">{item.balanceAfter === null ? <span className="text-ink-faint">— 未取得</span> : item.balanceAfter.toLocaleString('ja-JP')}</Td>
                   <Td>{item.mode === 'manual' ? item.executedByStaffName ?? '担当者未取得' : item.entryType === 'spend' ? '本人' : '自動'}</Td>
-                  <Td align="right"><Button href={`/mileage/friends/detail?id=${encodeURIComponent(item.primaryFriendId)}`}>友だちを見る</Button></Td>
+                  <Td align="right">
+                    <div className="flex justify-end gap-2">
+                      {canOperate && item.status === 'pending' ? (
+                        <>
+                          <Button onClick={() => { setPendingAction({ kind: 'confirm', item }); setPendingReason(''); setPendingError('') }}>確定する</Button>
+                          <Button onClick={() => { setPendingAction({ kind: 'void', item }); setPendingReason(''); setPendingError('') }}>取り消す</Button>
+                        </>
+                      ) : null}
+                      <Button href={`/mileage/friends/detail?id=${encodeURIComponent(item.primaryFriendId)}`}>友だちを見る</Button>
+                    </div>
+                  </Td>
                 </Tr>
               })}
             </tbody>
@@ -255,6 +298,30 @@ export default function MileageHistoryTab({ accountId }: { accountId: string }) 
           </div>
         ) : null}
       </div>
+
+      <Dialog
+        open={pendingAction !== null}
+        title={pendingAction?.kind === 'confirm' ? 'このマイルを確定しますか？' : 'このマイルを取り消しますか？'}
+        description={pendingAction?.kind === 'confirm'
+          ? '確定待ちから利用可能に変わります。'
+          : '取り消すと逆向きの記録が残ります。もとの記録そのものは消えません。'}
+        tone={pendingAction?.kind === 'void' ? 'destructive' : 'default'}
+        confirmLabel={pendingAction?.kind === 'confirm' ? '確定する' : '取り消す'}
+        busy={pendingBusy}
+        error={pendingError || undefined}
+        onCancel={() => { if (!pendingBusy) setPendingAction(null) }}
+        onConfirm={() => void runPendingAction()}
+      >
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="font-semibold text-ink">理由（必須）</span>
+          <textarea
+            className="min-h-20 rounded border border-hairline px-3 py-2 text-sm"
+            value={pendingReason}
+            onChange={(event) => setPendingReason(event.target.value)}
+            placeholder={pendingAction?.kind === 'confirm' ? '例：入金を確認しました' : '例：予約がキャンセルされました'}
+          />
+        </label>
+      </Dialog>
     </section>
   )
 }

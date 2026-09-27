@@ -4,6 +4,7 @@ import {
   finishCloneRun,
   findRunByKey,
   getCloneRun,
+  createRecipe,
   getRecipeById,
   listCloneItems,
   listRecipes,
@@ -282,7 +283,11 @@ recipes.get('/api/recipes', requireRole('owner', 'admin', 'staff'), async (c) =>
     if (accountId && !(await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId]))) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
-    const [rows, counts] = await Promise.all([listRecipes(c.env.DB), cloneCounts(c.env.DB)]);
+    /*
+      **組織レシピは持ち主の範囲にだけ出す**（§7-5）。アカウントが
+      決まっていなければ初期同梱だけ——別の組織のレシピをこぼさない。
+    */
+    const [rows, counts] = await Promise.all([listRecipes(c.env.DB, accountId), cloneCounts(c.env.DB)]);
     const features = accountId ? await readFeatures(c.env.DB, accountId) : {};
     return c.json({ success: true, data: rows.map((r) => serialize(r, counts, features)) });
   } catch (err) {
@@ -291,11 +296,59 @@ recipes.get('/api/recipes', requireRole('owner', 'admin', 'staff'), async (c) =>
   }
 });
 
+/**
+ * 組織レシピを作る（§7-5）。`recipe.definition.create` を持つ
+ * owner/admin だけ。**レシピは静的な見本**——ここでは定義を作らない。
+ */
+recipes.post('/api/recipes', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const staff = c.get('staff');
+    const body = await c.req.json<{
+      name?: string;
+      purpose?: string;
+      createsSummary?: string;
+      requiredFeatures?: string[];
+      items?: RecipeItem[] | null;
+      accountId?: string;
+    }>();
+    const name = body.name?.trim();
+    const purpose = body.purpose?.trim();
+    const createsSummary = body.createsSummary?.trim();
+    const accountId = body.accountId;
+    if (!name || !purpose || !createsSummary || !accountId) {
+      return c.json({
+        success: false,
+        error: '名前・目的・作られるものの説明・対象アカウントが要ります',
+        code: 'INVALID_INPUT',
+      }, 400);
+    }
+    if (!(await canAccessAllLineAccounts(c.env.DB, staff, [accountId]))) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    if (body.items != null && !Array.isArray(body.items)) {
+      return c.json({ success: false, error: 'items は配列で渡してください', code: 'INVALID_INPUT' }, 400);
+    }
+    const recipe = await createRecipe(c.env.DB, {
+      name,
+      purpose,
+      createsSummary,
+      requiredFeatures: body.requiredFeatures ?? [],
+      items: body.items ?? null,
+      lineAccountId: accountId,
+      createdByStaffId: staff?.id ?? null,
+    });
+    return c.json({ success: true, data: serialize(recipe, {}, {}) }, 201);
+  } catch (err) {
+    console.error('POST /api/recipes error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
 recipes.get('/api/recipes/:id', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
-    const recipe = await getRecipeById(c.env.DB, c.req.param('id'));
-    if (!recipe) return c.json({ success: false, error: 'Not found' }, 404);
     const accountId = c.req.query('account_id') ?? c.req.query('accountId') ?? null;
+    const recipe = await getRecipeById(c.env.DB, c.req.param('id'), accountId);
+    if (!recipe) return c.json({ success: false, error: 'Not found' }, 404);
     if (accountId && !(await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId]))) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
@@ -322,9 +375,6 @@ recipes.post('/api/recipes/:id/clone', requireRole('owner', 'admin', 'staff'), a
     if (!idempotencyKey || idempotencyKey.length > 128) {
       return c.json({ success: false, error: 'Idempotency-Key が要ります', code: 'INVALID_INPUT' }, 400);
     }
-    const recipe = await getRecipeById(c.env.DB, c.req.param('id'));
-    if (!recipe) return c.json({ success: false, error: 'Not found' }, 404);
-
     const body = await c.req.json<{
       accountId?: string;
       namePrefix?: string | null;
@@ -333,6 +383,12 @@ recipes.post('/api/recipes/:id/clone', requireRole('owner', 'admin', 'staff'), a
     if (!body.accountId || !Number.isInteger(body.expectedVersion)) {
       return c.json({ success: false, error: 'accountId が要ります' }, 400);
     }
+    /*
+      **組織レシピは持ち主のアカウントへだけ複製できる**（§7-5）。
+      別アカウントへは無いものとして扱う（404）。
+    */
+    const recipe = await getRecipeById(c.env.DB, c.req.param('id'), body.accountId);
+    if (!recipe) return c.json({ success: false, error: 'Not found' }, 404);
     if (!(await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId]))) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
