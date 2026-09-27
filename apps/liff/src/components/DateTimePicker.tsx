@@ -230,6 +230,11 @@ export default function DateTimePicker({
   const [calReloadKey, setCalReloadKey] = useState(0);
   // 最初に開く月の探索が済んだか。済むまでは空きの無い月を飛ばす。
   const [calAutoDone, setCalAutoDone] = useState(false);
+  // 利用者が一度でも日を選んだら、遅れて届く応答の自動選択で上書きしない
+  // (リスト・カレンダー共通。月を送った後の選び直しもしない。
+  // 担当が変わると呼び側の key で作り直されるので、画面の中では消さない。
+  // 読み直しだけ最初から探し直す)。
+  const userPickedDayRef = useRef(false);
 
   // 最初の形は「端末の覚え → 管理画面の設定 → リスト」の順。設定が読めなくても止めない。
   useEffect(() => {
@@ -263,7 +268,11 @@ export default function DateTimePicker({
       .then((r) => {
         const grouped = groupSlots(r.by_staff[0] ? [r.by_staff[0]] : []).byDate;
         setListByDate(grouped);
-        setListDay((prev) => (prev && grouped[prev] ? prev : Object.keys(grouped)[0] ?? null));
+        setListDay((prev) => {
+          // 利用者が選んだ日は、遅れて届く応答で選び直さない。
+          if (userPickedDayRef.current) return prev;
+          return prev && grouped[prev] ? prev : Object.keys(grouped)[0] ?? null;
+        });
       })
       .catch((e) => {
         logFailure('availability', e);
@@ -314,10 +323,12 @@ export default function DateTimePicker({
   }, [view, settings, month, menuId, staffId, today, windowEnd, loadedMonths, calReloadKey]);
 
   // 見ている月が読めたら、その月で空きのある一番早い日を選ぶ。
-  // 月を送った時は選び直す（前の月の日を下に残さない）。
+  // 利用者がまだ日を選んでいない間だけ選び直す。選んだ後の月送り・
+  // 遅れて届く応答では、選んだ日を残す（上書きしない）。
   useEffect(() => {
     if (view !== 'calendar' || !settings) return;
     if (!loadedMonths.includes(month)) return;
+    if (userPickedDayRef.current) return;
     const open = openDaysOfMonth(month, calByDate, today, windowEnd);
     setCalDay(open[0] ?? null);
   }, [view, settings, month, loadedMonths, calByDate, today, windowEnd]);
@@ -452,7 +463,10 @@ export default function DateTimePicker({
                     <button
                       key={d}
                       type="button"
-                      onClick={() => setListDay(d)}
+                      onClick={() => {
+                        userPickedDayRef.current = true;
+                        setListDay(d);
+                      }}
                       disabled={!open}
                       aria-pressed={active}
                       className={`flex min-h-16 w-15 shrink-0 flex-col items-center justify-center gap-1 rounded-xl border px-1 py-2 focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-100 ${
@@ -481,6 +495,8 @@ export default function DateTimePicker({
       ) : calFailed ? (
         <LoadErrorView onRetry={() => {
           loadingMonthsRef.current.clear();
+          // 読み直しは最初から探し直す（選んだ日も消えるので自動選択を戻す）。
+          userPickedDayRef.current = false;
           setCalFailed(false);
           setCalByDate({});
           setCalClosed({});
@@ -545,7 +561,10 @@ export default function DateTimePicker({
                       <button
                         key={d}
                         type="button"
-                        onClick={() => setCalDay(d)}
+                        onClick={() => {
+                          userPickedDayRef.current = true;
+                          setCalDay(d);
+                        }}
                         disabled={!selectable}
                         aria-pressed={active}
                         aria-label={dayStateLabel(d, state)}

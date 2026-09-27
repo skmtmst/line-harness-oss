@@ -57,6 +57,14 @@ interface ScenarioListProps {
   onReorder?: (ids: string[]) => void
   loading?: boolean
   onCreate?: () => void
+  /**
+   * R173: 検索・絞り込みの結果が0件のとき真にする。元データ0件の
+   * 「まだありません」と分け、「条件に合うものがありません」と
+   * 条件を外す口を出す（共通 ListState の `filtered`）。
+   */
+  isFiltered?: boolean
+  /** 絞り込みを外す。`isFiltered` のときだけ使う。 */
+  onClearFilter?: () => void
 }
 
 /**
@@ -86,6 +94,8 @@ export default function ScenarioList({
   onReorder,
   loading,
   onCreate,
+  isFiltered = false,
+  onClearFilter,
 }: ScenarioListProps) {
   const router = useRouter()
   /** いま掴んでいるシナリオ。落とした先と入れ替える。 */
@@ -377,6 +387,25 @@ export default function ScenarioList({
   )
 
   if (scenarios.length === 0) {
+    // R173: 絞り込みの結果0件は、元データ0件と分ける。作る口ではなく
+    // 条件を外す口を出す（保存済みが消えたと誤読されるため）。
+    if (isFiltered) {
+      return (
+        <>
+          <ListState
+            kind="empty"
+            emptyPreset="filtered"
+            action={onClearFilter ? (
+              <Button variant="secondary" onClick={onClearFilter}>
+                条件をクリア
+              </Button>
+            ) : undefined}
+          />
+          {moveDialog}
+          {confirmDialog}
+        </>
+      )
+    }
     return (
       <>
         <ListState
