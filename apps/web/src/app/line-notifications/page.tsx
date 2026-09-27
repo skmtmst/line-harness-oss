@@ -8,6 +8,7 @@ import NotificationRunList from '@/components/line-notifications/notification-ru
 import OperatorNotificationRules from './operator-notification-rules'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import HelpTip from '@/components/shared/help-tip'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import Notice from '@/components/shared/notice'
@@ -20,6 +21,7 @@ import {
   type EcNotificationSetting,
   type LineNotificationDefinition,
   type LineNotificationMetric,
+  type LineNotificationSendCounts,
 } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import {
@@ -643,6 +645,7 @@ function LineNotificationsPage() {
   const [overview, setOverview] = useState<EcCommerceOverview | null>(null)
   const [definitions, setDefinitions] = useState<LineNotificationDefinition[]>([])
   const [metrics, setMetrics] = useState<LineNotificationMetric[]>([])
+  const [sendCounts, setSendCounts] = useState<LineNotificationSendCounts | null>(null)
   const [quota, setQuota] = useState<LineNotificationQuota | null>(null)
   const [filter, setFilter] = useState<CustomerFilter>('all')
   const [customerPage, setCustomerPage] = useState(1)
@@ -684,6 +687,7 @@ function LineNotificationsPage() {
     setOverview(null)
     setDefinitions([])
     setMetrics([])
+    setSendCounts(null)
     setQuota(null)
     setNotice(null)
     setCloseConfirmOpen(false)
@@ -725,7 +729,7 @@ function LineNotificationsPage() {
     // 設定口は列車側で店別になったため、持ち回しはしない。
     const needCustomer = tab === 'customer'
     try {
-      const [settingRes, overviewRes, definitionRes, metricRes, quotaRes] = await Promise.all([
+      const [settingRes, overviewRes, definitionRes, metricRes, sendCountsRes, quotaRes] = await Promise.all([
         api.ecCommerce.settings(selectedAccountId), api.ecCommerce.overview(selectedAccountId),
         needCustomer
           ? api.lineNotifications.definitions(selectedAccountId).catch((error: unknown) => {
@@ -735,6 +739,12 @@ function LineNotificationsPage() {
           : Promise.resolve(null),
         needCustomer
           ? api.lineNotifications.metrics(selectedAccountId).catch((error: unknown) => {
+              if (error instanceof ApiError && error.status === 403) throw error
+              return null
+            })
+          : Promise.resolve(null),
+        needCustomer
+          ? api.lineNotifications.sendCounts(selectedAccountId).catch((error: unknown) => {
               if (error instanceof ApiError && error.status === 403) throw error
               return null
             })
@@ -803,6 +813,7 @@ function LineNotificationsPage() {
       setOverview(overviewRes.data)
       setDefinitions(loadedDefinitions)
       setMetrics(metricRes?.success ? metricRes.data.items : [])
+      setSendCounts(sendCountsRes?.success ? sendCountsRes.data : null)
       setQuota(quotaRes?.success ? quotaRes.data.quota : null)
       setExpanded((current) => withDrafts.some((setting) => setting.eventType === current) ? current : null)
       if (restoredEvents.length > 0) {
@@ -820,9 +831,20 @@ function LineNotificationsPage() {
   }, [selectedAccountId, tab])
   useEffect(() => { void load() }, [load])
 
+  /*
+   * 行の「今日」「この30日」は実際の送信履歴（send-counts）で数える。
+   * ECの取り込み件数（overview.byType）やLINE集計の全期間合計（metrics）は
+   * 混ぜない。口がまだ返っていないときだけ null（「—」表示）にする。
+   */
+  const sendCountMaps = useMemo(() => ({
+    today: new Map(sendCounts?.byEventType.map((item) => [item.eventType, item.today]) ?? []),
+    last30d: new Map(sendCounts?.byEventType.map((item) => [item.eventType, item.last30d]) ?? []),
+  }), [sendCounts])
   // N-338: 行の「今日」列と同じ数で多い順に並べ、説明文と一致させる。
   const sentCountOf = useCallback((eventType: string): number | null =>
-    overview?.byType.find((item) => item.eventType === eventType)?.count ?? null, [overview])
+    sendCounts ? (sendCountMaps.today.get(eventType) ?? 0) : null, [sendCounts, sendCountMaps])
+  const sent30dOf = useCallback((eventType: string): number | null =>
+    sendCounts ? (sendCountMaps.last30d.get(eventType) ?? 0) : null, [sendCounts, sendCountMaps])
   const visible = useMemo(() => sortCustomerSettingsBySentCount(settings.filter((setting) => {
     if (filter === 'enabled') return setting.isEnabled
     if (filter === 'stopped') return !setting.isEnabled
@@ -846,12 +868,20 @@ function LineNotificationsPage() {
     if (value === 'incomplete') return settings.filter(isIncomplete).length
     return settings.length
   }
-  const sentBreakdown = overview?.byType.slice(0, 3).map((item) => `${item.label} ${item.count}`).join('・') ?? ''
+  const sentBreakdown = useMemo(() => {
+    if (!sendCounts) return ''
+    const labelOf = new Map(settings.map((setting) => [setting.eventType, setting.label]))
+    const ranked = [...sendCounts.byEventType]
+      .filter((item) => item.today > 0)
+      .sort((a, b) => b.today - a.today)
+      .slice(0, 3)
+    return ranked.map((item) => `${labelOf.get(item.eventType) ?? item.eventType} ${item.today}`).join('・')
+  }, [sendCounts, settings])
   const kpis = customerNotificationKpis({
     ready: loadState === 'ready' && overview !== null,
     settingsCount: settings.length,
     enabledCount: settings.filter((setting) => setting.isEnabled).length,
-    sentToday: overview?.last24h ?? null,
+    sentToday: sendCounts?.sentToday ?? null,
     sentBreakdown,
     failed: overview?.failed ?? null,
     quota,
@@ -1173,7 +1203,7 @@ function LineNotificationsPage() {
         : visible.length === 0 ? <ListState kind="empty" title="条件に合うお知らせはありません" description="絞り込みを変えてください。" />
         : <>
         <div className="line-notification-v6-header">
-          <span>お知らせ</span><span>いつ送るか</span><span>今日</span><span>この30日</span><span>LINE上で表示</span><span>操作</span>
+          <span>お知らせ</span><span>いつ送るか</span><span className="inline-flex items-center gap-1">今日<HelpTip label="今日の件数の説明">今日の0時からいままでに送った数です</HelpTip></span><span className="inline-flex items-center gap-1">この30日<HelpTip label="この30日の件数の説明">今日を含む30日間に送った数です</HelpTip></span><span>LINE上で表示</span><span>操作</span>
         </div>
         {visiblePage.map((setting) => <article key={setting.eventType} className="border-b border-hairline last:border-b-0">
           <div className="line-notification-v6-row">
@@ -1183,8 +1213,8 @@ function LineNotificationsPage() {
               <p className="mt-0.5 truncate text-xs text-ink-faint">{formatUpdatedAt(setting.updatedAt)}</p>
             </div>
             <span className="text-sm text-ink-secondary">{timingLabel(setting)}</span>
-            <span className="text-sm tabular-nums text-ink-secondary">{overview?.byType.find((item) => item.eventType === setting.eventType)?.count ?? '—'}通</span>
-            <span className="text-sm tabular-nums text-ink-secondary">{metricByEvent.get(setting.eventType)?.accepted.value ?? '—'}通</span>
+            <span className="text-sm tabular-nums text-ink-secondary">{sentCountOf(setting.eventType) ?? '—'}通</span>
+            <span className="text-sm tabular-nums text-ink-secondary">{sent30dOf(setting.eventType) ?? '—'}通</span>
             <span className="text-sm text-ink-faint">{(() => {
               const displayed = metricByEvent.get(setting.eventType)?.displayed
               if (!displayed || displayed.value === null) return displayed?.state === 'pending' ? '集計待ち' : '— 未取得'

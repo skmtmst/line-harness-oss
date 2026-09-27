@@ -4442,6 +4442,18 @@ export type LineNotificationMetrics = {
   }
 }
 
+/**
+ * 顧客へのお知らせの送信件数。Workerが共通送信台帳の受け付け済みから
+ * JSTの今日・この30日で数えたもの。ECの取り込み件数でもLINE集計の
+ * 全期間合計でもない。
+ */
+export type LineNotificationSendCounts = {
+  sentToday: number
+  sentLast30d: number
+  byEventType: Array<{ eventType: string; today: number; last30d: number }>
+  period: { today: string; from30d: string; to: string }
+}
+
 export type EcShipment = {
   id: string
   eventType: string
@@ -9827,6 +9839,9 @@ export const api = {
     },
     metrics: (lineAccountId: string) => fetchApi<ApiResponse<LineNotificationMetrics>>(
       `/api/line-notifications/metrics?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+    ),
+    sendCounts: (lineAccountId: string) => fetchApi<ApiResponse<LineNotificationSendCounts>>(
+      `/api/line-notifications/send-counts?lineAccountId=${encodeURIComponent(lineAccountId)}`,
     ),
     retryDelivery: (id: string, data: { lineAccountId: string; expectedVersion: number }) => fetchApi<ApiResponse<{
       id: string
