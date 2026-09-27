@@ -700,6 +700,9 @@
   "components/shared/list-state.tsx": {
     "unresolved-classname": 5
   },
+  "components/shared/list-toolbar.tsx": {
+    "unresolved-classname": 6
+  },
   "components/shared/not-connected.tsx": {
     "unresolved-classname": 3
   },
@@ -719,7 +722,7 @@
     "unresolved-classname": 9
   },
   "components/shared/row-actions.tsx": {
-    "unresolved-classname": 3
+    "unresolved-classname": 4
   },
   "components/shared/save-conflict-bar.tsx": {
     "unresolved-classname": 4

@@ -111,6 +111,9 @@ import type {
   DecideIdentityCandidateRequest,
   UndoIdentityCandidateRequest,
   RichMenuAreaIntent,
+  GoogleSheetsConnectionStatus,
+  GoogleSheetsConnection,
+  GoogleSheetsSyncRun,
 } from '@line-crm/shared'
 
 export type { RichMenuAreaIntent } from '@line-crm/shared'
@@ -267,31 +270,14 @@ export interface IssuedIntegrationApiToken extends IntegrationApiTokenInfo {
   token: string
 }
 
-/* #838 第2段: Google Sheets 連携。トークン類は応答に乗らない設計。 */
-export type GoogleSheetsConnectionStatus = 'disconnected' | 'pending_target' | 'connected' | 'expired'
-
-export interface GoogleSheetsConnection {
-  status: GoogleSheetsConnectionStatus
-  googleAccountEmail?: string | null
-  spreadsheetId?: string | null
-  spreadsheetTitle?: string | null
-  spreadsheetUrl?: string | null
-  lastSyncedAt?: string | null
-  lastSyncStatus?: 'ok' | 'partial' | 'error' | null
-  lastSyncError?: string | null
-  consecutiveFailures?: number
-  connectedAt?: string | null
-}
-
-export interface GoogleSheetsSyncRun {
-  id: string
-  kind: 'manual' | 'scheduled'
-  dataType: 'friends' | 'form_answers'
-  status: 'running' | 'ok' | 'partial' | 'error'
-  rowsWritten: number
-  error: string | null
-  startedAt: string
-  finishedAt: string | null
+/*
+ * #838 第2段: Google Sheets 連携。型の正本は packages/shared
+ *（Worker とこの画面で1つの型を使う）。トークン類は応答に乗らない設計。
+ */
+export type {
+  GoogleSheetsConnectionStatus,
+  GoogleSheetsConnection,
+  GoogleSheetsSyncRun,
 }
 
 export type AccessUserStatus = 'active' | 'invited' | 'expired' | 'suspended'
@@ -1660,6 +1646,63 @@ export type ApiBroadcast = Omit<Broadcast, 'targetType'> & {
   approvalDecidedByStaffId?: string | null;
   approvalDecidedAt?: string | null;
   approvalRejectReason?: string | null;
+  /**
+   * 10の状態（#816）。status・承認・停止・台帳から組み立てた見せ方の状態。
+   * 無いとき（古い応答）は status から読み替える。
+   */
+  displayStatus?: BroadcastDisplayStatus;
+  displayStatusLabel?: string;
+  ledger?: BroadcastLedger;
+};
+
+/** 一斉配信の10の状態（#816）。 */
+export type BroadcastDisplayStatus =
+  | 'draft'
+  | 'pending_approval'
+  | 'scheduled'
+  | 'preparing'
+  | 'sending'
+  | 'sent'
+  | 'partial_failed'
+  | 'failed'
+  | 'stopped'
+  | 'expired';
+
+/** 宛先台帳の1行（GET /:id/recipients）。札の言葉は Worker が直して返す。 */
+export type BroadcastRecipientRow = {
+  friendId: string
+  displayName: string
+  lineAccountId: string | null
+  group: 'delivered' | 'failed_temporary' | 'failed_permanent' | 'unknown' | 'inflight'
+  label: string
+  detail: string
+  retryable: boolean
+  lineRequestId: string | null
+  errorCode: string | null
+  dispatchedAt: string | null
+  settledAt: string | null
+};
+
+export type BroadcastRecipientsSummary = {
+  sent: number
+  failedTemporary: number
+  failedPermanent: number
+  unknown: number
+  inFlight: number
+  pending: number | null
+  total: number
+  retryableCount: number
+};
+
+/** 操作の記録の1件（GET /:id/activity）。操作と承認を混ぜて新しい順に返す。 */
+export type BroadcastActivityEntry = {
+  kind: 'lifecycle' | 'approval'
+  action: string
+  label: string
+  actorStaffId: string | null
+  actorName: string | null
+  reason: string | null
+  createdAt: string
 };
 
 /** 承認の依頼先の候補（承認できる人だけ。自分は除く）。 */
@@ -1706,13 +1749,17 @@ export type BroadcastApprovalState = {
 export type BroadcastLedger = {
   /** 届いた人。 */
   sent: number
-  /** 届かなかったと断定できた人。**再送の対象**。 */
+  /** 届かなかったと断定できた人（一時的＋恒常的）。 */
   failed: number
+  /** 一時的な失敗（混み合い・止める前で未送信）。**再送の対象**。 */
+  failedTemporary?: number
+  /** 恒常的な失敗（ブロックなど）。送り直さない。 */
+  failedPermanent?: number
   /** 外へ出たかもしれないが確かめられない人。**再送しない**。 */
   unknown: number
   /** いま送っている途中の人。 */
   inFlight: number
-  /** 再送の対象人数（= failed）。 */
+  /** 再送の対象人数（= 一時的な失敗）。 */
   retryableCount: number
 };
 
@@ -4442,6 +4489,18 @@ export type LineNotificationMetrics = {
   }
 }
 
+/**
+ * 顧客へのお知らせの送信件数。Workerが共通送信台帳の受け付け済みから
+ * JSTの今日・この30日で数えたもの。ECの取り込み件数でもLINE集計の
+ * 全期間合計でもない。
+ */
+export type LineNotificationSendCounts = {
+  sentToday: number
+  sentLast30d: number
+  byEventType: Array<{ eventType: string; today: number; last30d: number }>
+  period: { today: string; from30d: string; to: string }
+}
+
 export type EcShipment = {
   id: string
   eventType: string
@@ -4982,6 +5041,13 @@ export interface AccountHandover {
   movedCount: number
   failedCount: number
   failureReason: string | null
+  /** 移し元システム側の申告件数。事前確認の合計と違うままでは本実行できない。 */
+  declaredFriendTotal?: number | null
+  /** 切り戻せる期限（本実行から7日間）。本実行前は null。 */
+  rollbackDeadline?: string | null
+  rolledBackAt?: string | null
+  rolledBackBy?: string | null
+  rollbackNote?: string | null
   createdAt: string
   linkedAt: string | null
   previewedAt: string | null
@@ -5643,6 +5709,7 @@ export type StepUpPurpose =
   | 'line_account.connect'
   | 'line_account.credentials'
   | 'line_account.archive'
+  | 'account_handover.execute'
   | 'broadcast.approval'
   | 'webhook.api_token'
   | 'webhook.secret'
@@ -6851,6 +6918,13 @@ export const api = {
           pathCount: number
           eventTypeCount: number
           lastEventAt: string | null
+          /** #818: 同意した割合と、同意がなくて数えなかった件数 */
+          consent: {
+            granted: number
+            declined: number
+            suppressed: number
+            grantedRate: number | null
+          }
         }>
       >(`/api/site/summary${rangeQuery({ accountId })}`),
     pages: (params?: { from?: string; to?: string; accountId?: string }) =>
@@ -6865,7 +6939,7 @@ export const api = {
     trackingKey: (accountId?: string) =>
       fetchApi<ApiResponse<{ accountId: string; trackingKey: string }>>(
         accountId
-          ? `/api/site/tracking-key?accountId=${encodeURIComponent(accountId)}`
+          ? `/api/site/tracking-key?account_id=${encodeURIComponent(accountId)}`
           : '/api/site/tracking-key',
       ),
     friendEvents: (friendId: string) =>
@@ -7818,8 +7892,9 @@ export const api = {
         { method: 'POST', body: JSON.stringify({ expectedVersion }) },
       ),
     /**
-     * 失敗した相手だけ送り直す。**送達不明の相手は含まれない**（二重に
-     * 届くのを避けるため）。相手へ実際に届くので、送信と同じ確認を要求する。
+     * 一時的な失敗の相手だけ送り直す（#816）。**送達不明と恒常的な失敗
+     * （ブロックなど）は含まれない**。相手へ実際に届くので、送信と同じ
+     * 確認を要求する。
      */
     retryFailed: (id: string, expectedVersion: number) =>
       fetchApi<ApiResponse<ApiBroadcast & { ledger: BroadcastLedger }> & { attemptNo?: number; retryTargets?: number }>(
@@ -7830,6 +7905,46 @@ export const api = {
           body: JSON.stringify({ expectedVersion }),
         },
       ),
+    /**
+     * 宛先台帳（#816）。宛先ごとに結果・時刻・LINEの要求IDを返す。
+     * `result` で絞れる（all・delivered・temporary・permanent・unknown・inflight）。
+     * 旧配信は集約だけ（aggregateOnly）で、行は捏造しない。
+     */
+    recipients: (id: string, params?: { result?: string; cursor?: string; limit?: number }) => {
+      const query = new URLSearchParams()
+      if (params?.result) query.set('result', params.result)
+      if (params?.cursor) query.set('cursor', params.cursor)
+      if (params?.limit) query.set('limit', String(params.limit))
+      const qs = query.toString()
+      return fetchApi<{
+        success: boolean
+        data?: {
+          rows: BroadcastRecipientRow[]
+          summary: BroadcastRecipientsSummary
+          aggregateOnly: boolean
+          aggregateReason: 'all' | 'legacy' | null
+          legacySuccessCount: number | null
+        }
+        error?: string
+        pagination?: { total: number; limit: number; cursor: number; nextCursor: string | null }
+      }>(`/api/broadcasts/${id}/recipients${qs ? `?${qs}` : ''}`)
+    },
+    /**
+     * 操作の記録（#816）。作成・編集・予約・送信・停止・再送と、承認の
+     * 依頼・承認・差し戻しを新しい順に混ぜて返す。追記だけで消せない。
+     */
+    activity: (id: string, params?: { cursor?: string; limit?: number }) => {
+      const query = new URLSearchParams()
+      if (params?.cursor) query.set('cursor', params.cursor)
+      if (params?.limit) query.set('limit', String(params.limit))
+      const qs = query.toString()
+      return fetchApi<{
+        success: boolean
+        data?: BroadcastActivityEntry[]
+        error?: string
+        pagination?: { limit: number; cursor: number; nextCursor: string | null }
+      }>(`/api/broadcasts/${id}/activity${qs ? `?${qs}` : ''}`)
+    },
     getProgress: (id: string) =>
       fetchApi<{ success: boolean; data?: {
         status: string
@@ -8392,7 +8507,7 @@ export const api = {
      */
     preview: (
       id: string,
-      input: { sourceFriendTotal: number; counts: HandoverMatchCounts },
+      input: { sourceFriendTotal: number; counts: HandoverMatchCounts; declaredFriendTotal?: number | null },
     ) =>
       fetchApi<ApiResponse<AccountHandover>>(`/api/account-handovers/${id}/preview`, {
         method: 'POST',
@@ -8413,16 +8528,29 @@ export const api = {
         `/api/account-handovers/${id}/decisions`,
         { method: 'PUT', body: JSON.stringify({ decisions }) },
       ),
-    /** 段5。本実行と照合。要確認がのこっていると 422 で止まる。 */
-    execute: (id: string) =>
+    /** 段5。本実行と照合。要確認がのこっていると 422 で止まる。本人確認（step-up）が要る。 */
+    execute: (id: string, stepUpToken?: string) =>
       fetchApi<ApiResponse<AccountHandover & { plannedCount: number }>>(
         `/api/account-handovers/${id}/execute`,
-        { method: 'POST' },
+        {
+          method: 'POST',
+          headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
+        },
       ),
     cancel: (id: string) =>
       fetchApi<ApiResponse<AccountHandover>>(`/api/account-handovers/${id}/cancel`, {
         method: 'POST',
       }),
+    /** 段6。切り戻し。本実行から7日間だけ。本人確認（step-up）が要る。 */
+    rollback: (id: string, note?: string, stepUpToken?: string) =>
+      fetchApi<ApiResponse<AccountHandover & { restoredCount: number }>>(
+        `/api/account-handovers/${id}/rollback`,
+        {
+          method: 'POST',
+          headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
+          body: JSON.stringify({ note: note ?? null }),
+        },
+      ),
   },
   friendMigrations: {
     list: () => fetchApi<ApiResponse<UidMigrationRun[]>>('/api/friends/migrations'),
@@ -8558,6 +8686,46 @@ export const api = {
     delete: (id: string, stepUpToken?: string) =>
       fetchApi<ApiResponse<null>>(`/api/line-accounts/${id}`, {
         method: 'DELETE',
+        headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
+      }),
+    // 送受信の停止・再開（X-1）。理由は必須。再開は接続確認を内包する。
+    deactivate: (id: string, reason: string, stepUpToken?: string) =>
+      fetchApi<ApiResponse<LineAccount>>(`/api/line-accounts/${id}/deactivate`, {
+        method: 'POST',
+        headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
+        body: JSON.stringify({ reason }),
+      }),
+    activate: (id: string, reason: string, stepUpToken?: string) =>
+      fetchApi<ApiResponse<LineAccount & { checks?: unknown[] }>>(
+        `/api/line-accounts/${id}/activate`,
+        {
+          method: 'POST',
+          headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
+          body: JSON.stringify({ reason }),
+        },
+      ),
+    // 「止めていたので送らなかった」の一覧（X-1）。再開の確認に使う。
+    skippedDeliveries: (id: string) =>
+      fetchApi<ApiResponse<Array<{
+        id: string;
+        kind: string;
+        refId: string;
+        title: string | null;
+        reason: string;
+        skippedAt: string;
+      }>>>(`/api/line-accounts/${id}/skipped-deliveries`),
+    // アーカイブ（X-1）。止まっている・既定でない・配送が走っていない
+    // アカウントだけ。一覧から外れ、記録は残る。
+    archive: (id: string, reason?: string, stepUpToken?: string) =>
+      fetchApi<ApiResponse<LineAccount>>(`/api/line-accounts/${id}/archive`, {
+        method: 'POST',
+        headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
+        body: JSON.stringify({ reason: reason ?? null }),
+      }),
+    // アーカイブから戻す。戻った直後は「止まっている」状態。
+    restore: (id: string, stepUpToken?: string) =>
+      fetchApi<ApiResponse<LineAccount>>(`/api/line-accounts/${id}/restore`, {
+        method: 'POST',
         headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
       }),
     updateOrder: (ordered: Array<{ id: string; displayOrder: number }>) =>
@@ -9827,6 +9995,9 @@ export const api = {
     },
     metrics: (lineAccountId: string) => fetchApi<ApiResponse<LineNotificationMetrics>>(
       `/api/line-notifications/metrics?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+    ),
+    sendCounts: (lineAccountId: string) => fetchApi<ApiResponse<LineNotificationSendCounts>>(
+      `/api/line-notifications/send-counts?lineAccountId=${encodeURIComponent(lineAccountId)}`,
     ),
     retryDelivery: (id: string, data: { lineAccountId: string; expectedVersion: number }) => fetchApi<ApiResponse<{
       id: string
@@ -12321,6 +12492,58 @@ export const api = {
     },
     logs: (id: string, limit = 20) =>
       fetchApi<ApiResponse<AdConversionLog[]>>(`/api/ad-platforms/${id}/logs?limit=${limit}`),
+    /** #818: その連携の前日分の広告費をいま取り込む */
+    importCost: (id: string) =>
+      fetchApi<ApiResponse<{ status: 'success' | 'failed' | 'skipped' }>>(
+        `/api/ad-platforms/${id}/cost-import`,
+        { method: 'POST' },
+      ),
+  },
+  /**
+   * #818: 流入元ごとの広告費の台帳。
+   * 取込分と手入力分を同じ一覧で返し、手入力分は source が 'manual'。
+   */
+  adCosts: {
+    list: (params?: { accountId?: string; from?: string; to?: string }) => {
+      const query = new URLSearchParams()
+      if (params?.accountId) query.set('accountId', params.accountId)
+      if (params?.from) query.set('from', params.from)
+      if (params?.to) query.set('to', params.to)
+      const suffix = query.size > 0 ? `?${query.toString()}` : ''
+      return fetchApi<ApiResponse<{
+        rows: Array<{
+          sourceLabel: string
+          adPlatformId: string | null
+          entryRouteId: string | null
+          source: 'import' | 'manual'
+          totals: Array<{ currency: string; amountMinor: number }>
+          friendAdds: number | null
+          costPerFriendMinor: number | null
+          lastImportedAt: string | null
+        }>
+        platforms: Array<{
+          id: string
+          name: string
+          displayName: string | null
+          lastSuccessAt: string | null
+          lastRunStatus: 'success' | 'failed' | null
+          lastRunAt: string | null
+          lastError: string | null
+        }>
+      }>>(`/api/ad-costs${suffix}`)
+    },
+    create: (data: {
+      lineAccountId?: string
+      sourceLabel: string
+      entryRouteId?: string
+      day: string
+      amountMinor: number
+      currency?: string
+    }) =>
+      fetchApi<ApiResponse<unknown>>('/api/ad-costs', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
   },
   uploads: {
     /**

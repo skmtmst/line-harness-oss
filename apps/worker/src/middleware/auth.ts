@@ -220,6 +220,8 @@ const STAFF_API_PERMISSIONS: Array<[string, string]> = [
   // 流入計測の入口経路と文面は /inflow-links 画面が呼ぶ。
   ['/api/entry-routes', '/inflow-links'], ['/api/entry-route-genres', '/inflow-links'],
   ['/api/message-templates', '/inflow-links'],
+  // 広告費の台帳(#818)も流入画面の一部。書き込みは route 側で owner/admin に絞る。
+  ['/api/ad-costs', '/inflow-links'],
   ['/api/funnels', '/analytics'],
   // ダッシュボード(ホーム)の数字と表示設定。'/' 鍵はメニューの href と同じ。
   // /api/list-stats は複数画面の集計で帰属を決められないため登録しない

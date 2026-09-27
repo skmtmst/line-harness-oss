@@ -115,6 +115,10 @@ beforeEach(() => {
   // 「今日」は 2026-10-15（木）に固定する。部品が読む jstToday を
   // 偽装しているので、実機の日付が何日でも選ばれる日は変わらない。
   todayOverride = '2026-10-15';
+  // 時計そのものも固定する（jstToday 偽装との二重固定。Date だけを
+  // 偽物にし、タイマーは本物のままなので待ち受けは壊れない）。
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-10-15T00:00:00+09:00'));
   memoryValues.clear();
   vi.clearAllMocks();
   mockAvailability();
@@ -123,6 +127,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
@@ -268,6 +273,7 @@ describe('カレンダー', () => {
 
   it('月のぶんは28日ずつに割って読む（口の上限を超えない）', async () => {
     todayOverride = '2026-10-01';
+    vi.setSystemTime(new Date('2026-10-01T00:00:00+09:00'));
     mockSettings('calendar', 60);
     renderPicker();
     await screen.findByRole('button', { name: '10月30日 空きあり' });
@@ -300,6 +306,7 @@ describe('カレンダー', () => {
 describe('枠の二重読み', () => {
   it('月をまたいで割って読んでも、同じ日の同じ時刻は1つだけ出る', async () => {
     todayOverride = '2026-09-27';
+    vi.setSystemTime(new Date('2026-09-27T00:00:00+09:00'));
     // 口が期間を広めに返し、二口ぶんに同じ枠が入ってきた場合。
     const octSlots: Slot[] = [
       { date: '2026-10-01', start: '10:00', end: '11:00' },
@@ -350,6 +357,7 @@ describe('枠の二重読み', () => {
 describe('カレンダーの最初の月と月送り', () => {
   it('今月に空きが無く来月にある時は、来月を開いて1日を選ぶ', async () => {
     todayOverride = '2026-09-27';
+    vi.setSystemTime(new Date('2026-09-27T00:00:00+09:00'));
     availability.mockImplementation(
       async (_menuId: string, _staffId: string | undefined, from: string, to: string) => ({
         by_staff: [
@@ -423,35 +431,46 @@ describe('カレンダーの見た目（設計合わせ）', () => {
     expect(past.className).toContain('text-ink-faint');
   });
 
-  it('ます目は枠なし・高さが幅以下（h-10）で、塗るのは選んだ日だけ', async () => {
-    await openCalendar();
-    // 選んだ日のます目を探す。枠の読み込みと「選ぶ」は別の描画で来るので、
-    // あるだけ待つと塗る前のます目をつかんで落ちることがある（CIで再現）。
-    // 読み上げ名（aria-label）と押した状態（aria-pressed）の両方で待ち受ける。
-    // ます目は切り替え釦なので、選んだ状態は aria-pressed が持つ。
-    const selected = await screen.findByRole('button', {
-      name: '10月16日 空きあり',
-      pressed: true,
-    });
-    const grid = screen.getByLabelText('2026年10月の日付');
-    expect(grid.className).toContain('grid-cols-7');
-    const cells = within(grid).getAllByRole('button');
-    expect(cells.length).toBeGreaterThan(0);
-    for (const cell of cells) {
-      // 枠なし・縦長にしない（h-10 = 40px。375px幅で1ます≈42px）。
-      expect(cell.className).not.toContain('border');
-      expect(cell.className).not.toContain('min-h-14');
-      expect(cell.className).toContain('h-10');
-    }
-    // 選んだ日（10-16）だけ濃い緑で塗る。ほかは塗らない。
-    expect(selected.className).toContain('bg-accent-deep');
-    expect(selected.className).toContain('rounded-lg');
-    const others = cells.filter((cell) => cell !== selected);
-    expect(others.length).toBeGreaterThan(0);
-    for (const cell of others) {
-      expect(cell.className).not.toContain('bg-accent-deep');
-    }
-  });
+  it.each([
+    // [試験の今日, 最初に選ばれる日の読み上げ]
+    ['2026-10-15', '10月16日 空きあり'],
+    ['2026-10-01', '10月16日 空きあり'],
+    ['2026-10-17', '10月20日 空きあり'],
+  ])(
+    'ます目は枠なし・高さが幅以下（h-10）で、塗るのは選んだ日だけ（今日=%s）',
+    async (today, expectedLabel) => {
+      // 実機の日付が何日でも同じ結果になるよう時計を固定する。
+      // 最初に選ぶ日は今日によって変わるので日付を決め打ちせず、
+      // 「押した状態のます目」を読み上げ名（aria-label）で探して確かめる。
+      vi.setSystemTime(new Date(`${today}T00:00:00+09:00`));
+      todayOverride = today;
+      await openCalendar();
+      // 月の読み込みが終わるまで待ってからます目を探す。
+      const grid = await screen.findByLabelText('2026年10月の日付');
+      expect(grid.className).toContain('grid-cols-7');
+      // 枠の読み込みと「選ぶ」は別の描画で来るので、押した状態の
+      // ます目が出るまで待つ。ます目は切り替え釦なので、選んだ状態は
+      // aria-pressed が持つ（aria-selected は釦に付けられない）。
+      const selected = await within(grid).findByRole('button', { pressed: true });
+      expect(selected.getAttribute('aria-label')).toBe(expectedLabel);
+      const cells = within(grid).getAllByRole('button');
+      expect(cells.length).toBeGreaterThan(0);
+      for (const cell of cells) {
+        // 枠なし・縦長にしない（h-10 = 40px。375px幅で1ます≈42px）。
+        expect(cell.className).not.toContain('border');
+        expect(cell.className).not.toContain('min-h-14');
+        expect(cell.className).toContain('h-10');
+      }
+      // 選んだ日だけ濃い緑で塗る。ほかは塗らない。
+      expect(selected.className).toContain('bg-accent-deep');
+      expect(selected.className).toContain('rounded-lg');
+      const others = cells.filter((cell) => cell !== selected);
+      expect(others.length).toBeGreaterThan(0);
+      for (const cell of others) {
+        expect(cell.className).not.toContain('bg-accent-deep');
+      }
+    },
+  );
 
   it('空きありは点・満席は「満」・お休みは「休」の印が出る', async () => {
     await openCalendar();

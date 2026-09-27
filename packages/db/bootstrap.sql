@@ -70,7 +70,7 @@ CREATE TABLE account_handovers (
   resolved_at         TEXT,
   executed_at         TEXT,
   completed_at        TEXT
-);
+, declared_friend_total INTEGER, rolled_back_at TEXT, rolled_back_by TEXT, rollback_note TEXT);
 
 CREATE TABLE account_health_logs (
   id              TEXT PRIMARY KEY,
@@ -93,6 +93,16 @@ CREATE TABLE account_migrations (
   completed_at     TEXT
 );
 
+CREATE TABLE account_pool_switch_events (
+  id              TEXT PRIMARY KEY,
+  pool_id         TEXT NOT NULL REFERENCES traffic_pools(id) ON DELETE CASCADE,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  direction       TEXT NOT NULL CHECK (direction IN ('out', 'in')),
+  reason          TEXT NOT NULL,
+  actor           TEXT NOT NULL DEFAULT 'system',
+  created_at      TEXT NOT NULL
+);
+
 CREATE TABLE account_settings (
   id              TEXT PRIMARY KEY,
   line_account_id TEXT NOT NULL,
@@ -101,6 +111,17 @@ CREATE TABLE account_settings (
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   UNIQUE(line_account_id, key)
+);
+
+CREATE TABLE account_skipped_deliveries (
+  id              TEXT PRIMARY KEY,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  kind            TEXT NOT NULL,
+  ref_id          TEXT NOT NULL,
+  title           TEXT,
+  reason          TEXT NOT NULL DEFAULT 'account_inactive',
+  skipped_at      TEXT NOT NULL,
+  UNIQUE (kind, ref_id)
 );
 
 CREATE TABLE action_score_rule_sets (
@@ -175,6 +196,34 @@ CREATE TABLE ad_conversion_outbox (
   updated_at        TEXT NOT NULL, ref_tracking_id TEXT, click_id TEXT, click_id_type TEXT, click_recorded_at TEXT, click_expires_at TEXT, click_consent_at TEXT, click_context_json TEXT, selection_reason TEXT NOT NULL DEFAULT 'legacy_unsnapshotted', is_retryable INTEGER NOT NULL DEFAULT 1
   CHECK (is_retryable IN (0, 1)),
   UNIQUE (ad_platform_id, friend_id, event_name, idempotency_key)
+);
+
+CREATE TABLE ad_cost_entries (
+  id              TEXT PRIMARY KEY,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  -- 取込の場合は元の外部連携、手入力なら NULL
+  ad_platform_id  TEXT REFERENCES ad_platforms(id) ON DELETE SET NULL,
+  -- 取込費用を帰属させる流入元(任意)。無い取込は流入元なしのまま集計だけに出す
+  entry_route_id  TEXT REFERENCES entry_routes(id) ON DELETE SET NULL,
+  source_label    TEXT NOT NULL,
+  day             TEXT NOT NULL,
+  amount_minor    INTEGER NOT NULL CHECK (amount_minor >= 0),
+  currency        TEXT NOT NULL DEFAULT 'JPY',
+  source          TEXT NOT NULL CHECK (source IN ('import', 'manual')),
+  imported_at     TEXT,
+  created_by      TEXT REFERENCES staff_members(id),
+  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
+CREATE TABLE ad_cost_import_runs (
+  id             TEXT PRIMARY KEY,
+  ad_platform_id TEXT NOT NULL REFERENCES ad_platforms(id) ON DELETE CASCADE,
+  day            TEXT NOT NULL,
+  status         TEXT NOT NULL CHECK (status IN ('success', 'failed')),
+  error_message  TEXT,
+  created_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  UNIQUE (ad_platform_id, day)
 );
 
 CREATE TABLE ad_platforms (
@@ -1418,6 +1467,19 @@ CREATE TABLE broadcast_insights (
   created_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
+CREATE TABLE broadcast_lifecycle_events (
+  id              TEXT PRIMARY KEY,
+  broadcast_id    TEXT NOT NULL REFERENCES broadcasts (id) ON DELETE CASCADE,
+  actor_staff_id  TEXT,
+  action          TEXT NOT NULL CHECK (action IN (
+    'created', 'updated', 'scheduled', 'send_started',
+    'stopped', 'resumed', 'retried', 'cancelled'
+  )),
+  reason          TEXT,
+  detail_json     TEXT,
+  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
 CREATE TABLE broadcast_message_assets (
   id              TEXT PRIMARY KEY,
   line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE,
@@ -1455,7 +1517,7 @@ CREATE TABLE broadcast_send_claims (
   settled_at      TEXT,
   error_code      TEXT,
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
-  updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), line_request_id TEXT,
   PRIMARY KEY (broadcast_id, friend_id)
 );
 
@@ -3374,7 +3436,9 @@ CREATE TABLE line_accounts (
   official_profile_url   TEXT,
   created_at             TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at             TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, login_channel_id TEXT, login_channel_secret TEXT, liff_id TEXT, token_expires_at TEXT, friend_capacity INTEGER, capacity_warn_at INTEGER, icon_url TEXT, parent_line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL, tenant_id TEXT REFERENCES tenants(id), timezone TEXT NOT NULL DEFAULT 'Asia/Tokyo', provider_id TEXT, revision INTEGER NOT NULL DEFAULT 1, line_display_name TEXT, line_picture_url TEXT, line_basic_id TEXT, line_profile_synced_at TEXT);
+, login_channel_id TEXT, login_channel_secret TEXT, liff_id TEXT, token_expires_at TEXT, friend_capacity INTEGER, capacity_warn_at INTEGER, icon_url TEXT, parent_line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL, tenant_id TEXT REFERENCES tenants(id), timezone TEXT NOT NULL DEFAULT 'Asia/Tokyo', provider_id TEXT, revision INTEGER NOT NULL DEFAULT 1, line_display_name TEXT, line_picture_url TEXT, line_basic_id TEXT, line_profile_synced_at TEXT, inactive_reason TEXT
+  CHECK (inactive_reason IS NULL OR inactive_reason IN ('manual', 'ban_detected', 'credential_invalid')), inactive_reason_detail TEXT, inactivated_at TEXT, login_channel_secret_encrypted TEXT, last_webhook_received_at TEXT, webhook_silence_exempt INTEGER NOT NULL DEFAULT 0
+  CHECK (webhook_silence_exempt IN (0, 1)));
 
 CREATE TABLE line_message_unsends (
   line_message_account_key TEXT NOT NULL,
@@ -5891,6 +5955,15 @@ CREATE TABLE scoring_rules (
   updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
+CREATE TABLE site_consent_days (
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  day             TEXT NOT NULL,
+  suppressed      INTEGER NOT NULL DEFAULT 0,
+  granted         INTEGER NOT NULL DEFAULT 0,
+  declined        INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (line_account_id, day)
+);
+
 CREATE TABLE site_events (
   id          TEXT PRIMARY KEY,
   visitor_id  TEXT NOT NULL REFERENCES site_visitors(id) ON DELETE CASCADE,
@@ -5918,7 +5991,7 @@ CREATE TABLE site_visitors (
   last_seen_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')),
   linked_at     TEXT,
   linked_by     TEXT CHECK (linked_by IS NULL OR linked_by IN ('entry_route','liff','form','manual'))
-, line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL);
+, line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL, consent_state TEXT CHECK (consent_state IS NULL OR consent_state IN ('granted', 'declined')), consent_at TEXT);
 
 CREATE TABLE staff (
   id                       TEXT PRIMARY KEY,
@@ -6682,6 +6755,12 @@ CREATE INDEX idx_account_handovers_from ON account_handovers (from_account_id);
 
 CREATE INDEX idx_account_handovers_status ON account_handovers (status);
 
+CREATE INDEX idx_account_pool_switch_events_account
+  ON account_pool_switch_events(line_account_id, created_at DESC);
+
+CREATE INDEX idx_account_skipped_deliveries_account
+  ON account_skipped_deliveries(line_account_id, skipped_at DESC);
+
 CREATE INDEX idx_action_score_rule_sets_account_status
   ON action_score_rule_sets(line_account_id, status);
 
@@ -6710,6 +6789,19 @@ CREATE INDEX idx_ad_conversion_outbox_friend
 
 CREATE INDEX idx_ad_conversion_outbox_retryable_due
   ON ad_conversion_outbox(is_retryable, status, next_attempt_at);
+
+CREATE INDEX idx_ad_cost_entries_account_day ON ad_cost_entries(line_account_id, day);
+
+CREATE INDEX idx_ad_cost_entries_route ON ad_cost_entries(entry_route_id, day);
+
+CREATE UNIQUE INDEX idx_ad_cost_entries_unique_day
+  ON ad_cost_entries(
+    line_account_id,
+    COALESCE(ad_platform_id, ''),
+    COALESCE(entry_route_id, ''),
+    source_label,
+    day
+  );
 
 CREATE INDEX idx_ad_platforms_account ON ad_platforms(line_account_id);
 
@@ -7036,6 +7128,9 @@ CREATE INDEX idx_broadcast_approval_events_broadcast
 CREATE INDEX idx_broadcast_insights_broadcast_id ON broadcast_insights(broadcast_id);
 
 CREATE INDEX idx_broadcast_insights_status ON broadcast_insights(status);
+
+CREATE INDEX idx_broadcast_lifecycle_events_broadcast
+  ON broadcast_lifecycle_events (broadcast_id, created_at DESC);
 
 CREATE INDEX idx_broadcast_message_assets_account_kind
   ON broadcast_message_assets(line_account_id, kind, updated_at DESC);

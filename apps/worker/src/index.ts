@@ -104,6 +104,7 @@ import { trackedLinks } from './routes/tracked-links.js';
 import { entryRoutes } from './routes/entry-routes.js';
 import { forms } from './routes/forms.js';
 import { adPlatforms } from './routes/ad-platforms.js';
+import { adCosts } from './routes/ad-costs.js';
 import { staff } from './routes/staff.js';
 import { access } from './routes/access.js';
 import { capabilities } from './routes/capabilities.js';
@@ -500,6 +501,7 @@ app.route('/', trackedLinks);
 app.route('/', entryRoutes);
 app.route('/', forms);
 app.route('/', adPlatforms);
+app.route('/', adCosts);
 app.route('/', staff);
 app.route('/', access);
 app.route('/', capabilities);
@@ -1700,6 +1702,24 @@ async function runSixHourlyHeavyJobs(
             failed: result.failed,
             completed: result.completed,
           }));
+        }
+      },
+    },
+    {
+      // #818: 広告費の日次取り込み。媒体の数字は前日分までしか確定しないので
+      // 対象は常に昨日(JST)。実行台帳の媒体×日一意制約で、6時間ごとの
+      // 再実行は成功済みの分を取り直さない。
+      name: 'ad cost import',
+      run: async () => {
+        const { importAdCosts } = await import('./services/ad-cost-import.js');
+        const day = new Date(Date.now() + 9 * 3600_000 - 24 * 3600_000)
+          .toISOString().slice(0, 10);
+        const result = await importAdCosts(env.DB, {
+          day,
+          credentialKey: env.LINE_CREDENTIAL_ENCRYPTION_KEY,
+        });
+        if (result.imported + result.failed > 0) {
+          console.log(JSON.stringify({ event: 'ad_cost_import', ...result }));
         }
       },
     },
