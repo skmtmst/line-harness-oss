@@ -24,7 +24,7 @@ const MAX_PETS = 3000;
 type PetRow = {
   id: string; friend_id: string; customer_id: string | null; name: string; animal_type: string; gender: string; breed: string | null;
   birthday: string | null; weight_kg: number | null; neutered: number | null; activity_level: string | null; feeding_product_id: string | null;
-  image_url: string | null; created_at: string; updated_at: string;
+  image_url: string | null; created_at: string; updated_at: string; weight_updated_at: string | null;
   owner_name: string | null; owner_picture_url: string | null; ec_customer_id: string | null;
 };
 
@@ -41,7 +41,7 @@ async function requireAccount(c: Context<Env>, accountId: string): Promise<Respo
 }
 
 const PET_SELECT = `SELECT p.id, p.friend_id, p.customer_id, p.name, p.animal_type, p.gender, p.breed, p.birthday, p.weight_kg,
-       p.neutered, p.activity_level, p.feeding_product_id, p.image_url, p.created_at, p.updated_at,
+       p.neutered, p.activity_level, p.feeding_product_id, p.image_url, p.created_at, p.updated_at, p.weight_updated_at,
        f.display_name AS owner_name, f.picture_url AS owner_picture_url, s.customer_id AS ec_customer_id
   FROM nen_pet_profiles p
   JOIN friends f ON f.id = p.friend_id
@@ -90,7 +90,11 @@ function petView(row: PetRow, products: FeedingProductRow[], today: Date, treatL
     neutered: row.neutered, activity_level: row.activity_level, feeding_product_id: row.feeding_product_id,
   }, products, today, treatLimitPercent);
   const product = pickProduct(products, row.feeding_product_id);
-  const weightAgeDays = daysBetween(row.updated_at, today);
+  // 監査 R57: 「体重の更新」はプロフィール全体の更新日ではなく、体重を測った・
+  // 直した日だけを見る。日記や編集で体重が入った瞬間に weight_updated_at が立ち、
+  // 名前だけの編集では動かない。未登録（NULL）の行だけ従来どおり updated_at。
+  const weightRefreshed = row.weight_updated_at ?? row.updated_at;
+  const weightAgeDays = daysBetween(weightRefreshed, today);
   return {
     id: row.id,
     name: row.name,
@@ -108,6 +112,7 @@ function petView(row: PetRow, products: FeedingProductRow[], today: Date, treatL
     feeding: plan ? { dailyKcal: plan.dailyKcal, dailyGrams: plan.dailyGrams, factorLabel: plan.factorLabel, stageLabel: plan.stageLabel, venisonGrams: plan.venison.grams, venisonKcal: plan.venison.kcal, treatName: plan.venison.product?.name ?? null } : null,
     imageUrl: row.image_url,
     updatedAt: row.updated_at,
+    weightUpdatedAt: weightRefreshed,
     weightStale: weightAgeDays != null && weightAgeDays >= STALE_WEIGHT_DAYS,
     owner: { friendId: row.friend_id, name: row.owner_name ?? '', pictureUrl: row.owner_picture_url, customerId: row.ec_customer_id ?? row.customer_id ?? null },
   };
@@ -168,7 +173,7 @@ nenPets.get('/api/nen/pets', async (c) => {
   }
   if (weight === 'stale' || weight === 'fresh') {
     const cutoff = new Date(today.getTime() - STALE_WEIGHT_DAYS * 86_400_000).toISOString();
-    where.push(`julianday(p.updated_at) ${weight === 'stale' ? '<=' : '>'} julianday(?)`);
+    where.push(`julianday(COALESCE(p.weight_updated_at, p.updated_at)) ${weight === 'stale' ? '<=' : '>'} julianday(?)`);
     binds.push(cutoff);
   }
   const whereSql = where.join(' AND ');
@@ -194,7 +199,7 @@ nenPets.get('/api/nen/pets', async (c) => {
               SUM(CASE WHEN p.animal_type = 'dog' THEN 1 ELSE 0 END) AS dogs,
               SUM(CASE WHEN p.animal_type = 'cat' THEN 1 ELSE 0 END) AS cats,
               SUM(CASE WHEN substr(p.created_at, 1, 10) >= ? THEN 1 ELSE 0 END) AS new_this_month,
-              SUM(CASE WHEN julianday(p.updated_at) <= julianday(?) THEN 1 ELSE 0 END) AS stale_weight
+              SUM(CASE WHEN julianday(COALESCE(p.weight_updated_at, p.updated_at)) <= julianday(?) THEN 1 ELSE 0 END) AS stale_weight
          FROM nen_pet_profiles p JOIN friends f ON f.id = p.friend_id
         WHERE f.line_account_id = ?`,
     ).bind(monthStart, kpiCutoff, accountId).first<Record<string, number | null>>(),
