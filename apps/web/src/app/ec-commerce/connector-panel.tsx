@@ -268,7 +268,7 @@ export default function ConnectorPanel({ accountId }: { accountId: string | null
         }}
       />
       {/* #948 N-322: 止める変更を保存せずに離れるときの確認。 */}
-      <ConfirmDialog
+      <ConfirmDialog primaryAction="cancel"
         open={leaveTarget !== null}
         title="保存していない変更があります"
         description={pendingStatusChange

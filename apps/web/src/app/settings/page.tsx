@@ -1082,7 +1082,7 @@ export default function SettingsPage() {
         onConfirm={resetToDefaults}
       />
 
-      <ConfirmDialog
+      <ConfirmDialog primaryAction="cancel"
         open={leaveTarget !== null}
         title="保存していない変更があります"
         description="保存せずに移動すると、この画面で変更した機能の表示・並び順は失われます。"
