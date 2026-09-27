@@ -2,6 +2,8 @@
 
 import { useMemo, useState, type ReactNode } from 'react'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import LinePreview from '@/components/shared/line-preview'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import Select from '@/components/shared/select'
@@ -297,17 +299,11 @@ export default function RichMenuCreateForm({
                 </div>
               ) : null}
               <div>
-                <span className="text-ink-secondary mb-1 block text-sm font-medium">出す相手</span>
-                <div className="space-y-2">
-                  <label className="flex items-start gap-2 text-sm">
-                    <input type="radio" name="create-audience" className="mt-1" checked={!value.targetingEnabled} disabled={locked} onChange={() => patch({ targetingEnabled: false })} />
-                    <span><span className="text-ink font-medium">すべての友だち</span><span className="text-ink-faint block text-xs">ほかの出し分けに当てはまらなかった人へ出ます</span></span>
-                  </label>
-                  <label className="flex items-start gap-2 text-sm">
-                    <input type="radio" name="create-audience" className="mt-1" checked={value.targetingEnabled} disabled={locked} onChange={() => patch({ targetingEnabled: true, isDefaultForAll: false })} />
-                    <span><span className="text-ink font-medium">条件に当てはまる友だちだけ</span><span className="text-ink-faint block text-xs">当てはまらない人には、これより下のメニューが出ます</span></span>
-                  </label>
-                </div>
+                <span className="text-ink-secondary mb-1 block text-sm font-medium" aria-hidden="true">出す相手</span>
+                <RadioCardGroup legend="出す相手">
+                  <RadioCard name="create-audience" value="all" checked={!value.targetingEnabled} disabled={locked} onChange={() => patch({ targetingEnabled: false })} title="すべての友だち" note="ほかの出し分けに当てはまらなかった人へ出ます" />
+                  <RadioCard name="create-audience" value="targeted" checked={value.targetingEnabled} disabled={locked} onChange={() => patch({ targetingEnabled: true, isDefaultForAll: false })} title="条件に当てはまる友だちだけ" note="当てはまらない人には、これより下のメニューが出ます" />
+                </RadioCardGroup>
               </div>
             </div>
 
@@ -343,23 +339,17 @@ export default function RichMenuCreateForm({
               </div>
             ) : null}
 
-            <label className={`flex items-start gap-2 text-sm ${value.targetingEnabled ? 'opacity-50' : ''}`}>
-              <input
-                type="checkbox"
-                className="mt-1"
-                checked={value.isDefaultForAll}
-                disabled={locked || value.targetingEnabled}
-                onChange={(event) => patch({ isDefaultForAll: event.target.checked })}
-              />
-              <span>
-                <span className="text-ink font-medium">公開したら「すべての友だち」の既定メニューにする</span>
-                <span className="text-ink-faint block text-xs">
-                  {value.targetingEnabled
-                    ? '出し分けを選んだメニューは全員の既定にはできません。'
-                    : '公開のときにLINEの既定へ設定します。ほかに既定のメニューがある場合は入れ替わります。'}
-                </span>
-              </span>
-            </label>
+            <Checkbox
+              className={value.targetingEnabled ? 'opacity-50' : ''}
+              checked={value.isDefaultForAll}
+              disabled={locked || value.targetingEnabled}
+              onCheckedChange={(checked) => patch({ isDefaultForAll: checked })}
+              description={value.targetingEnabled
+                ? '出し分けを選んだメニューは全員の既定にはできません。'
+                : '公開のときにLINEの既定へ設定します。ほかに既定のメニューがある場合は入れ替わります。'}
+            >
+              公開したら「すべての友だち」の既定メニューにする
+            </Checkbox>
           </section>
 
           <div className="grid gap-4 sm:grid-cols-2">
