@@ -180,7 +180,7 @@ export default function SiteScript() {
                 <p className="text-xs text-ink">広告の効果を知るため、この端末での閲覧を記録してよいですか？</p>
                 <div className="flex gap-2">
                   <span className="rounded-control border border-hairline px-3 py-1.5 text-xs text-ink-secondary">記録しない</span>
-                  <span className="rounded-control bg-accent px-3 py-1.5 text-xs font-semibold text-on-accent">記録してよい</span>
+                  <span className="rounded-control bg-accent-deep px-3 py-1.5 text-xs font-semibold text-on-accent">記録してよい</span>
                 </div>
               </div>
             </div>
