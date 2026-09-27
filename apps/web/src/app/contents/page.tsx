@@ -30,6 +30,8 @@ import Pagination from '@/components/shared/pagination'
 import ListRange from '@/components/ui/list-range'
 import FilterChip from '@/components/shared/filter-chip'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
+import FolderAddDialog from '@/components/shared/folder-add-dialog'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
@@ -146,6 +148,14 @@ function MediaLibraryInner() {
   const [addingFolder, setAddingFolder] = useState(false)
   const [folderName, setFolderName] = useState('')
   const [savingFolder, setSavingFolder] = useState(false)
+  /*
+    R37: フォルダの名前変更・削除を FolderPanel の「…」へ接続する。
+    追加だけあって直し・消しが無いと、整理し直す手段が無い。
+  */
+  const [editingFolder, setEditingFolder] = useState<Folder | null>(null)
+  const [deletingFolder, setDeletingFolder] = useState<Folder | null>(null)
+  const [folderBusy, setFolderBusy] = useState(false)
+  const [folderError, setFolderError] = useState('')
   const [uploadOpen, setUploadOpen] = useState(false)
   /* ★V7: 札の操作を並べない。「使用箇所＋ダウンロード＋…」の1行に収め、削除の印は残す。取得は読取権限でも使うので「…」に隠さない。 */
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
@@ -446,6 +456,26 @@ function MediaLibraryInner() {
       setError(caught instanceof Error ? caught.message : 'フォルダを追加できませんでした')
     } finally {
       setSavingFolder(false)
+    }
+  }
+
+  /** R37: フォルダを消す。中身は消えず未分類に戻る。消した先を選んでいたら「すべて」へ戻す。 */
+  async function removeFolder() {
+    if (!deletingFolder || !selectedAccountId || folderBusy) return
+    const accountAtRequest = selectedAccountId
+    setFolderBusy(true)
+    setFolderError('')
+    try {
+      const response = await api.folders.delete(deletingFolder.id, accountAtRequest)
+      if (!response.success) throw new Error(response.error)
+      if (accountAtRequest !== latestAccountRef.current) return
+      setDeletingFolder(null)
+      if (folderFilter === deletingFolder.id) setFolderFilter('')
+      void load()
+    } catch {
+      if (accountAtRequest === latestAccountRef.current) setFolderError('フォルダを削除できませんでした。')
+    } finally {
+      setFolderBusy(false)
     }
   }
 
@@ -803,10 +833,16 @@ function MediaLibraryInner() {
               // 数える計算は、黙って別の母集団にすり替わるため廃止。
               count: folder.itemCount ?? null,
               color: folder.color,
+              // R37: 名前変更・削除を「…」へ接続する。権限の無い人には
+              // 押して失敗する口を見せない。
+              onEdit: canManageMedia ? () => setEditingFolder(folder) : undefined,
+              onDelete: canManageMedia ? () => { setFolderError(''); setDeletingFolder(folder) } : undefined,
+              deleteNote: '削除しても、中のメディアは未分類に残ります。',
             })),
             { id: UNGROUPED, label: '未分類', count: unfiledCount },
           ]}
         >
+          {folderError ? <p role="alert" className="text-ink-secondary text-xs">{folderError}</p> : null}
           {addingFolder ? (
             <div className="space-y-2">
               <input
@@ -1437,6 +1473,36 @@ function MediaLibraryInner() {
           notifyToast(message)
           void load()
         }}
+      />
+
+      {editingFolder && (
+        <FolderAddDialog
+          kind="media"
+          folder={editingFolder}
+          accountId={selectedAccountId}
+          note="メディアを分けてしまう箱です。削除しても、中のメディアは未分類に残ります。"
+          placeholder="例: 01_商品写真"
+          onClose={() => setEditingFolder(null)}
+          onAdded={() => { setEditingFolder(null); void load() }}
+        />
+      )}
+
+      {/*
+        R37: 消す前に、中身がどうなるかを本文で読ませる。
+        「中身は未分類に戻ります」の確認を ConfirmDialog で行う。
+      */}
+      <ConfirmDialog
+        open={deletingFolder !== null}
+        title={`フォルダ「${deletingFolder?.name ?? ''}」を削除しますか？`}
+        description={deletingFolder?.itemCount != null
+          ? `削除しても、中のメディアは未分類に残ります。いまこのフォルダに入っているのは${deletingFolder.itemCount}件です。`
+          : '削除しても、中のメディアは未分類に残ります。'}
+        confirmLabel="削除する"
+        destructive
+        busy={folderBusy}
+        error={folderError || undefined}
+        onCancel={() => { if (!folderBusy) { setDeletingFolder(null); setFolderError('') } }}
+        onConfirm={() => void removeFolder()}
       />
 
       {preview && (
