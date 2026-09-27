@@ -11,7 +11,7 @@ describe('V6 リッチメニュー作成 XtfO3', () => {
   it('実Nodeと3段の現在地を画面から共通部品へ渡す', () => {
     expect(page).toContain('data-design-node="XtfO3"')
     expect(page).toContain("import RichMenuCreateForm")
-    expect(form).toContain("import StepTrail from '@/components/shared/step-trail'")
+    expect(form).toContain("import Stepper from '@/components/shared/stepper'")
     expect(form).toContain('label="リッチメニュー作成の進み方"')
     expect(form).toContain("{ label: '形とボタン', state: 'current' }")
     expect(form).toContain("{ label: '誰に出すか', state: 'todo' }")
