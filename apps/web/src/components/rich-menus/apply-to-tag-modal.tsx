@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
 import { api } from '@/lib/api'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
 
 type Tag = { id: string; name: string; color: string }
@@ -142,63 +143,69 @@ export function ApplyToTagModal({ groupId, groupName, onClose }: Props) {
 
           {phase === 'config' && (
             <>
-              <div className="space-y-3 mb-5">
-                <RadioOption
-                  checked={mode.kind === 'all-followers'}
-                  onChange={() => pickMode({ kind: 'all-followers' })}
-                  label="このアカウントの全員に適用"
-                  description="現時点で friend 状態の友だち全員に LINE のメニューを link します。新規友だちには適用されません。"
-                />
-                <RadioOption
-                  checked={mode.kind === 'tag'}
-                  onChange={() =>
-                    pickMode({
-                      kind: 'tag',
-                      tagId: tags[0]?.id ?? '',
-                    })
-                  }
-                  label="タグで絞り込んで適用"
-                  description="指定したタグを持つ友だちだけに表示します。"
-                  disabled={tags.length === 0}
-                >
-                  {mode.kind === 'tag' && (
-                    <>
-                      <Select
-                        value={mode.tagId}
-                        onChange={(value) =>
-                          pickMode({ kind: 'tag', tagId: value })
-                        }
-                        aria-label="適用するタグ"
-                        options={
-                          tags.length === 0
-                            ? [{ value: '', label: tagsLoading ? 'タグを読み込んでいます' : 'タグがありません' }]
-                            : tags.map((t) => ({ value: t.id, label: t.name }))
-                        }
-                        size="full"
-                        className="mt-2"
-                      />
-                      {tagsLoadError && (
-                        <p className="text-ink-faint mt-2 text-xs">
-                          タグを読み込めませんでした。タグの絞り込みは使えません。
-                          <button
-                            type="button"
-                            onClick={loadTags}
-                            className="text-action ml-1 font-medium underline"
-                          >
-                            もう一度読み込む
-                          </button>
-                        </p>
-                      )}
-                    </>
-                  )}
-                </RadioOption>
-                <RadioOption
-                  checked={mode.kind === 'set-default'}
-                  onChange={() => pickMode({ kind: 'set-default' })}
-                  label="全員のデフォルトに設定する"
-                  description="LINE 公式アカウントのデフォルトメニューにします。新規友だちも含め全員に自動で表示されます。同じアカウント内の他のメニューのデフォルト設定は解除されます。"
-                  warn
-                />
+              <div className="mb-5">
+                <RadioCardGroup legend="適用する相手" className="grid gap-2">
+                  <RadioCard
+                    name="apply-mode"
+                    value="all-followers"
+                    checked={mode.kind === 'all-followers'}
+                    onChange={() => pickMode({ kind: 'all-followers' })}
+                    title="このアカウントの全員に適用"
+                    note="現時点で friend 状態の友だち全員に LINE のメニューを link します。新規友だちには適用されません。"
+                  />
+                  <RadioCard
+                    name="apply-mode"
+                    value="tag"
+                    checked={mode.kind === 'tag'}
+                    disabled={tags.length === 0}
+                    disabledReason={tagsLoading ? 'タグを読み込んでいます' : '使えるタグがありません'}
+                    onChange={() =>
+                      pickMode({
+                        kind: 'tag',
+                        tagId: tags[0]?.id ?? '',
+                      })
+                    }
+                    title="タグで絞り込んで適用"
+                    note="指定したタグを持つ友だちだけに表示します。"
+                  />
+                  <RadioCard
+                    name="apply-mode"
+                    value="set-default"
+                    checked={mode.kind === 'set-default'}
+                    onChange={() => pickMode({ kind: 'set-default' })}
+                    title="全員のデフォルトに設定する"
+                    note="LINE 公式アカウントのデフォルトメニューにします。新規友だちも含め全員に自動で表示されます。同じアカウント内の他のメニューのデフォルト設定は解除されます。"
+                  />
+                </RadioCardGroup>
+                {mode.kind === 'tag' && (
+                  <div className="mt-2">
+                    <Select
+                      value={mode.tagId}
+                      onChange={(value) =>
+                        pickMode({ kind: 'tag', tagId: value })
+                      }
+                      aria-label="適用するタグ"
+                      options={
+                        tags.length === 0
+                          ? [{ value: '', label: tagsLoading ? 'タグを読み込んでいます' : 'タグがありません' }]
+                          : tags.map((t) => ({ value: t.id, label: t.name }))
+                      }
+                      size="full"
+                    />
+                    {tagsLoadError && (
+                      <p className="text-ink-faint mt-2 text-xs">
+                        タグを読み込めませんでした。タグの絞り込みは使えません。
+                        <button
+                          type="button"
+                          onClick={loadTags}
+                          className="text-action ml-1 font-medium underline"
+                        >
+                          もう一度読み込む
+                        </button>
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="flex justify-end gap-2">
                 <button
@@ -292,49 +299,3 @@ export function ApplyToTagModal({ groupId, groupName, onClose }: Props) {
   )
 }
 
-function RadioOption({
-  checked,
-  onChange,
-  label,
-  description,
-  warn,
-  disabled,
-  children,
-}: {
-  checked: boolean
-  onChange: () => void
-  label: string
-  description: string
-  warn?: boolean
-  disabled?: boolean
-  children?: React.ReactNode
-}) {
-  return (
-    <label
-      className={`block border rounded-lg p-3 transition-colors ${
-        disabled
-          ? 'opacity-50 cursor-not-allowed border-gray-200'
-          : checked
-            ? warn
-              ? 'border-amber-400 bg-amber-50 cursor-pointer'
-              : 'border-green-500 bg-green-50 cursor-pointer'
-            : 'border-gray-200 hover:bg-gray-50 cursor-pointer'
-      }`}
-    >
-      <div className="flex items-start gap-3">
-        <input
-          type="radio"
-          checked={checked}
-          onChange={onChange}
-          disabled={disabled}
-          className="mt-1"
-        />
-        <div className="flex-1">
-          <div className="text-sm font-medium text-ink">{label}</div>
-          <p className="text-xs text-gray-600 mt-0.5">{description}</p>
-          {children}
-        </div>
-      </div>
-    </label>
-  )
-}

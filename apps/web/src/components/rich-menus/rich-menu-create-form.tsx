@@ -2,8 +2,11 @@
 
 import { useMemo, useState, type ReactNode } from 'react'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import Chip from '@/components/shared/chip'
 import LinePreview from '@/components/shared/line-preview'
 import { RequiredBadge } from '@/components/shared/form-controls'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
 import Stepper from '@/components/shared/stepper'
 import Notice from '@/components/shared/notice'
@@ -297,17 +300,26 @@ export default function RichMenuCreateForm({
                 </div>
               ) : null}
               <div>
-                <span className="text-ink-secondary mb-1 block text-sm font-medium">出す相手</span>
-                <div className="space-y-2">
-                  <label className="flex items-start gap-2 text-sm">
-                    <input type="radio" name="create-audience" className="mt-1" checked={!value.targetingEnabled} disabled={locked} onChange={() => patch({ targetingEnabled: false })} />
-                    <span><span className="text-ink font-medium">すべての友だち</span><span className="text-ink-faint block text-xs">ほかの出し分けに当てはまらなかった人へ出ます</span></span>
-                  </label>
-                  <label className="flex items-start gap-2 text-sm">
-                    <input type="radio" name="create-audience" className="mt-1" checked={value.targetingEnabled} disabled={locked} onChange={() => patch({ targetingEnabled: true, isDefaultForAll: false })} />
-                    <span><span className="text-ink font-medium">条件に当てはまる友だちだけ</span><span className="text-ink-faint block text-xs">当てはまらない人には、これより下のメニューが出ます</span></span>
-                  </label>
-                </div>
+                <RadioCardGroup legend="出す相手" legendVisible className="grid gap-2 sm:grid-cols-2">
+                  <RadioCard
+                    name="create-audience"
+                    value="all"
+                    checked={!value.targetingEnabled}
+                    disabled={locked}
+                    onChange={() => patch({ targetingEnabled: false })}
+                    title="すべての友だち"
+                    note="ほかの出し分けに当てはまらなかった人へ出ます"
+                  />
+                  <RadioCard
+                    name="create-audience"
+                    value="targeted"
+                    checked={value.targetingEnabled}
+                    disabled={locked}
+                    onChange={() => patch({ targetingEnabled: true, isDefaultForAll: false })}
+                    title="条件に当てはまる友だちだけ"
+                    note="当てはまらない人には、これより下のメニューが出ます"
+                  />
+                </RadioCardGroup>
               </div>
             </div>
 
@@ -343,23 +355,18 @@ export default function RichMenuCreateForm({
               </div>
             ) : null}
 
-            <label className={`flex items-start gap-2 text-sm ${value.targetingEnabled ? 'opacity-50' : ''}`}>
-              <input
-                type="checkbox"
-                className="mt-1"
+            <div className={value.targetingEnabled ? 'opacity-50' : ''}>
+              <Checkbox
                 checked={value.isDefaultForAll}
                 disabled={locked || value.targetingEnabled}
-                onChange={(event) => patch({ isDefaultForAll: event.target.checked })}
-              />
-              <span>
-                <span className="text-ink font-medium">公開したら「すべての友だち」の既定メニューにする</span>
-                <span className="text-ink-faint block text-xs">
-                  {value.targetingEnabled
-                    ? '出し分けを選んだメニューは全員の既定にはできません。'
-                    : '公開のときにLINEの既定へ設定します。ほかに既定のメニューがある場合は入れ替わります。'}
-                </span>
-              </span>
-            </label>
+                onCheckedChange={(checked) => patch({ isDefaultForAll: checked })}
+                description={value.targetingEnabled
+                  ? '出し分けを選んだメニューは全員の既定にはできません。'
+                  : '公開のときにLINEの既定へ設定します。ほかに既定のメニューがある場合は入れ替わります。'}
+              >
+                公開したら「すべての友だち」の既定メニューにする
+              </Checkbox>
+            </div>
           </section>
 
           <div className="grid gap-4 sm:grid-cols-2">
@@ -369,8 +376,8 @@ export default function RichMenuCreateForm({
 
           <section className="border-hairline bg-canvas-sunken rounded-card border p-4">
             <h2 className="text-ink mb-3 text-sm font-bold">押した面ごとの動き</h2>
-            <div className="space-y-2">{currentAreas.map((area, index) => <div key={area.id}><div className="border-hairline bg-canvas flex items-center gap-3 rounded-control border px-3 py-2 text-xs"><strong className="text-ink flex h-6 w-6 items-center justify-center rounded-control border border-hairline">{String.fromCharCode(65 + index)}</strong><span className="text-ink-secondary">{isAreaActionConfigured(area) ? area.label || 'アクション設定済み' : 'アクションを実行'}</span><button type="button" disabled={locked} onClick={() => openAreaEditor(index)} className={`ml-auto font-semibold ${isAreaActionConfigured(area) ? 'text-action' : 'text-danger'}`}>{isAreaActionConfigured(area) ? '設定を変更する' : 'アクションを設定する'}</button></div>{editingAreaIndex === index && editingArea ? <div className="border-hairline bg-canvas mt-2 rounded-control border p-4"><AreaProperties area={editingArea} pages={createPages} tags={tags} templates={templates} forms={forms} trackedLinks={trackedLinks} taps={null} showManagementDetails={false} allowedIntents={allowedIntents} onUpdate={(areaPatch) => setEditingArea((current) => current ? { ...current, ...areaPatch } : current)} /><div className="mt-4 flex justify-end gap-2"><Button type="button" onClick={() => { setEditingAreaIndex(null); setEditingArea(null) }}>キャンセル</Button><Button type="button" variant="primary" onClick={saveEditingArea}>この面の設定を保存</Button></div></div> : null}</div>)}</div>
-            <p className={`mt-3 text-xs font-semibold ${unsetLabels.length > 0 ? 'text-danger' : 'text-success'}`}>{currentAreas.length === 0 ? '面を追加し、公開前にそれぞれのアクションを設定してください。' : unsetLabels.length > 0 ? `面 ${unsetLabels.join('、')} のアクションが未設定です。公開すると、その場所を押しても何も起きません。` : 'すべての面にアクションが設定されています。'}</p>
+            <div className="space-y-2">{currentAreas.map((area, index) => <div key={area.id}><div className="border-hairline bg-canvas flex items-center gap-3 rounded-control border px-3 py-2 text-xs"><strong className="text-ink flex h-6 w-6 items-center justify-center rounded-control border border-hairline">{String.fromCharCode(65 + index)}</strong><span className="text-ink-secondary">{isAreaActionConfigured(area) ? area.label || 'アクション設定済み' : 'アクションを実行'}</span>{isAreaActionConfigured(area) ? null : <Chip tone="neutral">未設定</Chip>}<button type="button" disabled={locked} onClick={() => openAreaEditor(index)} className="ml-auto font-semibold text-action">{isAreaActionConfigured(area) ? '設定を変更する' : '設定する'}</button></div>{editingAreaIndex === index && editingArea ? <div className="border-hairline bg-canvas mt-2 rounded-control border p-4"><AreaProperties area={editingArea} pages={createPages} tags={tags} templates={templates} forms={forms} trackedLinks={trackedLinks} taps={null} showManagementDetails={false} allowedIntents={allowedIntents} onUpdate={(areaPatch) => setEditingArea((current) => current ? { ...current, ...areaPatch } : current)} /><div className="mt-4 flex justify-end gap-2"><Button type="button" onClick={() => { setEditingAreaIndex(null); setEditingArea(null) }}>キャンセル</Button><Button type="button" variant="primary" onClick={saveEditingArea}>この面の設定を保存</Button></div></div> : null}</div>)}</div>
+            <p className={`mt-3 text-xs font-semibold ${unsetLabels.length > 0 ? 'text-warning' : 'text-success'}`}>{currentAreas.length === 0 ? '面を追加し、公開前にそれぞれのアクションを設定してください。' : unsetLabels.length > 0 ? `面 ${unsetLabels.join('、')} のアクションが未設定です。公開すると、その場所を押しても何も起きません。` : 'すべての面にアクションが設定されています。'}</p>
           </section>
         </div>
 

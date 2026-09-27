@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
 /*
- * R23: リッチメニュー作成のタグ候補は、いま選んでいるアカウントのものだけ。
+ * m18r: リッチメニュー作成のテンプレート候補は、いま選んでいるアカウントのものだけ。
  * 本物のReactで動かして見る。
- * - タグ一覧の取得に選択accountが付く（別アカウントの同名タグが混ざらない）
+ * - テンプレート一覧の取得に選択accountが付く（別アカウントのものが混ざらない）
  * - アカウントを切り替えたら、前の候補にしかない選択を外して知らせる
  */
 import React, { act } from 'react'
@@ -39,9 +39,9 @@ let host: HTMLDivElement
 let root: Root
 const fetchUrls: string[] = []
 
-const TAGS_BY_ACCOUNT: Record<string, Array<{ id: string; name: string }>> = {
-  'acc-1': [{ id: 'tag-a1', name: '会員' }],
-  'acc-2': [{ id: 'tag-b2', name: '予約' }],
+const TEMPLATES_BY_ACCOUNT: Record<string, Array<{ id: string; name: string }>> = {
+  'acc-1': [{ id: 'tpl-a1', name: 'お知らせ' }],
+  'acc-2': [{ id: 'tpl-b2', name: '予約確認' }],
 }
 
 function stubFetch() {
@@ -50,9 +50,9 @@ function stubFetch() {
     const text = String(url)
     fetchUrls.push(text)
     const parsed = new URL(text, 'http://localhost')
-    if (parsed.pathname === '/api/tags') {
-      const accountId = parsed.searchParams.get('lineAccountId')
-      return { ok: true, status: 200, json: async () => ({ success: true, data: accountId ? (TAGS_BY_ACCOUNT[accountId] ?? []) : [] }) }
+    if (parsed.pathname === '/api/templates') {
+      const accountId = parsed.searchParams.get('account_id')
+      return { ok: true, status: 200, json: async () => ({ success: true, data: accountId ? (TEMPLATES_BY_ACCOUNT[accountId] ?? []) : [] }) }
     }
     return { ok: true, status: 200, json: async () => ({ success: true, data: [] }) }
   }))
@@ -64,14 +64,20 @@ async function settle(milliseconds: number) {
   })
 }
 
-function combobox(): HTMLElement {
-  const fields = Array.from(host.querySelectorAll('[role="combobox"]'))
-  const tagField = fields.find((el) => el.getAttribute('aria-label') === 'タグを付ける')
-  if (!tagField) throw new Error('タグの選択欄が見つかりません')
-  return tagField as HTMLElement
+function templateUrls() {
+  return fetchUrls.filter((url) => new URL(url, 'http://localhost').pathname === '/api/templates')
 }
 
-describe('R23 作成画面のタグ候補は選択accountで絞る', () => {
+function clickOption(label: string) {
+  const option = Array.from(document.querySelectorAll('[role="option"]')).find((el) =>
+    el.textContent?.includes(label),
+  )
+  if (!option) throw new Error(`選択肢「${label}」が見つかりません`)
+  const button = option.querySelector('button') ?? option
+  fireEvent.click(button as Element)
+}
+
+describe('m18r 作成画面のテンプレート候補は選択accountで絞る', () => {
   beforeEach(() => {
     accountState.id = 'acc-1'
     stubFetch()
@@ -88,15 +94,14 @@ describe('R23 作成画面のタグ候補は選択accountで絞る', () => {
     vi.unstubAllGlobals()
   })
 
-  it('タグ一覧の取得に選択accountが付く', async () => {
+  it('テンプレート一覧の取得に選択accountが付く', async () => {
     await act(async () => {
       root.render(<NewRichMenuPage />)
     })
     await settle(100)
-    const tagUrls = fetchUrls.filter((url) => new URL(url, 'http://localhost').pathname === '/api/tags')
-    expect(tagUrls.length).toBeGreaterThan(0)
-    for (const url of tagUrls) {
-      expect(url).toContain('lineAccountId=acc-1')
+    expect(templateUrls().length).toBeGreaterThan(0)
+    for (const url of templateUrls()) {
+      expect(url).toContain('account_id=acc-1')
     }
   })
 
@@ -105,22 +110,32 @@ describe('R23 作成画面のタグ候補は選択accountで絞る', () => {
       root.render(<NewRichMenuPage />)
     })
     await settle(100)
-    // 1面目の動きを開き、acc-1 のタグ「会員」を選んで保存する
+    // 1面目の動きを開き、動きを「テンプレートを送る」に変える
     const setup = Array.from(host.querySelectorAll('button')).find((b) => b.textContent === '設定する')
     expect(setup).toBeTruthy()
     await act(async () => {
       fireEvent.click(setup!)
     })
     await settle(50)
+    const intentTrigger = host.querySelector('button[aria-label="押したときの動き"]')
+    expect(intentTrigger).toBeTruthy()
     await act(async () => {
-      fireEvent.focus(combobox())
+      fireEvent.click(intentTrigger!)
     })
     await settle(50)
-    // 候補の一覧は MenuPortal で document.body 直下に出る（host の中にはない）。
-    const option = Array.from(document.querySelectorAll('[role="option"]')).find((el) => el.textContent?.includes('会員'))
-    expect(option).toBeTruthy()
     await act(async () => {
-      fireEvent.click(option!)
+      clickOption('テンプレートを送る')
+    })
+    await settle(50)
+    // acc-1 のテンプレート「お知らせ」を選ぶ
+    const templateTrigger = host.querySelector('button[aria-label="送るテンプレート"]')
+    expect(templateTrigger).toBeTruthy()
+    await act(async () => {
+      fireEvent.click(templateTrigger!)
+    })
+    await settle(50)
+    await act(async () => {
+      clickOption('お知らせ')
     })
     await settle(50)
     const save = Array.from(host.querySelectorAll('button')).find((b) => b.textContent === 'この面の設定を保存')
@@ -129,14 +144,13 @@ describe('R23 作成画面のタグ候補は選択accountで絞る', () => {
       fireEvent.click(save!)
     })
     await settle(50)
-    // acc-2（タグ「予約」だけ）へ切り替える
+    // acc-2（テンプレート「予約確認」だけ）へ切り替える
     accountState.id = 'acc-2'
     await act(async () => {
       root.render(<NewRichMenuPage />)
     })
     await settle(150)
-    const tagUrls = fetchUrls.filter((url) => new URL(url, 'http://localhost').pathname === '/api/tags')
-    expect(tagUrls.some((url) => url.includes('lineAccountId=acc-2'))).toBe(true)
+    expect(templateUrls().some((url) => url.includes('account_id=acc-2'))).toBe(true)
     expect(host.textContent).toContain('1件は、今のアカウントにないため外しました')
   })
 })
