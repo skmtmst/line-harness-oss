@@ -801,6 +801,28 @@ export async function updateForm(
   return updated ? { kind: 'updated', form: updated } : { kind: 'not_found' };
 }
 
+/**
+ * フォームのフォルダ所属だけを変える（R25）。
+ *
+ * 編集保存（`updateForm`）とは別の細い口。所属は版管理の対象外のため、
+ * 編集の版（`content_revision`）の確認も加算もしない。版を動かすと、
+ * 編集中の人の保存が 409 になったり、削除影響の確認（`revision`）が
+ * 無効になったりする。`updated_at` だけは進める（一覧の「更新」順に反映）。
+ *
+ * 見つからなければ `false` を返す（確認と削除のあいだに消えたとき用）。
+ */
+export async function setFormFolder(
+  db: D1Database,
+  id: string,
+  folderId: string | null,
+): Promise<boolean> {
+  const result = await db
+    .prepare(`UPDATE forms SET folder_id = ?, updated_at = ? WHERE id = ?`)
+    .bind(folderId, jstNow(), id)
+    .run();
+  return Number(result.meta?.changes ?? 0) === 1;
+}
+
 // ── Submissions ───────────────────────────────────────────────────────────────
 
 /**

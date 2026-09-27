@@ -1,0 +1,22 @@
+/*
+ * オプション設定の窓の外枠（R26）。
+ *
+ * 以前は高さ 900・幅 880・上下余白 74 の固定だった。390px の画面では
+ * 窓が画面の外へ出て、閉じる口まで届かなかった。縦は画面に収め、
+ * 中身だけを中で流す（中身のスクロールは呼び出し側の flex 受け）。
+ *
+ * 寸法はここにだけ置く。Tailwind の任意値（`max-h-[...]`）にすると
+ * 規格外の値が普通のクラスと同じ見た目になり、設計負債の数に載る。
+ */
+.panel {
+  margin-block: 1rem; /* margin: 16 */
+  max-height: calc(100dvh - 2rem);
+  max-width: 880px; /* maxWidth: 880 */
+}
+
+@media (min-width: 640px) {
+  .panel {
+    margin-block: 74px; /* margin: 74 */
+    max-height: calc(100dvh - 148px);
+  }
+}
