@@ -8,7 +8,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { Folder } from '@line-crm/shared'
 import { api, ApiError, describeSaveFailure } from '@/lib/api'
-import { commonVarValueError, COMMON_VAR_VALUE_REQUIRED } from '@/lib/common-vars'
+import { commonVarValueError, COMMON_VAR_VALUE_REQUIRED, isSecretLikeVarValue } from '@/lib/common-vars'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import FeatureGate from '@/components/feature-gate'
 import { useAccount } from '@/contexts/account-context'
@@ -242,7 +242,7 @@ function NewCommonVarInner() {
   // 種別は内部stateからのみ選ぶが、見つからないときは先頭へ倒す（非null断言を使わない）。
   const spec = TYPES.find((t) => t.key === type) ?? TYPES[0]
 
-  const save = async (allowSensitive = false) => {
+  const save = async (allowSensitive = false, asDraft = false) => {
     if (saving) return
     if (!selectedAccountId) {
       setError('LINEアカウントを選択してください')
@@ -291,6 +291,21 @@ function NewCommonVarInner() {
         return
       }
     }
+    // Q: 鍵の形・長い乱数はサーバでも422で止まる。確認を通しても保存できない
+    // ものはここで止め、理由を欄のすぐ下へ出す。
+    const secretField = isSecretLikeVarValue(value)
+      ? 'cv-value'
+      : expiryBehavior === 'fallback' && isSecretLikeVarValue(fallbackValue)
+        ? 'cv-fallback-value'
+        : null
+    if (secretField) {
+      const message = '鍵やトークンのような秘密の値は共通情報に保存できません。外部連携の設定へ登録してください'
+      setError(message)
+      if (secretField === 'cv-value') setValueFieldError(message)
+      else setFallbackFieldError(message)
+      focusField(secretField)
+      return
+    }
     const sensitiveFields = sensitiveFieldLabels(value, memo)
     if (sensitiveFields.length > 0 && !allowSensitive) {
       setSecretWarningFields(sensitiveFields)
@@ -313,6 +328,7 @@ function NewCommonVarInner() {
         validUntil: validUntil || null,
         expiryBehavior,
         fallbackValue: expiryBehavior === 'fallback' ? fallbackValue : null,
+        status: asDraft ? 'draft' as const : 'active' as const,
       }
       const res = await api.commonVars.create(payload)
       if (accountAtRequest !== latestAccountRef.current) return
@@ -643,6 +659,10 @@ function NewCommonVarInner() {
         actions={(
           <>
             <Button href="/contents/vars">共通情報一覧へ戻る</Button>
+            {/* Q: まだ配信へ出したくないものは下書きで残せる。下書きは差し込みに使われない。 */}
+            <Button type="button" disabled={saving} onClick={() => void save(false, true)}>
+              下書きとして保存
+            </Button>
             <Button type="button" variant="primary" disabled={saving} onClick={() => void save()}>
               {saving ? '登録中…' : '登録'}
             </Button>

@@ -415,6 +415,15 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
     },
   },
   {
+    name: 'common var expiry notices',
+    classification: { kind: 'feature', featureId: 'common_vars' },
+    enforcement: {
+      mode: 'gated',
+      sources: ['apps/worker/src/services/common-var-expiry-sweep.ts'],
+      markers: ['isCommonVarsEnabled(db, candidate.line_account_id)'],
+    },
+  },
+  {
     name: 'scenario deliveries',
     dispatchLane: 'delivery',
     classification: { kind: 'feature', featureId: 'scenarios' },

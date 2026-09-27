@@ -632,6 +632,17 @@ export default function RichMenusListPage() {
   const currentPage = Math.min(page, pageCount)
   const shownGroups = groups
 
+  /**
+   * R173: 検索・絞り込み・フォルダのいずれかが効いているか。
+   * 効いているときの0件は「まだありません」と言わず、条件を外す口を出す。
+   */
+  const richMenuFilterActive = query.trim() !== '' || savedFilter !== '' || folderFilter !== ''
+  const clearRichMenuFilters = () => {
+    setQuery('')
+    setSavedFilter('')
+    setFolderFilter('')
+  }
+
   useEffect(() => {
     setPage(1)
   }, [folderFilter, pageSize, query, savedFilter, sortKey])
@@ -860,12 +871,21 @@ export default function RichMenusListPage() {
                 onRetry={() => void reload()}
               />
             ) : shownGroups.length === 0 ? (
-              <ListState
-                kind="empty"
-                title="まだリッチメニューがありません"
-                description="トークの下に出すメニューを作れます。"
-                action={<Button href="/rich-menus/new" variant="primary">＋ メニューを作る</Button>}
-              />
+              richMenuFilterActive ? (
+                /* R173: 検索・絞り込み・フォルダの結果0件。元データ0件と分け、条件を外す口を出す。 */
+                <ListState
+                  kind="empty"
+                  emptyPreset="filtered"
+                  action={<Button variant="secondary" onClick={clearRichMenuFilters}>条件をクリア</Button>}
+                />
+              ) : (
+                <ListState
+                  kind="empty"
+                  title="まだリッチメニューがありません"
+                  description="トークの下に出すメニューを作れます。"
+                  action={<Button href="/rich-menus/new" variant="primary">＋ メニューを作る</Button>}
+                />
+              )
             ) : (
               <section className="border-hairline bg-canvas rounded-card overflow-hidden border shadow-card">
                 {/* #641: 操作列が広くなった分は表だけが横に流れる */}

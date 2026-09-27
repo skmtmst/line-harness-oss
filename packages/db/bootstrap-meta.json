@@ -427,6 +427,8 @@
     "470_google_sheets_integrations.sql",
     "472_affiliate_offer_versions.sql",
     "473_affiliate_attribution_decisions.sql",
+    "484_common_var_lifecycle.sql",
+    "485_common_var_failure_reasons.sql",
     "488_incoming_webhook_secret_grace.sql",
     "489_incoming_webhook_ambiguous_hold.sql",
     "494_session_step_up_and_unfamiliar.sql",
@@ -439,5 +441,5 @@
     "503_measurement_sites.sql",
     "504_conversion_reversal_ledger.sql"
   ],
-  "migrationCount": 438
+  "migrationCount": 440
 }

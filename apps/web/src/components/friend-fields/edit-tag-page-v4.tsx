@@ -1,13 +1,13 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { X } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import type { Tag, TagGroup } from '@line-crm/shared'
 import { api, ApiError, type TagDefinition, type TagDependencies, type TagDeleteImpactReferences } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
+import Dialog from '@/components/shared/dialog'
 import TargetMissing from '@/components/shared/target-missing'
 import TagEditorV4, { definitionsForSave, linkedActionFromDefinition, type TagEditorValues } from './tag-editor-v4'
 import Notice from '@/components/shared/notice'
@@ -48,28 +48,47 @@ export function DeleteDialog({ tag, dependencies, dependenciesStatus, onCancel, 
     : dependenciesStatus === 'error'
       ? '影響を確認できませんでした。開き直してください'
       : ''
+  /*
+   * R138: 手作りの確認窓を共通の `Dialog` へ統一した。以前は開いても
+   * フォーカスが背後に残り、Shift+Tab で背後の保存へ抜け、Escape で
+   * 閉じず、見出しとの紐付けも無かった。共通窓が開始時のフォーカス・
+   * 窓内の Tab 循環・Escape・終了後の復帰・見出しの紐付けを持つ。
+   * 入力確認（名前の typing）が必要なため、操作欄だけ `footer` で渡す。
+   */
   return (
-    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-ink/45 p-4">
-      <section className="relative w-full max-w-[680px] rounded-card border border-hairline bg-canvas p-7 shadow-2xl" role="alertdialog" aria-modal="true">
-        <button type="button" onClick={onCancel} aria-label="閉じる" className="absolute right-4 top-4 rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
-          <X aria-hidden="true" className="h-5 w-5" />
-        </button>
-        <h2 className="text-xl font-bold text-ink">「{tag.name}」を削除しますか？</h2>
-        <p className="mt-2 text-sm leading-6 text-ink-secondary">削除すると、このタグを使っている設定と友だちへの付与状態に影響します。</p>
-        <div className="mt-5 overflow-hidden rounded-control border border-hairline">
-          <dl className="divide-y divide-hairline text-sm">
-            <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">タグが付いている友だち</dt><dd className="font-bold">{(dependencies?.friendCount ?? tag.friendCount ?? 0).toLocaleString('ja-JP')}人</dd></div>
-            <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">配信・シナリオなどの参照</dt><dd className="font-bold">{manualRefs === null ? '—' : `${manualRefs}件`}</dd></div>
-            <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">自動付与の参照</dt><dd className="font-bold">{autoRefs === null ? '—' : `${autoRefs}件`}</dd></div>
-            <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">連動アクション</dt><dd className="font-bold">停止</dd></div>
-            <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">すでに積んだマイル</dt><dd className="font-bold">そのまま残る</dd></div>
-          </dl>
+    <Dialog
+      open
+      tone="destructive"
+      title={`「${tag.name}」を削除しますか？`}
+      description="削除すると、このタグを使っている設定と友だちへの付与状態に影響します。"
+      busy={deleting}
+      onCancel={onCancel}
+      footer={(
+        <div className="flex items-center justify-end gap-2">
+          {blockedReason && <p className="min-w-0 flex-1 text-xs text-ink-faint">{blockedReason}</p>}
+          <Button onClick={onCancel} disabled={deleting}>キャンセル</Button>
+          <Button
+            variant="danger"
+            onClick={onDelete}
+            disabled={deleting || blocked || confirmation !== tag.name}
+          >
+            {deleting ? '削除中…' : 'タグを削除'}
+          </Button>
         </div>
-        <Notice tone="danger" className="mt-4">アフィリエイトや外部連携で使用中の場合は削除できません。削除後は元に戻せません。</Notice>
-        <label className="mt-5 block"><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">確認のため「{tag.name}」と入力してください</span><input value={confirmation} onChange={(event) => setConfirmation(event.target.value)} disabled={blocked} className="w-full rounded-control border border-hairline px-3 py-2.5 text-sm focus:border-danger disabled:bg-canvas-sunken" /></label>
-        <div className="mt-6 flex items-center justify-end gap-2">{blockedReason && <p className="min-w-0 flex-1 text-xs text-ink-faint">{blockedReason}</p>}<button type="button" onClick={onCancel} className="shrink-0 rounded-control border border-hairline px-4 py-2.5 text-sm font-medium text-ink-secondary">キャンセル</button><button type="button" disabled={deleting || blocked || confirmation !== tag.name} onClick={onDelete} className="rounded-control bg-danger px-4 py-2.5 text-sm font-bold text-on-accent disabled:opacity-40">{deleting ? '削除中…' : 'タグを削除'}</button></div>
-      </section>
-    </div>
+      )}
+    >
+      <div className="overflow-hidden rounded-control border border-hairline">
+        <dl className="divide-y divide-hairline text-sm">
+          <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">タグが付いている友だち</dt><dd className="font-bold">{(dependencies?.friendCount ?? tag.friendCount ?? 0).toLocaleString('ja-JP')}人</dd></div>
+          <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">配信・シナリオなどの参照</dt><dd className="font-bold">{manualRefs === null ? '—' : `${manualRefs}件`}</dd></div>
+          <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">自動付与の参照</dt><dd className="font-bold">{autoRefs === null ? '—' : `${autoRefs}件`}</dd></div>
+          <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">連動アクション</dt><dd className="font-bold">停止</dd></div>
+          <div className="flex justify-between px-4 py-3"><dt className="text-ink-secondary">すでに積んだマイル</dt><dd className="font-bold">そのまま残る</dd></div>
+        </dl>
+      </div>
+      <Notice tone="danger" className="mt-4">アフィリエイトや外部連携で使用中の場合は削除できません。削除後は元に戻せません。</Notice>
+      <label className="mt-5 block"><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">確認のため「{tag.name}」と入力してください</span><input value={confirmation} onChange={(event) => setConfirmation(event.target.value)} disabled={blocked || deleting} className="w-full rounded-control border border-hairline px-3 py-2.5 text-sm focus:border-danger disabled:bg-canvas-sunken" /></label>
+    </Dialog>
   )
 }
 

@@ -148,6 +148,8 @@ interface StubData {
   staff?: Array<{ id: string; display_name: string; is_designation_optional: number }>;
   shifts?: Array<{ staff_id: string; work_date: string; start_time: string; end_time: string }>;
   rules?: Array<{ staff_id: string; weekday: number; start_time: string; end_time: string }>;
+  breaks?: Array<{ staff_id: string; weekday: number; start_time: string; end_time: string }>;
+  breakDates?: Array<{ staff_id: string; work_date: string; start_time: string; end_time: string }>;
   bookings?: Array<{ staff_id: string; starts_at: string; block_ends_at: string }>;
   menuResources?: Array<{
     id: string;
@@ -222,6 +224,12 @@ function stubDB(data: StubData, seen?: Array<{ sql: string; args: unknown[] }>):
           }
           if (sql.includes('FROM staff_availability_rules')) {
             return { results: data.rules ?? [] };
+          }
+          if (sql.includes('FROM staff_break_dates')) {
+            return { results: data.breakDates ?? [] };
+          }
+          if (sql.includes('FROM staff_breaks')) {
+            return { results: data.breaks ?? [] };
           }
           if (sql.includes('FROM bookings')) {
             return { results: data.bookings ?? [] };
