@@ -10,6 +10,8 @@ import { restaurantTestApi } from '@/lib/restaurant-test-api'
 import TermsConsent from './terms-consent'
 import { initialWizardStep, STEP } from './terms-state'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import StickyBar from '@/components/shared/sticky-bar'
 
 const steps = [
@@ -74,6 +76,16 @@ export default function NewRestaurantStorePage() {
   const [connectionError, setConnectionError] = useState('')
   const [saving, setSaving] = useState(false)
   const [created, setCreated] = useState<{ id: string; storeName: string; lineAccountName: string } | null>(null)
+
+  /*
+   * R161 監査：店舗名などを入れたまま規約を別画面で読むと、戻ったときに
+   * 空欄へ戻る。登録が済むまで、入力が残っている間は未保存とし、
+   * 離れる操作では確認を出す。
+   */
+  const dirty = created === null && (
+    name !== '' || alias !== '' || officialAccountReady || channelId !== '' || channelSecret !== ''
+  )
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
 
   useEffect(() => {
     let active = true
@@ -246,5 +258,7 @@ export default function NewRestaurantStorePage() {
         </aside>
       </div>
     </div>
+    {/* R161 監査：店舗名などの書きかけがある間の離脱確認。 */}
+    <ConfirmDialog primaryAction="cancel" open={leaveTarget !== null} title="保存していない変更があります" description="このまま移動すると、入力した店舗の内容は保存されません。保存せずに移動しますか？" confirmLabel="保存せずに移動" cancelLabel="入力を続ける" onConfirm={confirmLeave} onCancel={cancelLeave} />
   </div>
 }

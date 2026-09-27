@@ -54,6 +54,16 @@ function overlaps(aStart: number, aEnd: number, bStart: number, bEnd: number): b
   return aStart < bEnd && bStart < aEnd;
 }
 
+/**
+ * R92: 店舗共通ルールの値を範囲検査して読む。手編集で壊れた値・
+ * 型違いは「未設定」と同じ扱いにし、メニュー値だけを見る。
+ */
+function intInRange(value: unknown, min: number, max: number): number | null {
+  return typeof value === 'number' && Number.isInteger(value) && value >= min && value <= max
+    ? value
+    : null;
+}
+
 function isHhmm(value: string): boolean {
   return /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value);
 }
@@ -71,6 +81,29 @@ function mergeIntervals(intervals: Interval[]): Interval[] {
     else merged.push({ ...cur });
   }
   return merged.map((m) => ({ start: fromMin(m.s), end: fromMin(m.e) }));
+}
+
+/** 稼働区間から休憩などの除外区間を差し引く（R164）。 */
+function subtractIntervals(working: Interval[], excluded: Interval[]): Interval[] {
+  let out = mergeIntervals(working);
+  const cuts = mergeIntervals(excluded);
+  for (const cut of cuts) {
+    const cs = toMin(cut.start);
+    const ce = toMin(cut.end);
+    const next: Interval[] = [];
+    for (const w of out) {
+      const ws = toMin(w.start);
+      const we = toMin(w.end);
+      if (ce <= ws || we <= cs) {
+        next.push(w);
+        continue;
+      }
+      if (ws < cs) next.push({ start: fromMin(ws), end: fromMin(cs) });
+      if (ce < we) next.push({ start: fromMin(ce), end: fromMin(we) });
+    }
+    out = next;
+  }
+  return mergeIntervals(out);
 }
 
 /** 稼働区間と店舗例外時間の共通部分だけを残す（短縮営業用）。 */
@@ -251,6 +284,12 @@ export interface GetAvailabilityParams {
   to: string;
   now: Date;
   minLeadTimeMinutes: number;
+  /**
+   * R92: お客さま向けの判定では店舗共通ルール（受付締切・受付期間）を
+   * メニューの個別指定が無いときの既定値として使う。運用者向け
+   * （当日の電話予約など）は付けず、従来どおりメニュー値だけを見る。
+   */
+  applyStoreRules?: boolean;
   googleCredentials?: GoogleServiceAccountCredentials;
   /**
    * 予約内容の変更で、変更対象そのものを空き枠計算から外す。
@@ -324,6 +363,22 @@ interface RuleRow {
   end_time: string;
 }
 
+/** 曜日指定の休憩（staff_breaks）。勤務時間内の休み時間。 */
+interface BreakRow {
+  staff_id: string;
+  weekday: number;
+  start_time: string;
+  end_time: string;
+}
+
+/** 日付指定の休憩（staff_break_dates）。その日だけの休み時間。 */
+interface BreakDateRow {
+  staff_id: string;
+  work_date: string;
+  start_time: string;
+  end_time: string;
+}
+
 interface BookingRow {
   staff_id: string;
   menu_id: string;
@@ -377,6 +432,8 @@ interface LoadedAvailability {
   timeZone: string;
   shiftRows: ShiftRow[];
   ruleRows: RuleRow[];
+  breakRows: BreakRow[];
+  breakDateRows: BreakDateRow[];
   bookingRows: BookingRow[];
   resourceBookingRows: ResourceBookingRow[];
   minLeadAt: Date;
@@ -613,9 +670,9 @@ async function loadAvailabilityData(
         AND date_to >= ?`)
       .bind(params.lineAccountId, params.to, params.from)
       .all<AvailabilityExceptionRow>(),
-    db.prepare(`SELECT timezone, business_hours_configured FROM booking_settings WHERE line_account_id = ?`)
+    db.prepare(`SELECT timezone, business_hours_configured, booking_window_days, cutoff_minutes_before FROM booking_settings WHERE line_account_id = ?`)
       .bind(params.lineAccountId)
-      .first<{ timezone: string | null; business_hours_configured: number }>(),
+      .first<{ timezone: string | null; business_hours_configured: number; booking_window_days: number | null; cutoff_minutes_before: number | null }>(),
   ]);
   // 店舗のタイムゾーンで日付・時刻を読む。未設定・壊れた値は Asia/Tokyo。
   const timeZone = normalizeTimeZone(settingsRow?.timezone ?? FALLBACK_TIME_ZONE);
@@ -658,6 +715,28 @@ async function loadAvailabilityData(
     )
     .bind(...staffIds)
     .all<{ staff_id: string; weekday: number; start_time: string; end_time: string }>();
+
+  // R164: 曜日指定・日付指定の休憩。勤務区間から差し引くため、
+  // 空きの列挙と確定前判定の両方で同じく読む。
+  const [weeklyBreaks, datedBreaks] = await Promise.all([
+    db.prepare(
+      `SELECT staff_id, weekday, start_time, end_time
+         FROM staff_breaks
+        WHERE staff_id IN (${placeholders})`,
+    )
+      .bind(...staffIds)
+      .all<BreakRow>(),
+    db.prepare(
+      `SELECT staff_id, work_date, start_time, end_time
+         FROM staff_break_dates
+        WHERE staff_id IN (${placeholders})
+          AND work_date BETWEEN ? AND ?`,
+      )
+      .bind(...staffIds, params.from, params.to)
+      .all<BreakDateRow>(),
+  ]);
+  const breaks = weeklyBreaks.results ?? [];
+  const breakDates = datedBreaks.results ?? [];
 
   // 既存予約を読む範囲は、店舗タイムゾーンの暦日の境界そのものにする。
   // 暦日を UTC の 00:00 と見なして前後 1 日ずつ足す形だと、UTC より
@@ -720,19 +799,32 @@ async function loadAvailabilityData(
   };
   // 受付の締め切り。全体の最短リード時間とメニューごとの締め切りの、
   // 遅い方を採る。片方だけを見ると、どちらかの設定が黙って無視される。
+  // R92: メニューの個別指定が無いとき、お客さま向け (applyStoreRules) は
+  // 店舗共通ルールを既定値として使う。要件 v6-28 §受付期間・締切:
+  // 「店舗既定値を持ち、メニューは必要な項目だけ上書きする」。
+  // 手編集で壊れた店舗値は無視し、メニュー値だけを見る（従来どおり）。
+  const storeCutoffMinutes = intInRange(settingsRow?.cutoff_minutes_before, 0, 43_200);
+  const menuCutoffMinutes = menu.cutoff_hours_before == null ? null : menu.cutoff_hours_before * 60;
   const cutoffMinutes = Math.max(
     params.minLeadTimeMinutes,
-    (menu.cutoff_hours_before ?? 0) * 60,
+    params.applyStoreRules
+      ? (menuCutoffMinutes ?? storeCutoffMinutes ?? 0)
+      : (menuCutoffMinutes ?? 0),
   );
   const minLeadAt = new Date(params.now.getTime() + cutoffMinutes * 60_000);
 
   // 何日先まで受けるか。未設定なら制限しない。日付で切る。
   // 24 時間の倍数の加算では夏時間の切替日（23 時間・25 時間の日）に
   // 暦日がずれるため、暦日で足す。
+  // R92: お客さま向けはメニュー未指定のとき店舗の受付期間を使う。
+  const storeWindowDays = intInRange(settingsRow?.booking_window_days, 1, 365);
+  const effectiveWindowDays = params.applyStoreRules
+    ? (menu.booking_window_days ?? storeWindowDays)
+    : menu.booking_window_days;
   const windowLastDate =
-    menu.booking_window_days == null
+    effectiveWindowDays == null
       ? null
-      : addDays(tzDateStr(timeZone, params.now), menu.booking_window_days);
+      : addDays(tzDateStr(timeZone, params.now), effectiveWindowDays);
 
   const googleBusyByStaff = new Map<string, Array<{ start: string; end: string }> | null>();
   const calendarSync: CalendarSyncState[] = [];
@@ -786,6 +878,8 @@ async function loadAvailabilityData(
       timeZone,
       shiftRows: shifts.results ?? [],
       ruleRows: rules.results ?? [],
+      breakRows: breaks,
+      breakDateRows: breakDates,
       bookingRows: bookings.results ?? [],
       resourceBookingRows: resourceBookings.results ?? [],
       minLeadAt,
@@ -939,6 +1033,28 @@ function computeDayWorking(
   for (const hours of resourceHoursById.values()) {
     workingList = intersectIntervals(workingList, mergeIntervals(hours));
     if (workingList.length === 0) break;
+  }
+  // R164: 休憩を勤務区間から差し引く。その日だけの休憩と、その曜日の
+  // いつもの休憩の両方を見る。壊れた行は保存口で弾くため、ここでは
+  // 時刻の形が正しいものだけを差し引く。
+  if (workingList.length > 0) {
+    const weekday = weekdayForDate(date);
+    const cuts: Interval[] = [];
+    for (const row of d.breakDateRows) {
+      if (row.staff_id === staffId && row.work_date === date
+        && isHhmm(row.start_time) && isHhmm(row.end_time)
+        && row.start_time < row.end_time) {
+        cuts.push({ start: row.start_time, end: row.end_time });
+      }
+    }
+    for (const row of d.breakRows) {
+      if (row.staff_id === staffId && row.weekday === weekday
+        && isHhmm(row.start_time) && isHhmm(row.end_time)
+        && row.start_time < row.end_time) {
+        cuts.push({ start: row.start_time, end: row.end_time });
+      }
+    }
+    if (cuts.length > 0) workingList = subtractIntervals(workingList, cuts);
   }
   return { working: workingList, block: null };
 }
@@ -1262,6 +1378,8 @@ export interface ExplainSlotParams {
   time: string;
   now: Date;
   minLeadTimeMinutes: number;
+  /** R92: お客さま向けの説明では店舗共通ルールを既定値として使う。 */
+  applyStoreRules?: boolean;
   googleCredentials?: GoogleServiceAccountCredentials;
 }
 
@@ -1304,6 +1422,7 @@ export async function explainBookingSlot(
     to: params.date,
     now: params.now,
     minLeadTimeMinutes: params.minLeadTimeMinutes,
+    applyStoreRules: params.applyStoreRules,
     googleCredentials: params.googleCredentials,
   });
   const result = (partial: Partial<SlotCheckResult>): SlotCheckResult => ({

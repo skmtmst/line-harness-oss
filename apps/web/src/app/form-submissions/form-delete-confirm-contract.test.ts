@@ -12,8 +12,10 @@ describe('V6回答フォーム削除確認 gBp2J', () => {
     expect(PAGE).toContain('<ConfirmDialog')
     expect(PAGE).toContain('displayFormName(deleteTarget.name)')
     // 削除は行に直に置かず、…メニューの中の危ない操作から確認ダイアログへつなぐ。
-    expect(PAGE).toContain("label: '削除する'")
-    expect(PAGE).toContain("tone: 'danger'")
+    // R27 で共通の RowActions へ寄せた。赤と区切りは部品側が付ける。
+    expect(PAGE).toContain('<RowActions')
+    expect(PAGE).toContain("destructiveItem={{ id: 'delete', label: '削除する'")
+    expect(PAGE).not.toContain("tone: 'danger'")
   })
 
   it('影響確認を先に読み、公開中・回答あり・利用中はアーカイブへ分ける', () => {

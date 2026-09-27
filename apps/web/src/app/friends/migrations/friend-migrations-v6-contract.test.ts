@@ -28,6 +28,22 @@ describe('V6 機能3 UID・CSV移行', () => {
     ])
   })
 
+  it('R113 引用符内の改行を含む名前は1行に保つ', () => {
+    expect(parseFriendCsv('LINEユーザーID,LINE表示名,本名,システム表示名\r\nU1,"山田\n太郎",たろう,タロウ\r\nU2,鈴木,鈴木 次郎,ジロウ\r\n')).toEqual([
+      { lineUid: 'U1', displayName: '山田\n太郎', realName: 'たろう', systemDisplayName: 'タロウ' },
+      { lineUid: 'U2', displayName: '鈴木', realName: '鈴木 次郎', systemDisplayName: 'ジロウ' },
+    ])
+  })
+
+  it('R113 書き出しの数式防止 `\'` は外し、名前の `\'` は残す', () => {
+    expect(parseFriendCsv('LINEユーザーID,LINE表示名\nU1,"\'=SUM(1,2)"\nU2,"\'-さくら"\nU3,\'hello\nU4,@tanaka')).toEqual([
+      { lineUid: 'U1', displayName: '=SUM(1,2)', realName: null, systemDisplayName: null },
+      { lineUid: 'U2', displayName: '-さくら', realName: null, systemDisplayName: null },
+      { lineUid: 'U3', displayName: "'hello", realName: null, systemDisplayName: null },
+      { lineUid: 'U4', displayName: '@tanaka', realName: null, systemDisplayName: null },
+    ])
+  })
+
   it('通常・読込・空・失敗を別の文で持つ', () => {
     expect(UID_PAGE).toContain('UID移行を読み込んでいます')
     expect(UID_PAGE).toContain('UID移行を表示できませんでした')
@@ -42,6 +58,11 @@ describe('V6 機能3 UID・CSV移行', () => {
     expect(UID_PAGE).toContain('実データはまだ変更していません')
     expect(UID_PAGE).toContain("unresolved ?? '—'")
     expect(CSV_PAGE).toContain("job.row_count ?? job.total_count ?? '—'")
+  })
+
+  it('R114 出ない項目は選べないことが文に残る', () => {
+    expect(CSV_PAGE).toContain('まだ書き出せません')
+    expect(CSV_PAGE).toContain('今書き出せるのは基本の5列だけです')
   })
 
   it('設計Nodeと本物のAPIに接続する', () => {

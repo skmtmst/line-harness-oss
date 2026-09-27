@@ -450,7 +450,7 @@ function MenuStaffMatrixContent() {
         </ul>
       </div>
 
-      <ConfirmDialog
+      <ConfirmDialog primaryAction="cancel"
         open={leaveTarget !== null}
         title="保存していない変更があります"
         description="このまま移動すると、担当割り当てへの変更は失われます。保存せずに移動しますか？"

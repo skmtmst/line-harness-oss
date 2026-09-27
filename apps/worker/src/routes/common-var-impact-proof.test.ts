@@ -51,7 +51,7 @@ async function previewToken(req: (path: string, key?: string, init?: RequestInit
 test('N-185 確認値なしの保存は428で止まり値は変わらない', async () => {
   const { t, raw, req, J } = setup();
   const r = await req('/api/common-vars/cv-1?accountId=acc-a', 'key-owner', {
-    method: 'PATCH', headers: J, body: JSON.stringify({ value: '11-20' }),
+    method: 'PATCH', headers: J, body: JSON.stringify({ value: '11-20', changeReason: '時間更新' }),
   });
   expect(r.status).toBe(428);
   expect((raw.prepare('SELECT value FROM common_vars WHERE id = ?').get('cv-1') as { value: string }).value).toBe('10-19');
@@ -62,17 +62,17 @@ test('N-185 正しい確認値で保存でき使い回しは409', async () => {
   const { t, raw, req, J } = setup();
   const first = await previewToken(req, J);
   const ok = await req('/api/common-vars/cv-1?accountId=acc-a', 'key-owner', {
-    method: 'PATCH', headers: J, body: JSON.stringify({ value: '11-20', impactProof: first.impactProof }),
+    method: 'PATCH', headers: J, body: JSON.stringify({ value: '11-20', impactProof: first.impactProof, changeReason: '時間更新' }),
   });
   expect(ok.status).toBe(200);
   // 使い回し（版が進んだ古い確認値）は409
   const reuse = await req('/api/common-vars/cv-1?accountId=acc-a', 'key-owner', {
-    method: 'PATCH', headers: J, body: JSON.stringify({ value: '11-21', impactProof: first.impactProof }),
+    method: 'PATCH', headers: J, body: JSON.stringify({ value: '11-21', impactProof: first.impactProof, changeReason: '理由' }),
   });
   expect(reuse.status).toBe(409);
   // 別IDの確認値は409
   const other = await req('/api/common-vars/cv-1?accountId=acc-a', 'key-owner', {
-    method: 'PATCH', headers: J, body: JSON.stringify({ value: '11-21', impactProof: `other-id.1.${'0'.repeat(64)}` }),
+    method: 'PATCH', headers: J, body: JSON.stringify({ value: '11-21', impactProof: `other-id.1.${'0'.repeat(64)}`, changeReason: '理由' }),
   });
   expect(other.status).toBe(409);
   t.raw.close();
@@ -84,7 +84,7 @@ test('N-185 確認後に使用先が変われば409', async () => {
   raw.prepare(`INSERT INTO templates (id, name, message_type, message_content, line_account_id)
     VALUES ('tpl-new','追加案内','text','追加は{{var.shop_hours}}です','acc-a')`).run();
   const r = await req('/api/common-vars/cv-1?accountId=acc-a', 'key-owner', {
-    method: 'PATCH', headers: J, body: JSON.stringify({ value: '11-20', impactProof: first.impactProof }),
+    method: 'PATCH', headers: J, body: JSON.stringify({ value: '11-20', impactProof: first.impactProof, changeReason: '理由' }),
   });
   expect(r.status).toBe(409);
   expect((await r.json() as any).code).toBe('impact_usage_changed');

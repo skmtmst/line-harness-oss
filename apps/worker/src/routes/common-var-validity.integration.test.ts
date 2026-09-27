@@ -68,12 +68,13 @@ describe('共通情報の有効期間 API（実route + SQLite）', () => {
     const proof = (await preview.json() as { data: { impactProof: string } }).data.impactProof;
     const updated = await app(store.db).request(`/api/common-vars/${id}?accountId=account-a`, json('PATCH', {
       expectedVersion: 1, impactProof: proof, validUntil: '2026-09-16T13:00', expiryBehavior: 'stop', fallbackValue: null,
+      changeReason: '期間の修正',
     }), { DB: store.db } as Env['Bindings']);
     expect(updated.status).toBe(200);
     expect((await updated.json() as { data: object }).data).toMatchObject({ version: 2, expiryBehavior: 'stop', fallbackValue: null });
 
     const stale = await app(store.db).request(`/api/common-vars/${id}?accountId=account-a`, json('PATCH', {
-      expectedVersion: 1, impactProof: proof, validUntil: null,
+      expectedVersion: 1, impactProof: proof, validUntil: null, changeReason: '期間を外す',
     }), { DB: store.db } as Env['Bindings']);
     expect(stale.status).toBe(409);
     const hidden = await app(store.db).request(`/api/common-vars/${id}?accountId=account-b`, {}, { DB: store.db } as Env['Bindings']);
@@ -92,5 +93,84 @@ describe('共通情報の有効期間 API（実route + SQLite）', () => {
       expect(response.status).toBe(400);
     }
     expect(store.raw.prepare('SELECT COUNT(*) AS count FROM common_vars').get()).toEqual({ count: 0 });
+  });
+
+  it('変える理由がない更新・削除を400で止める（Q）', async () => {
+    const created = await app(store.db).request('/api/common-vars', json('POST', {
+      accountId: 'account-a', name: '営業時間', varKey: 'hours', value: '10-19',
+    }), { DB: store.db } as Env['Bindings']);
+    const id = (await created.json() as { data: { id: string } }).data.id;
+
+    for (const body of [{ value: '11-20' }, { value: '11-20', changeReason: '  ' }]) {
+      const response = await app(store.db).request(`/api/common-vars/${id}?accountId=account-a`, json('PATCH', body),
+        { DB: store.db } as Env['Bindings']);
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({ code: 'change_reason_required' });
+    }
+    // 止まったので値は変わっていない。
+    expect(store.raw.prepare('SELECT value FROM common_vars WHERE id = ?').get(id)).toEqual({ value: '10-19' });
+
+    // 削除も理由が必須。
+    const deleted = await app(store.db).request(`/api/common-vars/${id}?accountId=account-a`,
+      { method: 'DELETE' }, { DB: store.db } as Env['Bindings']);
+    expect(deleted.status).toBe(400);
+    const okDelete = await app(store.db).request(
+      `/api/common-vars/${id}?accountId=account-a&reason=${encodeURIComponent('もう使わない')}`,
+      { method: 'DELETE' }, { DB: store.db } as Env['Bindings']);
+    expect(okDelete.status).toBe(200);
+    const version = store.raw.prepare(
+      'SELECT change_reason FROM common_var_versions WHERE common_var_id = ? ORDER BY version_no DESC LIMIT 1',
+    ).get(id) as { change_reason: string };
+    expect(version.change_reason).toBe('もう使わない');
+  });
+
+  it('秘密の値は登録も更新も422で止める（Q）', async () => {
+    // 鍵の形の文字列はリポジトリの秘匿情報スキャンに引っかかるため連結で組み立てる。
+    const stripeLike = ['sk', 'live', 'fakefake12345'].join('_');
+    const slackLike = 'xoxb-' + '123456789012-ABCDEFGHIJKLM';
+    const created = await app(store.db).request('/api/common-vars', json('POST', {
+      accountId: 'account-a', name: '鍵', varKey: 'api_key', value: stripeLike,
+    }), { DB: store.db } as Env['Bindings']);
+    expect(created.status).toBe(422);
+    expect(await created.json()).toMatchObject({ code: 'secret_value_not_allowed' });
+
+    const normal = await app(store.db).request('/api/common-vars', json('POST', {
+      accountId: 'account-a', name: '営業時間', varKey: 'hours', value: '10-19',
+    }), { DB: store.db } as Env['Bindings']);
+    const id = (await normal.json() as { data: { id: string } }).data.id;
+    const preview = await app(store.db).request(`/api/common-vars/${id}/impact-preview`, json('POST', {
+      accountId: 'account-a', nextValue: slackLike,
+    }), { DB: store.db } as Env['Bindings']);
+    const proof = (await preview.json() as { data: { impactProof: string } }).data.impactProof;
+    const patched = await app(store.db).request(`/api/common-vars/${id}?accountId=account-a`, json('PATCH', {
+      value: slackLike, impactProof: proof, changeReason: '更新',
+    }), { DB: store.db } as Env['Bindings']);
+    expect(patched.status).toBe(422);
+  });
+
+  it('状態は 下書き→使用中→止めた→使用中 で進み、理由と許されない遷移を固定する（Q）', async () => {
+    const created = await app(store.db).request('/api/common-vars', json('POST', {
+      accountId: 'account-a', name: '準備中', varKey: 'wip', value: '未確定', status: 'draft',
+    }), { DB: store.db } as Env['Bindings']);
+    expect(created.status).toBe(201);
+    const body = await created.json() as { data: { id: string; status: string; state: string } };
+    expect(body.data.status).toBe('draft');
+    expect(body.data.state).toBe('draft');
+
+    // 理由なしの切替は止まる。
+    const noReason = await app(store.db).request(`/api/common-vars/${body.data.id}/status?accountId=account-a`,
+      json('POST', { to: 'active' }), { DB: store.db } as Env['Bindings']);
+    expect(noReason.status).toBe(400);
+    // 下書きを直接「止めた」にはできない。
+    const invalid = await app(store.db).request(`/api/common-vars/${body.data.id}/status?accountId=account-a`,
+      json('POST', { to: 'stopped', changeReason: 'x' }), { DB: store.db } as Env['Bindings']);
+    expect(invalid.status).toBe(422);
+
+    const published = await app(store.db).request(`/api/common-vars/${body.data.id}/status?accountId=account-a`,
+      json('POST', { to: 'active', changeReason: '審査完了' }), { DB: store.db } as Env['Bindings']);
+    expect((await published.json() as { data: { status: string } }).data.status).toBe('active');
+    const stopped = await app(store.db).request(`/api/common-vars/${body.data.id}/status?accountId=account-a`,
+      json('POST', { to: 'stopped', changeReason: '確認のため止める' }), { DB: store.db } as Env['Bindings']);
+    expect((await stopped.json() as { data: { status: string } }).data.status).toBe('stopped');
   });
 });

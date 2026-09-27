@@ -11,6 +11,7 @@ import {
   formBelongsToLineAccount,
   createForm,
   updateForm,
+  setFormFolder,
   publishFormVersion,
   type UpdateFormInput,
   archiveFormAtRevision,
@@ -1047,6 +1048,7 @@ forms.put('/api/forms/:id', async (c) => {
       description?: string | null;
       fields?: unknown[];
       layout?: unknown;
+      folderId?: string | null;
       onSubmitTagId?: string | null;
       onSubmitScenarioId?: string | null;
       onSubmitMessageType?: 'text' | 'flex' | null;
@@ -1079,8 +1081,39 @@ forms.put('/api/forms/:id', async (c) => {
     const expectedContentRevision = typeof body.expectedContentRevision === 'number'
       ? body.expectedContentRevision
       : Number.NaN;
-    if (!Number.isInteger(expectedContentRevision) || expectedContentRevision < 1) {
+    /*
+     * R25: フォルダへの移し変え（`folderId`）は、中身の更新と一緒でなければ
+     * 版の確認を要しない。所属は版管理の対象外で、確認を強いると一覧からの
+     * 移動のたびに詳細の取得が要る。#723 の例外ではなく、中身が無い要求に
+     * 対して確認する版が無いだけ。**中身の更新と一緒のときは確認を免除しない。**
+     * 先に確認してから動かす。逆にすると、409 のとき移動だけ残る。
+     */
+    const hasContentUpdate = Object.keys(body).some((key) => key !== 'folderId');
+    if (hasContentUpdate && (!Number.isInteger(expectedContentRevision) || expectedContentRevision < 1)) {
       return c.json({ success: false, error: '確認した版が必要です' }, 400);
+    }
+
+    if ('folderId' in body) {
+      const rawFolderId = body.folderId;
+      const nextFolderId = rawFolderId === null || rawFolderId === '' ? null : String(rawFolderId);
+      if (nextFolderId !== null) {
+        // テンプレートの `readFolderId` と同じ決まり。消えた箱・別用途の箱・
+        // 別アカウントの箱は断る。**黙って未分類にしない。**
+        const folder = await getFolderById(c.env.DB, nextFolderId);
+        const requestAccountId = c.req.query('account_id');
+        if (!folder || folder.kind !== 'form'
+          || (folder.account_id !== null && folder.account_id !== requestAccountId)) {
+          return c.json({ success: false, error: 'そのフォルダはありません' }, 422);
+        }
+      }
+      if (!await setFormFolder(c.env.DB, id, nextFolderId)) {
+        return c.json({ success: false, error: 'Form not found' }, 404);
+      }
+      if (!hasContentUpdate) {
+        const moved = await getFormById(c.env.DB, id);
+        if (!moved) return c.json({ success: false, error: 'Form not found' }, 404);
+        return c.json({ success: true, data: serializeForm(moved) });
+      }
     }
 
     // Only include fields that were explicitly sent (avoid undefined → null conversion)
