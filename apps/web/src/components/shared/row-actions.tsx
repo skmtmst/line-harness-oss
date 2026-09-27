@@ -167,7 +167,8 @@ export function RowActions({
             {...menuButtonProps}
             label={subjectName ? `${subjectName}のその他操作` : 'そのほかの操作'}
             aria-expanded={menuOpen}
-            onClick={() => setMenuOpen((open) => !open)}
+            /* R13: 「…」自体の押下も行の詳細遷移へ伝えない。 */
+            onClick={(event) => { event.stopPropagation(); setMenuOpen((open) => !open) }}
           />
           <ActionMenu
             open={menuOpen}

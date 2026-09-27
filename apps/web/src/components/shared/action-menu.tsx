@@ -84,6 +84,12 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
       aria-label={ariaLabel}
       className={`${styles.menu} ${inline ? styles.inline : ''}`}
       onKeyDown={moveFocus}
+      /*
+       * R13: メニューは行の中（tr の詳細遷移など）に置く。
+       * 中の押下がそのまま行へ伝わると、選んだ操作の代わりに
+       * 詳細へ移動してしまう。容器と項目の両方で止める。
+       */
+      onClick={(event) => event.stopPropagation()}
       data-design-part="action-menu"
       data-design-node="xifuV"
     >
@@ -101,7 +107,7 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
             className={`${styles.item} ${item.description || (item.disabled && item.disabledReason) ? styles.itemTall : ''} ${item.tone === 'danger' ? styles.danger : ''}`}
             disabled={item.disabled}
             title={item.label}
-            onClick={() => { item.onSelect(); onClose() }}
+            onClick={(event) => { event.stopPropagation(); item.onSelect(); onClose() }}
           >
             {item.icon ? <span className={styles.icon} aria-hidden="true">{item.icon}</span> : null}
             <span className={styles.itemBody}>
