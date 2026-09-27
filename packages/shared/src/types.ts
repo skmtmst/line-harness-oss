@@ -382,6 +382,13 @@ export interface MediaDeleteImpact {
   /** 7種類すべてを削除直前に読み切った時刻。0件でも必ず入る。 */
   checkedAt: string;
   lastScannedAt: string | null;
+  /**
+   * 7種類すべてを読み切れたか（R34）。表が無い環境などで一部を読めな
+   * かったときは false。false のとき usageCount 0 は「どこでも使って
+   * いない」ではなく「確かめられなかった」で、canDelete も false
+   * （確かめられないものは消させない）。
+   */
+  verified: boolean;
   canDelete: boolean;
   recommendedAction: "delete" | "review_references";
 }

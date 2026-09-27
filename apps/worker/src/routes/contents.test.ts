@@ -898,6 +898,22 @@ describe('メディアの削除', () => {
         usageCount: 1,
         references: [{ name: '来店後のご案内' }],
         canDelete: false,
+        verified: true,
+      },
+    });
+  });
+
+  it('R34: 表が無い読み口があっても503にせず、未確認として返す', async () => {
+    scanMocks.scanSingleMediaUsage.mockResolvedValueOnce({ scanned: 1, matched: 0, pruned: 0, skippedTables: ['webinars'] });
+    mocks.getMediaDeleteImpactSnapshot.mockResolvedValueOnce({ impact: DELETE_IMPACT, usages: [] });
+    const res = await req('/api/media/md-1/delete-impact?accountId=account-1', 'GET');
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      data: {
+        usageCount: 0,
+        verified: false,
+        canDelete: false,
+        recommendedAction: 'review_references',
       },
     });
   });
@@ -941,29 +957,48 @@ describe('メディアの削除', () => {
   });
 
   it('使われていれば最新の影響を返して止める', async () => {
-    mocks.getMediaDeleteImpact.mockResolvedValue({
-      ...DELETE_IMPACT,
-      usageCount: 5,
-      canDelete: false,
-      recommendedAction: 'review_references',
+    mocks.getMediaDeleteImpactSnapshot.mockResolvedValue({
+      impact: {
+        ...DELETE_IMPACT,
+        usageCount: 5,
+        canDelete: false,
+        recommendedAction: 'review_references',
+      },
+      usages: [],
     });
     const res = await req('/api/media/md-1?accountId=account-1', 'DELETE');
     expect(res.status).toBe(409);
-    const body = (await res.json()) as { code: string; data: { usageCount: number } };
+    const body = (await res.json()) as { code: string; data: { usageCount: number; verified: boolean } };
     expect(body.code).toBe('media_delete_blocked');
     expect(body.data.usageCount).toBe(5);
+    expect(body.data.verified).toBe(true);
     expect(mocks.deleteMedia).not.toHaveBeenCalled();
   });
 
   it('force=1 を付けても使用中は消さない', async () => {
-    mocks.getMediaDeleteImpact.mockResolvedValue({
-      ...DELETE_IMPACT,
-      usageCount: 5,
-      canDelete: false,
-      recommendedAction: 'review_references',
+    mocks.getMediaDeleteImpactSnapshot.mockResolvedValue({
+      impact: {
+        ...DELETE_IMPACT,
+        usageCount: 5,
+        canDelete: false,
+        recommendedAction: 'review_references',
+      },
+      usages: [],
     });
     const res = await req('/api/media/md-1?accountId=account-1&force=1', 'DELETE');
     expect(res.status).toBe(409);
+    expect(mocks.deleteMedia).not.toHaveBeenCalled();
+  });
+
+  it('R34: 読み残しがあるときは未確認として止め、確かめられないものは消さない', async () => {
+    scanMocks.scanSingleMediaUsage.mockResolvedValueOnce({ scanned: 1, matched: 0, pruned: 0, skippedTables: ['webinars'] });
+    mocks.getMediaDeleteImpactSnapshot.mockResolvedValueOnce({ impact: DELETE_IMPACT, usages: [] });
+    const res = await req('/api/media/md-1?accountId=account-1', 'DELETE');
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { code: string; data: { verified: boolean; canDelete: boolean } };
+    expect(body.code).toBe('media_delete_unverified');
+    expect(body.data.verified).toBe(false);
+    expect(body.data.canDelete).toBe(false);
     expect(mocks.deleteMedia).not.toHaveBeenCalled();
   });
 

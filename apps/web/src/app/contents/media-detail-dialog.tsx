@@ -598,7 +598,12 @@ export default function MediaDetailDialog({
           <section className="border-hairline rounded-card border bg-canvas p-4">
             <div className="flex items-center justify-between gap-3">
               <h3 className="text-ink text-sm font-bold">使われている場所</h3>
-              <span className="text-action text-xs font-bold">{impact ? `${impact.usageCount}か所` : '—'}</span>
+              {/* R34: 未確認の0件は「0か所」にしない。件数は「—」で出す。 */}
+              <span className="text-action text-xs font-bold">
+                {impact && (impact.verified !== false || impact.references.length > 0)
+                  ? `${impact.usageCount}か所`
+                  : '—'}
+              </span>
             </div>
             {phase === 'loading' ? (
               <p className="text-ink-faint mt-3 text-xs">使われている場所を確認しています…</p>
@@ -607,8 +612,25 @@ export default function MediaDetailDialog({
                 <p className="text-danger text-xs">使われている場所を確認できませんでした。</p>
                 <Button type="button" onClick={() => void loadImpact()}>読み直す</Button>
               </div>
-            ) : impact && impact.references.length > 0 ? (
-              <ul className="mt-3 space-y-2">
+            ) : impact ? (
+              <>
+                {/*
+                  R34: 未確認は「どこでも使っていない」と分けて出す。
+                  見つかった使用先は実在するので一覧は残し、読み残しがある
+                  旨と読み直しを添える。0件の未確認は未使用にしない。
+                */}
+                {impact.verified === false ? (
+                  <div className="mt-3 space-y-2" role="status">
+                    <p className="text-ink-secondary text-xs">
+                      {impact.references.length > 0
+                        ? 'ほかに確認できていない場所があります。'
+                        : '使われている場所を確かめられませんでした。'}
+                    </p>
+                    <Button type="button" onClick={() => void loadImpact()}>読み直す</Button>
+                  </div>
+                ) : null}
+                {impact.references.length > 0 ? (
+                  <ul className="mt-3 space-y-2">
                 {impact.references.map((reference: MediaDeleteImpactReference, index) => {
                   const usage = reference as MediaUsageReferenceItem
                   const selectValue = usageSelectValue(usage.reference)
@@ -648,13 +670,17 @@ export default function MediaDetailDialog({
                     </li>
                   )
                 })}
-              </ul>
-            ) : (
-              <p className="text-ink-faint mt-3 text-xs">どこでも使われていません。</p>
-            )}
+                  </ul>
+                ) : impact.verified === false ? null : (
+                  <p className="text-ink-faint mt-3 text-xs">どこでも使われていません。</p>
+                )}
+              </>
+            ) : null}
             {usageError ? <p className="text-danger mt-3 text-xs" role="alert">{usageError}</p> : null}
             {impact ? <p className="text-ink-faint mt-3 text-xs">{checkedAtText(impact.checkedAt)} 時点で確認</p> : null}
-            {impact && impact.usageCount > 0 ? (
+            {impact && impact.verified === false ? (
+              <p className="text-ink-secondary mt-3 text-xs leading-5">確かめられないため削除できません。読み直してから、もう一度お試しください。</p>
+            ) : impact && impact.usageCount > 0 ? (
               <p className="text-ink-faint mt-3 text-xs leading-5">使われているあいだは削除できません。先にこの{impact.usageCount}か所から外してください。</p>
             ) : null}
           </section>

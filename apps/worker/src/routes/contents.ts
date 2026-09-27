@@ -9,8 +9,9 @@ import {
   archiveMedia,
   restoreMedia,
   getMediaUsages,
-  getMediaDeleteImpact,
   getMediaDeleteImpactSnapshot,
+  isMissingTableError,
+  getStaffNameMap,
   getMediaReplacementPlan,
   applyMediaReplacementPlan,
   getMediaStorageQuota,
@@ -1370,7 +1371,7 @@ contents.get('/api/media/:id/delete-impact', requireRole('owner', 'admin'), asyn
     const existing = await getMediaById(c.env.DB, c.req.param('id'), accountId);
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
     const checkedAt = jstNow();
-    await scanSingleMediaUsage(c.env.DB, checkedAt, {
+    const scan = await scanSingleMediaUsage(c.env.DB, checkedAt, {
       id: existing.id,
       r2_key: existing.r2_key,
     });
@@ -1378,11 +1379,34 @@ contents.get('/api/media/:id/delete-impact', requireRole('owner', 'admin'), asyn
     if (!snapshot) return c.json({ success: false, error: 'Not found' }, 404);
     const { impact, usages } = snapshot;
     /*
+      R34: 版の表が無い環境では版の一覧が読めない。全体を503にせず、
+      版なしで続けて「未確認」として返す。
+    */
+    let versions: Awaited<ReturnType<typeof getMediaVersionList>> = [];
+    let versionsReady = true;
+    try {
+      versions = await getMediaVersionList(c.env.DB, existing.id, accountId);
+    } catch (err) {
+      if (!isMissingTableError(err)) throw err;
+      console.error('GET /api/media/:id/delete-impact versions skipped:', err);
+      versionsReady = false;
+    }
+    /*
+      R34: 読み残しがあるときは「どこでも使っていない」にしない。
+      usageCount 0 でも未確認として返し、削除も止める（canDelete false）。
+      確かめられないものは消させない。
+    */
+    const verified = versionsReady && (scan.skippedTables ?? []).length === 0;
+    const verifiedImpact = verified ? impact : {
+      ...impact,
+      canDelete: false,
+      recommendedAction: 'review_references' as const,
+    };
+    /*
       使用先ごとの参照モード（ライブ参照・固定する版）と、切替に使う
       版の一覧も一緒に返す。references と usages は同じsnapshotから
       作られているので、index対応中に別走査の行が混ざらない。
     */
-    const versions = await getMediaVersionList(c.env.DB, existing.id, accountId);
     const states = await getMediaUsageReferenceStates(c.env.DB, {
       media: existing,
       usages,
@@ -1393,8 +1417,9 @@ contents.get('/api/media/:id/delete-impact', requireRole('owner', 'admin'), asyn
     return c.json({
       success: true,
       data: {
-        ...impact,
-        references: impact.references.map((reference, index) => ({
+        ...verifiedImpact,
+        verified,
+        references: verifiedImpact.references.map((reference, index) => ({
           ...reference,
           refKind: usages[index]?.ref_kind ?? null,
           refId: usages[index]?.ref_id ?? null,
@@ -1570,20 +1595,35 @@ contents.delete('/api/media/:id', requireRole('owner', 'admin'), async (c) => {
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
 
     const checkedAt = jstNow();
-    await scanSingleMediaUsage(c.env.DB, checkedAt, {
+    const scan = await scanSingleMediaUsage(c.env.DB, checkedAt, {
       id: existing.id,
       r2_key: existing.r2_key,
     });
-    const impact = await getMediaDeleteImpact(c.env.DB, id, accountId, checkedAt);
-    if (!impact) return c.json({ success: false, error: 'Not found' }, 404);
+    const snapshot = await getMediaDeleteImpactSnapshot(c.env.DB, id, accountId, checkedAt);
+    if (!snapshot) return c.json({ success: false, error: 'Not found' }, 404);
+    // R34: 読み残しがあるときは使われていないと断定できない。確かめられ
+    // ないものは消させない（ fail-closed ）。読み直しを促す409で返す。
+    const verified = (scan.skippedTables ?? []).length === 0;
+    const impact = verified ? snapshot.impact : {
+      ...snapshot.impact,
+      canDelete: false,
+      recommendedAction: 'review_references' as const,
+    };
     if (!impact.canDelete) {
       return c.json(
-        {
-          success: false,
-          error: `このファイルは ${impact.usageCount} か所で使われています。先に使用先から外してください。`,
-          code: 'media_delete_blocked',
-          data: impact,
-        },
+        verified
+          ? {
+            success: false,
+            error: `このファイルは ${impact.usageCount} か所で使われています。先に使用先から外してください。`,
+            code: 'media_delete_blocked',
+            data: { ...impact, verified },
+          }
+          : {
+            success: false,
+            error: '使用先を確かめられなかったため削除できません。使用先を読み直してから、もう一度お試しください。',
+            code: 'media_delete_unverified',
+            data: { ...impact, verified },
+          },
         409,
       );
     }

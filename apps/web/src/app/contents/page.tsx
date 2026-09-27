@@ -1234,15 +1234,24 @@ function MediaLibraryInner() {
         {impactPhase === 'loading' ? (
           <p className="text-ink-faint text-xs">使われている場所を確認しています…</p>
         ) : impactPhase === 'error' ? (
-          <p className="text-danger text-xs font-semibold" role="alert">
-            使われている場所を確認できませんでした。読み直してから、もう一度お試しください。
-          </p>
+          <div className="space-y-2">
+            <p className="text-danger text-xs font-semibold" role="alert">
+              使われている場所を確認できませんでした。読み直してから、もう一度お試しください。
+            </p>
+            {/* R34: 詳細と同じように、確認時刻と読み直しを一覧でも出す。 */}
+            <Button type="button" onClick={() => { if (deleting) void openDelete(deleting) }}>読み直す</Button>
+          </div>
         ) : impact ? (
           <div className="space-y-3">
             <p className={impact.canDelete ? 'text-ink-secondary text-sm' : 'text-danger text-sm font-semibold'}>
               {usageText(impact)}
               {blockedReason(impact) ? ` ${blockedReason(impact)}` : ''}
             </p>
+            {impact.verified === false ? (
+              <div>
+                <Button type="button" onClick={() => { if (deleting) void openDelete(deleting) }}>読み直す</Button>
+              </div>
+            ) : null}
 
             {impact.references.length > 0 ? (
               <div>
