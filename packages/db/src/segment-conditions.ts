@@ -697,3 +697,17 @@ export function parseCondition(raw: string | null | undefined): SegmentCondition
     return null
   }
 }
+
+/**
+ * 条件が実質空か。空なら「絞り込みなし」と同じ扱いにする。
+ *
+ * 空の条件を持たせたまま数えると、画面は絞り込んでいるように見えて
+ * 全員が対象になる。保存時もここで空を落とす。
+ */
+export function isEmptySegmentCondition(
+  condition: SegmentCondition | null | undefined,
+): boolean {
+  if (!condition) return true;
+  if ((condition.rules?.length ?? 0) > 0) return false;
+  return !(condition.groups ?? []).some((group) => !isEmptySegmentCondition(group));
+}

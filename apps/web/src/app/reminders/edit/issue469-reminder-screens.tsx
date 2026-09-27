@@ -22,7 +22,8 @@ import {
   SummaryCard,
 } from '@/components/reminders/reminder-v6-ui'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import { firstReminderStepMessage, reminderPlaceholders } from '@/components/reminders/reminder-labels'
+import InsertToolbar from '@/components/scenarios/insert-toolbar'
+import { firstReminderStepMessage, reminderPlaceholders, renderReminderBodySample } from '@/components/reminders/reminder-labels'
 import { useReminderTestRecipient } from '@/components/reminders/use-reminder-test-recipient'
 import { useReminderTestSend } from '@/components/reminders/use-reminder-test-send'
 import { TestRecipientGuidance, testRecipientDestinationLabel, testRecipientNote, testSendConfirmDescription } from '@/components/reminders/test-recipient-guidance'
@@ -56,6 +57,8 @@ export function Issue469ReminderStepEditor({ reminderId }: { reminderId: string 
   const [savedSettings, setSavedSettings] = useState<ReminderDraftSettings | null>(null)
   const [versionId, setVersionId] = useState<string | null>(null)
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null)
+  // 差し込みをカーソルの位置に入れるために、本文の入力欄そのものを渡す。
+  const bodyRef = useRef<HTMLTextAreaElement>(null)
   const [validation, setValidation] = useState<ReminderValidationResult | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -216,7 +219,7 @@ export function Issue469ReminderStepEditor({ reminderId }: { reminderId: string 
     <ReminderWizard current={3} />
     <ReminderWorkspace aside={<div data-issue546-aside className="grid gap-3">
       <SummaryCard rows={[["対象者", validation?.audience.matched == null ? '検査後に表示' : `${validation.audience.matched.toLocaleString('ja-JP')}人`], ['基準日', '予約日時（Google Meet相談）'], ['通知ステップ', `${settings.steps.length}件`], ['状態', dirty ? '未保存の変更あり' : '下書き']]} />
-      <LinePreview caption={selectedStep ? `表示例：${stepTimingLabel(selectedStep, settings.deliveryMode)} に届きます` : '通知はまだありません'} empty={!selectedStep}>{selectedStep ? selectedStep.messageContent || '本文を入力すると、ここに表示例が出ます。' : '「通知を追加」で1通目を作成してください。'}</LinePreview>
+      <LinePreview caption={selectedStep ? `表示例：${stepTimingLabel(selectedStep, settings.deliveryMode)} に届きます` : '通知はまだありません'} empty={!selectedStep}>{selectedStep ? selectedStep.messageContent ? renderReminderBodySample(selectedStep.messageContent) : '本文を入力すると、ここに表示例が出ます。' : '「通知を追加」で1通目を作成してください。'}</LinePreview>
     </div>}>
       <ReminderPanel title="通知ステップ" note="基準日を軸に、何回・いつ送るかを並べます。上から順に届きます。">
         {settings.steps.length === 0 ? <p className="text-ink-faint rounded-lg border border-hairline p-3 text-xs">通知はまだありません。「通知を追加」で1通目を作成してください。本文が入るまで次へは進めません。</p> : null}
@@ -242,11 +245,18 @@ export function Issue469ReminderStepEditor({ reminderId }: { reminderId: string 
                 const daysBefore = Number(event.target.value)
                 if (Number.isInteger(daysBefore)) updateStep(selectedStep.stableStepId, { offsetDays: -daysBefore })
               }} /></Field>
-              <Field label="送信時刻"><TextInput className="border-hairline rounded-control focus:ring-accent border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value={selectedStep.sendAtTime ?? ''} placeholder="HH:MM" onChange={(event) => updateStep(selectedStep.stableStepId, { sendAtTime: event.target.value || null })} /></Field>
+              <Field label="送信時刻"><TextInput className="border-hairline rounded-control focus:ring-accent min-w-24 border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value={selectedStep.sendAtTime ?? ''} placeholder="HH:MM" onChange={(event) => updateStep(selectedStep.stableStepId, { sendAtTime: event.target.value || null })} /></Field>
             </>)}
           </div>
-          <div className="flex flex-wrap gap-2"><Pill tone="success">名前</Pill><Pill>友だち情報</Pill><Pill>共通情報</Pill><Pill>回答フォーム</Pill><Pill>配信日</Pill><Pill>その他</Pill></div>
-          <Field label="本文" required note={`${selectedStep.messageContent.length} / 5,000文字`}><TextArea rows={3} className="border-hairline rounded-control focus:ring-accent border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value={selectedStep.messageContent} onChange={(event) => updateStep(selectedStep.stableStepId, { messageContent: event.target.value })} /></Field>
+          <InsertToolbar
+            targetRef={bodyRef}
+            value={selectedStep.messageContent}
+            onChange={(next) => updateStep(selectedStep.stableStepId, { messageContent: next.slice(0, 5000) })}
+          />
+          <Field label="本文" required note={`${selectedStep.messageContent.length} / 5,000文字`}><TextArea ref={bodyRef} rows={3} className="border-hairline rounded-control focus:ring-accent border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value={selectedStep.messageContent} onChange={(event) => updateStep(selectedStep.stableStepId, { messageContent: event.target.value })} /></Field>
+          {/\{\{[^}]+\}\}/.test(selectedStep.messageContent)
+            ? <p className="text-ink-secondary text-xs">見本：{renderReminderBodySample(selectedStep.messageContent)}</p>
+            : null}
         </div>
       </ReminderPanel> : null}
       <ReminderPanel title="URLの扱い" note="短縮するとクリック数を計測できます。Meetの参加URLは短縮しない設定です。"><div className="flex items-center justify-between rounded-lg border border-hairline p-3 text-xs"><span>Google Meet 参加URL　<Pill>参加URL（差し込み）</Pill></span><strong>短縮しない</strong></div></ReminderPanel>
@@ -255,8 +265,15 @@ export function Issue469ReminderStepEditor({ reminderId }: { reminderId: string 
     <div className="mt-16"><ReminderFooter primary={saving ? '保存中…' : '送信設定へ'} primaryDisabled={saving || !allStepsHaveContent} onPrimary={() => void save()} /></div>
     <ConfirmDialog open={leaveTarget !== null} title="保存していない変更があります" description="このまま移動すると、通知ステップへの変更は失われます。保存せずに移動しますか？" confirmLabel="保存せずに移動" cancelLabel="編集を続ける" onConfirm={confirmLeave} onCancel={cancelLeave} />
     <style jsx global>{`
-      [data-design-node='J64xI'] > div:nth-of-type(2) {
-        grid-template-columns: minmax(0, 1fr) 390px;
+      /*
+       * R17: 右390px固定は広い幅だけ。中くらいの幅では LINE のプレビューを
+       * 下へ送り、入力欄を細くしない。共通ワークスペースの 1100px 切り替え
+       * (reminder-v6-ui.module.css) と同じ境目にする。
+       */
+      @media(min-width: 1101px) {
+        [data-design-node='J64xI'] > div:nth-of-type(2) {
+          grid-template-columns: minmax(0, 1fr) 390px;
+        }
       }
       [data-issue546-aside] > section:first-child {
         min-height: 299px;
