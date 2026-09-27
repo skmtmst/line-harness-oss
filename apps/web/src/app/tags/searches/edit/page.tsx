@@ -699,7 +699,7 @@ function SavedSearchEditInner() {
         )}
       />
       <ConfirmDialog open={deleteOpen && original.canDelete === true} title={`「${name}」を削除しますか？`} description="使用先が無いことをサーバーで確認済みです。保存した条件だけを削除し、友だちは削除しません。" confirmLabel="削除する" destructive onCancel={() => setDeleteOpen(false)} onConfirm={() => { setDeleteOpen(false); void remove() }} />
-      <ConfirmDialog
+      <ConfirmDialog primaryAction="cancel"
         open={leaveTarget !== null}
         title="保存していない変更があります"
         description="このまま移動すると、検索条件への変更は失われます。保存せずに移動しますか？"

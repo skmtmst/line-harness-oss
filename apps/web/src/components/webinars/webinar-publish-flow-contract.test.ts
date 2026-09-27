@@ -33,8 +33,13 @@ describe('V6 ウェビナー公開前確認と公開完了の契約', () => {
   })
 
   it('公開APIの実際の返事に含まれるIDだけを完了画面へ渡す', () => {
-    expect(FORM).toContain('`/webinars/published?id=${updated.data.id}`')
-    expect(FORM).toContain('`/webinars/published?id=${created.data.id}`')
+    /*
+      R95: 公開は公開専用口を通す。完了画面の行き先は保存の返事のIDから
+      作り、作り話の status=success は付けない。
+    */
+    expect(FORM).toContain('return publishNow(updated.data.id)')
+    expect(FORM).toContain('return publishNow(created.data.id)')
+    expect(FORM).toContain('`/webinars/published?id=${webinarId}`')
     expect(FORM).not.toContain('/webinars/published?status=success')
   })
 

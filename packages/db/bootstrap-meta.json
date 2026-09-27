@@ -425,6 +425,8 @@
     "468_event_custom_questions.sql",
     "469_manual_link_screens.sql",
     "470_google_sheets_integrations.sql",
+    "484_common_var_lifecycle.sql",
+    "485_common_var_failure_reasons.sql",
     "486_mileage_adjustment_approvals.sql",
     "487_mileage_adjustment_approval_events.sql",
     "488_incoming_webhook_secret_grace.sql",
@@ -439,5 +441,5 @@
     "503_measurement_sites.sql",
     "504_conversion_reversal_ledger.sql"
   ],
-  "migrationCount": 438
+  "migrationCount": 440
 }

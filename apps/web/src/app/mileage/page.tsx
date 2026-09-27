@@ -1013,7 +1013,7 @@ function MileagePageInner() {
         </label>
       </Dialog>
 
-      <ConfirmDialog
+      <ConfirmDialog primaryAction="cancel"
         open={leaveTarget !== null}
         title="保存していない変更があります"
         description="このまま移動すると、たまる決めごとの並び順への変更は失われます。保存せずに移動しますか？"

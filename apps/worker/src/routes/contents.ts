@@ -60,6 +60,10 @@ import {
   COMMON_VAR_TYPES,
   normalizeCommonVarValue,
   normalizeCommonVarValidityAt,
+  isSecretLikeValue,
+  setCommonVarStatus,
+  CommonVarReasonRequiredError,
+  CommonVarStatusTransitionError,
   type Media,
   type MediaKind,
   type CommonVar,
@@ -1691,6 +1695,16 @@ function serializeVar(row: CommonVar) {
     expiryBehavior: row.expiry_behavior ?? 'stop',
     version: Number(row.version ?? 1),
     archivedAt: row.archived_at ?? null,
+    // Q: 「期限切れ」は時刻からその都度計算する。画面は state を見るだけでよい。
+    status: row.status ?? 'active',
+    stoppedAt: row.stopped_at ?? null,
+    state: row.status === 'stopped'
+      ? 'stopped'
+      : row.status === 'draft'
+        ? 'draft'
+        : row.valid_until !== null && Date.parse(row.valid_until) <= Date.now()
+          ? 'expired'
+          : 'active',
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     nextSchedule: row.next_effective_from
@@ -2171,6 +2185,18 @@ contents.post('/api/common-vars', requireRole('owner', 'admin'), async (c) => {
     if (validity.fallbackValue !== null && fallbackValue === null) {
       return c.json({ success: false, error: '代替値は種別に合う値を入力してください' }, 400);
     }
+    // Q: 鍵やトークンのような秘密の値は共通情報に置かせない。
+    if (isSecretLikeValue(value) || (fallbackValue !== null && isSecretLikeValue(fallbackValue))) {
+      return c.json({
+        success: false,
+        code: 'secret_value_not_allowed',
+        error: '鍵やトークンのような秘密の値は共通情報に保存できません。外部連携の設定へ登録してください',
+      }, 422);
+    }
+    const statusRaw = body.status === undefined ? 'active' : String(body.status);
+    if (statusRaw !== 'active' && statusRaw !== 'draft') {
+      return c.json({ success: false, error: '状態は「下書き」か「使用中」で登録してください' }, 400);
+    }
 
     const created = await createCommonVar(c.env.DB, {
       lineAccountId: accountId,
@@ -2185,6 +2211,7 @@ contents.post('/api/common-vars', requireRole('owner', 'admin'), async (c) => {
       validUntil: validity.validUntil.value,
       fallbackValue,
       expiryBehavior: validity.expiryBehavior,
+      status: statusRaw as 'draft' | 'active',
     });
     return c.json({ success: true, data: serializeVar(created) }, 201);
   } catch (err) {
@@ -2255,12 +2282,35 @@ contents.patch('/api/common-vars/:id', requireRole('owner', 'admin'), async (c) 
     if (patchMemo !== undefined && patchMemo.length > 1000) {
       return c.json({ success: false, error: 'メモは1000文字までで入力してください' }, 400);
     }
+    // Q: 変える理由は必須。後から履歴を見た人が「なぜ変えたか」を追えるようにする。
+    const changeReason = typeof body.changeReason === 'string' ? body.changeReason.trim() : '';
+    if (!changeReason) {
+      return c.json({
+        success: false,
+        code: 'change_reason_required',
+        error: '変える理由を入力してください',
+      }, 400);
+    }
+    if (patchValue !== undefined && isSecretLikeValue(patchValue)) {
+      return c.json({
+        success: false,
+        code: 'secret_value_not_allowed',
+        error: '鍵やトークンのような秘密の値は共通情報に保存できません。外部連携の設定へ登録してください',
+      }, 422);
+    }
     const validity = parseCommonVarValidity(body, existing);
     const normalizedFallback = validity.fallbackValue === null
       ? null
       : normalizeCommonVarValue(existing.type as CommonVarType, validity.fallbackValue);
     if (validity.fallbackValue !== null && normalizedFallback === null) {
       return c.json({ success: false, error: '代替値は種別に合う値を入力してください' }, 400);
+    }
+    if (normalizedFallback !== null && isSecretLikeValue(normalizedFallback)) {
+      return c.json({
+        success: false,
+        code: 'secret_value_not_allowed',
+        error: '鍵やトークンのような秘密の値は代替値にも保存できません',
+      }, 422);
     }
     // N-185: 影響確認なしの保存を止める。確認値は対象ID・版・使用先集合の写し。
     // 形の検査は先に済ませているため、ここからは確認値だけを見る。
@@ -2302,7 +2352,7 @@ contents.patch('/api/common-vars/:id', requireRole('owner', 'admin'), async (c) 
       memo: patchMemo,
       expectedVersion,
       actorId: c.get('staff').id,
-      changeReason: typeof body.changeReason === 'string' ? body.changeReason : undefined,
+      changeReason,
       ...(validity.validFrom.present ? { validFrom: validity.validFrom.value } : {}),
       ...(validity.validUntil.present ? { validUntil: validity.validUntil.value } : {}),
       ...(validity.fallbackPresent ? { fallbackValue: normalizedFallback } : {}),
@@ -2313,6 +2363,9 @@ contents.patch('/api/common-vars/:id', requireRole('owner', 'admin'), async (c) 
   } catch (err) {
     if (err instanceof RequestBodyError) {
       return c.json({ success: false, error: err.message }, err.status);
+    }
+    if (err instanceof CommonVarReasonRequiredError) {
+      return c.json({ success: false, code: 'change_reason_required', error: '変える理由を入力してください' }, 400);
     }
     if (err instanceof CommonVarFolderError) {
       return c.json({ success: false, error: '指定のフォルダが見つかりません。フォルダを選び直してください' }, 400);
@@ -2326,6 +2379,64 @@ contents.patch('/api/common-vars/:id', requireRole('owner', 'admin'), async (c) 
       }, 409);
     }
     console.error('PATCH /api/common-vars/:id error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// Q: 状態の切替。下書き→使用中（公開）、使用中→止めた、止めた→使用中（再開）。
+// 値の変更ではないので影響確認は求めないが、状態を変える操作なので理由は必須。
+contents.post('/api/common-vars/:id/status', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const id = c.req.param('id');
+    const accountId = c.req.query('accountId')?.trim();
+    if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    const body = await c.req.json<Record<string, unknown>>();
+    const to = String(body.to ?? '');
+    if (to !== 'active' && to !== 'stopped') {
+      return c.json({ success: false, error: '状態は「使用中」か「止めた」のどちらかにしてください' }, 400);
+    }
+    const changeReason = typeof body.changeReason === 'string' ? body.changeReason.trim() : '';
+    if (!changeReason) {
+      return c.json({
+        success: false,
+        code: 'change_reason_required',
+        error: '変える理由を入力してください',
+      }, 400);
+    }
+    const expectedVersion = body.expectedVersion === undefined
+      ? undefined
+      : Number(body.expectedVersion);
+    const updated = await setCommonVarStatus(c.env.DB, id, accountId, {
+      to,
+      changeReason,
+      expectedVersion,
+      actorId: c.get('staff').id,
+    });
+    if (!updated) return c.json({ success: false, error: 'Not found' }, 404);
+    return c.json({ success: true, data: serializeVar(updated) });
+  } catch (err) {
+    if (err instanceof CommonVarStatusTransitionError) {
+      return c.json({
+        success: false,
+        code: 'invalid_status_transition',
+        error: `今の状態（${err.from === 'draft' ? '下書き' : err.from === 'active' ? '使用中' : '止めた'}）からはその操作ができません`,
+      }, 422);
+    }
+    if (err instanceof CommonVarReasonRequiredError) {
+      return c.json({ success: false, code: 'change_reason_required', error: '変える理由を入力してください' }, 400);
+    }
+    if (err instanceof CommonVarVersionConflictError) {
+      return c.json({
+        success: false,
+        error: '別の担当者が先に更新しました。最新内容を読み直してください。',
+        code: 'common_var_version_conflict',
+        currentVersion: err.currentVersion,
+      }, 409);
+    }
+    console.error('POST /api/common-vars/:id/status error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2476,7 +2587,15 @@ contents.post('/api/common-vars/:id/replace', requireRole('owner', 'admin'), asy
         data: preview,
       }, 409);
     }
-    const result = await applyCommonVarReplacementPlan(c.env.DB, plan, c.get('staff').id);
+    // Q: 差し替えて保管するときも、やった人の理由を版履歴に残す。
+    const replaceReason = typeof body.changeReason === 'string' ? body.changeReason.trim() : '';
+    if (!replaceReason) {
+      return c.json(
+        { success: false, error: '変えた・消した理由を入力してください', code: 'common_var_reason_required' },
+        400,
+      );
+    }
+    const result = await applyCommonVarReplacementPlan(c.env.DB, plan, c.get('staff').id, replaceReason);
     let remainingUsageCount: number | null = null;
     try {
       const remaining = await getCommonVarUsageImpact(c.env.DB, source.var_key, accountId);
@@ -2523,6 +2642,14 @@ contents.delete('/api/common-vars/:id', requireRole('owner', 'admin'), async (c)
     }
     const existing = await getCommonVarById(c.env.DB, c.req.param('id'), accountId);
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
+    // Q: 消すときも理由が必須。版履歴に残すので空欄や自動入力は受けない。
+    const deleteReason = c.req.query('reason')?.trim() ?? '';
+    if (!deleteReason) {
+      return c.json(
+        { success: false, error: '消した理由を入力してください', code: 'common_var_reason_required' },
+        400,
+      );
+    }
     const impact = await getCommonVarUsageImpact(c.env.DB, existing.var_key, accountId);
     const deleteImpact = serializeCommonVarDeleteImpact(existing, impact);
     if (!deleteImpact.canDelete) {
@@ -2536,7 +2663,7 @@ contents.delete('/api/common-vars/:id', requireRole('owner', 'admin'), async (c)
         409,
       );
     }
-    await deleteCommonVar(c.env.DB, existing.id, accountId, c.get('staff').id);
+    await deleteCommonVar(c.env.DB, existing.id, accountId, c.get('staff').id, deleteReason);
     return c.json({ success: true, data: null });
   } catch (err) {
     console.error('DELETE /api/common-vars/:id error:', err);
@@ -2604,6 +2731,14 @@ contents.post('/api/common-vars/:id/schedules', requireRole('owner', 'admin'), a
         { success: false, error: '更新後の値は種別に合う値を入力してください' },
         400,
       );
+    }
+    // Q: 予約で入る値も秘密の値は受け付けない（登録・編集と同じ口）。
+    if (isSecretLikeValue(normalizedScheduled)) {
+      return c.json({
+        success: false,
+        code: 'secret_value_not_allowed',
+        error: '鍵やトークンのような秘密の値は共通情報に保存できません',
+      }, 422);
     }
 
     const created = await createCommonVarSchedule(c.env.DB, {

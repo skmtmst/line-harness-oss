@@ -190,7 +190,7 @@ function NenColumnEditInner() {
         </div>
       )}
       {/* #935 N-301: 書きかけのまま離れるときの確認。 */}
-      <ConfirmDialog
+      <ConfirmDialog primaryAction="cancel"
         open={leaveTarget !== null}
         title="入力した紹介文が保存されていません"
         description="このまま移動すると、入力した紹介文は保存されません。移動しますか？"
