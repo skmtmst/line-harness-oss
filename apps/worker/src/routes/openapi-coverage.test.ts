@@ -1382,10 +1382,11 @@ const ALLOWLIST = new Set<string>([
   'GET /api/accounts/{id}/health',
   'POST /api/accounts/{id}/migrate',
 
-  // core：設定テンプレート（OpenAPI未記載・順次記載）（4件）
+  // core：設定テンプレート（OpenAPI未記載・順次記載）（5件）
   'GET /api/recipes',
   'GET /api/recipes/clone-runs/{runId}',
   'GET /api/recipes/{id}',
+  'POST /api/recipes',
   'POST /api/recipes/{id}/clone',
 
   // public：LINE利用者が行う公開フォーム操作（OpenAPI未記載・順次記載）（3件）
@@ -1424,8 +1425,12 @@ const ALLOWLIST = new Set<string>([
   // public：回答前に表示する公開フォーム（OpenAPI未記載・順次記載）（1件）
   'GET /api/forms/{id}',
 
-  // core：初期設定（OpenAPI未記載・順次記載）（1件）
+  // core：初期設定（OpenAPI未記載・順次記載）（2件）
   'GET /api/getting-started',
+  'POST /api/getting-started/dismiss',
+
+  // core：失敗文面の対応表（OpenAPI未記載・順次記載）（1件）
+  'GET /api/error-messages',
 
   // system：稼働確認（OpenAPI未記載・順次記載）（1件）
   'GET /api/health',

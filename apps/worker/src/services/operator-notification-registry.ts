@@ -67,6 +67,15 @@ export const OPERATOR_NOTIFICATION_EVENT_TYPES: OperatorEventTypeEntry[] = [
     },
     connected: true,
   },
+  {
+    eventType: 'manual_link_broken',
+    label: 'マニュアルリンクの切断',
+    producer: {
+      file: 'apps/worker/src/index.ts',
+      route: 'cron manual link weekly check',
+    },
+    connected: true,
+  },
 ];
 
 export function isKnownOperatorEventType(eventType: string): boolean {
