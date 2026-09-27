@@ -22,6 +22,8 @@ export * from './line-accounts';
 export * from './conversions';
 export * from './conversion-definitions';
 export * from './conversion-event-sources';
+export * from './conversion-exclusions';
+export * from './segment-conditions';
 export * from './affiliates';
 export * from './webhooks';
 export * from './booking-audit';
