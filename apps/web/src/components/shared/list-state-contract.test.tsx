@@ -56,6 +56,18 @@ describe('一覧の状態とページ送り', () => {
     expect(html).not.toContain('新しく作成')
   })
 
+  it('R38: 絞り込みの0件は「まだありません」と言わず、条件を外す口と出す', () => {
+    const html = renderToStaticMarkup(
+      <ListState kind="empty" emptyPreset="filtered" action={<button type="button">条件を外す</button>} />,
+    )
+    expect(html).toContain('条件に合うものがありません')
+    expect(html).toContain('条件を外す')
+    expect(html).not.toContain('まだありません')
+    // 作る口は出さない。保存済みが消えたと誤読される。
+    expect(html).not.toContain('登録')
+    expect(html).not.toContain('作る')
+  })
+
   it('送る先が1ページしか無いとき、ページ送りを描かない', () => {
     // 画面ごとに `{pageCount > 1 && …}` と書くと、書き忘れた画面だけ
     // 出たままになる。**部品の側で決める。**

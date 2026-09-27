@@ -33,6 +33,7 @@ class MockMediaUsageReferenceError extends Error {
 }
 
 const mocks = {
+  getStaffNameMap: vi.fn(async () => new Map()),
   getMedia: vi.fn(),
   countMedia: vi.fn(),
   getMediaById: vi.fn(),
@@ -104,6 +105,10 @@ const mocks = {
     if (type === 'image') {
       if (value === '') return value;
       return value.length <= 200 && /^https:\/\/\S+$/.test(value) ? value : null;
+    }
+    if (type === 'url') {
+      if (value === '') return value;
+      return value.length <= 200 && /^https?:\/\/\S+$/.test(value) ? value : null;
     }
     if (type === 'date' || type === 'datetime') {
       const match = type === 'date'
@@ -532,6 +537,26 @@ describe('メディアのアップロード', () => {
     });
   });
 
+  it('R35: 一覧は入れた人の表示名を添え、IDをそのまま出さない', async () => {
+    mocks.getStaffNameMap.mockResolvedValueOnce(new Map([['u-1', '川野 健太']]));
+    const res = await req('/api/media?accountId=account-1', 'GET');
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      data: { items: Array<{ uploadedBy: string; uploadedByName: string | null }> };
+    };
+    expect(body.data.items[0]?.uploadedBy).toBe('u-1');
+    expect(body.data.items[0]?.uploadedByName).toBe('川野 健太');
+  });
+
+  it('R35: 退職・削除済みで引けない入れた人は null で返し、画面が言葉にする', async () => {
+    mocks.getStaffNameMap.mockResolvedValueOnce(new Map());
+    const res = await req('/api/media/md-1?accountId=account-1', 'GET');
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { data: { item: { uploadedBy: string; uploadedByName: string | null } } };
+    expect(body.data.item.uploadedBy).toBe('u-1');
+    expect(body.data.item.uploadedByName).toBeNull();
+  });
+
   it('LINEアカウントを指定しない一覧取得は止める', async () => {
     const res = await req('/api/media', 'GET');
     expect(res.status).toBe(400);
@@ -894,6 +919,22 @@ describe('メディアの削除', () => {
         usageCount: 1,
         references: [{ name: '来店後のご案内' }],
         canDelete: false,
+        verified: true,
+      },
+    });
+  });
+
+  it('R34: 表が無い読み口があっても503にせず、未確認として返す', async () => {
+    scanMocks.scanSingleMediaUsage.mockResolvedValueOnce({ scanned: 1, matched: 0, pruned: 0, skippedTables: ['webinars'] });
+    mocks.getMediaDeleteImpactSnapshot.mockResolvedValueOnce({ impact: DELETE_IMPACT, usages: [] });
+    const res = await req('/api/media/md-1/delete-impact?accountId=account-1', 'GET');
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      data: {
+        usageCount: 0,
+        verified: false,
+        canDelete: false,
+        recommendedAction: 'review_references',
       },
     });
   });
@@ -937,29 +978,48 @@ describe('メディアの削除', () => {
   });
 
   it('使われていれば最新の影響を返して止める', async () => {
-    mocks.getMediaDeleteImpact.mockResolvedValue({
-      ...DELETE_IMPACT,
-      usageCount: 5,
-      canDelete: false,
-      recommendedAction: 'review_references',
+    mocks.getMediaDeleteImpactSnapshot.mockResolvedValue({
+      impact: {
+        ...DELETE_IMPACT,
+        usageCount: 5,
+        canDelete: false,
+        recommendedAction: 'review_references',
+      },
+      usages: [],
     });
     const res = await req('/api/media/md-1?accountId=account-1', 'DELETE');
     expect(res.status).toBe(409);
-    const body = (await res.json()) as { code: string; data: { usageCount: number } };
+    const body = (await res.json()) as { code: string; data: { usageCount: number; verified: boolean } };
     expect(body.code).toBe('media_delete_blocked');
     expect(body.data.usageCount).toBe(5);
+    expect(body.data.verified).toBe(true);
     expect(mocks.deleteMedia).not.toHaveBeenCalled();
   });
 
   it('force=1 を付けても使用中は消さない', async () => {
-    mocks.getMediaDeleteImpact.mockResolvedValue({
-      ...DELETE_IMPACT,
-      usageCount: 5,
-      canDelete: false,
-      recommendedAction: 'review_references',
+    mocks.getMediaDeleteImpactSnapshot.mockResolvedValue({
+      impact: {
+        ...DELETE_IMPACT,
+        usageCount: 5,
+        canDelete: false,
+        recommendedAction: 'review_references',
+      },
+      usages: [],
     });
     const res = await req('/api/media/md-1?accountId=account-1&force=1', 'DELETE');
     expect(res.status).toBe(409);
+    expect(mocks.deleteMedia).not.toHaveBeenCalled();
+  });
+
+  it('R34: 読み残しがあるときは未確認として止め、確かめられないものは消さない', async () => {
+    scanMocks.scanSingleMediaUsage.mockResolvedValueOnce({ scanned: 1, matched: 0, pruned: 0, skippedTables: ['webinars'] });
+    mocks.getMediaDeleteImpactSnapshot.mockResolvedValueOnce({ impact: DELETE_IMPACT, usages: [] });
+    const res = await req('/api/media/md-1?accountId=account-1', 'DELETE');
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { code: string; data: { verified: boolean; canDelete: boolean } };
+    expect(body.code).toBe('media_delete_unverified');
+    expect(body.data.verified).toBe(false);
+    expect(body.data.canDelete).toBe(false);
     expect(mocks.deleteMedia).not.toHaveBeenCalled();
   });
 
@@ -1765,6 +1825,7 @@ describe('共通情報', () => {
       ['boolean', 'true'],
       // 既存型も新しい分岐で退行していない。
       ['text', 'これまでの文字列'],
+      ['url', 'https://example.com/shop'],
     ] as const;
 
     for (const [type, value] of postCases) {
@@ -1783,6 +1844,8 @@ describe('共通情報', () => {
       ['date', '2026-02-30'],
       ['datetime', '2026-02-30T24:00'],
       ['boolean', 'yes'],
+      // R36: URL型にURLでない文章は登録させない。
+      ['url', 'これはURLではありません'],
     ] as const;
     for (const [type, value] of rejectedCreates) {
       const response = await req('/api/common-vars', 'POST', {
@@ -1829,6 +1892,40 @@ describe('共通情報', () => {
       value: '2026-02-30', impactProof: 'forged', expectedVersion: 3,
     });
     expect(invalidPatch.status).toBe(400);
+
+    // R36: URL型は新規・編集・予約のすべてで http/https のURLだけを受ける。
+    const urlBad = await req('/api/common-vars', 'POST', {
+      accountId: 'account-1', name: '店舗リンク', varKey: 'shop_link', type: 'url',
+      value: 'これはURLではありません',
+    });
+    expect(urlBad.status).toBe(400);
+    expect(await urlBad.json()).toMatchObject({
+      error: 'URLの値は http:// または https:// からはじまる形で入力してください',
+    });
+    mocks.getCommonVarById.mockResolvedValueOnce({ ...VAR, type: 'url', value: 'https://example.com/old' });
+    const urlBadPatch = await req('/api/common-vars/cv-1?accountId=account-1', 'PATCH', {
+      value: 'これはURLではありません', impactProof: 'forged', expectedVersion: 3,
+    });
+    expect(urlBadPatch.status).toBe(400);
+    expect(await urlBadPatch.json()).toMatchObject({
+      error: 'URLの値は http:// または https:// からはじまる形で入力してください',
+    });
+    // 直前の正常な更新の1回きりで、URLでない値はDBへ渡さない。
+    expect(mocks.updateCommonVar).toHaveBeenCalledTimes(1);
+    // 代替値も同じ確かめを通る。
+    const urlBadFallback = await req('/api/common-vars', 'POST', {
+      accountId: 'account-1', name: '店舗リンク2', varKey: 'shop_link2', type: 'url',
+      value: 'https://example.com/shop',
+      expiryBehavior: 'fallback', fallbackValue: 'これはURLではありません',
+    });
+    expect(urlBadFallback.status).toBe(400);
+    mocks.getCommonVarById.mockResolvedValueOnce({ ...VAR, type: 'url', value: 'https://example.com/old' });
+    const urlBadSchedule = await req('/api/common-vars/cv-1/schedules?accountId=account-1', 'POST', {
+      effectiveFrom: '2099-01-01T00:00',
+      value: 'これはURLではありません',
+    });
+    expect(urlBadSchedule.status).toBe(400);
+    expect(mocks.createCommonVarSchedule).not.toHaveBeenCalled();
 
     // Account access and stale versions are rejected before a write. This remains
     // true for a newly added type, not only for the legacy text fixture.
