@@ -33,6 +33,7 @@ binding = "AI"
 crons = ["*/5 * * * *", "1-56/5 * * * *", "0 */6 * * *"]
 
 [vars]
+DEPLOY_ENV = "production"
 RESTAURANT_TEST_ENABLED = "false"
 WORKER_NAME = "nen-line"
 ADMIN_PAGES_PROJECT = "nen-line-admin-98712679"
