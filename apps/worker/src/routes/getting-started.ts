@@ -90,24 +90,30 @@ gettingStarted.get('/api/getting-started', requireRole('owner', 'admin', 'staff'
     const expected = expectedWebhookUrl(c.env.WORKER_URL ?? new URL(c.req.url).origin);
     const webhookChecks = await Promise.all(
       rows.map(async (row) => {
-        if (row.is_active !== 1) return { id: row.id, status: 'unknown' as const };
+        if (row.is_active !== 1) return { id: row.id, status: 'unknown' as const, active: null as boolean | null };
         const hasSecret = Boolean(row.channel_secret || row.channel_secret_encrypted);
-        if (!hasSecret) return { id: row.id, status: 'unknown' as const };
+        if (!hasSecret) return { id: row.id, status: 'unknown' as const, active: null as boolean | null };
         try {
           const token = await resolveLineCredential(
             row.channel_access_token_encrypted,
             row.channel_access_token,
             { lineAccountId: row.id, field: 'channel_access_token' },
           );
-          if (!token) return { id: row.id, status: 'unknown' as const };
+          if (!token) return { id: row.id, status: 'unknown' as const, active: null as boolean | null };
           const check = await fetchWebhookEndpoint(token, expected);
-          return { id: row.id, status: check.status };
+          return { id: row.id, status: check.status, active: check.active };
         } catch {
-          return { id: row.id, status: 'unknown' as const };
+          return { id: row.id, status: 'unknown' as const, active: null as boolean | null };
         }
       }),
     );
-    const usable = webhookChecks.filter((w) => w.status === 'matched').length;
+    /*
+      R74。URLが一致していても、LINE側でWebhookの利用がオフなら
+      受信は届かない。「終わり」に数えない。`active: null`（読めなかった）
+      は従来どおり「合っている側」に寄せず `unknown` のまま——
+      ここでは利用オフ（false）だけを除外する。
+    */
+    const usable = webhookChecks.filter((w) => w.status === 'matched' && w.active !== false).length;
 
     const tagCount = accountId ? await c.env.DB.prepare(
       `SELECT COUNT(*) AS c FROM tags
@@ -186,7 +192,7 @@ gettingStarted.get('/api/getting-started', requireRole('owner', 'admin', 'staff'
     const steps = [
       {
         ...withAccess(staff, 'accounts', usable > 0 ? 'done' : rows.length > 0 ? 'stalled' : 'todo',
-          rows.length > 0 && usable === 0 ? 'Webhookまたはシークレットを確認してください' : null),
+          rows.length > 0 && usable === 0 ? 'LINE側のWebhook利用設定またはシークレットを確認してください' : null),
         /*
           **Webhook を確かめられなかったことを隠さない。** ここが空だと、
           段1が終わらない理由が運用者に分からない。

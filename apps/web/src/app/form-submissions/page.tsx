@@ -1,25 +1,25 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { MoreHorizontal, X } from 'lucide-react'
+import { X } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { fetchApi } from '@/lib/api'
 import { api, ApiError, type FormDeleteImpact } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
-import { useCanManage } from '@/components/automations/use-can-manage'
+import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { displayFormName, sortFormsByLatestAnswer } from './form-list'
 import Button from '@/components/shared/button'
-import IconButton from '@/components/shared/icon-button'
-import ActionMenu from '@/components/shared/action-menu'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import ListState from '@/components/shared/list-state'
+import { RowActions } from '@/components/shared/row-actions'
 import Select from '@/components/shared/select'
 import ListToolbar from '@/components/shared/list-toolbar'
 import FilterChip from '@/components/shared/filter-chip'
 import Pagination from '@/components/shared/pagination'
 import StatusBadge from '@/components/shared/status-badge'
-import type { FormLayout } from '@line-crm/shared'
+import type { Folder, FormLayout } from '@line-crm/shared'
 import { hasStoredDestination, summarizeFormDestinations } from './form-destination-summary'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import CopyTextButton from '@/components/ui/copy-text-button'
@@ -56,11 +56,11 @@ interface Form {
   accountScopeReviewRequired?: boolean
 }
 
-interface FormFolder {
-  id: string
-  name: string
-  formCount: number
-}
+/**
+ * 「未分類」の送り値。`GET /api/forms` の `folder_id=unfiled` と同じ。
+ * フォルダのIDとは重ならないよう、予約語として扱う。
+ */
+const UNFILED_VALUE = 'unfiled'
 
 type FormListResponse = Form[] | {
   items: Form[]
@@ -132,16 +132,29 @@ export default function FormSubmissionsPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { selectedAccountId, loading: accountLoading } = useAccount()
-  /**
-   * フォルダを作れるのは owner / admin だけ（`POST /api/folders` の
-   * `requireRole('owner', 'admin')`）。**staff には口ごと出さない。**
-   * 押せない灰色の口を置くと「権限を足せば使える操作」に見えるが、
-   * staff にとっては永久に押せない。役割の判定は1か所に寄せてある。
-   * 読み取り前（null）は出さない側へ倒す。
+  /*
+   * 箱の作成・名前変更・削除・並び替えは `POST/PATCH/DELETE /api/folders` が
+   * `requireRole('owner', 'admin')` で閉じている。staff へ操作を見せると
+   * 押しても 403 になるだけなので、操作ごと出さない（テンプレート一覧と同じ）。
+   * 自動化の操作可否（useCanManage）では見ない。あれは項目キーがあれば
+   * staff も通るが、箱の口は役割だけを見るため食い違う。
    */
-  const canAddFolder = useCanManage()
+  const [canManageFolders] = useState(() =>
+    typeof window === 'undefined' ? true : isOwnerOrAdmin())
   const [forms, setForms] = useState<Form[]>([])
-  const [folders, setFolders] = useState<FormFolder[]>([])
+  const [folders, setFolders] = useState<Folder[]>([])
+  const [folderDialogOpen, setFolderDialogOpen] = useState(false)
+  const [editingFolder, setEditingFolder] = useState<Folder | null>(null)
+  const [deletingFolder, setDeletingFolder] = useState<Folder | null>(null)
+  /** 消す箱に入っているフォーム数。`null` はまだ数えていない。 */
+  const [deletingFolderCount, setDeletingFolderCount] = useState<number | null>(null)
+  const [folderBusy, setFolderBusy] = useState(false)
+  /** 箱の読み込み・操作の失敗。箱の場所に小さく出す。一覧は普通に出す。 */
+  const [folderError, setFolderError] = useState('')
+  const [moveTarget, setMoveTarget] = useState<Form | null>(null)
+  const [moveFolderId, setMoveFolderId] = useState<string>(UNFILED_VALUE)
+  const [moveBusy, setMoveBusy] = useState(false)
+  const [moveError, setMoveError] = useState('')
   const [formTotal, setFormTotal] = useState(0)
   /** フォルダ欄の「すべて」件数。絞り込み前の件数（all_total）。 */
   const [folderTotal, setFolderTotal] = useState(0)
@@ -168,8 +181,9 @@ export default function FormSubmissionsPage() {
   const [editingName, setEditingName] = useState('')
   const [savingName, setSavingName] = useState(false)
   const [renameError, setRenameError] = useState('')
+  /** 名前変更の保存に添える編集の版。一覧は持っていないので開くときに読む。 */
+  const [renameRevision, setRenameRevision] = useState<number | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Form | null>(null)
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [deleteImpact, setDeleteImpact] = useState<FormDeleteImpact | null>(null)
   const [deleteImpactLoading, setDeleteImpactLoading] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -240,10 +254,23 @@ export default function FormSubmissionsPage() {
         + (fetchQuery.trim() ? `&q=${encodeURIComponent(fetchQuery.trim())}` : '')
       const [res, folderRes] = await Promise.all([
         fetchApi<{ success: boolean; data: FormListResponse }>(`/api/forms?${account}${folder}${paging}`),
-        fetchApi<{ success: boolean; data: FormFolder[] }>(`/api/folders?kind=form&${account}`),
+        api.folders.list('form', selectedAccountId),
       ])
-      if (!res.success || !folderRes.success) throw new Error('load_failed')
+      if (!res.success || !folderRes.success) {
+        // 箱だけ取れないときは一覧を落とさない。箱の場所に小さく出す。
+        if (res.success && request === formRequest.current) {
+          const items = Array.isArray(res.data) ? res.data : res.data.items
+          setForms(items)
+          setFormTotal(Array.isArray(res.data) ? items.length : res.data.total)
+          setFolderTotal(Array.isArray(res.data) ? items.length : (res.data.all_total ?? res.data.total))
+          setFolders([])
+          setFolderError('フォルダを読み込めませんでした。')
+          return
+        }
+        throw new Error('load_failed')
+      }
       if (request !== formRequest.current) return
+      setFolderError('')
       const items = Array.isArray(res.data) ? res.data : res.data.items
       setForms(items)
       setFolders(folderRes.data)
@@ -326,10 +353,31 @@ export default function FormSubmissionsPage() {
     }
   }
 
-  const openRename = (form: Form) => {
+  /*
+   * R27: 名前の変更は「…」の中の操作。保存は編集保存と同じ口を通るので、
+   * 確認した編集の版を添える。一覧は版を持っていないため、窓を開くときに
+   * 1件取得で読む。版なしで送ると口が 400 にする（#723）。
+   */
+  const openRename = async (form: Form) => {
     setEditingForm(form)
     setEditingName(displayFormName(form.name))
     setRenameError('')
+    setRenameRevision(null)
+    if (!selectedAccountId) {
+      setRenameError('LINE公式アカウントを選んでください。')
+      return
+    }
+    try {
+      const res = await fetchApi<{ success: boolean; data: { contentRevision?: number } }>(
+        `/api/forms/${form.id}?account_id=${encodeURIComponent(selectedAccountId)}`,
+      )
+      if (!res.success) throw new Error('rename_revision_failed')
+      const revision = res.data.contentRevision
+      if (!Number.isInteger(revision)) throw new Error('rename_revision_failed')
+      setRenameRevision(revision as number)
+    } catch {
+      setRenameError('フォームの状態を確認できませんでした。開き直してください。')
+    }
   }
 
   const saveName = async () => {
@@ -338,9 +386,20 @@ export default function FormSubmissionsPage() {
     setSavingName(true)
     setRenameError('')
     try {
+      let revision = renameRevision
+      if (revision === null) {
+        const res = await fetchApi<{ success: boolean; data: { contentRevision?: number } }>(
+          `/api/forms/${editingForm.id}?account_id=${encodeURIComponent(selectedAccountId)}`,
+        )
+        if (!res.success || !Number.isInteger(res.data.contentRevision)) {
+          throw new Error('rename_revision_failed')
+        }
+        revision = res.data.contentRevision as number
+        setRenameRevision(revision)
+      }
       const res = await fetchApi<{ success: boolean; data: Form }>(`/api/forms/${editingForm.id}?account_id=${encodeURIComponent(selectedAccountId)}`, {
         method: 'PUT',
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ name, expectedContentRevision: revision }),
       })
       if (!res.success) throw new Error('rename_failed')
       setForms((current) => current.map((form) => (
@@ -349,8 +408,10 @@ export default function FormSubmissionsPage() {
       setEditingForm(null)
       // 名前は検索・名前順の対象。サーバー側の絞り込み・並びとずれないよう読み直す。
       void loadForms()
-    } catch {
-      setRenameError('フォーム名を変更できませんでした。もう一度お試しください。')
+    } catch (error) {
+      setRenameError(error instanceof ApiError && error.status === 409
+        ? 'ほかの人が先にこの回答フォームを保存しました。開き直して、もう一度お試しください。'
+        : 'フォーム名を変更できませんでした。もう一度お試しください。')
     } finally {
       setSavingName(false)
     }
@@ -395,6 +456,95 @@ export default function FormSubmissionsPage() {
       setDeleteError('この回答フォームをアーカイブできませんでした。状態を読み直してから、もう一度お試しください。')
     } finally {
       setDeleting(false)
+    }
+  }
+
+  /*
+   * R25: 箱の並び替え。2つの更新は口が1回で行う。途中で片方だけ変わらない。
+   */
+  const moveFolder = async (index: number, direction: -1 | 1) => {
+    const target = folders[index]
+    const neighbor = folders[index + direction]
+    if (!target || !neighbor || folderBusy || !selectedAccountId) return
+    setFolderBusy(true)
+    setFolderError('')
+    try {
+      const result = await api.folders.swapOrder(target.id, neighbor.id, selectedAccountId)
+      if (!result.success) throw new Error(result.error)
+      await loadForms()
+    } catch {
+      setFolderError('並び順を変えられませんでした。')
+    } finally {
+      setFolderBusy(false)
+    }
+  }
+
+  const openFolderDelete = async (folder: Folder) => {
+    setDeletingFolder(folder)
+    setDeletingFolderCount(null)
+    setFolderError('')
+    if (!selectedAccountId) return
+    // 消す前に中の件数を読む。取れなくても消す操作自体はできる。
+    try {
+      const account = `account_id=${encodeURIComponent(selectedAccountId)}`
+      const res = await fetchApi<{ success: boolean; data: FormListResponse }>(
+        `/api/forms?${account}&folder_id=${encodeURIComponent(folder.id)}&with_list_summary=1&page=1&limit=1&filter=all&sort=latest-answer`,
+      )
+      if (res.success) {
+        setDeletingFolderCount(Array.isArray(res.data) ? res.data.length : res.data.total)
+      }
+    } catch {
+      setDeletingFolderCount(null)
+    }
+  }
+
+  const removeFolder = async () => {
+    if (!deletingFolder || folderBusy || !selectedAccountId) return
+    const targetId = deletingFolder.id
+    setFolderBusy(true)
+    setFolderError('')
+    try {
+      const res = await api.folders.delete(targetId, selectedAccountId)
+      if (!res.success) throw new Error(res.error)
+      setDeletingFolder(null)
+      if (activeFolderId === targetId) setActiveFolderId('all')
+      await loadForms()
+    } catch {
+      setFolderError('フォルダを削除できませんでした。')
+    } finally {
+      setFolderBusy(false)
+    }
+  }
+
+  const openMove = (form: Form) => {
+    setMoveTarget(form)
+    setMoveFolderId(form.folderId ?? UNFILED_VALUE)
+    setMoveError('')
+  }
+
+  const moveForm = async () => {
+    if (!moveTarget || moveBusy || !selectedAccountId) return
+    const nextFolderId = moveFolderId === UNFILED_VALUE ? null : moveFolderId
+    if ((moveTarget.folderId ?? null) === nextFolderId) {
+      setMoveTarget(null)
+      return
+    }
+    setMoveBusy(true)
+    setMoveError('')
+    try {
+      const res = await fetchApi<{ success: boolean; data: Form }>(
+        `/api/forms/${moveTarget.id}?account_id=${encodeURIComponent(selectedAccountId)}`,
+        { method: 'PUT', body: JSON.stringify({ folderId: nextFolderId }) },
+      )
+      if (!res.success) throw new Error('move_failed')
+      setMoveTarget(null)
+      await loadForms()
+    } catch (error) {
+      setMoveError(error instanceof ApiError && error.status === 422
+        ? 'そのフォルダはありません。開き直して、もう一度お試しください。'
+        : 'フォルダへ移せませんでした。もう一度お試しください。')
+    } finally {
+      setMoveBusy(false)
     }
   }
 
@@ -479,7 +629,7 @@ export default function FormSubmissionsPage() {
         </div>
       </div>
 
-      <div style={FOLDER_RAIL_STYLE} className="grid items-start gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
+      <div style={FOLDER_RAIL_STYLE} className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
         <FolderPanel
           /* R12: 総数は「すべて」の行と同じ数なので見出しには出さない。 */
           activeId={activeFolderId}
@@ -487,24 +637,38 @@ export default function FormSubmissionsPage() {
             setActiveFolderId(folder)
             updateListState({ page: 1 })
           }}
-          // 保存先（forms.folder_id）がまだ無いので、owner / admin でも押せない。
-          // オーナー指示 #582 は追加操作をこの欄へ置くことを求めるので、
-          // 消さずに止めて理由を添える。実データは #688（migration 372）。
-          addFolderDisabled={canAddFolder === true}
-          addFolderTitle="フォームのフォルダ保存先は未接続です"
-          addFolderNote={
-            canAddFolder === true ? (
-              <p className="text-ink-faint text-xs leading-relaxed">
-                フォームのフォルダ保存先はまだ接続されていません。接続されるまではフォルダを追加できません。
-              </p>
-            ) : undefined
-          }
+          // R25: 箱は選んだアカウントに付けて作る。staff には操作ごと出さない。
+          onAddFolder={canManageFolders ? () => setFolderDialogOpen(true) : undefined}
           rows={[
             { id: 'all', label: 'すべて', count: loading || loadError ? 0 : folderTotal },
-            ...folders.map((folder) => ({ id: folder.id, label: folder.name, count: folder.formCount })),
-            { id: 'unfiled', label: '未分類', count: loading || loadError ? 0 : Math.max(0, folderTotal - folders.reduce((sum, folder) => sum + folder.formCount, 0)) },
+            ...folders.map((folder, index) => ({
+              id: folder.id,
+              label: folder.name,
+              // 箱ごとの件数はまだ数えていない（#631 の流儀で出さない）。
+              count: folder.itemCount ?? null,
+              color: folder.color,
+              onEdit: canManageFolders ? () => setEditingFolder(folder) : undefined,
+              onMoveUp: canManageFolders && index > 0 ? () => void moveFolder(index, -1) : undefined,
+              onMoveDown: canManageFolders && index < folders.length - 1 ? () => void moveFolder(index, 1) : undefined,
+              onDelete: canManageFolders ? () => void openFolderDelete(folder) : undefined,
+              deleteNote: '削除しても、中のフォームは未分類に残ります。',
+            })),
+            // 未分類の件数も数えていない。0 とは言わない。
+            { id: UNFILED_VALUE, label: '未分類', count: null },
           ]}
-        />
+        >
+          <p className="text-ink-faint text-xs leading-relaxed">
+            フォルダを消しても、入っていたフォームは未分類として残ります。
+          </p>
+          {folderError ? (
+            <p role="alert" className="text-ink-secondary text-xs">
+              {folderError}
+              <button type="button" onClick={() => void loadForms()} className="text-action ml-2 font-semibold hover:underline">
+                もう一度
+              </button>
+            </p>
+          ) : null}
+        </FolderPanel>
 
         <section className="min-w-0">
           {/*
@@ -725,28 +889,20 @@ export default function FormSubmissionsPage() {
                     {reviewMode ? (
                       <span className="sr-only">読み取り専用</span>
                     ) : (
-                      /* 行の操作は「主な1つ＋…メニュー」。削除は行に直に置かず、メニューの中の危ない操作へ。 */
-                      <span className="relative inline-flex items-center justify-end gap-1.5">
-                        <Button variant="secondary" size="compact" onClick={() => openRename(form)}>編集</Button>
-                        <IconButton
-                          aria-label={`${normalizedName}のその他操作`}
-                          aria-expanded={openMenuId === form.id}
-                          onClick={() => setOpenMenuId((current) => (current === form.id ? null : form.id))}
-                        >
-                          <MoreHorizontal aria-hidden />
-                        </IconButton>
-                        <ActionMenu
-                          open={openMenuId === form.id}
-                          ariaLabel={`${normalizedName}の操作`}
-                          onClose={() => setOpenMenuId(null)}
-                          items={[{
-                            id: 'delete',
-                            label: '削除する',
-                            tone: 'danger',
-                            onSelect: () => void openDelete(form),
-                          }]}
-                        />
-                      </span>
+                      /*
+                       * R27: 行の主ボタン「編集」は質問の編集（編集画面）へ。
+                       * 名前の変更と箱への移動は「…」の中。削除は区切りの後の
+                       * 危ない操作へ。共通の RowActions にそろえる。
+                       */
+                      <RowActions
+                        edit={{ href: `/form-submissions/edit?id=${encodeURIComponent(form.id)}&tab=basic` }}
+                        menuItems={[
+                          { id: 'rename', label: '名前を変更', onSelect: () => void openRename(form) },
+                          { id: 'move', label: 'フォルダへ移す', onSelect: () => openMove(form) },
+                        ]}
+                        destructiveItem={{ id: 'delete', label: '削除する', onSelect: () => void openDelete(form) }}
+                        subjectName={normalizedName}
+                      />
                     )}
                   </td>
                 </tr>
@@ -837,6 +993,83 @@ export default function FormSubmissionsPage() {
           </div>
         </div>
       )}
+
+      {folderDialogOpen && (
+        <FolderAddDialog
+          kind="form"
+          accountId={selectedAccountId}
+          note="フォームを分けてしまう箱です。消しても、入っていたフォームは未分類として残ります。"
+          placeholder="例: 01_来店・予約"
+          onClose={() => setFolderDialogOpen(false)}
+          onAdded={() => void loadForms()}
+        />
+      )}
+
+      {editingFolder && (
+        <FolderAddDialog
+          kind="form"
+          folder={editingFolder}
+          accountId={selectedAccountId}
+          note="フォームを分けてしまう箱です。削除しても、中のフォームは未分類に残ります。"
+          placeholder="例: 01_来店・予約"
+          onClose={() => setEditingFolder(null)}
+          onAdded={() => { setEditingFolder(null); void loadForms() }}
+        />
+      )}
+
+      <ConfirmDialog
+        open={deletingFolder !== null}
+        title={`フォルダ「${deletingFolder?.name ?? ''}」を削除しますか？`}
+        description={`削除しても、中のフォームは未分類に残ります。${
+          deletingFolderCount === null
+            ? 'いまこのフォルダに入っている件数を確認できませんでした。'
+            : `いまこのフォルダに入っているのは${deletingFolderCount.toLocaleString('ja-JP')}件です。`
+        }`}
+        confirmLabel="削除する"
+        destructive
+        busy={folderBusy}
+        error={folderError || undefined}
+        onConfirm={() => void removeFolder()}
+        onCancel={() => {
+          if (folderBusy) return
+          setDeletingFolder(null)
+          setFolderError('')
+        }}
+      />
+
+      <ConfirmDialog
+        open={moveTarget !== null}
+        title={moveTarget ? `「${displayFormName(moveTarget.name)}」をどのフォルダへ移しますか？` : 'フォルダへ移しますか？'}
+        description="回答やURLは変わりません。入れる箱だけが変わります。"
+        confirmLabel="移動する"
+        busy={moveBusy}
+        error={moveError || undefined}
+        onConfirm={() => void moveForm()}
+        onCancel={() => {
+          if (moveBusy) return
+          setMoveTarget(null)
+          setMoveError('')
+        }}
+      >
+        <div className="space-y-1" role="radiogroup" aria-label="移動先のフォルダ">
+          {[{ id: UNFILED_VALUE, name: '未分類' }, ...folders.map((folder) => ({ id: folder.id, name: folder.name }))].map((folder) => (
+            <label
+              key={folder.id}
+              className={`rounded-control flex cursor-pointer items-center gap-2 border px-3 py-2 text-sm ${
+                moveFolderId === folder.id ? 'border-accent bg-accent-soft' : 'border-hairline'
+              }`}
+            >
+              <input
+                type="radio"
+                name="move-folder"
+                checked={moveFolderId === folder.id}
+                onChange={() => setMoveFolderId(folder.id)}
+              />
+              <span className="text-ink min-w-0 flex-1 truncate" title={folder.name}>{folder.name}</span>
+            </label>
+          ))}
+        </div>
+      </ConfirmDialog>
 
       <ConfirmDialog
         open={deleteTarget !== null}

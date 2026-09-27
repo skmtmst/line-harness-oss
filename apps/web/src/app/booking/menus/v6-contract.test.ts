@@ -14,6 +14,11 @@ describe('V6 予約設定', () => {
     expect(CREATE).toContain('designNode="GhOb3"')
   })
 
+  it('R91: メニューがあるときも見出しに作成の入口を常設する', () => {
+    expect(LIST).toContain("tab === 'menus' && canEditMenus")
+    expect(LIST).toContain('href="/booking/menus/new"')
+  })
+
   it('本文に画面タイトルを重ねず、行き先が分かる操作名にする', () => {
     expect(LIST).not.toContain('<Header')
     expect(CREATE).toContain('showHeader={false}')

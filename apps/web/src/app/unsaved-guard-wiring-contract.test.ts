@@ -89,6 +89,8 @@ const EXEMPTIONS: Record<string, string> = {
     '費用の手入力はダイアログ内の dirty。閉じると元に戻る仕様で、画面離脱ガードの対象外',
   'components/shared/drawer.tsx':
     'dirty 印（*）を表示するだけの共通部品。編集画面ではない',
+  'app/nen-members/photo-reward-policy.tsx':
+    '棚（Drawer）の中の小さな操作。閉じると入力は戻る仕様で、画面離脱ガードの対象外。保存中・戻し中は棚を閉じられない',
   'components/reminders/reminder-publish-flow.tsx':
     '公開フロー全体で離脱番兵を持たないのは従来どおり。対象条件の書きかけも段内の一時状態で、保存は「通知ステップへ」に集約する。段またぎの離脱の扱いは段全体で別途検討',
   'app/form-submissions/page.tsx':

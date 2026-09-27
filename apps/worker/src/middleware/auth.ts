@@ -413,6 +413,7 @@ const STAFF_EXPLICIT_ALLOW: Array<[method: string, path: string]> = [
 
 const STAFF_EXPLICIT_ALLOW_PATTERNS: Array<[method: string, pattern: RegExp]> = [
   ['POST', /^\/api\/restaurant-test\/stores\/[^/]+\/select$/],
+  ['PATCH', /^\/api\/restaurant-test\/reservations\/[^/]+$/],
   ['GET', /^\/api\/restaurant-test\/google\/reviews\/[^/]+$/],
   ['POST', /^\/api\/restaurant-test\/google\/reviews\/[^/]+\/draft\/generate$/],
   ['PUT', /^\/api\/restaurant-test\/google\/reviews\/[^/]+\/draft$/],

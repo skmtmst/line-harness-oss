@@ -38,7 +38,7 @@ function stubFetch() {
           draftUpdatedAt: '2026-09-01',
           publishedVersion: null,
           published: { name: '決めごと', eventType: 'friend_added', source: null, amount: 10, initialStatus: 'available', validFrom: null, validUntil: null, status: 'published', updatedAt: '2026-09-01' },
-          metrics30d: { eligible: 0, granted: 0, excluded: 0 },
+          metrics30d: { eligible: 0, granted: 0, grantedMiles: 0, excluded: 0 },
         }],
         pagination: { total: 1 },
         unassignedLegacyCount: 0,

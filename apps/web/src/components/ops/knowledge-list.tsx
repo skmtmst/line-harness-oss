@@ -87,12 +87,12 @@ export default function KnowledgeList() {
           const approved = label.label === '承認済み'
           return <Tr key={article.id}>
             <Td className={styles.titleCell} title={article.title}>{article.title}</Td>
-            <Td>{KNOWLEDGE_KINDS.find(v => v.value === article.kind)?.label}</Td>
-            <Td><Chip tone={articleKindLabel.tone} className={styles.articleKindChip}>{articleKindLabel.label}</Chip></Td>
-            <Td><Chip tone={label.tone} className={styles.chip}>{label.label}</Chip></Td>
-            <Td>{article.usedCount ? `${article.usedCount}回` : '—'}</Td>
-            <Td>{article.helpfulCount ? `${article.helpfulCount}件` : '—'}</Td>
-            <Td>{knowledgeDate(article.updatedAt)}</Td>
+            <Td data-label="種類">{KNOWLEDGE_KINDS.find(v => v.value === article.kind)?.label}</Td>
+            <Td data-label="記事の種類"><Chip tone={articleKindLabel.tone} className={styles.articleKindChip}>{articleKindLabel.label}</Chip></Td>
+            <Td data-label="状態"><Chip tone={label.tone} className={styles.chip}>{label.label}</Chip></Td>
+            <Td data-label="使われた回数">{article.usedCount ? `${article.usedCount}回` : '—'}</Td>
+            <Td data-label="役に立った">{article.helpfulCount ? `${article.helpfulCount}件` : '—'}</Td>
+            <Td data-label="更新日">{knowledgeDate(article.updatedAt)}</Td>
             <Td><div className={styles.rowActions}>
               <button type="button" disabled={busy} onClick={() => void open(article)}>{approved ? '直す' : label.label === '承認待ち' ? '内容を確認' : '理由を確認'}</button>
               {article.reviewState !== 'dismissed' && <button type="button" disabled={busy} onClick={() => void review(article, approved ? 'disable' : 'dismiss')}>{approved ? '無効にする' : '見送る'}</button>}

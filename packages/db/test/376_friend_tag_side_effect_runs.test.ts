@@ -4,7 +4,7 @@
  * schema.sql + migrations を順に当てた実 SQLite で、台帳の状態遷移・予約・
  * 「止まっている行」の判定を確かめる。
  */
-import { beforeEach, describe, expect, test } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from 'vitest';
 import Database from 'better-sqlite3';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -47,7 +47,15 @@ const ASSIGNED_AT = '2026-09-11T10:00:00.000+09:00';
 let sqlite: Database.Database;
 let db: D1Database;
 
-beforeEach(() => {
+/**
+ * schema.sql + 全 migration の当て直しは1回で約2秒かかる。試験ごと
+ * (16本) に繰り返すと30秒の同期処理になり、混んだ CI では worker が
+ * 60秒近く応答できず `Timeout calling "onTaskUpdate"` で全件成功でも
+ * 落ちていた。土台は beforeAll で1回だけ作り、試験ごとは BEGIN で始めて
+ * ROLLBACK で戻す(口の batch はセーブポイントで入れ子になるので壊れない)。
+ * 使い終わった接続は afterAll で閉じる。
+ */
+beforeAll(() => {
   sqlite = new Database(':memory:');
   execSafe(sqlite, readFileSync(join(root, 'schema.sql'), 'utf8'));
   for (const file of readdirSync(join(root, 'migrations')).filter((n) => n.endsWith('.sql')).sort()) {
@@ -68,6 +76,18 @@ beforeEach(() => {
     )
     .run(ASSIGNED_AT);
   db = asD1(sqlite);
+});
+
+beforeEach(() => {
+  sqlite.exec('BEGIN');
+});
+
+afterEach(() => {
+  sqlite.exec('ROLLBACK');
+});
+
+afterAll(() => {
+  sqlite.close();
 });
 
 function run(stepKey: string): FriendTagSideEffectRun {

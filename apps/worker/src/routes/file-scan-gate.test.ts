@@ -141,6 +141,25 @@ describe('ファイル検査の一覧', () => {
     expect(res.status).toBe(404);
   });
 
+  it('ファイル名で絞れ、件数も同じ条件で数える (監査R132)', async () => {
+    insertScan({ filename: 'invoice.pdf' });
+    insertScan({ filename: 'photo.png' });
+    const res = await get('/api/file-scans?accountId=acc-1&q=invoice', 'owner-1');
+    expect(res.status).toBe(200);
+    const body = await res.json() as { data: { items: { filename: string }[]; total: number } };
+    expect(body.data.items.map((row) => row.filename)).toEqual(['invoice.pdf']);
+    expect(body.data.total).toBe(1);
+  });
+
+  it('検索語は % や _ をそのままの文字として扱う (監査R132)', async () => {
+    insertScan({ filename: '100%.png' });
+    insertScan({ filename: 'a.png' });
+    const res = await get('/api/file-scans?accountId=acc-1&q=' + encodeURIComponent('%'), 'owner-1');
+    const body = await res.json() as { data: { items: { filename: string }[]; total: number } };
+    expect(body.data.items.map((row) => row.filename)).toEqual(['100%.png']);
+    expect(body.data.total).toBe(1);
+  });
+
   it('staff は自分の上げた分の状態は見られる', async () => {
     const scan = insertScan({ status: 'pending', reason_code: null, reason_detail: null });
     const res = await get(
