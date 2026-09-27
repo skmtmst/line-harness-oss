@@ -5,15 +5,18 @@ import {
   completePhotoNotificationDelivery,
   consumePhotoOriginalDownload,
   consumeStepUpGrant,
+  createPhotoRewardPolicy,
   getBulkDecisionReceipt,
   getPhotoAssetStatus,
   getPhotoDerivatives,
   getPhotoReviewMetrics,
   issuePhotoOriginalDownload,
+  listPhotoRewardPolicies,
   reconcileBulkNotificationOutcomes,
   recordBulkDecisionNotificationResult,
   requestPhotoAssessment,
   requestPhotoAssetProcessing,
+  revertPhotoRewardPolicyToVersion,
   type BulkNotifiedItem,
   type BulkNotificationResult,
   type BulkPhotoDecision,
@@ -97,6 +100,143 @@ nenPhotoOperations.get(
     } catch (error) {
       console.error('GET photo review metrics error:', error);
       return c.json({ success: false, error: '写真審査の集計を取得できませんでした' }, 500);
+    }
+  },
+);
+
+/*
+ * 報酬の決まりの版 (#817)。保存するたびに版を1つ足し、前の版は変えない。
+ * 「この版に戻す」は、その版の中身で新しい版を作る。
+ * 決まりは全体で1つ（アカウントの切り分けなし）。見るだけなら
+ * 写真審査の表示権限で足り、変えるのは owner・admin だけ。
+ */
+nenPhotoOperations.get(
+  '/api/nen-members/photo-reward-policy/versions',
+  requirePhotoPermission('photo.submission.view'),
+  async (c) => {
+    try {
+      const versions = await listPhotoRewardPolicies(c.env.DB);
+      return c.json({
+        success: true,
+        data: versions.map((version) => ({
+          versionNumber: version.version_number,
+          policyKey: version.policy_key,
+          points: version.points,
+          summary: version.summary,
+          effectiveFrom: version.effective_from,
+          createdBy: version.created_by_staff_id,
+          createdAt: version.created_at,
+          status: version.status,
+        })),
+      });
+    } catch (error) {
+      console.error('GET photo reward policy versions error:', error);
+      return c.json({ success: false, error: '報酬の決まりの版を取得できませんでした' }, 500);
+    }
+  },
+);
+
+nenPhotoOperations.post(
+  '/api/nen-members/photo-reward-policy/versions',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    type Body = { points?: unknown; summary?: unknown; effectiveFrom?: unknown; expectedVersion?: unknown };
+    const body = await c.req.json<Body>().catch((): Body => ({}));
+    const key = idempotencyKey(c);
+    if (!key) {
+      return c.json({ success: false, error: '再実行キーを確認してください' }, 400);
+    }
+    const points = Number(body.points);
+    const summary = typeof body.summary === 'string' ? body.summary : '';
+    const effectiveFrom = body.effectiveFrom == null || body.effectiveFrom === ''
+      ? null
+      : String(body.effectiveFrom);
+    const expectedVersion = body.expectedVersion === undefined || body.expectedVersion === null
+      ? undefined
+      : Number(body.expectedVersion);
+    if (!Number.isInteger(points) || points <= 0 || points > 100000) {
+      return c.json({ success: false, error: '1枚につき付ける点数を1〜100000で入力してください' }, 400);
+    }
+    if (effectiveFrom !== null && Number.isNaN(Date.parse(effectiveFrom))) {
+      return c.json({ success: false, error: '使い始めの日時の形を確認してください' }, 400);
+    }
+    if (expectedVersion !== undefined && (!Number.isInteger(expectedVersion) || expectedVersion < 1)) {
+      return c.json({ success: false, error: '確認した版の番号を確認してください' }, 400);
+    }
+    auditLog(c, 'photo.reward.policy.create', { kind: 'nen-photo-reward-policy' });
+    try {
+      const { created, version } = await createPhotoRewardPolicy(c.env.DB, {
+        points,
+        summary,
+        effectiveFrom,
+        expectedVersion,
+        idempotencyKey: key,
+        staffId: c.get('staff')?.id ?? null,
+      });
+      return c.json({
+        success: true,
+        data: {
+          created,
+          version: {
+            versionNumber: version.version_number,
+            policyKey: version.policy_key,
+            points: version.points,
+            summary: version.summary,
+            effectiveFrom: version.effective_from,
+            createdAt: version.created_at,
+          },
+        },
+      });
+    } catch (error) {
+      if (String(error).includes('PHOTO_REWARD_POLICY_VERSION_CONFLICT')) {
+        return c.json({ success: false, error: 'ほかの担当者が先に保存しました。開き直して確認してください', code: 'VERSION_CONFLICT' }, 409);
+      }
+      console.error('POST photo reward policy versions error:', error);
+      return c.json({ success: false, error: '報酬の決まりを保存できませんでした' }, 500);
+    }
+  },
+);
+
+nenPhotoOperations.post(
+  '/api/nen-members/photo-reward-policy/revert',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    type Body = { versionNumber?: unknown };
+    const body = await c.req.json<Body>().catch((): Body => ({}));
+    const key = idempotencyKey(c);
+    if (!key) {
+      return c.json({ success: false, error: '再実行キーを確認してください' }, 400);
+    }
+    const versionNumber = Number(body.versionNumber);
+    if (!Number.isInteger(versionNumber) || versionNumber < 1) {
+      return c.json({ success: false, error: '戻す版の番号を確認してください' }, 400);
+    }
+    auditLog(c, 'photo.reward.policy.revert', { kind: 'nen-photo-reward-policy' });
+    try {
+      const { created, version } = await revertPhotoRewardPolicyToVersion(
+        c.env.DB, versionNumber,
+        { idempotencyKey: key, staffId: c.get('staff')?.id ?? null },
+      );
+      return c.json({
+        success: true,
+        data: {
+          created,
+          version: {
+            versionNumber: version.version_number,
+            policyKey: version.policy_key,
+            points: version.points,
+            summary: version.summary,
+            effectiveFrom: version.effective_from,
+            createdAt: version.created_at,
+          },
+        },
+      });
+    } catch (error) {
+      if (String(error).includes('PHOTO_REWARD_POLICY_VERSION_NOT_FOUND')) {
+        return c.json({ success: false, error: '戻す版が見つかりません' }, 404);
+      }
+      console.error('POST photo reward policy revert error:', error);
+      return c.json({ success: false, error: '報酬の決まりを戻せませんでした' }, 500);
     }
   },
 );

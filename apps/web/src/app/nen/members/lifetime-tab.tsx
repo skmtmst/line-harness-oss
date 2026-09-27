@@ -201,7 +201,7 @@ export default function LifetimeTab({
         )}
       />
 
-      <ConfirmDialog
+      <ConfirmDialog primaryAction="cancel"
         open={leaveTarget !== null}
         title="保存していない変更があります"
         description="このまま移動すると、節目への変更は失われます。保存せずに移動しますか？"

@@ -254,7 +254,7 @@ export default function NewRichMenuPage() {
           setMediaPickerOpen(false)
         }}
       />
-      <ConfirmDialog
+      <ConfirmDialog primaryAction="cancel"
         open={leaveTarget !== null}
         title="入力中の内容があります"
         description="このまま移動すると、入力した内容は保存されません。移動しますか？"

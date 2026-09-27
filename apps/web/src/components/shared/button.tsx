@@ -28,6 +28,8 @@ type CommonProps = {
 type NativeButtonProps = CommonProps &
   Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children' | 'className' | 'href'> & {
     href?: never
+    /** 開いた直後に標的を寄せたいときだけ渡す（未保存の離脱確認の主ボタン）。 */
+    ref?: React.Ref<HTMLButtonElement>
   }
 
 type LinkButtonProps = CommonProps &
@@ -66,10 +68,11 @@ export default function Button(props: ButtonProps) {
     size: _size,
     type = 'button',
     variant: _variant,
+    ref,
     ...buttonProps
   } = props
   return (
-    <button type={type} className={classes} {...buttonProps}>
+    <button type={type} className={classes} ref={ref} {...buttonProps}>
       {children}
     </button>
   )

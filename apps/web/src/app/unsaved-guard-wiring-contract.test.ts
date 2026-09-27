@@ -20,6 +20,7 @@ const DIRTY_SIGNATURE = /dirty|unsaved|savedSnapshot|未保存/i
 /** 番兵を持つ画面。`useUnsavedGuard` と離脱確認ダイアログの両方が必要。 */
 const GUARDED = [
   'app/booking/menus/staff/page.tsx',
+  'app/booking/staff/shifts/page.tsx',
   'app/contents/vars/edit/page.tsx',
   'app/contents/vars/new/page.tsx',
   'app/ec-commerce/connector-panel.tsx',
@@ -38,15 +39,21 @@ const GUARDED = [
   'app/reminders/new/page.tsx',
   'app/restaurant-test/google/google-business.tsx',
   'app/restaurant-test/google/google-profile.tsx',
+  'app/restaurant-test/stores/new/page.tsx',
   'app/rich-menus/edit/page.tsx',
   'app/rich-menus/new/page.tsx',
   'app/settings/page.tsx',
   'app/settings/file-scan/page.tsx',
+  'app/tags/fields/edit/page.tsx',
   'app/tags/fields/new/page.tsx',
   'app/tags/searches/edit/page.tsx',
+  'app/templates/questions/new/page.tsx',
   'app/webinars/edit/page.tsx',
   'app/webinars/new/page.tsx',
   'components/accounts/account-ordering.tsx',
+  'components/events/event-wizard.tsx',
+  'components/friend-fields/support-mark-editor.tsx',
+  'components/reminders/reminder-publish-flow.tsx',
 ] as const
 
 /*
@@ -89,8 +96,16 @@ const EXEMPTIONS: Record<string, string> = {
     '費用の手入力はダイアログ内の dirty。閉じると元に戻る仕様で、画面離脱ガードの対象外',
   'components/shared/drawer.tsx':
     'dirty 印（*）を表示するだけの共通部品。編集画面ではない',
-  'components/reminders/reminder-publish-flow.tsx':
-    '公開フロー全体で離脱番兵を持たないのは従来どおり。対象条件の書きかけも段内の一時状態で、保存は「通知ステップへ」に集約する。段またぎの離脱の扱いは段全体で別途検討',
+  'components/shared/dialog.tsx':
+    '確認窓の共通部品。未保存の離脱確認では primaryAction="cancel" で残る方を主にする。窓自体は編集を持たない',
+  'components/shared/confirm-dialog.tsx':
+    '確認窓の共通部品。未保存の離脱確認では主が取消のとき印を付けない。窓自体は編集を持たない',
+  'components/shared/overlay-utils.ts':
+    '重なりの共通部品。初回フォーカスの寄せ先を呼出側で選べるだけで、編集を持たない',
+  'components/shared/button.tsx':
+    'ボタンの共通部品。開いた直後の標的用の ref を受けられるだけで、編集を持たない',
+  'app/nen-members/photo-reward-policy.tsx':
+    '棚（Drawer）の中の小さな操作。閉じると入力は戻る仕様で、画面離脱ガードの対象外。保存中・戻し中は棚を閉じられない',
   'app/form-submissions/page.tsx':
     '一覧と絞り込みが中心。作る操作は下書きを作って編集画面（GUARDED）へ渡すため、この画面に残る下書きを持たない',
   'app/inflow-links/page.tsx':
@@ -145,8 +160,6 @@ const UNTRIAGED: Record<string, string> = {
     's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'app/booking/staff/page.tsx':
     's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
-  'app/booking/staff/shifts/page.tsx':
-    's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'app/broadcasts/page.tsx':
     's2: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'app/chats/page.tsx':
@@ -194,8 +207,6 @@ const UNTRIAGED: Record<string, string> = {
     's1: シナリオ詳細。手動保存で番兵なし。V6R-S1-d（board#1065）で付ける',
   'app/scenarios/first-step/page.tsx':
     's1: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
-  'app/tags/fields/edit/page.tsx':
-    's1: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'app/tags/fields/migrate/page.tsx':
     's1: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'app/templates/page.tsx':
@@ -218,11 +229,7 @@ const UNTRIAGED: Record<string, string> = {
     's2: 一斉配信の作成。手動保存で番兵なし。V6R-S2-a（kentavndng/line-harness-board#1066）で付ける',
   'components/events/event-form.tsx':
     's3: イベント作成。V6R-S3-b（board#1067）で付ける',
-  'components/events/event-wizard.tsx':
-    's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'components/friend-fields/edit-tag-page-v4.tsx':
-    's1: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
-  'components/friend-fields/support-mark-editor.tsx':
     's1: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'components/friend-fields/support-mark-rules-panel.tsx':
     's1: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',

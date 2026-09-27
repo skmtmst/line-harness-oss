@@ -774,7 +774,7 @@ function ReviewDraftScreen({ accountId, reviewId, data, canPublish, backHref, on
           ) : null}
         </aside>
       </div>
-      <ConfirmDialog
+      <ConfirmDialog primaryAction="cancel"
         open={leaveTarget !== null}
         title="保存していない下書きがあります"
         description="このまま移動すると、返信文の変更は失われます。下書き保存をしてから移動するか、保存せずに移動してください。"

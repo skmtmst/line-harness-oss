@@ -247,6 +247,11 @@ describe('カレンダー', () => {
     const group = await screen.findByRole('radiogroup', { name: '表示の切り替え' });
     fireEvent.click(within(group).getByRole('radio', { name: 'カレンダー' }));
     await screen.findByRole('button', { name: '10月16日 空きあり' });
+    // 月の読み込みと「一番早い日を自動で選ぶ」は別の描画で来る。ます目が
+    // 出ただけでは自動選択がまだで、先に日を押すと遅れて来た自動選択に
+    // 上書きされ「10/20 の空き」が出ない（CI の間欠失敗）。自動選択の
+    // 結果（10/16 の段）が出てから押す。
+    expect(await screen.findByText('10/16(金) の空き')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '10月20日 空きあり' }));
     expect(await screen.findByText('10/20(火) の空き')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '09:00' }));

@@ -114,6 +114,33 @@ describe('GET /api/chats/quick-counts (INBOX-09)', () => {
     expect(body.data).toMatchObject({ all: 2, reply: 2, overdue: 1 });
   });
 
+  test('R111 遅れて届いた受信は件数と一覧で同じ待ち時間になる', async () => {
+    const seedDelayed = (id: string, eventAgeMs: number, storedAgeMs: number) => {
+      const storedAt = new Date(NOW - storedAgeMs).toISOString();
+      const eventAt = new Date(NOW - eventAgeMs).toISOString();
+      db.raw.prepare('INSERT INTO friends(id,line_user_id,display_name,line_account_id) VALUES (?,?,?,?)')
+        .run(id, id, id, 'account-a');
+      db.raw.prepare(`INSERT INTO chats(id,friend_id,operator_id,status,last_message_at,created_at,updated_at)
+        VALUES (?,?,?,?,?,?,?)`).run(id, id, null, 'unread', storedAt, storedAt, storedAt);
+      db.raw.prepare(`INSERT INTO messages_log(id,friend_id,direction,message_type,content,created_at,line_event_at)
+        VALUES (?,?,'incoming','text',?,?,?)`).run(id, id, `msg-${id}`, storedAt, eventAt);
+    };
+    // 8時の受信が10時に保存 → 10分後の時点で待ち2時間10分。件数と一覧の
+    // どちらでも1時間以上待ちになる（受信時刻を正とする）。
+    seedDelayed('delayed', 2 * 3600_000 + 10 * 60_000, 10 * 60_000);
+    // 逆（保存が古く受信が新しい）はどちらでも1時間以上にしない。
+    seedDelayed('backfill', 10 * 60_000, 2 * 3600_000);
+
+    const { body } = await counts({ lineAccountId: 'account-a' });
+    expect(body.data).toMatchObject({ all: 2, reply: 2, overdue: 1 });
+
+    const listRes = await app().request(
+      '/api/chats?quickFilter=overdue&lineAccountId=account-a&limit=200', {}, { DB: db.db });
+    expect(listRes.status).toBe(200);
+    const listBody = await listRes.json() as { success: boolean; data: Array<{ friendId: string }> };
+    expect(listBody.data.map((row) => row.friendId)).toEqual(['delayed']);
+  });
+
   test('チャネル値が不正なら400、権限外アカウントなら404', async () => {
     expect((await counts({ channel: 'bogus' })).status).toBe(400);
     expect((await counts({ lineAccountId: 'account-x' })).status).toBe(404);

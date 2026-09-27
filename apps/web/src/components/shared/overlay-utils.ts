@@ -16,6 +16,11 @@ export function useOverlayFocus(
   open: boolean,
   onClose: () => void,
   closeDisabled = false,
+  /**
+   * 初回に寄せる要素。未指定なら先頭の操作へ寄せる従来どおり。
+   * 未保存の離脱確認のように「残る方」を主にする窓で、主のボタンへ寄せる。
+   */
+  initialFocus?: () => HTMLElement | null,
 ): RefObject<HTMLDivElement | null> {
   const containerRef = useRef<HTMLDivElement>(null)
   const onCloseRef = useRef(onClose)
@@ -39,7 +44,7 @@ export function useOverlayFocus(
     const focusable = () =>
       Array.from(containerRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? [])
     // 初回フォーカスの予約は cleanup で取消せるようにしておく。
-    const initialFocusFrame = requestAnimationFrame(() => focusable()[0]?.focus())
+    const initialFocusFrame = requestAnimationFrame(() => (initialFocus?.() ?? focusable()[0])?.focus())
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && !closeDisabled) {

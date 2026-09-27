@@ -4,7 +4,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { describeReminderTiming } from '@line-crm/shared'
 import type { ReminderDraftSettings, ReminderDraftVersion, ReminderPreviewResult, ReminderPublishResult, ReminderValidationResult } from '@line-crm/shared'
-import { api } from '@/lib/api'
+import { ApiError, api } from '@/lib/api'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { firstReminderStepMessage, reminderPlaceholders, reminderStepTimings, reminderStopSummary, reminderTriggerLabel } from './reminder-labels'
 import { useReminderTestRecipient, type ReminderTestRecipientView } from './use-reminder-test-recipient'
 import { useReminderTestSend } from './use-reminder-test-send'
@@ -72,6 +73,10 @@ export default function ReminderPublishFlow({ reminderId, stage }: { reminderId:
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [testConfirm, setTestConfirm] = useState(false)
+  /** R145 監査：対象と停止条件の書きかけ。保存済みの下書きとの差で見る。 */
+  const [savedSnapshot, setSavedSnapshot] = useState<string | null>(null)
+  /** R148 監査：別の画面の先勝ちで保存が 409 になったとき、読み直しへ出す。 */
+  const [conflict, setConflict] = useState(false)
   // 送信先はテスト段だけ読む。ほかの段で余計なGETを打たない。
   const testRecipient = useReminderTestRecipient(stage === 'test' ? reminderId : null)
   // 送信状態・冪等キー・遅い応答の破棄は1か所で持つ（DEEP-09/10/11）。
@@ -91,8 +96,35 @@ export default function ReminderPublishFlow({ reminderId, stage }: { reminderId:
       // いつまでも読み込み中になるので、失敗として再読み込みへ出す。
       if (response.data.reminderId !== reminderId) throw new Error('下書きを読み込めませんでした。')
       setDraft(response.data); setSettings(response.data.settings)
+      setSavedSnapshot(JSON.stringify(response.data.settings))
+      setConflict(false)
     } catch { if (seq === requestSeq.current) setError('下書きを読み込めませんでした。') } finally { if (seq === requestSeq.current) setLoading(false) }
   }, [reminderId])
+
+  /*
+   * R145 監査：対象と終了条件の書きかけも「未保存の変更あり」とし、
+   * 一覧・メニュー移動では確認を出す。編集を続ければ内容を保ち、
+   * 破棄を選んだときだけ保存済みの下書きへ戻す。
+   * 入力欄を持つのは対象の段だけなので、番兵はこの段で働く。
+   */
+  const dirty = stage === 'target'
+    && draft !== null && settings !== null && savedSnapshot !== null
+    && JSON.stringify(settings) !== savedSnapshot
+  const draftRef = useRef(draft)
+  draftRef.current = draft
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({
+    dirty,
+    busy,
+    onDiscard: () => {
+      // 「保存せずに移動」が確定したら、段の中に留まる遷移でも書きかけを
+      // 残さない。「変更は消えます」の約束どおり、保存済みの下書きへ戻す。
+      const saved = draftRef.current
+      if (saved) {
+        setSettings(saved.settings)
+        setSavedSnapshot(JSON.stringify(saved.settings))
+      }
+    },
+  })
 
   useEffect(() => {
     // 対象が変わったら前の対象の本文・検査結果・送信結果を持ち越さない。
@@ -128,10 +160,18 @@ export default function ReminderPublishFlow({ reminderId, stage }: { reminderId:
   async function saveTarget() {
     if (!settings) return
     setBusy(true)
+    setConflict(false)
     try {
-      const response = await api.reminders.saveDraft(reminderId, settings)
+      const response = await api.reminders.saveDraft(
+        reminderId,
+        settings,
+        // R148 監査：対象設定の保存も通知ステップと同じ条件にする。開いた
+        // ときの版IDと版時刻を送り、別の画面が先に保存していたら 409 で止める。
+        draft ? { expectedVersionId: draft.versionId, expectedUpdatedAt: draft.updatedAt } : {},
+      )
       if (!response.success) throw new Error(response.error)
       setDraft(response.data); setSettings(response.data.settings)
+      setSavedSnapshot(JSON.stringify(response.data.settings))
       /*
        * REMINDER-09: 通常導線は 対象 → 通知ステップ → 送信設定（配信予定）。
        * 通知編集（STEP 3）を飛ばして配信予定へ進むと、操作していない工程が
@@ -139,7 +179,14 @@ export default function ReminderPublishFlow({ reminderId, stage }: { reminderId:
        */
       router.push(`/reminders/edit?id=${encodeURIComponent(reminderId)}`)
     }
-    catch { setError('対象と終了条件を保存できませんでした。') } finally { setBusy(false) }
+    catch (caught) {
+      if (caught instanceof ApiError && caught.status === 409) {
+        setConflict(true)
+        setError('この下書きは別の画面で先に更新されました。最新の内容を読み直してください。')
+      } else {
+        setError('対象と終了条件を保存できませんでした。')
+      }
+    } finally { setBusy(false) }
   }
   async function sendTest() {
     const outcome = await testSend.send()
@@ -183,13 +230,23 @@ export default function ReminderPublishFlow({ reminderId, stage }: { reminderId:
   return (
     <div data-reminder-publish-stage={stage}>
       <ReminderWizard current={current} />
-      {(error || (!testConfirm && testIssue)) ? <Notice tone="danger" className="mb-3">{error || testIssue}</Notice> : null}
+      {(error || (!testConfirm && testIssue)) ? (
+        <Notice
+          tone="danger"
+          className="mb-3"
+          action={conflict ? <button type="button" className="font-semibold underline" onClick={() => void loadDraft()}>最新の内容を読み直す</button> : undefined}
+        >
+          {error || testIssue}
+        </Notice>
+      ) : null}
       {stage === 'target' ? <TargetStage reminderId={reminderId} settings={subjectSettings} validation={validation} validationFailed={validationState === 'error'} onRetryValidation={retryValidation} onChange={setSettings} onNext={() => void saveTarget()} busy={busy} /> : null}
       {stage === 'preview' ? <PreviewStage settings={subjectSettings} preview={preview} previewFailed={previewState === 'error'} onRetryPreview={retryPreview} editHref={`/reminders/edit?id=${encodeURIComponent(reminderId)}`} onNext={() => go('test')} /> : null}
       {stage === 'test' ? <TestStage draft={subjectDraft} recipientName={testSend.phase.kind === 'succeeded' ? testSend.phase.recipientName : null} recipientKind={testSend.phase.kind === 'succeeded' ? testSend.phase.recipientKind : null} recipientView={testRecipient.view} onRecipientRecheck={() => void testRecipient.reload()} onConfirm={() => { testSend.beginAttempt(); setTestConfirm(true) }} onNext={() => go('confirm')} /> : null}
       {stage === 'confirm' ? <ConfirmStage draft={subjectDraft} settings={subjectSettings} validation={validation} validationFailed={validationState === 'error'} onRetryValidation={retryValidation} onPublish={() => void publishDraft()} busy={busy} /> : null}
       {stage === 'done' ? <DoneStage draft={subjectDraft} published={published} preview={preview} validation={validation} /> : null}
       <ConfirmDialog open={testConfirm && stage === 'test'} title="テスト送信しますか？" description={testSend.phase.kind === 'unknown' ? '前回の送信結果を確認できていません。再試行しても二重には送られません。' : testSendConfirmDescription(testRecipient.view, testSend.phase.kind === 'succeeded' ? testSend.phase.recipientName : null, testSend.phase.kind === 'succeeded' ? testSend.phase.recipientKind : null)} confirmLabel={testIssue ? 'もう一度送信' : 'テスト送信'} cancelLabel="配信予定へ戻る" busy={sendBusy} error={testIssue} onConfirm={() => void sendTest()} onCancel={() => setTestConfirm(false)} />
+      {/* R145 監査：対象と停止条件の書きかけがある間の離脱確認。 */}
+      <ConfirmDialog primaryAction="cancel" open={leaveTarget !== null} title="保存していない変更があります" description="このまま移動すると、対象と停止条件への変更は失われます。保存せずに移動しますか？" confirmLabel="保存せずに移動" cancelLabel="編集を続ける" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )
 }

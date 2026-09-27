@@ -198,7 +198,7 @@ export default function NewWebinarPage() {
           </>
         )}
       />
-      <ConfirmDialog
+      <ConfirmDialog primaryAction="cancel"
         open={leaveTarget !== null}
         title="保存していない変更があります"
         description="このまま移動すると、入力した内容は保存されません。移動しますか？"
