@@ -248,6 +248,18 @@ webhook.post('/webhook', async (c) => {
     return c.json({ status: 'ok' }, 200);
   }
 
+  // 届いた時刻を覚える。届かない警告（X-2）の判定に使う。
+  if (matchedAccountId) {
+    try {
+      await db
+        .prepare(`UPDATE line_accounts SET last_webhook_received_at = ? WHERE id = ?`)
+        .bind(new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, -1) + '+09:00', matchedAccountId)
+        .run();
+    } catch (stampError) {
+      console.error('last_webhook_received_at update failed:', stampError);
+    }
+  }
+
   let body: WebhookRequestBody;
   try {
     body = JSON.parse(rawBody) as WebhookRequestBody;
