@@ -57,6 +57,7 @@ import {
   BROADCASTS, BROADCAST_FOLDERS, BROADCAST_INSIGHTS, BROADCAST_LIST_META,
   BROADCAST_NOTIFICATION_SETTINGS,
   BROADCAST_APPROVAL_CONFIG, BROADCAST_APPROVAL_CANDIDATES, BROADCAST_APPROVAL_STATE,
+  BROADCAST_RECIPIENTS, BROADCAST_ACTIVITY,
   BROADCAST_PREFLIGHT, BROADCAST_SAVED_VIEWS, CHATS, FRIEND_FIELDS, FRIEND_ATTRIBUTE_FIELDS, FRIEND_FIELD_FOLDERS,
   FRIEND_ATTRIBUTE_SAVED_SEARCH_DETAIL, FRIEND_ATTRIBUTE_SAVED_SEARCH_RESPONSE, FRIEND_FIELD_MIGRATION_PREVIEW,
   INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS,
@@ -86,7 +87,7 @@ import {
   BOOKING_AVAILABILITY_RULES, BOOKING_BREAKS, BOOKING_BREAK_DATES, BOOKING_STAFF_SHIFTS, BOOKING_GOOGLE_CALENDAR,
   BOOKING_PROXY_CREATE, BOOKING_REQUESTS,
   BOOKING_ADMIN_DETAIL, BOOKING_CUSTOMER_CONTEXT, BOOKING_REMINDER_PREVIEW, BOOKING_CONFLICT_ALTERNATIVES,
-  EC_NOTIFICATION_SETTINGS, EC_NOTIFICATION_RUNS, LINE_NOTIFICATION_DEFINITIONS, LINE_NOTIFICATION_METRICS, LINE_NOTIFICATION_DELIVERIES,
+  EC_NOTIFICATION_SETTINGS, EC_NOTIFICATION_RUNS, LINE_NOTIFICATION_DEFINITIONS, LINE_NOTIFICATION_METRICS, LINE_NOTIFICATION_SEND_COUNTS, LINE_NOTIFICATION_DELIVERIES,
   OPERATOR_NOTIFICATION_RECIPIENTS, OPERATOR_NOTIFICATION_RULES, ADMIN_EVENTS, EVENT_DETAIL, EVENT_SLOTS, EVENT_WAITLIST, EVENT_BOOKINGS, NEN_PHOTOS, NEN_PHOTO_DETAIL,
   NEN_PHOTO_REVIEW_METRICS, NEN_PHOTO_ASSET_STATUS, NEN_PHOTO_DERIVATIVES,
   NEN_PHOTO_ASSET_PROCESS_RESULT, NEN_PHOTO_BULK_DECISION_RESULT,
@@ -2601,11 +2602,64 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   }
   const broadcastApproval = pathname.match(/^\/api\/broadcasts\/([^/]+)\/approval$/)
   if (broadcastApproval) {
+    const approvalId = broadcastApproval[1]
+    // 記録の見本と合わせる。2行目は承認を通って送信済み。
+    // 承認の無い配信は 'none'（段に承認待ちを出さない）。
+    if (approvalId === 'broadcast-2') {
+      return {
+        success: true,
+        data: {
+          ...BROADCAST_APPROVAL_STATE,
+          approval: {
+            ...BROADCAST_APPROVAL_STATE.approval,
+            status: 'approved',
+            decidedByStaffId: 'staff-approver',
+            decidedAt: '2026-09-25T21:02:00+09:00',
+          },
+        },
+      }
+    }
+    if (approvalId !== 'broadcast-0' && approvalId !== 'broadcast-visual') {
+      return {
+        success: true,
+        data: {
+          ...BROADCAST_APPROVAL_STATE,
+          approval: {
+            ...BROADCAST_APPROVAL_STATE.approval,
+            status: 'none',
+            requestedByStaffId: null,
+            requestedAt: null,
+            approverStaffId: null,
+            note: null,
+          },
+          gate: { ...BROADCAST_APPROVAL_STATE.gate, required: false, recipientCount: 0 },
+        },
+      }
+    }
     return { success: true, data: BROADCAST_APPROVAL_STATE }
   }
   const broadcastInsight = pathname.match(/^\/api\/broadcasts\/([^/]+)\/insight$/)
   if (broadcastInsight) {
     return { success: true, data: BROADCAST_INSIGHTS[broadcastInsight[1]] ?? null }
+  }
+  const broadcastRecipients = pathname.match(/^\/api\/broadcasts\/([^/]+)\/recipients$/)
+  if (broadcastRecipients) {
+    const wanted = query.get('result') ?? 'all'
+    const groupFor = { delivered: 'delivered', temporary: 'failed_temporary', permanent: 'failed_permanent', unknown: 'unknown', inflight: 'inflight' }[wanted]
+    const rows = groupFor ? BROADCAST_RECIPIENTS.rows.filter((row) => row.group === groupFor) : BROADCAST_RECIPIENTS.rows
+    return {
+      success: true,
+      data: { rows, summary: BROADCAST_RECIPIENTS.summary, aggregateOnly: false, aggregateReason: null, legacySuccessCount: null },
+      pagination: { total: rows.length, limit: 50, cursor: 0, nextCursor: null },
+    }
+  }
+  const broadcastActivity = pathname.match(/^\/api\/broadcasts\/([^/]+)\/activity$/)
+  if (broadcastActivity) {
+    return {
+      success: true,
+      data: BROADCAST_ACTIVITY,
+      pagination: { limit: 50, cursor: 0, nextCursor: null },
+    }
   }
   const broadcastOne = pathname.match(/^\/api\/broadcasts\/([^/]+)$/)
   if (broadcastOne) {
@@ -2757,9 +2811,52 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (pathname === '/api/site/pages') return { success: true, data: SITE_TRACKING_PAGES }
   if (pathname === '/api/site/tracking-key') {
     // アカウントごとに違う鍵を返す。乱数は使わない(毎回同じ絵にする)。
-    const accountId = query.get('accountId') ?? 'visual-qa-account'
+    // 画面は account_id で送る（旧 accountId も受ける）。
+    const accountId = query.get('account_id') ?? query.get('accountId') ?? 'visual-qa-account'
     const trackingKey = `hk_${createHash('sha256').update(`site-tracking:${accountId}`).digest('hex').slice(0, 32)}`
     return { success: true, data: { accountId, trackingKey } }
+  }
+  // Google Sheets 連携の見本。名前は packages/shared の型どおり（data 包み）。
+  if (pathname === '/api/integrations/google-sheets/connection') {
+    return {
+      success: true,
+      data: {
+        connection: {
+          status: 'connected',
+          googleAccountEmail: 'owner@example.com',
+          spreadsheetId: 'sheet-123',
+          spreadsheetTitle: 'LINE連携シート',
+          spreadsheetUrl: 'https://docs.google.com/spreadsheets/d/sheet-123',
+          lastSyncedAt: '2026-09-26T03:00:00.000Z',
+          lastSyncStatus: 'ok',
+          lastSyncError: null,
+          consecutiveFailures: 0,
+          connectedAt: '2026-09-20T00:00:00.000Z',
+        },
+        oauthConfigured: true,
+        syncRunning: false,
+        canManage: true,
+      },
+    }
+  }
+  if (pathname === '/api/integrations/google-sheets/runs') {
+    return {
+      success: true,
+      data: {
+        runs: [
+          {
+            id: 'run-1',
+            kind: 'scheduled',
+            dataType: 'friends',
+            status: 'ok',
+            rowsWritten: 120,
+            error: null,
+            startedAt: '2026-09-26T03:00:00.000Z',
+            finishedAt: '2026-09-26T03:01:00.000Z',
+          },
+        ],
+      },
+    }
   }
   if (pathname === '/api/ad-platforms') return { success: true, data: AD_PLATFORMS }
   if (pathname === '/api/ad-platforms/logs') {
@@ -2969,6 +3066,9 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   }
   if (pathname === '/api/line-notifications/metrics') {
     return { success: true, data: LINE_NOTIFICATION_METRICS }
+  }
+  if (pathname === '/api/line-notifications/send-counts') {
+    return { success: true, data: LINE_NOTIFICATION_SEND_COUNTS }
   }
   if (pathname === '/api/line-notifications/deliveries') {
     const requestedLimit = Number.parseInt(query.get('limit') ?? '', 10)

@@ -6,6 +6,8 @@ import { api, type GoogleSheetsConnection, type GoogleSheetsSyncRun } from '@/li
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Disclosure from '@/components/shared/disclosure'
+import { isGoogleSheetsConnectionPayload, isGoogleSheetsRunsPayload } from '@line-crm/shared'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -97,20 +99,30 @@ export default function GoogleSheetsPanel() {
       loadGenerationRef.current !== requestGeneration
       || selectedAccountIdRef.current !== requestAccountId
     ) return
-    if (connectionResult.status === 'fulfilled' && connectionResult.value.success) {
-      setConnection(connectionResult.value.data.connection)
-      setCanManage(connectionResult.value.data.canManage)
-      setOauthConfigured(connectionResult.value.data.oauthConfigured)
-      setSyncRunning(connectionResult.value.data.syncRunning)
+    /*
+     * 応答の形は packages/shared の判定で確かめる。形が違う応答でも
+     * 「読み込めなかった」表示へ逃がす（読み込み中のまま止めない）。
+     */
+    const connectionPayload = connectionResult.status === 'fulfilled' && connectionResult.value.success
+      ? connectionResult.value.data
+      : undefined
+    if (isGoogleSheetsConnectionPayload(connectionPayload)) {
+      setConnection(connectionPayload.connection)
+      setCanManage(connectionPayload.canManage)
+      setOauthConfigured(connectionPayload.oauthConfigured)
+      setSyncRunning(connectionPayload.syncRunning)
       // 未設定（pending_target）なら出力先フォームを開いた状態で見せる。
-      setShowTargetForm(connectionResult.value.data.connection.status === 'pending_target')
+      setShowTargetForm(connectionPayload.connection.status === 'pending_target')
       setStatus('ready')
     } else {
       setStatus('error')
       setLoadError('連携の状態を読み込めませんでした。')
     }
     if (runsResult.status === 'fulfilled' && runsResult.value.success) {
-      setRuns(runsResult.value.data.runs)
+      const runsPayload = runsResult.value.data
+      if (isGoogleSheetsRunsPayload(runsPayload)) {
+        setRuns(runsPayload.runs)
+      }
     }
   }, [selectedAccountId])
 
@@ -245,10 +257,22 @@ export default function GoogleSheetsPanel() {
       )}
       {status === 'error' && (
         <div className="bg-canvas border-hairline rounded-card border p-5">
-          <p className="text-danger text-sm">{loadError}</p>
-          <Button variant="secondary" className="mt-3" onClick={() => void load()}>
-            もう一度読み込む
-          </Button>
+          <p className="text-ink text-sm font-semibold">{loadError}</p>
+          <p className="text-ink-secondary mt-1 text-xs">
+            連携の内容は変わっていません。読み込み直しても直らないときは、下の確かめ方を見てください。
+          </p>
+          <div className="mt-3">
+            <Button variant="secondary" onClick={() => void load()}>
+              もう一度読み込む
+            </Button>
+          </div>
+          <Disclosure title="確かめ方" size="compact" className="mt-3">
+            <ul className="list-disc space-y-1 pl-5 text-xs leading-relaxed text-ink-secondary">
+              <li>左で選んでいるLINEアカウントが合っているか確かめてください。</li>
+              <li>ログインし直してから、もう一度読み込んでください。</li>
+              <li>Google側でこのアプリの許可を取り消した場合は、「Googleアカウントを接続する」からやり直してください。</li>
+            </ul>
+          </Disclosure>
         </div>
       )}
 

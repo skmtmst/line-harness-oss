@@ -37,9 +37,7 @@ describe('Issue #451 V6画面名はトップバーだけに置く', () => {
     expect(autoReplies).toContain('＋ ルールを作る')
   })
 
-  it('一斉配信詳細のCSV操作を下部追従バーへ置く', () => {
-    const source = read('broadcasts/detail/page.tsx')
-    expect(source).toContain('<StickyBar')
-    expect(source.indexOf('<StickyBar')).toBeLessThan(source.lastIndexOf('CSVで書き出す'))
-  })
+  // 一斉配信詳細のCSV操作の置き場所は #816 C で変えた（概要・宛先タブの中。
+  // 下の追従バーは出さない）。置き場所の契約は
+  // broadcasts/detail/broadcast-detail-v6-contract.test.ts が持つ。
 })

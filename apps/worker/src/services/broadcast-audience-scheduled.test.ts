@@ -28,6 +28,10 @@ vi.mock('@line-crm/line-sdk', () => ({
       line.pushed.push({ to: [to], messages });
       return { requestId: 'request-1' };
     }
+    async pushMessageWithRequestId(to: string, messages: unknown) {
+      line.pushed.push({ to: [to], messages });
+      return { data: {}, requestId: 'request-1' };
+    }
   },
 }));
 

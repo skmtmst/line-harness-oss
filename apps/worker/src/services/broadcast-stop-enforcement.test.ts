@@ -47,9 +47,14 @@ function makeLineClient(opts: {
       const index = calls.length;
       calls.push([...userIds]);
       await opts.onMulticast?.(userIds, index);
+      return { requestId: 'req-1' };
     },
     async pushMessage(userId: string) {
       calls.push([userId]);
+    },
+    async pushMessageWithRequestId(userId: string) {
+      calls.push([userId]);
+      return { requestId: 'req-1' };
     },
     async broadcast() {
       return { requestId: 'req-1' };
@@ -258,9 +263,11 @@ describe('一斉配信の停止（#662）', () => {
       seedSendingSegmentBroadcast(raw);
 
       // 2束目（100人）が LINE に断られる。要求は届いていて、誰にも配られていない。
+      // #816: 送り直すのは一時的な失敗だけなので、429（速度制限）で断る。
+      // 400 だと恒常的な失敗になり、送り直しの対象に入らない。
       const first = makeLineClient({
         onMulticast: (_ids, index) => {
-          if (index === 1) throw rejectedByLine(400);
+          if (index === 1) throw rejectedByLine(429);
         },
       });
       await processQueuedBroadcasts(db, first.client);

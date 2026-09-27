@@ -23,6 +23,10 @@ function makeLineClient() {
     async pushMessage(userId: string) {
       pushed.push(userId);
     },
+    async pushMessageWithRequestId(userId: string) {
+      pushed.push(userId);
+      return { requestId: 'req-1' };
+    },
   } as unknown as import('@line-crm/line-sdk').LineClient;
   return { client, pushed };
 }
