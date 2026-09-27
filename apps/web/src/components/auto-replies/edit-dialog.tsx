@@ -657,7 +657,7 @@ export default function EditDialog({
           <section className="space-y-4">
             {!page && <div>
               <h2 className="text-ink text-lg font-bold">基本設定</h2>
-              <p className="text-ink-faint mt-1 text-xs">ルール名・フォルダ・優先順位を設定します。</p>
+              <p className="text-ink-faint mt-1 text-xs">ルール名・フォルダを決めます。動く順番は一覧で上下を入れ替えて決めます。</p>
             </div>}
 
             <div className={page ? 'grid items-start gap-3 xl:grid-cols-4' : ''}>
