@@ -3,7 +3,7 @@
 import { X } from 'lucide-react'
 import DateField from '@/components/shared/date-field'
 import DateTimeField, { TimeField } from '@/components/shared/date-time-field'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -624,10 +624,11 @@ function EditCommonVarInner() {
                   </div>
                   <div>
                     <label htmlFor="cv-folder" className="text-ink-secondary mb-1 block text-sm font-medium">フォルダ</label>
-                    <SelectField
+                    <Select
+                      aria-label="フォルダ"
                       id="cv-folder"
                       value={folderId}
-                      onChange={(e) => { setSaved(false); setFolderId(e.target.value) }}
+                      onChange={(value) => { setSaved(false); setFolderId(value) }}
                       options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]}
                     />
                   </div>
@@ -638,7 +639,7 @@ function EditCommonVarInner() {
                     <label htmlFor="cv-value" className="text-ink-secondary text-sm font-medium">差し込まれる文字</label>
                     <span className="text-ink-faint text-xs tabular-nums">{value.length} / {item.type === 'long_text' ? 10000 : 200}</span>
                   </div>
-                  {item.type === 'boolean' ? <SelectField id="cv-value" value={value} onChange={(e) => { setSaved(false); setValue(e.target.value) }} options={[{ value: 'true', label: 'true' }, { value: 'false', label: 'false' }]} className="w-full" /> : (item.type as string) === 'long_text' ? <textarea id="cv-value" maxLength={10000} value={value} onChange={(e) => { setSaved(false); setValue(e.target.value) }} className="border-hairline rounded-control w-full border px-3 py-3 text-sm" rows={5} /> : (item.type as string) === 'date' ? <DateField id="cv-value" value={value} onChange={(v) => { setSaved(false); setValue(v) }} /> : (item.type as string) === 'datetime' ? <DateTimeField id="cv-value" value={value} onChange={(v) => { setSaved(false); setValue(v) }} /> : <input
+                  {item.type === 'boolean' ? <Select size="full" aria-label="差し込まれる文字" id="cv-value" value={value} onChange={(value) => { setSaved(false); setValue(value) }} options={[{ value: 'true', label: 'true' }, { value: 'false', label: 'false' }]} /> : (item.type as string) === 'long_text' ? <textarea id="cv-value" maxLength={10000} value={value} onChange={(e) => { setSaved(false); setValue(e.target.value) }} className="border-hairline rounded-control w-full border px-3 py-3 text-sm" rows={5} /> : (item.type as string) === 'date' ? <DateField id="cv-value" value={value} onChange={(v) => { setSaved(false); setValue(v) }} /> : (item.type as string) === 'datetime' ? <DateTimeField id="cv-value" value={value} onChange={(v) => { setSaved(false); setValue(v) }} /> : <input
                     id="cv-value"
                     type={item.type === 'number' ? 'number' : 'text'}
                     maxLength={item.type === 'number' ? undefined : 200}
@@ -699,16 +700,17 @@ function EditCommonVarInner() {
                   </div>
                   <div>
                     <label htmlFor="cv-expiry-behavior" className="text-ink-secondary mb-1 block text-xs font-medium">期間外の動作</label>
-                    <SelectField id="cv-expiry-behavior" value={expiryBehavior} onChange={(e) => { setSaved(false); setExpiryBehavior(e.target.value as 'stop' | 'fallback') }} options={[{ value: 'stop', label: '配信を止める' }, { value: 'fallback', label: '代替値を使う' }]} />
+                    <Select aria-label="期間外の動作" id="cv-expiry-behavior" value={expiryBehavior} onChange={(value) => { setSaved(false); setExpiryBehavior(value as 'stop' | 'fallback') }} options={[{ value: 'stop', label: '配信を止める' }, { value: 'fallback', label: '代替値を使う' }]} />
                   </div>
                   {expiryBehavior === 'fallback' && (
                     <div>
                       <label htmlFor="cv-fallback-value" className="text-ink-secondary mb-1 block text-xs font-medium">代替値</label>
                       {item.type === 'boolean' ? (
-                        <SelectField
+                        <Select
+                          aria-label="代替値"
                           id="cv-fallback-value"
                           value={fallbackValue}
-                          onChange={(e) => { setSaved(false); setFallbackValue(e.target.value) }}
+                          onChange={(value) => { setSaved(false); setFallbackValue(value) }}
                           options={[{ value: '', label: '選んでください' }, { value: 'true', label: 'true' }, { value: 'false', label: 'false' }]}
                         />
                       ) : (item.type as string) === 'date' ? (
@@ -1038,13 +1040,7 @@ function EditCommonVarInner() {
                 更新後の値
               </label>
               {item?.type === 'boolean' ? (
-                <SelectField
-                  id="sc-value"
-                  value={draft.value}
-                  onChange={(e) => setDraft({ ...draft, value: e.target.value })}
-                  options={[{ value: '', label: '選んでください' }, { value: 'true', label: 'true' }, { value: 'false', label: 'false' }]}
-                  className="w-full"
-                />
+                <Select size="full" aria-label="更新後の値" id="sc-value" value={draft.value} onChange={(value) => setDraft({ ...draft, value: value })} options={[{ value: '', label: '選んでください' }, { value: 'true', label: 'true' }, { value: 'false', label: 'false' }]} />
               ) : (item?.type as string) === 'date' ? (
                 <DateField id="sc-value" value={draft.value} onChange={(v) => setDraft({ ...draft, value: v })} />
               ) : (item?.type as string) === 'datetime' ? (

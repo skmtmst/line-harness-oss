@@ -220,7 +220,7 @@ describe('プロフィールの採用値を変える窓', () => {
   }]
 
   it('候補を選ぶまで保存できず、画面にはマスク済み値と取得元だけを出す', () => {
-    // 共通 SelectField は Next.js の自動 JSX runtime 前提。SSR 単体試験でも同じ前提を置く。
+    // 共通 Select は Next.js の自動 JSX runtime 前提。SSR 単体試験でも同じ前提を置く。
     vi.stubGlobal('React', React)
     const draft = emptyProfileCandidateDraft(candidates)
     const html = renderToStaticMarkup(

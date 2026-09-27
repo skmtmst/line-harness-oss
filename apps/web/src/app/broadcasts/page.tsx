@@ -15,7 +15,7 @@ import ListState from '@/components/shared/list-state'
 import { audienceSummary, rowExcerpt } from '@/lib/broadcast-summary'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import Button from '@/components/shared/button'
 import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { ApprovalBadge } from '@/components/broadcasts/broadcast-approval'
@@ -110,6 +110,8 @@ function BroadcastList() {
   // タイトルの絞り込み（設計 `Body` の「タイトルで検索」）。
   // 一覧が増えると、配信名を覚えていても探すのに時間がかかる。
   const [titleQuery, setTitleQuery] = useState('')
+  /* 保存した検索の選び欄の表示値。選ぶと絞りへ反映する（素の select の defaultValue 相当）。 */
+  const [savedViewId, setSavedViewId] = useState('')
   /*
    * 配信日で絞る。
    *
@@ -565,10 +567,13 @@ function BroadcastList() {
             />
           </div>
           <div className="mb-3 flex flex-wrap items-center gap-2">
-            <SelectField
+            <Select
               aria-label="保存した検索"
-              defaultValue=""
-              onChange={(event) => applySavedView(event.target.value)}
+              value={savedViewId}
+              onChange={(value) => {
+                setSavedViewId(value)
+                applySavedView(value)
+              }}
               options={[
                 { value: '', label: '保存した検索' },
                 ...savedViews.map((view) => ({ value: view.id, label: view.name })),
@@ -610,10 +615,10 @@ function BroadcastList() {
             <div className="w-52"><DateField value={dateFrom} onChange={setDateFrom} max={dateTo || undefined} aria-label="配信日（開始）" /></div>
             <span className="text-ink-faint text-xs">〜</span>
             <div className="w-52"><DateField value={dateTo} onChange={setDateTo} min={dateFrom || undefined} aria-label="配信日（終了）" /></div>
-            <SelectField
+            <Select
               aria-label="並び順"
               value={sortKey}
-              onChange={(event) => setSortKey(event.target.value === 'oldest' ? 'oldest' : 'newest')}
+              onChange={(value) => setSortKey(value === 'oldest' ? 'oldest' : 'newest')}
               options={[
                 { value: 'newest', label: '配信日が新しい順' },
                 { value: 'oldest', label: '配信日が古い順' },
@@ -650,11 +655,11 @@ function BroadcastList() {
       */}
       <div className="mb-3 flex flex-wrap items-center justify-end gap-2">
         <span className="text-ink-faint text-xs whitespace-nowrap">表示件数</span>
-        <SelectField
+        <Select
           aria-label="表示件数"
           value={String(pageSize)}
-          size="compact"
-          onChange={(event) => setPageSize(Number(event.target.value) || 20)}
+          size="page-size"
+          onChange={(value) => setPageSize(Number(value) || 20)}
           options={[
             { value: '20', label: '20件表示' },
             { value: '50', label: '50件表示' },

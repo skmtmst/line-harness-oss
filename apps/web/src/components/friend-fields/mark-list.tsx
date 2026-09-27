@@ -9,6 +9,7 @@ import { api, ApiError, type SupportMarkArchiveImpact, type SupportMarkListItem 
 import { createResponseGate } from '@/lib/latest-request'
 import Button from '@/components/shared/button'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import Select from '@/components/shared/select'
 import ListKpis from '@/components/shared/list-kpis'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
@@ -95,10 +96,14 @@ function ArchiveMarkDialog({ mark, impact, replacementMarkId, loading, saving, e
           {loading ? <p className="rounded-control bg-surface-soft p-3 text-sm text-ink-faint">影響を確認しています…</p> : impact ? (
             <div>
               <label className="block text-sm font-semibold text-ink">置き換え先
-                <select value={replacementMarkId} onChange={(event) => onReplacement(event.target.value)} className="v6-select mt-1.5 h-10 w-full rounded-control border border-hairline bg-canvas px-3 font-normal">
-                  <option value="">選んでください</option>
-                  {impact.replacementOptions.map((option) => <option key={option.id} value={option.id}>{option.name}{option.isDefault ? '（初期値）' : ''}</option>)}
-                </select>
+                <Select
+                  aria-label="置き換え先"
+                  value={replacementMarkId}
+                  onChange={onReplacement}
+                  options={[{ value: '', label: '選んでください' }, ...impact.replacementOptions.map((option) => ({ value: option.id, label: `${option.name}${option.isDefault ? '（初期値）' : ''}` }))]}
+                  size="full"
+                  className="mt-1.5"
+                />
               </label>
               {selected ? <p className="mt-2 text-xs text-ink-faint">{impact.friendCount}人を「{selected.name}」へ置き換えます。</p> : null}
             </div>
@@ -361,11 +366,17 @@ export default function SupportMarkList({ accountId }: { accountId: string | nul
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="マーク名で検索" aria-label="マーク名で検索" className="h-9 w-[150px] rounded-control border border-hairline bg-canvas px-3 text-label" />
-        <select value={usage} onChange={(event) => setUsage(event.target.value as typeof usage)} className="v6-select h-9 w-[142px] rounded-control border border-hairline bg-canvas pl-3 text-label font-semibold text-ink" aria-label="利用状態">
-          <option value="all">利用状態：すべて</option>
-          <option value="used">使用中</option>
-          <option value="unused">未使用</option>
-        </select>
+        <Select
+          label="利用状態"
+          aria-label="利用状態"
+          value={usage}
+          onChange={(value) => setUsage(value as typeof usage)}
+          options={[
+            { value: 'all', label: 'すべて' },
+            { value: 'used', label: '使用中' },
+            { value: 'unused', label: '未使用' },
+          ]}
+        />
         <span className="flex-1" />
         {/* 追加ボタンはタブの右に1個だけ（#1014 ATTR-22）。一覧の中には置かない。 */}
       </div>

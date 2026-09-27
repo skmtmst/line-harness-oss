@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { ListPlus } from 'lucide-react'
 import type { Scenario, DeliveryMode, Folder } from '@line-crm/shared'
 import Button from '@/components/shared/button'
+import Select from '@/components/shared/select'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
@@ -360,19 +361,17 @@ export default function ScenarioList({
     >
       <label className="block">
         <span className="text-ink-secondary mb-1 block text-xs font-medium">移動先のフォルダ</span>
-        <select
+        <Select
+          aria-label="移動先のフォルダ"
+          size="full"
           value={moveDraft}
-          onChange={(event) => setMoveDraft(event.target.value)}
+          onChange={(value) => setMoveDraft(value)}
           disabled={moving}
-          className="v6-select h-9 w-full rounded-control border border-hairline bg-canvas pl-3 text-sm font-semibold text-ink"
-        >
-          <option value="">未分類</option>
-          {folders.map((folder) => (
-            <option key={folder.id} value={folder.id}>
-              {folder.name}
-            </option>
-          ))}
-        </select>
+          options={[
+            { value: '', label: '未分類' },
+            ...folders.map((folder) => ({ value: folder.id, label: folder.name })),
+          ]}
+        />
       </label>
     </ConfirmDialog>
   )

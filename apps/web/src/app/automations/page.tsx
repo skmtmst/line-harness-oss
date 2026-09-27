@@ -1,6 +1,6 @@
 'use client'
 
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { api, ApiError } from '@/lib/api'
@@ -670,16 +670,16 @@ export default function AutomationsPage() {
         />
         <div className="flex items-center gap-2">
           <p className="text-sm text-ink-secondary">この30日</p>
-          <SelectField
+          <Select
             aria-label="並び順"
             value={sortOrder}
-            onChange={(event) => { setSortOrder(event.target.value as 'runs' | 'priority' | 'name'); setPage(1) }}
+            onChange={(value) => { setSortOrder(value as 'runs' | 'priority' | 'name'); setPage(1) }}
             options={[
               { value: 'runs', label: '動いた回数が多い順' },
               { value: 'priority', label: '動く順' },
               { value: 'name', label: '名前順' },
             ]}
-            className="h-10 min-w-36"
+            className="min-w-36"
           />
         </div>
       </div>

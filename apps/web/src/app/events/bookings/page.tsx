@@ -11,7 +11,7 @@ import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
 import TargetMissing from '@/components/shared/target-missing'
 import Pagination from '@/components/shared/pagination'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import { ActionCell, DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 // #740: 一覧の Kpi と一字一句同じだったため、機能内共有の1部品へ統合した。
@@ -997,10 +997,10 @@ function BookingsInner() {
           {occurrenceSlots.length > 0 && (
             <label className="text-ink-secondary grid gap-1 text-xs font-medium">
               開催回
-              <SelectField
+              <Select
                 aria-label="開催回を選ぶ"
                 value={selectedOccurrenceId}
-                onChange={(event) => setSelectedOccurrenceId(event.target.value)}
+                onChange={(value) => setSelectedOccurrenceId(value)}
                 options={occurrenceSlots.map((slot) => ({ value: slot.id, label: formatJp(slot.starts_at, '日時未取得') }))}
               />
             </label>

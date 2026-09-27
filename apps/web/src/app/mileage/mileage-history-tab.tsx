@@ -7,6 +7,7 @@ import DateField from '@/components/shared/date-field'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import Pagination from '@/components/shared/pagination'
+import Select from '@/components/shared/select'
 import SummaryCard from '@/components/shared/summary-card'
 import { DataTable, NameCell, Td, Th, Tr } from '@/components/shared/table'
 import { api, type MileageAdminHistory, type MileageAdminHistoryItem, type MileageHistoryItem } from '@/lib/api'
@@ -149,34 +150,43 @@ export default function MileageHistoryTab({ accountId }: { accountId: string }) 
               className="h-10 rounded-control border border-hairline bg-canvas px-3 text-sm font-normal text-ink outline-none focus:border-accent"
             />
           </label>
-          <label className="grid w-36 gap-1 text-xs font-semibold text-ink-secondary">
-            種類
-            <select value={entryType} onChange={(event) => resetFilter(() => setEntryType(event.target.value as EntryTypeFilter))} className="v6-select h-10 rounded-control border border-hairline bg-canvas text-sm font-normal text-ink">
-              <option value="">すべての種類</option>
-              <option value="grant">付与</option>
-              <option value="reversal">取消</option>
-              <option value="spend">使用</option>
-              <option value="expiration">失効</option>
-              <option value="adjustment">手動調整</option>
-            </select>
-          </label>
-          <label className="grid w-36 gap-1 text-xs font-semibold text-ink-secondary">
-            状態
-            <select value={status} onChange={(event) => resetFilter(() => setStatus(event.target.value as StatusFilter))} className="v6-select h-10 rounded-control border border-hairline bg-canvas text-sm font-normal text-ink">
-              <option value="">すべての状態</option>
-              <option value="available">利用可能</option>
-              <option value="pending">確定待ち</option>
-              <option value="void">取消済み</option>
-            </select>
-          </label>
-          <label className="grid w-36 gap-1 text-xs font-semibold text-ink-secondary">
-            動かした方法
-            <select value={mode} onChange={(event) => resetFilter(() => setMode(event.target.value as ModeFilter))} className="v6-select h-10 rounded-control border border-hairline bg-canvas text-sm font-normal text-ink">
-              <option value="">自動・手動</option>
-              <option value="automatic">自動</option>
-              <option value="manual">手動</option>
-            </select>
-          </label>
+          <Select
+            label="種類"
+            aria-label="種類"
+            value={entryType}
+            onChange={(value) => resetFilter(() => setEntryType(value as EntryTypeFilter))}
+            options={[
+              { value: '', label: 'すべての種類' },
+              { value: 'grant', label: '付与' },
+              { value: 'reversal', label: '取消' },
+              { value: 'spend', label: '使用' },
+              { value: 'expiration', label: '失効' },
+              { value: 'adjustment', label: '手動調整' },
+            ]}
+          />
+          <Select
+            label="状態"
+            aria-label="状態"
+            value={status}
+            onChange={(value) => resetFilter(() => setStatus(value as StatusFilter))}
+            options={[
+              { value: '', label: 'すべての状態' },
+              { value: 'available', label: '利用可能' },
+              { value: 'pending', label: '確定待ち' },
+              { value: 'void', label: '取消済み' },
+            ]}
+          />
+          <Select
+            label="動かした方法"
+            aria-label="動かした方法"
+            value={mode}
+            onChange={(value) => resetFilter(() => setMode(value as ModeFilter))}
+            options={[
+              { value: '', label: '自動・手動' },
+              { value: 'automatic', label: '自動' },
+              { value: 'manual', label: '手動' },
+            ]}
+          />
           <span className="grid w-48 gap-1 text-xs font-semibold text-ink-secondary">
             開始日
             <DateField aria-label="開始日" value={from} onChange={(v) => resetFilter(() => setFrom(v))} />

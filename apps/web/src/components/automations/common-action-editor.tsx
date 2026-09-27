@@ -4,7 +4,7 @@ import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-react'
 import type { CommonActionResources, CommonActionStep } from '@/lib/api'
 import Button from '@/components/shared/button'
 import IconButton from '@/components/shared/icon-button'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import { TextArea, TextField } from '@/components/shared/text-field'
 
 const ACTION_OPTIONS: Array<{ value: CommonActionStep['type']; label: string }> = [
@@ -94,11 +94,13 @@ export default function CommonActionEditor({
           <div className="grid gap-3 lg:grid-cols-2">
             <label className="text-ink-secondary text-sm">
               処理
-              <SelectField
+              <Select
+                aria-label="処理"
+                size="full"
                 value={step.type}
-                onChange={(event) => update(index, {
-                  type: event.target.value as CommonActionStep['type'],
-                  params: defaultParams(event.target.value as CommonActionStep['type']),
+                onChange={(value) => update(index, {
+                  type: value as CommonActionStep['type'],
+                  params: defaultParams(value as CommonActionStep['type']),
                 })}
                 className="mt-1 w-full"
                 options={ACTION_OPTIONS}
@@ -106,9 +108,11 @@ export default function CommonActionEditor({
             </label>
             <label className="text-ink-secondary text-sm">
               失敗したとき
-              <SelectField
+              <Select
+                aria-label="失敗したとき"
+                size="full"
                 value={step.onFailure}
-                onChange={(event) => update(index, { onFailure: event.target.value as 'stop' | 'continue' })}
+                onChange={(value) => update(index, { onFailure: value as 'stop' | 'continue' })}
                 className="mt-1 w-full"
                 options={[
                   { value: 'stop', label: 'ここで止める' },
@@ -151,9 +155,11 @@ function ResourceSelect({
   return (
     <label className="text-ink-secondary block text-sm">
       {label}
-      <SelectField
+      <Select
+        aria-label={label}
+        size="full"
         value={value}
-        onChange={(event) => onChange(event.target.value)}
+        onChange={(value) => onChange(value)}
         className="mt-1 w-full"
         options={[{ value: '', label: `${label}を選ぶ` }, ...options.map((option) => ({ value: option.id, label: option.name }))]}
       />

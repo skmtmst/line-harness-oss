@@ -31,6 +31,7 @@ import { Bell, Calendar, FileText, Flag, MessageSquare, Tag, User, Variable, Wor
 import type { LucideIcon } from 'lucide-react'
 import styles from './action-editor.module.css'
 import Button from '@/components/shared/button'
+import Select from '@/components/shared/select'
 import {
   api,
   type ScenarioAction,
@@ -415,7 +416,8 @@ export default function ActionEditor({
                 </section>
                 <section className="grid gap-3" style={{ gridTemplateColumns: '1fr 300px' }}>
                   <label className="text-ink text-xs font-medium">保存するアクション名<input className="border-hairline mt-1 h-10 w-full rounded-control border px-3 text-sm" defaultValue="初回案内完了処理" /></label>
-                  <label className="text-ink text-xs font-medium">フォルダ<select className="border-hairline mt-1 h-10 w-full rounded-control border px-3 text-sm" defaultValue="common"><option value="common">シナリオ共通</option></select></label>
+                  {/* フォルダは表示だけ（読む口も書く口も無い）。defaultValue の初期表示を value で維持する。 */}
+                  <label className="text-ink text-xs font-medium">フォルダ<Select aria-label="フォルダ" size="full" value="common" onChange={() => {}} options={[{ value: 'common', label: 'シナリオ共通' }]} /></label>
                 </section>
                 {/*
                   ③ 追加する動作を選ぶ。設計は一覧より前。
@@ -511,7 +513,6 @@ export default function ActionEditor({
   )
 }
 
-const selectClass = 'border-hairline rounded-control text-ink h-9 border bg-white px-2 text-sm min-w-0'
 const inputClass = 'border-hairline rounded-control text-ink h-9 border px-3 text-sm min-w-0 flex-1'
 
 /**
@@ -586,18 +587,15 @@ export function ActionConfigEditor({
     case 'friend_field':
       return (
         <div className="flex flex-wrap items-center gap-2">
-          <select
+          <Select
+            aria-label="友だち情報の項目"
             value={String(c.fieldId ?? '')}
-            onChange={(e) => onChange({ ...c, fieldId: e.target.value })}
-            className={selectClass}
-          >
-            <option value="">項目を選ぶ</option>
-            {fields.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.name}
-              </option>
-            ))}
-          </select>
+            onChange={(value) => onChange({ ...c, fieldId: value })}
+            options={[
+              { value: '', label: '項目を選ぶ' },
+              ...fields.map((f) => ({ value: f.id, label: f.name })),
+            ]}
+          />
           <span className="text-ink-secondary text-sm">に</span>
           {c.op !== 'clear' && (
             <input
@@ -607,16 +605,17 @@ export function ActionConfigEditor({
             />
           )}
           <span className="text-ink-secondary text-sm">を</span>
-          <select
+          <Select
+            aria-label="友だち情報の操作"
             value={String(c.op ?? 'set')}
-            onChange={(e) => onChange({ ...c, op: e.target.value })}
-            className={selectClass}
-          >
-            <option value="set">← (代入)</option>
-            <option value="add">＋ (加算)</option>
-            <option value="sub">－ (減算)</option>
-            <option value="clear">X (消去)</option>
-          </select>
+            onChange={(value) => onChange({ ...c, op: value })}
+            options={[
+              { value: 'set', label: '← (代入)' },
+              { value: 'add', label: '＋ (加算)' },
+              { value: 'sub', label: '－ (減算)' },
+              { value: 'clear', label: 'X (消去)' },
+            ]}
+          />
           <span className="text-ink-secondary text-sm">する</span>
         </div>
       )
@@ -625,18 +624,15 @@ export function ActionConfigEditor({
       return (
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-ink text-sm font-medium">対応マーク</span>
-          <select
+          <Select
+            aria-label="対応マーク"
             value={String(c.markId ?? '')}
-            onChange={(e) => onChange({ ...c, markId: e.target.value || null })}
-            className={selectClass}
-          >
-            <option value="">マークを外す</option>
-            {marks.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name}
-              </option>
-            ))}
-          </select>
+            onChange={(value) => onChange({ ...c, markId: value || null })}
+            options={[
+              { value: '', label: 'マークを外す' },
+              ...marks.map((m) => ({ value: m.id, label: m.name })),
+            ]}
+          />
         </div>
       )
 
@@ -644,28 +640,26 @@ export function ActionConfigEditor({
       return (
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-2">
-            <select
+            <Select
+              aria-label="シナリオ操作"
               value={String(c.op ?? 'start')}
-              onChange={(e) => onChange({ ...c, op: e.target.value })}
-              className={selectClass}
-            >
-              <option value="start">購読を始める</option>
-              <option value="stop">購読を止める</option>
-              <option value="resume_previous">1つ前のシナリオを再開する</option>
-            </select>
+              onChange={(value) => onChange({ ...c, op: value })}
+              options={[
+                { value: 'start', label: '購読を始める' },
+                { value: 'stop', label: '購読を止める' },
+                { value: 'resume_previous', label: '1つ前のシナリオを再開する' },
+              ]}
+            />
             {c.op !== 'resume_previous' && (
-              <select
+              <Select
+                aria-label="対象のシナリオ"
                 value={String(c.scenarioId ?? '')}
-                onChange={(e) => onChange({ ...c, scenarioId: e.target.value })}
-                className={selectClass}
-              >
-                <option value="">{c.op === 'stop' ? 'このシナリオ' : 'シナリオを選ぶ'}</option>
-                {scenarios.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
+                onChange={(value) => onChange({ ...c, scenarioId: value })}
+                options={[
+                  { value: '', label: c.op === 'stop' ? 'このシナリオ' : 'シナリオを選ぶ' },
+                  ...scenarios.map((s) => ({ value: s.id, label: s.name })),
+                ]}
+              />
             )}
           </div>
           {c.op === 'start' && (
@@ -702,18 +696,15 @@ export function ActionConfigEditor({
     case 'common_var':
       return (
         <div className="flex flex-wrap items-center gap-2">
-          <select
+          <Select
+            aria-label="共通情報"
             value={String(c.varKey ?? '')}
-            onChange={(e) => onChange({ ...c, varKey: e.target.value })}
-            className={selectClass}
-          >
-            <option value="">共通情報を選ぶ</option>
-            {vars.map((v) => (
-              <option key={v.varKey} value={v.varKey}>
-                {v.name}
-              </option>
-            ))}
-          </select>
+            onChange={(value) => onChange({ ...c, varKey: value })}
+            options={[
+              { value: '', label: '共通情報を選ぶ' },
+              ...vars.map((v) => ({ value: v.varKey, label: v.name })),
+            ]}
+          />
           <span className="text-ink-secondary text-sm">に</span>
           <input
             value={String(c.value ?? '')}
@@ -721,14 +712,15 @@ export function ActionConfigEditor({
             className={inputClass}
           />
           <span className="text-ink-secondary text-sm">を</span>
-          <select
+          <Select
+            aria-label="共通情報の操作"
             value={String(c.op ?? 'add')}
-            onChange={(e) => onChange({ ...c, op: e.target.value })}
-            className={selectClass}
-          >
-            <option value="add">＋ (加算)</option>
-            <option value="sub">－ (減算)</option>
-          </select>
+            onChange={(value) => onChange({ ...c, op: value })}
+            options={[
+              { value: 'add', label: '＋ (加算)' },
+              { value: 'sub', label: '－ (減算)' },
+            ]}
+          />
           <span className="text-ink-secondary text-sm">する</span>
         </div>
       )

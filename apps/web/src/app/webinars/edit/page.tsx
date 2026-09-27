@@ -1,7 +1,7 @@
 'use client'
 
 import Disclosure from '@/components/shared/disclosure'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
@@ -567,7 +567,7 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
     const watching = summary ? Math.max(0, summary.viewers - summary.completed) : 0
     return (
       <div className="space-y-4" data-design-node="Q8sHa">
-        <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-ink text-lg font-bold">参加者管理</h2><p className="text-ink-faint mt-1 text-xs">申込・視聴・CTA・フォームの結果を友だち単位で確認します。</p></div>{participantsState === 'ready' ? <div className="flex flex-wrap items-center gap-2"><SelectField aria-label="参加者の分類で絞り込む" size="compact" value={participantFilter} onChange={(event) => setParticipantFilter(event.target.value as '' | WebinarParticipantClassification)} options={PARTICIPANT_FILTER_OPTIONS} /><Button disabled={csvBusy} onClick={() => downloadParticipantsCsv(participantFilter || undefined)}>{csvBusy ? '書き出しています…' : '参加者をCSVで書き出す'}</Button></div> : null}</div>
+        <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-ink text-lg font-bold">参加者管理</h2><p className="text-ink-faint mt-1 text-xs">申込・視聴・CTA・フォームの結果を友だち単位で確認します。</p></div>{participantsState === 'ready' ? <div className="flex flex-wrap items-center gap-2"><Select aria-label="参加者の分類で絞り込む" size="page-size" value={participantFilter} onChange={(value) => setParticipantFilter(value as '' | WebinarParticipantClassification)} options={PARTICIPANT_FILTER_OPTIONS} /><Button disabled={csvBusy} onClick={() => downloadParticipantsCsv(participantFilter || undefined)}>{csvBusy ? '書き出しています…' : '参加者をCSVで書き出す'}</Button></div> : null}</div>
         {csvError ? <p className="text-danger text-xs" role="alert">{csvError}</p> : null}
         {summary ? (
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -1548,12 +1548,13 @@ function CtasTab({ webinarId, durationSeconds, forms, formsState, onRetryForms, 
                 className="w-20 rounded border px-2 py-1"
               />
             </label>
-            <SelectField value={c.kind} onChange={(e) => update(i, { kind: e.target.value as 'form' | 'url' })} options={[{ value: "form", label: "フォーム" }, { value: "url", label: "URL" }]} className="rounded border px-2 py-1" />
+            <Select aria-label="リンクの種類" value={c.kind} onChange={(value) => update(i, { kind: value as 'form' | 'url' })} options={[{ value: "form", label: "フォーム" }, { value: "url", label: "URL" }]} />
             {c.kind === 'form' ? (
               <>
-                <SelectField
+                <Select
+                  aria-label="使うフォーム"
                   value={c.formId ?? ''}
-                  onChange={(e) => update(i, { formId: e.target.value || null })}
+                  onChange={(value) => update(i, { formId: value || null })}
                   options={[{ value: '', label: 'フォームを選択...' }, ...forms.map((f) => ({ value: f.id, label: f.name }))]}
                 />
                 {(formsState === 'error' || formsState === 'forbidden') && (
@@ -1778,9 +1779,9 @@ function CtaDesignStep({ webinarId, accountId, durationSeconds, editor, registra
             ) : null}
             {accountId && registrationFormState === 'ready' && publishedRegistrationForms.length > 0 ? (
               <div className="max-w-md">
-                <SelectField
+                <Select
                   value={selectedRegistrationFormId}
-                  onChange={(event) => setSelectedRegistrationFormId(event.target.value)}
+                  onChange={(value) => setSelectedRegistrationFormId(value)}
                   aria-label="申込に使う回答フォーム"
                   options={[{ value: '', label: '申込フォームを選ぶ' }, ...publishedRegistrationForms.map((form) => ({ value: form.id, label: form.name }))]}
                 />
@@ -1914,7 +1915,7 @@ function WebinarActionsTab({ webinarId, editor, onEditorChange }: { webinarId: s
           <div className="flex items-center justify-between gap-3"><div><h2 className="text-ink text-base font-bold">配信後の通知・アクション</h2><p className="text-ink-faint mt-1 text-xs">保存済みの実行内容です。</p></div><span className="text-ink-faint text-xs">{completedActions.length}件</span></div>
           <ul className="divide-hairline mt-3 divide-y rounded-control border border-hairline">{completedActions.length === 0 ? <li className="text-ink-faint p-4 text-sm">まだ設定されていません。</li> : completedActions.map((action, index) => <li key={action.id ?? index} className="text-ink px-4 py-3 text-sm font-semibold">{ACTION_LABELS[action.actionType]}</li>)}</ul>
         </section>
-        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card"><h2 className="text-ink text-sm font-bold">視聴結果を取得できない場合</h2><p className="text-ink-faint mt-1 text-xs">再取得するか、要対応へ追加するか選択できます。</p><div className="mt-3 max-w-sm"><SelectField value={missingResultPolicy} onChange={(event) => setMissingResultPolicy(event.target.value as WebinarEditor['actionPolicy']['missingResultPolicy'])} options={[{ value: 'escalate', label: '要対応へ追加' }, { value: 'retry_next_day', label: '翌日に再取得' }]} /></div></section>
+        <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card"><h2 className="text-ink text-sm font-bold">視聴結果を取得できない場合</h2><p className="text-ink-faint mt-1 text-xs">再取得するか、要対応へ追加するか選択できます。</p><div className="mt-3 max-w-sm"><Select aria-label="視聴結果を取得できない場合" value={missingResultPolicy} onChange={(value) => setMissingResultPolicy(value as WebinarEditor['actionPolicy']['missingResultPolicy'])} options={[{ value: 'escalate', label: '要対応へ追加' }, { value: 'retry_next_day', label: '翌日に再取得' }]} /></div></section>
         <EditorDetails label="通知・アクションの詳細を編集する">
         <section className="space-y-4">
       <div><h2 className="text-ink font-bold">視聴後の通知・アクション</h2><p className="text-ink-faint mt-1 text-xs">視聴完了・CTAクリック・未視聴ごとの処理を設定します。</p></div>
@@ -1926,12 +1927,11 @@ function WebinarActionsTab({ webinarId, editor, onEditorChange }: { webinarId: s
           const referenceKey = actionReferenceKey(action.actionType)
           return (
             <div key={action.id ?? `${trigger}-${index}`} className="bg-canvas grid gap-3 p-4 md:grid-cols-3 md:items-center">
-              <SelectField
+              <Select
                 value={action.actionType}
-                onChange={(event) => update(index, { actionType: event.target.value as WebinarAction['actionType'], config: {} })}
+                onChange={(value) => update(index, { actionType: value as WebinarAction['actionType'], config: {} })}
                 aria-label="実行するアクション"
                 options={Object.entries(ACTION_LABELS).map(([value, label]) => ({ value, label }))}
-                className="border-hairline rounded-control border px-3 py-2 text-sm"
               />
               {referenceKey ? <input value={String(action.config[referenceKey] ?? '')} onChange={(event) => update(index, { config: { [referenceKey]: event.target.value } })} placeholder={`${referenceKey}を入力`} className="border-hairline rounded-control border px-3 py-2 text-sm" /> : <span className="text-ink-faint text-xs">追加設定はありません</span>}
               <Button type="button" onClick={() => remove(index)}>外す</Button>

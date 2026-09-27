@@ -14,6 +14,7 @@ import NoteBar from '@/components/shared/note-bar'
 import SummaryCard from '@/components/shared/summary-card'
 import { STATE_TEXT, notConnectedText } from '@/components/shared/not-connected'
 import { Th } from '@/components/shared/table'
+import Select from '@/components/shared/select'
 
 export const FIELD_TYPE_HINTS: Record<FriendFieldType, string> = {
   text: '短いテキスト', textarea: '長い文章', number: '体重など', date: '誕生日など', datetime: '予約日時など',
@@ -273,10 +274,13 @@ export default function FriendFieldList({ accountId }: { accountId: string | nul
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="項目名で検索" aria-label="項目名で検索" className="h-9 w-[150px] rounded-control border border-hairline bg-canvas px-3 text-label" />
-        <select value={type} onChange={(event) => setType(event.target.value as typeof type)} className="v6-select h-9 w-[150px] rounded-control border border-hairline bg-canvas px-3 text-label font-semibold text-ink" aria-label="項目の種類">
-          <option value="all">種類：すべて</option>
-          {Object.entries(FIELD_TYPE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-        </select>
+        <Select
+          label="種類"
+          aria-label="項目の種類"
+          value={type}
+          onChange={(value) => setType(value as typeof type)}
+          options={[{ value: 'all', label: 'すべて' }, ...Object.entries(FIELD_TYPE_LABELS).map(([value, label]) => ({ value, label }))]}
+        />
         <span className="flex-1" />
         {/* 追加ボタンはタブの右に1個だけ（#1014 ATTR-22）。一覧の中には置かない。 */}
       </div>

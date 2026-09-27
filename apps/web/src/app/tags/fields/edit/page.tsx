@@ -10,7 +10,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import Button from '@/components/shared/button'
 import StickyBar from '@/components/shared/sticky-bar'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import ListState from '@/components/shared/list-state'
 import TargetMissing from '@/components/shared/target-missing'
 import { Field, TextInput, TextArea } from '@/components/shared/form-controls'
@@ -203,7 +203,7 @@ function EditFriendFieldForm() {
               </Field>
             ) : null}
             <Field label="フォルダ" htmlFor="ff-folder" note="フォルダは友だち詳細のタブになります。">
-              <SelectField id="ff-folder" value={folderId} onChange={(event) => setFolderId(event.target.value)} disabled={locked} aria-label="友だち情報欄のフォルダ" className="v6-select w-full" options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]} />
+              <Select id="ff-folder" value={folderId} onChange={(value) => setFolderId(value)} disabled={locked} aria-label="友だち情報欄のフォルダ" size="full" options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]} />
             </Field>
             {/* IDEA-04: 印だけならタグ・対応状態なら対応マークという分類の違いを、編集の場所でも確認できるようにする。 */}
             <AttributeKindGuide current="field" />

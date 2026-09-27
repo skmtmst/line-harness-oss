@@ -13,6 +13,7 @@ import Notice from '@/components/shared/notice'
 import Button from '@/components/shared/button'
 import ListKpis from '@/components/shared/list-kpis'
 import ListState from '@/components/shared/list-state'
+import Select from '@/components/shared/select'
 import Pagination from '@/components/shared/pagination'
 import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { Tabs } from '@/components/shared/tabs'
@@ -95,17 +96,14 @@ function TrashIcon() {
  * 素の `select` ではない。見た目は札が持ち、操作と読み上げは `select` が持つ。
  */
 function FolderSelect({ tag, groups, onItemsChange, onError }: { tag: Tag; groups: TagGroup[]; onItemsChange: (update: (current: Tag[]) => Tag[]) => void; onError: (message: string) => void }) {
-  const group = groups.find((item) => item.id === tag.groupId)
+  // 共通Selectは透明な重ね合わせにできないため、色丸・札・▾の見た目から標準Selectの見た目へ変わる。操作・読み上げ・選択肢は変えない。
   return (
-    <span className="relative inline-flex h-7 items-center gap-1.5 rounded-mini border border-hairline bg-canvas px-2" title={group?.name ?? '未分類'}>
-      <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: group?.color ?? '#c3c8c4' }} />
-      <span className="truncate text-caption font-semibold text-ink">{group?.name ?? '未分類'}</span>
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="shrink-0 text-ink-faint"><path d="m6 9 6 6 6-6" /></svg>
-      <select
-        aria-label={`${tag.name} のフォルダ`}
-        value={tag.groupId ?? ''}
-        onChange={async (event) => {
-          const groupId = event.target.value || null
+    <Select
+      aria-label={`${tag.name} のフォルダ`}
+      value={tag.groupId ?? ''}
+      onChange={(value) => {
+        const groupId = value || null
+        void (async () => {
           try {
             const result = await api.tags.setGroup(tag.id, groupId)
             if (!result.success) throw new Error(result.error)
@@ -115,15 +113,12 @@ function FolderSelect({ tag, groups, onItemsChange, onError }: { tag: Tag; group
             /* 失敗は再読込で隠さず、理由を出す。 */
             onError(reason instanceof ApiError ? reason.message : 'フォルダを変更できませんでした')
           }
-        }}
-        className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-      >
-        <option value="">未分類</option>
-        {groups
-          .filter((item) => item.accountId === tag.lineAccountId)
-          .map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-      </select>
-    </span>
+        })()
+      }}
+      options={[{ value: '', label: '未分類' }, ...groups
+        .filter((item) => item.accountId === tag.lineAccountId)
+        .map((item) => ({ value: item.id, label: item.name }))]}
+    />
   )
 }
 
@@ -939,18 +934,17 @@ export default function TagsPageV4({
             同じ絞り込みをセレクトで受け、帯は「開く」まで畳んでおく。
           */}
           <div className="xl:hidden">
-            <select
+            <Select
               aria-label="フォルダで絞る"
               value={folder}
-              onChange={(event) => setFolder(event.target.value)}
-              className="v6-select h-10 w-full rounded-control border border-hairline bg-canvas pl-3 text-label font-semibold text-ink"
-            >
-              <option value="">フォルダ：すべて（{ready ? items.length : '—'}件）</option>
-              {groups.map((group) => (
-                <option key={group.id} value={group.id}>{group.name}</option>
-              ))}
-              <option value={UNGROUPED}>未分類</option>
-            </select>
+              onChange={setFolder}
+              options={[
+                { value: '', label: `フォルダ：すべて（${ready ? items.length : '—'}件）` },
+                ...groups.map((group) => ({ value: group.id, label: group.name })),
+                { value: UNGROUPED, label: '未分類' },
+              ]}
+              size="full"
+            />
           </div>
           <div className="hidden xl:block">
             <FolderList groups={groups} items={items} countsKnown={ready} active={folder} onSelect={setFolder} onChanged={() => void load()} />
@@ -962,9 +956,9 @@ export default function TagsPageV4({
             */}
             <div className="mb-[10px] flex flex-wrap items-center gap-2">
               <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="タグ名・用途で検索" className="h-10 min-w-45 flex-1 rounded-control border border-hairline bg-canvas px-3 text-label" />
-              <select aria-label="使用状態で絞り込む" value={usageFilter} onChange={(event) => setUsageFilter(event.target.value)} className="v6-select h-10 min-w-44 rounded-control border border-hairline bg-canvas pl-3 text-label font-semibold text-ink"><option value="all">使用状態：すべて</option><option value="linked">連動あり</option><option value="unused">未使用</option></select>
-              <select aria-label="付与元で絞り込む" value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)} className="v6-select h-10 min-w-38 rounded-control border border-hairline bg-canvas pl-3 text-label font-semibold text-ink"><option value="all">付与元：すべて</option>{Object.entries(SOURCE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
-              <select aria-label="表示件数" value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))} className="v6-select ml-auto h-10 min-w-32 rounded-control border border-hairline bg-canvas pl-3 text-label font-semibold text-ink">{[20,30,40,50].map((size) => <option key={size} value={size}>{size}件表示</option>)}</select>
+              <Select aria-label="使用状態で絞り込む" value={usageFilter} onChange={setUsageFilter} options={[{ value: 'all', label: '使用状態：すべて' }, { value: 'linked', label: '連動あり' }, { value: 'unused', label: '未使用' }]} />
+              <Select aria-label="付与元で絞り込む" value={sourceFilter} onChange={setSourceFilter} options={[{ value: 'all', label: '付与元：すべて' }, ...Object.entries(SOURCE_LABELS).map(([value, label]) => ({ value, label }))]} />
+              <Select aria-label="表示件数" value={String(pageSize)} onChange={(value) => setPageSize(Number(value))} options={[20, 30, 40, 50].map((size) => ({ value: String(size), label: `${size}件表示` }))} size="page-size" className="ml-auto" />
               <span className="text-xs tabular-nums text-ink-faint">{ready ? `${filtered.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, filtered.length)} / ${filtered.length}件` : '—'}</span>
             </div>
             {/* 設計 `UOmne`。**5つ。押した数だけ重ねて絞る。** */}

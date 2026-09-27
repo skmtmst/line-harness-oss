@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Combobox from '@/components/shared/combobox'
+import Select from '@/components/shared/select'
 import { api, describeSaveFailure } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
@@ -224,25 +225,23 @@ export default function EditRouteModal({
         </Field>
 
         <Field label="送り先 Pool">
-          <select
+          <Select
+            aria-label="送り先 Pool"
             value={form.poolId ?? ''}
-            onChange={(e) => setForm({ ...form, poolId: e.target.value || null })}
-            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm"
-          >
-            {pools.map((p) => {
+            onChange={(value) => setForm({ ...form, poolId: value || null })}
+            size="full"
+            options={pools.map((p) => {
               const members = poolMembers[p.id] ?? []
               const memberText =
                 members.length === 0
                   ? '（アカウント未所属）'
                   : `— ${members.join(', ')}`
-              return (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                  {p.slug === 'main' ? '（既定）' : ''} {memberText}
-                </option>
-              )
+              return {
+                value: p.id,
+                label: `${p.name}${p.slug === 'main' ? '（既定）' : ''} ${memberText}`,
+              }
             })}
-          </select>
+          />
         </Field>
 
         <Field label="起動シナリオ（任意）">

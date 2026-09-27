@@ -11,7 +11,7 @@ import QuestionEditor, {
 import Button from '@/components/shared/button'
 import StickyBar from '@/components/shared/sticky-bar'
 import ListState from '@/components/shared/list-state'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import { TextField } from '@/components/shared/text-field'
 import { Field } from '@/components/shared/form-controls'
 import type { Folder } from '@line-crm/shared'
@@ -226,12 +226,12 @@ function QuestionTemplatePageInner() {
               選んだ置き場の名前をそのまま入れて、ずれないようにする。
             */}
             <Field label="置き場" htmlFor="tq-folder">
-              <SelectField
+              <Select
                 id="tq-folder"
                 aria-label="置き場"
                 value={folderId ?? ''}
-                onChange={(event) => {
-                  const next = event.target.value || null
+                onChange={(value) => {
+                  const next = value || null
                   setFolderId(next)
                   setCategory(folders.find((folder) => folder.id === next)?.name ?? '未分類')
                 }}

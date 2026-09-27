@@ -54,6 +54,7 @@ import ActionMenu from '@/components/shared/action-menu'
 import { MoreAction } from '@/components/shared/row-actions'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { Th } from '@/components/shared/table'
+import Select from '@/components/shared/select'
 import {
   scenarioReachBarWidth,
   scenarioReachCountLabel,
@@ -1267,16 +1268,18 @@ export default function ScenarioDetailClient({
         */}
         <div>
           <label className="block text-xs font-medium text-ink-secondary mb-1">送信後</label>
-          <select
-            className="w-full border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+          <Select
+            aria-label="送信後"
             value={stepForm.afterSend}
-            onChange={(e) =>
-              setStepForm({ ...stepForm, afterSend: e.target.value as 'continue' | 'pause' })
+            onChange={(value) =>
+              setStepForm({ ...stepForm, afterSend: value as 'continue' | 'pause' })
             }
-          >
-            <option value="continue">送信後：次のステップへ進む</option>
-            <option value="pause">送信後：ここで一時停止する</option>
-          </select>
+            options={[
+              { value: 'continue', label: '送信後：次のステップへ進む' },
+              { value: 'pause', label: '送信後：ここで一時停止する' },
+            ]}
+            size="full"
+          />
           <p className="text-xs text-ink-faint mt-0.5">
             一時停止にすると、この通を送ったところで止まります。再開するまで次は届きません。
           </p>
@@ -1359,11 +1362,11 @@ export default function ScenarioDetailClient({
         {!stepForm.question && stepForm.inputMode === 'template' && (
           <div>
             <label className="block text-xs font-medium text-ink-secondary mb-1">テンプレート <span className="text-danger">*</span></label>
-            <select
-              className="w-full border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+            <Select
+              aria-label="テンプレート"
               value={stepForm.templateId ?? ''}
-              onChange={(e) => {
-                const templateId = e.target.value || null
+              onChange={(value) => {
+                const templateId = value || null
                 const template = templates.find((item) => item.id === templateId)
                 setStepForm({
                   ...stepForm,
@@ -1373,13 +1376,16 @@ export default function ScenarioDetailClient({
                   messageContent: template?.messageContent ?? stepForm.messageContent,
                 })
               }}
-            >
-              <option value="">-- 選択してください --</option>
-              {templates.map((t) => (
-                <option key={t.id} value={t.id}>{t.name}{t.category ? ` (${t.category})` : ''}</option>
-              ))}
-            </select>
-            <p className="text-xs text-amber-700 mt-1">
+              options={[
+                { value: '', label: '-- 選択してください --' },
+                ...templates.map((t) => ({
+                  value: t.id,
+                  label: `${t.name}${t.category ? ` (${t.category})` : ''}`,
+                })),
+              ]}
+              size="full"
+            />
+            <p className="text-xs text-warning mt-1">
               ⓘ テンプレートが修正されると、このステップの内容も自動で同期されます
             </p>
           </div>
@@ -1389,15 +1395,13 @@ export default function ScenarioDetailClient({
           <>
             <div>
               <label className="block text-xs font-medium text-ink-secondary mb-1">メッセージタイプ</label>
-              <select
-                className="w-full border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+              <Select
+                aria-label="メッセージタイプ"
                 value={stepForm.messageType}
-                onChange={(e) => setStepForm({ ...stepForm, messageType: e.target.value as MessageType })}
-              >
-                {messageTypeOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
+                onChange={(value) => setStepForm({ ...stepForm, messageType: value as MessageType })}
+                options={messageTypeOptions}
+                size="full"
+              />
             </div>
             {/*
               位置情報・動画・音声・スタンプは、本文ではなく専用の欄で書く。
@@ -1514,16 +1518,16 @@ export default function ScenarioDetailClient({
           <div className="space-y-3">
             <div>
               <label className="block text-xs font-medium text-ink-secondary mb-1">到達したらタグ付与</label>
-              <select
-                className="w-full border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+              <Select
+                aria-label="到達したらタグ付与"
                 value={stepForm.onReachTagId ?? ''}
-                onChange={(e) => setStepForm({ ...stepForm, onReachTagId: e.target.value || null })}
-              >
-                <option value="">-- なし --</option>
-                {tags.map((t) => (
-                  <option key={t.id} value={t.id}>{t.name}</option>
-                ))}
-              </select>
+                onChange={(value) => setStepForm({ ...stepForm, onReachTagId: value || null })}
+                options={[
+                  { value: '', label: '-- なし --' },
+                  ...tags.map((t) => ({ value: t.id, label: t.name })),
+                ]}
+                size="full"
+              />
               <p className="text-xs text-ink-faint mt-0.5">
                 このステップが配信完了したら、選んだタグを友だちに付与します
               </p>
@@ -1852,20 +1856,20 @@ export default function ScenarioDetailClient({
                 黙って保存しないため）。保存済みの値が候補に無いときは
                 値を消さず、名前を確認できない旨の選択肢として残す。
               */}
-              <select
-                className="border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent w-full disabled:bg-canvas-sunken disabled:text-ink-faint"
+              <Select
+                aria-label="フォルダ"
                 value={editForm.folderId}
                 disabled={folderState !== 'ready'}
-                onChange={(e) => setEditForm({ ...editForm, folderId: e.target.value })}
-              >
-                <option value="">未分類</option>
-                {editFolderMissing ? (
-                  <option value={editForm.folderId}>名前を確認できません</option>
-                ) : null}
-                {folders.map((f) => (
-                  <option key={f.id} value={f.id}>{f.name}</option>
-                ))}
-              </select>
+                onChange={(value) => setEditForm({ ...editForm, folderId: value })}
+                options={[
+                  { value: '', label: '未分類' },
+                  ...(editFolderMissing
+                    ? [{ value: editForm.folderId, label: '名前を確認できません' }]
+                    : []),
+                  ...folders.map((f) => ({ value: f.id, label: f.name })),
+                ]}
+                size="full"
+              />
               <p className="text-ink-faint mt-1 text-xs">一覧の左のパネルで、この分類ごとに絞り込めます。</p>
               {folderState !== 'ready' ? (
                 <p className="text-ink-faint mt-1 text-xs">
@@ -1881,15 +1885,13 @@ export default function ScenarioDetailClient({
             </div>
             <div>
               <label className="block text-xs font-medium text-ink-secondary mb-1">トリガー</label>
-              <select
-                className="w-full border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+              <Select
+                aria-label="トリガー"
                 value={editForm.triggerType}
-                onChange={(e) => setEditForm({ ...editForm, triggerType: e.target.value as ScenarioTriggerType })}
-              >
-                {triggerOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
+                onChange={(value) => setEditForm({ ...editForm, triggerType: value as ScenarioTriggerType })}
+                options={triggerOptions}
+                size="full"
+              />
             </div>
             <div className="flex items-center gap-2">
               <input

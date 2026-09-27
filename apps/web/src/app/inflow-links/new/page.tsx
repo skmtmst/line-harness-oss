@@ -13,7 +13,7 @@ import CreatePage, {
   FormSection,
   inputClass,
 } from '@/components/shared/create-page'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 
 /** 流入元の情報と、友だち追加時の動きをまとめて設定する。 */
 
@@ -258,12 +258,12 @@ export default function NewInflowLinkPage() {
           htmlFor="ir-tag"
           note="あとで配信の絞り込みに使えます。"
         >
-          <SelectField
+          <Select
             id="ir-tag"
             value={tagId}
-            onChange={(e) => setTagId(e.target.value)}
+            onChange={(value) => setTagId(value)}
             aria-label="自動で付けるタグ"
-            className={inputClass}
+            size="full"
             options={[
               { value: '', label: '（なし）' },
               ...tagOptionGroups.flatMap((group) =>
@@ -281,12 +281,12 @@ export default function NewInflowLinkPage() {
           htmlFor="ir-scenario"
           note="経路ごとに違う案内を送れます。"
         >
-          <SelectField
+          <Select
             id="ir-scenario"
             value={scenarioId}
-            onChange={(e) => setScenarioId(e.target.value)}
+            onChange={(value) => setScenarioId(value)}
             aria-label="開始するシナリオ配信"
-            className={inputClass}
+            size="full"
             options={[
               { value: '', label: '（なし）' },
               ...scenarios.map((scenario) => ({ value: scenario.id, label: scenario.name })),
@@ -299,12 +299,12 @@ export default function NewInflowLinkPage() {
           htmlFor="ir-intro"
           note="シナリオとは別に、その場で1通だけ送ります。"
         >
-          <SelectField
+          <Select
             id="ir-intro"
             value={introTemplateId}
-            onChange={(e) => setIntroTemplateId(e.target.value)}
+            onChange={(value) => setIntroTemplateId(value)}
             aria-label="追加直後に送るメッセージ"
-            className={inputClass}
+            size="full"
             options={[
               { value: '', label: '送らない' },
               ...templates.map((template) => ({ value: template.id, label: template.name })),
@@ -337,12 +337,12 @@ export default function NewInflowLinkPage() {
           htmlFor="ir-pool"
           note="選ばないと、全体の既定の振り分けに従います。"
         >
-          <SelectField
+          <Select
             id="ir-pool"
             value={poolId}
-            onChange={(e) => setPoolId(e.target.value)}
+            onChange={(value) => setPoolId(value)}
             aria-label="友だちの追加先アカウント"
-            className={inputClass}
+            size="full"
             options={[
               { value: '', label: 'メインプールで自動振り分け' },
               ...pools.map((pool) => ({ value: pool.id, label: pool.name })),

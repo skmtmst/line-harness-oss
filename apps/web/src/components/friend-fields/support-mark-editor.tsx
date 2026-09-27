@@ -7,6 +7,7 @@ import { api, type SaveSupportMarkAutomationRule, type SupportMarkAutomationEven
 import Button from '@/components/shared/button'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import Card from '@/components/shared/card'
+import Select from '@/components/shared/select'
 import ListState from '@/components/shared/list-state'
 import StickyBar from '@/components/shared/sticky-bar'
 import SupportMarkRulesPanel from './support-mark-rules-panel'
@@ -188,20 +189,32 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
               <div className="mt-3 rounded-control border border-hairline p-3 text-sm">
                 <label className="block text-xs font-semibold text-ink-secondary">
                   きっかけ
-                  <select aria-label="きっかけ" value={ruleEvent} onChange={(event) => setRuleEvent(event.target.value as SupportMarkAutomationEvent)} className="v6-select mt-1 h-10 w-full rounded-control border border-hairline bg-canvas px-3 text-sm font-semibold text-ink focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info">
-                    {EVENT_LABELS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
-                  </select>
+                  <Select
+                    aria-label="きっかけ"
+                    value={ruleEvent}
+                    onChange={(value) => setRuleEvent(value as SupportMarkAutomationEvent)}
+                    options={EVENT_LABELS.map((item) => ({ value: item.value, label: item.label }))}
+                    size="full"
+                    className="mt-1"
+                  />
                 </label>
                 <p aria-hidden="true" className="my-1 text-center text-ink-faint">↓</p>
                 <p className="min-w-0 break-words rounded-control bg-surface-soft px-3 py-2.5 font-semibold text-ink">「{name || 'このマーク'}」に変更</p>
                 <label className="mt-3 block text-xs font-semibold text-ink-secondary">
                   手動で変更した直後の保護
-                  <select aria-label="手動変更の保護時間" value={String(ruleProtectionMinutes)} onChange={(event) => setRuleProtectionMinutes(Number(event.target.value))} className="v6-select mt-1 h-10 w-full rounded-control border border-hairline bg-canvas px-3 text-sm font-semibold text-ink focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-status-info">
-                    <option value="0">保護しない（次のきっかけですぐ変更）</option>
-                    <option value="30">30分は手動の変更を守る</option>
-                    <option value="60">1時間は手動の変更を守る</option>
-                    <option value="1440">1日は手動の変更を守る</option>
-                  </select>
+                  <Select
+                    aria-label="手動変更の保護時間"
+                    value={String(ruleProtectionMinutes)}
+                    onChange={(value) => setRuleProtectionMinutes(Number(value))}
+                    options={[
+                      { value: '0', label: '保護しない（次のきっかけですぐ変更）' },
+                      { value: '30', label: '30分は手動の変更を守る' },
+                      { value: '60', label: '1時間は手動の変更を守る' },
+                      { value: '1440', label: '1日は手動の変更を守る' },
+                    ]}
+                    size="full"
+                    className="mt-1"
+                  />
                 </label>
                 <label className="mt-3 flex items-center gap-2 text-sm font-semibold text-ink">
                   <input type="checkbox" checked={ruleActive} onChange={(event) => setRuleActive(event.target.checked)} className="h-6 w-6 shrink-0 accent-accent-deep" />

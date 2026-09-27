@@ -11,7 +11,7 @@ import Breadcrumb from '@/components/shared/breadcrumb'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import StickyBar from '@/components/shared/sticky-bar'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import { Field, TextInput, TextArea } from '@/components/shared/form-controls'
 import { FIELD_TYPE_HINTS, FIELD_TYPE_LABELS } from '@/components/friend-fields/field-list'
 import { AttributeKindGuide, DuplicateNameNote, findDuplicateNames } from '@/components/friend-fields/attribute-kind-guide'
@@ -145,11 +145,11 @@ function NewFriendFieldForm() {
             </Field>
             <p className="font-mono text-xs font-semibold text-ink-secondary">{`{{field.${fieldKey || 'pet_name'}}}`}</p>
             <Field label="種類" htmlFor="ff-type" note={FIELD_TYPE_HINTS[type]}>
-              <SelectField
+              <Select
                 id="ff-type"
                 value={type}
-                onChange={(event) => {
-                  const next = event.target.value as FriendFieldType
+                onChange={(value) => {
+                  const next = value as FriendFieldType
                   setType(next)
                   /*
                     ATTR-07: 種類を変えたら既定値は捨てる。
@@ -160,7 +160,7 @@ function NewFriendFieldForm() {
                   setDefaultValue('')
                 }}
                 aria-label="友だち情報欄の種類"
-                className="v6-select w-full"
+                size="full"
                 options={TYPES.map((item) => ({ value: item, label: FIELD_TYPE_LABELS[item] }))}
               />
             </Field>
@@ -185,7 +185,7 @@ function NewFriendFieldForm() {
               </Field>
             ) : null}
             <Field label="フォルダ" htmlFor="ff-folder" note="フォルダは友だち詳細のタブになります。">
-              <SelectField id="ff-folder" value={folderId} onChange={(event) => setFolderId(event.target.value)} aria-label="友だち情報欄のフォルダ" className="v6-select w-full" options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]} />
+              <Select id="ff-folder" value={folderId} onChange={(value) => setFolderId(value)} aria-label="友だち情報欄のフォルダ" size="full" options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]} />
             </Field>
             {/* IDEA-04: 「情報欄」を選んだ理由と、印だけならタグ・対応状態なら対応マークという違いを、作る場所で確認できるようにする。 */}
             <AttributeKindGuide current="field" />

@@ -25,7 +25,7 @@ import { FIELD_TYPE_LABELS } from '@/components/friend-fields/field-list'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
 import TargetMissing from '@/components/shared/target-missing'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import ListRange from '@/components/ui/list-range'
 import { usePageTitle } from '@/components/shell/page-chrome'
 
@@ -338,13 +338,13 @@ function FieldInput({
   }
   if (field.type === 'select') {
     return (
-      <SelectField
+      <Select
         id={id}
         value={value}
         disabled={readOnly}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(value) => onChange(value)}
         aria-label={`${field.name}の値`}
-        className={base}
+        size="full"
         options={[
           { value: '', label: '— 未設定 —' },
           ...(field.options ?? []).map((option) => ({ value: option, label: option })),
@@ -1457,12 +1457,12 @@ function FriendDetailInner() {
                   <div className="border-hairline bg-canvas-sunken rounded-control mt-2 space-y-2 border p-3" data-support-editor>
                     <label className="text-ink-faint block text-xs">
                       対応状況
-                      <SelectField
+                      <Select size="full"
                         value={supportStatus}
                         disabled={supportBusy}
-                        onChange={(e) => setSupportStatus(e.target.value as Chat['status'])}
+                        onChange={(value) => setSupportStatus(value as Chat['status'])}
                         aria-label="対応状況を変える"
-                        className="border-hairline rounded-control bg-canvas text-ink mt-1 w-full border px-2 py-1.5 text-xs"
+                        className="mt-1"
                         options={[
                           { value: 'unread', label: '未対応' },
                           { value: 'in_progress', label: '対応中' },
@@ -1473,12 +1473,12 @@ function FriendDetailInner() {
                     </label>
                     <label className="text-ink-faint block text-xs">
                       担当者
-                      <SelectField
+                      <Select size="full"
                         value={supportOperatorId}
                         disabled={supportBusy}
-                        onChange={(e) => setSupportOperatorId(e.target.value)}
+                        onChange={(value) => setSupportOperatorId(value)}
                         aria-label="担当者を変える"
-                        className="border-hairline rounded-control bg-canvas text-ink mt-1 w-full border px-2 py-1.5 text-xs"
+                        className="mt-1"
                         options={[
                           { value: '', label: '未割り当て' },
                           ...supportOperators.map((operator) => ({ value: operator.id, label: operator.name })),
@@ -1850,19 +1850,7 @@ function FriendDetailInner() {
                         <p className="text-ink-faint text-xs">登録できるシナリオがありません。</p>
                       ) : (
                         <>
-                          <SelectField
-                            value={scenarioPick}
-                            disabled={scenarioBusy}
-                            onChange={(e) => setScenarioPick(e.target.value)}
-                            aria-label="登録するシナリオを選ぶ"
-                            className="border-hairline rounded-control bg-canvas text-ink w-full border px-2 py-1.5 text-xs"
-                            options={[
-                              { value: '', label: '— シナリオを選ぶ —' },
-                              ...scenarioOptions
-                                .filter((s) => s.isActive)
-                                .map((s) => ({ value: s.id, label: s.name })),
-                            ]}
-                          />
+                          <Select size="full" value={scenarioPick} disabled={scenarioBusy} onChange={(value) => setScenarioPick(value)} aria-label="登録するシナリオを選ぶ" options={[ { value: '', label: '— シナリオを選ぶ —' }, ...scenarioOptions .filter((s) => s.isActive) .map((s) => ({ value: s.id, label: s.name })), ]} />
                           {scenarioPick ? (
                             <p className="text-ink-secondary text-xs">
                               「{scenarioOptions.find((s) => s.id === scenarioPick)?.name}」に

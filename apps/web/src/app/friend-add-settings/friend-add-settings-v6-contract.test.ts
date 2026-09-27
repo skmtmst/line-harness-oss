@@ -133,7 +133,7 @@ describe('V6 友だち追加時配信の点検・中の再発防止(#501)', () =
     // 「次に流すシナリオ」欄で、このアカウントのシナリオだけを選ぶ。
     expect(EDITOR).toContain('次に流すシナリオ')
     expect(EDITOR).toContain('value={definition.scenarioId ??')
-    expect(EDITOR).toContain('scenarioId: event.target.value || null')
+    expect(EDITOR).toContain('scenarioId: value || null')
     expect(EDITOR).toContain('scenarios.map((scenario) => ({ value: scenario.id, label: scenario.name }))')
   })
 

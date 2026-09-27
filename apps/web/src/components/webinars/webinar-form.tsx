@@ -6,6 +6,7 @@ import { api, webinarApi, type Webinar, type WebinarInput, type WebinarScheduleR
 import type { MediaItem } from '@line-crm/shared'
 import { useAccount } from '@/contexts/account-context'
 import StickyBar from '@/components/shared/sticky-bar'
+import Select from '@/components/shared/select'
 import DateTimeField, { TimeField } from '@/components/shared/date-time-field'
 import { CareCard } from '@/components/shared/side-cards'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -286,15 +287,16 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
         </div>
         <div>
           <label className={labelClass}>公開状態</label>
-          <select
+          <Select
+            aria-label="公開状態"
             value={status}
-            onChange={(e) => setStatus(e.target.value as Webinar['status'])}
-            className={`${inputClass} w-auto`}
-          >
-            <option value="draft">下書き</option>
-            <option value="active">公開中</option>
-            <option value="archived">アーカイブ</option>
-          </select>
+            onChange={(value) => setStatus(value as Webinar['status'])}
+            options={[
+              { value: 'draft', label: '下書き' },
+              { value: 'active', label: '公開中' },
+              { value: 'archived', label: 'アーカイブ' },
+            ]}
+          />
         </div>
         <div>
           <label className={labelClass}>動画の長さ（分）</label>
@@ -326,25 +328,24 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
                   <button type="button" onClick={() => setMediaLoadKey((key) => key + 1)} className="ml-2 font-medium underline">もう一度読み込む</button>
                 </p>
               ) : (
-                <select
+                <Select
                   aria-label="配信動画"
+                  size="full"
                   value={videoChoice}
-                  onChange={(e) => setVideoChoice(e.target.value)}
+                  onChange={(value) => setVideoChoice(value)}
                   disabled={videoMedia === null}
-                  className={inputClass}
-                >
-                  <option value="">設定しない</option>
-                  {videoChoice === EXTERNAL_VIDEO && (
-                    <option value={EXTERNAL_VIDEO}>現在の設定を維持（ライブラリ外の動画）</option>
-                  )}
-                  {(videoMedia ?? []).map((item) => (
-                    <option key={item.id} value={item.id}>{item.filename}</option>
-                  ))}
-                  {videoMedia && videoChoice && videoChoice !== EXTERNAL_VIDEO &&
-                    !videoMedia.some((item) => item.id === videoChoice) && (
-                    <option value={videoChoice}>現在の動画（ライブラリで見つかりません）</option>
-                  )}
-                </select>
+                  options={[
+                    { value: '', label: '設定しない' },
+                    ...(videoChoice === EXTERNAL_VIDEO
+                      ? [{ value: EXTERNAL_VIDEO, label: '現在の設定を維持（ライブラリ外の動画）' }]
+                      : []),
+                    ...(videoMedia ?? []).map((item) => ({ value: item.id, label: item.filename })),
+                    ...(videoMedia && videoChoice && videoChoice !== EXTERNAL_VIDEO &&
+                    !videoMedia.some((item) => item.id === videoChoice)
+                      ? [{ value: videoChoice, label: '現在の動画（ライブラリで見つかりません）' }]
+                      : []),
+                  ]}
+                />
               )}
               {videoChoice === EXTERNAL_VIDEO && initial?.videoPrefix && (
                 <p className="mt-1 text-micro text-ink-faint">現在の設定: {initial.videoPrefix}</p>
@@ -388,7 +389,7 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
               <div className="flex flex-wrap items-end gap-3">
                 <span className="text-xs text-ink-faint">開始<TimeField value={bulkStart} onChange={setBulkStart} aria-label="まとめて作る枠の開始" className="mt-1" /></span>
                 <span className="text-xs text-ink-faint">終了<TimeField value={bulkEnd} onChange={setBulkEnd} aria-label="まとめて作る枠の終了" className="mt-1" /></span>
-                <label className="text-xs text-ink-faint">間隔<select value={bulkInterval} onChange={(e) => setBulkInterval(Number(e.target.value))} className="mt-1 block rounded-lg border border-hairline px-2 py-2 text-sm"><option value={30}>30分</option><option value={60}>60分</option><option value={120}>120分</option></select></label>
+                <label className="text-xs text-ink-faint">間隔<Select aria-label="間隔" value={String(bulkInterval)} onChange={(value) => setBulkInterval(Number(value))} options={[{ value: '30', label: '30分' }, { value: '60', label: '60分' }, { value: '120', label: '120分' }]} /></label>
                 <button type="button" onClick={applyDailySchedule} className="rounded-lg bg-ink px-4 py-2 text-sm font-semibold text-white hover:brightness-92">毎日の枠を置き換える</button>
               </div>
               <p className="mt-2 text-[11px] text-ink-faint">下の保存ボタンを押すまでは本番へ反映されません。</p>
@@ -396,10 +397,11 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
             <div className="max-h-[420px] space-y-2 overflow-y-auto pr-1">
         {rules.map((r, i) => (
           <div key={i} className="flex flex-wrap items-center gap-2 rounded-lg border border-hairline p-2 text-sm">
-            <select
+            <Select
+              aria-label="繰り返しパターン"
               value={r.type}
-              onChange={(e) => {
-                const type = e.target.value as WebinarScheduleRule['type']
+              onChange={(value) => {
+                const type = value as WebinarScheduleRule['type']
                 updateRule(
                   i,
                   type === 'once'
@@ -407,12 +409,12 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
                     : { type, time: r.time ?? '20:00', days: type === 'weekly' ? [] : undefined, at: undefined },
                 )
               }}
-              className="rounded-lg border border-hairline px-2 py-1"
-            >
-              <option value="daily">毎日</option>
-              <option value="weekly">毎週</option>
-              <option value="once">単発</option>
-            </select>
+              options={[
+                { value: 'daily', label: '毎日' },
+                { value: 'weekly', label: '毎週' },
+                { value: 'once', label: '単発' },
+              ]}
+            />
             {r.type === 'weekly' &&
               DAYS.map((d, di) => (
                 <label key={di} className="flex items-center gap-0.5">

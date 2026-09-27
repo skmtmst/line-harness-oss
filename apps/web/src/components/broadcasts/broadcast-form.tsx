@@ -61,6 +61,7 @@ import Combobox from '@/components/shared/combobox'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Button from '@/components/shared/button'
 import { RequiredBadge } from '@/components/shared/form-controls'
+import Select from '@/components/shared/select'
 import BroadcastStepRail from '@/components/broadcasts/broadcast-step-rail'
 import { broadcastSteps, type BroadcastStepKey } from '@/components/broadcasts/broadcast-steps'
 import { testSendFailure, testSendResult, type TestSendView } from './test-send-view'
@@ -308,16 +309,20 @@ function BubbleEditor({ bubble, index, total, assets, assetsStatus, accountId, o
   return <section className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-sm">
     <div className="flex items-center gap-3 border-b border-hairline bg-canvas-sunken px-4 py-3">
       <span className="flex h-7 w-7 items-center justify-center rounded-full bg-accent-deep text-xs font-bold text-on-accent">{index + 1}</span>
-      <select value={bubble.type} onChange={(e) => onChange(emptyBubble(e.target.value as BroadcastBubbleType))} className="min-w-0 flex-1 rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-semibold">
-        {Object.entries(TYPE_LABELS).map(([value, label]) => {
+      <Select
+        aria-label={`吹き出し${index + 1}の種類`}
+        value={bubble.type}
+        onChange={(value) => onChange(emptyBubble(value as BroadcastBubbleType))}
+        options={Object.entries(TYPE_LABELS).map(([value, label]) => {
           const reason = UNSENDABLE_TYPES[value as BroadcastBubbleType]
-          return (
-            <option key={value} value={value} disabled={Boolean(reason)}>
-              {reason ? `${label}（未対応）` : label}
-            </option>
-          )
+          return {
+            value,
+            label: reason ? `${label}（未対応）` : label,
+            disabled: Boolean(reason),
+          }
         })}
-      </select>
+        className="min-w-0 flex-1"
+      />
       <button type="button" disabled={index === 0} onClick={() => onMove(-1)} className="h-9 w-9 rounded-control border disabled:opacity-30" aria-label="上へ移動">↑</button>
       <button type="button" disabled={index === total - 1} onClick={() => onMove(1)} className="h-9 w-9 rounded-control border disabled:opacity-30" aria-label="下へ移動">↓</button>
       <button type="button" disabled={total === 1} onClick={onDelete} className="h-9 rounded-control border border-danger-bg px-3 text-xs font-semibold text-danger disabled:opacity-30">削除</button>
@@ -455,8 +460,12 @@ function TextBubbleEditor({ bubble, index, trackLinks, buttons, embedded = false
               <div key={buttonIndex} className="grid grid-cols-[1.5rem_minmax(0,1fr)_minmax(0,1.35fr)_2rem] items-center gap-2 rounded-control bg-canvas-sunken p-2">
                 <GripVertical size={16} className="text-ink-faint" aria-hidden />
                 <input aria-label={`ボタン${buttonIndex + 1}のラベル`} value={button.label} onChange={(event) => onButtonsChange(buttons.map((item, i) => i === buttonIndex ? { ...item, label: event.target.value } : item))} placeholder="ボタン名" className="min-w-0 rounded-control border border-hairline bg-canvas px-2 py-1.5 text-xs" />
-                <div className="grid min-w-0 grid-cols-[7rem_minmax(0,1fr)] overflow-hidden rounded-control border border-hairline bg-canvas">
-                  <select aria-label={`ボタン${buttonIndex + 1}の種類`} value={button.type} onChange={(event) => onButtonsChange(buttons.map((item, i) => i === buttonIndex ? { ...item, type: event.target.value as 'url' | 'pdf' } : item))} className="border-hairline border-r bg-canvas px-2 py-1.5 text-xs"><option value="url">URLを開く</option><option value="pdf">PDFを開く</option></select>
+                {/*
+                  共通の選び欄（幅176px）に合わせて種類の列を広げる。
+                  開いた候補が切れないよう overflow-hidden は外す。
+                */}
+                <div className="grid min-w-0 grid-cols-[11rem_minmax(0,1fr)] rounded-control border border-hairline bg-canvas">
+                  <Select aria-label={`ボタン${buttonIndex + 1}の種類`} value={button.type} onChange={(value) => onButtonsChange(buttons.map((item, i) => i === buttonIndex ? { ...item, type: value as 'url' | 'pdf' } : item))} options={[{ value: 'url', label: 'URLを開く' }, { value: 'pdf', label: 'PDFを開く' }]} />
                   <input aria-label={`ボタン${buttonIndex + 1}のURL`} value={button.value} onChange={(event) => onButtonsChange(buttons.map((item, i) => i === buttonIndex ? { ...item, value: event.target.value } : item))} placeholder="https://example.com" className="min-w-0 px-2 py-1.5 text-xs" />
                 </div>
                 <button type="button" aria-label={`ボタン${buttonIndex + 1}を削除`} onClick={() => onButtonsChange(buttons.filter((_, i) => i !== buttonIndex))} className="flex justify-center text-danger"><Trash2 size={16} aria-hidden /></button>
@@ -1712,15 +1721,16 @@ export default function BroadcastForm({
             </label>
             <label className="block">
               <span className="text-ink block text-sm font-bold">フォルダ</span>
-              <select
+              <Select
                 aria-label="フォルダ"
                 value={folderId}
-                onChange={(e) => setFolderId(e.target.value)}
-                className="border-hairline rounded-control mt-2 w-full border px-3 py-2.5 text-sm"
-              >
-                <option value="">未分類</option>
-                {folders.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
-              </select>
+                onChange={setFolderId}
+                options={[
+                  { value: '', label: '未分類' },
+                  ...folders.map((f) => ({ value: f.id, label: f.name })),
+                ]}
+                size="full"
+              />
             </label>
           </div>
           <label className="mt-4 block">
@@ -2078,16 +2088,17 @@ export default function BroadcastForm({
                 />
               </label>
               <label className="block text-xs font-bold text-ink-secondary">フォルダ
-                <select
+                <Select
                   aria-label="テンプレートのフォルダ"
                   value={templatePickerFolderId}
-                  onChange={(event) => setTemplatePickerFolderId(event.target.value)}
-                  className="mt-2 w-full rounded-control border border-hairline px-3 py-2 text-sm font-normal"
-                >
-                  <option value="">すべて</option>
-                  {templateFolders.map((folder) => <option key={folder.id} value={folder.id}>{folder.name}</option>)}
-                  <option value="__none__">未分類</option>
-                </select>
+                  onChange={setTemplatePickerFolderId}
+                  options={[
+                    { value: '', label: 'すべて' },
+                    ...templateFolders.map((folder) => ({ value: folder.id, label: folder.name })),
+                    { value: '__none__', label: '未分類' },
+                  ]}
+                  size="full"
+                />
               </label>
             </div>
             <div className="mt-4 space-y-3">

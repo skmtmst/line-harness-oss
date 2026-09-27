@@ -34,7 +34,7 @@ import SortSelect from '@/components/ui/sort-select'
 import PageSizeSelect from '@/components/ui/page-size-select'
 import FeatureGate from '@/components/feature-gate'
 import { useAccount } from '@/contexts/account-context'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import {
   filterAndSortCommonVars,
   type CommonVarFilter,
@@ -674,14 +674,7 @@ function VarsPageInner() {
           <label className="text-ink-secondary block text-xs font-semibold" htmlFor="vars-folder-filter">
             フォルダ
           </label>
-          <SelectField
-            id="vars-folder-filter"
-            aria-label="フォルダ"
-            value={folderFilter}
-            onChange={(event) => setFolderFilter(event.target.value)}
-            className="w-full"
-            options={folderOptions}
-          />
+          <Select size="full" id="vars-folder-filter" aria-label="フォルダ" value={folderFilter} onChange={(value) => setFolderFilter(value)} options={folderOptions} />
           {addingFolder ? (
             folderForm
           ) : (
@@ -1071,13 +1064,12 @@ function VarsPageInner() {
                     </p>
                     <label className="text-ink-secondary mt-2 block text-xs font-semibold">
                       差し替え先
-                      <SelectField
+                      <Select size="full"
                         value={replacementId}
                         disabled={singleBusy || replacementCandidates.length === 0}
-                        onChange={(event) => void selectReplacement(event.target.value)}
+                        onChange={(value) => void selectReplacement(value)}
                         aria-label="差し替え先"
-                        className="mt-1 w-full"
-                        style={{ width: '100%' }}
+                        className="mt-1"
                         options={replacementCandidates.length > 0
                           ? replacementCandidates.map((candidate) => ({
                               value: candidate.id,

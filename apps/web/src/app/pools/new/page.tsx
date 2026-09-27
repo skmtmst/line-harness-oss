@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { LineAccount } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import CreatePage, { Field, inputClass } from '@/components/shared/create-page'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 
 /** slug は URL に出る。日本語や記号を許すと /pool/xxx が壊れる。 */
 const SLUG_PATTERN = /^[a-z0-9][a-z0-9-]{1,31}$/
@@ -137,12 +137,12 @@ export default function NewPoolPage() {
         required
         note="友だち数が上限に近づいたら、ここを切り替えます。配ったURLはそのまま使えます。"
       >
-        <SelectField
+        <Select
           id="pl-account"
           value={accountId}
-          onChange={(e) => setAccountId(e.target.value)}
+          onChange={(value) => setAccountId(value)}
           aria-label="いまの受け入れ先"
-          className={inputClass}
+          size="full"
           options={accounts.map((account) => ({ value: account.id, label: account.name }))}
         />
         {accountsError && (

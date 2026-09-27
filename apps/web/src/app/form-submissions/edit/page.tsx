@@ -14,7 +14,7 @@
  */
 
 import ListState from '@/components/shared/list-state'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
@@ -738,7 +738,7 @@ function FormEditInner() {
             </Field>
 
             <Field label="公開状態" htmlFor="fm-active">
-              <SelectField id="fm-active" value={isActive ? '1' : '0'} onChange={(e) => setIsActive(e.target.value === '1')} options={[{ value: "1", label: "公開中" }, { value: "0", label: "停止中" }]} className={inputClass} />
+              <Select id="fm-active" aria-label="公開状態" value={isActive ? '1' : '0'} onChange={(value) => setIsActive(value === '1')} options={[{ value: "1", label: "公開中" }, { value: "0", label: "停止中" }]} size="full" />
             </Field>
 
             <Field
@@ -746,11 +746,13 @@ function FormEditInner() {
               htmlFor="fm-tag"
               note="このフォームに答えた人を、あとから絞り込めます。"
             >
-              <SelectField
+              <Select
                 id="fm-tag"
+                aria-label="回答したときに付けるタグ"
                 value={onSubmitTagId}
-                onChange={(e) => setOnSubmitTagId(e.target.value)}
+                onChange={(value) => setOnSubmitTagId(value)}
                 options={[{ value: '', label: '— 付けない —' }, ...refs.tags.map((t) => ({ value: t.id, label: t.name }))]}
+                size="full"
               />
             </Field>
 

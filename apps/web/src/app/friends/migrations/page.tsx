@@ -12,7 +12,7 @@ import HelpTip from '@/components/shared/help-tip'
 import ListState from '@/components/shared/list-state'
 import PageHeader from '@/components/shared/page-header'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import SummaryCard from '@/components/shared/summary-card'
 import { TableHeadRow, Th } from '@/components/shared/table'
@@ -137,7 +137,7 @@ export default function FriendMigrationsPage() {
     <div className="grid gap-4 xl:grid-cols-2">
       <section className="bg-canvas rounded-card border-hairline border p-4">
         <h2 className="text-ink text-base font-bold">CSVで書き出す</h2>
-        <label className="text-ink-secondary mt-4 block text-xs font-semibold">対象<SelectField aria-label="書き出すLINEアカウント" value={accountId} onChange={(event) => setAccountId(event.target.value)} options={[{ value: '', label: 'アカウントを選択' }, ...accounts.map((account) => ({ value: account.id, label: account.name }))]} /></label>
+        <label className="text-ink-secondary mt-4 block text-xs font-semibold">対象<Select aria-label="書き出すLINEアカウント" value={accountId} onChange={(value) => setAccountId(value)} options={[{ value: '', label: 'アカウントを選択' }, ...accounts.map((account) => ({ value: account.id, label: account.name }))]} /></label>
         <fieldset className="mt-4 space-y-2"><legend className="text-ink-secondary mb-2 text-xs font-semibold">書き出す項目</legend>
           {([['basic', '基本（名前・LINEアカウント・登録日）'], ['tags_fields', 'タグ・友だち情報'], ['support', '対応状況・対応マーク・担当者']] as const).map(([value, label]) => <Checkbox key={value} checked={columns.includes(value)} onCheckedChange={() => toggleColumn(value)}>{label}</Checkbox>)}
         </fieldset>

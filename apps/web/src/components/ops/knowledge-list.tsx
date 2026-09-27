@@ -9,7 +9,7 @@ import KnowledgeEditor from '@/components/ops/knowledge-editor'
 import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
 import ListState from '@/components/shared/list-state'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import Pagination from '@/components/shared/pagination'
 import ListRange from '@/components/ui/list-range'
@@ -63,12 +63,12 @@ export default function KnowledgeList() {
     <div className={styles.filters}>
       <div className={styles.search}><Search aria-hidden="true" /><TextField aria-label="タイトル・質問・キーワードで検索"
         placeholder="タイトル・質問・キーワードで検索" value={q} onChange={e => { setQ(e.target.value); setOffset(0) }} maxLength={200} /></div>
-      <SelectField aria-label="種類" className={styles.filter} value={kind} onChange={e => { setKind(e.target.value); setOffset(0) }}
+      <Select aria-label="種類" className={styles.filter} value={kind} onChange={value => { setKind(value); setOffset(0) }}
         options={[{ value: '', label: '種類：すべて' }, ...KNOWLEDGE_KINDS]} />
-      <SelectField data-design-node="aeKindFilter" aria-label="記事の種類" className={styles.articleKindFilter} value={articleKind}
-        onChange={e => { setArticleKind(e.target.value); setOffset(0) }}
-        options={[{ value: '', label: '記事：すべて' }, ...KNOWLEDGE_ARTICLE_KINDS]} />
-      <SelectField aria-label="状態" className={styles.filter} value={state} onChange={e => { setState(e.target.value); setOffset(0) }}
+      <span data-design-node="aeKindFilter"><Select aria-label="記事の種類" className={styles.articleKindFilter} value={articleKind}
+        onChange={value => { setArticleKind(value); setOffset(0) }}
+        options={[{ value: '', label: '記事：すべて' }, ...KNOWLEDGE_ARTICLE_KINDS]} /></span>
+      <Select aria-label="状態" className={styles.filter} value={state} onChange={value => { setState(value); setOffset(0) }}
         options={[{ value: '', label: '状態：すべて' }, { value: 'pending', label: '承認待ち' }, { value: 'approved', label: '承認済み' }, { value: 'needs_review', label: '要確認' }, { value: 'dismissed', label: '見送り' }]} />
       <span className={styles.count}>{loaded && !error ? `${total}件` : '—'}</span>
     </div>

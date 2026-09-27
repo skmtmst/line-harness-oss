@@ -41,11 +41,12 @@ describe('V6 シナリオ作成・配信方式 cCB7r', () => {
     expect(page).toContain('folderId: nextFolder')
     expect(page).toContain('folderId: folderId || null')
     expect(page).toContain("setFolderId(res.data.folderId ?? '')")
-    expect(page).toContain("import SelectField from '@/components/shared/select-field'")
+    expect(page).toContain("import Select from '@/components/shared/select'")
     expect(page).toContain("{ value: '', label: '未分類' }")
     expect(page).toContain("...(selectedFolderMissing ? [{ value: folderId, label: '名前を確認できません' }] : [])")
     expect(page).toContain("...folders.map((folder) => ({ value: folder.id, label: folder.name }))")
-    expect(page).toContain('className="v6-select ')
+    expect(page).toContain('aria-label="シナリオのフォルダ"')
+    expect(page).toContain('size="full"')
   })
 
   it('フォルダを取得できないとき未分類と決めつけず変更を止める', () => {
@@ -53,7 +54,7 @@ describe('V6 シナリオ作成・配信方式 cCB7r', () => {
     expect(page).toContain("disabled={(Boolean(id) && !scenario) || folderState !== 'ready' || detailsSaving || saving !== null}")
     expect(page).toContain('フォルダを確認できないため、いまは変更できません。')
     expect(page).toContain("folderState === 'error'")
-    expect(page).toContain("? '確認できません'")
+    expect(page).toContain("label: '名前を確認できません'")
     expect(page).toContain("folderState === 'loading'")
     expect(page).toContain("? '読み込み中…'")
   })

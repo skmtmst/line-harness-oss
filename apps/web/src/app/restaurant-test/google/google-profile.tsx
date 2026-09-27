@@ -10,7 +10,7 @@ import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import StickyBar from '@/components/shared/sticky-bar'
 import Toggle from '@/components/shared/toggle'
@@ -226,7 +226,7 @@ export function ProfileTab({ accountId, go }: { accountId: string; go: ProfileNa
         {earlyClose !== null ? (
           <div className="border-hairline bg-canvas flex flex-wrap items-center gap-3 rounded-control border px-4 py-3">
             <span className="text-sm font-semibold">今日の閉店時刻</span>
-            <SelectField size="compact" aria-label="今日の閉店時刻" value={earlyClose} onChange={(event) => setEarlyClose(event.target.value)} options={closeOptions} />
+            <Select size="page-size" aria-label="今日の閉店時刻" value={earlyClose} onChange={(value) => setEarlyClose(value)} options={closeOptions} />
             <span className="text-ink-secondary text-caption">現在 {formatPeriods(today.periods)}</span>
             <span className="grow" />
             <Button size="field" onClick={() => setEarlyClose(null)} disabled={busy}>やめる</Button>
@@ -326,18 +326,13 @@ export function ProfileTab({ accountId, go }: { accountId: string; go: ProfileNa
 
 function TimeSelect({ value, onChange, kind, label }: { value: string; onChange: (v: string) => void; kind: 'open' | 'close'; label: string }) {
   return (
-    <span className="relative inline-flex">
-      <select
-        aria-label={label}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="bg-canvas text-ink h-9 appearance-none rounded-control border pr-8 pl-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-status-info"
-        style={{ width: 120, borderColor: 'var(--color-hairline)' }}
-      >
-        {TIME_OPTIONS.map((t) => <option key={t} value={t}>{kind === 'close' && t === '00:00' ? '24:00' : t}</option>)}
-      </select>
-      <ChevronDown size={14} className="text-ink-faint pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2" aria-hidden="true" />
-    </span>
+    <Select
+      aria-label={label}
+      value={value}
+      onChange={onChange}
+      options={TIME_OPTIONS.map((t) => ({ value: t, label: kind === 'close' && t === '00:00' ? '24:00' : t }))}
+      size="page-size"
+    />
   )
 }
 
@@ -971,8 +966,8 @@ export function HistoryScreen({ accountId, initialResult, go }: { accountId: str
       <div className="flex flex-wrap items-center gap-3">
         <PillTabs label="変更の種類" items={HISTORY_KINDS.map((k) => ({ key: k.key, label: `${k.label}${data ? ` ${data.counts[k.key]}` : ''}`, current: kind === k.key, onClick: () => { setKind(k.key); setPage(1) } }))} />
         <span className="grow" />
-        <SelectField aria-label="結果で絞り込み" value={result} onChange={(event) => { setResult(event.target.value as GoogleHistoryResult); setPage(1) }} options={[{ value: 'all', label: '結果：すべて' }, { value: 'applied', label: '反映済み' }, { value: 'pending', label: '反映確認中' }, { value: 'failed', label: '失敗・取り消し' }]} />
-        <SelectField size="compact" aria-label="期間" value={days} onChange={(event) => { setDays(event.target.value); setPage(1) }} options={[{ value: '7', label: '期間：7日' }, { value: '30', label: '期間：30日' }, { value: '90', label: '期間：90日' }, { value: '365', label: '期間：1年' }]} />
+        <Select aria-label="結果で絞り込み" value={result} onChange={(value) => { setResult(value as GoogleHistoryResult); setPage(1) }} options={[{ value: 'all', label: '結果：すべて' }, { value: 'applied', label: '反映済み' }, { value: 'pending', label: '反映確認中' }, { value: 'failed', label: '失敗・取り消し' }]} />
+        <Select size="page-size" aria-label="期間" value={days} onChange={(value) => { setDays(value); setPage(1) }} options={[{ value: '7', label: '期間：7日' }, { value: '30', label: '期間：30日' }, { value: '90', label: '期間：90日' }, { value: '365', label: '期間：1年' }]} />
         <SearchField placeholder="内容で検索" aria-label="内容で検索" value={search} onChange={setSearch} onClear={() => setSearch('')} />
       </div>
 

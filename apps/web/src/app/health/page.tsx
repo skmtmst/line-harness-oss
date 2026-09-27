@@ -5,7 +5,7 @@ import { api } from '@/lib/api'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Progress from '@/components/shared/progress'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import Avatar from '@/components/shared/avatar'
 import Button from '@/components/shared/button'
 import { ChevronDown } from 'lucide-react'
@@ -353,12 +353,10 @@ export default function HealthPage() {
               <form onSubmit={handleMigrate}>
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-ink-secondary mb-1">移行先アカウント</label>
-                  <SelectField
+                  <Select size="full"
                     value={migrateToId}
-                    onChange={(e) => setMigrateToId(e.target.value)}
+                    onChange={(value) => setMigrateToId(value)}
                     aria-label="移行先アカウント"
-                    className="w-full border border-hairline rounded-control px-3 py-2 text-sm bg-canvas focus:outline-none focus:ring-2 focus:ring-accent"
-                    required
                     options={[
                       { value: '', label: '選択してください' },
                       ...accounts

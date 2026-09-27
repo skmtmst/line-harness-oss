@@ -1,6 +1,6 @@
 'use client'
 
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import SearchField from '@/components/shared/search-field'
 import ListRange from '@/components/ui/list-range'
 import { useDeferredValue, useEffect, useState, useCallback, useRef } from 'react'
@@ -765,12 +765,12 @@ export default function RichMenusListPage() {
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
-          <SelectField value={sortKey} onChange={(e) => setSortKey(e.target.value as SortKey)} aria-label="並び順" options={[{ value: "priority", label: "出す順番（自分で決めた順）" }, { value: "taps", label: "タップ数が多い順" }, { value: "updated", label: "更新が新しい順" }, { value: "name", label: "名前順" }]} className="border-hairline rounded-control focus:ring-accent min-w-60 border px-2 py-2 text-sm focus:ring-2 focus:outline-none" />
+          <Select value={sortKey} onChange={(value) => setSortKey(value as SortKey)} aria-label="並び順" options={[{ value: "priority", label: "出す順番（自分で決めた順）" }, { value: "taps", label: "タップ数が多い順" }, { value: "updated", label: "更新が新しい順" }, { value: "name", label: "名前順" }]} className="min-w-60" />
           <span className="text-ink-faint text-xs whitespace-nowrap">表示</span>
-          <SelectField
-            size="compact"
-            value={pageSize}
-            onChange={(e) => setPageSize(Number(e.target.value))}
+          <Select
+            size="page-size"
+            value={String(pageSize)}
+            onChange={(value) => setPageSize(Number(value))}
             aria-label="表示件数"
             options={[{ value: '20', label: '20件表示' }, { value: '50', label: '50件表示' }, { value: '100', label: '100件表示' }]}
           />

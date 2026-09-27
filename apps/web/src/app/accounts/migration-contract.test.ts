@@ -142,18 +142,12 @@ describe('UID移行のタブと段組み（#984 LAY-13/14）', () => {
     expect(PAGE).toContain('href="#migration-history"')
   })
 
-  it('プルダウンの全幅は画面側の属性スコープで広げる', () => {
-    /*
-     * shared/ は Claude 所有領域。U063 と同じく、共有部品を改変せず
-     * data-selects-wide の属性スコープで select だけを全幅にする。
-     * className="w-full" の上書きはモジュールCSSの .default に負けるため使わない。
-     */
-    expect(PAGE).toContain('data-selects-wide')
-    expect(PAGE).toContain('[data-selects-wide] select { width: 100%; }')
-    expect(PAGE).toContain('<SelectField aria-label="移行元アカウント"')
-    expect(PAGE).toContain('<SelectField aria-label="移行先アカウント"')
-    expect(PAGE).not.toContain('size="full"')
-    expect(PAGE.match(/<SelectField[^>]*w-full/g) ?? []).toHaveLength(0)
+  it('移行元・移行先の選び欄は欄いっぱいに広げる', () => {
+    // 選び欄は Select 1 本化済み。幅は部品の size="full" で持たせる。
+    expect(PAGE).toContain('<Select aria-label="移行元アカウント"')
+    expect(PAGE).toContain('<Select aria-label="移行先アカウント"')
+    expect(PAGE.match(/size="full"/g)?.length).toBeGreaterThanOrEqual(2)
+    expect(PAGE).not.toContain('[data-selects-wide] select')
   })
 
   it('移行元と移行先は同幅の2欄、利用目的は全幅', () => {

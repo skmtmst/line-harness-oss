@@ -1,6 +1,6 @@
 'use client'
 
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import { MoreAction } from '@/components/shared/row-actions'
 import StatusBadge from '@/components/shared/status-badge'
@@ -767,7 +767,7 @@ export default function TemplatesPage() {
           #668: 「保存した検索」の飾りは消した。押せる形をしているのに
           何も起きない札は、押した人に「やった」と誤解させる
           （v6-common-rules §2-2）。保存検索の仕組みができたら、
-          一斉配信と同じ選び口（SelectField）で置き直す。
+          一斉配信と同じ選び口（共通の Select）で置き直す。
         */}
         {/*
           ここは「20件表示」の選び口だった(#615)。**選べない選び口だった。**
@@ -847,7 +847,7 @@ export default function TemplatesPage() {
             </div>
             <div>
               <label className="block text-xs font-medium text-ink-secondary mb-1">タイプ</label>
-              <SelectField value={form.messageType} onChange={(e) => setForm({ ...form, messageType: e.target.value })} options={[{ value: "text", label: "テキスト" }, { value: "flex", label: "カード型" }, { value: "image", label: "画像" }]} className="w-full border border-hairline rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-canvas" />
+              <Select aria-label="タイプ" value={form.messageType} onChange={(value) => setForm({ ...form, messageType: value })} options={[{ value: "text", label: "テキスト" }, { value: "flex", label: "カード型" }, { value: "image", label: "画像" }]} size="full" />
             </div>
             <div>
               <label className="block text-xs font-medium text-ink-secondary mb-1">内容 / JSON <span className="text-red-500">*</span></label>
@@ -1148,14 +1148,14 @@ export default function TemplatesPage() {
                       <label className="mb-1.5 block text-[11px] font-medium text-ink-faint" htmlFor="template-folder-select">
                         置き場
                       </label>
-                      <SelectField
+                      <Select
                         id="template-folder-select"
                         aria-label="置き場"
                         value={drawerData.folderId ?? ''}
                         disabled={movingId === drawerData.id}
-                        onChange={(event) => void moveTemplate(
+                        onChange={(value) => void moveTemplate(
                           drawerData,
-                          event.target.value === '' ? null : event.target.value,
+                          value === '' ? null : value,
                         )}
                         options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]}
                       />

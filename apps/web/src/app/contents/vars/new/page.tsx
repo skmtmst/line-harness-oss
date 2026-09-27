@@ -2,7 +2,7 @@
 
 import DateField from '@/components/shared/date-field'
 import DateTimeField from '@/components/shared/date-time-field'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -391,10 +391,11 @@ function NewCommonVarInner() {
             <label htmlFor="cv-folder" className="text-ink-secondary mb-1 block text-sm font-medium">
               フォルダ
             </label>
-            <SelectField
+            <Select
+              aria-label="フォルダ"
               id="cv-folder"
               value={folderId}
-              onChange={(e) => setFolderId(e.target.value)}
+              onChange={(value) => setFolderId(value)}
               options={[{ value: '', label: '未分類' }, ...folders.map((folder) => ({ value: folder.id, label: folder.name }))]}
             />
           </div>
@@ -415,19 +416,13 @@ function NewCommonVarInner() {
           </div>
           <div>
             <label htmlFor="cv-expiry-behavior" className="text-ink-secondary mb-1 block text-xs font-medium">期間外の動作</label>
-            <SelectField id="cv-expiry-behavior" value={expiryBehavior} onChange={(e) => setExpiryBehavior(e.target.value as 'stop' | 'fallback')} options={[{ value: 'stop', label: '配信を止める' }, { value: 'fallback', label: '代替値を使う' }]} className="w-full" />
+            <Select size="full" aria-label="期間外の動作" id="cv-expiry-behavior" value={expiryBehavior} onChange={(value) => setExpiryBehavior(value as 'stop' | 'fallback')} options={[{ value: 'stop', label: '配信を止める' }, { value: 'fallback', label: '代替値を使う' }]} />
           </div>
           {expiryBehavior === 'fallback' && (
             <div>
               <label htmlFor="cv-fallback-value" className="text-ink-secondary mb-1 block text-xs font-medium">代替値</label>
               {type === 'boolean' ? (
-                <SelectField
-                  id="cv-fallback-value"
-                  value={fallbackValue}
-                  onChange={(e) => setFallbackValue(e.target.value)}
-                  options={[{ value: '', label: '選んでください' }, { value: 'true', label: 'true' }, { value: 'false', label: 'false' }]}
-                  className="w-full"
-                />
+                <Select size="full" aria-label="代替値" id="cv-fallback-value" value={fallbackValue} onChange={(value) => setFallbackValue(value)} options={[{ value: '', label: '選んでください' }, { value: 'true', label: 'true' }, { value: 'false', label: 'false' }]} />
               ) : type === 'date' ? (
                 <DateField id="cv-fallback-value" value={fallbackValue} onChange={setFallbackValue} />
               ) : type === 'datetime' ? (
@@ -521,7 +516,7 @@ function NewCommonVarInner() {
           <label htmlFor="cv-value" className="text-ink-secondary mb-1 block text-sm font-medium">
             値 {COMMON_VAR_VALUE_REQUIRED.has(type) && <span className="text-danger">*</span>}
           </label>
-          {type === 'boolean' ? <SelectField id="cv-value" value={value} onChange={(e) => { setValue(e.target.value); setSecretWarningFields(null) }} options={[{ value: '', label: '選んでください' }, { value: 'true', label: 'true' }, { value: 'false', label: 'false' }]} className="w-full max-w-md" /> : type === 'long_text' ? <textarea
+          {type === 'boolean' ? <Select size="full" aria-label="値" id="cv-value" value={value} onChange={(value) => { setValue(value); setSecretWarningFields(null) }} options={[{ value: '', label: '選んでください' }, { value: 'true', label: 'true' }, { value: 'false', label: 'false' }]} className="max-w-md" /> : type === 'long_text' ? <textarea
             ref={longValueRef}
             id="cv-value"
             maxLength={10000}

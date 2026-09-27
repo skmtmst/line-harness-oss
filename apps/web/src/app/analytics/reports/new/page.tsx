@@ -7,7 +7,7 @@ import Button from '@/components/shared/button'
 import { TimeField } from '@/components/shared/date-time-field'
 import ListState from '@/components/shared/list-state'
 import PageHeader from '@/components/shared/page-header'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import StickyBar from '@/components/shared/sticky-bar'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
@@ -352,14 +352,14 @@ function AnalyticsReportFormPage() {
           <section className="border-hairline bg-canvas rounded-card border p-4 sm:p-6">
             <h2 className="mb-4 text-lg font-semibold">いつ送りますか</h2>
             <div className="grid items-end gap-4 md:grid-cols-4">
-              <label className="text-ink-secondary grid gap-2 text-xs font-semibold">間かく<SelectField value={cadence} onChange={(event) => setCadence(event.target.value as 'weekly' | 'monthly')} options={[{ value: 'weekly', label: '毎週' }, { value: 'monthly', label: '毎月' }]} /></label>
+              <label className="text-ink-secondary grid gap-2 text-xs font-semibold">間かく<Select aria-label="間かく" value={cadence} onChange={(value) => setCadence(value as 'weekly' | 'monthly')} options={[{ value: 'weekly', label: '毎週' }, { value: 'monthly', label: '毎月' }]} size="standard" /></label>
               {cadence === 'weekly' ? (
-                <label className="text-ink-secondary grid gap-2 text-xs font-semibold">曜日<SelectField value={weekday} onChange={(event) => setWeekday(event.target.value)} options={['日曜日', '月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日'].map((label, value) => ({ value: String(value), label }))} /></label>
+                <label className="text-ink-secondary grid gap-2 text-xs font-semibold">曜日<Select aria-label="送る曜日" value={weekday} onChange={(value) => setWeekday(value)} options={['日曜日', '月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日'].map((label, value) => ({ value: String(value), label }))} size="standard" /></label>
               ) : (
-                <label className="text-ink-secondary grid gap-2 text-xs font-semibold">日<SelectField value={monthDay} onChange={(event) => setMonthDay(event.target.value)} options={Array.from({ length: 28 }, (_, index) => ({ value: String(index + 1), label: `${index + 1}日` }))} /></label>
+                <label className="text-ink-secondary grid gap-2 text-xs font-semibold">日<Select aria-label="送る日" value={monthDay} onChange={(value) => setMonthDay(value)} options={Array.from({ length: 28 }, (_, index) => ({ value: String(index + 1), label: `${index + 1}日` }))} size="standard" /></label>
               )}
               <span className="text-ink-secondary grid gap-2 text-xs font-semibold">時刻<TimeField value={sendTime} onChange={setSendTime} aria-label="送る時刻" /></span>
-              <label className="text-ink-secondary grid gap-2 text-xs font-semibold">集計する期間<SelectField value={periodDays} onChange={(event) => setPeriodDays(event.target.value)} options={[{ value: '7', label: '前の7日間' }, { value: '30', label: '前の30日間' }, { value: '90', label: '前の90日間' }]} /></label>
+              <label className="text-ink-secondary grid gap-2 text-xs font-semibold">集計する期間<Select aria-label="集計する期間" value={periodDays} onChange={(value) => setPeriodDays(value)} options={[{ value: '7', label: '前の7日間' }, { value: '30', label: '前の30日間' }, { value: '90', label: '前の90日間' }]} size="standard" /></label>
             </div>
             <p className="text-ink-secondary mb-0 mt-4 text-xs">時刻は {options.timeZone} で計算します。</p>
           </section>

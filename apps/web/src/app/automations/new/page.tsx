@@ -1,6 +1,6 @@
 'use client'
 
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
@@ -674,13 +674,14 @@ function ResourcePickRow(props: {
         {title}<RequiredBadge />
       </label>
       <div className={styles.field}>
-        <SelectField
+        <Select
           id={id}
           value={value}
           disabled={tagsLoading || tagsFailed}
-          onChange={(event) => onPick(event.target.value)}
+          onChange={(value) => onPick(value)}
           aria-label={selectLabel}
           className={styles.select}
+          size="standard"
           options={[
             { value: '', label: '— 選んでください —' },
             ...options.map((option) => ({ value: option.value, label: option.label })),
@@ -1670,11 +1671,11 @@ export default function NewAutomationPage() {
               <div className="mt-4 rounded-control border border-hairline bg-canvas-sunken p-3">
                 <p className="text-xs font-semibold text-ink-secondary">きっかけの詳しい設定</p>
                 <div className="mt-2 grid gap-3 sm:grid-cols-2">
-                  {eventType === 'tag_change' ? <SelectField aria-label="きっかけのタグ" value={String(triggerConfig.tagId ?? '')} onChange={(e) => setTriggerConfig({ ...triggerConfig, tagId: e.target.value })} options={[{ value: '', label: 'どのタグか選ぶ' }, ...tags.map((tag) => ({ value: tag.id, label: tag.name }))]} className={styles.select} /> : null}
-                  {eventType === 'tag_change' ? <SelectField aria-label="付いたとき・外れたとき" value={String(triggerConfig.action ?? 'add')} onChange={(e) => setTriggerConfig({ ...triggerConfig, action: e.target.value })} options={[{ value: 'add', label: '付いたとき' }, { value: 'remove', label: '外れたとき' }]} className={styles.select} /> : null}
+                  {eventType === 'tag_change' ? <Select aria-label="きっかけのタグ" value={String(triggerConfig.tagId ?? '')} onChange={(value) => setTriggerConfig({ ...triggerConfig, tagId: value })} options={[{ value: '', label: 'どのタグか選ぶ' }, ...tags.map((tag) => ({ value: tag.id, label: tag.name }))]} className={styles.select} size="standard" /> : null}
+                  {eventType === 'tag_change' ? <Select aria-label="付いたとき・外れたとき" value={String(triggerConfig.action ?? 'add')} onChange={(value) => setTriggerConfig({ ...triggerConfig, action: value })} options={[{ value: 'add', label: '付いたとき' }, { value: 'remove', label: '外れたとき' }]} className={styles.select} size="standard" /> : null}
                   {eventType === 'form_submitted' ? <TextField aria-label="回答フォーム" placeholder="フォームID（空欄ならすべて）" value={String(triggerConfig.formId ?? '')} onChange={(e) => setTriggerConfig({ formId: e.target.value })} /> : null}
                   {eventType === 'link_clicked' ? <TextField aria-label="計測リンク" placeholder="計測リンクID（空欄ならすべて）" value={String(triggerConfig.trackedLinkId ?? '')} onChange={(e) => setTriggerConfig({ trackedLinkId: e.target.value })} /> : null}
-                  {eventType === 'calendar_booked' ? <SelectField aria-label="予約の種類" value={String(triggerConfig.bookingType ?? '')} onChange={(e) => setTriggerConfig({ ...triggerConfig, bookingType: e.target.value })} options={[{ value: '', label: 'すべての予約' }, { value: 'salon', label: 'サロン予約' }, { value: 'event', label: 'イベント予約' }]} className={styles.select} /> : null}
+                  {eventType === 'calendar_booked' ? <Select aria-label="予約の種類" value={String(triggerConfig.bookingType ?? '')} onChange={(value) => setTriggerConfig({ ...triggerConfig, bookingType: value })} options={[{ value: '', label: 'すべての予約' }, { value: 'salon', label: 'サロン予約' }, { value: 'event', label: 'イベント予約' }]} className={styles.select} size="standard" /> : null}
                   {eventType === 'calendar_booked' && triggerConfig.bookingType !== 'event' ? <TextField aria-label="予約メニュー" placeholder="メニューID（空欄ならすべて）" value={String(triggerConfig.menuId ?? '')} onChange={(e) => setTriggerConfig({ ...triggerConfig, menuId: e.target.value })} /> : null}
                   {eventType === 'calendar_booked' && triggerConfig.bookingType === 'event' ? <TextField aria-label="対象イベント" placeholder="イベントID（空欄ならすべて）" value={String(triggerConfig.eventId ?? '')} onChange={(e) => setTriggerConfig({ ...triggerConfig, eventId: e.target.value })} /> : null}
                   {eventType === 'datetime' ? <DateTimeField aria-label="実行日時" value={String(triggerConfig.at ?? '')} onChange={(v) => setTriggerConfig({ ...triggerConfig, at: v })} /> : null}
@@ -1787,14 +1788,16 @@ export default function NewAutomationPage() {
                       すること<RequiredBadge />
                     </label>
                     <div className={styles.field}>
-                      <SelectField
+                      <Select
                         id={`au-action-${row.key}`}
+                        aria-label="すること"
                         value={row.type}
-                        onChange={(event) =>
-                          updateAction(row.key, { type: event.target.value as ActionType })
+                        onChange={(value) =>
+                          updateAction(row.key, { type: value as ActionType })
                         }
                         options={ACTIONS.map((action) => ({ value: action.value, label: action.label }))}
                         className={styles.select}
+                        size="standard"
                       />
                     </div>
                   </div>

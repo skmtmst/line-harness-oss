@@ -1,6 +1,6 @@
 'use client'
 
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Tag } from '@line-crm/shared'
 import { api } from '@/lib/api'
@@ -483,15 +483,16 @@ export default function NewMileageRulePage() {
         </Field>
 
         <Field label="きっかけ" htmlFor="sc-event" required note={selected.note}>
-          <SelectField
+          <Select
+            aria-label="きっかけ"
             id="sc-event"
             value={eventType}
-            onChange={(e) => {
-              setEventType(e.target.value)
+            onChange={(value) => {
+              setEventType(value)
               setSource('')
             }}
             options={EVENT_TYPES.map((t) => ({ value: t.value, label: t.label }))}
-            className={inputClass}
+            size="full"
           />
         </Field>
 
@@ -500,12 +501,12 @@ export default function NewMileageRulePage() {
           htmlFor="sc-source"
           note="同じ行動でも、経由した場所ごとに分けられます。"
         >
-          <SelectField
+          <Select
             id="sc-source"
             value={source}
-            onChange={(e) => setSource(e.target.value)}
+            onChange={(value) => setSource(value)}
             aria-label="行動の出どころ"
-            className={inputClass}
+            size="full"
             options={selected.sources.map(([value, label]) => ({ value, label }))}
           />
         </Field>
@@ -563,18 +564,18 @@ export default function NewMileageRulePage() {
           htmlFor="sc-cap"
           note="同じ人が1日に何回まで対象になるかです。"
         >
-          <SelectField
+          <Select
             id="sc-cap"
             value={dailyCap}
-            onChange={(e) => setDailyCap(e.target.value)}
+            onChange={(value) => setDailyCap(value)}
             aria-label="1日に数える回数"
-            className={inputClass}
+            size="full"
             options={DAILY_CAPS.map(([value, label]) => ({ value, label }))}
           />
         </Field>
 
         <Field label="同じ対象の数えかた" htmlFor="sc-unique">
-          <SelectField id="sc-unique" value={uniqueMode} onChange={(e) => setUniqueMode(e.target.value as typeof uniqueMode)} options={[{ value: "", label: "何度でも数える" }, { value: "subject", label: "同じ対象は1回だけ" }, { value: "subjectPerDay", label: "同じ対象は1日1回だけ" }]} className={inputClass} />
+          <Select aria-label="同じ対象の数えかた" id="sc-unique" value={uniqueMode} onChange={(value) => setUniqueMode(value as typeof uniqueMode)} size="full" options={[{ value: "", label: "何度でも数える" }, { value: "subject", label: "同じ対象は1回だけ" }, { value: "subjectPerDay", label: "同じ対象は1日1回だけ" }]} />
         </Field>
         </div>
       </FormSection>

@@ -16,7 +16,7 @@ import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import TargetMissing from '@/components/shared/target-missing'
 import NoteBar from '@/components/shared/note-bar'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import SummaryCard from '@/components/shared/summary-card'
 import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
@@ -489,10 +489,10 @@ function ResultsInner() {
                 手元の表示中ページだけを絞ると、総件数と食い違う。
               */}
               <div className="mb-3 flex flex-wrap items-center gap-3">
-                <SelectField
-                  size="compact"
+                <Select
+                  size="page-size"
                   value={subscriptionStatus}
-                  onChange={(event) => setSubscriptionStatus(event.target.value)}
+                  onChange={(value) => setSubscriptionStatus(value)}
                   aria-label="購読の状態で絞り込む"
                   options={[
                     { value: '', label: 'すべての状態' },
@@ -756,17 +756,12 @@ function ResultsInner() {
             </button>
           </p>
         ) : (
-          <SelectField
+          <Select
             value={moveScenarioId}
-            title={moveOptions === null
-              ? '読み込んでいます'
-              : moveChoices.length === 0
-                ? '移せるシナリオがありません'
-                : '移し先のシナリオを選んでください'}
             disabled={moveOptions === null || moveChoices.length === 0 || opBusy !== null}
-            onChange={(event) => setMoveScenarioId(event.target.value)}
+            onChange={(value) => setMoveScenarioId(value)}
             aria-label="移し先のシナリオ"
-            className="w-full"
+            size="full"
             options={[
               {
                 value: '',

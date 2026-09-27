@@ -470,9 +470,7 @@ export default function AffiliatePaymentTab({ accountId }: { accountId: string }
           className="border-hairline rounded-control min-w-0 flex-1 border px-3 py-2 text-sm"
           style={{ maxWidth: 460 }}
         />
-        <select aria-label="支払い一覧の表示件数" className="border-hairline rounded-control border px-3 py-2 text-sm" defaultValue="20">
-          <option value="20">20件表示</option>
-        </select>
+        {/* 選べる件数が1つだけで何も変わらない飾りは置かない（★V7の決まり）。 */}
         <Button onClick={() => setFilter(filter === 'all' ? 'ready' : 'all')} aria-pressed={filter === 'ready'}>今回の締め {rowCountLabel}人</Button>
         <Button disabled title="支払履歴APIが未接続です">過去の支払い —</Button>
         <Button onClick={() => setFilter(filter === 'bank_missing' ? 'all' : 'bank_missing')} aria-pressed={filter === 'bank_missing'}>振込先が未登録 {missingBankLabel}人</Button>

@@ -606,22 +606,23 @@ function OverviewTab({
         <label className="block text-sm font-medium text-gray-700 mb-1.5">
           1 人あたり予約回数
         </label>
-        <select
-          value={draft.max_bookings_per_friend ?? 'unlimited'}
-          onChange={(e) =>
+        <Select
+          aria-label="1 人あたり予約回数"
+          value={draft.max_bookings_per_friend == null ? 'unlimited' : String(draft.max_bookings_per_friend)}
+          onChange={(value) =>
             update(
               'max_bookings_per_friend',
-              e.target.value === 'unlimited' ? null : Number(e.target.value),
+              value === 'unlimited' ? null : Number(value),
             )
           }
-          className="border border-hairline rounded-lg px-3 py-2 text-sm"
-        >
-          <option value="unlimited">制限なし</option>
-          <option value="1">1 回まで</option>
-          <option value="2">2 回まで</option>
-          <option value="3">3 回まで</option>
-          <option value="5">5 回まで</option>
-        </select>
+          options={[
+            { value: 'unlimited', label: '制限なし' },
+            { value: '1', label: '1 回まで' },
+            { value: '2', label: '2 回まで' },
+            { value: '3', label: '3 回まで' },
+            { value: '5', label: '5 回まで' },
+          ]}
+        />
       </div>
 
       {/* 公開対象 */}
@@ -1440,19 +1441,13 @@ function PublishTab({
         <label htmlFor="ev-visible-tag" className="mb-1.5 block text-sm font-medium text-gray-700">
           公開対象
         </label>
-        <select
+        <Select
+          aria-label="公開対象"
           id="ev-visible-tag"
           value={draft.visible_tag_id ?? ''}
-          onChange={(e) => update('visible_tag_id', e.target.value === '' ? null : e.target.value)}
-          className="rounded-lg border border-hairline px-3 py-2 text-sm"
-        >
-          <option value="">友だち全員</option>
-          {tags.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.name} を持つ人だけ
-            </option>
-          ))}
-        </select>
+          onChange={(value) => update('visible_tag_id', value === '' ? null : value)}
+          options={[{ value: '', label: '友だち全員' }, ...tags.map((t) => ({ value: t.id, label: `${t.name} を持つ人だけ` }))]}
+        />
         <p className="mt-1 text-xs text-gray-500">
           絞ると、タグを持たない人にはイベントが存在しないものとして扱われます。
           URL を直接開いても表示されません。
@@ -1468,23 +1463,18 @@ function PublishTab({
           保存値が選択肢に無いときは「保存済み：…」として出し、
           先頭項目を選んだように見せない・別値へ無断変換しない。
         */}
-        <select
+        <Select
+          aria-label="申込の締め切り"
           id="ev-entry-cutoff"
           value={deadlineSelectValue(draft.entry_cutoff_hours_before)}
-          onChange={(e) =>
-            update('entry_cutoff_hours_before', parseDeadlineSelect(e.target.value))
+          onChange={(value) =>
+            update('entry_cutoff_hours_before', parseDeadlineSelect(value))
           }
-          className="rounded-lg border border-hairline px-3 py-2 text-sm"
-        >
-          {deadlineOptionsWithSaved(
+          options={deadlineOptionsWithSaved(
             EVENT_ENTRY_CUTOFF_OPTIONS,
             draft.entry_cutoff_hours_before,
-          ).map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
+          )}
+        />
       </div>
 
       <div>
@@ -1495,22 +1485,17 @@ function PublishTab({
           EVENT-03: 保存値の意味は作成画面・Worker と同じ。
           null=不可、0=開始直前まで、正数=開始N時間前。
         */}
-        <select
+        <Select
+          aria-label="キャンセル期限（友だち側）"
           value={deadlineSelectValue(draft.cancel_deadline_hours_before)}
-          onChange={(e) =>
-            update('cancel_deadline_hours_before', parseDeadlineSelect(e.target.value))
+          onChange={(value) =>
+            update('cancel_deadline_hours_before', parseDeadlineSelect(value))
           }
-          className="border border-hairline rounded-lg px-3 py-2 text-sm"
-        >
-          {deadlineOptionsWithSaved(
+          options={deadlineOptionsWithSaved(
             EVENT_CANCEL_DEADLINE_OPTIONS,
             draft.cancel_deadline_hours_before,
-          ).map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
+          )}
+        />
       </div>
 
       <label className="flex items-start gap-3 p-3 border border-hairline rounded-lg cursor-pointer hover:bg-gray-50">
@@ -1530,20 +1515,21 @@ function PublishTab({
         <label className="block text-sm font-medium text-gray-700 mb-1.5">
           開始 N 時間前リマインダ
         </label>
-        <select
-          value={draft.reminder_hours_before ?? 'off'}
-          onChange={(e) =>
-            update('reminder_hours_before', e.target.value === 'off' ? null : Number(e.target.value))
+        <Select
+          aria-label="開始 N 時間前リマインダ"
+          value={draft.reminder_hours_before == null ? 'off' : String(draft.reminder_hours_before)}
+          onChange={(value) =>
+            update('reminder_hours_before', value === 'off' ? null : Number(value))
           }
-          className="border border-hairline rounded-lg px-3 py-2 text-sm"
-        >
-          <option value="off">送信しない</option>
-          <option value="1">1 時間前</option>
-          <option value="2">2 時間前</option>
-          <option value="3">3 時間前</option>
-          <option value="6">6 時間前</option>
-          <option value="24">24 時間前</option>
-        </select>
+          options={[
+            { value: 'off', label: '送信しない' },
+            { value: '1', label: '1 時間前' },
+            { value: '2', label: '2 時間前' },
+            { value: '3', label: '3 時間前' },
+            { value: '6', label: '6 時間前' },
+            { value: '24', label: '24 時間前' },
+          ]}
+        />
       </div>
 
       {/* 予約者向けカスタムメッセージ追記 */}

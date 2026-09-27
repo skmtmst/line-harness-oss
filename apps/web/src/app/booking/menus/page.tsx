@@ -1,7 +1,7 @@
 'use client'
 
 import { X } from 'lucide-react'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import { TimeField } from '@/components/shared/date-time-field'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
@@ -729,9 +729,10 @@ function BookingRulesEditor({ accountId, initial, canEdit, onRetry, onSaved }: {
            * IANA名の自由入力は綴り違いで予約全体がずれるため、候補から選ぶ形へ。
            * 保存済みの値が候補に無いときは先頭に足して、黙って書き換えない。
            */}
-          <SelectField
+          <Select
+            aria-label="タイムゾーン"
             value={draft.timeZone}
-            onChange={(event) => set('timeZone', event.target.value)}
+            onChange={(value) => set('timeZone', value)}
             options={(TIME_ZONE_CHOICES.includes(draft.timeZone)
               ? TIME_ZONE_CHOICES
               : [draft.timeZone, ...TIME_ZONE_CHOICES]
@@ -746,19 +747,21 @@ function BookingRulesEditor({ accountId, initial, canEdit, onRetry, onSaved }: {
         <RuleNumberField label="キャンセルの期限" unit="分前" min={0} max={43200} value={draft.cancelDeadlineMinutesBefore} onChange={(value) => set('cancelDeadlineMinutesBefore', value)} humanize={minutesBeforeLabel} />
         <RuleNumberField label="1人が同時に持てる予約" unit="件" min={1} max={100} value={draft.maxActiveBookingsPerFriend} onChange={(value) => set('maxActiveBookingsPerFriend', value)} />
         <Field label="予約の承認" required>
-          <SelectField
+          <Select
+            aria-label="予約の承認"
             value={draft.approvalMode}
-            onChange={(event) => set('approvalMode', event.target.value as 'automatic' | 'manual')}
+            onChange={(value) => set('approvalMode', value as 'automatic' | 'manual')}
             options={[{ value: 'automatic', label: '自動で確定' }, { value: 'manual', label: '確認してから確定' }]}
           />
         </Field>
         <RuleNumberField label="仮押さえの保持時間" unit="分" min={1} max={1440} value={draft.holdMinutes} onChange={(value) => set('holdMinutes', value)} humanize={formatMinutesLengthHint} />
         <Field label="予約枠の間隔" required>
-          <SelectField
+          <Select
+            aria-label="予約枠の間隔"
             value={String(draft.slotGranularityMinutes)}
-            onChange={(event) => set(
+            onChange={(value) => set(
               'slotGranularityMinutes',
-              Number(event.target.value) as BookingSettings['slotGranularityMinutes'],
+              Number(value) as BookingSettings['slotGranularityMinutes'],
             )}
             options={[5, 10, 15, 30, 60].map((value) => ({ value: String(value), label: `${value}分` }))}
           />
@@ -1075,11 +1078,11 @@ function EditMenuModal({
             />
           </Field>
           <Field label="料金の形" required>
-            <SelectField
+            <Select
               aria-label="料金の形"
               value={form.price_mode ?? 'fixed'}
-              onChange={(e) => {
-                const mode = e.target.value as NonNullable<BookingMenu['price_mode']>
+              onChange={(value) => {
+                const mode = value as NonNullable<BookingMenu['price_mode']>
                 // 無料・お問い合わせは金額を持たない。DB CHECK と Worker の
                 // readPriceModeAndAmount に合わせて base_price=0 にそろえる。
                 setForm((current) => ({
@@ -1122,9 +1125,10 @@ function EditMenuModal({
             />
           </div>
           <Field label="予約申込時に自動付与するタグ">
-            <SelectField
+            <Select
+              aria-label="予約申込時に自動付与するタグ"
               value={form.auto_tag_id ?? ''}
-              onChange={(e) => set('auto_tag_id', e.target.value === '' ? null : e.target.value)}
+              onChange={(value) => set('auto_tag_id', value === '' ? null : value)}
               options={[
                 { value: '', label: '— なし —' },
                 ...(danglingAutoTag
