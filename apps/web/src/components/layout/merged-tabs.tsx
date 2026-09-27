@@ -114,13 +114,20 @@ export default function MergedTabs({
   )
 }
 
-/** クエリから今のタブを読む。知らない値は既定（省略時は先頭）のタブに寄せる。 */
+/**
+ * クエリから今のタブを読む。知らない値は既定（省略時は先頭）のタブに寄せる。
+ *
+ * `aliases` は改名前に配ったURL（ブックマーク・社内Wiki）を受けるための
+ * 互換表。`{ clicks: 'url-clicks' }` のように旧キー→現行キーを書く。
+ */
 export function useMergedTab(
   tabs: readonly MergedTab[],
   paramName = 'tab',
   defaultKey?: string,
+  aliases?: Readonly<Record<string, string>>,
 ): string {
   const params = useSearchParams()
   const raw = params.get(paramName)
-  return tabs.find((t) => t.key === raw)?.key ?? defaultKey ?? tabs[0].key
+  const key = (raw && aliases?.[raw]) || raw
+  return tabs.find((t) => t.key === key)?.key ?? defaultKey ?? tabs[0].key
 }

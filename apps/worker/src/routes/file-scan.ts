@@ -156,6 +156,12 @@ export async function processDueFileScans(
 fileScan.get('/api/file-scans', requireRole('owner', 'admin'), async (c) => {
   const accountId = (c.req.query('accountId') ?? '').trim();
   const status = (c.req.query('status') ?? '').trim() as FileScanStatus | '';
+  /*
+   * 監査 R132: 一覧は以前先頭50件固定で、51件目以降へ辿り着けなかった。
+   * ページ送り（limit/offset）に加えてファイル名の検索を受ける。検索は
+   * 件数と同じ条件で絞るので、一覧と総件数がずれない。
+   */
+  const query = (c.req.query('q') ?? '').trim();
   const limit = Math.min(Math.max(Number(c.req.query('limit') ?? 20) || 20, 1), 100);
   const offset = Math.max(Number(c.req.query('offset') ?? 0) || 0, 0);
   if (!accountId) return c.json({ success: false, error: 'accountId が必要です' }, 400);
@@ -163,10 +169,15 @@ fileScan.get('/api/file-scans', requireRole('owner', 'admin'), async (c) => {
     return c.json({ success: false, error: 'Not found' }, 404);
   }
   const allowed: FileScanStatus[] = ['pending', 'clean', 'rejected', 'quarantined'];
-  const where = status && (allowed as string[]).includes(status)
-    ? `line_account_id = ? AND status = ?`
-    : `line_account_id = ?`;
-  const binds = status && (allowed as string[]).includes(status) ? [accountId, status] : [accountId];
+  const conditions = status && (allowed as string[]).includes(status)
+    ? [`line_account_id = ?`, `status = ?`]
+    : [`line_account_id = ?`];
+  const binds: (string | number)[] = status && (allowed as string[]).includes(status) ? [accountId, status] : [accountId];
+  if (query) {
+    conditions.push(`filename LIKE ? ESCAPE '\\'`);
+    binds.push(`%${query.replace(/[\\%_]/g, '\\$&')}%`);
+  }
+  const where = conditions.join(' AND ');
   const rows = await c.env.DB.prepare(
     `SELECT * FROM media_file_scans WHERE ${where} ORDER BY updated_at DESC LIMIT ? OFFSET ?`,
   ).bind(...binds, limit, offset).all<FileScanRow>();
