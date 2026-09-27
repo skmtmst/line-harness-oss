@@ -1723,9 +1723,7 @@ CREATE TABLE "common_var_resolution_failures" (
   )),
   source_id       TEXT NOT NULL,
   var_key         TEXT NOT NULL,
-  reason          TEXT NOT NULL CHECK (reason IN ('missing', 'not_started', 'expired', 'fallback_missing', 'invalid_window')),
-  -- 1 = 共通情報を直せば同じ送信を重複なく再試行できる。0 = 再試行しても
-  -- 治らない失敗（今のところ解決失敗はすべて 1。将来の恒久的失敗用の印）。
+  reason          TEXT NOT NULL CHECK (reason IN ('missing', 'not_started', 'expired', 'fallback_missing', 'invalid_window', 'stopped', 'draft')),
   retryable       INTEGER NOT NULL DEFAULT 1 CHECK (retryable IN (0, 1)),
   execution_at    TEXT NOT NULL,
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')),
@@ -1748,7 +1746,8 @@ CREATE TABLE "common_vars" (
   line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE,
   memo TEXT NOT NULL DEFAULT '', version INTEGER NOT NULL DEFAULT 1,
   updated_by TEXT, archived_at TEXT, replacement_run_id TEXT, valid_from TEXT, valid_until TEXT, fallback_value TEXT, expiry_behavior TEXT NOT NULL DEFAULT 'stop'
-  CHECK (expiry_behavior IN ('stop', 'fallback')),
+  CHECK (expiry_behavior IN ('stop', 'fallback')), status TEXT NOT NULL DEFAULT 'active'
+  CHECK (status IN ('draft', 'active', 'stopped')), stopped_at TEXT, expiry_notice_14_at TEXT, expiry_notice_3_at TEXT,
   UNIQUE(line_account_id, var_key)
 );
 
@@ -7258,7 +7257,7 @@ CREATE INDEX idx_common_var_export_jobs_account
 
 CREATE INDEX idx_common_var_replacement_runs_v403_source ON common_var_replacement_runs(source_common_var_id, created_at DESC);
 
-CREATE INDEX idx_common_var_resolution_failures_source_v423
+CREATE INDEX idx_common_var_resolution_failures_source_v485
   ON common_var_resolution_failures(source_kind, source_id, created_at DESC);
 
 CREATE INDEX idx_common_var_schedules_v403_pending ON common_var_schedules(var_id, effective_from) WHERE applied_at IS NULL;

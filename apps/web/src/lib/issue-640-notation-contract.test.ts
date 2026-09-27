@@ -102,6 +102,6 @@ describe('#640 日時表記の統一（JST・フォーマット）', () => {
 
   it('日時の整形は画面の既存ユーティリティを使う（場当たりの文字列処理を増やさない）', () => {
     expect(ANALYTICS_TIME).toContain("timeZone: 'Asia/Tokyo'")
-    expect(VARS).toContain("import { formatStamp } from '@/lib/common-vars'")
+    expect(VARS).toMatch(/import \{[^}]*formatStamp[^}]*\} from '@\/lib\/common-vars'/)
   })
 })

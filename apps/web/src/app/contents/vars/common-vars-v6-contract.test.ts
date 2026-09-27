@@ -44,13 +44,14 @@ describe('V6共通情報一覧', () => {
     expect(EDIT_PAGE).toContain('api.commonVars.schedules(id, accountAtRequest)')
   })
 
-  it('一覧は種別を出さず、WuKzUの6列を固定する', () => {
+  it('一覧は種別を出さず、Qで「状態」列を足した7列を固定する', () => {
     const headings = [...PAGE.matchAll(/<Th[^>]*>([\s\S]*?)<\/Th>/g)]
       .map((match) => match[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim())
       .slice(1)
     expect(headings).toEqual([
       '共通情報',
       '差し込みキー',
+      '状態',
       '中身',
       '使われている場所',
       '更新・次の変更',
