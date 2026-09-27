@@ -76,13 +76,18 @@ export default function ActionEditor({
             ))}
           </select>
 
+          {/*
+            R26追補: スマホ幅では文章の入力欄を種類の選択の下に全幅で置く。
+            `flex-1` だけだと同行に残って約50pxに押し込まれる。
+            `basis-full` で折り返し、PC幅では元どおり横に並べる。
+          */}
           {action.kind === 'send_text' && (
             <input
               type="text"
               value={action.text}
               onChange={(e) => patch(index, { ...action, text: e.target.value })}
               placeholder="送る文面"
-              className={`${cellInput} min-w-0 flex-1 sm:min-w-[16rem]`}
+              className={`${cellInput} min-w-0 flex-1 basis-full sm:basis-auto sm:min-w-[16rem]`}
             />
           )}
 
@@ -152,7 +157,7 @@ export default function ActionEditor({
                 value={action.value}
                 onChange={(e) => patch(index, { ...action, value: e.target.value })}
                 placeholder="書き込む値"
-                className={`${cellInput} min-w-0 flex-1 sm:min-w-[10rem]`}
+                className={`${cellInput} min-w-0 flex-1 basis-full sm:basis-auto sm:min-w-[10rem]`}
               />
             </>
           )}

@@ -223,7 +223,8 @@ describe('V6回答フォームの未実装3画面', () => {
     // 動作の欄は狭い幅で縦に並べ、欄の固定の最小幅をなくす。
     expect(OPTIONS).toContain('flex-col gap-2 sm:flex-row')
     expect(ACTIONS).not.toContain('min-w-[16rem] flex-1')
-    expect(ACTIONS).toContain('min-w-0 flex-1 sm:min-w-[16rem]')
+    expect(ACTIONS).toContain('min-w-0 flex-1 basis-full sm:basis-auto sm:min-w-[16rem]')
+    expect(ACTIONS).toContain('min-w-0 flex-1 basis-full sm:basis-auto sm:min-w-[10rem]')
   })
 
   it('v9tYhl は専用ルートで通常・読込・空・失敗を言い分ける', () => {
