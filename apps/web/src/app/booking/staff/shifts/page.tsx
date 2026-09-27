@@ -22,6 +22,7 @@ import { useAccount } from '@/contexts/account-context'
 import { canEditFeature, canViewFeature } from '@/lib/staff-capability'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import DateField from '@/components/shared/date-field'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
@@ -95,6 +96,13 @@ function BusinessHoursEditor({ accountId, settings, canEdit, onSaved, onReload }
   const [draft, setDraft] = useState(() => initialBusinessHours(settings))
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  /*
+   * R161 監査：曜日・時間を変えたまま別画面へ移ると、確認なく入力が
+   * 消える。保存済みの設定との差を未保存とし、離れる操作では確認を出す。
+   * 保存の成功後は設定が届き直して draft が戻るため、確認は出ない。
+   */
+  const businessHoursDirty = JSON.stringify(draft) !== JSON.stringify(initialBusinessHours(settings))
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty: businessHoursDirty, busy: saving })
   const activeRef = useRef(true)
   const inFlightRef = useRef(false)
 
@@ -234,6 +242,8 @@ function BusinessHoursEditor({ accountId, settings, canEdit, onSaved, onReload }
         ) : <p className="text-ink-faint mt-3 text-xs">閲覧のみです。変更には予約設定の権限が必要です。</p>}
       </div>
       </fieldset>
+      {/* R161 監査：営業時間の書きかけがある間の離脱確認。 */}
+      <ConfirmDialog open={leaveTarget !== null} title="保存していない変更があります" description="このまま移動すると、営業時間への変更は失われます。保存せずに移動しますか？" confirmLabel="保存せずに移動" cancelLabel="編集を続ける" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </section>
   )
 }
@@ -337,6 +347,12 @@ function ResourceEditor({ accountId, resource, canManage, onSaved, onDeleted }: 
   const [type, setType] = useState(resource.type)
   const [capacity, setCapacity] = useState(String(resource.capacity))
   const [saving, setSaving] = useState(false)
+  /*
+   * R161 監査：設備名などを変えたまま別画面へ移ると、確認なく入力が
+   * 消える。読み込んだ設備との差を未保存とし、離れる操作では確認を出す。
+   */
+  const resourceDirty = name !== resource.name || type !== resource.type || capacity !== String(resource.capacity)
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty: resourceDirty, busy: saving })
   const [error, setError] = useState<string | null>(null)
   const activeRef = useRef(true)
   const inFlightRef = useRef(false)
@@ -410,6 +426,8 @@ function ResourceEditor({ accountId, resource, canManage, onSaved, onDeleted }: 
           {!resource.usage?.referenced ? <Button onClick={() => void remove()} disabled={saving}>設備を削除</Button> : null}
         </div>
       ) : <p className="text-ink-faint mt-2 text-xs">閲覧のみです。変更はオーナーまたは管理者が行えます。</p>}
+      {/* R161 監査：設備の書きかけがある間の離脱確認。 */}
+      <ConfirmDialog open={leaveTarget !== null} title="保存していない変更があります" description="このまま移動すると、設備への変更は失われます。保存せずに移動しますか？" confirmLabel="保存せずに移動" cancelLabel="編集を続ける" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )
 }
@@ -423,6 +441,10 @@ function NewResourceEditor({ accountId, onCreated }: {
   const [capacity, setCapacity] = useState('1')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // R161 監査：設備の追加欄に入力が残ったまま別画面へ移ると、確認なく
+  // 消える。何か入っている間は未保存とし、離れる操作では確認を出す。
+  const newResourceDirty = name !== '' || type !== '' || capacity !== '1'
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty: newResourceDirty, busy: saving })
   const activeRef = useRef(true)
   const inFlightRef = useRef(false)
   useEffect(() => () => { activeRef.current = false }, [])
@@ -470,6 +492,8 @@ function NewResourceEditor({ accountId, onCreated }: {
       </div>
       {error ? <p className="text-danger mt-2 text-xs" role="alert">{error}</p> : null}
       <Button className="mt-3" variant="primary" onClick={() => void create()} disabled={saving}>{saving ? '追加中…' : '設備を追加'}</Button>
+      {/* R161 監査：追加欄の書きかけがある間の離脱確認。 */}
+      <ConfirmDialog open={leaveTarget !== null} title="保存していない変更があります" description="このまま移動すると、入力した設備は保存されません。保存せずに移動しますか？" confirmLabel="保存せずに移動" cancelLabel="入力を続ける" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )
 }
@@ -685,6 +709,14 @@ function StoreShiftsView() {
     ? `${workerBase}/o?liffId=${encodeURIComponent(selectedAccount.liffId)}&page=salon-book`
     : null
   const range = useMemo(previewRange, [])
+  /*
+   * R161 監査：休業日の追加・修正欄に書きかけがあるまま別画面へ移ると、
+   * 確認なく入力が消える。欄が出ていて何か入っている間は未保存とし、
+   * 離れる操作では確認を出す。保存の成功後は欄が閉じるため確認は出ない。
+   */
+  const exceptionFormDirty = (addingClosed && (closedFrom !== '' || closedTo !== '' || closedReason !== ''))
+    || editingExceptionId !== null
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty: exceptionFormDirty, busy: savingClosed || exceptionBusy })
 
   useEffect(() => {
     const canEdit = canEditFeature('booking.settings')
@@ -1088,6 +1120,8 @@ function StoreShiftsView() {
         }}
         onConfirm={() => void removeException()}
       />
+      {/* R161 監査：休業日の書きかけがある間の離脱確認。 */}
+      <ConfirmDialog open={leaveTarget !== null} title="保存していない変更があります" description="このまま移動すると、休業日への変更は失われます。保存せずに移動しますか？" confirmLabel="保存せずに移動" cancelLabel="編集を続ける" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )
 }

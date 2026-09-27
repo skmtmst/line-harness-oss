@@ -4,9 +4,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Circle } from 'lucide-react'
 import { api, type SaveSupportMarkAutomationRule, type SupportMarkAutomationEvent, type SupportMarkListItem } from '@/lib/api'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import Button from '@/components/shared/button'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import Card from '@/components/shared/card'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Select from '@/components/shared/select'
 import ListState from '@/components/shared/list-state'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -53,7 +55,22 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
   const [ruleProtectionMinutes, setRuleProtectionMinutes] = useState(0)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  /*
+   * R176 監査：名前・色を変えたまま一覧へ移ると、確認なく入力が消える。
+   * 読み込んだ（新規は作りたての）姿との差を未保存とし、離れる操作では
+   * 確認を出す。保存の成功後は別画面へ送るため、確認が出ることはない。
+   */
+  const [baseline, setBaseline] = useState<{ name: string; color: string; displayOrder: number; isDefault: boolean } | null>(null)
   const selected = useMemo(() => items.find((mark) => mark.id === markId), [items, markId])
+  const dirty = baseline !== null && (
+    name !== baseline.name
+    || color !== baseline.color
+    || displayOrder !== baseline.displayOrder
+    || isDefault !== baseline.isDefault
+    // 新規の自動変更ルールは「作る」と押した時点で書きかけ。
+    || (!editing && (createRule || ruleEvent !== 'staff_assigned' || ruleActive !== true || ruleProtectionMinutes !== 0))
+  )
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
   /* IDEA-04: 同名のマークがすでにあるとき、保存する前に知らせる（自分自身は外す）。 */
   const nameDuplicates = useMemo(() => findDuplicateNames(items, name, markId ?? null), [items, name, markId])
   const currentUsages = selected ? [
@@ -87,10 +104,14 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
           setColor(current.color)
           setDisplayOrder(current.displayOrder)
           setIsDefault(current.isDefault)
+          setBaseline({ name: current.name, color: current.color, displayOrder: current.displayOrder, isDefault: current.isDefault })
         } else if (editing) {
           setError('対応マークが見つかりません')
         } else {
+          // 新規は作りたての姿（名前「要確認」・先頭の色・末尾の順番）を
+          // 「保存済み」とし、触った分だけ未保存にする。
           setDisplayOrder(rows.length)
+          setBaseline({ name: '要確認', color: COLORS[0].value, displayOrder: rows.length, isDefault: false })
         }
       })
       .catch(() => setError('対応マークを読み込めませんでした'))
@@ -247,6 +268,8 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
         status={editing ? '変更内容を確認して保存してください' : 'マーク名・色・初期値を確認してください'}
         actions={<><Button href="/tags?tab=marks">キャンセル</Button><Button type="button" variant="primary" disabled={saving || !name.trim() || (editing && !selected)} onClick={() => void save()}>{saving ? '保存中…' : editing ? '変更を保存' : '対応マークを作る'}</Button></>}
       />
+      {/* R176 監査：名前・色などの書きかけがある間の離脱確認。 */}
+      <ConfirmDialog open={leaveTarget !== null} title="保存していない変更があります" description="このまま移動すると、マークへの変更は失われます。保存せずに移動しますか？" confirmLabel="保存せずに移動" cancelLabel="編集を続ける" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )
 }
