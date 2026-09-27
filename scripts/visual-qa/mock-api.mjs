@@ -4695,6 +4695,69 @@ const server = createServer((req, res) => {
       res.writeHead(200).end(JSON.stringify({ success: true }))
       return
     }
+    // K-1・O-1: 公開の進みと公開前の確認の見本（本物と同じ器）。
+    const richMenuProgress = /^\/api\/rich-menu-groups\/([^/]+)\/publish-progress$/.exec(url.pathname)
+    if (method === 'GET' && richMenuProgress) {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: {
+        run: { id: 'visual-qa-run', mode: 'publish', status: 'failed', startedAt: '2026-09-27T10:00:00+09:00', completedAt: '2026-09-27T10:01:00+09:00' },
+        steps: [
+          { key: 'image', label: '画像をLINEに上げる', status: 'done' },
+          { key: 'menu', label: 'メニューを作る', status: 'done' },
+          { key: 'assign', label: '友だちに割り当てる', status: 'failed' },
+          { key: 'cleanup', label: '前のメニューを片付ける', status: 'pending' },
+        ],
+        message: '割り当てに失敗したので、作ったメニューをLINEから消し、前のメニューのままにしました。もう一度公開できます。',
+      } }))
+      return
+    }
+    const richMenuPrecheck = /^\/api\/rich-menu-groups\/([^/]+)\/prepublish-check$/.exec(url.pathname)
+    if (method === 'GET' && richMenuPrecheck) {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: {
+        fingerprint: 'visual-qa-fp',
+        pageCount: 2,
+        maxPages: 10,
+        selfCheck: { ok: true, message: '自前の検査を通りました。' },
+        deviceConfirmed: false,
+        deviceConfirmedAt: null,
+        versionNumber: null,
+      } }))
+      return
+    }
+    const richMenuValidate = /^\/api\/rich-menu-groups\/([^/]+)\/validate$/.exec(url.pathname)
+    if (method === 'POST' && richMenuValidate) {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: {
+        checks: [
+          { key: 'self', ok: true, message: '自前の検査を通りました。' },
+          { key: 'line', ok: true, message: 'LINEの検査を通りました。' },
+        ],
+      } }))
+      return
+    }
+    const richMenuDevice = /^\/api\/rich-menu-groups\/([^/]+)\/device-confirm$/.exec(url.pathname)
+    if (method === 'POST' && richMenuDevice) {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: {
+        confirmedAt: '2026-09-27T10:00:00+09:00', fingerprint: 'visual-qa-fp',
+      } }))
+      return
+    }
+    // K-2: 照合の見本。ずれの種類ごとの直し方（fix）つき。
+    const richMenuReconcile = /^\/api\/rich-menu-groups\/([^/]+)\/reconcile$/.exec(url.pathname)
+    if (method === 'POST' && richMenuReconcile) {
+      let raw = ''
+      req.on('data', (chunk) => { raw += chunk })
+      req.on('end', () => {
+        let dryRun = true
+        try { dryRun = JSON.parse(raw || '{}').dryRun !== false } catch { dryRun = true }
+        const diffs = [
+          { kind: 'external_only', detail: 'LINEにだけあるメニュー「別で作ったメニュー」（rm-external-1）があります', richMenuId: 'rm-external-1', fix: { label: 'こちらに取り込む', action: 'import-external' } },
+          { kind: 'default_mismatch', detail: 'LINEの全員既定がこのメニューを指していません（現在: rm-other-9）', richMenuId: 'rm-other-9', fix: { label: 'こちらに合わせる', action: 'relink-default' } },
+        ]
+        res.writeHead(200).end(JSON.stringify({ success: true, data: dryRun
+          ? { dryRun: true, diffs }
+          : { dryRun: false, diffs, applied: 1, failed: [], unapplied: [{ diff: diffs[0], reason: '取り込みは「外部メニューの取り込み」画面で運用者が行います' }], runId: 'visual-qa-reconcile-run' } }))
+      })
+      return
+    }
     const richMenuWriteAction = /^\/api\/rich-menu-groups\/([^/]+)\/(publish|unpublish|schedule|apply-to-tag)$/.exec(url.pathname)
     if (method === 'POST' && richMenuWriteAction) {
       const action = richMenuWriteAction[2]

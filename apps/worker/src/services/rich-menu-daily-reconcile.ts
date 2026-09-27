@@ -7,6 +7,7 @@ import {
   markRichMenuPublishRun,
   toJstString,
 } from '@line-crm/db';
+import { featureJobCanRun } from './feature-enforcement.js';
 import { computeRichMenuDiffs } from '../lib/rich-menu-reconcile.js';
 import { createLineApiClient, type LineRichMenuClient } from '../lib/rich-menu-publisher.js';
 
@@ -42,6 +43,8 @@ export async function processDailyRichMenuReconcile(
   let failed = 0;
   for (const { group_id: groupId, account_id: accountId } of groups) {
     if ((await countScheduledReconcileSince(db, groupId, dayStart)) > 0) continue;
+    // 機能オフのアカウントは見ない（再オンで再開する）。
+    if (!await featureJobCanRun(db, { accountId, featureId: 'rich_menus', job: 'rich menu daily reconcile' })) continue;
     const account = await getLineAccountById(db, accountId);
     if (!account?.channel_access_token) {
       failed += 1;

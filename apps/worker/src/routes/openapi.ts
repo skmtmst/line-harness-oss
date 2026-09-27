@@ -5816,6 +5816,38 @@ const spec = {
         responses: { '200': { description: 'Diffs listed or repaired' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found or not visible' }, '502': { description: 'LINE state unreadable' } },
       },
     },
+    '/api/rich-menu-groups/{groupId}/publish-progress': {
+      get: {
+        tags: ['Rich Menus'],
+        summary: 'K-1: 最新の公開実行の4段（画像・メニュー・割り当て・片付け）（owner/admin）',
+        parameters: [{ name: 'groupId', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Steps with per-step status and message' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found or not visible' } },
+      },
+    },
+    '/api/rich-menu-groups/{groupId}/prepublish-check': {
+      get: {
+        tags: ['Rich Menus'],
+        summary: 'O-1: 公開前の確認（自前検査・実機・版）。LINE検査は別口（owner/admin）',
+        parameters: [{ name: 'groupId', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Self check, device confirmation and version state' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found or not visible' } },
+      },
+    },
+    '/api/rich-menu-groups/{groupId}/validate': {
+      post: {
+        tags: ['Rich Menus'],
+        summary: 'O-1: 公開する形のままLINEの検査APIに通す。下書きもLINEも変えない（owner/admin）',
+        parameters: [{ name: 'groupId', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Self and LINE check results' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found or not visible' } },
+      },
+    },
+    '/api/rich-menu-groups/{groupId}/device-confirm': {
+      post: {
+        tags: ['Rich Menus'],
+        summary: 'O-1: 実機で見た記録。今の下書きにひもづく（owner/admin）',
+        parameters: [{ name: 'groupId', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Confirmation recorded' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found or not visible' } },
+      },
+    },
     '/api/rich-menu-groups/{groupId}/duplicate': {
       post: {
         tags: ['Rich Menus'],
