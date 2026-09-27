@@ -90,6 +90,7 @@ describe('N-251 広告費の通貨表示とaccount切替', () => {
   it('JPY/USDを分け、0・未設定・通貨不明を混同しない', async () => {
     handler = async (path) => {
       if (path.startsWith('/api/ad-platforms/logs')) return logs()
+      if (path.startsWith('/api/ad-costs')) return { success: true, data: { rows: [], platforms: [] } }
       return {
         success: true,
         data: [

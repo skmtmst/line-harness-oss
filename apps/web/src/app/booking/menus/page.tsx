@@ -8,6 +8,7 @@ import Link from 'next/link'
 import Button from '@/components/shared/button'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import Disclosure from '@/components/shared/disclosure'
+import HelpTip from '@/components/shared/help-tip'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
@@ -712,6 +713,7 @@ function BookingRulesEditor({ accountId, initial, canEdit, onRetry, onSaved }: {
         approvalMode: draft.approvalMode,
         holdMinutes: draft.holdMinutes,
         slotGranularityMinutes: draft.slotGranularityMinutes,
+        liffDateView: draft.liffDateView ?? 'list',
         reminderDayBeforeTime: draft.reminderDayBeforeTime || null,
         reminderHoursBefore: draft.reminderHoursBefore,
       })
@@ -787,6 +789,47 @@ function BookingRulesEditor({ accountId, initial, canEdit, onRetry, onSaved }: {
         <RuleNumberField label="当日のお知らせを送るタイミング" unit="時間前" min={1} max={72} value={draft.reminderHoursBefore} onChange={(value) => set('reminderHoursBefore', value)} humanize={formatHoursBeforeHint} />
       </div>
       <p className="text-ink-faint mt-4 text-xs">0分前は、開始直前まで受け付ける・キャンセルできる設定です。</p>
+      <div className="border-hairline mt-5 border-t pt-4">
+        <div className="flex items-center gap-1">
+          <span id="liff-date-view-label" className="text-ink-secondary text-xs font-medium">
+            日時を選ぶ画面の最初の形
+          </span>
+          <HelpTip label="日時を選ぶ画面の最初の形の説明">
+            お客さんは画面の上で切り替えられます。ここで決めるのは最初に開いた時の形です。
+          </HelpTip>
+        </div>
+        <div role="radiogroup" aria-labelledby="liff-date-view-label" className="mt-2 grid gap-3 sm:grid-cols-2">
+          {([
+            { value: 'list', title: 'リスト', desc: '日付を横に並べ、その日の時刻を選ぶ' },
+            { value: 'calendar', title: 'カレンダー', desc: '月の表から日を選び、その日の時刻を選ぶ' },
+          ] as const).map((option) => {
+            const checked = (draft.liffDateView ?? 'list') === option.value
+            return (
+              <label
+                key={option.value}
+                className={`flex cursor-pointer items-start gap-3 rounded-card border p-4 focus-within:outline-2 focus-within:outline-offset-1 focus-within:outline-status-info ${
+                  checked ? 'border-accent bg-accent-soft' : 'border-hairline bg-canvas'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="liff-date-view"
+                  checked={checked}
+                  onChange={() => set('liffDateView', option.value)}
+                  className="sr-only"
+                />
+                <span aria-hidden="true" className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${checked ? 'border-accent' : 'border-hairline'}`}>
+                  {checked ? <span className="bg-accent h-2.5 w-2.5 rounded-full" /> : null}
+                </span>
+                <span>
+                  <span className="text-ink block text-sm font-semibold">{option.title}</span>
+                  <span className="text-ink-secondary mt-1 block text-xs leading-5">{option.desc}</span>
+                </span>
+              </label>
+            )
+          })}
+        </div>
+      </div>
       {saveError && (
         <Notice
           tone="danger"
@@ -1398,8 +1441,9 @@ function MenusPageHost() {
     ? `${workerBase}/o?liffId=${encodeURIComponent(selectedAccount.liffId)}&page=salon-book`
     : null
   return (
-    <div>
-      <div data-design="Head" className="mb-5 flex min-h-10 flex-wrap items-center justify-between gap-3">
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <div data-design="Head" className="flex min-h-10 flex-wrap items-center justify-between gap-3">
         <Breadcrumb items={[{ label: '予約' }, { label: '予約設定' }]} />
         {previewUrl && <Button href={previewUrl}>お客様に見える画面を確かめる</Button>}
       </div>
@@ -1407,7 +1451,7 @@ function MenusPageHost() {
           受付時間は別URLへ移動する。
           MergedTabs は「同じ画面の中で切り替わるもの」しか扱えないので
           ここは手で並べている。 */}
-      <div data-design="Tabs" className="border-hairline mb-4 flex flex-wrap gap-1 border-b">
+      <div data-design="Tabs" className="border-hairline flex flex-wrap gap-1 border-b">
         <Link
           href="/booking/menus?tab=menus"
           className={`rounded-t-md px-4 py-2 text-sm ${

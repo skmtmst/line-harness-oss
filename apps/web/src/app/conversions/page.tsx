@@ -182,7 +182,7 @@ import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
-import SearchField from '@/components/shared/search-field'
+import ListToolbar from '@/components/shared/list-toolbar'
 import Select from '@/components/shared/select'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import FilterChip from '@/components/shared/filter-chip'
@@ -734,10 +734,10 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
   }, [highlightedPoint, current])
 
   return (
-    <div data-conversion-points-design="v6">
+    <div data-conversion-points-design="v6" className="flex flex-col gap-4">
 
       {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}
-      <KpiCollapse data-design="KPIs" className="mb-4" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <KpiCollapse data-design="KPIs" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard
           title="決めてある成果地点"
           value={definitions?.pagination.total ?? null}
@@ -781,70 +781,67 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
         <Notice tone="info" message={`「${highlightedPoint.name}」を保存しました。色の付いた行です。`} className="mb-4" />
       ) : null}
 
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <Button href="/conversions/new" variant="primary">＋ 成果地点を作る</Button>
         <Button onClick={() => void exportCsv()} disabled={exporting}>
           {exporting ? '書き出しています' : 'CSVで書き出す'}
         </Button>
       </div>
-      {exportError ? <p className="text-danger mb-3 text-sm" role="alert">{exportError}</p> : null}
+      {exportError ? <p className="text-danger text-sm" role="alert">{exportError}</p> : null}
 
-      <div
-        data-design="Bar"
-        className="mb-3 space-y-3"
-      >
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <SearchField
-            value={query}
-            onChange={(value) => {
-              setQuery(value)
-              setPage(1)
-            }}
-            onClear={() => {
-              setQuery('')
-              setPage(1)
-            }}
-            placeholder="成果地点の名前で検索"
-            aria-label="成果地点の名前で検索"
-            className="min-w-64"
-          />
-          <div className="flex flex-wrap items-center gap-2">
+      {/*
+        ★V7 `Xn1Mz`：検索は幅320で1行目、2行目は左に絞り込み・
+        右端に並び順。期間の目安は2行目の右へ。
+      */}
+      <ListToolbar
+        search={{
+          placeholder: '成果地点の名前で検索',
+          value: query,
+          onChange: (value) => {
+            setQuery(value)
+            setPage(1)
+          },
+        }}
+        filters={
+          <>
+            {([
+              ['all', 'すべて', definitions?.pagination.total ?? 0],
+              ['active', '動いている', definitions?.stateCounts.active ?? 0],
+              ['draft', '下書き', definitions?.stateCounts.draft ?? 0],
+              ['invalid', '入力不良', definitions?.stateCounts.invalid ?? 0],
+              ['sourceStopped', '起点停止', definitions?.stateCounts.sourceStopped ?? 0],
+              ['stopped', '止めている', definitions?.stateCounts.stopped ?? 0],
+              ['unused', 'どこからも使われていない', definitions?.stateCounts.unused ?? 0],
+            ] as const).map(([value, label, total]) => (
+              <FilterChip
+                key={value}
+                selected={status === value}
+                onChange={() => {
+                  setStatus(value)
+                  setPage(1)
+                }}
+                count={total}
+              >
+                {label}
+              </FilterChip>
+            ))}
+          </>
+        }
+        trailing={
+          <>
             <p className="text-ink-secondary text-sm tabular-nums">{rangeLabel(30)}</p>
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {([
-            ['all', 'すべて', definitions?.pagination.total ?? 0],
-            ['active', '動いている', definitions?.stateCounts.active ?? 0],
-            ['draft', '下書き', definitions?.stateCounts.draft ?? 0],
-            ['invalid', '入力不良', definitions?.stateCounts.invalid ?? 0],
-            ['sourceStopped', '起点停止', definitions?.stateCounts.sourceStopped ?? 0],
-            ['stopped', '止めている', definitions?.stateCounts.stopped ?? 0],
-            ['unused', 'どこからも使われていない', definitions?.stateCounts.unused ?? 0],
-          ] as const).map(([value, label, total]) => (
-            <FilterChip
-              key={value}
-              selected={status === value}
-              onChange={() => {
-                setStatus(value)
+            <Select
+              aria-label="並び順"
+              value={sort}
+              options={SORT_OPTIONS}
+              onChange={(value) => {
+                setSort(value as PointSort)
                 setPage(1)
               }}
-              count={total}
-            >
-              {label}
-            </FilterChip>
-          ))}
-          <Select
-            aria-label="並び順"
-            value={sort}
-            options={SORT_OPTIONS}
-            onChange={(value) => {
-              setSort(value as PointSort)
-              setPage(1)
-            }}
-          />
-        </div>
-      </div>
+            />
+          </>
+        }
+      />
 
       {listTruncated ? (
         <p

@@ -25,6 +25,7 @@ const GUARDED = [
   'app/ec-commerce/connector-panel.tsx',
   'app/form-submissions/edit/page.tsx',
   'app/friend-add-settings/friend-add-rule-editor.tsx',
+  'app/inflow-links/new/page.tsx',
   'app/mileage/page.tsx',
   'app/nen-campaigns/columns/new/page.tsx',
   'app/nen-campaigns/edit/campaign-editor.tsx',
@@ -61,6 +62,8 @@ const COVERED_BY_PARENT: Record<string, string> = {
  * 番兵を付けられるようになったら EXEMPTIONS から GUARDED へ移す。
  */
 const EXEMPTIONS: Record<string, string> = {
+  'app/affiliates/payment-tab.tsx':
+    '支払いCSV出力の確認窓（Vの本人確認入力を含む）。保存する編集画面ではなく番兵の対象外',
   'app/affiliates/new/page.tsx':
     '「未保存の追加情報を破棄して一覧へ戻る」明示フロー。dirty管理ではなく部分保存の案内',
   'app/automations/new/page.tsx':
@@ -81,6 +84,8 @@ const EXEMPTIONS: Record<string, string> = {
     '自動化ウィザードの段内エディタ。下書きはサーバーへ保存し、離脱の扱いは app/automations/new/page.tsx と同じく別途検討',
   'components/scenarios/trigger-editor.tsx':
     'ダイアログ内の dirty。閉じると元に戻る仕様で、画面離脱ガードの対象外',
+  'app/inflow-links/ad-integration.tsx':
+    '費用の手入力はダイアログ内の dirty。閉じると元に戻る仕様で、画面離脱ガードの対象外',
   'components/shared/drawer.tsx':
     'dirty 印（*）を表示するだけの共通部品。編集画面ではない',
   'app/nen-members/photo-reward-policy.tsx':
@@ -151,8 +156,6 @@ const UNTRIAGED: Record<string, string> = {
   'app/hq/support/page.tsx':
     'hq: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'app/inflow-links/_components/edit-route-modal.tsx':
-    's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
-  'app/inflow-links/new/page.tsx':
     's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'app/line-notifications/operator/new/page.tsx':
     's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',

@@ -41,6 +41,29 @@ async function resetMock() {
 
 const failures = [];
 
+/**
+ * カレンダーで空きのある日を月をまたいで探し、2番目に早い日を選ぶ。
+ * （1つしか無ければその1つ。今月に空きが無い時は次の月へ送る）
+ */
+async function pickOpenDay(p) {
+  // 最初の月は空きのある月まで自動で送られるので、空き日の出現を待つ。
+  const waitOpen = () =>
+    p.getByRole('button', { name: /空きあり/ }).first().waitFor({ timeout: 20000 }).catch(() => {});
+  await waitOpen();
+  for (let i = 0; i < 12; i++) {
+    const days = p.getByRole('button', { name: /空きあり/ });
+    const count = await days.count();
+    if (count > 0) {
+      await days.nth(Math.min(1, count - 1)).click();
+      return;
+    }
+    const next = p.getByRole('button', { name: '次の月' });
+    if (!(await next.isEnabled())) return;
+    await next.click();
+    await waitOpen();
+  }
+}
+
 /** @param {{ mock?: object, waitMs?: number, after?: (page) => Promise<void> }} opts */
 async function shot(page, viewport, name, url, opts = {}) {
   await resetMock();
@@ -84,6 +107,30 @@ try {
         await p.getByRole('button', { name: '担当を選ぶ' }).click();
         await p.getByRole('button', { name: /QA スタッフ/ }).click();
         await p.getByRole('button', { name: '日時を選ぶ' }).click();
+      },
+    });
+    await shot(page, viewport, 'booking-calendar', '/booking?liffId=qa', {
+      waitMs: 2000,
+      after: async (p) => {
+        await p.getByRole('button', { name: 'QA カット' }).click();
+        await p.getByRole('button', { name: '担当を選ぶ' }).click();
+        await p.getByRole('button', { name: /QA スタッフ/ }).click();
+        await p.getByRole('button', { name: '日時を選ぶ' }).click();
+        await p.getByRole('radio', { name: 'カレンダー' }).click();
+      },
+    });
+    await shot(page, viewport, 'booking-calendar-selected', '/booking?liffId=qa', {
+      waitMs: 2000,
+      after: async (p) => {
+        await p.getByRole('button', { name: 'QA カット' }).click();
+        await p.getByRole('button', { name: '担当を選ぶ' }).click();
+        await p.getByRole('button', { name: /QA スタッフ/ }).click();
+        await p.getByRole('button', { name: '日時を選ぶ' }).click();
+        await p.getByRole('radio', { name: 'カレンダー' }).click();
+        // 空き日を月をまたいで探す（今月に空きが無い時もある）。
+        // 2番目に早い空き日を選び、その日の時刻を選んだ状態で撮る。
+        await pickOpenDay(p);
+        await p.getByRole('button', { name: '11:00' }).click();
       },
     });
     await shot(page, viewport, 'booking-loading', '/booking?liffId=qa', {
@@ -165,9 +212,10 @@ try {
       waitMs: 2000,
     });
 
-    // イベント完了 (確定・承認待ちの2種)
-    await shot(page, viewport, 'event-done', '/events/qa-event-1/done?bookingId=qa-1&status=confirmed&liffId=qa');
+    // イベント完了 (確定・承認待ち・キャンセル待ちの3種)
+    await shot(page, viewport, 'event-done', '/events/qa-event-1/done?bookingId=qa-1&status=confirmed&startsAt=2026-10-01T10:00:00%2B09:00&liffId=qa');
     await shot(page, viewport, 'event-done-pending', '/events/qa-event-1/done?bookingId=qa-1&status=requested&liffId=qa');
+    await shot(page, viewport, 'event-done-waitlisted', '/events/qa-event-1/done?status=waitlisted&startsAt=2026-10-01T10:00:00%2B09:00&liffId=qa');
 
     // 待ちの案内 (準備→確定→失敗)
     await shot(page, viewport, 'waitlist', '/?eventWaitlistToken=qa-token-1&liffId=qa');

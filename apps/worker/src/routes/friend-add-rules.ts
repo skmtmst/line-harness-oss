@@ -281,6 +281,7 @@ async function validateReferences(
   accountId: string,
   definition: FriendAddRuleDefinition,
   friendKind: FriendAddRuleKind,
+  options?: { allowIncomplete?: boolean },
 ): Promise<FriendAddRuleReferenceError[]> {
   const messages: FriendAddRuleReferenceError[] = [];
   const push = (key: ReferenceErrorKey, message: string) => {
@@ -339,10 +340,12 @@ async function validateReferences(
   /*
    * 再追加で「何も配信しない」(returningMode none) ときはシナリオを使わない。
    * 要件 v6-09 §4-3 の正規の選択肢であり、受け皿ルール自身も scenarioId なしで
-   * 作られる (ensureFriendAddFallbackRules)。それ以外は従来どおり必須。
+   * 作られる (ensureFriendAddFallbackRules)。下書きの保存では未完成を許す
+   * (R30)。それ以外（テスト・公開前確認・公開）は従来どおり必須とし、
+   * 公開はテスト成功が鍵のため未完成のまま公開できない。
    */
   const skipsScenario = friendKind === 'returning' && definition.returningMode === 'none';
-  if (!definition.scenarioId && !skipsScenario) {
+  if (!definition.scenarioId && !skipsScenario && !options?.allowIncomplete) {
     push(friendKind, '実際に配信するシナリオを決めてください。');
   }
   /*
@@ -745,13 +748,21 @@ friendAddRules.get('/api/friend-add-rules', requireRole('owner', 'admin', 'staff
         folderName: folder,
       }),
       loadOptions(c.env.DB, accountId),
+      /*
+       * R31: まとめの数はすべて直近7日にそろえる。直近7日の友だち追加だけに
+       * 期間を付け、ほかを通算にすると同じ期間の成果として比べられない。
+       * 「送信成功」は配送処理の完了件数ではなく、実際に送った通数
+       * (delivery_count の合計) とし、送信履歴の「累計配信」と同じ数え方に
+       * する。失敗は送信履歴の「エラー」と同じく failed と partial_failed
+       * (再送待ち) を合わせる。
+       */
       c.env.DB.prepare(
         `SELECT
            SUM(CASE WHEN occurred_at >= strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours', '-7 days') THEN 1 ELSE 0 END) AS recent_adds,
-           SUM(CASE WHEN attribution_status = 'captured' THEN 1 ELSE 0 END) AS captured,
-           SUM(CASE WHEN attribution_status = 'unavailable' THEN 1 ELSE 0 END) AS unknown_route,
-           SUM(CASE WHEN routing_status = 'completed' THEN 1 ELSE 0 END) AS delivered,
-           SUM(CASE WHEN routing_status = 'failed' THEN 1 ELSE 0 END) AS failed
+           SUM(CASE WHEN occurred_at >= strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours', '-7 days') AND attribution_status = 'captured' THEN 1 ELSE 0 END) AS captured,
+           SUM(CASE WHEN occurred_at >= strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours', '-7 days') AND attribution_status = 'unavailable' THEN 1 ELSE 0 END) AS unknown_route,
+           SUM(CASE WHEN occurred_at >= strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours', '-7 days') THEN COALESCE(delivery_count, 0) ELSE 0 END) AS delivered,
+           SUM(CASE WHEN occurred_at >= strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours', '-7 days') AND routing_status IN ('failed', 'partial_failed') THEN 1 ELSE 0 END) AS failed
          FROM friend_add_events WHERE line_account_id = ? AND friend_kind = ?`,
       ).bind(accountId, kind).first<{
         recent_adds: number | null; captured: number | null; unknown_route: number | null;
@@ -906,7 +917,9 @@ friendAddRules.post('/api/friend-add-rules/drafts', requireRole('owner', 'admin'
   if (!await canUseAccount(c, accountId)) return c.json({ success: false, error: '対象のLINEアカウントが見つかりません' }, 404);
   await ensureFriendAddFallbackRules(c.env.DB, accountId);
   const definition = normalizeDefinition(body.definition);
-  const referenceErrors = await validateReferences(c.env.DB, accountId, definition, body.friendKind!);
+  // 下書きは未完成のまま保存できる (R30)。全体の必須はテスト・公開前確認で見る。
+  // 書いた参照先がこのアカウントの持ち物かの確認はここでも行う。
+  const referenceErrors = await validateReferences(c.env.DB, accountId, definition, body.friendKind!, { allowIncomplete: true });
   if (referenceErrors.length > 0) {
     return c.json({
       success: false,
@@ -982,7 +995,8 @@ friendAddRules.put('/api/friend-add-rules/:id/draft', requireRole('owner', 'admi
   if (!current) return c.json({ success: false, error: '設定が見つかりません' }, 404);
   if (current.friend_kind !== body.friendKind) return c.json({ success: false, error: '判定する人は途中で変更できません' }, 400);
   const definition = normalizeDefinition(body.definition);
-  const referenceErrors = await validateReferences(c.env.DB, accountId, definition, body.friendKind!);
+  // 下書きは未完成のまま保存できる (R30)。全体の必須はテスト・公開前確認で見る。
+  const referenceErrors = await validateReferences(c.env.DB, accountId, definition, body.friendKind!, { allowIncomplete: true });
   if (referenceErrors.length > 0) {
     return c.json({
       success: false,

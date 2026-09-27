@@ -17,7 +17,7 @@ import NoteBar from '@/components/shared/note-bar'
 import Pagination from '@/components/shared/pagination'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { useAccount } from '@/contexts/account-context'
 import {
@@ -490,8 +490,9 @@ function MileagePageInner() {
   }
 
   return (
-    <div data-mileage-design="v6" data-design-node={tab === 'balances' ? 's98Vfw' : tab === 'earning-rules' ? 'N46cQ' : tab === 'rewards' ? 'qlVLJ' : tab === 'history' ? 'MvZm5' : 'z3PB2'}>
-      <Breadcrumb items={[{ label: '成果と分析' }, { label: 'マイル' }, ...(tab === 'balances' ? [] : [{ label: TABS.find((item) => item.key === tab)?.label ?? 'マイル' }])]} className="mb-3" />
+    <div data-mileage-design="v6" data-design-node={tab === 'balances' ? 's98Vfw' : tab === 'earning-rules' ? 'N46cQ' : tab === 'rewards' ? 'qlVLJ' : tab === 'history' ? 'MvZm5' : 'z3PB2'} className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <Breadcrumb items={[{ label: '成果と分析' }, { label: 'マイル' }, ...(tab === 'balances' ? [] : [{ label: TABS.find((item) => item.key === tab)?.label ?? 'マイル' }])]} />
       <div data-design="Tabs">
         <MergedTabs
           basePath="/mileage"
@@ -517,11 +518,13 @@ function MileagePageInner() {
       `}</style>
 
       {!selectedAccountId && !accountLoading ? (
-        <ListState
-          kind="empty"
-          title="LINEアカウントを選択してください"
-          description="友だちの残高は、共通トップバーで選んだLINEアカウントごとに表示します。"
-        />
+        <div className="bg-canvas rounded-card border-hairline border">
+          <ListState
+            kind="empty"
+            title="LINEアカウントを選択してください"
+            description="友だちの残高は、共通トップバーで選んだLINEアカウントごとに表示します。"
+          />
+        </div>
       ) : <>
 
       {tab === 'balances' && loading ? (
@@ -542,11 +545,11 @@ function MileagePageInner() {
       ) : null}
 
       {tab === 'balances' && !loading && !loadError && <>
-      <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <SummaryCard variant="v6" title="マイルを持っている友だち" value={summary?.withBalanceCount ?? null} unit="人" detail={summary ? `選択中 ${summary.totalMembers.toLocaleString('ja-JP')}人のうち` : '選択中のLINEアカウント'} />
-        <SummaryCard variant="v6" title="たまっているマイル" value={summary?.available ?? null} unit=" マイル" detail={`確定待ち ${summary?.pending.toLocaleString('ja-JP') ?? '—'} マイル`} />
-        <SummaryCard variant="v6" title="今月の増減" value={summary?.monthChange ?? null} unit=" マイル" detail="" help="選択中の友だち全体の増減です" />
-        <SummaryCard
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <KpiCard variant="v6" title="マイルを持っている友だち" value={summary?.withBalanceCount ?? null} unit="人" detail={summary ? `選択中 ${summary.totalMembers.toLocaleString('ja-JP')}人のうち` : '選択中のLINEアカウント'} />
+        <KpiCard variant="v6" title="たまっているマイル" value={summary?.available ?? null} unit=" マイル" detail={`確定待ち ${summary?.pending.toLocaleString('ja-JP') ?? '—'} マイル`} />
+        <KpiCard variant="v6" title="今月の増減" value={summary?.monthChange ?? null} unit=" マイル" detail="" help="選択中の友だち全体の増減です" />
+        <KpiCard
           variant="v6"
           title="もうすぐ消えるマイル"
           value={summary?.expiringMiles30d ?? null}
@@ -554,10 +557,10 @@ function MileagePageInner() {
           detail={summary?.expiringMiles30d == null ? '期限付きの付与記録はありません' : '30日以内に期限を迎える分'}
         />
       </div>
-      <NoteBar className="mb-4">
+      <NoteBar>
         友だちごとにたまっているマイルです。どうやってたまるかは「たまる決めごと」、何と交換できるかは「使い道」で決めます。
       </NoteBar>
-      <div className="mb-3 flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <SearchField
           aria-label="友だちの名前で検索"
           value={searchInput}
@@ -582,7 +585,7 @@ function MileagePageInner() {
         事実は字だけの行として出す。「残高が多い順」も選べないので
         「並び順：」の前置きで固定値だと分かる形にする。
       */}
-      <div className="mb-4 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-xs" aria-label="ランク別の人数">
+      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-xs" aria-label="ランク別の人数">
         <span className="text-ink font-semibold tabular-nums">
           すべて {overviewTotal === null ? '—' : `${formatMileageNumber(overviewTotal)}名`}
         </span>
@@ -601,15 +604,15 @@ function MileagePageInner() {
       </div>
       </>}
 
-      {tab === 'earning-rules' && <div className="mb-6">
+      {tab === 'earning-rules' && <div className="flex flex-col gap-4">
         {/* 設計 N46cQ に本文見出しは無い。画面名はタブが持っているので、
             ここで見出しをもう一度書かない。 */}
-        {!loading && !loadError ? <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <SummaryCard variant="v6" title="動いている決めごと" value={activeRules.length} unit="つ" detail={`止めているもの ${rules.length - activeRules.length}つ`} />
-          <SummaryCard variant="v6" title="この30日で付いたマイル" value={ruleSummary?.grantedMiles ?? null} unit="マイル" detail={`のべ ${formatMileageNumber(ruleSummary?.grantedCount ?? 0)}回`} />
-          <SummaryCard variant="v6" title="いちばん付いている" value={topRule ? grantedMiles30d(topRule) : null} unit="マイル" detail={topRule ? `${topRule.draft.name}・${formatMileageNumber(topRule.metrics30d.granted)}回` : 'まだ付与記録はありません'} />
+        {!loading && !loadError ? <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <KpiCard variant="v6" title="動いている決めごと" value={activeRules.length} unit="つ" detail={`止めているもの ${rules.length - activeRules.length}つ`} />
+          <KpiCard variant="v6" title="この30日で付いたマイル" value={ruleSummary?.grantedMiles ?? null} unit="マイル" detail={`のべ ${formatMileageNumber(ruleSummary?.grantedCount ?? 0)}回`} />
+          <KpiCard variant="v6" title="いちばん付いている" value={topRule ? grantedMiles30d(topRule) : null} unit="マイル" detail={topRule ? `${topRule.draft.name}・${formatMileageNumber(topRule.metrics30d.granted)}回` : 'まだ付与記録はありません'} />
           {/* MILEAGE-05: 分母の人数は計算と同じ口の値を見せる。数字そのものなので「？」へ移さない。 */}
-          <SummaryCard variant="v6" title="1人あたりの平均" value={ruleSummary?.averageBalance ?? null} unit="マイル" detail={ruleSummary?.averageDenominator ? `残高0の人は除き、持っている人 ${formatMileageNumber(ruleSummary.averageDenominator)}人で割った数` : '残高がある人がいないため計算していません'} />
+          <KpiCard variant="v6" title="1人あたりの平均" value={ruleSummary?.averageBalance ?? null} unit="マイル" detail={ruleSummary?.averageDenominator ? `残高0の人は除き、持っている人 ${formatMileageNumber(ruleSummary.averageDenominator)}人で割った数` : '残高がある人がいないため計算していません'} />
         </div> : null}
         <NoteBar>
           どんなことをしたら何マイル付けるかを決めます。付与数を変えると、変更後に起きた行動から新しい値を使います。
@@ -629,16 +632,18 @@ function MileagePageInner() {
             onRetry={() => void reloadAll()}
           />
         ) : rules.length === 0 ? (
-          <ListState
-            kind="empty"
-            title="まだ決めごとがありません"
-            description="どんなことをしたら何マイル付けるかを決めます。"
-            action={<Button href="/mileage/earning-rules/new" variant="primary">＋ 決めごとを作る</Button>}
-          />
+          <div className="bg-canvas rounded-card border-hairline border">
+            <ListState
+              kind="empty"
+              title="まだ決めごとがありません"
+              description="どんなことをしたら何マイル付けるかを決めます。"
+              action={<Button href="/mileage/earning-rules/new" variant="primary">＋ 決めごとを作る</Button>}
+            />
+          </div>
         ) : (
         <>
         <div
-          className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3"
+          className="bg-canvas rounded-card border-hairline flex flex-wrap items-center gap-2 border p-3"
         >
           <Button href="/mileage/earning-rules/new" variant="primary">決めごとをつくる</Button>
           <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
@@ -666,7 +671,7 @@ function MileagePageInner() {
           <Notice tone="danger" message={ruleActionError} className="mb-3" />
         ) : null}
 
-        <div className="mb-3 flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {RULE_FILTERS.map((f) => (
             <FilterChip
               key={f.key}
@@ -684,11 +689,13 @@ function MileagePageInner() {
         </div>
 
         {shownRules.length === 0 ? (
-          <ListState
-            kind="empty"
-            title="絞り込みに合う決めごとがありません"
-            description="絞り込みの札を外すと表示されます。"
-          />
+          <div className="bg-canvas rounded-card border-hairline border">
+            <ListState
+              kind="empty"
+              title="絞り込みに合う決めごとがありません"
+              description="絞り込みの札を外すと表示されます。"
+            />
+          </div>
         ) : (
         <div className="bg-canvas rounded-card border-hairline overflow-hidden border" data-mileage-table="earning-rules">
           <table className="w-full table-fixed">
@@ -795,7 +802,7 @@ function MileagePageInner() {
         </div>
         )}
 
-        <div className="mt-3 flex items-center justify-between gap-3">
+        <div className="flex items-center justify-between gap-3">
           <p className="text-xs font-semibold tabular-nums text-ink-faint">
             {shownRules.length === rules.length
               ? `決めごと ${rules.length}件のうち ${Math.min((rulePage - 1) * RULE_PAGE_SIZE + 1, shownRules.length)}〜${Math.min(rulePage * RULE_PAGE_SIZE, shownRules.length)}件を表示`

@@ -12,6 +12,7 @@ shared-button-importer app/analytics/reports/new/page.tsx
 shared-button-importer app/auto-replies/page.tsx
 shared-button-importer app/auto-replies/publish/page.tsx
 shared-button-importer app/auto-replies/runs/page.tsx
+shared-button-importer app/automations/new/friend-multi-select.tsx
 shared-button-importer app/automations/new/page.tsx
 shared-button-importer app/automations/page.tsx
 shared-button-importer app/automations/runs/page.tsx
@@ -25,6 +26,7 @@ shared-button-importer app/booking/menus/staff/page.tsx
 shared-button-importer app/booking/staff/page.tsx
 shared-button-importer app/booking/staff/shifts/page.tsx
 shared-button-importer app/booking/staff/shifts/staff-detail.tsx
+shared-button-importer app/broadcasts/detail/broadcast-recipients.tsx
 shared-button-importer app/broadcasts/detail/page.tsx
 shared-button-importer app/broadcasts/new/page.tsx
 shared-button-importer app/broadcasts/page.tsx

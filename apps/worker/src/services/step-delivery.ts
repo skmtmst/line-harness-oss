@@ -20,6 +20,7 @@ import {
   type DeliveryMode,
   type Friend,
   listLineAccountsWithTenantStatus,
+  recordSkippedDelivery,
 } from '@line-crm/db';
 import type { LineClient } from '@line-crm/line-sdk';
 import { isStoppedTenantStatus } from './tenant-runtime-status.js';
@@ -187,8 +188,14 @@ export async function processStepDeliveries(
   lineClient: LineClient,
   workerUrl?: string,
 ): Promise<void> {
+  const accountsWithStatus = await listLineAccountsWithTenantStatus(db);
   const tenantStatusByAccount = new Map(
-    (await listLineAccountsWithTenantStatus(db)).map((account) => [account.id, account.tenant_status]),
+    accountsWithStatus.map((account) => [account.id, account.tenant_status]),
+  );
+  // アカウントの稼働状態（X-1）。止めているアカウントの配信は
+  // 「送らなかった」として pause して一覧に残す。
+  const activeByAccount = new Map(
+    accountsWithStatus.map((account) => [account.id, Boolean(account.is_active)]),
   );
   // Crash recovery: a claim (active→delivering) that never got released means
   // the worker died mid-delivery — without this, the enrollment is stranded
@@ -221,6 +228,30 @@ export async function processStepDeliveries(
         .prepare(`SELECT line_account_id FROM scenarios WHERE id = ?`)
         .bind(fs.scenario_id)
         .first<{ line_account_id: string | null }>();
+      if (
+        ownerRow?.line_account_id
+        && activeByAccount.get(ownerRow.line_account_id) === false
+      ) {
+        // アカウント停止中（X-1）。claim せず、送らなかった記録を残して
+        // 配列から外す。再開後も自動では送り直さない（pause で止める）。
+        try {
+          await recordSkippedDelivery(db, {
+            lineAccountId: ownerRow.line_account_id,
+            kind: 'scenario_step',
+            refId: fs.id,
+            title: `friend_scenario:${fs.scenario_id}`,
+          });
+        } catch (skipError) {
+          console.error(`[step-delivery] skipped ledger write failed for ${fs.id}:`, skipError);
+        }
+        await db.prepare(
+          `UPDATE friend_scenarios
+              SET status = 'paused', pause_reason = 'account_inactive',
+                  next_delivery_at = NULL, updated_at = ?
+            WHERE id = ? AND status = 'active'`,
+        ).bind(now, fs.id).run();
+        continue;
+      }
       if (ownerRow?.line_account_id && isStoppedTenantStatus(tenantStatusByAccount.get(ownerRow.line_account_id))) {
         // A stop is a point-in-time cancellation for due deliveries. Pausing
         // prevents an overdue message from being pushed automatically after restore.

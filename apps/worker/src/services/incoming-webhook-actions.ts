@@ -14,7 +14,19 @@ type ActionRunResult = {
   matchedFriendId: string | null;
   executed: number;
   failed: number;
+  /** S: matched / not_found / ambiguous(複数一致で保留)のどれだったか。 */
+  matchStatus: 'matched' | 'not_found' | 'ambiguous' | 'skipped';
 };
+
+/**
+ * S (#939 機能26): 人の照合結果。0件は not_found、1件は matched、
+ * 2件以上は ambiguous。ambiguous は行動を自動実行せず箱へ保留し、
+ * 人がどの友だちか選ぶ(成り済ましの取り違えを防ぐ)。
+ */
+export type IncomingFriendMatch =
+  | { status: 'matched'; friendId: string }
+  | { status: 'ambiguous'; friendIds: string[] }
+  | { status: 'not_found' };
 
 function jsonPathSegment(key: string): string {
   return /^[A-Za-z_][A-Za-z0-9_-]*$/.test(key) ? `.${key}` : `[${JSON.stringify(key)}]`;
@@ -89,12 +101,18 @@ function profileValueText(valueJson: string): string | null {
   }
 }
 
-async function resolveFriendId(
+export async function resolveFriendMatch(
   db: D1Database,
   lineAccountId: string,
   payload: unknown,
   config: IncomingWebhookIdentityMatch,
-): Promise<string | null> {
+): Promise<IncomingFriendMatch> {
+  /*
+   * S (#939 機能26): 照合の決まり。
+   * - 順に試し、最初に1件以上見つかった方法で決める(推奨順位どおり)
+   * - 1件なら matched、2件以上なら ambiguous(先頭だけ選んで動かさない)
+   * - 全部0件なら not_found。名前だけの照合は行わない。
+   */
   for (const method of config.methods) {
     const raw = valueAtPath(payload, method.path);
     const value = typeof raw === 'string' ? raw.trim() : typeof raw === 'number' ? String(raw) : '';
@@ -103,7 +121,7 @@ async function resolveFriendId(
       const row = await db.prepare(
         `SELECT id FROM friends WHERE id = ? AND line_account_id = ?`,
       ).bind(value, lineAccountId).first<{ id: string }>();
-      if (row) return row.id;
+      if (row) return { status: 'matched', friendId: row.id };
       continue;
     }
     if (method.kind === 'verified_email' || method.kind === 'verified_phone') {
@@ -124,22 +142,32 @@ async function resolveFriendId(
             AND pv.field_key = ? AND pv.is_active = 1 AND pv.verified_at IS NOT NULL
           ORDER BY f.created_at ASC`,
       ).bind(lineAccountId, fieldKey).all<{ friend_id: string; value_json: string }>();
+      const matched: string[] = [];
       for (const row of candidates.results ?? []) {
         const stored = profileValueText(row.value_json);
-        if (stored !== null && normalize(stored) === want) return row.friend_id;
+        if (stored !== null && normalize(stored) === want && !matched.includes(row.friend_id)) {
+          matched.push(row.friend_id);
+        }
       }
+      if (matched.length > 1) return { status: 'ambiguous', friendIds: matched };
+      if (matched.length === 1) return { status: 'matched', friendId: matched[0]! };
       continue;
     }
-    const row = await db.prepare(
-      `SELECT f.id
+    const rows = await db.prepare(
+      `SELECT f.id, f.created_at
          FROM friends f
          JOIN users u ON u.id = f.user_id
         WHERE f.line_account_id = ? AND u.external_id = ?
-        ORDER BY f.created_at ASC LIMIT 1`,
-    ).bind(lineAccountId, value).first<{ id: string }>();
-    if (row) return row.id;
+        ORDER BY f.created_at ASC`,
+    ).bind(lineAccountId, value).all<{ id: string }>();
+    const ids: string[] = [];
+    for (const row of rows.results ?? []) {
+      if (!ids.includes(row.id)) ids.push(row.id);
+    }
+    if (ids.length > 1) return { status: 'ambiguous', friendIds: ids };
+    if (ids.length === 1) return { status: 'matched', friendId: ids[0]! };
   }
-  return null;
+  return { status: 'not_found' };
 }
 
 function directAction(ref: IncomingWebhookActionRef, index: number): ActionDefinition | null {
@@ -188,6 +216,18 @@ async function commonActionPlan(
  * すると成り済ませられるため、人が確かめてから結び付ける。
  * 同じ受信の再送は台帳側の UNIQUE で増えない。
  */
+/** 照合に使おうとした値の並び。箱の中で運用者が確かめるためのもの。 */
+function identityAttemptsOf(payload: unknown, config: IncomingWebhookIdentityMatch) {
+  return config.methods
+    .map((method) => {
+      const raw = valueAtPath(payload, method.path);
+      const value = typeof raw === 'string' ? raw.trim()
+        : typeof raw === 'number' ? String(raw) : '';
+      return { kind: method.kind, path: method.path, value: value.slice(0, 200) };
+    })
+    .filter((attempt) => attempt.value !== '');
+}
+
 async function recordNotFound(
   db: D1Database,
   input: {
@@ -201,24 +241,48 @@ async function recordNotFound(
 ): Promise<void> {
   const onNotFound = input.identityMatching.onNotFound;
   if (onNotFound === 'do_nothing') return;
-  const attempts = input.identityMatching.methods
-    .map((method) => {
-      const raw = valueAtPath(input.payload, method.path);
-      const value = typeof raw === 'string' ? raw.trim()
-        : typeof raw === 'number' ? String(raw) : '';
-      return { kind: method.kind, path: method.path, value: value.slice(0, 200) };
-    })
-    .filter((attempt) => attempt.value !== '');
   const record = () => recordIncomingWebhookUnmatched(db, {
     webhookId: input.webhookId,
     lineAccountId: input.lineAccountId,
     sourceEventId: input.sourceEventId,
     kind: onNotFound === 'create_candidate' ? 'candidate' : 'unmatched',
-    identityAttempts: attempts,
+    identityAttempts: identityAttemptsOf(input.payload, input.identityMatching),
     maskedShape: maskedPayloadShape(input.payload),
     receivedAt: input.execution?.occurredAt,
   });
   if (input.execution) await input.execution.step('unmatched', record);
+  else await record();
+}
+
+/**
+ * S (#939 機能26): 同じ値の友だちが2人以上いた届物を箱へ保留する。
+ * onNotFound の設定に関わらず必ず置く。自動で先頭だけ選んで動かすと、
+ * まったく別の友だちにタグやメッセージが届いてしまうため。
+ * 同じ受信の再送は台帳側の UNIQUE で増えない。
+ */
+async function recordAmbiguous(
+  db: D1Database,
+  input: {
+    webhookId: string;
+    lineAccountId: string;
+    sourceEventId: string;
+    payload: unknown;
+    identityMatching: IncomingWebhookIdentityMatch;
+    candidateFriendIds: string[];
+    execution?: IncomingWebhookExecution;
+  },
+): Promise<void> {
+  const record = () => recordIncomingWebhookUnmatched(db, {
+    webhookId: input.webhookId,
+    lineAccountId: input.lineAccountId,
+    sourceEventId: input.sourceEventId,
+    kind: 'ambiguous',
+    identityAttempts: identityAttemptsOf(input.payload, input.identityMatching),
+    maskedShape: maskedPayloadShape(input.payload),
+    candidateFriendIds: input.candidateFriendIds,
+    receivedAt: input.execution?.occurredAt,
+  });
+  if (input.execution) await input.execution.step('ambiguous', record);
   else await record();
 }
 
@@ -242,15 +306,22 @@ export async function executeIncomingWebhookActions(
    * 照合だけは行い、見つからなければ箱へ置く。
    */
   if (input.actions.length === 0 && input.identityMatching.onNotFound === 'do_nothing') {
-    return { matchedFriendId: null, executed: 0, failed: 0 };
+    return { matchedFriendId: null, executed: 0, failed: 0, matchStatus: 'skipped' };
   }
-  const resolve = () => resolveFriendId(db, input.lineAccountId, input.payload, input.identityMatching);
-  const friendId = input.execution ? await input.execution.step('matched-friend', resolve) : await resolve();
-  if (!friendId) {
+  const resolve = () => resolveFriendMatch(db, input.lineAccountId, input.payload, input.identityMatching);
+  const match = input.execution ? await input.execution.step('matched-friend', resolve) : await resolve();
+  if (match.status === 'ambiguous') {
+    await recordAmbiguous(db, { ...input, candidateFriendIds: match.friendIds });
+    return { matchedFriendId: null, executed: 0, failed: 0, matchStatus: 'ambiguous' };
+  }
+  if (match.status === 'not_found') {
     await recordNotFound(db, input);
-    return { matchedFriendId: null, executed: 0, failed: 0 };
+    return { matchedFriendId: null, executed: 0, failed: 0, matchStatus: 'not_found' };
   }
-  if (input.actions.length === 0) return { matchedFriendId: friendId, executed: 0, failed: 0 };
+  const friendId = match.friendId;
+  if (input.actions.length === 0) {
+    return { matchedFriendId: friendId, executed: 0, failed: 0, matchStatus: 'matched' };
+  }
 
   const executors = createAutomationActionExecutors(input.dependencies);
   let executed = 0;
@@ -324,5 +395,56 @@ export async function executeIncomingWebhookActions(
       }
     }
   }
-  return { matchedFriendId: friendId, executed, failed };
+  return { matchedFriendId: friendId, executed, failed, matchStatus: 'matched' };
+}
+
+/**
+ * S (#939 機能26): 受け取りの試し。届いたつもりのJSONを照合と
+ * 行動の組み立てまで試すが、実行も記録(箱・見本)もしない。
+ * 行動の内訳は common_action は公開済み版を展開し、直接指定は
+ * 種類だけ返す(実行しないので副作用は無い)。
+ */
+export type IncomingWebhookPreview = {
+  match: IncomingFriendMatch;
+  identityAttempts: Array<{ kind: string; path: string; value: string }>;
+  actions: Array<
+    | { refIndex: number; ref: IncomingWebhookActionRef; ok: true; plan: Array<{ type: string }> }
+    | { refIndex: number; ref: IncomingWebhookActionRef; ok: false; error: string }
+  >;
+};
+
+export async function previewIncomingWebhook(
+  db: D1Database,
+  input: {
+    lineAccountId: string;
+    payload: unknown;
+    identityMatching: IncomingWebhookIdentityMatch;
+    actions: IncomingWebhookActionRef[];
+  },
+): Promise<IncomingWebhookPreview> {
+  const match = await resolveFriendMatch(db, input.lineAccountId, input.payload, input.identityMatching);
+  const actions: IncomingWebhookPreview['actions'] = [];
+  let sequence = 0;
+  for (const [refIndex, ref] of input.actions.entries()) {
+    try {
+      const plan = ref.refKind === 'common_action'
+        ? await commonActionPlan(db, input.lineAccountId, ref)
+        : [directAction(ref, sequence)].filter((item): item is ActionDefinition => item !== null);
+      if (plan.length === 0) throw new Error(`未対応の受信Webhook処理です: ${ref.refKind}`);
+      actions.push({ refIndex, ref, ok: true, plan: plan.map((action) => ({ type: action.type })) });
+      sequence += plan.length;
+    } catch (error) {
+      actions.push({
+        refIndex,
+        ref,
+        ok: false,
+        error: error instanceof Error ? error.message : '処理の確認に失敗しました',
+      });
+    }
+  }
+  return {
+    match,
+    identityAttempts: identityAttemptsOf(input.payload, input.identityMatching),
+    actions,
+  };
 }

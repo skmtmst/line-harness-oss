@@ -14,10 +14,11 @@ import type { BookingAvailabilitySlot } from '@/lib/api'
  * （apps/liff/src/components/DateTimePicker.tsx）と同じ構造かを
  * 実Reactで確かめる。
  *
- * 実LIFF（★V7）: 「日時を選んでください」の下に日付の札が横に並び
- * （枠の無い日は「満席」で押せない）、選んだ日の時刻ボタンが
- * 3列（grid-cols-3）で並ぶだけ。
- * 月間カレンダー・○×休・凡例・「空き枠の内訳」は実画面に無い。
+ * 実LIFF（★V7）: 「日時を選んでください」の下にリスト／カレンダーの
+ * 切り替え。リストは日付の札が横に並び（枠の無い日は「満席」で押せない）、
+ * カレンダーは月の表（●空きあり／満／休＋印の見方）。
+ * どちらも選んだ日の時刻ボタンが3列（grid-cols-3）で並ぶ。
+ * 「空き枠の内訳」は実画面に無い。
  */
 
 const DIR = dirname(fileURLToPath(import.meta.url))
@@ -49,7 +50,7 @@ function slot(date: string, start: string): BookingAvailabilitySlot {
 
 afterEach(cleanup)
 
-describe('前提: 実LIFFが「日時を選んでください」＋日付横並び札＋3列時刻ボタンの構造', () => {
+describe('前提: 実LIFFが「日時を選んでください」＋リスト／カレンダー切替＋3列時刻ボタンの構造', () => {
   it('LIFF側の文言と構造が変わっていない（変わったらプレビューも追随が必要）', () => {
     expect(LIFF_SOURCE).toContain('日時を選んでください')
     expect(LIFF_SOURCE).toContain('この期間に空きはありません。')
@@ -65,18 +66,21 @@ describe('前提: 実LIFFが「日時を選んでください」＋日付横並�
     // 旧い見せ方（枠ごとの文言・赤いそのまま表示・題と本文の重ね）が復活していない。
     expect(LIFF_SOURCE).not.toContain('空き枠を取得中...')
     expect(LIFF_SOURCE).not.toContain('text-red-600')
-    // ★V7: 日付は横に並ぶ札（枠無しは「満席」）、時刻は選んだ日の3列。
+    // ★V7: リストは日付の横並び札（枠無しは「満席」）、時刻は選んだ日の3列。
     expect(LIFF_SOURCE).toContain('grid-cols-3')
     expect(LIFF_SOURCE).toContain('満席')
     expect(LIFF_SOURCE).toContain('aria-label="日付"')
     expect(LIFF_SOURCE).not.toContain('grid-cols-4')
-    // LIFFにカレンダー表示が導入されたら検知できるよう、不在も確認する。
-    expect(LIFF_SOURCE).not.toContain('grid-cols-7')
+    // カレンダーは月の表（7列・●／満／休の印＋印の見方）。
+    expect(LIFF_SOURCE).toContain('grid-cols-7')
+    expect(LIFF_SOURCE).toContain('お休み')
+    expect(LIFF_SOURCE).toContain('radiogroup')
   })
 
-  it('管理画面側に架空カレンダーの文言・構造が残っていない', () => {
+  it('管理画面側に実LIFFと違う見せ方が残っていない', () => {
     expect(PAGE_SOURCE).not.toContain('ご希望の日をえらんでください')
     expect(PAGE_SOURCE).not.toContain('空き枠の内訳')
+    // 月の表（7列）はプレビュー部品だけが持つ。設定画面本体には置かない。
     expect(PAGE_SOURCE).not.toContain('grid-cols-7')
   })
 })
@@ -143,7 +147,7 @@ describe('プレビューが実LIFFと同じ構造で描画される', () => {
     expect(container.querySelectorAll('button').length).toBe(8)
   })
 
-  it('架空カレンダーの部品（曜日見出し・○×休・凡例・内訳）は出ない', () => {
+  it('リストの時は月の表（7列）・印の見方・内訳は出ない', () => {
     const { container } = render(
       <LiffDateTimePreview
         status="ready"
@@ -158,6 +162,47 @@ describe('プレビューが実LIFFと同じ構造で描画される', () => {
     expect(container.textContent).not.toContain('満席です')
     expect(container.querySelector('.grid-cols-7')).toBeNull()
     expect(container.querySelector('details')).toBeNull()
+  })
+
+  it('カレンダーの時は月の表が7列で、リストの時は無い', () => {
+    const { container, unmount } = render(
+      <LiffDateTimePreview
+        status="ready"
+        slots={slots}
+        menuName="カット"
+        staffName="田中"
+        initialView="calendar"
+        closedDates={['2026-10-02']}
+      />,
+    )
+    // 月の表（2026年10月）・7列・印の見方・選んだ日の時刻3列が出る。
+    expect(screen.getByText('2026年10月')).toBeTruthy()
+    const grids = container.querySelectorAll('.grid.grid-cols-7')
+    expect(grids.length).toBe(1)
+    expect(container.textContent).toContain('空きあり')
+    expect(container.textContent).toContain('満席')
+    expect(container.textContent).toContain('お休み')
+    expect(screen.getByText('10/1(木) の空き')).toBeTruthy()
+    expect(container.querySelectorAll('.grid.grid-cols-3').length).toBe(1)
+    // 休みの日（10/2）は「休」の印になる。
+    const oct2 = [...container.querySelectorAll('.grid-cols-7 button')].find((button) =>
+      button.textContent?.startsWith('2'),
+    )
+    expect(oct2?.textContent).toContain('休')
+    unmount()
+    // リストに戻すと7列は消える。
+    const list = render(
+      <LiffDateTimePreview
+        status="ready"
+        slots={slots}
+        menuName="カット"
+        staffName="田中"
+        initialView="list"
+      />,
+    )
+    expect(list.container.querySelector('.grid-cols-7')).toBeNull()
+    expect(list.container.querySelectorAll('.grid.grid-cols-3').length).toBe(1)
+    list.unmount()
   })
 
   it('空きが無いときは実LIFFと同じ「この期間に空きはありません。」', () => {

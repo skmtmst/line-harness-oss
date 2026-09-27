@@ -2,6 +2,7 @@
 
 import SelectField from '@/components/shared/select-field'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
+import ListToolbar from '@/components/shared/list-toolbar'
 import { MoreAction } from '@/components/shared/row-actions'
 import StatusBadge from '@/components/shared/status-badge'
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
@@ -615,7 +616,7 @@ export default function TemplatesPage() {
     : 0
 
   return (
-    <div data-design-node="W7LBc">
+    <div data-design-node="W7LBc" className="flex flex-col gap-4">
       <div data-design="TypeTabs" data-design-node="W7LBc kcmGB">
         <Tabs
           items={[
@@ -754,36 +755,47 @@ export default function TemplatesPage() {
 
       {/* ★V7：常に出ていた説明の帯は外し、フォルダ欄の下の説明へ短くまとめた。 */}
 
-      {/* 検索と並び順（設計 `Body` の上）。 */}
-      <div className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3">
-        <input
-          type="search"
-          placeholder="テンプレート名で検索（本文・差し込んでいる項目も対象）"
-          aria-label="名前・本文・差し込んでいる項目で検索"
-          value={templateQuery}
-          onChange={(e) => setTemplateQuery(e.target.value)}
-          className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
-        />
-        {/*
-          #668: 「保存した検索」の飾りは消した。押せる形をしているのに
-          何も起きない札は、押した人に「やった」と誤解させる
-          （v6-common-rules §2-2）。保存検索の仕組みができたら、
-          一斉配信と同じ選び口（SelectField）で置き直す。
-        */}
-        {/*
-          ここは「20件表示」の選び口だった(#615)。**選べない選び口だった。**
-          `value` だけ渡して `onChange` も読み取り専用指定も無いので、React が
-          controlled field の警告を console error に出していた。そのうえ
-          この一覧はページ送りを持たず、絞り込みに合うものを**全部**描くので、
-          「20件表示」という表示そのものが嘘だった。
-
-          **操作できない事実は、操作部品ではなく数で出す。**選び口へ戻すのは、
-          一覧にページ送りを入れるときに一緒にやる。
-        */}
-        {view === 'ready' ? (
-          <ListRange className="px-1 tabular-nums" total={filteredTemplates.length} first={filteredTemplates.length === 0 ? 0 : 1} last={filteredTemplates.length} />
-        ) : null}
-      </div>
+      {/*
+        ★V7 `Xn1Mz`：検索は幅320で1行目。#668 の「保存した検索」の飾りは
+        消したまま（仕組みができたら一斉配信と同じ選び口で置き直す）。
+        #615 の選び口も戻さない（ページ送りが無いので「20件表示」は嘘になる）。
+        一致した数は結果の側（2行目の右）に出す。
+      */}
+      <ListToolbar
+        search={{
+          placeholder: 'テンプレート名で検索（本文・差し込んでいる項目も対象）',
+          label: '名前・本文・差し込んでいる項目で検索',
+          value: templateQuery,
+          onChange: setTemplateQuery,
+        }}
+        filters={
+          <>
+            {([
+              { key: 'all', label: 'すべて' },
+              { key: 'single', label: '1通のみ' },
+              { key: 'multiple', label: '複数通' },
+              { key: 'variables', label: '差し込みあり' },
+              { key: 'unused', label: '未使用' },
+            ] as const).map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => setTypeFilter(key)}
+                /* #702: 選んだ札は濃い緑＋白文字(5.44:1)。明るいLINE緑だと白文字で2.26:1しかない。 */
+                className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+                  typeFilter === key ? 'bg-accent-deep text-on-accent' : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </>
+        }
+        trailing={
+          view === 'ready' ? (
+            <ListRange className="px-1 tabular-nums" total={filteredTemplates.length} first={filteredTemplates.length === 0 ? 0 : 1} last={filteredTemplates.length} />
+          ) : null
+        }
+      />
 
 
       {/*
@@ -792,38 +804,16 @@ export default function TemplatesPage() {
       */}
       {error && view !== 'error' && (
         <div
-          className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm"
+          className="p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm"
           role="alert"
         >
           {error}
         </div>
       )}
 
-      {/* Type filter */}
-      <div className="mb-4 flex flex-wrap gap-2">
-        {([
-          { key: 'all', label: 'すべて' },
-          { key: 'single', label: '1通のみ' },
-          { key: 'multiple', label: '複数通' },
-          { key: 'variables', label: '差し込みあり' },
-          { key: 'unused', label: '未使用' },
-        ] as const).map(({ key, label }) => (
-          <button
-            key={key}
-            onClick={() => setTypeFilter(key)}
-            /* #702: 選んだ札は濃い緑＋白文字(5.44:1)。明るいLINE緑だと白文字で2.26:1しかない。 */
-            className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
-              typeFilter === key ? 'bg-accent-deep text-on-accent' : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
       {/* Create form */}
       {showCreate && (
-        <div className="mb-6 bg-canvas rounded-card border border-hairline p-6">
+        <div className="bg-canvas rounded-card border border-hairline p-6">
           <h2 className="text-sm font-semibold text-ink mb-4">新規テンプレートを作成</h2>
           <div className="space-y-4 max-w-lg">
             <div>
@@ -1111,7 +1101,7 @@ export default function TemplatesPage() {
                 <p className="text-xs text-ink-faint">{drawerError}</p>
               </div>
             ) : !drawerData ? null : (
-              <div className="p-4 space-y-5">
+              <div className="flex flex-col gap-4 p-4">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium ${typeBadgeColor[drawerData.question ? 'question' : drawerData.messageType] ?? 'bg-canvas-sunken text-ink-secondary'}`}>
                     {messageTypeText(drawerData.question ? 'question' : drawerData.messageType)}

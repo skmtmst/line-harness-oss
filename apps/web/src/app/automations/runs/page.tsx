@@ -9,6 +9,7 @@ import ListState from '@/components/shared/list-state'
 import MergedTabs from '@/components/layout/merged-tabs'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import FilterChip from '@/components/shared/filter-chip'
+import Pagination from '@/components/shared/pagination'
 import KpiCollapse from '@/components/ui/kpi-collapse'
 import Notice from '@/components/shared/notice'
 import ListRange from '@/components/ui/list-range'
@@ -57,6 +58,9 @@ const TABS = [
   { key: 'templates', label: '見本', href: '/automations?tab=templates' },
   { key: 'common-actions', label: '共通アクション', href: '/common-actions' },
 ]
+
+/** 1ページに読む件数（R24）。以前の固定表示と同じ20件。 */
+const RUNS_PAGE_SIZE = 20
 
 const STATUS_LABEL: Record<RunStatus, string> = {
   queued: '待っています',
@@ -136,6 +140,12 @@ export default function AutomationRunsPage() {
   const [includeTest, setIncludeTest] = useState(false)
   const [csvBusy, setCsvBusy] = useState(false)
   /*
+   * R24: 21件目以降を順にたどれるよう、共通のページ送りで読む位置を持つ。
+   * 1ページは20件（以前の固定表示と同じ）。検索・絞り込み・店が替わったら
+   * 先頭へ戻す（替えた条件の2ページ目に残ると「無い」と読み違える）。
+   */
+  const [page, setPage] = useState(1)
+  /*
    * #1043 / V6 §9: 見るだけの権限では「もう一度やる」「取りやめ」
    * 「CSVで書き出す」を出さない。最終判断はサーバの個別権限キー。
    */
@@ -154,8 +164,24 @@ export default function AutomationRunsPage() {
 
   const changeQuery = (value: string) => {
     setQuery(value)
+    setPage(1)
     router.replace(automationRunsSearchUrl(pathname, searchParams.toString(), value), { scroll: false })
   }
+
+  const changeResultFilter = (value: 'all' | 'executed' | 'skipped' | 'problems') => {
+    setResultFilter(value)
+    setPage(1)
+  }
+
+  const changeIncludeTest = (value: boolean) => {
+    setIncludeTest(value)
+    setPage(1)
+  }
+
+  /* 店が替わったら先頭のページから読み直す。 */
+  useEffect(() => {
+    setPage(1)
+  }, [selectedAccountId])
 
   const load = useCallback(async () => {
     if (accountLoading) return
@@ -163,7 +189,7 @@ export default function AutomationRunsPage() {
     loadGeneration.current = generation
     setStatus('loading')
     try {
-      const params = new URLSearchParams({ limit: '20', offset: '0' })
+      const params = new URLSearchParams({ limit: String(RUNS_PAGE_SIZE), offset: String((page - 1) * RUNS_PAGE_SIZE) })
       if (selectedAccountId) params.set('lineAccountId', selectedAccountId)
       if (query.trim()) params.set('search', query.trim())
       if (resultFilter !== 'all') params.set('status', resultFilter)
@@ -181,7 +207,7 @@ export default function AutomationRunsPage() {
       setData(null)
       setStatus('error')
     }
-  }, [accountLoading, query, resultFilter, selectedAccountId, includeTest])
+  }, [accountLoading, page, query, resultFilter, selectedAccountId, includeTest])
 
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 400)
@@ -282,8 +308,9 @@ export default function AutomationRunsPage() {
   }
 
   return (
-    <div data-design-node="DkPY0">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <div data-design-node="DkPY0" className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-ink-faint">自動化 ＞ オートメーション ＞ 動いた記録</p>
         {runPermissions?.canExport ? (
           <div className="text-right">
@@ -292,10 +319,10 @@ export default function AutomationRunsPage() {
           </div>
         ) : null}
       </div>
-      <div className="mb-4"><MergedTabs basePath="/automations/runs" paramName="tab" tabs={TABS} active="runs" /></div>
+      <div><MergedTabs basePath="/automations/runs" paramName="tab" tabs={TABS} active="runs" /></div>
 
       {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}
-      <KpiCollapse className="mb-4" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <KpiCollapse gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Metric label="この30日に動いた" value={data ? `${data.summary.executed.toLocaleString('ja-JP')}回` : '—'} note={data ? '実行結果を集計' : '未取得'} />
         <Metric label="失敗した" value={data ? `${data.summary.failed.toLocaleString('ja-JP')}回` : '—'} note="処理結果を確認してください" />
         <Metric label="いちばん動いた" value={data?.summary.mostRunName ?? '—'} note={data?.summary.mostRunCount !== null && data?.summary.mostRunCount !== undefined ? `${data.summary.mostRunCount.toLocaleString('ja-JP')}回` : '未取得'} />
@@ -305,14 +332,14 @@ export default function AutomationRunsPage() {
       <Notice tone="info" message="オートメーションが動いた記録です。条件に外れて動かなかったものも並びます。" className="mb-4" />
       {retryNotice ? <p className="mb-4 rounded-control border border-hairline bg-canvas-sunken px-4 py-3 text-sm text-ink-secondary" role="status">{retryNotice}</p> : null}
 
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <input type="search" value={query} onChange={(event) => changeQuery(event.target.value)} placeholder="友だちの名前・オートメーションの名前で検索" className="h-10 w-full max-w-lg rounded-control border border-hairline bg-canvas px-3 text-sm" />
         <div className="flex items-center gap-3">
           <label className="flex items-center gap-1.5 text-sm text-ink-secondary">
             <input
               type="checkbox"
               checked={includeTest}
-              onChange={(event) => setIncludeTest(event.target.checked)}
+              onChange={(event) => changeIncludeTest(event.target.checked)}
             />
             テスト実行も見る
           </label>
@@ -320,14 +347,14 @@ export default function AutomationRunsPage() {
         </div>
       </div>
 
-      <div className="mb-3 flex flex-wrap gap-2" aria-label="結果で絞り込む">
+      <div className="flex flex-wrap gap-2" aria-label="結果で絞り込む">
         {([
           ['all', 'すべて', data?.summary.total.toLocaleString('ja-JP') ?? '—'],
           ['executed', '動いた', data?.summary.executed.toLocaleString('ja-JP') ?? '—'],
           ['skipped', '条件に外れた', data?.summary.skipped.toLocaleString('ja-JP') ?? '—'],
           ['problems', '失敗', data?.summary.failed.toLocaleString('ja-JP') ?? '—'],
         ] as const).map(([value, label, total]) => (
-          <FilterChip key={value} selected={resultFilter === value} onChange={() => setResultFilter(value)} count={total}>{label}</FilterChip>
+          <FilterChip key={value} selected={resultFilter === value} onChange={() => changeResultFilter(value)} count={total}>{label}</FilterChip>
         ))}
       </div>
 
@@ -336,7 +363,9 @@ export default function AutomationRunsPage() {
       ) : status === 'error' ? (
         <ListState kind="error" title="動いた記録を読み込めませんでした" description="記録は消えていません。再読み込みしてください。" action={<Button onClick={() => void load()}>もう一度読み込む</Button>} />
       ) : !data || data.items.length === 0 ? (
-        <ListState kind="empty" title={query || resultFilter !== 'all' ? '条件に合う記録はありません' : '動いた記録はまだありません'} description={query || resultFilter !== 'all' ? '検索語や絞り込みを変えてください。' : 'オートメーションが動くと、結果がここに残ります。'} />
+        <div className="bg-canvas rounded-card border-hairline border">
+          <ListState kind="empty" title={query || resultFilter !== 'all' ? '条件に合う記録はありません' : '動いた記録はまだありません'} description={query || resultFilter !== 'all' ? '検索語や絞り込みを変えてください。' : 'オートメーションが動くと、結果がここに残ります。'} />
+        </div>
       ) : (
         <div className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-sm">
           <div className="grid grid-cols-6 gap-3 bg-canvas-sunken px-4 py-3 text-xs font-semibold text-ink-faint">
@@ -363,12 +392,26 @@ export default function AutomationRunsPage() {
               </div>
             </div>
           ))}
-          <div className="border-t border-hairline px-4 py-3"><ListRange label="記録" total={data.pagination.total} first={data.items.length === 0 ? 0 : 1} last={data.items.length} /></div>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-hairline px-4 py-3">
+            <ListRange
+              label="記録"
+              total={data.pagination.total}
+              first={data.items.length === 0 ? 0 : data.pagination.offset + 1}
+              last={data.pagination.offset + data.items.length}
+            />
+            {/* R24: 21件目以降はページ送りでたどる。1ページだけなら出さない（部品側の決めごと）。 */}
+            <Pagination
+              page={page}
+              pageCount={Math.max(1, Math.ceil(data.pagination.total / RUNS_PAGE_SIZE))}
+              onPageChange={setPage}
+              ariaLabel="動いた記録のページ送り"
+            />
+          </div>
         </div>
       )}
 
       {selectedRun ? (
-        <section data-design="run-detail" className="mt-4 rounded-card border border-hairline bg-canvas p-5 shadow-sm" aria-label="実行記録の中身">
+        <section data-design="run-detail" className="rounded-card border border-hairline bg-canvas p-5 shadow-sm" aria-label="実行記録の中身">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <p className="text-xs font-semibold text-info">実行記録の中身</p>

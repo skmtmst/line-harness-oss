@@ -28,7 +28,18 @@ export interface SiteVisitor {
   last_seen_at: string;
   linked_at: string | null;
   linked_by: string | null;
+  consent_state: 'granted' | 'declined' | null;
+  consent_at: string | null;
 }
+
+/**
+ * 埋め込みJSが送る同意の状態 (#818)。
+ *   granted … 「記録してよい」を選んだ。行動を記録する
+ *   declined … 「記録しない」を選んだ。数えるだけ
+ *   unset   … まだ選んでいない。数えるだけ
+ * 同意以外の閲覧は1件も site_events に残さない。
+ */
+export type SiteConsent = 'granted' | 'declined' | 'unset';
 
 export interface SiteEvent {
   id: string;
@@ -191,20 +202,58 @@ export async function linkVisitorToFriend(
   return linked;
 }
 
+/** 日付だけの集計を1つ進める。個人やページの情報はここに入れない。 */
+async function incrementConsentCounter(
+  db: D1Database,
+  lineAccountId: string,
+  field: 'suppressed' | 'granted' | 'declined',
+): Promise<void> {
+  const today = new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
+  await db
+    .prepare(
+      `INSERT INTO site_consent_days (line_account_id, day, ${field})
+       VALUES (?, ?, 1)
+       ON CONFLICT(line_account_id, day)
+       DO UPDATE SET ${field} = ${field} + 1`,
+    )
+    .bind(lineAccountId, today)
+    .run();
+}
+
+/**
+ * 行動を記録する。同意が取れていない送信はここで止め、件数だけを
+ * 日ごとの台帳に足す（#818 の合格条件「同意していない閲覧は
+ * 1件も記録されない」）。訪問者の行そのものも立てない。
+ */
 export async function recordSiteEvent(
   db: D1Database,
   input: {
     visitorId: string;
     lineAccountId: string;
     eventType: SiteEventType;
+    consent?: SiteConsent;
     host?: unknown;
     path?: unknown;
     label?: string | null;
     valueNum?: number | null;
     referrer?: unknown;
   },
-): Promise<void> {
+): Promise<'recorded' | 'suppressed'> {
+  if (input.consent !== 'granted') {
+    await incrementConsentCounter(db, input.lineAccountId, 'suppressed');
+    return 'suppressed';
+  }
   const visitor = await getOrCreateVisitor(db, input.visitorId, input.lineAccountId);
+  if (visitor.consent_state !== 'granted') {
+    await db
+      .prepare(
+        `UPDATE site_visitors
+            SET consent_state = 'granted', consent_at = ?
+          WHERE id = ?`,
+      )
+      .bind(jstNow(), visitor.id)
+      .run();
+  }
   await db
     .prepare(
       `INSERT INTO site_events
@@ -225,6 +274,57 @@ export async function recordSiteEvent(
       jstNow(),
     )
     .run();
+  return 'recorded';
+}
+
+/**
+ * 「記録してよい」「記録しない」の選択を日ごとに数える。
+ * どちらを選んだかの母数が同意率の分母になる。拒否した人の行動は
+ * 記録しないが、拒否したという選択自体は集計にだけ残す。
+ */
+export async function recordSiteConsentDecision(
+  db: D1Database,
+  lineAccountId: string,
+  decision: 'granted' | 'declined',
+): Promise<void> {
+  await incrementConsentCounter(db, lineAccountId, decision);
+}
+
+/** 同意の状況。管理画面に「同意した割合」と「数えなかった件数」を出すための数。 */
+export interface SiteConsentSummary {
+  /** 「記録してよい」を選んだ数 */
+  granted: number;
+  /** 「記録しない」を選んだ数 */
+  declined: number;
+  /** 同意がなくて記録しなかった閲覧・操作の件数 */
+  suppressed: number;
+  /** granted / (granted + declined)。誰も選んでいなければ null */
+  grantedRate: number | null;
+}
+
+export async function getSiteConsentSummary(
+  db: D1Database,
+  lineAccountId: string,
+): Promise<SiteConsentSummary> {
+  const row = await db
+    .prepare(
+      `SELECT COALESCE(SUM(suppressed), 0) AS suppressed,
+              COALESCE(SUM(granted), 0) AS granted,
+              COALESCE(SUM(declined), 0) AS declined
+         FROM site_consent_days
+        WHERE line_account_id = ?`,
+    )
+    .bind(lineAccountId)
+    .first<{ suppressed: number; granted: number; declined: number }>();
+  const granted = Number(row?.granted ?? 0);
+  const declined = Number(row?.declined ?? 0);
+  const decided = granted + declined;
+  return {
+    granted,
+    declined,
+    suppressed: Number(row?.suppressed ?? 0),
+    grantedRate: decided > 0 ? granted / decided : null,
+  };
 }
 
 /** ページ別の閲覧数。多い順。 */

@@ -15,7 +15,7 @@ import ActionMenu from '@/components/shared/action-menu'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
-import SearchField from '@/components/shared/search-field'
+import ListToolbar from '@/components/shared/list-toolbar'
 import FilterChip from '@/components/shared/filter-chip'
 import Pagination from '@/components/shared/pagination'
 import StatusBadge from '@/components/shared/status-badge'
@@ -469,8 +469,9 @@ export default function FormSubmissionsPage() {
   }, [loadError, loading, page, pageCount])
 
   return (
-    <div data-design-node="EMBIK">
-      <div data-design="Bar" className="mb-4 flex flex-wrap items-center justify-between gap-2">
+    <div data-design-node="EMBIK" className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <div data-design="Bar" className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap gap-2">
           <Button variant="primary" onClick={createDraft} disabled={creating}>
             {creating ? '下書きを作成中' : '＋ フォームを作る'}
@@ -506,76 +507,83 @@ export default function FormSubmissionsPage() {
         />
 
         <section className="min-w-0">
-          <div className="border-hairline rounded-card mb-3 flex flex-wrap items-center gap-2 border bg-white p-3">
-            <SearchField
-              value={query}
-              onChange={(value) => updateListState({ query: value, page: 1 })}
-              onClear={() => updateListState({ query: '', page: 1 })}
-              placeholder="フォーム名・質問文で検索"
-              aria-label="フォーム名・質問文で検索"
-              className="min-w-60 flex-1"
-            />
-            <Select
-              aria-label="並び順"
-              value={formSort}
-              options={[
-                { value: 'latest-answer', label: '最新の回答順' },
-                { value: 'answers', label: '回答が多い順' },
-                { value: 'updated', label: '更新が新しい順' },
-                { value: 'name', label: '名前順' },
-              ]}
-              onChange={(value) => updateListState({ sort: value as FormSort, page: 1 })}
-            />
-            <Select
-              aria-label="表示件数"
-              size="page-size"
-              value={String(pageSize)}
-              options={FORM_PAGE_SIZES.map((size) => ({ value: String(size), label: `${size}件表示` }))}
-              onChange={(value) => updateListState({ pageSize: Number(value), page: 1 })}
-            />
-          </div>
-
           {/*
-            ★V7：「保存した検索」と書いていたが、中身は状態の絞り込み（保存はできない）。
-            管理者確認は1行を占める大きなボタンだったので、絞り込みの右端へ寄せる。
+            ★V7 `Xn1Mz`：検索は幅320で1行目、2行目は左に絞り込み・
+            右端に並び順と表示件数。管理者確認の切り替えは2行目の右へ。
+            設計の Saved（絞り込み行）は共通 ListToolbar の2行目にいる。
+            印だけここに残し、設計との突き合わせを保つ（Bar の印は上の
+            作成行にある）。
           */}
-          <div data-design="Saved" className="mb-3 flex flex-wrap items-center gap-2">
-            <span className="text-xs text-ink-faint">絞り込み</span>
-            {([
-              ['all', 'すべて'],
-              ['published', '公開中'],
-              ['draft', '下書き'],
-              ['stored', '情報欄に保存している'],
-            ] as Array<[FormFilter, string]>).map(([value, label]) => (
-              <FilterChip key={value} selected={formFilter === value} onChange={() => updateListState({ filter: value, page: 1 })}>
-                {label}
-              </FilterChip>
-            ))}
-            <span className="ml-auto">
-              <FilterChip
-                selected={reviewMode}
-                onChange={(next) => { setReviewMode(next); setPage(1) }}
-              >
-                {reviewMode ? '通常の一覧に戻る' : '管理者確認（担当未割り当て）'}
-              </FilterChip>
-            </span>
+          <div data-design="Saved">
+          <ListToolbar
+            search={{
+              placeholder: 'フォーム名・質問文で検索',
+              value: query,
+              onChange: (value) => updateListState({ query: value, page: 1 }),
+            }}
+            filters={
+              <>
+                <span className="text-xs text-ink-faint">絞り込み</span>
+                {([
+                  ['all', 'すべて'],
+                  ['published', '公開中'],
+                  ['draft', '下書き'],
+                  ['stored', '情報欄に保存している'],
+                ] as Array<[FormFilter, string]>).map(([value, label]) => (
+                  <FilterChip key={value} selected={formFilter === value} onChange={() => updateListState({ filter: value, page: 1 })}>
+                    {label}
+                  </FilterChip>
+                ))}
+              </>
+            }
+            trailing={
+              <>
+                <Select
+                  aria-label="並び順"
+                  value={formSort}
+                  options={[
+                    { value: 'latest-answer', label: '最新の回答順' },
+                    { value: 'answers', label: '回答が多い順' },
+                    { value: 'updated', label: '更新が新しい順' },
+                    { value: 'name', label: '名前順' },
+                  ]}
+                  onChange={(value) => updateListState({ sort: value as FormSort, page: 1 })}
+                />
+                <Select
+                  aria-label="表示件数"
+                  size="page-size"
+                  value={String(pageSize)}
+                  options={FORM_PAGE_SIZES.map((size) => ({ value: String(size), label: `${size}件表示` }))}
+                  onChange={(value) => updateListState({ pageSize: Number(value), page: 1 })}
+                />
+                <FilterChip
+                  selected={reviewMode}
+                  onChange={(next) => { setReviewMode(next); setPage(1) }}
+                >
+                  {reviewMode ? '通常の一覧に戻る' : '管理者確認（担当未割り当て）'}
+                </FilterChip>
+              </>
+            }
+          />
           </div>
           {reviewMode && (
-            <div className="border-hairline rounded-card mb-3 border bg-white p-3 text-xs text-ink-secondary">
+            <div className="border-hairline rounded-card border bg-white p-3 text-xs text-ink-secondary">
               <p><span className="font-bold text-ink">管理者確認中のフォーム</span> — 担当アカウントが決まっていない旧フォームだけを出しています。公開URLは生きているため回答は入り続けます。</p>
               <p className="mt-1">担当の割り当ては後続の対応（#771）で行います。この画面では割り当て操作はできません。</p>
             </div>
           )}
 
-          {createError && <p className="mb-3 text-sm text-danger">{createError}</p>}
+          {createError && <p className="text-sm text-danger">{createError}</p>}
           {accountLoading ? (
           <ListState kind="loading" title="LINE公式アカウントを確認しています" />
         ) : !selectedAccountId ? (
-          <ListState
-            kind="empty"
-            title="LINE公式アカウントを選んでください"
-            description="上のアカウント切替から、回答フォームを使う公式アカウントを選びます。"
-          />
+          <div className="bg-canvas rounded-card border-hairline border">
+            <ListState
+              kind="empty"
+              title="LINE公式アカウントを選んでください"
+              description="上のアカウント切替から、回答フォームを使う公式アカウントを選びます。"
+            />
+          </div>
         ) : loading ? (
           <ListState
             kind="loading"
@@ -590,35 +598,43 @@ export default function FormSubmissionsPage() {
             onRetry={() => void loadForms()}
           />
         ) : reviewMode && reviewForbidden ? (
-          <ListState
-            kind="empty"
-            title="確認できる未割り当てフォームはありません"
-            description="管理者確認は既定テナントの管理者のみ利用できます。"
-          />
+          <div className="bg-canvas rounded-card border-hairline border">
+            <ListState
+              kind="empty"
+              title="確認できる未割り当てフォームはありません"
+              description="管理者確認は既定テナントの管理者のみ利用できます。"
+            />
+          </div>
         ) : reviewMode && forms.length === 0 ? (
-          <ListState
-            kind="empty"
-            title="担当未割り当てのフォームはありません"
-            description="担当の決まっていない旧フォームはここに出ます。"
-          />
+          <div className="bg-canvas rounded-card border-hairline border">
+            <ListState
+              kind="empty"
+              title="担当未割り当てのフォームはありません"
+              description="担当の決まっていない旧フォームはここに出ます。"
+            />
+          </div>
         ) : folderTotal === 0 ? (
-          <ListState
-            kind="empty"
-            title="まだフォームがありません"
-            description="最初の1つを作ると、集まった回答もここから見られます。"
+          <div className="bg-canvas rounded-card border-hairline border">
+            <ListState
+              kind="empty"
+              title="まだフォームがありません"
+              description="最初の1つを作ると、集まった回答もここから見られます。"
             action={(
               <Button variant="primary" onClick={createDraft} disabled={creating}>
                 {creating ? '下書きを作成中' : '＋ フォームを作る'}
               </Button>
             )}
-          />
+            />
+          </div>
         ) : (
           listTotal === 0 ? (
-            <ListState
-              kind="empty"
-              title="条件に合うフォームはありません"
-              description="検索語や絞り込み条件を変えてください。"
-            />
+            <div className="bg-canvas rounded-card border-hairline border">
+              <ListState
+                kind="empty"
+                title="条件に合うフォームはありません"
+                description="検索語や絞り込み条件を変えてください。"
+              />
+            </div>
           ) : (
           <div className="border-hairline rounded-card overflow-hidden border bg-white">
             {/*

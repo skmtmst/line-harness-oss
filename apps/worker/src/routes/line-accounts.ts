@@ -15,6 +15,9 @@ import {
   setDefaultLineAccount,
   archiveLineAccount,
   restoreLineAccount,
+  deactivateLineAccount,
+  activateLineAccount,
+  listSkippedDeliveries,
   getLineAccountConnectionChecksByIdempotencyKey,
   saveLineAccountConnectionChecks,
   LineAccountRevisionConflictError,
@@ -28,6 +31,8 @@ import type {
 } from '@line-crm/db';
 import { CredentialEncryptionKeyError } from '@line-crm/db';
 import { requireRole } from '../middleware/role-guard.js';
+import { sensitiveStepUpSatisfied, stepUpRequiredResponse } from '../lib/step-up.js';
+import { auditLog } from '../lib/audit-log.js';
 import { fetchBotProfile, type BotProfile } from '../lib/bot-profile.js';
 import {
   detectFollowerImportCapability,
@@ -107,6 +112,12 @@ function serializeLineAccount(row: DbLineAccount) {
     isActive: Boolean(row.is_active),
     isDefault: Boolean(row.is_default),
     archivedAt: row.archived_at ?? null,
+    // 止めた理由。動いていれば null（v6-33 §10-1）。
+    inactiveReason: row.inactive_reason ?? null,
+    inactiveReasonDetail: row.inactive_reason_detail ?? null,
+    inactivatedAt: row.inactivated_at ?? null,
+    lastWebhookReceivedAt: row.last_webhook_received_at ?? null,
+    webhookSilenceExempt: Boolean(row.webhook_silence_exempt ?? 0),
     country: row.country,
     role: row.role,
     timezone: row.timezone ?? 'Asia/Tokyo',
@@ -137,7 +148,9 @@ function serializeLineAccount(row: DbLineAccount) {
     channelSecretConfigured: Boolean(row.channel_secret_encrypted || row.channel_secret),
     channelSecretLast4: row.channel_secret_last4 ?? null,
     channelSecretUpdatedAt: row.channel_secret_updated_at ?? null,
-    loginChannelSecretConfigured: Boolean(row.login_channel_secret),
+    loginChannelSecretConfigured: Boolean(
+      row.login_channel_secret_encrypted || row.login_channel_secret,
+    ),
     loginChannelSecretLast4: row.login_channel_secret_last4 ?? null,
     loginChannelSecretUpdatedAt: row.login_channel_secret_updated_at ?? null,
   };
@@ -623,6 +636,11 @@ async function archiveAccountResponse(
   if (!account) {
     return c.json({ success: false, error: 'LINE account not found' }, 404);
   }
+  // アカウントの停止・削除は大事な操作（V）。セッションの10分窓か、
+  // この操作専用の1回限り grant が必要。
+  if (!await sensitiveStepUpSatisfied(c, 'line_account.archive')) {
+    return stepUpRequiredResponse(c, 'アカウントの停止・削除には本人確認が必要です');
+  }
   if (account.archived_at) {
     return c.json({ success: false, error: 'ACCOUNT_ARCHIVED' }, 409);
   }
@@ -631,6 +649,8 @@ async function archiveAccountResponse(
     return c.json({
       success: false,
       error: 'LINE_ACCOUNT_ARCHIVE_BLOCKED',
+      // `data` は ApiError.data へ載る口。画面は blockers を理由の言葉に写す。
+      data: { blockers },
       details: { blockers },
     }, 409);
   }
@@ -661,6 +681,10 @@ lineAccounts.post('/api/line-accounts/:id/archive', requireRole('owner'), async 
 
 lineAccounts.post('/api/line-accounts/:id/restore', requireRole('owner'), async (c) => {
   try {
+    // 止めたアカウントの再有効化は接続の変更（V）。停止・削除と同じ確認を求める。
+    if (!await sensitiveStepUpSatisfied(c, 'line_account.credentials')) {
+      return stepUpRequiredResponse(c, 'アカウントの再開には本人確認が必要です');
+    }
     const id = c.req.param('id')!;
     const account = await getAuthorizedLineAccount(c, id);
     if (!account) {
@@ -675,6 +699,158 @@ lineAccounts.post('/api/line-accounts/:id/restore', requireRole('owner'), async 
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
+
+/**
+ * 送受信を止める（v6-33 §10-1、X-1）。
+ * 理由は必須。止めている間の受信は署名検証から外れ、予約配信は
+ * 「止めていたので送らなかった」として一覧に残る。
+ */
+lineAccounts.post('/api/line-accounts/:id/deactivate', requireRole('owner', 'admin'), async (c) => {
+  try {
+    if (!await sensitiveStepUpSatisfied(c, 'line_account.credentials')) {
+      return stepUpRequiredResponse(c, 'アカウントの停止には本人確認が必要です');
+    }
+    const id = c.req.param('id')!;
+    const account = await getAuthorizedLineAccount(c, id);
+    if (!account) return c.json({ success: false, error: 'LINE account not found' }, 404);
+    if (account.archived_at) {
+      return c.json({ success: false, error: 'ACCOUNT_ARCHIVED' }, 409);
+    }
+
+    const body = await c.req
+      .json<{ reason?: unknown }>()
+      .catch(() => ({} as { reason?: unknown }));
+    const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
+    if (!reason) {
+      return c.json({ success: false, error: 'reason is required' }, 422);
+    }
+    if (reason.length > 500) {
+      return c.json({ success: false, error: 'reason must be 500 characters or fewer' }, 422);
+    }
+    if (!account.is_active) {
+      return c.json({ success: true, data: serializeLineAccount(account) });
+    }
+
+    const updated = await deactivateLineAccount(c.env.DB, id, {
+      reason: 'manual',
+      detail: reason,
+    });
+    auditLog(c, 'line_account.deactivate', { id, kind: 'line_account' }, { lineAccountId: id });
+    return c.json({ success: true, data: serializeLineAccount(updated!) });
+  } catch (err) {
+    const conflict = lifecycleConflict(err);
+    if (conflict) return c.json(conflict, 409);
+    console.error('POST /api/line-accounts/:id/deactivate error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/**
+ * 送受信を再開する（v6-33 §10-2、X-1）。
+ * 理由は必須。再開の前に接続を確かめ、LINE との接続（bot_info）が
+ * 通らないときは再開しない。確かめた結果は台帳にも残す。
+ */
+lineAccounts.post('/api/line-accounts/:id/activate', requireRole('owner', 'admin'), async (c) => {
+  try {
+    if (!await sensitiveStepUpSatisfied(c, 'line_account.credentials')) {
+      return stepUpRequiredResponse(c, 'アカウントの再開には本人確認が必要です');
+    }
+    const id = c.req.param('id')!;
+    const account = await getAuthorizedLineAccount(c, id);
+    if (!account) return c.json({ success: false, error: 'LINE account not found' }, 404);
+    if (account.archived_at) {
+      return c.json({ success: false, error: 'ACCOUNT_ARCHIVED' }, 409);
+    }
+
+    const body = await c.req
+      .json<{ reason?: unknown }>()
+      .catch(() => ({} as { reason?: unknown }));
+    const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
+    if (!reason) {
+      return c.json({ success: false, error: 'reason is required' }, 422);
+    }
+    if (reason.length > 500) {
+      return c.json({ success: false, error: 'reason must be 500 characters or fewer' }, 422);
+    }
+
+    // 再開の前に接続を確かめる。bot_info が通らなければ再開しない。
+    const urls = publicAccountUrls(c, account.liff_id);
+    const collected = await collectConnectionChecks(account, urls.webhook, urls.liffEndpoint);
+    const botInfo = collected.checks.find((check) => check.kind === 'bot_info');
+    const connectionOk = botInfo?.result === 'ok';
+    try {
+      await saveLineAccountConnectionChecks(c.env.DB, {
+        lineAccountId: id,
+        expectedRevision: account.revision ?? 1,
+        checkedBy: c.get('staff').id,
+        checkedAt: jstNow(),
+        correlationId: c.req.header('X-Correlation-ID')?.trim() || crypto.randomUUID(),
+        idempotencyKey: `activate-${crypto.randomUUID()}`,
+        checks: collected.checks,
+      });
+    } catch (checkError) {
+      // 台帳への記録が失敗しても再開判定は止めない（検査自体は済んでいる）。
+      console.error('activate connection-check save failed:', checkError);
+    }
+    if (!connectionOk) {
+      return c.json(
+        {
+          success: false,
+          error: 'LINE との接続を確認できなかったため、まだ再開できません',
+          checks: collected.checks.map((check) => ({
+            kind: check.kind,
+            result: check.result,
+            expectedUrl: check.expectedUrl ?? null,
+            registeredUrl: check.registeredUrl ?? null,
+            webhookActive: check.webhookActive ?? null,
+            httpStatus: check.httpStatus ?? null,
+          })),
+        },
+        422,
+      );
+    }
+
+    const updated = await activateLineAccount(c.env.DB, id);
+    auditLog(c, 'line_account.activate', { id, kind: 'line_account' }, { lineAccountId: id });
+    return c.json({ success: true, data: serializeLineAccount(updated!) });
+  } catch (err) {
+    const conflict = lifecycleConflict(err);
+    if (conflict) return c.json(conflict, 409);
+    console.error('POST /api/line-accounts/:id/activate error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/**
+ * 「止めていたので送らなかった」の一覧（v6-33 §10-2）。
+ * 再開の画面で運用者が確認し、再実行は別途選ぶ。
+ */
+lineAccounts.get(
+  '/api/line-accounts/:id/skipped-deliveries',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    try {
+      const id = c.req.param('id')!;
+      const account = await getAuthorizedLineAccount(c, id);
+      if (!account) return c.json({ success: false, error: 'LINE account not found' }, 404);
+      const rows = await listSkippedDeliveries(c.env.DB, id);
+      return c.json({
+        success: true,
+        data: rows.map((row) => ({
+          id: row.id,
+          kind: row.kind,
+          refId: row.ref_id,
+          title: row.title,
+          reason: row.reason,
+          skippedAt: row.skipped_at,
+        })),
+      });
+    } catch (err) {
+      console.error('GET /api/line-accounts/:id/skipped-deliveries error:', err);
+      return c.json({ success: false, error: 'Internal server error' }, 500);
+    }
+  },
+);
 
 // GET /api/line-accounts/:id - get single without persisted secret values
 lineAccounts.get('/api/line-accounts/:id', async (c) => {
@@ -1034,6 +1210,10 @@ lineAccounts.post('/api/line-accounts/connect/check', requireRole('owner'), asyn
 
 // UI用の自動接続・保存。5段目が完了しなければ作成途中の行を必ず巻き戻す。
 lineAccounts.post('/api/line-accounts/connect', requireRole('owner'), async (c) => {
+  // LINE の接続（新しいアカウントの接続）は大事な操作（V）。
+  if (!await sensitiveStepUpSatisfied(c, 'line_account.connect')) {
+    return stepUpRequiredResponse(c, 'LINEの接続には本人確認が必要です');
+  }
   const parsed = await readConnectRequest(c);
   if (!parsed.ok) return c.json({ success: false, error: parsed.error }, 422);
   const baseUrl = (c.env.WORKER_PUBLIC_URL || c.env.WORKER_URL || new URL(c.req.url).origin).replace(/\/$/, '');
@@ -1139,6 +1319,10 @@ lineAccounts.post('/api/line-accounts/connect', requireRole('owner'), async (c) 
 
 // POST /api/line-accounts - create
 lineAccounts.post('/api/line-accounts', requireRole('owner'), async (c) => {
+  // LINE の接続の追加は大事な操作（V）。
+  if (!await sensitiveStepUpSatisfied(c, 'line_account.connect')) {
+    return stepUpRequiredResponse(c, 'LINEの接続には本人確認が必要です');
+  }
   try {
     let body: {
       channelId: string;
@@ -1496,8 +1680,12 @@ lineAccounts.patch(
         iconUrl?: string | null;
         officialProfileUrl?: string | null;
       }>();
-      if (body.isActive === false && currentAccount.is_default) {
-        return c.json({ success: false, error: 'ACCOUNT_DEFAULT' }, 409);
+      // 送受信の停止・再開は理由が必須（X-1）。この窓口では受けない。
+      if (body.isActive !== undefined && Boolean(currentAccount.is_active) !== body.isActive) {
+        return c.json({
+          success: false,
+          error: '送受信の停止・再開は理由が必要です。/deactivate・/activate を使ってください',
+        }, 422);
       }
 
       // Normalize: trim non-empty strings; treat empty/whitespace-only as null.
@@ -1540,6 +1728,16 @@ lineAccounts.patch(
       const touchesLogin =
         loginChannelId !== undefined || loginChannelSecret !== undefined;
       const touchesLoginOrLiff = touchesLogin || liffId !== undefined;
+      /*
+       * Login鍵の書き換え・送受信の有効/停止は大事な操作（V）。
+       * 名前やOG情報だけの更新は対象外なので、触った項目で分ける。
+       */
+      if (
+        (touchesLoginOrLiff || body.isActive !== undefined)
+        && !await sensitiveStepUpSatisfied(c, 'line_account.credentials')
+      ) {
+        return stepUpRequiredResponse(c, '接続情報・有効状態の変更には本人確認が必要です');
+      }
       if (touchesLoginOrLiff) {
         if (touchesLogin) {
           const pairError = validateLoginChannelPair(
@@ -1653,8 +1851,12 @@ lineAccounts.put('/api/line-accounts/:id', requireRole('owner'), async (c) => {
       ogDefaultDescription?: string | null;
       officialProfileUrl?: string | null;
     }>();
-    if (body.isActive === false && currentAccount.is_default) {
-      return c.json({ success: false, error: 'ACCOUNT_DEFAULT' }, 409);
+    // 送受信の停止・再開は理由が必須（X-1）。この窓口では受けない。
+    if (body.isActive !== undefined && Boolean(currentAccount.is_active) !== body.isActive) {
+      return c.json({
+        success: false,
+        error: '送受信の停止・再開は理由が必要です。/deactivate・/activate を使ってください',
+      }, 422);
     }
 
     const country = normalizeOptionalString(body.country);
@@ -1701,6 +1903,11 @@ lineAccounts.put('/api/line-accounts/:id', requireRole('owner'), async (c) => {
       liffId !== undefined ||
       body.isActive !== undefined;
     const officialProfileUrlTouched = officialProfileUrl.value !== undefined;
+
+    // 鍵・トークンの書き換え（接続情報・有効/無効の切替）は大事な操作（V）。
+    if (credentialsTouched && !await sensitiveStepUpSatisfied(c, 'line_account.credentials')) {
+      return stepUpRequiredResponse(c, '接続情報の変更には本人確認が必要です');
+    }
 
     let updated = credentialsTouched
       ? await updateLineAccount(c.env.DB, id, {

@@ -32,7 +32,7 @@ import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import Pagination from '@/components/shared/pagination'
-import SearchField from '@/components/shared/search-field'
+import ListToolbar from '@/components/shared/list-toolbar'
 import Select from '@/components/shared/select'
 
 interface MessageTemplate {
@@ -737,11 +737,12 @@ function InflowLinksPageInner({
   }
 
   return (
-    <div>
-      <p data-design="Head" className="mb-4 text-sm text-ink-faint">
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <p data-design="Head" className="text-sm text-ink-faint">
         どこから友だちが来たかを計測します。発行したURLごとにクリック・友だち追加・その後の成果まで追えます。
       </p>
-      <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div data-design="KPIs" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard
           title="流入元"
           value={routeCountAvailable ? accountRouteCount : null}
@@ -793,7 +794,7 @@ function InflowLinksPageInner({
         毎回読むものではないので、開閉する欄に畳む。表と数字を先に見せる。
         未計測の注文を0件と読ませないための件数は、開けば必ず読める。
       */}
-      <Disclosure size="compact" className="mb-4" title="数え方と経路の分かり方" hint="累計・はじめて来た経路に数えます">
+      <Disclosure size="compact" title="数え方と経路の分かり方" hint="累計・はじめて来た経路に数えます">
         <div className="text-ink-secondary space-y-2 text-xs leading-relaxed">
           <p>        LINEの「友だち追加」だけでは、その人がどこから来たのかは分かりません。
         ここで発行したURLをいったん通ってもらうことで、はじめて経路が分かります。QRコードも同じURLから作れます。
@@ -807,9 +808,9 @@ function InflowLinksPageInner({
         </div>
       </Disclosure>
 
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2"><Button href="/inflow-links/new" variant="primary">＋ 流入リンクを作る</Button><div className="flex gap-2"><Button variant="secondary" onClick={() => setBulkOpen(true)}>まとめて操作{selectedRouteIds.size > 0 ? `（${selectedRouteIds.size}件選択中）` : ''}</Button></div></div>
+      <div className="flex flex-wrap items-center justify-between gap-2"><Button href="/inflow-links/new" variant="primary">＋ 流入リンクを作る</Button><div className="flex gap-2"><Button variant="secondary" onClick={() => setBulkOpen(true)}>まとめて操作{selectedRouteIds.size > 0 ? `（${selectedRouteIds.size}件選択中）` : ''}</Button></div></div>
 
-      <div style={FOLDER_RAIL_STYLE} className="grid gap-5 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
+      <div style={FOLDER_RAIL_STYLE} className="grid gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
         <FolderPanel
           total={`${accountFilteredRows.length}件`}
           activeId={selectedGenre}
@@ -827,80 +828,81 @@ function InflowLinksPageInner({
           ]}
         />
 
-        <section className="min-w-0">
-          <div className="mb-3 flex flex-col gap-3 rounded-xl border border-hairline bg-canvas p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+        <section className="flex min-w-0 flex-col gap-4">
+          <div className="flex flex-col gap-3 rounded-xl border border-hairline bg-canvas p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
             <div>
               <p className="text-xs font-medium text-ink-faint">選択中のフォルダ</p>
               <h2 className="mt-0.5 text-lg font-bold text-ink">{selectedGenreLabel || 'フォルダを選んでください'}</h2>
               <p className="text-xs text-ink-faint">{genreRows.length} リンク</p>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <SearchField
-                value={search}
-                onChange={(value) => {
-                  setSearch(value)
-                  setPage(1)
-                }}
-                onClear={() => {
-                  setSearch('')
-                  setPage(1)
-                }}
-                placeholder="流入元の名前・REFで検索"
-                aria-label="流入元の名前・REFで検索"
-                className="w-full sm:w-64"
-              />
-              {/* ★V7：「並び順：友だち追加が多い順」が標準幅では「友だち…」で切れるので、この欄だけ広げる。 */}
-              <div className="w-full sm:w-64">
+          </div>
+          {/*
+            ★V7 `Xn1Mz`：検索は幅320で1行目、2行目は左に絞り込み・
+            右端に並び順と表示件数。
+            #734: 「このフォルダに流入リンクをつくる」「CSVで書き出す」の
+            2つ目は置かない。同じ意図の主操作は画面上部の1系統に揃える
+            （新規作成はフォルダ選択を持つ /inflow-links/new が正規口）。
+          */}
+          <ListToolbar
+            search={{
+              placeholder: '流入元の名前・REFで検索',
+              value: search,
+              onChange: (value) => {
+                setSearch(value)
+                setPage(1)
+              },
+            }}
+            filters={
+              <div className="flex flex-wrap items-center gap-2" aria-label="流入経路の絞り込み">
+                {([
+                  ['all', 'すべて', genreRows.length],
+                  ['has-friends', '友だち追加あり', genreRows.filter((row) => (row.stats?.friendCount ?? 0) > 0).length],
+                  ['no-friends', '友だち追加なし', genreRows.filter((row) => (row.stats?.friendCount ?? 0) === 0).length],
+                  ['unconfigured', '動きが未設定', genreRows.filter((row) => !row.scenarioId && !row.tagId && row.source === 'entry_route').length],
+                ] as Array<[RouteFilter, string, number]>).map(([value, label, total]) => (
+                  <FilterChip
+                    key={value}
+                    selected={filter === value}
+                    onChange={() => {
+                      setFilter(value)
+                      setPage(1)
+                    }}
+                    count={total}
+                  >
+                    {label}
+                  </FilterChip>
+                ))}
+              </div>
+            }
+            trailing={
+              <>
+                {/* ★V7：「並び順：友だち追加が多い順」が標準幅では「友だち…」で切れるので、この欄だけ広げる。 */}
+                <div className="w-full sm:w-64">
+                  <Select
+                    aria-label="並び順"
+                    label="並び順"
+                    size="full"
+                    value={sort}
+                    options={SORT_OPTIONS}
+                    onChange={(value) => {
+                      setSort(value as RouteSort)
+                      setPage(1)
+                    }}
+                  />
+                </div>
                 <Select
-                  aria-label="並び順"
-                  label="並び順"
-                  size="full"
-                  value={sort}
-                  options={SORT_OPTIONS}
+                  aria-label="表示件数"
+                  value={String(pageSize)}
+                  options={PAGE_SIZE_OPTIONS}
                   onChange={(value) => {
-                    setSort(value as RouteSort)
+                    setPageSize(Number(value))
                     setPage(1)
                   }}
+                  size="page-size"
                 />
-              </div>
-              <Select
-                aria-label="表示件数"
-                value={String(pageSize)}
-                options={PAGE_SIZE_OPTIONS}
-                onChange={(value) => {
-                  setPageSize(Number(value))
-                  setPage(1)
-                }}
-                size="page-size"
-              />
-              {/*
-                #734: 「このフォルダに流入リンクをつくる」「CSVで書き出す」の
-                2つ目は置かない。同じ意図の主操作は画面上部の1系統に揃える
-                （新規作成はフォルダ選択を持つ /inflow-links/new が正規口）。
-              */}
-            </div>
-          </div>
-
-          <div className="mb-3 flex flex-wrap items-center gap-2" aria-label="流入経路の絞り込み">
-            {([
-              ['all', 'すべて', genreRows.length],
-              ['has-friends', '友だち追加あり', genreRows.filter((row) => (row.stats?.friendCount ?? 0) > 0).length],
-              ['no-friends', '友だち追加なし', genreRows.filter((row) => (row.stats?.friendCount ?? 0) === 0).length],
-              ['unconfigured', '動きが未設定', genreRows.filter((row) => !row.scenarioId && !row.tagId && row.source === 'entry_route').length],
-            ] as Array<[RouteFilter, string, number]>).map(([value, label, total]) => (
-              <FilterChip
-                key={value}
-                selected={filter === value}
-                onChange={() => {
-                  setFilter(value)
-                  setPage(1)
-                }}
-                count={total}
-              >
-                {label}
-              </FilterChip>
-            ))}
-          </div>
+              </>
+            }
+          />
 
 
       {/*
@@ -1222,6 +1224,7 @@ function InflowLinksPageInner({
           tags={tags}
           existingGenres={genreOptions}
           poolMemberNames={poolMemberNames}
+          accountId={selectedAccountId}
           onClose={() => setEditing(null)}
           onSaved={(savedRoute, created) => {
             setEditing(null)

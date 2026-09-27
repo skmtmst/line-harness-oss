@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { Trash2 } from 'lucide-react'
+import { RowActions } from '@/components/shared/row-actions'
 import ReorderGrip from './reorder-grip'
 import { mergeVisibleOrder } from './reorder-utils'
 import type { SavedSearch, SavedSearchCondition, Tag } from '@line-crm/shared'
@@ -11,7 +11,7 @@ import { useAccount } from '@/contexts/account-context'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
 import Notice from '@/components/shared/notice'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { describeSavedCondition, type SavedSearchConditionLabels } from '@/components/friends/saved-search-utils'
@@ -233,10 +233,10 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
   return (
     <div data-design-node="QKx8Q">
       <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <SummaryCard title="保存した条件" value={kpis.total} unit="件" detail="上限50件" loading={loading} variant="v6" />
-        <SummaryCard title="配信で使用中" value={kpis.usedInBroadcasts} unit="件" detail="変更時は影響確認" loading={loading} variant="v6" />
-        <SummaryCard title="該当者0人" value={kpis.zeroMatches} unit="件" detail="条件の見直し候補" loading={loading} variant="v6" />
-        <SummaryCard title="今月の呼び出し" value={kpis.callsThisMonth} unit="回" detail={kpis.callsThisMonth === null ? '呼び出し記録は未接続' : '配信・自動処理'} loading={loading} variant="v6" />
+        <KpiCard title="保存した条件" value={kpis.total} unit="件" detail="上限50件" loading={loading} variant="v6" />
+        <KpiCard title="配信で使用中" value={kpis.usedInBroadcasts} unit="件" detail="変更時は影響確認" loading={loading} variant="v6" />
+        <KpiCard title="該当者0人" value={kpis.zeroMatches} unit="件" detail="条件の見直し候補" loading={loading} variant="v6" />
+        <KpiCard title="今月の呼び出し" value={kpis.callsThisMonth} unit="回" detail={kpis.callsThisMonth === null ? '呼び出し記録は未接続' : '配信・自動処理'} loading={loading} variant="v6" />
       </div>
 
       {/*
@@ -440,18 +440,22 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
                   <p className="text-ink-faint">{new Date(search.updatedAt ?? search.createdAt).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
                 </td>
                 <td className="px-3 py-3 align-top">
-                  <div className="flex items-center gap-2">
-                    {search.lineAccountId ? <Link href={`/friends?savedSearch=${search.id}`} className="whitespace-nowrap text-xs font-semibold text-action hover:underline">友だち一覧へ</Link> : null}
-                  <button
-                    onClick={() => remove(search)}
-                    disabled={deleteDisabled}
-                    aria-label={`${search.name}を削除`}
-                    title={deleteTitle}
-                    className="rounded-md p-1 text-danger hover:bg-danger-bg disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    <Trash2 aria-hidden="true" size={16} />
-                  </button>
-                  </div>
+                  {/*
+                    ★V7 `Xn1Mz`：行の操作は「主な1つ＋…」。削除はメニューの
+                    中の危ない操作へ。ゴミ箱の印だけのボタンは行に直に置かない。
+                    押せない理由（使用中・未確認など）はメニューに出す。
+                  */}
+                  <RowActions
+                    subjectName={search.name}
+                    detail={search.lineAccountId ? { label: '友だち一覧へ', href: `/friends?savedSearch=${search.id}` } : undefined}
+                    destructiveItem={{
+                      id: 'delete',
+                      label: '削除する',
+                      disabled: deleteDisabled,
+                      disabledReason: deleteDisabled ? deleteTitle : undefined,
+                      onSelect: () => remove(search),
+                    }}
+                  />
                 </td>
               </tr>
             )
@@ -500,16 +504,21 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-2 pt-1">
-                      {search.lineAccountId ? <Link href={`/friends?savedSearch=${search.id}`} className="whitespace-nowrap text-xs font-semibold text-action hover:underline">一覧へ</Link> : null}
-                      <button
-                        onClick={() => remove(search)}
-                        disabled={deleteDisabled}
-                        aria-label={`${search.name}を削除`}
-                        title={deleteTitle}
-                        className="rounded-md p-1 text-danger hover:bg-danger-bg disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        <Trash2 aria-hidden="true" size={16} />
-                      </button>
+                      {/*
+                        ★V7 `Xn1Mz`：行の操作は「主な1つ＋…」。削除はメニューの
+                        中の危ない操作へ。ゴミ箱の印だけのボタンは行に直に置かない。
+                      */}
+                      <RowActions
+                        subjectName={search.name}
+                        detail={search.lineAccountId ? { label: '一覧へ', href: `/friends?savedSearch=${search.id}` } : undefined}
+                        destructiveItem={{
+                          id: 'delete',
+                          label: '削除する',
+                          disabled: deleteDisabled,
+                          disabledReason: deleteDisabled ? deleteTitle : undefined,
+                          onSelect: () => remove(search),
+                        }}
+                      />
                     </div>
                   </div>
                 </li>

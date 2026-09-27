@@ -360,15 +360,90 @@ export async function createAdminSession(
   tokenHash: string,
   staffId: string,
   expiresAt: string,
-  device: { userAgent?: string | null; ipPrefix?: string | null } = {},
+  device: { userAgent?: string | null; ipPrefix?: string | null; deviceHash?: string | null; unfamiliarAt?: string | null } = {},
 ): Promise<void> {
   await db
     .prepare(
-      `INSERT INTO admin_sessions (token_hash, staff_id, expires_at, user_agent, ip_prefix)
-       VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO admin_sessions (token_hash, staff_id, expires_at, user_agent, ip_prefix, device_hash, unfamiliar_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
     )
-    .bind(tokenHash, staffId, expiresAt, device.userAgent ?? null, device.ipPrefix ?? null)
+    .bind(tokenHash, staffId, expiresAt, device.userAgent ?? null, device.ipPrefix ?? null, device.deviceHash ?? null, device.unfamiliarAt ?? null)
     .run();
+}
+
+/** V: 大事な操作の再確認・いつもと違うログインで読み書きするセッション本体。 */
+export interface AdminSessionSecurity {
+  token_hash: string;
+  staff_id: string;
+  created_at: string;
+  expires_at: string;
+  step_up_at: string | null;
+  device_hash: string | null;
+  ip_prefix: string | null;
+  unfamiliar_at: string | null;
+}
+
+export async function getAdminSessionByTokenHash(
+  db: D1Database,
+  tokenHash: string,
+): Promise<AdminSessionSecurity | null> {
+  return db
+    .prepare(
+      `SELECT token_hash, staff_id, created_at, expires_at, step_up_at, device_hash, ip_prefix, unfamiliar_at
+       FROM admin_sessions
+       WHERE token_hash = ?`,
+    )
+    .bind(tokenHash)
+    .first<AdminSessionSecurity>();
+}
+
+/** 再確認（step-up）に成功した時刻をセッションへ刻む。APIキー経路は行が無いので何もしない。 */
+export async function markAdminSessionStepUp(
+  db: D1Database,
+  tokenHash: string,
+  stepUpAt: string,
+): Promise<void> {
+  await db
+    .prepare('UPDATE admin_sessions SET step_up_at = ? WHERE token_hash = ?')
+    .bind(stepUpAt, tokenHash)
+    .run();
+}
+
+/**
+ * 過去に同じ端末か同じ場所から入った形跡があるか。
+ *
+ * 端末（device_hash）と場所（ip_prefix）は片方しか残っていない行もあるため、
+ * 「比べられる側が存在する」信号ごとに照合する。判断材料がまだ1件も無い
+ * 初回ログインは比較対象がないので unfamiliar にしない（導入直後の全員通知を
+ * 避ける狙いもある）。
+ */
+export async function adminSessionFamiliarity(
+  db: D1Database,
+  staffId: string,
+  input: { deviceHash: string | null; ipPrefix: string | null },
+): Promise<{ hasBaseline: boolean; deviceKnown: boolean; ipKnown: boolean }> {
+  const rows = await db
+    .prepare(
+      `SELECT
+         COUNT(*) AS baseline_count,
+         MAX(CASE WHEN device_hash IS NOT NULL AND device_hash = ? THEN 1 ELSE 0 END) AS device_known,
+         MAX(CASE WHEN ip_prefix IS NOT NULL AND ip_prefix = ? THEN 1 ELSE 0 END) AS ip_known,
+         MAX(CASE WHEN device_hash IS NOT NULL THEN 1 ELSE 0 END) AS has_device_data
+       FROM admin_sessions
+       WHERE staff_id = ?`,
+    )
+    .bind(input.deviceHash ?? '', input.ipPrefix ?? '', staffId)
+    .first<{ baseline_count: number; device_known: number; ip_known: number; has_device_data: number }>();
+  const hasBaseline = Number(rows?.baseline_count ?? 0) > 0;
+  const hasDeviceData = Number(rows?.has_device_data ?? 0) > 0;
+  return {
+    hasBaseline,
+    // 端末は device_hash が取れるようになってから照合する。過去に1件も
+    // 記録が無い間は「初めて」と断定しない。
+    deviceKnown: !input.deviceHash || !hasDeviceData || Number(rows?.device_known ?? 0) > 0,
+    // 場所は ip_prefix が昔から記録されているので、そのまま照合する。
+    ipKnown: !input.ipPrefix || Number(rows?.ip_known ?? 0) > 0,
+  };
 }
 
 /** 本人のセッション一覧用。token_hash は漏れても認証に使えない指紋として返す。 */

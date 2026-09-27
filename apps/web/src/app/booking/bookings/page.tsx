@@ -8,6 +8,7 @@ import { api, bookingApi, type BookingAdminDetail, type BookingMenu, type Bookin
 import { useAccount } from '@/contexts/account-context'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Button from '@/components/shared/button'
+import ListToolbar from '@/components/shared/list-toolbar'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
@@ -622,14 +623,14 @@ export default function BookingsPage() {
 
   const pageHead = (
     <>
-      <div data-design="Toolbar" className="mb-2 flex flex-wrap items-center justify-between gap-3">
+      <div data-design="Toolbar" className="flex flex-wrap items-center justify-between gap-3">
         <nav className="text-ink-faint text-xs" aria-label="パンくず">
           <span>予約</span>
           <span className="mx-1.5">/</span>
           <span>予約管理</span>
         </nav>
       </div>
-      <nav aria-label="予約の表示" className="border-hairline mb-4 flex items-center gap-7 border-b">
+      <nav aria-label="予約の表示" className="border-hairline flex items-center gap-7 border-b">
         {/*
           ★V7：集計が取れていない間、タブの件数に 0 を出さない。件数は出さない。
         */}
@@ -694,9 +695,10 @@ export default function BookingsPage() {
     </>
   )
 
+  {/* 帯同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
   if (view === 'day' || view === 'week') {
     return (
-      <div>
+      <div className="flex flex-col gap-4">
         {pageHead}
         {createRow}
         {/*
@@ -704,14 +706,12 @@ export default function BookingsPage() {
           出す（#634 の読み直す口は保つ）。一覧が読めている間はカレンダーを出す。
         */}
         {error ? (
-          <div className="mb-4">
-            <ListState
-              kind="error"
-              title="予約を読み込めませんでした"
-              description="通信が切れたか、サーバが応えませんでした。登録した内容は消えていません。"
-              onRetry={() => void load()}
-            />
-          </div>
+          <ListState
+            kind="error"
+            title="予約を読み込めませんでした"
+            description="通信が切れたか、サーバが応えませんでした。登録した内容は消えていません。"
+            onRetry={() => void load()}
+          />
         ) : (
           <BookingCalendar
             mode={view}
@@ -737,7 +737,7 @@ export default function BookingsPage() {
   }
 
   return (
-    <div>
+    <div className="flex flex-col gap-4">
       {pageHead}
 
       {/*
@@ -748,7 +748,7 @@ export default function BookingsPage() {
       {summaryError && (
         // ★V7 `x63W5x`：補助のデータ（集計）だけ取れないときは、その場所に
         // 小さく1行だけ。一覧はそのまま使える。文言は契約試験が守る。
-        <p className="text-ink-secondary mb-4 text-xs" role="status">
+        <p className="text-ink-secondary text-xs" role="status">
           集計を読み込めませんでした。一覧はそのまま使えます。
           <button type="button" className="text-action ml-2 font-semibold hover:underline" onClick={() => setSummarySeq((n) => n + 1)}>もう一度読み込む</button>
         </p>
@@ -758,7 +758,7 @@ export default function BookingsPage() {
         ★V7 `x63W5x`：取れない KPI は「—」。読み込み中は「読み込んでいます」、
         失敗は「読み込めませんでした」と言い分け、0（本当に0件）と混ぜない。
       */}
-      <div data-design="KPIs" className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
+      <div data-design="KPIs" className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <Kpi
           title="今月の予約"
           value={summaryReady ? kpi.total : null}
@@ -806,83 +806,84 @@ export default function BookingsPage() {
         </div>
 
         <div className="min-w-0 flex-1">
-          <div
-            data-design="Bar"
-            className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3"
-          >
-            <input
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="お客さま名で検索"
-              aria-label="お客さま名で検索"
-              className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
-            />
-            {/* N-398: 担当者と種別（予約経路）の絞り込み。一覧と件数の両方に効く。 */}
-            <Select
-              aria-label="担当者で絞り込む"
-              value={staffFilter}
-              onChange={setStaffFilter}
-              options={[
-                { value: 'all', label: '担当: すべて' },
-                ...staffList.map((item) => ({ value: item.id, label: item.display_name })),
-              ]}
-            />
-            <Select
-              aria-label="予約経路で絞り込む"
-              value={sourceFilter}
-              onChange={setSourceFilter}
-              options={SOURCE_FILTERS.map((item) => ({ value: item.key, label: item.label }))}
-            />
-            {/* N-397: 今の絞り込みのままCSVへ。範囲の断りはCSV先頭行に入る。 */}
-            {selectedAccountId ? (
-              <Button variant="secondary" disabled={csvBusy} onClick={downloadLedgerCsv}>
-                {csvBusy ? '書き出しています…' : 'CSVで書き出す'}
-              </Button>
-            ) : null}
-            {/*
-              #670 17: 押せない「保存した条件」(準備中です)は置かない。
-              押せない口を並べると「まだ何かある」と読める。条件の保存が
-              要るときは、動く形で足し直す。
-            */}
+          {/*
+            ★V7 `Xn1Mz`：検索は幅320で1行目、2行目は左に絞り込み・
+            右端にCSVで書き出す。
+            #670 17: 押せない「保存した条件」(準備中です)は置かない。
+            押せない口を並べると「まだ何かある」と読める。条件の保存が
+            要るときは、動く形で足し直す。
+            設計の Bar（検索行）・Saved（絞り込み行）は共通 ListToolbar の
+            1・2行目にいる。印だけここに残し、設計との突き合わせを保つ。
+          */}
+          <div data-design="Bar">
+          <div data-design="Saved">
+          <ListToolbar
+            search={{ placeholder: 'お客さま名で検索', value: query, onChange: setQuery }}
+            filters={
+              <>
+                <span className="text-ink-faint text-xs">よく使う</span>
+                {STATUS_TABS.map(({ key, label }) => (
+                  <button
+                    key={key}
+                    onClick={() => setTab(key)}
+                    className={`rounded-pill px-3 py-1 text-xs font-medium transition-colors ${
+                      tab === key
+                        ? 'bg-accent-deep text-on-accent'
+                        : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+                <span className="border-hairline mx-1 h-4 border-l" />
+                <button
+                  onClick={() => setRange(range === 'today' ? 'all' : 'today')}
+                  className={`rounded-pill px-3 py-1 text-xs font-medium ${
+                    range === 'today'
+                      ? 'bg-accent-deep text-on-accent'
+                      : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
+                  }`}
+                >
+                  今日
+                </button>
+                <button
+                  onClick={() => setRange(range === 'week' ? 'all' : 'week')}
+                  className={`rounded-pill px-3 py-1 text-xs font-medium ${
+                    range === 'week'
+                      ? 'bg-accent-deep text-on-accent'
+                      : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
+                  }`}
+                >
+                  今週
+                </button>
+                {/* N-398: 担当者と種別（予約経路）の絞り込み。一覧と件数の両方に効く。 */}
+                <Select
+                  aria-label="担当者で絞り込む"
+                  value={staffFilter}
+                  onChange={setStaffFilter}
+                  options={[
+                    { value: 'all', label: '担当: すべて' },
+                    ...staffList.map((item) => ({ value: item.id, label: item.display_name })),
+                  ]}
+                />
+                <Select
+                  aria-label="予約経路で絞り込む"
+                  value={sourceFilter}
+                  onChange={setSourceFilter}
+                  options={SOURCE_FILTERS.map((item) => ({ value: item.key, label: item.label }))}
+                />
+              </>
+            }
+            trailing={
+              /* N-397: 今の絞り込みのままCSVへ。範囲の断りはCSV先頭行に入る。 */
+              selectedAccountId ? (
+                <Button variant="secondary" disabled={csvBusy} onClick={downloadLedgerCsv}>
+                  {csvBusy ? '書き出しています…' : 'CSVで書き出す'}
+                </Button>
+              ) : null
+            }
+          />
           </div>
-
-          <div data-design="Saved" className="mb-3 flex flex-wrap items-center gap-2">
-            <span className="text-ink-faint text-xs">よく使う</span>
-            {STATUS_TABS.map(({ key, label }) => (
-              <button
-                key={key}
-                onClick={() => setTab(key)}
-                className={`rounded-pill px-3 py-1 text-xs font-medium transition-colors ${
-                  tab === key
-                    ? 'bg-accent-deep text-on-accent'
-                    : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-            <span className="border-hairline mx-1 h-4 border-l" />
-            <button
-              onClick={() => setRange(range === 'today' ? 'all' : 'today')}
-              className={`rounded-pill px-3 py-1 text-xs font-medium ${
-                range === 'today'
-                  ? 'bg-accent-deep text-on-accent'
-                  : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
-              }`}
-            >
-              今日
-            </button>
-            <button
-              onClick={() => setRange(range === 'week' ? 'all' : 'week')}
-              className={`rounded-pill px-3 py-1 text-xs font-medium ${
-                range === 'week'
-                  ? 'bg-accent-deep text-on-accent'
-                  : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
-              }`}
-            >
-              今週
-            </button>
           </div>
 
           {!selectedAccountId ? (
@@ -1236,7 +1237,7 @@ function BookingDetailPanel({
             </div>
           </section>
 
-          <section className="bg-canvas rounded-card border-hairline mb-4 border p-5">
+          <section className="bg-canvas rounded-card border-hairline border p-5">
             <h3 className="text-ink text-base font-semibold">この方のこれまで</h3>
             <p className="text-ink-faint mt-1 text-xs">顧客カルテの履歴は、友だち詳細で確認できます。前回のことを覚えていると、話が早くなります。</p>
             <div className="border-hairline mt-4 grid grid-cols-4 gap-3 border-b pb-2 text-xs text-ink-faint"><span>いつ・何を</span><span>担当</span><span>金額</span><span>メモ</span></div>

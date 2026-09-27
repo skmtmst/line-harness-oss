@@ -72,9 +72,9 @@
     "direct-th": 6
   },
   "app/booking/staff/shifts/liff-preview.tsx": {
-    "arbitrary-value": 1,
-    "direct-primary-button": 1,
-    "direct-secondary-button": 2
+    "arbitrary-value": 2,
+    "direct-primary-button": 2,
+    "direct-secondary-button": 3
   },
   "app/broadcasts/detail/page.tsx": {
     "direct-secondary-button": 2
@@ -695,10 +695,13 @@
     "direct-primary-button": 1
   },
   "components/shared/help-tip.tsx": {
-    "unresolved-classname": 3
+    "unresolved-classname": 4
   },
   "components/shared/list-state.tsx": {
     "unresolved-classname": 5
+  },
+  "components/shared/list-toolbar.tsx": {
+    "unresolved-classname": 6
   },
   "components/shared/not-connected.tsx": {
     "unresolved-classname": 3
@@ -719,7 +722,7 @@
     "unresolved-classname": 9
   },
   "components/shared/row-actions.tsx": {
-    "unresolved-classname": 3
+    "unresolved-classname": 4
   },
   "components/shared/save-conflict-bar.tsx": {
     "unresolved-classname": 4

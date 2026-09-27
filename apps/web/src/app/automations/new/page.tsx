@@ -8,6 +8,7 @@ import type { Automation } from '@line-crm/shared'
 import { AUTOMATION_DRAFT_ACTION_OPTIONS, AUTOMATION_DRAFT_TRIGGER_OPTIONS } from '@line-crm/shared'
 import { api, ApiError, type AutomationDraftAction, type AutomationDraftDetail } from '@/lib/api'
 import Breadcrumb from '@/components/shared/breadcrumb'
+import FilterChip from '@/components/shared/filter-chip'
 import StickyBar from '@/components/shared/sticky-bar'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { TextArea, TextField } from '@/components/shared/text-field'
@@ -35,6 +36,14 @@ import ConditionBuilder, {
 import { useCanManageCommonActions } from '@/components/automations/use-common-action-permission'
 import styles from './new-automation.module.css'
 import Button from '@/components/shared/button'
+import {
+  friendNamesOf,
+  normalizeFriendIds,
+  normalizeWeekdays,
+  weekdayNames,
+} from './trigger-helpers'
+import { WeekdaySelect } from './weekday-select'
+import { FriendMultiSelect } from './friend-multi-select'
 
 /**
  * ルールを作る。Pencil ★V6 `Rv8Jv`（25-1-A つくる）。
@@ -488,7 +497,8 @@ const actionDraftToPayload = (row: ActionDraft, index: number): AutomationDraftA
 const conditionPayload = (condition: SegmentCondition | null): Record<string, unknown> =>
   (pruneCondition(condition) ?? {}) as Record<string, unknown>
 
-/** きっかけの詳しい設定を、保存で送る形へ直す。 */
+/**
+ * きっかけの詳しい設定を、保存で送る形へ直す。 */
 const normalizeTriggerConfigFor = (
   eventType: AutomationDraftDetail['eventType'],
   triggerConfig: Record<string, unknown>,
@@ -501,12 +511,12 @@ const normalizeTriggerConfigFor = (
   }
   if (eventType === 'datetime') {
     const local = String(triggerConfig.at ?? '')
-    return { at: local ? new Date(`${local}:00+09:00`).toISOString() : '', friendIds: String(triggerConfig.friendIds ?? '').split(',').map((id) => id.trim()).filter(Boolean) }
+    return { at: local ? new Date(`${local}:00+09:00`).toISOString() : '', friendIds: normalizeFriendIds(triggerConfig.friendIds) }
   }
   if (eventType === 'daily' || eventType === 'weekly') return {
     time: String(triggerConfig.time ?? ''),
-    friendIds: String(triggerConfig.friendIds ?? '').split(',').map((id) => id.trim()).filter(Boolean),
-    ...(eventType === 'weekly' ? { weekdays: String(triggerConfig.weekdays ?? '').split(',').map(Number).filter((day) => Number.isInteger(day) && day >= 0 && day <= 6) } : {}),
+    friendIds: normalizeFriendIds(triggerConfig.friendIds),
+    ...(eventType === 'weekly' ? { weekdays: normalizeWeekdays(triggerConfig.weekdays) } : {}),
   }
   if (eventType === 'link_clicked') {
     const trackedLinkId = String(triggerConfig.trackedLinkId ?? '').trim()
@@ -574,8 +584,8 @@ const draftDetailToForm = (detail: AutomationDraftDetail): {
 } => {
   const storedCondition = storedConditionToForm(detail.conditions)
   const config = detail.triggerConfig ?? {}
-  const joinIds = (value: unknown) =>
-    Array.isArray(value) ? value.map((item) => String(item)).join(',') : ''
+  /* R21・R22: 曜日と対象の友だちは配列で持つ。古い文字列の控えも正規化する。 */
+  const friendNames = friendNamesOf(config as Record<string, unknown>)
   const triggerConfig = ((): Record<string, unknown> => {
     switch (detail.eventType) {
       case 'tag_change':
@@ -594,14 +604,15 @@ const draftDetailToForm = (detail: AutomationDraftDetail): {
           eventId: String(config.eventId ?? ''),
         }
       case 'datetime':
-        return { at: isoToDatetimeLocal(String(config.at ?? '')), friendIds: joinIds(config.friendIds) }
+        return { at: isoToDatetimeLocal(String(config.at ?? '')), friendIds: normalizeFriendIds(config.friendIds), friendNames }
       case 'daily':
-        return { time: String(config.time ?? ''), friendIds: joinIds(config.friendIds) }
+        return { time: String(config.time ?? ''), friendIds: normalizeFriendIds(config.friendIds), friendNames }
       case 'weekly':
         return {
           time: String(config.time ?? ''),
-          friendIds: joinIds(config.friendIds),
-          weekdays: Array.isArray(config.weekdays) ? config.weekdays.map((day) => String(day)).join(',') : '',
+          friendIds: normalizeFriendIds(config.friendIds),
+          friendNames,
+          weekdays: normalizeWeekdays(config.weekdays),
         }
       default:
         return {}
@@ -1159,10 +1170,47 @@ export default function NewAutomationPage() {
     setTriggerConfig({})
   }, [eventType])
 
+  /*
+   * R22: 読み込んだ下書きの対象（IDだけ）へ名前を付け直す。
+   * 保存にはIDだけを送り、名前は表示専用（`friendNames`）として持つ。
+   * 指紋・保存の中身には名前を入れないので、付け直しで「変更あり」にはならない。
+   */
+  useEffect(() => {
+    if (!selectedAccountId) return
+    const ids = normalizeFriendIds(triggerConfig.friendIds)
+    const names = friendNamesOf(triggerConfig)
+    const missing = ids.filter((id) => !names[id])
+    if (missing.length === 0) return
+    let cancelled = false
+    void Promise.all(
+      missing.map((id) =>
+        api.friends
+          .get(id, { includeSubmissions: false })
+          .then((response) => {
+            if (!response.success) return { id, name: id }
+            const label = (response.data as { displayName?: unknown }).displayName
+            return { id, name: typeof label === 'string' && label ? label : id }
+          })
+          .catch(() => ({ id, name: id })),
+      ),
+    ).then((resolved) => {
+      if (cancelled || resolved.length === 0) return
+      const found: Record<string, string> = {}
+      for (const item of resolved) found[item.id] = item.name
+      setTriggerConfig((current) => ({ ...current, friendNames: { ...friendNamesOf(current), ...found } }))
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [selectedAccountId, triggerConfig.friendIds, triggerConfig.friendNames])
+
   // #519 軽 + #942 N-355: 共有の選択肢すべてを描く。設定の要約もそれぞれ持つ。
+  const weeklyDays = eventType === 'weekly' ? normalizeWeekdays(triggerConfig.weekdays) : []
   const triggerConfigSummary = eventType === 'datetime'
     ? String(triggerConfig.at ?? '日時を指定')
-    : eventType === 'daily' || eventType === 'weekly'
+    : eventType === 'weekly'
+      ? `毎週${weekdayNames(weeklyDays) || '曜日を選ぶ'} ${String(triggerConfig.time ?? '時刻を指定')}`
+      : eventType === 'daily'
       ? String(triggerConfig.time ?? '時刻を指定')
       : eventType === 'form_submitted'
         ? String(triggerConfig.formId ?? 'すべてのフォーム')
@@ -1193,9 +1241,9 @@ export default function NewAutomationPage() {
     // 時刻・日時のきっかけは対象の友だちが必須（サーバの検証と同じ条件）。
     if (eventType === 'datetime' && !String(triggerConfig.at ?? '').trim()) return '実行日時を入力してください'
     if ((eventType === 'daily' || eventType === 'weekly') && !String(triggerConfig.time ?? '').trim()) return '実行時刻を入力してください'
-    if (eventType === 'weekly' && !String(triggerConfig.weekdays ?? '').trim()) return '曜日を入力してください'
+    if (eventType === 'weekly' && normalizeWeekdays(triggerConfig.weekdays).length === 0) return '曜日を1つ以上選んでください'
     if ((eventType === 'datetime' || eventType === 'daily' || eventType === 'weekly')
-      && !String(triggerConfig.friendIds ?? '').trim()) return '対象の友だちを入力してください'
+      && normalizeFriendIds(triggerConfig.friendIds).length === 0) return '対象の友だちを選んでください'
     if (actions.length === 0) return 'することを1つ以上決めてください'
     for (const row of actions) {
       if (row.type === 'add_tag' && !row.tagId) return '付けるタグを選んでください'
@@ -1576,7 +1624,8 @@ export default function NewAutomationPage() {
   if (resumeTarget === undefined) return null
 
   return (
-    <div data-design-node="Rv8Jv">
+    <div data-design-node="Rv8Jv" className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       <div data-design="Crumb">
         <Breadcrumb
           items={[{ label: 'オートメーション', href: '/automations' }, { label: 'ルールを作る' }]}
@@ -1585,7 +1634,7 @@ export default function NewAutomationPage() {
 
       {storedDraftHint && !savedDraft && resumeTarget === null ? (
         <div
-          className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-control border border-info bg-info-bg px-4 py-3 text-sm font-medium text-info"
+          className="flex flex-wrap items-center justify-between gap-2 rounded-control border border-info bg-info-bg px-4 py-3 text-sm font-medium text-info"
           role="note"
         >
           <span>
@@ -1597,7 +1646,7 @@ export default function NewAutomationPage() {
         </div>
       ) : null}
 
-      <div className="mb-3 grid grid-cols-3 gap-3 rounded-card border border-hairline bg-canvas px-5 py-4" aria-label="いまの決めごと">
+      <div className="grid grid-cols-3 gap-3 rounded-card border border-hairline bg-canvas px-5 py-4" aria-label="いまの決めごと">
         <SummaryStep number={1} label="きっかけ" value={selectedEvent.label} />
         <SummaryStep number={2} label="だれに" value={targetSummary} />
         <SummaryStep number={3} label="すること" value={actionSummary || '処理を選んでください'} active />
@@ -1678,9 +1727,28 @@ export default function NewAutomationPage() {
                   {eventType === 'calendar_booked' && triggerConfig.bookingType !== 'event' ? <TextField aria-label="予約メニュー" placeholder="メニューID（空欄ならすべて）" value={String(triggerConfig.menuId ?? '')} onChange={(e) => setTriggerConfig({ ...triggerConfig, menuId: e.target.value })} /> : null}
                   {eventType === 'calendar_booked' && triggerConfig.bookingType === 'event' ? <TextField aria-label="対象イベント" placeholder="イベントID（空欄ならすべて）" value={String(triggerConfig.eventId ?? '')} onChange={(e) => setTriggerConfig({ ...triggerConfig, eventId: e.target.value })} /> : null}
                   {eventType === 'datetime' ? <DateTimeField aria-label="実行日時" value={String(triggerConfig.at ?? '')} onChange={(v) => setTriggerConfig({ ...triggerConfig, at: v })} /> : null}
+                  {/* R21: 曜日は数字を打たせず7つの札から選ぶ。空の要素を数字にしない。 */}
+                  {eventType === 'weekly' ? (
+                    <div className="sm:col-span-2">
+                      <WeekdaySelect
+                        value={triggerConfig.weekdays as ReadonlyArray<number>}
+                        time={String(triggerConfig.time ?? '')}
+                        onChange={(days) => setTriggerConfig({ ...triggerConfig, weekdays: days })}
+                      />
+                    </div>
+                  ) : null}
                   {eventType === 'daily' || eventType === 'weekly' ? <TimeField aria-label="実行時刻" step={300} value={String(triggerConfig.time ?? '')} onChange={(v) => setTriggerConfig({ ...triggerConfig, time: v })} /> : null}
-                  {eventType === 'weekly' ? <TextField aria-label="曜日" placeholder="曜日番号（例: 1,3 は月・水）" value={String(triggerConfig.weekdays ?? '')} onChange={(e) => setTriggerConfig({ ...triggerConfig, weekdays: e.target.value })} /> : null}
-                  {eventType === 'datetime' || eventType === 'daily' || eventType === 'weekly' ? <TextField aria-label="対象の友だち" placeholder="友だちID（複数はカンマ区切り、最大100人）" value={String(triggerConfig.friendIds ?? '')} onChange={(e) => setTriggerConfig({ ...triggerConfig, friendIds: e.target.value })} /> : null}
+                  {/* R22: 対象は名前で探して選ぶ。IDの手入力はさせない。 */}
+                  {eventType === 'datetime' || eventType === 'daily' || eventType === 'weekly' ? (
+                    <div className="sm:col-span-2">
+                      <FriendMultiSelect
+                        accountId={selectedAccountId ?? null}
+                        selectedIds={normalizeFriendIds(triggerConfig.friendIds)}
+                        names={friendNamesOf(triggerConfig)}
+                        onChange={(ids, nextNames) => setTriggerConfig({ ...triggerConfig, friendIds: ids, friendNames: nextNames })}
+                      />
+                    </div>
+                  ) : null}
                 </div>
                 <p className="mt-2 text-xs text-ink-faint">{triggerConfigSummary}。保存後も設定を確認できます。</p>
               </div>

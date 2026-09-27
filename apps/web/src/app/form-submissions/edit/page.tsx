@@ -673,8 +673,9 @@ function FormEditInner() {
   }
 
   return (
-    <div>
-      <nav className="text-ink-faint mb-2 text-xs" data-design="Crumb">
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <nav className="text-ink-faint text-xs" data-design="Crumb">
         <Link href="/form-submissions" className="hover:underline">
           回答フォーム
         </Link>
@@ -682,7 +683,7 @@ function FormEditInner() {
         <span>{name || '（名前なし）'}</span>
       </nav>
 
-      <nav className="mb-4 flex flex-wrap gap-2" aria-label="回答フォームの編集画面">
+      <nav className="flex flex-wrap gap-2" aria-label="回答フォームの編集画面">
         <Button
           href={`/form-submissions/edit?id=${encodeURIComponent(id)}&tab=basic`}
           variant={editorTab === 'basic' ? 'primary' : 'secondary'}
@@ -725,7 +726,7 @@ function FormEditInner() {
         <>
           <div
             data-design="Meta"
-            className="bg-canvas rounded-card border-hairline mb-4 grid gap-4 border p-4 sm:grid-cols-2 xl:grid-cols-5"
+            className="bg-canvas rounded-card border-hairline grid gap-4 border p-4 sm:grid-cols-2 xl:grid-cols-5"
           >
             <Field label="フォーム名" htmlFor="fm-name" required>
               <input
@@ -827,7 +828,7 @@ function FormEditInner() {
                 onOgImageUrlChange={setOgImageUrl}
               />
             ) : (
-            <section className="min-w-0">
+            <section className="flex min-w-0 flex-col gap-4">
               {/* タブ */}
               <div className="border-hairline flex flex-wrap items-center gap-1 border-b pb-2">
                 <button
@@ -1028,7 +1029,7 @@ function FormEditInner() {
                   return null
                 }
                 return (
-                  <details className="bg-canvas rounded-card border-hairline mt-4 border p-4">
+                  <details className="bg-canvas rounded-card border-hairline border p-4">
                     <summary className="text-ink cursor-pointer text-sm font-bold">
                       送信時に更新する情報（{overview.questions.length}件の質問
                       {overview.formWide.length > 0 ? `・フォーム全体${overview.formWide.length}件` : ''}）
@@ -1054,7 +1055,7 @@ function FormEditInner() {
                 )
               })()}
 
-              <div className="bg-canvas rounded-card border-hairline mt-4 space-y-4 border p-4">
+              <div className="bg-canvas rounded-card border-hairline space-y-4 border p-4">
                 <Field
                   label="説明"
                   htmlFor="fm-desc"

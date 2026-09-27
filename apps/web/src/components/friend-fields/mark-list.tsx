@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { LockKeyhole, Trash2, X } from 'lucide-react'
+import { LockKeyhole, X } from 'lucide-react'
+import { RowActions } from '@/components/shared/row-actions'
 import ReorderGrip from './reorder-grip'
 import { mergeVisibleOrder, movableIds } from './reorder-utils'
 import { api, ApiError, type SupportMarkArchiveImpact, type SupportMarkListItem } from '@/lib/api'
@@ -442,10 +443,23 @@ export default function SupportMarkList({ accountId }: { accountId: string | nul
                   <td className="px-3 py-3 text-ink">{autoRuleLabel(mark)}</td>
                   <td className="truncate px-3 py-3 text-ink" title={usageLabel(mark)}>{usageLabel(mark)}</td>
                   <td className="px-3 py-3 text-center">
+                    {/*
+                      ★V7 `Xn1Mz`：行の操作は「主な1つ（編集）＋…」。保管は
+                      メニューの中の危ない操作へ。ゴミ箱の印だけのボタンは
+                      行に直に置かない。置けない行は鍵の印のまま残す。
+                    */}
                     {mark.isDefault || mark.isInherited ? (
                       <span title={mark.isDefault ? '初期値のマークは保管できません' : '共有マークは編集後に保管できます'} className="inline-flex text-ink-faint"><LockKeyhole size={18} aria-label={mark.isDefault ? '初期値のため保管できません' : '共有マークのため保管できません'} /></span>
                     ) : (
-                      <button type="button" onClick={() => void openArchive(mark)} aria-label={`${mark.name}を保管`} className="text-danger hover:opacity-70"><Trash2 size={18} /></button>
+                      <RowActions
+                        subjectName={mark.name}
+                        edit={{ href: `/tags/marks/edit?id=${encodeURIComponent(mark.id)}` }}
+                        destructiveItem={{
+                          id: 'archive',
+                          label: '保管する',
+                          onSelect: () => void openArchive(mark),
+                        }}
+                      />
                     )}
                   </td>
                 </tr>
@@ -485,7 +499,15 @@ export default function SupportMarkList({ accountId }: { accountId: string | nul
                       {mark.isDefault || mark.isInherited ? (
                         <span title={mark.isDefault ? '初期値のマークは保管できません' : '共有マークは編集後に保管できます'} className="inline-flex text-ink-faint"><LockKeyhole size={18} aria-label={mark.isDefault ? '初期値のため保管できません' : '共有マークのため保管できません'} /></span>
                       ) : (
-                        <button type="button" onClick={() => void openArchive(mark)} aria-label={`${mark.name}を保管`} className="text-danger hover:opacity-70"><Trash2 size={18} /></button>
+                        <RowActions
+                          subjectName={mark.name}
+                          edit={{ href: `/tags/marks/edit?id=${encodeURIComponent(mark.id)}` }}
+                          destructiveItem={{
+                            id: 'archive',
+                            label: '保管する',
+                            onSelect: () => void openArchive(mark),
+                          }}
+                        />
                       )}
                     </div>
                   </div>
