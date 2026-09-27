@@ -2,14 +2,16 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { Plug } from 'lucide-react'
-import { api } from '@/lib/api'
+import { api, type MeasurementSite } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
+import Dialog from '@/components/shared/dialog'
 import Disclosure from '@/components/shared/disclosure'
 import ListState from '@/components/shared/list-state'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import Notice from '@/components/shared/notice'
+import { TextField, TextArea } from '@/components/shared/text-field'
 
 type PageRow = { host: string | null; path: string; views: number; visitors: number }
 type TrackingSummary = {
@@ -42,17 +44,33 @@ export default function SiteScript() {
   const [trackingKey, setTrackingKey] = useState<string | null>(null)
   const [keyLoading, setKeyLoading] = useState(true)
   const [keyAttempt, setKeyAttempt] = useState(0)
+  // #819: 成果を数えるサイト。ドメイン単位の許可と、許可外から届いた数。
+  const [sites, setSites] = useState<MeasurementSite[]>([])
+  const [sitesFailed, setSitesFailed] = useState(false)
+  const [canManage, setCanManage] = useState(false)
+  const [siteDialog, setSiteDialog] = useState<
+    | { mode: 'create'; label: string; domainsText: string; error: string | null }
+    | { mode: 'edit'; site: MeasurementSite; label: string; domainsText: string; error: string | null }
+    | null
+  >(null)
+  const [siteBusy, setSiteBusy] = useState(false)
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? ''
   const snippet = trackingKey
     ? `<script async src="${apiUrl}/api/site/script.js" data-key="${trackingKey}"></script>`
     : null
+  /** サイトごとの成果計測つきコード。data-site を足すと許可ドメインの判定が効く。 */
+  const siteSnippet = (siteId: string) =>
+    trackingKey
+      ? `<script async src="${apiUrl}/api/site/script.js" data-key="${trackingKey}" data-site="${siteId}"></script>`
+      : null
 
   const load = useCallback(async () => {
     setLoading(true)
     setFailed(false)
-    const [pagesResult, summaryResult] = await Promise.allSettled([
+    const [pagesResult, summaryResult, sitesResult] = await Promise.allSettled([
       api.siteTracking.pages({ accountId: selectedAccountId ?? undefined }),
       api.siteTracking.summary(selectedAccountId ?? undefined),
+      api.measurementSites.list(selectedAccountId ?? undefined),
     ])
     if (pagesResult.status === 'fulfilled' && pagesResult.value.success) {
       setPages(pagesResult.value.data)
@@ -67,8 +85,56 @@ export default function SiteScript() {
     } else {
       setFailed(true)
     }
+    // 計測サイトは別の口。ここだけ失敗してもページ全体の状態を壊さない。
+    if (sitesResult.status === 'fulfilled' && sitesResult.value.success && Array.isArray(sitesResult.value.data)) {
+      setSites(sitesResult.value.data)
+      setSitesFailed(false)
+    } else {
+      setSitesFailed(true)
+    }
     setLoading(false)
   }, [selectedAccountId])
+
+  // サイトの追加・変更は owner/admin だけ。staff は閲覧まで。
+  useEffect(() => {
+    let active = true
+    void api.staff.me().then((response) => {
+      if (!active) return
+      setCanManage(response.success && (response.data.role === 'owner' || response.data.role === 'admin'))
+    }).catch(() => undefined)
+    return () => { active = false }
+  }, [])
+
+  const parseDomains = (text: string) =>
+    text.split(/[\s,]+/).map((d) => d.trim()).filter(Boolean)
+
+  const saveSite = async () => {
+    if (!siteDialog) return
+    setSiteBusy(true)
+    try {
+      const domains = parseDomains(siteDialog.domainsText)
+      if (siteDialog.mode === 'create') {
+        const res = await api.measurementSites.create({
+          accountId: selectedAccountId ?? undefined,
+          label: siteDialog.label,
+          domains,
+        })
+        if (!res.success) throw new Error(res.error || '作成できませんでした')
+      } else {
+        const res = await api.measurementSites.update(siteDialog.site.id, {
+          label: siteDialog.label,
+          domains,
+        })
+        if (!res.success) throw new Error(res.error || '更新できませんでした')
+      }
+      setSiteDialog(null)
+      await load()
+    } catch (err) {
+      setSiteDialog({ ...siteDialog, error: err instanceof Error ? err.message : '保存できませんでした' })
+    } finally {
+      setSiteBusy(false)
+    }
+  }
 
   useEffect(() => {
     void load()
@@ -213,6 +279,87 @@ export default function SiteScript() {
           </section>
 
           <section className="rounded-card border border-hairline bg-canvas p-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="text-base font-bold text-ink">成果を数えるサイト</h2>
+                <p className="mt-1 text-xs leading-relaxed text-ink-faint">
+                  サイトごとに「ここから届いた成果だけ数える」範囲を決めます。ここに無いドメインから届いた分は成果に数えず、届いた件数と最後の場所だけを残します。
+                </p>
+              </div>
+              {canManage ? (
+                <Button
+                  variant="secondary"
+                  onClick={() => setSiteDialog({ mode: 'create', label: '', domainsText: '', error: null })}
+                >
+                  サイトを追加
+                </Button>
+              ) : null}
+            </div>
+            {sitesFailed ? (
+              <p className="mt-3 text-xs leading-relaxed text-ink-secondary" role="status">
+                計測サイトを読み込めませんでした。
+                <button type="button" onClick={() => void load()} className="text-action ml-1 underline">
+                  もう一度読み込む
+                </button>
+              </p>
+            ) : sites.length === 0 ? (
+              <p className="mt-3 text-xs leading-relaxed text-ink-faint">
+                まだサイトがありません。追加するとサイトごとの計測コードが出ます。
+              </p>
+            ) : (
+              <ul className="mt-3 space-y-3">
+                {sites.map((site) => {
+                  const code = siteSnippet(site.id)
+                  return (
+                    <li key={site.id} className="rounded-control border border-hairline p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-ink" title={site.label}>{site.label}</p>
+                          <p className="mt-0.5 text-xs text-ink-faint">
+                            サイトID <code className="break-all">{site.id}</code>
+                          </p>
+                        </div>
+                        {canManage ? (
+                          <Button
+                            variant="secondary"
+                            onClick={() =>
+                              setSiteDialog({
+                                mode: 'edit',
+                                site,
+                                label: site.label,
+                                domainsText: site.domains.join('\n'),
+                                error: null,
+                              })
+                            }
+                          >
+                            編集
+                          </Button>
+                        ) : null}
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {site.domains.map((host) => (
+                          <Chip key={host} tone="neutral">{host}</Chip>
+                        ))}
+                      </div>
+                      {site.rejectedCount > 0 ? (
+                        <p className="mt-2 text-xs text-status-warn-deep">
+                          許可にない場所から届いた分: {site.rejectedCount.toLocaleString('ja-JP')}件
+                          {site.lastRejectedHost ? `（最後: ${site.lastRejectedHost}）` : ''}
+                        </p>
+                      ) : null}
+                      {code ? (
+                        <div className="mt-2 rounded-control bg-ink p-3">
+                          <code className="block overflow-x-auto text-xs text-on-accent">{code}</code>
+                        </div>
+                      ) : null}
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </section>
+
+          <section className="rounded-card border border-hairline bg-canvas p-5">
             <h2 className="text-base font-bold text-ink">閲覧の記録への同意</h2>
             <p className="mt-1 text-xs leading-relaxed text-ink-faint">
               計測コードを貼ると、サイトの下に記録の案内が出ます。選ぶまでは閲覧を記録せず、数えなかった分だけここに出します。
@@ -309,6 +456,42 @@ export default function SiteScript() {
           </section>
         </aside>
       </div>
+
+      <Dialog
+        open={siteDialog !== null}
+        title={siteDialog?.mode === 'edit' ? '計測サイトを直す' : '計測サイトを追加'}
+        description="このサイトから届いた成果だけを数えます。ドメインは1行に1つずつ書きます（例: shop.example.com）。www の有無は同じサイトとして扱います。"
+        busy={siteBusy}
+        error={siteDialog?.error ?? undefined}
+        confirmLabel={siteDialog?.mode === 'edit' ? '保存する' : '追加する'}
+        onConfirm={() => void saveSite()}
+        onCancel={() => setSiteDialog(null)}
+      >
+        {siteDialog ? (
+          <div className="space-y-3">
+            <label className="block">
+              <span className="text-xs font-semibold text-ink">サイトの名前</span>
+              <TextField
+                className="mt-1"
+                value={siteDialog.label}
+                maxLength={100}
+                placeholder="例: 公式ショップ"
+                onChange={(e) => setSiteDialog({ ...siteDialog, label: e.target.value })}
+              />
+            </label>
+            <label className="block">
+              <span className="text-xs font-semibold text-ink">計測を許可するドメイン</span>
+              <TextArea
+                className="mt-1"
+                rows={4}
+                value={siteDialog.domainsText}
+                placeholder={'example.com\nshop.example.com'}
+                onChange={(e) => setSiteDialog({ ...siteDialog, domainsText: e.target.value })}
+              />
+            </label>
+          </div>
+        ) : null}
+      </Dialog>
     </div>
   )
 }

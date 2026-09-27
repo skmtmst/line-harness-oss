@@ -44,8 +44,10 @@ vi.mock('next/link', () => ({
     React.createElement('a', { href }, children),
 }))
 
+const accountId = vi.hoisted(() => ({ value: 'account-ny' }))
+
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ selectedAccountId: 'account-ny', accounts: [{ id: 'account-ny', name: 'NY店' }] }),
+  useAccount: () => ({ selectedAccountId: accountId.value, accounts: [{ id: accountId.value, name: 'NY店' }] }),
 }))
 
 vi.mock('@/components/shared/select', () => ({
@@ -291,5 +293,43 @@ describe('代理予約: 下書き・空きセル・権限（実React）', () => 
     await mount()
     await settle()
     expect(all('button').some((b) => b.textContent?.includes('予約内容を確認する'))).toBe(true)
+  })
+
+  it('R14: 破棄したら「お客様からの要望」も消え、復元元も消える', async () => {
+    window.history.replaceState(null, '', '/booking/bookings/new')
+    seedDraft()
+    await mount()
+    await flush()
+
+    expect(valueOf(byLabel('お客様からの要望'))).toBe('急ぎでお願いします')
+    expect(container.textContent).toContain('書きかけの入力を戻しました')
+
+    const discard = all('button').find((b) => b.textContent?.includes('破棄して最初から入れ直す'))!
+    await act(async () => { discard.click() })
+    await flush()
+
+    expect(valueOf(byLabel('お客様からの要望'))).toBe('')
+    // 破棄後は最初の状態（LINEの友だち選び）に戻り、メニューも空になる。
+    expect(valueOf(byLabel('予約メニュー'))).toBe('')
+    expect(window.sessionStorage.getItem(DRAFT_KEY)).toBeNull()
+    expect(container.textContent).not.toContain('書きかけの入力を戻しました')
+  })
+
+  it('R14: アカウントを切り替えたら前の要望を持ち越さない', async () => {
+    window.history.replaceState(null, '', '/booking/bookings/new')
+    accountId.value = 'account-ny'
+    seedDraft()
+    await mount()
+    await flush()
+    expect(valueOf(byLabel('お客様からの要望'))).toBe('急ぎでお願いします')
+
+    // 切り替え先には下書きが無い。前のアカウントの要望が残っていたら持ち越し。
+    accountId.value = 'account-bb'
+    await act(async () => { root.render(React.createElement(NewProxyBookingPage)) })
+    await flush()
+
+    expect(valueOf(byLabel('お客様からの要望'))).toBe('')
+    expect(container.textContent).not.toContain('書きかけの入力を戻しました')
+    accountId.value = 'account-ny'
   })
 })

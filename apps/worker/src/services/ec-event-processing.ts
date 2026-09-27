@@ -221,12 +221,24 @@ export async function processEcEvent(
         ).bind(event.occurred_at.slice(0, 19).replace('T', ' '), couponCode).run();
       }
       try {
+        // R42: 注文の合計を型付きの数値として渡す。無い・壊れているときは
+        // 0円にせず金額なし(null)で記録し、metadata にも残して後から
+        // 追えるようにする。
+        const orderTotal = event.order?.total;
+        const orderValue = typeof orderTotal === 'number'
+          && Number.isFinite(orderTotal) && orderTotal >= 0
+          ? orderTotal : null;
         await recordConversionSourceEvent(db, {
           sourceType: 'ec_order_confirmed',
           lineAccountId,
           friendId: friend.id,
           sourceEventId: event.event_id,
-          metadata: { ecEventId: event.event_id, orderNumber: event.order?.number ?? null },
+          value: orderValue,
+          metadata: {
+            ecEventId: event.event_id,
+            orderNumber: event.order?.number ?? null,
+            orderTotal: orderValue,
+          },
         });
       } catch (error) {
         console.error(`[ec-event] conversion record failed event=${event.event_id}`, error);

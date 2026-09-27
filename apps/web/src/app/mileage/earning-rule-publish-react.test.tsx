@@ -195,7 +195,8 @@ async function waitForRowMenuButton(): Promise<HTMLButtonElement> {
 async function waitForPublishItem(): Promise<HTMLButtonElement> {
   for (let i = 0; i < 40; i += 1) {
     await act(async () => { await Promise.resolve() })
-    const items = [...container.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')]
+    // メニューは最上層（MenuPortal→document.body）に出る。器の中にはいない。
+    const items = [...document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')]
     const item = items.find((node) => node.textContent?.trim() === '公開して反映')
     if (item) return item
   }

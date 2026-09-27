@@ -94,19 +94,28 @@ function deleteRoute(id: string, confirmationName?: string) {
 }
 
 describe('POST /api/entry-routes', () => {
+  // R39: 作成は選択中アカウントの所属が必須。可視範囲の解決は
+  // getLineAccountScopeEntries のモックで acc-1 を見える状態にする。
+  beforeEach(() => {
+    mocks.getLineAccountScopeEntries.mockResolvedValue([
+      { id: 'acc-1', tenant_id: 'tenant-a' },
+    ] as never);
+  });
+
   it('creates a named link inside a genre', async () => {
     mocks.createEntryRoute.mockResolvedValue({
       id: 'route-1', ref_code: 'ashop-instagram', genre: 'A店', name: 'Instagram',
       tag_id: null, scenario_id: null, redirect_url: null, pool_id: null,
       intro_template_id: null, run_account_friend_add_scenarios: 1, is_active: 1,
+      line_account_id: 'acc-1',
       created_at: '2026-08-14', updated_at: '2026-08-14',
     });
-    const response = await post({ genre: ' A店 ', name: ' Instagram ', refCode: 'ashop-instagram' });
+    const response = await post({ genre: ' A店 ', name: ' Instagram ', refCode: 'ashop-instagram', lineAccountId: 'acc-1' });
     expect(response.status).toBe(201);
-    const body = await response.json() as { data: { genre: string; name: string } };
-    expect(body.data).toMatchObject({ genre: 'A店', name: 'Instagram' });
+    const body = await response.json() as { data: { genre: string; name: string; lineAccountId: string | null } };
+    expect(body.data).toMatchObject({ genre: 'A店', name: 'Instagram', lineAccountId: 'acc-1' });
     expect(mocks.createEntryRoute).toHaveBeenCalledWith(env.DB, expect.objectContaining({
-      genre: 'A店', name: 'Instagram', refCode: 'ashop-instagram', tenantId: 'tenant-a',
+      genre: 'A店', name: 'Instagram', refCode: 'ashop-instagram', tenantId: 'tenant-a', lineAccountId: 'acc-1',
     }));
   });
 
@@ -115,18 +124,32 @@ describe('POST /api/entry-routes', () => {
       id: 'route-legacy', ref_code: 'instagram', genre: null, name: 'Instagram',
       tag_id: null, scenario_id: null, redirect_url: null, pool_id: null,
       intro_template_id: null, run_account_friend_add_scenarios: 1, is_active: 1,
+      line_account_id: 'acc-1',
       created_at: '2026-08-14', updated_at: '2026-08-14',
     });
-    expect((await post({ name: 'Instagram', refCode: 'instagram' })).status).toBe(201);
-    expect((await post({ genre: 'A店', name: 'Instagram', refCode: 'bad code' })).status).toBe(400);
+    expect((await post({ name: 'Instagram', refCode: 'instagram', lineAccountId: 'acc-1' })).status).toBe(201);
+    expect((await post({ genre: 'A店', name: 'Instagram', refCode: 'bad code', lineAccountId: 'acc-1' })).status).toBe(400);
     expect(mocks.createEntryRoute).toHaveBeenCalledTimes(1);
   });
 
   it('returns a useful conflict for duplicate ref codes', async () => {
     mocks.createEntryRoute.mockRejectedValue(new Error('UNIQUE constraint failed: entry_routes.ref_code'));
-    const response = await post({ genre: 'A店', name: 'Instagram', refCode: 'duplicate' });
+    const response = await post({ genre: 'A店', name: 'Instagram', refCode: 'duplicate', lineAccountId: 'acc-1' });
     expect(response.status).toBe(409);
     expect(await response.json()).toMatchObject({ error: 'この ref_code は既に使われています' });
+  });
+
+  it('所属なしの作成はLINE_ACCOUNT_REQUIREDで保存しない', async () => {
+    const response = await post({ name: '所属なし', refCode: 'no-account' });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ code: 'LINE_ACCOUNT_REQUIRED' });
+    expect(mocks.createEntryRoute).not.toHaveBeenCalled();
+  });
+
+  it('範囲外アカウントの作成は404で保存しない', async () => {
+    const response = await post({ name: '他所', refCode: 'foreign', lineAccountId: 'acc-x' });
+    expect(response.status).toBe(404);
+    expect(mocks.createEntryRoute).not.toHaveBeenCalled();
   });
 
   it.each(['owner', 'admin'] as const)('%sは従来どおり作成できる', async (role) => {
@@ -134,13 +157,14 @@ describe('POST /api/entry-routes', () => {
       id: `route-${role}`, ref_code: `${role}-ref`, genre: null, name: role,
       tag_id: null, scenario_id: null, redirect_url: null, pool_id: null,
       intro_template_id: null, run_account_friend_add_scenarios: 1, is_active: 1,
+      line_account_id: 'acc-1',
       tenant_id: 'tenant-a', created_at: '2026-09-16', updated_at: '2026-09-16',
     });
     const response = await mutateWith(
       appForStaff(role),
       'POST',
       '/api/entry-routes',
-      { name: role, refCode: `${role}-ref` },
+      { name: role, refCode: `${role}-ref`, lineAccountId: 'acc-1' },
     );
     expect(response.status).toBe(201);
     expect(mocks.createEntryRoute).toHaveBeenCalledTimes(1);
@@ -151,13 +175,14 @@ describe('POST /api/entry-routes', () => {
       id: 'route-staff', ref_code: 'staff-ref', genre: null, name: '担当者経路',
       tag_id: null, scenario_id: null, redirect_url: null, pool_id: null,
       intro_template_id: null, run_account_friend_add_scenarios: 1, is_active: 1,
+      line_account_id: 'acc-1',
       tenant_id: 'tenant-a', created_at: '2026-09-16', updated_at: '2026-09-16',
     });
     const response = await mutateWith(
       appForStaff('staff', ['/inflow-links']),
       'POST',
       '/api/entry-routes',
-      { name: '担当者経路', refCode: 'staff-ref' },
+      { name: '担当者経路', refCode: 'staff-ref', lineAccountId: 'acc-1' },
     );
     expect(response.status).toBe(201);
     expect(mocks.createEntryRoute).toHaveBeenCalledTimes(1);

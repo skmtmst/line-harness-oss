@@ -87,20 +87,20 @@ async function settle() {
 }
 
 function byId(id: string): HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement {
-  const el = host.querySelector(`#${id}`)
+  const el = document.querySelector(`#${id}`)
   if (!el) throw new Error(`見つかりません: #${id}`)
   return el as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
 }
 
 function byExactText(tag: string, text: string): HTMLElement {
-  const found = Array.from(host.querySelectorAll(tag)).find((el) => el.textContent?.trim() === text)
+  const found = Array.from(document.querySelectorAll(tag)).find((el) => el.textContent?.trim() === text)
   if (!found) throw new Error(`見つかりません: <${tag}> "${text}"`)
   return found as HTMLElement
 }
 
 /** 編集画面の社内メモ欄。id/aria-labelを持たないためplaceholderで探す。 */
 function memoInput(): HTMLInputElement {
-  const found = Array.from(host.querySelectorAll('input')).find(
+  const found = Array.from(document.querySelectorAll('input')).find(
     (el) => el.getAttribute('placeholder') === '運用上の注意や、この値の使い方を書きます',
   )
   if (!found) throw new Error('編集画面の社内メモ欄が見つかりません')
@@ -128,18 +128,18 @@ async function pickCalendarDay(iso: string) {
   const [y, mo, d] = iso.split('-').map(Number)
   const week = '日月火水木金土'[new Date(y, mo - 1, d).getDay()]
   for (let i = 0; i < 36; i += 1) {
-    const grid = host.querySelector('[role="grid"]')
+    const grid = document.querySelector('[role="grid"]')
     const label = grid?.getAttribute('aria-label')
     if (label === `${y}年${mo}月`) break
     const target = y * 12 + mo
     const currentLabel = /^(\d+)年(\d+)月$/.exec(label ?? '')
     const current = currentLabel ? Number(currentLabel[1]) * 12 + Number(currentLabel[2]) : target
-    const nav = Array.from(host.querySelectorAll('button')).find(
+    const nav = Array.from(document.querySelectorAll('button')).find(
       (b) => b.getAttribute('aria-label') === (target > current ? '次の月' : '前の月'),
     )!
     await click(nav)
   }
-  const day = Array.from(host.querySelectorAll('button')).find((b) =>
+  const day = Array.from(document.querySelectorAll('button')).find((b) =>
     (b.getAttribute('aria-label') ?? '').startsWith(`${y}年${mo}月${d}日（${week}）`),
   )!
   await click(day)
@@ -154,7 +154,7 @@ async function setDateValue(id: string, iso: string) {
 
 /** 開いている日時の選択箱を閉じる（次の欄の前に必ず呼ぶ）。日付の選択は選ぶと閉じる。 */
 async function closeDatePicker() {
-  const picker = host.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')
+  const picker = document.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')
   if (!picker) return
   const close = Array.from(picker.querySelectorAll('button')).find((b) => b.textContent?.trim() === '閉じる')!
   await click(close)
@@ -165,10 +165,10 @@ async function setDateTimeValue(id: string, iso: string) {
   const [date, time] = iso.split('T')
   const [hour, minute] = time.split(':')
   await click(byId(id) as unknown as HTMLElement)
-  const picker = host.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
+  const picker = document.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
   await click(picker.querySelector('button[aria-label="日付"]') as HTMLElement)
   await pickCalendarDay(date)
-  const reopened = host.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
+  const reopened = document.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
   await act(async () => {
     const hourSelect = reopened.querySelector('select[aria-label="時"]') as HTMLSelectElement
     hourSelect.value = hour
@@ -183,7 +183,7 @@ async function setDateTimeValue(id: string, iso: string) {
 /** 日付の選択を空にする。 */
 async function clearPickerDate(id: string) {
   await click(byId(id) as unknown as HTMLElement)
-  const picker = host.querySelector('[role="dialog"][aria-label="日付を選ぶ"]')!
+  const picker = document.querySelector('[role="dialog"][aria-label="日付を選ぶ"]')!
   const clear = Array.from(picker.querySelectorAll('button')).find((b) => b.textContent?.trim() === '消す')!
   await click(clear)
 }

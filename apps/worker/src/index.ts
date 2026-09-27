@@ -105,6 +105,7 @@ import { entryRoutes } from './routes/entry-routes.js';
 import { forms } from './routes/forms.js';
 import { adPlatforms } from './routes/ad-platforms.js';
 import { adCosts } from './routes/ad-costs.js';
+import { webMeasurement } from './routes/web-measurement.js';
 import { staff } from './routes/staff.js';
 import { access } from './routes/access.js';
 import { capabilities } from './routes/capabilities.js';
@@ -502,6 +503,8 @@ app.route('/', entryRoutes);
 app.route('/', forms);
 app.route('/', adPlatforms);
 app.route('/', adCosts);
+// Web計測の公開口と計測サイトの管理(#819)。
+app.route('/', webMeasurement);
 app.route('/', staff);
 app.route('/', access);
 app.route('/', capabilities);
