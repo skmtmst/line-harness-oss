@@ -11,10 +11,18 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const fetchApi = vi.hoisted(() => vi.fn())
+const apiFolders = vi.hoisted(() => ({
+  list: vi.fn(),
+  create: vi.fn(),
+  update: vi.fn(),
+  delete: vi.fn(),
+  swapOrder: vi.fn(),
+}))
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
-  return { ...actual, fetchApi }
+  // `api.folders.*` は内部で生の fetchApi を掴むため、部品ごと差し替える。
+  return { ...actual, fetchApi, api: { ...(actual as unknown as { api: object }).api, folders: apiFolders } }
 })
 
 vi.mock('next/link', () => ({
@@ -73,6 +81,7 @@ const unassignedForm = {
 }
 
 function mockDefault() {
+  apiFolders.list.mockImplementation(async () => ({ success: true, data: [] }))
   fetchApi.mockImplementation(async (path: string) => {
     if (path.startsWith('/api/forms/unassigned')) {
       return { success: true, data: [unassignedForm] }

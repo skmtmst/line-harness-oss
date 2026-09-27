@@ -185,6 +185,8 @@ async function reverifyLatestSlot(
     staffId: string;
     startsAt: Date;
     minLeadTimeMinutes: number;
+    /** R92: お客さま向けの再照合では店舗共通ルールを既定値として使う。 */
+    applyStoreRules?: boolean;
     /** 予約変更時は変更対象を重なり判定から外す（自予約と衝突しないように）。 */
     excludeBookingId?: string;
   },
@@ -199,6 +201,7 @@ async function reverifyLatestSlot(
     to: date,
     now: new Date(),
     minLeadTimeMinutes: input.minLeadTimeMinutes,
+    applyStoreRules: input.applyStoreRules,
     googleCredentials: googleCredentials(env),
     excludeBookingId: input.excludeBookingId,
   });
@@ -586,6 +589,8 @@ booking.get('/api/liff/booking/availability', async (c) => {
   if ((toD.getTime() - fromD.getTime()) / 86400_000 > 28) {
     return c.json({ error: 'range_too_wide' }, 400);
   }
+  // R92: お客さまの画面の空き確認では、店舗共通の受付締切・受付期間を
+  // メニューの個別指定が無いときの既定値として使う。
   const result = await getAvailability(c.env.DB, {
     lineAccountId: accountId,
     menuId,
@@ -594,6 +599,7 @@ booking.get('/api/liff/booking/availability', async (c) => {
     to,
     now: new Date(),
     minLeadTimeMinutes: DEFAULT_ACCOUNT_SETTINGS.min_lead_time_minutes,
+    applyStoreRules: true,
     googleCredentials: googleCredentials(c.env),
   });
   return c.json(result);
@@ -702,12 +708,14 @@ booking.post('/api/liff/booking/requests', async (c) => {
   // リードタイム / 既存予約を、確定直前にもう一度突合する。
   // 突合は店舗タイムゾーンの暦日で取り直した候補の instant と、要求の
   // instant の完全一致で行う（+09:00 固定の壁時刻照合ではない）。
+  // R92: 予約直前の突合もお客さまの空き確認と同じ店舗ルールで判定する。
   const slotMatched = await reverifyLatestSlot(c.env.DB, c.env, {
     lineAccountId: accountId,
     menuId: body.menu_id,
     staffId: body.staff_id,
     startsAt,
     minLeadTimeMinutes: DEFAULT_ACCOUNT_SETTINGS.min_lead_time_minutes,
+    applyStoreRules: true,
   });
   if (!slotMatched) return c.json({ error: 'slot_not_available' }, 422);
 
@@ -3113,6 +3121,7 @@ booking.get('/api/booking/admin/availability-check', async (c) => {
   if (!isValidShiftDate(date) || !isClockTime(time)) {
     return c.json({ error: 'invalid_params' }, 400);
   }
+  // R92: 「なぜ取れないか」の説明もお客さまの判定と同じ店舗ルールで出す。
   const result = await explainBookingSlot(c.env.DB, {
     lineAccountId: accountId,
     menuId,
@@ -3121,6 +3130,7 @@ booking.get('/api/booking/admin/availability-check', async (c) => {
     time,
     now: new Date(),
     minLeadTimeMinutes: DEFAULT_ACCOUNT_SETTINGS.min_lead_time_minutes,
+    applyStoreRules: true,
     googleCredentials: googleCredentials(c.env),
   });
   return c.json(result);
@@ -4905,9 +4915,24 @@ booking.get('/api/booking/admin/requests-summary', async (c) => {
             SUM(CASE WHEN date(datetime(starts_at, '+9 hours')) = ?
                      AND status NOT IN ('rejected','cancelled','canceled','completed','no_show')
                      THEN 1 ELSE 0 END) AS today_active_total,
-            SUM(CASE WHEN date(datetime(starts_at, '+9 hours')) BETWEEN ? AND ? THEN 1 ELSE 0 END) AS week_total
+            SUM(CASE WHEN date(datetime(starts_at, '+9 hours')) BETWEEN ? AND ? THEN 1 ELSE 0 END) AS week_total,
+            /*
+             * 表示タブ（今日・今週・今月）の数。カレンダーと同じ基準で
+             * 取消・拒否・期限切れを除いた「有効な予約」だけ数える。
+             * KPI・解約率に使う従来の集計（month_total 等）は変えない。
+             */
+            SUM(CASE WHEN date(datetime(starts_at, '+9 hours')) = ?
+                     AND status NOT IN ('cancelled','canceled','rejected','expired')
+                     THEN 1 ELSE 0 END) AS today_tab_total,
+            SUM(CASE WHEN date(datetime(starts_at, '+9 hours')) BETWEEN ? AND ?
+                     AND status NOT IN ('cancelled','canceled','rejected','expired')
+                     THEN 1 ELSE 0 END) AS week_tab_total,
+            SUM(CASE WHEN substr(datetime(starts_at, '+9 hours'), 1, 7) = ?
+                     AND status NOT IN ('cancelled','canceled','rejected','expired')
+                     THEN 1 ELSE 0 END) AS month_tab_total
        FROM bookings WHERE line_account_id = ?`,
-  ).bind(thisMonth, thisMonth, thisMonth, lastMonth, today, today, today, weekTo, accountId).first<Record<string, number>>();
+  ).bind(thisMonth, thisMonth, thisMonth, lastMonth, today, today, today, weekTo,
+    today, today, weekTo, thisMonth, accountId).first<Record<string, number>>();
   const byMenu = await c.env.DB.prepare(
     `SELECT m.name, COUNT(*) AS total FROM bookings b
        INNER JOIN menus m ON m.id = b.menu_id
@@ -4920,6 +4945,9 @@ booking.get('/api/booking/admin/requests-summary', async (c) => {
     todayTotal: Number(totals?.today_total ?? 0),
     todayActiveTotal: Number(totals?.today_active_total ?? 0),
     weekTotal: Number(totals?.week_total ?? 0),
+    todayTabTotal: Number(totals?.today_tab_total ?? 0),
+    weekTabTotal: Number(totals?.week_tab_total ?? 0),
+    monthTabTotal: Number(totals?.month_tab_total ?? 0),
     byMenu: byMenu.results.map((row) => ({ name: row.name, total: Number(row.total) })),
   });
 });

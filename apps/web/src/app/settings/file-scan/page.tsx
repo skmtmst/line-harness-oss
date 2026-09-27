@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useDeferredValue, useEffect, useState } from 'react'
 import { ApiError, api, type FileScanConfig, type FileScanItem } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -12,10 +12,13 @@ import HelpTip from '@/components/shared/help-tip'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import Select from '@/components/shared/select'
+import Pagination from '@/components/shared/pagination'
+import ListRange from '@/components/ui/list-range'
 import { RowActions } from '@/components/shared/row-actions'
 import { DataTable, Td, Th, TableHeadRow, Tr } from '@/components/shared/table'
 import { TextField, TextArea } from '@/components/shared/text-field'
-import Toggle from '@/components/shared/toggle'
+/** 一覧の1ページの件数。先頭50件固定だった監査 R132 の名残を残さない。 */
+const PAGE_SIZE = 50
 
 /**
  * 設定の中の「ファイルの検査」（B-2）。
@@ -33,6 +36,9 @@ export default function FileScanSettingsPage() {
   const [items, setItems] = useState<FileScanItem[]>([])
   const [total, setTotal] = useState(0)
   const [statusFilter, setStatusFilter] = useState('quarantined')
+  const [query, setQuery] = useState('')
+  const deferredQuery = useDeferredValue(query)
+  const [page, setPage] = useState(1)
   const [actionError, setActionError] = useState('')
   const [actionDone, setActionDone] = useState('')
   const [releaseTarget, setReleaseTarget] = useState<FileScanItem | null>(null)
@@ -46,6 +52,7 @@ export default function FileScanSettingsPage() {
   const [endpoint, setEndpoint] = useState('')
   const [secretRef, setSecretRef] = useState('')
   const [configBusy, setConfigBusy] = useState(false)
+  const [stopExternal, setStopExternal] = useState(false)
 
   // 外の検査の設定が保存前なら離脱の番兵を出す。
   const configDirty = configOpen && (
@@ -67,7 +74,12 @@ export default function FileScanSettingsPage() {
     try {
       const [me, list, configRes] = await Promise.all([
         api.staff.me(),
-        api.fileScan.list(selectedAccountId, { status: statusFilter, limit: 50, offset: 0 }),
+        api.fileScan.list(selectedAccountId, {
+          status: statusFilter,
+          q: deferredQuery.trim() || undefined,
+          limit: PAGE_SIZE,
+          offset: (page - 1) * PAGE_SIZE,
+        }),
         api.fileScan.getConfig(selectedAccountId),
       ])
       if (!me.success || !list.success || !configRes.success) {
@@ -80,6 +92,8 @@ export default function FileScanSettingsPage() {
       }
       setItems(list.data.items)
       setTotal(list.data.total)
+      /* 消す・戻すで今のページが空になったら1ページ目へ戻す（監査 R132）。 */
+      if (list.data.items.length === 0 && page > 1) setPage(1)
       setConfig(configRes.data.config)
       setProvider(configRes.data.config?.externalProvider ?? '')
       setEndpoint(configRes.data.config?.externalEndpointUrl ?? '')
@@ -88,7 +102,7 @@ export default function FileScanSettingsPage() {
     } catch {
       setPhase('error')
     }
-  }, [selectedAccountId, statusFilter])
+  }, [selectedAccountId, statusFilter, deferredQuery, page])
 
   useEffect(() => {
     void load()
@@ -165,6 +179,35 @@ export default function FileScanSettingsPage() {
     }
   }
 
+  /*
+   * 監査 R133: 「止める」は表示を畳むのではなく、保存済みの設定を
+   * 実際に消す。空に保存すると送信は止まる（部分だけの空はAPIが弾く）。
+   */
+  async function stopExternalConfig() {
+    if (!selectedAccountId) return
+    setConfigBusy(true)
+    setActionError('')
+    try {
+      const res = await api.fileScan.saveConfig(selectedAccountId, {
+        externalProvider: null,
+        externalEndpointUrl: null,
+        externalSecretRef: null,
+      })
+      if (!res.success) {
+        setActionError('設定を消せませんでした。')
+        return
+      }
+      setStopExternal(false)
+      setConfigOpen(false)
+      setActionDone('外の検査サービスへの送信を止めました。内蔵の簡易検査は続きます。')
+      await load()
+    } catch {
+      setActionError('設定を消せませんでした。通信状態を確認して、もう一度お試しください。')
+    } finally {
+      setConfigBusy(false)
+    }
+  }
+
   if (phase === 'loading') {
     return <ListState kind="loading" />
   }
@@ -215,11 +258,21 @@ export default function FileScanSettingsPage() {
           </HelpTip>
         </h2>
         <Chip tone="warn">{`${total}件`}</Chip>
-        <span className="ml-auto">
+        <span className="ml-auto flex flex-wrap items-center gap-2">
+          {/*
+            監査 R132: 51件目以降へ辿り着けなかったため、ファイル名で探す
+            欄とページ送りを足す。探す言葉は件数と同じ条件で絞る。
+          */}
+          <TextField
+            aria-label="ファイル名で探す"
+            placeholder="ファイル名で探す"
+            value={query}
+            onChange={(event) => { setQuery(event.target.value); setPage(1) }}
+          />
           <Select
             aria-label="検査の状態"
             value={statusFilter}
-            onChange={(value) => setStatusFilter(value)}
+            onChange={(value) => { setStatusFilter(value); setPage(1) }}
             options={[
               { value: 'quarantined', label: '状態：しまったもの' },
               { value: 'pending', label: '状態：確かめています' },
@@ -287,23 +340,57 @@ export default function FileScanSettingsPage() {
               ))}
             </tbody>
           </DataTable>
+          {/* 監査 R132: 件数と表示範囲を示し、51件目以降もページで辿れる。 */}
+          {total > PAGE_SIZE ? (
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+              <ListRange
+                total={total}
+                first={(page - 1) * PAGE_SIZE + 1}
+                last={Math.min(page * PAGE_SIZE, total)}
+              />
+              <Pagination
+                page={page}
+                pageCount={Math.ceil(total / PAGE_SIZE)}
+                onPageChange={setPage}
+              />
+            </div>
+          ) : null}
         </div>
       )}
 
       <h2 className="text-ink mt-8 text-base font-bold">外の検査</h2>
+      {/*
+        監査 R133: 以前は編集欄の開閉を「使う」スイッチに見せていたため、
+        設定済みでもOFFに見え、OFFへ戻しても送る設定は残っていた。
+        実際に送っているかは保存済みの設定から表示し、編集欄は
+        「設定を編集」で開き、止める操作は設定の消去と一致させる。
+      */}
       <p className="text-ink-secondary mt-1 text-xs">
-        {config?.externalEndpointUrl ? `送り先：${config.externalEndpointUrl}` : 'いまは内蔵の簡易検査だけです。'}
+        {config?.externalProvider && config?.externalEndpointUrl
+          ? `使っています。送り先：${config.externalEndpointUrl}`
+          : 'いまは内蔵の簡易検査だけです。外の検査サービスには送っていません。'}
       </p>
       <div className="mt-2 flex items-center gap-2">
-        <span id="file-scan-external-label" className="text-ink text-sm">外の検査サービスを使う</span>
+        <span id="file-scan-external-label" className="text-ink text-sm">外の検査サービスの設定</span>
         <HelpTip label="外の検査サービスの意味">
           内蔵の簡易検査に加えて、外の検査サービスにも送る設定です。設定がある時だけ送ります。鍵そのものはここに置かず、秘密値の仕組みにある名前だけを指します。
         </HelpTip>
-        <Toggle
-          label="外の検査サービスを使う"
-          checked={configOpen}
-          onChange={setConfigOpen}
-        />
+        <Button type="button" onClick={() => {
+          /* 開き直す時は保存済みの値へ戻す。編集中の置き去りを残さない。 */
+          if (!configOpen) {
+            setProvider(config?.externalProvider ?? '')
+            setEndpoint(config?.externalEndpointUrl ?? '')
+            setSecretRef(config?.externalSecretRef ?? '')
+          }
+          setConfigOpen(!configOpen)
+        }}>
+          {configOpen ? '設定を閉じる' : '設定を編集'}
+        </Button>
+        {config?.externalProvider && config?.externalEndpointUrl ? (
+          <Button type="button" disabled={configBusy} onClick={() => setStopExternal(true)}>
+            外の検査を止める
+          </Button>
+        ) : null}
       </div>
       {configOpen ? (
         <div className="mt-3 max-w-xl space-y-3">
@@ -380,6 +467,19 @@ export default function FileScanSettingsPage() {
           confirmLeave()
         }}
       />
+
+      {stopExternal ? (
+        <ConfirmDialog
+          open
+          title="外の検査を止める"
+          description="外の検査サービスへの送信設定を消します。内蔵の簡易検査は続きます。もう一度使うには設定を入れ直します。"
+          confirmLabel="外の検査を止める"
+          cancelLabel="やめる"
+          busy={configBusy}
+          onCancel={() => setStopExternal(false)}
+          onConfirm={() => void stopExternalConfig()}
+        />
+      ) : null}
 
       {deleteTarget ? (
         <ConfirmDialog

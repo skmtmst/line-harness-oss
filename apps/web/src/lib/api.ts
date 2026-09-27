@@ -7235,10 +7235,11 @@ export const api = {
   },
   /** 危険なファイルの検査。確かめ終わるまで中身は出さない。 */
   fileScan: {
-    list: (accountId: string, params?: { status?: string; limit?: number; offset?: number }) => {
+    list: (accountId: string, params?: { status?: string; q?: string; limit?: number; offset?: number }) => {
       const q = new URLSearchParams()
       q.set('accountId', accountId)
       if (params?.status) q.set('status', params.status)
+      if (params?.q) q.set('q', params.q)
       if (params?.limit) q.set('limit', String(params.limit))
       if (params?.offset) q.set('offset', String(params.offset))
       return fetchApi<ApiResponse<{ items: FileScanItem[]; total: number; limit: number; offset: number }>>(
@@ -13709,6 +13710,13 @@ export const bookingApi = {
        */
       todayActiveTotal?: number
       weekTotal: number
+      /**
+       * 表示タブ（今日・今週・今月）の数。取消・拒否・期限切れを除いた
+       * 有効な予約だけ（カレンダーと同じ基準）。段階配備中の旧Workerでは未返却。
+       */
+      todayTabTotal?: number
+      weekTabTotal?: number
+      monthTabTotal?: number
       byMenu: Array<{ name: string; total: number }>
     }>(withAccount(`/api/booking/admin/requests-summary?${query.toString()}`, accountId))
   },

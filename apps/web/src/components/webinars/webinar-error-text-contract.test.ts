@@ -10,6 +10,8 @@ describe('ウェビナー失敗文の日本語表示の契約', () => {
       .toBe('URL用の名前が正しくありません。半角英数字と-だけ使えます。')
     expect(webinarErrorText(new ApiError(409, 'version_conflict', 'version_conflict'), '予備文'))
       .toBe('別の画面で更新されました。開き直してから試してください。')
+    expect(webinarErrorText(new ApiError(409, 'publish_via_publish_endpoint', 'publish_via_publish_endpoint'), '予備文'))
+      .toBe('公開は確認ステップから行ってください。')
   })
 
   it('知らないコード・コード無しは予備文をそのまま出す', () => {

@@ -1016,6 +1016,63 @@ async function webinarActionReferenceValid(
   }
 }
 
+export type WebinarActionExecutionStatus =
+  | 'queued' | 'claimed' | 'succeeded' | 'skipped'
+  | 'retry_wait' | 'permanent_failed' | 'cancelled';
+
+export interface WebinarActionExecutionInput {
+  webinarActionId: string;
+  webinarId: string;
+  friendId: string;
+  sessionStartAt: number | null;
+  trigger: WebinarActionTrigger;
+  status: WebinarActionExecutionStatus;
+  idempotencyKey: string;
+  lastError?: string | null;
+}
+
+/**
+ * 視聴後アクションの実行記録を冪等キーで1件だけ残す。
+ * 既に同じキーの記録がある再送は何も書かず false を返す。
+ */
+export async function insertWebinarActionExecutionIgnore(
+  db: D1Database,
+  input: WebinarActionExecutionInput,
+): Promise<boolean> {
+  const now = jstNow();
+  const result = await db
+    .prepare(
+      `INSERT OR IGNORE INTO webinar_action_executions
+         (id, webinar_action_id, webinar_id, friend_id, session_start_at,
+          trigger, status, attempt, idempotency_key, last_error, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)`,
+    )
+    .bind(
+      crypto.randomUUID(), input.webinarActionId, input.webinarId, input.friendId,
+      input.sessionStartAt, input.trigger, input.status, input.idempotencyKey,
+      input.lastError ?? null, now, now,
+    )
+    .run();
+  return (result.meta?.changes ?? 0) > 0;
+}
+
+/** 実行記録の結末を残す。冪等キーで1件だけ更新する。 */
+export async function finishWebinarActionExecution(
+  db: D1Database,
+  idempotencyKey: string,
+  status: WebinarActionExecutionStatus,
+  lastError: string | null,
+): Promise<void> {
+  await db
+    .prepare(
+      `UPDATE webinar_action_executions
+          SET status = ?, last_error = ?, updated_at = ?
+        WHERE idempotency_key = ?`,
+    )
+    .bind(status, lastError, jstNow(), idempotencyKey)
+    .run();
+}
+
 export async function getWebinarComments(
   db: D1Database,
   webinarId: string,

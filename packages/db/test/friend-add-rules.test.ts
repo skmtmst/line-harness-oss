@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from 'vitest';
 import Database from 'better-sqlite3';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -112,7 +112,15 @@ describe('friend add V6 rules', () => {
   let sqlite: Database.Database;
   let db: D1Database;
 
-  beforeEach(() => { sqlite = setup(); db = asD1(sqlite); });
+  // 土台の当て直し(約1.4秒×8本)を1回にし、試験ごとは巻き戻しで戻す。
+  // 376番の試験と同じ理由(worker の onTaskUpdate タイムアウト避け)。
+  beforeAll(() => { sqlite = setup(); db = asD1(sqlite); });
+
+  beforeEach(() => { sqlite.exec('BEGIN'); });
+
+  afterEach(() => { sqlite.exec('ROLLBACK'); });
+
+  afterAll(() => { sqlite.close(); });
 
   test('下書きの作成・更新・テスト・公開を固定版として残す', async () => {
     const created = await createFriendAddRuleDraft(db, {
