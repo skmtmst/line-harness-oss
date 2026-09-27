@@ -52,6 +52,7 @@ function serialize(row: EntryRoute) {
     introTemplateId: row.intro_template_id,
     runAccountFriendAddScenarios: row.run_account_friend_add_scenarios === 1,
     isActive: row.is_active === 1,
+    lineAccountId: row.line_account_id ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -182,6 +183,11 @@ entryRoutes.post('/api/entry-routes', requireEntryRouteManagement(), async (c) =
       introTemplateId?: string | null;
       runAccountFriendAddScenarios?: boolean;
       isActive?: boolean;
+      /** R39: 画面のヘッダーで選んだ所属。機能強制ミドルウェアが読む鍵と同名で受ける。 */
+      lineAccountId?: string | null;
+      line_account_id?: string | null;
+      accountId?: string | null;
+      account_id?: string | null;
     }>();
     const refCode = body.refCode?.trim();
     const name = body.name?.trim();
@@ -195,8 +201,27 @@ entryRoutes.post('/api/entry-routes', requireEntryRouteManagement(), async (c) =
     if ((genre?.length ?? 0) > 80 || name.length > 120) {
       return c.json({ success: false, error: 'ジャンルは80文字、名前は120文字以内で入力してください' }, 400);
     }
-    const tenantId = c.get('staff').tenantId ?? DEFAULT_TENANT_ID;
-    const row = await createEntryRoute(c.env.DB, { ...body, refCode, name, genre, tenantId });
+    const staff = c.get('staff');
+    // R39: 送りに所属が無いと機能強制で止まる。担当アカウント制の職員は
+    // 自分の所属へ倒し、それでも無ければ作らせない。
+    const lineAccountId = body.lineAccountId?.trim()
+      || body.line_account_id?.trim()
+      || body.accountId?.trim()
+      || body.account_id?.trim()
+      || staff.assignedLineAccountId
+      || null;
+    if (!lineAccountId) {
+      return c.json({
+        success: false,
+        error: 'LINEアカウントを指定してください',
+        code: 'LINE_ACCOUNT_REQUIRED',
+      }, 400);
+    }
+    // N-011 と同じ境界で照合する。範囲外の指定は「ない」ものとして404にする。
+    const decision = await resolveRequestBoundary(c.env.DB, staff, lineAccountId);
+    if (!decision.allowed) return c.json({ success: false, error: 'Not found' }, 404);
+    const tenantId = staff.tenantId ?? DEFAULT_TENANT_ID;
+    const row = await createEntryRoute(c.env.DB, { ...body, refCode, name, genre, tenantId, lineAccountId });
     return c.json({ success: true, data: serialize(row) }, 201);
   } catch (err) {
     console.error('POST /api/entry-routes error:', err);
