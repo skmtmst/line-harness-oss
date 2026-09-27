@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Button from '@/components/shared/button'
 import { TimeField } from '@/components/shared/date-time-field'
 import ListState from '@/components/shared/list-state'
@@ -82,6 +82,7 @@ const ROLE_LABEL = { owner: '統括', admin: '管理者', staff: '運用担当' 
 
 function AnalyticsReportFormPage() {
   const searchParams = useSearchParams()
+  const router = useRouter()
   const editId = searchParams.get('id')
   usePageTitle(editId ? '定期レポートを直す' : '定期レポートをつくる')
   const { selectedAccountId, loading: accountLoading } = useAccount()
@@ -252,7 +253,19 @@ function AnalyticsReportFormPage() {
           ...payload, sendOnce,
         })
         if (!response.success) throw new Error(response.error)
-        notifyToast(sendOnce ? '1回だけ送る依頼を受け付けました。送信結果は運用状態に残ります。' : `${nextLabel}から届く定期レポートを作りました。`)
+        /*
+          R76。作ったあとも新規のまま残すと、時刻を直してもう一度押したときに
+          更新ではなく別の定期配信が増える。作りたての編集画面へ移せば、
+          次の保存は更新（PUT）になる。1回だけ送る場合も一覧へ移して、
+          同じ依頼を二重に押せないようにする。
+        */
+        if (sendOnce) {
+          notifyToast('1回だけ送る依頼を受け付けました。送信結果は運用状態に残ります。')
+          router.push('/analytics?tab=saved')
+        } else {
+          notifyToast(`${nextLabel}から届く定期レポートを作りました。`)
+          router.push(`/analytics/reports/new?id=${response.data.id}`)
+        }
       }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : editing ? '定期レポートを更新できませんでした' : '定期レポートを作れませんでした')
