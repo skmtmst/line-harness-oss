@@ -16,8 +16,9 @@ const TERMS_DOC = readFileSync(
 describe('U095 店舗追加の画面全体のはみ出し', () => {
   it('外側と内側のグリッドは1列のとき minmax(0,1fr) で幅を越えない', () => {
     // grid-cols-1 は repeat(1, minmax(0, 1fr)) と同じ。auto の1列では中身が広いと越える。
-    expect(PAGE).toContain('grid-cols-1 items-start gap-5 xl:grid-cols-[220px_minmax(0,1fr)]')
-    expect(PAGE).toContain('grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_280px]')
+    // 列の間隔はカード間と同じ gap-4（16px）にそろえる（m13h。minmax の意図は変えない）。
+    expect(PAGE).toContain('grid-cols-1 items-start gap-4 xl:grid-cols-[220px_minmax(0,1fr)]')
+    expect(PAGE).toContain('grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_280px]')
   })
 
   it('手順・本文・案内の各パネルは内容より細く縮める', () => {

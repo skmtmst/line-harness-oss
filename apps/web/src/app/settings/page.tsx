@@ -903,7 +903,8 @@ export default function SettingsPage() {
     .join('、')
 
   return (
-    <div>
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       {/*
         U034: 390px・768pxでは右の操作（並び替え・保存など）が見出しを
         押しつぶし、題が1文字ずつ縦に割れていた。共通の PageHeader の形は
@@ -912,7 +913,6 @@ export default function SettingsPage() {
       */}
       <div data-page-header-wrap>
       <PageHeader
-        className="mb-5"
         breadcrumb={[{ label: '設定' }, { label: '機能設定' }]}
         title="機能設定"
         description=""
@@ -976,7 +976,7 @@ export default function SettingsPage() {
           </div>
 
           {dirty && (
-            <div className="border-hairline bg-canvas rounded-card mb-4 flex flex-col gap-2 border p-4 sm:flex-row sm:items-center">
+            <div className="border-hairline bg-canvas rounded-card flex flex-col gap-2 border p-4 sm:flex-row sm:items-center">
               <label htmlFor="feature-settings-reason" className="text-ink shrink-0 text-sm font-bold">
                 変更理由<RequiredBadge />
               </label>
@@ -994,14 +994,14 @@ export default function SettingsPage() {
           {loading ? (
             <div className="border-hairline bg-canvas text-ink-faint rounded-card border p-10 text-center text-sm">読み込み中…</div>
           ) : (
-            <div className={ordering ? 'grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_20rem]' : ''}>
+            <div className={ordering ? 'grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]' : 'grid gap-4'}>
               {/*
                 利用状況の取得自体に失敗したとき。バッジは付かないので、
                 無表示のままにせず一覧の先頭で理由とやり直しを出す。
                 設定の切替はこの間も触れるままにする。
               */}
               {usageFailed && (
-                <div className="border-hairline bg-canvas-sunken text-ink-faint mb-4 flex items-center gap-2 rounded-card border px-4 py-2 text-xs">
+                <div className="border-hairline bg-canvas-sunken text-ink-faint flex items-center gap-2 rounded-card border px-4 py-2 text-xs">
                   <span>機能の利用状況を読めませんでした。設定の切替はそのまま使えます。</span>
                   <button
                     type="button"

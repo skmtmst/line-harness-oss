@@ -758,8 +758,9 @@ function BookingDetailInner() {
   }
 
   return (
-    <div>
-      <nav className="text-ink-faint mb-2 text-xs" aria-label="パンくず">
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <nav className="text-ink-faint text-xs" aria-label="パンくず">
         <Link href="/booking/bookings" className="hover:underline">
           予約管理
         </Link>

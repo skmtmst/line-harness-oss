@@ -577,8 +577,9 @@ function EditCommonVarInner() {
   }
 
   return (
-    <div>
-      <nav className="text-ink-faint mb-3 text-xs">
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <nav className="text-ink-faint text-xs">
         <Link href="/contents/vars" className="text-info hover:underline">
           共通情報一覧
         </Link>

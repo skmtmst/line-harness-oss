@@ -279,7 +279,7 @@ function AnalyticsReportFormPage() {
   return (
     // U054: 左右の余白は app-shell が持つ（16px/24px/40px）。
     // ここで px-6 を重ねるとスマホで入力幅が二重に削られる。
-    <div className="text-ink mx-auto max-w-screen-2xl pb-24" data-design-node="URqOA">
+    <div className="text-ink mx-auto flex max-w-screen-2xl flex-col gap-4 pb-24" data-design-node="URqOA">
       <PageHeader
         breadcrumb={[{ label: '分析', href: '/analytics' }, { label: editing ? '定期レポートを直す' : '定期レポートをつくる' }]}
         title={editing ? '定期レポートを直す' : '定期レポートをつくる'}
@@ -288,7 +288,7 @@ function AnalyticsReportFormPage() {
       {!canManage && <div className="bg-canvas-sunken mb-4 rounded-control px-4 py-3 text-sm">運用担当は内容を確認できます。作成は統括または管理者が行います。</div>}
       {error && <Notice tone="danger" message={error} onClose={() => setError('')} className="mb-4" />}
 
-      <div className="grid items-start gap-6 xl:grid-cols-3">
+      <div className="grid items-start gap-4 xl:grid-cols-3">
         <div className="grid gap-4 xl:col-span-2">
           <section className="border-hairline bg-canvas rounded-card border p-4 sm:p-6">
             <h2 className="text-lg font-semibold">名前を付けます</h2>
