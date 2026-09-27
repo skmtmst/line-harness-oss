@@ -355,6 +355,8 @@ export type AuditEventSummary = {
   changed: number
   logins: number
   suspiciousLogins: number
+  /** 「気になるもの」タブと同じ条件（失敗・要確認）の件数。タブの件数は一覧と同じ分類で数える（監査 R69）。 */
+  attention: number
 }
 
 export type FriendProfileCandidateOption = {
@@ -6517,13 +6519,14 @@ export const api = {
       ),
     urlClicksOverview: (
       accountId: string,
-      params?: { from?: string; to?: string; limit?: number },
+      params?: { from?: string; to?: string; limit?: number; query?: string },
     ) => {
       const query = new URLSearchParams()
       query.set('account_id', accountId)
       if (params?.from) query.set('from', params.from)
       if (params?.to) query.set('to', params.to)
       if (params?.limit) query.set('limit', String(params.limit))
+      if (params?.query) query.set('query', params.query)
       return fetchApi<ApiResponse<AnalyticsUrlClicksOverview>>(
         `/api/analytics/url-clicks?${query.toString()}`,
       )
@@ -6792,6 +6795,10 @@ export const api = {
       category?: 'auth' | 'business'
       result?: 'success' | 'denied' | 'failed'
       attention?: boolean
+      /** 集計タブと同じ分類での絞り込み（監査 R69）。 */
+      group?: 'deleted' | 'sent' | 'changed' | 'login' | 'attention'
+      /** ページ分割もこの順序で行う（監査 R68）。 */
+      sort?: 'asc' | 'desc'
       actorId?: string
       action?: string
       query?: string
@@ -6805,6 +6812,8 @@ export const api = {
       if (params?.category) q.set('category', params.category)
       if (params?.result) q.set('result', params.result)
       if (params?.attention !== undefined) q.set('attention', String(params.attention))
+      if (params?.group) q.set('group', params.group)
+      if (params?.sort) q.set('sort', params.sort)
       if (params?.actorId) q.set('actorId', params.actorId)
       if (params?.action) q.set('action', params.action)
       if (params?.query) q.set('query', params.query)
@@ -10815,6 +10824,15 @@ export const api = {
     validateDraft: (id: string) =>
       fetchApi<ApiResponse<ReminderValidationResult>>(`/api/reminders/${id}/validate`, {
         method: 'POST',
+      }),
+    /**
+     * 未保存の条件で人数を数え直す (R15)。条件を送らなければ保存済みの
+     * まま数える。顔ぶれ (先頭20人) も同じ条件で切って返す。
+     */
+    audience: (id: string, condition?: unknown) =>
+      fetchApi<ApiResponse<{ matched: number; excluded: number; sample: Array<{ id: string; displayName: string }> }>>(`/api/reminders/${id}/audience`, {
+        method: 'POST',
+        body: JSON.stringify(condition === undefined ? {} : { condition }),
       }),
     previewDraft: (id: string, targetDate?: string) =>
       fetchApi<ApiResponse<ReminderPreviewResult>>(`/api/reminders/${id}/preview`, {

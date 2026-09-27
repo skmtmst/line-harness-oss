@@ -596,6 +596,7 @@ export async function getAnalyticsUrlClicksOverview(
   db: D1Database,
   context: AnalyticsOverviewContext,
   limit = 200,
+  query?: string,
 ) {
   const safeLimit = Math.min(200, Math.max(1, limit));
   const inclusiveTo = new Date(new Date(context.toExclusive).getTime() - 1).toISOString();
@@ -605,6 +606,7 @@ export async function getAnalyticsUrlClicksOverview(
       context.lineAccountId,
       { from: context.from, to: inclusiveTo },
       safeLimit + 1,
+      query,
     ),
     db.prepare(
       `SELECT available_from, state, reason

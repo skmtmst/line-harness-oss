@@ -14,6 +14,21 @@ vi.mock('@line-crm/db', () => ({
 
 vi.mock('./feature-enforcement.js', () => ({ featureJobCanRun: async () => true }));
 
+/*
+ * R15: 走査も公開版の対象条件で絞る。判定の中身は別試験の守備範囲。
+ * 条件なしでは従来どおり登録し、判定を読まない。
+ */
+const getReminderTargetCondition = vi.fn();
+const matchesCondition = vi.fn();
+
+vi.mock('./reminder-trigger.js', () => ({
+  getReminderTargetCondition: (...a: unknown[]) => getReminderTargetCondition(...a),
+}));
+
+vi.mock('./segment-query.js', () => ({
+  matchesCondition: (...a: unknown[]) => matchesCondition(...a),
+}));
+
 import { processFriendFieldReminders } from './friend-field-reminders.js';
 
 const db = {} as D1Database;
@@ -39,6 +54,8 @@ beforeEach(() => {
   enrollFriendsInReminderOnce.mockReset().mockImplementation(
     async (_db: D1Database, _reminderId: string, candidates: unknown[]) => candidates.length,
   );
+  getReminderTargetCondition.mockReset().mockResolvedValue(null);
+  matchesCondition.mockReset().mockResolvedValue(true);
 });
 
 describe('processFriendFieldReminders', () => {
@@ -306,5 +323,62 @@ describe('分割と再開', () => {
 
     expect(first).toEqual({ enrolled: 1, skipped: 0, scanned: 1, hasMore: true });
     expect(resumed).toEqual({ enrolled: 0, skipped: 1, scanned: 1, hasMore: false });
+  });
+
+  describe('公開版の対象条件', () => {
+    const CONDITION = { operator: 'AND', rules: [{ type: 'tag_exists', value: 'tag-1' }] };
+
+    function birthdayPage() {
+      getFriendFieldReminders.mockResolvedValue([reminder()]);
+      getFriendsWithFieldValuePage.mockResolvedValue([
+        { friend_id: 'f-1', value: '1990-05-03' },
+      ]);
+    }
+
+    it('条件なしでは判定を読まず従来どおり登録する', async () => {
+      birthdayPage();
+      const result = await processFriendFieldReminders(db, jst('2026-04-01T00:05'));
+      expect(result.enrolled).toBe(1);
+      expect(getReminderTargetCondition).toHaveBeenCalledWith(db, 'rem-1');
+      expect(matchesCondition).not.toHaveBeenCalled();
+      expect(enrollFriendsInReminderOnce).toHaveBeenCalledWith(db, 'rem-1', [{
+        friendId: 'f-1',
+        targetDate: '2026-05-03T00:00:00+09:00',
+      }]);
+    });
+
+    it('条件に当てはまる友だちは登録する', async () => {
+      birthdayPage();
+      getReminderTargetCondition.mockResolvedValue(CONDITION);
+      matchesCondition.mockResolvedValue(true);
+      const result = await processFriendFieldReminders(db, jst('2026-04-01T00:05'));
+      expect(result.enrolled).toBe(1);
+      expect(matchesCondition).toHaveBeenCalledWith(db, 'f-1', CONDITION);
+    });
+
+    it('条件に外れる友だちは登録せず、走査は止めない', async () => {
+      birthdayPage();
+      getReminderTargetCondition.mockResolvedValue(CONDITION);
+      matchesCondition.mockResolvedValue(false);
+      const result = await processFriendFieldReminders(db, jst('2026-04-01T00:05'));
+      expect(result).toEqual({ enrolled: 0, skipped: 1, scanned: 1, hasMore: false });
+      expect(enrollFriendsInReminderOnce).toHaveBeenCalledWith(db, 'rem-1', []);
+      // カーソルは進める。外れた1人が後続を止めない。
+      expect(setFriendFieldReminderScanCursor).toHaveBeenCalled();
+    });
+
+    it('判定で転んでもその1人だけ飛ばして続ける', async () => {
+      birthdayPage();
+      getReminderTargetCondition.mockResolvedValue(CONDITION);
+      matchesCondition.mockRejectedValueOnce(new Error('D1 gone'));
+      const quiet = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      try {
+        const result = await processFriendFieldReminders(db, jst('2026-04-01T00:05'));
+        expect(result).toEqual({ enrolled: 0, skipped: 1, scanned: 1, hasMore: false });
+        expect(quiet).toHaveBeenCalled();
+      } finally {
+        quiet.mockRestore();
+      }
+    });
   });
 });

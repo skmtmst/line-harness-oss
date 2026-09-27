@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import SearchField from '@/components/shared/search-field'
@@ -22,6 +22,7 @@ const EMPTY_SUMMARY: AuditEventSummary = {
   changed: 0,
   logins: 0,
   suspiciousLogins: 0,
+  attention: 0,
 }
 
 const ROLE_LABELS: Record<string, string> = {
@@ -52,15 +53,18 @@ function isAttention(row: AuditEventItem): boolean {
   return row.riskLevel !== 'normal' || row.result !== 'success'
 }
 
-function belongsTo(row: AuditEventItem, filter: string): boolean {
-  const action = row.action.toLowerCase()
-  if (filter === 'all') return true
-  if (filter === 'deleted') return action.includes('delete')
-  if (filter === 'sent') return action.includes('send') || action.includes('publish')
-  if (filter === 'settings') return action.includes('update') || action.includes('change') || action.includes('patch') || action.includes('put')
-  if (filter === 'login') return row.category === 'auth' && action.includes('login')
-  if (filter === 'attention') return isAttention(row)
-  return true
+/*
+ * 監査 R69: タブの絞り込みはサーバ側の集計と同じ分類（group）で行う。
+ * 以前は画面側の独自条件で、集計が数えた publish・change・patch・put の
+ * 記録が「配信した」「設定を変えた」の一覧から消えていた。
+ */
+const TAB_GROUP: Record<string, 'deleted' | 'sent' | 'changed' | 'login' | 'attention' | undefined> = {
+  all: undefined,
+  deleted: 'deleted',
+  sent: 'sent',
+  settings: 'changed',
+  login: 'login',
+  attention: 'attention',
 }
 
 function formatDate(value: string): string {
@@ -144,22 +148,14 @@ export default function LoginAudit({ userId }: { userId?: string }) {
       const from = periodFilter === 'all'
         ? undefined
         : new Date(Date.now() - Number(periodFilter) * 24 * 60 * 60 * 1000).toISOString()
-      const category = actionFilter === 'login' ? 'auth' as const : undefined
-      const action = actionFilter === 'deleted'
-        ? 'delete'
-        : actionFilter === 'sent'
-          ? 'send'
-          : actionFilter === 'settings'
-            ? 'update'
-            : undefined
       const auditResult = await api.audit.events({
         lineAccountId: selectedAccountId ?? undefined,
         actorId: userId,
         query: query.trim() || undefined,
         from,
-        category,
-        attention: actionFilter === 'attention' ? true : undefined,
-        action,
+        group: TAB_GROUP[actionFilter],
+        // 監査 R68: 並び順もAPIへ渡し、DBが同じ順序でページを分ける。
+        sort: sort === 'old' ? 'asc' : 'desc',
         limit: pageSize,
         offset: (page - 1) * pageSize,
       })
@@ -186,7 +182,7 @@ export default function LoginAudit({ userId }: { userId?: string }) {
     } finally {
       if (requestId === requestSeq.current) setLoading(false)
     }
-  }, [actionFilter, page, pageSize, periodFilter, query, selectedAccountId, userId])
+  }, [actionFilter, page, pageSize, periodFilter, query, selectedAccountId, sort, userId])
 
   useEffect(() => { void load() }, [load])
 
@@ -196,13 +192,10 @@ export default function LoginAudit({ userId }: { userId?: string }) {
     sent: summary.sent,
     settings: summary.changed,
     login: summary.logins,
-    attention: summary.suspiciousLogins,
+    attention: summary.attention,
   }
-  const shown = useMemo(() => rows
-    .filter((row) => belongsTo(row, actionFilter))
-    .sort((a, b) => sort === 'new'
-      ? new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      : new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()), [actionFilter, rows, sort])
+  // 絞り込み・並び替えはサーバ側で済んでいるので、返ってきた頁をそのまま出す。
+  const shown = rows
   useEffect(() => { setPage(1) }, [actionFilter, pageSize, periodFilter, query, sort])
   const pageCount = Math.max(1, Math.ceil(total / pageSize))
   const currentPage = Math.min(page, pageCount)

@@ -68,7 +68,7 @@ import {
   FRIEND_SAVED_VIEWS, MERGED_PERSON_DETAIL, MERGED_PERSON_EMPTY, MERGED_PERSON_ERROR,
   LIST_STATS, NEN_BIRTHDAY_COUPON, NEN_CAMPAIGN_SETTINGS, NEN_COLUMN_CREATE, NEN_COLUMN_OPERATIONS, NEN_COLUMNS, NEN_JOBS, NEN_PETS,
   NEN_FLOW_METRICS, NEN_COLUMN_METRICS, NEN_PET_METRICS, NEN_DELIVERIES, NEN_DELIVERY_DETAILS,
-  OPERATORS, REMINDERS, REMINDER_DRAFT, REMINDER_FOLDERS, REMINDER_VALIDATE, REMINDER_PREVIEW, REMINDER_TEST_SEND, REMINDER_PUBLISH, SCENARIO_ACTIONS, SCENARIO_DRAFT, SCENARIO_FOLDERS, SCENARIO_STATS, SCENARIO_STEPS, SCENARIO_SIMULATION, SCENARIO_RUNS, USERS_GROUPED,
+  OPERATORS, REMINDERS, REMINDER_DRAFT, REMINDER_FOLDERS, REMINDER_VALIDATE, REMINDER_AUDIENCE, REMINDER_PREVIEW, REMINDER_TEST_SEND, REMINDER_PUBLISH, SCENARIO_ACTIONS, SCENARIO_DRAFT, SCENARIO_FOLDERS, SCENARIO_STATS, SCENARIO_STEPS, SCENARIO_SIMULATION, SCENARIO_RUNS, USERS_GROUPED,
   RICH_MENU_DELETE_IMPACT, RICH_MENU_DELETE_IMPACT_EMPTY,
   RICH_MENU_GROUPS, RICH_MENU_GROUP_DETAILS, RICH_MENU_EXTERNAL, RICH_MENU_TAP_STATS,
   TAGS, TAG_GROUPS, TAG_DEFINITION_NEN_SUBSCRIPTION, TAG_DEPENDENCIES_NEN_SUBSCRIPTION,
@@ -1292,8 +1292,18 @@ function visualQaWriteBody(method, pathname) {
    * 読みの `/draft` と `/runs` は従来のGET側にある。ここは書き込み側で、
    * 本番と同じ器（`{success:true,data}`）で固定の返事を返す。
    */
-  if (method === 'PUT' && /^\/api\/reminders\/[^/]+\/draft$/.test(pathname)) return REMINDER_DRAFT
+  /*
+   * 対象者ステップはどのIDで開いても描けるように、要求のIDをそのまま返す。
+   * 固定の `reminder-3` を返すと、別ID（例 `reminder-1`）では画面の
+   * 照合（`draft.reminderId === reminderId`）に落ち、いつまでも
+   * 「下書きを読み込んでいます」になる。F-1 の撮影は ID を変えて行う。
+   */
+  if (method === 'PUT' && /^\/api\/reminders\/[^/]+\/draft$/.test(pathname)) {
+    const draftId = decodeURIComponent(pathname.split('/')[3] ?? '')
+    return { ...REMINDER_DRAFT, reminderId: draftId || REMINDER_DRAFT.reminderId }
+  }
   if (method === 'POST' && /^\/api\/reminders\/[^/]+\/validate$/.test(pathname)) return REMINDER_VALIDATE
+  if (method === 'POST' && /^\/api\/reminders\/[^/]+\/audience$/.test(pathname)) return REMINDER_AUDIENCE
   if (method === 'POST' && /^\/api\/reminders\/[^/]+\/preview$/.test(pathname)) return REMINDER_PREVIEW
   if (method === 'POST' && /^\/api\/reminders\/[^/]+\/test-send$/.test(pathname)) return REMINDER_TEST_SEND
   if (method === 'POST' && /^\/api\/reminders\/[^/]+\/publish$/.test(pathname)) return REMINDER_PUBLISH
@@ -2478,8 +2488,16 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       },
     }
   }
+  /*
+   * 対象者の画面が読む口（条件・人数・顔ぶれ・数え直し）の見本。
+   * 下書きは要求のIDをそのまま返す。固定IDだと別IDの撮影が
+   * 照合に落ち、F-1（条件を足す・変える・消す・人数がすぐ変わる・
+   * 顔ぶれを見る）を確かめられない。人数・顔ぶれ・数え直しは
+   * `REMINDER_VALIDATE` / `REMINDER_AUDIENCE` が固定で返す。
+   */
   if (/^\/api\/reminders\/[^/]+\/draft$/.test(pathname)) {
-    return { success: true, data: REMINDER_DRAFT }
+    const draftId = decodeURIComponent(pathname.split('/')[3] ?? '')
+    return { success: true, data: { ...REMINDER_DRAFT, reminderId: draftId || REMINDER_DRAFT.reminderId } }
   }
   const reminderOne = /^\/api\/reminders\/([^/]+)$/.exec(pathname)
   if (reminderOne) {
