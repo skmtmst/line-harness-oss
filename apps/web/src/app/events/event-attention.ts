@@ -66,9 +66,25 @@ export function summarizeEventAttention(
 }
 
 export function daysUntilEvent(item: EventListItem, nowMs = Date.now()): number | null {
-  const start = startsAt(item)
-  if (start === null) return null
-  return Math.max(0, Math.ceil((start - nowMs) / DAY_MS))
+  return daysUntilIso(item.next_slot_starts_at, nowMs)
+}
+
+/** 開催日時の ISO 文字列までの日数。全体集計の日付にも使う。 */
+export function daysUntilIso(iso: string | null, nowMs = Date.now()): number | null {
+  if (!iso) return null
+  const parsed = Date.parse(iso)
+  if (!Number.isFinite(parsed)) return null
+  return Math.max(0, Math.ceil((parsed - nowMs) / DAY_MS))
+}
+
+/** 一覧・編集の状態印の決め方（R81）。公開済みでも今後の枠が無ければ終了。 */
+export type EventRowState = 'draft' | 'full' | 'ended' | 'open'
+
+export function eventRowState(item: Pick<EventListItem, 'is_published' | 'next_slot_starts_at' | 'total_capacity' | 'total_active'>): EventRowState {
+  if (item.is_published !== 1) return 'draft'
+  if (!item.next_slot_starts_at) return 'ended'
+  if (item.total_capacity != null && item.total_active >= item.total_capacity) return 'full'
+  return 'open'
 }
 
 /**
