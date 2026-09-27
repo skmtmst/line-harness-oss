@@ -7,7 +7,8 @@ describe('Pencil V6 の入力・選択・押し口規定', () => {
   it('役割ごとの高さと白背景を共通部品で維持する', () => {
     const button = read('./button.module.css')
     const formControls = read('./form-controls.module.css')
-    const select = read('./select-field.module.css')
+    const select = read('./select.module.css')
+    const selectTsx = read('./select.tsx')
     const search = read('./search-field.module.css')
 
     /*
@@ -19,11 +20,12 @@ describe('Pencil V6 の入力・選択・押し口規定', () => {
     expect(button).toMatch(/\.field\s*{[^}]*height:\s*40px/s)
     expect(formControls).toMatch(/\.control\s*{[^}]*background:\s*var\(--color-canvas\)/s)
     expect(formControls).toMatch(/\.input\s*{[^}]*height:\s*40px/s)
-    expect(select).toMatch(/\.select\s*{[^}]*height:\s*40px/s)
-    expect(select).toMatch(/background-color:\s*var\(--color-canvas\)/)
-    expect(select).toMatch(/background-position:\s*right 13px center/)
+    expect(select).toMatch(/\.trigger\s*{[^}]*height:\s*40px/s)
+    expect(select).toMatch(/background:\s*var\(--color-canvas\)/)
+    // 開いた候補は DOM に描き、矢印はアイコンで出す（ブラウザ任せにしない）。
+    expect(selectTsx).toContain('ChevronDown')
     /*
-     * 呼び出し側の幅指定（`w-full` など utilities レイヤー）が既定幅
+     * 呼び出し側の幅指定（`size="full"` や utilities レイヤー）が既定幅
      * 176px/128px を上書きできるよう、部品の宣言は components レイヤー
      * に置く。未レイヤーに戻すとレイヤー外が常に勝ち、グリッド枠から
      * プルダウンがはみ出す（予約設定の空き確認で発生）。
@@ -66,11 +68,13 @@ describe('Pencil V6 の入力・選択・押し口規定', () => {
 
     expect(folderSelect).toContain('size="field"')
     expect(users).not.toContain('className="h-9')
-    expect(users).toContain('v6-select h-10 min-w-44')
+    expect(users).toContain('aria-label="UID連携で絞り込む"')
+    expect(users).toContain('aria-label="所属アカウントで絞り込む"')
     expect(tags).not.toContain('v6-select-tight h-9')
     expect(tags).toContain('h-10 min-w-45 flex-1')
-    expect(tags).toContain('h-10 min-w-44')
-    expect(tags).toContain('h-10 min-w-38')
+    expect(tags).toContain('aria-label="使用状態で絞り込む"')
+    expect(tags).toContain('aria-label="付与元で絞り込む"')
+    expect(tags).toContain('size="page-size"')
     expect(broadcasts).toContain('bg-canvas focus:ring-accent h-10')
   })
 })
