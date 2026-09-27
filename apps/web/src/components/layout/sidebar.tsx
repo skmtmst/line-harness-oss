@@ -12,6 +12,7 @@ import { HQ_TEMPLATE_DISTRIBUTION_ENABLED } from '@/lib/hq-template-availability
 import { usePageChrome } from '@/components/shell/page-chrome'
 import { defaultTitleForPath } from '@/components/shell/app-top-bar'
 import SidebarIdentity from './sidebar-identity'
+import Notice from '@/components/shared/notice'
 import HqAccountMenu from '@/components/hq/account-menu'
 import {
   FEATURE_SETTINGS_UPDATED_EVENT,
@@ -555,18 +556,21 @@ export default function Sidebar({
           1画面に同じ読み直しボタンを2つ出さない。
         */}
         {visibilityStatus === 'error' && selectedAccountId && (
-          <div className="mx-3 mb-2 rounded-control border border-warning bg-warning-bg px-3 py-2 text-xs text-ink-secondary">
-            <p>
-              機能設定を読み込めませんでした。
+          <Notice
+            tone="warn"
+            className="mx-3 mb-2"
+            action={(
               <button
                 type="button"
                 onClick={() => setVisibilityRetry((current) => current + 1)}
-                className="ml-1 cursor-pointer font-bold text-action underline"
+                className="cursor-pointer font-bold text-action underline"
               >
                 もう一度
               </button>
-            </p>
-          </div>
+            )}
+          >
+            機能設定を読み込めませんでした。
+          </Notice>
         )}
         {visibleSections.map((section, si) => (
           <div key={si} className={styles.section}>

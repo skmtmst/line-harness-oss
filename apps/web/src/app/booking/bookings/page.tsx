@@ -9,6 +9,7 @@ import { useAccount } from '@/contexts/account-context'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import FolderPanel, { FOLDER_RAIL_WIDTH } from '@/components/shared/folder-panel'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -1212,9 +1213,9 @@ function BookingDetailPanel({
         </div>
 
         <div data-design="Body" className="grid gap-4 px-6 py-4 xl:grid-cols-4">
-          <div className="flex min-w-0 flex-col gap-4 xl:col-span-3">
-          {detailError ? <p className="border-danger bg-danger-bg text-danger rounded-card border px-4 py-3 text-sm">{detailError}</p> : null}
-          <section>
+          <div className="min-w-0 xl:col-span-3">
+          {detailError ? <Notice tone="danger" message={detailError} onClose={() => setDetailError('')} className="mb-4" /> : null}
+          <section className="mb-6">
             <div className="bg-success-bg text-success mb-3 w-fit rounded-pill px-3 py-1 text-xs font-semibold">予約が入っています</div>
             <p className="text-ink-secondary mb-3 text-sm">{formatJpDateTime(b.starts_at)}〜{formatJpTime(b.ends_at)} ／ 担当 {b.staff_name} ／ {isLinked ? 'LINEから入りました。' : '電話・店頭で受け付けました。'}</p>
             <div className="bg-canvas rounded-card border-hairline border p-5">

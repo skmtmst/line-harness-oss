@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, type FriendStats } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import SummaryCard from '@/components/shared/summary-card'
+import Notice from '@/components/shared/notice'
 
 /** Pencil ★V6（`zZMNG`）の上部カード。数え方は既存APIのままにする。 */
 export default function FriendKpis() {
@@ -87,16 +88,21 @@ export default function FriendKpis() {
   return (
     <div data-design="V6FriendKpis" data-design-node="zZMNG">
       {failed && !loading ? (
-        <div className="mb-3.5 flex items-center justify-between rounded-card border border-status-danger-border bg-status-danger-soft px-4 py-2.5 text-xs text-danger">
-          <span>友だち集計を読み込めませんでした。</span>
-          <button
-            type="button"
-            onClick={() => void load(selectedAccountId)}
-            className="font-semibold text-action underline"
-          >
-            再読み込み
-          </button>
-        </div>
+        <Notice
+          tone="danger"
+          className="mb-3.5"
+          action={(
+            <button
+              type="button"
+              onClick={() => void load(selectedAccountId)}
+              className="font-semibold text-action underline"
+            >
+              再読み込み
+            </button>
+          )}
+        >
+          友だち集計を読み込めませんでした。
+        </Notice>
       ) : null}
       <div className="grid grid-cols-2 gap-3.5 xl:grid-cols-4">
         {cards.map((card) => (

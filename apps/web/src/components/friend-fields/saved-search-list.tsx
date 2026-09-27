@@ -12,6 +12,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import SummaryCard from '@/components/shared/summary-card'
+import Notice from '@/components/shared/notice'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { describeSavedCondition, type SavedSearchConditionLabels } from '@/components/friends/saved-search-utils'
 import {
@@ -247,18 +248,19 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
       </p>
 
       {!accountId && (
-        <div className="bg-info-bg text-info mb-4 rounded-lg p-4 text-sm">
+        <Notice tone="info" className="mb-4">
           上部でLINE公式アカウントを選んでください。
-        </div>
+        </Notice>
       )}
 
       {error && (
-        <div className="bg-danger-bg border-danger-bg text-danger mb-4 rounded-lg border p-4 text-sm">
-          {error}
-          {retryOrder ? (
+        <Notice
+          tone="danger"
+          className="mb-4"
+          action={retryOrder ? (
             <button
               type="button"
-              className="ml-2 font-semibold underline underline-offset-2"
+              className="font-semibold underline underline-offset-2"
               onClick={() => {
                 const next = retryOrder
                 setRetryOrder(null)
@@ -267,8 +269,10 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
             >
               再試行
             </button>
-          ) : null}
-        </div>
+          ) : undefined}
+        >
+          {error}
+        </Notice>
       )}
 
       {/*

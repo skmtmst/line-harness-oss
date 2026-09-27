@@ -10,6 +10,7 @@ import Button from '@/components/shared/button'
 import { FeatureDisabledScreen } from '@/components/feature-disabled-gate'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 import StatusBadge from '@/components/shared/status-badge'
 import { isPoolsFeatureAvailable } from '@/lib/pools-availability'
 
@@ -110,10 +111,11 @@ export default function PoolsPage() {
           ) : (
             <div className="flex flex-col gap-4">
               {error ? (
-                <div className="border-danger bg-danger-bg text-danger rounded-control flex flex-wrap items-center gap-3 border p-4 text-sm" role="alert">
-                  <span className="min-w-0 flex-1">{error}</span>
-                  <button type="button" onClick={() => { void load() }} className="shrink-0 font-medium underline">もう一度読み込む</button>
-                </div>
+                <Notice
+                  tone="danger"
+                  message={error}
+                  action={<button type="button" onClick={() => { void load() }} className="shrink-0 font-medium underline">もう一度読み込む</button>}
+                />
               ) : null}
               {sortedPools.map((pool) => (
                 <PoolCard key={pool.id} pool={pool} accounts={accounts} onChange={load} />
@@ -420,9 +422,7 @@ function CreatePoolModal({
           </button>
         </div>
         {error && (
-          <div className="border-danger bg-danger-bg text-danger rounded-control border p-2 text-xs" role="alert">
-            {error}
-          </div>
+          <Notice tone="danger" message={error} />
         )}
         <input
           value={slug}

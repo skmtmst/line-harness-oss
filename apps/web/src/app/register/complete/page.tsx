@@ -7,6 +7,7 @@ import AuthCard, { AuthField } from '@/components/auth/auth-card'
 import PasswordField from '@/components/auth/password-field'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 import { TextField } from '@/components/shared/text-field'
 import { storeAdminSession } from '@/lib/admin-session'
 import { authRequest, confirmError, passwordError, readDeviceMarker, storeDeviceMarker } from '@/lib/auth-email'
@@ -122,9 +123,7 @@ function CompleteInner() {
     >
       <form onSubmit={(event) => void submit(event)} noValidate className="flex w-full flex-col gap-4">
         {error ? (
-          <p role="alert" className="rounded-control bg-status-danger-soft px-4 py-3 text-label text-danger">
-            {error}
-          </p>
+          <Notice tone="danger" message={error} />
         ) : null}
         <AuthField label="メールアドレス" hint="確認済み・ここでは変えられません" htmlFor="complete-email">
           <div id="complete-email" className="flex h-11 w-full items-center justify-between rounded-control border border-hairline bg-surface-pearl px-3 text-label text-ink-secondary">
