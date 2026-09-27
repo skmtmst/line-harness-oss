@@ -741,3 +741,44 @@ describe('一覧の担当欄 (#953 E-05)', () => {
     expect(within(byName(/公開で未割当/)).getByText('担当なし')).toBeTruthy()
   })
 })
+
+describe('監査 R91: メニューがあるときも見出しに作成の入口', () => {
+  test('1件ある一覧でも見出しに「＋ 予約メニューを作る」が出る', async () => {
+    /*
+     * 以前は作成の入口が空状態の中にしかなく、1件あると
+     * 2つ目のメニューを足せなかった。見出しに常設する。
+     */
+    fixture.listMenus = vi.fn(async () => ({
+      menus: [{
+        id: 'menu-1',
+        name: 'カット',
+        category_label: null,
+        description: null,
+        duration_minutes: 60,
+        buffer_after_minutes: 0,
+        base_price: 8000,
+        price_mode: 'fixed',
+        sort_order: 0,
+        is_active: 1,
+        auto_tag_id: null,
+        concurrent_capacity: 1,
+        booking_window_days: null,
+        cutoff_hours_before: null,
+        cancel_deadline_hours_before: null,
+        intake_question: null,
+        assigned_staff: [] as Array<{ id: string; display_name: string }>,
+        version: 1,
+      }],
+    }))
+    render(<><MenusPage /><ToastHost /></>)
+
+    await waitFor(() => {
+      const rows = screen.getAllByRole('row')
+      expect(rows.some((row) => within(row).queryByText('カット'))).toBe(true)
+    })
+    const head = document.querySelector('[data-design="Head"]')
+    expect(head).toBeTruthy()
+    const entry = head!.querySelector('a[href="/booking/menus/new"]')
+    expect(entry?.textContent).toContain('予約メニューを作る')
+  })
+})
