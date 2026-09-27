@@ -732,6 +732,9 @@ function versionResponse(row: ReminderVersionRow, fallbackLeapYearPolicy?: 'feb2
     lastTestStatus: row.last_test_status,
     lastTestedAt: row.last_tested_at,
     publishedAt: row.published_at,
+    // R148 監査：保存のたびに変わる版時刻。画面は開いたときの値を保存時に
+    // 送り返し、ずれていれば別の画面の先勝ちとして 409 で止める。
+    updatedAt: row.updated_at,
   };
 }
 
@@ -1064,8 +1067,14 @@ reminders.put('/api/reminders/:id/draft', requireRole('owner', 'admin'), async (
       && typeof (rawBody as Record<string, unknown>).expectedVersionId === 'string'
       ? (rawBody as Record<string, unknown>).expectedVersionId as string
       : undefined;
+    // R148 監査：対象設定の保存も通知ステップと同じ条件にする。版IDに加え、
+    // 保存のたびに変わる版時刻も照合し、ずれていれば 409 で止める。
+    const expectedUpdatedAt = rawBody && typeof rawBody === 'object' && !Array.isArray(rawBody)
+      && typeof (rawBody as Record<string, unknown>).expectedUpdatedAt === 'string'
+      ? (rawBody as Record<string, unknown>).expectedUpdatedAt as string
+      : undefined;
     const saved = await saveReminderDraftVersion(
-      c.env.DB, c.req.param('id'), parsed.value, { expectedVersionId },
+      c.env.DB, c.req.param('id'), parsed.value, { expectedVersionId, expectedUpdatedAt },
     );
     return c.json({ success: true, data: versionResponse(saved) });
   } catch (err) {
@@ -1312,6 +1321,9 @@ reminders.get('/api/reminders/:id/runs', async (c) => {
           isActive: Boolean(reminder.is_active),
           lifecycleStatus: reminder.lifecycle_status,
           stopConditions: publishedSettings?.stopConditions ?? null,
+          // R146 監査：公開版の有無を画面へ渡す。無い下書きは「停止中」と
+          // 出さず「下書き」と出し、再開ボタンを出さない。
+          hasPublishedVersion: publishedVersion !== null,
         },
         summary,
         steps: stepRows.map((row, index) => ({
@@ -1451,6 +1463,11 @@ reminders.put('/api/reminders/:id', requireRole('owner', 'admin'), async (c) => 
     if (!updated) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({ success: true, data: { id: updated.id, name: updated.name, isActive: Boolean(updated.is_active) } });
   } catch (err) {
+    // R146 監査：公開版の無い下書きの再開は 409 で止める。通すと公開版IDが
+    // null のまま稼働中になり、公開版との状態が不整合になる。
+    if (err instanceof Error && err.message === 'REMINDER_NOT_PUBLISHED') {
+      return c.json({ success: false, error: 'まだ公開していない下書きは再開できません。先に公開してください' }, 409);
+    }
     console.error('PUT /api/reminders/:id error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
