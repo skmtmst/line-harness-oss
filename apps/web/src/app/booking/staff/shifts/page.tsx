@@ -1066,7 +1066,8 @@ function StoreShiftsView() {
                 <Link href="/booking/bookings" className="text-action flex justify-between gap-3"><span>→ 予約管理</span><span className="text-ink-faint text-xs">入った予約の台帳</span></Link>
                 <Link href="/rich-menus" className="text-action flex justify-between gap-3"><span>→ リッチメニュー</span><span className="text-ink-faint text-xs">予約ボタンの飛び先</span></Link>
                 <Link href="/reminders" className="text-action flex justify-between gap-3"><span>→ リマインダ</span><span className="text-ink-faint text-xs">前日・当日のお知らせ</span></Link>
-                <Link href="/users" className="text-action flex justify-between gap-3"><span>→ ログインユーザー</span><span className="text-ink-faint text-xs">担当できる人</span></Link>
+                <Link href="/booking/staff" className="text-action flex justify-between gap-3"><span>→ 予約の担当者</span><span className="text-ink-faint text-xs">担当できる人の追加と削除</span></Link>
+                <Link href="/staff" className="text-action flex justify-between gap-3"><span>→ ログインユーザー</span><span className="text-ink-faint text-xs">ログイン権限の管理</span></Link>
               </div>
             </section>
           </aside>

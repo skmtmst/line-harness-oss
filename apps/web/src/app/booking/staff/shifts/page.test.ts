@@ -84,6 +84,15 @@ describe('受付枠と休業日のV6契約', () => {
     expect(PAGE).not.toContain('function shortDate(')
   })
 
+  it('つながる先の担当者リンクは予約担当・ログイン権限へ進み顧客統合へ行かない(R162)', () => {
+    // /users は複数の友だちを1人の顧客として束ねる一覧で、担当者の管理ではない。
+    expect(PAGE).not.toContain('href="/users"')
+    expect(PAGE).toContain('href="/booking/staff"')
+    expect(PAGE).toContain('→ 予約の担当者')
+    expect(PAGE).toContain('href="/staff"')
+    expect(PAGE).toContain('→ ログインユーザー')
+  })
+
   it('登録済みの休業日は版付きで修正・削除でき、削除は確認を挟む (#953 E-09)', () => {
     expect(PAGE).toContain('bookingApi.updateException(selectedAccountId')
     expect(PAGE).toContain('bookingApi.deleteException(selectedAccountId')
