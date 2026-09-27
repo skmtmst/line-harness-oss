@@ -425,6 +425,8 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'POST /api/ops/support/tickets',
     'POST /api/ops/support/tickets/:id/draft/ai',
     'POST /api/ops/support/tickets/:id/reply',
+    // 組織ローカルのレシピ作成は owner/admin 専用（route 側の requireRole と一致）。
+    'POST /api/recipes',
     'POST /api/recipes/:id/clone',
     'POST /api/restaurant-test/gbp/posts',
     'POST /api/restaurant-test/google/changes/:id/send',
