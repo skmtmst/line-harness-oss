@@ -32,8 +32,9 @@ describe('V6 支払いの追記台帳契約', () => {
     expect(API).toContain("purpose: 'affiliate.payout.export'")
     expect(PAYMENT).toContain("process.env.NEXT_PUBLIC_API_URL ?? ''")
     expect(PAYMENT).toContain('statementKeysRef.current.get(item.affiliateId)')
-    expect(PAYMENT).toContain('Promise.allSettled(preview.affiliates.map')
-    expect(PAYMENT).toContain('}, payoutKey)')
+    // R43: 締め直後はプレビュー、再開時は台帳の内訳から対象を取る。
+    expect(PAYMENT).toContain('Promise.allSettled(statementTargets.map')
+    expect(PAYMENT).toContain('}, key)')
     expect(PAYMENT).toContain('exportKey,')
   })
 
@@ -103,7 +104,8 @@ describe('V6 支払いの追記台帳契約', () => {
   })
 
   it('振込用CSVは合言葉が空のまま送らない（#554 点検#505中8）', () => {
-    expect(PAYMENT).toContain('if (!payoutKey)')
-    expect(PAYMENT).toContain('disabled={!closed || operationBusy || !payoutKey}')
+    // 合言葉は締め直後だけでなく再開時にも必要なため、無ければ払い出す。
+    expect(PAYMENT).toContain('payoutKey || crypto.randomUUID()')
+    expect(PAYMENT).toContain('disabled={!closed || operationBusy || Boolean(resumed?.batch)}')
   })
 })

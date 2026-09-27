@@ -763,6 +763,7 @@ const ALLOWLIST = new Set<string>([
   'GET /api/affiliate-payments',
   'GET /api/affiliate-payments/{id}/preview',
   'GET /api/affiliate-payout-batches/{id}/download',
+  'GET /api/affiliate-settlements/current',
   'GET /api/affiliate-settlements/preview',
   'GET /api/affiliates-report',
   'GET /api/affiliates/{id}/archive-impact',

@@ -246,9 +246,9 @@ function PetRow({ pet, canEdit, onEdit }: { pet: NenPetRow; canEdit: boolean; on
       <Td><span className="block truncate text-label text-ink-secondary" title={pet.productName ?? '（未設定）'}>{pet.productName ?? '（未設定）'}</span></Td>
       <Td>
         {pet.weightStale ? (
-          <Chip tone="warn">{pet.updatedAt.slice(5, 10).replace('-', '/')}</Chip>
+          <Chip tone="warn">{pet.weightUpdatedAt.slice(5, 10).replace('-', '/')}</Chip>
         ) : (
-          <span className="text-label text-ink-secondary">{pet.updatedAt.slice(5, 10).replace('-', '/')}</span>
+          <span className="text-label text-ink-secondary">{pet.weightUpdatedAt.slice(5, 10).replace('-', '/')}</span>
         )}
       </Td>
       {/*
