@@ -151,7 +151,11 @@ function BroadcastDetailInner() {
           detail.data.targetType !== 'all' && detail.data.targetType !== 'multi-account-dedup'
         if (needsAudienceNames) {
           setAudienceNameState('loading')
-          void Promise.allSettled([api.tags.list(), api.scenarios.list()])
+          // R23横展開: この配信のアカウントの候補だけで名前を解決する。
+          void Promise.allSettled([
+            api.tags.list({ accountId: selectedAccountId }),
+            api.scenarios.list({ accountId: selectedAccountId }),
+          ])
             .then(([tagsRes, scenariosRes]) => {
               if (!active) return
               const tags = tagsRes.status === 'fulfilled' && tagsRes.value.success ? tagsRes.value.data : null

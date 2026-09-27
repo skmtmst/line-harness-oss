@@ -16,7 +16,8 @@ describe('inflow link tag auto-assignment UI wiring', () => {
   test('inflow-links page loads tags and shows the assigned auto-tag in the route list', () => {
     expect(page).toContain("import type { ApiResponse, EntryRoute, EntryRouteGenre, TrafficPool, Scenario, Tag }");
     expect(page).toContain('const [tags, setTags] = useState<Tag[]>([])');
-    expect(page).toContain('api.tags.list()');
+    // R23横展開: 候補は今のアカウントだけ（別アカウントの同名タグ混入防止）。
+    expect(page).toContain('api.tags.list(candidateParams)');
     expect(page).toContain('if (tagRes.success) setTags(tagRes.data)');
     expect(page).toContain('tagId: r.tagId');
     expect(page).toContain('const tag = tags.find((t) => t.id === r.tagId)');

@@ -131,12 +131,13 @@ function NewBroadcastPageContent() {
 
   const load = useCallback(async () => {
     try {
-      const res = await api.tags.list()
+      // R23横展開: 条件づくりのタグ候補は今のアカウントだけ。切替で取り直す。
+      const res = await api.tags.list(selectedAccountId ? { accountId: selectedAccountId } : undefined)
       if (res.success) setTags(res.data)
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [selectedAccountId])
 
   useEffect(() => {
     void load()
