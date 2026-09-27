@@ -827,7 +827,7 @@ lineAccounts.post('/api/line-accounts/:id/activate', requireRole('owner', 'admin
  */
 lineAccounts.get(
   '/api/line-accounts/:id/skipped-deliveries',
-  requireRole('owner', 'admin', 'staff'),
+  requireRole('owner', 'admin'),
   async (c) => {
     try {
       const id = c.req.param('id')!;
