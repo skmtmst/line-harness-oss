@@ -700,6 +700,9 @@
   "components/shared/list-state.tsx": {
     "unresolved-classname": 5
   },
+  "components/shared/list-toolbar.tsx": {
+    "unresolved-classname": 6
+  },
   "components/shared/not-connected.tsx": {
     "unresolved-classname": 3
   },
