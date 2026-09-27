@@ -734,10 +734,10 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
   }, [highlightedPoint, current])
 
   return (
-    <div data-conversion-points-design="v6">
+    <div data-conversion-points-design="v6" className="flex flex-col gap-4">
 
       {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}
-      <KpiCollapse data-design="KPIs" className="mb-4" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <KpiCollapse data-design="KPIs" gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard
           title="決めてある成果地点"
           value={definitions?.pagination.total ?? null}
@@ -781,17 +781,17 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
         <Notice tone="info" message={`「${highlightedPoint.name}」を保存しました。色の付いた行です。`} className="mb-4" />
       ) : null}
 
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <Button href="/conversions/new" variant="primary">＋ 成果地点を作る</Button>
         <Button onClick={() => void exportCsv()} disabled={exporting}>
           {exporting ? '書き出しています' : 'CSVで書き出す'}
         </Button>
       </div>
-      {exportError ? <p className="text-danger mb-3 text-sm" role="alert">{exportError}</p> : null}
+      {exportError ? <p className="text-danger text-sm" role="alert">{exportError}</p> : null}
 
       <div
         data-design="Bar"
-        className="mb-3 space-y-3"
+        className="space-y-3"
       >
         <div className="flex flex-wrap items-center justify-between gap-2">
           <SearchField

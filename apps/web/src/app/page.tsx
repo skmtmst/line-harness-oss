@@ -1419,9 +1419,10 @@ function DashboardPageInner() {
   const healthClass = displayedHealthRisk === 'danger' ? 'text-danger' : displayedHealthRisk === 'warning' ? 'text-warning' : displayedHealthRisk === 'normal' ? 'text-success' : 'text-ink-faint'
 
   return (
-    <div>
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       {/* V6 `vUXKb/vwcM6`: 画面名は共通トップバーだけ。本文には操作だけを置く。 */}
-      <div data-design="Head" className="mb-4.5 flex min-h-10 flex-wrap items-center justify-between gap-3">
+      <div data-design="Head" className="flex min-h-10 flex-wrap items-center justify-between gap-3">
         <Button onClick={openEditor}>
           <EditIcon />ダッシュボード編集
         </Button>
@@ -1499,12 +1500,12 @@ function DashboardPageInner() {
         黄色の帯にしない。
       */}
       {data?.partialFailures?.length ? (
-        <p className="text-ink-secondary mb-5 text-xs" role="status">
+        <p className="text-ink-secondary text-xs" role="status">
           一部のデータを{STATE_TEXT.error}（{data.partialFailures.join('、')}）。0件としては表示していません。
         </p>
       ) : null}
 
-      {visibleToday.length > 0 ? <section data-design="TodayTasks" className="mb-6">
+      {visibleToday.length > 0 ? <section data-design="TodayTasks">
         {/* 見出しは置かない（オーナー指示）。4枚の小カードだけ出す。 */}
         {/* #975 U060: 390pxでは先頭2件だけ出し、残りは「集計を見る」で開く。 */}
         <KpiCollapse gridClassName="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -1512,8 +1513,8 @@ function DashboardPageInner() {
         </KpiCollapse>
       </section> : null}
 
-      <div data-design="Middle" className="grid grid-cols-1 items-start gap-[18px] xl:grid-cols-[minmax(0,3fr)_minmax(300px,1fr)]">
-        <div data-design="Body" className="min-w-0 space-y-[18px]">
+      <div data-design="Middle" className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(300px,1fr)]">
+        <div data-design="Body" className="flex min-w-0 flex-col gap-4">
           {/*
             出荷予定を含め、メインのカードは編集パネルで決めた順番どおりに出す
             （DASH-06）。以前は出荷だけがメインの外へ固定され、並べ替えても
