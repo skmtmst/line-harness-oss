@@ -278,8 +278,62 @@ describe('カレンダー', () => {
     renderPicker();
     await screen.findByText('2026年10月');
     expect(
-      await screen.findByText('この月に空きはありません。別の月を選んでください。'),
+      await screen.findByText('この月は空きがありません。'),
     ).toBeTruthy();
+  });
+});
+
+describe('カレンダーの最初の月と月送り', () => {
+  it('今月に空きが無く来月にある時は、来月を開いて1日を選ぶ', async () => {
+    todayOverride = '2026-09-27';
+    availability.mockImplementation(
+      async (_menuId: string, _staffId: string | undefined, from: string, to: string) => ({
+        by_staff: [
+          {
+            staff_id: 's1',
+            display_name: '担当A',
+            slots: [
+              { date: '2026-10-01', start: '10:00', end: '11:00' },
+              { date: '2026-10-01', start: '11:00', end: '12:00' },
+              { date: '2026-10-05', start: '10:00', end: '11:00' },
+            ].filter((s) => s.date >= from && s.date <= to),
+          },
+        ],
+        closed_dates: [],
+      }),
+    );
+    mockSettings('calendar', 60);
+    renderPicker();
+    // 9月ではなく、空きのある一番早い日（10/1）の月を開く。
+    expect(await screen.findByText('2026年10月')).toBeTruthy();
+    expect(await screen.findByText('10/1(木) の空き')).toBeTruthy();
+    expect(
+      screen.getByRole('button', { name: '10月1日 空きあり' }).getAttribute('aria-pressed'),
+    ).toBe('true');
+  });
+
+  it('月を送ると、その月で空きのある一番早い日を選び直す', async () => {
+    mockSettings('calendar', 60);
+    renderPicker();
+    // 今月（10月）の一番早い空き日から始まる。
+    expect(await screen.findByText('10/16(金) の空き')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '次の月' }));
+    expect(await screen.findByText('2026年11月')).toBeTruthy();
+    // 来月の一番早い空き日（11/2）に変わり、前の月の日は下に残らない。
+    expect(await screen.findByText('11/2(月) の空き')).toBeTruthy();
+    expect(screen.queryByText('10/16(金) の空き')).toBeNull();
+  });
+
+  it('送った先の月に空きが無ければその旨だけ出す', async () => {
+    mockSettings('calendar', 60);
+    renderPicker();
+    expect(await screen.findByText('10/16(金) の空き')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '次の月' }));
+    expect(await screen.findByText('11/2(月) の空き')).toBeTruthy();
+    // 12月に空きは無い（受付期限は12-14）。
+    fireEvent.click(screen.getByRole('button', { name: '次の月' }));
+    expect(await screen.findByText('2026年12月')).toBeTruthy();
+    expect(await screen.findByText('この月は空きがありません。')).toBeTruthy();
   });
 });
 

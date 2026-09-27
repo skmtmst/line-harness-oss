@@ -56,6 +56,20 @@ function monthEnd(month: string): string {
   return addDays(`${addMonths(month, 1)}-01`, -1);
 }
 
+/** 見ている月のうち、空きのある日を早い順に並べる（今日〜受付期限の内側だけ）。 */
+function openDaysOfMonth(
+  target: string,
+  byDate: Record<string, string[]>,
+  today: string,
+  windowEnd: string,
+): string[] {
+  const from = monthStart(target) < today ? today : monthStart(target);
+  const to = monthEnd(target) > windowEnd ? windowEnd : monthEnd(target);
+  return Object.keys(byDate)
+    .filter((d) => d >= from && d <= to && (byDate[d]?.length ?? 0) > 0)
+    .sort();
+}
+
 /** [from, to] を CHUNK_DAYS 日ずつに割る（口の上限に収める）。 */
 function splitRange(from: string, to: string): Array<[string, string]> {
   const chunks: Array<[string, string]> = [];
@@ -178,6 +192,8 @@ export default function DateTimePicker({
   const [calDay, setCalDay] = useState<string | null>(null);
   const [calFailed, setCalFailed] = useState(false);
   const [calReloadKey, setCalReloadKey] = useState(0);
+  // 最初に開く月の探索が済んだか。済むまでは空きの無い月を飛ばす。
+  const [calAutoDone, setCalAutoDone] = useState(false);
 
   // 最初の形は「端末の覚え → 管理画面の設定 → リスト」の順。設定が読めなくても止めない。
   useEffect(() => {
@@ -251,12 +267,6 @@ export default function DateTimePicker({
         setCalByDate((prev) => ({ ...prev, ...grouped }));
         setCalClosed((prev) => ({ ...prev, ...closed }));
         setLoadedMonths((prev) => (prev.includes(month) ? prev : [...prev, month]));
-        // 最初に開いた時は、空きのある一番早い日を選んだ状態にする。
-        setCalDay((prev) => {
-          if (prev !== null) return prev;
-          const open = Object.keys(grouped).filter((d) => grouped[d].length > 0).sort();
-          return open[0] ?? null;
-        });
       })
       .catch((e) => {
         if (cancelled) return;
@@ -267,6 +277,28 @@ export default function DateTimePicker({
       cancelled = true;
     };
   }, [view, settings, month, menuId, staffId, today, windowEnd, loadedMonths, calReloadKey]);
+
+  // 見ている月が読めたら、その月で空きのある一番早い日を選ぶ。
+  // 月を送った時は選び直す（前の月の日を下に残さない）。
+  useEffect(() => {
+    if (view !== 'calendar' || !settings) return;
+    if (!loadedMonths.includes(month)) return;
+    const open = openDaysOfMonth(month, calByDate, today, windowEnd);
+    setCalDay(open[0] ?? null);
+  }, [view, settings, month, loadedMonths, calByDate, today, windowEnd]);
+
+  // 最初に開く月は、空きのある一番早い日がある月にする。
+  // 今月に空きが無ければ次の月へ送る（利用者が月を送った後は動かない）。
+  useEffect(() => {
+    if (view !== 'calendar' || !settings || calAutoDone) return;
+    if (!loadedMonths.includes(month)) return;
+    const open = openDaysOfMonth(month, calByDate, today, windowEnd);
+    if (open.length > 0 || month >= monthOf(windowEnd)) {
+      setCalAutoDone(true);
+      return;
+    }
+    setMonth(addMonths(month, 1));
+  }, [view, settings, calAutoDone, month, loadedMonths, calByDate, today, windowEnd]);
 
   const listHasSlots =
     listByDate !== null && Object.values(listByDate).some((times) => times.length > 0);
@@ -416,6 +448,9 @@ export default function DateTimePicker({
           setCalClosed({});
           setLoadedMonths([]);
           setCalDay(null);
+          // 読み直しは今月から探し直す。
+          setMonth(monthOf(today));
+          setCalAutoDone(false);
           setCalReloadKey((k) => k + 1);
         }} />
       ) : (
@@ -514,7 +549,7 @@ export default function DateTimePicker({
           )}
           {monthLoaded && !calDay && (
             <p className="text-sm leading-6 text-ink-secondary">
-              {monthHasOpen ? '日を選んでください。' : 'この月に空きはありません。別の月を選んでください。'}
+              {monthHasOpen ? '日を選んでください。' : 'この月は空きがありません。'}
             </p>
           )}
         </>

@@ -41,6 +41,29 @@ async function resetMock() {
 
 const failures = [];
 
+/**
+ * カレンダーで空きのある日を月をまたいで探し、2番目に早い日を選ぶ。
+ * （1つしか無ければその1つ。今月に空きが無い時は次の月へ送る）
+ */
+async function pickOpenDay(p) {
+  // 最初の月は空きのある月まで自動で送られるので、空き日の出現を待つ。
+  const waitOpen = () =>
+    p.getByRole('button', { name: /空きあり/ }).first().waitFor({ timeout: 20000 }).catch(() => {});
+  await waitOpen();
+  for (let i = 0; i < 12; i++) {
+    const days = p.getByRole('button', { name: /空きあり/ });
+    const count = await days.count();
+    if (count > 0) {
+      await days.nth(Math.min(1, count - 1)).click();
+      return;
+    }
+    const next = p.getByRole('button', { name: '次の月' });
+    if (!(await next.isEnabled())) return;
+    await next.click();
+    await waitOpen();
+  }
+}
+
 /** @param {{ mock?: object, waitMs?: number, after?: (page) => Promise<void> }} opts */
 async function shot(page, viewport, name, url, opts = {}) {
   await resetMock();
@@ -104,8 +127,9 @@ try {
         await p.getByRole('button', { name: /QA スタッフ/ }).click();
         await p.getByRole('button', { name: '日時を選ぶ' }).click();
         await p.getByRole('radio', { name: 'カレンダー' }).click();
+        // 空き日を月をまたいで探す（今月に空きが無い時もある）。
         // 2番目に早い空き日を選び、その日の時刻を選んだ状態で撮る。
-        await p.getByRole('button', { name: /空きあり/ }).nth(1).click();
+        await pickOpenDay(p);
         await p.getByRole('button', { name: '11:00' }).click();
       },
     });
