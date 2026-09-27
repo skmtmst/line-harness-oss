@@ -84,8 +84,12 @@ function dateOnlyDaysAgo(days: number) {
   return date.toISOString().slice(0, 10)
 }
 
+/*
+ * R53: 台帳の実額合計を使う。下書き金額を後から変えても、
+ * 過ぎた30日の額は変わらない（回数×今の下書き金額にしない）。
+ */
 function grantedMiles30d(rule: MileageEarningRuleV6) {
-  return rule.metrics30d.granted * rule.draft.amount
+  return rule.metrics30d.grantedMiles
 }
 
 type EarningRuleSummary = {
@@ -141,7 +145,7 @@ const RULE_FILTERS: Array<{ key: RuleFilter; label: string }> = [
 
 const RULE_SORTS: Array<{ value: RuleSort; label: string }> = [
   { value: 'order', label: '決めた並び順' },
-  { value: 'granted', label: '付いた回数が多い順' },
+  { value: 'granted', label: '付いたマイルが多い順' },
   { value: 'name', label: '名前順' },
   { value: 'amount', label: 'マイルが多い順' },
 ]

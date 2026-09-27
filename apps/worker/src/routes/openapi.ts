@@ -4424,6 +4424,64 @@ const spec = {
         },
       },
     },
+    // ── Photo reward policy (#817 報酬の決まりの版) ─────────────────────────
+    '/api/nen-members/photo-reward-policy/versions': {
+      get: {
+        tags: ['NenMembers'],
+        summary: '報酬の決まりの版の履歴を新しい版から返す',
+        description: '保存のたびに足した版を新しい順に返す。前の版は変わらない。status は in_use（いま使っている）/ reserved（予約）/ past（過去）。第1版は既存の5pt固定（legacy-5）。',
+        responses: {
+          '200': { description: '版の一覧 { versionNumber・policyKey・points・summary・effectiveFrom・status }' },
+          '403': { description: '写真審査の表示権限がない' },
+        },
+      },
+      post: {
+        tags: ['NenMembers'],
+        summary: '報酬の決まりの新しい版を作る',
+        description: '番号は「いまの最大＋1」。前の版は変えない。Idempotency-Key ヘッダ(必須)で再試行を見分ける。同じ確認キーの再送では版を増やさない。owner・admin だけ。',
+        parameters: [
+          { name: 'Idempotency-Key', in: 'header', required: true, schema: { type: 'string', minLength: 8, maxLength: 200 }, description: '保存操作の確認キー。必須。同じキーの再試行は同じ結果を返す。' },
+        ],
+        requestBody: { content: { 'application/json': { schema: {
+          type: 'object',
+          required: ['points'],
+          properties: {
+            points: { type: 'integer', minimum: 1, maximum: 100000, description: '採用1枚につき付ける点数。必須。' },
+            summary: { type: 'string', description: '版の中身のひとこと（例：報酬を5pt→10ptに）。' },
+            effectiveFrom: { type: 'string', description: '使い始めの日時。空は公開と同時。未来の日時は予約の札。' },
+            expectedVersion: { type: 'integer', minimum: 1, description: '確認したときの最新版。省略可。進んでいたら409。' },
+          },
+        } } } },
+        responses: {
+          '200': { description: '保存成功。data に created・version を返す。' },
+          '400': { description: '確認キー不足・点数が範囲外・日時の形が不正' },
+          '403': { description: 'owner・admin 以外' },
+        },
+      },
+    },
+    '/api/nen-members/photo-reward-policy/revert': {
+      post: {
+        tags: ['NenMembers'],
+        summary: '指定の版の中身で報酬の決まりの新しい版を作る',
+        description: '過去の版は変えない。その中身（点数・ひとこと）で新しい版を作る。使い始めは空（公開と同時）。Idempotency-Key ヘッダ(必須)で再試行を見分ける。owner・admin だけ。',
+        parameters: [
+          { name: 'Idempotency-Key', in: 'header', required: true, schema: { type: 'string', minLength: 8, maxLength: 200 }, description: '保存操作の確認キー。必須。同じキーの再試行は同じ結果を返す。' },
+        ],
+        requestBody: { content: { 'application/json': { schema: {
+          type: 'object',
+          required: ['versionNumber'],
+          properties: {
+            versionNumber: { type: 'integer', minimum: 1, description: '戻す版の番号。必須。無い版は404。' },
+          },
+        } } } },
+        responses: {
+          '200': { description: '戻す成功。data に created・version を返す。' },
+          '400': { description: '確認キー不足・版の番号が数でない' },
+          '403': { description: 'owner・admin 以外' },
+          '404': { description: '戻す版が無い' },
+        },
+      },
+    },
     '/api/templates/{id}/publish': {
       post: {
         tags: ['Templates'],

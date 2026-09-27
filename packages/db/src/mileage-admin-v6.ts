@@ -1,5 +1,6 @@
 import { getActionScoreBands } from './action-score-rules';
 import { publishedRuleContentFromDraft } from './mileage.js';
+import type { SegmentCondition } from './segment-conditions.js';
 import { jstNow } from './utils.js';
 
 const CONDITION_TYPES = new Set([
@@ -300,13 +301,21 @@ export async function getMileageEarningRulesV6(
               (SELECT COUNT(*) FROM mileage_ledger ml
                 JOIN friends lf ON lf.id = ml.beneficiary_friend_id
                WHERE lf.line_account_id = ? AND ml.mileage_rule_id = r.id
-                 AND ml.entry_type = 'grant' AND ml.occurred_at >= datetime('now', '-30 days')) AS granted_30d
+                 AND ml.entry_type = 'grant' AND ml.occurred_at >= datetime('now', '-30 days')) AS granted_30d,
+              /*
+               * R53: 回数ではなく台帳の実額を合計する。下書き金額を
+               * 後から変えても、過ぎた付与の額は変わらない。
+               */
+              (SELECT COALESCE(SUM(ml.amount), 0) FROM mileage_ledger ml
+                JOIN friends lf ON lf.id = ml.beneficiary_friend_id
+               WHERE lf.line_account_id = ? AND ml.mileage_rule_id = r.id
+                 AND ml.entry_type = 'grant' AND ml.occurred_at >= datetime('now', '-30 days')) AS granted_miles_30d
          FROM mileage_earning_rule_drafts d
          JOIN mileage_rules r ON r.id = d.rule_id
         WHERE d.line_account_id = ?
         ORDER BY COALESCE(json_extract(d.draft_json, '$.sortOrder'), 0), r.created_at, r.id
         LIMIT ? OFFSET ?`,
-    ).bind(input.lineAccountId, input.lineAccountId, input.lineAccountId, input.limit, input.offset).all<Record<string, unknown>>(),
+    ).bind(input.lineAccountId, input.lineAccountId, input.lineAccountId, input.lineAccountId, input.limit, input.offset).all<Record<string, unknown>>(),
     db.prepare(
       `SELECT
          (SELECT COUNT(*) FROM mileage_earning_rule_drafts WHERE line_account_id = ?) AS total,
@@ -318,6 +327,7 @@ export async function getMileageEarningRulesV6(
     items: rows.results.map((row) => {
       const eligible = Number(row.eligible_30d ?? 0);
       const granted = Number(row.granted_30d ?? 0);
+      const grantedMiles = Number(row.granted_miles_30d ?? 0);
       return {
         id: String(row.id),
         published: {
@@ -333,7 +343,7 @@ export async function getMileageEarningRulesV6(
         publishedVersion: row.published_version_number === null || row.published_version_number === undefined
           ? null
           : Number(row.published_version_number),
-        metrics30d: { eligible, granted, excluded: Math.max(0, eligible - granted) },
+        metrics30d: { eligible, granted, grantedMiles, excluded: Math.max(0, eligible - granted) },
       };
     }),
     pagination: { total: Number(counts?.total ?? 0), limit: input.limit, offset: input.offset },
@@ -737,6 +747,12 @@ export async function publishMileageEarningRule(
       initialStatus: draft.initialStatus,
       validFrom: draft.validFrom,
       validUntil: draft.validUntil,
+      /*
+       * R52: 下書きの対象条件を公開版へ載せる。載せないと公開版だけ
+       * 条件が消え、対象外へ付与される。保存時に型を絞ってあるので
+       * 絞り込み部品の形と一致する。
+       */
+      targetConditions: draft.targetConditions as SegmentCondition | null,
     },
     live.conditions,
   );
