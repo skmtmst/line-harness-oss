@@ -182,7 +182,7 @@ function FriendAddRunDetailInner() {
   const runAction = routingAction(detail.status, detail.errorCode)
   const routeName = detail.attribution.status === 'captured'
     ? detail.attribution.routeName || detail.attribution.reason || '選択した経路'
-    : '経路は取得できません'
+    : '経路は記録されていません'
   const ruleLabel = detail.rule
     ? `${detail.rule.name ?? '名前は未取得'}・第${detail.rule.versionNumber ?? '—'}版`
     : '使用ルールは未取得'
