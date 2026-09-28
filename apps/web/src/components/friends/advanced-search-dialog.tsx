@@ -18,6 +18,7 @@ import {
 import { TextInput } from '@/components/shared/form-controls'
 import DateField from '@/components/shared/date-field'
 import Button from '@/components/shared/button'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Combobox from '@/components/shared/combobox'
 import Select from '@/components/shared/select'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
@@ -720,20 +721,18 @@ export default function AdvancedSearchDialog({
               「対象」プルダウンの2か所が同じ変数へ別の意味で書き込み、
               「すべて」が非表示だけを検索していた。
             */}
-            <div className="mt-2 flex flex-wrap gap-4 text-xs font-semibold text-ink-secondary" role="radiogroup" aria-label="表示する友だち">
+            <RadioCardGroup legend="表示する友だち" className="mt-2 flex flex-wrap gap-4">
               {VISIBILITY_OPTIONS.map((item) => (
-                <label key={item.value} className="flex items-center gap-2">
-                  <input
-                    type="radio"
-                    name="friend-search-visibility"
-                    checked={visibility === item.value}
-                    onChange={() => setVisibility(item.value)}
-                    className="h-4 w-4 accent-accent"
-                  />
-                  {item.label}
-                </label>
+                <RadioCard
+                  key={item.value}
+                  name="friend-search-visibility"
+                  value={item.value}
+                  checked={visibility === item.value}
+                  onChange={() => setVisibility(item.value)}
+                  title={item.label}
+                />
               ))}
-            </div>
+            </RadioCardGroup>
             <label className="mt-3 flex flex-wrap items-center gap-3 text-xs font-semibold text-ink-secondary">
               友だちの状態
               {/* 共通Selectはvalue/onChange必須のため、操作なしの固定表示として値と空の変更受けを付ける。disabledの見た目・文言は変えない。 */}

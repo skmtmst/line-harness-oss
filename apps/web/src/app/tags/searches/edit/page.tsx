@@ -29,6 +29,7 @@ import { TextInput } from '@/components/shared/form-controls'
 import DateField from '@/components/shared/date-field'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
 import { optionsWithCurrent } from './reference-options'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -832,13 +833,10 @@ function SavedSearchEditInner() {
               </div>
               <TextInput value={conditions.description ?? ''} maxLength={300} onChange={(event) => patchConditions({ ...conditions, description: event.target.value })} placeholder="この検索を使う目的" className="max-w-xl" aria-label="説明" />
             </div>
-            <fieldset className="mt-4">
-              <legend className="text-xs font-semibold text-ink-faint">共有範囲</legend>
-              {/* ATTR-16: 狭い画面では縦に折り返す。横に伸ばして画面をはみ出させない。 */}
-              <div className="mt-2 flex flex-wrap gap-x-6 gap-y-2 text-sm text-ink-secondary">
-                <label className="flex items-center gap-2"><input type="radio" checked={isShared} onChange={() => setIsShared(true)} /> 全員（他の担当者からも使えます）</label>
-                <label className="flex items-center gap-2"><input type="radio" checked={!isShared} onChange={() => setIsShared(false)} /> 自分だけ</label>
-              </div>
+            <RadioCardGroup legend="共有範囲" className="mt-4">
+              <RadioCard name="saved-search-share" value="shared" checked={isShared} onChange={() => setIsShared(true)} title="全員" note="他の担当者からも使えます" />
+              <RadioCard name="saved-search-share" value="private" checked={!isShared} onChange={() => setIsShared(false)} title="自分だけ" />
+            </RadioCardGroup>
               {/*
                 設計 `XBkiQ`：共有範囲を選ぶ場所で、上限と「共有すると何が
                 起きるか」を先に言う。50件に近づいてから初めて知る、という
@@ -851,7 +849,6 @@ function SavedSearchEditInner() {
                   : `保存できるのは50件までです（いま${savedCount}件）。`}
                 共有すると、一斉配信・オートメーションの対象条件からも呼び出せます。
               </p>
-            </fieldset>
             {/* IDEA-04: 条件の保存は「保存した検索」。印ならタグ・値なら情報欄という違いを、編集の場所でも確認できるようにする。 */}
             <div className="mt-4"><AttributeKindGuide current="search" /></div>
           </section>

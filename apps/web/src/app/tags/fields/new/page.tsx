@@ -9,6 +9,7 @@ import FeatureGate from '@/components/feature-gate'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import Notice from '@/components/shared/notice'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -31,10 +32,7 @@ function suggestKey(name: string): string {
 
 function Toggle({ checked, onChange, label, hint }: { checked: boolean; onChange: (next: boolean) => void; label: string; hint: string }) {
   return (
-    <label className="flex cursor-pointer items-start justify-between gap-4 py-2">
-      <span><span className="block text-sm font-semibold text-ink">{label}</span><span className="block text-xs text-ink-faint">{hint}</span></span>
-      <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="mt-1 h-4 w-4 accent-accent" />
-    </label>
+    <Checkbox checked={checked} onCheckedChange={onChange} description={hint} className="py-2">{label}</Checkbox>
   )
 }
 

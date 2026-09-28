@@ -1,5 +1,6 @@
 'use client'
 
+import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Tag } from '@line-crm/shared'
@@ -444,10 +445,11 @@ export default function NewMileageRulePage() {
             <div className="rounded-card bg-canvas p-3 text-sm leading-6 text-ink">
               ありがとうございます。{validAmount ? value.toLocaleString('ja-JP') : '—'} マイルが付きました。現在の残高は、配信時に自動で入ります。
             </div>
-            <label className="mt-3 flex items-start gap-2 text-xs text-ink">
-              <input type="checkbox" checked={notifyFriend} onChange={(event) => setNotifyFriend(event.target.checked)} />
-              <span>マイルが付いたら、この内容を自動で知らせる</span>
-            </label>
+            <Checkbox
+              checked={notifyFriend}
+              onCheckedChange={setNotifyFriend}
+              className="mt-3"
+            >マイルが付いたら、この内容を自動で知らせる</Checkbox>
             <p className="mt-2 text-xs text-ink-secondary">通知するかどうかと本文を、たまる決めごとの下書きへ一緒に保存します。</p>
           </LinePreview>
 
@@ -548,10 +550,12 @@ export default function NewMileageRulePage() {
 
         <details className="rounded-control border border-hairline px-3 py-2">
           <summary className="cursor-pointer text-xs font-semibold text-action">倍率の詳細設定</summary>
-          <label className="mt-3 flex items-start gap-2 text-sm text-ink-secondary">
-            <input type="checkbox" className="mt-0.5" checked={ignoreMultiplier} onChange={(e) => setIgnoreMultiplier(e.target.checked)} />
-            <span>会員ランクの倍率をかけない<span className="block text-xs text-ink-faint">誰でも同じ額にしたいときに選びます。</span></span>
-          </label>
+          <Checkbox
+            checked={ignoreMultiplier}
+            onCheckedChange={setIgnoreMultiplier}
+            description="誰でも同じ額にしたいときに選びます。"
+            className="mt-3"
+          >会員ランクの倍率をかけない</Checkbox>
         </details>
       </FormSection>
 
@@ -627,15 +631,19 @@ export default function NewMileageRulePage() {
             </Field>
           </div>
           {cancellationEvent ? (
-            <label className="mt-3 flex items-start gap-2 text-sm text-ink-secondary">
-              <input type="checkbox" checked={reverseOnCancellation} onChange={(e) => setReverseOnCancellation(e.target.checked)} className="mt-0.5" />
-              <span>取り消されたら、付けたぶんを引く<span className="block text-xs text-ink-faint">{eventType === 'booking_created' ? '予約の取り消し' : '注文の取り消し'}を同じ記録から追跡します。</span></span>
-            </label>
+            <Checkbox
+              checked={reverseOnCancellation}
+              onCheckedChange={setReverseOnCancellation}
+              description={`${eventType === 'booking_created' ? '予約の取り消し' : '注文の取り消し'}を同じ記録から追跡します。`}
+              className="mt-3"
+            >取り消されたら、付けたぶんを引く</Checkbox>
           ) : null}
-          <label className="mt-3 flex items-start gap-2 text-sm text-ink-secondary">
-            <input type="checkbox" className="mt-0.5" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
-            <span>作成したらすぐ動かす<span className="block text-xs text-ink-faint">オフにすると停止中で保存します。</span></span>
-          </label>
+          <Checkbox
+            checked={isActive}
+            onCheckedChange={setIsActive}
+            description="オフにすると停止中で保存します。"
+            className="mt-3"
+          >作成したらすぐ動かす</Checkbox>
         </details>
       </FormSection>
     </CreatePage>

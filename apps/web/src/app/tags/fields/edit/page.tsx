@@ -10,6 +10,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Notice from '@/components/shared/notice'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -62,10 +63,7 @@ function sameLabels(a: string[], b: string[]): boolean {
 
 function Toggle({ checked, onChange, label, hint, disabled }: { checked: boolean; onChange: (next: boolean) => void; label: string; hint: string; disabled?: boolean }) {
   return (
-    <label className={`flex items-start justify-between gap-4 py-2 ${disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}>
-      <span><span className="block text-sm font-semibold text-ink">{label}</span><span className="block text-xs text-ink-faint">{hint}</span></span>
-      <input type="checkbox" checked={checked} disabled={disabled} onChange={(event) => onChange(event.target.checked)} className="mt-1 h-4 w-4 accent-accent" />
-    </label>
+    <Checkbox checked={checked} onCheckedChange={onChange} disabled={disabled} description={hint} className="py-2">{label}</Checkbox>
   )
 }
 

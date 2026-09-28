@@ -1,6 +1,7 @@
 'use client'
 
 import Avatar from '@/components/shared/avatar'
+import Checkbox from '@/components/shared/checkbox'
 import { ArrowLeft, CircleDot, Copy, List, ListPlus, PencilLine, Send, Star } from 'lucide-react'
 import { Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
@@ -356,17 +357,13 @@ function FieldInput({
   }
   if (field.type === 'checkbox') {
     return (
-      <label className="flex cursor-pointer items-center gap-2">
-        <input
-          id={id}
-          type="checkbox"
-          checked={value === '1'}
-          disabled={readOnly}
-          onChange={(e) => onChange(e.target.checked ? '1' : '')}
-          className="rounded border-gray-300"
-        />
-        <span className="text-ink-secondary text-sm">はい</span>
-      </label>
+      <Checkbox
+        id={id}
+        checked={value === '1'}
+        disabled={readOnly}
+        onCheckedChange={(checked) => onChange(checked ? '1' : '')}
+        aria-label={`${field.name}：はい`}
+      >はい</Checkbox>
     )
   }
   const inputType =
