@@ -6683,13 +6683,23 @@ export const WEBINAR_NOTIFICATIONS = {
     webinarId: 'webinar-1', version: 3,
     registrationEnabled: true, dayBeforeEnabled: true, dayBeforeTime: '20:00',
     hourBeforeEnabled: true, hourBeforeMinutes: 60, startEnabled: true,
-    missedEnabled: true, missedTime: '10:00', completedEnabled: true,
+    missedEnabled: true, missedTime: '10:00', missedWindowDays: 7, completedEnabled: true,
     updatedAt: '2026-08-25T02:00:00.000Z',
   },
   overview: {
     total: 184, pending: 32, sent: 149, failed: 3, skipped: 0, cancelled: 0,
     audience: { people: 184, bookings: 184, definition: 'active_registrations' },
   },
+}
+
+/**
+ * N: 動画の準備の段の見本。「配信の形」まで進んだ状態。
+ * 準備が済むまで公開できないことの撮影に使う。
+ */
+export const WEBINAR_VIDEO_ASSET = {
+  id: 'video-asset-1', stage: 'packaging', stageLabel: '配信の形', provider: 'r2_hls',
+  durationSeconds: 2_538, errorCode: null, expiresAt: null, purgedAt: null,
+  createdAt: '2026-09-20T00:00:00+09:00', updatedAt: '2026-09-20T01:00:00+09:00',
 }
 
 export const WEBINAR_CTAS = [{
@@ -6785,6 +6795,22 @@ export const WEBINAR_ANALYTICS = {
     { startSeconds: 1_100, endSeconds: 1_800, viewers: 101 },
     { startSeconds: 1_800, endSeconds: 2_538, viewers: 98 },
   ],
+  // J-1「どこまで見られたか」の見本。申し込みボタンは25分（1_500秒）。
+  retention: {
+    bucketSeconds: 60,
+    started: 112,
+    points: [
+      { atSeconds: 0, viewers: 112 },
+      { atSeconds: 60, viewers: 108 },
+      { atSeconds: 720, viewers: 84 },
+      { atSeconds: 1_440, viewers: 61 },
+      { atSeconds: 1_500, viewers: 58 },
+      { atSeconds: 2_400, viewers: 41 },
+    ],
+  },
+  startedViewers: 112,
+  heartbeatRejects: 2,
+  ctaAtSeconds: 1_500,
   measurement: { state: 'available', reason: null },
   formFunnel: {
     ctaImpressions: 96, ctaClicks: 52, formOpens: 41, formStarts: 32,

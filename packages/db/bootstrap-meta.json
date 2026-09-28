@@ -434,6 +434,8 @@
     "475_notification_delivery_origin_index.sql",
     "476_entry_route_stopped.sql",
     "477_entry_route_account_active_index.sql",
+    "478_webinar_video_assets.sql",
+    "479_webinar_session_capacity.sql",
     "482_form_test_answers.sql",
     "483_form_open_test_flag.sql",
     "484_common_var_lifecycle.sql",
@@ -454,7 +456,9 @@
     "501_site_tracking_consent.sql",
     "502_booking_liff_date_view.sql",
     "503_measurement_sites.sql",
-    "504_conversion_reversal_ledger.sql"
+    "504_conversion_reversal_ledger.sql",
+    "507_webinar_heartbeat_state.sql",
+    "508_webinar_heartbeat_rejects.sql"
   ],
-  "migrationCount": 455
+  "migrationCount": 459
 }

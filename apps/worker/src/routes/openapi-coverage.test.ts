@@ -563,6 +563,10 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'PUT /api/liff/nen/pets/{id}',
   'PUT /api/nen/feeding-products',
   'PUT /api/nen/rank-settings',
+  'GET /api/webinars/{id}/sessions/{startAt}',
+  'GET /api/webinars/{id}/video-asset',
+  'POST /api/webinars/{id}/video-asset/advance',
+  'PUT /api/webinars/{id}/sessions/{startAt}',
 ]);
 
 const ALLOWLIST = new Set<string>([

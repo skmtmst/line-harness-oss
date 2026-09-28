@@ -102,7 +102,7 @@ import {
   CONVERSION_DEFINITION_PREVIEW, CONVERSION_DEFINITION_DELETE_IMPACT,
   OPERATION_CONTROL_PREVIEW, OPERATION_HEALTH, OPERATION_HISTORY,
   WEBINARS, WEBINAR_FOLDERS, WEBINAR_OVERVIEW, WEBINAR_NOTIFICATIONS, WEBINAR_CTAS, WEBINAR_ACTIONS, WEBINAR_COMMENTS, WEBINAR_ANALYTICS,
-  WEBINAR_EDITOR, WEBINAR_PUBLISH_VALIDATION, WEBINAR_PARTICIPANTS,
+  WEBINAR_EDITOR, WEBINAR_PUBLISH_VALIDATION, WEBINAR_PARTICIPANTS, WEBINAR_VIDEO_ASSET,
   FRIEND_ADD_RULE_PUBLISH, FRIEND_ADD_RULE_VALIDATE,
   ACCESS_USERS, ACCESS_ROLES, ACCESS_AUDIT_EVENTS,
   GETTING_STARTED, RECIPES, MANUAL_LINKS,
@@ -122,6 +122,10 @@ const HOST = '127.0.0.1'
 
 // 機能10専用。フォルダ操作後の再取得でも、同じプロセス内では保存結果を返す。
 let webinarFolders = WEBINAR_FOLDERS.map((folder) => ({ ...folder }))
+
+// J-1・N 撮影用。動画の準備の段と開催回の定員を同じプロセス内で保存結果として返す。
+let mockVideoAsset = WEBINAR_VIDEO_ASSET ? { ...WEBINAR_VIDEO_ASSET } : null
+let mockSessionCapacity = 50
 
 // R25専用。回答フォームの箱も作る・直す・消すを見本で返す。
 let formFolders = FORM_FOLDERS.map((folder) => ({ ...folder }))
@@ -3840,6 +3844,24 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (/^\/api\/webinars\/[^/]+\/comments$/.test(pathname)) return { success: true, data: WEBINAR_COMMENTS }
   if (/^\/api\/webinars\/[^/]+\/user-comments$/.test(pathname)) return { success: true, data: [] }
   if (/^\/api\/webinars\/[^/]+\/analytics$/.test(pathname)) return { success: true, data: WEBINAR_ANALYTICS }
+  if (/^\/api\/webinars\/[^/]+\/video-asset$/.test(pathname)) {
+    return { success: true, data: { asset: mockVideoAsset } }
+  }
+  if (/^\/api\/webinars\/[^/]+\/sessions\/[^/]+$/.test(pathname)) {
+    const startAt = Number(pathname.split('/').pop())
+    const capacity = mockSessionCapacity
+    const reservedCount = 3
+    return {
+      success: true,
+      data: {
+        session: {
+          sessionStartAt: startAt, capacity, reservedCount,
+          state: capacity !== null && reservedCount >= capacity ? 'full' : 'open',
+          remaining: capacity === null ? null : Math.max(0, capacity - reservedCount),
+        },
+      },
+    }
+  }
   if (/^\/api\/webinars\/[^/]+$/.test(pathname)) {
     /*
       ウェビナー1件。**器を通さない**（`fetchApi<{ data: Webinar }>`）。
@@ -4073,6 +4095,51 @@ const server = createServer((req, res) => {
     )
     if (formWriteRequest) {
       res.writeHead(200).end(JSON.stringify(bodyFor(method, url.pathname, url.searchParams)))
+      return
+    }
+    // J-1・N 撮影用。動画の準備の段と開催回の定員の保存を見本で返す。
+    if (
+      (method === 'POST' && /^\/api\/webinars\/[^/]+\/video-asset\/advance$/.test(url.pathname)) ||
+      (method === 'PUT' && /^\/api\/webinars\/[^/]+\/sessions\/[^/]+$/.test(url.pathname))
+    ) {
+      let raw = ''
+      req.on('data', (chunk) => { raw += chunk })
+      req.on('end', () => {
+        let body = {}
+        try { body = JSON.parse(raw || '{}') } catch { body = {} }
+        if (/video-asset\/advance$/.test(url.pathname)) {
+          const stage = typeof body.stage === 'string' ? body.stage : mockVideoAsset?.stage ?? 'uploaded'
+          const labels = {
+            uploaded: '受け付け', inspecting: '検査', converting: '変換',
+            packaging: '配信の形', thumbnail: '表紙', ready: '準備完了', failed: '失敗',
+          }
+          mockVideoAsset = mockVideoAsset
+            ? { ...mockVideoAsset, stage, stageLabel: labels[stage] ?? stage }
+            : {
+              id: 'video-asset-1', stage, stageLabel: labels[stage] ?? stage, provider: 'r2_hls',
+              durationSeconds: 0, errorCode: null, expiresAt: null, purgedAt: null,
+              createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+            }
+          res.writeHead(200).end(JSON.stringify({ success: true, data: { asset: mockVideoAsset } }))
+          return
+        }
+        const capacity = body.capacity === undefined || body.capacity === null
+          ? null
+          : Math.floor(Number(body.capacity))
+        mockSessionCapacity = Number.isInteger(capacity) && capacity >= 1 ? capacity : null
+        const startAt = Number(url.pathname.split('/').pop())
+        const reservedCount = 3
+        res.writeHead(200).end(JSON.stringify({
+          success: true,
+          data: {
+            session: {
+              sessionStartAt: startAt, capacity: mockSessionCapacity, reservedCount,
+              state: mockSessionCapacity !== null && reservedCount >= mockSessionCapacity ? 'full' : 'open',
+              remaining: mockSessionCapacity === null ? null : Math.max(0, mockSessionCapacity - reservedCount),
+            },
+          },
+        }))
+      })
       return
     }
     if (/^\/api\/(mileage\/(rules|rewards|adjustments)|action-scores\/rules)/.test(url.pathname)) {
