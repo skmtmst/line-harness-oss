@@ -96,36 +96,6 @@ function TrashIcon() {
   )
 }
 
-/**
- * フォルダの選び直し。設計 `SgpDb` は「色の丸 ＋ 名前 ＋ ▾」の小さな札で、
- * 素の `select` ではない。見た目は札が持ち、操作と読み上げは `select` が持つ。
- */
-function FolderSelect({ tag, groups, onItemsChange, onError }: { tag: Tag; groups: TagGroup[]; onItemsChange: (update: (current: Tag[]) => Tag[]) => void; onError: (message: string) => void }) {
-  // 共通Selectは透明な重ね合わせにできないため、色丸・札・▾の見た目から標準Selectの見た目へ変わる。操作・読み上げ・選択肢は変えない。
-  return (
-    <Select
-      aria-label={`${tag.name} のフォルダ`}
-      value={tag.groupId ?? ''}
-      onChange={(value) => {
-        const groupId = value || null
-        void (async () => {
-          try {
-            const result = await api.tags.setGroup(tag.id, groupId)
-            if (!result.success) throw new Error(result.error)
-            /* 成功は手元だけ直す。withCounts 付き全件の取り直しは要らない。 */
-            onItemsChange((current) => current.map((item) => item.id === tag.id ? { ...item, groupId } : item))
-          } catch (reason) {
-            /* 失敗は再読込で隠さず、理由を出す。 */
-            onError(reason instanceof ApiError ? reason.message : 'フォルダを変更できませんでした')
-          }
-        })()
-      }}
-      options={[{ value: '', label: '未分類' }, ...groups
-        .filter((item) => item.accountId === tag.lineAccountId)
-        .map((item) => ({ value: item.id, label: item.name }))]}
-    />
-  )
-}
 
 /**
  * 連動の札。設計 `B9QCB3`（緑）／`IoiWQ`（黄）／`Ws7fo`（灰）。
@@ -629,7 +599,8 @@ export default function TagsPageV4({
   const [items, setItems] = useState<Tag[]>(fixture?.items ?? [])
   const [groups, setGroups] = useState<TagGroup[]>(fixture?.groups ?? [])
   const [status, setStatus] = useState<LoadStatus>(fixture ? 'ready' : 'loading')
-  // 操作の失敗（並び替え・★・フォルダ）。**読み込みの失敗とは別物**なので混ぜない。
+  // 操作の失敗（並び替え・★）。**読み込みの失敗とは別物**なので混ぜない。
+  // フォルダの変更は一覧では行わない（編集画面の「所属フォルダ」で行う）。
   const [error, setError] = useState('')
   const [query, setQuery] = useState('')
   const [folder, setFolder] = useState('')
@@ -990,12 +961,19 @@ export default function TagsPageV4({
                       </FilterChip>
                     )
                   })}
-                </>
-              }
-              trailing={
-                <>
-                  <Select aria-label="表示件数" value={String(pageSize)} onChange={(value) => setPageSize(Number(value))} options={[20, 30, 40, 50].map((size) => ({ value: String(size), label: `${size}件表示` }))} size="page-size" />
-                  <span className="text-xs tabular-nums text-ink-faint">{ready ? `${filtered.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, filtered.length)} / ${filtered.length}件` : '—'}</span>
+                  {/*
+                    件数と表示件数は絞り込みと同じ折り返しの流れの末尾に置く
+                    （m21o）。`trailing` の別枠にすると、絞り込みがあふれた幅
+                    （1440px・1152px）で件数だけの行ができてしまう。末尾の
+                    `ml-auto` で行の右端へ寄せ、札と行を共にする。選ぶ欄は
+                    ほかの欄と同じく幅96・短い文字（`20件`）にそろえる。
+                  */}
+                  <span className="ml-auto flex shrink-0 items-center gap-2">
+                    <span className="w-24">
+                      <Select aria-label="表示件数" className="w-full" value={String(pageSize)} onChange={(value) => setPageSize(Number(value))} options={[20, 30, 40, 50].map((size) => ({ value: String(size), label: `${size}件` }))} size="page-size" />
+                    </span>
+                    <span className="whitespace-nowrap text-xs tabular-nums text-ink-faint">{ready ? `${filtered.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, filtered.length)} / ${filtered.length}件` : '—'}</span>
+                  </span>
                 </>
               }
             />
@@ -1098,9 +1076,13 @@ export default function TagsPageV4({
                           {/* ATTR-20: 登録日は名前の下へ畳む。独立した列にすると1024pxでつぶれる。 */}
                           <p className="mt-0.5 pl-4 text-[11px] text-ink-faint">{formatDate(tag.createdAt)} 登録</p>
                         </Td>
-                        <Td onClick={(event) => event.stopPropagation()}>
-                          <FolderSelect tag={tag} groups={groups} onItemsChange={setItems} onError={setError} />
-                        </Td>
+                        {/*
+                          フォルダは文字だけ（m21o）。行ごとの選び直し欄は
+                          幅176pxで列（11%）に収まらず隣の「付け方」へ重なって
+                          いた。変更は行を押して開く編集画面の「所属フォルダ」で
+                          行う。長い名前は省略し、全文は重ねて読める。
+                        */}
+                        <Td className="truncate text-label text-ink" title={group?.name ?? '未分類'}>{group?.name ?? '未分類'}</Td>
                         <Td className="text-label tabular-nums">{tag.friendCount ?? 0}人</Td>
                         <Td className="cq-hide-below-830 truncate text-label text-ink" title={sourceLabel(tag)}>{sourceLabel(tag)}</Td>
                         <Td>
@@ -1193,7 +1175,8 @@ export default function TagsPageV4({
                                 </p>
                               ) : null}
                               <p className="mt-1 text-xs text-ink-secondary">{tag.friendCount ?? 0}人・{usageLabel(tag)}</p>
-                              <div className="mt-2" onClick={(event) => event.stopPropagation()}><FolderSelect tag={tag} groups={groups} onItemsChange={setItems} onError={setError} /></div>
+                              {/* フォルダは文字だけ（m21o）。表と同じく、変更は編集画面で行う。 */}
+                              <p className="mt-1 text-xs text-ink-secondary">フォルダ：{group?.name ?? '未分類'}</p>
                             </div>
                             <div className="flex shrink-0 items-center gap-2 pt-1">
                               <button
