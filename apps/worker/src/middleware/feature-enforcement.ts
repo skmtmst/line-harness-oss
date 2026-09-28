@@ -510,6 +510,153 @@ async function appendFeatureScopeMeta(c: Context<Env>, excluded: number): Promis
   }
 }
 
+const BULK_APPROVAL_PATH = '/api/conversions/approvals/bulk';
+const BULK_APPROVAL_MAX_ITEMS = 100;
+
+/**
+ * m22u R352・R355：一括承認の対象IDから所属アカウントを引く。
+ *
+ * 一括の body は items（成果IDの列）だけで、アカウントを載せない。
+ * URL にも対象IDが無いため従来の解決では空になり、固定アカウントのない
+ * 管理者は LINE_ACCOUNT_REQUIRED で止まっていた。ここでは items の成果ID
+ * から所属を引き、対象ごとの権限・機能状態を判定できるようにする。
+ */
+function bulkApprovalEventIds(body: unknown): string[] {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return [];
+  const items = (body as { items?: unknown }).items;
+  if (!Array.isArray(items)) return [];
+  const ids: string[] = [];
+  for (const raw of items) {
+    if (ids.length >= BULK_APPROVAL_MAX_ITEMS) break;
+    const id = (raw as { id?: unknown } | null | undefined)?.id;
+    if (typeof id === 'string' && id) ids.push(id);
+  }
+  return ids;
+}
+
+type BulkApprovalScope =
+  | { ok: true; enabled: string[] }
+  | { ok: false; response: Response };
+
+/**
+ * 一括承認の入口判定。null のときは対象が引けなかったため、従来の解決
+ * （割当アカウント・LINE_ACCOUNT_REQUIRED）へ進む。handler が入力検査で
+ * 400 にするため、状態は変わらない。
+ */
+async function resolveBulkApprovalScope(
+  c: Context<Env>,
+  featureId: FeatureId,
+): Promise<BulkApprovalScope | null> {
+  let parsed: unknown = null;
+  try {
+    if (c.req.header('content-type')?.toLowerCase().includes('application/json')) {
+      parsed = await c.req.raw.clone().json();
+    }
+  } catch {
+    parsed = null;
+  }
+  const eventIds = bulkApprovalEventIds(parsed);
+  if (eventIds.length === 0) return null;
+  const db = dbFor(c.env);
+  const rows = await db.prepare(
+    `SELECT ce.id AS event_id, cp.line_account_id AS account_id
+       FROM conversion_events ce
+       JOIN conversion_points cp ON cp.id = ce.conversion_point_id
+      WHERE ce.id IN (${eventIds.map(() => '?').join(',')})`,
+  ).bind(...eventIds).all<{ event_id: string; account_id: string | null }>();
+  const byId = new Map(rows.results.map((row) => [row.event_id, row.account_id]));
+  // 行が無い対象は handler が denied/failed へ1件ずつ振り分ける。
+  const resolved = eventIds
+    .map((id) => byId.get(id))
+    .filter((account): account is string | null => account !== undefined);
+  // 所属が NULL（全アカウント共用）の対象が混ざるときは従来の解決へ。
+  if (resolved.some((account) => account === null)) return null;
+  const union = [...new Set(resolved as string[])];
+  if (union.length === 0) return null;
+
+  // 一括の URL に資源は無いため、ここでの mismatch は起きない。
+  const { ids: explicit } = await requestAccountIds(c);
+  const staff = c.get('staff');
+  if (explicit.length > 0) {
+    /*
+     * R355: 指定したアカウントと対象の所属が違うときは全体を拒否する。
+     * A の名前で B の成果を通す抜け道にしない。
+     */
+    if (union.some((account) => !explicit.includes(account))) {
+      return {
+        ok: false,
+        response: c.json({
+          success: false,
+          error: '指定されたLINEアカウントと対象データの所属が一致しません',
+          code: 'LINE_ACCOUNT_MISMATCH',
+        }, 403),
+      };
+    }
+    if (staff) {
+      const scope = await getVisibleLineAccountScope(db, staff);
+      if (explicit.some((account) => !scope.ids.includes(account))) {
+        return {
+          ok: false,
+          response: c.json({
+            success: false,
+            error: 'このLINEアカウントを操作する権限がありません',
+          }, 403),
+        };
+      }
+    }
+    const enabled = await bulkEnabledAccounts(c, explicit, featureId);
+    if (enabled.length === 0) {
+      return { ok: false, response: await bulkUnavailable(c, explicit, featureId) };
+    }
+    return { ok: true, enabled };
+  }
+  /*
+   * 明示がないときは対象の所属の和集合で見る。権限外の対象は全体を
+   * 落とさず、handler が1件ずつ denied へ振り分ける。機能オフの対象も
+   * 同じく handler が1件ずつ失敗として返し、許可分は処理する。
+   */
+  const enabled = await bulkEnabledAccounts(c, union, featureId);
+  if (enabled.length === 0) {
+    return { ok: false, response: await bulkUnavailable(c, union, featureId) };
+  }
+  return { ok: true, enabled };
+}
+
+/** 指定アカウントのうち機能が有効なものだけを返す。 */
+async function bulkEnabledAccounts(
+  c: Context<Env>,
+  accountIds: string[],
+  featureId: FeatureId,
+): Promise<string[]> {
+  const staff = c.get('staff');
+  const db = dbFor(c.env);
+  const requestContext = staff
+    ? createFeatureAvailabilityRequestContext((await getVisibleLineAccountScope(db, staff)).accounts)
+    : undefined;
+  const states = await Promise.all(accountIds.map(async (accountId) => ({
+    accountId,
+    availability: await accountFeatureAvailability(db, accountId, featureId, requestContext),
+  })));
+  return states
+    .filter(({ availability }) => availabilityAllowsOperation(availability, c.req.method))
+    .map(({ accountId }) => accountId);
+}
+
+/** 対象すべてが機能オフのときの全体拒否（従来の unavailableResponse と同じ形）。 */
+async function bulkUnavailable(
+  c: Context<Env>,
+  accountIds: string[],
+  featureId: FeatureId,
+): Promise<Response> {
+  const staff = c.get('staff');
+  const db = dbFor(c.env);
+  const requestContext = staff
+    ? createFeatureAvailabilityRequestContext((await getVisibleLineAccountScope(db, staff)).accounts)
+    : undefined;
+  const availability = await accountFeatureAvailability(db, accountIds[0]!, featureId, requestContext);
+  return unavailableResponse(c, availability);
+}
+
 /**
  * 認証・tenant scope の後、handler の前で会社の機能設定を強制する。
  * manifest は CI で全 route 分類済みのため、未知の管理 API は fail closed にする。
@@ -535,6 +682,18 @@ export const featureEnforcementMiddleware: MiddlewareHandler<Env> = async (c, ne
     }, 500);
   }
   if (classification.kind !== 'feature') return next();
+
+  // m22u R352・R355: 一括承認は items の成果IDから所属を引いて判定する。
+  if (c.req.method === 'POST' && c.req.path === BULK_APPROVAL_PATH) {
+    const bulk = await resolveBulkApprovalScope(c, classification.featureId);
+    if (bulk) {
+      if (!bulk.ok) return bulk.response;
+      const staff = c.get('staff');
+      if (staff) c.set('staff', { ...staff, featureEnabledLineAccountIds: bulk.enabled });
+      return next();
+    }
+    // 対象が引けない要求は下の従来の解決へ（handler が入力検査で400にする）。
+  }
 
   const { ids: accountIds, accountMismatch } = await requestAccountIds(c);
   const staff = c.get('staff');
