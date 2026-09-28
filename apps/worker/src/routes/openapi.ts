@@ -1138,6 +1138,34 @@ const spec = {
         responses: { '200': { description: 'Orders attributed to the ref code with status summary' }, '403': { description: 'LINEアカウントの表示権限なし' } },
       },
     },
+    // ── ダッシュボード: 今後の予定・数字の出どころ・印刷用PDF（L #824・M） ──
+    '/api/dashboard/upcoming': {
+      get: {
+        tags: ['Dashboard'], summary: '今後の予定（予約配信・リマインダー・予約の7日分、読むだけ）',
+        parameters: [
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'days', in: 'query', schema: { type: 'integer', default: 7, minimum: 1, maximum: 31 } },
+        ],
+        responses: { '200': { description: 'Upcoming items' }, '400': { description: 'LINEアカウント未指定' }, '404': { description: 'LINEアカウント範囲外' } },
+      },
+    },
+    '/api/dashboard/delivery-failure-origins': {
+      get: {
+        tags: ['Dashboard'], summary: '失敗の数を通知の送達台帳から出どころ別に数える（同じ失敗は1件・送り直し除外）',
+        parameters: [
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'since', in: 'query', schema: { type: 'string' } },
+        ],
+        responses: { '200': { description: 'Failure origins' }, '400': { description: '指定が正しくない' }, '404': { description: 'LINEアカウント範囲外' } },
+      },
+    },
+    '/api/entry-routes/{id}/qr-pdf': {
+      post: {
+        tags: ['Dashboard'], summary: '印刷用PDFをサーバーで作る（止めた経路は出さない）',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'A4 PDF' }, '404': { description: 'Not found' }, '409': { description: '経路は停止中' } },
+      },
+    },
     // ── 広告費 (#818) ────────────────────────────────────────────────────
     '/api/ad-costs': {
       get: {
@@ -6071,6 +6099,7 @@ const spec = {
     },
   },
   tags: [
+    { name: 'Dashboard', description: 'ダッシュボードの予定・数字の出どころ・印刷' },
     { name: 'Friends', description: '友だち管理' },
     { name: 'HQ Templates', description: '統括ひな形の作成・事前検査・店舗配布' },
     { name: 'Tags', description: 'タグ管理' },

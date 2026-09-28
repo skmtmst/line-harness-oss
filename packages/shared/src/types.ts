@@ -1232,6 +1232,10 @@ export interface EntryRoute {
   introTemplateId: string | null;
   runAccountFriendAddScenarios: boolean;
   isActive: boolean;
+  /** 受付を止めた時刻。受付中・記録の無い古い行は null。 */
+  stoppedAt: string | null;
+  /** 止めた理由。受付中は null。 */
+  stoppedReason: string | null;
   /** 所属するLINEアカウント。未割当の古い行では null のことがある。 */
   lineAccountId?: string | null;
   createdAt: string;

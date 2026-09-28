@@ -600,11 +600,53 @@ const DASHBOARD_PREFERENCES = {
     ],
     right: [
       ...['send-quota', 'operational-alerts', 'connection-status', 'support-mark-status',
-        'friend-status', 'upcoming', 'monthly-delivery', 'recent-results'].map((id) => ({ id, visible: true })),
+        'friend-status', 'upcoming', 'delivery-failures', 'monthly-delivery', 'recent-results'].map((id) => ({ id, visible: true })),
       ...['booking-status', 'inflow-top', 'funnel-alert', 'automation-failures'].map((id) => ({ id, visible: false })),
     ],
   },
 }
+
+/**
+ * M (今後の予定)の見本。型は `api.ts` の `DashboardUpcoming` どおり。
+ * 予約配信・リマインダー・予約を時刻順に並べた形。
+ */
+const DASHBOARD_UPCOMING = {
+  items: [
+    { kind: 'reminder', id: 'fr-1', title: '来店前日（あおい）', startsAt: `${FIXED_TO}T01:00:00.000Z`, href: '/reminders' },
+    { kind: 'broadcast', id: 'bc-1', title: '秋の案内', startsAt: `${FIXED_TO}T02:00:00.000Z`, href: '/broadcasts' },
+    { kind: 'booking', id: 'bk-1', title: '相談30分（あおい）', startsAt: `${FIXED_TO}T03:00:00.000Z`, href: '/booking/bookings?view=list' },
+  ],
+  asOf: `${FIXED_TO}T00:00:00.000Z`,
+  rangeDays: 7,
+}
+
+/**
+ * L (#824 数字の出どころ)の見本。型は `api.ts` の `DeliveryFailureOrigins` どおり。
+ * 同じ失敗は1件・送り直しは数えない形（合計3件）。
+ */
+const DASHBOARD_DELIVERY_FAILURE_ORIGINS = {
+  total: 3,
+  asOf: `${FIXED_TO}T11:50:00.000Z`,
+  origins: [
+    { source: 'broadcast.failed', failures: 2, latestFailedAt: `${FIXED_TO}T11:50:00.000Z`, sampleDeliveryIds: ['delivery-a', 'delivery-b'] },
+    { source: 'scenario.failed', failures: 1, latestFailedAt: `${FIXED_TO}T10:20:00.000Z`, sampleDeliveryIds: ['delivery-c'] },
+  ],
+}
+
+/** M (止めた経路のQR)の印刷用PDFの見本。A4・1枚の骨組みだけ。 */
+const QR_PRINT_PDF_SAMPLE = `%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] >>
+endobj
+trailer
+<< /Size 4 /Root 1 0 R >>
+%%EOF`
 
 const DASHBOARD_OVERVIEW = {
   period: 'today',
@@ -2203,6 +2245,11 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       `null` を返すと組み込みの既定になり、絵が変わる。
     */
     return { success: true, data: DASHBOARD_PREFERENCES }
+  }
+  // M (今後の予定)・L (#824 数字の出どころ)の見本。型どおりの名前で返す。
+  if (pathname === '/api/dashboard/upcoming') return { success: true, data: DASHBOARD_UPCOMING }
+  if (pathname === '/api/dashboard/delivery-failure-origins') {
+    return { success: true, data: DASHBOARD_DELIVERY_FAILURE_ORIGINS }
   }
   // 設計と画像で比べるための中身。空の表しか描けないと、
   // 「空の状態」だけを見て一致したと言えてしまう。
@@ -3993,6 +4040,25 @@ const server = createServer((req, res) => {
   //
   // ただし画面側のエラー報告だけは 204 で受ける。405 を返すと、
   // 報告が失敗したこと自体が新しいエラーになって際限なく増える。
+  // M (止めた経路のQR): 印刷用PDFの見本。止めた経路は409で出さない。
+  const qrPdf = /^\/api\/entry-routes\/([^/]+)\/qr-pdf$/.exec(url.pathname)
+  if (method === 'POST' && qrPdf) {
+    const route = ENTRY_ROUTES.find((item) => item.id === qrPdf[1])
+    if (!route) {
+      res.writeHead(404).end(JSON.stringify({ success: false, error: 'Not found' }))
+      return
+    }
+    if (!route.isActive) {
+      res.writeHead(409).end(JSON.stringify({ success: false, error: 'この経路は停止しています' }))
+      return
+    }
+    res.setHeader('Content-Type', 'application/pdf')
+    res.setHeader('Content-Disposition', `attachment; filename="qr-${route.refCode}.pdf"`)
+    res.setHeader('Cache-Control', 'no-store')
+    res.writeHead(200).end(QR_PRINT_PDF_SAMPLE)
+    return
+  }
+
   if (method !== 'GET') {
     const formWriteRequest = (
       (method === 'POST' && (url.pathname === '/api/forms/drafts'
