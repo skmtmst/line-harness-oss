@@ -1296,6 +1296,15 @@ scenarios.get('/api/scenarios/:id/preview', scenarioPermission('view'), async (c
         // R212: 下書きの通も並ぶが、実際は送られない。送られる通と
         // 見分けられるよう別を付ける（友だち別の予定は下書きを除く）。
         isDraft: Number(step.is_draft ?? 0) !== 0,
+        /*
+         * R237: 公開版・通の控えのどれを表示しているかを出す。
+         * template 参照があるのに控えのときは、未反映の理由も付ける
+         * （保存と公開を取り違えると、確認すべき場所を誤る）。
+         */
+        contentSource: resolved.templateIdAtSend != null
+          ? 'template' as const
+          : (step.template_id != null ? 'step-fallback' as const : 'step' as const),
+        fallbackReason: resolved.fallbackReason,
       };
     });
 
