@@ -9,7 +9,6 @@ const dbMocks = {
   markRedemptionStepSent: vi.fn().mockResolvedValue(undefined),
   clearRedemptionStepIntent: vi.fn().mockResolvedValue(undefined),
   hasSentRedemptionSteps: vi.fn().mockResolvedValue(false),
-  hasReconcileRedemptionSteps: vi.fn().mockResolvedValue(false),
   MILEAGE_REWARD_RETRY_KEY_VALIDITY_MS: 24 * 60 * 60 * 1000,
   MileageRedemptionConfirmError: class MileageRedemptionConfirmError extends Error {},
   MileageRewardError: class MileageRewardError extends Error {

@@ -1306,20 +1306,7 @@ export async function hasSentRedemptionSteps(
   return row != null;
 }
 
-/**
- * R364: 照合待ちの手順があるか。送ったか確かめられない行が残る交換は、
- * 要対応の一覧に出し、手動のやり直しも受け付ける。
- */
-export async function hasReconcileRedemptionSteps(
-  db: D1Database,
-  redemptionId: string,
-): Promise<boolean> {
-  const row = await db.prepare(
-    `SELECT 1 AS ok FROM mileage_redemption_step_deliveries
-      WHERE redemption_id = ? AND status = 'started' AND needs_reconcile = 1 LIMIT 1`,
-  ).bind(redemptionId).first<{ ok: number }>();
-  return row != null;
-}
+
 
 export interface RedemptionStepLease {
   redemptionId: string;
