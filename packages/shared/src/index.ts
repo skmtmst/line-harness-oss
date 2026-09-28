@@ -8,6 +8,7 @@ export * from "./reminder-name";
 export * from "./anniversary";
 export * from "./shipping-schedule";
 export * from "./form-layout";
+export * from "./flex-content";
 export * from "./tenant";
 export * from "./friend-bulk-runs";
 export * from "./identity-candidates";
