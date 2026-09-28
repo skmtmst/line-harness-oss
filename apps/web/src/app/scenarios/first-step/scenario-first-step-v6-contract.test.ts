@@ -54,7 +54,8 @@ describe('V6 1通目設定の契約', () => {
     expect(PREVIEW).toContain('<LinePreview')
     // R213: 通番号は変数で出す（2通目以降の編集で正しい番号になる）。
     // 新規1通目の既定は 1 のままなので、ここの見た目は変わらない。
-    expect(PREVIEW).toContain('に届きます（{stepLabel}）')
+    // R235: 時刻未設定の分岐が入ったが、通番号は両方の枝で変数のまま。
+    expect(PREVIEW).toContain('${stepLabel}')
     expect(PREVIEW).toContain('stepOrder = 1')
     expect(PREVIEW).toContain('設定サマリー')
   })

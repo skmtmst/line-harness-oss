@@ -92,3 +92,55 @@ describe('R212: 一括プレビューは下書きを区別する', () => {
     ).toBeTruthy()
   })
 })
+
+/*
+ * R237: テンプレート参照の通は、一括プレビューが「公開版・通の控え」の
+ * どれかと、控えのときは未反映の理由を出す。通の直接入力には出さない。
+ * 直しを戻す（対象版の表示を外す）と、この試験は赤くなる。
+ */
+describe('R237: 一括プレビューは対象版と未反映理由を出す', () => {
+  it('公開版・未公開の控えを出し分け、直接入力には出さない', async () => {
+    vi.mocked(api.scenarios.preview).mockResolvedValueOnce({
+      success: true,
+      data: {
+        startAt: '2026-09-28T10:00:00+09:00',
+        steps: [
+          {
+            stepOrder: 1,
+            deliveryAt: '2026-09-28T10:00:00+09:00',
+            deliveryAtLabel: 'Day 0 10:00 (日)',
+            messageType: 'テキスト',
+            messageContent: '公開版の通',
+            isDraft: false,
+            contentSource: 'template',
+            fallbackReason: null,
+          },
+          {
+            stepOrder: 2,
+            deliveryAt: '2026-09-29T10:00:00+09:00',
+            deliveryAtLabel: 'Day 1 10:00 (月)',
+            messageType: 'テキスト',
+            messageContent: '未公開テンプレートの通',
+            isDraft: false,
+            contentSource: 'step-fallback',
+            fallbackReason: 'unpublished',
+          },
+          {
+            stepOrder: 3,
+            deliveryAt: '2026-09-30T10:00:00+09:00',
+            deliveryAtLabel: 'Day 2 10:00 (火)',
+            messageType: 'テキスト',
+            messageContent: '直接書いた通',
+            isDraft: false,
+            contentSource: 'step',
+            fallbackReason: null,
+          },
+        ],
+      },
+    })
+    render(<BulkPreviewModal open scenarioId="sc-1" onClose={vi.fn()} />)
+    expect(await screen.findByText('テンプレートの公開版を表示')).toBeTruthy()
+    expect(screen.getByText('通の控えを表示（テンプレートが未公開のため）')).toBeTruthy()
+    expect(screen.queryByText('通の控えを表示（テンプレートが削除されているため）')).toBeNull()
+  })
+})

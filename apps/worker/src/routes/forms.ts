@@ -1148,6 +1148,70 @@ forms.post('/api/forms/drafts', async (c) => {
   }
 });
 
+/*
+ * POST /api/forms/:id/duplicate — フォーム全体を別IDの下書きとして複製する(R230)。
+ *
+ * 引き継ぐのは中身だけ（名前・説明・質問・レイアウト・分岐・回答後の設定・
+ * デザイン・所属フォルダ・利用アカウント）。引き継がないのは集まった回答・
+ * 公開版・公開状態・集計（新しい ID なので回答・来訪・版は付いてこない）。
+ * 複製は必ず受付停止（isActive: false）で作り、公開中の写しを作らない。
+ */
+forms.post('/api/forms/:id/duplicate', async (c) => {
+  try {
+    const id = c.req.param('id');
+    const accountIds = await getFormAccountIds(c.env.DB, id);
+    const duplicateGate = await requireFormManage(c, accountIds);
+    if (duplicateGate) return duplicateGate;
+    const source = await getFormById(c.env.DB, id);
+    if (!source) {
+      return c.json({ success: false, error: 'Form not found' }, 404);
+    }
+    const requestAccountId = c.req.query('account_id');
+    if (requestAccountId && !await canUseFormFromAccount(c, id, requestAccountId)) {
+      return c.json({ success: false, error: 'Form not found' }, 404);
+    }
+    const body = await c.req.json<{ name?: unknown }>()
+      .catch(() => ({} as { name?: unknown }));
+    const requestedName = typeof body.name === 'string' ? body.name.trim() : '';
+    const name = (requestedName || `${source.name}の複製`).slice(0, 200);
+    const copy = await createForm(c.env.DB, {
+      name,
+      description: source.description,
+      fields: source.fields,
+      layout: source.layout,
+      onSubmitTagId: source.on_submit_tag_id,
+      onSubmitScenarioId: source.on_submit_scenario_id,
+      onSubmitMessageType: source.on_submit_message_type,
+      onSubmitMessageContent: source.on_submit_message_content,
+      onSubmitWebhookUrl: source.on_submit_webhook_url,
+      onSubmitWebhookHeaders: source.on_submit_webhook_headers,
+      onSubmitWebhookFailMessage: source.on_submit_webhook_fail_message,
+      saveToMetadata: source.save_to_metadata === 1,
+      ogTitle: source.og_title,
+      ogDescription: source.og_description,
+      ogImageUrl: source.og_image_url,
+      // 公開中の写しを作らない。編集画面で中身を整えてから公開する。
+      isActive: false,
+      lineAccountIds: accountIds,
+    });
+    /*
+     * 所属フォルダも引き継ぐ。消えた箱・別用途の箱は付けない（PUT の
+     * folderId と同じ決まり）。箱が無くても複製自体は作る。
+     */
+    if (source.folder_id) {
+      const folder = await getFolderById(c.env.DB, source.folder_id);
+      if (folder && folder.kind === 'form') {
+        await setFormFolder(c.env.DB, copy.id, source.folder_id);
+      }
+    }
+    const withFolder = source.folder_id ? await getFormById(c.env.DB, copy.id) : copy;
+    return c.json({ success: true, data: serializeForm(withFolder ?? copy) }, 201);
+  } catch (err) {
+    console.error('POST /api/forms/:id/duplicate error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
 // PUT /api/forms/:id — update form
 forms.put('/api/forms/:id', async (c) => {
   try {

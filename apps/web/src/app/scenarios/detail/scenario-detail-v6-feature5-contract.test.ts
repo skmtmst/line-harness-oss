@@ -251,7 +251,12 @@ describe('配信対象の言い表し方', () => {
   it('送ったあと次へ進むのは決まっている値。—にしない', () => {
     expect(describeAfterSend('continue')).toEqual({ label: '次へ進む', paused: false })
     expect(describeAfterSend(undefined)).toEqual({ label: '次へ進む', paused: false })
-    expect(describeAfterSend('pause')).toEqual({ label: '返信まで一時停止', paused: true })
+    /*
+     * R236: pause は人が再開するまで止まるだけ。返信で自動再開しないのに
+     * 「返信まで」と書くと、返信を待てば続くと誤解される。編集欄の
+     * 「送信後：ここで一時停止する」と同じ意味の文言にそろえる。
+     */
+    expect(describeAfterSend('pause')).toEqual({ label: '送信後に一時停止', paused: true })
   })
 })
 
