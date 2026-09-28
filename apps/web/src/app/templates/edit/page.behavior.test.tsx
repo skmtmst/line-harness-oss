@@ -382,6 +382,23 @@ describe('食い違ったまま保存させない', () => {
     expect(T.validateTemplateSave(saveInput({ name: '   ' }))).toBe('名前を入力してください')
     expect(T.validateTemplateSave(saveInput({ messageContent: '  ' }))).toBe('本文を入力してください')
   })
+
+  it('R249: カード型に通常文・壊れたJSON・型なしJSONを保存しない', async () => {
+    for (const messageContent of ['初回のお届け予定はこちらです', '{壊れている', '{}']) {
+      const input = saveInput({ messageType: 'flex', messageContent })
+      expect(T.validateTemplateSave(input)).toContain('カードの内容')
+      const result = await T.saveTemplateEdit(input)
+      expect(result.ok).toBe(false)
+    }
+  })
+
+  it('R249: 正常なカードは保存できる', () => {
+    const input = saveInput({
+      messageType: 'flex',
+      messageContent: '{"type":"bubble","body":{"type":"box","layout":"vertical","contents":[]}}',
+    })
+    expect(T.validateTemplateSave(input)).toBeNull()
+  })
 })
 
 /* ------------------------------------------------------------ 逆順の応答 */

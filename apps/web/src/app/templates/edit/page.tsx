@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { api, ApiError, describeSaveFailure } from '@/lib/api'
 import { isOwnerOrAdmin } from '@/lib/staff-capability'
-import { type Folder } from '@line-crm/shared'
+import { type Folder, validateFlexContent } from '@line-crm/shared'
 import { Field, inputClass } from '@/components/shared/create-page'
 import Button from '@/components/shared/button'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -180,6 +180,13 @@ function validateTemplateSave(input: TemplateSaveInput): string | null {
   if (!input.templateId && !input.selectedAccountId) return '上のバーでLINE公式アカウントを選んでください'
   if (!input.name.trim()) return '名前を入力してください'
   if (!input.messageContent.trim()) return '本文を入力してください'
+  /*
+   * R249: カード型はバブルかカルーセルのJSONでないと保存しない。
+   * 通常文のまま保存できると「作れた」と誤認する。保存口も
+   * 同じ判定で断るが、ここで先に止めると往復しない。
+   */
+  const flexError = validateFlexContent(input.messageType, input.messageContent)
+  if (flexError) return flexError
   return null
 }
 
