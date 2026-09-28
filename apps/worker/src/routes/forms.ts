@@ -44,6 +44,10 @@ import {
   getFormSubmitClaimsBySubmissionIds,
   getFormVersionContent,
   getFormVersionContentsByIds,
+  countActiveFormTestTokens,
+  insertFormTestToken,
+  getValidFormTestToken,
+  deleteExpiredFormTestTokens,
   updateFormSubmissionDestinationWriteResult,
   getFriendByLineUserIdForAccount,
   getFriendById,
@@ -66,6 +70,7 @@ import type {
   FormSubmission as DbFormSubmission,
   FormDestinationWriteResult,
   FormUsedByAccount,
+  FormWithStats as DbFormWithStats,
   Friend as DbFriend,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
@@ -99,6 +104,8 @@ import {
 import {
   formMatchesListFilter,
   formMatchesListQuery,
+  formThemeContrastError,
+  normalizeFormTheme,
   sortFormListItems,
   type FormListFilter,
   type FormListSort,
@@ -115,6 +122,39 @@ async function stoppedPublicFormResponse(c: Context<Env>, formId: string): Promi
   return accountIds.some((accountId) => statuses.get(accountId) === 'active')
     ? null
     : c.json({ success: false, code: 'TENANT_SUSPENDED', error: '現在ご利用いただけません' }, 503);
+}
+
+/**
+ * P（回答フォームの公開前の試し）：試し合言葉の共通処理。
+ *
+ * 公開前の下書きを、お客さま画面で試すための合言葉。生の値は保存せず、
+ * SHA-256 の16進だけを台帳に残す。試しで開く・答えるたびに期限を見る。
+ * 合言葉が違う・期限切れのときは失敗側に閉じる（本物としては扱わない）。
+ */
+const FORM_TEST_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
+const FORM_TEST_TOKEN_MAX_ACTIVE = 5;
+
+async function sha256Hex(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+/** 要求に付いた試し合言葉を読む。ヘッダかクエリのどちらか。 */
+function readFormTestToken(c: Context<Env>): string | null {
+  const header = c.req.header('X-Form-Test-Token')?.trim();
+  if (header) return header;
+  const query = c.req.query('test_token')?.trim();
+  return query ? query : null;
+}
+
+async function verifyFormTestToken(
+  db: D1Database,
+  formId: string,
+  presented: string,
+): Promise<boolean> {
+  if (!presented) return false;
+  const hash = await sha256Hex(presented);
+  return (await getValidFormTestToken(db, formId, hash, jstNow())) !== null;
 }
 
 /** 回答に添付できる画像。heic は iPhone の既定の形式なので入れておく。 */
@@ -311,6 +351,11 @@ function serializeForm(
     folderId: row.folder_id ?? null,
     publishedContentRevision: row.published_content_revision ?? null,
     submitCount: row.submit_count,
+    // P（一覧の数）：今月の数は一覧取得のときだけ付く。直接取得では
+    // 未取得として null を返す（0 とは言わない）。
+    monthlySubmitCount: (row as Partial<DbFormWithStats>).monthly_submit_count ?? null,
+    monthlyOpenCount: (row as Partial<DbFormWithStats>).monthly_open_count ?? null,
+    monthlyCompletionRate: (row as Partial<DbFormWithStats>).monthly_completion_rate ?? null,
     ogTitle: row.og_title,
     ogDescription: row.og_description,
     ogImageUrl: row.og_image_url,
@@ -861,6 +906,20 @@ forms.get('/api/forms/:id', async (c) => {
   try {
     const id = c.req.param('id');
     const staff = c.get('staff');
+    // P（試し回答）：試し合言葉が正しければ、下書きをお客さまの形で返す。
+    // 公開版が無くても試せる。秘密は公開形にしないので漏れない。
+    // 合言葉が違うときは本物として扱わず、試しだと分かる文で断る。
+    const presentedTestToken = readFormTestToken(c);
+    if (presentedTestToken) {
+      if (!await verifyFormTestToken(c.env.DB, id, presentedTestToken)) {
+        return c.json({ success: false, error: '試し合言葉が無効です。管理画面から取り直してください' }, 403);
+      }
+      const draft = await getFormById(c.env.DB, id);
+      if (!draft) {
+        return c.json({ success: false, error: 'Form not found' }, 404);
+      }
+      return c.json({ success: true, data: { ...serializePublicForm(draft), isTest: true } });
+    }
     // ログイン中の運用者が公開URLを開いても、account_id を明示した管理画面取得で
     // ない限り下書きを漏らさない。
     const adminView = Boolean(staff && c.req.query('account_id'));
@@ -940,6 +999,50 @@ forms.post('/api/forms/:id/publish', async (c) => {
   }
 });
 
+// POST /api/forms/:id/test-token — 公開前の試し合言葉を発行する。
+//
+// 下書きの編集ができる人だけが取れる。合言葉自体は1回だけ返し、台帳には
+// SHA-256 の16進だけを残す。有効期限は24時間。試しで開く・答えるときは
+// この合言葉を添え、集計に入れず、回答後アクションも動かさない。
+forms.post('/api/forms/:id/test-token', async (c) => {
+  try {
+    const id = c.req.param('id');
+    const manageGate = await requireFormManage(c, await getFormAccountIds(c.env.DB, id));
+    if (manageGate) return manageGate;
+    if (!await canUseFormFromAccount(c, id, c.req.query('account_id'))) {
+      return c.json({ success: false, error: 'Form not found' }, 404);
+    }
+    const draft = await getFormById(c.env.DB, id);
+    if (!draft) {
+      return c.json({ success: false, error: 'Form not found' }, 404);
+    }
+    const now = jstNow();
+    await deleteExpiredFormTestTokens(c.env.DB, now);
+    const active = await countActiveFormTestTokens(c.env.DB, id, now);
+    if (active >= FORM_TEST_TOKEN_MAX_ACTIVE) {
+      return c.json(
+        { success: false, error: '試し合言葉が上限（5件）に達しています。期限切れを待ってから、もう一度お試しください' },
+        429,
+      );
+    }
+    const token = `${crypto.randomUUID()}-${crypto.randomUUID()}`;
+    const expiresAt = toJstString(new Date(Date.now() + FORM_TEST_TOKEN_TTL_MS));
+    const staff = c.get('staff');
+    await insertFormTestToken(c.env.DB, {
+      id: crypto.randomUUID(),
+      formId: id,
+      tokenHash: await sha256Hex(token),
+      createdByStaffId: typeof staff?.id === 'string' ? staff.id : null,
+      expiresAt,
+    });
+    // 生の合言葉はこの応答でしか返さない。台帳からは読み出せない。
+    return c.json({ success: true, data: { token, expiresAt } });
+  } catch (err) {
+    console.error('POST /api/forms/:id/test-token error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
 // POST /api/forms — create form
 forms.post('/api/forms', async (c) => {
   try {
@@ -980,6 +1083,16 @@ forms.post('/api/forms', async (c) => {
     }
     if (body.layout !== undefined && !normalized) {
       return c.json({ success: false, error: 'layout の形が正しくありません' }, 400);
+    }
+    // P（読みにくい色）：文字と背景の差が 4.5:1 未満の組み合わせは作れない。
+    if (normalized && !('error' in normalized) && normalized.layout) {
+      const createdLayout = JSON.parse(normalized.layout) as { options?: { theme?: unknown } };
+      const createContrastError = formThemeContrastError(
+        normalizeFormTheme(createdLayout.options?.theme),
+      );
+      if (createContrastError) {
+        return c.json({ success: false, error: createContrastError }, 422);
+      }
     }
 
     const form = await createForm(c.env.DB, {
@@ -1031,6 +1144,70 @@ forms.post('/api/forms/drafts', async (c) => {
     return c.json({ success: true, data: serializeForm(form) }, 201);
   } catch (err) {
     console.error('POST /api/forms/drafts error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/*
+ * POST /api/forms/:id/duplicate — フォーム全体を別IDの下書きとして複製する(R230)。
+ *
+ * 引き継ぐのは中身だけ（名前・説明・質問・レイアウト・分岐・回答後の設定・
+ * デザイン・所属フォルダ・利用アカウント）。引き継がないのは集まった回答・
+ * 公開版・公開状態・集計（新しい ID なので回答・来訪・版は付いてこない）。
+ * 複製は必ず受付停止（isActive: false）で作り、公開中の写しを作らない。
+ */
+forms.post('/api/forms/:id/duplicate', async (c) => {
+  try {
+    const id = c.req.param('id');
+    const accountIds = await getFormAccountIds(c.env.DB, id);
+    const duplicateGate = await requireFormManage(c, accountIds);
+    if (duplicateGate) return duplicateGate;
+    const source = await getFormById(c.env.DB, id);
+    if (!source) {
+      return c.json({ success: false, error: 'Form not found' }, 404);
+    }
+    const requestAccountId = c.req.query('account_id');
+    if (requestAccountId && !await canUseFormFromAccount(c, id, requestAccountId)) {
+      return c.json({ success: false, error: 'Form not found' }, 404);
+    }
+    const body = await c.req.json<{ name?: unknown }>()
+      .catch(() => ({} as { name?: unknown }));
+    const requestedName = typeof body.name === 'string' ? body.name.trim() : '';
+    const name = (requestedName || `${source.name}の複製`).slice(0, 200);
+    const copy = await createForm(c.env.DB, {
+      name,
+      description: source.description,
+      fields: source.fields,
+      layout: source.layout,
+      onSubmitTagId: source.on_submit_tag_id,
+      onSubmitScenarioId: source.on_submit_scenario_id,
+      onSubmitMessageType: source.on_submit_message_type,
+      onSubmitMessageContent: source.on_submit_message_content,
+      onSubmitWebhookUrl: source.on_submit_webhook_url,
+      onSubmitWebhookHeaders: source.on_submit_webhook_headers,
+      onSubmitWebhookFailMessage: source.on_submit_webhook_fail_message,
+      saveToMetadata: source.save_to_metadata === 1,
+      ogTitle: source.og_title,
+      ogDescription: source.og_description,
+      ogImageUrl: source.og_image_url,
+      // 公開中の写しを作らない。編集画面で中身を整えてから公開する。
+      isActive: false,
+      lineAccountIds: accountIds,
+    });
+    /*
+     * 所属フォルダも引き継ぐ。消えた箱・別用途の箱は付けない（PUT の
+     * folderId と同じ決まり）。箱が無くても複製自体は作る。
+     */
+    if (source.folder_id) {
+      const folder = await getFolderById(c.env.DB, source.folder_id);
+      if (folder && folder.kind === 'form') {
+        await setFormFolder(c.env.DB, copy.id, source.folder_id);
+      }
+    }
+    const withFolder = source.folder_id ? await getFormById(c.env.DB, copy.id) : copy;
+    return c.json({ success: true, data: serializeForm(withFolder ?? copy) }, 201);
+  } catch (err) {
+    console.error('POST /api/forms/:id/duplicate error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1131,6 +1308,14 @@ forms.put('/api/forms/:id', async (c) => {
       }
       if ('error' in normalized) {
         return c.json({ success: false, error: normalized.error }, 400);
+      }
+      // P（読みにくい色）：文字と背景の差が 4.5:1 未満の組み合わせは保存できない。
+      const savedLayout = JSON.parse(normalized.layout) as { options?: { theme?: unknown } };
+      const contrastError = formThemeContrastError(
+        normalizeFormTheme(savedLayout.options?.theme),
+      );
+      if (contrastError) {
+        return c.json({ success: false, error: contrastError }, 422);
       }
       updates.layout = normalized.layout;
       updates.fields = normalized.fields;
@@ -1685,6 +1870,40 @@ forms.post('/api/forms/:id/opened', async (c) => {
   if (stopped) return stopped;
   try {
     const formId = c.req.param('id');
+    // P（試し回答）：試し合言葉が正しければ、下書きの「開いた記録」を試しで残す。
+    // 受付停止の下書きでも試せる。本物の数（完了率の分母）には入れない。
+    const presentedTestToken = readFormTestToken(c);
+    if (presentedTestToken) {
+      if (!await verifyFormTestToken(c.env.DB, formId, presentedTestToken)) {
+        return c.json({ success: false, error: '試し合言葉が無効です。管理画面から取り直してください' }, 403);
+      }
+      const draft = await getFormById(c.env.DB, formId);
+      if (!draft) {
+        return c.json({ success: false, error: 'Form not found' }, 404);
+      }
+      const identity = await verifyCallerLineIdentity(c.req.header('Authorization'), c.env);
+      if (identity && (!identity.lineAccountId
+        || !await formBelongsToLineAccount(c.env.DB, formId, identity.lineAccountId))) {
+        return c.json({ success: true, isTest: true });
+      }
+      const friend = identity
+        ? await getFriendByLineUserIdForAccount(
+            c.env.DB,
+            identity.lineUserId,
+            identity.lineAccountId,
+          )
+        : null;
+      await c.env.DB.prepare(
+        'INSERT INTO form_opens (id, form_id, friend_id, friend_name, opened_at, is_test) VALUES (?, ?, ?, ?, ?, 1)',
+      ).bind(
+        crypto.randomUUID(),
+        formId,
+        friend?.id ?? null,
+        friend?.display_name ?? null,
+        jstNow(),
+      ).run();
+      return c.json({ success: true, isTest: true });
+    }
     /*
      * 受け付けていないフォームの「開いた記録」を増やさない。**塞ぐのは2つ。**
      *
@@ -1837,12 +2056,28 @@ forms.post('/api/forms/:id/files', async (c) => {
   if (stopped) return stopped;
   try {
     const formId = c.req.param('id');
-    const form = await getFormById(c.env.DB, formId, { published: true });
-    if (!form) {
-      return c.json({ success: false, error: 'Form not found' }, 404);
-    }
-    if (!form.is_active) {
-      return c.json({ success: false, error: 'このフォームは受け付けていません' }, 400);
+    // P（試し回答）：試し合言葉が正しければ、下書きへの添付も試せる。
+    // 受付停止の下書きでも試せる。検査（危険な中身の確認）は本物と同じにする。
+    const fileTestToken = readFormTestToken(c);
+    let form: DbForm;
+    if (fileTestToken) {
+      if (!await verifyFormTestToken(c.env.DB, formId, fileTestToken)) {
+        return c.json({ success: false, error: '試し合言葉が無効です。管理画面から取り直してください' }, 403);
+      }
+      const draft = await getFormById(c.env.DB, formId);
+      if (!draft) {
+        return c.json({ success: false, error: 'Form not found' }, 404);
+      }
+      form = draft;
+    } else {
+      const published = await getFormById(c.env.DB, formId, { published: true });
+      if (!published) {
+        return c.json({ success: false, error: 'Form not found' }, 404);
+      }
+      if (!published.is_active) {
+        return c.json({ success: false, error: 'このフォームは受け付けていません' }, 400);
+      }
+      form = published;
     }
 
     const layout = parseLayout(form.layout, form.fields);
@@ -2015,19 +2250,39 @@ forms.post('/api/forms/:id/submit', async (c) => {
     if (!FORM_IDEMPOTENCY_KEY_PATTERN.test(idempotencyKey)) {
       return c.json({ success: false, error: 'Idempotency-Key must be a UUID' }, 400);
     }
-    const form = await getFormById(c.env.DB, formId, { published: true });
-    if (!form) {
-      return c.json({ success: false, error: 'Form not found' }, 404);
-    }
-    if (!form.is_active) {
-      return c.json({ success: false, error: 'This form is no longer accepting responses' }, 400);
-    }
-
-    let body: { data?: unknown; trackedLinkId?: unknown };
+    let body: { data?: unknown; trackedLinkId?: unknown; testToken?: unknown };
     try {
       body = await c.req.json();
     } catch {
       return c.json({ success: false, error: 'リクエストの形式が正しくありません' }, 400);
+    }
+    // P（試し回答）：試し合言葉はヘッダ・クエリ・本文のどこからでも読む。
+    // 正しければ下書きを読む（公開版が無くても・受付停止でも試せる）。
+    // 合言葉が違うときは本物として扱わず、試しだと分かる文で断る。
+    const presentedTestToken = readFormTestToken(c)
+      ?? (typeof body.testToken === 'string' && body.testToken.trim() ? body.testToken.trim() : null);
+    let testDraft: DbForm | null = null;
+    if (presentedTestToken) {
+      if (!await verifyFormTestToken(c.env.DB, formId, presentedTestToken)) {
+        return c.json({ success: false, error: '試し合言葉が無効です。管理画面から取り直してください' }, 403);
+      }
+      testDraft = await getFormById(c.env.DB, formId);
+      if (!testDraft) {
+        return c.json({ success: false, error: 'Form not found' }, 404);
+      }
+    }
+    let form: DbForm;
+    if (testDraft) {
+      form = testDraft;
+    } else {
+      const published = await getFormById(c.env.DB, formId, { published: true });
+      if (!published) {
+        return c.json({ success: false, error: 'Form not found' }, 404);
+      }
+      if (!published.is_active) {
+        return c.json({ success: false, error: 'This form is no longer accepting responses' }, 400);
+      }
+      form = published;
     }
     // data と trackedLinkId は実行時に形と大きさを見る。形の違う値は
     // 後の処理で落ちる前に 400 で断る。
@@ -2066,6 +2321,59 @@ forms.post('/api/forms/:id/submit', async (c) => {
       return c.json({ success: false, error: 'Friend not found' }, 404);
     }
     const friendId = friend.id;
+
+    // P（試し回答）：試し合言葉が正しければ、下書きへの試し回答として保存する。
+    // 集計に入れず、定員の確保・件数の更新・Webhook・タグ・シナリオ・リマインダ・
+    // マイル・通知・自動化・計測をいっさい動かさない。入力の形と回答期限は
+    // 本物と同じに見る。
+    if (testDraft) {
+      delete submissionData._webhookVerified;
+      delete submissionData._skipWebhook;
+      const draftLayout: FormLayout | null = testDraft.layout ? parseLayout(testDraft.layout) : null;
+      let testRejected: string | null = null;
+      if (draftLayout) {
+        testRejected = await checkFormGates({
+          db: c.env.DB,
+          formId,
+          layout: draftLayout,
+          friendId,
+          submitCount: 0,
+          answers: submissionData,
+          isTest: true,
+        });
+      } else {
+        const fields = JSON.parse(testDraft.fields || '[]') as Array<{
+          name: string;
+          label: string;
+          type: string;
+          required?: boolean;
+        }>;
+        for (const field of fields) {
+          if (field.required) {
+            const val = submissionData[field.name];
+            if (val === undefined || val === null || val === '') {
+              testRejected = `${field.label} は必須項目です`;
+              break;
+            }
+          }
+        }
+      }
+      if (testRejected) {
+        return c.json({ success: false, error: testRejected }, 400);
+      }
+      const testSubmission = await insertFormSubmissionRecord(c.env.DB, {
+        id: crypto.randomUUID(),
+        formId,
+        formVersionId: testDraft.current_published_version_id ?? null,
+        friendId,
+        data: JSON.stringify(submissionData),
+        isTest: true,
+      });
+      return c.json(
+        { success: true, data: { ...serializeSubmission(testSubmission), isTest: true } },
+        201,
+      );
+    }
 
     // キーあり送信の照合材料。読み取りだけに使い、予約の書き込みは判定の後。
     let peekScope: FormSubmitClaimScope | null = null;

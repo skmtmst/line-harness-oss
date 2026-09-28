@@ -183,6 +183,11 @@ function OtherTextInput({
 export default function Form() {
   const { id } = useParams<{ id: string }>();
   const [search] = useSearchParams();
+  /**
+   * P（試し回答）：管理画面の試しURLに付く合言葉。あるときは下書きを試す。
+   * 試しの回答は集計に入らず、回答後の動作も動かない。
+   */
+  const testToken = search.get('test_token');
 
   const [form, setForm] = useState<PublicForm | null>(null);
   const [answers, setAnswers] = useState<Answers>({});
@@ -209,7 +214,7 @@ export default function Form() {
     void (async () => {
       setLoading(true);
       try {
-        const data = await api.getForm(id);
+        const data = await api.getForm(id, testToken ?? undefined);
         if (cancelled) return;
         setForm(data);
         setAnswers(initialAnswers(data.layout));
@@ -217,8 +222,9 @@ export default function Form() {
           document.title = data.layout.options.pageTitle;
         }
 
-        // 前回の回答を出す設定のときだけ、サーバが中身を返す
-        if (data.layout.options?.restorePrevious) {
+        // 前回の回答を出す設定のときだけ、サーバが中身を返す。
+        // 試しでは前の試しを書き戻さない（本物の回答も出さない）。
+        if (!testToken && data.layout.options?.restorePrevious) {
           try {
             const latest = await api.getMyLatestFormAnswer(id);
             if (!cancelled && latest?.answers) {
@@ -244,7 +250,7 @@ export default function Form() {
     return () => {
       cancelled = true;
     };
-  }, [id, reloadKey]);
+  }, [id, reloadKey, testToken]);
 
   const layout = form?.layout;
   const section = layout?.sections[sectionIndex];
@@ -300,7 +306,7 @@ export default function Form() {
     setError(null);
     setUploading((prev) => ({ ...prev, [name]: true }));
     try {
-      const res = await api.uploadFormFile(id, file);
+      const res = await api.uploadFormFile(id, file, testToken ?? undefined);
       setValue(name, res.data.url);
       clearFieldError(name);
     } catch (err) {
@@ -377,7 +383,7 @@ export default function Form() {
       const attempt = await api.submitForm(id!, {
         data: answers,
         trackedLinkId: search.get('ref') ?? undefined,
-      }, current);
+      }, current, testToken ?? undefined);
       const decision = decideFormSubmitStep(attempt);
       if (decision.action === 'done') {
         const url = layout!.options?.thanksUrl;
@@ -462,7 +468,8 @@ export default function Form() {
    */
   const hasCustomTheme = options.theme !== undefined && options.theme !== null;
 
-  if (!form.isActive) {
+  // P（試し回答）：試し合言葉があるときは、受付停止の下書きでも試せる。
+  if (!form.isActive && !testToken) {
     return (
       <div className="mx-auto max-w-md" style={{ backgroundColor: theme.sub }}>
         <StatusView icon="calendar" title="このフォームは、いま回答を受け付けていません。" />
@@ -479,6 +486,11 @@ export default function Form() {
           title="送信しました"
           body={layout.options?.thanksText || 'ご回答ありがとうございました。'}
         />
+        {testToken ? (
+          <p className="px-6 pb-8 text-center text-xs text-ink-faint">
+            試しの回答のため、集計には入りません。
+          </p>
+        ) : null}
       </div>
     );
   }
@@ -504,6 +516,11 @@ export default function Form() {
             <h1 className="text-[17px] leading-[26px] font-bold text-ink">{options.pageTitle}</h1>
           </div>
         )}
+        {testToken ? (
+          <p className="mt-4 rounded-lg border border-hairline bg-canvas px-3 py-2 text-center text-xs text-ink-faint">
+            試し回答中です。この回答は集計に入りません。
+          </p>
+        ) : null}
         <div className={options.pageTitle ? 'mt-4' : undefined}>
           {form.description && (
             <p className="mb-4 text-sm leading-relaxed whitespace-pre-wrap text-ink-secondary">

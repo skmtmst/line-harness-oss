@@ -16,6 +16,7 @@ import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import ConditionBuilder, {
+  findInvalidRangeIssue,
   isEmptyCondition,
   isRuleComplete,
   pruneCondition,
@@ -116,6 +117,8 @@ export function ConditionDialog({
   const [draft, setDraft] = useState<SegmentCondition | null>(value)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  /* R247: 入力済みの不正範囲は欄の下で知らせて止める。保存済みは維持する。 */
+  const [rangeError, setRangeError] = useState('')
 
   return (
     <Shell
@@ -136,6 +139,16 @@ export function ConditionDialog({
             type="button"
             disabled={saving}
             onClick={async () => {
+              /*
+               * R247: 入力済みの不正範囲（上下限の逆転など）は落とさず、
+               * 欄の下で知らせて止める。保存済みの条件は維持する。
+               */
+              const rangeIssue = findInvalidRangeIssue(draft)
+              if (rangeIssue) {
+                setRangeError(rangeIssue)
+                return
+              }
+              setRangeError('')
               setSaving(true)
               setError('')
               try {
@@ -162,6 +175,9 @@ export function ConditionDialog({
     >
       {error && (
         <Notice tone="danger" className="mb-4" message={error} />
+      )}
+      {rangeError && (
+        <Notice tone="validation" className="mb-4" message={rangeError} />
       )}
       <span className="sr-only">{title}{description}</span>
       <section className="bg-canvas-sunken rounded-panel mb-4 px-4 py-5">
@@ -232,17 +248,24 @@ export function ConditionDialog({
           </p>
         )}
       </section>
+      {/*
+        R238: ここに並べるのは、下の「詳しい条件を編集」を開いたときの
+        追加ボタンと同じものだけにする。足せない軸（イベント予約・
+        カレンダー予約・共通情報・リマインダ・担当者・流入経路・配信状況・
+        予約状況・購入履歴）を「利用できる」と書くと、無い操作を探し続ける
+        ことになる。並び・名前は ConditionBuilder の追加ボタンと同じ
+        （RULE_KINDS）。増減したら両方を直す（下の試験が見張る）。
+      */}
       <section className="mt-4">
-        <h3 className="text-ink text-sm font-bold">利用できる条件軸</h3>
-        <p className="text-ink-secondary mt-2 text-xs font-medium">標準互換（15軸） <span className="text-ink-faint ml-2 font-normal">友だち一覧の詳細検索・属性の保存した検索と同じ並び</span></p>
+        <h3 className="text-ink text-sm font-bold">足せる条件</h3>
+        <p className="text-ink-secondary mt-2 text-xs font-medium">下の「詳しい条件を編集」を開くと出る追加ボタンと同じ並び</p>
         <div className="mt-2 space-y-3">{[
           ['名前','個別メモ','ステータスメッセージ','友だち登録日'],
-          ['タグ','友だち情報','シナリオ','イベント予約','カレンダー予約'],
-          ['共通情報','リマインダ','回答フォーム','最終反応日','その他'],
-          ['対応マーク'],
+          ['対応マーク','タグ','友だち情報','シナリオ購読','シナリオ'],
+          ['回答フォーム','最終反応日','反応状態','行動スコア'],
+          ['ブロック状態','表示状態'],
         ].map((line) => <div key={line[0]} className="flex gap-2">{line.map((label) => <span key={label} className="border-hairline rounded-pill border px-2.5 py-1.5 text-xs text-ink-secondary">{label}</span>)}</div>)}</div>
-        <p className="text-ink-secondary mt-3 text-xs font-medium">この画面だけの軸（6軸） <span className="text-ink-faint ml-2 font-normal">配信の絞り込みで使える追加の軸</span></p>
-        <div className="mt-2 space-y-3">{[['担当者','流入経路','配信状況'],['予約状況','購入履歴','ブロック状態']].map((line) => <div key={line[0]} className="flex gap-2">{line.map((label) => <span key={label} className="border-hairline rounded-pill border px-2.5 py-1.5 text-xs text-ink-secondary">{label}</span>)}</div>)}</div>
+        <p className="text-ink-faint mt-2 text-xs">対応マーク・友だち情報は、任意機能をオンにしているアカウントだけで出ます。</p>
       </section>
       <Notice tone="info" className="mt-5">複数条件は「すべて一致（AND）」または「いずれか一致（OR）」で結合できます。</Notice>
       <details className="mt-3"><summary className="text-action cursor-pointer text-xs">詳しい条件を編集</summary><div className="mt-3"><ConditionBuilder value={draft} onChange={setDraft} /></div></details>
@@ -280,6 +303,8 @@ export function OnCompleteDialog({
 }) {
   const [draftMode, setDraftMode] = useState<OnCompleteMode>(mode)
   const [draftTarget, setDraftTarget] = useState<string | null>(targetScenarioId)
+  /* R239: 移動先の未選択は入力不足として欄の下で案内し、通信失敗と分ける。 */
+  const [targetError, setTargetError] = useState('')
   const [scenarios, setScenarios] = useState<{ id: string; name: string }[]>([])
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -368,6 +393,12 @@ export function OnCompleteDialog({
             type="button"
             disabled={saving}
             onClick={async () => {
+              /* R239: 移動先の未選択は送らずに欄の下で案内する。 */
+              if (draftMode === 'move' && !draftTarget) {
+                setTargetError('移動先を選んでください')
+                return
+              }
+              setTargetError('')
               setSaving(true)
               try {
                 const err = await onSave(draftMode, draftMode === 'move' ? draftTarget : null)
@@ -476,7 +507,11 @@ export function OnCompleteDialog({
                 aria-label="移動先のシナリオ"
                 id="on-complete-move-target"
                 value={draftTarget ?? ''}
-                onChange={(next) => setDraftTarget(next || null)}
+                onChange={(next) => {
+                  setDraftTarget(next || null)
+                  if (next) setTargetError('')
+                }}
+                error={targetError || undefined}
                 disabled={candidatesState === 'loading'}
                 options={[
                   {

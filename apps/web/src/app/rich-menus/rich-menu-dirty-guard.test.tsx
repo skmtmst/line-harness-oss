@@ -13,6 +13,7 @@ const richMenuUpdate = vi.hoisted(() => vi.fn())
 const richMenuSchedule = vi.hoisted(() => vi.fn())
 const richMenuPublish = vi.hoisted(() => vi.fn())
 const richMenuPreviewTargets = vi.hoisted(() => vi.fn())
+const richMenuDuplicate = vi.hoisted(() => vi.fn())
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
@@ -107,6 +108,7 @@ vi.mock('@/lib/api', () => ({
       schedule: richMenuSchedule,
       publish: richMenuPublish,
       previewTargets: richMenuPreviewTargets,
+      duplicate: richMenuDuplicate,
       audienceSummary: () => Promise.resolve({ success: true, data: { total: { value: 0, state: 'available', reason: null }, targeted: { value: 0, state: 'available', reason: null }, excluded: { value: 0, state: 'available', reason: null }, effective: { value: 0, state: 'available', reason: null } } }),
       imageUrl: (key: string) => `/img/${key}`,
     },
@@ -203,6 +205,8 @@ beforeEach(() => {
   richMenuSchedule.mockImplementation(() => Promise.resolve({ success: true, data: { id: 'sch-1' } }))
   richMenuPublish.mockReset()
   richMenuPublish.mockImplementation(() => Promise.resolve({ success: true, data: { pages: [] } }))
+  richMenuDuplicate.mockReset()
+  richMenuDuplicate.mockImplementation(() => Promise.resolve({ success: true, data: { id: 'copy-1' } }))
   // 公開入力の下書きは localStorage に残る。試験ごとに空で始める。
   vi.stubGlobal('localStorage', new MemoryStorage())
   richMenuPreviewTargets.mockReset()
@@ -637,7 +641,8 @@ describe('公開前チェックの人数（未保存条件）', () => {
     expect(screen.queryByText(/誰に出すかが決まっています/)).toBeNull()
     // 右の欄と「公開すると何が変わるか」も 0人 でそろえる
     expect(screen.getByText('0人')).toBeTruthy()
-    expect(screen.getByText(/0人 のトーク画面のメニューが入れ替わります/)).toBeTruthy()
+    // R204: 条件が空なら「全員の画面が変わる」ではなく「誰にも出ない」と説明する
+    expect(screen.getByText(/公開しても今は誰の画面にも出ません/)).toBeTruthy()
   })
 })
 
@@ -765,5 +770,99 @@ describe('公開入力の下書き（localStorage）', () => {
     await screen.findByText('いつ出すか')
     expect(document.querySelectorAll<HTMLInputElement>('input[name="publish-mode"]')[1].checked).toBe(true)
     expect(screen.getByLabelText('出しはじめ').textContent).toContain('2026年10月1日（木）10:00')
+  })
+})
+
+/*
+ * R204/R205: 公開画面の「何が変わるか」は、実際の動きと編集中の設定に
+ * 合わせて言い分ける。以前は常に「N人 のトーク画面のメニューが
+ * 入れ替わります」と出て、条件で出し分ける設定でも全員に変わるように
+ * 読めた。
+ */
+describe('R204 公開すると何が変わるか（設定に合わせた説明）', () => {
+  async function renderPublish(group: typeof GROUP) {
+    richMenuGet.mockImplementation(() => Promise.resolve({ success: true, data: group }))
+    searchParams.value = new URLSearchParams('id=grp-1&step=publish')
+    render(<RichMenuEditPage />)
+    await flush()
+    await screen.findByText('いつ出すか')
+  }
+
+  test('全員の既定のときは「すべての友だちの画面に出る」と説明する', async () => {
+    await renderPublish({ ...GROUP, isDefaultForAll: true })
+    expect(screen.getByText(/すべての友だちのトーク画面に出ます/)).toBeTruthy()
+    expect(screen.queryByText(/登録だけでは/)).toBeNull()
+  })
+
+  test('条件で出し分けるときは「順次切り替わる」と説明し、全員にすぐ出るとは言わない', async () => {
+    await renderPublish({
+      ...GROUP,
+      targetingEnabled: true,
+      targetingCondition: JSON.stringify({ operator: 'AND', rules: [{ type: 'private_memo', value: '保存済み' }] }),
+    })
+    expect(screen.getByText(/順次切り替わります/)).toBeTruthy()
+    expect(screen.getByText(/すぐ全員に出るわけではありません/)).toBeTruthy()
+    expect(screen.queryByText(/すべての友だちのトーク画面に出ます/)).toBeNull()
+  })
+
+  test('対象設定なしなら「登録だけでは画面は変わらない」と説明する', async () => {
+    await renderPublish(GROUP)
+    expect(screen.getByText(/LINEへの登録だけでは、友だちのトーク画面は変わりません/)).toBeTruthy()
+    expect(screen.getByText(/「表示先」で出す相手を決めてください/)).toBeTruthy()
+  })
+
+  test('公開が終わると、設定に合った完了文が出る', async () => {
+    await renderPublish(GROUP)
+    fireEvent.click(screen.getByText('この内容で公開する'))
+    await flush()
+    expect(richMenuPublish).toHaveBeenCalled()
+    expect(screen.getByText(/一覧の「表示先」から操作してください/)).toBeTruthy()
+    // 対象設定なしなのに「全員の画面が変わった」とは言わない
+    expect(screen.queryByText(/既定メニューになりました/)).toBeNull()
+  })
+})
+
+/*
+ * R232: 複製に成功したのに確認窓が残ると、コピーの編集画面で
+ * 「このコピーをさらに複製する？」に見えてしまう。成功時は窓を閉じ、
+ * 失敗時は窓を開いたまま理由を出す。
+ */
+describe('複製の確認窓 (R232)', () => {
+  test('成功すると窓が閉じ、コピーの編集画面へ移る', async () => {
+    searchParams.value = new URLSearchParams('id=grp-1')
+    render(<RichMenuEditPage />)
+    await flush()
+    await screen.findByDisplayValue('メインメニュー')
+
+    fireEvent.click(screen.getByRole('button', { name: '複製する' }))
+    await flush()
+    expect(screen.getByRole('button', { name: '下書きとして複製する' })).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: '下書きとして複製する' }))
+    await flush()
+
+    expect(richMenuDuplicate).toHaveBeenCalledTimes(1)
+    expect(routerPush).toHaveBeenCalledWith('/rich-menus/edit?id=copy-1')
+    // 窓は閉じている。残ると「コピーをさらに複製する？」に見える。
+    expect(screen.queryByRole('button', { name: '下書きとして複製する' })).toBeNull()
+    expect(screen.getByText(/下書きを複製しました/)).toBeTruthy()
+  })
+
+  test('失敗したときは窓が開いたまま理由を出し、遷移しない', async () => {
+    richMenuDuplicate.mockImplementationOnce(() => Promise.resolve({ success: false, error: 'copy failed' }))
+    searchParams.value = new URLSearchParams('id=grp-1')
+    render(<RichMenuEditPage />)
+    await flush()
+    await screen.findByDisplayValue('メインメニュー')
+
+    fireEvent.click(screen.getByRole('button', { name: '複製する' }))
+    await flush()
+    fireEvent.click(screen.getByRole('button', { name: '下書きとして複製する' }))
+    await flush()
+
+    expect(richMenuDuplicate).toHaveBeenCalledTimes(1)
+    expect(routerPush).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: '下書きとして複製する' })).toBeTruthy()
+    expect(screen.getByText('copy failed')).toBeTruthy()
   })
 })

@@ -16,10 +16,11 @@ import ActionEditor from '@/components/scenarios/action-editor'
 import TriggerEditor from '@/components/scenarios/trigger-editor'
 import CarouselPicker from '@/components/scenarios/carousel-picker'
 import InsertToolbar from '@/components/scenarios/insert-toolbar'
-import StepPreview, { previewOffsets } from '@/components/scenarios/step-preview'
+import StepPreview, { previewOffsets, isDeliveryTimeSet } from '@/components/scenarios/step-preview'
 import type { StepMessageKind } from '@/components/scenarios/message-type-tabs'
 import MessageKindFields, {
   emptyMessageKindState,
+  messageKindProblem,
   parseMessageKind,
   serializeMessageKind,
   type MessageKind,
@@ -34,6 +35,9 @@ import QuestionEditor, {
   deadAnswerSettings,
   emptyQuestion,
   isUriOnlyBehavior,
+  planChoiceActionRemap,
+  validateChoiceUris,
+  withChoiceKeys,
   type ScenarioQuestion,
 } from '@/components/scenarios/question-editor'
 import {
@@ -44,7 +48,7 @@ import {
   describeCondition,
   type OnCompleteMode,
 } from '@/components/scenarios/scenario-dialogs'
-import type { SegmentCondition } from '@/components/shared/condition-builder'
+import { findInvalidRangeIssue, type SegmentCondition } from '@/components/shared/condition-builder'
 import ScheduleInput, {
   emptySchedule,
   buildSchedulePayload,
@@ -65,7 +69,7 @@ import {
   scenarioReachPercent,
   scenarioReachPercentLabel,
 } from './scenario-reach-display'
-import { describeAfterSend, describeStepAudience } from './scenario-step-audience'
+import { describeAfterSend, describeStepAudience, stepKindLabel, stepListTitle } from './scenario-step-audience'
 import {
   scenarioSimulationKey,
   simulationForKey,
@@ -137,7 +141,9 @@ function formatScheduleLabel(mode: DeliveryMode | undefined, step: ScenarioStep)
     return `購読開始から${parts.join('')}後`
   }
   // absolute_time
-  return `購読開始から${step.offsetDays ?? 0}日後の ${step.deliveryTime ?? '00:00'}`
+  // R235: 時刻を消したまま「○日後の 」と出すと、設定が済んだように見える。未設定とはっきり言う。
+  if (!step.deliveryTime) return '時刻を入力してください'
+  return `購読開始から${step.offsetDays ?? 0}日後の ${step.deliveryTime}`
 }
 
 interface StepFormState {
@@ -177,6 +183,29 @@ class DuplicateAborted extends Error {
     cause?: unknown,
   ) {
     super(cause instanceof Error && cause.message ? cause.message : '複製できませんでした')
+  }
+}
+
+/*
+ * R216: 複製で送る時刻の欄は、配信方式ごとに必要なものだけにする。
+ * 全部送ると、口（validateStepSchedule）が余分な欄を見て 400 で止める。
+ * 経過時間なのに delayMinutes を送ると、1通目で止まって作りかけの
+ * コピーが残る。保存の buildSchedulePayload と同じ分け方にする。
+ */
+function stepScheduleForClone(
+  mode: DeliveryMode,
+  step: Pick<ScenarioStep, 'delayMinutes' | 'offsetDays' | 'offsetMinutes' | 'deliveryTime'>,
+): { delayMinutes?: number; offsetDays?: number; offsetMinutes?: number; deliveryTime?: string } {
+  if (mode === 'relative') return { delayMinutes: step.delayMinutes }
+  if (mode === 'elapsed') {
+    return {
+      offsetDays: step.offsetDays ?? 0,
+      offsetMinutes: step.offsetMinutes ?? 0,
+    }
+  }
+  return {
+    offsetDays: step.offsetDays ?? 0,
+    deliveryTime: step.deliveryTime ?? '09:00',
   }
 }
 
@@ -721,8 +750,8 @@ export default function ScenarioDetailClient({
       const existingByOrder = new Map(existing.data.steps.map((s) => [s.stepOrder, s.id]))
       const stepIdMap = new Map<string, string>()
       // 通は順に足す。まとめて入れる口が無い。
-      // 時刻・絞り込み・質問・下書きの別まで写す。落とすと時刻指定の複製が
-      // 400 で失敗したり、別物の流れになる。
+      // 時刻・絞り込み・質問・下書きの別まで写す。落とすと別物の流れに
+      // なる。時刻は方式に合う欄だけ送る（余分な欄があると 400 で止まる）。
       for (const step of sortedSteps) {
         const already = existingByOrder.get(step.stepOrder)
         if (already) {
@@ -731,10 +760,7 @@ export default function ScenarioDetailClient({
         }
         const copied = await api.scenarios.addStep(copy, {
           stepOrder: step.stepOrder,
-          delayMinutes: step.delayMinutes,
-          offsetDays: step.offsetDays ?? undefined,
-          offsetMinutes: step.offsetMinutes ?? 0,
-          deliveryTime: step.deliveryTime ?? undefined,
+          ...stepScheduleForClone(deliveryMode, step),
           messageType: step.messageType,
           messageContent: step.messageContent,
           templateId: step.templateId ?? null,
@@ -972,7 +998,8 @@ export default function ScenarioDetailClient({
       afterSend: step.afterSend ?? 'continue',
       inputMode: step.templateId ? 'template' : 'direct',
       targetCondition: (step.targetCondition as SegmentCondition | null) ?? null,
-      question: (step.question as ScenarioQuestion | null) ?? null,
+      /* R246: 開くときに鍵を振る。削除・追加の追跡に使う。 */
+      question: step.question ? withChoiceKeys(step.question as ScenarioQuestion) : null,
       isDraft: step.isDraft === true,
     })
     // 専用の欄で書く種別は、保存されている JSON を欄の形に戻す。
@@ -992,6 +1019,50 @@ export default function ScenarioDetailClient({
     setShowStepForm(false)
     setEditingStepId(null)
     setStepError('')
+  }
+
+  /*
+   * R246: 選択肢別アクションの紐づけを、位置ではなく選択肢の鍵で付け替える。
+   * 口に choiceIndex の書き換えが無いため、移動は「消して作り直し」で行う
+   * （中身・条件・繰り返しは引き継ぐ）。失敗時は文を返し、呼び出し側が
+   * 画面を閉じずに知らせる。成功・対象なしは null。
+   */
+  const remapChoiceActions = async (
+    stepId: string,
+    nextQuestion: ScenarioQuestion | null,
+  ): Promise<string | null> => {
+    const prevStep = scenario?.steps.find((step) => step.id === stepId)
+    const prevQuestion = (prevStep?.question as ScenarioQuestion | null) ?? null
+    if (!prevQuestion && !nextQuestion) return null
+    const list = await api.scenarios.actions.list(id)
+    if (!list.success) return '選択肢の動作を読み直せませんでした。画面を開き直して対応を確認してください。'
+    const rows = list.data.filter(
+      (action) => action.hook === 'choice_selected' && (action.stepId ?? null) === stepId,
+    )
+    if (rows.length === 0) return null
+    const plan = planChoiceActionRemap(prevQuestion?.choices ?? [], nextQuestion?.choices ?? [], rows)
+    if (plan.removeIds.length === 0 && plan.moveTo.length === 0) return null
+    const moveById = new Map(plan.moveTo.map((move) => [move.id, move.choiceIndex]))
+    for (const row of rows) {
+      const moveTo = moveById.get(row.id)
+      if (moveTo === undefined && !plan.removeIds.includes(row.id)) continue
+      const removed = await api.scenarios.actions.remove(id, row.id)
+      if (!removed.success) return '選択肢の動作の付け替えに失敗しました。画面を開き直して対応を確認してください。'
+      if (moveTo !== undefined) {
+        const recreated = await api.scenarios.actions.create(id, {
+          hook: row.hook,
+          stepId: row.stepId,
+          choiceIndex: moveTo,
+          actionType: row.actionType,
+          config: row.config ?? {},
+          condition: row.condition ?? null,
+          repeatOnRefire: row.repeatOnRefire,
+          sortOrder: row.sortOrder,
+        })
+        if (!recreated.success) return '選択肢の動作の付け替えに失敗しました。画面を開き直して対応を確認してください。'
+      }
+    }
+    return null
   }
 
   const handleSaveStep = async () => {
@@ -1024,9 +1095,31 @@ export default function ScenarioDetailClient({
         )
         return
       }
+      /*
+       * R214: 行き先（URL・電話・メール）の形を見る。not-a-url のような
+       * 値でも保存できると、設定済みに見えて実際は開けない通になる。
+       * 下書きでも通さず、その場で直せるよう選択肢番号で名指しする。
+       */
+      const uriError = validateChoiceUris(stepForm.question)
+      if (uriError) {
+        setStepError(uriError)
+        return
+      }
     } else if (stepForm.inputMode === 'direct') {
       // 直接入力モード: messageContent 必須 + Flex/画像 は JSON parse 検証
       if (!stepForm.messageContent.trim()) {
+        /*
+         * R234: 専用欄（音声・スタンプなど）で「入っているが送れない」値の
+         * ときは、どこが悪いかをはっきり言う。「入力してください」だけだと
+         * 空欄と区別がつかず、足しても足しても通らない。
+         */
+        if (isStructuredKind(stepForm.messageType)) {
+          const problem = messageKindProblem(stepForm.messageType as MessageKind, kindState)
+          if (problem) {
+            setStepError(problem)
+            return
+          }
+        }
         setStepError('メッセージ内容を入力してください')
         return
       }
@@ -1047,6 +1140,24 @@ export default function ScenarioDetailClient({
         setStepError('テンプレートを選択してください')
         return
       }
+    }
+    /*
+     * R235: 時刻指定なのに時刻が空のまま送ると、サーバーが 400 で断る。
+     * 投げる前に時刻の欄へ戻す。時刻の欄の場所（「購読開始から ○日後の
+     * ○に配信」）も文に入れ、どこを直すか分かるようにする。
+     */
+    if (deliveryMode === 'absolute_time' && !isDeliveryTimeSet(stepForm.schedule.deliveryTime)) {
+      setStepError('配信する時刻を入力してください（「購読開始から ○日後の ○に配信」の時刻の欄）')
+      return
+    }
+    /*
+     * R247: 1通の配信条件の不正範囲（上下限の逆転など）は落とさず、
+     * 欄の下で知らせて止める。保存済みの条件は維持する。
+     */
+    const rangeIssue = findInvalidRangeIssue(stepForm.targetCondition ?? null)
+    if (rangeIssue) {
+      setStepError(rangeIssue)
+      return
     }
     setStepSaving(true)
     setStepError('')
@@ -1069,6 +1180,8 @@ export default function ScenarioDetailClient({
           payloadMessageContent = tpl.messageContent || ' '
         }
       }
+      /* R246: 保存直前にも鍵を振る。削除・追加の追跡に使う。 */
+      const keyedQuestion = stepForm.question ? withChoiceKeys(stepForm.question) : null
       const payload = {
         stepOrder: stepForm.stepOrder,
         ...schedulePayload,
@@ -1080,13 +1193,24 @@ export default function ScenarioDetailClient({
         // null を渡すと「絞り込みなし」に戻る。undefined だと据え置きになるので、
         // 外したつもりが残るのを防ぐために必ず値を送る。
         targetCondition: stepForm.targetCondition,
-        question: stepForm.question,
+        question: keyedQuestion,
         isDraft: stepForm.isDraft,
       }
       if (editingStepId) {
         const res = await api.scenarios.updateStep(id, editingStepId, payload)
         if (!res.success) {
           setStepError(res.error)
+          return
+        }
+        /*
+         * R246: 質問と動作の更新を一緒に確定する。選択肢の削除・追加で
+         * 位置がずれても、残る選択肢の動作を保持し、消えた選択肢の動作
+         * だけを消す。新しい選択肢は行が無い（0件から始める）。
+         */
+        const remapError = await remapChoiceActions(editingStepId, keyedQuestion)
+        if (remapError) {
+          setStepError(remapError)
+          await loadScenario(true)
           return
         }
       } else {
@@ -1117,8 +1241,15 @@ export default function ScenarioDetailClient({
       closeStepForm()
       loadScenario(true)
       reloadStats()
-    } catch {
-      setStepError('ステップの保存に失敗しました。通信を確かめて、もう一度お試しください。')
+    } catch (error) {
+      /*
+       * R235: 入力の不備（400番台）と通信・サーバーの失敗を分ける。
+       * 時刻の空などの入力エラーまで「通信を確かめて」と出すと、
+       * 直せるものを直せず再試行を繰り返すことになる。
+       */
+      setStepError(error instanceof ApiError && error.status >= 400 && error.status < 500
+        ? '入力内容に不備があります。時刻・本文を確かめて、もう一度お試しください。'
+        : 'ステップの保存に失敗しました。通信を確かめて、もう一度お試しください。')
     } finally {
       setStepSaving(false)
     }
@@ -1158,10 +1289,8 @@ export default function ScenarioDetailClient({
         stepOrder: step.stepOrder + 1,
         messageType: step.messageType,
         messageContent: step.messageContent,
-        delayMinutes: step.delayMinutes,
-        offsetDays: step.offsetDays ?? undefined,
-        offsetMinutes: step.offsetMinutes ?? undefined,
-        deliveryTime: step.deliveryTime ?? undefined,
+        // 方式に合う時刻の欄だけ送る。余分な欄があると口が 400 で止める。
+        ...stepScheduleForClone(deliveryMode, step),
         templateId: step.templateId ?? null,
         onReachTagId: step.onReachTagId ?? null,
         afterSend: step.afterSend,
@@ -1372,7 +1501,9 @@ export default function ScenarioDetailClient({
                 setStepForm({
                   ...stepForm,
                   templateId,
-                  question: template?.question ? structuredClone(template.question) : null,
+                  question: template?.question
+                    ? withChoiceKeys(structuredClone(template.question) as ScenarioQuestion)
+                    : null,
                   messageType: (template?.messageType as MessageType | undefined) ?? stepForm.messageType,
                   messageContent: template?.messageContent ?? stepForm.messageContent,
                 })
@@ -1576,6 +1707,7 @@ export default function ScenarioDetailClient({
       <aside data-design-node="xfYLn" className="min-w-0 space-y-4">
         <StepPreview
           deliveryMode={deliveryMode}
+          stepOrder={stepForm.stepOrder}
           offsetDays={stepFormPreview.offsetDays}
           deliveryTime={stepForm.schedule.deliveryTime}
           offsetHours={stepFormPreview.offsetHours}
@@ -2191,17 +2323,19 @@ export default function ScenarioDetailClient({
                   const tpl = step.templateId
                     ? templates.find((t) => t.id === step.templateId)
                     : null
-                  const kindLabel = tpl
-                    ? 'テンプレート'
-                    : (messageTypeOptions.find((o) => o.value === step.messageType)?.label ??
-                      step.messageType)
                   // 内容の桁は見出しだけ出す。中身はプレビューで開く。
                   // 本文をそのまま桁に入れると、行の高さが通ごとに変わって
                   // 上下の見比べができなくなる。
-                  const title =
-                    tpl?.name ??
-                    (step.messageContent || '').split('\n')[0].slice(0, 60) ??
-                    '（空）'
+                  // R215: 質問の通は messageContent が空（' '）のまま残る。
+                  // 本文で代用すると空のボタン・種別「テキスト」になり、
+                  // どの質問か一覧で分からない。質問文を見出しにする。
+                  const kindLabel = stepKindLabel(
+                    step,
+                    tpl?.name ?? null,
+                    messageTypeOptions.find((o) => o.value === step.messageType)?.label ??
+                      step.messageType,
+                  )
+                  const title = stepListTitle(step, tpl?.name ?? null)
                   return (
                     <Fragment key={step.id}>
                       {idx > 0 && (
@@ -2256,16 +2390,24 @@ export default function ScenarioDetailClient({
                           {formatScheduleLabel(deliveryMode, step)}
                         </td>
                         <td className="w-full max-w-0 px-3 py-3 align-top">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              editingStepId === step.id ? closeStepForm() : openEditStep(step)
-                            }
-                            className="text-info block w-full truncate text-left text-sm hover:underline"
-                            title={title}
-                          >
-                            {title}
-                          </button>
+                          <span className="flex min-w-0 items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                editingStepId === step.id ? closeStepForm() : openEditStep(step)
+                              }
+                              className="text-info block min-w-0 flex-1 truncate text-left text-sm hover:underline"
+                              title={title}
+                            >
+                              {title}
+                            </button>
+                            {/*
+                              R212: 下書きの通は送られないのに、通常の通と
+                              同じ見た目だった。配信される通とされない通を
+                              見分けられるよう、共通の StatusChip で名指しする。
+                            */}
+                            {step.isDraft === true && <StatusChip status="draft" />}
+                          </span>
                           {step.onReachTagId && (
                             <p className="text-ink-faint mt-0.5 truncate text-xs">
                               到達タグ: {tags.find((t) => t.id === step.onReachTagId)?.name ?? step.onReachTagId}

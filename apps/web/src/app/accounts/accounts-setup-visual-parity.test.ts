@@ -60,7 +60,9 @@ describe('D-3 店舗追加・一覧の統括集約', () => {
   })
 
   it('階層編集部品を一覧の操作から開き、保存APIへつなぐ', () => {
-    for (const label of ['未設定のLINEアカウント', 'LINEアカウント階層をドラッグ＆ドロップで編集', '未保存の変更', '構成を保存']) {
+    // R191: 移動先メニュー（キーボード・クリックの代替経路）が増えたので、
+    // 見出しは「ドラッグ＆ドロップで編集」とは言わず「編集」に留める。
+    for (const label of ['未設定のLINEアカウント', 'LINEアカウント階層を編集', '未保存の変更', '構成を保存']) {
       expect(orderingSource).toContain(label)
     }
     expect(orderingSource).toContain('api.lineAccounts.updateHierarchy')

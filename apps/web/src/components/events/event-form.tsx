@@ -24,6 +24,7 @@ import EventQuestionsEditor, { parseEventQuestions } from '@/components/events/e
 import DateField from '@/components/shared/date-field'
 import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { TimeField } from '@/components/shared/date-time-field'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 // #740: 下書きの初期値と字数上限は作成画面と共有する。片方だけ変えないこと。
 import {
   EVENT_CANCEL_DEADLINE_OPTIONS,
@@ -1297,11 +1298,13 @@ export function BulkSlotDialog({
           </div>
           <div>
             <span className="text-sm font-medium text-gray-700 block mb-1.5">曜日</span>
-            <div className="flex gap-1.5">
+            {/* R218: 色だけでなく aria-pressed で選択状態を読み上げに伝える。 */}
+            <div className="flex gap-1.5" role="group" aria-label="枠を作る曜日">
               {['日', '月', '火', '水', '木', '金', '土'].map((d, i) => (
                 <button
                   key={i}
                   type="button"
+                  aria-pressed={weekdays.includes(i)}
                   onClick={() => toggleWeekday(i)}
                   className={`flex-1 px-2 py-2 text-sm border rounded-lg ${
                     weekdays.includes(i)
@@ -1573,32 +1576,29 @@ function PublishTab({
 
       <div>
         <div className="text-sm font-medium text-gray-700 mb-2">公開状態</div>
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={() => update('is_published', 0)}
-            className={`p-3 border-2 rounded-lg text-left transition-colors ${
-              draft.is_published === 0
-                ? 'border-gray-700 bg-gray-50'
-                : 'border-gray-200 bg-white hover:border-gray-300'
-            }`}
-          >
-            <div className="text-sm font-bold text-ink">下書き</div>
-            <div className="text-xs text-gray-600 mt-0.5">友だちには見えない</div>
-          </button>
-          <button
-            type="button"
-            onClick={() => update('is_published', 1)}
-            className={`p-3 border-2 rounded-lg text-left transition-colors ${
-              draft.is_published === 1
-                ? 'border-green-500 bg-green-50'
-                : 'border-gray-200 bg-white hover:border-green-300'
-            }`}
-          >
-            <div className="text-sm font-bold text-ink">公開する</div>
-            <div className="text-xs text-gray-600 mt-0.5">予約 URL が有効になる</div>
-          </button>
-        </div>
+        {/*
+          R218: 下書き/公開は二者択一なので、素のボタンではなく
+          共通の RadioCard（本物の input[type=radio]）にする。
+          読み上げとキーボードで選択状態が伝わる。
+        */}
+        <RadioCardGroup legend="公開状態" className="grid grid-cols-2 gap-2">
+          <RadioCard
+            name="event-publish-state"
+            value="draft"
+            checked={draft.is_published === 0}
+            onChange={() => update('is_published', 0)}
+            title="下書き"
+            note="友だちには見えない"
+          />
+          <RadioCard
+            name="event-publish-state"
+            value="published"
+            checked={draft.is_published === 1}
+            onChange={() => update('is_published', 1)}
+            title="公開する"
+            note="予約 URL が有効になる"
+          />
+        </RadioCardGroup>
         <p className="text-xs text-gray-500 mt-2">
           {draft.is_published === 1
             ? '✓ 保存後、友だちに「予約 URL」を案内できます。'

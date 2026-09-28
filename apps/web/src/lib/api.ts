@@ -2057,6 +2057,8 @@ export type AnalyticsReactionsOverview = AnalyticsEnvelope<{
     sentAt: string
     targetPeople: AnalyticsMetric<number>
     delivered: AnalyticsMetric<number>
+    /** シナリオの送信通数。届いた人数ではないので「到達」欄には出さない（監査R225） */
+    sentMessages: AnalyticsMetric<number>
     opened: AnalyticsMetric<number>
     lineClicked: AnalyticsMetric<number>
     outcomes: AnalyticsMetric<number>
@@ -3838,7 +3840,11 @@ export type RichMenuAreaPayload = {
   boundsY: number
   boundsWidth: number
   boundsHeight: number
-  actionType: 'uri' | 'message' | 'postback' | 'richmenuswitch'
+  /**
+   * O: datetimepicker・clipboard も送れる（受け口が intent から DB へ落とす）。
+   * intent が真実で、actionType は容れ物。
+   */
+  actionType: 'uri' | 'message' | 'postback' | 'richmenuswitch' | 'datetimepicker' | 'clipboard'
   actionData: Record<string, unknown>
   intent?: RichMenuAreaIntent | null
   /** 管理用のボタン名。 */
@@ -7121,6 +7127,15 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ name, accountId }),
       }),
+    /**
+     * R230: フォーム全体を別IDの下書きとして複製する。質問・分岐・デザイン・
+     * 受付設定を引き継ぎ、回答・公開状態・集計は引き継がない。複製は受付停止。
+     */
+    duplicate: (id: string, accountId: string, name?: string) =>
+      fetchApi<ApiResponse<{ id: string; isActive: boolean }>>(
+        `/api/forms/${id}/duplicate?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'POST', body: JSON.stringify({ name: name?.trim() ? name.trim() : undefined }) },
+      ),
     update: (
       id: string,
       accountId: string,
@@ -7161,6 +7176,15 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ expectedContentRevision }),
       }),
+    /**
+     * P（公開前の試し）：試し合言葉を発行する。生の合言葉はこの応答でしか返らない。
+     * 有効期限は24時間。試しの回答は集計に入らず、回答後の動作も動かない。
+     */
+    issueTestToken: (id: string, accountId: string) =>
+      fetchApi<ApiResponse<{ token: string; expiresAt: string }>>(
+        `/api/forms/${id}/test-token?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'POST', body: JSON.stringify({}) },
+      ),
     deleteImpact: (id: string, accountId: string) =>
       fetchApi<ApiResponse<FormDeleteImpact>>(
         `/api/forms/${id}/delete-impact?account_id=${encodeURIComponent(accountId)}`,
@@ -7813,6 +7837,12 @@ export const api = {
           deliveryAtLabel: string
           messageType: string
           messageContent: string
+          /** 下書きの通は送られない（R212）。 */
+          isDraft?: boolean
+          /** R237: 公開版・通の控えのどれか。 */
+          contentSource?: 'template' | 'step' | 'step-fallback'
+          /** R237: 控えに落ちた理由。 */
+          fallbackReason?: 'missing' | 'unpublished' | 'other_account' | null
         }>
       }>>(`/api/scenarios/${id}/preview${q}`, { signal })
     },
@@ -9572,6 +9602,8 @@ export const api = {
         category: string;
         messageType: string;
         messageContent: string;
+        /** R194: 管理一覧の抜粋・検索が読む最新の下書き本文。公開版だけのときは null。 */
+        draftMessageContent: string | null;
         folderId: string | null;
         question: TemplateQuestion | null;
         questionStatus: 'draft' | 'published';
@@ -9634,6 +9666,8 @@ export const api = {
           tapCount: number;
           monthlySendCount: number | null;
           totalSendCount: number | null;
+          /** R194: 最新の下書き本文（管理一覧用）。公開版だけのときは null。 */
+          draftMessageContent: string | null;
           hasDraft: boolean;
           publishedVersion: number;
           publishedAt: string | null;
@@ -12362,13 +12396,59 @@ export const api = {
     reconcile: (groupId: string, dryRun: boolean) =>
       fetchApi<ApiResponse<{
         dryRun: boolean;
-        diffs: Array<{ kind: string; detail: string; pageId?: string; richMenuId?: string }>;
+        diffs: Array<{
+          kind: string; detail: string; pageId?: string; richMenuId?: string;
+          /** K-2: ずれの種類ごとの直し方（1つ）。 */
+          fix: { label: string; action: string };
+        }>;
         applied?: number;
         failed?: Array<{ diff: { kind: string; detail: string }; error: string }>;
+        /** K-2: 自動で直さない分（取り込み候補）。運用者が画面で直す。 */
+        unapplied?: Array<{ diff: { kind: string; detail: string }; reason: string }>;
+        runId?: string;
       }>>(`/api/rich-menu-groups/${groupId}/reconcile`, {
         method: 'POST',
         body: JSON.stringify({ dryRun }),
       }),
+
+    /** K-1: 最新の公開実行の4段（画像・メニュー・割り当て・片付け）。 */
+    publishProgress: (groupId: string) =>
+      fetchApi<ApiResponse<{
+        run: {
+          id: string; mode: string; status: string;
+          startedAt: string; completedAt: string | null;
+        } | null;
+        steps: Array<{
+          key: string; label: string;
+          status: 'done' | 'failed' | 'running' | 'pending' | 'skipped';
+        }>;
+        message: string | null;
+      }>>(`/api/rich-menu-groups/${groupId}/publish-progress`),
+
+    /** O-1: 公開前の確認（自前検査・実機・版）。LINE検査は別口で通す。 */
+    prepublishCheck: (groupId: string) =>
+      fetchApi<ApiResponse<{
+        fingerprint: string;
+        pageCount: number;
+        maxPages: number;
+        selfCheck: { ok: boolean; message: string };
+        deviceConfirmed: boolean;
+        deviceConfirmedAt: string | null;
+        versionNumber: number | null;
+      }>>(`/api/rich-menu-groups/${groupId}/prepublish-check`),
+
+    /** O-1: 公開する形のままLINEの検査APIに通す。下書きもLINEも変えない。 */
+    validatePublish: (groupId: string) =>
+      fetchApi<ApiResponse<{
+        checks: Array<{ key: 'self' | 'line'; ok: boolean; message: string }>;
+      }>>(`/api/rich-menu-groups/${groupId}/validate`, { method: 'POST' }),
+
+    /** O-1: 実機で見た記録。今の下書きにひもづく。 */
+    confirmDevice: (groupId: string) =>
+      fetchApi<ApiResponse<{ confirmedAt: string; fingerprint: string }>>(
+        `/api/rich-menu-groups/${groupId}/device-confirm`,
+        { method: 'POST' },
+      ),
 
     /** N-154: メニュー全体を別IDの下書きとして複製する。 */
     duplicate: (groupId: string, idempotencyKey: string, input?: { name?: string }) =>
@@ -14155,6 +14235,8 @@ export interface EventListItem {
   reminder_day_before_enabled: number;
   reminder_hours_before: number | null;
   is_published: number;
+  /** U: 保存する状態（下書き・公開中・一時停止・終了・中止）。旧応答には無いため optional。 */
+  lifecycle_status?: EventLifecycleStatus | null;
   sort_order: number;
   created_at: string;
   updated_at: string;
@@ -14198,6 +14280,8 @@ export interface EventDetail {
   reminder_day_before_enabled: number;
   reminder_hours_before: number | null;
   is_published: number;
+  /** U: 保存する状態。旧応答には無いため optional。 */
+  lifecycle_status?: EventLifecycleStatus | null;
   sort_order: number;
   confirmation_message_extra: string | null;
   reminder_message_extra: string | null;
@@ -14444,6 +14528,61 @@ export type EventWaitlistPromotionResult =
   | { kind: 'promoted'; occurrenceVersion: number; promoted: { waitlistId: string; friendId: string; partySize: number; status: 'offered'; offeredAt: string; expiresAt: string } }
   | { kind: 'noop'; occurrenceVersion: number; promoted: null; reason: string };
 
+/**
+ * U: イベントの保存する状態（v6-29 §11-2）。
+ * 「満席」「申込が少ない」は保存せず、開催回・定員・日時からの計算で札を出す。
+ */
+export type EventLifecycleStatus = 'draft' | 'published' | 'paused' | 'ended' | 'cancelled';
+
+export interface EventSlotChange {
+  slot_id: string;
+  starts_at?: string;
+  ends_at?: string;
+  capacity?: number | null;
+  is_active?: number;
+}
+
+export interface EventChangeImpact {
+  slot_id: string;
+  starts_at: string;
+  ends_at: string;
+  capacity: number | null;
+  confirmed_seats: number;
+  waiting_seats: number;
+  pending_reminders: number;
+  errors: string[];
+  notices: string[];
+}
+
+export interface EventChangePreview {
+  event_id: string;
+  impacts: EventChangeImpact[];
+  event_notices: string[];
+  blocked: boolean;
+  total_confirmed: number;
+  total_waiting: number;
+  total_pending_reminders: number;
+}
+
+export interface EventChangeApplyResult {
+  success: boolean;
+  deduplicated?: boolean;
+  version?: number;
+  log_id: string;
+  affected_confirmed?: number;
+  affected_waiting?: number;
+  notified?: number;
+}
+
+export interface EventLifecycleResult {
+  success: boolean;
+  deduplicated?: boolean;
+  unchanged?: boolean;
+  lifecycle_status: EventLifecycleStatus;
+  version: number;
+  log_id?: string;
+}
+
 export const eventsApi = {
   listEvents: (
     accountId: string,
@@ -14568,11 +14707,67 @@ export const eventsApi = {
       withAccount(`/api/events/admin/occurrences/${encodeURIComponent(occurrenceId)}/applicant-broadcasts/preview`, accountId),
       { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey }, body: JSON.stringify(data) },
     ).then((response) => response.data),
-  promoteOccurrenceWaitlist: (accountId: string, occurrenceId: string, expectedVersion: number) =>
+  promoteOccurrenceWaitlist: (accountId: string, occurrenceId: string, expectedVersion: number, reason: string) =>
     fetchApi<{ success: true; data: EventWaitlistPromotionResult }>(
       withAccount(`/api/events/admin/occurrences/${encodeURIComponent(occurrenceId)}/waitlist/promote`, accountId),
-      { method: 'POST', body: JSON.stringify({ expectedVersion }) },
+      { method: 'POST', body: JSON.stringify({ expectedVersion, reason }) },
     ).then((response) => response.data),
+  /** U: 待ち順の手動変更。理由が必須。 */
+  reorderOccurrenceWaitlist: (
+    accountId: string,
+    occurrenceId: string,
+    body: { ordered_ids: string[]; expectedVersion?: number; reason: string },
+  ) =>
+    fetchApi<{ success: true; occurrence_version: number; order: string[]; log_id: string }>(
+      withAccount(`/api/events/admin/occurrences/${encodeURIComponent(occurrenceId)}/waitlist/reorder`, accountId),
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+  /** U: 飛ばし（最後尾へ回す）。理由が必須。行は消さない。 */
+  skipOccurrenceWaitlist: (
+    accountId: string,
+    occurrenceId: string,
+    body: { waitlist_id: string; expectedVersion?: number; reason: string },
+  ) =>
+    fetchApi<{ success: true; occurrence_version: number; waitlist_id: string; log_id: string }>(
+      withAccount(`/api/events/admin/occurrences/${encodeURIComponent(occurrenceId)}/waitlist/skip`, accountId),
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+  /** U: 状態の切替（下書き・公開中・一時停止・終了・中止）。 */
+  setEventLifecycle: (
+    accountId: string,
+    eventId: string,
+    body: { to: EventLifecycleStatus; reason?: string; idempotency_key?: string },
+  ) =>
+    fetchApi<EventLifecycleResult>(
+      withAccount(`/api/events/admin/events/${eventId}/lifecycle`, accountId),
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+  /** U: 変更の事前表示（読み取り専用）。 */
+  previewEventChange: (
+    accountId: string,
+    eventId: string,
+    body: { slot_changes: EventSlotChange[]; event_changes?: { venue_name?: string | null; venue_url?: string | null } },
+  ) =>
+    fetchApi<EventChangePreview>(
+      withAccount(`/api/events/admin/events/${eventId}/change-review`, accountId),
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+  /** U: 変更確認の適用。 */
+  applyEventChange: (
+    accountId: string,
+    eventId: string,
+    body: {
+      expected_version: number;
+      change_reason?: string;
+      idempotency_key: string;
+      slot_changes: EventSlotChange[];
+      event_changes?: { venue_name?: string | null; venue_url?: string | null };
+    },
+  ) =>
+    fetchApi<EventChangeApplyResult>(
+      withAccount(`/api/events/admin/events/${eventId}/change-review/apply`, accountId),
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
   listBookings: (
     accountId: string,
     eventId: string,

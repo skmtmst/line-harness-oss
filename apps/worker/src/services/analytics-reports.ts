@@ -367,10 +367,15 @@ function headlineLines(schedule: AnalyticsReportSchedule, report: Awaited<Return
   if (schedule.sections.includes('reactions')) {
     const delivered = envelopeNumber(current.reactions, ['metrics', 'delivered']);
     const opened = envelopeNumber(current.reactions, ['metrics', 'opened']);
-    if (delivered?.state === 'available' && typeof delivered.value === 'number') {
+    // 監査 R225: シナリオは届いた人数が取れないため、シナリオを含む期間は
+    // delivered が partial（取れた一斉配信だけの合計）になる。行を消さず、
+    // 取れた分だけだと分かる添え書きを付けて出す。
+    if (delivered && (delivered.state === 'available' || delivered.state === 'partial')
+        && typeof delivered.value === 'number') {
       const openedPart = opened?.state === 'available' && typeof opened.value === 'number'
         ? `・開封${jaNumber.format(opened.value)}件` : '';
-      lines.push(`・配信の反応: ${jaNumber.format(delivered.value)}件配信${openedPart}`);
+      const scope = delivered.state === 'partial' ? '（一斉配信のみ）' : '';
+      lines.push(`・配信の反応: ${jaNumber.format(delivered.value)}件配信${openedPart}${scope}`);
     }
   }
   if (schedule.sections.includes('routes')) {

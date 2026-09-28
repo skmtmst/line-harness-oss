@@ -20,7 +20,9 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import {
   emptyLayout,
+  formThemeContrastError,
   newBlockId,
+  normalizeFormTheme,
   validateFormForPublish,
   type FormBlock,
   type FormInputType,
@@ -129,6 +131,14 @@ function FormEditInner() {
    */
   const [contentRevision, setContentRevision] = useState<number | null>(null)
   const [publishedVersionId, setPublishedVersionId] = useState<string | null>(null)
+  /*
+   * P（公開前の試し）：試し合言葉と試しURL。合言葉の生の値はこの画面でしか
+   * 見られない。試しは保存済みの下書きに出る（保存していない変更は出ない）。
+   */
+  const [testToken, setTestToken] = useState<string | null>(null)
+  const [testExpiresAt, setTestExpiresAt] = useState<string | null>(null)
+  const [testBusy, setTestBusy] = useState(false)
+  const [testError, setTestError] = useState('')
   /**
    * ほかの人が先に保存していたとき（409）。
    *
@@ -537,6 +547,17 @@ function FormEditInner() {
       return false
     }
 
+    /*
+     * P（読みにくい色）：文字と背景の差が 4.5:1 未満の組み合わせは保存できない。
+     * 下書きも公開も同じ決まり（保存APIも同じ検査をする。ここで先に止めるのは、
+     * 保存だけ済んで「保存できませんでした」に化けるのを防ぐため）。
+     */
+    const contrastError = formThemeContrastError(normalizeFormTheme(layout.options?.theme))
+    if (contrastError) {
+      setError(contrastError)
+      return false
+    }
+
     // 公開に進むときだけ、公開前の検査を通す。分岐の循環・消えた行き先・
     // 共通ヘッダの分岐・選ぶ先が空の動作は、下書きでは許すが公開は止める。
     // （公開APIも同じ検査をする。ここで先に止めるのは、保存だけ済んで
@@ -621,6 +642,29 @@ function FormEditInner() {
       setSaving(false)
     }
   }
+
+  /*
+   * P（公開前の試し）：試し合言葉を取って試しURLを作る。試しは保存済みの
+   * 下書きに出る。試しの回答は集計に入らず、回答後の動作も動かない。
+   */
+  const startTest = async () => {
+    if (!selectedAccountId || testBusy) return
+    setTestBusy(true)
+    setTestError('')
+    try {
+      const res = await api.forms.issueTestToken(id, selectedAccountId)
+      if (!res.success) throw new Error(res.error)
+      setTestToken(res.data.token)
+      setTestExpiresAt(res.data.expiresAt)
+    } catch {
+      setTestError('試し合言葉を作れませんでした。もう一度お試しください。')
+    } finally {
+      setTestBusy(false)
+    }
+  }
+  const testUrl = answerUrl && testToken
+    ? `${answerUrl}${answerUrl.includes('?') ? '&' : '?'}test_token=${encodeURIComponent(testToken)}`
+    : null
 
   /*
     対象が無いときは、タブ・入力・右の案内・固定バーのどれも出さない。
@@ -799,6 +843,56 @@ function FormEditInner() {
                 <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>
               </p>
             </div>
+          </div>
+
+          {/*
+            P（公開前の試し）：下書きをお客さま画面で試す。試しの回答は集計に
+            入らず、回答後の動作も動かない。合言葉は24時間有効。
+            説明の帯は1本の決まりに触れないよう、帯ではなく枠で出す。
+          */}
+          <div className="bg-canvas rounded-card border-hairline mt-4 border p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-ink text-sm font-semibold">公開前に試す</p>
+                <p className="text-ink-secondary mt-0.5 text-xs">
+                  保存済みの下書きをお客さま画面で開きます。試しの回答は集計に入らず、回答後の動作も動きません。保存していない変更は試しに出ないので、先に下書きを保存してください。
+                </p>
+              </div>
+              <Button
+                onClick={() => void startTest()}
+                disabled={testBusy || !answerUrl}
+                title={answerUrl ? '試し合言葉を取って試しURLを作ります' : '回答用URLがまだ無いため試せません'}
+              >
+                {testBusy ? '用意しています...' : 'テスト回答を始める'}
+              </Button>
+            </div>
+            {testError && <p role="alert" className="text-danger mt-2 text-xs">{testError}</p>}
+            {testUrl && (
+              <div className="mt-3">
+                <div className="flex items-center gap-1">
+                  <input
+                    readOnly
+                    value={testUrl}
+                    onFocus={(e) => e.currentTarget.select()}
+                    aria-label="試しURL"
+                    className={`${inputClass} text-xs`}
+                  />
+                  <Button
+                    onClick={() => {
+                      void navigator.clipboard
+                        .writeText(testUrl)
+                        .catch(() => window.prompt('コピーしてください:', testUrl))
+                    }}
+                  >
+                    コピー
+                  </Button>
+                </div>
+                <p className="text-ink-faint mt-1 text-xs">
+                  {testExpiresAt ? `このURLは${new Date(testExpiresAt).toLocaleString('ja-JP', { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}まで使えます。` : ''}
+                  試しは友だち登録済みのLINEで開いてください。
+                </p>
+              </div>
+            )}
           </div>
 
           <div className="grid gap-4 xl:grid-cols-[minmax(320px,26rem)_minmax(0,1fr)]">

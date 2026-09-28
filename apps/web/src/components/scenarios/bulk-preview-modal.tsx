@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { api } from '@/lib/api'
 import DateTimeField from '@/components/shared/date-time-field'
 import Dialog from '@/components/shared/dialog'
+import StatusChip from '@/components/shared/status-chip'
 import { isCurrentPreviewRequest } from './bulk-preview-request'
 
 interface Props {
@@ -18,6 +19,25 @@ interface PreviewStep {
   deliveryAtLabel: string
   messageType: string
   messageContent: string
+  /** 下書きの通は送られない（R212）。 */
+  isDraft?: boolean
+  /** R237: 公開版・通の控えのどれか。 */
+  contentSource?: 'template' | 'step' | 'step-fallback'
+  /** R237: 控えに落ちた理由。 */
+  fallbackReason?: 'missing' | 'unpublished' | 'other_account' | null
+}
+
+/**
+ * R237: この通の見本が「公開版・通の控え」のどれか。控えのときは
+ * 未反映の理由も添える。通の直接入力（template 参照なし）は正規の控え
+ * なので何も出さない（重複した説明を出さない）。
+ */
+export function contentSourceLabel(step: PreviewStep): string | null {
+  if (step.contentSource === 'template') return 'テンプレートの公開版を表示'
+  if (step.contentSource !== 'step-fallback') return null
+  if (step.fallbackReason === 'unpublished') return '通の控えを表示（テンプレートが未公開のため）'
+  if (step.fallbackReason === 'other_account') return '通の控えを表示（別のLINEアカウントのテンプレートのため）'
+  return '通の控えを表示（テンプレートが削除されているため）'
 }
 
 function nowJstAsLocalInput(): string {
@@ -83,7 +103,7 @@ export default function BulkPreviewModal({ open, scenarioId, onClose }: Props) {
     <Dialog
       open={open}
       title="一括プレビュー"
-      description="起点からの各通の届く日時と内容の見本です。送りはしません。"
+      description="起点からの各通の届く日時と内容の見本です。送りはしません。下書きの通には札を付けますが、実際の配信と友だち別の予定には入りません。"
       onCancel={onClose}
     >
       <div className="mb-4">
@@ -111,9 +131,17 @@ export default function BulkPreviewModal({ open, scenarioId, onClose }: Props) {
               <summary className="flex cursor-pointer list-none items-center gap-2 text-sm">
                 <span className="text-ink-faint w-8 font-mono">#{s.stepOrder}</span>
                 <span className="text-ink-secondary flex-1">{s.deliveryAtLabel}</span>
+                {/* R212: 下書きの通を区別せず並べると、送られる通と誤解する。 */}
+                {s.isDraft === true && <StatusChip status="draft" />}
                 <span className="text-info text-xs">{s.messageType}</span>
                 <span className="text-ink-faint transition-transform group-open:rotate-90">▶</span>
               </summary>
+              {(() => {
+                const source = contentSourceLabel(s)
+                return source ? (
+                  <p className="text-ink-faint mt-1 text-xs">{source}</p>
+                ) : null
+              })()}
               <pre className="bg-canvas-sunken text-ink-secondary mt-2 max-h-48 overflow-y-auto rounded p-2 text-xs break-words whitespace-pre-wrap">
                 {s.messageContent}
               </pre>

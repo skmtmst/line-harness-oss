@@ -23,6 +23,7 @@ import { Tabs } from '@/components/shared/tabs'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import type { Folder } from '@line-crm/shared'
+import { validateFlexContent } from '@line-crm/shared'
 import {
   createBlockedReason,
   failureOf,
@@ -43,6 +44,8 @@ interface Template {
   category: string
   messageType: string
   messageContent: string
+  /** R194: 最新の下書き本文。公開版だけのときは null。 */
+  draftMessageContent?: string | null
   /** 置き場。未分類は null。一覧の口が返している。 */
   folderId: string | null
   question: TemplateQuestion | null
@@ -52,6 +55,10 @@ interface Template {
   tapCount: number
   monthlySendCount: number | null
   totalSendCount: number | null
+  /** 347: 公開待ちの下書きがあるか。 */
+  hasDraft?: boolean
+  /** 347: 最後に公開した日時。未公開はnull。 */
+  publishedAt?: string | null
   createdAt: string
   updatedAt: string
 }
@@ -324,9 +331,16 @@ export default function TemplatesPage() {
     が替わったときだけ検索索引を作り、入力中は正規化済み文字列だけを比べる。
     差し込み項目の文字列は messageContent 自体に含まれるため、別の正規表現走査は不要。
   */
+  /*
+    R194: 管理一覧の抜粋・検索は「いまの最新」を対象にする。公開版しか無い
+    テンプレートは公開版、編集中の下書きがあるものは下書きを読む
+    （送信で選ぶ側は公開版だけを見る決まりは変えない）。旧公開版にも
+    合うよう messageContent も索引に残す。
+  */
+  const latestContentOf = (t: Template) => t.draftMessageContent ?? t.messageContent
   const templateSearchIndex = useMemo(() => templates.map((template) => ({
     template,
-    normalizedSearchText: [template.name, template.messageContent]
+    normalizedSearchText: [template.name, template.messageContent, template.draftMessageContent ?? '']
       .map(normalizeTemplateSearchText)
       .join('\0'),
   })), [templates])
@@ -348,8 +362,9 @@ export default function TemplatesPage() {
     if (!questionTab && t.question) return []
     if (typeFilter === 'unused' && t.usageCount !== 0) return []
     if (typeFilter === 'single' && (t.question !== null || t.messageType === 'carousel')) return []
-    if (typeFilter === 'multiple' && t.messageType !== 'carousel' && !t.messageContent.includes('\n\n')) return []
-    if (typeFilter === 'variables' && !t.messageContent.includes('{{')) return []
+    const content = latestContentOf(t)
+    if (typeFilter === 'multiple' && t.messageType !== 'carousel' && !content.includes('\n\n')) return []
+    if (typeFilter === 'variables' && !content.includes('{{')) return []
     return [t]
   }), [normalizedTemplateQuery, questionTab, selectedCategory, templateSearchIndex, typeFilter])
 
@@ -410,6 +425,8 @@ export default function TemplatesPage() {
       if (!res.success) throw new Error(res.error ?? '移せませんでした')
       setTemplates((prev) => prev.map((item) => item.id === template.id ? { ...item, folderId } : item))
       setDrawerData((prev) => prev?.id === template.id ? { ...prev, folderId } : prev)
+      // R195: 移動元・移動先どちらの件数も変わるので、フォルダの数も読み直す。
+      await loadFolders()
     } catch (cause) {
       setFolderError(cause instanceof Error ? cause.message : '置き場を変えられませんでした。')
     } finally {
@@ -448,7 +465,9 @@ export default function TemplatesPage() {
       if (res.success) {
         setShowCreate(false)
         setForm({ name: '', category: 'general', messageType: 'text', messageContent: '' })
+        // R195: 新しく作った分、未分類の件数も増えるので合わせて読み直す。
         load()
+        void loadFolders()
       } else {
         setFormError(res.error)
       }
@@ -541,7 +560,8 @@ export default function TemplatesPage() {
       if (!res.success) throw new Error(res.error)
       setPendingDelete(null)
       if (drawerId === target.id) setDrawerId(null)
-      await load()
+      // R195: 件数（未分類・フォルダ別）はフォルダ側の集計が持つので両方読み直す。
+      await Promise.all([load(), loadFolders()])
     } catch {
       // 生のAPIエラーは運用者に読めないので、窓の中に運用の言葉で出す。
       setDeleteError('このテンプレートを削除できませんでした。状態を読み直してから、もう一度お試しください。')
@@ -981,8 +1001,17 @@ export default function TemplatesPage() {
           items={filteredTemplates.map((t) => ({
             id: t.id,
             name: t.name,
-            status: <TemplateKindBadge kind={t.question ? 'question' : t.messageType} />,
-            summary: `${t.messageContent.slice(0, 60)}${t.messageContent.length > 60 ? '...' : ''}`,
+            status: (
+              <span className="inline-flex items-center gap-1">
+                <TemplateKindBadge kind={t.question ? 'question' : t.messageType} />
+                {t.hasDraft && (
+                  <StatusBadge size="compact" tone={t.publishedAt == null ? 'warning' : 'info'}>
+                    {t.publishedAt == null ? '未公開' : '編集中'}
+                  </StatusBadge>
+                )}
+              </span>
+            ),
+            summary: `${latestContentOf(t).slice(0, 60)}${latestContentOf(t).length > 60 ? '...' : ''}`,
             metric: typeof t.usageCount !== 'number' ? '使用先を確認できません' : t.usageCount === 0 ? 'なし' : `${t.usageCount}件で使用`,
             primaryAction: canMutateTemplates ? (
               <Button
@@ -1049,8 +1078,16 @@ export default function TemplatesPage() {
                     {/* 1列目は表の幅に合わせて縮む（以前は抜粋が最大 448px で、1440px でも表が右へはみ出した）。 */}
                     <td className="w-2/5 max-w-0 px-4 py-3">
                       <p className="truncate text-sm font-medium text-ink" title={t.name}>{t.name}</p>
-                      <p className="text-micro text-ink-faint mt-0.5 truncate">
-                        {t.messageContent.slice(0, 60)}{t.messageContent.length > 60 ? '...' : ''}
+                      {/* R194: 抜粋は最新（下書きがあれば下書き）。どの版か分かるように札を添える。 */}
+                      <p className="text-micro text-ink-faint mt-0.5 flex min-w-0 items-center gap-1.5">
+                        {t.hasDraft && (
+                          <StatusBadge size="compact" tone={t.publishedAt == null ? 'warning' : 'info'}>
+                            {t.publishedAt == null ? '未公開' : '編集中'}
+                          </StatusBadge>
+                        )}
+                        <span className="truncate">
+                          {latestContentOf(t).slice(0, 60)}{latestContentOf(t).length > 60 ? '...' : ''}
+                        </span>
                       </p>
                     </td>
                     <td className="px-3 py-3">
@@ -1257,11 +1294,21 @@ export default function TemplatesPage() {
                       </div>
                     ) : drawerData.messageType === 'flex' ? (
                       (() => {
-                        try {
-                          return <FlexPreviewComponent content={drawerData.messageContent} maxWidth={420} />
-                        } catch {
-                          return <p className="text-danger text-xs">カード型の中身を読めませんでした。作り直すか、テキストで作り直してください。</p>
+                        /*
+                         * R249: 描画部品は壊れた内容でも例外を出さないので、
+                         * try/catch では形式の誤いを拾えない。検査で先に
+                         * 見分け、直し方（下の編集欄）と合わせて知らせる。
+                         */
+                        const flexError = validateFlexContent('flex', drawerData.messageContent)
+                        if (flexError) {
+                          return (
+                            <div role="alert">
+                              <p className="text-danger text-xs font-semibold">{flexError}</p>
+                              <p className="text-ink-secondary mt-1 text-xs">下の「内容 / JSON 編集」で直して保存してください。このままでは公開できません。</p>
+                            </div>
+                          )
                         }
+                        return <FlexPreviewComponent content={drawerData.messageContent} maxWidth={420} />
                       })()
                     ) : drawerData.messageType === 'image' ? (
                       (() => {

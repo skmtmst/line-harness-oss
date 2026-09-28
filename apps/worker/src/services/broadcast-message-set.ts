@@ -68,7 +68,14 @@ function contentForBubble(type: string, value: unknown): string {
   }
   if (type === 'flex') {
     const flexJson = nonEmptyString(content.flexJson, 'flexJson');
-    jsonObject(flexJson, 'flexJson');
+    const parsed = jsonObject(flexJson, 'flexJson');
+    /*
+     * R234: `{}` のような「JSON としては正しいが中身が無い」も送る前（保存・
+     * 配信前検査・送信）に止める。送れるのはバブルかカルーセルだけ。
+     */
+    if (parsed.type !== 'bubble' && parsed.type !== 'carousel') {
+      throw new Error('Flexはバブルかカルーセルの形にしてください');
+    }
     return flexJson;
   }
   if (type === 'carousel') {
@@ -77,6 +84,14 @@ function contentForBubble(type: string, value: unknown): string {
     try { columns = JSON.parse(columnsJson); } catch { /* handled below */ }
     if (!Array.isArray(columns) || columns.length === 0) {
       throw new Error('messageBubbles columnsJson must be a non-empty JSON array');
+    }
+    // R234: `[{}]` のような「配列だが中身が空」も止める。選んだテンプレートの
+    // 中身は必ず 1 枚以上のパネル（キーを持つ object）のはず。
+    const broken = columns.some((column) =>
+      !column || typeof column !== 'object' || Array.isArray(column) || Object.keys(column).length === 0,
+    );
+    if (broken) {
+      throw new Error('カルーセルの中身を確認してください。空のパネルがあります');
     }
     return columnsJson;
   }
@@ -94,6 +109,10 @@ function contentForBubble(type: string, value: unknown): string {
     if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
       throw new Error('messageBubbles location coordinates are required');
     }
+    // 監査 R210: 地図上に無い数字を完成扱いにしない。画面の検査とそろえる。
+    if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+      throw new Error('位置情報の緯度は-90〜90、経度は-180〜180で入力してください');
+    }
     return JSON.stringify({
       title: typeof location.title === 'string' && location.title.trim() ? location.title.trim() : '場所',
       address: typeof location.address === 'string' ? location.address.trim() : '',
@@ -107,17 +126,31 @@ function contentForBubble(type: string, value: unknown): string {
     if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) {
       throw new Error('messageBubbles audio duration is required');
     }
+    /*
+     * R234: LINE は https で公開された音声しか受けない。not-a-url のような値は
+     * 保存できても送信で断られるので、保存・配信前検査の時点で止める。
+     */
+    const audioUrl = nonEmptyString(audio.originalContentUrl, 'audio originalContentUrl');
+    if (!audioUrl.toLowerCase().startsWith('https://')) {
+      throw new Error('音声のURLは https:// から始めてください');
+    }
     return JSON.stringify({
-      originalContentUrl: nonEmptyString(audio.originalContentUrl, 'audio originalContentUrl'),
+      originalContentUrl: audioUrl,
       duration: Math.round(durationSeconds * 1000),
     });
   }
   if (type === 'sticker') {
     const sticker = record(state.sticker);
-    return JSON.stringify({
-      packageId: nonEmptyString(sticker.packageId, 'sticker packageId'),
-      stickerId: nonEmptyString(sticker.stickerId, 'sticker stickerId'),
-    });
+    const packageId = nonEmptyString(sticker.packageId, 'sticker packageId');
+    const stickerId = nonEmptyString(sticker.stickerId, 'sticker stickerId');
+    /*
+     * R234: LINE の番号はどちらも数字だけ。not-a-package のような文字は
+     * 保存できても送信で断られるので、保存・配信前検査の時点で止める。
+     */
+    if (!/^\d+$/.test(packageId) || !/^\d+$/.test(stickerId)) {
+      throw new Error('スタンプの番号が正しくありません。一覧から選び直してください');
+    }
+    return JSON.stringify({ packageId, stickerId });
   }
   throw new Error(`Unsupported broadcast bubble type: ${type}`);
 }

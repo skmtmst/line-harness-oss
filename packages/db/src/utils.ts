@@ -58,6 +58,65 @@ export function nextDateString(day: string): string {
   return new Date(Date.parse(`${day}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
 }
 
+/*
+ * 監査 R227: 期間の境界を UTC の ISO 文字列へ揃える。
+ * 記録の時刻は JST 表記（`jstNow` の `+09:00`）で、画面から来る期間も
+ * JST の暦日を指す。時差の書かれた値（`Z`・`+09:00`）はそのまま、
+ * 書かれていない値（`'2026-08-01'`・`'2026-08-16T23:59:59.999'`）は
+ * JST として読む。読めない値は null を返す。
+ */
+export function jstBoundToIso(bound: string): string | null {
+  const trimmed = bound.trim();
+  const candidate = /(?:Z|[+-]\d{2}:?\d{2})$/.test(trimmed)
+    ? trimmed
+    : /^\d{4}-\d{2}-\d{2}$/.test(trimmed)
+      ? `${trimmed}T00:00:00+09:00`
+      : `${trimmed}+09:00`;
+  const ms = Date.parse(candidate);
+  return Number.isFinite(ms) ? new Date(ms).toISOString() : null;
+}
+
+/*
+ * 期間ウィンドウの部品をまとめて作る。
+ * - `fromIso` / `toIso`: julianday へ渡す正規化済みの境界（UTC ISO）。
+ * - `lo` / `hi`: 索引へ乗せるための先読み範囲。日時の列には `…Z` と
+ *   `…+09:00` が混在するので文字列の大小だけでは前後を決められず、
+ *   タイムゾーンの差（±14時間）に余裕を足した26時間分だけ広い日付で
+ *   先に絞る。下限は空白区切りにし、'T' 以外の区切りの行を誤って外さない
+ *   （空白 < 'T'）。所属の最終判定は julianday が行う。
+ */
+export function analyticsWindow(
+  from: string,
+  to: string,
+): { lo: string; hi: string; fromIso: string; toIso: string } {
+  const fromIso = jstBoundToIso(from) ?? from;
+  const toIso = jstBoundToIso(to) ?? to;
+  const fromMs = Date.parse(fromIso);
+  const toMs = Date.parse(toIso);
+  // 境界が読めないときは絞り込まず、julianday だけの判定に落とす。
+  if (!Number.isFinite(fromMs) || !Number.isFinite(toMs)) {
+    return { lo: '', hi: '￿', fromIso, toIso };
+  }
+  const margin = 26 * 60 * 60_000;
+  return {
+    lo: `${new Date(fromMs - margin).toISOString().slice(0, 10)} 00:00:00`,
+    hi: `${new Date(toMs + margin).toISOString().slice(0, 10)}T00:00:00`,
+    fromIso,
+    toIso,
+  };
+}
+
+/*
+ * 期間ウィンドウの WHERE 断片。索引に乗る大まかな比較（先読み）と、
+ * 正確な julianday 判定の2段構え。bind は `win.lo, win.hi, win.fromIso,
+ * win.toIso` の順。上限は既定で開区間（<）。上限込みの窓には
+ * `toInclusive: true`。
+ */
+export function analyticsWindowWhere(column: string, toInclusive = false): string {
+  return `AND ${column} >= ? AND ${column} < ?
+          AND julianday(${column}) >= julianday(?) AND julianday(${column}) ${toInclusive ? '<=' : '<'} julianday(?)`;
+}
+
 /**
  * 表があるかを確かめる。決まりの表が無い古いスキーマ（最小構成の単体試験など）
  * では、新しい表を読む処理を従来の動きに落とすために使う。

@@ -143,7 +143,7 @@ describe('分析CSVの非同期書き出し', () => {
   it('配信の反応を画面と同じ列で書き出す', async () => {
     const csv = await exportAndDownload('reactions', { from: '2026-09-01', to: '2026-09-30' });
     const lines = csv.replace(/^﻿/, '').split('\r\n').filter(Boolean);
-    expect(lines[0]).toBe('"配信","種類","送った日時","対象","到達","開封","LINEクリック","成果"');
+    expect(lines[0]).toBe('"配信","種類","送った日時","対象","到達","送信通数","開封","LINEクリック","成果"');
     expect(lines).toHaveLength(2);
     expect(lines[1]).toContain('"秋のセール","一斉配信","2026-09-10T10:00:00+09:00","100"');
   });

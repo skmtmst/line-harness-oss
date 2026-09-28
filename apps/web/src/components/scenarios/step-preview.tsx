@@ -39,9 +39,22 @@ export interface StepPreviewProps {
   kindState?: MessageKindState
   /** 誰に送るか。札に出す。 */
   audienceLabel: string
+  /**
+   * R213: いま触っている通の番号。新規1通目のときは 1（省略時も 1）。
+   * 2通目以降の編集で 1通目と案内すると、前後の流れを取り違える。
+   */
+  stepOrder?: number
 }
 
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土']
+
+/** 配信時刻の形（worker の validateStepSchedule と同じ）。空や崩れた値は受けない。 */
+export const DELIVERY_TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/
+
+/** 時刻指定なのに時刻が入っているか。消したままは「未設定」として扱う。 */
+export function isDeliveryTimeSet(deliveryTime: string): boolean {
+  return DELIVERY_TIME_RE.test(deliveryTime.trim())
+}
 
 /** 日本時間で見た「いま」。端末が海外時刻でも、配信はJSTで動く。 */
 function nowJst(): Date {
@@ -78,7 +91,15 @@ export function computeDeliveryAt(
 ): Date {
   const at = new Date(start.getTime())
   if (mode === 'absolute_time') {
-    const [h, m] = deliveryTime.split(':').map((n) => Number(n) || 0)
+    /*
+     * R235: 時刻を消したまま（''）来ると、分の取り出しが undefined になり
+     * setHours が Invalid Date を作って「NaN月NaN日」が出ていた。形が違う
+     * 値は 0時0分に倒さず、呼び側が未設定表示にする（下の timeMissing）。
+     * ここでは壊れた日時を作らないことだけを守る。
+     */
+    const parts = deliveryTime.split(':').map((n) => Number(n))
+    const h = Number.isFinite(parts[0]) ? (parts[0] as number) : 0
+    const m = Number.isFinite(parts[1]) ? (parts[1] as number) : 0
     at.setDate(at.getDate() + offsetDays)
     at.setHours(h, m, 0, 0)
     if (at.getTime() < start.getTime()) at.setDate(at.getDate() + 1)
@@ -139,6 +160,8 @@ function scheduleWords(
   offsetMinutes = 0,
 ): string {
   if (mode === 'absolute_time') {
+    // R235: 時刻が空のまま「当日の 」と出すと、設定が済んだように見える。未設定とはっきり言う。
+    if (!isDeliveryTimeSet(deliveryTime)) return '時刻が未入力です'
     return offsetDays === 0 ? `当日の ${deliveryTime}` : `${offsetDays}日後の ${deliveryTime}`
   }
   const parts: string[] = []
@@ -186,28 +209,36 @@ export default function StepPreview({
   question,
   kindState,
   audienceLabel,
+  stepOrder = 1,
 }: StepPreviewProps) {
+  const stepLabel = `${stepOrder}通目`
   const start = nowJst()
+  /*
+   * R235: 時刻を消したままは予定未設定として出し、日付計算へ渡さない。
+   * 計算した日時を出すと、00:00 に倒れた値か NaN のどちらかが出て、
+   * どちらも「設定が済んだ」か「壊れた」ように見える。
+   */
+  const timeMissing = deliveryMode === 'absolute_time' && !isDeliveryTimeSet(deliveryTime)
   const at = computeDeliveryAt(
     start,
     deliveryMode,
     offsetDays,
-    deliveryTime,
+    timeMissing ? '00:00' : deliveryTime,
     offsetHours,
     offsetMinutes,
   )
   const words = scheduleWords(deliveryMode, offsetDays, deliveryTime, offsetHours, offsetMinutes)
-  const rolled = rolledToNextDay(start, at, deliveryMode, offsetDays)
+  const rolled = !timeMissing && rolledToNextDay(start, at, deliveryMode, offsetDays)
 
   return (
     <aside
-      aria-label="1通目の下見"
+      aria-label={`${stepLabel}の下見`}
       className={`${styles.preview} border-hairline bg-canvas border p-4`}
     >
       {/* LINEの見た目の枠は共通部品 `LinePreview`（B-6）。届く日時は見える札のまま残す。 */}
       <div className="-mx-4 -mt-4 mb-4">
         <LinePreview
-          caption={<span className="inline-flex items-center gap-1"><Clock aria-hidden size={13} strokeWidth={1.75} />{words}に届きます（1通目）</span>}
+          caption={<span className="inline-flex items-center gap-1"><Clock aria-hidden size={13} strokeWidth={1.75} />{timeMissing ? `時刻を入れると届く日時が出ます（${stepLabel}）` : `${words}に届きます（${stepLabel}）`}</span>}
         >
           {templateName ? (
             <Bubble>
@@ -237,7 +268,7 @@ export default function StepPreview({
         <p className="flex justify-center">
           <span className={`${styles.band} bg-accent-soft text-accent-deep rounded-pill flex items-center gap-1 px-2.5 text-micro font-semibold`}>
             <Clock aria-hidden size={13} strokeWidth={1.75} />
-            {words}・{formatJst(at)}
+            {timeMissing ? '時刻が未入力です' : `${words}・${formatJst(at)}`}
           </span>
         </p>
 
@@ -382,15 +413,22 @@ export default function StepPreview({
         </p>
       )}
 
+      {/*
+        R213: 新規1通目の案内を使い回さない。2通目以降の編集中に
+        「2通目からは、このあとの編集画面で足せます」と出すと、
+        いま触っている通と順序を取り違える。
+      */}
       <p className="text-ink-faint border-hairline mt-3 border-t pt-3 text-micro leading-relaxed">
-        2通目からは、このあとの編集画面で足せます。足すと、ここと同じ形で届く日時が並びます。
+        {stepOrder <= 1
+          ? '2通目からは、このあとの編集画面で足せます。足すと、ここと同じ形で届く日時が並びます。'
+          : `いま編集中の${stepLabel}の見本です。前後の通は、一覧の並びで確認できます。`}
       </p>
 
       <section className="border-hairline mt-3 border-t pt-3">
         <h3 className="text-ink text-sm font-bold">設定サマリー</h3>
         <dl className="mt-2 divide-y divide-hairline text-xs">
           <SummaryRow label="配信対象" value={audienceLabel} />
-          <SummaryRow label="配信日時" value={`${words}・${formatJst(at)}`} />
+          <SummaryRow label="配信日時" value={timeMissing ? '時刻を入力してください' : `${words}・${formatJst(at)}`} />
           <SummaryRow
             label="送信数"
             value={templateName ? 'テンプレート 1通' : `${kind === 'text' ? 'テキスト' : 'メッセージ'} 1通`}

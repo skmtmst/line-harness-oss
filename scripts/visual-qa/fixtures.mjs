@@ -916,29 +916,33 @@ const FORM_BASE_LAYOUT = {
   },
 }
 
-const formRow = (id, name, description, folderId, isActive, submitCount, weeklySubmitCount, lastSubmittedAt, updatedAt, destinationSummary) => ({
+const formRow = (id, name, description, folderId, isActive, submitCount, monthly, lastSubmittedAt, updatedAt, destinationSummary) => ({
   id, lineAccountId: 'visual-qa-account', name, description, folderId,
   fields: [], layout: FORM_BASE_LAYOUT, onSubmitTagId: null, onSubmitScenarioId: null,
   onSubmitMessageType: null, onSubmitMessageContent: null, onSubmitWebhookUrl: null,
   onSubmitWebhookHeaders: null, onSubmitWebhookFailMessage: null,
   saveToMetadata: destinationSummary.friendFieldCount > 0, isActive, status: 'active', archivedAt: null,
-  revision: 1, submitCount, weeklySubmitCount, createdAt: updatedAt, updatedAt, lastSubmittedAt,
+  revision: 1, submitCount,
+  monthlySubmitCount: monthly.submitCount,
+  monthlyOpenCount: monthly.openCount,
+  monthlyCompletionRate: monthly.rate,
+  createdAt: updatedAt, updatedAt, lastSubmittedAt,
   usedByAccounts: [], accountScopeReviewRequired: false,
   destinationCount: destinationSummary.friendFieldCount + destinationSummary.tagCount,
   destinationSummary,
 })
 
-/** 回答フォーム一覧。設計 `EMBIK` に見えている6行。 */
+/** 回答フォーム一覧。設計 `EMBIK` に見えている6行。今月の数は日本時間の1日から。 */
 export const FORMS = [
-  formRow('form-1', '来店アンケート', '来店後に感想と次回の希望を聞く・9ブロック', 'form-folder-visit', true, 1284, 42, '2026-08-21T03:00:00.000Z', '2026-08-21T03:00:00.000Z', { friendFieldCount: 3, tagCount: 2 }),
-  formRow('form-2', '資料請求', '名前と連絡先・5ブロック', 'form-folder-request', true, 3410, 128, '2026-08-22T03:00:00.000Z', '2026-08-12T03:00:00.000Z', { friendFieldCount: 5, tagCount: 1 }),
-  formRow('form-3', '休止の理由', '定期便を止める人に理由を聞く・3ブロック', 'form-folder-survey', true, 96, 4, '2026-08-20T03:00:00.000Z', '2026-08-18T03:00:00.000Z', { friendFieldCount: 1, tagCount: 0 }),
-  formRow('form-4', 'イベント申込（8月）', '日時の希望と人数・7ブロック', 'form-folder-visit', true, 220, 61, '2026-08-25T03:00:00.000Z', '2026-08-22T03:00:00.000Z', { friendFieldCount: 4, tagCount: 0 }),
-  formRow('form-5', '会員登録', '住所と生年月日・12ブロック', 'form-folder-request', false, 0, 0, null, '2026-08-15T03:00:00.000Z', { friendFieldCount: 7, tagCount: 0 }),
-  { ...formRow('form-6', '旧アンケート（2025春）', '3ブロック', null, false, 1860, 0, '2025-05-30T03:00:00.000Z', '2025-05-30T03:00:00.000Z', { friendFieldCount: 2, tagCount: 0 }), status: 'archived', archivedAt: '2025-05-30T03:00:00.000Z' },
+  formRow('form-1', '来店アンケート', '来店後に感想と次回の希望を聞く・9ブロック', 'form-folder-visit', true, 1284, { submitCount: 186, openCount: 248, rate: 75 }, '2026-08-21T03:00:00.000Z', '2026-08-21T03:00:00.000Z', { friendFieldCount: 3, tagCount: 2 }),
+  formRow('form-2', '資料請求', '名前と連絡先・5ブロック', 'form-folder-request', true, 3410, { submitCount: 402, openCount: 536, rate: 75 }, '2026-08-22T03:00:00.000Z', '2026-08-12T03:00:00.000Z', { friendFieldCount: 5, tagCount: 1 }),
+  formRow('form-3', '休止の理由', '定期便を止める人に理由を聞く・3ブロック', 'form-folder-survey', true, 96, { submitCount: 12, openCount: 20, rate: 60 }, '2026-08-20T03:00:00.000Z', '2026-08-18T03:00:00.000Z', { friendFieldCount: 1, tagCount: 0 }),
+  formRow('form-4', 'イベント申込（8月）', '日時の希望と人数・7ブロック', 'form-folder-visit', true, 220, { submitCount: 88, openCount: 110, rate: 80 }, '2026-08-25T03:00:00.000Z', '2026-08-22T03:00:00.000Z', { friendFieldCount: 4, tagCount: 0 }),
+  formRow('form-5', '会員登録', '住所と生年月日・12ブロック', 'form-folder-request', false, 0, { submitCount: 0, openCount: 0, rate: null }, null, '2026-08-15T03:00:00.000Z', { friendFieldCount: 7, tagCount: 0 }),
+  { ...formRow('form-6', '旧アンケート（2025春）', '3ブロック', null, false, 1860, { submitCount: 0, openCount: 5, rate: 0 }, '2025-05-30T03:00:00.000Z', '2025-05-30T03:00:00.000Z', { friendFieldCount: 2, tagCount: 0 }), status: 'archived', archivedAt: '2025-05-30T03:00:00.000Z' },
   /* NEN-07: NEN配信「口コミのお願い」がつなぐフォーム。編集画面の選択肢と
    * 「つながる先」へ出る公開中フォームとして見本へ置く。 */
-  formRow('form-review', '口コミ', '星の評価とひとこと・2ブロック', null, true, 210, 9, '2026-08-24T03:00:00.000Z', '2026-08-24T03:00:00.000Z', { friendFieldCount: 1, tagCount: 1 }),
+  formRow('form-review', '口コミ', '星の評価とひとこと・2ブロック', null, true, 210, { submitCount: 24, openCount: 30, rate: 80 }, '2026-08-24T03:00:00.000Z', '2026-08-24T03:00:00.000Z', { friendFieldCount: 1, tagCount: 1 }),
 ]
 
 /** 機能13 `EMBIK`。一覧6行と、画面全体18件の集計を同じ応答で返す。 */
@@ -5700,7 +5704,7 @@ const adminEvent = (id, name, nextSlot, capacity, active, pending, published = 1
   description: 'はじめての方むけに、おうちでできるコツをお伝えします。',
   description_centered: 0, max_bookings_per_friend: 1, requires_approval: 1,
   cancel_deadline_hours_before: 24, reminder_day_before_enabled: 1, reminder_hours_before: 3,
-  is_published: published, sort_order: 1,
+  is_published: published, lifecycle_status: published === 1 ? 'published' : 'draft', sort_order: 1,
   created_at: '2026-09-01T01:00:00.000Z', updated_at: '2026-09-02T01:00:00.000Z',
   next_slot_starts_at: nextSlot,
   total_capacity: capacity, total_active: active, pending_count: pending,
@@ -5738,6 +5742,7 @@ export const EVENT_DETAIL = {
   reminder_day_before_enabled: 1,
   reminder_hours_before: 24,
   is_published: 1,
+  lifecycle_status: 'published',
   sort_order: 1,
   confirmation_message_extra: null,
   reminder_message_extra: null,
@@ -5767,6 +5772,61 @@ export const EVENT_WAITLIST = [
   { id: 'ew-1', slot_id: 'event-slot-1', friend_id: 'friend-4', status: 'waiting', notified_at: null, created_at: '2026-09-02T01:00:00.000Z', slot_starts_at: '2026-09-25T05:00:00.000Z', friend_name: '中村 彩' },
   { id: 'ew-2', slot_id: 'event-slot-1', friend_id: 'friend-5', status: 'waiting', notified_at: null, created_at: '2026-09-02T02:00:00.000Z', slot_starts_at: '2026-09-25T05:00:00.000Z', friend_name: '石田 未来' },
 ]
+
+/* U: 変更の確認・状態・待ちの手動操作・開催回の変更の見本（実APIと同じ器）。 */
+export const EVENT_CHANGE_PREVIEW = {
+  event_id: 'ev-1',
+  impacts: [
+    {
+      slot_id: 'event-slot-1',
+      starts_at: '2026-09-25T05:00:00.000Z',
+      ends_at: '2026-09-25T06:30:00.000Z',
+      capacity: 12,
+      confirmed_seats: 9,
+      waiting_seats: 2,
+      pending_reminders: 9,
+      errors: [],
+      notices: ['datetime_moved_with_bookings'],
+    },
+  ],
+  event_notices: [],
+  blocked: false,
+  total_confirmed: 9,
+  total_waiting: 2,
+  total_pending_reminders: 9,
+}
+
+export const EVENT_CHANGE_APPLY_RESULT = {
+  success: true,
+  version: 4,
+  log_id: 'ecl-1',
+  affected_confirmed: 9,
+  affected_waiting: 2,
+  notified: 9,
+}
+
+export const EVENT_LIFECYCLE_RESULT = {
+  success: true,
+  lifecycle_status: 'paused',
+  version: 4,
+  log_id: 'ecl-2',
+}
+
+export const EVENT_WAITLIST_REORDER_RESULT = {
+  success: true,
+  occurrence_version: 5,
+  order: ['ew-2', 'ew-1'],
+  log_id: 'ecl-3',
+}
+
+export const EVENT_WAITLIST_SKIP_RESULT = {
+  success: true,
+  occurrence_version: 6,
+  waitlist_id: 'ew-1',
+  log_id: 'ecl-4',
+}
+
+export const EVENT_LIFF_CHANGE_RESULT = { id: 'ev-booking-2', status: 'confirmed' }
 
 /*
   イベントの申込者。設計 `i5SN2j` の「申し込み12／キャンセル待ち3／取り消した2」。

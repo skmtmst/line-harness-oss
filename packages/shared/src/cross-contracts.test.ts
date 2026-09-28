@@ -16,9 +16,11 @@ describe("横断契約の正本", () => {
       large: { width: 2500, height: 1686 },
       compact: { width: 2500, height: 843 },
     });
+    // O(#822): LINE が後から足した2つの動き。DB の action_type は4つのまま。
     expect(RICH_MENU_ACTION_TYPE_BY_INTENT).toEqual({
       url: "uri", tel: "uri", form: "uri", text: "message",
       template: "postback", switch: "richmenuswitch", postback: "postback",
+      datetime: "datetimepicker", clipboard: "clipboard",
     });
   });
 

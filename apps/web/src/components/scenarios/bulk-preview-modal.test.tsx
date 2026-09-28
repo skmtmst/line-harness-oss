@@ -20,9 +20,11 @@ vi.mock('next/link', () => ({
 }))
 
 import BulkPreviewModal from './bulk-preview-modal'
+import { api } from '@/lib/api'
 
 afterEach(() => {
   cleanup()
+  vi.clearAllMocks()
 })
 
 describe('一括プレビューは共通の Dialog', () => {
@@ -48,5 +50,97 @@ describe('一括プレビューは共通の Dialog', () => {
   it('閉じているときは何も出さない', () => {
     const { container } = render(<BulkPreviewModal open={false} scenarioId="sc-1" onClose={vi.fn()} />)
     expect(container.innerHTML).not.toContain('一括プレビュー')
+  })
+})
+
+/*
+ * R212: 下書きの通を一括プレビューで区別せず表示する。
+ * 送られる通と誤解するので、下書きには札を付け、実際の配信と
+ * 友だち別の予定には入らないことを窓の説明に書く。
+ * 直しを戻す（札を外す）と、この試験は赤くなる。
+ */
+describe('R212: 一括プレビューは下書きを区別する', () => {
+  it('下書きの通に札を付け、扱いの説明を出す', async () => {
+    vi.mocked(api.scenarios.preview).mockResolvedValueOnce({
+      success: true,
+      data: {
+        startAt: '2026-09-28T10:00:00+09:00',
+        steps: [
+          {
+            stepOrder: 1,
+            deliveryAt: '2026-09-28T10:00:00+09:00',
+            deliveryAtLabel: 'Day 0 10:00 (日)',
+            messageType: 'テキスト',
+            messageContent: '通常の通',
+            isDraft: false,
+          },
+          {
+            stepOrder: 2,
+            deliveryAt: '2026-09-29T10:00:00+09:00',
+            deliveryAtLabel: 'Day 1 10:00 (月)',
+            messageType: 'テキスト',
+            messageContent: '下書きの通',
+            isDraft: true,
+          },
+        ],
+      },
+    })
+    render(<BulkPreviewModal open scenarioId="sc-1" onClose={vi.fn()} />)
+    expect(await screen.findByText('下書き')).toBeTruthy()
+    expect(
+      screen.getByText('起点からの各通の届く日時と内容の見本です。送りはしません。下書きの通には札を付けますが、実際の配信と友だち別の予定には入りません。'),
+    ).toBeTruthy()
+  })
+})
+
+/*
+ * R237: テンプレート参照の通は、一括プレビューが「公開版・通の控え」の
+ * どれかと、控えのときは未反映の理由を出す。通の直接入力には出さない。
+ * 直しを戻す（対象版の表示を外す）と、この試験は赤くなる。
+ */
+describe('R237: 一括プレビューは対象版と未反映理由を出す', () => {
+  it('公開版・未公開の控えを出し分け、直接入力には出さない', async () => {
+    vi.mocked(api.scenarios.preview).mockResolvedValueOnce({
+      success: true,
+      data: {
+        startAt: '2026-09-28T10:00:00+09:00',
+        steps: [
+          {
+            stepOrder: 1,
+            deliveryAt: '2026-09-28T10:00:00+09:00',
+            deliveryAtLabel: 'Day 0 10:00 (日)',
+            messageType: 'テキスト',
+            messageContent: '公開版の通',
+            isDraft: false,
+            contentSource: 'template',
+            fallbackReason: null,
+          },
+          {
+            stepOrder: 2,
+            deliveryAt: '2026-09-29T10:00:00+09:00',
+            deliveryAtLabel: 'Day 1 10:00 (月)',
+            messageType: 'テキスト',
+            messageContent: '未公開テンプレートの通',
+            isDraft: false,
+            contentSource: 'step-fallback',
+            fallbackReason: 'unpublished',
+          },
+          {
+            stepOrder: 3,
+            deliveryAt: '2026-09-30T10:00:00+09:00',
+            deliveryAtLabel: 'Day 2 10:00 (火)',
+            messageType: 'テキスト',
+            messageContent: '直接書いた通',
+            isDraft: false,
+            contentSource: 'step',
+            fallbackReason: null,
+          },
+        ],
+      },
+    })
+    render(<BulkPreviewModal open scenarioId="sc-1" onClose={vi.fn()} />)
+    expect(await screen.findByText('テンプレートの公開版を表示')).toBeTruthy()
+    expect(screen.getByText('通の控えを表示（テンプレートが未公開のため）')).toBeTruthy()
+    expect(screen.queryByText('通の控えを表示（テンプレートが削除されているため）')).toBeNull()
   })
 })

@@ -1575,6 +1575,20 @@ async function runFrequentHeavyJobs(
         if (result.processed > 0) console.log(JSON.stringify({ event: 'nen_rich_menu_job', ...result }));
       },
     },
+    {
+      // K(#822): リッチメニューの毎日の照合。公開中の group を1日1回だけ見る。
+      // 見つけたずれは直さず台帳に残す。直すのは運用者が K-2 画面で行う。
+      name: 'rich menu daily reconcile',
+      run: async () => {
+        const { processDailyRichMenuReconcile } = await import('./services/rich-menu-daily-reconcile.js');
+        const result = await processDailyRichMenuReconcile(env.DB, {
+          now: new Date(event.scheduledTime),
+        });
+        if (result.checked + result.failed > 0) {
+          console.log(JSON.stringify({ event: 'rich_menu_daily_reconcile', ...result }));
+        }
+      },
+    },
   ];
 
   if (!env.XSERVER_RELAY_SECRET && env.XSERVER_MAIL_HOST && env.XSERVER_MAIL_USER && env.XSERVER_MAIL_PASSWORD) {
@@ -2159,6 +2173,14 @@ async function scheduled(
         });
         if (!res.ok) throw new Error(`LINE createRichMenu failed: ${res.status} ${await res.text()}`);
         return res.json() as Promise<{ richMenuId: string }>;
+      },
+      async validateRichMenu(payload: unknown) {
+        const res = await fetch('https://api.line.me/v2/bot/richmenu/validate', {
+          method: 'POST',
+          headers: { Authorization: auth, 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) throw new Error(`LINE validateRichMenu failed: ${res.status} ${await res.text()}`);
       },
       async listRichMenus() {
         const res = await fetch('https://api.line.me/v2/bot/richmenu/list', {

@@ -74,15 +74,38 @@ describe('GET /api/chats/quick-counts (INBOX-09)', () => {
     seedEmail('mail-unread-old', { age: 2 * 3600_000 });
     seedEmail('mail-resolved', { status: 'resolved' });
 
-    const { status, body } = await counts({ lineAccountId: 'account-a' });
-    expect(status).toBe(200);
-    // lineAccountId を渡すとメール一覧と同じくメールは対象外。
-    expect(body.data).toMatchObject({ all: 3, reply: 2, overdue: 1 });
+    // メールはLINEアカウントに所属しない。アカウント選択中も一覧と同じく数える。
+    const selected = await counts({ lineAccountId: 'account-a' });
+    expect(selected.status).toBe(200);
+    expect(selected.body.data).toMatchObject({ all: 5, reply: 3, overdue: 2 });
+    expect(selected.body.data?.email.all).toBe(2);
 
     const all = await counts();
     expect(all.body.data).toMatchObject({ all: 5, reply: 3, overdue: 2 });
     expect(all.body.data?.line.all).toBe(3);
     expect(all.body.data?.email.all).toBe(2);
+  });
+
+  test('メールを見られない担当者の件数にはメールが入らない', async () => {
+    seedLine('line-unread', {});
+    seedEmail('mail-unread', {});
+    db.raw.prepare(
+      `INSERT INTO staff_members (id, name, role, api_key, tenant_id, account_scope)
+       VALUES ('scoped-reader', 'scoped-reader', 'staff', 'key-scoped', NULL, 'accounts')`,
+    ).run();
+    db.raw.prepare(
+      'INSERT INTO staff_account_scopes (staff_id, line_account_id, created_at) VALUES (?, ?, ?)',
+    ).run('scoped-reader', 'account-a', new Date(NOW).toISOString());
+
+    // アカウント選択の有無に関わらず、見られない人の件数にメールは入らない。
+    for (const filters of [{}, { lineAccountId: 'account-a' }] as Array<Record<string, string>>) {
+      const { status, body } = await counts(filters, 'scoped-reader');
+      expect(status).toBe(200);
+      expect(body.data).toMatchObject({ all: 1, reply: 1 });
+      expect(body.data?.email.all).toBe(0);
+    }
+    const mailOnly = await counts({ channel: 'email' }, 'scoped-reader');
+    expect(mailOnly.body.data?.all).toBe(0);
   });
 
   test('経路の絞り込みで片側だけを数える', async () => {

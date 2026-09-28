@@ -89,7 +89,7 @@ import {
   BOOKING_PROXY_CREATE, BOOKING_REQUESTS,
   BOOKING_ADMIN_DETAIL, BOOKING_CUSTOMER_CONTEXT, BOOKING_REMINDER_PREVIEW, BOOKING_CONFLICT_ALTERNATIVES,
   EC_NOTIFICATION_SETTINGS, EC_NOTIFICATION_RUNS, LINE_NOTIFICATION_DEFINITIONS, LINE_NOTIFICATION_METRICS, LINE_NOTIFICATION_SEND_COUNTS, LINE_NOTIFICATION_DELIVERIES,
-  OPERATOR_NOTIFICATION_RECIPIENTS, OPERATOR_NOTIFICATION_RULES, ADMIN_EVENTS, EVENT_DETAIL, EVENT_SLOTS, EVENT_WAITLIST, EVENT_BOOKINGS, NEN_PHOTOS, NEN_PHOTO_DETAIL,
+  OPERATOR_NOTIFICATION_RECIPIENTS, OPERATOR_NOTIFICATION_RULES, ADMIN_EVENTS, EVENT_DETAIL, EVENT_SLOTS, EVENT_WAITLIST, EVENT_BOOKINGS, EVENT_CHANGE_PREVIEW, EVENT_CHANGE_APPLY_RESULT, EVENT_LIFECYCLE_RESULT, EVENT_WAITLIST_REORDER_RESULT, EVENT_WAITLIST_SKIP_RESULT, EVENT_LIFF_CHANGE_RESULT, NEN_PHOTOS, NEN_PHOTO_DETAIL,
   NEN_PHOTO_REVIEW_METRICS, NEN_PHOTO_ASSET_STATUS, NEN_PHOTO_DERIVATIVES,
   NEN_PHOTO_ASSET_PROCESS_RESULT, NEN_PHOTO_BULK_DECISION_RESULT,
   NEN_PHOTO_REWARD_POLICY_VERSIONS,
@@ -1501,6 +1501,25 @@ function visualQaWriteBody(method, pathname) {
   if (method === 'POST' && /^\/api\/events\/admin\/events\/[^/]+\/slots$/.test(pathname)) {
     return { items: EVENT_SLOTS }
   }
+  /* U: 変更の確認・状態・待ちの手動操作・LIFF開催回変更の見本（実APIと同じ器）。 */
+  if (method === 'POST' && /^\/api\/events\/admin\/events\/[^/]+\/lifecycle$/.test(pathname)) {
+    return EVENT_LIFECYCLE_RESULT
+  }
+  if (method === 'POST' && /^\/api\/events\/admin\/events\/[^/]+\/change-review$/.test(pathname)) {
+    return EVENT_CHANGE_PREVIEW
+  }
+  if (method === 'POST' && /^\/api\/events\/admin\/events\/[^/]+\/change-review\/apply$/.test(pathname)) {
+    return EVENT_CHANGE_APPLY_RESULT
+  }
+  if (method === 'POST' && /^\/api\/events\/admin\/occurrences\/[^/]+\/waitlist\/reorder$/.test(pathname)) {
+    return EVENT_WAITLIST_REORDER_RESULT
+  }
+  if (method === 'POST' && /^\/api\/events\/admin\/occurrences\/[^/]+\/waitlist\/skip$/.test(pathname)) {
+    return EVENT_WAITLIST_SKIP_RESULT
+  }
+  if (method === 'POST' && /^\/api\/events\/liff\/bookings\/[^/]+\/change$/.test(pathname)) {
+    return EVENT_LIFF_CHANGE_RESULT
+  }
   if (method === 'PUT' && /^\/api\/events\/admin\/events\/[^/]+\/slots\/[^/]+$/.test(pathname)) {
     return EVENT_SLOTS[0]
   }
@@ -2419,6 +2438,16 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   }
   if (method === 'DELETE' && pathname === `/api/forms/${FORM_DETAIL.id}`) {
     return { success: true, data: null }
+  }
+  // P: 公開前の試し合言葉の発行。生の値はこの応答でしか返らない。
+  const formTestToken = method === 'POST' && /^\/api\/forms\/([^/]+)\/test-token$/.exec(pathname)
+  if (formTestToken) {
+    return { success: true, data: { token: 'test-token-qa', expiresAt: '2026-09-28T15:00:00.000+09:00' } }
+  }
+  // R230: フォーム全体の複製。絵の検証用に新しい下書き（受付停止）を返す。
+  const formDuplicate = method === 'POST' && /^\/api\/forms\/([^/]+)\/duplicate$/.exec(pathname)
+  if (formDuplicate) {
+    return { success: true, data: { id: 'form-duplicate-qa', isActive: false } }
   }
   if (pathname === '/api/forms') {
     return { success: true, data: query.get('with_list_summary') === '1' ? FORM_LIST : FORMS }
@@ -4841,6 +4870,69 @@ const server = createServer((req, res) => {
         return
       }
       res.writeHead(200).end(JSON.stringify({ success: true }))
+      return
+    }
+    // K-1・O-1: 公開の進みと公開前の確認の見本（本物と同じ器）。
+    const richMenuProgress = /^\/api\/rich-menu-groups\/([^/]+)\/publish-progress$/.exec(url.pathname)
+    if (method === 'GET' && richMenuProgress) {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: {
+        run: { id: 'visual-qa-run', mode: 'publish', status: 'failed', startedAt: '2026-09-27T10:00:00+09:00', completedAt: '2026-09-27T10:01:00+09:00' },
+        steps: [
+          { key: 'image', label: '画像をLINEに上げる', status: 'done' },
+          { key: 'menu', label: 'メニューを作る', status: 'done' },
+          { key: 'assign', label: '友だちに割り当てる', status: 'failed' },
+          { key: 'cleanup', label: '前のメニューを片付ける', status: 'pending' },
+        ],
+        message: '割り当てに失敗したので、作ったメニューをLINEから消し、前のメニューのままにしました。もう一度公開できます。',
+      } }))
+      return
+    }
+    const richMenuPrecheck = /^\/api\/rich-menu-groups\/([^/]+)\/prepublish-check$/.exec(url.pathname)
+    if (method === 'GET' && richMenuPrecheck) {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: {
+        fingerprint: 'visual-qa-fp',
+        pageCount: 2,
+        maxPages: 10,
+        selfCheck: { ok: true, message: '自前の検査を通りました。' },
+        deviceConfirmed: false,
+        deviceConfirmedAt: null,
+        versionNumber: null,
+      } }))
+      return
+    }
+    const richMenuValidate = /^\/api\/rich-menu-groups\/([^/]+)\/validate$/.exec(url.pathname)
+    if (method === 'POST' && richMenuValidate) {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: {
+        checks: [
+          { key: 'self', ok: true, message: '自前の検査を通りました。' },
+          { key: 'line', ok: true, message: 'LINEの検査を通りました。' },
+        ],
+      } }))
+      return
+    }
+    const richMenuDevice = /^\/api\/rich-menu-groups\/([^/]+)\/device-confirm$/.exec(url.pathname)
+    if (method === 'POST' && richMenuDevice) {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: {
+        confirmedAt: '2026-09-27T10:00:00+09:00', fingerprint: 'visual-qa-fp',
+      } }))
+      return
+    }
+    // K-2: 照合の見本。ずれの種類ごとの直し方（fix）つき。
+    const richMenuReconcile = /^\/api\/rich-menu-groups\/([^/]+)\/reconcile$/.exec(url.pathname)
+    if (method === 'POST' && richMenuReconcile) {
+      let raw = ''
+      req.on('data', (chunk) => { raw += chunk })
+      req.on('end', () => {
+        let dryRun = true
+        try { dryRun = JSON.parse(raw || '{}').dryRun !== false } catch { dryRun = true }
+        const diffs = [
+          { kind: 'external_only', detail: 'LINEにだけあるメニュー「別で作ったメニュー」（rm-external-1）があります', richMenuId: 'rm-external-1', fix: { label: 'こちらに取り込む', action: 'import-external' } },
+          { kind: 'default_mismatch', detail: 'LINEの全員既定がこのメニューを指していません（現在: rm-other-9）', richMenuId: 'rm-other-9', fix: { label: 'こちらに合わせる', action: 'relink-default' } },
+        ]
+        res.writeHead(200).end(JSON.stringify({ success: true, data: dryRun
+          ? { dryRun: true, diffs }
+          : { dryRun: false, diffs, applied: 1, failed: [], unapplied: [{ diff: diffs[0], reason: '取り込みは「外部メニューの取り込み」画面で運用者が行います' }], runId: 'visual-qa-reconcile-run' } }))
+      })
       return
     }
     const richMenuWriteAction = /^\/api\/rich-menu-groups\/([^/]+)\/(publish|unpublish|schedule|apply-to-tag)$/.exec(url.pathname)

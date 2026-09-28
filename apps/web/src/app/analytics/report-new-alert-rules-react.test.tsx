@@ -337,3 +337,69 @@ describe('定期レポートの作成後(R76)', () => {
     expect(fixture.pushes).toEqual(['/analytics?tab=saved'])
   })
 })
+
+describe('定期レポートの宛先(R228)', () => {
+  async function typeInto(ariaLabel: string, value: string) {
+    const input = host.querySelector(`input[aria-label="${ariaLabel}"]`) as HTMLInputElement | null
+    if (!input) throw new Error(`「${ariaLabel}」の入力が見つかりません`)
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+    await act(async () => {
+      setter.call(input, value)
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+      await Promise.resolve()
+    })
+  }
+
+  async function selectStaffRecipient() {
+    const personCheck = Array.from(host.querySelectorAll('input[type="checkbox"]')).find(
+      (item) => !(item as HTMLInputElement).disabled && item.closest('label')?.textContent?.includes('テスト'),
+    ) as HTMLInputElement
+    await act(async () => { personCheck.click(); await Promise.resolve() })
+  }
+
+  it('形の合わないメール宛先は行のそばで理由を出し、送信しない', async () => {
+    await render()
+    await selectStaffRecipient()
+    await act(async () => { button('宛先を足す').click(); await Promise.resolve() })
+    await typeInto('宛先のメールアドレス 1行目', 'not-an-address')
+
+    // どの行がなぜ止まったかが、その行に出る。
+    expect(host.textContent).toContain('「not-an-address」はメールアドレスの形になっていません')
+    // 混ざったままでは送らせない（以前は不正行だけ黙って外れていた）。
+    expect(button('つくって動かす').disabled).toBe(true)
+    expect(button('いますぐ1回だけ送ってみる').disabled).toBe(true)
+    expect(writeCalls('POST')).toHaveLength(0)
+  })
+
+  it('直すか消すと送れる。直した宛先は本文へ残る', async () => {
+    await render()
+    await selectStaffRecipient()
+    await act(async () => { button('宛先を足す').click(); await Promise.resolve() })
+    await typeInto('宛先のメールアドレス 1行目', 'broken')
+    await typeInto('宛先のメールアドレス 1行目', 'ops@example.com')
+
+    expect(button('つくって動かす').disabled).toBe(false)
+    await act(async () => { button('つくって動かす').click(); await Promise.resolve(); await Promise.resolve() })
+
+    const post = writeCalls('POST').at(-1)
+    const recipients = (post?.body as { recipients: Array<{ kind: string; email?: string; staffId?: string }> }).recipients
+    expect(recipients).toContainEqual(expect.objectContaining({ kind: 'email', email: 'ops@example.com' }))
+    expect(recipients).toContainEqual(expect.objectContaining({ kind: 'staff', staffId: 'u-1' }))
+  })
+
+  it('行の「消す」で不備のある宛先だけ外せる', async () => {
+    await render()
+    await selectStaffRecipient()
+    await act(async () => { button('宛先を足す').click(); await Promise.resolve() })
+    await typeInto('宛先のメールアドレス 1行目', 'broken')
+    expect(button('つくって動かす').disabled).toBe(true)
+
+    const remove = host.querySelector('button[aria-label="1行目の宛先を消す"]') as HTMLButtonElement
+    expect(remove).not.toBeNull()
+    await act(async () => { remove.click(); await Promise.resolve() })
+    expect(button('つくって動かす').disabled).toBe(false)
+    await act(async () => { button('つくって動かす').click(); await Promise.resolve(); await Promise.resolve() })
+    const recipients = (writeCalls('POST').at(-1)?.body as { recipients: Array<{ kind: string }> }).recipients
+    expect(recipients).toEqual([expect.objectContaining({ kind: 'staff', staffId: 'u-1' })])
+  })
+})
