@@ -166,13 +166,22 @@ export const EFFECTIVE_LEGEND: ReadonlyArray<{
   },
 ]
 
-/** 応答したときに行うこと。設定を開かずに何をするルールか読めるようにする。 */
+/**
+ * 応答したときに行うこと。設定を開かずに何をするルールか読めるようにする。
+ *
+ * R256: 対応済み9種は編集画面（シナリオの終了後の処理 #961・`ACTION_KINDS`）
+ * と同じ名称にする。未知の将来種別だけが「その他の処理」になる。
+ */
 const ACTION_WORDS: Record<string, string> = {
-  tag: 'タグ',
-  friend_field: '友だち情報',
-  support_mark: '対応マーク',
-  scenario: 'シナリオ',
-  common_var: '共通情報',
+  tag: 'タグ操作',
+  friend_field: '友だち情報操作',
+  support_mark: '対応マーク操作',
+  scenario: 'シナリオ操作',
+  common_var: '共通情報操作',
+  send_message: 'テキスト送信',
+  send_template: 'テンプレート送信',
+  reminder: 'リマインダ操作',
+  event_booking: 'イベント予約操作',
 }
 
 export function actionWord(actionType: string): string {

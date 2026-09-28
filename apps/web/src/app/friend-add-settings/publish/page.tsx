@@ -300,13 +300,18 @@ function FriendAddPublishInner() {
 
   const blocked = blockedReason(validation)
   const ready = canPublish({ validation, busy })
+  // 「何も配信しない」ではメッセージもシナリオも送らない（R261）。
+  const noneMode = ruleDetail?.rule.friendKind === 'returning'
+    && ruleDetail?.rule.definition.returningMode === 'none'
 
   return (
     <div className={styles.screen} data-design-node="ec9vg">
       <PageHeader
         breadcrumb={[{ label: '友だち追加時の配信', href: '/friend-add-settings' }, { label: '最終確認' }]}
         title="友だち追加時・最終確認"
-        description="有効化すると、新しく追加された友だちへ初回案内を送ります。"
+        description={noneMode
+          ? '有効化すると、再追加した人へアクションだけを実行します。'
+          : '有効化すると、新しく追加された友だちへ初回案内を送ります。'}
       />
       <Stepper label="設定の進み" steps={STEPS.map((label, index) => ({ label, state: index + 1 < 5 ? 'done' as const : 'current' as const }))} />
 
@@ -341,20 +346,23 @@ function FriendAddPublishInner() {
           </Card>
 
           <Card layout="vertical" className={styles.section} data-friend-add-part="summary">
-            <CardHeader title="最終確認" meta="有効化すると新しく追加された友だちへ初回案内を送ります。" />
+            <CardHeader title="最終確認" meta={noneMode ? '有効化すると、再追加した人に対してアクションだけを実行します。' : '有効化すると新しく追加された友だちへ初回案内を送ります。'} />
             <div className={styles.rows}>
               <Row label="設定名" value={ruleDetail?.rule.name ?? `第${draft.versionNumber}版の下書き`} />
               <Row label="流入条件" value={ruleDetail?.rule.isFallback ? '経路が分からなかった人' : ruleDetail?.rule.routeNames.join('、') || NOT_AVAILABLE} />
-              <Row label="送信タイミング" value={(ruleDetail?.rule.definition.timing ?? draft.routing.firstTime.timing) === 'immediate' ? '登録直後から5分以内' : 'シナリオの時刻に従う'} />
+              <Row label="送信タイミング" value={noneMode ? '適用外（配信しません）' : (ruleDetail?.rule.definition.timing ?? draft.routing.firstTime.timing) === 'immediate' ? '登録直後から5分以内' : 'シナリオの時刻に従う'} />
               <Row label="対象" value={ruleDetail?.rule.friendKind === 'returning' ? '以前からの友だち・ブロック解除' : '初回登録・既存友だち除外'} />
-              <Row label="初回案内" value={ruleDetail?.rule.scenarioName ?? (draft.routing.firstTime.scenarioId ? '選択済みのシナリオ' : NOT_AVAILABLE)} />
+              <Row label="初回案内" value={noneMode ? 'なし（アクションのみ実行）' : ruleDetail?.rule.scenarioName ?? (draft.routing.firstTime.scenarioId ? '選択済みのシナリオ' : NOT_AVAILABLE)} />
               <Row label="アクション" value={ruleDetail ? ruleActionSummary(ruleDetail.rule) : actionSummary(draft)} />
             </div>
             {/*
              * 再追加時の制限は設定値をそのまま出す。固定で「24時間に1回」と
              * 書くと、制限しない・7日に1回の設定と食い違う(#946 N-109 同类)。
+             * 「何も配信しない」はそもそも送らないので、再送の説明は出さない。
              */}
-            <p className={styles.note}>{suppressionNote(ruleDetail?.rule.definition.resendSuppressionHours)}</p>
+            <p className={styles.note}>{noneMode
+              ? '再追加ではメッセージもシナリオも動かしません。案内後のアクションだけを実行します。'
+              : suppressionNote(ruleDetail?.rule.definition.resendSuppressionHours)}</p>
           </Card>
 
           <Card layout="vertical" className={styles.section} data-friend-add-part="test">
@@ -385,13 +393,17 @@ function FriendAddPublishInner() {
         <aside className={styles.side}>
           {/* LINEの見た目の枠は共通部品 `LinePreview`（B-6）。白い箱はやめる。 */}
           <LinePreview
-            caption={draft.routing.firstTime.timing === 'immediate'
-              ? '登録直後から5分以内に届きます'
-              : '設定したシナリオの時刻に届きます'}
+            caption={noneMode
+              ? '再追加では配信しません'
+              : draft.routing.firstTime.timing === 'immediate'
+                ? '登録直後から5分以内に届きます'
+                : '設定したシナリオの時刻に届きます'}
             accountName="LINE公式アカウント"
           >
             <div className="rounded-card bg-canvas p-3 text-xs leading-6 text-ink-secondary">
-              {ruleDetail?.rule.definition.messageText || `シナリオ「${ruleDetail?.rule.scenarioName ?? '選択中'}」を開始します。`}
+              {noneMode
+                ? 'メッセージは届きません。アクションだけを実行します。'
+                : ruleDetail?.rule.definition.messageText || `シナリオ「${ruleDetail?.rule.scenarioName ?? '選択中'}」を開始します。`}
             </div>
           </LinePreview>
           <Card layout="vertical" className={styles.section} data-friend-add-part="side">

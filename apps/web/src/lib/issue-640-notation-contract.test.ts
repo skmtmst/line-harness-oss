@@ -44,7 +44,7 @@ describe('#640 省略表示の全文確認（title）', () => {
     const thTitles = FRIEND_ADD.match(/<Th title=/g)
     expect(thTitles, '見出しセルの title が足りない').not.toBeNull()
     expect(thTitles!.length).toBeGreaterThanOrEqual(6)
-    expect(FRIEND_ADD).toMatch(/block truncate" title=\{rule\.isFallback/)
+    expect(FRIEND_ADD).toMatch(/block truncate" title=\{routeLabel\(rule\)\}/)
     expect(FRIEND_ADD).toMatch(/block truncate" title=\{deliverySummary\(rule\)\}/)
   })
 
