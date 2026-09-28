@@ -319,7 +319,11 @@ type UnappliedDebit = {
  * もう次の締めには出てこない(二重控除しない)。
  * 台帳が無い環境(移行前)では空を返して既存表示を壊さない。
  */
-async function unappliedSettlementDebits(
+/**
+ * m22u R358 の回帰用に公開する、未適用の取り立て(clawback)の読み取り。
+ * 締め→却下で起こした相殺は、再承認で確定が戻ると取り立て対象から外す。
+ */
+export async function unappliedSettlementDebits(
   db: D1Database,
   input: { tenantId: string; lineAccountId: string },
 ): Promise<UnappliedDebit[]> {
@@ -337,6 +341,14 @@ async function unappliedSettlementDebits(
          ON sl.entry_id = d.id AND sl.status = 'included'
       WHERE d.organization_id = ? AND d.line_account_id = ?
         AND d.entry_type = 'debit'
+        -- m22u R358: 再承認で確定が戻った成果の相殺は取り立てない。
+        -- 確定が有効なまま残る限り、却下の取り消しは無かったことになる。
+        AND NOT EXISTS (
+          SELECT 1 FROM affiliate_reward_entries c
+           WHERE c.conversion_event_id = d.conversion_event_id
+             AND c.entry_type = 'credit'
+             AND c.status <> 'reversed'
+        )
       GROUP BY d.id
       ORDER BY d.created_at, d.id`,
   ).bind(input.tenantId, input.lineAccountId).all<{

@@ -105,6 +105,11 @@ export async function ensureConversionRewardSnapshot(
   const row = await db.prepare(
     `SELECT ce.id AS conversion_event_id,
             ce.value_snapshot AS value_snapshot,
+            ce.approval_formula AS frozen_formula,
+            ce.approval_commission_rate AS frozen_rate,
+            ce.approval_base_amount AS frozen_base,
+            ce.approval_fixed_reward AS frozen_fixed,
+            ce.approval_amount_minor AS frozen_amount,
             a.id AS affiliate_id,
             a.name AS affiliate_name,
             a.code AS affiliate_code,
@@ -134,6 +139,11 @@ export async function ensureConversionRewardSnapshot(
   ).bind(eventId).first<{
     conversion_event_id: string;
     value_snapshot: number | null;
+    frozen_formula: string | null;
+    frozen_rate: number | null;
+    frozen_base: number | null;
+    frozen_fixed: number | null;
+    frozen_amount: number | null;
     affiliate_id: string;
     affiliate_name: string;
     affiliate_code: string;
@@ -195,10 +205,27 @@ export async function ensureConversionRewardSnapshot(
   ).bind(eventId).first<{ 1: number }>();
   if (settled) return null;
 
-  const rate = row.commission_rate === null ? 0 : Number(row.commission_rate);
-  const formula: AffiliateRewardFormula = rate > 0 ? 'rate' : 'fixed';
-  const baseAmount = formula === 'rate' ? Number(row.value_snapshot ?? row.point_value ?? 0) : null;
-  const fixedReward = formula === 'fixed' ? Math.round(Number(row.fixed_reward ?? 0)) : null;
+  // m22u R356・R357: 承認時に凍結した入力があれば、現在の設定ではなく
+  // 凍結値を優先する(承認後の設定変更で過去の承認額が動かない)。
+  const frozenFormula = row.frozen_formula === 'rate' || row.frozen_formula === 'fixed'
+    ? row.frozen_formula
+    : null;
+  const liveRate = row.commission_rate === null ? 0 : Number(row.commission_rate);
+  const liveFormula: AffiliateRewardFormula = liveRate > 0 ? 'rate' : 'fixed';
+  const formula: AffiliateRewardFormula = frozenFormula ?? liveFormula;
+  const rate = formula === 'rate'
+    ? (row.frozen_rate === null || row.frozen_rate === undefined ? liveRate : Number(row.frozen_rate))
+    : 0;
+  const baseAmount = formula === 'rate'
+    ? (row.frozen_base === null || row.frozen_base === undefined
+      ? Number(row.value_snapshot ?? row.point_value ?? 0)
+      : Number(row.frozen_base))
+    : null;
+  const fixedReward = formula === 'fixed'
+    ? (row.frozen_fixed === null || row.frozen_fixed === undefined
+      ? Math.round(Number(row.fixed_reward ?? 0))
+      : Math.round(Number(row.frozen_fixed)))
+    : null;
   const amount = formula === 'rate'
     ? Math.round(baseAmount! * rate / 100)
     : fixedReward!;
@@ -333,6 +360,47 @@ export async function reverseSettledRewardOnRejection(
     reversalEntryId: reversal.id,
     amountMinor: Number(reversal.amount_minor),
   };
+}
+
+/**
+ * m22u R358：締め済みの成果を却下→再承認したときの復活。
+ *
+ * 締めは成果ごとに確定(credit)を1件しか持てない（UNIQUE のため再承認で
+ * 新しい確定は作れない）。そのため再承認では、却下で reversed にした確定を
+ * settled へ戻し、締めの記録（settlement-1 の明細）をそのまま生かす。
+ * 却下で起こした相殺(debit)は行として残すが、有効な確定が戻った分は
+ * 未適用の取り立てから外す（affiliate-payouts 側の判定で見る）。
+ *
+ * 書込みは fence 付き：いま承認中で、取り消し済みの確定と相殺の組がある
+ * ときだけ戻す。再送では確定が有効のため 0 行で終わる（調整は1回）。
+ */
+export async function restoreSettledRewardOnReapproval(
+  db: D1Database,
+  eventId: string,
+): Promise<string | null> {
+  const result = await db.prepare(
+    `UPDATE affiliate_reward_entries
+        SET status = 'settled'
+      WHERE conversion_event_id = ?
+        AND entry_type = 'credit'
+        AND status = 'reversed'
+        AND EXISTS (
+          SELECT 1 FROM affiliate_reward_entries d
+           WHERE d.conversion_event_id = affiliate_reward_entries.conversion_event_id
+             AND d.entry_type = 'debit'
+        )
+        AND EXISTS (
+          SELECT 1 FROM conversion_events ce
+           WHERE ce.id = affiliate_reward_entries.conversion_event_id
+             AND COALESCE(ce.approval_status, 'pending') = 'approved'
+        )`,
+  ).bind(eventId).run();
+  if ((result.meta?.changes ?? 0) === 0) return null;
+  const restored = await db.prepare(
+    `SELECT id FROM affiliate_reward_entries
+      WHERE conversion_event_id = ? AND entry_type = 'credit' AND status = 'settled'`,
+  ).bind(eventId).first<{ id: string }>();
+  return restored?.id ?? null;
 }
 
 interface SettlementPreviewInternal extends AffiliateSettlementPreview {
