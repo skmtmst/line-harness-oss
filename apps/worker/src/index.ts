@@ -228,6 +228,12 @@ export type Env = {
     RAW_MAIL?: R2Bucket;
     ASSETS: Fetcher;
     AI?: Ai;
+    /**
+     * バナー生成の用途寸法への整形（Cloudflare Images・R120）。
+     * R2 の `IMAGES` とは別物なので `CF_IMAGES` という名前にしている。
+     * 未設定の環境（手元・試験）では変換を飛ばして元の画像を保存する。
+     */
+    CF_IMAGES?: ImagesBinding;
     /** 運営コンソールの返信下書きに使う Workers AI のモデル名。未設定なら routes/ops-support.ts の既定。 */
     OPS_SUPPORT_AI_MODEL?: string;
     EMAIL?: SendEmail;

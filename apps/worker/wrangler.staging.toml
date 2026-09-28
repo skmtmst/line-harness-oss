@@ -35,6 +35,12 @@ bucket_name = "musubo-raw-mail-stg"
 [ai]
 binding = "AI"
 
+# バナー生成の用途寸法への整形（Cloudflare Images・R120）。
+# R2 の `IMAGES` と名前が重なるため `CF_IMAGES` にしている。
+# 注意: Images の有効化が必要か・変換回ごとの料金を、配備の前にオーナーへ確認する。
+[images]
+binding = "CF_IMAGES"
+
 [[queues.producers]]
 binding = "CODEX_MENTION_QUEUE"
 queue = "nen-codex-mentions-stg"

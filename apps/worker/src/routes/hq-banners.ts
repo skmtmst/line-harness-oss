@@ -37,9 +37,14 @@ import {
   BANNER_MAX_COUNT,
   BANNER_PRESETS,
   buildBannerPrompt,
+  findBannerPreset,
   resolveBannerQuality,
   validateBannerRequest,
 } from '../services/banner-prompt.js';
+import {
+  resolveBannerCropPosition,
+  resizeBannerToPreset,
+} from '../services/banner-resize.js';
 import { toJstString } from '@line-crm/db';
 import {
   DEFAULT_OPENAI_IMAGE_MODEL,
@@ -540,6 +545,13 @@ hqBanners.post('/api/hq/banners/generations/:id/run', async (c) => {
     return c.json({ success: true, data: { generation: serializeGeneration(latest!), image: null, finished: true } });
   }
 
+  // 切り抜きの位置（R120）。生成APIを叩く前に断つ。保存はしない（migration 不要）。
+  const runBody = await readJson(c);
+  const crop = resolveBannerCropPosition(runBody?.gravity);
+  if (!crop) {
+    return c.json({ success: false, error: '切り抜きの位置は中央・上・下から選んでください' }, 400);
+  }
+
   await updateBannerGenerationProgress(db, generation.id, { status: 'running', markStarted: true });
   const model = generation.model_name || c.env.OPENAI_IMAGE_MODEL || DEFAULT_OPENAI_IMAGE_MODEL;
   const sequence = generation.done_count + generation.failed_count + 1;
@@ -568,24 +580,33 @@ hqBanners.post('/api/hq/banners/generations/:id/run', async (c) => {
       referenceImage,
     });
 
+    // 生成は3種類の大きさだけなので、用途の指定寸法へ cover で整えてから
+    // 保存する（R120）。binding が無い環境では元のまま保存する。
+    const apiDims = sizeToDimensions(generation.api_size);
+    const preset = findBannerPreset(generation.preset_key);
+    const shaped = preset
+      ? await resizeBannerToPreset(result.bytes, preset, crop, c.env.CF_IMAGES ?? null)
+      : { bytes: result.bytes, width: apiDims.width, height: apiDims.height, resized: false };
+    // 整形したものは JPEG、元のままのときは生成時の形式のまま。
+    const mimeType = shaped.resized ? 'image/jpeg' : result.mimeType;
+
     const project = await getBannerProject(db, generation.project_id, tenantId);
     const r2Key = `banner/${crypto.randomUUID()}.jpg`;
-    await c.env.IMAGES.put(r2Key, result.bytes, {
-      httpMetadata: { contentType: result.mimeType },
+    await c.env.IMAGES.put(r2Key, shaped.bytes, {
+      httpMetadata: { contentType: mimeType },
       customMetadata: { source: 'banner-generation', generationId: generation.id },
     });
-    const { width, height } = sizeToDimensions(generation.api_size);
     let media: Media;
     try {
       media = await createMedia(db, {
         lineAccountId: null,
         kind: 'image',
         filename: `${safeFilenameBase(project?.name ?? 'banner')}-${sequence}.jpg`,
-        mimeType: result.mimeType,
-        sizeBytes: result.bytes.byteLength,
+        mimeType,
+        sizeBytes: shaped.bytes.byteLength,
         r2Key,
-        width,
-        height,
+        width: shaped.width,
+        height: shaped.height,
         uploadedBy: c.get('staff')?.id ?? null,
       });
     } catch (error) {
@@ -626,6 +647,11 @@ hqBanners.post('/api/hq/banners/generations/:id/run', async (c) => {
         generation: serializeGeneration(latest!),
         image: detail ? serializeImage(detail, base) : null,
         finished: isFinished,
+        // 用途の指定寸法へ整形できたか。false のとき画面は
+        // 「大きさの調整は検証環境で確認」と出す（R120）。
+        resized: shaped.resized,
+        targetWidth: preset?.targetWidth ?? shaped.width,
+        targetHeight: preset?.targetHeight ?? shaped.height,
       },
     });
   } catch (error) {
