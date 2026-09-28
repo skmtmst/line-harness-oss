@@ -87,6 +87,8 @@ interface TemplateDetail {
     reminderSteps: Array<{ reminderId: string; reminderName: string; stepId: string }>
     richMenuAreas: Array<{ groupId: string; groupName: string; pageName: string; areaId: string; label: string | null }>
     trackedLinks: Array<{ id: string; name: string }>
+    /** R347: 旧公開版に固定された送信待ち・取消ずみの登録。来ない古い応答では空扱い。 */
+    reminderEnrollments?: Array<{ enrollmentId: string; reminderId: string; reminderName: string; versionNumber: number; enrollmentStatus: string; targetDate: string }>
   }
   createdAt: string
   updatedAt: string
@@ -643,6 +645,13 @@ export default function TemplatesPage() {
       label: `リマインダ「${usage.reminderName}」`,
       icon: Workflow,
     })),
+    // R347: 旧公開版に固定された登録は版と状態を出す。消すと本文が控えに変わる。
+    ...(drawerData.usedBy.reminderEnrollments ?? []).map((usage) => ({
+      key: `reminder-enrollment-${usage.enrollmentId}`,
+      href: `/reminders/detail?id=${usage.reminderId}`,
+      label: `リマインダ「${usage.reminderName}」第${usage.versionNumber}版（${usage.enrollmentStatus === 'cancelled' ? '取消ずみ' : '送信待ち'}）`,
+      icon: Workflow,
+    })),
     ...drawerData.usedBy.richMenuAreas.map((usage) => ({
       key: `rich-menu-${usage.areaId}`,
       href: `/rich-menus/edit?id=${usage.groupId}`,
@@ -663,6 +672,7 @@ export default function TemplatesPage() {
       + reminderStepUsages.length
       + richMenuAreaUsages.length
       + trackedLinkUsages.length
+      + (drawerData.usedBy.reminderEnrollments ?? []).length
     : 0
 
   return (

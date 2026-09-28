@@ -11,6 +11,7 @@
 import {
   claimReminderDeliveryRun,
   completeReminderDeliveryRunStatement,
+  getFriendReminderSendGate,
   getFriendReminderStatus,
   getPendingReminderDeliveries,
   completeReminderIfDone,
@@ -18,6 +19,7 @@ import {
   getFriendById,
   getLineAccountById,
   getTemplateById,
+  holdExpiredLineRetryRuns,
   isOperationCapabilityStopped,
   releaseClaimedReminderRun,
   skipReminderDeliveryRun,
@@ -136,6 +138,11 @@ export async function processReminderDeliveries(
   const now = options.now ?? new Date();
   const nowIso = now.toISOString();
   const leaseExpiresAt = new Date(now.getTime() + LEASE_MINUTES * 60_000).toISOString();
+
+  // R344: 再試行キーの期限を過ぎた結果不明は自動で送らない。
+  // 要確認として残し、人が確かめて手動で送る。
+  await holdExpiredLineRetryRuns(db, { now: nowIso });
+
   const pending = await getPendingReminderDeliveries(db);
   const accountsWithStatus = await listLineAccountsWithTenantStatus(db);
   const tenantStatusByAccount = new Map(
@@ -202,6 +209,7 @@ export async function processReminderDeliveries(
           code: 'tenant_suspended',
           message: '契約先の利用停止中に配信時刻を過ぎたため送信しませんでした。',
           now: nowIso,
+          expectedLeaseExpiresAt: run.lease_expires_at ? [run.lease_expires_at] : [],
         });
         result.skipped++;
       }
@@ -239,6 +247,7 @@ export async function processReminderDeliveries(
           code: 'account_inactive',
           message: 'アカウントの送受信を止めている間に配信時刻を過ぎたため送信しませんでした。',
           now: nowIso,
+          expectedLeaseExpiresAt: run.lease_expires_at ? [run.lease_expires_at] : [],
         });
         result.skipped++;
       }
@@ -272,8 +281,13 @@ export async function processReminderDeliveries(
         result.held += 1;
         continue enrollmentLoop;
       }
+      // R339: 候補読込後の日時変更を見落とさない。実行行を作る前に
+      // 登録の現在値を読み直し、ずれた起点では古い予定を作らない。
+      // 次の tick で読み直すためここでは何も積まない。
+      const gate = await getFriendReminderSendGate(db, enrollment.id);
+      if (!gate || gate.status !== 'active' || gate.targetDate !== enrollment.target_date) continue;
       const sendAt = resolveReminderSendAt(
-        new Date(enrollment.target_date),
+        new Date(gate.targetDate),
         {
           offsetDays: step.offset_days,
           sendAtTime: step.send_at_time,
@@ -290,9 +304,14 @@ export async function processReminderDeliveries(
         scheduledAt: sendAt.toISOString(),
         now: nowIso,
         leaseExpiresAt,
+        expectedTargetDate: gate.targetDate,
       });
       // 別cronが送信中、再試行時刻前、または既に終端状態なら何もしない。
       if (!run) continue;
+      // R340: この貸出で付けた期限だけを以後の書込に使う。期限切れで
+      // 別処理へ移った後の書込は 0 件になり、上書きしない。
+      const claimLease = run.lease_expires_at;
+      const ownedLeases = (claimLease ? [claimLease] : []).concat([leaseExpiresAt]);
 
       // 取消と cron の競合対策: claimed 済みでも送る直前に登録を確認する。
       // 取消後に残った実行行は送らず止める (取消漏れの送信を防ぐ)。
@@ -303,8 +322,8 @@ export async function processReminderDeliveries(
           `UPDATE reminder_delivery_runs
               SET status = 'cancelled', completed_at = ?, lease_expires_at = NULL,
                   next_retry_at = NULL, updated_at = ?
-            WHERE id = ? AND status = 'claimed'`,
-        ).bind(nowIso, nowIso, run.id).run();
+            WHERE id = ? AND status = 'claimed' AND lease_expires_at = ?`,
+        ).bind(nowIso, nowIso, run.id, claimLease).run();
         result.skipped++;
         continue enrollmentLoop;
       }
@@ -315,6 +334,7 @@ export async function processReminderDeliveries(
           code: 'friend_not_found',
           message: '友だち情報が見つからないため送信しませんでした。',
           now: nowIso,
+          expectedLeaseExpiresAt: claimLease ? [claimLease] : [],
         });
         result.skipped++;
         continue;
@@ -325,6 +345,7 @@ export async function processReminderDeliveries(
           code: 'friend_not_following',
           message: 'ブロックまたは友だち解除のため送信しませんでした。',
           now: nowIso,
+          expectedLeaseExpiresAt: claimLease ? [claimLease] : [],
         });
         result.skipped++;
         continue;
@@ -344,6 +365,8 @@ export async function processReminderDeliveries(
           friendReminderId: enrollment.id,
           now: nowIso,
           leaseExpiresAt,
+          expectedLeaseExpiresAt: claimLease ? [claimLease] : [],
+          expectedTargetDate: gate.targetDate,
         })) {
           result.skipped++;
           continue;
@@ -356,6 +379,8 @@ export async function processReminderDeliveries(
           friendReminderId: enrollment.id,
           now: nowIso,
           leaseExpiresAt,
+          expectedLeaseExpiresAt: ownedLeases,
+          expectedTargetDate: gate.targetDate,
         })) {
           result.skipped++;
           continue;
@@ -364,7 +389,7 @@ export async function processReminderDeliveries(
         // 切り替わった分は claim をキューへ戻し、失敗・skipped にはしない
         // (停止を理由に消さない。復旧後に届く)。
         if (await isOperationCapabilityStopped(db, accountId, 'reminder_dispatch')) {
-          await releaseClaimedReminderRun(db, { id: run.id, now: nowIso });
+          await releaseClaimedReminderRun(db, { id: run.id, now: nowIso, expectedLeaseExpiresAt: ownedLeases });
           result.held += 1;
           continue enrollmentLoop;
         }
@@ -402,6 +427,7 @@ export async function processReminderDeliveries(
             lineRequestId: response.requestId,
             messageLogId: logId,
             now: nowIso,
+            expectedLeaseExpiresAt: ownedLeases,
           }),
         ]);
         result.succeeded++;
@@ -425,7 +451,9 @@ export async function processReminderDeliveries(
           safe.retryable,
         )?.toISOString() ?? null;
         const exhausted = safe.retryable && !retryAt;
-        await failReminderDeliveryRun(db, {
+        // R340: 持ち主が移っているときは書けず false になる。
+        // 新しい持ち主が結果を記録するため、ここでは数えない。
+        const recorded = await failReminderDeliveryRun(db, {
           id: run.id,
           code: exhausted ? 'retry_exhausted' : safe.code,
           message: exhausted
@@ -433,7 +461,9 @@ export async function processReminderDeliveries(
             : safe.message,
           retryAt,
           now: nowIso,
+          expectedLeaseExpiresAt: ownedLeases,
         });
+        if (!recorded) continue;
         if (retryAt) result.retrying++;
         else result.failed++;
         console.error(JSON.stringify({

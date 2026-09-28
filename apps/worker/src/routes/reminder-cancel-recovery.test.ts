@@ -232,6 +232,7 @@ describe('取消と送信claimの原子化 (#654-1)', () => {
           friendReminderId: 'FR-1',
           now: '2026-09-10T00:00:00.000Z',
           leaseExpiresAt: '2026-09-10T00:05:00.000Z',
+          expectedLeaseExpiresAt: '2026-09-10T00:05:00.000Z',
         });
       });
       const cancellation = cancelV6RemindersForSource(cancelling, {

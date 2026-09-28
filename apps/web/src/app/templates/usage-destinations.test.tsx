@@ -172,6 +172,24 @@ describe('テンプレート詳細の使用先リンク (#891 N-143)', () => {
     expect(screen.getByText('どこからも呼ばれていません')).toBeTruthy()
     expect(screen.queryByText('開く')).toBeNull()
   })
+
+  test('R347: 旧版に固定された送信待ちの登録は版と状態を出して個別に開ける', async () => {
+    await renderDetailAndWait({
+      ...EMPTY_USED_BY,
+      reminderEnrollments: [
+        {
+          enrollmentId: 'fr-1', reminderId: 're-1', reminderName: '前日案内',
+          versionNumber: 1, enrollmentStatus: 'active', targetDate: '2026-10-05',
+        },
+      ],
+    })
+
+    expect(screen.getByText('前日案内')).toBeTruthy()
+    expect(screen.getByText('第1版')).toBeTruthy()
+    expect(screen.getByText('送信待ち')).toBeTruthy()
+    const hrefs = screen.getAllByText('開く').map((el) => (el as HTMLAnchorElement).getAttribute('href'))
+    expect(hrefs).toEqual(['/reminders/detail?id=re-1'])
+  })
 })
 
 describe('テンプレート一覧の差し替え導線 (#891 N-135)', () => {

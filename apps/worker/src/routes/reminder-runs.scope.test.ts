@@ -10,10 +10,12 @@ const mocks = vi.hoisted(() => ({
   getRun: vi.fn(),
   retryRun: vi.fn(),
   getPublishedVersion: vi.fn(),
+  getScope: vi.fn(),
 }))
 
 vi.mock('../services/account-access.js', () => ({
   canAccessAllLineAccounts: mocks.canAccess,
+  getVisibleLineAccountScope: mocks.getScope,
 }))
 vi.mock('@line-crm/db', async (importOriginal) => ({
   ...await importOriginal<typeof import('@line-crm/db')>(),
@@ -55,6 +57,13 @@ const run = {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  mocks.getScope.mockResolvedValue({
+    accounts: [],
+    ids: ['account-1'],
+    allowedAccountIds: ['account-1'],
+    canSeeUnassigned: false,
+    isAccountScoped: false,
+  })
   mocks.getReminderById.mockResolvedValue(reminder)
   mocks.listRuns.mockResolvedValue({ items: [], total: 0 })
   mocks.getSummary.mockResolvedValue({
@@ -77,8 +86,10 @@ describe('リマインダ実行記録のアカウント範囲', () => {
 
     const response = await createApp().request('/api/reminders/reminder-1/runs')
 
+    // R349: 行の送信元アカウントで絞ってから、見える行がなく親も見えなければ 404。
+    // 絞り込み自体が DB 照会のため listRuns は呼ばれる。
     expect(response.status).toBe(404)
-    expect(mocks.listRuns).not.toHaveBeenCalled()
+    expect(mocks.listRuns).toHaveBeenCalled()
   })
 
   it('見られるアカウントだけ実行一覧を返し、既読率を作らない', async () => {

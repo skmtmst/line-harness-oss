@@ -1,6 +1,7 @@
 import type { Context, MiddlewareHandler } from 'hono';
 import type { FeatureId } from '@line-crm/shared';
 import type { Env } from '../index.js';
+import type { AuthenticatedStaff } from './auth.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { dbFor } from '../services/db-router.js';
 import {
@@ -376,7 +377,8 @@ const RESOURCE_ACCOUNT_LOOKUPS: ReadonlyArray<{
   { pattern: /^\/api\/broadcasts\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM broadcasts WHERE id = ?' },
   { pattern: /^\/api\/broadcast-message-assets\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM broadcast_message_assets WHERE id = ?' },
   { pattern: /^\/api\/reminders\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM reminders WHERE id = ?' },
-  { pattern: /^\/api\/friend-reminders\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM friend_reminders WHERE id = ?' },
+  // R348: friend_reminders 表に所属列は無い。友だちの所属で判定する。
+  { pattern: /^\/api\/friend-reminders\/([^/]+)/, sql: 'SELECT f.line_account_id AS account_id FROM friend_reminders fr JOIN friends f ON f.id = fr.friend_id WHERE fr.id = ?' },
   { pattern: /^\/api\/reminder-runs\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM reminder_delivery_runs WHERE id = ?' },
   { pattern: /^\/api\/auto-replies\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM auto_replies WHERE id = ?' },
   { pattern: /^\/api\/rich-menu-groups\/([^/]+)/, sql: 'SELECT account_id FROM rich_menu_groups WHERE id = ?' },
@@ -398,6 +400,71 @@ const RESOURCE_ACCOUNT_LOOKUPS: ReadonlyArray<{
   // 照合が無いと PUT/DELETE /api/mileage/rules/:id が全部 LINE_ACCOUNT_REQUIRED で止まる。
   { pattern: /^\/api\/mileage\/rules\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM mileage_rules WHERE id = ?' },
 ];
+
+/**
+ * R348/R349: 親ではなく行の送信元アカウントで担当を判定する口。
+ * 履歴・登録の一覧と、登録1件の操作（日時変更・取消・再開）が対象。
+ * 行の絞り込み自体は route 側で行い、ここでは「通してよいか」だけ決める。
+ */
+const ROW_SCOPED_REMINDER_PATTERN = /^\/api\/reminders\/([^/]+)\/(runs|registrants([/?].*)?$)/;
+
+function matchRowScopedReminderId(path: string): string | null {
+  const match = ROW_SCOPED_REMINDER_PATTERN.exec(path);
+  return match ? decodeURIComponent(match[1]!) : null;
+}
+
+/**
+ * ルールの今の所属に加え、実行行の送信元と登録の友だちの所属を集める。
+ * 所属を変えた後も、旧所属の担当者が旧行へ届くようにするため。
+ */
+async function reminderRowAccountSet(db: D1Database, reminderId: string): Promise<string[]> {
+  const result = await db.prepare(
+    `SELECT line_account_id AS account_id FROM reminders WHERE id = ?
+     UNION
+     SELECT line_account_id FROM reminder_delivery_runs WHERE reminder_id = ?
+     UNION
+     SELECT f.line_account_id
+       FROM friend_reminders fr
+       JOIN friends f ON f.id = fr.friend_id
+      WHERE fr.reminder_id = ?`,
+  ).bind(reminderId, reminderId, reminderId).all<{ account_id: string | null }>();
+  return [...new Set(
+    (result.results ?? []).map((row) => row.account_id).filter((id): id is string => Boolean(id)),
+  )];
+}
+
+async function rowScopedReminderAccountIds(
+  c: Context<Env>,
+  db: D1Database,
+  staff: AuthenticatedStaff | undefined,
+  reminderId: string,
+): Promise<{ ids: string[]; accountMismatch: boolean; forbidden: boolean }> {
+  let queryAccount: string | null = null;
+  for (const key of ACCOUNT_KEYS) {
+    const value = c.req.query(key);
+    if (value?.trim()) {
+      queryAccount = value.trim();
+      break;
+    }
+  }
+  const fromBody = await bodyAccountIds(c);
+  const bodySingle = fromBody.length === 1 ? fromBody[0]! : null;
+  if (queryAccount && bodySingle && queryAccount !== bodySingle) {
+    return { ids: [], accountMismatch: true, forbidden: false };
+  }
+  const owned = await reminderRowAccountSet(db, reminderId);
+  const candidates = queryAccount ? [queryAccount] : fromBody.length > 0 ? fromBody : owned;
+  if (candidates.length === 0) return { ids: [], accountMismatch: false, forbidden: false };
+  if (candidates.some((id) => !owned.includes(id))) {
+    return { ids: [], accountMismatch: true, forbidden: false };
+  }
+  // 担当外の所属だけを指定・保持しているときは通さない。行の絞り込みは
+  // route 側で行うため、ここでは見える所属だけを機能判定へ渡す。
+  const scope = await getVisibleLineAccountScope(db, staff);
+  const visible = candidates.filter((id) => scope.ids.includes(id));
+  if (visible.length === 0) return { ids: [], accountMismatch: false, forbidden: true };
+  return { ids: visible, accountMismatch: false, forbidden: false };
+}
 
 /**
  * URL が指す対象の所属accountを返す。対象が無い・account未割当なら null。
@@ -424,18 +491,27 @@ async function resourceOwnerAccountId(c: Context<Env>): Promise<string | null> {
 }
 
 async function requestAccountIds(c: Context<Env>): Promise<{ ids: string[]; accountMismatch: boolean }> {
-  const explicit: string[] = [];
+  // R348: query と body の両方に所属があるときは両方を見る。query だけを
+  // 見ると、query に旧所属・body に新所属を書いて検査をすり抜けられる。
+  // 両方が食い違う入力はどちらを信じるか決められないため断る。
+  let queryAccount: string | null = null;
   for (const key of ACCOUNT_KEYS) {
     const value = c.req.query(key);
     if (value?.trim()) {
-      explicit.push(value.trim());
+      queryAccount = value.trim();
       break;
     }
   }
-  if (explicit.length === 0) {
-    const fromBody = await bodyAccountIds(c);
-    explicit.push(...fromBody);
+  const fromBody = await bodyAccountIds(c);
+  // 一括指定の配列（accountIds 等）は別用途の絞り込みに使う口があるため、
+  // 単一指定のときだけ query との食い違いを見る。
+  const bodySingle = fromBody.length === 1 ? fromBody[0]! : null;
+  if (queryAccount && bodySingle && queryAccount !== bodySingle) {
+    return { ids: [], accountMismatch: true };
   }
+  const explicit: string[] = [];
+  if (queryAccount) explicit.push(queryAccount);
+  else explicit.push(...fromBody);
   if (explicit.length > 0) {
     /*
      * 明示されたaccountとURLの対象の所属が食い違うときは断る。
@@ -536,9 +612,39 @@ export const featureEnforcementMiddleware: MiddlewareHandler<Env> = async (c, ne
   }
   if (classification.kind !== 'feature') return next();
 
-  const { ids: accountIds, accountMismatch } = await requestAccountIds(c);
   const staff = c.get('staff');
   const db = dbFor(c.env);
+  // R348/R349: 履歴・登録の口は親の所属だけで閉じない。行の送信元
+  // アカウントのどれかを担当していれば通し、行の絞り込みは route 側で行う。
+  const rowScopedReminderId = matchRowScopedReminderId(c.req.path);
+  if (rowScopedReminderId) {
+    const decided = await rowScopedReminderAccountIds(c, db, staff, rowScopedReminderId);
+    if (decided.forbidden) {
+      return c.json({
+        success: false,
+        error: 'このLINEアカウントを操作する権限がありません',
+      }, 403);
+    }
+    return enforceAccounts(c, next, db, staff, classification, decided.ids, decided.accountMismatch);
+  }
+
+  const { ids: accountIds, accountMismatch } = await requestAccountIds(c);
+  return enforceAccounts(c, next, db, staff, classification, accountIds, accountMismatch);
+};
+
+/**
+ * 機能設定の強制（本文）。行単位の口（R348/R349）と通常の口で共有する。
+ * accountIds は「この要求で機能判定する所属」の確定ずみ一覧。
+ */
+async function enforceAccounts(
+  c: Context<Env>,
+  next: () => Promise<void>,
+  db: D1Database,
+  staff: AuthenticatedStaff | undefined,
+  classification: Extract<RouteClassification, { kind: 'feature' }>,
+  accountIds: string[],
+  accountMismatch: boolean,
+): Promise<Response | void> {
   const isReadOperation = c.req.method === 'GET' || c.req.method === 'HEAD';
   if (accountMismatch) {
     return c.json({
