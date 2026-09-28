@@ -2,7 +2,8 @@
 
 import Link from 'next/link'
 import { useRef, type ReactNode } from 'react'
-import { listInterpolations, type CommonVar, type FriendField } from '@line-crm/shared'
+import { listInterpolations, validateFlexContent, type CommonVar, type FriendField } from '@line-crm/shared'
+import FlexPreviewComponent from '@/components/flex-preview'
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
 import Button from '@/components/shared/button'
 import LinePreview from '@/components/shared/line-preview'
@@ -278,6 +279,14 @@ export function MessageTemplateEditor({
   const splitAt = 4500
   const preview = buildTemplatePreview(value.messageContent, references)
   const messageUrls = extractMessageUrls(value.messageContent)
+  /*
+   * R249: カード型は通常文のまま保存できない。入力の最中に
+   * 形式の誤りをその場で知らせる（保存口も同じ判定で断る）。
+   * 空のときはここでは何も言わない（必須チェックが受け持つ）。
+   */
+  const flexError = value.messageType === 'flex'
+    ? validateFlexContent('flex', value.messageContent)
+    : null
   const contentLabel = bodyLabel ?? (value.messageType === 'text' ? '本文' : 'メッセージ内容')
 
   return (
@@ -304,7 +313,14 @@ export function MessageTemplateEditor({
           </>}
         >
           {value.messageType === 'flex' ? (
-            <TextArea id="tp-content" aria-label={bodyAriaLabel} ref={contentRef} rows={14} value={value.messageContent} disabled={disabled} onChange={(event) => onChange({ ...value, messageContent: event.target.value })} className="resize-y font-mono text-xs" />
+            <>
+              <TextArea id="tp-content" aria-label={bodyAriaLabel} ref={contentRef} rows={14} value={value.messageContent} disabled={disabled} onChange={(event) => onChange({ ...value, messageContent: event.target.value })} className="resize-y font-mono text-xs" />
+              {flexError ? (
+                <p role="alert" className="text-danger mt-1 text-xs">{flexError}このままでは保存できません。</p>
+              ) : !value.messageContent.trim() ? (
+                <p className="text-ink-faint mt-1 text-xs">バブルかカルーセルの形のJSONで書きます（例：{'{"type":"bubble", …}'}）。通常文のままでは保存できません。</p>
+              ) : null}
+            </>
           ) : (
             <TextArea id="tp-content" aria-label={bodyAriaLabel} ref={contentRef} rows={6} value={value.messageContent} disabled={disabled} onChange={(event) => onChange({ ...value, messageContent: event.target.value })} className="resize-y" />
           )}
@@ -326,12 +342,34 @@ export function MessageTemplateEditor({
       </div>
       <div data-design="Right" className="w-full shrink-0 space-y-4 xl:w-96">
         <LinePreview
-          note="差し込み後の見え方（山田 太郎さんの場合）"
+          note={value.messageType === 'flex' ? 'カードの見え方です。' : '差し込み後の見え方（山田 太郎さんの場合）'}
           accountName="然-NEN-"
         >
-          <div className="bg-canvas-sunken rounded-card p-3"><TemplatePreviewMessage preview={preview} /></div>
-          <p className="text-ink mt-2 text-xs leading-relaxed">名前は山田 太郎さん、友だち情報は項目の既定値、共通情報は現在値で表示しています。</p>
-          <p className="text-ink mt-1 text-xs">URLは短縮され、クリックが計測されます</p>
+          {/*
+            R249: カード型は詳細と同じカード表示にする。通常文の
+            生表示では「作れた」と誤認する。形式が壊れている間は
+            何が悪いかをここでも知らせる。
+          */}
+          {value.messageType === 'flex' ? (
+            flexError ? (
+              <div role="alert" className="bg-canvas-sunken rounded-card p-3">
+                <p className="text-danger text-xs font-semibold">{flexError}</p>
+                <p className="text-ink-secondary mt-1 text-xs">直すとここにカードが表示されます。このままでは保存できません。</p>
+              </div>
+            ) : !value.messageContent.trim() ? (
+              <div className="bg-canvas-sunken rounded-card p-3">
+                <p className="text-ink-faint text-xs">カードの内容を入力すると、ここに表示されます。</p>
+              </div>
+            ) : (
+              <div className="bg-canvas-sunken rounded-card p-3"><FlexPreviewComponent content={value.messageContent} /></div>
+            )
+          ) : (
+            <>
+              <div className="bg-canvas-sunken rounded-card p-3"><TemplatePreviewMessage preview={preview} /></div>
+              <p className="text-ink mt-2 text-xs leading-relaxed">名前は山田 太郎さん、友だち情報は項目の既定値、共通情報は現在値で表示しています。</p>
+              <p className="text-ink mt-1 text-xs">URLは短縮され、クリックが計測されます</p>
+            </>
+          )}
         </LinePreview>
       </div>
     </div>

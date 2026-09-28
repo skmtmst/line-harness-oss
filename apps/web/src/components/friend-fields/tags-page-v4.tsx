@@ -12,8 +12,8 @@ import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
 import Button from '@/components/shared/button'
-import FilterChip from '@/components/shared/filter-chip'
 import ListToolbar from '@/components/shared/list-toolbar'
+import MultiSelect from '@/components/shared/multi-select'
 import { RowActions } from '@/components/shared/row-actions'
 import Disclosure from '@/components/shared/disclosure'
 import ListKpis from '@/components/shared/list-kpis'
@@ -96,36 +96,6 @@ function TrashIcon() {
   )
 }
 
-/**
- * フォルダの選び直し。設計 `SgpDb` は「色の丸 ＋ 名前 ＋ ▾」の小さな札で、
- * 素の `select` ではない。見た目は札が持ち、操作と読み上げは `select` が持つ。
- */
-function FolderSelect({ tag, groups, onItemsChange, onError }: { tag: Tag; groups: TagGroup[]; onItemsChange: (update: (current: Tag[]) => Tag[]) => void; onError: (message: string) => void }) {
-  // 共通Selectは透明な重ね合わせにできないため、色丸・札・▾の見た目から標準Selectの見た目へ変わる。操作・読み上げ・選択肢は変えない。
-  return (
-    <Select
-      aria-label={`${tag.name} のフォルダ`}
-      value={tag.groupId ?? ''}
-      onChange={(value) => {
-        const groupId = value || null
-        void (async () => {
-          try {
-            const result = await api.tags.setGroup(tag.id, groupId)
-            if (!result.success) throw new Error(result.error)
-            /* 成功は手元だけ直す。withCounts 付き全件の取り直しは要らない。 */
-            onItemsChange((current) => current.map((item) => item.id === tag.id ? { ...item, groupId } : item))
-          } catch (reason) {
-            /* 失敗は再読込で隠さず、理由を出す。 */
-            onError(reason instanceof ApiError ? reason.message : 'フォルダを変更できませんでした')
-          }
-        })()
-      }}
-      options={[{ value: '', label: '未分類' }, ...groups
-        .filter((item) => item.accountId === tag.lineAccountId)
-        .map((item) => ({ value: item.id, label: item.name }))]}
-    />
-  )
-}
 
 /**
  * 連動の札。設計 `B9QCB3`（緑）／`IoiWQ`（黄）／`Ws7fo`（灰）。
@@ -634,7 +604,8 @@ export default function TagsPageV4({
   const [items, setItems] = useState<Tag[]>(fixture?.items ?? [])
   const [groups, setGroups] = useState<TagGroup[]>(fixture?.groups ?? [])
   const [status, setStatus] = useState<LoadStatus>(fixture ? 'ready' : 'loading')
-  // 操作の失敗（並び替え・★・フォルダ）。**読み込みの失敗とは別物**なので混ぜない。
+  // 操作の失敗（並び替え・★）。**読み込みの失敗とは別物**なので混ぜない。
+  // フォルダの変更は一覧では行わない（編集画面の「所属フォルダ」で行う）。
   const [error, setError] = useState('')
   const [query, setQuery] = useState('')
   const [folder, setFolder] = useState('')
@@ -981,26 +952,37 @@ export default function TagsPageV4({
                   {/* 素の select は置かない（#640）。選び口は共通 Select。幅は部品の既定（176px）。 */}
                   <Select aria-label="使用状態で絞り込む" value={usageFilter} onChange={setUsageFilter} options={[{ value: 'all', label: '使用状態：すべて' }, { value: 'linked', label: '連動あり' }, { value: 'unused', label: '未使用' }]} />
                   <Select aria-label="付与元で絞り込む" value={sourceFilter} onChange={setSourceFilter} options={[{ value: 'all', label: '付与元：すべて' }, ...Object.entries(SOURCE_LABELS).map(([value, label]) => ({ value, label }))]} />
-                  {/* 設計 `UOmne`。**5つ。押した数だけ重ねて絞る。** */}
-                  <span className="text-ink-faint text-xs">よく使う</span>
-                  {QUICK_FILTERS.map(([key, label]) => {
-                    const on = quick.includes(key)
-                    return (
-                      <FilterChip
-                        key={key}
-                        selected={on}
-                        onChange={(next) => setQuick((current) => next ? [...current, key] : current.filter((k) => k !== key))}
-                      >
-                        {label}
-                      </FilterChip>
-                    )
-                  })}
-                </>
-              }
-              trailing={
-                <>
-                  <Select aria-label="表示件数" value={String(pageSize)} onChange={(value) => setPageSize(Number(value))} options={[20, 30, 40, 50].map((size) => ({ value: String(size), label: `${size}件表示` }))} size="page-size" />
-                  <span className="text-xs tabular-nums text-ink-faint">{ready ? `${filtered.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, filtered.length)} / ${filtered.length}件` : '—'}</span>
+                  {/*
+                    設計 `UOmne` の「よく使う」5つ。**重ねて絞れるのは変えない。**
+                    札を6つ並べると1440pxでも絞り込みが2行になり、件数が
+                    3行目へ落ちていた。1つの選び口（共通 MultiSelect）にまとめ、
+                    2行目を1行に収める。開いたまま重ねて選べ、「N件選択中」と
+                    「すべて外す」は部品が持つ。
+                  */}
+                  <span className="w-44 shrink-0">
+                    <MultiSelect
+                      aria-label="よく使う絞り込み"
+                      className="w-full"
+                      maxChips={1}
+                      onChange={setQuick}
+                      options={QUICK_FILTERS.map(([value, label]) => ({ value, label }))}
+                      placeholder="よく使う"
+                      values={quick}
+                    />
+                  </span>
+                  {/*
+                    件数と表示件数は絞り込みと同じ折り返しの流れの末尾に置く
+                    （m21o）。`trailing` の別枠にすると、絞り込みがあふれた幅
+                    （1440px・1152px）で件数だけの行ができてしまう。末尾の
+                    `ml-auto` で行の右端へ寄せ、札と行を共にする。選ぶ欄は
+                    ほかの欄と同じく幅96・短い文字（`20件`）にそろえる。
+                  */}
+                  <span className="ml-auto flex shrink-0 items-center gap-2">
+                    <span className="w-24">
+                      <Select aria-label="表示件数" className="w-full" value={String(pageSize)} onChange={(value) => setPageSize(Number(value))} options={[20, 30, 40, 50].map((size) => ({ value: String(size), label: `${size}件` }))} size="page-size" />
+                    </span>
+                    <span className="whitespace-nowrap text-xs tabular-nums text-ink-faint">{ready ? `${filtered.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, filtered.length)} / ${filtered.length}件` : '—'}</span>
+                  </span>
                 </>
               }
             />
@@ -1026,21 +1008,28 @@ export default function TagsPageV4({
                 従来どおり表の内側だけが横へ動く。
               */}
               <DataTable>
-                {/* 設計 `HrwyW` の見出し。「表示」は★、「操作」はゴミ箱だけ。 */}
+                {/* 設計 `HrwyW` の見出し。「表示」は★。 */}
                 <thead>
                   <TableHeadRow>
-                    {/* 先頭の選択列と末尾の操作列は外側の余白をそろえる。操作列は中身の幅で固定する。 */}
+                    {/*
+                      列幅の取り直し（m21o Second）。固定幅の合計 308px＋
+                      割合54%にし、残りは「使用先」が吸う（auto）。割合だけの
+                      取り方だと固定2列（44＋64）が枠に上乗せされ、1440pxで
+                      44pxの横送りが出ていた。操作列は中身（編集＋…）に合わせ
+                      128pxへ広げる（枠付きボタンのため64pxでは切れる）。
+                      短い列は固定にして詰め、使用先は狭めても title で読める。
+                    */}
                     <Th style={{ width: 44 }}><span className="sr-only">並び替え</span></Th>
-                    <Th style={{ width: '22%' }}>タグ</Th>
-                    <Th style={{ width: '11%' }}>フォルダ</Th>
-                    <Th style={{ width: '7%' }} className="whitespace-nowrap">人数</Th>
+                    <Th style={{ width: '20%' }}>タグ</Th>
+                    <Th style={{ width: '10%' }}>フォルダ</Th>
+                    <Th style={{ width: 80 }} className="whitespace-nowrap">人数</Th>
                     <Th style={{ width: '11%' }} className="cq-hide-below-830 whitespace-nowrap">付け方</Th>
-                    <Th style={{ width: '17%' }} className="whitespace-nowrap" title="マイル・アクションとの連動">連動</Th>
+                    <Th style={{ width: '13%' }} className="whitespace-nowrap" title="マイル・アクションとの連動">連動</Th>
                     <Th>使用先</Th>
-                    <Th style={{ width: '6%' }}>表示</Th>
+                    <Th style={{ width: 56 }}>表示</Th>
                     {/* #768: 表が横に流れる帯でも操作列は右端に留める。 */}
-                    {/* 見出し「操作」は2文字で1行に収める（w-11 では「操／作」と折れる）。中身はゴミ箱1つなので w-16 で足りる。 */}
-                    <Th style={{ width: 64 }} className="sticky right-0 whitespace-nowrap bg-canvas-sunken">操作</Th>
+                    {/* 見出し「操作」は2文字で1行に収める（w-11 では「操／作」と折れる）。 */}
+                    <Th style={{ width: 128 }} className="sticky right-0 whitespace-nowrap bg-canvas-sunken">操作</Th>
                   </TableHeadRow>
                 </thead>
                 <tbody className="divide-y divide-hairline">
@@ -1103,9 +1092,13 @@ export default function TagsPageV4({
                           {/* ATTR-20: 登録日は名前の下へ畳む。独立した列にすると1024pxでつぶれる。 */}
                           <p className="mt-0.5 pl-4 text-[11px] text-ink-faint">{formatDate(tag.createdAt)} 登録</p>
                         </Td>
-                        <Td onClick={(event) => event.stopPropagation()}>
-                          <FolderSelect tag={tag} groups={groups} onItemsChange={setItems} onError={setError} />
-                        </Td>
+                        {/*
+                          フォルダは文字だけ（m21o）。行ごとの選び直し欄は
+                          幅176pxで列（11%）に収まらず隣の「付け方」へ重なって
+                          いた。変更は行を押して開く編集画面の「所属フォルダ」で
+                          行う。長い名前は省略し、全文は重ねて読める。
+                        */}
+                        <Td className="truncate text-label text-ink" title={group?.name ?? '未分類'}>{group?.name ?? '未分類'}</Td>
                         <Td className="text-label tabular-nums">{tag.friendCount ?? 0}人</Td>
                         <Td className="cq-hide-below-830 truncate text-label text-ink" title={sourceLabel(tag)}>{sourceLabel(tag)}</Td>
                         <Td>
@@ -1198,7 +1191,8 @@ export default function TagsPageV4({
                                 </p>
                               ) : null}
                               <p className="mt-1 text-xs text-ink-secondary">{tag.friendCount ?? 0}人・{usageLabel(tag)}</p>
-                              <div className="mt-2" onClick={(event) => event.stopPropagation()}><FolderSelect tag={tag} groups={groups} onItemsChange={setItems} onError={setError} /></div>
+                              {/* フォルダは文字だけ（m21o）。表と同じく、変更は編集画面で行う。 */}
+                              <p className="mt-1 text-xs text-ink-secondary">フォルダ：{group?.name ?? '未分類'}</p>
                             </div>
                             <div className="flex shrink-0 items-center gap-2 pt-1">
                               <button
