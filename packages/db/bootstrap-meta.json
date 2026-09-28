@@ -436,6 +436,8 @@
     "477_entry_route_account_active_index.sql",
     "478_webinar_video_assets.sql",
     "479_webinar_session_capacity.sql",
+    "482_form_test_answers.sql",
+    "483_form_open_test_flag.sql",
     "484_common_var_lifecycle.sql",
     "485_common_var_failure_reasons.sql",
     "486_mileage_adjustment_approvals.sql",
@@ -458,5 +460,5 @@
     "507_webinar_heartbeat_state.sql",
     "508_webinar_heartbeat_rejects.sql"
   ],
-  "migrationCount": 457
+  "migrationCount": 459
 }

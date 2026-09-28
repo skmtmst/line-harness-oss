@@ -2487,7 +2487,8 @@ CREATE TABLE form_opens (
   friend_id TEXT,
   friend_name TEXT,
   opened_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
+, is_test INTEGER NOT NULL DEFAULT 0
+  CHECK (is_test IN (0, 1)));
 
 CREATE TABLE form_submissions (
   id TEXT PRIMARY KEY,
@@ -2496,7 +2497,8 @@ CREATE TABLE form_submissions (
   data TEXT NOT NULL DEFAULT '{}',
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 , destination_write_status TEXT NOT NULL DEFAULT 'unknown'
-  CHECK (destination_write_status IN ('pending', 'succeeded', 'partial', 'failed', 'not_requested', 'unknown')), destination_write_attempted INTEGER, destination_write_succeeded INTEGER, destination_write_failed INTEGER, destination_write_completed_at TEXT, form_version_id TEXT REFERENCES form_versions(id));
+  CHECK (destination_write_status IN ('pending', 'succeeded', 'partial', 'failed', 'not_requested', 'unknown')), destination_write_attempted INTEGER, destination_write_succeeded INTEGER, destination_write_failed INTEGER, destination_write_completed_at TEXT, form_version_id TEXT REFERENCES form_versions(id), is_test INTEGER NOT NULL DEFAULT 0
+  CHECK (is_test IN (0, 1)));
 
 CREATE TABLE form_submit_claims (
   tenant_id TEXT NOT NULL DEFAULT '',
@@ -2534,6 +2536,15 @@ CREATE TABLE form_submit_outbox (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   PRIMARY KEY (tenant_id, line_account_id, form_id, friend_id, idempotency_key, kind)
+);
+
+CREATE TABLE form_test_tokens (
+  id                  TEXT PRIMARY KEY,
+  form_id             TEXT NOT NULL REFERENCES forms(id) ON DELETE CASCADE,
+  token_hash          TEXT NOT NULL UNIQUE,
+  created_by_staff_id TEXT,
+  expires_at          TEXT NOT NULL,
+  created_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours'))
 );
 
 CREATE TABLE form_versions (
@@ -7667,6 +7678,9 @@ CREATE INDEX idx_form_capacity_claims_submission
 
 CREATE INDEX idx_form_opens_form ON form_opens (form_id, opened_at);
 
+CREATE INDEX idx_form_opens_test_month
+  ON form_opens(form_id, is_test, opened_at);
+
 CREATE INDEX idx_form_submissions_form ON form_submissions (form_id);
 
 CREATE INDEX idx_form_submissions_form_friend
@@ -7677,6 +7691,9 @@ CREATE INDEX idx_form_submissions_form_write_status
 
 CREATE INDEX idx_form_submissions_friend ON form_submissions (friend_id);
 
+CREATE INDEX idx_form_submissions_test_month
+  ON form_submissions(form_id, is_test, created_at);
+
 CREATE INDEX idx_form_submissions_version
   ON form_submissions(form_version_id)
   WHERE form_version_id IS NOT NULL;
@@ -7686,6 +7703,9 @@ CREATE INDEX idx_form_submit_claims_submission
 
 CREATE INDEX idx_form_submit_claims_updated
   ON form_submit_claims (updated_at);
+
+CREATE INDEX idx_form_test_tokens_form
+  ON form_test_tokens(form_id, expires_at);
 
 CREATE INDEX idx_form_versions_form_number
   ON form_versions(form_id, version_number DESC);
