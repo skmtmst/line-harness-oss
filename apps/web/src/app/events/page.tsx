@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { eventsApi, type EventListItem, type EventListSummary } from '@/lib/api'
+import { api, ApiError, eventsApi, type EventListItem, type EventListSummary } from '@/lib/api'
 import { clampSearchQuery, SEARCH_QUERY_MAX_LENGTH } from '@/lib/search-query'
 import { withRequestTimeout } from '@/lib/request-timeout'
 import { useAccount } from '@/contexts/account-context'
@@ -13,6 +13,8 @@ import ListToolbar from '@/components/shared/list-toolbar'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { RowActions } from '@/components/shared/row-actions'
 import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import Select from '@/components/shared/select'
 // #740: bookings の EventKpi と一字一句同じだったため、機能内共有の1部品へ統合した。
@@ -74,6 +76,27 @@ export default function EventsListPage() {
   const [sort, setSort] = useState<'soon' | 'name'>('soon')
   const [page, setPage] = useState(1)
   const loadRequestRef = useRef(0)
+  /*
+   * R217: イベント本体の削除口。枠の削除しかなかったため、作りかけや
+   * 終わったイベントを運用者自身が片付けられなかった。
+   */
+  const [deleteTarget, setDeleteTarget] = useState<EventListItem | null>(null)
+  const [deleteBusy, setDeleteBusy] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
+  const [canDelete, setCanDelete] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    // 削除は owner/admin だけ（サーバ側も同じ権限で閉じている）。
+    // staff 口が取れないときは入口を出さない（安全側）。
+    void Promise.resolve(api.staff?.me?.()).then((res) => {
+      if (!active || !res?.success) return
+      setCanDelete(res.data.role === 'owner' || res.data.role === 'admin')
+    }).catch(() => {})
+    return () => {
+      active = false
+    }
+  }, [])
 
   const refresh = useCallback(async () => {
     const requestId = ++loadRequestRef.current
@@ -126,6 +149,26 @@ export default function EventsListPage() {
   }, [query, filter, sort])
 
   const attention = useMemo(() => summarizeEventAttention(items), [items])
+
+  async function confirmDeleteEvent() {
+    if (!deleteTarget || deleteBusy || !selectedAccountId) return
+    setDeleteBusy(true)
+    setDeleteError('')
+    try {
+      await eventsApi.deleteEvent(selectedAccountId, deleteTarget.id)
+      setDeleteTarget(null)
+      await refresh()
+    } catch (cause) {
+      // 申込や順番待ちが残るときは 409（event_has_active_bookings）。理由だけを日本語で見せる。
+      setDeleteError(
+        cause instanceof ApiError && (cause.code === 'event_has_active_bookings' || cause.status === 409)
+          ? '申込中・確定済みの予約、またはキャンセル待ちの人がいるため削除できません。先に申込者への対応を終えてください。'
+          : '削除できませんでした。時間をおいて、もう一度お試しください。',
+      )
+    } finally {
+      setDeleteBusy(false)
+    }
+  }
   /*
    * R79/R80: 数値カードは応答の全体集計（絞り込みに合う全件の今後の枠）を使う。
    * ページ内の行だけを数えると、21件目以降があるときに全体が小さく見える。
@@ -412,14 +455,27 @@ export default function EventsListPage() {
                       )}
                     </Td>
                     <ActionCell>
-                      <span className="inline-flex items-center justify-end gap-2">
-                        <Button href={'/events/edit?id=' + e.id} variant="secondary">
-                          中身を見る
-                        </Button>
-                        <Button href={'/events/bookings?id=' + e.id} variant="secondary">
-                          申込者を見る
-                        </Button>
-                      </span>
+                      {/*
+                        R217/LAY-18: 「中身を見る」「申込者を見る」のあとに「⋯」を置き、
+                        元に戻せない「削除」はメニューの最後へ。削除は owner/admin のみ。
+                      */}
+                      <RowActions
+                        subjectName={e.name}
+                        detail={{ href: '/events/edit?id=' + e.id, label: '中身を見る' }}
+                        edit={{ href: '/events/bookings?id=' + e.id, label: '申込者を見る' }}
+                        destructiveItem={
+                          canDelete
+                            ? {
+                                id: 'delete-event',
+                                label: 'イベントを削除',
+                                onSelect: () => {
+                                  setDeleteError('')
+                                  setDeleteTarget(e)
+                                },
+                              }
+                            : undefined
+                        }
+                      />
                     </ActionCell>
                   </Tr>
                 ))}
@@ -448,6 +504,26 @@ export default function EventsListPage() {
         */}
         {dataReady ? <Pagination page={current} pageCount={pageCount} onPageChange={setPage} /> : null}
       </div>
+
+      {/*
+        R217: イベント本体の削除確認。申込・順番待ちが残る場合は
+        サーバが 409 で止めるので、その理由をこの窓で見せる。
+      */}
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        destructive
+        title={`「${deleteTarget?.name ?? ''}」を削除しますか？`}
+        description="このイベントは一覧から外れ、公開中の予約URLは受け付けを止めます。いまある枠も使えなくなります。これまでの申込の記録は残ります。この操作は元に戻せません。"
+        confirmLabel="削除する"
+        busy={deleteBusy}
+        error={deleteError}
+        onConfirm={() => void confirmDeleteEvent()}
+        onCancel={() => {
+          if (deleteBusy) return
+          setDeleteError('')
+          setDeleteTarget(null)
+        }}
+      />
     </div>
   )
 }
