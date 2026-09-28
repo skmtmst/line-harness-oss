@@ -85,6 +85,16 @@ describe('renderEventNotificationText', () => {
     expect(text).toContain('会場: 渋谷');
     expect(text).not.toContain('https://');
   });
+
+  test('U: 日時・会場の変更は新旧を添えて知らせる', () => {
+    const text = renderEventNotificationText('schedule_changed', {
+      ...baseCtx,
+      changeSummary: '9月25日 10:00 → 9月26日 10:00',
+    });
+    expect(text).toContain('イベントの内容が変更になりました');
+    expect(text).toContain('変更内容: 9月25日 10:00 → 9月26日 10:00');
+    expect(text).toContain('予約履歴画面から変更・キャンセル');
+  });
 });
 
 describe('renderEventNotificationText — custom extra append', () => {
