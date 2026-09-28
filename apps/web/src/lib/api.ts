@@ -13602,6 +13602,16 @@ export interface BookingHistorySummary {
   staffName: string;
 }
 
+/**
+ * R320: 前回来店の申し送りの元予約。過去の来店完了だけを指す。
+ * 日時・状態と一緒に表示し、元予約への入口にする。
+ */
+export interface BookingHandoverRef {
+  id: string;
+  startsAt: string;
+  status: string;
+}
+
 export interface BookingCustomerContext {
   id: string;
   friendId: string | null;
@@ -13612,6 +13622,7 @@ export interface BookingCustomerContext {
   tags: Array<{ id: string; name: string }>;
   mileageBalance: number | null;
   previousHandover: string | null;
+  previousHandoverBooking: BookingHandoverRef | null;
   recentBookings: BookingHistorySummary[];
 }
 
@@ -13669,7 +13680,10 @@ export interface BookingAdminDetail {
     mileageBalance: number | null;
   };
   previousHandover: string | null;
+  previousHandoverBooking: BookingHandoverRef | null;
   history: BookingHistorySummary[];
+  /** R321: 同じ顧客の予約総数（この予約を除く）。history は直近10件だけ。 */
+  historyTotal: number;
   reminders: Array<{
     id: string;
     kind: string;

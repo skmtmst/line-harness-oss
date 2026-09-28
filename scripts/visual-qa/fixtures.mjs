@@ -5334,6 +5334,7 @@ export const BOOKING_PROXY_CREATE = {
         phone: '090-1234-5678', petName: 'こむぎ',
         tags: [{ id: 'tag-nen', name: 'NEN会員' }, { id: 'tag-delivery', name: '定期便' }],
         mileageBalance: 1240, previousHandover: '前回は右耳を短めに整えました。',
+        previousHandoverBooking: { id: 'bk-kanno-1', startsAt: '2026-08-03T01:00:00.000Z', status: 'completed' },
         recentBookings: [
           { id: 'bk-kanno-1', startsAt: '2026-08-03T01:00:00.000Z', status: 'completed', customerNote: '顔まわりは丸く', handoverNote: '右耳を短めに整えました。', price: 8400, menuName: 'トリミング（小型犬）', staffName: '佐々木' },
           { id: 'bk-kanno-2', startsAt: '2026-07-04T01:00:00.000Z', status: 'completed', customerNote: null, handoverNote: null, price: 4200, menuName: 'シャンプーのみ', staffName: '高田' },
@@ -5386,10 +5387,12 @@ export const BOOKING_ADMIN_DETAIL = {
       phone: '090-4321-8765', petName: 'ももちゃん', tags: [{ id: 'tag-vip', name: 'VIP' }], mileageBalance: 2860,
     },
     previousHandover: '前回は足先を短めに整えました。',
+    previousHandoverBooking: { id: 'bk-history-1', startsAt: '2026-08-03T00:00:00.000Z', status: 'completed' },
     history: [
       { id: 'bk-history-1', startsAt: '2026-08-03T00:00:00.000Z', status: 'completed', customerNote: '足先は短め', handoverNote: '耳の赤みは落ち着いています。', price: 8400, menuName: 'トリミング（小型犬）', staffName: '佐々木' },
       { id: 'bk-history-2', startsAt: '2026-07-05T01:00:00.000Z', status: 'completed', customerNote: null, handoverNote: null, price: 4200, menuName: 'シャンプーのみ', staffName: '高田' },
     ],
+    historyTotal: 2,
     reminders: [
       { id: 'br-detail-day', kind: 'day_before', scheduledAt: '2026-09-02T00:00:00.000Z', sentAt: '2026-09-02T00:00:03.000Z', status: 'sent', retryCount: 0 },
       { id: 'br-detail-hour', kind: 'hours_before', scheduledAt: '2026-09-02T23:00:00.000Z', sentAt: null, status: 'pending', retryCount: 0 },
