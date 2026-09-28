@@ -88,6 +88,6 @@ export function describeAfterSend(afterSend: 'continue' | 'pause' | undefined): 
   paused: boolean
 } {
   return afterSend === 'pause'
-    ? { label: '返信まで一時停止', paused: true }
+    ? { label: '送信後に一時停止', paused: true }
     : { label: '次へ進む', paused: false }
 }
