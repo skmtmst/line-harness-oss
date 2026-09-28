@@ -115,6 +115,43 @@ describe('一斉配信の複数吹き出し契約', () => {
     expect(rendered[0].messageContent).toBe('田中さん');
   });
 
+  /*
+   * R234: 監査の不正例（音声 not-a-url・スタンプ not-a-package・Flex {}・
+   * カルーセル [{}]）は、保存・配信前検査・送信のどこでも通さない。
+   * 正常例（https・数字の番号・バブル・中身のあるパネル）は通す。
+   */
+  it('R234: 送れない音声URL・スタンプ番号・Flex・カルーセルを止める', () => {
+    const audio = (url: string) => ({
+      type: 'audio', content: { state: { audio: { originalContentUrl: url, duration: '1' } } },
+    });
+    expect(() => parseBroadcastMessageParts({
+      messageType: 'text', messageContent: 'x', messageBubbles: [audio('not-a-url')],
+    })).toThrow('https://');
+    expect(() => parseBroadcastMessageParts({
+      messageType: 'text', messageContent: 'x', messageBubbles: [audio('http://e.test/a.m4a')],
+    })).toThrow('https://');
+    // 正常例（https・1秒）は通す。短さでは止めない。
+    const okAudio = parseBroadcastMessageParts({
+      messageType: 'text', messageContent: 'x', messageBubbles: [audio('https://e.test/a.m4a')],
+    });
+    expect(okAudio[0].messageContent).toContain('1000');
+
+    expect(() => parseBroadcastMessageParts({
+      messageType: 'text', messageContent: 'x',
+      messageBubbles: [{ type: 'sticker', content: { state: { sticker: { packageId: 'not-a-package', stickerId: 'not-a-sticker' } } } }],
+    })).toThrow('番号');
+
+    expect(() => parseBroadcastMessageParts({
+      messageType: 'text', messageContent: 'x',
+      messageBubbles: [{ type: 'flex', content: { flexJson: '{}' } }],
+    })).toThrow('バブルかカルーセル');
+
+    expect(() => parseBroadcastMessageParts({
+      messageType: 'text', messageContent: 'x',
+      messageBubbles: [{ type: 'carousel', content: { columnsJson: '[{}]' } }],
+    })).toThrow('空のパネル');
+  });
+
   it('テスト表示とバッチ差分は先頭のテキストだけへ付ける', () => {
     const parts = parseBroadcastMessageParts({
       messageType: 'text', messageContent: 'legacy',

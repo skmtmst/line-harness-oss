@@ -11,6 +11,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   emptyMessageKindState,
+  messageKindProblem,
   serializeMessageKind,
   locationRangeError,
   parseMessageKind,
@@ -144,6 +145,26 @@ describe('音声', () => {
     const json = serializeMessageKind('audio', s)!
     expect(parseMessageKind('audio', json).audio.duration).toBe('30')
   })
+
+  /*
+   * R234: URL が https でない音声は、書けていても送れない。
+   * 空と同じく書き出さず、理由も返す（未完成表示と保存の検査が同じ理由を見る）。
+   */
+  it('https でないURLは書き出さない（R234）', () => {
+    const s = emptyMessageKindState()
+    for (const url of ['not-a-url', 'http://e.com/a.m4a', 'ftp://e.com/a.m4a']) {
+      s.audio = { originalContentUrl: url, duration: '1' }
+      expect(serializeMessageKind('audio', s)).toBeNull()
+      expect(messageKindProblem('audio', s)).toContain('https://')
+    }
+  })
+
+  it('https の音声は 1 秒でも書き出す（短さでは止めない）', () => {
+    const s = emptyMessageKindState()
+    s.audio = { originalContentUrl: 'https://e.com/a.m4a', duration: '1' }
+    expect(messageKindProblem('audio', s)).toBeNull()
+    expect(JSON.parse(serializeMessageKind('audio', s)!).duration).toBe(1000)
+  })
 })
 
 describe('スタンプ', () => {
@@ -163,6 +184,16 @@ describe('スタンプ', () => {
     s.sticker = { packageId: '789', stickerId: '10855' }
     const json = serializeMessageKind('sticker', s)!
     expect(parseMessageKind('sticker', json).sticker).toEqual(s.sticker)
+  })
+
+  /*
+   * R234: 数字でない番号は、2つそろっていても送れない。書き出さず理由も返す。
+   */
+  it('数字でない番号は書き出さない（R234）', () => {
+    const s = emptyMessageKindState()
+    s.sticker = { packageId: 'not-a-package', stickerId: 'not-a-sticker' }
+    expect(serializeMessageKind('sticker', s)).toBeNull()
+    expect(messageKindProblem('sticker', s)).toContain('番号')
   })
 })
 
