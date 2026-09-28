@@ -23,6 +23,8 @@ import { ApiError } from '@/lib/api'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { errorMessage, formatDate, formatDateTime } from './google-format'
 import { ChangeConfirmScreen, HistoryScreen, HoursEditor, PROFILE_DESIGN_NODES, ProfileEditScreen, ProfileTab, type HoursMode } from './google-profile'
+import { POSTS_DESIGN_NODES, PostConfirmScreen, PostEditor, PostsTab } from './google-posts'
+import type { GooglePostKind } from '@/lib/restaurant-google-api'
 import {
   restaurantGoogleApi,
   type GoogleConnectionData,
@@ -41,7 +43,8 @@ import {
  *  - GB-16 xSudF  返信の公開確認      - GB-15 oQRFu  状態・エラー
  *
  * 第2段（プロフィール・営業時間・変更履歴）は `google-profile.tsx`（GB-10〜GB-12、GB-17〜GB-19）。
- * 投稿・パフォーマンスは第3段以降。タブは見せるが押せない（未対応機能を利用可能に見せない）。
+ * 第3段（投稿：最新情報・イベント・特典）は `google-posts.tsx`（GB-4〜GB-8、GB-14）。
+ * パフォーマンスは第4段以降。タブは見せるが押せない（未対応機能を利用可能に見せない）。
  */
 
 type TabKey = 'reviews' | 'posts' | 'performance' | 'profile' | 'settings'
@@ -152,7 +155,7 @@ function GoogleBusinessInner() {
     label: TAB_LABELS[key],
     current: tab === key,
     count: key === 'reviews' && connected ? data.summary.newCount : undefined,
-    disabled: !connected && key !== 'settings' ? true : key === 'posts' || key === 'performance',
+    disabled: !connected && key !== 'settings' ? true : key === 'performance',
     onClick: () => go({ tab: key }),
   }))
 
@@ -161,7 +164,10 @@ function GoogleBusinessInner() {
   const hoursMode: HoursMode = searchParams.get('mode') === 'calendar' ? 'calendar' : searchParams.get('mode') === 'weekly' ? 'weekly' : 'text'
   const profileView = tab === 'profile' && connected ? (view === 'hours' || view === 'confirm' || view === 'history' || view === 'edit' ? view : 'profile') : null
   const profileNode = profileView === 'hours' ? PROFILE_DESIGN_NODES[`hours:${hoursMode}`] : profileView === 'confirm' ? PROFILE_DESIGN_NODES['confirm:hours'] : profileView ? PROFILE_DESIGN_NODES[profileView] : null
-  const panelNode = profileNode ?? designNode
+  const postsView = tab === 'posts' && connected ? (view === 'new' || view === 'edit' || view === 'confirm' ? view : 'list') : null
+  const postKind: GooglePostKind = searchParams.get('kind') === 'event' ? 'event' : searchParams.get('kind') === 'offer' ? 'offer' : 'standard'
+  const postsNode = postsView === 'new' || postsView === 'edit' ? POSTS_DESIGN_NODES[`edit:${postKind}`] : postsView ? POSTS_DESIGN_NODES[postsView] : null
+  const panelNode = profileNode ?? postsNode ?? designNode
 
   return (
     <section className="border-hairline bg-canvas text-ink min-w-0 overflow-hidden rounded-card border" data-design-node={panelNode}>
@@ -180,6 +186,12 @@ function GoogleBusinessInner() {
           <ProfileEditScreen accountId={selectedAccountId} go={go} />
         ) : profileView === 'profile' ? (
           <ProfileTab accountId={selectedAccountId} go={go} />
+        ) : postsView === 'new' || postsView === 'edit' ? (
+          <PostEditor accountId={selectedAccountId} kind={postKind} postId={postsView === 'edit' ? reviewId : null} go={go} />
+        ) : postsView === 'confirm' && reviewId ? (
+          <PostConfirmScreen key={reviewId} accountId={selectedAccountId} id={reviewId} go={go} />
+        ) : postsView === 'list' ? (
+          <PostsTab accountId={selectedAccountId} go={go} />
         ) : tab === 'settings' ? (
           <SettingsTab accountId={selectedAccountId} data={data} canManage={canManageConnection} onChanged={() => { void load() }} />
         ) : (

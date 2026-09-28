@@ -456,7 +456,8 @@
     "503_measurement_sites.sql",
     "504_conversion_reversal_ledger.sql",
     "507_webinar_heartbeat_state.sql",
-    "508_webinar_heartbeat_rejects.sql"
+    "508_webinar_heartbeat_rejects.sql",
+    "511_restaurant_google_posts.sql"
   ],
-  "migrationCount": 457
+  "migrationCount": 458
 }

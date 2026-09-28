@@ -5717,6 +5717,67 @@ CREATE TABLE rt_google_oauth_states (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE rt_google_posts (
+  id TEXT PRIMARY KEY,
+  store_id TEXT NOT NULL REFERENCES rt_stores(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL CHECK (kind IN ('standard', 'event', 'offer', 'alert')),
+  origin TEXT NOT NULL DEFAULT 'admin' CHECK (origin IN ('admin', 'google')),
+
+  -- 本文・タイトル（イベント／特典はタイトル必須。最新情報は空文字のまま使わない）
+  summary TEXT NOT NULL DEFAULT '',
+  title TEXT,
+
+  -- イベント／特典の期間。Google の TimeInterval は日付と時刻が別項目なので分けて持つ。
+  -- タイムゾーンは店舗の所在地に合わせてGoogle側が解釈する（既定Asia/Tokyo）。
+  event_start_date TEXT,
+  event_start_time TEXT,
+  event_end_date TEXT,
+  event_end_time TEXT,
+
+  -- ボタン。特典（offer）ではGoogleが無視するため送らない（画面にも出さない）。
+  cta_type TEXT CHECK (cta_type IN ('none', 'book', 'order', 'shop', 'learn_more', 'sign_up', 'call')),
+  cta_url TEXT,
+
+  -- 特典だけの項目（いずれも任意）
+  coupon_code TEXT,
+  redeem_online_url TEXT,
+  terms_conditions TEXT,
+
+  -- 画像。[{ mediaId, filename, sourceUrl }] のJSON配列。第3段は社内の登録メディアから1枚まで。
+  -- Local Posts の media は sourceUrl のみ対応のため、登録メディアの公開URLをそのまま入れる。
+  media_json TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(media_json)),
+
+  publish_mode TEXT NOT NULL DEFAULT 'now' CHECK (publish_mode IN ('now', 'scheduled')),
+  publish_at TEXT,
+
+  status TEXT NOT NULL DEFAULT 'draft'
+    CHECK (status IN ('draft', 'scheduled', 'pending_confirm', 'accepted', 'published',
+                      'rejected', 'failed', 'cancelled', 'deleted')),
+
+  -- Google 側の識別子。accounts/{account}/locations/{location}/localPosts/{id} の形。
+  google_post_name TEXT,
+  google_state TEXT,
+  search_url TEXT,
+  google_create_time TEXT,
+  google_update_time TEXT,
+
+  -- 送信内容の指紋（SHA-256先頭32文字）。送信結果が不明なとき、Googleの一覧から
+  -- 自分が出した投稿を見つけて二重投稿を避けるための照合キー。
+  content_fingerprint TEXT,
+  request_id TEXT,
+
+  staff_id TEXT,
+  staff_name TEXT,
+  error TEXT,
+
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  sent_at TEXT,
+  published_at TEXT,
+  checked_at TEXT,
+  deleted_at TEXT,
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
 CREATE TABLE rt_google_profiles (
   store_id TEXT PRIMARY KEY REFERENCES rt_stores(id) ON DELETE CASCADE,
   location_name TEXT NOT NULL,
@@ -8489,6 +8550,16 @@ CREATE INDEX idx_rt_google_changes_status ON rt_google_changes(store_id, status)
 CREATE INDEX idx_rt_google_changes_store ON rt_google_changes(store_id, created_at DESC);
 
 CREATE INDEX idx_rt_google_oauth_states_expires ON rt_google_oauth_states(expires_at);
+
+CREATE INDEX idx_rt_google_posts_fingerprint
+  ON rt_google_posts(store_id, content_fingerprint) WHERE content_fingerprint IS NOT NULL;
+
+CREATE UNIQUE INDEX idx_rt_google_posts_google_name
+  ON rt_google_posts(store_id, google_post_name) WHERE google_post_name IS NOT NULL;
+
+CREATE INDEX idx_rt_google_posts_status ON rt_google_posts(store_id, status);
+
+CREATE INDEX idx_rt_google_posts_store ON rt_google_posts(store_id, created_at DESC);
 
 CREATE INDEX idx_rt_google_reviews_store
   ON rt_google_reviews(store_id, reply_status, create_time DESC);

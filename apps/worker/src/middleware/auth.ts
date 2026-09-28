@@ -409,6 +409,10 @@ const STAFF_EXPLICIT_ALLOW: Array<[method: string, path: string]> = [
   ['POST', '/api/restaurant-test/google/hours/propose'],
   ['POST', '/api/restaurant-test/google/profile/propose'],
   ['GET', '/api/restaurant-test/google/changes'],
+  // Googleビジネス第3段（GB-4〜GB-14）：担当者も投稿を読み、下書きを作れる。Googleへの送信・削除は店舗管理者以上。
+  ['GET', '/api/restaurant-test/google/posts'],
+  ['POST', '/api/restaurant-test/google/posts'],
+  ['POST', '/api/restaurant-test/google/posts/sync'],
   // 運営からのお知らせ（★V6 37-7）は本人宛て。担当者でも読んで既読にできる。
   ['GET', '/api/hq/notices'],
   ['GET', '/api/hq/notices/line-registration'],
@@ -422,6 +426,9 @@ const STAFF_EXPLICIT_ALLOW_PATTERNS: Array<[method: string, pattern: RegExp]> = 
   ['PUT', /^\/api\/restaurant-test\/google\/reviews\/[^/]+\/draft$/],
   ['GET', /^\/api\/restaurant-test\/google\/changes\/[^/]+$/],
   ['POST', /^\/api\/restaurant-test\/google\/changes\/[^/]+\/cancel$/],
+  ['GET', /^\/api\/restaurant-test\/google\/posts\/[^/]+$/],
+  ['PUT', /^\/api\/restaurant-test\/google\/posts\/[^/]+$/],
+  ['POST', /^\/api\/restaurant-test\/google\/posts\/[^/]+\/cancel$/],
   ['POST', /^\/api\/hq\/notices\/[^/]+\/read$/],
 ];
 
