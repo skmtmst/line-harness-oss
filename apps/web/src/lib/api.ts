@@ -7161,6 +7161,15 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ expectedContentRevision }),
       }),
+    /**
+     * P（公開前の試し）：試し合言葉を発行する。生の合言葉はこの応答でしか返らない。
+     * 有効期限は24時間。試しの回答は集計に入らず、回答後の動作も動かない。
+     */
+    issueTestToken: (id: string, accountId: string) =>
+      fetchApi<ApiResponse<{ token: string; expiresAt: string }>>(
+        `/api/forms/${id}/test-token?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'POST', body: JSON.stringify({}) },
+      ),
     deleteImpact: (id: string, accountId: string) =>
       fetchApi<ApiResponse<FormDeleteImpact>>(
         `/api/forms/${id}/delete-impact?account_id=${encodeURIComponent(accountId)}`,
