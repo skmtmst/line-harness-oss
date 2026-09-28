@@ -13,7 +13,6 @@ import {
   deleteReminderStep,
   enrollFriendInReminder,
   getFriendReminders,
-  cancelFriendReminder,
   listReminderRegistrants,
   moveReminderRegistrantTargetDate,
   cancelReminderRegistrant,
@@ -62,6 +61,10 @@ import { buildOffsetListResponse, parseOffsetPaging } from '../lib/list-paging.j
 const reminders = new Hono<Env>();
 
 async function requireVisibleReminder(c: Context<Env>, next: () => Promise<void>) {
+  // R348/R349: 履歴と登録は行ごとの送信元アカウントで見る。親ルールの
+  // 今の所属だけで閉じると、所属変更後に旧登録が操作できなくなるため、
+  // ここでは通して各 handler で行単位に判定する。
+  if (isReminderRowScopedPath(c.req.path)) return next();
   const reminder = await getReminderById(c.env.DB, c.req.param('id')!);
   if (!reminder || !await canAccessAllLineAccounts(
     c.env.DB,
@@ -71,6 +74,14 @@ async function requireVisibleReminder(c: Context<Env>, next: () => Promise<void>
     return c.json({ success: false, error: 'Reminder not found' }, 404);
   }
   await next();
+}
+
+/**
+ * R348/R349: 親ではなく行の送信元アカウントで担当を判定する口。
+ * 履歴・登録の一覧と、登録1件の操作（日時変更・取消・再開）が対象。
+ */
+function isReminderRowScopedPath(path: string): boolean {
+  return /^\/api\/reminders\/[^/]+\/(runs|registrants([/?].*)?$)/.test(path);
 }
 
 const TRIGGER_TYPES = ['manual', 'booking', 'event', 'friend_field'] as const;
@@ -816,14 +827,14 @@ reminders.get('/api/reminders', requireRole('owner', 'admin', 'staff'), async (c
         // JOIN だと通の数だけ行が増えて total がずれるので EXISTS で検査する。
         // 本文は公開済みが reminder_steps、まだ公開していない下書きが
         // current_draft_version_id のぶら下がる reminder_version_steps にある。
-        clauses.push(`(LOWER(r.name) LIKE ? ESCAPE '\\' OR LOWER(COALESCE(r.description, '')) LIKE ? ESCAPE '\\'
+        clauses.push(`(LOWER(r.name) LIKE ? ESCAPE '\' OR LOWER(COALESCE(r.description, '')) LIKE ? ESCAPE '\'
           OR EXISTS (SELECT 1 FROM reminder_steps search_steps
             WHERE search_steps.reminder_id = r.id
-              AND LOWER(search_steps.message_content) LIKE ? ESCAPE '\\')
+              AND LOWER(search_steps.message_content) LIKE ? ESCAPE '\')
           OR EXISTS (SELECT 1 FROM reminder_versions draft_version
             JOIN reminder_version_steps draft_steps ON draft_steps.reminder_version_id = draft_version.id
             WHERE draft_version.id = r.current_draft_version_id
-              AND LOWER(draft_steps.message_content) LIKE ? ESCAPE '\\'))`);
+              AND LOWER(draft_steps.message_content) LIKE ? ESCAPE '\'))`);
         const searchPattern = `%${escapedLike(q)}%`;
         bindings.push(searchPattern, searchPattern, searchPattern, searchPattern);
       }
@@ -1281,13 +1292,14 @@ reminders.get('/api/reminders/:id/runs', async (c) => {
   try {
     const reminderId = c.req.param('id');
     const reminder = await getReminderById(c.env.DB, reminderId);
-    const accountId = reminder
-      ? (reminder as { line_account_id?: string | null }).line_account_id ?? null
-      : null;
-    // ルート共通middlewareに加え、個人名を返す口でも親リマインダの範囲を明示確認する。
-    if (!reminder || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+    if (!reminder) {
       return c.json({ success: false, error: 'Reminder not found' }, 404);
     }
+    const accountId = (reminder as { line_account_id?: string | null }).line_account_id ?? null;
+    // R349: 個人名を返す口は、親の今の所属ではなく実行行の送信元
+    // アカウントで絞る。所属変更前の履歴が担当外に漏れないようにする。
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    const canSeeParent = await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId]);
 
     const rawStatus = c.req.query('status');
     // 管理画面と共有契約は「配信予定」を planned と呼ぶ。DB の queued は
@@ -1307,11 +1319,15 @@ reminders.get('/api/reminders/:id/runs', async (c) => {
     const search = c.req.query('search')?.trim().slice(0, 100) || undefined;
 
     const [runs, summary, stepRows, publishedVersion] = await Promise.all([
-      listReminderDeliveryRuns(c.env.DB, { reminderId, status, search, limit, offset }),
-      getReminderDeliveryRunSummary(c.env.DB, reminderId),
-      getReminderDeliveryStepSummaries(c.env.DB, reminderId),
+      listReminderDeliveryRuns(c.env.DB, { reminderId, status, search, limit, offset, scope }),
+      getReminderDeliveryRunSummary(c.env.DB, reminderId, scope),
+      getReminderDeliveryStepSummaries(c.env.DB, reminderId, scope),
       getReminderPublishedVersion(c.env.DB, reminderId),
     ]);
+    // 見える行がなく親も見えないときは、あるなしを区別せず 404。
+    if (runs.total === 0 && !canSeeParent) {
+      return c.json({ success: false, error: 'Reminder not found' }, 404);
+    }
     // 公開版のスナップショットが実際の停止条件。下書きや旧API由来の行で
     // 取れないときは null にし、画面側で「未取得」と区別する。
     const publishedSettings = publishedVersion ? parseReminderVersionSettings(publishedVersion) : null;
@@ -1632,7 +1648,19 @@ function mutationResponse(
 /** N-064: リマインダ別の登録者を、直接URLから安全に確認できる一覧。 */
 reminders.get('/api/reminders/:id/registrants', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
-    const items = await listReminderRegistrants(c.env.DB, c.req.param('id'));
+    // R348: 親の今の所属ではなく、友だちの所属が見える担当に出す。
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    const items = await listReminderRegistrants(c.env.DB, c.req.param('id'), scope);
+    if (items.length === 0) {
+      const reminder = await getReminderById(c.env.DB, c.req.param('id'));
+      const accountId = reminder
+        ? (reminder as { line_account_id?: string | null }).line_account_id ?? null
+        : null;
+      // 見える行がなく親も見えないときは、あるなしを区別せず 404。
+      if (!reminder || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+        return c.json({ success: false, error: 'Reminder not found' }, 404);
+      }
+    }
     return c.json({ success: true, data: items.map(publicRegistrant) });
   } catch (err) {
     console.error('GET /api/reminders/:id/registrants error:', err);
@@ -1653,6 +1681,7 @@ reminders.patch('/api/reminders/:id/registrants/:enrollmentId', requireRole('own
       enrollmentId: c.req.param('enrollmentId'),
       targetDate,
       expectedLockVersion: body.expectedLockVersion,
+      scope: await getVisibleLineAccountScope(c.env.DB, c.get('staff')),
     }));
   } catch (err) {
     console.error('PATCH /api/reminders/:id/registrants/:enrollmentId error:', err);
@@ -1672,6 +1701,7 @@ reminders.post('/api/reminders/:id/registrants/:enrollmentId/cancel', requireRol
       enrollmentId: c.req.param('enrollmentId'),
       expectedLockVersion: body.expectedLockVersion,
       cancelReason: 'manual_registration_cancelled',
+      scope: await getVisibleLineAccountScope(c.env.DB, c.get('staff')),
     }));
   } catch (err) {
     console.error('POST /api/reminders/:id/registrants/:enrollmentId/cancel error:', err);
@@ -1690,8 +1720,9 @@ async function buildResumeExpectedRuns(
   reminderId: string,
   enrollmentId: string,
   now: Date,
+  scope?: { allowedAccountIds: string[]; canSeeUnassigned: boolean },
 ): Promise<ResumeExpectedRun[] | undefined> {
-  const enrollment = await getReminderRegistrantById(db, reminderId, enrollmentId);
+  const enrollment = await getReminderRegistrantById(db, reminderId, enrollmentId, scope);
   if (!enrollment || enrollment.status !== 'cancelled') return undefined;
   const target = new Date(enrollment.target_date);
   if (Number.isNaN(target.getTime())) return undefined;
@@ -1722,13 +1753,18 @@ reminders.post('/api/reminders/:id/registrants/:enrollmentId/resume', requireRol
       return c.json({ success: false, error: 'expectedLockVersion を正しく指定してください' }, 400);
     }
     const expectedRuns = await buildResumeExpectedRuns(
-      c.env.DB, c.req.param('id'), c.req.param('enrollmentId'), new Date(),
+      c.env.DB,
+      c.req.param('id'),
+      c.req.param('enrollmentId'),
+      new Date(),
+      await getVisibleLineAccountScope(c.env.DB, c.get('staff')),
     );
     return mutationResponse(c, await resumeReminderRegistrant(c.env.DB, {
       reminderId: c.req.param('id'),
       enrollmentId: c.req.param('enrollmentId'),
       expectedLockVersion: body.expectedLockVersion,
       expectedRuns,
+      scope: await getVisibleLineAccountScope(c.env.DB, c.get('staff')),
     }));
   } catch (err) {
     console.error('POST /api/reminders/:id/registrants/:enrollmentId/resume error:', err);
@@ -1784,7 +1820,28 @@ reminders.delete('/api/friend-reminders/:id', requireRole('owner', 'admin', 'sta
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [friendAccountId, reminderAccountId])) {
       return c.json({ success: false, error: 'Friend reminder not found' }, 404);
     }
-    await cancelFriendReminder(c.env.DB, c.req.param('id'));
+    // R350: 一覧側の取消と同じ処理へ寄せる。番号・理由・未送信の停止を
+    // 一貫させ、送信待ちが残って通知が続くのを防ぐ。応答の形は変えない。
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    const current = await getReminderRegistrantById(
+      c.env.DB, enrollmentRow.reminder_id, c.req.param('id'), scope,
+    );
+    if (!current) {
+      return c.json({ success: false, error: 'Friend reminder not found' }, 404);
+    }
+    const cancelled = await cancelReminderRegistrant(c.env.DB, {
+      reminderId: enrollmentRow.reminder_id,
+      enrollmentId: c.req.param('id'),
+      expectedLockVersion: current.lock_version,
+      cancelReason: 'manual_registration_cancelled',
+      scope,
+    });
+    if (cancelled.state === 'not_found') {
+      return c.json({ success: false, error: 'Friend reminder not found' }, 404);
+    }
+    if (cancelled.state === 'conflict') {
+      return c.json({ success: false, error: 'ほかの担当者による変更があります。一覧を読み直してください。' }, 409);
+    }
     return c.json({ success: true, data: null });
   } catch (err) {
     console.error('DELETE /api/friend-reminders/:id error:', err);
@@ -1797,12 +1854,23 @@ reminders.post('/api/reminder-runs/:runId/retry', requireRole('owner', 'admin'),
   try {
     const run = await getReminderDeliveryRunById(c.env.DB, c.req.param('runId'));
     if (!run) return c.json({ success: false, error: '実行結果が見つかりません' }, 404);
+    // R348/R349: 所属が変わったルールの旧実行行は、行の送信元アカウントで
+    // 判定する。親だけを見ると旧担当が再試行できず、逆に現担当が旧行へ届く。
+    // 未所属の旧行だけは従来どおり親で判定する。
+    const runAccountId = (run as { line_account_id?: string | null }).line_account_id ?? null;
     const reminder = await getReminderById(c.env.DB, run.reminder_id);
-    const accountId = reminder
-      ? (reminder as { line_account_id?: string | null }).line_account_id ?? null
-      : null;
-    if (!reminder || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
-      return c.json({ success: false, error: '実行結果が見つかりません' }, 404);
+    if (!reminder) return c.json({ success: false, error: '実行結果が見つかりません' }, 404);
+    if (runAccountId !== null) {
+      // 送信元が分かる行はその所属だけで判定する。親の今の所属を足すと、
+      // 旧担当が締め出され、現担当が旧行へ届いてしまう。
+      if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [runAccountId])) {
+        return c.json({ success: false, error: '実行結果が見つかりません' }, 404);
+      }
+    } else {
+      const accountId = (reminder as { line_account_id?: string | null }).line_account_id ?? null;
+      if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+        return c.json({ success: false, error: '実行結果が見つかりません' }, 404);
+      }
     }
 
     const requestKey = c.req.header('Idempotency-Key');

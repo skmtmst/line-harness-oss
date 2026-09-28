@@ -84,6 +84,35 @@ export type ReminderRegistrantMutation =
   | { state: 'updated' | 'replayed'; row: FriendReminderRow }
   | { state: 'conflict' | 'not_found' };
 
+/**
+ * R348/R349: 行ごとの送信元アカウントで絞るための担当範囲。
+ * getVisibleLineAccountScope と同じ形。未指定なら従来の条件のまま
+ * （親ルールと友だちの所属一致）。経路側は必ず渡す。
+ */
+export interface ReminderRowScope {
+  allowedAccountIds: string[];
+  canSeeUnassigned: boolean;
+}
+
+/**
+ * 送信元アカウントの列に対する絞り込み条件を作る。見える範囲が空なら
+ * 何も通さない（`1 = 0`）。未所属の行は見てよい人だけに残す。
+ */
+function reminderRowScopePredicate(
+  column: string,
+  scope: ReminderRowScope | undefined,
+  bindings: unknown[],
+): string | null {
+  if (!scope) return null;
+  const parts: string[] = [];
+  if (scope.allowedAccountIds.length > 0) {
+    parts.push(`${column} IN (${scope.allowedAccountIds.map(() => '?').join(', ')})`);
+    bindings.push(...scope.allowedAccountIds);
+  }
+  if (scope.canSeeUnassigned) parts.push(`${column} IS NULL`);
+  return parts.length > 0 ? `(${parts.join(' OR ')})` : '1 = 0';
+}
+
 export interface ReminderDraftStepInput {
   stableStepId: string;
   offsetMinutes: number;
@@ -896,40 +925,53 @@ export async function getFriendReminders(db: D1Database, friendId: string): Prom
   return result.results;
 }
 
-/** リマインダの登録者一覧。壊れた別アカウント行は表示・操作の対象にしない。 */
+/**
+ * R348: リマインダの登録者一覧。親ルールの今の所属ではなく、友だちの
+ * 所属（＝送信元アカウント）が見える担当に出す。所属を変えても旧登録が
+ * 一覧から消えず、取消・日時変更の対象に残る。担当外の友だちの行は出さない。
+ * scope 未指定の内部呼び出しは従来どおり親子の所属一致だけを通す。
+ */
 export async function listReminderRegistrants(
   db: D1Database,
   reminderId: string,
+  scope?: ReminderRowScope,
 ): Promise<ReminderRegistrantRow[]> {
+  const bindings: unknown[] = [reminderId];
+  const scopePredicate = reminderRowScopePredicate('f.line_account_id', scope, bindings);
+  const predicate = scopePredicate ?? '(r.line_account_id IS NULL OR f.line_account_id IS NULL OR r.line_account_id = f.line_account_id)';
   const result = await db.prepare(
     `SELECT fr.*, f.display_name AS friend_name, f.line_account_id AS friend_line_account_id
        FROM friend_reminders fr
        JOIN friends f ON f.id = fr.friend_id
        JOIN reminders r ON r.id = fr.reminder_id
       WHERE fr.reminder_id = ?
-        AND (r.line_account_id IS NULL OR f.line_account_id IS NULL OR r.line_account_id = f.line_account_id)
+        AND ${predicate}
       ORDER BY fr.target_date ASC, fr.created_at ASC, fr.id ASC`,
-  ).bind(reminderId).all<ReminderRegistrantRow>();
+  ).bind(...bindings).all<ReminderRegistrantRow>();
   return result.results;
 }
 
 /**
- * 一覧操作の対象行を、リマインダ・友だちの所属が一致する場合だけ読む。
- * route 側のリマインダ可視性チェックに加え、移行前の不正な結合を通さない。
+ * R348: 一覧操作の対象行を、友だちの所属が見える担当にだけ読む。
+ * scope 未指定の内部呼び出しは従来どおり親子の所属一致だけを通す。
  */
 export async function getReminderRegistrantById(
   db: D1Database,
   reminderId: string,
   enrollmentId: string,
+  scope?: ReminderRowScope,
 ): Promise<FriendReminderRow | null> {
+  const bindings: unknown[] = [enrollmentId, reminderId];
+  const scopePredicate = reminderRowScopePredicate('f.line_account_id', scope, bindings);
+  const predicate = scopePredicate ?? '(r.line_account_id IS NULL OR f.line_account_id IS NULL OR r.line_account_id = f.line_account_id)';
   return db.prepare(
     `SELECT fr.*
        FROM friend_reminders fr
        JOIN friends f ON f.id = fr.friend_id
        JOIN reminders r ON r.id = fr.reminder_id
       WHERE fr.id = ? AND fr.reminder_id = ?
-        AND (r.line_account_id IS NULL OR f.line_account_id IS NULL OR r.line_account_id = f.line_account_id)`,
-  ).bind(enrollmentId, reminderId).first<FriendReminderRow>();
+        AND ${predicate}`,
+  ).bind(...bindings).first<FriendReminderRow>();
 }
 
 function replayOrConflict(
@@ -953,9 +995,9 @@ function replayOrConflict(
  */
 export async function moveReminderRegistrantTargetDate(
   db: D1Database,
-  input: { reminderId: string; enrollmentId: string; targetDate: string; expectedLockVersion: number; now?: string },
+  input: { reminderId: string; enrollmentId: string; targetDate: string; expectedLockVersion: number; now?: string; scope?: ReminderRowScope },
 ): Promise<ReminderRegistrantMutation> {
-  const current = await getReminderRegistrantById(db, input.reminderId, input.enrollmentId);
+  const current = await getReminderRegistrantById(db, input.reminderId, input.enrollmentId, input.scope);
   if (!current) return { state: 'not_found' };
   if (current.status !== 'active' || current.lock_version !== input.expectedLockVersion || current.target_date === input.targetDate) {
     return replayOrConflict(current, input.expectedLockVersion, 'active', input.targetDate);
@@ -982,21 +1024,21 @@ export async function moveReminderRegistrantTargetDate(
   ]);
   if (Number(results[0]?.meta?.changes ?? 0) === 0) {
     return replayOrConflict(
-      await getReminderRegistrantById(db, input.reminderId, input.enrollmentId),
+      await getReminderRegistrantById(db, input.reminderId, input.enrollmentId, input.scope),
       input.expectedLockVersion,
       'active',
       input.targetDate,
     );
   }
-  return { state: 'updated', row: (await getReminderRegistrantById(db, input.reminderId, input.enrollmentId))! };
+  return { state: 'updated', row: (await getReminderRegistrantById(db, input.reminderId, input.enrollmentId, input.scope))! };
 }
 
 /** 手動取消。外部送信済み・送信履歴は消さず、未送信の実行だけを止める。 */
 export async function cancelReminderRegistrant(
   db: D1Database,
-  input: { reminderId: string; enrollmentId: string; expectedLockVersion: number; cancelReason: string; now?: string },
+  input: { reminderId: string; enrollmentId: string; expectedLockVersion: number; cancelReason: string; now?: string; scope?: ReminderRowScope },
 ): Promise<ReminderRegistrantMutation> {
-  const current = await getReminderRegistrantById(db, input.reminderId, input.enrollmentId);
+  const current = await getReminderRegistrantById(db, input.reminderId, input.enrollmentId, input.scope);
   if (!current) return { state: 'not_found' };
   if (current.status !== 'active' || current.lock_version !== input.expectedLockVersion) {
     return replayOrConflict(current, input.expectedLockVersion, 'cancelled');
@@ -1022,9 +1064,9 @@ export async function cancelReminderRegistrant(
     ).bind(now, now, input.enrollmentId, input.reminderId, input.expectedLockVersion + 1),
   ]);
   if (Number(results[0]?.meta?.changes ?? 0) === 0) {
-    return replayOrConflict(await getReminderRegistrantById(db, input.reminderId, input.enrollmentId), input.expectedLockVersion, 'cancelled');
+    return replayOrConflict(await getReminderRegistrantById(db, input.reminderId, input.enrollmentId, input.scope), input.expectedLockVersion, 'cancelled');
   }
-  return { state: 'updated', row: (await getReminderRegistrantById(db, input.reminderId, input.enrollmentId))! };
+  return { state: 'updated', row: (await getReminderRegistrantById(db, input.reminderId, input.enrollmentId, input.scope))! };
 }
 
 export interface ResumeExpectedRun {
@@ -1119,9 +1161,10 @@ export async function resumeReminderRegistrant(
     now?: string;
     /** 再開後に送るべき未来の通。未指定なら登録の有効化だけ行う。 */
     expectedRuns?: ResumeExpectedRun[];
+    scope?: ReminderRowScope;
   },
 ): Promise<ReminderRegistrantMutation> {
-  const current = await getReminderRegistrantById(db, input.reminderId, input.enrollmentId);
+  const current = await getReminderRegistrantById(db, input.reminderId, input.enrollmentId, input.scope);
   if (!current) return { state: 'not_found' };
   if (current.status !== 'cancelled' || current.lock_version !== input.expectedLockVersion) {
     return replayOrConflict(current, input.expectedLockVersion, 'active');
@@ -1148,9 +1191,9 @@ export async function resumeReminderRegistrant(
       WHERE id = ? AND reminder_id = ? AND status = 'cancelled' AND lock_version = ?`,
   ).bind(now, input.enrollmentId, input.reminderId, input.expectedLockVersion).run();
   if (Number(result.meta?.changes ?? 0) === 0) {
-    return replayOrConflict(await getReminderRegistrantById(db, input.reminderId, input.enrollmentId), input.expectedLockVersion, 'active');
+    return replayOrConflict(await getReminderRegistrantById(db, input.reminderId, input.enrollmentId, input.scope), input.expectedLockVersion, 'active');
   }
-  return { state: 'updated', row: (await getReminderRegistrantById(db, input.reminderId, input.enrollmentId))! };
+  return { state: 'updated', row: (await getReminderRegistrantById(db, input.reminderId, input.enrollmentId, input.scope))! };
 }
 
 export async function cancelFriendReminder(db: D1Database, id: string): Promise<void> {
@@ -2157,6 +2200,8 @@ export async function listReminderDeliveryRuns(
     search?: string;
     limit: number;
     offset: number;
+    /** R349: 実行行の送信元アカウントで絞る。未指定なら従来どおり全行。 */
+    scope?: ReminderRowScope;
   },
 ): Promise<{ items: ReminderDeliveryRunListRow[]; total: number }> {
   const where = ['rdr.reminder_id = ?'];
@@ -2169,6 +2214,8 @@ export async function listReminderDeliveryRuns(
     where.push(`COALESCE(f.display_name, '') LIKE ? ESCAPE '\\'`);
     bindings.push(`%${input.search.replace(/[\\%_]/g, '\\$&')}%`);
   }
+  const scopePredicate = reminderRowScopePredicate('rdr.line_account_id', input.scope, bindings);
+  if (scopePredicate) where.push(scopePredicate);
   const predicate = where.join(' AND ');
   const total = await db.prepare(
     `SELECT COUNT(*) AS count
@@ -2203,6 +2250,8 @@ export async function listReminderDeliveryRuns(
 export async function getReminderDeliveryRunSummary(
   db: D1Database,
   reminderId: string,
+  /** R349: 集計も実行行の送信元アカウントで絞る。未指定なら従来どおり全行。 */
+  scope?: ReminderRowScope,
 ): Promise<{
   sent: number;
   scheduled: number;
@@ -2211,6 +2260,8 @@ export async function getReminderDeliveryRunSummary(
   targetCount: number;
   nextScheduledAt: string | null;
 }> {
+  const bindings: unknown[] = [reminderId];
+  const scopePredicate = reminderRowScopePredicate('line_account_id', scope, bindings);
   const row = await db.prepare(
     `SELECT
        SUM(CASE WHEN status = 'succeeded' THEN 1 ELSE 0 END) AS sent,
@@ -2222,8 +2273,8 @@ export async function getReminderDeliveryRunSummary(
          WHEN status = 'retry_wait' THEN next_retry_at
          WHEN status IN ('queued', 'claimed') THEN scheduled_at
        END) AS next_scheduled_at
-     FROM reminder_delivery_runs WHERE reminder_id = ?`,
-  ).bind(reminderId).first<{
+     FROM reminder_delivery_runs WHERE reminder_id = ?${scopePredicate ? ` AND ${scopePredicate}` : ''}`,
+  ).bind(...bindings).first<{
     sent: number | null;
     scheduled: number | null;
     stopped: number | null;
@@ -2253,17 +2304,24 @@ export interface ReminderDeliveryStepSummaryRow {
 export async function getReminderDeliveryStepSummaries(
   db: D1Database,
   reminderId: string,
+  /** R349: 通ごとの集計も実行行の送信元アカウントで絞る。未指定なら従来どおり全行。 */
+  scope?: ReminderRowScope,
 ): Promise<ReminderDeliveryStepSummaryRow[]> {
+  // 結合条件の `?` が WHERE より前にあるため、束ねる順序も合わせる。
+  const scopeBindings: unknown[] = [];
+  const scopePredicate = reminderRowScopePredicate('rdr.line_account_id', scope, scopeBindings);
+  const bindings: unknown[] = [...scopeBindings, reminderId];
   const rows = await db.prepare(
     `SELECT rs.id, rs.offset_minutes, rs.message_type, rs.message_content,
             SUM(CASE WHEN rdr.status = 'succeeded' THEN 1 ELSE 0 END) AS sent,
             SUM(CASE WHEN rdr.status = 'permanent_failed' THEN 1 ELSE 0 END) AS errors
        FROM reminder_steps rs
-       LEFT JOIN reminder_delivery_runs rdr ON rdr.reminder_step_id = rs.id
+       LEFT JOIN reminder_delivery_runs rdr
+         ON rdr.reminder_step_id = rs.id${scopePredicate ? ` AND ${scopePredicate}` : ''}
       WHERE rs.reminder_id = ?
       GROUP BY rs.id, rs.offset_minutes, rs.message_type, rs.message_content
       ORDER BY rs.offset_minutes ASC, rs.id ASC`,
-  ).bind(reminderId).all<ReminderDeliveryStepSummaryRow>();
+  ).bind(...bindings).all<ReminderDeliveryStepSummaryRow>();
   return rows.results.map((row) => ({
     ...row,
     sent: Number(row.sent ?? 0),
