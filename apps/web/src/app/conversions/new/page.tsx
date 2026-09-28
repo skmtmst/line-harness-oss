@@ -532,7 +532,7 @@ export default function NewConversionPointPage() {
               label="数えてよいページ"
               htmlFor="cv-url"
               required
-              help="前方一致で判定し、パラメータは無視します。"
+              help="「?」以降と「#」以降を除いて前方一致で判定します。"
             >
               <input
                 id="cv-url"
