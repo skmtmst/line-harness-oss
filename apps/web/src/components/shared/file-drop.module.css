@@ -105,14 +105,13 @@
   }
 }
 
-/* 本物の file input は見せない。キーボードは「ファイルを選ぶ」ボタンから開く。 */
+/*
+ * 本物の file input は出さない（display:none）。
+ * 開くのは「ファイルを選ぶ」ボタンからの programmatic click。
+ * キーボード・読み上げはボタンのまま（input は aria-hidden・tabIndex -1）。
+ */
 .input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  opacity: 0;
-  pointer-events: none;
+  display: none;
 }
 
 /* キーボードで場所へ来たときの輪郭。緑は「正常」の意味なので輪郭に使わない。 */

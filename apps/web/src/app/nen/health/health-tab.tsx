@@ -201,8 +201,11 @@ export default function HealthTab({
   )
 }
 
-/** 8週の週平均体重を小さな棒で。最小〜最大の幅で高さを決め、記録の無い週は薄い線。 */
-function WeightBars({ series, warn }: { series: Array<number | null>; warn: boolean }) {
+/**
+ * 8週の週平均体重を小さな棒で。最小〜最大の幅で高さを決め、記録の無い週は薄い線。
+ * 棒の上は丸めない。8px 幅に丸みを付けると縦長の点に見える。
+ */
+export function WeightBars({ series, warn }: { series: Array<number | null>; warn: boolean }) {
   const known = series.filter((v): v is number => v != null)
   const min = known.length ? Math.min(...known) : 0
   const max = known.length ? Math.max(...known) : 0
@@ -212,9 +215,9 @@ function WeightBars({ series, warn }: { series: Array<number | null>; warn: bool
       {series.map((value, index) => value == null ? (
         <span key={index} className="h-0.5 w-2 rounded-pill bg-hairline" />
       ) : warn ? (
-        <span key={index} className="w-2 rounded-t-sm bg-status-warn" style={{ height: `${max === min ? 60 : 30 + Math.round(((value - min) / (max - min)) * 70)}%` }} />
+        <span key={index} className="w-2 bg-status-warn" style={{ height: `${max === min ? 60 : 30 + Math.round(((value - min) / (max - min)) * 70)}%` }} />
       ) : (
-        <span key={index} className="w-2 rounded-t-sm bg-accent" style={{ height: `${max === min ? 60 : 30 + Math.round(((value - min) / (max - min)) * 70)}%` }} />
+        <span key={index} className="w-2 bg-accent" style={{ height: `${max === min ? 60 : 30 + Math.round(((value - min) / (max - min)) * 70)}%` }} />
       ))}
     </span>
   )

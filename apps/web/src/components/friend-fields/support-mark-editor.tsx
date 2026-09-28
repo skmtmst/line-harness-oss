@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { Circle } from 'lucide-react'
 import { api, type SaveSupportMarkAutomationRule, type SupportMarkAutomationEvent, type SupportMarkListItem } from '@/lib/api'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -144,9 +145,10 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
 
   return (
     <div data-design-node="GMvBd">
+      {/* m22c: 見出し行の戻りは共通の行き先リンク（カード見出しと同じ13px/600青文字）。ボタン枠のままでは分類案内の行き先リンクとずれる（自動点検 k=10）。 */}
       <div className="mb-4 flex items-center justify-between gap-4">
         <Breadcrumb items={[{ label: '対応マーク', href: '/tags?tab=marks' }, { label: editing ? 'マークを編集' : 'マークを作る' }]} />
-        <Button href="/tags?tab=marks">対応マークへ</Button>
+        <Link href="/tags?tab=marks" className="text-status-info shrink-0 text-label font-semibold hover:underline">対応マークへ</Link>
       </div>
 
       {error ? <Notice tone="danger" className="mb-4">{error}</Notice> : null}
