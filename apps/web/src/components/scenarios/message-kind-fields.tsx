@@ -33,48 +33,96 @@ export function emptyMessageKindState(): MessageKindState {
 }
 
 /**
+ * まだ送れる形になっていない理由。送れるなら null。
+ *
+ * R234: 空っぽだけでなく「入っているが送れない」もここで止める。
+ * 形式だけの検査（https・番号の形・秒数）にし、実在の確認（番号の組み合わせが
+ * 本当に送れるか・URLの先に音声があるか）はしない。実在は送る直前の検査と
+ * LINE 側の応答に任せる。
+ */
+export function messageKindProblem(kind: MessageKind, state: MessageKindState): string | null {
+  switch (kind) {
+    case 'location': {
+      const v = state.location
+      if (v.latitude.trim() === '' || v.longitude.trim() === '') return '位置情報の緯度と経度を入力してください'
+      const lat = Number(v.latitude)
+      const lng = Number(v.longitude)
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return '位置情報の緯度と経度を数で入力してください'
+      return null
+    }
+    case 'video': {
+      const v = state.video
+      if (!v.originalContentUrl.trim() || !v.previewImageUrl.trim()) return '動画のURLとサムネイル画像のURLを入力してください'
+      return null
+    }
+    case 'audio': {
+      const v = state.audio
+      const url = v.originalContentUrl.trim()
+      // LINE は https で公開された音声しか受けない。not-a-url のような値は
+      // 保存できても送信で断られるので、書いた時点で止める。
+      if (!url) return '音声のURLを入力してください'
+      if (!url.toLowerCase().startsWith('https://')) return '音声のURLは https:// から始めてください'
+      const duration = Number(v.duration)
+      if (v.duration.trim() === '' || !Number.isFinite(duration) || duration <= 0) {
+        return '音声の長さ（秒）を 0 より大きい数で入力してください'
+      }
+      return null
+    }
+    case 'sticker': {
+      const v = state.sticker
+      const packageId = v.packageId.trim()
+      const stickerId = v.stickerId.trim()
+      if (!packageId || !stickerId) return 'スタンプを選んでください'
+      // LINE の番号はどちらも数字だけ。not-a-package のような文字は
+      // 保存できても送信で断られるので、書いた時点で止める。
+      if (!/^\d+$/.test(packageId) || !/^\d+$/.test(stickerId)) {
+        return 'スタンプの番号が正しくありません。一覧から選び直してください'
+      }
+      return null
+    }
+  }
+}
+
+/**
  * 入力欄の値を、配信側が読む形の JSON にする。
  *
- * 足りないものがあれば null。呼ぶ側は「まだ書けていない」として扱う。
+ * 足りない・送れないものがあれば null。呼ぶ側は「まだ書けていない」として扱う。
+ * 判定は messageKindProblem と同じ（別々に書くと、帯は済みなのに保存で
+ * 断られる形になる。broadcast-form.tsx の bubblesError と同じ考え）。
  */
 export function serializeMessageKind(kind: MessageKind, state: MessageKindState): string | null {
   switch (kind) {
     case 'location': {
+      if (messageKindProblem(kind, state)) return null
       const v = state.location
-      const lat = Number(v.latitude)
-      const lng = Number(v.longitude)
-      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null
-      if (v.latitude.trim() === '' || v.longitude.trim() === '') return null
       return JSON.stringify({
         title: v.title.trim() || '場所',
         address: v.address.trim(),
-        latitude: lat,
-        longitude: lng,
+        latitude: Number(v.latitude),
+        longitude: Number(v.longitude),
       })
     }
     case 'video': {
+      if (messageKindProblem(kind, state)) return null
       const v = state.video
       // LINE はサムネイルも必須。片方だけでは送れない。
-      if (!v.originalContentUrl.trim() || !v.previewImageUrl.trim()) return null
       return JSON.stringify({
         originalContentUrl: v.originalContentUrl.trim(),
         previewImageUrl: v.previewImageUrl.trim(),
       })
     }
     case 'audio': {
+      if (messageKindProblem(kind, state)) return null
       const v = state.audio
-      const duration = Number(v.duration)
-      if (!v.originalContentUrl.trim()) return null
-      if (!Number.isFinite(duration) || duration <= 0) return null
       return JSON.stringify({
         originalContentUrl: v.originalContentUrl.trim(),
         // 画面は秒で聞き、LINEはミリ秒で受ける。
-        duration: Math.round(duration * 1000),
+        duration: Math.round(Number(v.duration) * 1000),
       })
     }
     case 'sticker': {
+      if (messageKindProblem(kind, state)) return null
       const v = state.sticker
-      if (!v.packageId.trim() || !v.stickerId.trim()) return null
       return JSON.stringify({ packageId: v.packageId.trim(), stickerId: v.stickerId.trim() })
     }
   }

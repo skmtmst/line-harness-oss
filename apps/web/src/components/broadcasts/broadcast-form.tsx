@@ -8,6 +8,7 @@ import { AlertTriangle, ArrowRight, CheckCircle2, Eye, GripVertical, Paperclip, 
 import {
   ApiError,
   api,
+  describeSaveFailure,
   type ApiBroadcast,
   type BroadcastBubble,
   type BroadcastBubbleType,
@@ -41,6 +42,7 @@ import {
   type TargetMode,
 } from '@/lib/broadcast-audience'
 import type { SegmentCondition } from '@/lib/segment-condition'
+import { carouselColumnsProblem, flexContentProblem } from '@/components/broadcasts/bubble-content-check'
 import { newBroadcastDraftSession, persistBroadcastDraft } from '@/lib/broadcast-draft'
 import ConditionBuilder from '@/components/shared/condition-builder'
 import DateField from '@/components/shared/date-field'
@@ -50,7 +52,7 @@ import { audienceSummary } from '@/lib/broadcast-summary'
 import InsertToolbar from '@/components/scenarios/insert-toolbar'
 import MessageKindFields, {
   emptyMessageKindState,
-  serializeMessageKind,
+  messageKindProblem,
   type MessageKind,
   type MessageKindState,
 } from '@/components/scenarios/message-kind-fields'
@@ -513,15 +515,29 @@ function bubblesError(bubbles: BroadcastBubble[]): string {
     */
     if (KIND_FIELD_TYPES.has(bubble.type)) {
       const state = bubble.content.state as MessageKindState | undefined
-      if (!state || !serializeMessageKind(bubble.type as MessageKind, state)) {
-        return `吹き出し${index + 1}の${TYPE_LABELS[bubble.type]}を入力してください`
+      /*
+       * R234: 空だけでなく「入っているが送れない」（http の音声URL・
+       * 文字のスタンプ番号）も未完成にする。理由は入力欄の検査と同じ文にし、
+       * 5段の帯と保存の検査で食い違わせない。
+       */
+      const problem = !state
+        ? `${TYPE_LABELS[bubble.type]}を入力してください`
+        : messageKindProblem(bubble.type as MessageKind, state)
+      if (problem) {
+        return `吹き出し${index + 1}の${problem}`
       }
     }
-    if (bubble.type === 'carousel' && !String(bubble.content.columnsJson ?? '').trim()) {
-      return `吹き出し${index + 1}のカルーセルを選択してください`
+    if (bubble.type === 'carousel') {
+      const columnsProblem = carouselColumnsProblem(bubble.content.columnsJson)
+      if (columnsProblem) {
+        return `吹き出し${index + 1}の${columnsProblem}`
+      }
     }
     if (bubble.type === 'flex') {
-      try { JSON.parse(String(bubble.content.flexJson ?? '')) } catch { return `吹き出し${index + 1}のFlex JSONを確認してください` }
+      const flexProblem = flexContentProblem(bubble.content.flexJson)
+      if (flexProblem) {
+        return `吹き出し${index + 1}の${flexProblem}`
+      }
     }
     /*
      * 素材の引用は、選んでいないときも選んだ中身が送れる形に直せないときも
@@ -1339,8 +1355,13 @@ export default function BroadcastForm({
         // フォルダ件数の読み直しは呼び側に任せる。失敗時は呼ばない。
         onDraftSaved?.(saved)
       }
-    } catch {
-      setError('下書きを保存できませんでした')
+    } catch (error) {
+      /*
+       * R234: 保存側で弾いた理由（音声URL・スタンプ番号・Flexの形など）を
+       * そのまま出す。「保存できませんでした」だけだと、どこを直すか分からない。
+       * 400 の本文は運用者へ出してよい安全な文だけが来る（api.ts の約束）。
+       */
+      setError(describeSaveFailure(error))
     } finally {
       setSaving(false)
     }
