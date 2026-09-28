@@ -116,7 +116,7 @@ describe('機能08 点検: どんなときに動くか列（N-088）', () => {
     expect(PAGE).toContain('conditionChips(r)')
   })
 
-  it('複数の言葉は件数込みで出し、全文は title で読める', () => {
+  it('複数の言葉は数え残し込みで出し、全文は title で読める', () => {
     const summary = triggerSummary({
       ...baseRule,
       keywords: [
@@ -126,7 +126,8 @@ describe('機能08 点検: どんなときに動くか列（N-088）', () => {
       ],
       keywordMatchMode: 'all',
     })
-    expect(summary.text).toBe('「予約」「変更」ほか1件')
+    // m22d: 数え残しは「つ」にし、「件」は数のカードだけに残す（件数の重なり整理）。
+    expect(summary.text).toBe('「予約」「変更」ほか1つ')
     expect(summary.title).toContain('完全一致「予約」')
     expect(summary.title).toContain('部分一致「変更」')
     expect(summary.title).toContain('すべてに当たると動きます')

@@ -442,13 +442,20 @@ function FriendAddRunsInner() {
                   ? item.attribution.routeName || item.attribution.reason || '選択した経路'
                   : '経路は取得できません'
                 const displayName = item.friend.displayName || '名前は未取得'
-                const action = item.scenario?.started
-                  ? `シナリオ「${item.scenario.name ?? '名前は未取得'}」を開始`
-                  : item.deliveryCount > 0
-                    ? `初回案内を${item.deliveryCount}通送信`
-                    : item.actions.total > 0
-                      ? `${item.actions.total}件の処理を実行`
-                      : routingAction(item.status, item.errorCode)
+                /*
+                  m22d: 失敗した実行の行に「○件の処理を実行」と出すと、
+                  成功したように読める。失敗は理由の文にし、同じ「1件」が
+                  3回出るのもやめる（内訳の2行と合わせても2回まで）。
+                */
+                const action = item.status === 'failed'
+                  ? routingAction(item.status, item.errorCode)
+                  : item.scenario?.started
+                    ? `シナリオ「${item.scenario.name ?? '名前は未取得'}」を開始`
+                    : item.deliveryCount > 0
+                      ? `初回案内を${item.deliveryCount}通送信`
+                      : item.actions.total > 0
+                        ? `${item.actions.total}件の処理を実行`
+                        : routingAction(item.status, item.errorCode)
                 return (
                   // #973 U045: 1行目は名前と結果、2行目は時刻と詳細。1行に
                   // すべて並べると狭い幅で右端が切れる。
