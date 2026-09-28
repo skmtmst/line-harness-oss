@@ -49,7 +49,7 @@ const NOT_YET: Record<string, number> = {}
 
 describe('素の <select> を画面に書かない', () => {
   it('全ページを読めている', () => {
-    expect(PAGES.length).toBe(188)  // 情報欄の編集画面と運営専用ナレッジ（37-11）、★V7見本（v7-progress-filedrop・v7-combobox・v7-target-missing）、設定の中のファイルの検査を含む実測値。2026-09-25 に比較用 /tags-v2・/tags-v3 の2画面を撤去。2026-09-28 にイベントの変更の確認・お客様表示の確認の2画面を追加（U）。
+    expect(PAGES.length).toBe(189)  // 情報欄の編集画面と運営専用ナレッジ（37-11）、★V7見本（v7-progress-filedrop・v7-combobox・v7-target-missing）、設定の中のファイルの検査を含む実測値。2026-09-25 に比較用 /tags-v2・/tags-v3 の2画面を撤去。2026-09-28 にイベントの変更の確認・お客様表示の確認の2画面を追加（U）。同日に付与ルールの下書き編集画面を追加（R296）。
   })
 
   it('表に無い画面は素の <select> を持たない', () => {
