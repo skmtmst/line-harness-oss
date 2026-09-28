@@ -11,6 +11,7 @@ import { useReminderTestRecipient, type ReminderTestRecipientView } from './use-
 import { useReminderTestSend } from './use-reminder-test-send'
 import { TestRecipientGuidance, testRecipientDestinationLabel, testRecipientNote, testSendConfirmDescription, type ReminderTestRecipientKind } from './test-recipient-guidance'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import HelpTip from '@/components/shared/help-tip'
@@ -363,7 +364,7 @@ export function TargetStage({ reminderId, settings, validation, validationFailed
               : <ul className="max-h-64 space-y-1 overflow-y-auto text-xs">{faces.sample.map((friend) => <li key={friend.id} className="border-b border-hairline py-1.5">{friend.displayName}</li>)}</ul>}
       </Dialog>
     </ReminderPanel>
-    <ReminderPanel title="終了・停止条件" note="不要になった通知を自動で止めます。"><div className="divide-y divide-hairline">{[["bookingCancelled",'予約がキャンセルされた','即時停止'],['supportMarkCompleted','対応マークが「完了」になった','残りを停止'],['daysAfterTarget','基準日を過ぎて7日経過','自動終了'],['friendBlocked','友だちがブロックした','即時停止']].map(([key,label,result]) => <label key={key} className="flex items-center gap-3 py-3 text-xs"><input type="checkbox" checked={key === 'daysAfterTarget' ? stop.daysAfterTarget != null : Boolean(stop[key as keyof typeof stop])} onChange={(event) => onChange({ ...settings, stopConditions: { ...stop, [key]: key === 'daysAfterTarget' ? event.target.checked ? 7 : null : event.target.checked } })} /><span className="flex-1 font-medium">{label}</span><Pill tone="success">{result}</Pill></label>)}</div></ReminderPanel>
+    <ReminderPanel title="終了・停止条件" note="不要になった通知を自動で止めます。"><div className="divide-y divide-hairline">{[["bookingCancelled",'予約がキャンセルされた','即時停止'],['supportMarkCompleted','対応マークが「完了」になった','残りを停止'],['daysAfterTarget','基準日を過ぎて7日経過','自動終了'],['friendBlocked','友だちがブロックした','即時停止']].map(([key,label,result]) => <Checkbox key={key} checked={key === 'daysAfterTarget' ? stop.daysAfterTarget != null : Boolean(stop[key as keyof typeof stop])} onCheckedChange={(checked) => onChange({ ...settings, stopConditions: { ...stop, [key]: key === 'daysAfterTarget' ? checked ? 7 : null : checked } })} className="py-3"><span className="flex w-full items-center gap-3"><span className="flex-1 font-medium">{label}</span><Pill tone="success">{result}</Pill></span></Checkbox>)}</div></ReminderPanel>
     {/* REMINDER-09: 次は通知ステップ（STEP 3）。配信予定は通知を保存してから。 */}
     <ReminderFooter primary={busy ? '保存中…' : '通知ステップへ'} primaryDisabled={busy} onPrimary={onNext} />
   </ReminderWorkspace></div>

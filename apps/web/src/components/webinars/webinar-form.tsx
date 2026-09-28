@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { api, webinarApi, type Webinar, type WebinarInput, type WebinarScheduleRule } from '@/lib/api'
 import type { MediaItem } from '@line-crm/shared'
 import { useAccount } from '@/contexts/account-context'
+import Checkbox from '@/components/shared/checkbox'
 import StickyBar from '@/components/shared/sticky-bar'
 import Select from '@/components/shared/select'
 import DateTimeField, { TimeField } from '@/components/shared/date-time-field'
@@ -440,20 +441,17 @@ export default function WebinarForm({ initial, hideBar = false, onSaved, onDirty
             />
             {r.type === 'weekly' &&
               DAYS.map((d, di) => (
-                <label key={di} className="flex items-center gap-0.5">
-                  <input
-                    type="checkbox"
-                    checked={r.days?.includes(di) ?? false}
-                    onChange={(e) =>
-                      updateRule(i, {
-                        days: e.target.checked
-                          ? [...(r.days ?? []), di]
-                          : (r.days ?? []).filter((x) => x !== di),
-                      })
-                    }
-                  />
-                  {d}
-                </label>
+                <Checkbox
+                  key={di}
+                  checked={r.days?.includes(di) ?? false}
+                  onCheckedChange={(checked) =>
+                    updateRule(i, {
+                      days: checked
+                        ? [...(r.days ?? []), di]
+                        : (r.days ?? []).filter((x) => x !== di),
+                    })
+                  }
+                >{d}</Checkbox>
               ))}
             {r.type === 'once' ? (
               <DateTimeField

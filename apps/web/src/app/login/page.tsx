@@ -6,6 +6,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import AuthCard, { AuthField } from '@/components/auth/auth-card'
 import PasswordField from '@/components/auth/password-field'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import Notice from '@/components/shared/notice'
 import { TextField } from '@/components/shared/text-field'
 import { storeAdminSession } from '@/lib/admin-session'
@@ -119,15 +120,10 @@ export default function LoginPage() {
         <AuthField label="パスワード" htmlFor="login-password">
           <PasswordField id="login-password" value={password} onChange={setPassword} autoComplete="current-password" />
         </AuthField>
-        <label className="flex items-center gap-2 text-caption text-ink-secondary">
-          <input
-            type="checkbox"
-            checked={remember}
-            onChange={(event) => setRemember(event.target.checked)}
-            className="h-4 w-4 accent-accent-deep"
-          />
-          この端末では7日間ログインを保持する
-        </label>
+        <Checkbox
+          checked={remember}
+          onCheckedChange={setRemember}
+        >この端末では7日間ログインを保持する</Checkbox>
         <div className="flex justify-end">
           <Link href="/password/forgot" className="text-caption font-semibold text-action hover:underline">
             パスワードを忘れた方はこちら

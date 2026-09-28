@@ -2,7 +2,9 @@
 
 import { useEffect, useId, useState, type ReactNode } from 'react'
 import type { LineAccount, StaffMember } from '@line-crm/shared'
+import Checkbox from '@/components/shared/checkbox'
 import Dialog from '@/components/shared/dialog'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
 import { TextField } from '@/components/shared/text-field'
 
@@ -149,23 +151,14 @@ export default function MemberDialog({
 
         <fieldset className="flex flex-col gap-2" disabled={busy}>
           <legend className="text-label font-bold text-ink">担当範囲</legend>
-          <div className="flex flex-wrap gap-4">
-            <label className="flex items-center gap-2 text-label text-ink">
-              <input type="radio" name={`${uid}-scope`} className="accent-accent-deep" checked={value.accountScope === 'all'} onChange={() => { set('accountScope', 'all'); set('scopedLineAccountIds', []) }} />
-              全アカウント
-            </label>
-            <label className="flex items-center gap-2 text-label text-ink">
-              <input type="radio" name={`${uid}-scope`} className="accent-accent-deep" checked={value.accountScope === 'accounts'} onChange={() => set('accountScope', 'accounts')} />
-              指定したアカウントだけ
-            </label>
-          </div>
+          <RadioCardGroup legend="担当範囲" className="flex flex-wrap gap-4">
+            <RadioCard name={`${uid}-scope`} value="all" checked={value.accountScope === 'all'} disabled={busy} onChange={() => { set('accountScope', 'all'); set('scopedLineAccountIds', []) }} title="全アカウント" />
+            <RadioCard name={`${uid}-scope`} value="accounts" checked={value.accountScope === 'accounts'} disabled={busy} onChange={() => set('accountScope', 'accounts')} title="指定したアカウントだけ" />
+          </RadioCardGroup>
           {value.accountScope === 'accounts' ? (
             <div className="grid gap-1.5 rounded-control border border-hairline p-3 sm:grid-cols-2">
               {accounts.map((account) => (
-                <label key={account.id} className="flex items-center gap-2 text-label text-ink">
-                  <input type="checkbox" className="accent-accent-deep" checked={value.scopedLineAccountIds.includes(account.id)} onChange={() => toggleAccount(account.id)} />
-                  <span className="truncate">{account.name}</span>
-                </label>
+                <Checkbox key={account.id} checked={value.scopedLineAccountIds.includes(account.id)} disabled={busy} onCheckedChange={() => toggleAccount(account.id)}>{account.name}</Checkbox>
               ))}
               {accounts.length === 0 ? <p className="text-caption text-ink-faint">アカウントがまだありません。</p> : null}
             </div>

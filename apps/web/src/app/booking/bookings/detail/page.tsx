@@ -18,6 +18,7 @@ import {
 import { useAccount } from '@/contexts/account-context'
 import { canOperateBookings } from '../../lib/booking-permissions'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import HelpTip from '@/components/shared/help-tip'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import DateField from '@/components/shared/date-field'
@@ -921,25 +922,9 @@ function BookingDetailInner() {
                     <p className="text-ink mb-2 text-xs font-medium">お知らせの送り方（この予約だけの設定）</p>
                     <div className="space-y-2">
                       {(Object.keys(POLICY_FIELD_LABELS) as Array<keyof BookingNotificationPolicy>).map((key) => (
-                        <label key={key} className="flex items-center gap-2 text-sm">
-                          <input
-                            type="checkbox"
-                            checked={editPolicy[key]}
-                            onChange={(event) => setEditPolicy((prev) => ({ ...prev, [key]: event.target.checked }))}
-                            className="accent-accent-deep h-4 w-4"
-                          />
-                          <span className="text-ink">{POLICY_FIELD_LABELS[key]}を送る</span>
-                        </label>
+                        <Checkbox key={key} checked={editPolicy[key]} onCheckedChange={(checked) => setEditPolicy((prev) => ({ ...prev, [key]: checked }))}>{POLICY_FIELD_LABELS[key]}を送る</Checkbox>
                       ))}
-                      <label className="flex items-center gap-2 text-sm">
-                        <input
-                          type="checkbox"
-                          checked={editSendNotice}
-                          onChange={(event) => setEditSendNotice(event.target.checked)}
-                          className="accent-accent-deep h-4 w-4"
-                        />
-                        <span className="text-ink">今回の変更をお客様のLINEに知らせる</span>
-                      </label>
+                      <Checkbox checked={editSendNotice} onCheckedChange={setEditSendNotice}>今回の変更をお客様のLINEに知らせる</Checkbox>
                     </div>
                   </div>
                 ) : (

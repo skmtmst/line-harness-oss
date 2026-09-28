@@ -5,6 +5,8 @@ import { useSearchParams } from 'next/navigation'
 import { EC_EVENT_TYPES, ecEventLabel } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import RadioCard from '@/components/shared/radio-card'
 import Notice from '@/components/shared/notice'
 import CreatePage, { AsideCard, Field, inputClass } from '@/components/shared/create-page'
 import { isStepUpRequired, useStepUpGate } from '@/components/step-up-prompt'
@@ -210,25 +212,21 @@ function NewWebhookForm() {
         <legend className="text-ink-secondary text-xs font-bold">
           送るイベント<RequiredBadge />
         </legend>
-        <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="送るイベントの決め方">
-          <label className="border-hairline flex min-h-9 cursor-pointer items-center gap-2 rounded-control border px-3 py-2 text-sm font-semibold text-ink">
-            <input
-              type="radio"
-              name="wh-event-mode"
-              checked={sendAllEvents}
-              onChange={() => setSendAllEvents(true)}
-            />
-            すべてのイベントを送る
-          </label>
-          <label className="border-hairline flex min-h-9 cursor-pointer items-center gap-2 rounded-control border px-3 py-2 text-sm font-semibold text-ink">
-            <input
-              type="radio"
-              name="wh-event-mode"
-              checked={!sendAllEvents}
-              onChange={() => setSendAllEvents(false)}
-            />
-            送るイベントを選ぶ
-          </label>
+        <div className="flex flex-wrap gap-2">
+          <RadioCard
+            name="wh-event-mode"
+            value="all"
+            checked={sendAllEvents}
+            onChange={() => setSendAllEvents(true)}
+            title="すべてのイベントを送る"
+          />
+          <RadioCard
+            name="wh-event-mode"
+            value="selected"
+            checked={!sendAllEvents}
+            onChange={() => setSendAllEvents(false)}
+            title="送るイベントを選ぶ"
+          />
         </div>
         {presetLabel ? (
           <p className="text-ink-secondary mt-2 text-xs">
@@ -243,18 +241,11 @@ function NewWebhookForm() {
                 <ul className="mt-1.5 grid gap-1.5 sm:grid-cols-2">
                   {group.events.map((event) => (
                     <li key={event.value}>
-                      <label className="border-hairline hover:bg-canvas-sunken flex cursor-pointer items-start gap-2 rounded-control border px-3 py-2">
-                        <input
-                          type="checkbox"
-                          className="mt-1"
-                          checked={selectedEvents.includes(event.value)}
-                          onChange={() => toggleEvent(event.value)}
-                        />
-                        <span className="min-w-0">
-                          <span className="text-ink block text-sm font-semibold">{event.label}</span>
-                          <span className="text-ink-faint block font-mono text-micro">{event.value}</span>
-                        </span>
-                      </label>
+                      <Checkbox
+                        checked={selectedEvents.includes(event.value)}
+                        onCheckedChange={() => toggleEvent(event.value)}
+                        description={event.value}
+                      >{event.label}</Checkbox>
                     </li>
                   ))}
                 </ul>

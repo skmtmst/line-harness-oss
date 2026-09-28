@@ -66,6 +66,7 @@ import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
 import Combobox from '@/components/shared/combobox'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import Checkbox from '@/components/shared/checkbox'
 import Button from '@/components/shared/button'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import Select from '@/components/shared/select'
@@ -462,10 +463,7 @@ function TextBubbleEditor({ bubble, index, total, trackLinks, embedded = false, 
       <section className="rounded-control mt-4 border border-hairline p-3">
         <h5 className="text-sm font-bold text-ink">URLの扱い</h5>
         <p className="mt-1 text-xs text-ink-faint">短縮すると、URLごとのクリック数を計測できます。</p>
-        <label className="mt-3 flex items-center gap-2 text-xs text-ink-secondary">
-          <input type="checkbox" checked={!trackLinks} onChange={(event) => onTrackLinksChange(!event.target.checked)} />
-          このメッセージではURLを短縮しない
-        </label>
+        <Checkbox checked={!trackLinks} onCheckedChange={(checked) => onTrackLinksChange(!checked)} className="mt-3">このメッセージではURLを短縮しない</Checkbox>
         <div className="mt-3 overflow-hidden rounded-control border border-hairline text-xs">
           <div className="broadcast-url-row bg-canvas-sunken px-3 py-2 font-bold text-ink-faint"><span>サイト名</span><span>URL</span><span>計測</span></div>
           {urls.length ? urls.map((url) => <div key={url} className="broadcast-url-row gap-2 border-t border-hairline px-3 py-2"><span className="font-semibold">キャンペーンLP</span><span className="truncate" title={url}>{url}</span><span>{'短縮して計測'}</span></div>) : (
@@ -1918,41 +1916,22 @@ export default function BroadcastForm({
             そろえて、それぞれに説明を付ける。
           */}
           {/* 4つある。3列だと3+1で折り返して最後の1つだけ浮くので、2列と4列で切り替える。 */}
-          <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          <RadioCardGroup legend="配信対象" className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
             {TARGET_MODES.map((mode) => (
-              <label
+              <RadioCard
                 key={mode.value}
-                className={`flex h-full cursor-pointer flex-col gap-1 rounded-card border p-3 transition-colors ${
-                  targetMode === mode.value
-                    ? 'border-accent bg-accent-soft'
-                    : 'border-hairline hover:bg-canvas-sunken'
-                }`}
-              >
-                <span className="flex items-start gap-2">
-                  {/*
-                    **読み上げ名を付ける。**
-                    `<label>` が丸ごと囲っているので目では押せるが、
-                    丸自体には名前が無く、読み上げでは「ラジオボタン」としか
-                    言われない。撮影ハーネスもこれを名前で探せず、
-                    設計 `cPk8A`（対象条件）が撮れていなかった。
-                  */}
-                  <input
-                    type="radio"
-                    name="broadcast-target-mode"
-                    aria-label={mode.label}
-                    checked={targetMode === mode.value}
-                    onChange={() => {
-                      if (mode.value === 'advanced') openConditionDialog()
-                      else setTargetMode(mode.value)
-                    }}
-                    className="mt-0.5"
-                  />
-                  <span className="text-ink text-sm font-semibold">{mode.label}</span>
-                </span>
-                <span className="text-ink-faint pl-6 text-xs leading-relaxed">{mode.description}</span>
-              </label>
+                name="broadcast-target-mode"
+                value={mode.value}
+                checked={targetMode === mode.value}
+                onChange={() => {
+                  if (mode.value === 'advanced') openConditionDialog()
+                  else setTargetMode(mode.value)
+                }}
+                title={mode.label}
+                note={mode.description}
+              />
             ))}
-          </div>
+          </RadioCardGroup>
           {audienceNotice && targetMode === 'advanced' && conditionHasAnalyticsAudience(condition) && (
             <div className="bg-accent-soft rounded-card mt-3 flex flex-wrap items-center justify-between gap-2 p-3">
               <p className="text-ink text-sm">
@@ -2398,15 +2377,11 @@ export default function BroadcastForm({
           <li className="flex items-center gap-2"><span className={testResult?.kind === 'success' ? 'text-success' : testResult ? 'text-danger' : 'text-warning'}>{testResult?.kind === 'success' ? '✓' : '!'}</span><span>{testResult?.kind === 'success' ? 'テスト送信が完了しています' : testResult ? 'テスト送信で届かなかった宛先があります' : 'テスト送信がまだです'}</span></li>
           <li className="flex items-center gap-2"><span className={quotaInsufficient || lengthNotice.tone === 'error' ? 'text-danger' : quotaAvailable ? 'text-success' : 'text-warning'}>{quotaInsufficient || lengthNotice.tone === 'error' ? '!' : quotaAvailable ? '✓' : '○'}</span><span>{visualQaAugustCampaign ? '送信枠を超えていません' : quotaInsufficient ? `送信枠が${Math.max(0, quota.planned - (quota.remaining ?? 0)).toLocaleString('ja-JP')}通不足しています` : quotaAvailable ? `送信枠は残り${quota.remaining?.toLocaleString('ja-JP')}通です` : '送信枠を確認できません'}</span></li>
         </ul>
-        {!visualQaAugustCampaign && <label className="border-hairline mt-4 flex cursor-pointer items-center gap-3 border-t pt-4 text-sm font-semibold text-ink">
-          <input
-            type="checkbox"
-            checked={previewConfirmed}
-            onChange={(event) => setPreviewConfirmed(event.target.checked)}
-            className="size-4 accent-[var(--color-accent-deep)]"
-          />
-          <span>{previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です'}</span>
-        </label>}
+        {!visualQaAugustCampaign && <Checkbox
+          checked={previewConfirmed}
+          onCheckedChange={setPreviewConfirmed}
+          className="border-hairline mt-4 border-t pt-4"
+        >{previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です'}</Checkbox>}
       </section>
 
       {/*

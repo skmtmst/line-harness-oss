@@ -6,6 +6,7 @@ import type { Folder, FriendField, ReminderDraftSettings, ReminderDraftStep, Rem
 import { api, eventsApi, type EventListItem } from '@/lib/api'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
@@ -399,15 +400,11 @@ export default function NewReminderPage() {
               </Field>
               {fieldsLoadState === 'ready' && dateFields.length === 0 ? <small>このアカウントに日付型の情報欄がまだありません。友だち情報欄から追加してください。</small> : null}
               <div className="mt-3">
-                <label className="flex items-center gap-2 text-sm font-bold text-ink">
-                  <input
-                    type="checkbox"
-                    checked={repeatYearly}
-                    onChange={(event) => setRepeatYearly(event.target.checked)}
-                    aria-label="毎年くり返す"
-                  />
-                  毎年くり返す（誕生日・契約更新日など）
-                </label>
+                <Checkbox
+                  checked={repeatYearly}
+                  onCheckedChange={setRepeatYearly}
+                  aria-label="毎年くり返す"
+                >毎年くり返す（誕生日・契約更新日など）</Checkbox>
                 {repeatYearly ? (
                   <div className="mt-2">
                     <Field label="2月29日が基準日のとき" note="うるう年は2月29日に届きます。平年の扱いを選んでください。">

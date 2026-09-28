@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { ApiError, api } from '@/lib/api'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import Card from '@/components/shared/card'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
@@ -269,16 +270,9 @@ export function PhotoPublications({ accountId, onBack }: { accountId: string; on
   >
     <fieldset className="grid gap-2">
       <legend className="mb-2 text-sm font-extrabold text-ink">使う場所</legend>
-      {PLACEMENT_CHOICES.map((choice) => <label className="flex items-center gap-2 rounded-control border border-hairline p-3 text-xs font-bold text-ink-secondary" key={choice.type}>
-        <input
-          type="checkbox"
-          checked={selectedPlacements.includes(choice.type)}
-          onChange={(event) => setSelectedPlacements((current) => event.target.checked
-            ? [...current, choice.type]
-            : current.filter((value) => value !== choice.type))}
-        />
-        <span>{choice.label}</span>
-      </label>)}
+      {PLACEMENT_CHOICES.map((choice) => <Checkbox key={choice.type} checked={selectedPlacements.includes(choice.type)} onCheckedChange={(checked) => setSelectedPlacements((current) => checked
+        ? [...current, choice.type]
+        : current.filter((value) => value !== choice.type))}>{choice.label}</Checkbox>)}
       <p className="text-xs leading-relaxed text-ink-faint">何も選ばず保存すると、現在の掲載先だけを外します。写真の公開同意と審査履歴は残ります。</p>
     </fieldset>
   </Dialog>}
