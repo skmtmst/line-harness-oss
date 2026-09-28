@@ -1,6 +1,9 @@
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { boundedListLimit, jstNow, nonNegativeListOffset, toJstString } from './utils.js';
-import { resolveAffiliateAttribution } from './affiliate-attribution.js';
+import {
+  explainAffiliateAttribution,
+  recordAttributionDecision,
+} from './affiliate-attribution.js';
 import { isFriendExcludedByConversion, readConversionExclusion } from './conversion-exclusions.js';
 // =============================================================================
 // Conversion Points & Events — CV Tracking
@@ -592,12 +595,14 @@ export async function trackConversion(
       ? measuredValue(point)
       : null;
 
-  // Resolve last-touch affiliate attribution before inserting the event.
-  // 地点ごとに期間を狭めたい場合があるので attribution_days を渡す
-  // （NULL なら全体の既定 90 日）。
-  const attr = await resolveAffiliateAttribution(db, input.friendId, undefined, {
+  // 付け方の判断(#823)。候補を新しい順に並べ、決まりをすべて満たす
+  // 最初の紹介に付ける。地点ごとに期間を狭めたい場合は attribution_days を渡す。
+  // 付けなかった理由も残し、成果の詳細で1件ずつ説明できるようにする。
+  const explanation = await explainAffiliateAttribution(db, input.friendId, now, {
     windowDays: point.attribution_days ?? undefined,
+    lineAccountId: friend.line_account_id ?? null,
   });
+  const attr = explanation.decision;
 
   // Affiliate-attributed CVs enter the approval queue as 'pending'; non-attributed
   // CVs leave approval_status NULL (the approval flow only applies to attributed rows).
@@ -771,6 +776,16 @@ export async function trackConversion(
     .bind(id)
     .first<ConversionEvent>();
   if (!created) throw new Error('conversion_event_insert_failed');
+  // 付け方の判断を成果に結びつけて残す。同じ成果の再送は最初の記録を保つ。
+  // 記録に失敗しても成果自体は失わない(成果の取りこぼしより記録の欠落を選ぶ)。
+  try {
+    await recordAttributionDecision(db, id, input.friendId, input.conversionPointId, explanation);
+  } catch (err) {
+    console.error('attribution decision unreadable:', {
+      conversionEventId: id,
+      err: err instanceof Error ? err.message : String(err),
+    });
+  }
   return created;
 }
 
