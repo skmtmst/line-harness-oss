@@ -119,6 +119,8 @@ describe('共通部品の影響範囲', () => {
       'app/reminders/page.tsx',
       // 2026-09-23: Googleビジネスの口コミ一覧（★V6 GB-2）。20件ずつのページ送り。
       'app/restaurant-test/google/google-business.tsx',
+      // Googleビジネス第3段: 投稿一覧（GB-4 MAozg）の表の下にページ送りがある。
+      'app/restaurant-test/google/google-posts.tsx',
       // Googleビジネス第2段: 変更履歴（GB-17 w7ZTml）の表の下にページ送りがある。
       'app/restaurant-test/google/google-profile.tsx',
       // #919: 予約台帳が増えても消えないよう、期間・状態の絞り込みと20件ずつのページ送りに寄せた。
