@@ -5,6 +5,7 @@ import { api } from '@/lib/api'
 import type { ScenarioActionType } from '@/lib/api'
 import { ActionConfigEditor, ACTION_KINDS } from '@/components/scenarios/action-editor'
 import Select from '@/components/shared/select'
+import { actionIncompleteReason } from './action-completeness'
 import { newActionKey, type InlineAction } from './draft-fields'
 import { useAccount } from '@/contexts/account-context'
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
@@ -142,7 +143,14 @@ export default function InlineActionList({
         </p>
       )}
 
-      {actions.map((action, index) => (
+      {actions.map((action, index) => {
+        /*
+         * R255: 必須の中身が空の処理は「未完成」の札を付け、保存の前に知らせる。
+         * 下書き保存自体は止めない（後から埋められる）が、不備が見えないまま
+         * 完成と思い込むのを防ぐ。札の形はシナリオの終了後の処理（#961）と同じ。
+         */
+        const incompleteReason = actionIncompleteReason(action.actionType, action.config)
+        return (
         <div key={action.key} className="border-hairline rounded-control border p-3">
           <div className="mb-2 flex items-center justify-between gap-2">
             <span className="text-ink text-xs font-semibold">
@@ -212,9 +220,17 @@ export default function InlineActionList({
               vars={vars}
               onChange={(config) => update(action.key, config)}
             />
+            {incompleteReason ? (
+              <p className="mt-2">
+                <span className="bg-warning-bg text-warning rounded-pill px-2 py-0.5 font-medium" style={{ fontSize: 10 }}>
+                  未完成 — {incompleteReason}
+                </span>
+              </p>
+            ) : null}
           </div>
         </div>
-      ))}
+        )
+      })}
 
       <div className="flex flex-wrap gap-1.5">
         {ACTION_KINDS.filter((kind) => !kind.feature || actionFeatureVisibility.enabled(kind.feature)).map((kind) => (

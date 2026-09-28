@@ -104,6 +104,46 @@ describe('名前', () => {
       }),
     ).toEqual([])
   })
+
+  /*
+   * R258: 検索対象の指定と未指定を区別する。空配列は「選んでいない」
+   * 状態のまま保存されたもので、全欄へ広げず作り直しを促す。
+   * 未指定（古い保存形）はこれまでどおり全欄で探す。
+   */
+  it('R258 空配列は全欄へ広がらない（作り直しを促す）', () => {
+    const empty: SegmentCondition = {
+      operator: 'AND',
+      rules: [{ type: 'name', value: { text: '田中', targets: [] } }],
+    }
+    expect(() => buildSegmentQuery(empty)).toThrow(/at least one target/)
+  })
+
+  it('R258 未指定は古い保存形として全欄で探す', async () => {
+    raw.prepare(`UPDATE friends SET display_name = 'ニックネーム' WHERE id = 'a'`).run()
+    // targets が無い古い形。real_name の値でも当たる。
+    expect(
+      await idsMatching({
+        operator: 'AND',
+        rules: [{ type: 'name', value: { text: '田中太郎' } }],
+      }),
+    ).toEqual(['a'])
+  })
+
+  it('R258 複数選択は選んだ欄だけで判定する', async () => {
+    raw.prepare(`UPDATE friends SET display_name = 'ニックネーム' WHERE id = 'a'`).run()
+    expect(
+      await idsMatching({
+        operator: 'AND',
+        rules: [{ type: 'name', value: { text: '田中太郎', targets: ['display', 'real'] } }],
+      }),
+    ).toEqual(['a'])
+    expect(
+      await idsMatching({
+        operator: 'AND',
+        rules: [{ type: 'name', value: { text: '田中太郎', targets: ['display', 'system'] } }],
+      }),
+    ).toEqual([])
+  })
 })
 
 describe('友だち情報欄', () => {
