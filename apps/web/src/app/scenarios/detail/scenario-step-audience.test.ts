@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { describeStepAudience } from './scenario-step-audience'
+import { describeStepAudience, stepKindLabel, stepListTitle } from './scenario-step-audience'
 
 /*
   **形が違う値で落ちないことを、試験で押さえる。**
@@ -53,5 +53,37 @@ describe('配信対象の桁は、形が違う値で落ちない', () => {
     const text = describeStepAudience(raw, [])
     expect(text).toBe('詳細条件 1件')
     expect(text).not.toContain('tag-')
+  })
+})
+
+/*
+ * R215: 質問のステップが一覧で空欄のテキストとして表示される。
+ * 質問文は編集画面で残るのに、一覧の内容欄は空のボタン・種別テキストに
+ * なっていた。質問文を見出しにし、種別を「質問・分岐」と出す。
+ * 直しを戻す（本文だけ見る）と、この試験は赤くなる。
+ */
+describe('R215: 一覧の内容と種別は質問文を出す', () => {
+  const question = { text: '体調はいかがですか？', tapMode: 'single', choices: [] }
+
+  it('質問がある通は質問文が見出しになる（本文が空でも）', () => {
+    expect(stepListTitle({ messageContent: ' ', question }, null)).toBe('体調はいかがですか？')
+  })
+
+  it('質問がある通の種別は質問・分岐になる', () => {
+    expect(stepKindLabel({ question }, null, 'テキスト')).toBe('質問・分岐')
+  })
+
+  it('質問が無い通はこれまでどおり本文と種別を出す', () => {
+    expect(stepListTitle({ messageContent: 'こんにちは', question: null }, null)).toBe('こんにちは')
+    expect(stepKindLabel({ question: null }, null, 'テキスト')).toBe('テキスト')
+  })
+
+  it('テンプレの通はテンプレ名とテンプレートを出す', () => {
+    expect(stepListTitle({ messageContent: ' ', question }, '春の案内')).toBe('春の案内')
+    expect(stepKindLabel({ question }, '春の案内', 'テキスト')).toBe('テンプレート')
+  })
+
+  it('空の通は空の印を出す', () => {
+    expect(stepListTitle({ messageContent: ' ', question: null }, null)).toBe('（空）')
   })
 })
