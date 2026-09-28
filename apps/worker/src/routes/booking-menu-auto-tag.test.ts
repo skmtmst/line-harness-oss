@@ -26,7 +26,8 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { Env } from '../index.js';
 
 // 送る側(LINE 通知)は対象外。予約の成否とタグ付与だけを見る。
-vi.mock('../services/booking-notifier.js', () => ({
+vi.mock('../services/booking-notifier.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../services/booking-notifier.js')>()),
   sendBookingNotification: vi.fn(async () => ({ ok: true })),
 }));
 vi.mock('../services/account-access.js', () => ({

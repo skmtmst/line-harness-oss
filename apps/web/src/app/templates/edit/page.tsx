@@ -298,6 +298,13 @@ function templateUsageEntries(usedBy: TemplateUsedBy): Array<{
       href: `/reminders/edit?id=${usage.reminderId}`,
       label: `リマインダ「${usage.reminderName}」`,
     })),
+    // R347: 旧公開版に固定された登録も本文は今のテンプレートを読むため、
+    // 変更の影響先に出す。消すのではなく版と状態を添える。
+    ...(usedBy.reminderEnrollments ?? []).map((usage) => ({
+      key: `reminder-enrollment-${usage.enrollmentId}`,
+      href: `/reminders/detail?id=${usage.reminderId}`,
+      label: `リマインダ「${usage.reminderName}」第${usage.versionNumber}版（${usage.enrollmentStatus === 'cancelled' ? '取消ずみ' : '送信待ち'}）`,
+    })),
     ...usedBy.richMenuAreas.map((usage) => ({
       key: `rich-menu-${usage.areaId}`,
       href: `/rich-menus/edit?id=${usage.groupId}`,

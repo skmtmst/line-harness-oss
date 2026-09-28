@@ -339,3 +339,74 @@ export async function getBroadcastDeleteBlockers(
   const refs = await listBroadcastReferences(db, templateId);
   return refs.filter((ref) => ref.status === 'scheduled' || ref.status === 'sending');
 }
+
+export interface PinnedReminderTemplateReference {
+  enrollmentId: string;
+  reminderId: string;
+  reminderName: string;
+  versionNumber: number;
+  enrollmentStatus: 'active' | 'cancelled' | 'completed';
+  targetDate: string;
+}
+
+/**
+ * R347: 旧公開版に固定された登録から、テンプレートを使うものを返す。
+ * 現行の reminder_steps だけ見ると、版を切り替えた途端に使用先が0件に
+ * 見える。登録は reminder_version_id で版に固定され、その版の手順が持つ
+ * template_id で送るため、こちらの参照が消えたことにならない。
+ * 同じ登録が複数手順で同じテンプレートを使うときは1件にまとめる
+ * （一覧の数と使用先の件数をずらさない）。
+ *
+ * templateAccountId を渡すと、getTemplateUsage と同じく「同じアカウント
+ * or 未設定」の使用先だけに絞る（#891）。
+ */
+export async function listPinnedReminderTemplateReferences(
+  db: D1Database,
+  templateId: string,
+  templateAccountId?: string | null,
+): Promise<PinnedReminderTemplateReference[]> {
+  const scope = templateAccountId ? ' AND (r.line_account_id IS NULL OR r.line_account_id = ?)' : '';
+  const binds = templateAccountId ? [templateId, templateAccountId] : [templateId];
+  const result = await db
+    .prepare(
+      `SELECT DISTINCT fr.id AS enrollment_id, fr.reminder_id, r.name AS reminder_name,
+              rv.version_number, fr.status AS enrollment_status, fr.target_date
+         FROM friend_reminders fr
+         JOIN reminders r ON r.id = fr.reminder_id
+         JOIN reminder_versions rv ON rv.id = fr.reminder_version_id
+         JOIN reminder_version_steps rvs ON rvs.reminder_version_id = rv.id
+        WHERE rvs.template_id = ?${scope}
+        ORDER BY r.name, fr.target_date, fr.id`,
+    )
+    .bind(...binds)
+    .all<{
+      enrollment_id: string;
+      reminder_id: string;
+      reminder_name: string;
+      version_number: number;
+      enrollment_status: string;
+      target_date: string;
+    }>();
+  return (result.results ?? []).map((row) => ({
+    enrollmentId: row.enrollment_id,
+    reminderId: row.reminder_id,
+    reminderName: row.reminder_name,
+    versionNumber: Number(row.version_number),
+    enrollmentStatus: row.enrollment_status as PinnedReminderTemplateReference['enrollmentStatus'],
+    targetDate: row.target_date,
+  }));
+}
+
+/**
+ * R347: 削除を止める登録。送信待ち（active）と取消ずみ（cancelled）だけ。
+ * 取消ずみは再開すると固定した版で送り直すため、止める側に入れる。
+ * 送り終わった（completed）登録はもう送らないので止めない。
+ */
+export async function getPinnedReminderDeleteBlockers(
+  db: D1Database,
+  templateId: string,
+  templateAccountId?: string | null,
+): Promise<PinnedReminderTemplateReference[]> {
+  const refs = await listPinnedReminderTemplateReferences(db, templateId, templateAccountId);
+  return refs.filter((ref) => ref.enrollmentStatus === 'active' || ref.enrollmentStatus === 'cancelled');
+}

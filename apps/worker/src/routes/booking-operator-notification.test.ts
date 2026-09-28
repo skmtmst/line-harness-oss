@@ -35,7 +35,8 @@ vi.mock('../services/event-bus.js', async (importOriginal) => ({
   fireOutgoingWebhooks,
 }));
 // 送る側(顧客への LINE 通知)は対象外。予約の成否と運用者通知だけを見る。
-vi.mock('../services/booking-notifier.js', () => ({
+vi.mock('../services/booking-notifier.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../services/booking-notifier.js')>()),
   sendBookingNotification: vi.fn(async () => ({ ok: true })),
 }));
 vi.mock('../services/account-access.js', () => ({

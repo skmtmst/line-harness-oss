@@ -18,6 +18,7 @@ import {
   listBroadcastReferences,
   listTemplateReferences,
   getBroadcastDeleteBlockers,
+  getPinnedReminderDeleteBlockers,
   MediaReferenceAccountError,
 } from '@line-crm/db';
 import type { TemplateRow } from '@line-crm/db';
@@ -370,6 +371,10 @@ templates.get('/api/templates/:id', async (c) => {
     const usedBy = await usageWithVersions(c.env.DB, id, item.line_account_id);
     // 467: 一斉配信の参照は参照表から足す（送った時の版のまま）。
     const broadcasts = await listBroadcastReferences(c.env.DB, id);
+    // R347: 旧公開版に固定された送信待ち・取消ずみの登録も使用先に出す。
+    const reminderEnrollments = await getPinnedReminderDeleteBlockers(
+      c.env.DB, id, item.line_account_id,
+    );
     return c.json({
       success: true,
       data: {
@@ -386,7 +391,7 @@ templates.get('/api/templates/:id', async (c) => {
         carouselTapLimitMode: draftCarouselTapLimitModeOf(item),
         carouselTapLimitText: draftCarouselTapLimitTextOf(item),
         ...versionInfoOf(item),
-        usedBy: { ...usedBy, broadcasts },
+        usedBy: { ...usedBy, broadcasts, reminderEnrollments },
         createdAt: item.created_at,
         updatedAt: item.updated_at,
       },
@@ -442,7 +447,11 @@ templates.get('/api/templates/:id/usages', async (c) => {
     // 467: 一斉配信の参照は参照表から足す（送った時の版のまま）。
     const usage = await usageWithVersions(c.env.DB, templateId, tpl.line_account_id);
     const broadcasts = await listBroadcastReferences(c.env.DB, templateId);
-    return c.json({ success: true, data: { ...usage, broadcasts } });
+    // R347: 旧公開版に固定された送信待ち・取消ずみの登録も使用先に出す。
+    const reminderEnrollments = await getPinnedReminderDeleteBlockers(
+      c.env.DB, templateId, tpl.line_account_id,
+    );
+    return c.json({ success: true, data: { ...usage, broadcasts, reminderEnrollments } });
   } catch (err) {
     console.error('GET /api/templates/:id/usages error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
@@ -937,12 +946,23 @@ templates.delete('/api/templates/:id', requireRole('owner', 'admin'), async (c) 
     // 送った配信は送った時の版のまま残り、下書きは本文の写しで作り直せる。
     const blockers = await getBroadcastDeleteBlockers(c.env.DB, id);
     const broadcasts = await listBroadcastReferences(c.env.DB, id);
-    if (usageCount > 0 || blockers.length > 0) {
+    // R347: 旧公開版に固定された送信待ち・取消ずみ（再開できる）の登録が
+    // 使っているものも消せない。消すと固定した版の本文が控えに変わる。
+    const reminderBlockers = await getPinnedReminderDeleteBlockers(
+      c.env.DB, id, existing.line_account_id,
+    );
+    if (usageCount > 0 || blockers.length > 0 || reminderBlockers.length > 0) {
       const named = blockers.slice(0, 3).map((b) => `「${b.title}」`).join('、');
       const rest = blockers.length > 3 ? `ほか${blockers.length - 3}件` : '';
+      const reminderNames = [...new Set(reminderBlockers.map((b) => b.reminderName))];
+      const reminderNamed = reminderNames.slice(0, 3).map((name) => `「${name}」`).join('、');
+      const reminderRest = reminderNames.length > 3 ? `ほか${reminderNames.length - 3}件` : '';
       const reasons: string[] = [];
       if (blockers.length > 0) {
         reasons.push(`予約済み・送信中の配信${blockers.length}件（${named}${rest}）で使われています`);
+      }
+      if (reminderBlockers.length > 0) {
+        reasons.push(`送信待ちの通知${reminderBlockers.length}件（${reminderNamed}${reminderRest}）が使っています`);
       }
       if (usageCount > 0) {
         reasons.push(`${usageCount}件の設定で使用中です`);
@@ -950,7 +970,7 @@ templates.delete('/api/templates/:id', requireRole('owner', 'admin'), async (c) 
       return c.json({
         success: false,
         code: 'IN_USE',
-        usageCount: usageCount + blockers.length,
+        usageCount: usageCount + blockers.length + reminderBlockers.length,
         error: `${reasons.join('。')}。先に使用先を差し替えてください。`,
         usedBy: { ...usage, broadcasts },
         blockers,

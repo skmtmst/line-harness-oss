@@ -103,6 +103,21 @@ describe('m21o タグ一覧のフォルダ欄と件数', () => {
     expect(labeled[0].textContent).toContain('EC連携')
   })
 
+  it('タグ総数は「1–20 / N件」の1か所だけ。フォルダ帯とKPIに重ねない', () => {
+    render(<TagsPageV4 accountId="account-a" fixture={{ items: ITEMS, groups: GROUPS }} />)
+    // 残すのは一覧の上の「1–2 / 2件」だけ。
+    expect(screen.getByText(/1.2 \/ 2件/)).toBeTruthy()
+    // フォルダ帯の「すべて」行は一覧総数と同じ数なので出さない
+    // （各フォルダ・未分類の内訳はフォルダの数として出す）。
+    for (const row of screen.getAllByRole('button', { name: 'すべて' })) {
+      expect(row.textContent).toBe('すべて')
+    }
+    // 狭い幅のフォルダ絞り込みにも総数を重ねない。
+    expect(screen.queryByText(/フォルダ：すべて（/)).toBeNull()
+    // KPI の「タグ数」は同じ総数の重ね書きだったため「未使用」へ置き換えた。
+    expect(screen.queryByText('タグ数')).toBeNull()
+  })
+
   it('件数は絞り込みと同じ流れの末尾（右端）にあり、単独の行を作らない', () => {
     render(<TagsPageV4 accountId="account-a" fixture={{ items: ITEMS, groups: GROUPS }} />)
     const pager = screen.getByRole('button', { name: '表示件数' })

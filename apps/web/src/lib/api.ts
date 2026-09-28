@@ -9754,6 +9754,8 @@ export const api = {
           trackedLinks: Array<{ id: string; name: string }>;
           /** 467: 一斉配信の参照（送った時の版のまま）。 */
           broadcasts: Array<{ broadcastId: string; title: string; status: string; scheduledAt: string | null; templateVersionNumber: number | null; referenceMode: 'fixed' | 'latest' }>;
+          /** R347: 旧公開版に固定された送信待ち・取消ずみの登録。 */
+          reminderEnrollments?: Array<{ enrollmentId: string; reminderId: string; reminderName: string; versionNumber: number; enrollmentStatus: string; targetDate: string }>;
         };
         createdAt: string;
         updatedAt: string;
@@ -9842,6 +9844,8 @@ export const api = {
         trackedLinks: Array<{ id: string; name: string }>;
         /** 467: 一斉配信の参照（送った時の版のまま）。 */
         broadcasts: Array<{ broadcastId: string; title: string; status: string; scheduledAt: string | null; templateVersionNumber: number | null; referenceMode: 'fixed' | 'latest' }>;
+        /** R347: 旧公開版に固定された送信待ち・取消ずみの登録。 */
+        reminderEnrollments: Array<{ enrollmentId: string; reminderId: string; reminderName: string; versionNumber: number; enrollmentStatus: string; targetDate: string }>;
       }>>(`/api/templates/${id}/usages`),
     /**
      * 466: 版の履歴。新しい版から返る。status は in_use / reserved / past。
