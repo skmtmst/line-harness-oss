@@ -25,7 +25,8 @@ export default function MediaPreviewOverlay({
   return (
     <div
       ref={overlayRef}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-6"
+      className="fixed inset-0 z-50 flex items-center justify-center p-6"
+      style={{ background: 'color-mix(in srgb, var(--color-ink) 60%, transparent)' }}
       role="dialog"
       aria-modal="true"
       aria-label={`${filename}のプレビュー`}
