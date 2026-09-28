@@ -444,6 +444,12 @@ const inputClass =
 
 function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEditorProps) {
   const v = rule.value as Record<string, unknown>
+  /*
+   * R258: 名前の検索対象は1つ以上必要。最後の1つを外そうとしたら
+   * 外さずに欄の下で理由を知らせる（曜日・受信元と同じ扱い）。
+   * 外したまま保存されると判定側が全欄へ広げていた。
+   */
+  const [nameTargetsNotice, setNameTargetsNotice] = useState(false)
 
   // タグは4つの演算子で type そのものが変わる。1つの行として扱う。
   if (rule.type.startsWith('tag_')) {
@@ -484,14 +490,20 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
   }
 
   switch (rule.type) {
-    case 'name':
+    case 'name': {
+      const nameTargets = Array.isArray(v.targets) ? (v.targets as string[]) : []
+      const nameText = String(v.text ?? '')
+      const changeName = (next: Record<string, unknown>) => {
+        setNameTargetsNotice(false)
+        onChange({ type: rule.type, value: next })
+      }
       return (
         <>
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-ink text-sm font-medium">名前</span>
             <input
-              value={String(v.text ?? '')}
-              onChange={(e) => onChange({ type: rule.type, value: { ...v, text: e.target.value } })}
+              value={nameText}
+              onChange={(e) => changeName({ ...v, text: e.target.value })}
               placeholder="半角スペースで区切るといずれかに一致"
               aria-label="名前に含む文字"
               className={inputClass}
@@ -503,23 +515,25 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
               { key: 'real', label: '本名' },
               { key: 'system', label: 'システム表示名' },
             ].map((t) => {
-              const targets = Array.isArray(v.targets) ? (v.targets as string[]) : []
               return (
                 <label key={t.key} className="text-ink-secondary flex items-center gap-1.5 text-xs">
                   <input
                     type="checkbox"
-                    checked={targets.includes(t.key)}
-                    onChange={(e) =>
-                      onChange({
-                        type: rule.type,
-                        value: {
-                          ...v,
-                          targets: e.target.checked
-                            ? [...targets, t.key]
-                            : targets.filter((x) => x !== t.key),
-                        },
+                    checked={nameTargets.includes(t.key)}
+                    onChange={(e) => {
+                      // 最後の1つは外さない。外したまま保存されると
+                      // 判定側が全欄へ広げてしまう（R258）。
+                      if (!e.target.checked && nameTargets.length === 1 && nameTargets.includes(t.key)) {
+                        setNameTargetsNotice(true)
+                        return
+                      }
+                      changeName({
+                        ...v,
+                        targets: e.target.checked
+                          ? [...nameTargets, t.key]
+                          : nameTargets.filter((x) => x !== t.key),
                       })
-                    }
+                    }}
                   />
                   {t.label}
                 </label>
@@ -527,8 +541,14 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
             })}
             <span className="text-ink-faint text-xs">から検索</span>
           </div>
+          {nameTargetsNotice || (nameTargets.length === 0 && nameText.trim() !== '') ? (
+            <p role="status" className="text-ink-secondary text-xs">
+              検索対象は1つ以上必要です。探す欄を1つ以上選んでください。
+            </p>
+          ) : null}
         </>
       )
+    }
 
     case 'private_memo':
     case 'status_message':

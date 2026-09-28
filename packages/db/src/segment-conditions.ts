@@ -402,6 +402,15 @@ function buildRuleClause(rule: SegmentRule): { sql: string; bindings: unknown[] 
       const targets = rawTargets.filter(
         (t): t is string => typeof t === 'string' && t in NAME_COLUMNS,
       )
+      /*
+       * R258: targets の指定と未指定を区別する。空配列は「選んでいない」
+       * 状態のまま保存されたもので、全欄への拡大はしない（fail-closed。
+       * 空文字や空IDと同じく作り直しを促す）。未指定（古い保存形）は
+       * これまでどおり全欄で探す。
+       */
+      if (Array.isArray(v.targets) && targets.length === 0) {
+        throw new Error('name rule requires at least one target')
+      }
       const columns = (targets.length > 0 ? targets : Object.keys(NAME_COLUMNS)).map(
         (t) => NAME_COLUMNS[t],
       )
