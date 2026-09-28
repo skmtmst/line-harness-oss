@@ -337,6 +337,28 @@ describe('A-8 friends tenant scope', () => {
     expect((await createApp([]).request('/api/friends?scoreMin=70&scoreMax=30')).status).toBe(400);
   });
 
+  test('R300: scoredOnly=1 で未採点の0点を除く（低い帯の引き継ぎ）', async () => {
+    mocks.canAccess.mockResolvedValue(true);
+    const prepared: Array<{ sql: string; binds: unknown[] }> = [];
+    const response = await createApp(prepared).request(
+      '/api/friends?lineAccountId=own&scoreMax=29&scoredOnly=1&includeTags=false',
+    );
+    expect(response.status).toBe(200);
+    expect(prepared.some(({ sql, binds }) =>
+      sql.includes('f.score <= ?') && sql.includes('f.score != 0')
+      && sql.includes('FROM friend_scores scored_only') && binds.includes(29))).toBe(true);
+  });
+
+  test('R300: scoredOnlyを付けない既存の呼び出しは従来どおり', async () => {
+    mocks.canAccess.mockResolvedValue(true);
+    const prepared: Array<{ sql: string; binds: unknown[] }> = [];
+    const response = await createApp(prepared).request(
+      '/api/friends?lineAccountId=own&scoreMax=29&includeTags=false',
+    );
+    expect(response.status).toBe(200);
+    expect(prepared.some(({ sql }) => sql.includes('scored_only'))).toBe(false);
+  });
+
   test('分析対象者はアカウント指定がなければ検索しない', async () => {
     const response = await createApp([]).request('/api/friends?audienceId=audience-a');
     expect(response.status).toBe(400);

@@ -467,6 +467,17 @@ friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) =>
       conditions.push('f.score <= ?');
       binds.push(scoreMax.value);
     }
+    /*
+     * R300: 行動スコア一覧の帯は「点数がついている人」だけを数える
+     * （`f.score != 0 OR 履歴あり`）。低い帯の引き継ぎ（`?scoredOnly=1`）では
+     * 未採点の0点を含めず、一覧・検索・配信の対象定義をそろえる。
+     * 付けない既存の呼び出しは従来どおり（点数範囲だけ）。
+     */
+    if (c.req.query('scoredOnly') === '1') {
+      conditions.push(
+        '(f.score != 0 OR EXISTS (SELECT 1 FROM friend_scores scored_only WHERE scored_only.friend_id = f.id))',
+      );
+    }
     // Unhandled filter: chats.status === 'unread'.
     //
     // We derive 対応マーク from chats.status — the same model the /chats UI

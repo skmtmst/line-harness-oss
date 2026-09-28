@@ -178,6 +178,8 @@ export function buildBroadcastHandoff(input: {
   attentionOnly: boolean
   scoreMin?: number
   scoreMax?: number
+  /** R300: 行動スコアの帯から来たとき `true`。未採点の0点を対象から除く。 */
+  scoredOnly?: boolean
   audienceId: string
   advanced: AdvancedSearchResult | null
 }): BroadcastHandoff {
@@ -200,7 +202,10 @@ export function buildBroadcastHandoff(input: {
     rules.push({ type: 'metadata_equals', value: { key: '__attention', value: '1' } })
   }
   if (input.scoreMin !== undefined || input.scoreMax !== undefined) {
-    rules.push({ type: 'score_range', value: { min: input.scoreMin, max: input.scoreMax } })
+    rules.push({
+      type: 'score_range',
+      value: { min: input.scoreMin, max: input.scoreMax, ...(input.scoredOnly ? { scoredOnly: true } : {}) },
+    })
   }
   if (input.audienceId) {
     rules.push({ type: 'analytics_audience', value: { audienceId: input.audienceId } })

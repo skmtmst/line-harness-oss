@@ -30,6 +30,7 @@ import {
   type ActionScoreRuleTestResult,
 } from '@/lib/api'
 import { localDateTime, utcDateTime } from '@/lib/presentation'
+import { validateRuleName, validateTestScore } from './score-rules-validation'
 
 type ConfirmAction = { kind: 'publish'; draftVersionId: string } | { kind: 'stop' } | null
 
@@ -159,6 +160,14 @@ export default function ActionScoreRulesPage() {
   const [testScore, setTestScore] = useState('30')
   const [testEvent, setTestEvent] = useState<string>(EVENT_OPTIONS[0].value)
   const [testResult, setTestResult] = useState<ActionScoreRuleTestResult | null>(null)
+  /*
+   * R301: 試算後に点数・行動を変えたら古い成功結果を残さない。入力のたび
+   * 結果を消し、要求ごとの番号で遅れて届いた古い応答も新しい入力へ
+   * 表示しない（入力を変えると番号が進み、古い応答は捨てられる）。
+   */
+  const testRunRef = useRef(0)
+  // R303: 空の表示名で「設定を反映」したときの理由。欄の下で見せる。
+  const [editError, setEditError] = useState('')
   // R130: 試算の入力ミスは窓の外ではなく窓の中・欄の下で見せる。
   const [testError, setTestError] = useState('')
   const [testScoreError, setTestScoreError] = useState('')
@@ -239,10 +248,24 @@ export default function ActionScoreRulesPage() {
   const closeEditor = () => {
     setEditRuleIndex(null)
     setEditDraft(null)
+    setEditError('')
   }
 
+  /*
+   * R303: 空・空白の表示名では一覧へ追加せず、編集窓を維持して欄の下に
+   * 理由を出す。新規追加も既存の編集も同じ条件で検証し、直してから反映する。
+   */
   const applyEditor = () => {
-    if (editRuleIndex !== null && editDraft) updateRule(editRuleIndex, editDraft)
+    if (editRuleIndex === null || !editDraft) {
+      closeEditor()
+      return
+    }
+    const checked = validateRuleName(editDraft.name)
+    if (!checked.ok) {
+      setEditError(checked.error)
+      return
+    }
+    updateRule(editRuleIndex, { ...editDraft, name: checked.value })
     closeEditor()
   }
 
@@ -377,6 +400,13 @@ export default function ActionScoreRulesPage() {
     if (!selectedAccountId || !bundle) return
     const accountAtRequest = selectedAccountId
     const [eventType, source] = testEvent.split('|')
+    // R302: 空欄・空白だけは必須エラーにし、0として送らない。
+    const checked = validateTestScore(testScore, bundle.bands)
+    if (!checked.ok) {
+      setTestScoreError(checked.error)
+      return
+    }
+    const runId = ++testRunRef.current
     setBusy(true)
     setTestError('')
     setTestScoreError('')
@@ -385,11 +415,13 @@ export default function ActionScoreRulesPage() {
       const response = await api.actionScores.testRules({
         accountId: accountAtRequest,
         configuration: bundle,
-        currentScore: Number(testScore),
+        currentScore: checked.value,
         eventType,
         source: source || null,
       })
       if (accountAtRequest !== latestAccountRef.current) return
+      // R301: 待っている間に点数・行動が変わったら、この応答は古いので捨てる。
+      if (testRunRef.current !== runId) return
       if (!response.success) throw new Error(response.error)
       setTestResult(response.data)
     } catch (error) {
@@ -554,8 +586,8 @@ export default function ActionScoreRulesPage() {
         footer={<div className="flex justify-end gap-2"><Button variant="primary" onClick={() => void runTest()} disabled={busy}>この条件をテスト</Button></div>}
       >
         <div className="grid gap-3">
-          <Field label="テスト前の点数" htmlFor="test-score" note={`${bundle?.bands.min ?? 0}〜${bundle?.bands.max ?? 100}の整数で入力`} error={testScoreError || undefined}><TextInput id="test-score" type="number" value={testScore} invalid={Boolean(testScoreError)} onChange={(event) => { setTestScore(event.target.value); setTestScoreError('') }} /></Field>
-          <Field label="試す行動"><Select aria-label="テストする行動" value={testEvent} onChange={(value) => { setTestEvent(value); setTestError('') }} options={[...EVENT_OPTIONS]} size="full" /></Field>
+          <Field label="テスト前の点数" htmlFor="test-score" note={`${bundle?.bands.min ?? 0}〜${bundle?.bands.max ?? 100}の整数で入力`} error={testScoreError || undefined}><TextInput id="test-score" type="number" value={testScore} invalid={Boolean(testScoreError)} onChange={(event) => { setTestScore(event.target.value); setTestScoreError(''); setTestResult(null); testRunRef.current += 1 }} /></Field>
+          <Field label="試す行動"><Select aria-label="テストする行動" value={testEvent} onChange={(value) => { setTestEvent(value); setTestError(''); setTestResult(null); testRunRef.current += 1 }} options={[...EVENT_OPTIONS]} size="full" /></Field>
           {testResult ? (
             <Notice tone="success">
               <p className="text-xs font-semibold">{testResult.scoreBefore}点 → {testResult.scoreAfter}点</p>
@@ -576,7 +608,7 @@ export default function ActionScoreRulesPage() {
             footer={<div className="flex justify-end"><Button variant="primary" onClick={() => applyEditor()}>設定を反映</Button></div>}
           >
             <div className="grid gap-3 sm:grid-cols-2">
-              <div className="sm:col-span-2"><Field label="表示名" htmlFor="rule-name"><TextInput id="rule-name" value={rule.name} onChange={(event) => updateEditDraft({ name: event.target.value })} /></Field></div>
+              <div className="sm:col-span-2"><Field label="表示名" htmlFor="rule-name" error={editError || undefined}><TextInput id="rule-name" value={rule.name} invalid={Boolean(editError)} onChange={(event) => { updateEditDraft({ name: event.target.value }); setEditError('') }} /></Field></div>
               <div className="sm:col-span-2"><Field label="きっかけ"><Select aria-label={`${rule.name}のきっかけ`} value={eventValue(rule)} onChange={(value) => {
                 const [eventType, source] = value.split('|')
                 const name = EVENT_OPTIONS.find((option) => option.value === value)?.label ?? rule.name
