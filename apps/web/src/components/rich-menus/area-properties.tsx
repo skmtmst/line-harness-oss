@@ -59,6 +59,11 @@ export function actionTypeForIntent(intent: RichMenuAreaIntent): Area['actionTyp
   return RICH_MENU_ACTION_TYPE_BY_INTENT[intent]
 }
 
+/** ボタンの動きを人間の言葉で返す。キャンバスのエリア一覧でも使う。 */
+export function intentLabelOf(area: Area): string {
+  return INTENT_OPTIONS.find((o) => o.value === intentOf(area))?.label ?? 'ボタン'
+}
+
 /** 種類を変えたときの、入力欄の初期値。 */
 function defaultActionData(intent: RichMenuAreaIntent): Record<string, unknown> {
   switch (intent) {

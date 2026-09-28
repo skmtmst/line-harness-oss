@@ -916,6 +916,13 @@ function Editor({
       await persistDraft()
       const res = await api.richMenuGroups.duplicate(group.id, crypto.randomUUID())
       if (!res.success) throw new Error(res.error ?? '複製できませんでした')
+      /*
+       * R232: 画面遷移しても確認窓の状態は残る（同じページでクエリだけ変わる）。
+       * 閉じてから移る。残ったままだと「コピーをさらに複製する？」に見えて、
+       * もう一度押すと不要なコピーが増える。
+       */
+      setConfirmKind(null)
+      setNotice(`「${group.name}」の下書きを複製しました。この画面はコピーの編集です。`)
       router.push(`/rich-menus/edit?id=${res.data.id}`)
     } catch (e) {
       setConfirmError(e instanceof Error && e.message !== '複製できませんでした'
