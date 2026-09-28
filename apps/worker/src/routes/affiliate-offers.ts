@@ -2,10 +2,15 @@ import { Hono } from 'hono';
 import type { Context } from 'hono';
 import {
   createAffiliateOffer,
-  updateAffiliateOffer,
+  createOfferVersion,
+  getCurrentOfferVersion,
+  getOfferCapStatus,
   listAffiliateOffers,
+  listOfferVersions,
+  updateAffiliateOffer,
   getAffiliateOfferById,
   type AffiliateOffer,
+  type AffiliateOfferVersion,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { auditLog } from '../lib/audit-log.js';
@@ -135,6 +140,11 @@ affiliateOffers.post('/api/affiliate-offers', requireRole('owner', 'admin'), asy
         description?: string | null;
         rewardAmount?: number;
         rewardMiles?: number;
+        windowDays?: number;
+        capTotal?: number | null;
+        capMonthlyPerAffiliate?: number | null;
+        receptionFrom?: string | null;
+        receptionTo?: string | null;
         lineAccountId?: string | null;
         tagId?: string | null;
         scenarioId?: string | null;
@@ -163,6 +173,18 @@ affiliateOffers.post('/api/affiliate-offers', requireRole('owner', 'admin'), asy
     if (body.rewardMiles !== undefined && !isValidReward(body.rewardMiles)) {
       return c.json(
         { success: false, error: 'rewardMiles must be a non-negative integer' },
+        400,
+      );
+    }
+    if (body.windowDays !== undefined && !isValidWindowDays(body.windowDays)) {
+      return c.json(
+        { success: false, error: 'windowDays must be an integer between 1 and 365' },
+        400,
+      );
+    }
+    if (!isValidCap(body.capTotal) || !isValidCap(body.capMonthlyPerAffiliate)) {
+      return c.json(
+        { success: false, error: 'cap must be a positive integer or null' },
         400,
       );
     }
@@ -195,6 +217,19 @@ affiliateOffers.post('/api/affiliate-offers', requireRole('owner', 'admin'), asy
       isActive: body.isActive,
       operationId: operationId || undefined,
     });
+    // 作った案件の決まりを初版として残す(#823)。版が無いと期間30日・上限なしの
+    // 扱いになるため、値は今の案件と同じものを写す。
+    await createOfferVersion(c.env.DB, {
+      offerId: offer.id,
+      rewardAmount: body.rewardAmount,
+      rewardMiles: body.rewardMiles,
+      windowDays: body.windowDays,
+      capTotal: body.capTotal,
+      capMonthlyPerAffiliate: body.capMonthlyPerAffiliate,
+      receptionFrom: body.receptionFrom ?? null,
+      receptionTo: body.receptionTo ?? null,
+      createdBy: c.get('staff')?.id ?? null,
+    });
     return c.json({ success: true, data: serializeOffer(offer) }, 201);
   } catch (err) {
     console.error('POST /api/affiliate-offers error:', err);
@@ -213,6 +248,11 @@ affiliateOffers.put('/api/affiliate-offers/:id', requireRole('owner', 'admin'), 
         description?: string | null;
         rewardAmount?: number;
         rewardMiles?: number;
+        windowDays?: number;
+        capTotal?: number | null;
+        capMonthlyPerAffiliate?: number | null;
+        receptionFrom?: string | null;
+        receptionTo?: string | null;
         lineAccountId?: string | null;
         tagId?: string | null;
         scenarioId?: string | null;
@@ -232,6 +272,18 @@ affiliateOffers.put('/api/affiliate-offers/:id', requireRole('owner', 'admin'), 
     if (body.rewardMiles !== undefined && !isValidReward(body.rewardMiles)) {
       return c.json(
         { success: false, error: 'rewardMiles must be a non-negative integer' },
+        400,
+      );
+    }
+    if (body.windowDays !== undefined && !isValidWindowDays(body.windowDays)) {
+      return c.json(
+        { success: false, error: 'windowDays must be an integer between 1 and 365' },
+        400,
+      );
+    }
+    if (!isValidCap(body.capTotal) || !isValidCap(body.capMonthlyPerAffiliate)) {
+      return c.json(
+        { success: false, error: 'cap must be a positive integer or null' },
         400,
       );
     }
@@ -263,6 +315,26 @@ affiliateOffers.put('/api/affiliate-offers/:id', requireRole('owner', 'admin'), 
       return c.json({ success: false, error: refError }, 400);
     }
 
+    // 報酬・期間・上限・受付の変更は、決まりの新しい版として残す(#823)。
+    // 版を先に作り、失敗したら案件の値も変えない。版が無い昔の案件は、
+    // この保存で初版が生まれる。
+    if (body.rewardAmount !== undefined || body.rewardMiles !== undefined
+      || body.windowDays !== undefined || body.capTotal !== undefined
+      || body.capMonthlyPerAffiliate !== undefined
+      || body.receptionFrom !== undefined || body.receptionTo !== undefined) {
+      await createOfferVersion(c.env.DB, {
+        offerId: id,
+        rewardAmount: body.rewardAmount,
+        rewardMiles: body.rewardMiles,
+        windowDays: body.windowDays,
+        capTotal: body.capTotal,
+        capMonthlyPerAffiliate: body.capMonthlyPerAffiliate,
+        receptionFrom: body.receptionFrom,
+        receptionTo: body.receptionTo,
+        createdBy: c.get('staff')?.id ?? null,
+      });
+    }
+
     const updated = await updateAffiliateOffer(c.env.DB, id, {
       name: body.name !== undefined ? body.name.trim() : undefined,
       description: body.description,
@@ -280,6 +352,144 @@ affiliateOffers.put('/api/affiliate-offers/:id', requireRole('owner', 'admin'), 
     return c.json({ success: true, data: serializeOffer(updated) });
   } catch (err) {
     console.error('PUT /api/affiliate-offers/:id error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+function serializeOfferVersion(row: AffiliateOfferVersion) {
+  return {
+    id: row.id,
+    offerId: row.offer_id,
+    versionNumber: row.version_number,
+    rewardAmount: row.reward_amount,
+    rewardMiles: row.reward_miles,
+    windowDays: row.window_days,
+    capTotal: row.cap_total,
+    capMonthlyPerAffiliate: row.cap_monthly_per_affiliate,
+    receptionFrom: row.reception_from,
+    receptionTo: row.reception_to,
+    effectiveFrom: row.effective_from,
+    createdAt: row.created_at,
+  };
+}
+
+function isValidWindowDays(v: unknown): v is number {
+  return typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= 365;
+}
+
+function isValidCap(v: unknown): v is number | null | undefined {
+  return v === undefined
+    || v === null
+    || (typeof v === 'number' && Number.isInteger(v) && v > 0);
+}
+
+// GET /api/affiliate-offers/:id/versions - 決まりの版の履歴(新しい順)
+affiliateOffers.get('/api/affiliate-offers/:id/versions', async (c) => {
+  try {
+    const versions = await listOfferVersions(c.env.DB, c.req.param('id'));
+    return c.json({ success: true, data: versions.map(serializeOfferVersion) });
+  } catch (err) {
+    console.error('GET /api/affiliate-offers/:id/versions error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// GET /api/affiliate-offers/:id/cap-status - 今の決まりと上限の残り
+affiliateOffers.get('/api/affiliate-offers/:id/cap-status', async (c) => {
+  try {
+    const id = c.req.param('id');
+    const version = await getCurrentOfferVersion(c.env.DB, id);
+    const status = await getOfferCapStatus(c.env.DB, id, {
+      affiliateId: c.req.query('affiliateId') || undefined,
+    });
+    return c.json({
+      success: true,
+      data: {
+        version: version ? serializeOfferVersion(version) : null,
+        capped: status.capped,
+        capTotal: status.capTotal,
+        totalUsed: status.totalUsed,
+        totalRemaining: status.totalRemaining,
+        capMonthlyPerAffiliate: status.capMonthlyPerAffiliate,
+        monthlyUsed: status.monthlyUsed,
+        monthlyRemaining: status.monthlyRemaining,
+      },
+    });
+  } catch (err) {
+    console.error('GET /api/affiliate-offers/:id/cap-status error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// POST /api/affiliate-offers/:id/versions - 決まりの新しい版を保存
+affiliateOffers.post('/api/affiliate-offers/:id/versions', requireRole('owner', 'admin'), async (c) => {
+  auditLog(c, 'affiliate.offer.version.create', { kind: 'affiliate_offer', id: c.req.param('id') });
+  try {
+    const body = await c.req
+      .json<{
+        rewardAmount?: number;
+        rewardMiles?: number;
+        windowDays?: number;
+        capTotal?: number | null;
+        capMonthlyPerAffiliate?: number | null;
+        receptionFrom?: string | null;
+        receptionTo?: string | null;
+        effectiveFrom?: string | null;
+        idempotencyKey?: string;
+      }>()
+      .catch(() => ({}) as Record<string, never>);
+
+    if (body.rewardAmount !== undefined && !isValidReward(body.rewardAmount)) {
+      return c.json(
+        { success: false, error: 'rewardAmount must be a non-negative integer' },
+        400,
+      );
+    }
+    if (body.rewardMiles !== undefined && !isValidReward(body.rewardMiles)) {
+      return c.json(
+        { success: false, error: 'rewardMiles must be a non-negative integer' },
+        400,
+      );
+    }
+    if (body.windowDays !== undefined && !isValidWindowDays(body.windowDays)) {
+      return c.json(
+        { success: false, error: 'windowDays must be an integer between 1 and 365' },
+        400,
+      );
+    }
+    if (!isValidCap(body.capTotal) || !isValidCap(body.capMonthlyPerAffiliate)) {
+      return c.json(
+        { success: false, error: 'cap must be a positive integer or null' },
+        400,
+      );
+    }
+    const idempotencyKey = typeof body.idempotencyKey === 'string' ? body.idempotencyKey.trim() : '';
+    if (idempotencyKey && (idempotencyKey.length < 8 || idempotencyKey.length > 200)) {
+      return c.json({ success: false, error: 'もう一度、最初からやり直してください' }, 400);
+    }
+
+    const version = await createOfferVersion(c.env.DB, {
+      offerId: c.req.param('id'),
+      rewardAmount: body.rewardAmount,
+      rewardMiles: body.rewardMiles,
+      windowDays: body.windowDays,
+      capTotal: body.capTotal,
+      capMonthlyPerAffiliate: body.capMonthlyPerAffiliate,
+      receptionFrom: body.receptionFrom ?? null,
+      receptionTo: body.receptionTo ?? null,
+      effectiveFrom: body.effectiveFrom ?? null,
+      createdBy: c.get('staff')?.id ?? null,
+      idempotencyKey: idempotencyKey || undefined,
+    });
+    return c.json({ success: true, data: serializeOfferVersion(version) }, 201);
+  } catch (err) {
+    if (err instanceof Error && err.message === 'offer not found') {
+      return c.json({ success: false, error: 'Offer not found' }, 404);
+    }
+    if (err instanceof Error && /windowDays|cap/.test(err.message)) {
+      return c.json({ success: false, error: err.message }, 400);
+    }
+    console.error('POST /api/affiliate-offers/:id/versions error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

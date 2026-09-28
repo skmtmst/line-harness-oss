@@ -4285,6 +4285,42 @@ export const AFFILIATE_OFFERS = [
 ]
 
 /*
+ * #823 案件の決まりの版と上限の残り・成果の付け方の記録。
+ * 型どおりの名前（api.ts の OfferVersion・OfferCapStatus・AttributionDecisionView）で返す。
+ */
+export const OFFER_VERSIONS = [
+  { id: 'aov-2', offerId: 'ao-2', versionNumber: 2, rewardAmount: 5000, rewardMiles: 500, windowDays: 30, capTotal: 200, capMonthlyPerAffiliate: 10, receptionFrom: '2026-10-01T00:00:00.000+09:00', receptionTo: '2026-12-31T23:59:59.000+09:00', effectiveFrom: null, createdAt: '2026-09-27T00:00:00.000+09:00' },
+  { id: 'aov-1', offerId: 'ao-2', versionNumber: 1, rewardAmount: 5000, rewardMiles: 500, windowDays: 30, capTotal: null, capMonthlyPerAffiliate: null, receptionFrom: null, receptionTo: null, effectiveFrom: null, createdAt: '2026-02-10T00:00:00.000+09:00' },
+]
+
+export const OFFER_CAP_STATUS = {
+  version: OFFER_VERSIONS[0],
+  capped: false,
+  capTotal: 200,
+  totalUsed: 162,
+  totalRemaining: 38,
+  capMonthlyPerAffiliate: 10,
+  monthlyUsed: 3,
+  monthlyRemaining: 7,
+}
+
+export const ATTRIBUTION_DECISION = {
+  conversionEventId: 'ev-1',
+  affiliateId: 'af-1',
+  refCode: 'ref-1',
+  offerId: 'ao-2',
+  offerVersionId: 'aov-2',
+  reason: 'matched_last_touch',
+  windowDays: 30,
+  candidates: [
+    { affiliateId: 'af-1', affiliateName: 'はなこ', refCode: 'ref-1', touchedAt: '2026-09-20T10:02:00.000+09:00', offerId: 'ao-2', offerName: '定期便のお申し込み', chosen: true, skipReason: null, windowDays: 30 },
+    { affiliateId: 'af-2', affiliateName: 'けんた', refCode: 'ref-2', touchedAt: '2026-09-18T21:40:00.000+09:00', offerId: 'ao-2', offerName: '定期便のお申し込み', chosen: false, skipReason: 'out_of_window', windowDays: 30 },
+    { affiliateId: 'af-3', affiliateName: '本人', refCode: 'ref-3', touchedAt: '2026-09-20T09:58:00.000+09:00', offerId: 'ao-2', offerName: '定期便のお申し込み', chosen: false, skipReason: 'self_referral', windowDays: 30 },
+  ],
+  createdAt: '2026-09-27T12:00:00.000+09:00',
+}
+
+/*
   マイルの残高。設計 `s98Vfw` の並びそのまま。
 
   **`/api/mileage/overview` は器の形が要る。** 画面の `isMileageAdminOverview` は
@@ -5360,6 +5396,36 @@ export const BOOKING_ADMIN_DETAIL = {
     ],
   },
 }
+
+/** T: 予約メニューの版の履歴。新しい順。いちばん新しい版だけ in_use。 */
+export const BOOKING_MENU_VERSIONS = [
+  {
+    version_number: 2, title: '第2版', status: 'in_use',
+    summary: '値段 7,800円→8,400円', author: '店長', at: '2026-09-27T10:00:00+09:00',
+    lines: [
+      '名前：トリミング（小型犬）',
+      '分類：トリミング',
+      '説明：小型犬の全身カットとシャンプー',
+      '時間：105分（後片付け15分）',
+      '値段：8,400円',
+      '受付：30日先まで・3時間前締切・取消期限なし',
+      '状態：公開中',
+    ],
+  },
+  {
+    version_number: 1, title: '第1版', status: 'past',
+    summary: '最初の版', author: null, at: '2026-09-02T10:00:00+09:00',
+    lines: [
+      '名前：トリミング（小型犬）',
+      '分類：トリミング',
+      '説明：小型犬の全身カットとシャンプー',
+      '時間：105分（後片付け15分）',
+      '値段：7,800円',
+      '受付：30日先まで・3時間前締切・取消期限なし',
+      '状態：公開中',
+    ],
+  },
+]
 
 /** 機能34。サーバ判定を画面側で作り直さず、そのまま描く固定応答。 */
 export const GETTING_STARTED = {

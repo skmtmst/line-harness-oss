@@ -1215,6 +1215,68 @@ export type AffiliateOffer = {
   createdAt: string
 }
 
+/** 案件の決まりの版 (#823)。保存するたびに増え、前の版は変わらない。 */
+export type OfferVersion = {
+  id: string
+  offerId: string
+  versionNumber: number
+  rewardAmount: number
+  rewardMiles: number
+  windowDays: number
+  capTotal: number | null
+  capMonthlyPerAffiliate: number | null
+  receptionFrom: string | null
+  receptionTo: string | null
+  effectiveFrom: string | null
+  createdAt: string
+}
+
+/** 今の決まりと上限の残り (#823)。空は「上限なし」。 */
+export type OfferCapStatus = {
+  version: OfferVersion | null
+  capped: boolean
+  capTotal: number | null
+  totalUsed: number
+  totalRemaining: number | null
+  capMonthlyPerAffiliate: number | null
+  monthlyUsed: number
+  monthlyRemaining: number | null
+}
+
+/** 付け方の判断の理由。画面には人の言葉で出す。#823 */
+export type AttributionSkipReason =
+  | 'out_of_window'
+  | 'self_referral'
+  | 'inactive_link'
+  | 'inactive_affiliate'
+  | 'other_account'
+  | 'reception_closed'
+  | 'capped_total'
+  | 'capped_monthly'
+
+/** 成果の付け方の記録 (#823)。候補1件ずつの結果を持つ。 */
+export type AttributionDecisionView = {
+  conversionEventId: string
+  affiliateId: string | null
+  refCode: string | null
+  offerId: string | null
+  offerVersionId: string | null
+  reason: string
+  windowDays: number
+  candidates: Array<{
+    affiliateId: string
+    affiliateName: string
+    refCode: string
+    touchedAt: string
+    offerId: string | null
+    offerName: string | null
+    chosen: boolean
+    skipReason: AttributionSkipReason | null
+    windowDays: number
+  }>
+  createdAt: string
+}
+
 /** Approval queue row as returned by /api/conversions/approvals */
 export type ConversionApprovalItem = {
   eventId: string
@@ -12564,6 +12626,11 @@ export const api = {
       description?: string | null
       rewardAmount?: number
       rewardMiles?: number
+      windowDays?: number
+      capTotal?: number | null
+      capMonthlyPerAffiliate?: number | null
+      receptionFrom?: string | null
+      receptionTo?: string | null
       lineAccountId?: string | null
       tagId?: string | null
       scenarioId?: string | null
@@ -12581,6 +12648,11 @@ export const api = {
       description: string | null
       rewardAmount: number
       rewardMiles: number
+      windowDays: number
+      capTotal: number | null
+      capMonthlyPerAffiliate: number | null
+      receptionFrom: string | null
+      receptionTo: string | null
       lineAccountId: string | null
       tagId: string | null
       scenarioId: string | null
@@ -12590,6 +12662,34 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
+    /** 決まりの版の履歴（新しい順）。#823 */
+    versions: (id: string) =>
+      fetchApi<{ success: boolean; data: OfferVersion[] }>(
+        `/api/affiliate-offers/${encodeURIComponent(id)}/versions`,
+      ),
+    /** 今の決まりと上限の残り。#823 */
+    capStatus: (id: string, affiliateId?: string) => {
+      const qs = affiliateId ? `?affiliateId=${encodeURIComponent(affiliateId)}` : ''
+      return fetchApi<{ success: boolean; data: OfferCapStatus }>(
+        `/api/affiliate-offers/${encodeURIComponent(id)}/cap-status${qs}`,
+      )
+    },
+    /** 決まりの新しい版を保存する。前の版は変わらない。#823 */
+    createVersion: (id: string, data: {
+      rewardAmount?: number
+      rewardMiles?: number
+      windowDays?: number
+      capTotal?: number | null
+      capMonthlyPerAffiliate?: number | null
+      receptionFrom?: string | null
+      receptionTo?: string | null
+      effectiveFrom?: string | null
+      idempotencyKey?: string
+    }) =>
+      fetchApi<{ success: boolean; data: OfferVersion }>(
+        `/api/affiliate-offers/${encodeURIComponent(id)}/versions`,
+        { method: 'POST', body: JSON.stringify(data) },
+      ),
   },
   conversionApprovals: {
     list: (params?: { status?: 'pending' | 'approved' | 'rejected'; limit?: number; offset?: number }) => {
@@ -12621,6 +12721,11 @@ export const api = {
       }; error?: string }>(
         '/api/conversions/approvals/bulk',
         { method: 'POST', body: JSON.stringify({ items }) },
+      ),
+    /** どの紹介に成果を付けたかの記録。無い昔の成果は success:false。#823 */
+    attribution: (eventId: string) =>
+      fetchApi<{ success: boolean; data: AttributionDecisionView; error?: string }>(
+        `/api/conversions/events/${encodeURIComponent(eventId)}/attribution`,
       ),
   },
   /**
@@ -12992,6 +13097,27 @@ export interface BookingMenuResourceAssignment {
   warning: 'resource_inactive' | 'capacity_exceeded' | null;
 }
 
+/** T: 予約メニューの版。いちばん新しい版だけ status が in_use。 */
+export interface BookingMenuVersion {
+  version_number: number;
+  title: string;
+  status: 'in_use' | 'past';
+  summary: string;
+  author: string | null;
+  at: string;
+  lines: string[];
+}
+
+/** T: 予約の写し。予約した時点の内容（値段・時間）。無い予約は null。 */
+export interface BookingMenuSnapshot {
+  version: number;
+  name: string;
+  durationMinutes: number;
+  bufferAfterMinutes: number;
+  basePrice: number;
+  priceMode: string;
+}
+
 export interface BookingException {
   id: string;
   lineAccountId: string;
@@ -13360,6 +13486,8 @@ export interface BookingAdminDetail {
   notificationPolicy: BookingNotificationPolicy;
   menuName: string;
   staffName: string;
+  /** T: 予約の写し。写しが無い予約（490 より前）は null。 */
+  menuSnapshot?: BookingMenuSnapshot | null;
   customer: {
     friendId: string | null;
     bookingCustomerId: string | null;
@@ -13663,6 +13791,22 @@ export const bookingApi = {
       method: 'PUT',
       body: JSON.stringify({ ...body, expectedVersion }),
     }),
+  /** T: 版の履歴。新しい順。いちばん新しい版だけ status が in_use。 */
+  listMenuVersions: (accountId: string, id: string) =>
+    fetchApi<{ versions: BookingMenuVersion[] }>(
+      withAccount(`/api/booking/admin/menus/${id}/versions`, accountId),
+    ),
+  /** T: 版の中身。比べる画面に行の一覧で返す。 */
+  getMenuVersion: (accountId: string, id: string, version: number) =>
+    fetchApi<{ version: BookingMenuVersion }>(
+      withAccount(`/api/booking/admin/menus/${id}/versions/${version}`, accountId),
+    ),
+  /** T: この版に戻す。昔の版は変えず、その中身で新しい版を作る。 */
+  revertMenuVersion: (accountId: string, id: string, version: number, expectedVersion: number) =>
+    fetchApi<{ ok: true; version: number }>(
+      withAccount(`/api/booking/admin/menus/${id}/versions/${version}/revert`, accountId),
+      { method: 'POST', body: JSON.stringify({ expectedVersion }) },
+    ),
   saveMenuResources: (
     accountId: string,
     id: string,

@@ -1,4 +1,5 @@
 import { jstNow } from './utils.js';
+import { recordMenuVersion } from './menu-versions.js';
 
 export type BookingInterval = { start: string; end: string; capacity?: number };
 export type BookingExceptionKind = 'closed' | 'custom_hours' | 'open';
@@ -675,6 +676,8 @@ export async function updateBookingMenuSettings(
     cancelDeadlineHoursBefore?: number | null;
     /** 公開切替だけ変えるときに使う。送らなければ今のまま。 */
     isActive?: boolean;
+    /** 版に残す「誰が」。無ければ空で残す。 */
+    staffId?: string | null;
   },
 ): Promise<
   | { status: 'updated'; version: number }
@@ -709,6 +712,8 @@ export async function updateBookingMenuSettings(
     .bind(...values)
     .run();
   if ((result.meta.changes ?? 0) > 0) {
+    // 保存するたびに版を1つ足す（T）。前の版は変えない。
+    await recordMenuVersion(db, { menuId: input.id, staffId: input.staffId ?? null });
     return { status: 'updated', version: input.expectedVersion + 1 };
   }
   const current = await db.prepare(`SELECT version FROM menus

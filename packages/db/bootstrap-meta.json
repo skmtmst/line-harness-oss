@@ -428,6 +428,8 @@
     "468_event_custom_questions.sql",
     "469_manual_link_screens.sql",
     "470_google_sheets_integrations.sql",
+    "472_affiliate_offer_versions.sql",
+    "473_affiliate_attribution_decisions.sql",
     "478_webinar_video_assets.sql",
     "479_webinar_session_capacity.sql",
     "484_common_var_lifecycle.sql",
@@ -436,6 +438,8 @@
     "487_mileage_adjustment_approval_events.sql",
     "488_incoming_webhook_secret_grace.sql",
     "489_incoming_webhook_ambiguous_hold.sql",
+    "490_menu_versions.sql",
+    "491_booking_menu_snapshot.sql",
     "494_session_step_up_and_unfamiliar.sql",
     "495_session_familiarity_ip_index.sql",
     "496_operation_health_check_keys.sql",
@@ -450,5 +454,5 @@
     "507_webinar_heartbeat_state.sql",
     "508_webinar_heartbeat_rejects.sql"
   ],
-  "migrationCount": 449
+  "migrationCount": 453
 }
