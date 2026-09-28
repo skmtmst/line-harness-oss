@@ -50,11 +50,17 @@ export default function GettingStartedBand({ accountId }: { accountId: string | 
       className="border-info bg-info-bg relative flex items-center gap-3 rounded-card border px-4 py-3 pr-12"
     >
       <p className="text-info text-sm font-semibold">{headline}</p>
+      {/*
+        m22c: 行き先リンクは共通の見た目（カード見出しの行き先リンクと同じ
+        13px/600の青文字＋→）にそろえる。枠付きボタンにすると、同じ画面の
+        「受信箱を開く→」などと大きさ・太さ・色がずれる（自動点検 k=10）。
+      */}
       <Link
         href="/getting-started"
-        className="border-info text-info hover:bg-canvas shrink-0 rounded-control border px-3 py-1.5 text-xs font-bold"
+        className="text-status-info inline-flex shrink-0 items-center gap-1 text-label font-semibold hover:underline"
       >
         順路を見る
+        <span aria-hidden="true">→</span>
       </Link>
       <button
         type="button"

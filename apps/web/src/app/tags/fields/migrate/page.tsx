@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import type { FriendField, FriendFieldType } from '@line-crm/shared'
 import { useAccount } from '@/contexts/account-context'
 import FeatureGate from '@/components/feature-gate'
@@ -298,9 +299,10 @@ function MigrateFriendField() {
   return (
     <div data-design-node="KoT6c" className="flex flex-col gap-4">
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      {/* m22c: 見出し行の戻りは共通の行き先リンク（カード見出しと同じ13px/600青文字）。 */}
       <div className="flex items-center justify-between gap-4">
         <Breadcrumb items={[{ label: '友だち情報欄', href: '/tags?tab=fields' }, { label: '項目を移行' }]} />
-        <Button href="/tags?tab=fields">友だち情報欄へ</Button>
+        <Link href="/tags?tab=fields" className="text-status-info shrink-0 text-label font-semibold hover:underline">友だち情報欄へ</Link>
       </div>
 
       <Notice tone="info" className="mb-4">

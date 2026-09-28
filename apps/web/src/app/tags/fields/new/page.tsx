@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import type { FriendField, FriendFieldType, Folder } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -144,12 +145,13 @@ function NewFriendFieldForm() {
 
   return (
     <div data-design-node="A1ZYeP" className="flex flex-col gap-4">
-      {/* R177: 同じ見出し行の形。パンくずを縮め、ボタンは残す。 */}
+      {/* R177: 同じ見出し行の形。パンくずを縮め、戻り先は残す。 */}
+      {/* m22c: 見出し行の戻りは共通の行き先リンク（カード見出しと同じ13px/600青文字）。ボタン枠のままでは分類案内の行き先リンクとずれる（自動点検 k=10）。 */}
       <div className="flex items-center justify-between gap-4">
         <div className="min-w-0 flex-1">
           <Breadcrumb items={[{ label: '友だち情報欄', href: '/tags?tab=fields' }, { label: '項目を作る' }]} />
         </div>
-        <Button href={back ?? '/tags?tab=fields'} className="shrink-0">友だち情報欄へ</Button>
+        <Link href={back ?? '/tags?tab=fields'} className="text-status-info shrink-0 text-label font-semibold hover:underline">友だち情報欄へ</Link>
       </div>
 
       {error ? <Notice tone="danger" message={error} className="mb-4" /> : null}
