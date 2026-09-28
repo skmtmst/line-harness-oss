@@ -84,7 +84,7 @@ describe('m22b 表の左右の余白（操作列の右寄せ）', () => {
 
   it('/tags：操作列は中身＋共通の余白に広げる', () => {
     const body = read('components', 'friend-fields', 'tags-page-v4.tsx')
-    expect(body).toContain('<Th style={{ width: 136 }} className="sticky right-0')
+    expect(body).toContain('<Th style={{ width: 128 }} className="sticky right-0')
   })
 })
 
