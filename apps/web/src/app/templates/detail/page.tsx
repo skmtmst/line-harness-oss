@@ -29,6 +29,8 @@ interface Usage {
   trackedLinks: Array<{ id: string; name: string }>
   /** 467: 一斉配信の参照（送った時の版のまま）。来ない古い応答では空扱い。 */
   broadcasts?: Array<{ broadcastId: string; title: string; status: string; scheduledAt: string | null; templateVersionNumber: number | null }>
+  /** R347: 旧公開版に固定された送信待ち・取消ずみの登録。来ない古い応答では空扱い。 */
+  reminderEnrollments?: Array<{ enrollmentId: string; reminderId: string; reminderName: string; versionNumber: number; enrollmentStatus: string; targetDate: string }>
 }
 
 interface TemplateVersionItem {
@@ -51,6 +53,13 @@ function broadcastStatusText(status: string): string {
   if (status === 'sending') return '送信中'
   if (status === 'sent') return '送信済み'
   return '下書き'
+}
+
+/** R347: 旧版に固定された登録の状態の札。取消ずみは再開すると送り直す。 */
+function enrollmentStatusText(status: string): string {
+  if (status === 'active') return '送信待ち'
+  if (status === 'cancelled') return '取消ずみ'
+  return status
 }
 
 function TemplateDetailInner() {
@@ -185,6 +194,7 @@ function TemplateDetailInner() {
   }, [id, reload])
 
   const broadcastRefs = usage?.broadcasts ?? []
+  const enrollmentRefs = usage?.reminderEnrollments ?? []
   const usageCount = usage
     ? usage.autoReplies.length
       + usage.automations.length
@@ -193,6 +203,7 @@ function TemplateDetailInner() {
       + usage.richMenuAreas.length
       + usage.trackedLinks.length
       + broadcastRefs.length
+      + enrollmentRefs.length
     : 0
   // 予約済み・送信中の配信で使うものは消せない（API も 409 で止める）。
   const blockingBroadcasts = broadcastRefs.filter(
@@ -329,6 +340,15 @@ function TemplateDetailInner() {
       href: u.status === 'scheduled'
         ? `/broadcasts/reserved?id=${u.broadcastId}`
         : `/broadcasts/detail?id=${u.broadcastId}`,
+    })),
+    // R347: 旧公開版に固定された登録は版と状態を出す。消すと本文が控えに変わる。
+    ...enrollmentRefs.map((u) => ({
+      key: `reminder-enrollment-${u.enrollmentId}`,
+      kind: 'リマインダ',
+      name: u.reminderName,
+      version: versionText(u.versionNumber),
+      status: enrollmentStatusText(u.enrollmentStatus),
+      href: `/reminders/detail?id=${u.reminderId}`,
     })),
   ]
 
