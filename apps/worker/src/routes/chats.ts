@@ -701,9 +701,11 @@ chats.get('/api/chats/quick-counts', requireRole('owner', 'admin', 'staff'), asy
 
     /*
      * ── メール側。一覧（/api/support/inbox?channel=email）と同じ
-     * 表示条件（デフォルトテナントのみ・同じ検索・担当・未読）で数える。 ──
+     * 表示条件（デフォルトテナントのみ・同じ検索・担当・未読）で数える。
+     * メールは LINE アカウントに所属しないため、選択中のアカウントが
+     * あっても数える（一覧と同じ）。 ──
      */
-    if (channel !== 'line' && scope.canSeeUnassigned && !lineAccountId) {
+    if (channel !== 'line' && scope.canSeeUnassigned) {
       const statusSql = !status || status === 'all'
         ? '1=1'
         : status === 'resolved'
