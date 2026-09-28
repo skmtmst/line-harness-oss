@@ -102,6 +102,38 @@ export async function finishBookingOperation(
   ).run();
 }
 
+/**
+ * R323: 手動再送の二重実行を防ぐ取得 (lease)。
+ *
+ * opened_at を原子的に更新し、取れたときだけ true を返す。Google 側の
+ * 削除回収 (processPendingCalendarDeleteOperations) と同じ形で、status は
+ * retry_wait/permanent_failed のままのためスキーマ変更は要らない。
+ * 処理中に止まった worker の行は opened_at が古くなれば再取得する。
+ */
+export async function claimBookingOperationForRetry(
+  db: D1Database,
+  input: {
+    id: string;
+    kind: BookingOperationKind;
+    now?: Date;
+    /** lease切れとみなす分数。未指定なら 10。 */
+    staleAfterMinutes?: number;
+  },
+): Promise<boolean> {
+  const now = input.now ?? new Date();
+  const nowIso = now.toISOString();
+  const staleCutoff = new Date(
+    now.getTime() - (input.staleAfterMinutes ?? 10) * 60_000,
+  ).toISOString();
+  const claimed = await db.prepare(
+    `UPDATE booking_operation_runs SET opened_at = ?, updated_at = ?
+      WHERE id = ? AND kind = ?
+        AND status IN ('retry_wait', 'permanent_failed')
+        AND (opened_at IS NULL OR opened_at < ?)`,
+  ).bind(nowIso, nowIso, input.id, input.kind, staleCutoff).run();
+  return (claimed.meta?.changes ?? 0) > 0;
+}
+
 export async function findBookingOperation(
   db: D1Database,
   input: { lineAccountId: string; idempotencyKey: string },

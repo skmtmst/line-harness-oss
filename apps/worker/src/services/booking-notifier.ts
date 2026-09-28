@@ -44,12 +44,18 @@ export interface SendNotificationParams {
   toLineUserId: string;
   kind: NotificationKind;
   ctx: NotificationContext;
+  /**
+   * R323: LINE の再試行キー (X-Line-Retry-Key)。同じ操作の再送・回収で
+   * 同じ値を渡すと、LINE 側の到達ずみ再送は 409 で冪等に吸収される
+   * (client が成功として扱う)。未指定なら付けずに従来どおり送る。
+   */
+  retryKey?: string;
 }
 
 export async function sendBookingNotification(params: SendNotificationParams): Promise<void> {
   const text = renderNotificationText(params.kind, params.ctx);
   const client = new LineClient(params.channelAccessToken);
-  await client.pushMessage(params.toLineUserId, [{ type: 'text', text }]);
+  await client.pushMessage(params.toLineUserId, [{ type: 'text', text }], params.retryKey);
 }
 
 export type BookingNotificationSender = (params: SendNotificationParams) => Promise<void>;
