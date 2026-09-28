@@ -134,8 +134,8 @@ adCosts.post('/api/ad-costs', requireRole('owner', 'admin'), async (c) => {
     if (!isValidCostDay(body.day)) {
       return c.json({ success: false, error: '日付は 2026-08-01 の形で指定してください' }, 400);
     }
-    const amountMinor = Number(body.amountMinor);
-    if (!Number.isInteger(amountMinor) || amountMinor < 0) {
+    const amountMinor = body.amountMinor;
+    if (typeof amountMinor !== 'number' || !Number.isInteger(amountMinor) || amountMinor < 0) {
       return c.json({ success: false, error: '費用は0以上の整数で入れてください' }, 400);
     }
     const currency = body.currency == null ? 'JPY' : normalizeCostCurrency(body.currency);

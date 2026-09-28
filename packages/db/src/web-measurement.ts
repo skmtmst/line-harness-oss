@@ -43,7 +43,8 @@ export function normalizeSiteHost(raw: unknown): string | null {
   }
   host = host.replace(/\.$/, '').split(':')[0];
   if (!HOST_PATTERN.test(host)) return null;
-  return host;
+  const bare = host.replace(/^www\./, '');
+  return HOST_PATTERN.test(bare) ? bare : host;
 }
 
 export async function listMeasurementSites(
@@ -151,13 +152,14 @@ export async function siteAllowsHost(
   siteId: string,
   host: string,
 ): Promise<boolean> {
-  const bare = host.replace(/^www\./, '');
+  const bare = normalizeSiteHost(host);
+  if (!bare) return false;
   const row = await db
     .prepare(
       `SELECT 1 AS ok FROM measurement_site_domains
         WHERE site_id = ? AND (host = ? OR host = ?)`,
     )
-    .bind(siteId, host, bare)
+    .bind(siteId, bare, `www.${bare}`)
     .first<{ ok: number }>();
   return row !== null;
 }

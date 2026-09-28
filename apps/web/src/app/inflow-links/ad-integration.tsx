@@ -185,6 +185,9 @@ export default function AdIntegration({
   const [platforms, setPlatforms] = useState<AdPlatform[]>([])
   const [logs, setLogs] = useState<AdConversionLog[]>([])
   const [logTotal, setLogTotal] = useState(0)
+  // R278: 30日の送信結果は一覧の口が返す集計を使う。ページ・絞り込みで
+  // 変わらない全アカウント範囲の数で、口が返さない時だけ従来の推測へ戻る。
+  const [logSummary, setLogSummary] = useState<{ sentLast30Days: number; pendingLast30Days: number; failedLast30Days: number } | null>(null)
   const [loading, setLoading] = useState(true)
   const [failed, setFailed] = useState(false)
   const [query, setQuery] = useState('')
@@ -215,6 +218,7 @@ export default function AdIntegration({
       setPlatforms([])
       setLogs([])
       setLogTotal(0)
+      setLogSummary(null)
       setCostRows([])
       setCostPlatforms([])
       setFailed(false)
@@ -238,6 +242,7 @@ export default function AdIntegration({
       setPlatforms(platformResponse.data)
       setLogs(logResponse.data.items)
       setLogTotal(logResponse.data.total)
+      setLogSummary(logResponse.data.summary ?? null)
       if (costResponse.success) {
         setCostRows(costResponse.data.rows ?? [])
         setCostPlatforms(costResponse.data.platforms ?? [])
@@ -260,6 +265,7 @@ export default function AdIntegration({
     setPlatforms([])
     setLogs([])
     setLogTotal(0)
+    setLogSummary(null)
     void load()
     return () => { loadGenerationRef.current += 1 }
   }, [load])
@@ -280,9 +286,9 @@ export default function AdIntegration({
           },
     )
   }, [onPlatformCountsChange, loading, failed, selectedAccountId, platforms])
-  const sentCount = configNumber(platforms, 'sent_count') ?? logs.filter((log) => matchesStatus(log, 'sent')).length
-  const pendingCount = configNumber(platforms, 'pending_count') ?? logs.filter((log) => log.status === 'pending').length
-  const failedCount = configNumber(platforms, 'failed_count') ?? logs.filter((log) => log.status === 'failed').length
+  const sentCount = logSummary?.sentLast30Days ?? configNumber(platforms, 'sent_count') ?? logs.filter((log) => matchesStatus(log, 'sent')).length
+  const pendingCount = logSummary?.pendingLast30Days ?? configNumber(platforms, 'pending_count') ?? logs.filter((log) => log.status === 'pending').length
+  const failedCount = logSummary?.failedLast30Days ?? configNumber(platforms, 'failed_count') ?? logs.filter((log) => log.status === 'failed').length
   // #514-13: 取れない数を 0 と書かない。retry_success_count が無ければ「—」。
   const retrySuccessCount = configNumber(platforms, 'retry_success_count')
   const visibleLogs = logs
@@ -303,9 +309,10 @@ export default function AdIntegration({
 
   const submitManualEntry = useCallback(async () => {
     if (!selectedAccountId || manualBusy) return
-    const amount = Number(manualAmount)
     if (!manualLabel.trim()) { setManualError('流入元の名前を入れてください'); return }
     if (!manualDay) { setManualError('費用の日付を選んでください'); return }
+    if (!manualAmount.trim()) { setManualError('費用を入力してください'); return }
+    const amount = Number(manualAmount)
     if (!Number.isInteger(amount) || amount < 0) { setManualError('費用は0以上の整数(円)で入れてください'); return }
     setManualBusy(true)
     setManualError('')
@@ -603,9 +610,14 @@ export default function AdIntegration({
       totalCostByCurrency.set(total.currency, (totalCostByCurrency.get(total.currency) ?? 0) + total.amountMinor)
     }
   }
-  const linkedFriendAdds = costRows.reduce((sum, row) => sum + (row.friendAdds ?? 0), 0)
-  const jpyCost = totalCostByCurrency.get('JPY')
-  const avgCostPerFriend = jpyCost != null && linkedFriendAdds > 0 ? Math.round(jpyCost / linkedFriendAdds) : null
+  const linkedJpyRows = costRows.filter((row) => row.entryRouteId && row.totals.some((total) => total.currency === 'JPY'))
+  const addsByRoute = new Map<string, number>()
+  for (const row of linkedJpyRows) {
+    if (row.entryRouteId && !addsByRoute.has(row.entryRouteId)) addsByRoute.set(row.entryRouteId, row.friendAdds ?? 0)
+  }
+  const linkedFriendAdds = [...addsByRoute.values()].reduce((sum, count) => sum + count, 0)
+  const linkedJpyCost = linkedJpyRows.reduce((sum, row) => sum + (row.totals.find((total) => total.currency === 'JPY')?.amountMinor ?? 0), 0)
+  const avgCostPerFriend = linkedFriendAdds > 0 ? Math.round(linkedJpyCost / linkedFriendAdds) : null
 
   return (
     <div className="space-y-4" data-design-node="v0HaI">
@@ -622,7 +634,7 @@ export default function AdIntegration({
             : '—'}
           detail={totalCostByCurrency.size > 0 ? '取込分と手入力分の合計です' : 'まだ費用の記録がありません'}
         />
-        <Metric label="友だち1人あたり" value={avgCostPerFriend} detail="費用÷友だち追加。人数が取れる流入元だけで割ります" prefix="¥" />
+        <Metric label="友だち1人あたり" value={avgCostPerFriend} detail="経路がある円の費用だけを合計し、同じ経路の追加人数は1回だけ数えます。経路なし・追加0人・他通貨は計算に含めません" prefix="¥" />
         <Metric label="成果1件あたり" value={null} detail="認めた成果の件数は未接続のため表示できません" prefix="¥" />
       </div>
 
