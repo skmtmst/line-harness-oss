@@ -63,7 +63,8 @@ vi.mock('../services/account-access.js', () => ({
   })),
 }));
 
-vi.mock('../services/booking-notifier.js', () => ({
+vi.mock('../services/booking-notifier.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../services/booking-notifier.js')>()),
   sendBookingNotification: vi.fn(async () => ({ ok: true })),
   notifyForBooking: vi.fn(async () => undefined),
 }));

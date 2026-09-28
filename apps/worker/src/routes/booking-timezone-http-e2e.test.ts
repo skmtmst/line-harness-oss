@@ -25,7 +25,8 @@ import { replaceBookingMenuResources } from '@line-crm/db';
 import type { Env } from '../index.js';
 
 // 送る側（LINE 通知・自動化）は、この試験の対象ではない。
-vi.mock('../services/booking-notifier.js', () => ({
+vi.mock('../services/booking-notifier.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../services/booking-notifier.js')>()),
   sendBookingNotification: vi.fn(async () => ({ ok: true })),
 }));
 vi.mock('../services/account-access.js', () => ({
