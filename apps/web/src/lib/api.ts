@@ -3838,7 +3838,11 @@ export type RichMenuAreaPayload = {
   boundsY: number
   boundsWidth: number
   boundsHeight: number
-  actionType: 'uri' | 'message' | 'postback' | 'richmenuswitch'
+  /**
+   * O: datetimepicker・clipboard も送れる（受け口が intent から DB へ落とす）。
+   * intent が真実で、actionType は容れ物。
+   */
+  actionType: 'uri' | 'message' | 'postback' | 'richmenuswitch' | 'datetimepicker' | 'clipboard'
   actionData: Record<string, unknown>
   intent?: RichMenuAreaIntent | null
   /** 管理用のボタン名。 */
@@ -12371,13 +12375,59 @@ export const api = {
     reconcile: (groupId: string, dryRun: boolean) =>
       fetchApi<ApiResponse<{
         dryRun: boolean;
-        diffs: Array<{ kind: string; detail: string; pageId?: string; richMenuId?: string }>;
+        diffs: Array<{
+          kind: string; detail: string; pageId?: string; richMenuId?: string;
+          /** K-2: ずれの種類ごとの直し方（1つ）。 */
+          fix: { label: string; action: string };
+        }>;
         applied?: number;
         failed?: Array<{ diff: { kind: string; detail: string }; error: string }>;
+        /** K-2: 自動で直さない分（取り込み候補）。運用者が画面で直す。 */
+        unapplied?: Array<{ diff: { kind: string; detail: string }; reason: string }>;
+        runId?: string;
       }>>(`/api/rich-menu-groups/${groupId}/reconcile`, {
         method: 'POST',
         body: JSON.stringify({ dryRun }),
       }),
+
+    /** K-1: 最新の公開実行の4段（画像・メニュー・割り当て・片付け）。 */
+    publishProgress: (groupId: string) =>
+      fetchApi<ApiResponse<{
+        run: {
+          id: string; mode: string; status: string;
+          startedAt: string; completedAt: string | null;
+        } | null;
+        steps: Array<{
+          key: string; label: string;
+          status: 'done' | 'failed' | 'running' | 'pending' | 'skipped';
+        }>;
+        message: string | null;
+      }>>(`/api/rich-menu-groups/${groupId}/publish-progress`),
+
+    /** O-1: 公開前の確認（自前検査・実機・版）。LINE検査は別口で通す。 */
+    prepublishCheck: (groupId: string) =>
+      fetchApi<ApiResponse<{
+        fingerprint: string;
+        pageCount: number;
+        maxPages: number;
+        selfCheck: { ok: boolean; message: string };
+        deviceConfirmed: boolean;
+        deviceConfirmedAt: string | null;
+        versionNumber: number | null;
+      }>>(`/api/rich-menu-groups/${groupId}/prepublish-check`),
+
+    /** O-1: 公開する形のままLINEの検査APIに通す。下書きもLINEも変えない。 */
+    validatePublish: (groupId: string) =>
+      fetchApi<ApiResponse<{
+        checks: Array<{ key: 'self' | 'line'; ok: boolean; message: string }>;
+      }>>(`/api/rich-menu-groups/${groupId}/validate`, { method: 'POST' }),
+
+    /** O-1: 実機で見た記録。今の下書きにひもづく。 */
+    confirmDevice: (groupId: string) =>
+      fetchApi<ApiResponse<{ confirmedAt: string; fingerprint: string }>>(
+        `/api/rich-menu-groups/${groupId}/device-confirm`,
+        { method: 'POST' },
+      ),
 
     /** N-154: メニュー全体を別IDの下書きとして複製する。 */
     duplicate: (groupId: string, idempotencyKey: string, input?: { name?: string }) =>

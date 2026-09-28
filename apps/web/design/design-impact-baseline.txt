@@ -136,7 +136,10 @@ shared-button-importer app/reminders/page.tsx
 shared-button-importer app/rich-menus/connections/page.tsx
 shared-button-importer app/rich-menus/edit/page.tsx
 # #356 (board #898-#904): 公開履歴の再試行・照合、テスト適用の操作に共通Buttonを使う。
+# K-1・O-1 (#822): 公開の進み・公開前の確認の操作にも共通Buttonを使う。
+shared-button-importer app/rich-menus/edit/prepublish-check-section.tsx
 shared-button-importer app/rich-menus/edit/publish-history.tsx
+shared-button-importer app/rich-menus/edit/publish-progress-section.tsx
 shared-button-importer app/rich-menus/edit/test-apply-section.tsx
 shared-button-importer app/rich-menus/new/page.tsx
 shared-button-importer app/rich-menus/page.tsx
