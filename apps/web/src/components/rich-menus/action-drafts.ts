@@ -1,6 +1,7 @@
 import type { Area } from './canvas-editor'
 import type { RichMenuTemplate } from '@/lib/rich-menu-templates'
 import { templateToAreas } from '@/lib/rich-menu-templates'
+import { richMenuUriError } from '@line-crm/shared'
 
 export function createAreaDrafts(template: RichMenuTemplate): Area[] {
   return templateToAreas(template).map((area, index) => ({
@@ -27,7 +28,12 @@ export function isAreaActionConfigured(area: Area): boolean {
   const data = area.actionData ?? {}
   switch (area.intent) {
     case 'url':
-      return Boolean(area.trackedLinkId || String(data.uri ?? '').trim())
+      /*
+       * R203: 「URLを開く」は飛び先が実際に URI として読めるときだけ
+       * 「設定済み」。`not-a-url` のような文字列は未設定として残す。
+       * （下書きへの保存は許すが、完成・公開には進めない）
+       */
+      return Boolean(area.trackedLinkId) || richMenuUriError(String(data.uri ?? '')) === null
     case 'tel':
       return Boolean(String(data.tel ?? '').trim())
     case 'text':

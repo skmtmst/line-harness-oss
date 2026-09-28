@@ -80,4 +80,25 @@ describe('R84 一括追加の窓は増えても操作できる', () => {
     expect(onSubmit).toHaveBeenCalledTimes(1)
     expect(onSubmit.mock.calls[0][0]).toMatchObject({ time_patterns: [{ start: '10:00', end: '11:00' }] })
   })
+
+  /*
+   * R218: 曜日ボタンは色だけでなく aria-pressed で選んだ状態を
+   * 読み上げへ伝える。群には「枠を作る曜日」の名札を付ける。
+   */
+  it('曜日ボタンは aria-pressed で選んだ状態を伝える', async () => {
+    await renderDialog()
+    const group = document.querySelector('[role="group"][aria-label="枠を作る曜日"]')
+    expect(group, '曜日の群に名札がある').toBeTruthy()
+    const days = [...group!.querySelectorAll('button')]
+    expect(days.map((b) => b.textContent)).toEqual(['日', '月', '火', '水', '木', '金', '土'])
+    // 既定は平日（月〜金）が選ばれている
+    expect(days.map((b) => b.getAttribute('aria-pressed')))
+      .toEqual(['false', 'true', 'true', 'true', 'true', 'true', 'false'])
+
+    await act(async () => { days[0].click() }) // 日を足す
+    expect(days[0].getAttribute('aria-pressed')).toBe('true')
+    // もう一度押すと外れる
+    await act(async () => { days[1].click() }) // 月を外す
+    expect(days[1].getAttribute('aria-pressed')).toBe('false')
+  })
 })

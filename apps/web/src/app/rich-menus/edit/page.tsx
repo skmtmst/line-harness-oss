@@ -769,7 +769,13 @@ function Editor({
     } catch (e) {
       // WRITE-01: 権限不足・所属違い・機能オフの理由が見えるようにする。
       // 内部文（API error: 5xx 等）は画面へ出さない。
-      setError(describeSaveFailure(e))
+      // R205: Worker が英語で返す既知の検証文は日本語へ写す。
+      const raw = e instanceof Error ? e.message : ''
+      setError(
+        /targetingPriority/.test(raw)
+          ? '出す順番は1以上の整数で入力してください。小数は使えません。'
+          : describeSaveFailure(e),
+      )
     } finally {
       setSaving(false)
     }
@@ -797,16 +803,35 @@ function Editor({
       if (!res.success) throw new Error(res.error ?? 'publish failed')
       publishAttempt.current.succeed()
       setConfirmKind(null)
-      setNotice('LINEへの登録が終わりました。友だちのトーク画面に出すには、一覧の「友だちに表示」を実行してください。')
+      /*
+       * R204: 公開＝LINEへの登録。実際に友だちの画面が変わるのは
+       * 「全員の既定」にしている場合だけなので、設定に合わせて言い分ける。
+       * メニュー項目の名前（一覧の「表示先」）は実際の表記にそろえる。
+       */
+      setNotice(
+        isDefaultForAll
+          ? 'LINEへの登録が終わり、すべての友だちの既定メニューになりました。'
+          : targetingEnabled
+            ? 'LINEへの登録が終わりました。条件に当てはまる人の画面には、その人に関係する出来事（友だち追加・タグ付けなど）が起きたタイミングで順次出ます。'
+            : 'LINEへの登録が終わりました。友だちのトーク画面に出すには、一覧の「表示先」から操作してください。',
+      )
       // 「いますぐ出す」で使い切った公開入力の下書きは残さない。
       resetPublishPlan()
       await reload()
-    } catch {
+    } catch (e) {
       // 生のAPIエラーは出さない。運用者が次にすることだけを窓に書く。
+      // R203: ただし入力検査の日本語メッセージ（「ページ…の『…』: URLの形が…」）
+      // は直し方が書いてあるので、そのまま見せる。
+      const raw = e instanceof Error ? e.message : ''
+      const isValidationMessage = /[ぁ-んァ-ヶ一-龠]/u.test(raw) && raw !== 'publish failed'
       setConfirmError(
-        draftSaved
-          ? 'LINEへ登録できませんでした。下書きは保存済みです。LINEへの登録だけもう一度お試しください。'
-          : 'LINEへ登録できませんでした。下書きは保存されていません。しばらくおいてから、もう一度お試しください。',
+        /targetingPriority/.test(raw)
+          ? '出す順番は1以上の整数で入力してください。小数は使えません。'
+          : isValidationMessage
+            ? raw
+            : draftSaved
+              ? 'LINEへ登録できませんでした。下書きは保存済みです。LINEへの登録だけもう一度お試しください。'
+              : 'LINEへ登録できませんでした。下書きは保存されていません。しばらくおいてから、もう一度お試しください。',
       )
     } finally {
       setPublishing(false)
@@ -1061,6 +1086,8 @@ function Editor({
         onTargetingCondition={setTargetingCondition}
         onRefresh={() => void reloadTargetPreview()}
         onSave={() => void handleSave()}
+        saveError={error}
+        saveNotice={notice}
         readOnly={aggregateOnly}
       />
       {leaveConfirmDialog}
@@ -1081,6 +1108,10 @@ function Editor({
         onPublishChange={updatePublishPlan}
         conditionEmpty={conditionEmpty}
         previewUnsaved={previewUnsaved}
+        isDefaultForAll={isDefaultForAll}
+        targetingEnabled={targetingEnabled}
+        saveError={error}
+        saveNotice={notice}
         onSave={() => void handleSave()}
         onPublishNow={() => void handlePublish()}
         onSchedule={scheduleSubmit}
@@ -1777,6 +1808,8 @@ function TargetingStep({
   onTargetingCondition,
   onRefresh,
   onSave,
+  saveError = null,
+  saveNotice = '',
   readOnly = false,
 }: {
   group: Group
@@ -1797,6 +1830,9 @@ function TargetingStep({
   onTargetingCondition: (value: SegmentCondition | null) => void
   onRefresh: () => void
   onSave: () => void
+  /** R205: 下書き保存の結果。この画面だけだと失敗が見えなかった。 */
+  saveError?: string | null
+  saveNotice?: string
   /** N-156: staffは集計だけ見る。条件の編集は owner/admin の仕事。 */
   readOnly?: boolean
 }) {
@@ -1831,6 +1867,9 @@ function TargetingStep({
     <div data-design-node="kQ1bs" className="pb-24">
       <nav className="text-ink-faint mb-2 text-xs"><Link href="/rich-menus">リッチメニュー</Link><span className="mx-1.5">/</span>{group.name}</nav>
       <StepHeader active={2} groupId={group.id} />
+      {/* R205: 下書き保存の結果はどの工程でも同じ位置に出す。 */}
+      {saveNotice ? <Notice tone="success" message={saveNotice} className="mb-4" /> : null}
+      {saveError ? <Notice tone="danger" message={saveError} className="mb-4" /> : null}
 
       <div className="grid gap-5 xl:grid-cols-3">
         <section className="border-hairline bg-canvas rounded-card border p-6 shadow-sm xl:col-span-2">
@@ -1869,7 +1908,9 @@ function TargetingStep({
             <div><p className="text-ink-faint text-xs">いま当てはまる人</p><p className="text-ink mt-1 text-2xl font-bold">{conditionEmpty ? '0人' : previewLoading ? '確認中…' : <MetricValue metric={preview?.matched} />}</p></div>
             <div>
               <label className="text-ink-faint text-xs" htmlFor="targeting-priority">出す順番</label>
-              <div className="mt-1 flex items-center gap-2"><input id="targeting-priority" aria-label="出す順番" type="number" min={1} value={targetingPriority + 1} disabled={readOnly} onChange={(event) => onTargetingPriority(Math.max(0, Number(event.target.value) - 1))} className="border-hairline rounded-control w-20 border px-3 py-2 text-lg font-bold" /><span className="text-ink-secondary text-sm">番目</span></div>
+              <div className="mt-1 flex items-center gap-2"><input id="targeting-priority" aria-label="出す順番" type="number" min={1} step={1} value={targetingPriority + 1} disabled={readOnly} onChange={(event) => onTargetingPriority(Math.max(0, Number(event.target.value) - 1))} className="border-hairline rounded-control w-20 border px-3 py-2 text-lg font-bold" /><span className="text-ink-secondary text-sm">番目</span></div>
+              {/* R205: 小数はサーバで弾かれる。欄の近くに制限を書く。 */}
+              <p className="text-ink-faint mt-1 text-[11px]">1以上の整数（小数は使えません）</p>
             </div>
             <div><p className="text-ink-faint text-xs">実際にこのメニューが出る人</p><p className="text-ink mt-1 text-2xl font-bold">{conditionEmpty ? '0人' : <MetricValue metric={preview?.effective} />}</p></div>
           </div>
@@ -1911,6 +1952,10 @@ function PublishStep({
   onPublishChange,
   conditionEmpty = false,
   previewUnsaved = false,
+  isDefaultForAll = false,
+  targetingEnabled = false,
+  saveError = null,
+  saveNotice = '',
   onSave,
   onPublishNow,
   onSchedule,
@@ -1933,6 +1978,12 @@ function PublishStep({
   conditionEmpty?: boolean
   /** 人数がまだ保存していない条件で数えられているとき true。 */
   previewUnsaved?: boolean
+  /** R204: 実際の公開効果の説明に使う、編集中（まだ保存前も含む）の対象設定。 */
+  isDefaultForAll?: boolean
+  targetingEnabled?: boolean
+  /** R205: 下書き保存の結果をこのステップでも出す。 */
+  saveError?: string | null
+  saveNotice?: string
   onSave: () => void
   onPublishNow: () => void
   onSchedule: (input: RichMenuScheduleInput) => Promise<void>
@@ -2035,6 +2086,9 @@ function PublishStep({
     <div data-design-node="UMiJ9" className="pb-24">
       <nav className="text-ink-faint mb-2 text-xs"><Link href="/rich-menus">リッチメニュー</Link><span className="mx-1.5">/</span>{group.name}</nav>
       <StepHeader active={3} groupId={group.id} />
+      {/* R205: 下書き保存の結果はどの工程でも同じ位置に出す。 */}
+      {saveNotice ? <Notice tone="success" message={saveNotice} className="mb-4" /> : null}
+      {saveError ? <Notice tone="danger" message={saveError} className="mb-4" /> : null}
       <div className="grid gap-5 xl:grid-cols-3">
         <section className="border-hairline bg-canvas rounded-card border p-6 shadow-sm xl:col-span-2">
           <h2 className="text-ink text-base font-bold">いつ出すか</h2>
@@ -2082,7 +2136,24 @@ function PublishStep({
 
         <aside className="space-y-4">
           <section className="border-hairline bg-canvas rounded-card border p-5"><h2 className="text-ink text-sm font-bold">このメニューの設定</h2><dl className="mt-4 space-y-3 text-xs"><div><dt className="text-ink-faint">誰に出るか</dt><dd className="text-ink mt-1 font-semibold">{conditionEmpty ? '0人' : <MetricValue metric={preview?.effective} />}{previewUnsaved && !conditionEmpty ? <span className="text-ink-faint ml-1 font-normal">（未保存の条件）</span> : null}</dd></div><div><dt className="text-ink-faint">形</dt><dd className="text-ink mt-1 font-semibold">{group.size === 'large' ? '大' : '小'}・切替あり {pages.length}枚</dd></div><div><dt className="text-ink-faint">終わったら</dt><dd className="text-ink mt-1 font-semibold">{mode === 'period' ? restoreMenus.find((item) => item.id === restoreGroupId)?.name ?? '前のメニューに戻す' : '指定なし'}</dd></div></dl></section>
-          <Notice tone="info"><h2 className="text-sm font-bold">公開すると何が変わるか</h2><p className="mt-2 text-xs">{conditionEmpty ? '0人' : <MetricValue metric={preview?.effective} />} のトーク画面のメニューが入れ替わります。</p><p className="mt-2 text-xs">LINEへの反映は数分かかることがあります。</p></Notice>
+          {/*
+            R204: 「公開」は LINE への登録。全員の画面が変わるのは
+            isDefaultForAll（全員の既定）のときだけ。条件で出し分ける設定は、
+            その人の出来事（友だち追加・タグ付け）が起きたときに順次切り替わる。
+            どちらでもない公開は登録だけで、表示は一覧の「表示先」から行う。
+          */}
+          <Notice tone="info"><h2 className="text-sm font-bold">公開すると何が変わるか</h2>
+            {isDefaultForAll ? (
+              <p className="mt-2 text-xs">このアカウントの既定メニューになります。個別に別のメニューを指定されている人以外の、すべての友だちのトーク画面に出ます。</p>
+            ) : targetingEnabled && conditionEmpty ? (
+              <p className="mt-2 text-xs">出す条件が空のため、公開しても今は誰の画面にも出ません。前の工程で条件を決めるか、一覧の「表示先」から出す相手を選んでください。</p>
+            ) : targetingEnabled ? (
+              <p className="mt-2 text-xs">LINEに登録されます。条件にいま当てはまる <MetricValue metric={preview?.effective} /> のメニューは、その人に関係する出来事（友だち追加・タグ付けなど）が起きたタイミングで順次切り替わります。すぐ全員に出るわけではありません。</p>
+            ) : (
+              <p className="mt-2 text-xs">LINEへの登録だけでは、友だちのトーク画面は変わりません。公開のあと、一覧の「表示先」で出す相手を決めてください。</p>
+            )}
+            <p className="mt-2 text-xs">LINEへの反映は数分かかることがあります。</p>
+          </Notice>
           {/* N-152: 全員へ出す前に、自分のLINEだけで見え方を確かめる。 */}
           {canOperate ? <TestApplySection groupId={group.id} /> : null}
           {/* O-1: 公開の前の確認。プレビューだけでは公開できない。 */}

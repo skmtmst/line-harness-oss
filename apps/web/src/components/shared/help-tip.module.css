@@ -2,8 +2,8 @@
 /*
  * 見出し・ラベル横の「？」（共通ルール 2-1b・★V7 `LYs5d`「？ 補足の印」）。
  *
- * 印は 18px の角丸の正方形（角 4px・枠 1px `ink-faint`・地 `canvas`）の
- * 中に「?」11px 太字 `ink-secondary`。丸・楕円・枠なしは使わない。
+ * 印は 18px の正円（枠 1px `ink-faint`・地 `canvas`）の
+ * 中に「?」11px 太字 `ink-secondary`。角丸の正方形・楕円・枠なしは使わない。
  * 押せる範囲は 28px（指では 44px）。吹き出しは最大幅 300px。
  * 色は `var()` だけを使う。
  */
@@ -17,7 +17,7 @@
 }
 
 /*
- * 見た目の箱は 18px の正方形に固定し、題の行の高さに入れない。
+ * 見た目の箱は 18px の正円に固定し、題の行の高さに入れない。
  * globals の button{min-height:32px}・表の中の button の決まりに負けない
  * よう、幅・高さ・最小・最大をすべて 18px にし、aspect-ratio: 1 で
  * 縦横を同じに保つ。押せる範囲は位置を持たない ::before で広げる
@@ -39,7 +39,7 @@
   aspect-ratio: 1 / 1; /* 縦横は必ず同じ */
   padding: 0;
   border: 1px solid var(--color-ink-faint); /* border: $ink-faint */
-  border-radius: 4px; /* cornerRadius: 4（★V7 `LYs5d`。$radius-tiny=3 ではない） */
+  border-radius: 50%; /* ★V7 `LYs5d` 18px 正円 */
   background: var(--color-canvas); /* fill: $canvas */
   color: var(--color-ink-secondary); /* color: $ink-secondary */
   cursor: pointer;

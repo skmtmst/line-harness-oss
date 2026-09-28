@@ -811,9 +811,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           assignee: assigneeFilter,
           unreadOnly,
           quickFilter: quickFilter === 'all' ? undefined : quickFilter,
-          // R110: 件数（quick-counts）と同じアカウント条件にする。
-          // 送らないと一覧だけメールが出て件数が0になる。
-          accountId: selectedAccountId || undefined,
         })}`,
       ))
       if (listFilterKeyRef.current !== listFilterKey || emailListRequestRef.current !== requestId) return
@@ -851,7 +848,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         setEmailLoading(false)
       }
     }
-  }, [statusFilter, debouncedNameQuery, assigneeFilter, unreadOnly, quickFilter, listFilterKey, selectedAccountId])
+  }, [statusFilter, debouncedNameQuery, assigneeFilter, unreadOnly, quickFilter, listFilterKey])
 
   useEffect(() => {
     void loadEmails()

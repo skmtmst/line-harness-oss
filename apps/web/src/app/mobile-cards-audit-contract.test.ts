@@ -50,7 +50,7 @@ describe('2: テンプレート・成果地点の一覧はこの形になる', (
   })
 
   it('テンプレートのカードは名前・種別・要点・主な数字・編集・「…」を持つ', () => {
-    expect(TEMPLATES).toContain('summary: `${t.messageContent.slice(0, 60)}')
+    expect(TEMPLATES).toContain('summary: `${latestContentOf(t).slice(0, 60)}')
     expect(TEMPLATES).toContain('件で使用')
     expect(TEMPLATES).toContain('onSelect: () => setDrawerId(t.id)')
   })
