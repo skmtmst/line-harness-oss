@@ -171,9 +171,11 @@ describe('sfTEW CSVで一括登録の確認画面', () => {
 })
 
 describe('XBkiQ 保存した検索の編集', () => {
-  const shareField = element(EDIT_PAGE, 'fieldset')
+  // m21u: 素の fieldset を共通の RadioCardGroup へ置き換えた。群と案内は保つ。
+  const shareField = between(EDIT_PAGE, '<RadioCardGroup legend="共有範囲"', '</p>\n            {/* IDEA-04')
 
   it('共有範囲のところで、上限と共有すると何が起きるかを先に言う', () => {
+    expect(shareField).toContain('legend="共有範囲"')
     expect(shareField).toContain('保存できるのは50件までです（いま${savedCount}件）')
     expect(shareField).toContain('一斉配信・オートメーションの対象条件からも呼び出せます')
   })
