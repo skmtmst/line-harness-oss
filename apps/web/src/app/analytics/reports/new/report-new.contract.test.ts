@@ -22,7 +22,7 @@ describe('V6 URqOA 定期レポート作成', () => {
     expect(PAGE).toContain('<ListState kind="error"')
     expect(PAGE).toContain('kind="empty"')
     expect(PAGE).toContain("response.data.role === 'owner' || response.data.role === 'admin'")
-    expect(PAGE).toContain('disabled={saving || !canManage || !hasRecipient}')
+    expect(PAGE).toContain('disabled={saving || !canManage || !hasRecipient || hasInvalidEmail}')
   })
 
   it('本物の設定APIへ接続し、未取得を0へ置き換えない', () => {

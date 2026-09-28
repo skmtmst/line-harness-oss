@@ -13,6 +13,7 @@ const richMenuUpdate = vi.hoisted(() => vi.fn())
 const richMenuSchedule = vi.hoisted(() => vi.fn())
 const richMenuPublish = vi.hoisted(() => vi.fn())
 const richMenuPreviewTargets = vi.hoisted(() => vi.fn())
+const richMenuDuplicate = vi.hoisted(() => vi.fn())
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
@@ -107,6 +108,7 @@ vi.mock('@/lib/api', () => ({
       schedule: richMenuSchedule,
       publish: richMenuPublish,
       previewTargets: richMenuPreviewTargets,
+      duplicate: richMenuDuplicate,
       audienceSummary: () => Promise.resolve({ success: true, data: { total: { value: 0, state: 'available', reason: null }, targeted: { value: 0, state: 'available', reason: null }, excluded: { value: 0, state: 'available', reason: null }, effective: { value: 0, state: 'available', reason: null } } }),
       imageUrl: (key: string) => `/img/${key}`,
     },
@@ -203,6 +205,8 @@ beforeEach(() => {
   richMenuSchedule.mockImplementation(() => Promise.resolve({ success: true, data: { id: 'sch-1' } }))
   richMenuPublish.mockReset()
   richMenuPublish.mockImplementation(() => Promise.resolve({ success: true, data: { pages: [] } }))
+  richMenuDuplicate.mockReset()
+  richMenuDuplicate.mockImplementation(() => Promise.resolve({ success: true, data: { id: 'copy-1' } }))
   // 公開入力の下書きは localStorage に残る。試験ごとに空で始める。
   vi.stubGlobal('localStorage', new MemoryStorage())
   richMenuPreviewTargets.mockReset()
@@ -815,5 +819,50 @@ describe('R204 公開すると何が変わるか（設定に合わせた説明�
     expect(screen.getByText(/一覧の「表示先」から操作してください/)).toBeTruthy()
     // 対象設定なしなのに「全員の画面が変わった」とは言わない
     expect(screen.queryByText(/既定メニューになりました/)).toBeNull()
+  })
+})
+
+/*
+ * R232: 複製に成功したのに確認窓が残ると、コピーの編集画面で
+ * 「このコピーをさらに複製する？」に見えてしまう。成功時は窓を閉じ、
+ * 失敗時は窓を開いたまま理由を出す。
+ */
+describe('複製の確認窓 (R232)', () => {
+  test('成功すると窓が閉じ、コピーの編集画面へ移る', async () => {
+    searchParams.value = new URLSearchParams('id=grp-1')
+    render(<RichMenuEditPage />)
+    await flush()
+    await screen.findByDisplayValue('メインメニュー')
+
+    fireEvent.click(screen.getByRole('button', { name: '複製する' }))
+    await flush()
+    expect(screen.getByRole('button', { name: '下書きとして複製する' })).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: '下書きとして複製する' }))
+    await flush()
+
+    expect(richMenuDuplicate).toHaveBeenCalledTimes(1)
+    expect(routerPush).toHaveBeenCalledWith('/rich-menus/edit?id=copy-1')
+    // 窓は閉じている。残ると「コピーをさらに複製する？」に見える。
+    expect(screen.queryByRole('button', { name: '下書きとして複製する' })).toBeNull()
+    expect(screen.getByText(/下書きを複製しました/)).toBeTruthy()
+  })
+
+  test('失敗したときは窓が開いたまま理由を出し、遷移しない', async () => {
+    richMenuDuplicate.mockImplementationOnce(() => Promise.resolve({ success: false, error: 'copy failed' }))
+    searchParams.value = new URLSearchParams('id=grp-1')
+    render(<RichMenuEditPage />)
+    await flush()
+    await screen.findByDisplayValue('メインメニュー')
+
+    fireEvent.click(screen.getByRole('button', { name: '複製する' }))
+    await flush()
+    fireEvent.click(screen.getByRole('button', { name: '下書きとして複製する' }))
+    await flush()
+
+    expect(richMenuDuplicate).toHaveBeenCalledTimes(1)
+    expect(routerPush).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: '下書きとして複製する' })).toBeTruthy()
+    expect(screen.getByText('copy failed')).toBeTruthy()
   })
 })
