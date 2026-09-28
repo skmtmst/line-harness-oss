@@ -35,6 +35,7 @@ import QuestionEditor, {
   deadAnswerSettings,
   emptyQuestion,
   isUriOnlyBehavior,
+  validateChoiceUris,
   type ScenarioQuestion,
 } from '@/components/scenarios/question-editor'
 import {
@@ -66,7 +67,7 @@ import {
   scenarioReachPercent,
   scenarioReachPercentLabel,
 } from './scenario-reach-display'
-import { describeAfterSend, describeStepAudience } from './scenario-step-audience'
+import { describeAfterSend, describeStepAudience, stepKindLabel, stepListTitle } from './scenario-step-audience'
 import {
   scenarioSimulationKey,
   simulationForKey,
@@ -180,6 +181,29 @@ class DuplicateAborted extends Error {
     cause?: unknown,
   ) {
     super(cause instanceof Error && cause.message ? cause.message : '複製できませんでした')
+  }
+}
+
+/*
+ * R216: 複製で送る時刻の欄は、配信方式ごとに必要なものだけにする。
+ * 全部送ると、口（validateStepSchedule）が余分な欄を見て 400 で止める。
+ * 経過時間なのに delayMinutes を送ると、1通目で止まって作りかけの
+ * コピーが残る。保存の buildSchedulePayload と同じ分け方にする。
+ */
+function stepScheduleForClone(
+  mode: DeliveryMode,
+  step: Pick<ScenarioStep, 'delayMinutes' | 'offsetDays' | 'offsetMinutes' | 'deliveryTime'>,
+): { delayMinutes?: number; offsetDays?: number; offsetMinutes?: number; deliveryTime?: string } {
+  if (mode === 'relative') return { delayMinutes: step.delayMinutes }
+  if (mode === 'elapsed') {
+    return {
+      offsetDays: step.offsetDays ?? 0,
+      offsetMinutes: step.offsetMinutes ?? 0,
+    }
+  }
+  return {
+    offsetDays: step.offsetDays ?? 0,
+    deliveryTime: step.deliveryTime ?? '09:00',
   }
 }
 
@@ -724,8 +748,8 @@ export default function ScenarioDetailClient({
       const existingByOrder = new Map(existing.data.steps.map((s) => [s.stepOrder, s.id]))
       const stepIdMap = new Map<string, string>()
       // 通は順に足す。まとめて入れる口が無い。
-      // 時刻・絞り込み・質問・下書きの別まで写す。落とすと時刻指定の複製が
-      // 400 で失敗したり、別物の流れになる。
+      // 時刻・絞り込み・質問・下書きの別まで写す。落とすと別物の流れに
+      // なる。時刻は方式に合う欄だけ送る（余分な欄があると 400 で止まる）。
       for (const step of sortedSteps) {
         const already = existingByOrder.get(step.stepOrder)
         if (already) {
@@ -734,10 +758,7 @@ export default function ScenarioDetailClient({
         }
         const copied = await api.scenarios.addStep(copy, {
           stepOrder: step.stepOrder,
-          delayMinutes: step.delayMinutes,
-          offsetDays: step.offsetDays ?? undefined,
-          offsetMinutes: step.offsetMinutes ?? 0,
-          deliveryTime: step.deliveryTime ?? undefined,
+          ...stepScheduleForClone(deliveryMode, step),
           messageType: step.messageType,
           messageContent: step.messageContent,
           templateId: step.templateId ?? null,
@@ -1027,6 +1048,16 @@ export default function ScenarioDetailClient({
         )
         return
       }
+      /*
+       * R214: 行き先（URL・電話・メール）の形を見る。not-a-url のような
+       * 値でも保存できると、設定済みに見えて実際は開けない通になる。
+       * 下書きでも通さず、その場で直せるよう選択肢番号で名指しする。
+       */
+      const uriError = validateChoiceUris(stepForm.question)
+      if (uriError) {
+        setStepError(uriError)
+        return
+      }
     } else if (stepForm.inputMode === 'direct') {
       // 直接入力モード: messageContent 必須 + Flex/画像 は JSON parse 検証
       if (!stepForm.messageContent.trim()) {
@@ -1189,10 +1220,8 @@ export default function ScenarioDetailClient({
         stepOrder: step.stepOrder + 1,
         messageType: step.messageType,
         messageContent: step.messageContent,
-        delayMinutes: step.delayMinutes,
-        offsetDays: step.offsetDays ?? undefined,
-        offsetMinutes: step.offsetMinutes ?? undefined,
-        deliveryTime: step.deliveryTime ?? undefined,
+        // 方式に合う時刻の欄だけ送る。余分な欄があると口が 400 で止める。
+        ...stepScheduleForClone(deliveryMode, step),
         templateId: step.templateId ?? null,
         onReachTagId: step.onReachTagId ?? null,
         afterSend: step.afterSend,
@@ -1607,6 +1636,7 @@ export default function ScenarioDetailClient({
       <aside data-design-node="xfYLn" className="min-w-0 space-y-4">
         <StepPreview
           deliveryMode={deliveryMode}
+          stepOrder={stepForm.stepOrder}
           offsetDays={stepFormPreview.offsetDays}
           deliveryTime={stepForm.schedule.deliveryTime}
           offsetHours={stepFormPreview.offsetHours}
@@ -2222,17 +2252,19 @@ export default function ScenarioDetailClient({
                   const tpl = step.templateId
                     ? templates.find((t) => t.id === step.templateId)
                     : null
-                  const kindLabel = tpl
-                    ? 'テンプレート'
-                    : (messageTypeOptions.find((o) => o.value === step.messageType)?.label ??
-                      step.messageType)
                   // 内容の桁は見出しだけ出す。中身はプレビューで開く。
                   // 本文をそのまま桁に入れると、行の高さが通ごとに変わって
                   // 上下の見比べができなくなる。
-                  const title =
-                    tpl?.name ??
-                    (step.messageContent || '').split('\n')[0].slice(0, 60) ??
-                    '（空）'
+                  // R215: 質問の通は messageContent が空（' '）のまま残る。
+                  // 本文で代用すると空のボタン・種別「テキスト」になり、
+                  // どの質問か一覧で分からない。質問文を見出しにする。
+                  const kindLabel = stepKindLabel(
+                    step,
+                    tpl?.name ?? null,
+                    messageTypeOptions.find((o) => o.value === step.messageType)?.label ??
+                      step.messageType,
+                  )
+                  const title = stepListTitle(step, tpl?.name ?? null)
                   return (
                     <Fragment key={step.id}>
                       {idx > 0 && (
@@ -2287,16 +2319,24 @@ export default function ScenarioDetailClient({
                           {formatScheduleLabel(deliveryMode, step)}
                         </td>
                         <td className="w-full max-w-0 px-3 py-3 align-top">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              editingStepId === step.id ? closeStepForm() : openEditStep(step)
-                            }
-                            className="text-info block w-full truncate text-left text-sm hover:underline"
-                            title={title}
-                          >
-                            {title}
-                          </button>
+                          <span className="flex min-w-0 items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                editingStepId === step.id ? closeStepForm() : openEditStep(step)
+                              }
+                              className="text-info block min-w-0 flex-1 truncate text-left text-sm hover:underline"
+                              title={title}
+                            >
+                              {title}
+                            </button>
+                            {/*
+                              R212: 下書きの通は送られないのに、通常の通と
+                              同じ見た目だった。配信される通とされない通を
+                              見分けられるよう、共通の StatusChip で名指しする。
+                            */}
+                            {step.isDraft === true && <StatusChip status="draft" />}
+                          </span>
                           {step.onReachTagId && (
                             <p className="text-ink-faint mt-0.5 truncate text-xs">
                               到達タグ: {tags.find((t) => t.id === step.onReachTagId)?.name ?? step.onReachTagId}
