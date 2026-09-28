@@ -1,6 +1,7 @@
 'use client'
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { MoreHorizontal } from 'lucide-react'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import MileageRewardsTab from './mileage-rewards-tab'
@@ -157,6 +158,7 @@ const RULE_PAGE_SIZE = 8
 
 
 function MileagePageInner() {
+  const router = useRouter()
   const tab = useMergedTab(TABS, 'tab', 'balances')
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const latestAccountRef = useRef(selectedAccountId)
@@ -182,6 +184,9 @@ function MileagePageInner() {
   const [ruleActionError, setRuleActionError] = useState('')
   const [publishTarget, setPublishTarget] = useState<MileageEarningRuleV6 | null>(null)
   const [publishError, setPublishError] = useState('')
+  /** R296: まだ公開していない決めごとだけ消せる。運用済みは停止して残す。 */
+  const [deleteTarget, setDeleteTarget] = useState<MileageEarningRuleV6 | null>(null)
+  const [deleteError, setDeleteError] = useState('')
   const [savingRuleOrder, setSavingRuleOrder] = useState(false)
   const [ruleOrder, setRuleOrder] = useState<string[]>([])
   const [ruleOrderDirty, setRuleOrderDirty] = useState(false)
@@ -426,6 +431,28 @@ function MileagePageInner() {
       await loadRules()
     } catch {
       setRuleActionError('たまる決めごとを更新できませんでした。もう一度お試しください。')
+    } finally {
+      setSavingRuleId(null)
+    }
+  }
+
+  /*
+   * R296: まだ公開したことがない決めごとだけ消せる。付与履歴があるものは
+   * 口が 409 で断るので、その文を確認窓にそのまま出す（運用済みは停止）。
+   */
+  const deleteRule = async (rule: MileageEarningRuleV6) => {
+    if (savingRuleId !== null) return
+    setSavingRuleId(rule.id)
+    setDeleteError('')
+    try {
+      const res = await api.mileage.deleteRule(rule.id)
+      if (!res.success) throw new Error(res.error)
+      setDeleteTarget(null)
+      await loadRules()
+    } catch (caught) {
+      setDeleteError(caught instanceof Error && caught.message && !/^API error/.test(caught.message)
+        ? caught.message
+        : '削除できませんでした。もう一度お試しください。')
     } finally {
       setSavingRuleId(null)
     }
@@ -854,10 +881,26 @@ function MileagePageInner() {
                         吹き出しは枠に切られる。開いた分は行の中でそのまま伸ばす。
                       */}
                       <details className="min-w-0 shrink-0 text-ink-secondary">
-                        <summary className="cursor-pointer font-semibold text-action">公開版の中身を見る</summary>
-                        <p className="mt-1 rounded-control border border-hairline bg-canvas p-2 shadow-card" title={`${rule.published.name} / ${ruleEventLabel(rule.published.eventType, EVENT_LABELS)} / ${formatMileageNumber(rule.published.amount)}マイル`}>
-                          {rule.published.name}・{ruleEventLabel(rule.published.eventType, EVENT_LABELS)}・{formatMileageNumber(rule.published.amount)}マイル
-                        </p>
+                        {/*
+                          R297: 未公開の決めごとに「公開版」があるように見せない。
+                          公開済みだけ版番号と反映日時つきで、下書きと比較できる。
+                        */}
+                        <summary className="cursor-pointer font-semibold text-action">
+                          {rule.publishedVersion == null ? '下書きの内容を見る' : '公開版の中身を見る'}
+                        </summary>
+                        {rule.publishedVersion == null ? (
+                          <p className="mt-1 rounded-control border border-hairline bg-canvas p-2 shadow-card">
+                            {rule.draft.name}・{ruleEventLabel(rule.draft.eventType, EVENT_LABELS)}・{formatMileageNumber(rule.draft.amount)}マイル
+                            <span className="mt-1 block text-ink-faint">
+                              下書き v{rule.draftVersion}・{formatMileageDate(rule.draftUpdatedAt)} に保存・まだ公開版はありません
+                            </span>
+                          </p>
+                        ) : (
+                          <p className="mt-1 rounded-control border border-hairline bg-canvas p-2 shadow-card" title={`${rule.published.name} / ${ruleEventLabel(rule.published.eventType, EVENT_LABELS)} / ${formatMileageNumber(rule.published.amount)}マイル`}>
+                            公開版 v{rule.publishedVersion}・{rule.published.name}・{ruleEventLabel(rule.published.eventType, EVENT_LABELS)}・{formatMileageNumber(rule.published.amount)}マイル
+                            <span className="mt-1 block text-ink-faint">{formatMileageDate(rule.published.updatedAt)} に反映</span>
+                          </p>
+                        )}
                       </details>
                     </div>
                   </td>
@@ -905,6 +948,12 @@ function MileagePageInner() {
                         onClose={() => setRuleMenuId(null)}
                         items={[
                           {
+                            id: 'edit',
+                            label: '下書きを編集',
+                            external: true,
+                            onSelect: () => router.push(`/mileage/earning-rules/edit?id=${encodeURIComponent(rule.id)}`),
+                          },
+                          {
                             id: 'test',
                             label: 'この内容をテスト',
                             disabled: ruleTestBusy,
@@ -925,6 +974,19 @@ function MileagePageInner() {
                             disabledReason: '別の決めごとを反映しています',
                             onSelect: () => { setPublishError(''); setPublishTarget(rule) },
                           },
+                          /*
+                            R296: 消せるのは公開前の下書きだけ。履歴のある運用済みは
+                            口が 409 で断るので、そこへは「停止」を選ばせる。
+                          */
+                          ...(rule.publishedVersion == null ? [{
+                            id: 'delete',
+                            label: 'この決めごとを削除',
+                            tone: 'danger' as const,
+                            dividerBefore: true,
+                            disabled: savingRuleId !== null,
+                            disabledReason: 'ほかの操作を反映しています',
+                            onSelect: () => { setDeleteError(''); setDeleteTarget(rule) },
+                          }] : []),
                         ]}
                       />
                     </div>
@@ -960,6 +1022,18 @@ function MileagePageInner() {
         error={publishError || undefined}
         onCancel={() => { if (savingRuleId === null) setPublishTarget(null) }}
         onConfirm={() => { if (publishTarget) void publishRule(publishTarget) }}
+      />
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title={deleteTarget ? `「${deleteTarget.draft.name}」を削除しますか？` : '決めごとを削除しますか？'}
+        description="まだ公開していない決めごとの下書きごと消えます。取り消せません。すでに動いている決めごとは、削除ではなく停止を選んでください。"
+        confirmLabel="削除する"
+        destructive
+        busy={deleteTarget !== null && savingRuleId === deleteTarget.id}
+        error={deleteError || undefined}
+        onCancel={() => { if (savingRuleId === null) setDeleteTarget(null) }}
+        onConfirm={() => { if (deleteTarget) void deleteRule(deleteTarget) }}
       />
 
       <Dialog

@@ -44,6 +44,7 @@ const ROUTE_TO_SCREEN: ReadonlyArray<readonly [string, string]> = [
   ['/affiliate-offers', '16-1'],
   ['/mileage', '17-1'],
   ['/mileage/earning-rules/new', '17-1'],
+  ['/mileage/earning-rules/edit', '17-1'],
   ['/scoring', '17-1'],
   ['/inflow-links', '18-1'],
   ['/inflow-links/new', '18-1'],
