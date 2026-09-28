@@ -386,7 +386,7 @@ export interface InboxStatusBreakdown {
  *   （行が無い友だちは対応済み。一覧の `COALESCE(c.status, 'resolved')` と同じ）。
  * - MAIL は `/api/support/inbox` と同じく `support_email_threads` の status 単位。
  * - MAIL はアカウントを持たないため、未割り当てが見える範囲のときだけ数える
- *   （受信箱の一覧と同じ条件。選択中のLINEアカウントだけを見る範囲では 0）。
+ *   （受信箱の一覧と同じ条件）。アカウント選択中も、見える人には数える。
  */
 export interface InboxStatusCounts extends InboxStatusBreakdown {
   line: InboxStatusBreakdown;
