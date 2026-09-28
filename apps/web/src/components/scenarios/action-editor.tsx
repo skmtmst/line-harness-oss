@@ -31,6 +31,8 @@ import { Bell, Calendar, FileText, Flag, MessageSquare, Tag, User, Variable, Wor
 import type { LucideIcon } from 'lucide-react'
 import styles from './action-editor.module.css'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
 import {
   api,
@@ -493,7 +495,7 @@ export default function ActionEditor({
                             >
                               {action.condition ? '条件ON' : '条件OFF'}
                             </button>
-                            <details><summary className="text-action cursor-pointer list-none text-xs">内容を編集</summary><div className="absolute right-20 z-10 mt-2 rounded-card p-4 shadow-lg" style={{ width: 640, background: 'var(--color-canvas)' }}><ActionConfigEditor action={action} tags={tags} fields={fields} marks={marks} scenarios={scenarioOpts} vars={vars} onChange={(config) => void save(action, { config })} /><label className="mt-3 flex items-center gap-2 text-xs"><input type="checkbox" checked={action.repeatOnRefire} onChange={(e) => void save(action, { repeatOnRefire: e.target.checked })} />発動2回目以降も実行する</label><div className="mt-3 flex gap-2"><button type="button" onClick={() => void move(index, -1)} disabled={index === 0}>上へ</button><button type="button" onClick={() => void move(index, 1)} disabled={index === actions.length - 1}>下へ</button><button type="button" onClick={() => void remove(action)} className="text-danger">削除</button></div></div></details>
+                            <details><summary className="text-action cursor-pointer list-none text-xs">内容を編集</summary><div className="absolute right-20 z-10 mt-2 rounded-card p-4 shadow-lg" style={{ width: 640, background: 'var(--color-canvas)' }}><ActionConfigEditor action={action} tags={tags} fields={fields} marks={marks} scenarios={scenarioOpts} vars={vars} onChange={(config) => void save(action, { config })} /><Checkbox className="mt-3" checked={action.repeatOnRefire} onCheckedChange={(checked) => void save(action, { repeatOnRefire: checked })}>発動2回目以降も実行する</Checkbox><div className="mt-3 flex gap-2"><button type="button" onClick={() => void move(index, -1)} disabled={index === 0}>上へ</button><button type="button" onClick={() => void move(index, 1)} disabled={index === actions.length - 1}>下へ</button><button type="button" onClick={() => void remove(action)} className="text-danger">削除</button></div></div></details>
                           </div>
                         </div>
                       </div>
@@ -549,18 +551,18 @@ export function ActionConfigEditor({
       const selected = Array.isArray(c.tagIds) ? (c.tagIds as string[]) : []
       return (
         <>
-          <div className="flex flex-wrap items-center gap-4">
+          <RadioCardGroup legend="タグの操作" className="flex flex-wrap items-center gap-4">
             {(['add', 'remove'] as const).map((op) => (
-              <label key={op} className="text-ink flex items-center gap-1.5 text-sm">
-                <input
-                  type="radio"
-                  checked={(c.op ?? 'add') === op}
-                  onChange={() => onChange({ ...c, op })}
-                />
-                {op === 'add' ? 'タグを追加' : 'タグをはずす'}
-              </label>
+              <RadioCard
+                key={op}
+                name="tag-op"
+                value={op}
+                checked={(c.op ?? 'add') === op}
+                onChange={() => onChange({ ...c, op })}
+                title={op === 'add' ? 'タグを追加' : 'タグをはずす'}
+              />
             ))}
-          </div>
+          </RadioCardGroup>
           <div className="flex flex-wrap gap-1.5">
             {tags.map((tag) => {
               const on = selected.includes(tag.id)
@@ -668,29 +670,29 @@ export function ActionConfigEditor({
           {c.op === 'start' && (
             <div className="bg-canvas-sunken rounded-card space-y-2 px-3 py-2.5">
               <p className="text-ink text-xs font-bold">シナリオを購読する場合</p>
-              {(
-                [
-                  { value: 'from_start', label: '(新規)最初から／(再開)最初から' },
-                  { value: 'from_read', label: '(再開)友だちが読んだところから' },
-                ] as const
-              ).map((opt) => (
-                <label key={opt.value} className="text-ink-secondary flex items-center gap-1.5 text-xs">
-                  <input
-                    type="radio"
+              <RadioCardGroup legend="シナリオを購読する場合">
+                {(
+                  [
+                    { value: 'from_start', label: '(新規)最初から／(再開)最初から' },
+                    { value: 'from_read', label: '(再開)友だちが読んだところから' },
+                  ] as const
+                ).map((opt) => (
+                  <RadioCard
+                    key={opt.value}
+                    name="scenario-restart"
+                    value={opt.value}
                     checked={(c.restart ?? 'from_start') === opt.value}
                     onChange={() => onChange({ ...c, restart: opt.value })}
+                    title={opt.label}
                   />
-                  {opt.label}
-                </label>
-              ))}
-              <label className="text-ink-secondary flex items-center gap-1.5 text-xs">
-                <input
-                  type="checkbox"
-                  checked={c.rememberPrevious === true}
-                  onChange={(e) => onChange({ ...c, rememberPrevious: e.target.checked })}
-                />
+                ))}
+              </RadioCardGroup>
+              <Checkbox
+                checked={c.rememberPrevious === true}
+                onCheckedChange={(checked) => onChange({ ...c, rememberPrevious: checked })}
+              >
                 いま読んでいるシナリオを控えて、あとで「1つ前のシナリオを再開」で戻せるようにする
-              </label>
+              </Checkbox>
             </div>
           )}
         </div>

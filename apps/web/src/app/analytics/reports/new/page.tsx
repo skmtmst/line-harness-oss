@@ -4,6 +4,7 @@ import { Suspense, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import { TimeField } from '@/components/shared/date-time-field'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -327,14 +328,9 @@ function AnalyticsReportFormPage() {
                 // ものは外せる向きだけ残す(点検のN-284)。
                 const locked = Boolean(choice.unavailable) && !checked
                 return (
-                  <label className={`flex items-start gap-3 ${locked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`} key={choice.id}>
-                    <input className="accent-accent mt-0.5 size-5" type="checkbox" checked={checked} disabled={locked} onChange={() => toggleSection(choice.id)} />
-                    <span className="grid gap-1">
-                      <strong className="text-sm">{choice.title}</strong>
-                      <small className="text-ink-secondary text-xs font-normal">{choice.detail}</small>
-                      {choice.unavailable && <small className="text-ink-faint text-xs font-normal">{choice.unavailable}</small>}
-                    </span>
-                  </label>
+                  <Checkbox key={choice.id} checked={checked} disabled={locked} onCheckedChange={() => toggleSection(choice.id)} description={<>{choice.detail}{choice.unavailable && <>（{choice.unavailable}）</>}</>}>
+                    <strong>{choice.title}</strong>
+                  </Checkbox>
                 )
               })}
             </div>
@@ -346,15 +342,14 @@ function AnalyticsReportFormPage() {
               <p className="text-ink-secondary mb-4 mt-1 text-sm">チェックした分析の最新の結果を、レポートに添えます。無くても作れます。</p>
               <div className="grid gap-x-8 gap-y-3 md:grid-cols-2">
                 {options.savedAnalyses.map((item) => (
-                  <label className="flex cursor-pointer items-start gap-3" key={item.id}>
-                    <input
-                      className="accent-accent mt-0.5 size-5"
-                      type="checkbox"
-                      checked={savedAnalysisIds.includes(item.id)}
-                      onChange={() => setSavedAnalysisIds((current) => current.includes(item.id) ? current.filter((id) => id !== item.id) : [...current, item.id])}
-                    />
-                    <span className="grid gap-1"><strong className="text-sm">{item.name}</strong><small className="text-ink-secondary text-xs font-normal">{item.kind === 'cross' ? 'クロス分析' : 'ファネル'}</small></span>
-                  </label>
+                  <Checkbox
+                    key={item.id}
+                    checked={savedAnalysisIds.includes(item.id)}
+                    onCheckedChange={() => setSavedAnalysisIds((current) => current.includes(item.id) ? current.filter((id) => id !== item.id) : [...current, item.id])}
+                    description={item.kind === 'cross' ? 'クロス分析' : 'ファネル'}
+                  >
+                    <strong>{item.name}</strong>
+                  </Checkbox>
                 ))}
               </div>
             </section>
@@ -385,14 +380,14 @@ function AnalyticsReportFormPage() {
               {options.recipients.map((person) => {
                 const checked = staffIds.includes(person.id)
                 return (
-                  <li key={person.id}>
-                    <label className={`flex min-h-11 cursor-pointer items-start gap-3 px-4 py-2.5 ${checked ? 'bg-accent-soft' : ''}`}>
-                      <input className="accent-accent mt-1 size-4 shrink-0" type="checkbox" checked={checked} onChange={() => setStaffIds((current) => current.includes(person.id) ? current.filter((id) => id !== person.id) : [...current, person.id])} />
-                      <span className="min-w-0">
-                        <strong className="text-ink block truncate text-sm" title={person.name}>{person.name}</strong>
-                        <span className="text-ink-secondary block text-xs">ログインユーザー ／ {ROLE_LABEL[person.role]}</span>
-                      </span>
-                    </label>
+                  <li key={person.id} className={`min-h-11 px-4 py-2.5 ${checked ? 'bg-accent-soft' : ''}`}>
+                    <Checkbox
+                      checked={checked}
+                      onCheckedChange={() => setStaffIds((current) => current.includes(person.id) ? current.filter((id) => id !== person.id) : [...current, person.id])}
+                      description={<span className="text-ink-secondary">ログインユーザー ／ {ROLE_LABEL[person.role]}</span>}
+                    >
+                      <strong className="block truncate text-sm" title={person.name}>{person.name}</strong>
+                    </Checkbox>
                   </li>
                 )
               })}
@@ -413,29 +408,26 @@ function AnalyticsReportFormPage() {
             </ul>
             <div className="mt-2"><Button variant="secondary" onClick={() => setEmails((current) => [...current, ''])}>宛先を足す</Button></div>
             {!hasRecipient && <p className="text-ink-secondary mt-3 text-xs">受け取る人を1人以上選んでください。選ぶまで作れません。</p>}
-            <label className="border-hairline mt-5 flex items-start gap-3 border-t pt-4">
-              <input className="accent-accent mt-0.5 size-5" type="checkbox" checked={lineEnabled} onChange={(event) => setLineEnabled(event.target.checked)} />
-              <span className="grid gap-1"><strong className="text-sm">LINEでも同じ内容を送る</strong><small className="text-ink-secondary text-xs font-normal">ログインユーザーのLINEに、要点だけを短くまとめて送ります。</small></span>
-            </label>
+            <Checkbox className="border-hairline mt-5 flex w-full border-t pt-4" checked={lineEnabled} onCheckedChange={setLineEnabled} description="ログインユーザーのLINEに、要点だけを短くまとめて送ります。">
+              <strong>LINEでも同じ内容を送る</strong>
+            </Checkbox>
           </section>
 
           <section className="border-hairline bg-canvas rounded-card border p-4 sm:p-6">
             <h2 className="text-lg font-semibold">知らせの決めごと</h2>
             <p className="text-ink-secondary mb-4 mt-1 text-sm">レポートを作るときに前の期間と比べ、条件に合えばレポートに含めて知らせます。</p>
-            <label className="mb-3 flex items-center gap-2 text-sm font-semibold"><input className="accent-accent size-5" type="checkbox" checked={alertsEnabled} onChange={(event) => setAlertsEnabled(event.target.checked)} />大きな変化を知らせる</label>
+            <Checkbox className="mb-3" checked={alertsEnabled} onCheckedChange={setAlertsEnabled}>大きな変化を知らせる</Checkbox>
             <ul className="grid list-none gap-3 p-0">
               {ALERT_RULE_DEFS.map((def) => {
                 const draft = alertDrafts[def.id]
                 const fieldsDisabled = !alertsEnabled || !draft.enabled
                 return (
                   <li className="flex items-start gap-2 text-xs" key={def.id}>
-                    <input
-                      type="checkbox"
-                      className="accent-accent size-4 shrink-0"
+                    <Checkbox
                       checked={draft.enabled}
                       disabled={!alertsEnabled}
                       aria-label={`${def.name}を使う`}
-                      onChange={(event) => setAlertDrafts((current) => ({ ...current, [def.id]: { ...current[def.id], enabled: event.target.checked } }))}
+                      onCheckedChange={(checked) => setAlertDrafts((current) => ({ ...current, [def.id]: { ...current[def.id], enabled: checked } }))}
                     />
                     <span className="grid gap-1">
                       <strong>

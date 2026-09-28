@@ -428,6 +428,8 @@
     "468_event_custom_questions.sql",
     "469_manual_link_screens.sql",
     "470_google_sheets_integrations.sql",
+    "472_affiliate_offer_versions.sql",
+    "473_affiliate_attribution_decisions.sql",
     "474_notification_delivery_source.sql",
     "475_notification_delivery_origin_index.sql",
     "476_entry_route_stopped.sql",
@@ -450,5 +452,5 @@
     "503_measurement_sites.sql",
     "504_conversion_reversal_ledger.sql"
   ],
-  "migrationCount": 449
+  "migrationCount": 451
 }

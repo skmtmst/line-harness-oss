@@ -81,6 +81,7 @@ import {
   STAFF_MEMBERS, LOGIN_AUDIT,
   AFFILIATES, AFFILIATE_OFFERS, AFFILIATE_REPORT, AFFILIATE_REPORT_DETAIL, AFFILIATE_LINKS,
   AFFILIATE_SETTLEMENT_PREVIEW, AFFILIATE_SETTLEMENT_CREATED, AFFILIATE_PAYOUT_BATCH, AFFILIATE_STATEMENT,
+  OFFER_VERSIONS, OFFER_CAP_STATUS, ATTRIBUTION_DECISION,
   MILEAGE_EARNING_RULES, MILEAGE_FRIENDS, MILEAGE_HISTORY, MILEAGE_OVERVIEW,
   COMMON_ACTIONS, COMMON_ACTION_DETAIL, AUTOMATIONS, AUTOMATION_RUNS, AUTOMATION_TEMPLATES,
   BOOKING_MENUS, BOOKING_SETTINGS, BOOKING_STAFF, BOOKING_STAFF_MENUS, BOOKING_MENU_STAFF, BOOKING_AVAILABILITY, BOOKING_RESOURCES,
@@ -3035,6 +3036,13 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   */
   if (pathname === '/api/affiliates') return { success: true, data: AFFILIATES }
   if (pathname === '/api/affiliate-offers') return { success: true, data: AFFILIATE_OFFERS }
+  // #823 案件の決まりの版・上限の残り・成果の付け方の記録。
+  const offerVersions = /^\/api\/affiliate-offers\/([^/]+)\/versions$/.exec(pathname)
+  if (offerVersions) return { success: true, data: OFFER_VERSIONS }
+  const offerCapStatus = /^\/api\/affiliate-offers\/([^/]+)\/cap-status$/.exec(pathname)
+  if (offerCapStatus) return { success: true, data: OFFER_CAP_STATUS }
+  const conversionAttribution = /^\/api\/conversions\/events\/([^/]+)\/attribution$/.exec(pathname)
+  if (conversionAttribution) return { success: true, data: ATTRIBUTION_DECISION }
   if (pathname === '/api/common-actions') {
     const status = query.get('status')
     const search = (query.get('query') ?? '').trim().toLocaleLowerCase('ja')

@@ -23,6 +23,7 @@ import { TextInput } from '@/components/shared/form-controls'
 import DateField from '@/components/shared/date-field'
 import Notice from '@/components/shared/notice'
 import { TimeField } from '@/components/shared/date-time-field'
+import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import EventQuestionsEditor, { parseEventQuestions } from '@/components/events/event-questions-editor'
@@ -602,14 +603,13 @@ function OverviewStep({
             placeholder="例：開催趣旨、注意事項、持ち物などを記載…"
             className={inputClass}
           />
-          <label className="text-ink-secondary mt-2 flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={draft.description_centered === 1}
-              onChange={(e) => update('description_centered', e.target.checked ? 1 : 0)}
-            />
+          <Checkbox
+            className="mt-2"
+            checked={draft.description_centered === 1}
+            onCheckedChange={(checked) => update('description_centered', checked ? 1 : 0)}
+          >
             詳細を中央揃えで表示する
-          </label>
+          </Checkbox>
         </div>
       </FormSection>
 
@@ -737,20 +737,13 @@ function OverviewStep({
         label="満席になったとき"
         note="満席後も申し込みを受けるかを決めます。"
       >
-        <label className="text-ink-secondary flex items-start gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={draft.waitlist_enabled === 1}
-            onChange={(event) => update('waitlist_enabled', event.target.checked ? 1 : 0)}
-            className="mt-0.5"
-          />
-          <span>
-            <span className="text-ink block font-medium">キャンセル待ちを受け付ける</span>
-            <span className="text-ink-faint block text-xs">
-              空きが出たら、申込者一覧で待っている方を順に確認できます。
-            </span>
-          </span>
-        </label>
+        <Checkbox
+          checked={draft.waitlist_enabled === 1}
+          onCheckedChange={(checked) => update('waitlist_enabled', checked ? 1 : 0)}
+          description="空きが出たら、申込者一覧で待っている方を順に確認できます。"
+        >
+          キャンセル待ちを受け付ける
+        </Checkbox>
       </FormSection>
 
       <FormSection
@@ -758,20 +751,13 @@ function OverviewStep({
         label="申し込んだ人にすること"
         note="受付と前日のお知らせを自動で行います。"
       >
-        <label className="text-ink-secondary flex items-start gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={draft.requires_approval === 1}
-            onChange={(event) => update('requires_approval', event.target.checked ? 1 : 0)}
-            className="mt-0.5"
-          />
-          <span>
-            <span className="text-ink block font-medium">承認してから予約を確定する</span>
-            <span className="text-ink-faint block text-xs">
-              申し込み後、申込者一覧で承認するまで確定しません。承認待ちの分も残席を使います。
-            </span>
-          </span>
-        </label>
+        <Checkbox
+          checked={draft.requires_approval === 1}
+          onCheckedChange={(checked) => update('requires_approval', checked ? 1 : 0)}
+          description="申し込み後、申込者一覧で承認するまで確定しません。承認待ちの分も残席を使います。"
+        >
+          承認してから予約を確定する
+        </Checkbox>
         <Field label="承認の期限" htmlFor="approval-deadline-hours">
           <Select
             id="approval-deadline-hours"
@@ -783,20 +769,13 @@ function OverviewStep({
             size="full"
           />
         </Field>
-        <label className="text-ink-secondary flex items-start gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={draft.reminder_day_before_enabled === 1}
-            onChange={(event) => update('reminder_day_before_enabled', event.target.checked ? 1 : 0)}
-            className="mt-0.5"
-          />
-          <span>
-            <span className="text-ink block font-medium">前日に思い出してもらう</span>
-            <span className="text-ink-faint block text-xs">
-              開催前日にLINEで自動のお知らせを送ります。
-            </span>
-          </span>
-        </label>
+        <Checkbox
+          checked={draft.reminder_day_before_enabled === 1}
+          onCheckedChange={(checked) => update('reminder_day_before_enabled', checked ? 1 : 0)}
+          description="開催前日にLINEで自動のお知らせを送ります。"
+        >
+          前日に思い出してもらう
+        </Checkbox>
       </FormSection>
       </div>
 
@@ -1291,14 +1270,12 @@ function SlotsStep({
               />
             </Field>
           </div>
-          <label className="text-ink-secondary flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={draft.reminder_day_before_enabled === 1}
-              onChange={(e) => update('reminder_day_before_enabled', e.target.checked ? 1 : 0)}
-            />
+          <Checkbox
+            checked={draft.reminder_day_before_enabled === 1}
+            onCheckedChange={(checked) => update('reminder_day_before_enabled', checked ? 1 : 0)}
+          >
             前日にもお知らせを送る
-          </label>
+          </Checkbox>
         </FormSection>
 
         <StepFooter
@@ -1453,20 +1430,13 @@ function PublishStep({
               size="full"
             />
           </Field>
-          <label className="text-ink-secondary flex items-start gap-2 text-sm">
-            <input
-              type="checkbox"
-              className="mt-0.5"
-              checked={draft.waitlist_enabled === 1}
-              onChange={(e) => update('waitlist_enabled', e.target.checked ? 1 : 0)}
-            />
-            <span>
-              定員に達したらキャンセル待ちを受け付ける
-              <span className="text-ink-faint block text-xs">
-                空きが出たら、待っている方に自動でお知らせします。
-              </span>
-            </span>
-          </label>
+          <Checkbox
+            checked={draft.waitlist_enabled === 1}
+            onCheckedChange={(checked) => update('waitlist_enabled', checked ? 1 : 0)}
+            description="空きが出たら、待っている方に自動でお知らせします。"
+          >
+            定員に達したらキャンセル待ちを受け付ける
+          </Checkbox>
         </FormSection>
 
         <FormSection step={2} label="誰に見せるか">
@@ -1554,21 +1524,14 @@ function PublishStep({
         </FormSection>
 
         <FormSection step={5} label="公開">
-          <label className="text-ink-secondary flex items-start gap-2 text-sm">
-            <input
-              type="checkbox"
-              className="mt-0.5"
-              checked={draft.is_published === 1}
-              disabled={noSlots}
-              onChange={(e) => update('is_published', e.target.checked ? 1 : 0)}
-            />
-            <span>
-              保存したらすぐ公開する
-              <span className="text-ink-faint block text-xs">
-                オフにすると下書きとして保存され、URLを開いても表示されません。
-              </span>
-            </span>
-          </label>
+          <Checkbox
+            checked={draft.is_published === 1}
+            disabled={noSlots}
+            onCheckedChange={(checked) => update('is_published', checked ? 1 : 0)}
+            description="オフにすると下書きとして保存され、URLを開いても表示されません。"
+          >
+            保存したらすぐ公開する
+          </Checkbox>
           {/* 枠が0件のイベントは、公開しても friend 側に日時が1つも出ない。
               公開できてしまうと「公開したのに申し込めない」になる。 */}
           {noSlots && (
