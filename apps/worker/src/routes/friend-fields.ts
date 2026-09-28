@@ -143,6 +143,12 @@ function parseOptions(raw: unknown, existingRaw?: string | null): { ok: true; va
   return { ok: true, value: JSON.stringify(items), items };
 }
 
+/*
+ * R181: 既定値の検査は個別値（validateFriendFieldValue）と同じ物差しで
+ * 行う。以前はここに独自の甘い検査があり、存在しない日付・記号だけの
+ * 電話番号が既定値として保存できていた。選択肢はID付きの形で渡し、
+ * 個別値側の突き合わせ（ID・表示名の両対応）を使う。
+ */
 function validateDefaultValue(
   raw: unknown,
   type: FriendFieldType,
@@ -150,36 +156,10 @@ function validateDefaultValue(
 ): { ok: true; value: string | null } | { ok: false; error: string } {
   if (raw === null || raw === undefined || raw === '') return { ok: true, value: null };
   if (type === 'image' || type === 'pdf') return { ok: false, error: '画像・PDFには既定値を設定できません' };
-  if (type === 'checkbox') {
-    if (raw === true || raw === '1' || raw === 'true') return { ok: true, value: '1' };
-    if (raw === false || raw === '0' || raw === 'false') return { ok: true, value: '0' };
-    return { ok: false, error: 'チェック項目の既定値はtrueまたはfalseで指定してください' };
-  }
-  if (type === 'multi_select') {
-    const values = Array.isArray(raw) ? raw.map(String) : null;
-    if (!values) return { ok: false, error: '複数選択の既定値は選択肢IDの配列で指定してください' };
-    const ids = values.map((value) => options.find((item) => item.id === value || item.label === value)?.id);
-    if (ids.some((id) => !id)) return { ok: false, error: '存在しない選択肢が既定値に含まれています' };
-    return { ok: true, value: JSON.stringify(ids) };
-  }
-  const value = String(raw).trim();
-  if (type === 'select') {
-    const option = options.find((item) => item.id === value || item.label === value);
-    return option ? { ok: true, value: option.id } : { ok: false, error: '既定値は登録済みの選択肢から指定してください' };
-  }
-  if (type === 'number' && !Number.isFinite(Number(value))) return { ok: false, error: '既定値を数値で指定してください' };
-  if (type === 'date' && !/^\d{4}-\d{2}-\d{2}$/.test(value)) return { ok: false, error: '既定値をYYYY-MM-DDで指定してください' };
-  if (type === 'datetime' && Number.isNaN(Date.parse(value))) return { ok: false, error: '既定値を日時形式で指定してください' };
-  if (type === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return { ok: false, error: '既定値をメールアドレス形式で指定してください' };
-  if (type === 'tel' && !/^\+?[0-9() -]{8,20}$/.test(value)) return { ok: false, error: '既定値を電話番号形式で指定してください' };
-  if (type === 'url') {
-    try { if (!['http:', 'https:'].includes(new URL(value).protocol)) throw new Error(); }
-    catch { return { ok: false, error: '既定値をhttpまたはhttpsのURLで指定してください' }; }
-  }
-  const limit = type === 'textarea' ? 2000 : 200;
-  return value.length <= limit
-    ? { ok: true, value }
-    : { ok: false, error: `既定値は${limit}文字以内で指定してください` };
+  return validateFriendFieldValue(
+    { type, options_json: options.length > 0 ? JSON.stringify(options) : null },
+    raw,
+  );
 }
 
 async function sha256(value: string): Promise<string> {

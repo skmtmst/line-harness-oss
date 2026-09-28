@@ -48,9 +48,8 @@ describe('通の複製は後ろをずらしてから足す', () => {
   it('時刻・絞り込み・質問・下書きの別まで写す', () => {
     const body = duplicateStep()
     for (const field of [
-      'delayMinutes: step.delayMinutes',
-      'offsetDays: step.offsetDays',
-      'deliveryTime: step.deliveryTime',
+      // R216: 時刻は方式に合う欄だけ送る（全部送ると口が 400 で止める）。
+      'stepScheduleForClone(deliveryMode, step)',
       'targetCondition:',
       'question:',
       'isDraft: step.isDraft',
@@ -58,21 +57,31 @@ describe('通の複製は後ろをずらしてから足す', () => {
       expect(body, `${field} が複製に含まれていません`).toContain(field)
     }
   })
+
+  it('R216: 余分な時刻の欄を送らない（経過時間に delayMinutes を混ぜない）', () => {
+    const body = duplicateStep()
+    expect(body).not.toContain('delayMinutes: step.delayMinutes')
+    expect(DETAIL).toContain('function stepScheduleForClone(')
+  })
 })
 
 describe('シナリオの複製は通の中身を落とさない', () => {
   it('時刻・絞り込み・質問・下書きの別まで写す', () => {
     const body = duplicateScenario()
     for (const field of [
-      'delayMinutes: step.delayMinutes',
-      'offsetDays: step.offsetDays',
-      'deliveryTime: step.deliveryTime',
+      // R216: 時刻は方式に合う欄だけ送る（全部送ると口が 400 で止める）。
+      'stepScheduleForClone(deliveryMode, step)',
       'targetCondition:',
       'question:',
       'isDraft: step.isDraft',
     ]) {
       expect(body, `${field} が複製に含まれていません`).toContain(field)
     }
+  })
+
+  it('R216: 余分な時刻の欄を送らない（経過時間に delayMinutes を混ぜない）', () => {
+    const body = duplicateScenario()
+    expect(body).not.toContain('delayMinutes: step.delayMinutes')
   })
 
   it('SCENARIO-08: シナリオ全体の対象条件・終了後の処理・きっかけ・アクションも写す', () => {
