@@ -18,10 +18,14 @@ import {
   failReminderDeliveryRun,
   getFriendById,
   getLineAccountById,
+  getReminderDeliveryRunSentPayload,
   getTemplateById,
+  getTemplateVersion,
   holdExpiredLineRetryRuns,
   isOperationCapabilityStopped,
+  parseTemplateVersionSnapshot,
   releaseClaimedReminderRun,
+  saveReminderDeliveryRunSentPayload,
   skipReminderDeliveryRun,
   verifyClaimedRunBeforeSend,
   listLineAccountsWithTenantStatus,
@@ -39,7 +43,7 @@ import {
   externalDeliveryRetryAt,
   type SafeExternalDeliveryError,
 } from './external-delivery-retry.js';
-import type { ReminderStepRow } from '@line-crm/db';
+import type { ReminderDeliveryRunRow, ReminderStepRow } from '@line-crm/db';
 import type { Message } from '@line-crm/line-sdk';
 import { featureJobCanRun } from './feature-enforcement.js';
 
@@ -78,19 +82,39 @@ export async function buildReminderStepMessage(
   // 下書き試験から呼ぶときは 'test_send' を渡す。台帳の送信種別が
   // 本番配信とテスト送信で分かれる。
   sourceKind: 'reminder' | 'test_send' = 'reminder',
+  // R346: 登録時のテンプレート版の写し {"テンプレートID": 公開版番号}。
+  // 無いときは今までどおり最新の版を読む（下書き試験・古い登録）。
+  options?: { pinnedTemplateVersions?: Record<string, number> | null },
 ): Promise<{
   message: Message;
   messageType: string;
   messageContent: string;
   templateId: string | null;
+  templateVersion: number | null;
 }> {
   let messageType = step.message_type;
   let messageContent = step.message_content;
+  let templateVersion: number | null = null;
   if (step.template_id) {
-    const template = await getTemplateById(db, step.template_id);
-    if (template) {
-      messageType = template.message_type;
-      messageContent = template.message_content;
+    // R346: 登録時の版があるときはその版で送る。新しい版にするのは
+    // 登録し直した時だけ。版履歴に無いときは今の版へ落ちる。
+    const pinned = options?.pinnedTemplateVersions?.[step.template_id];
+    if (pinned != null) {
+      const version = await getTemplateVersion(db, step.template_id, pinned);
+      if (version) {
+        messageType = version.message_type;
+        messageContent = version.message_content;
+        templateVersion = version.version_number;
+      }
+    }
+    if (templateVersion == null) {
+      const template = await getTemplateById(db, step.template_id);
+      if (template) {
+        messageType = template.message_type;
+        messageContent = template.message_content;
+        const live = Number(template.published_version);
+        templateVersion = Number.isFinite(live) && live > 0 ? live : null;
+      }
     }
   }
   const resolvedMeta = await resolveMetadata(db, friend);
@@ -109,7 +133,62 @@ export async function buildReminderStepMessage(
     messageType,
     messageContent: expanded,
     templateId: step.template_id,
+    templateVersion,
   };
+}
+
+/**
+ * R345: 1通の送信内容を決める。初回は作って実行行へ残し、
+ * 同じ再試行キーの再送は残した本文をそのまま使う。
+ * 受理ずみ（409）の再試行も初回と同じ要求になるため、履歴は初回の内容を表す。
+ * まだ送っていない通は今までどおり最新の差し込みで作る。
+ */
+async function resolveReminderRunMessage(
+  db: D1Database,
+  run: ReminderDeliveryRunRow,
+  step: ReminderStepRow,
+  friend: NonNullable<Awaited<ReturnType<typeof getFriendById>>>,
+  sendAt: Date,
+  pinnedTemplateVersions: Record<string, number> | null,
+  ownedLeases: string[],
+  nowIso: string,
+): Promise<{
+  message: Message;
+  messageType: string;
+  messageContent: string;
+  templateId: string | null;
+}> {
+  const saved = await getReminderDeliveryRunSentPayload(db, run.id);
+  if (saved) {
+    return {
+      message: buildMessage(saved.messageType, saved.messageContent),
+      messageType: saved.messageType,
+      messageContent: saved.messageContent,
+      templateId: saved.templateId,
+    };
+  }
+  const fresh = await buildReminderStepMessage(db, step, friend, sendAt, 'reminder', {
+    pinnedTemplateVersions,
+  });
+  // 先に残した処理があるときはそちらを使う（同じ実行の二重保存をしない）。
+  const persisted = await saveReminderDeliveryRunSentPayload(db, {
+    id: run.id,
+    messageType: fresh.messageType,
+    messageContent: fresh.messageContent,
+    templateId: fresh.templateId,
+    templateVersion: fresh.templateVersion,
+    now: nowIso,
+    expectedLeaseExpiresAt: ownedLeases,
+  });
+  if (persisted) {
+    return {
+      message: buildMessage(persisted.messageType, persisted.messageContent),
+      messageType: persisted.messageType,
+      messageContent: persisted.messageContent,
+      templateId: persisted.templateId,
+    };
+  }
+  return fresh;
 }
 
 /** Provider本文や秘密値を管理画面へ出さず、運用者が次の行動を選べる言葉へ直す。 */
@@ -355,7 +434,13 @@ export async function processReminderDeliveries(
         const deliveryClient = await (options.resolveClient
           ? options.resolveClient(accountId, lineClient)
           : defaultResolveClient(db, accountId, lineClient));
-        const built = await buildReminderStepMessage(db, step, friend, sendAt);
+        // R346: この登録が使うテンプレート版。無い登録は今までどおり最新の版。
+        const pinnedTemplateVersions = parseTemplateVersionSnapshot(
+          enrollment.template_version_snapshot,
+        );
+        const built = await resolveReminderRunMessage(
+          db, run, step, friend, sendAt, pinnedTemplateVersions, ownedLeases, nowIso,
+        );
         // 取消と送信の競合対策: push の直前に送る権利を1文で確かめる。
         // この後 push まで待たない (間に取消が入る余地を残さない)。
         // 外部送信は巻き戻せないため、権利取得と取消確定の順序は DB の1文で
