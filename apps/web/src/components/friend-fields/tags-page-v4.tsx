@@ -540,8 +540,9 @@ function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag: Tag; a
             <TrashIcon />
           </span>
           <div className="mt-5 min-w-0">
-            <h2 id={titleId} className="text-xl font-bold text-ink">「{tag.name}」を削除しますか？</h2>
-            <p className="mt-1 text-sm text-ink-secondary">このタグを使っている場所と、外れる友だちを確認してください。</p>
+            {/* R190: 実行するのは保管（アーカイブ）。削除と書くと消えたように読める。 */}
+            <h2 id={titleId} className="text-xl font-bold text-ink">「{tag.name}」を保管しますか？</h2>
+            <p className="mt-1 text-sm text-ink-secondary">このタグを使っている場所と、外れる友だちを確認してください。保管すると友だちから外れ、一覧には「保管済み」として残ります。元に戻せません。</p>
           </div>
         </div>
 
@@ -560,9 +561,9 @@ function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag: Tag; a
         {impactStatus === 'ready' && impact && !impact.canDelete && (
           <div data-qa="tag-delete-blocked-warning" className="mt-4 rounded-control border border-danger/25 bg-danger-bg p-2 text-sm text-danger">
             {impact.referenceCounts.affiliateOffers > 0 ? (
-              <><p className="font-bold">アフィリエイトのオファーで使用中のタグは削除できません</p><p className="mt-1">その場合は、先にオファー側の設定からこのタグを外してください。削除しても、過去のマイル履歴と配信ログは残ります。</p></>
+              <><p className="font-bold">アフィリエイトのオファーで使用中のタグは保管できません</p><p className="mt-1">その場合は、先にオファー側の設定からこのタグを外してください。保管しても、過去のマイル履歴と配信ログは残ります。</p></>
             ) : (
-              <><p className="font-bold">有効な参照があるタグは、完全に削除できません</p><p className="mt-1">参照中の設定を確認してから操作してください。過去のマイル履歴と配信ログは残ります。</p></>
+              <><p className="font-bold">有効な参照があるタグは保管できません</p><p className="mt-1">参照中の設定を確認してから操作してください。過去のマイル履歴と配信ログは残ります。</p></>
             )}
           </div>
         )}
@@ -572,7 +573,7 @@ function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag: Tag; a
           <span className="mb-1.5 block text-xs font-semibold text-ink-secondary">確認のため、タグ名を入力してください</span>
           <input value={text} onChange={(event) => setText(event.target.value)} placeholder={tag.name} disabled={blocked} className="w-full rounded-control border border-hairline px-3 py-2.5 text-sm focus:border-danger disabled:bg-canvas-sunken" />
         </label>
-        {/* 設計 `rHKRG`。左が「やめる」、右が「このタグを削除する」。 */}
+        {/* 設計 `rHKRG`。左が「やめる」、右が「このタグを保管する」。 */}
         <div className="mt-5 flex items-center justify-end gap-3">
           {blockedReason && <p className="min-w-0 flex-1 text-xs text-ink-faint">{blockedReason}</p>}
           <button type="button" onClick={onCancel} className="shrink-0 rounded-control border border-hairline px-4 py-2.5 text-sm font-medium text-ink-secondary">やめる</button>
@@ -597,15 +598,15 @@ function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag: Tag; a
                  * 起きたか分からない」に見える（#708 の裁定）。
                  */
                 if (reason instanceof ApiError && reason.code === 'already_archived') {
-                  onArchived('このタグはすでに整理されています。')
+                  onArchived('このタグはすでに保管済みです。')
                   return
                 }
-                setSaveError('アーカイブできませんでした。影響を読み直して、もう一度お試しください。')
+                setSaveError('保管できませんでした。影響を読み直して、もう一度お試しください。')
                 setSaving(false)
               }
             }}
             className="shrink-0 rounded-control bg-danger px-4 py-2.5 text-sm font-bold text-on-accent disabled:opacity-40"
-          >{saving ? '削除中…' : 'このタグを削除する'}</button>
+          >{saving ? '保管中…' : 'このタグを保管する'}</button>
         </div>
       </section>
     </div>
@@ -1135,9 +1136,10 @@ export default function TagsPageV4({
                           <RowActions
                             subjectName={tag.name}
                             edit={{ href: `/tags/edit?id=${tag.id}` }}
-                            destructiveItem={{
-                              id: 'delete',
-                              label: '削除する',
+                            /* R190: 保管済みに戻す口は無いため、同じ確認を繰り返さない。 */
+                            destructiveItem={tag.status === 'archived' ? undefined : {
+                              id: 'archive',
+                              label: '保管する',
                               onSelect: () => setDeleteTarget(tag),
                             }}
                           />
@@ -1207,9 +1209,9 @@ export default function TagsPageV4({
                                 <RowActions
                                   subjectName={tag.name}
                                   edit={{ href: `/tags/edit?id=${tag.id}` }}
-                                  destructiveItem={{
-                                    id: 'delete',
-                                    label: '削除する',
+                                  destructiveItem={tag.status === 'archived' ? undefined : {
+                                    id: 'archive',
+                                    label: '保管する',
                                     onSelect: () => setDeleteTarget(tag),
                                   }}
                                 />
