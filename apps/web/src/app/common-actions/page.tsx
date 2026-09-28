@@ -6,6 +6,7 @@ import { ExternalLink, MoreHorizontal, RefreshCw } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import { api, type CommonActionSummary } from '@/lib/api'
 import Button from '@/components/shared/button'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import NoteBar from '@/components/shared/note-bar'
 import PageHeader from '@/components/shared/page-header'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -231,19 +232,21 @@ export default function CommonActionsPage() {
           loading: loading && query !== deferredQuery,
         }}
         filters={
-          <div className="flex flex-wrap gap-2" aria-label="状態で絞り込む">
-            {FILTERS.map((option) => (
-              <label
-                key={option.value}
-                className={filter === option.value
-                  ? 'bg-success-bg text-success rounded-pill border border-success px-3 py-1.5 text-xs font-semibold'
-                  : 'border-hairline text-ink-secondary rounded-pill border bg-canvas px-3 py-1.5 text-xs'}
-              >
-                <input className="sr-only" type="radio" name="common-action-filter" value={option.value} checked={filter === option.value} onChange={() => { setFilter(option.value); setPage(1) }} />
-                {option.label}{(() => { const count = filterCount(option.value); return count == null ? '' : ` ${count}` })()}
-              </label>
-            ))}
-          </div>
+          <RadioCardGroup legend="状態で絞り込む" className="flex flex-wrap gap-2">
+            {FILTERS.map((option) => {
+              const count = filterCount(option.value)
+              return (
+                <RadioCard
+                  key={option.value}
+                  name="common-action-filter"
+                  value={option.value}
+                  checked={filter === option.value}
+                  onChange={() => { setFilter(option.value); setPage(1) }}
+                  title={`${option.label}${count == null ? '' : ` ${count}`}`}
+                />
+              )
+            })}
+          </RadioCardGroup>
         }
         trailing={
           <Button

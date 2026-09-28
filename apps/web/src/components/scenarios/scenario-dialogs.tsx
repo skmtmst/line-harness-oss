@@ -13,6 +13,8 @@ import { shortDateTime } from '@/lib/hq-banners'
 import { scenarioReferenceData } from './scenario-reference-data'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import ConditionBuilder, {
@@ -425,7 +427,7 @@ export function OnCompleteDialog({
       }
     >
       {error && <Notice tone="danger" className="mb-4" message={error} />}
-      <div className="space-y-3">
+      <RadioCardGroup legend="最後の1通を配り終えた人をどうするか" className="space-y-3">
         {(
           [
             {
@@ -446,25 +448,17 @@ export function OnCompleteDialog({
             },
           ]
         ).map((opt) => (
-          <label
+          <RadioCard
             key={opt.value}
-            className={`rounded-panel flex cursor-pointer gap-3 border p-4 ${
-              draftMode === opt.value ? 'border-accent bg-accent-soft' : 'border-hairline'
-            }`}
-          >
-            <input
-              type="radio"
-              className="mt-1"
-              checked={draftMode === opt.value}
-              onChange={() => setDraftMode(opt.value)}
-            />
-            <span className="min-w-0">
-              <span className="text-ink block text-sm font-bold">{ON_COMPLETE_LABEL[opt.value]}</span>
-              <span className="text-ink-secondary mt-0.5 block text-xs">{opt.hint}</span>
-            </span>
-          </label>
+            name="scenario-complete-action"
+            value={opt.value}
+            checked={draftMode === opt.value}
+            onChange={() => setDraftMode(opt.value)}
+            title={ON_COMPLETE_LABEL[opt.value]}
+            note={opt.hint}
+          />
         ))}
-      </div>
+      </RadioCardGroup>
 
       <div className="border-hairline mt-5 border-t pt-5">
         <p className="text-ink text-sm font-bold">その他のアクション</p>
@@ -875,7 +869,7 @@ export function TestSendDialog({
           「戻る」「テスト送信を開始」へ必ず到達できるようにする。
         */}
         <div className="fixed inset-0 z-10 flex items-start justify-center overflow-y-auto px-6 pb-6" style={{ paddingTop: 'min(265px, 30vh)', background: 'color-mix(in srgb, var(--color-ink) 35%, transparent)' }}>
-          <div className="w-full rounded-panel shadow-xl" style={{ maxWidth: 672, background: 'var(--color-canvas)' }}><div className="border-hairline border-b px-6 py-5"><h2 className="text-lg font-bold">選択した1名へ実際に送信しますか？</h2><p className="text-ink-secondary mt-1 text-sm">{friendName}さん（{recipientLabel}）へ{confirmSteps.length}通をテスト送信します。実際のLINEメッセージとして届きます。</p></div><div className="space-y-3 px-6 py-5 text-sm">{requiredConfirmations.map((label, index) => (<label key={label} className="flex items-center gap-2"><input type="checkbox" checked={confirmChecks[index] === true} disabled={sending || result?.ok === true} onChange={(e) => setConfirmChecks((prev) => prev.map((v, i) => (i === index ? e.target.checked : v)))} />{label}</label>))}<p className="text-ink-faint text-xs">購読の登録は増えません。配信予定も作りません。</p>
+          <div className="w-full rounded-panel shadow-xl" style={{ maxWidth: 672, background: 'var(--color-canvas)' }}><div className="border-hairline border-b px-6 py-5"><h2 className="text-lg font-bold">選択した1名へ実際に送信しますか？</h2><p className="text-ink-secondary mt-1 text-sm">{friendName}さん（{recipientLabel}）へ{confirmSteps.length}通をテスト送信します。実際のLINEメッセージとして届きます。</p></div><div className="space-y-3 px-6 py-5 text-sm">{requiredConfirmations.map((label, index) => (<Checkbox key={label} checked={confirmChecks[index] === true} disabled={sending || result?.ok === true} onCheckedChange={(checked) => setConfirmChecks((prev) => prev.map((v, i) => (i === index ? checked : v)))}>{label}</Checkbox>))}<p className="text-ink-faint text-xs">購読の登録は増えません。配信予定も作りません。</p>
             {sending && <Notice tone="info">送信中です。完了までこの画面のまま待ってください。</Notice>}
             {result && (
               <Notice tone={result.ok ? 'success' : 'danger'}>

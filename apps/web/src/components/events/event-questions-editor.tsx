@@ -2,6 +2,7 @@
 
 import type { EventQuestion } from '@/lib/api'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 
 const TYPE_LABELS: Record<EventQuestion['type'], string> = {
@@ -97,14 +98,10 @@ export default function EventQuestionsEditor({
                 label: TYPE_LABELS[t],
               }))}
             />
-            <label className="text-ink-secondary flex items-center gap-2 text-xs">
-              <input
-                type="checkbox"
-                checked={q.required}
-                onChange={(e) => setAt(index, { required: e.target.checked })}
-              />
-              必須にする
-            </label>
+            <Checkbox
+              checked={q.required}
+              onCheckedChange={(checked) => setAt(index, { required: checked })}
+            >必須にする</Checkbox>
           </div>
           {NEEDS_OPTIONS.has(q.type) && (
             <div className="space-y-1.5">

@@ -13,6 +13,7 @@
  */
 
 import { useState } from 'react'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 
 export type MessageKind = 'location' | 'video' | 'audio' | 'sticker'
 
@@ -431,24 +432,23 @@ export default function MessageKindFields({ kind, value, onChange }: MessageKind
         LINE側の決まりで送れません。
       </p>
 
-      <div className="flex flex-wrap gap-4">
+      <RadioCardGroup legend="スタンプの決め方" className="flex flex-wrap gap-4">
         {(
           [
             { value: 'pick' as const, label: '一覧から選ぶ' },
             { value: 'manual' as const, label: '番号を直接入れる' },
           ]
         ).map((o) => (
-          <label key={o.value} className="text-ink flex cursor-pointer items-center gap-2 text-sm">
-            <input
-              type="radio"
-              name="stickerMode"
-              checked={stickerMode === o.value}
-              onChange={() => setStickerMode(o.value)}
-            />
-            {o.label}
-          </label>
+          <RadioCard
+            key={o.value}
+            name="stickerMode"
+            value={o.value}
+            checked={stickerMode === o.value}
+            onChange={() => setStickerMode(o.value)}
+            title={o.label}
+          />
         ))}
-      </div>
+      </RadioCardGroup>
 
       {stickerMode === 'pick' ? (
         <div className="flex flex-wrap gap-2">
