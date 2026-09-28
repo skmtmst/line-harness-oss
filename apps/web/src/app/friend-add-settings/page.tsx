@@ -37,12 +37,26 @@ function successRate(delivered: number | null, failed: number | null) {
 }
 
 function deliverySummary(rule: FriendAddRule) {
+  // 「何も配信しない」ではメッセージもシナリオも動かない（R261）。
+  if (rule.friendKind === 'returning' && rule.definition.returningMode === 'none') {
+    return '配信なし（アクションのみ）'
+  }
   const message = rule.definition.messageType === 'template'
     ? 'テンプレート'
     : rule.definition.messageType === 'form'
       ? '回答フォーム'
       : rule.definition.messageText ? 'テキスト' : null
   return [message, rule.scenarioName].filter(Boolean).join('＋') || '未取得'
+}
+
+/*
+ * 流入リンクを1件も選んでいない下書きは、実行側ではどの経路にも
+ * 当たらない（「すべての流入経路」ではない）。未完成のしるしとして
+ * 「未選択」と出す（R260）。
+ */
+function routeLabel(rule: FriendAddRule) {
+  if (rule.isFallback) return '経路が取れなかったとき'
+  return rule.routeNames.join('、') || '未選択'
 }
 
 export default function FriendAddSettingsPage() {
@@ -325,7 +339,7 @@ function FriendAddSettingsList() {
                     <Tr key={rule.id}>
                       <NameCell name={<a href={`/friend-add-settings?view=edit&id=${encodeURIComponent(rule.id)}`} className="text-ink block truncate font-bold" title={rule.name}>{rule.name}</a>} sub={rule.isFallback ? 'いちばん最後に動く・消せない' : `優先順位 ${rule.priority}`} />
                       <Td><StatusBadge tone={rule.status === 'published' || rule.isFallback ? 'success' : 'neutral'} size="compact">{rule.isFallback ? '常に有効' : rule.status === 'published' ? '有効' : rule.status === 'draft' ? '下書き' : rule.status === 'stopped' ? '停止中' : 'アーカイブ'}</StatusBadge></Td>
-                      <Td><span className="block truncate" title={rule.isFallback ? '経路が取れなかったとき' : rule.routeNames.join('、') || 'すべての流入経路'}>{rule.isFallback ? '経路が取れなかったとき' : rule.routeNames.join('、') || 'すべての流入経路'}</span></Td>
+                      <Td><span className="block truncate" title={routeLabel(rule)}>{routeLabel(rule)}</span></Td>
                       <Td><span className="block truncate" title={deliverySummary(rule)}>{deliverySummary(rule)}</span></Td>
                       <Td>{countText(rule.matchedLast7Days, '人')}</Td>
                       <ActionCell>
