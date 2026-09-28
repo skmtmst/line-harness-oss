@@ -13547,6 +13547,8 @@ export interface BookingSlotCheckResult {
   bookable: boolean;
   reasons: BookingSlotBlockReason[];
   per_staff: BookingSlotCheckStaff[];
+  /** R314: 判定に実際に使った枠間隔（分）。無い応答では刻み幅を書かない文言にする。 */
+  slotGranularityMinutes?: number;
 }
 
 export interface ProxyBookingResult {
@@ -13853,7 +13855,7 @@ export const bookingApi = {
     ),
   getAvailability: (
     accountId: string,
-    params: { menuId: string; staffId?: string; from: string; to: string; excludeBookingId?: string },
+    params: { menuId: string; staffId?: string; from: string; to: string; excludeBookingId?: string; applyStoreRules?: boolean },
   ) => {
     const query = new URLSearchParams({
       account_id: accountId,
@@ -13863,6 +13865,8 @@ export const bookingApi = {
     });
     if (params.staffId) query.set('staff_id', params.staffId);
     if (params.excludeBookingId) query.set('exclude_booking_id', params.excludeBookingId);
+    // (b): お客様の画面の見本だけ店舗ルールで判定する。付けない呼び出しは従来どおり。
+    if (params.applyStoreRules) query.set('apply_store_rules', '1');
     return fetchApi<BookingAvailabilityResponse>(`/api/booking/admin/availability?${query}`);
   },
   /**

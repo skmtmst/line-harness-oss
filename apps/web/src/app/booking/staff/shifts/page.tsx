@@ -569,7 +569,7 @@ const SLOT_REASON_LABELS: Record<BookingSlotBlockReason, string> = {
   booking_window: '受付期間（何日先まで取れるか）の外です',
   past_cutoff: '受付の締め切り（何時間前まで取れるか）を過ぎています',
   invalid_time: 'その時刻は存在しません',
-  not_on_grid: '開始時刻が受付の刻み（30分）に合っていません',
+  not_on_grid: '開始時刻が受付の刻みに合っていません',
   exception_closed: '休業日・例外日で閉めています',
   exception_invalid: '例外日の時間設定が壊れているため、安全のため閉めています',
   outside_working: '勤務・営業時間の外です',
@@ -583,7 +583,14 @@ const SLOT_REASON_LABELS: Record<BookingSlotBlockReason, string> = {
   unavailable: 'この日時は受け付けられません',
 }
 
-function slotReasonLabel(reason: BookingSlotBlockReason): string {
+/*
+ * R314: 刻みの理由だけ、判定に実際に使った幅を添える。応答に無いときは
+ * 幅を書かない文言にする（古い決めつけの「30分」は出さない）。
+ */
+export function slotReasonLabel(reason: BookingSlotBlockReason, slotGranularityMinutes?: number): string {
+  if (reason === 'not_on_grid' && slotGranularityMinutes != null) {
+    return `開始時刻が受付の刻み（${slotGranularityMinutes}分）に合っていません`
+  }
   return SLOT_REASON_LABELS[reason] ?? 'この日時は受け付けられません'
 }
 
@@ -707,7 +714,7 @@ function SlotCheckCard({ accountId, menus }: { accountId: string; menus: Booking
           <Notice tone="warn" className="mt-3">
             <p className="font-semibold">この日時は予約できません。</p>
             <ul className="mt-1 list-disc space-y-0.5 pl-5 text-xs">
-              {result.reasons.map((reason) => <li key={reason}>{slotReasonLabel(reason)}</li>)}
+              {result.reasons.map((reason) => <li key={reason}>{slotReasonLabel(reason, result.slotGranularityMinutes)}</li>)}
             </ul>
             {result.per_staff.length > 1 ? (
               <ul className="mt-2 space-y-0.5 border-t border-current/20 pt-2 text-xs">
@@ -715,7 +722,7 @@ function SlotCheckCard({ accountId, menus }: { accountId: string; menus: Booking
                   <li key={staff.staff_id}>
                     {staff.display_name}: {staff.bookable
                       ? '予約できます'
-                      : staff.reasons.map(slotReasonLabel).join('、')}
+                      : staff.reasons.map((reason) => slotReasonLabel(reason, result.slotGranularityMinutes)).join('、')}
                   </li>
                 ))}
               </ul>
@@ -822,10 +829,13 @@ function StoreShiftsView() {
         return
       }
       try {
+        // (b): 見本はお客様と同じ店舗ルールで判定する。付けないと締切前の
+        // 枠まで出て、空き確認の判定と食い違う。
         const availability = await bookingApi.getAvailability(selectedAccountId, {
           menuId: menu.id,
           from: range.from,
           to: range.to,
+          applyStoreRules: true,
         })
         if (requestId !== requestRef.current) return
         // LIFF は by_staff[0]（担当一覧の先頭）の枠だけを画面に出す。
