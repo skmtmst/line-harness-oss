@@ -10,7 +10,7 @@ export type FriendImportRow = {
  * `"..."` で包む正しいCSVにするため、先に改行で割ると1人ぶんが
  * 複数行に割れて余分なUID行ができる。`""` は `"` 1つに戻す。
  */
-function splitCsvRecords(text: string): string[][] {
+export function splitCsvRecords(text: string): string[][] {
   const source = text.replace(/^\uFEFF/, '')
   const records: string[][] = []
   let cells: string[] = []
@@ -62,7 +62,7 @@ function splitCsvRecords(text: string): string[][] {
       index += 1
     }
   }
-  if (touched || cells.length > 0) pushRecord()
+  if (!quoted && (touched || cells.length > 0)) pushRecord()
   return records
 }
 
