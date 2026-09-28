@@ -44,6 +44,10 @@ function routeApp(current: AuthenticatedStaff | undefined) {
   instance.post('/api/automations/:id/draft', (c) => c.json({ success: true }));
   instance.put('/api/mileage/rules/:id', (c) => c.json({ success: true }));
   instance.delete('/api/mileage/rules/:id', (c) => c.json({ success: true }));
+  // R351: 成果の個別操作（取消履歴・取消・承認/却下）。判定までが対象なので stub で足りる。
+  instance.get('/api/conversions/events/:id/reversals', (c) => c.json({ success: true }));
+  instance.post('/api/conversions/events/:id/reversals', (c) => c.json({ success: true }));
+  instance.patch('/api/conversions/events/:id/approval', (c) => c.json({ success: true }));
   return instance;
 }
 
@@ -92,6 +96,12 @@ function seedResources(testDb: SqliteD1): void {
     INSERT INTO conversion_points
       (id, name, event_type, line_account_id, created_at)
     VALUES ('cv-1', '成果地点1', 'purchase', 'account-1', ?)
+  `).run(now);
+  // R351: account-1 の地点にぶら下がる成果1件。所属は地点表だけが持つ。
+  testDb.raw.prepare(`
+    INSERT INTO conversion_events
+      (id, conversion_point_id, friend_id, created_at)
+    VALUES ('ce-a', 'cv-1', 'friend-a', ?)
   `).run(now);
   // V6オートメーション。一覧が返すidはこちら（旧 automations 表には無い）。
   testDb.raw.prepare(`
@@ -367,5 +377,46 @@ describe('WRITE-01: 対象IDからの所属account解決', () => {
       method: 'DELETE',
     }, env);
     expect(response.status).toBe(200);
+  });
+
+  it('R351: 個別成果の操作は地点の所属で通る（query無し・明示一致）', async () => {
+    // conversion_events に所属列は無い。旧SQLだと no such column で500になる。
+    const app = routeApp(staff('env-owner'));
+    const history = await app.request('/api/conversions/events/ce-a/reversals', {
+      method: 'GET',
+    }, env);
+    expect(history.status).toBe(200);
+    const historyExplicit = await app.request('/api/conversions/events/ce-a/reversals?account_id=account-1', {
+      method: 'GET',
+    }, env);
+    expect(historyExplicit.status).toBe(200);
+    const reverse = await app.request('/api/conversions/events/ce-a/reversals', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ kind: 'reverse', reason: '重複のため' }),
+    }, env);
+    expect(reverse.status).toBe(200);
+    const approval = await app.request('/api/conversions/events/ce-a/approval', {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ status: 'approved' }),
+    }, env);
+    expect(approval.status).toBe(200);
+  });
+
+  it('R351: 別accountの明示・範囲外スタッフは個別成果を通さない', async () => {
+    const app = routeApp(staff('env-owner'));
+    const mismatch = await app.request('/api/conversions/events/ce-a/reversals?account_id=account-2', {
+      method: 'GET',
+    }, env);
+    expect(mismatch.status).toBe(403);
+    expect(await mismatch.json()).toMatchObject({ code: 'LINE_ACCOUNT_MISMATCH' });
+
+    seedScopedStaff(testDb, 'scoped-2', 'account-2');
+    const scoped = routeApp(staff('scoped-2', 'staff'));
+    const foreign = await scoped.request('/api/conversions/events/ce-a/reversals', {
+      method: 'GET',
+    }, env);
+    expect(foreign.status).toBe(403);
   });
 });
