@@ -1575,7 +1575,37 @@ export type AffiliateAccountSettlementPreview = {
       rewardAmount: number
     }>
   }
+  /**
+   * 期間の始まりより前に承認され、まだ締められていない繰越分(R44)。
+   * 古いWorkerでは付かないので、画面側は未設定でも動くこと。
+   */
+  carriedOver?: {
+    count: number
+    amount: number
+  }
   previewVersion: string
+}
+
+/** R43: 締め済み台帳の再開情報（明細発行・CSV準備の続きに使う）。 */
+export type AffiliateSettlementResume = {
+  settlementId: string
+  state: string
+  version: number
+  closedAt: string | null
+  totalAmount: number
+  conversionCount: number
+  periodFrom: string
+  periodTo: string
+  affiliates: Array<{
+    affiliateId: string
+    affiliateName: string
+    code: string
+    amount: number
+    conversionCount: number
+    statementIssued: boolean
+    bankProfileRegistered: boolean
+  }>
+  batch: { id: string; state: string; lineCount: number } | null
 }
 
 export type AffiliateAccountSettlementResult = {
@@ -9262,6 +9292,13 @@ export const api = {
       period: { periodFrom: string; periodTo: string },
     ) => fetchApi<ApiResponse<AffiliateAccountSettlementPreview>>(
       `/api/affiliate-settlements/preview?${new URLSearchParams({ lineAccountId, ...period })}`,
+    ),
+    /** R43: この期間に締め済みの台帳があれば、明細発行・CSV準備を再開するための情報を返す。 */
+    settlementCurrent: (
+      lineAccountId: string,
+      period: { periodFrom: string; periodTo: string },
+    ) => fetchApi<ApiResponse<AffiliateSettlementResume | null>>(
+      `/api/affiliate-settlements/current?${new URLSearchParams({ lineAccountId, ...period })}`,
     ),
     closeSettlement: (
       data: {

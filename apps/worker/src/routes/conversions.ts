@@ -1978,7 +1978,8 @@ conversions.patch('/api/conversions/events/:id/approval', requireApprovalPermiss
     if (parsed.status === 'approved' && decided.outcome === 'updated') {
       try {
         const info = await getConversionApprovalNotifyInfo(c.env.DB, c.req.param('id'));
-        if (info) {
+        // R48: 紹介者が成果の通知を切っているときは送信処理に進まない。
+        if (info && info.notifyOnConversion) {
           await notifyAffiliateApproval(
             c.env.DB,
             c.env,
@@ -2099,7 +2100,8 @@ conversions.post('/api/conversions/approvals/bulk', requireApprovalPermission, a
       if (parsed.status === 'approved' && decided.outcome === 'updated') {
         try {
           const info = await getConversionApprovalNotifyInfo(c.env.DB, item.id);
-          if (info) {
+          // R48: 紹介者が成果の通知を切っているときは送信処理に進まない。
+          if (info && info.notifyOnConversion) {
             await notifyAffiliateApproval(c.env.DB, c.env, info.affiliateId, info.offerName, info.rewardAmount);
           }
         } catch (err) {

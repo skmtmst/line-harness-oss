@@ -56,12 +56,23 @@ describe('進む操作は下の操作の帯に1つだけ', () => {
     expect(event).toContain('<BottomBar>');
     expect(event.match(/<Button/g)?.length ?? 0).toBe(1);
     expect(event).toContain('variant="primary"');
-    expect(event).toContain('selectedId');
-    expect(event).toContain('disabled={!selectedId');
+    expect(event).toContain('selectedSlot');
+    expect(event).toContain('時間を選んでください');
     expect(event).toContain('この時間で申し込む');
     // 枠のボタンは選択だけし、確認画面への遷移は帯のボタンが持つ。
     expect(event).toContain('setSelectedId(s.id)');
     expect(event).not.toContain('/confirm?slotId=${s.id}');
+  });
+
+  it('詳細の主ボタンは状態に合わせる (上限・満席・待ち)', () => {
+    // 上限に達したら理由をボタンに出して押せなくする。
+    expect(event).toContain('予約上限に達しています');
+    // 全部満席なら「満席です」で押せない。枠自体が無い時も同じ。
+    expect(event).toContain('満席です');
+    expect(event).toContain('allFull');
+    // 待ちを受けるイベントでは満席の枠を選べ、選んだら待ちに入る文言になる。
+    expect(event).toContain('waitlistOpen');
+    expect(event).toContain('キャンセル待ちに入る');
   });
 
   it('確認は申し込む1つ (戻るボタンは見出しの ← だけ)', () => {

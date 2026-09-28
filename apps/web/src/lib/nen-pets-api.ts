@@ -38,6 +38,8 @@ export interface NenPetRow {
   feeding: { dailyKcal: number; dailyGrams: number | null; factorLabel: string; stageLabel: string; venisonGrams: number | null; venisonKcal: number; treatName: string | null } | null
   imageUrl: string | null
   updatedAt: string
+  /** 「体重の更新」列に出す日。体重を測った・直した日だけで、名前の編集では動かない（監査 R57）。 */
+  weightUpdatedAt: string
   weightStale: boolean
   owner: { friendId: string; name: string; pictureUrl: string | null; customerId: string | null }
 }

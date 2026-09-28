@@ -212,6 +212,8 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'GET /api/affiliate-payments',
     'GET /api/affiliate-payments/:id/preview',
     'GET /api/affiliate-payout-batches/:id/download',
+    // R43: 締め済み台帳の再開照会。preview と同じく owner/admin 専用。
+    'GET /api/affiliate-settlements/current',
     'GET /api/affiliate-settlements/preview',
     'GET /api/affiliates',
     'GET /api/affiliates-report',
