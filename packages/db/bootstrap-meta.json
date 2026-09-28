@@ -428,6 +428,8 @@
     "468_event_custom_questions.sql",
     "469_manual_link_screens.sql",
     "470_google_sheets_integrations.sql",
+    "472_affiliate_offer_versions.sql",
+    "473_affiliate_attribution_decisions.sql",
     "484_common_var_lifecycle.sql",
     "485_common_var_failure_reasons.sql",
     "486_mileage_adjustment_approvals.sql",

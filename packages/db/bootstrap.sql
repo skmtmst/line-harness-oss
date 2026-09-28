@@ -279,6 +279,38 @@ CREATE TABLE affiliate_adjustments (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE affiliate_attribution_decisions (
+  id TEXT PRIMARY KEY,
+  conversion_event_id TEXT NOT NULL UNIQUE REFERENCES conversion_events(id) ON DELETE CASCADE,
+  friend_id TEXT NOT NULL,
+  conversion_point_id TEXT NOT NULL,
+  -- 付けた先。付けなかったときは空。
+  affiliate_id TEXT REFERENCES affiliates(id),
+  ref_code TEXT,
+  offer_id TEXT REFERENCES affiliate_offers(id),
+  -- 判断に使った案件の版。版を変えてもこの記録は変わらない。
+  offer_version_id TEXT REFERENCES affiliate_offer_versions(id),
+  -- 判断の理由。画面には人の言葉で出す。
+  reason TEXT NOT NULL CHECK (reason IN (
+    'matched_last_touch',
+    'no_touch',
+    'out_of_window',
+    'self_referral',
+    'inactive_link',
+    'inactive_affiliate',
+    'other_account',
+    'reception_closed',
+    'capped_total',
+    'capped_monthly'
+  )),
+  -- 判断に使った数える期間(日)。案件の版があればその値、なければ全体の既定。
+  window_days INTEGER NOT NULL CHECK (window_days BETWEEN 1 AND 365),
+  -- 候補になった紹介の写し(JSON)。紹介者名・案件名・開いた時刻・結果を
+  -- 判断の時点で残す。後から名前が変わっても、この記録は書き換えない。
+  candidates_json TEXT NOT NULL DEFAULT '[]',
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE affiliate_bank_profiles (
   affiliate_id TEXT PRIMARY KEY REFERENCES affiliates(id),
   organization_id TEXT NOT NULL REFERENCES tenants(id),
@@ -319,6 +351,30 @@ CREATE TABLE affiliate_links (
   created_at      TEXT NOT NULL,
   click_count     INTEGER NOT NULL DEFAULT 0
 , operation_id TEXT);
+
+CREATE TABLE affiliate_offer_versions (
+  id TEXT PRIMARY KEY,
+  offer_id TEXT NOT NULL REFERENCES affiliate_offers(id),
+  version_number INTEGER NOT NULL,
+  -- 1件あたりの報酬。固定額(円)とマイル。
+  reward_amount INTEGER NOT NULL DEFAULT 0 CHECK (reward_amount >= 0),
+  reward_miles INTEGER NOT NULL DEFAULT 0 CHECK (reward_miles >= 0),
+  -- リンクを開いてから数える期間(日)。既定 30。
+  window_days INTEGER NOT NULL DEFAULT 30 CHECK (window_days BETWEEN 1 AND 365),
+  -- 上限。空は「上限なし」。上限に達したら受付を自動で止める。
+  cap_total INTEGER CHECK (cap_total IS NULL OR cap_total > 0),
+  cap_monthly_per_affiliate INTEGER CHECK (cap_monthly_per_affiliate IS NULL OR cap_monthly_per_affiliate > 0),
+  -- 受付の期間。空の端は「区切りなし」。期間外の紹介には成果を付けない。
+  reception_from TEXT,
+  reception_to TEXT,
+  -- 使い始めの日時。空は「公開と同時」。未来の日時は「予約」の札で見せる。
+  effective_from TEXT,
+  created_by_staff_id TEXT,
+  -- 同じ確認キーの再送では版を増やさないための鍵。
+  idempotency_key TEXT UNIQUE,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (offer_id, version_number)
+);
 
 CREATE TABLE affiliate_offers (
   id              TEXT PRIMARY KEY,
@@ -6972,6 +7028,12 @@ CREATE INDEX idx_admin_two_factor_challenges_expires
 CREATE INDEX idx_admin_two_factor_challenges_staff
   ON admin_two_factor_challenges(staff_id);
 
+CREATE INDEX idx_affiliate_attribution_decisions_friend
+  ON affiliate_attribution_decisions (friend_id, created_at DESC);
+
+CREATE INDEX idx_affiliate_attribution_decisions_offer
+  ON affiliate_attribution_decisions (offer_id, created_at DESC);
+
 CREATE INDEX idx_affiliate_bank_profiles_scope
   ON affiliate_bank_profiles(organization_id, line_account_id, affiliate_id);
 
@@ -6984,6 +7046,9 @@ CREATE INDEX idx_affiliate_links_offer ON affiliate_links (offer_id);
 CREATE UNIQUE INDEX idx_affiliate_links_operation_id
   ON affiliate_links(affiliate_id, operation_id)
   WHERE operation_id IS NOT NULL;
+
+CREATE INDEX idx_affiliate_offer_versions_offer
+  ON affiliate_offer_versions (offer_id, version_number DESC);
 
 CREATE UNIQUE INDEX idx_affiliate_offers_operation_id
   ON affiliate_offers(line_account_id, operation_id)

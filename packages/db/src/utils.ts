@@ -1,3 +1,5 @@
+import type { D1Database } from '@cloudflare/workers-types';
+
 /** JST offset: UTC+9 in milliseconds */
 const JST_OFFSET_MS = 9 * 60 * 60_000;
 
@@ -54,4 +56,21 @@ export function jstDateString(offsetDays = 0, nowMs = Date.now()): string {
 /** 暦日の翌日（YYYY-MM-DD）。`col >= day AND col < next` の半開区間に使う。 */
 export function nextDateString(day: string): string {
   return new Date(Date.parse(`${day}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
+}
+
+/**
+ * 表があるかを確かめる。決まりの表が無い古いスキーマ（最小構成の単体試験など）
+ * では、新しい表を読む処理を従来の動きに落とすために使う。
+ * 表が無いこと自体は異常ではないので、失敗時は false を返す。
+ */
+export async function dbTableExists(db: D1Database, name: string): Promise<boolean> {
+  try {
+    const row = await db
+      .prepare(`SELECT 1 AS ok FROM sqlite_master WHERE type = 'table' AND name = ?`)
+      .bind(name)
+      .first<{ ok: number }>();
+    return !!row;
+  } catch {
+    return false;
+  }
 }

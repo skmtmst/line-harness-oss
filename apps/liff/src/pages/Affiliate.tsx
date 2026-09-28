@@ -40,6 +40,13 @@ interface OfferData {
   description: string | null;
   rewardAmount: number;
   rewardMiles: number;
+  windowDays: number | null;
+  receptionFrom: string | null;
+  receptionTo: string | null;
+  /** 上限に達して受付が止まっているか。(PR823) */
+  halted: boolean;
+  totalRemaining: number | null;
+  monthlyRemaining: number | null;
   enrolled: boolean;
   refCode: string | null;
   url: string | null;
@@ -689,7 +696,10 @@ function OfferCard({
       onEnrolled(link);
     } catch (e) {
       logFailure('affiliate-enroll', e);
-      setError(SUBMIT_FAILED_MESSAGE);
+      // 上限で止まった受付だけ、サーバーの文言をそのまま出す(PR823)。
+      // それ以外の失敗は定型文にする(技術的な文言を出さない)。
+      const message = e instanceof Error ? e.message : ''
+      setError(message.includes('上限に達したため終了') ? message : SUBMIT_FAILED_MESSAGE);
     } finally {
       setBusy(false);
       enrollCalledRef.current = false;
@@ -712,6 +722,12 @@ function OfferCard({
           {offer.rewardMiles > 0 && ` +${offer.rewardMiles.toLocaleString()}マイル`}
         </p>
       </div>
+
+      {offer.halted ? (
+        <p className="text-xs font-bold text-danger">受付は終了しました（上限に達したため）</p>
+      ) : offer.totalRemaining != null && offer.totalRemaining > 0 ? (
+        <p className="text-xs text-ink-faint tabular-nums">上限まであと{offer.totalRemaining}件</p>
+      ) : null}
 
       {offer.enrolled ? (
         <div className="space-y-2">

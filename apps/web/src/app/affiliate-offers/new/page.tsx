@@ -1,10 +1,12 @@
 'use client'
 
 import Select from '@/components/shared/select'
+import Checkbox from '@/components/shared/checkbox'
 import { useEffect, useRef, useState } from 'react'
 import type { Tag, Scenario } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import { usePageTitle } from '@/components/shell/page-chrome'
 import CreatePage, {
   AsideCard,
   Field,
@@ -35,6 +37,7 @@ function rewardIntegerError(value: string, kind: 'amount' | 'miles'): string | n
  * ここを取り違えると、紹介の成果がいつまでも確定しない設定ができてしまう。
  */
 export default function NewAffiliateOfferPage() {
+  usePageTitle('案件を作る')
   const { selectedAccountId, selectedAccount } = useAccount()
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
@@ -333,20 +336,13 @@ export default function NewAffiliateOfferPage() {
         </Field>
         </div>
 
-        <label className="text-ink-secondary flex items-start gap-2 text-sm">
-          <input
-            type="checkbox"
-            className="mt-0.5"
-            checked={publishNow}
-            onChange={(e) => setPublishNow(e.target.checked)}
-          />
-          <span>
-            作成したらすぐ公開する
-            <span className="text-ink-faint block text-xs">
-              オフにすると下書きとして保存され、アフィリエイターに表示されません。
-            </span>
-          </span>
-        </label>
+        <Checkbox
+          checked={publishNow}
+          onCheckedChange={setPublishNow}
+          description="オフにすると下書きとして保存され、アフィリエイターに表示されません。"
+        >
+          <span className="text-ink-secondary text-sm">作成したらすぐ公開する</span>
+        </Checkbox>
       </FormSection>
     </CreatePage>
   )
