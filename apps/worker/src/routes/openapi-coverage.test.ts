@@ -150,6 +150,8 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/accounts/health-summary',
   'GET /api/account-handovers/{id}',
   'GET /api/ad-costs',
+  'GET /api/affiliate-offers/{id}/cap-status',
+  'GET /api/affiliate-offers/{id}/versions',
   'GET /api/affiliates',
   'GET /api/affiliates/{id}',
   'GET /api/affiliates/{id}/report',
@@ -186,9 +188,12 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/conversions/definitions/{id}/events',
   'GET /api/conversions/definitions/{id}/ingest-events',
   'GET /api/conversions/events',
+  'GET /api/conversions/events/{id}/attribution',
   'GET /api/conversions/events/{id}/reversals',
   'GET /api/conversions/points',
   'GET /api/conversions/report',
+  'GET /api/dashboard/delivery-failure-origins',
+  'GET /api/dashboard/upcoming',
   'GET /api/ec-commerce/orders/{id}',
   'GET /api/events/admin/events/{id}/occurrence-selector',
   'GET /api/events/admin/occurrences/{id}/applicants.csv',
@@ -312,6 +317,9 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'PATCH /api/saved-searches/reorder',
   'PATCH /api/support-marks/reorder',
   'PUT /api/booking/admin/menus/{id}/resources',
+  'GET /api/booking/admin/menus/{id}/versions',
+  'GET /api/booking/admin/menus/{id}/versions/{version}',
+  'POST /api/booking/admin/menus/{id}/versions/{version}/revert',
   'PATCH /api/hq/banners/projects/{id}',
   'PATCH /api/hq/templates/{id}',
   'PATCH /api/line-accounts/{id}',
@@ -332,6 +340,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/account-handovers/{id}/rollback',
   'POST /api/ad-costs',
   'POST /api/ad-platforms/{id}/cost-import',
+  'POST /api/affiliate-offers/{id}/versions',
   'POST /api/affiliates',
   'POST /api/affiliates/click',
   'POST /api/auth/password/forgot',
@@ -380,12 +389,14 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/conversions/ingest/{id}',
   'POST /api/conversions/points',
   'POST /api/conversions/track',
+  'POST /api/entry-routes/{id}/qr-pdf',
   'POST /api/events/admin/occurrences/{id}/applicant-broadcasts/preview',
   'POST /api/friends/{id}/tags',
   'POST /api/file-scans/{id}/release',
   'POST /api/file-scans/{id}/retry',
   'POST /api/forms/{id}/publish',
   'POST /api/forms/{id}/submissions/{submissionId}/retry-effects',
+  'POST /api/forms/{id}/test-token',
   'POST /api/hq/banners/generations/{id}/cancel',
   'POST /api/hq/banners/generations/{id}/run',
   'POST /api/hq/banners/images/{id}/deliver',
@@ -556,6 +567,10 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'PUT /api/liff/nen/pets/{id}',
   'PUT /api/nen/feeding-products',
   'PUT /api/nen/rank-settings',
+  'GET /api/webinars/{id}/sessions/{startAt}',
+  'GET /api/webinars/{id}/video-asset',
+  'POST /api/webinars/{id}/video-asset/advance',
+  'PUT /api/webinars/{id}/sessions/{startAt}',
 ]);
 
 const ALLOWLIST = new Set<string>([
@@ -601,13 +616,14 @@ const ALLOWLIST = new Set<string>([
   'PUT /api/booking/admin/staff/{id}/menus',
   'PUT /api/booking/admin/staff/{id}/shifts',
 
-  // 機能「mileage」の管理画面用API（OpenAPI未記載・順次記載）（39件）
+  // 機能「mileage」の管理画面用API（OpenAPI未記載・順次記載）（46件）
   'DELETE /api/scoring-rules/{id}',
   'GET /api/action-scores/bands',
   'GET /api/action-scores/friends',
   'GET /api/action-scores/rules',
   'GET /api/friends/{id}/mileage',
   'GET /api/friends/{id}/score',
+  'GET /api/mileage/adjustment-approvals',
   'GET /api/mileage/adjustment-policy',
   'GET /api/mileage/earning-rules',
   'GET /api/mileage/friends',
@@ -625,7 +641,13 @@ const ALLOWLIST = new Set<string>([
   'POST /api/action-scores/rules/stop',
   'POST /api/action-scores/rules/test',
   'POST /api/friends/{id}/score',
+  'POST /api/mileage/adjustment-approvals/{id}/approve',
+  'POST /api/mileage/adjustment-approvals/{id}/cancel',
+  'POST /api/mileage/adjustment-approvals/{id}/reject',
   'POST /api/mileage/adjustments',
+  'POST /api/mileage/earning-rules/test',
+  'POST /api/mileage/entries/{id}/confirm',
+  'POST /api/mileage/entries/{id}/void',
   'POST /api/mileage/events',
   'POST /api/mileage/redemptions',
   'POST /api/mileage/redemptions/{id}/retry-fulfillment',
@@ -1388,10 +1410,11 @@ const ALLOWLIST = new Set<string>([
   'GET /api/accounts/{id}/health',
   'POST /api/accounts/{id}/migrate',
 
-  // core：設定テンプレート（OpenAPI未記載・順次記載）（4件）
+  // core：設定テンプレート（OpenAPI未記載・順次記載）（5件）
   'GET /api/recipes',
   'GET /api/recipes/clone-runs/{runId}',
   'GET /api/recipes/{id}',
+  'POST /api/recipes',
   'POST /api/recipes/{id}/clone',
 
   // public：LINE利用者が行う公開フォーム操作（OpenAPI未記載・順次記載）（3件）
@@ -1430,8 +1453,12 @@ const ALLOWLIST = new Set<string>([
   // public：回答前に表示する公開フォーム（OpenAPI未記載・順次記載）（1件）
   'GET /api/forms/{id}',
 
-  // core：初期設定（OpenAPI未記載・順次記載）（1件）
+  // core：初期設定（OpenAPI未記載・順次記載）（2件）
   'GET /api/getting-started',
+  'POST /api/getting-started/dismiss',
+
+  // core：失敗文面の対応表（OpenAPI未記載・順次記載）（1件）
+  'GET /api/error-messages',
 
   // system：稼働確認（OpenAPI未記載・順次記載）（1件）
   'GET /api/health',

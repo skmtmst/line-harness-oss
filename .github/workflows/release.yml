@@ -96,6 +96,11 @@ jobs:
         run: pnpm -r --workspace-concurrency=1 --if-present run typecheck
 
       - name: Run every populated workspace test suite
+        env:
+          # R152: apps/web のテストは api.ts が import 時に
+          # NEXT_PUBLIC_API_URL を要求する。外部へは出ない試験用の値を
+          # 明示する（PR 側の required-pr-gate と同じ前提）。
+          NEXT_PUBLIC_API_URL: https://nen-line-stg.skmtmst.workers.dev
         run: |
           pnpm --filter @line-crm/db test
           pnpm --filter @line-crm/shared test

@@ -7,6 +7,9 @@ export const OPERATION_HEALTH_CHECK_KEYS = [
   'webhook',
   'dispatch_jobs',
   'friend_change',
+  'monitoring_heartbeat',
+  'infra_canary',
+  'credential_expiry',
 ] as const;
 
 export type OperationHealthCheckKey = (typeof OPERATION_HEALTH_CHECK_KEYS)[number];

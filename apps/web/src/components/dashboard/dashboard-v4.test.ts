@@ -206,6 +206,8 @@ describe('ダッシュボードV4の初期表示', () => {
       // 設計 `vUXKb` は接続状態のすぐ下に「現在の対応マーク」を置く。
       'support-mark-status',
       'upcoming',
+      // L (#824): 通知の送達台帳から数えた今日の失敗。既定で出す。
+      'delivery-failures',
       'monthly-delivery',
       'recent-results',
     ])

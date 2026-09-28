@@ -1,6 +1,7 @@
 import Link from 'next/link'
-import type { ReactNode } from 'react'
-import type { BookingRequest, DashboardOverview } from '@/lib/api'
+import { useEffect, useState, type ReactNode } from 'react'
+import type { BookingRequest, DashboardOverview, DashboardUpcoming, DeliveryFailureOrigins } from '@/lib/api'
+import { api } from '@/lib/api'
 import Card from '@/components/shared/card'
 import HelpTip from '@/components/shared/help-tip'
 
@@ -237,42 +238,117 @@ function formatUpcomingDate(iso: string): string {
   })
 }
 
+const upcomingKindLabel: Record<string, string> = {
+  broadcast: '配信',
+  reminder: 'リマインダー',
+  booking: '予約',
+}
+
+/**
+ * 今後の予定（M）。
+ *
+ * 予約配信・リマインダー・予約の7日分を時刻順に並べる。種類ごとの
+ * 一覧へつなぐ。ここから変えることはできない（読むだけ）。
+ * 旧Worker（upcoming 未返却）では予約だけの表示へ戻る。
+ */
 export function UpcomingCard({
+  accountId,
   bookings,
   loading,
   updatedAt,
 }: {
+  /** 選択中のLINEアカウント。upcoming の取得に使う。 */
+  accountId?: string | null
   bookings: BookingRequest[] | null
   loading: boolean
   /* 明細を最後に取れた時刻。読込中・失敗時は出さない（IDEA-01）。 */
   updatedAt?: Date | null
 }) {
-  const upcoming = bookings ? activeUpcomingBookings(bookings) : []
+  const [upcoming, setUpcoming] = useState<DashboardUpcoming | null>(null)
+  const [upcomingFailed, setUpcomingFailed] = useState(false)
+  const [upcomingAt, setUpcomingAt] = useState<Date | null>(null)
+  useEffect(() => {
+    if (!accountId) return
+    let cancelled = false
+    setUpcoming(null)
+    setUpcomingFailed(false)
+    setUpcomingAt(null)
+    void api.dashboard.upcoming(accountId)
+      .then((response) => {
+        if (cancelled) return
+        if (response.success) {
+          setUpcoming(response.data)
+          setUpcomingAt(new Date())
+        } else {
+          setUpcomingFailed(true)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setUpcomingFailed(true)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [accountId])
+
+  const merged = accountId && !upcomingFailed ? upcoming : null
+  if (merged) {
+    return (
+      <SideCard
+        title="今後の予定"
+        helpTip="7日分の予約配信・リマインダー・予約です。見るだけで、ここからは変えられません。"
+        freshness={upcomingAt ? <span className="text-ink-faint shrink-0 text-xs font-medium">更新 {upcomingAt.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' })}</span> : undefined}
+      >
+        {merged.items.length === 0 ? (
+          <p className="text-ink-faint text-xs leading-relaxed">予定されている配信・予約はありません。</p>
+        ) : (
+          <div className="space-y-3">
+            {merged.items.slice(0, 5).map((item) => (
+              <div key={`${item.kind}-${item.id}`} className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-ink truncate text-xs font-medium" title={item.title}>
+                    <Link href={item.href} className="hover:underline">{item.title}</Link>
+                  </p>
+                  <p className="text-ink-faint text-micro mt-0.5">
+                    {upcomingKindLabel[item.kind] ?? '予定'}
+                  </p>
+                </div>
+                <span className="text-ink-secondary text-micro shrink-0 tabular-nums">{formatUpcomingDate(item.startsAt)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </SideCard>
+    )
+  }
+
+  const legacy = bookings ? activeUpcomingBookings(bookings) : []
+  const legacyLoading = accountId ? upcomingFailed && loading : loading
+  const legacyFailed = accountId ? upcomingFailed && bookings === null : bookings === null
   return (
     /*
-      このカードが載せるのは予約だけ（DASH-10）。「今後の予定」「配信・予約は
-      ありません」と書くと、配信が無いことにも読めてしまう。
+      旧Worker（upcoming 未返却）の戻り先。載せるのは予約だけで、
       行き先は予約一覧（リスト表示）。カードに並ぶのは未来の予約なので、
       日カレンダーではなく一覧へ送る（IDEA-01）。
     */
     <SideCard
-      title="今後の予約"
-      period="今後"
+      title="今後の予定"
+      helpTip="7日分の予約配信・リマインダー・予約です。見るだけで、ここからは変えられません。"
       action={{ label: 'すべて見る →', href: '/booking/bookings?view=list' }}
       freshness={updatedAt ? <span className="text-ink-faint shrink-0 text-xs font-medium">更新 {updatedAt.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' })}</span> : undefined}
     >
-      {loading ? (
+      {legacyLoading ? (
         <div className="space-y-2">
           <div className="bg-canvas-sunken h-5 animate-pulse rounded" />
           <div className="bg-canvas-sunken h-5 animate-pulse rounded" />
         </div>
-      ) : bookings === null ? (
-        <p className="text-ink-faint text-xs leading-relaxed">予約を読み込めませんでした。</p>
-      ) : upcoming.length === 0 ? (
-        <p className="text-ink-faint text-xs leading-relaxed">今後の予約はありません。</p>
+      ) : legacyFailed ? (
+        <p className="text-ink-faint text-xs leading-relaxed">予定を読み込めませんでした。</p>
+      ) : legacy.length === 0 ? (
+        <p className="text-ink-faint text-xs leading-relaxed">予定されている配信・予約はありません。</p>
       ) : (
         <div className="space-y-3">
-          {upcoming.slice(0, 3).map((booking) => (
+          {legacy.slice(0, 3).map((booking) => (
             <div key={booking.id} className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-ink truncate text-xs font-medium" title={booking.menu_name}>{booking.menu_name}</p>
@@ -283,6 +359,78 @@ export function UpcomingCard({
               <span className="text-ink-secondary shrink-0 text-[11px] tabular-nums">{formatUpcomingDate(booking.starts_at)}</span>
             </div>
           ))}
+        </div>
+      )}
+    </SideCard>
+  )
+}
+
+function formatAsOfMonthDay(iso: string): string {
+  return new Date(iso).toLocaleString('ja-JP', {
+    month: 'numeric',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'Asia/Tokyo',
+  })
+}
+
+/**
+ * 今日の配信の失敗（L #824）。
+ *
+ * 数は通知の送達台帳から数える。同じ失敗は1件に数え、送り直しは
+ * 数えない。出どころといつ時点の数かは、見出しの「？」に出す。
+ * 本文に補足を書いて箱を高くしない。
+ */
+export function DeliveryFailuresCard({ accountId }: { accountId?: string | null }) {
+  const [origins, setOrigins] = useState<DeliveryFailureOrigins | null>(null)
+  const [failed, setFailed] = useState(false)
+  const [fetchedAt, setFetchedAt] = useState<Date | null>(null)
+  useEffect(() => {
+    if (!accountId) return
+    let cancelled = false
+    setOrigins(null)
+    setFailed(false)
+    setFetchedAt(null)
+    void api.dashboard.deliveryFailureOrigins(accountId)
+      .then((response) => {
+        if (cancelled) return
+        if (response.success) {
+          setOrigins(response.data)
+          setFetchedAt(new Date())
+        } else {
+          setFailed(true)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [accountId])
+
+  const asOf = origins?.asOf ? formatAsOfMonthDay(origins.asOf) : null
+  return (
+    <SideCard
+      title="今日の配信の失敗"
+      helpTip={asOf
+        ? `出どころ：通知の送達台帳・${asOf}時点。同じ失敗は1件として数えています（送り直しは数えません）。`
+        : '出どころ：通知の送達台帳。同じ失敗は1件として数えています（送り直しは数えません）。'}
+      freshness={fetchedAt ? <span className="text-ink-faint shrink-0 text-xs font-medium">更新 {fetchedAt.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' })}</span> : undefined}
+    >
+      {origins ? (
+        <p className="text-ink text-2xl leading-9 font-bold tabular-nums">
+          {`${origins.total.toLocaleString('ja-JP')}件`}
+        </p>
+      ) : failed ? (
+        <>
+          <p className="text-ink text-2xl leading-9 font-bold tabular-nums">—</p>
+          <p className="text-ink-faint mt-1 text-xs leading-relaxed">読み込めませんでした。</p>
+        </>
+      ) : (
+        <div className="space-y-2">
+          <div className="bg-canvas-sunken h-7 w-20 animate-pulse rounded" />
         </div>
       )}
     </SideCard>

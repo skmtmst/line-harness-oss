@@ -14,9 +14,11 @@ import ShipmentPanel, { type ShipmentSummary } from '@/components/dashboard/ship
 import QrDialog from '@/components/dashboard/qr-dialog'
 import FriendTrendTable from '@/components/dashboard/friend-trend-table'
 import DashboardFreshness, { dashboardLocalUpdatedAt, dashboardPeriodLabel } from '@/components/dashboard/freshness'
+import GettingStartedBand from '@/components/dashboard/getting-started-band'
 import {
   FriendStatusCard,
   SupportMarkStatusCard,
+  DeliveryFailuresCard,
   MonthlyDeliveryCard,
   RecentResultsCard,
   SideCard,
@@ -1375,7 +1377,8 @@ function DashboardPageInner() {
     />
     if (id === 'operational-alerts') return <OperationalAlertsCard risk={displayedHealthRisk} healthIssues={healthIssueCount} oldestWaitMinutes={pendingOldest} twoFactor={displayedTwoFactor} referenceCount={reference?.operationalAlerts} failed={healthFailed} updatedAt={supplementLoadedAt} />
     if (id === 'connection-status') return <ConnectionStatusCard account={selectedAccount} risk={displayedHealthRisk} activeFriends={activeFriends} healthFailed={healthFailed} updatedAt={supplementLoadedAt} />
-    if (id === 'upcoming') return <UpcomingCard bookings={displayedBookings} loading={supplementLoading} updatedAt={bookingsFailed ? null : supplementLoadedAt} />
+    if (id === 'upcoming') return <UpcomingCard accountId={selectedAccountId} bookings={displayedBookings} loading={supplementLoading} updatedAt={bookingsFailed ? null : supplementLoadedAt} />
+    if (id === 'delivery-failures') return <DeliveryFailuresCard accountId={selectedAccountId} />
     if (id === 'monthly-delivery') return data && !sectionAvailable('delivery')
       ? <UnavailableDataCard title="今月の配信" section={data.sections?.delivery} onRetry={() => void load()} />
       : data ? <MonthlyDeliveryCard delivery={data.delivery} freshness={<DashboardFreshness freshness={data.sections?.delivery?.freshness} asOf={data.sections?.delivery?.asOf} reason={data.sections?.delivery?.reason} />} />
@@ -1429,6 +1432,11 @@ function DashboardPageInner() {
     <div className="flex flex-col gap-4">
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
       {/* V6 `vUXKb/vwcM6`: 画面名は共通トップバーだけ。本文には操作だけを置く。 */}
+      {/*
+        設計 ★V6 34-1：終わっていない段があるあいだだけ進みの帯を出す。
+        閉じた・全部終わった・取れなかったときは何も描かない。
+      */}
+      <GettingStartedBand accountId={selectedAccountId} />
       <div data-design="Head" className="flex min-h-10 flex-wrap items-center justify-between gap-3">
         <Button onClick={openEditor}>
           <EditIcon />ダッシュボード編集

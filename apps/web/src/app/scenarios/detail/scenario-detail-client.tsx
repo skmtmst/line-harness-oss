@@ -8,6 +8,8 @@ import type { Scenario, ScenarioStep, ScenarioTriggerType, MessageType, Delivery
 import { api, ApiError, type ScenarioRuns } from '@/lib/api'
 import Header from '@/components/layout/header'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import TargetMissing from '@/components/shared/target-missing'
 import FlexPreviewComponent from '@/components/flex-preview'
 import ActionEditor from '@/components/scenarios/action-editor'
@@ -1293,25 +1295,22 @@ export default function ScenarioDetailClient({
           <div className="space-y-3">
         {/* 入力モード切替: 直接入力 / テンプレート参照 */}
         <div className="space-y-2">
-          <label className="block text-xs font-medium text-ink-secondary">メッセージの指定方法</label>
-          <div className="flex gap-4 text-sm">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="radio"
-                checked={stepForm.inputMode === 'direct'}
-                onChange={() => setStepForm({ ...stepForm, inputMode: 'direct', templateId: null })}
-              />
-              <span>直接入力</span>
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="radio"
-                checked={stepForm.inputMode === 'template'}
-                onChange={() => setStepForm({ ...stepForm, inputMode: 'template' })}
-              />
-              <span>テンプレートを使う</span>
-            </label>
-          </div>
+          <RadioCardGroup legend="メッセージの指定方法" className="grid gap-2 sm:grid-cols-2">
+            <RadioCard
+              name="step-input-mode"
+              value="direct"
+              checked={stepForm.inputMode === 'direct'}
+              onChange={() => setStepForm({ ...stepForm, inputMode: 'direct', templateId: null })}
+              title="直接入力"
+            />
+            <RadioCard
+              name="step-input-mode"
+              value="template"
+              checked={stepForm.inputMode === 'template'}
+              onChange={() => setStepForm({ ...stepForm, inputMode: 'template' })}
+              title="テンプレートを使う"
+            />
+          </RadioCardGroup>
         </div>
 
         {/*
@@ -1543,16 +1542,14 @@ export default function ScenarioDetailClient({
         </FormSection>
 
         {/* 下書き。書きかけを保存しておくため。配信からは外れる。 */}
-        <label className="text-ink-secondary flex items-center gap-2 text-xs">
-          <input
-            type="checkbox"
-            checked={stepForm.isDraft}
-            onChange={(e) => setStepForm({ ...stepForm, isDraft: e.target.checked })}
-          />
+        <Checkbox
+          checked={stepForm.isDraft}
+          onCheckedChange={(checked) => setStepForm({ ...stepForm, isDraft: checked })}
+        >
           下書きにする（配信されません。テスト送信では送れます）
-        </label>
+        </Checkbox>
 
-        {stepError && <p className="text-xs text-red-600">{stepError}</p>}
+        {stepError && <p className="text-danger text-xs">{stepError}</p>}
 
         <div className="flex gap-2">
           <button
@@ -1895,32 +1892,21 @@ export default function ScenarioDetailClient({
               />
             </div>
             <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="editIsActive"
+              <Checkbox
                 checked={editForm.isActive}
-                onChange={(e) => setEditForm({ ...editForm, isActive: e.target.checked })}
-                className="h-4 w-4 rounded border-hairline text-accent-deep focus:ring-accent"
-              />
-              <label htmlFor="editIsActive" className="text-sm text-ink-secondary">稼働する</label>
+                onCheckedChange={(checked) => setEditForm({ ...editForm, isActive: checked })}
+              >
+                稼働する
+              </Checkbox>
             </div>
             <div className="border-hairline rounded-card border p-3">
-              <label className="flex cursor-pointer items-start gap-2">
-                <input
-                  type="checkbox"
-                  checked={!editForm.allowConcurrent}
-                  onChange={(e) => setEditForm({ ...editForm, allowConcurrent: !e.target.checked })}
-                  className="mt-0.5 h-4 w-4 rounded border-hairline text-accent-deep focus:ring-accent"
-                />
-                <span className="text-ink-secondary text-sm">
-                  他のシナリオが動いている人は登録しない
-                  <span className="text-ink-faint block text-xs leading-relaxed">
-                    既定では、1人が複数のシナリオに同時に入れます。
-                    ここをチェックすると、他のシナリオが動いている人はこのシナリオに入りません。
-                    すでに入っている人には影響しません。
-                  </span>
-                </span>
-              </label>
+              <Checkbox
+                checked={!editForm.allowConcurrent}
+                onCheckedChange={(checked) => setEditForm({ ...editForm, allowConcurrent: !checked })}
+                description="既定では、1人が複数のシナリオに同時に入れます。ここをチェックすると、他のシナリオが動いている人はこのシナリオに入りません。すでに入っている人には影響しません。"
+              >
+                他のシナリオが動いている人は登録しない
+              </Checkbox>
             </div>
             <div className="flex gap-2">
               <button

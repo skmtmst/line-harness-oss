@@ -44,7 +44,13 @@ describe('Issue #709: フォルダ帯の見出し件数は行が表す項目の�
 
   it('メディアはメディア総件数（フォルダ数+1ではない）', () => {
     const src = read('contents/page.tsx')
-    expect(src).toContain('total={`${total} 件`}')
+    /*
+     * m18s: 見出しの総数は「すべて」の行と同じ数なので出さない（回答フォーム
+     * #m18k と同じ形）。総件数の置き場所は「すべて」の行。絞り込み後の件数は
+     * 一覧側の ListRange。旧 assertion（見出しに total）は ★V7 に書き換えた。
+     */
+    expect(src).not.toContain('total={`${total} 件`}')
+    expect(src).toContain("{ id: '', label: 'すべて', count: overallTotal ?? total }")
     expect(src).not.toContain('total={`${folders.length + 1}`}')
   })
 

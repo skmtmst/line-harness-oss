@@ -9,6 +9,7 @@ import Select from '@/components/shared/select'
 import Avatar from '@/components/shared/avatar'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
+import { parseJstDateTime, shortDateTime } from '@/lib/hq-banners'
 import { ChevronDown } from 'lucide-react'
 
 interface LineAccount {
@@ -30,7 +31,14 @@ interface AccountHealthLog {
   createdAt: string
 }
 
-type AccountHealthState = AccountHealthLog['riskLevel'] | 'unknown' | 'error'
+/*
+ * R168: BAN検知はcronで5分ごとに走る。最後の確認がしきい値より古いなら
+ * 「確認が止まっている」として区別する。古い正常の記録を現在の
+ * 正常稼働として見せないための区切り。
+ */
+const STALE_CHECK_AFTER_MS = 60 * 60 * 1000
+
+type AccountHealthState = AccountHealthLog['riskLevel'] | 'unknown' | 'error' | 'stale'
 
 interface AccountHealthSnapshot {
   state: AccountHealthState
@@ -61,7 +69,16 @@ const riskConfig = {
   danger: { label: '危険', color: 'bg-danger', textColor: 'text-danger', bgColor: 'bg-danger-bg' },
   unknown: { label: '未確認', color: 'bg-ink-faint', textColor: 'text-ink-faint', bgColor: 'bg-canvas-sunken' },
   error: { label: '取得失敗', color: 'bg-danger', textColor: 'text-danger', bgColor: 'bg-danger-bg' },
+  stale: { label: '確認停止中', color: 'bg-status-warn', textColor: 'text-status-warn-deep', bgColor: 'bg-status-warn-soft' },
 } satisfies Record<AccountHealthState, { label: string; color: string; textColor: string; bgColor: string }>
+
+/** 最終確認がしきい値より古いか。時刻が読めないものは「古い」とは言えないので stale にしない。 */
+function isStaleCheck(createdAt: string | null | undefined, now = new Date()): boolean {
+  if (!createdAt) return false
+  const checkedAt = parseJstDateTime(createdAt)
+  if (Number.isNaN(checkedAt.getTime())) return false
+  return now.getTime() - checkedAt.getTime() > STALE_CHECK_AFTER_MS
+}
 
 function isRiskLevel(value: unknown): value is AccountHealthLog['riskLevel'] {
   return value === 'normal' || value === 'warning' || value === 'danger'
@@ -233,11 +250,15 @@ export default function HealthPage() {
           {/* Account Health Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {accounts.map((account) => {
-              const risk = latestRisk[account.id] ?? 'unknown'
-              const config = riskConfig[risk]
+              const storedRisk = latestRisk[account.id] ?? 'unknown'
               const isExpanded = expandedId === account.id
               const logs = healthLogs[account.id] || []
-              const healthUnavailable = risk === 'unknown' || risk === 'error'
+              const latestLog = logs[0] ?? null
+              // R168: 最終確認が古いときは、記録上の結果ではなく「確認が止まっている」を出す。
+              const stale = storedRisk !== 'unknown' && storedRisk !== 'error' && isStaleCheck(latestLog?.createdAt)
+              const risk: AccountHealthState = stale ? 'stale' : storedRisk
+              const config = riskConfig[risk]
+              const healthUnavailable = risk === 'unknown' || risk === 'error' || risk === 'stale'
 
               return (
                 <div key={account.id} className="bg-canvas rounded-card border border-hairline overflow-hidden">
@@ -252,6 +273,10 @@ export default function HealthPage() {
                         <div>
                           <h3 className="text-sm font-bold text-ink">{account.name}</h3>
                           <p className="text-xs text-ink-faint">チャネル {account.channelId}</p>
+                          {/* R168: いつ確かめた結果かを常に出す。 */}
+                          <p className="text-xs text-ink-faint">
+                            最終確認 {latestLog ? shortDateTime(latestLog.createdAt) : '—'}
+                          </p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
@@ -272,7 +297,9 @@ export default function HealthPage() {
                           <p>
                             {risk === 'error'
                               ? 'ヘルス情報を取得できませんでした。'
-                              : 'まだ確認結果がありません。'}
+                              : risk === 'stale'
+                                ? `最後の確認は ${latestLog ? shortDateTime(latestLog.createdAt) : '—'} です。確認が止まっているため、現在の状態は分かりません（最後の結果は「${latestLog ? riskConfig[latestLog.riskLevel].label : '—'}」）。`
+                                : 'まだ確認結果がありません。'}
                           </p>
                           <button
                             type="button"
@@ -285,7 +312,8 @@ export default function HealthPage() {
                         </div>
                       )}
 
-                      {risk === 'danger' && (
+                      {/* 確認が止まっていても、最後の結果が危険なら移行の入口は残す。 */}
+                      {storedRisk === 'danger' && (
                         <div className="mb-3">
                           <button
                             onClick={() => {

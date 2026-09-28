@@ -1,6 +1,6 @@
 import { accountFeatureOffExclusionSql, isAccountFeatureEnabled } from './account-settings.js';
 import { matchesCondition, parseCondition, type SegmentCondition } from './segment-conditions.js';
-import { jstNow } from './utils.js';
+import { dbTableExists, jstNow } from './utils.js';
 
 export const DEFAULT_MILEAGE_PROGRAM_ID = 'default';
 
@@ -2485,6 +2485,18 @@ export async function syncAffiliateConversionMileage(
   eventId: string,
   status: 'approved' | 'rejected',
 ): Promise<void> {
+  // 付けた時点の版があれば、その版の決まりを優先する(#823)。
+  // 版の表が無い古いスキーマでは、従来どおり今の案件の値を使う。
+  const hasVersionTables = (await dbTableExists(db, 'affiliate_offer_versions'))
+    && (await dbTableExists(db, 'affiliate_attribution_decisions'));
+  const milesSelect = hasVersionTables
+    ? 'COALESCE(ov.reward_miles, off.reward_miles) AS reward_miles'
+    : 'off.reward_miles AS reward_miles';
+  const versionJoins = hasVersionTables
+    ? `LEFT JOIN affiliate_attribution_decisions dad
+           ON dad.conversion_event_id = ce.id
+         LEFT JOIN affiliate_offer_versions ov ON ov.id = dad.offer_version_id`
+    : '';
   const context = await db
     .prepare(
       `SELECT ce.id AS event_id,
@@ -2498,7 +2510,7 @@ export async function syncAffiliateConversionMileage(
               beneficiary.line_account_id AS beneficiary_line_account_id,
               off.id AS offer_id,
               off.name AS offer_name,
-              off.reward_miles,
+              ${milesSelect},
               off.mileage_program_id
          FROM conversion_events ce
          JOIN affiliates a ON a.id = ce.affiliate_id
@@ -2508,6 +2520,7 @@ export async function syncAffiliateConversionMileage(
            ON al.ref_code = ce.attributed_ref_code
           AND al.affiliate_id = ce.affiliate_id
          LEFT JOIN affiliate_offers off ON off.id = al.offer_id
+         ${versionJoins}
         WHERE ce.id = ? AND ce.affiliate_id IS NOT NULL`,
     )
     .bind(eventId)

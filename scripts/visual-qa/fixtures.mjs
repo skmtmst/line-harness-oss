@@ -916,29 +916,33 @@ const FORM_BASE_LAYOUT = {
   },
 }
 
-const formRow = (id, name, description, folderId, isActive, submitCount, weeklySubmitCount, lastSubmittedAt, updatedAt, destinationSummary) => ({
+const formRow = (id, name, description, folderId, isActive, submitCount, monthly, lastSubmittedAt, updatedAt, destinationSummary) => ({
   id, lineAccountId: 'visual-qa-account', name, description, folderId,
   fields: [], layout: FORM_BASE_LAYOUT, onSubmitTagId: null, onSubmitScenarioId: null,
   onSubmitMessageType: null, onSubmitMessageContent: null, onSubmitWebhookUrl: null,
   onSubmitWebhookHeaders: null, onSubmitWebhookFailMessage: null,
   saveToMetadata: destinationSummary.friendFieldCount > 0, isActive, status: 'active', archivedAt: null,
-  revision: 1, submitCount, weeklySubmitCount, createdAt: updatedAt, updatedAt, lastSubmittedAt,
+  revision: 1, submitCount,
+  monthlySubmitCount: monthly.submitCount,
+  monthlyOpenCount: monthly.openCount,
+  monthlyCompletionRate: monthly.rate,
+  createdAt: updatedAt, updatedAt, lastSubmittedAt,
   usedByAccounts: [], accountScopeReviewRequired: false,
   destinationCount: destinationSummary.friendFieldCount + destinationSummary.tagCount,
   destinationSummary,
 })
 
-/** 回答フォーム一覧。設計 `EMBIK` に見えている6行。 */
+/** 回答フォーム一覧。設計 `EMBIK` に見えている6行。今月の数は日本時間の1日から。 */
 export const FORMS = [
-  formRow('form-1', '来店アンケート', '来店後に感想と次回の希望を聞く・9ブロック', 'form-folder-visit', true, 1284, 42, '2026-08-21T03:00:00.000Z', '2026-08-21T03:00:00.000Z', { friendFieldCount: 3, tagCount: 2 }),
-  formRow('form-2', '資料請求', '名前と連絡先・5ブロック', 'form-folder-request', true, 3410, 128, '2026-08-22T03:00:00.000Z', '2026-08-12T03:00:00.000Z', { friendFieldCount: 5, tagCount: 1 }),
-  formRow('form-3', '休止の理由', '定期便を止める人に理由を聞く・3ブロック', 'form-folder-survey', true, 96, 4, '2026-08-20T03:00:00.000Z', '2026-08-18T03:00:00.000Z', { friendFieldCount: 1, tagCount: 0 }),
-  formRow('form-4', 'イベント申込（8月）', '日時の希望と人数・7ブロック', 'form-folder-visit', true, 220, 61, '2026-08-25T03:00:00.000Z', '2026-08-22T03:00:00.000Z', { friendFieldCount: 4, tagCount: 0 }),
-  formRow('form-5', '会員登録', '住所と生年月日・12ブロック', 'form-folder-request', false, 0, 0, null, '2026-08-15T03:00:00.000Z', { friendFieldCount: 7, tagCount: 0 }),
-  { ...formRow('form-6', '旧アンケート（2025春）', '3ブロック', null, false, 1860, 0, '2025-05-30T03:00:00.000Z', '2025-05-30T03:00:00.000Z', { friendFieldCount: 2, tagCount: 0 }), status: 'archived', archivedAt: '2025-05-30T03:00:00.000Z' },
+  formRow('form-1', '来店アンケート', '来店後に感想と次回の希望を聞く・9ブロック', 'form-folder-visit', true, 1284, { submitCount: 186, openCount: 248, rate: 75 }, '2026-08-21T03:00:00.000Z', '2026-08-21T03:00:00.000Z', { friendFieldCount: 3, tagCount: 2 }),
+  formRow('form-2', '資料請求', '名前と連絡先・5ブロック', 'form-folder-request', true, 3410, { submitCount: 402, openCount: 536, rate: 75 }, '2026-08-22T03:00:00.000Z', '2026-08-12T03:00:00.000Z', { friendFieldCount: 5, tagCount: 1 }),
+  formRow('form-3', '休止の理由', '定期便を止める人に理由を聞く・3ブロック', 'form-folder-survey', true, 96, { submitCount: 12, openCount: 20, rate: 60 }, '2026-08-20T03:00:00.000Z', '2026-08-18T03:00:00.000Z', { friendFieldCount: 1, tagCount: 0 }),
+  formRow('form-4', 'イベント申込（8月）', '日時の希望と人数・7ブロック', 'form-folder-visit', true, 220, { submitCount: 88, openCount: 110, rate: 80 }, '2026-08-25T03:00:00.000Z', '2026-08-22T03:00:00.000Z', { friendFieldCount: 4, tagCount: 0 }),
+  formRow('form-5', '会員登録', '住所と生年月日・12ブロック', 'form-folder-request', false, 0, { submitCount: 0, openCount: 0, rate: null }, null, '2026-08-15T03:00:00.000Z', { friendFieldCount: 7, tagCount: 0 }),
+  { ...formRow('form-6', '旧アンケート（2025春）', '3ブロック', null, false, 1860, { submitCount: 0, openCount: 5, rate: 0 }, '2025-05-30T03:00:00.000Z', '2025-05-30T03:00:00.000Z', { friendFieldCount: 2, tagCount: 0 }), status: 'archived', archivedAt: '2025-05-30T03:00:00.000Z' },
   /* NEN-07: NEN配信「口コミのお願い」がつなぐフォーム。編集画面の選択肢と
    * 「つながる先」へ出る公開中フォームとして見本へ置く。 */
-  formRow('form-review', '口コミ', '星の評価とひとこと・2ブロック', null, true, 210, 9, '2026-08-24T03:00:00.000Z', '2026-08-24T03:00:00.000Z', { friendFieldCount: 1, tagCount: 1 }),
+  formRow('form-review', '口コミ', '星の評価とひとこと・2ブロック', null, true, 210, { submitCount: 24, openCount: 30, rate: 80 }, '2026-08-24T03:00:00.000Z', '2026-08-24T03:00:00.000Z', { friendFieldCount: 1, tagCount: 1 }),
 ]
 
 /** 機能13 `EMBIK`。一覧6行と、画面全体18件の集計を同じ応答で返す。 */
@@ -4070,12 +4074,12 @@ export const INCOMING_WEBHOOK_DETAILS = {
   出してはいけないのは列名のほう（`v6-no-internal-ids.test.ts` が見張っている）。
 */
 export const ENTRY_ROUTES = [
-  { id: 'er-1', refCode: 'summer-ig', genre: 'SNS', name: '夏のInstagram投稿', tagId: 'tag-vip', scenarioId: 'scenario-0', redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: true, isActive: true, createdAt: '2026-08-02T00:00:00.000Z', updatedAt: '2026-08-25T00:12:00.000Z' },
-  { id: 'er-2', refCode: 'tanaka01', genre: '紹介', name: '紹介リンク 田中 明', tagId: null, scenarioId: 'scenario-0', redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: true, isActive: true, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-24T09:40:00.000Z' },
-  { id: 'er-3', refCode: 'shop-pop', genre: '店頭', name: '店頭POPのQRコード', tagId: null, scenarioId: 'scenario-0', redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: true, isActive: true, createdAt: '2026-04-01T00:00:00.000Z', updatedAt: '2026-08-25T02:30:00.000Z' },
-  { id: 'er-4', refCode: 'g-ads-summer', genre: '広告', name: 'Google広告 夏キャンペーン', tagId: null, scenarioId: null, redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: false, isActive: true, createdAt: '2026-07-01T00:00:00.000Z', updatedAt: '2026-08-25T00:00:00.000Z' },
-  { id: 'er-5', refCode: 'mail-sign', genre: 'メール', name: 'メール署名', tagId: null, scenarioId: null, redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: false, isActive: true, createdAt: '2026-02-14T00:00:00.000Z', updatedAt: '2026-08-10T00:00:00.000Z' },
-  { id: 'er-6', refCode: 'flyer-spring', genre: '紙', name: 'チラシ（2026春）', tagId: null, scenarioId: 'scenario-0', redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: true, isActive: false, createdAt: '2026-03-01T00:00:00.000Z', updatedAt: '2026-06-30T00:00:00.000Z' },
+  { id: 'er-1', refCode: 'summer-ig', genre: 'SNS', name: '夏のInstagram投稿', tagId: 'tag-vip', scenarioId: 'scenario-0', redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: true, isActive: true, stoppedAt: null, stoppedReason: null, createdAt: '2026-08-02T00:00:00.000Z', updatedAt: '2026-08-25T00:12:00.000Z' },
+  { id: 'er-2', refCode: 'tanaka01', genre: '紹介', name: '紹介リンク 田中 明', tagId: null, scenarioId: 'scenario-0', redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: true, isActive: true, stoppedAt: null, stoppedReason: null, createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-24T09:40:00.000Z' },
+  { id: 'er-3', refCode: 'shop-pop', genre: '店頭', name: '店頭POPのQRコード', tagId: null, scenarioId: 'scenario-0', redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: true, isActive: true, stoppedAt: null, stoppedReason: null, createdAt: '2026-04-01T00:00:00.000Z', updatedAt: '2026-08-25T02:30:00.000Z' },
+  { id: 'er-4', refCode: 'g-ads-summer', genre: '広告', name: 'Google広告 夏キャンペーン', tagId: null, scenarioId: null, redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: false, isActive: true, stoppedAt: null, stoppedReason: null, createdAt: '2026-07-01T00:00:00.000Z', updatedAt: '2026-08-25T00:00:00.000Z' },
+  { id: 'er-5', refCode: 'mail-sign', genre: 'メール', name: 'メール署名', tagId: null, scenarioId: null, redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: false, isActive: true, stoppedAt: null, stoppedReason: null, createdAt: '2026-02-14T00:00:00.000Z', updatedAt: '2026-08-10T00:00:00.000Z' },
+  { id: 'er-6', refCode: 'flyer-spring', genre: '紙', name: 'チラシ（2026春）', tagId: null, scenarioId: 'scenario-0', redirectUrl: null, poolId: null, introTemplateId: null, runAccountFriendAddScenarios: true, isActive: false, stoppedAt: '2026-06-30T00:00:00.000Z', stoppedReason: '春の配布が終わった', createdAt: '2026-03-01T00:00:00.000Z', updatedAt: '2026-06-30T00:00:00.000Z' },
 ]
 
 /** 機能18。設計画像と同じ通常状態を、実データを使わずに撮るための固定値。 */
@@ -4283,6 +4287,42 @@ export const AFFILIATE_OFFERS = [
   { id: 'ao-4', name: '資料請求', description: null, rewardAmount: 1500, rewardMiles: 0, mileageProgramId: 'mp-1', lineAccountId: 'visual-qa-account', tagId: null, scenarioId: 'scenario-0', isActive: true, createdAt: '2026-03-15T00:00:00.000Z' },
   { /* 設計の「停止・終了 1」。 */ id: 'ao-5', name: '春の紹介キャンペーン', description: '2026春で終了', rewardAmount: 8000, rewardMiles: 0, mileageProgramId: 'mp-1', lineAccountId: 'visual-qa-account', tagId: null, scenarioId: null, isActive: false, createdAt: '2026-01-05T00:00:00.000Z' },
 ]
+
+/*
+ * #823 案件の決まりの版と上限の残り・成果の付け方の記録。
+ * 型どおりの名前（api.ts の OfferVersion・OfferCapStatus・AttributionDecisionView）で返す。
+ */
+export const OFFER_VERSIONS = [
+  { id: 'aov-2', offerId: 'ao-2', versionNumber: 2, rewardAmount: 5000, rewardMiles: 500, windowDays: 30, capTotal: 200, capMonthlyPerAffiliate: 10, receptionFrom: '2026-10-01T00:00:00.000+09:00', receptionTo: '2026-12-31T23:59:59.000+09:00', effectiveFrom: null, createdAt: '2026-09-27T00:00:00.000+09:00' },
+  { id: 'aov-1', offerId: 'ao-2', versionNumber: 1, rewardAmount: 5000, rewardMiles: 500, windowDays: 30, capTotal: null, capMonthlyPerAffiliate: null, receptionFrom: null, receptionTo: null, effectiveFrom: null, createdAt: '2026-02-10T00:00:00.000+09:00' },
+]
+
+export const OFFER_CAP_STATUS = {
+  version: OFFER_VERSIONS[0],
+  capped: false,
+  capTotal: 200,
+  totalUsed: 162,
+  totalRemaining: 38,
+  capMonthlyPerAffiliate: 10,
+  monthlyUsed: 3,
+  monthlyRemaining: 7,
+}
+
+export const ATTRIBUTION_DECISION = {
+  conversionEventId: 'ev-1',
+  affiliateId: 'af-1',
+  refCode: 'ref-1',
+  offerId: 'ao-2',
+  offerVersionId: 'aov-2',
+  reason: 'matched_last_touch',
+  windowDays: 30,
+  candidates: [
+    { affiliateId: 'af-1', affiliateName: 'はなこ', refCode: 'ref-1', touchedAt: '2026-09-20T10:02:00.000+09:00', offerId: 'ao-2', offerName: '定期便のお申し込み', chosen: true, skipReason: null, windowDays: 30 },
+    { affiliateId: 'af-2', affiliateName: 'けんた', refCode: 'ref-2', touchedAt: '2026-09-18T21:40:00.000+09:00', offerId: 'ao-2', offerName: '定期便のお申し込み', chosen: false, skipReason: 'out_of_window', windowDays: 30 },
+    { affiliateId: 'af-3', affiliateName: '本人', refCode: 'ref-3', touchedAt: '2026-09-20T09:58:00.000+09:00', offerId: 'ao-2', offerName: '定期便のお申し込み', chosen: false, skipReason: 'self_referral', windowDays: 30 },
+  ],
+  createdAt: '2026-09-27T12:00:00.000+09:00',
+}
 
 /*
   マイルの残高。設計 `s98Vfw` の並びそのまま。
@@ -5360,6 +5400,36 @@ export const BOOKING_ADMIN_DETAIL = {
     ],
   },
 }
+
+/** T: 予約メニューの版の履歴。新しい順。いちばん新しい版だけ in_use。 */
+export const BOOKING_MENU_VERSIONS = [
+  {
+    version_number: 2, title: '第2版', status: 'in_use',
+    summary: '値段 7,800円→8,400円', author: '店長', at: '2026-09-27T10:00:00+09:00',
+    lines: [
+      '名前：トリミング（小型犬）',
+      '分類：トリミング',
+      '説明：小型犬の全身カットとシャンプー',
+      '時間：105分（後片付け15分）',
+      '値段：8,400円',
+      '受付：30日先まで・3時間前締切・取消期限なし',
+      '状態：公開中',
+    ],
+  },
+  {
+    version_number: 1, title: '第1版', status: 'past',
+    summary: '最初の版', author: null, at: '2026-09-02T10:00:00+09:00',
+    lines: [
+      '名前：トリミング（小型犬）',
+      '分類：トリミング',
+      '説明：小型犬の全身カットとシャンプー',
+      '時間：105分（後片付け15分）',
+      '値段：7,800円',
+      '受付：30日先まで・3時間前締切・取消期限なし',
+      '状態：公開中',
+    ],
+  },
+]
 
 /** 機能34。サーバ判定を画面側で作り直さず、そのまま描く固定応答。 */
 export const GETTING_STARTED = {
@@ -6613,13 +6683,23 @@ export const WEBINAR_NOTIFICATIONS = {
     webinarId: 'webinar-1', version: 3,
     registrationEnabled: true, dayBeforeEnabled: true, dayBeforeTime: '20:00',
     hourBeforeEnabled: true, hourBeforeMinutes: 60, startEnabled: true,
-    missedEnabled: true, missedTime: '10:00', completedEnabled: true,
+    missedEnabled: true, missedTime: '10:00', missedWindowDays: 7, completedEnabled: true,
     updatedAt: '2026-08-25T02:00:00.000Z',
   },
   overview: {
     total: 184, pending: 32, sent: 149, failed: 3, skipped: 0, cancelled: 0,
     audience: { people: 184, bookings: 184, definition: 'active_registrations' },
   },
+}
+
+/**
+ * N: 動画の準備の段の見本。「配信の形」まで進んだ状態。
+ * 準備が済むまで公開できないことの撮影に使う。
+ */
+export const WEBINAR_VIDEO_ASSET = {
+  id: 'video-asset-1', stage: 'packaging', stageLabel: '配信の形', provider: 'r2_hls',
+  durationSeconds: 2_538, errorCode: null, expiresAt: null, purgedAt: null,
+  createdAt: '2026-09-20T00:00:00+09:00', updatedAt: '2026-09-20T01:00:00+09:00',
 }
 
 export const WEBINAR_CTAS = [{
@@ -6715,6 +6795,22 @@ export const WEBINAR_ANALYTICS = {
     { startSeconds: 1_100, endSeconds: 1_800, viewers: 101 },
     { startSeconds: 1_800, endSeconds: 2_538, viewers: 98 },
   ],
+  // J-1「どこまで見られたか」の見本。申し込みボタンは25分（1_500秒）。
+  retention: {
+    bucketSeconds: 60,
+    started: 112,
+    points: [
+      { atSeconds: 0, viewers: 112 },
+      { atSeconds: 60, viewers: 108 },
+      { atSeconds: 720, viewers: 84 },
+      { atSeconds: 1_440, viewers: 61 },
+      { atSeconds: 1_500, viewers: 58 },
+      { atSeconds: 2_400, viewers: 41 },
+    ],
+  },
+  startedViewers: 112,
+  heartbeatRejects: 2,
+  ctaAtSeconds: 1_500,
   measurement: { state: 'available', reason: null },
   formFunnel: {
     ctaImpressions: 96, ctaClicks: 52, formOpens: 41, formStarts: 32,

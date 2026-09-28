@@ -24,8 +24,17 @@ import {
   replaceWebinarCtas,
   replaceWebinarComments,
   upsertWebinarViewer,
-  updateWebinarViewerPosition,
-  recordWebinarViewSegment,
+  recordWebinarHeartbeat,
+  parseWebinarHeartbeatPlayerState,
+  getWebinarRetention,
+  countWebinarStartedViewers,
+  countWebinarHeartbeatRejects,
+  getWebinarVideoAsset,
+  advanceWebinarVideoAsset,
+  isWebinarVideoReady,
+  getWebinarSession,
+  setWebinarSessionCapacity,
+  type WebinarVideoStage,
   recordWebinarCtaClick,
   recordWebinarFunnelEvent,
   insertWebinarUserComment,
@@ -465,24 +474,44 @@ webinarRoutes.post('/api/liff/webinars/:slug/heartbeat', async (c) => {
     if (auth instanceof Response) return auth;
     const loaded = { webinar: auth.webinar };
 
-    const body = await c.req.json<{ sessionStartAt?: unknown; positionSeconds?: unknown }>();
+    // J #821: 再生中だけ15秒ごとに送る。状態・速度・申告時刻も受け、
+    // 受信はサーバー時刻基準で異常を除外する（recordWebinarHeartbeat）。
+    const body = await c.req.json<{
+      sessionStartAt?: unknown; positionSeconds?: unknown;
+      playerState?: unknown; playbackRate?: unknown; clientAtMs?: unknown;
+    }>();
     const sessionStartAt = Number(body.sessionStartAt);
     const positionSeconds = Math.floor(Number(body.positionSeconds));
+    const playbackRate = body.playbackRate === undefined || body.playbackRate === null
+      ? 1
+      : Number(body.playbackRate);
+    const clientAtMs = body.clientAtMs === undefined || body.clientAtMs === null
+      ? null
+      : Math.floor(Number(body.clientAtMs));
     if (
       !Number.isFinite(sessionStartAt) ||
       !Number.isFinite(positionSeconds) ||
       positionSeconds < 0 ||
-      positionSeconds > loaded.webinar.duration_seconds + 60
+      positionSeconds > loaded.webinar.duration_seconds + 60 ||
+      !Number.isFinite(playbackRate) ||
+      (clientAtMs !== null && !Number.isFinite(clientAtMs))
     ) {
       return c.json({ error: 'invalid_body' }, 422);
     }
-    await updateWebinarViewerPosition(
-      c.env.DB, loaded.webinar.id, auth.friendId, sessionStartAt, positionSeconds,
-    );
-    if (positionSeconds > 0) {
-      await recordWebinarViewSegment(
-        c.env.DB, loaded.webinar.id, auth.friendId, sessionStartAt, positionSeconds,
-      );
+    if (parseWebinarHeartbeatPlayerState(body.playerState) === null) {
+      return c.json({ error: 'invalid_body' }, 422);
+    }
+    const heartbeat = await recordWebinarHeartbeat(c.env.DB, {
+      webinarId: loaded.webinar.id,
+      friendId: auth.friendId,
+      sessionStartAt,
+      positionSeconds,
+      playerState: parseWebinarHeartbeatPlayerState(body.playerState) ?? 'playing',
+      playbackRate,
+      clientAtMs,
+    });
+    if (heartbeat.status === 'rejected') {
+      return c.json({ ok: true, counted: false, reason: heartbeat.reason });
     }
     c.executionCtx.waitUntil(awardWebinarPositionMileage(c.env.DB, {
       webinarId: loaded.webinar.id,
@@ -608,15 +637,22 @@ webinarRoutes.post('/api/liff/webinars/:slug/register', async (c) => {
       if (!Number.isFinite(sessionStartAt) || sessionStartAt !== onDemandStart) {
         return c.json({ error: 'invalid_session' }, 400);
       }
-      const registered = await registerWebinarSession(
-        c.env.DB, webinar.id, auth.friendId, sessionStartAt,
-      );
-      return c.json({
-        ok: true,
-        sessionStartAt,
-        rescheduled: registered.rescheduled,
-        confirmationQueued: false,
-      });
+      try {
+        const registered = await registerWebinarSession(
+          c.env.DB, webinar.id, auth.friendId, sessionStartAt,
+        );
+        return c.json({
+          ok: true,
+          sessionStartAt,
+          rescheduled: registered.rescheduled,
+          confirmationQueued: false,
+        });
+      } catch (err) {
+        if (err instanceof Error && err.message === 'session_full') {
+          return c.json({ error: 'session_full' }, 409);
+        }
+        throw err;
+      }
     }
     const rules = parseScheduleRules(webinar.schedule_json);
     const session = resolveSession(rules, webinar.duration_seconds, now);
@@ -631,12 +667,21 @@ webinarRoutes.post('/api/liff/webinars/:slug/register', async (c) => {
     ) {
       return c.json({ error: 'invalid_session' }, 400);
     }
-    const registered = await registerWebinarSession(
-      c.env.DB,
-      webinar.id,
-      auth.friendId,
-      sessionStartAt,
-    );
+    let registered: Awaited<ReturnType<typeof registerWebinarSession>>;
+    try {
+      registered = await registerWebinarSession(
+        c.env.DB,
+        webinar.id,
+        auth.friendId,
+        sessionStartAt,
+      );
+    } catch (err) {
+      // N: 定員は申込の時に確保する。満員なら申込を受けない。
+      if (err instanceof Error && err.message === 'session_full') {
+        return c.json({ error: 'session_full' }, 409);
+      }
+      throw err;
+    }
     const notificationSettings = await getWebinarNotificationSettings(c.env.DB, webinar.id);
     const liffMatch = /liff\.line\.me\/([^/?]+)/.exec(c.env.LIFF_URL ?? '');
     if (registered.created && (notificationSettings?.registrationEnabled ?? true)) c.executionCtx.waitUntil(
@@ -1445,12 +1490,20 @@ async function buildPublishValidation(c: Context<Env>, row: Webinar) {
     );
   const notificationTest = editor.notificationTest as { status?: unknown } | null;
   const publicPageTest = editor.publicPage.test as { status?: unknown } | null;
+  const videoAsset = await getWebinarVideoAsset(c.env.DB, row.id);
+  // N: 準備（ready）が済むまで配信に選べない。資産の行が無い従来の
+  // 動画（video_prefix だけ）はそのまま通す。準備中の資産がある時は止める。
+  const videoReady = videoAsset
+    ? await isWebinarVideoReady(c.env.DB, row.id)
+    : Boolean(row.video_prefix);
   const checks = [
     {
       key: 'video_ready',
-      label: '動画・公開が設定されています',
-      status: row.video_prefix ? 'passed' : 'failed',
-      detail: row.video_prefix ? '動画を配信できます' : '動画がreadyではありません',
+      label: '動画の準備ができています',
+      status: videoReady ? 'passed' : 'failed',
+      detail: videoAsset
+        ? (videoReady ? '動画を配信できます' : `動画は「${videoAsset.stage}」の段です。準備が済むまで公開できません`)
+        : row.video_prefix ? '動画を配信できます' : '動画が設定されていません',
     },
     {
       key: 'form_active',
@@ -1551,6 +1604,152 @@ webinarRoutes.post('/api/webinars/:id/publish', requireRole('owner', 'admin'), a
     return c.json({ success: true, data: { webinar: serializeWebinar(updated!), validation } });
   } catch (err) {
     console.error('POST /api/webinars/:id/publish error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// N: 動画の準備の段を見る。段の名前は運用者の言葉で返す。
+const WEBINAR_VIDEO_STAGE_LABELS: Record<string, string> = {
+  uploaded: '受け付け',
+  inspecting: '検査',
+  converting: '変換',
+  packaging: '配信の形',
+  thumbnail: '表紙',
+  ready: '準備完了',
+  failed: '失敗',
+};
+
+function serializeVideoAsset(asset: {
+  id: string; stage: string; provider: string; duration_seconds: number;
+  error_code: string | null; expires_at: string | null; purged_at: string | null;
+  created_at: string; updated_at: string;
+} | null) {
+  if (!asset) return null;
+  return {
+    id: asset.id,
+    stage: asset.stage,
+    stageLabel: WEBINAR_VIDEO_STAGE_LABELS[asset.stage] ?? asset.stage,
+    provider: asset.provider,
+    durationSeconds: asset.duration_seconds,
+    errorCode: asset.error_code,
+    expiresAt: asset.expires_at,
+    purgedAt: asset.purged_at,
+    createdAt: asset.created_at,
+    updatedAt: asset.updated_at,
+  };
+}
+
+webinarRoutes.get('/api/webinars/:id/video-asset', async (c) => {
+  try {
+    const id = c.req.param('id');
+    const row = await getWebinarById(c.env.DB, id);
+    if (!row) return c.json({ success: false, error: 'Not found' }, 404);
+    return c.json({ success: true, data: { asset: serializeVideoAsset(await getWebinarVideoAsset(c.env.DB, id)) } });
+  } catch (err) {
+    console.error('GET /api/webinars/:id/video-asset error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+const WEBINAR_VIDEO_NEXT_STAGE: Record<string, string[]> = {
+  uploaded: ['inspecting', 'failed'],
+  inspecting: ['converting', 'failed'],
+  converting: ['packaging', 'failed'],
+  packaging: ['thumbnail', 'failed'],
+  thumbnail: ['ready', 'failed'],
+  ready: [],
+  failed: [],
+};
+
+webinarRoutes.post('/api/webinars/:id/video-asset/advance', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const id = c.req.param('id');
+    const row = await getWebinarById(c.env.DB, id);
+    if (!row) return c.json({ success: false, error: 'Not found' }, 404);
+    const body = await c.req.json<{ stage?: unknown; errorCode?: unknown; durationSeconds?: unknown }>();
+    const stage = typeof body.stage === 'string' ? body.stage : '';
+    if (!['uploaded', 'inspecting', 'converting', 'packaging', 'thumbnail', 'ready', 'failed'].includes(stage)) {
+      return c.json({ success: false, error: 'invalid_stage' }, 400);
+    }
+    const current = await getWebinarVideoAsset(c.env.DB, id);
+    const allowed = current ? WEBINAR_VIDEO_NEXT_STAGE[current.stage] ?? [] : ['uploaded'];
+    if (!allowed.includes(stage)) {
+      return c.json({ success: false, error: 'invalid_stage_transition' }, 409);
+    }
+    const durationSeconds = body.durationSeconds === undefined || body.durationSeconds === null
+      ? null
+      : Math.floor(Number(body.durationSeconds));
+    if (durationSeconds !== null && (!Number.isFinite(durationSeconds) || durationSeconds < 0)) {
+      return c.json({ success: false, error: 'invalid_body' }, 400);
+    }
+    const advanced = await advanceWebinarVideoAsset(c.env.DB, id, stage as WebinarVideoStage, {
+      errorCode: typeof body.errorCode === 'string' ? body.errorCode.slice(0, 64) : null,
+      durationSeconds,
+    });
+    if (!advanced) return c.json({ success: false, error: 'invalid_stage_transition' }, 409);
+    auditLog(c, 'webinar.video_stage', { kind: 'webinar', id });
+    return c.json({ success: true, data: { asset: serializeVideoAsset(advanced) } });
+  } catch (err) {
+    console.error('POST /api/webinars/:id/video-asset/advance error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+webinarRoutes.get('/api/webinars/:id/sessions/:startAt', async (c) => {
+  try {
+    const id = c.req.param('id');
+    const row = await getWebinarById(c.env.DB, id);
+    if (!row) return c.json({ success: false, error: 'Not found' }, 404);
+    const startAt = Math.floor(Number(c.req.param('startAt')));
+    if (!Number.isFinite(startAt)) return c.json({ success: false, error: 'invalid_body' }, 400);
+    const session = await getWebinarSession(c.env.DB, id, startAt);
+    return c.json({
+      success: true,
+      data: {
+        session: session
+          ? {
+            sessionStartAt: session.session_start_at,
+            capacity: session.capacity,
+            reservedCount: session.reserved_count,
+            state: session.state,
+            remaining: session.capacity === null ? null : Math.max(0, session.capacity - session.reserved_count),
+          }
+          : null,
+      },
+    });
+  } catch (err) {
+    console.error('GET /api/webinars/:id/sessions error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+webinarRoutes.put('/api/webinars/:id/sessions/:startAt', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const id = c.req.param('id');
+    const row = await getWebinarById(c.env.DB, id);
+    if (!row) return c.json({ success: false, error: 'Not found' }, 404);
+    const startAt = Math.floor(Number(c.req.param('startAt')));
+    const body = await c.req.json<{ capacity?: unknown }>();
+    const capacity = body.capacity === undefined || body.capacity === null ? null : Math.floor(Number(body.capacity));
+    if (!Number.isFinite(startAt) || (capacity !== null && (!Number.isInteger(capacity) || capacity < 1))) {
+      return c.json({ success: false, error: 'invalid_body' }, 400);
+    }
+    const session = await setWebinarSessionCapacity(c.env.DB, id, startAt, capacity);
+    auditLog(c, 'webinar.session_capacity', { kind: 'webinar', id });
+    return c.json({
+      success: true,
+      data: {
+        session: {
+          sessionStartAt: session.session_start_at,
+          capacity: session.capacity,
+          reservedCount: session.reserved_count,
+          state: session.state,
+          remaining: session.capacity === null ? null : Math.max(0, session.capacity - session.reserved_count),
+        },
+      },
+    });
+  } catch (err) {
+    console.error('PUT /api/webinars/:id/sessions error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1663,7 +1862,8 @@ webinarRoutes.put(
         booleans.some((value) => typeof value !== 'boolean') ||
         typeof body.dayBeforeTime !== 'string' ||
         typeof body.missedTime !== 'string' ||
-        typeof body.hourBeforeMinutes !== 'number'
+        typeof body.hourBeforeMinutes !== 'number' ||
+        (body.missedWindowDays !== undefined && typeof body.missedWindowDays !== 'number')
       ) {
         return c.json({ success: false, error: 'invalid_settings' }, 400);
       }
@@ -1675,7 +1875,7 @@ webinarRoutes.put(
       return c.json({ success: true, data: result });
     } catch (err) {
       const code = err instanceof Error ? err.message : 'invalid_settings';
-      if (code === 'invalid_time' || code === 'invalid_hour_before') {
+      if (code === 'invalid_time' || code === 'invalid_hour_before' || code === 'invalid_missed_window') {
         return c.json({ success: false, error: code }, 400);
       }
       console.error('PUT /api/webinars/:id/notifications error:', err);
@@ -2008,7 +2208,7 @@ webinarRoutes.get('/api/webinars/:id/analytics', async (c) => {
     const role = c.get('staff')?.role;
     const canSeeIndividuals = role === 'owner' || role === 'admin';
     const completionThreshold = Math.max(1, Math.floor(row.duration_seconds * 0.9));
-    const [sessions, dropoff, participants, summary, daily, formFunnel, viewSegments, editor] = await Promise.all([
+    const [sessions, dropoff, participants, summary, daily, formFunnel, viewSegments, editor, retention, startedViewers, heartbeatRejects, ctas] = await Promise.all([
       getWebinarSessionStats(c.env.DB, id),
       getWebinarDropoff(c.env.DB, id),
       canSeeIndividuals
@@ -2019,7 +2219,16 @@ webinarRoutes.get('/api/webinars/:id/analytics', async (c) => {
       getWebinarFormFunnelStats(c.env.DB, id),
       getWebinarViewSegmentCoverage(c.env.DB, id),
       getWebinarEditorSettings(c.env.DB, id),
+      // J #821: 維持率の線・視聴開始（有効区間30秒以上）・異常の除外件数
+      getWebinarRetention(c.env.DB, id),
+      countWebinarStartedViewers(c.env.DB, id),
+      countWebinarHeartbeatRejects(c.env.DB, id),
+      // J-1: 申し込みボタンが出た時刻に縦の線を引く
+      getWebinarCtas(c.env.DB, id),
     ]);
+    const ctaAtSeconds = ctas.length === 0
+      ? null
+      : Math.min(...ctas.map((cta) => cta.at_seconds));
     return c.json({
       success: true,
       data: {
@@ -2065,6 +2274,18 @@ webinarRoutes.get('/api/webinars/:id/analytics', async (c) => {
           endSeconds: segment.end_seconds,
           viewers: Number(segment.viewers),
         })),
+        // J #821: J-1「どこまで見られたか」の線と3つの数字の材料
+        retention: {
+          bucketSeconds: retention.bucketSeconds,
+          started: retention.started,
+          points: retention.points.map((point) => ({
+            atSeconds: point.at_seconds,
+            viewers: point.viewers,
+          })),
+        },
+        startedViewers,
+        heartbeatRejects,
+        ctaAtSeconds,
         measurement: editor?.delivery_kind === 'external'
           ? { state: 'unavailable', reason: '外部動画では個人の視聴区間を取得できません' }
           : viewSegments.length > 0

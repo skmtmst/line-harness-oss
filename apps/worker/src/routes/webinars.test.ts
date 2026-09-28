@@ -25,7 +25,24 @@ const dbMocks = {
   getFormById: vi.fn(),
   replaceWebinarComments: vi.fn(),
   upsertWebinarViewer: vi.fn(),
-  updateWebinarViewerPosition: vi.fn(),
+  recordWebinarHeartbeat: vi.fn(
+    async (): Promise<{ status: string; reason?: string }> => ({ status: 'recorded' }),
+  ),
+  parseWebinarHeartbeatPlayerState: realDb.parseWebinarHeartbeatPlayerState,
+  getWebinarRetention: vi.fn(
+    async (): Promise<{ bucketSeconds: number; started: number; points: Array<{ at_seconds: number; viewers: number }> }> => (
+      { bucketSeconds: 60, started: 0, points: [] }
+    ),
+  ),
+  countWebinarStartedViewers: vi.fn(async () => 0),
+  countWebinarHeartbeatRejects: vi.fn(async () => 0),
+  getWebinarVideoAsset: vi.fn(
+    async (): Promise<{ id: string; webinar_id: string; stage: string } | null> => null,
+  ),
+  advanceWebinarVideoAsset: vi.fn(),
+  isWebinarVideoReady: vi.fn(async () => true),
+  getWebinarSession: vi.fn(async () => null),
+  setWebinarSessionCapacity: vi.fn(),
   recordWebinarCtaClick: vi.fn(),
   recordWebinarFunnelEvent: vi.fn(),
   insertWebinarUserComment: vi.fn(),
@@ -58,7 +75,6 @@ const dbMocks = {
   applyMileageRulesForEvent: vi.fn(),
   getDueWebinarRegistrations: vi.fn(),
   markWebinarRegistrationNotified: vi.fn(),
-  recordWebinarViewSegment: vi.fn(),
   getWebinarEditorSettings: vi.fn(),
   saveWebinarEditorSettings: vi.fn(),
   publishWebinarEditorVersion: vi.fn(),
@@ -195,13 +211,20 @@ beforeEach(() => {
     public_page_test_json: null, published_version: null, published_at: null, created_at: 'x', updated_at: 'x',
   }));
   dbMocks.getWebinarViewSegmentCoverage.mockResolvedValue([]);
+  dbMocks.recordWebinarHeartbeat.mockResolvedValue({ status: 'recorded' });
+  dbMocks.getWebinarRetention.mockResolvedValue({ bucketSeconds: 60, started: 0, points: [] });
+  dbMocks.countWebinarStartedViewers.mockResolvedValue(0);
+  dbMocks.countWebinarHeartbeatRejects.mockResolvedValue(0);
+  dbMocks.getWebinarVideoAsset.mockResolvedValue(null);
+  dbMocks.isWebinarVideoReady.mockResolvedValue(true);
+  dbMocks.getWebinarSession.mockResolvedValue(null);
   dbMocks.getWebinarParticipantOperations.mockResolvedValue([]);
   dbMocks.getWebinarMonitoringSummary.mockResolvedValue({
     notification_failures: 0, duplicate_registrations: 0, view_segment_failures: 0, action_failures: 0,
   });
   dbMocks.getWebinarPublicAccount.mockResolvedValue({ id: 'account-a', liff_id: '999-test' });
   dbMocks.formBelongsToLineAccount.mockResolvedValue(true);
-  dbMocks.recordWebinarViewSegment.mockResolvedValue(undefined);
+  dbMocks.recordWebinarHeartbeat.mockResolvedValue({ status: 'recorded' });
   dbMocks.getUpcomingWebinarRegistration.mockResolvedValue(null);
   dbMocks.getWebinarRegistration.mockResolvedValue({
     id: 'reg-current', webinar_id: 'w1', friend_id: 'friend-1',
@@ -801,18 +824,58 @@ function postJson(path: string, body: unknown) {
 }
 
 describe('POST /api/liff/webinars/:slug/heartbeat', () => {
-  test('位置を記録する', async () => {
+  test('位置を記録する（再生中・等速が既定）', async () => {
     const res = await postJson('/api/liff/webinars/test-webinar/heartbeat', {
       sessionStartAt: SESSION_START,
       positionSeconds: 1234,
     });
     expect(res.status).toBe(200);
-    expect(dbMocks.updateWebinarViewerPosition).toHaveBeenCalledWith(
-      expect.anything(), 'w1', 'friend-1', SESSION_START, 1234,
+    expect(dbMocks.recordWebinarHeartbeat).toHaveBeenCalledWith(
+      expect.anything(),
+      {
+        webinarId: 'w1', friendId: 'friend-1', sessionStartAt: SESSION_START,
+        positionSeconds: 1234, playerState: 'playing', playbackRate: 1, clientAtMs: null,
+      },
     );
-    expect(dbMocks.recordWebinarViewSegment).toHaveBeenCalledWith(
-      expect.anything(), 'w1', 'friend-1', SESSION_START, 1234,
+  });
+
+  test('状態・速度・申告時刻を渡す', async () => {
+    const res = await postJson('/api/liff/webinars/test-webinar/heartbeat', {
+      sessionStartAt: SESSION_START,
+      positionSeconds: 100,
+      playerState: 'buffering',
+      playbackRate: 1.5,
+      clientAtMs: 1720000000000,
+    });
+    expect(res.status).toBe(200);
+    expect(dbMocks.recordWebinarHeartbeat).toHaveBeenCalledWith(
+      expect.anything(),
+      {
+        webinarId: 'w1', friendId: 'friend-1', sessionStartAt: SESSION_START,
+        positionSeconds: 100, playerState: 'buffering', playbackRate: 1.5,
+        clientAtMs: 1720000000000,
+      },
     );
+  });
+
+  test('不明な状態は 422', async () => {
+    const res = await postJson('/api/liff/webinars/test-webinar/heartbeat', {
+      sessionStartAt: SESSION_START,
+      positionSeconds: 100,
+      playerState: 'dancing',
+    });
+    expect(res.status).toBe(422);
+    expect(dbMocks.recordWebinarHeartbeat).not.toHaveBeenCalled();
+  });
+
+  test('異常の除外は数えずに理由を返す', async () => {
+    dbMocks.recordWebinarHeartbeat.mockResolvedValueOnce({ status: 'rejected', reason: 'position_jump' });
+    const res = await postJson('/api/liff/webinars/test-webinar/heartbeat', {
+      sessionStartAt: SESSION_START,
+      positionSeconds: 5000,
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, counted: false, reason: 'position_jump' });
   });
 
   test('90%視聴で完了通知を一度だけ作る処理へ渡す', async () => {
@@ -1009,6 +1072,87 @@ describe('POST /api/liff/webinars/:slug/register', () => {
       sessionStartAt: SESSION_START,
     });
     expect(res.status).toBe(400);
+  });
+
+  test('満員の開催回は 409（既存の申込は残る）', async () => {
+    vi.setSystemTime(new Date((SESSION_START - 3600) * 1000));
+    webinarNotificationMocks.registerWebinarSession.mockRejectedValueOnce(new Error('session_full'));
+    const res = await postJson('/api/liff/webinars/test-webinar/register', {
+      sessionStartAt: SESSION_START,
+    });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: 'session_full' });
+  });
+});
+
+describe('webinar video asset stages (N)', () => {
+  test('段を順に進め、飛ばしは 409', async () => {
+    dbMocks.getWebinarById.mockResolvedValue(makeWebinar({ account_id: 'account-a' }));
+    dbMocks.getWebinarVideoAsset
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: 'a1', webinar_id: 'w1', stage: 'uploaded' });
+    dbMocks.advanceWebinarVideoAsset.mockResolvedValue({ id: 'a1', stage: 'inspecting' });
+
+    const ok = await adminReq('/api/webinars/w1/video-asset/advance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ stage: 'uploaded' }),
+    });
+    expect(ok.status).toBe(200);
+
+    dbMocks.getWebinarVideoAsset.mockResolvedValue({ id: 'a1', webinar_id: 'w1', stage: 'uploaded' });
+    const skip = await adminReq('/api/webinars/w1/video-asset/advance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ stage: 'ready' }),
+    });
+    expect(skip.status).toBe(409);
+    expect(await skip.json()).toEqual({ success: false, error: 'invalid_stage_transition' });
+  });
+
+  test('知らない段名は 400', async () => {
+    dbMocks.getWebinarById.mockResolvedValue(makeWebinar({ account_id: 'account-a' }));
+    const res = await adminReq('/api/webinars/w1/video-asset/advance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ stage: 'broadcast' }),
+    });
+    expect(res.status).toBe(400);
+  });
+});
+
+describe('webinar session capacity (N)', () => {
+  test('定員を決めて残席を見る', async () => {
+    dbMocks.getWebinarById.mockResolvedValue(makeWebinar({ account_id: 'account-a' }));
+    dbMocks.setWebinarSessionCapacity.mockResolvedValue({
+      session_start_at: SESSION_START, capacity: 50, reserved_count: 3, state: 'open',
+    });
+    const res = await adminReq(`/api/webinars/w1/sessions/${SESSION_START}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ capacity: 50 }),
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      success: true,
+      data: {
+        session: {
+          sessionStartAt: SESSION_START, capacity: 50, reservedCount: 3,
+          state: 'open', remaining: 47,
+        },
+      },
+    });
+  });
+
+  test('0人以下の定員は 400', async () => {
+    dbMocks.getWebinarById.mockResolvedValue(makeWebinar({ account_id: 'account-a' }));
+    const res = await adminReq(`/api/webinars/w1/sessions/${SESSION_START}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ capacity: 0 }),
+    });
+    expect(res.status).toBe(400);
+    expect(dbMocks.setWebinarSessionCapacity).not.toHaveBeenCalled();
   });
 });
 
@@ -1640,6 +1784,59 @@ describe('admin CRUD', () => {
       submitErrors: 1,
       fieldCompletions: [{ fieldName: 'annual_revenue', users: 6 }],
     });
+  });
+
+  test('分析に維持率・視聴開始・申込ボタンの時刻を返す (J-1)', async () => {
+    dbMocks.getWebinarById.mockResolvedValue(makeWebinar({ account_id: 'account-a' }));
+    dbMocks.getWebinarSessionStats.mockResolvedValue([]);
+    dbMocks.getWebinarDropoff.mockResolvedValue([]);
+    dbMocks.getWebinarParticipantStats.mockResolvedValue([]);
+    dbMocks.getWebinarAnalyticsSummary.mockResolvedValue({
+      reservations: 150, viewers: 112, registered_and_joined: 110,
+      watched_5m: 100, watched_15m: 80, completed: 41,
+      avg_watched_seconds: 1800, cta_clicks: 30, form_submissions: 10,
+    });
+    dbMocks.getWebinarDailyStats.mockResolvedValue([]);
+    dbMocks.getWebinarFormFunnelStats.mockResolvedValue({
+      cta_impressions: 100, cta_clicks: 30, form_opens: 20, form_starts: 15,
+      submit_attempts: 12, submit_successes: 10, submit_errors: 1, field_completions: [],
+    });
+    dbMocks.getWebinarViewSegmentCoverage.mockResolvedValue([]);
+    dbMocks.getWebinarEditorSettings.mockResolvedValue(null);
+    dbMocks.getWebinarRetention.mockResolvedValue({
+      bucketSeconds: 60,
+      started: 112,
+      points: [
+        { at_seconds: 0, viewers: 112 },
+        { at_seconds: 60, viewers: 90 },
+      ],
+    });
+    dbMocks.countWebinarStartedViewers.mockResolvedValue(112);
+    dbMocks.countWebinarHeartbeatRejects.mockResolvedValue(3);
+    dbMocks.getWebinarCtas.mockResolvedValue([
+      { id: 'cta-1', at_seconds: 1500, kind: 'form', title: '申し込む', body: null, button_label: '申し込む', auto_open: 0, form_id: 'f1', url: null },
+    ]);
+    const res = await adminReq('/api/webinars/w1/analytics');
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      data: {
+        retention: { bucketSeconds: number; started: number; points: Array<{ atSeconds: number; viewers: number }> };
+        startedViewers: number;
+        heartbeatRejects: number;
+        ctaAtSeconds: number | null;
+      };
+    };
+    expect(body.data.retention).toEqual({
+      bucketSeconds: 60,
+      started: 112,
+      points: [
+        { atSeconds: 0, viewers: 112 },
+        { atSeconds: 60, viewers: 90 },
+      ],
+    });
+    expect(body.data.startedViewers).toBe(112);
+    expect(body.data.heartbeatRejects).toBe(3);
+    expect(body.data.ctaAtSeconds).toBe(1500);
   });
 
   test('POST /api/webinars/:id/archive は履歴を消さずアーカイブする', async () => {

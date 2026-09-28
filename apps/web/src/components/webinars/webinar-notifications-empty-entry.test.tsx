@@ -120,6 +120,7 @@ describe('通知の設定がまだ無いウェビナー（WEBINAR-09）', () => 
       startEnabled: false,
       missedEnabled: false,
       missedTime: '20:00',
+      missedWindowDays: 7,
       completedEnabled: false,
     })
     expect(host.textContent).toContain('保存しました。')

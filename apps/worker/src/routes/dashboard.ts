@@ -7,6 +7,8 @@ import {
   getDashboardOverview,
   getDashboardDefaultPreference,
   getDashboardPreference,
+  getDashboardUpcoming,
+  getDeliveryFailureOrigins,
   getListStats,
   getLineAccountById,
   getLineAccountsByIds,
@@ -442,6 +444,61 @@ dashboard.put('/api/dashboard/preferences/default', requireRole('owner'), async 
   } catch (err) {
     console.error('PUT /api/dashboard/preferences/default error:', err);
     return c.json({ success: false as const, error: '会社の既定配置を保存できませんでした' }, 500);
+  }
+});
+
+/**
+ * M (今後の予定): 06予約配信・07リマインダ・27予約を7日分だけ束ねる。
+ *
+ * 新しい表は作らず、読むだけ。各機能の画面へのつなぎは一覧へのリンクに
+ * 留める。`days` は1〜31に収める(収まらない値は1〜31へ丸める)。
+ */
+dashboard.get('/api/dashboard/upcoming', async (c) => {
+  try {
+    const access = await requireVisibleAccount(c);
+    if ('response' in access) return access.response;
+    const rawDays = Number(c.req.query('days') ?? 7);
+    const days = Number.isFinite(rawDays) ? Math.min(Math.max(Math.floor(rawDays), 1), 31) : 7;
+    const data = await getDashboardUpcoming(c.env.DB, {
+      lineAccountId: access.accountId,
+      now: new Date().toISOString(),
+      days,
+    });
+    return c.json({ success: true as const, data });
+  } catch (err) {
+    console.error('GET /api/dashboard/upcoming error:', err);
+    return c.json({ success: false as const, error: '今後の予定を取得できませんでした' }, 500);
+  }
+});
+
+/** 日本時間の今日 0:00。失敗の「今日ぶん」の既定の境目。 */
+function jstDayStart(now: Date): string {
+  return `${new Date(now.getTime() + 9 * 3_600_000).toISOString().slice(0, 10)}T00:00:00+09:00`;
+}
+
+/**
+ * L (#824 数字の出どころ): 失敗の数を通知の送達台帳から出どころ別に数える。
+ *
+ * 同じ失敗は通知1件として数え、送り直しは数えない。件数は台帳の件数と
+ * 一致する。カードの「i」はこの応答の出どころと時点を見せる。
+ */
+dashboard.get('/api/dashboard/delivery-failure-origins', async (c) => {
+  try {
+    const access = await requireVisibleAccount(c);
+    if ('response' in access) return access.response;
+    const rawSince = c.req.query('since');
+    const since = rawSince ?? jstDayStart(new Date());
+    if (!Number.isFinite(Date.parse(since))) {
+      return c.json({ success: false as const, error: '日時の指定が正しくありません' }, 400);
+    }
+    const data = await getDeliveryFailureOrigins(c.env.DB, {
+      lineAccountId: access.accountId,
+      since,
+    });
+    return c.json({ success: true as const, data });
+  } catch (err) {
+    console.error('GET /api/dashboard/delivery-failure-origins error:', err);
+    return c.json({ success: false as const, error: '失敗の出どころを取得できませんでした' }, 500);
   }
 });
 

@@ -74,6 +74,27 @@ export function pruneStaleAreaTags(
   return { next, removed }
 }
 
+/**
+ * m18r: アカウントを切り替えたらテンプレートの候補が変わる。前の
+ * アカウントにしかないテンプレートの選択は外す（タグの prune と同じ形）。
+ * 純粋関数。外した件数を返すので、呼び出し側で知らせの文に使える。
+ */
+export function pruneStaleAreaTemplates(
+  drafts: Record<string, Area[]>,
+  validIds: ReadonlySet<string>,
+): { next: Record<string, Area[]>; removed: number } {
+  let removed = 0
+  const next: Record<string, Area[]> = {}
+  for (const [key, areas] of Object.entries(drafts)) {
+    next[key] = areas.map((area) => {
+      if (!area.templateId || validIds.has(area.templateId)) return area
+      removed += 1
+      return { ...area, templateId: null }
+    })
+  }
+  return { next, removed }
+}
+
 export function areaDraftsForCreate(areas: Area[]) {
   return areas.map((area) => ({
     boundsX: area.boundsX,

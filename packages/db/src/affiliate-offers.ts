@@ -572,3 +572,250 @@ export async function getConversionApprovalNotifyInfo(
     notifyOnConversion: row.notify_on_conversion !== 0,
   };
 }
+
+// =============================================================================
+// Affiliate Offer Versions — 案件の決まりの版 (#823)
+// =============================================================================
+//
+// 保存するたびに1行足す。前の版は変えない。「この版に戻す」は中身で新しい版を作る。
+// 数える期間の既定は 30 日。上限・受付の期間を持つ。
+
+/** 案件の版に持つ数える期間の既定(日)。汎用リンクの 90 日(legacy)とは別。 */
+export const OFFER_ATTRIBUTION_WINDOW_DEFAULT = 30;
+
+export interface AffiliateOfferVersion {
+  id: string;
+  offer_id: string;
+  version_number: number;
+  reward_amount: number;
+  reward_miles: number;
+  window_days: number;
+  cap_total: number | null;
+  cap_monthly_per_affiliate: number | null;
+  reception_from: string | null;
+  reception_to: string | null;
+  effective_from: string | null;
+  created_by_staff_id: string | null;
+  idempotency_key: string | null;
+  created_at: string;
+}
+
+export interface CreateOfferVersionInput {
+  offerId: string;
+  rewardAmount?: number;
+  rewardMiles?: number;
+  /** 1〜365。省略時は前の版を引き継ぎ、初版は 30。 */
+  windowDays?: number;
+  /** 正の整数または null(上限なし)。 */
+  capTotal?: number | null;
+  capMonthlyPerAffiliate?: number | null;
+  receptionFrom?: string | null;
+  receptionTo?: string | null;
+  effectiveFrom?: string | null;
+  createdBy?: string | null;
+  /** 同じ確認キーの再送では版を増やさない。 */
+  idempotencyKey?: string | null;
+}
+
+function isValidWindowDays(v: unknown): v is number {
+  return typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= 365;
+}
+
+function isValidCap(v: unknown): v is number {
+  return typeof v === 'number' && Number.isInteger(v) && v > 0;
+}
+
+/** その案件の今の版(番号が最大の行)。版が無い古い案件は null。 */
+export async function getCurrentOfferVersion(
+  db: D1Database,
+  offerId: string,
+): Promise<AffiliateOfferVersion | null> {
+  return db
+    .prepare(
+      `SELECT * FROM affiliate_offer_versions WHERE offer_id = ? ORDER BY version_number DESC LIMIT 1`,
+    )
+    .bind(offerId)
+    .first<AffiliateOfferVersion>();
+}
+
+export async function listOfferVersions(
+  db: D1Database,
+  offerId: string,
+): Promise<AffiliateOfferVersion[]> {
+  const result = await db
+    .prepare(
+      `SELECT * FROM affiliate_offer_versions WHERE offer_id = ? ORDER BY version_number DESC`,
+    )
+    .bind(offerId)
+    .all<AffiliateOfferVersion>();
+  return result.results;
+}
+
+async function findOfferVersionByIdempotencyKey(
+  db: D1Database,
+  offerId: string,
+  idempotencyKey: string,
+): Promise<AffiliateOfferVersion | null> {
+  return db
+    .prepare(
+      `SELECT * FROM affiliate_offer_versions WHERE offer_id = ? AND idempotency_key = ?`,
+    )
+    .bind(offerId, idempotencyKey)
+    .first<AffiliateOfferVersion>();
+}
+
+/**
+ * 案件の決まりの新しい版を作る。前の版は変えない。
+ * 同じ確認キーの再送は最初の版を返す(二重に版を増やさない)。
+ */
+export async function createOfferVersion(
+  db: D1Database,
+  input: CreateOfferVersionInput,
+): Promise<AffiliateOfferVersion> {
+  if (input.idempotencyKey) {
+    const existing = await findOfferVersionByIdempotencyKey(db, input.offerId, input.idempotencyKey);
+    if (existing) return existing;
+  }
+  const offer = await getAffiliateOfferById(db, input.offerId);
+  if (!offer) throw new Error('offer not found');
+  if (input.windowDays !== undefined && !isValidWindowDays(input.windowDays)) {
+    throw new Error('windowDays must be an integer between 1 and 365');
+  }
+  for (const cap of [input.capTotal, input.capMonthlyPerAffiliate]) {
+    if (cap !== undefined && cap !== null && !isValidCap(cap)) {
+      throw new Error('cap must be a positive integer or null');
+    }
+  }
+  const current = await getCurrentOfferVersion(db, input.offerId);
+  const id = crypto.randomUUID();
+  const now = jstNow();
+  const row: AffiliateOfferVersion = {
+    id,
+    offer_id: input.offerId,
+    version_number: (current?.version_number ?? 0) + 1,
+    reward_amount: input.rewardAmount ?? current?.reward_amount ?? offer.reward_amount,
+    reward_miles: input.rewardMiles ?? current?.reward_miles ?? offer.reward_miles,
+    window_days: input.windowDays
+      ?? current?.window_days
+      ?? OFFER_ATTRIBUTION_WINDOW_DEFAULT,
+    cap_total: input.capTotal !== undefined ? input.capTotal : (current?.cap_total ?? null),
+    cap_monthly_per_affiliate: input.capMonthlyPerAffiliate !== undefined
+      ? input.capMonthlyPerAffiliate
+      : (current?.cap_monthly_per_affiliate ?? null),
+    reception_from: input.receptionFrom !== undefined ? input.receptionFrom : (current?.reception_from ?? null),
+    reception_to: input.receptionTo !== undefined ? input.receptionTo : (current?.reception_to ?? null),
+    effective_from: input.effectiveFrom !== undefined ? input.effectiveFrom : null,
+    created_by_staff_id: input.createdBy ?? null,
+    idempotency_key: input.idempotencyKey ?? null,
+    created_at: now,
+  };
+  try {
+    await db
+      .prepare(
+        `INSERT INTO affiliate_offer_versions
+           (id, offer_id, version_number, reward_amount, reward_miles, window_days,
+            cap_total, cap_monthly_per_affiliate, reception_from, reception_to,
+            effective_from, created_by_staff_id, idempotency_key, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        row.id, row.offer_id, row.version_number, row.reward_amount, row.reward_miles,
+        row.window_days, row.cap_total, row.cap_monthly_per_affiliate,
+        row.reception_from, row.reception_to, row.effective_from,
+        row.created_by_staff_id, row.idempotency_key, row.created_at,
+      )
+      .run();
+  } catch (err) {
+    // 同じ確認キーの同時再送は片方だけが通り、もう片方は最初の版を拾う。
+    if (input.idempotencyKey) {
+      const winner = await findOfferVersionByIdempotencyKey(db, input.offerId, input.idempotencyKey);
+      if (winner) return winner;
+    }
+    throw err;
+  }
+  return row;
+}
+
+// ── 上限の使用状況 ─────────────────────────────────────────────────────────
+
+/**
+ * 日本時間の月の区切りを ISO 文字列で返す。SQLite 側は julianday() で
+ * 時刻として比べる(文字列の形に依存しないため。affiliate-attribution 参照)。
+ */
+export function jstMonthRange(at?: string): { start: string; end: string } {
+  const base = at ? new Date(at) : new Date();
+  const jst = new Date(base.getTime() + 9 * 60 * 60 * 1000);
+  const year = jst.getUTCFullYear();
+  const month = jst.getUTCMonth();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const start = `${year}-${pad(month + 1)}-01T00:00:00+09:00`;
+  const next = new Date(Date.UTC(year, month + 1, 1) - 9 * 60 * 60 * 1000);
+  const end = `${next.getUTCFullYear()}-${pad(next.getUTCMonth() + 1)}-${pad(next.getUTCDate())}T00:00:00+09:00`;
+  return { start, end };
+}
+
+export interface OfferCapStatus {
+  /** 上限に達して受付が止まっているか。 */
+  capped: boolean;
+  /** 案件全体の上限・使用数・残り。空は「上限なし」。 */
+  capTotal: number | null;
+  totalUsed: number;
+  totalRemaining: number | null;
+  /** 1人あたり月の上限・その人の今月の使用数・残り。空は「上限なし」。 */
+  capMonthlyPerAffiliate: number | null;
+  monthlyUsed: number;
+  monthlyRemaining: number | null;
+}
+
+/**
+ * 案件の上限の使用状況。上限に達したら受付を自動で止める判断に使う。
+ * 数えるのは、その案件のリンクに付いた成果(conversion_events)の件数。
+ */
+export async function getOfferCapStatus(
+  db: D1Database,
+  offerId: string,
+  opts?: { affiliateId?: string; at?: string },
+): Promise<OfferCapStatus> {
+  const version = await getCurrentOfferVersion(db, offerId);
+  const capTotal = version?.cap_total ?? null;
+  const capMonthly = version?.cap_monthly_per_affiliate ?? null;
+  const at = opts?.at ?? jstNow();
+  const totalRow = await db
+    .prepare(
+      `SELECT COUNT(*) AS used
+         FROM conversion_events ce
+         JOIN affiliate_links al ON al.ref_code = ce.attributed_ref_code
+        WHERE al.offer_id = ? AND ce.affiliate_id IS NOT NULL`,
+    )
+    .bind(offerId)
+    .first<{ used: number }>();
+  const totalUsed = totalRow?.used ?? 0;
+  let monthlyUsed = 0;
+  if (opts?.affiliateId) {
+    const { start, end } = jstMonthRange(at);
+    const monthlyRow = await db
+      .prepare(
+        `SELECT COUNT(*) AS used
+           FROM conversion_events ce
+           JOIN affiliate_links al ON al.ref_code = ce.attributed_ref_code
+          WHERE al.offer_id = ? AND ce.affiliate_id = ?
+            AND julianday(ce.created_at) >= julianday(?)
+            AND julianday(ce.created_at) < julianday(?)`,
+      )
+      .bind(offerId, opts.affiliateId, start, end)
+      .first<{ used: number }>();
+    monthlyUsed = monthlyRow?.used ?? 0;
+  }
+  const totalRemaining = capTotal == null ? null : Math.max(0, capTotal - totalUsed);
+  const monthlyRemaining = capMonthly == null ? null : Math.max(0, capMonthly - monthlyUsed);
+  return {
+    capped: (totalRemaining !== null && totalRemaining <= 0)
+      || (monthlyRemaining !== null && monthlyRemaining <= 0),
+    capTotal,
+    totalUsed,
+    totalRemaining,
+    capMonthlyPerAffiliate: capMonthly,
+    monthlyUsed,
+    monthlyRemaining,
+  };
+}
