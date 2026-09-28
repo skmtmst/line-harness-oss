@@ -397,6 +397,25 @@ class FakeElement extends FakeNode {
   blur() {
     if (this.ownerDocument!.activeElement === this) this.ownerDocument!.activeElement = this.ownerDocument!.body
   }
+
+  /*
+   * 重なり部品（useOverlayFocus）がフォーカスを回す要素を探すのに使う。
+   * 本物はCSSセレクタで選ぶが、ここでは押せる部品の並びだけを返す近似。
+   */
+  querySelectorAll(): FakeElement[] {
+    const found: FakeElement[] = []
+    const focusable = new Set(['BUTTON', 'INPUT', 'SELECT', 'TEXTAREA', 'A'])
+    const walk = (node: FakeNode) => {
+      for (const child of node.childNodes) {
+        if (child instanceof FakeElement) {
+          if (focusable.has(child.tagName)) found.push(child)
+          walk(child)
+        }
+      }
+    }
+    walk(this)
+    return found
+  }
 }
 
 class FakeFormElement extends FakeElement {
@@ -726,6 +745,12 @@ async function installReactHost(accounts: LineAccount[]): Promise<Host> {
   globals.Node = FakeNode
   globals.HTMLElement = FakeElement
   globals.IS_REACT_ACT_ENVIRONMENT = true
+  /*
+   * 重なり部品（useOverlayFocus）は初回フォーカスを rAF で予約する。
+   * この置き場はブラウザではないので、タイマーへ写す。
+   */
+  globals.requestAnimationFrame = (callback: () => void) => setTimeout(callback, 0)
+  globals.cancelAnimationFrame = (id: ReturnType<typeof setTimeout>) => clearTimeout(id)
 
   /*
    * この置き場の tsconfig は `jsx: preserve` なので、試験の変換だけ古い形

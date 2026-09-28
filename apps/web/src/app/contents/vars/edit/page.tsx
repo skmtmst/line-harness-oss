@@ -4,6 +4,7 @@ import { X } from 'lucide-react'
 import DateField from '@/components/shared/date-field'
 import DateTimeField, { TimeField } from '@/components/shared/date-time-field'
 import Select from '@/components/shared/select'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -110,6 +111,9 @@ function EditCommonVarInner() {
 
   /** 予約を足す窓。開いていない間は null。 */
   const [draft, setDraft] = useState<{ date: string; time: string; value: string } | null>(null)
+  // スケジュール設定の窓も共通の約束へ: Escapeで閉じる・Tabは窓の中・
+  // 閉じたら起点へ戻す。背景クリックの閉じるはこのまま残す。
+  const draftPanelRef = useOverlayFocus(!!draft, () => setDraft(null))
   /** 予約を全部消す確認窓。チェックを外したときに開く。 */
   const [clearSchedulesOpen, setClearSchedulesOpen] = useState(false)
   const [clearSchedulesBusy, setClearSchedulesBusy] = useState(false)
@@ -1216,7 +1220,7 @@ function EditCommonVarInner() {
             if (e.target === e.currentTarget) setDraft(null)
           }}
         >
-          <div className="rounded-card bg-canvas w-full max-w-md space-y-4 p-6 shadow-xl">
+          <div ref={draftPanelRef} className="rounded-card bg-canvas w-full max-w-md space-y-4 p-6 shadow-xl">
             <div className="flex items-start justify-between gap-3">
               <p className="text-ink text-sm font-semibold">スケジュール設定</p>
               <button type="button" onClick={() => setDraft(null)} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">

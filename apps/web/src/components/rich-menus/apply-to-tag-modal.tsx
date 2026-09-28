@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
 import { api } from '@/lib/api'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
 
@@ -55,6 +56,8 @@ export function ApplyToTagModal({ groupId, groupName, onClose }: Props) {
   const [phase, setPhase] = useState<'config' | 'running' | 'done' | 'error'>(
     'config',
   )
+  // 一括適用の走っている最中はEscapeで窓だけ消えないようにする。
+  const panelRef = useOverlayFocus(true, onClose, phase === 'running')
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<{
     chunks: number
@@ -129,10 +132,16 @@ export function ApplyToTagModal({ groupId, groupName, onClose }: Props) {
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="apply-to-tag-title"
+        className="bg-white rounded-lg shadow-xl w-full max-w-md"
+      >
         <div className="p-6">
           <div className="mb-1 flex items-start justify-between gap-3">
-            <h2 className="text-lg font-semibold text-ink">
+            <h2 id="apply-to-tag-title" className="text-lg font-semibold text-ink">
               友だちにこのメニューを表示
             </h2>
             <button type="button" onClick={onClose} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">

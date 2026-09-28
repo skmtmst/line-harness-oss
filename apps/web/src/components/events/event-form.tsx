@@ -13,6 +13,7 @@ import { BULK_SLOT_LIMIT, generateBulkSlots, type BulkSlotInput } from './bulk-s
 import { jstHHMMToUtcIso, utcIsoToJstDate, utcIsoToJstHHMM } from './jst'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
@@ -1019,6 +1020,8 @@ function AddSlotDialog({
   const [capacity, setCapacity] = useState<string>('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  // 保存中はEscapeで窓だけ消えないようにする（共通の窓の約束）。
+  const panelRef = useOverlayFocus(true, onClose, busy)
 
   async function submit() {
     setBusy(true)
@@ -1039,7 +1042,7 @@ function AddSlotDialog({
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-canvas rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-label="予約枠を追加" className="bg-canvas rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
         <div className="mb-4 flex items-start justify-between gap-3">
           <h3 className="text-lg font-bold text-ink">予約枠を追加</h3>
           <button type="button" onClick={onClose} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
@@ -1155,13 +1158,16 @@ function EditSlotDialog({
     }
   }
 
+  // 保存中はEscapeで窓だけ消えないようにする（共通の窓の約束）。
+  const panelRef = useOverlayFocus(true, onClose, busy)
+
   // 新しい部品はデザイントークンで書く（このファイルの古い生色クラスを増やさない）。
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center"
       style={{ background: 'color-mix(in srgb, var(--color-ink) 40%, transparent)' }}
     >
-      <div className="bg-canvas rounded-card mx-4 w-full max-w-md p-6 shadow-xl">
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-label="予約枠を編集" className="bg-canvas rounded-card mx-4 w-full max-w-md p-6 shadow-xl">
         <div className="mb-4 flex items-start justify-between gap-3">
           <h3 className="text-ink text-lg font-bold">予約枠を編集</h3>
           <button type="button" onClick={onClose} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
