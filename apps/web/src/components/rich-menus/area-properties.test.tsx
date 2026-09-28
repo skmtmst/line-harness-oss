@@ -92,3 +92,52 @@ describe('ボタンのタグ選び（R19/R20）', () => {
     expect(screen.getByRole('listbox')).toBeTruthy()
   })
 })
+
+function IntentHarness({ intent }: { intent: 'datetime' | 'clipboard' }) {
+  const [area, setArea] = useState<Area>({
+    id: 'area-b',
+    boundsX: 0,
+    boundsY: 0,
+    boundsWidth: 100,
+    boundsHeight: 100,
+    actionType: intent === 'datetime' ? 'datetimepicker' : 'clipboard',
+    actionData: intent === 'datetime' ? { mode: 'date' } : { text: '' },
+    intent,
+    label: intent === 'datetime' ? '日時を選ぶ' : 'コピーする',
+  })
+  const onUpdate = vi.fn((patch: Partial<Area>) => setArea((prev) => ({ ...prev, ...patch })))
+  return (
+    <AreaProperties
+      area={area}
+      pages={[]}
+      tags={[]}
+      templates={[]}
+      forms={[]}
+      trackedLinks={[]}
+      taps={null}
+      onUpdate={onUpdate}
+      showManagementDetails={false}
+    />
+  )
+}
+
+describe('日時を選ぶ・文字をコピーするボタン（O）', () => {
+  it('日時の種類とはじめの値を入れられる', () => {
+    render(<IntentHarness intent="datetime" />)
+    expect(screen.getByLabelText('日時の種類')).toBeTruthy()
+    expect(screen.getByPlaceholderText('例：2026-10-01')).toBeTruthy()
+  })
+
+  it('コピーする文字を入れられる', () => {
+    render(<IntentHarness intent="clipboard" />)
+    expect(screen.getByPlaceholderText('例：合言葉は「さくら」')).toBeTruthy()
+  })
+
+  it('種類の選択肢に日時・コピーが増えている', () => {
+    render(<Harness />)
+    fireEvent.click(screen.getByRole('button', { name: '押したときの動き' }))
+    const listbox = screen.getByRole('listbox')
+    expect(within(listbox).getByRole('option', { name: /日時を選ぶ/ })).toBeTruthy()
+    expect(within(listbox).getByRole('option', { name: /文字をコピーする/ })).toBeTruthy()
+  })
+})

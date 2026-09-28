@@ -102,7 +102,7 @@ import {
   CONVERSION_DEFINITION_PREVIEW, CONVERSION_DEFINITION_DELETE_IMPACT,
   OPERATION_CONTROL_PREVIEW, OPERATION_HEALTH, OPERATION_HISTORY,
   WEBINARS, WEBINAR_FOLDERS, WEBINAR_OVERVIEW, WEBINAR_NOTIFICATIONS, WEBINAR_CTAS, WEBINAR_ACTIONS, WEBINAR_COMMENTS, WEBINAR_ANALYTICS,
-  WEBINAR_EDITOR, WEBINAR_PUBLISH_VALIDATION, WEBINAR_PARTICIPANTS,
+  WEBINAR_EDITOR, WEBINAR_PUBLISH_VALIDATION, WEBINAR_PARTICIPANTS, WEBINAR_VIDEO_ASSET,
   FRIEND_ADD_RULE_PUBLISH, FRIEND_ADD_RULE_VALIDATE,
   ACCESS_USERS, ACCESS_ROLES, ACCESS_AUDIT_EVENTS,
   GETTING_STARTED, RECIPES, MANUAL_LINKS,
@@ -122,6 +122,10 @@ const HOST = '127.0.0.1'
 
 // 機能10専用。フォルダ操作後の再取得でも、同じプロセス内では保存結果を返す。
 let webinarFolders = WEBINAR_FOLDERS.map((folder) => ({ ...folder }))
+
+// J-1・N 撮影用。動画の準備の段と開催回の定員を同じプロセス内で保存結果として返す。
+let mockVideoAsset = WEBINAR_VIDEO_ASSET ? { ...WEBINAR_VIDEO_ASSET } : null
+let mockSessionCapacity = 50
 
 // R25専用。回答フォームの箱も作る・直す・消すを見本で返す。
 let formFolders = FORM_FOLDERS.map((folder) => ({ ...folder }))
@@ -2416,6 +2420,11 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (method === 'DELETE' && pathname === `/api/forms/${FORM_DETAIL.id}`) {
     return { success: true, data: null }
   }
+  // P: 公開前の試し合言葉の発行。生の値はこの応答でしか返らない。
+  const formTestToken = method === 'POST' && /^\/api\/forms\/([^/]+)\/test-token$/.exec(pathname)
+  if (formTestToken) {
+    return { success: true, data: { token: 'test-token-qa', expiresAt: '2026-09-28T15:00:00.000+09:00' } }
+  }
   if (pathname === '/api/forms') {
     return { success: true, data: query.get('with_list_summary') === '1' ? FORM_LIST : FORMS }
   }
@@ -3835,6 +3844,24 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (/^\/api\/webinars\/[^/]+\/comments$/.test(pathname)) return { success: true, data: WEBINAR_COMMENTS }
   if (/^\/api\/webinars\/[^/]+\/user-comments$/.test(pathname)) return { success: true, data: [] }
   if (/^\/api\/webinars\/[^/]+\/analytics$/.test(pathname)) return { success: true, data: WEBINAR_ANALYTICS }
+  if (/^\/api\/webinars\/[^/]+\/video-asset$/.test(pathname)) {
+    return { success: true, data: { asset: mockVideoAsset } }
+  }
+  if (/^\/api\/webinars\/[^/]+\/sessions\/[^/]+$/.test(pathname)) {
+    const startAt = Number(pathname.split('/').pop())
+    const capacity = mockSessionCapacity
+    const reservedCount = 3
+    return {
+      success: true,
+      data: {
+        session: {
+          sessionStartAt: startAt, capacity, reservedCount,
+          state: capacity !== null && reservedCount >= capacity ? 'full' : 'open',
+          remaining: capacity === null ? null : Math.max(0, capacity - reservedCount),
+        },
+      },
+    }
+  }
   if (/^\/api\/webinars\/[^/]+$/.test(pathname)) {
     /*
       ウェビナー1件。**器を通さない**（`fetchApi<{ data: Webinar }>`）。
@@ -4068,6 +4095,51 @@ const server = createServer((req, res) => {
     )
     if (formWriteRequest) {
       res.writeHead(200).end(JSON.stringify(bodyFor(method, url.pathname, url.searchParams)))
+      return
+    }
+    // J-1・N 撮影用。動画の準備の段と開催回の定員の保存を見本で返す。
+    if (
+      (method === 'POST' && /^\/api\/webinars\/[^/]+\/video-asset\/advance$/.test(url.pathname)) ||
+      (method === 'PUT' && /^\/api\/webinars\/[^/]+\/sessions\/[^/]+$/.test(url.pathname))
+    ) {
+      let raw = ''
+      req.on('data', (chunk) => { raw += chunk })
+      req.on('end', () => {
+        let body = {}
+        try { body = JSON.parse(raw || '{}') } catch { body = {} }
+        if (/video-asset\/advance$/.test(url.pathname)) {
+          const stage = typeof body.stage === 'string' ? body.stage : mockVideoAsset?.stage ?? 'uploaded'
+          const labels = {
+            uploaded: '受け付け', inspecting: '検査', converting: '変換',
+            packaging: '配信の形', thumbnail: '表紙', ready: '準備完了', failed: '失敗',
+          }
+          mockVideoAsset = mockVideoAsset
+            ? { ...mockVideoAsset, stage, stageLabel: labels[stage] ?? stage }
+            : {
+              id: 'video-asset-1', stage, stageLabel: labels[stage] ?? stage, provider: 'r2_hls',
+              durationSeconds: 0, errorCode: null, expiresAt: null, purgedAt: null,
+              createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+            }
+          res.writeHead(200).end(JSON.stringify({ success: true, data: { asset: mockVideoAsset } }))
+          return
+        }
+        const capacity = body.capacity === undefined || body.capacity === null
+          ? null
+          : Math.floor(Number(body.capacity))
+        mockSessionCapacity = Number.isInteger(capacity) && capacity >= 1 ? capacity : null
+        const startAt = Number(url.pathname.split('/').pop())
+        const reservedCount = 3
+        res.writeHead(200).end(JSON.stringify({
+          success: true,
+          data: {
+            session: {
+              sessionStartAt: startAt, capacity: mockSessionCapacity, reservedCount,
+              state: mockSessionCapacity !== null && reservedCount >= mockSessionCapacity ? 'full' : 'open',
+              remaining: mockSessionCapacity === null ? null : Math.max(0, mockSessionCapacity - reservedCount),
+            },
+          },
+        }))
+      })
       return
     }
     if (/^\/api\/(mileage\/(rules|rewards|adjustments)|action-scores\/rules)/.test(url.pathname)) {
@@ -4774,6 +4846,69 @@ const server = createServer((req, res) => {
         return
       }
       res.writeHead(200).end(JSON.stringify({ success: true }))
+      return
+    }
+    // K-1・O-1: 公開の進みと公開前の確認の見本（本物と同じ器）。
+    const richMenuProgress = /^\/api\/rich-menu-groups\/([^/]+)\/publish-progress$/.exec(url.pathname)
+    if (method === 'GET' && richMenuProgress) {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: {
+        run: { id: 'visual-qa-run', mode: 'publish', status: 'failed', startedAt: '2026-09-27T10:00:00+09:00', completedAt: '2026-09-27T10:01:00+09:00' },
+        steps: [
+          { key: 'image', label: '画像をLINEに上げる', status: 'done' },
+          { key: 'menu', label: 'メニューを作る', status: 'done' },
+          { key: 'assign', label: '友だちに割り当てる', status: 'failed' },
+          { key: 'cleanup', label: '前のメニューを片付ける', status: 'pending' },
+        ],
+        message: '割り当てに失敗したので、作ったメニューをLINEから消し、前のメニューのままにしました。もう一度公開できます。',
+      } }))
+      return
+    }
+    const richMenuPrecheck = /^\/api\/rich-menu-groups\/([^/]+)\/prepublish-check$/.exec(url.pathname)
+    if (method === 'GET' && richMenuPrecheck) {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: {
+        fingerprint: 'visual-qa-fp',
+        pageCount: 2,
+        maxPages: 10,
+        selfCheck: { ok: true, message: '自前の検査を通りました。' },
+        deviceConfirmed: false,
+        deviceConfirmedAt: null,
+        versionNumber: null,
+      } }))
+      return
+    }
+    const richMenuValidate = /^\/api\/rich-menu-groups\/([^/]+)\/validate$/.exec(url.pathname)
+    if (method === 'POST' && richMenuValidate) {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: {
+        checks: [
+          { key: 'self', ok: true, message: '自前の検査を通りました。' },
+          { key: 'line', ok: true, message: 'LINEの検査を通りました。' },
+        ],
+      } }))
+      return
+    }
+    const richMenuDevice = /^\/api\/rich-menu-groups\/([^/]+)\/device-confirm$/.exec(url.pathname)
+    if (method === 'POST' && richMenuDevice) {
+      res.writeHead(200).end(JSON.stringify({ success: true, data: {
+        confirmedAt: '2026-09-27T10:00:00+09:00', fingerprint: 'visual-qa-fp',
+      } }))
+      return
+    }
+    // K-2: 照合の見本。ずれの種類ごとの直し方（fix）つき。
+    const richMenuReconcile = /^\/api\/rich-menu-groups\/([^/]+)\/reconcile$/.exec(url.pathname)
+    if (method === 'POST' && richMenuReconcile) {
+      let raw = ''
+      req.on('data', (chunk) => { raw += chunk })
+      req.on('end', () => {
+        let dryRun = true
+        try { dryRun = JSON.parse(raw || '{}').dryRun !== false } catch { dryRun = true }
+        const diffs = [
+          { kind: 'external_only', detail: 'LINEにだけあるメニュー「別で作ったメニュー」（rm-external-1）があります', richMenuId: 'rm-external-1', fix: { label: 'こちらに取り込む', action: 'import-external' } },
+          { kind: 'default_mismatch', detail: 'LINEの全員既定がこのメニューを指していません（現在: rm-other-9）', richMenuId: 'rm-other-9', fix: { label: 'こちらに合わせる', action: 'relink-default' } },
+        ]
+        res.writeHead(200).end(JSON.stringify({ success: true, data: dryRun
+          ? { dryRun: true, diffs }
+          : { dryRun: false, diffs, applied: 1, failed: [], unapplied: [{ diff: diffs[0], reason: '取り込みは「外部メニューの取り込み」画面で運用者が行います' }], runId: 'visual-qa-reconcile-run' } }))
+      })
       return
     }
     const richMenuWriteAction = /^\/api\/rich-menu-groups\/([^/]+)\/(publish|unpublish|schedule|apply-to-tag)$/.exec(url.pathname)

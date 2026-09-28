@@ -400,10 +400,16 @@ describe('N-159: 有効な行き先ゼロの公開拒否', () => {
     });
     insertArea('p2', 'a2', { label: 'サイトを開く' });
 
+    // O: 実機で見た確認が無いと公開できない門番。先に押してから公開する。
+    const app = setupApp(db, r2);
+    const confirm = authed('/api/rich-menu-groups/g1/device-confirm', { method: 'POST' });
+    const confirmRes = await app.request(confirm.path, confirm.init);
+    expect(confirmRes.status).toBe(200);
+
     const { path, init } = authed('/api/rich-menu-groups/g1/publish', {
       method: 'POST', headers: { 'Idempotency-Key': 'label-boundary-20chars-0001' },
     });
-    const res = await setupApp(db, r2).request(path, init);
+    const res = await app.request(path, init);
 
     expect(res.status).toBe(200);
     expect(groupStatus('g1')).toBe('published');
@@ -474,10 +480,15 @@ describe('N-155: 読み上げラベルの必須化と20字上限', () => {
     insertPage('g1', 'p1', 0, true);
     insertArea('p1', 'a1', { label: 'あ'.repeat(20) });
 
+    // O: 実機で見た確認を先に済ませる。
+    const app = setupApp(db, r2);
+    const confirm = authed('/api/rich-menu-groups/g1/device-confirm', { method: 'POST' });
+    expect((await app.request(confirm.path, confirm.init)).status).toBe(200);
+
     const { path, init } = authed('/api/rich-menu-groups/g1/publish', {
       method: 'POST', headers: { 'Idempotency-Key': 'label-boundary-20chars-0001' },
     });
-    const res = await setupApp(db, r2).request(path, init);
+    const res = await app.request(path, init);
 
     expect(res.status).toBe(200);
     expect(groupStatus('g1')).toBe('published');

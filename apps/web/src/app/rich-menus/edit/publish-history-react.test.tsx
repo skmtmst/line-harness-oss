@@ -26,6 +26,8 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
       richMenuGroups: {
         ...actual.api.richMenuGroups,
         publishRuns: async () => net.publishRunsResult,
+        // K-2: 開いた時の照合は読むだけ。ずれなしで返す。
+        reconcile: async () => ({ success: true, data: { dryRun: true, diffs: [] } }),
       },
     },
   }

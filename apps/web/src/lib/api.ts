@@ -3838,7 +3838,11 @@ export type RichMenuAreaPayload = {
   boundsY: number
   boundsWidth: number
   boundsHeight: number
-  actionType: 'uri' | 'message' | 'postback' | 'richmenuswitch'
+  /**
+   * O: datetimepicker・clipboard も送れる（受け口が intent から DB へ落とす）。
+   * intent が真実で、actionType は容れ物。
+   */
+  actionType: 'uri' | 'message' | 'postback' | 'richmenuswitch' | 'datetimepicker' | 'clipboard'
   actionData: Record<string, unknown>
   intent?: RichMenuAreaIntent | null
   /** 管理用のボタン名。 */
@@ -7161,6 +7165,15 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ expectedContentRevision }),
       }),
+    /**
+     * P（公開前の試し）：試し合言葉を発行する。生の合言葉はこの応答でしか返らない。
+     * 有効期限は24時間。試しの回答は集計に入らず、回答後の動作も動かない。
+     */
+    issueTestToken: (id: string, accountId: string) =>
+      fetchApi<ApiResponse<{ token: string; expiresAt: string }>>(
+        `/api/forms/${id}/test-token?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'POST', body: JSON.stringify({}) },
+      ),
     deleteImpact: (id: string, accountId: string) =>
       fetchApi<ApiResponse<FormDeleteImpact>>(
         `/api/forms/${id}/delete-impact?account_id=${encodeURIComponent(accountId)}`,
@@ -12364,13 +12377,59 @@ export const api = {
     reconcile: (groupId: string, dryRun: boolean) =>
       fetchApi<ApiResponse<{
         dryRun: boolean;
-        diffs: Array<{ kind: string; detail: string; pageId?: string; richMenuId?: string }>;
+        diffs: Array<{
+          kind: string; detail: string; pageId?: string; richMenuId?: string;
+          /** K-2: ずれの種類ごとの直し方（1つ）。 */
+          fix: { label: string; action: string };
+        }>;
         applied?: number;
         failed?: Array<{ diff: { kind: string; detail: string }; error: string }>;
+        /** K-2: 自動で直さない分（取り込み候補）。運用者が画面で直す。 */
+        unapplied?: Array<{ diff: { kind: string; detail: string }; reason: string }>;
+        runId?: string;
       }>>(`/api/rich-menu-groups/${groupId}/reconcile`, {
         method: 'POST',
         body: JSON.stringify({ dryRun }),
       }),
+
+    /** K-1: 最新の公開実行の4段（画像・メニュー・割り当て・片付け）。 */
+    publishProgress: (groupId: string) =>
+      fetchApi<ApiResponse<{
+        run: {
+          id: string; mode: string; status: string;
+          startedAt: string; completedAt: string | null;
+        } | null;
+        steps: Array<{
+          key: string; label: string;
+          status: 'done' | 'failed' | 'running' | 'pending' | 'skipped';
+        }>;
+        message: string | null;
+      }>>(`/api/rich-menu-groups/${groupId}/publish-progress`),
+
+    /** O-1: 公開前の確認（自前検査・実機・版）。LINE検査は別口で通す。 */
+    prepublishCheck: (groupId: string) =>
+      fetchApi<ApiResponse<{
+        fingerprint: string;
+        pageCount: number;
+        maxPages: number;
+        selfCheck: { ok: boolean; message: string };
+        deviceConfirmed: boolean;
+        deviceConfirmedAt: string | null;
+        versionNumber: number | null;
+      }>>(`/api/rich-menu-groups/${groupId}/prepublish-check`),
+
+    /** O-1: 公開する形のままLINEの検査APIに通す。下書きもLINEも変えない。 */
+    validatePublish: (groupId: string) =>
+      fetchApi<ApiResponse<{
+        checks: Array<{ key: 'self' | 'line'; ok: boolean; message: string }>;
+      }>>(`/api/rich-menu-groups/${groupId}/validate`, { method: 'POST' }),
+
+    /** O-1: 実機で見た記録。今の下書きにひもづく。 */
+    confirmDevice: (groupId: string) =>
+      fetchApi<ApiResponse<{ confirmedAt: string; fingerprint: string }>>(
+        `/api/rich-menu-groups/${groupId}/device-confirm`,
+        { method: 'POST' },
+      ),
 
     /** N-154: メニュー全体を別IDの下書きとして複製する。 */
     duplicate: (groupId: string, idempotencyKey: string, input?: { name?: string }) =>
@@ -14692,14 +14751,39 @@ export type WebinarNotificationSettings = {
   startEnabled: boolean
   missedEnabled: boolean
   missedTime: string
+  /** 見逃し配信の期限（開催からの日数。1〜30、既定7）。N。 */
+  missedWindowDays: number
   completedEnabled: boolean
   updatedAt: string
 }
 
 export type WebinarNotificationSettingsInput = Omit<
   WebinarNotificationSettings,
-  'webinarId' | 'version' | 'updatedAt'
->
+  'webinarId' | 'version' | 'updatedAt' | 'missedWindowDays'
+> & {
+  missedWindowDays?: number
+}
+
+export type WebinarVideoAsset = {
+  id: string
+  stage: 'uploaded' | 'inspecting' | 'converting' | 'packaging' | 'thumbnail' | 'ready' | 'failed'
+  stageLabel: string
+  provider: string
+  durationSeconds: number
+  errorCode: string | null
+  expiresAt: string | null
+  purgedAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type WebinarSessionCapacity = {
+  sessionStartAt: number
+  capacity: number | null
+  reservedCount: number
+  state: 'open' | 'full' | 'closed'
+  remaining: number | null
+}
 
 export type WebinarSkipReasonCount = {
   /** 記録された理由の符号。古い行では null のことがある。 */
@@ -14789,6 +14873,18 @@ export type WebinarAnalytics = {
   dropoff: Array<{ bucketStart: number; viewers: number }>
   viewSegments?: Array<{ startSeconds: number; endSeconds: number; viewers: number }>
   measurement?: { state: 'available' | 'unavailable'; reason: string | null }
+  /** J-1「どこまで見られたか」の線と3つの数字の材料。 */
+  retention: {
+    bucketSeconds: number
+    started: number
+    points: Array<{ atSeconds: number; viewers: number }>
+  }
+  /** 有効な区間の合計30秒以上の人数。 */
+  startedViewers: number
+  /** 異常として除外した heartbeat の件数。 */
+  heartbeatRejects: number
+  /** 申し込みボタンが出た時刻（秒）。CTAが無ければ null。 */
+  ctaAtSeconds: number | null
   formFunnel: {
     ctaImpressions: number
     ctaClicks: number
@@ -15041,6 +15137,22 @@ export const webinarApi = {
       }),
     }),
   analytics: (id: string) => fetchApi<{ data: WebinarAnalytics }>(`/api/webinars/${id}/analytics`),
+  videoAsset: (id: string) => fetchApi<{ data: { asset: WebinarVideoAsset | null } }>(
+    `/api/webinars/${id}/video-asset`,
+  ),
+  advanceVideoAsset: (
+    id: string,
+    input: { stage: WebinarVideoAsset['stage']; errorCode?: string | null; durationSeconds?: number | null },
+  ) => fetchApi<{ data: { asset: WebinarVideoAsset } }>(`/api/webinars/${id}/video-asset/advance`, {
+    method: 'POST', body: JSON.stringify(input),
+  }),
+  webinarSession: (id: string, startAt: number) => fetchApi<{ data: { session: WebinarSessionCapacity | null } }>(
+    `/api/webinars/${id}/sessions/${startAt}`,
+  ),
+  setSessionCapacity: (id: string, startAt: number, capacity: number | null) =>
+    fetchApi<{ data: { session: WebinarSessionCapacity } }>(`/api/webinars/${id}/sessions/${startAt}`, {
+      method: 'PUT', body: JSON.stringify({ capacity }),
+    }),
   participants: (id: string, cursor?: string, limit?: number, filter?: WebinarParticipantClassification) => fetchApi<{ data: WebinarParticipantPage }>(
     `/api/webinars/${id}/participants${cursor || limit || filter ? `?${[
       cursor ? `cursor=${encodeURIComponent(cursor)}` : '',
