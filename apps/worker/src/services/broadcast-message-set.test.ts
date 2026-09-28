@@ -43,6 +43,21 @@ describe('一斉配信の複数吹き出し契約', () => {
       .toThrow('originalContentUrl');
   });
 
+  it('範囲外の緯度・経度を直し方で止める（監査 R210）', () => {
+    // 地図上に無い数字を完成扱いにすると、下書きに残って送られる。
+    const outOfRange = (latitude: string, longitude: string) => ({
+      type: 'location',
+      content: { state: { location: { title: '本店', address: '東京', latitude, longitude } } },
+    });
+    expect(() => parseBroadcastMessageParts({ messageType: 'text', messageContent: 'x', messageBubbles: [outOfRange('91', '139.7')] }))
+      .toThrow('緯度は-90〜90');
+    expect(() => parseBroadcastMessageParts({ messageType: 'text', messageContent: 'x', messageBubbles: [outOfRange('35.6', '181')] }))
+      .toThrow('経度は-180〜180');
+    // 境界値は通す。
+    const parts = parseBroadcastMessageParts({ messageType: 'text', messageContent: 'x', messageBubbles: [outOfRange('90', '-180')] });
+    expect(parts).toHaveLength(1);
+  });
+
   it('配信用素材4種類を画面と同じ変換でLINEの種別に直す', () => {
     // 画面の保存（1吹き出し）と複数吹き出しの解析が同じ変換を使う。
     // 中身の JSON が本文にならない（監査 R144）。
