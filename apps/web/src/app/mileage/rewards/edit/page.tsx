@@ -16,7 +16,7 @@ import StickyBar from '@/components/shared/sticky-bar'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { localDateTime, utcDateTime } from '@/lib/presentation'
-import { validateReward, type FormState } from './reward-form'
+import { LIMIT_FIELD_ERRORS, normalizeDigits, optionalInteger, validateReward, type FormState } from './reward-form'
 import {
   api,
   ApiError,
@@ -109,12 +109,15 @@ function isMileageRewardSummary(value: unknown): value is MileageRewardSummary {
     && (candidate.currentVersion === null || typeof candidate.currentVersion === 'object')
 }
 
-/** 空文字は `null`（限りなし・決めない）。**0 を null に潰さない。** */
+/*
+ * R298: 空欄だけが `null`（限りなし・決めない）。0 は潰さない。
+ * 数にならない入力は検証で止まるはずだが、万一ここへ来ても
+ * 「無制限」へ黙って潰さず失敗にする。
+ */
 function numberOrNull(value: string): number | null {
-  const trimmed = value.trim()
-  if (!trimmed) return null
-  const parsed = Number(trimmed)
-  return Number.isFinite(parsed) ? parsed : null
+  const parsed = optionalInteger(value)
+  if (parsed === undefined) throw new Error('数の限り・上限・日数の入力を確認してください')
+  return parsed
 }
 
 function draftOf(form: FormState): MileageRewardDraftInput {
@@ -400,11 +403,11 @@ function MileageRewardEditorInner() {
             **「限りなし」と「品切れ」を混ぜない。** 空欄は限りなし、0 は品切れ。
             同じ見た目にすると、出したつもりのものが誰にも交換できない。
           */}
-          <Field label="数の限り" htmlFor="reward-stock" note="空欄なら限りなし。0 と書くと品切れ（交換できません）">
-            <TextInput id="reward-stock" inputMode="numeric" value={form.stockLimit} onChange={(e) => set('stockLimit', e.target.value)} placeholder="限りなし" />
+          <Field label="数の限り" htmlFor="reward-stock" note="空欄なら限りなし。0 と書くと品切れ（交換できません）" error={touched && errors.includes(LIMIT_FIELD_ERRORS.stockLimit) ? LIMIT_FIELD_ERRORS.stockLimit : undefined}>
+            <TextInput id="reward-stock" inputMode="numeric" value={form.stockLimit} onChange={(e) => set('stockLimit', normalizeDigits(e.target.value))} placeholder="限りなし" />
           </Field>
-          <Field label="1人あたりの上限" htmlFor="reward-per-friend" note="空欄なら何回でも">
-            <TextInput id="reward-per-friend" inputMode="numeric" value={form.perFriendLimit} onChange={(e) => set('perFriendLimit', e.target.value)} placeholder="制限なし" />
+          <Field label="1人あたりの上限" htmlFor="reward-per-friend" note="空欄なら何回でも" error={touched && errors.includes(LIMIT_FIELD_ERRORS.perFriendLimit) ? LIMIT_FIELD_ERRORS.perFriendLimit : undefined}>
+            <TextInput id="reward-per-friend" inputMode="numeric" value={form.perFriendLimit} onChange={(e) => set('perFriendLimit', normalizeDigits(e.target.value))} placeholder="制限なし" />
           </Field>
           <Field label="交換できる期間" htmlFor="reward-starts" note="空欄ならいつでも" error={touched && errors.includes('交換終了は交換開始より後にしてください') ? '交換終了は交換開始より後にしてください' : undefined}>
             <div className="flex flex-wrap items-center gap-2">
@@ -413,8 +416,8 @@ function MileageRewardEditorInner() {
               <DateTimeField aria-label="交換終了" value={form.endsAt} onChange={(v) => set('endsAt', v)} />
             </div>
           </Field>
-          <Field label="交換後に使える日数" htmlFor="reward-expires" note="空欄なら期限なし">
-            <TextInput id="reward-expires" inputMode="numeric" value={form.benefitExpiresDays} onChange={(e) => set('benefitExpiresDays', e.target.value)} placeholder="期限なし" />
+          <Field label="交換後に使える日数" htmlFor="reward-expires" note="空欄なら期限なし" error={touched && errors.includes(LIMIT_FIELD_ERRORS.benefitExpiresDays) ? LIMIT_FIELD_ERRORS.benefitExpiresDays : undefined}>
+            <TextInput id="reward-expires" inputMode="numeric" value={form.benefitExpiresDays} onChange={(e) => set('benefitExpiresDays', normalizeDigits(e.target.value))} placeholder="期限なし" />
           </Field>
         </Card>
 

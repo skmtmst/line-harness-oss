@@ -170,6 +170,7 @@ describe('画面の一覧', () => {
       '/inflow-links/new',
       '/form-submissions/edit',
       '/mileage/earning-rules/new',
+      '/mileage/earning-rules/edit',
       '/automations/new',
       '/webhooks/new',
       '/booking/bookings/detail',

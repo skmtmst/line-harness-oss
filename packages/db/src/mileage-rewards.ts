@@ -229,6 +229,19 @@ function positiveInteger(value: unknown, label: string, optional = false): numbe
   return parsed;
 }
 
+/*
+ * 在庫だけは 0 が意味を持つ（品切れ）。空欄は無制限、0 は品切れ、
+ * 正の整数は上限。画面の案内と交換判定（0 なら常に在庫切れ）と揃える。
+ */
+function nonNegativeInteger(value: unknown, label: string): number | null {
+  if (value == null || value === '') return null;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    throw new MileageRewardError('invalid_number', `${label}は0以上の整数で入力してください`);
+  }
+  return parsed;
+}
+
 function optionalDate(value: unknown, label: string): string | null {
   if (value == null || value === '') return null;
   if (typeof value !== 'string' || Number.isNaN(new Date(value).getTime())) {
@@ -309,7 +322,7 @@ export function validateMileageRewardDraft(value: MileageRewardDraftInput): Requ
     imageUrl: optionalText(value.imageUrl, '画像URL', 2000),
     rewardKind,
     requiredMiles: positiveInteger(value.requiredMiles, '必要マイル')!,
-    stockLimit: positiveInteger(value.stockLimit, '在庫数', true),
+    stockLimit: nonNegativeInteger(value.stockLimit, '在庫数'),
     perFriendLimit: positiveInteger(value.perFriendLimit, '1人あたりの交換上限', true),
     startsAt,
     endsAt,

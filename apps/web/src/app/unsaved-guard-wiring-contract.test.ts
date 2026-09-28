@@ -27,6 +27,7 @@ const GUARDED = [
   'app/form-submissions/edit/page.tsx',
   'app/friend-add-settings/friend-add-rule-editor.tsx',
   'app/inflow-links/new/page.tsx',
+  'app/mileage/earning-rules/edit/page.tsx',
   'app/mileage/page.tsx',
   'app/nen-campaigns/columns/new/page.tsx',
   'app/nen-campaigns/edit/campaign-editor.tsx',
