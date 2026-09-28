@@ -13132,6 +13132,11 @@ export const api = {
         total: number
         page: number
         limit: number
+        summary: {
+          sentLast30Days: number
+          pendingLast30Days: number
+          failedLast30Days: number
+        }
         sort: Array<{ field: string; direction: 'asc' | 'desc' }>
       }>>(`/api/ad-platforms/logs?${query.toString()}`)
     },
