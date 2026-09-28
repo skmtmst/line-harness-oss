@@ -73,7 +73,9 @@ function QuestionTemplatePageInner() {
   const [folders, setFolders] = useState<Folder[]>([])
   // 編集時はテンプレートが属するアカウント。選択中と食い違うことがある（N-147）。
   const [templateAccountId, setTemplateAccountId] = useState<string | null>(null)
-  const [question, setQuestion] = useState<ScenarioQuestion>(() => emptyQuestion())
+  /* 作りたての姿を「保存済み」とする。emptyQuestion() は呼ぶたびに違う鍵を振るため、別々に呼ぶと作りたてなのに未保存になる。 */
+  const [initialQuestion] = useState<ScenarioQuestion>(() => emptyQuestion())
+  const [question, setQuestion] = useState<ScenarioQuestion>(initialQuestion)
   const [usageCount, setUsageCount] = useState(0)
   const [loading, setLoading] = useState(Boolean(id))
   const [saving, setSaving] = useState(false)
@@ -150,7 +152,7 @@ function QuestionTemplatePageInner() {
     name: '',
     category: '未分類',
     folderId: null as string | null,
-    question: emptyQuestion(),
+    question: initialQuestion,
   }))
   const dirty = snapshotOf({ name, category, folderId, question }) !== savedSnapshot
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
