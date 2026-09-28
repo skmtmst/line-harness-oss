@@ -7813,6 +7813,8 @@ export const api = {
           deliveryAtLabel: string
           messageType: string
           messageContent: string
+          /** 下書きの通は送られない（R212）。 */
+          isDraft?: boolean
         }>
       }>>(`/api/scenarios/${id}/preview${q}`, { signal })
     },
