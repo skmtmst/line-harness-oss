@@ -11,7 +11,7 @@ import Pagination from '@/components/shared/pagination'
 import Select from '@/components/shared/select'
 import KpiCard from '@/components/shared/kpi-card'
 import { DataTable, NameCell, Td, Th, Tr } from '@/components/shared/table'
-import { api, type MileageAdminHistory, type MileageAdminHistoryItem, type MileageHistoryItem } from '@/lib/api'
+import { ApiError, api, type MileageAdminHistory, type MileageAdminHistoryItem, type MileageHistoryItem } from '@/lib/api'
 import { csvCell } from '@/lib/presentation'
 import {
   formatMileageChange,
@@ -21,6 +21,7 @@ import {
   mileageSourceNoteText,
   mileageStatusLabel,
 } from './mileage-display'
+import { validateHistoryPeriod } from './mileage-history-period'
 import { mileagePaginationTotal } from './mileage-response-state'
 
 const PAGE_SIZE = 50
@@ -57,6 +58,11 @@ export default function MileageHistoryTab({ accountId, canOperate = false }: { a
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
+  /*
+   * R304: 口が入力ミスを 400 で返してきたときの理由。通信障害の文とは分け、
+   * 日付の欄のそばへ出す。利用者が直す場所が分かるようにする。
+   */
+  const [inputRejected, setInputRejected] = useState<string | null>(null)
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -66,10 +72,24 @@ export default function MileageHistoryTab({ accountId, canOperate = false }: { a
     return () => window.clearTimeout(timer)
   }, [searchInput])
 
+  /*
+   * R304: 開始日が終了日より後のときは取りに行かず、日付エラーの表示に任せる。
+   * 取得失敗の文で再読み込みを促すと、直しようのない再読み込みを繰り返す。
+   */
+  const periodError = validateHistoryPeriod(from, to)
+
   const load = useCallback(async () => {
     const request = ++requestRef.current
     setLoading(true)
     setError(false)
+    setInputRejected(null)
+    if (validateHistoryPeriod(from, to)) {
+      if (request === requestRef.current) {
+        setResult(null)
+        setLoading(false)
+      }
+      return
+    }
     try {
       const response = await api.mileage.history({
         accountId,
@@ -85,10 +105,15 @@ export default function MileageHistoryTab({ accountId, canOperate = false }: { a
       if (request !== requestRef.current) return
       if (!response.success) throw new Error(response.error)
       setResult(response.data)
-    } catch {
+    } catch (caught) {
       if (request !== requestRef.current) return
       setResult(null)
-      setError(true)
+      // R304: 口の入力エラー（400）は通信障害と分け、日付の欄のそばへ出す。
+      if (caught instanceof ApiError && caught.status === 400) {
+        setInputRejected('入力した条件を確認してください。開始日は終了日より前の日付を入力してください。')
+      } else {
+        setError(true)
+      }
     } finally {
       if (request === requestRef.current) setLoading(false)
     }
@@ -160,7 +185,7 @@ export default function MileageHistoryTab({ accountId, canOperate = false }: { a
   return (
     <section aria-label="マイルの履歴" data-design-node="MvZm5" className="space-y-4">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <KpiCard variant="v6" title="この期間の記録" value={total} unit="件" detail={periodSummary ? `付いた ${grantedCount.toLocaleString('ja-JP')}・使った ${spentCount.toLocaleString('ja-JP')}` : '内訳を取得できませんでした'} />
+        <KpiCard variant="v6" title="この期間の記録" value={total} unit="件" detail={periodSummary ? `付いた ${grantedCount.toLocaleString('ja-JP')}・使った ${spentCount.toLocaleString('ja-JP')}` : (periodError ?? inputRejected) ? '' : '内訳を取得できませんでした'} />
         <KpiCard variant="v6" title="手で動かした分" value={periodSummary?.manualCount ?? null} unit="件" detail="" help="担当者が直接増減したものです" />
         <KpiCard variant="v6" title="取り消し" value={periodSummary ? reversalCount : null} unit="件" detail="" help="予約取消などに伴うものです" />
         <KpiCard variant="v6" title="反映を待っている" value={periodSummary?.pendingCount ?? null} unit="件" detail="確定条件を待っている記録" />
@@ -222,13 +247,16 @@ export default function MileageHistoryTab({ accountId, canOperate = false }: { a
           />
           <span className="grid w-48 gap-1 text-xs font-semibold text-ink-secondary">
             開始日
-            <DateField aria-label="開始日" value={from} onChange={(v) => resetFilter(() => setFrom(v))} />
+            <DateField aria-label="開始日" value={from} invalid={Boolean(periodError ?? inputRejected)} onChange={(v) => resetFilter(() => setFrom(v))} />
           </span>
           <span className="grid w-48 gap-1 text-xs font-semibold text-ink-secondary">
             終了日
-            <DateField aria-label="終了日" value={to} onChange={(v) => resetFilter(() => setTo(v))} />
+            <DateField aria-label="終了日" value={to} invalid={Boolean(periodError ?? inputRejected)} onChange={(v) => resetFilter(() => setTo(v))} />
           </span>
         </div>
+        {(periodError ?? inputRejected) ? (
+          <p role="alert" className="mt-3 text-xs text-danger">{periodError ?? inputRejected}</p>
+        ) : null}
       </div>
 
       <div className="overflow-hidden rounded-card border border-hairline bg-canvas">
@@ -239,6 +267,12 @@ export default function MileageHistoryTab({ accountId, canOperate = false }: { a
 
         {loading ? (
           <ListState kind="loading" />
+        ) : (periodError ?? inputRejected) ? (
+          <ListState
+            kind="empty"
+            title="日付の条件を確認してください"
+            description="開始日は終了日より前の日付を入力してください。直すと履歴を表示できます。"
+          />
         ) : error ? (
           <ListState
             kind="error"
