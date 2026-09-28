@@ -440,6 +440,8 @@
     "487_mileage_adjustment_approval_events.sql",
     "488_incoming_webhook_secret_grace.sql",
     "489_incoming_webhook_ambiguous_hold.sql",
+    "490_menu_versions.sql",
+    "491_booking_menu_snapshot.sql",
     "494_session_step_up_and_unfamiliar.sql",
     "495_session_familiarity_ip_index.sql",
     "496_operation_health_check_keys.sql",

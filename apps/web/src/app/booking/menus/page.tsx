@@ -31,6 +31,7 @@ import { Suspense } from 'react'
 import { useMergedTab } from '@/components/layout/merged-tabs'
 import BookingStaffPage from '@/app/booking/staff/page'
 import ListRange from '@/components/ui/list-range'
+import MenuVersionHistory from './menu-version-history'
 import { bookingMenuError } from './menu-validation'
 import { bookingWindowEnd, businessHourSummary, minutesBeforeLabel } from '../lib/format-time'
 import { formatHoursBeforeHint, formatMinutesLengthHint } from '@/lib/format-duration'
@@ -95,6 +96,7 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
   const [settings, setSettings] = useState<BookingSettings | null>(null)
   const [settingsError, setSettingsError] = useState<string | null>(null)
   const [editing, setEditing] = useState<BookingMenu | null>(null)
+  const [historyTarget, setHistoryTarget] = useState<BookingMenu | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   // copy 状態は menu.id 単位で持つ。複数メニューを連続でコピーしたとき
@@ -192,6 +194,7 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
   useEffect(() => {
     // 切替前accountの編集窓を、新しいaccount上へ残さない。
     setEditing(null)
+    setHistoryTarget(null)
   }, [selectedAccountId])
 
   useEffect(() => {
@@ -505,7 +508,13 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
                       <RowActions
                         subjectName={m.name}
                         detail={{ label: '中身を見る', onClick: () => setEditing(m) }}
-                        menuItems={canEditMenus ? [
+                        menuItems={[
+                          {
+                            id: 'history',
+                            label: '版の履歴',
+                            onSelect: () => setHistoryTarget(m),
+                          },
+                          ...(canEditMenus ? [
                           {
                             id: 'move-up',
                             label: '上へ',
@@ -526,7 +535,7 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
                             dividerBefore: true,
                             onSelect: () => setVisibilityTarget(m),
                           },
-                        ] : []}
+                          ] : [])]}
                       />
                     </ActionCell>
                   </Tr>
@@ -541,6 +550,25 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
         <Pagination page={page} pageCount={pageCount} onPageChange={setPage} ariaLabel="予約メニューのページ送り" />
       </div>
       </>}
+
+      {historyTarget && selectedAccountId && (
+        <MenuVersionHistory
+          menuId={historyTarget.id}
+          menuName={historyTarget.name}
+          currentVersion={historyTarget.version ?? 1}
+          accountId={selectedAccountId}
+          canRevert={canEditMenus}
+          onReverted={(version) => {
+            setItems((current) => current.map((item) => item.id === historyTarget.id
+              ? { ...item, version }
+              : item))
+            setHistoryTarget((current) => current && current.id === historyTarget.id
+              ? { ...current, version }
+              : current)
+          }}
+          onClose={() => setHistoryTarget(null)}
+        />
+      )}
 
       {editing && (
         <EditMenuModal
