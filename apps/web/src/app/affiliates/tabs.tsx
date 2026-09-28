@@ -2719,10 +2719,13 @@ export function OffersTab() {
           detail={confirmedDetail(confirmedState, topOffer ? `${topOffer.name}・確定 ${formatYen(offerStats.get(topOffer.id)?.reward ?? 0)}${confirmedTruncated ? '（直近5000件まで）' : ''}` : '成果はまだありません')}
         />
         <KpiCard
-          title="1件あたりの平均報酬"
+          title="平均報酬額"
           value={averageReward}
           unit="円"
           detail={`いちばん高い案件 ${formatYen(Math.max(0, ...rewardValues))}`}
+          /* m22d: 「1件あたり」は単位の意味なので見出しの「？」へ移し、
+             件数は「紹介できる案件」と「動きが未設定の案件」の2か所だけにする。 */
+          help="成果1件あたりの平均です"
         />
         <KpiCard
           title="動きが未設定の案件"

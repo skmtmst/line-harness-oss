@@ -589,7 +589,8 @@ export default function NewConversionPointPage() {
         note="ここを間違えると、売上を重ねて数えることがあります。"
       >
         <div className="grid gap-2 sm:grid-cols-3">
-          <ChoiceCard selected={deduplicationMode === 'every'} title="何回でも数える" note="買うたびに1件。売上を追うときに使います" onClick={() => setDeduplicationMode('every')} />
+          {/* m22d: 「1件」は試算の「1件あたり」に集約し、ここでは書かない。 */}
+          <ChoiceCard selected={deduplicationMode === 'every'} title="何回でも数える" note="買うたびに数えます。売上を追うときに使います" onClick={() => setDeduplicationMode('every')} />
           <ChoiceCard selected={deduplicationMode === 'once_per_friend'} title="1人1回だけ" note="はじめての人だけを数えます" onClick={() => setDeduplicationMode('once_per_friend')} />
           <ChoiceCard selected={deduplicationMode === 'window'} title="30日に1回まで" note="短い間にくり返し起きるものに使います" onClick={() => setDeduplicationMode('window')} />
         </div>
@@ -616,7 +617,8 @@ export default function NewConversionPointPage() {
               </p>
             ) : null}
           </Field>
-          <Field label="決まった金額（円）" htmlFor="cv-value" help="1件ごとの金額です。">
+          {/* m22d: 「1件」は試算の「1件あたり」に集約し、ここでは書かない。 */}
+          <Field label="決まった金額（円）" htmlFor="cv-value" help="成果ごとの金額です。">
             <input
               id="cv-value"
               type="number"

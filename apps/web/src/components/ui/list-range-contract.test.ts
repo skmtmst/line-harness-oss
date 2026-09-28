@@ -12,10 +12,16 @@ import { describe, expect, it } from 'vitest'
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8')
 
-/** 件数表示を ListRange へ寄せた一覧画面・部品。 */
+/**
+ * 件数表示を ListRange へ寄せた一覧画面・部品。
+ *
+ * m22d: 「友だち追加時の配信 一覧」と「保留中の受信カード」は外す。
+ * 件数は「数字のカード」の1か所に集約し、一覧の下では繰り返さない
+ * （同じ「4件」「5件」が3〜4回出るため）。#667 の統一より
+ * 「1画面に1か所」のほうが上（オーナー方針 2026-09-25）。
+ */
 const LIST_RANGE_USERS: Array<[string, string]> = [
   ['../../app/friends/page.tsx を使う友だち一覧', '../friends/friend-list-table.tsx'],
-  ['友だち追加時の配信 一覧', '../../app/friend-add-settings/page.tsx'],
   ['友だち追加時の配信 実行結果', '../../app/friend-add-settings/runs/page.tsx'],
   ['リッチメニュー', '../../app/rich-menus/page.tsx'],
   ['回答フォーム 一覧', '../../app/form-submissions/page.tsx'],
@@ -35,7 +41,6 @@ const LIST_RANGE_USERS: Array<[string, string]> = [
   ['友だち詳細 回答一覧', '../../app/friends/detail/page.tsx'],
   ['Webhook のやり取り', '../../app/webhooks/webhook-interactions.tsx'],
   ['受信一覧（旧inbox部品）', '../inbox/inbox-list.tsx'],
-  ['保留中の受信カード', '../support/pending-inbox-card.tsx'],
   ['タグ一覧', '../friend-attributes-v2/tag-list-v2.tsx'],
   ['スタッフの操作記録', '../staff/login-audit.tsx'],
 ]
