@@ -1,9 +1,11 @@
 'use client'
 
-import { Suspense, useEffect, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import EventForm from '@/components/events/event-form'
+import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Notice from '@/components/shared/notice'
 import TargetMissing from '@/components/shared/target-missing'
 import { useAccount } from '@/contexts/account-context'
@@ -11,6 +13,7 @@ import {
   eventsApi,
   type EventBookingSummary,
   type EventDetail,
+  type EventLifecycleStatus,
   type EventSlot,
 } from '@/lib/api'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -86,21 +89,36 @@ function BookingStatus({ accountId, eventId }: { accountId: string; eventId: str
         <h2 className="text-ink text-sm font-bold">申込の状況</h2>
         {event && (() => {
           /*
-           * R81: 公開済みでも今後の枠が無ければ「終了」。
-           * 枠が読めていないときは断定せず、旧来どおり受付中と出す。
+           * U: 保存する状態を出す。R81: 公開中でも今後の枠が無ければ
+           * 「終了」。枠が読めていないときは断定せず、公開中と出す。
            */
           const nowMs = Date.now()
           const hasFuture = slots === null
             ? null
             : slots.some((s) => s.is_active === 1 && Date.parse(s.starts_at) >= nowMs)
-          if (!event.is_published) {
+          const lifecycle = event.lifecycle_status ?? (event.is_published === 1 ? 'published' : 'draft')
+          if (lifecycle === 'draft') {
             return (
               <span className="rounded-pill bg-canvas-sunken text-ink-faint px-2 py-0.5 text-nano font-medium">
                 下書き
               </span>
             )
           }
-          if (hasFuture === false) {
+          if (lifecycle === 'paused') {
+            return (
+              <span className="rounded-pill bg-warning-bg text-warning px-2 py-0.5 text-nano font-medium">
+                一時停止
+              </span>
+            )
+          }
+          if (lifecycle === 'cancelled') {
+            return (
+              <span className="rounded-pill bg-canvas-sunken text-ink-faint px-2 py-0.5 text-nano font-medium">
+                中止
+              </span>
+            )
+          }
+          if (lifecycle === 'ended' || hasFuture === false) {
             return (
               <span className="rounded-pill bg-canvas-sunken text-ink-faint px-2 py-0.5 text-nano font-medium">
                 終了
@@ -109,7 +127,7 @@ function BookingStatus({ accountId, eventId }: { accountId: string; eventId: str
           }
           return (
             <span className="rounded-pill bg-success-bg text-success px-2 py-0.5 text-nano font-medium">
-              受付中
+              公開中
             </span>
           )
         })()}
@@ -131,6 +149,142 @@ function BookingStatus({ accountId, eventId }: { accountId: string; eventId: str
         ))}
       </div>
     </div>
+  )
+}
+
+/**
+ * U: 状態の切替（下書き・公開中・一時停止・終了・中止）。
+ * 今の状態から進める先だけを出し、一時停止と中止は理由を聞く。
+ * 理由は変更の記録に残る。
+ */
+const NEXT_LIFECYCLE: Record<EventLifecycleStatus, Array<{ to: EventLifecycleStatus; label: string; needsReason: boolean }>> = {
+  draft: [{ to: 'published', label: '公開する', needsReason: false }],
+  published: [
+    { to: 'paused', label: '一時停止する', needsReason: true },
+    { to: 'ended', label: '終了する', needsReason: false },
+    { to: 'cancelled', label: '中止する', needsReason: true },
+  ],
+  paused: [
+    { to: 'published', label: '再開する', needsReason: false },
+    { to: 'ended', label: '終了する', needsReason: false },
+    { to: 'cancelled', label: '中止する', needsReason: true },
+  ],
+  ended: [],
+  cancelled: [],
+}
+
+function LifecycleSection({ accountId, eventId }: { accountId: string; eventId: string }) {
+  const [lifecycle, setLifecycle] = useState<EventLifecycleStatus | null>(null)
+  const [pending, setPending] = useState<{ to: EventLifecycleStatus; label: string; needsReason: boolean } | null>(null)
+  const [reason, setReason] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const idempotencyKeyRef = useRef(crypto.randomUUID())
+
+  useEffect(() => {
+    let cancelled = false
+    void eventsApi.getEvent(accountId, eventId).then(
+      (detail) => {
+        if (cancelled) return
+        setLifecycle(detail.lifecycle_status ?? (detail.is_published === 1 ? 'published' : 'draft'))
+      },
+      () => {
+        if (!cancelled) setLifecycle(null)
+      },
+    )
+    return () => {
+      cancelled = true
+    }
+  }, [accountId, eventId])
+
+  const runSwitch = async () => {
+    if (!pending || busy) return
+    const trimmed = reason.trim()
+    if (pending.needsReason && trimmed === '') return
+    setBusy(true)
+    setError('')
+    try {
+      const result = await eventsApi.setEventLifecycle(accountId, eventId, {
+        to: pending.to,
+        reason: trimmed === '' ? undefined : trimmed,
+        idempotency_key: idempotencyKeyRef.current,
+      })
+      idempotencyKeyRef.current = crypto.randomUUID()
+      setLifecycle(result.lifecycle_status)
+      setPending(null)
+      setReason('')
+    } catch (err) {
+      const code = (err as { body?: { error?: string } }).body?.error
+      setError(
+        code === 'lifecycle_transition_invalid'
+          ? 'いまの状態からは変えられません。開き直して最新の状態で、もう一度お試しください。'
+          : '変えられませんでした。時間をおいて、もう一度お試しください。',
+      )
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const options = lifecycle ? NEXT_LIFECYCLE[lifecycle] : []
+  return (
+    <section className="bg-canvas rounded-card border-hairline border p-4" aria-label="公開の状態">
+      <div className="flex flex-wrap items-center gap-2">
+        <h2 className="text-ink text-sm font-bold">公開の状態</h2>
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          {options.map((option) => (
+            <Button
+              key={option.to}
+              variant="secondary"
+              onClick={() => {
+                setReason('')
+                setError('')
+                setPending(option)
+              }}
+            >
+              {option.label}
+            </Button>
+          ))}
+        </div>
+      </div>
+      {lifecycle === null && (
+        <p className="text-ink-faint mt-2 text-xs">状態を読み込んでいます…</p>
+      )}
+      <ConfirmDialog
+        open={pending !== null}
+        title={`このイベントを${pending?.label ?? '変える'}？`}
+        description={
+          pending?.to === 'cancelled'
+            ? '中止にすると申込の受付は止まり、申込の履歴は残ります。元に戻すことはできません。'
+            : pending?.to === 'paused'
+              ? '一時停止中はお客様の画面から申込ができなくなります。申込の履歴は残ります。'
+              : '状態を変えます。'
+        }
+        confirmLabel={pending?.label ?? '変える'}
+        cancelLabel="やめる"
+        busy={busy}
+        error={error}
+        onConfirm={() => void runSwitch()}
+        onCancel={() => {
+          if (busy) return
+          setPending(null)
+          setReason('')
+          setError('')
+        }}
+      >
+        {pending?.needsReason && (
+          <label className="block">
+            <span className="text-ink-faint text-xs">理由（必須・変更の記録に残ります）</span>
+            <textarea
+              value={reason}
+              onChange={(event) => setReason(event.target.value)}
+              rows={2}
+              placeholder="例：台風のため今週の受付を止めます"
+              className="border-hairline rounded-control mt-1 w-full border px-3 py-2 text-sm"
+            />
+          </label>
+        )}
+      </ConfirmDialog>
+    </section>
   )
 }
 
@@ -162,12 +316,17 @@ function EditEventInner() {
           <span className="mx-1.5">/</span>
           <span>編集</span>
         </nav>
-        <Link
-          href={`/events/bookings?id=${id}`}
-          className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
-        >
-          申込の一覧を見る
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button href={`/events/change-review?id=${id}`} variant="secondary">
+            変更の影響を確認
+          </Button>
+          <Button href={`/events/preview?id=${id}`} variant="secondary">
+            お客様表示を確認
+          </Button>
+          <Button href={`/events/bookings?id=${id}`} variant="secondary">
+            申込の一覧を見る
+          </Button>
+        </div>
       </div>
 
       {!selectedAccountId ? (
@@ -177,6 +336,7 @@ function EditEventInner() {
       ) : (
         <>
           <BookingStatus accountId={selectedAccountId} eventId={id} />
+          <LifecycleSection accountId={selectedAccountId} eventId={id} />
           <div data-design="Body">
             <EventForm accountId={selectedAccountId} eventId={id} />
           </div>

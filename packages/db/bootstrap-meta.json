@@ -448,6 +448,8 @@
     "489_incoming_webhook_ambiguous_hold.sql",
     "490_menu_versions.sql",
     "491_booking_menu_snapshot.sql",
+    "492_event_lifecycle_status.sql",
+    "493_event_change_logs.sql",
     "494_session_step_up_and_unfamiliar.sql",
     "495_session_familiarity_ip_index.sql",
     "496_operation_health_check_keys.sql",
@@ -464,5 +466,5 @@
     "509_rich_menu_publish_runs.sql",
     "510_rich_menu_publish_run_pages.sql"
   ],
-  "migrationCount": 463
+  "migrationCount": 465
 }

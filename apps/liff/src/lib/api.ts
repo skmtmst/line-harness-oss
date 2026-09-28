@@ -284,6 +284,17 @@ export const api = {
     get<{ items: EventBookingMine[] }>(`/api/liff/events/me?tab=${tab}`),
   cancelMyEventBooking: (bookingId: string) =>
     post<{ ok: true }>(`/api/liff/events/me/${bookingId}/cancel`, {}),
+  /**
+   * U-3: 自分の申込の開催回変更。新しい席を確保できた時だけ元の申込を
+   * 取り消す、まとめて1つの操作。Idempotency-Key は呼び出し側が
+   * 1操作ぶん安定した鍵を使い回す。
+   */
+  changeMyEventBooking: (bookingId: string, toSlotId: string, idempotencyKey: string) =>
+    post<{ id: string; status: string }>(
+      `/api/events/liff/bookings/${bookingId}/change`,
+      { to_slot_id: toSlotId },
+      { 'Idempotency-Key': idempotencyKey },
+    ),
   acceptEventWaitlistOffer: (token: string) =>
     post<{
       success: true;
