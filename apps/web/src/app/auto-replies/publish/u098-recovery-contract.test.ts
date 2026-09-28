@@ -30,7 +30,9 @@ describe('再読み込みだけにしない（#975 U098）', () => {
   it('追加設定の実施詳細は、対象未指定・アカウント未選択・失敗で履歴へ戻れる', () => {
     expect(RUN_DETAIL).toContain('見る実行詳細が指定されていません')
     expect(RUN_DETAIL).toContain('LINEアカウントを選んでください')
-    expect(RUN_DETAIL).toContain('backHref="/friend-add-settings/runs"')
+    // R268: 戻り先は一覧から受け取った絞り込み・ページ位置を残す listHref。
+    // 条件なしのとき listHref は '/friend-add-settings/runs' に落ちる。
+    expect(RUN_DETAIL).toContain('backHref={listHref}')
     expect(RUN_DETAIL).toContain('実行履歴の一覧へ戻る')
     expect(RUN_DETAIL).toContain('もう一度読み込む')
     expect(RUN_DETAIL).toContain('対象の記録が見つかりません')

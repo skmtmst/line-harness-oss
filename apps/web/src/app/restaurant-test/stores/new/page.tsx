@@ -11,6 +11,7 @@ import TermsConsent from './terms-consent'
 import { initialWizardStep, STEP } from './terms-state'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import StickyBar from '@/components/shared/sticky-bar'
 
@@ -235,7 +236,7 @@ export default function NewRestaurantStorePage() {
               <p className="font-semibold text-ink">まずはLINE公式アカウントの登録を行いましょう。</p>
               <p className="mt-2">LINE公式アカウントをお持ちでない方は、LINE for Businessから無料で店舗専用のアカウントを開設してください。作成後、この画面へ戻ってチェックを入れます。</p>
             </div>
-            <label className="flex cursor-pointer items-start gap-3 rounded-control border border-hairline px-4 py-3 text-sm font-semibold text-ink"><input type="checkbox" checked={officialAccountReady} onChange={(event) => setOfficialAccountReady(event.target.checked)} className="mt-0.5 h-4 w-4 accent-accent" />LINE公式アカウントを作成済みです</label>
+            <Checkbox checked={officialAccountReady} onCheckedChange={setOfficialAccountReady} className="rounded-control border border-hairline px-4 py-3">LINE公式アカウントを作成済みです</Checkbox>
             <StickyBar actions={<><button type="button" onClick={() => setStep(STEP.BASICS)} className="rounded-control border border-hairline px-4 py-2.5 text-sm font-semibold text-ink">戻る</button><button type="button" disabled={!officialAccountReady} onClick={() => setStep(STEP.CREDENTIALS)} className="rounded-control bg-accent-deep px-5 py-2.5 text-sm font-semibold text-on-accent disabled:cursor-not-allowed disabled:opacity-40">次へ</button></>} />
           </div>}
 

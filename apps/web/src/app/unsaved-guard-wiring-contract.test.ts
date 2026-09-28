@@ -39,6 +39,7 @@ const GUARDED = [
   'app/reminders/edit/issue469-reminder-screens.tsx',
   'app/reminders/new/page.tsx',
   'app/restaurant-test/google/google-business.tsx',
+  'app/restaurant-test/google/google-posts.tsx',
   'app/restaurant-test/google/google-profile.tsx',
   'app/restaurant-test/stores/new/page.tsx',
   'app/rich-menus/edit/page.tsx',
@@ -141,8 +142,6 @@ const EDITOR_MIN_INPUTS = 3
 const UNTRIAGED: Record<string, string> = {
   'app/affiliate-offers/new/page.tsx':
     's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
-  'app/affiliates/action-dialogs.tsx':
-    's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'app/affiliates/tabs.tsx':
     's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'app/analytics/page.tsx':
@@ -189,8 +188,6 @@ const UNTRIAGED: Record<string, string> = {
   'app/mileage/earning-rules/new/page.tsx':
     's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'app/mileage/rewards/edit/page.tsx':
-    's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
-  'app/nen-members/page.tsx':
     's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'app/nen/pets/pet-editor.tsx':
     's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',

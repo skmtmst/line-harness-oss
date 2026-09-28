@@ -20,7 +20,8 @@ const UTILS = readFileSync(join(HERE, '..', '..', 'components', 'friends', 'save
 describe('FRIEND-01 対象の選択を1か所の明示的な4値にする', () => {
   it('表示中/非表示のみ/ブロックした人/すべてのラジオを1グループで出す', () => {
     expect(UTILS).toContain("export type FriendVisibilityChoice = 'visible' | 'hidden' | 'blocked' | 'all'")
-    expect(DIALOG).toContain('role="radiogroup"')
+    // m21u: 素の選択群を共通の RadioCardGroup（fieldset＋legend）へ置き換えた。
+    expect(DIALOG).toContain('legend="表示する友だち"')
     for (const label of ['表示中', '非表示のみ', 'ブロックした人', 'すべて']) {
       expect(DIALOG).toContain(`label: '${label}'`)
     }

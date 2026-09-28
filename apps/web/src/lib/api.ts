@@ -5533,11 +5533,16 @@ export type FriendAddRunList = {
   total: number
   nextCursor: string | null
   summary: {
-    totalRuns: number
+    /** 直近28日に追加された人数（同じ人の再追加は1人）。 */
+    recentFriends: number
+    /** 直近28日の追加記録の件数（同じ人の再追加も数える）。 */
+    recentEvents: number
     cumulativeDeliveries: number
     scenarioStarts: number
     averageSendTimeMs: number | null
     failed: number
+    /** 実際に送った記録の最新日時。1件も送っていなければ null。 */
+    lastDeliveryAt: string | null
     staffHandoffs: { value: number | null; state: 'available' | 'unavailable'; reason: string | null }
   }
 }
@@ -7786,6 +7791,14 @@ export const api = {
       }),
     delete: (id: string) =>
       fetchApi<ApiResponse<null>>(`/api/scenarios/${id}`, { method: 'DELETE' }),
+    /**
+     * R250: このシナリオを終了後の移動先にしているシナリオの一覧。
+     * 削除の確認窓で「どのシナリオの設定が変わるか」を見せる。
+     */
+    moveReferrers: (id: string) =>
+      fetchApi<ApiResponse<{ items: Array<{ id: string; name: string }>; total: number }>>(
+        `/api/scenarios/${id}/move-referrers`,
+      ),
     addStep: (
       id: string,
       data: {

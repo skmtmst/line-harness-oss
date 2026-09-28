@@ -84,8 +84,9 @@ describe('CSVで書き出す（R159）', () => {
 
     await act(async () => { root.render(<OpsAuditPage />) })
     await flush()
-    // 範囲が画面に出る（表示中の件数ではなく全件数）
-    expect(host.textContent).toContain('いまの条件の全120件')
+    // 範囲が画面に出る（一覧の件数の1か所。見出しの横では繰り返さない m22d）
+    expect(host.textContent).toContain('120件中 1〜50件を表示')
+    expect(host.textContent).not.toContain('いまの条件の全')
 
     const csvButton = Array.from(document.querySelectorAll('button')).find((b) => b.textContent?.includes('CSVで書き出す'))!
     await act(async () => { csvButton.click() })

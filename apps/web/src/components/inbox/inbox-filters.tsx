@@ -1,5 +1,6 @@
 'use client'
 
+import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 
 interface AccountOption {
@@ -31,14 +32,10 @@ export default function InboxFilters({
         placeholder="名前で検索"
         className="min-w-[240px] flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm"
       />
-      <label className="flex items-center gap-2 text-sm text-gray-700">
-        <input
-          type="checkbox"
-          checked={overdueOnly}
-          onChange={(e) => onChange({ overdueOnly: e.target.checked })}
-        />
-        1時間以上のみ
-      </label>
+      <Checkbox
+        checked={overdueOnly}
+        onCheckedChange={(checked) => onChange({ overdueOnly: checked })}
+      >1時間以上のみ</Checkbox>
       <Select
         value={account}
         onChange={(value) => onChange({ account: value })}

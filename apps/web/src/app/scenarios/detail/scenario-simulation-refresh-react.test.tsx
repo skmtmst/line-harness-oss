@@ -133,6 +133,7 @@ vi.mock('@/components/scenarios/scenario-dialogs', () => ({
       対象を保存
     </button>
   ),
+  MoveReferrersNotice: () => null,
   OnCompleteDialog: () => null,
   TestSendDialog: () => null,
   ON_COMPLETE_LABEL: { pause: '一時停止', resume_previous: '前へ戻す', move: '別のシナリオへ' },

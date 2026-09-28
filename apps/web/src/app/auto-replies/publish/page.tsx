@@ -29,6 +29,7 @@ import type {
   AutoReplyValidationResult,
 } from '@line-crm/shared'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import LinePreview from '@/components/shared/line-preview'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
@@ -525,22 +526,19 @@ function AutoReplyPublishInner() {
                     return (
                       <li key={conflict.autoReplyId}>
                         <span>{index + 2}</span>
-                        <label>
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            aria-label={`${conflict.name}の重なりを確認した`}
-                            onChange={() => {
-                              setAcknowledged((current) => {
-                                const next = new Set(current)
-                                if (next.has(conflict.autoReplyId)) next.delete(conflict.autoReplyId)
-                                else next.add(conflict.autoReplyId)
-                                return next
-                              })
-                            }}
-                          />
-                          <span><strong>{conflict.name}</strong><small>{tone.label}・{conflict.reason}</small></span>
-                        </label>
+                        <Checkbox
+                          checked={checked}
+                          aria-label={`${conflict.name}の重なりを確認した`}
+                          onCheckedChange={() => {
+                            setAcknowledged((current) => {
+                              const next = new Set(current)
+                              if (next.has(conflict.autoReplyId)) next.delete(conflict.autoReplyId)
+                              else next.add(conflict.autoReplyId)
+                              return next
+                            })
+                          }}
+                          description={`${tone.label}・${conflict.reason}`}
+                        >{conflict.name}</Checkbox>
                         <em>{conflict.certainty === 'certain' ? '停止' : '対象外'}</em>
                       </li>
                     )

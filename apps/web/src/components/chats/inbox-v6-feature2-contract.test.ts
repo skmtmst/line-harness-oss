@@ -182,14 +182,13 @@ describe('Xi4x9 右パネルの表示項目', () => {
     expect(panel).toContain('moveGroupBefore')
   })
 
-  it('出し入れは素のチェックを土台にした入／切で読み上げにも伝わる', () => {
-    expect(panel).toContain('type="checkbox"')
-    expect(panel).toContain('role="switch"')
-    expect(panel).toContain('className="peer sr-only"')
-    expect(panel).toContain('peer-checked:bg-accent')
-    // 軌道と丸は input の兄弟でないと `peer-checked:` が効かない。
-    expect(panel).toContain('peer-checked:translate-x-4')
-    expect(panel).not.toContain('<span className="rounded-pill bg-step-idle peer-checked:bg-accent peer-focus-visible:ring-accent/40 flex')
+  it('出し入れは本物のチェックを土台にした入／切で読み上げにも伝わる', () => {
+    // m21u: 素の input＋自作スイッチを共通の Checkbox へ置き換えた。
+    // 本物の input を使う性質（読み上げで入／切が伝わる）は保つ。
+    expect(panel).toContain('共通の Checkbox（本物の input）')
+    expect(panel).toContain('aria-label={`${group.label}を表示`}')
+    expect(panel).not.toContain('type="checkbox"')
+    expect(panel).not.toContain('role="switch"')
   })
 
   it('全部隠しても戻せる道と、閉じる道を置く', () => {

@@ -18,7 +18,8 @@ describe('一斉配信の作成', () => {
   it('右側をLINEプレビューと明記し、確認済みを利用者が記録できる', () => {
     expect(FORM).toContain('実際のLINE表示に近い確認用プレビューです。')
     expect(FORM).toContain("previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です'")
-    expect(FORM).toContain('setPreviewConfirmed(event.target.checked)')
+    // m21u: 素の input を共通の Checkbox へ置き換えた。利用者が記録できる動きは保つ。
+    expect(FORM).toContain('onCheckedChange={setPreviewConfirmed}')
     expect(FORM).toContain('+ (previewConfirmed ? 0 : 1)')
     expect(FORM).toContain('}, [bubbles, scheduledDate, scheduledTime, sendMode, visualQaAugustCampaign])')
   })

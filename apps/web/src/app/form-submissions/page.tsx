@@ -10,6 +10,7 @@ import { useAccount } from '@/contexts/account-context'
 import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { displayFormName, sortFormsByLatestAnswer } from './form-list'
 import Button from '@/components/shared/button'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import ListState from '@/components/shared/list-state'
@@ -1142,24 +1143,18 @@ export default function FormSubmissionsPage() {
           setMoveError('')
         }}
       >
-        <div className="space-y-1" role="radiogroup" aria-label="移動先のフォルダ">
+        <RadioCardGroup legend="移動先のフォルダ" className="space-y-1">
           {[{ id: UNFILED_VALUE, name: '未分類' }, ...folders.map((folder) => ({ id: folder.id, name: folder.name }))].map((folder) => (
-            <label
+            <RadioCard
               key={folder.id}
-              className={`rounded-control flex cursor-pointer items-center gap-2 border px-3 py-2 text-sm ${
-                moveFolderId === folder.id ? 'border-accent bg-accent-soft' : 'border-hairline'
-              }`}
-            >
-              <input
-                type="radio"
-                name="move-folder"
-                checked={moveFolderId === folder.id}
-                onChange={() => setMoveFolderId(folder.id)}
-              />
-              <span className="text-ink min-w-0 flex-1 truncate" title={folder.name}>{folder.name}</span>
-            </label>
+              name="move-folder"
+              value={folder.id}
+              checked={moveFolderId === folder.id}
+              onChange={() => setMoveFolderId(folder.id)}
+              title={folder.name}
+            />
           ))}
-        </div>
+        </RadioCardGroup>
       </ConfirmDialog>
 
       <ConfirmDialog

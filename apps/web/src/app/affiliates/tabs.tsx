@@ -17,6 +17,7 @@ import MenuPortal from '@/components/shared/menu-portal'
 import { MoreAction } from '@/components/shared/row-actions'
 import Button from '@/components/shared/button'
 import type { ButtonProps } from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import Chip from '@/components/shared/chip'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
@@ -2158,15 +2159,14 @@ export function ApprovalQueue() {
                 <Th>
                   <span className="flex items-center gap-2">
                     {status === 'pending' && (
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         aria-label="このページの確認不要な成果をすべて選ぶ"
                         checked={allSafeSelected}
-                        onChange={(event) => {
+                        onCheckedChange={(checked) => {
                           setSelected((current) => {
                             const next = new Set(current)
                             for (const eventId of safePendingIds) {
-                              if (event.target.checked) next.add(eventId)
+                              if (checked) next.add(eventId)
                               else next.delete(eventId)
                             }
                             return next
@@ -2199,21 +2199,20 @@ export function ApprovalQueue() {
                   <td className="text-ink px-4 py-3 text-sm">
                     <div className="flex items-start gap-2">
                     {status === 'pending' && (
-                      <input
-                        type="checkbox"
-                        className="mt-1"
+                      <Checkbox
                         aria-label={`${personNameText(item.friendName)}の成果を選ぶ`}
                         checked={selected.has(item.eventId)}
                         disabled={needsReview}
                         title={needsReview ? '確認が必要な成果はまとめて承認できません' : undefined}
-                        onChange={(event) => {
+                        onCheckedChange={(checked) => {
                           setSelected((current) => {
                             const next = new Set(current)
-                            if (event.target.checked) next.add(item.eventId)
+                            if (checked) next.add(item.eventId)
                             else next.delete(item.eventId)
                             return next
                           })
                         }}
+                        className="mt-1"
                       />
                     )}
                     <span>
@@ -2730,10 +2729,13 @@ export function OffersTab() {
           detail={confirmedDetail(confirmedState, topOffer ? `${topOffer.name}・確定 ${formatYen(offerStats.get(topOffer.id)?.reward ?? 0)}${confirmedTruncated ? '（直近5000件まで）' : ''}` : '成果はまだありません')}
         />
         <KpiCard
-          title="1件あたりの平均報酬"
+          title="平均報酬額"
           value={averageReward}
           unit="円"
           detail={`いちばん高い案件 ${formatYen(Math.max(0, ...rewardValues))}`}
+          /* m22d: 「1件あたり」は単位の意味なので見出しの「？」へ移し、
+             件数は「紹介できる案件」と「動きが未設定の案件」の2か所だけにする。 */
+          help="成果1件あたりの平均です"
         />
         <KpiCard
           title="動きが未設定の案件"
@@ -2971,18 +2973,14 @@ function SettlementEditor({
           />
         </div>
       </div>
-      <label className="mt-3 flex cursor-pointer items-start gap-2">
-        <input
-          type="checkbox"
-          checked={notify}
-          onChange={(e) => {
-            setNotify(e.target.checked)
-            setSaved(false)
-          }}
-          className="mt-0.5 rounded border-gray-300"
-        />
-        <span className="text-xs text-gray-600">成果が出たときに本人へ知らせる</span>
-      </label>
+      <Checkbox
+        checked={notify}
+        onCheckedChange={(checked) => {
+          setNotify(checked)
+          setSaved(false)
+        }}
+        className="mt-3"
+      >成果が出たときに本人へ知らせる</Checkbox>
       <p className="mt-2 text-[11px] text-gray-400">
         保留日数と支払いサイクルは取り決めの記録です。報酬の計算そのものには使いません。
       </p>
