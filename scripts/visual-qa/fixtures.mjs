@@ -916,29 +916,33 @@ const FORM_BASE_LAYOUT = {
   },
 }
 
-const formRow = (id, name, description, folderId, isActive, submitCount, weeklySubmitCount, lastSubmittedAt, updatedAt, destinationSummary) => ({
+const formRow = (id, name, description, folderId, isActive, submitCount, monthly, lastSubmittedAt, updatedAt, destinationSummary) => ({
   id, lineAccountId: 'visual-qa-account', name, description, folderId,
   fields: [], layout: FORM_BASE_LAYOUT, onSubmitTagId: null, onSubmitScenarioId: null,
   onSubmitMessageType: null, onSubmitMessageContent: null, onSubmitWebhookUrl: null,
   onSubmitWebhookHeaders: null, onSubmitWebhookFailMessage: null,
   saveToMetadata: destinationSummary.friendFieldCount > 0, isActive, status: 'active', archivedAt: null,
-  revision: 1, submitCount, weeklySubmitCount, createdAt: updatedAt, updatedAt, lastSubmittedAt,
+  revision: 1, submitCount,
+  monthlySubmitCount: monthly.submitCount,
+  monthlyOpenCount: monthly.openCount,
+  monthlyCompletionRate: monthly.rate,
+  createdAt: updatedAt, updatedAt, lastSubmittedAt,
   usedByAccounts: [], accountScopeReviewRequired: false,
   destinationCount: destinationSummary.friendFieldCount + destinationSummary.tagCount,
   destinationSummary,
 })
 
-/** 回答フォーム一覧。設計 `EMBIK` に見えている6行。 */
+/** 回答フォーム一覧。設計 `EMBIK` に見えている6行。今月の数は日本時間の1日から。 */
 export const FORMS = [
-  formRow('form-1', '来店アンケート', '来店後に感想と次回の希望を聞く・9ブロック', 'form-folder-visit', true, 1284, 42, '2026-08-21T03:00:00.000Z', '2026-08-21T03:00:00.000Z', { friendFieldCount: 3, tagCount: 2 }),
-  formRow('form-2', '資料請求', '名前と連絡先・5ブロック', 'form-folder-request', true, 3410, 128, '2026-08-22T03:00:00.000Z', '2026-08-12T03:00:00.000Z', { friendFieldCount: 5, tagCount: 1 }),
-  formRow('form-3', '休止の理由', '定期便を止める人に理由を聞く・3ブロック', 'form-folder-survey', true, 96, 4, '2026-08-20T03:00:00.000Z', '2026-08-18T03:00:00.000Z', { friendFieldCount: 1, tagCount: 0 }),
-  formRow('form-4', 'イベント申込（8月）', '日時の希望と人数・7ブロック', 'form-folder-visit', true, 220, 61, '2026-08-25T03:00:00.000Z', '2026-08-22T03:00:00.000Z', { friendFieldCount: 4, tagCount: 0 }),
-  formRow('form-5', '会員登録', '住所と生年月日・12ブロック', 'form-folder-request', false, 0, 0, null, '2026-08-15T03:00:00.000Z', { friendFieldCount: 7, tagCount: 0 }),
-  { ...formRow('form-6', '旧アンケート（2025春）', '3ブロック', null, false, 1860, 0, '2025-05-30T03:00:00.000Z', '2025-05-30T03:00:00.000Z', { friendFieldCount: 2, tagCount: 0 }), status: 'archived', archivedAt: '2025-05-30T03:00:00.000Z' },
+  formRow('form-1', '来店アンケート', '来店後に感想と次回の希望を聞く・9ブロック', 'form-folder-visit', true, 1284, { submitCount: 186, openCount: 248, rate: 75 }, '2026-08-21T03:00:00.000Z', '2026-08-21T03:00:00.000Z', { friendFieldCount: 3, tagCount: 2 }),
+  formRow('form-2', '資料請求', '名前と連絡先・5ブロック', 'form-folder-request', true, 3410, { submitCount: 402, openCount: 536, rate: 75 }, '2026-08-22T03:00:00.000Z', '2026-08-12T03:00:00.000Z', { friendFieldCount: 5, tagCount: 1 }),
+  formRow('form-3', '休止の理由', '定期便を止める人に理由を聞く・3ブロック', 'form-folder-survey', true, 96, { submitCount: 12, openCount: 20, rate: 60 }, '2026-08-20T03:00:00.000Z', '2026-08-18T03:00:00.000Z', { friendFieldCount: 1, tagCount: 0 }),
+  formRow('form-4', 'イベント申込（8月）', '日時の希望と人数・7ブロック', 'form-folder-visit', true, 220, { submitCount: 88, openCount: 110, rate: 80 }, '2026-08-25T03:00:00.000Z', '2026-08-22T03:00:00.000Z', { friendFieldCount: 4, tagCount: 0 }),
+  formRow('form-5', '会員登録', '住所と生年月日・12ブロック', 'form-folder-request', false, 0, { submitCount: 0, openCount: 0, rate: null }, null, '2026-08-15T03:00:00.000Z', { friendFieldCount: 7, tagCount: 0 }),
+  { ...formRow('form-6', '旧アンケート（2025春）', '3ブロック', null, false, 1860, { submitCount: 0, openCount: 5, rate: 0 }, '2025-05-30T03:00:00.000Z', '2025-05-30T03:00:00.000Z', { friendFieldCount: 2, tagCount: 0 }), status: 'archived', archivedAt: '2025-05-30T03:00:00.000Z' },
   /* NEN-07: NEN配信「口コミのお願い」がつなぐフォーム。編集画面の選択肢と
    * 「つながる先」へ出る公開中フォームとして見本へ置く。 */
-  formRow('form-review', '口コミ', '星の評価とひとこと・2ブロック', null, true, 210, 9, '2026-08-24T03:00:00.000Z', '2026-08-24T03:00:00.000Z', { friendFieldCount: 1, tagCount: 1 }),
+  formRow('form-review', '口コミ', '星の評価とひとこと・2ブロック', null, true, 210, { submitCount: 24, openCount: 30, rate: 80 }, '2026-08-24T03:00:00.000Z', '2026-08-24T03:00:00.000Z', { friendFieldCount: 1, tagCount: 1 }),
 ]
 
 /** 機能13 `EMBIK`。一覧6行と、画面全体18件の集計を同じ応答で返す。 */
@@ -6679,13 +6683,23 @@ export const WEBINAR_NOTIFICATIONS = {
     webinarId: 'webinar-1', version: 3,
     registrationEnabled: true, dayBeforeEnabled: true, dayBeforeTime: '20:00',
     hourBeforeEnabled: true, hourBeforeMinutes: 60, startEnabled: true,
-    missedEnabled: true, missedTime: '10:00', completedEnabled: true,
+    missedEnabled: true, missedTime: '10:00', missedWindowDays: 7, completedEnabled: true,
     updatedAt: '2026-08-25T02:00:00.000Z',
   },
   overview: {
     total: 184, pending: 32, sent: 149, failed: 3, skipped: 0, cancelled: 0,
     audience: { people: 184, bookings: 184, definition: 'active_registrations' },
   },
+}
+
+/**
+ * N: 動画の準備の段の見本。「配信の形」まで進んだ状態。
+ * 準備が済むまで公開できないことの撮影に使う。
+ */
+export const WEBINAR_VIDEO_ASSET = {
+  id: 'video-asset-1', stage: 'packaging', stageLabel: '配信の形', provider: 'r2_hls',
+  durationSeconds: 2_538, errorCode: null, expiresAt: null, purgedAt: null,
+  createdAt: '2026-09-20T00:00:00+09:00', updatedAt: '2026-09-20T01:00:00+09:00',
 }
 
 export const WEBINAR_CTAS = [{
@@ -6781,6 +6795,22 @@ export const WEBINAR_ANALYTICS = {
     { startSeconds: 1_100, endSeconds: 1_800, viewers: 101 },
     { startSeconds: 1_800, endSeconds: 2_538, viewers: 98 },
   ],
+  // J-1「どこまで見られたか」の見本。申し込みボタンは25分（1_500秒）。
+  retention: {
+    bucketSeconds: 60,
+    started: 112,
+    points: [
+      { atSeconds: 0, viewers: 112 },
+      { atSeconds: 60, viewers: 108 },
+      { atSeconds: 720, viewers: 84 },
+      { atSeconds: 1_440, viewers: 61 },
+      { atSeconds: 1_500, viewers: 58 },
+      { atSeconds: 2_400, viewers: 41 },
+    ],
+  },
+  startedViewers: 112,
+  heartbeatRejects: 2,
+  ctaAtSeconds: 1_500,
   measurement: { state: 'available', reason: null },
   formFunnel: {
     ctaImpressions: 96, ctaClicks: 52, formOpens: 41, formStarts: 32,

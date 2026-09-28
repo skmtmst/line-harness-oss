@@ -865,3 +865,61 @@ describe('webinar notification jobs', () => {
     }));
   });
 });
+
+describe('webinar session capacity and missed window (N)', () => {
+  test('定員いっぱいの開催回への申込は session_full で断る', async () => {
+    const { db, raw } = createTestD1();
+    seedBase(raw);
+    insertFriend(raw, 'friend-2', { line_account_id: 'account-1', line_user_id: 'U002' });
+    await saveWebinarNotificationSettings(db, 'webinar-1', SETTINGS, NOW);
+    const { setWebinarSessionCapacity } = await import('@line-crm/db');
+    await setWebinarSessionCapacity(db, 'webinar-1', SESSION, 1);
+    await registerWebinarSession(db, 'webinar-1', 'friend-1', SESSION, NOW);
+    await expect(registerWebinarSession(db, 'webinar-1', 'friend-2', SESSION, NOW))
+      .rejects.toThrow('session_full');
+  });
+
+  test('選び直しで古い回の席が空く', async () => {
+    const { db, raw } = createTestD1();
+    seedBase(raw);
+    await saveWebinarNotificationSettings(db, 'webinar-1', SETTINGS, NOW);
+    const { setWebinarSessionCapacity, getWebinarSession } = await import('@line-crm/db');
+    await setWebinarSessionCapacity(db, 'webinar-1', SESSION, 1);
+    await registerWebinarSession(db, 'webinar-1', 'friend-1', SESSION, NOW);
+    const next = SESSION + 3600;
+    await registerWebinarSession(db, 'webinar-1', 'friend-1', next, NOW);
+    expect(await getWebinarSession(db, 'webinar-1', SESSION)).toMatchObject({ reserved_count: 0 });
+  });
+
+  test('見逃し配信は期限切れを送らず理由を残す', async () => {
+    const { db, raw } = createTestD1();
+    seedBase(raw);
+    await saveWebinarNotificationSettings(db, 'webinar-1', SETTINGS, NOW);
+    await registerWebinarSession(db, 'webinar-1', 'friend-1', SESSION, NOW);
+    const job = raw.prepare(
+      `SELECT id FROM webinar_notification_jobs WHERE kind='missed'`,
+    ).get() as { id: string };
+    raw.prepare(
+      `UPDATE webinar_notification_jobs SET scheduled_at=?, next_retry_at=? WHERE id=?`,
+    ).run(Math.floor(NOW.getTime() / 1000), Math.floor(NOW.getTime() / 1000), job.id);
+    raw.prepare(
+      `INSERT INTO operation_control_sets
+        (scope_key, line_account_id, version, states_json, updated_at)
+       VALUES ('account-1', 'account-1', 1, '{"reminder_dispatch":"running"}', ?)`,
+    ).run(NOW.toISOString());
+    const dispatch = vi.fn(async () => new Response('{}', { status: 200 }));
+    // 開催から8日後（期限7日を過ぎている）。他の3件は対象回終了で、
+    // 見逃し分は期限切れで見送られる。
+    const late = new Date((SESSION + 8 * 86400) * 1000);
+    expect(await processWebinarNotificationJobs(db, {
+      now: late,
+      proxyBaseUrl: 'https://worker.example.com',
+      defaultAccessToken: 'fallback',
+      defaultLiffId: null,
+      proxyDispatch: dispatch,
+    })).toEqual({ sent: 0, failed: 0, skipped: 4, heldByStop: 0 });
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(raw.prepare(`SELECT status, last_error_code FROM webinar_notification_jobs WHERE id=?`).get(job.id))
+      .toEqual({ status: 'skipped', last_error_code: 'missed_window_expired' });
+  });
+});

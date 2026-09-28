@@ -5,6 +5,8 @@ import {
   fieldsToLayout,
   formChoiceIsSelected,
   formThemeButtonText,
+  FORM_THEME_DEFAULT,
+  formThemeContrastError,
   isCalendarDateString,
   isFormAnswerEmpty,
   layoutToFields,
@@ -699,5 +701,60 @@ describe("初期値の公開前検証（R196）", () => {
     ]);
     // 下書きでは許す（公開の直前で止める）
     expect(validateFormDefinition(draft)).toBeNull();
+  });
+});
+
+/**
+ * P（回答フォームの読みにくい色）：文字（text）と背景（sub）の差が
+ * 4.5:1 未満なら保存できない。比は WCAG の式で測り、独立に python で
+ * 検算した値（既定 15.3・#999/白 2.8・#777/白 4.4・同色 1.0）と突き合わせる。
+ */
+describe("文字と背景のコントラスト（P）", () => {
+  test("既定の組み合わせは通る", () => {
+    expect(formThemeContrastError(FORM_THEME_DEFAULT)).toBeNull();
+  });
+
+  test("4.5未満は測った比を文に入れて止める", () => {
+    const error = formThemeContrastError({
+      ...FORM_THEME_DEFAULT,
+      text: "#999999",
+      sub: "#ffffff",
+    });
+    expect(error).toContain("保存できません");
+    expect(error).toContain("いま 2.8:1");
+    expect(error).toContain("4.5:1以上");
+  });
+
+  test("同じ色は 1:1 で止める", () => {
+    const error = formThemeContrastError({
+      ...FORM_THEME_DEFAULT,
+      text: "#ffffff",
+      sub: "#ffffff",
+    });
+    expect(error).toContain("いま 1:1");
+  });
+
+  test("4.5ぎりぎり（#777/白 = 4.47）は通さない", () => {
+    expect(
+      formThemeContrastError({
+        ...FORM_THEME_DEFAULT,
+        text: "#777777",
+        sub: "#ffffff",
+      }),
+    ).toContain("保存できません");
+  });
+
+  test("公開前の検査で読みにくい色を止める", () => {
+    const layout = layoutWith([
+      input({ name: "name", label: "お名前", type: "text" }),
+    ]);
+    layout.options.theme = {
+      ...FORM_THEME_DEFAULT,
+      text: "#999999",
+      sub: "#ffffff",
+    };
+    expect(validateFormForPublish(layout)).toContain("保存できません");
+    layout.options.theme = { ...FORM_THEME_DEFAULT };
+    expect(validateFormForPublish(layout)).toBeNull();
   });
 });

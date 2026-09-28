@@ -35,4 +35,20 @@ describe('リッチメニューの画面確認モック', () => {
     expect(MOCK_API).toContain("writeHead(409)");
     expect(MOCK_API).toContain('rich-menu-target');
   });
+
+  it('K-1・O-1・K-2の口の見本がある', () => {
+    // 公開の進み・公開前の確認・LINE検査・実機で見た・照合。
+    for (const path of [
+      'publish-progress',
+      'prepublish-check',
+      '/validate',
+      'device-confirm',
+      '/reconcile',
+    ]) {
+      expect(MOCK_API.includes(path), `mock に ${path} がない`).toBe(true);
+    }
+    // ずれの種類ごとの直し方（fix）つき。
+    expect(MOCK_API).toContain('こちらに取り込む');
+    expect(MOCK_API).toContain('import-external');
+  });
 });

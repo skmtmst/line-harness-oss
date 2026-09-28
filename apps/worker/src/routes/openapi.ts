@@ -5798,6 +5798,23 @@ const spec = {
         },
       },
     },
+    '/api/forms/{id}/test-token': {
+      post: {
+        tags: ['Forms'],
+        summary: '公開前の試し開き・試し回答に使う合言葉を発行する',
+        description: '生の合言葉はこの応答でしか返さない。台帳にはSHA-256の16進だけを残し、有効期限は24時間。試し回答は集計に入れず、回答後アクションも動かさない。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '合言葉と有効期限（token, expiresAt）' },
+          '403': { description: 'フォームの編集権限が無い' },
+          '404': { description: 'フォームが無い、または権限範囲外' },
+          '429': { description: '試し合言葉が上限（5件）に達している' },
+        },
+      },
+    },
     // ── Event applicant operations ─────────────────────────────────────────
     '/api/events/admin/events/{id}/occurrence-selector': {
       get: {
@@ -5949,6 +5966,38 @@ const spec = {
         responses: { '200': { description: 'Diffs listed or repaired' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found or not visible' }, '502': { description: 'LINE state unreadable' } },
       },
     },
+    '/api/rich-menu-groups/{groupId}/publish-progress': {
+      get: {
+        tags: ['Rich Menus'],
+        summary: 'K-1: 最新の公開実行の4段（画像・メニュー・割り当て・片付け）（owner/admin）',
+        parameters: [{ name: 'groupId', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Steps with per-step status and message' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found or not visible' } },
+      },
+    },
+    '/api/rich-menu-groups/{groupId}/prepublish-check': {
+      get: {
+        tags: ['Rich Menus'],
+        summary: 'O-1: 公開前の確認（自前検査・実機・版）。LINE検査は別口（owner/admin）',
+        parameters: [{ name: 'groupId', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Self check, device confirmation and version state' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found or not visible' } },
+      },
+    },
+    '/api/rich-menu-groups/{groupId}/validate': {
+      post: {
+        tags: ['Rich Menus'],
+        summary: 'O-1: 公開する形のままLINEの検査APIに通す。下書きもLINEも変えない（owner/admin）',
+        parameters: [{ name: 'groupId', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Self and LINE check results' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found or not visible' } },
+      },
+    },
+    '/api/rich-menu-groups/{groupId}/device-confirm': {
+      post: {
+        tags: ['Rich Menus'],
+        summary: 'O-1: 実機で見た記録。今の下書きにひもづく（owner/admin）',
+        parameters: [{ name: 'groupId', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Confirmation recorded' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found or not visible' } },
+      },
+    },
     '/api/rich-menu-groups/{groupId}/duplicate': {
       post: {
         tags: ['Rich Menus'],
@@ -6097,6 +6146,66 @@ const spec = {
         },
       },
     },
+    // ── Webinars（動画素材の準備・開催回の定員。J-1・N #821） ──────────────
+    '/api/webinars/{id}/video-asset': {
+      get: {
+        tags: ['Webinars'], summary: '動画素材の準備段階を取得',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Video asset stage' }, '404': { description: 'Webinar not found' } },
+      },
+    },
+    '/api/webinars/{id}/video-asset/advance': {
+      post: {
+        tags: ['Webinars'], summary: '動画素材の準備段階を1段進める',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object', required: ['stage'],
+          properties: {
+            stage: { type: 'string', enum: ['uploaded', 'inspecting', 'converting', 'packaging', 'thumbnail', 'ready', 'failed'] },
+            errorCode: { type: 'string' },
+            durationSeconds: { type: ['integer', 'null'], minimum: 0 },
+          },
+        } } } },
+        responses: {
+          '200': { description: 'Stage advanced' },
+          '400': { description: 'Invalid stage or body' },
+          '403': { description: 'Owner or admin role required' },
+          '404': { description: 'Webinar not found' },
+          '409': { description: 'Stage transition not allowed' },
+        },
+      },
+    },
+    '/api/webinars/{id}/sessions/{startAt}': {
+      get: {
+        tags: ['Webinars'], summary: '開催回の定員と残席を取得',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'startAt', in: 'path', required: true, schema: { type: 'integer' } },
+        ],
+        responses: {
+          '200': { description: 'Session capacity and remaining seats' },
+          '400': { description: 'Invalid session start' },
+          '404': { description: 'Webinar not found' },
+        },
+      },
+      put: {
+        tags: ['Webinars'], summary: '開催回の定員を設定（nullで無制限に戻す）',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'startAt', in: 'path', required: true, schema: { type: 'integer' } },
+        ],
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object',
+          properties: { capacity: { type: ['integer', 'null'], minimum: 1 } },
+        } } } },
+        responses: {
+          '200': { description: 'Session capacity updated' },
+          '400': { description: 'Invalid session start or capacity' },
+          '403': { description: 'Owner or admin role required' },
+          '404': { description: 'Webinar not found' },
+        },
+      },
+    },
   },
   tags: [
     { name: 'Dashboard', description: 'ダッシュボードの予定・数字の出どころ・印刷' },
@@ -6118,6 +6227,7 @@ const spec = {
     { name: 'Rich Menus', description: 'リッチメニュー公開予約' },
     { name: 'Common Vars', description: '共通情報と監査付きCSV書き出し' },
     { name: 'Automations', description: 'オートメーションの定義・実行記録' },
+    { name: 'Webinars', description: 'ウェビナーの動画素材・開催回の定員' },
     { name: 'Settings', description: '機能設定' },
     { name: 'Operator notifications', description: '運用者へのお知らせの自動実行' },
     { name: 'Webhook', description: 'LINE Webhook' },

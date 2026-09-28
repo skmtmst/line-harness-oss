@@ -52,10 +52,10 @@ export interface RichMenuPage {
   updated_at: string;
 }
 
-// 運用者から見た「何をするボタンか」。LINE が持てる action は uri / message /
-// postback / richmenuswitch の4つだけなので、「電話をかける」「テンプレートを送る」
-// 「回答フォームを開く」はその上に乗せた言い換えとして intent で持つ。
-// publish 時に rich-menu-publisher が LINE の action へ変換する。
+// 運用者から見た「何をするボタンか」。datetime（日時を選ぶ）と clipboard
+//（文字をコピーする）は LINE の動き（datetimepicker・clipboard）そのまま。
+// DB の action_type は CHECK で4つのままなので、この2つは postback に
+// 載せて保存し、publish 時に intent から本来の動きへ戻す。
 export type RichMenuAreaIntent =
   | 'url'      // URLを開く       → uri
   | 'tel'      // 電話をかける     → uri (tel:)
@@ -63,7 +63,9 @@ export type RichMenuAreaIntent =
   | 'template' // テンプレートを送る → postback (こちらから送る)
   | 'form'     // 回答フォームを開く → uri (LIFF)
   | 'switch'   // メニューを切り替える → richmenuswitch
-  | 'postback';
+  | 'postback'
+  | 'datetime' // 日時を選ぶ       → datetimepicker
+  | 'clipboard'; // 文字をコピーする → clipboard
 
 export interface RichMenuArea {
   id: string;
