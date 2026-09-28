@@ -26,7 +26,8 @@ describe('友だち追加の実行結果カード（#973 U045）', () => {
   })
 
   it('詳細への導線は2段目に残る', () => {
-    const detailRow = PAGE.match(/formatJstDateTime\(item\.receivedAt\)[\s\S]{0,600}?\/friend-add-settings\/runs\/detail/)
+    // 行き先は detailHref が組み立てる（絞り込み・ページ位置を引き継ぐ R268）。
+    const detailRow = PAGE.match(/formatJstDateTime\(item\.receivedAt\)[\s\S]{0,600}?detailHref\(item\.id\)/)
     expect(detailRow, '時刻と同じ段に詳細リンクが無い').not.toBeNull()
   })
 })

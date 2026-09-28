@@ -5518,11 +5518,16 @@ export type FriendAddRunList = {
   total: number
   nextCursor: string | null
   summary: {
-    totalRuns: number
+    /** 直近28日に追加された人数（同じ人の再追加は1人）。 */
+    recentFriends: number
+    /** 直近28日の追加記録の件数（同じ人の再追加も数える）。 */
+    recentEvents: number
     cumulativeDeliveries: number
     scenarioStarts: number
     averageSendTimeMs: number | null
     failed: number
+    /** 実際に送った記録の最新日時。1件も送っていなければ null。 */
+    lastDeliveryAt: string | null
     staffHandoffs: { value: number | null; state: 'available' | 'unavailable'; reason: string | null }
   }
 }

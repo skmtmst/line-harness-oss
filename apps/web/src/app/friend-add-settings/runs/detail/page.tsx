@@ -2,14 +2,22 @@
 
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 import StatusBadge from '@/components/shared/status-badge'
 import TargetMissing from '@/components/shared/target-missing'
 import { api, ApiError, type FriendAddRunDetail } from '@/lib/api'
+import {
+  DELIVERY_UNKNOWN_ACTION,
+  DELIVERY_UNKNOWN_CODE,
+  formatJstDateTime,
+  routingAction,
+  routingLabel,
+} from '../run-status'
 
 const ACTION_LABELS: Record<string, string> = {
   tag: 'タグ操作',
@@ -21,7 +29,8 @@ const ACTION_LABELS: Record<string, string> = {
   unknown: '処理内容は未取得',
 }
 
-const STATUS_LABELS: Record<string, string> = {
+/** 付随処理の状態。イベント自体の配信・処理状態（run-status）とは別の言葉。 */
+const ACTION_STATUS_LABELS: Record<string, string> = {
   pending: '開始待ち',
   running: '実行中',
   completed: '成功',
@@ -38,6 +47,20 @@ function FriendAddRunDetailInner() {
   usePageTitle('友だち追加時配信・実行詳細')
   const searchParams = useSearchParams()
   const runId = searchParams.get('id') ?? ''
+  /*
+   * 一覧から受け取った絞り込み・ページ位置を戻り先へ引き継ぐ。
+   * 条件なしの一覧URLにすると、絞り込みが外れて同じ記録を探し直す
+   * ことになる（R268）。
+   */
+  const listHref = useMemo(() => {
+    const params = new URLSearchParams()
+    for (const key of ['kind', 'status', 'attribution', 'rule_id', 'pages']) {
+      const value = searchParams.get(key)
+      if (value) params.set(key, value)
+    }
+    const query = params.toString()
+    return `/friend-add-settings/runs${query ? `?${query}` : ''}`
+  }, [searchParams])
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const [detail, setDetail] = useState<FriendAddRunDetail | null>(null)
   const [loading, setLoading] = useState(true)
@@ -116,7 +139,7 @@ function FriendAddRunDetailInner() {
         kind="unspecified"
         title="見る実行詳細が指定されていません"
         description="実行履歴の一覧から、見る記録を選び直してください。"
-        backHref="/friend-add-settings/runs"
+        backHref={listHref}
         backLabel="実行履歴の一覧へ戻る"
       />
     )
@@ -130,7 +153,7 @@ function FriendAddRunDetailInner() {
         kind="not-found"
         title="この実行詳細は見つかりません"
         description="対象の記録が見つかりません。削除されたか、一覧から選び直してください。"
-        backHref="/friend-add-settings/runs"
+        backHref={listHref}
         backLabel="実行履歴の一覧へ戻る"
       />
     )
@@ -153,25 +176,61 @@ function FriendAddRunDetailInner() {
   const actionRuns = detail.actionRuns ?? []
   const failed = actionRuns.filter((action) => action.status === 'failed')
   const displayName = detail.friend.displayName || '名前は未取得'
-  const runStatus = detail.status === 'completed'
-    ? { label: '完了', tone: 'success' as const }
-    : detail.status === 'suppressed'
-      ? { label: '配信なし', tone: 'info' as const }
-      : detail.status === 'pending'
-        ? { label: '処理中', tone: 'info' as const }
-        : { label: '一部失敗', tone: 'danger' as const }
+  // 一覧と同じ判定を使う。詳細だけ「送達不明」を「配信なし」と表示すると、
+  // 届いたか分からない記録を「送っていない」と読み違える（R267）。
+  const runStatus = routingLabel(detail.status, detail.errorCode)
+  const runAction = routingAction(detail.status, detail.errorCode)
+  const routeName = detail.attribution.status === 'captured'
+    ? detail.attribution.routeName || detail.attribution.reason || '選択した経路'
+    : '経路は取得できません'
+  const ruleLabel = detail.rule
+    ? `${detail.rule.name ?? '名前は未取得'}・第${detail.rule.versionNumber ?? '—'}版`
+    : '使用ルールは未取得'
 
   return (
     <div className="space-y-4 pb-8">
-      <Link className="text-sm font-bold text-action hover:underline" href="/friend-add-settings/runs">← 実行結果へ戻る</Link>
+      <Link className="text-sm font-bold text-action hover:underline" href={listHref}>← 実行結果へ戻る</Link>
       <section className="rounded-card border border-hairline bg-canvas p-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="text-lg font-bold">{displayName}</p>
-            <p className="mt-1 text-sm text-ink-secondary">{detail.rule?.name ?? '使用ルールは未取得'}</p>
+            <p className="mt-1 text-sm text-ink-secondary">{runAction}</p>
           </div>
           <StatusBadge tone={runStatus.tone}>{runStatus.label}</StatusBadge>
         </div>
+        {detail.errorCode === DELIVERY_UNKNOWN_CODE ? (
+          <Notice tone="danger" className="mt-3">{DELIVERY_UNKNOWN_ACTION}</Notice>
+        ) : null}
+        {/*
+          R265: 同じ友だちの別の記録を詳細だけで見分けられるよう、
+          日時・追加の種類・経路・適用ルールと版・記録IDを先頭に置く。
+        */}
+        <dl className="mt-4 grid gap-x-6 gap-y-3 border-t border-hairline pt-4 text-sm sm:grid-cols-2">
+          <div>
+            <dt className="text-xs text-ink-faint">受信日時</dt>
+            <dd className="mt-0.5">{formatJstDateTime(detail.receivedAt)}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-ink-faint">処理日時</dt>
+            <dd className="mt-0.5">{detail.processedAt ? formatJstDateTime(detail.processedAt) : 'まだ処理していません'}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-ink-faint">追加の種類</dt>
+            <dd className="mt-0.5">{detail.friendKind === 'first_time' ? 'はじめて' : '再追加・ブロック解除'}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-ink-faint">流入経路</dt>
+            <dd className="mt-0.5">{routeName}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-ink-faint">適用ルール</dt>
+            <dd className="mt-0.5">{ruleLabel}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-ink-faint">記録ID（お問い合わせ用）</dt>
+            <dd className="mt-0.5 break-all font-mono text-xs">{detail.id}</dd>
+          </div>
+        </dl>
       </section>
 
       <section className="rounded-card border border-hairline bg-canvas p-4">
@@ -187,11 +246,13 @@ function FriendAddRunDetailInner() {
                 <div key={action.id} className="flex items-start justify-between gap-4 py-3">
                   <div className="min-w-0">
                     <strong className="block truncate">{index + 1}. {ACTION_LABELS[action.type] ?? '処理'}</strong>
-                    <p className="mt-1 text-xs text-ink-faint">試行 {action.attemptCount}回</p>
+                    <p className="mt-1 text-xs text-ink-faint">
+                      試行 {action.attemptCount}回・{formatJstDateTime(action.completedAt ?? action.startedAt)}
+                    </p>
                     {message && <p className="mt-1 text-xs text-danger">{message}</p>}
                   </div>
                   <StatusBadge tone={action.status === 'failed' ? 'danger' : action.status === 'completed' ? 'success' : 'info'}>
-                    {STATUS_LABELS[action.status] ?? '確認中'}
+                    {ACTION_STATUS_LABELS[action.status] ?? '確認中'}
                   </StatusBadge>
                 </div>
               )

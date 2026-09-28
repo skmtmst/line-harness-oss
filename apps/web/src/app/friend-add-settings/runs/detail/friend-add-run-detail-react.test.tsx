@@ -4,15 +4,16 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const state = vi.hoisted(() => ({ accountId: 'account-1' }))
+const state = vi.hoisted(() => ({ accountId: 'account-1', params: 'id=run-1' }))
 const apiMocks = vi.hoisted(() => ({ runDetail: vi.fn(), retryRun: vi.fn() }))
 vi.mock('next/link', () => ({ default: ({ href, children, ...props }: any) => <a href={href} {...props}>{children}</a> }))
-vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams('id=run-1') }))
+vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams(state.params) }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: state.accountId, loading: false }) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
 vi.mock('@/components/shared/button', () => ({ default: ({ children, ...props }: any) => <button {...props}>{children}</button> }))
 vi.mock('@/components/shared/list-state', () => ({ default: ({ title }: { title: string }) => <div>{title}</div> }))
-vi.mock('@/components/shared/status-badge', () => ({ default: ({ children }: { children: React.ReactNode }) => <span>{children}</span> }))
+vi.mock('@/components/shared/notice', () => ({ default: ({ children }: { children: React.ReactNode }) => <div role="note">{children}</div> }))
+vi.mock('@/components/shared/status-badge', () => ({ default: ({ children }: { children: React.ReactNode }) => <span data-badge>{children}</span> }))
 vi.mock('@/lib/api', () => ({ api: { friendAddRules: apiMocks } }))
 
 const { default: FriendAddRunDetailPage } = await import('./page')
@@ -40,6 +41,7 @@ let root: Root
 
 beforeEach(() => {
   state.accountId = 'account-1'
+  state.params = 'id=run-1'
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   host = document.createElement('div')
   document.body.appendChild(host)
@@ -94,7 +96,8 @@ describe('N-103 friend-add run detail', () => {
       },
     })
     await render()
-    expect(host.textContent).toContain('一部失敗')
+    // 一覧と同じ言葉で「再送待ち」を出す（R267）
+    expect(host.textContent).toContain('再送待ち')
     expect(host.textContent).not.toContain('失敗した1件だけ再試行')
   })
 
@@ -122,5 +125,59 @@ describe('N-103 friend-add run detail', () => {
     })
     expect(host.textContent).toContain('account-2の顧客')
     expect(host.textContent).not.toContain('account-1の顧客')
+  })
+})
+
+describe('R264〜R268 実行詳細', () => {
+  it('R265: 受信日時・追加の種類・経路・適用ルールと版・記録IDを先頭に示す', async () => {
+    apiMocks.runDetail.mockResolvedValue({
+      success: true,
+      data: {
+        ...detail('account-1').data,
+        processedAt: '2026-09-16T10:00:03+09:00',
+        attribution: { status: 'captured', routeId: 'route-1', routeName: '紹介QR', reason: 'REF001' },
+      },
+    })
+    await render()
+    const text = host.textContent ?? ''
+    expect(text).toContain('2026/09/16 10:00')
+    expect(text).toContain('はじめて')
+    expect(text).toContain('紹介QR')
+    expect(text).toContain('初回案内・第1版')
+    expect(text).toContain('run-1')
+  })
+
+  it('R267: 送達不明は「配信なし」に置き換わらず警告を優先する', async () => {
+    apiMocks.runDetail.mockResolvedValue({
+      success: true,
+      data: { ...detail('account-1').data, status: 'suppressed', errorCode: 'delivery_unknown' },
+    })
+    await render()
+    const text = host.textContent ?? ''
+    expect(text).toContain('送達不明・要確認（自動では送り直しません）')
+    // イベントの状態表示が「配信なし」に変わらない
+    const badge = host.querySelector('[data-badge]')
+    expect(badge?.textContent).toBe('送達不明')
+  })
+
+  it('R267: 配信なし（suppressed）の記録は一覧と同じ「配信なし」を出す', async () => {
+    apiMocks.runDetail.mockResolvedValue({
+      success: true,
+      data: { ...detail('account-1').data, status: 'suppressed', errorCode: null },
+    })
+    await render()
+    const badge = host.querySelector('[data-badge]')
+    expect(badge?.textContent).toBe('配信なし')
+  })
+
+  it('R268: 一覧へ戻るリンクが受け取った絞り込みとページ位置を返す', async () => {
+    state.params = 'id=run-1&kind=first_time&status=failed&attribution=captured&rule_id=rule-1&pages=cur-8%2Ccur-9'
+    await render()
+    const back = host.querySelector('a[href^="/friend-add-settings/runs?"]')
+    expect(back).not.toBeNull()
+    const href = back!.getAttribute('href')!
+    for (const part of ['kind=first_time', 'status=failed', 'attribution=captured', 'rule_id=rule-1', 'pages=']) {
+      expect(href).toContain(part)
+    }
   })
 })
