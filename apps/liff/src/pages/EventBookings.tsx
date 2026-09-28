@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
-import { api, type EventBookingMine } from '../lib/api.js';
+import { api, type EventBookingMine, type EventSlot } from '../lib/api.js';
 import { utcToJstHm, utcToJstMd } from '../lib/datetime.js';
 import { logFailure } from '../lib/user-message.js';
 import LoadErrorView from '../components/LoadErrorView.js';
 import LoadingView from '../components/LoadingView.js';
 import Card from '../components/ui/Card.js';
 import Badge from '../components/ui/Badge.js';
+import Button from '../components/ui/Button.js';
 import ConfirmDialog from '../components/ui/ConfirmDialog.js';
 import Icon from '../components/ui/Icon.js';
 import PageHeader from '../components/ui/PageHeader.js';
@@ -66,6 +67,96 @@ export default function EventBookings() {
   // 取り消す予約。開いている間だけ持つ。ブラウザの `confirm()` は使わず、
   // 共通の確認窓で聞く (やめるを選ぶとここが空のまま終わる)。
   const [pendingCancel, setPendingCancel] = useState<EventBookingMine | null>(null);
+
+  /**
+   * U-3: 開催回を変える予約。窓を開けている間だけ持つ。
+   * 冪等鍵は窓を開けたときに1つ作り、失敗後の再試行でも使い回す
+   * (応答を失った成功を二重にしない)。
+   */
+  const [pendingChange, setPendingChange] = useState<{
+    booking: EventBookingMine;
+    slots: EventSlot[] | null;
+    slotsFailed: boolean;
+    selectedSlotId: string | null;
+    idempotencyKey: string;
+    changeError: string | null;
+  } | null>(null);
+
+  // 自分の予約一覧には枠 ID が無いため、今の時間は開始日時で見分ける。
+  function isCurrentSlot(booking: EventBookingMine, slot: EventSlot): boolean {
+    return slot.starts_at === booking.slot_starts_at;
+  }
+
+  async function openChange(booking: EventBookingMine) {
+    if (busy) return;
+    setActionError(null);
+    setPendingChange({
+      booking,
+      slots: null,
+      slotsFailed: false,
+      selectedSlotId: null,
+      idempotencyKey: crypto.randomUUID(),
+      changeError: null,
+    });
+    try {
+      const res = await api.getEventSlots(booking.event_id);
+      setPendingChange((current) => {
+        if (!current || current.booking.id !== booking.id) return current;
+        const first = res.items.find(
+          (s) => !isCurrentSlot(booking, s) && s.remaining !== 0,
+        );
+        return { ...current, slots: res.items, selectedSlotId: first?.id ?? null };
+      });
+    } catch (e) {
+      logFailure('change-event-booking-slots', e);
+      setPendingChange((current) =>
+        current && current.booking.id === booking.id ? { ...current, slotsFailed: true } : current,
+      );
+    }
+  }
+
+  async function runChange() {
+    const target = pendingChange;
+    if (!target || !target.selectedSlotId || busy) return;
+    const selected = target.slots?.find((s) => s.id === target.selectedSlotId);
+    // 今の時間そのものは選ばせない (API も same_slot で止める)。
+    if (!selected || isCurrentSlot(target.booking, selected)) return;
+    setBusy(true);
+    setActionError(null);
+    try {
+      await api.changeMyEventBooking(
+        target.booking.id,
+        target.selectedSlotId,
+        target.idempotencyKey,
+      );
+      setPendingChange(null);
+      await refresh();
+    } catch (err) {
+      logFailure('change-event-booking', err);
+      const e = err as { body?: { error?: string } };
+      const msg = (() => {
+        switch (e.body?.error) {
+          case 'slot_full': return '選んだ時間は満席になりました。別の時間を選んでください。';
+          case 'change_deadline_passed': return '変更期限を過ぎています。LINE で運営にご連絡ください。';
+          case 'change_not_allowed': return 'このイベントは LIFF からの変更に対応していません。LINE で運営にご連絡ください。';
+          case 'slot_inactive':
+          case 'slot_started':
+          case 'entry_closed': return '選んだ時間は受付を終えています。別の時間を選んでください。';
+          case 'same_slot': return '今と同じ時間です。別の時間を選んでください。';
+          case 'over_friend_limit':
+          case 'duplicate_friend_booking': return '申込の上限に達しているため変えられません。LINE で運営にご連絡ください。';
+          case 'invalid_state': return 'この予約は既に変更・キャンセル済みのため変えられません。一覧を開き直してください。';
+          case 'send_in_flight_retry': return '送信の直前でした。少し待ってから、もう一度お試しください。';
+          default: return '変えられませんでした。時間をおいて、もう一度お試しください。';
+        }
+      })();
+      setPendingChange((current) =>
+        current && current.booking.id === target.booking.id ? { ...current, changeError: msg } : current,
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function runCancel() {
     const b = pendingCancel;
@@ -176,7 +267,18 @@ export default function EventBookings() {
                           <Badge tone={meta.tone}>{meta.text}</Badge>
                         </div>
                         {canCancel(b) && (
-                          <div className="mt-2 text-left">
+                          <div className="mt-2 flex items-center gap-4 text-left">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                void openChange(b);
+                              }}
+                              disabled={busy}
+                              className="inline-flex min-h-11 items-center gap-0.5 text-sm font-semibold text-info-link focus-visible:outline-2 focus-visible:outline-ink disabled:opacity-50"
+                            >
+                              時間を変える
+                              <Icon name="chevron-right" className="h-4 w-4" />
+                            </button>
                             <button
                               type="button"
                               onClick={() => {
@@ -217,6 +319,90 @@ export default function EventBookings() {
         }}
         onConfirm={() => void runCancel()}
       />
+      <ConfirmDialog
+        open={pendingChange !== null}
+        title={pendingChange ? `「${pendingChange.booking.event_name}」の時間を変えますか？` : ''}
+        description={
+          pendingChange
+            ? '新しい時間の席を取れたときだけ、今の予約を取り消します。満席の時間へは変えられません。'
+            : ''
+        }
+        confirmLabel="この時間に変える"
+        cancelLabel="やめる"
+        busy={busy}
+        error={pendingChange?.changeError ?? undefined}
+        onCancel={() => {
+          if (!busy) setPendingChange(null);
+        }}
+        onConfirm={
+          pendingChange?.selectedSlotId && !busy ? () => void runChange() : undefined
+        }
+      >
+        {pendingChange && (
+          <div className="mt-3">
+            {pendingChange.slots === null && !pendingChange.slotsFailed && (
+              <p className="text-sm text-ink-secondary">時間を読み込んでいます…</p>
+            )}
+            {pendingChange.slotsFailed && (
+              <div className="space-y-2">
+                <p className="text-sm text-ink-secondary">
+                  時間を読み込めませんでした。予約はなくなっていません。
+                </p>
+                <Button
+                  variant="secondary"
+                  disabled={busy}
+                  onClick={() => void openChange(pendingChange.booking)}
+                >
+                  読み直す
+                </Button>
+              </div>
+            )}
+            {pendingChange.slots !== null && (
+              <ul className="space-y-2">
+                {pendingChange.slots.map((s) => {
+                  const current = isCurrentSlot(pendingChange.booking, s);
+                  const full = s.remaining === 0;
+                  const disabled = current || full || busy;
+                  const selected = pendingChange.selectedSlotId === s.id;
+                  return (
+                    <li key={s.id}>
+                      <button
+                        type="button"
+                        disabled={disabled}
+                        aria-pressed={selected}
+                        onClick={() =>
+                          setPendingChange((prev) =>
+                            prev ? { ...prev, selectedSlotId: s.id, changeError: null } : prev,
+                          )
+                        }
+                        className={`flex min-h-12 w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left focus-visible:outline-2 focus-visible:outline-ink disabled:cursor-not-allowed ${
+                          disabled
+                            ? 'border-hairline bg-shell-gray'
+                            : selected
+                              ? 'border-accent-deep bg-ok-bg'
+                              : 'border-hairline bg-canvas'
+                        }`}
+                      >
+                        <span
+                          className={`text-sm font-semibold whitespace-nowrap ${disabled ? 'text-ink-faint' : selected ? 'text-ok-ink' : 'text-ink'}`}
+                        >
+                          {utcToJstMd(s.starts_at)} {utcToJstHm(s.starts_at)}〜
+                          {utcToJstHm(s.ends_at)}
+                        </span>
+                        <span
+                          className={`shrink-0 text-xs whitespace-nowrap ${disabled ? 'text-ink-faint' : selected ? 'text-ok-ink' : 'text-ink-secondary'}`}
+                        >
+                          {current ? '今の時間' : full ? '満席' : '空きあり'}
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        )}
+      </ConfirmDialog>
     </div>
   );
 }

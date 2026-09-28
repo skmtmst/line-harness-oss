@@ -5884,6 +5884,187 @@ const spec = {
         },
       },
     },
+    // ── Event lifecycle and change review ─────────────────────────────────
+    '/api/events/admin/events/{id}/lifecycle': {
+      post: {
+        tags: ['Events'],
+        summary: 'イベントの状態を切り替える',
+        description: '下書き・公開中・一時停止・終了・中止を切り替える。一時停止と中止は理由が必須。公開可否へ両書きする。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object', required: ['to'],
+          properties: {
+            to: { type: 'string', enum: ['draft', 'published', 'paused', 'ended', 'cancelled'] },
+            reason: { type: 'string' },
+            idempotency_key: { type: 'string' },
+          },
+        } } } },
+        responses: {
+          '200': { description: '切り替え後の状態と版' },
+          '400': { description: 'account_id が無い' },
+          '403': { description: 'owner/admin権限が無い、またはアカウント範囲外' },
+          '404': { description: 'イベントが無い、またはアカウント範囲外' },
+          '409': { description: '許さない遷移、または版の食い違い' },
+          '422': { description: '状態または理由が不正' },
+        },
+      },
+    },
+    '/api/events/admin/events/{id}/change-review': {
+      post: {
+        tags: ['Events'],
+        summary: '日時・定員・会場の変更前に影響を確かめる',
+        description: '読み取り専用の事前表示。影響人数と止める理由を返す。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object', required: ['slot_changes'],
+          properties: {
+            slot_changes: { type: 'array', items: { type: 'object', required: ['slot_id'], properties: {
+              slot_id: { type: 'string' },
+              starts_at: { type: 'string' },
+              ends_at: { type: 'string' },
+              capacity: { type: 'integer', minimum: 1 },
+              is_active: { type: 'integer', enum: [0, 1] },
+            } } },
+            event_changes: { type: 'object', properties: {
+              venue_name: { type: 'string' },
+              venue_url: { type: 'string' },
+            } },
+          },
+        } } } },
+        responses: {
+          '200': { description: '影響人数と止める理由の事前表示' },
+          '400': { description: 'account_id が無い' },
+          '403': { description: 'owner/admin権限が無い' },
+          '404': { description: 'イベントが無い、またはアカウント範囲外' },
+          '422': { description: 'slot_changes が不正' },
+        },
+      },
+    },
+    '/api/events/admin/events/{id}/change-review/apply': {
+      post: {
+        tags: ['Events'],
+        summary: '確かめた変更を版の一致で適用する',
+        description: '版の一致で直列化し、二重実行は冪等キーで吸収する。日時・会場が動いた回の確定申込へは届く範囲でLINE通知する。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object', required: ['expected_version', 'idempotency_key', 'slot_changes'],
+          properties: {
+            expected_version: { type: 'integer', minimum: 1 },
+            idempotency_key: { type: 'string', minLength: 1 },
+            change_reason: { type: 'string' },
+            slot_changes: { type: 'array', items: { type: 'object', required: ['slot_id'], properties: {
+              slot_id: { type: 'string' },
+              starts_at: { type: 'string' },
+              ends_at: { type: 'string' },
+              capacity: { type: 'integer', minimum: 1 },
+              is_active: { type: 'integer', enum: [0, 1] },
+            } } },
+            event_changes: { type: 'object', properties: {
+              venue_name: { type: 'string' },
+              venue_url: { type: 'string' },
+            } },
+          },
+        } } } },
+        responses: {
+          '200': { description: '適用済み（同じ冪等キーの再実行を含む）' },
+          '400': { description: 'account_id または冪等キーが無い' },
+          '403': { description: 'owner/admin権限が無い' },
+          '404': { description: 'イベントが無い、またはアカウント範囲外' },
+          '409': { description: '版の食い違い' },
+          '422': { description: '版・変更内容が不正' },
+        },
+      },
+    },
+    '/api/events/admin/occurrences/{id}/waitlist/reorder': {
+      post: {
+        tags: ['Events'],
+        summary: '待ち順を手で並べ直す',
+        description: '枠の待ち全件の並べ直しで受ける。理由が必須。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object', required: ['reason', 'ordered_ids'],
+          properties: {
+            reason: { type: 'string', minLength: 1 },
+            ordered_ids: { type: 'array', items: { type: 'string' } },
+            expected_version: { type: 'integer', minimum: 1 },
+          },
+        } } } },
+        responses: {
+          '200': { description: '並べ直し後の順番と開催回の版' },
+          '400': { description: 'account_id が無い' },
+          '403': { description: 'owner/admin/staff権限が無い' },
+          '404': { description: '開催回が無い、またはアカウント範囲外' },
+          '409': { description: '版の食い違い' },
+          '422': { description: '理由または ordered_ids が不正' },
+        },
+      },
+    },
+    '/api/events/admin/occurrences/{id}/waitlist/skip': {
+      post: {
+        tags: ['Events'],
+        summary: '待ちの案内を今回見送り最後尾へ回す',
+        description: '飛ばし。行は消さない。理由が必須。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object', required: ['reason', 'waitlist_id'],
+          properties: {
+            reason: { type: 'string', minLength: 1 },
+            waitlist_id: { type: 'string', minLength: 1 },
+            expected_version: { type: 'integer', minimum: 1 },
+          },
+        } } } },
+        responses: {
+          '200': { description: '最後尾へ回した待ちと開催回の版' },
+          '400': { description: 'account_id が無い' },
+          '403': { description: 'owner/admin/staff権限が無い' },
+          '404': { description: '開催回または待ちが無い、アカウント範囲外' },
+          '409': { description: '版の食い違い' },
+          '422': { description: '理由または waitlist_id が不正' },
+        },
+      },
+    },
+    '/api/events/liff/bookings/{id}/change': {
+      post: {
+        tags: ['Events'],
+        summary: '本人が予約を別の開催回へ移す',
+        description: '新しい席を確保できた時だけ元の申込を取り消す、まとめて1つの操作。確保に失敗したら旧予約を維持する。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'Idempotency-Key', in: 'header', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object', required: ['to_slot_id'],
+          properties: {
+            to_slot_id: { type: 'string', minLength: 1 },
+          },
+        } } } },
+        responses: {
+          '200': { description: '移し先の予約IDと状態（同じ冪等キーの再実行を含む）' },
+          '400': { description: '本人確認・冪等キーが無い' },
+          '401': { description: 'LINE本人確認に失敗' },
+          '403': { description: '変更締切を過ぎたなど変更できない' },
+          '404': { description: '予約が無い、または本人・アカウント範囲外' },
+          '409': { description: '満席・締切・上限などにより移動できない' },
+          '410': { description: '移し先の開催回が始まった、または受付終了' },
+          '422': { description: '移し先の指定が不正' },
+        },
+      },
+    },
     // ── Event waitlist ────────────────────────────────────────────────────
     '/api/liff/events/waitlist/{token}/accept': {
       post: {

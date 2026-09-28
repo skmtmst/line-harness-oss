@@ -3,7 +3,7 @@ import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-import { deadAnswerSettings, isUriOnlyBehavior } from '../../../components/scenarios/question-editor'
+import { deadAnswerSettings, isUriOnlyBehavior, validateChoiceUris } from '../../../components/scenarios/question-editor'
 
 /*
  * SCENARIO-21・SCENARIO-22 の再発防止。
@@ -95,5 +95,82 @@ describe('SCENARIO-22: URIだけの挙動に届かない設定をさせない', 
   it('保存時にも URI だけの挙動に残った回答依存の設定を止める', () => {
     expect(saveStep).toContain('isUriOnlyBehavior(choice.behavior)')
     expect(saveStep).toContain('deadAnswerSettings(')
+  })
+})
+
+/*
+ * R214: 質問のURL選択肢に不正なURLを保存できる。
+ * not-a-url のような行き先でも保存できると、設定済みに見えて
+ * 実際は開けない通になる。保存時（画面）と保存口（worker）の
+ * 両方で止め、正しいURLへ直せるようにする。
+ */
+describe('R214: 行き先の形が正しくない選択肢は保存しない', () => {
+  const base = {
+    text: '体調はいかがですか？',
+    tapMode: 'single' as const,
+  }
+
+  it('URLを開くに not-a-url は止める', () => {
+    expect(
+      validateChoiceUris({
+        ...base,
+        choices: [{ label: '見る', behavior: 'url', url: 'not-a-url' }],
+      }),
+    ).toContain('選択肢1のURL')
+  })
+
+  it('正しい https のURLは通す', () => {
+    expect(
+      validateChoiceUris({
+        ...base,
+        choices: [{ label: '見る', behavior: 'url', url: 'https://example.com/a' }],
+      }),
+    ).toBeNull()
+  })
+
+  it('電話・メールも形を見る', () => {
+    expect(
+      validateChoiceUris({
+        ...base,
+        choices: [{ label: '電話', behavior: 'tel', tel: 'abc' }],
+      }),
+    ).toContain('選択肢1の電話番号')
+    expect(
+      validateChoiceUris({
+        ...base,
+        choices: [{ label: 'メール', behavior: 'mail', email: 'not-an-email' }],
+      }),
+    ).toContain('選択肢1のメールアドレス')
+    expect(
+      validateChoiceUris({
+        ...base,
+        choices: [
+          { label: '電話', behavior: 'tel', tel: '03-1234-5678' },
+          { label: 'メール', behavior: 'mail', email: 'a@example.com' },
+        ],
+      }),
+    ).toBeNull()
+  })
+
+  it('行き先が空のままも通さない', () => {
+    expect(
+      validateChoiceUris({
+        ...base,
+        choices: [{ label: '見る', behavior: 'url', url: '' }],
+      }),
+    ).toContain('選択肢1のURL')
+  })
+
+  it('挙動が「何もしない」なら行き先は見ない', () => {
+    expect(
+      validateChoiceUris({
+        ...base,
+        choices: [{ label: 'はい', behavior: 'none' }],
+      }),
+    ).toBeNull()
+  })
+
+  it('保存時に行き先の検査を通す', () => {
+    expect(saveStep).toContain('validateChoiceUris(stepForm.question)')
   })
 })

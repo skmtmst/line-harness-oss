@@ -5704,7 +5704,7 @@ const adminEvent = (id, name, nextSlot, capacity, active, pending, published = 1
   description: 'はじめての方むけに、おうちでできるコツをお伝えします。',
   description_centered: 0, max_bookings_per_friend: 1, requires_approval: 1,
   cancel_deadline_hours_before: 24, reminder_day_before_enabled: 1, reminder_hours_before: 3,
-  is_published: published, sort_order: 1,
+  is_published: published, lifecycle_status: published === 1 ? 'published' : 'draft', sort_order: 1,
   created_at: '2026-09-01T01:00:00.000Z', updated_at: '2026-09-02T01:00:00.000Z',
   next_slot_starts_at: nextSlot,
   total_capacity: capacity, total_active: active, pending_count: pending,
@@ -5742,6 +5742,7 @@ export const EVENT_DETAIL = {
   reminder_day_before_enabled: 1,
   reminder_hours_before: 24,
   is_published: 1,
+  lifecycle_status: 'published',
   sort_order: 1,
   confirmation_message_extra: null,
   reminder_message_extra: null,
@@ -5771,6 +5772,61 @@ export const EVENT_WAITLIST = [
   { id: 'ew-1', slot_id: 'event-slot-1', friend_id: 'friend-4', status: 'waiting', notified_at: null, created_at: '2026-09-02T01:00:00.000Z', slot_starts_at: '2026-09-25T05:00:00.000Z', friend_name: '中村 彩' },
   { id: 'ew-2', slot_id: 'event-slot-1', friend_id: 'friend-5', status: 'waiting', notified_at: null, created_at: '2026-09-02T02:00:00.000Z', slot_starts_at: '2026-09-25T05:00:00.000Z', friend_name: '石田 未来' },
 ]
+
+/* U: 変更の確認・状態・待ちの手動操作・開催回の変更の見本（実APIと同じ器）。 */
+export const EVENT_CHANGE_PREVIEW = {
+  event_id: 'ev-1',
+  impacts: [
+    {
+      slot_id: 'event-slot-1',
+      starts_at: '2026-09-25T05:00:00.000Z',
+      ends_at: '2026-09-25T06:30:00.000Z',
+      capacity: 12,
+      confirmed_seats: 9,
+      waiting_seats: 2,
+      pending_reminders: 9,
+      errors: [],
+      notices: ['datetime_moved_with_bookings'],
+    },
+  ],
+  event_notices: [],
+  blocked: false,
+  total_confirmed: 9,
+  total_waiting: 2,
+  total_pending_reminders: 9,
+}
+
+export const EVENT_CHANGE_APPLY_RESULT = {
+  success: true,
+  version: 4,
+  log_id: 'ecl-1',
+  affected_confirmed: 9,
+  affected_waiting: 2,
+  notified: 9,
+}
+
+export const EVENT_LIFECYCLE_RESULT = {
+  success: true,
+  lifecycle_status: 'paused',
+  version: 4,
+  log_id: 'ecl-2',
+}
+
+export const EVENT_WAITLIST_REORDER_RESULT = {
+  success: true,
+  occurrence_version: 5,
+  order: ['ew-2', 'ew-1'],
+  log_id: 'ecl-3',
+}
+
+export const EVENT_WAITLIST_SKIP_RESULT = {
+  success: true,
+  occurrence_version: 6,
+  waitlist_id: 'ew-1',
+  log_id: 'ecl-4',
+}
+
+export const EVENT_LIFF_CHANGE_RESULT = { id: 'ev-booking-2', status: 'confirmed' }
 
 /*
   イベントの申込者。設計 `i5SN2j` の「申し込み12／キャンセル待ち3／取り消した2」。

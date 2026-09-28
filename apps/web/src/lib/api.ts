@@ -2057,6 +2057,8 @@ export type AnalyticsReactionsOverview = AnalyticsEnvelope<{
     sentAt: string
     targetPeople: AnalyticsMetric<number>
     delivered: AnalyticsMetric<number>
+    /** シナリオの送信通数。届いた人数ではないので「到達」欄には出さない（監査R225） */
+    sentMessages: AnalyticsMetric<number>
     opened: AnalyticsMetric<number>
     lineClicked: AnalyticsMetric<number>
     outcomes: AnalyticsMetric<number>
@@ -7826,6 +7828,8 @@ export const api = {
           deliveryAtLabel: string
           messageType: string
           messageContent: string
+          /** 下書きの通は送られない（R212）。 */
+          isDraft?: boolean
         }>
       }>>(`/api/scenarios/${id}/preview${q}`, { signal })
     },
@@ -14214,6 +14218,8 @@ export interface EventListItem {
   reminder_day_before_enabled: number;
   reminder_hours_before: number | null;
   is_published: number;
+  /** U: 保存する状態（下書き・公開中・一時停止・終了・中止）。旧応答には無いため optional。 */
+  lifecycle_status?: EventLifecycleStatus | null;
   sort_order: number;
   created_at: string;
   updated_at: string;
@@ -14257,6 +14263,8 @@ export interface EventDetail {
   reminder_day_before_enabled: number;
   reminder_hours_before: number | null;
   is_published: number;
+  /** U: 保存する状態。旧応答には無いため optional。 */
+  lifecycle_status?: EventLifecycleStatus | null;
   sort_order: number;
   confirmation_message_extra: string | null;
   reminder_message_extra: string | null;
@@ -14503,6 +14511,61 @@ export type EventWaitlistPromotionResult =
   | { kind: 'promoted'; occurrenceVersion: number; promoted: { waitlistId: string; friendId: string; partySize: number; status: 'offered'; offeredAt: string; expiresAt: string } }
   | { kind: 'noop'; occurrenceVersion: number; promoted: null; reason: string };
 
+/**
+ * U: イベントの保存する状態（v6-29 §11-2）。
+ * 「満席」「申込が少ない」は保存せず、開催回・定員・日時からの計算で札を出す。
+ */
+export type EventLifecycleStatus = 'draft' | 'published' | 'paused' | 'ended' | 'cancelled';
+
+export interface EventSlotChange {
+  slot_id: string;
+  starts_at?: string;
+  ends_at?: string;
+  capacity?: number | null;
+  is_active?: number;
+}
+
+export interface EventChangeImpact {
+  slot_id: string;
+  starts_at: string;
+  ends_at: string;
+  capacity: number | null;
+  confirmed_seats: number;
+  waiting_seats: number;
+  pending_reminders: number;
+  errors: string[];
+  notices: string[];
+}
+
+export interface EventChangePreview {
+  event_id: string;
+  impacts: EventChangeImpact[];
+  event_notices: string[];
+  blocked: boolean;
+  total_confirmed: number;
+  total_waiting: number;
+  total_pending_reminders: number;
+}
+
+export interface EventChangeApplyResult {
+  success: boolean;
+  deduplicated?: boolean;
+  version?: number;
+  log_id: string;
+  affected_confirmed?: number;
+  affected_waiting?: number;
+  notified?: number;
+}
+
+export interface EventLifecycleResult {
+  success: boolean;
+  deduplicated?: boolean;
+  unchanged?: boolean;
+  lifecycle_status: EventLifecycleStatus;
+  version: number;
+  log_id?: string;
+}
+
 export const eventsApi = {
   listEvents: (
     accountId: string,
@@ -14627,11 +14690,67 @@ export const eventsApi = {
       withAccount(`/api/events/admin/occurrences/${encodeURIComponent(occurrenceId)}/applicant-broadcasts/preview`, accountId),
       { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey }, body: JSON.stringify(data) },
     ).then((response) => response.data),
-  promoteOccurrenceWaitlist: (accountId: string, occurrenceId: string, expectedVersion: number) =>
+  promoteOccurrenceWaitlist: (accountId: string, occurrenceId: string, expectedVersion: number, reason: string) =>
     fetchApi<{ success: true; data: EventWaitlistPromotionResult }>(
       withAccount(`/api/events/admin/occurrences/${encodeURIComponent(occurrenceId)}/waitlist/promote`, accountId),
-      { method: 'POST', body: JSON.stringify({ expectedVersion }) },
+      { method: 'POST', body: JSON.stringify({ expectedVersion, reason }) },
     ).then((response) => response.data),
+  /** U: 待ち順の手動変更。理由が必須。 */
+  reorderOccurrenceWaitlist: (
+    accountId: string,
+    occurrenceId: string,
+    body: { ordered_ids: string[]; expectedVersion?: number; reason: string },
+  ) =>
+    fetchApi<{ success: true; occurrence_version: number; order: string[]; log_id: string }>(
+      withAccount(`/api/events/admin/occurrences/${encodeURIComponent(occurrenceId)}/waitlist/reorder`, accountId),
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+  /** U: 飛ばし（最後尾へ回す）。理由が必須。行は消さない。 */
+  skipOccurrenceWaitlist: (
+    accountId: string,
+    occurrenceId: string,
+    body: { waitlist_id: string; expectedVersion?: number; reason: string },
+  ) =>
+    fetchApi<{ success: true; occurrence_version: number; waitlist_id: string; log_id: string }>(
+      withAccount(`/api/events/admin/occurrences/${encodeURIComponent(occurrenceId)}/waitlist/skip`, accountId),
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+  /** U: 状態の切替（下書き・公開中・一時停止・終了・中止）。 */
+  setEventLifecycle: (
+    accountId: string,
+    eventId: string,
+    body: { to: EventLifecycleStatus; reason?: string; idempotency_key?: string },
+  ) =>
+    fetchApi<EventLifecycleResult>(
+      withAccount(`/api/events/admin/events/${eventId}/lifecycle`, accountId),
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+  /** U: 変更の事前表示（読み取り専用）。 */
+  previewEventChange: (
+    accountId: string,
+    eventId: string,
+    body: { slot_changes: EventSlotChange[]; event_changes?: { venue_name?: string | null; venue_url?: string | null } },
+  ) =>
+    fetchApi<EventChangePreview>(
+      withAccount(`/api/events/admin/events/${eventId}/change-review`, accountId),
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+  /** U: 変更確認の適用。 */
+  applyEventChange: (
+    accountId: string,
+    eventId: string,
+    body: {
+      expected_version: number;
+      change_reason?: string;
+      idempotency_key: string;
+      slot_changes: EventSlotChange[];
+      event_changes?: { venue_name?: string | null; venue_url?: string | null };
+    },
+  ) =>
+    fetchApi<EventChangeApplyResult>(
+      withAccount(`/api/events/admin/events/${eventId}/change-review/apply`, accountId),
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
   listBookings: (
     accountId: string,
     eventId: string,
