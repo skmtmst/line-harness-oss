@@ -70,7 +70,12 @@ function scoreRangeCondition(params: URLSearchParams): SegmentCondition | null {
   const max = parse('scoreMax')
   if (min === null && max === null) return null
   if (min !== null && max !== null && min > max) return null
-  return { operator: 'AND', rules: [{ type: 'score_range', value: { min, max } }] }
+  // R300: 行動スコアの帯から来たときは「点数がついている人」だけを対象にする。
+  const scoredOnly = params.get('scoredOnly') === '1'
+  return {
+    operator: 'AND',
+    rules: [{ type: 'score_range', value: { min, max, ...(scoredOnly ? { scoredOnly: true } : {}) } }],
+  }
 }
 
 /**

@@ -97,6 +97,8 @@ function FriendsPageInner({
   const scoreMin = scoreBoundary(searchParams.get('scoreMin'))
   const scoreMax = scoreBoundary(searchParams.get('scoreMax'))
   const hasScoreRange = scoreMin !== undefined || scoreMax !== undefined
+  // R300: 行動スコアの帯からの引き継ぎは「点数がついている人」だけ。未採点の0点を除く。
+  const scoredOnly = searchParams.get('scoredOnly') === '1'
   const audienceId = searchParams.get('audienceId')?.trim() || ''
   const directSavedSearchId = searchParams.get('savedSearch')
   const [friends, setFriends] = useState<FriendListItem[]>([])
@@ -217,10 +219,11 @@ function FriendsPageInner({
         attentionOnly,
         scoreMin,
         scoreMax,
+        scoredOnly,
         audienceId,
         advanced,
       }),
-    [searchSubmitted, selectedTagId, responseFilter, operatorId, scenarioId, attentionOnly, scoreMin, scoreMax, audienceId, advanced],
+    [searchSubmitted, selectedTagId, responseFilter, operatorId, scenarioId, attentionOnly, scoreMin, scoreMax, scoredOnly, audienceId, advanced],
   )
   const broadcastHandoffHref =
     broadcastHandoff.kind === 'ready' && canRunBulk(staffRole)
@@ -313,6 +316,7 @@ function FriendsPageInner({
         metadata: attentionOnly ? { __attention: '1' } : undefined,
         scoreMin,
         scoreMax,
+        scoredOnly: scoredOnly || undefined,
       })
       if (requestId !== loadRequestRef.current) return
       const context = loadContextRef.current
@@ -339,7 +343,7 @@ function FriendsPageInner({
       setTotal(0)
       setLoadStatus('error')
     }
-  }, [advanced, attentionOnly, audienceId, operatorId, page, pageSize, responseFilter, scenarioId, scoreMax, scoreMin, searchSubmitted, selectedAccountId, selectedTagId, sortMode])
+  }, [advanced, attentionOnly, audienceId, operatorId, page, pageSize, responseFilter, scenarioId, scoreMax, scoreMin, scoredOnly, searchSubmitted, selectedAccountId, selectedTagId, sortMode])
 
   useEffect(() => void loadOptions(), [loadOptions])
   useEffect(() => void loadMarks(), [loadMarks])
@@ -462,6 +466,7 @@ function FriendsPageInner({
             行動スコア：{scoreMin !== undefined ? `${scoreMin}点以上` : ''}
             {scoreMin !== undefined && scoreMax !== undefined ? '〜' : ''}
             {scoreMax !== undefined ? `${scoreMax}点以下` : ''}
+            {scoredOnly ? '（点数がついている人のみ）' : ''}
           </span>
           <Link href="/friends" className="font-semibold text-action hover:underline">この条件を外す</Link>
         </div>

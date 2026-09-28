@@ -554,6 +554,15 @@ function buildRuleClause(rule: SegmentRule): { sql: string; bindings: unknown[] 
         clauses.push('f.score <= ?')
         bindings.push(max)
       }
+      /*
+       * R300: 行動スコア一覧の帯は「点数がついている人」だけを数える
+       * （`f.score != 0 OR 履歴あり`）。低い帯の引き継ぎで未採点の0点まで
+       * 拾わないよう、引き継ぎ側が `scoredOnly: true` を付けて同じ定義にする。
+       * 付けない既存の条件は従来どおり（点数範囲だけ）。
+       */
+      if (v.scoredOnly === true) {
+        clauses.push('(f.score != 0 OR EXISTS (SELECT 1 FROM friend_scores scored_only WHERE scored_only.friend_id = f.id))')
+      }
       return { sql: `(${clauses.join(' AND ')})`, bindings }
     }
 
