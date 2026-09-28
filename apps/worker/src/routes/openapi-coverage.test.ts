@@ -394,6 +394,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/friends/{id}/tags',
   'POST /api/file-scans/{id}/release',
   'POST /api/file-scans/{id}/retry',
+  'POST /api/forms/{id}/duplicate',
   'POST /api/forms/{id}/publish',
   'POST /api/forms/{id}/submissions/{submissionId}/retry-effects',
   'POST /api/forms/{id}/test-token',

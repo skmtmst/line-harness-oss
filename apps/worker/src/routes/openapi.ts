@@ -5798,6 +5798,33 @@ const spec = {
         },
       },
     },
+    '/api/forms/{id}/duplicate': {
+      post: {
+        tags: ['Forms'],
+        summary: 'フォーム全体を別IDの下書きとして複製する',
+        description: '質問・レイアウト・回答後の設定・所属フォルダ・利用アカウントを引き継ぐ。集まった回答・公開版・公開状態・集計は引き継がず、複製は必ず受付停止で作る。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: false, schema: { type: 'string' } },
+        ],
+        requestBody: {
+          required: false,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: { name: { type: 'string', description: '複製の名前。空なら「元の名前の複製」' } },
+              },
+            },
+          },
+        },
+        responses: {
+          '201': { description: '複製した下書き（受付停止）' },
+          '403': { description: 'フォームの編集権限が無い' },
+          '404': { description: 'フォームが無い、または権限範囲外' },
+        },
+      },
+    },
     '/api/forms/{id}/test-token': {
       post: {
         tags: ['Forms'],
