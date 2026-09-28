@@ -63,9 +63,11 @@ function isValidReward(v: unknown): v is number {
 }
 
 /**
- * 案件に結ぶタグ・シナリオが、案件と同じLINEアカウントのものか確かめる
+ * 案件に結ぶタグ・シナリオが、案件と同じLINEアカウントの有効なものか確かめる
  * （#554 点検#505中3）。他アカウントのものを結ぶと成果時の誤動作・
  * 情報の混ざりになる。存在しない・見えないは区別せず400にする。
+ * 保管済みタグ・停止中シナリオは承認時点で実行できないので、
+ * ここで具体的な理由を添えて止める（監査 R193）。
  */
 async function offerReferenceError(
   db: D1Database,
@@ -73,12 +75,25 @@ async function offerReferenceError(
   id: string,
   lineAccountId: string,
 ): Promise<string | null> {
-  const table = kind === 'tag' ? 'tags' : 'scenarios';
   const label = kind === 'tag' ? 'タグ' : 'シナリオ';
+  if (kind === 'tag') {
+    const row = await db.prepare(
+      `SELECT id, status FROM tags WHERE id = ? AND line_account_id = ?`,
+    ).bind(id, lineAccountId).first<{ id: string; status: string }>();
+    if (!row) return `${label}が見つかりません。選び直してください`;
+    if (row.status !== 'active') {
+      return 'このタグは保管済みのため、成果の動作には使えません。別のタグを選ぶか、タグの整理をやり直してください';
+    }
+    return null;
+  }
   const row = await db.prepare(
-    `SELECT id FROM ${table} WHERE id = ? AND line_account_id = ?`,
-  ).bind(id, lineAccountId).first<{ id: string }>();
-  return row ? null : `${label}が見つかりません。選び直してください`;
+    `SELECT id, is_active FROM scenarios WHERE id = ? AND line_account_id = ?`,
+  ).bind(id, lineAccountId).first<{ id: string; is_active: number }>();
+  if (!row) return `${label}が見つかりません。選び直してください`;
+  if (!row.is_active) {
+    return 'このシナリオは停止中のため、成果の動作には使えません。別のシナリオを選ぶか、シナリオを再開してください';
+  }
+  return null;
 }
 
 async function offerReferencesError(

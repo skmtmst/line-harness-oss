@@ -74,4 +74,53 @@ describe('N-211 案件作成の選択肢は選択accountで絞る', () => {
       expect(url).toContain('acc-1')
     }
   })
+
+  /*
+   * R193: 保管済みタグ・停止中シナリオは成果承認時に実行できない。
+   * 作成画面の候補から外す（案件編集モーダルの #798 と同じ決まり）。
+   */
+  it('保管済みタグと停止中シナリオは候補に出さない', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url: unknown) => {
+      const text = String(url)
+      if (text.includes('/api/tags')) {
+        return { ok: true, status: 200, json: async () => ({ success: true, data: [
+          { id: 't1', name: '有効タグ', lineAccountId: 'acc-1', status: 'active' },
+          { id: 't2', name: '保管済みタグ', lineAccountId: 'acc-1', status: 'archived' },
+        ] }) }
+      }
+      if (text.includes('/api/scenarios')) {
+        return { ok: true, status: 200, json: async () => ({ success: true, data: { items: [
+          { id: 's1', name: '有効シナリオ', lineAccountId: 'acc-1', isActive: true },
+          { id: 's2', name: '停止シナリオ', lineAccountId: 'acc-1', isActive: false },
+        ], total: 2 } }) }
+      }
+      return { ok: true, status: 200, json: async () => ({ success: true, data: {} }) }
+    }))
+    await act(async () => {
+      root.render(<NewAffiliateOfferPage />)
+    })
+    await settle(100)
+
+    const optionLabels = async (buttonId: string) => {
+      const button = host.querySelector<HTMLButtonElement>(`#${buttonId}`)
+      expect(button).toBeTruthy()
+      await act(async () => { button!.click() })
+      // 選択肢は最上層（portal）に出るので document 側を見る。
+      const labels = [...document.querySelectorAll('[role="option"]')]
+        .map((el) => el.textContent ?? '')
+      return labels
+    }
+
+    const tagLabels = await optionLabels('of-tag')
+    expect(tagLabels.some((text) => text.includes('有効タグ'))).toBe(true)
+    expect(tagLabels.some((text) => text.includes('保管済みタグ'))).toBe(false)
+
+    // 開いているメニューを閉じてからシナリオ側を開く。
+    await act(async () => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    })
+    const scenarioLabels = await optionLabels('of-scenario')
+    expect(scenarioLabels.some((text) => text.includes('有効シナリオ'))).toBe(true)
+    expect(scenarioLabels.some((text) => text.includes('停止シナリオ'))).toBe(false)
+  })
 })

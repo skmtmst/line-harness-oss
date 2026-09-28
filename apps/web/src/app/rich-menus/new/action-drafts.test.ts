@@ -63,6 +63,36 @@ describe('R23 アカウント切替で前の候補にしかないタグを外す
   })
 })
 
+describe('R203 「URLを開く」の飛び先検査', () => {
+  function urlArea(id: string, uri: string, trackedLinkId: string | null = null): Area {
+    return {
+      ...textArea(id),
+      actionType: 'uri',
+      intent: 'url',
+      actionData: { uri },
+      trackedLinkId,
+    }
+  }
+
+  it('URLではない文字列は「設定済み」にしない', () => {
+    expect(isAreaActionConfigured(urlArea('a', 'not-a-url'))).toBe(false)
+    expect(unsetAreaLabels([urlArea('a', 'not-a-url')])).toEqual(['A'])
+  })
+
+  it('正しいURLなら設定済み。計測リンクを選んでいればURL欄は不要', () => {
+    expect(isAreaActionConfigured(urlArea('a', 'https://example.com/apply'))).toBe(true)
+    expect(isAreaActionConfigured(urlArea('a', '', 'link-1'))).toBe(true)
+    // LINEのuriアクションが通す scheme（電話・メール）も設定済みとして扱う
+    expect(isAreaActionConfigured(urlArea('a', 'tel:0312345678'))).toBe(true)
+    expect(isAreaActionConfigured(urlArea('a', 'mailto:info@example.com'))).toBe(true)
+  })
+
+  it('空欄と使えない scheme は未設定のまま', () => {
+    expect(isAreaActionConfigured(urlArea('a', ''))).toBe(false)
+    expect(isAreaActionConfigured(urlArea('a', 'javascript:alert(1)'))).toBe(false)
+  })
+})
+
 describe('m18r アカウント切替で前の候補にしかないテンプレートを外す', () => {
   function templateArea(id: string, templateId: string | null): Area {
     return { ...textArea(id, ''), intent: 'template', templateId }
