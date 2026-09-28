@@ -257,6 +257,73 @@ export function ConditionDialog({
   )
 }
 
+/* -------------------------------------- 終了後の移動先にされているときの注意 */
+
+export type MoveReferrer = { id: string; name: string }
+
+/**
+ * R250: 削除の確認窓で「どのシナリオの終了後の処理が変わるか」を見せる。
+ *
+ * 一覧・詳細の両方の削除確認から使う。件数は取れたときだけ出す。
+ * 読み込み中・失敗は件数を書かず、失敗は「戻ることがある」とだけ伝える。
+ * 参照が無いときは何も出さない（0件の断りは書かない）。
+ */
+export function MoveReferrersNotice({ scenarioId }: { scenarioId: string }) {
+  const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [items, setItems] = useState<MoveReferrer[]>([])
+
+  useEffect(() => {
+    let stale = false
+    setState('loading')
+    setItems([])
+    api.scenarios.moveReferrers(scenarioId).then(
+      (res) => {
+        if (stale) return
+        if (res.success) {
+          setItems(res.data.items)
+          setState('ready')
+        } else {
+          setState('error')
+        }
+      },
+      () => {
+        if (!stale) setState('error')
+      },
+    )
+    return () => {
+      stale = true
+    }
+  }, [scenarioId])
+
+  if (state === 'loading') {
+    return <p className="text-ink-faint text-xs">終了後の移動先としての利用を確認しています…</p>
+  }
+  if (state === 'error') {
+    return (
+      <p className="text-warning text-xs font-medium">
+        終了後の移動先としての利用を確認できませんでした。削除すると、利用していたシナリオの終了後の処理が「一時停止」に戻ることがあります。
+      </p>
+    )
+  }
+  if (items.length === 0) return null
+  const shown = items.slice(0, 5)
+  const rest = items.length - shown.length
+  return (
+    <div>
+      <p className="text-warning text-sm font-medium">
+        このシナリオは{items.length}件のシナリオの終了後の移動先になっています。
+      </p>
+      <p className="text-ink-secondary mt-1 text-xs">
+        {shown.map((s) => s.name).join('、')}
+        {rest > 0 ? `、ほか${rest}件` : ''}
+      </p>
+      <p className="text-ink-secondary mt-1 text-xs">
+        削除すると、これらのシナリオの終了後の処理は「一時停止」に戻ります。
+      </p>
+    </div>
+  )
+}
+
 /* -------------------------------------------- 最終コンテンツ配信後の処理 */
 
 export type OnCompleteMode = 'pause' | 'resume_previous' | 'move'
@@ -375,6 +442,14 @@ export function OnCompleteDialog({
             type="button"
             disabled={saving}
             onClick={async () => {
+              /*
+               * R250: 移動先のない「次のシナリオへ移動」は保存しない。
+               * 欠落したまま送ると400になるだけなので、窓の中で理由を出す。
+               */
+              if (draftMode === 'move' && !draftTarget && candidatesState === 'ready') {
+                setError('「次のシナリオへ移動」には移動先のシナリオが要ります。')
+                return
+              }
               setSaving(true)
               try {
                 const err = await onSave(draftMode, draftMode === 'move' ? draftTarget : null)
@@ -502,6 +577,16 @@ export function OnCompleteDialog({
               {savedTargetMissing ? (
                 <p className="text-warning mt-1.5 text-xs">
                   保存されている移動先はこのアカウントの候補にありません（別アカウント・削除済み・権限外の可能性）。そのまま保存すると現在の値が維持されます。
+                </p>
+              ) : null}
+              {/*
+                R250: 移動先が空のままの「次のシナリオへ移動」は保存できない
+                設定。選ばずに閉じると気づけないので、窓の中で理由を出す。
+                （失敗・警告は HelpTip に入れない決まりのため、本文に書く）
+              */}
+              {candidatesState === 'ready' && !draftTarget ? (
+                <p className="text-warning mt-1.5 text-xs font-medium">
+                  移動先が選ばれていません。選んで保存してください。
                 </p>
               ) : null}
             </>

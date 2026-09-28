@@ -40,6 +40,7 @@ import QuestionEditor, {
 } from '@/components/scenarios/question-editor'
 import {
   ConditionDialog,
+  MoveReferrersNotice,
   OnCompleteDialog,
   TestSendDialog,
   ON_COMPLETE_LABEL,
@@ -2105,11 +2106,21 @@ export default function ScenarioDetailClient({
                   <span className="text-ink block text-sm font-bold underline-offset-2 hover:underline">
                     {ON_COMPLETE_LABEL[(scenario.onCompleteMode ?? 'pause') as OnCompleteMode]}
                   </span>
-                  <span className="text-ink-faint mt-0.5 block text-xs">
-                    {actionCounts['__complete__']
-                      ? `アクション ${actionCounts['__complete__']} 件`
-                      : '読み終えた人を次のシナリオへ送ることもできます'}
-                  </span>
+                  {/*
+                    R250: 移動先のない「次のシナリオへ移動」は保存できない設定。
+                    削除などで欠けたまま残っていることがあるので、札でも知らせる。
+                  */}
+                  {(scenario.onCompleteMode ?? 'pause') === 'move' && !scenario.onCompleteScenarioId ? (
+                    <span className="text-warning mt-0.5 block text-xs font-medium">
+                      移動先が選ばれていません。開いて選び直してください。
+                    </span>
+                  ) : (
+                    <span className="text-ink-faint mt-0.5 block text-xs">
+                      {actionCounts['__complete__']
+                        ? `アクション ${actionCounts['__complete__']} 件`
+                        : '読み終えた人を次のシナリオへ送ることもできます'}
+                    </span>
+                  )}
                 </button>
               </SettingCard>
             </div>
@@ -2602,7 +2613,12 @@ export default function ScenarioDetailClient({
           setDeleteScenarioOpen(false)
           setDeleteScenarioError('')
         }}
-      />
+      >
+        {/* R250: 終了後の移動先にされていると、削除で参照元の設定が変わる。件数が取れたときだけ出す。 */}
+        <div className="text-ink-secondary mt-3 space-y-2 text-sm">
+          <MoveReferrersNotice scenarioId={id} />
+        </div>
+      </ConfirmDialog>
 
       {/* SCENARIO-09: 複製が途中で止まったときの、作りかけコピーの削除確認 */}
       <ConfirmDialog

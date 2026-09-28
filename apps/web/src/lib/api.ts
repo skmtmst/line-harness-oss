@@ -7771,6 +7771,14 @@ export const api = {
       }),
     delete: (id: string) =>
       fetchApi<ApiResponse<null>>(`/api/scenarios/${id}`, { method: 'DELETE' }),
+    /**
+     * R250: このシナリオを終了後の移動先にしているシナリオの一覧。
+     * 削除の確認窓で「どのシナリオの設定が変わるか」を見せる。
+     */
+    moveReferrers: (id: string) =>
+      fetchApi<ApiResponse<{ items: Array<{ id: string; name: string }>; total: number }>>(
+        `/api/scenarios/${id}/move-referrers`,
+      ),
     addStep: (
       id: string,
       data: {
