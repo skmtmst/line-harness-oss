@@ -207,7 +207,7 @@ function hasLinkedActions(tag: Tag): boolean {
 }
 
 /**
- * 今月（日本時間）に作られたか。「今月追加」の判定。
+ * 今月（日本時間）に作られたか。「今月増えたタグ」の判定。
  *
  * サーバーは UTC の ISO で返す。日本時間で数えないと、月初と月末の
  * 9時間ぶんがずれる（8/1 の朝に作ったタグが7月扱いになる）。
@@ -240,17 +240,12 @@ function formatDate(value: string): string {
  * 2026-08-26 まで3つしか無く、しかも「今月増えた」は絞り込みの中に
  * 対応する枝が無くて**押しても何も起きなかった**。
  */
-/*
- * m22c: 5つの札は1440pxで1行に収める。絞りの意味は変えず、言葉だけ短くする
- * （「のタグ」「増えた」「あり」「表示」を落とす）。「よく使う」の
- * 見出しと組みで意味が通る。
- */
 const QUICK_FILTERS: Array<[string, string]> = [
-  ['unused', '未使用'],
-  ['recent', '今月追加'],
-  ['auto', '自動付与'],
+  ['unused', '未使用のタグ'],
+  ['recent', '今月増えたタグ'],
+  ['auto', '自動付与あり'],
   ['linked', '連動あり'],
-  ['starred', '★のみ'],
+  ['starred', '★のみ表示'],
 ]
 
 const cardShadow = '[box-shadow:1px_1px_1px_rgba(15,23,42,0.14)]'
@@ -690,7 +685,7 @@ export default function TagsPageV4({
     for (const key of quick) {
       if (key === 'unused' && !unused) return false
       if (key === 'recent' && !isThisMonth(tag.createdAt)) return false
-      // 「自動付与」は手動を含まない。手動は自動ではない。
+      // 「自動付与あり」は手動を含まない。手動は自動ではない。
       if (key === 'auto' && (!tag.assignSource || tag.assignSource === 'manual')) return false
       if (key === 'linked' && !linked) return false
       if (key === 'starred' && !tag.isStarred) return false

@@ -267,13 +267,8 @@ describe('友だち属性 V4 contract', () => {
 
   it('「よく使う」は設計の5つで、どれも絞り込みに効く', () => {
     const source = read('components/friend-fields/tags-page-v4.tsx')
-    // m22c: 1440pxで1行に収めるため言葉を短くした。5つの絞りと枝は変えない。
-    // 長い言い方に戻っていたら赤（1行に収まらなくなる）。
-    for (const entry of ["['unused', '未使用']", "['recent', '今月追加']", "['auto', '自動付与']", "['linked', '連動あり']", "['starred', '★のみ']"]) {
-      expect(source, `よく使うに「${entry}」が無い`).toContain(entry)
-    }
-    for (const old of ['未使用のタグ', '今月増えたタグ', '自動付与あり', '★のみ表示']) {
-      expect(source, `長い札「${old}」が残っている`).not.toContain(old)
+    for (const label of ['未使用のタグ', '今月増えたタグ', '自動付与あり', '連動あり', '★のみ表示']) {
+      expect(source, `よく使うに「${label}」が無い`).toContain(label)
     }
     // 2026-08-26: 「今月増えた」は札だけあって、絞り込みに枝が無く
     // **押しても何も起きなかった**。5つとも枝があることを見る。
