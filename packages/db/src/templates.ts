@@ -1003,6 +1003,16 @@ export async function getTemplatesWithUsageCount(
          FROM reminder_steps rs JOIN reminders r ON r.id = rs.reminder_id
         WHERE rs.template_id IS NOT NULL
        UNION ALL
+       -- R347: 旧公開版に固定された送信待ち・取消ずみ（再開できる）の登録も
+       -- 1登録1件で数える。版を切り替えても使用先が0件に見えないようにする。
+       -- 手順単位ではなく登録単位にまとめる（使用先の件数とずらさない）。
+       SELECT rvs.template_id, r.line_account_id AS acct
+         FROM friend_reminders fr
+         JOIN reminders r ON r.id = fr.reminder_id
+         JOIN reminder_version_steps rvs ON rvs.reminder_version_id = fr.reminder_version_id
+        WHERE rvs.template_id IS NOT NULL AND fr.status IN ('active', 'cancelled')
+        GROUP BY rvs.template_id, fr.id
+       UNION ALL
        SELECT a.template_id, g.account_id AS acct
          FROM rich_menu_areas a
          JOIN rich_menu_pages p ON p.id = a.page_id
