@@ -190,6 +190,14 @@ export default function FormSubmissionsPage() {
   const [renameError, setRenameError] = useState('')
   /** 名前変更の保存に添える編集の版。一覧は持っていないので開くときに読む。 */
   const [renameRevision, setRenameRevision] = useState<number | null>(null)
+  /*
+   * R230: フォーム全体の複製。質問・分岐・デザイン・受付設定を引き継いだ
+   * 別IDの停止中フォームを作る。回答・公開状態・集計は引き継がない。
+   */
+  const [duplicateTarget, setDuplicateTarget] = useState<Form | null>(null)
+  const [duplicateName, setDuplicateName] = useState('')
+  const [duplicating, setDuplicating] = useState(false)
+  const [duplicateError, setDuplicateError] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<Form | null>(null)
   const [deleteImpact, setDeleteImpact] = useState<FormDeleteImpact | null>(null)
   const [deleteImpactLoading, setDeleteImpactLoading] = useState(false)
@@ -421,6 +429,36 @@ export default function FormSubmissionsPage() {
         : 'フォーム名を変更できませんでした。もう一度お試しください。')
     } finally {
       setSavingName(false)
+    }
+  }
+
+  const openDuplicate = (form: Form) => {
+    setDuplicateTarget(form)
+    setDuplicateName(`${displayFormName(form.name)}の複製`)
+    setDuplicateError('')
+  }
+
+  const duplicateForm = async () => {
+    if (!duplicateTarget || duplicating || !selectedAccountId) return
+    const name = duplicateName.trim()
+    if (!name) {
+      setDuplicateError('複製の名前を入力してください。')
+      return
+    }
+    setDuplicating(true)
+    setDuplicateError('')
+    try {
+      const res = await api.forms.duplicate(duplicateTarget.id, selectedAccountId, name)
+      if (!res.success) throw new Error(res.error)
+      setDuplicateTarget(null)
+      // 複製は停止中の下書き。用途に合わせて直せるよう、編集画面を開く。
+      router.push(`/form-submissions/edit?id=${encodeURIComponent(res.data.id)}&tab=basic`)
+    } catch (error) {
+      setDuplicateError(error instanceof ApiError && error.status === 404
+        ? '元のフォームが見つかりませんでした。一覧を開き直してください。'
+        : 'フォームを複製できませんでした。もう一度お試しください。')
+    } finally {
+      setDuplicating(false)
     }
   }
 
@@ -950,6 +988,8 @@ export default function FormSubmissionsPage() {
                         menuItems={[
                           { id: 'rename', label: '名前を変更', onSelect: () => void openRename(form) },
                           { id: 'move', label: 'フォルダへ移す', onSelect: () => openMove(form) },
+                          // R230: フォーム全体の複製。質問・分岐・受付設定を引き継いだ別IDの下書きを作る。
+                          { id: 'duplicate', label: '複製する', onSelect: () => openDuplicate(form) },
                         ]}
                         destructiveItem={{ id: 'delete', label: '削除する', onSelect: () => void openDelete(form) }}
                         subjectName={normalizedName}
@@ -1120,6 +1160,33 @@ export default function FormSubmissionsPage() {
             </label>
           ))}
         </div>
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={duplicateTarget !== null}
+        title={duplicateTarget ? `「${displayFormName(duplicateTarget.name)}」を複製しますか？` : 'フォームを複製しますか？'}
+        description="質問・分岐・デザイン・回答後の設定を引き継いだ、受付停止中のフォームを作ります。集まった回答・公開状態・集計は引き継ぎません。"
+        confirmLabel="複製する"
+        busy={duplicating}
+        error={duplicateError || undefined}
+        onConfirm={() => void duplicateForm()}
+        onCancel={() => {
+          if (duplicating) return
+          setDuplicateTarget(null)
+          setDuplicateError('')
+        }}
+      >
+        <label className="block">
+          <span className="mb-1.5 block text-xs font-medium text-ink-secondary">複製の名前</span>
+          <input
+            value={duplicateName}
+            onChange={(event) => setDuplicateName(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') void duplicateForm()
+            }}
+            className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+          />
+        </label>
       </ConfirmDialog>
 
       <ConfirmDialog

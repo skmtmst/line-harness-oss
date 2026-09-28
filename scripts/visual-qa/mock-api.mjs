@@ -2444,6 +2444,11 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (formTestToken) {
     return { success: true, data: { token: 'test-token-qa', expiresAt: '2026-09-28T15:00:00.000+09:00' } }
   }
+  // R230: フォーム全体の複製。絵の検証用に新しい下書き（受付停止）を返す。
+  const formDuplicate = method === 'POST' && /^\/api\/forms\/([^/]+)\/duplicate$/.exec(pathname)
+  if (formDuplicate) {
+    return { success: true, data: { id: 'form-duplicate-qa', isActive: false } }
+  }
   if (pathname === '/api/forms') {
     return { success: true, data: query.get('with_list_summary') === '1' ? FORM_LIST : FORMS }
   }

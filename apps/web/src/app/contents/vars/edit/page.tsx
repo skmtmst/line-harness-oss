@@ -109,6 +109,10 @@ function EditCommonVarInner() {
 
   /** 予約を足す窓。開いていない間は null。 */
   const [draft, setDraft] = useState<{ date: string; time: string; value: string } | null>(null)
+  /** 予約を全部消す確認窓。チェックを外したときに開く。 */
+  const [clearSchedulesOpen, setClearSchedulesOpen] = useState(false)
+  const [clearSchedulesBusy, setClearSchedulesBusy] = useState(false)
+  const [clearSchedulesError, setClearSchedulesError] = useState('')
 
   // 直したら欄の下の文言は消す。残ると直ったのに怒られているように見える。
   useEffect(() => { setValueFieldError('') }, [value])
@@ -555,7 +559,10 @@ function EditCommonVarInner() {
         return
       }
       setDraft(null)
-      void load()
+      // `load()` だと名前・値・期間の入力欄まで保存済みの値へ戻る。
+      // 予約の追加は本体の保存と別物なので、保存済みの写しだけを取り直し
+      // 打ち込んだ内容は残す（refreshBaseline と同じ考え方）。
+      await refreshBaseline(item.id, selectedAccountId)
     } catch (e) {
       // サーバの生文言（500の'Internal server error'など）は出さない。
       setError(scheduleErrorText(e))
@@ -567,9 +574,34 @@ function EditCommonVarInner() {
     setError('')
     try {
       await api.commonVars.deleteSchedule(item.id, scheduleId, selectedAccountId)
-      void load()
+      // 予定の削除でも入力中の名前・値・期間は消さない。予定一覧だけ
+      // 取り直す（refreshBaseline）。
+      await refreshBaseline(item.id, selectedAccountId)
     } catch {
       setError('予約の削除に失敗しました。通信を確かめて、もう一度お試しください。')
+    }
+  }
+
+  /*
+    「自動で文字を変える」のチェックを外す操作。予定が1件でもあると
+    チェックが付いたまま見えるので、外した＝全部消す、に揃える。
+    いきなり消さず確認窓を出すのは、予定は時刻で値を書き換える
+    重い設定だから。窓で「すべて消す」を選んだときだけ消す。
+  */
+  const clearSchedules = async () => {
+    if (!item || !selectedAccountId) return
+    setClearSchedulesBusy(true)
+    setClearSchedulesError('')
+    try {
+      for (const schedule of schedules) {
+        await api.commonVars.deleteSchedule(item.id, schedule.id, selectedAccountId)
+      }
+      setClearSchedulesOpen(false)
+      await refreshBaseline(item.id, selectedAccountId)
+    } catch {
+      setClearSchedulesError('消せなかった予定があります。通信を確かめて、もう一度お試しください。')
+    } finally {
+      setClearSchedulesBusy(false)
     }
   }
 
@@ -916,11 +948,21 @@ function EditCommonVarInner() {
                 <label className="flex cursor-pointer items-start gap-3">
                   <input
                     type="checkbox"
-                    checked={schedules.length > 0}
-                    onChange={() => {
-                      if (schedules.length === 0) {
-                        const now = jstNowLocalInput()
-                        setDraft({ date: now.date, time: '00:00', value })
+                    checked={schedules.length > 0 || draft !== null}
+                    onChange={(event) => {
+                      if (event.target.checked) {
+                        if (schedules.length === 0 && draft === null) {
+                          const now = jstNowLocalInput()
+                          setDraft({ date: now.date, time: '00:00', value })
+                        }
+                      } else if (draft !== null) {
+                        // 登録前の入力中なら、窓を畳むだけで済む。
+                        setDraft(null)
+                      } else {
+                        // 登録済みの予定は時刻に値を書き換える設定。
+                        // 外す＝全部消すなので、確認を挟む。
+                        setClearSchedulesError('')
+                        setClearSchedulesOpen(true)
                       }
                     }}
                     className="mt-1 accent-green-500"
@@ -1340,6 +1382,19 @@ function EditCommonVarInner() {
           ) : null}
         </div>
       </ConfirmDialog>
+
+      {/* チェックを外す＝登録済みの予定を全部消す、の確認。 */}
+      <ConfirmDialog
+        open={clearSchedulesOpen}
+        title="更新の予定をすべて消しますか？"
+        description="予定の時刻に値が変わる設定をすべて取り消します。いま入力中の内容はそのまま残ります。"
+        confirmLabel="すべて消す"
+        destructive
+        busy={clearSchedulesBusy}
+        error={clearSchedulesError || undefined}
+        onConfirm={clearSchedulesBusy ? undefined : () => void clearSchedules()}
+        onCancel={() => { if (!clearSchedulesBusy) setClearSchedulesOpen(false) }}
+      />
 
       {leaveConfirmDialog}
     </div>
