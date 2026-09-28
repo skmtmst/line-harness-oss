@@ -618,6 +618,36 @@ describe('V6 mileage rewards', () => {
     ).get(reserved.redemption.id)).toEqual({ status: 'started', needsReconcile: 1, generation: 1 });
   });
 
+  /*
+   * R299: 画面は「0 と書くと品切れ」と案内するのに、保存側の検証が 0 を
+   * 拒否していた。空欄=無制限・0=品切れ・正の整数=上限で画面・保存・
+   * 交換判定を揃える。
+   */
+  it('stores zero stock as sold out and keeps blank unlimited', async () => {
+    const soldOut = await createMileageRewardDraft(db, {
+      lineAccountId: 'account-1',
+      draft: { name: '品切れ特典', rewardKind: 'coupon', requiredMiles: 300, stockLimit: 0 },
+    });
+    expect(soldOut.currentVersion?.stockLimit).toBe(0);
+
+    const unlimited = await createMileageRewardDraft(db, {
+      lineAccountId: 'account-1',
+      draft: { name: '無制限特典', rewardKind: 'coupon', requiredMiles: 300, stockLimit: null },
+    });
+    expect(unlimited.currentVersion?.stockLimit).toBeNull();
+
+    // 負数・小数・数にならない文字は「無制限」へ黙って潰さず拒否する。
+    for (const bad of [-1, 1.5, 'abc']) {
+      await expect(createMileageRewardDraft(db, {
+        lineAccountId: 'account-1',
+        draft: {
+          name: '不正な在庫', rewardKind: 'coupon', requiredMiles: 300,
+          stockLimit: bad as number,
+        },
+      })).rejects.toMatchObject({ code: 'invalid_number' });
+    }
+  });
+
   it('rejects unsupported or more than 15 reward target conditions', async () => {
     await expect(createMileageRewardDraft(db, {
       lineAccountId: 'account-1',
