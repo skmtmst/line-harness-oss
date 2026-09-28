@@ -9,7 +9,6 @@ import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import StatusBadge from '@/components/shared/status-badge'
 import { STATE_TEXT } from '@/components/shared/not-connected'
 import { dashboardLocalUpdatedAt } from '@/components/dashboard/freshness'
-import ListRange from '@/components/ui/list-range'
 import Notice from '@/components/shared/notice'
 
 /**
@@ -126,8 +125,6 @@ export default function PendingInboxCard({
   const staffIdRef = useRef<string | null>(null)
   const total = summary?.total ?? 0
   const pageCount = Math.max(1, Math.ceil(total / pageSize))
-  const firstRow = total === 0 ? 0 : (page - 1) * pageSize + 1
-  const lastRow = Math.min(total, (page - 1) * pageSize + items.length)
 
   /*
    * 担当者ごとの表示件数を復元する（DASH-25）。
@@ -216,9 +213,9 @@ export default function PendingInboxCard({
           この一覧は可視の全アカウントの合計。同じ画面の小カード
           「対応が必要な受信」(選択中のアカウントの数)とは範囲が違うため、
           範囲を題に書いて混同を防ぐ。
+          件数は小カードの1か所に集約し、見出しの横では繰り返さない（m22d）。
         */
         title="対応が必要な受信（全アカウント）"
-        meta={summary && summary.total > 0 ? `${summary.total}件` : undefined}
         action={<Link href="/chats" className="hover:underline">受信箱をすべて見る →</Link>}
         actionTone="info"
       />
@@ -348,12 +345,16 @@ export default function PendingInboxCard({
               </li>
             ))}
           </ul>
-          {total > 0 ? (
+          {/*
+            件数は小カードの1か所に集約し、一覧の下では繰り返さない（m22d）。
+            ページ送りだけ残す。1ページに収まるときは Pagination が null を
+            返すので、帯ごと出さない（押せない空の帯を残さない）。
+          */}
+          {total > 0 && pageCount > 1 ? (
             <nav
-              className="border-hairline flex h-[50px] shrink-0 items-center justify-between gap-3 border-t px-5"
+              className="border-hairline flex h-[50px] shrink-0 items-center justify-end gap-3 border-t px-5"
               aria-label="受信一覧のページ送り"
             >
-              <ListRange className="tabular-nums" total={total} first={firstRow} last={lastRow} />
               <Pagination
                 page={page}
                 pageCount={pageCount}

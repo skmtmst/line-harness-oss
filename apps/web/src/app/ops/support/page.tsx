@@ -476,7 +476,8 @@ export default function OpsSupportPage() {
                 <Meta label="プラン">{planLabel(ticket.tenantPlanKey)}・{PLAN_STATUS_LABEL[ticket.tenantPlanStatus] ?? ticket.tenantPlanStatus}</Meta>
                 <Meta label="店舗">{detail?.tenant.accountCount ?? 0}</Meta>
                 <Meta label="LINE登録">{detail ? `${detail.tenant.staffCount}人中${detail.tenant.staffWithLine}人` : '—'}</Meta>
-                <Meta label="過去のチケット">{detail ? `${detail.tenant.pastTickets}件（未解決 ${detail.tenant.pastOpen}）` : '—'}</Meta>
+                {/* m22d: 一覧の件数と重なる「○件」は出さない。未解決を先に言う。 */}
+                <Meta label="過去のチケット">{detail ? `これまで${detail.tenant.pastTickets}のうち未解決${detail.tenant.pastOpen}件` : '—'}</Meta>
                 <span className="col-span-full flex items-center justify-end gap-2">
                   <Button size="field" href={tenantDetailHref(ticket.tenantId)}>契約先を開く</Button>
                   <Button size="field" disabled={busy} onClick={() => void impersonate(ticket.tenantId, setBusy, setError)}>代理ログイン</Button>

@@ -1023,7 +1023,7 @@ export default function TagsPageV4({
                     <Th>使用先</Th>
                     <Th style={{ width: 56 }}>表示</Th>
                     {/* #768: 表が横に流れる帯でも操作列は右端に留める。 */}
-                    {/* 見出し「操作」は2文字で1行に収める（w-11 では「操／作」と折れる）。 */}
+                    {/* 見出し「操作」は2文字で1行に収める（w-11 では「操／作」と折れる）。操作列は中身（編集＋…）に合わせ128px（m21o・m22bで64pxのはみ出しを解消）。 */}
                     <Th style={{ width: 128 }} className="sticky right-0 whitespace-nowrap bg-canvas-sunken">操作</Th>
                   </TableHeadRow>
                 </thead>

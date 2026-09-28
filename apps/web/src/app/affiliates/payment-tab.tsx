@@ -126,7 +126,15 @@ function SettlementCloseDialog({
       {preview ? (
         <div className="space-y-4">
           <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">締める額</dt><dd className="text-ink mt-1 text-lg font-bold">{yen(preview.totalAmount)}</dd></div>
+            <div className="bg-canvas-sunken rounded-control p-3">
+              <dt className="text-ink-faint text-xs">締める額</dt>
+              <dd className="text-ink mt-1 text-lg font-bold">{yen(preview.totalAmount)}</dd>
+              {(preview.totalDeduction ?? 0) > 0 ? (
+                <p className="text-ink-faint mt-1 text-xs">
+                  元の報酬 {yen(preview.totalAmount + (preview.totalDeduction ?? 0))} − 取消の差し引き {yen(preview.totalDeduction ?? 0)}
+                </p>
+              ) : null}
+            </div>
             <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">払う相手</dt><dd className="text-ink mt-1 text-lg font-bold">{preview.affiliates.length.toLocaleString('ja-JP')}人</dd></div>
             <div className="bg-canvas-sunken rounded-control p-3"><dt className="text-ink-faint text-xs">成果</dt><dd className="text-ink mt-1 text-lg font-bold">{preview.conversionCount.toLocaleString('ja-JP')}件</dd></div>
           </dl>
@@ -497,6 +505,16 @@ export default function AffiliatePaymentTab({ accountId }: { accountId: string }
         </Notice>
       ) : null}
 
+      {/* R288: 取消の差し引きと、引ききれず次回へ繰り越す分を明記する。 */}
+      {(preview?.totalDeduction ?? 0) > 0 || (preview?.carriedDeduction?.amount ?? 0) > 0 ? (
+        <Notice tone="info">
+          締めたあとに取り消された分 {yen(preview?.totalDeduction ?? 0)} を差し引いています。
+          {(preview?.carriedDeduction?.amount ?? 0) > 0
+            ? `今回引ききれない ${yen(preview?.carriedDeduction?.amount ?? 0)} は次回へ繰り越し、正の振込はその分だけ減ります。`
+            : ''}
+        </Notice>
+      ) : null}
+
       {preview?.excludedZeroAmount && preview.excludedZeroAmount.count > 0 ? (
         <Notice tone="warn">
           報酬が0円の成果 {preview.excludedZeroAmount.count.toLocaleString('ja-JP')}件は、支払えないため今回の締め対象から外れています。対象は「{dateLabel(preview.periodTo)} で締める」の確認画面で見られます。
@@ -602,7 +620,14 @@ export default function AffiliatePaymentTab({ accountId }: { accountId: string }
               return (
                 <Tr key={item.affiliateId}>
                   <NameCell name={item.affiliateName} sub={`コード ${item.code}`} />
-                  <Td align="right" className="font-semibold tabular-nums">{yen(item.amount)}</Td>
+                  <Td align="right" className="font-semibold tabular-nums">
+                    {yen(item.amount)}
+                    {(item.deduction ?? 0) > 0 ? (
+                      <span className="text-ink-faint mt-0.5 block text-xs font-normal">
+                        元の報酬 {yen(item.grossAmount ?? item.amount + (item.deduction ?? 0))} − 取消の差し引き {yen(item.deduction ?? 0)}
+                      </span>
+                    ) : null}
+                  </Td>
                   <Td align="right" className="tabular-nums">認めた {item.conversionCount.toLocaleString('ja-JP')}件</Td>
                   <Td>
                     {item.bankProfileRegistered

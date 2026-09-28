@@ -368,6 +368,66 @@ describe('V6 friend-add rule data contracts', () => {
     expect(bogusAttribution.status).toBe(400);
   });
 
+  /*
+   * R264: 「直近28日の追加」は人数（ユニーク友だち）と回数（追加記録）を
+   * 分け、期間の外・別アカウント・絞り込みの外を数えない。
+   * R266: 「最終配信」は実際に送った記録の最新日時（受信順の先頭行の
+   * 処理時刻ではない）。
+   */
+  it('実行結果の集計は28日窓・絞り込み・実送信日時と一致する', async () => {
+    insertFriend(testDb.raw, 'friend-1', { line_account_id: 'account-1', display_name: '山田 太郎' });
+    insertFriend(testDb.raw, 'friend-2', { line_account_id: 'account-1', display_name: '佐藤 花子' });
+    insertFriend(testDb.raw, 'friend-9', { line_account_id: 'account-2', display_name: '別店 客' });
+    const jst = (daysAgo: number, hour = 10) =>
+      new Date(Date.now() - daysAgo * 86400000 + 9 * 3600000).toISOString().slice(0, 11) + `${String(hour).padStart(2, '0')}:00:00.000+09:00`;
+    const insertRun = (row: {
+      id: string; friendId: string; accountId?: string; kind?: string; status?: string;
+      occurredAt: string; processedAt?: string | null; deliveries?: number; firstSentAt?: string | null;
+    }) => testDb.raw.prepare(
+      `INSERT INTO friend_add_events
+        (id, line_account_id, friend_id, webhook_event_id, friend_kind, attribution_status,
+         routing_status, occurred_at, processed_at, delivery_count, first_delivery_sent_at)
+       VALUES (?, ?, ?, ?, ?, 'captured', ?, ?, ?, ?, ?)`,
+    ).run(
+      row.id, row.accountId ?? 'account-1', row.friendId, `webhook-${row.id}`,
+      row.kind ?? 'first_time', row.status ?? 'completed', row.occurredAt,
+      row.processedAt ?? row.occurredAt, row.deliveries ?? 0, row.firstSentAt ?? null,
+    );
+
+    // 直近28日内：同じ友だちへの2記録（人=1、記録=2）。先に来た記録ほど配信が古い。
+    insertRun({ id: 'run-a', friendId: 'friend-1', occurredAt: jst(3, 10), processedAt: jst(3, 10), deliveries: 1, firstSentAt: jst(3, 10) });
+    insertRun({ id: 'run-b', friendId: 'friend-1', occurredAt: jst(2, 9), processedAt: jst(2, 9) });
+    // 28日より前：friend-2 の記録（直近28日の人数・回数に入らない）。
+    insertRun({ id: 'run-c', friendId: 'friend-2', occurredAt: jst(40, 8), deliveries: 1, firstSentAt: jst(40, 8) });
+    // 配信していないが処理済みの記録が最新――「最終配信」に使ってはいけない。
+    insertRun({ id: 'run-d', friendId: 'friend-2', occurredAt: jst(1, 12), processedAt: jst(1, 12), status: 'suppressed' });
+    // 別アカウントの記録は対象外。
+    insertRun({ id: 'run-e', friendId: 'friend-9', accountId: 'account-2', occurredAt: jst(1, 11), deliveries: 1, firstSentAt: jst(1, 11) });
+
+    const response = await app(testDb.db).request('/api/friend-add-runs?account_id=account-1');
+    expect(response.status).toBe(200);
+    const body = await response.json() as {
+      data: {
+        summary: {
+          recentFriends: number; recentEvents: number; cumulativeDeliveries: number;
+          failed: number; lastDeliveryAt: string | null;
+        };
+      };
+    };
+    expect(body.data.summary.recentFriends).toBe(2);   // friend-1・friend-2（run-d は28日内）
+    expect(body.data.summary.recentEvents).toBe(3);    // run-a・run-b・run-d
+    expect(body.data.summary.cumulativeDeliveries).toBe(2); // run-a + run-c（全期間）
+    expect(body.data.summary.lastDeliveryAt).toBe(jst(3, 10)); // run-dの処理時刻ではない
+
+    // 絞り込みは集計にも効く：該当なしの条件では上部も0になる。
+    const filtered = await app(testDb.db).request('/api/friend-add-runs?account_id=account-1&kind=returning');
+    const filteredBody = await filtered.json() as typeof body;
+    expect(filteredBody.data.summary.recentFriends).toBe(0);
+    expect(filteredBody.data.summary.recentEvents).toBe(0);
+    expect(filteredBody.data.summary.cumulativeDeliveries).toBe(0);
+    expect(filteredBody.data.summary.lastDeliveryAt).toBeNull();
+  });
+
   it('送れなかった実行はpartial_failedで絞れ、要確認に数える', async () => {
     seedRuleAndRun(testDb);
     insertFriend(testDb.raw, 'friend-2', { line_account_id: 'account-1', display_name: '佐藤 花子' });

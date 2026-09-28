@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { api, type FollowerImportState, type LineAccountConnectData } from '@/lib/api'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
 import Button from '@/components/shared/button'
+import RadioCard from '@/components/shared/radio-card'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import PageHeader from '@/components/shared/page-header'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -258,8 +259,8 @@ export default function NewLineAccountPage() {
               <fieldset>
                 <legend className="text-ink-secondary mb-2 text-xs font-medium">アカウントの用意方法</legend>
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <Choice checked={accountMethod === 'existing'} onChange={() => setAccountMethod('existing')} label="既存の公式アカウントを使う" />
-                  <Choice checked={accountMethod === 'new'} onChange={() => setAccountMethod('new')} label="新しく公式アカウントを作成" />
+                  <Choice checked={accountMethod === 'existing'} onChange={() => setAccountMethod('existing')} label="既存の公式アカウントを使う" value="existing" />
+                  <Choice checked={accountMethod === 'new'} onChange={() => setAccountMethod('new')} label="新しく公式アカウントを作成" value="new" />
                 </div>
               </fieldset>
               {accountMethod === 'new' && <div className="rounded-control border-hairline border p-4 text-sm">
@@ -368,8 +369,8 @@ function ManualLink({ anchor, label }: { anchor: 'm1' | 'm2' | 'm3'; label: stri
   return <a href={`/manuals/line-connect/index.html#${anchor}`} target="_blank" rel="noreferrer" className="text-action shrink-0 text-xs font-semibold hover:underline">{label}</a>
 }
 
-function Choice({ checked, onChange, label }: { checked: boolean; onChange: () => void; label: string }) {
-  return <label className="rounded-control border-hairline flex cursor-pointer items-center gap-3 border p-4 text-sm text-ink"><input type="radio" name="account-method" checked={checked} onChange={onChange} />{label}</label>
+function Choice({ checked, onChange, label, value }: { checked: boolean; onChange: () => void; label: string; value: string }) {
+  return <RadioCard name="account-method" value={value} checked={checked} onChange={onChange} title={label} />
 }
 
 function Field({ id, label, value, onChange, placeholder, required = false, type = 'text', inputMode, error }: { id: string; label: string; value: string; onChange: (value: string) => void; placeholder?: string; required?: boolean; type?: 'text' | 'password'; inputMode?: 'text' | 'numeric'; error?: string }) {

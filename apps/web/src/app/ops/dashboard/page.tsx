@@ -146,7 +146,12 @@ export default function OpsDashboardPage() {
                   <li key={row.key} className="flex items-center gap-2 rounded-control bg-canvas-sunken px-3 py-2 text-caption text-ink">
                     <span aria-hidden="true" className="inline-block h-2.5 w-2.5 rounded-pill" style={{ background: shareColor(row.key) }} />
                     <span>{row.label}</span>
-                    <span className="ml-auto text-ink-secondary">{row.count}件 ・ {row.percent}%</span>
+                    {/*
+                      m22d: 件数は「契約中の月額合計」のカードに集約し、ここは
+                      割合だけにする（同じ「1件」「2件」が4回出るため）。
+                      契約先の総数は円グラフの中央、内訳の数はカードに出る。
+                    */}
+                    <span className="ml-auto text-ink-secondary">{row.percent}%</span>
                   </li>
                 ))}
               </ul>

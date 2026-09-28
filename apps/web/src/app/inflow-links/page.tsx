@@ -26,6 +26,7 @@ import SiteScript from '@/components/inflow-links/site-script'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Dialog from '@/components/shared/dialog'
 import Disclosure from '@/components/shared/disclosure'
 import FilterChip from '@/components/shared/filter-chip'
@@ -1512,8 +1513,7 @@ function BulkRoutesDialog({
               {remaining.length > 8 ? ` ほか${(remaining.length - 8).toLocaleString('ja-JP')}件` : ''}
             </p>
           </div>
-          <fieldset className="space-y-2">
-            <legend className="text-ink mb-1 text-sm font-bold">どの操作をしますか？</legend>
+          <RadioCardGroup legend="どの操作をしますか？">
             {([
               {
                 value: 'pause' as const,
@@ -1536,46 +1536,33 @@ function BulkRoutesDialog({
             ]).map((option) => {
               const unavailable = option.count === 0
               return (
-                <label
+                <RadioCard
                   key={option.value}
-                  className={`block rounded-control border p-3 ${unavailable ? 'border-hairline bg-canvas-sunken' : action === option.value ? 'border-accent bg-accent-soft' : 'border-hairline bg-canvas cursor-pointer'}`}
-                >
-                  <span className="flex gap-3">
-                    <input
-                      type="radio"
-                      name="inflow-bulk-action"
-                      value={option.value}
-                      checked={action === option.value}
-                      disabled={unavailable}
-                      onChange={() => setAction(option.value)}
-                    />
-                    <span className="min-w-0 flex-1">
-                      <span className={`block text-sm font-semibold ${unavailable ? 'text-ink-faint' : 'text-ink'}`}>
-                        {option.label}
-                      </span>
-                      <span className="text-ink-faint mt-0.5 block text-xs">
-                        {unavailable ? `${option.note} 今の選択には効きません。` : option.note}
-                      </span>
-                      {option.value === 'move' && action === 'move' ? (
-                        <span className="mt-2 block" onClick={(event) => event.stopPropagation()}>
-                          <Select
-                            aria-label="移動先のフォルダ"
-                            value={genre}
-                            size="full"
-                            onChange={setGenre}
-                            options={[
-                              { value: '', label: '未分類' },
-                              ...genreOptions.map((name) => ({ value: name, label: name })),
-                            ]}
-                          />
-                        </span>
-                      ) : null}
-                    </span>
-                  </span>
-                </label>
+                  name="inflow-bulk-action"
+                  value={option.value}
+                  checked={action === option.value}
+                  disabled={unavailable}
+                  disabledReason="今の選択には効きません"
+                  onChange={() => setAction(option.value)}
+                  title={option.label}
+                  note={option.note}
+                />
               )
             })}
-          </fieldset>
+          </RadioCardGroup>
+          {action === 'move' ? (
+            <Select
+              aria-label="移動先のフォルダ"
+              value={genre}
+              size="full"
+              onChange={setGenre}
+              options={[
+                { value: '', label: '未分類' },
+                ...genreOptions.map((name) => ({ value: name, label: name })),
+              ]}
+              className="mt-2"
+            />
+          ) : null}
         </div>
       )}
     </Dialog>

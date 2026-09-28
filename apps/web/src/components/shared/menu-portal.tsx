@@ -170,6 +170,14 @@ export default function MenuPortal({
       const target = event.target as Node
       if (panelRef.current?.contains(target)) return
       if (anchorRef.current()?.contains(target)) return
+      /*
+       * R251: 別の器（MenuPortal）の中への押下は外側扱いにしない。
+       * 時刻ダイアログの中の時・分 Select の候補は、body 直下の別の器に
+       * 描かれる。外側扱いで先に閉じると click が届かず値が入らない。
+       * 重なった器同士は、それぞれ自分の外への押下だけで閉じる。
+       */
+      const element = target as Partial<HTMLElement>
+      if (typeof element.closest === 'function' && element.closest('[data-menu-portal]')) return
       closeRef.current()
     }
     const onKeyDown = (event: globalThis.KeyboardEvent) => {

@@ -374,6 +374,18 @@ export function settlementWriteStatements(
     settlementId: string;
     targets: SettlementWriteTarget[];
     now: string;
+    /**
+     * R288: 全体締めが同時に付ける取消(entry_id 参照)の消費行。
+     * 別締めに先取りされて1行でも欠けたら、報酬行もろとも巻き戻す。
+     * 個別締めは渡さない(従来どおり報酬行だけを見る)。
+     */
+    expectedDebitEntryIds?: string[];
+    /**
+     * R288: 取り込む取消行。巻き戻し文より先に積むため、ここで受け取る。
+     * amount は負数(差し引き)。書込みは条件付きで、別締めが先に同じ
+     * 取消を付けていたら0行になる(entry_id の UNIQUE との二重構え)。
+     */
+    debitLines?: Array<{ debitId: string; affiliateId: string; amount: number }>;
   },
 ): D1PreparedStatement[] {
   const entryKeyPrefix = `settlement:${input.settlementId}:`;
@@ -433,19 +445,43 @@ export function settlementWriteStatements(
     );
   }
 
+  // R288: 取消の消費行は報酬行の直後・巻き戻し文より先に積む。
+  // 順序が逆だと巻き戻しがまだ無い行を数えて締めごと消してしまう。
+  for (const line of input.debitLines ?? []) {
+    statements.push(db.prepare(
+      `INSERT INTO affiliate_settlement_lines
+         (id, settlement_id, affiliate_id, entry_id, amount_minor, status, created_at)
+       SELECT ?, ?, ?, ?, ?, 'included', ?
+        WHERE NOT EXISTS (
+          SELECT 1 FROM affiliate_settlement_lines slx WHERE slx.entry_id = ?
+        )`,
+    ).bind(crypto.randomUUID(), input.settlementId, line.affiliateId, line.debitId, line.amount, input.now, line.debitId));
+  }
+
   // 巻き戻しの3文。fenceを通らなかった対象が1件でもあれば、この確定で
   // 書いた明細行 → credit → header の順に消す(子から先に消してFKを壊さない)。
   // 述語はいずれも「自分が消す表」を数えないため、途中経過に左右されない。
+  // R288: 取消の消費行も数える。別締めに先取りされて欠けたら、
+  // 報酬行が全部書けていても締めごと消す(部分適用は残らない)。
   const writtenEntries =
     `(SELECT COUNT(*) FROM affiliate_reward_entries re
        WHERE substr(re.idempotency_key, 1, ?) = ?)`;
+  const debitIds = input.expectedDebitEntryIds ?? [];
+  const writtenDebits = debitIds.length > 0
+    ? ` OR (SELECT COUNT(*) FROM affiliate_settlement_lines sl2
+             WHERE sl2.settlement_id = ?
+               AND sl2.entry_id IN (${debitIds.map(() => '?').join(',')})) <> ?`
+    : '';
   const noLinesLeft =
     `NOT EXISTS (SELECT 1 FROM affiliate_settlement_lines sl WHERE sl.settlement_id = ?)`;
   statements.push(
     db.prepare(
       `DELETE FROM affiliate_settlement_lines
-        WHERE settlement_id = ? AND ${writtenEntries} <> ?`,
-    ).bind(input.settlementId, entryKeyPrefix.length, entryKeyPrefix, input.targets.length),
+        WHERE settlement_id = ? AND (${writtenEntries} <> ?${writtenDebits})`,
+    ).bind(
+      input.settlementId, entryKeyPrefix.length, entryKeyPrefix, input.targets.length,
+      ...(debitIds.length > 0 ? [input.settlementId, ...debitIds, debitIds.length] : []),
+    ),
     db.prepare(
       `DELETE FROM affiliate_reward_entries
         WHERE substr(idempotency_key, 1, ?) = ? AND ${noLinesLeft}`,

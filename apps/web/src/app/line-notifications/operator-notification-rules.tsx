@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Download, Plus, Search, X } from 'lucide-react'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import KpiCard from '@/components/shared/kpi-card'
@@ -152,7 +153,9 @@ export default function OperatorNotificationRules({ lineAccountId }: { lineAccou
 
     <div className="flex flex-wrap items-center gap-2">
       <label className="flex min-w-72 max-w-md flex-1 items-center gap-2 rounded-control border border-hairline bg-canvas px-3 py-2"><Search aria-hidden="true" size={17} className="text-ink-faint" /><span className="sr-only">お知らせを検索</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="お知らせ名・きっかけで探す" className="min-w-0 flex-1 bg-transparent text-sm outline-none" /></label>
-      {(['all', 'published', 'draft', 'missing'] as const).map((value) => <label key={value}><input className="peer sr-only" type="radio" name="operator-filter" checked={filter === value} onChange={() => setFilter(value)} /><span className="inline-flex min-h-9 cursor-pointer items-center rounded-pill border border-hairline bg-canvas px-3 text-xs font-semibold text-ink-secondary peer-checked:border-accent peer-checked:bg-accent-soft peer-checked:text-accent-deep">{{ all: `すべて ${summary?.total ?? '—'}`, published: `出している ${summary?.published ?? '—'}`, draft: `止めている ${summary?.stopped ?? '—'}`, missing: `受け取る人がいない ${summary?.missingRecipients ?? '—'}` }[value]}</span></label>)}
+      <RadioCardGroup legend="公開状態で絞り込む" className="flex flex-wrap gap-2">
+        {(['all', 'published', 'draft', 'missing'] as const).map((value) => <RadioCard key={value} name="operator-filter" value={value} checked={filter === value} onChange={() => setFilter(value)} title={{ all: `すべて ${summary?.total ?? '—'}`, published: `出している ${summary?.published ?? '—'}`, draft: `止めている ${summary?.stopped ?? '—'}`, missing: `受け取る人がいない ${summary?.missingRecipients ?? '—'}` }[value]} />)}
+      </RadioCardGroup>
       <span className="rounded-control border border-hairline bg-canvas px-3 py-2 text-xs font-semibold text-ink-secondary">よく届く順</span>
     </div>
 

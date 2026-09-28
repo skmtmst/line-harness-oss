@@ -642,9 +642,13 @@ friendAddRules.get('/api/friend-add-runs', requireRole('owner', 'admin', 'staff'
     const total = await c.env.DB.prepare(
       `SELECT COUNT(*) AS count FROM friend_add_events e WHERE ${clauses.join(' AND ')}`,
     ).bind(...bindings).first<{ count: number }>();
+    // 上部の集計も同じ絞り込みの中だけを数える（R264）。絞り込み中に
+    // アカウント全体の数が出ると、対象範囲が読み手に伝わらない。
+    const listClauses = [...clauses];
+    const listBindings = [...bindings];
     if (cursor) {
-      clauses.push('(e.occurred_at < ? OR (e.occurred_at = ? AND e.id < ?))');
-      bindings.push(cursor.occurredAt, cursor.occurredAt, cursor.id);
+      listClauses.push('(e.occurred_at < ? OR (e.occurred_at = ? AND e.id < ?))');
+      listBindings.push(cursor.occurredAt, cursor.occurredAt, cursor.id);
     }
     const [result, summary] = await Promise.all([
       c.env.DB.prepare(
@@ -671,9 +675,9 @@ friendAddRules.get('/api/friend-add-runs', requireRole('owner', 'admin', 'staff'
                FROM friend_add_action_runs
               GROUP BY event_id
            ) ar ON ar.event_id = e.id
-          WHERE ${clauses.join(' AND ')}
+          WHERE ${listClauses.join(' AND ')}
           ORDER BY e.occurred_at DESC, e.id DESC LIMIT ?`,
-      ).bind(...bindings, limit + 1).all<{
+      ).bind(...listBindings, limit + 1).all<{
         id: string; friend_id: string; display_name: string | null; friend_kind: string;
         attribution_status: string; entry_route_id: string | null; entry_route_name: string | null;
         ref_code: string | null; routing_status: string; error_code: string | null;
@@ -682,18 +686,28 @@ friendAddRules.get('/api/friend-add-runs', requireRole('owner', 'admin', 'staff'
         scenario_id: string | null; scenario_name: string | null; enrollment_id: string | null;
         delivery_count: number; action_count: number; failed_action_count: number;
       }>(),
+      /*
+       * 「直近28日の追加」は人数（同じ人の再追加は1人）と回数（記録数）を
+       * 分けて数える。期間の境界はJSTで計算し、オフセットなしで保存した
+       * 古い行とも比較できるよう空白区切りを T に揃えてから比べる（R264）。
+       * last_delivery_at は実際に送った記録だけの最新日時で、一覧の先頭行の
+       * 処理時刻（届いていない記録を含む）とは別物（R266）。
+       */
       c.env.DB.prepare(
-        `SELECT COUNT(*) AS total_runs,
-                SUM(delivery_count) AS delivery_count,
-                SUM(CASE WHEN routing_status IN ('failed', 'partial_failed') THEN 1 ELSE 0 END) AS failed_runs,
-                AVG(CASE WHEN first_delivery_sent_at IS NOT NULL
-                    THEN (julianday(first_delivery_sent_at) - julianday(occurred_at)) * 86400000 END) AS average_send_ms,
-                SUM(CASE WHEN scenario_enrollment_id IS NOT NULL THEN 1 ELSE 0 END) AS scenario_starts
-           FROM friend_add_events
-          WHERE line_account_id = ?`,
-      ).bind(accountId).first<{
-        total_runs: number; delivery_count: number | null; failed_runs: number | null;
-        average_send_ms: number | null; scenario_starts: number | null;
+        `SELECT COUNT(DISTINCT CASE WHEN REPLACE(e.occurred_at, ' ', 'T') >= strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours', '-28 days') THEN e.friend_id END) AS recent_friends,
+                SUM(CASE WHEN REPLACE(e.occurred_at, ' ', 'T') >= strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours', '-28 days') THEN 1 ELSE 0 END) AS recent_events,
+                SUM(e.delivery_count) AS delivery_count,
+                SUM(CASE WHEN e.routing_status IN ('failed', 'partial_failed') THEN 1 ELSE 0 END) AS failed_runs,
+                AVG(CASE WHEN e.first_delivery_sent_at IS NOT NULL
+                    THEN (julianday(e.first_delivery_sent_at) - julianday(REPLACE(e.occurred_at, ' ', 'T'))) * 86400000 END) AS average_send_ms,
+                SUM(CASE WHEN e.scenario_enrollment_id IS NOT NULL THEN 1 ELSE 0 END) AS scenario_starts,
+                MAX(e.first_delivery_sent_at) AS last_delivery_at
+           FROM friend_add_events e
+          WHERE ${clauses.join(' AND ')}`,
+      ).bind(...bindings).first<{
+        recent_friends: number; recent_events: number | null; delivery_count: number | null;
+        failed_runs: number | null; average_send_ms: number | null; scenario_starts: number | null;
+        last_delivery_at: string | null;
       }>(),
     ]);
     const allRows = result.results ?? [];
@@ -733,11 +747,13 @@ friendAddRules.get('/api/friend-add-runs', requireRole('owner', 'admin', 'staff'
         total: total?.count ?? 0,
         nextCursor: allRows.length > limit && items.length > 0 ? makeRunCursor(items[items.length - 1]) : null,
         summary: {
-          totalRuns: summary?.total_runs ?? 0,
+          recentFriends: summary?.recent_friends ?? 0,
+          recentEvents: summary?.recent_events ?? 0,
           cumulativeDeliveries: summary?.delivery_count ?? 0,
           scenarioStarts: summary?.scenario_starts ?? 0,
           averageSendTimeMs: summary?.average_send_ms == null ? null : Math.max(0, Math.round(summary.average_send_ms)),
           failed: summary?.failed_runs ?? 0,
+          lastDeliveryAt: summary?.last_delivery_at ?? null,
           staffHandoffs: { value: null, state: 'unavailable', reason: '担当者引き継ぎと実行イベントを結ぶ記録がありません' },
         },
       },

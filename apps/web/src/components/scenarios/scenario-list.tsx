@@ -7,6 +7,7 @@ import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { MoveReferrersNotice } from './scenario-dialogs'
 import StatusChip from '@/components/shared/status-chip'
 import ListState from '@/components/shared/list-state'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
@@ -320,6 +321,8 @@ export default function ScenarioList({
     >
       {deleteTarget && (
         <div className="text-ink-secondary space-y-2 text-sm">
+          {/* R250: 終了後の移動先にされていると、削除で参照元の設定が変わる。件数が取れたときだけ出す。 */}
+          <MoveReferrersNotice scenarioId={deleteTarget.id} />
           <p>
             購読中 {(deleteTarget.subscriberCount ?? 0).toLocaleString('ja-JP')}人 ／ 通数{' '}
             {deleteTarget.stepCount === undefined

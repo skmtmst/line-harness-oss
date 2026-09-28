@@ -323,7 +323,7 @@ export default function DuplicatesPage() {
                   <TableStateRow colSpan={7} kind="loading" title="読み込んでいます…" />
                 ) : candidates.length ? candidates.map((candidate) => (
                   <tr key={candidate.id}>
-                    <td className="truncate py-3 pr-3 pl-5 font-semibold text-ink" title={`${candidate.left.label} ↔ ${candidate.right.label}`}>{candidate.left.label} ↔ {candidate.right.label}</td>
+                    <td className="py-3 pr-3 pl-5 font-semibold text-ink" title={`${candidate.left.label} ↔ ${candidate.right.label}`}><span className="block truncate">{candidate.left.label} ↔ {candidate.right.label}</span></td>
                     <td className="px-3 py-3 text-ink-secondary">{candidate.confidence.label === 'very_high' ? '最高' : candidate.confidence.label === 'high' ? '高' : candidate.confidence.label === 'medium' ? '中' : '低'}</td>
                     <td className="truncate px-3 py-3 text-ink-secondary" title={candidate.evidenceSummary.join('・')}>{candidate.evidenceSummary.join('・') || '根拠を確認'}</td>
                     <td className="truncate px-3 py-3 text-ink-secondary">{[candidate.left.lineAccountName, candidate.right.lineAccountName].filter(Boolean).join(' / ') || '—'}</td>
@@ -396,11 +396,11 @@ export default function DuplicatesPage() {
                   <tbody className="divide-y divide-[#EAEBED] bg-white text-[#565F59]">
                     {data.perAccount.map((row) => (
                       <tr key={row.accountId}>
-                        <td className="truncate py-4 pr-4 pl-5 font-semibold text-[#1D1D1F]" title={row.accountName}>{row.accountName}</td>
-                        <td className="px-4 py-4 text-right tabular-nums">{fmt.format(row.friends)}</td>
-                        <td className="px-4 py-4 text-right tabular-nums">{fmt.format(row.dups)}</td>
+                        <td className="py-4 pr-4 pl-5 font-semibold text-[#1D1D1F]" title={row.accountName}><span className="block truncate">{row.accountName}</span></td>
+                        <td className="px-4 py-4 text-right tabular-nums"><span>{fmt.format(row.friends)}</span></td>
+                        <td className="px-4 py-4 text-right tabular-nums"><span>{fmt.format(row.dups)}</span></td>
                         <td className="py-4 pr-5 pl-4 text-right tabular-nums">
-                          {(row.dupRate * 100).toFixed(0)}%
+                          <span>{(row.dupRate * 100).toFixed(0)}%</span>
                         </td>
                       </tr>
                     ))}
@@ -446,8 +446,8 @@ export default function DuplicatesPage() {
                   <tbody className="divide-y divide-[#EAEBED] bg-white text-[#565F59]">
                     {data.perAccount.map((row) => (
                       <tr key={row.accountId}>
-                        <td title={row.accountName} className="truncate py-4 pr-2 pl-4 font-semibold text-[#1D1D1F]">
-                          {row.accountName}
+                        <td title={row.accountName} className="py-4 pr-2 pl-4 font-semibold text-[#1D1D1F]">
+                          <span className="block truncate">{row.accountName}</span>
                         </td>
                         {data.perAccount.map((col) => {
                           if (row.accountId === col.accountId) {
@@ -456,7 +456,7 @@ export default function DuplicatesPage() {
                                 key={col.accountId}
                                 className="px-2 py-4 text-right text-[#B8BCC2]"
                               >
-                                —
+                                <span>—</span>
                               </td>
                             )
                           }

@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
+import RadioCard from '@/components/shared/radio-card'
 import { ApiError, api } from '@/lib/api'
 import { FEATURE_SETTINGS_UPDATED_EVENT } from '@/lib/feature-settings'
 import { loadFeatureSettings } from '@/lib/feature-settings-cache'
@@ -218,27 +219,15 @@ function Picker({ currentFeatures, selectedId, busy, applyError, onSelect, onApp
           業種・担当業務に近いものを1つ選んでください
         </legend>
         {FEATURE_PRESETS.map((preset) => (
-          <label
+          <RadioCard
             key={preset.id}
-            className={`rounded-control flex cursor-pointer items-start gap-2.5 border p-3 ${
-              preset.id === selectedId
-                ? 'border-accent-deep bg-accent-soft'
-                : 'border-hairline bg-canvas'
-            }`}
-          >
-            <input
-              type="radio"
-              name="feature-preset"
-              value={preset.id}
-              checked={preset.id === selectedId}
-              onChange={() => onSelect(preset.id)}
-              className="accent-accent-deep mt-0.5"
-            />
-            <span className="flex min-w-0 flex-col gap-0.5">
-              <span className="text-sm font-bold text-ink">{preset.label}</span>
-              <span className="text-xs leading-relaxed text-ink-secondary">{preset.audience}</span>
-            </span>
-          </label>
+            name="feature-preset"
+            value={preset.id}
+            checked={preset.id === selectedId}
+            onChange={() => onSelect(preset.id)}
+            title={preset.label}
+            note={preset.audience}
+          />
         ))}
       </fieldset>
 

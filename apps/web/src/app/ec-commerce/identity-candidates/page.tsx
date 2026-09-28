@@ -145,7 +145,11 @@ export default function EcIdentityCandidatesPage() {
             <KpiCard variant="v6" title="結びついていない" value={operations?.summary.unmatched ?? null} unit="件" detail="確認待ちの注文・会員" badge="要対応" />
             <KpiCard variant="v6" title="候補が見つかった" value={candidateCount} unit="件" detail="" help="名前や電話が近い人がいます" />
             <KpiCard variant="v6" title="自動で結びついた" value={operations?.summary.linked ?? null} unit="件" detail="" help="同じ人として結びついた会員です" />
-            <KpiCard variant="v6" title="結びつけると増える売上" value={operations?.summary.potentialRevenue ?? null} unit="円" detail={`この${(operations?.summary.unmatched ?? 0).toLocaleString('ja-JP')}件ぶん。分析にも入ります`} />
+            {/*
+              m22d: 「24件」は「結びついていない」のカードと一覧の件数に集約し、
+              ここでは繰り返さない。売上の中身は「？」へ移す。
+            */}
+            <KpiCard variant="v6" title="結びつけると増える売上" value={operations?.summary.potentialRevenue ?? null} unit="円" detail="分析にも入ります" help="結びついていない注文・会員の売上見込みです" />
           </div>
 
           <NoteBar help="メールアドレスか電話番号が同じなら自動で結びつきます" helpLabel="自動で結びつく条件">メールアドレスか電話番号が同じなら、自動で結びつきます。どちらも違うときに、ここへ並びます。名前だけが同じ人は、別人のこともあるので自動では結びつけません。</NoteBar>

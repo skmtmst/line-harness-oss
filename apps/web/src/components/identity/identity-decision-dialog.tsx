@@ -8,6 +8,8 @@ import type {
   IdentityReprocessMode,
 } from '@line-crm/shared'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Dialog from '@/components/shared/dialog'
 import Select from '@/components/shared/select'
 import { RequiredBadge } from '@/components/shared/form-controls'
@@ -117,26 +119,19 @@ export default function IdentityDecisionDialog({
       }
     >
       <div className={styles.dialogBody}>
-        <div className={styles.choices} role="radiogroup" aria-label="判定">
+        <RadioCardGroup legend="判定" className={styles.choices}>
           {DECISIONS.map((item) => (
-            <label
+            <RadioCard
               key={item}
-              className={`${styles.choice} ${decision === item ? styles.choiceOn : ''}`}
-            >
-              <input
-                type="radio"
-                name="identity-decision"
-                value={item}
-                checked={decision === item}
-                onChange={() => setDecision(item)}
-              />
-              <span className={styles.choiceText}>
-                <span className={styles.choiceTitle}>{decisionText(item)}</span>
-                <span className={styles.choiceNote}>{decisionNote(item)}</span>
-              </span>
-            </label>
+              name="identity-decision"
+              value={item}
+              checked={decision === item}
+              onChange={() => setDecision(item)}
+              title={decisionText(item)}
+              note={decisionNote(item)}
+            />
           ))}
-        </div>
+        </RadioCardGroup>
 
         {canReprocess ? (
           <div className={styles.field}>
@@ -183,14 +178,11 @@ export default function IdentityDecisionDialog({
               'プライバシーポリシーと利用規約に、この使い方が書いてある',
               'LINEの規約と、プロバイダーの決めごとに反していない',
             ].map((label, index) => (
-              <label key={label} className={styles.choice}>
-                <input
-                  type="checkbox"
-                  checked={consents[index]}
-                  onChange={(event) => setConsents((current) => current.map((value, itemIndex) => itemIndex === index ? event.target.checked : value))}
-                />
-                <span className={styles.choiceNote}>{label}</span>
-              </label>
+              <Checkbox
+                key={label}
+                checked={consents[index]}
+                onCheckedChange={(checked) => setConsents((current) => current.map((value, itemIndex) => itemIndex === index ? checked : value))}
+              >{label}</Checkbox>
             ))}
           </div>
         ) : null}

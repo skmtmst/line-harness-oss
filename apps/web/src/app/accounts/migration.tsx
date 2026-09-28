@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ApiResponse, LineAccount } from '@line-crm/shared'
 import { api, ApiError, fetchApi, type UidMigrationItem, type UidMigrationRun } from '@/lib/api'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
@@ -780,7 +781,7 @@ function ActiveMigration({
       {detailBusy && <p role="status" className="text-ink-faint border-hairline border-b px-4 py-2 text-xs">対応表を読み込んでいます…</p>}
       <div className="border-hairline flex flex-wrap items-center gap-3 border-b px-4 py-3">
         <Select aria-label="分類で絞り込む" value={classification} onChange={(value) => onFilterChange(value as '' | ItemClassification, pendingOnly)} options={[{ value: '', label: 'すべての分類' }, ...ITEM_CLASSIFICATIONS.map((value) => ({ value, label: classLabel[value] }))]} size="standard" />
-        <label className="text-ink-secondary flex cursor-pointer items-center gap-2 text-xs font-semibold"><input type="checkbox" checked={pendingOnly} onChange={(event) => onFilterChange(classification, event.target.checked)} className="size-4" />未判断のみ</label>
+        <Checkbox checked={pendingOnly} onCheckedChange={(checked) => onFilterChange(classification, checked)}>未判断のみ</Checkbox>
         <span className="text-ink-faint ml-auto text-xs">全 {total.toLocaleString()} 件</span>
       </div>
       {(active.items?.length ?? 0) === 0 ? <ListState kind="empty" title="対応表に結果がありません" description="絞り込みを変えるか、別のCSVを選んでテスト移行してください。" /> : <DataTable className="rounded-none border-0">

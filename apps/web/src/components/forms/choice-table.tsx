@@ -15,6 +15,7 @@
 import { useState } from 'react'
 import { newBlockId, type FormChoice, type FormInputBlock, type FormSection } from '@line-crm/shared'
 import ActionEditor from './action-editor'
+import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 import { cellInput, miniButton, type FormRefs } from './form-refs'
 
@@ -220,47 +221,39 @@ export default function ChoiceTable({
                   )}
 
                   <div className="flex flex-wrap items-center gap-4">
-                    <label className="text-ink-secondary flex items-center gap-2 text-xs">
-                      <input
-                        type="checkbox"
-                        checked={choice.defaultSelected ?? false}
-                        onChange={(e) => {
-                          // 単一選択（ラジオ・プルダウン）で初期選択は1つだけ。
-                          // 新しく付けた選択肢を残し、他の初期選択を外す。
-                          if (
-                            e.target.checked &&
-                            (block.type === 'radio' || block.type === 'select')
-                          ) {
-                            setChoices(
-                              choices.map((c) =>
-                                c.id === choice.id
-                                  ? { ...c, defaultSelected: true }
-                                  : { ...c, defaultSelected: false },
-                              ),
-                            )
-                            return
-                          }
-                          patchChoice(choice.id, { defaultSelected: e.target.checked })
-                        }}
-                      />
-                      はじめから選んでおく
-                    </label>
-
-                    <label className="text-ink-secondary flex items-center gap-2 text-xs">
-                      <input
-                        type="checkbox"
-                        checked={choice.capacity?.enabled ?? false}
-                        onChange={(e) =>
-                          patchChoice(choice.id, {
-                            capacity: {
-                              enabled: e.target.checked,
-                              limit: choice.capacity?.limit ?? 10,
-                            },
-                          })
+                    <Checkbox
+                      checked={choice.defaultSelected ?? false}
+                      onCheckedChange={(checked) => {
+                        // 単一選択（ラジオ・プルダウン）で初期選択は1つだけ。
+                        // 新しく付けた選択肢を残し、他の初期選択を外す。
+                        if (
+                          checked &&
+                          (block.type === 'radio' || block.type === 'select')
+                        ) {
+                          setChoices(
+                            choices.map((c) =>
+                              c.id === choice.id
+                                ? { ...c, defaultSelected: true }
+                                : { ...c, defaultSelected: false },
+                            ),
+                          )
+                          return
                         }
-                      />
-                      定員を決める
-                    </label>
+                        patchChoice(choice.id, { defaultSelected: checked })
+                      }}
+                    >はじめから選んでおく</Checkbox>
+
+                    <Checkbox
+                      checked={choice.capacity?.enabled ?? false}
+                      onCheckedChange={(checked) =>
+                        patchChoice(choice.id, {
+                          capacity: {
+                            enabled: checked,
+                            limit: choice.capacity?.limit ?? 10,
+                          },
+                        })
+                      }
+                    >定員を決める</Checkbox>
 
                     {choice.capacity?.enabled && (
                       <label className="text-ink-secondary flex items-center gap-1 text-xs">

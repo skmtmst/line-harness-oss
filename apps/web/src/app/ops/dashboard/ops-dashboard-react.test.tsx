@@ -102,7 +102,10 @@ describe('画面', () => {
     expect(text).toContain('解約率 0.0%')
     expect(text).toContain('月ごとの売上')
     expect(host.querySelectorAll('svg rect').length).toBeGreaterThanOrEqual(6)
-    expect(text).toContain('4件 ・ 27%')
+    // m22d: プラン別の行は割合だけにする。件数は「契約中の月額合計」の
+    // カードに集約する（同じ「1件」「2件」が4回出るため）。
+    expect(text).toContain('27%')
+    expect(text).not.toContain('4件 ・ 27%')
     expect(text).toContain('トライアルは契約前です')
     expect(text).toContain('決済が失敗している契約先')
     expect(text).toContain('LINEのトークン期限が近い店舗')
