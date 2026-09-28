@@ -16,10 +16,11 @@ import ActionEditor from '@/components/scenarios/action-editor'
 import TriggerEditor from '@/components/scenarios/trigger-editor'
 import CarouselPicker from '@/components/scenarios/carousel-picker'
 import InsertToolbar from '@/components/scenarios/insert-toolbar'
-import StepPreview, { previewOffsets } from '@/components/scenarios/step-preview'
+import StepPreview, { previewOffsets, isDeliveryTimeSet } from '@/components/scenarios/step-preview'
 import type { StepMessageKind } from '@/components/scenarios/message-type-tabs'
 import MessageKindFields, {
   emptyMessageKindState,
+  messageKindProblem,
   parseMessageKind,
   serializeMessageKind,
   type MessageKind,
@@ -137,7 +138,9 @@ function formatScheduleLabel(mode: DeliveryMode | undefined, step: ScenarioStep)
     return `購読開始から${parts.join('')}後`
   }
   // absolute_time
-  return `購読開始から${step.offsetDays ?? 0}日後の ${step.deliveryTime ?? '00:00'}`
+  // R235: 時刻を消したまま「○日後の 」と出すと、設定が済んだように見える。未設定とはっきり言う。
+  if (!step.deliveryTime) return '時刻を入力してください'
+  return `購読開始から${step.offsetDays ?? 0}日後の ${step.deliveryTime}`
 }
 
 interface StepFormState {
@@ -1027,6 +1030,18 @@ export default function ScenarioDetailClient({
     } else if (stepForm.inputMode === 'direct') {
       // 直接入力モード: messageContent 必須 + Flex/画像 は JSON parse 検証
       if (!stepForm.messageContent.trim()) {
+        /*
+         * R234: 専用欄（音声・スタンプなど）で「入っているが送れない」値の
+         * ときは、どこが悪いかをはっきり言う。「入力してください」だけだと
+         * 空欄と区別がつかず、足しても足しても通らない。
+         */
+        if (isStructuredKind(stepForm.messageType)) {
+          const problem = messageKindProblem(stepForm.messageType as MessageKind, kindState)
+          if (problem) {
+            setStepError(problem)
+            return
+          }
+        }
         setStepError('メッセージ内容を入力してください')
         return
       }
@@ -1047,6 +1062,15 @@ export default function ScenarioDetailClient({
         setStepError('テンプレートを選択してください')
         return
       }
+    }
+    /*
+     * R235: 時刻指定なのに時刻が空のまま送ると、サーバーが 400 で断る。
+     * 投げる前に時刻の欄へ戻す。時刻の欄の場所（「購読開始から ○日後の
+     * ○に配信」）も文に入れ、どこを直すか分かるようにする。
+     */
+    if (deliveryMode === 'absolute_time' && !isDeliveryTimeSet(stepForm.schedule.deliveryTime)) {
+      setStepError('配信する時刻を入力してください（「購読開始から ○日後の ○に配信」の時刻の欄）')
+      return
     }
     setStepSaving(true)
     setStepError('')
@@ -1117,8 +1141,15 @@ export default function ScenarioDetailClient({
       closeStepForm()
       loadScenario(true)
       reloadStats()
-    } catch {
-      setStepError('ステップの保存に失敗しました。通信を確かめて、もう一度お試しください。')
+    } catch (error) {
+      /*
+       * R235: 入力の不備（400番台）と通信・サーバーの失敗を分ける。
+       * 時刻の空などの入力エラーまで「通信を確かめて」と出すと、
+       * 直せるものを直せず再試行を繰り返すことになる。
+       */
+      setStepError(error instanceof ApiError && error.status >= 400 && error.status < 500
+        ? '入力内容に不備があります。時刻・本文を確かめて、もう一度お試しください。'
+        : 'ステップの保存に失敗しました。通信を確かめて、もう一度お試しください。')
     } finally {
       setStepSaving(false)
     }
