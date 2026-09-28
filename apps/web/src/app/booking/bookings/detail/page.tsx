@@ -261,6 +261,8 @@ function auditLine(log: BookingAuditLog): string {
       return `${actor}がGoogleカレンダーへの反映を再試行しました`
     case 'notification_retried':
       return `${actor}がLINE通知を再試行しました`
+    case 'v6_sync_failed':
+      return `${actor}が通知の同期に失敗しました（予約の変更は保存されています。次回の保存で直します）`
     default:
       return `${actor}が${log.action}しました`
   }
@@ -716,8 +718,14 @@ function BookingDetailInner() {
       const result = await bookingApi.retryNotification(selectedAccountId, id, runId)
       notifyToast(result.status === 'succeeded' ? 'お知らせを送りました' : 'お知らせの送信に失敗しました。通信を確かめて、もう一度お試しください。', result.status === 'succeeded' ? undefined : { tone: 'error' })
       await load()
-    } catch {
-      setError('お知らせを再送できませんでした')
+    } catch (cause) {
+      // R323/R324: 処理中と失効は理由を分けて出す。
+      const code = cause instanceof ApiError ? cause.code : ''
+      setError(code === 'notification_obsolete'
+        ? 'このお知らせは今の予約の状態に合わないため送れません'
+        : code === 'retry_in_progress'
+          ? 'ほかの担当者が再送中のため送れません。しばらくしてからお試しください'
+          : 'お知らせを再送できませんでした')
       await load()
     } finally {
       setRetrying(null)
