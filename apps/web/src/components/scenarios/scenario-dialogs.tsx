@@ -280,6 +280,8 @@ export function OnCompleteDialog({
 }) {
   const [draftMode, setDraftMode] = useState<OnCompleteMode>(mode)
   const [draftTarget, setDraftTarget] = useState<string | null>(targetScenarioId)
+  /* R239: 移動先の未選択は入力不足として欄の下で案内し、通信失敗と分ける。 */
+  const [targetError, setTargetError] = useState('')
   const [scenarios, setScenarios] = useState<{ id: string; name: string }[]>([])
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -368,6 +370,12 @@ export function OnCompleteDialog({
             type="button"
             disabled={saving}
             onClick={async () => {
+              /* R239: 移動先の未選択は送らずに欄の下で案内する。 */
+              if (draftMode === 'move' && !draftTarget) {
+                setTargetError('移動先を選んでください')
+                return
+              }
+              setTargetError('')
               setSaving(true)
               try {
                 const err = await onSave(draftMode, draftMode === 'move' ? draftTarget : null)
@@ -476,7 +484,11 @@ export function OnCompleteDialog({
                 aria-label="移動先のシナリオ"
                 id="on-complete-move-target"
                 value={draftTarget ?? ''}
-                onChange={(next) => setDraftTarget(next || null)}
+                onChange={(next) => {
+                  setDraftTarget(next || null)
+                  if (next) setTargetError('')
+                }}
+                error={targetError || undefined}
                 disabled={candidatesState === 'loading'}
                 options={[
                   {
