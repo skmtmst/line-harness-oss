@@ -219,6 +219,41 @@ describe('応答する曜日', () => {
       expect(isOnRespondingDay(rule, jst('2026-08-11T12:00'))).toBe(false);
       expect(isOnRespondingDay(rule, jst('2026-08-18T12:00'))).toBe(true);
     });
+
+    /*
+     * R253: 2027年も公式の祝日で判定する（計算で出す方式）。
+     * 2027-01-01 は金曜の元日、2027-02-23 は火曜の天皇誕生日、
+     * 2027-01-11 は成人の日、2027-03-21 は春分の日。
+     */
+    it('R253 2027年元日は祝日として扱う（金曜＋除外なら止める）', () => {
+      const rule = { ...base, response_weekdays_json: '[5]', response_holiday_rule: 'exclude' };
+      expect(isOnRespondingDay(rule, jst('2027-01-01T12:00'))).toBe(false);
+      // 同じ金曜でも平日なら応答する（2027-01-08 は金曜の平日）。
+      expect(isOnRespondingDay(rule, jst('2027-01-08T12:00'))).toBe(true);
+    });
+
+    it('R253 2027年の祝日は追加でも応答する（火曜＋追加）', () => {
+      const rule = { ...base, response_weekdays_json: '[2]', response_holiday_rule: 'include' };
+      // 天皇誕生日（火）。選んだ曜日でなくても祝日なら応答する。
+      expect(isOnRespondingDay(rule, jst('2027-02-23T12:00'))).toBe(true);
+      // 成人の日（月）・春分の日（日）も祝日として応答する。
+      expect(isOnRespondingDay(rule, jst('2027-01-11T12:00'))).toBe(true);
+      expect(isOnRespondingDay(rule, jst('2027-03-21T12:00'))).toBe(true);
+      // 振替休日（3/22・月）も休みとして応答する。
+      expect(isOnRespondingDay(rule, jst('2027-03-22T12:00'))).toBe(true);
+    });
+
+    it('R253 計算の範囲外の年は祝日ではない日として扱い、警告を出す', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        const rule = { ...base, response_weekdays_json: '[2]', response_holiday_rule: 'exclude' };
+        // 2100-01-05 は火曜。範囲外は祝日扱いしないので応答する。
+        expect(isOnRespondingDay(rule, new Date('2100-01-05T12:00:00+09:00'))).toBe(true);
+        expect(warn).toHaveBeenCalled();
+      } finally {
+        warn.mockRestore();
+      }
+    });
   });
 
   describe('日をまたぐ時間帯', () => {

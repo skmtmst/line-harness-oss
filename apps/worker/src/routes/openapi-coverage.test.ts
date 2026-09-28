@@ -299,6 +299,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/scenarios/{id}/runs',
   'GET /api/scenarios/{id}/stats',
   'GET /api/scenarios/{id}/triggers',
+  'GET /api/scenarios/{id}/move-referrers',
   'GET /api/settings/features/visibility',
   'GET /api/staff/last-logins',
   'GET /api/tags',

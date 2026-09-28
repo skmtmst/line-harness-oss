@@ -15,6 +15,7 @@ import {
   retryFailedFriendScenario,
   moveFriendScenarioTo,
   getFriendById,
+  listMoveReferrers,
   jstNow,
   getScenarioPublishedVersion,
   publishScenarioVersion,
@@ -751,7 +752,38 @@ scenarios.put('/api/scenarios/:id', requireScenarioEditBoundary, async (c) => {
   }
 });
 
+// GET /api/scenarios/:id/move-referrers - 終了後の移動先にしているシナリオの一覧
+//
+// R250: 消す前に「どのシナリオの終了後の処理が変わるか」を確認窓で見せる
+// ための読み取り。消したあとは参照元の終了後の処理が「一時停止」へ戻る
+// （deleteScenario が原子で直す）ので、この一覧は消す前の案内専用。
+scenarios.get('/api/scenarios/:id/move-referrers', scenarioPermission('view'), async (c) => {
+  try {
+    const id = c.req.param('id')!;
+    const scenario = await getScenarioById(c.env.DB, id);
+    if (!scenario) {
+      return c.json({ success: false, error: 'Scenario not found' }, 404);
+    }
+    // 見える範囲だけに絞る。見えないアカウントの名前は数えない。
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    const referrers = await listMoveReferrers(c.env.DB, id);
+    const items = referrers
+      .filter((r) => r.lineAccountId === null
+        ? scope.canSeeUnassigned
+        : scope.allowedAccountIds.includes(r.lineAccountId))
+      .map(({ id: referrerId, name }) => ({ id: referrerId, name }));
+    return c.json({ success: true, data: { items, total: items.length } });
+  } catch (err) {
+    console.error('GET /api/scenarios/:id/move-referrers error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
 // DELETE /api/scenarios/:id - delete
+//
+// R250: 終了後の移動先にされていた場合、参照元の終了後の処理は
+// 「一時停止」へ戻る（deleteScenario が同じ batch で直す）。
+// 「移動先のない移動」は残らない。
 scenarios.delete('/api/scenarios/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const id = c.req.param('id');
