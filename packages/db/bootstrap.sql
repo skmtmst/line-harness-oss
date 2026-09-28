@@ -2954,7 +2954,7 @@ CREATE TABLE friend_reminders (
   status          TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'completed', 'cancelled')),
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, reminder_version_id TEXT REFERENCES reminder_versions(id), source_kind TEXT NOT NULL DEFAULT 'manual', source_id TEXT, source_event_id TEXT, timezone TEXT NOT NULL DEFAULT 'Asia/Tokyo', cancel_reason TEXT, completed_at TEXT, lock_version INTEGER NOT NULL DEFAULT 0);
+, reminder_version_id TEXT REFERENCES reminder_versions(id), source_kind TEXT NOT NULL DEFAULT 'manual', source_id TEXT, source_event_id TEXT, timezone TEXT NOT NULL DEFAULT 'Asia/Tokyo', cancel_reason TEXT, completed_at TEXT, lock_version INTEGER NOT NULL DEFAULT 0, template_version_snapshot TEXT);
 
 CREATE TABLE friend_scenario_op_keys (
   op_idempotency_key TEXT PRIMARY KEY,
@@ -5346,7 +5346,7 @@ CREATE TABLE reminder_delivery_runs (
   started_at                 TEXT,
   completed_at               TEXT,
   created_at                 TEXT NOT NULL,
-  updated_at                 TEXT NOT NULL,
+  updated_at                 TEXT NOT NULL, sent_message_type TEXT, sent_message_content TEXT, sent_template_id TEXT, sent_template_version INTEGER,
   UNIQUE (friend_reminder_id, reminder_step_id, scheduled_at)
 );
 
