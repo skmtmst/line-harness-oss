@@ -244,6 +244,26 @@ describe('conversion definition V6 routes', () => {
     );
   });
 
+  it('R285: レポートは選んだアカウントの範囲をDBへ渡し、担当外は入れない', async () => {
+    dbMocks.getConversionDefinitionReport.mockClear();
+    const report = await app('staff').request('/api/conversions/report?from=2026-09-01&to=2026-09-07&lineAccountId=account-a');
+    expect(report.status).toBe(200);
+    expect(dbMocks.getConversionDefinitionReport).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        lineAccountId: 'account-a',
+        scope: { allowedAccountIds: ['account-a'], includeUnassigned: false },
+      }),
+    );
+
+    // 担当外のアカウントを指定したら403で、集計自体を呼ばない。
+    dbMocks.getConversionDefinitionReport.mockClear();
+    accountMocks.canAccessAllLineAccounts.mockResolvedValueOnce(false);
+    const hidden = await app('staff').request('/api/conversions/report?from=2026-09-01&to=2026-09-07&lineAccountId=account-b');
+    expect(hidden.status).toBe(403);
+    expect(dbMocks.getConversionDefinitionReport).not.toHaveBeenCalled();
+  });
+
   it('CSVは専用権限と一覧同条件を使い、空でも定義ヘッダーを返す', async () => {
     expect((await app('staff').request('/api/conversions/export')).status).toBe(403);
     const response = await app('staff', ['/conversions', 'conversion.report.export']).request(

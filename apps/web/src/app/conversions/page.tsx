@@ -1780,7 +1780,7 @@ function ReportTab({ accountId }: { accountId: string | null }) {
         />
       </KpiCollapse>
 
-      <Notice tone="info" message="成果地点ごとの件数と、どこから来たかです。数え方は「成果地点」で決めます。" />
+      <Notice tone="info" message="成果地点ごとの件数と、どこから来たかです。数え方は「成果地点」で決めます。件数と金額は、取り消された成果を除いた数です。" />
 
       <section className="bg-canvas rounded-card border-hairline border p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">

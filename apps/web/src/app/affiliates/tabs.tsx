@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { Fragment, useState, useEffect, useCallback, useMemo, useRef, useId } from 'react'
 import { X } from 'lucide-react'
 import KpiCard from '@/components/shared/kpi-card'
 import {
@@ -1383,6 +1383,12 @@ interface OfferFormProps {
 
 function OfferFormModal({ initial, accounts, tags, scenarios, onClose, onSaved }: OfferFormProps) {
   const isEdit = Boolean(initial)
+  // R286: 読み上げの項目名。見えている項目名と入力欄を htmlFor・id で結ぶ。
+  const fieldId = useId()
+  const nameId = `${fieldId}-name`
+  const descriptionId = `${fieldId}-description`
+  const rewardAmountId = `${fieldId}-reward-amount`
+  const rewardMilesId = `${fieldId}-reward-miles`
   const [name, setName] = useState(initial?.name ?? '')
   const [description, setDescription] = useState(initial?.description ?? '')
   const [rewardAmount, setRewardAmount] = useState(
@@ -1565,10 +1571,11 @@ function OfferFormModal({ initial, accounts, tags, scenarios, onClose, onSaved }
     >
       <div className="space-y-4">
         <div>
-          <label className="text-ink-secondary mb-1 block text-xs font-medium">
+          <label htmlFor={nameId} className="text-ink-secondary mb-1 block text-xs font-medium">
             案件名 <span className="text-danger">*</span>
           </label>
           <input
+            id={nameId}
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -1578,8 +1585,9 @@ function OfferFormModal({ initial, accounts, tags, scenarios, onClose, onSaved }
         </div>
 
         <div>
-          <label className="text-ink-secondary mb-1 block text-xs font-medium">説明</label>
+          <label htmlFor={descriptionId} className="text-ink-secondary mb-1 block text-xs font-medium">説明</label>
           <textarea
+            id={descriptionId}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={2}
@@ -1589,8 +1597,9 @@ function OfferFormModal({ initial, accounts, tags, scenarios, onClose, onSaved }
         </div>
 
         <div>
-          <label className="text-ink-secondary mb-1 block text-xs font-medium">報酬額（円）</label>
+          <label htmlFor={rewardAmountId} className="text-ink-secondary mb-1 block text-xs font-medium">報酬額（円）</label>
           <input
+            id={rewardAmountId}
             type="number"
             min="0"
             step="1"
@@ -1602,8 +1611,9 @@ function OfferFormModal({ initial, accounts, tags, scenarios, onClose, onSaved }
         </div>
 
         <div>
-          <label className="text-ink-secondary mb-1 block text-xs font-medium">成果承認時の付与マイル</label>
+          <label htmlFor={rewardMilesId} className="text-ink-secondary mb-1 block text-xs font-medium">成果承認時の付与マイル</label>
           <input
+            id={rewardMilesId}
             type="number"
             min="0"
             step="1"

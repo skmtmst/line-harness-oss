@@ -1498,6 +1498,7 @@ export type ConversionDefinitionReport = {
   previousRange: { from: string; to: string; timeZone: 'Asia/Tokyo' }
   kpis: {
     recordedCount: number
+    recordedValue: number
     reversedCount: number | null
     netCount: number
     netValue: number
