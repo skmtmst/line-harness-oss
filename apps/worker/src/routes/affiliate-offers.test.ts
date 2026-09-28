@@ -21,6 +21,10 @@ const dbMocks = {
   updateAffiliateOffer: vi.fn(),
   listAffiliateOffers: vi.fn(),
   getAffiliateOfferById: vi.fn(),
+  createOfferVersion: vi.fn(),
+  getCurrentOfferVersion: vi.fn(),
+  listOfferVersions: vi.fn(),
+  getOfferCapStatus: vi.fn(),
 };
 vi.mock('@line-crm/db', () => dbMocks);
 
