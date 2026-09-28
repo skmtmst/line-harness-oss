@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { validateReward, type FormState } from './reward-form'
+import { optionalInteger, validateReward, type FormState } from './reward-form'
 
 const RAW_PAGE = readFileSync(join(__dirname, 'page.tsx'), 'utf8')
 const API = readFileSync(join(__dirname, '..', '..', '..', '..', 'lib', 'api.ts'), 'utf8')
@@ -57,6 +57,29 @@ describe('使い道の入力の確かめ', () => {
     expect(validateReward({ ...base, startsAt: '2026-09-10T10:00', endsAt: '2026-09-01T10:00' }))
       .toContain('交換終了は交換開始より後にしてください')
   })
+
+  it('R298: 空欄は無制限・0は品切れ・正の整数は上限、それ以外は止める', () => {
+    // 在庫だけは 0 が品切れの意味を持つ（R299）。それ以外は 1 以上。
+    expect(validateReward({ ...base, stockLimit: '0' })).toEqual([])
+    expect(validateReward({ ...base, stockLimit: '10' })).toEqual([])
+    // 全角数字は半角へそろえて受け取る。
+    expect(validateReward({ ...base, stockLimit: '１０' })).toEqual([])
+    expect(optionalInteger('１０')).toBe(10)
+
+    for (const key of ['stockLimit', 'perFriendLimit', 'benefitExpiresDays'] as const) {
+      for (const bad of ['abc', '-1', '1.5']) {
+        expect(validateReward({ ...base, [key]: bad }).length, `${key}=${bad}`).toBeGreaterThan(0)
+      }
+      expect(validateReward({ ...base, [key]: '' }), `${key}=空欄`).toEqual([])
+      expect(validateReward({ ...base, [key]: '5' }), `${key}=5`).toEqual([])
+    }
+    // 0 が通るのは数の限りだけ。
+    expect(validateReward({ ...base, perFriendLimit: '0' })).toContain('1人あたりの上限は1以上の整数で入力してください')
+    expect(validateReward({ ...base, benefitExpiresDays: '0' })).toContain('交換後に使える日数は1以上の整数で入力してください')
+    // 不正な入力は undefined を返し、null（無制限）にはならない。
+    expect(optionalInteger('abc')).toBeUndefined()
+    expect(optionalInteger('')).toBeNull()
+  })
 })
 
 describe('V6 17-1-G の配線', () => {
@@ -66,9 +89,20 @@ describe('V6 17-1-G の配線', () => {
       ものが誰にも交換できない状態を見分けられない。
     */
     expect(PAGE).toContain('空欄なら限りなし。0 と書くと品切れ（交換できません）')
-    expect(PAGE).toContain("if (!trimmed) return null")
-    // 0 を null へ潰さない。
+    expect(PAGE).toContain('optionalInteger(value)')
+    // 0 を null へ潰さない。数にならない入力も null（無制限）へ潰さない。
     expect(PAGE).not.toContain('Number(value) || null')
+    expect(PAGE).not.toContain('Number.isFinite(parsed) ? parsed : null')
+  })
+
+  it('R298: 数の限り・上限・日数の不正入力を欄ごとに止める', () => {
+    // 画面の確かめと保存側の変換が同じ `optionalInteger` を使う。
+    expect(PAGE).toContain('LIMIT_FIELD_ERRORS.stockLimit')
+    expect(PAGE).toContain('LIMIT_FIELD_ERRORS.perFriendLimit')
+    expect(PAGE).toContain('LIMIT_FIELD_ERRORS.benefitExpiresDays')
+    expect(PAGE).toContain('error={touched')
+    // 全角数字は半角へそろえて受け取る。
+    expect(PAGE).toContain('normalizeDigits(e.target.value)')
   })
 
   it('渡すものは保存できる種類だけ出す', () => {

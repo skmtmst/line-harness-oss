@@ -1338,12 +1338,25 @@ export async function updateMileageRule(
  * 戻り値は消えた件数。0なら履歴あり・存在しない・同時削除のいずれかで、呼び出し側は安全拒否する。
  */
 export async function deleteMileageRule(db: D1Database, id: string): Promise<number> {
-  const result = await db.prepare(
-    `DELETE FROM mileage_rules
-      WHERE id = ?
-        AND NOT EXISTS (SELECT 1 FROM mileage_ledger WHERE mileage_rule_id = ?)`,
-  ).bind(id, id).run();
-  return result.meta?.changes ?? 0;
+  /*
+   * R296: V6 の決めごとは下書き行が mileage_rules への FK を持つので、
+   * 下書きを残したまま本体を消すと外部キー違反で落ちる。先に下書きを消す。
+   * 両文に履歴ガードを付けて1トランザクション(batch)で送る——下書きだけ
+   * 消えて本体が残ると、一覧に出ないのに付与が動く決めごとになる。
+   */
+  const [, deleted] = await db.batch([
+    db.prepare(
+      `DELETE FROM mileage_earning_rule_drafts
+        WHERE rule_id = ?
+          AND NOT EXISTS (SELECT 1 FROM mileage_ledger WHERE mileage_rule_id = ?)`,
+    ).bind(id, id),
+    db.prepare(
+      `DELETE FROM mileage_rules
+        WHERE id = ?
+          AND NOT EXISTS (SELECT 1 FROM mileage_ledger WHERE mileage_rule_id = ?)`,
+    ).bind(id, id),
+  ]);
+  return deleted.meta?.changes ?? 0;
 }
 
 export interface ApplyMileageRulesInput {

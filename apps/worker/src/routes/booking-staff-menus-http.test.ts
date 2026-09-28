@@ -210,6 +210,27 @@ describe('staff×menu 割り当て保存の原子性', () => {
   });
 });
 
+describe('R310 割当再試行の安全性（再試行は割当だけ送る）', () => {
+  test('同じ割当PUTの再送は行を増やさず、スタッフも増やさない', async () => {
+    const staffCount = async () =>
+      (await db.prepare('SELECT COUNT(*) AS n FROM staff').first<{ n: number }>())!.n;
+    const before = await staffCount();
+    const menus = [
+      { menu_id: 'menu-a1', is_offered: true },
+      { menu_id: 'menu-a2', is_offered: false },
+    ];
+    const first = await putStaffMenus('staff-a1', menus);
+    expect(first.status).toBe(200);
+    const rows = await staffMenuRows('staff-a1');
+    // 割当の再送は同じ行に戻り、増えない。
+    const second = await putStaffMenus('staff-a1', menus);
+    expect(second.status).toBe(200);
+    await expect(staffMenuRows('staff-a1')).resolves.toEqual(rows);
+    // 割当の再送でスタッフが増えることはない（登録は別口）。
+    expect(await staffCount()).toBe(before);
+  });
+});
+
 describe('担当割り当ての一括読み取り（#1060: 一覧のN+1解消）', () => {
   test('全スタッフ分のmatrixを1応答で返す（未割当はis_offered=0）', async () => {
     const res = await getStaffMenusBulk();

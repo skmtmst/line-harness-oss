@@ -4,7 +4,7 @@
 // and applies lead-time / virtual-staff rules.
 
 import type { AvailabilityByStaff } from './booking-types.js';
-import { SLOT_GRANULARITY_MINUTES } from './booking-types.js';
+import { SLOT_GRANULARITY_CHOICES, SLOT_GRANULARITY_MINUTES } from './booking-types.js';
 import { getStaffGoogleBusy } from './booking-calendar-sync.js';
 import type { GoogleServiceAccountCredentials } from './google-service-account.js';
 import { storeSeatsForSlot, type StoreCapacityWindow } from './booking-store-capacity.js';
@@ -324,7 +324,7 @@ export type SlotBlockReason =
   | 'past_cutoff'
   /** その壁時刻は存在しない（夏時間の gap 等） */
   | 'invalid_time'
-  /** 受付の刻み（30分）の開始時刻ではない */
+  /** 受付の刻みの開始時刻ではない（刻み幅は店舗設定） */
   | 'not_on_grid'
   /** 休業日・例外日で閉めている */
   | 'exception_closed'
@@ -438,6 +438,11 @@ interface LoadedAvailability {
   resourceBookingRows: ResourceBookingRow[];
   minLeadAt: Date;
   windowLastDate: string | null;
+  /**
+   * R314: 予約枠の間隔（分）。店舗設定の保存値を使う。行が無い・壊れた
+   * 値のときだけ従来の既定（30）に寄せる。
+   */
+  slotGranularity: number;
   googleBusyByStaff: Map<string, Array<{ start: string; end: string }> | null>;
   calendarSync: CalendarSyncState[];
   bookingMsByStaff: Map<string, InstantBusy[]>;
@@ -670,12 +675,17 @@ async function loadAvailabilityData(
         AND date_to >= ?`)
       .bind(params.lineAccountId, params.to, params.from)
       .all<AvailabilityExceptionRow>(),
-    db.prepare(`SELECT timezone, business_hours_configured, booking_window_days, cutoff_minutes_before FROM booking_settings WHERE line_account_id = ?`)
+    db.prepare(`SELECT timezone, business_hours_configured, booking_window_days, cutoff_minutes_before, slot_granularity_minutes FROM booking_settings WHERE line_account_id = ?`)
       .bind(params.lineAccountId)
-      .first<{ timezone: string | null; business_hours_configured: number; booking_window_days: number | null; cutoff_minutes_before: number | null }>(),
+      .first<{ timezone: string | null; business_hours_configured: number; booking_window_days: number | null; cutoff_minutes_before: number | null; slot_granularity_minutes: number | null }>(),
   ]);
   // 店舗のタイムゾーンで日付・時刻を読む。未設定・壊れた値は Asia/Tokyo。
   const timeZone = normalizeTimeZone(settingsRow?.timezone ?? FALLBACK_TIME_ZONE);
+  // R314: 枠生成・可否説明で使う刻み幅は店舗設定の保存値。候補外・欠損は既定へ。
+  const storedGranularity = Number(settingsRow?.slot_granularity_minutes);
+  const slotGranularity = (SLOT_GRANULARITY_CHOICES as readonly number[]).includes(storedGranularity)
+    ? storedGranularity
+    : SLOT_GRANULARITY_MINUTES;
   const requiredResources = menuResources.results ?? [];
   const hasInvalidResource = requiredResources.some((row) =>
     row.capacity == null
@@ -884,6 +894,7 @@ async function loadAvailabilityData(
       resourceBookingRows: resourceBookings.results ?? [],
       minLeadAt,
       windowLastDate,
+      slotGranularity,
       googleBusyByStaff,
       calendarSync,
       bookingMsByStaff,
@@ -1332,7 +1343,7 @@ export async function getAvailability(
         working: workingList,
         busy: dayBookings,
         menu: d.menuForCalc,
-        granularityMinutes: SLOT_GRANULARITY_MINUTES,
+        granularityMinutes: d.slotGranularity,
         capacity: staffCapacity,
       });
       for (const slot of daySlots) {
@@ -1403,6 +1414,11 @@ export interface SlotCheckResult {
   /** bookable=false のとき全担当分の理由を集約したもの。 */
   reasons: SlotBlockReason[];
   per_staff: SlotCheckStaff[];
+  /**
+   * R314: 判定に実際に使った枠間隔（分）。理由文が適用値を表示するために使う。
+   * 追加の項目なので、読まない呼び出し側の動きは変わらない。
+   */
+  slotGranularityMinutes?: number;
 }
 
 /**
@@ -1425,6 +1441,7 @@ export async function explainBookingSlot(
     applyStoreRules: params.applyStoreRules,
     googleCredentials: params.googleCredentials,
   });
+  const d0 = loaded.kind === 'ok' ? loaded.data : null;
   const result = (partial: Partial<SlotCheckResult>): SlotCheckResult => ({
     date: params.date,
     time: params.time,
@@ -1432,6 +1449,8 @@ export async function explainBookingSlot(
     bookable: false,
     reasons: [],
     per_staff: [],
+    // R314: 刻み幅が要る理由文のため、読めたときは適用値を添える。
+    ...(d0 ? { slotGranularityMinutes: d0.slotGranularity } : null),
     ...partial,
   });
   if (loaded.kind === 'no_menu') return result({ reasons: ['menu_inactive'] });
@@ -1490,7 +1509,7 @@ export async function explainBookingSlot(
             working: day.working,
             busy: dayBookings,
             menu: d.menuForCalc,
-            granularityMinutes: SLOT_GRANULARITY_MINUTES,
+            granularityMinutes: d.slotGranularity,
             capacity: staffCapacity,
           });
           const candidate = daySlots.find((slot) => slot.start === params.time);
@@ -1500,7 +1519,7 @@ export async function explainBookingSlot(
               dayBookings,
               startMin,
               occupyMin,
-              SLOT_GRANULARITY_MINUTES,
+              d.slotGranularity,
               staffCapacity,
             ));
           } else {

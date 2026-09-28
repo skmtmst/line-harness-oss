@@ -14,7 +14,6 @@ import {
   type BookingMenu,
   type BookingResource,
   type BookingSettings,
-  type BookingSlotBlockReason,
   type BookingSlotCheckResult,
   type BookingStaff,
 } from '@/lib/api'
@@ -345,6 +344,15 @@ function ResourceEditor({ accountId, resource, canManage, onSaved, onDeleted }: 
   const [type, setType] = useState(resource.type)
   const [capacity, setCapacity] = useState(String(resource.capacity))
   const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  /* R313: 削除は確認窓を挟む。確定するまで送らない。 */
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  /*
+   * R312: 停止・再開で書きかけがあるときの破棄確認。
+   * 保存後は版が上がって窓が作り直され、下書きは消える。黙って消さず、
+   * 破棄するか編集に戻るかを利用者に選ばせる。
+   */
+  const [confirmStop, setConfirmStop] = useState(false)
   /*
    * R161 監査：設備名などを変えたまま別画面へ移ると、確認なく入力が
    * 消える。読み込んだ設備との差を未保存とし、離れる操作では確認を出す。
@@ -356,7 +364,7 @@ function ResourceEditor({ accountId, resource, canManage, onSaved, onDeleted }: 
   const inFlightRef = useRef(false)
   useEffect(() => () => { activeRef.current = false }, [])
 
-  async function update(nextActive = resource.isActive) {
+  async function update() {
     if (inFlightRef.current) return
     const parsedCapacity = Number(capacity)
     if (!name.trim() || name.trim().length > 100 || !type.trim() || type.trim().length > 50
@@ -373,6 +381,30 @@ function ResourceEditor({ accountId, resource, canManage, onSaved, onDeleted }: 
         name: name.trim(),
         type: type.trim(),
         capacity: parsedCapacity,
+        isActive: resource.isActive,
+      })
+      if (activeRef.current) onSaved(response.data)
+    } catch (cause) {
+      if (activeRef.current) setError(resourceSaveError(cause))
+    } finally {
+      inFlightRef.current = false
+      if (activeRef.current) setSaving(false)
+    }
+  }
+
+  /*
+   * R312: 受付の停止・再開は状態だけ変える。編集中の名前・種類・上限は
+   * 送らない（Worker が保存済みの値で補う部分更新）。下書きが不正でも
+   * 停止は進み、入力はそのまま残す。
+   */
+  async function setActive(nextActive: boolean) {
+    if (inFlightRef.current) return
+    inFlightRef.current = true
+    setSaving(true)
+    setError(null)
+    try {
+      const response = await bookingApi.updateResource(accountId, resource.id, {
+        expectedVersion: resource.version,
         isActive: nextActive,
       })
       if (activeRef.current) onSaved(response.data)
@@ -387,16 +419,19 @@ function ResourceEditor({ accountId, resource, canManage, onSaved, onDeleted }: 
   async function remove() {
     if (inFlightRef.current) return
     inFlightRef.current = true
-    setSaving(true)
+    setDeleting(true)
     setError(null)
     try {
       await bookingApi.deleteResource(accountId, resource.id, resource.version)
-      if (activeRef.current) onDeleted(resource.id)
+      if (activeRef.current) {
+        setConfirmDelete(false)
+        onDeleted(resource.id)
+      }
     } catch (cause) {
       if (activeRef.current) setError(resourceSaveError(cause))
     } finally {
       inFlightRef.current = false
-      if (activeRef.current) setSaving(false)
+      if (activeRef.current) setDeleting(false)
     }
   }
 
@@ -419,13 +454,42 @@ function ResourceEditor({ accountId, resource, canManage, onSaved, onDeleted }: 
       {error ? <p className="text-danger mt-2 text-xs" role="alert">{error}</p> : null}
       {canManage ? (
         <div className="mt-3 flex flex-wrap gap-2">
-          <Button variant="primary" onClick={() => void update()} disabled={saving}>{saving ? '保存中…' : '設備を保存'}</Button>
-          <Button onClick={() => void update(!resource.isActive)} disabled={saving}>{resource.isActive ? '受付を停止' : '受付を再開'}</Button>
-          {!resource.usage?.referenced ? <Button onClick={() => void remove()} disabled={saving}>設備を削除</Button> : null}
+          <Button variant="primary" onClick={() => void update()} disabled={saving || deleting}>{saving ? '保存中…' : '設備を保存'}</Button>
+          <Button onClick={() => {
+            if (resourceDirty) { setError(null); setConfirmStop(true); return }
+            void setActive(!resource.isActive)
+          }} disabled={saving || deleting}>{saving ? '保存中…' : resource.isActive ? '受付を停止' : '受付を再開'}</Button>
+          {!resource.usage?.referenced ? <Button onClick={() => { setError(null); setConfirmDelete(true) }} disabled={saving || deleting}>設備を削除</Button> : null}
         </div>
       ) : <p className="text-ink-faint mt-2 text-xs">閲覧のみです。変更はオーナーまたは管理者が行えます。</p>}
+      <ConfirmDialog
+        open={confirmStop}
+        title={`編集中の変更を破棄して${resource.isActive ? '停止' : '再開'}しますか？`}
+        description="名前・種類・上限の編集中の内容は保存されません。受付の状態だけ変わります。"
+        confirmLabel={resource.isActive ? '破棄して停止' : '破棄して再開'}
+        cancelLabel="編集に戻る"
+        primaryAction="cancel"
+        busy={saving}
+        onCancel={() => { if (!saving) setConfirmStop(false) }}
+        onConfirm={() => { setConfirmStop(false); void setActive(!resource.isActive) }}
+      />
       {/* R161 監査：設備の書きかけがある間の離脱確認。 */}
       <ConfirmDialog primaryAction="cancel" open={leaveTarget !== null} title="保存していない変更があります" description="このまま移動すると、設備への変更は失われます。保存せずに移動しますか？" confirmLabel="保存せずに移動" cancelLabel="編集を続ける" onConfirm={confirmLeave} onCancel={cancelLeave} />
+      {/*
+       * R313: 削除は共通の確認窓を挟む。消さずに受付だけ止める道も添える。
+       * 休業日の削除（#953 E-09）と同じ形。
+       */}
+      <ConfirmDialog
+        open={confirmDelete}
+        title={`「${resource.name}」を削除しますか？`}
+        description="削除すると元に戻せません。受付だけ止めたいときは「受付を停止」を使ってください。"
+        confirmLabel="削除する"
+        cancelLabel="やめる"
+        destructive
+        busy={deleting}
+        onCancel={() => { if (!deleting) setConfirmDelete(false) }}
+        onConfirm={() => void remove()}
+      />
     </div>
   )
 }
@@ -496,31 +560,8 @@ function NewResourceEditor({ accountId, onCreated }: {
   )
 }
 
-/** IDEA-28: 予約できない理由コードを運用者向けの文へ。予定の件名や相手など詳細は API から返らない。 */
-const SLOT_REASON_LABELS: Record<BookingSlotBlockReason, string> = {
-  menu_inactive: 'このメニューは受付を止めているか、削除されています',
-  staff_not_offered: 'このメニューを担当できるスタッフがいません',
-  invalid_resource: 'このメニューが必要とする設備の設定に問題があります',
-  booking_window: '受付期間（何日先まで取れるか）の外です',
-  past_cutoff: '受付の締め切り（何時間前まで取れるか）を過ぎています',
-  invalid_time: 'その時刻は存在しません',
-  not_on_grid: '開始時刻が受付の刻み（30分）に合っていません',
-  exception_closed: '休業日・例外日で閉めています',
-  exception_invalid: '例外日の時間設定が壊れているため、安全のため閉めています',
-  outside_working: '勤務・営業時間の外です',
-  duration_overrun: '勤務・営業の終わりまでに所要時間が収まりません',
-  other_booking: 'ほかの予約と重なっています',
-  google_busy: '外部カレンダーの予定と重なっています',
-  capacity_full: '担当の同時受付数がいっぱいです',
-  store_full: '店舗全体の同時受付枠がいっぱいです',
-  resource_shortage: '必要な設備がその時間に足りません',
-  calendar_unavailable: '外部カレンダーを読めないため、安全のため閉めています',
-  unavailable: 'この日時は受け付けられません',
-}
-
-function slotReasonLabel(reason: BookingSlotBlockReason): string {
-  return SLOT_REASON_LABELS[reason] ?? 'この日時は受け付けられません'
-}
+/* 理由文は別ファイル（ページは default 以外を export できない）。 */
+import { slotReasonLabel } from './slot-reason'
 
 // IDEA-28: 日時を指定して、予約できるか・だめならどの条件で閉まっているかを確かめる。
 // 読み取りだけで予約は作らない。判定はお客様の予約画面と同じ条件。
@@ -642,7 +683,7 @@ function SlotCheckCard({ accountId, menus }: { accountId: string; menus: Booking
           <Notice tone="warn" className="mt-3">
             <p className="font-semibold">この日時は予約できません。</p>
             <ul className="mt-1 list-disc space-y-0.5 pl-5 text-xs">
-              {result.reasons.map((reason) => <li key={reason}>{slotReasonLabel(reason)}</li>)}
+              {result.reasons.map((reason) => <li key={reason}>{slotReasonLabel(reason, result.slotGranularityMinutes)}</li>)}
             </ul>
             {result.per_staff.length > 1 ? (
               <ul className="mt-2 space-y-0.5 border-t border-current/20 pt-2 text-xs">
@@ -650,7 +691,7 @@ function SlotCheckCard({ accountId, menus }: { accountId: string; menus: Booking
                   <li key={staff.staff_id}>
                     {staff.display_name}: {staff.bookable
                       ? '予約できます'
-                      : staff.reasons.map(slotReasonLabel).join('、')}
+                      : staff.reasons.map((reason) => slotReasonLabel(reason, result.slotGranularityMinutes)).join('、')}
                   </li>
                 ))}
               </ul>
@@ -757,10 +798,13 @@ function StoreShiftsView() {
         return
       }
       try {
+        // (b): 見本はお客様と同じ店舗ルールで判定する。付けないと締切前の
+        // 枠まで出て、空き確認の判定と食い違う。
         const availability = await bookingApi.getAvailability(selectedAccountId, {
           menuId: menu.id,
           from: range.from,
           to: range.to,
+          applyStoreRules: true,
         })
         if (requestId !== requestRef.current) return
         // LIFF は by_staff[0]（担当一覧の先頭）の枠だけを画面に出す。
