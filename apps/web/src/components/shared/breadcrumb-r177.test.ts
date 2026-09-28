@@ -27,9 +27,19 @@ describe('R177 パンくずと戻るボタンのはみ出し', () => {
   })
 
   it('編集3画面の見出し行はパンくずを縮めボタンを残す', () => {
-    for (const [name, page] of [['fields/edit', fieldEdit], ['fields/new', fieldNew], ['searches/edit', searchEdit]] as const) {
+    /*
+     * m22c: fields系の戻りはボタン枠から共通の行き先リンクへ変えた。
+     * 残すのは「戻り先」であって枠ではない。パンくずが縮み（min-w-0）、
+     * 戻り先が縮まず（shrink-0）残ることを見る。
+     */
+    for (const [name, page, back] of [
+      ['fields/edit', fieldEdit, '>友だち情報欄へ</Link>'],
+      ['fields/new', fieldNew, '>友だち情報欄へ</Link>'],
+      ['searches/edit', searchEdit, '>保存した検索へ</Button>'],
+    ] as const) {
       expect(page, `${name} のパンくずが縮まない`).toContain('<div className="min-w-0 flex-1">')
-      expect(page, `${name} のボタンが押されない`).toContain('className="shrink-0"')
+      expect(page, `${name} の戻り先が縮んで押せない`).toContain('shrink-0')
+      expect(page, `${name} の戻り先が無い`).toContain(back)
     }
   })
 })
