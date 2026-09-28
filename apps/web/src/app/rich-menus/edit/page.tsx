@@ -2,9 +2,9 @@
 
 import DateTimeField from '@/components/shared/date-time-field'
 import Select from '@/components/shared/select'
-import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
+import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import TargetMissing from '@/components/shared/target-missing'
@@ -1360,7 +1360,7 @@ function Editor({
 
             <Checkbox
               checked={targetingEnabled}
-              onCheckedChange={(checked) => setTargetingEnabled(checked)}
+              onCheckedChange={setTargetingEnabled}
               description="切ると、このメニューは条件で配られなくなります。すでに見えている人からはすぐには消えません。"
             >
               条件で出し分ける
@@ -1680,14 +1680,13 @@ function Editor({
 
       <StickyBar actions={(
         <div className="flex items-center gap-2">
-          <span className="mr-2">
-            <Checkbox
-              checked={preview}
-              onCheckedChange={(checked) => setPreview(checked)}
-            >
-              プレビュー
-            </Checkbox>
-          </span>
+          <Checkbox
+            className="mr-2"
+            checked={preview}
+            onCheckedChange={setPreview}
+          >
+            プレビュー
+          </Checkbox>
           <button
             onClick={handleSave}
             disabled={saving || publishing || unpublishing || busy}

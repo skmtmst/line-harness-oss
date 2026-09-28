@@ -392,11 +392,12 @@ export async function recordCustomerEcDelivery(
       (id, line_account_id, instance_id, audience_type, recipient_type, recipient_id,
        channel, idempotency_key, status, retryable, attempts, provider_request_id,
        provider_status, error_code, error_message_safe, queued_at, accepted_at,
-       failed_at, execution_mode, version, updated_at)
+       failed_at, execution_mode, version, updated_at, source)
     VALUES (?, ?, ?, 'customer', 'friend', ?, 'line', ?, ?, 0, ?, ?, ?, ?, ?,
-            ?, ?, ?, 'automatic', 1, ?)
+            ?, ?, ?, 'automatic', 1, ?, ?)
     ON CONFLICT(line_account_id, idempotency_key) DO UPDATE SET
       status = excluded.status,
+      source = excluded.source,
       attempts = notification_deliveries.attempts + excluded.attempts,
       provider_request_id = COALESCE(
         excluded.provider_request_id, notification_deliveries.provider_request_id),
@@ -415,7 +416,7 @@ export async function recordCustomerEcDelivery(
     deliveryStatus, errorCode, errorMessage, now,
     deliveryStatus === 'provider_accepted' ? now : null,
     deliveryStatus === 'failed' ? now : null,
-    now,
+    now, input.sourceEventType,
   ).run();
 
   if (!input.attemptedSend) return;
@@ -860,12 +861,14 @@ export async function insertNotificationResendDelivery(
       INSERT INTO notification_deliveries
         (id, line_account_id, instance_id, audience_type, recipient_type, recipient_id,
          channel, idempotency_key, status, retryable, attempts, queued_at,
-         execution_mode, version, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', 1, 0, ?, 'resend', 1, ?)
+         execution_mode, version, updated_at, source)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', 1, 0, ?, 'resend', 1, ?,
+              (SELECT i.source_event_type FROM notification_instances i
+                WHERE i.id = ? AND i.line_account_id = ?))
     `).bind(
       id, input.lineAccountId, instance.instance_id, instance.audience_type,
       instance.recipient_type, instance.recipient_id, instance.channel,
-      idempotencyKey, now, now,
+      idempotencyKey, now, now, instance.instance_id, input.lineAccountId,
     ),
     // 再送理由は監査として残す。対応状況の履歴（resolved/reopened）とは
     // 別actionなので一覧の解決状態には影響しない。
@@ -1030,9 +1033,11 @@ export async function recordCustomerTestDelivery(
       (id, line_account_id, instance_id, audience_type, recipient_type, recipient_id,
        channel, idempotency_key, status, retryable, attempts, provider_request_id,
        provider_status, error_code, error_message_safe, queued_at, accepted_at,
-       failed_at, execution_mode, version, updated_at)
+       failed_at, execution_mode, version, updated_at, source)
     VALUES (?, ?, ?, 'customer', 'friend', ?, 'line', ?, ?, 0, 1, ?, ?, ?, ?,
-            ?, ?, ?, 'test', 1, ?)
+            ?, ?, ?, 'test', 1, ?,
+            (SELECT i.source_event_type FROM notification_instances i
+              WHERE i.id = ? AND i.line_account_id = ?))
   `).bind(
     id, input.lineAccountId, input.instanceId, input.recipientId,
     input.idempotencyKey, status,
@@ -1040,6 +1045,7 @@ export async function recordCustomerTestDelivery(
     input.errorCode ?? null, input.errorMessageSafe ?? null, now,
     status === 'provider_accepted' ? now : null,
     status === 'failed' ? now : null, now,
+    input.instanceId, input.lineAccountId,
   ).run();
   await db.prepare(`
     INSERT INTO notification_delivery_attempts

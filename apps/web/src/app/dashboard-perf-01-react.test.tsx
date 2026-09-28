@@ -103,6 +103,20 @@ function installFetch() {
         total: 1,
       }))
     }
+    if (path.startsWith('/api/dashboard/upcoming')) {
+      const startsAt = new Date(Date.now() + 2 * 86_400_000).toISOString()
+      return jsonResponse(ok({
+        success: true,
+        data: {
+          items: [{ kind: 'booking', id: 'bk-1', title: '相談（テスト）', startsAt, href: '/booking/bookings?view=list' }],
+          asOf: new Date().toISOString(),
+          rangeDays: 7,
+        },
+      }))
+    }
+    if (path.startsWith('/api/dashboard/delivery-failure-origins')) {
+      return jsonResponse(ok({ success: true, data: { total: 0, asOf: null, origins: [] } }))
+    }
     if (path.startsWith('/api/entry-routes')) return jsonResponse(ok({ success: true, data: [] }))
     if (path.startsWith('/api/nen-members/photos/review-metrics')) {
       return jsonResponse(ok({
@@ -186,9 +200,9 @@ describe('PERF-01 補足データはカードごとに独立して反映する',
     const bookingsCard = Array.from(host.querySelectorAll('h3'))
       .find((node) => node.textContent?.trim() === '今日の予約')
     expect(bookingsCard?.parentElement?.parentElement?.textContent).toContain('1')
-    // 今後の予約カードは読み込みスケルトンを抜け、明細を出している。
+    // 今後の予定カードは読み込みスケルトンを抜け、明細を出している。
     const upcoming = Array.from(host.querySelectorAll('h2'))
-      .find((node) => node.textContent?.trim() === '今後の予約')
+      .find((node) => node.textContent?.trim() === '今後の予定')
     const upcomingCard = upcoming?.closest('[class*="rounded"]')?.parentElement?.textContent
       ?? upcoming?.parentElement?.parentElement?.parentElement?.textContent
     expect(upcomingCard).toContain('相談')

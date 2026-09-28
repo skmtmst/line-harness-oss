@@ -21,6 +21,7 @@ import type {
 } from '@line-crm/shared'
 import { newBlockId } from '@line-crm/shared'
 import ChoiceTable from './choice-table'
+import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 import { describeInputUpdates } from './form-update-summary'
 import { cellInput, fieldInput, type FormRefs } from './form-refs'
@@ -368,21 +369,17 @@ export default function BlockEditor({
                         block.type !== 'textarea' || key === 'note',
                     )
                     .map((key) => (
-                      <label
+                      <Checkbox
                         key={key}
-                        className="text-ink-secondary flex items-center gap-1.5 text-xs"
+                        checked={block.destinations?.[key] ?? false}
+                        onCheckedChange={(checked) =>
+                          patchInput({
+                            destinations: { ...block.destinations, [key]: checked },
+                          })
+                        }
                       >
-                        <input
-                          type="checkbox"
-                          checked={block.destinations?.[key] ?? false}
-                          onChange={(e) =>
-                            patchInput({
-                              destinations: { ...block.destinations, [key]: e.target.checked },
-                            })
-                          }
-                        />
                         {{ realName: '本名', displayName: 'システム表示名', note: '個別メモ' }[key]}
-                      </label>
+                      </Checkbox>
                     ))}
                 </div>
 
@@ -529,16 +526,14 @@ export default function BlockEditor({
                       />
                       文字
                     </label>
-                    <label className="text-ink-secondary flex items-center gap-1.5 text-xs">
-                      <input
-                        type="checkbox"
-                        checked={block.limit?.hideCounter ?? false}
-                        onChange={(e) =>
-                          patchInput({ limit: { ...block.limit, hideCounter: e.target.checked } })
-                        }
-                      />
+                    <Checkbox
+                      checked={block.limit?.hideCounter ?? false}
+                      onCheckedChange={(checked) =>
+                        patchInput({ limit: { ...block.limit, hideCounter: checked } })
+                      }
+                    >
                       文字数を出さない
-                    </label>
+                    </Checkbox>
                   </div>
                 </div>
               )}
@@ -546,20 +541,18 @@ export default function BlockEditor({
               {/* 日付からリマインダ */}
               {block.type === 'date' && (
                 <div className="border-hairline rounded-control bg-canvas-sunken border p-3">
-                  <label className="text-ink-secondary flex items-center gap-2 text-xs font-medium">
-                    <input
-                      type="checkbox"
-                      checked={!!block.reminder}
-                      onChange={(e) =>
-                        patchInput({
-                          reminder: e.target.checked
-                            ? { reminderId: '', time: '09:00' }
-                            : null,
-                        })
-                      }
-                    />
+                  <Checkbox
+                    checked={!!block.reminder}
+                    onCheckedChange={(checked) =>
+                      patchInput({
+                        reminder: checked
+                          ? { reminderId: '', time: '09:00' }
+                          : null,
+                      })
+                    }
+                  >
                     この日付からリマインダを起動する
-                  </label>
+                  </Checkbox>
 
                   {block.reminder && (
                     <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -586,32 +579,26 @@ export default function BlockEditor({
 
               {/* 共通のチェック */}
               <div className="border-hairline flex flex-wrap gap-4 border-t pt-3">
-                <label className="text-ink-secondary flex items-center gap-1.5 text-xs">
-                  <input
-                    type="checkbox"
-                    checked={block.required ?? false}
-                    onChange={(e) => patchInput({ required: e.target.checked })}
-                  />
+                <Checkbox
+                  checked={block.required ?? false}
+                  onCheckedChange={(checked) => patchInput({ required: checked })}
+                >
                   必須
-                </label>
+                </Checkbox>
                 {(block.type === 'radio' || block.type === 'checkbox') && (
-                  <label className="text-ink-secondary flex items-center gap-1.5 text-xs">
-                    <input
-                      type="checkbox"
-                      checked={block.inline ?? false}
-                      onChange={(e) => patchInput({ inline: e.target.checked })}
-                    />
+                  <Checkbox
+                    checked={block.inline ?? false}
+                    onCheckedChange={(checked) => patchInput({ inline: checked })}
+                  >
                     横並び
-                  </label>
+                  </Checkbox>
                 )}
-                <label className="text-ink-secondary flex items-center gap-1.5 text-xs">
-                  <input
-                    type="checkbox"
-                    checked={block.hidden ?? false}
-                    onChange={(e) => patchInput({ hidden: e.target.checked })}
-                  />
+                <Checkbox
+                  checked={block.hidden ?? false}
+                  onCheckedChange={(checked) => patchInput({ hidden: checked })}
+                >
                   非表示
-                </label>
+                </Checkbox>
                 <span className="text-ink-faint ml-auto text-xs">
                   回答データの見出し：{block.name}
                 </span>

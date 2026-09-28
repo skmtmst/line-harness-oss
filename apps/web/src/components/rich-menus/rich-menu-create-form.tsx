@@ -360,18 +360,17 @@ export default function RichMenuCreateForm({
               </div>
             ) : null}
 
-            <div className={value.targetingEnabled ? 'opacity-50' : ''}>
-              <Checkbox
-                checked={value.isDefaultForAll}
-                disabled={locked || value.targetingEnabled}
-                onCheckedChange={(checked) => patch({ isDefaultForAll: checked })}
-                description={value.targetingEnabled
-                  ? '出し分けを選んだメニューは全員の既定にはできません。'
-                  : '公開のときにLINEの既定へ設定します。ほかに既定のメニューがある場合は入れ替わります。'}
-              >
-                公開したら「すべての友だち」の既定メニューにする
-              </Checkbox>
-            </div>
+            <Checkbox
+              className={value.targetingEnabled ? 'opacity-50' : ''}
+              checked={value.isDefaultForAll}
+              disabled={locked || value.targetingEnabled}
+              onCheckedChange={(checked) => patch({ isDefaultForAll: checked })}
+              description={value.targetingEnabled
+                ? '出し分けを選んだメニューは全員の既定にはできません。'
+                : '公開のときにLINEの既定へ設定します。ほかに既定のメニューがある場合は入れ替わります。'}
+            >
+              公開したら「すべての友だち」の既定メニューにする
+            </Checkbox>
           </section>
 
           <div className="grid gap-4 sm:grid-cols-2">
