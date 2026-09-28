@@ -8754,11 +8754,11 @@ export const api = {
     generations: {
       get: (id: string) =>
         fetchApi<ApiResponse<BannerGeneration>>(`/api/hq/banners/generations/${encodeURIComponent(id)}`),
-      /** 1回で1枚作る。画面が枚数ぶん繰り返す。 */
-      run: (id: string) =>
+      /** 1回で1枚作る。画面が枚数ぶん繰り返す。切り抜き位置は用途寸法への整形に使う。 */
+      run: (id: string, input?: { gravity?: string }) =>
         fetchApi<ApiResponse<BannerRunResult>>(`/api/hq/banners/generations/${encodeURIComponent(id)}/run`, {
           method: 'POST',
-          body: JSON.stringify({}),
+          body: JSON.stringify(input ?? {}),
         }),
       cancel: (id: string) =>
         fetchApi<ApiResponse<BannerGeneration>>(`/api/hq/banners/generations/${encodeURIComponent(id)}/cancel`, {
