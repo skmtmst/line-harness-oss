@@ -6,7 +6,7 @@
 import { describe, expect, test, vi, afterEach } from 'vitest';
 import { LineClient } from '@line-crm/line-sdk';
 
-function stubFetch(handler: (url: string, init: Record<string, unknown>) => Response) {
+function stubFetch(handler: (url: string, init: Record<string, unknown>) => Response | Promise<Response>) {
   const spy = vi.fn(async (url: unknown, init: unknown) => handler(String(url), (init ?? {}) as Record<string, unknown>));
   vi.stubGlobal('fetch', spy);
   return spy;

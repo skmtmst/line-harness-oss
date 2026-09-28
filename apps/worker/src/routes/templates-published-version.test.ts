@@ -30,6 +30,7 @@ const mocks = vi.hoisted(() => ({
   listTemplateReferences: vi.fn().mockResolvedValue([]),
   listBroadcastReferences: vi.fn().mockResolvedValue([]),
   getBroadcastDeleteBlockers: vi.fn().mockResolvedValue([]),
+  getPinnedReminderDeleteBlockers: vi.fn().mockResolvedValue([]),
 }));
 vi.mock('@line-crm/db', () => mocks);
 

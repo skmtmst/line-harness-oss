@@ -20,6 +20,7 @@ const mocks = {
   listTemplateReferences: vi.fn().mockResolvedValue([]),
   listBroadcastReferences: vi.fn().mockResolvedValue([]),
   getBroadcastDeleteBlockers: vi.fn().mockResolvedValue([]),
+  getPinnedReminderDeleteBlockers: vi.fn().mockResolvedValue([]),
 };
 vi.mock('@line-crm/db', () => mocks);
 
@@ -83,6 +84,23 @@ describe('テンプレートの削除', () => {
 
     expect(response.status).toBe(409);
     expect(body).toMatchObject({ code: 'IN_USE', usageCount: 1 });
+    expect(mocks.deleteTemplate).not.toHaveBeenCalled();
+  });
+
+  it('R347: 旧版に固定された送信待ちの登録があれば409で止める', async () => {
+    mocks.getPinnedReminderDeleteBlockers.mockResolvedValueOnce([
+      { enrollmentId: 'fr-1', reminderId: 're-1', reminderName: '前日案内', versionNumber: 1, enrollmentStatus: 'active', targetDate: '2026-10-05' },
+    ]);
+
+    const response = await makeApp().fetch(
+      new Request('https://example.com/api/templates/tpl-1', { method: 'DELETE' }),
+      env,
+    );
+    const body = await response.json() as { code: string; usageCount: number; error: string };
+
+    expect(response.status).toBe(409);
+    expect(body).toMatchObject({ code: 'IN_USE', usageCount: 1 });
+    expect(body.error).toContain('送信待ちの通知1件');
     expect(mocks.deleteTemplate).not.toHaveBeenCalled();
   });
 
