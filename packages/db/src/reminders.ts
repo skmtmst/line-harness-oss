@@ -62,6 +62,11 @@ export interface FriendReminderRow {
   created_at: string;
   updated_at: string;
   reminder_version_id: string | null;
+  /**
+   * R346: 登録時に使っていたテンプレートの公開版。
+   * {"テンプレートID": 公開版番号} の JSON。NULL は今までどおり最新の版を読む。
+   */
+  template_version_snapshot: string | null;
   source_kind: string;
   source_id: string | null;
   source_event_id: string | null;
@@ -205,6 +210,15 @@ export interface ReminderDeliveryRunRow {
   last_error_message: string | null;
   line_request_id: string | null;
   message_log_id: string | null;
+  /**
+   * R345: 初回に送った本文（差し込み済み）と使った版。
+   * 同じ再試行キーの再送はここから送り、履歴もここから残す。
+   * NULL は「まだ送っていない」→今までどおり最新の内容で作る。
+   */
+  sent_message_type: string | null;
+  sent_message_content: string | null;
+  sent_template_id: string | null;
+  sent_template_version: number | null;
   manual_retry_key: string | null;
   started_at: string | null;
   completed_at: string | null;
@@ -848,6 +862,49 @@ async function ensureReminderPublishedVersion(
   return current.current_published_version_id;
 }
 
+/**
+ * R346: 登録時に使っていたテンプレートの公開版を写す。
+ * {"テンプレートID": 公開版番号} の JSON。本文は作らない。
+ * まだ公開されていない・消えたテンプレートは載せず、送るときに今の版を読む。
+ */
+export async function snapshotReminderTemplateVersions(
+  db: D1Database,
+  templateIds: Array<string | null>,
+): Promise<string | null> {
+  const ids = [...new Set(templateIds.filter((id): id is string => !!id))];
+  if (ids.length === 0) return null;
+  const rows = await db.prepare(
+    `SELECT id, published_version FROM templates WHERE id IN (${ids.map(() => '?').join(', ')})`,
+  ).bind(...ids).all<{ id: string; published_version: number }>();
+  const map: Record<string, number> = {};
+  for (const row of rows.results ?? []) {
+    const version = Number(row.published_version);
+    if (Number.isFinite(version) && version > 0) map[row.id] = version;
+  }
+  return Object.keys(map).length > 0 ? JSON.stringify(map) : null;
+}
+
+/**
+ * R346: 登録に残した版指定を読む。壊れた記録は「指定なし」と同じにする。
+ */
+export function parseTemplateVersionSnapshot(
+  value: string | null | undefined,
+): Record<string, number> | null {
+  if (!value) return null;
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+    const map: Record<string, number> = {};
+    for (const [key, version] of Object.entries(parsed as Record<string, unknown>)) {
+      const n = Number(version);
+      if (key && Number.isFinite(n) && n > 0) map[key] = n;
+    }
+    return Object.keys(map).length > 0 ? map : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function enrollFriendInReminder(
   db: D1Database,
   input: {
@@ -898,16 +955,24 @@ export async function enrollFriendInReminder(
   const versionId = await ensureReminderPublishedVersion(db, reminder);
   const id = crypto.randomUUID();
   const now = jstNow();
+  // R346: この登録が使うテンプレートの公開版を写す。新しい版にするのは
+  // 登録し直した時だけ。版履歴に無い分は送るときに今の版を読む。
+  const versionSteps = await getReminderVersionSteps(db, versionId);
+  const templateSnapshot = await snapshotReminderTemplateVersions(
+    db,
+    versionSteps.map((step) => step.template_id),
+  );
   await db.prepare(
     `INSERT INTO friend_reminders
-       (id, friend_id, reminder_id, reminder_version_id, target_date,
+       (id, friend_id, reminder_id, reminder_version_id, template_version_snapshot, target_date,
         source_kind, source_id, source_event_id, timezone, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).bind(
     id,
     input.friendId,
     input.reminderId,
     versionId,
+    templateSnapshot,
     input.targetDate,
     input.sourceKind ?? 'manual',
     input.sourceId ?? null,
@@ -2131,6 +2196,81 @@ export async function getReminderDeliveryRunById(
     .first<ReminderDeliveryRunRow>();
 }
 
+export interface ReminderDeliveryRunSentPayload {
+  messageType: string;
+  messageContent: string;
+  templateId: string | null;
+  templateVersion: number | null;
+}
+
+/**
+ * R345: 初回に送った本文（差し込み済み）を読む。
+ * まだ送っていなければ null（呼び出し側は今までどおり最新の内容で作る）。
+ */
+export async function getReminderDeliveryRunSentPayload(
+  db: D1Database,
+  runId: string,
+): Promise<ReminderDeliveryRunSentPayload | null> {
+  const row = await db.prepare(
+    `SELECT sent_message_type, sent_message_content, sent_template_id, sent_template_version
+       FROM reminder_delivery_runs WHERE id = ?`,
+  ).bind(runId).first<{
+    sent_message_type: string | null;
+    sent_message_content: string | null;
+    sent_template_id: string | null;
+    sent_template_version: number | null;
+  }>();
+  if (!row || row.sent_message_content == null || row.sent_message_type == null) return null;
+  return {
+    messageType: row.sent_message_type,
+    messageContent: row.sent_message_content,
+    templateId: row.sent_template_id,
+    templateVersion: row.sent_template_version == null ? null : Number(row.sent_template_version),
+  };
+}
+
+/**
+ * R345: 初回に送る本文を残し、残っている本文を返す。
+ * 先に残した処理があるときはそちらを返し、上書きしない
+ * （同じ実行の二重保存・別処理の上書きをしない）。
+ * 貸出を失っているときは残せず null を返す（呼び出し側は作りたてを使うが、
+ * 直後の検証で止まるため送らない）。
+ */
+export async function saveReminderDeliveryRunSentPayload(
+  db: D1Database,
+  input: {
+    id: string;
+    messageType: string;
+    messageContent: string;
+    templateId: string | null;
+    templateVersion: number | null;
+    now: string;
+    /** R340: 自分が今の持ち主のときだけ残す。 */
+    expectedLeaseExpiresAt: string | string[];
+  },
+): Promise<ReminderDeliveryRunSentPayload | null> {
+  const owner = ownerGateSql(
+    Array.isArray(input.expectedLeaseExpiresAt)
+      ? input.expectedLeaseExpiresAt
+      : [input.expectedLeaseExpiresAt],
+  );
+  await db.prepare(
+    `UPDATE reminder_delivery_runs
+        SET sent_message_type = ?, sent_message_content = ?,
+            sent_template_id = ?, sent_template_version = ?, updated_at = ?
+      WHERE id = ? AND sent_message_content IS NULL AND ${owner.sql}`,
+  ).bind(
+    input.messageType,
+    input.messageContent,
+    input.templateId,
+    input.templateVersion,
+    input.now,
+    input.id,
+    ...owner.bindings,
+  ).run();
+  return getReminderDeliveryRunSentPayload(db, input.id);
+}
+
 export type RetryReminderDeliveryRunResult =
   | { kind: 'scheduled'; run: ReminderDeliveryRunRow }
   | { kind: 'replay'; run: ReminderDeliveryRunRow }
@@ -2421,6 +2561,12 @@ export async function enrollFriendsInReminderOnce(
 ): Promise<number> {
   let enrolled = 0;
   const now = jstNow();
+  // R346: まとめ登録も1件ずつと同じ版で送る。この束が使うテンプレートの
+  // 公開版を1度だけ写し、新しい行に付ける（ある行は触らない）。
+  const bulkTemplateSnapshot = await snapshotReminderTemplateVersions(
+    db,
+    (await getReminderSteps(db, reminderId)).map((step) => step.template_id),
+  );
 
   for (let offset = 0; offset < candidates.length; offset += FRIEND_REMINDER_INSERT_CHUNK) {
     const chunk = candidates.slice(offset, offset + FRIEND_REMINDER_INSERT_CHUNK);
@@ -2433,13 +2579,13 @@ export async function enrollFriendsInReminderOnce(
         candidate.targetDate,
       );
     }
-    bindings.push(reminderId, now, now);
+    bindings.push(reminderId, bulkTemplateSnapshot, now, now);
 
     const result = await db.prepare(
       `WITH candidates(id, friend_id, target_date) AS (VALUES ${values})
        INSERT OR IGNORE INTO friend_reminders
-         (id, friend_id, reminder_id, target_date, created_at, updated_at)
-       SELECT c.id, c.friend_id, ?, c.target_date, ?, ?
+         (id, friend_id, reminder_id, target_date, template_version_snapshot, created_at, updated_at)
+       SELECT c.id, c.friend_id, ?, c.target_date, ?, ?, ?
          FROM candidates c
         WHERE NOT EXISTS (
           SELECT 1
