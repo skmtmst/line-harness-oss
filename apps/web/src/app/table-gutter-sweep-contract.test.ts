@@ -122,15 +122,17 @@ describe('表の外側の余白の洗い出し', () => {
 
   it('/duplicates：外側は見出しの余白にそろえ、操作は右へ寄せる', () => {
     const body = code(read('app', 'duplicates', 'page.tsx'))
-    // 候補の表（20px）。
+    // 候補の表（20px）。文字だけのセルは span で包み、本当の余白で測らせる（m22b。見た目は同じ）。
     expect(body).toContain('<Th className="pl-5">候補</Th>')
     expect(body).toContain('<Th align="right" className="pr-5">操作</Th>')
-    expect(body).toContain('truncate py-3 pr-3 pl-5')
+    expect(body).toContain('py-3 pr-3 pl-5')
+    expect(body).toContain('<span className="block truncate">{candidate.left.label}')
     expect(body).toContain('whitespace-nowrap py-2 pr-5 pl-3 text-right')
     // アカウント別の表（20px）。
     expect(body).toContain('<Th className="pl-5">アカウント</Th>')
     expect(body).toContain('pr-5">重複率')
-    expect(body).toContain('truncate py-4 pr-4 pl-5')
+    expect(body).toContain('py-4 pr-4 pl-5')
+    expect(body).toContain('<span className="block truncate">{row.accountName}</span>')
     expect(body).toContain('py-4 pr-5 pl-4 text-right tabular-nums')
     // 行列の表（16px。列数が可変のため末尾列は要素指定）。
     expect(body).toContain('<Th className="pl-4">行')
@@ -141,7 +143,7 @@ describe('表の外側の余白の洗い出し', () => {
   it('/tags・/tags/folders/new：先頭列と操作列の外側をそろえる', () => {
     const body = code(read('components', 'friend-fields', 'tags-page-v4.tsx'))
     // 共通 Th（余白 12px＝px-3 を持つ）へ寄せた後は幅だけ指定する。
-    // 先頭列 w-11（44px）、操作列は編集＋…の2点分の128px（64pxでは枠付きボタンが切れる）。
+    // 先頭列 w-11（44px）、操作列は編集＋…の2点分の128px（64pxでは枠付きボタンが切れる。m21o・m22b）。
     expect(body).toContain('<Th style={{ width: 44 }}>')
     expect(body).toContain('<Th style={{ width: 128 }} className="sticky right-0')
     expect(body).toContain('>操作</Th>')
