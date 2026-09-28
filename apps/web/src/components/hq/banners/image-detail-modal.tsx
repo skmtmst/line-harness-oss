@@ -4,6 +4,7 @@ import { Download, ImagePlus, RefreshCw, Star, Store, Trash2, X } from 'lucide-r
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import type { AccountWithStats } from '@/contexts/account-context'
@@ -176,12 +177,11 @@ export default function ImageDetailModal({
                                 : 'flex h-11 cursor-pointer items-center gap-3 rounded-control px-2 text-ink hover:bg-canvas-sunken'
                           }
                         >
-                          <input
-                            type="checkbox"
-                            className="h-4.5 w-4.5 accent-accent-deep"
+                          <Checkbox
                             checked={already || checked}
                             disabled={already || busy}
-                            onChange={() => toggle(account.id)}
+                            onCheckedChange={() => toggle(account.id)}
+                            aria-label={`${account.displayName ?? account.name}へ配布`}
                           />
                           <span className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-mini bg-accent-soft text-nano font-bold text-accent-deep">
                             {account.pictureUrl ? (

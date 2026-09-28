@@ -21,6 +21,7 @@ import {
 import { useAccount } from '@/contexts/account-context'
 import { canEditFeature, canViewFeature } from '@/lib/staff-capability'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import DateField from '@/components/shared/date-field'
@@ -184,15 +185,12 @@ function BusinessHoursEditor({ accountId, settings, canEdit, onSaved, onReload }
           const accepts = intervals.length > 0
           return (
             <div className="grid gap-3 px-4 py-3 text-sm lg:grid-cols-6" key={day.weekday}>
-              <label className="flex items-center gap-2 font-semibold whitespace-nowrap lg:col-span-1">
-                <input
-                  aria-label={`${day.label}を受け付ける`}
-                  type="checkbox"
-                  checked={accepts}
-                  onChange={(event) => setAccepts(day.weekday, event.target.checked)}
-                />
-                {day.label}
-              </label>
+              <Checkbox
+                checked={accepts}
+                onCheckedChange={(checked) => setAccepts(day.weekday, checked)}
+                aria-label={`${day.label}を受け付ける`}
+                className="font-semibold whitespace-nowrap lg:col-span-1"
+              >{day.label}</Checkbox>
               {!accepts ? (
                 <p className="text-ink-faint lg:col-span-5">{settings.businessHoursConfigured ? '休み（定休日）' : '未設定（現在は担当者の勤務時間どおり）'}</p>
               ) : (

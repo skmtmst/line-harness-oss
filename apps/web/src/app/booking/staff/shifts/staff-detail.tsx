@@ -15,6 +15,7 @@ import {
 import { useAccount } from '@/contexts/account-context'
 import { canEditFeature } from '@/lib/staff-capability'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import DateField from '@/components/shared/date-field'
 import Notice from '@/components/shared/notice'
@@ -864,16 +865,11 @@ export default function StaffDetail({ staffId }: { staffId: string }) {
                 return (
                   <div className="flex min-h-10 flex-wrap items-center gap-3 px-4 py-2 text-sm" key={day.weekday}>
                     <strong className="w-24 shrink-0 whitespace-nowrap">{day.label}</strong>
-                    <label className="flex items-center gap-2 text-xs">
-                      <input
-                        type="checkbox"
-                        aria-label={`${day.label}は出勤する`}
-                        checked={row.active}
-                        onChange={(event) => updateDraft(day.weekday, { active: event.target.checked })}
-                        className="rounded"
-                      />
-                      <span>出る</span>
-                    </label>
+                    <Checkbox
+                      checked={row.active}
+                      onCheckedChange={(checked) => updateDraft(day.weekday, { active: checked })}
+                      aria-label={`${day.label}は出勤する`}
+                    >出る</Checkbox>
                     {row.active ? (
                       <>
                         <span className="flex items-center gap-1 text-xs">
