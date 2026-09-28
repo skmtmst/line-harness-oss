@@ -225,6 +225,8 @@ export interface PublicForm {
   description: string | null;
   layout: FormLayout;
   isActive: boolean;
+  /** P（試し回答）：true は下書きの試し。集計に入らず、後処理も動かない。 */
+  isTest?: boolean;
 }
 
 /** フォーム回答の送信結果。未完のとき data.complete が false で返る。 */
@@ -300,7 +302,12 @@ export const api = {
     }>(`/api/liff/events/waitlist/${encodeURIComponent(token)}/accept`, {}),
 
   // ===== 回答フォーム =====
-  getForm: (id: string) => get<PublicForm>(`/api/forms/${id}`),
+  /**
+   * P（試し回答）：試し合言葉を添えると、未公開の下書きをお客さまの形で返す。
+   * 合言葉が違うときは 403 になる（本物としては扱わない）。
+   */
+  getForm: (id: string, testToken?: string) =>
+    get<PublicForm>(`/api/forms/${id}${testToken ? `?test_token=${encodeURIComponent(testToken)}` : ''}`),
   /** 前回の自分の回答。「前回の回答を出しておく」設定のときだけ中身が返る */
   getMyLatestFormAnswer: (id: string) =>
     get<{ answers: Record<string, unknown>; createdAt: string } | null>(
@@ -317,11 +324,14 @@ export const api = {
    */
   submitForm: async (
     id: string,
-    body: { data: Record<string, unknown>; trackedLinkId?: string },
+    body: { data: Record<string, unknown>; trackedLinkId?: string; testToken?: string },
     // #729: 第3引数は必須のまま(付け忘れは従来どおり型で落ちる)。
     // 共有ヘッダ関数へ渡す際に UUID 検証を通す。呼び出し側(Form.tsx)は
     // 所有パス外のため、この境界で検証する形に留める。
     idempotencyKey: string,
+    // P（試し回答）：試し合言葉を添えると、下書きへの試し回答になる。
+    // 集計に入らず、後処理も動かない。
+    testToken?: string,
   ): Promise<{ status: number; body: FormSubmitResponse | null }> => {
     const url = new URL(`${BASE}/api/forms/${id}/submit`, window.location.origin);
     url.searchParams.set('liffId', getLiffId());
@@ -329,7 +339,7 @@ export const api = {
       method: 'POST',
       // #729: ヘッダ組立は共有部品へ寄せる。認証の取得・URL・応答判定はここに残す。
       headers: authHeaders(buildFormSubmitHeaders(toFormIdempotencyKey(idempotencyKey))),
-      body: JSON.stringify(body),
+      body: JSON.stringify(testToken ? { ...body, testToken } : body),
     });
     let parsed: FormSubmitResponse | null = null;
     try {
@@ -340,9 +350,9 @@ export const api = {
     return { status: res.status, body: parsed };
   },
   /** 回答に添付する画像を預ける。返ってきたURLを回答に入れる */
-  uploadFormFile: (id: string, file: File) =>
+  uploadFormFile: (id: string, file: File, testToken?: string) =>
     postBinary<{ success: true; data: { key: string; url: string; mimeType: string; size: number } }>(
-      `/api/forms/${id}/files`,
+      `/api/forms/${id}/files${testToken ? `?test_token=${encodeURIComponent(testToken)}` : ''}`,
       file,
     ),
 

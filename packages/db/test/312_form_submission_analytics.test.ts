@@ -50,24 +50,26 @@ describe('migration 312 form submission analytics', () => {
         form_id TEXT NOT NULL,
         friend_id TEXT,
         data TEXT NOT NULL DEFAULT '{}',
-        created_at TEXT NOT NULL
+        created_at TEXT NOT NULL,
+        is_test INTEGER NOT NULL DEFAULT 0
       );
       CREATE TABLE form_opens (
         id TEXT PRIMARY KEY,
         form_id TEXT NOT NULL,
         friend_id TEXT,
-        opened_at TEXT NOT NULL
+        opened_at TEXT NOT NULL,
+        is_test INTEGER NOT NULL DEFAULT 0
       );
       INSERT INTO friends VALUES
         ('friend-a1', 'account-a', '山田'),
         ('friend-a2', 'account-a', '佐藤'),
         ('friend-a3', 'account-a', '田中'),
         ('friend-b1', 'account-b', '別店舗');
-      INSERT INTO form_submissions VALUES
+      INSERT INTO form_submissions (id, form_id, friend_id, data, created_at) VALUES
         ('legacy-a1', 'form-1', 'friend-a1', '{"next_visit":"2026-09-20"}', '2026-09-01'),
         ('legacy-a2', 'form-1', 'friend-a2', '{"next_visit":"2026-09-25"}', '2026-09-02'),
         ('legacy-b1', 'form-1', 'friend-b1', '{"next_visit":"2026-09-30"}', '2026-09-03');
-      INSERT INTO form_opens VALUES
+      INSERT INTO form_opens (id, form_id, friend_id, opened_at) VALUES
         ('open-a1-1', 'form-1', 'friend-a1', '2026-09-01'),
         ('open-a1-2', 'form-1', 'friend-a1', '2026-09-02'),
         ('open-a2', 'form-1', 'friend-a2', '2026-09-02'),

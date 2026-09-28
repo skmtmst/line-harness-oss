@@ -81,12 +81,17 @@ function draftAreaToDefinition(area: Area): RichMenuDefinition['richMenu']['page
   if (area.trackedLinkId) fail('計測リンクは店舗ごとの参照です。配布先へ安全に置き換えられないため保存しません。')
   if (area.scoreChange != null && area.scoreChange !== 0) fail('スコア加算は統括の配布形式が未対応のため保存しません。')
   if (!area.intent || !['url', 'text', 'form', 'template'].includes(area.intent)) fail('このボタン動作は統括の配布形式が未対応のため保存しません。')
+  // O: 日時・コピーは統括の配布形式が持てない（上の門番で弾く）。
+  // 種類は intent から決め直し、4つのままに絞る。
+  const hqIntent = area.intent as 'url' | 'text' | 'form' | 'template'
+  const actionType: 'uri' | 'message' | 'postback' | 'richmenuswitch' =
+    hqIntent === 'url' || hqIntent === 'form' ? 'uri' : hqIntent === 'text' ? 'message' : 'postback'
   const entries = Object.entries(area.actionData ?? {})
   if (entries.some(([, value]) => typeof value !== 'string')) fail('ボタン動作に保存できない値が含まれています。')
   return {
     id: area.id,
     bounds: { x: area.boundsX, y: area.boundsY, width: area.boundsWidth, height: area.boundsHeight },
-    actionType: area.actionType,
+    actionType,
     actionData: Object.fromEntries(entries) as Record<string, string>,
     intent: area.intent as 'url' | 'text' | 'form' | 'template',
     ...(area.label ? { label: area.label } : {}),

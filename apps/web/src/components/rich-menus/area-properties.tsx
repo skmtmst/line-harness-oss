@@ -34,6 +34,10 @@ type Props = {
 export function isTapCountable(area: Area): boolean {
   const intent = intentOf(area)
   if (intent === 'url') return Boolean(area.trackedLinkId)
+  // 日時を選ぶボタンは postback で届くので数えられる。コピーは端末の中で
+  // 完結し、押されたことがこちらに届かない。
+  if (intent === 'datetime') return true
+  if (intent === 'clipboard') return false
   return intent !== 'tel' && intent !== 'form'
 }
 
@@ -46,6 +50,8 @@ const INTENT_OPTIONS: { value: RichMenuAreaIntent; label: string; hint: string }
   { value: 'tel', label: '電話をかける', hint: 'スマホの電話アプリが立ち上がる' },
   { value: 'switch', label: 'メニューを切り替える', hint: 'タブのように別ページを出す' },
   { value: 'postback', label: 'こちらで処理する', hint: '自動応答やオートメーションの合図を送る（上級）' },
+  { value: 'datetime', label: '日時を選ぶ', hint: 'カレンダーや時計を出して選んでもらう' },
+  { value: 'clipboard', label: '文字をコピーする', hint: '合言葉などを端末に写す' },
 ]
 
 /** intent から、LINE に登録するときの種類を決める。 */
@@ -70,6 +76,10 @@ function defaultActionData(intent: RichMenuAreaIntent): Record<string, unknown> 
       return { targetPageId: '' }
     case 'postback':
       return { data: '', displayText: '' }
+    case 'datetime':
+      return { mode: 'datetime', initial: '', max: '', min: '' }
+    case 'clipboard':
+      return { text: '' }
   }
 }
 
@@ -85,6 +95,10 @@ export function intentOf(area: Area): RichMenuAreaIntent {
       return 'switch'
     case 'postback':
       return 'postback'
+    case 'datetimepicker':
+      return 'datetime'
+    case 'clipboard':
+      return 'clipboard'
   }
 }
 
@@ -164,8 +178,10 @@ export function AreaProperties({
   }
 
   // タグ付けとスコアは、押されたことがこちらに届くボタンでしか使えない。
-  // URL・電話・フォームは LINE の中で完結してしまい、押されたことが分からない。
-  const sideEffectsAvailable = intent === 'text' || intent === 'template' || intent === 'postback'
+  // URL・電話・フォーム・コピーは LINE の中で完結してしまい、押されたことが分からない。
+  // 日時を選ぶボタンは postback で届くので使える。
+  const sideEffectsAvailable =
+    intent === 'text' || intent === 'template' || intent === 'postback' || intent === 'datetime'
 
   return (
     <div className="space-y-3 text-sm">
@@ -385,6 +401,62 @@ export function AreaProperties({
             />
           </Field>
         </>
+      )}
+
+      {intent === 'datetime' && (
+        <>
+          <Field label="日時の種類" hint="友だちに見せるカレンダーや時計の形を決めます。">
+            <Select
+              value={(data.mode as string) ?? 'datetime'}
+              onChange={(value) => onUpdate({ actionData: { ...data, mode: value } })}
+              aria-label="日時の種類"
+              options={[
+                { value: 'date', label: '日付（2026-10-01）' },
+                { value: 'time', label: '時刻（10:00）' },
+                { value: 'datetime', label: '日時（2026-10-01 10:00）' },
+              ]}
+              size="full"
+            />
+          </Field>
+          <Field label="はじめの値（任意）" hint="空欄なら、開いたときの日時が使われます。">
+            <input
+              value={(data.initial as string) ?? ''}
+              onChange={(e) => onUpdate({ actionData: { ...data, initial: e.target.value } })}
+              placeholder="例：2026-10-01"
+              className={inputClass}
+            />
+          </Field>
+          <div className="grid grid-cols-2 gap-2">
+            <Field label="いちばん前（任意）">
+              <input
+                value={(data.min as string) ?? ''}
+                onChange={(e) => onUpdate({ actionData: { ...data, min: e.target.value } })}
+                placeholder="例：2026-09-01"
+                className={inputClass}
+              />
+            </Field>
+            <Field label="いちばん後（任意）">
+              <input
+                value={(data.max as string) ?? ''}
+                onChange={(e) => onUpdate({ actionData: { ...data, max: e.target.value } })}
+                placeholder="例：2026-12-31"
+                className={inputClass}
+              />
+            </Field>
+          </div>
+        </>
+      )}
+
+      {intent === 'clipboard' && (
+        <Field label="コピーする文字" hint="押すと、この文字が友だちの端末に写ります。">
+          <input
+            value={(data.text as string) ?? ''}
+            onChange={(e) => onUpdate({ actionData: { ...data, text: e.target.value } })}
+            maxLength={1000}
+            placeholder="例：合言葉は「さくら」"
+            className={inputClass}
+          />
+        </Field>
       )}
 
       {/* 押されたときの追加の動き */}

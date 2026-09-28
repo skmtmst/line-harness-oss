@@ -23,6 +23,7 @@ import type { Folder, FormLayout } from '@line-crm/shared'
 import { hasStoredDestination, summarizeFormDestinations } from './form-destination-summary'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import CopyTextButton from '@/components/ui/copy-text-button'
+import HelpTip from '@/components/shared/help-tip'
 import ListRange from '@/components/ui/list-range'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import './form-submissions.css'
@@ -46,7 +47,13 @@ interface Form {
   status: 'active' | 'archived'
   revision: number
   submitCount?: number
-  weeklySubmitCount?: number
+  /**
+   * P（一覧の数）：日本時間の1日から数えた今月の回答完了数・開いた人数・完了率。
+   * 取れていないときは null（「—」と出す。0 とは言わない）。
+   */
+  monthlySubmitCount?: number | null
+  monthlyOpenCount?: number | null
+  monthlyCompletionRate?: number | null
   folderId?: string | null
   destinationSummary?: { friendFieldCount: number; tagCount: number }
   createdAt: string
@@ -814,7 +821,13 @@ export default function FormSubmissionsPage() {
                   <Th>フォーム</Th>
                   <Th className="w-20">状態</Th>
                   <Th className="w-32">回答の保存先</Th>
-                  <Th className="w-24" align="right">回答数</Th>
+                  <Th className="w-36" align="right">
+                    回答数
+                    {' '}
+                    <HelpTip label="今月の完了率の説明">
+                      今月の件数は日本時間の1日から数えています。完了率は今月の回答完了を今月開いた人で割った割合で、試しの回答は入れていません。
+                    </HelpTip>
+                  </Th>
                   <Th className="cq-hide-below-800 w-20">更新</Th>
                   {/* #768: 表が横に流れる帯でも操作列は右端に留める。 */}
                   <Th className="bg-surface-pearl sticky right-0 w-32" align="right">操作</Th>
@@ -877,7 +890,22 @@ export default function FormSubmissionsPage() {
                         {displayCount ? `${displayCount.toLocaleString('ja-JP')}件` : '0件'}
                       </Link>
                     )}
-                    {form.weeklySubmitCount ? <span className="block text-ink-faint">今週 {form.weeklySubmitCount.toLocaleString('ja-JP')}件</span> : null}
+                    {/*
+                      P（一覧の数）：今月は日本時間の1日から数える。
+                      完了率 ＝ 今月の回答完了 ÷ 今月開いた人。試しの回答は入れない。
+                      取れていない数は「—」だけ出す（0 とは言わない）。
+                      定義・分母は見出しの「？」に1つだけ置き、行には置かない。
+                    */}
+                    <span className="text-ink-faint block">
+                      {form.monthlySubmitCount == null
+                        ? '今月 —'
+                        : `今月 ${form.monthlySubmitCount.toLocaleString('ja-JP')}件`}
+                    </span>
+                    <span className="text-ink-faint block">
+                      {form.monthlyCompletionRate == null
+                        ? '完了率 —'
+                        : `完了率 ${form.monthlyCompletionRate.toLocaleString('ja-JP')}%`}
+                    </span>
                   </td>
                   <td className="cq-hide-below-800 px-3 py-2.5 text-xs tabular-nums" title={form.updatedAt ? undefined : '更新日時を取得できません'}>{displayUpdatedAt(form.updatedAt)}</td>
                   <td className="bg-canvas sticky right-0 px-3 py-2.5 text-right text-xs">

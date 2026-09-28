@@ -5798,6 +5798,23 @@ const spec = {
         },
       },
     },
+    '/api/forms/{id}/test-token': {
+      post: {
+        tags: ['Forms'],
+        summary: '公開前の試し開き・試し回答に使う合言葉を発行する',
+        description: '生の合言葉はこの応答でしか返さない。台帳にはSHA-256の16進だけを残し、有効期限は24時間。試し回答は集計に入れず、回答後アクションも動かさない。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '合言葉と有効期限（token, expiresAt）' },
+          '403': { description: 'フォームの編集権限が無い' },
+          '404': { description: 'フォームが無い、または権限範囲外' },
+          '429': { description: '試し合言葉が上限（5件）に達している' },
+        },
+      },
+    },
     // ── Event applicant operations ─────────────────────────────────────────
     '/api/events/admin/events/{id}/occurrence-selector': {
       get: {
@@ -6128,6 +6145,38 @@ const spec = {
         parameters: [{ name: 'groupId', in: 'path', required: true, schema: { type: 'string' } }],
         requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { dryRun: { type: 'boolean' } } } } } },
         responses: { '200': { description: 'Diffs listed or repaired' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found or not visible' }, '502': { description: 'LINE state unreadable' } },
+      },
+    },
+    '/api/rich-menu-groups/{groupId}/publish-progress': {
+      get: {
+        tags: ['Rich Menus'],
+        summary: 'K-1: 最新の公開実行の4段（画像・メニュー・割り当て・片付け）（owner/admin）',
+        parameters: [{ name: 'groupId', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Steps with per-step status and message' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found or not visible' } },
+      },
+    },
+    '/api/rich-menu-groups/{groupId}/prepublish-check': {
+      get: {
+        tags: ['Rich Menus'],
+        summary: 'O-1: 公開前の確認（自前検査・実機・版）。LINE検査は別口（owner/admin）',
+        parameters: [{ name: 'groupId', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Self check, device confirmation and version state' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found or not visible' } },
+      },
+    },
+    '/api/rich-menu-groups/{groupId}/validate': {
+      post: {
+        tags: ['Rich Menus'],
+        summary: 'O-1: 公開する形のままLINEの検査APIに通す。下書きもLINEも変えない（owner/admin）',
+        parameters: [{ name: 'groupId', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Self and LINE check results' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found or not visible' } },
+      },
+    },
+    '/api/rich-menu-groups/{groupId}/device-confirm': {
+      post: {
+        tags: ['Rich Menus'],
+        summary: 'O-1: 実機で見た記録。今の下書きにひもづく（owner/admin）',
+        parameters: [{ name: 'groupId', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Confirmation recorded' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found or not visible' } },
       },
     },
     '/api/rich-menu-groups/{groupId}/duplicate': {
