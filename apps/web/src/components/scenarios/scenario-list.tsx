@@ -624,14 +624,18 @@ export default function ScenarioList({
                   {/*
                     0人のとき、作っただけでは配信されないことに気づけない。
                     始め方への導線をその場に出す。
+                    m21p: 「購読 / 読了」列は w-28（112px）で、7文字の
+                    「配信を始める方法」は「配信を始め…」と途中で切れていた。
+                    全文は title で読めるようにし、見える文字は6文字の
+                    「配信の始め方」にして省略自体を出さない。
                   */}
                   {s.subscriberCount === 0 && (
                     <Link
                       href={`/scenarios/detail?id=${s.id}`}
                       title="配信を始める方法"
-                      className="text-info mt-0.5 block truncate text-xs font-normal hover:underline"
+                      className="text-info mt-0.5 block truncate text-xs font-normal whitespace-nowrap hover:underline"
                     >
-                      配信を始める方法
+                      配信の始め方
                     </Link>
                   )}
                 </td>

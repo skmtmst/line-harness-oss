@@ -977,6 +977,47 @@ describe('V6 定期レポートAPI', () => {
     expect((await req('/api/analytics/report-schedules?account_id=account-b')).status).toBe(404);
   });
 
+  it('R228: 正しい宛先と形の合わない宛先が混ざっていても止める', async () => {
+    // 以前は不正な宛先を黙って外して作成していた（送ったつもりが届かない）。
+    const mixed = await req(`/api/analytics/report-schedules?${ACCOUNT}`, 'POST', {
+      ...body,
+      recipients: [
+        { kind: 'email', email: 'ops@example.com', label: '運用' },
+        { kind: 'email', email: 'not-an-address', label: '壊れた行' },
+      ],
+    });
+    expect(mixed.status).toBe(422);
+    expect(await mixed.json()).toMatchObject({ success: false });
+    expect(mocks.createAnalyticsReportSchedule).not.toHaveBeenCalled();
+
+    const staffMixed = await req(`/api/analytics/report-schedules?${ACCOUNT}`, 'POST', {
+      ...body,
+      recipients: [
+        { kind: 'staff', staffId: 'u-1', label: 'テスト' },
+        { kind: 'email', email: 'missing-at.example.com', label: '壊れた行' },
+      ],
+    });
+    expect(staffMixed.status).toBe(422);
+    expect(mocks.createAnalyticsReportSchedule).not.toHaveBeenCalled();
+
+    // 読み取れない形の行（kind が不明 / staffId なし）も黙って捨てない。
+    const unknown = await req(`/api/analytics/report-schedules?${ACCOUNT}`, 'POST', {
+      ...body,
+      recipients: [{ kind: 'staff', staffId: 'u-1' }, { kind: 'fax', email: 'x@example.com' }],
+    });
+    expect(unknown.status).toBe(422);
+
+    // 正しい宛先だけなら従来どおり作れる（回帰）。
+    const ok = await req(`/api/analytics/report-schedules?${ACCOUNT}`, 'POST', {
+      ...body,
+      recipients: [
+        { kind: 'staff', staffId: 'u-1', label: 'テスト' },
+        { kind: 'email', email: 'OPS@example.com', label: '運用' },
+      ],
+    });
+    expect(ok.status).toBe(201);
+  });
+
   it('読取失敗は500で返し、未取得を空に見せない', async () => {
     mocks.getAnalyticsReportSchedules.mockRejectedValueOnce(new Error('db down'));
     const res = await req(`/api/analytics/report-schedules?${ACCOUNT}`);

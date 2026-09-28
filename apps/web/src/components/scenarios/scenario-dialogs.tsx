@@ -16,6 +16,7 @@ import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import ConditionBuilder, {
+  findInvalidRangeIssue,
   isEmptyCondition,
   isRuleComplete,
   pruneCondition,
@@ -116,6 +117,8 @@ export function ConditionDialog({
   const [draft, setDraft] = useState<SegmentCondition | null>(value)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  /* R247: 入力済みの不正範囲は欄の下で知らせて止める。保存済みは維持する。 */
+  const [rangeError, setRangeError] = useState('')
 
   return (
     <Shell
@@ -136,6 +139,16 @@ export function ConditionDialog({
             type="button"
             disabled={saving}
             onClick={async () => {
+              /*
+               * R247: 入力済みの不正範囲（上下限の逆転など）は落とさず、
+               * 欄の下で知らせて止める。保存済みの条件は維持する。
+               */
+              const rangeIssue = findInvalidRangeIssue(draft)
+              if (rangeIssue) {
+                setRangeError(rangeIssue)
+                return
+              }
+              setRangeError('')
               setSaving(true)
               setError('')
               try {
@@ -162,6 +175,9 @@ export function ConditionDialog({
     >
       {error && (
         <Notice tone="danger" className="mb-4" message={error} />
+      )}
+      {rangeError && (
+        <Notice tone="validation" className="mb-4" message={rangeError} />
       )}
       <span className="sr-only">{title}{description}</span>
       <section className="bg-canvas-sunken rounded-panel mb-4 px-4 py-5">
@@ -354,6 +370,8 @@ export function OnCompleteDialog({
 }) {
   const [draftMode, setDraftMode] = useState<OnCompleteMode>(mode)
   const [draftTarget, setDraftTarget] = useState<string | null>(targetScenarioId)
+  /* R239: 移動先の未選択は入力不足として欄の下で案内し、通信失敗と分ける。 */
+  const [targetError, setTargetError] = useState('')
   const [scenarios, setScenarios] = useState<{ id: string; name: string }[]>([])
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -443,13 +461,16 @@ export function OnCompleteDialog({
             disabled={saving}
             onClick={async () => {
               /*
-               * R250: 移動先のない「次のシナリオへ移動」は保存しない。
-               * 欠落したまま送ると400になるだけなので、窓の中で理由を出す。
+               * R250 + R239: 移動先のない「次のシナリオへ移動」は保存しない。
+               * 欠落したまま送ると400になるだけなので、欄の下と窓の上で理由を出す。
+               * 欄の下（targetError）が入力不足、窓の上（error）が保存前の止め。
                */
-              if (draftMode === 'move' && !draftTarget && candidatesState === 'ready') {
+              if (draftMode === 'move' && !draftTarget) {
+                setTargetError('移動先を選んでください')
                 setError('「次のシナリオへ移動」には移動先のシナリオが要ります。')
                 return
               }
+              setTargetError('')
               setSaving(true)
               try {
                 const err = await onSave(draftMode, draftMode === 'move' ? draftTarget : null)
@@ -558,7 +579,11 @@ export function OnCompleteDialog({
                 aria-label="移動先のシナリオ"
                 id="on-complete-move-target"
                 value={draftTarget ?? ''}
-                onChange={(next) => setDraftTarget(next || null)}
+                onChange={(next) => {
+                  setDraftTarget(next || null)
+                  if (next) setTargetError('')
+                }}
+                error={targetError || undefined}
                 disabled={candidatesState === 'loading'}
                 options={[
                   {

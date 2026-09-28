@@ -141,9 +141,9 @@ describe('表の外側の余白の洗い出し', () => {
   it('/tags・/tags/folders/new：先頭列と操作列の外側をそろえる', () => {
     const body = code(read('components', 'friend-fields', 'tags-page-v4.tsx'))
     // 共通 Th（余白 12px＝px-3 を持つ）へ寄せた後は幅だけ指定する。
-    // 先頭列 w-11（44px）、見出し「操作」は2文字で1行のため w-16（64px）。
+    // 先頭列 w-11（44px）、操作列は編集＋…の2点分の128px（64pxでは枠付きボタンが切れる）。
     expect(body).toContain('<Th style={{ width: 44 }}>')
-    expect(body).toContain('<Th style={{ width: 64 }} className="sticky right-0')
+    expect(body).toContain('<Th style={{ width: 128 }} className="sticky right-0')
     expect(body).toContain('>操作</Th>')
     expect(body).toContain('cursor-grab')
   })

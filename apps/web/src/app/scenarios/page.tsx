@@ -648,13 +648,19 @@ export default function ScenariosPage() {
   }
 
   return (
-    <div>
-      <Notice tone="info" className="mb-4" data-design="Head">
+    <div className="flex flex-col gap-4">
+      {/*
+        m21p: 一覧の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの
+        mb/mt は付けない（一斉配信の一覧と同じ値・同じ形）。
+      */}
+      <Notice tone="info" data-design="Head">
         作成しただけでは配信されません。開始条件を設定すると配信が始まります。
       </Notice>
       {/*
         SCENARIO-16: 下線だけの span は押せない。3手順の説明は
         開閉欄へ移し、帯は1〜2文だけにする。
+        m21p: ★V7 の順は「説明の開閉 → 数のカード → ＋作る → 一覧」。
+        開閉欄はここの1つだけにする（数のカードの下の2つ目は置かない）。
       */}
       <Disclosure size="compact" title="配信を始める方法" hint="3手順">
         <ol className="list-decimal space-y-1 pl-5 text-sm">
@@ -702,19 +708,6 @@ export default function ScenariosPage() {
         ]}
       />
       </div>
-
-      {/*
-        ★V7 `Xn1Mz`：上からの順は「数のカード → 説明の開閉 → ＋作る」。
-        SCENARIO-16: 下線だけの span は押せない。3手順の説明は
-        開閉欄へ移し、帯は1〜2文だけにする。
-      */}
-      <Disclosure size="compact" title="配信を始める方法" hint="3手順" className="mb-4">
-        <ol className="list-decimal space-y-1 pl-5 text-sm">
-          <li>一覧からシナリオを開き、「開始のきっかけ」（友だち追加時・タグが付いたときなど）を設定します。</li>
-          <li>詳細画面の「テスト送信」で、実際の届き方を確認します。</li>
-          <li>この一覧に戻り、行の「その他 → 再開する」から配信を開始します。</li>
-        </ol>
-      </Disclosure>
 
       {folderDialogOpen && (
         <FolderAddDialog
@@ -765,8 +758,11 @@ export default function ScenariosPage() {
         </div>
       ) : null}
 
-      {/* 一覧本体（設計 `Body`）。 */}
-      <div data-design="Body">
+      {/*
+        m21p: 作成ボタンは一覧本体の外へ出す。ボタンと下のフォルダの枠の
+        間は親の gap-4 で空ける（一斉配信の Head と同じ形）。Body の中に
+        置くと親の余白が効かず、枠にくっついて見える。
+      */}
       <div className="flex flex-wrap items-center gap-2">
         <Button
           variant="primary"
@@ -775,6 +771,8 @@ export default function ScenariosPage() {
           ＋ シナリオを作る
         </Button>
       </div>
+      {/* 一覧本体（設計 `Body`）。 */}
+      <div data-design="Body">
       {/*
         設計はフォルダを左の縦パネルに置く。シナリオはフォルダを持って
         いないので（列が無い）、いまは「すべて」だけ。分類できるように
@@ -796,7 +794,11 @@ export default function ScenariosPage() {
         </details>
         <div className="hidden lg:block">{folderPanel}</div>
 
-        <div>
+        {/*
+          m21p: 一覧列の縦の間隔も親の gap-4 にそろえる。行ごとの
+          mb/mt は付けない（一斉配信の一覧列と同じ形）。
+        */}
+        <div className="flex flex-col gap-4">
       {/*
         ★V7 `Xn1Mz`：検索は幅320で1行目、2行目は左に絞り込み。
         よく使う絞り込み。数え方が決まっているのは「停止中のみ」だけ。
@@ -848,13 +850,13 @@ export default function ScenariosPage() {
         絞り込んでいないときは一致＝全体なので、この行は出さない。
       */}
       {(serverQuery || stoppedOnly || createdThisMonthOnly || folderFilter) && scenarioList.loaded && (
-        <p className="text-ink-faint mb-3 text-xs tabular-nums">
+        <p className="text-ink-faint text-xs tabular-nums">
           条件に一致したシナリオ：{scenarioList.total.toLocaleString('ja-JP')}件
         </p>
       )}
 
       {actionError && (
-        <Notice tone="danger" message={actionError} className="mb-4" />
+        <Notice tone="danger" message={actionError} />
       )}
 
       {scenarioList.loading && scenarios.length === 0 ? (
@@ -880,7 +882,7 @@ export default function ScenariosPage() {
         />
       )}
       {scenarioList.pageCount > 1 ? (
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <ListRange
             total={scenarioList.total}
             first={(scenarioList.page - 1) * scenarioList.limit + 1}

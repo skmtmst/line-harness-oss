@@ -236,14 +236,27 @@ function parseReportBody(raw: unknown): { ok: true; value: {
     : [];
   if (!channels.length) return { ok: false, error: '通知方法を選んでください' };
   const recipients: AnalyticsReportRecipient[] = [];
+  // R228: 形が合わない宛先を黙って外さない。正しい宛先と混ざっていても、
+  // 不備のある行を示して止める（送ったつもりが届いていないを防ぐ）。
   for (const item of Array.isArray(body.recipients) ? body.recipients : []) {
-    if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      return { ok: false, error: '宛先に読み取れない行があります' };
+    }
     const value = item as Record<string, unknown>;
     const label = typeof value.label === 'string' ? value.label.trim().slice(0, 120) : '';
-    if (value.kind === 'staff' && typeof value.staffId === 'string' && value.staffId.trim()) {
+    if (value.kind === 'staff') {
+      if (typeof value.staffId !== 'string' || !value.staffId.trim()) {
+        return { ok: false, error: '宛先のログインユーザーを読み取れませんでした' };
+      }
       recipients.push({ kind: 'staff', staffId: value.staffId.trim(), label: label || 'ログインユーザー' });
-    } else if (value.kind === 'email' && typeof value.email === 'string' && isEmail(value.email.trim())) {
-      recipients.push({ kind: 'email', email: value.email.trim().toLowerCase(), label: label || value.email.trim() });
+    } else if (value.kind === 'email') {
+      const email = typeof value.email === 'string' ? value.email.trim() : '';
+      if (!isEmail(email)) {
+        return { ok: false, error: `宛先のメールアドレス「${email || '(空)'}」は形が正しくありません` };
+      }
+      recipients.push({ kind: 'email', email: email.toLowerCase(), label: label || email });
+    } else {
+      return { ok: false, error: '宛先に読み取れない行があります' };
     }
   }
   if (!recipients.length) return { ok: false, error: '受け取る人を選んでください' };

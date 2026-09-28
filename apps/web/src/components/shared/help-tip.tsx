@@ -90,8 +90,8 @@ export default function HelpTip({
         className={styles.button}
       >
         {/*
-          ★V7 `LYs5d`「？ 補足の印」：18px の角丸の正方形の中に「?」。
-          丸・楕円・枠なしは使わない（2026-09-27 オーナー指摘）。
+          ★V7 `LYs5d`「？ 補足の印」：18px の正円の中に「?」。
+          角丸の正方形・楕円・枠なしは使わない（2026-09-28 オーナー指示）。
         */}
         <span aria-hidden="true" className={styles.mark}>?</span>
       </button>
