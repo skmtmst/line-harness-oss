@@ -40,13 +40,18 @@ vi.mock('../services/availability.js', async (importOriginal) => {
   return { ...actual, getAvailability: availabilityMocks.getAvailability };
 });
 
-const notifierMocks = {
-  calls: [] as Array<Record<string, unknown>>,
-  sendBookingNotification: vi.fn(async (params: Record<string, unknown>) => {
-    notifierMocks.calls.push(params);
-  }),
-};
-vi.mock('../services/booking-notifier.js', () => notifierMocks);
+const notifierMocks = vi.hoisted(() => {
+  const calls: Array<Record<string, unknown>> = [];
+  const sendBookingNotification = vi.fn(async (params: Record<string, unknown>) => {
+    calls.push(params);
+  });
+  return { calls, sendBookingNotification };
+});
+// 送る側だけ差し替える。文面の組み立て（notificationTiming・formatStartsAtForStore）は本物を使う。
+vi.mock('../services/booking-notifier.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../services/booking-notifier.js')>()),
+  ...notifierMocks,
+}));
 
 const accountAccessMocks = {
   canAccessAllLineAccounts: vi.fn(),
