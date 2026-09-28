@@ -21,6 +21,15 @@ const db = vi.hoisted(() => ({
   markRichMenuGroupPublished: vi.fn(),
   getLineAccountById: vi.fn(),
   getTrackedLinkById: vi.fn(),
+  ensureRichMenuVersion: vi.fn(async (_db: unknown, input: { id: string }) => ({ id: input.id, version_number: 1, status: 'draft' })),
+  markRichMenuVersionPublished: vi.fn(),
+  recordRichMenuDeviceConfirmation: vi.fn(),
+  findRichMenuDeviceConfirmation: vi.fn(async () => ({ id: 'dc1', confirmed_at: '2026-09-16T00:00:00.000Z' })),
+  ensureRichMenuPublishRun: vi.fn(async (_db: unknown, input: { id: string }) => ({ id: input.id, status: 'running', last_error_code: null })),
+  markRichMenuPublishRun: vi.fn(),
+  ensureRichMenuPublishRunPages: vi.fn(),
+  markRichMenuPublishRunPageStep: vi.fn(),
+  listRichMenuPublishRunPages: vi.fn(async () => []),
   jstNow: vi.fn(() => '2026-09-16T00:00:00.000Z'),
 }));
 vi.mock('@line-crm/db', () => db);
@@ -158,6 +167,9 @@ function lineFetch(url: unknown, init?: RequestInit) {
   const method = init?.method ?? 'GET';
   if (target === 'https://api.line.me/v2/bot/richmenu/list') {
     return Promise.resolve(new Response(JSON.stringify({ richmenus: [...menus.values()] }), { status: 200 }));
+  }
+  if (target === 'https://api.line.me/v2/bot/richmenu/validate' && method === 'POST') {
+    return Promise.resolve(new Response('{}', { status: 200 }));
   }
   if (target === 'https://api.line.me/v2/bot/richmenu' && method === 'POST') {
     const body = JSON.parse(String(init?.body)) as { name: string };

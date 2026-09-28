@@ -3,10 +3,13 @@
 import { useRef, useState } from 'react'
 import {
   FORM_THEME_DEFAULT,
+  formThemeContrastError,
+  normalizeFormTheme,
   type FormCornerRadius,
   type FormFontFamily,
   type FormTheme,
 } from '@line-crm/shared'
+import HelpTip from '@/components/shared/help-tip'
 import type { MediaItem } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
@@ -58,6 +61,11 @@ export default function FormDesignSettings({
 }) {
   const router = useRouter()
   const theme = value ?? FORM_THEME_DEFAULT
+  /*
+   * P（読みにくい色）：文字と背景の差が 4.5:1 未満の組み合わせは保存できない。
+   * 直し方（失敗そのもの）は赤字で欄の下に出し、決まりの意味だけを「？」に入れる。
+   */
+  const contrastError = formThemeContrastError(normalizeFormTheme(theme))
   /** FORM-18: カードの画像URLの入力時検査。空は「使わない」なので通す。 */
   const ogImageError = ogImageUrlError(ogImageUrl)
   /** メディア選択窓を開いている対象。null なら閉じている（N-193）。 */
@@ -186,11 +194,22 @@ export default function FormDesignSettings({
           CSS編集を実装するときは、そのときタブへ戻す。
         */}
         <div>
-          <h3 className="text-ink text-sm font-medium">色</h3>
+          <h3 className="text-ink text-sm font-medium">
+            色
+            {' '}
+            <HelpTip label="文字と背景の色の決まりの説明">
+              お客さま画面は文字を背景の上に置きます。この2色の差は4.5:1以上が必要です。足りない組み合わせは保存できません。
+            </HelpTip>
+          </h3>
           <div className="mt-3 flex items-center justify-between gap-3">
             <p className="text-ink text-sm font-semibold">色は5つの役割にだけ割り当てます</p>
             <Button onClick={resetColors} title="5つの色だけを初期の組合せにします。書体・角の丸み・背景画像は変わりません。">おまかせで組む</Button>
           </div>
+          {contrastError ? (
+            <p role="alert" className="text-danger mt-2 text-xs leading-5">
+              {contrastError}
+            </p>
+          ) : null}
           <div className="mt-2 space-y-2">
             {COLOR_ROLES.map((role) => {
               const errorId = `form-theme-${role.key}-error`

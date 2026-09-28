@@ -396,6 +396,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/file-scans/{id}/retry',
   'POST /api/forms/{id}/publish',
   'POST /api/forms/{id}/submissions/{submissionId}/retry-effects',
+  'POST /api/forms/{id}/test-token',
   'POST /api/hq/banners/generations/{id}/cancel',
   'POST /api/hq/banners/generations/{id}/run',
   'POST /api/hq/banners/images/{id}/deliver',
@@ -502,6 +503,10 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/rich-menu-groups/{groupId}/publish-runs',
   'POST /api/rich-menu-groups/{groupId}/publish-runs/{requestId}/retry',
   'POST /api/rich-menu-groups/{groupId}/reconcile',
+  'GET /api/rich-menu-groups/{groupId}/publish-progress',
+  'GET /api/rich-menu-groups/{groupId}/prepublish-check',
+  'POST /api/rich-menu-groups/{groupId}/validate',
+  'POST /api/rich-menu-groups/{groupId}/device-confirm',
   'POST /api/rich-menu-groups/{groupId}/duplicate',
   'GET /api/rich-menu-groups/{groupId}/audience-summary',
   'GET /api/rich-menu-groups/{groupId}/test-apply',
@@ -562,6 +567,10 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'PUT /api/liff/nen/pets/{id}',
   'PUT /api/nen/feeding-products',
   'PUT /api/nen/rank-settings',
+  'GET /api/webinars/{id}/sessions/{startAt}',
+  'GET /api/webinars/{id}/video-asset',
+  'POST /api/webinars/{id}/video-asset/advance',
+  'PUT /api/webinars/{id}/sessions/{startAt}',
 ]);
 
 const ALLOWLIST = new Set<string>([

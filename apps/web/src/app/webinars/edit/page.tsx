@@ -1,6 +1,9 @@
 'use client'
 
 import Disclosure from '@/components/shared/disclosure'
+import RetentionSection from './retention-section'
+import SessionCapacityCell from './session-capacity-cell'
+import VideoStages from './video-stages'
 import LinePreview from '@/components/shared/line-preview'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
@@ -663,6 +666,7 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
     const analyticsSections = [
       { label: '視聴結果', href: '#webinar-analytics-result' },
       { label: '視聴行動', href: '#webinar-analytics-behavior' },
+      { label: 'どこまで見られたか', href: '#webinar-analytics-retention' },
     ] as const
     return (
       <div className="space-y-4" data-design-node="yxyzQ">
@@ -672,6 +676,13 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
           <div className="min-w-0 flex-1 space-y-3">
             <section id="webinar-analytics-result" className="border-hairline bg-canvas rounded-card scroll-mt-4 border p-4 shadow-card"><h2 className="text-ink text-base font-bold">視聴結果</h2><p className="text-ink-faint mt-1 text-xs">申込・再生・完了率を確認します。</p><dl className="divide-hairline mt-4 divide-y rounded-control border border-hairline"><div className="flex justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">申込</dt><dd className="text-ink text-sm font-bold">{summary.reservations.toLocaleString('ja-JP')}人</dd></div><div className="flex justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">再生</dt><dd className="text-ink text-sm font-bold">{summary.viewers.toLocaleString('ja-JP')}人（{percent(summary.viewers, summary.reservations)}）</dd></div></dl></section>
             <section id="webinar-analytics-behavior" className="border-hairline bg-canvas rounded-card scroll-mt-4 border p-4 shadow-card"><h2 className="text-ink text-base font-bold">視聴行動</h2><p className="text-ink-faint mt-1 text-xs">離脱箇所とCTA反応を確認します。</p><dl className="divide-hairline mt-4 divide-y rounded-control border border-hairline"><div className="flex justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">平均視聴時間</dt><dd className="text-ink text-sm font-bold">{fmtSec(summary.avgWatchedSeconds)}（{avgRate}%）</dd></div><div className="flex justify-between gap-4 px-4 py-4"><dt className="text-ink-faint text-xs font-semibold">最大離脱</dt><dd className="text-ink text-sm font-bold">{largestDropoff !== null ? `${fmtSec(largestDropoff)}付近` : `—（${analytics.measurement?.reason ?? '区間未取得'}）`}</dd></div></dl></section>
+            <RetentionSection
+              retention={analytics.retention ?? { bucketSeconds: 60, started: 0, points: [] }}
+              completed={summary.completed}
+              ctaAtSeconds={analytics.ctaAtSeconds ?? null}
+              heartbeatRejects={analytics.heartbeatRejects ?? 0}
+              durationSeconds={durationSeconds}
+            />
           </div>
           <SummaryAside rows={[
             ['視聴完了', `${summary.completed.toLocaleString('ja-JP')}人`],
@@ -1086,11 +1097,11 @@ function AnalyticsTab({ webinarId, durationSeconds, view = 'analytics', analytic
               {/* 外の箱が枠とスクロールを持つため、表の枠は消す。見出しの吸着は欄ごとに残す。 */}
               <DataTable className="rounded-none border-0">
                 <thead>
-                  <TableHeadRow><Th className="sticky top-0 bg-surface-pearl">開始</Th><Th className="sticky top-0 bg-surface-pearl">参加</Th><Th className="sticky top-0 bg-surface-pearl">平均視聴</Th><Th className="sticky top-0 bg-surface-pearl">CTA</Th></TableHeadRow>
+                  <TableHeadRow><Th className="sticky top-0 bg-surface-pearl">開始</Th><Th className="sticky top-0 bg-surface-pearl">参加</Th><Th className="sticky top-0 bg-surface-pearl">平均視聴</Th><Th className="sticky top-0 bg-surface-pearl">CTA</Th><Th className="sticky top-0 bg-surface-pearl">定員</Th></TableHeadRow>
                 </thead>
                 <tbody>
                   {analytics.sessions.slice(0, 30).map((s) => (
-                    <Tr key={s.sessionStartAt}><Td className="text-ink-secondary text-xs">{fmtSession(s.sessionStartAt)}</Td><Td className="text-xs">{s.viewers}</Td><Td className="text-xs">{fmtSec(s.avgWatchedSeconds)}</Td><Td className="text-xs">{s.ctaClicks} ({percent(s.ctaClicks, s.viewers)})</Td></Tr>
+                    <Tr key={s.sessionStartAt}><Td className="text-ink-secondary text-xs">{fmtSession(s.sessionStartAt)}</Td><Td className="text-xs">{s.viewers}</Td><Td className="text-xs">{fmtSec(s.avgWatchedSeconds)}</Td><Td className="text-xs">{s.ctaClicks} ({percent(s.ctaClicks, s.viewers)})</Td><Td className="text-xs"><SessionCapacityCell webinarId={webinarId} sessionStartAt={s.sessionStartAt} /></Td></Tr>
                   ))}
                 </tbody>
               </DataTable>
@@ -1180,6 +1191,7 @@ function VideoDesignStep({ webinar, editor, registrations, publicUrl, canOpenPub
             <div><p className="text-ink-faint text-xs font-semibold">動画</p><div className="border-hairline text-ink mt-1 rounded-control border px-3 py-3 text-sm font-semibold"><VideoMediaLabel webinar={webinar} /></div></div>
             <div><p className="text-ink-faint text-xs font-semibold">再生時間</p><div className="border-hairline text-ink mt-1 rounded-control border px-3 py-3 text-sm font-semibold">{durationLabel(webinar.durationSeconds)}</div></div>
           </div>
+          <VideoStages webinarId={webinar.id} hasVideo={Boolean(webinar.videoPrefix || webinar.videoMediaId)} />
         </section>
         <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card">
           <h2 className="text-ink text-base font-bold">公開設定</h2>
@@ -1263,7 +1275,7 @@ function missedNoticeSummary(
   if (failed) return NOTIFICATION_ROW_STATE.failed.label
   if (!settings) return NOTIFICATION_ROW_STATE.unset.label
   return settings.missedEnabled
-    ? `未視聴者へ翌日${settings.missedTime || '—'}に送信`
+    ? `未視聴者へ翌日${settings.missedTime || '—'}に送信（期限${settings.missedWindowDays ?? 7}日）`
     : '送りません'
 }
 

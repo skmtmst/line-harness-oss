@@ -58,6 +58,19 @@ const dbMocks = {
   markRichMenuTestApplyRevertFailed: vi.fn(),
   getStaffById: vi.fn(),
   getMediaById: vi.fn(),
+  ensureRichMenuVersion: vi.fn(),
+  markRichMenuVersionPublished: vi.fn(),
+  getLatestRichMenuVersion: vi.fn(),
+  recordRichMenuDeviceConfirmation: vi.fn(),
+  findRichMenuDeviceConfirmation: vi.fn(),
+  ensureRichMenuPublishRun: vi.fn(),
+  markRichMenuPublishRun: vi.fn(),
+  listRichMenuPublishRuns: vi.fn(),
+  getLatestRichMenuPublishRun: vi.fn(),
+  ensureRichMenuPublishRunPages: vi.fn(),
+  markRichMenuPublishRunPageStep: vi.fn(),
+  listRichMenuPublishRunPages: vi.fn(),
+  listAccountReferencedLineRichMenuIds: vi.fn(async () => []),
   recordAuditEvent: vi.fn(),
   maskAuditIp: vi.fn(() => null),
   auditDeviceFamily: vi.fn(() => 'unknown'),
@@ -184,6 +197,14 @@ beforeEach(() => {
   dbMocks.getRichMenuManualPublishRequest.mockResolvedValue({ id: 'manual-1', status: 'running' });
   dbMocks.claimRichMenuManualPublishRequest.mockResolvedValue(true);
   dbMocks.renewPublishLease.mockResolvedValue(true);
+  // K・O: 版の凍結と実機確認は公開の前提。門番（自前検査400）を確かめる試験では通しておく。
+  dbMocks.ensureRichMenuVersion.mockImplementation(
+    async (_db: unknown, input: { id: string }) => ({ id: input.id, version_number: 1, status: 'draft' }),
+  );
+  dbMocks.findRichMenuDeviceConfirmation.mockResolvedValue({ id: 'dc1', confirmed_at: '2026-09-07T12:00:00.000' });
+  dbMocks.ensureRichMenuPublishRun.mockImplementation(
+    async (_db: unknown, input: { id: string }) => ({ id: input.id, status: 'running', last_error_code: null }),
+  );
 });
 
 // ----- GET /api/rich-menu-groups -----
