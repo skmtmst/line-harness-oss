@@ -337,6 +337,24 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
     },
   },
   {
+    name: 'google business resync',
+    classification: { kind: 'feature', featureId: 'restaurant_test' },
+    enforcement: {
+      mode: 'gated',
+      sources: ['apps/worker/src/services/google-business-resync.ts'],
+      markers: ["'restaurant_test', 'google business resync'"],
+    },
+  },
+  {
+    name: 'google business metrics',
+    classification: { kind: 'feature', featureId: 'restaurant_test' },
+    enforcement: {
+      mode: 'gated',
+      sources: ['apps/worker/src/services/google-business-resync.ts'],
+      markers: ["'restaurant_test', 'google business metrics'"],
+    },
+  },
+  {
     name: 'automation deliveries',
     dispatchLane: 'delivery',
     classification: { kind: 'feature', featureId: 'automations' },

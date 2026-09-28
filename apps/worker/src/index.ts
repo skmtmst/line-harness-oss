@@ -157,6 +157,7 @@ import { restaurantGoogle } from './routes/restaurant-google.js';
 import { googleSheets } from './routes/google-sheets.js';
 import { restaurantGoogleProfile } from './routes/restaurant-google-profile.js';
 import { restaurantGooglePosts } from './routes/restaurant-google-posts.js';
+import { restaurantGooglePerformance } from './routes/restaurant-google-performance.js';
 import { tenants } from './routes/tenants.js';
 import { ops } from './routes/ops.js';
 import { piiMaskMiddleware, type ImpersonationContext } from './middleware/impersonation.js';
@@ -559,6 +560,7 @@ app.route('/', restaurantTest);
 app.route('/', restaurantGoogle);
 app.route('/', restaurantGoogleProfile);
 app.route('/', restaurantGooglePosts);
+app.route('/', restaurantGooglePerformance);
 app.route('/', googleSheets);
 app.route('/', tenants);
 app.route('/', hqBanners);
@@ -1602,6 +1604,23 @@ async function runFrequentHeavyJobs(
     });
   }
 
+  if (restaurantTestEnabled(env)) {
+    jobs.push({
+      // Googleビジネス第4段: 口コミ・投稿の再同期。5分レーンだが接続ごとの
+      // 55分ゲートで実質1時間ごと。書き込み経路は手動syncと同じ関数を使う。
+      name: 'google business resync',
+      run: async () => {
+        const { processGoogleBusinessHourlyResync } = await import('./services/google-business-resync.js');
+        const result = await processGoogleBusinessHourlyResync(env, {
+          now: new Date(event.scheduledTime).toISOString(),
+        });
+        if (result.reviewsSynced + result.postsSynced + result.failed > 0) {
+          console.log(JSON.stringify({ event: 'google_business_resync_tick', ...result }));
+        }
+      },
+    });
+  }
+
   const jstMinutes = toJstParts(new Date(event.scheduledTime)).minutes;
 
   // 日本時間の各時01分に、友だち情報欄の日付から当日分のリマインダを立てる。
@@ -1786,6 +1805,20 @@ async function runSixHourlyHeavyJobs(
         const result = await deleteExpiredRestaurantRawEmails(env);
         if (result.deleted + result.failed > 0) {
           console.log(JSON.stringify({ event: 'restaurant_raw_mail_retention', ...result }));
+        }
+      },
+    });
+    jobs.push({
+      // Googleビジネス第4段: パフォーマンス指標の取り込み。JST日付でゲートし、
+      // 6時間tickのうち当日未実行の最初の1回（通常は深夜）だけ実際に回る。
+      name: 'google business metrics',
+      run: async () => {
+        const { processGoogleBusinessDailyMetrics } = await import('./services/google-business-resync.js');
+        const result = await processGoogleBusinessDailyMetrics(env, {
+          now: new Date(event.scheduledTime).toISOString(),
+        });
+        if (result.synced + result.failed > 0) {
+          console.log(JSON.stringify({ event: 'google_business_metrics_tick', ...result }));
         }
       },
     });

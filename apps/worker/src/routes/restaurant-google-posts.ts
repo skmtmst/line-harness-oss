@@ -278,7 +278,9 @@ async function updateDraft(c: Context<Env>, store: StoreContext, id: string, inp
     .run();
 }
 
-async function setStatus(c: Context<Env>, storeId: string, id: string, patch: Partial<{ status: PostStatus; error: string | null; requestId: string | null; sentAt: string | null; publishedAt: string | null; checkedAt: string | null; deletedAt: string | null; contentFingerprint: string | null; googlePostName: string | null; googleState: string | null; searchUrl: string | null; googleCreateTime: string | null; googleUpdateTime: string | null; origin: 'admin' | 'google' }>): Promise<void> {
+type PostStatusPatch = Partial<{ status: PostStatus; error: string | null; requestId: string | null; sentAt: string | null; publishedAt: string | null; checkedAt: string | null; deletedAt: string | null; contentFingerprint: string | null; googlePostName: string | null; googleState: string | null; searchUrl: string | null; googleCreateTime: string | null; googleUpdateTime: string | null; origin: 'admin' | 'google' }>;
+
+async function setStatusForEnv(env: Env['Bindings'], storeId: string, id: string, patch: PostStatusPatch): Promise<void> {
   const sets: string[] = ['updated_at = ?'];
   const values: unknown[] = [nowIso()];
   const columns: Record<string, unknown> = {
@@ -303,10 +305,14 @@ async function setStatus(c: Context<Env>, storeId: string, id: string, patch: Pa
     values.push(value);
   }
   values.push(id, storeId);
-  await dbFor(c.env, storeId)
+  await dbFor(env, storeId)
     .prepare(`UPDATE rt_google_posts SET ${sets.join(', ')} WHERE id = ? AND store_id = ?`)
     .bind(...values)
     .run();
+}
+
+async function setStatus(c: Context<Env>, storeId: string, id: string, patch: PostStatusPatch): Promise<void> {
+  await setStatusForEnv(c.env, storeId, id, patch);
 }
 
 // ---------- GB-4：一覧 ----------
@@ -353,26 +359,9 @@ restaurantGooglePosts.get('/api/restaurant-test/google/posts', async (c) => {
 
 // ---------- 取り込み（sync） ----------
 
-restaurantGooglePosts.post('/api/restaurant-test/google/posts/sync', async (c) => {
-  const ctx = await requireConnectedStore(c);
-  if (ctx instanceof Response) return ctx;
-  const { store, connection } = ctx;
-  let options: RequestOptions;
-  try {
-    options = { fetch, accessToken: await accessTokenFor(c, connection) };
-  } catch (error) {
-    return googleErrorResponse(c, error);
-  }
-
-  let googlePosts: GooglePost[];
-  try {
-    googlePosts = await listLocalPosts(options, connection.location_name!);
-  } catch (error) {
-    if (error instanceof GoogleBusinessError && error.kind === 'no_permission') await setConnectionStatus(c, store.id, 'no_permission', 'no_permission');
-    return googleErrorResponse(c, error);
-  }
-
-  const rows = (await dbFor(c.env, store.id).prepare('SELECT * FROM rt_google_posts WHERE store_id = ?').bind(store.id).all<PostRow>()).results;
+/** Google側の投稿一覧をDBへ写す。手動sync（下のエンドポイント）と定期再同期の両方から使う。 */
+export async function applyGooglePostsSync(env: Env['Bindings'], storeId: string, googlePosts: GooglePost[]): Promise<void> {
+  const rows = (await dbFor(env, storeId).prepare('SELECT * FROM rt_google_posts WHERE store_id = ?').bind(storeId).all<PostRow>()).results;
   const byName = new Map(rows.filter((r) => r.google_post_name).map((r) => [r.google_post_name as string, r]));
   const seenNames = new Set<string>();
   const now = nowIso();
@@ -382,7 +371,7 @@ restaurantGooglePosts.post('/api/restaurant-test/google/posts/sync', async (c) =
     const stateStatus: PostStatus = post.state === 'LIVE' ? 'published' : post.state === 'REJECTED' ? 'rejected' : post.state === 'SCHEDULED' ? 'scheduled' : 'accepted';
     const existing = byName.get(post.name);
     if (existing) {
-      await setStatus(c, store.id, existing.id, {
+      await setStatusForEnv(env, storeId, existing.id, {
         status: stateStatus,
         googleState: post.state,
         searchUrl: post.searchUrl,
@@ -404,7 +393,7 @@ restaurantGooglePosts.post('/api/restaurant-test/google/posts/sync', async (c) =
       }
     }
     if (matched) {
-      await setStatus(c, store.id, matched.id, {
+      await setStatusForEnv(env, storeId, matched.id, {
         status: stateStatus,
         googlePostName: post.name,
         googleState: post.state,
@@ -418,7 +407,7 @@ restaurantGooglePosts.post('/api/restaurant-test/google/posts/sync', async (c) =
     }
     // Google側で直接作られた投稿。編集はさせず、一覧に「Googleで作成」として出す。
     const id = crypto.randomUUID();
-    await dbFor(c.env, store.id)
+    await dbFor(env, storeId)
       .prepare(
         `INSERT INTO rt_google_posts
            (id, store_id, kind, origin, summary, title, media_json, status, google_post_name, google_state, search_url,
@@ -427,7 +416,7 @@ restaurantGooglePosts.post('/api/restaurant-test/google/posts/sync', async (c) =
       )
       .bind(
         id,
-        store.id,
+        storeId,
         post.kind === 'unknown' || post.kind === 'alert' ? 'standard' : post.kind,
         post.summary,
         post.title,
@@ -446,10 +435,31 @@ restaurantGooglePosts.post('/api/restaurant-test/google/posts/sync', async (c) =
   // Google側から消えた公開済み投稿を検知する。
   for (const row of rows) {
     if (row.status === 'published' && row.google_post_name && !seenNames.has(row.google_post_name)) {
-      await setStatus(c, store.id, row.id, { status: 'deleted', deletedAt: now, checkedAt: now });
+      await setStatusForEnv(env, storeId, row.id, { status: 'deleted', deletedAt: now, checkedAt: now });
     }
   }
+}
 
+restaurantGooglePosts.post('/api/restaurant-test/google/posts/sync', async (c) => {
+  const ctx = await requireConnectedStore(c);
+  if (ctx instanceof Response) return ctx;
+  const { store, connection } = ctx;
+  let options: RequestOptions;
+  try {
+    options = { fetch, accessToken: await accessTokenFor(c, connection) };
+  } catch (error) {
+    return googleErrorResponse(c, error);
+  }
+
+  let googlePosts: GooglePost[];
+  try {
+    googlePosts = await listLocalPosts(options, connection.location_name!);
+  } catch (error) {
+    if (error instanceof GoogleBusinessError && error.kind === 'no_permission') await setConnectionStatus(c, store.id, 'no_permission', 'no_permission');
+    return googleErrorResponse(c, error);
+  }
+
+  await applyGooglePostsSync(c.env, store.id, googlePosts);
   return c.json({ success: true });
 });
 
