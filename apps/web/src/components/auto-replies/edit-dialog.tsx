@@ -329,6 +329,11 @@ export default function EditDialog({
     readKeywordRules(draft),
   )
   const [weekdays, setWeekdays] = useState<number[]>(draft.responseWeekdays ?? [])
+  /*
+   * R252: 最後の曜日を外そうとしたときに欄の下で出す理由。
+   * 選び直したら消える（残り続けると次の操作の説明に見える）。
+   */
+  const [weekdayNotice, setWeekdayNotice] = useState<string | null>(null)
   const [holidayRule, setHolidayRule] = useState<HolidayRuleValue>(
     (draft.responseHolidayRule as HolidayRuleValue) ?? 'ignore',
   )
@@ -961,6 +966,27 @@ export default function EditDialog({
             <div>
               <p className="text-ink-faint mb-1.5 text-xs">応答する曜日</p>
               <div className="flex flex-wrap gap-1.5">
+                {/*
+                  R252: 「すべての曜日」は押す操作として明示する。
+                  空（何も選ばない）＝全曜日、という暗黙の読み替えを
+                  見た目に載せないと、最後の1つを外したときに全曜日へ
+                  広がって見える。
+                */}
+                <button
+                  type="button"
+                  aria-pressed={weekdays.length === 0}
+                  onClick={() => {
+                    setWeekdays([])
+                    setWeekdayNotice(null)
+                  }}
+                  className={`rounded-control border px-2.5 py-1 text-xs transition-colors ${
+                    weekdays.length === 0
+                      ? 'border-accent bg-accent-soft text-ink font-bold'
+                      : 'border-transparent bg-canvas-sunken text-ink-secondary hover:bg-hairline'
+                  }`}
+                >
+                  すべての曜日
+                </button>
                 {WEEKDAY_LABELS.map((label, day) => {
                   const on = weekdays.length === 0 || weekdays.includes(day)
                   return (
@@ -973,12 +999,27 @@ export default function EditDialog({
                         // 「その曜日だけ」にする（全部入りから1つ外す、ではない）。
                         if (weekdays.length === 0) {
                           setWeekdays([day])
+                          setWeekdayNotice(null)
                           return
                         }
-                        const next = weekdays.includes(day)
-                          ? weekdays.filter((d) => d !== day)
-                          : [...weekdays, day].sort((a, b) => a - b)
-                        setWeekdays(next)
+                        if (weekdays.includes(day)) {
+                          /*
+                           * 最後の1つは外さない。外すと空＝全曜日になり、
+                           * 減らすつもりの操作で対象が広がる（R252）。
+                           * 受信元の選択（最後の1つは残す）と同じ扱い。
+                           */
+                          if (weekdays.length === 1) {
+                            setWeekdayNotice(
+                              '曜日は1つ以上必要です。すべてにする場合は「すべての曜日」を押してください。',
+                            )
+                            return
+                          }
+                          setWeekdays(weekdays.filter((d) => d !== day))
+                          setWeekdayNotice(null)
+                          return
+                        }
+                        setWeekdays([...weekdays, day].sort((a, b) => a - b))
+                        setWeekdayNotice(null)
                       }}
                       className={`rounded-control border px-2.5 py-1 text-xs transition-colors ${
                         on
@@ -996,6 +1037,11 @@ export default function EditDialog({
                   ? 'すべての曜日で応答します。'
                   : `${weekdays.map((d) => WEEKDAY_LABELS[d]).join('・')}曜だけ応答します。`}
               </p>
+              {weekdayNotice ? (
+                <p role="status" className="text-ink-secondary mt-1 text-[11px]">
+                  {weekdayNotice}
+                </p>
+              ) : null}
             </div>
 
             {!page && <div>
