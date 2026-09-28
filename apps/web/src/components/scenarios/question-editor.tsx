@@ -194,16 +194,34 @@ export function validateChoiceUris(question: ScenarioQuestion): string | null {
   return null
 }
 
-/** URI だけの挙動では届かない、回答依存の設定をまとめて外す。 */
-export function clearDeadAnswerSettings(choice: QuestionChoice): QuestionChoice {
-  const next = { ...choice }
-  delete next.reply
-  delete next.repeatReply
-  delete next.userMessage
-  delete next.addTagIds
-  delete next.removeTagIds
-  delete next.field
+/*
+ * R248: 選択肢の差し替え。`undefined` の項目は消す（残さない）。
+ * `setChoice` の部分マージ `{...今, ...差分}` では `delete` した属性が
+ * 復活してしまい、「実行されない設定を消す」が効かなかった。
+ */
+export function mergeChoice(base: QuestionChoice, patch: Partial<QuestionChoice>): QuestionChoice {
+  const next: QuestionChoice = { ...base, ...patch }
+  for (const key of Object.keys(patch) as (keyof QuestionChoice)[]) {
+    if (patch[key] === undefined) delete next[key]
+  }
   return next
+}
+
+/*
+ * URI だけの挙動では届かない、回答依存の設定をまとめて外す。
+ * `undefined` を付けて返す（消してしまわない）。`setChoice` の部分マージでは
+ * 無い項目が復活するため、`mergeChoice` が `undefined` を消す段取りにする。
+ */
+export function clearDeadAnswerSettings(choice: QuestionChoice): QuestionChoice {
+  return {
+    ...choice,
+    reply: undefined,
+    repeatReply: undefined,
+    userMessage: undefined,
+    addTagIds: undefined,
+    removeTagIds: undefined,
+    field: undefined,
+  }
 }
 
 /*
@@ -267,7 +285,7 @@ export default function QuestionEditor({
 
   const setChoice = (index: number, patch: Partial<QuestionChoice>) => {
     const choices = [...value.choices]
-    choices[index] = { ...choices[index], ...patch }
+    choices[index] = mergeChoice(choices[index], patch)
     onChange({ ...value, choices })
   }
 

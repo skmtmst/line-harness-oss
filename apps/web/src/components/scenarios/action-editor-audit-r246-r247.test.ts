@@ -11,7 +11,10 @@ import { describe, expect, it } from 'vitest'
 
 import { findInvalidRangeIssue } from '@/lib/segment-condition'
 import {
+  clearDeadAnswerSettings,
+  deadAnswerSettings,
   emptyQuestion,
+  mergeChoice,
   newChoiceKey,
   planChoiceActionRemap,
   withChoiceKeys,
@@ -93,6 +96,43 @@ describe('R246 質問と動作の更新を一緒に確定する', () => {
     expect(QUESTION_EDITOR).toContain('planChoiceActionRemap')
     expect(DETAIL_CLIENT).toContain('withChoiceKeys')
     expect(DETAIL_CLIENT).toContain('remapChoiceActions(editingStepId')
+  })
+})
+
+describe('R248 実行されない設定を消すが効く', () => {
+  const filled = {
+    key: 'a',
+    label: '案内',
+    behavior: 'url' as const,
+    url: 'https://example.com',
+    reply: '返信文',
+    repeatReply: '二度押し文',
+    userMessage: '利用者文',
+    addTagIds: ['tag-1'],
+    removeTagIds: ['tag-2'],
+    field: { fieldId: 'field-1', value: '3' },
+  }
+
+  it('消去を部分マージにかけても3項目の警告が残らない', () => {
+    expect(deadAnswerSettings(filled)).toHaveLength(6)
+    /* ボタンの動き：setChoice と同じ mergeChoice にかける */
+    const cleared = mergeChoice(filled, clearDeadAnswerSettings(filled))
+    expect(deadAnswerSettings(cleared)).toEqual([])
+    expect(cleared.reply).toBeUndefined()
+    expect(cleared.field).toBeUndefined()
+  })
+
+  it('消去後もラベル・挙動・URL・鍵は残る', () => {
+    const cleared = mergeChoice(filled, clearDeadAnswerSettings(filled))
+    expect(cleared.label).toBe('案内')
+    expect(cleared.behavior).toBe('url')
+    expect(cleared.url).toBe('https://example.com')
+    expect(cleared.key).toBe('a')
+  })
+
+  it('ボタンは置き換えではなく差し替えの段取りを使う', () => {
+    expect(QUESTION_EDITOR).toContain('choices[index] = mergeChoice(choices[index], patch)')
+    expect(QUESTION_EDITOR).toContain('setChoice(index, clearDeadAnswerSettings(choice))')
   })
 })
 
