@@ -12,6 +12,8 @@ import CreatePage, {
 } from '@/components/shared/create-page'
 import Checkbox from '@/components/shared/checkbox'
 import ListState from '@/components/shared/list-state'
+/* R309: メニュー候補の料金は一覧・割当表と同じ共通表示にする。 */
+import { menuPriceLabel } from '../../lib/menu-price'
 import Select from '@/components/shared/select'
 import { canEditFeature } from '@/lib/staff-capability'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -278,7 +280,7 @@ export default function NewBookingStaffPage() {
                   className="border-hairline hover:bg-canvas-sunken w-full rounded-md border p-2.5"
                 ><span className="flex w-full items-center gap-2"><span className="text-ink text-sm">{m.name}</span>
                   <span className="text-ink-faint ml-auto text-xs tabular-nums">
-                    {m.duration_minutes}分 / ¥{m.base_price.toLocaleString()}
+                    {m.duration_minutes}分 / {menuPriceLabel(m)}
                   </span></span>
                 </Checkbox>
               </li>

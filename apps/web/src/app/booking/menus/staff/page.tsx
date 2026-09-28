@@ -14,6 +14,8 @@ import Notice from '@/components/shared/notice'
 import StatusBadge from '@/components/shared/status-badge'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { notifyToast } from '@/components/shared/toast'
+/* R309: 標準の料金は一覧・スタッフ追加の候補と同じ共通表示にする。 */
+import { menuPriceLabel } from '../../lib/menu-price'
 
 /**
  * メニューごとの担当スタッフ（設計 V2 8-2-4 / node B88kuI）。
@@ -348,7 +350,7 @@ function MenuStaffMatrixContent() {
                     </Td>
                     <Td className="text-ink-secondary align-top text-xs tabular-nums">
                       {m.duration_minutes} 分
-                      <br />¥{m.base_price.toLocaleString()}
+                      <br />{menuPriceLabel(m)}
                     </Td>
                     {staff.map((s) => {
                       const row = grid[s.id]?.[m.id]

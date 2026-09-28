@@ -36,6 +36,8 @@ import ListRange from '@/components/ui/list-range'
 import MenuVersionHistory from './menu-version-history'
 import { bookingMenuError } from './menu-validation'
 import { bookingWindowEnd, businessHourSummary, minutesBeforeLabel } from '../lib/format-time'
+/* R309: 金額列は割当表・スタッフ追加の候補と同じ共通表示にする。 */
+import { menuPriceLabel } from '../lib/menu-price'
 import { formatHoursBeforeHint, formatMinutesLengthHint } from '@/lib/format-duration'
 
 /**
@@ -72,14 +74,7 @@ function bookingRulesErrorMessage(error: unknown, action: '読み込み' | '保�
   return `予約の基本ルールを${action}できませんでした。通信状態を確認して、もう一度お試しください。`
 }
 
-/**
- * 一覧の金額列。料金モードが先で、金額はその次。
- * 「お問い合わせ」は金額ではないので ¥ を付けず、無料とも混ぜない。
- */
-function menuPriceLabel(menu: BookingMenu): string {
-  if (menu.price_mode === 'inquiry') return 'お問い合わせ'
-  return menu.base_price === 0 ? '無料' : `¥${menu.base_price.toLocaleString()}`
-}
+
 
 function supportingDetail(
   hasAccount: boolean,
