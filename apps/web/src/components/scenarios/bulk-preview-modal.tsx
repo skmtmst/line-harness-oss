@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { api } from '@/lib/api'
 import DateTimeField from '@/components/shared/date-time-field'
 import Dialog from '@/components/shared/dialog'
+import StatusChip from '@/components/shared/status-chip'
 import { isCurrentPreviewRequest } from './bulk-preview-request'
 
 interface Props {
@@ -18,6 +19,8 @@ interface PreviewStep {
   deliveryAtLabel: string
   messageType: string
   messageContent: string
+  /** 下書きの通は送られない（R212）。 */
+  isDraft?: boolean
 }
 
 function nowJstAsLocalInput(): string {
@@ -83,7 +86,7 @@ export default function BulkPreviewModal({ open, scenarioId, onClose }: Props) {
     <Dialog
       open={open}
       title="一括プレビュー"
-      description="起点からの各通の届く日時と内容の見本です。送りはしません。"
+      description="起点からの各通の届く日時と内容の見本です。送りはしません。下書きの通には札を付けますが、実際の配信と友だち別の予定には入りません。"
       onCancel={onClose}
     >
       <div className="mb-4">
@@ -111,6 +114,8 @@ export default function BulkPreviewModal({ open, scenarioId, onClose }: Props) {
               <summary className="flex cursor-pointer list-none items-center gap-2 text-sm">
                 <span className="text-ink-faint w-8 font-mono">#{s.stepOrder}</span>
                 <span className="text-ink-secondary flex-1">{s.deliveryAtLabel}</span>
+                {/* R212: 下書きの通を区別せず並べると、送られる通と誤解する。 */}
+                {s.isDraft === true && <StatusChip status="draft" />}
                 <span className="text-info text-xs">{s.messageType}</span>
                 <span className="text-ink-faint transition-transform group-open:rotate-90">▶</span>
               </summary>

@@ -228,7 +228,7 @@ function NewFriendFieldForm() {
             >
               {/* R139: 複数選択は登録済みの選択肢から複数選ぶ。単一選択は一覧から1つ選ぶ。 */}
               <DefaultValueInput
-                mode={FILE_TYPES.has(type) ? 'file' : type === 'multi_select' ? 'multi' : type === 'select' ? 'single' : 'text'}
+                mode={FILE_TYPES.has(type) ? 'file' : type === 'multi_select' ? 'multi' : type === 'select' ? 'single' : type === 'textarea' ? 'longtext' : 'text'}
                 options={optionList}
                 textValue={defaultValue}
                 onTextChange={setDefaultValue}

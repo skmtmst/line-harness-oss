@@ -185,3 +185,17 @@ describe('FRIEND-03/20 条件を人が読める形で出す', () => {
     expect(describeSavedVisibility({})).toBe('すべて')
   })
 })
+
+describe('R185 回答フォーム・購入履歴は実行できる条件として読む', () => {
+  it('「未接続」と出さず有無が読める', () => {
+    expect(describeSavedCondition({ kind: 'form', op: 'exists', value: '' }, [], {})).toBe('回答フォームの回答がある')
+    expect(describeSavedCondition({ kind: 'form', op: 'not_exists', value: '' }, [], {})).toBe('回答フォームの回答がない')
+    expect(describeSavedCondition({ kind: 'purchase', op: 'exists', value: '' }, [], {})).toBe('購入履歴がある')
+  })
+
+  it('特定の指定があれば名前で読める', () => {
+    expect(
+      describeSavedCondition({ kind: 'form', op: 'exists', value: 'form-1' }, [], { forms: { 'form-1': '申込フォーム' } }),
+    ).toBe('回答フォーム「申込フォーム」の回答がある')
+  })
+})

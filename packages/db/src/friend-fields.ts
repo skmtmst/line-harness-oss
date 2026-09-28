@@ -735,10 +735,21 @@ export function validateFriendFieldValue(
     return { ok: true, value: raw.trim() };
   }
   if (type === 'datetime') {
-    if (typeof raw !== 'string' || Number.isNaN(Date.parse(raw.trim()))) {
+    if (typeof raw !== 'string') return { ok: false, error: '日時形式で入力してください' };
+    const text = raw.trim();
+    if (Number.isNaN(Date.parse(text))) {
       return { ok: false, error: '日時形式で入力してください' };
     }
-    return { ok: true, value: new Date(raw.trim()).toISOString() };
+    /*
+     * R181: Date.parse は存在しない日（2026-02-31）を翌月へ読み替えて
+     * 通してしまう。先頭が YYYY-MM-DD のときは暦に存在するかも見る。
+     * 日付型と同じ判定にし、既定値・個別値で同じ結果にする。
+     */
+    const datePrefix = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (datePrefix && !isExistingCalendarDate(`${datePrefix[1]}-${datePrefix[2]}-${datePrefix[3]}`)) {
+      return { ok: false, error: '存在する日時を日時形式で入力してください' };
+    }
+    return { ok: true, value: new Date(text).toISOString() };
   }
   if (type === 'email') {
     if (typeof raw !== 'string') return { ok: false, error: 'メールアドレス形式で入力してください' };
@@ -748,11 +759,18 @@ export function validateFriendFieldValue(
       : { ok: false, error: 'メールアドレス形式で入力してください' };
   }
   if (type === 'tel') {
-    if (typeof raw !== 'string') return { ok: false, error: '電話番号形式で入力してください' };
+    if (typeof raw !== 'string') return { ok: false, error: '電話番号は数字10〜15桁で入力してください' };
     const text = raw.trim();
-    return /^\+?[0-9() -]{8,20}$/.test(text)
+    /*
+     * R181: 記号だけ（--------）が旧い検査を通っていた。移行プレビュー・
+     * 本人特定と同じく数字の桁数で見る。入力の見た目（ハイフン等）は
+     * 残し、保存する形は変えない。
+     */
+    const digits = text.replace(/\D/g, '');
+    const ok = /^\+?[0-9()\- ]{1,25}$/.test(text) && digits.length >= 10 && digits.length <= 15;
+    return ok
       ? { ok: true, value: text }
-      : { ok: false, error: '電話番号形式で入力してください' };
+      : { ok: false, error: '電話番号は数字10〜15桁で入力してください' };
   }
   if (type === 'url') {
     if (typeof raw !== 'string') return { ok: false, error: 'httpまたはhttpsのURLで入力してください' };

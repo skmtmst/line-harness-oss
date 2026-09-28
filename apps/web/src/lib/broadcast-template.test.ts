@@ -4,6 +4,7 @@ import {
   bubbleLegacyMessage,
   bubblesForSave,
   contentTemplateToBubble,
+  messageButtonsError,
   messageTemplateToBubble,
 } from './broadcast-template'
 import { emptyMessageKindState } from '@/components/scenarios/message-kind-fields'
@@ -207,5 +208,54 @@ describe('素材の引用を LINE の種別に直す', () => {
 
   it('直った素材は空文字（問題なし）を返す', () => {
     expect(assetBubbleError({ id: 'b', type: 'card_message', content: cardContent })).toBe('')
+  })
+})
+
+/*
+ * ボタンの入力不備（監査 R206）。
+ *
+ * 空の名前・空のURL・https でないURLを区別して返し、番号で指す。
+ * 「下書きを保存できませんでした」だけでは、どこを直すべきか分からない。
+ */
+describe('ボタンの入力不備', () => {
+  const button = (over: Record<string, unknown> = {}) => ({
+    label: '資料を見る',
+    type: 'url' as const,
+    value: 'https://example.com/guide',
+    ...over,
+  })
+
+  it('空の名前は番号と項目を指す', () => {
+    expect(messageButtonsError([button({ label: '  ' })])).toBe('ボタン1の名前を入力してください')
+  })
+
+  it('空のURLは番号と項目を指す', () => {
+    expect(messageButtonsError([button({ value: '' })])).toBe('ボタン1のURLを入力してください')
+  })
+
+  it('https でないURLは https を求める', () => {
+    expect(messageButtonsError([button({ value: 'not-a-url' })])).toBe(
+      'ボタン1のURLは https:// から始めてください',
+    )
+    expect(messageButtonsError([button({ value: 'http://example.com' })])).toBe(
+      'ボタン1のURLは https:// から始めてください',
+    )
+  })
+
+  it('2つ目以降も番号で指す', () => {
+    expect(messageButtonsError([button(), button({ value: 'not-a-url' })])).toBe(
+      'ボタン2のURLは https:// から始めてください',
+    )
+  })
+
+  it('そろっていれば空文字（問題なし）を返す', () => {
+    expect(messageButtonsError([])).toBe('')
+    expect(messageButtonsError([button()])).toBe('')
+  })
+
+  it('5つ目は置けない', () => {
+    expect(messageButtonsError([button(), button(), button(), button(), button()])).toBe(
+      'ボタンは4つまでです',
+    )
   })
 })

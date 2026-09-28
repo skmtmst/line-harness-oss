@@ -19,6 +19,7 @@ import {
   validateAnswers,
   validateFormDefinition,
   validateFormForPublish,
+  type FormBlock,
   type FormInputBlock,
   type FormLayout,
 } from "./form-layout";
@@ -641,6 +642,65 @@ describe("公開前の検査(FORM-05/07/14)", () => {
       reminder: { reminderId: "rm-1", time: "09:00" },
     };
     expect(validateFormForPublish(layout)).toBeNull();
+  });
+});
+
+describe("画像ブロックのURL検証（保存時。R197）", () => {
+  function layoutWithImage(mediaUrl: string, linkUrl?: string): FormLayout {
+    const layout = emptyLayout();
+    const image: FormBlock =
+      linkUrl === undefined
+        ? { id: "img1", kind: "image", mediaUrl }
+        : { id: "img1", kind: "image", mediaUrl, linkUrl };
+    layout.sections[0].blocks = [input({ name: "x", label: "ひとこと" }), image];
+    return layout;
+  }
+
+  test("URLでない画像URL・リンクは保存で止める", () => {
+    expect(validateFormDefinition(layoutWithImage("not-a-url"))).toContain("URLの形ではありません");
+    expect(validateFormDefinition(layoutWithImage("https://example.com/a.png", "not-a-url"))).toContain(
+      "URLの形ではありません",
+    );
+  });
+
+  test("正しいhttps URLと未指定は通す", () => {
+    expect(
+      validateFormDefinition(layoutWithImage("https://example.com/a.png", "https://example.com/go")),
+    ).toBeNull();
+    expect(validateFormDefinition(layoutWithImage(""))).toBeNull();
+  });
+});
+
+describe("初期値の公開前検証（R196）", () => {
+  test("形式と矛盾する初期値は対象欄と理由を示して止める", () => {
+    const badMail = layoutWith([
+      input({ name: "mail", label: "メール", limit: { format: "email" }, defaultValue: "not-an-email" }),
+    ]);
+    expect(validateFormForPublish(badMail)).toContain("初期値");
+
+    const badDate = layoutWith([input({ name: "day", label: "希望日", type: "date", defaultValue: "2026-02-30" })]);
+    expect(validateFormForPublish(badDate)).toContain("初期値");
+
+    const badPref = layoutWith([
+      input({ name: "pref", label: "住まい", type: "prefecture", defaultValue: "存在しない県" }),
+    ]);
+    expect(validateFormForPublish(badPref)).toContain("初期値");
+  });
+
+  test("合っている初期値・空の初期値は通す（下書き保存も通す）", () => {
+    const good = layoutWith([
+      input({ name: "mail", label: "メール", limit: { format: "email" }, defaultValue: "a@example.com" }),
+      input({ name: "day", label: "希望日", type: "date", defaultValue: "2026-03-01" }),
+      input({ name: "pref", label: "住まい", type: "prefecture", defaultValue: "東京都" }),
+      input({ name: "memo", label: "メモ", required: true }),
+    ]);
+    expect(validateFormForPublish(good)).toBeNull();
+
+    const draft = layoutWith([
+      input({ name: "mail", label: "メール", limit: { format: "email" }, defaultValue: "not-an-email" }),
+    ]);
+    // 下書きでは許す（公開の直前で止める）
+    expect(validateFormDefinition(draft)).toBeNull();
   });
 });
 

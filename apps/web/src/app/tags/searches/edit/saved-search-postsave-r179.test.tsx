@@ -68,6 +68,8 @@ vi.mock('@/lib/api', () => ({
     supportMarks: { list: () => Promise.resolve({ success: true, data: [] }) },
     scenarios: { list: () => Promise.resolve({ success: true, data: [] }) },
     friendFields: { list: () => Promise.resolve({ success: true, data: [] }) },
+    forms: { list: () => Promise.resolve({ success: true, data: [] }) },
+    operators: { list: () => Promise.resolve({ success: true, data: [] }) },
     featureSettings: {
       visibility: () => Promise.resolve({ success: true, data: { features: {} } }),
     },
