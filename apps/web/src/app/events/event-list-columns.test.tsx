@@ -4,7 +4,7 @@
  * 「全員」が1文字ずつ縦に折れていた。申込条件は状態の札の下へ畳み、
  * 幅の無い列を作らない。見る筋書き:
  *   1. 見出しに「申込条件」は無く、「状態」がある
- *   2. 状態のますに札と条件の両方が入る（受付中＋全員、終了＋タグ名）
+ *   2. 状態のますに札と条件の両方が入る（公開中＋全員、終了＋タグ名）
  *   3. 条件の文字は折れない（truncate＝1行省略）し、タグ名は title で全文を確認できる
  */
 import React, { act } from 'react'
@@ -127,12 +127,13 @@ describe('m19d 一覧の状態ますに申込条件を畳む', () => {
     await renderPage()
     const heads = [...document.querySelectorAll('th')].map((th) => th.textContent?.trim())
     expect(heads).not.toContain('申込条件')
-    expect(heads).toContain('状態')
+    // 状態の見出しには「？」の補足が付くため、前方一致で見る。
+    expect(heads.some((head) => head?.startsWith('状態'))).toBe(true)
     const rows = [...document.querySelectorAll('tbody tr')]
     expect(rows).toHaveLength(2)
     // 状態のますは後ろから2番目（最後は操作）。
     const stateOf = (row: Element) => row.querySelectorAll('td')[4]
-    expect(stateOf(rows[0]).textContent).toContain('受付中')
+    expect(stateOf(rows[0]).textContent).toContain('公開中')
     expect(stateOf(rows[0]).textContent).toContain('全員')
     expect(stateOf(rows[1]).textContent).toContain('終了')
     expect(stateOf(rows[1]).textContent).toContain('定期便の契約がある人だけの長いタグ名')

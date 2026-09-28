@@ -245,18 +245,20 @@ function parseJsonObject(value: unknown): Record<string, unknown> | null {
 
 function validateMessageOptions(value: unknown): string | null {
   if (value === undefined || value === null) return null;
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return 'messageOptions must be an object';
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return 'ボタンの設定を読み込めませんでした';
   const options = value as { buttons?: unknown; resources?: unknown };
   if (options.buttons !== undefined) {
-    if (!Array.isArray(options.buttons) || options.buttons.length > 4) return 'messageOptions.buttons must contain at most 4 items';
-    for (const button of options.buttons) {
-      if (!button || typeof button !== 'object' || Array.isArray(button)) return 'messageOptions.buttons item must be an object';
+    // 監査 R206: 番号と不足項目を日本語で返す。画面の検査と文言をそろえる。
+    if (!Array.isArray(options.buttons) || options.buttons.length > 4) return 'ボタンは4つまでです';
+    for (const [index, button] of options.buttons.entries()) {
+      const number = index + 1;
+      if (!button || typeof button !== 'object' || Array.isArray(button)) return `ボタン${number}を読み込めませんでした`;
       const item = button as Record<string, unknown>;
-      if (typeof item.label !== 'string' || !item.label.trim()) return 'messageOptions button label is required';
-      if (!['url', 'pdf', 'postback'].includes(String(item.type))) return 'messageOptions button type is invalid';
-      if (typeof item.value !== 'string' || !item.value.trim()) return 'messageOptions button value is required';
-      if ((item.type === 'url' || item.type === 'pdf') && !/^https:\/\//i.test(item.value)) {
-        return 'messageOptions URL and PDF values must use https';
+      if (typeof item.label !== 'string' || !item.label.trim()) return `ボタン${number}の名前を入力してください`;
+      if (!['url', 'pdf', 'postback'].includes(String(item.type))) return `ボタン${number}の種類を確認してください`;
+      if (typeof item.value !== 'string' || !item.value.trim()) return `ボタン${number}のURLを入力してください`;
+      if ((item.type === 'url' || item.type === 'pdf') && !/^https:\/\//i.test(item.value.trim())) {
+        return `ボタン${number}のURLは https:// から始めてください`;
       }
     }
   }

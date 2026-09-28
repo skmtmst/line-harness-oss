@@ -19,7 +19,8 @@ import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/sh
 import Select from '@/components/shared/select'
 // #740: bookings の EventKpi と一字一句同じだったため、機能内共有の1部品へ統合した。
 import EventKpi from '@/components/events/event-kpi'
-import { daysUntilIso, eventRowState, summarizeEventAttention } from './event-attention'
+import HelpTip from '@/components/shared/help-tip'
+import { daysUntilIso, eventRowState, isLowApplication, summarizeEventAttention } from './event-attention'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -289,7 +290,7 @@ export default function EventsListPage() {
             <span className="text-ink-faint text-xs">よく使う</span>
             {(
               [
-                ['open', '受付中のみ'],
+                ['open', '公開中のみ'],
                 ['pending', '承認待ちあり'],
                 ['full', '満席'],
               ] as const
@@ -361,7 +362,14 @@ export default function EventsListPage() {
                   <Th style={{ width: '16%' }}>開催日時</Th>
                   <Th style={{ width: '12%' }} align="right">予約 / 定員</Th>
                   <Th style={{ width: '10%' }} align="right">承認待ち</Th>
-                  <Th style={{ width: '12%' }}>状態</Th>
+                  <Th style={{ width: '12%' }}>
+                    <span className="inline-flex items-center gap-1">
+                      状態
+                      <HelpTip label="状態の見方の説明">
+                        下書き・公開中・一時停止・終了・中止は保存した状態です。満席と申し込みが少ないは、その都度数えた目印で、状態ではありません。
+                      </HelpTip>
+                    </span>
+                  </Th>
                   {/* 操作列は固定幅（256px）。割合にすると中身（2ボタン約242px）が器からはみ出す。 */}
                   <Th align="right" className="w-64">操作</Th>
                 </TableHeadRow>
@@ -404,36 +412,63 @@ export default function EventsListPage() {
                     </Td>
                     <Td>
                       {/*
-                        R81: 公開済みでも今後の枠が無ければ「終了」。
-                        受付中と出すと、終わった会を募集中として選んでしまう。
+                        U: 保存する状態（下書き・公開中・一時停止・終了・中止）
+                        を出す。「満席」「申し込みが少ない」は保存せず、その
+                        都度数えた目印として横に足す。
+                        R81: 公開中でも今後の枠が無ければ「終了」。公開中と
+                        出すと、終わった会を募集中として選んでしまう。
                       */}
                       {(() => {
                         const state = eventRowState(e)
-                        if (state === 'draft') {
+                        const primary = (() => {
+                          if (state === 'draft') {
+                            return (
+                              <span className="bg-canvas-sunken text-ink-faint rounded-pill px-2 py-0.5 text-xs">
+                                下書き
+                              </span>
+                            )
+                          }
+                          if (state === 'paused') {
+                            return (
+                              <span className="bg-warning-bg text-warning rounded-pill px-2 py-0.5 text-xs">
+                                一時停止
+                              </span>
+                            )
+                          }
+                          if (state === 'cancelled') {
+                            return (
+                              <span className="bg-canvas-sunken text-ink-faint rounded-pill px-2 py-0.5 text-xs">
+                                中止
+                              </span>
+                            )
+                          }
+                          if (state === 'ended') {
+                            return (
+                              <span className="bg-canvas-sunken text-ink-faint rounded-pill px-2 py-0.5 text-xs">
+                                終了
+                              </span>
+                            )
+                          }
                           return (
-                            <span className="bg-canvas-sunken text-ink-faint rounded-pill px-2 py-0.5 text-xs">
-                              準備中
+                            <span className="bg-success-bg text-success rounded-pill px-2 py-0.5 text-xs">
+                              公開中
                             </span>
                           )
-                        }
-                        if (state === 'ended') {
-                          return (
-                            <span className="bg-canvas-sunken text-ink-faint rounded-pill px-2 py-0.5 text-xs">
-                              終了
-                            </span>
-                          )
-                        }
-                        if (state === 'full') {
-                          return (
-                            <span className="bg-warning-bg text-warning rounded-pill px-2 py-0.5 text-xs">
-                              満席
-                            </span>
-                          )
-                        }
+                        })()
                         return (
-                          <span className="bg-success-bg text-success rounded-pill px-2 py-0.5 text-xs">
-                            受付中
-                          </span>
+                          <div className="flex flex-wrap items-center gap-1">
+                            {primary}
+                            {state === 'full' && (
+                              <span className="bg-warning-bg text-warning rounded-pill px-2 py-0.5 text-xs">
+                                満席
+                              </span>
+                            )}
+                            {state === 'open' && isLowApplication(e) && (
+                              <span className="bg-canvas-sunken text-ink-secondary rounded-pill px-2 py-0.5 text-xs">
+                                申し込みが少ない
+                              </span>
+                            )}
+                          </div>
                         )
                       })()}
                       {/*

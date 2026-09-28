@@ -33,6 +33,13 @@ function dateCondition(
     const from = text(range.from);
     const to = text(range.to);
     if (!from && !to) return `${label}の範囲がありません`;
+    /*
+     * R183: 開始日より後の終了日は0人になる設定ミス。0人のまま数えて
+     * 実行すると「本当に該当者なし」と区別が付かないため、実行の時点
+     * でも断る（保存時は validateSearchConditions が先に断る）。
+     * 日付は YYYY-MM-DD のため文字列比較で前後が分かる。
+     */
+    if (from && to && from > to) return `${label}の開始日が終了日より後になっています`;
     const clauses: string[] = [];
     const binds: unknown[] = [];
     if (from) { clauses.push(`${columnSql} >= ?`); binds.push(from); }

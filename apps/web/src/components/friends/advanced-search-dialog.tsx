@@ -597,18 +597,24 @@ export default function AdvancedSearchDialog({
                 )}
 
                 {b.kind === 'created_at' && (
-                  <div className="flex flex-wrap items-center gap-2">
-                    <DateField
-                      value={b.from}
-                      onChange={(v) => patch(i, { ...b, from: v })}
-                      aria-label="友だち登録日の開始"
-                    />
-                    <span className="text-ink-secondary text-sm">〜</span>
-                    <DateField
-                      value={b.to}
-                      onChange={(v) => patch(i, { ...b, to: v })}
-                      aria-label="友だち登録日の終了"
-                    />
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <DateField
+                        value={b.from}
+                        onChange={(v) => patch(i, { ...b, from: v })}
+                        aria-label="友だち登録日の開始"
+                      />
+                      <span className="text-ink-secondary text-sm">〜</span>
+                      <DateField
+                        value={b.to}
+                        onChange={(v) => patch(i, { ...b, to: v })}
+                        aria-label="友だち登録日の終了"
+                      />
+                    </div>
+                    {/* R183: 逆転期間は保存・実行のどちらも断られる。欄で先に知らせる。 */}
+                    {b.from && b.to && b.from > b.to ? (
+                      <p role="alert" className="mt-1 text-xs text-danger">開始日が終了日より後になっています。入れ替えると保存できます。</p>
+                    ) : null}
                   </div>
                 )}
 

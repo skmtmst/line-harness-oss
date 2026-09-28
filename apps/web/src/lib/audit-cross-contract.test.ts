@@ -13,7 +13,9 @@ const RICH_MENU_ROUTE = read('../../../worker/src/routes/rich-menu-groups.ts')
 describe('#599 横断契約の一本化', () => {
   it('リッチメニューの利用側が共有の寸法・intent対応表を参照する', () => {
     expect(AREA_PROPERTIES).toContain('RICH_MENU_ACTION_TYPE_BY_INTENT[intent]')
-    expect(RICH_MENU_ROUTE).toContain('RICH_MENU_ACTION_TYPE_BY_INTENT[intent]')
+    // O(#822): DB へ載せる種類は、同じ共有の DB 用対応表から引く。
+    // 手書きの対応表は作らない（下の not.toContain が見張る）。
+    expect(RICH_MENU_ROUTE).toContain('RICH_MENU_DB_ACTION_TYPE_BY_INTENT[intent]')
     expect(RICH_MENU_ROUTE).toContain('RICH_MENU_DIMENSIONS.large')
     expect(AREA_PROPERTIES).not.toContain('const ACTION_TYPE_BY_INTENT')
     expect(RICH_MENU_ROUTE).not.toContain('const ACTION_TYPE_BY_INTENT')

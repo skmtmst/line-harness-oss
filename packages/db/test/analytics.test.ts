@@ -165,6 +165,42 @@ describe('getBroadcastSummary', () => {
     ]);
   });
 
+  // 監査 R227: 画面の期間は JST の暦日、記録の時刻は +09:00・Z・時差なしが
+  // 混在する。先読みの文字列範囲で外さず、julianday が瞬時で判定する。
+  test('クリック時刻は表記が混在していても JST の暦日で期間判定する', async () => {
+    sqlite.prepare(
+      `INSERT INTO friends (id, line_user_id, display_name, line_account_id)
+       VALUES ('friend-a','line-user-a','Aさん','account-a'),
+              ('friend-a2','line-user-a2','A2さん','account-a'),
+              ('friend-a3','line-user-a3','A3さん','account-a')`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO tracked_links (id, name, original_url, line_account_id)
+       VALUES ('link-a','A店の案内','https://example.com/a','account-a')`,
+    ).run();
+    sqlite.exec(`
+      INSERT INTO link_clicks (id, tracked_link_id, friend_id, clicked_at) VALUES
+        -- JST 8/10 00:30（瞬時では 8/9 15:30Z）→ 期間内
+        ('c-jst-in','link-a','friend-a','2026-08-10T00:30:00+09:00'),
+        -- UTC 8/9 16:00Z（JST では 8/10 01:00）→ 期間内。文字列比較では外れる
+        ('c-z-in','link-a','friend-a2','2026-08-09T16:00:00.000Z'),
+        -- 時差なし 8/10 12:00 → UTC として 8/10 21:00 JST → 期間内
+        ('c-plain-in','link-a','friend-a3','2026-08-10T12:00:00.000'),
+        -- JST 8/9 23:30 → 期間外（前日）
+        ('c-jst-out','link-a','friend-a','2026-08-09T23:30:00+09:00'),
+        -- UTC 8/10 15:30Z（JST では 8/11 00:30）→ 期間外（翌日）。
+        -- 文字列比較では期間内に見えてしまう
+        ('c-z-out','link-a','friend-a','2026-08-10T15:30:00.000Z');
+    `);
+    const range = { from: '2026-08-10', to: '2026-08-10T23:59:59.999' };
+
+    await expect(getLinkClickSummary(db, 'account-a', range)).resolves.toEqual([
+      { trackedLinkId: 'link-a', name: 'A店の案内', clicks: 3, uniqueFriends: 3 },
+    ]);
+    const stats = await getTrackedLinkStats(db, 'account-a', range);
+    expect(stats[0]).toMatchObject({ clicks: 3, uniqueFriends: 3 });
+  });
+
   test('クロス集計に別のLINE公式アカウントの友だちを混ぜない', async () => {
     sqlite.prepare(
       `INSERT INTO friends (id, line_user_id, display_name, line_account_id)

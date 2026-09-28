@@ -19,7 +19,7 @@ import type {
   FormInputType,
   FormSection,
 } from '@line-crm/shared'
-import { newBlockId } from '@line-crm/shared'
+import { newBlockId, PREFECTURES } from '@line-crm/shared'
 import ChoiceTable from './choice-table'
 import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
@@ -458,16 +458,57 @@ export default function BlockEditor({
                   </label>
                 )}
 
-                <label className="block">
-                  <span className="text-ink-secondary mb-1 block text-xs font-medium">初期値</span>
-                  <input
-                    type="text"
-                    value={block.defaultValue ?? ''}
-                    onChange={(e) => patchInput({ defaultValue: e.target.value })}
-                    placeholder="はじめから入れておく値"
-                    className={fieldInput}
-                  />
-                </label>
+                {/*
+                  R196: 初期値はその欄の形で入れる。単一行のまま入れると
+                  メール・日付・都道府県と矛盾する値が作れてしまい、
+                  公開前の検査で止まる（回答者が送信できなくなるため）。
+                */}
+                {block.type === 'textarea' ? (
+                  <label className="block">
+                    <span className="text-ink-secondary mb-1 block text-xs font-medium">初期値</span>
+                    <textarea
+                      rows={2}
+                      value={block.defaultValue ?? ''}
+                      onChange={(e) => patchInput({ defaultValue: e.target.value })}
+                      placeholder="はじめから入れておく値"
+                      className={`${fieldInput} resize-y`}
+                    />
+                  </label>
+                ) : block.type === 'date' ? (
+                  <label className="block">
+                    <span className="text-ink-secondary mb-1 block text-xs font-medium">初期値</span>
+                    <input
+                      type="date"
+                      value={block.defaultValue ?? ''}
+                      onChange={(e) => patchInput({ defaultValue: e.target.value })}
+                      className={fieldInput}
+                    />
+                  </label>
+                ) : block.type === 'prefecture' ? (
+                  <label className="block">
+                    <span className="text-ink-secondary mb-1 block text-xs font-medium">初期値</span>
+                    <Select
+                      aria-label="初期値"
+                      value={block.defaultValue ?? ''}
+                      onChange={(value) => patchInput({ defaultValue: value })}
+                      options={[
+                        { value: '', label: '— 入れない —' },
+                        ...PREFECTURES.map((name) => ({ value: name, label: name })),
+                      ]}
+                    />
+                  </label>
+                ) : (
+                  <label className="block">
+                    <span className="text-ink-secondary mb-1 block text-xs font-medium">初期値</span>
+                    <input
+                      type="text"
+                      value={block.defaultValue ?? ''}
+                      onChange={(e) => patchInput({ defaultValue: e.target.value })}
+                      placeholder="はじめから入れておく値"
+                      className={fieldInput}
+                    />
+                  </label>
+                )}
               </div>
 
               {/* 入力制限 */}
