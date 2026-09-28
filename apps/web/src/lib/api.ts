@@ -9602,6 +9602,8 @@ export const api = {
         category: string;
         messageType: string;
         messageContent: string;
+        /** R194: 管理一覧の抜粋・検索が読む最新の下書き本文。公開版だけのときは null。 */
+        draftMessageContent: string | null;
         folderId: string | null;
         question: TemplateQuestion | null;
         questionStatus: 'draft' | 'published';
@@ -9664,6 +9666,8 @@ export const api = {
           tapCount: number;
           monthlySendCount: number | null;
           totalSendCount: number | null;
+          /** R194: 最新の下書き本文（管理一覧用）。公開版だけのときは null。 */
+          draftMessageContent: string | null;
           hasDraft: boolean;
           publishedVersion: number;
           publishedAt: string | null;

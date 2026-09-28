@@ -311,6 +311,11 @@ templates.get('/api/templates', async (c) => {
       category: t.category,
       messageType: t.message_type,
       messageContent: t.message_content,
+      /*
+       * R194: 管理一覧の抜粋・検索が読む最新の下書き。公開版しか無ければ null。
+       * 送信の候補選びは `messageContent`（公開版）だけを見る決まりは変えない。
+       */
+      draftMessageContent: t.draft_message_content ?? null,
       question: questionValue(t.question_json),
       questionStatus: t.question_status,
       folderId: t.folder_id ?? null,
