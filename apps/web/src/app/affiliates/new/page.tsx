@@ -85,7 +85,9 @@ function Unavailable({ label, reason }: { label: string; reason: string }) {
 type PayoutKind = 'per_conversion' | 'rate' | 'none'
 
 const PAYOUT_KINDS: Array<{ value: PayoutKind; label: string; note: string }> = [
-  { value: 'per_conversion', label: '成果1件ごとに定額', note: '1件あたりの金額を決めます' },
+  /* m22d: 金額は案件側で決まる（下の「1件あたりの報酬」と同じ説明）。
+     「1件あたり」を注記にも書くと、同じ「1件」が3回出るので書かない。 */
+  { value: 'per_conversion', label: '成果1件ごとに定額', note: '金額は案件の「報酬額」で決めます' },
   { value: 'rate', label: '売上に対する割合', note: '注文金額の◯%を報酬にします' },
   { value: 'none', label: '報酬なし（計測のみ）', note: '成果の件数だけを記録します' },
 ]

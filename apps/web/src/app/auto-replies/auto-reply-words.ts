@@ -246,8 +246,10 @@ export function keywordRules(rule: {
 /**
  * 「どんなときに動くか」の先頭行と、読める形の全文。
  *
- * 先頭行は幅が狭いので「言葉・言葉・ほかN件」まで。全文は title に
+ * 先頭行は幅が狭いので「言葉・言葉・ほかNつ」まで。全文は title に
  * 一致方法と「どれか1つ／すべて」のまとめ方まで書く。
+ * m22d: キーワードの数え残しは「つ」にし、「件」は数のカードだけに残す
+ * （ほかN件だと、有効・要確認の「3件」と同じ「3件」が3回出る）。
  */
 export function triggerSummary(rule: {
   keyword: string
@@ -274,7 +276,7 @@ export function triggerSummary(rule: {
   const shown = rules.slice(0, 2).map((item) => `「${item.keyword}」`).join('')
   const rest = rules.length - 2
   return {
-    text: rest > 0 ? `${shown}ほか${rest}件` : shown,
+    text: rest > 0 ? `${shown}ほか${rest}つ` : shown,
     title: `${details} — ${mode}`,
   }
 }
