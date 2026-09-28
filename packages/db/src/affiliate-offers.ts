@@ -1,5 +1,9 @@
-import { jstNow } from './utils.js';
-import { ensureConversionRewardSnapshot, reverseSettledRewardOnRejection } from './affiliate-settlements.js';
+import { dbTableExists, jstNow } from './utils.js';
+import {
+  ensureConversionRewardSnapshot,
+  restoreSettledRewardOnReapproval,
+  reverseSettledRewardOnRejection,
+} from './affiliate-settlements.js';
 import { createAffiliateLink } from './affiliate-links.js';
 import type { AffiliateLink } from './affiliate-links.js';
 import { ensureDefaultMileageProgram } from './mileage.js';
@@ -326,7 +330,11 @@ export async function setConversionApproval(
     // 金額/条件/対象が変わらないようにする。曖昧な行は版を作らずnullで
     // 終える(版が無い行は締め・支払い・レポートで0として扱う)。
     // 版の書き込みが落ちた場合は再試行(already_set側)で修復する。
+    // m22u R356・R357: 版より先に承認時の金額・マイルを凍結する。
+    // m22u R358: 締め後の却下→再承認では取り消し済みの確定を戻す。
+    if (status === 'approved') await freezeConversionApproval(db, eventId);
     if (status === 'approved') await ensureConversionRewardSnapshot(db, eventId, now);
+    if (status === 'approved') await restoreSettledRewardOnReapproval(db, eventId);
     // 確定済みの成果を取り消したときは、確定を消さずに同額の反対仕訳を起こす。
     // 締めの記録はそのまま残し、支払いの確定済みだけが相殺される。
     if (status === 'rejected') await reverseSettledRewardOnRejection(db, eventId, now);
@@ -343,10 +351,159 @@ export async function setConversionApproval(
   if (!existing) return false;
   // 二重押しの再試行は承認済みの修復にも使う: 承認だけ通って版が無い
   // 行があればここで作る(締めは版優先のため、版が無いと後編集で金額が動く)。
+  // m22u R356・R357: 凍結が無ければここで埋め直し、版の修復は凍結値を優先する。
+  // m22u R358: 復活の戻し忘れもここで修復する（再送では何も起きない）。
+  if (status === 'approved') await freezeConversionApproval(db, eventId);
   if (status === 'approved') await ensureConversionRewardSnapshot(db, eventId, now);
+  if (status === 'approved') await restoreSettledRewardOnReapproval(db, eventId);
   // 取消の再試行も同じく修復に使う: 取消だけ通って反対仕訳が無い行を起票する。
   if (status === 'rejected') await reverseSettledRewardOnRejection(db, eventId, now);
   return 'already_set';
+}
+
+/**
+ * m22u R356・R357：承認した時点の金額・マイルの凍結。
+ *
+ * 承認の UPDATE が通った直後に、その時点で見える計算入力（率/基準額/
+ * 固定額・版の固定を優先）とマイル数を conversion_events の列へ写す。
+ * 列は初回だけ埋める（COALESCE の先勝ち）。再試行・締め・通知は凍結値を
+ * 優先するため、承認後の設定変更で過去の承認額が動かない。
+ * 却下では凍結しない（却下→再承認は新しい承認としてその時点で凍結する）。
+ */
+export interface ApprovalFreezeInputs {
+  formula: 'rate' | 'fixed';
+  commissionRate: number | null;
+  baseAmount: number | null;
+  fixedReward: number | null;
+  amountMinor: number;
+  rewardMiles: number;
+}
+
+async function readApprovalFreezeInputs(
+  db: D1Database,
+  eventId: string,
+): Promise<ApprovalFreezeInputs | null> {
+  const hasVersionTables = (await dbTableExists(db, 'affiliate_offer_versions'))
+    && (await dbTableExists(db, 'affiliate_attribution_decisions'));
+  const fixedRewardSelect = hasVersionTables
+    ? 'COALESCE(ov.reward_amount, off.reward_amount) AS fixed_reward'
+    : 'off.reward_amount AS fixed_reward';
+  const milesSelect = hasVersionTables
+    ? 'COALESCE(ov.reward_miles, off.reward_miles) AS reward_miles'
+    : 'off.reward_miles AS reward_miles';
+  const versionJoins = hasVersionTables
+    ? `LEFT JOIN affiliate_attribution_decisions dad
+         ON dad.conversion_event_id = ce.id
+       LEFT JOIN affiliate_offer_versions ov ON ov.id = dad.offer_version_id`
+    : '';
+  const row = await db.prepare(
+    `SELECT a.commission_rate AS commission_rate,
+            ce.value_snapshot AS value_snapshot,
+            cp.value AS point_value,
+            ${fixedRewardSelect},
+            ${milesSelect}
+       FROM conversion_events ce
+       JOIN affiliates a ON a.id = ce.affiliate_id
+       LEFT JOIN conversion_points cp ON cp.id = ce.conversion_point_id
+       LEFT JOIN affiliate_links al
+         ON al.ref_code = ce.attributed_ref_code
+        AND al.affiliate_id = a.id
+       LEFT JOIN affiliate_offers off ON off.id = al.offer_id
+       ${versionJoins}
+      WHERE ce.id = ?
+        AND ce.affiliate_id IS NOT NULL
+        AND COALESCE(ce.approval_status, 'pending') = 'approved'`,
+  ).bind(eventId).first<{
+    commission_rate: number | null;
+    value_snapshot: number | null;
+    point_value: number | null;
+    fixed_reward: number | null;
+    reward_miles: number | null;
+  }>();
+  if (!row) return null;
+  const rate = row.commission_rate === null ? 0 : Number(row.commission_rate);
+  const formula: 'rate' | 'fixed' = rate > 0 ? 'rate' : 'fixed';
+  const baseAmount = formula === 'rate' ? Number(row.value_snapshot ?? row.point_value ?? 0) : null;
+  const fixedReward = formula === 'fixed' ? Math.round(Number(row.fixed_reward ?? 0)) : null;
+  return {
+    formula,
+    commissionRate: formula === 'rate' ? rate : null,
+    baseAmount,
+    fixedReward,
+    amountMinor: formula === 'rate' ? Math.round(baseAmount! * rate / 100) : fixedReward!,
+    rewardMiles: Math.max(0, Math.round(Number(row.reward_miles ?? 0))),
+  };
+}
+
+/**
+ * 承認時の金額・マイルを成果行へ凍結する。列が埋まっていれば何もしない
+ * （初回承認の値が正本）。凍結に失敗しても承認自体は通す — 呼び出し側で
+ * 投げ直さないこと（再試行の already_set 側で埋め直す）。
+ */
+export async function freezeConversionApproval(db: D1Database, eventId: string): Promise<void> {
+  try {
+    const inputs = await readApprovalFreezeInputs(db, eventId);
+    if (!inputs) return;
+    await db.prepare(
+      `UPDATE conversion_events
+          SET approval_amount_minor = COALESCE(approval_amount_minor, ?),
+              approval_formula = COALESCE(approval_formula, ?),
+              approval_commission_rate = COALESCE(approval_commission_rate, ?),
+              approval_base_amount = COALESCE(approval_base_amount, ?),
+              approval_fixed_reward = COALESCE(approval_fixed_reward, ?),
+              approval_reward_miles = COALESCE(approval_reward_miles, ?)
+        WHERE id = ?`,
+    ).bind(
+      inputs.amountMinor, inputs.formula, inputs.commissionRate, inputs.baseAmount,
+      inputs.fixedReward, inputs.rewardMiles, eventId,
+    ).run();
+  } catch (error) {
+    console.error(`freezeConversionApproval failed (event=${eventId}):`, error);
+  }
+}
+
+/**
+ * m22u R354：承認通知の送信記録。
+ *
+ * 承認状態（updated/already_set）と通知の送信状態を分ける。同じ承認世代
+ * （approved_at）の通知は1回だけ送り、再試行の修復で欠けた通知だけ送る。
+ */
+export interface ApprovalNotificationState {
+  /** この承認世代の通知を送ってよいか。 */
+  send: boolean;
+  /** 現在の承認世代。未承認の行は null。 */
+  approvedAt: string | null;
+}
+
+export async function getApprovalNotificationState(
+  db: D1Database,
+  eventId: string,
+): Promise<ApprovalNotificationState> {
+  const row = await db.prepare(
+    `SELECT approved_at, approval_notified_generation
+       FROM conversion_events WHERE id = ?`,
+  ).bind(eventId).first<{ approved_at: string | null; approval_notified_generation: string | null }>();
+  if (!row || !row.approved_at) return { send: false, approvedAt: row?.approved_at ?? null };
+  return { send: row.approval_notified_generation !== row.approved_at, approvedAt: row.approved_at };
+}
+
+/**
+ * 通知を送った記録を残す。別の走者が先に記録していたら false を返す
+ * （送った側だけが true。二重送信の抑止に使う）。
+ */
+export async function markApprovalNotified(
+  db: D1Database,
+  eventId: string,
+  approvedAt: string,
+): Promise<boolean> {
+  const result = await db.prepare(
+    `UPDATE conversion_events
+        SET approval_notified_generation = ?
+      WHERE id = ?
+        AND approved_at IS ?
+        AND (approval_notified_generation IS NULL OR approval_notified_generation != ?)`,
+  ).bind(approvedAt, eventId, approvedAt, approvedAt).run();
+  return (result.meta?.changes ?? 0) > 0;
 }
 
 export type ApprovalDecisionStatus = 'pending' | 'approved' | 'rejected';
@@ -389,7 +546,11 @@ export async function decideConversionApproval(
       .bind(status, now, eventId, ...expectedBinds)
       .run();
     if ((result.meta?.changes ?? 0) > 0) {
+      // m22u R356・R357: 版より先に承認時の金額・マイルを凍結する。
+      if (status === 'approved') await freezeConversionApproval(db, eventId);
       if (status === 'approved') await ensureConversionRewardSnapshot(db, eventId, now);
+      // m22u R358: 締め後の却下→再承認では取り消し済みの確定を戻す。
+      if (status === 'approved') await restoreSettledRewardOnReapproval(db, eventId);
       if (status === 'rejected') await reverseSettledRewardOnRejection(db, eventId, now);
       return { outcome: 'updated', currentStatus: status };
     }
@@ -407,7 +568,11 @@ export async function decideConversionApproval(
     : 'pending';
   if (current === status) {
     // 同じ判断の再送は冪等成功にし、版・反対仕訳の欠落だけ修復する。
+    // m22u R356・R357: 凍結が無ければここで埋め直し、版の修復は凍結値を優先する。
+    // m22u R358: 復活の戻し忘れもここで修復する（再送では何も起きない）。
+    if (status === 'approved') await freezeConversionApproval(db, eventId);
     if (status === 'approved') await ensureConversionRewardSnapshot(db, eventId, now);
+    if (status === 'approved') await restoreSettledRewardOnReapproval(db, eventId);
     if (status === 'rejected') await reverseSettledRewardOnRejection(db, eventId, now);
     return { outcome: 'already_set', currentStatus: current };
   }
@@ -542,6 +707,7 @@ export async function getConversionApprovalNotifyInfo(
        */
       `SELECT ce.affiliate_id AS affiliate_id,
               off.name AS offer_name,
+              ce.approval_amount_minor AS frozen_reward_amount,
               off.reward_amount AS offer_reward_amount,
               (SELECT calc.amount_minor
                  FROM affiliate_reward_calculations calc
@@ -560,6 +726,7 @@ export async function getConversionApprovalNotifyInfo(
     .first<{
       affiliate_id: string;
       offer_name: string | null;
+      frozen_reward_amount: number | null;
       offer_reward_amount: number | null;
       calculated_reward_amount: number | null;
       notify_on_conversion: number | null;
@@ -568,7 +735,13 @@ export async function getConversionApprovalNotifyInfo(
   return {
     affiliateId: row.affiliate_id,
     offerName: row.offer_name,
-    rewardAmount: row.calculated_reward_amount ?? row.offer_reward_amount ?? 0,
+    // m22u R357: 版が無い(保存失敗後)ときは凍結した承認時金額を使い、
+    // 変更後の案件額を見せない。凍結も無ければ従来どおり案件額。
+    rewardAmount: row.calculated_reward_amount
+      ?? (row.frozen_reward_amount === null || row.frozen_reward_amount === undefined
+        ? row.offer_reward_amount
+        : Number(row.frozen_reward_amount))
+      ?? 0,
     notifyOnConversion: row.notify_on_conversion !== 0,
   };
 }
