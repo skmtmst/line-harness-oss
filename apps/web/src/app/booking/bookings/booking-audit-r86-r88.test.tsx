@@ -91,7 +91,8 @@ describe('監査 R86: 取消済みは件数・売上見込みから外す', () =
 describe('監査 R87: 重ならない空き枠の入口は残す', () => {
   it('10:00の予約があっても10:30の空き枠に入口が出る', () => {
     show([booking({ status: 'confirmed' })], [slot()])
-    expect(screen.getByLabelText('この空き枠に予約を入れる')).toBeTruthy()
+    // R315: 読み上げ名は日付・開始時刻・担当を含む（10:30 山田 空きあり）。
+    expect(screen.getByLabelText(/10:30.*山田.*空きあり/)).toBeTruthy()
   })
 
   it('枠が予約と重なるときは入口を出さない', () => {
@@ -99,6 +100,6 @@ describe('監査 R87: 重ならない空き枠の入口は残す', () => {
       [booking({ status: 'confirmed' })],
       [slot({ start: '10:00', end: '10:30', startUtc: '2026-09-28T10:00:00+09:00', endUtc: '2026-09-28T10:30:00+09:00' })],
     )
-    expect(screen.queryByLabelText('この空き枠に予約を入れる')).toBeNull()
+    expect(screen.queryByLabelText(/空きあり/)).toBeNull()
   })
 })

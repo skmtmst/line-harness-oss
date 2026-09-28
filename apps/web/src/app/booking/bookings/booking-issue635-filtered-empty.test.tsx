@@ -67,6 +67,8 @@ const staff = { id: 'staff-1', display_name: '山田', is_active: 1 }
 
 beforeEach(() => {
   vi.clearAllMocks()
+  // R317: 台帳は同じタブの保存へ条件を残す。新しいタブ相当の前提にする。
+  window.sessionStorage.clear()
   fixture.staffMe.mockResolvedValue({ success: false })
   fixture.listRequests.mockResolvedValue({ requests: [], total: 0 })
   fixture.requestsSummary.mockResolvedValue(summary)

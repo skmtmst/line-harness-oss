@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Ban, CalendarCheck, Clock3, ClipboardList, EyeOff, MailX, MessageCircle, MousePointerClick, Pencil, Plus, RefreshCw, ShoppingBag, Trash2, UserPlus, WalletCards } from 'lucide-react'
+import { Ban, CalendarCheck, Clock3, ClipboardList, EyeOff, MailX, MessageCircle, MousePointerClick, Pencil, Plus, RefreshCw, ShoppingBag, UserPlus, WalletCards } from 'lucide-react'
 import { EC_EVENT_LABELS, EC_EVENT_TYPES } from '@line-crm/shared'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Breadcrumb from '@/components/shared/breadcrumb'
@@ -13,6 +13,7 @@ import { Field, TextInput } from '@/components/shared/form-controls'
 import DateTimeField from '@/components/shared/date-time-field'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
+import { RowActions } from '@/components/shared/row-actions'
 import Select from '@/components/shared/select'
 import { notifyToast } from '@/components/shared/toast'
 import Toggle from '@/components/shared/toggle'
@@ -147,6 +148,8 @@ export default function ActionScoreRulesPage() {
   const [canEdit, setCanEdit] = useState(false)
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null)
   const [editRuleIndex, setEditRuleIndex] = useState<number | null>(null)
+  // ほかの一覧と同じく、削除は「…」の中へ入れ、押した先で確認を出す。
+  const [deleteRuleIndex, setDeleteRuleIndex] = useState<number | null>(null)
   /*
    * R129: 編集窓の入力は仮状態（`editDraft`）にだけ書き、「設定を反映」で
    * 親の一覧へ渡す。閉じる・Escapeは仮状態を捨てるだけ。入力のたび親を
@@ -487,7 +490,23 @@ export default function ActionScoreRulesPage() {
                       </button>
                       <span className="col-span-2 text-left text-sm font-bold text-ink sm:text-right">{rulePointLabel(rule)}</span>
                       <span className="col-span-9 text-xs text-ink-secondary sm:col-span-3">{ruleFrequencyLabel(rule)}</span>
-                      {canEdit ? <button type="button" className="col-span-1 justify-self-end rounded-control p-2 text-danger hover:bg-status-danger-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-status-danger" aria-label={`${rule.name}を削除`} onClick={() => removeRule(index)}><Trash2 className="h-4 w-4" aria-hidden="true" /></button> : null}
+                      {/*
+                        * ほかの一覧と同じく、削除は行の赤いゴミ箱ではなく
+                        * 「…」の中の「削除する」へ入れる。押した先で確認を
+                        * 出し、間違って消さない（LAY-18）。
+                        */}
+                      {canEdit ? (
+                        <span className="col-span-1 justify-self-end">
+                          <RowActions
+                            subjectName={rule.name}
+                            destructiveItem={{
+                              id: 'delete',
+                              label: '削除する',
+                              onSelect: () => setDeleteRuleIndex(index),
+                            }}
+                          />
+                        </span>
+                      ) : null}
                     </div>
                   ))}
                 </div>
@@ -634,6 +653,18 @@ export default function ActionScoreRulesPage() {
         error={actionError}
         onCancel={() => !busy && setConfirmAction(null)}
         onConfirm={() => void stop()}
+      />
+      <ConfirmDialog
+        open={deleteRuleIndex !== null}
+        title={`「${deleteRuleIndex !== null ? bundle?.rules[deleteRuleIndex]?.name ?? '' : ''}」を削除しますか？`}
+        description="下書きから消えます。公開中の版と友だちの点数は変わりません。「下書きに保存」を押すまで確定しません。"
+        confirmLabel="削除する"
+        destructive
+        onCancel={() => setDeleteRuleIndex(null)}
+        onConfirm={() => {
+          if (deleteRuleIndex !== null) removeRule(deleteRuleIndex)
+          setDeleteRuleIndex(null)
+        }}
       />
     </div>
   )

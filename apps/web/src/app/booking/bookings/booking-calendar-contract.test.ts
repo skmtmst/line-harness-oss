@@ -71,7 +71,12 @@ describe('V6 予約管理の時間台帳', () => {
     expect(CALENDAR).toContain('`/booking/bookings/new?${params.toString()}`')
     expect(CALENDAR).toContain("date: input.day")
     expect(CALENDAR).toContain("params.set('staff', input.staffName)")
-    expect(CALENDAR).toContain('aria-label="この空き枠に予約を入れる"')
+    // R315: 空き枠の読み上げ名は日付・開始時刻・担当を含む固有の名前。
+    // 70本すべて同じ名前では、読み上げの一覧から目的の日時を選べない。
+    expect(CALENDAR).toContain('function slotAriaLabel')
+    expect(CALENDAR).toContain('空きあり')
+    expect(CALENDAR).toContain('label={entryLabel}')
+    expect(CALENDAR).not.toContain('aria-label="この空き枠に予約を入れる"')
     // 操作できない人（canCreate=false）は「あき」の文字だけ。押せる形に見せない。
     expect(CALENDAR).toContain('if (!href) {')
     // R87: 予約ありのマスでも重ならない枠の入口は残す。重なりは時刻で確かめる。
