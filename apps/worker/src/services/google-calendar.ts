@@ -18,6 +18,9 @@ export interface CreateEventInput {
   start: string;   // ISO datetime string
   end: string;     // ISO datetime string
   description?: string;
+  // こちらで採番したイベント ID。渡すと Google 側もこの ID で登録される。
+  // 外部作成とDB保存の間で障害が起きても再送が別 ID を生まない。
+  id?: string;
 }
 
 export class GoogleCalendarClient {
@@ -69,6 +72,7 @@ export class GoogleCalendarClient {
       description: event.description,
       start: { dateTime: event.start, timeZone: TIMEZONE },
       end: { dateTime: event.end, timeZone: TIMEZONE },
+      ...(event.id ? { id: event.id } : {}),
     };
 
     const res = await fetch(url, {
