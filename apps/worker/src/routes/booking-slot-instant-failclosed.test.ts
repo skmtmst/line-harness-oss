@@ -18,7 +18,8 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import type { Env } from '../index.js';
 
-vi.mock('../services/booking-notifier.js', () => ({
+vi.mock('../services/booking-notifier.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../services/booking-notifier.js')>()),
   sendBookingNotification: vi.fn(async () => ({ ok: true })),
 }));
 vi.mock('../services/account-access.js', () => ({
