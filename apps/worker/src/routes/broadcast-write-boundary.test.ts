@@ -213,4 +213,23 @@ describe('配信の共通境界(N-061)', () => {
     expect((await putUpdate('bc-1', { title: '題名', expectedVersion: 1 }, owner)).status).toBe(200);
     expect((await postSend('bc-1', owner)).status).toBe(200);
   });
+
+  test('ボタンの不備は番号と項目を日本語で断る（監査 R206）', async () => {
+    // 空の名前・空のURL・https でないURLを区別する。理由のない失敗にしない。
+    const button = (over: Record<string, unknown>) => ({
+      label: '資料を見る', type: 'url', value: 'https://example.com/guide', ...over,
+    });
+    const emptyLabel = await postCreate({ ...CREATE_BODY, messageOptions: { buttons: [button({ label: '' })] } });
+    expect(emptyLabel.status).toBe(400);
+    await expect(emptyLabel.json()).resolves.toMatchObject({ error: 'ボタン1の名前を入力してください' });
+    const emptyUrl = await postCreate({ ...CREATE_BODY, messageOptions: { buttons: [button({ value: '' })] } });
+    expect(emptyUrl.status).toBe(400);
+    await expect(emptyUrl.json()).resolves.toMatchObject({ error: 'ボタン1のURLを入力してください' });
+    const badUrl = await postCreate({ ...CREATE_BODY, messageOptions: { buttons: [button({ value: 'not-a-url' })] } });
+    expect(badUrl.status).toBe(400);
+    await expect(badUrl.json()).resolves.toMatchObject({ error: 'ボタン1のURLは https:// から始めてください' });
+    // 直したら通る。
+    const fixed = await postCreate({ ...CREATE_BODY, messageOptions: { buttons: [button({})] } });
+    expect(fixed.status).toBe(201);
+  });
 });

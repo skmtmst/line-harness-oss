@@ -13,6 +13,7 @@ import {
   emptyMessageKindState,
   messageKindProblem,
   serializeMessageKind,
+  locationRangeError,
   parseMessageKind,
   type MessageKindState,
 } from './message-kind-fields'
@@ -51,6 +52,44 @@ describe('位置情報', () => {
     expect(
       serializeMessageKind('location', withLocation({ latitude: 'あ', longitude: '139' })),
     ).toBeNull()
+  })
+
+  /*
+   * 範囲外の緯度・経度（監査 R210）。
+   *
+   * 地図上に無い数字を「入力済み」にすると、配信前チェックまで進んで
+   * 下書きに残る。範囲内の値への直し方も返す。
+   */
+  it('範囲外の緯度・経度は書き出さない', () => {
+    expect(
+      serializeMessageKind('location', withLocation({ latitude: '91', longitude: '139.701' })),
+    ).toBeNull()
+    expect(
+      serializeMessageKind('location', withLocation({ latitude: '35.658', longitude: '181' })),
+    ).toBeNull()
+    expect(
+      serializeMessageKind('location', withLocation({ latitude: '-91', longitude: '-181' })),
+    ).toBeNull()
+  })
+
+  it('境界値は書き出す', () => {
+    expect(
+      serializeMessageKind('location', withLocation({ latitude: '90', longitude: '180' })),
+    ).not.toBeNull()
+    expect(
+      serializeMessageKind('location', withLocation({ latitude: '-90', longitude: '-180' })),
+    ).not.toBeNull()
+  })
+
+  it('範囲外は直し方を返す（空欄・範囲内は空文字）', () => {
+    expect(locationRangeError(withLocation({ latitude: '91', longitude: '139' }).location)).toBe(
+      '緯度は-90〜90で入力してください',
+    )
+    expect(locationRangeError(withLocation({ latitude: '35', longitude: '181' }).location)).toBe(
+      '経度は-180〜180で入力してください',
+    )
+    expect(locationRangeError(withLocation({ latitude: '35', longitude: '139' }).location)).toBe('')
+    expect(locationRangeError(withLocation({}).location)).toBe('')
   })
 
   it('書いた値が編集で戻る', () => {

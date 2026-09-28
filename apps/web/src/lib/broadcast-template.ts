@@ -2,6 +2,7 @@ import type {
   BroadcastBubble,
   BroadcastBubbleType,
   BroadcastMessageAsset,
+  BroadcastMessageButton,
 } from '@/lib/api'
 import {
   convertBroadcastAsset,
@@ -167,6 +168,24 @@ export type BroadcastMessageKind =
 
 /** 位置情報・音声・スタンプ。シナリオと同じ入力欄・同じ並べ方を使う。 */
 const KIND_FIELD_TYPES = new Set<BroadcastBubbleType>(['location', 'audio', 'sticker'])
+
+/**
+ * ボタンがそのまま保存できる形になっているか。空文字なら問題なし。
+ *
+ * 空の名前・空のURL・https でないURLを区別して返す。保存の検査と
+ * 作成5段の帯が同じ関数を見る（監査 R206）。Worker 側の検査と文言を
+ * そろえているので、画面で通ったものが保存で断られない。
+ */
+export function messageButtonsError(buttons: BroadcastMessageButton[]): string {
+  if (buttons.length > 4) return 'ボタンは4つまでです'
+  for (const [index, button] of buttons.entries()) {
+    const number = index + 1
+    if (!button.label.trim()) return `ボタン${number}の名前を入力してください`
+    if (!button.value.trim()) return `ボタン${number}のURLを入力してください`
+    if (!/^https:\/\//i.test(button.value.trim())) return `ボタン${number}のURLは https:// から始めてください`
+  }
+  return ''
+}
 
 export function isContentTemplateType(type: BroadcastBubbleType): boolean {
   return ['rich_message', 'card_message', 'coupon', 'research'].includes(type)
