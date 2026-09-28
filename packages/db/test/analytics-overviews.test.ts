@@ -15,6 +15,7 @@ import {
   type AnalyticsOverviewContext,
 } from '../src/analytics-overviews.js';
 import { setFriendSupportMarkBulk } from '../src/support-marks.js';
+import { analyticsWindow, analyticsWindowWhere } from '../src/utils.js';
 import { asD1 } from './d1-test-helper.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -212,6 +213,98 @@ describe('V6分析の概要4画面', () => {
     expect(result.data.campaigns.some((item) => item.id === 'sc-other')).toBe(false);
     // 対象人数の合計も自分のアカウント分だけ（各シナリオ1人ずつ）。
     expect(result.data.metrics.sent.value).toBe(200);
+  });
+
+  // 監査 R225: シナリオは届いた人数が取れない。送信ログの通数を
+  // 「到達」として出すと人数と通数が混ざるので、欄を分けて返す。
+  it('シナリオは対象人数と送信通数を分け、届いた人数は取れないと返す', async () => {
+    sqlite.exec(`
+      INSERT INTO scenarios (id, name, trigger_type, line_account_id)
+      VALUES ('sc-r225','3通シナリオ','manual','account-a');
+      INSERT INTO scenario_steps (id, scenario_id, step_order, message_type, message_content)
+      VALUES ('ss-r225','sc-r225',1,'text','x');
+      -- 同じ人へ3通。人数は1、通数は3。
+      INSERT INTO messages_log (
+        id, friend_id, direction, message_type, content,
+        scenario_step_id, line_account_id, created_at
+      ) VALUES ('m-r225-1','friend-a','outgoing','text','x','ss-r225','account-a','2026-08-10T00:00:00.000Z'),
+               ('m-r225-2','friend-a','outgoing','text','x','ss-r225','account-a','2026-08-11T00:00:00.000Z'),
+               ('m-r225-3','friend-a','outgoing','text','x','ss-r225','account-a','2026-08-12T00:00:00.000Z');
+      INSERT INTO broadcasts (
+        id, title, message_type, message_content, status, sent_at,
+        total_count, success_count, line_account_id
+      ) VALUES ('b-r225','一斉','text','x','sent','2026-08-10T00:00:00.000Z',30,30,'account-a');
+      INSERT INTO broadcast_insights (id, broadcast_id, delivered, unique_impression, unique_click, status)
+      VALUES ('bi-r225','b-r225',25,NULL,NULL,'ready');
+    `);
+
+    const result = await getAnalyticsReactionsOverview(db, CONTEXT);
+    const scenario = result.data.campaigns.find((item) => item.id === 'sc-r225');
+    expect(scenario).toMatchObject({
+      targetPeople: { value: 1 },
+      sentMessages: { value: 3, state: 'available' },
+      // 送信ログだけなので届いた人数は出さない（0でも通数でもない）。
+      delivered: { value: null, state: 'unavailable' },
+    });
+    const broadcast = result.data.campaigns.find((item) => item.id === 'b-r225');
+    expect(broadcast).toMatchObject({
+      delivered: { value: 25, state: 'available' },
+      sentMessages: { value: null, state: 'unavailable' },
+    });
+    // 合計の「届いた人」にシナリオの通数が混ざらない。
+    expect(result.data.metrics.delivered).toMatchObject({ value: 25 });
+  });
+
+  // 監査 R227: 記録の時刻表記（Z / +09:00）が混在しても、期間への所属は
+  // 同じ瞬時で判定する。先読みの文字列範囲は「外さない」ためのもので、
+  // 最終判定は julianday に任せる。
+  it('シナリオ集計は Z と +09:00 が混在する記録を同じ瞬時で期間判定する', async () => {
+    sqlite.exec(`
+      INSERT INTO scenarios (id, name, trigger_type, line_account_id)
+      VALUES ('sc-mixed','混在','manual','account-a');
+      INSERT INTO scenario_steps (id, scenario_id, step_order, message_type, message_content)
+      VALUES ('ss-mixed','sc-mixed',1,'text','x');
+      INSERT INTO messages_log (
+        id, friend_id, direction, message_type, content,
+        scenario_step_id, line_account_id, created_at
+      ) VALUES
+        -- 期間内: 2026-07-31T15:30Z（JSTでは8/1の0:30）
+        ('m-in-jst','friend-a','outgoing','text','x','ss-mixed','account-a','2026-08-01T00:30:00+09:00'),
+        -- 期間内: 2026-08-05T00:00Z
+        ('m-in-z','friend-a','outgoing','text','x','ss-mixed','account-a','2026-08-05T00:00:00.000Z'),
+        -- 期間内: 2026-08-30T14:30Z（JSTでは8/30の23:30。先読み上限と同日）
+        ('m-in-edge','friend-a','outgoing','text','x','ss-mixed','account-a','2026-08-30T23:30:00+09:00'),
+        -- 期間外: 2026-07-31T14:59Z（JSTでは7/31の23:59）
+        ('m-out-before','friend-a','outgoing','text','x','ss-mixed','account-a','2026-07-31T23:59:59+09:00'),
+        -- 期間外: 上限ちょうど 2026-08-30T15:00Z（開区間）
+        ('m-out-exact','friend-a','outgoing','text','x','ss-mixed','account-a','2026-08-30T15:00:00.000Z'),
+        -- 期間外: 2026-08-30T15:30Z（JSTでは8/31の0:30。先読みでは外れる）
+        ('m-out-after','friend-a','outgoing','text','x','ss-mixed','account-a','2026-08-31T00:30:00+09:00');
+    `);
+
+    const result = await getAnalyticsReactionsOverview(db, CONTEXT);
+    const scenario = result.data.campaigns.find((item) => item.id === 'sc-mixed');
+    // 期間内の3通だけを数える。
+    expect(scenario).toMatchObject({ sentMessages: { value: 3 }, targetPeople: { value: 1 } });
+  });
+
+  // 監査 R227: 期間条件の先読みが索引へ乗ることを計画で確認する。
+  // （履歴が増えても全件走査にならない）
+  it('シナリオ集計の期間条件は作成日時の複合索引を使う', () => {
+    const win = analyticsWindow(CONTEXT.from, CONTEXT.toExclusive);
+    const plan = sqlite.prepare(
+      `EXPLAIN QUERY PLAN
+       SELECT s.id, COUNT(*) AS sent_count
+         FROM messages_log m JOIN scenario_steps ss ON ss.id = m.scenario_step_id
+         JOIN scenarios s ON s.id = ss.scenario_id
+        WHERE m.line_account_id = ? AND m.direction = 'outgoing'
+          ${analyticsWindowWhere('m.created_at')}
+        GROUP BY s.id`,
+    ).all('account-a', win.lo, win.hi, win.fromIso, win.toIso) as Array<{ detail: string }>;
+    const details = plan.map(({ detail }) => detail).join('\n');
+
+    expect(details).not.toContain('SCAN messages_log');
+    expect(details).toContain('USING INDEX idx_messages_account_direction_created');
   });
 
   it('流入経路は第一接触で帰属し、広告費がないとき0円にしない', async () => {
