@@ -148,7 +148,8 @@ async function pickTimeByLabel(label: string, hhmm: string) {
   fireEvent.change(picker.querySelector('select[aria-label="分"]')!, { target: { value: minute } })
   fireEvent.click([...picker.querySelectorAll('button')].find((b) => b.textContent?.trim() === '閉じる')!)
 }
-import StaffShiftsPage, { slotReasonLabel } from './page'
+import StaffShiftsPage from './page'
+import { slotReasonLabel } from './slot-reason'
 
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
