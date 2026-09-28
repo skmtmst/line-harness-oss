@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation'
 import type { FormLayout } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import TargetMissing from '@/components/shared/target-missing'
 import Pagination from '@/components/shared/pagination'
 import Select from '@/components/shared/select'
@@ -474,10 +475,13 @@ function ResponseDetail({
   retryError: string
   onRetryPostActions: () => void
 }) {
+  // 詳細の引き出しも窓と同じ約束: Escapeで閉じる・Tabは中だけ・
+  // 閉じたら起点へ戻す。背景の閉じるボタンは循環に入れないよう aside 側へ。
+  const panelRef = useOverlayFocus(true, onClose)
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       <button type="button" className="bg-ink/30 absolute inset-0" onClick={onClose} aria-label="回答詳細を閉じる" />
-      <aside className="bg-canvas relative h-full w-full max-w-md overflow-y-auto p-5 shadow-xl">
+      <aside ref={panelRef} role="dialog" aria-modal="true" aria-label="回答詳細" className="bg-canvas relative h-full w-full max-w-md overflow-y-auto p-5 shadow-xl">
         <div className="border-hairline flex items-center justify-between border-b pb-4"><h2 className="text-ink text-base font-bold">回答詳細</h2><button type="button" onClick={onClose} className="text-ink-faint text-xl" aria-label="閉じる">×</button></div>
         <dl className="mt-5 space-y-4">
           <Detail label="答えた人" value={item.friendName ?? '不明'} />

@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { X } from 'lucide-react'
 import { api, ApiError } from '@/lib/api'
 import Notice from '@/components/shared/notice'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import type { EntryRouteGenre } from '@line-crm/shared'
 
 export default function GenreModal({
@@ -18,6 +19,9 @@ export default function GenreModal({
   const [name, setName] = useState(genre?.name ?? '')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const titleId = useId()
+  // 保存の途中でEscape・背景クリックに負けて窓だけ消えないようにする。
+  const panelRef = useOverlayFocus(true, onClose, submitting)
 
   const save = async () => {
     const normalized = name.trim()
@@ -44,9 +48,9 @@ export default function GenreModal({
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/45 p-4">
-      <div className="w-full max-w-md rounded-2xl bg-canvas p-6 shadow-2xl">
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby={titleId} className="w-full max-w-md rounded-2xl bg-canvas p-6 shadow-2xl">
         <div className="flex items-start justify-between gap-3">
-          <h2 className="text-lg font-bold text-ink">
+          <h2 id={titleId} className="text-lg font-bold text-ink">
             {genre ? 'ジャンル名を編集' : '新しいジャンル'}
           </h2>
           <button type="button" onClick={onClose} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">

@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import Link from 'next/link'
 import { useAccount } from '@/contexts/account-context'
 import MenuPortal from '@/components/shared/menu-portal'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
 
 export interface AccountSwitchTarget {
   id: string
@@ -38,14 +39,12 @@ export function AccountSwitchDialog({
   onClose: () => void
   onConfirm: () => void
 }) {
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose() }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [onClose])
+  // Escapeで閉じる・Tabは窓の中で回る・開いたら窓の中へフォーカス・
+  // 閉じたら起点へ戻す・背面はスクロールしない（共通の約束）。
+  const panelRef = useOverlayFocus(true, onClose)
 
   return <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/45 p-4" role="dialog" aria-modal="true" aria-labelledby="account-switch-title" onClick={onClose}>
-    <div className="w-full max-w-md rounded-card bg-canvas p-5 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+    <div ref={panelRef} className="w-full max-w-md rounded-card bg-canvas p-5 shadow-2xl" onClick={(event) => event.stopPropagation()}>
       <div className="flex items-start justify-between gap-4">
         <div><p className="text-xs font-semibold text-ink-faint">LINEアカウントを切り替え</p><h2 id="account-switch-title" className="mt-1 text-lg font-bold text-ink">このアカウントへ移動しますか？</h2></div>
         <button type="button" onClick={onClose} aria-label="閉じる" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xl text-ink-faint hover:bg-canvas-sunken">×</button>

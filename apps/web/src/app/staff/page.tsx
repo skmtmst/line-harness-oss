@@ -15,6 +15,7 @@ import { Tabs } from '@/components/shared/tabs'
 import { ActionCell, DataTable, TableHeadRow, TableStateRow, Td, Th, Tr } from '@/components/shared/table'
 import Pagination from '@/components/shared/pagination'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest as SharedStepUpRequest } from '@/components/step-up-prompt'
@@ -137,7 +138,11 @@ function accessFeatureLabel(user: AccessUserItem): string {
   return `${user.featureCount}機能`
 }
 function RowActionButton({ label, onClick, qaOpen }: { label: string; onClick: () => void; qaOpen?: string }) { const marker = qaOpen ?? (label === '中身を見る' ? 'EOTS4' : undefined); return <Button size="compact" onClick={onClick} {...(marker ? { 'data-qa-open': marker } : {})}>{label}</Button> }
-function Modal({ children, onClose, wide = false }: { children: React.ReactNode; onClose: () => void; wide?: boolean }) { return <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4" role="dialog" aria-modal="true" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}><div className={`max-h-[90vh] w-full overflow-y-auto rounded-card bg-canvas p-6 shadow-xl relative ${wide ? 'max-w-3xl' : 'max-w-xl'}`}><button type="button" onClick={onClose} aria-label="閉じる" className="absolute right-4 top-4 rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken"><X aria-hidden="true" className="h-5 w-5" /></button>{children}</div></div> }
+function Modal({ children, onClose, wide = false }: { children: React.ReactNode; onClose: () => void; wide?: boolean }) {
+  // Escapeで閉じる・Tabは窓の中・閉じたら起点へ戻す（共通の約束）。
+  const panelRef = useOverlayFocus(true, onClose)
+  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4" role="dialog" aria-modal="true" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}><div ref={panelRef} className={`max-h-[90vh] w-full overflow-y-auto rounded-card bg-canvas p-6 shadow-xl relative ${wide ? 'max-w-3xl' : 'max-w-xl'}`}><button type="button" onClick={onClose} aria-label="閉じる" className="absolute right-4 top-4 rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken"><X aria-hidden="true" className="h-5 w-5" /></button>{children}</div></div>
+}
 
 function LoginHistoryNote({ count, loading, failed = false }: { count: number | null; loading: boolean; failed?: boolean }) {
   if (loading) return <p className="text-xs text-ink-secondary">ログイン履歴を確認中…</p>

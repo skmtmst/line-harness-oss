@@ -11,6 +11,7 @@ import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import WebhookInteractions from './webhook-interactions'
@@ -275,6 +276,17 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
     | null
   >(null)
   const [rotateSecretValue, setRotateSecretValue] = useState('')
+
+  // 2つの窓も共通の約束に揃える: Escapeで閉じる・Tabは窓の中・
+  // 閉じたら起点へ戻す・背面はスクロールしない。
+  const rotateModalRef = useOverlayFocus(!!rotateTarget, () => {
+    setRotateTarget(null)
+    setRotateSecretValue('')
+  })
+  const secretModalRef = useOverlayFocus(!!createdSecret, () => {
+    setCreatedSecret(null)
+    setSecretCopied(false)
+  })
 
   /**
    * 削除の確認。ブラウザの `confirm()` は「この受信Webhookを削除しますか？」
@@ -742,10 +754,10 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
 
       {/* Rotate-secret modal — used to recover legacy webhooks or rotate. */}
       {rotateTarget && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <form onSubmit={handleRotateSubmit} className="bg-canvas rounded-lg shadow-xl max-w-lg w-full p-6">
+        <div ref={rotateModalRef} className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <form onSubmit={handleRotateSubmit} role="dialog" aria-modal="true" aria-labelledby="rotate-secret-title" className="bg-canvas rounded-lg shadow-xl max-w-lg w-full p-6">
             <div className="mb-2 flex items-start justify-between gap-3">
-              <h2 className="text-lg font-semibold text-ink">
+              <h2 id="rotate-secret-title" className="text-lg font-semibold text-ink">
                 「{rotateTarget.name}」のシークレットを{rotateTarget.activate ? '設定して有効化' : '更新'}
               </h2>
               <button
@@ -807,9 +819,9 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
       {/* Created-secret modal — shown ONCE after a successful create. */}
       {createdSecret && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-canvas rounded-lg shadow-xl max-w-lg w-full p-6">
+          <div ref={secretModalRef} role="dialog" aria-modal="true" aria-labelledby="created-secret-title" className="bg-canvas rounded-lg shadow-xl max-w-lg w-full p-6">
             <div className="mb-2 flex items-start justify-between gap-3">
-              <h2 className="text-lg font-semibold text-ink">
+              <h2 id="created-secret-title" className="text-lg font-semibold text-ink">
                 シークレットを保存してください
               </h2>
               <button

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { openUpdateStream, getUpdateStatus } from '@/lib/update-client'
 import type { UpdateEvent } from '@line-harness/update-engine'
 
@@ -44,6 +45,8 @@ export function ProgressModal({
   const [events, setEvents] = useState<UpdateEvent[]>([])
   const [final, setFinal] = useState<FinalState | null>(null)
   const [mode, setMode] = useState<'sse' | 'polling'>('sse')
+  // 実行中は×も出さないため、Escapeも同じく終了後だけ効かせる。
+  const panelRef = useOverlayFocus(true, onClose, !final)
 
   useEffect(() => {
     let es: EventSource | null = null
@@ -116,9 +119,15 @@ export function ProgressModal({
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="update-progress-title"
+        className="bg-white rounded-lg shadow-xl w-full max-w-md p-6"
+      >
         <div className="mb-3 flex items-start justify-between gap-3">
-          <h2 className="text-lg font-semibold">
+          <h2 id="update-progress-title" className="text-lg font-semibold">
             アップデート中{' '}
             {mode === 'polling' && (
               <span className="text-xs text-gray-500">(polling)</span>

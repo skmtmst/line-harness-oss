@@ -9,6 +9,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
 import { FeatureDisabledScreen } from '@/components/feature-disabled-gate'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import StatusBadge from '@/components/shared/status-badge'
@@ -394,6 +395,9 @@ function CreatePoolModal({
   const [activeAccountId, setActiveAccountId] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  // 共通ダイアログと同じ約束: 開いたら窓の中へフォーカス・Tabは窓の中・
+  // Escapeで閉じる・閉じたら起点へ戻す・背面はスクロールしない。
+  const panelRef = useOverlayFocus(true, onClose)
 
   const onSubmit = async () => {
     if (!slug || !name || !activeAccountId) return
@@ -414,9 +418,15 @@ function CreatePoolModal({
 
   return (
     <div className="bg-scrim fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="bg-canvas rounded-card w-full max-w-md space-y-3 p-6">
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="create-pool-title"
+        className="bg-canvas rounded-card w-full max-w-md space-y-3 p-6"
+      >
         <div className="flex items-start justify-between gap-3">
-          <h2 className="text-lg font-medium">新規プール</h2>
+          <h2 id="create-pool-title" className="text-lg font-medium">新規プール</h2>
           <button type="button" onClick={onClose} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
             <X aria-hidden="true" className="h-5 w-5" />
           </button>
