@@ -157,6 +157,7 @@ operations.post('/api/operations/health/runs', requireRole('owner', 'admin'), as
       lineAccountId: accountId,
       source: 'manual',
       actorId: c.get('staff')!.id,
+      deps: { r2: c.env.IMAGES, queue: c.env.CODEX_MENTION_QUEUE },
     });
     return c.json({ success: true, duplicate: checked.duplicate, data: staleHealth(checked.run) }, checked.duplicate ? 200 : 201);
   } catch (error) {

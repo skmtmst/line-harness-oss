@@ -12,7 +12,8 @@ import {
   formatDate,
   formatDateTime,
   planLabel,
-  tenantStatusChip,
+  planStatusChip,
+  tenantUseStatusChip,
   opsCall,
 } from '@/components/ops/ops-ui'
 import Button from '@/components/shared/button'
@@ -116,7 +117,8 @@ function OpsTenantDetailContent() {
       <div className="flex flex-wrap items-center gap-2.5">
         <h2 className="text-heading font-bold text-ink">{tenant.name}</h2>
         {tenant.plan_key ? <Chip tone="info">{planLabel(tenant.plan_key)}</Chip> : null}
-        {tenantStatusChip(tenant.status, tenant.plan_status)}
+        {tenantUseStatusChip(tenant.status)}
+        {planStatusChip(tenant.plan_status)}
         <div className="flex-1" />
         <Button onClick={() => void impersonate()} disabled={busy || tenant.status === 'archived'}>
           <Eye aria-hidden="true" className="h-4 w-4" />
@@ -155,7 +157,7 @@ function OpsTenantDetailContent() {
             <CardHeader title="契約の状況" />
             <dl className="flex flex-col gap-3 px-4 pb-4">
               <Kv k="プラン" v={planLabel(tenant.plan_key)} />
-              <Kv k="状態" v={PLAN_STATUS_LABEL[tenant.plan_status] ?? tenant.plan_status} />
+              <Kv k="請求の状態" v={PLAN_STATUS_LABEL[tenant.plan_status] ?? tenant.plan_status} />
               <Kv k="次回の請求日" v={formatDate(tenant.current_period_ends_at)} />
               <Kv k="トライアル" v={tenant.trial_ends_at ? `${formatDate(tenant.trial_ends_at)} まで` : '—'} />
               <Kv k="請求の詳細" v="Stripe の管理画面で確認します" tone="info" />

@@ -12,6 +12,7 @@ import type { Env } from '../index.js';
 
 const db = {
   listRecipes: vi.fn(),
+  createRecipe: vi.fn(),
   getRecipeById: vi.fn(),
   cloneCounts: vi.fn(),
   getCloneRun: vi.fn(),
@@ -277,6 +278,78 @@ describe('複製', () => {
     const res = await makeApp().fetch(clone({ accountId: 'acc-1' }), env);
     expect(res.status).toBe(409);
     expect(await res.json()).toMatchObject({ code: 'IDEMPOTENCY_CONFLICT' });
+  });
+
+  /*
+    **組織レシピは持ち主のアカウントへだけ複製できる**（§7-5）。
+    対象アカウントを渡して引き、範囲外は db 層が null を返す。
+  */
+  it('対象アカウントの範囲でレシピを引く', async () => {
+    await makeApp().fetch(clone({ accountId: 'acc-1' }), env);
+    expect(db.getRecipeById).toHaveBeenCalledWith(expect.anything(), 'rcp-1', 'acc-1');
+  });
+});
+
+describe('組織レシピの作成（POST /api/recipes）', () => {
+  const validBody = {
+    name: '新規登録7日間フォロー',
+    purpose: '友だちが増えたあと、7日かけて関係を作ります。',
+    createsSummary: 'タグ1つ、シナリオ7通',
+    accountId: 'acc-1',
+    items: [{ kind: 'タグ', name: '新規', note: '友だち追加時のルールから付きます' }],
+  };
+
+  function create(body: unknown) {
+    return new Request('https://example.com/api/recipes', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  }
+
+  it('owner/admin が組織レシピを作れる', async () => {
+    db.createRecipe.mockResolvedValue({ ...RECIPE, origin: 'org' });
+    const res = await makeApp().fetch(create(validBody), env);
+    expect(res.status).toBe(201);
+    expect(db.createRecipe).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        name: validBody.name,
+        lineAccountId: 'acc-1',
+        createdByStaffId: 'u-1',
+      }),
+    );
+  });
+
+  it('必須項目が欠けたら400にする', async () => {
+    const res = await makeApp().fetch(create({ name: '名前だけ' }), env);
+    expect(res.status).toBe(400);
+    expect(db.createRecipe).not.toHaveBeenCalled();
+  });
+
+  it('staff は作れない', async () => {
+    const res = await makeApp('staff').fetch(create(validBody), env);
+    expect(res.status).toBe(403);
+    expect(db.createRecipe).not.toHaveBeenCalled();
+  });
+
+  it('担当外アカウントへは作らない（404）', async () => {
+    accountAccess.canAccessAllLineAccounts.mockResolvedValue(false);
+    const res = await makeApp().fetch(create(validBody), env);
+    expect(res.status).toBe(404);
+    expect(db.createRecipe).not.toHaveBeenCalled();
+  });
+});
+
+describe('組織レシピの範囲（一覧）', () => {
+  it('アカウントを渡して、初期同梱と自分のレシピだけを引く', async () => {
+    await makeApp().fetch(new Request('https://example.com/api/recipes?account_id=acc-1'), env);
+    expect(db.listRecipes).toHaveBeenCalledWith(expect.anything(), 'acc-1');
+  });
+
+  it('アカウントが無ければ初期同梱だけを引く', async () => {
+    await makeApp().fetch(new Request('https://example.com/api/recipes'), env);
+    expect(db.listRecipes).toHaveBeenCalledWith(expect.anything(), null);
   });
 });
 

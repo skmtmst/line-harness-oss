@@ -35,6 +35,7 @@ const GUARDED = [
   'app/nen/members/lifetime-tab.tsx',
   'app/nen/members/rank-settings-tab.tsx',
   'app/nen/pets/feeding-tab.tsx',
+  'app/ops/announcements/page.tsx',
   'app/reminders/edit/issue469-reminder-screens.tsx',
   'app/reminders/new/page.tsx',
   'app/restaurant-test/google/google-business.tsx',
@@ -193,8 +194,6 @@ const UNTRIAGED: Record<string, string> = {
     's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'app/nen/pets/pet-editor.tsx':
     's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
-  'app/ops/announcements/page.tsx':
-    'hq: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'app/ops/support/page.tsx':
     'hq: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'app/pools/new/page.tsx':
