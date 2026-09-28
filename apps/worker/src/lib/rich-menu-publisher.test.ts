@@ -265,6 +265,20 @@ describe('validateRichMenuGroupForPublish', () => {
     it('1000文字ちょうどは許可する', () => {
       accepts(groupWith('uri', { uri: `https://x.example/${'a'.repeat(981)}` }));
     });
+
+    it('URLではない文字列は、どの面かを伝えて拒否する', () => {
+      rejects(groupWith('uri', { uri: 'not-a-url' }), 'URLの形が正しくありません');
+      rejects(groupWith('uri', { uri: 'not-a-url' }), '「ボタン」');
+    });
+
+    it('LINEのuriアクションが通せない scheme は拒否する', () => {
+      rejects(groupWith('uri', { uri: 'javascript:alert(1)' }), 'https://・http://・tel:・mailto:');
+    });
+
+    it('https:// 以外に LINE が通す tel: と mailto: は許可する', () => {
+      accepts(groupWith('uri', { uri: 'tel:0312345678' }));
+      accepts(groupWith('uri', { uri: 'mailto:info@example.com' }));
+    });
   });
 
   describe('postback', () => {
@@ -1103,6 +1117,48 @@ describe('intent の入力チェック', () => {
         r2,
       ),
     ).rejects.toThrowError(/送るテンプレートを選んでください/);
+  });
+
+  it('「URLを開く」に URL でない文字列なら、LINE を呼ぶ前に止める', async () => {
+    const line = makeMockLineClient();
+    await expect(
+      publishRichMenuGroup(
+        groupWithAreas([
+          {
+            id: 'a1',
+            bounds: BOUNDS,
+            actionType: 'uri',
+            actionData: { uri: 'not-a-url' },
+            intent: 'url',
+            label: '予約ページ',
+          },
+        ]),
+        line,
+        r2,
+      ),
+    ).rejects.toThrowError(/「予約ページ」: URLの形が正しくありません/);
+    expect(line.calls).toEqual([]);
+  });
+
+  it('計測リンクを選んだ面は、生成済みURLなので手入力URIの検査を飛ばす', async () => {
+    const line = makeMockLineClient();
+    const result = await publishRichMenuGroup(
+      groupWithAreas([
+        {
+          id: 'a1',
+          bounds: BOUNDS,
+          actionType: 'uri',
+          actionData: {},
+          intent: 'url',
+          trackedLinkUrl: 'https://l.example.com/r/abc',
+          label: '予約ページ',
+        },
+      ]),
+      line,
+      r2,
+    );
+    expect(result.pages).toEqual([{ pageId: 'p1', newRichMenuId: 'lm-1' }]);
+    expect(line.calls[0]).toBe('create');
   });
 });
 
