@@ -44,14 +44,13 @@ describe('一斉配信の一覧の幅（m20i・その1）', () => {
   it('操作列は固定幅（px）で、詳細＋…が収まる', () => {
     // % だと狭い帯で100pxを切り、中身（詳細約56＋間8＋…32＋余白24）が
     // 右へはみ出して枠が横に送れていた。★V7：操作列は固定幅。
+    // 右端の余白は共通の12px（詰めない）。中身90＋余白24＝114に収まる幅にする。
     const opHead = THEAD.match(/<Th style=\{\{\s*width:\s*(\d+)\s*\}\}[^>]*>\s*操作/)
     expect(opHead, '操作列の固定幅が無い').not.toBeNull()
     const opWidth = Number((opHead as RegExpMatchArray)[1])
-    expect(opWidth, '操作列が狭く中身がはみ出す').toBeGreaterThanOrEqual(100)
-    expect(opWidth, '操作列が広すぎて結果が潰れる').toBeLessThanOrEqual(114)
+    expect(opWidth, '操作列が狭く中身がはみ出す').toBeGreaterThanOrEqual(114)
+    expect(opWidth, '操作列が広すぎて結果が潰れる').toBeLessThanOrEqual(124)
     expect(THEAD, '操作列に % が残っている').not.toMatch(/操作[\s\S]{0,80}width:\s*'\d+%/)
-    // 操作列の余白は8pxに詰める（中身96＋余白16＝112まで収まる）。
-    expect(TBODY, '操作セルの余白を詰めていない').toContain('px-2')
   })
 
   it('% の列と操作列の固定幅を足してもいちばん狭い帯に収まる', () => {

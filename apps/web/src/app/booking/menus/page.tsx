@@ -470,7 +470,7 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
                         ように見えるが実際は押せない印になる（監査 A12・#709）。
                         並び順は操作列の「…」の中の上へ・下へで変える。
                       */}
-                      {m.name}{m.is_active ? '' : '（休止中）'}
+                      <span>{m.name}{m.is_active ? '' : '（休止中）'}</span>
                       {m.description && <span className="text-ink-faint mt-1 block max-w-72 truncate text-xs" title={m.description}>{m.description}</span>}
                       {m.category_label && (
                         <span className="bg-canvas-sunken text-ink-faint ml-2 inline-block rounded px-2 py-0.5 text-xs">

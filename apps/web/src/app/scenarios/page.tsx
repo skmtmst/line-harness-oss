@@ -231,11 +231,16 @@ function StartScenarioDialog({
         : triggers
             .map((t) => describeStartTrigger(t, t.tagId ? tagNameById[t.tagId] ?? null : null))
             .join('、')
+  /*
+   * R250: 移動先が空の「次のシナリオへ移動」は保存できない設定。
+   * 取得の失敗と、選ばれていないこととを書き分ける。
+   */
+  const moveTargetSummary = !scenario.onCompleteScenarioId
+    ? '（移動先が選ばれていません）'
+    : `（${moveTargetName ?? (preflightLoading ? '確認中…' : '移動先を取得できませんでした')}）`
   const completeSummary =
     ON_COMPLETE_LABEL[completeMode] +
-    (completeMode === 'move'
-      ? `（${moveTargetName ?? (preflightLoading ? '確認中…' : '移動先を取得できませんでした')}）`
-      : '') +
+    (completeMode === 'move' ? moveTargetSummary : '') +
     (completeActionCount === null
       ? ''
       : completeActionCount > 0

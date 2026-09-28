@@ -330,7 +330,7 @@ describe('定期レポートの作成後(R76)', () => {
   it('1回だけ送る成功後は一覧へ移す（同じ依頼を二重に押せない）', async () => {
     await render()
     await selectRecipient()
-    await act(async () => { button('いますぐ1回だけ送ってみる').click(); await Promise.resolve(); await Promise.resolve() })
+    await act(async () => { button('今すぐ1回だけ送る').click(); await Promise.resolve(); await Promise.resolve() })
 
     expect(writeCalls('POST')).toHaveLength(1)
     expect((writeCalls('POST').at(-1)?.body as { sendOnce: boolean }).sendOnce).toBe(true)
@@ -367,7 +367,7 @@ describe('定期レポートの宛先(R228)', () => {
     expect(host.textContent).toContain('「not-an-address」はメールアドレスの形になっていません')
     // 混ざったままでは送らせない（以前は不正行だけ黙って外れていた）。
     expect(button('つくって動かす').disabled).toBe(true)
-    expect(button('いますぐ1回だけ送ってみる').disabled).toBe(true)
+    expect(button('今すぐ1回だけ送る').disabled).toBe(true)
     expect(writeCalls('POST')).toHaveLength(0)
   })
 

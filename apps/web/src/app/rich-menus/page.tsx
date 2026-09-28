@@ -965,7 +965,7 @@ export default function RichMenusListPage() {
                             だけのボタンは行に直に置かない。撮影口（szXsT）は
                             「…」ボタンへ移す（2段操作の1段目）。
                           */}
-                          <div className="relative inline-flex items-center justify-end gap-1.5">
+                          <div className="relative flex w-full items-center justify-end gap-1.5">
                             <RowActions
                               subjectName={g.name}
                               edit={{ href: `/rich-menus/edit?id=${g.id}` }}

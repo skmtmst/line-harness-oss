@@ -212,7 +212,14 @@ describe('友だち属性 V4 contract', () => {
     expect(source).toContain("tag.assignSource ? SOURCE_LABELS[tag.assignSource] : '—'")
     // 使用先。`withCounts=1` で読んでいるので、無いのは0件＝「未使用」。
     expect(source).toContain("api.tags.list({ withCounts: true, accountId })")
-    expect(source).toContain('item.accountId === tag.lineAccountId')
+    /*
+     * フォルダの選択肢はタグのアカウント範囲に限る（他アカウントの
+     * フォルダへ黙って入れない）。一覧では選び直し欄を置かず（m21o）、
+     * 編集画面の「所属フォルダ」で変える。絞りは編集画面の読み込み時に行う。
+     */
+    expect(source).not.toContain('<FolderSelect')
+    const edit = read('components/friend-fields/edit-tag-page-v4.tsx')
+    expect(edit).toContain('folders.data.filter((group) => group.accountId === selectedAccountId)')
     expect(source).toContain("if (!tag.usedIn) return 'なし'")
     /*
       「未使用」は **友だち0人かつ全参照0件**（kenta 確定 2026-08-26）。
