@@ -5,6 +5,7 @@ import Combobox from '@/components/shared/combobox'
 import Select from '@/components/shared/select'
 import { api, describeSaveFailure } from '@/lib/api'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import Dialog from '@/components/shared/dialog'
 import Notice from '@/components/shared/notice'
 import type {
@@ -278,26 +279,17 @@ export default function EditRouteModal({
           />
         </Field>
 
-        <label className="flex items-start gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={form.runAccountFriendAddScenarios ?? true}
-            onChange={(e) => {
-              setForm({
-                ...form,
-                runAccountFriendAddScenarios: e.target.checked,
-              })
-              setWarning(null)
-            }}
-            className="mt-0.5"
-          />
-          <span>
-            アカウント標準の友だち追加時設定も実行する（並走モード）
-            <span className="text-ink-faint mt-0.5 block text-xs">
-              OFF にするとアカウント標準シナリオは抑止され、このリンクの設定だけが流れます。
-            </span>
-          </span>
-        </label>
+        <Checkbox
+          checked={form.runAccountFriendAddScenarios ?? true}
+          onCheckedChange={(checked) => {
+            setForm({
+              ...form,
+              runAccountFriendAddScenarios: checked,
+            })
+            setWarning(null)
+          }}
+          description="OFF にするとアカウント標準シナリオは抑止され、このリンクの設定だけが流れます。"
+        >アカウント標準の友だち追加時設定も実行する（並走モード）</Checkbox>
 
         {warning && (
           <Notice

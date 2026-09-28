@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import { ApiError, api, type SupportMarkAutomationEvent, type SupportMarkAutomationRule } from '@/lib/api'
@@ -366,14 +367,10 @@ export default function SupportMarkRulesPanel({
             </label>
           </div>
 
-          <label className={styles.check}>
-            <input
-              type="checkbox"
-              checked={draft.isActive}
-              onChange={(e) => setDraft((d) => ({ ...d, isActive: e.target.checked }))}
-            />
-            このルールを動かす
-          </label>
+          <Checkbox
+            checked={draft.isActive}
+            onCheckedChange={(checked) => setDraft((d) => ({ ...d, isActive: checked }))}
+          >このルールを動かす</Checkbox>
 
           <div className={styles.formActions}>
             <Button onClick={() => { setEditingId(null); setFailure(null) }} disabled={saving}>

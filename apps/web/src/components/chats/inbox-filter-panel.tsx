@@ -2,6 +2,7 @@
 
 import type { ChatStatus } from './inbox-dropdown'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import Checkbox from '@/components/shared/checkbox'
 import Combobox from '@/components/shared/combobox'
 import Select from '@/components/shared/select'
 import { Filter, X } from 'lucide-react'
@@ -179,10 +180,7 @@ export default function InboxFilterPanel({
                 <span className={labelClass}>表示するメッセージ種別</span>
                 <div className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-2">
                   {MESSAGE_KINDS.map((kind) => (
-                    <label key={kind} className="text-ink-faint flex items-center gap-2 text-xs">
-                      <input type="checkbox" checked readOnly disabled className="accent-accent" />
-                      {kind}
-                    </label>
+                    <Checkbox key={kind} checked readOnly disabled onCheckedChange={() => {}}>{kind}</Checkbox>
                   ))}
                 </div>
                 <p className="text-ink-faint mt-1 text-micro">メッセージ種別での絞り込みには対応していません</p>
@@ -190,16 +188,12 @@ export default function InboxFilterPanel({
             </div>
           </details>
 
-          <label className="border-hairline flex h-10 items-center justify-between border-t pt-3 text-sm">
-            <span className="text-ink">未読だけ表示</span>
-            <input
-              type="checkbox"
-              checked={value.unreadOnly}
-              onChange={(event) => set({ unreadOnly: event.target.checked })}
-              aria-label="未読だけ表示"
-              className="accent-accent h-4 w-4"
-            />
-          </label>
+          <Checkbox
+            checked={value.unreadOnly}
+            onCheckedChange={(checked) => set({ unreadOnly: checked })}
+            aria-label="未読だけ表示"
+            className="border-hairline border-t pt-3"
+          >未読だけ表示</Checkbox>
         </div>
 
         {/*

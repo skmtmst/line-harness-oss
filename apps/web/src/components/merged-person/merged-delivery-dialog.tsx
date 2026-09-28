@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react'
 import type { MergedPersonDeliveryPriority } from '@line-crm/shared'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import Dialog from '@/components/shared/dialog'
 import {
   canSaveDeliveryPriorities,
@@ -141,15 +142,10 @@ export default function MergedDeliveryDialog({
         ))}
 
         {clearingAll ? (
-          <label className={styles.warn}>
-            <input
-              type="checkbox"
-              checked={confirmedClearAll}
-              onChange={(event) => setConfirmedClearAll(event.target.checked)}
-            />
-            {' '}
-            全部を「使わない」にすると、この人へはどこからも送れなくなります。承知のうえで保存します。
-          </label>
+          <Checkbox
+            checked={confirmedClearAll}
+            onCheckedChange={setConfirmedClearAll}
+          >全部を「使わない」にすると、この人へはどこからも送れなくなります。承知のうえで保存します。</Checkbox>
         ) : null}
       </div>
     </Dialog>

@@ -97,25 +97,22 @@ afterEach(() => {
 })
 
 describe('NEXT-22: 明細作成とLINE通知のチェック', () => {
-  test('チェックは1つだけで、ON/OFFが操作・見た目・実状態で一致する', async () => {
+  test('チェックは1つだけで、ON/OFFが操作・実状態で一致する', async () => {
     renderDialog({ bankProfileRegistered: true })
-    const checkbox = await screen.findByRole('checkbox')
+    // m21u: 素の input＋飾りアイコンを共通の Checkbox へ置き換えた。
+    // 見た目は共通部品が実状態に連動させるので、ここでは名前・個数・実状態だけ見る。
+    const checkbox = await screen.findByRole('checkbox', { name: '支払明細を作成して、この方のLINEに知らせる' })
     expect(screen.getAllByRole('checkbox')).toHaveLength(1)
-    const label = checkbox.closest('label')!
-    // 既定はON。見た目のチェックマークも描かれている。
+    // 既定はON。
     expect((checkbox as HTMLInputElement).checked).toBe(true)
-    expect(label.querySelector('svg.lucide-check')).toBeTruthy()
     await act(async () => {
       fireEvent.click(checkbox)
     })
-    // OFFにすると見た目のチェックマークも消える。
     expect((checkbox as HTMLInputElement).checked).toBe(false)
-    expect(label.querySelector('svg.lucide-check')).toBeNull()
     await act(async () => {
       fireEvent.click(checkbox)
     })
     expect((checkbox as HTMLInputElement).checked).toBe(true)
-    expect(label.querySelector('svg.lucide-check')).toBeTruthy()
   })
 
   test('チェックを外して確定すると、明細・通知の口を呼ばない', async () => {

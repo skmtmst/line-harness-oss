@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import Combobox from '@/components/shared/combobox'
 import ListState from '@/components/shared/list-state'
 import { ApiError, api } from '@/lib/api'
@@ -481,11 +482,10 @@ export default function BulkRunDialog({
             ) : null}
 
             {!reversible ? (
-              <label className={styles.confirm}>
-                <input type="checkbox" checked={irreversibleConfirmed} onChange={(e) => setIrreversibleConfirmed(e.target.checked)} />
+              <Checkbox checked={irreversibleConfirmed} onCheckedChange={setIrreversibleConfirmed}>
                 {/* 取り消せないことを窓の中に書く。 */}
                 この操作は取り消せません。{countText(preview.targetCount, '人')}に実行することを確認しました。
-              </label>
+              </Checkbox>
             ) : null}
 
             {blocked ? <p className={styles.hint}>{blocked}</p> : null}

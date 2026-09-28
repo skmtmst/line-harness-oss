@@ -17,7 +17,8 @@ describe('Webhookイベントの選択（#975 U067）', () => {
   it('「すべて送る」か「選ぶ」の2択＋チェックの選択肢', () => {
     expect(PAGE).toContain('すべてのイベントを送る')
     expect(PAGE).toContain('送るイベントを選ぶ')
-    expect(PAGE).toContain('type="checkbox"')
+    // m21u: 素の input を共通の Checkbox へ置き換えた。直書きは残さない。
+    expect(PAGE).not.toContain('type="checkbox"')
     expect(PAGE).toContain('WEBHOOK_EVENT_GROUPS')
   })
 

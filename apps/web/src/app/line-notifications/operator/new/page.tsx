@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useEffect, useState } from 'react'
 import { ArrowRight, Building2 } from 'lucide-react'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import { Field, TextInput } from '@/components/shared/form-controls'
 import NoteBar from '@/components/shared/note-bar'
 import Notice from '@/components/shared/notice'
@@ -267,7 +268,7 @@ function NewOperatorNotificationInner() {
             <p className="mt-1 text-xs text-ink-faint">LINEログイン済みの人にだけ届きます。担当が決まっていないと届きません。</p>
             <div className="mt-4 grid max-w-3xl gap-3 sm:grid-cols-2"><Field label="送り先" htmlFor="operator-recipient-kind"><Select aria-label="送り先" id="operator-recipient-kind" size="full" value="staff" onChange={() => undefined} options={[{ value: 'staff', label: 'スタッフ' }]} /></Field><Field label="チーム" htmlFor="operator-recipient-team"><Select aria-label="チーム" id="operator-recipient-team" size="full" value="all" onChange={() => undefined} options={[{ value: 'all', label: `選択中のスタッフ（${recipientIds.length}人）` }]} /></Field></div>
             <div className="mt-3 flex flex-wrap gap-2">
-              {recipients ? recipients.items.map((recipient) => { const selected = recipientIds.includes(recipient.id); return <label key={recipient.id} className="cursor-pointer"><input type="checkbox" className="peer sr-only" checked={selected} onChange={(event) => setRecipientIds((current) => event.target.checked ? [...current, recipient.id] : current.filter((id) => id !== recipient.id))} /><span className="inline-flex rounded-pill border border-hairline bg-canvas px-3 py-1 text-xs font-semibold text-ink-secondary peer-checked:border-accent peer-checked:bg-accent-soft peer-checked:text-accent-deep">{recipient.name}{recipient.channels.line ? '' : '（LINE未連携）'}</span></label> }) : <p className="text-sm text-ink-faint">受け取る人を読み込んでいます…</p>}
+              {recipients ? recipients.items.map((recipient) => { const selected = recipientIds.includes(recipient.id); return <Checkbox key={recipient.id} checked={selected} onCheckedChange={(checked) => setRecipientIds((current) => checked ? [...current, recipient.id] : current.filter((id) => id !== recipient.id))}>{recipient.name}{recipient.channels.line ? '' : '（LINE未連携）'}</Checkbox> }) : <p className="text-sm text-ink-faint">受け取る人を読み込んでいます…</p>}
             </div>
             {recipients ? <p className="mt-3 text-xs text-ink-secondary">選択 {recipientIds.length}人 ／ LINEで受け取れる {recipients.items.filter((item) => recipientIds.includes(item.id) && item.channels.line).length}人 ／ 管理画面で受け取れる {recipientIds.length}人</p> : null}
           </section>
@@ -282,11 +283,18 @@ function NewOperatorNotificationInner() {
                 <Select aria-label="同じ知らせを重ねない" id="operator-dedupe" size="full" value={dedupeMinutes} onChange={(value) => setDedupeMinutes(value)} options={DEDUPE_OPTIONS} />
               </Field>
             </div>
-            <label className="mt-4 flex items-start gap-3 text-sm text-ink-secondary">
-              <input type="checkbox" checked={onlyAvailable} onChange={(event) => setOnlyAvailable(event.target.checked)} className="mt-0.5 h-4 w-4 accent-accent" />
-              <span><strong className="block text-ink">手が空いている人だけに送る</strong><span className="text-xs text-ink-faint">対応中の人には送りません。</span></span>
-            </label>
-            <label className="mt-4 flex items-start gap-3 text-sm text-ink-secondary"><input type="checkbox" checked={emailFallback} onChange={(event) => setEmailFallback(event.target.checked)} className="mt-0.5 h-4 w-4 accent-accent" /><span><strong className="block text-ink">だれも受け取れないときはメールでも送る</strong><span className="text-xs text-ink-faint">LINE未ログインの人がいるとき</span></span></label>
+            <Checkbox
+              checked={onlyAvailable}
+              onCheckedChange={setOnlyAvailable}
+              description="対応中の人には送りません。"
+              className="mt-4"
+            >手が空いている人だけに送る</Checkbox>
+            <Checkbox
+              checked={emailFallback}
+              onCheckedChange={setEmailFallback}
+              description="LINE未ログインの人がいるとき"
+              className="mt-4"
+            >だれも受け取れないときはメールでも送る</Checkbox>
           </section>
 
           {error ? <Notice tone="danger" message={error} /> : null}

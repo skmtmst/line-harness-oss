@@ -6,6 +6,7 @@ import { api, type OpsKnowledgeArticle, type OpsKnowledgeInput } from '@/lib/api
 import { opsCall } from './ops-ui'
 import { KNOWLEDGE_KINDS, knowledgeArticleKind, knowledgeTime } from './knowledge-format'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import Chip from '@/components/shared/chip'
 import Dialog from '@/components/shared/dialog'
 import Select from '@/components/shared/select'
@@ -95,12 +96,9 @@ export default function KnowledgeEditor({ article: initial, onClose, onSaved }: 
       {!form.answer.trim() && article.articleKind === 'answer_example' && <p data-design-node="aeEmptyAnswerNote" className={styles.emptyAnswerNote}>運営の回答がありません。答えを書いて承認できます</p>}
       <label className={styles.field}><span>キーワード</span><TextField value={keywords} maxLength={480} disabled={busy} onChange={e => { setKeywords(e.target.value); setConfirmed(false) }} /></label>
       <label className={`${styles.field} ${styles.kind}`}><span>種類</span><Select aria-label="種類" options={KNOWLEDGE_KINDS} value={form.kind} disabled={busy} onChange={value => change('kind', value as OpsKnowledgeInput['kind'])} /></label>
-      {!editing && <label className={styles.confirm} data-design-node="xNNWI">
-        <input type="checkbox" checked={confirmed} disabled={busy || !eligible} onChange={e => setConfirmed(e.target.checked)} />
-        {article.articleKind === 'verified'
-          ? '解決策と結果を元のやり取りで確認しました'
-          : '回答内容が正しいことを元のやり取りで確認しました'}
-      </label>}
+      {!editing && <span data-design-node="xNNWI"><Checkbox checked={confirmed} disabled={busy || !eligible} onCheckedChange={setConfirmed}>{article.articleKind === 'verified'
+        ? '解決策と結果を元のやり取りで確認しました'
+        : '回答内容が正しいことを元のやり取りで確認しました'}</Checkbox></span>}
     </div>
   </Dialog>
 }

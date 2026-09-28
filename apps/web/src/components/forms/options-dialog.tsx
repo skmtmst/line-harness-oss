@@ -16,6 +16,7 @@ import ActionEditor from './action-editor'
 import { describeAction } from './form-update-summary'
 import { fieldInput, type FormRefs } from './form-refs'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import DateTimeField from '@/components/shared/date-time-field'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 
@@ -168,7 +169,7 @@ export default function OptionsDialog({
 }
 
 function OptionCard({ checked, onChange, label, note }: { checked: boolean; onChange: (next: boolean) => void; label: string; note: string }) {
-  return <label className={`rounded-control border p-3 ${checked ? 'border-accent bg-accent-soft' : 'border-hairline'}`}><span className="flex items-center gap-2 text-sm font-medium"><input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />{label}</span><span className="text-ink-faint ml-6 mt-1 block text-xs">{note}</span></label>
+  return <Checkbox checked={checked} onCheckedChange={onChange} description={note} className="rounded-control border border-hairline p-3">{label}</Checkbox>
 }
 
 function FieldLine({ label, children }: { label: string; children: React.ReactNode }) {

@@ -35,6 +35,7 @@ import ImageUploader, { type ImageUploaderValue } from '@/components/shared/imag
 import { Suspense } from 'react'
 import EmailThread from '@/components/support/email-thread'
 import Button from '@/components/shared/button'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import DateTimeField from '@/components/shared/date-time-field'
 import HelpTip from '@/components/shared/help-tip'
@@ -3482,24 +3483,22 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 {showComposerOptions && (
                   <div className="bg-canvas-sunken rounded-card mb-2 flex flex-wrap items-center gap-x-3 gap-y-2 p-3 text-xs">
                     <span className="text-ink-faint">送信キー:</span>
-                    <label className="flex cursor-pointer items-center gap-1">
-                      <input
-                        type="radio"
+                    <RadioCardGroup legend="送信キー" className="flex flex-wrap gap-2">
+                      <RadioCard
+                        name="chat-send-mode"
+                        value="enter"
                         checked={sendMode === 'enter'}
                         onChange={() => setSendMode('enter')}
-                        className="accent-accent"
+                        title="Enter"
                       />
-                      <span>Enter</span>
-                    </label>
-                    <label className="flex cursor-pointer items-center gap-1">
-                      <input
-                        type="radio"
+                      <RadioCard
+                        name="chat-send-mode"
+                        value="shift-enter"
                         checked={sendMode === 'shift-enter'}
                         onChange={() => setSendMode('shift-enter')}
-                        className="accent-accent"
+                        title="Shift+Enter"
                       />
-                      <span>Shift+Enter</span>
-                    </label>
+                    </RadioCardGroup>
                   </div>
                 )}
 

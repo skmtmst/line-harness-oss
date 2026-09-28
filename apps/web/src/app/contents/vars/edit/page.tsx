@@ -23,6 +23,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { NOT_AVAILABLE, STATE_TEXT } from '@/components/shared/not-connected'
 import { checkedAtText, placeholderText } from '../delete-impact'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -945,35 +946,26 @@ function EditCommonVarInner() {
               </section>
 
               <section className="bg-canvas rounded-card border-hairline border p-4">
-                <label className="flex cursor-pointer items-start gap-3">
-                  <input
-                    type="checkbox"
-                    checked={schedules.length > 0 || draft !== null}
-                    onChange={(event) => {
-                      if (event.target.checked) {
-                        if (schedules.length === 0 && draft === null) {
-                          const now = jstNowLocalInput()
-                          setDraft({ date: now.date, time: '00:00', value })
-                        }
-                      } else if (draft !== null) {
-                        // 登録前の入力中なら、窓を畳むだけで済む。
-                        setDraft(null)
-                      } else {
-                        // 登録済みの予定は時刻に値を書き換える設定。
-                        // 外す＝全部消すなので、確認を挟む。
-                        setClearSchedulesError('')
-                        setClearSchedulesOpen(true)
+                <Checkbox
+                  checked={schedules.length > 0 || draft !== null}
+                  onCheckedChange={(checked) => {
+                    if (checked) {
+                      if (schedules.length === 0 && draft === null) {
+                        const now = jstNowLocalInput()
+                        setDraft({ date: now.date, time: '00:00', value })
                       }
-                    }}
-                    className="mt-1 accent-green-500"
-                  />
-                  <span>
-                    <span className="text-ink block text-sm font-semibold">この日を過ぎたら、自動で文字を変える</span>
-                    <span className="text-ink-faint mt-1 block text-xs">
-                      期間が終わったら出したくない案内や、次の値へ切り替えるときに使います。
-                    </span>
-                  </span>
-                </label>
+                    } else if (draft !== null) {
+                      // 登録前の入力中なら、窓を畳むだけで済む。
+                      setDraft(null)
+                    } else {
+                      // 登録済みの予定は時刻に値を書き換える設定。
+                      // 外す＝全部消すなので、確認を挟む。
+                      setClearSchedulesError('')
+                      setClearSchedulesOpen(true)
+                    }
+                  }}
+                  description="期間が終わったら出したくない案内や、次の値へ切り替えるときに使います。"
+                >この日を過ぎたら、自動で文字を変える</Checkbox>
                 {schedules.map((schedule) => (
                   <div key={schedule.id} className="border-hairline mt-3 flex flex-wrap items-center justify-between gap-3 border-t pt-3 text-xs">
                     <span className="text-ink-secondary">
