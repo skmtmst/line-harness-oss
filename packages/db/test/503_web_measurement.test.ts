@@ -13,7 +13,9 @@ import {
   normalizeSiteHost,
   recordAnonymousConversionDay,
   recordDomainRejection,
+  resumeMeasurementSite,
   siteAllowsHost,
+  stopMeasurementSite,
   updateMeasurementSiteDomains,
 } from '../src/web-measurement.js';
 import { asD1 } from './d1-test-helper.js';
@@ -47,7 +49,9 @@ function setup(): Database.Database {
       VALUES ('ev-1', 'point-1', 'friend-1', 1000, '2026-09-02 10:00:00'),
              ('ev-2', 'point-1', 'friend-2', 2000, '2026-09-02 11:00:00');
   `);
-  for (const file of ['503_measurement_sites.sql', '504_conversion_reversal_ledger.sql']) {
+  // R275の465は表の作成(503)より前の番号。新しいDBではこの順で流れるため、
+  // ここでも同じ順で当てて「表が無くても止まらない」ことを固定する。
+  for (const file of ['465_inflow_stop_cancel.sql', '503_measurement_sites.sql', '504_conversion_reversal_ledger.sql']) {
     sqlite.exec(
       readFileSync(join(import.meta.dirname, '..', 'migrations', file), 'utf8'),
     );
@@ -253,5 +257,31 @@ describe('地点ごとの取消集計(純数から引く分)', () => {
     expect(await isConversionEventReversed(db, 'ev-1')).toBe(true);
     const metrics = await getReversalMetricsByPoint(db, ['point-1']);
     expect(metrics.get('point-1')).toEqual({ count: 1, value: 1000 });
+  });
+});
+
+describe('計測サイトの停止・再開 (R275)', () => {
+  it('止めると日時と理由が残り、一覧は「停止中」を返す。再開で戻る', async () => {
+    const db = asD1(setup());
+    const site = await createMeasurementSite(db, {
+      lineAccountId: 'a1', label: '公式ショップ', domains: ['example.com'],
+    });
+
+    const stopped = await stopMeasurementSite(db, site.id, 'サイトを閉じたため');
+    expect(stopped).toBe('stopped');
+    // 重ねて止めても状態は1つだけ
+    expect(await stopMeasurementSite(db, site.id, 'もう一度')).toBe('already_stopped');
+
+    const listed = await listMeasurementSites(db, 'a1');
+    expect(listed[0].stopped_at).toBeTruthy();
+    expect(listed[0].stopped_reason).toBe('サイトを閉じたため');
+    // 行と許可ドメインは消えない
+    expect(listed[0].domains).toEqual(['example.com']);
+
+    expect(await resumeMeasurementSite(db, site.id)).toBe('resumed');
+    expect(await resumeMeasurementSite(db, site.id)).toBe('not_stopped');
+    const after = await listMeasurementSites(db, 'a1');
+    expect(after[0].stopped_at).toBeNull();
+    expect(after[0].stopped_reason).toBeNull();
   });
 });
