@@ -62,8 +62,10 @@ function seed(testDb: SqliteD1): void {
      VALUES ('point-web', '購入完了', 'purchase', 'url_reach', 'https://example.com/thanks',
              'source', 'a1', 'tenant-1', 'active', 0, ?),
             ('point-anon', '到達(匿名可)', 'visit', 'url_reach', 'https://example.com/lp',
-             'none', 'a1', 'tenant-1', 'active', 1, ?)`,
-  ).run(NOW, NOW);
+             'none', 'a1', 'tenant-1', 'active', 1, ?),
+            ('point-query', '申込完了', 'form_submitted', 'url_reach', 'https://example.com/entry?utm_source=seed',
+             'none', 'a1', 'tenant-1', 'active', 0, ?)`,
+  ).run(NOW, NOW, NOW);
   testDb.raw.prepare(
     `INSERT INTO friends (id, line_user_id, display_name, line_account_id)
      VALUES ('f1', 'U-f1', '友だち1', 'a1')`,
@@ -206,6 +208,43 @@ describe('POST /api/public/web-conversions', () => {
     };
     await postConversion(testDb, body);
     await postConversion(testDb, body);
+    expect(eventCount(testDb)).toBe(1);
+  });
+
+  it('R282: 保存側・受信側のクエリと#以降を外して判定する', async () => {
+    const testDb = createTestD1();
+    seed(testDb);
+    const siteId = seedSite(testDb);
+    // 保存値に ?utm_source=seed が残っていても、同じページに当たる。
+    // 受信のクエリ違い・ページ内位置が付いても当たる。
+    await postConversion(testDb, {
+      siteId, visitorId: 'visitor-1', host: 'example.com', path: '/entry?x=1#sec', consent: 'granted',
+    });
+    const row = testDb.raw.prepare(
+      `SELECT conversion_point_id FROM conversion_events`,
+    ).get() as { conversion_point_id: string } | undefined;
+    expect(row?.conversion_point_id).toBe('point-query');
+  });
+
+  it('R282: _ を含む保存値は別文字へ広げない', async () => {
+    const testDb = createTestD1();
+    seed(testDb);
+    const siteId = seedSite(testDb);
+    testDb.raw.prepare(
+      `INSERT INTO conversion_points
+        (id, name, event_type, measure_method, target_url, value_mode,
+         line_account_id, tenant_id, status, count_anonymous, created_at)
+       VALUES ('point-under', '完了', 'visit', 'url_reach', 'https://example.com/order_done',
+               'none', 'a1', 'tenant-1', 'active', 0, ?)`,
+    ).run(NOW);
+    expect(eventCount(testDb)).toBe(0);
+    await postConversion(testDb, {
+      siteId, visitorId: 'visitor-1', host: 'example.com', path: '/orderXdone', consent: 'granted',
+    });
+    expect(eventCount(testDb)).toBe(0);
+    await postConversion(testDb, {
+      siteId, visitorId: 'visitor-1', host: 'example.com', path: '/order_done', consent: 'granted',
+    });
     expect(eventCount(testDb)).toBe(1);
   });
 

@@ -70,7 +70,7 @@ function Status({ value }: { value: string }) {
   const good = ['connected', 'active', 'approved', 'completed', 'visited', 'confirmed'].includes(value)
   const warning = ['warning', 'pending', 'draft', 'scheduled', 'unreplied'].includes(value)
   const labels: Record<string, string> = {
-    connected: '正常', active: '有効', approved: '承認済', completed: '完了', visited: '来店済',
+    connected: '正常', active: '有効', invited: '招待中', suspended: '停止中', archived: '保管済', approved: '承認済', completed: '完了', visited: '来店済',
     confirmed: '予約確定', warning: '要確認', pending: '承認待ち', draft: '下書き', scheduled: '予約済',
     unreplied: '未返信', unconfigured: '未設定', disabled: '無効', error: 'エラー', returned: '差戻し',
     seated: '来店中', cancelled: '取消', no_show: '無断キャンセル', preview_only: 'プレビューのみ',
@@ -143,8 +143,8 @@ export default function RestaurantConsole({ view }: { view: string }) {
 
   const mutate = async (action: () => Promise<unknown>, success: string) => {
     setBusy(true)
-    try { await action(); await load(); setNotice({ tone: 'success', text: success }) }
-    catch (error) { setNotice({ tone: 'error', text: error instanceof Error ? error.message : '保存できませんでした。' }) }
+    try { await action(); await load(); setNotice({ tone: 'success', text: success }); return true }
+    catch (error) { setNotice({ tone: 'error', text: error instanceof Error ? error.message : '保存できませんでした。' }); return false }
     finally { setBusy(false) }
   }
 
@@ -164,14 +164,15 @@ export default function RestaurantConsole({ view }: { view: string }) {
         selectedStoreId={selectedStoreId}
         busy={busy}
         create={(body) => mutate(() => restaurantTestApi.createMembership(selectedAccountId!, body), '飲食店向けの名簿へ追加しました。この登録だけではログイン権限は変わりません。')}
+        update={(id, body) => mutate(() => restaurantTestApi.updateMembership(selectedAccountId!, id, body), '所属ユーザーを更新しました。ログイン権限は変わりません。')}
         createStore={(body) => mutate(() => restaurantTestApi.createStore(selectedAccountId!, body), '店舗を追加しました。')}
         updateStore={(id, body) => mutate(() => restaurantTestApi.updateStore(selectedAccountId!, id, body), '店舗情報を更新しました。')}
       />
       : activeView === 'approvals' ? <Approvals data={snapshot} busy={busy} decide={(id, action) => mutate(() => restaurantTestApi.decideApproval(selectedAccountId!, id, action), action === 'approve' ? '承認しました。外部公開は行っていません。' : '差し戻しました。')} />
       : activeView === 'reservations' ? <Reservations data={snapshot} store={store} busy={busy} query={effectiveQuery ?? { limit: 100, offset: 0 }} total={snapshot.reservationTotal ?? 0} todayStartIso={todayStartIso} onQueryChange={setLedgerQuery} create={(body) => mutate(() => restaurantTestApi.createReservation(selectedAccountId!, body), '予約台帳へ登録しました。')} importInbound={(body) => mutate(() => restaurantTestApi.importReservation(selectedAccountId!, body), '受信専用データとして取り込みました。')} update={(id, body, success) => mutate(() => restaurantTestApi.updateReservation(selectedAccountId!, id, body), success)} />
-      : activeView === 'tables' ? <Tables data={snapshot} store={store} busy={busy} create={(body) => mutate(() => restaurantTestApi.createTable(selectedAccountId!, body), '卓を追加しました。')} />
+      : activeView === 'tables' ? <Tables data={snapshot} store={store} busy={busy} create={(body) => mutate(() => restaurantTestApi.createTable(selectedAccountId!, body), '卓を追加しました。')} update={(id, body) => mutate(() => restaurantTestApi.updateTable(selectedAccountId!, id, body), '卓を更新しました。')} />
       : activeView === 'inventory' ? <Inventory data={snapshot} store={store} busy={busy} save={(row, body) => mutate(() => restaurantTestApi.updateInventory(selectedAccountId!, row.id, body), '予約枠を更新しました。外部媒体へは反映していません。')} />
-      : activeView === 'menu' ? <Menu data={snapshot} store={store} busy={busy} create={(body) => mutate(() => restaurantTestApi.createMenu(selectedAccountId!, body), 'メニューを追加しました。')} />
+      : activeView === 'menu' ? <Menu data={snapshot} store={store} busy={busy} create={(body) => mutate(() => restaurantTestApi.createMenu(selectedAccountId!, body), 'メニューを追加しました。')} update={(id, body) => mutate(() => restaurantTestApi.updateMenu(selectedAccountId!, id, body), 'メニューを更新しました。')} />
       : <LineFollowup data={snapshot} store={store} busy={busy} save={(flow, patch) => mutate(() => restaurantTestApi.updateLineFlow(selectedAccountId!, flow.id, patch), 'LINEカード設定を保存しました。送信はまだ行いません。')} />}
   </>
 }
@@ -424,26 +425,56 @@ function StoreManagement({ accounts, data, busy, createStore, updateStore }: {
   </Panel>
 }
 
-function Organization({ accountId, accounts, data, selectedStoreId, busy, create, createStore, updateStore }: {
+function Organization({ accountId, accounts, data, selectedStoreId, busy, create, update, createStore, updateStore }: {
   accountId: string
   accounts: AccountWithStats[]
   data: RestaurantSnapshot
   selectedStoreId: string
   busy: boolean
   create: (body: Record<string, unknown>) => void
+  update: (id: string, body: Record<string, unknown>) => Promise<boolean>
   createStore: (body: StoreCreateInput) => void
   updateStore: (id: string, body: StoreUpdateInput) => void
 }) {
   const members = selectedStoreId ? data.memberships.filter((m) => !m.store_id || m.store_id === selectedStoreId) : data.memberships
   const selectedStore = data.stores.find((item) => item.id === selectedStoreId) || null
   const [showForm, setShowForm] = useState(false)
+  const [editingId, setEditingId] = useState('')
+  const [stopId, setStopId] = useState('')
+  const editing = members.find((member) => member.id === editingId)
+  const stopping = members.find((member) => member.id === stopId)
   const submit = (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); const fd = new FormData(event.currentTarget); create({ storeId: fd.get('storeId') || null, staffName: fd.get('staffName'), email: fd.get('email'), role: fd.get('role'), lineUid: fd.get('lineUid'), googleEmail: fd.get('googleEmail') }) }
+  const submitEdit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!editing) return
+    const fd = new FormData(event.currentTarget)
+    if (await update(editing.id, { storeId: fd.get('storeId') || null, staffName: fd.get('staffName'), email: fd.get('email'), role: fd.get('role'), lineUid: fd.get('lineUid'), googleEmail: fd.get('googleEmail') })) setEditingId('')
+  }
   return <div className="grid gap-5 xl:grid-cols-[280px_minmax(0,1fr)]">
     <Panel title="組織階層"><div className="p-4"><p className="mb-2 text-xs font-semibold text-ink-faint">統括: {data.organization?.tenant_name || '未設定'}</p><div className="rounded-control bg-accent-soft px-4 py-3 font-bold text-accent-deep">{data.organization?.name}</div><div className="ml-5 border-l border-hairline pl-4 pt-2">{data.stores.map((s) => <div key={s.id} className="my-2 rounded-control border border-hairline px-3 py-2 text-sm"><span className="font-semibold">{s.name}</span><Status value={s.status} /></div>)}</div></div></Panel>
     <div className="space-y-5"><StoreManagement accounts={accounts} data={data} busy={busy} createStore={createStore} updateStore={updateStore} /><IntakeAddressPanel accountId={accountId} store={selectedStore} /><div className="grid gap-4 sm:grid-cols-3"><Metric label="所属ユーザー" value={`${members.length}名`} note="名簿に載っている人数" /><Metric label="店舗管理者" value={`${members.filter((m) => m.role === 'store_manager').length}名`} note="名簿上の役割（操作権限は別）" /><Metric label="連携アカウント" value={`${members.filter((m) => m.line_uid || m.google_email).length}件`} note="LINE UID / Google" /></div>
       <div className="flex justify-end"><button onClick={() => setShowForm(!showForm)} className="rounded-control bg-accent-deep px-4 py-2 text-sm font-bold text-on-accent">ユーザーを追加</button></div>
       {showForm && <InlineForm title="飲食店向けユーザー"><form onSubmit={submit} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6"><Field label="氏名" name="staffName" required /><Field label="メール" name="email" type="email" /><label className="text-xs font-bold text-ink-secondary">役割<DefaultSelect name="role" ariaLabel="役割" defaultValue="staff" options={[{ value: 'staff', label: 'Staff' }, { value: 'store_manager', label: 'StoreManager' }, { value: 'super_admin', label: 'SuperAdmin' }]} /></label><label className="text-xs font-bold text-ink-secondary">担当店舗<DefaultSelect name="storeId" ariaLabel="担当店舗" defaultValue="" options={[{ value: '', label: '全店舗' }, ...data.stores.map((s) => ({ value: s.id, label: s.name }))]} /></label><Field label="LINE通知UID" name="lineUid" /><Field label="Googleメール" name="googleEmail" type="email" /><div className="sm:col-span-2 xl:col-span-6 flex justify-end"><button disabled={busy} className="rounded-control bg-accent-deep px-5 py-2 text-sm font-bold text-on-accent">追加</button></div></form></InlineForm>}
-      <Panel title="アカウント一覧" description="この一覧は名簿です。ここでの役割・担当店舗の登録だけではログイン権限は変わりません。実際の操作は、ログイン中のスタッフの役割（オーナー・管理者・スタッフ）で決まります。"><DataTable className="rounded-none border-0"><thead><TableHeadRow>{['氏名', '役割', '担当店舗', 'LINE通知UID', 'Google連携', '状態'].map((h) => <Th key={h}>{h}</Th>)}</TableHeadRow></thead><tbody>{members.map((m) => <Tr key={m.id}><Td className="font-bold">{m.staff_name}<p className="text-xs font-normal text-ink-faint">{m.email || 'メール未設定'}</p></Td><Td><span className="rounded-pill bg-action-soft px-2 py-1 text-xs font-bold text-action">{roleLabel[m.role]}</span></Td><Td>{data.stores.find((s) => s.id === m.store_id)?.name || '全店舗'}</Td><Td>{m.line_uid ? '設定済' : '未設定'}</Td><Td>{m.google_email || '未設定'}</Td><Td><Status value={m.status} /></Td></Tr>)}</tbody></DataTable></Panel>
+      {editing && <InlineForm title={`${editing.staff_name}を変更`}>
+        <form key={editing.id} onSubmit={(event) => void submitEdit(event)} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+          <Field label="氏名" name="staffName" defaultValue={editing.staff_name} required />
+          <Field label="メール" name="email" type="email" defaultValue={editing.email ?? ''} />
+          <label className="text-xs font-bold text-ink-secondary">役割
+            <DefaultSelect name="role" ariaLabel="役割" defaultValue={editing.role} options={[{ value: 'staff', label: 'Staff' }, { value: 'store_manager', label: 'StoreManager' }, { value: 'super_admin', label: 'SuperAdmin' }]} />
+          </label>
+          <label className="text-xs font-bold text-ink-secondary">担当店舗
+            <DefaultSelect name="storeId" ariaLabel="担当店舗" defaultValue={editing.store_id ?? ''} options={[{ value: '', label: '全店舗' }, ...data.stores.map((s) => ({ value: s.id, label: s.name }))]} />
+          </label>
+          <Field label="LINE通知UID" name="lineUid" defaultValue={editing.line_uid ?? ''} />
+          <Field label="Googleメール" name="googleEmail" type="email" defaultValue={editing.google_email ?? ''} />
+          <div className="flex justify-end gap-2 sm:col-span-2 xl:col-span-6">
+            <Button type="button" onClick={() => setEditingId('')}>やめる</Button>
+            <Button type="submit" variant="primary" disabled={busy}>変更を保存</Button>
+          </div>
+        </form>
+      </InlineForm>}
+      <ConfirmDialog open={Boolean(stopping)} title="この所属ユーザーを停止しますか？" description="名簿には残り、再開できます。この名簿だけではログイン権限は変わりません。" confirmLabel="停止する" busy={busy} onCancel={() => setStopId('')} onConfirm={() => { if (stopping) void update(stopping.id, { status: 'suspended' }).then(() => setStopId('')) }} />
+      <Panel title="アカウント一覧" description="この一覧は名簿です。ここでの役割・担当店舗の登録だけではログイン権限は変わりません。実際の操作は、ログイン中のスタッフの役割（オーナー・管理者・スタッフ）で決まります。"><DataTable className="rounded-none border-0"><thead><TableHeadRow>{['氏名', '役割', '担当店舗', 'LINE通知UID', 'Google連携', '状態'].map((h) => <Th key={h}>{h}</Th>)}</TableHeadRow></thead><tbody>{members.map((m) => <Tr key={m.id}><Td className="font-bold">{m.staff_name}<p className="text-xs font-normal text-ink-faint">{m.email || 'メール未設定'}</p></Td><Td><span className="rounded-pill bg-action-soft px-2 py-1 text-xs font-bold text-action">{roleLabel[m.role]}</span></Td><Td>{data.stores.find((s) => s.id === m.store_id)?.name || '全店舗'}</Td><Td>{m.line_uid ? '設定済' : '未設定'}</Td><Td>{m.google_email || '未設定'}</Td><Td><div className="flex flex-wrap items-center gap-2"><Status value={m.status} /><Button size="compact" disabled={busy} onClick={() => { setEditingId(m.id); setShowForm(false) }}>変更</Button>{m.status === 'suspended' ? <Button size="compact" disabled={busy} onClick={() => void update(m.id, { status: 'active' })}>再開</Button> : <Button size="compact" disabled={busy} onClick={() => setStopId(m.id)}>停止</Button>}</div></Td></Tr>)}</tbody></DataTable></Panel>
       <Panel title="権限マトリクス" description="想定の役割分担です。実際の操作可否は、ログイン中のスタッフの役割（オーナー・管理者・スタッフ）で決まります。"><DataTable className="rounded-none border-0"><thead><TableHeadRow><Th>操作</Th><Th>SuperAdmin</Th><Th>StoreManager</Th><Th>Staff</Th></TableHeadRow></thead><tbody>{[['全店閲覧・契約設定', true, false, false], ['担当店舗の設定・承認', true, true, false], ['予約入力・配席', true, true, true], ['Google/LINE公開承認', true, true, false]].map(([label, ...values]) => <Tr key={String(label)}><Td>{label}</Td>{values.map((v, i) => <Td key={i} align="center" className="font-bold">{v ? <span className="text-success">✓</span> : <span className="text-ink-faint">—</span>}</Td>)}</Tr>)}</tbody></DataTable></Panel>
     </div>
   </div>
@@ -563,9 +594,9 @@ function Reservations({ data, store, busy, query, total, todayStartIso, onQueryC
       </div>
       <div className="flex flex-wrap justify-end gap-2"><button onClick={() => setShowImport(!showImport)} className="rounded-control border border-nen-border bg-nen-ivory px-4 py-2 text-sm font-bold text-nen-green">受信データを試す</button><button onClick={() => setShowForm(!showForm)} className="rounded-control bg-accent-deep px-4 py-2 text-sm font-bold text-on-accent">手動予約を登録</button></div>
     </div>
-    {showForm && <InlineForm title="手動予約"><form onSubmit={submit} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6"><Field label="お客様名" name="customerName" required /><Field label="電話番号" name="phone" /><Field label="人数" name="guestCount" type="number" defaultValue="2" required /><Field label="開始日時" name="startsAt" type="datetime-local" required /><label className="text-xs font-bold text-ink-secondary">コース<DefaultSelect name="courseId" ariaLabel="コース" defaultValue="" options={[{ value: '', label: '未選択' }, ...data.menuItems.filter((m) => !store || m.store_id === store.id).map((m) => ({ value: m.id, label: m.name }))]} /></label><Field label="アレルギー・特記事項" name="allergyNote" /><div className="sm:col-span-2 xl:col-span-6 flex justify-end"><button disabled={busy} className="rounded-control bg-accent-deep px-5 py-2 text-sm font-bold text-on-accent">台帳へ登録</button></div></form></InlineForm>}
+    {showForm && <InlineForm title="手動予約"><form onSubmit={submit} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6"><Field label="お客様名" name="customerName" required /><Field label="電話番号" name="phone" /><Field label="人数" name="guestCount" type="number" defaultValue="2" required /><Field label="開始日時" name="startsAt" type="datetime-local" required /><label className="text-xs font-bold text-ink-secondary">コース<DefaultSelect name="courseId" ariaLabel="コース" defaultValue="" options={[{ value: '', label: '未選択' }, ...data.menuItems.filter((m) => (!store || m.store_id === store.id) && m.status === 'active').map((m) => ({ value: m.id, label: m.name }))]} /></label><Field label="アレルギー・特記事項" name="allergyNote" /><div className="sm:col-span-2 xl:col-span-6 flex justify-end"><button disabled={busy} className="rounded-control bg-accent-deep px-5 py-2 text-sm font-bold text-on-accent">台帳へ登録</button></div></form></InlineForm>}
     {showImport && <InlineForm title="媒体受信シミュレーター（外部への書戻しなし）"><form onSubmit={importSubmit} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6"><label className="text-xs font-bold text-ink-secondary">受信元<DefaultSelect name="provider" ariaLabel="受信元" defaultValue="restaurant_board" options={[{ value: 'restaurant_board', label: 'レストランボード' }, { value: 'hotpepper', label: 'Hot Pepper' }, { value: 'tabelog', label: '食べログ' }]} /></label><Field label="外部予約ID" name="externalId" defaultValue={`DEMO-${Date.now()}`} required /><Field label="お客様名" name="customerName" required /><Field label="人数" name="guestCount" type="number" defaultValue="2" required /><Field label="開始日時" name="startsAt" type="datetime-local" required /><div className="flex items-end"><button disabled={busy} className="w-full rounded-control bg-nen-green px-4 py-2 text-sm font-bold text-on-accent">受信として取込</button></div></form></InlineForm>}
-    {editing && <InlineForm title={`${editing.customer_name}の予約を変更`}><form key={editing.id} onSubmit={submitEdit} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6"><Field label="お客様名" name="customerName" defaultValue={editing.customer_name} required /><Field label="電話番号" name="customerPhone" defaultValue={editing.customer_phone || ''} /><Field label="人数" name="guestCount" type="number" defaultValue={String(editing.guest_count)} required /><Field label="開始日時" name="startsAt" type="datetime-local" defaultValue={toLocalInput(editing.starts_at)} required /><Field label="終了日時" name="endsAt" type="datetime-local" defaultValue={toLocalInput(editing.ends_at)} required /><label className="text-xs font-bold text-ink-secondary">卓<DefaultSelect name="tableId" ariaLabel="卓" defaultValue={editing.table_id || ''} options={[{ value: '', label: '未配席' }, ...storeTables.map((t) => ({ value: t.id, label: `${t.code}・${t.label}（${t.min_capacity}〜${t.max_capacity}名）` }))]} /></label><label className="text-xs font-bold text-ink-secondary">コース<DefaultSelect name="courseId" ariaLabel="コース" defaultValue={editing.course_id || ''} options={[{ value: '', label: '席のみ' }, ...data.menuItems.filter((m) => !store || m.store_id === store.id).map((m) => ({ value: m.id, label: m.name }))]} /></label><Field label="アレルギー・特記事項" name="allergyNote" defaultValue={editing.allergy_note || ''} /><div className="sm:col-span-2 xl:col-span-6 flex justify-end gap-2"><Button onClick={() => setEditingId('')}>やめる</Button><Button variant="primary" type="submit" disabled={busy}>変更を保存</Button></div></form></InlineForm>}
+    {editing && <InlineForm title={`${editing.customer_name}の予約を変更`}><form key={editing.id} onSubmit={submitEdit} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6"><Field label="お客様名" name="customerName" defaultValue={editing.customer_name} required /><Field label="電話番号" name="customerPhone" defaultValue={editing.customer_phone || ''} /><Field label="人数" name="guestCount" type="number" defaultValue={String(editing.guest_count)} required /><Field label="開始日時" name="startsAt" type="datetime-local" defaultValue={toLocalInput(editing.starts_at)} required /><Field label="終了日時" name="endsAt" type="datetime-local" defaultValue={toLocalInput(editing.ends_at)} required /><label className="text-xs font-bold text-ink-secondary">卓<DefaultSelect name="tableId" ariaLabel="卓" defaultValue={editing.table_id || ''} options={[{ value: '', label: '未配席' }, ...storeTables.filter((t) => t.is_active === 1 || t.id === editing.table_id).map((t) => ({ value: t.id, label: `${t.code}・${t.label}（${t.min_capacity}〜${t.max_capacity}名）` }))]} /></label><label className="text-xs font-bold text-ink-secondary">コース<DefaultSelect name="courseId" ariaLabel="コース" defaultValue={editing.course_id || ''} options={[{ value: '', label: '席のみ' }, ...data.menuItems.filter((m) => (!store || m.store_id === store.id) && (m.status === 'active' || m.id === editing.course_id)).map((m) => ({ value: m.id, label: m.name }))]} /></label><Field label="アレルギー・特記事項" name="allergyNote" defaultValue={editing.allergy_note || ''} /><div className="sm:col-span-2 xl:col-span-6 flex justify-end gap-2"><Button onClick={() => setEditingId('')}>やめる</Button><Button variant="primary" type="submit" disabled={busy}>変更を保存</Button></div></form></InlineForm>}
     <Panel title="予約タイムライン" description="媒体別の色と、配席・コースを同時に確認します。"><DataTable className="rounded-none border-0"><colgroup><col className="w-32" /><col className="w-28" /><col /><col className="w-16" /><col className="w-24" /><col className="w-24" /><col className="w-32" /><col className="w-24" /><col className="w-32" /></colgroup><thead><TableHeadRow>{['時刻', '予約元', 'お客様', '人数', '卓', 'コース', '注意事項', '状態', '操作'].map((h) => <Th key={h}>{h}</Th>)}</TableHeadRow></thead><tbody>{rows.map((r) => <Tr key={r.id}><Td className="whitespace-nowrap font-bold">{formatDate(r.starts_at)}</Td><Td><span className={`rounded-pill px-2 py-1 text-xs font-bold ${sourceTone[r.source] || 'bg-canvas-sunken text-ink-secondary'}`}>{sourceLabel[r.source] || r.source}</span></Td><Td className="truncate font-bold" title={`${r.customer_name} ${r.customer_phone || ''}`}>{r.customer_name}<p className="truncate text-xs font-normal text-ink-faint">{r.customer_phone || '電話未登録'}</p></Td><Td className="whitespace-nowrap">{r.guest_count}名</Td><Td className="truncate" title={r.table_label || undefined}>{r.table_label || <span className="text-warning">未配席</span>}</Td><Td className="truncate" title={r.course_name || undefined}>{r.course_name || '席のみ'}</Td><Td className="truncate text-xs text-danger" title={r.allergy_note || undefined}>{r.allergy_note || '—'}</Td><Td><Status value={r.status} /></Td><Td><div className="flex gap-1"><button type="button" onClick={() => { setEditingId(r.id); setShowForm(false) }} className="whitespace-nowrap rounded-control border border-action px-2 py-1 text-xs font-bold text-action">変更</button>{['cancelled', 'no_show'].includes(r.status) ? <Button size="compact" disabled={busy} onClick={() => update(r.id, { status: 'confirmed' }, '予約を有効に戻しました。')}>復活</Button> : <button type="button" onClick={() => setCancelId(r.id)} className="whitespace-nowrap rounded-control border border-danger px-2 py-1 text-xs font-bold text-danger">取消</button>}</div></Td></Tr>)}</tbody></DataTable>{rows.length === 0 && <p className="p-8 text-center text-sm text-ink-faint">条件に合う予約はありません。</p>}<div className="flex justify-center p-4"><Pagination page={page} pageCount={pageCount} onPageChange={(next) => onQueryChange({ ...query, offset: (next - 1) * limit })} ariaLabel="予約台帳のページ送り" /></div></Panel>
     <ConfirmDialog open={cancelId !== ''} title="この予約を取り消しますか？" description="台帳には取消として残ります。時間帯の在庫は人数分だけ戻ります。" confirmLabel="取り消す" busy={busy} onCancel={() => setCancelId('')} onConfirm={() => { if (cancelId) update(cancelId, { status: 'cancelled' }, '予約を取り消しました。'); setCancelId('') }} />
     <Panel title="顧客カルテ" description="電話番号またはLINE UIDで名寄せする設計です。"><div className="grid gap-3 p-5 sm:grid-cols-2 xl:grid-cols-3">{rows.slice(0, 6).map((r) => <div key={r.id} className="rounded-control border border-hairline p-4"><p className="font-bold">{r.customer_name}</p><p className="mt-1 text-xs text-ink-faint">{r.customer_phone || r.line_uid || '連絡先未登録'}</p><p className="mt-3 text-sm text-ink-secondary">直近: {formatDate(r.starts_at)} / {r.guest_count}名</p></div>)}</div></Panel>
@@ -581,15 +612,41 @@ function Field({ label, name, type = 'text', defaultValue, required = false }: {
 }
 function InlineForm({ title, children }: { title: string; children: ReactNode }) { return <section className="rounded-card border border-accent bg-accent-soft/40 p-5"><h2 className="mb-4 font-bold text-accent-deep">{title}</h2>{children}</section> }
 
-function Tables({ data, store, busy, create }: { data: RestaurantSnapshot; store: RestaurantStore | null; busy: boolean; create: (body: Record<string, unknown>) => void }) {
+function Tables({ data, store, busy, create, update }: { data: RestaurantSnapshot; store: RestaurantStore | null; busy: boolean; create: (body: Record<string, unknown>) => void; update: (id: string, body: Record<string, unknown>) => Promise<boolean> }) {
   const rows = scoped(data.tables, store?.id || '')
   const [showForm, setShowForm] = useState(false)
+  const [editingId, setEditingId] = useState('')
+  const [stopId, setStopId] = useState('')
+  const editing = rows.find((row) => row.id === editingId)
+  const stopping = rows.find((row) => row.id === stopId)
   const submit = (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); if (!store) return; const fd = new FormData(event.currentTarget); create({ storeId: store.id, code: fd.get('code'), label: fd.get('label'), seatType: fd.get('seatType'), minCapacity: Number(fd.get('minCapacity')), maxCapacity: Number(fd.get('maxCapacity')) }) }
+  const submitEdit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!editing) return
+    const fd = new FormData(event.currentTarget)
+    if (await update(editing.id, { code: fd.get('code'), label: fd.get('label'), seatType: fd.get('seatType'), minCapacity: Number(fd.get('minCapacity')), maxCapacity: Number(fd.get('maxCapacity')) })) setEditingId('')
+  }
   return <div className="space-y-5"><div className="grid gap-4 sm:grid-cols-4"><Metric label="卓数" value={rows.length} note="稼働・停止を含む" /><Metric label="総席数" value={rows.reduce((s, t) => s + t.max_capacity, 0)} note="最大収容人数" /><Metric label="結合可能" value={new Set(rows.filter((t) => t.join_group).map((t) => t.join_group)).size} note="結合グループ" /><Metric label="個室" value={rows.filter((t) => t.seat_type === 'private_room').length} note="個室卓" /></div>
     <div className="flex justify-end"><button onClick={() => setShowForm(!showForm)} className="rounded-control bg-accent-deep px-4 py-2 text-sm font-bold text-on-accent">卓を追加</button></div>
     {showForm && <InlineForm title="新しい卓"><form onSubmit={submit} className="grid gap-3 sm:grid-cols-3 xl:grid-cols-6"><Field label="卓番" name="code" required /><Field label="表示名" name="label" required /><label className="text-xs font-bold text-ink-secondary">席種<DefaultSelect name="seatType" ariaLabel="席種" defaultValue="table" options={[{ value: 'table', label: 'テーブル' }, { value: 'counter', label: 'カウンター' }, { value: 'private_room', label: '個室' }, { value: 'terrace', label: 'テラス' }]} /></label><Field label="最小人数" name="minCapacity" type="number" defaultValue="1" required /><Field label="最大人数" name="maxCapacity" type="number" defaultValue="4" required /><div className="flex items-end"><button disabled={busy} className="w-full rounded-control bg-accent-deep px-4 py-2 text-sm font-bold text-on-accent">追加</button></div></form></InlineForm>}
+    {editing && <InlineForm title={`${editing.code}・${editing.label}を変更`}>
+      <form key={editing.id} onSubmit={(event) => void submitEdit(event)} className="grid gap-3 sm:grid-cols-3 xl:grid-cols-6">
+        <Field label="卓番" name="code" defaultValue={editing.code} required />
+        <Field label="表示名" name="label" defaultValue={editing.label} required />
+        <label className="text-xs font-bold text-ink-secondary">席種
+          <DefaultSelect name="seatType" ariaLabel="席種" defaultValue={editing.seat_type} options={[{ value: 'table', label: 'テーブル' }, { value: 'counter', label: 'カウンター' }, { value: 'private_room', label: '個室' }, { value: 'terrace', label: 'テラス' }]} />
+        </label>
+        <Field label="最小人数" name="minCapacity" type="number" defaultValue={String(editing.min_capacity)} required />
+        <Field label="最大人数" name="maxCapacity" type="number" defaultValue={String(editing.max_capacity)} required />
+        <div className="flex items-end gap-2">
+          <Button type="button" onClick={() => setEditingId('')}>やめる</Button>
+          <Button type="submit" variant="primary" disabled={busy}>変更を保存</Button>
+        </div>
+      </form>
+    </InlineForm>}
+    <ConfirmDialog open={Boolean(stopping)} title="この卓を停止しますか？" description="予約履歴と卓の情報は残ります。停止中の卓は自動配席の候補から外れ、後で再開できます。" confirmLabel="停止する" busy={busy} onCancel={() => setStopId('')} onConfirm={() => { if (stopping) void update(stopping.id, { isActive: false }).then(() => setStopId('')) }} />
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_330px]"><Panel title="フロアマップ" description="ドラッグ配置は切り離し後の専用サーバーで永続化します。"><div className="relative m-5 min-h-[420px] rounded-card border border-dashed border-hairline bg-canvas-sunken p-5"><div className="grid grid-cols-3 gap-6">{rows.map((t) => <div key={t.id} className={`flex min-h-28 flex-col items-center justify-center rounded-card border-2 p-3 text-center ${t.join_group ? 'border-accent bg-accent-soft' : 'border-hairline bg-canvas'}`}><p className="text-xs font-bold text-ink-faint">{t.code}</p><p className="mt-1 font-bold">{t.label}</p><p className="mt-2 text-xs text-ink-secondary">{t.min_capacity}〜{t.max_capacity}名</p>{t.join_group && <span className="mt-2 rounded-pill bg-canvas px-2 py-1 text-[10px] font-bold text-accent-deep">結合 {t.join_group}</span>}</div>)}</div></div></Panel>
-      <Panel title="卓の詳細"><div className="divide-y divide-hairline">{rows.map((t) => <div key={t.id} className="p-4"><div className="flex justify-between"><p className="font-bold">{t.code} · {t.label}</p><Status value={t.is_active ? 'active' : 'disabled'} /></div><p className="mt-1 text-xs text-ink-faint">{t.seat_type} / {t.min_capacity}〜{t.max_capacity}名</p></div>)}</div></Panel></div>
+      <Panel title="卓の詳細"><div className="divide-y divide-hairline">{rows.map((t) => <div key={t.id} className="p-4"><div className="flex justify-between"><p className="font-bold">{t.code} · {t.label}</p><Status value={t.is_active ? 'active' : 'suspended'} /></div><p className="mt-1 text-xs text-ink-faint">{t.seat_type} / {t.min_capacity}〜{t.max_capacity}名</p><div className="mt-2 flex flex-wrap gap-2"><Button size="compact" disabled={busy} onClick={() => { setEditingId(t.id); setShowForm(false) }}>変更</Button>{t.is_active ? <Button size="compact" disabled={busy} onClick={() => setStopId(t.id)}>停止</Button> : <Button size="compact" disabled={busy} onClick={() => void update(t.id, { isActive: true })}>再開</Button>}</div></div>)}</div></Panel></div>
     <Panel title="自動配席ルール"><div className="p-5 text-sm leading-6 text-ink-secondary"><p className="font-bold text-nen-green">収容差が最小の卓を優先</p><p>少人数予約で大型卓を占有しないよう、人数を収容できる卓のうち余剰席が最も少ない卓を候補にします。結合卓は同一グループとして次段階で評価します。</p></div></Panel>
   </div>
 }
@@ -613,14 +670,43 @@ function InventoryEditor({ row, busy, save }: { row: RestaurantInventory; busy: 
   return <Tr><Td className="font-bold">{formatDate(row.starts_at, false)}</Td><Td className="w-40"><div className="h-2 rounded-full bg-canvas-sunken"><div className={`h-full rounded-full ${ratio >= 90 ? 'bg-danger' : ratio >= 70 ? 'bg-warning' : 'bg-accent'}`} style={{ width: `${Math.max(4, ratio)}%` }} /></div></Td><Td className="font-bold">{row.reserved_count}</Td><Td><input aria-label="総数" type="number" value={total} onChange={(e) => setTotal(Number(e.target.value))} className={input} /></Td><Td><input aria-label="OTA枠" type="number" value={ota} onChange={(e) => setOta(Number(e.target.value))} className={input} /></Td><Td><input aria-label="LINE枠" type="number" value={line} onChange={(e) => setLine(Number(e.target.value))} className={input} /></Td><Td><input aria-label="当日枠" type="number" value={walkIn} onChange={(e) => setWalkIn(Number(e.target.value))} className={input} /></Td><Td><button disabled={busy || ota + line + walkIn > total} onClick={() => save(row, { totalCapacity: total, otaCapacity: ota, lineCapacity: line, walkInCapacity: walkIn })} className="rounded-control bg-accent-deep px-3 py-1.5 text-xs font-bold text-on-accent disabled:opacity-40">保存</button></Td></Tr>
 }
 
-function Menu({ data, store, busy, create }: { data: RestaurantSnapshot; store: RestaurantStore | null; busy: boolean; create: (body: Record<string, unknown>) => void }) {
+function Menu({ data, store, busy, create, update }: { data: RestaurantSnapshot; store: RestaurantStore | null; busy: boolean; create: (body: Record<string, unknown>) => void; update: (id: string, body: Record<string, unknown>) => Promise<boolean> }) {
   const rows = scoped(data.menuItems, store?.id || '')
   const [showForm, setShowForm] = useState(false)
+  const [editingId, setEditingId] = useState('')
+  const [stopId, setStopId] = useState('')
+  const editing = rows.find((row) => row.id === editingId)
+  const stopping = rows.find((row) => row.id === stopId)
   const submit = (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); if (!store) return; const fd = new FormData(event.currentTarget); create({ storeId: store.id, kind: fd.get('kind'), name: fd.get('name'), price: Number(fd.get('price')), allergens: String(fd.get('allergens') || '').split(',').map((s) => s.trim()).filter(Boolean), servicePeriods: [fd.get('period')] }) }
-  return <div className="space-y-5"><div className="grid gap-4 sm:grid-cols-5"><Metric label="全メニュー" value={rows.length} note="公開・下書き" /><Metric label="コース" value={rows.filter((m) => m.kind === 'course').length} note="予約時に選択" /><Metric label="単品" value={rows.filter((m) => m.kind === 'a_la_carte').length} note="アラカルト" /><Metric label="要承認" value={data.approvals.filter((a) => a.kind === 'menu_change' && a.status === 'pending').length} note="価格・内容改定" tone="warning" /><Metric label="アレルギー登録" value={rows.filter((m) => safeArray(m.allergens_json).length).length} note="注意品目あり" /></div>
+  const submitEdit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!editing) return
+    const fd = new FormData(event.currentTarget)
+    const period = fd.get('period')
+    if (await update(editing.id, { kind: fd.get('kind'), name: fd.get('name'), price: Number(fd.get('price')), allergens: String(fd.get('allergens') || '').split(',').map((item) => item.trim()).filter(Boolean), servicePeriods: period === 'both' ? ['lunch', 'dinner'] : [period] })) setEditingId('')
+  }
+  return <div className="space-y-5"><div className="grid gap-4 sm:grid-cols-5"><Metric label="全メニュー" value={rows.length} note="公開・下書き・保管済み" /><Metric label="コース" value={rows.filter((m) => m.kind === 'course').length} note="予約時に選択" /><Metric label="単品" value={rows.filter((m) => m.kind === 'a_la_carte').length} note="アラカルト" /><Metric label="要承認" value={data.approvals.filter((a) => a.kind === 'menu_change' && a.status === 'pending').length} note="価格・内容改定" tone="warning" /><Metric label="アレルギー登録" value={rows.filter((m) => safeArray(m.allergens_json).length).length} note="注意品目あり" /></div>
     <div className="flex justify-end"><button onClick={() => setShowForm(!showForm)} className="rounded-control bg-accent-deep px-4 py-2 text-sm font-bold text-on-accent">メニューを追加</button></div>
     {showForm && <InlineForm title="新しいメニュー"><form onSubmit={submit} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6"><label className="text-xs font-bold text-ink-secondary">種類<DefaultSelect name="kind" ariaLabel="種類" defaultValue="course" options={[{ value: 'course', label: 'コース' }, { value: 'a_la_carte', label: '単品' }]} /></label><Field label="メニュー名" name="name" required /><Field label="価格（税込）" name="price" type="number" required /><Field label="アレルギー（カンマ区切り）" name="allergens" /><label className="text-xs font-bold text-ink-secondary">提供時間<DefaultSelect name="period" ariaLabel="提供時間" defaultValue="lunch" options={[{ value: 'lunch', label: 'ランチ' }, { value: 'dinner', label: 'ディナー' }]} /></label><div className="flex items-end"><button disabled={busy} className="w-full rounded-control bg-accent-deep px-4 py-2 text-sm font-bold text-on-accent">追加</button></div></form></InlineForm>}
-    <Panel title="メニュー一覧" description="予約台帳・Google投稿・LINEカードで同じマスターを参照します。"><DataTable className="rounded-none border-0"><thead><TableHeadRow>{['メニュー', '種類', '価格', '提供時間', '所要時間', 'アレルギー', '状態'].map((h) => <Th key={h}>{h}</Th>)}</TableHeadRow></thead><tbody>{rows.map((m) => <Tr key={m.id}><Td className="font-bold text-action">{m.name}</Td><Td>{m.kind === 'course' ? 'コース' : '単品'}</Td><Td className="font-bold">{yen(m.price)}</Td><Td>{safeArray(m.service_periods_json).map((p) => p === 'lunch' ? 'ランチ' : 'ディナー').join('・')}</Td><Td>{m.duration_minutes ? `${m.duration_minutes}分` : '—'}</Td><Td>{safeArray(m.allergens_json).join('・') || 'なし'}</Td><Td><Status value={m.status} /></Td></Tr>)}</tbody></DataTable></Panel>
+    {editing && <InlineForm title={`${editing.name}を変更`}>
+      <form key={editing.id} onSubmit={(event) => void submitEdit(event)} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+        <label className="text-xs font-bold text-ink-secondary">種類
+          <DefaultSelect name="kind" ariaLabel="種類" defaultValue={editing.kind} options={[{ value: 'course', label: 'コース' }, { value: 'a_la_carte', label: '単品' }]} />
+        </label>
+        <Field label="メニュー名" name="name" defaultValue={editing.name} required />
+        <Field label="価格（税込）" name="price" type="number" defaultValue={String(editing.price)} required />
+        <Field label="アレルギー（カンマ区切り）" name="allergens" defaultValue={safeArray(editing.allergens_json).join(', ')} />
+        <label className="text-xs font-bold text-ink-secondary">提供時間
+          <DefaultSelect name="period" ariaLabel="提供時間" defaultValue={safeArray(editing.service_periods_json).length > 1 ? 'both' : safeArray(editing.service_periods_json)[0] || 'dinner'} options={[{ value: 'lunch', label: 'ランチ' }, { value: 'dinner', label: 'ディナー' }, { value: 'both', label: 'ランチ・ディナー' }]} />
+        </label>
+        <div className="flex items-end gap-2">
+          <Button type="button" onClick={() => setEditingId('')}>やめる</Button>
+          <Button type="submit" variant="primary" disabled={busy}>変更を保存</Button>
+        </div>
+      </form>
+    </InlineForm>}
+    <ConfirmDialog open={Boolean(stopping)} title="このメニューを停止しますか？" description="メニューは保管され、予約履歴の参照は残ります。後で再開できます。" confirmLabel="停止する" busy={busy} onCancel={() => setStopId('')} onConfirm={() => { if (stopping) void update(stopping.id, { status: 'archived' }).then(() => setStopId('')) }} />
+    <Panel title="メニュー一覧" description="予約台帳・Google投稿・LINEカードで同じマスターを参照します。"><DataTable className="rounded-none border-0"><thead><TableHeadRow>{['メニュー', '種類', '価格', '提供時間', '所要時間', 'アレルギー', '状態'].map((h) => <Th key={h}>{h}</Th>)}</TableHeadRow></thead><tbody>{rows.map((m) => <Tr key={m.id}><Td className="font-bold text-action">{m.name}</Td><Td>{m.kind === 'course' ? 'コース' : '単品'}</Td><Td className="font-bold">{yen(m.price)}</Td><Td>{safeArray(m.service_periods_json).map((p) => p === 'lunch' ? 'ランチ' : 'ディナー').join('・')}</Td><Td>{m.duration_minutes ? `${m.duration_minutes}分` : '—'}</Td><Td>{safeArray(m.allergens_json).join('・') || 'なし'}</Td><Td><div className="flex flex-wrap items-center gap-2"><Status value={m.status} /><Button size="compact" disabled={busy} onClick={() => { setEditingId(m.id); setShowForm(false) }}>変更</Button>{m.status === 'archived' ? <Button size="compact" disabled={busy} onClick={() => void update(m.id, { status: 'active' })}>再開</Button> : <Button size="compact" disabled={busy} onClick={() => setStopId(m.id)}>停止</Button>}</div></Td></Tr>)}</tbody></DataTable></Panel>
   </div>
 }
 

@@ -67,6 +67,11 @@ function scoreRangeQuery(filter: ActionScoreFilter, summary: ActionScoreOverview
   const query = new URLSearchParams()
   if (range.min !== null) query.set('scoreMin', String(range.min))
   if (range.max !== null) query.set('scoreMax', String(range.max))
+  /*
+   * R300: 帯は「点数がついている人」だけを数えている。友だち検索と配信へも
+   * 同じ条件を引き継ぎ、未採点の0点まで拾わないようにする。
+   */
+  query.set('scoredOnly', '1')
   return query.toString()
 }
 
@@ -212,6 +217,7 @@ export default function ActionScoreTab({ accountId }: { accountId: string }) {
           {friendsHref ? <Button href={friendsHref}><Users className="h-4 w-4" aria-hidden="true" />この帯の人を見る</Button> : null}
           {broadcastHref ? <Button href={broadcastHref}><Send className="h-4 w-4" aria-hidden="true" />この帯に配信する</Button> : null}
           {filter === 'all' ? <span className="text-xs text-ink-faint">高い・ふつう・低いの帯を選ぶと、友だち検索と配信へ引き継げます。</span> : null}
+          {filter === 'high' || filter === 'normal' || filter === 'low' ? <span className="text-xs text-ink-faint">この帯の条件（点数がついている人のみ）を引き継ぎます。友だち名の検索は引き継ぎません。</span> : null}
           {filter === 'decreased' ? <span className="text-xs text-ink-faint">下がっている人は、この一覧で理由を確認できます。</span> : null}
         </div>
         <Button onClick={exportCurrentPage} disabled={!overview?.items.length}>

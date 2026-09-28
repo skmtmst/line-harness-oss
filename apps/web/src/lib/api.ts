@@ -2916,6 +2916,11 @@ export type FriendListParams = {
   /** 行動スコアの現在値。片方だけでも指定できる。 */
   scoreMin?: number
   scoreMax?: number
+  /**
+   * R300: `true` で「点数がついている人」だけ（未採点の0点を除く）。
+   * 行動スコア一覧の帯の引き継ぎ用。一覧・検索・配信の対象定義をそろえる。
+   */
+  scoredOnly?: boolean
 }
 
 export type FriendWithTags = Friend & { tags: Tag[] }
@@ -6060,6 +6065,7 @@ export const api = {
       if (params?.visibility) query.visibility = params.visibility
       if (params?.scoreMin !== undefined) query.scoreMin = String(params.scoreMin)
       if (params?.scoreMax !== undefined) query.scoreMax = String(params.scoreMax)
+      if (params?.scoredOnly) query.scoredOnly = '1'
       for (const [k, v] of Object.entries(params?.metadata ?? {})) {
         if (k && v) query[`metadata.${k}`] = v
       }
@@ -13126,6 +13132,11 @@ export const api = {
         total: number
         page: number
         limit: number
+        summary: {
+          sentLast30Days: number
+          pendingLast30Days: number
+          failedLast30Days: number
+        }
         sort: Array<{ field: string; direction: 'asc' | 'desc' }>
       }>>(`/api/ad-platforms/logs?${query.toString()}`)
     },

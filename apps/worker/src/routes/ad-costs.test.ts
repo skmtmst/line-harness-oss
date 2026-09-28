@@ -142,6 +142,9 @@ describe('POST /api/ad-costs', () => {
       });
     expect((await post({ amountMinor: -1 })).status).toBe(400);
     expect((await post({ amountMinor: 1.5 })).status).toBe(400);
+    expect((await post({ amountMinor: '' })).status).toBe(400);
+    expect((await post({ amountMinor: '   ' })).status).toBe(400);
+    expect((await post({ amountMinor: 0 })).status).toBe(201);
     expect((await post({ day: '09/20' })).status).toBe(400);
     expect((await post({ currency: 'YENX' })).status).toBe(400);
     expect((await post({ sourceLabel: '' })).status).toBe(400);

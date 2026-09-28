@@ -83,6 +83,18 @@ describe('計測サイトと許可ドメイン', () => {
     expect(await siteAllowsHost(db, site.id, 'sub.example.com')).toBe(false);
   });
 
+  it('R279 wwwつき・なしの既存登録と来訪ホスト4通りを同じサイトとして扱う', async () => {
+    const db = asD1(setup());
+    for (const [index, stored] of ['example.com', 'www.example.com'].entries()) {
+      const site = await createMeasurementSite(db, { lineAccountId: 'a1', label: `site-${index}`, domains: [stored] });
+      for (const visiting of ['example.com', 'www.example.com']) {
+        expect(await siteAllowsHost(db, site.id, visiting)).toBe(true);
+      }
+      expect(await siteAllowsHost(db, site.id, 'sub.example.com')).toBe(false);
+      expect(await siteAllowsHost(db, site.id, 'evil-example.com')).toBe(false);
+    }
+  });
+
   it('ドメインの更新は差し替えになる', async () => {
     const db = asD1(setup());
     const site = await createMeasurementSite(db, {
@@ -102,6 +114,7 @@ describe('ドメイン名の検査', () => {
     expect(normalizeSiteHost('example.com.')).toBe('example.com');
     expect(normalizeSiteHost('example.com:8443')).toBe('example.com');
     expect(normalizeSiteHost('EXAMPLE.COM')).toBe('example.com');
+    expect(normalizeSiteHost('https://WWW.Example.COM/path')).toBe('example.com');
   });
 
   it('ドメインでない入力は弾く', () => {

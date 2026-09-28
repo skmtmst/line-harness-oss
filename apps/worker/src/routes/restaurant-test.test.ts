@@ -967,6 +967,69 @@ describe('飲食店向けテストAPI', () => {
     expect(conflict.status).toBe(409);
   });
 
+  it('R107: 卓を変更・停止・再開しても予約の参照を残し、別組織の卓は変更しない', async () => {
+    seedRestaurantFixture();
+    const path = '/api/restaurant-test/tables/table-ginza?account_id=account-1';
+    expect((await requestWithMethod(path, 'PATCH', { code: 'T-10', label: '窓際', seatType: 'counter', minCapacity: 1, maxCapacity: 2 })).status).toBe(200);
+    expect((await requestWithMethod(path, 'PATCH', { isActive: false })).status).toBe(200);
+    expect(testDb.raw.prepare('SELECT code, label, seat_type, is_active FROM rt_tables WHERE id = ?').get('table-ginza')).toEqual({ code: 'T-10', label: '窓際', seat_type: 'counter', is_active: 0 });
+    expect(testDb.raw.prepare('SELECT table_id FROM rt_reservations WHERE id = ?').get('reservation-ginza')).toEqual({ table_id: 'table-ginza' });
+    const stoppedBooking = await request('/api/restaurant-test/reservations/manual?account_id=account-1', { storeId: 'store-ginza', customerName: '停止確認', guestCount: 2, startsAt: '2026-10-10T10:00:00.000Z', endsAt: '2026-10-10T12:00:00.000Z', tableId: 'table-ginza' });
+    expect(stoppedBooking.status).toBe(400);
+    const inbound = await request('/api/restaurant-test/inbound/reservations?account_id=account-1', { storeId: 'store-ginza', provider: 'restaurant_board', eventId: 'stopped-table', reservation: { externalId: 'RB-STOP-T', customerName: '停止確認', guestCount: 2, startsAt: '2026-10-10T10:00:00.000Z', endsAt: '2026-10-10T12:00:00.000Z', tableId: 'table-ginza' } });
+    expect(inbound.status).toBe(400);
+    expect(testDb.raw.prepare("SELECT status FROM rt_sync_events WHERE external_event_id = 'stopped-table'").get()).toEqual({ status: 'failed' });
+    expect((await requestWithMethod(path, 'PATCH', { isActive: true })).status).toBe(200);
+    expect((await requestWithMethod(path, 'PATCH', { minCapacity: 3, maxCapacity: 2 })).status).toBe(400);
+    expect((await requestWithMethod('/api/restaurant-test/tables/table-ginza?account_id=account-4', 'PATCH', { label: '改ざん' })).status).not.toBe(200);
+  });
+
+  it('R107: メニューを変更・保管・再開しても予約の参照を残す', async () => {
+    seedRestaurantFixture();
+    const path = '/api/restaurant-test/menu/menu-ginza?account_id=account-1';
+    expect((await requestWithMethod(path, 'PATCH', { name: '新コース', kind: 'course', price: 9900, allergens: ['卵'], servicePeriods: ['lunch'] })).status).toBe(200);
+    expect((await requestWithMethod(path, 'PATCH', { status: 'archived' })).status).toBe(200);
+    expect(testDb.raw.prepare('SELECT name, price, status, allergens_json FROM rt_menu_items WHERE id = ?').get('menu-ginza')).toEqual({ name: '新コース', price: 9900, status: 'archived', allergens_json: '["卵"]' });
+    expect(testDb.raw.prepare('SELECT course_id FROM rt_reservations WHERE id = ?').get('reservation-ginza')).toEqual({ course_id: 'menu-ginza' });
+    const stoppedBooking = await request('/api/restaurant-test/reservations/manual?account_id=account-1', { storeId: 'store-ginza', customerName: '停止確認', guestCount: 2, startsAt: '2026-10-10T10:00:00.000Z', endsAt: '2026-10-10T12:00:00.000Z', courseId: 'menu-ginza' });
+    expect(stoppedBooking.status).toBe(400);
+    const inbound = await request('/api/restaurant-test/inbound/reservations?account_id=account-1', { storeId: 'store-ginza', provider: 'restaurant_board', eventId: 'stopped-course', reservation: { externalId: 'RB-STOP-C', customerName: '停止確認', guestCount: 2, startsAt: '2026-10-10T10:00:00.000Z', endsAt: '2026-10-10T12:00:00.000Z', courseId: 'menu-ginza' } });
+    expect(inbound.status).toBe(400);
+    expect((await requestWithMethod(path, 'PATCH', { status: 'active' })).status).toBe(200);
+    expect((await requestWithMethod(path, 'PATCH', { price: -1 })).status).toBe(400);
+  });
+
+  it('R107: 所属ユーザーの変更・停止・再開と権限の境界', async () => {
+    seedRestaurantFixture();
+    testDb.raw.prepare("INSERT INTO rt_memberships (id, organization_id, store_id, staff_name, role) VALUES ('member-ginza', 'org-fixture', 'store-ginza', '旧名', 'staff')").run();
+    const path = '/api/restaurant-test/memberships/member-ginza?account_id=account-1';
+    expect((await requestWithMethod(path, 'PATCH', { staffName: '新名', role: 'store_manager', email: 'new@example.test' })).status).toBe(200);
+    expect((await requestWithMethod(path, 'PATCH', { status: 'suspended' })).status).toBe(200);
+    expect(testDb.raw.prepare('SELECT staff_name, role, status FROM rt_memberships WHERE id = ?').get('member-ginza')).toEqual({ staff_name: '新名', role: 'store_manager', status: 'suspended' });
+    expect((await requestWithMethod(path, 'PATCH', { status: 'active' })).status).toBe(200);
+    expect((await requestWithMethod(path, 'PATCH', { storeId: 'no-such-store' })).status).toBe(400);
+    authMocks.getStaffByApiKey.mockResolvedValue({ id: 'admin-test', name: '管理者', role: 'admin', access_level: 'full', permission_keys: '[]', assigned_line_account_id: null, can_access_descendant_accounts: 1 });
+    expect((await requestWithMethod(path, 'PATCH', { role: 'super_admin' }, 'admin-key')).status).toBe(403);
+  });
+
+  it('R107: 店舗を選択した管理者は別店舗の卓・メニュー・所属ユーザーを更新できない', async () => {
+    seedRestaurantFixture();
+    testDb.raw.prepare("INSERT INTO rt_tables (id, store_id, code, label, seat_type, min_capacity, max_capacity) VALUES ('table-yokohama', 'store-yokohama', 'Y1', '横浜卓', 'table', 1, 4)").run();
+    testDb.raw.prepare("INSERT INTO rt_menu_items (id, store_id, kind, name, price) VALUES ('menu-yokohama', 'store-yokohama', 'course', '横浜コース', 2000)").run();
+    testDb.raw.prepare("INSERT INTO rt_memberships (id, organization_id, store_id, staff_name, role) VALUES ('member-yokohama', 'org-fixture', 'store-yokohama', '横浜スタッフ', 'staff')").run();
+    const session = await createAdminSession();
+    expect((await requestAs('/api/restaurant-test/stores/store-ginza/select?account_id=account-1', session, {})).status).toBe(200);
+    for (const [entity, id, body] of [
+      ['tables', 'table-yokohama', { label: '改ざん' }],
+      ['menu', 'menu-yokohama', { name: '改ざん' }],
+      ['memberships', 'member-yokohama', { staffName: '改ざん' }],
+    ] as const) {
+      expect((await requestWithMethod(`/api/restaurant-test/${entity}/${id}?account_id=account-1`, 'PATCH', body, session)).status).toBe(404);
+    }
+    expect((await requestWithMethod('/api/restaurant-test/memberships/member-yokohama?account_id=account-1', 'PATCH', { storeId: 'store-ginza' }, session)).status).toBe(404);
+    expect(testDb.raw.prepare("SELECT staff_name FROM rt_memberships WHERE id = 'member-yokohama'").get()).toEqual({ staff_name: '横浜スタッフ' });
+  });
+
   it('R102: 新しい連携通知は予約を更新する', async () => {
     seedRestaurantFixture();
     const store = testDb.raw.prepare("SELECT id FROM rt_stores WHERE code = 'GINZA'").get() as { id: string };

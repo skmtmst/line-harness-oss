@@ -67,6 +67,26 @@ describe('詳細条件で絞る', () => {
     expect(bindings).toEqual([30, 69]);
   });
 
+  it('R300: 帯の引き継ぎは未採点の0点を除く（scoredOnly）', () => {
+    const { sql, bindings } = buildSegmentQuery({
+      operator: 'AND',
+      rules: [{ type: 'score_range', value: { min: null, max: 29, scoredOnly: true } }],
+    });
+    expect(sql).toContain('f.score <= ?');
+    expect(sql).toContain('f.score != 0');
+    expect(sql).toContain('FROM friend_scores scored_only');
+    expect(bindings).toEqual([29]);
+  });
+
+  it('R300: scoredOnlyを付けない既存の条件は従来どおり（点数範囲だけ）', () => {
+    const { sql } = buildSegmentQuery({
+      operator: 'AND',
+      rules: [{ type: 'score_range', value: { min: null, max: 29 } }],
+    });
+    expect(sql).toContain('f.score <= ?');
+    expect(sql).not.toContain('scored_only');
+  });
+
   it('空または逆転した行動スコア範囲を拒否する', () => {
     expect(() => buildSegmentQuery({
       operator: 'AND', rules: [{ type: 'score_range', value: { min: null, max: null } }],

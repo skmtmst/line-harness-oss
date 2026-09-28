@@ -420,20 +420,25 @@ adPlatforms.get('/api/ad-platforms/logs', requireRole('owner', 'admin', 'staff')
       return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
     }
     const scope = lineAccountId ? null : await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
-    const clauses: string[] = [];
-    const bindings: unknown[] = [];
+    // アカウント範囲だけを先に組み立てる。30日集計はページの絞り込み
+    // （状態・検索・ページ）に左右されず、この範囲だけで数える。
+    const scopeClauses: string[] = [];
+    const scopeBindings: unknown[] = [];
 
     if (lineAccountId) {
-      clauses.push('line_account_id = ?');
-      bindings.push(lineAccountId);
+      scopeClauses.push('line_account_id = ?');
+      scopeBindings.push(lineAccountId);
     } else if (scope!.allowedAccountIds.length) {
-      clauses.push(scope!.canSeeUnassigned
+      scopeClauses.push(scope!.canSeeUnassigned
         ? `(line_account_id IN (${scope!.allowedAccountIds.map(() => '?').join(',')}) OR line_account_id IS NULL)`
         : `line_account_id IN (${scope!.allowedAccountIds.map(() => '?').join(',')})`);
-      bindings.push(...scope!.allowedAccountIds);
+      scopeBindings.push(...scope!.allowedAccountIds);
     } else {
-      clauses.push(scope!.canSeeUnassigned ? 'line_account_id IS NULL' : '1 = 0');
+      scopeClauses.push(scope!.canSeeUnassigned ? 'line_account_id IS NULL' : '1 = 0');
     }
+
+    const clauses = [...scopeClauses];
+    const bindings = [...scopeBindings];
 
     if (status && status !== 'all') {
       if (!['sent', 'pending', 'failed'].includes(status)) {
@@ -453,19 +458,40 @@ adPlatforms.get('/api/ad-platforms/logs', requireRole('owner', 'admin', 'staff')
     }
 
     const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
-    const count = await c.env.DB.prepare(
-      `SELECT COUNT(*) AS total FROM ad_conversion_logs ${where}`,
-    ).bind(...bindings).first<{ total: number }>();
-    const logs = await c.env.DB.prepare(
-      `SELECT * FROM ad_conversion_logs ${where}
-       ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`,
-    ).bind(...bindings, limit, (page - 1) * limit).all<AdConversionLog>();
+    const scopeWhere = scopeClauses.length ? `WHERE ${scopeClauses.join(' AND ')}` : '';
+    // 直近30日の送信結果は全ページ共通の数。一覧の絞り込みとは別に、
+    // アカウント範囲と期間だけで数える。時刻は julianday で比較し、
+    // `+09:00` 付きと Z 付きが混ざってもずれないようにする。
+    const last30Start = new Date(Date.now() - 30 * 86_400_000).toISOString();
+    const last30Where = `${scopeWhere ? `${scopeWhere} AND` : 'WHERE'} julianday(created_at) >= julianday(?)`;
+    const [count, summary, logs] = await Promise.all([
+      c.env.DB.prepare(
+        `SELECT COUNT(*) AS total FROM ad_conversion_logs ${where}`,
+      ).bind(...bindings).first<{ total: number }>(),
+      c.env.DB.prepare(
+        `SELECT
+           SUM(CASE WHEN status IN ('sent', 'success') THEN 1 ELSE 0 END) AS sent,
+           SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending,
+           SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failed
+         FROM ad_conversion_logs ${last30Where}`,
+      ).bind(...scopeBindings, last30Start)
+        .first<{ sent: number | null; pending: number | null; failed: number | null }>(),
+      c.env.DB.prepare(
+        `SELECT * FROM ad_conversion_logs ${where}
+         ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`,
+      ).bind(...bindings, limit, (page - 1) * limit).all<AdConversionLog>(),
+    ]);
 
     return c.json({
       success: true,
       data: {
         items: logs.results.map(serializeLog),
         total: Number(count?.total ?? 0),
+        summary: {
+          sentLast30Days: Number(summary?.sent ?? 0),
+          pendingLast30Days: Number(summary?.pending ?? 0),
+          failedLast30Days: Number(summary?.failed ?? 0),
+        },
         page,
         limit,
         sort: [

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { X } from 'lucide-react'
 import { api, bookingApi, type BookingAdminDetail, type BookingMenu, type BookingRequest, type BookingStaff } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -125,6 +125,20 @@ function formatJpTime(iso: string): string {
   })
 }
 
+/**
+ * R316: 予約の日付（9/30(火)）。詳細パネルの見出しで使う。
+ * 「今日」と固定すると、別の日の予約を開いても今日に見える。
+ */
+function formatJpDay(iso: string): string {
+  if (Number.isNaN(new Date(iso).getTime())) return '—'
+  return new Date(iso).toLocaleDateString('ja-JP', {
+    month: 'numeric',
+    day: 'numeric',
+    weekday: 'short',
+    timeZone: 'Asia/Tokyo',
+  })
+}
+
 function jstDay(iso: string): string {
   return new Date(new Date(iso).getTime() + 9 * 3600_000).toISOString().slice(0, 10)
 }
@@ -141,30 +155,112 @@ function monthLabel(key: string): string {
   return `${year}年${month}月`
 }
 
+/**
+ * R317: 台帳の状態をURLとタブ内の保存の両方へ残すための鍵。
+ * 日付は `date`、検索語は `q`、ほかは一覧の絞り込み名そのまま。
+ */
+const LEDGER_QUERY_KEYS = ['view', 'status', 'range', 'date', 'q', 'menu', 'staff', 'source', 'page'] as const
+const LEDGER_STORAGE_KEY = 'booking-ledger-state-v1'
+
+type LedgerSavedState = {
+  view?: string | null
+  status?: string | null
+  range?: string | null
+  date?: string | null
+  q?: string | null
+  menu?: string | null
+  staff?: string | null
+  source?: string | null
+  page?: string | null
+}
+
+/** 同じタブで見ていた台帳の状態。無い・壊れているときは null。 */
+function readLedgerState(): LedgerSavedState | null {
+  try {
+    const raw = window.sessionStorage.getItem(LEDGER_STORAGE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as LedgerSavedState
+    return parsed && typeof parsed === 'object' ? parsed : null
+  } catch {
+    return null
+  }
+}
+
 export default function BookingsPage() {
   usePageTitle('予約管理')
   const { selectedAccountId, selectedAccount } = useAccount()
   const urlParams = useSearchParams()
+  const router = useRouter()
   const [view, setView] = useState<'day' | 'week' | 'month' | 'list'>('day')
   const [tab, setTab] = useState<string>('requested')
   /** 「今日」「今週」の絞り込み。設計の「よく使う」にある。 */
   const [range, setRange] = useState<'all' | 'today' | 'week'>('all')
   /*
-   * URLの `?view=` `?status=` `?range=` で絞り込み済みの一覧を開ける
-   * （IDEA-01）。ダッシュボードの「予約状況」カードは
-   * `?view=list&status=requested` でここへ来る。初回だけURLを状態へ
-   * 写し、知らない値は既定へ落とす。
+   * R317: URLの条件（`?view=` `?status=` `?range=` `?date=` `?q=` …）で
+   * 絞り込み済みの一覧を開ける（IDEA-01）。ダッシュボードの「予約状況」
+   * カードは `?view=list&status=requested` でここへ来る。URLに何も
+   * なければ、同じタブで見ていた状態（入力画面のパンくずなど条件を
+   * 持たない行き先から帰ってきたとき）へ戻す。初回だけ状態へ写し、
+   * 知らない値は既定へ落とす。
    */
   const urlInitRef = useRef(false)
+  // R317: 復元で絞り込みが変わっても、戻したページは1へ戻さない。
+  const pageResetRef = useRef({ seenMount: false, restoreTransition: false })
   useEffect(() => {
     if (urlInitRef.current) return
     urlInitRef.current = true
-    const viewParam = urlParams.get('view')
-    if (viewParam === 'week' || viewParam === 'month' || viewParam === 'list') setView(viewParam)
-    const statusParam = urlParams.get('status')
-    if (statusParam && STATUS_TABS.some((item) => item.key === statusParam)) setTab(statusParam)
-    const rangeParam = urlParams.get('range')
-    if (rangeParam === 'today' || rangeParam === 'week') setRange(rangeParam)
+    const hasQuery = LEDGER_QUERY_KEYS.some((key) => urlParams.get(key) !== null)
+    // URLに条件が無いときだけ、同じタブの保存を使う。URLがあるときは
+    // URLを正とし、混ぜない（共有URLを開いた人が他人の条件を見ない）。
+    const saved = !hasQuery ? readLedgerState() : null
+    if (saved) pageResetRef.current.restoreTransition = true
+    const get = (key: keyof LedgerSavedState) => urlParams.get(key) ?? saved?.[key] ?? null
+    const viewParam = get('view')
+    if (viewParam === 'day' || viewParam === 'week' || viewParam === 'month' || viewParam === 'list') {
+      setView(viewParam)
+      pageResetRef.current.restoreTransition = true
+    }
+    const statusParam = get('status')
+    if (statusParam && STATUS_TABS.some((item) => item.key === statusParam)) {
+      setTab(statusParam)
+      pageResetRef.current.restoreTransition = true
+    }
+    const rangeParam = get('range')
+    if (rangeParam === 'today' || rangeParam === 'week') {
+      setRange(rangeParam)
+      pageResetRef.current.restoreTransition = true
+    }
+    const dateParam = get('date')
+    if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
+      setCalendarAnchor(dateParam)
+      pageResetRef.current.restoreTransition = true
+    }
+    const queryParam = get('q')
+    if (queryParam) {
+      setQuery(queryParam)
+      pageResetRef.current.restoreTransition = true
+    }
+    const menuParam = get('menu')
+    if (menuParam) {
+      setMenuFilter(menuParam)
+      pageResetRef.current.restoreTransition = true
+    }
+    const staffParam = get('staff')
+    if (staffParam) {
+      setStaffFilter(staffParam)
+      pageResetRef.current.restoreTransition = true
+    }
+    const sourceParam = get('source')
+    if (sourceParam && SOURCE_FILTERS.some((item) => item.key === sourceParam)) {
+      setSourceFilter(sourceParam)
+      pageResetRef.current.restoreTransition = true
+    }
+    const pageParam = get('page')
+    const pageNumber = pageParam ? Number.parseInt(pageParam, 10) : NaN
+    if (Number.isFinite(pageNumber) && pageNumber >= 1) {
+      setPage(Math.floor(pageNumber))
+      pageResetRef.current.restoreTransition = true
+    }
   }, [urlParams])
   const [menuFilter, setMenuFilter] = useState<string>('all')
   // N-398: 担当者・予約経路の絞り込み。一覧の取得とCSV書出しの両方に渡す。
@@ -632,11 +728,59 @@ export default function BookingsPage() {
     setTab('all')
   }
 
-  // 絞り込みが変わったら1ページ目に戻す。3ページ目のまま条件を狭めると
-  // 「該当なし」に見えてしまう。R90: 表示の切り替え（今月など）も条件。
+  /*
+   * 絞り込みが変わったら1ページ目に戻す。3ページ目のまま条件を狭めると
+   * 「該当なし」に見えてしまう。R90: 表示の切り替え（今月など）も条件。
+   * R317: 初回の描画と、URL・保存からの復元では戻さない。戻すと
+   * 戻したページが消えて、再読み込みの意味がなくなる。
+   */
   useEffect(() => {
+    if (!pageResetRef.current.seenMount) {
+      pageResetRef.current.seenMount = true
+      return
+    }
+    if (pageResetRef.current.restoreTransition) {
+      pageResetRef.current.restoreTransition = false
+      return
+    }
     setPage(1)
   }, [tab, menuFilter, query, range, staffFilter, sourceFilter, view])
+
+  /*
+   * R317: 表示方法・対象日・絞り込み・ページをURLへ写す。再読み込みで
+   * 同じ状態へ戻れる。履歴は汚さない（replace）。同じタブ内の保存にも
+   * 残し、条件を持たないパンくずから戻ったときも復元する。
+   * 明示の解除（絞り込みを解除）は既定値へ戻り、URLも既定へ戻る。
+   */
+  const ledgerQuery = [
+    `view=${view}`,
+    `status=${tab}`,
+    ...(range === 'all' ? [] : [`range=${range}`]),
+    `date=${calendarAnchor}`,
+    ...(query.trim() ? [`q=${encodeURIComponent(query.trim())}`] : []),
+    ...(menuFilter === 'all' ? [] : [`menu=${encodeURIComponent(menuFilter)}`]),
+    ...(staffFilter === 'all' ? [] : [`staff=${encodeURIComponent(staffFilter)}`]),
+    ...(sourceFilter === 'all' ? [] : [`source=${sourceFilter}`]),
+    ...(page <= 1 ? [] : [`page=${page}`]),
+  ].join('&')
+  useEffect(() => {
+    if (!urlInitRef.current) return
+    try {
+      window.sessionStorage.setItem(
+        LEDGER_STORAGE_KEY,
+        JSON.stringify({
+          view, status: tab, range, date: calendarAnchor, q: query,
+          menu: menuFilter, staff: staffFilter, source: sourceFilter, page: String(page),
+        }),
+      )
+    } catch {
+      // 保存に失敗しても一覧は使える。URLへの写しは続ける。
+    }
+    const current = window.location.search.replace(/^\?/, '')
+    if (current !== ledgerQuery) {
+      router.replace(ledgerQuery ? `/booking/bookings?${ledgerQuery}` : '/booking/bookings')
+    }
+  }, [ledgerQuery, router])
 
   // タブ切替やアカウント切替で items が入れ替わったとき、開いていた予約が
   // 一覧から消えることがある。その場合はパネルを閉じる。
@@ -678,6 +822,8 @@ export default function BookingsPage() {
             key={key}
             type="button"
             onClick={() => setView(key)}
+            /* R315: 選んでいる表示を色だけでなく意味でも伝える。 */
+            aria-pressed={view === key}
             className={`border-b-2 px-1 py-3 text-sm font-semibold ${
               view === key ? 'border-accent text-accent-deep' : 'border-transparent text-ink-secondary'
             }`}
@@ -867,6 +1013,8 @@ export default function BookingsPage() {
                   <button
                     key={key}
                     onClick={() => setTab(key)}
+                    /* R315: 選んでいる絞り込みを色だけでなく意味でも伝える。 */
+                    aria-pressed={tab === key}
                     className={`rounded-pill px-3 py-1 text-xs font-medium transition-colors ${
                       tab === key
                         ? 'bg-accent-deep text-on-accent'
@@ -879,6 +1027,7 @@ export default function BookingsPage() {
                 <span className="border-hairline mx-1 h-4 border-l" />
                 <button
                   onClick={() => setRange(range === 'today' ? 'all' : 'today')}
+                  aria-pressed={range === 'today'}
                   className={`rounded-pill px-3 py-1 text-xs font-medium ${
                     range === 'today'
                       ? 'bg-accent-deep text-on-accent'
@@ -889,6 +1038,7 @@ export default function BookingsPage() {
                 </button>
                 <button
                   onClick={() => setRange(range === 'week' ? 'all' : 'week')}
+                  aria-pressed={range === 'week'}
                   className={`rounded-pill px-3 py-1 text-xs font-medium ${
                     range === 'week'
                       ? 'bg-accent-deep text-on-accent'
@@ -1202,7 +1352,7 @@ function BookingDetailPanel({
       <aside className="relative h-full w-full overflow-y-auto bg-canvas-sunken shadow-xl">
         <div className="border-hairline sticky top-0 z-10 flex min-h-16 items-center justify-between gap-3 border-b bg-canvas px-6 py-3">
           <div className="min-w-0">
-            <p className="text-ink-faint text-xs font-semibold">予約管理　›　今日　›　{formatJpTime(b.starts_at)} {b.friend_name ?? 'お客様'}さま</p>
+            <p className="text-ink-faint text-xs font-semibold">予約管理　›　{formatJpDay(b.starts_at)}　›　{formatJpTime(b.starts_at)} {b.friend_name ?? 'お客様'}さま</p>
             <h2 className="text-ink mt-1 truncate text-xl font-semibold">{b.friend_name ?? 'お客様'} ／ {b.menu_name}</h2>
           </div>
           <div className="flex shrink-0 items-center gap-2">
