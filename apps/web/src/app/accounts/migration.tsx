@@ -21,6 +21,7 @@ import { TextField } from '@/components/shared/text-field'
 import MergedTabs from '@/components/layout/merged-tabs'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { FRIENDS_MERGED_TABS } from '@/app/friends/friends-tabs'
+import { splitCsvRecords } from '@/app/friends/migrations/friend-csv'
 
 const STEPS: readonly string[] = ['移行の登録', '対応表の取込', '事前確認', '要確認の判断', '本移行と照合']
 
@@ -52,17 +53,16 @@ export function splitUidCsvLine(line: string): string[] | null {
 }
 
 export function parseUidCsv(text: string) {
-  const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/).filter((line) => line.trim())
-  if (lines.length < 2) return []
-  const headers = splitUidCsvLine(lines[0])?.map((value) => value.trim().toLowerCase()) ?? []
+  const records = splitCsvRecords(text).filter((cells) => cells.some((cell) => cell.trim()))
+  if (records.length < 2) return []
+  const headers = records[0].map((value) => value.trim().toLowerCase())
   const oldIndex = headers.findIndex((value) => ['old_uid', '旧uid', '移行元uid'].includes(value))
   const newIndex = headers.findIndex((value) => ['new_uid', '新uid', '移行先uid'].includes(value))
   if (oldIndex < 0 || newIndex < 0) return []
   const rows: Array<{ oldUid: string; newUid: string | null; evidenceType: 'operator_csv' }> = []
-  for (const line of lines.slice(1)) {
+  for (const cells of records.slice(1)) {
     // **列の数が合わない行は読み飛ばす。** ずれたまま結び付けると別人になる。
-    const cells = splitUidCsvLine(line)
-    if (!cells || cells.length !== headers.length) continue
+    if (cells.length !== headers.length) continue
     const oldUid = cells[oldIndex].trim()
     if (!oldUid) continue
     rows.push({ oldUid, newUid: cells[newIndex].trim() || null, evidenceType: 'operator_csv' as const })

@@ -684,15 +684,18 @@ function InflowLinksPageInner({
   }
 
   // 設計のKPI。stats は期間を受け取らないので、出せるのは累計だけ。
-  // 「稼働中」は登録済みの行。orphan（外部が発行した未登録 ref）は流入実績が
-  // あるだけで、こちらから止める・直すができないので数に入れない。
+  // R273: 「受付中」は isActive が真の登録済み行だけを数える。orphan（外部が
+  // 発行した未登録 ref）は流入実績があるだけで、こちらから止める・直すが
+  // できないので数に入れない。停止中も別に数え、一覧・一括操作・詳細と同じ
+  // 言葉（受付中・停止中）で出す。
   // 帯は画面全体の要約なので、**フォルダの選択や検索文字で数が変わってはいけない。**
   // ここを `sortedRows`（フォルダ＋検索で絞ったもの）から数えていたため、
   // フォルダ列が「SNS 2／未分類 1」と出ている横で帯が「流入元 0件」になっていた。
   // フォルダ列の件数は `accountFilteredRows` から数えている（下の `:genreCount`）ので、
   // 同じ画面の中で数え方が2通りある状態だった。帯もそちらに揃える。
   const accountRouteCount = summary?.routeTotal ?? accountFilteredRows.length
-  const activeRouteCount = accountFilteredRows.filter((r) => r.source !== 'orphan').length
+  const activeRouteCount = accountFilteredRows.filter((r) => r.source !== 'orphan' && r.isActive === true).length
+  const stoppedRouteCount = accountFilteredRows.filter((r) => r.source !== 'orphan' && r.isActive === false).length
   /*
     **読み込めていないときに0件と書かない。**
 
@@ -754,7 +757,7 @@ function InflowLinksPageInner({
             routeCountAvailable
               ? summary?.routeTotal != null
                 ? '4つのフォルダ・今月 8/01〜8/25'
-                : `稼働中 ${activeRouteCount}`
+                : `受付中 ${activeRouteCount}・停止中 ${stoppedRouteCount}`
               : loading
                 ? '読み込んでいます'
                 : '読み込めませんでした'
@@ -1146,6 +1149,7 @@ function InflowLinksPageInner({
                           onClick={() => onCopy(r.refCode, r.refCode)}
                           className="text-[11px] font-medium text-action hover:underline"
                           aria-label={`${r.name}のURLをコピー`}
+                          title={r.isActive === false ? '停止中のため、このURLを開いても友だち追加できません' : undefined}
                         >
                           {copyFailedId === r.refCode ? 'コピー失敗' : copiedId === r.refCode ? '済み' : 'コピー'}
                         </button>
@@ -1514,7 +1518,7 @@ function BulkRoutesDialog({
               {
                 value: 'pause' as const,
                 label: 'まとめて停止する',
-                note: `選んだ中の稼働中 ${pauseTargets.length.toLocaleString('ja-JP')}件が対象です。`,
+                note: `選んだ中の受付中 ${pauseTargets.length.toLocaleString('ja-JP')}件が対象です。`,
                 count: pauseTargets.length,
               },
               {

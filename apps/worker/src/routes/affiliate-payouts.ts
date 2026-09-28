@@ -74,12 +74,19 @@ function csvCell(value: string | number): string {
 
 function simplePdf(snapshot: {
   affiliateCode: string; periodFrom: string; periodTo: string; totalAmount: number; currency: string;
+  grossAmount?: number; deductionAmount?: number;
 }): Uint8Array {
   const ascii = (value: string) => value.replace(/[^\x20-\x7E]/g, '?').replace(/[()\\]/g, '\\$&');
+  const deduction = snapshot.deductionAmount ?? 0;
   const lines = [
     'Affiliate payment statement',
     `Affiliate: ${ascii(snapshot.affiliateCode)}`,
     `Period: ${ascii(snapshot.periodFrom)} - ${ascii(snapshot.periodTo)}`,
+    // R288: 取消の差し引きがあるときだけ内訳を分けて出す。
+    ...(deduction > 0 ? [
+      `Gross: ${snapshot.currency} ${snapshot.grossAmount ?? snapshot.totalAmount + deduction}`,
+      `Adjustment: -${snapshot.currency} ${deduction}`,
+    ] : []),
     `Amount: ${snapshot.currency} ${snapshot.totalAmount}`,
   ];
   const stream = `BT /F1 14 Tf 72 760 Td ${lines.map((line, index) => `${index ? '0 -24 Td ' : ''}(${line}) Tj`).join(' ')} ET`;

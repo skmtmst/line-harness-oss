@@ -1802,12 +1802,54 @@ export async function listConversionDefinitionEvents(
   });
 }
 
+type ReportLedgers = { affiliate: boolean; reversals: boolean };
+
+/** 取消台帳の接続状況。無い環境(移行前)では取消判定を0に倒す。 */
+async function reportLedgerAvailability(db: D1Database): Promise<ReportLedgers> {
+  const tables = await db
+    .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('affiliate_adjustments','affiliate_reward_entries','conversion_event_reversals')")
+    .all<{ name: string }>();
+  const names = new Set(tables.results.map((row) => row.name));
+  return {
+    affiliate: names.has('affiliate_adjustments') && names.has('affiliate_reward_entries'),
+    reversals: names.has('conversion_event_reversals'),
+  };
+}
+
+/**
+ * R284/R285: 取消の正本は「成果単位」の判定にする。
+ * 報酬の取消調整が付いた成果、または取消台帳の最新が 'reverse' の成果を
+ * 取消扱いにする(再計上 = 最新が 'restore' は数え直しに戻る)。
+ * 判定はイベント一覧と同じ定義で、期間の区切りは成果の発生日(ce.created_at)、
+ * 範囲の絞りは成果地点の所属(cp.line_account_id)でかける。
+ * 合計・日別・地点別・経路別はすべてこの同じ集合から引く。
+ */
+function cancelledEventPredicate(ledgers: ReportLedgers): string {
+  const parts: string[] = [];
+  if (ledgers.affiliate) {
+    parts.push(`EXISTS(SELECT 1 FROM affiliate_reward_entries re
+              JOIN affiliate_adjustments aa ON aa.source_entry_id = re.id
+             WHERE re.conversion_event_id = ce.id AND aa.reason_type = 'cancel')`);
+  }
+  if (ledgers.reversals) {
+    parts.push(`EXISTS(SELECT 1 FROM conversion_event_reversals r
+             WHERE r.conversion_event_id = ce.id AND r.kind = 'reverse'
+               AND NOT EXISTS (SELECT 1 FROM conversion_event_reversals newer
+                                WHERE newer.conversion_event_id = r.conversion_event_id
+                                  AND (newer.created_at > r.created_at
+                                    OR (newer.created_at = r.created_at AND newer.rowid > r.rowid))))`);
+  }
+  return parts.length > 0 ? `(${parts.join(' OR ')})` : '0';
+}
+
 type ReportRow = {
   conversion_point_id: string;
   conversion_point_name: string;
   event_type: string;
   total_count: number;
   total_value: number;
+  cancelled_count: number;
+  cancelled_value: number;
 };
 
 async function reportRows(
@@ -1816,12 +1858,15 @@ async function reportRows(
   lineAccountId: string | undefined,
   from: string,
   to: string,
+  cancelledSql: string,
 ): Promise<ReportRow[]> {
   const account = scope ? accountWhere('cp.', scope, lineAccountId) : { sql: '1 = 1', values: [] as unknown[] };
   const rows = await db.prepare(`SELECT cp.id AS conversion_point_id,
       cp.name AS conversion_point_name, cp.event_type,
       COUNT(ce.id) AS total_count,
-      COALESCE(SUM(CASE WHEN ce.id IS NULL THEN 0 ELSE COALESCE(ce.value_snapshot, 0) END), 0) AS total_value
+      COALESCE(SUM(CASE WHEN ce.id IS NULL THEN 0 ELSE COALESCE(ce.value_snapshot, 0) END), 0) AS total_value,
+      COALESCE(SUM(CASE WHEN ce.id IS NOT NULL AND ${cancelledSql} THEN 1 ELSE 0 END), 0) AS cancelled_count,
+      COALESCE(SUM(CASE WHEN ${cancelledSql} THEN COALESCE(ce.value_snapshot, 0) ELSE 0 END), 0) AS cancelled_value
     FROM conversion_points cp
     LEFT JOIN conversion_events ce ON ce.conversion_point_id = cp.id
       AND substr(ce.created_at, 1, 10) >= ? AND substr(ce.created_at, 1, 10) <= ?
@@ -1853,12 +1898,14 @@ export async function getConversionReport(
   db: D1Database,
   opts: { startDate?: string; endDate?: string; scope?: ConversionDefinitionScope } = {},
 ): Promise<ConversionReport[]> {
+  const ledgers = await reportLedgerAvailability(db);
   const rows = await reportRows(
     db,
     opts.scope ?? null,
     undefined,
     opts.startDate ? `${opts.startDate} 00:00:00` : '0001-01-01 00:00:00',
     opts.endDate ? `${opts.endDate} 23:59:59` : '9999-12-31 23:59:59',
+    cancelledEventPredicate(ledgers),
   );
   return rows.map((row) => ({
     conversionPointId: row.conversion_point_id,
@@ -1878,38 +1925,29 @@ export async function getConversionDefinitionReport(
     previousRange: ConversionDefinitionRange;
   },
 ) {
+  const ledgers = await reportLedgerAvailability(db);
+  const cancelledSql = cancelledEventPredicate(ledgers);
   const [current, previous] = await Promise.all([
-    reportRows(db, input.scope, input.lineAccountId, input.range.from, input.range.to),
-    reportRows(db, input.scope, input.lineAccountId, input.previousRange.from, input.previousRange.to),
+    reportRows(db, input.scope, input.lineAccountId, input.range.from, input.range.to, cancelledSql),
+    reportRows(db, input.scope, input.lineAccountId, input.previousRange.from, input.previousRange.to, cancelledSql),
   ]);
-  const [currentCancellations, previousCancellations] = await Promise.all([
-    cancellationMetrics(db, input.range.from, input.range.to),
-    cancellationMetrics(db, input.previousRange.from, input.previousRange.to),
-  ]);
-  // #819: 成果イベントの取消台帳も純数から引く。
-  const [currentReversals, previousReversals] = await Promise.all([
-    reversalMetrics(db, input.range.from, input.range.to),
-    reversalMetrics(db, input.previousRange.from, input.previousRange.to),
-  ]);
-  const subtractFor = (pointId: string, cancellations: Map<string, CancellationMetric>, reversals: Map<string, CancellationMetric>) => ({
-    count: (cancellations.get(pointId)?.count ?? 0) + (reversals.get(pointId)?.count ?? 0),
-    value: (cancellations.get(pointId)?.value ?? 0) + (reversals.get(pointId)?.value ?? 0),
-  });
+  const sumTotals = (rows: ReportRow[]) => rows.reduce((sum, row) => ({
+    count: sum.count + Number(row.total_count),
+    value: sum.value + Number(row.total_value),
+    cancelledCount: sum.cancelledCount + Number(row.cancelled_count),
+    cancelledValue: sum.cancelledValue + Number(row.cancelled_value),
+  }), { count: 0, value: 0, cancelledCount: 0, cancelledValue: 0 });
+  const totals = sumTotals(current);
+  const previousTotals = sumTotals(previous);
+  const net = {
+    count: totals.count - totals.cancelledCount,
+    value: totals.value - totals.cancelledValue,
+  };
+  const previousNet = {
+    count: previousTotals.count - previousTotals.cancelledCount,
+    value: previousTotals.value - previousTotals.cancelledValue,
+  };
   const previousById = new Map(previous.map((row) => [row.conversion_point_id, row]));
-  const totals = current.reduce((sum, row) => {
-    const subtract = subtractFor(row.conversion_point_id, currentCancellations, currentReversals);
-    return {
-      count: sum.count + Number(row.total_count) - subtract.count,
-      value: sum.value + Number(row.total_value) - subtract.value,
-    };
-  }, { count: 0, value: 0 });
-  const previousTotals = previous.reduce((sum, row) => {
-    const subtract = subtractFor(row.conversion_point_id, previousCancellations, previousReversals);
-    return {
-      count: sum.count + Number(row.total_count) - subtract.count,
-      value: sum.value + Number(row.total_value) - subtract.value,
-    };
-  }, { count: 0, value: 0 });
   const account = accountWhere('cp.', input.scope, input.lineAccountId);
   // N-265: 経路別の母数。ref_tracking に残る「その経路を踏んだ友だち数」を
   // 分母にする。created_at は JST ISO(+09:00)と datetime() 書式が混在するため、
@@ -1918,22 +1956,26 @@ export async function getConversionDefinitionReport(
   const [dailyRows, routeRows, audienceRows] = await Promise.all([
     db.prepare(`SELECT substr(ce.created_at, 1, 10) AS day, cp.id AS conversion_point_id,
                        cp.name AS conversion_point_name, COUNT(*) AS total_count,
-                       COALESCE(SUM(COALESCE(ce.value_snapshot, 0)), 0) AS total_value
+                       COALESCE(SUM(COALESCE(ce.value_snapshot, 0)), 0) AS total_value,
+                       COALESCE(SUM(CASE WHEN ${cancelledSql} THEN 1 ELSE 0 END), 0) AS cancelled_count,
+                       COALESCE(SUM(CASE WHEN ${cancelledSql} THEN COALESCE(ce.value_snapshot, 0) ELSE 0 END), 0) AS cancelled_value
                   FROM conversion_events ce
                   JOIN conversion_points cp ON cp.id = ce.conversion_point_id
                  WHERE substr(ce.created_at, 1, 10) >= ? AND substr(ce.created_at, 1, 10) <= ? AND ${account.sql}
                  GROUP BY day, cp.id ORDER BY day ASC, cp.id ASC`)
       .bind(input.range.from.slice(0, 10), input.range.to.slice(0, 10), ...account.values)
-      .all<{ day: string; conversion_point_id: string; conversion_point_name: string; total_count: number; total_value: number }>(),
+      .all<{ day: string; conversion_point_id: string; conversion_point_name: string; total_count: number; total_value: number; cancelled_count: number; cancelled_value: number }>(),
     db.prepare(`SELECT ce.conversion_point_id, COALESCE(ce.attributed_ref_code, 'unattributed') AS route_key,
                        COUNT(*) AS total_count,
-                       COALESCE(SUM(COALESCE(ce.value_snapshot, 0)), 0) AS total_value
+                       COALESCE(SUM(COALESCE(ce.value_snapshot, 0)), 0) AS total_value,
+                       COALESCE(SUM(CASE WHEN ${cancelledSql} THEN 1 ELSE 0 END), 0) AS cancelled_count,
+                       COALESCE(SUM(CASE WHEN ${cancelledSql} THEN COALESCE(ce.value_snapshot, 0) ELSE 0 END), 0) AS cancelled_value
                   FROM conversion_events ce
                   JOIN conversion_points cp ON cp.id = ce.conversion_point_id
                  WHERE substr(ce.created_at, 1, 10) >= ? AND substr(ce.created_at, 1, 10) <= ? AND ${account.sql}
                  GROUP BY ce.conversion_point_id, route_key ORDER BY total_count DESC, route_key ASC`)
       .bind(input.range.from.slice(0, 10), input.range.to.slice(0, 10), ...account.values)
-      .all<{ conversion_point_id: string; route_key: string; total_count: number; total_value: number }>(),
+      .all<{ conversion_point_id: string; route_key: string; total_count: number; total_value: number; cancelled_count: number; cancelled_value: number }>(),
     db.prepare(`SELECT rt.ref_code, COUNT(DISTINCT rt.friend_id) AS audience
                   FROM ref_tracking rt
                   JOIN friends f ON f.id = rt.friend_id
@@ -1958,76 +2000,87 @@ export async function getConversionDefinitionReport(
   };
   const routesByDefinition = new Map<string, Array<{ routeKey: string; label: string; attributionState: 'attributed' | 'unattributed'; netCount: number; netValue: number; audience: number | null; conversionRate: number | null }>>();
   for (const row of routeRows.results) {
-    const netCount = Number(row.total_count);
-    const route = { routeKey: row.route_key, label: row.route_key === 'unattributed' ? '未帰属' : row.route_key, attributionState: row.route_key === 'unattributed' ? 'unattributed' as const : 'attributed' as const, netCount, netValue: Number(row.total_value), ...routeMetric(row.route_key, netCount) };
+    const netCount = Number(row.total_count) - Number(row.cancelled_count);
+    const netValue = Number(row.total_value) - Number(row.cancelled_value);
+    const route = { routeKey: row.route_key, label: row.route_key === 'unattributed' ? '未帰属' : row.route_key, attributionState: row.route_key === 'unattributed' ? 'unattributed' as const : 'attributed' as const, netCount, netValue, ...routeMetric(row.route_key, netCount) };
     routesByDefinition.set(row.conversion_point_id, [...(routesByDefinition.get(row.conversion_point_id) ?? []), route]);
   }
   const byDefinition = current.map((row) => {
     const before = previousById.get(row.conversion_point_id);
-    const currentSubtract = subtractFor(row.conversion_point_id, currentCancellations, currentReversals);
-    const previousSubtract = subtractFor(row.conversion_point_id, previousCancellations, previousReversals);
+    const cancelledCount = Number(row.cancelled_count);
+    const cancelledValue = Number(row.cancelled_value);
+    const beforeCancelledCount = Number(before?.cancelled_count ?? 0);
+    const beforeCancelledValue = Number(before?.cancelled_value ?? 0);
+    const netCount = Number(row.total_count) - cancelledCount;
+    const netValue = Number(row.total_value) - cancelledValue;
+    const beforeNetCount = Number(before?.total_count ?? 0) - beforeCancelledCount;
+    const beforeNetValue = Number(before?.total_value ?? 0) - beforeCancelledValue;
     return {
       conversionPointId: row.conversion_point_id,
       conversionPointName: row.conversion_point_name,
       sourceType: row.event_type,
-      netCount: Number(row.total_count) - currentSubtract.count,
-      netValue: Number(row.total_value) - currentSubtract.value,
-      previousNetCount: Number(before?.total_count ?? 0) - previousSubtract.count,
-      previousNetValue: Number(before?.total_value ?? 0) - previousSubtract.value,
-      countChange: (Number(row.total_count) - currentSubtract.count) - (Number(before?.total_count ?? 0) - previousSubtract.count),
-      cancellationCount: currentSubtract.count > 0 ? currentSubtract.count : null,
-      cancellationValue: currentSubtract.value > 0 ? currentSubtract.value : null,
+      netCount,
+      netValue,
+      previousNetCount: beforeNetCount,
+      previousNetValue: beforeNetValue,
+      countChange: netCount - beforeNetCount,
+      cancellationCount: cancelledCount > 0 ? cancelledCount : null,
+      cancellationValue: cancelledValue > 0 ? cancelledValue : null,
       routes: routesByDefinition.get(row.conversion_point_id) ?? [],
     };
   });
   const fastestGrowing = byDefinition
     .filter((row) => row.netCount > 0 || row.previousNetCount > 0)
     .sort((a, b) => b.countChange - a.countChange)[0] ?? null;
+  const ledgersConnected = ledgers.affiliate || ledgers.reversals;
   return {
     range: input.range,
     previousRange: input.previousRange,
     kpis: {
+      // R284: recorded は取消前の総数。純数(net)とは別に持つ。
       recordedCount: totals.count,
-      reversedCount: ([...currentCancellations.values()].reduce((sum, metric) => sum + metric.count, 0) + [...currentReversals.values()].reduce((sum, metric) => sum + metric.count, 0)) || null,
-      netCount: totals.count,
-      netValue: totals.value,
-      averageNetValue: totals.count > 0 ? Math.round((totals.value / totals.count) * 100) / 100 : null,
-      previousNetCount: previousTotals.count,
-      previousNetValue: previousTotals.value,
-      countChangeRate: previousTotals.count > 0
-        ? Math.round(((totals.count - previousTotals.count) / previousTotals.count) * 10_000) / 100
+      recordedValue: totals.value,
+      reversedCount: totals.cancelledCount || null,
+      netCount: net.count,
+      netValue: net.value,
+      averageNetValue: net.count > 0 ? Math.round((net.value / net.count) * 100) / 100 : null,
+      previousNetCount: previousNet.count,
+      previousNetValue: previousNet.value,
+      countChangeRate: previousNet.count > 0
+        ? Math.round(((net.count - previousNet.count) / previousNet.count) * 10_000) / 100
         : null,
-      reversalState: currentCancellations.size > 0 || currentReversals.size > 0 ? 'available' as const : 'unavailable' as const,
-      reversalReason: currentCancellations.size > 0 || currentReversals.size > 0 ? '取消イベント台帳から集計' : '取消イベント台帳はまだ接続されていません',
-      cancellationCount: ([...currentCancellations.values()].reduce((sum, metric) => sum + metric.count, 0) + [...currentReversals.values()].reduce((sum, metric) => sum + metric.count, 0)) || null,
-      cancellationValue: ([...currentCancellations.values()].reduce((sum, metric) => sum + metric.value, 0) + [...currentReversals.values()].reduce((sum, metric) => sum + metric.value, 0)) || null,
+      reversalState: ledgersConnected ? 'available' as const : 'unavailable' as const,
+      reversalReason: ledgersConnected ? '取消イベント台帳から集計' : '取消イベント台帳はまだ接続されていません',
+      cancellationCount: totals.cancelledCount || null,
+      cancellationValue: totals.cancelledValue || null,
       fastestGrowing,
     },
     daily: dailyRows.results.map((row) => ({
       day: row.day,
       conversionPointId: row.conversion_point_id,
       conversionPointName: row.conversion_point_name,
-      netCount: Number(row.total_count),
-      netValue: Number(row.total_value),
+      netCount: Number(row.total_count) - Number(row.cancelled_count),
+      netValue: Number(row.total_value) - Number(row.cancelled_value),
     })),
     byDefinition,
     byRoute: [...routeRows.results].reduce((all, row) => {
+      const netCount = Number(row.total_count) - Number(row.cancelled_count);
+      const netValue = Number(row.total_value) - Number(row.cancelled_value);
       const existing = all.find((item) => item.routeKey === row.route_key);
       if (existing) {
-        existing.netCount += Number(row.total_count);
-        existing.netValue += Number(row.total_value);
+        existing.netCount += netCount;
+        existing.netValue += netValue;
         const metric = routeMetric(row.route_key, existing.netCount);
         existing.audience = metric.audience;
         existing.conversionRate = metric.conversionRate;
         return all;
       }
-      const netCount = Number(row.total_count);
       all.push({
       routeKey: row.route_key,
       label: row.route_key === 'unattributed' ? '未帰属' : row.route_key,
       attributionState: row.route_key === 'unattributed' ? 'unattributed' : 'attributed',
       netCount,
-      netValue: Number(row.total_value),
+      netValue,
       ...routeMetric(row.route_key, netCount),
       });
       return all;
