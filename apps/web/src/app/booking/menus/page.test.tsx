@@ -272,6 +272,98 @@ describe('既存メニューの編集窓: 共有設備の割当', () => {
   })
 })
 
+describe('R305 編集窓は共通Dialog（フォーカス・Esc・破棄確認）', () => {
+  function menu() {
+    return {
+      id: 'menu-1',
+      name: 'カット',
+      category_label: null,
+      description: null,
+      duration_minutes: 60,
+      buffer_after_minutes: 0,
+      base_price: 8000,
+      price_mode: 'fixed',
+      sort_order: 0,
+      is_active: 1,
+      auto_tag_id: null as string | null,
+      concurrent_capacity: 1,
+      booking_window_days: null,
+      cutoff_hours_before: null,
+      cancel_deadline_hours_before: null,
+      intake_question: null,
+      assigned_staff: [{ id: 'staff-a', display_name: '担当A' }],
+      assigned_resources: [],
+      version: 1,
+    }
+  }
+
+  async function openEditor() {
+    fixture.listMenus = vi.fn(async () => ({ menus: [menu()] }))
+    render(<><MenusPage /><ToastHost /></>)
+    fireEvent.click(await screen.findByRole('button', { name: '中身を見る' }))
+    await screen.findByText('メニュー編集')
+  }
+
+  test('窓はrole=dialog・aria-modalを持ち、見出しと結び付く', async () => {
+    await openEditor()
+    const dialog = screen.getByRole('dialog', { name: 'メニュー編集' })
+    expect(dialog.getAttribute('aria-modal')).toBe('true')
+  })
+
+  test('変えずにEscapeすると窓が閉じる', async () => {
+    await openEditor()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByText('メニュー編集')).toBeNull())
+  })
+
+  test('名前を変えてEscapeすると破棄確認が出て、編集窓は残る', async () => {
+    await openEditor()
+    const dialog = screen.getByRole('dialog', { name: 'メニュー編集' })
+    fireEvent.change(within(dialog).getByLabelText(/名前/), { target: { value: 'カラー' } })
+    fireEvent.keyDown(document, { key: 'Escape' })
+    await screen.findByText('変更を破棄しますか？')
+    // 破棄を選ぶまで編集窓は閉じない。
+    expect(screen.getByRole('dialog', { name: 'メニュー編集' })).toBeTruthy()
+  })
+
+  test('破棄確認で「破棄する」を押すと閉じ、「編集に戻る」では入力を残して戻る', async () => {
+    await openEditor()
+    const dialog = screen.getByRole('dialog', { name: 'メニュー編集' })
+    const nameInput = within(dialog).getByLabelText(/名前/) as HTMLInputElement
+    fireEvent.change(nameInput, { target: { value: 'カラー' } })
+    fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
+    await screen.findByText('変更を破棄しますか？')
+
+    // 戻るを選ぶと入力を残したまま編集へ戻る。
+    fireEvent.click(screen.getByRole('button', { name: '編集に戻る' }))
+    await waitFor(() => expect(screen.queryByText('変更を破棄しますか？')).toBeNull())
+    expect(nameInput.value).toBe('カラー')
+    expect(screen.getByRole('dialog', { name: 'メニュー編集' })).toBeTruthy()
+
+    // 破棄を選ぶと窓ごと閉じる。
+    fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
+    await screen.findByText('変更を破棄しますか？')
+    fireEvent.click(screen.getByRole('button', { name: '破棄する' }))
+    await waitFor(() => expect(screen.queryByText('メニュー編集')).toBeNull())
+  })
+
+  test('Tabは窓の中で循環する（最後→先頭・先頭→最後）', async () => {
+    await openEditor()
+    const dialog = screen.getByRole('dialog', { name: 'メニュー編集' })
+    const closeButton = within(dialog).getByRole('button', { name: '閉じる' })
+    const saveButton = within(dialog).getByRole('button', { name: '保存' })
+
+    // 最後にいる状態でTabを押すと先頭（×）へ戻り、背後へ抜けない。
+    saveButton.focus()
+    fireEvent.keyDown(document, { key: 'Tab' })
+    expect(document.activeElement).toBe(closeButton)
+
+    // 先頭でShift+Tabを押すと最後（保存）へ回り、背後へ抜けない。
+    fireEvent.keyDown(document, { key: 'Tab', shiftKey: true })
+    expect(document.activeElement).toBe(saveButton)
+  })
+})
+
 describe('既存メニューの編集窓: 予約申込時に自動付与するタグ', () => {
   function menu(overrides: Record<string, unknown> = {}) {
     return {

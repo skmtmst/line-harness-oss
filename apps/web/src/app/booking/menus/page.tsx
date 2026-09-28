@@ -1,6 +1,5 @@
 'use client'
 
-import { X } from 'lucide-react'
 import Select from '@/components/shared/select'
 import { TimeField } from '@/components/shared/date-time-field'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -18,6 +17,7 @@ import Pagination from '@/components/shared/pagination'
 import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { RowActions } from '@/components/shared/row-actions'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Dialog from '@/components/shared/dialog'
 import {
   api,
   ApiError,
@@ -970,6 +970,35 @@ function EditMenuModal({
   ))
   const resourceSubmitRef = useRef(false)
   const resourceLoadGenerationRef = useRef(0)
+  /** 破棄確認の表示。×・Esc・背景・キャンセルは dirty のときだけここへ寄せる。 */
+  const [showDiscard, setShowDiscard] = useState(false)
+  /*
+   * R305: 未保存の変更があるか。フォームと設備の割当を開いた直後と比べ、
+   * 変わっていれば閉じる前に破棄確認を挟む。保存の成否自体は submit 側の
+   * 扱いのまま変えない。
+   */
+  const initialSnapshot = useRef<string | null>(null)
+  if (initialSnapshot.current === null) {
+    initialSnapshot.current = JSON.stringify({
+      form: menu,
+      resources: [...(menu.assigned_resources ?? [])]
+        .map((item) => [item.resourceId, item.quantity] as const)
+        .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
+    })
+  }
+  const dirty = JSON.stringify({
+    form,
+    resources: [...resourceAssignments.entries()]
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
+  }) !== initialSnapshot.current
+  /** 閉じる操作は共通 Dialog（×・Esc・背景）から全部ここへ集まる。 */
+  function requestClose() {
+    if (dirty && !saving) {
+      setShowDiscard(true)
+      return
+    }
+    onClose()
+  }
 
   useEffect(() => {
     const generation = ++resourceLoadGenerationRef.current
@@ -1108,16 +1137,36 @@ function EditMenuModal({
     }
   }
 
+  /*
+   * R305: 手作りの窓を共通の Dialog へ置き換えた。初期フォーカス・Tabの循環・
+   * Esc取消・閉じた後の元ボタンへの復帰は共通部品が持つ。×・Esc・背景・
+   * キャンセルは requestClose へ集め、未保存なら破棄確認を挟む。
+   */
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-canvas rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between gap-3 border-b border-hairline px-6 py-4">
-          <h2 className="text-base font-semibold">メニュー編集</h2>
-          <button type="button" onClick={onClose} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
-            <X aria-hidden="true" className="h-5 w-5" />
-          </button>
-        </div>
-        <div className="px-6 py-4 space-y-4">
+    <>
+      <Dialog
+        open
+        title="メニュー編集"
+        onCancel={requestClose}
+        busy={saving}
+        footer={
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <Button type="button" onClick={requestClose} disabled={saving}>
+              キャンセル
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              onClick={() => void submit()}
+              disabled={saving || !canEdit}
+              title={canEdit ? undefined : '予約メニューの変更権限がありません'}
+            >
+              {saving ? '保存中…' : '保存'}
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
           <Field label="名前" required>
             <input
               type="text"
@@ -1347,7 +1396,7 @@ function EditMenuModal({
           >有効（顧客に表示する）</Checkbox>
           {err && (
             <div role="alert">
-              <p className="text-xs text-red-600">{err}</p>
+              <p className="text-danger text-xs">{err}</p>
               {conflict && (
                 <button
                   type="button"
@@ -1360,24 +1409,18 @@ function EditMenuModal({
             </div>
           )}
         </div>
-        <div className="px-6 py-4 border-t border-hairline flex gap-2 justify-end">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-ink-secondary bg-canvas-sunken hover:bg-gray-200 rounded-lg"
-          >
-            キャンセル
-          </button>
-          <button
-            onClick={submit}
-            disabled={saving || !canEdit}
-            title={canEdit ? undefined : '予約メニューの変更権限がありません'}
-            className="bg-accent-deep text-on-accent rounded-control px-4 py-2 text-sm font-medium transition-colors hover:brightness-92 disabled:opacity-50"
-          >
-            {saving ? '保存中…' : '保存'}
-          </button>
-        </div>
-      </div>
-    </div>
+      </Dialog>
+      <ConfirmDialog
+        open={showDiscard}
+        title="変更を破棄しますか？"
+        description="保存していない変更は消えます。閉じてよければ破棄を選んでください。"
+        confirmLabel="破棄する"
+        cancelLabel="編集に戻る"
+        primaryAction="cancel"
+        onConfirm={onClose}
+        onCancel={() => setShowDiscard(false)}
+      />
+    </>
   )
 }
 
@@ -1386,7 +1429,7 @@ function Field({ label, required, children }: { label: string; required?: boolea
     <label className="block">
       <span className="block text-xs font-medium text-ink-secondary mb-1">
         {label}
-        {required && <span className="text-red-500 ml-0.5">*</span>}
+        {required && <span className="text-danger ml-0.5">*</span>}
       </span>
       {children}
     </label>
