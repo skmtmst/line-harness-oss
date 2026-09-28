@@ -2690,6 +2690,9 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
         .sort((left, right) => left.sortOrder - right.sortOrder),
     }
   }
+  // R250: 終了後の移動先にしているシナリオの一覧。型どおり `{items,total}`。
+  const scenarioMoveReferrers = pathname.match(/^\/api\/scenarios\/([^/]+)\/move-referrers$/)
+  if (scenarioMoveReferrers) return { success: true, data: { items: [], total: 0 } }
   const scenario = pathname.match(/^\/api\/scenarios\/([^/]+)$/)
   if (scenario) {
     // 通を配列で返す。`{items,total}` のままだと `scenario.steps` で落ちる。

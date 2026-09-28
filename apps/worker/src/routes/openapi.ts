@@ -2459,6 +2459,13 @@ const spec = {
         responses: { '200': { description: 'Scenario triggers' }, '403': { description: 'Scenario view permission required' }, '404': { description: 'Not found in account scope' } },
       },
     },
+    '/api/scenarios/{id}/move-referrers': {
+      get: {
+        tags: ['Scenarios'], summary: '終了後の移動先にしているシナリオを確認',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Referring scenarios for delete confirmation' }, '403': { description: 'Scenario view permission required' }, '404': { description: 'Not found in account scope' } },
+      },
+    },
     '/api/scenarios/{id}/simulate': {
       post: {
         tags: ['Scenarios'],
