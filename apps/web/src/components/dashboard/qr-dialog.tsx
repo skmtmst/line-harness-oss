@@ -101,8 +101,15 @@ export default function QrDialog({
   const routes = routesProp ?? fetchedRoutes ?? []
   const routesPending = routesProp !== undefined ? (routesPendingProp ?? false) : fetchedRoutes === null
   const [routeId, setRouteId] = useState(initialRouteId)
+  /*
+   * 一覧に無いIDを指定されたときだけ取り直す。止めた経路は一覧から
+   * 外れるため、「見つからない」と「止めている」を分けるための1回。
+   */
+  const [lookedUpRoute, setLookedUpRoute] = useState<EntryRoute | null>(null)
   const [size, setSize] = useState(SIZES[0].value)
   const [format, setFormat] = useState(FORMATS[0].value)
+  /* 印刷用PDFの取り寄せ状態。失敗してもダイアログは閉じない。 */
+  const [pdfState, setPdfState] = useState<'idle' | 'working' | 'failed'>('idle')
   /*
    * コピーの結果は3状態。失敗しても押す前と同じ見た目だと、
    * 配布に使うURLを取れていないことに気づけない（DASH-29）。
@@ -113,7 +120,10 @@ export default function QrDialog({
   // 開くたびに呼び出し元の選択に合わせる。閉じている間に向こうで
   // 経路を変えていたら、次に開いたときはそちらが正。
   useEffect(() => {
-    if (open) setRouteId(initialRouteId)
+    if (open) {
+      setRouteId(initialRouteId)
+      setPdfState('idle')
+    }
   }, [open, initialRouteId])
 
   useEffect(() => {
@@ -121,8 +131,7 @@ export default function QrDialog({
     let cancelled = false
     void api.entryRoutes.list()
       .then((res) => {
-        // 停止中の経路のQRを配ると、読み取っても友だち追加できない。
-        if (!cancelled) setFetchedRoutes(res.success ? res.data.filter((r) => r.isActive) : [])
+        if (!cancelled) setFetchedRoutes(res.success ? res.data : [])
       })
       .catch(() => {
         // 経路一覧だけが取れなくても、基本の追加URLのQRは表示できる。
@@ -135,19 +144,43 @@ export default function QrDialog({
 
   const base = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '')
   const route = routes.find((r) => r.id === routeId)
+    ?? (lookedUpRoute?.id === routeId ? lookedUpRoute : null)
   /*
-   * 指定された経路が現在の一覧に無い（停止・削除・別アカウントの経路）
-   * ときは、基本URLのQRへ黙って置き換えない。経路を選び直すまで
-   * QR・コピー・ダウンロードを止める（DASH-09 / DASH-28 の方向）。
+   * 一覧に無いIDは1件だけ取り直す。止めた経路は「停止しています」と出し、
+   * 削除・別アカウントの経路は「見つからない」と出す。基本URLのQRへ
+   * 黙って置き換えない。経路を選び直すまでQR・コピー・ダウンロードを
+   * 止める（DASH-09 / DASH-28 の方向）。
    */
+  useEffect(() => {
+    if (!open || routeId === '' || routesPending) return
+    if (routes.some((r) => r.id === routeId)) {
+      setLookedUpRoute(null)
+      return
+    }
+    let cancelled = false
+    setLookedUpRoute(null)
+    void api.entryRoutes.get(routeId)
+      .then((res) => {
+        if (!cancelled && res.success) setLookedUpRoute(res.data)
+      })
+      .catch(() => {
+        // 取れなければ「見つからない」のまま。ここでは何も出さない。
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [open, routeId, routes, routesPending])
+  /* 止めた経路は QR も印刷も出さない（M）。選択肢にも出さない。 */
+  const routeStopped = route != null && !route.isActive
   const routeMissing = routeId !== '' && !route && !routesPending
-  const link = route ? `${base}/r/${route.refCode}` : baseLink
+  const link = route && route.isActive ? `${base}/r/${route.refCode}` : baseLink
+  const blocked = routeMissing || routeStopped
 
   useEffect(() => {
     let cancelled = false
     setQrDataUrl('')
     // PERF-09: 閉じている間は QR を作らない。開いた時点で qrcode を読む。
-    if (!open || routeMissing) {
+    if (!open || blocked) {
       return () => { cancelled = true }
     }
     void qrToDataURL(link, {
@@ -160,7 +193,7 @@ export default function QrDialog({
     return () => {
       cancelled = true
     }
-  }, [link, routeMissing, open])
+  }, [link, blocked, open])
 
   // Escape・Tabの循環・背景スクロール停止・閉じたあとのフォーカス戻しは
   // 共通のoverlay作法に揃える。保存中の処理はないためEscapeは常に閉じる。
@@ -182,9 +215,9 @@ export default function QrDialog({
    * 基本のときはAPIが返した公式プロフィール短縮URLを優先する。
    * 段階配備中の旧Workerでは公式ID（basicId）から同じ行き先を組み立てる。
    */
-  const profileUrl = route
+  const profileUrl = route && route.isActive
     ? link
-    : routeMissing
+    : blocked
       ? null
       : resolveOfficialProfileUrl(officialProfileUrl, accountBasicId)
 
@@ -201,6 +234,41 @@ export default function QrDialog({
       setCopyState('failed')
     }
   }
+
+  /*
+   * 印刷用PDFはサーバーで作る（M）。止めた経路は409で断られる。
+   * 基本の追加URLには経路IDが無いため、従来どおりブラウザの印刷を使う。
+   */
+  const downloadPdf = async () => {
+    if (!route || !route.isActive) return
+    setPdfState('working')
+    try {
+      const blob = await api.entryRoutes.qrPdf(route.id)
+      const objectUrl = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = objectUrl
+      anchor.download = `qr-${route.refCode}.pdf`
+      document.body.appendChild(anchor)
+      anchor.click()
+      anchor.remove()
+      URL.revokeObjectURL(objectUrl)
+      setPdfState('idle')
+    } catch {
+      setPdfState('failed')
+    }
+  }
+
+  /* 止めた記録の表示用。読めない日時は出さない。 */
+  const stoppedDetail = (() => {
+    if (!routeStopped || !route) return null
+    const reason = route.stoppedReason?.trim() || null
+    const at = route.stoppedAt ? new Date(route.stoppedAt) : null
+    const when = at && Number.isFinite(at.getTime())
+      ? at.toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' })
+      : null
+    if (reason && when) return `${reason}（${when}に停止）`
+    return reason ?? (when ? `${when}に停止` : null)
+  })()
 
   const printQr = () => {
     const printWindow = window.open('', '_blank', 'width=720,height=820')
@@ -266,7 +334,12 @@ export default function QrDialog({
               パネルの内側に収まらず横にはみ出していた。正方形は保つ。
             */}
             <div className="bg-canvas-sunken rounded-panel flex aspect-square w-full max-w-[280px] items-center justify-center">
-              {routeMissing ? (
+              {routeStopped ? (
+                <p className="text-ink-secondary px-4 text-center text-xs leading-relaxed" role="alert">
+                  この経路は停止しています。QRコードは表示しません。
+                  {stoppedDetail ? <><br />{stoppedDetail}</> : null}
+                </p>
+              ) : routeMissing ? (
                 <p className="text-ink-faint max-w-[220px] px-4 text-center text-xs leading-relaxed">
                   選んだ経路はこのアカウントでは見つかりません。<br />経路を選び直してください。
                 </p>
@@ -313,10 +386,15 @@ export default function QrDialog({
                 className="w-full"
                 options={[
                   { value: '', label: '基本の追加URL' },
-                  ...routes.map((r) => ({ value: r.id, label: r.name })),
+                  ...routes.filter((r) => r.isActive).map((r) => ({ value: r.id, label: r.name })),
                 ]}
               />
-              {routeMissing ? (
+              {routeStopped ? (
+                <p className="text-danger mt-1 text-xs" role="alert">
+                  この経路は停止しています。QRコードと印刷は出せません。
+                  {stoppedDetail ? ` ${stoppedDetail}` : '別の経路か「基本の追加URL」を選んでください。'}
+                </p>
+              ) : routeMissing ? (
                 <p className="text-danger mt-1 text-xs" role="alert">
                   選んだ経路はこのアカウントでは使えません。別の経路か「基本の追加URL」を選んでください。
                 </p>
@@ -383,7 +461,7 @@ export default function QrDialog({
                   id="qr-link"
                   readOnly
                   rows={3}
-                  value={routeMissing ? '' : link}
+                  value={blocked ? '' : link}
                   onFocus={(e) => e.currentTarget.select()}
                   className="border-hairline bg-canvas-sunken text-ink-secondary rounded-control min-w-0 flex-1 resize-none border px-3 py-2 font-mono text-xs leading-relaxed focus:outline-none"
                 />
@@ -391,7 +469,7 @@ export default function QrDialog({
                   variant="secondary"
                   type="button"
                   onClick={copy}
-                  disabled={routeMissing}
+                  disabled={blocked}
                   className="min-h-11 shrink-0"
                 >
                   コピー
@@ -411,7 +489,7 @@ export default function QrDialog({
             </div>
 
             <div className="flex flex-wrap gap-2">
-              {routeMissing ? (
+              {blocked ? (
                 <Button variant="primary" disabled>
                   <DownloadIcon />画像をダウンロード
                 </Button>
@@ -423,15 +501,36 @@ export default function QrDialog({
                   <DownloadIcon />画像をダウンロード
                 </Button>
               )}
-              <Button
-                variant="secondary"
-                type="button"
-                onClick={printQr}
-                disabled={routeMissing}
-              >
-                PDFで印刷
-              </Button>
+              {/*
+                印刷用PDFはサーバーで作る（M）。経路を選んでいるときは
+                サーバーのPDFを取り寄せ、基本の追加URLのときだけ従来の
+                ブラウザ印刷を使う。止めた経路では押せない。
+              */}
+              {route && route.isActive ? (
+                <Button
+                  variant="secondary"
+                  type="button"
+                  onClick={() => void downloadPdf()}
+                  disabled={pdfState === 'working'}
+                >
+                  PDFで印刷
+                </Button>
+              ) : (
+                <Button
+                  variant="secondary"
+                  type="button"
+                  onClick={printQr}
+                  disabled={blocked}
+                >
+                  PDFで印刷
+                </Button>
+              )}
             </div>
+            {pdfState === 'failed' ? (
+              <p className="text-danger mt-1 text-xs" role="alert">
+                印刷用PDFを作れませんでした。もう一度押してください。
+              </p>
+            ) : null}
 
             <div className="border-hairline bg-surface-pearl rounded-control border p-4">
               <h3 className="text-ink text-sm font-bold">使うときのヒント</h3>

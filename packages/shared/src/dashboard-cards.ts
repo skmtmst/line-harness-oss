@@ -32,6 +32,7 @@ export const DASHBOARD_CARD_GROUPS = {
     'support-mark-status',
     'friend-status',
     'upcoming',
+    'delivery-failures',
     'monthly-delivery',
     'recent-results',
     'booking-status',

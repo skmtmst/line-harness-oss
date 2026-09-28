@@ -13,6 +13,10 @@ export interface EntryRoute {
   intro_template_id: string | null;
   run_account_friend_add_scenarios: number;
   is_active: number;
+  /** 476: 受付を止めた時刻。受付中・止めた記録が無い古い行は null。 */
+  stopped_at: string | null;
+  /** 476: 止めた理由。受付中は null。 */
+  stopped_reason: string | null;
   tenant_id: string | null;
   /** migration 308 より前の互換行は未割当のため null。 */
   line_account_id?: string | null;
@@ -190,7 +194,7 @@ export async function createEntryRoute(
 export async function updateEntryRoute(
   db: D1Database,
   id: string,
-  input: Partial<CreateEntryRouteInput>,
+  input: Partial<CreateEntryRouteInput> & { stoppedReason?: string | null },
 ): Promise<EntryRoute | null> {
   const now = jstNow();
   const fields: string[] = ['updated_at = ?'];
@@ -210,7 +214,24 @@ export async function updateEntryRoute(
     fields.push('run_account_friend_add_scenarios = ?');
     values.push(input.runAccountFriendAddScenarios ? 1 : 0);
   }
-  if (input.isActive !== undefined) { fields.push('is_active = ?'); values.push(input.isActive ? 1 : 0); }
+  if (input.isActive !== undefined) {
+    fields.push('is_active = ?');
+    values.push(input.isActive ? 1 : 0);
+    if (!input.isActive) {
+      // 受付停止はいつ・なぜ止めたかを残す。QRダイアログの停止表示が読む。
+      fields.push('stopped_at = ?');
+      values.push(now);
+      const reason = input.stoppedReason?.trim() || null;
+      fields.push('stopped_reason = ?');
+      values.push(reason);
+    } else {
+      // 受付再開で停止の記録を消す。古い停止表示が残らないようにする。
+      fields.push('stopped_at = ?');
+      values.push(null);
+      fields.push('stopped_reason = ?');
+      values.push(null);
+    }
+  }
 
   values.push(id);
 

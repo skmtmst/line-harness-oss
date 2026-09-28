@@ -2208,7 +2208,7 @@ CREATE TABLE entry_routes (
   is_active   INTEGER NOT NULL DEFAULT 1,
   created_at  TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
-, pool_id TEXT REFERENCES traffic_pools (id) ON DELETE SET NULL, intro_template_id TEXT REFERENCES message_templates (id) ON DELETE SET NULL, run_account_friend_add_scenarios INTEGER NOT NULL DEFAULT 1, genre TEXT, tenant_id TEXT REFERENCES tenants(id), line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE);
+, pool_id TEXT REFERENCES traffic_pools (id) ON DELETE SET NULL, intro_template_id TEXT REFERENCES message_templates (id) ON DELETE SET NULL, run_account_friend_add_scenarios INTEGER NOT NULL DEFAULT 1, genre TEXT, tenant_id TEXT REFERENCES tenants(id), line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE, stopped_at TEXT, stopped_reason TEXT);
 
 CREATE TABLE error_messages (
   -- エラーコード。code が無い現行 route は error 文字列そのものを鍵にする（§9-1）。
@@ -4679,7 +4679,7 @@ CREATE TABLE notification_deliveries (
   execution_mode          TEXT NOT NULL DEFAULT 'automatic'
                           CHECK (execution_mode IN ('automatic', 'retry', 'resend', 'test')),
   version                 INTEGER NOT NULL DEFAULT 1 CHECK (version > 0),
-  updated_at              TEXT NOT NULL,
+  updated_at              TEXT NOT NULL, source TEXT,
   UNIQUE (line_account_id, idempotency_key)
 );
 
@@ -7577,6 +7577,9 @@ CREATE INDEX idx_engagement_events_source
 CREATE INDEX idx_entry_route_genres_created
   ON entry_route_genres (created_at ASC);
 
+CREATE INDEX idx_entry_routes_account_active
+  ON entry_routes(line_account_id, is_active);
+
 CREATE INDEX idx_entry_routes_genre
   ON entry_routes (genre, created_at DESC);
 
@@ -8264,6 +8267,9 @@ CREATE INDEX idx_nen_rich_menu_jobs_status
 
 CREATE INDEX idx_notification_deliveries_account_status
   ON notification_deliveries(line_account_id, status, queued_at DESC, id DESC);
+
+CREATE INDEX idx_notification_deliveries_origin
+  ON notification_deliveries(line_account_id, status, source, failed_at DESC);
 
 CREATE INDEX idx_notification_deliveries_retry
   ON notification_deliveries(status, retryable, next_retry_at);

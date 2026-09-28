@@ -430,6 +430,10 @@
     "470_google_sheets_integrations.sql",
     "472_affiliate_offer_versions.sql",
     "473_affiliate_attribution_decisions.sql",
+    "474_notification_delivery_source.sql",
+    "475_notification_delivery_origin_index.sql",
+    "476_entry_route_stopped.sql",
+    "477_entry_route_account_active_index.sql",
     "478_webinar_video_assets.sql",
     "479_webinar_session_capacity.sql",
     "484_common_var_lifecycle.sql",
@@ -454,5 +458,5 @@
     "507_webinar_heartbeat_state.sql",
     "508_webinar_heartbeat_rejects.sql"
   ],
-  "migrationCount": 453
+  "migrationCount": 457
 }
