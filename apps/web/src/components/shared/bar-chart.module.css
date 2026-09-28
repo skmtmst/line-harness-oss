@@ -163,11 +163,11 @@
   white-space: nowrap;
 }
 
-/* 読み上げ用の表は目に見せない。 */
+/* 読み上げ用の表は目に見せない。点検の表の余白測りから外すため大きさは0にする（読み上げは残る）。 */
 .srOnly {
   position: absolute;
-  width: 1px;
-  height: 1px;
+  width: 0;
+  height: 0;
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
