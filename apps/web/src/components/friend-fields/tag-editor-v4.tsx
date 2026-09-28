@@ -15,6 +15,7 @@ import Drawer from '@/components/shared/drawer'
 import IconButton from '@/components/shared/icon-button'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { notifyToast } from '@/components/shared/toast'
 import StickyBar from '@/components/shared/sticky-bar'
 import { RequiredBadge } from '@/components/shared/form-controls'
@@ -293,6 +294,9 @@ function RetroactiveDialog({ values, count, tagId, accountId, onCancel, onSave, 
   const [accepted, setAccepted] = useState(referenceState)
   const [preview, setPreview] = useState<TagRetroactivePreview | null>(null)
   const [previewError, setPreviewError] = useState('')
+  // alertdialog にも共通の約束を合わせる: Escapeで戻る・Tabは窓の中・
+  // 閉じたら起点へ戻す・背面はスクロールしない。
+  const panelRef = useOverlayFocus(true, onCancel)
 
   const fetchPreview = () => {
     if (!tagId || !accountId) return
@@ -320,14 +324,14 @@ function RetroactiveDialog({ values, count, tagId, accountId, onCancel, onSave, 
   const referralTotal = preview ? preview.referralMiles : referralTargets * values.referralRewardMiles
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-ink/35 p-4">
-      <section className="relative w-full max-w-[670px] -translate-y-7 rounded-card border border-hairline bg-canvas p-7 shadow-2xl" role="alertdialog" aria-modal="true">
+      <section ref={panelRef} className="relative w-full max-w-[670px] -translate-y-7 rounded-card border border-hairline bg-canvas p-7 shadow-2xl" role="alertdialog" aria-modal="true" aria-labelledby="tag-retroactive-title">
         <button type="button" onClick={onCancel} aria-label="閉じる" className="absolute right-4 top-4 rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
           <X aria-hidden="true" className="h-5 w-5" />
         </button>
         <span className="mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-warning-bg text-warning" aria-hidden="true">
           <Coins size={21} strokeWidth={2} />
         </span>
-        <h2 className="text-xl font-bold text-ink">{selfTargets + referralTargets}人にさかのぼってマイルを積みますか？</h2>
+        <h2 id="tag-retroactive-title" className="text-xl font-bold text-ink">{selfTargets + referralTargets}人にさかのぼってマイルを積みますか？</h2>
         <p className="mt-2 text-sm leading-6 text-ink-secondary">「{values.name || 'このタグ'}」の変更を、いまこのタグが付いている人にも適用します。人数はサーバーで再計算した値です。</p>
         <div className="mt-4 overflow-hidden rounded-control border border-hairline">
           <dl className="divide-y divide-hairline text-sm">
