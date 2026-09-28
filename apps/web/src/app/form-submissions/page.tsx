@@ -441,10 +441,13 @@ export default function FormSubmissionsPage() {
   const removeForm = async () => {
     if (!deleteTarget || !deleteImpact || deleting || stopping || !selectedAccountId) return
     const targetId = deleteTarget.id
+    // 完全削除と保管で文言を分ける。削除したのに「アーカイブできなかった」と
+    // 出ると、結果を誤認して不要な再試行が起きる（R199）。
+    const permanentDelete = deleteImpact.canDelete
     setDeleting(true)
     setDeleteError('')
     try {
-      const result = deleteImpact.canDelete
+      const result = permanentDelete
         ? await api.forms.remove(targetId, selectedAccountId, deleteImpact.revision)
         : await api.forms.archive(targetId, selectedAccountId, deleteImpact.revision)
       if (!result.success) throw new Error('delete_failed')
@@ -453,7 +456,27 @@ export default function FormSubmissionsPage() {
       // ページの欠け・件数のずれを残さないよう、サーバー側の一覧を読み直す。
       void loadForms()
     } catch {
-      setDeleteError('この回答フォームをアーカイブできませんでした。状態を読み直してから、もう一度お試しください。')
+      /*
+       * R199: 処理済みなのに失敗を返す経路をなくす。応答が失われたときは
+       * 対象を読み直し、既に消えていれば成功として扱う（行を外して閉じる）。
+       * 残っているときだけ失敗文を出す。どちらの操作をしたかが分かる文言にする。
+       */
+      let gone = false
+      try {
+        await api.forms.get(targetId, selectedAccountId)
+      } catch (checkError) {
+        // 保管済みも取得口では見つからない（404）。どちらも一覧には戻らない。
+        if (checkError instanceof ApiError && checkError.status === 404) gone = true
+      }
+      if (gone) {
+        setForms((current) => current.filter((form) => form.id !== targetId))
+        setDeleteTarget(null)
+        void loadForms()
+      } else {
+        setDeleteError(permanentDelete
+          ? 'この回答フォームを削除できませんでした。状態を読み直してから、もう一度お試しください。'
+          : 'この回答フォームをアーカイブできませんでした。状態を読み直してから、もう一度お試しください。')
+      }
     } finally {
       setDeleting(false)
     }
