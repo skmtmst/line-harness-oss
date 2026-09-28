@@ -65,10 +65,12 @@ describe('V6 支払いの追記台帳契約', () => {
       NEXT-22: 明細作成とLINE通知は createStatement 1本の処理で分けられない。
       連動する2つのチェックは1つへまとめ、飾りのチェックマークは実状態に
       連動させる（OFFでもONに見える表示を残さない）。
+      m21u: 素の input＋飾りアイコンを共通の Checkbox へ置き換えた。
+      見た目は共通部品が実状態に連動させる。
     */
     expect(DIALOGS).toContain('支払明細を作成して、この方のLINEに知らせる')
-    expect((DIALOGS.match(/type="checkbox"/g) ?? []).length).toBe(1)
-    expect(DIALOGS).toContain('{issueStatement ? <Check size={12} /> : null}')
+    expect(DIALOGS).not.toContain('type="checkbox"')
+    expect(DIALOGS).not.toContain('{issueStatement ? <Check size={12} /> : null}')
     expect(DIALOGS).toContain('支払いは確定しましたが、支払明細とLINE通知を作れませんでした')
     /*
       NEXT-23: プレビューが返さない却下件数・除外金額を固定値で補わない。

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { EC_EVENT_LABELS, type EcEventType } from '@line-crm/shared'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
@@ -188,13 +189,13 @@ export default function ConnectorPanel({ accountId }: { accountId: string | null
           <section className={styles.card}>
             <h2 className={styles.cardTitle}>どこの出来事を取り込むか</h2>
             <p className={styles.cardNote}>チェックを外すと、その出来事を起点にした配信や集計も止まります。</p>
-            <div className={styles.checks}>{CONNECTOR_EVENT_TYPES.map((value) => <label className={styles.check} key={value}><input type="checkbox" checked={form.eventTypes.includes(value)} onChange={() => toggle('eventTypes', value)} /><span>{EC_EVENT_LABELS[value]}</span></label>)}</div>
+            <div className={styles.checks}>{CONNECTOR_EVENT_TYPES.map((value) => <Checkbox key={value} checked={form.eventTypes.includes(value)} onCheckedChange={() => toggle('eventTypes', value)}>{EC_EVENT_LABELS[value]}</Checkbox>)}</div>
           </section>
 
           <section className={styles.card}>
             <h2 className={styles.cardTitle}>どうやって人を見分けるか</h2>
             <p className={styles.cardNote}>上から照らし合わせます。名前だけで自動では結びつけません。</p>
-            <div className={styles.ruleList}>{IDENTITY_RULES.map(([value, label, note], index) => <label className={styles.rule} key={value}><input type="checkbox" checked={form.identityRules.includes(value)} onChange={() => toggle('identityRules', value)} /><span className={styles.ruleNumber}>{index + 1}</span><span><strong>{label}</strong><small>{note}</small></span></label>)}</div>
+            <div className={styles.ruleList}>{IDENTITY_RULES.map(([value, label, note], index) => <Checkbox key={value} checked={form.identityRules.includes(value)} onCheckedChange={() => toggle('identityRules', value)} description={note}>{`順番${index + 1}：${label}`}</Checkbox>)}</div>
             <div className={styles.actions}>
               {connector ? <Button type="button" onClick={() => setForm({ ...form, status: form.status === 'paused' ? 'connected' : 'paused' })}>{form.status === 'paused' ? '取り込みを再開する' : '取り込みを止める'}</Button> : null}
               <Button type="button" variant="primary" disabled={saving || !form.shopDomain || (!connector?.secretConfigured && form.inboundSecret.length < 32)} onClick={requestSave}>{saving ? '保存しています…' : '設定を保存'}</Button>

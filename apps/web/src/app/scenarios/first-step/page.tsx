@@ -36,6 +36,7 @@ import type { SegmentCondition } from '@/components/shared/condition-builder'
 import { pruneCondition } from '@/lib/segment-condition'
 import Select from '@/components/shared/select'
 import Button from '@/components/shared/button'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Notice from '@/components/shared/notice'
 import TargetMissing from '@/components/shared/target-missing'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -557,7 +558,7 @@ function FirstStepContent() {
             この1通目を誰に送るかを決めます。開始のきっかけは、このあとの編集画面で決められます。
           </p>
 
-          <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2">
+          <RadioCardGroup legend="この1通目を誰に送るか" className="mt-4">
             {(
               [
                 { value: 'all', label: 'シナリオ購読中の全員に配信する' },
@@ -565,17 +566,16 @@ function FirstStepContent() {
                 { value: 'advanced', label: '詳細条件で絞り込んで配信する' },
               ] as const
             ).map(opt => (
-              <label key={opt.value} className="text-ink flex cursor-pointer items-center gap-2 text-sm">
-                <input
-                  type="radio"
-                  name="targetMode"
-                  checked={targetMode === opt.value}
-                  onChange={() => setTargetMode(opt.value)}
-                />
-                {opt.label}
-              </label>
+              <RadioCard
+                key={opt.value}
+                name="targetMode"
+                value={opt.value}
+                checked={targetMode === opt.value}
+                onChange={() => setTargetMode(opt.value)}
+                title={opt.label}
+              />
             ))}
-          </div>
+          </RadioCardGroup>
 
           {targetMode === 'tag' && (
             <label className="mt-4 block">
@@ -678,24 +678,23 @@ function FirstStepContent() {
             この管理画面で送れないことが分からない）。
           */}
           <div className="mt-5">
-            <div className="mb-3 flex flex-wrap items-center gap-4">
+            <RadioCardGroup legend="配信内容の作り方" className="mb-3 flex flex-wrap gap-4">
               {(
                 [
                   { value: 'compose', label: 'この画面で作る' },
                   { value: 'template', label: 'テンプレートから選ぶ' },
                 ] as const
               ).map(o => (
-                <label key={o.value} className="text-ink flex cursor-pointer items-center gap-2 text-sm">
-                  <input
-                    type="radio"
-                    name="contentMode"
-                    checked={contentMode === o.value}
-                    onChange={() => changeContentMode(o.value)}
-                  />
-                  {o.label}
-                </label>
+                <RadioCard
+                  key={o.value}
+                  name="contentMode"
+                  value={o.value}
+                  checked={contentMode === o.value}
+                  onChange={() => changeContentMode(o.value)}
+                  title={o.label}
+                />
               ))}
-            </div>
+            </RadioCardGroup>
 
             {preserved && restoreNotice && (
               <Notice tone="warn" message={restoreNotice} className="mb-3" />

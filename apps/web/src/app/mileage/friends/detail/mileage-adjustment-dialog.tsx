@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import { ChoiceCard } from '@/components/shared/create-page'
 import Dialog from '@/components/shared/dialog'
 import Notice from '@/components/shared/notice'
@@ -258,13 +259,12 @@ export default function MileageAdjustmentDialog({
                     onChange={setExpiresOn}
                   />
                 </Field>
-                <label className="flex items-start gap-2 rounded-control border border-hairline p-3 text-sm text-ink-secondary">
-                  <input type="checkbox" checked={notifyFriend} onChange={(event) => setNotifyFriend(event.target.checked)} className="mt-0.5" />
-                  <span>
-                    友だちに知らせる
-                    <span className="mt-1 block text-xs text-ink-faint">増減したマイルと変更後の残高をLINEで知らせます。</span>
-                  </span>
-                </label>
+                <Checkbox
+                  checked={notifyFriend}
+                  onCheckedChange={setNotifyFriend}
+                  description="増減したマイルと変更後の残高をLINEで知らせます。"
+                  className="rounded-control border border-hairline p-3"
+                >友だちに知らせる</Checkbox>
               </div>
               {!policyLoading && !policy?.configured && canConfigurePolicy ? (
                 <section className="rounded-control border border-warning bg-warning-bg p-3" aria-label="高額調整の承認境界を設定">

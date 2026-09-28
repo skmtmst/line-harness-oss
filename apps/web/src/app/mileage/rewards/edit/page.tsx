@@ -3,6 +3,7 @@
 import { Suspense, useCallback, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Button from '@/components/shared/button'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Card, { CardHeader } from '@/components/shared/card'
 import ConditionBuilder, { pruneCondition } from '@/components/shared/condition-builder'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -348,29 +349,21 @@ function MileageRewardEditorInner() {
             **並べたタイルで選ぶ**（設計 `p9CcEB`）。選び口に畳むと、
             何が渡るのかを1つずつ開いて確かめることになる。
           */}
-          <div role="radiogroup" aria-label="渡すもの" className="grid gap-2 sm:grid-cols-2">
+          <RadioCardGroup legend="渡すもの" className="grid gap-2 sm:grid-cols-2">
             {KINDS.map((kind) => {
               return (
-                <label
+                <RadioCard
                   key={kind.value}
-                  className="block cursor-pointer"
-                >
-                  <input
-                    type="radio"
-                    name="reward-kind"
-                    value={kind.value}
-                    checked={form.rewardKind === kind.value}
-                    onChange={() => set('rewardKind', kind.value)}
-                    className="peer sr-only"
-                  />
-                  <span className="rounded-control border-hairline bg-canvas block border p-3 text-left hover:bg-canvas-sunken peer-checked:border-accent peer-checked:bg-accent-soft peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent-deep">
-                    <span className="text-ink block text-sm font-bold">{kind.label}</span>
-                    <span className="text-ink-faint mt-0.5 block text-xs">{kind.note}</span>
-                  </span>
-                </label>
+                  name="reward-kind"
+                  value={kind.value}
+                  checked={form.rewardKind === kind.value}
+                  onChange={() => set('rewardKind', kind.value)}
+                  title={kind.label}
+                  note={kind.note}
+                />
               )
             })}
-          </div>
+          </RadioCardGroup>
           <div className="mt-4">
             <Field
               label="交換後に渡すもの"

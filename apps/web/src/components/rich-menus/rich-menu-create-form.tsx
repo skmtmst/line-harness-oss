@@ -282,9 +282,9 @@ export default function RichMenuCreateForm({
           <div>
             <span className="text-ink-secondary mb-2 block text-sm font-medium">面の分けかた</span>
             <p className="text-ink-faint mb-3 text-xs">押せるところをいくつに分けるか。あとから編集画面で区切り直せます。</p>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7">
-              {shownTemplates.map((item) => <label key={item.key} className={`rounded-control border p-2 transition-colors ${locked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'} ${value.templateKey === item.key ? 'border-accent bg-accent-soft' : 'border-hairline hover:bg-canvas-sunken'}`}><input type="radio" name="template" value={item.key} checked={value.templateKey === item.key} disabled={locked} onChange={(event) => selectTemplate(event.target.value)} className="sr-only" /><RichMenuTemplatePreview template={item} /><div className="text-ink mt-1 text-center text-xs font-medium">{TEMPLATE_LABELS[item.key] ?? item.label}</div></label>)}
-            </div>
+            <RadioCardGroup legend="面の分けかた" className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7">
+              {shownTemplates.map((item) => <RadioCard key={item.key} name="template" value={item.key} checked={value.templateKey === item.key} disabled={locked} onChange={(selected) => selectTemplate(selected)} title={TEMPLATE_LABELS[item.key] ?? item.label} note={<RichMenuTemplatePreview template={item} />} />)}
+            </RadioCardGroup>
           </div>
 
           {/*

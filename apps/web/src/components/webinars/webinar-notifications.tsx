@@ -8,6 +8,7 @@ import {
   type WebinarNotificationSettingsInput,
 } from '@/lib/api'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import { TimeField } from '@/components/shared/date-time-field'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
@@ -366,19 +367,13 @@ export default function WebinarNotifications({ webinarId, onLoaded, onDirtyChang
       <ul className="border-hairline divide-hairline divide-y overflow-hidden rounded-xl border">
         {rows.map((row) => (
           <li key={row.key} className="bg-canvas flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-            <label className="flex min-w-0 flex-1 items-start gap-3">
-              <input
-                type="checkbox"
-                checked={row.on}
-                onChange={row.toggle}
-                aria-label={`${row.label}を送る`}
-                className="accent-accent mt-0.5"
-              />
-              <span className="min-w-0">
-                <span className="text-ink block text-sm font-semibold">{row.label}</span>
-                <span className="text-ink-faint block text-xs">{row.note}</span>
-              </span>
-            </label>
+            <Checkbox
+              checked={row.on}
+              onCheckedChange={row.toggle}
+              aria-label={`${row.label}を送る`}
+              description={row.note}
+              className="min-w-0 flex-1"
+            >{row.label}</Checkbox>
             {/* 切っているものの細かい設定は出さない。押しても効かない欄を並べない。 */}
             {row.on && row.extra ? <div className="shrink-0">{row.extra}</div> : null}
           </li>

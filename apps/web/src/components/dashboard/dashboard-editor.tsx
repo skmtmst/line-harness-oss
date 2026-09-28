@@ -27,6 +27,7 @@ import {
 } from '@line-crm/shared'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import Notice from '@/components/shared/notice'
 
@@ -239,11 +240,12 @@ function SortableCardRow({ item, definition, canMoveUp, canMoveDown, onMove, onT
           <ChevronDown aria-hidden="true" className="h-4 w-4" />
         </button>
       </div>
-      <label className="relative inline-flex shrink-0 cursor-pointer items-center">
-        <input type="checkbox" checked={item.visible} onChange={onToggle} className="peer sr-only" aria-label={`${definition.label}を${item.visible ? '非表示' : '表示'}にする`} />
-        <span className="bg-hairline peer-checked:bg-accent h-6 w-[42px] rounded-pill transition-colors" />
-        <span className="bg-canvas absolute left-0.5 h-5 w-5 rounded-full shadow-sm transition-transform peer-checked:translate-x-[18px]" />
-      </label>
+      <Checkbox
+        checked={item.visible}
+        onCheckedChange={onToggle}
+        aria-label={`${definition.label}を${item.visible ? '非表示' : '表示'}にする`}
+        className="shrink-0"
+      />
     </div>
   )
 }

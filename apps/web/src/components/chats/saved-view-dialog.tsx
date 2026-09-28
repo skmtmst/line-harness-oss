@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
+import Checkbox from '@/components/shared/checkbox'
 import Combobox from '@/components/shared/combobox'
 import Select from '@/components/shared/select'
 import Notice from '@/components/shared/notice'
@@ -281,17 +282,12 @@ export default function SavedViewDialog({
               </dl>
             </div>
 
-            <label className="flex items-center justify-between gap-4">
-              <span>
-                <span className="text-ink block text-xs font-medium">よく使うに追加</span>
-                <span className="text-ink-faint text-micro mt-0.5 block">保存した検索一覧の上部に表示します</span>
-              </span>
-              <span className="relative inline-flex h-6 w-11 shrink-0 items-center">
-                <input type="checkbox" checked={favorite} onChange={(event) => setFavorite(event.target.checked)} aria-label="よく使うに追加" className="peer sr-only" />
-                <span className="bg-canvas-sunken peer-checked:bg-accent-deep absolute inset-0 rounded-full transition-colors" />
-                <span className="bg-canvas absolute left-1 h-4 w-4 rounded-full shadow transition-transform peer-checked:translate-x-5" />
-              </span>
-            </label>
+            <Checkbox
+              checked={favorite}
+              onCheckedChange={setFavorite}
+              aria-label="よく使うに追加"
+              description="保存した検索一覧の上部に表示します"
+            >よく使うに追加</Checkbox>
 
             {/* 設計 `AuSDY` と同じく、直す場所を見たあとに理由を読む。 */}
             {error || showMissingError ? (

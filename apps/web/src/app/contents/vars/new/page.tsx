@@ -13,6 +13,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import FeatureGate from '@/components/feature-gate'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
+import RadioCard from '@/components/shared/radio-card'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Notice from '@/components/shared/notice'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -511,36 +512,28 @@ function NewCommonVarInner() {
           </legend>
           <div className="max-w-xl space-y-2">
             {TYPES.map((t) => (
-              <label
+              <RadioCard
                 key={t.key}
-                className={`rounded-control flex cursor-pointer items-center gap-3 border p-3 transition-colors ${
-                  type === t.key
-                    ? 'border-accent bg-accent-soft'
-                    : 'border-hairline hover:bg-canvas-sunken'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="cv-type"
-                  value={t.key}
-                  checked={type === t.key}
-                  onChange={() => {
-                    setType(t.key)
-                    setValue('')
-                  }}
-                  className="accent-accent-deep"
-                />
-                <span
-                  className="bg-canvas border-hairline text-ink-secondary flex h-8 w-11 shrink-0 items-center justify-center rounded border text-xs"
-                  aria-hidden="true"
-                >
-                  {t.mark}
-                </span>
-                <span className="min-w-0">
-                  <span className="text-ink block text-sm font-medium">{t.label}</span>
-                  <span className="text-ink-faint block text-xs">{t.note}</span>
-                </span>
-              </label>
+                name="cv-type"
+                value={t.key}
+                checked={type === t.key}
+                onChange={() => {
+                  setType(t.key)
+                  setValue('')
+                }}
+                title={t.label}
+                note={
+                  <>
+                    <span
+                      className="bg-canvas border-hairline text-ink-secondary mr-2 inline-flex h-8 w-11 items-center justify-center rounded border text-xs"
+                      aria-hidden="true"
+                    >
+                      {t.mark}
+                    </span>
+                    {t.note}
+                  </>
+                }
+              />
             ))}
           </div>
         </fieldset>

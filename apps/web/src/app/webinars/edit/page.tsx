@@ -25,6 +25,7 @@ import {
 import WebinarForm from '@/components/webinars/webinar-form'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import StickyBar from '@/components/shared/sticky-bar'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
@@ -1602,14 +1603,10 @@ function CtasTab({ webinarId, durationSeconds, forms, formsState, onRetryForms, 
               />
             )}
             {c.kind === 'form' && (
-              <label className="flex items-center gap-1">
-                <input
-                  type="checkbox"
-                  checked={c.autoOpen}
-                  onChange={(e) => update(i, { autoOpen: e.target.checked })}
-                />
-                自動でフォームを開く
-              </label>
+              <Checkbox
+                checked={c.autoOpen}
+                onCheckedChange={(checked) => update(i, { autoOpen: checked })}
+              >自動でフォームを開く</Checkbox>
             )}
             <button
               onClick={() => {
