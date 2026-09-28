@@ -70,7 +70,12 @@ import {
   reserveIdempotencyResponse,
   saveIdempotencyResponse,
 } from '../services/booking-idempotency.js';
-import { sendBookingNotification, type NotificationKind } from '../services/booking-notifier.js';
+import {
+  formatStartsAtForStore,
+  notificationTiming,
+  sendBookingNotification,
+  type NotificationKind,
+} from '../services/booking-notifier.js';
 import { dispatchOperatorEvent } from '../services/operator-notification-dispatch.js';
 import { fireOutgoingWebhooks } from '../services/event-bus.js';
 import {
@@ -296,13 +301,6 @@ async function bookingConflictAlternatives(
 // ----------------------------------------------------------------
 // Helpers
 
-const JST_OFFSET_MS = 9 * 3600_000;
-
-function startsAtJst(utcIso: string): string {
-  const jst = new Date(new Date(utcIso).getTime() + JST_OFFSET_MS).toISOString();
-  return `${jst.slice(0, 10)} ${jst.slice(11, 16)}`;
-}
-
 // UTC [start, end) bounds covering a JST calendar day (YYYY-MM-DD in JST).
 // The JST day runs [date 00:00 JST, date+1 00:00 JST) = [date-1 15:00Z, date 15:00Z).
 // Used to fetch a staff member's existing bookings for slot computation.
@@ -474,12 +472,14 @@ async function notifyForBooking(
               s.display_name AS staff_name,
               la.channel_access_token,
               la.channel_access_token_encrypted,
-              f.line_user_id
+              f.line_user_id,
+              bs.timezone
          FROM bookings b
          INNER JOIN menus m ON m.id = b.menu_id
          INNER JOIN staff s ON s.id = b.staff_id
          INNER JOIN line_accounts la ON la.id = b.line_account_id
          INNER JOIN friends f ON f.id = b.friend_id
+          LEFT JOIN booking_settings bs ON bs.line_account_id = b.line_account_id
         WHERE b.id = ?`,
     )
     .bind(bookingId)
@@ -491,6 +491,7 @@ async function notifyForBooking(
       channel_access_token: string;
       channel_access_token_encrypted: string | null;
       line_user_id: string;
+      timezone: string | null;
     }>();
   if (!row) return;
   const operationId = existingOperationId ?? await queueBookingOperation(db, {
@@ -506,6 +507,10 @@ async function notifyForBooking(
       row.channel_access_token,
       { lineAccountId: row.line_account_id, field: 'channel_access_token' },
     );
+    // 文面の日時は店舗の時間帯で書く (R332)。kind に応じた相対表現は
+    // 送信時点の実測で組み立てる (R333)。
+    const timeZone = row.timezone ?? 'Asia/Tokyo';
+    const timing = notificationTiming(row.starts_at, timeZone, new Date());
     await sendBookingNotification({
       channelAccessToken: accessToken,
       toLineUserId: row.line_user_id,
@@ -513,8 +518,8 @@ async function notifyForBooking(
       ctx: {
         menuName: row.menu_name,
         staffName: row.staff_name,
-        startsAtJst: startsAtJst(row.starts_at),
-        hoursBefore: 0,
+        startsAt: formatStartsAtForStore(row.starts_at, timeZone),
+        ...timing,
       },
     });
     await finishBookingOperation(db, {
