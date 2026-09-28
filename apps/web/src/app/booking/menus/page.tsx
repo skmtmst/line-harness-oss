@@ -6,6 +6,8 @@ import { TimeField } from '@/components/shared/date-time-field'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import RadioCard from '@/components/shared/radio-card'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import Disclosure from '@/components/shared/disclosure'
 import HelpTip from '@/components/shared/help-tip'
@@ -468,7 +470,7 @@ function MenusPageInner({ activeTab, onMenuCount }: { activeTab: string; onMenuC
                         ように見えるが実際は押せない印になる（監査 A12・#709）。
                         並び順は操作列の「…」の中の上へ・下へで変える。
                       */}
-                      {m.name}{m.is_active ? '' : '（休止中）'}
+                      <span>{m.name}{m.is_active ? '' : '（休止中）'}</span>
                       {m.description && <span className="text-ink-faint mt-1 block max-w-72 truncate text-xs" title={m.description}>{m.description}</span>}
                       {m.category_label && (
                         <span className="bg-canvas-sunken text-ink-faint ml-2 inline-block rounded px-2 py-0.5 text-xs">
@@ -833,27 +835,15 @@ function BookingRulesEditor({ accountId, initial, canEdit, onRetry, onSaved }: {
           ] as const).map((option) => {
             const checked = (draft.liffDateView ?? 'list') === option.value
             return (
-              <label
+              <RadioCard
                 key={option.value}
-                className={`flex cursor-pointer items-start gap-3 rounded-card border p-4 focus-within:outline-2 focus-within:outline-offset-1 focus-within:outline-status-info ${
-                  checked ? 'border-accent bg-accent-soft' : 'border-hairline bg-canvas'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="liff-date-view"
-                  checked={checked}
-                  onChange={() => set('liffDateView', option.value)}
-                  className="sr-only"
-                />
-                <span aria-hidden="true" className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${checked ? 'border-accent' : 'border-hairline'}`}>
-                  {checked ? <span className="bg-accent h-2.5 w-2.5 rounded-full" /> : null}
-                </span>
-                <span>
-                  <span className="text-ink block text-sm font-semibold">{option.title}</span>
-                  <span className="text-ink-secondary mt-1 block text-xs leading-5">{option.desc}</span>
-                </span>
-              </label>
+                name="liff-date-view"
+                value={option.value}
+                checked={checked}
+                onChange={() => set('liffDateView', option.value)}
+                title={option.title}
+                note={option.desc}
+              />
             )
           })}
         </div>
@@ -1256,19 +1246,18 @@ function EditMenuModal({
                   const checked = resourceAssignments.has(resource.id)
                   return (
                     <div key={resource.id} className="bg-canvas-sunken rounded-control flex items-center gap-3 p-2">
-                      <label className="flex min-w-0 flex-1 items-center gap-2 text-sm">
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          disabled={!canManageResources || (!resource.isActive && !checked)}
-                          onChange={(event) => toggleResource(resource.id, event.target.checked)}
-                        />
+                      <Checkbox
+                        checked={checked}
+                        disabled={!canManageResources || (!resource.isActive && !checked)}
+                        onCheckedChange={(value) => toggleResource(resource.id, value)}
+                        className="min-w-0 flex-1"
+                      >
                         <span className="truncate" title={resource.name}>{resource.name}</span>
                         {!resource.isActive && <span className="text-warning text-xs">停止中・新規受付不可</span>}
                         {resource.isActive && checked
                           && (resourceAssignments.get(resource.id) ?? 1) > resource.capacity
                           && <span className="text-warning text-xs">必要数が受付上限超過・新規受付不可</span>}
-                      </label>
+                      </Checkbox>
                       {checked && (
                         <label className="flex items-center gap-1 text-xs">
                           必要数
@@ -1352,15 +1341,10 @@ function EditMenuModal({
             </Field>
           </div>
 
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={Boolean(form.is_active)}
-              onChange={(e) => set('is_active', e.target.checked ? 1 : 0)}
-              className="rounded"
-            />
-            有効（顧客に表示する）
-          </label>
+          <Checkbox
+            checked={Boolean(form.is_active)}
+            onCheckedChange={(value) => set('is_active', value ? 1 : 0)}
+          >有効（顧客に表示する）</Checkbox>
           {err && (
             <div role="alert">
               <p className="text-xs text-red-600">{err}</p>

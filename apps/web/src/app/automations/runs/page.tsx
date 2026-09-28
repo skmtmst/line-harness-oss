@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useAccount } from '@/contexts/account-context'
 import { api, downloadApiFile, fetchApi, type AutomationRunDetail } from '@/lib/api'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import ListState from '@/components/shared/list-state'
 import MergedTabs from '@/components/layout/merged-tabs'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -335,14 +336,10 @@ export default function AutomationRunsPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <input type="search" value={query} onChange={(event) => changeQuery(event.target.value)} placeholder="友だちの名前・オートメーションの名前で検索" className="h-10 w-full max-w-lg rounded-control border border-hairline bg-canvas px-3 text-sm" />
         <div className="flex items-center gap-3">
-          <label className="flex items-center gap-1.5 text-sm text-ink-secondary">
-            <input
-              type="checkbox"
-              checked={includeTest}
-              onChange={(event) => changeIncludeTest(event.target.checked)}
-            />
-            テスト実行も見る
-          </label>
+          <Checkbox
+            checked={includeTest}
+            onCheckedChange={(checked) => changeIncludeTest(checked)}
+          >テスト実行も見る</Checkbox>
           <p className="text-sm text-ink-secondary">この30日・20件表示</p>
         </div>
       </div>

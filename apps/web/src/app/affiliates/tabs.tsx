@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { Fragment, useState, useEffect, useCallback, useMemo, useRef, useId } from 'react'
 import { X } from 'lucide-react'
 import KpiCard from '@/components/shared/kpi-card'
 import {
@@ -17,6 +17,7 @@ import MenuPortal from '@/components/shared/menu-portal'
 import { MoreAction } from '@/components/shared/row-actions'
 import Button from '@/components/shared/button'
 import type { ButtonProps } from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import Chip from '@/components/shared/chip'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
@@ -1383,6 +1384,12 @@ interface OfferFormProps {
 
 function OfferFormModal({ initial, accounts, tags, scenarios, onClose, onSaved }: OfferFormProps) {
   const isEdit = Boolean(initial)
+  // R286: 読み上げの項目名。見えている項目名と入力欄を htmlFor・id で結ぶ。
+  const fieldId = useId()
+  const nameId = `${fieldId}-name`
+  const descriptionId = `${fieldId}-description`
+  const rewardAmountId = `${fieldId}-reward-amount`
+  const rewardMilesId = `${fieldId}-reward-miles`
   const [name, setName] = useState(initial?.name ?? '')
   const [description, setDescription] = useState(initial?.description ?? '')
   const [rewardAmount, setRewardAmount] = useState(
@@ -1565,10 +1572,11 @@ function OfferFormModal({ initial, accounts, tags, scenarios, onClose, onSaved }
     >
       <div className="space-y-4">
         <div>
-          <label className="text-ink-secondary mb-1 block text-xs font-medium">
+          <label htmlFor={nameId} className="text-ink-secondary mb-1 block text-xs font-medium">
             案件名 <span className="text-danger">*</span>
           </label>
           <input
+            id={nameId}
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -1578,8 +1586,9 @@ function OfferFormModal({ initial, accounts, tags, scenarios, onClose, onSaved }
         </div>
 
         <div>
-          <label className="text-ink-secondary mb-1 block text-xs font-medium">説明</label>
+          <label htmlFor={descriptionId} className="text-ink-secondary mb-1 block text-xs font-medium">説明</label>
           <textarea
+            id={descriptionId}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={2}
@@ -1589,8 +1598,9 @@ function OfferFormModal({ initial, accounts, tags, scenarios, onClose, onSaved }
         </div>
 
         <div>
-          <label className="text-ink-secondary mb-1 block text-xs font-medium">報酬額（円）</label>
+          <label htmlFor={rewardAmountId} className="text-ink-secondary mb-1 block text-xs font-medium">報酬額（円）</label>
           <input
+            id={rewardAmountId}
             type="number"
             min="0"
             step="1"
@@ -1602,8 +1612,9 @@ function OfferFormModal({ initial, accounts, tags, scenarios, onClose, onSaved }
         </div>
 
         <div>
-          <label className="text-ink-secondary mb-1 block text-xs font-medium">成果承認時の付与マイル</label>
+          <label htmlFor={rewardMilesId} className="text-ink-secondary mb-1 block text-xs font-medium">成果承認時の付与マイル</label>
           <input
+            id={rewardMilesId}
             type="number"
             min="0"
             step="1"
@@ -2148,15 +2159,14 @@ export function ApprovalQueue() {
                 <Th>
                   <span className="flex items-center gap-2">
                     {status === 'pending' && (
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         aria-label="このページの確認不要な成果をすべて選ぶ"
                         checked={allSafeSelected}
-                        onChange={(event) => {
+                        onCheckedChange={(checked) => {
                           setSelected((current) => {
                             const next = new Set(current)
                             for (const eventId of safePendingIds) {
-                              if (event.target.checked) next.add(eventId)
+                              if (checked) next.add(eventId)
                               else next.delete(eventId)
                             }
                             return next
@@ -2189,21 +2199,20 @@ export function ApprovalQueue() {
                   <td className="text-ink px-4 py-3 text-sm">
                     <div className="flex items-start gap-2">
                     {status === 'pending' && (
-                      <input
-                        type="checkbox"
-                        className="mt-1"
+                      <Checkbox
                         aria-label={`${personNameText(item.friendName)}の成果を選ぶ`}
                         checked={selected.has(item.eventId)}
                         disabled={needsReview}
                         title={needsReview ? '確認が必要な成果はまとめて承認できません' : undefined}
-                        onChange={(event) => {
+                        onCheckedChange={(checked) => {
                           setSelected((current) => {
                             const next = new Set(current)
-                            if (event.target.checked) next.add(item.eventId)
+                            if (checked) next.add(item.eventId)
                             else next.delete(item.eventId)
                             return next
                           })
                         }}
+                        className="mt-1"
                       />
                     )}
                     <span>
@@ -2492,12 +2501,13 @@ function OffersList({
       <table className="w-full min-w-[760px]">
         <thead>
           <TableHeadRow>
+            {/* 表の外側の余白は左右で同じにし、操作は右端にそろえる。 */}
             <Th>案件</Th>
             <Th align="right">報酬</Th>
             <Th>成果が出たときの動き</Th>
             <Th align="right">紹介している人</Th>
             <Th align="right">成果</Th>
-            <Th align="center">操作</Th>
+            <Th align="right">操作</Th>
           </TableHeadRow>
         </thead>
         <tbody className="divide-hairline divide-y">
@@ -2529,7 +2539,7 @@ function OffersList({
                 {(offerStats.get(offer.id)?.conversions ?? 0).toLocaleString()}件
                 <span className="text-ink-faint block text-xs">確定 {formatYen(offerStats.get(offer.id)?.reward ?? 0)}</span>
               </td>
-              <td className="px-4 py-3 text-center">
+              <td className="px-4 py-3 text-right whitespace-nowrap">
                 <button
                   onClick={() => onEdit(offer)}
                   className="text-action text-xs font-medium hover:underline"
@@ -2719,10 +2729,13 @@ export function OffersTab() {
           detail={confirmedDetail(confirmedState, topOffer ? `${topOffer.name}・確定 ${formatYen(offerStats.get(topOffer.id)?.reward ?? 0)}${confirmedTruncated ? '（直近5000件まで）' : ''}` : '成果はまだありません')}
         />
         <KpiCard
-          title="1件あたりの平均報酬"
+          title="平均報酬額"
           value={averageReward}
           unit="円"
           detail={`いちばん高い案件 ${formatYen(Math.max(0, ...rewardValues))}`}
+          /* m22d: 「1件あたり」は単位の意味なので見出しの「？」へ移し、
+             件数は「紹介できる案件」と「動きが未設定の案件」の2か所だけにする。 */
+          help="成果1件あたりの平均です"
         />
         <KpiCard
           title="動きが未設定の案件"
@@ -2960,18 +2973,14 @@ function SettlementEditor({
           />
         </div>
       </div>
-      <label className="mt-3 flex cursor-pointer items-start gap-2">
-        <input
-          type="checkbox"
-          checked={notify}
-          onChange={(e) => {
-            setNotify(e.target.checked)
-            setSaved(false)
-          }}
-          className="mt-0.5 rounded border-gray-300"
-        />
-        <span className="text-xs text-gray-600">成果が出たときに本人へ知らせる</span>
-      </label>
+      <Checkbox
+        checked={notify}
+        onCheckedChange={(checked) => {
+          setNotify(checked)
+          setSaved(false)
+        }}
+        className="mt-3"
+      >成果が出たときに本人へ知らせる</Checkbox>
       <p className="mt-2 text-[11px] text-gray-400">
         保留日数と支払いサイクルは取り決めの記録です。報酬の計算そのものには使いません。
       </p>

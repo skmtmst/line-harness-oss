@@ -9,6 +9,7 @@ import { isPoolsFeatureAvailable } from '@/lib/pools-availability'
 import { qrToDataURL } from '@/lib/qr-image'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { useAccount } from '@/contexts/account-context'
+import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Notice from '@/components/shared/notice'
 import CreatePage, {
@@ -175,7 +176,7 @@ export default function NewInflowLinkPage() {
       successHref={(id) => `/inflow-links/detail?id=${id}`}
       designNode="TEVk8"
       variant="v6"
-      statusLabel="まだ発行されていません。発行すると、すぐにこのURLが使えます。"
+      statusLabel={isActive ? 'まだ発行されていません。発行すると、すぐにこのURLが使えます。' : 'まだ発行されていません。公開オフのまま発行すると、URLを開いても友だち追加できません。'}
       validate={() => {
         if (!selectedAccountId) return 'LINEアカウントを選んでください（画面上部で選べます）'
         if (!name.trim()) return 'リンク名を入力してください'
@@ -377,10 +378,12 @@ export default function NewInflowLinkPage() {
               <input id="ir-redirect" type="url" value={redirectUrl} onChange={(e) => setRedirectUrl(e.target.value)} placeholder="https://example.com/lp" className={inputClass} />
             </Field>
           </div>
-          <label className="mt-3 flex items-start gap-2 text-sm text-ink-secondary">
-            <input type="checkbox" className="mt-0.5" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
-            <span>発行したらすぐ使えるようにする<span className="block text-xs text-ink-faint">オフにすると、URLを開いても友だち追加できません。</span></span>
-          </label>
+          <Checkbox
+            checked={isActive}
+            onCheckedChange={setIsActive}
+            description="オフにすると、URLを開いても友だち追加できません。"
+            className="mt-3"
+          >発行したらすぐ使えるようにする</Checkbox>
         </details>
       </FormSection>
 

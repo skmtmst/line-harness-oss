@@ -8,6 +8,7 @@ import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import { createPollGeneration, startVisiblePoll, type VisiblePollHandle } from '@/lib/visible-polling'
 import TemplatePicker from '@/components/chats/template-picker'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
 
 /**
@@ -739,16 +740,17 @@ export default function EmailThread({
         {showComposerOptions && (
           <div className="bg-canvas-sunken rounded-card mb-2 flex flex-wrap items-center gap-x-3 gap-y-2 p-3 text-xs">
             <span className="text-ink-secondary">送信キー</span>
-            {(
-              [
-                { value: 'enter', label: 'Enter で送信' },
-                { value: 'shift-enter', label: 'Shift + Enter で送信' },
-              ] as const
-            ).map(opt => (
-              <label key={opt.value} className="inline-flex cursor-pointer items-center gap-1.5 select-none">
-                <input
-                  type="radio"
+            <RadioCardGroup legend="送信キー" className="flex flex-wrap gap-2">
+              {(
+                [
+                  { value: 'enter', label: 'Enter で送信' },
+                  { value: 'shift-enter', label: 'Shift + Enter で送信' },
+                ] as const
+              ).map(opt => (
+                <RadioCard
+                  key={opt.value}
                   name="mail-send-mode"
+                  value={opt.value}
                   checked={sendMode === opt.value}
                   onChange={() => {
                     setSendMode(opt.value)
@@ -759,10 +761,10 @@ export default function EmailThread({
                       /* 保存できないブラウザはこの画面のあいだだけ効く */
                     }
                   }}
+                  title={opt.label}
                 />
-                <span className="text-ink-secondary">{opt.label}</span>
-              </label>
-            ))}
+              ))}
+            </RadioCardGroup>
             <span className="text-ink-faint">Ctrl / Command + Enter でも送れます</span>
           </div>
         )}

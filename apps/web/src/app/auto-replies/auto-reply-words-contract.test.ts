@@ -158,10 +158,33 @@ describe('自動応答の一覧に出す言葉（内部語の置き換え表）'
   })
 
   it('知らないアクションでも、保存してある値をそのまま出さない', () => {
-    expect(actionWord('tag')).toBe('タグ')
-    expect(actionWord('common_var')).toBe('共通情報')
+    expect(actionWord('tag')).toBe('タグ操作')
+    expect(actionWord('common_var')).toBe('共通情報操作')
     expect(actionWord('rich_menu_switch')).toBe('その他の処理')
     expectNoInternalWord(actionWord('rich_menu_switch'))
+  })
+
+  /**
+   * R256: 送信・リマインダ・イベントの4種を「その他の処理」にまとめない。
+   * 対応済み9種は編集画面（`ACTION_KINDS` の label）と同じ名称にする。
+   * 変えたのは言い換えの表だけで、知らない値は出さない意図は変えない。
+   */
+  it('R256 対応済み9種は編集と同じ名称で判別できる', () => {
+    expect(actionWord('tag')).toBe('タグ操作')
+    expect(actionWord('friend_field')).toBe('友だち情報操作')
+    expect(actionWord('support_mark')).toBe('対応マーク操作')
+    expect(actionWord('scenario')).toBe('シナリオ操作')
+    expect(actionWord('common_var')).toBe('共通情報操作')
+    expect(actionWord('send_message')).toBe('テキスト送信')
+    expect(actionWord('send_template')).toBe('テンプレート送信')
+    expect(actionWord('reminder')).toBe('リマインダ操作')
+    expect(actionWord('event_booking')).toBe('イベント予約操作')
+    for (const type of [
+      'tag', 'friend_field', 'support_mark', 'scenario', 'common_var',
+      'send_message', 'send_template', 'reminder', 'event_booking',
+    ]) {
+      expectNoInternalWord(actionWord(type))
+    }
   })
 
   /**

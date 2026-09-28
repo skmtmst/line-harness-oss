@@ -30,6 +30,8 @@ import CreatePage, {
   inputClass,
 } from '@/components/shared/create-page'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import ConditionBuilder, { pruneCondition } from '@/components/shared/condition-builder'
 import type { SegmentCondition } from '@/lib/segment-condition'
 import { originInfoOf } from '../origin-labels'
@@ -470,32 +472,24 @@ export default function NewConversionPointPage() {
     >
       <FormSection step={1} label="何が起きたら数えますか">
         {/* #975 U062: 390pxで6枚の大カードを積まない。短い選択群にし、説明は選択中の1種類だけ下へ出す。 */}
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3" role="radiogroup" aria-label="数えるきっかけ">
+        <RadioCardGroup legend="数えるきっかけ" className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           {TRIGGER_CHOICES.map((choice) => {
-            const Icon = choice.icon
             const selected = triggerKind === choice.value
             return (
-              <label
+              <RadioCard
                 key={choice.value}
-                className={`rounded-control flex min-h-11 min-w-0 items-center gap-2 border px-3 py-2 text-left transition-colors ${
-                  selected ? 'border-accent bg-accent-soft' : 'border-hairline hover:bg-canvas-sunken'
-                } ${choice.connected ? 'cursor-pointer' : 'cursor-not-allowed opacity-55'}`}
-              >
-                <input
-                  type="radio"
-                  name="conversion-trigger"
-                  value={choice.value}
-                  checked={selected}
-                  disabled={!choice.connected}
-                  onChange={() => selectTrigger(choice)}
-                  className="sr-only"
-                />
-                <Icon className={`shrink-0 ${selected ? 'text-accent-deep' : 'text-ink-faint'}`} size={16} aria-hidden />
-                <span className="text-ink truncate text-xs font-bold" title={choice.label}>{choice.label}</span>
-              </label>
+                name="conversion-trigger"
+                value={choice.value}
+                checked={selected}
+                disabled={!choice.connected}
+                disabledReason={choice.connected ? undefined : 'このきっかけはまだ使えません'}
+                onChange={() => selectTrigger(choice)}
+                title={choice.label}
+                note={choice.note}
+              />
             )
           })}
-        </div>
+        </RadioCardGroup>
         {(() => {
           const current = TRIGGER_CHOICES.find((choice) => choice.value === triggerKind)
           return current ? (
@@ -589,7 +583,8 @@ export default function NewConversionPointPage() {
         note="ここを間違えると、売上を重ねて数えることがあります。"
       >
         <div className="grid gap-2 sm:grid-cols-3">
-          <ChoiceCard selected={deduplicationMode === 'every'} title="何回でも数える" note="買うたびに1件。売上を追うときに使います" onClick={() => setDeduplicationMode('every')} />
+          {/* m22d: 「1件」は試算の「1件あたり」に集約し、ここでは書かない。 */}
+          <ChoiceCard selected={deduplicationMode === 'every'} title="何回でも数える" note="買うたびに数えます。売上を追うときに使います" onClick={() => setDeduplicationMode('every')} />
           <ChoiceCard selected={deduplicationMode === 'once_per_friend'} title="1人1回だけ" note="はじめての人だけを数えます" onClick={() => setDeduplicationMode('once_per_friend')} />
           <ChoiceCard selected={deduplicationMode === 'window'} title="30日に1回まで" note="短い間にくり返し起きるものに使います" onClick={() => setDeduplicationMode('window')} />
         </div>
@@ -616,7 +611,8 @@ export default function NewConversionPointPage() {
               </p>
             ) : null}
           </Field>
-          <Field label="決まった金額（円）" htmlFor="cv-value" help="1件ごとの金額です。">
+          {/* m22d: 「1件」は試算の「1件あたり」に集約し、ここでは書かない。 */}
+          <Field label="決まった金額（円）" htmlFor="cv-value" help="成果ごとの金額です。">
             <input
               id="cv-value"
               type="number"
@@ -673,16 +669,10 @@ export default function NewConversionPointPage() {
                   <ul className="mt-2 space-y-1.5">
                     {targets.map((target) => (
                       <li key={usageKey(target)}>
-                        {/* 13px の箱だけだと的が小さい。箱自体を 24px にして行全体を押せるようにする。 */}
-                        <label className="flex min-h-6 cursor-pointer items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={selectedUsageKeys.has(usageKey(target))}
-                            onChange={() => toggleUsage(target)}
-                            className="h-6 w-6 shrink-0 accent-accent-deep"
-                          />
-                          <span className="text-ink text-xs">{target.label}</span>
-                        </label>
+                        <Checkbox
+                          checked={selectedUsageKeys.has(usageKey(target))}
+                          onCheckedChange={() => toggleUsage(target)}
+                        >{target.label}</Checkbox>
                       </li>
                     ))}
                   </ul>
@@ -691,20 +681,12 @@ export default function NewConversionPointPage() {
             )
           })}
         </div>
-        <label className="border-hairline rounded-control mt-3 flex min-h-6 cursor-pointer items-start gap-3 border p-3">
-          <input
-            type="checkbox"
-            checked={saveAsDraft}
-            onChange={(event) => setSaveAsDraft(event.target.checked)}
-            className="h-6 w-6 shrink-0 accent-accent-deep"
-          />
-          <span>
-            <span className="text-ink block text-sm font-semibold">まだ計測せず、下書きとして保存する</span>
-            <span className="text-ink-faint mt-0.5 block text-xs">
-              一覧の「下書き」に入ります。数えはじめるには一覧から公開します。
-            </span>
-          </span>
-        </label>
+        <Checkbox
+          checked={saveAsDraft}
+          onCheckedChange={setSaveAsDraft}
+          description="一覧の「下書き」に入ります。数えはじめるには一覧から公開します。"
+          className="border-hairline rounded-control mt-3 border p-3"
+        >まだ計測せず、下書きとして保存する</Checkbox>
         <Disclosure size="compact" title="詳細設定" hint="帰属期間・集計対象">
           <div className="grid gap-3 md:grid-cols-2">
             <Field label="友だち追加からの計測期間" htmlFor="cv-days" note="空欄なら既定の90日です。">

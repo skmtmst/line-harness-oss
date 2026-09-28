@@ -1,5 +1,6 @@
 'use client'
 
+import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 import { TextArea, TextInput } from '@/components/shared/form-controls'
 
@@ -53,22 +54,19 @@ export default function DefaultValueInput({
           {options.map((option) => {
             const checked = multiValue.includes(option)
             return (
-              <label key={option} className="flex cursor-pointer items-center gap-2 py-1 text-sm text-ink">
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  disabled={disabled}
-                  onChange={(event) => {
-                    onMultiChange(
-                      event.target.checked
-                        ? [...multiValue, option]
-                        : multiValue.filter((item) => item !== option),
-                    )
-                  }}
-                  className="h-4 w-4 accent-accent"
-                />
-                <span className="min-w-0 flex-1 truncate" title={option}>{option}</span>
-              </label>
+              <Checkbox
+                key={option}
+                checked={checked}
+                disabled={disabled}
+                onCheckedChange={(next) => {
+                  onMultiChange(
+                    next
+                      ? [...multiValue, option]
+                      : multiValue.filter((item) => item !== option),
+                  )
+                }}
+                className="py-1"
+              ><span className="min-w-0 flex-1 truncate" title={option}>{option}</span></Checkbox>
             )
           })}
         </div>

@@ -11,6 +11,7 @@ import { LayoutGrid, List as ListIcon } from 'lucide-react'
 import { api, ApiError, type MediaQuota } from '@/lib/api'
 import FeatureGate from '@/components/feature-gate'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import ListToolbar from '@/components/shared/list-toolbar'
 import ActionMenu from '@/components/shared/action-menu'
 import { MoreAction } from '@/components/shared/row-actions'
@@ -1151,13 +1152,12 @@ function MediaLibraryInner() {
                   </div>
                 ) : (
                   <>
-                    <label className="flex items-start gap-1.5">
+                    <span className="flex items-start gap-1.5">
                       {canManageMedia ? (
-                        <input
-                          type="checkbox"
+                        <Checkbox
                           checked={selected.has(item.id)}
                           disabled={!isKnownUnused(item) || !!item.archivedAt}
-                          onChange={() =>
+                          onCheckedChange={() =>
                             setSelected((prev) => {
                               const next = new Set(prev)
                               if (next.has(item.id)) next.delete(item.id)
@@ -1175,7 +1175,6 @@ function MediaLibraryInner() {
                                   ? '使用先から外すまで削除できません'
                                   : undefined
                           }
-                          className="accent-green-500 mt-0.5"
                         />
                       ) : null}
                       <span className="bg-ink-secondary text-on-accent rounded px-1 py-0.5 text-[10px] leading-none">
@@ -1192,7 +1191,7 @@ function MediaLibraryInner() {
                       <span className="text-ink min-w-0 flex-1 truncate text-caption font-bold" title={item.filename}>
                         {item.filename}
                       </span>
-                    </label>
+                    </span>
                     <p className="text-ink-faint text-nano font-semibold tabular-nums">
                       {formatMediaDetails(item)}
                     </p>
@@ -1475,22 +1474,17 @@ function MediaLibraryInner() {
 
         <div className="flex flex-wrap items-center gap-3">
           {canManageMedia ? (
-            <label className="text-ink-secondary flex items-center gap-1.5 text-sm">
-              <input
-                type="checkbox"
-                checked={allSelected}
-                onChange={() =>
-                  setSelected((prev) => {
-                    if (allSelected) return new Set<string>()
-                    const next = new Set(prev)
-                    for (const item of removable) next.add(item.id)
-                    return next
-                  })
-                }
-                className="accent-green-500"
-              />
-              すべてのメディアを選択
-            </label>
+            <Checkbox
+              checked={allSelected}
+              onCheckedChange={() =>
+                setSelected((prev) => {
+                  if (allSelected) return new Set<string>()
+                  const next = new Set(prev)
+                  for (const item of removable) next.add(item.id)
+                  return next
+                })
+              }
+            >すべてのメディアを選択</Checkbox>
           ) : null}
           {canManageMedia ? (
             <button

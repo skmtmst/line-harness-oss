@@ -15,7 +15,7 @@ import Select from '@/components/shared/select'
 import Pagination from '@/components/shared/pagination'
 import ListRange from '@/components/ui/list-range'
 import { RowActions } from '@/components/shared/row-actions'
-import { DataTable, Td, Th, TableHeadRow, Tr } from '@/components/shared/table'
+import { ActionCell, DataTable, Td, Th, TableHeadRow, Tr } from '@/components/shared/table'
 import { TextField, TextArea } from '@/components/shared/text-field'
 /** 一覧の1ページの件数。先頭50件固定だった監査 R132 の名残を残さない。 */
 const PAGE_SIZE = 50
@@ -295,17 +295,17 @@ export default function FileScanSettingsPage() {
         <div className="mt-4 overflow-x-auto">
           <DataTable>
             <colgroup>
-              <col style={{ width: '34%' }} />
+              <col style={{ width: '32%' }} />
               <col style={{ width: '20%' }} />
-              <col style={{ width: '30%' }} />
-              <col style={{ width: '16%' }} />
+              <col style={{ width: '28%' }} />
+              <col style={{ width: '20%' }} />
             </colgroup>
             <thead>
               <TableHeadRow>
                 <Th>ファイル</Th>
                 <Th>上げた人</Th>
                 <Th>見つかったもの</Th>
-                <Th>操作</Th>
+                <Th align="right">操作</Th>
               </TableHeadRow>
             </thead>
             <tbody>
@@ -320,7 +320,7 @@ export default function FileScanSettingsPage() {
                   <Td>
                     <span className="block truncate" title={item.reasonLabel ?? '確認が必要です'}>{item.reasonLabel ?? '確認が必要です'}</span>
                   </Td>
-                  <Td>
+                  <ActionCell>
                     {item.status === 'quarantined' ? (
                       <RowActions
                         subjectName={item.filename}
@@ -335,7 +335,7 @@ export default function FileScanSettingsPage() {
                     ) : (
                       <span className="text-ink-faint">—</span>
                     )}
-                  </Td>
+                  </ActionCell>
                 </Tr>
               ))}
             </tbody>

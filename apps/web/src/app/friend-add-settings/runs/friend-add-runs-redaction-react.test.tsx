@@ -6,7 +6,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const state = vi.hoisted(() => ({ redacted: true }))
 vi.mock('next/link', () => ({ default: ({ href, children, ...props }: any) => <a href={href} {...props}>{children}</a> }))
-vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams() }))
+vi.mock('next/navigation', () => ({
+  useSearchParams: () => new URLSearchParams(),
+  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
+}))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1', accounts: [{ id: 'account-1' }], loading: false }) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
 vi.mock('@/components/shared/button', () => ({ default: ({ href, children, ...props }: any) => href ? <a href={href} {...props}>{children}</a> : <button {...props}>{children}</button> }))
@@ -25,7 +28,7 @@ vi.mock('@/lib/api', () => ({ api: { friendAddRules: {
       rule: null, scenario: null, actions: { total: 0, failed: 0 }, deliveryCount: 0, status: 'completed', errorCode: null,
     }],
     total: 1, nextCursor: null,
-    summary: { totalRuns: 1, cumulativeDeliveries: 0, scenarioStarts: 0, averageSendTimeMs: null, failed: 0, staffHandoffs: { value: null, state: 'unavailable', reason: null } },
+    summary: { recentFriends: 1, recentEvents: 1, cumulativeDeliveries: 0, scenarioStarts: 0, averageSendTimeMs: null, failed: 0, lastDeliveryAt: null, staffHandoffs: { value: null, state: 'unavailable', reason: null } },
   } })),
   get: vi.fn(async () => ({ success: false })), stop: vi.fn(),
 } } }))

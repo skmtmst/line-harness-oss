@@ -2,11 +2,13 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { Circle } from 'lucide-react'
 import { api, type SaveSupportMarkAutomationRule, type SupportMarkAutomationEvent, type SupportMarkListItem } from '@/lib/api'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import Button from '@/components/shared/button'
 import Breadcrumb from '@/components/shared/breadcrumb'
+import Checkbox from '@/components/shared/checkbox'
 import Card from '@/components/shared/card'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Select from '@/components/shared/select'
@@ -144,9 +146,10 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
 
   return (
     <div data-design-node="GMvBd">
+      {/* m22c: 見出し行の戻りは共通の行き先リンク（カード見出しと同じ13px/600青文字）。ボタン枠のままでは分類案内の行き先リンクとずれる（自動点検 k=10）。 */}
       <div className="mb-4 flex items-center justify-between gap-4">
         <Breadcrumb items={[{ label: '対応マーク', href: '/tags?tab=marks' }, { label: editing ? 'マークを編集' : 'マークを作る' }]} />
-        <Button href="/tags?tab=marks">対応マークへ</Button>
+        <Link href="/tags?tab=marks" className="text-status-info shrink-0 text-label font-semibold hover:underline">対応マークへ</Link>
       </div>
 
       {error ? <Notice tone="danger" className="mb-4">{error}</Notice> : null}
@@ -178,10 +181,11 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
             狭い幅でチェック欄がカードの外へ切れる。
           */}
           <div className="border-t border-hairline pt-4">
-            <label className="flex items-center gap-2 text-sm font-semibold text-ink">
-              <input type="checkbox" checked={isDefault} disabled={selected?.isDefault} onChange={(event) => setIsDefault(event.target.checked)} className="h-6 w-6 shrink-0 accent-accent-deep" />
-              新しい友だちに最初から付ける
-            </label>
+            <Checkbox
+              checked={isDefault}
+              disabled={selected?.isDefault}
+              onCheckedChange={setIsDefault}
+            >新しい友だちに最初から付ける</Checkbox>
             <p className="mt-1 text-xs font-normal leading-relaxed text-ink-faint">最初から付けるマークは1つだけ選べます</p>
           </div>
           {/* IDEA-04: 対応の状態管理なら対応マーク・印だけならタグ・値を持たせるなら情報欄という違いを、作る場所で確認できるようにする。 */}
@@ -238,10 +242,11 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
                     className="mt-1"
                   />
                 </label>
-                <label className="mt-3 flex items-center gap-2 text-sm font-semibold text-ink">
-                  <input type="checkbox" checked={ruleActive} onChange={(event) => setRuleActive(event.target.checked)} className="h-6 w-6 shrink-0 accent-accent-deep" />
-                  このルールを有効にして登録する
-                </label>
+                <Checkbox
+                  checked={ruleActive}
+                  onCheckedChange={setRuleActive}
+                  className="mt-3"
+                >このルールを有効にして登録する</Checkbox>
                 <div className="mt-3 flex justify-end">
                   <Button type="button" onClick={() => setCreateRule(false)}>ルールを外す</Button>
                 </div>

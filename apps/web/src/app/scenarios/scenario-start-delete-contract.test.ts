@@ -15,7 +15,8 @@ const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
 describe('シナリオ一覧の開始確認と削除（点検 #495 中4・中6）', () => {
   it('確認チェックは制御化し、未チェックの間は開始ボタンを押せない', () => {
     expect(PAGE).toContain('checked={confirmed}')
-    expect(PAGE).toContain('setConfirmed(event.target.checked)')
+    // m21u: 素の input を共通の Checkbox へ置き換えた。制御と未チェックで押せない動きは保つ。
+    expect(PAGE).toContain('onCheckedChange={setConfirmed}')
     /*
      * SCENARIO-07: 試算の取得待ち・取得失敗のあいだも開始できない。
      * チェック済みでも preflight が ready でなければ押せない。

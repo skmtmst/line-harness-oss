@@ -13,6 +13,8 @@ import { shortDateTime } from '@/lib/hq-banners'
 import { scenarioReferenceData } from './scenario-reference-data'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import ConditionBuilder, {
@@ -273,6 +275,73 @@ export function ConditionDialog({
   )
 }
 
+/* -------------------------------------- 終了後の移動先にされているときの注意 */
+
+export type MoveReferrer = { id: string; name: string }
+
+/**
+ * R250: 削除の確認窓で「どのシナリオの終了後の処理が変わるか」を見せる。
+ *
+ * 一覧・詳細の両方の削除確認から使う。件数は取れたときだけ出す。
+ * 読み込み中・失敗は件数を書かず、失敗は「戻ることがある」とだけ伝える。
+ * 参照が無いときは何も出さない（0件の断りは書かない）。
+ */
+export function MoveReferrersNotice({ scenarioId }: { scenarioId: string }) {
+  const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [items, setItems] = useState<MoveReferrer[]>([])
+
+  useEffect(() => {
+    let stale = false
+    setState('loading')
+    setItems([])
+    api.scenarios.moveReferrers(scenarioId).then(
+      (res) => {
+        if (stale) return
+        if (res.success) {
+          setItems(res.data.items)
+          setState('ready')
+        } else {
+          setState('error')
+        }
+      },
+      () => {
+        if (!stale) setState('error')
+      },
+    )
+    return () => {
+      stale = true
+    }
+  }, [scenarioId])
+
+  if (state === 'loading') {
+    return <p className="text-ink-faint text-xs">終了後の移動先としての利用を確認しています…</p>
+  }
+  if (state === 'error') {
+    return (
+      <p className="text-warning text-xs font-medium">
+        終了後の移動先としての利用を確認できませんでした。削除すると、利用していたシナリオの終了後の処理が「一時停止」に戻ることがあります。
+      </p>
+    )
+  }
+  if (items.length === 0) return null
+  const shown = items.slice(0, 5)
+  const rest = items.length - shown.length
+  return (
+    <div>
+      <p className="text-warning text-sm font-medium">
+        このシナリオは{items.length}件のシナリオの終了後の移動先になっています。
+      </p>
+      <p className="text-ink-secondary mt-1 text-xs">
+        {shown.map((s) => s.name).join('、')}
+        {rest > 0 ? `、ほか${rest}件` : ''}
+      </p>
+      <p className="text-ink-secondary mt-1 text-xs">
+        削除すると、これらのシナリオの終了後の処理は「一時停止」に戻ります。
+      </p>
+    </div>
+  )
+}
+
 /* -------------------------------------------- 最終コンテンツ配信後の処理 */
 
 export type OnCompleteMode = 'pause' | 'resume_previous' | 'move'
@@ -393,9 +462,14 @@ export function OnCompleteDialog({
             type="button"
             disabled={saving}
             onClick={async () => {
-              /* R239: 移動先の未選択は送らずに欄の下で案内する。 */
+              /*
+               * R250 + R239: 移動先のない「次のシナリオへ移動」は保存しない。
+               * 欠落したまま送ると400になるだけなので、欄の下と窓の上で理由を出す。
+               * 欄の下（targetError）が入力不足、窓の上（error）が保存前の止め。
+               */
               if (draftMode === 'move' && !draftTarget) {
                 setTargetError('移動先を選んでください')
+                setError('「次のシナリオへ移動」には移動先のシナリオが要ります。')
                 return
               }
               setTargetError('')
@@ -425,7 +499,7 @@ export function OnCompleteDialog({
       }
     >
       {error && <Notice tone="danger" className="mb-4" message={error} />}
-      <div className="space-y-3">
+      <RadioCardGroup legend="最後の1通を配り終えた人をどうするか" className="space-y-3">
         {(
           [
             {
@@ -446,25 +520,17 @@ export function OnCompleteDialog({
             },
           ]
         ).map((opt) => (
-          <label
+          <RadioCard
             key={opt.value}
-            className={`rounded-panel flex cursor-pointer gap-3 border p-4 ${
-              draftMode === opt.value ? 'border-accent bg-accent-soft' : 'border-hairline'
-            }`}
-          >
-            <input
-              type="radio"
-              className="mt-1"
-              checked={draftMode === opt.value}
-              onChange={() => setDraftMode(opt.value)}
-            />
-            <span className="min-w-0">
-              <span className="text-ink block text-sm font-bold">{ON_COMPLETE_LABEL[opt.value]}</span>
-              <span className="text-ink-secondary mt-0.5 block text-xs">{opt.hint}</span>
-            </span>
-          </label>
+            name="scenario-complete-action"
+            value={opt.value}
+            checked={draftMode === opt.value}
+            onChange={() => setDraftMode(opt.value)}
+            title={ON_COMPLETE_LABEL[opt.value]}
+            note={opt.hint}
+          />
         ))}
-      </div>
+      </RadioCardGroup>
 
       <div className="border-hairline mt-5 border-t pt-5">
         <p className="text-ink text-sm font-bold">その他のアクション</p>
@@ -530,6 +596,16 @@ export function OnCompleteDialog({
               {savedTargetMissing ? (
                 <p className="text-warning mt-1.5 text-xs">
                   保存されている移動先はこのアカウントの候補にありません（別アカウント・削除済み・権限外の可能性）。そのまま保存すると現在の値が維持されます。
+                </p>
+              ) : null}
+              {/*
+                R250: 移動先が空のままの「次のシナリオへ移動」は保存できない
+                設定。選ばずに閉じると気づけないので、窓の中で理由を出す。
+                （失敗・警告は HelpTip に入れない決まりのため、本文に書く）
+              */}
+              {candidatesState === 'ready' && !draftTarget ? (
+                <p className="text-warning mt-1.5 text-xs font-medium">
+                  移動先が選ばれていません。選んで保存してください。
                 </p>
               ) : null}
             </>
@@ -875,7 +951,7 @@ export function TestSendDialog({
           「戻る」「テスト送信を開始」へ必ず到達できるようにする。
         */}
         <div className="fixed inset-0 z-10 flex items-start justify-center overflow-y-auto px-6 pb-6" style={{ paddingTop: 'min(265px, 30vh)', background: 'color-mix(in srgb, var(--color-ink) 35%, transparent)' }}>
-          <div className="w-full rounded-panel shadow-xl" style={{ maxWidth: 672, background: 'var(--color-canvas)' }}><div className="border-hairline border-b px-6 py-5"><h2 className="text-lg font-bold">選択した1名へ実際に送信しますか？</h2><p className="text-ink-secondary mt-1 text-sm">{friendName}さん（{recipientLabel}）へ{confirmSteps.length}通をテスト送信します。実際のLINEメッセージとして届きます。</p></div><div className="space-y-3 px-6 py-5 text-sm">{requiredConfirmations.map((label, index) => (<label key={label} className="flex items-center gap-2"><input type="checkbox" checked={confirmChecks[index] === true} disabled={sending || result?.ok === true} onChange={(e) => setConfirmChecks((prev) => prev.map((v, i) => (i === index ? e.target.checked : v)))} />{label}</label>))}<p className="text-ink-faint text-xs">購読の登録は増えません。配信予定も作りません。</p>
+          <div className="w-full rounded-panel shadow-xl" style={{ maxWidth: 672, background: 'var(--color-canvas)' }}><div className="border-hairline border-b px-6 py-5"><h2 className="text-lg font-bold">選択した1名へ実際に送信しますか？</h2><p className="text-ink-secondary mt-1 text-sm">{friendName}さん（{recipientLabel}）へ{confirmSteps.length}通をテスト送信します。実際のLINEメッセージとして届きます。</p></div><div className="space-y-3 px-6 py-5 text-sm">{requiredConfirmations.map((label, index) => (<Checkbox key={label} checked={confirmChecks[index] === true} disabled={sending || result?.ok === true} onCheckedChange={(checked) => setConfirmChecks((prev) => prev.map((v, i) => (i === index ? checked : v)))}>{label}</Checkbox>))}<p className="text-ink-faint text-xs">購読の登録は増えません。配信予定も作りません。</p>
             {sending && <Notice tone="info">送信中です。完了までこの画面のまま待ってください。</Notice>}
             {result && (
               <Notice tone={result.ok ? 'success' : 'danger'}>

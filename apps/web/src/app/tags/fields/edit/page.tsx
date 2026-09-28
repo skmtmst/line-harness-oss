@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import type { FriendField, Folder } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -10,6 +11,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Notice from '@/components/shared/notice'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -62,10 +64,7 @@ function sameLabels(a: string[], b: string[]): boolean {
 
 function Toggle({ checked, onChange, label, hint, disabled }: { checked: boolean; onChange: (next: boolean) => void; label: string; hint: string; disabled?: boolean }) {
   return (
-    <label className={`flex items-start justify-between gap-4 py-2 ${disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}>
-      <span><span className="block text-sm font-semibold text-ink">{label}</span><span className="block text-xs text-ink-faint">{hint}</span></span>
-      <input type="checkbox" checked={checked} disabled={disabled} onChange={(event) => onChange(event.target.checked)} className="mt-1 h-4 w-4 accent-accent" />
-    </label>
+    <Checkbox checked={checked} onCheckedChange={onChange} disabled={disabled} description={hint} className="py-2">{label}</Checkbox>
   )
 }
 
@@ -248,12 +247,13 @@ function EditFriendFieldForm() {
   return (
     <div className="flex flex-col gap-4">
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
-      {/* R177: 長い項目名で戻るボタンが右へ押し出されていた。パンくずを縮め、ボタンは残す。 */}
+      {/* R177: 長い項目名で戻りが右へ押し出されていた。パンくずを縮め、戻り先は残す。 */}
+      {/* m22c: 見出し行の戻りは共通の行き先リンク（カード見出しと同じ13px/600青文字）。 */}
       <div className="flex items-center justify-between gap-4">
         <div className="min-w-0 flex-1">
           <Breadcrumb items={[{ label: '友だち情報欄', href: '/tags?tab=fields' }, { label: field.name }]} />
         </div>
-        <Button href="/tags?tab=fields" className="shrink-0">友だち情報欄へ</Button>
+        <Link href="/tags?tab=fields" className="text-status-info shrink-0 text-label font-semibold hover:underline">友だち情報欄へ</Link>
       </div>
 
       {error ? <Notice tone="danger" message={error} className="mb-4" /> : null}

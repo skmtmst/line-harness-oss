@@ -106,14 +106,19 @@ const TEMPLATE_LABELS: Record<string, string> = {
 export function RichMenuTemplatePreview({ template }: { template: RichMenuTemplate }) {
   const dims = SIZE_DIMENSIONS[template.size]
   const inset = dims.width * 0.006
+  /*
+   * 面の記号（A・B…）は面の位置を示すため、座標は変えない。
+   * 大きさだけ実表示に合わせた px 指定にする。SVG 内の単位のまま
+   * （200px超）書くと、計算上の大きな文字として読まれる。
+   */
   return (
     <svg viewBox={`0 0 ${dims.width} ${dims.height}`} className="border-hairline bg-canvas-sunken w-full rounded border" role="img" aria-label={`${template.label} の面の分けかた`}>
       {template.areas.length === 0 ? (
-        <text x={dims.width / 2} y={dims.height / 2} textAnchor="middle" dominantBaseline="central" fontSize={dims.height / 7} style={{ fill: 'var(--color-ink-faint)' }}>自由に配置</text>
+        <text x={dims.width / 2} y={dims.height / 2} textAnchor="middle" dominantBaseline="central" style={{ fontSize: 'clamp(10px, 0.85vw, 16px)', fill: 'var(--color-ink-faint)' }}>自由に配置</text>
       ) : template.areas.map((area, index) => (
         <g key={index}>
           <rect x={area.x + inset} y={area.y + inset} width={Math.max(0, area.w - inset * 2)} height={Math.max(0, area.h - inset * 2)} rx={dims.width * 0.008} strokeWidth={dims.width * 0.004} style={{ fill: 'var(--color-accent-soft)', stroke: 'var(--color-accent)' }} />
-          <text x={area.x + area.w / 2} y={area.y + area.h / 2} textAnchor="middle" dominantBaseline="central" fontSize={dims.height / 8} style={{ fill: 'var(--color-ink-secondary)', fontWeight: 700 }}>{String.fromCharCode(65 + index)}</text>
+          <text x={area.x + area.w / 2} y={area.y + area.h / 2} textAnchor="middle" dominantBaseline="central" style={{ fontSize: 'clamp(9px, 0.75vw, 14px)', fill: 'var(--color-ink-secondary)', fontWeight: 700 }}>{String.fromCharCode(65 + index)}</text>
         </g>
       ))}
     </svg>
@@ -277,9 +282,9 @@ export default function RichMenuCreateForm({
           <div>
             <span className="text-ink-secondary mb-2 block text-sm font-medium">面の分けかた</span>
             <p className="text-ink-faint mb-3 text-xs">押せるところをいくつに分けるか。あとから編集画面で区切り直せます。</p>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7">
-              {shownTemplates.map((item) => <label key={item.key} className={`rounded-control border p-2 transition-colors ${locked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'} ${value.templateKey === item.key ? 'border-accent bg-accent-soft' : 'border-hairline hover:bg-canvas-sunken'}`}><input type="radio" name="template" value={item.key} checked={value.templateKey === item.key} disabled={locked} onChange={(event) => selectTemplate(event.target.value)} className="sr-only" /><RichMenuTemplatePreview template={item} /><div className="text-ink mt-1 text-center text-xs font-medium">{TEMPLATE_LABELS[item.key] ?? item.label}</div></label>)}
-            </div>
+            <RadioCardGroup legend="面の分けかた" className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7">
+              {shownTemplates.map((item) => <RadioCard key={item.key} name="template" value={item.key} checked={value.templateKey === item.key} disabled={locked} onChange={(selected) => selectTemplate(selected)} title={TEMPLATE_LABELS[item.key] ?? item.label} note={<RichMenuTemplatePreview template={item} />} />)}
+            </RadioCardGroup>
           </div>
 
           {/*

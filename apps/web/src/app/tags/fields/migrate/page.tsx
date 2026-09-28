@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import type { FriendField, FriendFieldType } from '@line-crm/shared'
 import { useAccount } from '@/contexts/account-context'
 import FeatureGate from '@/components/feature-gate'
@@ -9,6 +10,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import ListState from '@/components/shared/list-state'
 import StickyBar from '@/components/shared/sticky-bar'
 import TargetMissing from '@/components/shared/target-missing'
@@ -298,9 +300,10 @@ function MigrateFriendField() {
   return (
     <div data-design-node="KoT6c" className="flex flex-col gap-4">
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      {/* m22c: 見出し行の戻りは共通の行き先リンク（カード見出しと同じ13px/600青文字）。 */}
       <div className="flex items-center justify-between gap-4">
         <Breadcrumb items={[{ label: '友だち情報欄', href: '/tags?tab=fields' }, { label: '項目を移行' }]} />
-        <Button href="/tags?tab=fields">友だち情報欄へ</Button>
+        <Link href="/tags?tab=fields" className="text-status-info shrink-0 text-label font-semibold hover:underline">友だち情報欄へ</Link>
       </div>
 
       <Notice tone="info" className="mb-4">
@@ -336,19 +339,10 @@ function MigrateFriendField() {
             </div>
           ) : (
             <div className="mt-3">
-              <fieldset>
-                <legend className="sr-only">移行先の決め方</legend>
-                <div className="flex flex-wrap gap-4 text-sm text-ink-secondary">
-                  <label className="flex items-center gap-2">
-                    <input type="radio" checked={targetMode === 'new'} onChange={() => { setTargetMode('new'); resetConfirmation() }} />
-                    新しい項目を作る
-                  </label>
-                  <label className="flex items-center gap-2">
-                    <input type="radio" checked={targetMode === 'existing'} onChange={() => { setTargetMode('existing'); resetConfirmation() }} />
-                    既存の項目を使う
-                  </label>
-                </div>
-              </fieldset>
+              <RadioCardGroup legend="移行先の決め方">
+                <RadioCard name="field-migrate-target" value="new" checked={targetMode === 'new'} onChange={() => { setTargetMode('new'); resetConfirmation() }} title="新しい項目を作る" />
+                <RadioCard name="field-migrate-target" value="existing" checked={targetMode === 'existing'} onChange={() => { setTargetMode('existing'); resetConfirmation() }} title="既存の項目を使う" />
+              </RadioCardGroup>
               {targetMode === 'new' ? (
                 <>
                   <label className="mt-3 block text-sm font-semibold text-ink">項目名

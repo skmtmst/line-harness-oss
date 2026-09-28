@@ -526,11 +526,17 @@ function AnalyticsReportFormPage() {
         </aside>
       </div>
 
+      {/*
+        m22c: 下の3つの操作は1440pxで1行に収める。試し送りは言葉を短くし
+        （今すぐ1回だけ送る）、キャンセルは隣のボタンと同じ高さ40にそろえる。
+        行の中で高さが違うと、同じ1行でも上端がずれて2行に見える
+        （見た目の自動点検 k=5）。
+      */}
       <StickyBar
         status={editing
           ? <>「{editing.name}」を直しています。保存すると、次の{nextLabel}から新しい内容で届きます。</>
           : <>まだ動いていません。つくると、次の{nextLabel}から届きはじめます。</>}
-        actions={<><Link className="text-ink-secondary p-3 text-sm no-underline" href="/analytics">キャンセル</Link>{!editing && <Button variant="secondary" disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} onClick={() => void submit(true)}>いますぐ1回だけ送ってみる</Button>}<Button disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} onClick={() => void submit(false)}>{saving ? (editing ? '保存しています' : '作っています') : (editing ? '変更を保存する' : 'つくって動かす')}</Button></>}
+        actions={<><Link className="text-ink-secondary inline-flex h-10 items-center px-3 text-sm no-underline" href="/analytics">キャンセル</Link>{!editing && <Button variant="secondary" disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} onClick={() => void submit(true)}>今すぐ1回だけ送る</Button>}<Button disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} onClick={() => void submit(false)}>{saving ? (editing ? '保存しています' : '作っています') : (editing ? '変更を保存する' : 'つくって動かす')}</Button></>}
       />
     </div>
   )

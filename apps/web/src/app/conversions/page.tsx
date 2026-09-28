@@ -216,6 +216,7 @@ import { useAccount } from '@/contexts/account-context'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import MobileTableCards from '@/components/shared/mobile-table-cards'
 import Button from '@/components/shared/button'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
@@ -1623,44 +1624,50 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
             </section>
 
             <section>
-              <h3 className="text-ink text-sm font-bold">どうしますか？</h3>
-              <div className="mt-2 space-y-2">
-                <label className={`rounded-control flex cursor-pointer items-start gap-3 border p-3 ${stopAction === 'stop' ? 'border-accent bg-accent-soft' : 'border-hairline'}`}>
-                  <input type="radio" name="conversion-stop-action" checked={stopAction === 'stop'} onChange={() => setStopAction('stop')} className="mt-0.5" />
-                  <div>
-                    <p className="text-ink text-sm font-semibold">数えるのをやめる（おすすめ）</p>
-                    <p className="text-ink-faint mt-0.5 text-xs">これから先は数えません。過去の記録と分析は残します。</p>
-                  </div>
-                </label>
-                <label className={`rounded-control flex cursor-pointer items-start gap-3 border p-3 ${stopAction === 'replace' ? 'border-accent bg-accent-soft' : 'border-hairline'}`}>
-                  <input type="radio" name="conversion-stop-action" checked={stopAction === 'replace'} onChange={() => setStopAction('replace')} className="mt-0.5" disabled={!stopImpact?.replacementCandidates.length} />
-                  <div>
-                    <p className="text-ink text-sm font-semibold">別の成果地点に差し替えてから削除する</p>
-                    <p className="text-ink-faint mt-0.5 text-xs">利用先を別の成果地点へ切り替え、過去の数字を残します。</p>
-                    {stopAction === 'replace' ? (
-                      <Select
-                        aria-label="差し替え先の成果地点"
-                        value={replacementId}
-                        options={[
-                          { value: '', label: '差し替え先を選ぶ' },
-                          ...(stopImpact?.replacementCandidates ?? []).map((item) => ({ value: item.id, label: item.name })),
-                        ]}
-                        onChange={setReplacementId}
-                        className="mt-2"
-                      />
-                    ) : null}
-                  </div>
-                </label>
-                <label className={`rounded-control flex items-start gap-3 border p-3 ${stopImpact?.canDelete ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'} ${stopAction === 'delete' ? 'border-accent bg-accent-soft' : 'border-hairline'}`}>
-                  <input type="radio" name="conversion-stop-action" checked={stopAction === 'delete'} onChange={() => setStopAction('delete')} className="mt-0.5" disabled={!stopImpact?.canDelete} />
-                  <div>
-                    <p className="text-ink text-sm font-semibold">このまま削除する</p>
-                    <p className="text-ink-faint mt-0.5 text-xs">{stopImpact?.canDelete
-                      ? '成果0件・利用先0件のため、この成果地点だけを削除できます。'
-                      : '成果または利用先があるため、物理削除は選べません。'}</p>
-                  </div>
-                </label>
-              </div>
+              <RadioCardGroup legend="どうしますか？" legendVisible>
+                <RadioCard
+                  name="conversion-stop-action"
+                  value="stop"
+                  checked={stopAction === 'stop'}
+                  onChange={() => setStopAction('stop')}
+                  title="数えるのをやめる（おすすめ）"
+                  note="これから先は数えません。過去の記録と分析は残します。"
+                />
+                <RadioCard
+                  name="conversion-stop-action"
+                  value="replace"
+                  checked={stopAction === 'replace'}
+                  onChange={() => setStopAction('replace')}
+                  disabled={!stopImpact?.replacementCandidates.length}
+                  disabledReason="差し替え先の成果地点がありません"
+                  title="別の成果地点に差し替えてから削除する"
+                  note="利用先を別の成果地点へ切り替え、過去の数字を残します。"
+                />
+                <RadioCard
+                  name="conversion-stop-action"
+                  value="delete"
+                  checked={stopAction === 'delete'}
+                  onChange={() => setStopAction('delete')}
+                  disabled={!stopImpact?.canDelete}
+                  disabledReason="成果または利用先があるため、物理削除は選べません。"
+                  title="このまま削除する"
+                  note={stopImpact?.canDelete
+                    ? '成果0件・利用先0件のため、この成果地点だけを削除できます。'
+                    : '成果または利用先があるため、物理削除は選べません。'}
+                />
+              </RadioCardGroup>
+              {stopAction === 'replace' ? (
+                <Select
+                  aria-label="差し替え先の成果地点"
+                  value={replacementId}
+                  options={[
+                    { value: '', label: '差し替え先を選ぶ' },
+                    ...(stopImpact?.replacementCandidates ?? []).map((item) => ({ value: item.id, label: item.name })),
+                  ]}
+                  onChange={setReplacementId}
+                  className="mt-2"
+                />
+              ) : null}
             </section>
 
             <p className="text-ink-faint text-xs">{stopAction === 'replace'
@@ -1842,7 +1849,7 @@ function ReportTab({ accountId }: { accountId: string | null }) {
         />
       </KpiCollapse>
 
-      <Notice tone="info" message="成果地点ごとの件数と、どこから来たかです。数え方は「成果地点」で決めます。" />
+      <Notice tone="info" message="成果地点ごとの件数と、どこから来たかです。数え方は「成果地点」で決めます。件数と金額は、取り消された成果を除いた数です。" />
 
       <section className="bg-canvas rounded-card border-hairline border p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
