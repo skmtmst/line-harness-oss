@@ -18,6 +18,7 @@ import {
 import { useAccount } from '@/contexts/account-context'
 import { canOperateBookings } from '../../lib/booking-permissions'
 import Button from '@/components/shared/button'
+import HelpTip from '@/components/shared/help-tip'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import DateField from '@/components/shared/date-field'
 import Notice from '@/components/shared/notice'
@@ -820,6 +821,42 @@ function BookingDetailInner() {
                   ) : detail.calendarSync === 'pending' ? '反映処理中' : '未設定'}
               </Row>
             </section>
+
+            {/* ---- 予約した時の内容の写し (T) ---- */}
+            {(() => {
+              const snapshot = detail.menuSnapshot ?? null
+              if (!snapshot) return null
+              const bookedMinutes = Math.round(
+                (new Date(detail.endsAt).getTime() - new Date(detail.startsAt).getTime()) / 60000,
+              )
+              // 写しがいまのメニューと同じなら、同じ数字を二度出さない。
+              if (
+                snapshot.name === detail.menuName
+                && snapshot.basePrice === detail.price
+                && snapshot.durationMinutes === bookedMinutes
+              ) return null
+              return (
+                <section className="bg-canvas rounded-card border-hairline border p-5">
+                  <h2 className="text-ink mb-3 text-sm font-semibold">
+                    予約した時の内容
+                    <HelpTip label="予約した時の内容の説明">
+                      予約した時点のメニューの写しです。あとでメニューを変えても、この予約の内容は変わりません。
+                    </HelpTip>
+                  </h2>
+                  <Row label="メニュー">{snapshot.name}（第{snapshot.version}版の内容）</Row>
+                  <Row label="時間">{snapshot.durationMinutes} 分</Row>
+                  <Row label="料金">
+                    <span className="tabular-nums">
+                      {snapshot.priceMode === 'free'
+                        ? '無料'
+                        : snapshot.priceMode === 'inquiry'
+                          ? 'お問い合わせ'
+                          : `¥${snapshot.basePrice.toLocaleString()}（税込）`}
+                    </span>
+                  </Row>
+                </section>
+              )
+            })()}
 
             {/* ---- 予約内容の変更 (N-389) ---- */}
             {editing ? (
