@@ -7,15 +7,11 @@ type SupportEmailInboxQuery = {
   assignee?: string
   unreadOnly?: boolean
   quickFilter?: 'reply' | 'overdue'
-  /** 選択中のLINEアカウント。件数（quick-counts）と同じ条件にする。 */
-  accountId?: string
 }
 
-/*
- * R110: 選択中のLINEアカウントは検索条件へ混ぜる。メールにアカウントの
- * 紐付けは無いが、件数側はアカウント選択中にメールを数えない。
- * 一覧だけ混ぜないと「一覧にあるのに件数が0」になる。
- * アカウント未選択のときは送らず、全メールのままにする。
+/**
+ * メール問い合わせはLINEアカウントに所属していないため、
+ * 選択中のLINEアカウントを検索条件へ混ぜない。
  */
 export function buildSupportEmailInboxQuery({
   status,
@@ -25,7 +21,6 @@ export function buildSupportEmailInboxQuery({
   assignee,
   unreadOnly,
   quickFilter,
-  accountId,
 }: SupportEmailInboxQuery): string {
   return new URLSearchParams({
     channel: 'email',
@@ -36,6 +31,5 @@ export function buildSupportEmailInboxQuery({
     ...(assignee && assignee !== 'all' ? { assignee } : {}),
     ...(unreadOnly ? { unreadOnly: '1' } : {}),
     ...(quickFilter ? { quickFilter } : {}),
-    ...(accountId ? { lineAccountId: accountId } : {}),
   }).toString()
 }
