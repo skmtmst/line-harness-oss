@@ -1,9 +1,7 @@
 'use client'
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { MoreHorizontal } from 'lucide-react'
-import ActionMenu from '@/components/shared/action-menu'
-import IconButton from '@/components/shared/icon-button'
+import { RowActions } from '@/components/shared/row-actions'
 import {
   api,
   describeSaveFailure,
@@ -352,7 +350,6 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
   const [sort, setSort] = useState<PointSort>('cv-desc')
   const [status, setStatus] = useState<StatusFilter>('all')
   const [page, setPage] = useState(1)
-  const [pointMenuId, setPointMenuId] = useState<string | null>(null)
   const [loadFailed, setLoadFailed] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState('')
@@ -1038,25 +1035,21 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                 使う場所を足す
               </Button>
             ),
+            /*
+             * R280: 開閉は行ごとの共通 RowActions に任せる。以前は画面全体の
+             * `pointMenuId` をスマホカードとPC表で共有していたため、隠れて
+             * いる側の器まで body へ出てメニューが2つに見えた。
+             */
             moreAction: (
-              <span className="relative flex h-9 w-9 items-center justify-center">
-                <IconButton
-                  aria-label={`${point.name}のその他操作`}
-                  title={`${point.name}のその他操作`}
-                  onClick={() => setPointMenuId((currentId) => (currentId === point.id ? null : point.id))}
-                >
-                  <MoreHorizontal />
-                </IconButton>
-                <ActionMenu
-                  open={pointMenuId === point.id}
-                  ariaLabel={`${point.name}の操作`}
-                  onClose={() => setPointMenuId(null)}
-                  items={[
-                    { id: 'detail', label: '中身を見る', onSelect: () => setDetailTarget(point) },
-                  ]}
-                />
-              </span>
+              <RowActions
+                menuItems={[
+                  { id: 'detail', label: '中身を見る', onSelect: () => setDetailTarget(point) },
+                ]}
+                subjectName={point.name}
+              />
             ),
+            onSelect: () => setDetailTarget(point),
+            onSelectLabel: `${point.name}の詳細を開く`,
           }))}
         />
         <div data-design="Table" className="bg-canvas rounded-card border-hairline border hidden md:block">
@@ -1080,7 +1073,12 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                 <tr
                   key={point.id}
                   ref={point.id === highlightId ? highlightRowRef : null}
-                  className={point.id === highlightId ? 'bg-accent-soft' : 'hover:bg-canvas-sunken'}
+                  /*
+                   * R280: 行のクリックでも詳細が開く。操作列の中の押下は
+                   * 行へ伝えない（選んだ操作の代わりに詳細へ移動してしまう）。
+                   */
+                  className={`${point.id === highlightId ? 'bg-accent-soft' : 'hover:bg-canvas-sunken'} cursor-pointer`}
+                  onClick={() => setDetailTarget(point)}
                 >
                   <td className="text-ink w-1/6 px-4 py-3 text-sm font-medium">
                     <span className="line-clamp-2" title={point.name}>{point.name}</span>
@@ -1121,11 +1119,14 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                     : 'text-ink-secondary w-1/4 px-4 py-3 text-sm'}>
                     <span className="line-clamp-2" title={usageLabel(point)}>{usageLabel(point)}</span>
                   </td>
-                  <td className="px-4 py-3 text-right whitespace-nowrap">
+                  <td className="px-4 py-3 text-right whitespace-nowrap" onClick={(event) => event.stopPropagation()}>
                     {/*
                       幅の決まっていない列へ2つのボタンを右詰めで入れると、
                       狭い幅で内容が左の「使われている場所」へはみ出して
                       文字に重なっていた。主操作だけ残し、詳細はメニューへ畳む。
+                      R280: 「…」は開閉を行ごとに持つ共通 RowActions にする。
+                      画面全体の共有状態だと、隠れているスマホカード側の器まで
+                      body へ出てメニューが2つに見えた。
                     */}
                     <div className="relative flex items-center justify-end gap-2">
                       <Button
@@ -1134,20 +1135,11 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                       >
                         使う場所を足す
                       </Button>
-                      <IconButton
-                        aria-label={`${point.name}のその他操作`}
-                        title={`${point.name}のその他操作`}
-                        onClick={() => setPointMenuId((current) => (current === point.id ? null : point.id))}
-                      >
-                        <MoreHorizontal />
-                      </IconButton>
-                      <ActionMenu
-                        open={pointMenuId === point.id}
-                        ariaLabel={`${point.name}の操作`}
-                        onClose={() => setPointMenuId(null)}
-                        items={[
+                      <RowActions
+                        menuItems={[
                           { id: 'detail', label: '中身を見る', onSelect: () => setDetailTarget(point) },
                         ]}
+                        subjectName={point.name}
                       />
                     </div>
                   </td>
