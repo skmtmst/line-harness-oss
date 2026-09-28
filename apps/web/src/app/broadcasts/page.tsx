@@ -781,17 +781,17 @@ function BroadcastList() {
             */}
             {/*
               列幅は % と操作列の固定幅の組み合わせ（m20i）。
-              操作は中身（詳細＋…約90＋余白16）だけの110pxに固定する
-              （★V7：操作列は固定幅）。余白は12px→8pxに詰める（下の
-              ActionCell の px-2）。% の合計は83に抑え、110pxを足しても
+              操作は中身（詳細＋…約90＋共通の余白24）だけの120pxに固定する
+              （★V7：操作列は固定幅・右端の余白は共通の12px）。
+              % の合計は82に抑え、120pxを足しても
               いちばん狭い帯（1280px時の表≈700px）に収まる。タイトルも
-              17%に詰めて、空いたぶんを結果18%へ回す。結果の各行は
+              16%に詰めて、空いたぶんを結果18%へ回す。結果の各行は
               1440pxで1行に収まる。狭い帯ではラベルと数字の間で折れて
               よい（数字と率は離さない）。横には送らない。
             */}
             <thead>
               <TableHeadRow>
-                <Th style={{ width: '17%' }}>
+                <Th style={{ width: '16%' }}>
                   タイトル・内容
                 </Th>
                 <Th style={{ width: '14%' }}>
@@ -811,7 +811,7 @@ function BroadcastList() {
                   結果
                 </Th>
                 {/* #768: 表が横に流れる帯でも操作列は右端に留める。 */}
-                <Th style={{ width: 110 }} align="right" className="sticky right-0 bg-canvas-sunken">
+                <Th style={{ width: 120 }} align="right" className="sticky right-0 bg-canvas-sunken">
                   操作
                 </Th>
               </TableHeadRow>
@@ -969,7 +969,7 @@ function BroadcastList() {
                       削除はメニューの中の危ない操作へ。行にゴミ箱の
                       アイコンだけのボタンは置かない（★V7 Xn1Mz）。
                     */}
-                    <ActionCell className="sticky right-0 bg-canvas px-2 group-hover:bg-canvas-sunken">
+                    <ActionCell className="sticky right-0 bg-canvas group-hover:bg-canvas-sunken">
                       {/* 行を押すと詳細へ行くので、行の中の操作は行へ伝えない。 */}
                       {/* m20i: 操作列が固定幅で余るぶんは右へ寄せ、「…」を枠の端に置く。 */}
                       <span className="inline-flex w-full justify-end" onClick={(event) => event.stopPropagation()}>

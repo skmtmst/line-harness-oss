@@ -80,8 +80,13 @@ export function AttributeKindGuide({ current }: { current: AttributeKind }) {
                 {isCurrent ? <span className="ml-1 rounded-pill bg-accent-deep px-2 py-0.5 text-nano font-bold text-on-accent">この画面</span> : null}
               </p>
               <p className="mt-0.5 leading-5">{guide.holds}。{guide.useWhen}ときに選びます。</p>
+              {/*
+                m22c: 行き先リンクは共通の見た目（カード見出しの行き先リンクと
+                同じ13px/600の青文字）にそろえる。12pxのままでは、同じ画面の
+                見出し行の戻りリンクと大きさ・色がずれる（自動点検 k=10）。
+              */}
               {!isCurrent ? (
-                <Link href={guide.createHref} className="mt-0.5 inline-block font-semibold text-action hover:underline">
+                <Link href={guide.createHref} className="text-status-info mt-0.5 inline-block text-label font-semibold hover:underline">
                   {guide.createLabel} →
                 </Link>
               ) : null}

@@ -106,14 +106,19 @@ const TEMPLATE_LABELS: Record<string, string> = {
 export function RichMenuTemplatePreview({ template }: { template: RichMenuTemplate }) {
   const dims = SIZE_DIMENSIONS[template.size]
   const inset = dims.width * 0.006
+  /*
+   * 面の記号（A・B…）は面の位置を示すため、座標は変えない。
+   * 大きさだけ実表示に合わせた px 指定にする。SVG 内の単位のまま
+   * （200px超）書くと、計算上の大きな文字として読まれる。
+   */
   return (
     <svg viewBox={`0 0 ${dims.width} ${dims.height}`} className="border-hairline bg-canvas-sunken w-full rounded border" role="img" aria-label={`${template.label} の面の分けかた`}>
       {template.areas.length === 0 ? (
-        <text x={dims.width / 2} y={dims.height / 2} textAnchor="middle" dominantBaseline="central" fontSize={dims.height / 7} style={{ fill: 'var(--color-ink-faint)' }}>自由に配置</text>
+        <text x={dims.width / 2} y={dims.height / 2} textAnchor="middle" dominantBaseline="central" style={{ fontSize: 'clamp(10px, 0.85vw, 16px)', fill: 'var(--color-ink-faint)' }}>自由に配置</text>
       ) : template.areas.map((area, index) => (
         <g key={index}>
           <rect x={area.x + inset} y={area.y + inset} width={Math.max(0, area.w - inset * 2)} height={Math.max(0, area.h - inset * 2)} rx={dims.width * 0.008} strokeWidth={dims.width * 0.004} style={{ fill: 'var(--color-accent-soft)', stroke: 'var(--color-accent)' }} />
-          <text x={area.x + area.w / 2} y={area.y + area.h / 2} textAnchor="middle" dominantBaseline="central" fontSize={dims.height / 8} style={{ fill: 'var(--color-ink-secondary)', fontWeight: 700 }}>{String.fromCharCode(65 + index)}</text>
+          <text x={area.x + area.w / 2} y={area.y + area.h / 2} textAnchor="middle" dominantBaseline="central" style={{ fontSize: 'clamp(9px, 0.75vw, 14px)', fill: 'var(--color-ink-secondary)', fontWeight: 700 }}>{String.fromCharCode(65 + index)}</text>
         </g>
       ))}
     </svg>

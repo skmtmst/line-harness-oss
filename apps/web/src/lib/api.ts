@@ -7771,6 +7771,14 @@ export const api = {
       }),
     delete: (id: string) =>
       fetchApi<ApiResponse<null>>(`/api/scenarios/${id}`, { method: 'DELETE' }),
+    /**
+     * R250: このシナリオを終了後の移動先にしているシナリオの一覧。
+     * 削除の確認窓で「どのシナリオの設定が変わるか」を見せる。
+     */
+    moveReferrers: (id: string) =>
+      fetchApi<ApiResponse<{ items: Array<{ id: string; name: string }>; total: number }>>(
+        `/api/scenarios/${id}/move-referrers`,
+      ),
     addStep: (
       id: string,
       data: {
@@ -10695,7 +10703,7 @@ export const api = {
         method: 'POST',
       }),
     /** 新しい rules 契約でテスト実行し、本番データは変更しない。 */
-    test: (accountId: string, ruleId: string) =>
+    test: (accountId: string, ruleId: string, input?: { routeId?: string | null; expectedAt?: string | null; friendId?: string | null }) =>
       fetchApi<ApiResponse<{
         stateChanged: false
         ruleId: string
@@ -10719,7 +10727,13 @@ export const api = {
         }
       }>('/api/friend-add-rules/test', {
         method: 'POST',
-        body: JSON.stringify({ accountId, ruleId }),
+        body: JSON.stringify({
+          accountId,
+          ruleId,
+          routeId: input?.routeId ?? null,
+          expectedAt: input?.expectedAt ?? null,
+          friendId: input?.friendId ?? null,
+        }),
       }),
     publish: (accountId: string, ruleId: string, idempotencyKey: string) =>
       fetchApi<ApiResponse<{ id: string; versionNumber: number; publishedAt: string }>>(

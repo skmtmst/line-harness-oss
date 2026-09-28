@@ -23,6 +23,7 @@ import { Tabs } from '@/components/shared/tabs'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import type { Folder } from '@line-crm/shared'
+import { validateFlexContent } from '@line-crm/shared'
 import {
   createBlockedReason,
   failureOf,
@@ -1293,11 +1294,21 @@ export default function TemplatesPage() {
                       </div>
                     ) : drawerData.messageType === 'flex' ? (
                       (() => {
-                        try {
-                          return <FlexPreviewComponent content={drawerData.messageContent} maxWidth={420} />
-                        } catch {
-                          return <p className="text-danger text-xs">カード型の中身を読めませんでした。作り直すか、テキストで作り直してください。</p>
+                        /*
+                         * R249: 描画部品は壊れた内容でも例外を出さないので、
+                         * try/catch では形式の誤いを拾えない。検査で先に
+                         * 見分け、直し方（下の編集欄）と合わせて知らせる。
+                         */
+                        const flexError = validateFlexContent('flex', drawerData.messageContent)
+                        if (flexError) {
+                          return (
+                            <div role="alert">
+                              <p className="text-danger text-xs font-semibold">{flexError}</p>
+                              <p className="text-ink-secondary mt-1 text-xs">下の「内容 / JSON 編集」で直して保存してください。このままでは公開できません。</p>
+                            </div>
+                          )
                         }
+                        return <FlexPreviewComponent content={drawerData.messageContent} maxWidth={420} />
                       })()
                     ) : drawerData.messageType === 'image' ? (
                       (() => {

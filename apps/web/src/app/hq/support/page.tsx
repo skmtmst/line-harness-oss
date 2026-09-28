@@ -254,11 +254,15 @@ export default function HqSupportPage() {
 
           <div className="flex flex-col gap-1.5">
             <span className="text-label font-bold text-ink">画面の画像（任意・{SUPPORT_ATTACHMENT_MAX}枚まで）</span>
+            {/*
+              本物の file input は出さない（display:none）。
+              開くのは下の「クリックして画像を選ぶ」ボタンから。
+            */}
             <input
               ref={fileRef}
               type="file"
               accept="image/png,image/jpeg"
-              className="sr-only"
+              className="hidden"
               tabIndex={-1}
               aria-hidden="true"
               onChange={(event) => void addFile(event.target.files?.[0])}

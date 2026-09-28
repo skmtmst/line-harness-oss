@@ -2492,12 +2492,13 @@ function OffersList({
       <table className="w-full min-w-[760px]">
         <thead>
           <TableHeadRow>
+            {/* 表の外側の余白は左右で同じにし、操作は右端にそろえる。 */}
             <Th>案件</Th>
             <Th align="right">報酬</Th>
             <Th>成果が出たときの動き</Th>
             <Th align="right">紹介している人</Th>
             <Th align="right">成果</Th>
-            <Th align="center">操作</Th>
+            <Th align="right">操作</Th>
           </TableHeadRow>
         </thead>
         <tbody className="divide-hairline divide-y">
@@ -2529,7 +2530,7 @@ function OffersList({
                 {(offerStats.get(offer.id)?.conversions ?? 0).toLocaleString()}件
                 <span className="text-ink-faint block text-xs">確定 {formatYen(offerStats.get(offer.id)?.reward ?? 0)}</span>
               </td>
-              <td className="px-4 py-3 text-center">
+              <td className="px-4 py-3 text-right whitespace-nowrap">
                 <button
                   onClick={() => onEdit(offer)}
                   className="text-action text-xs font-medium hover:underline"

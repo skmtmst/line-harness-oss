@@ -91,17 +91,17 @@ export default function FriendIdentityCandidatesPage() {
                       return (
                         <Tr key={field.fieldKey}>
                           <Td className="pl-5"><span className="font-semibold text-ink">{field.fieldLabel}</span></Td>
-                          <Td>{left?.valuePreview ?? '—'}</Td>
-                          <Td>{right?.valuePreview ?? '—'}</Td>
-                          <Td className="pr-5">判定時に選択</Td>
+                          <Td><span>{left?.valuePreview ?? '—'}</span></Td>
+                          <Td><span>{right?.valuePreview ?? '—'}</span></Td>
+                          <Td className="pr-5"><span>判定時に選択</span></Td>
                         </Tr>
                       )
                     })}
                     {tagCandidates.length > 0 ? (
                       <Tr>
                         <Td className="pl-5"><span className="font-semibold text-ink">タグ</span></Td>
-                        <Td colSpan={2}>{tagCandidates.map((tag) => tag.name).join('・')}</Td>
-                        <Td className="pr-5">元の友だちに保持</Td>
+                        <Td colSpan={2}><span>{tagCandidates.map((tag) => tag.name).join('・')}</span></Td>
+                        <Td className="pr-5"><span>元の友だちに保持</span></Td>
                       </Tr>
                     ) : null}
                   </tbody>

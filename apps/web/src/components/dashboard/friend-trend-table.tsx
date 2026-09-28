@@ -74,18 +74,20 @@ export default function FriendTrendTable({
               return (
                 <Tr key={row.date} className="text-ink-secondary">
                   <Td className="whitespace-nowrap">
-                    {formatDate(row.date)}
-                    {row.estimated && !allEstimated ? (
-                      <span className="text-ink-faint ml-1.5 text-nano">推定</span>
-                    ) : null}
+                    <span>
+                      {formatDate(row.date)}
+                      {row.estimated && !allEstimated ? (
+                        <span className="text-ink-faint ml-1.5 text-nano">推定</span>
+                      ) : null}
+                    </span>
                   </Td>
                   <Td align="right" className="tabular-nums">
-                    {diff === null ? '—' : diff === 0 ? '0' : diff > 0 ? `+${diff}` : diff}
+                    <span>{diff === null ? '—' : diff === 0 ? '0' : diff > 0 ? `+${diff}` : diff}</span>
                   </Td>
-                  <Td align="right" className="tabular-nums">{row.added}</Td>
-                  <Td align="right" className="tabular-nums">{row.blocked}</Td>
+                  <Td align="right" className="tabular-nums"><span>{row.added}</span></Td>
+                  <Td align="right" className="tabular-nums"><span>{row.blocked}</span></Td>
                   <Td align="right" className="font-medium tabular-nums">
-                    {row.active.toLocaleString('ja-JP')}
+                    <span>{row.active.toLocaleString('ja-JP')}</span>
                   </Td>
                 </Tr>
               )
