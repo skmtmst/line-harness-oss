@@ -1116,6 +1116,9 @@ export default function EditDialog({
                     <button
                       key={key}
                       type="button"
+                      // R254: 選・不選を読み上げで区別できるようにする。
+                      // 曜日・一致のしかたの切り替えと同じ押した状態。
+                      aria-pressed={on}
                       onClick={() =>
                         setMessageKinds((prev) => {
                           // 何も選んでいない状態は「全部」を意味する。そこから
