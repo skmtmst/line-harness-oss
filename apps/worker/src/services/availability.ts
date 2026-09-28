@@ -172,7 +172,7 @@ export function computeSlots(input: ComputeSlotsInput): Interval[] {
 const FALLBACK_TIME_ZONE = 'Asia/Tokyo';
 
 /** booking_settings.timezone を読む。壊れた値は Asia/Tokyo に寄せる。 */
-function normalizeTimeZone(raw: unknown): string {
+export function normalizeTimeZone(raw: unknown): string {
   const candidate = typeof raw === 'string' && raw.trim() ? raw.trim() : FALLBACK_TIME_ZONE;
   try {
     new Intl.DateTimeFormat('en-US', { timeZone: candidate });

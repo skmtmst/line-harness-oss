@@ -285,9 +285,14 @@ function FolderList({ groups, items, countsKnown, active, onSelect, onChanged }:
   const [menuError, setMenuError] = useState('')
   const [deleteGroup, setDeleteGroup] = useState<TagGroup | null>(null)
   const rows = [
-    { id: '', name: 'すべて', count: items.length, color: '#06c755' },
-    ...groups.map((group) => ({ id: group.id, name: group.name, count: items.filter((tag) => tag.groupId === group.id).length, color: group.color ?? '#8b938d' })),
-    { id: UNGROUPED, name: '未分類', count: items.filter((tag) => !tag.groupId).length, color: '#c3c8c4' },
+    /*
+     * 「すべて」の中身は一覧の総数と同じ数。フォルダの内訳（各フォルダ・
+     * 未分類の数）だけを出し、総数は一覧の上の「1–20 / N件」だけにする
+     * （同じ数を重ねて出さない。#946 の「絞り込み後の件数は一覧の側」）。
+     */
+    { id: '', name: 'すべて', count: null, color: '#06c755' },
+    ...groups.map((group) => ({ id: group.id, name: group.name, count: items.filter((tag) => tag.groupId === group.id).length as number | null, color: group.color ?? '#8b938d' })),
+    { id: UNGROUPED, name: '未分類', count: items.filter((tag) => !tag.groupId).length as number | null, color: '#c3c8c4' },
   ]
   const move = async (group: TagGroup, direction: -1 | 1) => {
     const index = groups.findIndex((item) => item.id === group.id)
@@ -329,7 +334,7 @@ function FolderList({ groups, items, countsKnown, active, onSelect, onChanged }:
       <nav className="p-2">{rows.map((row) => {
         const group = groups.find((item) => item.id === row.id)
         const groupIndex = group ? groups.findIndex((item) => item.id === group.id) : -1
-        return <div key={row.id} className="group relative flex items-center"><button type="button" onClick={() => onSelect(row.id)} className={`flex min-w-0 flex-1 items-center gap-2 rounded-control px-3 py-2.5 text-left text-label ${active === row.id ? 'bg-accent-soft font-bold text-accent-deep' : 'font-semibold text-ink hover:bg-canvas-sunken'}`}><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: row.color }} /><span className="min-w-0 flex-1 truncate" title={row.name}>{row.name}</span><span className={`inline-flex h-[26px] shrink-0 items-center rounded-pill px-[9px] text-caption font-semibold tabular-nums ${active === row.id ? 'bg-canvas text-accent-deep' : 'bg-canvas-sunken text-ink-faint'}`}>{countsKnown ? row.count : '—'}</span></button>{group ? <button type="button" aria-label={`${group.name}の操作`} aria-expanded={menuId === group.id} onClick={() => setMenuId((current) => current === group.id ? null : group.id)} className={`ml-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-control text-ink-faint hover:bg-canvas-sunken focus-visible:outline ${active === row.id ? '' : 'invisible group-hover:visible focus-visible:visible max-xl:visible'}`}><MoreHorizontal aria-hidden="true" size={16} /></button> : null}{group ? <ActionMenu open={menuId === group.id} onClose={() => setMenuId(null)} ariaLabel={`${group.name}の操作`} note="削除しても、中のタグは未分類に残ります。" items={[
+        return <div key={row.id} className="group relative flex items-center"><button type="button" onClick={() => onSelect(row.id)} className={`flex min-w-0 flex-1 items-center gap-2 rounded-control px-3 py-2.5 text-left text-label ${active === row.id ? 'bg-accent-soft font-bold text-accent-deep' : 'font-semibold text-ink hover:bg-canvas-sunken'}`}><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: row.color }} /><span className="min-w-0 flex-1 truncate" title={row.name}>{row.name}</span>{row.count !== null ? <span className={`inline-flex h-[26px] shrink-0 items-center rounded-pill px-[9px] text-caption font-semibold tabular-nums ${active === row.id ? 'bg-canvas text-accent-deep' : 'bg-canvas-sunken text-ink-faint'}`}>{countsKnown ? row.count : '—'}</span> : null}</button>{group ? <button type="button" aria-label={`${group.name}の操作`} aria-expanded={menuId === group.id} onClick={() => setMenuId((current) => current === group.id ? null : group.id)} className={`ml-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-control text-ink-faint hover:bg-canvas-sunken focus-visible:outline ${active === row.id ? '' : 'invisible group-hover:visible focus-visible:visible max-xl:visible'}`}><MoreHorizontal aria-hidden="true" size={16} /></button> : null}{group ? <ActionMenu open={menuId === group.id} onClose={() => setMenuId(null)} ariaLabel={`${group.name}の操作`} note="削除しても、中のタグは未分類に残ります。" items={[
           { id: 'rename', label: '名前を変更', icon: <Pencil size={15} />, onSelect: () => window.location.assign(`/tags/folders/new?id=${group.id}`) },
           { id: 'color', label: '色を変える', icon: <Palette size={15} />, onSelect: () => window.location.assign(`/tags/folders/new?id=${group.id}`) },
           { id: 'up', label: '並び順を上へ', icon: <ArrowUp size={15} />, disabled: busy || groupIndex === 0, onSelect: () => void move(group, -1) },
@@ -869,20 +874,20 @@ export default function TagsPageV4({
           // #981 A04-02: 一覧・フォルダ帯と同じアカウント範囲で数える
           // （シナリオの NEXT-26 と同じ）。未選択＝全アカウント表示は未指定。
           accountId={accountId ?? undefined}
-          titles={['タグ数', '付与済み友だち', '今月の付与', '整理候補']}
+          titles={['未使用', '付与済み友だち', '今月の付与', '整理候補']}
           build={(stats) => [
             {
-              title: 'タグ数',
+              title: '未使用',
               /*
-               * `stats.tags.total` はテナント全体の件数で、選択中の
-               * アカウント範囲を見ない（/api/list-stats の tags.total は
-               * スコープ無しの COUNT(*)）。フォルダ帯の「すべて」と同じ
-               * 母集団にそろえるため、一覧そのものの件数を使う（#981）。
-               * 未取得は `—`、0件は `0件`。
+               * タグの総数は一覧の上の「1–20 / N件」だけに出す。ここに
+               * 「タグ数 101件」を並べると同じ数が1画面に重なっていた。
+               * 空いた枠は、総数の内訳として出していた「未使用」の数へ。
+               * （`stats.tags.unused` は使わない。絞り込み・使用先と同じ
+               * 数え方に寄せる。未取得は `—`、0件は `0件`。）
                */
-              value: ready ? items.length : null,
+              value: unusedCount,
               unit: '件',
-              detail: `未使用 ${unusedCount === null ? '—' : `${unusedCount}件`}`,
+              detail: '友だち0人・参照0件',
             },
             { title: '付与済み友だち', value: stats.tags.taggedFriends, unit: '人', detail: '1つ以上付与' },
             { title: '今月の付与', value: stats.tags.assignedThisMonth, unit: '回', detail: '手動・自動' },
@@ -916,7 +921,9 @@ export default function TagsPageV4({
               value={folder}
               onChange={setFolder}
               options={[
-                { value: '', label: `フォルダ：すべて（${ready ? items.length : '—'}件）` },
+                // 「すべて」の後ろの総数は一覧の件数と同じもの。一覧の上の
+                // 「1–20 / N件」だけに出し、ここでは重ねない（#946）。
+                { value: '', label: 'フォルダ：すべて' },
                 ...groups.map((group) => ({ value: group.id, label: group.name })),
                 { value: UNGROUPED, label: '未分類' },
               ]}

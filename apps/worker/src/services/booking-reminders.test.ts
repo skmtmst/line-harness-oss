@@ -11,8 +11,8 @@ interface DueRow {
   staff_name: string;
   channel_access_token: string;
   line_user_id: string;
-  /** 店舗設定の当日お知らせオフセット。JOIN した行が来る想定。 */
-  reminder_hours_before?: number | null;
+  /** 店舗のタイムゾーン。文面の日時と相対表現に使う (R332/R333)。 */
+  timezone?: string | null;
 }
 
 function stubDB(due: DueRow[]) {
@@ -45,7 +45,6 @@ function stubDB(due: DueRow[]) {
   return { db, updates };
 }
 
-const REMINDER_HOURS_BEFORE = 2;
 const NOW = new Date('2026-05-10T05:01:00Z');
 
 describe('processDueReminders', () => {
@@ -68,7 +67,6 @@ describe('processDueReminders', () => {
     const result = await processDueReminders(db, {
       now: NOW,
       sender,
-      reminderHoursBefore: REMINDER_HOURS_BEFORE,
     });
     expect(result).toEqual({ sent: 1, failed: 0 });
     expect(sender).toHaveBeenCalledTimes(1);
@@ -88,7 +86,6 @@ describe('processDueReminders', () => {
     const result = await processDueReminders(db, {
       now: NOW,
       sender,
-      reminderHoursBefore: REMINDER_HOURS_BEFORE,
     });
     expect(result).toEqual({ sent: 0, failed: 0 });
     expect(sender).not.toHaveBeenCalled();
@@ -113,7 +110,6 @@ describe('processDueReminders', () => {
     const result = await processDueReminders(db, {
       now: NOW,
       sender,
-      reminderHoursBefore: REMINDER_HOURS_BEFORE,
     });
     expect(result).toEqual({ sent: 0, failed: 1 });
     const failedUpdate = updates.find((u) => u.sql.includes('SET status = ?, retry_count = ?'));
@@ -122,31 +118,21 @@ describe('processDueReminders', () => {
     expect(failedUpdate!.bound[1]).toBe(1); // retry_count
   });
 
-  test('店舗設定のオフセットを文面に使う (N-395)', async () => {
+  // R333: 文面の残り時間は送信時点の実測。店舗設定のオフセットは
+  // 通知予定を作る側だけが使い、文面には混入しない。
+  test('残り時間は設定値ではなく送信時点からの実測 (R333)', async () => {
     const due: DueRow[] = [
       {
         id: 'R1',
         booking_id: 'B1',
         kind: 'hours_before',
         retry_count: 0,
+        // 送信時点 05:01Z → 開始 09:00Z、実測で約4時間
         starts_at: '2026-05-10T09:00:00Z',
         menu_name: 'カット',
         staff_name: '山田',
         channel_access_token: 'tok',
         line_user_id: 'U',
-        reminder_hours_before: 4,
-      },
-      {
-        id: 'R2',
-        booking_id: 'B2',
-        kind: 'hours_before',
-        retry_count: 0,
-        starts_at: '2026-05-10T09:00:00Z',
-        menu_name: 'カット',
-        staff_name: '山田',
-        channel_access_token: 'tok',
-        line_user_id: 'U',
-        reminder_hours_before: null, // 未設定店舗は既定値
       },
     ];
     const { db } = stubDB(due);
@@ -154,11 +140,66 @@ describe('processDueReminders', () => {
     await processDueReminders(db, {
       now: NOW,
       sender,
-      reminderHoursBefore: REMINDER_HOURS_BEFORE,
     });
-    expect(sender).toHaveBeenCalledTimes(2);
-    expect(sender.mock.calls[0][0].ctx.hoursBefore).toBe(4);
-    expect(sender.mock.calls[1][0].ctx.hoursBefore).toBe(REMINDER_HOURS_BEFORE);
+    expect(sender).toHaveBeenCalledTimes(1);
+    const ctx = sender.mock.calls[0][0].ctx;
+    expect(ctx.hoursUntil).toBe(4);
+    expect(ctx.daysUntil).toBe(0);
+  });
+
+  // R332: 文面の日時は店舗の時間帯。日本以外の店舗では現地日時を出す。
+  test('店舗がニューヨークなら日時は現地時間で組み立てる (R332)', async () => {
+    const due: DueRow[] = [
+      {
+        id: 'R1',
+        booking_id: 'B1',
+        kind: 'day_before',
+        retry_count: 0,
+        // NY 現地 2026-05-10 10:00 (EDT=-4) = 14:00Z
+        starts_at: '2026-05-10T14:00:00Z',
+        menu_name: 'カット',
+        staff_name: '山田',
+        channel_access_token: 'tok',
+        line_user_id: 'U',
+        timezone: 'America/New_York',
+      },
+    ];
+    const { db } = stubDB(due);
+    const sender = vi.fn().mockResolvedValue(undefined);
+    await processDueReminders(db, {
+      now: NOW,
+      sender,
+    });
+    const ctx = sender.mock.calls[0][0].ctx;
+    expect(ctx.startsAt).toBe('2026-05-10 10:00');
+    expect(ctx.daysUntil).toBe(0); // NY の暦日では当日
+  });
+
+  // R333: 前日通知の送信が遅れて予約当日になっても「明日」とは言わせない。
+  test('遅れて当日になった前日リマインダは daysUntil=0 (R333)', async () => {
+    const lateNow = new Date('2026-05-11T00:00:00Z'); // JST 09:00
+    const due: DueRow[] = [
+      {
+        id: 'R1',
+        booking_id: 'B1',
+        kind: 'day_before',
+        retry_count: 1,
+        starts_at: '2026-05-11T02:00:00Z', // JST 11:00、JST では当日
+        menu_name: 'カット',
+        staff_name: '山田',
+        channel_access_token: 'tok',
+        line_user_id: 'U',
+      },
+    ];
+    const { db } = stubDB(due);
+    const sender = vi.fn().mockResolvedValue(undefined);
+    await processDueReminders(db, {
+      now: lateNow,
+      sender,
+    });
+    const ctx = sender.mock.calls[0][0].ctx;
+    expect(ctx.daysUntil).toBe(0);
+    expect(ctx.startsAt).toBe('2026-05-11 11:00');
   });
 
   test('送信失敗 3 回目: failed_permanent', async () => {
@@ -177,10 +218,9 @@ describe('processDueReminders', () => {
     ];
     const { db, updates } = stubDB(due);
     const sender = vi.fn().mockRejectedValue(new Error('LINE 500'));
-    await processDueReminders(db, {
+    const result = await processDueReminders(db, {
       now: NOW,
       sender,
-      reminderHoursBefore: REMINDER_HOURS_BEFORE,
     });
     const u = updates.find((x) => x.sql.includes('SET status = ?, retry_count = ?'));
     expect(u!.bound[0]).toBe('failed_permanent');

@@ -83,7 +83,6 @@ describe('feature off job gates', () => {
       await processDueReminders(testDb.db, {
         now: new Date('2026-09-08T00:00:00+09:00'),
         sender,
-        reminderHoursBefore: 24,
       });
       expect(sender).not.toHaveBeenCalled();
       expect(await featureState(testDb, 'booking_reminders', 'r-1', 'status')).toBe('pending');

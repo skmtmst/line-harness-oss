@@ -3,6 +3,7 @@
 // the notification text renderer needs in one query.
 
 import type { BookingNotificationSender, NotificationKind } from './booking-notifier.js';
+import { formatStartsAtForStore, notificationTiming } from './booking-notifier.js';
 import { REMINDER_MAX_RETRY } from './booking-types.js';
 import {
   activeTenantLineAccountSql,
@@ -24,21 +25,13 @@ interface DueRow {
   channel_access_token: string;
   channel_access_token_encrypted: string | null;
   line_user_id: string;
-  /** 店舗設定の当日お知らせオフセット。NULL = 既定 (params.reminderHoursBefore)。 */
-  reminder_hours_before: number | null;
+  /** 店舗のタイムゾーン。文面の日時と「本日/明日」の判定に使う。 */
+  timezone: string | null;
 }
 
 export interface ProcessRemindersParams {
   now: Date;
   sender: BookingNotificationSender;
-  reminderHoursBefore: number;
-}
-
-const JST_OFFSET_MS = 9 * 3600_000;
-
-function startsAtJst(utcIso: string): string {
-  const jst = new Date(new Date(utcIso).getTime() + JST_OFFSET_MS).toISOString();
-  return `${jst.slice(0, 10)} ${jst.slice(11, 16)}`;
 }
 
 /**
@@ -82,7 +75,7 @@ export async function processDueReminders(
               la.channel_access_token,
               la.channel_access_token_encrypted,
               f.line_user_id,
-              bs.reminder_hours_before
+              bs.timezone
          FROM booking_reminders r
          INNER JOIN bookings b ON b.id = r.booking_id
          INNER JOIN menus m ON m.id = b.menu_id
@@ -175,6 +168,11 @@ export async function processDueReminders(
         continue;
       }
 
+      // 文面の日時は店舗の時間帯で書き (R332)、「本日/明日」と残り時間は
+      // 送信時点の実測から組み立てる (R333)。予約の瞬間 (starts_at) や
+      // 通知予定自体は変えない。
+      const timeZone = row.timezone ?? 'Asia/Tokyo';
+      const timing = notificationTiming(row.starts_at, timeZone, params.now);
       await params.sender({
         channelAccessToken: accessToken,
         toLineUserId: row.line_user_id,
@@ -182,10 +180,8 @@ export async function processDueReminders(
         ctx: {
           menuName: row.menu_name,
           staffName: row.staff_name,
-          startsAtJst: startsAtJst(row.starts_at),
-          // N-395: 店舗設定のオフセットを文面にも反映する。
-          // 未設定の店舗は呼び出し側の既定値 (2時間前) のまま。
-          hoursBefore: row.reminder_hours_before ?? params.reminderHoursBefore,
+          startsAt: formatStartsAtForStore(row.starts_at, timeZone),
+          ...timing,
         },
         // R323 と同じ考え方: 同じ貸出の再送は安定キーで行い、
         // LINE 側の到達ずみ再送は冪等に吸収する。
