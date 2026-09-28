@@ -401,14 +401,14 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go }: { accou
       <div className="gb-post-edit-grid grid min-w-0 grid-cols-1 gap-6">
         <div className="flex min-w-0 flex-col gap-4">
           {form.kind !== 'standard' ? (
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-2">
               <label htmlFor="gb-post-title" className="text-label font-semibold">{form.kind === 'event' ? 'イベントタイトル' : '特典タイトル'}</label>
               <TextField id="gb-post-title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} disabled={!editable} maxLength={100} />
             </div>
           ) : null}
 
           {form.kind !== 'standard' ? (
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-2">
               <span className="text-label font-semibold">開催・有効期間</span>
               <div className="flex flex-wrap gap-2">
                 <TextField aria-label="開始日" type="date" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} disabled={!editable} />
@@ -421,7 +421,7 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go }: { accou
             </div>
           ) : null}
 
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-2">
             <label htmlFor="gb-post-summary" className="text-label font-semibold">本文</label>
             <TextArea id="gb-post-summary" rows={8} value={form.summary} onChange={(e) => setForm({ ...form, summary: e.target.value })} disabled={!editable} maxLength={1500} />
             <p className={`text-caption text-right ${form.summary.length > 1500 ? 'text-danger' : 'text-ink-faint'}`}>{form.summary.length} / 1,500</p>
@@ -459,15 +459,15 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go }: { accou
 
           {form.kind === 'offer' ? (
             <div className="flex flex-col gap-3">
-              <div className="flex flex-col gap-1.5">
+              <div className="flex flex-col gap-2">
                 <label htmlFor="gb-post-coupon" className="text-label font-semibold">クーポンコード（任意）</label>
                 <TextField id="gb-post-coupon" value={form.couponCode} onChange={(e) => setForm({ ...form, couponCode: e.target.value })} disabled={!editable} maxLength={40} />
               </div>
-              <div className="flex flex-col gap-1.5">
+              <div className="flex flex-col gap-2">
                 <label htmlFor="gb-post-redeem" className="text-label font-semibold">特典の利用リンク（任意）</label>
                 <TextField id="gb-post-redeem" type="url" placeholder="https://" value={form.redeemOnlineUrl} onChange={(e) => setForm({ ...form, redeemOnlineUrl: e.target.value })} disabled={!editable} maxLength={200} />
               </div>
-              <div className="flex flex-col gap-1.5">
+              <div className="flex flex-col gap-2">
                 <label htmlFor="gb-post-terms" className="text-label font-semibold">利用条件（任意）</label>
                 <TextArea id="gb-post-terms" rows={3} value={form.termsConditions} onChange={(e) => setForm({ ...form, termsConditions: e.target.value })} disabled={!editable} maxLength={300} />
               </div>
@@ -475,12 +475,12 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go }: { accou
             </div>
           ) : (
             <div className="flex flex-col gap-3">
-              <div className="flex flex-col gap-1.5">
+              <div className="flex flex-col gap-2">
                 <span className="text-label font-semibold">ボタン（任意）</span>
                 <Select aria-label="ボタンの種類" value={form.ctaType} onChange={(v) => setForm({ ...form, ctaType: v as GooglePostCtaType | '' })} options={[{ value: '', label: 'なし' }, ...(Object.keys(CTA_LABELS) as GooglePostCtaType[]).map((k) => ({ value: k, label: CTA_LABELS[k] }))]} disabled={!editable} />
               </div>
               {form.ctaType && form.ctaType !== 'call' ? (
-                <div className="flex flex-col gap-1.5">
+                <div className="flex flex-col gap-2">
                   <label htmlFor="gb-post-cta-url" className="text-label font-semibold">リンク先</label>
                   <TextField id="gb-post-cta-url" type="url" placeholder="https://" value={form.ctaUrl} onChange={(e) => setForm({ ...form, ctaUrl: e.target.value })} disabled={!editable} maxLength={500} />
                 </div>
@@ -488,7 +488,7 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go }: { accou
             </div>
           )}
 
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-2">
             <span className="text-label font-semibold">公開方法</span>
             <div className="flex gap-2">
               <span className="bg-accent-soft text-accent-deep rounded-control px-3 py-1.5 text-sm font-semibold">今すぐ</span>
