@@ -17,6 +17,7 @@ import { formatStamp, COMMON_VAR_STATE_LABELS } from '@/lib/common-vars'
 import Pagination from '@/components/shared/pagination'
 import ListRange from '@/components/ui/list-range'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import SearchField from '@/components/shared/search-field'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
@@ -920,10 +921,9 @@ function VarsPageInner() {
                 <thead>
                   <TableHeadRow className="bg-canvas-sunken border-hairline border-b">
                     <Th className="w-10 px-3 py-3">
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         checked={allOnPageSelected}
-                        onChange={() =>
+                        onCheckedChange={() =>
                           setSelected((prev) => {
                             const next = new Set(prev)
                             for (const item of current) {
@@ -934,7 +934,6 @@ function VarsPageInner() {
                           })
                         }
                         aria-label="このページの共通情報をすべて選ぶ"
-                        className="accent-accent-deep"
                       />
                     </Th>
                     {/* 見出しも固定幅で切れ得るので、重ねると全文が読める
@@ -966,12 +965,10 @@ function VarsPageInner() {
                       return (
                         <tr key={item.id} className="group hover:bg-canvas-sunken">
                           <td className="px-3 py-3">
-                            <input
-                              type="checkbox"
+                            <Checkbox
                               checked={selected.has(item.id)}
-                              onChange={() => toggle(item.id)}
+                              onCheckedChange={() => toggle(item.id)}
                               aria-label={`${item.name}を選ぶ`}
-                              className="accent-accent-deep"
                             />
                           </td>
                           <td className="px-4 py-3">
@@ -1066,7 +1063,7 @@ function VarsPageInner() {
                               行の操作は同じ高さ（32）にそろえる。削除は撮影入口
                              （data-qa-open="yPkWe"）のため行に残す。
                             */}
-                            <span className="inline-flex items-center justify-end gap-2">
+                            <span className="flex w-full items-center justify-end gap-2">
                               <Button
                                 href={`/contents/vars/edit?id=${item.id}`}
                                 size="compact"

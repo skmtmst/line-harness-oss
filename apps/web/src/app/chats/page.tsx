@@ -35,6 +35,7 @@ import ImageUploader, { type ImageUploaderValue } from '@/components/shared/imag
 import { Suspense } from 'react'
 import EmailThread from '@/components/support/email-thread'
 import Button from '@/components/shared/button'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import DateTimeField from '@/components/shared/date-time-field'
 import HelpTip from '@/components/shared/help-tip'
@@ -2379,6 +2380,10 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
            * INBOX-10: ここで数えるのは対応期限ではなく、未対応のまま
            * 最後のやり取りから1時間以上たった会話。「期限超過」と書くと
            * 設定した期限の超過に読めるため、実態に合う名前にする。
+           *
+           * m22c: 右の操作（絞り込み・保存した検索・対応ルール）と同じ
+           * 高さ32にそろえる。行の中で高さが違うと、同じ1行でも上端が
+           * ずれて2行に見える（見た目の自動点検 k=5）。
            */
           { key: 'overdue' as const, label: '1時間以上待ち', title: '未対応のまま、最後のやり取りから1時間以上たった会話' },
         ].map((filter) => (
@@ -2388,7 +2393,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
             onClick={() => { setQuickFilter(filter.key); dropSavedViewParam() }}
             aria-pressed={quickFilter === filter.key}
             title={filter.title}
-            className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+            className={`inline-flex h-8 shrink-0 items-center whitespace-nowrap rounded-full border px-3 text-xs font-semibold transition-colors ${
               quickFilter === filter.key
                 ? 'border-accent-deep bg-accent-soft text-accent-deep'
                 : 'border-hairline bg-canvas text-ink-secondary hover:bg-canvas-sunken'
@@ -2418,8 +2423,10 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           左側が画面外へ出た。幅も画面の左右16px以内に収める。
         */}
         <div>
+          {/* m22c: 左の札と同じ高さ32にそろえる（行の上端を1つに保つ）。 */}
           <Button
             type="button"
+            size="compact"
             onClick={() => {
               setSavedViewsOpen((open) => !open)
               setSavedViewError('')
@@ -2513,7 +2520,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
             </div>
           )}
         </div>
-        <Button href="/tags?tab=marks" className="h-10 shrink-0">
+        {/* m22c: 左の札と同じ高さ32にそろえる（行の上端を1つに保つ）。 */}
+        <Button href="/tags?tab=marks" size="compact" className="shrink-0">
           <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M9 4v6M15 14v6" /></svg>
           対応ルール
         </Button>
@@ -3475,24 +3483,22 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 {showComposerOptions && (
                   <div className="bg-canvas-sunken rounded-card mb-2 flex flex-wrap items-center gap-x-3 gap-y-2 p-3 text-xs">
                     <span className="text-ink-faint">送信キー:</span>
-                    <label className="flex cursor-pointer items-center gap-1">
-                      <input
-                        type="radio"
+                    <RadioCardGroup legend="送信キー" className="flex flex-wrap gap-2">
+                      <RadioCard
+                        name="chat-send-mode"
+                        value="enter"
                         checked={sendMode === 'enter'}
                         onChange={() => setSendMode('enter')}
-                        className="accent-accent"
+                        title="Enter"
                       />
-                      <span>Enter</span>
-                    </label>
-                    <label className="flex cursor-pointer items-center gap-1">
-                      <input
-                        type="radio"
+                      <RadioCard
+                        name="chat-send-mode"
+                        value="shift-enter"
                         checked={sendMode === 'shift-enter'}
                         onChange={() => setSendMode('shift-enter')}
-                        className="accent-accent"
+                        title="Shift+Enter"
                       />
-                      <span>Shift+Enter</span>
-                    </label>
+                    </RadioCardGroup>
                   </div>
                 )}
 

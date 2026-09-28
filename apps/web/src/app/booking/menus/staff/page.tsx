@@ -8,6 +8,7 @@ import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Notice from '@/components/shared/notice'
 import StatusBadge from '@/components/shared/status-badge'
@@ -356,19 +357,12 @@ function MenuStaffMatrixContent() {
                         row?.override_duration_minutes != null || row?.override_price != null
                       return (
                         <Td key={s.id} className="align-top">
-                          <label className="flex cursor-pointer items-center gap-1.5 text-xs">
-                            <input
-                              type="checkbox"
-                              checked={offered}
-                              onChange={(e) =>
-                                update(s.id, m.id, { is_offered: e.target.checked ? 1 : 0 })
-                              }
-                              className="accent-accent"
-                            />
-                            <span className={offered ? 'text-ink' : 'text-ink-faint'}>
-                              {offered ? '対応できる' : '対応しない'}
-                            </span>
-                          </label>
+                          <Checkbox
+                            checked={offered}
+                            onCheckedChange={(checked) =>
+                              update(s.id, m.id, { is_offered: checked ? 1 : 0 })
+                            }
+                          >{offered ? '対応できる' : '対応しない'}</Checkbox>
                           {offered ? (
                             <>
                               <div className="mt-1.5 flex items-center gap-1">

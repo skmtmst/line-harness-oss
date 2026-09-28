@@ -8,6 +8,7 @@ import {
   type SegmentCondition,
 } from '@/lib/segment-condition'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import { notifyToast } from '@/components/shared/toast'
@@ -240,18 +241,11 @@ export default function SegmentPresetControls({
               autoFocus
             />
           </label>
-          <label className="text-ink-secondary flex items-start gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={isShared}
-              onChange={(event) => setIsShared(event.target.checked)}
-              className="mt-0.5"
-            />
-            <span>
-              同じLINEアカウントを扱う運用者と共有する
-              <span className="text-ink-faint mt-1 block text-xs">外すと、自分だけが呼び出せます。</span>
-            </span>
-          </label>
+          <Checkbox
+            checked={isShared}
+            onCheckedChange={setIsShared}
+            description="外すと、自分だけが呼び出せます。"
+          >同じLINEアカウントを扱う運用者と共有する</Checkbox>
         </div>
       </Dialog>
 

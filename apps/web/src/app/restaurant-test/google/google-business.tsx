@@ -7,6 +7,8 @@ import { ExternalLink, Link2, RefreshCw, Sparkles, Star } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Card from '@/components/shared/card'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
@@ -346,24 +348,19 @@ function SettingsTab({ accountId, data, canManage, onChanged }: { accountId: str
               </div>
             </div>
             <p className="text-ink-secondary text-sm leading-relaxed">このLINEアカウント（{data.store.name}）に接続する店舗を1つ選んでください。接続後は、選んだ店舗だけを表示します。</p>
-            <div className="flex flex-col gap-2" role="radiogroup" aria-label="接続するGoogleビジネスプロフィール">
+            <RadioCardGroup legend="接続するGoogleビジネスプロフィール" className="flex flex-col gap-2">
             {data.candidates.map((candidate) => (
-              <label
+              <RadioCard
                 key={candidate.locationName}
-                className={`gb-location-option flex min-w-0 cursor-pointer items-center gap-3 rounded-control border px-3.5 py-2 transition-colors ${
-                  selectedLocation === candidate.locationName
-                    ? 'border-accent bg-accent-soft'
-                    : 'border-hairline bg-surface-pearl hover:bg-canvas-sunken'
-                }`}
-              >
-                <input type="radio" name="location" value={candidate.locationName} checked={selectedLocation === candidate.locationName} onChange={() => setSelectedLocation(candidate.locationName)} className="gb-accent-control h-4 w-4 shrink-0" />
-                <span className="min-w-0">
-                  <span className="block truncate text-sm font-semibold" title={candidate.locationTitle}>{candidate.locationTitle}</span>
-                  {candidate.addressText ? <span className="text-ink-secondary block truncate text-xs" title={candidate.addressText}>{candidate.addressText}</span> : null}
-                </span>
-              </label>
+                name="location"
+                value={candidate.locationName}
+                checked={selectedLocation === candidate.locationName}
+                onChange={() => setSelectedLocation(candidate.locationName)}
+                title={candidate.locationTitle}
+                note={candidate.addressText ?? undefined}
+              />
             ))}
-            </div>
+            </RadioCardGroup>
             {actionError ? <NoteBar tone="danger">{actionError}</NoteBar> : null}
             <div className="border-hairline flex flex-wrap justify-center gap-2 border-t pt-4">
               <Button onClick={() => setConfirmDisconnect(true)} disabled={busy || !canManage}>Googleアカウントを選び直す</Button>
@@ -706,10 +703,11 @@ function ReviewDraftScreen({ accountId, reviewId, data, canPublish, backHref, on
           </Card>
           <Card padding="roomy">
             <h3 className="mb-3 text-base font-bold">公開前の確認</h3>
-            <label className="mb-4 flex items-start gap-2 text-sm leading-relaxed">
-              <input type="checkbox" checked={checked} onChange={(event) => setChecked(event.target.checked)} className="gb-accent-control mt-1 h-4 w-4 shrink-0" />
-              <span>返信先・内容・個人情報の有無を確認しました</span>
-            </label>
+            <Checkbox
+              checked={checked}
+              onCheckedChange={setChecked}
+              className="mb-4"
+            >返信先・内容・個人情報の有無を確認しました</Checkbox>
             <ul className="text-ink-secondary flex flex-col gap-2 text-xs leading-relaxed">
               <li>・予約内容や来店履歴などを追記していません</li>
               <li>・返信は店舗を代表して公開されます</li>

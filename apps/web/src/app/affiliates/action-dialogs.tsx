@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Check, Landmark, X } from 'lucide-react'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -141,21 +143,15 @@ export function AffiliateArchiveDialog({
             </p>
           </section>
 
-          <fieldset className="space-y-2">
-            <legend className="text-ink mb-2 text-sm font-bold">どうしますか？</legend>
+          <RadioCardGroup legend="どうしますか？">
             {([
               ['pause', '紹介だけを止める（おすすめ）', 'あとから再開できます。過去の記録は残ります。'],
               ['pay_first', `先に ${yen(impact.unsettledReward)} を確定してから、また考える`, '支払いの画面へ移ります。アーカイブはしません。'],
               ['archive', 'このままアーカイブする', '管理一覧から外します。過去の記録は残ります。'],
             ] as const).map(([value, label, description]) => (
-              <label key={value} className={`block cursor-pointer rounded-control border p-3 ${choice === value ? 'border-accent bg-accent-soft' : 'border-hairline bg-canvas'}`}>
-                <span className="flex gap-3">
-                  <input type="radio" name="archive-choice" value={value} checked={choice === value} onChange={() => setChoice(value)} />
-                  <span><span className="text-ink block text-sm font-semibold">{label}</span><span className="text-ink-faint mt-0.5 block text-xs">{description}</span></span>
-                </span>
-              </label>
+              <RadioCard key={value} name="archive-choice" value={value} checked={choice === value} onChange={() => setChoice(value)} title={label} note={description} />
             ))}
-          </fieldset>
+          </RadioCardGroup>
 
           <label className="text-ink block text-sm font-semibold">
               確認のため「{target?.name}」と打ってください
@@ -384,25 +380,11 @@ export function AffiliatePaymentConfirmDialog({
             （OFFなのにONに見える見た目を残さない）。
           */}
           <div className="space-y-2">
-            <label className="flex items-start gap-3 text-xs text-ink-secondary cursor-pointer">
-              <input
-                type="checkbox"
-                className="sr-only"
-                checked={issueStatement}
-                onChange={(event) => setIssueStatement(event.target.checked)}
-              />
-              <span
-                aria-hidden="true"
-                className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center border ${issueStatement ? 'border-accent-deep bg-accent-deep text-on-accent' : 'border-hairline bg-canvas'}`}
-                style={{ borderRadius: 3 }}
-              >
-                {issueStatement ? <Check size={12} /> : null}
-              </span>
-              <span>
-                <strong className="block text-sm text-ink">支払明細を作成して、この方のLINEに知らせる</strong>
-                内訳が入った明細を作り、「{dateLabel(preview.paymentDate)} に {yen(preview.amount)} をお振込みします」と届きます。
-              </span>
-            </label>
+            <Checkbox
+              checked={issueStatement}
+              onCheckedChange={setIssueStatement}
+              description={`内訳が入った明細を作り、「${dateLabel(preview.paymentDate)} に ${yen(preview.amount)} をお振込みします」と届きます。`}
+            >支払明細を作成して、この方のLINEに知らせる</Checkbox>
           </div>
         </div>
       ) : null}

@@ -21,6 +21,7 @@ import ListToolbar from '@/components/shared/list-toolbar'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Disclosure from '@/components/shared/disclosure'
 import ListState from '@/components/shared/list-state'
@@ -230,11 +231,16 @@ function StartScenarioDialog({
         : triggers
             .map((t) => describeStartTrigger(t, t.tagId ? tagNameById[t.tagId] ?? null : null))
             .join('、')
+  /*
+   * R250: 移動先が空の「次のシナリオへ移動」は保存できない設定。
+   * 取得の失敗と、選ばれていないこととを書き分ける。
+   */
+  const moveTargetSummary = !scenario.onCompleteScenarioId
+    ? '（移動先が選ばれていません）'
+    : `（${moveTargetName ?? (preflightLoading ? '確認中…' : '移動先を取得できませんでした')}）`
   const completeSummary =
     ON_COMPLETE_LABEL[completeMode] +
-    (completeMode === 'move'
-      ? `（${moveTargetName ?? (preflightLoading ? '確認中…' : '移動先を取得できませんでした')}）`
-      : '') +
+    (completeMode === 'move' ? moveTargetSummary : '') +
     (completeActionCount === null
       ? ''
       : completeActionCount > 0
@@ -299,7 +305,7 @@ function StartScenarioDialog({
           <p className="text-sm font-bold">開始後に起きること</p>
           <ul className="mt-2 space-y-1 text-xs"><li>・条件に一致した{simulation?.audience.newStartPlanned.toLocaleString('ja-JP') ?? '—'}人が購読を開始します</li><li>・稼働中の友だちは停止するまで次のステップへ進みます</li><li>・一度届いたメッセージは取り消せません。間違いに気づいたらすぐ停止してください</li></ul>
         </Notice>
-        <label className={`mx-6 mb-4 flex items-center gap-2 text-sm font-medium ${preflightLoading ? 'opacity-60' : ''}`}><input type="checkbox" checked={confirmed} disabled={preflightState !== 'ready'} onChange={(event) => setConfirmed(event.target.checked)} />対象人数・内容・送信枠を確認しました</label>
+        <Checkbox checked={confirmed} disabled={preflightState !== 'ready'} onCheckedChange={setConfirmed} className="mx-6 mb-4">対象人数・内容・送信枠を確認しました</Checkbox>
         {error ? <Notice tone="danger" message={error} className="mx-6 mb-4" /> : null}
         <div className="border-hairline mt-auto flex justify-end gap-3 border-t px-6 py-4">
           <span className="text-ink-faint mr-auto self-center text-xs">開始後も、一覧からいつでも停止できます。</span><Button onClick={onCancel} disabled={busy}>戻って確認</Button>

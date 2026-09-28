@@ -6,6 +6,8 @@ import { Check, ChevronRight, Plus, X } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import LinePreview from '@/components/shared/line-preview'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { RequiredBadge } from '@/components/shared/form-controls'
@@ -505,10 +507,7 @@ function RoutesStep({ rule, definition, options, toggleRoute, setDefinition, rou
       ) : (
         <div className={'friend-add-editor-routeList'}>
           {options.routes.map((route) => (
-            <label key={route.id} className={definition.routeIds.includes(route.id) ? 'friend-add-editor-routeSelected' : 'friend-add-editor-route'}>
-              <input type="checkbox" checked={definition.routeIds.includes(route.id)} onChange={() => toggleRoute(route.id)} />
-              <span><strong>{route.name}</strong><small>{route.kind}</small></span>
-            </label>
+            <Checkbox key={route.id} checked={definition.routeIds.includes(route.id)} onCheckedChange={() => toggleRoute(route.id)} description={route.kind}>{route.name}</Checkbox>
           ))}
         </div>
       )}
@@ -516,17 +515,14 @@ function RoutesStep({ rule, definition, options, toggleRoute, setDefinition, rou
       <Field label="曜日">
         <div className={'friend-add-editor-weekdays'}>
           {['日', '月', '火', '水', '木', '金', '土'].map((label, day) => (
-            <label key={label}>
-              <input
-                type="checkbox"
-                checked={weekdays.includes(day)}
-                onChange={() => setDefinition((current) => ({
-                  ...current,
-                  weekdays: weekdays.includes(day) ? weekdays.filter((value) => value !== day) : [...weekdays, day].sort(),
-                }))}
-              />
-              {label}
-            </label>
+            <Checkbox
+              key={label}
+              checked={weekdays.includes(day)}
+              onCheckedChange={() => setDefinition((current) => ({
+                ...current,
+                weekdays: weekdays.includes(day) ? weekdays.filter((value) => value !== day) : [...weekdays, day].sort(),
+              }))}
+            >{label}</Checkbox>
           ))}
         </div>
       </Field>
@@ -667,10 +663,10 @@ function MessageStep({ definition, setDefinition, friendKind, scenarios, openAct
       <div className={'friend-add-editor-actionSummary'}><div><strong>案内後のアクション</strong><button type="button" onClick={openActions}>アクションを追加</button></div><p>{definition.actions.length ? definition.actions.map((action) => action.label).join('／') : '追加のアクションはありません'}</p></div>
       <Field label="流入経路が不明な場合">
         <small>共通案内を送るか、何もしないか選べます。</small>
-        <div className={'friend-add-editor-choiceList'}>
-          <label><input type="radio" name="unknown-route-action" checked={unknownRoute.sendCommonGuidance} onChange={() => setDefinition((current) => ({ ...current, unknownRouteAction: { sendCommonGuidance: true, notifyStaff: false } }))} />共通案内を送る</label>
-          <label><input type="radio" name="unknown-route-action" checked={!unknownRoute.sendCommonGuidance} onChange={() => setDefinition((current) => ({ ...current, unknownRouteAction: { sendCommonGuidance: false, notifyStaff: false } }))} />何もしない</label>
-        </div>
+        <RadioCardGroup legend="流入経路が不明な場合">
+          <RadioCard name="unknown-route-action" value="guide" checked={unknownRoute.sendCommonGuidance} onChange={() => setDefinition((current) => ({ ...current, unknownRouteAction: { sendCommonGuidance: true, notifyStaff: false } }))} title="共通案内を送る" />
+          <RadioCard name="unknown-route-action" value="none" checked={!unknownRoute.sendCommonGuidance} onChange={() => setDefinition((current) => ({ ...current, unknownRouteAction: { sendCommonGuidance: false, notifyStaff: false } }))} title="何もしない" />
+        </RadioCardGroup>
       </Field>
     </Section>
   )

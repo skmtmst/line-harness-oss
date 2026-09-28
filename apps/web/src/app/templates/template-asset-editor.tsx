@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import type { MediaItem } from '@line-crm/shared'
 import { api, type BroadcastAssetKind } from '@/lib/api'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import LinePreview from '@/components/shared/line-preview'
 import Combobox from '@/components/shared/combobox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -608,10 +609,13 @@ export default function TemplateAssetEditor({ kind, visual = false }: { kind: As
                     <Field label="答え方">
                       <Select aria-label="答え方" value={previewQuestion.format} onChange={(value) => updateQuestion(previewQuestionIndex, { format: value as ResearchFormat })} options={[{ value: 'single', label: '1つだけ選ぶ' }, { value: 'multiple', label: 'いくつでも選ぶ' }, { value: 'free', label: '自由に書く' }]} size="full" />
                     </Field>
-                    <label className="mt-2 flex items-start gap-2 text-sm font-normal md:mt-8">
-                      <input type="checkbox" aria-label="必ず答えてもらう" checked={previewQuestion.required} onChange={(event) => updateQuestion(previewQuestionIndex, { required: event.target.checked })} className="accent-accent mt-0.5" />
-                      <span><strong className="block">必ず答えてもらう</strong><span className="text-ink-faint text-xs">外すと、この質問は飛ばせます。</span></span>
-                    </label>
+                    <Checkbox
+                      checked={previewQuestion.required}
+                      onCheckedChange={(checked) => updateQuestion(previewQuestionIndex, { required: checked })}
+                      aria-label="必ず答えてもらう"
+                      description="外すと、この質問は飛ばせます。"
+                      className="mt-2 md:mt-8"
+                    >必ず答えてもらう</Checkbox>
                   </div>
                   {previewQuestion.format !== 'free' ? (
                     <div className="mt-3">

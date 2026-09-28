@@ -104,6 +104,7 @@ vi.mock('@/components/scenarios/question-editor', () => ({
 }))
 vi.mock('@/components/scenarios/scenario-dialogs', () => ({
   ConditionDialog: () => null,
+  MoveReferrersNotice: () => null,
   OnCompleteDialog: () => null,
   TestSendDialog: () => null,
   ON_COMPLETE_LABEL: { pause: '一時停止', resume_previous: '前へ戻す', move: '別のシナリオへ' },

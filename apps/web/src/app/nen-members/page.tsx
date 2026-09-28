@@ -14,6 +14,7 @@ import {
 import { useAccount } from '@/contexts/account-context'
 import Dialog from '@/components/shared/dialog'
 import Checkbox from '@/components/shared/checkbox'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import SearchField from '@/components/shared/search-field'
@@ -1046,14 +1047,13 @@ export default function PhotoReviewsPage() {
               <p className="mt-1 text-xs text-ink-faint">{Number.isFinite(Number(rejectingPhoto.returned_count)) ? Number(rejectingPhoto.returned_count) === 0 ? 'この方を見送るのははじめてです' : `この方を見送ったこと ${Number(rejectingPhoto.returned_count)}回` : 'この方を以前に見送った回数は未取得です'}</p>
               </div>
             </div>
-            <fieldset className="space-y-2">
-              <legend className="text-sm font-semibold text-ink">見送る理由</legend>
-              {REVIEW_REASONS.map((reason) => <label key={reason.value} className="flex cursor-pointer items-start gap-2 rounded-control border border-hairline px-3 py-2.5 text-sm text-ink-secondary"><input type="radio" name="photo-review-reason" value={reason.value} checked={reasonCode === reason.value} onChange={() => { setReasonCode(reason.value); setReasonError('') }} className="mt-0.5" /><span><span className="font-medium text-ink">{reason.label}</span><span className="mt-1 block text-xs text-ink-faint">「{reason.message}」</span></span></label>)}
-            </fieldset>
+            <RadioCardGroup legend="見送る理由">
+              {REVIEW_REASONS.map((reason) => <RadioCard key={reason.value} name="photo-review-reason" value={reason.value} checked={reasonCode === reason.value} onChange={() => { setReasonCode(reason.value); setReasonError('') }} title={reason.label} note={`「${reason.message}」`} />)}
+            </RadioCardGroup>
             <label className="block text-sm font-semibold text-ink">お客様に届く補足（直せます）<textarea value={reasonNote} onChange={(event) => { setReasonNote(event.target.value.slice(0, 500)); setReasonError('') }} rows={2} placeholder={reasonCode === 'other' ? 'お客様に送る文章を書いてください' : '必要な場合だけ補足します'} className="mt-2 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-normal text-ink" /></label>
             <div className="rounded-control border border-accent-border bg-accent-soft p-3 text-sm text-ink-secondary"><p className="font-semibold text-ink">お客様にはこう届きます（直せます）</p><p className="mt-1 whitespace-pre-line">{photoPetDisplayName(rejectingPhoto.pet_name, { callName: rejectingPhoto.pet_call_name, gender: rejectingPhoto.pet_gender })}の写真をありがとうございます。{reasonCode === 'other' ? reasonNote || 'お客様に送る文章を入力してください。' : selectedReasonMessage}{reasonNote && reasonCode !== 'other' ? `\n${reasonNote}` : ''}{`\n`}お手数をおかけします。</p></div>
-            <label className="flex cursor-pointer items-start gap-2 text-sm text-ink-secondary"><input type="checkbox" checked={resubmitInvite} onChange={(event) => setResubmitInvite(event.target.checked)} className="mt-0.5 opacity-100" /><span><span className="font-semibold text-ink">もう一度 送ってもらえるようお願いする</span><span className="block text-xs text-ink-faint">チェックを付けると、見送りのお知らせに別のお写真をお願いする案内を添えます。</span></span></label>
-            <label className="flex cursor-pointer items-start gap-2 text-sm text-ink-secondary"><input type="checkbox" checked={watchSubmitter} onChange={(event) => setWatchSubmitter(event.target.checked)} className="mt-0.5 opacity-100" /><span><span className="font-semibold text-ink">この人の次の投稿は、必ず人が見る</span><span className="block text-xs text-ink-faint">この方に印を付け、次に届く写真を一覧で「確認対象」として表示します。</span></span></label>
+            <Checkbox checked={resubmitInvite} onCheckedChange={setResubmitInvite} description="チェックを付けると、見送りのお知らせに別のお写真をお願いする案内を添えます。">もう一度 送ってもらえるようお願いする</Checkbox>
+            <Checkbox checked={watchSubmitter} onCheckedChange={setWatchSubmitter} description="この方に印を付け、次に届く写真を一覧で「確認対象」として表示します。">この人の次の投稿は、必ず人が見る</Checkbox>
             <p className="text-xs font-semibold text-ink-faint">見送っても、この方のマイルは減りません。</p>
         </div>
     </Dialog>}
@@ -1061,10 +1061,9 @@ export default function PhotoReviewsPage() {
       if (reasonCode === 'other' && !reasonNote.trim()) { setReasonError('そのほかの理由を入力してください'); return }
       void bulkReview('return', { reasonCode, reasonNote: reasonNote.trim() })
     }}>
-      <fieldset className="space-y-2">
-        <legend className="text-sm font-semibold text-ink">見送り理由</legend>
-        {REVIEW_REASONS.map((reason) => <label key={reason.value} className="flex cursor-pointer items-start gap-2 rounded-control border border-hairline px-3 py-2.5 text-sm text-ink-secondary"><input type="radio" name="photo-bulk-review-reason" value={reason.value} checked={reasonCode === reason.value} onChange={() => { setReasonCode(reason.value); setReasonError('') }} className="mt-0.5" /><span className="font-medium text-ink">{reason.label}</span></label>)}
-      </fieldset>
+      <RadioCardGroup legend="見送り理由">
+        {REVIEW_REASONS.map((reason) => <RadioCard key={reason.value} name="photo-bulk-review-reason" value={reason.value} checked={reasonCode === reason.value} onChange={() => { setReasonCode(reason.value); setReasonError('') }} title={reason.label} />)}
+      </RadioCardGroup>
       <label className="mt-4 block text-sm font-semibold text-ink">投稿者に届く補足（直せます）<textarea value={reasonNote} onChange={(event) => { setReasonNote(event.target.value.slice(0, 500)); setReasonError('') }} rows={3} placeholder={reasonCode === 'other' ? '理由を入力してください' : '必要な場合だけ入力します'} className="mt-2 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-normal text-ink" /></label>
       <div className="mt-4 rounded-control border border-accent-border bg-accent-soft p-3 text-sm text-ink-secondary"><p className="font-semibold text-ink">投稿者に届く内容</p><p className="mt-1 whitespace-pre-line">お写真をご投稿いただきありがとうございます。{`\n`}今回は「{selectedReasonLabel}」のため、掲載を見送らせていただきました。{reasonNote && `\n${reasonNote}`}{`\n`}内容をご確認のうえ、よろしければ別のお写真をご投稿ください。</p></div>
     </Dialog>
