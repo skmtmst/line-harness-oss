@@ -7,6 +7,12 @@ const db = vi.hoisted(() => ({
   acquirePublishLease: vi.fn(), releasePublishLease: vi.fn(), renewPublishLease: vi.fn(), isPublishLeaseHeld: vi.fn(), setPageRichMenuId: vi.fn(), markRichMenuGroupPublished: vi.fn(), markRichMenuGroupUnpublished: vi.fn(),
   getLineAccountById: vi.fn(), getFollowingLineUserIdsByTag: vi.fn(), getTrackedLinkById: vi.fn(), getRichMenuTapStats: vi.fn(), getRichMenuAudienceStats: vi.fn(), recordRichMenuAssignmentsByLineUserIds: vi.fn(), clearRichMenuAssignmentsForGroup: vi.fn(), listRichMenuSchedulesByGroup: vi.fn(), cancelRichMenuSchedule: vi.fn(),
   createRichMenuScheduleAtomic: vi.fn(), createRichMenuManualPublishRequestAtomic: vi.fn(), getRichMenuManualPublishRequest: vi.fn(), getRichMenuManualPublishShells: vi.fn(), recordRichMenuManualPublishShells: vi.fn(), claimRichMenuManualPublishRequest: vi.fn(), markRichMenuManualPublishSucceeded: vi.fn(), markRichMenuManualPublishFailed: vi.fn(), restartRichMenuManualPublishRequest: vi.fn(), jstNow: vi.fn(() => '2026-09-16T00:00:00.000Z'),
+  ensureRichMenuVersion: vi.fn(async (_db: unknown, input: { id: string }) => ({ id: input.id, version_number: 1, definition_fingerprint: 'fp', status: 'draft' })),
+  markRichMenuVersionPublished: vi.fn(), recordRichMenuDeviceConfirmation: vi.fn(),
+  findRichMenuDeviceConfirmation: vi.fn(async () => ({ id: 'dc1', confirmed_at: '2026-09-16T00:00:00.000Z' })),
+  ensureRichMenuPublishRun: vi.fn(async (_db: unknown, input: { id: string }) => ({ id: input.id, status: 'running', last_error_code: null })),
+  markRichMenuPublishRun: vi.fn(), ensureRichMenuPublishRunPages: vi.fn(), markRichMenuPublishRunPageStep: vi.fn(),
+  listRichMenuPublishRunPages: vi.fn(async () => []),
 }));
 vi.mock('@line-crm/db', () => db);
 const access = vi.hoisted(() => ({ canAccessAllLineAccounts: vi.fn(async () => true) }));
@@ -14,6 +20,8 @@ vi.mock('../services/account-access.js', () => access);
 const publisher = vi.hoisted(() => ({
   createRichMenuShells: vi.fn(), switchRichMenuLive: vi.fn(), deleteRichMenuShells: vi.fn(),
   resolveSwitcherActions: vi.fn((pages: unknown[]) => pages), validateRichMenuGroupForPublish: vi.fn(),
+  validateRichMenuPagesWithLine: vi.fn(),
+  buildAliasId: vi.fn((groupId: string, orderIndex: number) => `lhx-${groupId.slice(0, 8)}-${orderIndex}`),
   unpublishRichMenuGroup: vi.fn(), linkRichMenuBulkChunked: vi.fn(),
   PublishLeaseLostError: class PublishLeaseLostError extends Error {},
   RichMenuValidationError: class RichMenuValidationError extends Error {},

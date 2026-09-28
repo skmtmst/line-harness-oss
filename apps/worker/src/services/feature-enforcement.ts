@@ -187,6 +187,16 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
     },
   },
   {
+    // K(#822): 公開中のリッチメニューを1日1回だけ見て、ずれを台帳に残す。
+    name: 'rich menu daily reconcile',
+    classification: { kind: 'feature', featureId: 'rich_menus' },
+    enforcement: {
+      mode: 'gated',
+      sources: ['apps/worker/src/services/rich-menu-daily-reconcile.ts'],
+      markers: ["job: 'rich menu daily reconcile'"],
+    },
+  },
+  {
     name: 'support email sync',
     classification: { kind: 'core', reason: '運用問い合わせ受信' },
     enforcement: { mode: 'exempt', reason: '運用の問い合わせ受信で、アカウント機能に属さない' },

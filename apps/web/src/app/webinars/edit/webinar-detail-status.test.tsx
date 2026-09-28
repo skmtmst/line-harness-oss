@@ -154,7 +154,7 @@ describe('通知の要約は有効フラグから組み立てる(WEBINAR-10)', (
     expect(deliveryTimingSummary(notificationSettings({ startEnabled: true }), true, false))
       .toBe('開始時')
     expect(missedNoticeSummary(notificationSettings({ missedEnabled: true }), true, false))
-      .toBe('未視聴者へ翌日20:00に送信')
+      .toBe('未視聴者へ翌日20:00に送信（期限7日）')
     expect(completedNoticeSummary(notificationSettings({ completedEnabled: true }), true, false))
       .toBe('見終わった人へお礼を送信')
   })

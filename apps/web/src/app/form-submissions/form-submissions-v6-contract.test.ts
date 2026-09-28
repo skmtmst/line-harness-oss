@@ -323,6 +323,40 @@ describe('V6回答フォームの中項目(#503 M3・M9)', () => {
   })
 })
 
+describe('P 一覧の数・公開前の試し・読みにくい色', () => {
+  it('一覧の行に今月の件数と完了率を出し、「？」は見出しに1つだけ置く', () => {
+    expect(PAGE).toContain('今月 ${form.monthlySubmitCount')
+    expect(PAGE).toContain('完了率 ${form.monthlyCompletionRate')
+    expect(PAGE).toContain('今月 —')
+    expect(PAGE).toContain('完了率 —')
+    expect(PAGE).toContain('今月の完了率の説明')
+    expect(PAGE).toContain('試しの回答は入れていません')
+    // 「？」の説明は見出しに1つだけ。行に並べない。
+    expect((PAGE.match(/今月の完了率の説明/g) ?? []).length).toBe(1)
+    // 死んでいた今週表示は出さない。数はサーバーが数える。
+    expect(PAGE).not.toContain('今週')
+    expect(PAGE).not.toContain('weeklySubmitCount')
+  })
+
+  it('編集画面から公開前の試しを始められる', () => {
+    expect(EDIT_PAGE).toContain('テスト回答を始める')
+    expect(EDIT_PAGE).toContain('api.forms.issueTestToken(id, selectedAccountId)')
+    expect(EDIT_PAGE).toContain('試しURL')
+    expect(EDIT_PAGE).toContain('試しの回答は集計に入らず')
+    expect(API).toContain('issueTestToken:')
+    expect(API).toContain('/test-token?account_id=')
+  })
+
+  it('読みにくい色は画面と保存の両方で止める', () => {
+    expect(DESIGN_SETTINGS).toContain('formThemeContrastError')
+    expect(DESIGN_SETTINGS).toContain('文字と背景の色の決まりの説明')
+    expect(DESIGN_SETTINGS).toContain('role="alert"')
+    expect(EDIT_PAGE).toContain('formThemeContrastError(normalizeFormTheme(layout.options?.theme))')
+    expect(SHARED_FORM_LAYOUT).toContain('formThemeContrastError')
+    expect(SHARED_FORM_LAYOUT).toContain('FORM_THEME_MIN_CONTRAST')
+  })
+})
+
 describe('#578 ページ名の変更（#503 L3）', () => {
   it('空のページ名は作らせず、無い頁は触らない', () => {
     expect(EDIT_PAGE).toContain("from '@/components/forms/section-name'")

@@ -34,7 +34,10 @@ export interface WebinarContext {
 }
 
 const DRIFT_TOLERANCE = 5;
-const HEARTBEAT_MS = 30_000;
+// J #821: 再生中だけ15秒ごとに送る。
+const HEARTBEAT_MS = 15_000;
+
+type HeartbeatPlayerState = 'playing' | 'paused' | 'hidden' | 'buffering' | 'seeking';
 
 // プレビューモード (?preview=1): 運営が内容確認するための隠しモード。
 // ライブ位置に縛られず 0 秒から再生し、シークバー + 速度切替を出す。
@@ -491,15 +494,30 @@ function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string }) {
     return () => document.removeEventListener('visibilitychange', onVisible);
   }, [expectedPosition, ended]);
 
-  // ハートビート (配信終了後は送らない)
+  // ハートビート (配信終了後は送らない。J #821: 再生中だけ15秒ごと)。
+  // 状態を区別する: 再生・一時停止・隠れた・読み込み待ち・位置の移動・速度。
+  // 一時停止や隠れている時間はサーバー側で視聴に数えない。
   useEffect(() => {
     if (!state?.live || !joined || ended || IS_PREVIEW) return;
     const src = state;
+    const playerState = (): HeartbeatPlayerState => {
+      const video = videoRef.current;
+      if (!video) return 'playing';
+      if (document.visibilityState === 'hidden') return 'hidden';
+      if (video.seeking) return 'seeking';
+      if (video.readyState < 3 && !video.paused) return 'buffering';
+      if (video.paused) return 'paused';
+      return 'playing';
+    };
     const timer = setInterval(() => {
+      const video = videoRef.current;
       const pos = Math.min(Math.floor(expectedPosition()), src.durationSeconds);
       void apiPost(`/api/liff/webinars/${encodeURIComponent(slug)}/heartbeat`, {
         sessionStartAt: src.sessionStartAt,
         positionSeconds: pos,
+        playerState: playerState(),
+        playbackRate: video?.playbackRate ?? 1,
+        clientAtMs: Date.now(),
       }, ctx).catch(() => undefined);
     }, HEARTBEAT_MS);
     return () => clearInterval(timer);

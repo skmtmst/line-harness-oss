@@ -53,7 +53,7 @@ export type RichMenuCreateValue = {
 }
 
 export const STORE_NEW_MENU_INTENTS: RichMenuAreaIntent[] = [
-  'url', 'text', 'template', 'form', 'tel', 'postback',
+  'url', 'text', 'template', 'form', 'tel', 'postback', 'datetime', 'clipboard',
 ]
 
 /**
