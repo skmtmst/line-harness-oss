@@ -16,6 +16,19 @@ describe('V6 機能3 UID・CSV移行', () => {
     ])
   })
 
+  it('R113 UID対応表の引用符内改行を1件として読み、続く行もずらさない', () => {
+    expect(parseUidCsv('old_uid,new_uid\r\n"old\n-1",new-1\r\nold-2,"new\n-2"\r\n')).toEqual([
+      { oldUid: 'old\n-1', newUid: 'new-1', evidenceType: 'operator_csv' },
+      { oldUid: 'old-2', newUid: 'new\n-2', evidenceType: 'operator_csv' },
+    ])
+  })
+
+  it('R113 閉じていない引用符の対応行を誤って結び付けない', () => {
+    expect(parseUidCsv('old_uid,new_uid\nold-1,new-1\n"old-2,new-2')).toEqual([
+      { oldUid: 'old-1', newUid: 'new-1', evidenceType: 'operator_csv' },
+    ])
+  })
+
   it('Harnessの書き出しCSVを取り込める', () => {
     expect(parseFriendCsv('LINEユーザーID,LINE表示名,本名,システム表示名\nU1,山田,山田 太郎,たろう')).toEqual([
       { lineUid: 'U1', displayName: '山田', realName: '山田 太郎', systemDisplayName: 'たろう' },

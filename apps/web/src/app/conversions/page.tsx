@@ -1,9 +1,7 @@
 'use client'
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { MoreHorizontal } from 'lucide-react'
-import ActionMenu from '@/components/shared/action-menu'
-import IconButton from '@/components/shared/icon-button'
+import { RowActions } from '@/components/shared/row-actions'
 import {
   api,
   describeSaveFailure,
@@ -223,6 +221,7 @@ import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import ListToolbar from '@/components/shared/list-toolbar'
+import HelpTip from '@/components/shared/help-tip'
 import Select from '@/components/shared/select'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import FilterChip from '@/components/shared/filter-chip'
@@ -353,7 +352,6 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
   const [sort, setSort] = useState<PointSort>('cv-desc')
   const [status, setStatus] = useState<StatusFilter>('all')
   const [page, setPage] = useState(1)
-  const [pointMenuId, setPointMenuId] = useState<string | null>(null)
   const [loadFailed, setLoadFailed] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState('')
@@ -542,6 +540,17 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
     }
     if (editForm.deduplicationMode === 'window' && !editForm.deduplicationWindowDays.trim()) {
       setEditError('数えない日数を入れてください')
+      return
+    }
+    // R281: ページ到達は対象URLが無いと1件も数えられないため、空のまま送らせない。
+    if (editForm.sourceType === 'url_reach' && !editForm.targetUrl.trim()) {
+      setEditError('数えてよいページを入れてください')
+      return
+    }
+    if (editForm.attributionDays.trim()
+      && (!Number.isInteger(Number(editForm.attributionDays))
+        || Number(editForm.attributionDays) < 1 || Number(editForm.attributionDays) > 365)) {
+      setEditError('計測期間は1〜365日で入れてください（空欄なら既定の90日です）')
       return
     }
     if (editForm.exclusionMemo.trim().length > 500) {
@@ -1039,25 +1048,21 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                 使う場所を足す
               </Button>
             ),
+            /*
+             * R280: 開閉は行ごとの共通 RowActions に任せる。以前は画面全体の
+             * `pointMenuId` をスマホカードとPC表で共有していたため、隠れて
+             * いる側の器まで body へ出てメニューが2つに見えた。
+             */
             moreAction: (
-              <span className="relative flex h-9 w-9 items-center justify-center">
-                <IconButton
-                  aria-label={`${point.name}のその他操作`}
-                  title={`${point.name}のその他操作`}
-                  onClick={() => setPointMenuId((currentId) => (currentId === point.id ? null : point.id))}
-                >
-                  <MoreHorizontal />
-                </IconButton>
-                <ActionMenu
-                  open={pointMenuId === point.id}
-                  ariaLabel={`${point.name}の操作`}
-                  onClose={() => setPointMenuId(null)}
-                  items={[
-                    { id: 'detail', label: '中身を見る', onSelect: () => setDetailTarget(point) },
-                  ]}
-                />
-              </span>
+              <RowActions
+                menuItems={[
+                  { id: 'detail', label: '中身を見る', onSelect: () => setDetailTarget(point) },
+                ]}
+                subjectName={point.name}
+              />
             ),
+            onSelect: () => setDetailTarget(point),
+            onSelectLabel: `${point.name}の詳細を開く`,
           }))}
         />
         <div data-design="Table" className="bg-canvas rounded-card border-hairline border hidden md:block">
@@ -1081,7 +1086,12 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                 <tr
                   key={point.id}
                   ref={point.id === highlightId ? highlightRowRef : null}
-                  className={point.id === highlightId ? 'bg-accent-soft' : 'hover:bg-canvas-sunken'}
+                  /*
+                   * R280: 行のクリックでも詳細が開く。操作列の中の押下は
+                   * 行へ伝えない（選んだ操作の代わりに詳細へ移動してしまう）。
+                   */
+                  className={`${point.id === highlightId ? 'bg-accent-soft' : 'hover:bg-canvas-sunken'} cursor-pointer`}
+                  onClick={() => setDetailTarget(point)}
                 >
                   <td className="text-ink w-1/6 px-4 py-3 text-sm font-medium">
                     <span className="line-clamp-2" title={point.name}>{point.name}</span>
@@ -1122,11 +1132,14 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                     : 'text-ink-secondary w-1/4 px-4 py-3 text-sm'}>
                     <span className="line-clamp-2" title={usageLabel(point)}>{usageLabel(point)}</span>
                   </td>
-                  <td className="px-4 py-3 text-right whitespace-nowrap">
+                  <td className="px-4 py-3 text-right whitespace-nowrap" onClick={(event) => event.stopPropagation()}>
                     {/*
                       幅の決まっていない列へ2つのボタンを右詰めで入れると、
                       狭い幅で内容が左の「使われている場所」へはみ出して
                       文字に重なっていた。主操作だけ残し、詳細はメニューへ畳む。
+                      R280: 「…」は開閉を行ごとに持つ共通 RowActions にする。
+                      画面全体の共有状態だと、隠れているスマホカード側の器まで
+                      body へ出てメニューが2つに見えた。
                     */}
                     <div className="relative flex items-center justify-end gap-2">
                       <Button
@@ -1135,20 +1148,11 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                       >
                         使う場所を足す
                       </Button>
-                      <IconButton
-                        aria-label={`${point.name}のその他操作`}
-                        title={`${point.name}のその他操作`}
-                        onClick={() => setPointMenuId((current) => (current === point.id ? null : point.id))}
-                      >
-                        <MoreHorizontal />
-                      </IconButton>
-                      <ActionMenu
-                        open={pointMenuId === point.id}
-                        ariaLabel={`${point.name}の操作`}
-                        onClose={() => setPointMenuId(null)}
-                        items={[
+                      <RowActions
+                        menuItems={[
                           { id: 'detail', label: '中身を見る', onSelect: () => setDetailTarget(point) },
                         ]}
+                        subjectName={point.name}
                       />
                     </div>
                   </td>
@@ -1210,7 +1214,34 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
               <div><dt className="text-ink-faint">何が起きたら数えるか</dt><dd className="text-ink mt-1 font-semibold">{sourceTriggerLabel(detailTarget)}</dd></div>
               {/* R41: 対象・金額の説明も対応表と同じものを使う。 */}
               <div><dt className="text-ink-faint">対象</dt><dd className="text-ink mt-1 font-semibold">{originInfoOf(detailTarget.sourceType).target}</dd></div>
+              {/* R281: ページ到達の対象URLは詳細で確認できる。長いURLは安全な位置で折り返す。 */}
+              {detailTarget.measureMethod === 'url_reach' ? (
+                <div className="col-span-2">
+                  <dt className="text-ink-faint">数えてよいページ</dt>
+                  <dd className="text-ink mt-1 font-semibold break-all" title={detailTarget.targetUrl ?? undefined}>
+                    {detailTarget.targetUrl ?? '決まっていません'}
+                  </dd>
+                </div>
+              ) : null}
               <div><dt className="text-ink-faint">金額</dt><dd className="text-ink mt-1 font-semibold">{valueModeLine(detailTarget)}</dd></div>
+              {/* R281: 計測期間と取消方針も詳細で確認できる。空欄は既定の90日と分かる書き方にする。 */}
+              <div>
+                <dt className="text-ink-faint">
+                  計測期間{' '}
+                  <HelpTip label="計測期間の説明">
+                    友だち追加からこの日数までの成果を数えます。同じ人を数えない「数えない日数」とは別の設定です。
+                  </HelpTip>
+                </dt>
+                <dd className="text-ink mt-1 font-semibold">
+                  {detailTarget.attributionDays == null ? '90日（既定）' : `${detailTarget.attributionDays}日`}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-ink-faint">取り消しの扱い</dt>
+                <dd className="text-ink mt-1 font-semibold">
+                  {REVERSAL_OPTIONS.find((option) => option.value === detailTarget.reversalPolicy)?.label ?? detailTarget.reversalPolicy}
+                </dd>
+              </div>
               {/* R40: 数えない条件とメモを詳細でも確認できる。 */}
               <div className="col-span-2"><dt className="text-ink-faint">数えない条件</dt><dd className="text-ink mt-1 font-semibold">{exclusionLine(detailTarget.sourceConfig)}</dd></div>
               <div><dt className="text-ink-faint">数え方</dt><dd className="text-ink mt-1 font-semibold">{deduplicationLabel(detailTarget.deduplicationMode, detailTarget.deduplicationWindowDays)}</dd></div>
@@ -1411,6 +1442,20 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                 onChange={(event) => setEditForm({ ...editForm, name: event.target.value })}
               />
             </label>
+            {/* R281: ページ到達の対象URLも編集できる。URL以外は起点が固定で入力欄は出さない。 */}
+            {editForm.sourceType === 'url_reach' ? (
+              <label className="block">
+                <span className="text-ink-faint text-xs">数えてよいページ</span>
+                <TextField
+                  aria-label="数えてよいページ"
+                  inputMode="url"
+                  value={editForm.targetUrl}
+                  maxLength={2000}
+                  placeholder="https://example.com/thanks"
+                  onChange={(event) => setEditForm({ ...editForm, targetUrl: event.target.value })}
+                />
+              </label>
+            ) : null}
             {/* 起点に金額が無いものは注文の金額を出さない。選択肢は対応表が持つ(作成と同じ)。 */}
             <label className="block">
               <span className="text-ink-faint text-xs">金額の決め方</span>
@@ -1471,6 +1516,23 @@ function ConversionsPageInner({ accountId }: { accountId: string | null }) {
                 options={REVERSAL_OPTIONS}
                 onChange={(value) => setEditForm({ ...editForm, reversalPolicy: value as EditForm['reversalPolicy'] })}
               />
+            </label>
+            {/* R281: 友だち追加からの計測期間も編集できる。空欄は既定の90日。 */}
+            <label className="block">
+              <span className="text-ink-faint text-xs">
+                友だち追加からの計測期間（日）{' '}
+                <HelpTip label="計測期間の説明">
+                  友だち追加からこの日数までの成果を数えます。同じ人を数えない「数えない日数」とは別の設定です。
+                </HelpTip>
+              </span>
+              <TextField
+                aria-label="友だち追加からの計測期間"
+                inputMode="numeric"
+                value={editForm.attributionDays}
+                placeholder="90"
+                onChange={(event) => setEditForm({ ...editForm, attributionDays: event.target.value })}
+              />
+              <span className="text-ink-faint mt-1 block text-xs">空欄なら既定の90日です。</span>
             </label>
             {/* R40: 数えない条件とメモも編集できる。条件は作成と同じ共通部品。 */}
             <div>

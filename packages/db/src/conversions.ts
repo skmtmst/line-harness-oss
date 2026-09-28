@@ -269,11 +269,58 @@ export async function updateConversionPoint(
 }
 
 /**
+ * ページ到達の照合用にURLを同じ形へ直す（R282）。
+ *
+ * - `?` 以降（パラメータ）と `#` 以降（ページ内位置）を外す。
+ *   画面の説明どおり「パラメータは無視」する。保存した側に残っている
+ *   パラメータも同じく外すので、保存時と受信時で解釈がずれない。
+ * - ホストは小文字へ揃える（大文字・小文字の違いは同じ場所とみなす）。
+ * - パスは文字どおりに残す（大文字・小文字は別の場所、`_` や `%` も
+ *   別の文字へ広げない）。
+ *
+ * http(s) でない・壊れた形は null を返す。
+ */
+export function normalizeUrlReachUrl(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    return null;
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
+  const host = parsed.hostname.toLowerCase();
+  if (!host) return null;
+  const port = parsed.port ? `:${parsed.port}` : '';
+  return `${parsed.protocol}//${host}${port}${parsed.pathname || '/'}`;
+}
+
+/**
+ * 保存した対象URLが受信URLに当てはまるか（R282）。
+ *
+ * 両方を normalizeUrlReachUrl で同じ形へ直してから、文字どおりの
+ * 前方一致で見る。SQL の LIKE に任せない（`_`・`%` が別の文字へ
+ * 広がり、パスが大文字・小文字を区別しなくなるため）。
+ */
+export function matchesUrlReachTarget(targetUrl: unknown, url: string): boolean {
+  const target = normalizeUrlReachUrl(targetUrl);
+  const incoming = normalizeUrlReachUrl(url);
+  return target !== null && incoming !== null && incoming.startsWith(target);
+}
+
+/**
  * このURLに到達したときに数える成果地点を探す。
  *
  * target_url の前方一致で見る。完全一致にすると、クエリ文字列
  * （?utm_source=... など）が付いた瞬間に数えられなくなる。
  * 逆に部分一致にすると、URLの途中にたまたま含まれるだけで数えてしまう。
+ *
+ * R282: 照合は matchesUrlReachTarget（文字どおりの前方一致）で行う。
+ * 保存済みの設定を SQL で正規化し直すのはやめ、候補を絞ったあと
+ * JS で1件ずつ見る。既存の設定（パラメータ付きの保存など）も
+ * 作り直さずに正しく当てはまる。
  *
  * lineAccountId は「絞っていない地点（NULL）」と「このアカウントの地点」
  * の両方を拾う。
@@ -283,6 +330,7 @@ export async function getUrlReachConversionPoints(
   url: string,
   lineAccountId: string | null,
 ): Promise<ConversionPoint[]> {
+  if (normalizeUrlReachUrl(url) === null) return [];
   // N-263: 統括も一致条件にする。アカウントを絞っていない地点でも
   // tenant_id を持つので、リンクのアカウントの統括と同じ地点だけを返せば、
   // 「全アカウント対象の地点が別の統括のリンクで反応する」ことがない。
@@ -294,14 +342,13 @@ export async function getUrlReachConversionPoints(
           AND status = 'active'
           AND target_url IS NOT NULL
           AND target_url != ''
-          AND ? LIKE target_url || '%'
           AND (line_account_id IS NULL OR line_account_id = ?)
           AND COALESCE(tenant_id, ?) = COALESCE(
             (SELECT tenant_id FROM line_accounts WHERE id = ?), ?)`,
     )
-    .bind(url, lineAccountId, DEFAULT_TENANT_ID, lineAccountId, DEFAULT_TENANT_ID)
+    .bind(lineAccountId, DEFAULT_TENANT_ID, lineAccountId, DEFAULT_TENANT_ID)
     .all<ConversionPoint>();
-  return result.results;
+  return result.results.filter((point) => matchesUrlReachTarget(point.target_url, url));
 }
 
 /**

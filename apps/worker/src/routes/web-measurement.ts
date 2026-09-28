@@ -95,7 +95,11 @@ webMeasurement.post('/api/public/web-conversions', async (c) => {
       return c.body(null, 204, corsHeaders());
     }
 
-    const path = typeof body.path === 'string' && body.path.startsWith('/') ? body.path.split('?')[0] : '/';
+    // R282: パラメータ（?以降）とページ内位置（#以降）は判定に使わない。
+    // 照合自体も getUrlReachConversionPoints 側で同じ形へ直して比べる。
+    const path = typeof body.path === 'string' && body.path.startsWith('/')
+      ? body.path.split('?')[0].split('#')[0] || '/'
+      : '/';
     const fullUrl = `https://${host}${path}`;
 
     // url_reach 地点のうち、対象URLの前方一致に合うものを数える。
