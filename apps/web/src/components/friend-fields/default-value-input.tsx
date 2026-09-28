@@ -1,9 +1,9 @@
 'use client'
 
 import Select from '@/components/shared/select'
-import { TextInput } from '@/components/shared/form-controls'
+import { TextArea, TextInput } from '@/components/shared/form-controls'
 
-export type DefaultValueMode = 'text' | 'single' | 'multi' | 'file'
+export type DefaultValueMode = 'text' | 'longtext' | 'single' | 'multi' | 'file'
 
 /**
  * R139: 既定値の入力欄。種類に合う形で出す。
@@ -98,6 +98,27 @@ export default function DefaultValueInput({
   }
   if (mode === 'file') {
     return <TextInput id={inputId} value="" disabled placeholder="画像・PDFには設定できません" onChange={() => {}} />
+  }
+  /*
+   * R186: 複数行テキストの既定値は複数行で入れる。1行欄では改行が
+   * 入力時に消え、保存後の見え方と食い違っていた。
+   */
+  if (mode === 'longtext') {
+    return (
+      <>
+        <TextArea
+          id={inputId}
+          rows={4}
+          value={textValue}
+          onChange={(event) => onTextChange(event.target.value)}
+          disabled={disabled}
+          placeholder="未設定"
+        />
+        <p className="mt-2 text-xs leading-5 text-ink-faint">
+          空欄のとき、この文章がそのまま使われます。改行も残ります。
+        </p>
+      </>
+    )
   }
   return (
     <TextInput

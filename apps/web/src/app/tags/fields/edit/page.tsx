@@ -28,6 +28,38 @@ function isLockedField(field: FriendField): boolean {
   return field.isInherited === true
 }
 
+/*
+ * R182: 保存済みの既定値はID（複数選択はIDの配列のJSON）で入っている。
+ * 画面は選択肢名で持つため、読み込み時と同じ戻し方で「保存済みの
+ * 選択肢名」を作り、未保存の判定に使う。IDのまま比べると、単一選択は
+ * 開いた瞬間に未保存扱いになり、複数選択は変えても未保存にならない。
+ */
+function storedDefaultLabels(field: FriendField): { single: string; multi: string[] } {
+  const stored = field.defaultValue ?? ''
+  const labels = field.options ?? []
+  const definitions = field.optionDefinitions ?? null
+  const toLabel = (entry: string): string | null =>
+    definitions?.find((item) => item.id === entry)?.label
+    ?? (labels.includes(entry) ? entry : null)
+  if (field.type === 'multi_select') {
+    let entries: string[] = []
+    try {
+      const parsed: unknown = JSON.parse(stored)
+      if (Array.isArray(parsed)) entries = parsed.map(String)
+    } catch { entries = [] }
+    return { single: '', multi: entries.map(toLabel).filter((item): item is string => item !== null) }
+  }
+  if (field.type === 'select' && stored) return { single: toLabel(stored) ?? '', multi: [] }
+  return { single: stored, multi: [] }
+}
+
+function sameLabels(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false
+  const sortedA = [...a].sort()
+  const sortedB = [...b].sort()
+  return sortedA.every((item, index) => item === sortedB[index])
+}
+
 function Toggle({ checked, onChange, label, hint, disabled }: { checked: boolean; onChange: (next: boolean) => void; label: string; hint: string; disabled?: boolean }) {
   return (
     <label className={`flex items-start justify-between gap-4 py-2 ${disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}>
@@ -85,33 +117,11 @@ function EditFriendFieldForm() {
       setField(found)
       setName(found.name)
       setOptions((found.options ?? []).join('\n'))
-      /*
-       * R139: 保存済みの既定値はID（複数選択はIDの配列のJSON）で入って
-       * いる。選択肢のIDと表示名の対応で表示名へ戻す。対応が無い古い
-       * 形は表示名の突き合わせに倒し、どちらにも無い値は選ばない。
-       */
+      /* R139: 保存済みの既定値は選択肢名へ戻して持つ（IDのまま見せない）。 */
       {
-        const stored = found.defaultValue ?? ''
-        const labels = found.options ?? []
-        const definitions = found.optionDefinitions ?? null
-        const toLabel = (entry: string): string | null =>
-          definitions?.find((item) => item.id === entry)?.label
-          ?? (labels.includes(entry) ? entry : null)
-        if (found.type === 'multi_select') {
-          let entries: string[] = []
-          try {
-            const parsed: unknown = JSON.parse(stored)
-            if (Array.isArray(parsed)) entries = parsed.map(String)
-          } catch { entries = [] }
-          setDefaultOptions(entries.map(toLabel).filter((item): item is string => item !== null))
-          setDefaultValue('')
-        } else if (found.type === 'select' && stored) {
-          setDefaultOptions([])
-          setDefaultValue(toLabel(stored) ?? '')
-        } else {
-          setDefaultOptions([])
-          setDefaultValue(stored)
-        }
+        const stored = storedDefaultLabels(found)
+        setDefaultOptions(stored.multi)
+        setDefaultValue(stored.single)
       }
       setIsPersonal(found.isPersonal)
       setIsStarred(found.isStarred)
@@ -140,10 +150,13 @@ function EditFriendFieldForm() {
    * 離れる操作では確認を出す。保存の成功後は別画面へ送るため、
    * 確認が出ることはない。
    */
-  const dirty = field !== null && !isLockedField(field) && (
+  /* R182: 既定値は保存済みの選択肢名と比べる（IDのまま比べない）。 */
+  const storedDefaults = field ? storedDefaultLabels(field) : null
+  const dirty = field !== null && storedDefaults !== null && !isLockedField(field) && (
     name !== field.name
     || options !== (field.options ?? []).join('\n')
-    || defaultValue !== (field.defaultValue ?? '')
+    || defaultValue !== storedDefaults.single
+    || !sameLabels(defaultOptions, storedDefaults.multi)
     || isPersonal !== field.isPersonal
     || isStarred !== field.isStarred
     || ecIsMaster !== field.ecIsMaster
@@ -294,7 +307,7 @@ function EditFriendFieldForm() {
             >
               {/* R139: 複数選択は登録済みの選択肢から複数選ぶ。単一選択は一覧から1つ選ぶ。 */}
               <DefaultValueInput
-                mode={FILE_TYPES.has(field.type) ? 'file' : field.type === 'multi_select' ? 'multi' : field.type === 'select' ? 'single' : 'text'}
+                mode={FILE_TYPES.has(field.type) ? 'file' : field.type === 'multi_select' ? 'multi' : field.type === 'select' ? 'single' : field.type === 'textarea' ? 'longtext' : 'text'}
                 options={optionList}
                 textValue={defaultValue}
                 onTextChange={setDefaultValue}

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { X } from 'lucide-react'
 import { api } from '@/lib/api'
 import type { AutoReplyDraftInput, AutoReplyDraftVersion } from '@line-crm/shared'
+import { validateFlexContent } from '@line-crm/shared'
 import type { SegmentCondition } from '@/lib/segment-condition'
 import ConditionBuilder from '@/components/shared/condition-builder'
 import InlineActionList, { useActionOptions } from './inline-action-list'
@@ -405,19 +406,27 @@ export default function EditDialog({
       setError('キーワードを入力してください')
       return
     }
+    /*
+     * R200: 「連投を防ぐ」は送る前に欄の名前と許容範囲で止める。
+     * 保存口も同じ文言で断るが、ここで先に止めると往復しない。
+     */
+    if (cooldown.trim() !== '') {
+      const cooldownValue = Number(cooldown)
+      if (!Number.isInteger(cooldownValue) || cooldownValue < 0 || cooldownValue > 10080) {
+        setError('「連投を防ぐ」は0〜10080の整数（分）で入力してください')
+        return
+      }
+    }
     if (mode === 'template' && !templateId) { setError('テンプレートを選んでください'); return }
     if (mode === 'inline-text' && !responseContent.trim()) {
       setError('内容を入力してください'); return
     }
     if (mode === 'inline-flex') {
       if (!responseContent.trim()) { setError('カードの内容を入力してください'); return }
-      try {
-        JSON.parse(responseContent)
-      } catch {
-        // カード形式なのにJSONでない本文を保存すると、送信側がテキストへ落として
-        // そのまま送ってしまう。ここで止める。
-        setError('カードの内容をJSON形式で入力してください'); return
-      }
+      // R201: JSONとして読めるだけでは足りない。`{}` のような構造のない内容は
+      // 送信時に落ちるだけなので、保存の側で止める（保存口も同じ判定）。
+      const flexError = validateFlexContent('flex', responseContent)
+      if (flexError) { setError(flexError); return }
     }
     if (mode === 'inline-image' && !readLineImageContent(responseContent)) {
       // テキストのまま画像形式で保存させない（画像選択部品がJSONを書く）。

@@ -36,6 +36,12 @@ import { savedSearchSummary, type SavedSearchConditionLabels } from '@/component
 import MetricValue from '@/components/ui/metric-value'
 import { AttributeKindGuide, DuplicateNameNote, findDuplicateNames } from '@/components/friend-fields/attribute-kind-guide'
 
+/*
+ * R185: 友だち画面で作れる条件はここでも編集できるようにする。実行側
+ * （saved-search-filter）が解釈できる種類はすべて並べ、知らない種類を
+ * 先頭の「タグ」へ置換表示しない。回答フォーム・購入履歴は実行できる
+ * ので「未接続」として削除を迫らない。
+ */
 const EDITABLE_KINDS: Array<{ value: SavedSearchConditionKind; label: string }> = [
   { value: 'tag', label: 'タグ' },
   { value: 'name', label: '名前' },
@@ -43,12 +49,48 @@ const EDITABLE_KINDS: Array<{ value: SavedSearchConditionKind; label: string }> 
   { value: 'status_message', label: 'ステータスメッセージ' },
   { value: 'mark', label: '対応マーク' },
   { value: 'scenario', label: 'シナリオ' },
+  { value: 'assignee', label: '担当者' },
+  { value: 'event_booking', label: 'イベント予約' },
+  { value: 'calendar_booking', label: 'カレンダー予約' },
+  { value: 'form', label: '回答フォーム' },
+  { value: 'purchase', label: '購入履歴' },
+  { value: 'last_activity', label: '最終反応日' },
+  { value: 'reminder', label: 'リマインダ' },
+  { value: 'memo', label: '個別メモ' },
+  { value: 'common_event', label: 'その他のイベント' },
   { value: 'chat_status', label: '対応状況' },
   { value: 'following', label: '友だち状態' },
   { value: 'created_at', label: '友だち追加日' },
 ]
 
-const UNSUPPORTED_KINDS = new Set<SavedSearchConditionKind>(['form', 'purchase'])
+/** 存在確認だけの種類（値が無くても「ある／ない」が成立する）。 */
+const EXISTENCE_KINDS = new Set<SavedSearchConditionKind>([
+  'event_booking', 'calendar_booking', 'form', 'purchase', 'reminder',
+])
+
+/** 日付の範囲・前後で絞る種類。 */
+const DATE_RANGE_KINDS = new Set<SavedSearchConditionKind>(['created_at', 'last_activity'])
+
+/*
+ * R185: 保存済みの旧表記（has/eq 等）を画面の主表記へ寄せる。
+ * 実行側は両方を同じ意味で解釈するため、付け替えで意味は変わらない。
+ */
+function canonicalExistenceOp(op: string): 'exists' | 'not_exists' {
+  return ['not_exists', 'not_has', 'ne'].includes(op) ? 'not_exists' : 'exists'
+}
+
+function dateRangeOf(condition: SavedSearchCondition): { from: string; to: string } {
+  if (condition.value && typeof condition.value === 'object') {
+    const range = condition.value as { from?: unknown; to?: unknown }
+    return {
+      from: typeof range.from === 'string' ? range.from : '',
+      to: typeof range.to === 'string' ? range.to : '',
+    }
+  }
+  const single = typeof condition.value === 'string' ? condition.value : ''
+  if (condition.op === 'before') return { from: '', to: single }
+  return { from: single, to: '' }
+}
 const USAGE_KIND_LABELS = {
   broadcast: '一斉配信',
   automation: 'オートメーション',
@@ -62,24 +104,30 @@ const USAGE_KIND_LABELS = {
   画面を離れたあとに検索が壊れる。
 */
 function conditionProblem(condition: SavedSearchCondition): string | null {
-  if (UNSUPPORTED_KINDS.has(condition.kind)) return '未接続の条件を削除してください'
   if (!isSavedSearchOpAllowed(condition.kind, condition.op)) {
     return `${EDITABLE_KINDS.find((item) => item.value === condition.kind)?.label ?? '条件'}では使えない比較方法です`
   }
   if (condition.kind === 'following') return typeof condition.value === 'boolean' ? null : '友だち状態を選んでください'
-  if (condition.kind === 'created_at') {
-    const range = condition.value && typeof condition.value === 'object'
-      ? condition.value as { from?: unknown; to?: unknown }
-      : null
-    return range && (range.from || range.to) ? null : '友だち追加日を入力してください'
+  if (DATE_RANGE_KINDS.has(condition.kind)) {
+    const label = condition.kind === 'last_activity' ? '最終反応日' : '友だち追加日'
+    const { from, to } = dateRangeOf(condition)
+    if (!from && !to) return `${label}を入力してください`
+    /* R183: 逆転期間は0人として扱わず、保存の前に断る。片側だけは許す。 */
+    if (from && to && from > to) return '期間の開始日が終了日より後になっています'
+    return null
   }
   if (condition.kind === 'field' && !condition.key?.trim()) return '友だち情報の項目名を入力してください'
   /*
     「登録あり／なし」は値を取らない。値の必須チェックへ落とさない。
-    ただし値そのものが選択対象になる条件（タグの has 等）では
-    使わないので、値を取らない kind だけに限る。
+    友だち画面で作った存在確認（予約・回答・リマインダ等）は値なしで
+    保存されるため、実行側が値を要らない種類だけ値なしを許す（R185）。
+    タグ等の値は引き続き必須（空で保存すると実行時に止まる）。
   */
-  if ((condition.kind === 'field' || condition.kind === 'memo') && isSavedSearchValueOptionalOp(condition.op)) return null
+  if ((condition.kind === 'field' || condition.kind === 'memo' || EXISTENCE_KINDS.has(condition.kind))
+    && isSavedSearchValueOptionalOp(condition.op)) return null
+  if (condition.kind === 'common_event' && !(typeof condition.value === 'string' && condition.value.trim())) {
+    return 'その他のイベントの種類を入力してください'
+  }
   return typeof condition.value === 'string' && condition.value.trim()
     ? null
     : `${EDITABLE_KINDS.find((item) => item.value === condition.kind)?.label ?? '条件'}の値を選んでください`
@@ -102,12 +150,82 @@ function normalizeForEdit(search: SavedSearch): SavedSearchConditions {
   }
 }
 
+/*
+ * R185: 日付の範囲・前後を1つの編集欄で扱う。友だち画面は「以降」
+ * （after＋日付1つ）で保存するため、文字列の値も範囲へ読み替える。
+ * 以前は between の形だけを想定し、「以降」が空の範囲になって
+ * 日付必須エラーで保存できなかった。
+ * R183: 逆転期間は欄の下で知らせる（保存前の検査でも断る）。
+ * ATTR-16: 390pxでは開始/終了を縦に積み、それぞれラベルを付ける。
+ */
+function DateRangeEditor({
+  condition,
+  onChange,
+}: {
+  condition: SavedSearchCondition
+  onChange: (next: SavedSearchCondition) => void
+}) {
+  const { from, to } = dateRangeOf(condition)
+  const op = condition.op === 'after' || condition.op === 'before' ? condition.op : 'between'
+  const setOp = (next: string) => {
+    if (next === 'after') onChange({ ...condition, op: 'after', value: from || to })
+    else if (next === 'before') onChange({ ...condition, op: 'before', value: to || from })
+    else onChange({ ...condition, op: 'between', value: { from, to } })
+  }
+  const setFrom = (v: string) => {
+    if (op === 'after') onChange({ ...condition, op: 'after', value: v })
+    else if (op === 'before') onChange({ ...condition, op: 'between', value: { from: v, to } })
+    else onChange({ ...condition, op: 'between', value: { from: v, to } })
+  }
+  const setTo = (v: string) => {
+    if (op === 'before') onChange({ ...condition, op: 'before', value: v })
+    else if (op === 'after') onChange({ ...condition, op: 'between', value: { from, to: v } })
+    else onChange({ ...condition, op: 'between', value: { from, to: v } })
+  }
+  const reversed = Boolean(from && to && from > to)
+  return (
+    <div className="min-w-0 flex-1">
+      <div className="flex min-w-0 flex-wrap items-end gap-2">
+        <Select
+          aria-label="日付の比べ方"
+          value={op}
+          onChange={setOp}
+          options={[
+            { value: 'between', label: '期間' },
+            { value: 'after', label: '以降' },
+            { value: 'before', label: '以前' },
+          ]}
+          className="w-28"
+        />
+        <label className="min-w-40 flex-1 text-xs font-semibold text-ink-faint">
+          {op === 'before' ? '終了日' : '開始日'}
+          <DateField aria-label={op === 'before' ? '終了日' : '開始日'} value={op === 'before' ? to : from} onChange={op === 'before' ? setTo : setFrom} className="mt-1" />
+        </label>
+        {op === 'between' ? (
+          <>
+            <span className="pb-2 text-ink-faint" aria-hidden="true">〜</span>
+            <label className="min-w-40 flex-1 text-xs font-semibold text-ink-faint">
+              終了日
+              <DateField aria-label="終了日" value={to} onChange={setTo} className="mt-1" />
+            </label>
+          </>
+        ) : null}
+      </div>
+      {reversed ? (
+        <p role="alert" className="mt-1 text-xs text-danger">開始日が終了日より後になっています。入れ替えてください。</p>
+      ) : null}
+    </div>
+  )
+}
+
 function ConditionEditor({
   condition,
   tags,
   marks,
   scenarios,
   fields,
+  forms,
+  operators,
   referenceErrors,
   onChange,
   onDelete,
@@ -117,29 +235,33 @@ function ConditionEditor({
   marks: SupportMark[]
   scenarios: Scenario[]
   fields: FriendField[]
-  referenceErrors: { marks: boolean; scenarios: boolean; fields: boolean }
+  forms: Array<{ id: string; name: string }>
+  operators: Array<{ id: string; name: string }>
+  referenceErrors: { marks: boolean; scenarios: boolean; fields: boolean; forms: boolean; operators: boolean }
   onChange: (next: SavedSearchCondition) => void
   onDelete: () => void
 }) {
-  const unsupported = UNSUPPORTED_KINDS.has(condition.kind)
   const changeKind = (kind: SavedSearchConditionKind) => {
     if (kind === 'tag') onChange({ kind, op: 'includes', value: tags[0]?.id ?? '' })
     else if (kind === 'field') onChange({ kind, key: fields[0]?.fieldKey ?? '', op: 'eq', value: '' })
     else if (kind === 'mark') onChange({ kind, op: 'eq', value: marks[0]?.id ?? '' })
     else if (kind === 'scenario') onChange({ kind, op: 'eq', value: scenarios[0]?.id ?? '' })
+    else if (kind === 'assignee') onChange({ kind, op: 'eq', value: operators[0]?.id ?? '' })
+    else if (kind === 'form') onChange({ kind, op: 'exists', value: '' })
     else if (kind === 'following') onChange({ kind, op: 'eq', value: true })
-    else if (kind === 'created_at') onChange({ kind, op: 'between', value: { from: '', to: '' } })
+    else if (kind === 'memo') onChange({ kind, op: 'exists', value: '' })
+    else if (kind === 'common_event') onChange({ kind, op: 'exists', value: '' })
+    else if (EXISTENCE_KINDS.has(kind)) onChange({ kind, op: 'exists', value: '' })
+    else if (DATE_RANGE_KINDS.has(kind)) onChange({ kind, op: 'between', value: { from: '', to: '' } })
     else onChange({ kind, op: kind === 'name' || kind === 'status_message' ? 'contains' : 'eq', value: '' })
   }
   const rawValue = typeof condition.value === 'string' ? condition.value : ''
 
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-control border border-hairline bg-canvas p-2">
-      <Select aria-label="条件の種類" value={condition.kind} disabled={unsupported} onChange={(value) => changeKind(value as SavedSearchConditionKind)} options={unsupported ? [{ value: condition.kind, label: condition.kind === 'form' ? '回答フォーム' : '購入履歴' }] : EDITABLE_KINDS} className="w-36" />
+      <Select aria-label="条件の種類" value={EDITABLE_KINDS.some((item) => item.value === condition.kind) ? condition.kind : ''} onChange={(value) => changeKind(value as SavedSearchConditionKind)} options={[{ value: '', label: '種類を選ぶ', disabled: true }, ...EDITABLE_KINDS]} className="w-36" />
 
-      {unsupported ? (
-        <span className="min-w-0 flex-1 text-xs text-status-warn-deep">この条件は実行口が未接続です。削除するまで保存・実行できません。</span>
-      ) : condition.kind === 'tag' ? (
+      {condition.kind === 'tag' ? (
         <>
           <Select aria-label="タグの比較" value={condition.op} onChange={(op) => onChange({ ...condition, op })} options={[{ value: 'includes', label: '次を含む' }, { value: 'excludes', label: '次を含まない' }]} className="w-32" />
           <Select aria-label="タグ" value={rawValue} onChange={(value) => onChange({ ...condition, value })} options={[{ value: '', label: 'タグを選ぶ' }, ...tags.map((tag) => ({ value: tag.id, label: tag.name }))]} className="min-w-44 flex-1" />
@@ -220,23 +342,104 @@ function ConditionEditor({
         <Select aria-label="友だち状態" value={condition.value === false ? 'false' : 'true'} onChange={(value) => onChange({ ...condition, value: value === 'true' })} options={[{ value: 'true', label: '友だち中' }, { value: 'false', label: 'ブロック済み' }]} className="min-w-44 flex-1" />
       ) : condition.kind === 'chat_status' ? (
         <Select aria-label="対応状況" value={rawValue} onChange={(value) => onChange({ ...condition, value })} options={[{ value: '', label: '対応状況を選ぶ' }, { value: 'unread', label: '未対応' }, { value: 'in_progress', label: '対応中' }, { value: 'on_hold', label: '保留' }, { value: 'resolved', label: '対応済み' }]} className="min-w-44 flex-1" />
-      ) : condition.kind === 'created_at' ? (
-        /*
-          ATTR-16: 390pxでは開始/終了を縦に積み、それぞれラベルを付ける。
-          以前の `min-w-80` はカードの最小幅を押し広げて、条件名・共有範囲
-          まで画面の外へはみ出していた。
-        */
-        <div className="flex min-w-0 flex-1 flex-wrap items-end gap-2">
-          <label className="min-w-40 flex-1 text-xs font-semibold text-ink-faint">
-            開始日
-            <DateField aria-label="開始日" value={typeof condition.value === 'object' && condition.value ? String((condition.value as { from?: string }).from ?? '') : ''} onChange={(v) => onChange({ ...condition, op: 'between', value: { ...(typeof condition.value === 'object' ? condition.value : {}), from: v } })} className="mt-1" />
-          </label>
-          <span className="pb-2 text-ink-faint" aria-hidden="true">〜</span>
-          <label className="min-w-40 flex-1 text-xs font-semibold text-ink-faint">
-            終了日
-            <DateField aria-label="終了日" value={typeof condition.value === 'object' && condition.value ? String((condition.value as { to?: string }).to ?? '') : ''} onChange={(v) => onChange({ ...condition, op: 'between', value: { ...(typeof condition.value === 'object' ? condition.value : {}), to: v } })} className="mt-1" />
-          </label>
-        </div>
+      ) : condition.kind === 'assignee' ? (
+        <>
+          <Select
+            aria-label="担当者の比較"
+            value={condition.op === 'ne' ? 'ne' : 'eq'}
+            onChange={(op) => onChange({ ...condition, op })}
+            options={[{ value: 'eq', label: '次の担当' }, { value: 'ne', label: '次以外' }]}
+            className="w-32"
+          />
+          <Select
+            aria-label="担当者"
+            value={rawValue}
+            disabled={referenceErrors.operators}
+            onChange={(value) => onChange({ ...condition, value })}
+            options={optionsWithCurrent(
+              operators.map((operator) => ({ value: operator.id, label: operator.name })),
+              rawValue,
+              '選択済みの担当者',
+              referenceErrors.operators ? '担当者を取得できません' : operators.length ? '担当者を選ぶ' : '担当者がいません',
+            )}
+            className="min-w-44 flex-1"
+          />
+        </>
+      ) : condition.kind === 'form' ? (
+        <>
+          <Select
+            aria-label="回答フォームの有無"
+            value={canonicalExistenceOp(condition.op)}
+            onChange={(op) => onChange({ ...condition, op })}
+            options={[{ value: 'exists', label: '回答がある' }, { value: 'not_exists', label: '回答がない' }]}
+            className="w-32"
+          />
+          <Select
+            aria-label="回答フォーム"
+            value={rawValue}
+            disabled={referenceErrors.forms}
+            onChange={(value) => onChange({ ...condition, value })}
+            options={optionsWithCurrent(
+              forms.map((form) => ({ value: form.id, label: form.name })),
+              rawValue,
+              '選択済みの回答フォーム',
+              referenceErrors.forms ? '回答フォームを取得できません' : 'すべての回答フォーム',
+            )}
+            className="min-w-44 flex-1"
+          />
+        </>
+      ) : condition.kind === 'purchase' ? (
+        <>
+          <Select
+            aria-label="購入履歴の有無"
+            value={canonicalExistenceOp(condition.op)}
+            onChange={(op) => onChange({ ...condition, op })}
+            options={[{ value: 'exists', label: '購入がある' }, { value: 'not_exists', label: '購入がない' }]}
+            className="w-32"
+          />
+          <TextInput value={rawValue} onChange={(event) => onChange({ ...condition, value: event.target.value })} placeholder="空欄はすべての購入" aria-label="購入イベントの種類（空欄可）" className="min-w-40 flex-1" />
+        </>
+      ) : condition.kind === 'common_event' ? (
+        <>
+          <Select
+            aria-label="その他のイベントの有無"
+            value={canonicalExistenceOp(condition.op)}
+            onChange={(op) => onChange({ ...condition, op })}
+            options={[{ value: 'exists', label: '発生がある' }, { value: 'not_exists', label: '発生がない' }]}
+            className="w-32"
+          />
+          <TextInput value={rawValue} onChange={(event) => onChange({ ...condition, value: event.target.value })} placeholder="イベント種別（例：conversion）" aria-label="イベント種別" className="min-w-40 flex-1" />
+        </>
+      ) : condition.kind === 'memo' ? (
+        <>
+          <Select
+            aria-label="個別メモの比較"
+            value={['exists', 'has', 'not_exists', 'not_has', 'eq', 'contains'].includes(condition.op) ? condition.op : 'exists'}
+            onChange={(op) => onChange({ ...condition, op, value: isSavedSearchValueOptionalOp(op) ? '' : condition.value })}
+            options={[
+              { value: 'exists', label: 'メモがある' },
+              { value: 'not_exists', label: 'メモがない' },
+              { value: 'eq', label: '等しい' },
+              { value: 'contains', label: '含む' },
+            ]}
+            className="w-32"
+          />
+          {isSavedSearchValueOptionalOp(condition.op) ? (
+            <span className="min-w-0 flex-1 text-xs text-ink-faint">有無だけで絞ります。入力は不要です。</span>
+          ) : (
+            <TextInput value={rawValue} onChange={(event) => onChange({ ...condition, value: event.target.value })} placeholder="メモの内容" aria-label="メモの内容" className="min-w-40 flex-1" />
+          )}
+        </>
+      ) : EXISTENCE_KINDS.has(condition.kind) ? (
+        <Select
+          aria-label={`${EDITABLE_KINDS.find((item) => item.value === condition.kind)?.label ?? '条件'}の有無`}
+          value={canonicalExistenceOp(condition.op)}
+          onChange={(op) => onChange({ ...condition, op })}
+          options={[{ value: 'exists', label: 'ある' }, { value: 'not_exists', label: 'ない' }]}
+          className="w-32"
+        />
+      ) : DATE_RANGE_KINDS.has(condition.kind) ? (
+        <DateRangeEditor condition={condition} onChange={onChange} />
       ) : (
         <TextInput value={rawValue} onChange={(event) => onChange({ ...condition, value: event.target.value })} placeholder="値を入力" className="min-w-44 flex-1" />
       )}
@@ -254,6 +457,8 @@ function ConditionGroup({
   marks,
   scenarios,
   fields,
+  forms,
+  operators,
   referenceErrors,
   onChange,
 }: {
@@ -264,7 +469,9 @@ function ConditionGroup({
   marks: SupportMark[]
   scenarios: Scenario[]
   fields: FriendField[]
-  referenceErrors: { marks: boolean; scenarios: boolean; fields: boolean }
+  forms: Array<{ id: string; name: string }>
+  operators: Array<{ id: string; name: string }>
+  referenceErrors: { marks: boolean; scenarios: boolean; fields: boolean; forms: boolean; operators: boolean }
   onChange: (next: SavedSearchCondition[]) => void
 }) {
   return (
@@ -285,6 +492,8 @@ function ConditionGroup({
             marks={marks}
             scenarios={scenarios}
             fields={fields}
+            forms={forms}
+            operators={operators}
             referenceErrors={referenceErrors}
             onChange={(next) => onChange(items.map((item, itemIndex) => itemIndex === index ? next : item))}
             onDelete={() => onChange(items.filter((_, itemIndex) => itemIndex !== index))}
@@ -306,7 +515,10 @@ function SavedSearchEditInner() {
   const [marks, setMarks] = useState<SupportMark[]>([])
   const [scenarios, setScenarios] = useState<Scenario[]>([])
   const [fields, setFields] = useState<FriendField[]>([])
-  const [referenceErrors, setReferenceErrors] = useState({ marks: false, scenarios: false, fields: false })
+  /* R185: 回答フォーム・担当者の条件も名前で選ぶための候補。 */
+  const [forms, setForms] = useState<Array<{ id: string; name: string }>>([])
+  const [operators, setOperators] = useState<Array<{ id: string; name: string }>>([])
+  const [referenceErrors, setReferenceErrors] = useState({ marks: false, scenarios: false, fields: false, forms: false, operators: false })
   const [name, setName] = useState('')
   const [conditions, setConditions] = useState<SavedSearchConditions>({ all: [], any: [] })
   const [isShared, setIsShared] = useState(false)
@@ -392,16 +604,22 @@ function SavedSearchEditInner() {
       api.supportMarks.list(selectedAccountId, { suppressFeatureDisabledEvent: true }).catch(() => null),
       api.scenarios.list({ accountId: selectedAccountId }).catch(() => null),
       api.friendFields.list(selectedAccountId, undefined, { suppressFeatureDisabledEvent: true }).catch(() => null),
-    ]).then(([detail, searches, tagResult, markResult, scenarioResult, fieldResult]) => {
+      api.forms.list(selectedAccountId).catch(() => null),
+      api.operators.list().catch(() => null),
+    ]).then(([detail, searches, tagResult, markResult, scenarioResult, fieldResult, formResult, operatorResult]) => {
       if (cancelled) return
       if (tagResult.success) setTags(tagResult.data)
       setMarks(markResult?.success ? markResult.data : [])
       setScenarios(scenarioResult?.success ? scenarioResult.data : [])
       setFields(fieldResult?.success ? fieldResult.data : [])
+      setForms(formResult?.success ? formResult.data : [])
+      setOperators(operatorResult?.success ? operatorResult.data : [])
       setReferenceErrors({
         marks: markResult?.success !== true,
         scenarios: scenarioResult?.success !== true,
         fields: fieldResult?.success !== true,
+        forms: formResult?.success !== true,
+        operators: operatorResult?.success !== true,
       })
       setSavedCount(searches.success ? searches.summary.total : null)
       setSiblingSearches(searches.success ? searches.items.map((item) => ({ id: item.id, name: item.name })) : [])
@@ -411,6 +629,14 @@ function SavedSearchEditInner() {
         setSearchMissing(true)
         return
       }
+      /*
+       * R184: 別の検索へ移ったときは未計算の印と前の検索の失敗を捨てる。
+       * 以前は残り続け、保存済みのコピーにも「変更後は未計算」と出て
+       * 不要な再読込を要求していた。飛んでいる再計算も今の検索の
+       * ものではないので無効にする。
+       */
+      gateRef.current.invalidate()
+      setPreviewStale(false)
       setOriginal(found)
       setName(found.name)
       setConditions(normalizeForEdit(found))
@@ -453,7 +679,9 @@ function SavedSearchEditInner() {
     marks: Object.fromEntries(marks.map((mark) => [mark.id, mark.name])),
     scenarios: Object.fromEntries(scenarios.map((scenario) => [scenario.id, scenario.name])),
     fields: Object.fromEntries(fields.map((field) => [field.fieldKey, field.name])),
-  }), [marks, scenarios, fields])
+    forms: Object.fromEntries(forms.map((form) => [form.id, form.name])),
+    assignees: Object.fromEntries(operators.map((operator) => [operator.id, operator.name])),
+  }), [marks, scenarios, fields, forms, operators])
   const beforeSummary = useMemo(
     () => (original ? savedSearchSummary(original.conditions, tags, conditionLabels) : []),
     [original, tags, conditionLabels],
@@ -628,8 +856,8 @@ function SavedSearchEditInner() {
             <div className="mt-4"><AttributeKindGuide current="search" /></div>
           </section>
 
-          <ConditionGroup title="すべて満たす" operator="AND" items={conditions.all ?? []} tags={tags} marks={marks} scenarios={scenarios} fields={fields} referenceErrors={referenceErrors} onChange={(all) => patchConditions({ ...conditions, all })} />
-          <ConditionGroup title="いずれか1つ以上満たす" operator="OR" items={conditions.any ?? []} tags={tags} marks={marks} scenarios={scenarios} fields={fields} referenceErrors={referenceErrors} onChange={(any) => patchConditions({ ...conditions, any })} />
+          <ConditionGroup title="すべて満たす" operator="AND" items={conditions.all ?? []} tags={tags} marks={marks} scenarios={scenarios} fields={fields} forms={forms} operators={operators} referenceErrors={referenceErrors} onChange={(all) => patchConditions({ ...conditions, all })} />
+          <ConditionGroup title="いずれか1つ以上満たす" operator="OR" items={conditions.any ?? []} tags={tags} marks={marks} scenarios={scenarios} fields={fields} forms={forms} operators={operators} referenceErrors={referenceErrors} onChange={(any) => patchConditions({ ...conditions, any })} />
         </div>
 
         <aside className="min-w-0 space-y-4">
@@ -693,7 +921,8 @@ function SavedSearchEditInner() {
           <section className="rounded-card border border-hairline bg-canvas p-4 shadow-card">
             <h2 className="text-base font-bold text-ink">一覧での表示</h2>
             <label className="mt-3 block text-xs font-semibold text-ink-faint">並び順
-              <Select aria-label="並び順" value={conditions.list?.sort ?? 'recent'} onChange={(value) => patchConditions({ ...conditions, list: { ...conditions.list, sort: value as 'recent' | 'oldest' } })} options={[{ value: 'recent', label: '最終接触が新しい順' }, { value: 'oldest', label: '最終接触が古い順' }]} size="full" className="mt-1" />
+              {/* R188: 一覧の実装は友だち追加日順。最終接触と書くと運用者の意図とずれる。 */}
+              <Select aria-label="並び順" value={conditions.list?.sort ?? 'recent'} onChange={(value) => patchConditions({ ...conditions, list: { ...conditions.list, sort: value as 'recent' | 'oldest' } })} options={[{ value: 'recent', label: '友だち追加の新しい順' }, { value: 'oldest', label: '友だち追加の古い順' }]} size="full" className="mt-1" />
             </label>
             <label className="mt-3 block text-xs font-semibold text-ink-faint">表示件数
               <Select aria-label="表示件数" value={String(conditions.list?.limit ?? 20)} onChange={(value) => patchConditions({ ...conditions, list: { ...conditions.list, limit: Number(value) as 10 | 20 | 30 | 40 | 50 } })} options={[10, 20, 30, 40, 50].map((size) => ({ value: String(size), label: `${size}件表示` }))} size="full" className="mt-1" />

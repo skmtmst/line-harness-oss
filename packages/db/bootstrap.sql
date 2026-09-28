@@ -2275,6 +2275,35 @@ CREATE TABLE event_bookings (
   FOREIGN KEY (friend_id) REFERENCES friends(id)
 );
 
+CREATE TABLE event_change_logs (
+  id                    TEXT PRIMARY KEY,
+  line_account_id       TEXT NOT NULL,
+  event_id              TEXT NOT NULL,
+  slot_id               TEXT,
+  actor_id              TEXT,
+  actor_role            TEXT,
+  action                TEXT NOT NULL
+    CHECK (action IN (
+      'lifecycle',
+      'change_review_apply',
+      'waitlist_promote',
+      'waitlist_reorder',
+      'waitlist_skip',
+      'booking_change'
+    )),
+  reason                TEXT,
+  before_json           TEXT,
+  after_json            TEXT,
+  affected_confirmed    INTEGER NOT NULL DEFAULT 0,
+  affected_waiting       INTEGER NOT NULL DEFAULT 0,
+  affected_reminders     INTEGER NOT NULL DEFAULT 0,
+  notify_planned         INTEGER NOT NULL DEFAULT 0,
+  notify_sent            INTEGER NOT NULL DEFAULT 0,
+  idempotency_key       TEXT,
+  created_at            TEXT NOT NULL,
+  FOREIGN KEY (event_id) REFERENCES events(id)
+);
+
 CREATE TABLE event_occurrence_applicant_snapshots (
   id              TEXT PRIMARY KEY,
   line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
@@ -2341,7 +2370,7 @@ CREATE TABLE "event_waitlist" (
   notified_at                    TEXT,
   version                        INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1),
   created_at                     TEXT NOT NULL,
-  updated_at                     TEXT NOT NULL, event_version_id TEXT REFERENCES event_versions(id), event_snapshot_json TEXT CHECK (event_snapshot_json IS NULL OR json_valid(event_snapshot_json)),
+  updated_at                     TEXT NOT NULL, event_version_id TEXT REFERENCES event_versions(id), event_snapshot_json TEXT CHECK (event_snapshot_json IS NULL OR json_valid(event_snapshot_json)), sort_order INTEGER NOT NULL DEFAULT 0,
   FOREIGN KEY (line_account_id) REFERENCES line_accounts(id),
   FOREIGN KEY (event_id) REFERENCES events(id),
   FOREIGN KEY (slot_id) REFERENCES event_slots(id),
@@ -2393,7 +2422,8 @@ CREATE TABLE events (
   CHECK (failed_account_ids IS NULL OR json_valid(failed_account_ids)), confirmation_message_extra TEXT, reminder_message_extra TEXT, og_title TEXT, og_description TEXT, og_image_url TEXT, visible_tag_id TEXT, waitlist_enabled INTEGER NOT NULL DEFAULT 0, entry_cutoff_hours_before INTEGER, version INTEGER NOT NULL DEFAULT 1, current_published_version_id TEXT, version_write_token TEXT, approval_deadline_hours INTEGER NOT NULL DEFAULT 24
   CHECK (approval_deadline_hours IN (2, 24, 72)), questions_json TEXT CHECK (
     questions_json IS NULL OR json_valid(questions_json)
-  ),
+  ), lifecycle_status TEXT NOT NULL DEFAULT 'draft'
+  CHECK (lifecycle_status IN ('draft', 'published', 'paused', 'ended', 'cancelled')), lifecycle_changed_at TEXT, lifecycle_change_reason TEXT,
   FOREIGN KEY (line_account_id) REFERENCES line_accounts(id)
 );
 
@@ -7686,6 +7716,13 @@ CREATE INDEX idx_event_bookings_requested_expiry
 
 CREATE INDEX idx_event_bookings_slot_status ON event_bookings (slot_id, status);
 
+CREATE INDEX idx_event_change_logs_event
+  ON event_change_logs (event_id, created_at);
+
+CREATE UNIQUE INDEX idx_event_change_logs_idem
+  ON event_change_logs (line_account_id, idempotency_key)
+  WHERE idempotency_key IS NOT NULL;
+
 CREATE INDEX idx_event_occurrence_applicant_snapshots_expiry
   ON event_occurrence_applicant_snapshots(expires_at);
 
@@ -7714,7 +7751,13 @@ CREATE UNIQUE INDEX idx_event_waitlist_slot_identity
   ON event_waitlist(slot_id, identity_key)
   WHERE status IN ('waiting', 'offered', 'accepted');
 
+CREATE INDEX idx_event_waitlist_slot_order
+  ON event_waitlist (slot_id, status, sort_order, created_at);
+
 CREATE INDEX idx_events_account_published_sort ON events (line_account_id, is_published, sort_order);
+
+CREATE INDEX idx_events_lifecycle
+  ON events (line_account_id, lifecycle_status);
 
 CREATE INDEX idx_ffv_field ON friend_field_values(field_id, value);
 
