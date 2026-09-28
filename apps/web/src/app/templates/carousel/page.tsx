@@ -7,6 +7,7 @@ import { api } from '@/lib/api'
 import type { Folder } from '@line-crm/shared'
 import { Field, inputClass } from '@/components/shared/create-page'
 import LinePreview from '@/components/shared/line-preview'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import InlineActionList, { useActionOptions } from '@/components/auto-replies/inline-action-list'
@@ -756,33 +757,23 @@ function CarouselEditorInner() {
                 出るので数えられません。
               </p>
             </div>
-            <div className="space-y-1">
-              <label className="flex cursor-pointer items-start gap-2">
-                <input
-                  type="radio"
-                  name="tap-limit"
-                  checked={tapLimitMode === 'none'}
-                  onChange={() => setTapLimitMode('none')}
-                  className="mt-0.5"
-                />
-                <span className="text-sm">何度でも押せる</span>
-              </label>
-              <label className="flex cursor-pointer items-start gap-2">
-                <input
-                  type="radio"
-                  name="tap-limit"
-                  checked={tapLimitMode === 'once'}
-                  onChange={() => setTapLimitMode('once')}
-                  className="mt-0.5"
-                />
-                <span className="text-sm">
-                  1人につき1回だけ
-                  <span className="text-ink-faint block text-[11px]">
-                    このカルーセル全体で1回です。どのボタンを押しても、次からは動きません。
-                  </span>
-                </span>
-              </label>
-            </div>
+            <RadioCardGroup legend="押せる回数">
+              <RadioCard
+                name="tap-limit"
+                value="none"
+                checked={tapLimitMode === 'none'}
+                onChange={() => setTapLimitMode('none')}
+                title="何度でも押せる"
+              />
+              <RadioCard
+                name="tap-limit"
+                value="once"
+                checked={tapLimitMode === 'once'}
+                onChange={() => setTapLimitMode('once')}
+                title="1人につき1回だけ"
+                note="このカルーセル全体で1回です。どのボタンを押しても、次からは動きません。"
+              />
+            </RadioCardGroup>
 
             {tapLimitMode === 'once' && (
               <Field

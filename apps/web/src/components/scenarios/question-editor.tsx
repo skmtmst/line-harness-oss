@@ -12,6 +12,8 @@
 
 import { useEffect, useId, useState } from 'react'
 import { useAccount } from '@/contexts/account-context'
+import Checkbox from '@/components/shared/checkbox'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
 import { scenarioReferenceData } from './scenario-reference-data'
 
@@ -490,45 +492,43 @@ export default function QuestionEditor({
                     </div>
                     {(choice.scenario?.op ?? 'start') === 'start' && (
                       <>
+                        <RadioCardGroup legend="再開するときの続きかた" className="flex flex-wrap gap-2">
                         {(
                           [
                             { value: 'from_start', label: '最初から' },
                             { value: 'from_read', label: '(再開)友だちが読んだところから' },
                           ] as const
                         ).map((opt) => (
-                          <label key={opt.value} className="text-ink-secondary flex items-center gap-1.5 text-xs">
-                            <input
-                              type="radio"
-                              checked={(choice.scenario?.restart ?? 'from_start') === opt.value}
-                              onChange={() =>
-                                setChoice(index, {
-                                  scenario: {
-                                    op: choice.scenario?.op ?? 'start',
-                                    ...choice.scenario,
-                                    restart: opt.value,
-                                  },
-                                })
-                              }
-                            />
-                            {opt.label}
-                          </label>
-                        ))}
-                        <label className="text-ink-secondary flex items-center gap-1.5 text-xs">
-                          <input
-                            type="checkbox"
-                            checked={choice.scenario?.rememberPrevious === true}
-                            onChange={(e) =>
+                          <RadioCard
+                            key={opt.value}
+                            name={`${fieldBase}-restart`}
+                            value={opt.value}
+                            checked={(choice.scenario?.restart ?? 'from_start') === opt.value}
+                            onChange={() =>
                               setChoice(index, {
                                 scenario: {
                                   op: choice.scenario?.op ?? 'start',
                                   ...choice.scenario,
-                                  rememberPrevious: e.target.checked,
+                                  restart: opt.value,
                                 },
                               })
                             }
+                            title={opt.label}
                           />
-                          いまのシナリオを控えて、あとで戻せるようにする
-                        </label>
+                        ))}
+                      </RadioCardGroup>
+                      <Checkbox
+                        checked={choice.scenario?.rememberPrevious === true}
+                        onCheckedChange={(checked) =>
+                          setChoice(index, {
+                            scenario: {
+                              op: choice.scenario?.op ?? 'start',
+                              ...choice.scenario,
+                              rememberPrevious: checked,
+                            },
+                          })
+                        }
+                      >いまのシナリオを控えて、あとで戻せるようにする</Checkbox>
                       </>
                     )}
                   </div>
@@ -594,14 +594,11 @@ export default function QuestionEditor({
                       <p className="text-ink-faint mt-1 text-xs leading-relaxed">
                         ボタンを押したときに、友だちの発言としてトークに残る文です。
                       </p>
-                      <label className="text-ink-secondary mt-1.5 flex items-center gap-1.5 text-xs">
-                        <input
-                          type="checkbox"
-                          checked={choice.hideUserMessage === true}
-                          onChange={(e) => setChoice(index, { hideUserMessage: e.target.checked })}
-                        />
-                        ユーザーメッセージを使用しない
-                      </label>
+                      <Checkbox
+                        checked={choice.hideUserMessage === true}
+                        onCheckedChange={(checked) => setChoice(index, { hideUserMessage: checked })}
+                        className="mt-1.5"
+                      >ユーザーメッセージを使用しない</Checkbox>
                     </div>
 
                     <div>

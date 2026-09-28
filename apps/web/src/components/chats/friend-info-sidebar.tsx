@@ -7,6 +7,7 @@ import { api, type FriendUpcoming, type MileageHistoryItem, type MileageSummary 
 import { tagTextColor } from '@/lib/presentation'
 import type { FriendField } from '@line-crm/shared'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import { GripVertical, X } from 'lucide-react'
 
 interface FriendDetail {
@@ -550,30 +551,17 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
                       </button>
                     </span>
                     <span className="text-ink min-w-0 flex-1 truncate text-xs">{group.label}</span>
-                    {/*
-                      素の `<input type="checkbox">` を土台にする。見た目だけの
-                      `<button>` にすると、読み上げで「入／切」が伝わらない。
-                    */}
-                    <label className="relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center">
-                      <input
-                        type="checkbox"
-                        role="switch"
-                        checked={visible}
-                        aria-label={`${group.label}を表示`}
-                        onChange={() => setHiddenSections((current) => (
-                          visible
-                            ? [...new Set([...current, ...group.sections])]
-                            : current.filter((item) => !group.sections.includes(item))
-                        ))}
-                        className="peer sr-only"
-                      />
-                      {/*
-                        軌道と丸は**どちらも input の兄弟**にする。入れ子にすると
-                        `peer-checked:` は兄弟にしか効かないので、丸が動かない。
-                      */}
-                      <span className="rounded-pill bg-step-idle peer-checked:bg-accent peer-focus-visible:ring-accent/40 absolute inset-0 transition-colors peer-focus-visible:ring-2" />
-                      <span className="bg-canvas peer-checked:translate-x-4 absolute left-0.5 h-4 w-4 rounded-full transition-transform" />
-                    </label>
+                    {/* 共通の Checkbox（本物の input）。見た目だけの button にすると読み上げで「入／切」が伝わらない。 */}
+                    <Checkbox
+                      checked={visible}
+                      aria-label={`${group.label}を表示`}
+                      onCheckedChange={() => setHiddenSections((current) => (
+                        visible
+                          ? [...new Set([...current, ...group.sections])]
+                          : current.filter((item) => !group.sections.includes(item))
+                      ))}
+                      className="shrink-0"
+                    />
                   </div>
                 )
               })}

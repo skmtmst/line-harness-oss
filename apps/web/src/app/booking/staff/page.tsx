@@ -8,6 +8,7 @@ import { BOOKING_STAFF_LIMITS, parseBookingStaffInput, type StaffMember } from '
 import ImageUploader from '@/components/shared/image-uploader'
 import Select from '@/components/shared/select'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import IconButton from '@/components/shared/icon-button'
 import ActionMenu from '@/components/shared/action-menu'
 import ListState from '@/components/shared/list-state'
@@ -390,24 +391,14 @@ function Modal({
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 tabular-nums"
             />
           </Field>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={Boolean(form.is_designation_optional)}
-              onChange={(e) => set('is_designation_optional', e.target.checked ? 1 : 0)}
-              className="rounded"
-            />
-            <span>「指名なし」枠（仮想スタッフ）</span>
-          </label>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={Boolean(form.is_active)}
-              onChange={(e) => set('is_active', e.target.checked ? 1 : 0)}
-              className="rounded"
-            />
-            <span>有効（顧客に表示する）</span>
-          </label>
+          <Checkbox
+            checked={Boolean(form.is_designation_optional)}
+            onCheckedChange={(checked) => set('is_designation_optional', checked ? 1 : 0)}
+          >「指名なし」枠（仮想スタッフ）</Checkbox>
+          <Checkbox
+            checked={Boolean(form.is_active)}
+            onCheckedChange={(checked) => set('is_active', checked ? 1 : 0)}
+          >有効（顧客に表示する）</Checkbox>
           <Field label="ログインユーザー（本人の勤務）">
             <Select
               aria-label="ログインユーザーとの紐づけ"

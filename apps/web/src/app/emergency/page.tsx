@@ -3,6 +3,7 @@
 import { X } from 'lucide-react'
 import Select from '@/components/shared/select'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import Link from 'next/link'
 import React, { Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { LineAccount } from '@line-crm/shared'
@@ -1115,7 +1116,7 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
         <div className="min-w-0 flex-1 space-y-4">
           <section className={`border-hairline rounded-card overflow-hidden border bg-canvas ${isStopped || needsReload ? 'pointer-events-none opacity-50' : ''}`}>
             <div className="border-hairline border-b px-4 py-4"><h2 className="text-base font-bold text-ink">何を止めますか</h2><p className="mt-1 text-xs text-ink-faint">停止前に、何本と何人に関わるかを実測で確認します。</p></div>
-            <div>{(Object.keys(targetLabels) as StopTarget[]).map((key) => <label key={key} className="flex cursor-pointer items-center gap-3 border-b border-hairline px-4 py-3 last:border-0 hover:bg-canvas-sunken"><input type="checkbox" checked={targets[key]} onChange={(event) => setTargets((current) => ({ ...current, [key]: event.target.checked }))} disabled={mutationLocked || isStopped} className="h-4 w-4 accent-danger" /><span className="min-w-0 flex-1"><span className="block text-sm font-bold text-ink">{targetLabels[key].label}</span><span className="block text-xs text-ink-faint">{targetLabels[key].note}</span></span><span className="max-w-md shrink-0 text-right text-xs font-bold text-ink-secondary">{impactText(key)}</span></label>)}</div>
+            <div>{(Object.keys(targetLabels) as StopTarget[]).map((key) => <div key={key} className="flex items-center gap-3 border-b border-hairline px-4 py-3 last:border-0"><Checkbox checked={targets[key]} onCheckedChange={(checked) => setTargets((current) => ({ ...current, [key]: checked }))} disabled={mutationLocked || isStopped} description={targetLabels[key].note} className="min-w-0 flex-1">{targetLabels[key].label}</Checkbox><span className="max-w-md shrink-0 text-right text-xs font-bold text-ink-secondary">{impactText(key)}</span></div>)}</div>
           </section>
 
           <section className={`border-hairline rounded-card border bg-canvas p-4 ${isStopped || needsReload ? 'pointer-events-none opacity-50' : ''}`}>

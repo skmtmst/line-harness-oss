@@ -12,6 +12,7 @@ import CreatePage, {
   FormSection,
 } from '@/components/shared/create-page'
 import { TextInput } from '@/components/shared/form-controls'
+import Checkbox from '@/components/shared/checkbox'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 
@@ -279,14 +280,18 @@ export default function NewAffiliatePage() {
       aside={
         <>
           <AsideCard title="成果が出たときにすること">
-            <label className="border-hairline flex items-start gap-2 rounded-control border p-3 text-sm">
-              <input type="checkbox" className="mt-0.5" checked={notifyOnConversion} onChange={(e) => setNotifyOnConversion(e.target.checked)} />
-              <span><strong className="text-ink block">本人へメールで知らせる</strong><span className="text-ink-faint text-xs">報酬が確定したタイミングで届きます</span></span>
-            </label>
-            <label className="border-hairline mt-2 flex items-start gap-2 rounded-control border p-3 text-sm">
-              <input type="checkbox" className="mt-0.5" checked={startTracking} onChange={(e) => setStartTracking(e.target.checked)} />
-              <span><strong className="text-ink block">すぐに計測を始める</strong><span className="text-ink-faint text-xs">オフでもリンクは発行されます</span></span>
-            </label>
+            <Checkbox
+              checked={notifyOnConversion}
+              onCheckedChange={setNotifyOnConversion}
+              description="報酬が確定したタイミングで届きます"
+              className="border-hairline rounded-control border p-3"
+            >本人へメールで知らせる</Checkbox>
+            <Checkbox
+              checked={startTracking}
+              onCheckedChange={setStartTracking}
+              description="オフでもリンクは発行されます"
+              className="border-hairline mt-2 rounded-control border p-3"
+            >すぐに計測を始める</Checkbox>
             {/* ★V7: 未接続の断り書きは出さない。接続後に項目として出す。 */}
           </AsideCard>
 

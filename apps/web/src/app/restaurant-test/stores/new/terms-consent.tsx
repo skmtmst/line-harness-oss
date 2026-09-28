@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import Checkbox from '@/components/shared/checkbox'
 import TermsDocumentContent from '@/components/legal/terms-document'
 import { TERMS_DOCUMENT, TERMS_IS_DRAFT } from '@/content/terms/musubo-terms'
 import { canSubmitTerms, hasReadTerms } from './terms-state'
@@ -62,16 +63,12 @@ export default function TermsConsent({ onAgree }: { onAgree: () => Promise<void>
     >
       <TermsDocumentContent />
     </div>
-    <label className={`flex items-start gap-3 rounded-control border border-hairline px-4 py-3 text-sm font-semibold ${readToEnd ? 'cursor-pointer text-ink' : 'cursor-not-allowed text-ink-faint'}`}>
-      <input
-        type="checkbox"
-        checked={checked}
-        disabled={!readToEnd || saving}
-        onChange={(event) => setChecked(event.target.checked)}
-        className="mt-0.5 h-4 w-4 accent-accent"
-      />
-      上記の利用規約および個人情報の取扱いに同意します
-    </label>
+    <Checkbox
+      checked={checked}
+      disabled={!readToEnd || saving}
+      onCheckedChange={setChecked}
+      className="rounded-control border border-hairline px-4 py-3"
+    >上記の利用規約および個人情報の取扱いに同意します</Checkbox>
     {disabledReason && <p className="text-xs font-semibold text-warning">{disabledReason}</p>}
     {error && <p role="alert" className="text-xs font-semibold text-danger">{error}</p>}
     <div className="flex flex-wrap items-center justify-between gap-3">

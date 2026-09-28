@@ -10,6 +10,7 @@ import CreatePage, {
   FormSection,
   inputClass,
 } from '@/components/shared/create-page'
+import Checkbox from '@/components/shared/checkbox'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
 import { canEditFeature } from '@/lib/staff-capability'
@@ -271,18 +272,15 @@ export default function NewBookingStaffPage() {
           <ul className="space-y-1.5">
             {menus.map((m) => (
               <li key={m.id}>
-                <label className="border-hairline hover:bg-canvas-sunken flex cursor-pointer items-center gap-2 rounded-md border p-2.5">
-                  <input
-                    type="checkbox"
-                    checked={offered.has(m.id)}
-                    onChange={() => toggle(m.id)}
-                    className="accent-accent"
-                  />
-                  <span className="text-ink text-sm">{m.name}</span>
+                <Checkbox
+                  checked={offered.has(m.id)}
+                  onCheckedChange={() => toggle(m.id)}
+                  className="border-hairline hover:bg-canvas-sunken w-full rounded-md border p-2.5"
+                ><span className="flex w-full items-center gap-2"><span className="text-ink text-sm">{m.name}</span>
                   <span className="text-ink-faint ml-auto text-xs tabular-nums">
                     {m.duration_minutes}分 / ¥{m.base_price.toLocaleString()}
-                  </span>
-                </label>
+                  </span></span>
+                </Checkbox>
               </li>
             ))}
           </ul>
@@ -304,35 +302,17 @@ export default function NewBookingStaffPage() {
           </p>
         </Field>
 
-        <label className="flex cursor-pointer items-start gap-2">
-          <input
-            type="checkbox"
-            checked={isDesignationOptional}
-            onChange={(e) => setIsDesignationOptional(e.target.checked)}
-            className="accent-accent mt-0.5"
-          />
-          <span>
-            <span className="text-ink text-sm">「指名なし」の枠にも含める</span>
-            <span className="text-ink-faint block text-xs">
-              お客様が担当者を選ばなかったときの割り当て対象になります。
-            </span>
-          </span>
-        </label>
+        <Checkbox
+          checked={isDesignationOptional}
+          onCheckedChange={setIsDesignationOptional}
+          description="お客様が担当者を選ばなかったときの割り当て対象になります。"
+        >「指名なし」の枠にも含める</Checkbox>
 
-        <label className="flex cursor-pointer items-start gap-2">
-          <input
-            type="checkbox"
-            checked={isActive}
-            onChange={(e) => setIsActive(e.target.checked)}
-            className="accent-accent mt-0.5"
-          />
-          <span>
-            <span className="text-ink text-sm">登録したらすぐ予約を受ける</span>
-            <span className="text-ink-faint block text-xs">
-              オフにすると予約画面に表示されません。
-            </span>
-          </span>
-        </label>
+        <Checkbox
+          checked={isActive}
+          onCheckedChange={setIsActive}
+          description="オフにすると予約画面に表示されません。"
+        >登録したらすぐ予約を受ける</Checkbox>
 
         <Field
           label="ログインユーザーとの紐づけ"

@@ -10,6 +10,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import ListState from '@/components/shared/list-state'
 import StickyBar from '@/components/shared/sticky-bar'
 import TargetMissing from '@/components/shared/target-missing'
@@ -338,19 +339,10 @@ function MigrateFriendField() {
             </div>
           ) : (
             <div className="mt-3">
-              <fieldset>
-                <legend className="sr-only">移行先の決め方</legend>
-                <div className="flex flex-wrap gap-4 text-sm text-ink-secondary">
-                  <label className="flex items-center gap-2">
-                    <input type="radio" checked={targetMode === 'new'} onChange={() => { setTargetMode('new'); resetConfirmation() }} />
-                    新しい項目を作る
-                  </label>
-                  <label className="flex items-center gap-2">
-                    <input type="radio" checked={targetMode === 'existing'} onChange={() => { setTargetMode('existing'); resetConfirmation() }} />
-                    既存の項目を使う
-                  </label>
-                </div>
-              </fieldset>
+              <RadioCardGroup legend="移行先の決め方">
+                <RadioCard name="field-migrate-target" value="new" checked={targetMode === 'new'} onChange={() => { setTargetMode('new'); resetConfirmation() }} title="新しい項目を作る" />
+                <RadioCard name="field-migrate-target" value="existing" checked={targetMode === 'existing'} onChange={() => { setTargetMode('existing'); resetConfirmation() }} title="既存の項目を使う" />
+              </RadioCardGroup>
               {targetMode === 'new' ? (
                 <>
                   <label className="mt-3 block text-sm font-semibold text-ink">項目名

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import MenuPortal from '@/components/shared/menu-portal'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
@@ -1147,18 +1148,11 @@ function NotificationToggle({ checked, onChange, title, detail }: {
   detail: string
 }) {
   return (
-    <label className="flex cursor-pointer gap-3">
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(event) => onChange(event.target.checked)}
-        className="accent-accent-deep mt-1 h-4 w-4"
-      />
-      <div>
-        <p className="text-ink text-sm font-medium">{title}</p>
-        <p className="text-ink-faint mt-0.5 text-xs">{detail}</p>
-      </div>
-    </label>
+    <Checkbox
+      checked={checked}
+      onCheckedChange={onChange}
+      description={detail}
+    >{title}</Checkbox>
   )
 }
 
