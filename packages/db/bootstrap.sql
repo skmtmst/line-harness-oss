@@ -6833,6 +6833,16 @@ CREATE TABLE webinar_funnel_events (
   created_at       TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE webinar_heartbeat_rejects (
+  id TEXT PRIMARY KEY,
+  webinar_id TEXT NOT NULL REFERENCES webinars(id) ON DELETE CASCADE,
+  friend_id TEXT NOT NULL REFERENCES friends(id) ON DELETE CASCADE,
+  session_start_at INTEGER NOT NULL,
+  reason TEXT NOT NULL CHECK (reason IN ('position_jump', 'negative_gap', 'invalid_rate')),
+  position_seconds INTEGER NOT NULL,
+  received_at TEXT NOT NULL
+);
+
 CREATE TABLE webinar_journey_followups (
   id          TEXT PRIMARY KEY,
   webinar_id  TEXT NOT NULL REFERENCES webinars(id) ON DELETE CASCADE,
@@ -6896,7 +6906,8 @@ CREATE TABLE webinar_notification_settings (
   missed_time_minutes         INTEGER NOT NULL DEFAULT 600,
   completed_enabled           INTEGER NOT NULL DEFAULT 1,
   created_at                  TEXT NOT NULL,
-  updated_at                  TEXT NOT NULL,
+  updated_at                  TEXT NOT NULL, missed_window_days INTEGER NOT NULL DEFAULT 7
+  CHECK (missed_window_days BETWEEN 1 AND 30),
   CHECK (day_before_time_minutes BETWEEN 0 AND 1439),
   CHECK (hour_before_minutes BETWEEN 1 AND 10080),
   CHECK (missed_time_minutes BETWEEN 0 AND 1439)
@@ -6921,6 +6932,19 @@ CREATE TABLE webinar_registrations (
   UNIQUE (webinar_id, friend_id, session_start_at)
 );
 
+CREATE TABLE webinar_sessions (
+  id TEXT PRIMARY KEY,
+  webinar_id TEXT NOT NULL REFERENCES webinars(id) ON DELETE CASCADE,
+  session_start_at INTEGER NOT NULL,
+  capacity INTEGER CHECK (capacity IS NULL OR capacity > 0),
+  reserved_count INTEGER NOT NULL DEFAULT 0 CHECK (reserved_count >= 0),
+  state TEXT NOT NULL DEFAULT 'open'
+    CHECK (state IN ('open', 'full', 'closed')),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE (webinar_id, session_start_at)
+);
+
 CREATE TABLE webinar_user_comments (
   id TEXT PRIMARY KEY,
   webinar_id TEXT NOT NULL REFERENCES webinars(id) ON DELETE CASCADE,
@@ -6943,6 +6967,24 @@ CREATE TABLE webinar_versions (
   UNIQUE (webinar_id, version)
 );
 
+CREATE TABLE webinar_video_assets (
+  id TEXT PRIMARY KEY,
+  webinar_id TEXT NOT NULL REFERENCES webinars(id) ON DELETE CASCADE,
+  stage TEXT NOT NULL DEFAULT 'uploaded'
+    CHECK (stage IN (
+      'uploaded', 'inspecting', 'converting', 'packaging',
+      'thumbnail', 'ready', 'failed'
+    )),
+  provider TEXT NOT NULL DEFAULT 'r2_hls',
+  duration_seconds INTEGER NOT NULL DEFAULT 0 CHECK (duration_seconds >= 0),
+  checksum TEXT,
+  error_code TEXT,
+  expires_at TEXT,
+  purged_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
 CREATE TABLE webinar_view_segments (
   id               TEXT PRIMARY KEY,
   webinar_id       TEXT NOT NULL REFERENCES webinars(id) ON DELETE CASCADE,
@@ -6952,7 +6994,8 @@ CREATE TABLE webinar_view_segments (
   end_seconds      INTEGER NOT NULL CHECK (end_seconds > start_seconds),
   received_at      TEXT NOT NULL,
   idempotency_key  TEXT NOT NULL UNIQUE
-);
+, playback_rate REAL NOT NULL DEFAULT 1
+  CHECK (playback_rate > 0 AND playback_rate <= 4), client_at_ms INTEGER);
 
 CREATE TABLE webinar_viewers (
   id TEXT PRIMARY KEY,
@@ -6961,7 +7004,7 @@ CREATE TABLE webinar_viewers (
   session_start_at INTEGER NOT NULL,
   joined_at TEXT NOT NULL,
   last_position_seconds INTEGER NOT NULL DEFAULT 0,
-  cta_clicked_at TEXT,
+  cta_clicked_at TEXT, last_heartbeat_at INTEGER,
   UNIQUE (webinar_id, friend_id, session_start_at)
 );
 
@@ -6979,7 +7022,7 @@ CREATE TABLE webinars (
   tag_on_cta_click TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
-, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, publication_starts_at TEXT, publication_ends_at TEXT);
+, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, publication_starts_at TEXT, publication_ends_at TEXT, video_asset_id TEXT REFERENCES webinar_video_assets(id) ON DELETE SET NULL);
 
 CREATE INDEX idx_account_handovers_from ON account_handovers (from_account_id);
 
@@ -8817,6 +8860,9 @@ CREATE UNIQUE INDEX idx_webinar_funnel_events_unique
 CREATE INDEX idx_webinar_funnel_events_webinar_created
   ON webinar_funnel_events (webinar_id, created_at);
 
+CREATE INDEX idx_webinar_heartbeat_rejects_webinar
+  ON webinar_heartbeat_rejects (webinar_id, received_at);
+
 CREATE INDEX idx_webinar_journey_followups_status
   ON webinar_journey_followups (status, updated_at);
 
@@ -8838,14 +8884,23 @@ CREATE INDEX idx_webinar_regs_due
 CREATE INDEX idx_webinar_regs_friend
   ON webinar_registrations (webinar_id, friend_id);
 
+CREATE INDEX idx_webinar_sessions_webinar
+  ON webinar_sessions (webinar_id, session_start_at);
+
 CREATE INDEX idx_webinar_user_comments_webinar
   ON webinar_user_comments (webinar_id, created_at);
 
 CREATE INDEX idx_webinar_versions_state
   ON webinar_versions (webinar_id, state, version DESC);
 
+CREATE INDEX idx_webinar_video_assets_webinar
+  ON webinar_video_assets (webinar_id, stage);
+
 CREATE INDEX idx_webinar_view_segments_coverage
   ON webinar_view_segments (webinar_id, start_seconds, end_seconds);
+
+CREATE INDEX idx_webinar_view_segments_rate
+  ON webinar_view_segments (webinar_id, playback_rate);
 
 CREATE INDEX idx_webinar_viewers_webinar
   ON webinar_viewers (webinar_id, session_start_at);

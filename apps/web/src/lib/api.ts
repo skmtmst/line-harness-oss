@@ -14805,14 +14805,39 @@ export type WebinarNotificationSettings = {
   startEnabled: boolean
   missedEnabled: boolean
   missedTime: string
+  /** 見逃し配信の期限（開催からの日数。1〜30、既定7）。N。 */
+  missedWindowDays: number
   completedEnabled: boolean
   updatedAt: string
 }
 
 export type WebinarNotificationSettingsInput = Omit<
   WebinarNotificationSettings,
-  'webinarId' | 'version' | 'updatedAt'
->
+  'webinarId' | 'version' | 'updatedAt' | 'missedWindowDays'
+> & {
+  missedWindowDays?: number
+}
+
+export type WebinarVideoAsset = {
+  id: string
+  stage: 'uploaded' | 'inspecting' | 'converting' | 'packaging' | 'thumbnail' | 'ready' | 'failed'
+  stageLabel: string
+  provider: string
+  durationSeconds: number
+  errorCode: string | null
+  expiresAt: string | null
+  purgedAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type WebinarSessionCapacity = {
+  sessionStartAt: number
+  capacity: number | null
+  reservedCount: number
+  state: 'open' | 'full' | 'closed'
+  remaining: number | null
+}
 
 export type WebinarSkipReasonCount = {
   /** 記録された理由の符号。古い行では null のことがある。 */
@@ -14902,6 +14927,18 @@ export type WebinarAnalytics = {
   dropoff: Array<{ bucketStart: number; viewers: number }>
   viewSegments?: Array<{ startSeconds: number; endSeconds: number; viewers: number }>
   measurement?: { state: 'available' | 'unavailable'; reason: string | null }
+  /** J-1「どこまで見られたか」の線と3つの数字の材料。 */
+  retention: {
+    bucketSeconds: number
+    started: number
+    points: Array<{ atSeconds: number; viewers: number }>
+  }
+  /** 有効な区間の合計30秒以上の人数。 */
+  startedViewers: number
+  /** 異常として除外した heartbeat の件数。 */
+  heartbeatRejects: number
+  /** 申し込みボタンが出た時刻（秒）。CTAが無ければ null。 */
+  ctaAtSeconds: number | null
   formFunnel: {
     ctaImpressions: number
     ctaClicks: number
@@ -15154,6 +15191,22 @@ export const webinarApi = {
       }),
     }),
   analytics: (id: string) => fetchApi<{ data: WebinarAnalytics }>(`/api/webinars/${id}/analytics`),
+  videoAsset: (id: string) => fetchApi<{ data: { asset: WebinarVideoAsset | null } }>(
+    `/api/webinars/${id}/video-asset`,
+  ),
+  advanceVideoAsset: (
+    id: string,
+    input: { stage: WebinarVideoAsset['stage']; errorCode?: string | null; durationSeconds?: number | null },
+  ) => fetchApi<{ data: { asset: WebinarVideoAsset } }>(`/api/webinars/${id}/video-asset/advance`, {
+    method: 'POST', body: JSON.stringify(input),
+  }),
+  webinarSession: (id: string, startAt: number) => fetchApi<{ data: { session: WebinarSessionCapacity | null } }>(
+    `/api/webinars/${id}/sessions/${startAt}`,
+  ),
+  setSessionCapacity: (id: string, startAt: number, capacity: number | null) =>
+    fetchApi<{ data: { session: WebinarSessionCapacity } }>(`/api/webinars/${id}/sessions/${startAt}`, {
+      method: 'PUT', body: JSON.stringify({ capacity }),
+    }),
   participants: (id: string, cursor?: string, limit?: number, filter?: WebinarParticipantClassification) => fetchApi<{ data: WebinarParticipantPage }>(
     `/api/webinars/${id}/participants${cursor || limit || filter ? `?${[
       cursor ? `cursor=${encodeURIComponent(cursor)}` : '',

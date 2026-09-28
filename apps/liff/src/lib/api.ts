@@ -348,8 +348,15 @@ export const api = {
 
   // ===== Webinar =====
   webinarState: (slug: string) => get<WebinarState>(`/api/liff/webinars/${slug}`),
-  webinarHeartbeat: (slug: string, sessionStartAt: number, positionSeconds: number) =>
-    post<{ ok: true }>(`/api/liff/webinars/${slug}/heartbeat`, { sessionStartAt, positionSeconds }),
+  webinarHeartbeat: (
+    slug: string,
+    sessionStartAt: number,
+    positionSeconds: number,
+    extra?: { playerState?: string; playbackRate?: number; clientAtMs?: number },
+  ) =>
+    post<{ ok: true }>(`/api/liff/webinars/${slug}/heartbeat`, {
+      sessionStartAt, positionSeconds, ...extra,
+    }),
   webinarComment: (slug: string, sessionStartAt: number, atSeconds: number, body: string) =>
     post<{ ok: true }>(`/api/liff/webinars/${slug}/comments`, { sessionStartAt, atSeconds, body }),
   webinarCtaClick: (slug: string, sessionStartAt: number) =>

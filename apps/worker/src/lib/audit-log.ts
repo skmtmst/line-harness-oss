@@ -107,6 +107,8 @@ export type AuditAction =
   | 'webinar.pause'
   | 'webinar.duplicate'
   | 'webinar.participant.export'
+  | 'webinar.video_stage'
+  | 'webinar.session_capacity'
   | 'event.applicant.export'
   | 'event.change.apply'
   // #939 N-379: 外部連携の操作履歴。作成・設定変更・動かす/止める・
