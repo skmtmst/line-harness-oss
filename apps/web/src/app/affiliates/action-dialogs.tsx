@@ -6,6 +6,7 @@ import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Dialog from '@/components/shared/dialog'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import { TableHeadRow, Th } from '@/components/shared/table'
@@ -198,6 +199,9 @@ export function AffiliatePaymentConfirmDialog({
   const [idempotencyKey, setIdempotencyKey] = useState('')
   const [issueStatement, setIssueStatement] = useState(false)
   const [statementKey, setStatementKey] = useState('')
+  // 確定の実行中は×と同じくEscapeでも閉じない。共通の約束（初期フォーカス・
+  // Tabの循環・起点へのフォーカス復帰・背面スクロール停止）もそろえる。
+  const panelRef = useOverlayFocus(!!target, onClose, busy)
   /*
     NEXT-23: 振込先の登録・修正は本人が自分のLINEから行うので、運用者に
     できるのは本人への依頼だけ。依頼の手段（LINEの友だち・連絡先）は
@@ -288,7 +292,7 @@ export function AffiliatePaymentConfirmDialog({
 
   return (
     <div className="fixed inset-0 flex items-center justify-center overflow-y-auto bg-ink/40 p-4" style={{ zIndex: 90 }} data-design-node="GqFTV">
-      <section className="flex w-full flex-col overflow-hidden rounded-2xl border border-hairline bg-canvas shadow-2xl" style={{ maxWidth: 800 }} role="dialog" aria-modal="true" aria-labelledby="affiliate-payment-title">
+      <section ref={panelRef} className="flex w-full flex-col overflow-hidden rounded-2xl border border-hairline bg-canvas shadow-2xl" style={{ maxWidth: 800 }} role="dialog" aria-modal="true" aria-labelledby="affiliate-payment-title">
         <header className="flex items-center justify-between border-b border-hairline px-6 py-4.5">
           <div className="flex items-center gap-3">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-warning-bg text-warning" aria-hidden="true"><Landmark size={20} /></span>

@@ -31,6 +31,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { Bell, Calendar, FileText, Flag, MessageSquare, Tag, User, Variable, Workflow } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import styles from './action-editor.module.css'
@@ -320,6 +321,8 @@ export default function ActionEditor({
   onChanged,
 }: ActionEditorProps) {
   const { selectedAccountId } = useAccount()
+  // 共通の窓の約束: Escapeで閉じる・Tabは窓の中・閉じたら起点へ戻す。
+  const panelRef = useOverlayFocus(true, onClose)
   // 任意機能の動作種は、そのaccountで機能がオフなら追加口ごと出さない。
   const actionFeatureVisibility = useFeatureVisibility(selectedAccountId)
   const [actions, setActions] = useState<ScenarioAction[]>([])
@@ -712,11 +715,11 @@ export default function ActionEditor({
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4" style={{ background: 'color-mix(in srgb, var(--color-ink) 40%, transparent)' }}>
-      <div data-design-node="hz9ti" className={`${styles.dialog} flex w-full flex-col overflow-hidden rounded-card shadow-lg`}>
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby="action-editor-title" data-design-node="hz9ti" className={`${styles.dialog} flex w-full flex-col overflow-hidden rounded-card shadow-lg`}>
         {/* ① 見出しと説明。設計は見出し20/700・説明13。 */}
         <div className="border-hairline flex flex-wrap items-start justify-between gap-3 border-b px-6" style={{ paddingBlock: 18 }}>
           <div className="min-w-0">
-            <h2 className="text-ink text-title font-bold">送信後のアクションを設定</h2>
+            <h2 id="action-editor-title" className="text-ink text-title font-bold">送信後のアクションを設定</h2>
             <p className="text-ink-secondary mt-1 text-label leading-relaxed">
               外部サービスの8動作をすべて扱い、条件分岐と実行順をこの画面だけで組み立てます。
             </p>

@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useId, useRef, useState } from 'react'
 import { api } from '@/lib/api'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import {
   AccountFormSections,
   emptyAccountFormState,
@@ -74,18 +75,21 @@ export default function AccountEditModal({
   )
   const [iconUrl, setIconUrl] = useState(initialIconUrl ?? '')
   const [saving, setSaving] = useState(false)
+  const modalTitleId = useId()
   const [error, setError] = useState('')
   const [stepUp, setStepUp] = useState<StepUpRequest | null>(null)
 
-  // Lock background scroll while modal open. Restore on unmount so navigation
-  // away mid-edit doesn't leave the page in a non-scrollable state.
-  useEffect(() => {
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.body.style.overflow = prev
-    }
-  }, [])
+  /*
+   * 本人確認（StepUpPrompt）の窓が重なっている間は、Escape を
+   * 最上位の窓だけへ効かせるため外側の閉じる処理を止める。
+   * hook の依存にすると効果の掛け直しでフォーカスが飛ぶので ref 越しに見る。
+   * 背面のスクロール停止もこの hook が担う。
+   */
+  const stepUpOpenRef = useRef(false)
+  stepUpOpenRef.current = stepUp != null
+  const panelRef = useOverlayFocus(true, () => {
+    if (!stepUpOpenRef.current) onClose()
+  }, saving)
 
   const update = (partial: Partial<AccountFormState>) =>
     setState((s) => ({ ...s, ...partial }))
@@ -183,11 +187,15 @@ export default function AccountEditModal({
       onClick={onClose}
     >
       <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={modalTitleId}
         className="my-2 w-full max-w-2xl overflow-hidden rounded-lg bg-white shadow-xl sm:my-4"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-200 bg-white px-4 py-4 sm:px-6">
-          <h2 className="text-base font-bold text-gray-900">{initialSection === 'credentials' ? '資格情報を差し替える' : '登録の内容を編集する'}</h2>
+          <h2 id={modalTitleId} className="text-base font-bold text-gray-900">{initialSection === 'credentials' ? '資格情報を差し替える' : '登録の内容を編集する'}</h2>
           <button
             type="button"
             onClick={onClose}

@@ -17,7 +17,7 @@ import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog from '@/components/shared/dialog'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import ListRange from '@/components/ui/list-range'
 import { Tabs } from '@/components/shared/tabs'
 import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
@@ -208,6 +208,12 @@ export default function TemplatesPage() {
 
   // Drawer
   const [drawerId, setDrawerId] = useState<string | null>(null)
+  // 削除できない案内の窓も共通の約束へ: Escapeで閉じる・Tabは窓の中・
+  // 閉じたら起点へ戻す。
+  const blockedPanelRef = useOverlayFocus(blockedDelete !== null, () => {
+    setBlockedDelete(null)
+    setDrawerId(null)
+  })
   const [drawerData, setDrawerData] = useState<TemplateDetail | null>(null)
   const [drawerLoading, setDrawerLoading] = useState(false)
   const [drawerError, setDrawerError] = useState<string | null>(null)
@@ -1454,7 +1460,7 @@ export default function TemplatesPage() {
       )}
       {blockedDelete !== null ? (
         <div className="fixed inset-0 flex items-center justify-center bg-ink/40 p-4" style={{ zIndex: 90 }} data-design-node="M9cij">
-          <section className="flex w-full flex-col overflow-hidden rounded-2xl border border-hairline bg-canvas shadow-2xl" style={{ maxWidth: 720 }} role="dialog" aria-modal="true" aria-labelledby="blocked-template-title">
+          <section ref={blockedPanelRef} className="flex w-full flex-col overflow-hidden rounded-2xl border border-hairline bg-canvas shadow-2xl" style={{ maxWidth: 720 }} role="dialog" aria-modal="true" aria-labelledby="blocked-template-title">
             <header className="flex items-center justify-between border-b border-hairline px-6 py-4.5">
               <h2 id="blocked-template-title" className="text-lead font-bold text-ink">使用中のテンプレートは削除できません</h2>
               <button

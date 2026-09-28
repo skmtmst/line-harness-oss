@@ -23,6 +23,7 @@ import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import Disclosure from '@/components/shared/disclosure'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
@@ -69,6 +70,8 @@ function StartScenarioDialog({
 }) {
   const { selectedAccountId, accounts } = useAccount()
   const lineAccountId = scenario.lineAccountId ?? selectedAccountId
+  // 開始の実行中は×と同じくEscapeでも閉じない。
+  const panelRef = useOverlayFocus(true, onCancel, busy)
   const [simulation, setSimulation] = useState<ScenarioSimulation | null>(null)
   const [runs, setRuns] = useState<ScenarioRuns | null>(null)
   /*
@@ -249,7 +252,7 @@ function StartScenarioDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-6" style={{ background: 'color-mix(in srgb, var(--color-ink) 35%, transparent)' }} role="dialog" aria-modal="true" aria-labelledby="start-scenario-title">
-      <div className="border-hairline flex w-full flex-col overflow-y-auto rounded-card border shadow-xl" style={{ height: 860, maxWidth: 1040, background: 'var(--color-canvas)' }}>
+      <div ref={panelRef} className="border-hairline flex w-full flex-col overflow-y-auto rounded-card border shadow-xl" style={{ height: 860, maxWidth: 1040, background: 'var(--color-canvas)' }}>
         <div className="border-hairline flex items-start justify-between gap-4 border-b px-6 py-5">
           <div>
             <h2 id="start-scenario-title" className="text-ink text-xl font-bold">

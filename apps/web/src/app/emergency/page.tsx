@@ -2,6 +2,7 @@
 
 import { X } from 'lucide-react'
 import Select from '@/components/shared/select'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import Link from 'next/link'
@@ -1006,6 +1007,15 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
   const accountName = targetAccountId === 'all' ? 'すべてのアカウント' : accounts.find((account) => account.id === targetAccountId)?.name ?? '選択したアカウント'
   const fullReason = reasonDetail.trim() ? `${reason}: ${reasonDetail.trim()}` : reason
   const mutationLocked = isEmergencyMutationLocked(needsReload, running)
+  // 停止・復旧の実行中は、×と同じくEscapeでも窓を閉じない。
+  const confirmPanelRef = useOverlayFocus(!!confirmMode, () => {
+    setConfirmMode(null)
+    setConfirmWord('')
+  }, mutationLocked)
+  const stepUpPanelRef = useOverlayFocus(!!stepUpMode, () => {
+    setStepUpMode(null)
+    setStepUpCode('')
+  }, mutationLocked)
   const targetLabels: Record<StopTarget, { label: string; note: string }> = {
     broadcasts: { label: '予約中の一斉配信', note: '予約を下書きに戻します' },
     scenarios: { label: 'シナリオ配信', note: '稼働中のものを止めます' },
@@ -1164,7 +1174,7 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
       </div>
 
       {confirmMode && <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/35 p-4" role="dialog" aria-modal="true" aria-labelledby="emergency-confirm-title">
-        <div className="flex w-full flex-col overflow-hidden rounded-card bg-canvas shadow-2xl" style={{ height: 700, maxHeight: 'calc(100vh - 32px)', maxWidth: 720 }}>
+        <div ref={confirmPanelRef} className="flex w-full flex-col overflow-hidden rounded-card bg-canvas shadow-2xl" style={{ height: 700, maxHeight: 'calc(100vh - 32px)', maxWidth: 720 }}>
           <div className="flex items-start gap-3 border-b border-hairline px-6 py-6" style={{ minHeight: 112 }}><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-danger-bg text-xl font-bold text-danger">!</span><div className="min-w-0 flex-1"><h2 id="emergency-confirm-title" className="text-xl font-bold text-ink">{confirmMode === 'stop' ? '緊急停止の最終確認' : '復旧の最終確認'}</h2><p className="mt-1 text-sm text-ink-faint">{confirmMode === 'stop' ? 'この内容で止めます。止めた瞬間から、自動で送るものが出なくなります。' : '停止前に動いていたものだけを戻します。'}</p></div><button type="button" onClick={() => { setConfirmMode(null); setConfirmWord('') }} disabled={mutationLocked} aria-label="閉じる" className="rounded-mini shrink-0 p-1 text-ink-secondary hover:bg-canvas-sunken disabled:opacity-50"><X aria-hidden="true" className="h-5 w-5" /></button></div>
           <div className="flex-1 space-y-3 overflow-y-auto p-6">{confirmMode === 'stop' ? <>
             <section className="rounded-control border border-danger bg-danger-bg p-4 text-danger"><p className="text-sm font-bold">{accountName}</p><div className="mt-3 divide-y divide-danger/15">{selectedTargets.map((key) => <div key={key} className="flex items-center justify-between gap-4 py-2" style={{ minHeight: 58 }}><div className="flex items-center gap-3"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-canvas text-danger">■</span><div><p className="text-sm font-bold">{targetLabels[key].label}</p><p className="mt-0.5 text-xs">{targetLabels[key].note}</p></div></div><strong className="text-right text-sm">{impactText(key)}</strong></div>)}</div><p className="mt-3 text-xs font-bold">停止前にすでにLINEへ渡したものは取り消せません。</p></section>
@@ -1182,7 +1192,7 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
       </div>}
       {stepUpMode && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 p-4" role="dialog" aria-modal="true" aria-labelledby="emergency-step-up-title">
-          <div className="rounded-card w-full max-w-md bg-canvas p-6 shadow-2xl">
+          <div ref={stepUpPanelRef} className="rounded-card w-full max-w-md bg-canvas p-6 shadow-2xl">
             <div className="flex items-start justify-between gap-3">
               <h2 id="emergency-step-up-title" className="text-lg font-bold text-ink">
                 {stepUpMethod === 'password' ? 'パスワードで本人確認' : '認証アプリで本人確認'}

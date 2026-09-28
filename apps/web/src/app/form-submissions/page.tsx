@@ -12,6 +12,7 @@ import { displayFormName, sortFormsByLatestAnswer } from './form-list'
 import Button from '@/components/shared/button'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import ListState from '@/components/shared/list-state'
 import { RowActions } from '@/components/shared/row-actions'
@@ -191,6 +192,9 @@ export default function FormSubmissionsPage() {
   const [renameError, setRenameError] = useState('')
   /** 名前変更の保存に添える編集の版。一覧は持っていないので開くときに読む。 */
   const [renameRevision, setRenameRevision] = useState<number | null>(null)
+  // 名前変更の窓も共通の約束へ: Escapeで閉じる（保存中は止める）・
+  // Tabは窓の中・閉じたら起点へ戻す。
+  const renamePanelRef = useOverlayFocus(!!editingForm, () => setEditingForm(null), savingName)
   /*
    * R230: フォーム全体の複製。質問・分岐・デザイン・受付設定を引き継いだ
    * 別IDの停止中フォームを作る。回答・公開状態・集計は引き継がない。
@@ -1026,9 +1030,9 @@ export default function FormSubmissionsPage() {
             onClick={() => !savingName && setEditingForm(null)}
             aria-label="名前変更を閉じる"
           />
-          <div className="relative w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
+          <div ref={renamePanelRef} role="dialog" aria-modal="true" aria-labelledby="rename-form-title" className="relative w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
             <div className="flex items-start justify-between gap-3">
-              <h3 className="text-base font-semibold text-ink">フォーム名を変更</h3>
+              <h3 id="rename-form-title" className="text-base font-semibold text-ink">フォーム名を変更</h3>
               <button
                 type="button"
                 onClick={() => !savingName && setEditingForm(null)}
