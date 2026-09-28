@@ -1,6 +1,7 @@
 // Cron handler: expire 24h-old request bookings + purge idempotency rows.
 
 import type { BookingNotificationSender } from './booking-notifier.js';
+import { formatStartsAtForStore, notificationTiming } from './booking-notifier.js';
 import { purgeExpiredIdempotency } from './booking-idempotency.js';
 import { REQUEST_TTL_HOURS } from './booking-types.js';
 import { cancelByTrigger } from './reminder-trigger.js';
@@ -17,13 +18,8 @@ interface StaleRow {
   channel_access_token: string;
   channel_access_token_encrypted: string | null;
   line_user_id: string;
-}
-
-const JST_OFFSET_MS = 9 * 3600_000;
-
-function startsAtJst(utcIso: string): string {
-  const jst = new Date(new Date(utcIso).getTime() + JST_OFFSET_MS).toISOString();
-  return `${jst.slice(0, 10)} ${jst.slice(11, 16)}`;
+  /** 店舗のタイムゾーン。文面の日時に使う (R332)。 */
+  timezone: string | null;
 }
 
 export interface RunExpirerParams {
@@ -43,12 +39,14 @@ export async function runExpirer(
               s.display_name AS staff_name,
               la.channel_access_token,
               la.channel_access_token_encrypted,
-              f.line_user_id
+              f.line_user_id,
+              bs.timezone
          FROM bookings b
          INNER JOIN menus m ON m.id = b.menu_id
          INNER JOIN staff s ON s.id = b.staff_id
          INNER JOIN line_accounts la ON la.id = b.line_account_id
          INNER JOIN friends f ON f.id = b.friend_id
+          LEFT JOIN booking_settings bs ON bs.line_account_id = b.line_account_id
         WHERE b.status = 'requested'
           AND b.requested_at < ?
         LIMIT 200`,
@@ -113,6 +111,8 @@ export async function runExpirer(
         row.channel_access_token,
         { lineAccountId: row.line_account_id, field: 'channel_access_token' },
       );
+      const timeZone = row.timezone ?? 'Asia/Tokyo';
+      const timing = notificationTiming(row.starts_at, timeZone, params.now);
       await params.sender({
         channelAccessToken: accessToken,
         toLineUserId: row.line_user_id,
@@ -120,8 +120,8 @@ export async function runExpirer(
         ctx: {
           menuName: row.menu_name,
           staffName: row.staff_name,
-          startsAtJst: startsAtJst(row.starts_at),
-          hoursBefore: 0,
+          startsAt: formatStartsAtForStore(row.starts_at, timeZone),
+          ...timing,
         },
       });
     } catch {

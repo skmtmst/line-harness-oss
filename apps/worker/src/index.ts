@@ -2022,7 +2022,6 @@ async function scheduled(
       const result = await processDueReminders(env.DB, {
         now: new Date(),
         sender: sendBookingNotification,
-        reminderHoursBefore: DEFAULT_ACCOUNT_SETTINGS.reminder_hours_before,
       });
       if (result.sent + result.failed > 0) {
         console.log(`[booking-reminders] sent=${result.sent} failed=${result.failed}`);
