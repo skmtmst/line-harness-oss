@@ -305,7 +305,7 @@ export default function CommonActionsPage() {
                   </Td>
                   <ActionCell>
                     {/* #641: 「中身を見る」＋「その他（…）」の形にそろえる。残りはメニューへ集約。 */}
-                    <div className="relative inline-flex items-center justify-end gap-1.5">
+                    <div className="relative flex w-full items-center justify-end gap-1.5">
                     <Button
                       href={`/common-actions/versions?id=${encodeURIComponent(item.id)}`}
                       variant="secondary"

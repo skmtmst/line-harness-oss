@@ -1066,7 +1066,7 @@ function VarsPageInner() {
                               行の操作は同じ高さ（32）にそろえる。削除は撮影入口
                              （data-qa-open="yPkWe"）のため行に残す。
                             */}
-                            <span className="inline-flex items-center justify-end gap-2">
+                            <span className="flex w-full items-center justify-end gap-2">
                               <Button
                                 href={`/contents/vars/edit?id=${item.id}`}
                                 size="compact"
