@@ -1498,6 +1498,7 @@ export type ConversionDefinitionReport = {
   previousRange: { from: string; to: string; timeZone: 'Asia/Tokyo' }
   kpis: {
     recordedCount: number
+    recordedValue: number
     reversedCount: number | null
     netCount: number
     netValue: number
@@ -1619,7 +1620,12 @@ export type AffiliateAccountSettlementPreview = {
     affiliateId: string
     affiliateName: string
     code: string
+    /** 今回払う額。取消の差し引き後。 */
     amount: number
+    /** 差し引き前の報酬額。 */
+    grossAmount: number
+    /** 今回差し引く取消額。無いときは 0。 */
+    deduction: number
     conversionCount: number
     /** 管理画面へ口座番号を返さず、登録の有無だけを扱う。 */
     bankProfileRegistered: boolean
@@ -1645,6 +1651,15 @@ export type AffiliateAccountSettlementPreview = {
    * 古いWorkerでは付かないので、画面側は未設定でも動くこと。
    */
   carriedOver?: {
+    count: number
+    amount: number
+  }
+  /**
+   * R288: 今回差し引く取消額の合計と、引ききれず次回へ繰り越す分。
+   * 古いWorkerでは付かないので、画面側は未設定でも動くこと。
+   */
+  totalDeduction?: number
+  carriedDeduction?: {
     count: number
     amount: number
   }
@@ -5518,11 +5533,16 @@ export type FriendAddRunList = {
   total: number
   nextCursor: string | null
   summary: {
-    totalRuns: number
+    /** 直近28日に追加された人数（同じ人の再追加は1人）。 */
+    recentFriends: number
+    /** 直近28日の追加記録の件数（同じ人の再追加も数える）。 */
+    recentEvents: number
     cumulativeDeliveries: number
     scenarioStarts: number
     averageSendTimeMs: number | null
     failed: number
+    /** 実際に送った記録の最新日時。1件も送っていなければ null。 */
+    lastDeliveryAt: string | null
     staffHandoffs: { value: number | null; state: 'available' | 'unavailable'; reason: string | null }
   }
 }

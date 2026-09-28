@@ -5,7 +5,7 @@
  * 今の版と上限の残り・版の履歴と一緒に出す。保存するたびに版が増え、
  * 前の版は変わらない。
  */
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useId, useState } from 'react'
 import { api, type AffiliateOffer, type OfferCapStatus, type OfferVersion } from '@/lib/api'
 import Dialog from '@/components/shared/dialog'
 import HelpTip from '@/components/shared/help-tip'
@@ -129,16 +129,24 @@ export function OfferTermsFields({
   values: OfferTermsFieldValues
   onChange: (next: OfferTermsFieldValues) => void
 }) {
+  // R286: 読み上げの項目名。「？」は項目名の外に置き、名前を短く保つ。
+  const fieldId = useId()
+  const windowDaysId = `${fieldId}-window-days`
+  const capTotalId = `${fieldId}-cap-total`
+  const capMonthlyId = `${fieldId}-cap-monthly`
+  const receptionFromId = `${fieldId}-reception-from`
+  const receptionToId = `${fieldId}-reception-to`
   return (
     <>
       <div>
-        <label className="text-ink-secondary mb-1 flex items-center gap-1 text-xs font-medium">
-          数える期間（日）
+        <span className="text-ink-secondary mb-1 flex items-center gap-1 text-xs font-medium">
+          <label htmlFor={windowDaysId}>数える期間（日）</label>
           <HelpTip label="数える期間の説明">
             リンクを開いてから数える期間です。既定は30日です。
           </HelpTip>
-        </label>
+        </span>
         <input
+          id={windowDaysId}
           type="number"
           min="1"
           max="365"
@@ -151,13 +159,14 @@ export function OfferTermsFields({
       </div>
 
       <div>
-        <label className="text-ink-secondary mb-1 flex items-center gap-1 text-xs font-medium">
-          全体の上限（件）
+        <span className="text-ink-secondary mb-1 flex items-center gap-1 text-xs font-medium">
+          <label htmlFor={capTotalId}>全体の上限（件）</label>
           <HelpTip label="全体の上限の説明">
             この案件で付ける成果の数の上限です。上限に達したら受付を自動で止めます。
           </HelpTip>
-        </label>
+        </span>
         <input
+          id={capTotalId}
           type="number"
           min="1"
           step="1"
@@ -169,13 +178,14 @@ export function OfferTermsFields({
       </div>
 
       <div>
-        <label className="text-ink-secondary mb-1 flex items-center gap-1 text-xs font-medium">
-          1人あたり月の上限（件）
+        <span className="text-ink-secondary mb-1 flex items-center gap-1 text-xs font-medium">
+          <label htmlFor={capMonthlyId}>1人あたり月の上限（件）</label>
           <HelpTip label="1人あたり月の上限の説明">
             1人の紹介者に1か月で付ける数の上限です。上限に達したらその人の受付を止めます。
           </HelpTip>
-        </label>
+        </span>
         <input
+          id={capMonthlyId}
           type="number"
           min="1"
           step="1"
@@ -188,8 +198,9 @@ export function OfferTermsFields({
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="text-ink-secondary mb-1 block text-xs font-medium">受付の始め</label>
+          <label htmlFor={receptionFromId} className="text-ink-secondary mb-1 block text-xs font-medium">受付の始め</label>
           <input
+            id={receptionFromId}
             type="date"
             value={values.receptionFrom}
             onChange={(e) => onChange({ ...values, receptionFrom: e.target.value })}
@@ -197,8 +208,9 @@ export function OfferTermsFields({
           />
         </div>
         <div>
-          <label className="text-ink-secondary mb-1 block text-xs font-medium">受付の終わり</label>
+          <label htmlFor={receptionToId} className="text-ink-secondary mb-1 block text-xs font-medium">受付の終わり</label>
           <input
+            id={receptionToId}
             type="date"
             value={values.receptionTo}
             onChange={(e) => onChange({ ...values, receptionTo: e.target.value })}

@@ -273,7 +273,15 @@ function AutoReplyRunsInner() {
                           <strong title={item.friendName ?? undefined}>{item.friendName ?? '削除済みの友だち'}</strong>
                           <span title={item.inputPreview ?? undefined}>入力：{item.inputPreview ?? '—'}</span>
                         </div>
-                        <span className={styles.actionLabel} title={actionLabel(item)}>{actionLabel(item)}</span>
+                        {/*
+                          m22d: 失敗した行は理由を出す。「失敗1件」では何が
+                          起きたか分からず、同じ「1件」が3回出る。CSVの
+                          処理内容（actionLabel）は変えない。
+                        */}
+                        {(() => {
+                          const label = item.status === 'failed' && item.detail ? item.detail : actionLabel(item)
+                          return <span className={styles.actionLabel} title={label}>{label}</span>
+                        })()}
                         <StatusBadge tone={view.tone} size="compact">{view.label}</StatusBadge>
                         <time className={styles.time} dateTime={item.occurredAt}>{formatTime(item.occurredAt)}</time>
                         {item.canRetry ? (

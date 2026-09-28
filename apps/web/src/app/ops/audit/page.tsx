@@ -128,12 +128,15 @@ export default function OpsAuditPage() {
             </div>
           </div>
         </div>
+        {/*
+          m22d: 件数は下の一覧の件数（ListRange）の1か所に集約し、
+          見出しの横では繰り返さない。
+        */}
         <div className="flex items-center gap-2">
           <Button onClick={() => void exportCsv()} disabled={exporting || total === 0}>
             <Download aria-hidden="true" className="h-4 w-4" />
             {exporting ? '書き出しています…' : 'CSVで書き出す'}
           </Button>
-          <span className="text-micro text-ink-faint">いまの条件の全{total}件</span>
         </div>
       </div>
 
