@@ -1,7 +1,17 @@
 import { describe, expect, it } from 'vitest'
 
 import type { LineClient } from '@line-crm/line-sdk'
-import { restoreOperationIncident, stopOperationCapabilities } from '@line-crm/db'
+import {
+  claimReminderDeliveryRun,
+  completeReminderIfDone,
+  failReminderDeliveryRun,
+  holdExpiredLineRetryRuns,
+  restoreOperationIncident,
+  resumeReminderRegistrant,
+  retryReminderDeliveryRun,
+  stopOperationCapabilities,
+  verifyClaimedRunBeforeSend,
+} from '@line-crm/db'
 
 import { createTestD1, insertFriend } from '../test-utils/d1-sqlite.js'
 import { classifyReminderDeliveryError, processReminderDeliveries } from './reminder-delivery.js'
@@ -369,9 +379,10 @@ describe('リマインダ配信の実行記録', () => {
     expect(pushes).toEqual(['U-friend-1'])
     // claim 拒否は握っていないため skipped に数えない。送らず止める約束は同じ。
     expect(result).toEqual({ succeeded: 1, skipped: 0, retrying: 0, failed: 0, held: 0 })
+    // R339: 取消ずみの登録には実行行自体を作らない (取消時の回収が済みのため)。
     expect(raw.prepare(
       `SELECT status FROM reminder_delivery_runs WHERE friend_reminder_id = 'enrollment-2'`,
-    ).get()).toEqual({ status: 'cancelled' })
+    ).get()).toBeUndefined()
     expect(raw.prepare(
       `SELECT status FROM friend_reminders WHERE id = 'enrollment-2'`,
     ).get()).toEqual({ status: 'cancelled' })
@@ -628,5 +639,353 @@ describe('契約先の利用停止', () => {
     })
     expect(restored).toEqual({ succeeded: 0, skipped: 0, retrying: 0, failed: 0, held: 0 })
     expect(pushes).toHaveLength(0)
+  })
+})
+
+describe('監査の直し (R337・R339・R340・R341・R342・R344)', () => {
+  it('R337: 古い実行行が止まっても未送信の予定がある間は完了にしない', async () => {
+    const { db, raw } = createTestD1()
+    seedReminder(raw)
+    // 日時変更で古い行が止まり、新しい行が積まれた状態。
+    raw.prepare(
+      `INSERT INTO reminder_delivery_runs
+        (id, reminder_id, friend_reminder_id, friend_id, reminder_step_id, scheduled_at,
+         idempotency_key, line_retry_key, status, created_at, updated_at)
+       VALUES ('old-run','reminder-1','enrollment-1','friend-1','step-1','2026-08-28T08:00:00.000Z',
+         'k-old','rk-old','cancelled','2026-08-28T07:00:00.000Z','2026-08-28T07:00:00.000Z')`,
+    ).run()
+    raw.prepare(
+      `INSERT INTO reminder_delivery_runs
+        (id, reminder_id, friend_reminder_id, friend_id, reminder_step_id, scheduled_at,
+         idempotency_key, line_retry_key, status, created_at, updated_at)
+       VALUES ('new-run','reminder-1','enrollment-1','friend-1','step-1','2026-08-28T09:00:00.000Z',
+         'k-new','rk-new','queued','2026-08-28T07:00:00.000Z','2026-08-28T07:00:00.000Z')`,
+    ).run()
+    // 新しい予定の送信が1回失敗しても、登録は active のまま残る。
+    const failing = makeClient(async () => {
+      throw Object.assign(new Error('temporary'), { status: 503, retryable: true })
+    })
+    const failed = await processReminderDeliveries(db, failing, {
+      now: new Date('2026-08-28T09:00:00.000Z'),
+      pause: noPause,
+      resolveClient: async () => failing,
+    })
+    expect(failed.retrying).toBe(1)
+    expect(raw.prepare(`SELECT status FROM friend_reminders WHERE id = 'enrollment-1'`).get()).toEqual({
+      status: 'active',
+    })
+    // 送り直して成功したら完了になる。
+    const succeeding = makeClient(async () => ({ requestId: 'req-1' }))
+    const done = await processReminderDeliveries(db, succeeding, {
+      now: new Date('2026-08-28T09:01:00.000Z'),
+      pause: noPause,
+      resolveClient: async () => succeeding,
+    })
+    expect(done.succeeded).toBe(1)
+    expect(raw.prepare(`SELECT status FROM friend_reminders WHERE id = 'enrollment-1'`).get()).toEqual({
+      status: 'completed',
+    })
+  })
+
+  it('R339: 候補読込後の日時変更では古い基準日で送らない', async () => {
+    const { db, raw } = createTestD1()
+    seedReminder(raw)
+    const pushes: string[] = []
+    const client = makeClient(async (userId) => {
+      pushes.push(userId)
+      return { requestId: 'req-1' }
+    })
+    const result = await processReminderDeliveries(db, client, {
+      now: new Date('2026-08-28T09:00:00.000Z'),
+      pause: noPause,
+      resolveClient: async () => client,
+      // 1回目の検証と送信の間に予約が翌日へ動いた想定。
+      // 2回目の検証で起点ずれを検知し、古い予定では送らない。
+      beforePush: async () => {
+        await db.prepare(`UPDATE friend_reminders SET target_date = ? WHERE id = 'enrollment-1'`)
+          .bind('2026-08-29T10:00:00.000Z').run()
+      },
+    })
+    expect(pushes).toEqual([])
+    expect(result).toEqual({ succeeded: 0, skipped: 1, retrying: 0, failed: 0, held: 0 })
+    expect(raw.prepare(`SELECT target_date FROM friend_reminders WHERE id = 'enrollment-1'`).get()).toEqual({
+      target_date: '2026-08-29T10:00:00.000Z',
+    })
+  })
+
+  it('R339: 古い起点の claim は握らない', async () => {
+    const { db, raw } = createTestD1()
+    seedReminder(raw)
+    // 読込後に翌日へ動いた登録へ、古い起点では握れない。
+    const stale = await claimReminderDeliveryRun(db, {
+      lineAccountId: 'account-1',
+      reminderId: 'reminder-1',
+      friendReminderId: 'enrollment-1',
+      friendId: 'friend-1',
+      reminderStepId: 'step-1',
+      scheduledAt: '2026-08-28T09:00:00.000Z',
+      now: '2026-08-28T09:00:00.000Z',
+      leaseExpiresAt: '2026-08-28T09:05:00.000Z',
+      expectedTargetDate: '2026-08-27T10:00:00.000Z',
+    })
+    expect(stale).toBeNull()
+    // 読み直した起点なら握れる。
+    const fresh = await claimReminderDeliveryRun(db, {
+      lineAccountId: 'account-1',
+      reminderId: 'reminder-1',
+      friendReminderId: 'enrollment-1',
+      friendId: 'friend-1',
+      reminderStepId: 'step-1',
+      scheduledAt: '2026-08-28T09:00:00.000Z',
+      now: '2026-08-28T09:00:00.000Z',
+      leaseExpiresAt: '2026-08-28T09:05:00.000Z',
+      expectedTargetDate: '2026-08-28T10:00:00.000Z',
+    })
+    expect(fresh).not.toBeNull()
+    expect(raw.prepare(`SELECT COUNT(*) AS count FROM reminder_delivery_runs`).get()).toEqual({ count: 1 })
+  })
+
+  it('R339: ルール停止後の claim は握らない', async () => {
+    const { db, raw } = createTestD1()
+    seedReminder(raw)
+    raw.prepare(`UPDATE reminders SET is_active = 0 WHERE id = 'reminder-1'`).run()
+    const run = await claimReminderDeliveryRun(db, {
+      lineAccountId: 'account-1',
+      reminderId: 'reminder-1',
+      friendReminderId: 'enrollment-1',
+      friendId: 'friend-1',
+      reminderStepId: 'step-1',
+      scheduledAt: '2026-08-28T09:00:00.000Z',
+      now: '2026-08-28T09:00:00.000Z',
+      leaseExpiresAt: '2026-08-28T09:05:00.000Z',
+      expectedTargetDate: '2026-08-28T10:00:00.000Z',
+    })
+    expect(run).toBeNull()
+    // 再開すれば握れる。
+    raw.prepare(`UPDATE reminders SET is_active = 1 WHERE id = 'reminder-1'`).run()
+    const retried = await claimReminderDeliveryRun(db, {
+      lineAccountId: 'account-1',
+      reminderId: 'reminder-1',
+      friendReminderId: 'enrollment-1',
+      friendId: 'friend-1',
+      reminderStepId: 'step-1',
+      scheduledAt: '2026-08-28T09:00:00.000Z',
+      now: '2026-08-28T09:00:00.000Z',
+      leaseExpiresAt: '2026-08-28T09:05:00.000Z',
+      expectedTargetDate: '2026-08-28T10:00:00.000Z',
+    })
+    expect(retried).not.toBeNull()
+  })
+
+  it('R340: 期限切れの古い処理は新しい持ち主の行を上書きしない', async () => {
+    const { db, raw } = createTestD1()
+    seedReminder(raw)
+    const first = await claimReminderDeliveryRun(db, {
+      lineAccountId: 'account-1',
+      reminderId: 'reminder-1',
+      friendReminderId: 'enrollment-1',
+      friendId: 'friend-1',
+      reminderStepId: 'step-1',
+      scheduledAt: '2026-08-28T09:00:00.000Z',
+      now: '2026-08-28T09:00:00.000Z',
+      leaseExpiresAt: '2026-08-28T09:05:00.000Z',
+    })
+    expect(first).not.toBeNull()
+    const oldLease = first!.lease_expires_at
+    // 期限切れ後に新しい処理が握り直した想定。
+    raw.prepare(`UPDATE reminder_delivery_runs SET lease_expires_at = ? WHERE id = ?`)
+      .bind('2026-08-28T09:11:00.000Z', first!.id).run()
+    // 古い持ち主の検証・失敗・完了はどれも 0 件になる。
+    await expect(verifyClaimedRunBeforeSend(db, {
+      id: first!.id,
+      friendReminderId: 'enrollment-1',
+      now: '2026-08-28T09:06:00.000Z',
+      leaseExpiresAt: '2026-08-28T09:11:00.000Z',
+      expectedLeaseExpiresAt: [oldLease!],
+    })).resolves.toBe(false)
+    await expect(failReminderDeliveryRun(db, {
+      id: first!.id,
+      code: 'line_temporary_failure',
+      message: 'stale',
+      retryAt: '2026-08-28T09:07:00.000Z',
+      now: '2026-08-28T09:06:00.000Z',
+      expectedLeaseExpiresAt: [oldLease!],
+    })).resolves.toBe(false)
+    const row = raw.prepare(
+      `SELECT status, lease_expires_at, next_retry_at FROM reminder_delivery_runs WHERE id = ?`,
+    ).get(first!.id) as { status: string; lease_expires_at: string; next_retry_at: string | null }
+    expect(row).toMatchObject({ status: 'claimed', lease_expires_at: '2026-08-28T09:11:00.000Z' })
+    // 新しい持ち主の失敗は記録できる。
+    await expect(failReminderDeliveryRun(db, {
+      id: first!.id,
+      code: 'line_temporary_failure',
+      message: 'fresh',
+      retryAt: '2026-08-28T09:12:00.000Z',
+      now: '2026-08-28T09:11:00.000Z',
+      expectedLeaseExpiresAt: ['2026-08-28T09:11:00.000Z'],
+    })).resolves.toBe(true)
+  })
+
+  it('R341: 再開は取消ずみの未来予定を作り直す (送信ずみは触らない)', async () => {
+    const { db, raw } = createTestD1()
+    seedReminder(raw)
+    raw.prepare(
+      `INSERT INTO reminder_delivery_runs
+        (id, reminder_id, friend_reminder_id, friend_id, reminder_step_id, scheduled_at,
+         idempotency_key, line_retry_key, status, created_at, updated_at)
+       VALUES ('cancelled-run','reminder-1','enrollment-1','friend-1','step-1','2026-08-28T09:00:00.000Z',
+         'k1','rk1','cancelled','2026-08-28T07:00:00.000Z','2026-08-28T07:00:00.000Z')`,
+    ).run()
+    raw.prepare(`UPDATE friend_reminders SET status = 'cancelled', lock_version = 3 WHERE id = 'enrollment-1'`).run()
+    const resumed = await resumeReminderRegistrant(db, {
+      reminderId: 'reminder-1',
+      enrollmentId: 'enrollment-1',
+      expectedLockVersion: 3,
+      expectedRuns: [{ reminderStepId: 'step-1', scheduledAt: '2026-08-28T09:00:00.000Z' }],
+    })
+    expect(resumed.state).toBe('updated')
+    expect(raw.prepare(`SELECT status FROM friend_reminders WHERE id = 'enrollment-1'`).get()).toEqual({
+      status: 'active',
+    })
+    // 同じ予定の cancelled 行が queued へ戻る (一意制約で二重に作らない)。
+    expect(raw.prepare(
+      `SELECT status, COUNT(*) AS count FROM reminder_delivery_runs WHERE friend_reminder_id = 'enrollment-1'`,
+    ).get()).toEqual({ status: 'queued', count: 1 })
+    // 予定時刻に送れる。
+    const pushes: string[] = []
+    const client = makeClient(async (userId) => {
+      pushes.push(userId)
+      return { requestId: 'req-1' }
+    })
+    const result = await processReminderDeliveries(db, client, {
+      now: new Date('2026-08-28T09:00:00.000Z'),
+      pause: noPause,
+      resolveClient: async () => client,
+    })
+    expect(result.succeeded).toBe(1)
+    expect(pushes).toEqual(['U-friend-1'])
+  })
+
+  it('R342: 手動再試行でも同じ再試行キーを使う', async () => {
+    const { db, raw } = createTestD1()
+    seedReminder(raw)
+    const run = await claimReminderDeliveryRun(db, {
+      lineAccountId: 'account-1',
+      reminderId: 'reminder-1',
+      friendReminderId: 'enrollment-1',
+      friendId: 'friend-1',
+      reminderStepId: 'step-1',
+      scheduledAt: '2026-08-28T09:00:00.000Z',
+      now: '2026-08-28T09:00:00.000Z',
+      leaseExpiresAt: '2026-08-28T09:05:00.000Z',
+    })
+    expect(run).not.toBeNull()
+    const keyBefore = run!.line_retry_key
+    await failReminderDeliveryRun(db, {
+      id: run!.id,
+      code: 'line_temporary_failure',
+      message: 'boom',
+      retryAt: '2026-08-28T09:01:00.000Z',
+      now: '2026-08-28T09:00:00.000Z',
+      expectedLeaseExpiresAt: [run!.lease_expires_at!],
+    })
+    const retried = await retryReminderDeliveryRun(db, {
+      id: run!.id,
+      requestKey: 'manual-1',
+      now: '2026-08-28T09:02:00.000Z',
+    })
+    expect(retried?.kind).toBe('scheduled')
+    // キーは作り直さない。同じ通知の再試行は同じキーで送る。
+    expect(retried && 'run' in retried && retried.run.line_retry_key).toBe(keyBefore)
+  })
+
+  it('R344: 24時間を過ぎた結果不明は自動で送らず、要確認として残る', async () => {
+    const { db, raw } = createTestD1()
+    seedReminder(raw)
+    const run = await claimReminderDeliveryRun(db, {
+      lineAccountId: 'account-1',
+      reminderId: 'reminder-1',
+      friendReminderId: 'enrollment-1',
+      friendId: 'friend-1',
+      reminderStepId: 'step-1',
+      scheduledAt: '2026-08-28T09:00:00.000Z',
+      now: '2026-08-28T09:00:00.000Z',
+      leaseExpiresAt: '2026-08-28T09:05:00.000Z',
+    })
+    expect(run).not.toBeNull()
+    await failReminderDeliveryRun(db, {
+      id: run!.id,
+      code: 'line_temporary_failure',
+      message: 'boom',
+      retryAt: '2026-08-28T09:01:00.000Z',
+      now: '2026-08-28T09:00:00.000Z',
+      expectedLeaseExpiresAt: [run!.lease_expires_at!],
+    })
+    // 24時間1秒後に cron が戻っても自動では送らない。
+    const held = await holdExpiredLineRetryRuns(db, { now: '2026-08-29T09:00:01.000Z' })
+    expect(held).toBe(1)
+    expect(raw.prepare(
+      `SELECT next_retry_at, last_error_code FROM reminder_delivery_runs WHERE id = ?`,
+    ).get(run!.id)).toMatchObject({ next_retry_at: null, last_error_code: 'retry_key_expired' })
+    const pushes: string[] = []
+    const client = makeClient(async (userId) => {
+      pushes.push(userId)
+      return { requestId: 'req-1' }
+    })
+    const result = await processReminderDeliveries(db, client, {
+      now: new Date('2026-08-29T09:00:01.000Z'),
+      pause: noPause,
+      resolveClient: async () => client,
+    })
+    expect(pushes).toEqual([])
+    expect(result).toEqual({ succeeded: 0, skipped: 0, retrying: 0, failed: 0, held: 0 })
+    // 人が確かめた手動再試行は送れる。
+    const retried = await retryReminderDeliveryRun(db, {
+      id: run!.id,
+      requestKey: 'manual-1',
+      now: '2026-08-29T09:00:02.000Z',
+    })
+    expect(retried?.kind).toBe('scheduled')
+    const manual = await processReminderDeliveries(db, client, {
+      now: new Date('2026-08-29T09:00:03.000Z'),
+      pause: noPause,
+      resolveClient: async () => client,
+    })
+    expect(manual.succeeded).toBe(1)
+    expect(pushes).toEqual(['U-friend-1'])
+  })
+
+  it('R344: 24時間以内の再試行は同じキーで自動回復する', async () => {
+    const { db, raw } = createTestD1()
+    seedReminder(raw)
+    const seenKeys: Array<string | undefined> = []
+    let first = true
+    const client = makeClient(async (_userId, retryKey) => {
+      seenKeys.push(retryKey)
+      if (first) {
+        first = false
+        throw Object.assign(new Error('temporary'), { status: 503, retryable: true })
+      }
+      return { requestId: 'req-1' }
+    })
+    const failed = await processReminderDeliveries(db, client, {
+      now: new Date('2026-08-28T09:00:00.000Z'),
+      pause: noPause,
+      resolveClient: async () => client,
+    })
+    expect(failed.retrying).toBe(1)
+    // 期限内は止めない。
+    const held = await holdExpiredLineRetryRuns(db, { now: '2026-08-28T10:00:00.000Z' })
+    expect(held).toBe(0)
+    const done = await processReminderDeliveries(db, client, {
+      now: new Date('2026-08-28T10:00:00.000Z'),
+      pause: noPause,
+      resolveClient: async () => client,
+    })
+    expect(done.succeeded).toBe(1)
+    // 2回の送信は同じキー。
+    expect(seenKeys).toHaveLength(2)
+    expect(seenKeys[0]).toBeTruthy()
+    expect(seenKeys[1]).toBe(seenKeys[0])
   })
 })

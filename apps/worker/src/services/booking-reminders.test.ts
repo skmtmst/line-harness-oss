@@ -116,7 +116,7 @@ describe('processDueReminders', () => {
       reminderHoursBefore: REMINDER_HOURS_BEFORE,
     });
     expect(result).toEqual({ sent: 0, failed: 1 });
-    const failedUpdate = updates.find((u) => u.sql.includes('UPDATE booking_reminders SET status'));
+    const failedUpdate = updates.find((u) => u.sql.includes('SET status = ?, retry_count = ?'));
     expect(failedUpdate).toBeTruthy();
     expect(failedUpdate!.bound[0]).toBe('failed');
     expect(failedUpdate!.bound[1]).toBe(1); // retry_count
@@ -182,7 +182,7 @@ describe('processDueReminders', () => {
       sender,
       reminderHoursBefore: REMINDER_HOURS_BEFORE,
     });
-    const u = updates.find((x) => x.sql.includes('UPDATE booking_reminders SET status'));
+    const u = updates.find((x) => x.sql.includes('SET status = ?, retry_count = ?'));
     expect(u!.bound[0]).toBe('failed_permanent');
     expect(u!.bound[1]).toBe(3);
   });
