@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import {
+  CROP_POSITION_OPTIONS,
+  EMPTY_GENERATION_INPUT,
   activeGeneration,
   aspectBadge,
   generationConditionRows,
   groupPresets,
   imageMatchesQuery,
   inputFromGeneration,
+  isBannerCropPosition,
   parseJstDateTime,
   presetKeysForShape,
   relativeUpdated,
@@ -80,8 +83,25 @@ const image: BannerImage = {
   deliveredAccountIds: [],
 }
 
+describe('切り抜きの位置（R120）', () => {
+  it('中央・上・下の3つだけ', () => {
+    expect(CROP_POSITION_OPTIONS).toEqual([
+      { value: 'center', label: '中央' },
+      { value: 'top', label: '上' },
+      { value: 'bottom', label: '下' },
+    ])
+    expect(isBannerCropPosition('center')).toBe(true)
+    expect(isBannerCropPosition('left')).toBe(false)
+  })
+
+  it('初期値は中央で、「同じ設定でもう一度」も中央に戻る', () => {
+    expect(EMPTY_GENERATION_INPUT.cropPosition).toBe('center')
+    expect(inputFromGeneration(generation).cropPosition).toBe('center')
+  })
+})
+
 describe('生成条件の手元の検査', () => {
-  const base = { mode: 'banner' as const, presetKey: 'line_rich_message', textLines: ['A'], mainColor: null, subColor: null, personOption: 'without' as const, customPrompt: '', freePrompt: '', count: 1, referenceImageId: null, referenceMode: 'edit' as const }
+  const base = { mode: 'banner' as const, presetKey: 'line_rich_message', cropPosition: 'center' as const, textLines: ['A'], mainColor: null, subColor: null, personOption: 'without' as const, customPrompt: '', freePrompt: '', count: 1, referenceImageId: null, referenceMode: 'edit' as const }
 
   it('用途・テキスト・枚数がそろえば通る', () => {
     expect(validateGenerationInput(base, 4)).toBeNull()
@@ -182,7 +202,7 @@ describe('画像の表示', () => {
 })
 
 describe('参照画像（35-2）', () => {
-  const base = { mode: 'banner' as const, presetKey: 'line_rich_message', textLines: [''], mainColor: null, subColor: null, personOption: 'without' as const, customPrompt: '', freePrompt: '', count: 1, referenceImageId: 'i1', referenceMode: 'edit' as const }
+  const base = { mode: 'banner' as const, presetKey: 'line_rich_message', cropPosition: 'center' as const, textLines: [''], mainColor: null, subColor: null, personOption: 'without' as const, customPrompt: '', freePrompt: '', count: 1, referenceImageId: 'i1', referenceMode: 'edit' as const }
 
   it('土台に描き直すなら、テキストが無くても指示があれば通る', () => {
     expect(validateGenerationInput({ ...base, customPrompt: '文字を秋にする' }, 4)).toBeNull()

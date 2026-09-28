@@ -515,7 +515,8 @@ const spec = {
       post: {
         tags: ['HQ Banners'], summary: 'バナーを1枚生成して保存',
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
-        responses: { '200': { description: 'One image generated' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found' }, '422': { description: 'Image request rejected' }, '502': { description: 'Image provider failure' } },
+        requestBody: { required: false, content: { 'application/json': { schema: { type: 'object', properties: { gravity: { type: 'string', enum: ['center', 'top', 'bottom'], description: '用途寸法へ切り抜くときに残す位置。無ければ中央。' } } } } } },
+        responses: { '200': { description: 'One image generated' }, '400': { description: 'Invalid crop position' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found' }, '422': { description: 'Image request rejected' }, '502': { description: 'Image provider failure' } },
       },
     },
     '/api/hq/banners/generations/{id}/cancel': {
