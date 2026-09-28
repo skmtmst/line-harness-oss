@@ -713,6 +713,9 @@ function BookingRulesEditor({ accountId, initial, canEdit, onRetry, onSaved }: {
   const [draft, setDraft] = useState(initial)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  /* R311: 受付の締め切り・キャンセルの期限の空欄。0にせず保存を止める。 */
+  const [cutoffEmpty, setCutoffEmpty] = useState(false)
+  const [cancelEmpty, setCancelEmpty] = useState(false)
   // 店舗切替でこの画面は作り直される（key=accountId）。外れた応答は何も残さない。
   const mountedRef = useRef(true)
   useEffect(() => () => { mountedRef.current = false }, [])
@@ -722,6 +725,15 @@ function BookingRulesEditor({ accountId, initial, canEdit, onRetry, onSaved }: {
   }
 
   async function submit() {
+    // R311: 空欄のまま保存しない。消しただけでは0分前（直前まで可能）にしない。
+    const emptyLabels = [
+      cutoffEmpty ? '受付の締め切り' : null,
+      cancelEmpty ? 'キャンセルの期限' : null,
+    ].filter((label): label is string => label !== null)
+    if (emptyLabels.length > 0) {
+      setSaveError(`「${emptyLabels.join('」「')}」が空欄です。空欄のまま保存できません。直前まで可能にするときは0と入力してください。`)
+      return
+    }
     setSaving(true)
     setSaveError(null)
     try {
@@ -743,6 +755,8 @@ function BookingRulesEditor({ accountId, initial, canEdit, onRetry, onSaved }: {
       // 保存待ちに店舗が変わっていたら、旧店舗の応答を新店舗へ反映しない。
       if (!mountedRef.current) return
       setDraft(response.data)
+      setCutoffEmpty(false)
+      setCancelEmpty(false)
       notifyToast('予約の基本ルールを保存しました。')
       onSaved(response.data)
     } catch (saveFailure) {
@@ -775,8 +789,8 @@ function BookingRulesEditor({ accountId, initial, canEdit, onRetry, onSaved }: {
           ) : null}
         </Field>
         <RuleNumberField label="何日先まで受け付けるか" unit="日" min={1} max={365} value={draft.bookingWindowDays} onChange={(value) => set('bookingWindowDays', value)} />
-        <RuleNumberField label="受付の締め切り" unit="分前" min={0} max={43200} value={draft.cutoffMinutesBefore} onChange={(value) => set('cutoffMinutesBefore', value)} humanize={minutesBeforeLabel} />
-        <RuleNumberField label="キャンセルの期限" unit="分前" min={0} max={43200} value={draft.cancelDeadlineMinutesBefore} onChange={(value) => set('cancelDeadlineMinutesBefore', value)} humanize={minutesBeforeLabel} />
+        <RuleNumberField label="受付の締め切り" unit="分前" min={0} max={43200} value={draft.cutoffMinutesBefore} onChange={(value) => set('cutoffMinutesBefore', value)} trackEmpty={setCutoffEmpty} humanize={minutesBeforeLabel} />
+        <RuleNumberField label="キャンセルの期限" unit="分前" min={0} max={43200} value={draft.cancelDeadlineMinutesBefore} onChange={(value) => set('cancelDeadlineMinutesBefore', value)} trackEmpty={setCancelEmpty} humanize={minutesBeforeLabel} />
         <RuleNumberField label="1人が同時に持てる予約" unit="件" min={1} max={100} value={draft.maxActiveBookingsPerFriend} onChange={(value) => set('maxActiveBookingsPerFriend', value)} />
         <Field label="予約の承認" required>
           <Select
@@ -813,7 +827,7 @@ function BookingRulesEditor({ accountId, initial, canEdit, onRetry, onSaved }: {
         </Field>
         <RuleNumberField label="当日のお知らせを送るタイミング" unit="時間前" min={1} max={72} value={draft.reminderHoursBefore} onChange={(value) => set('reminderHoursBefore', value)} humanize={formatHoursBeforeHint} />
       </div>
-      <p className="text-ink-faint mt-4 text-xs">0分前は、開始直前まで受け付ける・キャンセルできる設定です。</p>
+      <p className="text-ink-faint mt-4 text-xs">0分前は、開始直前まで受け付ける・キャンセルできる設定です。空欄のまま保存できません。</p>
       <div className="border-hairline mt-5 border-t pt-4">
         <div className="flex items-center gap-1">
           <span id="liff-date-view-label" className="text-ink-secondary text-xs font-medium">
@@ -872,17 +886,38 @@ function BookingRulesEditor({ accountId, initial, canEdit, onRetry, onSaved }: {
   )
 }
 
-function RuleNumberField({ label, unit, min, max, value, onChange, humanize }: {
+function RuleNumberField({ label, unit, min, max, value, onChange, trackEmpty, humanize }: {
   label: string
   unit: string
   min: number
   max: number
   value: number
   onChange: (value: number) => void
+  /**
+   * R311: 空欄を0にせず別扱いするときだけ渡す。渡した欄は編集中の文字を
+   * 欄が持ち、空欄の間は onChange を呼ばない（空欄→0の自動変化をしない）。
+   * 保存前の空欄チェックは呼び出し側で行う。渡さない欄は従来どおり。
+   */
+  trackEmpty?: (empty: boolean) => void
   /** 入力値を時間・日の単位へ読み替える（例: 1440分 → 24時間前）。 */
   humanize?: (value: number) => string | null
 }) {
-  const hint = humanize?.(value)
+  const [text, setText] = useState<string | null>(null)
+  const trackEmptyRef = useRef(trackEmpty)
+  trackEmptyRef.current = trackEmpty
+  // 保存が通ると親の値が変わる。そのときだけ編集中の文字を捨てる。
+  useEffect(() => {
+    setText(null)
+    trackEmptyRef.current?.(false)
+  }, [value])
+  const shown = text ?? value
+  // 古い行には無い項目が undefined で来ることがある。旧表示と同じく空欄で出す。
+  const hintNumber = typeof shown === 'number'
+    ? shown
+    : typeof shown !== 'string' || shown.trim() === ''
+      ? null
+      : Number(shown)
+  const hint = hintNumber === null || Number.isNaN(hintNumber) ? null : humanize?.(hintNumber)
   return (
     <Field label={label} required>
       <div className="flex items-center gap-2">
@@ -891,8 +926,17 @@ function RuleNumberField({ label, unit, min, max, value, onChange, humanize }: {
           type="number"
           min={min}
           max={max}
-          value={value}
-          onChange={(event) => onChange(Number(event.target.value))}
+          value={shown ?? ''}
+          onChange={(event) => {
+            const raw = event.target.value
+            if (!trackEmpty) {
+              onChange(Number(raw))
+              return
+            }
+            setText(raw)
+            trackEmpty(raw === '')
+            if (raw !== '') onChange(Number(raw))
+          }}
           className="border-hairline rounded-control focus:ring-accent w-full border px-3 h-10 text-sm tabular-nums focus:outline-none focus:ring-2"
         />
         <span className="text-ink-faint whitespace-nowrap text-xs">{unit}</span>

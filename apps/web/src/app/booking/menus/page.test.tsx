@@ -477,6 +477,62 @@ describe('既存メニューの編集窓: 予約申込時に自動付与する�
   })
 })
 
+describe('R311 受付・キャンセル期限の空欄は0にしない', () => {
+  async function renderRules() {
+    fixture.activeTab = 'rules'
+    // 既存行あり（保存ボタンは「変更を保存」）にする。
+    fixture.getSettings = vi.fn(async () => ({ success: true, data: { ...SETTINGS, id: 'settings-a', version: 3 } }))
+    render(<><MenusPage /><ToastHost /></>)
+    await screen.findByRole('spinbutton', { name: '受付の締め切り' })
+  }
+
+  test('欄を消しても0にならず、空欄のまま保存できない', async () => {
+    await renderRules()
+    const cutoff = screen.getByRole('spinbutton', { name: '受付の締め切り' }) as HTMLInputElement
+    fireEvent.change(cutoff, { target: { value: '' } })
+
+    // 空欄を維持し、0へ自動で変わらない。
+    expect(cutoff.value).toBe('')
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '変更を保存' }))
+    })
+
+    expect((await screen.findByRole('alert')).textContent).toContain('空欄のまま保存できません')
+    expect(fixture.saveSettings).not.toHaveBeenCalled()
+  })
+
+  test('明示した0だけ直前まで可能として送る', async () => {
+    await renderRules()
+    const cutoff = screen.getByRole('spinbutton', { name: '受付の締め切り' }) as HTMLInputElement
+    fireEvent.change(cutoff, { target: { value: '0' } })
+    expect(cutoff.value).toBe('0')
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '変更を保存' }))
+    })
+
+    await waitFor(() => { expect(fixture.saveSettings).toHaveBeenCalled() })
+    expect(fixture.saveSettings).toHaveBeenCalledWith('account-a', expect.objectContaining({
+      cutoffMinutesBefore: 0,
+    }))
+  })
+
+  test('消したあと入れ直せばその値で保存できる', async () => {
+    await renderRules()
+    const cancel = screen.getByRole('spinbutton', { name: 'キャンセルの期限' }) as HTMLInputElement
+    fireEvent.change(cancel, { target: { value: '' } })
+    expect(cancel.value).toBe('')
+    fireEvent.change(cancel, { target: { value: '60' } })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '変更を保存' }))
+    })
+
+    await waitFor(() => { expect(fixture.saveSettings).toHaveBeenCalled() })
+    expect(fixture.saveSettings).toHaveBeenCalledWith('account-a', expect.objectContaining({
+      cancelDeadlineMinutesBefore: 60,
+    }))
+  })
+})
+
 describe('店舗共通の予約ルール', () => {
   test('行が無い店舗の既定値を編集し、version=0で初回保存する', async () => {
     fixture.activeTab = 'rules'
