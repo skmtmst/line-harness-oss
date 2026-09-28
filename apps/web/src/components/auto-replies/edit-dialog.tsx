@@ -11,6 +11,7 @@ import InlineActionList, { useActionOptions } from './inline-action-list'
 import {
   applyMatchType,
   emptyKeywordRule,
+  exactAllMismatchNotice,
   initialMatchType,
   readKeywordRules,
   readInlineActions,
@@ -22,6 +23,7 @@ import {
   type HolidayRuleValue,
   type InlineAction,
 } from './draft-fields'
+import Notice from '@/components/shared/notice'
 import ImageUploader from '@/components/shared/image-uploader'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
@@ -940,6 +942,15 @@ export default function EditDialog({
               「すべて」は絞り込みに使います。「予約」と「キャンセル」の両方が入った文にだけ
               返す、という形です。片方だけの問い合わせには返しません。
             </p>
+            {/*
+              R257: 異なる文言の完全一致をすべて必須にすると不成立になる。
+              条件を勝手に変えず、理由だけを知らせて保存は止めない。
+            */}
+            {exactAllMismatchNotice(keywordRules, keywordMatchMode) ? (
+              <Notice tone="warn" className="mb-3">
+                {exactAllMismatchNotice(keywordRules, keywordMatchMode)}
+              </Notice>
+            ) : null}
 
             <label className="text-ink-secondary mb-1 block text-xs">一致のしかた</label>
             <div className="flex gap-2">

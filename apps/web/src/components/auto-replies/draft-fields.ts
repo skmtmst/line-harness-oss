@@ -110,6 +110,32 @@ export function readKeywordRules(draft: {
   ]
 }
 
+/**
+ * R257: 異なる文言の完全一致を「すべて必須」にすると不成立になる。
+ *
+ * 1つの受信文は2つの異なる文言と完全には一致しないので、判定は必ず
+ * false を返す（Worker の `keywordMatches` が正しくそう動く）。
+ * ここは保存を止めず、不成立の理由だけを返す。埋まっていない行は見ない。
+ *
+ * 大文字小文字を区別しない行が混ざると成立し得る組み合わせがあるため、
+ * 厳密な一致（`caseSensitive` が効く行）だけのときに知らせる。誤った
+ * 案内を出さないための絞り込みで、緩い方の組み合わせは対象外。
+ */
+export function exactAllMismatchNotice(
+  rules: KeywordRuleDraft[],
+  matchMode: 'any' | 'all',
+): string | null {
+  if (matchMode !== 'all') return null
+  const words = rules.map((rule) => rule.keyword.trim()).filter((word) => word !== '')
+  if (words.length < 2) return null
+  const strict = rules
+    .filter((rule) => rule.keyword.trim() !== '')
+    .every((rule) => rule.matchType === 'exact' && rule.caseSensitive !== false)
+  if (!strict) return null
+  if (new Set(words).size < 2) return null
+  return '異なる文言の完全一致をすべて必須にしています。1つの受信文は2つの異なる文言と完全には一致しないため、このままでは応答しません。部分一致にするか、「どれか1つ」にしてください。'
+}
+
 export function toKeywordPayload(rule: KeywordRuleDraft): Record<string, unknown> {
   const payload: Record<string, unknown> = {
     keyword: rule.keyword,
