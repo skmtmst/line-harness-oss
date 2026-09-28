@@ -856,6 +856,72 @@ export async function createCommonVar(
   return (await getCommonVarById(db, id, input.lineAccountId))!;
 }
 
+const EXPIRY_BEHAVIOR_LABELS: Record<CommonVarExpiryBehavior, string> = {
+  stop: '配信を止める',
+  fallback: '代替値を使う',
+};
+
+/** 履歴に残す期間表示。DBのUTC ISOを、画面と同じ日本時間の短い形に直す。 */
+function formatVarStampJst(value: string | null): string {
+  if (!value) return '制限なし';
+  const ms = Date.parse(value);
+  if (!Number.isFinite(ms)) return value;
+  const jst = new Date(ms + 9 * 60 * 60_000);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${jst.getUTCFullYear()}/${jst.getUTCMonth() + 1}/${jst.getUTCDate()} ${pad(jst.getUTCHours())}:${pad(jst.getUTCMinutes())}`;
+}
+
+function clipVarValue(value: string | null): string {
+  if (!value) return '（空）';
+  return value.length > 24 ? `${value.slice(0, 24)}…` : value;
+}
+
+/*
+ * 履歴（common_var_versions）には名前・値・メモ・理由の列しかない。
+ * 有効期間や代替値だけを変えた保存は「同じ値→同じ値」に見えて、
+ * 期間の変更がどこにも残らない。列を足すmigrationなしで追えるよう、
+ * 変わった項目と前後を理由の末尾へ併記する。値そのものは versions の
+ * value 列に残るので、ここでは期間・動作・置き場所などの内訳を書く。
+ */
+function describeCommonVarChanges(
+  existing: CommonVar,
+  input: {
+    name?: string;
+    memo?: string;
+    folderId?: string | null;
+    validFrom?: string | null;
+    validUntil?: string | null;
+    fallbackValue?: string | null;
+    expiryBehavior?: CommonVarExpiryBehavior;
+  },
+): string {
+  const changes: string[] = [];
+  if (input.name !== undefined && input.name !== existing.name) {
+    changes.push(`名前「${clipVarValue(existing.name)}」→「${clipVarValue(input.name)}」`);
+  }
+  if (input.memo !== undefined && input.memo !== existing.memo) {
+    changes.push(`メモ「${clipVarValue(existing.memo)}」→「${clipVarValue(input.memo)}」`);
+  }
+  if ('folderId' in input && (input.folderId ?? null) !== existing.folder_id) {
+    changes.push('置き場所');
+  }
+  if ('validFrom' in input && (input.validFrom ?? null) !== existing.valid_from) {
+    changes.push(`有効開始 ${formatVarStampJst(existing.valid_from)}→${formatVarStampJst(input.validFrom ?? null)}`);
+  }
+  if ('validUntil' in input && (input.validUntil ?? null) !== existing.valid_until) {
+    changes.push(`有効終了 ${formatVarStampJst(existing.valid_until)}→${formatVarStampJst(input.validUntil ?? null)}`);
+  }
+  if (input.expiryBehavior !== undefined && input.expiryBehavior !== existing.expiry_behavior) {
+    changes.push(
+      `期間外の動作「${EXPIRY_BEHAVIOR_LABELS[existing.expiry_behavior]}」→「${EXPIRY_BEHAVIOR_LABELS[input.expiryBehavior]}」`,
+    );
+  }
+  if ('fallbackValue' in input && (input.fallbackValue ?? null) !== existing.fallback_value) {
+    changes.push(`代替値「${clipVarValue(existing.fallback_value)}」→「${clipVarValue(input.fallbackValue ?? null)}」`);
+  }
+  return changes.join('・');
+}
+
 export async function updateCommonVar(
   db: D1Database,
   id: string,
@@ -927,6 +993,10 @@ export async function updateCommonVar(
   if (sets.length > 0) {
     const now = jstNow();
     const nextVersion = existing.version + 1;
+    // 期間や代替値だけの変更が「同じ値→同じ値」に見えないよう、
+    // 変えた項目の内訳を理由へ併記する（describeCommonVarChanges）。
+    const changeDetail = describeCommonVarChanges(existing, input);
+    const storedReason = changeDetail ? `${changeReason}（変更: ${changeDetail}）` : changeReason;
     sets.push('version = ?', 'updated_by = ?', 'updated_at = ?');
     values.push(nextVersion, input.actorId ?? null, now, id, lineAccountId, existing.version);
     const results = await db.batch([
@@ -943,7 +1013,7 @@ export async function updateCommonVar(
         input.name ?? existing.name,
         input.value ?? existing.value,
         input.memo ?? existing.memo,
-        changeReason,
+        storedReason,
         input.actorId ?? null,
         now,
       ),
