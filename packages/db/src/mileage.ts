@@ -486,10 +486,28 @@ const FRIEND_WALLET_SCOPE_SQL = `(
  * follow the same person across multiple LINE accounts without rewriting old
  * ledger rows; an unlinked friend still has a safe friend-scoped wallet.
  */
+/**
+ * m22u R360：交換の内訳選びと同じ「使える」基準。
+ * 期限切れロットの残数は、台帳に残っていても使えない。残高からも外す。
+ * 比較は交換予約と同じ now で行い、基準のずれを作らない。
+ */
+function expiredLotHoldbackSql(): string {
+  return `COALESCE((
+           SELECT SUM(l.remaining_amount) FROM mileage_grant_lots l
+            WHERE l.program_id = mp.id
+              AND l.status = 'available'
+              AND l.remaining_amount > 0
+              AND l.expires_at IS NOT NULL AND l.expires_at <= ?
+              AND (l.beneficiary_key = 'friend:' || ?
+                   OR l.beneficiary_key = 'user:' || (SELECT user_id FROM friends WHERE id = ?))
+         ), 0)`;
+}
+
 export async function getMileageSummaryForFriend(
   db: D1Database,
   friendId: string,
   programId = DEFAULT_MILEAGE_PROGRAM_ID,
+  now = new Date().toISOString(),
 ): Promise<MileageSummary> {
   await ensureBuiltInProgram(db, programId);
   const row = await db
@@ -498,7 +516,8 @@ export async function getMileageSummaryForFriend(
          SELECT user_id FROM friends WHERE id = ?
        )
        SELECT mp.name AS program_name,
-              COALESCE(SUM(CASE WHEN ml.status = 'available' THEN ml.amount ELSE 0 END), 0) AS available,
+              COALESCE(SUM(CASE WHEN ml.status = 'available' THEN ml.amount ELSE 0 END), 0)
+                - ${expiredLotHoldbackSql()} AS available,
               COALESCE(SUM(CASE WHEN ml.status = 'pending' THEN ml.amount ELSE 0 END), 0) AS pending,
               COALESCE(SUM(CASE WHEN ml.entry_type = 'grant' AND ml.amount > 0
                                 THEN ml.amount ELSE 0 END), 0) AS lifetime_earned,
@@ -512,7 +531,7 @@ export async function getMileageSummaryForFriend(
         WHERE mp.id = ?
         GROUP BY mp.id, mp.name`,
     )
-    .bind(friendId, friendId, programId)
+    .bind(friendId, friendId, now, friendId, friendId, programId)
     .first<{
       program_name: string;
       available: number;
@@ -1527,11 +1546,12 @@ function mileageGrantExpiresAt(occurredAt: string, days: number | null | undefin
   return new Date(base + (days as number) * 86400_000).toISOString();
 }
 
-/** m22o: 見本の {balance} に入れる、いま使える残高。 */
+/** m22o: 見本の {balance} に入れる、いま使える残高。m22u R360: 期限切れは数えない。 */
 async function getMileageAvailableBalance(
   db: D1Database,
   input: { userId: string | null; friendId: string },
 ): Promise<number> {
+  const now = new Date().toISOString();
   const row = await db
     .prepare(
       `SELECT COALESCE(SUM(CASE WHEN status = 'available' THEN amount ELSE 0 END), 0) AS balance
@@ -1544,7 +1564,20 @@ async function getMileageAvailableBalance(
     )
     .bind(input.userId, input.userId, input.userId, input.userId, input.friendId)
     .first<{ balance: number }>();
-  return Number(row?.balance ?? 0);
+  const base = Number(row?.balance ?? 0);
+  if (!(await dbTableExists(db, 'mileage_grant_lots'))) return base;
+  // 残高の表示(残高照会)と同じく、期限切れロットの残数は使えない分として引く。
+  const keys = input.userId
+    ? [`user:${input.userId}`, `friend:${input.friendId}`]
+    : [`friend:${input.friendId}`];
+  const expired = await db.prepare(
+    `SELECT COALESCE(SUM(remaining_amount), 0) AS holdback FROM mileage_grant_lots
+      WHERE program_id = 'default'
+        AND status = 'available' AND remaining_amount > 0
+        AND expires_at IS NOT NULL AND expires_at <= ?
+        AND beneficiary_key IN (${keys.map(() => '?').join(',')})`,
+  ).bind(now, ...keys).first<{ holdback: number }>();
+  return base - Number(expired?.holdback ?? 0);
 }
 
 /** m22o: 通知の見本の差し込み({awardedMiles}・{balance})を値で埋める。 */
@@ -2716,6 +2749,8 @@ interface AffiliateConversionMileageContext {
   offer_id: string | null;
   offer_name: string | null;
   reward_miles: number | null;
+  /** m22u R356: 承認時に凍結したマイル数。NULL の行は従来どおり現在値。 */
+  frozen_miles: number | null;
   mileage_program_id: string | null;
 }
 
@@ -2747,6 +2782,7 @@ export async function syncAffiliateConversionMileage(
               ce.approval_status,
               ce.approved_at,
               ce.created_at,
+              ce.approval_reward_miles AS frozen_miles,
               ce.friend_id AS subject_friend_id,
               subject.user_id AS subject_user_id,
               a.friend_id AS beneficiary_friend_id,
@@ -2816,7 +2852,9 @@ export async function syncAffiliateConversionMileage(
   }
 
   if (status === 'approved') {
-    const rewardMiles = context.reward_miles ?? 0;
+    // m22u R356: 承認時に凍結したマイル数があれば、変更後の案件設定ではなく
+    // 凍結値を使う。0 の凍結も有効（0 のまま完了し、後日の再送で増えない）。
+    const rewardMiles = context.frozen_miles ?? context.reward_miles ?? 0;
     if (rewardMiles <= 0) return;
     await postMileageEntry(db, {
       programId,
@@ -2870,5 +2908,16 @@ export async function syncAffiliateConversionMileage(
       metadata: { originalEntryId: grant.id },
       occurredAt,
     });
+    // m22u R359: 取り消した付与の未使用分を交換対象から外す。交換の内訳は
+    // ロットから選ぶため、台帳の取消だけでは取消済みロットが使われてしまう。
+    // 使い切った分は交換側の予約が残り、未使用分だけを無効化する。
+    // 再送では取消済みのため grants に載らず、ここも再実行されない。
+    if (await dbTableExists(db, 'mileage_grant_lots')) {
+      await db.prepare(
+        `UPDATE mileage_grant_lots
+            SET remaining_amount = 0, status = 'void'
+          WHERE ledger_entry_id = ? AND status = 'available'`,
+      ).bind(grant.id).run();
+    }
   }
 }

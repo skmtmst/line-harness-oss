@@ -923,6 +923,22 @@ export async function reserveMileageRewardRedemption(
     remaining -= amount;
   }
   if (remaining > 0) {
+    // m22u R360: 残高はあるのに内訳が足りない主因は期限切れ。期限切れの
+    // ロットが不足分を説明できるときは「足りません」として案内し、
+    // 内訳エラー（確認できませんでした）にはしない。
+    const expiredHeld = await db.prepare(
+      `SELECT COALESCE(SUM(remaining_amount), 0) AS expired_remaining
+         FROM mileage_grant_lots
+        WHERE program_id = ? AND beneficiary_key = ? AND status = 'available'
+          AND remaining_amount > 0 AND expires_at IS NOT NULL AND expires_at <= ?`,
+    ).bind(reward.programId, beneficiaryKey, now).first<{ expired_remaining: number }>();
+    if (Number(expiredHeld?.expired_remaining ?? 0) > 0) {
+      throw new MileageRewardError(
+        'insufficient_miles',
+        '期限切れのマイルは使えないため、交換に必要なマイルが足りません',
+        409,
+      );
+    }
     throw new MileageRewardError('mileage_lots_unavailable', '交換できるマイルの内訳を確認できませんでした', 409);
   }
 
@@ -1152,10 +1168,13 @@ export async function refundMileageRewardRedemption(
         WHERE id = ? AND status NOT IN ('succeeded', 'refunded')`,
     ).bind(now, now, current.id),
     ...allocations.results.map((allocation) => db.prepare(
+      // m22u R359: 返却は有効なロットだけへ戻す。成果の取消で無効化した
+      // ロット(void)へは戻さない（取り消した付与が交換で復活しないように）。
       `UPDATE mileage_grant_lots
           SET remaining_amount = remaining_amount + ?,
               status = 'available'
-        WHERE ledger_entry_id = ? AND beneficiary_key = ?`,
+        WHERE ledger_entry_id = ? AND beneficiary_key = ?
+          AND status IN ('available', 'exhausted')`,
     ).bind(allocation.amount, allocation.grant_lot_id, current.beneficiaryKey)),
     ...(current.rewardCodeId
       ? [db.prepare(
