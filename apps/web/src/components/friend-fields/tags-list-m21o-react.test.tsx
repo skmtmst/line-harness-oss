@@ -8,9 +8,11 @@
  *   流れの末尾（右端）に置く。件数だけの行を作らない。
  * - 主な状態（正常・空・読み込み中・失敗）を言い分ける。
  */
-import React from 'react'
+import React, { act } from 'react'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { Tag, TagGroup } from '@line-crm/shared'
 
 vi.mock('next/navigation', () => ({
@@ -105,16 +107,62 @@ describe('m21o タグ一覧のフォルダ欄と件数', () => {
     render(<TagsPageV4 accountId="account-a" fixture={{ items: ITEMS, groups: GROUPS }} />)
     const pager = screen.getByRole('button', { name: '表示件数' })
     expect(screen.getByText(/1.2 \/ 2件/)).toBeTruthy()
-    const chip = screen.getByRole('button', { name: '未使用のタグ' })
-    // 件数の包みと札がいちばん近くで交わる場所が、札の親そのもの。
-    // 間に件数だけの行の包みが入らない。
-    let node: HTMLElement | null = pager
-    let shared: HTMLElement | null = null
-    while (node) {
-      if (node.contains(chip)) { shared = node; break }
-      node = node.parentElement
-    }
-    expect(shared).toBe(chip.parentElement)
+    // 「よく使う」は1つの選び口。件数の包みと同じ折り返しの流れにいる。
+    const menu = screen.getByRole('combobox', { name: 'よく使う絞り込み' })
+    const flow = pager.closest('span.ml-auto')?.parentElement
+    expect(flow).not.toBeNull()
+    expect(flow!.contains(menu)).toBe(true)
+    expect(flow!.contains(pager)).toBe(true)
+    // 選び口も流れの子孫（間に件数だけの行の包みが入らない）。
+    let node: HTMLElement | null = menu
+    while (node && node.parentElement !== flow) node = node.parentElement
+    expect(node).not.toBeNull()
+  })
+
+  it('「よく使う」は開いたまま重ねて選べ、絞り込みに効く', async () => {
+    render(<TagsPageV4 accountId="account-a" fixture={{ items: ITEMS, groups: GROUPS }} />)
+    const menu = screen.getByRole('combobox', { name: 'よく使う絞り込み' })
+    await act(async () => { fireEvent.click(menu) })
+    const option = await screen.findByRole('option', { name: '未使用のタグ' })
+    await act(async () => { fireEvent.click(option) })
+    // 閉じずに選べた数が分かり、絞り込みに効く（友だち0人・参照0件だけ残る）。
+    expect(await screen.findByText('1件選択中')).toBeTruthy()
+    await waitFor(() => {
+      expect(screen.queryByText('EC顧客連携済み')).toBeNull()
+    })
+    // 表と狭幅カードの両方に残る。
+    expect(screen.getAllByText('未契約').length).toBeGreaterThan(0)
+  })
+
+  describe('列幅の取り直し（1440px・1152pxで横送り0）', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/components/friend-fields/tags-page-v4.tsx'),
+      'utf8',
+    )
+
+    it('操作列は中身（編集＋…）に合わせ128px。64pxでは枠付きボタンが切れる', () => {
+      expect(source).toMatch(/<Th style=\{\{ width: 128 \}\}[^>]*>操作</)
+      expect(source).not.toMatch(/<Th style=\{\{ width: 64 \}\}/)
+    })
+
+    it('短い列は固定幅に詰め、割合は54%＋固定308pxに収める', () => {
+      // 固定：並び替え44＋人数80＋表示56＋操作128＝308。
+      expect(source).toMatch(/<Th style=\{\{ width: 80 \}\}[^>]*>人数</)
+      expect(source).toMatch(/<Th style=\{\{ width: 56 \}\}>表示</)
+      // 割合：タグ20＋フォルダ10＋付け方11＋連動13＝54。残りは使用先が吸う。
+      expect(source).toMatch(/<Th style=\{\{ width: '20%' \}\}>タグ</)
+      expect(source).toMatch(/<Th style=\{\{ width: '10%' \}\}>フォルダ</)
+      expect(source).toMatch(/<Th style=\{\{ width: '11%' \}\}[^>]*>付け方</)
+      expect(source).toMatch(/<Th style=\{\{ width: '13%' \}\}[^>]*>連動</)
+      // 使用先は auto のまま（狭めても title で読める）。
+      expect(source).toContain('<Th>使用先</Th>')
+    })
+
+    it('「よく使う」は札を並べず1つの選び口にする', () => {
+      expect(source).not.toContain('FilterChip')
+      expect(source).toContain('<MultiSelect')
+      expect(source).toContain('aria-label="よく使う絞り込み"')
+    })
   })
 
   it('空のときは「まだタグがありません」と出す', () => {

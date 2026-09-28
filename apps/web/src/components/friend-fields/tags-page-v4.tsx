@@ -12,8 +12,8 @@ import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
 import Button from '@/components/shared/button'
-import FilterChip from '@/components/shared/filter-chip'
 import ListToolbar from '@/components/shared/list-toolbar'
+import MultiSelect from '@/components/shared/multi-select'
 import { RowActions } from '@/components/shared/row-actions'
 import Disclosure from '@/components/shared/disclosure'
 import ListKpis from '@/components/shared/list-kpis'
@@ -947,20 +947,24 @@ export default function TagsPageV4({
                   {/* 素の select は置かない（#640）。選び口は共通 Select。幅は部品の既定（176px）。 */}
                   <Select aria-label="使用状態で絞り込む" value={usageFilter} onChange={setUsageFilter} options={[{ value: 'all', label: '使用状態：すべて' }, { value: 'linked', label: '連動あり' }, { value: 'unused', label: '未使用' }]} />
                   <Select aria-label="付与元で絞り込む" value={sourceFilter} onChange={setSourceFilter} options={[{ value: 'all', label: '付与元：すべて' }, ...Object.entries(SOURCE_LABELS).map(([value, label]) => ({ value, label }))]} />
-                  {/* 設計 `UOmne`。**5つ。押した数だけ重ねて絞る。** */}
-                  <span className="text-ink-faint text-xs">よく使う</span>
-                  {QUICK_FILTERS.map(([key, label]) => {
-                    const on = quick.includes(key)
-                    return (
-                      <FilterChip
-                        key={key}
-                        selected={on}
-                        onChange={(next) => setQuick((current) => next ? [...current, key] : current.filter((k) => k !== key))}
-                      >
-                        {label}
-                      </FilterChip>
-                    )
-                  })}
+                  {/*
+                    設計 `UOmne` の「よく使う」5つ。**重ねて絞れるのは変えない。**
+                    札を6つ並べると1440pxでも絞り込みが2行になり、件数が
+                    3行目へ落ちていた。1つの選び口（共通 MultiSelect）にまとめ、
+                    2行目を1行に収める。開いたまま重ねて選べ、「N件選択中」と
+                    「すべて外す」は部品が持つ。
+                  */}
+                  <span className="w-44 shrink-0">
+                    <MultiSelect
+                      aria-label="よく使う絞り込み"
+                      className="w-full"
+                      maxChips={1}
+                      onChange={setQuick}
+                      options={QUICK_FILTERS.map(([value, label]) => ({ value, label }))}
+                      placeholder="よく使う"
+                      values={quick}
+                    />
+                  </span>
                   {/*
                     件数と表示件数は絞り込みと同じ折り返しの流れの末尾に置く
                     （m21o）。`trailing` の別枠にすると、絞り込みがあふれた幅
@@ -999,21 +1003,28 @@ export default function TagsPageV4({
                 従来どおり表の内側だけが横へ動く。
               */}
               <DataTable>
-                {/* 設計 `HrwyW` の見出し。「表示」は★、「操作」はゴミ箱だけ。 */}
+                {/* 設計 `HrwyW` の見出し。「表示」は★。 */}
                 <thead>
                   <TableHeadRow>
-                    {/* 先頭の選択列と末尾の操作列は外側の余白をそろえる。操作列は中身の幅で固定する。 */}
+                    {/*
+                      列幅の取り直し（m21o Second）。固定幅の合計 308px＋
+                      割合54%にし、残りは「使用先」が吸う（auto）。割合だけの
+                      取り方だと固定2列（44＋64）が枠に上乗せされ、1440pxで
+                      44pxの横送りが出ていた。操作列は中身（編集＋…）に合わせ
+                      128pxへ広げる（枠付きボタンのため64pxでは切れる）。
+                      短い列は固定にして詰め、使用先は狭めても title で読める。
+                    */}
                     <Th style={{ width: 44 }}><span className="sr-only">並び替え</span></Th>
-                    <Th style={{ width: '22%' }}>タグ</Th>
-                    <Th style={{ width: '11%' }}>フォルダ</Th>
-                    <Th style={{ width: '7%' }} className="whitespace-nowrap">人数</Th>
+                    <Th style={{ width: '20%' }}>タグ</Th>
+                    <Th style={{ width: '10%' }}>フォルダ</Th>
+                    <Th style={{ width: 80 }} className="whitespace-nowrap">人数</Th>
                     <Th style={{ width: '11%' }} className="cq-hide-below-830 whitespace-nowrap">付け方</Th>
-                    <Th style={{ width: '17%' }} className="whitespace-nowrap" title="マイル・アクションとの連動">連動</Th>
+                    <Th style={{ width: '13%' }} className="whitespace-nowrap" title="マイル・アクションとの連動">連動</Th>
                     <Th>使用先</Th>
-                    <Th style={{ width: '6%' }}>表示</Th>
+                    <Th style={{ width: 56 }}>表示</Th>
                     {/* #768: 表が横に流れる帯でも操作列は右端に留める。 */}
-                    {/* 見出し「操作」は2文字で1行に収める（w-11 では「操／作」と折れる）。中身はゴミ箱1つなので w-16 で足りる。 */}
-                    <Th style={{ width: 64 }} className="sticky right-0 whitespace-nowrap bg-canvas-sunken">操作</Th>
+                    {/* 見出し「操作」は2文字で1行に収める（w-11 では「操／作」と折れる）。 */}
+                    <Th style={{ width: 128 }} className="sticky right-0 whitespace-nowrap bg-canvas-sunken">操作</Th>
                   </TableHeadRow>
                 </thead>
                 <tbody className="divide-y divide-hairline">
