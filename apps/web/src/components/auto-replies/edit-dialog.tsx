@@ -23,6 +23,8 @@ import {
 } from './draft-fields'
 import ImageUploader from '@/components/shared/image-uploader'
 import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
 import { TimeField } from '@/components/shared/date-time-field'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -988,24 +990,19 @@ export default function EditDialog({
             </div>
 
             {!page && <div>
-              <p className="text-ink-faint mb-1.5 text-xs">祝日</p>
-              <div className="space-y-1">
+              <RadioCardGroup legend="祝日">
                 {HOLIDAY_RULE_LABELS.map((option) => (
-                  <label key={option.value} className="flex cursor-pointer items-start gap-2">
-                    <input
-                      type="radio"
-                      name="ar-holiday"
-                      checked={holidayRule === option.value}
-                      onChange={() => setHolidayRule(option.value)}
-                      className="mt-0.5"
-                    />
-                    <span className="text-sm">
-                      {option.label}
-                      <span className="text-ink-faint block text-[11px]">{option.hint}</span>
-                    </span>
-                  </label>
+                  <RadioCard
+                    key={option.value}
+                    name="ar-holiday"
+                    value={option.value}
+                    checked={holidayRule === option.value}
+                    onChange={() => setHolidayRule(option.value)}
+                    title={option.label}
+                    note={option.hint}
+                  />
                 ))}
-              </div>
+              </RadioCardGroup>
             </div>}
 
             <div className="flex flex-wrap items-end gap-3">
@@ -1097,17 +1094,16 @@ export default function EditDialog({
                   {([['line', 'LINE'], ['email', 'メール']] as const).map(([source, label]) => {
                     const checked = receiveSources.includes(source)
                     return (
-                      <label key={source} className="border-hairline rounded-control flex items-center gap-2 border px-3 py-2 text-sm">
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => setReceiveSources((current) => {
-                            if (checked) return current.length === 1 ? current : current.filter((item) => item !== source)
-                            return [...current, source]
-                          })}
-                        />
+                      <Checkbox
+                        key={source}
+                        checked={checked}
+                        onCheckedChange={() => setReceiveSources((current) => {
+                          if (checked) return current.length === 1 ? current : current.filter((item) => item !== source)
+                          return [...current, source]
+                        })}
+                      >
                         {label}
-                      </label>
+                      </Checkbox>
                     )
                   })}
                 </div>
@@ -1132,53 +1128,32 @@ export default function EditDialog({
               </div>
             )}
 
-            {!page && <label className="flex cursor-pointer items-start gap-2">
-              <input
-                type="checkbox"
-                checked={skipWhenOperatorActive}
-                onChange={(e) => setSkipWhenOperatorActive(e.target.checked)}
-                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-success focus:ring-green-500"
-              />
-              <span className="text-ink-secondary text-xs">
-                担当者が対応中のトークでは返さない
-                <span className="text-ink-faint block text-[11px]">
-                  「対応中」のときだけ止まり、対応中が解除されるとあらためて動きます。
-                  未対応のまま放置されているトークには返します。
-                  予約・支払いなどの自動通知は別の送信経路なので止まりません。
-                </span>
-              </span>
-            </label>}
+            {!page && <Checkbox
+              checked={skipWhenOperatorActive}
+              onCheckedChange={setSkipWhenOperatorActive}
+              description="「対応中」のときだけ止まり、対応中が解除されるとあらためて動きます。未対応のまま放置されているトークには返します。予約・支払いなどの自動通知は別の送信経路なので止まりません。"
+            >
+              担当者が対応中のトークでは返さない
+            </Checkbox>}
 
             {!page && <div>
-              <p className="text-ink-faint mb-1.5 text-xs">応答する回数</p>
-              <div className="space-y-1">
-                <label className="flex cursor-pointer items-start gap-2">
-                  <input
-                    type="radio"
-                    name="ar-once"
-                    checked={!oncePerFriend}
-                    onChange={() => setOncePerFriend(false)}
-                    className="mt-0.5"
-                  />
-                  <span className="text-sm">何度でも応答する</span>
-                </label>
-                <label className="flex cursor-pointer items-start gap-2">
-                  <input
-                    type="radio"
-                    name="ar-once"
-                    checked={oncePerFriend}
-                    onChange={() => setOncePerFriend(true)}
-                    className="mt-0.5"
-                  />
-                  <span className="text-sm">
-                    1人につき1回だけ応答する
-                    <span className="text-ink-faint block text-[11px]">
-                      このルールで一度応答した人には、以後どのキーワードでも応答しません。
-                      上の「連投を防ぐ」は時間をあけるだけですが、こちらは二度と応答しません。
-                    </span>
-                  </span>
-                </label>
-              </div>
+              <RadioCardGroup legend="応答する回数">
+                <RadioCard
+                  name="ar-once"
+                  value="many"
+                  checked={!oncePerFriend}
+                  onChange={() => setOncePerFriend(false)}
+                  title="何度でも応答する"
+                />
+                <RadioCard
+                  name="ar-once"
+                  value="once"
+                  checked={oncePerFriend}
+                  onChange={() => setOncePerFriend(true)}
+                  title="1人につき1回だけ応答する"
+                  note="このルールで一度応答した人には、以後どのキーワードでも応答しません。上の「連投を防ぐ」は時間をあけるだけですが、こちらは二度と応答しません。"
+                />
+              </RadioCardGroup>
             </div>}
 
             <div>
@@ -1444,36 +1419,24 @@ export default function EditDialog({
                 </div>
               </div>
               <div className="md:col-span-2">
-                <label className="flex cursor-pointer items-start gap-2">
-                  <input
-                    type="checkbox"
-                    checked={skipWhenOperatorActive}
-                    onChange={(event) => setSkipWhenOperatorActive(event.target.checked)}
-                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-success focus:ring-green-500"
-                  />
-                  <span className="text-ink-secondary text-xs">
-                    担当者が対応中のトークでは返さない
-                    <span className="text-ink-faint block text-xs">
-                      「対応中」のときだけ止まり、対応中が解除されるとあらためて動きます。
-                      未対応のまま放置されているトークには返します。
-                      予約・支払いなどの自動通知は別の送信経路なので止まりません。
-                    </span>
-                  </span>
-                </label>
+                <Checkbox
+                  checked={skipWhenOperatorActive}
+                  onCheckedChange={setSkipWhenOperatorActive}
+                  description="「対応中」のときだけ止まり、対応中が解除されるとあらためて動きます。未対応のまま放置されているトークには返します。予約・支払いなどの自動通知は別の送信経路なので止まりません。"
+                >
+                  担当者が対応中のトークでは返さない
+                </Checkbox>
               </div>
             </div>
           )}
 
           {draft.id ? (
-            <label className="inline-flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={isActive}
-                onChange={(e) => setIsActive(e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300 text-success focus:ring-green-500"
-              />
-              <span className="text-ink-secondary text-xs">この応答をオンにする</span>
-            </label>
+            <Checkbox
+              checked={isActive}
+              onCheckedChange={setIsActive}
+            >
+              この応答をオンにする
+            </Checkbox>
           ) : (
             // AUTOREPLY-08: 新しい応答は止まった状態で保存される。
             // 有効化は一覧の「再開」や公開前の確認から、別の操作で行う。

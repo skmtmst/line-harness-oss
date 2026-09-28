@@ -163,7 +163,8 @@ describe('V6 自動応答一覧の契約', () => {
     expect(EDITOR).toContain('対応中が解除されるとあらためて動きます')
     expect(EDITOR).toContain('予約・支払いなどの自動通知は別の送信経路なので止まりません')
     // ページ表示（5段の編集画面）でも抑止設定を変えられる。
-    expect(EDITOR).toContain('setSkipWhenOperatorActive(event.target.checked)')
+    // m20j: 共通 Checkbox（onCheckedChange）へ寄せたため、素の event 式ではなく setter の配線を見る。
+    expect(EDITOR).toContain('setSkipWhenOperatorActive')
   })
 
   it('有効化完了の一時停止と複製を実口へ接続する（NEXT-20）', () => {
