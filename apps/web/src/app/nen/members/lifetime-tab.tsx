@@ -153,42 +153,51 @@ export default function LifetimeTab({
             </TableHeadRow>
           </thead>
           <tbody>
+            {/*
+              m18s: 幅を固定しない列は特典の1列だけにする。見出しだけでなく
+              行の側にも同じ幅を持たせ、どの行も同じ列幅で合うようにする。
+            */}
             {drafts.map((row, index) => (
               <Tr key={row.id ?? `new-${index}`}>
-                <Td>
+                <Td className="w-52">
                   <span className="flex items-center gap-2">
                     <TextField aria-label={`節目 ${index + 1}`} inputMode="numeric" value={row.threshold} onChange={(event) => update(index, { threshold: event.target.value })} />
                     <span className="shrink-0 text-caption font-semibold text-ink-faint">円</span>
                   </span>
                 </Td>
-                <Td><TextField aria-label={`称号 ${index + 1}`} value={row.title} maxLength={30} onChange={(event) => update(index, { title: event.target.value })} /></Td>
+                <Td className="w-56"><TextField aria-label={`称号 ${index + 1}`} value={row.title} maxLength={30} onChange={(event) => update(index, { title: event.target.value })} /></Td>
                 <Td className="cq-hide-below-800">
                   <span className="flex min-w-0 items-center gap-2.5">
                     <Chip tone="neutral" className="shrink-0">未設定</Chip>
                     <span className="min-w-0 truncate text-label text-ink-faint" title="限定グッズは決まり次第ここで設定します">限定グッズは決まり次第ここで設定します</span>
                   </span>
                 </Td>
-                <Td align="right" className="cq-hide-below-1010"><span className="text-label font-semibold tabular-nums text-ink">{row.reachedCount.toLocaleString('ja-JP')}人</span></Td>
-                <Td>
+                <Td align="right" className="cq-hide-below-1010 w-28"><span className="text-label font-semibold tabular-nums text-ink">{row.reachedCount.toLocaleString('ja-JP')}人</span></Td>
+                <Td className="w-44">
                   <Toggle checked={row.notify} onChange={(checked) => update(index, { notify: checked })} label={row.notify ? '通知する' : '通知しない'} />
                 </Td>
-                <Td align="right"><DeleteAction label={`${row.title || 'この節目'}を削除する`} onClick={() => { setDrafts((current) => current.filter((_, i) => i !== index)); setDirty(true) }} /></Td>
+                <Td align="right" className="w-14"><DeleteAction label={`${row.title || 'この節目'}を削除する`} onClick={() => { setDrafts((current) => current.filter((_, i) => i !== index)); setDirty(true) }} /></Td>
               </Tr>
             ))}
-            <Tr>
-              <Td colSpan={6}>
-                <button
-                  type="button"
-                  className="text-label font-semibold text-action"
-                  disabled={drafts.length >= 12}
-                  onClick={() => { setDrafts((current) => [...current, { id: null, threshold: '', title: '', notify: true, reachedCount: 0 }]); setDirty(true) }}
-                >
-                  ＋ 節目を追加
-                </button>
-              </Td>
-            </Tr>
           </tbody>
         </DataTable>
+        {/*
+          m18s 真因の直し：「追加」は表の外（表の下）に置き colSpan を使わない。
+          table-layout: fixed では結合セルが畳んだ列を見えない列として作り直し、
+          残り幅を分け合って帯と線が手前で切れて見える。表の中に結合が無いので
+          列は見えている列だけで決まる。枠の中のdivは共有の表部品が作るため、
+          同じ区画の表の直下に置く。
+        */}
+        <div className="mt-3">
+          <button
+            type="button"
+            className="text-label font-semibold text-action"
+            disabled={drafts.length >= 12}
+            onClick={() => { setDrafts((current) => [...current, { id: null, threshold: '', title: '', notify: true, reachedCount: 0 }]); setDirty(true) }}
+          >
+            ＋ 節目を追加
+          </button>
+        </div>
       </section>
 
       <StickyBar

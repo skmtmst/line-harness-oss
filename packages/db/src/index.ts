@@ -75,6 +75,7 @@ export * from './affiliate-links';
 export * from './affiliate-offers';
 export * from './mileage';
 export * from './mileage-admin-v6';
+export * from './mileage-approvals';
 export * from './mileage-rewards';
 export * from './affiliate-attribution';
 export * from './affiliate-report';
@@ -95,6 +96,7 @@ export function createDb(d1: D1Database): D1Database {
 export * from './folders';
 export * from './getting-started';
 export * from './manual-links';
+export * from './error-messages';
 export * from './recipes';
 export * from './account-handovers';
 export * from './friend-migrations';

@@ -66,8 +66,10 @@ describe('Pen.dev V6を共通レイアウトの正本にする', () => {
     expect(dashboard).not.toContain('shadow-[1px_1px_2px_rgba(29,29,31,0.13)]')
   })
 
-  it('編集画面は矢印ではなくドラッグ・表示切替・プレビューで操作する', () => {
+  it('編集画面はドラッグ・キーボード・表示切替・プレビューで操作する', () => {
     // 2026-09-03: 設計 `ZN0ov` は「「今日やること」は4枠までです」と書く。
+    // R116: ドラッグだけでは操作できない人がいるため、上下ボタンによる
+    // キーボード操作を残す（WCAG 2.5.7）。旧い「矢印禁止」の期待を更新する。
     for (const label of ['表示するカードと位置を変更します', 'カードと配置', 'プレビュー', '4枠までです', 'ダッシュボードに反映']) {
       expect(dashboardEditor).toContain(label)
     }
@@ -82,8 +84,9 @@ describe('Pen.dev V6を共通レイアウトの正本にする', () => {
     */
     expect(dashboardEditor).toContain("from '@line-crm/shared'")
     expect(dashboardEditor).toContain('DashboardGroup = DashboardCardGroup')
-    expect(dashboardEditor).not.toContain('上へ移動')
-    expect(dashboardEditor).not.toContain('下へ移動')
+    expect(dashboardEditor).toContain('上へ移動')
+    expect(dashboardEditor).toContain('下へ移動')
+    expect(dashboardEditor).toContain('KeyboardSensor')
   })
 
   it('対応が必要な受信はV4の4列だけを出し、件数に合わせて高さを縮める', () => {

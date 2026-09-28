@@ -905,10 +905,12 @@ nenCampaigns.post('/api/nen-campaigns/pets', requireRole('owner', 'admin'), asyn
   const now = jstNow();
   const id = crypto.randomUUID();
   await c.env.DB.prepare(
-    `INSERT INTO nen_pet_profiles (id, friend_id, customer_id, name, animal_type, gender, birthday, breed, weight_kg, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO nen_pet_profiles (id, friend_id, customer_id, name, animal_type, gender, birthday, breed, weight_kg, created_at, updated_at, weight_updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).bind(id, body.friendId, typeof body.customerId === 'string' ? body.customerId : null,
-    input.name, input.animalType, input.gender, input.birthday, input.breed, input.weightKg, now, now).run();
+    input.name, input.animalType, input.gender, input.birthday, input.breed, input.weightKg, now, now,
+    // 体重を入れて登録したときだけ「測った日＝登録日」を記録（監査 R57）。
+    input.weightKg == null ? null : now).run();
   await syncNenPetTags(c.env.DB, body.friendId);
   return c.json({ success: true, data: { id } }, 201);
 });
@@ -941,9 +943,15 @@ nenCampaigns.put('/api/nen-campaigns/pets/:id', requireRole('owner', 'admin'), a
     breed: patch.breed === undefined ? pet.breed : patch.breed,
     weightKg: patch.weightKg === undefined ? pet.weight_kg : patch.weightKg,
   };
+  // 監査 R57: 「体重の更新」は体重が実際に変わったときだけ動かす。
+  // 名前だけの編集や同じ値の再送では日付を維持する。
+  const weightTouched = patch.weightKg !== undefined && patch.weightKg !== pet.weight_kg;
   await c.env.DB.prepare(
-    `UPDATE nen_pet_profiles SET name = ?, animal_type = ?, gender = ?, birthday = ?, breed = ?, weight_kg = ?, updated_at = ? WHERE id = ?`,
-  ).bind(input.name, input.animalType, input.gender, input.birthday, input.breed, input.weightKg, jstNow(), c.req.param('id')).run();
+    `UPDATE nen_pet_profiles SET name = ?, animal_type = ?, gender = ?, birthday = ?, breed = ?, weight_kg = ?, updated_at = ?,
+       weight_updated_at = CASE WHEN ? THEN ? ELSE weight_updated_at END
+     WHERE id = ?`,
+  ).bind(input.name, input.animalType, input.gender, input.birthday, input.breed, input.weightKg, jstNow(),
+    weightTouched ? 1 : 0, jstNow(), c.req.param('id')).run();
   // 誕生日を明示して変えたときだけ、古い日付へ予約済みの誕生日クーポン配信を
   // 取消し、次の日次走査で新しい誕生日から組み直させる。発行済みの今年分は残る。
   if (patch.birthday !== undefined && (pet.birthday ?? null) !== patch.birthday) {

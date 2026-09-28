@@ -152,3 +152,38 @@ describe('課金プラン（36-2）', () => {
     expect(document.querySelector('[data-price-source="stripe"]')).toBeTruthy()
   })
 })
+
+/** R118: 履歴だけの取得失敗は「まだ支払いはありません」に置き換えない。 */
+describe('請求履歴の取得失敗（R118）', () => {
+  it('履歴の通信失敗でも概要は出し、履歴欄だけ失敗表示にする', async () => {
+    calls.invoices.mockRejectedValue(new Error('network'))
+    await openPage()
+    expect(screen.getByText('支払い履歴を読み込めませんでした')).toBeTruthy()
+    expect(screen.queryByText(/まだ支払いはありません/)).toBeNull()
+    // 概要（プラン）は出たまま。履歴の失敗で画面全体が失敗にならない。
+    expect(screen.getByText('ライト')).toBeTruthy()
+  })
+
+  it('履歴の失敗応答（success: false）も0件にしない', async () => {
+    calls.invoices.mockResolvedValue({ success: false, error: '履歴を取得できません' })
+    await openPage()
+    expect(screen.getByText('支払い履歴を読み込めませんでした')).toBeTruthy()
+    expect(screen.queryByText(/まだ支払いはありません/)).toBeNull()
+  })
+
+  it('履歴欄の「もう一度読み込む」で復帰する', async () => {
+    calls.invoices.mockRejectedValueOnce(new Error('network'))
+    await openPage()
+    expect(screen.getByText('支払い履歴を読み込めませんでした')).toBeTruthy()
+    calls.invoices.mockResolvedValue({ success: true, data: [] })
+    fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
+    await screen.findByText(/まだ支払いはありません/)
+    expect(screen.queryByText('支払い履歴を読み込めませんでした')).toBeNull()
+  })
+
+  it('履歴が本当に0件のときだけ「まだ支払いはありません」と出す', async () => {
+    await openPage()
+    expect(screen.getByText(/まだ支払いはありません/)).toBeTruthy()
+    expect(screen.queryByText('支払い履歴を読み込めませんでした')).toBeNull()
+  })
+})

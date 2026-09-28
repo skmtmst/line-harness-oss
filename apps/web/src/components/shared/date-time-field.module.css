@@ -53,6 +53,8 @@
 .timeLabel {
   display: grid;
   flex: 1;
+  /* 中の選択欄を幅に追従させるため、flex の最小幅（内容の幅）を外す（監査 R156）。 */
+  min-width: 0;
   gap: 4px;
   color: var(--color-ink-secondary);
   font-size: var(--text-label);

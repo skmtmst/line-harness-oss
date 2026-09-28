@@ -15,6 +15,12 @@ export interface RecipeRow {
   creates_summary: string;
   version: number;
   origin: 'builtin' | 'org';
+  /**
+   * 組織レシピの持ち主のアカウント。`builtin` は NULL（全組織共通）。
+   * 組織レシピは作った組織の範囲にだけ見える（要件 §7-5）。
+   */
+  line_account_id: string | null;
+  created_by_staff_id: string | null;
   required_features: string;
   items_json: string | null;
   item_count: number | null;
@@ -85,15 +91,91 @@ export function missingFeatures(required: string[], features: Record<string, boo
   return required.filter((key) => features[key] === false);
 }
 
-export async function listRecipes(db: D1Database): Promise<RecipeRow[]> {
-  const result = await db
-    .prepare(`SELECT * FROM recipes ORDER BY display_order, created_at`)
-    .all<RecipeRow>();
+/**
+ * 見えるレシピ。
+ *
+ * **組織レシピは持ち主の範囲にだけ出す。** アカウントが決まっていなければ
+ * 初期同梱（`builtin`）だけを返す——別の組織のレシピをこぼさない。
+ */
+export async function listRecipes(db: D1Database, accountId?: string | null): Promise<RecipeRow[]> {
+  const result = accountId
+    ? await db
+        .prepare(
+          `SELECT * FROM recipes
+            WHERE line_account_id IS NULL OR line_account_id = ?
+            ORDER BY display_order, created_at`,
+        )
+        .bind(accountId)
+        .all<RecipeRow>()
+    : await db
+        .prepare(`SELECT * FROM recipes WHERE line_account_id IS NULL ORDER BY display_order, created_at`)
+        .all<RecipeRow>();
   return result.results;
 }
 
-export async function getRecipeById(db: D1Database, id: string): Promise<RecipeRow | null> {
-  return db.prepare(`SELECT * FROM recipes WHERE id = ?`).bind(id).first<RecipeRow>();
+/**
+ * 1件を引く。`accountId` を渡すと、ほかの組織のレシピは無いものとして扱う
+ * （範囲外は 404——要件 §13）。
+ */
+export async function getRecipeById(
+  db: D1Database,
+  id: string,
+  accountId?: string | null,
+): Promise<RecipeRow | null> {
+  const row = await db.prepare(`SELECT * FROM recipes WHERE id = ?`).bind(id).first<RecipeRow>();
+  if (!row) return null;
+  if (accountId !== undefined && row.line_account_id !== null && row.line_account_id !== accountId) {
+    return null;
+  }
+  return row;
+}
+
+/**
+ * 組織レシピを作る（§7-5）。`origin` は常に `'org'`。
+ *
+ * **見本は版付き JSON で持つ。** 複製したあとにレシピを新版にしても、
+ * 作られた定義は変わらない（§7-4）。
+ */
+export async function createRecipe(
+  db: D1Database,
+  input: {
+    name: string;
+    purpose: string;
+    createsSummary: string;
+    requiredFeatures?: string[];
+    items?: RecipeItem[] | null;
+    lineAccountId: string;
+    createdByStaffId?: string | null;
+  },
+): Promise<RecipeRow> {
+  const id = crypto.randomUUID();
+  const now = jstNow();
+  const itemsJson = input.items ? JSON.stringify(input.items) : null;
+  await db
+    .prepare(
+      `INSERT INTO recipes
+         (id, name, purpose, creates_summary, version, origin, line_account_id,
+          created_by_staff_id, required_features, items_json, item_count,
+          display_order, created_at, updated_at)
+       VALUES (?, ?, ?, ?, 1, 'org', ?, ?, ?, ?, ?, 0, ?, ?)`,
+    )
+    .bind(
+      id,
+      input.name,
+      input.purpose,
+      input.createsSummary,
+      input.lineAccountId,
+      input.createdByStaffId ?? null,
+      JSON.stringify(input.requiredFeatures ?? []),
+      itemsJson,
+      input.items ? input.items.length : null,
+      now,
+      now,
+    )
+    .run();
+  const saved = await getRecipeById(db, id);
+  if (!saved) throw new Error('recipe_not_saved');
+  return saved;
 }
 
 /** これまで何回作られたか。レシピごと。 */

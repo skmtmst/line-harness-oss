@@ -8,6 +8,7 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
+  type Announcements,
   type DragEndEvent,
 } from '@dnd-kit/core'
 import {
@@ -24,6 +25,7 @@ import {
   type DashboardCardGroup,
   type DashboardCardId,
 } from '@line-crm/shared'
+import { ChevronDown, ChevronUp } from 'lucide-react'
 import Button from '@/components/shared/button'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import Notice from '@/components/shared/notice'
@@ -141,6 +143,21 @@ export function reorderDashboardItems(
   return arrayMove(items, oldIndex, newIndex)
 }
 
+/*
+ * R116: ドラッグを使わない1つずつの移動。タッチやマウスだけ、キーボード
+ * だけのどちらでも順番を変えられるようにする。端では何もしない。
+ */
+export function moveDashboardItem(
+  items: DashboardPreferenceItem[],
+  id: DashboardCardId,
+  direction: 'up' | 'down',
+): DashboardPreferenceItem[] {
+  const index = items.findIndex((item) => item.id === id)
+  const next = direction === 'up' ? index - 1 : index + 1
+  if (index < 0 || next < 0 || next >= items.length) return items
+  return arrayMove(items, index, next)
+}
+
 /** 「今日やること」の5枚目をONにしたとき、並びのいちばん下を自動でOFFにする。 */
 export function toggleDashboardItem(
   items: DashboardPreferenceItem[],
@@ -178,9 +195,12 @@ function GripIcon() {
   )
 }
 
-function SortableCardRow({ item, definition, onToggle }: {
+function SortableCardRow({ item, definition, canMoveUp, canMoveDown, onMove, onToggle }: {
   item: DashboardPreferenceItem
   definition: CardDefinition
+  canMoveUp: boolean
+  canMoveDown: boolean
+  onMove: (direction: 'up' | 'down') => void
   onToggle: () => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id })
@@ -194,6 +214,30 @@ function SortableCardRow({ item, definition, onToggle }: {
       <div className="min-w-0 flex-1">
         <p className="text-ink truncate text-sm font-medium" title={definition.label}>{definition.label}</p>
         <p className="text-ink-faint truncate text-[11px]" title={definition.description}>{definition.description}</p>
+      </div>
+      {/*
+        R116: ドラッグが難しいときの上下ボタン。タッチやマウスだけでも
+        1つずつ動かせる。端では押せない。
+      */}
+      <div role="group" aria-label={`${definition.label}の順番`} className="flex shrink-0 items-center">
+        <button
+          type="button"
+          aria-label={`${definition.label}を1つ上へ移動`}
+          disabled={!canMoveUp}
+          onClick={() => onMove('up')}
+          className="text-ink-faint hover:text-ink rounded p-1 disabled:opacity-30"
+        >
+          <ChevronUp aria-hidden="true" className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          aria-label={`${definition.label}を1つ下へ移動`}
+          disabled={!canMoveDown}
+          onClick={() => onMove('down')}
+          className="text-ink-faint hover:text-ink rounded p-1 disabled:opacity-30"
+        >
+          <ChevronDown aria-hidden="true" className="h-4 w-4" />
+        </button>
       </div>
       <label className="relative inline-flex shrink-0 cursor-pointer items-center">
         <input type="checkbox" checked={item.visible} onChange={onToggle} className="peer sr-only" aria-label={`${definition.label}を${item.visible ? '非表示' : '表示'}にする`} />
@@ -291,6 +335,8 @@ export default function DashboardEditor({ open, preferences, saving = false, sav
   const [mode, setMode] = useState<'cards' | 'preview'>('cards')
   const [confirmingReset, setConfirmingReset] = useState(false)
   const [reloading, setReloading] = useState(false)
+  /* R116: ボタン移動の結果を日本語で読み上げる。 */
+  const [announcement, setAnnouncement] = useState('')
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -344,6 +390,36 @@ export default function DashboardEditor({ open, preferences, saving = false, sav
     }))
   }
 
+  /* R116: 上下ボタンでの移動。端では何もしない。結果は日本語で読み上げる。 */
+  const handleMove = (group: DashboardGroup, id: DashboardCardId, direction: 'up' | 'down') => {
+    const next = moveDashboardItem(draft[group], id, direction)
+    if (next === draft[group]) return
+    setDraft({ ...draft, [group]: next })
+    const position = next.findIndex((item) => item.id === id) + 1
+    setAnnouncement(`${CARD_DEFINITION_MAP.get(id)?.label ?? id}を${position}番目へ移動しました`)
+  }
+
+  /*
+   * R116: ドラッグ中の読み上げも日本語にする。dnd-kit の既定は英語で、
+   * 位置も伝わらない。`draft` は描画時点の並びで、指している先の番号を言う。
+   */
+  const japaneseAnnouncements = (group: DashboardGroup): Announcements => {
+    const labelOf = (id: unknown) => CARD_DEFINITION_MAP.get(id as DashboardCardId)?.label ?? String(id)
+    const positionOf = (id: unknown) => draft[group].findIndex((item) => item.id === id) + 1
+    return {
+      onDragStart: ({ active }) => `${labelOf(active.id)}を持ち上げました。今の位置は${positionOf(active.id)}番目です。`,
+      onDragOver: ({ active, over }) => {
+        if (!over || active.id === over.id) return undefined
+        return `${labelOf(active.id)}を${labelOf(over.id)}の位置へ移動します。`
+      },
+      onDragEnd: ({ active, over }) => {
+        if (!over || active.id === over.id) return `${labelOf(active.id)}の位置は変わりませんでした。`
+        return `${labelOf(active.id)}を${positionOf(over.id)}番目へ移動しました。`
+      },
+      onDragCancel: ({ active }) => `${labelOf(active.id)}の移動をやめました。`,
+    }
+  }
+
   return (
     <div data-design="Editor" className="bg-ink/30 fixed inset-0 z-50 flex justify-end" role="presentation" onMouseDown={() => { if (!saving) onCancel() }}>
       <aside ref={panelRef} role="dialog" aria-modal="true" aria-labelledby="dashboard-editor-title" className="bg-canvas flex h-full w-full max-w-[540px] flex-col shadow-float" onMouseDown={(event) => event.stopPropagation()}>
@@ -356,7 +432,7 @@ export default function DashboardEditor({ open, preferences, saving = false, sav
             <button type="button" onClick={onCancel} disabled={saving} aria-label="閉じる" className="text-ink-faint hover:text-ink rounded-control p-1.5"><CloseIcon /></button>
           </div>
           <div className="mt-4 flex items-center justify-between gap-4">
-            <p className="text-ink-secondary text-xs">持ち手をドラッグして移動。スイッチで表示を切り替えます。</p>
+            <p className="text-ink-secondary text-xs">持ち手をドラッグして移動。上下ボタン・キーボードでも順番を変更。スイッチで表示を切り替えます。</p>
             {/*
               「初期状態に戻す」は個人配置の削除なので、パネル内の確認を
               挟んでから実行する（A01-02）。1回目のクリックは確認を出すだけで、
@@ -393,6 +469,9 @@ export default function DashboardEditor({ open, preferences, saving = false, sav
             <Button role="tab" aria-selected={mode === 'preview'} onClick={() => setMode('preview')} variant={mode === 'preview' ? 'primary' : 'secondary'}>プレビュー</Button>
           </div>
         </header>
+
+        {/* R116: 上下ボタンで動かした結果を読み上げる（見た目には出さない）。 */}
+        <p role="status" className="sr-only">{announcement}</p>
 
         {/*
           配置の保存・初期化の失敗はこのパネルの上部へ出す（DASH-05）。
@@ -432,15 +511,33 @@ export default function DashboardEditor({ open, preferences, saving = false, sav
                       設計 `ZN0ov` は「「今日やること」は4枠までです」を独立した1行で出す。
                       繋げると、上限の文と操作の案内が1つの札に見える。
                     */}
-                    <span className="text-ink-faint text-[11px]">ドラッグで順番変更</span>
+                    <span className="text-ink-faint text-[11px]">上下ボタン・ドラッグで順番変更</span>
                   </div>
-                  <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(event) => handleDragEnd(group, event)}>
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    accessibility={{
+                      announcements: japaneseAnnouncements(group),
+                      screenReaderInstructions: { draggable: '持ち上げるには Space を押し、上下の矢印キーで移動し、Space で置きます。Esc でやめます。' },
+                    }}
+                    onDragEnd={(event) => handleDragEnd(group, event)}
+                  >
                     <SortableContext items={draft[group].map((item) => item.id)} strategy={verticalListSortingStrategy}>
                       <div className="border-hairline overflow-hidden rounded-[9px] border">
-                        {draft[group].map((item) => {
+                        {draft[group].map((item, index) => {
                           const definition = CARD_DEFINITION_MAP.get(item.id)
                           if (!definition) return null
-                          return <SortableCardRow key={item.id} item={item} definition={definition} onToggle={() => toggle(group, item.id)} />
+                          return (
+                            <SortableCardRow
+                              key={item.id}
+                              item={item}
+                              definition={definition}
+                              canMoveUp={index > 0}
+                              canMoveDown={index < draft[group].length - 1}
+                              onMove={(direction) => handleMove(group, item.id, direction)}
+                              onToggle={() => toggle(group, item.id)}
+                            />
+                          )
                         })}
                       </div>
                     </SortableContext>

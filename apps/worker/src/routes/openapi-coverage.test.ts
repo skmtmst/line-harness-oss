@@ -600,13 +600,14 @@ const ALLOWLIST = new Set<string>([
   'PUT /api/booking/admin/staff/{id}/menus',
   'PUT /api/booking/admin/staff/{id}/shifts',
 
-  // 機能「mileage」の管理画面用API（OpenAPI未記載・順次記載）（39件）
+  // 機能「mileage」の管理画面用API（OpenAPI未記載・順次記載）（46件）
   'DELETE /api/scoring-rules/{id}',
   'GET /api/action-scores/bands',
   'GET /api/action-scores/friends',
   'GET /api/action-scores/rules',
   'GET /api/friends/{id}/mileage',
   'GET /api/friends/{id}/score',
+  'GET /api/mileage/adjustment-approvals',
   'GET /api/mileage/adjustment-policy',
   'GET /api/mileage/earning-rules',
   'GET /api/mileage/friends',
@@ -624,7 +625,13 @@ const ALLOWLIST = new Set<string>([
   'POST /api/action-scores/rules/stop',
   'POST /api/action-scores/rules/test',
   'POST /api/friends/{id}/score',
+  'POST /api/mileage/adjustment-approvals/{id}/approve',
+  'POST /api/mileage/adjustment-approvals/{id}/cancel',
+  'POST /api/mileage/adjustment-approvals/{id}/reject',
   'POST /api/mileage/adjustments',
+  'POST /api/mileage/earning-rules/test',
+  'POST /api/mileage/entries/{id}/confirm',
+  'POST /api/mileage/entries/{id}/void',
   'POST /api/mileage/events',
   'POST /api/mileage/redemptions',
   'POST /api/mileage/redemptions/{id}/retry-fulfillment',
@@ -759,6 +766,7 @@ const ALLOWLIST = new Set<string>([
   'GET /api/affiliate-payments',
   'GET /api/affiliate-payments/{id}/preview',
   'GET /api/affiliate-payout-batches/{id}/download',
+  'GET /api/affiliate-settlements/current',
   'GET /api/affiliate-settlements/preview',
   'GET /api/affiliates-report',
   'GET /api/affiliates/{id}/archive-impact',
@@ -1386,10 +1394,11 @@ const ALLOWLIST = new Set<string>([
   'GET /api/accounts/{id}/health',
   'POST /api/accounts/{id}/migrate',
 
-  // core：設定テンプレート（OpenAPI未記載・順次記載）（4件）
+  // core：設定テンプレート（OpenAPI未記載・順次記載）（5件）
   'GET /api/recipes',
   'GET /api/recipes/clone-runs/{runId}',
   'GET /api/recipes/{id}',
+  'POST /api/recipes',
   'POST /api/recipes/{id}/clone',
 
   // public：LINE利用者が行う公開フォーム操作（OpenAPI未記載・順次記載）（3件）
@@ -1428,8 +1437,12 @@ const ALLOWLIST = new Set<string>([
   // public：回答前に表示する公開フォーム（OpenAPI未記載・順次記載）（1件）
   'GET /api/forms/{id}',
 
-  // core：初期設定（OpenAPI未記載・順次記載）（1件）
+  // core：初期設定（OpenAPI未記載・順次記載）（2件）
   'GET /api/getting-started',
+  'POST /api/getting-started/dismiss',
+
+  // core：失敗文面の対応表（OpenAPI未記載・順次記載）（1件）
+  'GET /api/error-messages',
 
   // system：稼働確認（OpenAPI未記載・順次記載）（1件）
   'GET /api/health',
