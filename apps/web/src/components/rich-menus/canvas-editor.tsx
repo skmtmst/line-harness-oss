@@ -10,8 +10,12 @@ export type Area = {
   boundsY: number
   boundsWidth: number
   boundsHeight: number
-  /** LINE に登録するときの動きの種類。intent から決まる。 */
-  actionType: 'uri' | 'message' | 'postback' | 'richmenuswitch'
+  /**
+   * LINE に登録するときの動きの種類。intent から決まる。
+   * datetimepicker・clipboard は新しい2種。DB へは postback に載るが、
+   * 画面が送る段階では intent から決めた本来の種類を載せる。
+   */
+  actionType: 'uri' | 'message' | 'postback' | 'richmenuswitch' | 'datetimepicker' | 'clipboard'
   actionData: Record<string, unknown>
   /** 運用者から見た「何をするボタンか」。 */
   intent?: RichMenuAreaIntent | null

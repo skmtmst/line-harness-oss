@@ -436,6 +436,8 @@
     "477_entry_route_account_active_index.sql",
     "478_webinar_video_assets.sql",
     "479_webinar_session_capacity.sql",
+    "480_rich_menu_versions.sql",
+    "481_rich_menu_device_confirmations.sql",
     "482_form_test_answers.sql",
     "483_form_open_test_flag.sql",
     "484_common_var_lifecycle.sql",
@@ -458,7 +460,9 @@
     "503_measurement_sites.sql",
     "504_conversion_reversal_ledger.sql",
     "507_webinar_heartbeat_state.sql",
-    "508_webinar_heartbeat_rejects.sql"
+    "508_webinar_heartbeat_rejects.sql",
+    "509_rich_menu_publish_runs.sql",
+    "510_rich_menu_publish_run_pages.sql"
   ],
-  "migrationCount": 459
+  "migrationCount": 463
 }
