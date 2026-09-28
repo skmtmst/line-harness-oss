@@ -466,7 +466,8 @@
     "508_webinar_heartbeat_rejects.sql",
     "509_rich_menu_publish_runs.sql",
     "510_rich_menu_publish_run_pages.sql",
-    "511_restaurant_google_posts.sql"
+    "511_restaurant_google_posts.sql",
+    "512_restaurant_google_metrics.sql"
   ],
-  "migrationCount": 467
+  "migrationCount": 468
 }

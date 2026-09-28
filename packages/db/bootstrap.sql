@@ -5798,7 +5798,7 @@ CREATE TABLE rt_google_connections (
   total_review_count INTEGER,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
+, last_posts_synced_at TEXT, last_metrics_synced_at TEXT);
 
 CREATE TABLE rt_google_location_candidates (
   id TEXT PRIMARY KEY,
@@ -5808,6 +5808,30 @@ CREATE TABLE rt_google_location_candidates (
   address_text TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   UNIQUE(store_id, location_name)
+);
+
+CREATE TABLE rt_google_metrics_daily (
+  store_id TEXT NOT NULL REFERENCES rt_stores(id) ON DELETE CASCADE,
+  date TEXT NOT NULL,                       -- YYYY-MM-DD（店舗所在地の暦日。Googleの日次区切りに従う）
+
+  -- プロフィール表示（Business Impressions）の内訳
+  impressions_desktop_maps INTEGER,
+  impressions_desktop_search INTEGER,
+  impressions_mobile_maps INTEGER,
+  impressions_mobile_search INTEGER,
+
+  -- 行動（クリック等）
+  direction_requests INTEGER,               -- ルート検索
+  call_clicks INTEGER,                      -- 電話ボタンのクリック（通話成立数ではない）
+  website_clicks INTEGER,                   -- サイトへのクリック
+
+  -- 飲食店向け
+  menu_clicks INTEGER,                      -- メニュー閲覧
+  bookings INTEGER,                         -- Google経由の予約（連携サービス未対応の店舗は NULL）
+  food_orders INTEGER,                      -- 料理の注文（同上）
+
+  fetched_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  PRIMARY KEY (store_id, date)
 );
 
 CREATE TABLE rt_google_oauth_states (
@@ -8699,6 +8723,9 @@ CREATE INDEX idx_rt_gbp_reviews_store ON rt_gbp_reviews(store_id, reply_status, 
 CREATE INDEX idx_rt_google_changes_status ON rt_google_changes(store_id, status);
 
 CREATE INDEX idx_rt_google_changes_store ON rt_google_changes(store_id, created_at DESC);
+
+CREATE INDEX idx_rt_google_metrics_daily_store_date
+  ON rt_google_metrics_daily(store_id, date DESC);
 
 CREATE INDEX idx_rt_google_oauth_states_expires ON rt_google_oauth_states(expires_at);
 

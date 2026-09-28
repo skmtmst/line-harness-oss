@@ -150,11 +150,17 @@ export class GoogleAiTimeout extends Error {
 
 // ---------- env / helpers ----------
 
-function oauthClient(c: Context<Env>): GoogleOAuthClient | null {
-  const clientId = c.env.GOOGLE_BUSINESS_OAUTH_CLIENT_ID?.trim();
-  const clientSecret = c.env.GOOGLE_BUSINESS_OAUTH_CLIENT_SECRET?.trim();
+function oauthClientForEnv(env: Env['Bindings'], origin?: string): GoogleOAuthClient | null {
+  const clientId = env.GOOGLE_BUSINESS_OAUTH_CLIENT_ID?.trim();
+  const clientSecret = env.GOOGLE_BUSINESS_OAUTH_CLIENT_SECRET?.trim();
   if (!clientId || !clientSecret) return null;
-  return { clientId, clientSecret, redirectUri: `${new URL(c.req.url).origin}${CALLBACK_PATH}` };
+  // refresh には redirectUri を使わない。cron などリクエスト外から呼ぶときは
+  // ダミーの origin でよい（google-sheets の sheetsOauthClient と同じ扱い）。
+  return { clientId, clientSecret, redirectUri: `${origin ?? 'https://localhost'}${CALLBACK_PATH}` };
+}
+
+function oauthClient(c: Context<Env>): GoogleOAuthClient | null {
+  return oauthClientForEnv(c.env, new URL(c.req.url).origin);
 }
 
 export function writeEnabled(env: Env['Bindings']): boolean {
@@ -336,11 +342,15 @@ function publicReview(row: ReviewRow) {
   };
 }
 
-export async function setConnectionStatus(c: Context<Env>, storeId: string, status: ConnectionStatus, error?: string | null): Promise<void> {
-  await dbFor(c.env, storeId)
+export async function setConnectionStatusForEnv(env: Env['Bindings'], storeId: string, status: ConnectionStatus, error?: string | null): Promise<void> {
+  await dbFor(env, storeId)
     .prepare(`UPDATE rt_google_connections SET status = ?, last_sync_error = COALESCE(?, last_sync_error), updated_at = ? WHERE store_id = ?`)
     .bind(status, error ?? null, nowIso(), storeId)
     .run();
+}
+
+export async function setConnectionStatus(c: Context<Env>, storeId: string, status: ConnectionStatus, error?: string | null): Promise<void> {
+  await setConnectionStatusForEnv(c.env, storeId, status, error);
 }
 
 async function writeLog(
@@ -372,18 +382,18 @@ async function writeLog(
  * 有効なアクセストークンを返す。期限が近ければ更新して保存する。
  * 更新に失敗（invalid_grant）したら接続状態を expired にして例外を投げる。
  */
-export async function accessTokenFor(c: Context<Env>, connection: ConnectionRow): Promise<string> {
-  const key = c.env.LINE_CREDENTIAL_ENCRYPTION_KEY;
+export async function accessTokenForConnection(env: Env['Bindings'], connection: ConnectionRow): Promise<string> {
+  const key = env.LINE_CREDENTIAL_ENCRYPTION_KEY;
   const expiresAt = connection.access_token_expires_at ? Date.parse(connection.access_token_expires_at) : 0;
   if (connection.access_token_enc && expiresAt > Date.now() + 60_000) {
     return decryptCredential(connection.access_token_enc, key);
   }
   if (!connection.refresh_token_enc) throw new GoogleBusinessError('auth_expired', null, 'google_refresh_token_missing');
-  const client = oauthClient(c);
+  const client = oauthClientForEnv(env);
   if (!client) throw new GoogleBusinessError('unavailable', null, 'google_oauth_not_configured');
   try {
     const tokens = await refreshAccessToken({ client, refreshToken: await decryptCredential(connection.refresh_token_enc, key), fetch });
-    await dbFor(c.env, connection.store_id)
+    await dbFor(env, connection.store_id)
       .prepare(
         `UPDATE rt_google_connections
          SET access_token_enc = ?, access_token_expires_at = ?, refresh_token_enc = ?, updated_at = ?
@@ -400,10 +410,14 @@ export async function accessTokenFor(c: Context<Env>, connection: ConnectionRow)
     return tokens.accessToken;
   } catch (error) {
     if (error instanceof GoogleBusinessError && error.kind === 'auth_expired') {
-      await setConnectionStatus(c, connection.store_id, 'expired', 'auth_expired');
+      await setConnectionStatusForEnv(env, connection.store_id, 'expired', 'auth_expired');
     }
     throw error;
   }
+}
+
+export async function accessTokenFor(c: Context<Env>, connection: ConnectionRow): Promise<string> {
+  return accessTokenForConnection(c.env, connection);
 }
 
 export function googleErrorResponse(c: Context<Env>, error: unknown) {
@@ -484,6 +498,11 @@ restaurantGoogle.get('/api/restaurant-test/google/connection', async (c) => {
     )
     .bind(connection?.last_synced_at ? new Date(Date.parse(connection.last_synced_at) - 24 * 3600 * 1000).toISOString() : null, store.id)
     .first<{ unreplied: number | null; drafts: number | null; attention: number | null; new_count: number | null; stored: number }>();
+  // 第4段: 投稿タブの件数バッジ用。要対応 = Googleが不承認（rejected）か送信失敗（failed）。
+  const postsAttention = await db
+    .prepare(`SELECT COUNT(*) AS n FROM rt_google_posts WHERE store_id = ? AND status IN ('rejected', 'failed')`)
+    .bind(store.id)
+    .first<{ n: number }>();
   const candidates =
     connection?.status === 'pending_location'
       ? (
@@ -505,6 +524,7 @@ restaurantGoogle.get('/api/restaurant-test/google/connection', async (c) => {
       attentionCount: counts?.attention ?? 0,
       newCount: counts?.new_count ?? 0,
       storedCount: counts?.stored ?? 0,
+      postsAttentionCount: postsAttention?.n ?? 0,
       syncStale: !lastSyncedMs || Date.now() - lastSyncedMs > SYNC_STALE_AFTER_MS,
     },
     writeEnabled: writeEnabled(c.env),
@@ -762,8 +782,9 @@ restaurantGoogle.post('/api/restaurant-test/google/disconnect', requireConnectio
 
 // ---------- 口コミタブ ----------
 
-async function upsertReviews(c: Context<Env>, storeId: string, reviews: GoogleReview[]): Promise<void> {
-  const db = dbFor(c.env, storeId);
+/** 口コミの取り込みUPSERT。手動sync（下のエンドポイント）と定期再同期の両方から使う。 */
+export async function upsertReviewsForEnv(env: Env['Bindings'], storeId: string, reviews: GoogleReview[]): Promise<void> {
+  const db = dbFor(env, storeId);
   const now = nowIso();
   const statements = reviews.map((review) =>
     db
@@ -808,6 +829,23 @@ async function upsertReviews(c: Context<Env>, storeId: string, reviews: GoogleRe
   }
 }
 
+/** 同期結果（時刻・平均評価・総件数）を接続行へ記録する。手動syncと定期再同期の両方から使う。 */
+export async function recordReviewSyncResult(
+  env: Env['Bindings'],
+  storeId: string,
+  result: { complete: boolean; averageRating: number | null; totalReviewCount: number | null },
+): Promise<void> {
+  await dbFor(env, storeId)
+    .prepare(
+      `UPDATE rt_google_connections
+       SET last_synced_at = ?, last_sync_error = ?, average_rating = COALESCE(?, average_rating),
+           total_review_count = COALESCE(?, total_review_count), status = 'connected', updated_at = ?
+       WHERE store_id = ?`,
+    )
+    .bind(nowIso(), result.complete ? null : 'partial', result.averageRating, result.totalReviewCount, nowIso(), storeId)
+    .run();
+}
+
 restaurantGoogle.post('/api/restaurant-test/google/reviews/sync', async (c) => {
   const ctx = await requireConnectedStore(c);
   if (ctx instanceof Response) return ctx;
@@ -815,16 +853,8 @@ restaurantGoogle.post('/api/restaurant-test/google/reviews/sync', async (c) => {
   try {
     const accessToken = await accessTokenFor(c, connection);
     const result = await listAllReviews({ fetch, accessToken }, connection.location_name!);
-    await upsertReviews(c, store.id, result.reviews);
-    await dbFor(c.env, store.id)
-      .prepare(
-        `UPDATE rt_google_connections
-         SET last_synced_at = ?, last_sync_error = ?, average_rating = COALESCE(?, average_rating),
-             total_review_count = COALESCE(?, total_review_count), status = 'connected', updated_at = ?
-         WHERE store_id = ?`,
-      )
-      .bind(nowIso(), result.complete ? null : 'partial', result.averageRating, result.totalReviewCount, nowIso(), store.id)
-      .run();
+    await upsertReviewsForEnv(c.env, store.id, result.reviews);
+    await recordReviewSyncResult(c.env, store.id, result);
     return c.json({
       success: true,
       fetched: result.reviews.length,

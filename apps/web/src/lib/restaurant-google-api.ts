@@ -26,7 +26,7 @@ export type GoogleConnectionData = {
   store: { id: string; name: string; lineAccountId: string }
   connection: GoogleConnection
   candidates: GoogleLocationCandidate[]
-  summary: { unrepliedCount: number; draftCount: number; attentionCount: number; newCount: number; storedCount: number; syncStale: boolean }
+  summary: { unrepliedCount: number; draftCount: number; attentionCount: number; newCount: number; storedCount: number; postsAttentionCount: number; syncStale: boolean }
   writeEnabled: boolean
   oauthConfigured: boolean
   aiAvailable: boolean
@@ -222,6 +222,29 @@ export type GooglePostListData = {
   permissions: { canPublish: boolean }
 }
 
+// ---------- 第4段：パフォーマンス ----------
+
+export type GooglePerformanceDays = 7 | 28 | 90
+
+export type GooglePerformanceTotals = {
+  impressions: number | null
+  directionRequests: number | null
+  callClicks: number | null
+  websiteClicks: number | null
+}
+
+export type GooglePerformanceData = {
+  success: true
+  days: GooglePerformanceDays
+  range: { startDate: string; endDate: string }
+  previousRange: { startDate: string; endDate: string }
+  totals: GooglePerformanceTotals
+  previousTotals: GooglePerformanceTotals
+  daily: Array<{ date: string; impressions: number | null }>
+  food: { menuClicks: number | null; bookings: number | null; foodOrders: number | null }
+  lastMetricsSyncedAt: string | null
+}
+
 const base = '/api/restaurant-test/google'
 
 export const restaurantGoogleApi = {
@@ -290,4 +313,8 @@ export const restaurantGoogleApi = {
     fetchApi<{ success: true; alreadyPublished: boolean; post: GooglePost }>(withAccount(`${base}/posts/${encodeURIComponent(id)}/publish`, accountId), { method: 'POST', body: JSON.stringify({ confirmed: true }) }),
   removePost: (accountId: string, id: string) =>
     fetchApi<{ success: true; post: GooglePost }>(withAccount(`${base}/posts/${encodeURIComponent(id)}/remove`, accountId), { method: 'POST', body: JSON.stringify({ confirmed: true }) }),
+
+  // 第4段：パフォーマンス
+  performance: (accountId: string, days: GooglePerformanceDays) =>
+    fetchApi<GooglePerformanceData>(withAccount(`${base}/performance`, accountId, { days })),
 }
