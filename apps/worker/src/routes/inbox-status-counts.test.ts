@@ -117,15 +117,35 @@ describe('受信箱の対応状況は正本と一致する', () => {
     }
   });
 
-  test('LINEアカウントを指定した範囲ではMAILを数えない（受信箱の一覧と同じ）', async () => {
+  test('LINEアカウント選択中もMAILを数える（受信箱の一覧と同じ）', async () => {
     await seedMixed();
-    const lineOnly = await getInboxStatusCounts(db.db, { allowedAccountIds: ['account-a'], includeUnassigned: false });
+    // メールはLINEアカウントに所属しない。選択中のアカウントがあっても、
+    // 未割り当てが見える範囲ではメールを数える。一覧と同じ条件。
+    const scope = { allowedAccountIds: ['account-a'], includeUnassigned: true };
+    const counts = await getInboxStatusCounts(db.db, scope);
     const res = await app().request('/api/chats/quick-counts?channel=all&lineAccountId=account-a', {}, { DB: db.db });
-    const body = await res.json() as { success: boolean; data: { all: number; reply: number } };
+    const body = await res.json() as {
+      success: boolean;
+      data: { all: number; reply: number; email: { all: number } };
+    };
     expect(body.data.all).toBe(
-      lineOnly.line.unanswered + lineOnly.line.inProgress + lineOnly.line.onHold + lineOnly.line.resolved,
+      counts.unanswered + counts.inProgress + counts.onHold + counts.resolved,
     );
-    expect(body.data.reply).toBe(lineOnly.line.unanswered);
-    expect(lineOnly.email).toEqual({ unanswered: 0, inProgress: 0, onHold: 0, resolved: 0 });
+    expect(body.data.reply).toBe(counts.unanswered);
+    expect(body.data.email.all).toBe(
+      counts.email.unanswered + counts.email.inProgress + counts.email.onHold + counts.email.resolved,
+    );
+  });
+
+  test('アカウント選択中もメール一覧が返る', async () => {
+    await seedMixed();
+    const res = await app().request(
+      '/api/support/inbox?channel=email&status=all&lineAccountId=account-a&limit=200', {}, { DB: db.db });
+    expect(res.status).toBe(200);
+    const body = await res.json() as {
+      success: boolean; data: { items: unknown[]; summary: { total: number } };
+    };
+    expect(body.data.items.length).toBe(5);
+    expect(body.data.summary.total).toBe(5);
   });
 });

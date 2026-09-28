@@ -14,6 +14,13 @@ export interface ResolvedContent {
   templateIdAtSend: string | null;
   /** 質問テンプレートなら、その時点の質問。通常テンプレートは step の控え。 */
   questionJson: string | null;
+  /**
+   * テンプレート参照があるのに step の控えを使った理由(R237)。
+   * null は「控えが正規」（template_id 自体が無い）か、テンプレート解決済み。
+   * 一括プレビューが「公開版・控えのどれか」と「なぜ控えか」を出すために使う。
+   * 配信の動きは変えない。
+   */
+  fallbackReason: 'missing' | 'unpublished' | 'other_account' | null;
 }
 
 /**
@@ -51,6 +58,7 @@ export async function resolveStepContent(
       messageContent: step.message_content,
       templateIdAtSend: null,
       questionJson: step.question_json ?? null,
+      fallbackReason: null,
     };
   }
   const tpl = await db
@@ -63,11 +71,18 @@ export async function resolveStepContent(
       published_version: number; line_account_id: string | null;
     }>();
   if (!tpl || !isTemplateSendable(tpl, lineAccountId)) {
+    // R237: 控えに落ちた理由を分ける（isTemplateSendable と同じ判定順）。
+    const fallbackReason = !tpl
+      ? 'missing' as const
+      : Number(tpl.published_version ?? 0) < 1
+        ? 'unpublished' as const
+        : 'other_account' as const;
     return {
       messageType: step.message_type,
       messageContent: step.message_content,
       templateIdAtSend: null,
       questionJson: step.question_json ?? null,
+      fallbackReason,
     };
   }
   return {
@@ -75,5 +90,6 @@ export async function resolveStepContent(
     messageContent: tpl.message_content,
     templateIdAtSend: step.template_id,
     questionJson: tpl.question_json ?? step.question_json ?? null,
+    fallbackReason: null,
   };
 }

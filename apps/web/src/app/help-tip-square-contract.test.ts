@@ -1,9 +1,9 @@
 /*
- * 「？」は角丸の正方形に1本化する（★V7 `LYs5d`・2026-09-27 オーナー指摘）。
+ * 「？」は正円に1本化する（★V7 `LYs5d`・2026-09-28 オーナー指示）。
  *
- * 18px の箱（角 4px・枠 1px `ink-faint`・地 `canvas`）の中に「?」11px
- * 太字 `ink-secondary`。丸・楕円・枠なしは使わない。表の中・札の横・
- * カードの見出し、どこに置いても 18×18 の正方形のまま
+ * 18px の正円（枠 1px `ink-faint`・地 `canvas`）の中に「?」11px
+ * 太字 `ink-secondary`。角丸の正方形・楕円・枠なしは使わない。表の中・
+ * 札の横・カードの見出し、どこに置いても 18×18 の正円のまま
  * （globals の button の min-height・表の中の button の決まりに負けない）。
  * 見出しの行は `inline-flex items-center gap-1` で文字の縦の中央にそろえる。
  *
@@ -24,7 +24,7 @@ const SIDE_CARDS = fs.readFileSync(path.join(DASHBOARD, 'side-cards.tsx'), 'utf8
 const TREND = fs.readFileSync(path.join(DASHBOARD, 'friend-trend-table.tsx'), 'utf8')
 const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
 
-describe('「？」の角丸の正方形', () => {
+describe('「？」の正円', () => {
   it('箱は 18×18 に固定し、縦横を同じに保つ', () => {
     // 行頭に固定する（`min-width: 18px;` の中に `width: 18px;` が
     // 含まれるため、toContain では戻しても赤くならない）。
@@ -45,12 +45,12 @@ describe('「？」の角丸の正方形', () => {
   it('箱は枠つき（ink-faint・canvas）で、中の「?」は 11px 太字 ink-secondary', () => {
     expect(CSS).toContain('border: 1px solid var(--color-ink-faint);')
     expect(CSS).toContain('background: var(--color-canvas);')
-    expect(CSS).toContain('border-radius: 4px;')
+    expect(CSS).toContain('border-radius: 50%;')
     expect(CSS).toContain('font-size: var(--text-micro);')
     expect(CSS).toContain('font-weight: 700;')
   })
 
-  it('丸いアイコン（lucide）・枠なし・透明地は使わない', () => {
+  it('lucide の丸いアイコン・枠なし・透明地は使わない', () => {
     expect(TSX).not.toContain('lucide')
     expect(TSX).not.toContain('CircleHelp')
     expect(TSX).toContain('className={styles.mark}>?</span>')

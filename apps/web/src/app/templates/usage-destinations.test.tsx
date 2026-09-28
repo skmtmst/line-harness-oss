@@ -114,14 +114,14 @@ function stubRole(role: string | null) {
   })
 }
 
-function stubTemplateGet(usedBy = USED_BY, question: unknown = null) {
+function stubTemplateGet(usedBy = USED_BY, question: unknown = null, publishedVersion = 1) {
   templateGet.mockImplementation((id: string) => Promise.resolve({
     success: true,
     data: {
       ...(TEMPLATES.find((t) => t.id === id) ?? TEMPLATES[0]),
       usedBy,
       question,
-      hasDraft: true, publishedVersion: 1, publishedAt: '2026-09-01T00:00:00.000Z',
+      hasDraft: true, publishedVersion, publishedAt: '2026-09-01T00:00:00.000Z',
       draftVersion: 2, carouselActions: null, carouselTapLimitMode: 'none',
       carouselTapLimitText: null, questionStatus: 'draft',
     },
@@ -238,8 +238,8 @@ describe('テンプレート一覧の差し替え導線 (#891 N-135)', () => {
 })
 
 describe('テンプレート編集の利用先表示 (IDEA-11)', () => {
-  async function renderEditAndWait(usedBy = USED_BY) {
-    stubTemplateGet(usedBy)
+  async function renderEditAndWait(usedBy = USED_BY, publishedVersion = 1) {
+    stubTemplateGet(usedBy, null, publishedVersion)
     searchParams.value = new URLSearchParams('id=tpl-1')
     render(<TemplateEditPage />)
     await act(async () => { await Promise.resolve() })
@@ -251,8 +251,13 @@ describe('テンプレート編集の利用先表示 (IDEA-11)', () => {
   test('使用中のテンプレートは、保存の手前に利用先と予告が出る', async () => {
     await renderEditAndWait()
 
-    // 保存すると利用先へそのまま届くことが、保存の手前で分かる。
-    expect(screen.getByText(/新しい内容がそのまま使われます/)).toBeTruthy()
+    /*
+     * R237: 保存は下書きの保存で、利用先へは公開した内容だけが届く。
+     * 「そのまま使われる」とは書かない。公開の場所も名指しする。
+     */
+    expect(screen.getByText(/保存は下書きの保存です/)).toBeTruthy()
+    expect(screen.getByText(/一覧の詳細パネルから公開してください/)).toBeTruthy()
+    expect(screen.queryByText(/新しい内容がそのまま使われます/)).toBeNull()
     expect(screen.getByText('シナリオ「来店後」2通目').closest('a')?.getAttribute('href'))
       .toBe('/scenarios/detail?id=sc-1')
     expect(screen.getByText('自動応答「予約」の返信').closest('a')?.getAttribute('href'))
@@ -267,6 +272,14 @@ describe('テンプレート編集の利用先表示 (IDEA-11)', () => {
     const automation = screen.getByText(/オートメーション「予約後フォロー」/)
     expect(automation.closest('a')).toBeNull()
     expect(automation.textContent).toContain('旧形式')
+  })
+
+  test('R237: 未公開のテンプレートは、保存だけでは反映されないと分かる', async () => {
+    await renderEditAndWait(USED_BY, 0)
+
+    expect(screen.getByText(/まだ公開していません/)).toBeTruthy()
+    expect(screen.getByText(/保存しただけでは利用先へ反映されません/)).toBeTruthy()
+    expect(screen.queryByText(/新しい内容がそのまま使われます/)).toBeNull()
   })
 
   test('使われていないテンプレートは「どこからも呼ばれていません」と出る', async () => {
