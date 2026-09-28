@@ -28,6 +28,7 @@ import { validateCarousel } from '../services/carousel-validation.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { parseQuestion, type ScenarioQuestion } from '../services/scenario-question.js';
 import { validateTemplateMessage } from '../services/template-message-validation.js';
+import { validateFlexContent } from '@line-crm/shared';
 
 const templates = new Hono<Env>();
 
@@ -530,6 +531,16 @@ templates.post('/api/templates', requireRole('owner', 'admin'), async (c) => {
     if (!options.ok) return c.json({ success: false, error: options.error }, 400);
     const question = readQuestionPayload(body as unknown as Record<string, unknown>);
     if (!question.ok) return c.json({ success: false, error: question.error }, 422);
+    /*
+     * R249: カード型はバブルかカルーセルのJSONでないと保存しない。
+     * 通常文・壊れたJSON・型なしJSONのまま保存できると「作れた」と
+     * 誤認し、送信時に落ちる。質問付きは質問文をテキストとして
+     * 保存するので、カードの中身は見ない。
+     */
+    if (!question.question) {
+      const flexError = validateFlexContent(body.messageType, body.messageContent);
+      if (flexError) return c.json({ success: false, error: flexError }, 422);
+    }
     if (body.questionStatus && body.questionStatus !== 'draft' && body.questionStatus !== 'published') {
       return c.json({ success: false, error: '質問の保存状態を確認してください' }, 400);
     }
@@ -628,6 +639,11 @@ templates.put('/api/templates/:id', requireRole('owner', 'admin'), async (c) => 
     if (!options.ok) return c.json({ success: false, error: options.error }, 400);
     const question = readQuestionPayload(body as unknown as Record<string, unknown>);
     if (!question.ok) return c.json({ success: false, error: question.error }, 422);
+    // R249: 作成口と同じく、質問で上書きしないカード型だけ中身を見る。
+    if (changesMessage && !question.question) {
+      const flexError = validateFlexContent(baseMessageType, baseMessageContent);
+      if (flexError) return c.json({ success: false, error: flexError }, 422);
+    }
     if (body.questionStatus && body.questionStatus !== 'draft' && body.questionStatus !== 'published') {
       return c.json({ success: false, error: '質問の保存状態を確認してください' }, 400);
     }
@@ -757,6 +773,9 @@ templates.post('/api/templates/:id/publish', requireRole('owner', 'admin'), asyn
       if (!carousel.ok) return c.json({ success: false, error: carousel.error }, 422);
       const image = checkImageTemplate(draftType, draftContent);
       if (!image.ok) return c.json({ success: false, error: image.error }, 422);
+      // R249: 検査基準が変わる前に残った壊れたカードの下書きを出さない。
+      const flexError = validateFlexContent(draftType, draftContent);
+      if (flexError) return c.json({ success: false, error: flexError }, 422);
       const structured = checkStructuredSize(draftType, draftContent);
       if (!structured.ok) return c.json({ success: false, error: structured.error }, 422);
     }
