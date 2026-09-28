@@ -125,7 +125,10 @@ describe('getAvailability の実DB E2E（NY）', () => {
       minLeadTimeMinutes: 0,
     });
     const starts = result.by_staff[0].slots.map((slot) => slot.start);
-    expect(starts).toEqual(['19:00', '19:30', '20:00', '22:00']);
+    // R314: この店舗の booking_settings は枠間隔の指定なしで作るため
+    // DB 既定の 15 分（migrations/323・bootstrap.sql DEFAULT 15）が使われる。
+    // 実装の読み取りは正しく、期待の方が 30 分固定の古い値だったので直す。
+    expect(starts).toEqual(['19:00', '19:15', '19:30', '19:45', '20:00', '22:00']);
     expect(starts).not.toContain('21:00');
   });
 

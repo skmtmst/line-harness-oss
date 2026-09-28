@@ -14,6 +14,8 @@ import Notice from '@/components/shared/notice'
 import StatusBadge from '@/components/shared/status-badge'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { notifyToast } from '@/components/shared/toast'
+/* R309: 標準の料金は一覧・スタッフ追加の候補と同じ共通表示にする。 */
+import { menuPriceLabel } from '../../lib/menu-price'
 
 /**
  * メニューごとの担当スタッフ（設計 V2 8-2-4 / node B88kuI）。
@@ -151,8 +153,13 @@ function MenuStaffMatrixContent() {
     }
   }
 
-  /** メニューID → 担当できる人数。 */
-  const offeredCounts = useMemo(() => {
+  /*
+   * R308: 「割ってある人数」と「いま受付できる人数」を分ける。
+   * 非公開（is_active=0）の担当は割当としては数えるが、受付できる数には
+   * 入れない。受付できない担当だけを見て「足りている」と見逃さないため。
+   */
+  /** メニューID → 割ってある人数（非公開の担当を含む）。 */
+  const assignedCounts = useMemo(() => {
     const counts = new Map<string, number>()
     for (const m of menus) {
       let n = 0
@@ -161,9 +168,24 @@ function MenuStaffMatrixContent() {
     }
     return counts
   }, [menus, staff, grid])
+  /** メニューID → いま受付できる人数（稼働中の担当だけ）。 */
+  const availableCounts = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const m of menus) {
+      let n = 0
+      for (const s of staff) if (s.is_active && grid[s.id]?.[m.id]?.is_offered) n += 1
+      counts.set(m.id, n)
+    }
+    return counts
+  }, [menus, staff, grid])
 
-  const orphans = menus.filter((m) => (offeredCounts.get(m.id) ?? 0) === 0)
-  const assigned = [...offeredCounts.values()].reduce((a, b) => a + b, 0)
+  /** 受付できる担当がいないメニュー。誰も割っていない場合と、非公開しかいない場合。 */
+  const orphans = menus.filter((m) => (availableCounts.get(m.id) ?? 0) === 0)
+  /** 誰にも割っていないメニュー。 */
+  const unassigned = orphans.filter((m) => (assignedCounts.get(m.id) ?? 0) === 0)
+  /** 割ってはあるが非公開の担当しかいないメニュー。 */
+  const inactiveOnly = orphans.filter((m) => (assignedCounts.get(m.id) ?? 0) > 0)
+  const assigned = [...assignedCounts.values()].reduce((a, b) => a + b, 0)
   const pairs = menus.length * staff.length
 
   /*
@@ -251,8 +273,12 @@ function MenuStaffMatrixContent() {
           unit="組"
           detail={`全${pairs}組のうち`}
         />
+        {/*
+         * R308: 非公開しかいない場合もここに入るため、「誰も担当していない」
+         * では言葉がずれる。受付できる担当がいない、と言い換える。
+         */}
         <Kpi
-          title="誰も担当していない"
+          title="受付できる担当がいない"
           value={String(orphans.length)}
           unit="件"
           detail={orphans.length === 0 ? 'なし' : orphans.map((m) => m.name).join('・')}
@@ -269,9 +295,16 @@ function MenuStaffMatrixContent() {
           className="bg-warning-bg rounded-card flex flex-wrap items-center justify-between gap-2 p-4"
         >
           <div>
-            <p className="text-warning text-sm font-medium">
-              「{orphans.map((m) => m.name).join('」「')}」は担当できるスタッフがいません。
-            </p>
+            {unassigned.length > 0 && (
+              <p className="text-warning text-sm font-medium">
+                「{unassigned.map((m) => m.name).join('」「')}」は担当できるスタッフがいません。
+              </p>
+            )}
+            {inactiveOnly.length > 0 && (
+              <p className="text-warning text-sm font-medium">
+                「{inactiveOnly.map((m) => m.name).join('」「')}」は非公開の担当しかいません。
+              </p>
+            )}
             <p className="text-ink-secondary mt-0.5 text-xs">
               このままでは予約フォームに枠が出ません。
             </p>
@@ -313,6 +346,12 @@ function MenuStaffMatrixContent() {
                       key={s.id}
                     >
                       {s.display_name || s.name}
+                      {/* R308: 列見出しで非公開と分かるようにする。 */}
+                      {!s.is_active && (
+                        <span className="text-ink-faint text-micro block font-normal">
+                          非公開
+                        </span>
+                      )}
                       {s.is_designation_optional === 1 && (
                         <span className="text-ink-faint block text-[10px] font-normal">
                           指名なし
@@ -348,7 +387,7 @@ function MenuStaffMatrixContent() {
                     </Td>
                     <Td className="text-ink-secondary align-top text-xs tabular-nums">
                       {m.duration_minutes} 分
-                      <br />¥{m.base_price.toLocaleString()}
+                      <br />{menuPriceLabel(m)}
                     </Td>
                     {staff.map((s) => {
                       const row = grid[s.id]?.[m.id]
@@ -410,13 +449,22 @@ function MenuStaffMatrixContent() {
                       )
                     })}
                     <Td align="right" className="align-top text-sm tabular-nums">
+                      {/*
+                       * R308: 「提供できる数」は稼働中の担当だけ。非公開の割当が
+                       * あるときは割当数も添えて、両者を区別できるようにする。
+                       */}
                       <span
                         className={
-                          (offeredCounts.get(m.id) ?? 0) === 0 ? 'text-warning' : 'text-ink'
+                          (availableCounts.get(m.id) ?? 0) === 0 ? 'text-warning' : 'text-ink'
                         }
                       >
-                        {offeredCounts.get(m.id) ?? 0} 人
+                        {availableCounts.get(m.id) ?? 0} 人
                       </span>
+                      {(assignedCounts.get(m.id) ?? 0) > (availableCounts.get(m.id) ?? 0) && (
+                        <span className="text-ink-faint text-micro block">
+                          割当{assignedCounts.get(m.id)}（非公開{(assignedCounts.get(m.id) ?? 0) - (availableCounts.get(m.id) ?? 0)}）
+                        </span>
+                      )}
                     </Td>
                   </Tr>
                 ))}

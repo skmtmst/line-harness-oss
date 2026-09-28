@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from 'vitest';
-import { computeSlots, getAvailability, type Interval } from './availability.js';
+import { computeSlots, explainBookingSlot, getAvailability, type Interval } from './availability.js';
 
 const MENU_60 = { duration_minutes: 60, buffer_after_minutes: 0 };
 const MENU_60_BUF15 = { duration_minutes: 60, buffer_after_minutes: 15 };
@@ -169,6 +169,7 @@ interface StubData {
   store?: {
     booking_window_days?: number | null;
     cutoff_minutes_before?: number | null;
+    slot_granularity_minutes?: number | null;
   };
   calendarConnection?: {
     id: string;
@@ -194,6 +195,7 @@ function stubDB(data: StubData, seen?: Array<{ sql: string; args: unknown[] }>):
               business_hours_configured: 0,
               booking_window_days: data.store?.booking_window_days ?? null,
               cutoff_minutes_before: data.store?.cutoff_minutes_before ?? null,
+              slot_granularity_minutes: data.store?.slot_granularity_minutes ?? null,
             };
           }
           if (sql.includes('FROM menus')) return data.menu ?? null;
@@ -1575,5 +1577,210 @@ describe('getAvailability の店舗共通ルール（監査 R92）', () => {
       applyStoreRules: true,
     });
     expect(result.by_staff[0].slots.map((s) => s.start)).toContain('09:00');
+  });
+});
+
+describe('R314 枠間隔は店舗設定の保存値を使う', () => {
+  const R314_MENU = {
+    duration_minutes: 60,
+    buffer_after_minutes: 0,
+    override_duration: null,
+    override_price: null,
+  };
+  function r314db(slotGranularity: number | null) {
+    return stubDB({
+      menu: { ...R314_MENU },
+      staff: STAFF_S1,
+      shifts: [{ staff_id: 'S1', work_date: '2026-09-30', start_time: '10:00', end_time: '12:00' }],
+      bookings: [],
+      store: { slot_granularity_minutes: slotGranularity },
+    });
+  }
+  const baseParams = {
+    lineAccountId: 'A1',
+    menuId: 'M1',
+    from: '2026-09-30',
+    to: '2026-09-30',
+    now: new Date('2026-09-29T00:00:00Z'),
+    minLeadTimeMinutes: 0,
+  };
+
+  test('15分設定で10:15の枠が出て、説明でも予約できる', async () => {
+    const slots = await getAvailability(r314db(15), baseParams);
+    const starts = slots.by_staff[0].slots.map((s) => s.start);
+    expect(starts).toContain('10:00');
+    expect(starts).toContain('10:15');
+    expect(starts).toContain('10:30');
+    expect(starts).toContain('10:45');
+
+    const checked = await explainBookingSlot(r314db(15), {
+      lineAccountId: 'A1',
+      menuId: 'M1',
+      date: '2026-09-30',
+      time: '10:15',
+      now: new Date('2026-09-29T00:00:00Z'),
+      minLeadTimeMinutes: 0,
+    });
+    expect(checked.bookable).toBe(true);
+    expect(checked.reasons).toEqual([]);
+    expect(checked.slotGranularityMinutes).toBe(15);
+  });
+
+  test('候補外の保存値は従来の既定（30）で判定する', async () => {
+    const checked = await explainBookingSlot(r314db(7), {
+      lineAccountId: 'A1',
+      menuId: 'M1',
+      date: '2026-09-30',
+      time: '10:15',
+      now: new Date('2026-09-29T00:00:00Z'),
+      minLeadTimeMinutes: 0,
+    });
+    expect(checked.bookable).toBe(false);
+    expect(checked.reasons).toContain('not_on_grid');
+    expect(checked.slotGranularityMinutes).toBe(30);
+  });
+
+  test('5分・60分もそれぞれ設定と一致する', async () => {
+    const db5 = stubDB({
+      menu: { ...R314_MENU },
+      staff: STAFF_S1,
+      shifts: [{ staff_id: 'S1', work_date: '2026-09-30', start_time: '10:00', end_time: '12:00' }],
+      bookings: [],
+      store: { slot_granularity_minutes: 5 },
+    });
+    const five = await explainBookingSlot(db5, {
+      lineAccountId: 'A1',
+      menuId: 'M1',
+      date: '2026-09-30',
+      time: '10:05',
+      now: new Date('2026-09-29T00:00:00Z'),
+      minLeadTimeMinutes: 0,
+    });
+    expect(five.bookable).toBe(true);
+
+    const db60 = stubDB({
+      menu: { ...R314_MENU },
+      staff: STAFF_S1,
+      shifts: [{ staff_id: 'S1', work_date: '2026-09-30', start_time: '09:00', end_time: '12:00' }],
+      bookings: [],
+      store: { slot_granularity_minutes: 60 },
+    });
+    const hour = await explainBookingSlot(db60, {
+      lineAccountId: 'A1',
+      menuId: 'M1',
+      date: '2026-09-30',
+      time: '10:00',
+      now: new Date('2026-09-29T00:00:00Z'),
+      minLeadTimeMinutes: 0,
+    });
+    expect(hour.bookable).toBe(true);
+    const half = await explainBookingSlot(db60, {
+      lineAccountId: 'A1',
+      menuId: 'M1',
+      date: '2026-09-30',
+      time: '10:30',
+      now: new Date('2026-09-29T00:00:00Z'),
+      minLeadTimeMinutes: 0,
+    });
+    expect(half.bookable).toBe(false);
+    expect(half.reasons).toContain('not_on_grid');
+  });
+});
+
+describe('(b) 見本と空き確認は同じ店舗ルールで判定する', () => {
+  function bdb() {
+    return stubDB({
+      menu: {
+        duration_minutes: 60,
+        buffer_after_minutes: 0,
+        override_duration: null,
+        override_price: null,
+      },
+      staff: STAFF_S1,
+      shifts: [{ staff_id: 'S1', work_date: '2026-09-28', start_time: '09:00', end_time: '12:00' }],
+      bookings: [],
+      store: { booking_window_days: 60, cutoff_minutes_before: 1440, slot_granularity_minutes: 30 },
+    });
+  }
+  const now = new Date('2026-09-27T09:30:00Z');
+
+  test('店舗ルール付きの列挙は締切後の枠を出さない', async () => {
+    const result = await getAvailability(bdb(), {
+      lineAccountId: 'A1',
+      menuId: 'M1',
+      from: '2026-09-28',
+      to: '2026-09-28',
+      now,
+      minLeadTimeMinutes: 0,
+      applyStoreRules: true,
+    });
+    expect(result.by_staff[0].slots).toEqual([]);
+  });
+
+  test('店舗ルール無しの列挙は従来どおりメニュー値だけで出す', async () => {
+    const result = await getAvailability(bdb(), {
+      lineAccountId: 'A1',
+      menuId: 'M1',
+      from: '2026-09-28',
+      to: '2026-09-28',
+      now,
+      minLeadTimeMinutes: 0,
+    });
+    expect(result.by_staff[0].slots.map((s) => s.start)).toContain('09:00');
+  });
+
+  test('説明口は店舗ルールで締切後と説明する', async () => {
+    const checked = await explainBookingSlot(bdb(), {
+      lineAccountId: 'A1',
+      menuId: 'M1',
+      date: '2026-09-28',
+      time: '09:00',
+      now,
+      minLeadTimeMinutes: 60,
+      applyStoreRules: true,
+    });
+    expect(checked.bookable).toBe(false);
+    expect(checked.reasons).toContain('past_cutoff');
+  });
+});
+
+describe('(a) 受付期間の最終日は表示と判定で同じ', () => {
+  test('60日設定・9/28起点で11/27まで取れて11/28は期間外', async () => {
+    const db = stubDB({
+      menu: {
+        duration_minutes: 60,
+        buffer_after_minutes: 0,
+        override_duration: null,
+        override_price: null,
+      },
+      staff: STAFF_S1,
+      shifts: [
+        { staff_id: 'S1', work_date: '2026-11-27', start_time: '09:00', end_time: '12:00' },
+        { staff_id: 'S1', work_date: '2026-11-28', start_time: '09:00', end_time: '12:00' },
+      ],
+      bookings: [],
+      store: { booking_window_days: 60, cutoff_minutes_before: 1440, slot_granularity_minutes: 30 },
+    });
+    const params = {
+      lineAccountId: 'A1',
+      menuId: 'M1',
+      now: new Date('2026-09-28T00:00:00Z'),
+      minLeadTimeMinutes: 0,
+      applyStoreRules: true,
+    };
+    const last = await getAvailability(db, { ...params, from: '2026-11-27', to: '2026-11-27' });
+    expect(last.by_staff[0].slots.map((s) => s.start)).toContain('09:00');
+    const over = await getAvailability(db, { ...params, from: '2026-11-28', to: '2026-11-28' });
+    expect(over.by_staff[0].slots).toEqual([]);
+    const checked = await explainBookingSlot(db, {
+      lineAccountId: 'A1',
+      menuId: 'M1',
+      date: '2026-11-28',
+      time: '09:00',
+      now: new Date('2026-09-28T00:00:00Z'),
+      minLeadTimeMinutes: 0,
+      applyStoreRules: true,
+    });
+    expect(checked.reasons).toContain('booking_window');
   });
 });

@@ -1,6 +1,5 @@
 'use client'
 
-import { X } from 'lucide-react'
 import Select from '@/components/shared/select'
 import { TimeField } from '@/components/shared/date-time-field'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -18,6 +17,7 @@ import Pagination from '@/components/shared/pagination'
 import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { RowActions } from '@/components/shared/row-actions'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Dialog from '@/components/shared/dialog'
 import {
   api,
   ApiError,
@@ -36,6 +36,8 @@ import ListRange from '@/components/ui/list-range'
 import MenuVersionHistory from './menu-version-history'
 import { bookingMenuError } from './menu-validation'
 import { bookingWindowEnd, businessHourSummary, minutesBeforeLabel } from '../lib/format-time'
+/* R309: 金額列は割当表・スタッフ追加の候補と同じ共通表示にする。 */
+import { menuPriceLabel } from '../lib/menu-price'
 import { formatHoursBeforeHint, formatMinutesLengthHint } from '@/lib/format-duration'
 
 /**
@@ -72,14 +74,7 @@ function bookingRulesErrorMessage(error: unknown, action: '読み込み' | '保�
   return `予約の基本ルールを${action}できませんでした。通信状態を確認して、もう一度お試しください。`
 }
 
-/**
- * 一覧の金額列。料金モードが先で、金額はその次。
- * 「お問い合わせ」は金額ではないので ¥ を付けず、無料とも混ぜない。
- */
-function menuPriceLabel(menu: BookingMenu): string {
-  if (menu.price_mode === 'inquiry') return 'お問い合わせ'
-  return menu.base_price === 0 ? '無料' : `¥${menu.base_price.toLocaleString()}`
-}
+
 
 function supportingDetail(
   hasAccount: boolean,
@@ -718,6 +713,9 @@ function BookingRulesEditor({ accountId, initial, canEdit, onRetry, onSaved }: {
   const [draft, setDraft] = useState(initial)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  /* R311: 受付の締め切り・キャンセルの期限の空欄。0にせず保存を止める。 */
+  const [cutoffEmpty, setCutoffEmpty] = useState(false)
+  const [cancelEmpty, setCancelEmpty] = useState(false)
   // 店舗切替でこの画面は作り直される（key=accountId）。外れた応答は何も残さない。
   const mountedRef = useRef(true)
   useEffect(() => () => { mountedRef.current = false }, [])
@@ -727,6 +725,15 @@ function BookingRulesEditor({ accountId, initial, canEdit, onRetry, onSaved }: {
   }
 
   async function submit() {
+    // R311: 空欄のまま保存しない。消しただけでは0分前（直前まで可能）にしない。
+    const emptyLabels = [
+      cutoffEmpty ? '受付の締め切り' : null,
+      cancelEmpty ? 'キャンセルの期限' : null,
+    ].filter((label): label is string => label !== null)
+    if (emptyLabels.length > 0) {
+      setSaveError(`「${emptyLabels.join('」「')}」が空欄です。空欄のまま保存できません。直前まで可能にするときは0と入力してください。`)
+      return
+    }
     setSaving(true)
     setSaveError(null)
     try {
@@ -748,6 +755,8 @@ function BookingRulesEditor({ accountId, initial, canEdit, onRetry, onSaved }: {
       // 保存待ちに店舗が変わっていたら、旧店舗の応答を新店舗へ反映しない。
       if (!mountedRef.current) return
       setDraft(response.data)
+      setCutoffEmpty(false)
+      setCancelEmpty(false)
       notifyToast('予約の基本ルールを保存しました。')
       onSaved(response.data)
     } catch (saveFailure) {
@@ -780,8 +789,8 @@ function BookingRulesEditor({ accountId, initial, canEdit, onRetry, onSaved }: {
           ) : null}
         </Field>
         <RuleNumberField label="何日先まで受け付けるか" unit="日" min={1} max={365} value={draft.bookingWindowDays} onChange={(value) => set('bookingWindowDays', value)} />
-        <RuleNumberField label="受付の締め切り" unit="分前" min={0} max={43200} value={draft.cutoffMinutesBefore} onChange={(value) => set('cutoffMinutesBefore', value)} humanize={minutesBeforeLabel} />
-        <RuleNumberField label="キャンセルの期限" unit="分前" min={0} max={43200} value={draft.cancelDeadlineMinutesBefore} onChange={(value) => set('cancelDeadlineMinutesBefore', value)} humanize={minutesBeforeLabel} />
+        <RuleNumberField label="受付の締め切り" unit="分前" min={0} max={43200} value={draft.cutoffMinutesBefore} onChange={(value) => set('cutoffMinutesBefore', value)} trackEmpty={setCutoffEmpty} humanize={minutesBeforeLabel} />
+        <RuleNumberField label="キャンセルの期限" unit="分前" min={0} max={43200} value={draft.cancelDeadlineMinutesBefore} onChange={(value) => set('cancelDeadlineMinutesBefore', value)} trackEmpty={setCancelEmpty} humanize={minutesBeforeLabel} />
         <RuleNumberField label="1人が同時に持てる予約" unit="件" min={1} max={100} value={draft.maxActiveBookingsPerFriend} onChange={(value) => set('maxActiveBookingsPerFriend', value)} />
         <Field label="予約の承認" required>
           <Select
@@ -818,7 +827,7 @@ function BookingRulesEditor({ accountId, initial, canEdit, onRetry, onSaved }: {
         </Field>
         <RuleNumberField label="当日のお知らせを送るタイミング" unit="時間前" min={1} max={72} value={draft.reminderHoursBefore} onChange={(value) => set('reminderHoursBefore', value)} humanize={formatHoursBeforeHint} />
       </div>
-      <p className="text-ink-faint mt-4 text-xs">0分前は、開始直前まで受け付ける・キャンセルできる設定です。</p>
+      <p className="text-ink-faint mt-4 text-xs">0分前は、開始直前まで受け付ける・キャンセルできる設定です。空欄のまま保存できません。</p>
       <div className="border-hairline mt-5 border-t pt-4">
         <div className="flex items-center gap-1">
           <span id="liff-date-view-label" className="text-ink-secondary text-xs font-medium">
@@ -877,17 +886,38 @@ function BookingRulesEditor({ accountId, initial, canEdit, onRetry, onSaved }: {
   )
 }
 
-function RuleNumberField({ label, unit, min, max, value, onChange, humanize }: {
+function RuleNumberField({ label, unit, min, max, value, onChange, trackEmpty, humanize }: {
   label: string
   unit: string
   min: number
   max: number
   value: number
   onChange: (value: number) => void
+  /**
+   * R311: 空欄を0にせず別扱いするときだけ渡す。渡した欄は編集中の文字を
+   * 欄が持ち、空欄の間は onChange を呼ばない（空欄→0の自動変化をしない）。
+   * 保存前の空欄チェックは呼び出し側で行う。渡さない欄は従来どおり。
+   */
+  trackEmpty?: (empty: boolean) => void
   /** 入力値を時間・日の単位へ読み替える（例: 1440分 → 24時間前）。 */
   humanize?: (value: number) => string | null
 }) {
-  const hint = humanize?.(value)
+  const [text, setText] = useState<string | null>(null)
+  const trackEmptyRef = useRef(trackEmpty)
+  trackEmptyRef.current = trackEmpty
+  // 保存が通ると親の値が変わる。そのときだけ編集中の文字を捨てる。
+  useEffect(() => {
+    setText(null)
+    trackEmptyRef.current?.(false)
+  }, [value])
+  const shown = text ?? value
+  // 古い行には無い項目が undefined で来ることがある。旧表示と同じく空欄で出す。
+  const hintNumber = typeof shown === 'number'
+    ? shown
+    : typeof shown !== 'string' || shown.trim() === ''
+      ? null
+      : Number(shown)
+  const hint = hintNumber === null || Number.isNaN(hintNumber) ? null : humanize?.(hintNumber)
   return (
     <Field label={label} required>
       <div className="flex items-center gap-2">
@@ -896,8 +926,17 @@ function RuleNumberField({ label, unit, min, max, value, onChange, humanize }: {
           type="number"
           min={min}
           max={max}
-          value={value}
-          onChange={(event) => onChange(Number(event.target.value))}
+          value={shown ?? ''}
+          onChange={(event) => {
+            const raw = event.target.value
+            if (!trackEmpty) {
+              onChange(Number(raw))
+              return
+            }
+            setText(raw)
+            trackEmpty(raw === '')
+            if (raw !== '') onChange(Number(raw))
+          }}
           className="border-hairline rounded-control focus:ring-accent w-full border px-3 h-10 text-sm tabular-nums focus:outline-none focus:ring-2"
         />
         <span className="text-ink-faint whitespace-nowrap text-xs">{unit}</span>
@@ -970,6 +1009,35 @@ function EditMenuModal({
   ))
   const resourceSubmitRef = useRef(false)
   const resourceLoadGenerationRef = useRef(0)
+  /** 破棄確認の表示。×・Esc・背景・キャンセルは dirty のときだけここへ寄せる。 */
+  const [showDiscard, setShowDiscard] = useState(false)
+  /*
+   * R305: 未保存の変更があるか。フォームと設備の割当を開いた直後と比べ、
+   * 変わっていれば閉じる前に破棄確認を挟む。保存の成否自体は submit 側の
+   * 扱いのまま変えない。
+   */
+  const initialSnapshot = useRef<string | null>(null)
+  if (initialSnapshot.current === null) {
+    initialSnapshot.current = JSON.stringify({
+      form: menu,
+      resources: [...(menu.assigned_resources ?? [])]
+        .map((item) => [item.resourceId, item.quantity] as const)
+        .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
+    })
+  }
+  const dirty = JSON.stringify({
+    form,
+    resources: [...resourceAssignments.entries()]
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
+  }) !== initialSnapshot.current
+  /** 閉じる操作は共通 Dialog（×・Esc・背景）から全部ここへ集まる。 */
+  function requestClose() {
+    if (dirty && !saving) {
+      setShowDiscard(true)
+      return
+    }
+    onClose()
+  }
 
   useEffect(() => {
     const generation = ++resourceLoadGenerationRef.current
@@ -1108,16 +1176,36 @@ function EditMenuModal({
     }
   }
 
+  /*
+   * R305: 手作りの窓を共通の Dialog へ置き換えた。初期フォーカス・Tabの循環・
+   * Esc取消・閉じた後の元ボタンへの復帰は共通部品が持つ。×・Esc・背景・
+   * キャンセルは requestClose へ集め、未保存なら破棄確認を挟む。
+   */
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-canvas rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between gap-3 border-b border-hairline px-6 py-4">
-          <h2 className="text-base font-semibold">メニュー編集</h2>
-          <button type="button" onClick={onClose} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">
-            <X aria-hidden="true" className="h-5 w-5" />
-          </button>
-        </div>
-        <div className="px-6 py-4 space-y-4">
+    <>
+      <Dialog
+        open
+        title="メニュー編集"
+        onCancel={requestClose}
+        busy={saving}
+        footer={
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <Button type="button" onClick={requestClose} disabled={saving}>
+              キャンセル
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              onClick={() => void submit()}
+              disabled={saving || !canEdit}
+              title={canEdit ? undefined : '予約メニューの変更権限がありません'}
+            >
+              {saving ? '保存中…' : '保存'}
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
           <Field label="名前" required>
             <input
               type="text"
@@ -1347,7 +1435,7 @@ function EditMenuModal({
           >有効（顧客に表示する）</Checkbox>
           {err && (
             <div role="alert">
-              <p className="text-xs text-red-600">{err}</p>
+              <p className="text-danger text-xs">{err}</p>
               {conflict && (
                 <button
                   type="button"
@@ -1360,24 +1448,18 @@ function EditMenuModal({
             </div>
           )}
         </div>
-        <div className="px-6 py-4 border-t border-hairline flex gap-2 justify-end">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-ink-secondary bg-canvas-sunken hover:bg-gray-200 rounded-lg"
-          >
-            キャンセル
-          </button>
-          <button
-            onClick={submit}
-            disabled={saving || !canEdit}
-            title={canEdit ? undefined : '予約メニューの変更権限がありません'}
-            className="bg-accent-deep text-on-accent rounded-control px-4 py-2 text-sm font-medium transition-colors hover:brightness-92 disabled:opacity-50"
-          >
-            {saving ? '保存中…' : '保存'}
-          </button>
-        </div>
-      </div>
-    </div>
+      </Dialog>
+      <ConfirmDialog
+        open={showDiscard}
+        title="変更を破棄しますか？"
+        description="保存していない変更は消えます。閉じてよければ破棄を選んでください。"
+        confirmLabel="破棄する"
+        cancelLabel="編集に戻る"
+        primaryAction="cancel"
+        onConfirm={onClose}
+        onCancel={() => setShowDiscard(false)}
+      />
+    </>
   )
 }
 
@@ -1386,7 +1468,7 @@ function Field({ label, required, children }: { label: string; required?: boolea
     <label className="block">
       <span className="block text-xs font-medium text-ink-secondary mb-1">
         {label}
-        {required && <span className="text-red-500 ml-0.5">*</span>}
+        {required && <span className="text-danger ml-0.5">*</span>}
       </span>
       {children}
     </label>
