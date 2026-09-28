@@ -18,6 +18,12 @@ import { scenarioReferenceData } from './scenario-reference-data'
 export type ChoiceBehavior = 'none' | 'url' | 'tel' | 'add_friend' | 'mail' | 'form' | 'scenario'
 
 export interface QuestionChoice {
+  /*
+   * R246: 選択肢とアクションを並びの位置ではなく識別子で結ぶための鍵。
+   * 削除・追加で位置がずれても、残る選択肢の設定を保持できる。
+   * 質問JSONの一部として保存する（サーバーは未知の項目を残す）。
+   */
+  key?: string
   label: string
   behavior: ChoiceBehavior
   url?: string
@@ -31,6 +37,72 @@ export interface QuestionChoice {
   addTagIds?: string[]
   removeTagIds?: string[]
   field?: { fieldId: string; value: string }
+}
+
+/** 選択肢の鍵を作る。衝突しないよう乱数で作る。 */
+export function newChoiceKey(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return `c-${crypto.randomUUID()}`
+  }
+  return `c-${Date.now().toString(36)}-${Math.floor(Math.random() * 0xffff).toString(36)}`
+}
+
+/*
+ * R246: 鍵の無い選択肢（既存データ）に鍵を振る。ある鍵は変えない。
+ * 通の編集を開くときと保存の直前に通し、編集中の差し替え・削除・追加を
+ * 鍵で追えるようにする。
+ */
+export function withChoiceKeys(question: ScenarioQuestion): ScenarioQuestion {
+  const seen = new Set<string>()
+  const choices = question.choices.map((choice) => {
+    let key = typeof choice.key === 'string' && choice.key ? choice.key : ''
+    if (!key || seen.has(key)) key = newChoiceKey()
+    seen.add(key)
+    return key === choice.key ? choice : { ...choice, key }
+  })
+  return choices.every((choice, index) => choice === question.choices[index])
+    ? question
+    : { ...question, choices }
+}
+
+export interface ChoiceActionRow {
+  id: string
+  choiceIndex: number | null
+}
+
+export interface ChoiceActionRemap {
+  /** 消えた選択肢にだけ紐づいていた動作。消す。 */
+  removeIds: string[]
+  /** 残る選択肢の動作。新しい位置へ付け替える。 */
+  moveTo: { id: string; choiceIndex: number }[]
+}
+
+/*
+ * R246: 質問の保存時に、選択肢別アクションの紐づけを付け替える段取り。
+ * 鍵で old と new を突き合わせ、消えた鍵の行は消し、残る鍵の行は新しい
+ * 位置へ移す。新しい選択肢には行が無い（0件から始める）。
+ * 鍵が無い古い行は位置で突き合わせる（移行期の救済）。
+ */
+export function planChoiceActionRemap(
+  oldChoices: Pick<QuestionChoice, 'key'>[],
+  newChoices: Pick<QuestionChoice, 'key'>[],
+  rows: ChoiceActionRow[],
+): ChoiceActionRemap {
+  const keyAt = (choices: Pick<QuestionChoice, 'key'>[], index: number) =>
+    choices[index]?.key || `__index:${index}`
+  const newIndexOf = new Map(newChoices.map((choice, index) => [choice.key || `__index:${index}`, index]))
+  const removeIds: string[] = []
+  const moveTo: { id: string; choiceIndex: number }[] = []
+  for (const row of rows) {
+    if (row.choiceIndex === null || row.choiceIndex === undefined) continue
+    const newIndex = newIndexOf.get(keyAt(oldChoices, row.choiceIndex))
+    if (newIndex === undefined) {
+      removeIds.push(row.id)
+    } else if (newIndex !== row.choiceIndex) {
+      moveTo.push({ id: row.id, choiceIndex: newIndex })
+    }
+  }
+  return { removeIds, moveTo }
 }
 
 export interface ScenarioQuestion {
@@ -56,8 +128,8 @@ export function emptyQuestion(): ScenarioQuestion {
     text: '',
     tapMode: 'single',
     choices: [
-      { label: 'はい', behavior: 'none' },
-      { label: 'いいえ', behavior: 'none' },
+      { key: newChoiceKey(), label: 'はい', behavior: 'none' },
+      { key: newChoiceKey(), label: 'いいえ', behavior: 'none' },
     ],
   }
 }
@@ -598,7 +670,7 @@ export default function QuestionEditor({
           onClick={() =>
             onChange({
               ...value,
-              choices: [...value.choices, { label: '', behavior: 'none' }],
+              choices: [...value.choices, { key: newChoiceKey(), label: '', behavior: 'none' }],
             })
           }
           disabled={value.choices.length >= 13}

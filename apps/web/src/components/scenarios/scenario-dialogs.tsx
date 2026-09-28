@@ -16,6 +16,7 @@ import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import ConditionBuilder, {
+  findInvalidRangeIssue,
   isEmptyCondition,
   isRuleComplete,
   pruneCondition,
@@ -116,6 +117,8 @@ export function ConditionDialog({
   const [draft, setDraft] = useState<SegmentCondition | null>(value)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  /* R247: 入力済みの不正範囲は欄の下で知らせて止める。保存済みは維持する。 */
+  const [rangeError, setRangeError] = useState('')
 
   return (
     <Shell
@@ -136,6 +139,16 @@ export function ConditionDialog({
             type="button"
             disabled={saving}
             onClick={async () => {
+              /*
+               * R247: 入力済みの不正範囲（上下限の逆転など）は落とさず、
+               * 欄の下で知らせて止める。保存済みの条件は維持する。
+               */
+              const rangeIssue = findInvalidRangeIssue(draft)
+              if (rangeIssue) {
+                setRangeError(rangeIssue)
+                return
+              }
+              setRangeError('')
               setSaving(true)
               setError('')
               try {
@@ -162,6 +175,9 @@ export function ConditionDialog({
     >
       {error && (
         <Notice tone="danger" className="mb-4" message={error} />
+      )}
+      {rangeError && (
+        <Notice tone="validation" className="mb-4" message={rangeError} />
       )}
       <span className="sr-only">{title}{description}</span>
       <section className="bg-canvas-sunken rounded-panel mb-4 px-4 py-5">

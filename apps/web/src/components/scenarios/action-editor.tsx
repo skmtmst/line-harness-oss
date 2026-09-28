@@ -48,6 +48,7 @@ import {
 } from '@/lib/api'
 import Notice from '@/components/shared/notice'
 import ConditionBuilder, {
+  findInvalidRangeIssue,
   isEmptyCondition,
   isRuleComplete,
   type SegmentCondition,
@@ -621,7 +622,7 @@ export default function ActionEditor({
       setConditionFor(null)
       return
     }
-    const issue = findConditionDraftIssue(conditionDraft)
+    const issue = findConditionDraftIssue(conditionDraft) ?? findInvalidRangeIssue(conditionDraft)
     if (issue) {
       setConditionError(issue)
       return

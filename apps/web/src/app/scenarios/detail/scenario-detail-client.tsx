@@ -34,7 +34,9 @@ import QuestionEditor, {
   deadAnswerSettings,
   emptyQuestion,
   isUriOnlyBehavior,
+  planChoiceActionRemap,
   validateChoiceUris,
+  withChoiceKeys,
   type ScenarioQuestion,
 } from '@/components/scenarios/question-editor'
 import {
@@ -45,7 +47,7 @@ import {
   describeCondition,
   type OnCompleteMode,
 } from '@/components/scenarios/scenario-dialogs'
-import type { SegmentCondition } from '@/components/shared/condition-builder'
+import { findInvalidRangeIssue, type SegmentCondition } from '@/components/shared/condition-builder'
 import ScheduleInput, {
   emptySchedule,
   buildSchedulePayload,
@@ -993,7 +995,8 @@ export default function ScenarioDetailClient({
       afterSend: step.afterSend ?? 'continue',
       inputMode: step.templateId ? 'template' : 'direct',
       targetCondition: (step.targetCondition as SegmentCondition | null) ?? null,
-      question: (step.question as ScenarioQuestion | null) ?? null,
+      /* R246: 開くときに鍵を振る。削除・追加の追跡に使う。 */
+      question: step.question ? withChoiceKeys(step.question as ScenarioQuestion) : null,
       isDraft: step.isDraft === true,
     })
     // 専用の欄で書く種別は、保存されている JSON を欄の形に戻す。
@@ -1013,6 +1016,50 @@ export default function ScenarioDetailClient({
     setShowStepForm(false)
     setEditingStepId(null)
     setStepError('')
+  }
+
+  /*
+   * R246: 選択肢別アクションの紐づけを、位置ではなく選択肢の鍵で付け替える。
+   * 口に choiceIndex の書き換えが無いため、移動は「消して作り直し」で行う
+   * （中身・条件・繰り返しは引き継ぐ）。失敗時は文を返し、呼び出し側が
+   * 画面を閉じずに知らせる。成功・対象なしは null。
+   */
+  const remapChoiceActions = async (
+    stepId: string,
+    nextQuestion: ScenarioQuestion | null,
+  ): Promise<string | null> => {
+    const prevStep = scenario?.steps.find((step) => step.id === stepId)
+    const prevQuestion = (prevStep?.question as ScenarioQuestion | null) ?? null
+    if (!prevQuestion && !nextQuestion) return null
+    const list = await api.scenarios.actions.list(id)
+    if (!list.success) return '選択肢の動作を読み直せませんでした。画面を開き直して対応を確認してください。'
+    const rows = list.data.filter(
+      (action) => action.hook === 'choice_selected' && (action.stepId ?? null) === stepId,
+    )
+    if (rows.length === 0) return null
+    const plan = planChoiceActionRemap(prevQuestion?.choices ?? [], nextQuestion?.choices ?? [], rows)
+    if (plan.removeIds.length === 0 && plan.moveTo.length === 0) return null
+    const moveById = new Map(plan.moveTo.map((move) => [move.id, move.choiceIndex]))
+    for (const row of rows) {
+      const moveTo = moveById.get(row.id)
+      if (moveTo === undefined && !plan.removeIds.includes(row.id)) continue
+      const removed = await api.scenarios.actions.remove(id, row.id)
+      if (!removed.success) return '選択肢の動作の付け替えに失敗しました。画面を開き直して対応を確認してください。'
+      if (moveTo !== undefined) {
+        const recreated = await api.scenarios.actions.create(id, {
+          hook: row.hook,
+          stepId: row.stepId,
+          choiceIndex: moveTo,
+          actionType: row.actionType,
+          config: row.config ?? {},
+          condition: row.condition ?? null,
+          repeatOnRefire: row.repeatOnRefire,
+          sortOrder: row.sortOrder,
+        })
+        if (!recreated.success) return '選択肢の動作の付け替えに失敗しました。画面を開き直して対応を確認してください。'
+      }
+    }
+    return null
   }
 
   const handleSaveStep = async () => {
@@ -1079,6 +1126,15 @@ export default function ScenarioDetailClient({
         return
       }
     }
+    /*
+     * R247: 1通の配信条件の不正範囲（上下限の逆転など）は落とさず、
+     * 欄の下で知らせて止める。保存済みの条件は維持する。
+     */
+    const rangeIssue = findInvalidRangeIssue(stepForm.targetCondition ?? null)
+    if (rangeIssue) {
+      setStepError(rangeIssue)
+      return
+    }
     setStepSaving(true)
     setStepError('')
     try {
@@ -1100,6 +1156,8 @@ export default function ScenarioDetailClient({
           payloadMessageContent = tpl.messageContent || ' '
         }
       }
+      /* R246: 保存直前にも鍵を振る。削除・追加の追跡に使う。 */
+      const keyedQuestion = stepForm.question ? withChoiceKeys(stepForm.question) : null
       const payload = {
         stepOrder: stepForm.stepOrder,
         ...schedulePayload,
@@ -1111,13 +1169,24 @@ export default function ScenarioDetailClient({
         // null を渡すと「絞り込みなし」に戻る。undefined だと据え置きになるので、
         // 外したつもりが残るのを防ぐために必ず値を送る。
         targetCondition: stepForm.targetCondition,
-        question: stepForm.question,
+        question: keyedQuestion,
         isDraft: stepForm.isDraft,
       }
       if (editingStepId) {
         const res = await api.scenarios.updateStep(id, editingStepId, payload)
         if (!res.success) {
           setStepError(res.error)
+          return
+        }
+        /*
+         * R246: 質問と動作の更新を一緒に確定する。選択肢の削除・追加で
+         * 位置がずれても、残る選択肢の動作を保持し、消えた選択肢の動作
+         * だけを消す。新しい選択肢は行が無い（0件から始める）。
+         */
+        const remapError = await remapChoiceActions(editingStepId, keyedQuestion)
+        if (remapError) {
+          setStepError(remapError)
+          await loadScenario(true)
           return
         }
       } else {
@@ -1401,7 +1470,9 @@ export default function ScenarioDetailClient({
                 setStepForm({
                   ...stepForm,
                   templateId,
-                  question: template?.question ? structuredClone(template.question) : null,
+                  question: template?.question
+                    ? withChoiceKeys(structuredClone(template.question) as ScenarioQuestion)
+                    : null,
                   messageType: (template?.messageType as MessageType | undefined) ?? stepForm.messageType,
                   messageContent: template?.messageContent ?? stepForm.messageContent,
                 })
