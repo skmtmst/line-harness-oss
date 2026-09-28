@@ -11,20 +11,36 @@ const MB = 1024 * 1024
 
 describe('登録メディアの直接アップロード', () => {
   it.each([
-    ['image/jpeg', 10],
-    ['audio/mpeg', 200],
-    ['audio/mp4', 200],
-    ['video/mp4', 200],
-    ['application/pdf', 20],
-  ])('%s の上限を %iMB として扱う', (type, limitMb) => {
+    ['photo.jpg', 'image/jpeg', 10],
+    ['voice.mp3', 'audio/mpeg', 200],
+    ['voice.m4a', 'audio/mp4', 200],
+    ['movie.mp4', 'video/mp4', 200],
+    ['doc.pdf', 'application/pdf', 20],
+  ])('%s（%s）の上限を %iMB として扱う', (name, type, limitMb) => {
     expect(mediaFileLimitBytes({ type })).toBe(limitMb * MB)
-    expect(validateMediaFile({ name: 'sample', type, size: limitMb * MB })).toBe('')
-    expect(validateMediaFile({ name: 'sample', type, size: limitMb * MB + 1 })).toBe(`${limitMb}MBを超えています`)
+    expect(validateMediaFile({ name, type, size: limitMb * MB })).toBe('')
+    expect(validateMediaFile({ name, type, size: limitMb * MB + 1 })).toBe(`${limitMb}MBを超えています`)
   })
 
   it('空ファイルと許可していない形式を登録させない', () => {
     expect(validateMediaFile({ name: 'empty.png', type: 'image/png', size: 0 })).toBe('中身が空のファイルは登録できません')
     expect(validateMediaFile({ name: 'sheet.xlsx', type: 'application/vnd.ms-excel', size: 100 })).toBe('この形式は登録できません')
+  })
+
+  it('口に無い形式は `image/`・`audio/` の頭が合っても選択時点で弾く', () => {
+    // SVG・WAVは前方一致では画像・音声に見えるが、口（DIRECT_ALLOWED）には無い。
+    // 選んだ時点でエラーにしないと、まとめて送った口の400で有効な分まで落ちる。
+    expect(validateMediaFile({ name: 'icon.svg', type: 'image/svg+xml', size: 100 })).toBe('この形式は登録できません')
+    expect(validateMediaFile({ name: 'voice.wav', type: 'audio/wav', size: 100 })).toBe('この形式は登録できません')
+    expect(mediaFileLimitBytes({ type: 'image/svg+xml' })).toBeNull()
+  })
+
+  it('拡張子が中身の形式と食い違うものは選択時点で弾く', () => {
+    // 口は拡張子も照合する（`spec.ext.includes(ext)`）。画面側でも同じ判定をし、
+    // 食い違いだけをエラーにして残りの登録を妨げない。
+    expect(validateMediaFile({ name: 'photo.jpg', type: 'image/png', size: 100 })).toBe('拡張子が中身の形式と合っていません')
+    expect(validateMediaFile({ name: 'photo', type: 'image/png', size: 100 })).toBe('拡張子が中身の形式と合っていません')
+    expect(validateMediaFile({ name: 'photo.PNG', type: 'image/png', size: 100 })).toBe('')
   })
 
   it('新版は現在のメディアと同じ種類だけを選べる', () => {

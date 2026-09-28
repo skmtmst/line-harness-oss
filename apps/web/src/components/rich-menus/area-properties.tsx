@@ -3,7 +3,7 @@
 import MultiSelect from '@/components/shared/multi-select'
 import Select from '@/components/shared/select'
 import type { Area } from './canvas-editor'
-import { RICH_MENU_ACTION_TYPE_BY_INTENT, type RichMenuAreaIntent } from '@line-crm/shared'
+import { RICH_MENU_ACTION_TYPE_BY_INTENT, richMenuUriError, type RichMenuAreaIntent } from '@line-crm/shared'
 
 type Option = { id: string; name: string }
 
@@ -292,8 +292,15 @@ export function AreaProperties({
                 value={(data.uri as string) ?? ''}
                 onChange={(e) => onUpdate({ actionData: { ...data, uri: e.target.value } })}
                 placeholder="https://..."
+                aria-invalid={Boolean(String(data.uri ?? '').trim()) && richMenuUriError(String(data.uri ?? '')) !== null}
                 className={inputClass}
               />
+              {/* R203: URLでない文字列はその場で理由を出す。空欄は「未設定」側の表示が担う。 */}
+              {String(data.uri ?? '').trim() && richMenuUriError(String(data.uri ?? '')) ? (
+                <p role="alert" className="text-danger mt-1 text-xs">
+                  {richMenuUriError(String(data.uri ?? ''))}
+                </p>
+              ) : null}
             </Field>
           )}
         </>

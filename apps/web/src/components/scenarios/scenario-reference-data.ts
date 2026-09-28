@@ -1,4 +1,4 @@
-import { api, ApiError } from '@/lib/api'
+import { api, eventsApi, ApiError } from '@/lib/api'
 
 /*
   任意機能（友だち情報・対応マーク・共通情報）の参照一覧。
@@ -95,4 +95,18 @@ export const scenarioReferenceData = {
   commonVars: (accountId: string) =>
     cache.load(`common-vars:${accountId}`, () =>
       api.commonVars.list(accountId, undefined, { suppressFeatureDisabledEvent: true }).catch(emptyWhenFeatureDisabled)),
+  /*
+   * R245: テンプレート・リマインダ・イベント予約の対象指定は、アカウントで
+   * 絞った候補から名前で選ぶ。IDの直入力では運用者が選べない。
+   * タグ・テンプレートと同じく鍵をアカウントごとに分ける（R23 横展開）。
+   */
+  reminders: (accountId?: string | null) =>
+    cache.load(`reminders:${scopeKey(accountId)}`, () =>
+      api.reminders.list(accountId ? { accountId } : undefined)),
+  events: (accountId?: string | null) =>
+    cache.load(`events:${scopeKey(accountId)}`, async () => {
+      if (!accountId) return { success: false as const, error: 'account_required' }
+      const res = await eventsApi.listEvents(accountId, { limit: 200 })
+      return { success: true as const, data: res.items }
+    }),
 }

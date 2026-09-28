@@ -315,7 +315,12 @@ export default function NewAffiliateOfferPage() {
             id="of-tag"
             value={tagId}
             onChange={(value) => setTagId(value)}
-            options={[{ value: '', label: '（なし）' }, ...tags.map((t) => ({ value: t.id, label: t.name }))]}
+            options={[
+              { value: '', label: '（なし）' },
+              // 保管済みのタグは成果承認の時点で付けられない。選べるように見せて
+              // あとで失敗させるより、候補から外す（編集モーダルと同じ決まり #798）。
+              ...tags.filter((t) => (t.status ?? 'active') === 'active').map((t) => ({ value: t.id, label: t.name })),
+            ]}
             size="standard"
           />
         </Field>
@@ -330,7 +335,11 @@ export default function NewAffiliateOfferPage() {
             id="of-scenario"
             value={scenarioId}
             onChange={(value) => setScenarioId(value)}
-            options={[{ value: '', label: '（なし）' }, ...scenarios.map((s) => ({ value: s.id, label: s.name }))]}
+            options={[
+              { value: '', label: '（なし）' },
+              // 停止中のシナリオは成果承認時に始まらないので候補から外す。
+              ...scenarios.filter((s) => s.isActive !== false).map((s) => ({ value: s.id, label: s.name })),
+            ]}
             size="standard"
           />
         </Field>
