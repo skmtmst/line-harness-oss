@@ -117,6 +117,8 @@ export interface ReactionCampaignCsv {
   sentAt: string;
   targetPeople: AnalyticsMetric<number>;
   delivered: AnalyticsMetric<number>;
+  /** シナリオの送信通数。届いた人数とは別の欄にする（監査R225）。 */
+  sentMessages: AnalyticsMetric<number>;
   opened: AnalyticsMetric<number>;
   lineClicked: AnalyticsMetric<number>;
   outcomes: AnalyticsMetric<number>;
@@ -136,13 +138,14 @@ export function buildReactionsCsv(overview: ReactionsOverviewCsv): AnalyticsCsvR
     overview.campaignsTruncation.scenario ? `シナリオは新しい方から先頭${scenarioShown}件` : null,
   ].filter(Boolean).join('・');
   return [
-    ['配信', '種類', '送った日時', '対象', '到達', '開封', 'LINEクリック', '成果'],
+    ['配信', '種類', '送った日時', '対象', '到達', '送信通数', '開封', 'LINEクリック', '成果'],
     ...overview.campaigns.map((item) => [
       item.name,
       item.kind === 'broadcast' ? '一斉配信' : 'シナリオ',
       item.sentAt,
       shownCell(item.targetPeople),
       shownCell(item.delivered),
+      shownCell(item.sentMessages),
       shownCell(item.opened),
       shownCell(item.lineClicked),
       shownCell(item.outcomes),

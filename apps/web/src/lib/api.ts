@@ -2057,6 +2057,8 @@ export type AnalyticsReactionsOverview = AnalyticsEnvelope<{
     sentAt: string
     targetPeople: AnalyticsMetric<number>
     delivered: AnalyticsMetric<number>
+    /** シナリオの送信通数。届いた人数ではないので「到達」欄には出さない（監査R225） */
+    sentMessages: AnalyticsMetric<number>
     opened: AnalyticsMetric<number>
     lineClicked: AnalyticsMetric<number>
     outcomes: AnalyticsMetric<number>
@@ -7125,6 +7127,15 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ name, accountId }),
       }),
+    /**
+     * R230: フォーム全体を別IDの下書きとして複製する。質問・分岐・デザイン・
+     * 受付設定を引き継ぎ、回答・公開状態・集計は引き継がない。複製は受付停止。
+     */
+    duplicate: (id: string, accountId: string, name?: string) =>
+      fetchApi<ApiResponse<{ id: string; isActive: boolean }>>(
+        `/api/forms/${id}/duplicate?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'POST', body: JSON.stringify({ name: name?.trim() ? name.trim() : undefined }) },
+      ),
     update: (
       id: string,
       accountId: string,
@@ -7828,6 +7839,10 @@ export const api = {
           messageContent: string
           /** 下書きの通は送られない（R212）。 */
           isDraft?: boolean
+          /** R237: 公開版・通の控えのどれか。 */
+          contentSource?: 'template' | 'step' | 'step-fallback'
+          /** R237: 控えに落ちた理由。 */
+          fallbackReason?: 'missing' | 'unpublished' | 'other_account' | null
         }>
       }>>(`/api/scenarios/${id}/preview${q}`, { signal })
     },

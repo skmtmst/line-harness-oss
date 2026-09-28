@@ -21,6 +21,23 @@ interface PreviewStep {
   messageContent: string
   /** 下書きの通は送られない（R212）。 */
   isDraft?: boolean
+  /** R237: 公開版・通の控えのどれか。 */
+  contentSource?: 'template' | 'step' | 'step-fallback'
+  /** R237: 控えに落ちた理由。 */
+  fallbackReason?: 'missing' | 'unpublished' | 'other_account' | null
+}
+
+/**
+ * R237: この通の見本が「公開版・通の控え」のどれか。控えのときは
+ * 未反映の理由も添える。通の直接入力（template 参照なし）は正規の控え
+ * なので何も出さない（重複した説明を出さない）。
+ */
+export function contentSourceLabel(step: PreviewStep): string | null {
+  if (step.contentSource === 'template') return 'テンプレートの公開版を表示'
+  if (step.contentSource !== 'step-fallback') return null
+  if (step.fallbackReason === 'unpublished') return '通の控えを表示（テンプレートが未公開のため）'
+  if (step.fallbackReason === 'other_account') return '通の控えを表示（別のLINEアカウントのテンプレートのため）'
+  return '通の控えを表示（テンプレートが削除されているため）'
 }
 
 function nowJstAsLocalInput(): string {
@@ -119,6 +136,12 @@ export default function BulkPreviewModal({ open, scenarioId, onClose }: Props) {
                 <span className="text-info text-xs">{s.messageType}</span>
                 <span className="text-ink-faint transition-transform group-open:rotate-90">▶</span>
               </summary>
+              {(() => {
+                const source = contentSourceLabel(s)
+                return source ? (
+                  <p className="text-ink-faint mt-1 text-xs">{source}</p>
+                ) : null
+              })()}
               <pre className="bg-canvas-sunken text-ink-secondary mt-2 max-h-48 overflow-y-auto rounded p-2 text-xs break-words whitespace-pre-wrap">
                 {s.messageContent}
               </pre>

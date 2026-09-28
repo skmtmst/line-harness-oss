@@ -956,7 +956,7 @@ function TargetSelector({
         onChange={onChange}
         options={[
           ...options.map((o) => ({ value: o.id, label: o.name, hint: o.hint })),
-          ...(missing ? [{ value, label: '現在の保存値（名前を取得できません）' }] : []),
+          ...(missing ? [{ value, label: '現在の保存値' }] : []),
         ]}
         loading={loading}
         placeholder="名前で探す"
