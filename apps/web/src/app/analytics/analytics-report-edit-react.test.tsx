@@ -147,7 +147,7 @@ describe('定期レポートの編集画面(?id=)', () => {
     expect(nameInput).toBeTruthy()
     expect(host.textContent).toContain('「週次まとめ」を直しています')
     expect(host.textContent).toContain('変更を保存する')
-    expect(host.textContent).not.toContain('いますぐ1回だけ送ってみる')
+    expect(host.textContent).not.toContain('今すぐ1回だけ送る')
 
     await act(async () => { button('変更を保存する').click() })
     const putCall = net.calls.find((call) => call.path.startsWith('/api/analytics/report-schedules/report-1?') && call.method === 'PUT')

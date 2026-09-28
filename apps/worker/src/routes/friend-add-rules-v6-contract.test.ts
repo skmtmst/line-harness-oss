@@ -56,7 +56,13 @@ function seedRuleAndRun(testDb: SqliteD1): void {
     routeIds: ['route-1'], scenarioId: 'scenario-1', messageType: 'text',
     messageText: '友だち追加ありがとうございます', timing: 'immediate', actions: [
       { type: 'add_tag', label: '見込み客タグ', targetId: 'tag-1' },
-    ], friendCondition: '購入回数が1回以上', activeFrom: null, activeUntil: null,
+    ],
+    // 実行時も読める現在の形式で入れる。旧形式の自由文は実行時 fail-closed で
+    // 止まるため、公開版のfixtureに残すとテスト・公開前確認が正しく止まる。
+    friendCondition: JSON.stringify({
+      operator: 'AND', rules: [{ type: 'tag_exists', value: 'tag-1' }],
+    }),
+    activeFrom: null, activeUntil: null,
     weekdays: [1, 2, 3], timeWindows: [{ start: '09:00', end: '18:00' }],
     resendSuppressionHours: 24,
     deliveryChoices: { sendWelcomeMessage: true, startScenario: true, runActions: true },
@@ -409,10 +415,14 @@ describe('V6 friend-add rule data contracts', () => {
     ));
     // 400 にすると管理画面の共通取得部が本文を捨てるため、200 で理由を返す。
     expect(failed.status).toBe(200);
-    await expect(failed.json()).resolves.toMatchObject({
-      success: false,
-      data: { matched: false, reasons: ['実際に配信するシナリオを決めてください。'] },
-    });
+    const failedBody = await failed.json() as { success: boolean; data: { matched: boolean; reasons: string[] } };
+    expect(failedBody.success).toBe(false);
+    expect(failedBody.data.matched).toBe(false);
+    // シナリオの欠落と、選んだ経路が無い（どこにも届かない）欠落の両方を挙げる。
+    expect(failedBody.data.reasons).toEqual(expect.arrayContaining([
+      '実際に配信するシナリオを決めてください。',
+      '対象の流入リンクが選ばれていません。流入条件で1つ以上選んでください。',
+    ]));
     expect(testDb.raw.prepare(
       "SELECT last_tested_by_staff_id FROM friend_add_rule_versions WHERE id = 'version-3'",
     ).get()).toMatchObject({ last_tested_by_staff_id: 'owner-1' });
@@ -422,8 +432,10 @@ describe('V6 friend-add rule data contracts', () => {
       data: { rule: { lastTestedByStaffId: 'owner-1', lastTestedByStaffName: 'オーナー' } },
     });
 
+    // rule-1 の曜日（月〜水）・時間帯（09:00〜18:00）の内側の時刻で確かめる。
+    // 想定日時を渡さないと「実行した日の曜日・時刻」に結果が振り回される。
     const succeeded = await app(testDb.db).request('/api/friend-add-rules/test', json(
-      'POST', { accountId: 'account-1', ruleId: 'rule-1' },
+      'POST', { accountId: 'account-1', ruleId: 'rule-1', expectedAt: '2026-09-28T10:00' },
     ));
     expect(succeeded.status).toBe(200);
     await expect(succeeded.json()).resolves.toMatchObject({
@@ -435,6 +447,115 @@ describe('V6 friend-add rule data contracts', () => {
       'POST', { accountId: 'account-2', ruleId: 'rule-1' },
     ));
     expect(hidden.status).toBe(404);
+  });
+
+  /*
+   * R262(監査・2026-09-27): テストは参照先の整合だけで「選ばれる」と断定しない。
+   * 経路・曜日/時間帯・有効期間・友だち条件・再送制限を、指定した入力で
+   * 本番と同じ判定器に通し、当たらないときは理由を返す。
+   * rule-1: 月〜水・09:00〜18:00・経路 route-1・条件「見込み客タグ(tag-1)」。
+   */
+  it('テストは経路・曜日/時間帯・期限・友だちの状態を実判定で確かめる', async () => {
+    seedRuleAndRun(testDb);
+    testDb.raw.prepare(
+      "INSERT INTO friend_tags (friend_id, tag_id) VALUES ('friend-1', 'tag-1')",
+    ).run();
+    const inside = { accountId: 'account-1', ruleId: 'rule-1', expectedAt: '2026-09-28T10:00' };
+
+    // 条件を満たす友だち・対象の経路・対象の曜日時間 → 選ばれる
+    const hit = await app(testDb.db).request('/api/friend-add-rules/test', json(
+      'POST', { ...inside, routeId: 'route-1', friendId: 'friend-1' },
+    ));
+    await expect(hit.json()).resolves.toMatchObject({ success: true, data: { matched: true } });
+
+    // 条件を満たさない友だち（タグ無し）→ 条件不一致の理由
+    insertFriend(testDb.raw, 'friend-2', { line_account_id: 'account-1', display_name: '佐藤 花子' });
+    const notMet = await app(testDb.db).request('/api/friend-add-rules/test', json(
+      'POST', { ...inside, friendId: 'friend-2' },
+    ));
+    const notMetBody = await notMet.json() as { data: { matched: boolean; reasons: string[] } };
+    expect(notMetBody.data.matched).toBe(false);
+    expect(notMetBody.data.reasons).toEqual(expect.arrayContaining([
+      '試した友だちは、設定した友だち条件を満たしていません。',
+    ]));
+
+    // 対象外の曜日（2026-09-27 は日曜）→ 曜日の理由
+    const sunday = await app(testDb.db).request('/api/friend-add-rules/test', json(
+      'POST', { accountId: 'account-1', ruleId: 'rule-1', expectedAt: '2026-09-27T10:00' },
+    ));
+    const sundayBody = await sunday.json() as { data: { matched: boolean; reasons: string[] } };
+    expect(sundayBody.data.matched).toBe(false);
+    expect(sundayBody.data.reasons).toContain('この曜日は配信対象ではありません。');
+
+    // 対象外の流入リンク → 経路の理由
+    const wrongRoute = await app(testDb.db).request('/api/friend-add-rules/test', json(
+      'POST', { ...inside, routeId: 'route-9' },
+    ));
+    const wrongRouteBody = await wrongRoute.json() as { data: { matched: boolean; reasons: string[] } };
+    expect(wrongRouteBody.data.matched).toBe(false);
+    expect(wrongRouteBody.data.reasons).toContain('試した流入リンクはこの設定の対象ではありません。');
+
+    // 他アカウントの友だちは「いない」と返す（存在を教えない）
+    insertFriend(testDb.raw, 'friend-x', { line_account_id: 'account-2' });
+    const foreign = await app(testDb.db).request('/api/friend-add-rules/test', json(
+      'POST', { ...inside, friendId: 'friend-x' },
+    ));
+    const foreignBody = await foreign.json() as { data: { matched: boolean; reasons: string[] } };
+    expect(foreignBody.data.matched).toBe(false);
+    expect(foreignBody.data.reasons).toContain('試す友だちがこのアカウントに見つかりません。');
+
+    // 読めない想定日時は 400（理由なしの成功にはしない）
+    const badDate = await app(testDb.db).request('/api/friend-add-rules/test', json(
+      'POST', { accountId: 'account-1', ruleId: 'rule-1', expectedAt: 'not-a-date' },
+    ));
+    expect(badDate.status).toBe(400);
+  });
+
+  /*
+   * R262(監査・2026-09-27): 期限切れ・リンク未選択の下書きは、テストで
+   * 「選ばれます」と言わせない。公開前確認でも同じ理由で止まり、
+   * 最終確認画面へ引き継ぐ。
+   */
+  it('期限切れ・流入リンク未選択はテストと公開前確認の両方で止まる', async () => {
+    seedRuleAndRun(testDb);
+    const expired = JSON.stringify({
+      routeIds: [], scenarioId: 'scenario-1', messageType: 'text',
+      messageText: '終了した案内', timing: 'immediate', actions: [], friendCondition: '',
+      activeFrom: null, activeUntil: '2026-08-28T10:00', weekdays: [], timeWindows: [],
+    });
+    testDb.raw.prepare(
+      `INSERT INTO friend_add_rules
+        (id, line_account_id, friend_kind, name, priority, status, current_version_id, created_at, updated_at)
+       VALUES ('rule-expired', 'account-1', 'first_time', '終了した案内', 9, 'draft', NULL,
+               '2026-09-07T09:00:00.000', '2026-09-07T09:00:00.000')`,
+    ).run();
+    testDb.raw.prepare(
+      `INSERT INTO friend_add_rule_versions
+        (id, rule_id, version_number, definition_snapshot, status)
+       VALUES ('version-expired', 'rule-expired', 1, ?, 'draft')`,
+    ).run(expired);
+
+    const tested = await app(testDb.db).request('/api/friend-add-rules/test', json(
+      'POST', { accountId: 'account-1', ruleId: 'rule-expired' },
+    ));
+    const testedBody = await tested.json() as { success: boolean; data: { matched: boolean; reasons: string[] } };
+    expect(testedBody.success).toBe(false);
+    expect(testedBody.data.matched).toBe(false);
+    expect(testedBody.data.reasons).toEqual(expect.arrayContaining([
+      '有効期間の終了時刻が過ぎています。終了を延ばすか、この設定を消してください。',
+      '対象の流入リンクが選ばれていません。流入条件で1つ以上選んでください。',
+    ]));
+
+    const validate = await app(testDb.db).request('/api/friend-add-rules/rule-expired/validate?account_id=account-1', {
+      method: 'POST',
+    });
+    const validateBody = await validate.json() as {
+      data: { canPublish: boolean; checks: Array<{ status: string; label: string }> };
+    };
+    expect(validateBody.data.canPublish).toBe(false);
+    expect(validateBody.data.checks.some(
+      (check) => check.status === 'failed' && check.label.includes('有効期間の終了時刻が過ぎています'),
+    )).toBe(true);
   });
 
   /*

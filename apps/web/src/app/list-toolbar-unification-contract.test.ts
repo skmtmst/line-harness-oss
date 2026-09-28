@@ -71,17 +71,36 @@ describe('一覧の道具と行の操作の統一（★V7 Xn1Mz）', () => {
     }
   })
 
-  it('表示件数は2行目の右（trailing）に置き、単独の行を作らない', () => {
+  it('表示件数は2行目の右に置き、単独の行を作らない', () => {
     for (const rel of TOOLBAR_PAGES) {
       const src = read(rel)
       if (!src.includes('aria-label="表示件数"')) continue
       const toolbarAt = src.indexOf('<ListToolbar')
-      const trailingAt = src.indexOf('trailing={', toolbarAt)
-      expect(trailingAt, `${rel} の表示件数が2行目の右にありません`).toBeGreaterThan(toolbarAt)
+      /*
+       * タグ一覧だけ例外：絞り込みと同じ折り返しの流れの末尾（filters の
+       * 右端・`ml-auto`）に置く。`trailing` の別枠にすると、絞り込みが
+       * あふれた幅（1440px・1152px）で件数だけの行ができてしまう。
+       * どちらも「2行目の右端・単独の行なし」の意図は同じ。
+       */
+      const anchorAt = rel.includes('tags-page-v4')
+        ? src.indexOf('filters={', toolbarAt)
+        : src.indexOf('trailing={', toolbarAt)
+      expect(anchorAt, `${rel} の表示件数が2行目の右にありません`).toBeGreaterThan(toolbarAt)
       expect(
-        src.indexOf('aria-label="表示件数"', trailingAt),
+        src.indexOf('aria-label="表示件数"', anchorAt),
         `${rel} の表示件数が2行目の右にありません`,
-      ).toBeGreaterThan(trailingAt)
+      ).toBeGreaterThan(anchorAt)
+      if (rel.includes('tags-page-v4')) {
+        const pagerAt = src.indexOf('aria-label="表示件数"', anchorAt)
+        expect(
+          src.indexOf('ml-auto', anchorAt),
+          `${rel} の表示件数が行の右端に寄っていません`,
+        ).toBeGreaterThan(anchorAt)
+        expect(
+          src.indexOf('ml-auto', anchorAt),
+          `${rel} の表示件数が行の右端に寄っていません`,
+        ).toBeLessThan(pagerAt)
+      }
     }
   })
 

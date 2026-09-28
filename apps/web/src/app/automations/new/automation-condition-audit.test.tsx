@@ -186,7 +186,17 @@ async function fillMinimum(el: HTMLElement): Promise<void> {
 
 /** 条件部品で「名前に『田中』を含む」を組み立てる。 */
 async function addNameCondition(el: HTMLElement): Promise<void> {
-  await clickButton(el, '名前')
+  // m22c: 札ボタンではなく検索できる足し口（Combobox）で足す。
+  const picker = el.querySelector('input[aria-label="追加する条件を選ぶ"]') as HTMLInputElement
+  expect(picker, '条件の足し口が出ていない').toBeTruthy()
+  await act(async () => { picker.focus() })
+  await typeText(picker, '名前')
+  await act(async () => {
+    picker.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
+  })
+  await act(async () => {
+    picker.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+  })
   const input = el.querySelector('input[aria-label="名前に含む文字"]') as HTMLInputElement
   expect(input, '名前の条件の入力欄が出ていない').toBeTruthy()
   await typeText(input, '田中')

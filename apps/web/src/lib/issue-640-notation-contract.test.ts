@@ -44,7 +44,7 @@ describe('#640 省略表示の全文確認（title）', () => {
     const thTitles = FRIEND_ADD.match(/<Th title=/g)
     expect(thTitles, '見出しセルの title が足りない').not.toBeNull()
     expect(thTitles!.length).toBeGreaterThanOrEqual(6)
-    expect(FRIEND_ADD).toMatch(/block truncate" title=\{rule\.isFallback/)
+    expect(FRIEND_ADD).toMatch(/block truncate" title=\{routeLabel\(rule\)\}/)
     expect(FRIEND_ADD).toMatch(/block truncate" title=\{deliverySummary\(rule\)\}/)
   })
 
@@ -63,10 +63,12 @@ describe('#640 省略表示の全文確認（title）', () => {
     expect(NEN_OVERVIEW).toMatch(/title=\{sort === 'name'/)
   })
 
-  it('/tags: フォルダ札・フォルダ行・使用先セルに title', () => {
-    // フォルダの札は共通 Select。選んだ値が省略表示のとき、全文は
-    // 部品の title で確認できる（#640 の意図は部品側が持つ）。
-    expect(TAGS).toContain('aria-label={`${tag.name} のフォルダ`}')
+  it('/tags: フォルダ行・使用先セルに title', () => {
+    // フォルダの列は選び直し欄を置かず文字だけ出す（m21o）。
+    // 欄の幅が列を超えて隣へ重なっていたため。長い名前は省略し、
+    // 全文は title で確認できる（#640 の意図は残す）。
+    expect(TAGS).not.toContain('<FolderSelect')
+    expect(TAGS).toContain("title={group?.name ?? '未分類'}")
     expect(TAGS).not.toContain('<select')
     expect(TAGS).toMatch(/min-w-0 flex-1 truncate" title=\{row\.name\}/)
     // 使用先セルは共通 Td（余白は部品側）。全文確認の title は残す。

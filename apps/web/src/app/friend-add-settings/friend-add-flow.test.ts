@@ -30,6 +30,7 @@ const BASE_DEFINITION: FriendAddRuleDefinition = {
 describe('IDEA-09 友だち追加時配信の流れ説明', () => {
   it('経路→初回案内→付く属性→次の配信の順で、実設定の値を出す', () => {
     const steps = friendAddFlowSteps({
+      friendKind: 'first_time',
       isFallback: false,
       routeNames: ['店頭QR', 'Instagram広告'],
       missingRouteCount: 0,
@@ -57,6 +58,7 @@ describe('IDEA-09 友だち追加時配信の流れ説明', () => {
 
   it('設定していない内容は例示で埋めず「ありません」と書く', () => {
     const steps = friendAddFlowSteps({
+      friendKind: 'first_time',
       isFallback: false,
       routeNames: ['店頭QR'],
       missingRouteCount: 0,
@@ -73,6 +75,7 @@ describe('IDEA-09 友だち追加時配信の流れ説明', () => {
 
   it('受け皿ルールは経路不明の人向けであることを示す', () => {
     const steps = friendAddFlowSteps({
+      friendKind: 'first_time',
       isFallback: true,
       routeNames: [],
       missingRouteCount: 0,
@@ -85,6 +88,7 @@ describe('IDEA-09 友だち追加時配信の流れ説明', () => {
 
   it('停止・削除済みの経路は件数を明示する', () => {
     const steps = friendAddFlowSteps({
+      friendKind: 'first_time',
       isFallback: false,
       routeNames: ['店頭QR'],
       missingRouteCount: 2,
@@ -96,12 +100,12 @@ describe('IDEA-09 友だち追加時配信の流れ説明', () => {
 
   it('シナリオ未選択・削除済みを区別して書く', () => {
     const unset = friendAddFlowSteps({
-      isFallback: false, routeNames: ['A'], missingRouteCount: 0,
+      friendKind: 'first_time', isFallback: false, routeNames: ['A'], missingRouteCount: 0,
       definition: { ...BASE_DEFINITION, scenarioId: null }, scenarioName: null,
     })
     expect(unset[3].detail).toContain('配信シナリオは未選択です')
     const deleted = friendAddFlowSteps({
-      isFallback: false, routeNames: ['A'], missingRouteCount: 0,
+      friendKind: 'first_time', isFallback: false, routeNames: ['A'], missingRouteCount: 0,
       definition: BASE_DEFINITION, scenarioName: null,
     })
     expect(deleted[3].detail).toContain('削除済みのシナリオを指しています')
@@ -109,6 +113,7 @@ describe('IDEA-09 友だち追加時配信の流れ説明', () => {
 
   it('初回の1通を送らない設定は登録だけ行うと書く', () => {
     const steps = friendAddFlowSteps({
+      friendKind: 'first_time',
       isFallback: false, routeNames: ['A'], missingRouteCount: 0,
       definition: {
         ...BASE_DEFINITION,
@@ -117,6 +122,23 @@ describe('IDEA-09 友だち追加時配信の流れ説明', () => {
       scenarioName: 'ウェルカムシナリオ',
     })
     expect(steps[1].detail).toBe('最初の1通は送らず、シナリオへの登録だけを行います。')
+  })
+
+  it('再追加で「何も配信しない」は案内も次の配信も届かないと書く（アクションは別）', () => {
+    const steps = friendAddFlowSteps({
+      friendKind: 'returning',
+      isFallback: false, routeNames: ['A'], missingRouteCount: 0,
+      definition: {
+        ...BASE_DEFINITION,
+        returningMode: 'none',
+        actions: [{ type: 'add_tag', label: 'タグ「再来」を付ける', targetId: 'tag-9' }],
+      },
+      scenarioName: 'ウェルカムシナリオ',
+    })
+    // 「届く」ように見せない。タグ追加などのアクション自体は動くので両方書く。
+    expect(steps[1].detail).toContain('届きません')
+    expect(steps[2].detail).toContain('タグ「再来」を付ける')
+    expect(steps[3].detail).toContain('シナリオは動かしません')
   })
 })
 
