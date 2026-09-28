@@ -261,7 +261,8 @@ describe('友だち属性 V4 contract', () => {
     // #384で共通Tag型へ入ったため、画面だけの仮型へ戻さない。
     expect(source).not.toContain('TagWithCleanup')
     // 未取得は `—`、取得できて0件は `0件`。
-    expect(source).toContain("`未使用 ${unusedCount === null ? '—' : `${unusedCount}件`}`")
+    // 未使用の数は KPI の「未使用」カードが受け持つ（タグ総数の重ね書きをやめた跡）。
+    expect(source).toContain("value: unusedCount,")
     expect(source).toContain("unit: cleanupCount === null ? '' : '件'")
   })
 
