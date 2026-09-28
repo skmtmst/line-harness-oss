@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type {
   FriendAddEventAttributionStatus,
@@ -12,6 +12,7 @@ import { useAccount } from '@/contexts/account-context'
 import { api, type FriendAddRunList } from '@/lib/api'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { csvCell } from './csv'
+import { formatJstDateTime, routingAction, routingLabel } from './run-status'
 import { useCursorStack } from '../use-cursor-stack'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -19,7 +20,7 @@ import ListState from '@/components/shared/list-state'
 import MenuPortal from '@/components/shared/menu-portal'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
-import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
+import StatusBadge from '@/components/shared/status-badge'
 import KpiCard from '@/components/shared/kpi-card'
 import StickyBar from '@/components/shared/sticky-bar'
 import ListRange from '@/components/ui/list-range'
@@ -28,72 +29,9 @@ type KindFilter = 'all' | FriendAddEventKind
 type AttributionFilter = 'all' | FriendAddEventAttributionStatus
 type RoutingFilter = 'all' | FriendAddEventRoutingStatus
 
-const ROUTING_LABELS: Record<FriendAddEventRoutingStatus, { label: string; tone: StatusBadgeTone }> = {
-  pending: { label: 'テスト待ち', tone: 'info' },
-  completed: { label: '成功', tone: 'success' },
-  failed: { label: 'エラー', tone: 'danger' },
-  suppressed: { label: '配信なし', tone: 'neutral' },
-  partial_failed: { label: '再送待ち', tone: 'warning' },
-}
-
-const ROUTING_ACTIONS: Record<FriendAddEventRoutingStatus, string> = {
-  pending: '配信・処理を確認中',
-  completed: '初回案内を実行',
-  failed: '配信・処理に失敗',
-  suppressed: '配信・処理なし',
-  partial_failed: '送れず再送待ち',
-}
-
-/** 将来の状態が来ても描画を落とさない受け皿。 */
-const UNKNOWN_ROUTING_LABEL = { label: '不明', tone: 'neutral' } as const
-const UNKNOWN_ROUTING_ACTION = '状態を確認中'
-
-/*
- * 送達不明。送信は試したが、届いたかどうか分からない実行。
- * **自動では送り直さない**（送り直すと二重に届く）。「再送待ち」と同じ
- * 見た目にすると、放っておけばそのうち届くと読めてしまう。分けて出す。
- */
-const DELIVERY_UNKNOWN_CODE = 'delivery_unknown'
-const DELIVERY_UNKNOWN_LABEL = { label: '送達不明', tone: 'danger' } as const
-const DELIVERY_UNKNOWN_ACTION = '送達不明・要確認（自動では送り直しません）'
-
-function routingLabel(
-  status: FriendAddEventRoutingStatus,
-  errorCode: string | null,
-): { label: string; tone: StatusBadgeTone } {
-  if (errorCode === DELIVERY_UNKNOWN_CODE) return DELIVERY_UNKNOWN_LABEL
-  return ROUTING_LABELS[status] ?? UNKNOWN_ROUTING_LABEL
-}
-
-function routingAction(status: FriendAddEventRoutingStatus, errorCode: string | null): string {
-  if (errorCode === DELIVERY_UNKNOWN_CODE) return DELIVERY_UNKNOWN_ACTION
-  return ROUTING_ACTIONS[status] ?? UNKNOWN_ROUTING_ACTION
-}
-
-/** DBにはJSTの時刻をオフセットなしで保存した古い行がある。UTCへ読み替えず、そのままJSTとして表示する。 */
-function formatJstDateTime(value: string | null): string {
-  if (!value) return '—'
-  const bare = value.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/)
-  if (bare && !/[zZ]|[+-]\d{2}:?\d{2}$/.test(value)) {
-    return `${bare[1]}/${bare[2]}/${bare[3]} ${bare[4]}:${bare[5]}`
-  }
-  const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) return '—'
-  return new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(parsed)
-}
-
-function formatJstTime(value: string | null): string {
-  const dateTime = formatJstDateTime(value)
-  return dateTime === '—' ? dateTime : dateTime.slice(-5)
-}
+const RUN_STATUSES_PARAM = new Set<FriendAddEventRoutingStatus>([
+  'pending', 'completed', 'failed', 'suppressed', 'partial_failed',
+])
 
 const RULE_STATUS_LABELS: Record<string, string> = {
   published: '稼働中',
@@ -110,12 +48,27 @@ function FriendAddRunsInner() {
   usePageTitle('新規友だち初回案内・実行結果')
   const { selectedAccountId, accounts, loading: accountLoading } = useAccount()
   const searchParams = useSearchParams()
+  const router = useRouter()
   // 一覧の「この設定の実行結果」から来たとき、その設定の記録だけを見せる。
   const ruleIdFilter = searchParams.get('rule_id')
-  const [kind, setKind] = useState<KindFilter>('all')
-  const [attribution, setAttribution] = useState<AttributionFilter>('all')
-  const [routing, setRouting] = useState<RoutingFilter>('all')
-  const { cursor, page: cursorPage, canPrev, reset: resetCursor, goPrev, goNext } = useCursorStack()
+  /*
+   * 絞り込みとページ位置は URL が持つ（R268）。詳細から戻ったときに
+   * 同じ条件・同じページへ戻れるよう、URLの値をそのまま使う。
+   */
+  const kindParam = searchParams.get('kind')
+  const kind: KindFilter = kindParam === 'first_time' || kindParam === 'returning' ? kindParam : 'all'
+  const attributionParam = searchParams.get('attribution')
+  const attribution: AttributionFilter = attributionParam === 'captured' || attributionParam === 'unavailable' ? attributionParam : 'all'
+  const routingParam = searchParams.get('status')
+  const routing: RoutingFilter = routingParam && RUN_STATUSES_PARAM.has(routingParam as FriendAddEventRoutingStatus) ? routingParam as RoutingFilter : 'all'
+  /*
+   * ページ位置はURLの `pages` が持つ。カーソルの束を丸ごと入れるので、
+   * 詳細から3ページ目へ戻っても表示中の記録とページ番号が一致し、
+   * 「前へ」も正しくたどれる（R268）。
+   */
+  const pagesParam = searchParams.get('pages')
+  const { stack: cursorStack, cursor, page: cursorPage, canPrev, reset: resetCursor, goPrev, goNext } =
+    useCursorStack(pagesParam ? [null, ...pagesParam.split(',').filter(Boolean)] : undefined)
   const [data, setData] = useState<FriendAddRunList | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -170,19 +123,57 @@ function FriendAddRunsInner() {
     if (!accountLoading) void load()
   }, [accountLoading, load])
 
-  // アカウントや設定の絞りを変えたら古いカーソルで読まないよう巻き戻す。
+  /*
+   * アカウントや設定の絞りを変えたら古いカーソルで読まないよう巻き戻す。
+   * 初回（URLのカーソルで復元した直後）は巻き戻さない。ここで消すと
+   * 詳細からの戻りが先頭ページへ飛んでしまう（R268）。
+   */
+  const lastScope = useRef<string | null>(null)
   useEffect(() => {
-    resetCursor()
+    const scope = `${selectedAccountId ?? ''}:${ruleIdFilter ?? ''}`
+    if (lastScope.current === null) {
+      lastScope.current = scope
+      return
+    }
+    if (lastScope.current !== scope) {
+      lastScope.current = scope
+      resetCursor()
+    }
   }, [selectedAccountId, ruleIdFilter, resetCursor])
+
+  /*
+   * 今のページ位置（カーソルの束）をURLへ写す。詳細へのリンクがこのURLを
+   * 引き継ぐので、戻ると同じページ・同じ絞り込みへ戻れる（R268）。
+   */
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString())
+    const trail = cursorStack.slice(1).join(',')
+    if (trail) params.set('pages', trail)
+    else params.delete('pages')
+    const next = params.toString()
+    if (next !== searchParams.toString()) router.replace(`?${next}`, { scroll: false })
+  }, [cursorStack, searchParams, router])
 
   /*
    * 絞りの変更はカーソルの巻き戻しと同時に1回だけ読み直す。巻き戻しと取得を
    * 別の effect に分けると、絞り変更のたびに無駄な再取得が起きる。
    */
   const applyFilter = (patch: { kind?: KindFilter; attribution?: AttributionFilter; routing?: RoutingFilter }) => {
-    if (patch.kind !== undefined) setKind(patch.kind)
-    if (patch.attribution !== undefined) setAttribution(patch.attribution)
-    if (patch.routing !== undefined) setRouting(patch.routing)
+    const params = new URLSearchParams(searchParams.toString())
+    if (patch.kind !== undefined) {
+      if (patch.kind === 'all') params.delete('kind')
+      else params.set('kind', patch.kind)
+    }
+    if (patch.attribution !== undefined) {
+      if (patch.attribution === 'all') params.delete('attribution')
+      else params.set('attribution', patch.attribution)
+    }
+    if (patch.routing !== undefined) {
+      if (patch.routing === 'all') params.delete('status')
+      else params.set('status', patch.routing)
+    }
+    params.delete('pages')
+    router.replace(`?${params.toString()}`, { scroll: false })
     resetCursor()
   }
 
@@ -198,7 +189,6 @@ function FriendAddRunsInner() {
     }
     return Array.from(counts.entries()).sort((a, b) => b[1] - a[1])
   }, [data])
-  const latestProcessedAt = data?.items.find((item) => item.processedAt)?.processedAt ?? null
   // 絞り込みはサーバ側で済んでいるため、ここでは表示絞りをしない。
   const visibleItems = useMemo(() => data?.items ?? [], [data])
   const activeRuleId = data?.items.find((item) => item.rule)?.rule?.id ?? null
@@ -256,6 +246,22 @@ function FriendAddRunsInner() {
   const editHref = (step: 'basic' | 'preview') => activeRuleId
     ? `/friend-add-settings?view=edit&id=${encodeURIComponent(activeRuleId)}&step=${step}`
     : null
+
+  /*
+   * 詳細へのリンクは今の絞り込み・ページ位置を引き継ぐ。詳細側の
+   * 「実行結果へ戻る」がそのまま返すので、絞り込みが解除されない（R268）。
+   */
+  const detailHref = (id: string) => {
+    const params = new URLSearchParams()
+    params.set('id', id)
+    if (kind !== 'all') params.set('kind', kind)
+    if (attribution !== 'all') params.set('attribution', attribution)
+    if (routing !== 'all') params.set('status', routing)
+    if (ruleIdFilter) params.set('rule_id', ruleIdFilter)
+    const trail = cursorStack.slice(1).join(',')
+    if (trail) params.set('pages', trail)
+    return `/friend-add-settings/runs/detail?${params.toString()}`
+  }
 
   /*
    * CSVは表示中の20件ではなく、今の絞り込み（種類・経路・結果・設定）に
@@ -398,11 +404,22 @@ function FriendAddRunsInner() {
       ) : null}
 
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <KpiCard variant="v6" title="直近28日の追加" value={summary?.totalRuns ?? null} unit="人" detail="" help="友だち追加の合計です" loading={loading} />
+        <KpiCard
+          variant="v6"
+          title="直近28日の追加"
+          value={summary?.recentFriends ?? null}
+          unit="人"
+          detail={summary ? `追加記録 ${summary.recentEvents}件` : ''}
+          help="直近28日に追加された人数です。同じ人の再追加は1人として数え、追加の回数は「追加記録」の件数で確認できます。"
+          loading={loading}
+        />
         <KpiCard variant="v6" title="累計配信" value={summary?.cumulativeDeliveries ?? null} unit="通" detail="" help="実際に送った通数です" loading={loading} />
         <KpiCard variant="v6" title="シナリオ開始" value={summary?.scenarioStarts ?? null} unit="件" detail="" help="登録できた件数です" loading={loading} />
         <KpiCard variant="v6" title="エラー" value={summary?.failed ?? null} unit="件" detail="処理できなかった記録" loading={loading} badge={summary && summary.failed > 0 ? '要確認' : undefined} badgeTone="danger" />
       </div>
+      {kind !== 'all' || attribution !== 'all' || routing !== 'all' || ruleIdFilter ? (
+        <p className="mt-2 text-xs text-ink-faint">上の集計は、今の絞り込みに合う記録だけを対象にしています。</p>
+      ) : null}
 
       <div className="flex flex-col items-start gap-4 xl:flex-row">
         <div className="min-w-0 flex-1">
@@ -480,7 +497,7 @@ function FriendAddRunsInner() {
                       <time className="min-w-0 text-xs text-ink-secondary" dateTime={item.receivedAt}>{formatJstDateTime(item.receivedAt)}</time>
                       <Link
                         className="shrink-0 text-xs font-bold text-action hover:underline"
-                        href={`/friend-add-settings/runs/detail?id=${encodeURIComponent(item.id)}`}
+                        href={detailHref(item.id)}
                       >
                         詳細
                       </Link>
@@ -535,7 +552,7 @@ function FriendAddRunsInner() {
             <dl className="mt-4 divide-y divide-hairline text-sm">
               <div className="flex justify-between gap-3 py-3"><dt>状態</dt><dd className="font-bold">{ruleStatusLabel}</dd></div>
               <div className="flex justify-between gap-3 py-3"><dt>二重送信防止</dt><dd className="font-bold">{suppressionLabel}</dd></div>
-              <div className="flex justify-between gap-3 py-3"><dt>最終配信</dt><dd className="font-bold">{formatJstTime(latestProcessedAt)}</dd></div>
+              <div className="flex justify-between gap-3 py-3"><dt>最終配信</dt><dd className="font-bold">{summary === null ? '—' : summary.lastDeliveryAt ? formatJstDateTime(summary.lastDeliveryAt) : 'まだありません'}</dd></div>
               <div className="flex justify-between gap-3 py-3"><dt>平均送信</dt><dd className="font-bold">{summary?.averageSendTimeMs === null || summary?.averageSendTimeMs === undefined ? '未取得' : `${(summary.averageSendTimeMs / 1000).toFixed(1)}秒`}</dd></div>
             </dl>
           </section>
