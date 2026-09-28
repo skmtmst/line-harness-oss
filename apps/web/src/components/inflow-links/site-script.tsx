@@ -6,6 +6,7 @@ import { api, type MeasurementSite } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import Disclosure from '@/components/shared/disclosure'
 import ListState from '@/components/shared/list-state'
@@ -54,6 +55,12 @@ export default function SiteScript() {
     | null
   >(null)
   const [siteBusy, setSiteBusy] = useState(false)
+  // R275: サイトの停止(理由つき)と再開。止めても記録は消えない。
+  const [stopDialog, setStopDialog] = useState<
+    { site: MeasurementSite; reason: string; error: string | null } | null
+  >(null)
+  const [resumeTarget, setResumeTarget] = useState<MeasurementSite | null>(null)
+  const [siteActionError, setSiteActionError] = useState('')
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? ''
   const snippet = trackingKey
     ? `<script async src="${apiUrl}/api/site/script.js" data-key="${trackingKey}"></script>`
@@ -131,6 +138,44 @@ export default function SiteScript() {
       await load()
     } catch (err) {
       setSiteDialog({ ...siteDialog, error: err instanceof Error ? err.message : '保存できませんでした' })
+    } finally {
+      setSiteBusy(false)
+    }
+  }
+
+  const stopSite = async () => {
+    if (!stopDialog) return
+    const reason = stopDialog.reason.trim()
+    if (!reason) {
+      setStopDialog({ ...stopDialog, error: '止める理由を入れてください' })
+      return
+    }
+    setSiteBusy(true)
+    try {
+      const res = await api.measurementSites.stop(stopDialog.site.id, reason)
+      if (!res.success) throw new Error(res.error || '停止できませんでした')
+      setStopDialog(null)
+      setSiteActionError('')
+      await load()
+    } catch (err) {
+      setStopDialog({ ...stopDialog, error: err instanceof Error ? err.message : '停止できませんでした' })
+    } finally {
+      setSiteBusy(false)
+    }
+  }
+
+  const resumeSite = async () => {
+    if (!resumeTarget) return
+    setSiteBusy(true)
+    try {
+      const res = await api.measurementSites.resume(resumeTarget.id)
+      if (!res.success) throw new Error(res.error || '再開できませんでした')
+      setResumeTarget(null)
+      setSiteActionError('')
+      await load()
+    } catch (err) {
+      setResumeTarget(null)
+      setSiteActionError(err instanceof Error ? err.message : '再開できませんでした')
     } finally {
       setSiteBusy(false)
     }
@@ -308,34 +353,63 @@ export default function SiteScript() {
               </p>
             ) : (
               <ul className="mt-3 space-y-3">
+                {siteActionError ? (
+                  <li className="text-xs text-danger" role="alert">{siteActionError}</li>
+                ) : null}
                 {sites.map((site) => {
-                  const code = siteSnippet(site.id)
+                  const stopped = site.stoppedAt != null
+                  const code = stopped ? null : siteSnippet(site.id)
                   return (
                     <li key={site.id} className="rounded-control border border-hairline p-4">
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold text-ink" title={site.label}>{site.label}</p>
+                          <p className="truncate text-sm font-semibold text-ink" title={site.label}>
+                            {site.label}
+                            {stopped ? (
+                              <Chip tone="warn" className="ml-2">停止中</Chip>
+                            ) : null}
+                          </p>
                           <p className="mt-0.5 text-xs text-ink-faint">
                             サイトID <code className="break-all">{site.id}</code>
                           </p>
                         </div>
                         {canManage ? (
-                          <Button
-                            variant="secondary"
-                            onClick={() =>
-                              setSiteDialog({
-                                mode: 'edit',
-                                site,
-                                label: site.label,
-                                domainsText: site.domains.join('\n'),
-                                error: null,
-                              })
-                            }
-                          >
-                            編集
-                          </Button>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="secondary"
+                              onClick={() =>
+                                setSiteDialog({
+                                  mode: 'edit',
+                                  site,
+                                  label: site.label,
+                                  domainsText: site.domains.join('\n'),
+                                  error: null,
+                                })
+                              }
+                            >
+                              編集
+                            </Button>
+                            {stopped ? (
+                              <Button variant="secondary" onClick={() => setResumeTarget(site)}>
+                                計測を再開する
+                              </Button>
+                            ) : (
+                              <Button
+                                variant="secondary"
+                                onClick={() => setStopDialog({ site, reason: '', error: null })}
+                              >
+                                計測を止める
+                              </Button>
+                            )}
+                          </div>
                         ) : null}
                       </div>
+                      {stopped ? (
+                        <p className="mt-2 text-xs text-status-warn-deep">
+                          計測を止めています。このサイトから届く分は数えません。止めたときの記録は残っています。
+                          {site.stoppedReason ? `（理由: ${site.stoppedReason}）` : ''}
+                        </p>
+                      ) : null}
                       <div className="mt-2 flex flex-wrap gap-2">
                         {site.domains.map((host) => (
                           <Chip key={host} tone="neutral">{host}</Chip>
@@ -492,6 +566,45 @@ export default function SiteScript() {
           </div>
         ) : null}
       </Dialog>
+
+      <Dialog
+        open={stopDialog !== null}
+        title="このサイトの計測を止める"
+        description="止めるとこのサイトから届く分は成果に数えません。いままで数えた記録は残り、あとから再開できます。止めた理由は履歴に残ります。"
+        busy={siteBusy}
+        error={stopDialog?.error ?? undefined}
+        confirmLabel="計測を止める"
+        onConfirm={() => void stopSite()}
+        onCancel={() => { if (!siteBusy) setStopDialog(null) }}
+      >
+        {stopDialog ? (
+          <div className="space-y-3">
+            <p className="text-xs text-ink-secondary">
+              対象: <strong>{stopDialog.site.label}</strong>
+            </p>
+            <label className="block">
+              <span className="text-xs font-semibold text-ink">止める理由（必須）</span>
+              <TextField
+                className="mt-1"
+                value={stopDialog.reason}
+                maxLength={200}
+                placeholder="例: サイトを閉じたため"
+                onChange={(e) => setStopDialog({ ...stopDialog, reason: e.target.value })}
+              />
+            </label>
+          </div>
+        ) : null}
+      </Dialog>
+
+      <ConfirmDialog
+        open={resumeTarget !== null}
+        title="このサイトの計測を再開する"
+        description={resumeTarget ? `「${resumeTarget.label}」から届く分をまた数え始めます。止めていた間の分は数えていません。` : ''}
+        confirmLabel="再開する"
+        busy={siteBusy}
+        onConfirm={() => void resumeSite()}
+        onCancel={() => { if (!siteBusy) setResumeTarget(null) }}
+      />
     </div>
   )
 }

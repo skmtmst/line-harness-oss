@@ -1458,6 +1458,9 @@ export type MeasurementSite = {
   rejectedCount: number
   lastRejectedHost: string | null
   lastRejectedAt: string | null
+  /** 計測を止めた日時と理由。動いているサイトは null。 */
+  stoppedAt: string | null
+  stoppedReason: string | null
 }
 
 /** #819: 成果1件の取消・取消の取消の履歴行。 */
@@ -7304,6 +7307,17 @@ export const api = {
       fetchApi<ApiResponse<{ id: string }>>(
         `/api/measurement-sites/${encodeURIComponent(id)}`,
         { method: 'PATCH', body: JSON.stringify(data) },
+      ),
+    // 計測を止める・再開する。止めるときは理由が必須で、履歴は残る。
+    stop: (id: string, reason: string) =>
+      fetchApi<ApiResponse<{ id: string }>>(
+        `/api/measurement-sites/${encodeURIComponent(id)}/stop`,
+        { method: 'POST', body: JSON.stringify({ reason }) },
+      ),
+    resume: (id: string) =>
+      fetchApi<ApiResponse<{ id: string }>>(
+        `/api/measurement-sites/${encodeURIComponent(id)}/resume`,
+        { method: 'POST', body: JSON.stringify({}) },
       ),
   },
   funnels: {
@@ -13180,6 +13194,18 @@ export const api = {
           lastRunAt: string | null
           lastError: string | null
         }>
+        /** R275: 手入力の記録は1行ずつ返す。取消済みも履歴として出す。 */
+        manualEntries?: Array<{
+          id: string
+          sourceLabel: string
+          day: string
+          amountMinor: number
+          currency: string
+          entryRouteId: string | null
+          cancelledAt: string | null
+          cancelReason: string | null
+          createdAt: string
+        }>
       }>>(`/api/ad-costs${suffix}`)
     },
     create: (data: {
@@ -13194,6 +13220,12 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(data),
       }),
+    // R275: 手入力で間違えて入れた費用を集計から外す。行は残り、理由が必須。
+    cancel: (id: string, reason: string) =>
+      fetchApi<ApiResponse<{ id: string }>>(
+        `/api/ad-costs/${encodeURIComponent(id)}/cancel`,
+        { method: 'POST', body: JSON.stringify({ reason }) },
+      ),
   },
   uploads: {
     /**

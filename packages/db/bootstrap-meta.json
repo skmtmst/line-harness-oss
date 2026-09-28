@@ -423,6 +423,7 @@
     "462_pet_weight_updated_at.sql",
     "463_error_messages_and_getting_started_dismiss.sql",
     "464_organization_recipes.sql",
+    "465_inflow_stop_cancel.sql",
     "466_template_versions.sql",
     "467_template_references.sql",
     "468_event_custom_questions.sql",
@@ -467,5 +468,5 @@
     "510_rich_menu_publish_run_pages.sql",
     "511_restaurant_google_posts.sql"
   ],
-  "migrationCount": 466
+  "migrationCount": 467
 }

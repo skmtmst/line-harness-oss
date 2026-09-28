@@ -4351,6 +4351,68 @@ const spec = {
         },
       },
     },
+    '/api/measurement-sites/{id}/stop': {
+      post: {
+        tags: ['Conversions'],
+        summary: '計測サイトの計測を止める(R275)。行は残し停止日時と理由を記録',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['reason'],
+                properties: { reason: { type: 'string', maxLength: 200 } },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: '停止した' },
+          '400': { description: '理由が無い・長すぎる' },
+          '404': { description: 'サイトが見つからない' },
+          '409': { description: 'すでに停止している' },
+        },
+      },
+    },
+    '/api/measurement-sites/{id}/resume': {
+      post: {
+        tags: ['Conversions'],
+        summary: '停止した計測サイトの計測を再開する(R275)',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: {
+          '200': { description: '再開した' },
+          '404': { description: 'サイトが見つからない' },
+          '409': { description: '停止していない' },
+        },
+      },
+    },
+    '/api/ad-costs/{id}/cancel': {
+      post: {
+        tags: ['Conversions'],
+        summary: '手入力の広告費を取消する(R275)。行は残し取消日時と理由を記録',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['reason'],
+                properties: { reason: { type: 'string', maxLength: 200 } },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: '取消した' },
+          '400': { description: '理由が無い・長すぎる' },
+          '404': { description: '記録が見つからない' },
+          '409': { description: '取込分または取消済み' },
+        },
+      },
+    },
     '/api/public/web-conversions': {
       post: {
         tags: ['Conversions'],

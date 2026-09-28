@@ -1467,6 +1467,27 @@ async function runFrequentHeavyJobs(
             `[mileage-queue] processed=${result.processed} failed=${result.failed} granted=${result.granted}`,
           );
         }
+        // m22o: 付与ルールの「通知する」で予約された分だけ、付与の後に届ける。
+        // OFF のルールは予約自体が無い。公開URLが無い環境では送らず残す。
+        if (env.WORKER_PUBLIC_URL) {
+          const { deliverDueMileageGrantNotifications } = await import(
+            './services/mileage-grant-notification.js'
+          );
+          const { dispatchLineProxyLocally } = await import('./services/local-line-proxy.js');
+          const notified = await deliverDueMileageGrantNotifications(
+            {
+              db: env.DB,
+              workerPublicUrl: env.WORKER_PUBLIC_URL,
+              dispatch: (request) => dispatchLineProxyLocally(request, env),
+            },
+            { limit: 20 },
+          );
+          if (notified.delivered + notified.failed > 0) {
+            console.log(
+              `[mileage-grant-notify] delivered=${notified.delivered} failed=${notified.failed}`,
+            );
+          }
+        }
       },
     },
     {
