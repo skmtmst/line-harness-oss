@@ -671,6 +671,49 @@ export async function markMileageAdjustmentNotification(
   return mapNotification(row);
 }
 
+export interface PendingMileageGrantNotification {
+  id: string;
+  lineAccountId: string;
+  friendId: string;
+  ledgerEntryId: string;
+  idempotencyKey: string;
+  message: string;
+  attemptCount: number;
+}
+
+/**
+ * m22o: まだ送っていない付与の通知だけを古い順に返す。
+ * 手動調整の通知と同じ表に載るが、台帳の entry_type が grant の行だけを
+ * 拾う。調整の通知は調整の口がその場で送るので、ここでは触らない。
+ */
+export async function listPendingMileageGrantNotifications(
+  db: D1Database,
+  input: { limit?: number } = {},
+): Promise<PendingMileageGrantNotification[]> {
+  const limit = Math.min(100, Math.max(1, input.limit ?? 20));
+  const rows = await db.prepare(
+    `SELECT n.id, n.line_account_id, n.friend_id, n.ledger_entry_id,
+            n.idempotency_key, n.message_text, n.attempt_count
+       FROM mileage_adjustment_notifications n
+       JOIN mileage_ledger ml ON ml.id = n.ledger_entry_id
+      WHERE n.status = 'pending' AND ml.entry_type = 'grant'
+      ORDER BY n.created_at, n.id
+      LIMIT ?`,
+  ).bind(limit).all<{
+    id: string; line_account_id: string; friend_id: string; ledger_entry_id: string;
+    idempotency_key: string; message_text: string; attempt_count: number;
+  }>();
+  return rows.results.map((row) => ({
+    id: row.id,
+    lineAccountId: row.line_account_id,
+    friendId: row.friend_id,
+    ledgerEntryId: row.ledger_entry_id,
+    idempotencyKey: row.idempotency_key,
+    message: row.message_text,
+    attemptCount: Number(row.attempt_count ?? 0),
+  }));
+}
+
 export interface MileageEarningRulePublishResult {
   ruleId: string;
   versionId: string;
@@ -753,6 +796,13 @@ export async function publishMileageEarningRule(
        * 絞り込み部品の形と一致する。
        */
       targetConditions: draft.targetConditions as SegmentCondition | null,
+      /*
+       * m22o: 期限・取消・通知も公開版へ載せる。載せないと画面の設定が
+       * 実際の付与に効かない。公開版の設定だけを使い、下書きは見ない。
+       */
+      expiresAfterDays: draft.expiresAfterDays,
+      cancellationEventTypes: draft.cancellationEventTypes,
+      notification: draft.notification,
     },
     live.conditions,
   );
@@ -788,6 +838,9 @@ export async function publishMileageEarningRule(
             name: live.name, event_type: live.event_type, source: live.source,
             amount: live.amount, initial_status: live.initial_status,
             conditions: live.conditions, valid_from: live.valid_from, valid_until: live.valid_until,
+            // m22o: v0 は公開の仕組みができる前の live 写し。期限・取消・通知は持たない。
+            expires_after_days: null, cancellation_event_types: [],
+            notification: { enabled: false, messageTemplate: '' },
           }),
           now, input.staffId ?? null, now,
         ));

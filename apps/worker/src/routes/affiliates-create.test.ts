@@ -374,12 +374,14 @@ describe('紹介者APIの所属境界', () => {
     expect(dbMocks.listAffiliateLinks).not.toHaveBeenCalled();
   });
 
-  it('所属外アカウントを指定した作成は404にする', async () => {
+  it('所属外アカウントを指定した作成は断る（R348: query と body が食い違う入力は 403）', async () => {
     const response = await post('/api/affiliates', {
       name: '越境',
       lineAccountId: 'account-other',
     });
-    expect(response.status).toBe(404);
+    // query=account-1・body=account-other の食い違いは middleware が 403 で断り、
+    // 存在の有無を route まで届けない。作成は起きない。
+    expect(response.status).toBe(403);
     expect(dbMocks.createAffiliateWithRandomCode).not.toHaveBeenCalled();
   });
 });

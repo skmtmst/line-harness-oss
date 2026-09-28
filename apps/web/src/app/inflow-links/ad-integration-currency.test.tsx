@@ -248,4 +248,63 @@ describe('N-251 広告費の通貨表示とaccount切替', () => {
     await act(async () => { button('記録する').click(); await Promise.resolve() })
     expect(vi.mocked(fetch).mock.calls.some(([, init]) => init?.method === 'POST')).toBe(true)
   })
+
+  it('R275: 手で入れた費用を理由つきで取り消し、取消済みは集計外と分かる', async () => {
+    const entry = {
+      id: 'e-1', sourceLabel: 'チラシ', day: '2026-09-20', amountMinor: 8000,
+      currency: 'JPY', entryRouteId: null, cancelledAt: null, cancelReason: null,
+      createdAt: '2026-09-20T00:00:00.000Z',
+    }
+    handler = async (path) => {
+      if (path.startsWith('/api/staff/me')) return { success: true, data: { role: 'owner' } }
+      if (path.startsWith('/api/ad-platforms/logs')) return logs()
+      if (path.startsWith('/api/ad-costs')) return {
+        success: true,
+        data: { rows: [], platforms: [], manualEntries: [entry] },
+      }
+      return { success: true, data: [] }
+    }
+    await act(async () => { root.render(<AdIntegration view="metrics" />) })
+    await settle()
+    const button = (label: string) => Array.from(document.querySelectorAll('button')).find((item) => item.textContent?.trim() === label)!
+
+    expect(host.textContent).toContain('手で入れた費用')
+    await act(async () => { button('取り消す').click() })
+    // 窓の確定ボタンは一覧の同名ボタンと分ける（窓は最後に描かれる）。
+    const confirmButton = Array.from(document.querySelectorAll('button'))
+      .filter((item) => item.textContent?.trim() === '取り消す').pop()!
+    // 理由なしでは送らない
+    await act(async () => { confirmButton.click(); await Promise.resolve() })
+    expect(document.body.textContent).toContain('取り消す理由を入れてください')
+    expect(vi.mocked(fetch).mock.calls.some(([, init]) => init?.method === 'POST' && String(init?.body ?? '').includes('reason'))).toBe(false)
+
+    fireEvent.change(document.querySelector('#ad-cost-cancel-reason')!, { target: { value: '金額を間違えた' } })
+    await act(async () => { confirmButton.click(); await Promise.resolve() })
+    const cancelCall = vi.mocked(fetch).mock.calls.find(([input, init]) =>
+      init?.method === 'POST' && String(input).includes('/api/ad-costs/e-1/cancel'))
+    expect(cancelCall).toBeTruthy()
+    expect(String(cancelCall![1]?.body)).toContain('金額を間違えた')
+  })
+
+  it('R275: 取消済みの記録は取り消し済み表示で、もう一度は取り消せない', async () => {
+    const entry = {
+      id: 'e-2', sourceLabel: 'チラシ', day: '2026-09-20', amountMinor: 8000,
+      currency: 'JPY', entryRouteId: null, cancelledAt: '2026-09-21T00:00:00.000Z',
+      cancelReason: '日付を間違えた', createdAt: '2026-09-20T00:00:00.000Z',
+    }
+    handler = async (path) => {
+      if (path.startsWith('/api/staff/me')) return { success: true, data: { role: 'owner' } }
+      if (path.startsWith('/api/ad-platforms/logs')) return logs()
+      if (path.startsWith('/api/ad-costs')) return {
+        success: true,
+        data: { rows: [], platforms: [], manualEntries: [entry] },
+      }
+      return { success: true, data: [] }
+    }
+    await act(async () => { root.render(<AdIntegration view="metrics" />) })
+    await settle()
+    expect(host.textContent).toContain('取り消し済み')
+    expect(host.textContent).toContain('日付を間違えた')
+    expect(Array.from(document.querySelectorAll('button')).some((item) => item.textContent?.trim() === '取り消す')).toBe(false)
+  })
 })

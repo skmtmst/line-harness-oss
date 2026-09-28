@@ -3323,6 +3323,12 @@ booking.get('/api/booking/admin/availability', async (c) => {
   // 予約変更の枠選びでは変更対象を空き判定から外す。
   // 外さないと今の予約が自分と重なって「空きなし」に見える。
   const excludeBookingId = c.req.query('exclude_booking_id') || undefined;
+  /*
+   * (b): お客様の画面の見本（プレビュー）は、お客様と同じ店舗ルールで
+   * 判定する。付けない呼び出しは従来どおりメニュー値だけを見る
+   * （当日の電話予約など運用者向けの枠選びを塞がない）。
+   */
+  const applyStoreRules = c.req.query('apply_store_rules') === '1';
   if (menuIdsParam !== undefined) {
     const menuIds = [...new Set(
       menuIdsParam.split(',').map((id) => id.trim()).filter(Boolean),
@@ -3344,6 +3350,7 @@ booking.get('/api/booking/admin/availability', async (c) => {
         minLeadTimeMinutes: 0,
         googleCredentials: googleCredentials(c.env),
         excludeBookingId,
+        applyStoreRules,
       })),
     })));
     return c.json({ by_menu });
@@ -3358,6 +3365,7 @@ booking.get('/api/booking/admin/availability', async (c) => {
     minLeadTimeMinutes: 0,
     googleCredentials: googleCredentials(c.env),
     excludeBookingId,
+    applyStoreRules,
   });
   return c.json(result);
 });

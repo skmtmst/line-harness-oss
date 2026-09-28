@@ -29,6 +29,7 @@ import {
   usageRefusal,
   usageStatusText,
   validateGenerationInput,
+  type BannerCropPosition,
   type BannerGeneration,
   type BannerGenerationInput,
   type BannerImage,
@@ -74,6 +75,8 @@ function ProjectInner() {
   const [filter, setFilter] = useState<Filter>('all')
   const [actionError, setActionError] = useState('')
   const [generationError, setGenerationError] = useState('')
+  // 用途寸法へ整形できなかった生成があった（binding の無い環境）。R120。
+  const [sizeNotice, setSizeNotice] = useState(false)
   const [running, setRunning] = useState<BannerGeneration | null>(null)
   const [cancelling, setCancelling] = useState(false)
   const [openImage, setOpenImage] = useState<BannerImage | null>(null)
@@ -152,8 +155,11 @@ function ProjectInner() {
   /**
    * 1枚ずつ run を繰り返す。1回の呼び出しで1枚。
    * 失敗したらそこで止め、理由を出す。成功分はサーバーに残っている。
+   *
+   * 切り抜き位置は保存していないので、作り始めたときの値をそのまま使う。
+   * 画面を離れて戻った続きは中央になる（R120・migration 不要のため）。
    */
-  const runLoop = useCallback(async (generation: BannerGeneration) => {
+  const runLoop = useCallback(async (generation: BannerGeneration, crop: BannerCropPosition = 'center') => {
     if (loopRef.current === generation.id) return
     loopRef.current = generation.id
     cancelRef.current = false
@@ -163,10 +169,11 @@ function ProjectInner() {
     try {
       let current = generation
       while (!cancelRef.current) {
-        const res = await api.hqBanners.generations.run(current.id)
+        const res = await api.hqBanners.generations.run(current.id, { gravity: crop })
         if (!res.success) throw new Error(res.error)
         current = res.data.generation
         setRunning(current)
+        if (res.data.resized === false) setSizeNotice(true)
         if (res.data.image) {
           const image = res.data.image
           setImages((prev) => (prev.some((i) => i.id === image.id) ? prev : [image, ...prev]))
@@ -220,7 +227,7 @@ function ProjectInner() {
       })
       if (!res.success) throw new Error(res.error)
       setGenerations((prev) => [res.data, ...prev])
-      void runLoop(res.data)
+      void runLoop(res.data, input.cropPosition)
     } catch (caught) {
       setGenerationError(caught instanceof Error && caught.message ? caught.message : '生成を始められませんでした。')
       void loadUsage()
@@ -488,6 +495,9 @@ function ProjectInner() {
           <div className="border-t border-hairline" />
           {generationError ? (
             <Notice tone="danger" message={generationError} onClose={() => setGenerationError('')} className="mx-4 mt-4" />
+          ) : null}
+          {sizeNotice ? (
+            <Notice tone="info" message="大きさの調整は検証環境で確認してください。この画像は生成時の大きさのまま保存されています。" onClose={() => setSizeNotice(false)} className="mx-4 mt-4" />
           ) : null}
           <div data-design-node="TyPEb" className="p-4">
             {images.length === 0 && pendingCount === 0 ? (

@@ -6,6 +6,8 @@ import { fileURLToPath } from 'node:url';
 
 import {
   upsertAdCostEntry,
+  cancelAdCostEntry,
+  listManualAdCostEntries,
   recordAdCostImportRun,
   hasSuccessfulAdCostImport,
   getAdCostSummary,
@@ -222,6 +224,79 @@ describe('広告費の台帳', () => {
     expect(byRoute.get('route-1')).toEqual([{ currency: 'JPY', amountMinor: 3000 }]);
     expect(byRoute.get('route-2')).toEqual([{ currency: 'JPY', amountMinor: 2000 }]);
     expect(byRoute.size).toBe(2);
+  });
+});
+
+describe('手入力費用の取消 (R275)', () => {
+  test('取消すると一覧・経路別の集計から外れ、行と理由は残る', async () => {
+    const entry = await upsertAdCostEntry(db, {
+      lineAccountId: 'account-1', entryRouteId: 'route-1', sourceLabel: 'チラシ',
+      day: '2026-09-20', amountMinor: 8000, currency: 'JPY', source: 'manual',
+    });
+    await upsertAdCostEntry(db, {
+      lineAccountId: 'account-1', entryRouteId: 'route-1', sourceLabel: 'Meta広告',
+      day: '2026-09-20', amountMinor: 3000, currency: 'JPY', source: 'import',
+      adPlatformId: 'meta-1',
+    });
+
+    expect(await cancelAdCostEntry(db, { entryId: entry.id, reason: '日付を間違えた' }))
+      .toBe('cancelled');
+
+    const summary = await getAdCostSummary(db, {
+      lineAccountId: 'account-1', from: '2026-09-20', to: '2026-09-20',
+    });
+    expect(summary.map((row) => row.sourceLabel)).toEqual(['Meta広告']);
+
+    const byRoute = await getAdCostTotalsByRoute(db, {
+      lineAccountId: 'account-1', from: '2026-09-20', to: '2026-09-20',
+    });
+    expect(byRoute.get('route-1')).toEqual([{ currency: 'JPY', amountMinor: 3000 }]);
+
+    const manual = await listManualAdCostEntries(db, {
+      lineAccountId: 'account-1', from: '2026-09-01', to: '2026-09-30',
+    });
+    expect(manual).toHaveLength(1);
+    expect(manual[0].cancelled_at).toBeTruthy();
+    expect(manual[0].cancel_reason).toBe('日付を間違えた');
+    expect(manual[0].amount_minor).toBe(8000);
+  });
+
+  test('取込分・無い行・取消済みの行は取消せない', async () => {
+    const imported = await upsertAdCostEntry(db, {
+      lineAccountId: 'account-1', sourceLabel: 'Meta広告',
+      day: '2026-09-20', amountMinor: 3000, currency: 'JPY', source: 'import',
+      adPlatformId: 'meta-1',
+    });
+    expect(await cancelAdCostEntry(db, { entryId: imported.id, reason: 'x' })).toBe('not_manual');
+    expect(await cancelAdCostEntry(db, { entryId: 'missing', reason: 'x' })).toBe('not_found');
+
+    const manual = await upsertAdCostEntry(db, {
+      lineAccountId: 'account-1', sourceLabel: 'チラシ',
+      day: '2026-09-20', amountMinor: 8000, currency: 'JPY', source: 'manual',
+    });
+    await cancelAdCostEntry(db, { entryId: manual.id, reason: 'x' });
+    expect(await cancelAdCostEntry(db, { entryId: manual.id, reason: 'x' })).toBe('already_cancelled');
+  });
+
+  test('取消した記録と同じ識別条件・同じ日へ再登録すると新しい記録として戻る', async () => {
+    const entry = await upsertAdCostEntry(db, {
+      lineAccountId: 'account-1', sourceLabel: 'チラシ',
+      day: '2026-09-20', amountMinor: 8000, currency: 'JPY', source: 'manual',
+    });
+    await cancelAdCostEntry(db, { entryId: entry.id, reason: '金額を間違えた' });
+
+    const reentered = await upsertAdCostEntry(db, {
+      lineAccountId: 'account-1', sourceLabel: 'チラシ',
+      day: '2026-09-20', amountMinor: 9000, currency: 'JPY', source: 'manual',
+    });
+    expect(reentered.id).toBe(entry.id);
+    expect(reentered.cancelled_at).toBeNull();
+    expect(reentered.cancel_reason).toBeNull();
+
+    const summary = await getAdCostSummary(db, {
+      lineAccountId: 'account-1', from: '2026-09-20', to: '2026-09-20',
+    });
+    expect(summary[0].totals).toEqual([{ currency: 'JPY', amountMinor: 9000 }]);
   });
 });
 

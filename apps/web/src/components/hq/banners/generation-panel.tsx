@@ -3,10 +3,12 @@
 import { Images, Plus, Sparkles, Upload, X } from 'lucide-react'
 import { useId, useRef, type ReactNode } from 'react'
 import Button from '@/components/shared/button'
+import HelpTip from '@/components/shared/help-tip'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import {
+  CROP_POSITION_OPTIONS,
   CUSTOM_PROMPT_MAX,
   FREE_PROMPT_MAX,
   MAIN_COLOR_SWATCHES,
@@ -17,6 +19,7 @@ import {
   isHexColor,
   presetOptionLabel,
   tileCaption,
+  type BannerCropPosition,
   type BannerGenerationInput,
   type BannerImage,
   type BannerPreset,
@@ -110,6 +113,33 @@ export default function GenerationPanel({
           />
           {selectedPreset ? <p className="text-micro text-ink-faint">{selectedPreset.note}</p> : null}
         </Field>
+
+        {selectedPreset ? (
+          <Field
+            label="切り抜きの位置"
+            note="生成後に用途の寸法へ整える"
+            help={
+              <HelpTip label="切り抜きの位置の説明">
+                生成は3種類の大きさだけなので、用途の寸法に合うよう切り抜きます。選んだ側を残します。
+              </HelpTip>
+            }
+          >
+            <fieldset className="grid grid-cols-3 gap-1.5" disabled={disabled}>
+              <legend className="sr-only">切り抜きの位置</legend>
+              {CROP_POSITION_OPTIONS.map((option) => (
+                <SegmentOption
+                  key={option.value}
+                  name={`${uid}-crop`}
+                  value={option.value}
+                  checked={value.cropPosition === option.value}
+                  onSelect={() => set('cropPosition', option.value)}
+                  label={option.label}
+                />
+              ))}
+            </fieldset>
+            <CropPreview preset={selectedPreset} crop={value.cropPosition} />
+          </Field>
+        ) : null}
 
         <Field label="参照画像" note="任意・元にする画像を1枚">
           <div data-design-node="jZi2W" className="flex flex-col gap-2">
@@ -299,11 +329,13 @@ function Field({
   label,
   note,
   htmlFor,
+  help,
   children,
 }: {
   label: string
   note?: string
   htmlFor?: string
+  help?: ReactNode
   children: ReactNode
 }) {
   return (
@@ -312,11 +344,47 @@ function Field({
         {htmlFor ? (
           <label htmlFor={htmlFor} className="text-label font-bold text-ink">{label}</label>
         ) : (
-          <span className="text-label font-bold text-ink">{label}</span>
+          <span className="text-label font-bold text-ink">{label}{help ? <span className="ml-1">{help}</span> : null}</span>
         )}
         {note ? <span className="text-micro text-ink-faint">{note}</span> : null}
       </div>
       {children}
+    </div>
+  )
+}
+
+/**
+ * 切り抜きのプレビュー（R120）。生成元の枠（APIの大きさの比率）の中に、
+ * 用途の寸法の比率の窓を、選んだ位置（上・中央・下）で置く。
+ * 縦横比が同じ用途では窓が枠いっぱいになる（切り抜き無し・拡大だけ）。
+ */
+export function CropPreview({ preset, crop }: { preset: BannerPreset; crop: BannerCropPosition }) {
+  const api = /^(\d+)x(\d+)$/.exec(preset.apiSize)
+  const sourceW = api ? Number(api[1]) : preset.targetWidth
+  const sourceH = api ? Number(api[2]) : preset.targetHeight
+  // cover で用途寸法へ拡大したとき、元画像のどの範囲が残るか。
+  const scale = Math.max(preset.targetWidth / sourceW, preset.targetHeight / sourceH)
+  const windowW = Math.min((preset.targetWidth / (sourceW * scale)) * 100, 100)
+  const windowH = Math.min((preset.targetHeight / (sourceH * scale)) * 100, 100)
+  const top = crop === 'top' ? 0 : crop === 'bottom' ? 100 - windowH : (100 - windowH) / 2
+  const left = (100 - windowW) / 2
+  return (
+    <div>
+      <div
+        role="img"
+        aria-label={`生成後にこの範囲で${preset.targetWidth}×${preset.targetHeight}に整えます`}
+        className="relative w-full overflow-hidden rounded-mini bg-canvas-sunken"
+        style={{ aspectRatio: `${sourceW} / ${sourceH}` }}
+      >
+        <div
+          aria-hidden="true"
+          className="absolute border-2 border-dashed border-ink-faint bg-canvas"
+          style={{ width: `${windowW}%`, height: `${windowH}%`, top: `${top}%`, left: `${left}%` }}
+        />
+      </div>
+      <p className="mt-1 text-micro text-ink-faint">
+        生成後にこの範囲で{preset.targetWidth}×{preset.targetHeight}に整えます
+      </p>
     </div>
   )
 }

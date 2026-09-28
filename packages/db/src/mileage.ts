@@ -1026,6 +1026,15 @@ export interface MileageRuleRow {
    * undefined で、従来どおり条件なしとして付与する。
    */
   target_conditions?: string | null;
+  /**
+   * m22o: 公開版が持つ期限・取消・通知。target_conditions と同じく
+   * 公開版から組み立てた行だけが持つ(実行時のみ)。live 読みの行は
+   * undefined で、従来どおり期限なし・取消なし・通知なしとして扱う。
+   * 公開版(v1以降)の設定だけを使い、下書きは見ない。
+   */
+  expires_after_days?: number | null;
+  cancellation_event_types?: string[] | null;
+  notification?: { enabled: boolean; messageTemplate: string } | null;
   /** 334(#521): 帰属アカウント。NULL は変更不可の既存全店ルール。 */
   line_account_id?: string | null;
   is_active: number;
@@ -1203,6 +1212,8 @@ export async function getPublishedVersionContent(
  * 公開版の中身。is_active は含めない。停止・再開は live の稼働で見る。
  * R52: 下書きの対象条件(target_conditions)もここへ載せる。載せないと
  * 公開版だけ条件が消え、対象外の友だちへ付与される。
+ * m22o: 期限・取消・通知も同じく公開版へ載せる。載せないと画面の設定が
+ * 実際の付与に効かない。content_json は形を持たないので、列を足さずに載る。
  */
 export interface PublishedEarningRuleContent {
   name: string;
@@ -1214,6 +1225,12 @@ export interface PublishedEarningRuleContent {
   target_conditions: SegmentCondition | null;
   valid_from: string | null;
   valid_until: string | null;
+  /** m22o: 付与したマイルの有効期限(日数)。null は期限なし。 */
+  expires_after_days: number | null;
+  /** m22o: このきっかけが来たら過去の付与を取り消す。空は取消なし。 */
+  cancellation_event_types: string[];
+  /** m22o: 付与の後の友だちへの通知。off なら送らない。 */
+  notification: { enabled: boolean; messageTemplate: string };
 }
 
 export function publishedRuleContentFromDraft(
@@ -1227,10 +1244,21 @@ export function publishedRuleContentFromDraft(
     validUntil: string | null;
     /** R52: 下書きの対象条件。そのまま公開版へ載せる(条件なしは null)。 */
     targetConditions?: SegmentCondition | null;
+    /** m22o: 下書きの有効期限・取消・通知。そのまま公開版へ載せる。 */
+    expiresAfterDays?: number | null;
+    cancellationEventTypes?: string[];
+    notification?: { enabled: boolean; messageTemplate: string } | null;
   },
   /** 下書きが持たない実行条件は、いまの live を引き継ぐ(消さない)。 */
   currentConditions: string | null,
 ): PublishedEarningRuleContent {
+  const expiresAfterDays = draft.expiresAfterDays ?? null;
+  const cancellations = Array.isArray(draft.cancellationEventTypes)
+    ? [...new Set(draft.cancellationEventTypes.filter((item) => typeof item === 'string' && item.trim() !== ''))].slice(0, 10)
+    : [];
+  const notifyEnabled = draft.notification?.enabled === true
+    && typeof draft.notification.messageTemplate === 'string'
+    && draft.notification.messageTemplate.trim() !== '';
   return {
     name: draft.name,
     event_type: draft.eventType,
@@ -1241,6 +1269,14 @@ export function publishedRuleContentFromDraft(
     target_conditions: draft.targetConditions ?? null,
     valid_from: draft.validFrom,
     valid_until: draft.validUntil,
+    expires_after_days: Number.isInteger(expiresAfterDays) && (expiresAfterDays as number) > 0
+      ? expiresAfterDays as number
+      : null,
+    cancellation_event_types: cancellations,
+    notification: {
+      enabled: notifyEnabled,
+      messageTemplate: notifyEnabled ? (draft.notification as { messageTemplate: string }).messageTemplate : '',
+    },
   };
 }
 
@@ -1272,6 +1308,10 @@ export async function resolvePinnedRuleRow(
       target_conditions: v0.target_conditions ? JSON.stringify(v0.target_conditions) : null,
       valid_from: v0.valid_from,
       valid_until: v0.valid_until,
+      // m22o: v0 は公開の仕組みができる前の live 写し。期限・取消・通知は持たない。
+      expires_after_days: v0.expires_after_days ?? null,
+      cancellation_event_types: v0.cancellation_event_types ?? [],
+      notification: v0.notification ?? null,
     };
   }
   const content = await getPublishedVersionContent(db, input.ruleId, input.versionNumber);
@@ -1288,6 +1328,11 @@ export async function resolvePinnedRuleRow(
     target_conditions: content.target_conditions ? JSON.stringify(content.target_conditions) : null,
     valid_from: content.valid_from,
     valid_until: content.valid_until,
+    // m22o: 公開版の期限・取消・通知を実行時の行へ載せる。古い公開版に
+    // 項目が無いときは期限なし・取消なし・通知なしとして扱う。
+    expires_after_days: content.expires_after_days ?? null,
+    cancellation_event_types: content.cancellation_event_types ?? [],
+    notification: content.notification ?? null,
   };
 }
 
@@ -1467,6 +1512,152 @@ async function resolveMileageMultiplier(
   return row
     ? { bps: Number(row.bps), tagId: row.tag_id, tagName: row.tag_name }
     : { bps: 10000, tagId: null, tagName: null };
+}
+
+/**
+ * m22o: 公開版の有効期限(日数)から、台帳へ残す有効期限の日時を作る。
+ * 台帳の metadata.expiresAt は、使い道の山(mileage_grant_lots)へ
+ * expires_at として写る既存の仕組み(275 の trigger)が拾う。
+ * 日数が無い・壊れているときは null(期限なし)。
+ */
+function mileageGrantExpiresAt(occurredAt: string, days: number | null | undefined): string | null {
+  if (!Number.isInteger(days) || (days as number) <= 0) return null;
+  const base = Date.parse(occurredAt);
+  if (Number.isNaN(base)) return null;
+  return new Date(base + (days as number) * 86400_000).toISOString();
+}
+
+/** m22o: 見本の {balance} に入れる、いま使える残高。 */
+async function getMileageAvailableBalance(
+  db: D1Database,
+  input: { userId: string | null; friendId: string },
+): Promise<number> {
+  const row = await db
+    .prepare(
+      `SELECT COALESCE(SUM(CASE WHEN status = 'available' THEN amount ELSE 0 END), 0) AS balance
+         FROM mileage_ledger
+        WHERE program_id = 'default'
+          AND ((? IS NOT NULL
+                AND (beneficiary_user_id = ?
+                     OR beneficiary_friend_id IN (SELECT id FROM friends WHERE user_id = ?)))
+               OR (? IS NULL AND beneficiary_friend_id = ?))`,
+    )
+    .bind(input.userId, input.userId, input.userId, input.userId, input.friendId)
+    .first<{ balance: number }>();
+  return Number(row?.balance ?? 0);
+}
+
+/** m22o: 通知の見本の差し込み({awardedMiles}・{balance})を値で埋める。 */
+function renderMileageGrantNotification(
+  template: string,
+  input: { awardedMiles: number; balance: number },
+): string {
+  return template
+    .replace(/\{awardedMiles\}/g, String(input.awardedMiles))
+    .replace(/\{balance\}/g, String(input.balance));
+}
+
+/**
+ * m22o: 付与の後の友だちへの通知を1件だけ予約する。
+ * 手動調整の通知(mileage_adjustment_notifications)と同じ表を使う。
+ * 表は台帳1行に通知1行(ledger_entry_id が一意)で、送り分けは
+ * 台帳の entry_type(grant/adjustment)で見る。同じ付与の再送・
+ * キューの再試行では行を増やさず、送り済みなら送り直さない。
+ */
+async function reserveMileageGrantNotification(
+  db: D1Database,
+  input: {
+    lineAccountId: string;
+    friendId: string;
+    ledgerEntryId: string;
+    idempotencyKey: string;
+    message: string;
+  },
+): Promise<void> {
+  const now = jstNow();
+  await db
+    .prepare(
+      `INSERT OR IGNORE INTO mileage_adjustment_notifications
+         (id, line_account_id, friend_id, ledger_entry_id, idempotency_key, message_text, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
+    )
+    .bind(
+      crypto.randomUUID(), input.lineAccountId, input.friendId, input.ledgerEntryId,
+      input.idempotencyKey, input.message, now, now,
+    )
+    .run();
+}
+
+/**
+ * m22o: ルールで決めた取消の条件で、過去の付与を取り消す。
+ * 紹介成果の却下(#978 の取消の台帳)と同じ考え方: まだ取り消していない
+ * 付与だけに、負の reversal を1件ずつ残す。同じアカウントの中だけ。
+ *
+ * 合わせる鍵は「同じルール・同じ人・同じ出どころの番号(source_event_id)」。
+ * 別の予約の付与までは消さない。出どころの番号が無い行は特定できないので
+ * 触らない。止めたルールでも、止める前の付与の取消は残す。
+ */
+async function reverseMileageGrantsForCancellation(
+  db: D1Database,
+  input: {
+    friendId: string;
+    friendUserId: string | null;
+    lineAccountId: string | null;
+    eventId: string;
+    eventType: string;
+    source: string;
+    sourceEventId: string | null;
+    occurredAt: string;
+    pinned: Record<string, number>;
+  },
+): Promise<number> {
+  if (!input.sourceEventId || !input.lineAccountId) return 0;
+  let reversed = 0;
+  for (const [ruleId, versionNumber] of Object.entries(input.pinned)) {
+    const row = await resolvePinnedRuleRow(db, { ruleId, versionNumber });
+    if (!row) continue;
+    // 同じアカウントのルールだけ。よそのアカウントの付与に触らない。
+    if (row.line_account_id !== input.lineAccountId) continue;
+    const cancellations = row.cancellation_event_types ?? [];
+    if (!cancellations.includes(input.eventType)) continue;
+    const targets = await db
+      .prepare(
+        `SELECT original.*
+           FROM mileage_ledger original
+           LEFT JOIN mileage_ledger reversal ON reversal.reverses_entry_id = original.id
+          WHERE original.program_id = 'default'
+            AND original.mileage_rule_id = ?
+            AND original.entry_type = 'grant'
+            AND original.status = 'available'
+            AND original.source_event_id = ?
+            AND ((? IS NOT NULL AND original.beneficiary_user_id = ?)
+                 OR (? IS NULL AND original.beneficiary_friend_id = ?))
+            AND reversal.id IS NULL`,
+      )
+      .bind(ruleId, input.sourceEventId, input.friendUserId, input.friendUserId, input.friendUserId, input.friendId)
+      .all<MileageLedgerEntry>();
+    for (const grant of targets.results) {
+      await postMileageEntry(db, {
+        programId: grant.program_id,
+        beneficiaryUserId: grant.beneficiary_user_id,
+        beneficiaryFriendId: grant.beneficiary_friend_id,
+        engagementEventId: input.eventId,
+        mileageRuleId: ruleId,
+        entryType: 'reversal',
+        status: 'available',
+        amount: -grant.amount,
+        reason: `${row.name}の取消`,
+        source: input.source,
+        sourceEventId: input.sourceEventId,
+        idempotencyKey: `mileage-rule-reversal:${grant.id}`,
+        reversesEntryId: grant.id,
+        metadata: { ruleId, eventType: input.eventType, originalEntryId: grant.id },
+        occurredAt: input.occurredAt,
+      });
+      reversed += 1;
+    }
+  }
+  return reversed;
 }
 
 /**
@@ -1698,6 +1889,8 @@ async function applyMileageRulesImmediately(
           : conditions.uniquePerSubjectPerDay && input.subjectKey
             ? `rule:${rule.id}:identity:${beneficiaryIdentityKey}:day:${occurredAt.slice(0, 10)}:subject:${input.subjectKey}`
             : `rule:${rule.id}:event:${event.id}`;
+    // m22o: 公開版の有効期限を台帳へ残す。使い道の山へ写る既存の仕組みが拾う。
+    const expiresAt = mileageGrantExpiresAt(occurredAt, rule.expires_after_days ?? null);
     const entry = await postMileageEntry(db, {
       programId: rule.program_id,
       beneficiaryUserId,
@@ -1722,6 +1915,7 @@ async function applyMileageRulesImmediately(
         multiplierTagId: multiplier.tagId,
         multiplierTagName: multiplier.tagName,
         beneficiaryType: conditions.beneficiary ?? 'actor',
+        ...(expiresAt ? { expiresAt } : {}),
         ...(referrer ? {
           affiliateId: referrer.affiliateId,
           refCode: referrer.refCode,
@@ -1732,6 +1926,43 @@ async function applyMileageRulesImmediately(
       occurredAt,
     });
     granted.push(entry);
+    /*
+     * m22o: 公開版で「通知する」のときだけ、付与の後に友だちへ送る分を
+     * 予約する。送るのは Worker の cron。OFF なら予約しない。
+     */
+    const notify = rule.notification;
+    if (notify?.enabled && notify.messageTemplate && friend.line_account_id) {
+      const balance = await getMileageAvailableBalance(db, {
+        userId: beneficiaryUserId, friendId: beneficiaryFriendId,
+      });
+      await reserveMileageGrantNotification(db, {
+        lineAccountId: friend.line_account_id,
+        friendId: beneficiaryFriendId,
+        ledgerEntryId: entry.id,
+        idempotencyKey: `mileage-rule-grant:${entry.id}`,
+        message: renderMileageGrantNotification(notify.messageTemplate, {
+          awardedMiles: entry.amount, balance,
+        }),
+      });
+    }
+  }
+  /*
+   * m22o: 取消の条件に合うきっかけが来たら、過去の付与を取り消す。
+   * 受付時に固定した公開版だけを見て、下書きは見ない。版を持たない
+   * 古い行(NULL 互換)は従来どおり何もしない。既存の付与済みマイルは変えない。
+   */
+  if (pinned !== null) {
+    await reverseMileageGrantsForCancellation(db, {
+      friendId: friend.id,
+      friendUserId: friend.user_id,
+      lineAccountId: friend.line_account_id,
+      eventId: event.id,
+      eventType: input.eventType,
+      source: input.source,
+      sourceEventId: event.source_event_id,
+      occurredAt,
+      pinned,
+    });
   }
   return { event, granted };
 }

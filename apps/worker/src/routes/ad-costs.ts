@@ -1,10 +1,12 @@
 import { Hono, type Context } from 'hono';
 import {
+  cancelAdCostEntry,
   getAdCostImportStatus,
   getAdCostSummary,
   getAdPlatforms,
   getAdPlatformById,
   isValidCostDay,
+  listManualAdCostEntries,
   normalizeCostCurrency,
   upsertAdCostEntry,
 } from '@line-crm/db';
@@ -60,9 +62,11 @@ adCosts.get('/api/ad-costs', requireRole('owner', 'admin', 'staff'), async (c) =
       return c.json({ success: false, error: '期間は 2026-08-01 の形で指定してください' }, 400);
     }
 
-    const [rows, platforms] = await Promise.all([
+    const [rows, platforms, manualEntries] = await Promise.all([
       getAdCostSummary(c.env.DB, { lineAccountId: accountId, from, to }),
       getAdPlatforms(c.env.DB),
+      // R275: 手入力の記録は取消できるよう1行ずつ返す(取消済みも履歴として返す)。
+      listManualAdCostEntries(c.env.DB, { lineAccountId: accountId, from, to }),
     ]);
     const ownPlatforms = platforms.filter((p) => p.line_account_id === accountId && p.is_active === 1);
     const statusByPlatform = await getAdCostImportStatus(
@@ -98,6 +102,17 @@ adCosts.get('/api/ad-costs', requireRole('owner', 'admin', 'staff'), async (c) =
             lastError: status?.lastError ?? null,
           };
         }),
+        manualEntries: manualEntries.map((entry) => ({
+          id: entry.id,
+          sourceLabel: entry.source_label,
+          day: entry.day,
+          amountMinor: entry.amount_minor,
+          currency: entry.currency,
+          entryRouteId: entry.entry_route_id,
+          cancelledAt: entry.cancelled_at,
+          cancelReason: entry.cancel_reason,
+          createdAt: entry.created_at,
+        })),
       },
     });
   } catch (err) {
@@ -169,6 +184,43 @@ adCosts.post('/api/ad-costs', requireRole('owner', 'admin'), async (c) => {
     return c.json({ success: true, data: entry }, 201);
   } catch (err) {
     console.error('POST /api/ad-costs error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/**
+ * POST /api/ad-costs/:id/cancel — 手入力の費用を取消する (R275)。
+ *
+ * 日付・名前・金額を間違えて入れた記録を集計から外す。行は消さず、
+ * 取消した日時と理由を残す。取込分は媒体側の記録なので対象外。
+ */
+adCosts.post('/api/ad-costs/:id/cancel', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const entry = await c.env.DB
+      .prepare(`SELECT id, line_account_id FROM ad_cost_entries WHERE id = ?`)
+      .bind(c.req.param('id'))
+      .first<{ id: string; line_account_id: string }>();
+    if (!entry || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [entry.line_account_id])) {
+      return c.json({ success: false, error: '対象が見つかりません' }, 404);
+    }
+
+    const body = await c.req.json<{ reason?: unknown }>().catch(() => ({}) as { reason?: unknown });
+    const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
+    if (!reason || reason.length > 200) {
+      return c.json({ success: false, error: '取り消す理由を200字以内で入れてください' }, 400);
+    }
+
+    const result = await cancelAdCostEntry(c.env.DB, { entryId: entry.id, reason });
+    if (result === 'not_manual') {
+      return c.json({ success: false, error: '広告から取り込んだ費用はここでは取り消せません' }, 409);
+    }
+    if (result === 'already_cancelled') {
+      return c.json({ success: false, error: 'この記録はすでに取り消しています' }, 409);
+    }
+    auditLog(c, 'ad_cost.cancel', { id: entry.id, kind: 'ad_cost' }, { lineAccountId: entry.line_account_id });
+    return c.json({ success: true, data: { id: entry.id } });
+  } catch (err) {
+    console.error('POST /api/ad-costs/:id/cancel error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

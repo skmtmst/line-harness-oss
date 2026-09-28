@@ -157,6 +157,7 @@ import { restaurantGoogle } from './routes/restaurant-google.js';
 import { googleSheets } from './routes/google-sheets.js';
 import { restaurantGoogleProfile } from './routes/restaurant-google-profile.js';
 import { restaurantGooglePosts } from './routes/restaurant-google-posts.js';
+import { restaurantGooglePerformance } from './routes/restaurant-google-performance.js';
 import { tenants } from './routes/tenants.js';
 import { ops } from './routes/ops.js';
 import { piiMaskMiddleware, type ImpersonationContext } from './middleware/impersonation.js';
@@ -227,6 +228,12 @@ export type Env = {
     RAW_MAIL?: R2Bucket;
     ASSETS: Fetcher;
     AI?: Ai;
+    /**
+     * バナー生成の用途寸法への整形（Cloudflare Images・R120）。
+     * R2 の `IMAGES` とは別物なので `CF_IMAGES` という名前にしている。
+     * 未設定の環境（手元・試験）では変換を飛ばして元の画像を保存する。
+     */
+    CF_IMAGES?: ImagesBinding;
     /** 運営コンソールの返信下書きに使う Workers AI のモデル名。未設定なら routes/ops-support.ts の既定。 */
     OPS_SUPPORT_AI_MODEL?: string;
     EMAIL?: SendEmail;
@@ -559,6 +566,7 @@ app.route('/', restaurantTest);
 app.route('/', restaurantGoogle);
 app.route('/', restaurantGoogleProfile);
 app.route('/', restaurantGooglePosts);
+app.route('/', restaurantGooglePerformance);
 app.route('/', googleSheets);
 app.route('/', tenants);
 app.route('/', hqBanners);
@@ -1461,6 +1469,27 @@ async function runFrequentHeavyJobs(
             `[mileage-queue] processed=${result.processed} failed=${result.failed} granted=${result.granted}`,
           );
         }
+        // m22o: 付与ルールの「通知する」で予約された分だけ、付与の後に届ける。
+        // OFF のルールは予約自体が無い。公開URLが無い環境では送らず残す。
+        if (env.WORKER_PUBLIC_URL) {
+          const { deliverDueMileageGrantNotifications } = await import(
+            './services/mileage-grant-notification.js'
+          );
+          const { dispatchLineProxyLocally } = await import('./services/local-line-proxy.js');
+          const notified = await deliverDueMileageGrantNotifications(
+            {
+              db: env.DB,
+              workerPublicUrl: env.WORKER_PUBLIC_URL,
+              dispatch: (request) => dispatchLineProxyLocally(request, env),
+            },
+            { limit: 20 },
+          );
+          if (notified.delivered + notified.failed > 0) {
+            console.log(
+              `[mileage-grant-notify] delivered=${notified.delivered} failed=${notified.failed}`,
+            );
+          }
+        }
       },
     },
     {
@@ -1598,6 +1627,23 @@ async function runFrequentHeavyJobs(
         const { syncXServerSupportMailbox } = await import('./services/xserver-mail.js');
         const result = await syncXServerSupportMailbox(env);
         if (result.checked > 0) console.log(JSON.stringify({ event: 'support_email_sync', ...result }));
+      },
+    });
+  }
+
+  if (restaurantTestEnabled(env)) {
+    jobs.push({
+      // Googleビジネス第4段: 口コミ・投稿の再同期。5分レーンだが接続ごとの
+      // 55分ゲートで実質1時間ごと。書き込み経路は手動syncと同じ関数を使う。
+      name: 'google business resync',
+      run: async () => {
+        const { processGoogleBusinessHourlyResync } = await import('./services/google-business-resync.js');
+        const result = await processGoogleBusinessHourlyResync(env, {
+          now: new Date(event.scheduledTime).toISOString(),
+        });
+        if (result.reviewsSynced + result.postsSynced + result.failed > 0) {
+          console.log(JSON.stringify({ event: 'google_business_resync_tick', ...result }));
+        }
       },
     });
   }
@@ -1786,6 +1832,20 @@ async function runSixHourlyHeavyJobs(
         const result = await deleteExpiredRestaurantRawEmails(env);
         if (result.deleted + result.failed > 0) {
           console.log(JSON.stringify({ event: 'restaurant_raw_mail_retention', ...result }));
+        }
+      },
+    });
+    jobs.push({
+      // Googleビジネス第4段: パフォーマンス指標の取り込み。JST日付でゲートし、
+      // 6時間tickのうち当日未実行の最初の1回（通常は深夜）だけ実際に回る。
+      name: 'google business metrics',
+      run: async () => {
+        const { processGoogleBusinessDailyMetrics } = await import('./services/google-business-resync.js');
+        const result = await processGoogleBusinessDailyMetrics(env, {
+          now: new Date(event.scheduledTime).toISOString(),
+        });
+        if (result.synced + result.failed > 0) {
+          console.log(JSON.stringify({ event: 'google_business_metrics_tick', ...result }));
         }
       },
     });

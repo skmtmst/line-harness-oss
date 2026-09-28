@@ -991,7 +991,8 @@ export async function getTemplatesWithUsageCount(
   // （または未設定）の使用先だけを数える。詳細の getTemplateUsage と
   // 同じ粒度・同じ境界にしないと「一覧の数」と「詳細の件数」がずれる
   // （#891 N-135/142/143）。
-  const relationalRes = await db.prepare(
+  // D1 の compound SELECT 上限(5項)を超えないよう2本に分けて問い合わせる。
+  const relationalResA = await db.prepare(
     `SELECT template_id, acct FROM (
        SELECT template_id, line_account_id AS acct FROM auto_replies WHERE template_id IS NOT NULL AND deleted_at IS NULL
        UNION ALL
@@ -1002,7 +1003,10 @@ export async function getTemplatesWithUsageCount(
        SELECT rs.template_id, r.line_account_id AS acct
          FROM reminder_steps rs JOIN reminders r ON r.id = rs.reminder_id
         WHERE rs.template_id IS NOT NULL
-       UNION ALL
+     ) references_by_kind`,
+  ).all<{ template_id: string; acct: string | null }>();
+  const relationalResB = await db.prepare(
+    `SELECT template_id, acct FROM (
        -- R347: 旧公開版に固定された送信待ち・取消ずみ（再開できる）の登録も
        -- 1登録1件で数える。版を切り替えても使用先が0件に見えないようにする。
        -- 手順単位ではなく登録単位にまとめる（使用先の件数とずらさない）。
@@ -1022,6 +1026,7 @@ export async function getTemplatesWithUsageCount(
        SELECT template_id, line_account_id AS acct FROM tracked_links WHERE template_id IS NOT NULL
      ) references_by_kind`,
   ).all<{ template_id: string; acct: string | null }>();
+  const relationalRows = [...(relationalResA.results ?? []), ...(relationalResB.results ?? [])];
 
   // 使用先1件を (template_id, 使用先のアカウント) の行として集める。
   const usageRefs = new Map<string, Array<string | null>>();
@@ -1030,7 +1035,7 @@ export async function getTemplatesWithUsageCount(
     if (list) list.push(acct);
     else usageRefs.set(templateId, [acct]);
   };
-  for (const r of relationalRes.results ?? []) addRef(r.template_id, r.acct);
+  for (const r of relationalRows) addRef(r.template_id, r.acct);
 
   // 3. automations の actions JSON を取って template_id を抽出。
   // 詳細側は「そのテンプレートを使うオートメーション」を1件として

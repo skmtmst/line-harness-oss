@@ -413,6 +413,8 @@ const STAFF_EXPLICIT_ALLOW: Array<[method: string, path: string]> = [
   ['GET', '/api/restaurant-test/google/posts'],
   ['POST', '/api/restaurant-test/google/posts'],
   ['POST', '/api/restaurant-test/google/posts/sync'],
+  // Googleビジネス第4段（GB-9）：パフォーマンスは読み取りのみ。担当者も見られる。
+  ['GET', '/api/restaurant-test/google/performance'],
   // 運営からのお知らせ（★V6 37-7）は本人宛て。担当者でも読んで既読にできる。
   ['GET', '/api/hq/notices'],
   ['GET', '/api/hq/notices/line-registration'],

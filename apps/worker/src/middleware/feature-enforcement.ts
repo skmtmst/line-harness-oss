@@ -393,7 +393,8 @@ const RESOURCE_ACCOUNT_LOOKUPS: ReadonlyArray<{
   { pattern: /^\/api\/ad-platforms\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM ad_platforms WHERE id = ?' },
   { pattern: /^\/api\/friend-add-rules\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM friend_add_rules WHERE id = ?' },
   { pattern: /^\/api\/conversions\/(?:definitions|points)\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM conversion_points WHERE id = ?' },
-  { pattern: /^\/api\/conversions\/events\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM conversion_events WHERE id = ?' },
+  // R351: 成果の所属は地点表が持つ。イベント表に列は無いので結合して引く。
+  { pattern: /^\/api\/conversions\/events\/([^/]+)/, sql: 'SELECT cp.line_account_id AS account_id FROM conversion_events ce JOIN conversion_points cp ON cp.id = ce.conversion_point_id WHERE ce.id = ?' },
   { pattern: /^\/api\/events\/admin\/events\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM events WHERE id = ?' },
   // #1075: たまる決めごとの停止・再開・削除は payload に account を載せない。
   // 照合が無いと PUT/DELETE /api/mileage/rules/:id が全部 LINE_ACCOUNT_REQUIRED で止まる。

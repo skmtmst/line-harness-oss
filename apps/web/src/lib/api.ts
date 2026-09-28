@@ -1458,6 +1458,9 @@ export type MeasurementSite = {
   rejectedCount: number
   lastRejectedHost: string | null
   lastRejectedAt: string | null
+  /** 計測を止めた日時と理由。動いているサイトは null。 */
+  stoppedAt: string | null
+  stoppedReason: string | null
 }
 
 /** #819: 成果1件の取消・取消の取消の履歴行。 */
@@ -7305,6 +7308,17 @@ export const api = {
         `/api/measurement-sites/${encodeURIComponent(id)}`,
         { method: 'PATCH', body: JSON.stringify(data) },
       ),
+    // 計測を止める・再開する。止めるときは理由が必須で、履歴は残る。
+    stop: (id: string, reason: string) =>
+      fetchApi<ApiResponse<{ id: string }>>(
+        `/api/measurement-sites/${encodeURIComponent(id)}/stop`,
+        { method: 'POST', body: JSON.stringify({ reason }) },
+      ),
+    resume: (id: string) =>
+      fetchApi<ApiResponse<{ id: string }>>(
+        `/api/measurement-sites/${encodeURIComponent(id)}/resume`,
+        { method: 'POST', body: JSON.stringify({}) },
+      ),
   },
   funnels: {
     list: (accountId: string) =>
@@ -8740,11 +8754,11 @@ export const api = {
     generations: {
       get: (id: string) =>
         fetchApi<ApiResponse<BannerGeneration>>(`/api/hq/banners/generations/${encodeURIComponent(id)}`),
-      /** 1回で1枚作る。画面が枚数ぶん繰り返す。 */
-      run: (id: string) =>
+      /** 1回で1枚作る。画面が枚数ぶん繰り返す。切り抜き位置は用途寸法への整形に使う。 */
+      run: (id: string, input?: { gravity?: string }) =>
         fetchApi<ApiResponse<BannerRunResult>>(`/api/hq/banners/generations/${encodeURIComponent(id)}/run`, {
           method: 'POST',
-          body: JSON.stringify({}),
+          body: JSON.stringify(input ?? {}),
         }),
       cancel: (id: string) =>
         fetchApi<ApiResponse<BannerGeneration>>(`/api/hq/banners/generations/${encodeURIComponent(id)}/cancel`, {
@@ -13184,6 +13198,18 @@ export const api = {
           lastRunAt: string | null
           lastError: string | null
         }>
+        /** R275: 手入力の記録は1行ずつ返す。取消済みも履歴として出す。 */
+        manualEntries?: Array<{
+          id: string
+          sourceLabel: string
+          day: string
+          amountMinor: number
+          currency: string
+          entryRouteId: string | null
+          cancelledAt: string | null
+          cancelReason: string | null
+          createdAt: string
+        }>
       }>>(`/api/ad-costs${suffix}`)
     },
     create: (data: {
@@ -13198,6 +13224,12 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(data),
       }),
+    // R275: 手入力で間違えて入れた費用を集計から外す。行は残り、理由が必須。
+    cancel: (id: string, reason: string) =>
+      fetchApi<ApiResponse<{ id: string }>>(
+        `/api/ad-costs/${encodeURIComponent(id)}/cancel`,
+        { method: 'POST', body: JSON.stringify({ reason }) },
+      ),
   },
   uploads: {
     /**
@@ -13562,6 +13594,8 @@ export interface BookingSlotCheckResult {
   bookable: boolean;
   reasons: BookingSlotBlockReason[];
   per_staff: BookingSlotCheckStaff[];
+  /** R314: 判定に実際に使った枠間隔（分）。無い応答では刻み幅を書かない文言にする。 */
+  slotGranularityMinutes?: number;
 }
 
 export interface ProxyBookingResult {
@@ -13606,6 +13640,16 @@ export interface BookingHistorySummary {
   staffName: string;
 }
 
+/**
+ * R320: 前回来店の申し送りの元予約。過去の来店完了だけを指す。
+ * 日時・状態と一緒に表示し、元予約への入口にする。
+ */
+export interface BookingHandoverRef {
+  id: string;
+  startsAt: string;
+  status: string;
+}
+
 export interface BookingCustomerContext {
   id: string;
   friendId: string | null;
@@ -13616,6 +13660,7 @@ export interface BookingCustomerContext {
   tags: Array<{ id: string; name: string }>;
   mileageBalance: number | null;
   previousHandover: string | null;
+  previousHandoverBooking: BookingHandoverRef | null;
   recentBookings: BookingHistorySummary[];
 }
 
@@ -13673,7 +13718,10 @@ export interface BookingAdminDetail {
     mileageBalance: number | null;
   };
   previousHandover: string | null;
+  previousHandoverBooking: BookingHandoverRef | null;
   history: BookingHistorySummary[];
+  /** R321: 同じ顧客の予約総数（この予約を除く）。history は直近10件だけ。 */
+  historyTotal: number;
   reminders: Array<{
     id: string;
     kind: string;
@@ -13868,7 +13916,7 @@ export const bookingApi = {
     ),
   getAvailability: (
     accountId: string,
-    params: { menuId: string; staffId?: string; from: string; to: string; excludeBookingId?: string },
+    params: { menuId: string; staffId?: string; from: string; to: string; excludeBookingId?: string; applyStoreRules?: boolean },
   ) => {
     const query = new URLSearchParams({
       account_id: accountId,
@@ -13878,6 +13926,8 @@ export const bookingApi = {
     });
     if (params.staffId) query.set('staff_id', params.staffId);
     if (params.excludeBookingId) query.set('exclude_booking_id', params.excludeBookingId);
+    // (b): お客様の画面の見本だけ店舗ルールで判定する。付けない呼び出しは従来どおり。
+    if (params.applyStoreRules) query.set('apply_store_rules', '1');
     return fetchApi<BookingAvailabilityResponse>(`/api/booking/admin/availability?${query}`);
   },
   /**

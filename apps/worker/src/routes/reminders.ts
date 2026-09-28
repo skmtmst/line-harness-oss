@@ -827,14 +827,14 @@ reminders.get('/api/reminders', requireRole('owner', 'admin', 'staff'), async (c
         // JOIN だと通の数だけ行が増えて total がずれるので EXISTS で検査する。
         // 本文は公開済みが reminder_steps、まだ公開していない下書きが
         // current_draft_version_id のぶら下がる reminder_version_steps にある。
-        clauses.push(`(LOWER(r.name) LIKE ? ESCAPE '\' OR LOWER(COALESCE(r.description, '')) LIKE ? ESCAPE '\'
+        clauses.push(`(LOWER(r.name) LIKE ? ESCAPE '\\' OR LOWER(COALESCE(r.description, '')) LIKE ? ESCAPE '\\'
           OR EXISTS (SELECT 1 FROM reminder_steps search_steps
             WHERE search_steps.reminder_id = r.id
-              AND LOWER(search_steps.message_content) LIKE ? ESCAPE '\')
+              AND LOWER(search_steps.message_content) LIKE ? ESCAPE '\\')
           OR EXISTS (SELECT 1 FROM reminder_versions draft_version
             JOIN reminder_version_steps draft_steps ON draft_steps.reminder_version_id = draft_version.id
             WHERE draft_version.id = r.current_draft_version_id
-              AND LOWER(draft_steps.message_content) LIKE ? ESCAPE '\'))`);
+              AND LOWER(draft_steps.message_content) LIKE ? ESCAPE '\\'))`);
         const searchPattern = `%${escapedLike(q)}%`;
         bindings.push(searchPattern, searchPattern, searchPattern, searchPattern);
       }

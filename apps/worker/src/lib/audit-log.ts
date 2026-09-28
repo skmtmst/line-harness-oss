@@ -153,9 +153,14 @@ export type AuditAction =
   // #818: 広告費の手入力と、管理画面からの取り直し
   | 'ad_cost.manual_entry'
   | 'ad_cost.import'
+  // R275: 手入力した費用の取り消し
+  | 'ad_cost.cancel'
   // #819: 計測サイトの管理と成果の取り消し
   | 'measurement_site.create'
   | 'measurement_site.update'
+  // R275: 計測サイトの停止と再開
+  | 'measurement_site.stop'
+  | 'measurement_site.resume'
   | 'conversion.event.reverse'
   | 'conversion.event.restore';
 

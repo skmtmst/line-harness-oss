@@ -55,6 +55,19 @@ type AdCostRow = {
   lastImportedAt: string | null
 }
 
+/** R275: 手で入れた費用の1行。取消しても履歴に残る。 */
+type ManualCostEntry = {
+  id: string
+  sourceLabel: string
+  day: string
+  amountMinor: number
+  currency: string
+  entryRouteId: string | null
+  cancelledAt: string | null
+  cancelReason: string | null
+  createdAt: string
+}
+
 /** #818: 媒体ごとの取込状況。 */
 type AdCostPlatformStatus = {
   id: string
@@ -200,6 +213,13 @@ export default function AdIntegration({
   const [costRows, setCostRows] = useState<AdCostRow[]>([])
   const [costPlatforms, setCostPlatforms] = useState<AdCostPlatformStatus[]>([])
   const [costFailed, setCostFailed] = useState(false)
+  // R275: 手で入れた費用を1行ずつ持つ。間違えた記録はここから取消す。
+  const [manualEntries, setManualEntries] = useState<ManualCostEntry[]>([])
+  const [canManage, setCanManage] = useState(false)
+  const [cancelTarget, setCancelTarget] = useState<ManualCostEntry | null>(null)
+  const [cancelReason, setCancelReason] = useState('')
+  const [cancelBusy, setCancelBusy] = useState(false)
+  const [cancelError, setCancelError] = useState('')
   const [manualOpen, setManualOpen] = useState(false)
   const [manualBusy, setManualBusy] = useState(false)
   const [manualError, setManualError] = useState('')
@@ -246,10 +266,12 @@ export default function AdIntegration({
       if (costResponse.success) {
         setCostRows(costResponse.data.rows ?? [])
         setCostPlatforms(costResponse.data.platforms ?? [])
+        setManualEntries(costResponse.data.manualEntries ?? [])
         setCostFailed(false)
       } else {
         setCostRows([])
         setCostPlatforms([])
+        setManualEntries([])
         setCostFailed(true)
       }
     } catch {
@@ -269,6 +291,42 @@ export default function AdIntegration({
     void load()
     return () => { loadGenerationRef.current += 1 }
   }, [load])
+
+  // R275: 手入力の取消は owner/admin だけ。staff は閲覧まで。
+  // アカウント未選択では権限も取りにいかない（画面が通信しない約束）。
+  useEffect(() => {
+    if (!selectedAccountId) { setCanManage(false); return }
+    let active = true
+    void api.staff.me().then((response) => {
+      if (!active) return
+      setCanManage(response.success && (response.data.role === 'owner' || response.data.role === 'admin'))
+    }).catch(() => undefined)
+    return () => { active = false }
+  }, [selectedAccountId])
+
+  const openCancelDialog = useCallback((entry: ManualCostEntry) => {
+    setCancelTarget(entry)
+    setCancelReason('')
+    setCancelError('')
+  }, [])
+
+  const submitCancel = useCallback(async () => {
+    if (!cancelTarget || cancelBusy) return
+    const reason = cancelReason.trim()
+    if (!reason) { setCancelError('取り消す理由を入れてください'); return }
+    setCancelBusy(true)
+    setCancelError('')
+    try {
+      const res = await api.adCosts.cancel(cancelTarget.id, reason)
+      if (!res.success) { setCancelError(res.error ?? '取り消せませんでした'); return }
+      setCancelTarget(null)
+      void load()
+    } catch {
+      setCancelError('取り消せませんでした。通信状態を確かめて、もう一度お試しください。')
+    } finally {
+      setCancelBusy(false)
+    }
+  }, [cancelTarget, cancelBusy, cancelReason, load])
 
   const connected = platforms.filter((platform) => platform.isActive)
   /*
@@ -724,6 +782,39 @@ export default function AdIntegration({
             </tbody>
           </table>
         )}
+        {/*
+          R275: 手で入れた費用は1行ずつ出す。間違えて入れた分は理由を付けて
+          取消せる。取消すと集計から外れるが行と理由は残る。
+        */}
+        {manualEntries.length > 0 && (
+          <div className="border-t border-hairline px-4 py-3">
+            <h4 className="text-xs font-bold text-ink-secondary">手で入れた費用</h4>
+            <ul className="mt-2 divide-y divide-hairline">
+              {manualEntries.map((entry) => {
+                const cancelled = entry.cancelledAt != null
+                return (
+                  <li key={entry.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                    <div className="min-w-0">
+                      <p className={`text-xs font-semibold ${cancelled ? 'text-ink-faint line-through' : 'text-ink'}`}>
+                        {entry.day} ／ {entry.sourceLabel} ／ {formatMinor(entry.amountMinor, entry.currency)}
+                      </p>
+                      {cancelled ? (
+                        <p className="mt-0.5 text-xs text-ink-faint">
+                          取り消し済み（{entry.cancelReason ?? '理由の記録なし'}）— 集計には入りません
+                        </p>
+                      ) : null}
+                    </div>
+                    {!cancelled && canManage ? (
+                      <Button variant="secondary" onClick={() => openCancelDialog(entry)}>
+                        取り消す
+                      </Button>
+                    ) : null}
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
+        )}
       </section>
 
       {costPlatforms.length > 0 && (
@@ -817,6 +908,35 @@ export default function AdIntegration({
             />
           </div>
         </div>
+      </Dialog>
+
+      <Dialog
+        open={cancelTarget !== null}
+        title="この費用を取り消す"
+        description="取り消すと集計と「1人あたり」から外れます。記録そのものは残り、取り消した理由と日時が履歴に残ります。同じ流入元・同じ日に入れ直すと新しい記録として戻ります。"
+        confirmLabel="取り消す"
+        busy={cancelBusy}
+        error={cancelError}
+        onConfirm={() => void submitCancel()}
+        onCancel={() => { if (!cancelBusy) setCancelTarget(null) }}
+      >
+        {cancelTarget ? (
+          <div className="space-y-4">
+            <p className="text-xs text-ink-secondary">
+              対象: <strong>{cancelTarget.day} ／ {cancelTarget.sourceLabel} ／ {formatMinor(cancelTarget.amountMinor, cancelTarget.currency)}</strong>
+            </p>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-ink-secondary" htmlFor="ad-cost-cancel-reason">取り消す理由（必須）</label>
+              <TextField
+                id="ad-cost-cancel-reason"
+                value={cancelReason}
+                onChange={(event) => setCancelReason(event.target.value)}
+                placeholder="例: 金額を間違えた"
+                maxLength={200}
+              />
+            </div>
+          </div>
+        ) : null}
       </Dialog>
     </div>
   )
