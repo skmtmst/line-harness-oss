@@ -26,6 +26,10 @@ import {
   updateBookingAvailabilityException,
   deleteBookingAvailabilityException,
   updateBookingMenuSettings,
+  recordMenuVersion,
+  listMenuVersions,
+  revertMenuToVersion,
+  menuVersionContentLines,
   createBookingResource,
   deleteBookingResourceSafely,
   updateBookingResourceSafely,
@@ -675,7 +679,8 @@ booking.post('/api/liff/booking/requests', async (c) => {
   // Menu + staff_menu lookup (must be offered)
   const menuRow = await c.env.DB
     .prepare(
-      `SELECT m.id, m.duration_minutes, m.buffer_after_minutes, m.base_price,
+      `SELECT m.id, m.name, m.duration_minutes, m.buffer_after_minutes, m.base_price,
+              m.price_mode, m.version,
               m.auto_tag_id, m.concurrent_capacity,
               COALESCE(sm.override_duration_minutes, m.duration_minutes) AS dur,
               COALESCE(sm.override_price, m.base_price) AS price,
@@ -686,7 +691,7 @@ booking.post('/api/liff/booking/requests', async (c) => {
           AND m.deleted_at IS NULL AND m.is_active = 1`,
     )
     .bind(body.menu_id, body.staff_id, accountId)
-    .first<{ duration_minutes: number; buffer_after_minutes: number; auto_tag_id: string | null; concurrent_capacity: number; dur: number; price: number; is_offered: number | null }>();
+    .first<{ name: string; duration_minutes: number; buffer_after_minutes: number; auto_tag_id: string | null; concurrent_capacity: number; dur: number; price: number; price_mode: string; version: number; is_offered: number | null }>();
   if (!menuRow || menuRow.is_offered !== 1) {
     return c.json({ error: 'menu_not_offered' }, 422);
   }
@@ -725,12 +730,15 @@ booking.post('/api/liff/booking/requests', async (c) => {
   // 競合チェックと INSERT を 1 ステートメントで原子化する。
   // INSERT ... SELECT WHERE NOT EXISTS パターンで、同一スタッフの overlap 行がある場合は
   // 0 行 INSERT に落とす。changes=0 を 409 として扱う。
+  // 予約した時点の内容（値段・時間）の写しを持つ（T）。
+  const menuSnapshot = buildMenuSnapshot(menuRow);
   const bookingInsert = c.env.DB.prepare(
       `INSERT INTO bookings
         (id, line_account_id, friend_id, staff_id, menu_id,
          starts_at, ends_at, block_ends_at, status,
-         customer_note, price_at_booking, requested_at)
-       SELECT ?,?,?,?,?,?,?,?,?,?,?,?
+         customer_note, price_at_booking, requested_at,
+         menu_version_number, menu_snapshot_json)
+       SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?
         WHERE NOT EXISTS (
           -- 別メニューの予約は、定員に関係なく1件でも塞ぐ。
           -- 1対1の施術とグループを同じ時間に入れることはできない。
@@ -767,6 +775,8 @@ booking.post('/api/liff/booking/requests', async (c) => {
       body.customer_note ?? null,
       menuRow.price,
       nowIso,
+      menuSnapshot.version,
+      menuSnapshot.json,
       // 別メニューの重なりを見る副問い合わせ
       body.staff_id,
       blockEndsAt.toISOString(),
@@ -1937,6 +1947,7 @@ booking.put('/api/booking/admin/menus/:id/resources', requirePermission(BOOKING_
     const result = await replaceBookingMenuResources(c.env.DB, {
       menuId: c.req.param('id'), lineAccountId: accountId,
       expectedVersion: parsed.expectedVersion, resources: parsed.resources,
+      staffId: c.get('staff')?.id ?? null,
     });
     if (result.status === 'not_found') return c.json({ success: false, error: 'not_found' }, 404);
     if (result.status === 'conflict') {
@@ -1961,6 +1972,116 @@ booking.put('/api/booking/admin/menus/:id/resources', requirePermission(BOOKING_
     return c.json({ success: false, error: 'booking_menu_resources_save_failed' }, 503);
   }
 });
+
+/**
+ * 版の履歴 (T)。一覧・中身は見るだけの権限で読める。
+ * 「この版に戻す」は保存と同じ権限が要る。
+ */
+booking.get('/api/booking/admin/menus/:id/versions', async (c) => {
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  const versions = await listMenuVersions(c.env.DB, {
+    menuId: c.req.param('id'), lineAccountId: accountId,
+  });
+  if (!versions) return c.json({ error: 'not_found' }, 404);
+  const staffIds = [...new Set(versions.map((v) => v.createdByStaffId).filter((id): id is string => !!id))];
+  const staffNames = new Map<string, string>();
+  if (staffIds.length > 0) {
+    const staffRows = await c.env.DB.prepare(
+      `SELECT id, display_name FROM staff WHERE id IN (${staffIds.map(() => '?').join(',')})`,
+    ).bind(...staffIds).all<{ id: string; display_name: string }>();
+    for (const row of staffRows.results ?? []) staffNames.set(row.id, row.display_name);
+  }
+  return c.json({
+    versions: versions.map((version) => ({
+      version_number: version.versionNumber,
+      title: `第${version.versionNumber}版`,
+      status: version.status,
+      summary: version.summary,
+      author: version.createdByStaffId ? (staffNames.get(version.createdByStaffId) ?? null) : null,
+      at: version.createdAt,
+      lines: menuVersionContentLines(version),
+    })),
+  });
+});
+
+booking.get('/api/booking/admin/menus/:id/versions/:version', async (c) => {
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  const versionNumber = Number(c.req.param('version'));
+  if (!Number.isInteger(versionNumber) || versionNumber < 1) {
+    return c.json({ error: 'not_found' }, 404);
+  }
+  const versions = await listMenuVersions(c.env.DB, {
+    menuId: c.req.param('id'), lineAccountId: accountId,
+  });
+  const version = versions?.find((v) => v.versionNumber === versionNumber) ?? null;
+  if (!version) return c.json({ error: 'not_found' }, 404);
+  return c.json({
+    version: {
+      version_number: version.versionNumber,
+      title: `第${version.versionNumber}版`,
+      status: version.status,
+      summary: version.summary,
+      at: version.createdAt,
+      lines: menuVersionContentLines(version),
+    },
+  });
+});
+
+booking.post('/api/booking/admin/menus/:id/versions/:version/revert', requirePermission(BOOKING_MENUS_KEY), async (c) => {
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  const versionNumber = Number(c.req.param('version'));
+  const body = await c.req.json<Record<string, unknown>>().catch(() => null);
+  const expectedVersion = Number(body?.expectedVersion);
+  if (!Number.isInteger(versionNumber) || versionNumber < 1
+    || !Number.isInteger(expectedVersion) || expectedVersion < 1) {
+    return c.json({ error: 'expectedVersionは1以上の整数で指定してください' }, 400);
+  }
+  const result = await revertMenuToVersion(c.env.DB, {
+    menuId: c.req.param('id'),
+    lineAccountId: accountId,
+    versionNumber,
+    expectedVersion,
+    staffId: c.get('staff')?.id ?? null,
+  });
+  if (result.status === 'not_found') return c.json({ error: 'not_found' }, 404);
+  if (result.status === 'conflict') {
+    return c.json({
+      success: false,
+      code: 'version_conflict',
+      error: '予約メニューが更新されています。読み直してください',
+      data: { currentVersion: result.currentVersion },
+    }, 409);
+  }
+  return c.json({ ok: true, version: result.version });
+});
+
+/**
+ * 予約の写し (T)。予約した時点のメニューの内容（値段・時間）を残す。
+ * あとでメニューを変えても、この予約の写しは変わらない。
+ */
+function buildMenuSnapshot(menuRow: {
+  version: number;
+  name: string;
+  dur: number;
+  buffer_after_minutes: number;
+  price: number;
+  price_mode: string;
+}): { version: number; json: string } {
+  return {
+    version: Number(menuRow.version),
+    json: JSON.stringify({
+      version: Number(menuRow.version),
+      name: menuRow.name,
+      duration_minutes: Number(menuRow.dur),
+      buffer_after_minutes: Number(menuRow.buffer_after_minutes),
+      base_price: Number(menuRow.price),
+      price_mode: menuRow.price_mode,
+    }),
+  };
+}
 
 /**
  * 公開フラグの正規化。画面は 1/0 の数値、他は true/false で送る。
@@ -2072,6 +2193,8 @@ booking.post('/api/booking/admin/menus', requirePermission(BOOKING_MENUS_KEY), a
       ...ruleColumns.map((col) => rules.value[col]),
     )
     .run();
+  // 作った時点の中身を最初の版として残す（T）。
+  await recordMenuVersion(c.env.DB, { menuId: id, staffId: c.get('staff')?.id ?? null });
   return c.json({ id, version: 1 }, 201);
 });
 
@@ -2169,6 +2292,8 @@ booking.put('/api/booking/admin/menus/:id', requirePermission(BOOKING_MENUS_KEY)
     .bind(...values, id, accountId, expectedVersion)
     .run();
   if ((result.meta.changes ?? 0) > 0) {
+    // 保存するたびに版を1つ足す（T）。前の版は変えない。
+    await recordMenuVersion(c.env.DB, { menuId: id, staffId: c.get('staff')?.id ?? null });
     return c.json({ ok: true, version: expectedVersion + 1 });
   }
   const current = await c.env.DB
@@ -2233,6 +2358,7 @@ booking.patch('/api/booking/admin/menus/:id', requirePermission(BOOKING_MENUS_KE
       priceMode,
       basePrice,
       isActive,
+      staffId: c.get('staff')?.id ?? null,
       bookingWindowDays: rules.value.booking_window_days as number | null | undefined,
       cutoffHoursBefore: rules.value.cutoff_hours_before as number | null | undefined,
       cancelDeadlineHoursBefore: rules.value.cancel_deadline_hours_before as number | null | undefined,
@@ -3293,7 +3419,8 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
 
   const menuRow = await c.env.DB
     .prepare(
-      `SELECT m.id, m.duration_minutes, m.buffer_after_minutes, m.base_price,
+      `SELECT m.id, m.name, m.duration_minutes, m.buffer_after_minutes, m.base_price,
+              m.price_mode, m.version,
               m.concurrent_capacity,
               COALESCE(sm.override_duration_minutes, m.duration_minutes) AS dur,
               COALESCE(sm.override_price, m.base_price) AS price,
@@ -3304,7 +3431,7 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
           AND m.deleted_at IS NULL AND m.is_active = 1`,
     )
     .bind(body.menu_id, body.staff_id, accountId)
-    .first<{ duration_minutes: number; buffer_after_minutes: number; concurrent_capacity: number; dur: number; price: number; is_offered: number | null }>();
+    .first<{ name: string; duration_minutes: number; buffer_after_minutes: number; concurrent_capacity: number; dur: number; price: number; price_mode: string; version: number; is_offered: number | null }>();
   if (!menuRow || menuRow.is_offered !== 1) {
     return c.json({ error: 'menu_not_offered' }, 422);
   }
@@ -3374,13 +3501,16 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
     day_before: sendDayBefore,
     hours_before: sendHoursBefore,
   });
+  // 予約した時点の内容（値段・時間）の写しを持つ（T）。
+  const menuSnapshot = buildMenuSnapshot(menuRow);
   const bookingInsert = c.env.DB.prepare(
       `INSERT INTO bookings
         (id, line_account_id, friend_id, booking_customer_id, staff_id, menu_id,
          starts_at, ends_at, block_ends_at, status,
          customer_note, price_at_booking, requested_at, decided_at,
-         source, created_by_staff_id, notification_policy_snapshot)
-       SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
+         source, created_by_staff_id, notification_policy_snapshot,
+         menu_version_number, menu_snapshot_json)
+       SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
         WHERE NOT EXISTS (
           -- 別メニューの予約は、定員に関係なく1件でも塞ぐ。
           -- 1対1の施術とグループを同じ時間に入れることはできない。
@@ -3422,6 +3552,8 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
       bookingCustomerId ? 'phone' : 'operator',
       c.get('staff').id,
       notificationPolicy,
+      menuSnapshot.version,
+      menuSnapshot.json,
       // 別メニューの重なりを見る副問い合わせ
       body.staff_id,
       blockEndsAt.toISOString(),

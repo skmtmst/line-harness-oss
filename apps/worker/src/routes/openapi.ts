@@ -5442,6 +5442,60 @@ const spec = {
         },
       },
     },
+    // ── Booking menu versions / snapshots (T: 予約の設定の版と予約の写し) ──
+    '/api/booking/admin/menus/{id}/versions': {
+      get: {
+        tags: ['Booking'], summary: '予約メニューの版の履歴',
+        description: '保存するたびに増える版を新しい順に返す。いちばん新しい版だけ status が in_use。過去の版は変えない。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '版の一覧（版番号・見出し・札・ひとこと・中身の行）' },
+          '400': { description: 'account_id 未指定' },
+          '404': { description: '対象アカウントにメニューが存在しない' },
+        },
+      },
+    },
+    '/api/booking/admin/menus/{id}/versions/{version}': {
+      get: {
+        tags: ['Booking'], summary: '予約メニューの指定版の中身',
+        description: '比べる画面に行の一覧で返す。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'version', in: 'path', required: true, schema: { type: 'integer', minimum: 1 } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '指定版の中身（版番号・見出し・札・ひとこと・中身の行）' },
+          '400': { description: 'account_id 未指定' },
+          '404': { description: '対象アカウントにメニューまたは版が存在しない' },
+        },
+      },
+    },
+    '/api/booking/admin/menus/{id}/versions/{version}/revert': {
+      post: {
+        tags: ['Booking'], summary: '予約メニューを指定版に戻す',
+        description: '昔の版は変えず、その中身で新しい版を作る。読み直さずに送った古い版は 409 で止める。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'version', in: 'path', required: true, schema: { type: 'integer', minimum: 1 } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object', additionalProperties: false, required: ['expectedVersion'],
+          properties: { expectedVersion: { type: 'integer', minimum: 1 } },
+        } } } },
+        responses: {
+          '200': { description: '新しい版の番号' },
+          '400': { description: 'expectedVersion の不足または形式不正' },
+          '403': { description: 'メニューを保存する権限がない' },
+          '404': { description: '対象アカウントにメニューまたは版が存在しない' },
+          '409': { description: 'メニュー版が更新済み' },
+        },
+      },
+    },
     '/api/booking/admin/availability-check': {
       get: {
         tags: ['Booking'],

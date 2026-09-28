@@ -13097,6 +13097,27 @@ export interface BookingMenuResourceAssignment {
   warning: 'resource_inactive' | 'capacity_exceeded' | null;
 }
 
+/** T: 予約メニューの版。いちばん新しい版だけ status が in_use。 */
+export interface BookingMenuVersion {
+  version_number: number;
+  title: string;
+  status: 'in_use' | 'past';
+  summary: string;
+  author: string | null;
+  at: string;
+  lines: string[];
+}
+
+/** T: 予約の写し。予約した時点の内容（値段・時間）。無い予約は null。 */
+export interface BookingMenuSnapshot {
+  version: number;
+  name: string;
+  durationMinutes: number;
+  bufferAfterMinutes: number;
+  basePrice: number;
+  priceMode: string;
+}
+
 export interface BookingException {
   id: string;
   lineAccountId: string;
@@ -13465,6 +13486,8 @@ export interface BookingAdminDetail {
   notificationPolicy: BookingNotificationPolicy;
   menuName: string;
   staffName: string;
+  /** T: 予約の写し。写しが無い予約（490 より前）は null。 */
+  menuSnapshot?: BookingMenuSnapshot | null;
   customer: {
     friendId: string | null;
     bookingCustomerId: string | null;
@@ -13768,6 +13791,22 @@ export const bookingApi = {
       method: 'PUT',
       body: JSON.stringify({ ...body, expectedVersion }),
     }),
+  /** T: 版の履歴。新しい順。いちばん新しい版だけ status が in_use。 */
+  listMenuVersions: (accountId: string, id: string) =>
+    fetchApi<{ versions: BookingMenuVersion[] }>(
+      withAccount(`/api/booking/admin/menus/${id}/versions`, accountId),
+    ),
+  /** T: 版の中身。比べる画面に行の一覧で返す。 */
+  getMenuVersion: (accountId: string, id: string, version: number) =>
+    fetchApi<{ version: BookingMenuVersion }>(
+      withAccount(`/api/booking/admin/menus/${id}/versions/${version}`, accountId),
+    ),
+  /** T: この版に戻す。昔の版は変えず、その中身で新しい版を作る。 */
+  revertMenuVersion: (accountId: string, id: string, version: number, expectedVersion: number) =>
+    fetchApi<{ ok: true; version: number }>(
+      withAccount(`/api/booking/admin/menus/${id}/versions/${version}/revert`, accountId),
+      { method: 'POST', body: JSON.stringify({ expectedVersion }) },
+    ),
   saveMenuResources: (
     accountId: string,
     id: string,

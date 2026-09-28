@@ -22,6 +22,8 @@ interface BookingDetailRow {
   price_at_booking: number;
   requested_at: string;
   decided_at: string | null;
+  menu_version_number: number | null;
+  menu_snapshot_json: string | null;
   source: string;
   created_by_staff_id: string | null;
   external_event_id: string | null;
@@ -171,6 +173,7 @@ export async function getBookingAdminDetail(
             b.staff_id, b.menu_id,
             b.starts_at, b.ends_at, b.status, b.customer_note, b.internal_note,
             b.price_at_booking, b.requested_at, b.decided_at, b.source,
+            b.menu_version_number, b.menu_snapshot_json,
             b.created_by_staff_id, b.external_event_id, b.lock_version,
             b.notification_policy_snapshot,
             m.name AS menu_name, s.display_name AS staff_name,
@@ -237,11 +240,38 @@ export async function getBookingAdminDetail(
       : row.external_event_id
         ? 'synced'
         : 'not_configured';
+  // 予約の写し（T）。無い予約（490 より前）は null。壊れた写しも null に倒す。
+  let menuSnapshot: {
+    version: number;
+    name: string;
+    durationMinutes: number;
+    bufferAfterMinutes: number;
+    basePrice: number;
+    priceMode: string;
+  } | null = null;
+  if (row.menu_snapshot_json) {
+    try {
+      const parsed = JSON.parse(row.menu_snapshot_json) as Record<string, unknown>;
+      if (typeof parsed.name === 'string' && parsed.version != null) {
+        menuSnapshot = {
+          version: Number(parsed.version),
+          name: parsed.name,
+          durationMinutes: Number(parsed.duration_minutes),
+          bufferAfterMinutes: Number(parsed.buffer_after_minutes),
+          basePrice: Number(parsed.base_price),
+          priceMode: typeof parsed.price_mode === 'string' ? parsed.price_mode : 'fixed',
+        };
+      }
+    } catch {
+      menuSnapshot = null;
+    }
+  }
   return {
     id: row.id,
     staffId: row.staff_id,
     menuId: row.menu_id,
     lockVersion: Number(row.lock_version),
+    menuSnapshot,
     startsAt: row.starts_at,
     endsAt: row.ends_at,
     status: row.status,
