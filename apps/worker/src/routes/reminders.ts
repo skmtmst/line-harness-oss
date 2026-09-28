@@ -18,6 +18,9 @@ import {
   moveReminderRegistrantTargetDate,
   cancelReminderRegistrant,
   resumeReminderRegistrant,
+  getReminderRegistrantById,
+  getReminderVersionSteps,
+  type ResumeExpectedRun,
   getFolderById,
   getReminderDeliveryRunById,
   getReminderDeliveryRunSummary,
@@ -35,7 +38,7 @@ import {
   type ReminderVersionRow,
   type ReminderDeliveryRunStatus,
 } from '@line-crm/db';
-import { describeReminderTiming, LEAP_YEAR_POLICIES, REMINDER_NAME_MAX_LENGTH, REMINDER_NAME_TOO_LONG_MESSAGE } from '@line-crm/shared';
+import { describeReminderTiming, LEAP_YEAR_POLICIES, REMINDER_NAME_MAX_LENGTH, REMINDER_NAME_TOO_LONG_MESSAGE, resolveReminderSendAt } from '@line-crm/shared';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
@@ -1676,17 +1679,56 @@ reminders.post('/api/reminders/:id/registrants/:enrollmentId/cancel', requireRol
   }
 });
 
-/** 再開では旧実行行を復活させない。未送信だけが次回処理で再計算される。 */
+/**
+ * R341: 再開では取消の記録を外して未来の予定を作り直す。
+ * 未来の予定時刻に対応する cancelled 行だけ queued へ戻し、行が無い通は
+ * 新しく作る。送信ずみ・過去時刻の通には触らない。再開できないときは
+ * 成功と返さない (409/500)。
+ */
+async function buildResumeExpectedRuns(
+  db: D1Database,
+  reminderId: string,
+  enrollmentId: string,
+  now: Date,
+): Promise<ResumeExpectedRun[] | undefined> {
+  const enrollment = await getReminderRegistrantById(db, reminderId, enrollmentId);
+  if (!enrollment || enrollment.status !== 'cancelled') return undefined;
+  const target = new Date(enrollment.target_date);
+  if (Number.isNaN(target.getTime())) return undefined;
+  const reminder = await getReminderById(db, reminderId);
+  // 一覧 (getPendingReminderDeliveries) と同じく、固定版の通を優先する。
+  const steps = enrollment.reminder_version_id
+    ? await getReminderVersionSteps(db, enrollment.reminder_version_id)
+    : await getReminderSteps(db, reminderId);
+  const mode = reminder?.delivery_mode === 'time' ? 'time' : 'countdown';
+  const runs: ResumeExpectedRun[] = [];
+  for (const step of steps) {
+    const sendAt = resolveReminderSendAt(target, {
+      offsetDays: step.offset_days,
+      sendAtTime: step.send_at_time,
+      offsetMinutes: step.offset_minutes,
+    }, mode);
+    if (sendAt.getTime() <= now.getTime()) continue;
+    runs.push({ reminderStepId: step.id, scheduledAt: sendAt.toISOString() });
+  }
+  return runs;
+}
+
+/** 再開は未来の予定を作り直す (buildResumeExpectedRuns)。 */
 reminders.post('/api/reminders/:id/registrants/:enrollmentId/resume', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const body = await c.req.json<{ expectedLockVersion?: unknown }>();
     if (!isNonNegativeInteger(body.expectedLockVersion)) {
       return c.json({ success: false, error: 'expectedLockVersion を正しく指定してください' }, 400);
     }
+    const expectedRuns = await buildResumeExpectedRuns(
+      c.env.DB, c.req.param('id'), c.req.param('enrollmentId'), new Date(),
+    );
     return mutationResponse(c, await resumeReminderRegistrant(c.env.DB, {
       reminderId: c.req.param('id'),
       enrollmentId: c.req.param('enrollmentId'),
       expectedLockVersion: body.expectedLockVersion,
+      expectedRuns,
     }));
   } catch (err) {
     console.error('POST /api/reminders/:id/registrants/:enrollmentId/resume error:', err);
