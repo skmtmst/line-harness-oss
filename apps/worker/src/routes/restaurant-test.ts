@@ -1031,6 +1031,13 @@ restaurantTest.post('/api/restaurant-test/reservations/manual', requireRole('own
   if (!await acquireLock(dbFor(c.env, storeId), lockKey, lockOwner)) return c.json({ success: false, error: '同じ時間帯を別の担当者が更新中です' }, 409);
   try {
     const tables = await dbFor(c.env, storeId).prepare('SELECT id, min_capacity, max_capacity, is_active FROM rt_tables WHERE store_id = ?').bind(storeId).all<{ id: string; min_capacity: number; max_capacity: number; is_active: number }>();
+    if (checked.value.tableId && !tables.results.some((table) => table.id === checked.value.tableId && table.is_active === 1)) {
+      return c.json({ success: false, error: '停止中の卓は選べません' }, 400);
+    }
+    if (checked.value.courseId) {
+      const course = await dbFor(c.env, storeId).prepare('SELECT id FROM rt_menu_items WHERE id = ? AND store_id = ? AND status = ?').bind(checked.value.courseId, storeId, 'active').first();
+      if (!course) return c.json({ success: false, error: '停止中のコースは選べません' }, 400);
+    }
     const tableId = checked.value.tableId || chooseRestaurantTable(tables.results.map((row) => ({ id: row.id, minCapacity: row.min_capacity, maxCapacity: row.max_capacity, isActive: row.is_active === 1 })), checked.value.guestCount);
     if (tableId && await overlappingReservationExists(dbFor(c.env, storeId), storeId, tableId, checked.value.startsAt, checked.value.endsAt)) {
       return c.json({ success: false, error: '同じ卓に重なる時間の予約があるため登録できません' }, 409);
@@ -1128,8 +1135,8 @@ restaurantTest.patch('/api/restaurant-test/reservations/:id', requireRole('owner
       next.table_id = null;
     } else if (typeof body.tableId === 'string') {
       const table = await dbFor(c.env, current.store_id).prepare(
-        'SELECT id FROM rt_tables WHERE id = ? AND store_id = ? LIMIT 1',
-      ).bind(body.tableId, current.store_id).first();
+        'SELECT id FROM rt_tables WHERE id = ? AND store_id = ? AND (is_active = 1 OR id = ?) LIMIT 1',
+      ).bind(body.tableId, current.store_id, current.table_id).first();
       if (!table) return c.json({ success: false, error: '卓が正しくありません' }, 400);
       next.table_id = body.tableId;
     } else {
@@ -1141,8 +1148,8 @@ restaurantTest.patch('/api/restaurant-test/reservations/:id', requireRole('owner
       next.course_id = null;
     } else if (typeof body.courseId === 'string') {
       const course = await dbFor(c.env, current.store_id).prepare(
-        'SELECT id FROM rt_menu_items WHERE id = ? AND store_id = ? LIMIT 1',
-      ).bind(body.courseId, current.store_id).first();
+        'SELECT id FROM rt_menu_items WHERE id = ? AND store_id = ? AND (status = ? OR id = ?) LIMIT 1',
+      ).bind(body.courseId, current.store_id, 'active', current.course_id).first();
       if (!course) return c.json({ success: false, error: 'コースが正しくありません' }, 400);
       next.course_id = body.courseId;
     } else {
@@ -1220,10 +1227,10 @@ restaurantTest.post('/api/restaurant-test/inbound/reservations', requireRole('ow
   try {
     const value = checked.value;
     const current = await dbFor(c.env, body.storeId).prepare(
-      `SELECT id, starts_at, guest_count, status, source_updated_at FROM rt_reservations
+      `SELECT id, starts_at, guest_count, status, table_id, course_id, source_updated_at FROM rt_reservations
        WHERE store_id = ? AND source = ? AND external_id = ? LIMIT 1`,
     ).bind(body.storeId, body.provider, value.externalId)
-      .first<{ id: string; starts_at: string; guest_count: number; status: string; source_updated_at: string | null }>();
+      .first<{ id: string; starts_at: string; guest_count: number; status: string; table_id: string | null; course_id: string | null; source_updated_at: string | null }>();
     // R102: 媒体側の更新時刻が古い通知は記録だけ残して反映しない。
     if (current?.source_updated_at && value.sourceUpdatedAt
       && value.sourceUpdatedAt <= current.source_updated_at) {
@@ -1231,6 +1238,24 @@ restaurantTest.post('/api/restaurant-test/inbound/reservations', requireRole('ow
         "UPDATE rt_sync_events SET status = 'processed', processed_at = datetime('now') WHERE id = ?",
       ).bind(syncEventId).run();
       return c.json({ success: true, data: { duplicate: false, stale: true, direction: 'inbound', outboundWrites: 0 } }, 200);
+    }
+    if (value.tableId && value.tableId !== current?.table_id) {
+      const table = await dbFor(c.env, body.storeId).prepare('SELECT id FROM rt_tables WHERE id = ? AND store_id = ? AND is_active = 1')
+        .bind(value.tableId, body.storeId).first();
+      if (!table) {
+        await dbFor(c.env, body.storeId).prepare("UPDATE rt_sync_events SET status = 'failed', error_message = ? WHERE id = ?")
+          .bind('停止中の卓は選べません', syncEventId).run();
+        return c.json({ success: false, error: '停止中の卓は選べません' }, 400);
+      }
+    }
+    if (value.courseId && value.courseId !== current?.course_id) {
+      const course = await dbFor(c.env, body.storeId).prepare("SELECT id FROM rt_menu_items WHERE id = ? AND store_id = ? AND status = 'active'")
+        .bind(value.courseId, body.storeId).first();
+      if (!course) {
+        await dbFor(c.env, body.storeId).prepare("UPDATE rt_sync_events SET status = 'failed', error_message = ? WHERE id = ?")
+          .bind('停止中のコースは選べません', syncEventId).run();
+        return c.json({ success: false, error: '停止中のコースは選べません' }, 400);
+      }
     }
     // R100: 同じ卓に重なる有効予約があれば取り込まない（自分自身の更新は除く）。
     if (value.tableId && await overlappingReservationExists(
@@ -1298,6 +1323,86 @@ restaurantTest.post('/api/restaurant-test/memberships', requireRole('owner', 'ad
       body.role, body.lineUid?.trim() || null, body.googleEmail?.trim() || null,
     ).run();
   return c.json({ success: true, data: { id } }, 201);
+});
+
+restaurantTest.patch('/api/restaurant-test/tables/:id', requireRole('owner', 'admin'), async (c) => {
+  if (!hasOrganizationSelector(c)) return requiredAccount(c);
+  const organization = await organizationFor(c);
+  if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
+  const current = await dbFor(c.env).prepare(`SELECT t.* FROM rt_tables t JOIN rt_stores s ON s.id = t.store_id
+    WHERE t.id = ? AND s.organization_id = ? AND (? IS NULL OR s.id = ?)`)
+    .bind(c.req.param('id'), organization.id, organization.scopedStoreId, organization.scopedStoreId)
+    .first<{ store_id: string; code: string; label: string; seat_type: string; min_capacity: number; max_capacity: number; is_active: number }>();
+  if (!current) return c.json({ success: false, error: '卓が見つかりません' }, 404);
+  const body = await c.req.json<{ code?: string; label?: string; seatType?: string; minCapacity?: number; maxCapacity?: number; isActive?: boolean }>();
+  const code = body.code === undefined ? current.code : body.code;
+  const label = body.label === undefined ? current.label : body.label;
+  const seatType = body.seatType === undefined ? current.seat_type : body.seatType;
+  const min = body.minCapacity === undefined ? current.min_capacity : body.minCapacity;
+  const max = body.maxCapacity === undefined ? current.max_capacity : body.maxCapacity;
+  if (typeof code !== 'string' || !code.trim() || typeof label !== 'string' || !label.trim()
+    || !['counter', 'table', 'private_room', 'terrace'].includes(seatType)
+    || !Number.isInteger(min) || !Number.isInteger(max) || min < 1 || max < min
+    || (body.isActive !== undefined && typeof body.isActive !== 'boolean')) {
+    return c.json({ success: false, error: '卓の入力内容が正しくありません' }, 400);
+  }
+  await dbFor(c.env, current.store_id).prepare(`UPDATE rt_tables SET code = ?, label = ?, seat_type = ?, min_capacity = ?, max_capacity = ?, is_active = ?, updated_at = datetime('now') WHERE id = ?`)
+    .bind(code.trim(), label.trim(), seatType, min, max, body.isActive === undefined ? current.is_active : Number(body.isActive), c.req.param('id')).run();
+  return c.json({ success: true, data: { id: c.req.param('id') } });
+});
+
+restaurantTest.patch('/api/restaurant-test/memberships/:id', requireRole('owner', 'admin'), async (c) => {
+  if (!hasOrganizationSelector(c)) return requiredAccount(c);
+  const organization = await organizationFor(c);
+  if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
+  const current = await dbFor(c.env).prepare(`SELECT * FROM rt_memberships WHERE id = ? AND organization_id = ? AND (? IS NULL OR store_id = ?)`)
+    .bind(c.req.param('id'), organization.id, organization.scopedStoreId, organization.scopedStoreId)
+    .first<{ store_id: string | null; staff_name: string; email: string | null; role: string; line_uid: string | null; google_email: string | null; status: string }>();
+  if (!current) return c.json({ success: false, error: '所属ユーザーが見つかりません' }, 404);
+  const body = await c.req.json<{ storeId?: string | null; staffName?: string; email?: string | null; role?: string; lineUid?: string | null; googleEmail?: string | null; status?: string }>();
+  const storeId = body.storeId === undefined ? current.store_id : body.storeId === '' ? null : body.storeId;
+  const name = body.staffName === undefined ? current.staff_name : body.staffName;
+  const role = body.role === undefined ? current.role : body.role;
+  const status = body.status === undefined ? current.status : body.status;
+  if (typeof name !== 'string' || !name.trim() || !['super_admin', 'store_manager', 'staff'].includes(role)
+    || !['active', 'invited', 'suspended'].includes(status)
+    || [body.email, body.lineUid, body.googleEmail].some((value) => value !== undefined && value !== null && typeof value !== 'string')
+    || (storeId !== null && (typeof storeId !== 'string' || !await storeBelongsTo(c, organization.id, storeId)))
+    || (organization.scopedStoreId && storeId !== organization.scopedStoreId)) {
+    return c.json({ success: false, error: '所属ユーザーの入力内容が正しくありません' }, 400);
+  }
+  if ((role === 'super_admin' || current.role === 'super_admin') && c.get('staff')?.role !== 'owner') {
+    return c.json({ success: false, error: 'SuperAdminを変更できるのはオーナーだけです' }, 403);
+  }
+  const optional = (value: string | null | undefined, old: string | null) => value === undefined ? old : typeof value === 'string' ? value.trim() || null : null;
+  await dbFor(c.env, storeId || undefined).prepare(`UPDATE rt_memberships SET store_id = ?, staff_name = ?, email = ?, role = ?, line_uid = ?, google_email = ?, status = ?, updated_at = datetime('now') WHERE id = ?`)
+    .bind(storeId, name.trim(), optional(body.email, current.email), role, optional(body.lineUid, current.line_uid), optional(body.googleEmail, current.google_email), status, c.req.param('id')).run();
+  return c.json({ success: true, data: { id: c.req.param('id') } });
+});
+
+restaurantTest.patch('/api/restaurant-test/menu/:id', requireRole('owner', 'admin'), async (c) => {
+  if (!hasOrganizationSelector(c)) return requiredAccount(c);
+  const organization = await organizationFor(c);
+  if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
+  const current = await dbFor(c.env).prepare(`SELECT m.* FROM rt_menu_items m JOIN rt_stores s ON s.id = m.store_id
+    WHERE m.id = ? AND s.organization_id = ? AND (? IS NULL OR s.id = ?)`)
+    .bind(c.req.param('id'), organization.id, organization.scopedStoreId, organization.scopedStoreId)
+    .first<{ store_id: string; kind: string; name: string; price: number; allergens_json: string; service_periods_json: string; status: string }>();
+  if (!current) return c.json({ success: false, error: 'メニューが見つかりません' }, 404);
+  const body = await c.req.json<{ kind?: string; name?: string; price?: number; allergens?: string[]; servicePeriods?: string[]; status?: string }>();
+  const kind = body.kind === undefined ? current.kind : body.kind;
+  const name = body.name === undefined ? current.name : body.name;
+  const price = body.price === undefined ? current.price : body.price;
+  const status = body.status === undefined ? current.status : body.status;
+  if (!['course', 'a_la_carte'].includes(kind) || typeof name !== 'string' || !name.trim()
+    || !Number.isInteger(price) || price < 0 || !['draft', 'active', 'archived'].includes(status)
+    || (body.allergens !== undefined && (!Array.isArray(body.allergens) || body.allergens.some((item) => typeof item !== 'string')))
+    || (body.servicePeriods !== undefined && (!Array.isArray(body.servicePeriods) || body.servicePeriods.some((item) => !['lunch', 'dinner'].includes(item))))) {
+    return c.json({ success: false, error: 'メニューの入力内容が正しくありません' }, 400);
+  }
+  await dbFor(c.env, current.store_id).prepare(`UPDATE rt_menu_items SET kind = ?, name = ?, price = ?, allergens_json = ?, service_periods_json = ?, status = ?, updated_at = datetime('now') WHERE id = ?`)
+    .bind(kind, name.trim(), price, body.allergens === undefined ? current.allergens_json : JSON.stringify(body.allergens), body.servicePeriods === undefined ? current.service_periods_json : JSON.stringify(body.servicePeriods), status, c.req.param('id')).run();
+  return c.json({ success: true, data: { id: c.req.param('id') } });
 });
 
 restaurantTest.put('/api/restaurant-test/inventory/:id', requireRole('owner', 'admin'), async (c) => {
