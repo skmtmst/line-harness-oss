@@ -1,7 +1,6 @@
 'use client'
 
 import { Fragment, useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { X } from 'lucide-react'
 import KpiCard from '@/components/shared/kpi-card'
 import {
   api,
@@ -19,6 +18,7 @@ import Button from '@/components/shared/button'
 import type { ButtonProps } from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
 import FilterChip from '@/components/shared/filter-chip'
+import HelpTip from '@/components/shared/help-tip'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import Notice from '@/components/shared/notice'
@@ -203,6 +203,20 @@ function formatYen(n: number): string {
   return `¥${Math.round(n).toLocaleString('ja-JP')}`
 }
 
+/*
+  R292: 既存リンクの配布URL。Worker の `resolveLinkBaseUrl` と同じ優先順位。
+  1. 管理画面で決めた短縮ドメイン（`link_base_url`）があれば、その直下。
+  2. 無ければ Worker の `/r/`（`NEXT_PUBLIC_API_URL` が Worker のURL）。
+  呼び出し側で付け足しの `/r` を増やさない（Worker の契約どおり）。
+*/
+const WORKER_BASE = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '')
+
+function distributionUrl(refCode: string, customBase: string | null): string {
+  if (customBase) return `${customBase.replace(/\/$/, '')}/${refCode}`
+  if (WORKER_BASE) return `${WORKER_BASE}/r/${encodeURIComponent(refCode)}`
+  return ''
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Page
 // ─────────────────────────────────────────────────────────────────────────────
@@ -265,7 +279,14 @@ async function listAllConversionApprovals(
 // Affiliators tab — list + inline detail panel
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
+export function AffiliatorsTab({
+  accountId,
+  focusAffiliateId,
+}: {
+  accountId: string | null
+  /** R291: 停止前の確認から戻ってきたとき、最初に開く紹介者。 */
+  focusAffiliateId?: string | null
+}) {
   // ── list ───────────────────────────────────────────────────────────────────
   const [rows, setRows] = useState<AffiliateListRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -310,6 +331,16 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
   const [journeyMore, setJourneyMore] = useState(false)
   const [journeyLoadingMore, setJourneyLoadingMore] = useState(false)
   const journeyCursorRef = useRef<{ beforeAt: string; beforeId: string } | null>(null)
+  /*
+    R289: 内訳の読み込みの世代番号。紹介者を切り替えたら前の世代の遅い
+    応答を捨てる（#916 の会員一覧・友だち詳細と同じ形）。集計・リンク・
+    動線・追加読み込みの全経路で、選んでいる途中の世代だけを入れる。
+  */
+  const detailGenRef = useRef(0)
+  const selectedIdRef = useRef<string | null>(null)
+  const isCurrentDetail = useCallback((id: string, gen: number) => (
+    detailGenRef.current === gen && selectedIdRef.current === id
+  ), [])
 
   // ── load list ──────────────────────────────────────────────────────────────
   const loadList = useCallback(async () => {
@@ -354,6 +385,71 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
   }, [])
 
   useEffect(() => { void loadList() }, [loadList])
+
+  /*
+    R290: 「今月の成果の流れ」のクリック・友だち追加・成果は、今月の範囲で
+    取り直す。一覧の集計は累計のまま（一覧の表は累計で見る）なので、流れ用
+    だけ別に今月の allReport を読む。認めた・承認は承認の一覧の今月分。
+  */
+  const [monthlyFunnel, setMonthlyFunnel] = useState<{
+    clicks: number
+    friends: number
+    conversions: number
+  } | null>(null)
+  const [monthlyState, setMonthlyState] = useState<ConfirmedState>('loading')
+  const loadMonthlyFunnel = useCallback(async () => {
+    setMonthlyState('loading')
+    try {
+      const res = await api.affiliates.allReport({
+        startDate: settlementPeriod.periodFrom,
+        endDate: settlementPeriod.periodTo,
+      })
+      if (!res.success) throw new Error('monthly report fetch failed')
+      const list = res.data as unknown as AffiliateReportRow[]
+      setMonthlyFunnel({
+        clicks: list.reduce((sum, row) => sum + row.totalClicks, 0),
+        friends: list.reduce((sum, row) => sum + row.friendAdds, 0),
+        conversions: list.reduce((sum, row) => sum + row.totalConversions, 0),
+      })
+      setMonthlyState('ready')
+    } catch {
+      // R293: 取れていない数を0として描かない。再試行で戻す。
+      setMonthlyFunnel(null)
+      setMonthlyState('error')
+    }
+  }, [settlementPeriod])
+
+  useEffect(() => { void loadMonthlyFunnel() }, [loadMonthlyFunnel])
+
+  /*
+    R292: 配布URLの土台（短縮ドメイン）。取れなくても Worker の `/r/` で
+    URLは作れるので、ここでは失敗の面を出さない。
+  */
+  const [linkBaseUrl, setLinkBaseUrl] = useState<string | null>(null)
+  const [copiedLinkId, setCopiedLinkId] = useState<string | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    void api.accountSettings.getLinkBaseUrl().then((res) => {
+      if (cancelled || !res.success || !res.data) return
+      setLinkBaseUrl(res.data)
+    }).catch(() => { /* 取れなくても /r/ で作れる */ })
+    return () => { cancelled = true }
+  }, [])
+  /*
+    R292: URLの取り出しとコピーは計測を起こさない。文字を写すだけで、
+    クリック記録の口もリンク発行の口も呼ばない。
+  */
+  const copyLinkUrl = useCallback(async (link: AffiliateLink) => {
+    const url = distributionUrl(link.ref_code, linkBaseUrl)
+    if (!url) return
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopiedLinkId(link.id)
+      window.setTimeout(() => {
+        setCopiedLinkId((current) => (current === link.id ? null : current))
+      }, 2000)
+    } catch { /* 書けないときは選んで写せる（URLは表示のまま） */ }
+  }, [linkBaseUrl])
 
   useEffect(() => {
     let cancelled = false
@@ -404,7 +500,7 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
   }, [accountId, settlementPeriod])
 
   // ── load detail (report v2 + links) ────────────────────────────────────────
-  const loadDetail = useCallback(async (id: string) => {
+  const loadDetail = useCallback(async (id: string, gen: number) => {
     setDetailLoading(true)
     setDetailError(false)
     setReport(null)
@@ -418,23 +514,28 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
         api.affiliates.reportV2(id),
         api.affiliates.links(id),
       ])
+      // R289: 選んでいる途中の世代だけ入れる。遅れて届いた前の世代は捨てる。
+      if (!isCurrentDetail(id, gen)) return
       /* **形を確かめてから入れる。** 読めない返事を入れると、描くときに落ちる。 */
       setReport(reportRes.success ? asReportV2(reportRes.data) : null)
       if (linksRes.success) setLinks(linksRes.data as unknown as AffiliateLink[])
       // 失敗は握りつぶさず、内訳面に再試行を出す（#554 点検#505中7）。
       if (!reportRes.success || !linksRes.success) setDetailError(true)
     } catch {
+      if (!isCurrentDetail(id, gen)) return
       setDetailError(true)
     }
+    if (!isCurrentDetail(id, gen)) return
     setDetailLoading(false)
-  }, [])
+  }, [isCurrentDetail])
 
   // ── load first page of journeys ────────────────────────────────────────────
-  const loadJourneys = useCallback(async (id: string) => {
+  const loadJourneys = useCallback(async (id: string, gen: number) => {
     setJourneyLoading(true)
     setJourneyError(false)
     try {
       const res = await api.affiliates.journeys(id, { limit: JOURNEY_PAGE_SIZE })
+      if (!isCurrentDetail(id, gen)) return
       if (res.success) {
         setJourneys(res.data)
         journeyCursorRef.current = res.nextCursor ?? null
@@ -443,13 +544,15 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
         setJourneyError(true)
       }
     } catch {
+      if (!isCurrentDetail(id, gen)) return
       setJourneyError(true)
     }
+    if (!isCurrentDetail(id, gen)) return
     setJourneyLoading(false)
-  }, [])
+  }, [isCurrentDetail])
 
   // ── load more journeys ─────────────────────────────────────────────────────
-  const loadMoreJourneys = useCallback(async (id: string) => {
+  const loadMoreJourneys = useCallback(async (id: string, gen: number) => {
     if (journeyLoadingMore) return
     const cursor = journeyCursorRef.current
     if (!cursor) { setJourneyMore(false); return }
@@ -460,6 +563,8 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
         beforeAt: cursor.beforeAt,
         beforeId: cursor.beforeId,
       })
+      // R289: 追加読み込みの遅い応答も、別の紹介者へは混ぜない。
+      if (!isCurrentDetail(id, gen)) return
       if (res.success) {
         setJourneys((prev) => {
           const seen = new Set(prev.map((j) => j.friendId))
@@ -472,21 +577,48 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
         setJourneyError(true)
       }
     } catch {
+      if (!isCurrentDetail(id, gen)) return
       setJourneyError(true)
     }
+    // 読み込み中の印だけは必ず戻す（古い世代の応答でも印を残さない）。
     setJourneyLoadingMore(false)
-  }, [journeyLoadingMore])
+  }, [isCurrentDetail, journeyLoadingMore])
 
   // ── row click ──────────────────────────────────────────────────────────────
   const handleRowClick = useCallback((id: string) => {
     if (selectedId === id) {
+      // R289: 閉じたあとに届く応答も捨てるため、世代を進める。
+      detailGenRef.current += 1
+      selectedIdRef.current = null
       setSelectedId(null)
       return
     }
+    // R289: 世代を進めて、いま選んだ紹介者の応答だけ入れる。
+    detailGenRef.current += 1
+    selectedIdRef.current = id
+    const gen = detailGenRef.current
     setSelectedId(id)
-    void loadDetail(id)
-    void loadJourneys(id)
+    void loadDetail(id, gen)
+    void loadJourneys(id, gen)
   }, [selectedId, loadDetail, loadJourneys])
+
+  /*
+    R291: 停止前の確認（`?affiliate=`）から来たとき、その紹介者の内訳を
+    開く。一覧が読めてから1回だけ。閉じたあとは普通に操作できる。
+  */
+  const focusConsumedRef = useRef(false)
+  useEffect(() => {
+    if (!focusAffiliateId || focusConsumedRef.current) return
+    if (loading || error) return
+    if (!rows.some((row) => row.id === focusAffiliateId)) return
+    focusConsumedRef.current = true
+    detailGenRef.current += 1
+    selectedIdRef.current = focusAffiliateId
+    const gen = detailGenRef.current
+    setSelectedId(focusAffiliateId)
+    void loadDetail(focusAffiliateId, gen)
+    void loadJourneys(focusAffiliateId, gen)
+  }, [focusAffiliateId, rows, loading, error, loadDetail, loadJourneys])
 
   const shownRows = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase('ja-JP')
@@ -520,11 +652,17 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
     ?? paymentItems.reduce((sum, item) => sum + item.approvedReward, 0)
   const heldTotal = paymentItems.reduce((sum, item) => sum + item.heldReward, 0)
   const payoutCycle = paymentItems.find((item) => item.payoutCycle?.trim())?.payoutCycle ?? null
+  /*
+    R293: 流れの各段は、取れていないときに0を描かない。実値0のときだけ0。
+    読み込み中・取得失敗は「—」にし、失敗は再試行で戻す。
+  */
   const funnel = {
-    clicks: rows.reduce((sum, row) => sum + row.totalClicks, 0),
-    friends: rows.reduce((sum, row) => sum + row.friendAdds, 0),
-    conversions: rows.reduce((sum, row) => sum + row.totalConversions, 0),
-    approved: approvedThisMonth.length,
+    clicks: monthlyState === 'ready' && monthlyFunnel ? monthlyFunnel.clicks : null,
+    friends: monthlyState === 'ready' && monthlyFunnel ? monthlyFunnel.friends : null,
+    conversions: monthlyState === 'ready' && monthlyFunnel ? monthlyFunnel.conversions : null,
+    approved: approvalState === 'ready' ? approvedThisMonth.length : null,
+    reward: paymentState === 'ready' ? paymentTotal : null,
+    held: paymentState === 'ready' ? heldTotal : null,
   }
 
   const exportAffiliatesCsv = () => {
@@ -584,27 +722,49 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
 
       <section className="bg-canvas rounded-card border-hairline border p-4" aria-label="今月の成果の流れ">
         <div className="mb-3 flex items-center justify-between gap-3">
-          <h3 className="text-ink text-sm font-semibold">今月の成果の流れ</h3>
-          <span className="text-ink-faint text-xs">どこで人が減っているかを1本で見る</span>
+          <h3 className="text-ink flex items-center gap-1 text-sm font-semibold">
+            今月の成果の流れ
+            {/*
+              R290: 段ごとの数え方の違いは「？」に集約する。本文に補足を書いて
+              箱を高くしない（共通ルール 2-1b）。
+            */}
+            <HelpTip label="今月の成果の流れの説明">
+              クリック・友だち追加・成果は今月に起きた数を数えています。認めた・承認は承認の一覧にある今月の成果で、数え方が違うため段差は目安です。
+            </HelpTip>
+          </h3>
+          <span className="flex items-center gap-2">
+            <span className="text-ink-faint text-xs">どこで人が減っているかを1本で見る</span>
+            {monthlyState === 'error' ? (
+              <AffiliateButton onClick={() => { void loadMonthlyFunnel() }}>
+                もう一度読み込む
+              </AffiliateButton>
+            ) : null}
+          </span>
         </div>
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
-          {[
-            ['クリック', funnel.clicks],
-            ['友だち追加', funnel.friends],
-            ['成果', funnel.conversions],
-            ['認めた・承認', funnel.approved],
-          ].map(([label, value]) => (
+          {(
+            [
+              ['クリック', funnel.clicks],
+              ['友だち追加', funnel.friends],
+              ['成果', funnel.conversions],
+              ['認めた・承認', funnel.approved],
+            ] as Array<[label: string, value: number | null]>
+          ).map(([label, value]) => (
             <div key={label} className="bg-canvas-sunken rounded-control px-3 py-2">
               <p className="text-ink-faint text-xs">{label}</p>
               <p className="text-ink mt-1 text-lg font-semibold tabular-nums">
-                {Number(value).toLocaleString('ja-JP')}件
+                {value === null ? '—' : `${value.toLocaleString('ja-JP')}件`}
               </p>
             </div>
           ))}
           <div className="bg-accent-soft rounded-control px-3 py-2">
             <p className="text-ink-faint text-xs">報酬</p>
-            <p className="text-ink mt-1 text-lg font-semibold tabular-nums">{formatYen(paymentTotal)}</p>
-            <p className="text-ink-faint mt-0.5 text-xs">保留中 {formatYen(heldTotal)} を含む</p>
+            <p className="text-ink mt-1 text-lg font-semibold tabular-nums">
+              {funnel.reward === null ? '—' : formatYen(funnel.reward)}
+            </p>
+            <p className="text-ink-faint mt-0.5 text-xs">
+              {funnel.held === null ? '—' : `保留中 ${formatYen(funnel.held)} を含む`}
+            </p>
           </div>
         </div>
       </section>
@@ -845,7 +1005,7 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
                                     リンクと成果の記録は消えていません。期間を広げて確かめてください。
                                   </p>
                                   {detailError ? (
-                                    <AffiliateButton onClick={() => { void loadDetail(row.id) }} className="mt-3">
+                                    <AffiliateButton onClick={() => { void loadDetail(row.id, detailGenRef.current) }} className="mt-3">
                                       もう一度読み込む
                                     </AffiliateButton>
                                   ) : null}
@@ -954,14 +1114,17 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
                                 </div>
                               )}
 
-                              {/* Links table */}
+                              {/*
+                                R292: 既存リンクの配布URLとコピー。作ったときの
+                                画面を閉じたあとでも、同じ有効リンクを取り出せる。
+                              */}
                               {links.length > 0 && (
                                 <div>
                                   <p className="text-xs font-semibold text-ink-secondary uppercase mb-2">
                                     リンク別クリック ({links.length} 本)
                                   </p>
                                   <div className="overflow-x-auto">
-                                    <table className="min-w-[560px] text-sm">
+                                    <table className="min-w-[760px] text-sm">
                                       <thead>
                                         <tr className="text-left text-xs text-ink-faint">
                                           <th className="pb-1 pr-4">{LINK_CODE_HEADING}</th>
@@ -969,10 +1132,14 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
                                           <th className="pb-1 pr-4">案件</th>
                                           <th className="pb-1 pr-4 text-right">クリック</th>
                                           <th className="pb-1">状態</th>
+                                          <th className="pb-1 pr-4">配布URL</th>
+                                          <th className="pb-1 w-24">操作</th>
                                         </tr>
                                       </thead>
                                       <tbody className="divide-y divide-hairline">
-                                        {links.map((link) => (
+                                        {links.map((link) => {
+                                          const url = distributionUrl(link.ref_code, linkBaseUrl)
+                                          return (
                                           <tr key={link.id}>
                                             <td className="py-1 pr-4 font-mono text-status-info">{link.ref_code}</td>
                                             <td className="py-1 pr-4 text-ink-secondary">{link.label ?? '—'}</td>
@@ -991,8 +1158,27 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
                                                 : <span className="text-xs text-ink-faint">無効</span>
                                               }
                                             </td>
+                                            <td className="py-1 pr-4">
+                                              {url ? (
+                                                <span className="block max-w-56 truncate font-mono text-xs text-ink-secondary" title={url}>
+                                                  {url}
+                                                </span>
+                                              ) : (
+                                                <span className="text-ink-faint text-xs">—</span>
+                                              )}
+                                            </td>
+                                            <td className="py-1">
+                                              <AffiliateButton
+                                                aria-label={`${link.ref_code}の配布URLをコピー`}
+                                                disabled={!url}
+                                                onClick={() => { void copyLinkUrl(link) }}
+                                              >
+                                                {copiedLinkId === link.id ? 'コピー済' : 'コピー'}
+                                              </AffiliateButton>
+                                            </td>
                                           </tr>
-                                        ))}
+                                          )
+                                        })}
                                       </tbody>
                                     </table>
                                   </div>
@@ -1009,7 +1195,7 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
                                 ) : journeyError && journeys.length === 0 ? (
                                   <div>
                                     <p className="text-sm text-danger">動線を読み込めませんでした。記録は消えていません。</p>
-                                    <AffiliateButton onClick={() => { void loadJourneys(row.id) }} className="mt-3">
+                                    <AffiliateButton onClick={() => { void loadJourneys(row.id, detailGenRef.current) }} className="mt-3">
                                       もう一度読み込む
                                     </AffiliateButton>
                                   </div>
@@ -1056,7 +1242,7 @@ export function AffiliatorsTab({ accountId }: { accountId: string | null }) {
                                     ) : null}
                                     {journeyMore && (
                                       <button
-                                        onClick={() => { void loadMoreJourneys(row.id) }}
+                                        onClick={() => { void loadMoreJourneys(row.id, detailGenRef.current) }}
                                         disabled={journeyLoadingMore}
                                         className="mt-3 px-4 py-2 text-sm text-blue-700 hover:bg-blue-100 disabled:opacity-50 rounded-md border border-blue-200"
                                       >
@@ -1116,6 +1302,10 @@ export function CreateAffiliateModal({
   const [options, setOptions] = useState<FriendOption[]>([])
   const [searching, setSearching] = useState(false)
   const [suggestDismissed, setSuggestDismissed] = useState(false)
+  // R294: 0件と失敗を候補枠の中で言い分けるための状態。
+  const [searchError, setSearchError] = useState<string | null>(null)
+  const [searchedTerm, setSearchedTerm] = useState<string | null>(null)
+  const [retryNonce, setRetryNonce] = useState(0)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const [selected, setSelected] = useState<FriendOption | null>(null)
   const [commissionRate, setCommissionRate] = useState('')
@@ -1128,9 +1318,10 @@ export function CreateAffiliateModal({
   useEffect(() => {
     if (selected) return
     const term = search.trim()
-    if (!term) { setOptions([]); return }
+    if (!term) { setOptions([]); setSearchError(null); setSearchedTerm(null); return }
     let cancelled = false
     setSearching(true)
+    setSearchError(null)
     const t = setTimeout(async () => {
       try {
         const res = await api.friends.list({ search: term, limit: 20, includeTags: false })
@@ -1139,12 +1330,36 @@ export function CreateAffiliateModal({
           setOptions(
             res.data.items.map((f) => ({ id: f.id, displayName: f.displayName })),
           )
+          setSearchError(null)
+        } else {
+          // R294: 失敗を黙らせない。候補枠の中で再試行を出す。
+          setOptions([])
+          setSearchError('候補を読み込めませんでした')
         }
-      } catch { /* silent */ }
-      finally { if (!cancelled) setSearching(false) }
+      } catch {
+        if (cancelled) return
+        setOptions([])
+        setSearchError('候補を読み込めませんでした')
+      }
+      finally {
+        if (cancelled) return
+        setSearchedTerm(term)
+        setSearching(false)
+      }
     }, 250)
     return () => { cancelled = true; clearTimeout(t) }
-  }, [search, selected])
+  }, [search, selected, retryNonce])
+
+  // R294: 検索語・状態がそろったら候補枠を開いたままにする。0件でも
+  // 「該当なし」を出すため、候補があるときだけ開く作りはやめる。
+  const searchTerm = search.trim()
+  const suggestOpen = !suggestDismissed
+    && Boolean(searchTerm)
+    && (searching || searchError !== null || searchedTerm === searchTerm || options.length > 0)
+  const retrySearch = useCallback(() => {
+    setSuggestDismissed(false)
+    setRetryNonce((n) => n + 1)
+  }, [])
 
   const handleSubmit = useCallback(async () => {
     if (submitting) return
@@ -1193,53 +1408,54 @@ export function CreateAffiliateModal({
     } catch { /* clipboard unavailable — user can select manually */ }
   }, [issuedUrl])
 
+  /*
+    R295: 手作りの窓をやめ、共通の窓（Dialog）を使う。初期フォーカス・
+    Tab の循環・Escape・起動元への復帰は共通部品が持つ。
+    成功画面のフッターに「閉じる」は置かない（右上の×だけ。監査7 #809）。
+  */
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="アフィリエイター新規作成"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/35 p-4"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-md rounded-card border border-hairline bg-canvas p-5 shadow-lg"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-start justify-between gap-3">
-          <h2 className="font-bold text-ink">
-            アフィリエイター新規作成
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="閉じる"
-            className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken"
-          >
-            <X aria-hidden="true" className="h-5 w-5" />
-          </button>
+    <Dialog
+      open
+      title="アフィリエイター新規作成"
+      busy={submitting}
+      onCancel={onClose}
+      footer={issuedUrl ? (
+        <div className="border-hairline flex flex-wrap items-center justify-end gap-2 border-t pt-4">
+          <Button variant="primary" onClick={() => { void handleCopy() }}>
+            {copied ? 'コピー済' : 'コピー'}
+          </Button>
         </div>
-
+      ) : (
+        <div className="border-hairline flex flex-wrap items-center justify-end gap-2 border-t pt-4">
+          <Button onClick={onClose} disabled={submitting}>
+            キャンセル
+          </Button>
+          <Button
+            variant="primary"
+            onClick={() => { void handleSubmit() }}
+            disabled={submitting || !selected}
+          >
+            {submitting ? '作成中...' : '作成'}
+          </Button>
+        </div>
+      )}
+    >
         {issuedUrl ? (
           // ── Success state: show issued link with a copy button ────────────
-          <div className="mt-4 space-y-4">
+          <div className="space-y-4">
             <p className="text-sm text-ink-secondary">
               アフィリエイターを作成し、初期リンクを発行しました。
             </p>
-            <div className="flex items-stretch gap-2">
-              <input
-                readOnly
-                value={issuedUrl}
-                aria-label="発行した初期リンク"
-                className="min-w-0 flex-1 rounded-control border border-hairline bg-canvas-sunken px-3 py-2 font-mono text-sm text-ink"
-              />
-              <Button variant="primary" onClick={() => { void handleCopy() }}>
-                {copied ? 'コピー済' : 'コピー'}
-              </Button>
-            </div>
+            <input
+              readOnly
+              value={issuedUrl}
+              aria-label="発行した初期リンク"
+              className="border-hairline rounded-control bg-canvas-sunken text-ink w-full px-3 py-2 font-mono text-sm"
+            />
           </div>
         ) : (
           // ── Form state ────────────────────────────────────────────────────
-          <div className="mt-4 space-y-4">
+          <div className="space-y-4">
             {/* Friend selector */}
             <div>
               <label htmlFor="aff-friend-search" className="mb-1 block text-sm font-medium text-ink-secondary">
@@ -1269,7 +1485,7 @@ export function CreateAffiliateModal({
                     className="w-full rounded-control border border-hairline px-3 py-2 text-sm"
                   />
                   <MenuPortal
-                    open={!suggestDismissed && (searching || options.length > 0) && Boolean(search.trim())}
+                    open={suggestOpen}
                     align="start"
                     matchWidth
                     getAnchor={() => searchInputRef.current}
@@ -1282,8 +1498,19 @@ export function CreateAffiliateModal({
                     >
                       {searching ? (
                         <div className="px-3 py-2 text-sm text-ink-faint">検索中...</div>
+                      ) : searchError !== null ? (
+                        <div className="px-3 py-2 text-sm">
+                          <p className="text-danger">{searchError}</p>
+                          <button
+                            type="button"
+                            onClick={retrySearch}
+                            className="text-action mt-1 text-xs hover:underline"
+                          >
+                            もう一度試す
+                          </button>
+                        </div>
                       ) : options.length === 0 ? (
-                        <div className="px-3 py-2 text-sm text-ink-faint">該当なし</div>
+                        <div className="px-3 py-2 text-sm text-ink-faint">該当なし。検索語を変えてお試しください。</div>
                       ) : (
                         options.map((f) => (
                           <button
@@ -1330,23 +1557,9 @@ export function CreateAffiliateModal({
             {formError && (
               <Notice tone="danger" message={formError} />
             )}
-
-            <div className="flex justify-end gap-2 pt-2">
-              <Button onClick={onClose}>
-                キャンセル
-              </Button>
-              <Button
-                variant="primary"
-                onClick={() => { void handleSubmit() }}
-                disabled={submitting || !selected}
-              >
-                {submitting ? '作成中...' : '作成'}
-              </Button>
-            </div>
           </div>
         )}
-      </div>
-    </div>
+    </Dialog>
   )
 }
 
@@ -1682,8 +1895,15 @@ type ApprovalStatus = 'pending' | 'approved' | 'rejected'
 const APPROVAL_FILTER_ALL = 'all'
 const APPROVAL_FILTER_UNASSIGNED = '__unassigned__'
 
-export function ApprovalQueue() {
+export function ApprovalQueue({
+  focusAffiliateId,
+}: {
+  /** R291: 停止前の確認から来たとき、最初から絞る紹介者。 */
+  focusAffiliateId?: string | null
+} = {}) {
   const [status, setStatus] = useState<ApprovalStatus>('pending')
+  // R291: 紹介者の停止前に「認めるのを待っている成果」の明細を見るための絞り。
+  const [affiliateFilter, setAffiliateFilter] = useState<string | null>(focusAffiliateId ?? null)
   const [items, setItems] = useState<ConversionApprovalItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -1860,13 +2080,26 @@ export function ApprovalQueue() {
     }
   }, [loadItems])
 
+  /*
+    R291: 紹介者絞りはアカウント絞りの前段。ここを通った行だけが数えられ・
+    選ばれ・まとめて処理される（確認窓の対象紹介者・件数と一致する明細）。
+  */
+  const scopedItems = useMemo(() => (
+    affiliateFilter ? items.filter((item) => item.affiliateId === affiliateFilter) : items
+  ), [affiliateFilter, items])
+  const affiliateFilterName = affiliateFilter
+    ? (scopedItems[0]?.affiliateName
+      ?? items.find((item) => item.affiliateId === affiliateFilter)?.affiliateName
+      ?? null)
+    : null
+
   // N-218: アカウント絞りは一覧・件数・一括操作すべての元にする。
   // ここを通った行だけが数えられ・選ばれ・まとめて処理される。
   const accountItems = useMemo(() => {
-    if (accountFilter === APPROVAL_FILTER_ALL) return items
-    if (accountFilter === APPROVAL_FILTER_UNASSIGNED) return items.filter((item) => !item.lineAccountId)
-    return items.filter((item) => item.lineAccountId === accountFilter)
-  }, [accountFilter, items])
+    if (accountFilter === APPROVAL_FILTER_ALL) return scopedItems
+    if (accountFilter === APPROVAL_FILTER_UNASSIGNED) return scopedItems.filter((item) => !item.lineAccountId)
+    return scopedItems.filter((item) => item.lineAccountId === accountFilter)
+  }, [accountFilter, scopedItems])
 
   // 絞りの選択肢。権限内アカウント(lineAccounts.list は scope 済み)へ、
   // 読み込んだ行にだけあるIDと未割当を足す。行が無いアカウントは
@@ -2096,6 +2329,20 @@ export function ApprovalQueue() {
       </div>
 
       <div className="flex flex-wrap gap-2">
+        {/*
+          R291: 停止前の確認から来た紹介者絞り。押すと外れて一覧へ戻れる。
+          件数はこの紹介者の承認待ち（確認窓の数と一致）。
+        */}
+        {affiliateFilter ? (
+          <FilterChip
+            selected
+            onChange={() => { setAffiliateFilter(null); setPage(1); setSelected(new Set()) }}
+            count={counts.pending}
+            title="紹介者の絞りを外して、すべての成果に戻ります"
+          >
+            紹介者：{affiliateFilterName ?? '名前を確認できません'}
+          </FilterChip>
+        ) : null}
         {(['pending', 'approved', 'rejected'] as const).map((s) => (
           <FilterChip
             key={s}

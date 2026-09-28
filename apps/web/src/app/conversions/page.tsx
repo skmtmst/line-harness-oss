@@ -1942,6 +1942,11 @@ function ReportTab({ accountId }: { accountId: string | null }) {
 function ConversionsPageHost() {
   const tab = useMergedTab(MERGED_TABS, 'tab', DEFAULT_TAB)
   const { selectedAccountId } = useAccount()
+  /*
+    R291: 紹介者の停止前確認からの `?affiliate=`。承認待ちは成果承認タブで
+    この紹介者に絞り、リンクは紹介者タブでこの紹介者の内訳を開く。
+  */
+  const affiliateFocus = useSearchParams().get('affiliate')
   // タブごとの画面名をトップバーの h1 へ出す（Issue #637）。
   usePageTitle(conversionsTabTitle(tab))
   /**
@@ -1973,9 +1978,9 @@ function ConversionsPageHost() {
         label="成果とアフィリエイト・コンバージョンの画面"
       />
       {tab === 'points' && <ConversionsPageInner accountId={selectedAccountId} />}
-      {tab === 'affiliates' && <AffiliatorsTab accountId={selectedAccountId} />}
+      {tab === 'affiliates' && <AffiliatorsTab accountId={selectedAccountId} focusAffiliateId={affiliateFocus} />}
       {tab === 'offers' && <OffersTab />}
-      {tab === 'approvals' && <ApprovalQueue />}
+      {tab === 'approvals' && <ApprovalQueue focusAffiliateId={affiliateFocus} />}
       {tab === 'report' && <ReportTab accountId={selectedAccountId} />}
       {tab === 'payment' && (selectedAccountId
         ? <AffiliatePaymentTab accountId={selectedAccountId} />

@@ -131,10 +131,15 @@ export function AffiliateArchiveDialog({
         <div className="space-y-4">
           <section className="rounded-control border border-danger bg-danger-bg p-4">
             <h3 className="text-danger text-sm font-bold">アーカイブすると、次の3つが変わります</h3>
+            {/*
+              R291: 「ここを開く」は確認中の紹介者の明細へ飛ぶ。案件一覧や
+              成果地点の設定へ迷い込ませない。承認待ちは成果承認タブをこの
+              紹介者で絞ったもの、リンクはこの紹介者の内訳（リンク一覧）を開く。
+            */}
             <dl className="mt-2 divide-y divide-danger/20 text-sm">
-              <div className="flex items-center gap-3 py-2"><div className="min-w-0 flex-1"><dt className="text-danger text-xs font-semibold">発行ずみの紹介リンク</dt><dd className="text-ink mt-0.5 font-bold">{impact.activeLinks.toLocaleString('ja-JP')}本</dd></div><a className="rounded-control border border-danger bg-canvas px-3 py-1.5 text-xs font-semibold text-danger" href="/conversions?tab=offers">ここを開く</a></div>
+              <div className="flex items-center gap-3 py-2"><div className="min-w-0 flex-1"><dt className="text-danger text-xs font-semibold">発行ずみの紹介リンク</dt><dd className="text-ink mt-0.5 font-bold">{impact.activeLinks.toLocaleString('ja-JP')}本</dd></div><a className="rounded-control border border-danger bg-canvas px-3 py-1.5 text-xs font-semibold text-danger" href={`/conversions?tab=affiliates&affiliate=${encodeURIComponent(target?.id ?? '')}`}>ここを開く</a></div>
               <div className="flex items-center gap-3 py-2"><div className="min-w-0 flex-1"><dt className="text-danger text-xs font-semibold">支払いを確定していない報酬</dt><dd className="text-ink mt-0.5 font-bold">{yen(impact.unsettledReward)}</dd></div><a className="rounded-control border border-danger bg-canvas px-3 py-1.5 text-xs font-semibold text-danger" href="/conversions?tab=payment">ここを開く</a></div>
-              <div className="flex items-center gap-3 py-2"><div className="min-w-0 flex-1"><dt className="text-danger text-xs font-semibold">認めるのを待っている成果</dt><dd className="text-ink mt-0.5 font-bold">{impact.pendingConversions.toLocaleString('ja-JP')}件</dd></div><a className="rounded-control border border-danger bg-canvas px-3 py-1.5 text-xs font-semibold text-danger" href="/conversions">ここを開く</a></div>
+              <div className="flex items-center gap-3 py-2"><div className="min-w-0 flex-1"><dt className="text-danger text-xs font-semibold">認めるのを待っている成果</dt><dd className="text-ink mt-0.5 font-bold">{impact.pendingConversions.toLocaleString('ja-JP')}件</dd></div><a className="rounded-control border border-danger bg-canvas px-3 py-1.5 text-xs font-semibold text-danger" href={`/conversions?tab=approvals&affiliate=${encodeURIComponent(target?.id ?? '')}`}>ここを開く</a></div>
             </dl>
             <p className="text-danger mt-2 text-xs leading-5">
               紹介リンクは開けなくなります。過去の成果・報酬・支払いの記録は消えません。
