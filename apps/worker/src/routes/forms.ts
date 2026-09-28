@@ -81,6 +81,7 @@ import { resolveRequestBoundaries } from '../services/request-boundary.js';
 import { applyMileageRulesForEvent } from '@line-crm/db';
 import { createBroadcastRetryKey } from '../services/broadcast-retry-key.js';
 import { dispatchAutomationEventWithLogging } from '../services/automation-triggers.js';
+import { fireOutgoingWebhooks } from '../services/event-bus.js';
 import { applyActionScoreEvent } from '../services/action-score-events.js';
 import { dispatchOperatorEvent } from '../services/operator-notification-dispatch.js';
 import { recordConversionSourceEvent } from '@line-crm/db';
@@ -2904,6 +2905,15 @@ forms.post('/api/forms/:id/submit', async (c) => {
           friendId,
           eventData: { formId, submissionId: submission.id },
         }),
+        // R150: 送信Webhookの購読対象としても発火する。回答の中身は
+        // 個人情報を含むので送らず、識別子とフォーム名だけ渡す。
+        fireOutgoingWebhooks(c.env.DB, 'form_submitted', {
+          friendId,
+          sourceKind: 'form',
+          sourceEventId: submission.id,
+          occurredAt: submission.created_at,
+          eventData: { formId, formName: form.name, submissionId: submission.id },
+        }, identity.lineAccountId),
         // 回答が入ったことを運用者へ知らせる。他の副作用と同じ扱いで、
         // 通知が落ちても回答は成立させる。発生元に回答IDを使うので、
         // 同じキーでの再送・再開で通知が二重に作られることはない。

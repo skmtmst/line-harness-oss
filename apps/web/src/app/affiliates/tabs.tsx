@@ -46,6 +46,15 @@ import {
   personNameText,
 } from './affiliate-display'
 import { AffiliateArchiveDialog } from './action-dialogs'
+import AttributionSection from './attribution-view'
+import OfferTermsDialog, {
+  EMPTY_TERMS,
+  OfferTermsFields,
+  parseOfferTermsInput,
+  toDateInput,
+  type OfferTermsFieldValues,
+  type ParsedOfferTerms,
+} from './offer-terms'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import Toggle from '@/components/shared/toggle'
@@ -1389,6 +1398,46 @@ function OfferFormModal({ initial, accounts, tags, scenarios, onClose, onSaved }
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
+  // 決まりの欄（#823）。編集では今の版で埋める。読み込めるまでは
+  // 差分に含めない（読み込めないまま保存して上限を消さないため）。
+  const [terms, setTerms] = useState<OfferTermsFieldValues>(EMPTY_TERMS)
+  const [termsBase, setTermsBase] = useState<ParsedOfferTerms | null>(null)
+  const [termsLoaded, setTermsLoaded] = useState(!initial)
+
+  useEffect(() => {
+    if (!initial) return
+    let cancelled = false
+    void api.affiliateOffers.capStatus(initial.id)
+      .then((res) => {
+        if (cancelled || !res.success || !res.data) return
+        const version = res.data.version
+        const base: ParsedOfferTerms = {
+          windowDays: version?.windowDays ?? 30,
+          capTotal: version?.capTotal ?? null,
+          capMonthlyPerAffiliate: version?.capMonthlyPerAffiliate ?? null,
+          receptionFrom: version?.receptionFrom ?? null,
+          receptionTo: version?.receptionTo ?? null,
+        }
+        if (cancelled) return
+        setTermsBase(base)
+        setTerms({
+          windowDays: String(base.windowDays ?? 30),
+          capTotal: base.capTotal != null ? String(base.capTotal) : '',
+          capMonthly: base.capMonthlyPerAffiliate != null ? String(base.capMonthlyPerAffiliate) : '',
+          receptionFrom: toDateInput(base.receptionFrom),
+          receptionTo: toDateInput(base.receptionTo),
+        })
+        setTermsLoaded(true)
+      })
+      .catch(() => {
+        // 決まりが読めなくても、名前・報酬の編集はできる。決まりの差分は送らない。
+        if (!cancelled) setTermsLoaded(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [initial])
+
   // 選べるタグ・シナリオは「いま選んでいるLINEアカウントの有効なもの」だけに
   // 絞る（#798）。別アカウントのものを選ばせると保存時にサーバーが止める。
   // アカウント未選択のときは候補を出さない（先にアカウントを選ばせる）。
@@ -1425,6 +1474,32 @@ function OfferFormModal({ initial, accounts, tags, scenarios, onClose, onSaved }
       setFormError('付与マイルは0以上の整数で入力してください')
       return
     }
+    // 決まりの欄（#823）。壊れた値は欄の下ではなく箱の誤りで見せる。
+    const parsed = parseOfferTermsInput(terms)
+    if (parsed.error) {
+      setFormError(parsed.error)
+      return
+    }
+    // 編集では変えた決まりだけ送る。変えていない保存で版を増やさない。
+    // 読み込めなかったときは決まりを送らない（上限の消失を防ぐ）。
+    const termsDiff: ParsedOfferTerms = {}
+    if (isEdit && termsLoaded && termsBase) {
+      if (parsed.terms.windowDays !== undefined && parsed.terms.windowDays !== termsBase.windowDays) {
+        termsDiff.windowDays = parsed.terms.windowDays
+      }
+      if (parsed.terms.capTotal !== termsBase.capTotal) {
+        termsDiff.capTotal = parsed.terms.capTotal
+      }
+      if (parsed.terms.capMonthlyPerAffiliate !== termsBase.capMonthlyPerAffiliate) {
+        termsDiff.capMonthlyPerAffiliate = parsed.terms.capMonthlyPerAffiliate
+      }
+      if (parsed.terms.receptionFrom !== termsBase.receptionFrom) {
+        termsDiff.receptionFrom = parsed.terms.receptionFrom
+      }
+      if (parsed.terms.receptionTo !== termsBase.receptionTo) {
+        termsDiff.receptionTo = parsed.terms.receptionTo
+      }
+    }
 
     setSubmitting(true)
     try {
@@ -1434,6 +1509,7 @@ function OfferFormModal({ initial, accounts, tags, scenarios, onClose, onSaved }
           description: description.trim() || null,
           rewardAmount: reward,
           rewardMiles: miles,
+          ...termsDiff,
           lineAccountId: lineAccountId || null,
           tagId: tagId || null,
           scenarioId: scenarioId || null,
@@ -1452,6 +1528,11 @@ function OfferFormModal({ initial, accounts, tags, scenarios, onClose, onSaved }
           description: description.trim() || null,
           rewardAmount: reward,
           rewardMiles: miles,
+          windowDays: parsed.terms.windowDays,
+          capTotal: parsed.terms.capTotal,
+          capMonthlyPerAffiliate: parsed.terms.capMonthlyPerAffiliate,
+          receptionFrom: parsed.terms.receptionFrom,
+          receptionTo: parsed.terms.receptionTo,
           lineAccountId: lineAccountId || null,
           tagId: tagId || null,
           scenarioId: scenarioId || null,
@@ -1469,7 +1550,7 @@ function OfferFormModal({ initial, accounts, tags, scenarios, onClose, onSaved }
     } finally {
       setSubmitting(false)
     }
-  }, [submitting, name, description, rewardAmount, rewardMiles, lineAccountId, tagId, scenarioId, isActive, isEdit, initial, onSaved, onClose])
+  }, [submitting, name, description, rewardAmount, rewardMiles, terms, termsLoaded, termsBase, lineAccountId, tagId, scenarioId, isActive, isEdit, initial, onSaved, onClose])
 
   return (
     <Dialog
@@ -1533,6 +1614,8 @@ function OfferFormModal({ initial, accounts, tags, scenarios, onClose, onSaved }
           />
           <p className="text-ink-faint mt-1 text-[11px]">承認された紹介1件ごとに紹介者へ付与します</p>
         </div>
+
+        <OfferTermsFields values={terms} onChange={setTerms} />
 
         <div>
           <label className="text-ink-secondary mb-1 block text-xs font-medium">誘導 LINE アカウント</label>
@@ -2138,9 +2221,12 @@ export function ApprovalQueue() {
                   <td className="text-ink-secondary px-4 py-3 text-sm">
                     <span className="text-ink block font-medium">{item.offerName ?? '未設定'}</span>
                     <span className="text-ink-faint mt-0.5 block text-xs">{item.conversionPointName ?? '成果地点は未設定'}</span>
+                    {/* R51: 成果金額と確定報酬は別項目。ここは成果の金額。 */}
+                    <span className="text-ink-faint mt-0.5 block text-xs">成果額 {formatYenNullable(item.value)}</span>
                   </td>
                   <td className="text-ink px-4 py-3 text-right text-sm font-semibold tabular-nums">
-                    {formatYenNullable(item.value)}
+                    {/* R51: 報酬列は確定した報酬額。まだ決まっていなければ「未確定」。 */}
+                    {item.rewardAmount != null ? formatYenNullable(item.rewardAmount) : '未確定'}
                   </td>
                   <td className="px-4 py-3 text-center">
                     {needsReview ? (
@@ -2238,6 +2324,7 @@ export function ApprovalQueue() {
                   </dd>
                 </div>
               </dl>
+              <AttributionSection eventId={detailItem.eventId} />
             </div>
             <AffiliateButton onClick={() => setDetailItem(null)}>閉じる</AffiliateButton>
           </div>
@@ -2348,6 +2435,7 @@ function OffersList({
   error,
   filtered,
   onEdit,
+  onTerms,
   onRefresh,
 }: {
   offers: AffiliateOffer[]
@@ -2359,6 +2447,7 @@ function OffersList({
   /** 案件はあるが、絞り込みに合う行が無い。 */
   filtered: boolean
   onEdit: (offer: AffiliateOffer) => void
+  onTerms: (offer: AffiliateOffer) => void
   onRefresh: () => void
 }) {
   if (error) {
@@ -2447,6 +2536,12 @@ function OffersList({
                 >
                   編集
                 </button>
+                <button
+                  onClick={() => onTerms(offer)}
+                  className="text-action ml-2 text-xs font-medium hover:underline"
+                >
+                  決まり
+                </button>
                 <span className="text-ink-faint ml-2 text-xs">{offer.isActive ? '公開中' : '停止・終了'}</span>
               </td>
             </tr>
@@ -2470,6 +2565,7 @@ export function OffersTab() {
 
   const [formOpen, setFormOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<AffiliateOffer | null>(null)
+  const [termsTarget, setTermsTarget] = useState<AffiliateOffer | null>(null)
 
   // 一覧の見せ方。どれも読み込んだ行から数えられるので、画面の中で動かす。
   const [query, setQuery] = useState('')
@@ -2701,6 +2797,7 @@ export function OffersTab() {
         error={offersError}
         filtered={offers.length > 0 && shown.length === 0}
         onEdit={handleEdit}
+        onTerms={setTermsTarget}
         onRefresh={loadOffers}
       />
 
@@ -2733,6 +2830,10 @@ export function OffersTab() {
           onClose={() => setFormOpen(false)}
           onSaved={() => { void loadOffers() }}
         />
+      )}
+
+      {termsTarget && (
+        <OfferTermsDialog offer={termsTarget} onClose={() => setTermsTarget(null)} />
       )}
     </div>
   )

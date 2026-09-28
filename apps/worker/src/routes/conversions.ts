@@ -41,6 +41,7 @@ import {
   appendConversionReversal,
   getReversedEventIds,
   listConversionReversals,
+  getAttributionDecisionView,
   ConversionDefinitionError,
   CONVERSION_DEFINITION_USAGE_KINDS,
   isExclusionSavable,
@@ -1917,6 +1918,45 @@ function offerActionFailureMessage(failures: OfferActionFailure[]): string {
   );
 }
 
+// GET /api/conversions/events/:id/attribution - どの紹介に成果を付けたかの記録(#823)
+// 候補になった紹介を並べ、付けた先と付けなかった理由を1件ずつ返す。
+// 記録が無い昔の成果は 404。
+conversions.get('/api/conversions/events/:id/attribution', conversionPermission('view'), requireVisibleConversionEvent, async (c) => {
+  try {
+    const view = await getAttributionDecisionView(c.env.DB, c.req.param('id'));
+    if (!view) {
+      return c.json({ success: false, error: 'この成果の付け方の記録がありません' }, 404);
+    }
+    return c.json({
+      success: true,
+      data: {
+        conversionEventId: view.conversionEventId,
+        affiliateId: view.affiliateId,
+        refCode: view.refCode,
+        offerId: view.offerId,
+        offerVersionId: view.offerVersionId,
+        reason: view.reason,
+        windowDays: view.windowDays,
+        candidates: view.candidates.map((candidate) => ({
+          affiliateId: candidate.affiliateId,
+          affiliateName: candidate.affiliateName,
+          refCode: candidate.refCode,
+          touchedAt: candidate.touchedAt,
+          offerId: candidate.offerId,
+          offerName: candidate.offerName,
+          chosen: candidate.chosen,
+          skipReason: candidate.skipReason,
+          windowDays: candidate.windowDays,
+        })),
+        createdAt: view.createdAt,
+      },
+    });
+  } catch (err) {
+    console.error('GET /api/conversions/events/:id/attribution error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
 // PATCH /api/conversions/events/:id/approval - approve/reject an attributed CV
 conversions.patch('/api/conversions/events/:id/approval', requireApprovalPermission, requireVisibleConversionEvent, async (c) => {
   // 監査は更新の成功が確定してから残す(#513 M7)。以前は検証の前に
@@ -1978,7 +2018,8 @@ conversions.patch('/api/conversions/events/:id/approval', requireApprovalPermiss
     if (parsed.status === 'approved' && decided.outcome === 'updated') {
       try {
         const info = await getConversionApprovalNotifyInfo(c.env.DB, c.req.param('id'));
-        if (info) {
+        // R48: 紹介者が成果の通知を切っているときは送信処理に進まない。
+        if (info && info.notifyOnConversion) {
           await notifyAffiliateApproval(
             c.env.DB,
             c.env,
@@ -2099,7 +2140,8 @@ conversions.post('/api/conversions/approvals/bulk', requireApprovalPermission, a
       if (parsed.status === 'approved' && decided.outcome === 'updated') {
         try {
           const info = await getConversionApprovalNotifyInfo(c.env.DB, item.id);
-          if (info) {
+          // R48: 紹介者が成果の通知を切っているときは送信処理に進まない。
+          if (info && info.notifyOnConversion) {
             await notifyAffiliateApproval(c.env.DB, c.env, info.affiliateId, info.offerName, info.rewardAmount);
           }
         } catch (err) {

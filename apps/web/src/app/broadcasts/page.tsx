@@ -16,6 +16,7 @@ import ListState from '@/components/shared/list-state'
 import { audienceSummary, rowExcerpt } from '@/lib/broadcast-summary'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import ListToolbar from '@/components/shared/list-toolbar'
+import ListRange from '@/components/ui/list-range'
 import { RowActions } from '@/components/shared/row-actions'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Select from '@/components/shared/select'
@@ -539,9 +540,7 @@ function BroadcastList() {
               従来どおりの数え方で、見た目は変わらない。
             */}
             <FolderPanel
-              total={listTotal !== null && listTotal > broadcasts.length
-                ? `全${listTotal}件`
-                : `${broadcasts.length} 件`}
+              /* m18s: 見出しの総数は「すべて」の行と同じ数なので出さない（回答フォーム #m18k と同じ形）。絞り込み後の件数は一覧の側に出す。 */
               activeId={folderFilter}
               onSelect={setFolderFilter}
               onAddFolder={() => setFolderDialogOpen(true)}
@@ -761,6 +760,14 @@ function BroadcastList() {
         </div>
       ) : (
         <>
+        {/* m18s: タイトル・日付の絞り込み後の件数は一覧の側に出す。見出しには出さない。 */}
+        <div className="mb-2">
+          <ListRange
+            total={visibleBroadcasts.length}
+            first={visibleBroadcasts.length === 0 ? 0 : 1}
+            last={visibleBroadcasts.length}
+          />
+        </div>
         <DataTable>
             {/*
               列は設計 `q76C35`（V6 6-1 一斉配信）の6列。

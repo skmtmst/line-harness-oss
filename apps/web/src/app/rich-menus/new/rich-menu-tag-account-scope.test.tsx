@@ -106,7 +106,7 @@ describe('R23 作成画面のタグ候補は選択accountで絞る', () => {
     })
     await settle(100)
     // 1面目の動きを開き、acc-1 のタグ「会員」を選んで保存する
-    const setup = Array.from(host.querySelectorAll('button')).find((b) => b.textContent === 'アクションを設定する')
+    const setup = Array.from(host.querySelectorAll('button')).find((b) => b.textContent === '設定する')
     expect(setup).toBeTruthy()
     await act(async () => {
       fireEvent.click(setup!)

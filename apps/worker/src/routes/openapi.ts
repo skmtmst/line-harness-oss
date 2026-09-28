@@ -1138,6 +1138,34 @@ const spec = {
         responses: { '200': { description: 'Orders attributed to the ref code with status summary' }, '403': { description: 'LINEアカウントの表示権限なし' } },
       },
     },
+    // ── ダッシュボード: 今後の予定・数字の出どころ・印刷用PDF（L #824・M） ──
+    '/api/dashboard/upcoming': {
+      get: {
+        tags: ['Dashboard'], summary: '今後の予定（予約配信・リマインダー・予約の7日分、読むだけ）',
+        parameters: [
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'days', in: 'query', schema: { type: 'integer', default: 7, minimum: 1, maximum: 31 } },
+        ],
+        responses: { '200': { description: 'Upcoming items' }, '400': { description: 'LINEアカウント未指定' }, '404': { description: 'LINEアカウント範囲外' } },
+      },
+    },
+    '/api/dashboard/delivery-failure-origins': {
+      get: {
+        tags: ['Dashboard'], summary: '失敗の数を通知の送達台帳から出どころ別に数える（同じ失敗は1件・送り直し除外）',
+        parameters: [
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'since', in: 'query', schema: { type: 'string' } },
+        ],
+        responses: { '200': { description: 'Failure origins' }, '400': { description: '指定が正しくない' }, '404': { description: 'LINEアカウント範囲外' } },
+      },
+    },
+    '/api/entry-routes/{id}/qr-pdf': {
+      post: {
+        tags: ['Dashboard'], summary: '印刷用PDFをサーバーで作る（止めた経路は出さない）',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'A4 PDF' }, '404': { description: 'Not found' }, '409': { description: '経路は停止中' } },
+      },
+    },
     // ── 広告費 (#818) ────────────────────────────────────────────────────
     '/api/ad-costs': {
       get: {
@@ -4245,6 +4273,18 @@ const spec = {
         },
       },
     },
+    '/api/conversions/events/{id}/attribution': {
+      get: {
+        tags: ['Conversions'],
+        summary: '成果の付け方の記録(#823)',
+        description: '候補になった紹介を並べ、付けた先と付けなかった理由を1件ずつ返す。記録が無い昔の成果は 404。',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: {
+          '200': { description: '付け方の記録 { reason・windowDays・candidates }' },
+          '404': { description: '成果が見つからない・記録が無い' },
+        },
+      },
+    },
     '/api/measurement-sites': {
       get: {
         tags: ['Conversions'],
@@ -4382,6 +4422,45 @@ const spec = {
         security: [],
         requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { code: { type: 'string' }, url: { type: 'string' } }, required: ['code'] } } } },
         responses: { '201': { description: 'Recorded' } },
+      },
+    },
+    '/api/affiliate-offers/{id}/versions': {
+      get: {
+        tags: ['Affiliates'],
+        summary: '案件の決まりの版の履歴(#823)',
+        description: '保存のたびに足した版を新しい順に返す。前の版は変わらない。',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: {
+          '200': { description: '版の一覧 { versionNumber・rewardAmount・windowDays・caps・reception }' },
+          '404': { description: 'Not found in account scope' },
+        },
+      },
+      post: {
+        tags: ['Affiliates'],
+        summary: '案件の決まりの新しい版を保存(#823)',
+        description: 'owner/admin 専用。指定しなかった項目は今の版を引き継ぐ。同じ確認キーの再送では版を増やさない。',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { rewardAmount: { type: 'number' }, rewardMiles: { type: 'number' }, windowDays: { type: 'number' }, capTotal: { type: 'number', nullable: true }, capMonthlyPerAffiliate: { type: 'number', nullable: true }, receptionFrom: { type: 'string', nullable: true }, receptionTo: { type: 'string', nullable: true }, idempotencyKey: { type: 'string' } } } } } },
+        responses: {
+          '201': { description: '新しい版' },
+          '400': { description: '期間・上限の値が不正' },
+          '404': { description: '案件が見つからない' },
+        },
+      },
+    },
+    '/api/affiliate-offers/{id}/cap-status': {
+      get: {
+        tags: ['Affiliates'],
+        summary: '案件の今の決まりと上限の残り(#823)',
+        description: '上限に達したら受付は自動で止まる。affiliateId を渡すと1人あたり月の残りも返す。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'affiliateId', in: 'query', schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '今の版と残り { version・capped・totalRemaining・monthlyRemaining }' },
+          '404': { description: 'Not found in account scope' },
+        },
       },
     },
     // ── Templates (#645 公開版固定) ─────────────────────────────────────────
@@ -5391,6 +5470,60 @@ const spec = {
         },
       },
     },
+    // ── Booking menu versions / snapshots (T: 予約の設定の版と予約の写し) ──
+    '/api/booking/admin/menus/{id}/versions': {
+      get: {
+        tags: ['Booking'], summary: '予約メニューの版の履歴',
+        description: '保存するたびに増える版を新しい順に返す。いちばん新しい版だけ status が in_use。過去の版は変えない。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '版の一覧（版番号・見出し・札・ひとこと・中身の行）' },
+          '400': { description: 'account_id 未指定' },
+          '404': { description: '対象アカウントにメニューが存在しない' },
+        },
+      },
+    },
+    '/api/booking/admin/menus/{id}/versions/{version}': {
+      get: {
+        tags: ['Booking'], summary: '予約メニューの指定版の中身',
+        description: '比べる画面に行の一覧で返す。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'version', in: 'path', required: true, schema: { type: 'integer', minimum: 1 } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '指定版の中身（版番号・見出し・札・ひとこと・中身の行）' },
+          '400': { description: 'account_id 未指定' },
+          '404': { description: '対象アカウントにメニューまたは版が存在しない' },
+        },
+      },
+    },
+    '/api/booking/admin/menus/{id}/versions/{version}/revert': {
+      post: {
+        tags: ['Booking'], summary: '予約メニューを指定版に戻す',
+        description: '昔の版は変えず、その中身で新しい版を作る。読み直さずに送った古い版は 409 で止める。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'version', in: 'path', required: true, schema: { type: 'integer', minimum: 1 } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object', additionalProperties: false, required: ['expectedVersion'],
+          properties: { expectedVersion: { type: 'integer', minimum: 1 } },
+        } } } },
+        responses: {
+          '200': { description: '新しい版の番号' },
+          '400': { description: 'expectedVersion の不足または形式不正' },
+          '403': { description: 'メニューを保存する権限がない' },
+          '404': { description: '対象アカウントにメニューまたは版が存在しない' },
+          '409': { description: 'メニュー版が更新済み' },
+        },
+      },
+    },
     '/api/booking/admin/availability-check': {
       get: {
         tags: ['Booking'],
@@ -5662,6 +5795,23 @@ const spec = {
           '400': { description: '確認した編集版が不正' },
           '404': { description: 'フォームが無い、または権限範囲外' },
           '409': { description: '保存後に編集内容が変わった' },
+        },
+      },
+    },
+    '/api/forms/{id}/test-token': {
+      post: {
+        tags: ['Forms'],
+        summary: '公開前の試し開き・試し回答に使う合言葉を発行する',
+        description: '生の合言葉はこの応答でしか返さない。台帳にはSHA-256の16進だけを残し、有効期限は24時間。試し回答は集計に入れず、回答後アクションも動かさない。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '合言葉と有効期限（token, expiresAt）' },
+          '403': { description: 'フォームの編集権限が無い' },
+          '404': { description: 'フォームが無い、または権限範囲外' },
+          '429': { description: '試し合言葉が上限（5件）に達している' },
         },
       },
     },
@@ -5966,6 +6116,7 @@ const spec = {
     },
   },
   tags: [
+    { name: 'Dashboard', description: 'ダッシュボードの予定・数字の出どころ・印刷' },
     { name: 'Friends', description: '友だち管理' },
     { name: 'HQ Templates', description: '統括ひな形の作成・事前検査・店舗配布' },
     { name: 'Tags', description: 'タグ管理' },

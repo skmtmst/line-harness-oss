@@ -279,6 +279,38 @@ CREATE TABLE affiliate_adjustments (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE affiliate_attribution_decisions (
+  id TEXT PRIMARY KEY,
+  conversion_event_id TEXT NOT NULL UNIQUE REFERENCES conversion_events(id) ON DELETE CASCADE,
+  friend_id TEXT NOT NULL,
+  conversion_point_id TEXT NOT NULL,
+  -- 付けた先。付けなかったときは空。
+  affiliate_id TEXT REFERENCES affiliates(id),
+  ref_code TEXT,
+  offer_id TEXT REFERENCES affiliate_offers(id),
+  -- 判断に使った案件の版。版を変えてもこの記録は変わらない。
+  offer_version_id TEXT REFERENCES affiliate_offer_versions(id),
+  -- 判断の理由。画面には人の言葉で出す。
+  reason TEXT NOT NULL CHECK (reason IN (
+    'matched_last_touch',
+    'no_touch',
+    'out_of_window',
+    'self_referral',
+    'inactive_link',
+    'inactive_affiliate',
+    'other_account',
+    'reception_closed',
+    'capped_total',
+    'capped_monthly'
+  )),
+  -- 判断に使った数える期間(日)。案件の版があればその値、なければ全体の既定。
+  window_days INTEGER NOT NULL CHECK (window_days BETWEEN 1 AND 365),
+  -- 候補になった紹介の写し(JSON)。紹介者名・案件名・開いた時刻・結果を
+  -- 判断の時点で残す。後から名前が変わっても、この記録は書き換えない。
+  candidates_json TEXT NOT NULL DEFAULT '[]',
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE affiliate_bank_profiles (
   affiliate_id TEXT PRIMARY KEY REFERENCES affiliates(id),
   organization_id TEXT NOT NULL REFERENCES tenants(id),
@@ -319,6 +351,30 @@ CREATE TABLE affiliate_links (
   created_at      TEXT NOT NULL,
   click_count     INTEGER NOT NULL DEFAULT 0
 , operation_id TEXT);
+
+CREATE TABLE affiliate_offer_versions (
+  id TEXT PRIMARY KEY,
+  offer_id TEXT NOT NULL REFERENCES affiliate_offers(id),
+  version_number INTEGER NOT NULL,
+  -- 1件あたりの報酬。固定額(円)とマイル。
+  reward_amount INTEGER NOT NULL DEFAULT 0 CHECK (reward_amount >= 0),
+  reward_miles INTEGER NOT NULL DEFAULT 0 CHECK (reward_miles >= 0),
+  -- リンクを開いてから数える期間(日)。既定 30。
+  window_days INTEGER NOT NULL DEFAULT 30 CHECK (window_days BETWEEN 1 AND 365),
+  -- 上限。空は「上限なし」。上限に達したら受付を自動で止める。
+  cap_total INTEGER CHECK (cap_total IS NULL OR cap_total > 0),
+  cap_monthly_per_affiliate INTEGER CHECK (cap_monthly_per_affiliate IS NULL OR cap_monthly_per_affiliate > 0),
+  -- 受付の期間。空の端は「区切りなし」。期間外の紹介には成果を付けない。
+  reception_from TEXT,
+  reception_to TEXT,
+  -- 使い始めの日時。空は「公開と同時」。未来の日時は「予約」の札で見せる。
+  effective_from TEXT,
+  created_by_staff_id TEXT,
+  -- 同じ確認キーの再送では版を増やさないための鍵。
+  idempotency_key TEXT UNIQUE,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (offer_id, version_number)
+);
 
 CREATE TABLE affiliate_offers (
   id              TEXT PRIMARY KEY,
@@ -1416,7 +1472,7 @@ CREATE TABLE "bookings" (
   cancelled_at                 TEXT,
   completed_at                 TEXT,
   created_at                   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
-  updated_at                   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at                   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), menu_version_number INTEGER CHECK (menu_version_number IS NULL OR menu_version_number > 0), menu_snapshot_json TEXT CHECK (menu_snapshot_json IS NULL OR json_valid(menu_snapshot_json)),
   FOREIGN KEY (line_account_id) REFERENCES line_accounts(id),
   FOREIGN KEY (friend_id) REFERENCES friends(id),
   FOREIGN KEY (staff_id) REFERENCES staff(id),
@@ -2152,7 +2208,24 @@ CREATE TABLE entry_routes (
   is_active   INTEGER NOT NULL DEFAULT 1,
   created_at  TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
-, pool_id TEXT REFERENCES traffic_pools (id) ON DELETE SET NULL, intro_template_id TEXT REFERENCES message_templates (id) ON DELETE SET NULL, run_account_friend_add_scenarios INTEGER NOT NULL DEFAULT 1, genre TEXT, tenant_id TEXT REFERENCES tenants(id), line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE);
+, pool_id TEXT REFERENCES traffic_pools (id) ON DELETE SET NULL, intro_template_id TEXT REFERENCES message_templates (id) ON DELETE SET NULL, run_account_friend_add_scenarios INTEGER NOT NULL DEFAULT 1, genre TEXT, tenant_id TEXT REFERENCES tenants(id), line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE, stopped_at TEXT, stopped_reason TEXT);
+
+CREATE TABLE error_messages (
+  -- エラーコード。code が無い現行 route は error 文字列そのものを鍵にする（§9-1）。
+  code               TEXT PRIMARY KEY,
+  -- 運用者向け文面。{incidentId} {n} {max} などの差し込みは画面側で埋める。
+  message            TEXT NOT NULL,
+  -- 次の行動の種類。押せるものだけを出す。
+  next_action_kind   TEXT NOT NULL DEFAULT 'none'
+                       CHECK (next_action_kind IN ('navigate', 'retry', 'contact_admin', 'none')),
+  -- navigate の行き先（管理画面のパス）。navigate 以外は NULL。
+  next_action_target TEXT,
+  -- 出典（route または service）。追加するときは必ず埋める（§9-2）。
+  source             TEXT NOT NULL,
+  version            INTEGER NOT NULL DEFAULT 1,
+  created_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
 
 CREATE TABLE event_booking_idempotency_keys (
   key              TEXT PRIMARY KEY,
@@ -3726,6 +3799,30 @@ CREATE TABLE meet_consultations (
   updated_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
+CREATE TABLE menu_versions (
+  id TEXT PRIMARY KEY,
+  menu_id TEXT NOT NULL
+    REFERENCES menus(id) ON DELETE CASCADE,
+  version_number INTEGER NOT NULL CHECK (version_number > 0),
+  name TEXT NOT NULL,
+  category_label TEXT,
+  description TEXT,
+  duration_minutes INTEGER NOT NULL,
+  buffer_after_minutes INTEGER NOT NULL DEFAULT 0,
+  base_price INTEGER NOT NULL,
+  price_mode TEXT NOT NULL DEFAULT 'fixed'
+    CHECK (price_mode IN ('fixed', 'free', 'inquiry')),
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  is_active INTEGER NOT NULL DEFAULT 1,
+  -- 受付条件の上書き（booking_window_days / cutoff_hours_before /
+  -- cancel_deadline_hours_before / intake_question / concurrent_capacity）。
+  -- 空は「店舗の決まりを使う」。
+  rules_json TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(rules_json)),
+  created_by_staff_id TEXT,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  UNIQUE (menu_id, version_number)
+);
+
 CREATE TABLE menus (
   id                    TEXT PRIMARY KEY,
   line_account_id       TEXT NOT NULL,
@@ -3771,6 +3868,42 @@ CREATE TABLE messages_log (
   line_event_at    TEXT,
   created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , origin_kind TEXT, origin_id TEXT, scenario_version_step_id TEXT, line_message_id TEXT, line_message_account_key TEXT, unsent_at TEXT, quote_token TEXT, quoted_message_id TEXT);
+
+CREATE TABLE mileage_adjustment_approval_events (
+  id              TEXT PRIMARY KEY,
+  request_id      TEXT NOT NULL REFERENCES mileage_adjustment_approval_requests (id) ON DELETE CASCADE,
+  actor_staff_id  TEXT NOT NULL,
+  action          TEXT NOT NULL CHECK (action IN ('requested', 'approved', 'rejected', 'cancelled')),
+  reason          TEXT,
+  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
+CREATE TABLE mileage_adjustment_approval_requests (
+  id                     TEXT PRIMARY KEY,
+  line_account_id        TEXT NOT NULL,
+  program_id             TEXT NOT NULL DEFAULT 'default',
+  friend_id              TEXT NOT NULL,
+  direction              TEXT NOT NULL CHECK (direction IN ('increase', 'decrease')),
+  amount                 INTEGER NOT NULL CHECK (amount > 0),
+  reason_category        TEXT NOT NULL,
+  reason                 TEXT NOT NULL,
+  source_reference_id    TEXT,
+  expires_at             TEXT,
+  notify_friend          INTEGER NOT NULL DEFAULT 0,
+  idempotency_key        TEXT NOT NULL,
+  status                 TEXT NOT NULL DEFAULT 'pending'
+                           CHECK (status IN ('pending', 'approved', 'rejected', 'cancelled')),
+  requested_by_staff_id  TEXT NOT NULL,
+  requested_by_staff_name TEXT NOT NULL,
+  decided_by_staff_id    TEXT,
+  decided_by_staff_name  TEXT,
+  decided_at             TEXT,
+  decision_reason        TEXT,
+  ledger_entry_id        TEXT,
+  created_at             TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at             TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  UNIQUE (line_account_id, idempotency_key)
+);
 
 CREATE TABLE mileage_adjustment_notifications (
   id                TEXT PRIMARY KEY,
@@ -4266,7 +4399,7 @@ CREATE TABLE nen_pet_profiles (
   birthday TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
-, breed TEXT, weight_kg REAL, concerns TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(concerns)), recommended_daily_grams INTEGER, recommended_daily_min_grams INTEGER, recommended_daily_max_grams INTEGER, venison_daily_grams INTEGER, food_cycle_days INTEGER, image_r2_key TEXT, image_url TEXT, neutered INTEGER CHECK (neutered IN (0, 1)), activity_level TEXT NOT NULL DEFAULT 'normal' CHECK (activity_level IN ('low', 'normal', 'high')), daily_kcal INTEGER, feeding_product_id TEXT);
+, breed TEXT, weight_kg REAL, concerns TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(concerns)), recommended_daily_grams INTEGER, recommended_daily_min_grams INTEGER, recommended_daily_max_grams INTEGER, venison_daily_grams INTEGER, food_cycle_days INTEGER, image_r2_key TEXT, image_url TEXT, neutered INTEGER CHECK (neutered IN (0, 1)), activity_level TEXT NOT NULL DEFAULT 'normal' CHECK (activity_level IN ('low', 'normal', 'high')), daily_kcal INTEGER, feeding_product_id TEXT, weight_updated_at TEXT);
 
 CREATE TABLE nen_photo_assessment_runs (
   id TEXT PRIMARY KEY,
@@ -4557,7 +4690,7 @@ CREATE TABLE notification_deliveries (
   execution_mode          TEXT NOT NULL DEFAULT 'automatic'
                           CHECK (execution_mode IN ('automatic', 'retry', 'resend', 'test')),
   version                 INTEGER NOT NULL DEFAULT 1 CHECK (version > 0),
-  updated_at              TEXT NOT NULL,
+  updated_at              TEXT NOT NULL, source TEXT,
   UNIQUE (line_account_id, idempotency_key)
 );
 
@@ -4661,12 +4794,13 @@ CREATE TABLE operation_alert_notification_outbox (
   UNIQUE (event_id, staff_id, channel)
 );
 
-CREATE TABLE operation_alerts (
+CREATE TABLE "operation_alerts" (
   id                   TEXT PRIMARY KEY,
   line_account_id      TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
   check_key            TEXT NOT NULL CHECK (check_key IN (
     'line_connection', 'message_quota', 'external_integrations',
-    'webhook', 'dispatch_jobs', 'friend_change'
+    'webhook', 'dispatch_jobs', 'friend_change',
+    'monitoring_heartbeat', 'infra_canary', 'credential_expiry'
   )),
   status               TEXT NOT NULL CHECK (status IN ('open', 'acknowledged', 'resolved')),
   severity             TEXT NOT NULL CHECK (severity IN ('unknown', 'warning', 'danger')),
@@ -4743,12 +4877,13 @@ CREATE TABLE operation_dispatcher_heartbeats (
   updated_at       TEXT NOT NULL
 );
 
-CREATE TABLE operation_health_results (
+CREATE TABLE "operation_health_results" (
   id             TEXT PRIMARY KEY,
   run_id         TEXT NOT NULL REFERENCES operation_health_runs(id) ON DELETE CASCADE,
   check_key      TEXT NOT NULL CHECK (check_key IN (
     'line_connection', 'message_quota', 'external_integrations',
-    'webhook', 'dispatch_jobs', 'friend_change'
+    'webhook', 'dispatch_jobs', 'friend_change',
+    'monitoring_heartbeat', 'infra_canary', 'credential_expiry'
   )),
   status         TEXT NOT NULL CHECK (status IN ('normal', 'warning', 'danger', 'unknown')),
   summary        TEXT NOT NULL,
@@ -4796,6 +4931,13 @@ CREATE TABLE operation_incidents (
 , stopped_definitions_json TEXT
   CHECK (stopped_definitions_json IS NULL OR json_valid(stopped_definitions_json)), restore_report_json TEXT
   CHECK (restore_report_json IS NULL OR json_valid(restore_report_json)));
+
+CREATE TABLE operation_infra_probes (
+  id         TEXT PRIMARY KEY,
+  kind       TEXT NOT NULL CHECK (kind IN ('d1')),
+  payload    TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
 
 CREATE TABLE operation_notification_outbox (
   id              TEXT PRIMARY KEY,
@@ -5135,7 +5277,7 @@ CREATE TABLE recipes (
   display_order  INTEGER NOT NULL DEFAULT 0,
   created_at     TEXT NOT NULL,
   updated_at     TEXT NOT NULL
-);
+, line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL, created_by_staff_id TEXT);
 
 CREATE TABLE ref_tracking (
   id              TEXT PRIMARY KEY,
@@ -6153,7 +6295,7 @@ CREATE TABLE staff_members (
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , line_user_id TEXT, totp_secret_enc TEXT, totp_pending_secret_enc TEXT, totp_enabled_at TEXT, totp_last_used_step INTEGER, assigned_line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL, can_access_descendant_accounts INTEGER NOT NULL DEFAULT 0, tenant_id TEXT REFERENCES tenants(id), account_scope TEXT NOT NULL DEFAULT 'all'
-  CHECK (account_scope IN ('all', 'accounts')), policy_version INTEGER NOT NULL DEFAULT 1, password_hash TEXT, password_updated_at TEXT, role_bundle TEXT, view_permission_keys TEXT, email_mask TEXT, notice_friend_id TEXT, notice_linked_at TEXT, email_change_new TEXT, email_change_token_hash TEXT, email_change_expires_at TEXT);
+  CHECK (account_scope IN ('all', 'accounts')), policy_version INTEGER NOT NULL DEFAULT 1, password_hash TEXT, password_updated_at TEXT, role_bundle TEXT, view_permission_keys TEXT, email_mask TEXT, notice_friend_id TEXT, notice_linked_at TEXT, email_change_new TEXT, email_change_token_hash TEXT, email_change_expires_at TEXT, getting_started_dismissed_at TEXT);
 
 CREATE TABLE staff_menus (
   staff_id                  TEXT NOT NULL,
@@ -6897,6 +7039,12 @@ CREATE INDEX idx_admin_two_factor_challenges_expires
 CREATE INDEX idx_admin_two_factor_challenges_staff
   ON admin_two_factor_challenges(staff_id);
 
+CREATE INDEX idx_affiliate_attribution_decisions_friend
+  ON affiliate_attribution_decisions (friend_id, created_at DESC);
+
+CREATE INDEX idx_affiliate_attribution_decisions_offer
+  ON affiliate_attribution_decisions (offer_id, created_at DESC);
+
 CREATE INDEX idx_affiliate_bank_profiles_scope
   ON affiliate_bank_profiles(organization_id, line_account_id, affiliate_id);
 
@@ -6909,6 +7057,9 @@ CREATE INDEX idx_affiliate_links_offer ON affiliate_links (offer_id);
 CREATE UNIQUE INDEX idx_affiliate_links_operation_id
   ON affiliate_links(affiliate_id, operation_id)
   WHERE operation_id IS NOT NULL;
+
+CREATE INDEX idx_affiliate_offer_versions_offer
+  ON affiliate_offer_versions (offer_id, version_number DESC);
 
 CREATE UNIQUE INDEX idx_affiliate_offers_operation_id
   ON affiliate_offers(line_account_id, operation_id)
@@ -7176,6 +7327,9 @@ CREATE INDEX idx_booking_resource_consumptions_resource
 CREATE INDEX idx_booking_resources_account_active
   ON booking_resources(line_account_id, is_active, id);
 
+CREATE INDEX idx_bookings_menu_version
+  ON bookings (menu_id, menu_version_number);
+
 CREATE INDEX idx_bookings_v298_account_status_starts
   ON bookings(line_account_id, status, starts_at);
 
@@ -7390,6 +7544,9 @@ CREATE INDEX idx_engagement_events_source
 
 CREATE INDEX idx_entry_route_genres_created
   ON entry_route_genres (created_at ASC);
+
+CREATE INDEX idx_entry_routes_account_active
+  ON entry_routes(line_account_id, is_active);
 
 CREATE INDEX idx_entry_routes_genre
   ON entry_routes (genre, created_at DESC);
@@ -7852,6 +8009,9 @@ CREATE INDEX idx_meet_consultations_friend ON meet_consultations (friend_id);
 
 CREATE INDEX idx_meet_consultations_start ON meet_consultations (status, starts_at);
 
+CREATE INDEX idx_menu_versions_menu
+  ON menu_versions (menu_id, version_number DESC);
+
 CREATE INDEX idx_menus_account_sort ON menus (line_account_id, sort_order);
 
 CREATE INDEX idx_messages_account_direction_created ON messages_log(line_account_id, direction, created_at);
@@ -7887,6 +8047,15 @@ CREATE INDEX idx_messages_log_quoted
 CREATE INDEX idx_messages_log_version_step
   ON messages_log (friend_id, scenario_version_step_id)
   WHERE scenario_version_step_id IS NOT NULL;
+
+CREATE INDEX idx_mileage_adj_approval_account
+  ON mileage_adjustment_approval_requests (line_account_id, status, created_at DESC);
+
+CREATE INDEX idx_mileage_adj_approval_events_request
+  ON mileage_adjustment_approval_events (request_id, created_at DESC);
+
+CREATE INDEX idx_mileage_adj_approval_friend
+  ON mileage_adjustment_approval_requests (friend_id, created_at DESC);
 
 CREATE INDEX idx_mileage_adjustment_notifications_retry
   ON mileage_adjustment_notifications(status, updated_at)
@@ -8076,6 +8245,9 @@ CREATE INDEX idx_nen_rich_menu_jobs_status
 CREATE INDEX idx_notification_deliveries_account_status
   ON notification_deliveries(line_account_id, status, queued_at DESC, id DESC);
 
+CREATE INDEX idx_notification_deliveries_origin
+  ON notification_deliveries(line_account_id, status, source, failed_at DESC);
+
 CREATE INDEX idx_notification_deliveries_retry
   ON notification_deliveries(status, retryable, next_retry_at);
 
@@ -8099,7 +8271,7 @@ CREATE INDEX idx_operation_alert_events_alert_created
 CREATE INDEX idx_operation_alert_notification_due
   ON operation_alert_notification_outbox(status, next_attempt_at);
 
-CREATE INDEX idx_operation_alerts_account_status
+CREATE INDEX idx_operation_alerts_account_status_v496
   ON operation_alerts(line_account_id, status, updated_at DESC);
 
 CREATE INDEX idx_operation_audit_kind_date
@@ -8108,7 +8280,7 @@ CREATE INDEX idx_operation_audit_kind_date
 CREATE INDEX idx_operation_deployment_events_occurred
   ON operation_deployment_events(occurred_at DESC, id DESC);
 
-CREATE INDEX idx_operation_health_results_run
+CREATE INDEX idx_operation_health_results_run_v496
   ON operation_health_results(run_id, check_key);
 
 CREATE INDEX idx_operation_health_runs_scope_started
@@ -8194,6 +8366,8 @@ CREATE INDEX idx_recipe_clone_runs_v316_account
 
 CREATE INDEX idx_recipe_clone_runs_v316_recipe
   ON recipe_clone_runs(recipe_id, created_at DESC);
+
+CREATE INDEX idx_recipes_v464_account ON recipes(line_account_id);
 
 CREATE INDEX idx_ref_tracking_ad_click_scope
   ON ref_tracking(friend_id, line_account_id, created_at DESC);

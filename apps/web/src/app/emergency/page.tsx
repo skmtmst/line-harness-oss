@@ -232,7 +232,7 @@ function EmergencyControlFeedback({
   </>
 }
 
-type HealthCheckId = 'line' | 'quota' | 'api' | 'webhook' | 'delivery' | 'friends'
+type HealthCheckId = 'line' | 'quota' | 'api' | 'webhook' | 'delivery' | 'friends' | 'monitoring' | 'infra' | 'credential'
 
 interface HealthCheckItem {
   id: HealthCheckId
@@ -248,11 +248,14 @@ interface HealthCheckItem {
 
 const CHECK_DEFINITIONS: Array<Pick<HealthCheckItem, 'id' | 'label' | 'icon' | 'description' | 'threshold' | 'href'>> = [
   { id: 'line', label: 'LINE接続', icon: 'L', description: 'LINEのアカウントとつながっているか', threshold: '応答がない状態が5分つづくと「エラー」', href: '/accounts' },
-  { id: 'quota', label: '月間配信数', icon: '↗', description: 'LINEの上限に近づいていないか', threshold: '80%で「注意」・95%で「エラー」', href: '/broadcasts' },
+  { id: 'quota', label: '月間配信数', icon: '↗', description: 'LINEとHarness両方の上限に近づいていないか（送れる数は少ない方）', threshold: '80%で「注意」・95%・予定分の超過で「エラー」', href: '/broadcasts' },
   { id: 'api', label: 'API・外部連携', icon: '↔', description: '管理画面とEC連携が動いているか', threshold: '応答なし・取り込み0件で「注意」', href: '/ec-commerce' },
   { id: 'webhook', label: 'Webhook', icon: 'W', description: '合言葉が入り、送信が通っているか', threshold: '合言葉なしが1本でもあれば「注意」', href: '/webhooks' },
   { id: 'delivery', label: '配信処理', icon: '▷', description: '予約した配信が時刻どおりに出ているか', threshold: '10分の遅れで「注意」・30分で「エラー」', href: '/broadcasts/reserved' },
-  { id: 'friends', label: '友だち変化', icon: '人', description: '急に減っていないか', threshold: '1日で5%以上減ると「注意」', href: '/friends' },
+  { id: 'friends', label: '友だち変化', icon: '人', description: '急に減っていないか（同曜日・28日の基準と比較）', threshold: '1日で5%以上・10人以上減ると「注意」', href: '/friends' },
+  { id: 'infra', label: '裏の仕組み', icon: '▣', description: 'データの置き場（DB・保管庫・順番待ち）へ読み書きできるか', threshold: '遅い・失敗が3回続くと「エラー」', href: '/emergency?tab=health' },
+  { id: 'credential', label: '鍵の期限', icon: '鍵', description: 'LINEの鍵の期限が近づいていないか', threshold: '14日前で「注意」・期限切れで「エラー」', href: '/accounts' },
+  { id: 'monitoring', label: '見張り自体', icon: '◎', description: '5分ごとの確認が動いているか', threshold: '10分止まると「エラー」', href: '/emergency?tab=health' },
 ]
 
 const HEALTH_CHECK_ID: Record<OperationHealthCheckKey, HealthCheckId> = {
@@ -262,6 +265,9 @@ const HEALTH_CHECK_ID: Record<OperationHealthCheckKey, HealthCheckId> = {
   webhook: 'webhook',
   dispatch_jobs: 'delivery',
   friend_change: 'friends',
+  monitoring_heartbeat: 'monitoring',
+  infra_canary: 'infra',
+  credential_expiry: 'credential',
 }
 
 const severityStyle: Record<OperationSeverity, { label: string; badge: string; panel: string }> = {
@@ -373,6 +379,21 @@ const ALERT_RESPONSE_FIRST: Record<OperationHealthCheckKey, { impact: string; re
     impact: '友だちが急に減っている可能性があります。誤配信やブロックが原因の可能性があります。',
     recovery: '直近の配信内容を確認し、必要なら緊急停止してください。',
     href: '/emergency?tab=control',
+  },
+  monitoring_heartbeat: {
+    impact: '異常があっても通知されない可能性があります。',
+    recovery: '時間をおいても直らなければ、運営へ連絡してください。',
+    href: '/emergency?tab=health',
+  },
+  infra_canary: {
+    impact: '配信・保存・画面表示が止まる可能性があります。',
+    recovery: '時間をおいて再確認し、続く場合は運営へ連絡してください。',
+    href: '/emergency?tab=health',
+  },
+  credential_expiry: {
+    impact: '期限切れ後はLINEとのやり取りが止まる可能性があります。',
+    recovery: 'アカウント設定でLINEの鍵を確認し直してください。',
+    href: '/accounts',
   },
 }
 

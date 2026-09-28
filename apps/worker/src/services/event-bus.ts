@@ -258,8 +258,11 @@ async function reevaluateRichMenuTargeting(
   }
 }
 
-/** 送信Webhookへの通知 */
-async function fireOutgoingWebhooks(
+/**
+ * 送信Webhookへの通知。fireEvent を通る出来事はここへ流れ、
+ * 個別の発火点（フォーム回答・予約）からも直接呼べる。
+ */
+export async function fireOutgoingWebhooks(
   db: D1Database,
   eventType: string,
   payload: EventPayload,

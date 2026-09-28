@@ -2,6 +2,8 @@
 
 import DateTimeField from '@/components/shared/date-time-field'
 import Select from '@/components/shared/select'
+import Checkbox from '@/components/shared/checkbox'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -603,7 +605,8 @@ function Editor({
       const [tagRes, tplRes, formRes, linkRes, folderRes] = await Promise.allSettled([
         // R23: このメニューのアカウントのタグだけを候補にする（別アカウントの同名混入防止）。
         api.tags.list(group?.accountId ? { accountId: group.accountId } : undefined),
-        api.templates.list(),
+        // m18r: テンプレートもこのメニューのアカウントだけ（流入リンク #914 と同じ形）。
+        api.templates.list(undefined, group?.accountId ?? undefined),
         group?.accountId
           ? api.forms.list(group.accountId)
           : Promise.resolve({ success: true as const, data: [] }),
@@ -1355,21 +1358,13 @@ function Editor({
               </p>
             </div>
 
-            <label className="flex cursor-pointer items-start gap-2">
-              <input
-                type="checkbox"
-                checked={targetingEnabled}
-                onChange={(e) => setTargetingEnabled(e.target.checked)}
-                className="mt-0.5"
-              />
-              <span className="text-sm">
-                条件で出し分ける
-                <span className="text-ink-faint block text-[11px]">
-                  切ると、このメニューは条件で配られなくなります。すでに見えている人からは
-                  すぐには消えません。
-                </span>
-              </span>
-            </label>
+            <Checkbox
+              checked={targetingEnabled}
+              onCheckedChange={setTargetingEnabled}
+              description="切ると、このメニューは条件で配られなくなります。すでに見えている人からはすぐには消えません。"
+            >
+              条件で出し分ける
+            </Checkbox>
 
             {targetingEnabled && (
               <>
@@ -1685,14 +1680,13 @@ function Editor({
 
       <StickyBar actions={(
         <div className="flex items-center gap-2">
-          <label className="mr-2 flex cursor-pointer items-center gap-1.5 text-sm text-gray-600">
-            <input
-              type="checkbox"
-              checked={preview}
-              onChange={(e) => setPreview(e.target.checked)}
-            />
+          <Checkbox
+            className="mr-2"
+            checked={preview}
+            onCheckedChange={setPreview}
+          >
             プレビュー
-          </label>
+          </Checkbox>
           <button
             onClick={handleSave}
             disabled={saving || publishing || unpublishing || busy}
@@ -1839,15 +1833,27 @@ function TargetingStep({
       <div className="grid gap-5 xl:grid-cols-3">
         <section className="border-hairline bg-canvas rounded-card border p-6 shadow-sm xl:col-span-2">
           <h2 className="text-ink text-base font-bold">このメニューを出す相手</h2>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <label className={`rounded-card border p-4 ${readOnly ? 'opacity-70' : 'cursor-pointer'} ${!targetingEnabled ? 'border-accent bg-accent/5' : 'border-hairline'}`}>
-              <span className="flex items-center gap-2 text-sm font-semibold"><input type="radio" name="audience" checked={!targetingEnabled} disabled={readOnly} onChange={() => onTargetingEnabled(false)} />すべての友だち</span>
-              <span className="text-ink-faint mt-2 block text-xs leading-5">ほかのメニューに当てはまらなかった人に出る、いちばん下の受け皿になります</span>
-            </label>
-            <label className={`rounded-card border p-4 ${readOnly ? 'opacity-70' : 'cursor-pointer'} ${targetingEnabled ? 'border-accent bg-accent/5' : 'border-hairline'}`}>
-              <span className="flex items-center gap-2 text-sm font-semibold"><input type="radio" name="audience" checked={targetingEnabled} disabled={readOnly} onChange={() => onTargetingEnabled(true)} />条件に当てはまる友だちだけ</span>
-              <span className="text-ink-faint mt-2 block text-xs leading-5">当てはまらない人には、これより下のメニューが出ます</span>
-            </label>
+          <div className="mt-4">
+            <RadioCardGroup legend="出す相手の選択" className="grid gap-3 sm:grid-cols-2">
+              <RadioCard
+                name="audience"
+                value="all"
+                checked={!targetingEnabled}
+                disabled={readOnly}
+                onChange={() => onTargetingEnabled(false)}
+                title="すべての友だち"
+                note="ほかのメニューに当てはまらなかった人に出る、いちばん下の受け皿になります"
+              />
+              <RadioCard
+                name="audience"
+                value="targeted"
+                checked={targetingEnabled}
+                disabled={readOnly}
+                onChange={() => onTargetingEnabled(true)}
+                title="条件に当てはまる友だちだけ"
+                note="当てはまらない人には、これより下のメニューが出ます"
+              />
+            </RadioCardGroup>
           </div>
 
           {targetingEnabled ? (
@@ -2030,17 +2036,24 @@ function PublishStep({
       <div className="grid gap-5 xl:grid-cols-3">
         <section className="border-hairline bg-canvas rounded-card border p-6 shadow-sm xl:col-span-2">
           <h2 className="text-ink text-base font-bold">いつ出すか</h2>
-          <div className="mt-4 space-y-3">
-            {[
-              ['now', 'いますぐ出す', '保存したらすぐ、条件に当てはまる人のトーク画面に出ます'],
-              ['scheduled', '日時を決めて出す', 'その時刻になったら自動で出ます。それまでは今のメニューのままです'],
-              ['period', '期間を決める', '終わったら自動で元に戻します。キャンペーンはこれが安全です'],
-            ].map(([value, label, note]) => (
-              <label key={value} className={`rounded-card flex cursor-pointer gap-3 border p-4 ${mode === value ? 'border-accent bg-accent/5' : 'border-hairline'}`}>
-                <input type="radio" name="publish-mode" checked={mode === value} onChange={() => onPublishChange({ mode: value as PublishPlanInput['mode'] })} />
-                <span><strong className="text-ink block text-sm">{label}</strong><span className="text-ink-faint mt-1 block text-xs">{note}</span></span>
-              </label>
-            ))}
+          <div className="mt-4">
+            <RadioCardGroup legend="公開時期の選択" className="grid gap-3">
+              {[
+                ['now', 'いますぐ出す', '保存したらすぐ、条件に当てはまる人のトーク画面に出ます'],
+                ['scheduled', '日時を決めて出す', 'その時刻になったら自動で出ます。それまでは今のメニューのままです'],
+                ['period', '期間を決める', '終わったら自動で元に戻します。キャンペーンはこれが安全です'],
+              ].map(([value, label, note]) => (
+                <RadioCard
+                  key={value}
+                  name="publish-mode"
+                  value={value}
+                  checked={mode === value}
+                  onChange={(next) => onPublishChange({ mode: next as PublishPlanInput['mode'] })}
+                  title={label}
+                  note={note}
+                />
+              ))}
+            </RadioCardGroup>
           </div>
           {mode !== 'now' ? (
             <div className="border-hairline mt-5 grid gap-4 border-t pt-5 sm:grid-cols-2">
@@ -2058,8 +2071,8 @@ function PublishStep({
               ) : (
                 <li className="text-success">✓ 誰に出すかが決まっています（<MetricValue metric={preview?.matched} />{previewUnsaved ? '・未保存の条件で計算' : ''}）</li>
               )}
-              <li className={imageReady ? 'text-success' : 'text-danger'}>{imageReady ? '✓' : '⚠'} 画像が登録されています{imageReady ? '' : '（未設定のページがあります）'}</li>
-              <li className={unconfiguredAreas === 0 ? 'text-success' : 'text-danger'}>{unconfiguredAreas === 0 ? '✓ すべてのボタン名が設定されています' : `⚠ ボタン名が未設定の場所が ${unconfiguredAreas}件 あります`}</li>
+              <li className={imageReady ? 'text-success' : 'text-warning'}>{imageReady ? '✓' : '⚠'} 画像が登録されています{imageReady ? '' : '（未設定のページがあります）'}</li>
+              <li className={unconfiguredAreas === 0 ? 'text-success' : 'text-warning'}>{unconfiguredAreas === 0 ? '✓ すべてのボタン名が設定されています' : `⚠ ボタン名が未設定の場所が ${unconfiguredAreas}件 あります`}</li>
               {!conditionEmpty && preview?.overlap.value ? <li className="text-warning">⚠ 上の「{preview.higherMenus[0] ?? '優先メニュー'}」と {preview.overlap.value.toLocaleString('ja-JP')}人 が重なっています</li> : null}
             </ul>
           </div>

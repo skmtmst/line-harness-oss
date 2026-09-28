@@ -63,7 +63,7 @@ export default function MileageAdjustmentDialog({
   const [policy, setPolicy] = useState<MileageAdjustmentPolicy | null>(null)
   const [policyLoading, setPolicyLoading] = useState(false)
   const [policyThresholdText, setPolicyThresholdText] = useState('')
-  const [step, setStep] = useState<'input' | 'confirm'>('input')
+  const [step, setStep] = useState<'input' | 'confirm' | 'requested'>('input')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const idempotencyKey = useRef('')
@@ -110,9 +110,8 @@ export default function MileageAdjustmentDialog({
         ? '高額調整の承認境界が未設定です。下の欄で承認境界を設定してください。'
         : '高額調整の承認境界が未設定です。オーナーへ設定を依頼してください。'
     }
-    if (highValue) return `${policy?.approvalThreshold?.toLocaleString('ja-JP')} マイル以上は別のオーナー承認が必要です。`
     return null
-  }, [amount, canConfigurePolicy, currentBalance, direction, expiresOn, highValue, policy, policyLoading, reason, sourceReferenceId])
+  }, [amount, canConfigurePolicy, currentBalance, direction, expiresOn, policy, policyLoading, reason, sourceReferenceId])
 
   const submit = async () => {
     if (step === 'input') {
@@ -137,6 +136,11 @@ export default function MileageAdjustmentDialog({
         notifyFriend,
       }, idempotencyKey.current)
       if (!response.success) throw new Error(response.error)
+      // R: 境界以上はこの場では実行されず、別のオーナーへの承認依頼として残る。
+      if ('approvalRequired' in response.data && response.data.approvalRequired) {
+        setStep('requested')
+        return
+      }
       await onCompleted()
       onCancel()
     } catch (caught) {
@@ -174,7 +178,11 @@ export default function MileageAdjustmentDialog({
         description="記録に残ります。あとから理由をたどれるようにしてください。"
         busy={busy || policyLoading}
         error={error}
-        confirmLabel={step === 'input' ? '変更内容を確認' : `この内容で${direction === 'increase' ? '増やす' : '減らす'}`}
+        confirmLabel={step === 'input'
+          ? '変更内容を確認'
+          : highValue
+            ? 'この内容で承認を依頼する'
+            : `この内容で${direction === 'increase' ? '増やす' : '減らす'}`}
         cancelLabel={step === 'confirm' ? '入力に戻る' : 'キャンセル'}
         onConfirm={() => void submit()}
         onCancel={() => {
@@ -185,6 +193,11 @@ export default function MileageAdjustmentDialog({
             onCancel()
           }
         }}
+        footer={step === 'requested' ? (
+          <div className="flex justify-end">
+            <Button onClick={onCancel}>閉じる</Button>
+          </div>
+        ) : undefined}
       >
         <div className="space-y-5">
           <section className="rounded-control bg-canvas-sunken p-4">
@@ -193,7 +206,18 @@ export default function MileageAdjustmentDialog({
             <p className="mt-1 text-sm text-ink-secondary">いまの残高 {currentBalance.toLocaleString('ja-JP')} マイル</p>
           </section>
 
-          {step === 'input' ? (
+          {step === 'requested' ? (
+            <section aria-label="承認の依頼が完了しました" className="space-y-3">
+              <Notice tone="info">
+                別のオーナーへの承認を依頼しました。この変更はまだ残高へ反映されていません。
+                承認されると記録され、依頼の内容は取り下げるまで残ります。
+              </Notice>
+              <dl className="grid gap-2 rounded-control bg-canvas-sunken p-4 text-sm">
+                <div className="grid grid-cols-3 gap-3"><dt className="text-ink-faint">内容</dt><dd className="col-span-2 text-ink">{direction === 'increase' ? '増やす' : '減らす'} {amount.toLocaleString('ja-JP')} マイル</dd></div>
+                <div className="grid grid-cols-3 gap-3"><dt className="text-ink-faint">理由</dt><dd className="col-span-2 whitespace-pre-wrap text-ink">{reason.trim()}</dd></div>
+              </dl>
+            </section>
+          ) : step === 'input' ? (
             <>
               <div className="grid grid-cols-2 gap-3" aria-label="増やすか減らすか">
                 {(['increase', 'decrease'] as const).map((value) => (
@@ -273,6 +297,12 @@ export default function MileageAdjustmentDialog({
                 <div className="grid grid-cols-3 gap-3"><dt className="text-ink-faint">有効期限</dt><dd className="col-span-2 text-ink">{expiresOn || '期限なし'}</dd></div>
                 <div className="grid grid-cols-3 gap-3"><dt className="text-ink-faint">LINE通知</dt><dd className="col-span-2 text-ink">{notifyFriend ? '変更後に自動で知らせる' : '知らせない'}</dd></div>
               </dl>
+              {highValue ? (
+                <Notice tone="warn">
+                  {policy?.approvalThreshold?.toLocaleString('ja-JP')} マイル以上の変更は、この画面では実行されません。
+                  依頼した人とは別のオーナーが承認した時点で、残高へ反映されます。
+                </Notice>
+              ) : null}
               <Notice tone="warn">
                 既存の履歴は書き換えず、理由と実行者を持つ新しい調整行を追加します。同じ操作を再送しても二重反映しません。
               </Notice>

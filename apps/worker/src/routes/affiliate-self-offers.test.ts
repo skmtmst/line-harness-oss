@@ -23,6 +23,8 @@ const dbMocks = {
   generateRefSlug: vi.fn(() => 'slug00'),
   getLinkBaseUrl: vi.fn().mockResolvedValue(null),
   listAffiliateOffers: vi.fn(),
+  getCurrentOfferVersion: vi.fn(),
+  getOfferCapStatus: vi.fn(),
   enrollAffiliateInOffer: vi.fn(),
 };
 vi.mock('@line-crm/db', () => dbMocks);
@@ -146,6 +148,17 @@ beforeEach(() => {
   dbMocks.getAffiliateLinkStats.mockResolvedValue(new Map());
   // Only the active offer is returned by activeOnly listing.
   dbMocks.listAffiliateOffers.mockResolvedValue([ACTIVE_OFFER]);
+  // 既定は版なし・上限なし(従来の表示のまま)。
+  dbMocks.getCurrentOfferVersion.mockResolvedValue(null);
+  dbMocks.getOfferCapStatus.mockResolvedValue({
+    capped: false,
+    capTotal: null,
+    totalUsed: 0,
+    totalRemaining: null,
+    capMonthlyPerAffiliate: null,
+    monthlyUsed: 0,
+    monthlyRemaining: null,
+  });
   dbMocks.enrollAffiliateInOffer.mockImplementation(
     async (_db: unknown, input: { affiliateId: string; offerId: string }) => {
       const found = links.find((l) => l.offer_id === input.offerId);
@@ -224,6 +237,71 @@ describe('POST /api/liff/affiliate/offers/:id/enroll', () => {
     expect(b2.link.refCode).toBe('off0');
     // Only one link ever created for this affiliate×offer.
     expect(links.filter((l) => l.offer_id === 'off-active')).toHaveLength(1);
+  });
+
+  it('shows halted + remaining when the cap is reached', async () => {
+    dbMocks.getCurrentOfferVersion.mockResolvedValue({
+      id: 'ver-1',
+      offer_id: 'off-active',
+      version_number: 1,
+      reward_amount: 1000,
+      reward_miles: 50,
+      window_days: 30,
+      cap_total: 200,
+      cap_monthly_per_affiliate: 10,
+      reception_from: '2026-10-01T00:00:00.000+09:00',
+      reception_to: '2026-12-31T23:59:59.000+09:00',
+      effective_from: null,
+      created_by_staff_id: null,
+      idempotency_key: null,
+      created_at: '2026-09-01T00:00:00.000+09:00',
+    });
+    dbMocks.getOfferCapStatus.mockResolvedValue({
+      capped: true,
+      capTotal: 200,
+      totalUsed: 200,
+      totalRemaining: 0,
+      capMonthlyPerAffiliate: 10,
+      monthlyUsed: 3,
+      monthlyRemaining: 7,
+    });
+    const res = await call('/api/liff/affiliate/offers?lineAccessToken=tok-alice');
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      offers: Array<{
+        halted: boolean;
+        totalRemaining: number | null;
+        monthlyRemaining: number | null;
+        windowDays: number;
+        rewardAmount: number;
+      }>;
+    };
+    expect(body.offers[0]).toMatchObject({
+      halted: true,
+      totalRemaining: 0,
+      monthlyRemaining: 7,
+      windowDays: 30,
+      rewardAmount: 1000,
+    });
+  });
+
+  it('409s enroll when the cap is reached, without creating a link', async () => {
+    dbMocks.getOfferCapStatus.mockResolvedValue({
+      capped: true,
+      capTotal: 200,
+      totalUsed: 200,
+      totalRemaining: 0,
+      capMonthlyPerAffiliate: null,
+      monthlyUsed: 0,
+      monthlyRemaining: null,
+    });
+    const res = await call('/api/liff/affiliate/offers/off-active/enroll', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ lineAccessToken: 'tok-alice' }),
+    });
+    expect(res.status).toBe(409);
+    expect(dbMocks.enrollAffiliateInOffer).not.toHaveBeenCalled();
   });
 
   it('404s an inactive/unknown offer without enrolling', async () => {

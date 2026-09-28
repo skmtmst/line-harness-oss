@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { EC_EVENT_TYPES, ecEventLabel } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import Button from '@/components/shared/button'
@@ -39,6 +40,9 @@ const WEBHOOK_EVENT_GROUPS: ReadonlyArray<{
       { value: 'staff_assigned', label: '担当が割り当てられた' },
       { value: 'manual_reply_sent', label: '個別返信を送った' },
       { value: 'cv_fire', label: '成果地点が起きた' },
+      // R150: 見本から選べるように、実際に発火する出来事をそろえる。
+      { value: 'form_submitted', label: 'フォームが送られた' },
+      { value: 'booking_created', label: '予約が入った' },
     ],
   },
   {
@@ -49,13 +53,27 @@ const WEBHOOK_EVENT_GROUPS: ReadonlyArray<{
 ]
 
 /** 送信Webhookを作る唯一のフォーム。一覧の追加導線もこの画面へ集約する。 */
-export default function NewWebhookPage() {
+function NewWebhookForm() {
   const { selectedAccountId } = useAccount()
+  const searchParams = useSearchParams()
+  /*
+   * R150: 見本の「送り先を作る」は /webhooks/new?event=<種類> で開く。
+   * 実在する購読対象だけを初期選択にし、来た値がカタログに無ければ
+   * 従来どおり「すべてのイベントを送る」を選んだ状態にする。
+   */
+  const presetEvent = searchParams.get('event')
+  const presetValid = Boolean(
+    presetEvent
+      && WEBHOOK_EVENT_GROUPS.some((group) => group.events.some((event) => event.value === presetEvent)),
+  )
+  const presetLabel = presetValid
+    ? WEBHOOK_EVENT_GROUPS.flatMap((group) => group.events).find((event) => event.value === presetEvent)?.label
+    : null
   const [name, setName] = useState('')
   const [url, setUrl] = useState('')
   /* #975 U067: CSV手入力ではなく「すべて」かチェック選択で決める。 */
-  const [sendAllEvents, setSendAllEvents] = useState(true)
-  const [selectedEvents, setSelectedEvents] = useState<string[]>([])
+  const [sendAllEvents, setSendAllEvents] = useState(!presetValid)
+  const [selectedEvents, setSelectedEvents] = useState<string[]>(presetValid ? [presetEvent!] : [])
   /* 受信Webhookごとの発火 `incoming_webhook.<種類>` は種類IDで指定する詳細設定。 */
   const [incomingSources, setIncomingSources] = useState('')
   const [secret, setSecret] = useState(generateSecret)
@@ -212,6 +230,11 @@ export default function NewWebhookPage() {
             送るイベントを選ぶ
           </label>
         </div>
+        {presetLabel ? (
+          <p className="text-ink-secondary mt-2 text-xs">
+            見本「{presetLabel}」の条件を選んだ状態で開いています。すべてのイベントへ変えるときは上の選択を押してください。
+          </p>
+        ) : null}
         {!sendAllEvents && (
           <div className="space-y-3">
             {WEBHOOK_EVENT_GROUPS.map((group) => (
@@ -306,5 +329,14 @@ export default function NewWebhookPage() {
       </Field>
       {stepUpPrompt}
     </CreatePage>
+  )
+}
+
+export default function NewWebhookPage() {
+  // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
+  return (
+    <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
+      <NewWebhookForm />
+    </Suspense>
   )
 }

@@ -14,7 +14,7 @@ describe('/health のアカウント別状態契約', () => {
     expect(PAGE).toContain("if (!response.success) return { state: 'error', logs: [] }")
     expect(PAGE).toContain(": 'unknown'")
     expect(PAGE).toContain("return [accountId, { state: 'error', logs: [] }] as const")
-    expect(PAGE).toContain("const risk = latestRisk[account.id] ?? 'unknown'")
+    expect(PAGE).toContain("const storedRisk = latestRisk[account.id] ?? 'unknown'")
     expect(PAGE).not.toContain("risks[account.id] = 'normal'")
     expect(PAGE).not.toContain("latestRisk[account.id] || 'normal'")
   })
@@ -31,5 +31,24 @@ describe('/health のアカウント別状態契約', () => {
     expect(PAGE).toContain('ヘルス情報を取得できませんでした。')
     expect(PAGE).toContain("? '再取得中...' : '再試行'")
     expect(PAGE).toContain('onClick={() => void retryAccountHealth(account.id)}')
+  })
+
+  /*
+   * R168: 確認が止まっていても、24日前の「正常」が今の状態のように
+   * 見えていた。cronは5分おきに走るので、最終確認がしきい値より古い
+   * ものは結果ではなく「確認停止中」として区別する。
+   */
+  it('最終確認が古い記録は現在の状態として表示しない（R168）', () => {
+    expect(PAGE).toContain('STALE_CHECK_AFTER_MS')
+    expect(PAGE).toContain('isStaleCheck(')
+    expect(PAGE).toContain("stale: { label: '確認停止中'")
+    expect(PAGE).toContain("const stale = storedRisk !== 'unknown' && storedRisk !== 'error' && isStaleCheck(latestLog?.createdAt)")
+  })
+
+  it('最終確認の日時を常時出す（R168）', () => {
+    expect(PAGE).toContain('最終確認')
+    expect(PAGE).toContain('shortDateTime(latestLog.createdAt)')
+    // 確認が止まっているときは、最後の結果と併せて現在は不明と伝える。
+    expect(PAGE).toContain('確認が止まっているため、現在の状態は分かりません')
   })
 })

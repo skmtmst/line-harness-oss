@@ -37,7 +37,8 @@ describe('QRライブラリの表示時読み込み(PERF-09)', () => {
 
   it('閉じているQRダイアログは QR を作りにいかない', () => {
     const dialog = fs.readFileSync(path.join(SRC, 'components/dashboard/qr-dialog.tsx'), 'utf8')
-    expect(dialog).toContain('if (!open || routeMissing)')
+    // blocked は「見つからない・止めている」の両方。止めた経路のQRも作らない。
+    expect(dialog).toContain('if (!open || blocked)')
   })
 
   it('qrToDataURL は qrcode の読み込みを1回に束ね、以後は使い回す', async () => {

@@ -7,7 +7,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Chip from '@/components/shared/chip'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
-import { DeleteAction } from '@/components/shared/row-actions'
+import { RowActions } from '@/components/shared/row-actions'
 import StickyBar from '@/components/shared/sticky-bar'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { TextField } from '@/components/shared/text-field'
@@ -51,6 +51,8 @@ export default function RankSettingsTab({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  /** 削除の確認を開いている行。null の間は確認を出さない。 */
+  const [removeTarget, setRemoveTarget] = useState<number | null>(null)
   /** 下書きがどのアカウントのものか。編集状態はアカウントに固定する（DEEP-21）。 */
   const [draftAccountId, setDraftAccountId] = useState(accountId)
 
@@ -71,6 +73,7 @@ export default function RankSettingsTab({
     setDrafts([])
     setDirty(false)
     setError('')
+    setRemoveTarget(null)
     cancelLeave()
     setNotice(hadUnsaved ? 'LINEアカウントを切り替えたため、保存していない変更は破棄しました。' : '')
   }
@@ -167,13 +170,17 @@ export default function RankSettingsTab({
       {error ? <p className="text-label text-danger" role="alert">{error}</p> : null}
 
       <div data-design="Body" data-design-node="Y4zWdG" className="grid gap-4 xl:grid-cols-3">
-        <section data-design="Table" data-design-node="C0WaS" className="min-w-0 xl:col-span-2">
+        <section data-design="Table" data-design-node="C0WaS" className="@container min-w-0 xl:col-span-2">
           {/*
             R55: @container＋谷間帯の列削減は会員一覧と同じ形。1440pxでは
             2/3幅の表に固定幅が収まらず、タグ見出しが会員数へ重なっていた。
             入力3列を少し絞り、会員数は狭い表のとき畳む。
+            m18s: 器（@container）は枠ではなく区画に置く。表の幅（100%）は
+            ふつうの枠で決めないと、枠いっぱいに広がらず右側が空く。
+            区画に余白はなく枠と同幅のため、会員数を畳む境目（800）は変わらない。
+            操作列（w-14・右寄せ）は表の右端に付く。
           */}
-          <DataTable className="@container">
+          <DataTable>
             <thead>
               <TableHeadRow>
                 <Th className="w-44">ランク名</Th>
@@ -181,24 +188,29 @@ export default function RankSettingsTab({
                 <Th className="w-28">マイル還元</Th>
                 <Th>友だち属性タグ</Th>
                 <Th className="cq-hide-below-800 w-24" align="right">会員数</Th>
-                <Th className="w-14" align="right"><span className="sr-only">削除</span></Th>
+                <Th className="w-14" align="right"><span className="sr-only">操作</span></Th>
               </TableHeadRow>
             </thead>
             <tbody>
+              {/*
+                m18s: 幅を固定しない列はタグの1列だけにする。見出しだけでなく
+                行の側にも同じ幅を持たせ、どの行も同じ列幅で合うようにする。
+                タグが残りを受け取り、表が枠いっぱいに広がる。
+              */}
               {drafts.map((row, index) => {
                 const isBase = index === 0 && row.threshold.replace(/[,，]/g, '') === '0'
                 return (
                   <Tr key={row.id ?? `new-${index}`}>
-                    <Td>
+                    <Td className="w-44">
                       <TextField aria-label={`ランク名 ${index + 1}`} value={row.name} maxLength={20} onChange={(event) => update(index, { name: event.target.value })} />
                     </Td>
-                    <Td>
+                    <Td className="w-40">
                       <span className="flex items-center gap-2">
                         <TextField aria-label={`しきい値 ${index + 1}`} inputMode="numeric" value={row.threshold} onChange={(event) => update(index, { threshold: event.target.value })} disabled={isBase} />
                         <span className="shrink-0 text-caption font-semibold text-ink-faint">円〜</span>
                       </span>
                     </Td>
-                    <Td>
+                    <Td className="w-28">
                       <span className="flex items-center gap-2">
                         <TextField aria-label={`マイル還元 ${index + 1}`} inputMode="decimal" value={row.rate} onChange={(event) => update(index, { rate: event.target.value })} />
                         <span className="shrink-0 text-caption font-semibold text-ink-faint">%</span>
@@ -209,22 +221,46 @@ export default function RankSettingsTab({
                         {row.tagName ?? (row.name.trim() ? `[会員] ランク：${row.name.trim()}（保存すると作られます）` : '—')}
                       </span>
                     </Td>
-                    <Td align="right" className="cq-hide-below-800"><span className="text-label font-semibold tabular-nums text-ink">{row.memberCount.toLocaleString('ja-JP')}人</span></Td>
-                    <Td align="right">
-                      {isBase ? null : <DeleteAction label={`${row.name || 'このランク'}を削除する`} onClick={() => remove(index)} />}
+                    <Td align="right" className="cq-hide-below-800 w-24"><span className="text-label font-semibold tabular-nums text-ink">{row.memberCount.toLocaleString('ja-JP')}人</span></Td>
+                    <Td align="right" className="w-14">
+                      {isBase ? null : row.id === null ? (
+                        /* まだ保存していない行の取り消しは、確認なしの文字ボタン。 */
+                        <button
+                          type="button"
+                          className="text-label font-semibold text-action"
+                          onClick={() => remove(index)}
+                        >
+                          行を外す
+                        </button>
+                      ) : (
+                        /* ほかの一覧と同じ形（主な操作＋「…」）。削除は確認つき。 */
+                        <RowActions
+                          subjectName={row.name.trim() || `ランク ${index + 1}`}
+                          destructiveItem={{
+                            id: `rank-delete-${row.id}`,
+                            label: 'ランクを削除',
+                            onSelect: () => setRemoveTarget(index),
+                          }}
+                        />
+                      )}
                     </Td>
                   </Tr>
                 )
               })}
-              <Tr>
-                <Td colSpan={6}>
-                  <button type="button" className="text-label font-semibold text-action" onClick={add} disabled={drafts.length >= 8}>
-                    ＋ ランクを追加
-                  </button>
-                </Td>
-              </Tr>
             </tbody>
           </DataTable>
+          {/*
+            m18s 真因の直し：「追加」は表の外（表の下）に置き colSpan を使わない。
+            table-layout: fixed では結合セルが畳んだ列を見えない列として作り直し、
+            残り幅を分け合って帯と線が手前で切れて見える。表の中に結合が無いので
+            列は見えている列だけで決まる。枠の中のdivは共有の表部品が作るため、
+            同じ区画の表の直下に置く。
+          */}
+          <div className="mt-3">
+            <button type="button" className="text-label font-semibold text-action" onClick={add} disabled={drafts.length >= 8}>
+              ＋ ランクを追加
+            </button>
+          </div>
         </section>
 
         <div data-design="Side" data-design-node="RgQEL" className="flex flex-col gap-4">
@@ -274,6 +310,20 @@ export default function RankSettingsTab({
         cancelLabel="編集を続ける"
         onConfirm={confirmLeave}
         onCancel={cancelLeave}
+      />
+      {/* 行の削除は確認つき（ほかの一覧と同じ形）。外すだけでは消えず、保存で確定する。 */}
+      <ConfirmDialog
+        open={removeTarget !== null}
+        title={`「${removeTarget !== null ? drafts[removeTarget]?.name.trim() || `ランク ${removeTarget + 1}` : ''}」を削除しますか？`}
+        description="行を外すと、保存したときにこのランクは消えます。保存する前なら下のキャンセルで元に戻せます。"
+        confirmLabel="削除する"
+        cancelLabel="やめる"
+        destructive
+        onConfirm={() => {
+          if (removeTarget !== null) remove(removeTarget)
+          setRemoveTarget(null)
+        }}
+        onCancel={() => setRemoveTarget(null)}
       />
     </>
   )

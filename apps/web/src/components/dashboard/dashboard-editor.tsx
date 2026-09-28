@@ -73,8 +73,10 @@ const CARD_META: Record<DashboardCardId, { label: string; description: string; d
   'connection-status': { label: '接続状態', description: '右サイド', defaultVisible: true },
   'support-mark-status': { label: '現在の対応状況', description: '右サイド', defaultVisible: true },
   'friend-status': { label: '友だちの状態', description: '右サイド｜有効数・ブロック率', defaultVisible: false },
-  /* カードの実表題は「今後の予約」。載せるのは予約だけなので、編集パネルの名前も揃える（DASH-10）。 */
-  'upcoming': { label: '今後の予約', description: '右サイド', defaultVisible: true },
+  /* M: 予約だけでなく予約配信・リマインダも載せるので、表題と名前を「今後の予定」にした。 */
+  'upcoming': { label: '今後の予定', description: '右サイド', defaultVisible: true },
+  /* L (#824): 通知の送達台帳から数えた今日の失敗。出どころはカードの「？」に出す。 */
+  'delivery-failures': { label: '配信の失敗', description: '右サイド｜今日・出どころ付き', defaultVisible: true },
   'monthly-delivery': { label: '今月の配信', description: '右サイド', defaultVisible: true },
   'recent-results': { label: '最近の成果', description: '右サイド', defaultVisible: true },
   'booking-status': { label: '予約状況', description: '右サイド｜本日・変更・キャンセル', defaultVisible: false },
