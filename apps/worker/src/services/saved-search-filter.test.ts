@@ -107,3 +107,32 @@ describe('compileSavedSearch', () => {
     expect(result).toEqual({ ok: false, error: '友だち情報で使えない比較方法が指定されています' });
   });
 });
+
+describe('R183 逆転期間は0人として扱わず断る', () => {
+  it('開始日が終了日より後なら実行しない', () => {
+    const result = compileSavedSearch({
+      all: [{ kind: 'created_at', op: 'between', value: { from: '2026-09-30', to: '2026-09-01' } }],
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain('開始日が終了日より後');
+  });
+
+  it('最終反応日の逆転も断る', () => {
+    const result = compileSavedSearch({
+      all: [{ kind: 'last_activity', op: 'between', value: { from: '2026-09-30', to: '2026-09-01' } }],
+    });
+    expect(result.ok).toBe(false);
+  });
+
+  it('両端同日・片側指定・正常な期間は通る', () => {
+    for (const value of [
+      { from: '2026-09-01', to: '2026-09-01' },
+      { from: '2026-09-01', to: '' },
+      { from: '', to: '2026-09-01' },
+      { from: '2026-09-01', to: '2026-09-30' },
+    ]) {
+      const result = compileSavedSearch({ all: [{ kind: 'created_at', op: 'between', value }] });
+      expect(result.ok).toBe(true);
+    }
+  });
+});
