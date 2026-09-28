@@ -185,7 +185,6 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
     }
     const status = c.req.query('status') || 'open';
     const query = (c.req.query('q') || '').trim();
-    const selectedLineAccountId = (c.req.query('lineAccountId') || '').trim();
     const limit = Math.min(200, Math.max(1, Number.parseInt(c.req.query('limit') || '100', 10) || 100));
     const offset = Math.max(0, Number.parseInt(c.req.query('offset') || '0', 10) || 0);
     // LINEとメールを待ち時間順で統合してからページを切るため、要求ページの末尾まで
@@ -198,8 +197,9 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
 
     // Email threads have no account key in the legacy schema. Until a thread
     // is explicitly attributed, only the default tenant may view them.
-    // R110: アカウント選択中は件数側と同じく対象外にする（一覧と件数で一致）。
-    if (channel !== 'line' && scope.canSeeUnassigned && !selectedLineAccountId) {
+    // メール問い合わせは LINE アカウントに所属しないため、選択中の
+    // LINE アカウントがあっても対象から外さない（件数の数え方と同じ）。
+    if (channel !== 'line' && scope.canSeeUnassigned) {
       const statusSql = status === 'all'
         ? '1=1'
         : status === 'resolved'

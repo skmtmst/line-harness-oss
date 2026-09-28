@@ -24,6 +24,7 @@ import DateField from './date-field'
 import { TextField } from './text-field'
 import Select from './select'
 import {
+  findInvalidRangeIssue,
   isEmptyCondition,
   pruneCondition,
   type FieldOperator,
@@ -36,6 +37,7 @@ export {
   isRuleComplete,
   isEmptyCondition,
   pruneCondition,
+  findInvalidRangeIssue,
 } from '@/lib/segment-condition'
 export type { FieldOperator, SegmentCondition, SegmentRule } from '@/lib/segment-condition'
 
@@ -703,30 +705,45 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
         </div>
       )
 
-    case 'score_range':
+    case 'score_range': {
+      /*
+       * R247: 上下限の逆転は「書きかけ」と分け、両欄の近くに理由を示す。
+       * 黙って落として全員対象にしない。保存は呼び出し側で止める。
+       */
+      const rangeIssue = findInvalidRangeIssue({ operator: 'AND', rules: [rule] })
       return (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-ink text-sm font-medium">行動スコア</span>
-          <TextField
-            type="number"
-            step={1}
-            value={typeof v.min === 'number' ? v.min : ''}
-            onChange={(e) => onChange({ type: rule.type, value: { ...v, min: e.target.value === '' ? null : Number(e.target.value) } })}
-            placeholder="下限なし"
-            aria-label="行動スコアの下限"
-          />
-          <span className="text-ink-faint text-sm">点以上〜</span>
-          <TextField
-            type="number"
-            step={1}
-            value={typeof v.max === 'number' ? v.max : ''}
-            onChange={(e) => onChange({ type: rule.type, value: { ...v, max: e.target.value === '' ? null : Number(e.target.value) } })}
-            placeholder="上限なし"
-            aria-label="行動スコアの上限"
-          />
-          <span className="text-ink-faint text-sm">点以下</span>
+        <div className="space-y-1.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-ink text-sm font-medium">行動スコア</span>
+            <TextField
+              type="number"
+              step={1}
+              invalid={Boolean(rangeIssue)}
+              value={typeof v.min === 'number' ? v.min : ''}
+              onChange={(e) => onChange({ type: rule.type, value: { ...v, min: e.target.value === '' ? null : Number(e.target.value) } })}
+              placeholder="下限なし"
+              aria-label="行動スコアの下限"
+            />
+            <span className="text-ink-faint text-sm">点以上〜</span>
+            <TextField
+              type="number"
+              step={1}
+              invalid={Boolean(rangeIssue)}
+              value={typeof v.max === 'number' ? v.max : ''}
+              onChange={(e) => onChange({ type: rule.type, value: { ...v, max: e.target.value === '' ? null : Number(e.target.value) } })}
+              placeholder="上限なし"
+              aria-label="行動スコアの上限"
+            />
+            <span className="text-ink-faint text-sm">点以下</span>
+          </div>
+          {rangeIssue && (
+            <p role="alert" className="text-danger text-xs">
+              {rangeIssue}
+            </p>
+          )}
         </div>
       )
+    }
 
     case 'is_following':
     case 'is_hidden':

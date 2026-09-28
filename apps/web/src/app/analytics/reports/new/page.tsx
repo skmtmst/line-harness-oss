@@ -81,6 +81,15 @@ function defaultAlertDrafts(enabled: boolean): Record<string, AlertRuleDraft> {
 
 const ROLE_LABEL = { owner: '統括', admin: '管理者', staff: '運用担当' } as const
 
+/*
+ * メールアドレスの形の検査。裏側（apps/worker/src/routes/analytics.ts の
+ * isEmail）と同じ式で、同じ行を同じ理由で止める。以前は画面で止めずに
+ * 裏側が黙って落としていたので、1件でも不備があれば送信しない。
+ */
+function isEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) && value.length <= 254
+}
+
 function AnalyticsReportFormPage() {
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -194,11 +203,21 @@ function AnalyticsReportFormPage() {
 
   // 宛先が0件のときは作れない。裏側も「受け取る人を選んでください」で止める。
   const hasRecipient = staffIds.length > 0 || emails.some((item) => item.trim() !== '')
+  // R228: 形が合わない宛先行をその場で示す。空行は送信前に外すので対象外。
+  const invalidEmails = emails.map((item) => {
+    const trimmed = item.trim()
+    return trimmed !== '' && !isEmail(trimmed) ? trimmed : null
+  })
+  const hasInvalidEmail = invalidEmails.some(Boolean)
 
   const submit = async (sendOnce: boolean) => {
     if (!selectedAccountId || !options || !canManage || !hasRecipient) return
     if (!name.trim()) {
       setError('レポートの名前を入力してください')
+      return
+    }
+    if (hasInvalidEmail) {
+      setError('メールアドレスの形が正しくない宛先があります。該当の行を直すか消してください。')
       return
     }
     // 画面の数値を裏側が受け取れる形へ直す。変な数はここで止める
@@ -357,15 +376,16 @@ function AnalyticsReportFormPage() {
 
           <section className="border-hairline bg-canvas rounded-card border p-4 sm:p-6">
             <h2 className="mb-4 text-lg font-semibold">いつ送りますか</h2>
+            {/* R229: 標準幅(176px)固定にすると、中間幅で隣の欄に重なる。列の幅に合わせる。 */}
             <div className="grid items-end gap-4 md:grid-cols-4">
-              <label className="text-ink-secondary grid gap-2 text-xs font-semibold">間かく<Select aria-label="間かく" value={cadence} onChange={(value) => setCadence(value as 'weekly' | 'monthly')} options={[{ value: 'weekly', label: '毎週' }, { value: 'monthly', label: '毎月' }]} size="standard" /></label>
+              <label className="text-ink-secondary grid gap-2 text-xs font-semibold">間かく<Select aria-label="間かく" value={cadence} onChange={(value) => setCadence(value as 'weekly' | 'monthly')} options={[{ value: 'weekly', label: '毎週' }, { value: 'monthly', label: '毎月' }]} size="full" /></label>
               {cadence === 'weekly' ? (
-                <label className="text-ink-secondary grid gap-2 text-xs font-semibold">曜日<Select aria-label="送る曜日" value={weekday} onChange={(value) => setWeekday(value)} options={['日曜日', '月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日'].map((label, value) => ({ value: String(value), label }))} size="standard" /></label>
+                <label className="text-ink-secondary grid gap-2 text-xs font-semibold">曜日<Select aria-label="送る曜日" value={weekday} onChange={(value) => setWeekday(value)} options={['日曜日', '月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日'].map((label, value) => ({ value: String(value), label }))} size="full" /></label>
               ) : (
-                <label className="text-ink-secondary grid gap-2 text-xs font-semibold">日<Select aria-label="送る日" value={monthDay} onChange={(value) => setMonthDay(value)} options={Array.from({ length: 28 }, (_, index) => ({ value: String(index + 1), label: `${index + 1}日` }))} size="standard" /></label>
+                <label className="text-ink-secondary grid gap-2 text-xs font-semibold">日<Select aria-label="送る日" value={monthDay} onChange={(value) => setMonthDay(value)} options={Array.from({ length: 28 }, (_, index) => ({ value: String(index + 1), label: `${index + 1}日` }))} size="full" /></label>
               )}
               <span className="text-ink-secondary grid gap-2 text-xs font-semibold">時刻<TimeField value={sendTime} onChange={setSendTime} aria-label="送る時刻" /></span>
-              <label className="text-ink-secondary grid gap-2 text-xs font-semibold">集計する期間<Select aria-label="集計する期間" value={periodDays} onChange={(value) => setPeriodDays(value)} options={[{ value: '7', label: '前の7日間' }, { value: '30', label: '前の30日間' }, { value: '90', label: '前の90日間' }]} size="standard" /></label>
+              <label className="text-ink-secondary grid gap-2 text-xs font-semibold">集計する期間<Select aria-label="集計する期間" value={periodDays} onChange={(value) => setPeriodDays(value)} options={[{ value: '7', label: '前の7日間' }, { value: '30', label: '前の30日間' }, { value: '90', label: '前の90日間' }]} size="full" /></label>
             </div>
             <p className="text-ink-secondary mb-0 mt-4 text-xs">時刻は {options.timeZone} で計算します。</p>
           </section>
@@ -391,23 +411,42 @@ function AnalyticsReportFormPage() {
                   </li>
                 )
               })}
-              {emails.map((email, index) => (
-                <li key={index}>
-                  <label className="flex min-h-11 items-center gap-3 px-4 py-2.5">
-                    <span className="text-ink-secondary shrink-0 text-xs font-semibold">メールだけ</span>
-                    <input
-                      className="text-ink min-w-0 flex-1 bg-transparent text-sm outline-none"
-                      type="email"
-                      value={email}
-                      onChange={(event) => setEmails((current) => current.map((item, itemIndex) => itemIndex === index ? event.target.value : item))}
-                      placeholder="report@example.com"
-                    />
-                  </label>
-                </li>
-              ))}
+              {emails.map((email, index) => {
+                const invalid = invalidEmails[index]
+                return (
+                  <li key={index} className="px-4 py-2.5">
+                    <div className="flex min-h-11 items-center gap-3">
+                      <span className="text-ink-secondary shrink-0 text-xs font-semibold">メールだけ</span>
+                      <input
+                        className="text-ink min-w-0 flex-1 bg-transparent text-sm outline-none"
+                        type="email"
+                        value={email}
+                        onChange={(event) => setEmails((current) => current.map((item, itemIndex) => itemIndex === index ? event.target.value : item))}
+                        placeholder="report@example.com"
+                        aria-label={`宛先のメールアドレス ${index + 1}行目`}
+                        aria-invalid={invalid ? true : undefined}
+                      />
+                      <button
+                        type="button"
+                        className="text-ink-faint hover:text-ink-secondary shrink-0 text-xs"
+                        onClick={() => setEmails((current) => current.filter((_, itemIndex) => itemIndex !== index))}
+                        aria-label={`${index + 1}行目の宛先を消す`}
+                      >
+                        消す
+                      </button>
+                    </div>
+                    {invalid && (
+                      <p className="text-danger mt-1 text-xs" role="alert">
+                        「{invalid}」はメールアドレスの形になっていません。この宛先だけ外れないよう、直すか消してください。
+                      </p>
+                    )}
+                  </li>
+                )
+              })}
             </ul>
             <div className="mt-2"><Button variant="secondary" onClick={() => setEmails((current) => [...current, ''])}>宛先を足す</Button></div>
             {!hasRecipient && <p className="text-ink-secondary mt-3 text-xs">受け取る人を1人以上選んでください。選ぶまで作れません。</p>}
+            {hasInvalidEmail && <p className="text-danger mt-3 text-xs">形が正しくない宛先があるため、いまのままでは作れません。</p>}
             <Checkbox className="border-hairline mt-5 flex w-full border-t pt-4" checked={lineEnabled} onCheckedChange={setLineEnabled} description="ログインユーザーのLINEに、要点だけを短くまとめて送ります。">
               <strong>LINEでも同じ内容を送る</strong>
             </Checkbox>
@@ -491,7 +530,7 @@ function AnalyticsReportFormPage() {
         status={editing
           ? <>「{editing.name}」を直しています。保存すると、次の{nextLabel}から新しい内容で届きます。</>
           : <>まだ動いていません。つくると、次の{nextLabel}から届きはじめます。</>}
-        actions={<><Link className="text-ink-secondary p-3 text-sm no-underline" href="/analytics">キャンセル</Link>{!editing && <Button variant="secondary" disabled={saving || !canManage || !hasRecipient} onClick={() => void submit(true)}>いますぐ1回だけ送ってみる</Button>}<Button disabled={saving || !canManage || !hasRecipient} onClick={() => void submit(false)}>{saving ? (editing ? '保存しています' : '作っています') : (editing ? '変更を保存する' : 'つくって動かす')}</Button></>}
+        actions={<><Link className="text-ink-secondary p-3 text-sm no-underline" href="/analytics">キャンセル</Link>{!editing && <Button variant="secondary" disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} onClick={() => void submit(true)}>いますぐ1回だけ送ってみる</Button>}<Button disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} onClick={() => void submit(false)}>{saving ? (editing ? '保存しています' : '作っています') : (editing ? '変更を保存する' : 'つくって動かす')}</Button></>}
       />
     </div>
   )

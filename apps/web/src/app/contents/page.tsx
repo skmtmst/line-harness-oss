@@ -15,6 +15,7 @@ import ListToolbar from '@/components/shared/list-toolbar'
 import ActionMenu from '@/components/shared/action-menu'
 import { MoreAction } from '@/components/shared/row-actions'
 import { formatMediaSize } from './media-usage-display'
+import MediaPreviewOverlay from './media-preview-overlay'
 import Dialog from '@/components/shared/dialog'
 import {
   blockedReason,
@@ -1562,42 +1563,12 @@ function MediaLibraryInner() {
       />
 
       {preview && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-6"
-          role="dialog"
-          aria-modal="true"
-          aria-label={`${preview.filename}のプレビュー`}
-          onMouseDown={(e) => {
-            if (e.target === e.currentTarget) setPreview(null)
-          }}
-        >
-          <button
-            onClick={() => setPreview(null)}
-            aria-label="プレビューを閉じる"
-            className="text-on-accent absolute top-4 right-6 text-2xl leading-none"
-          >
-            ×
-          </button>
-          {preview.kind === 'image' ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={displaySrc(preview)}
-              alt={preview.filename}
-              className="max-h-full max-w-full object-contain"
-            />
-          ) : preview.kind === 'video' ? (
-            <video src={displaySrc(preview)} controls className="max-h-full max-w-full" />
-          ) : preview.kind === 'audio' ? (
-            <audio src={displaySrc(preview)} controls />
-          ) : (
-            <div className="rounded-card bg-canvas p-6 text-center text-sm">
-              <p className="text-ink font-medium">{preview.filename}</p>
-              <a href={displaySrc(preview)} target="_blank" rel="noreferrer" className="text-info mt-2 inline-block hover:underline">
-                別のタブで開く
-              </a>
-            </div>
-          )}
-        </div>
+        <MediaPreviewOverlay
+          filename={preview.filename}
+          kind={preview.kind}
+          src={displaySrc(preview)}
+          onClose={() => setPreview(null)}
+        />
       )}
     </div>
   )

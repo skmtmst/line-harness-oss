@@ -3,7 +3,7 @@
 import MultiSelect from '@/components/shared/multi-select'
 import Select from '@/components/shared/select'
 import type { Area } from './canvas-editor'
-import { RICH_MENU_ACTION_TYPE_BY_INTENT, type RichMenuAreaIntent } from '@line-crm/shared'
+import { RICH_MENU_ACTION_TYPE_BY_INTENT, richMenuUriError, type RichMenuAreaIntent } from '@line-crm/shared'
 
 type Option = { id: string; name: string }
 
@@ -57,6 +57,11 @@ const INTENT_OPTIONS: { value: RichMenuAreaIntent; label: string; hint: string }
 /** intent から、LINE に登録するときの種類を決める。 */
 export function actionTypeForIntent(intent: RichMenuAreaIntent): Area['actionType'] {
   return RICH_MENU_ACTION_TYPE_BY_INTENT[intent]
+}
+
+/** ボタンの動きを人間の言葉で返す。キャンバスのエリア一覧でも使う。 */
+export function intentLabelOf(area: Area): string {
+  return INTENT_OPTIONS.find((o) => o.value === intentOf(area))?.label ?? 'ボタン'
 }
 
 /** 種類を変えたときの、入力欄の初期値。 */
@@ -292,8 +297,15 @@ export function AreaProperties({
                 value={(data.uri as string) ?? ''}
                 onChange={(e) => onUpdate({ actionData: { ...data, uri: e.target.value } })}
                 placeholder="https://..."
+                aria-invalid={Boolean(String(data.uri ?? '').trim()) && richMenuUriError(String(data.uri ?? '')) !== null}
                 className={inputClass}
               />
+              {/* R203: URLでない文字列はその場で理由を出す。空欄は「未設定」側の表示が担う。 */}
+              {String(data.uri ?? '').trim() && richMenuUriError(String(data.uri ?? '')) ? (
+                <p role="alert" className="text-danger mt-1 text-xs">
+                  {richMenuUriError(String(data.uri ?? ''))}
+                </p>
+              ) : null}
             </Field>
           )}
         </>

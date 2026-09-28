@@ -11,7 +11,7 @@
 // 最後に isDefaultForAll なら 1 ページ目を全友だち default に。
 
 import { buildTapPostbackData } from './rich-menu-tap.js';
-import { RICH_MENU_DIMENSIONS, RICH_MENU_MAX_PAGES } from '@line-crm/shared';
+import { RICH_MENU_DIMENSIONS, RICH_MENU_MAX_PAGES, richMenuUriError } from '@line-crm/shared';
 
 export type Bounds = { x: number; y: number; width: number; height: number };
 
@@ -371,6 +371,14 @@ function validateAreaByIntent(area: AreaInput, prefix: string, group: GroupInput
       if (!limited(uri, 1000)) {
         throw new RichMenuValidationError(`${prefix}: URLは1000文字以内にしてください`);
       }
+      // R203: 計測リンクはこちらが生成したURLなので飛ばす。手入力の飛び先は
+      // URIの形と許可schemeを確かめ、LINEへ届いて初めて失敗する事故を防ぐ。
+      if (!area.trackedLinkUrl) {
+        const uriError = richMenuUriError(uri);
+        if (uriError) {
+          throw new RichMenuValidationError(`${prefix}: ${uriError}`);
+        }
+      }
       return;
     }
     case 'text': {
@@ -487,6 +495,11 @@ export function validateRichMenuGroupForPublish(group: GroupInput): void {
         }
         if ([...uri].length > 1000) {
           throw new RichMenuValidationError(`${prefix}: URLは1000文字以内にしてください`);
+        }
+        // R203: intent なしの古いボタンにも同じ検査を掛ける。
+        const uriError = richMenuUriError(String(uri));
+        if (uriError) {
+          throw new RichMenuValidationError(`${prefix}: ${uriError}`);
         }
       } else if (area.actionType === 'postback') {
         const data = area.actionData.data;

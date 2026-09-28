@@ -91,6 +91,43 @@ export function isRuleComplete(rule: SegmentRule): boolean {
   }
 }
 
+/*
+ * R247: 入力済みだが不正な数値範囲（上下限の逆転・非整数）を見つける。
+ * `isRuleComplete` はこれを一律「書きかけ」として落とすため、そのまま
+ * 保存すると絞り込みが黙って外れる（対象が広がる）。編集中の空行とは分け、
+ * 両欄の近くに理由を示して保存を止めるために使う。なければ null。
+ */
+export function findInvalidRangeIssue(condition: SegmentCondition | null): string | null {
+  if (!condition) return null
+  const checkRule = (rule: SegmentRule): string | null => {
+    if (rule.type !== 'score_range') return null
+    const v = rule.value as { min?: unknown; max?: unknown } | null | undefined
+    const min = v?.min ?? null
+    const max = v?.max ?? null
+    if (min === null || min === undefined || min === '' || max === null || max === undefined || max === '') {
+      return null
+    }
+    if (!Number.isSafeInteger(min) || !Number.isSafeInteger(max)) {
+      return '行動スコアは整数で入力してください。'
+    }
+    if ((min as number) > (max as number)) {
+      return '行動スコアの上限が下限を下回っています。下限と上限を見直してください。'
+    }
+    return null
+  }
+  for (const rule of condition.rules ?? []) {
+    const issue = checkRule(rule)
+    if (issue) return issue
+  }
+  for (const group of condition.groups ?? []) {
+    for (const rule of group.rules ?? []) {
+      const issue = checkRule(rule)
+      if (issue) return issue
+    }
+  }
+  return null
+}
+
 /** 書きかけの行を落とす。保存にも数え上げにも同じものを使う。 */
 export function pruneCondition(condition: SegmentCondition | null): SegmentCondition | null {
   if (!condition) return null

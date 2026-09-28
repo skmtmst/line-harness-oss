@@ -24,6 +24,10 @@ const template = (input: {
   name: string
   messageContent: string
   folderId?: string | null
+  /** R194: 編集中の下書き本文。一覧の抜粋・検索はこれを最新として読む。 */
+  draftMessageContent?: string | null
+  hasDraft?: boolean
+  publishedAt?: string | null
 }) => ({
   ...input,
   category: 'general',
@@ -230,5 +234,52 @@ describe('テンプレート一覧の検索', () => {
     await search(input, '切替後')
     expect(tableText('B社テンプレート')).toBeTruthy()
     expect(mockState.listCalls).toEqual(['account-a', 'account-b'])
+  })
+
+  /*
+   * R194: 編集中（下書きあり）・未公開のテンプレートは、一覧の抜粋と検索が
+   * 「最新の下書き」を対象にする。公開版だけを見て古い本文が残ると、
+   * 保存できていないように見える。
+   */
+  test('編集中の下書き本文が抜粋と検索に使われ、対象版の札が出る', async () => {
+    mockState.templates = [
+      template({
+        id: 'drafted',
+        name: '書き換えた行',
+        messageContent: '古い公開版の本文です',
+        draftMessageContent: '書き換え後の新しい本文です',
+        hasDraft: true,
+        publishedAt: '2026-09-01T00:00:00.000Z',
+      }),
+      template({
+        id: 'unpublished',
+        name: 'まだ公開していない行',
+        messageContent: '最初に保存した本文',
+        draftMessageContent: '直した未公開の本文',
+        hasDraft: true,
+        publishedAt: null,
+      }),
+    ]
+    const { input } = await renderPage('書き換えた行')
+
+    // 抜粋は最新の下書き。どの版かの札（編集中／未公開）が付く。
+    // 767px以下のカードにも同じ文が出るので、表の中だけで見る。
+    const table = screen.getByRole('table')
+    const row = within(table).getByText('書き換えた行').closest('tr')!
+    expect(within(row).getByText(/書き換え後の新しい本文/)).toBeTruthy()
+    expect(within(row).queryByText(/古い公開版の本文/)).toBeNull()
+    expect(within(row).getByText('編集中')).toBeTruthy()
+    const unpublishedRow = within(table).getByText('まだ公開していない行').closest('tr')!
+    expect(within(unpublishedRow).getByText('未公開')).toBeTruthy()
+
+    // 下書きの本文で検索できる
+    await search(input, '書き換え後')
+    expect(tableText('書き換えた行')).toBeTruthy()
+    // 公開版の本文にも合う（旧版だけに一致しても検索からは落ちない）
+    await search(input, '古い公開版')
+    expect(tableText('書き換えた行')).toBeTruthy()
+    await search(input, '直した未公開')
+    expect(tableText('まだ公開していない行')).toBeTruthy()
+    expect(tableText('書き換えた行')).toBeNull()
   })
 })
