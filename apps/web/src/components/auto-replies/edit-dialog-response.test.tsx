@@ -396,6 +396,102 @@ describe('U053: 見出しが末尾1文字だけで折り返さない', () => {
   })
 })
 
+describe('R200: 連投を防ぐの範囲外は日本語で止める', () => {
+  function mountModal(draft: AutoReplyDraft = newDraft) {
+    const onSaved = vi.fn()
+    act(() => {
+      root.render(
+        <EditDialog draft={draft} templates={templates} onClose={() => {}} onSaved={onSaved} />,
+      )
+    })
+    return { onSaved }
+  }
+
+  const modalSave = () => buttonByText('保存')
+
+  it.each(['-1', '1.5'])('「%s」では送らず欄の名前と許容範囲を出す', async (value) => {
+    mountModal()
+    await flush()
+    await setValue(host.querySelector<HTMLInputElement>('#ar-cooldown')!, value)
+    await click(modalSave())
+    await flush()
+    expect(mocks.create).not.toHaveBeenCalled()
+    expect(host.textContent).toContain('「連投を防ぐ」は0〜10080の整数')
+  })
+
+  it('0〜10080の整数は通る', async () => {
+    mountModal()
+    await flush()
+    await setValue(host.querySelector<HTMLInputElement>('#ar-cooldown')!, '60')
+    await click(modalSave())
+    await flush()
+    expect(mocks.create).toHaveBeenCalledTimes(1)
+    expect((mocks.create.mock.calls[0][0] as Record<string, unknown>).cooldownMinutes).toBe(60)
+  })
+
+  it('空の追加行は除外して保存する（保存を妨げない）', async () => {
+    mountPage(
+      {
+        ...newDraft,
+        keywords: [{ keyword: '予約', matchType: 'contains' }],
+      },
+      'trigger',
+    )
+    await flush()
+    await click(buttonByText('＋ キーワードを追加'))
+    expect(host.querySelector<HTMLInputElement>('input[aria-label="キーワード2"]')).not.toBeNull()
+    await click(saveButton())
+    await flush()
+    expect(mocks.create).toHaveBeenCalledTimes(1)
+    const body = mocks.create.mock.calls[0][0] as Record<string, unknown>
+    expect((body.keywords as unknown[]).length).toBe(1)
+  })
+})
+
+describe('R201: 構造のないカード内容は保存しない', () => {
+  function mountModal(draft: AutoReplyDraft = newDraft) {
+    act(() => {
+      root.render(
+        <EditDialog draft={draft} templates={templates} onClose={() => {}} onSaved={() => {}} />,
+      )
+    })
+  }
+
+  // 編集窓には本文欄が複数ある（社内メモなど）。カード用の欄は見本で見分ける。
+  const cardTextarea = () => {
+    const found = Array.from(host.querySelectorAll<HTMLTextAreaElement>('textarea')).find((el) =>
+      el.placeholder.includes('bubble'),
+    )
+    if (!found) throw new Error('カードの内容欄が見つかりません')
+    return found
+  }
+
+  it.each(['{}', '[]', 'null'])('「%s」では送らずカードの形を求める', async (value) => {
+    mountModal()
+    await flush()
+    await click(buttonByText('カードを直接作る'))
+    await setValue(cardTextarea(), value)
+    await click(buttonByText('保存'))
+    await flush()
+    expect(mocks.create).not.toHaveBeenCalled()
+    expect(host.textContent).toContain('バブルかカルーセル')
+  })
+
+  it('正常なバブルは保存できる', async () => {
+    mountModal()
+    await flush()
+    await click(buttonByText('カードを直接作る'))
+    await setValue(
+      cardTextarea(),
+      '{"type":"bubble","body":{"type":"box","layout":"vertical","contents":[]}}',
+    )
+    await click(buttonByText('保存'))
+    await flush()
+    expect(mocks.create).toHaveBeenCalledTimes(1)
+    expect((mocks.create.mock.calls[0][0] as Record<string, unknown>).responseType).toBe('flex')
+  })
+})
+
 describe('U076: 明るい緑に白い小文字の選択ボタンを改める', () => {
   it('選択状態は bg-accent 白文字ではなく淡い緑＋濃い文字＋aria-pressed', async () => {
     mountPage()

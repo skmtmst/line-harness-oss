@@ -377,4 +377,87 @@ describe('点検・中: 自動応答の下書き確認・上限・ページ送�
       keyword: '料金', responseContent: '承りました', lineAccountId: 'account-1', isActive: 'yes',
     })).status).toBe(400);
   });
+
+  it('R200: 連投を防ぐの範囲外は3つの口すべて日本語で断る', async () => {
+    const target = app(testDb.db);
+    const post = (body: Record<string, unknown>) => target.instance.request('/api/auto-replies', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    }, target.bindings);
+    const base = {
+      keyword: '予約',
+      matchType: 'contains',
+      responseType: 'text',
+      responseContent: '承りました',
+      lineAccountId: 'account-1',
+    };
+
+    for (const cooldownMinutes of [-1, 1.5]) {
+      const res = await post({ ...base, cooldownMinutes });
+      expect(res.status).toBe(400);
+      const body = await res.json() as { error: string };
+      expect(body.error).toContain('連投を防ぐ');
+      expect(body.error).not.toContain('cooldownMinutes');
+    }
+
+    const put = (body: Record<string, unknown>) => target.instance.request('/api/auto-replies/rule-1', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    }, target.bindings);
+    const updated = await put({ cooldownMinutes: -1 });
+    expect(updated.status).toBe(400);
+    expect((await updated.json() as { error: string }).error).toContain('連投を防ぐ');
+
+    const draft = await target.instance.request('/api/auto-replies/rule-1/draft', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(settings({ cooldownMinutes: -1, expectedVersion: 2 })),
+    }, target.bindings);
+    expect(draft.status).toBe(400);
+    expect((await draft.json() as { error: string }).error).toContain('連投を防ぐ');
+
+    // 0〜10080の整数は通る（0は「抑制しない」として保存される）。
+    expect((await post({ ...base, keyword: '予約A', cooldownMinutes: 60 })).status).toBe(201);
+  });
+
+  it('R201: 構造のないカード内容は有効な設定として保存しない', async () => {
+    const target = app(testDb.db);
+    const post = (body: Record<string, unknown>) => target.instance.request('/api/auto-replies', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    }, target.bindings);
+    const base = {
+      keyword: '予約',
+      matchType: 'contains',
+      responseType: 'flex',
+      lineAccountId: 'account-1',
+    };
+
+    for (const responseContent of ['{}', '[]', 'null', '{"type":"text","text":"hi"}']) {
+      const res = await post({ ...base, keyword: `予約${responseContent.length}`, responseContent });
+      expect(res.status).toBe(400);
+      expect((await res.json() as { error: string }).error).toContain('バブルかカルーセル');
+    }
+
+    const good = await post({
+      ...base,
+      keyword: '予約カード',
+      responseContent: '{"type":"bubble","body":{"type":"box","layout":"vertical","contents":[]}}',
+    });
+    expect(good.status).toBe(201);
+
+    // 下書き保存口も同じ判定。
+    const draft = await target.instance.request('/api/auto-replies/rule-1/draft', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(settings({
+        responseType: 'flex', responseContent: '{}', expectedVersion: 2,
+      })),
+    }, target.bindings);
+    expect(draft.status).toBe(400);
+    expect((await draft.json() as { error: string }).error).toContain('バブルかカルーセル');
+  });
 });
