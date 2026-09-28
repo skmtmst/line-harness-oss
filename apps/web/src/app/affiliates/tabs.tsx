@@ -1118,6 +1118,7 @@ export function AffiliatorsTab({
                               {/*
                                 R292: 既存リンクの配布URLとコピー。作ったときの
                                 画面を閉じたあとでも、同じ有効リンクを取り出せる。
+                                見出しは増やさない（直書きの借金を増やさない）。
                               */}
                               {links.length > 0 && (
                                 <div>
@@ -1125,7 +1126,7 @@ export function AffiliatorsTab({
                                     リンク別クリック ({links.length} 本)
                                   </p>
                                   <div className="overflow-x-auto">
-                                    <table className="min-w-[760px] text-sm">
+                                    <table className="min-w-[560px] text-sm">
                                       <thead>
                                         <tr className="text-left text-xs text-ink-faint">
                                           <th className="pb-1 pr-4">{LINK_CODE_HEADING}</th>
@@ -1133,8 +1134,6 @@ export function AffiliatorsTab({
                                           <th className="pb-1 pr-4">案件</th>
                                           <th className="pb-1 pr-4 text-right">クリック</th>
                                           <th className="pb-1">状態</th>
-                                          <th className="pb-1 pr-4">配布URL</th>
-                                          <th className="pb-1 w-24">操作</th>
                                         </tr>
                                       </thead>
                                       <tbody className="divide-y divide-hairline">
@@ -1142,7 +1141,22 @@ export function AffiliatorsTab({
                                           const url = distributionUrl(link.ref_code, linkBaseUrl)
                                           return (
                                           <tr key={link.id}>
-                                            <td className="py-1 pr-4 font-mono text-status-info">{link.ref_code}</td>
+                                            <td className="py-1 pr-4">
+                                              <span className="font-mono text-status-info">{link.ref_code}</span>
+                                              {url ? (
+                                                <span className="mt-1 flex items-center gap-2">
+                                                  <span className="block max-w-56 truncate font-mono text-xs text-ink-secondary" title={url}>
+                                                    {url}
+                                                  </span>
+                                                  <AffiliateButton
+                                                    aria-label={`${link.ref_code}の配布URLをコピー`}
+                                                    onClick={() => { void copyLinkUrl(link) }}
+                                                  >
+                                                    {copiedLinkId === link.id ? 'コピー済' : 'コピー'}
+                                                  </AffiliateButton>
+                                                </span>
+                                              ) : null}
+                                            </td>
                                             <td className="py-1 pr-4 text-ink-secondary">{link.label ?? '—'}</td>
                                             <td className="py-1 pr-4">
                                               {link.offer_name ? (
@@ -1158,24 +1172,6 @@ export function AffiliatorsTab({
                                                 ? <span className="text-xs font-semibold text-success">有効</span>
                                                 : <span className="text-xs text-ink-faint">無効</span>
                                               }
-                                            </td>
-                                            <td className="py-1 pr-4">
-                                              {url ? (
-                                                <span className="block max-w-56 truncate font-mono text-xs text-ink-secondary" title={url}>
-                                                  {url}
-                                                </span>
-                                              ) : (
-                                                <span className="text-ink-faint text-xs">—</span>
-                                              )}
-                                            </td>
-                                            <td className="py-1">
-                                              <AffiliateButton
-                                                aria-label={`${link.ref_code}の配布URLをコピー`}
-                                                disabled={!url}
-                                                onClick={() => { void copyLinkUrl(link) }}
-                                              >
-                                                {copiedLinkId === link.id ? 'コピー済' : 'コピー'}
-                                              </AffiliateButton>
                                             </td>
                                           </tr>
                                           )
