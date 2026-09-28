@@ -91,3 +91,36 @@ export function describeAfterSend(afterSend: 'continue' | 'pause' | undefined): 
     ? { label: '返信まで一時停止', paused: true }
     : { label: '次へ進む', paused: false }
 }
+
+/*
+ * R215: 一覧の「内容」「種別」の桁に出す見出し。
+ *
+ * 質問の通は messageContent が空（' '）のまま残る。質問文を見出しにし、
+ * 種別は「質問・分岐」と出す。空の本文で代用しない。
+ */
+export function stepQuestionHeading(raw: unknown): string | null {
+  if (!raw || typeof raw !== 'object') return null
+  const text = ((raw as { text?: unknown }).text ?? '').toString().trim().split('\n')[0].slice(0, 60)
+  return text || null
+}
+
+/** 一覧の「内容」の桁。テンプレ名 → 質問文 → 本文1行目の順で出す。 */
+export function stepListTitle(
+  step: { messageContent: string; question?: unknown },
+  templateName: string | null,
+): string {
+  if (templateName) return templateName
+  const bodyLine = (step.messageContent || '').split('\n')[0].slice(0, 60).trim()
+  return stepQuestionHeading(step.question) || bodyLine || '（空）'
+}
+
+/** 一覧の「種別」の桁。質問がある通は「質問・分岐」と出す。 */
+export function stepKindLabel(
+  step: { question?: unknown },
+  templateName: string | null,
+  fallbackLabel: string,
+): string {
+  if (templateName) return 'テンプレート'
+  if (stepQuestionHeading(step.question)) return '質問・分岐'
+  return fallbackLabel
+}

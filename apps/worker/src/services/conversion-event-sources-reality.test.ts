@@ -378,6 +378,17 @@ describe('起点2の別の入口: 手動タグ付け・オートメーション�
 describe('起点3: 動画を見終えた (webinar_completed)', () => {
   const SESSION_START = Math.floor(Date.UTC(2026, 6, 29, 11, 0) / 1000);
 
+  // heartbeat は15秒ごとの実視聴を想定し、経過時間に見合わない跳びは
+  // 異常として数えない。同秒内の550秒跳びは異常扱いになるので、試験も
+  // 実視聴と同じく時刻を進めて送る（数える意図は変えない）。
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(SESSION_START * 1000));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   function setupWebinar() {
     sqlite
       .prepare(
@@ -390,7 +401,8 @@ describe('起点3: 動画を見終えた (webinar_completed)', () => {
       .run();
   }
 
-  async function heartbeat(positionSeconds: number): Promise<Response> {
+  async function heartbeat(positionSeconds: number, advanceSeconds: number): Promise<Response> {
+    vi.advanceTimersByTime(advanceSeconds * 1000);
     const app = new Hono<Env>();
     app.route('/', webinarRoutes);
     const exec = makeExecCtx();
@@ -411,16 +423,16 @@ describe('起点3: 動画を見終えた (webinar_completed)', () => {
     addPoint('webinar_completed');
     setupWebinar();
 
-    const half = await heartbeat(400);
+    const half = await heartbeat(400, 400);
     expect(half.status).toBe(200);
     // 90%に届かない位置では数えない。
     expect(countEvents('webinar_completed')).toBe(0);
 
-    const done = await heartbeat(950);
+    const done = await heartbeat(950, 300);
     expect(done.status).toBe(200);
     expect(countEvents('webinar_completed')).toBe(1);
 
-    await heartbeat(980);
+    await heartbeat(980, 60);
     expect(countEvents('webinar_completed')).toBe(1);
   });
 });

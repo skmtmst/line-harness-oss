@@ -17,6 +17,7 @@ import { describeAction } from './form-update-summary'
 import { fieldInput, type FormRefs } from './form-refs'
 import Button from '@/components/shared/button'
 import DateTimeField from '@/components/shared/date-time-field'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
 
 /**
  * 期限を初めてONにしたときの初期値。日本時間で「7日後の23:59」。
@@ -42,6 +43,13 @@ export default function OptionsDialog({
   onSave: () => Promise<void>
 }) {
   const patch = (next: Partial<FormOptions>) => onChange({ ...value, ...next })
+  /*
+   * R198: 開いている間はTab/Shift+Tabを窓の中に閉じ込め、Escで閉じる。
+   * 呼び出し元（編集画面）は条件付きで描画しているので、描画中＝開いている。
+   * 閉じたあとのフォーカスは、開く前の場所（公開ボタンなど）へ戻す。
+   * 共通の窓制御と同じ作法にする（shared/overlay-utils）。
+   */
+  const panelRef = useOverlayFocus(true, onClose)
 
   return (
     <div
@@ -57,6 +65,7 @@ export default function OptionsDialog({
         寸法は options-dialog.module.css にだけ置く（任意値にしない）。
       */}
       <div
+        ref={panelRef}
         className={`bg-canvas flex w-full flex-col overflow-hidden rounded-panel shadow-lg ${styles.panel}`}
       >
         <div className="border-hairline flex shrink-0 items-center justify-between border-b px-5 py-3">

@@ -615,7 +615,12 @@ function MessageStep({ definition, setDefinition, friendKind, scenarios, openAct
   const skipsScenario = friendKind === 'returning' && definition.returningMode === 'none'
   return (
     <Section title="初回案内" description="最初に届けるメッセージと選択肢を設定します。">
-      <div className={'friend-add-editor-messageTabs'}>{(['text', 'template', 'form'] as const).map((type) => <button type="button" key={type} className={definition.messageType === type ? 'friend-add-editor-messageTabActive' : 'friend-add-editor-messageTab'} onClick={() => setDefinition((current) => ({ ...current, messageType: type }))}>{type === 'text' ? 'テキスト' : type === 'template' ? 'テンプレート' : '回答フォーム'}</button>)}</div>
+      {/*
+        R202: テンプレート・回答フォームは選ぶ欄も送る口もなく、押しても
+        配信形式の表示だけが変わっていた。完成していない形式は選べる形で
+        出さない（共通規則 2-2）。保存済みの値自体は残し、文面の編集はできる。
+      */}
+      <div className={'friend-add-editor-messageTabs'}><button type="button" className={definition.messageType === 'text' ? 'friend-add-editor-messageTabActive' : 'friend-add-editor-messageTab'} onClick={() => setDefinition((current) => ({ ...current, messageType: 'text' }))}>テキスト</button></div>
       {definition.messageType !== 'scenario' && <Field label="初回メッセージ" required><TextArea rows={7} value={definition.messageText} onChange={(event) => setDefinition((current) => ({ ...current, messageText: event.target.value }))} placeholder="友だち追加ありがとうございます。まずはご希望の内容をお選びください。" /></Field>}
       <div className={'friend-add-editor-messageChoices'} aria-label="初回メッセージの選択肢"><span>サービスを見る</span><span>相談を予約</span><span>お問い合わせ</span></div>
       <div className={'friend-add-editor-twoCols'}>

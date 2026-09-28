@@ -31,6 +31,7 @@ import { canRunBulk } from '@/components/friends/bulk-run-view'
 import { FRIENDS_MERGED_TABS } from './friends-tabs'
 import { buildBroadcastHandoff } from '@/lib/friends-broadcast-condition'
 import { readFriendsListSnapshot, writeFriendsListSnapshot } from './list-state'
+import { conditionsToEditorState, savedSearchParams, savedSearchSummary } from '@/components/friends/saved-search-utils'
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50] as const
 /*
   検索行の副操作は設計 `PhxG6` で高さ38px。共通Buttonは36pxなので当てない
@@ -345,13 +346,37 @@ function FriendsPageInner({
   useEffect(() => setPage(1), [selectedAccountId])
   useEffect(() => {
     // 保存した検索がオフのaccountでは ?savedSearch= 直URLも適用しない。
-    if (!directSavedSearchId || !savedSearchEnabled) return
+    if (!directSavedSearchId || !savedSearchEnabled || !selectedAccountId) return
+    /*
+     * R187: 直URLでも保存した並び順・表示件数を使う。IDだけ渡すと
+     * 新しい順・20件に戻り、検索ダイアログからの適用と食い違う。
+     * 取れなければIDだけの適用に倒し、一覧自体は止めない。
+     */
+    let cancelled = false
+    const accountId = selectedAccountId
+    const savedId = directSavedSearchId
     setAdvanced({
-      params: { savedSearchId: directSavedSearchId },
+      params: { savedSearchId: savedId },
       summary: ['保存した検索を適用中'],
     })
     setPage(1)
-  }, [directSavedSearchId, savedSearchEnabled])
+    void api.savedSearches.detail(savedId, accountId).then((res) => {
+      if (cancelled || !res.success) return
+      const params = savedSearchParams(savedId, res.data.conditions)
+      setAdvanced({
+        params,
+        summary: [`対象：${res.data.name}`, ...savedSearchSummary(res.data.conditions, allTags)],
+        editorState: conditionsToEditorState(res.data.conditions),
+      })
+      if (params.sort) setSortMode(params.sort)
+      if (params.limit && PAGE_SIZE_OPTIONS.includes(Number(params.limit) as (typeof PAGE_SIZE_OPTIONS)[number])) {
+        setPageSize(Number(params.limit) as (typeof PAGE_SIZE_OPTIONS)[number])
+      }
+      setPage(1)
+    }).catch(() => {})
+    return () => { cancelled = true }
+    /* タグ名の解決に使うため、タグ一覧の到着後にも要約を作り直す。 */
+  }, [directSavedSearchId, savedSearchEnabled, selectedAccountId, allTags])
   useEffect(() => {
     // 復元を評価するまでは読まない。既定条件で一度読んでから
     // 保存条件で読み直すと、一瞬別の一覧が見えて条件を2回取る。

@@ -219,6 +219,54 @@ describe('項目の作成', () => {
     );
   });
 
+describe('R181 既定値は個別値と同じ物差しで検証する', () => {
+  async function createDefault(type: string, defaultValue: unknown) {
+    return req(makeApp(), '/api/friend-fields?lineAccountId=account-1', 'POST', {
+      name: '検査項目', fieldKey: `check_${type}`, type, defaultValue,
+    });
+  }
+
+  it('存在しない日付の既定値は422', async () => {
+    const res = await createDefault('date', '2026-02-31');
+    expect(res.status).toBe(422);
+    expect(mocks.createFriendFieldForScope).not.toHaveBeenCalled();
+  });
+
+  it('うるう日の既定値は作れる', async () => {
+    const res = await createDefault('date', '2028-02-29');
+    expect(res.status).toBe(201);
+  });
+
+  it('存在しない日時の既定値は422', async () => {
+    const res = await createDefault('datetime', '2026-02-31T10:00:00+09:00');
+    expect(res.status).toBe(422);
+    expect(mocks.createFriendFieldForScope).not.toHaveBeenCalled();
+  });
+
+  it('数字のない電話番号の既定値は422', async () => {
+    const res = await createDefault('tel', '--------');
+    expect(res.status).toBe(422);
+    expect(mocks.createFriendFieldForScope).not.toHaveBeenCalled();
+  });
+
+  it('正しい電話番号の既定値は作れる', async () => {
+    const res = await createDefault('tel', '090-1234-5678');
+    expect(res.status).toBe(201);
+  });
+
+  it('個別値でも存在しない日時・数字なし電話番号は422', async () => {
+    mocks.getFriendFields.mockResolvedValue([
+      { ...FIELD, id: 'ff-dt', field_key: 'at', type: 'datetime' },
+      { ...FIELD, id: 'ff-tel', field_key: 'tel', type: 'tel' },
+    ]);
+    for (const values of [{ 'ff-dt': '2026-02-31T10:00:00+09:00' }, { 'ff-tel': '--------' }]) {
+      const res = await req(makeApp(), '/api/friends/f-1/fields', 'PUT', { values });
+      expect(res.status).toBe(422);
+    }
+    expect(mocks.setFriendFieldValue).not.toHaveBeenCalled();
+  });
+});
+
   it('選択肢を不変ID付きで保存する', async () => {
     const res = await req(makeApp(), '/api/friend-fields?lineAccountId=account-1', 'POST', {
       name: '都道府県', fieldKey: 'prefecture', type: 'select', options: ['東京', '大阪'], defaultValue: '東京',

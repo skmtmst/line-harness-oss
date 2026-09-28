@@ -2455,13 +2455,14 @@ function ReactionsOverviewTab({ accountId }: { accountId: string }) {
   const clickReason = overview.metrics.lineClicked.reason ?? overview.metrics.delivered.reason ?? undefined
   const clickHelp = clickReason ? undefined : 'LINEクリックを届いた人で割った割合です'
   const exportCampaigns = () => downloadCsv('analytics-reactions.csv', [
-    ['配信', '種類', '送った日時', '対象', '到達', '開封', 'LINEクリック', '成果'],
+    ['配信', '種類', '送った日時', '対象', '到達', '送信通数', '開封', 'LINEクリック', '成果'],
     ...overview.campaigns.map((item) => [
       item.name,
       item.kind === 'broadcast' ? '一斉配信' : 'シナリオ',
       item.sentAt,
       shownValue(item.targetPeople),
       shownValue(item.delivered),
+      shownValue(item.sentMessages),
       shownValue(item.opened),
       shownValue(item.lineClicked),
       shownValue(item.outcomes),
@@ -2474,7 +2475,7 @@ function ReactionsOverviewTab({ accountId }: { accountId: string }) {
     <AnalyticsPeriodControl days={days} onChange={setDays} />
     <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
       <KpiCard title={`この${days}日に送った`} value={overview.campaigns.length} unit="回" detail="" help="一覧に取得できた配信の回数です" />
-      <KpiCard title="届いた人" value={delivered} unit="人" help="配信ごとの到達数の合計です" {...metricCardState(overview.metrics.delivered, { detail: '' }, state.retry)} />
+      <KpiCard title="届いた人" value={delivered} unit="人" help="一斉配信の到達数の合計です。シナリオは届いた人数が取れないため含みません" {...metricCardState(overview.metrics.delivered, { detail: '' }, state.retry)} />
       <KpiCard title="押された割合" value={clickRate} unit="%" detail="" help={clickHelp} description={clickReason} />
       <KpiCard title="取得できない配信" value={shownValue(overview.metrics.unavailableCampaigns)} unit="件" help="開封などを取得できない配信の件数です" {...metricCardState(overview.metrics.unavailableCampaigns, { detail: '' }, state.retry)} />
     </div>
@@ -2497,8 +2498,8 @@ function ReactionsOverviewTab({ accountId }: { accountId: string }) {
       <AnalyticsExportButton onClick={exportCampaigns} disabled={overview.campaigns.length === 0} />
     </div>
     <div className="bg-canvas rounded-card border-hairline overflow-hidden border"><table className="w-full table-fixed">
-      <thead><TableHeadRow><Th>配信</Th><Th>種類・日時</Th><Th align="right">対象</Th><Th align="right" help="配信ごとの到達数の合計です">到達</Th><Th align="right" help="開いた人数です。20人未満など取得できない数は「—」で示します">開封</Th><Th align="right" help="こちらで作った中継URLを押した人数です">LINEクリック</Th><Th align="right">成果</Th></TableHeadRow></thead>
-      <tbody className="divide-hairline divide-y">{overview.campaigns.length === 0 ? <tr><td colSpan={7} className="text-ink-faint p-8 text-center text-sm">この期間の配信はありません</td></tr> : overview.campaigns.map((item) => <tr key={`${item.kind}:${item.id}`} className="text-sm"><td className="truncate px-4 py-3 font-medium" title={item.name}>{item.name}</td><td className="text-ink-secondary px-3 py-3">{item.kind === 'broadcast' ? '一斉配信' : 'シナリオ'}<br /><span className="text-xs tabular-nums">{formatAnalyticsDateTime(item.sentAt)}</span></td><td className="px-3 py-3 text-right"><MetricCell metric={item.targetPeople} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.delivered} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.opened} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.lineClicked} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.outcomes} /></td></tr>)}</tbody>
+      <thead><TableHeadRow><Th>配信</Th><Th>種類・日時</Th><Th align="right">対象</Th><Th align="right" help="一斉配信で届いた人数です。シナリオは届いた人数が取れないため「—」です">到達</Th><Th align="right" help="開いた人数です。20人未満など取得できない数は「—」で示します">開封</Th><Th align="right" help="こちらで作った中継URLを押した人数です">LINEクリック</Th><Th align="right">成果</Th></TableHeadRow></thead>
+      <tbody className="divide-hairline divide-y">{overview.campaigns.length === 0 ? <tr><td colSpan={7} className="text-ink-faint p-8 text-center text-sm">この期間の配信はありません</td></tr> : overview.campaigns.map((item) => <tr key={`${item.kind}:${item.id}`} className="text-sm"><td className="truncate px-4 py-3 font-medium" title={item.name}>{item.name}</td><td className="text-ink-secondary px-3 py-3">{item.kind === 'broadcast' ? '一斉配信' : 'シナリオ'}<br /><span className="text-xs tabular-nums">{formatAnalyticsDateTime(item.sentAt)}</span></td><td className="px-3 py-3 text-right"><MetricCell metric={item.targetPeople} />{item.kind === 'scenario' && <p className="mt-1 text-xs text-ink-faint">送信 <MetricCell metric={item.sentMessages} />通</p>}</td><td className="px-3 py-3 text-right"><MetricCell metric={item.delivered} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.opened} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.lineClicked} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.outcomes} /></td></tr>)}</tbody>
     </table></div>
   </div>
 }
@@ -2877,7 +2878,17 @@ function SavedAnalyticsTab({ accountId, onCountChange, canManage }: {
   }, [accountId, selectedId, snapshotReload])
 
   const selected = items.find((item) => item.id === selectedId) ?? null
-  const visibleItems = items.filter((item) => `${item.name} ${item.createdByName}`.toLowerCase().includes(query.trim().toLowerCase()))
+  const visibleItems = useMemo(
+    () => items.filter((item) => `${item.name} ${item.createdByName}`.toLowerCase().includes(query.trim().toLowerCase())),
+    [items, query],
+  )
+  // 監査 R226: 絞り込みで選んだ項目が見えなくなったら、見えている先頭へ
+  // 選び直す。0件なら選択を外す——条件に合わない分析の履歴を出し続けない。
+  useEffect(() => {
+    if (!visibleItems.some((item) => item.id === selectedId)) {
+      setSelectedId(visibleItems[0]?.id ?? '')
+    }
+  }, [visibleItems, selectedId])
   // ANALYTICS-05: 「定義が古い」のは版ずれだけを数える。未取得・失敗は
   // 集計状態の話で、定義の新旧とは別の軸——混ぜると、新しい定義で
   // まだ集計していないものと、単に取れなかったものが区別できない。
@@ -3056,6 +3067,12 @@ function SavedAnalyticsTab({ accountId, onCountChange, canManage }: {
                   </TableHeadRow>
                 </thead>
                 <tbody className="divide-hairline divide-y">
+                  {visibleItems.length === 0 && (
+                    <tr><td colSpan={7} className="text-ink-faint p-8 text-center text-sm">
+                      条件に合う保存済み分析はありません。
+                      <button type="button" className="text-action ml-2 font-semibold hover:underline" onClick={() => setQuery('')}>検索をやめる</button>
+                    </td></tr>
+                  )}
                   {visibleItems.map((item) => {
                     const active = selectedId === item.id
                     return (
@@ -3121,6 +3138,8 @@ function SavedAnalyticsTab({ accountId, onCountChange, canManage }: {
             )}
             {snapshotLoading ? (
               <p className="text-ink-faint mt-4 text-sm">結果を読み込んでいます</p>
+            ) : !selected ? (
+              <p className="text-ink-faint mt-4 text-sm">一覧から分析を選んでください</p>
             ) : snapshots.length === 0 ? (
               <p className="text-ink-faint mt-4 text-sm">保存された結果はありません</p>
             ) : (

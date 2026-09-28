@@ -5798,6 +5798,23 @@ const spec = {
         },
       },
     },
+    '/api/forms/{id}/test-token': {
+      post: {
+        tags: ['Forms'],
+        summary: '公開前の試し開き・試し回答に使う合言葉を発行する',
+        description: '生の合言葉はこの応答でしか返さない。台帳にはSHA-256の16進だけを残し、有効期限は24時間。試し回答は集計に入れず、回答後アクションも動かさない。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': { description: '合言葉と有効期限（token, expiresAt）' },
+          '403': { description: 'フォームの編集権限が無い' },
+          '404': { description: 'フォームが無い、または権限範囲外' },
+          '429': { description: '試し合言葉が上限（5件）に達している' },
+        },
+      },
+    },
     // ── Event applicant operations ─────────────────────────────────────────
     '/api/events/admin/events/{id}/occurrence-selector': {
       get: {
@@ -5864,6 +5881,187 @@ const spec = {
           '409': { description: '冪等キーが別内容に使われた、またはsnapshotが不正' },
           '410': { description: 'snapshotの期限切れ' },
           '422': { description: 'snapshotId が無い' },
+        },
+      },
+    },
+    // ── Event lifecycle and change review ─────────────────────────────────
+    '/api/events/admin/events/{id}/lifecycle': {
+      post: {
+        tags: ['Events'],
+        summary: 'イベントの状態を切り替える',
+        description: '下書き・公開中・一時停止・終了・中止を切り替える。一時停止と中止は理由が必須。公開可否へ両書きする。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object', required: ['to'],
+          properties: {
+            to: { type: 'string', enum: ['draft', 'published', 'paused', 'ended', 'cancelled'] },
+            reason: { type: 'string' },
+            idempotency_key: { type: 'string' },
+          },
+        } } } },
+        responses: {
+          '200': { description: '切り替え後の状態と版' },
+          '400': { description: 'account_id が無い' },
+          '403': { description: 'owner/admin権限が無い、またはアカウント範囲外' },
+          '404': { description: 'イベントが無い、またはアカウント範囲外' },
+          '409': { description: '許さない遷移、または版の食い違い' },
+          '422': { description: '状態または理由が不正' },
+        },
+      },
+    },
+    '/api/events/admin/events/{id}/change-review': {
+      post: {
+        tags: ['Events'],
+        summary: '日時・定員・会場の変更前に影響を確かめる',
+        description: '読み取り専用の事前表示。影響人数と止める理由を返す。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object', required: ['slot_changes'],
+          properties: {
+            slot_changes: { type: 'array', items: { type: 'object', required: ['slot_id'], properties: {
+              slot_id: { type: 'string' },
+              starts_at: { type: 'string' },
+              ends_at: { type: 'string' },
+              capacity: { type: 'integer', minimum: 1 },
+              is_active: { type: 'integer', enum: [0, 1] },
+            } } },
+            event_changes: { type: 'object', properties: {
+              venue_name: { type: 'string' },
+              venue_url: { type: 'string' },
+            } },
+          },
+        } } } },
+        responses: {
+          '200': { description: '影響人数と止める理由の事前表示' },
+          '400': { description: 'account_id が無い' },
+          '403': { description: 'owner/admin権限が無い' },
+          '404': { description: 'イベントが無い、またはアカウント範囲外' },
+          '422': { description: 'slot_changes が不正' },
+        },
+      },
+    },
+    '/api/events/admin/events/{id}/change-review/apply': {
+      post: {
+        tags: ['Events'],
+        summary: '確かめた変更を版の一致で適用する',
+        description: '版の一致で直列化し、二重実行は冪等キーで吸収する。日時・会場が動いた回の確定申込へは届く範囲でLINE通知する。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object', required: ['expected_version', 'idempotency_key', 'slot_changes'],
+          properties: {
+            expected_version: { type: 'integer', minimum: 1 },
+            idempotency_key: { type: 'string', minLength: 1 },
+            change_reason: { type: 'string' },
+            slot_changes: { type: 'array', items: { type: 'object', required: ['slot_id'], properties: {
+              slot_id: { type: 'string' },
+              starts_at: { type: 'string' },
+              ends_at: { type: 'string' },
+              capacity: { type: 'integer', minimum: 1 },
+              is_active: { type: 'integer', enum: [0, 1] },
+            } } },
+            event_changes: { type: 'object', properties: {
+              venue_name: { type: 'string' },
+              venue_url: { type: 'string' },
+            } },
+          },
+        } } } },
+        responses: {
+          '200': { description: '適用済み（同じ冪等キーの再実行を含む）' },
+          '400': { description: 'account_id または冪等キーが無い' },
+          '403': { description: 'owner/admin権限が無い' },
+          '404': { description: 'イベントが無い、またはアカウント範囲外' },
+          '409': { description: '版の食い違い' },
+          '422': { description: '版・変更内容が不正' },
+        },
+      },
+    },
+    '/api/events/admin/occurrences/{id}/waitlist/reorder': {
+      post: {
+        tags: ['Events'],
+        summary: '待ち順を手で並べ直す',
+        description: '枠の待ち全件の並べ直しで受ける。理由が必須。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object', required: ['reason', 'ordered_ids'],
+          properties: {
+            reason: { type: 'string', minLength: 1 },
+            ordered_ids: { type: 'array', items: { type: 'string' } },
+            expected_version: { type: 'integer', minimum: 1 },
+          },
+        } } } },
+        responses: {
+          '200': { description: '並べ直し後の順番と開催回の版' },
+          '400': { description: 'account_id が無い' },
+          '403': { description: 'owner/admin/staff権限が無い' },
+          '404': { description: '開催回が無い、またはアカウント範囲外' },
+          '409': { description: '版の食い違い' },
+          '422': { description: '理由または ordered_ids が不正' },
+        },
+      },
+    },
+    '/api/events/admin/occurrences/{id}/waitlist/skip': {
+      post: {
+        tags: ['Events'],
+        summary: '待ちの案内を今回見送り最後尾へ回す',
+        description: '飛ばし。行は消さない。理由が必須。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object', required: ['reason', 'waitlist_id'],
+          properties: {
+            reason: { type: 'string', minLength: 1 },
+            waitlist_id: { type: 'string', minLength: 1 },
+            expected_version: { type: 'integer', minimum: 1 },
+          },
+        } } } },
+        responses: {
+          '200': { description: '最後尾へ回した待ちと開催回の版' },
+          '400': { description: 'account_id が無い' },
+          '403': { description: 'owner/admin/staff権限が無い' },
+          '404': { description: '開催回または待ちが無い、アカウント範囲外' },
+          '409': { description: '版の食い違い' },
+          '422': { description: '理由または waitlist_id が不正' },
+        },
+      },
+    },
+    '/api/events/liff/bookings/{id}/change': {
+      post: {
+        tags: ['Events'],
+        summary: '本人が予約を別の開催回へ移す',
+        description: '新しい席を確保できた時だけ元の申込を取り消す、まとめて1つの操作。確保に失敗したら旧予約を維持する。',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'Idempotency-Key', in: 'header', required: true, schema: { type: 'string', format: 'uuid' } },
+        ],
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object', required: ['to_slot_id'],
+          properties: {
+            to_slot_id: { type: 'string', minLength: 1 },
+          },
+        } } } },
+        responses: {
+          '200': { description: '移し先の予約IDと状態（同じ冪等キーの再実行を含む）' },
+          '400': { description: '本人確認・冪等キーが無い' },
+          '401': { description: 'LINE本人確認に失敗' },
+          '403': { description: '変更締切を過ぎたなど変更できない' },
+          '404': { description: '予約が無い、または本人・アカウント範囲外' },
+          '409': { description: '満席・締切・上限などにより移動できない' },
+          '410': { description: '移し先の開催回が始まった、または受付終了' },
+          '422': { description: '移し先の指定が不正' },
         },
       },
     },
@@ -5947,6 +6145,38 @@ const spec = {
         parameters: [{ name: 'groupId', in: 'path', required: true, schema: { type: 'string' } }],
         requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { dryRun: { type: 'boolean' } } } } } },
         responses: { '200': { description: 'Diffs listed or repaired' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found or not visible' }, '502': { description: 'LINE state unreadable' } },
+      },
+    },
+    '/api/rich-menu-groups/{groupId}/publish-progress': {
+      get: {
+        tags: ['Rich Menus'],
+        summary: 'K-1: 最新の公開実行の4段（画像・メニュー・割り当て・片付け）（owner/admin）',
+        parameters: [{ name: 'groupId', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Steps with per-step status and message' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found or not visible' } },
+      },
+    },
+    '/api/rich-menu-groups/{groupId}/prepublish-check': {
+      get: {
+        tags: ['Rich Menus'],
+        summary: 'O-1: 公開前の確認（自前検査・実機・版）。LINE検査は別口（owner/admin）',
+        parameters: [{ name: 'groupId', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Self check, device confirmation and version state' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found or not visible' } },
+      },
+    },
+    '/api/rich-menu-groups/{groupId}/validate': {
+      post: {
+        tags: ['Rich Menus'],
+        summary: 'O-1: 公開する形のままLINEの検査APIに通す。下書きもLINEも変えない（owner/admin）',
+        parameters: [{ name: 'groupId', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Self and LINE check results' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found or not visible' } },
+      },
+    },
+    '/api/rich-menu-groups/{groupId}/device-confirm': {
+      post: {
+        tags: ['Rich Menus'],
+        summary: 'O-1: 実機で見た記録。今の下書きにひもづく（owner/admin）',
+        parameters: [{ name: 'groupId', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Confirmation recorded' }, '403': { description: 'Owner or admin role required' }, '404': { description: 'Not found or not visible' } },
       },
     },
     '/api/rich-menu-groups/{groupId}/duplicate': {
@@ -6097,6 +6327,66 @@ const spec = {
         },
       },
     },
+    // ── Webinars（動画素材の準備・開催回の定員。J-1・N #821） ──────────────
+    '/api/webinars/{id}/video-asset': {
+      get: {
+        tags: ['Webinars'], summary: '動画素材の準備段階を取得',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Video asset stage' }, '404': { description: 'Webinar not found' } },
+      },
+    },
+    '/api/webinars/{id}/video-asset/advance': {
+      post: {
+        tags: ['Webinars'], summary: '動画素材の準備段階を1段進める',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object', required: ['stage'],
+          properties: {
+            stage: { type: 'string', enum: ['uploaded', 'inspecting', 'converting', 'packaging', 'thumbnail', 'ready', 'failed'] },
+            errorCode: { type: 'string' },
+            durationSeconds: { type: ['integer', 'null'], minimum: 0 },
+          },
+        } } } },
+        responses: {
+          '200': { description: 'Stage advanced' },
+          '400': { description: 'Invalid stage or body' },
+          '403': { description: 'Owner or admin role required' },
+          '404': { description: 'Webinar not found' },
+          '409': { description: 'Stage transition not allowed' },
+        },
+      },
+    },
+    '/api/webinars/{id}/sessions/{startAt}': {
+      get: {
+        tags: ['Webinars'], summary: '開催回の定員と残席を取得',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'startAt', in: 'path', required: true, schema: { type: 'integer' } },
+        ],
+        responses: {
+          '200': { description: 'Session capacity and remaining seats' },
+          '400': { description: 'Invalid session start' },
+          '404': { description: 'Webinar not found' },
+        },
+      },
+      put: {
+        tags: ['Webinars'], summary: '開催回の定員を設定（nullで無制限に戻す）',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'startAt', in: 'path', required: true, schema: { type: 'integer' } },
+        ],
+        requestBody: { required: true, content: { 'application/json': { schema: {
+          type: 'object',
+          properties: { capacity: { type: ['integer', 'null'], minimum: 1 } },
+        } } } },
+        responses: {
+          '200': { description: 'Session capacity updated' },
+          '400': { description: 'Invalid session start or capacity' },
+          '403': { description: 'Owner or admin role required' },
+          '404': { description: 'Webinar not found' },
+        },
+      },
+    },
   },
   tags: [
     { name: 'Dashboard', description: 'ダッシュボードの予定・数字の出どころ・印刷' },
@@ -6118,6 +6408,7 @@ const spec = {
     { name: 'Rich Menus', description: 'リッチメニュー公開予約' },
     { name: 'Common Vars', description: '共通情報と監査付きCSV書き出し' },
     { name: 'Automations', description: 'オートメーションの定義・実行記録' },
+    { name: 'Webinars', description: 'ウェビナーの動画素材・開催回の定員' },
     { name: 'Settings', description: '機能設定' },
     { name: 'Operator notifications', description: '運用者へのお知らせの自動実行' },
     { name: 'Webhook', description: 'LINE Webhook' },

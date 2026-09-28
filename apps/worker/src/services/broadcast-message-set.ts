@@ -94,6 +94,10 @@ function contentForBubble(type: string, value: unknown): string {
     if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
       throw new Error('messageBubbles location coordinates are required');
     }
+    // 監査 R210: 地図上に無い数字を完成扱いにしない。画面の検査とそろえる。
+    if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+      throw new Error('位置情報の緯度は-90〜90、経度は-180〜180で入力してください');
+    }
     return JSON.stringify({
       title: typeof location.title === 'string' && location.title.trim() ? location.title.trim() : '場所',
       address: typeof location.address === 'string' ? location.address.trim() : '',

@@ -113,3 +113,14 @@ describe('R30 段移動ではその段の欄だけ確かめ欄の下に出す', 
     expect(navigation.replace).not.toHaveBeenCalled()
   })
 })
+
+describe('R202 初回案内は完成している形式だけ選べる形で出す', () => {
+  it('テンプレート・回答フォームのタブは出さずテキストだけ出す', async () => {
+    state.search = 'step=message'
+    await render()
+    const tabs = [...host.querySelectorAll('.friend-add-editor-messageTabs button')].map((item) => item.textContent)
+    expect(tabs).toEqual(['テキスト'])
+    expect(host.textContent).not.toContain('テンプレート')
+    expect(host.textContent).not.toContain('回答フォーム')
+  })
+})

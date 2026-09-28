@@ -39,6 +39,11 @@ export interface StepPreviewProps {
   kindState?: MessageKindState
   /** 誰に送るか。札に出す。 */
   audienceLabel: string
+  /**
+   * R213: いま触っている通の番号。新規1通目のときは 1（省略時も 1）。
+   * 2通目以降の編集で 1通目と案内すると、前後の流れを取り違える。
+   */
+  stepOrder?: number
 }
 
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土']
@@ -186,7 +191,9 @@ export default function StepPreview({
   question,
   kindState,
   audienceLabel,
+  stepOrder = 1,
 }: StepPreviewProps) {
+  const stepLabel = `${stepOrder}通目`
   const start = nowJst()
   const at = computeDeliveryAt(
     start,
@@ -201,13 +208,13 @@ export default function StepPreview({
 
   return (
     <aside
-      aria-label="1通目の下見"
+      aria-label={`${stepLabel}の下見`}
       className={`${styles.preview} border-hairline bg-canvas border p-4`}
     >
       {/* LINEの見た目の枠は共通部品 `LinePreview`（B-6）。届く日時は見える札のまま残す。 */}
       <div className="-mx-4 -mt-4 mb-4">
         <LinePreview
-          caption={<span className="inline-flex items-center gap-1"><Clock aria-hidden size={13} strokeWidth={1.75} />{words}に届きます（1通目）</span>}
+          caption={<span className="inline-flex items-center gap-1"><Clock aria-hidden size={13} strokeWidth={1.75} />{words}に届きます（{stepLabel}）</span>}
         >
           {templateName ? (
             <Bubble>
@@ -382,8 +389,15 @@ export default function StepPreview({
         </p>
       )}
 
+      {/*
+        R213: 新規1通目の案内を使い回さない。2通目以降の編集中に
+        「2通目からは、このあとの編集画面で足せます」と出すと、
+        いま触っている通と順序を取り違える。
+      */}
       <p className="text-ink-faint border-hairline mt-3 border-t pt-3 text-micro leading-relaxed">
-        2通目からは、このあとの編集画面で足せます。足すと、ここと同じ形で届く日時が並びます。
+        {stepOrder <= 1
+          ? '2通目からは、このあとの編集画面で足せます。足すと、ここと同じ形で届く日時が並びます。'
+          : `いま編集中の${stepLabel}の見本です。前後の通は、一覧の並びで確認できます。`}
       </p>
 
       <section className="border-hairline mt-3 border-t pt-3">
