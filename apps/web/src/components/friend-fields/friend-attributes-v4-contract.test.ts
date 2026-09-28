@@ -316,7 +316,8 @@ describe('友だち属性 V4 contract', () => {
     expect(source).toContain("impactStatus === 'ready' && impact && !impact.canDelete && (")
     expect(source).not.toContain('api.tags.delete(tag.id)')
     expect(source).toContain('impact.referenceCounts.affiliateOffers > 0')
-    expect(source).toContain('有効な参照があるタグは、完全に削除できません')
+    /* R190: 操作名は保管に統一。実行するのは履歴を残す保管（アーカイブ）。 */
+    expect(source).toContain('有効な参照があるタグは保管できません')
   })
 
   it('参照先は0件のものを出さず、取れないときは「0」と書かない', () => {
