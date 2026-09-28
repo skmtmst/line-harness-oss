@@ -2082,6 +2082,9 @@ export function ApprovalQueue({
         setError(res.error ?? 'まとめて処理できませんでした')
       }
     } catch (e) {
+      // m22u R353: 通信などで結果が不明のときは一覧を読み直す。Worker は
+      // 途中まで進んだ分を保存しているため、表示と保存状態を合わせる。
+      await loadItems()
       setError(e instanceof Error ? e.message : 'まとめて処理できませんでした')
     } finally {
       setBulkConfirm(null)

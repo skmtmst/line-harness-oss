@@ -28,6 +28,8 @@ const dbMocks = {
   getConversionApprovalQueue: vi.fn(),
   setConversionApproval: vi.fn(),
   decideConversionApproval: vi.fn(),
+  getApprovalNotificationState: vi.fn(),
+  markApprovalNotified: vi.fn(),
   getConversionApprovalNotifyInfo: vi.fn(),
   // N-212 の案件動作はここでは対象外 — 案件なしとして通す。
   getConversionOfferActionPlan: vi.fn().mockResolvedValue(null),
@@ -88,6 +90,12 @@ beforeEach(() => {
     { id: 'account-1', tenant_id: '00000000-0000-4000-8000-000000000001' },
   ]);
   dbMocks.syncAffiliateConversionMileage.mockResolvedValue(undefined);
+  // R354: 承認世代の通知は未送信として扱い、初回承認の通知を通す。
+  dbMocks.getApprovalNotificationState.mockResolvedValue({
+    send: true,
+    approvedAt: '2026-09-01T00:00:00.000+09:00',
+  });
+  dbMocks.markApprovalNotified.mockResolvedValue(true);
 });
 
 describe('GET /api/conversions/approvals', () => {
@@ -264,6 +272,11 @@ describe('PATCH /api/conversions/events/:id/approval', () => {
 
   it('returns 200 without calling notifyAffiliate when status is already_set (double-click guard)', async () => {
     dbMocks.decideConversionApproval.mockResolvedValue({ outcome: 'already_set', currentStatus: 'approved' });
+    // R354: 同じ承認世代の通知は送り済みなので送らない。
+    dbMocks.getApprovalNotificationState.mockResolvedValue({
+      send: false,
+      approvedAt: '2026-09-01T00:00:00.000+09:00',
+    });
     const res = await req('PATCH', '/api/conversions/events/ev-dup/approval', {
       status: 'approved',
       expectedStatus: 'pending',
@@ -279,6 +292,32 @@ describe('PATCH /api/conversions/events/:id/approval', () => {
     // Critical: notify must NOT be called for an idempotent no-op
     expect(notifyAffiliateApproval).not.toHaveBeenCalled();
     expect(dbMocks.getConversionApprovalNotifyInfo).not.toHaveBeenCalled();
+  });
+
+  it('notifies once on already_set when the approval generation was never notified (R354 repair)', async () => {
+    dbMocks.decideConversionApproval.mockResolvedValue({ outcome: 'already_set', currentStatus: 'approved' });
+    dbMocks.getApprovalNotificationState.mockResolvedValue({
+      send: true,
+      approvedAt: '2026-09-01T00:00:00.000+09:00',
+    });
+    dbMocks.getConversionApprovalNotifyInfo.mockResolvedValue({
+      affiliateId: 'aff-1',
+      offerName: '案件X',
+      rewardAmount: 5000,
+      notifyOnConversion: true,
+    });
+    dbMocks.markApprovalNotified.mockResolvedValue(true);
+    const res = await req('PATCH', '/api/conversions/events/ev-dup/approval', {
+      status: 'approved',
+      expectedStatus: 'pending',
+    });
+    expect(res.status).toBe(200);
+    expect(notifyAffiliateApproval).toHaveBeenCalledTimes(1);
+    expect(dbMocks.markApprovalNotified).toHaveBeenCalledWith(
+      expect.anything(),
+      'ev-dup',
+      '2026-09-01T00:00:00.000+09:00',
+    );
   });
 
   it('returns 500 when the mileage projection fails so a retry can repair it', async () => {
