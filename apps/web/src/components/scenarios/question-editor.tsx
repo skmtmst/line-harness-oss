@@ -91,6 +91,37 @@ export function deadAnswerSettings(choice: QuestionChoice): string[] {
   return dead
 }
 
+/*
+ * R214: 選択後の挙動ごとの行き先の検査。URLを開く・友だち追加・
+ * 回答フォームは https:// から始まるURL、電話は番号、
+ * メールはメールアドレスでなければ、LINE側で開けない。
+ * 検査せずに保存すると「設定済み」に見えて実際は開けない通になる。
+ * 空のままも通さない（空だと押しても何も起きないボタンになる）。
+ * 戻り値は最初に見つけた不備の文。なければ null。
+ */
+export function validateChoiceUris(question: ScenarioQuestion): string | null {
+  for (const [i, choice] of question.choices.entries()) {
+    const n = i + 1
+    if (choice.behavior === 'url' || choice.behavior === 'add_friend' || choice.behavior === 'form') {
+      const url = (choice.url ?? '').trim()
+      if (!/^https?:\/\/\S+$/.test(url)) {
+        return `選択肢${n}のURLが正しくありません。https:// から始まるURLを入力してください。`
+      }
+    } else if (choice.behavior === 'tel') {
+      const tel = (choice.tel ?? '').trim()
+      if (!/[0-9]/.test(tel) || !/^[0-9+\-() ]+$/.test(tel)) {
+        return `選択肢${n}の電話番号が正しくありません。数字で入力してください。`
+      }
+    } else if (choice.behavior === 'mail') {
+      const email = (choice.email ?? '').trim()
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return `選択肢${n}のメールアドレスが正しくありません。`
+      }
+    }
+  }
+  return null
+}
+
 /** URI だけの挙動では届かない、回答依存の設定をまとめて外す。 */
 export function clearDeadAnswerSettings(choice: QuestionChoice): QuestionChoice {
   const next = { ...choice }

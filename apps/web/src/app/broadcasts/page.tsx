@@ -973,9 +973,22 @@ function BroadcastList() {
                       {/* 行を押すと詳細へ行くので、行の中の操作は行へ伝えない。 */}
                       {/* m20i: 操作列が固定幅で余るぶんは右へ寄せ、「…」を枠の端に置く。 */}
                       <span className="inline-flex w-full justify-end" onClick={(event) => event.stopPropagation()}>
+                        {/*
+                          監査 R207: 下書き・予約は同じIDで編集を続けられる。
+                          操作列は固定幅（詳細＋…）なので、枠ボタンは増やさず
+                          「…」の中へ入れる。幅契約は変えない。
+                        */}
                         <RowActions
                           subjectName={broadcast.title}
                           detail={{ href: `/broadcasts/detail?id=${encodeURIComponent(broadcast.id)}` }}
+                          menuItems={(broadcast.status === 'draft' || broadcast.status === 'scheduled') ? [
+                            {
+                              id: 'resume',
+                              label: '編集を続ける',
+                              external: true,
+                              onSelect: () => router.push(`/broadcasts/new?draft=${encodeURIComponent(broadcast.id)}`),
+                            },
+                          ] : []}
                           destructiveItem={(broadcast.status === 'draft' || broadcast.status === 'scheduled') ? {
                             id: 'delete',
                             label: '削除する',
