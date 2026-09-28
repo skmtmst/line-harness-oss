@@ -33,9 +33,35 @@ export function emptyMessageKindState(): MessageKindState {
 }
 
 /**
+ * 緯度・経度の取れる範囲。地図上に無い数字を「入力済み」にしない
+ * （監査 R210）。Worker 側の検査とそろえている。
+ */
+export const LOCATION_LATITUDE_RANGE = { min: -90, max: 90 } as const
+export const LOCATION_LONGITUDE_RANGE = { min: -180, max: 180 } as const
+
+/**
+ * 位置情報の緯度・経度が範囲外のとき、利用者への直し方を返す。
+ * 空文字なら問題なし（「まだ書けていない」は呼ぶ側の文言に任せる）。
+ */
+export function locationRangeError(state: MessageKindState['location']): string {
+  if (state.latitude.trim() === '' || state.longitude.trim() === '') return ''
+  const lat = Number(state.latitude)
+  const lng = Number(state.longitude)
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return ''
+  if (lat < LOCATION_LATITUDE_RANGE.min || lat > LOCATION_LATITUDE_RANGE.max) {
+    return `緯度は${LOCATION_LATITUDE_RANGE.min}〜${LOCATION_LATITUDE_RANGE.max}で入力してください`
+  }
+  if (lng < LOCATION_LONGITUDE_RANGE.min || lng > LOCATION_LONGITUDE_RANGE.max) {
+    return `経度は${LOCATION_LONGITUDE_RANGE.min}〜${LOCATION_LONGITUDE_RANGE.max}で入力してください`
+  }
+  return ''
+}
+
+/**
  * 入力欄の値を、配信側が読む形の JSON にする。
  *
  * 足りないものがあれば null。呼ぶ側は「まだ書けていない」として扱う。
+ * 範囲外の緯度・経度も null（地図上に無い数字を完成扱いにしない）。
  */
 export function serializeMessageKind(kind: MessageKind, state: MessageKindState): string | null {
   switch (kind) {
@@ -45,6 +71,7 @@ export function serializeMessageKind(kind: MessageKind, state: MessageKindState)
       const lng = Number(v.longitude)
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null
       if (v.latitude.trim() === '' || v.longitude.trim() === '') return null
+      if (locationRangeError(v)) return null
       return JSON.stringify({
         title: v.title.trim() || '場所',
         address: v.address.trim(),
@@ -263,6 +290,7 @@ export default function MessageKindFields({ kind, value, onChange }: MessageKind
         </div>
         <p className={hintClass}>
           緯度と経度は、Googleマップで場所を右クリックすると出る数字です（左が緯度、右が経度）。
+          緯度は-90〜90、経度は-180〜180の範囲で入力してください。
         </p>
       </div>
     )
