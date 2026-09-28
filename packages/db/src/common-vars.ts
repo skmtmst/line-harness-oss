@@ -886,8 +886,6 @@ function clipVarValue(value: string | null): string {
 function describeCommonVarChanges(
   existing: CommonVar,
   input: {
-    name?: string;
-    memo?: string;
     folderId?: string | null;
     validFrom?: string | null;
     validUntil?: string | null;
@@ -895,13 +893,8 @@ function describeCommonVarChanges(
     expiryBehavior?: CommonVarExpiryBehavior;
   },
 ): string {
+  // 名前・値・メモは版行の列に残るので併記しない。残らない項目だけ書く。
   const changes: string[] = [];
-  if (input.name !== undefined && input.name !== existing.name) {
-    changes.push(`名前「${clipVarValue(existing.name)}」→「${clipVarValue(input.name)}」`);
-  }
-  if (input.memo !== undefined && input.memo !== existing.memo) {
-    changes.push(`メモ「${clipVarValue(existing.memo)}」→「${clipVarValue(input.memo)}」`);
-  }
   if ('folderId' in input && (input.folderId ?? null) !== existing.folder_id) {
     changes.push('置き場所');
   }
