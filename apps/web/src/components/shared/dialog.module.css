@@ -26,6 +26,12 @@
 .panel {
   display: flex;
   width: min(844px, 100%);
+  /*
+   * R283: 縦に長い窓でも見出し・閉じる・保存/取消に到達できる。
+   * 面の高さを画面内に収め、中身だけを送る。見出し行と操作は
+   * 縮めずに残す（右詳細パネル drawer と同じ形で全画面に効かせる）。
+   */
+  max-height: calc(100dvh - 32px);
   flex-direction: column;
   gap: 12px;
   border: 1px solid var(--color-hairline);
@@ -80,6 +86,8 @@
 /* 見出しと右上の×を1行に並べる。中身は今までどおり縦に積む。 */
 .headerRow {
   display: flex;
+  /* R283: 中身が長くても見出し行は縮めない（上に固定）。 */
+  flex: 0 0 auto;
   align-items: flex-start;
   gap: 8px;
 }
@@ -163,6 +171,9 @@
 
 .content {
   min-width: 0;
+  /* R283: 長い中身はこの中で送る。見出し・閉じる・操作は外に残る。 */
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .error {
@@ -176,6 +187,8 @@
 
 .actions {
   display: flex;
+  /* R283: 中身が長くても操作は縮めない（下に固定）。 */
+  flex: 0 0 auto;
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 10px;
