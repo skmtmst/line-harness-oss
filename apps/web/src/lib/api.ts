@@ -14266,9 +14266,15 @@ export const bookingApi = {
     fetchApi<{ audit_logs: BookingAuditLog[] }>(
       withAccount(`/api/booking/admin/bookings/${id}/audit-logs`, accountId) + `&limit=${limit}`,
     ),
-  createMenu: (accountId: string, body: Partial<BookingMenu>) =>
+  /**
+   * R535: 作成試行ごとの一意キーを送る。サーバーで保存された直後に
+   * 応答だけを失っても、同じキーでの再送は作り直さず作成済みIDを返す。
+   * キーが無い呼び出しは従来どおり毎回作成する。
+   */
+  createMenu: (accountId: string, body: Partial<BookingMenu>, idempotencyKey?: string) =>
     fetchApi<{ id: string }>(withAccount('/api/booking/admin/menus', accountId), {
       method: 'POST',
+      headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
       body: JSON.stringify(body),
     }),
   updateMenu: (accountId: string, id: string, expectedVersion: number, body: Partial<BookingMenu>) =>
