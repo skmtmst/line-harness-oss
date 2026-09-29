@@ -12,7 +12,7 @@ import Checkbox from '@/components/shared/checkbox'
 import IconButton from '@/components/shared/icon-button'
 import ActionMenu from '@/components/shared/action-menu'
 import ListState from '@/components/shared/list-state'
-import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
+import { isForbidden, isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
@@ -155,10 +155,11 @@ export default function BookingStaffPage() {
           kind="error"
           title="予約スタッフを表示できませんでした"
           // m23m: 403・429は共通の1枚（権限の案内・待ち案内）へ切り替える。
-          // それ以外は画面の文のまま。403は押しても直らないので再試行の口も出さない。
+          // それ以外は画面の文のまま。R539: 429は待ち直せば直るので再試行の口を
+          // 残す。403だけが押しても直らないので再試行の口を出さない。
           description={isForbiddenOrRateLimited(loadError) ? undefined : '登録したスタッフは消えていません。再読み込みしても直らない場合はエラー報告へ。'}
           error={loadError ?? undefined}
-          action={isForbiddenOrRateLimited(loadError) ? undefined : <Button variant="secondary" onClick={() => void load()}>予約スタッフを再読み込み</Button>}
+          action={isForbidden(loadError) ? undefined : <Button variant="secondary" onClick={() => void load()}>予約スタッフを再読み込み</Button>}
         />
       ) : items.length === 0 ? (
         <div className="bg-canvas rounded-card border border-hairline">
