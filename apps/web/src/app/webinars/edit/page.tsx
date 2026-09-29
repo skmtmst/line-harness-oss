@@ -56,6 +56,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { WEBINAR_SAKURA_COMMENTS_MAX } from '@/components/webinars/webinar-limits'
 import { publicationStateLabel } from '@/components/webinars/publication-label'
 import { webinarErrorText } from '@/components/webinars/webinar-error-text'
+import { webinarLoadFailure, type WebinarLoadFailure } from '../webinar-load-failure'
 import {
   reviewActionSummaryText,
   reviewMonitoringText,
@@ -2191,7 +2192,13 @@ function EditWebinarInner() {
     別のウェビナーへ切り替えた瞬間から、前のウェビナーの中身も失敗文も画面に出さない。
   */
   const [loadedWebinar, setLoadedWebinar] = useState<{ id: string; webinar: Webinar; editor: WebinarEditor } | null>(null)
-  const [loadFailure, setLoadFailure] = useState<{ id: string; message: string } | null>(null)
+  /*
+   * D004: 失敗の理由は `webinarLoadFailure` で言い分ける。403 は読み直しても
+   * 直らない（権限を足してもらうしかない）、429 は待てば直る、それ以外は
+   * 通信を確かめる。同じ「もう一度読み込む」を出すと、権限不足の人は
+   * 何度押しても直らない道へ誘われる（一覧 `/webinars` と同じ型）。
+   */
+  const [loadFailure, setLoadFailure] = useState<{ id: string; failure: WebinarLoadFailure } | null>(null)
   /** 404・空で見つからないとき。取得の失敗（loadFailure）とは分ける。 */
   const [loadMissing, setLoadMissing] = useState<{ id: string } | null>(null)
   /** 失敗したあとの「もう一度読み込む」で取り直すための番号。 */
@@ -2204,7 +2211,7 @@ function EditWebinarInner() {
 
   const webinar = loadedWebinar && loadedWebinar.id === id ? loadedWebinar.webinar : null
   const editor = loadedWebinar && loadedWebinar.id === id ? loadedWebinar.editor : null
-  const loadError = loadFailure && loadFailure.id === id ? loadFailure.message : null
+  const loadError = loadFailure && loadFailure.id === id ? loadFailure.failure : null
   const loadMissingNow = loadMissing !== null && loadMissing.id === id
   /* 今のウェビナーの中身も失敗も無い間が読み込み中。切替の1コマ目から前の中身を描かない。 */
   const loading = webinar === null && loadError === null && !loadMissingNow
@@ -2423,7 +2430,7 @@ function EditWebinarInner() {
           setLoadMissing({ id })
         } else {
           setLoadMissing(null)
-          setLoadFailure({ id, message: webinarErrorText(err, '読み込めませんでした。開き直してください。') })
+          setLoadFailure({ id, failure: webinarLoadFailure(err) })
         }
       })
     return () => { loadRequestId.current += 1 }
@@ -2509,9 +2516,11 @@ function EditWebinarInner() {
       <>
         <TargetMissing
           kind="error"
-          title="ウェビナーを読み込めませんでした"
-          description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
-          onRetry={() => setReloadKey((key) => key + 1)}
+          title={loadError?.title ?? 'ウェビナーを読み込めませんでした'}
+          description={loadError?.description ?? '通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。'}
+          {...(loadError === null || loadError.retryable
+            ? { onRetry: () => setReloadKey((key) => key + 1) }
+            : {})}
         />
         {leaveConfirmDialog}
       </>
