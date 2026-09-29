@@ -13,6 +13,7 @@ import {
   getTemplateById,
   autoReplyRowFromDraftSettings,
   autoReplyDraftSettingsFromRow,
+  autoReplyRuleCreateFingerprint,
   createAutoReplyWithDraftVersion,
   getAutoReplyDraftVersion,
   getAutoReplyPublishedVersion,
@@ -884,6 +885,32 @@ function validIdempotencyKey(value: string | undefined): value is string {
   return Boolean(value && value.length >= 8 && value.length <= 200 && /^[A-Za-z0-9._:-]+$/.test(value));
 }
 
+/*
+ * m26c R556/R570: 作成・複製の確認キー。ヘッダで受け、形が正しいときだけ
+ * 重複防止に使う。無い・壊れているときは従来どおり作る（後方互換）。
+ */
+function readIdempotencyKey(c: Context<Env>): string | undefined {
+  const raw = c.req.header('Idempotency-Key');
+  return validIdempotencyKey(raw) ? raw : undefined;
+}
+
+/** 要求キー台帳の失敗を応答へ寄せる。該当なしは null。 */
+function idempotencyErrorResponse(err: unknown): { status: 409; error: string } | null {
+  const code = err instanceof Error ? err.message : '';
+  if (code === 'AUTO_REPLY_IDEMPOTENCY_CONFLICT'
+    || code === 'AUTO_REPLY_IDEMPOTENCY_OPERATION_CONFLICT') {
+    return {
+      status: 409,
+      error: '同じ確認キーに異なる内容が送られました。一覧を確認してください',
+    };
+  }
+  // 同時実行の負け側で勝者がまだ確定していない。作り直しは起きないので再送を求める。
+  if (code.includes('auto_reply_create_requests') && /unique constraint/i.test(code)) {
+    return { status: 409, error: '処理中です。もう一度お試しください' };
+  }
+  return null;
+}
+
 function serializeAutoReply(
   row: DbAutoReply,
   internalMemo: string | null = null,
@@ -1177,8 +1204,20 @@ autoReplies.post('/api/auto-replies/drafts', requireRole('owner', 'admin'), asyn
       parsed.templateLineAccountId,
     );
     if (templateError) return c.json({ success: false, error: templateError }, 403);
-    const created = await createAutoReplyWithDraftVersion(c.env.DB, parsed.value);
-    return c.json({ success: true, data: draftVersionResponse(created.version) }, 201);
+    // m26c R556: 確認キーがあれば再送を同じ下書きへ復帰させる。
+    const draftKey = readIdempotencyKey(c);
+    try {
+      const created = await createAutoReplyWithDraftVersion(
+        c.env.DB,
+        parsed.value,
+        draftKey ? { key: draftKey, fingerprint: JSON.stringify(parsed.value) } : undefined,
+      );
+      return c.json({ success: true, data: draftVersionResponse(created.version) }, 201);
+    } catch (err) {
+      const mapped = idempotencyErrorResponse(err);
+      if (mapped) return c.json({ success: false, error: mapped.error }, mapped.status);
+      throw err;
+    }
   } catch (err) {
     console.error('POST /api/auto-replies/drafts error:', err);
     return c.json({ success: false, error: '自動応答の下書きを作成できませんでした' }, 500);
@@ -1661,7 +1700,9 @@ autoReplies.post('/api/auto-replies', requireRole('owner', 'admin'), async (c) =
       if (flexError) return c.json({ success: false, error: flexError }, 400);
     }
 
-    const item = await createAutoReply(c.env.DB, {
+    // m26c R570: 確認キーがあれば再送を同じ行へ復帰させる。
+    const ruleKey = readIdempotencyKey(c);
+    const createInput = {
       ...extras.value,
       keyword: body.keyword ?? '',
       matchType: body.matchType,
@@ -1676,7 +1717,22 @@ autoReplies.post('/api/auto-replies', requireRole('owner', 'admin'), async (c) =
       skipWhenOperatorActive: body.skipWhenOperatorActive === true,
       priority: priority.value,
       messageKinds: messageKinds.value,
-    });
+    };
+    let item: DbAutoReply;
+    try {
+      const created = await createAutoReply(
+        c.env.DB,
+        createInput,
+        ruleKey
+          ? { key: ruleKey, fingerprint: autoReplyRuleCreateFingerprint(createInput) }
+          : undefined,
+      );
+      item = created.rule;
+    } catch (err) {
+      const mapped = idempotencyErrorResponse(err);
+      if (mapped) return c.json({ success: false, error: mapped.error }, mapped.status);
+      throw err;
+    }
 
     const memos = await internalMemosOf(c.env.DB, [item.id]);
     return c.json({ success: true, data: serializeAutoReply(item, memos.get(item.id) ?? null) }, 201);

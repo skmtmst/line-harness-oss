@@ -1,4 +1,4 @@
-import type { AutoReply } from './auto-replies.js';
+import type { AutoReply, CreateAutoReplyInput } from './auto-replies.js';
 import { jstNow } from './utils.js';
 
 export type AutoReplyEvaluationStatus =
@@ -311,7 +311,7 @@ export async function planAutoReplyInternalMemoStatements(
   db: D1Database,
   rule: AutoReply,
   internalMemo: string | null,
-): Promise<{ statements: D1PreparedStatement[]; draftUpdated: boolean }> {
+): Promise<{ statements: D1PreparedStatement[]; draftUpdated: boolean; versionId: string | null }> {
   const now = jstNow();
   const draft = await getAutoReplyDraftVersion(db, rule.id);
   if (draft) {
@@ -326,6 +326,7 @@ export async function planAutoReplyInternalMemoStatements(
         ).bind(JSON.stringify(snapshot), now, draft.id),
       ],
       draftUpdated: true,
+      versionId: draft.id,
     };
   }
 
@@ -346,6 +347,7 @@ export async function planAutoReplyInternalMemoStatements(
   ).bind(rule.id).first<{ version_number: number }>();
   const versionId = crypto.randomUUID();
   return {
+    versionId,
     statements: [
       db.prepare(
         `UPDATE auto_reply_versions SET status = 'retired', updated_at = ?
@@ -382,15 +384,165 @@ export async function saveAutoReplyInternalMemo(
   await db.batch(planned.statements);
 }
 
+/**
+ * m26c R556/R570: 作成・複製の要求キー台帳（migration 543）。
+ * 直接作成（'rule'）と下書き付き作成（'draft'）を同じ表で受け、同じ
+ * Idempotency-Key の再送は保存済みを返し、異なる内容・別操作の使い回しは
+ * 作らず止める。共通ルールの所属は NULL でも重複を防げるよう、
+ * キーは表全体で一意にする。
+ */
+export type AutoReplyCreateOperation = 'rule' | 'draft';
+
+export interface AutoReplyCreateIdempotency {
+  key: string;
+  fingerprint: string;
+}
+
+interface AutoReplyCreateClaim {
+  operation: string;
+  request_fingerprint: string;
+  auto_reply_id: string;
+  version_id: string | null;
+}
+
+/** auto-replies.ts との循環参照を避けるための最小取得。 */
+async function getClaimRuleById(db: D1Database, id: string): Promise<AutoReply | null> {
+  return db.prepare(`SELECT * FROM auto_replies WHERE id = ? AND deleted_at IS NULL`)
+    .bind(id)
+    .first<AutoReply>();
+}
+
+export async function findAutoReplyCreateClaim(
+  db: D1Database,
+  key: string,
+): Promise<AutoReplyCreateClaim | null> {
+  return db.prepare(
+    `SELECT operation, request_fingerprint, auto_reply_id, version_id
+       FROM auto_reply_create_requests WHERE idempotency_key = ?`,
+  ).bind(key).first<AutoReplyCreateClaim>();
+}
+
+/** 保存済みの要求と突き合わせる。作り直すときは古い予約を消して null を返す。 */
+export async function resolveAutoReplyCreateClaim(
+  db: D1Database,
+  key: string,
+  previous: AutoReplyCreateClaim,
+  operation: AutoReplyCreateOperation,
+  fingerprint: string,
+): Promise<AutoReply | null> {
+  if (previous.operation !== operation) throw new Error('AUTO_REPLY_IDEMPOTENCY_OPERATION_CONFLICT');
+  if (previous.request_fingerprint !== fingerprint) throw new Error('AUTO_REPLY_IDEMPOTENCY_CONFLICT');
+  const rule = await getClaimRuleById(db, previous.auto_reply_id);
+  if (rule) return rule;
+  await db.prepare(`DELETE FROM auto_reply_create_requests WHERE idempotency_key = ?`)
+    .bind(key).run();
+  return null;
+}
+
+export function autoReplyCreateClaimStatement(
+  db: D1Database,
+  operation: AutoReplyCreateOperation,
+  lineAccountId: string | null,
+  idempotency: AutoReplyCreateIdempotency,
+  autoReplyId: string,
+  versionId: string | null,
+  now: string,
+): D1PreparedStatement {
+  return db.prepare(
+    `INSERT INTO auto_reply_create_requests
+       (id, line_account_id, operation, idempotency_key, request_fingerprint,
+        auto_reply_id, version_id, response_json, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).bind(
+    crypto.randomUUID(),
+    lineAccountId,
+    operation,
+    idempotency.key,
+    idempotency.fingerprint,
+    autoReplyId,
+    versionId,
+    JSON.stringify({ autoReplyId, versionId }),
+    now,
+  );
+}
+
+/**
+ * 直接作成の内容指紋。1文字でも違えば別の要求とみなし、作らず止める。
+ * 呼び出し側（Worker）がテンプレート解決後の値を渡すため、再送の突き合わせは
+ * 解決後の内容で行う。
+ */
+export function autoReplyRuleCreateFingerprint(input: CreateAutoReplyInput): string {
+  return JSON.stringify({
+    keyword: input.keyword,
+    matchType: input.matchType ?? 'exact',
+    responseType: input.responseType ?? 'text',
+    responseContent: input.responseContent,
+    templateId: input.templateId ?? null,
+    lineAccountId: input.lineAccountId ?? null,
+    isActive: input.isActive === true,
+    activeFrom: input.activeFrom ?? null,
+    activeUntil: input.activeUntil ?? null,
+    cooldownMinutes: input.cooldownMinutes ?? null,
+    skipWhenOperatorActive: input.skipWhenOperatorActive === true,
+    priority: input.priority ?? 0,
+    messageKinds: input.messageKinds ?? null,
+    actions: input.actions ?? null,
+    responseWeekdays: input.responseWeekdays ?? null,
+    responseHolidayRule: input.responseHolidayRule ?? null,
+    oncePerFriend: input.oncePerFriend === true,
+    keywords: input.keywords ?? null,
+    friendConditions: input.friendConditions ?? null,
+    respondToAll: input.respondToAll === true,
+    name: input.name ?? null,
+    keywordMatchMode: input.keywordMatchMode ?? 'any',
+    folderId: input.folderId ?? null,
+    internalMemo: input.internalMemo ?? null,
+  });
+}
+
 /** 新規定義と下書き版を1回のbatchで作る。作成時点では評価対象にしない。 */
 export async function createAutoReplyWithDraftVersion(
   db: D1Database,
   settings: AutoReplyDraftSettings,
-): Promise<{ rule: AutoReply; version: AutoReplyVersionRow }> {
+  idempotency?: AutoReplyCreateIdempotency,
+): Promise<{ rule: AutoReply; version: AutoReplyVersionRow; replayed: boolean }> {
+  if (idempotency) {
+    const previous = await findAutoReplyCreateClaim(db, idempotency.key);
+    if (previous) {
+      const matched = await resolveAutoReplyCreateClaim(
+        db,
+        idempotency.key,
+        previous,
+        'draft',
+        idempotency.fingerprint,
+      );
+      if (matched) {
+        const version = await getAutoReplyDraftVersion(db, matched.id)
+          ?? await getAutoReplyPublishedVersion(db, matched.id);
+        if (version) return { rule: matched, version, replayed: true };
+        await db.prepare(`DELETE FROM auto_reply_create_requests WHERE idempotency_key = ?`)
+          .bind(idempotency.key).run();
+      }
+    }
+  }
   const autoReplyId = crypto.randomUUID();
   const versionId = crypto.randomUUID();
   const now = jstNow();
-  await db.batch([
+  const claimStatements = idempotency
+    ? [
+      autoReplyCreateClaimStatement(
+        db,
+        'draft',
+        settings.lineAccountId,
+        idempotency,
+        autoReplyId,
+        versionId,
+        now,
+      ),
+    ]
+    : [];
+  try {
+    await db.batch([
     db.prepare(
       `INSERT INTO auto_replies
          (id, keyword, match_type, response_type, response_content,
@@ -442,13 +594,29 @@ export async function createAutoReplyWithDraftVersion(
       now,
       now,
     ),
-  ]);
+    ...claimStatements,
+    ]);
+  } catch (err) {
+    // 同時に同じキーが確定した可能性がある。勝った側の結果に従い、
+    // 勝者がいなければ元の失敗をそのまま返す（握りつぶさない）。
+    if (idempotency) {
+      const raced = await findAutoReplyCreateClaim(db, idempotency.key).catch(() => null);
+      if (raced?.operation === 'draft' && raced.request_fingerprint === idempotency.fingerprint) {
+        const winnerRule = await getClaimRuleById(db, raced.auto_reply_id).catch(() => null);
+        const winnerVersion = winnerRule
+          ? await getAutoReplyDraftVersion(db, winnerRule.id).catch(() => null)
+          : null;
+        if (winnerRule && winnerVersion) return { rule: winnerRule, version: winnerVersion, replayed: true };
+      }
+    }
+    throw err;
+  }
   const [rule, version] = await Promise.all([
     db.prepare(`SELECT * FROM auto_replies WHERE id = ?`).bind(autoReplyId).first<AutoReply>(),
     getAutoReplyVersionById(db, versionId),
   ]);
   if (!rule || !version) throw new Error('AUTO_REPLY_DRAFT_NOT_CREATED');
-  return { rule, version };
+  return { rule, version, replayed: false };
 }
 
 /**

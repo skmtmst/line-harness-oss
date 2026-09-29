@@ -1,6 +1,12 @@
 import { jstNow } from './utils.js';
 import { removeConsumerReferences, planSyncTemplateReferenceStatements } from './template-versions.js';
-import { planAutoReplyInternalMemoStatements } from './auto-reply-runs.js';
+import {
+  planAutoReplyInternalMemoStatements,
+  findAutoReplyCreateClaim,
+  resolveAutoReplyCreateClaim,
+  autoReplyCreateClaimStatement,
+} from './auto-reply-runs.js';
+import type { AutoReplyCreateIdempotency } from './auto-reply-runs.js';
 // =============================================================================
 // Auto-Replies — Keyword-triggered automatic responses (L社 自動応答 equivalent)
 // =============================================================================
@@ -157,7 +163,15 @@ export interface CreateAutoReplyInput {
 export async function createAutoReply(
   db: D1Database,
   input: CreateAutoReplyInput,
-): Promise<AutoReply> {
+  idempotency?: AutoReplyCreateIdempotency,
+): Promise<{ rule: AutoReply; replayed: boolean }> {
+  if (idempotency) {
+    const previous = await findAutoReplyCreateClaim(db, idempotency.key);
+    if (previous) {
+      const matched = await resolveAutoReplyCreateClaim(db, idempotency.key, previous, 'rule', idempotency.fingerprint);
+      if (matched) return { rule: matched, replayed: true };
+    }
+  }
   const id = crypto.randomUUID();
   const now = jstNow();
   const isActive = input.isActive === true;
@@ -221,9 +235,26 @@ export async function createAutoReply(
     id,
     created.template_id ? [created.template_id] : [],
   );
-  await db.batch([
-    db.prepare(
-      `INSERT INTO auto_replies
+  // R512 と同じく、要求キーの行も同じ batch で確定する。本体より後に積むため、
+  // 外部キーのある環境でも制約に当たらない。同じキーの同時実行は
+  // UNIQUE 制約で負けた側だけ巻き戻り、二重に残らない。
+  const claimStatements = idempotency && memoPlanned.versionId
+    ? [
+      autoReplyCreateClaimStatement(
+        db,
+        'rule',
+        created.line_account_id,
+        idempotency,
+        id,
+        memoPlanned.versionId,
+        now,
+      ),
+    ]
+    : [];
+  try {
+    await db.batch([
+      db.prepare(
+        `INSERT INTO auto_replies
          (id, keyword, match_type, response_type, response_content,
           template_id, line_account_id, is_active,
           active_from, active_until, cooldown_minutes, skip_when_operator_active,
@@ -263,11 +294,24 @@ export async function createAutoReply(
     ),
     ...memoPlanned.statements,
     ...refStatements,
-  ]);
+    ...claimStatements,
+    ]);
+  } catch (err) {
+    // 同時に同じキーが確定した可能性がある。勝った側の結果に従い、
+    // 勝者がいなければ元の失敗をそのまま返す（握りつぶさない）。
+    if (idempotency) {
+      const raced = await findAutoReplyCreateClaim(db, idempotency.key).catch(() => null);
+      if (raced?.operation === 'rule' && raced.request_fingerprint === idempotency.fingerprint) {
+        const winner = await getAutoReplyById(db, raced.auto_reply_id).catch(() => null);
+        if (winner) return { rule: winner, replayed: true };
+      }
+    }
+    throw err;
+  }
 
   const saved = await getAutoReplyById(db, id);
   if (!saved) throw new Error('AUTO_REPLY_NOT_CREATED');
-  return saved;
+  return { rule: saved, replayed: false };
 }
 
 export interface UpdateAutoReplyInput {
