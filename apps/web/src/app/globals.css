@@ -282,10 +282,22 @@
   --text-title--line-height: 1.4;
   /*
    * 28px。★V7 の「大きな数」（数のカードの値）。旧 #704 の 24px から
-   * 物差し改定で 28px へ。太字 700 を許すのはこの段だけ（§2）。
+   * 物差し改定で 28px へ。太字 700 を許すのはこの段だけ（§2）なので、
+   * 700 はここに付けてしまう（`text-hero` と書くだけで太字になる）。
    */
   --text-hero: 28px;
   --text-hero--line-height: 1.3;
+  --text-hero--font-weight: 700;
+
+  /*
+   * ★V7「見た目の物差し」§2: 太字は3段だけ。
+   *   600（題・表の見出し・ボタン）/ 500（ラベル・タブ）/ 400（本文・補足）
+   * 700・800 を許すのは大きな数（28px = text-hero）だけ。`font-bold` と
+   * `font-extrabold` はここで 600 に畳む（書き換える側は font-semibold
+   * と同じ意味になる）。
+   */
+  --font-weight-bold: 600;
+  --font-weight-extrabold: 600;
   --text-display: 30px;
   --text-metric: 22px;
   --text-micro: 11px;
@@ -545,6 +557,18 @@ button[aria-label$='を削除']:not(:hover, :focus-visible, :disabled) {
    */
   body {
     font-variant-numeric: tabular-nums;
+  }
+
+  /*
+   * ★V7「見た目の物差し」§2: 太字は 600 / 500 / 400 の3段だけで、
+   * 700 は `text-hero`（28px の大きな数）だけ。ブラウザが勝手に
+   * 700 にする `<strong>`・`<b>`・`<th>` を 600 に畳む。
+   * 本文中の強調（strong/b）は 600 でも前後の 400 と分かれる。
+   */
+  strong,
+  b,
+  th {
+    font-weight: 600;
   }
 
   :lang(ja) {
