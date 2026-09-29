@@ -34,7 +34,7 @@ export default function OgEditor({
     onChange({ ...value, [k]: v })
 
   return (
-    <div className="space-y-3 border border-hairline rounded-lg p-4 bg-surface-pearl">
+    <div className="space-y-3 border border-hairline rounded-control p-4 bg-surface-pearl">
       <div className="text-sm font-medium text-ink">
         リンクプレビュー（OGP）
       </div>
@@ -54,7 +54,7 @@ export default function OgEditor({
             maxLength={TITLE_MAX}
             placeholder={autoTitle ? `自動: ${autoTitle}` : '（自動生成）'}
             onChange={(e) => set('ogTitle', e.target.value || null)}
-            className="w-full border border-hairline rounded-lg px-3 py-2 text-sm"
+            className="w-full border border-hairline rounded-control px-3 py-2 text-sm"
           />
           <div className="text-xs text-ink-faint mt-1">
             {(value.ogTitle ?? '').length} / {TITLE_MAX}
@@ -74,7 +74,7 @@ export default function OgEditor({
           }
           rows={3}
           onChange={(e) => set('ogDescription', e.target.value || null)}
-          className="w-full border border-hairline rounded-lg px-3 py-2 text-sm"
+          className="w-full border border-hairline rounded-control px-3 py-2 text-sm"
         />
         <div className="text-xs text-ink-faint mt-1">
           {(value.ogDescription ?? '').length} / {DESC_MAX}

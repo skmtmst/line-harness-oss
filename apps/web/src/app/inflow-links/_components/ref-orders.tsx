@@ -164,7 +164,7 @@ export default function RefOrdersPanel({
           description="この経路から来た友だちの注文が記録されると、ここに表示されます。"
         />
       ) : (
-        <div className="mt-2 overflow-hidden rounded-lg border border-hairline bg-canvas">
+        <div className="mt-2 overflow-hidden rounded-control border border-hairline bg-canvas">
           <table className="w-full text-xs">
             <thead className="border-b border-hairline bg-canvas-sunken text-ink-faint">
               <TableHeadRow>

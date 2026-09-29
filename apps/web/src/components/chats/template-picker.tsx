@@ -342,7 +342,7 @@ export default function TemplatePicker({
     >
       <div
         ref={dialogRef}
-        className="flex h-[min(720px,calc(100vh-32px))] w-[min(920px,calc(100vw-32px))] flex-col overflow-hidden rounded-[14px] border border-hairline bg-canvas shadow-2xl"
+        className="flex h-[min(720px,calc(100vh-32px))] w-[min(920px,calc(100vw-32px))] flex-col overflow-hidden rounded-card border border-hairline bg-canvas shadow-overlay"
         onClick={(e) => e.stopPropagation()}
       >
         <header className="flex items-start justify-between gap-4 border-b border-hairline px-6 py-5">
@@ -355,7 +355,7 @@ export default function TemplatePicker({
           <button
             onClick={onClose}
             aria-label="閉じる"
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-lg leading-none text-ink-faint hover:bg-shell hover:text-ink"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-control text-lg leading-none text-ink-faint hover:bg-shell hover:text-ink"
           >
             ✕
           </button>
@@ -371,7 +371,7 @@ export default function TemplatePicker({
               onChange={(e) => setSearch(e.target.value)}
               placeholder="テンプレート名・本文で検索"
               aria-label="テンプレート名・本文で検索"
-              className="w-full rounded-lg border border-hairline py-2.5 pr-3 pl-9 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/15"
+              className="w-full rounded-control border border-hairline py-2.5 pr-3 pl-9 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/15"
             />
           </div>
           <TemplateFolderSelect
@@ -406,7 +406,7 @@ export default function TemplatePicker({
                   type="button"
                   onClick={() => setCategory(item.key)}
                   aria-pressed={category === item.key}
-                  className={`rounded-md border px-2.5 py-1.5 text-xs font-semibold ${category === item.key ? 'border-accent-border bg-accent-soft text-accent-deep' : 'border-hairline bg-canvas text-ink-faint hover:bg-shell'}`}
+                  className={`rounded-mini border px-2.5 py-1.5 text-xs font-semibold ${category === item.key ? 'border-accent-border bg-accent-soft text-accent-deep' : 'border-hairline bg-canvas text-ink-faint hover:bg-shell'}`}
                 >
                   {item.label}
                 </button>
@@ -419,7 +419,7 @@ export default function TemplatePicker({
                     setPackItems([])
                   }}
                   aria-pressed={packMode}
-                  className={`rounded-md border px-2.5 py-1.5 text-xs font-semibold ${packMode ? 'border-accent-border bg-accent-soft text-accent-deep' : 'border-shell-gray bg-canvas text-ink-faint hover:bg-canvas-sunken'}`}
+                  className={`rounded-mini border px-2.5 py-1.5 text-xs font-semibold ${packMode ? 'border-accent-border bg-accent-soft text-accent-deep' : 'border-shell-gray bg-canvas text-ink-faint hover:bg-canvas-sunken'}`}
                 >
                   まとめて選ぶ
                 </button>
@@ -470,7 +470,7 @@ export default function TemplatePicker({
                         )
                       }}
                       aria-pressed={packMode ? inPack : selected?.id === template.id}
-                      className={`w-full rounded-lg border px-3 py-3 text-left ${inPack || (!packMode && selected?.id === template.id) ? 'border-accent-border bg-accent-soft' : 'border-shell-gray bg-canvas hover:bg-canvas-sunken'}`}
+                      className={`w-full rounded-control border px-3 py-3 text-left ${inPack || (!packMode && selected?.id === template.id) ? 'border-accent-border bg-accent-soft' : 'border-shell-gray bg-canvas hover:bg-canvas-sunken'}`}
                     >
                       <p className="truncate text-sm font-semibold text-ink" title={template.name}>
                         {inPack ? `${packIndex + 1}. ` : ''}{template.name}
@@ -492,7 +492,7 @@ export default function TemplatePicker({
                   type="button"
                   onClick={loadMore}
                   disabled={loadingMore}
-                  className="rounded-full border border-hairline bg-canvas px-3 py-1.5 text-xs font-semibold text-action hover:bg-shell disabled:opacity-50"
+                  className="rounded-pill border border-hairline bg-canvas px-3 py-1.5 text-xs font-semibold text-action hover:bg-shell disabled:opacity-50"
                 >
                   {loadingMore ? '読み込み中...' : `さらに表示（残り${total - templates.length}件）`}
                 </button>
@@ -502,7 +502,7 @@ export default function TemplatePicker({
 
           <section className="min-h-0 bg-canvas p-6 md:overflow-y-auto" aria-label="テンプレートのプレビュー">
             {packMode && packItems.length > 0 ? (
-              <div className="mb-4 rounded-lg border border-hairline bg-canvas-sunken p-3">
+              <div className="mb-4 rounded-control border border-hairline bg-canvas-sunken p-3">
                 <p className="text-xs font-semibold text-ink-secondary">まとめて送る順番（{packItems.length}/5通）</p>
                 <ol className="mt-2 space-y-1">
                   {packItems.map((item, index) => (
@@ -513,7 +513,7 @@ export default function TemplatePicker({
                         type="button"
                         onClick={() => setPackItems((prev) => prev.filter((p) => p.id !== item.id))}
                         aria-label={`${item.name}をまとめ送りから外す`}
-                        className="shrink-0 rounded px-1.5 py-0.5 text-ink-faint hover:bg-shell-gray hover:text-ink-secondary"
+                        className="shrink-0 rounded-mini px-1.5 py-0.5 text-ink-faint hover:bg-shell-gray hover:text-ink-secondary"
                       >
                         外す
                       </button>
@@ -529,19 +529,19 @@ export default function TemplatePicker({
               <div>
                 <div className="flex items-center justify-between gap-3">
                   <h3 className="text-base font-bold text-ink">{selected.name}</h3>
-                  {category === 'frequent' && <span className="rounded-lg border border-status-warn bg-status-warn-soft px-2.5 py-1.5 text-xs font-semibold text-status-warn-deep">☆ よく使う</span>}
+                  {category === 'frequent' && <span className="rounded-control border border-status-warn bg-status-warn-soft px-2.5 py-1.5 text-xs font-semibold text-status-warn-deep">☆ よく使う</span>}
                 </div>
                 <p className="mt-5 text-xs font-semibold text-ink-faint">送信内容のプレビュー</p>
-                <div className="mt-3 min-h-[250px] rounded-[12px] bg-line-talk p-5 shadow-card">
-                  <div className="flex justify-center"><span className="rounded-full bg-canvas/85 px-3 py-1 text-[11px] text-ink-faint">今日</span></div>
-                  <div className="mt-4 max-w-[78%] rounded-[12px] rounded-tl-[4px] bg-canvas px-4 py-3 text-sm leading-6 whitespace-pre-wrap text-ink-secondary shadow-sm">{previewContent ?? selected.messageContent}</div>
+                <div className="mt-3 min-h-[250px] rounded-card bg-line-talk p-5 shadow-card">
+                  <div className="flex justify-center"><span className="rounded-pill bg-canvas/85 px-3 py-1 text-[11px] text-ink-faint">今日</span></div>
+                  <div className="mt-4 max-w-[78%] rounded-card rounded-tl-mini bg-canvas px-4 py-3 text-sm leading-6 whitespace-pre-wrap text-ink-secondary shadow-card">{previewContent ?? selected.messageContent}</div>
                 </div>
                 {previewContent !== null && resolvedPreview?.unresolved.length ? (
                   <p className="mt-3 text-xs leading-6 text-danger" role="alert">
                     解決できない差し込みがあります: {resolvedPreview.unresolved.map((v) => `{{${v}}}`).join(' ')}。このまま送信するとエラーになります。
                   </p>
                 ) : null}
-                <div className="mt-3 rounded-lg bg-canvas-sunken px-4 py-3 text-xs leading-6 text-ink-faint">
+                <div className="mt-3 rounded-control bg-canvas-sunken px-4 py-3 text-xs leading-6 text-ink-faint">
                   この操作ではまだ送信されません。入力欄へ内容を挿入します。<br />
                   種類：テキスト
                 </div>
@@ -576,7 +576,7 @@ export default function TemplatePicker({
           <div className="mt-3 flex flex-wrap justify-end gap-2">
             <button
               onClick={onClose}
-              className="min-h-11 whitespace-nowrap rounded-lg border border-hairline bg-canvas px-4 py-2 text-sm font-semibold text-ink-faint hover:bg-canvas-sunken"
+              className="min-h-11 whitespace-nowrap rounded-control border border-hairline bg-canvas px-4 py-2 text-sm font-semibold text-ink-faint hover:bg-canvas-sunken"
             >
               キャンセル
             </button>
@@ -592,7 +592,7 @@ export default function TemplatePicker({
                 }
                 onClose()
               }}
-              className="min-h-11 whitespace-nowrap rounded-lg bg-accent-deep px-5 py-2 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-deep/90 disabled:opacity-40"
+              className="min-h-11 whitespace-nowrap rounded-control bg-accent-deep px-5 py-2 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-deep/90 disabled:opacity-40"
             >
               {packMode && onPickPack ? `まとめて送る（${packItems.length}通）` : '入力欄へ挿入'}
             </button>

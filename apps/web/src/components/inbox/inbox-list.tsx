@@ -29,7 +29,7 @@ export default function InboxList({
   const end = Math.min(total, page * pageSize)
 
   return (
-    <div className="overflow-hidden rounded-lg bg-canvas shadow-sm ring-1 ring-hairline">
+    <div className="overflow-hidden rounded-control bg-canvas shadow-card ring-1 ring-hairline">
       {rows.length === 0 && !loading ? (
         <ListState
           kind="empty"

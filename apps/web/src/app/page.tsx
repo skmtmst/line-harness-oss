@@ -165,7 +165,7 @@ function TodayTaskCard({
           {loading ? (
             <>
               {/* #673: 「—」は「取れなかった」にも読めるので、待っている間は形だけ残す */}
-              <span className="bg-canvas-sunken inline-block h-7 w-16 animate-pulse rounded" aria-hidden="true" />
+              <span className="bg-canvas-sunken inline-block h-7 w-16 animate-pulse rounded-mini" aria-hidden="true" />
               <span className="sr-only">{STATE_TEXT.loading}</span>
             </>
           ) : (
@@ -374,8 +374,8 @@ function LoadingDataCard({ title, href, linkLabel }: { title: string; href: stri
         actionTone="info"
       />
       <div className="space-y-2 px-5 py-8" aria-label={`${title}を${STATE_TEXT.loading}`}>
-        <div className="bg-canvas-sunken h-5 animate-pulse rounded" />
-        <div className="bg-canvas-sunken h-5 w-2/3 animate-pulse rounded" />
+        <div className="bg-canvas-sunken h-5 animate-pulse rounded-mini" />
+        <div className="bg-canvas-sunken h-5 w-2/3 animate-pulse rounded-mini" />
       </div>
     </Card>
   )
@@ -436,7 +436,7 @@ function LiveDataCard({
         {loading ? (
           <>
             {/* #673: 「—」は「取れなかった」にも読めるので、待っている間は形だけ残す */}
-            <span className="bg-canvas-sunken inline-block h-7 w-20 animate-pulse rounded" aria-hidden="true" />
+            <span className="bg-canvas-sunken inline-block h-7 w-20 animate-pulse rounded-mini" aria-hidden="true" />
             <span className="sr-only">{STATE_TEXT.loading}</span>
           </>
         ) : (
@@ -506,7 +506,7 @@ function SendQuotaCard({
         <span className="text-base leading-tight">
           {loading ? (
             <>
-              <span className="bg-canvas-sunken inline-block h-6 w-44 animate-pulse rounded" aria-hidden="true" />
+              <span className="bg-canvas-sunken inline-block h-6 w-44 animate-pulse rounded-mini" aria-hidden="true" />
               <span className="sr-only">{STATE_TEXT.loading}</span>
             </>
           ) : unlimited
@@ -530,7 +530,7 @@ function SendQuotaCard({
           {`送信枠を${STATE_TEXT.error}。もう一度読み込む`}
         </button>
       ) : loading ? (
-        <span className="bg-canvas-sunken inline-block h-4 w-24 animate-pulse rounded" aria-hidden="true" />
+        <span className="bg-canvas-sunken inline-block h-4 w-24 animate-pulse rounded-mini" aria-hidden="true" />
       ) : unlimited ? (
         <span className="text-ink-faint">契約種別：無制限</span>
       ) : (
@@ -1443,7 +1443,7 @@ function DashboardPageInner() {
         </Button>
         <div className="flex flex-wrap items-center justify-end gap-2.5">
           <DashboardFreshness freshness={data?.freshness} asOf={data?.asOf} />
-          <span className={`${healthClass} inline-flex items-center gap-1.5 text-xs font-medium`}><span className="h-2 w-2 rounded-full bg-current" />{healthLabel}</span>
+          <span className={`${healthClass} inline-flex items-center gap-1.5 text-xs font-medium`}><span className="h-2 w-2 rounded-pill bg-current" />{healthLabel}</span>
           <div className="flex gap-2">
             {PERIODS.map((item) => (
               <button
@@ -1470,7 +1470,7 @@ function DashboardPageInner() {
             {unreadNotificationCount > 0 ? (
               <span
                 aria-hidden="true"
-                className="bg-danger text-on-accent pointer-events-none absolute -top-1.5 -right-1.5 min-w-5 rounded-full px-1 text-center text-xs leading-5 font-medium tabular-nums"
+                className="bg-danger text-on-accent pointer-events-none absolute -top-1.5 -right-1.5 min-w-5 rounded-pill px-1 text-center text-xs leading-5 font-medium tabular-nums"
               >{unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}</span>
             ) : null}
             <NotificationPanel

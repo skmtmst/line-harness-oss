@@ -207,7 +207,7 @@ export default function MediaUploadDialog({
         aria-labelledby={`${inputId}-title`}
         aria-busy={busy || undefined}
         tabIndex={-1}
-        className="border-hairline max-h-screen w-full max-w-2xl overflow-y-auto rounded-card border bg-canvas shadow-xl"
+        className="border-hairline max-h-screen w-full max-w-2xl overflow-y-auto rounded-card border bg-canvas shadow-float"
       >
         <div className="border-hairline flex items-center justify-between gap-3 border-b px-6 py-4">
           <h2 id={`${inputId}-title`} className="text-ink text-xl font-bold">ファイルを入れる</h2>

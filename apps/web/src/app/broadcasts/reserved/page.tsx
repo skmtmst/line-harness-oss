@@ -316,8 +316,8 @@ function ReservedBroadcastContent() {
         固定の右列で本文が潰れるので、1列に畳んで下へ並べる。
       */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
-        <section id="reservation-summary" style={{ minHeight: 760 }} className="bg-canvas border-hairline rounded-card min-w-0 flex-1 border px-6 py-8 text-center shadow-sm">
-          <span className="bg-accent-soft text-accent-deep mx-auto flex h-14 w-14 items-center justify-center rounded-full">
+        <section id="reservation-summary" style={{ minHeight: 760 }} className="bg-canvas border-hairline rounded-card min-w-0 flex-1 border px-6 py-8 text-center shadow-card">
+          <span className="bg-accent-soft text-accent-deep mx-auto flex h-14 w-14 items-center justify-center rounded-pill">
             <CalendarCheck2 size={28} aria-hidden="true" />
           </span>
           <h2 className="text-ink mt-5 text-xl font-bold">一斉配信を予約しました</h2>
@@ -353,7 +353,7 @@ function ReservedBroadcastContent() {
           </div>
         </section>
 
-        <aside className="bg-canvas border-hairline rounded-card shrink-0 border p-4 shadow-sm lg:w-97.5">
+        <aside className="bg-canvas border-hairline rounded-card shrink-0 border p-4 shadow-card lg:w-97.5">
           <h2 className="text-ink text-base font-bold">次にできること</h2>
           <p className="text-ink-faint mt-1 text-xs">予約後も開始前まで確認・取消できます。</p>
           <div className="mt-4 grid gap-2">

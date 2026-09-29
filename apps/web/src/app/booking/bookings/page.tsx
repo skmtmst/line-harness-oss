@@ -1168,7 +1168,7 @@ export default function BookingsPage() {
                         </Td>
                         <Td>
                           <span
-                            className={`inline-block rounded px-2 py-0.5 text-xs ${statusBadgeColor[b.status] ?? 'bg-canvas-sunken'}`}
+                            className={`inline-block rounded-mini px-2 py-0.5 text-xs ${statusBadgeColor[b.status] ?? 'bg-canvas-sunken'}`}
                           >
                             {statusLabel[b.status] ?? b.status}
                           </span>
@@ -1177,7 +1177,7 @@ export default function BookingsPage() {
                           <div className="inline-flex items-center gap-1">
                             <button
                               onClick={() => setDetailId(b.id)}
-                              className="text-ink-secondary bg-canvas-sunken rounded-md px-3 py-1 text-xs font-medium hover:bg-hairline"
+                              className="text-ink-secondary bg-canvas-sunken rounded-mini px-3 py-1 text-xs font-medium hover:bg-hairline"
                             >
                               詳細
                             </button>
@@ -1186,7 +1186,7 @@ export default function BookingsPage() {
                               <Link
                                 href={`/chats?friend=${b.friend_id}`}
                                 aria-label={`${b.friend_name ?? 'お客さま'}さんとの会話を受信箱で開く`}
-                                className="text-ink-secondary bg-canvas-sunken rounded-md px-3 py-1 text-xs font-medium hover:bg-hairline"
+                                className="text-ink-secondary bg-canvas-sunken rounded-mini px-3 py-1 text-xs font-medium hover:bg-hairline"
                               >
                                 会話
                               </Link>
@@ -1360,7 +1360,7 @@ function BookingDetailPanel({
         onClick={onClose}
         className="absolute inset-0 bg-scrim"
       />
-      <aside className="relative h-full w-full overflow-y-auto bg-canvas-sunken shadow-xl">
+      <aside className="relative h-full w-full overflow-y-auto bg-canvas-sunken shadow-float">
         <div className="border-hairline sticky top-0 z-10 flex min-h-16 items-center justify-between gap-3 border-b bg-canvas px-6 py-3">
           <div className="min-w-0">
             <p className="text-ink-faint text-xs font-semibold">予約管理　›　{formatJpDay(b.starts_at)}　›　{formatJpTime(b.starts_at)} {b.friend_name ?? 'お客様'}さま</p>
@@ -1436,7 +1436,7 @@ function BookingDetailPanel({
           <aside className="space-y-4">
           <section className="bg-canvas rounded-card border-hairline border p-5">
             <h3 className="text-ink text-sm font-semibold">お客様とペット</h3>
-            <div className="mt-3 flex items-center gap-3"><span className="bg-action-soft text-action flex h-10 w-10 items-center justify-center rounded-full font-semibold">{b.friend_name?.charAt(0) ?? '?'}</span><div>{b.friend_id ? <Link href={`/friends/detail?id=${encodeURIComponent(b.friend_id)}`} className="text-ink font-semibold hover:underline">{b.friend_name ?? '名前未設定'}さま</Link> : <span className="text-ink font-semibold">{b.friend_name ?? '名前未設定'}さま</span>}<p className="text-ink-faint text-xs">{b.friend_id ? 'LINEの友だち情報と来店履歴' : '電話受付のお客さま'}</p></div></div>
+            <div className="mt-3 flex items-center gap-3"><span className="bg-action-soft text-action flex h-10 w-10 items-center justify-center rounded-pill font-semibold">{b.friend_name?.charAt(0) ?? '?'}</span><div>{b.friend_id ? <Link href={`/friends/detail?id=${encodeURIComponent(b.friend_id)}`} className="text-ink font-semibold hover:underline">{b.friend_name ?? '名前未設定'}さま</Link> : <span className="text-ink font-semibold">{b.friend_name ?? '名前未設定'}さま</span>}<p className="text-ink-faint text-xs">{b.friend_id ? 'LINEの友だち情報と来店履歴' : '電話受付のお客さま'}</p></div></div>
             <DetailRow label="ペット">{detail?.customer.petName ?? '登録なし'}</DetailRow>
             <DetailRow label="連絡先">{detail?.customer.phone ?? '登録なし'}</DetailRow>
             {detail?.customer.tags.length ? <DetailRow label="タグ">{detail.customer.tags.map((tag) => tag.name).join('、')}</DetailRow> : null}
@@ -1494,7 +1494,7 @@ function ActionButtons({
         </button>
         <button
           onClick={() => onAction('reject')}
-          className="text-danger bg-danger-bg rounded-md px-3 py-1 text-xs font-medium hover:bg-status-danger-selected"
+          className="text-danger bg-danger-bg rounded-mini px-3 py-1 text-xs font-medium hover:bg-status-danger-selected"
         >
           拒否
         </button>
@@ -1506,19 +1506,19 @@ function ActionButtons({
       <div className="inline-flex gap-1">
         <button
           onClick={() => onAction('complete')}
-          className="bg-info-bg text-info rounded-md px-3 py-1 text-xs font-medium hover:bg-hairline"
+          className="bg-info-bg text-info rounded-mini px-3 py-1 text-xs font-medium hover:bg-hairline"
         >
           完了
         </button>
         <button
           onClick={() => onAction('no_show')}
-          className="bg-warning-bg text-warning rounded-md px-3 py-1 text-xs font-medium hover:bg-hairline"
+          className="bg-warning-bg text-warning rounded-mini px-3 py-1 text-xs font-medium hover:bg-hairline"
         >
           無断
         </button>
         <button
           onClick={() => onAction('cancel')}
-          className="text-ink-secondary bg-canvas-sunken rounded-md px-3 py-1 text-xs font-medium hover:bg-hairline"
+          className="text-ink-secondary bg-canvas-sunken rounded-mini px-3 py-1 text-xs font-medium hover:bg-hairline"
         >
           取消
         </button>

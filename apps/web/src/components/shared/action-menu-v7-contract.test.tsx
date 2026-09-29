@@ -215,7 +215,7 @@ describe('ActionMenu ★V7 の見た目', () => {
     expect(css).toMatch(/\.menu\s*{[^}]*min-width:\s*224px/s)
     expect(css).toMatch(/\.menu\s*{[^}]*max-width:\s*min\(320px,\s*calc\(100vw - 16px\)\)/s)
     expect(css).toMatch(/\.menu\s*{[^}]*background:\s*var\(--color-canvas\)/s)
-    expect(css).toMatch(/\.menu\s*{[^}]*border-radius:\s*12px/s)
+    expect(css).toMatch(/\.menu\s*{[^}]*border-radius:\s*var\(--radius-card\)/s)
     expect(css).toMatch(/\.menu\s*{[^}]*border:\s*1px solid var\(--color-hairline\)/s)
     expect(css).toMatch(/\.menu\s*{[^}]*box-shadow:\s*var\(--shadow-float\)/s)
     expect(css).toMatch(/\.item\s*{[^}]*height:\s*36px/s)

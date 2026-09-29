@@ -67,7 +67,7 @@ export default function BroadcastKpis({
           <p className="text-ink-secondary text-xs font-medium">{card.title}</p>
           <p className="mt-1 flex items-baseline gap-1">
             {loading ? (
-              <span className="bg-canvas-sunken inline-block h-7 w-14 animate-pulse rounded" />
+              <span className="bg-canvas-sunken inline-block h-7 w-14 animate-pulse rounded-mini" />
             ) : (
               // 監査6 #674: 数が無いときは「—」だけで単位を出さない（`—件` は数に見える）
               <span className="text-ink text-2xl font-bold">

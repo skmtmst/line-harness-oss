@@ -681,7 +681,7 @@ export default function NewBookingMenuPage() {
                 <Checkbox
                   checked={assigned.has(s.id)}
                   onCheckedChange={() => toggle(s.id)}
-                  className="border-hairline hover:bg-canvas-sunken rounded-md border p-2.5"
+                  className="border-hairline hover:bg-canvas-sunken rounded-mini border p-2.5"
                 >
                   <span className="text-ink text-sm">{s.display_name || s.name}</span>
                   {s.role && <span className="text-ink-faint text-xs">{s.role}</span>}

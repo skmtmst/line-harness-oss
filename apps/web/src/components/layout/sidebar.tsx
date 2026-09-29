@@ -512,9 +512,9 @@ export default function Sidebar({
         <div className="flex h-16 shrink-0 items-center gap-3 border-b border-hairline px-4 pr-16">
           {brand.iconUrl ? (
             /* eslint-disable-next-line @next/next/no-img-element -- LINE の CDN。静的アセットではない */
-            <img src={brand.iconUrl} alt="" className="h-9 w-9 shrink-0 rounded-xl object-cover" />
+            <img src={brand.iconUrl} alt="" className="h-9 w-9 shrink-0 rounded-card object-cover" />
           ) : (
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-bold text-on-accent" style={{ backgroundColor: 'var(--color-accent)' }}>然</div>
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-card text-sm font-bold text-on-accent" style={{ backgroundColor: 'var(--color-accent)' }}>然</div>
           )}
           <div className="min-w-0">
             <p className="truncate text-sm font-bold text-ink">{brand.name ?? '然-NEN- LINE管理システム'}</p>
@@ -535,8 +535,8 @@ export default function Sidebar({
       ) : preview ? (
         <div className="px-[13px] pb-[9px] pt-[18px]">
           <p className="mb-[11px] text-[12px] font-normal text-ink-faint">現在のLINEアカウント</p>
-          <div className="flex h-[66px] items-center rounded-[12px] border border-hairline bg-canvas px-3">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] bg-accent-soft text-[14px] font-semibold text-accent-deep">然</div>
+          <div className="flex h-[66px] items-center rounded-card border border-hairline bg-canvas px-3">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-control bg-accent-soft text-[14px] font-semibold text-accent-deep">然</div>
             <div className="ml-3 min-w-0 flex-1">
               <p className="truncate text-[14px] font-semibold text-ink">然-NEN- TEST</p>
               <p className="mt-0.5 truncate text-micro text-ink-faint">コミュニケーション</p>
@@ -660,7 +660,7 @@ export default function Sidebar({
         <button
           ref={menuButtonRef}
           onClick={() => setIsOpen(!isOpen)}
-          className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-shell transition-colors"
+          className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-control hover:bg-shell transition-colors"
           aria-label="メニュー"
           aria-expanded={isOpen}
           aria-controls="mobile-menu"
@@ -682,9 +682,9 @@ export default function Sidebar({
         <div className={styles.mobileBrand}>
           {brand.iconUrl ? (
             /* eslint-disable-next-line @next/next/no-img-element -- LINE の CDN。静的アセットではない */
-            <img src={brand.iconUrl} alt="" className="w-7 h-7 rounded-lg object-cover" />
+            <img src={brand.iconUrl} alt="" className="w-7 h-7 rounded-control object-cover" />
           ) : (
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center text-on-accent font-medium text-xs" style={{ backgroundColor: 'var(--color-accent)' }}>然</div>
+            <div className="w-7 h-7 rounded-control flex items-center justify-center text-on-accent font-medium text-xs" style={{ backgroundColor: 'var(--color-accent)' }}>然</div>
           )}
         </div>
       </div>
@@ -708,7 +708,7 @@ export default function Sidebar({
         className={`${styles.drawer} ${styles.mobileOnly} ${isOpen ? '' : styles.drawerClosed}`}
       >
         <div className="absolute right-3 top-2.5 z-10">
-          <button onClick={() => setIsOpen(false)} className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-shell" aria-label="閉じる">
+          <button onClick={() => setIsOpen(false)} className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-control hover:bg-shell" aria-label="閉じる">
             <svg className="w-5 h-5 text-ink-faint" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
