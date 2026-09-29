@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import ListState from '@/components/shared/list-state'
@@ -34,29 +34,32 @@ export default function GettingStartedPage() {
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const [steps, setSteps] = useState<StepResult[]>([])
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  // M017：捕まえた失敗を共通部品へ渡すために持つ。
+  const [loadError, setLoadError] = useState<unknown>(null)
 
-  useEffect(() => {
+  /*
+   * M017：読み込み失敗面に再試行口を付ける。押すとここへ戻る。
+   * 読み直しを押した瞬間に読込面へ切り替わるので、二度押しはできない。
+   */
+  const load = useCallback(async () => {
     if (accountLoading) return
     const accountId = selectedAccountId
-    let alive = true
     setStatus('loading')
-
-    void api.gettingStarted.get(accountId ?? undefined).then((res) => {
-      if (!alive) return
-      if (!res.success) {
-        setStatus('error')
-        return
-      }
+    setLoadError(null)
+    try {
+      const res = await api.gettingStarted.get(accountId ?? undefined)
+      if (!res.success) throw new Error(res.error)
       setSteps(buildStepsFromApi(res.data.steps))
       setStatus('ready')
-    }).catch(() => {
-      if (alive) setStatus('error')
-    })
-
-    return () => {
-      alive = false
+    } catch (caught) {
+      setLoadError(caught)
+      setStatus('error')
     }
   }, [accountLoading, selectedAccountId])
+
+  useEffect(() => {
+    void load()
+  }, [load])
 
   const reasons = stoppedReasons(steps)
   // 主役は「いまの手順」（終わっていない最初の段）だけ。他の段の行き先は枠にする。
@@ -64,8 +67,16 @@ export default function GettingStartedPage() {
 
   return (
     <div className={styles.page}>
+      {/*
+        読込面（loading）では共通部品が onRetry を見ない。
+        失敗面にだけ再試行口が出る。
+      */}
       {status !== 'ready' ? (
-        <ListState kind={status === 'error' ? 'error' : 'loading'} />
+        <ListState
+          kind={status === 'error' ? 'error' : 'loading'}
+          error={status === 'error' ? loadError : undefined}
+          onRetry={() => void load()}
+        />
       ) : (
         <>
           {/*

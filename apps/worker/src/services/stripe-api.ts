@@ -63,7 +63,18 @@ export async function stripeRequest<T>(
     payload = body ? encodeForm(body) : '';
     if (options.idempotencyKey) headers['Idempotency-Key'] = options.idempotencyKey;
   }
-  const res = await fetchImpl(url, { method, headers, body: payload });
+  /*
+   * M023：Stripe への輸送失敗（到達不能）は fetch 自体の throw になる。
+   * 包まずに投げると口側の汎用 500（内部文）へ落ちる。502 の
+   * StripeApiError に包み、口側の日本語案内（502）へ載せる。
+   * 実際の決済・送信はしない（試験は偽の応答で）。
+   */
+  let res: Response;
+  try {
+    res = await fetchImpl(url, { method, headers, body: payload });
+  } catch {
+    throw new StripeApiError(502, '決済サービスにつながりませんでした', 'network_unreachable');
+  }
   const text = await res.text();
   let json: unknown = null;
   try {

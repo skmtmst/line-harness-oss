@@ -1,4 +1,4 @@
-import { jstNow } from './utils.js';
+import { jstNow, toJstString } from './utils.js';
 import { nextSupportTicketNo } from './ops-support.js';
 
 /**
@@ -108,6 +108,57 @@ export async function createHqSupportRequest(
     )
     .run();
   return (await getHqSupportRequest(db, id, input.tenantId))!;
+}
+
+/**
+ * M028：確定応答を失った再送の重複判定。
+ *
+ * 同じ統括・同じ送信者・同じ内容（種類・件名・本文・関係店舗）が
+ * 直近 10 分にあれば、その行を返す。要求キー台帳は migration が要るため
+ * 番号待ちで、番号不要の範囲で重複チケットを作らない。
+ * 添付の違いまでは見ない（送り直しは同じ添付のため）。
+ */
+export const HQ_SUPPORT_DUPLICATE_WINDOW_MINUTES = 10;
+
+export async function findRecentDuplicateHqSupportRequest(
+  db: D1Database,
+  input: {
+    tenantId: string;
+    staffId: string | null;
+    staffName: string;
+    kind: HqSupportKind;
+    subject: string;
+    body: string;
+    lineAccountId: string | null;
+  },
+): Promise<HqSupportRequest | null> {
+  const cutoff = toJstString(new Date(Date.now() - HQ_SUPPORT_DUPLICATE_WINDOW_MINUTES * 60 * 1000));
+  return db
+    .prepare(
+      `SELECT * FROM hq_support_requests
+       WHERE tenant_id = ?
+         AND (staff_id = ? OR (staff_id IS NULL AND ? IS NULL))
+         AND staff_name = ?
+         AND kind = ?
+         AND subject = ?
+         AND body = ?
+         AND (line_account_id = ? OR (line_account_id IS NULL AND ? IS NULL))
+         AND created_at >= ?
+       ORDER BY created_at DESC LIMIT 1`,
+    )
+    .bind(
+      input.tenantId,
+      input.staffId,
+      input.staffId,
+      input.staffName,
+      input.kind,
+      input.subject,
+      input.body,
+      input.lineAccountId,
+      input.lineAccountId,
+      cutoff,
+    )
+    .first<HqSupportRequest>();
 }
 
 export async function markHqSupportRequestNotified(db: D1Database, id: string): Promise<void> {
