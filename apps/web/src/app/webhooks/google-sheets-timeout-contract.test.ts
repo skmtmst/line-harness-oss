@@ -20,7 +20,8 @@ describe('R151 Google Sheets 連携の読み込みは期限付き', () => {
     // 失敗系はすでに loadError → 再試行ボタンの経路がある。期限はその経路へ
     // 乗せるので、新しい分岐ではなく fetch の signal として渡す。
     expect(PANEL).toContain('api.webhooks.googleSheets.connection(requestAccountId, { signal })')
-    expect(PANEL).toContain('api.webhooks.googleSheets.runs(requestAccountId, { signal })')
+    // 履歴の取得は loadRuns に切り出し、そこへ同じ期限を渡す
+    expect(PANEL).toContain('api.webhooks.googleSheets.runs(accountId, { signal })')
     expect(PANEL).toContain('loadError')
   })
 })

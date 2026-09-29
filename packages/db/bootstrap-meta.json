@@ -474,7 +474,8 @@
     "520_incoming_webhook_receipt_plan.sql",
     "521_incoming_webhook_receipt_body_hash.sql",
     "532_webhook_interaction_secret_unavailable.sql",
+    "534_google_sheets_sync_run_scope.sql",
     "535_tiktok_pnl.sql"
   ],
-  "migrationCount": 475
+  "migrationCount": 476
 }
