@@ -8998,6 +8998,9 @@ CREATE INDEX idx_staff_members_role ON staff_members(role);
 CREATE INDEX idx_staff_members_tenant
   ON staff_members(tenant_id);
 
+CREATE UNIQUE INDEX idx_staff_members_tenant_email_unique
+  ON staff_members(COALESCE(tenant_id, ''), lower(email)) WHERE email IS NOT NULL;
+
 CREATE INDEX idx_staff_notification_reads_staff
   ON staff_notification_reads(staff_id, read_at DESC);
 

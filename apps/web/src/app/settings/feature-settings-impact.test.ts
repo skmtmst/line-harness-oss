@@ -38,7 +38,7 @@ describe('機能設定のオフ前影響確認(#643)', () => {
     expect(source).toContain('expectedVersion: settingsVersion')
     expect(source).toContain('sidebarItemOrder: currentOrder')
     expect(source).toContain('error instanceof ApiError && error.status === 409')
-    expect(source).toContain('setError(FEATURE_SETTINGS_CONFLICT_MESSAGE)')
+    expect(source).toContain('FEATURE_SETTINGS_CONFLICT_MESSAGE')
     expect(source).toContain("featureSettingsErrorMessage(error instanceof ApiError ? error.status : undefined, 'save')")
   })
 

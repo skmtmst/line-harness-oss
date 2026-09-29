@@ -63,6 +63,22 @@ export function featureSettingsAreDirty(input: {
 export const FEATURE_SETTINGS_CONFLICT_MESSAGE =
   'ほかの管理者が先に保存しました。最新の状態を読み直したので、内容を確認してもう一度保存してください。'
 
+/**
+ * 保存で競合(409)に弾かれたときの理由（D019）。
+ *
+ * 読み込めていないのに「ほかの管理者が先に保存しました」と出すと、
+ * 実際は権限や通信の失敗なのに別の理由に見える。読み込みの失敗を
+ * 引きずっているときは、その本当の理由（権限・保存失敗）に合わせる。
+ */
+export function featureSettingsSaveConflictMessage(input: {
+  loadFailed: boolean
+  loadForbidden: boolean
+}): string {
+  if (input.loadForbidden) return featureSettingsErrorMessage(403, 'save')
+  if (input.loadFailed) return featureSettingsErrorMessage(undefined, 'save')
+  return FEATURE_SETTINGS_CONFLICT_MESSAGE
+}
+
 export function featureSettingsErrorMessage(status: number | undefined, action: 'load' | 'save'): string {
   if (status === 403) {
     return action === 'save'

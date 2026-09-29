@@ -11,7 +11,7 @@
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import type { FileScanItem } from '@/lib/api'
+import { ApiError, type FileScanItem } from '@/lib/api'
 
 const mocks = vi.hoisted(() => ({
   accountId: 'acc-1' as string | null,
@@ -19,6 +19,8 @@ const mocks = vi.hoisted(() => ({
   list: vi.fn(),
   getConfig: vi.fn(),
   saveConfig: vi.fn(),
+  release: vi.fn(),
+  remove: vi.fn(),
 }))
 
 vi.mock('@/contexts/account-context', () => ({
@@ -46,6 +48,8 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
         list: mocks.list,
         getConfig: mocks.getConfig,
         saveConfig: mocks.saveConfig,
+        release: mocks.release,
+        remove: mocks.remove,
       },
     },
   }
@@ -208,5 +212,122 @@ describe('ファイルの検査の設定画面', () => {
         externalSecretRef: null,
       })
     })
+  })
+
+  /*
+   * 監査 D017: 確認窓の中で起きた失敗は、窓の中に理由を出す。
+   * ページ最上部の帯は暗転の後ろに隠れて読めないため、窓の中の
+   * 注意表示（role="alert"）へ出し、窓は開いたままにする。
+   */
+  async function openReleaseDialog() {
+    ready()
+    mocks.release.mockResolvedValue({ success: true, data: {} })
+    mocks.list.mockResolvedValue({ success: true, data: { items: [scanOf()], total: 1, limit: 50, offset: 0 } })
+    const { container } = render(<FileScanSettingsPage />)
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '使えるように戻す' })).toBeTruthy()
+    })
+    fireEvent.click(screen.getByRole('button', { name: '使えるように戻す' }))
+    const reason = screen.getByLabelText(/理由/)
+    fireEvent.change(reason, { target: { value: '社内の画像と確認できたため' } })
+    return { container }
+  }
+
+  function confirmInDialog(label: string) {
+    const buttons = screen.getAllByRole('button', { name: label })
+    fireEvent.click(buttons.at(-1)!)
+  }
+
+  test('戻すの失敗（409）は窓の中に理由を出し、窓は開いたまま (D017)', async () => {
+    const { container } = await openReleaseDialog()
+    mocks.release.mockRejectedValueOnce(new ApiError(409, 'version conflict'))
+    confirmInDialog('使えるように戻す')
+    const message = 'しまったファイルだけ戻せます。一覧を読み直してください。'
+    await waitFor(() => {
+      expect(screen.getByText(message)).toBeTruthy()
+    })
+    // 窓は開いたまま（理由欄が残る）。
+    expect(screen.getByLabelText(/理由/)).toBeTruthy()
+    // ページ最上部（暗転の後ろ）には出さない。
+    expect(container.querySelector('p[role="alert"]')).toBeNull()
+  })
+
+  test('消すの失敗（409）は窓の中に理由を出す (D017)', async () => {
+    ready()
+    mocks.remove.mockRejectedValueOnce(new ApiError(409, 'already gone'))
+    mocks.list.mockResolvedValue({ success: true, data: { items: [scanOf()], total: 1, limit: 50, offset: 0 } })
+    const { container } = render(<FileScanSettingsPage />)
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'invoice.pdfのその他操作' })).toBeTruthy()
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'invoice.pdfのその他操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '消す' }))
+    await waitFor(() => {
+      expect(screen.getByText('ファイルを消す')).toBeTruthy()
+    })
+    confirmInDialog('消す')
+    const message = 'しまった・使えないファイルだけ消せます。一覧を読み直してください。'
+    await waitFor(() => {
+      expect(screen.getByText(message)).toBeTruthy()
+    })
+    expect(screen.getByText('ファイルを消す')).toBeTruthy()
+    expect(container.querySelector('p[role="alert"]')).toBeNull()
+  })
+
+  test('外の検査を止める失敗（500）は窓の中に理由を出す (D017)', async () => {
+    ready()
+    mocks.saveConfig.mockRejectedValueOnce(new Error('boom'))
+    mocks.getConfig.mockResolvedValue({
+      success: true,
+      data: {
+        config: {
+          externalProvider: 'acme-scan',
+          externalEndpointUrl: 'https://scan.example.com/check',
+          externalSecretRef: 'FILE_SCAN_API_KEY',
+          externalTimeoutMs: 10000,
+          maxBytesOverride: null,
+          maxPixelsOverride: null,
+          updatedAt: '2026-09-20T00:00:00Z',
+        },
+      },
+    })
+    mocks.list.mockResolvedValue({ success: true, data: { items: [scanOf()], total: 1, limit: 50, offset: 0 } })
+    const { container } = render(<FileScanSettingsPage />)
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '外の検査を止める' })).toBeTruthy()
+    })
+    fireEvent.click(screen.getByRole('button', { name: '外の検査を止める' }))
+    await waitFor(() => {
+      expect(screen.getByText('外の検査を止める', { selector: 'h2' })).toBeTruthy()
+    })
+    confirmInDialog('外の検査を止める')
+    const message = '設定を消せませんでした。通信状態を確認して、もう一度お試しください。'
+    await waitFor(() => {
+      expect(screen.getByText(message)).toBeTruthy()
+    })
+    expect(screen.getByText('外の検査を止める', { selector: 'h2' })).toBeTruthy()
+    expect(container.querySelector('p[role="alert"]')).toBeNull()
+  })
+
+  /*
+   * 監査 D018: 必須の理由が空なら、APIを送らず「理由を入れてください」を
+   * 窓の中に出す（他画面の「変更理由を入力してください」と同じ流儀）。
+   */
+  test('戻すで理由が空ならAPIを送らず理由を促す (D018)', async () => {
+    ready()
+    mocks.list.mockResolvedValue({ success: true, data: { items: [scanOf()], total: 1, limit: 50, offset: 0 } })
+    render(<FileScanSettingsPage />)
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '使えるように戻す' })).toBeTruthy()
+    })
+    fireEvent.click(screen.getByRole('button', { name: '使えるように戻す' }))
+    expect(screen.getByLabelText(/理由/)).toBeTruthy()
+    confirmInDialog('使えるように戻す')
+    await waitFor(() => {
+      expect(screen.getByText('理由を入力してください')).toBeTruthy()
+    })
+    expect(mocks.release).not.toHaveBeenCalled()
+    // 窓は開いたまま。
+    expect(screen.getByLabelText(/理由/)).toBeTruthy()
   })
 })

@@ -8,7 +8,7 @@ import NoteBar from '@/components/shared/note-bar'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import ListState from '@/components/shared/list-state'
 import StatusBadge from '@/components/shared/status-badge'
-import { api } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
 import { csvCell } from '@/lib/presentation'
 import type {
   SearchConsoleMetric,
@@ -186,14 +186,28 @@ export default function SearchConsolePage() {
   const [setup, setSetup] = useState<SearchConsoleSetup | null>(null)
   const [loading, setLoading] = useState(true)
   const [denied, setDenied] = useState(false)
+  /*
+   * 監査 D020: 403（Google側の閲覧権限なし）だけ権限の案内カードにし、
+   * 通信断・500・429・success:false は失敗の理由と再読み込みを出す。
+   * 以前は catch が一律 denied にしていたため、原因と案内が食い違っていた。
+   */
+  const [loadError, setLoadError] = useState<unknown>(null)
+  const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
     let active = true
     setLoading(true)
     setDenied(false)
+    setLoadError(null)
     api.searchConsole.performance(days)
       .then((response) => {
-        if (!active || !response.success) return
+        if (!active) return
+        if (!response.success) {
+          setData(null)
+          setSetup(null)
+          setLoadError(new Error('search console load failed'))
+          return
+        }
         if (response.data.status === 'connected') {
           setData(response.data)
           setSetup(null)
@@ -202,10 +216,19 @@ export default function SearchConsolePage() {
           setSetup(response.data)
         }
       })
-      .catch(() => { if (active) { setData(null); setDenied(true) } })
+      .catch((caught: unknown) => {
+        if (!active) return
+        setData(null)
+        setSetup(null)
+        if (caught instanceof ApiError && caught.status === 403) {
+          setDenied(true)
+        } else {
+          setLoadError(caught)
+        }
+      })
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
-  }, [days])
+  }, [days, attempt])
 
   const metrics: Array<{ label: string; value: string; key: keyof SearchConsoleMetric; color: string; lower?: boolean }> = [
     { label: '合計クリック数', value: number.format(data?.summary.clicks ?? 0), key: 'clicks', color: 'var(--color-action)' },
@@ -264,6 +287,12 @@ export default function SearchConsolePage() {
 
       {loading ? (
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">{metrics.map((item) => <div key={item.label} className="rounded-card bg-canvas-sunken h-36 animate-pulse" />)}</div>
+      ) : loadError ? (
+        <ListState
+          kind="error"
+          error={loadError}
+          onRetry={() => setAttempt((current) => current + 1)}
+        />
       ) : !data ? (
         <>
           <div><NoteBar>Search Console をつなぐと、検索からの流入が見られます。</NoteBar></div>

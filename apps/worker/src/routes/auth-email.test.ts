@@ -383,7 +383,8 @@ describe('パスワード再設定（36-6）', () => {
   });
 
   it('同じメールに複数の権限者がいてどれも パスワード無しなら送らない（誰宛か決められない）', async () => {
-    testDb.raw.prepare(`INSERT INTO staff_members (id, name, email, role, api_key) VALUES ('a', 'A', 'dup@example.com', 'admin', 'k1'), ('b', 'B', 'dup@example.com', 'admin', 'k2')`).run();
+    // M958: 同じ統括での重複は一意制約で作れない。統括を分けた重複（運用上あり得る）で曖昧さを確かめる。
+    testDb.raw.prepare(`INSERT INTO staff_members (id, name, email, role, api_key, tenant_id) VALUES ('a', 'A', 'dup@example.com', 'admin', 'k1', 'tenant-a'), ('b', 'B', 'dup@example.com', 'admin', 'k2', 'tenant-b')`).run();
     await call('POST', '/api/auth/password/forgot', { email: 'dup@example.com', turnstileToken: 'tok' });
     expect(mail.sendPlainMail).not.toHaveBeenCalled();
   });
