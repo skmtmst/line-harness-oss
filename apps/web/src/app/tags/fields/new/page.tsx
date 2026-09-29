@@ -78,6 +78,9 @@ function NewFriendFieldForm() {
    */
   const idempotencyKeyRef = useRef<string>(crypto.randomUUID())
 
+  /* R514・R515 の読み直し。置き場・既存項目のどちらも、取れない失敗で
+   * 画面を落とさない（m23m の取りこぼしはこの書き直しに含まれたため、
+   * 1行の catch は付けない）。 */
   const loadFolders = useCallback(async () => {
     setReloading(true)
     try {

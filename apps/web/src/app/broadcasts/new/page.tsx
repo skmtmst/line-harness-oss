@@ -139,6 +139,8 @@ function NewBroadcastPageContent() {
       // R23横展開: 条件づくりのタグ候補は今のアカウントだけ。切替で取り直す。
       const res = await api.tags.list(selectedAccountId ? { accountId: selectedAccountId } : undefined)
       if (res.success) setTags(res.data)
+    } catch {
+      // m23m: タグ候補が取れなくても配信は作れる。取れない失敗で画面を落とさない。
     } finally {
       setLoading(false)
     }
