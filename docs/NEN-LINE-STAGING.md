@@ -45,6 +45,62 @@
 - Workerのカスタムドメインは wrangler の `routes`（`custom_domain = true`）で宣言し、デプロイ時に自動でDNS・証明書が設定される。Pagesのカスタムドメインは Cloudflare 側でプロジェクトに紐付ける。
 - `stg.musubo.jp`（サービス紹介サイトの確認用・Xserver）と `r.musubo.jp` / `rs.musubo.jp`（メール受信）は別用途。変更しない。
 - 新ドメイン経由のLINEログイン・LIFF・Webhookを使うには、LINE Developers側にURLの**追加**登録が必要（既存URLは削除しない）。
+- 管理画面のログイン後の着地先（`ADMIN_PUBLIC_URL`）は値を1つしか持てない。他社向け提供に合わせ **musubo.jp 一本化**とした（利用者判断・2026-09-29）。自社用の `*.pages.dev` から入っても着地は `https://admin.musubo.jp` になる。表示とログインは従来どおり動く。
+
+## 管理画面ログインのLINEチャネルを musubo へ移す（2026-09-29 利用者決定）
+
+他社向けサービスの入口を自社プロバイダーから切り離すため、**管理画面ログイン用のLINE Loginチャネルだけ**を新しいプロバイダー `musubo`（本番）/ `musubo TEST`（検証）で新規作成し、そちらへ乗り換える。
+
+### 移すもの・移さないもの
+
+| 対象 | プロバイダー | 扱い |
+| --- | --- | --- |
+| 管理画面のLINEログイン | `musubo` / `musubo TEST`（新規） | **移す** |
+| 自社EC-CUBEの会員LINEログイン | `然-NEN-` / `然-NEN- TEST` | 移さない |
+| 自社公式アカウントのMessaging API（配信・Webhook） | `然-NEN-` / `然-NEN- TEST` | 移さない |
+| 会員のLIFF連携（`routes/liff.ts`） | `然-NEN-` / `然-NEN- TEST` | 移さない |
+
+`LINE_LOGIN_CHANNEL_ID` / `LINE_LOGIN_CHANNEL_SECRET` は会員向けLIFF連携の既定チャネルも兼ねている。ここを付け替えると自社会員のLINE連携が壊れるため、**管理者ログイン専用の設定を別に持つ**。
+
+- `ADMIN_LINE_LOGIN_CHANNEL_ID`
+- `ADMIN_LINE_LOGIN_CHANNEL_SECRET`
+
+どちらもWorker secretとして環境ごとに設定する。未設定なら従来の `LINE_LOGIN_CHANNEL_*` へ戻るので、設定を入れるまで挙動は変わらない。
+
+### 新チャネルに登録するコールバックURL
+
+`redirect_uri` はリクエストされたホスト名から作られるため、**ホスト名ごとに登録が必要**。コールバックURL欄は複数行で複数URLを持てるので、新旧両方を登録する（`*.workers.dev` から入る自社運用も残すため）。
+
+| 環境 | プロバイダー / チャネル | 登録するURL |
+| --- | --- | --- |
+| 検証 | `musubo TEST` のLINE Login（新規） | `https://stg-api.musubo.jp/api/auth/line/callback`<br>`https://nen-line-stg.skmtmst.workers.dev/api/auth/line/callback` |
+| 本番 | `musubo` のLINE Login（新規） | `https://api.musubo.jp/api/auth/line/callback`<br>`https://nen-line.skmtmst.workers.dev/api/auth/line/callback` |
+
+本番の登録は、`ADMIN_PUBLIC_URL` と管理画面ビルドの `NEXT_PUBLIC_API_URL` を musubo.jp へ切り替える**本番リリースより前に**済ませる。順番を逆にすると、切替後の `redirect_uri` が未登録になり本番のLINEログインが失敗する。
+
+本番リリース時に合わせて必要な設定:
+
+- GitHub secret `NEXT_PUBLIC_API_URL` を `https://api.musubo.jp` にする（管理画面バンドルのAPI接続先）
+- Worker secret `ADMIN_ORIGIN` は新旧2オリジンを保持済み（2026-09-29にCodexが設定）
+
+### 権限者の再連携が必要な理由と手順
+
+LINEのユーザーIDは**プロバイダーごとに違う値**になる。チャネルを移すと、今までLINEでログインしていた権限者は別人として扱われ `not_authorized` になる。
+
+- 管理画面のログインは**メール＋パスワードが主**（決定 2026-09-13）。パスワードログインは影響を受けないので、締め出しにはならない。
+- LINEでログインしたい権限者は、オーナーが管理画面の権限者一覧から**招待を再送**し、届いたリンク（`/api/auth/line?invite=...`）を新しいチャネルで開き直すと再連携できる。前の連携は自動で外れる。
+
+### 切替の順番
+
+1. `musubo TEST` にLINE Loginチャネルを作り、検証用のコールバックURL2件を登録する
+2. 検証Workerに `ADMIN_LINE_LOGIN_CHANNEL_ID` / `ADMIN_LINE_LOGIN_CHANNEL_SECRET` を設定する
+3. 検証で、招待再送 → LINEログイン成功を確認する
+4. `musubo` にLINE Loginチャネルを作り、本番用のコールバックURL2件を登録する
+5. 本番Workerに同じ2つのsecretを設定する（本番リリースと同じ回に行う）
+
+### 旧記録（然-NEN- チャネルでのmusubo.jpコールバック）
+
+検証チャネル `2011090925`（`然-NEN- TEST`）には `https://stg-api.musubo.jp/api/auth/line/callback` を登録済みで、ログイン成功も確認した（2026-09-29）。この登録は自社EC-CUBE用の登録と同居しているため削除しない。上の乗り換えが済んだら、管理画面ログインは `musubo TEST` のチャネル側を使う。
 
 ## 通知事故を防ぐルール
 
@@ -80,6 +136,7 @@
 - 検証用LINE Loginチャネルの Channel secret
 - 検証用LIFF ID
 - 検証用LINE公式アカウントの Basic ID
+- 管理画面ログイン用LINE Loginチャネル（`musubo TEST`）の Channel ID / Channel secret
 
 これらはGitへ保存せず、Cloudflare Worker secrets またはビルド時の環境変数として設定します。
 
