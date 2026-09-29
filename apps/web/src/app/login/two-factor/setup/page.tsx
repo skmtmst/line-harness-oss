@@ -8,6 +8,7 @@ import { useBrand } from '@/lib/use-brand'
 import { qrToDataURL } from '@/lib/qr-image'
 import Notice from '@/components/shared/notice'
 import OtpInput from '@/components/shared/otp-input'
+import { isTwoFactorChallengeGone, twoFactorFailureMessage } from '../two-factor-error'
 
 type SetupData = { provisioningUri: string; manualKey: string }
 
@@ -27,6 +28,8 @@ export default function TwoFactorSetupPage() {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  /** R508: 合言葉が使えなくなった（期限切れ・回数制限）。入力は終わらせる。 */
+  const [expired, setExpired] = useState(false)
   const brand = useBrand()
 
   useEffect(() => {
@@ -69,7 +72,15 @@ export default function TwoFactorSetupPage() {
         body: JSON.stringify({ challengeToken: challenge, code: digits }),
       })
       const body = await response.json() as { success: boolean; error?: string; data?: { sessionToken?: string }; csrfToken?: string }
-      if (!response.ok || !body.success) throw new Error(body.error || '登録を完了できませんでした')
+      if (!response.ok || !body.success) {
+        if (isTwoFactorChallengeGone(response.status)) {
+          // 合言葉はサーバー側で消えている。再試行は通らないので入力を終わらせる。
+          setExpired(true)
+          setSetup(null)
+          setCode('')
+        }
+        throw new Error(body.error || '登録を完了できませんでした')
+      }
       if (body.data?.sessionToken) storeAdminSession(body.data.sessionToken, body.csrfToken)
       else if (body.csrfToken) {
         try { localStorage.setItem('lh_csrf', body.csrfToken) } catch { /* Cookie session is sufficient */ }
@@ -88,7 +99,8 @@ export default function TwoFactorSetupPage() {
       clearTwoFactorChallenge()
       window.location.assign(adminSessionHandoffPath(nextPath, body.data?.sessionToken, body.csrfToken))
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : '登録を完了できませんでした')
+      // R506のついで: 通信断の技術文言をそのまま出さない。
+      setError(twoFactorFailureMessage(caught, '登録を完了できませんでした'))
       setCode('')
     } finally { setBusy(false) }
   }
@@ -113,6 +125,11 @@ export default function TwoFactorSetupPage() {
         </p>
       </div>
       {error && <Notice tone="danger" message={error} className="mt-5" />}
+      {expired && (
+        <p className="mt-4 text-center text-xs text-ink-secondary">
+          表示中のQRコードは使えなくなりました。ログインし直すと新しいQRコードをお出しします。
+        </p>
+      )}
       {loading ? (
         <p className="mt-6 text-center text-xs text-ink-faint">QRコードを用意しています…</p>
       ) : setup ? (
