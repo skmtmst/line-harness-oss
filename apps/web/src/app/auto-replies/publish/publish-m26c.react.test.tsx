@@ -35,6 +35,7 @@ const mocks = vi.hoisted(() => {
     publishDraft: vi.fn(),
     stop: vi.fn(),
     createDraft: vi.fn(),
+    create: vi.fn(),
     saveDraft: vi.fn(),
     update: vi.fn(),
     friendsList: vi.fn(),
@@ -53,6 +54,7 @@ vi.mock('@/lib/api', () => ({
       publishDraft: mocks.publishDraft,
       stop: mocks.stop,
       createDraft: mocks.createDraft,
+      create: mocks.create,
       saveDraft: mocks.saveDraft,
       update: mocks.update,
     },
@@ -300,6 +302,70 @@ describe('m26c R552-UI: 内容が変わった試験結果', () => {
     if (!dialog) throw new Error('test dialog not open')
     await click('自動応答をテスト', dialog)
     expect(container.textContent).toMatch(/内容が変わり/)
+  });
+});
+
+describe('m26c R556-UI: 複製の再送は同じ確認キー', () => {
+  it('応答消失からの送り直しでも同じキーで1件に収まる', async () => {
+    mocks.createDraft.mockRejectedValueOnce(new MockApiError(500, '応答消失'))
+    mocks.createDraft.mockResolvedValueOnce({
+      success: true,
+      data: { autoReplyId: 'r-copy', versionId: 'v-copy' },
+    })
+    await goToDone()
+    await click('自動応答を複製して作成')
+    expect(container.textContent).toMatch(/読み直して/)
+    await click('自動応答を複製して作成')
+    expect(mocks.createDraft).toHaveBeenCalledTimes(2)
+    const firstKey = mocks.createDraft.mock.calls[0][1]
+    const secondKey = mocks.createDraft.mock.calls[1][1]
+    expect(typeof firstKey).toBe('string')
+    expect(secondKey).toBe(firstKey)
+  });
+});
+
+describe('m26c R570-UI: 新規作成の再送は同じ確認キー', () => {
+  async function renderNewDialog(onSaved: () => void) {
+    container = document.createElement('div')
+    document.body.appendChild(container)
+    root = createRoot(container)
+    await act(async () => {
+      root.render(
+        <EditDialog
+          draft={{
+            keyword: '予約',
+            matchType: 'contains',
+            responseType: 'text',
+            responseContent: '本文',
+            templateId: null,
+            lineAccountId: 'account-a',
+            isActive: false,
+          }}
+          templates={[]}
+          onClose={() => {}}
+          onSaved={onSaved}
+        />,
+      )
+    })
+    await flush()
+  }
+
+  it('応答消失からの送り直しでも同じキーで1件に収まる', async () => {
+    const onSaved = vi.fn()
+    mocks.create.mockRejectedValueOnce(new MockApiError(500, '応答消失'))
+    mocks.create.mockResolvedValueOnce({ success: true, data: { id: 'r-new' } })
+    await renderNewDialog(onSaved)
+    await click('保存')
+    // 応答消失の素の文言が出て、窓は閉じない。
+    expect(container.textContent).toMatch(/応答消失/)
+    expect(onSaved).not.toHaveBeenCalled()
+    await click('保存')
+    expect(mocks.create).toHaveBeenCalledTimes(2)
+    const firstKey = mocks.create.mock.calls[0][1]
+    const secondKey = mocks.create.mock.calls[1][1]
+    expect(typeof firstKey).toBe('string')
+    expect(secondKey).toBe(firstKey)
+    expect(onSaved).toHaveBeenCalledTimes(1)
   });
 });
 

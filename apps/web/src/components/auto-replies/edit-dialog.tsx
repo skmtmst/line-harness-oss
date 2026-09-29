@@ -375,6 +375,11 @@ export default function EditDialog({
     responseContent: string
   } | null>(null)
   const [draftSaved, setDraftSaved] = useState(false)
+  /*
+   * m26c R570: 新規作成の確認キーは窓ごとに1つ振り、窓を閉じるまで変えない。
+   * 成功の応答を失って同じ窓から送り直しても同じキーになり、二重に作らない。
+   */
+  const [createKey] = useState(() => crypto.randomUUID())
   // アクションで選ぶもの（タグ・友だち情報・対応マーク・シナリオ・共通情報）。
   const actionOptions = useActionOptions()
   // 一覧内で開く編集窓は共通のoverlay制御へ寄せる。Escape・Tab循環・背景
@@ -562,7 +567,7 @@ export default function EditDialog({
         // AUTOREPLY-08: 新規作成は常に止まった状態で保存する。チェックを
         // 付けて作る形にすると「オフで保存したのに動く」の逆が起きる。
         // 動かすのは保存後の再開・公開操作だけ。
-        await api.autoReplies.create({ ...body, isActive: false })
+        await api.autoReplies.create({ ...body, isActive: false }, createKey)
       }
       onSaved()
     } catch (e) {

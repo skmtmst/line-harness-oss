@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
@@ -269,6 +269,11 @@ function AutoReplyPublishInner() {
    * m26c R552: 試験の実行中に内容が変わった結果は使わない。再試験を求める。
    */
   const [staleTest, setStaleTest] = useState(false)
+  /*
+   * m26c R556: 複製の確認キーは最初の押下で振り、成功まで変えない。
+   * 成功の応答を失って送り直しても同じ下書きへ復帰し、二重に作らない。
+   */
+  const duplicateKeyRef = useRef<string | null>(null)
   const [stopped, setStopped] = useState<{
     stoppedAt: string | null
     stoppedByStaffName: string | null
@@ -531,11 +536,13 @@ function AutoReplyPublishInner() {
   const duplicate = () => void run('複製を作成', async () => {
     if (!draft) throw new Error('draft missing')
     const baseName = draft.settings.name || draft.settings.keyword || '自動応答'
+    duplicateKeyRef.current ??= crypto.randomUUID()
     const res = await api.autoReplies.createDraft({
       ...draft.settings,
       name: `${baseName}（複製）`.slice(0, 250),
-    })
+    }, duplicateKeyRef.current)
     if (!res.success || !res.data?.autoReplyId) throw new Error('duplicate failed')
+    duplicateKeyRef.current = null
     router.push(`/auto-replies/edit?id=${encodeURIComponent(res.data.autoReplyId)}`)
   })
 

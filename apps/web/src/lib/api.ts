@@ -10108,9 +10108,17 @@ export const api = {
       公開は `Idempotency-Key` を付ける——二度押しで2回公開すると、
       同じ変更が2つの版として台帳に残る。
     */
-    createDraft: (body: AutoReplyDraftInput) =>
+    createDraft: (
+      body: AutoReplyDraftInput,
+      /**
+       * m26c R556: 応答を失った再送を同じ下書きへ復帰させる確認キー。
+       * 省略時は従来どおり作る。
+       */
+      idempotencyKey?: string,
+    ) =>
       fetchApi<ApiResponse<AutoReplyDraftVersion>>('/api/auto-replies/drafts', {
         method: 'POST',
+        headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
         body: JSON.stringify(body),
       }),
     getDraft: (id: string) =>
@@ -10309,9 +10317,15 @@ export const api = {
       folderId?: string | null;
       /** 運用者だけが読むメモ。友だちへは出ない。1000字まで。 */
       internalMemo?: string | null;
-    }) =>
+    },
+    /**
+     * m26c R570: 応答を失った再送を同じ行へ復帰させる確認キー。
+     * 省略時は従来どおり作る。
+     */
+    idempotencyKey?: string) =>
       fetchApi<ApiResponse<{ id: string }>>('/api/auto-replies', {
         method: 'POST',
+        headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
         body: JSON.stringify(body),
       }),
     update: (id: string, body: {
