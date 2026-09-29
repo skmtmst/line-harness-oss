@@ -636,7 +636,7 @@ function SavedSearchEditInner() {
       api.forms.list(selectedAccountId).catch(() => null),
       api.operators.list().catch(() => null),
     ]).then(([detail, searches, tagResult, markResult, scenarioResult, fieldResult, formResult, operatorResult]) => {
-      /* R518: 切替後に届いた古い応答は捨てる。今の対象の再試行だけを描く。 */
+      // R518: 切替後に届いた古い応答は捨てる。今の対象の再試行だけを描く。
       if (cancelled || generation !== loadGenerationRef.current) return
       if (tagResult.success) setTags(tagResult.data)
       setMarks(markResult?.success ? markResult.data : [])
@@ -676,7 +676,7 @@ function SavedSearchEditInner() {
       /* IDEA-04: 計算に失敗している保存値を「計算済み」の時点付きで見せない。 */
       setPreviewError(found.match.error ?? '')
     }).catch((caught: unknown) => {
-      /* R518: 古い対象の失敗で今の画面を上書きしない。前の内容は既に消してある。 */
+      // R518: 古い対象の失敗で今の画面を上書きしない。前の内容は既に消してある。
       if (cancelled || generation !== loadGenerationRef.current) return
       if (caught instanceof ApiError && caught.status === 404) {
         setError('保存した検索が見つかりません')
