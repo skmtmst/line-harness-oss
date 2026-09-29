@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useAccount } from '@/contexts/account-context'
-import { api, downloadApiFile, fetchApi, type AutomationRunDetail } from '@/lib/api'
+import { api, ApiError, downloadApiFile, fetchApi, type AutomationRunDetail } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import ListState from '@/components/shared/list-state'
@@ -133,6 +133,13 @@ export default function AutomationRunsPage() {
   const [selectedRun, setSelectedRun] = useState<AutomationRun | null>(null)
   const [selectedDetail, setSelectedDetail] = useState<AutomationRunDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
+  /**
+   * R493: 詳細の取得失敗は「記録なし」と別に持つ。`forbidden` は権限不足
+   * （再読み込みを出さない）、`error` は通信などの失敗（再読み込みを出す）。
+   */
+  const [detailError, setDetailError] = useState<null | 'error' | 'forbidden'>(null)
+  /** 詳細の「もう一度読む」で取り直すための番号。 */
+  const [detailReloadKey, setDetailReloadKey] = useState(0)
   const [retryingId, setRetryingId] = useState<string | null>(null)
   const [retryNotice, setRetryNotice] = useState('')
   const [cancellingId, setCancellingId] = useState<string | null>(null)
@@ -154,6 +161,13 @@ export default function AutomationRunsPage() {
 
   // 検索の連打で古い応答が新しい表示を上書きしないよう世代で守る（#519 軽）。
   const loadGeneration = useRef(0)
+  const selectedAccountRef = useRef(selectedAccountId)
+  selectedAccountRef.current = selectedAccountId
+  /*
+   * R492: 店切替の effect と詳細読みの effect は同じ描画で走ることがある。
+   * 先に走る切替側が世代を進め、遅れた詳細の応答を捨てる。
+   */
+  const detailGeneration = useRef(0)
 
   /*
    * 一覧から来た検索語と、ブラウザの戻る・進むで変わったURLを入力欄へ戻す。
@@ -182,6 +196,21 @@ export default function AutomationRunsPage() {
   /* 店が替わったら先頭のページから読み直す。 */
   useEffect(() => {
     setPage(1)
+  }, [selectedAccountId])
+
+  /*
+   * R492: 店が替わったら、前の店の詳細・取消確認・操作案内を残さない。
+   * 読みかけの一覧も世代を進めて無効にする。残った確認で前の店の
+   * 実行を取りやめる道をここで塞ぐ（取りやめ自体も開始時の店と照合する）。
+   */
+  useEffect(() => {
+    loadGeneration.current += 1
+    detailGeneration.current += 1
+    setSelectedRun(null)
+    setSelectedDetail(null)
+    setDetailError(null)
+    setConfirmCancel(false)
+    setRetryNotice('')
   }, [selectedAccountId])
 
   const load = useCallback(async () => {
@@ -223,24 +252,39 @@ export default function AutomationRunsPage() {
   useEffect(() => {
     if (!selectedRun) {
       setSelectedDetail(null)
+      setDetailError(null)
       setConfirmCancel(false)
       return
     }
+    // R492: 読み始めた店と違う店が出ていたら、遅れて返っても書かない。
+    const accountAtStart = selectedAccountId
+    const generationAtStart = detailGeneration.current
+    const runId = selectedRun.id
+    const stale = () => generationAtStart !== detailGeneration.current
+      || selectedAccountRef.current !== accountAtStart
     let cancelled = false
     setDetailLoading(true)
-    api.automations.getRun(selectedRun.id)
+    setDetailError(null)
+    api.automations.getRun(runId)
       .then((response) => {
-        if (cancelled) return
-        setSelectedDetail(response.success ? response.data : null)
+        if (cancelled || stale()) return
+        if (response.success) {
+          setSelectedDetail(response.data)
+        } else {
+          setSelectedDetail(null)
+          setDetailError('error')
+        }
       })
-      .catch(() => {
-        if (!cancelled) setSelectedDetail(null)
+      .catch((caught: unknown) => {
+        if (cancelled || stale()) return
+        setSelectedDetail(null)
+        setDetailError(caught instanceof ApiError && caught.status === 403 ? 'forbidden' : 'error')
       })
       .finally(() => {
-        if (!cancelled) setDetailLoading(false)
+        if (!cancelled && !stale()) setDetailLoading(false)
       })
     return () => { cancelled = true }
-  }, [selectedRun])
+  }, [selectedRun, selectedAccountId, detailReloadKey])
 
   /**
    * #942 N-353: まだ終わっていない実行の取りやめ。
@@ -250,16 +294,21 @@ export default function AutomationRunsPage() {
    */
   const cancelRun = async (run: AutomationRun) => {
     if (!run.canCancel || cancellingId) return
+    // R492: 始めた店と違う店が出ていたら書かない。Bの画面からAへの
+    // 取消POSTを作らない（サーバ側も所属で見るが、画面で先に塞ぐ）。
+    const accountAtStart = selectedAccountId
     setCancellingId(run.id)
     setRetryNotice('')
     try {
       const response = await api.automations.cancelRun(run.id)
       if (!response.success) throw new Error(response.error)
+      if (selectedAccountRef.current !== accountAtStart) return
       setRetryNotice('実行を取りやめました。記録は残っています。')
       setSelectedRun(null)
       setConfirmCancel(false)
       await load()
     } catch (caught) {
+      if (selectedAccountRef.current !== accountAtStart) return
       setRetryNotice(caught instanceof Error ? caught.message : '実行を取りやめられませんでした')
     } finally {
       setCancellingId(null)
@@ -268,6 +317,7 @@ export default function AutomationRunsPage() {
 
   const retryRun = async (run: AutomationRun) => {
     if (!run.canRetry || retryingId) return
+    const accountAtStart = selectedAccountId
     setRetryingId(run.id)
     setRetryNotice('')
     try {
@@ -276,13 +326,45 @@ export default function AutomationRunsPage() {
         { method: 'POST' },
       )
       if (!response.success) throw new Error(response.error)
+      if (selectedAccountRef.current !== accountAtStart) return
       // #736: 実行完了を待たず受け付けだけ返すため、結果は実行記録の再取得で確認する。
       // 無期限ポーリングはしない。
       setRetryNotice('再実行を受け付けました。結果は実行記録で確認してください')
       setSelectedRun(null)
       await load()
     } catch (caught) {
-      setRetryNotice(caught instanceof Error ? caught.message : '再実行できませんでした')
+      if (selectedAccountRef.current !== accountAtStart) return
+      /*
+       * R494: 応答が失われた・競合で返ったときは古い失敗表示のままにしない。
+       * 一覧と詳細を取り直し、いまの状態に合わせて案内する。受付済みなら
+       * 古い再試行ボタンは残さない（取り直した行がボタンを決める）。
+       */
+      const failureMessage = caught instanceof Error ? caught.message : '再実行できませんでした'
+      await load()
+      try {
+        const detail = await api.automations.getRun(run.id)
+        if (!detail.success || selectedAccountRef.current !== accountAtStart) {
+          setRetryNotice(failureMessage)
+          return
+        }
+        setSelectedDetail(detail.data)
+        setSelectedRun((current) => current && current.id === run.id
+          ? {
+            ...current,
+            status: detail.data.status,
+            canRetry: detail.data.canRetry,
+            canCancel: detail.data.canCancel,
+          }
+          : current)
+        const accepted = !detail.data.canRetry
+          && (detail.data.status === 'queued' || detail.data.status === 'claimed'
+            || detail.data.status === 'waiting' || detail.data.status === 'retry_wait')
+        setRetryNotice(accepted
+          ? '再試行を受け付けています。結果はこの記録で確認できます。'
+          : failureMessage)
+      } catch {
+        setRetryNotice(failureMessage)
+      }
     } finally {
       setRetryingId(null)
     }
@@ -304,9 +386,52 @@ export default function AutomationRunsPage() {
       status: resultFilter !== 'all' ? resultFilter : undefined,
       includeTest,
     }), 'automation-runs.csv')
+      .then((result) => {
+        // R495: 上限で切れたら件数と分け方を知らせる。全部出たときは黙る。
+        if (result.truncated && result.totalCount !== null) {
+          const rest = result.totalCount - (result.returnedCount ?? 0)
+          setRetryNotice(
+            `5,000件までしか出ませんでした（対象${result.totalCount.toLocaleString('ja-JP')}件・残り${rest.toLocaleString('ja-JP')}件）。期間や絞り込みで分けて出してください。`,
+          )
+        }
+      })
       .catch(() => setRetryNotice('CSVを書き出せませんでした。通信を確認して、もう一度お試しください。'))
       .finally(() => setCsvBusy(false))
   }
+
+  /*
+   * R488: 1人テストの結果から `?run=<実行ID>` でこの記録へ飛べる。
+   * 一覧に無い実行（テスト実行など）でも、詳細だけ開く。
+   */
+  useEffect(() => {
+    const runId = new URLSearchParams(window.location.search).get('run')
+    if (!runId) return
+    const accountAtStart = selectedAccountRef.current
+    let cancelled = false
+    api.automations.getRun(runId)
+      .then((response) => {
+        if (cancelled || !response.success || selectedAccountRef.current !== accountAtStart) return
+        const detail = response.data
+        setSelectedRun({
+          id: detail.id,
+          occurredAt: detail.occurredAt,
+          subject: detail.friendName,
+          accountLabel: detail.accountLabel,
+          triggerLabel: detail.triggerLabel,
+          status: detail.status,
+          detail: detail.detail,
+          durationMs: detail.durationMs,
+          automationName: detail.automationName,
+          canRetry: detail.canRetry,
+          versionNumber: detail.versionNumber,
+          isTest: detail.isTest,
+          canCancel: detail.canCancel,
+        })
+        setSelectedDetail(detail)
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
 
   return (
     <div data-design-node="DkPY0" className="flex flex-col gap-4">
@@ -316,7 +441,11 @@ export default function AutomationRunsPage() {
         {runPermissions?.canExport ? (
           <div className="text-right">
             <Button disabled={csvBusy} onClick={downloadRunsCsv}>{csvBusy ? '書き出しています…' : 'CSVで書き出す'}</Button>
-            <p className="mt-1 text-xs text-ink-faint">いまの検索・絞り込みの行が出ます</p>
+            {data && data.pagination.total > 5000 ? (
+              <p className="mt-1 text-xs text-ink-faint">いまの検索・絞り込みは{data.pagination.total.toLocaleString('ja-JP')}件あり、5,000件までしか出ません。期間や絞り込みで分けて出してください。</p>
+            ) : (
+              <p className="mt-1 text-xs text-ink-faint">いまの検索・絞り込みの行が出ます（5,000件まで）</p>
+            )}
           </div>
         ) : null}
       </div>
@@ -447,6 +576,13 @@ export default function AutomationRunsPage() {
             <p className="text-xs font-semibold text-ink-faint">処理ごとの結果</p>
             {detailLoading ? (
               <p className="mt-2 text-sm text-ink-faint">読み込んでいます</p>
+            ) : detailError === 'forbidden' ? (
+              <p className="mt-2 text-sm text-ink-secondary">この実行を見る権限がありません。</p>
+            ) : detailError === 'error' ? (
+              <div className="mt-2 flex flex-wrap items-center gap-3">
+                <p className="text-sm text-ink-secondary">詳細を読み込めませんでした。記録は消えていません。</p>
+                <Button onClick={() => setDetailReloadKey((key) => key + 1)}>もう一度読む</Button>
+              </div>
             ) : selectedDetail && selectedDetail.steps.length > 0 ? (
               <ul className="mt-2 divide-y divide-hairline rounded-control border border-hairline">
                 {selectedDetail.steps.map((step) => (
@@ -486,7 +622,7 @@ export default function AutomationRunsPage() {
             {selectedRun.canCancel && runPermissions?.canOperate ? (
               confirmCancel ? (
                 <>
-                  <span className="text-xs font-semibold text-danger">この実行を取りやめますか？記録は残りますが、実行は戻せません。</span>
+                  <span className="text-xs font-semibold text-danger">「{selectedRun.accountLabel ?? '選択中のアカウント'}」の実行を取りやめますか？記録は残りますが、実行は戻せません。</span>
                   <Button onClick={() => void cancelRun(selectedRun)} disabled={cancellingId !== null}>
                     {cancellingId === selectedRun.id ? '取りやめ中' : '取りやめる'}
                   </Button>

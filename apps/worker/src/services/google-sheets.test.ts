@@ -5,6 +5,7 @@ import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import {
   acquireSyncRun,
   parseSpreadsheetId,
+  sheetsOauthClient,
   processDueGoogleSheetsSyncs,
   syncGoogleSheetsIntegration,
   syncOneDataType,
@@ -156,6 +157,64 @@ describe('parseSpreadsheetId', () => {
     expect(parseSpreadsheetId('https://evil.example.com/x')).toBeNull();
     expect(parseSpreadsheetId('abc')).toBeNull();
     expect(parseSpreadsheetId('https://docs.google.com/spreadsheets/d/')).toBeNull();
+  });
+});
+
+describe('sheetsOauthClient', () => {
+  const REDIRECT = 'https://example.workers.dev/api/integrations/google-sheets/oauth/callback';
+  type OauthEnv = Parameters<typeof sheetsOauthClient>[0];
+
+  it('Sheets専用の設定がある環境ではそちらを使う', () => {
+    const env = {
+      GOOGLE_SHEETS_OAUTH_CLIENT_ID: 'sheets-id',
+      GOOGLE_SHEETS_OAUTH_CLIENT_SECRET: 'sheets-secret',
+      GOOGLE_BUSINESS_OAUTH_CLIENT_ID: 'business-id',
+      GOOGLE_BUSINESS_OAUTH_CLIENT_SECRET: 'business-secret',
+    } satisfies OauthEnv;
+    expect(sheetsOauthClient(env, REDIRECT)).toEqual({
+      clientId: 'sheets-id',
+      clientSecret: 'sheets-secret',
+      redirectUri: REDIRECT,
+    });
+  });
+
+  it('Sheets専用が無ければGoogleビジネスの既存クライアントを共用する', () => {
+    const env = {
+      GOOGLE_BUSINESS_OAUTH_CLIENT_ID: 'business-id',
+      GOOGLE_BUSINESS_OAUTH_CLIENT_SECRET: 'business-secret',
+    } satisfies OauthEnv;
+    expect(sheetsOauthClient(env, REDIRECT)).toEqual({
+      clientId: 'business-id',
+      clientSecret: 'business-secret',
+      redirectUri: REDIRECT,
+    });
+  });
+
+  it('IDとシークレットを別クライアント間で混ぜない', () => {
+    // Sheets側がIDだけの半端な設定。ここでビジネス側のシークレットと組むと必ず認可に失敗する。
+    const env = {
+      GOOGLE_SHEETS_OAUTH_CLIENT_ID: 'sheets-id',
+      GOOGLE_BUSINESS_OAUTH_CLIENT_ID: 'business-id',
+      GOOGLE_BUSINESS_OAUTH_CLIENT_SECRET: 'business-secret',
+    } satisfies OauthEnv;
+    expect(sheetsOauthClient(env, REDIRECT)).toEqual({
+      clientId: 'business-id',
+      clientSecret: 'business-secret',
+      redirectUri: REDIRECT,
+    });
+  });
+
+  it('どちらの組も揃っていなければ null', () => {
+    expect(sheetsOauthClient({} satisfies OauthEnv, REDIRECT)).toBeNull();
+    expect(
+      sheetsOauthClient({ GOOGLE_BUSINESS_OAUTH_CLIENT_ID: 'business-id' } satisfies OauthEnv, REDIRECT),
+    ).toBeNull();
+    expect(
+      sheetsOauthClient(
+        { GOOGLE_SHEETS_OAUTH_CLIENT_ID: '  ', GOOGLE_SHEETS_OAUTH_CLIENT_SECRET: '  ' } satisfies OauthEnv,
+        REDIRECT,
+      ),
+    ).toBeNull();
   });
 });
 
