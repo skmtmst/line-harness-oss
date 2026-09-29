@@ -2585,7 +2585,11 @@ export function describeSaveFailure(err: unknown): string {
  * database, stack, HTML and other internal detail out of the screen.
  * (422 の本文は日本語の検証文のみであることを #496-11 で監査済み。)
  */
-const BODY_MESSAGE_STATUSES = new Set([400, 409, 422, 428])
+/*
+ * R503: 429（入力上限など）の本文も表示対象にする。サーバーが返すのは
+ * 利用者向けの回復案内だけ（内部情報は safeOperatorMessage が弾く）。
+ */
+const BODY_MESSAGE_STATUSES = new Set([400, 409, 422, 428, 429])
 
 const INTERNAL_ERROR_MARKERS = [
   /D1_ERROR/i,
@@ -12163,7 +12167,7 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    update: (id: string, data: { name?: string; email?: string | null; role?: string; isActive?: boolean; lineLinked?: false; permissionKeys?: string[]; notificationPreferences?: Record<string, { email: boolean; line: boolean }>; assignedLineAccountId?: string; canAccessDescendantAccounts?: boolean; accountScope?: 'all' | 'accounts'; scopedLineAccountIds?: string[]; managementContext?: 'hq'; roleBundle?: 'administrator' | 'operations' | 'reception' | 'view_only' | 'custom'; permissionScope?: Record<string, 'edit' | 'view' | 'none'>; permissionViewKeys?: string[]; emailMask?: 'full' | 'masked' | 'none' }, stepUpToken?: string) =>
+    update: (id: string, data: { name?: string; email?: string | null; role?: string; isActive?: boolean; lineLinked?: false; permissionKeys?: string[]; notificationPreferences?: Record<string, { email: boolean; line: boolean }>; assignedLineAccountId?: string; canAccessDescendantAccounts?: boolean; accountScope?: 'all' | 'accounts'; scopedLineAccountIds?: string[]; managementContext?: 'hq'; roleBundle?: 'administrator' | 'operations' | 'reception' | 'view_only' | 'custom'; permissionScope?: Record<string, 'edit' | 'view' | 'none'>; permissionViewKeys?: string[]; emailMask?: 'full' | 'masked' | 'none'; idempotencyKey?: string; expectedPolicyVersion?: number }, stepUpToken?: string) =>
       /*
        * 本人が自分のメールを変えたとき、emailChangePending=true と pendingEmail
        * が返る（N-433）。その場合メールはまだ切り替わっていない。
