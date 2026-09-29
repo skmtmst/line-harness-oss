@@ -379,7 +379,22 @@ export default function AccountMigration() {
         executing/completed で止めるので二重反映にはならない。
       */
       if (error instanceof ApiError) {
-        setExecuteError(apiErrorMessage(error, '本移行を実行できませんでした。'))
+        /*
+         * R398: 500でも「実データはまだ変更していません」と残さない。
+         * 一部反映のまま失敗することがあるので、必ず履歴を読み直して
+         * 実際の反映件数を見せる。再取得できなければ結果未確認にする。
+         * POSTの再送はしない（loadDetailはGETだけ）。
+         */
+        const detail = await loadDetail(active.id, page, classification, pendingOnly)
+        if (detail) {
+          setRuns((current) => current.map((run) => (run.id === detail.id ? { ...detail, items: undefined } : run)))
+          const applied = detail.counts.applied
+          setExecuteError(applied > 0 || detail.status === 'failed' || detail.status === 'completed'
+            ? `本移行で ${applied.toLocaleString()} 件が反映されています。失敗した行を確認して再実行するか、反映済みの分だけ切り戻せます。`
+            : apiErrorMessage(error, '本移行を実行できませんでした。'))
+        } else {
+          setExecuteError('実行結果を確認できませんでした。履歴を読み直して状態を確認してください。')
+        }
       } else {
         setExecuteError('応答を確認できませんでした。サーバーでは実行が完了している可能性があります。履歴を読み直して状態を確認してから、必要な場合だけ再実行してください。')
         void loadDetail(active.id, page, classification, pendingOnly)

@@ -144,6 +144,15 @@ export default function MergedPersonDetailView({
         ? failureOf({ status: error.status, code: error.code })
         : failureOf(null)
       setSaveError(`${next.title}。${next.description}`)
+      /*
+       * R389: 版の競合は古い結び付きのまま残さない。解除の窓を閉じて
+       * 最新を読み直し、成功した対象だけが解除済みになる。
+       */
+      if (error instanceof ApiError && error.status === 409) {
+        setUnlinkTarget(null)
+        setUnlinkReason('')
+        setReloadKey((key) => key + 1)
+      }
     }).finally(() => setUnlinking(false))
   }, [person, unlinkReason, unlinkTarget])
 
@@ -190,9 +199,22 @@ export default function MergedPersonDetailView({
 
   if (phase === 'loading') return <ListState kind="loading" />
   if (phase === 'forbidden') {
-    return <ListState kind="forbidden" title={failure?.title} description={failure?.description} />
+    /*
+     * R391: 権限不足でも一覧へ戻る口は残す。解除しきった直後の本人は
+     * サーバー側で保管状態として開くので、ここは本当に権限が無いときだけ。
+     */
+    return (
+      <ListState
+        kind="forbidden"
+        title={failure?.title}
+        description={failure?.description}
+        action={<Button type="button" onClick={onClose}>一覧へ戻る</Button>}
+      />
+    )
   }
   if (phase === 'error' || !person) {
+    // 取得失敗は共通の再読み込み口だけにする（契約試験）。一覧へ戻る口は
+    // forbidden 側に残し、ここでは読み直しを優先する。
     return (
       <ListState
         kind="error"
