@@ -798,6 +798,9 @@ const spec = {
     '/api/ops/tenants/{id}/status': {
       patch: { tags: ['Ops Console'], summary: '契約先の状態を変更（停止・アーカイブ・再開）', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['status', 'reason'], properties: { status: { type: 'string', enum: ['active', 'suspended', 'archived'] }, reason: { type: 'string', minLength: 4, maxLength: 500 }, confirmName: { type: 'string' } } } } } }, responses: { '200': { description: 'Status changed; audit recorded (visible to tenant)' }, '400': { description: 'Missing reason or name confirmation' }, '403': { description: 'Read-only or not a platform admin' } } },
     },
+    '/api/ops/tenants/{id}/feature-packs': {
+      patch: { tags: ['Ops Console'], summary: '契約先の機能パック（飲食店機能）を切り替える', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['featurePacks'], properties: { featurePacks: { type: 'array', items: { type: 'string', enum: ['restaurant'] } } } } } } }, responses: { '200': { description: 'Feature packs changed; audit recorded (visible to tenant)' }, '400': { description: 'Unknown feature pack' }, '403': { description: 'Read-only or not a platform admin' }, '404': { description: 'Tenant not found' } } },
+    },
     '/api/ops/impersonation/current': {
       get: { tags: ['Ops Console'], summary: '有効な代理ログイン', responses: { '200': { description: 'Active impersonation or null' } } },
     },

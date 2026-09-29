@@ -329,6 +329,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'PATCH /api/line-notifications/operator-rules/{id}/draft',
   'PATCH /api/ops/members/{staffId}',
   'PATCH /api/ops/support/tickets/{id}',
+  'PATCH /api/ops/tenants/{id}/feature-packs',
   'PATCH /api/ops/tenants/{id}/status',
   'PATCH /api/reminders/{id}/registrants/{enrollmentId}',
   'PATCH /api/tags/{id}',

@@ -308,7 +308,12 @@ describe('feature off impact check', () => {
 
     // 空DBで全33種をオフにする変更案は通り、有効から変わる分だけ結果が返る。
     // 既定オフの種は遷移しないため対象外になる。
+    // 統括ゲート導入時のバックフィル（既存統括に restaurant を付与）後の
+    // 状態に合わせ、既定の統括にも付けておく。付けなければ restaurant_test は
+    // 最初からoffで、遷移対象から外れてしまう。
     const testDb = createTestD1();
+    testDb.raw.prepare(`UPDATE tenants SET feature_packs = '["restaurant"]' WHERE id = ?`)
+      .run(DEFAULT_TENANT_ID);
     try {
       const features = Object.fromEntries(FEATURE_IDS.map((feature) => [feature, false]));
       const { status, body } = await postImpact(testDb, { expectedVersion: 0, features });

@@ -25,6 +25,7 @@ import TargetMissing from '@/components/shared/target-missing'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { Tabs } from '@/components/shared/tabs'
 import { TextArea, TextField } from '@/components/shared/text-field'
+import Toggle from '@/components/shared/toggle'
 import { RequiredBadge } from '@/components/shared/form-controls'
 
 /**
@@ -76,6 +77,25 @@ function OpsTenantDetailContent() {
     setBusy(false)
     if (!res.success) { setError(res.error || '代理ログインを始められませんでした'); return }
     window.location.assign('/hq')
+  }
+
+  /*
+   * 飲食店機能（restaurant-test）のマスタートグル。破壊的操作ではないため、
+   * 停止・アーカイブと違い確認ダイアログや理由入力は求めず即時反映する。
+   * オフにすると、この統括の各LINEアカウントの自己設定も強制的にオフになる。
+   */
+  const toggleRestaurantFeature = async (next: boolean) => {
+    if (!detail || busy) return
+    const current = detail.tenant.featurePacks
+    const featurePacks = next
+      ? [...new Set([...current, 'restaurant'])]
+      : current.filter((pack) => pack !== 'restaurant')
+    setBusy(true)
+    const res = await opsCall(api.ops.setTenantFeaturePacks(detail.tenant.id, featurePacks))
+    setBusy(false)
+    if (!res.success) { setError(res.error || '機能パックを変更できませんでした'); return }
+    setError('')
+    await load()
   }
 
   /*
@@ -150,7 +170,21 @@ function OpsTenantDetailContent() {
               <Kv k="店舗数" v={String(accounts.filter((a) => !a.archived_at).length)} />
               <Kv k="権限者数" v={String(members.filter((m) => m.is_active).length)} />
               <Kv k="最終ログイン" v={formatDateTime(tenant.last_login_at)} />
-              <Kv k="機能パック" v={tenant.featurePacks.length ? tenant.featurePacks.join('・') : '—'} />
+              <Kv
+                k="機能パック"
+                v={(
+                  <div className="flex items-center gap-2.5">
+                    <Toggle
+                      checked={tenant.featurePacks.includes('restaurant')}
+                      label={`飲食店機能を${tenant.featurePacks.includes('restaurant') ? 'オフ' : 'オン'}にする`}
+                      onChange={(next) => void toggleRestaurantFeature(next)}
+                    />
+                    <span className="text-caption text-ink-secondary">
+                      飲食店機能（予約台帳・座席管理・メニュー管理など9画面）
+                    </span>
+                  </div>
+                )}
+              />
             </dl>
           </Card>
           <Card>
