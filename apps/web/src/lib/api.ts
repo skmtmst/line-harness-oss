@@ -2560,6 +2560,26 @@ export class ApiError extends Error {
  * 秒数と日時の両方を受け、1〜3600秒に丸める。0以下・読めない値・
  * 過ぎた日時は `undefined`（画面は秒数なしの待ち案内にする）。
  */
+/**
+ * 通信断の1行（R506系）。
+ *
+ * fetch が通信の失敗で投げるのは英語の TypeError（`Failed to fetch` など）で、
+ * そのまま画面へ出すと運用者に意味が通じない。ここで日本語にして投げ直す。
+ * 画面は `err.message` をそのまま出せる（英語の検証文と違い、運用者の言葉）。
+ */
+export const NETWORK_FAILURE_MESSAGE = '通信できませんでした。接続を確かめて、もう一度お試しください。'
+
+async function fetchWithNetworkMessage(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  try {
+    return await fetch(input, init)
+  } catch (error) {
+    // 中断（AbortError・DOMException）は打ち切り合図なので、そのまま通す。
+    // 時間切れの打ち切りを失敗と数えないため（`use-server-list` の約束）。
+    if (error instanceof TypeError) throw new Error(NETWORK_FAILURE_MESSAGE)
+    throw error
+  }
+}
+
 export function parseRetryAfterSeconds(value: string | null): number | undefined {
   if (value === null) return undefined
   const text = value.trim()
@@ -2621,8 +2641,16 @@ export function describeSaveFailure(err: unknown): string {
 /*
  * R503: 429（入力上限など）の本文も表示対象にする。サーバーが返すのは
  * 利用者向けの回復案内だけ（内部情報は safeOperatorMessage が弾く）。
+ *
+ * D016: 410（招待の期限切れなど）・404（正しくないURLなど）も同じ扱いに
+ * する。サーバーはこの2つに日本語の次の行動まで書いた案内を返している
+ * （招待 `この招待は無効または期限切れです…`、メール変更
+ * `この確認リンクは無効または期限切れです…`、URL `この URL は…`）。
+ * 通さないと `API error: 410` だけになり、次に何をすればよいか分からない。
+ * 403・5xx は入れない。403 の本文は機械コード中心で画面は状態別の案内を
+ * 持ち、5xx の本文は内部の失敗の中身を持ちうるため。
  */
-const BODY_MESSAGE_STATUSES = new Set([400, 409, 422, 428, 429])
+const BODY_MESSAGE_STATUSES = new Set([400, 404, 409, 410, 422, 428, 429])
 
 const INTERNAL_ERROR_MARKERS = [
   /D1_ERROR/i,
@@ -2814,7 +2842,7 @@ export async function fetchApi<T>(path: string, options?: FetchApiOptions): Prom
    * 付ける（削っても往復は減らない）。
    */
   const isBodylessMethod = method === 'GET' || method === 'HEAD'
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await fetchWithNetworkMessage(`${API_URL}${path}`, {
     ...options,
     // Send the HttpOnly session cookie with every request.
     credentials: 'include',
@@ -2861,7 +2889,7 @@ export async function fetchApi<T>(path: string, options?: FetchApiOptions): Prom
 }
 
 async function fetchApiBlob(path: string, init?: { method?: string }): Promise<Blob> {
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await fetchWithNetworkMessage(`${API_URL}${path}`, {
     method: init?.method ?? 'GET',
     credentials: 'include',
     headers: adminSessionHeaders(),
@@ -2907,7 +2935,7 @@ export async function downloadApiFile(path: string, fallbackFilename: string): P
   returnedCount: number | null
   truncated: boolean
 }> {
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await fetchWithNetworkMessage(`${API_URL}${path}`, {
     credentials: 'include',
     headers: adminSessionHeaders(),
   })
@@ -12843,9 +12871,10 @@ export const api = {
       }),
 
     // 画像 upload は Content-Type を image/* で送るので fetchApi を使わず直接 fetch。
+    // 通信断の日本語化だけ fetchApi とそろえる。
     uploadImage: async (groupId: string, pageId: string, file: File) => {
       const csrf = getCsrfToken();
-      const res = await fetch(
+      const res = await fetchWithNetworkMessage(
         `${API_URL}/api/rich-menu-groups/${groupId}/pages/${pageId}/image`,
         {
           method: 'POST',
