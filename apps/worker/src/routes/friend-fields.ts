@@ -251,8 +251,13 @@ function convertMigrationValue(value: string, targetType: FriendFieldType): Omit
   const trimmed = value.trim();
   if (!trimmed) return { convertedValue: null, status: 'invalid', reason: '空欄です' };
   if (targetType === 'number') {
+    /*
+     * R549: 保存側（validateFriendFieldValue）と同じ物差しで判定する。
+     * 以前は Number() で見ていたため 0x10・1e5 などを「移せる」と数え、
+     * 保存では拒否されて件数が合わなかった。カンマ区切りは両側で外す。
+     */
     const normalized = trimmed.replace(/,/g, '');
-    return Number.isFinite(Number(normalized))
+    return /^[-+]?(\d+(\.\d+)?|\.\d+)$/.test(normalized) && Number.isFinite(Number(normalized))
       ? { convertedValue: normalized, status: 'convertible', reason: null }
       : { convertedValue: null, status: 'review', reason: '数値として確認できません' };
   }
