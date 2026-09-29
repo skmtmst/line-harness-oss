@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
 import PageHeader from '@/components/shared/page-header'
@@ -33,6 +34,7 @@ import {
   applyItemOrder,
   featureSettingsAreDirty,
   featureSettingsErrorMessage,
+  featureSettingsSaveConflictMessage,
   normalizeFeatureSettings,
   splitFeatureGroups,
 } from './feature-settings-view'
@@ -463,6 +465,12 @@ export default function SettingsPage() {
   /** GET で受けた版。保存時に送り返し、競合(409)を検出する。 */
   const [settingsVersion, setSettingsVersion] = useState(0)
   const [error, setError] = useState('')
+  /*
+   * 監査 D019: 読み込みに失敗したら初期値のスイッチ一覧を本物の設定の
+   * ように出さない。失敗の印だけにして、偽の設定を触らせない。
+   */
+  const [loadFailed, setLoadFailed] = useState(false)
+  const [loadErrorStatus, setLoadErrorStatus] = useState<number | undefined>(undefined)
   /**
    * 変更理由。サーバーが必須化しており、保存と同じ単位で監査へ残る。
    * 保存成功・取り消し・アカウント切替で空に戻す。
@@ -527,6 +535,8 @@ export default function SettingsPage() {
       setUsageFailed(false)
       setOrdering(false)
       setError('')
+      setLoadFailed(false)
+      setLoadErrorStatus(undefined)
       setImpactOpen(false)
       setImpactGroups([])
       setImpactError('')
@@ -573,18 +583,23 @@ export default function SettingsPage() {
       setUsageCategories([])
       setUsageFeatures([])
       cancelLeave()
+      setLoadFailed(false)
+      setLoadErrorStatus(undefined)
       setLoading(false)
       return
     }
     const ticket = accountGuard.issue(selectedAccountId)
     setLoading(true)
     setError('')
+    setLoadFailed(false)
+    setLoadErrorStatus(undefined)
     try {
       // サイドバーと同じ答えを共有する。保存の合図で捨てられる。
       const response = await loadFeatureSettings(selectedAccountId)
       if (!accountGuard.isCurrent(ticket, selectedAccountId)) return
       if (!response.success) {
         setError(response.error)
+        setLoadFailed(true)
         return
       }
       const next = normalizeFeatureSettings(response.data.features)
@@ -599,7 +614,10 @@ export default function SettingsPage() {
       void loadUsage()
     } catch (error) {
       if (!accountGuard.isCurrent(ticket, selectedAccountId)) return
-      setError(featureSettingsErrorMessage(error instanceof ApiError ? error.status : undefined, 'load'))
+      const status = error instanceof ApiError ? error.status : undefined
+      setError(featureSettingsErrorMessage(status, 'load'))
+      setLoadFailed(true)
+      setLoadErrorStatus(status)
     } finally {
       if (accountGuard.isCurrent(ticket, selectedAccountId)) setLoading(false)
     }
@@ -735,15 +753,18 @@ export default function SettingsPage() {
       if (!accountGuard.isCurrent(ticket, selectedAccountId)) return null
       // ほかの管理者が先に保存したときは、編集中身は残したまま
       // 最新を読み直し、内容を確認してもう一度保存してもらう。
+      // 読み込めていないときの409は競合ではなく本当の理由にする（D019）。
       if (error instanceof ApiError && error.status === 409) {
         await reloadSaved()
-        setError(FEATURE_SETTINGS_CONFLICT_MESSAGE)
+        setError(loadFailed
+          ? featureSettingsSaveConflictMessage({ loadFailed, loadForbidden: loadErrorStatus === 403 })
+          : FEATURE_SETTINGS_CONFLICT_MESSAGE)
         return null
       }
       setError(featureSettingsErrorMessage(error instanceof ApiError ? error.status : undefined, 'save'))
       return null
     }
-  }, [selectedAccountId, features, settingsVersion, reloadSaved, accountGuard])
+  }, [selectedAccountId, features, settingsVersion, reloadSaved, accountGuard, loadFailed, loadErrorStatus])
 
   const persist = async (impactToken?: string): Promise<boolean> => {
     if (!selectedAccountId) return false
@@ -824,9 +845,12 @@ export default function SettingsPage() {
       }
       // ほかの管理者が先に保存したときは、編集中身は残したまま
       // 最新を読み直し、内容を確認してもう一度保存してもらう。
+      // 読み込めていないときの409は競合ではなく本当の理由にする（D019）。
       if (error instanceof ApiError && error.status === 409) {
         await reloadSaved()
-        setError(FEATURE_SETTINGS_CONFLICT_MESSAGE)
+        setError(loadFailed
+          ? featureSettingsSaveConflictMessage({ loadFailed, loadForbidden: loadErrorStatus === 403 })
+          : FEATURE_SETTINGS_CONFLICT_MESSAGE)
         return false
       }
       setError(featureSettingsErrorMessage(error instanceof ApiError ? error.status : undefined, 'save'))
@@ -922,14 +946,14 @@ export default function SettingsPage() {
           <Button
             variant="secondary"
             onClick={() => setOrdering((current) => !current)}
-            disabled={loading || saving}
+            disabled={loading || saving || loadFailed}
           >
             {ordering ? '並び替えを閉じる' : '並びを変える'}
           </Button>
           <Button
             variant="secondary"
             onClick={discardChanges}
-            disabled={loading || saving || !dirty}
+            disabled={loading || saving || loadFailed || !dirty}
             title={!dirty && !loading ? '変更すると取り消せます' : undefined}
           >
             変更を取り消す
@@ -937,14 +961,14 @@ export default function SettingsPage() {
           <Button
             variant="secondary"
             onClick={() => setResetToDefaultsOpen(true)}
-            disabled={loading || saving}
+            disabled={loading || saving || loadFailed}
           >
             初期値に戻す
           </Button>
           <Button
             variant="primary"
             onClick={() => void save()}
-            disabled={loading || saving || !dirty}
+            disabled={loading || saving || loadFailed || !dirty}
             title={!dirty && !loading ? '変更すると保存できます' : undefined}
           >
             <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" className="h-4 w-4">
@@ -952,7 +976,7 @@ export default function SettingsPage() {
             </svg>
             {saving ? '保存中…' : '機能設定を保存'}
           </Button>
-          {!loading && !dirty && <span className="self-center text-xs text-ink-faint">変更すると保存できます</span>}
+          {!loading && !loadFailed && !dirty && <span className="self-center text-xs text-ink-faint">変更すると保存できます</span>}
           </>
         )}
       />
@@ -973,10 +997,10 @@ export default function SettingsPage() {
       ) : (
         <>
           <div aria-live="polite">
-            {error && <Notice tone="danger" message={error} className="mb-4" />}
+            {error && !loadFailed && <Notice tone="danger" message={error} className="mb-4" />}
           </div>
 
-          {dirty && (
+          {dirty && !loadFailed && (
             <div className="border-hairline bg-canvas rounded-card flex flex-col gap-2 border p-4 sm:flex-row sm:items-center">
               <label htmlFor="feature-settings-reason" className="text-ink shrink-0 text-sm font-bold">
                 変更理由<RequiredBadge />
@@ -994,6 +1018,17 @@ export default function SettingsPage() {
 
           {loading ? (
             <div className="border-hairline bg-canvas text-ink-faint rounded-card border p-10 text-center text-sm">読み込み中…</div>
+          ) : loadFailed ? (
+            /*
+             * 監査 D019: 読み込みに失敗したら初期値のスイッチ一覧を本物の
+             * 設定のように出さない。理由と再読み込みだけを出す。
+             * 403 は権限の理由のまま（再試行の口も残す）。
+             */
+            <ListState
+              kind="error"
+              title={error || '機能設定を読み込めませんでした'}
+              onRetry={() => void load()}
+            />
           ) : (
             <div className={ordering ? 'grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]' : 'grid gap-4'}>
               {/*
