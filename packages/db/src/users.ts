@@ -268,15 +268,59 @@ export async function archiveUser(db: D1Database, id: string): Promise<User | nu
   return getUserById(db, id);
 }
 
+/**
+ * 友だちを本人へ結ぶ。
+ *
+ * R385: 結ぶ前に友だち宛てへ付いたマイルは `friend:<id>` の財布に入っており、
+ * 結んだだけでは本人の残高・交換・期限集計から外れて見えなくなった。
+ * 友だち宛ての台帳行を本人へ付け替え、`friend:` の財布と付与内訳を本人の
+ * `user:` キーへ同じ保存単位で統合する。台帳の行自体は消さず、再実行しても
+ * 移し替える行は残らない（二重移管にならない）。
+ */
 export async function linkFriendToUser(
   db: D1Database,
   friendId: string,
   userId: string,
 ): Promise<void> {
-  await db
-    .prepare(`UPDATE friends SET user_id = ?, updated_at = ? WHERE id = ?`)
-    .bind(userId, jstNow(), friendId)
-    .run();
+  const now = jstNow();
+  const userKey = `user:${userId}`;
+  const friendKey = `friend:${friendId}`;
+  await db.batch([
+    db
+      .prepare(`UPDATE friends SET user_id = ?, updated_at = ? WHERE id = ?`)
+      .bind(userId, now, friendId),
+    db
+      .prepare(
+        `UPDATE mileage_ledger SET beneficiary_user_id = ?
+          WHERE beneficiary_friend_id = ? AND beneficiary_user_id IS NULL`,
+      )
+      .bind(userId, friendId),
+    db
+      .prepare(
+        `UPDATE mileage_grant_lots SET beneficiary_key = ?
+          WHERE beneficiary_key = ?`,
+      )
+      .bind(userKey, friendKey),
+    // 友だち名義の財布を本人の財布へ足す。本人の財布があれば残高を合算し、
+    // なければそのまま本人名義にする。そのあと友だち名義の行を消す。
+    db
+      .prepare(
+        `INSERT INTO mileage_wallets
+           (program_id, beneficiary_key, beneficiary_user_id, beneficiary_friend_id,
+            available, pending, version, updated_at)
+         SELECT program_id, ?, ?, NULL, available, pending, 1, ?
+           FROM mileage_wallets WHERE beneficiary_key = ?
+         ON CONFLICT(program_id, beneficiary_key) DO UPDATE SET
+           available = mileage_wallets.available + excluded.available,
+           pending = mileage_wallets.pending + excluded.pending,
+           version = mileage_wallets.version + 1,
+           updated_at = excluded.updated_at`,
+      )
+      .bind(userKey, userId, now, friendKey),
+    db
+      .prepare(`DELETE FROM mileage_wallets WHERE beneficiary_key = ?`)
+      .bind(friendKey),
+  ]);
 }
 
 export async function getUserFriends(

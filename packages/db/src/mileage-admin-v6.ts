@@ -1,7 +1,7 @@
 import { getActionScoreBands } from './action-score-rules';
 import { publishedRuleContentFromDraft } from './mileage.js';
 import type { SegmentCondition } from './segment-conditions.js';
-import { jstNow } from './utils.js';
+import { jstMonthStartString, jstNow } from './utils.js';
 
 const CONDITION_TYPES = new Set([
   'tag_exists', 'tag_not_exists', 'tag_all', 'tag_not_all',
@@ -371,67 +371,99 @@ export async function getMileageFriendsV6(
   const ranks = rankRows.results.map((row) => ({
     id: row.id, name: row.name, threshold: Number(row.required_miles),
   }));
-  const visible = [...new Set([input.lineAccountId, ...input.visibleAccountIds])];
-  const placeholders = visible.map(() => '?').join(',');
+  /*
+   * 残高・失効・今月の増減は名寄せした本人（beneficiary_key）単位で集計する。
+   * 明細APIの財布スコープ（FRIEND_WALLET_SCOPE_SQL）と同じ意味に揃え、
+   * 同じ本人に複数プロフィールがあっても合計を二度足さない（R385・R386）。
+   * 理由・実行者など記録ごとの中身はここには出さず、明細側が権限で伏せる
+   * （R387）。一覧の数字は共通残高として一貫させる。
+   */
+  /*
+   * R384: SQLite の datetime('now','start of month') は UTC の月初を返し、
+   * 日本時間の月初 0〜9 時に前月の記録を今月へ混ぜていた。JST の月初を
+   * こちらで計算し、JST 表記の occurred_at と同じ形の文字列で渡す。
+   */
+  const monthStart = jstMonthStartString();
   const ctes = `WITH selected AS (
     SELECT f.id AS friend_id, f.user_id, f.display_name, f.picture_url, f.line_account_id,
            la.name AS line_account_name,
            CASE WHEN f.user_id IS NOT NULL THEN 'user:' || f.user_id ELSE 'friend:' || f.id END AS beneficiary_key
       FROM friends f JOIN line_accounts la ON la.id = f.line_account_id
      WHERE f.line_account_id = ?
+  /*
+   * 同じ本人へ複数プロフィールが結ばれていると selected に同じ beneficiary_key の
+   * 行が並び、そのまま台帳へJOINすると1人の記録がプロフィール数だけ重複して
+   * 足される（R386）。まず本人キーへ一意化してから集計する。
+   */
+  ), keys AS (
+    SELECT beneficiary_key, MAX(user_id) AS user_id, MIN(friend_id) AS friend_id
+      FROM selected GROUP BY beneficiary_key
   ), ledger AS (
-    SELECT s.beneficiary_key,
+    SELECT k.beneficiary_key,
            SUM(CASE WHEN ml.status = 'available' THEN ml.amount ELSE 0 END) AS available,
            SUM(CASE WHEN ml.status = 'pending' THEN ml.amount ELSE 0 END) AS pending,
            SUM(CASE WHEN ml.entry_type = 'grant' AND ml.amount > 0 THEN ml.amount ELSE 0 END) AS lifetime_earned,
            ABS(SUM(CASE WHEN ml.entry_type = 'spend' AND ml.amount < 0 THEN ml.amount ELSE 0 END)) AS spent,
-           SUM(CASE WHEN ml.occurred_at >= datetime('now', 'start of month') THEN ml.amount ELSE 0 END) AS month_change,
+           SUM(CASE WHEN ml.occurred_at >= ? THEN ml.amount ELSE 0 END) AS month_change,
            MAX(ml.occurred_at) AS last_changed_at
-      FROM selected s
+      FROM keys k
       LEFT JOIN mileage_ledger ml ON ml.program_id = 'default' AND (
-        (s.user_id IS NOT NULL AND ml.beneficiary_user_id = s.user_id)
-        OR (s.user_id IS NULL AND ml.beneficiary_friend_id = s.friend_id)
+        (k.user_id IS NOT NULL AND (
+          ml.beneficiary_user_id = k.user_id
+          OR ml.beneficiary_friend_id IN (
+            SELECT lf.id FROM friends lf WHERE lf.user_id = k.user_id
+          )
+        ))
+        OR (k.user_id IS NULL AND ml.beneficiary_friend_id = k.friend_id)
       )
-      LEFT JOIN friends bf ON bf.id = ml.beneficiary_friend_id
-     WHERE ml.id IS NULL OR bf.line_account_id IN (${placeholders})
-        OR (ml.beneficiary_friend_id IS NULL AND ml.beneficiary_user_id = s.user_id)
-     GROUP BY s.beneficiary_key
+     GROUP BY k.beneficiary_key
   ), expiring AS (
-    SELECT s.beneficiary_key, SUM(l.remaining_amount) AS amount, COUNT(*) AS lot_count
-      FROM selected s JOIN mileage_grant_lots l ON l.program_id = 'default' AND l.beneficiary_key = s.beneficiary_key
+    SELECT k.beneficiary_key,
+           SUM(CASE WHEN datetime(l.expires_at) <= datetime('now', '+30 days')
+                    THEN l.remaining_amount ELSE 0 END) AS amount,
+           COUNT(*) AS lot_count,
+           MIN(l.expires_at) AS next_expires_at
+      FROM keys k JOIN mileage_grant_lots l ON l.program_id = 'default' AND l.beneficiary_key = k.beneficiary_key
      WHERE l.status = 'available' AND l.remaining_amount > 0 AND l.expires_at IS NOT NULL
-       AND datetime(l.expires_at) > datetime('now') AND datetime(l.expires_at) <= datetime('now', '+30 days')
-     GROUP BY s.beneficiary_key
+       AND datetime(l.expires_at) > datetime('now')
+     GROUP BY k.beneficiary_key
   )`;
-  const binds = [input.lineAccountId, ...visible];
+  const binds = [input.lineAccountId, monthStart];
   const rows = await db.prepare(
     `${ctes}
      SELECT s.*, COALESCE(l.available, 0) AS available, COALESCE(l.pending, 0) AS pending,
             COALESCE(l.lifetime_earned, 0) AS lifetime_earned, COALESCE(l.spent, 0) AS spent,
             COALESCE(l.month_change, 0) AS month_change, l.last_changed_at,
-            e.amount AS expiring_amount, e.lot_count, COUNT(*) OVER() AS filtered_count
+            e.amount AS expiring_amount, e.lot_count, e.next_expires_at,
+            COUNT(*) OVER() AS filtered_count
        FROM selected s LEFT JOIN ledger l ON l.beneficiary_key = s.beneficiary_key
        LEFT JOIN expiring e ON e.beneficiary_key = s.beneficiary_key
       WHERE (? = '' OR s.display_name LIKE '%' || ? || '%')
         AND (? = '' OR s.friend_id = ?)
       ORDER BY available DESC, s.display_name, s.friend_id LIMIT ? OFFSET ?`,
   ).bind(...binds, input.search, input.search, input.friendId ?? '', input.friendId ?? '', input.limit, input.offset).all<Record<string, unknown>>();
+  /*
+   * 合計は beneficiary_key（本人）単位で足す。同じ本人へ複数プロフィールが
+   * 結ばれていても、ledger/expiring はキーごとに1行なので二重計上しない
+   * （R386）。友だちの人数だけは行（プロフィール）数で数える。
+   */
   const summary = await db.prepare(
     `${ctes}
-     SELECT COUNT(*) AS total_members,
-            SUM(CASE WHEN COALESCE(l.available, 0) > 0 OR COALESCE(l.pending, 0) > 0 THEN 1 ELSE 0 END) AS with_balance_count,
-            COALESCE(SUM(COALESCE(l.available, 0)), 0) AS available,
-            COALESCE(SUM(COALESCE(l.pending, 0)), 0) AS pending,
-            SUM(e.amount) AS expiring_amount, SUM(COALESCE(e.lot_count, 0)) AS expiring_lot_count
-       FROM selected s LEFT JOIN ledger l ON l.beneficiary_key = s.beneficiary_key
-       LEFT JOIN expiring e ON e.beneficiary_key = s.beneficiary_key`,
+     SELECT (SELECT COUNT(*) FROM selected) AS total_members,
+            (SELECT COUNT(*) FROM ledger WHERE available > 0 OR pending > 0) AS with_balance_count,
+            (SELECT COALESCE(SUM(available), 0) FROM ledger) AS available,
+            (SELECT COALESCE(SUM(pending), 0) FROM ledger) AS pending,
+            (SELECT COALESCE(SUM(month_change), 0) FROM ledger) AS month_change,
+            (SELECT COALESCE(SUM(amount), 0) FROM expiring) AS expiring_amount,
+            (SELECT COALESCE(SUM(lot_count), 0) FROM expiring) AS expiring_lot_count,
+            (SELECT MIN(next_expires_at) FROM expiring) AS next_expires_at`,
   ).bind(...binds).first<Record<string, unknown>>();
   const rankPopulation = await db.prepare(
     `${ctes}
-     SELECT s.friend_id, COALESCE(l.available, 0) AS available,
+     SELECT COALESCE(l.available, 0) AS available,
             COALESCE(l.month_change, 0) AS month_change
-       FROM selected s LEFT JOIN ledger l ON l.beneficiary_key = s.beneficiary_key`,
-  ).bind(...binds).all<{ friend_id: string; available: number; month_change: number }>();
+       FROM ledger l`,
+  ).bind(...binds).all<{ available: number; month_change: number }>();
   const rankFor = (available: number) => [...ranks].reverse().find((rank) => available >= rank.threshold) ?? null;
   const rankCounts = ranks.map((rank) => ({
     rewardId: rank.id,
@@ -445,10 +477,13 @@ export async function getMileageFriendsV6(
       withBalanceCount: Number(summary?.with_balance_count ?? 0),
       available: Number(summary?.available ?? 0),
       pending: Number(summary?.pending ?? 0),
-      monthChange: rankPopulation.results.reduce((sum, row) => sum + Number(row.month_change ?? 0), 0),
+      monthChange: Number(summary?.month_change ?? 0),
       rankCounts,
+      // R383: 有効な期限つきロットが1つでもあれば null ではなく数値を返す。
+      // 30日内は0でも先に失効があるなら 0 と次の失効日で伝え、「なし（null）」と区別する。
       expiringMiles30d: Number(summary?.expiring_lot_count ?? 0) > 0
         ? Number(summary?.expiring_amount ?? 0) : null,
+      nextExpiringAt: summary?.next_expires_at == null ? null : String(summary.next_expires_at),
     },
     items: rows.results.map((row) => {
       const available = Number(row.available ?? 0);
@@ -467,7 +502,10 @@ export async function getMileageFriendsV6(
       monthChange: Number(row.month_change ?? 0),
       available: Number(row.available ?? 0),
       pending: Number(row.pending ?? 0),
+      // R383: summary と同じく「期限つきロットが存在するか」で null/0 を分け、
+      // 30日より先にしか失効がない人も「0 + 直近の失効日」で表せるようにする。
       expiringMiles30d: Number(row.lot_count ?? 0) > 0 ? Number(row.expiring_amount ?? 0) : null,
+      nextExpiringAt: row.next_expires_at == null ? null : String(row.next_expires_at),
       lifetimeEarned: Number(row.lifetime_earned ?? 0),
       spent: Number(row.spent ?? 0),
       lastChangedAt: row.last_changed_at ?? null,
@@ -652,15 +690,20 @@ export async function markMileageAdjustmentNotification(
   input: { id: string; status: 'sent' | 'failed'; lineRequestId?: string | null; errorCode?: string | null },
 ) {
   const now = new Date().toISOString();
+  /*
+   * R379: 同じ通知へ並行して届いた遅い失敗で、確定済みの sent・受理IDを
+   * 戻さない。一度 sent になった行は failed へ更新しない（受理IDと送信日時を保持）。
+   * failed → sent の回復は引き続き許す。
+   */
   await db.prepare(
     `UPDATE mileage_adjustment_notifications
         SET status = ?, attempt_count = attempt_count + 1, line_request_id = ?, error_code = ?,
             first_failed_at = CASE WHEN ? = 'failed' THEN COALESCE(first_failed_at, ?) ELSE first_failed_at END,
             sent_at = CASE WHEN ? = 'sent' THEN ? ELSE sent_at END, updated_at = ?
-      WHERE id = ?`,
+      WHERE id = ? AND (status <> 'sent' OR ? = 'sent')`,
   ).bind(
     input.status, input.lineRequestId ?? null, input.errorCode ?? null,
-    input.status, now, input.status, now, now, input.id,
+    input.status, now, input.status, now, now, input.id, input.status,
   ).run();
   const row = await db.prepare(
     `SELECT id, line_account_id, friend_id, ledger_entry_id, status, attempt_count,
@@ -669,6 +712,42 @@ export async function markMileageAdjustmentNotification(
   ).bind(input.id).first<NotificationRow>();
   if (!row) throw new MileageV6Error('notification_not_found', '通知の送信記録が見つかりません', 404);
   return mapNotification(row);
+}
+
+/**
+ * R380/R381: 通知の再送に必要な保存済みの中身（本文・送信キー・宛先）を返す。
+ * 一覧表示用の mapNotification とは別に、生の記録を返す。
+ */
+export async function getMileageAdjustmentNotificationRecord(
+  db: D1Database,
+  input: { lineAccountId: string; ledgerEntryId: string },
+): Promise<{
+  id: string;
+  lineAccountId: string;
+  friendId: string;
+  ledgerEntryId: string;
+  idempotencyKey: string;
+  messageText: string;
+  status: MileageAdjustmentNotificationStatus;
+} | null> {
+  const row = await db.prepare(
+    `SELECT id, line_account_id, friend_id, ledger_entry_id, idempotency_key, message_text, status
+       FROM mileage_adjustment_notifications
+      WHERE line_account_id = ? AND ledger_entry_id = ?`,
+  ).bind(input.lineAccountId, input.ledgerEntryId).first<{
+    id: string; line_account_id: string; friend_id: string; ledger_entry_id: string;
+    idempotency_key: string; message_text: string; status: MileageAdjustmentNotificationStatus;
+  }>();
+  if (!row) return null;
+  return {
+    id: row.id,
+    lineAccountId: row.line_account_id,
+    friendId: row.friend_id,
+    ledgerEntryId: row.ledger_entry_id,
+    idempotencyKey: row.idempotency_key,
+    messageText: row.message_text,
+    status: row.status,
+  };
 }
 
 export interface PendingMileageGrantNotification {
