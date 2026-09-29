@@ -1,104 +1,15 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import type { MileageRule } from '@/lib/api'
-import {
-  RULE_CSV_HEADER,
-  RULE_FILTERS,
-  RULE_SORTS,
-  earningRulesCsv,
-  hasRuleLimit,
-  ruleLimitLabel,
-  ruleEventLabel,
-  selectRules,
-} from './earning-rule-view'
+import { ruleEventLabel } from './earning-rule-view'
 
 const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
-
-function rule(over: Partial<MileageRule> & { id: string }): MileageRule {
-  return {
-    name: over.id,
-    eventType: 'message_received',
-    source: null,
-    amount: 1,
-    initialStatus: 'available',
-    conditions: {},
-    isActive: true,
-    validFrom: null,
-    validUntil: null,
-    createdAt: '2026-01-01T00:00:00.000Z',
-    updatedAt: '2026-01-01T00:00:00.000Z',
-    ...over,
-  }
-}
-
-const RULES: MileageRule[] = [
-  rule({ id: 'a', name: 'メッセージ', amount: 3, conditions: { dailyCapActions: 5 }, createdAt: '2026-03-01T00:00:00.000Z' }),
-  rule({ id: 'b', name: 'フォーム', eventType: 'form_submitted', amount: 30, isActive: false, createdAt: '2026-02-01T00:00:00.000Z' }),
-  rule({ id: 'c', name: '予約', eventType: 'booking_created', amount: 10, conditions: { uniquePerSubject: true }, createdAt: '2026-01-15T00:00:00.000Z' }),
-]
+const NEW_PAGE = readFileSync(new URL('./earning-rules/new/page.tsx', import.meta.url), 'utf8')
+const EDIT_PAGE = readFileSync(new URL('./earning-rules/edit/page.tsx', import.meta.url), 'utf8')
 
 describe('V6 たまる決めごと（N46cQ）の見せ方', () => {
-  it('絞り込みの札は読み込んだ行から数えられるものだけ持つ', () => {
-    expect(RULE_FILTERS.map((f) => f.key)).toEqual(['active', 'stopped', 'capped', 'uncapped'])
-  })
-
-  it('上限は、回数の上限と「1回だけ」の両方を上限として数える', () => {
-    expect(hasRuleLimit(rule({ id: 'x', conditions: { dailyCapActions: 3 } }))).toBe(true)
-    expect(hasRuleLimit(rule({ id: 'y', conditions: { uniquePerReferredFriend: true } }))).toBe(true)
-    // 倍率を無視するのは上限ではない。
-    expect(hasRuleLimit(rule({ id: 'z', conditions: { ignoreMultiplier: true } }))).toBe(false)
-    expect(hasRuleLimit(rule({ id: 'w', conditions: {} }))).toBe(false)
-  })
-
-  it('札を押すと、その札に合う決めごとだけ残る', () => {
-    expect(selectRules(RULES, { filters: ['stopped'], sort: 'newest' }).map((r) => r.id))
-      .toEqual(['b'])
-    expect(selectRules(RULES, { filters: ['uncapped'], sort: 'newest' }).map((r) => r.id))
-      .toEqual(['b'])
-  })
-
-  it('札を2つ押すと足し合わせる。どちらかに合えば残る', () => {
-    expect(selectRules(RULES, { filters: ['active', 'stopped'], sort: 'newest' })).toHaveLength(3)
-  })
-
-  it('並び順は新しい順・名前順・マイルが多い順の3つが動く', () => {
-    expect(RULE_SORTS.map((s) => s.value)).toEqual(['newest', 'name', 'amount'])
-    expect(selectRules(RULES, { filters: [], sort: 'newest' }).map((r) => r.id))
-      .toEqual(['a', 'b', 'c'])
-    expect(selectRules(RULES, { filters: [], sort: 'amount' }).map((r) => r.id))
-      .toEqual(['b', 'c', 'a'])
-  })
-
-  it('並び替えても元の配列は動かさない', () => {
-    const before = RULES.map((r) => r.id)
-    selectRules(RULES, { filters: [], sort: 'amount' })
-    expect(RULES.map((r) => r.id)).toEqual(before)
-  })
-
-  it('上限は運用者の言葉で書く', () => {
-    expect(ruleLimitLabel(rule({ id: 'x', conditions: { dailyCapActions: 5 } }))).toBe('1日5回まで')
-    expect(ruleLimitLabel(rule({ id: 'y', conditions: {} }))).toBe('行動ごとに付与')
-    expect(
-      ruleLimitLabel(rule({ id: 'z', conditions: { uniquePerSubjectPerDay: true, dailyCapActions: 3 } })),
-    ).toBe('同じリンクは1日1回・1日3件まで')
-  })
-
   it('未知の行動は内部語を出さず、運用者の言葉にする', () => {
     expect(ruleEventLabel('message_received', { message_received: 'メッセージ' })).toBe('メッセージ')
     expect(ruleEventLabel('internal_new_event', {})).toBe('その他の行動')
-  })
-
-  it('CSVは画面に出ている決めごとだけを、設計の見出しで書き出す', () => {
-    const shown = selectRules(RULES, { filters: ['stopped'], sort: 'newest' })
-    const csv = earningRulesCsv(shown, {
-      event: (eventType) => eventType,
-      date: (iso) => iso.slice(0, 10),
-    })
-    const lines = csv.split('\r\n')
-    expect(lines[0]).toBe(RULE_CSV_HEADER.join(','))
-    expect(lines).toHaveLength(2)
-    expect(lines[1]).toContain('止めています')
-    expect(csv).not.toContain('メッセージ')
   })
 })
 
@@ -107,9 +18,9 @@ describe('V6 たまる決めごと（N46cQ）の画面', () => {
     expect(PAGE).not.toContain('マイル付与ルール')
   })
 
-  it('案内バーを1本置く', () => {
+  it('各タブに案内バーを1本ずつ置く', () => {
     expect(PAGE).toContain("import NoteBar from '@/components/shared/note-bar'")
-    expect(PAGE.match(/<NoteBar/g) ?? []).toHaveLength(1)
+    expect(PAGE.match(/<NoteBar/g) ?? []).toHaveLength(2)
   })
 
   it('絞り込み札と並び順を共通部品でつなぐ', () => {
@@ -118,20 +29,102 @@ describe('V6 たまる決めごと（N46cQ）の画面', () => {
     expect(PAGE).toContain('aria-label="並び順"')
   })
 
-  it('口の無い「並び順を保存」を操作として置かない', () => {
-    expect(PAGE).not.toMatch(/>\s*並び順を保存\s*</)
+  it('並び順は一括口へまとめて保存する(N-243)', () => {
+    // 1件ずつPATCHすると途中失敗で一部だけ反映されるため、全順序を1回で送る。
+    expect(PAGE).toContain('api.mileage.saveEarningRulesOrder')
+    expect(PAGE).toContain('ids: ruleOrder')
+    expect(PAGE).toContain("{savingRuleOrder ? '保存しています' : '並び順を保存'}")
+    expect(PAGE).not.toContain('api.mileage.saveEarningRuleDraft')
+  })
+
+  it('利用対象条件と公開版の中身を一覧から確認できる', () => {
+    expect(PAGE).toContain('公開版の中身を見る')
+    expect(PAGE).toContain('rule.draft.targetConditions')
+    expect(PAGE).toContain('利用対象：すべての友だち')
+  })
+
+  it('R297: 未公開の決めごとに「公開版の中身」は出さず、下書きと言い分ける', () => {
+    // 公開版が無いのに「公開版の中身を見る」と出すと、見た人は
+    // 公開済みだと思い込む。未公開は下書きの中身と版・保存日時を出す。
+    expect(PAGE).toContain("rule.publishedVersion == null ? '下書きの内容を見る' : '公開版の中身を見る'")
+    expect(PAGE).toContain('まだ公開版はありません')
+    expect(PAGE).toContain('公開版 v${rule.publishedVersion}')
+    expect(PAGE).toContain('に反映')
+  })
+
+  it('R296: 一覧から下書きの編集画面へ行け、未公開だけ削除できる', () => {
+    // 編集の入口。別画面へ行く項目には external の印を付ける。
+    expect(PAGE).toContain('下書きを編集')
+    expect(PAGE).toContain('/mileage/earning-rules/edit?id=')
+    // 消せるのは公開前の下書きだけ。履歴のある運用済みは口が409で断り、
+    // 画面は確認窓に理由を残す（一覧を消さない）。
+    expect(PAGE).toContain('rule.publishedVersion == null')
+    expect(PAGE).toContain('この決めごとを削除')
+    expect(PAGE).toContain('api.mileage.deleteRule')
+    expect(PAGE).toContain('を削除しますか？')
+    expect(PAGE).toContain('取り消せません')
+    expect(PAGE).toContain('deleteError')
+  })
+
+  it('R296: 編集画面は下書きだけを版つきで保存し、動いている内容に触れない', () => {
+    // 保存は下書き口へ。読んだ版を渡すので、開いている間の他人の直しを
+    // 黙って上書きしない（ずれていたら口が409で断る）。
+    expect(EDIT_PAGE).toContain('api.mileage.saveEarningRuleDraft')
+    expect(EDIT_PAGE).toContain('expectedVersion: rule.draftVersion')
+    // 公開・停止・並び順はこの画面の仕事ではない（一覧の操作へ残す）。
+    expect(EDIT_PAGE).not.toContain('publishEarningRule')
+    expect(EDIT_PAGE).not.toContain('saveEarningRulesOrder')
+    // 動いている内容が変わらないことを画面の言葉で伝える。
+    expect(EDIT_PAGE).toContain('動いている内容は変わりません')
+    // 新規作成と同じ選択肢を使う（直しが片方だけに残らないように）。
+    expect(EDIT_PAGE).toContain("from '../rule-fields'")
+    expect(NEW_PAGE).toContain("from '../rule-fields'")
+    // 見つからない・読み込めないを言い分ける（★V7 共通部品その2）。
+    expect(EDIT_PAGE).toContain('この決めごとが見つかりません')
+    expect(EDIT_PAGE).toContain('たまる決めごとを読み込めませんでした')
   })
 
   it('一覧を設計の表で出す', () => {
     expect(PAGE).toContain("import { TableHeadRow, Th } from '@/components/shared/table'")
-    expect(PAGE).toContain('<Th>決めごと</Th>')
-    expect(PAGE).toContain('<Th>対象の行動</Th>')
-    expect(PAGE).toContain('<Th align="right">付与マイル</Th>')
-    expect(PAGE).toContain('<Th>上限</Th>')
-    expect(PAGE).toContain('<Th align="center">状態</Th>')
-    expect(PAGE).toContain('<Th align="center">操作</Th>')
+    expect(PAGE).toContain('>何をしてくれたら</Th>')
+    expect(PAGE).toContain('>対象の行動</Th>')
+    expect(PAGE).toContain('align="right">たまるマイル</Th>')
+    expect(PAGE).toContain('>有効期間・失効</Th>')
+    expect(PAGE).toContain('>この30日</Th>')
+    expect(PAGE).toContain('align="center">状態</Th>')
+    expect(PAGE).toContain('align="center">操作</Th>')
     // カード格子に戻していない。
     expect(PAGE).not.toContain('grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-4')
+  })
+
+  it('V6の30日集計・版・失効条件を表示する', () => {
+    expect(PAGE).toContain('api.mileage.earningRulesV6')
+    expect(PAGE).toContain('api.mileage.history')
+    expect(PAGE).toContain('api.mileage.friendsV6')
+    expect(PAGE).toContain('title="この30日で付いたマイル"')
+    expect(PAGE).toContain('title="1人あたりの平均"')
+    expect(PAGE).toContain('ruleSummary?.grantedMiles')
+    expect(PAGE).toContain('ruleSummary?.averageBalance')
+    expect(PAGE).toContain('grantedMiles30d(rule)')
+    // R53: 決めごと行の30日額は台帳の実額。回数×今の下書き金額にしない。
+    expect(PAGE).toContain('rule.metrics30d.grantedMiles')
+    expect(PAGE).not.toContain('rule.metrics30d.granted * rule.draft.amount')
+  })
+
+  it('平均の分母と説明文の人数は同じ値を使う（MILEAGE-05）', () => {
+    // 計算は「残高のある人」で割っているのに、説明が別の口の人数
+    // （全員の数）を出すと、運用者が違う分母で読んでしまう。
+    expect(PAGE).toContain('averageDenominator: friendsRes.data.summary.withBalanceCount')
+    expect(PAGE).toContain('formatMileageNumber(ruleSummary.averageDenominator)')
+    expect(PAGE).not.toContain('formatMileageNumber(tabCounts.balances')
+    // 残高0の人を含めるか除くかを明記する
+    expect(PAGE).toContain('残高0の人は除き')
+    // 割れる人がいないときは「計算していません」と言う（0とは言わない）
+    expect(PAGE).toContain('残高がある人がいないため計算していません')
+    expect(PAGE).toContain('rule.metrics30d.granted')
+    expect(PAGE).toContain('rule.metrics30d.excluded')
+    expect(PAGE).toContain('rule.draftVersion')
+    expect(PAGE).toContain('rule.draft.expiresAfterDays')
   })
 
   it('たまる決めごとの節に素のTailwind色を残さない', () => {
@@ -143,10 +136,42 @@ describe('V6 たまる決めごと（N46cQ）の画面', () => {
     expect(section).not.toMatch(/(?:text|bg|border|divide)-(?:gray|slate|indigo|green|rose|orange|amber|emerald)-\d{2,3}/)
   })
 
+  it('停止・再開の失敗は一覧を消さず行内の帯で出す', () => {
+    // 失敗は共通 Notice の危険の帯（role=alert は部品が付ける。★V7 共通部品その2 §1）。
+    expect(PAGE).toContain('ruleActionError')
+    expect(PAGE).toContain('<Notice tone="danger"')
+    expect(PAGE).not.toContain("setLoadError('たまる決めごとを更新できませんでした")
+  })
+
+  it('N-231 案1: 下書きの公開は保存と別の操作で、版を見せて確認窓で確かめる', () => {
+    // 公開して反映ボタン・公開版表示・下書き版の受け渡し。
+    expect(PAGE).toContain('api.mileage.publishEarningRule')
+    expect(PAGE).toContain('公開して反映')
+    expect(PAGE).toContain('rule.publishedVersion')
+    expect(PAGE).toContain('公開版 v${rule.publishedVersion}')
+    expect(PAGE).toContain('expectedVersion: rule.draftVersion')
+    // 取り消せない操作のため共通の確認窓で確かめる。ブラウザのconfirmは使わない。
+    expect(PAGE).toContain("import ConfirmDialog from '@/components/shared/confirm-dialog'")
+    expect(PAGE).toContain('<ConfirmDialog')
+    expect(PAGE).toContain('の下書きを公開して反映しますか？')
+    expect(PAGE).toContain('取り消せません')
+    expect(PAGE).not.toContain('window.confirm')
+  })
+
   it('読込中・取得失敗・空を言い分ける', () => {
     expect(PAGE).toContain('title="たまる決めごとを読み込んでいます"')
     expect(PAGE).toContain('title="たまる決めごとを読み込めませんでした"')
     expect(PAGE).toContain('title="まだ決めごとがありません"')
     expect(PAGE).toContain('title="絞り込みに合う決めごとがありません"')
+  })
+})
+
+describe('V6 たまる決めごとをつくる（BmoGY）の対象条件', () => {
+  it('共通の条件部品で15軸を組み合わせ、V6下書きへ保存する', () => {
+    expect(NEW_PAGE).toContain("import ConditionBuilder, {")
+    expect(NEW_PAGE).toContain('<ConditionBuilder')
+    expect(NEW_PAGE).toContain('value={targetConditions}')
+    expect(NEW_PAGE).toContain('targetConditions: pruneCondition(targetConditions)')
+    expect(NEW_PAGE).toContain('15の軸から組み合わせられます')
   })
 })

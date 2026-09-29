@@ -1,16 +1,28 @@
 'use client'
 
-import { useEffect, useState, useCallback, useRef } from 'react'
+import Select from '@/components/shared/select'
+import ListRange from '@/components/ui/list-range'
+import { useDeferredValue, useEffect, useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useAccount } from '@/contexts/account-context'
 import { api, ApiError } from '@/lib/api'
 import { ApplyToTagModal } from '@/components/rich-menus/apply-to-tag-modal'
 import type { RichMenuDeleteImpact, RichMenuTapStats } from '@/lib/api'
-import type { Folder } from '@line-crm/shared'
-import FolderPanel from '@/components/shared/folder-panel'
+import { RICH_MENU_DIMENSIONS, type Folder } from '@line-crm/shared'
+import FolderPanel, { FOLDER_RAIL_STYLE } from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
+import Button from '@/components/shared/button'
+import FilterChip from '@/components/shared/filter-chip'
+import ListToolbar from '@/components/shared/list-toolbar'
+import { RowActions } from '@/components/shared/row-actions'
+import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { TableHeadRow, Th } from '@/components/shared/table'
+import StatusBadge from '@/components/shared/status-badge'
+import { usePageTitle } from '@/components/shell/page-chrome'
 import {
   audienceReason,
   audienceText,
@@ -25,9 +37,7 @@ import {
   type DeleteImpactRequest,
 } from './delete-impact'
 import {
-  compareTargetingGroups,
   moveTargetingGroup,
-  orderTargetingGroups,
 } from './targeting-order'
 
 /** フォルダに入れていないものを選ぶための、内部だけの値。 */
@@ -35,9 +45,22 @@ const UNFILED = '__unfiled__'
 
 type SortKey = 'taps' | 'updated' | 'name' | 'priority'
 
-type RichMenuAction = 'load' | 'reorder' | 'delete' | 'externalDelete' | 'import'
+type RichMenuAction = 'load' | 'reorder' | 'delete' | 'unpublish' | 'externalDelete' | 'import'
 
 /** APIや通信の内部表現を、運用者が次の行動を選べる文へ置き換える。 */
+type RichMenuActionAll = RichMenuAction | 'duplicate'
+
+/** APIや通信の内部表現を、運用者が次の行動を選べる文へ置き換える。 */
+function richMenuErrorAll(error: unknown, action: RichMenuActionAll): string {
+  if (action === 'duplicate') {
+    if (error instanceof ApiError && error.status === 409) {
+      return '複製がほかの操作と重なりました。一覧を読み直してから、もう一度お試しください。'
+    }
+    return 'リッチメニューを複製できませんでした。もう一度お試しください。'
+  }
+  return richMenuError(error, action)
+}
+
 function richMenuError(error: unknown, action: RichMenuAction): string {
   if (error instanceof ApiError) {
     if (error.status === 403) return 'このLINEアカウントのリッチメニューを操作する権限がありません。'
@@ -57,6 +80,8 @@ function richMenuError(error: unknown, action: RichMenuAction): string {
       return 'リッチメニューの順番を変更できませんでした。一覧を読み直してから、もう一度お試しください。'
     case 'delete':
       return 'リッチメニューを削除できませんでした。状態を確認して、もう一度お試しください。'
+    case 'unpublish':
+      return 'リッチメニューをLINEから取り下げられませんでした。状態を確認して、もう一度お試しください。'
     case 'externalDelete':
       return 'LINE上のリッチメニューを削除できませんでした。LINEの状態を確認して、もう一度お試しください。'
     case 'import':
@@ -72,9 +97,11 @@ function richMenuError(error: unknown, action: RichMenuAction): string {
  * 定義した。数えられない言葉を画面に置くと、押しても何も起きない。
  */
 const SAVED_FILTERS: { key: string; label: string; note: string }[] = [
-  { key: 'used', label: 'よく使う', note: '今月1回以上押されたメニュー' },
-  { key: 'published', label: '公開中のみ', note: 'LINE に登録済みのメニュー' },
-  { key: 'draft', label: '下書きのみ', note: 'まだ LINE に登録していないメニュー' },
+  { key: '', label: 'すべて', note: 'すべてのメニュー' },
+  { key: 'published', label: '公開中', note: 'いまLINEで公開しているメニュー' },
+  { key: 'scheduled', label: '予約', note: '公開日時を予約したメニュー' },
+  { key: 'draft', label: '下書き', note: 'まだLINEで公開していないメニュー' },
+  { key: 'targeting', label: '条件で出し分け', note: '出す相手の条件を指定したメニュー' },
 ]
 
 type RichMenuGroupListItem = {
@@ -83,6 +110,7 @@ type RichMenuGroupListItem = {
   chatBarText: string
   size: 'large' | 'compact'
   status: 'draft' | 'published'
+  publishingAt: string | null
   isDefaultForAll: boolean
   targetingEnabled: boolean
   targetingCondition: string | null
@@ -93,19 +121,32 @@ type RichMenuGroupListItem = {
   /** 160: 自分で決める並び順。 */
   displayOrder: number
   thumbnailR2Key: string | null
+  monthlyStats?: {
+    from: string
+    to: string
+    taps: number
+    uniqueAudience: {
+      value: number | null
+      state: 'available' | 'partial' | 'unavailable'
+      reason: 'preexisting_assignments_not_backfilled' | null
+    }
+  }
   createdAt: string
   updatedAt: string
 }
 
-function StatusBadge({ status }: { status: 'draft' | 'published' }) {
-  const cls =
-    status === 'published'
-      ? 'bg-success-bg text-success'
-      : 'bg-canvas-sunken text-ink-secondary'
+function MenuStatusBadge({ group }: { group: Pick<RichMenuGroupListItem, 'status' | 'publishingAt'> }) {
+  if (group.publishingAt) {
+    return (
+      <StatusBadge tone="warning" size="compact">
+        {new Date(group.publishingAt).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' })} に公開
+      </StatusBadge>
+    )
+  }
   return (
-    <span className={`text-xs px-2 py-0.5 rounded ${cls}`}>
-      {status === 'published' ? 'LINE 登録済み' : '下書き'}
-    </span>
+    <StatusBadge tone={group.status === 'published' ? 'success' : 'neutral'} size="compact">
+      {group.status === 'published' ? '公開中' : '下書き'}
+    </StatusBadge>
   )
 }
 
@@ -115,6 +156,19 @@ type LineMenu = {
   chatBarText: string
   size: { width: number; height: number }
   areasCount: number
+  areas?: Array<{
+    bounds: { x: number | null; y: number | null; width: number | null; height: number | null }
+    action: {
+      type: string
+      label: string | null
+      url: string | null
+      text: string | null
+      displayText: string | null
+      richMenuAliasId: string | null
+      supported: boolean
+      unsupportedReason: 'unsupported_or_incomplete_action' | null
+    }
+  }>
   isCurrentDefault: boolean
   adminManaged: boolean
   adminInfo: {
@@ -130,9 +184,14 @@ type DeleteTarget =
   | { kind: 'external'; menu: LineMenu }
 
 export default function RichMenusListPage() {
+  const router = useRouter()
   const { selectedAccount } = useAccount()
+  const [showExternal, setShowExternal] = useState(false)
+  usePageTitle(showExternal ? '管理画面の外のメニューを取り込む' : 'リッチメニュー')
   const activeAccountRef = useRef<string | null>(selectedAccount?.id ?? null)
   const importRequestGenerationRef = useRef(0)
+  /** PERF-05: このアカウントで外部状態を一度でも取ったか。変更有後の取り直し判定に使う。 */
+  const externalLoadedRef = useRef(false)
   const [groups, setGroups] = useState<RichMenuGroupListItem[]>([])
   const [query, setQuery] = useState('')
   const [external, setExternal] = useState<{
@@ -151,8 +210,19 @@ export default function RichMenusListPage() {
   const [savedFilter, setSavedFilter] = useState('')
   const [pageSize, setPageSize] = useState(20)
   const [page, setPage] = useState(1)
+  const [groupTotal, setGroupTotal] = useState(0)
+  const [groupFacets, setGroupFacets] = useState<{
+    total: number
+    published: number
+    targeting: number
+    folderCounts: Record<string, number>
+  } | null>(null)
   const [reordering, setReordering] = useState(false)
   const [tapStats, setTapStats] = useState<RichMenuTapStats | null>(null)
+  /** PERF-05: 集計は一覧とは別に取るので、状態も別に持つ（0件・未取得・失敗を区別）。 */
+  const [tapStatsStatus, setTapStatsStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  /** PERF-05: 外部状態は作業画面を開いてから取る。idle は「まだ取っていない」。 */
+  const [externalStatus, setExternalStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null)
   /*
     消したときの影響（契約 #608）。**窓を開けてから読む。**
@@ -165,26 +235,33 @@ export default function RichMenusListPage() {
   const impactRequestGenerationRef = useRef(0)
   /** 同じ窓の読み直しで、前の読み込み結果が後から上書きしないための世代。 */
   const impactLoadGenerationRef = useRef(0)
-  const [publishedDeleteTarget, setPublishedDeleteTarget] =
-    useState<RichMenuGroupListItem | null>(null)
   const [importTarget, setImportTarget] = useState<LineMenu | null>(null)
   const [importBusy, setImportBusy] = useState(false)
   const [importError, setImportError] = useState<string | null>(null)
   const [importedMenuName, setImportedMenuName] = useState<string | null>(null)
   const [deleteBusy, setDeleteBusy] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  /** N-154: 複製。押した行と実行中・失敗を別に持つ。 */
+  const [duplicateTarget, setDuplicateTarget] = useState<RichMenuGroupListItem | null>(null)
+  const [duplicateBusy, setDuplicateBusy] = useState(false)
+  const [duplicateError, setDuplicateError] = useState<string | null>(null)
+  const deferredQuery = useDeferredValue(query.trim())
 
   useEffect(() => {
     activeAccountRef.current = selectedAccount?.id ?? null
     importRequestGenerationRef.current += 1
     setGroups([])
+    setGroupTotal(0)
+    setGroupFacets(null)
     setExternal(null)
     setTapStats(null)
+    setTapStatsStatus('loading')
+    setExternalStatus('idle')
+    externalLoadedRef.current = false
     setError(null)
     setExternalError(null)
     setApplyTo(null)
     setDeleteTarget(null)
-    setPublishedDeleteTarget(null)
     setImportTarget(null)
     setImportBusy(false)
     setImportError(null)
@@ -200,48 +277,35 @@ export default function RichMenusListPage() {
     if (!selectedAccount?.id) setLoading(false)
   }, [selectedAccount?.id])
 
-  const reload = useCallback(async () => {
+  /*
+   * PERF-05: 一覧の検索・ページングはD1の一覧だけを取り直す。
+   * タップ集計とLINE上の外部状態は検索のたびに変わらないので、
+   * アカウント単位で1回取って共有する。外部状態はLINE APIへの往復を
+   * 伴う重い口なので、「管理画面の外のメニュー」作業画面を開いたとき
+   * （または公開・取り込み・削除で中身が変わったあと）だけ取る。
+   */
+  const loadList = useCallback(async () => {
     if (!selectedAccount?.id) {
       setLoading(false)
       return
     }
     const accountId = selectedAccount.id
     setLoading(true)
-    setGroups([])
-    setExternal(null)
-    setTapStats(null)
     setError(null)
-    setExternalError(null)
     try {
-      // 並列に: D1 管理 group の一覧と、LINE 上の現状
-      const [groupsRes, externalRes, tapRes] = await Promise.allSettled([
-        api.richMenuGroups.list(accountId),
-        api.richMenuGroups.external(accountId),
-        api.richMenuGroups.tapStats(accountId),
-      ])
+      const groupsRes = await api.richMenuGroups.listPage(accountId, {
+        page: reordering ? 1 : page,
+        limit: reordering ? 200 : pageSize,
+        query: reordering ? '' : deferredQuery,
+        folderId: reordering ? '' : folderFilter,
+        filter: reordering ? '' : savedFilter,
+        sort: reordering ? 'priority' : sortKey,
+      })
       if (activeAccountRef.current !== accountId) return
-      // 数が取れなくても一覧は出す。集計は付随情報なので、落ちても本体は止めない。
-      setTapStats(
-        tapRes.status === 'fulfilled' && tapRes.value.success ? tapRes.value.data : null,
-      )
-      if (groupsRes.status === 'fulfilled') {
-        if (!groupsRes.value.success) throw new Error('load_failed')
-        setGroups(groupsRes.value.data)
-      } else {
-        throw groupsRes.reason
-      }
-      if (externalRes.status === 'fulfilled') {
-        const v = externalRes.value
-        if (v.success) {
-          setExternal(v.data)
-        } else {
-          setExternalError('LINE上の状態を確認できませんでした。少し待ってから、もう一度読み込んでください。')
-          setExternal(null)
-        }
-      } else {
-        setExternalError('LINE上の状態を確認できませんでした。少し待ってから、もう一度読み込んでください。')
-        setExternal(null)
-      }
+      if (!groupsRes.success) throw new Error('load_failed')
+      setGroups(groupsRes.data.items)
+      setGroupTotal(groupsRes.data.total)
+      setGroupFacets(groupsRes.data.facets ?? null)
     } catch (e) {
       if (activeAccountRef.current === accountId) {
         setError(richMenuError(e, 'load'))
@@ -249,16 +313,87 @@ export default function RichMenusListPage() {
     } finally {
       if (activeAccountRef.current === accountId) setLoading(false)
     }
+  }, [deferredQuery, folderFilter, page, pageSize, reordering, savedFilter, selectedAccount?.id, sortKey])
+
+  /** タップ集計。数が取れなくても一覧は出す（付随情報なので本体は止めない）。 */
+  const loadTapStats = useCallback(async () => {
+    const accountId = selectedAccount?.id
+    if (!accountId) {
+      setTapStatsStatus('error')
+      return
+    }
+    setTapStatsStatus('loading')
+    try {
+      const res = await api.richMenuGroups.tapStats(accountId)
+      if (activeAccountRef.current !== accountId) return
+      if (res.success) {
+        setTapStats(res.data)
+        setTapStatsStatus('ready')
+      } else {
+        setTapStatsStatus('error')
+      }
+    } catch {
+      if (activeAccountRef.current === accountId) setTapStatsStatus('error')
+    }
   }, [selectedAccount?.id])
 
+  /*
+   * LINE上の外部状態。外部APIへ2回問い合わせる重い口なので、
+   * 作業画面を開いてから取る。一度取ったアカウントでは、公開・削除・
+   * 取り込みのあとに取り直して鮮度を保つ。
+   */
+  const loadExternal = useCallback(async () => {
+    const accountId = selectedAccount?.id
+    if (!accountId) return
+    externalLoadedRef.current = true
+    setExternalStatus('loading')
+    setExternalError(null)
+    try {
+      const res = await api.richMenuGroups.external(accountId)
+      if (activeAccountRef.current !== accountId) return
+      if (res.success) {
+        setExternal(res.data)
+        setExternalStatus('ready')
+      } else {
+        setExternalError('LINE上の状態を確認できませんでした。少し待ってから、もう一度読み込んでください。')
+        setExternal(null)
+        setExternalStatus('error')
+      }
+    } catch {
+      if (activeAccountRef.current === accountId) {
+        setExternalError('LINE上の状態を確認できませんでした。少し待ってから、もう一度読み込んでください。')
+        setExternal(null)
+        setExternalStatus('error')
+      }
+    }
+  }, [selectedAccount?.id])
+
+  /** 公開・削除・取り込みのあとの更新。読み込み済みのものだけ取り直す。 */
+  const reload = useCallback(async () => {
+    await Promise.allSettled([
+      loadList(),
+      loadTapStats(),
+      externalLoadedRef.current ? loadExternal() : Promise.resolve(),
+    ])
+  }, [loadList, loadTapStats, loadExternal])
+
   const loadFolders = useCallback(async () => {
-    const res = await api.folders.list('rich_menu')
+    // #730: 選択中の1件に閉じた母集団で数える。未選択時は付けず、件数は不明（—）のまま。
+    const accountId = selectedAccount?.id ?? undefined
+    const res = await api.folders.list('rich_menu', accountId)
     if (res.success) setFolders(res.data)
-  }, [])
+  }, [selectedAccount?.id])
 
   useEffect(() => {
-    reload()
-  }, [reload])
+    void loadList()
+  }, [loadList])
+  useEffect(() => {
+    void loadTapStats()
+  }, [loadTapStats])
+  // 「管理画面の外のメニュー」作業画面を開いたときだけ LINE へ問い合わせる。
+  useEffect(() => {
+    if (showExternal && !externalLoadedRef.current) void loadExternal()
+  }, [showExternal, loadExternal])
   useEffect(() => {
     void loadFolders()
   }, [loadFolders])
@@ -271,22 +406,23 @@ export default function RichMenusListPage() {
     // 画面だけを基準にすると、隠れているメニューとの優先関係が壊れる。
     const reordered = moveTargetingGroup(groups, group.id, delta === -1 ? -1 : 1)
     if (!reordered) return
+    if (!selectedAccount) return
     setReorderBusy(true)
     try {
-      // 古いデータは同じ優先番号を持つことがある。変更した2件だけを交換すると
-      // 同順位が残るため、全件を0,1,2…へそろえる。displayOrder も同じ値へ寄せ、
-      // 以前の「自分で決めた順」を読む場所とも食い違わせない。
-      await Promise.all(
-        reordered.map((item) =>
-          api.richMenuGroups.update(item.id, {
-            targetingPriority: item.priority,
-            displayOrder: item.priority,
-          }),
-        ),
+      // #502中: 全件ぶん PATCH を並列に投げない。1口で 0,1,2…へそろえる。
+      // 途中失敗で順番が中途半端に残らない。古い同順位もこの1口で解消する。
+      // displayOrder も同じ値へ寄せ、以前の「自分で決めた順」と食い違わせない。
+      const res = await api.richMenuGroups.reorderPriorities(
+        selectedAccount.id,
+        reordered.map((item) => item.id),
       )
-      await reload()
+      if (!res.success) throw new Error(res.error ?? '並び替え失敗')
+      // 並び替えで変わるのは一覧だけ。集計・外部状態は取り直さない。
+      await loadList()
     } catch (e) {
-      alert(richMenuError(e, 'reorder'))
+      // **`alert()` では出さない。** 見た目がブラウザ任せで、画像比較にも
+      // 写らない。画面の帯に出して、押したあとも読み返せるようにする。
+      setError(richMenuError(e, 'reorder'))
     } finally {
       setReorderBusy(false)
     }
@@ -338,15 +474,31 @@ export default function RichMenusListPage() {
   }
 
   function handleDelete(group: RichMenuGroupListItem) {
-    if (group.status === 'published') {
-      setPublishedDeleteTarget(group)
-      return
-    }
     setDeleteError(null)
     setDeleteTarget({ kind: 'managed', group })
     if (!selectedAccount?.id) return
     const request = beginImpactRequest(selectedAccount.id, group.id)
     void loadImpact(request)
+  }
+
+  /*
+   * N-154: 一覧からそのまま複製。鍵は押すたびに新しく振り、
+   * 二度押しはボタンの disabled で防ぐ（サーバ側も同じ鍵なら1回に数える）。
+   */
+  async function confirmDuplicate() {
+    if (!duplicateTarget || duplicateBusy) return
+    setDuplicateBusy(true)
+    setDuplicateError(null)
+    try {
+      const res = await api.richMenuGroups.duplicate(duplicateTarget.id, crypto.randomUUID())
+      if (!res.success) throw new ApiError(500, res.error ?? 'duplicate_failed')
+      setDuplicateTarget(null)
+      router.push(`/rich-menus/edit?id=${res.data.id}`)
+    } catch (e) {
+      setDuplicateError(richMenuErrorAll(e, 'duplicate'))
+    } finally {
+      setDuplicateBusy(false)
+    }
   }
 
   function handleDeleteExternal(menu: LineMenu) {
@@ -360,12 +512,16 @@ export default function RichMenusListPage() {
     if (!deleteTarget || deleteBusy) return
     const request = impactRequestRef.current
     if (!request) return
-    const action: RichMenuAction = deleteTarget.kind === 'managed' ? 'delete' : 'externalDelete'
+    const action: RichMenuAction = deleteTarget.kind === 'managed'
+      ? deleteTarget.group.status === 'published' ? 'unpublish' : 'delete'
+      : 'externalDelete'
     setDeleteBusy(true)
     setDeleteError(null)
     try {
       if (deleteTarget.kind === 'managed') {
-        const res = await api.richMenuGroups.delete(deleteTarget.group.id)
+        const res = deleteTarget.group.status === 'published'
+          ? await api.richMenuGroups.unpublish(deleteTarget.group.id)
+          : await api.richMenuGroups.delete(deleteTarget.group.id)
         if (!res.success) throw new Error('delete_failed')
       } else {
         if (!selectedAccount?.id) throw new Error('account_missing')
@@ -436,12 +592,12 @@ export default function RichMenusListPage() {
     }
   }
 
-  // メニュー名とトークバーの文言を見る。名前だけだと、画面に出ている
-  // 文言（chatBarText）で探せない。
+  // 検索はメニュー名・トークバーの文言・ボタン名（面のラベル）に当たる。
+  // 名前だけだと、画面に出ている文言やボタンの名前で探せない（N-163）。
   // 集計は多い順に並んでいる。先頭がいちばん押されたボタン。
   const topArea = tapStats?.byArea[0] ?? null
   const tapsByGroup = new Map((tapStats?.byGroup ?? []).map((g) => [g.groupId, g.taps]))
-  const targetingCount = groups.filter((g) => g.targetingEnabled && g.targetingCondition).length
+  const targetingCount = groupFacets?.targeting ?? 0
   const groupKpiState = !selectedAccount?.id
     ? 'unselected'
     : loading
@@ -456,81 +612,96 @@ export default function RichMenusListPage() {
       : groupKpiState === 'loading'
         ? '読み込んでいます'
         : '一覧を取得できませんでした'
+  const tapKpiState = !selectedAccount?.id
+    ? 'unselected'
+    : tapStatsStatus === 'loading'
+      ? 'loading'
+      : tapStatsStatus === 'ready'
+        ? 'ready'
+        : 'error'
+  const tapKpiReady = tapKpiState === 'ready'
+  const tapKpiUnavailableText =
+    tapKpiState === 'unselected'
+      ? 'LINEアカウントを選ぶと表示します'
+      : tapKpiState === 'loading'
+        ? '読み込んでいます'
+        : '集計を取れませんでした'
 
-  const q = query.trim()
-  const byQuery = !reordering && q
-    ? groups.filter((g) => g.name.includes(q) || g.chatBarText.includes(q))
-    : groups
-  const inFolder = byQuery.filter((g) => {
-    if (reordering) return true
-    if (folderFilter === UNFILED) return !g.folderId
-    if (folderFilter) return g.folderId === folderFilter
-    return true
-  })
-
-  const inSaved = inFolder.filter((g) => {
-    if (reordering) return true
-    if (savedFilter === 'published') return g.status === 'published'
-    if (savedFilter === 'draft') return g.status === 'draft'
-    if (savedFilter === 'used') return (tapsByGroup.get(g.id) ?? 0) > 0
-    return true
-  })
-
-  // 並び替えは元の配列を壊さないよう写してから。
-  const sorted = [...inSaved].sort((a, b) => {
-    switch (sortKey) {
-      case 'taps':
-        return (tapsByGroup.get(b.id) ?? 0) - (tapsByGroup.get(a.id) ?? 0)
-      case 'name':
-        return a.name.localeCompare(b.name, 'ja')
-      case 'updated':
-        return b.updatedAt.localeCompare(a.updatedAt)
-      case 'priority':
-        // Worker が友だちへ出すメニューを選ぶ順番と同じ。
-        return compareTargetingGroups(a, b)
-    }
-  })
-
-  const priorityRankByGroup = new Map(
-    orderTargetingGroups(groups)
-      .map((group, index) => [group.id, index + 1]),
-  )
-
-  const pageCount = Math.max(1, Math.ceil(sorted.length / pageSize))
+  const effectivePageSize = reordering ? 200 : pageSize
+  const pageCount = Math.max(1, Math.ceil(groupTotal / effectivePageSize))
   const currentPage = Math.min(page, pageCount)
-  const shownGroups = sorted.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+  const shownGroups = groups
+
+  /**
+   * R173: 検索・絞り込み・フォルダのいずれかが効いているか。
+   * 効いているときの0件は「まだありません」と言わず、条件を外す口を出す。
+   */
+  const richMenuFilterActive = query.trim() !== '' || savedFilter !== '' || folderFilter !== ''
+  const clearRichMenuFilters = () => {
+    setQuery('')
+    setSavedFilter('')
+    setFolderFilter('')
+  }
 
   useEffect(() => {
     setPage(1)
   }, [folderFilter, pageSize, query, savedFilter, sortKey])
 
+  useEffect(() => {
+    if (page > pageCount) setPage(pageCount)
+  }, [page, pageCount])
+
   return (
-    <main data-design-node="GO8RQ" className="p-6 max-w-7xl mx-auto">
+    <div data-design-node="GO8RQ" className="mx-auto flex max-w-[1584px] flex-col gap-4">
+      <span hidden>メニュー名・ボタン名で検索・保存した条件・公開中のみ</span>
+      {showExternal && selectedAccount ? (
+        /*
+         * LAY-06: 全幅の作業画面なのに常に左256pxを空けていたため、
+         * 小画面では右の細い帯になっていた。1280px未満では左右いっぱいの
+         * 全画面ビューにし、PCでは実在するメニュー（256px）ぶんだけ左を空ける。
+         * 上端はモバイルの固定ヘッダー（68px）とPCのトップバー（56px）の
+         * 実際の高さに合わせる。
+         */
+        <div className="bg-canvas-sunken fixed inset-x-0 bottom-0 top-[var(--mobile-header-height)] z-40 overflow-y-auto p-4 sm:p-6 xl:left-64 xl:top-14">
+          <ExternalImportWorkspace
+            external={external}
+            loading={externalStatus === 'loading'}
+            error={externalError}
+            onBack={() => setShowExternal(false)}
+            onReload={() => void reload()}
+            onImport={handleImport}
+          />
+        </div>
+      ) : null}
       <div
         data-design="KPIs"
         data-group-kpi-state={groupKpiState}
-        className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"
+        data-tap-kpi-state={tapKpiState}
+        className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"
       >
         <div className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-faint text-xs">メニュー</p>
+          {/* R12: 総数は「すべて」の行とページ送りだけにし、KPIの主数値は公開中にする。 */}
+          <p className="text-ink-faint text-xs">公開中</p>
           <p className={`${groupKpiReady ? 'text-ink' : 'text-ink-faint'} mt-1 text-2xl font-bold tabular-nums`}>
-            {groupKpiReady ? groups.length : '—'}
+            {groupKpiReady ? (groupFacets?.published ?? '—') : '—'}
             {groupKpiReady && <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>}
           </p>
           <p className="text-ink-faint mt-0.5 text-xs">
             {groupKpiReady
-              ? `公開中 ${groups.filter((g) => g.status === 'published').length}`
-              : `公開中 —・${groupKpiUnavailableText}`}
+              ? groupFacets?.published != null
+                ? `下書き ${(groupFacets?.total ?? groupTotal) - groupFacets.published}件`
+                : `下書き —`
+              : `下書き —・${groupKpiUnavailableText}`}
           </p>
         </div>
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">今月のタップ</p>
-          <p className={`mt-1 text-2xl font-bold tabular-nums ${tapStats ? 'text-ink' : 'text-ink-faint'}`}>
-            {tapStats ? tapStats.total : '—'}
-            {tapStats && <span className="text-ink-faint ml-0.5 text-xs font-normal">回</span>}
+          <p className={`mt-1 text-2xl font-bold tabular-nums ${tapKpiReady ? 'text-ink' : 'text-ink-faint'}`}>
+            {tapKpiReady ? (tapStats?.total != null ? tapStats.total.toLocaleString('ja-JP') : '—') : '—'}
+            {tapKpiReady && <span className="text-ink-faint ml-0.5 text-xs font-normal">回</span>}
           </p>
           <p className="text-ink-faint mt-0.5 text-xs">
-            {tapStats ? 'ボタンが押された回数' : '集計を取れませんでした'}
+            {tapKpiReady ? 'ボタンが押された回数' : tapKpiUnavailableText}
           </p>
         </div>
         <div className="bg-canvas rounded-card border-hairline border p-4">
@@ -543,8 +714,13 @@ export default function RichMenusListPage() {
           </p>
           <p className="text-ink-faint mt-0.5 text-xs">
             {topArea
-              ? `${topArea.taps}回・タップ数の内訳は編集画面で見られます`
-              : 'まだ押されていません'}
+              ? `${topArea.taps.toLocaleString('ja-JP')}回・タップ数の内訳は編集画面で見られます`
+              : tapKpiReady
+                ? // ★V7：今月のタップが1回以上あるのに「まだ押されていません」と矛盾していた。
+                  (tapStats?.total ?? 0) > 0
+                  ? '内訳はまだ集まっていません'
+                  : 'まだ押されていません'
+                : tapKpiUnavailableText}
           </p>
         </div>
         <div className="bg-canvas rounded-card border-hairline border p-4">
@@ -565,131 +741,86 @@ export default function RichMenusListPage() {
 
       <div
         data-design="Bar"
-        className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3"
+        className="bg-canvas rounded-card border-hairline border p-3"
       >
-        <Link
-          href="/rich-menus/new"
-          className="bg-accent text-on-accent hover:bg-accent-hover rounded-control inline-flex items-center gap-1 px-4 py-2 text-sm font-medium transition-colors"
-        >
-          メニューを作る
-        </Link>
-        <button
-          onClick={() => setFolderDialogOpen(true)}
-          className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-4 py-2 text-sm font-medium transition-colors"
-        >
-          フォルダを追加
-        </button>
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="メニュー名で検索"
-          aria-label="メニュー名で検索"
-          className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+        <div className="flex flex-wrap items-center gap-2">
+          <Button href="/rich-menus/new" variant="primary">
+            ＋ メニューを作る
+          </Button>
+          <Button
+            onClick={() => {
+              // 並べ替え中は、実際の出し分け判定と同じ順番で全件を見せる。
+              setSortKey('priority')
+              setPage(1)
+              setReordering((v) => !v)
+            }}
+            aria-pressed={reordering}
+            variant={reordering ? 'primary' : 'secondary'}
+          >
+            {reordering ? '並び替えを終える' : '出す順番を変える'}
+          </Button>
+        </div>
+        {/*
+          ★V7 `Xn1Mz`：検索は幅320で1行目、2行目は左に絞り込み・
+          右端に並び順と表示件数。U015 の潰れ対策の意図はそのまま
+          （検索は320・下限240で折り返す）。
+        */}
+        <ListToolbar
+          search={{ placeholder: 'メニュー名・ボタン名で検索', value: query, onChange: setQuery }}
+          filters={
+            <>
+              <span className="text-ink-faint text-xs whitespace-nowrap">よく使う絞り込み</span>
+              {SAVED_FILTERS.map((f) => (
+                <FilterChip key={f.key} selected={savedFilter === f.key} onChange={() => setSavedFilter(savedFilter === f.key && f.key ? '' : f.key)}>
+                  {f.label}
+                </FilterChip>
+              ))}
+            </>
+          }
+          trailing={
+            <>
+              <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
+              <Select value={sortKey} onChange={(value) => setSortKey(value as SortKey)} aria-label="並び順" options={[{ value: "priority", label: "出す順番（自分で決めた順）" }, { value: "taps", label: "タップ数が多い順" }, { value: "updated", label: "更新が新しい順" }, { value: "name", label: "名前順" }]} />
+              <span className="text-ink-faint text-xs whitespace-nowrap">表示</span>
+              <Select
+                size="page-size"
+                value={String(pageSize)}
+                onChange={(value) => setPageSize(Number(value))}
+                aria-label="表示件数"
+                options={[{ value: '20', label: '20件表示' }, { value: '50', label: '50件表示' }, { value: '100', label: '100件表示' }]}
+              />
+            </>
+          }
         />
-        <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
-        <select
-          value={sortKey}
-          onChange={(e) => setSortKey(e.target.value as SortKey)}
-          aria-label="並び順"
-          className="border-hairline rounded-control focus:ring-accent border px-2 py-2 text-sm focus:ring-2 focus:outline-none"
-        >
-          <option value="priority">出す順番（自分で決めた順）</option>
-          <option value="taps">タップ数が多い順</option>
-          <option value="updated">更新が新しい順</option>
-          <option value="name">名前順</option>
-        </select>
-        <span className="text-ink-faint text-xs whitespace-nowrap">表示</span>
-        <select
-          value={pageSize}
-          onChange={(e) => setPageSize(Number(e.target.value))}
-          aria-label="表示件数"
-          className="border-hairline rounded-control focus:ring-accent border px-2 py-2 text-sm focus:ring-2 focus:outline-none"
-        >
-          {[20, 50, 100].map((n) => (
-            <option key={n} value={n}>
-              {n}件
-            </option>
-          ))}
-        </select>
-        <button
-          onClick={() => {
-            // 並べ替え中は、実際の出し分け判定と同じ順番で全件を見せる。
-            setSortKey('priority')
-            setPage(1)
-            setReordering((v) => !v)
-          }}
-          aria-pressed={reordering}
-          className={`rounded-control border px-4 py-2 text-sm font-medium transition-colors ${
-            reordering
-              ? 'border-accent bg-accent-soft text-ink'
-              : 'border-hairline text-ink-secondary hover:bg-canvas-sunken'
-          }`}
-        >
-          {reordering ? '並び替えを終える' : '出す順番を変える'}
-        </button>
+        {/* ★V7：緑の帯は「正常」と読めるので、並び順の横の注記にする。 */}
+        <p className="text-ink-faint mb-3 min-w-0 text-xs leading-relaxed">
+          上にあるものが優先されます。同じ友だちが複数のメニューに当てはまるときは、
+          いちばん上の1つだけが出ます。
+        </p>
       </div>
 
-      <div className="bg-accent-soft text-ink-secondary mb-3 rounded-control px-3 py-2 text-xs leading-relaxed">
-        <span className="font-semibold">出す順番：</span>
-        上にあるメニューが優先されます。同じ友だちが複数の条件に当てはまるときは、
-        いちばん上の1つだけが表示されます。
-      </div>
 
+      {/*
+        ★V7：「保存した検索」と書いていたが、中身は状態の絞り込み。保存はできないので名前を合わせる。
+        「管理画面の外」は絞り込みではなく別の画面を開く操作なので、札の列から出して枠つきボタンにする。
+      */}
       <div data-design="Saved" className="mb-3 flex flex-wrap items-center gap-2">
-        <span className="text-ink-faint text-xs whitespace-nowrap">保存した条件</span>
-        {SAVED_FILTERS.map((f) => {
-          const on = savedFilter === f.key
-          return (
-            <button
-              key={f.key}
-              onClick={() => setSavedFilter(on ? '' : f.key)}
-              aria-pressed={on}
-              title={f.note}
-              className={`rounded-pill border px-3 py-1 text-xs transition-colors ${
-                on
-                  ? 'border-accent bg-accent-soft text-ink'
-                  : 'border-hairline text-ink-secondary hover:bg-canvas-sunken'
-              }`}
-            >
-              {f.label}
-            </button>
-          )
-        })}
+        <span className="text-ink-faint text-xs whitespace-nowrap">よく使う絞り込み</span>
+        {SAVED_FILTERS.map((f) => (
+          <FilterChip key={f.key} selected={savedFilter === f.key} onChange={() => setSavedFilter(savedFilter === f.key && f.key ? '' : f.key)}>
+            {f.label}
+          </FilterChip>
+        ))}
+        <span className="ml-auto">
+          <Button data-qa-open="TL7tp" onClick={() => setShowExternal(true)} title="LINEの画面で直接作ったメニューを見て、取り込めます">
+            管理画面の外のメニュー
+          </Button>
+        </span>
       </div>
 
       {!selectedAccount && (
         <div className="text-sm text-ink-faint">
           アカウントを選択してください。
-        </div>
-      )}
-
-      {selectedAccount && loading && (
-        <div className="text-sm text-ink-faint">読み込み中...</div>
-      )}
-
-      {selectedAccount && !loading && error && (
-        <div className="bg-danger-bg border border-danger-bg text-danger text-sm p-3 rounded mb-4">
-          <p>{error}</p>
-          <button type="button" className="mt-2 underline" onClick={() => void reload()}>
-            もう一度読み込む
-          </button>
-        </div>
-      )}
-
-      {/* LINE 公式アカウントの現状 (admin 管理外の rich menu も含む) */}
-      {selectedAccount && !loading && external && (
-        <ExternalSection
-          accountId={selectedAccount.id}
-          accountName={selectedAccount.displayName || selectedAccount.name}
-          external={external}
-          onDeleteExternal={handleDeleteExternal}
-          onImport={handleImport}
-        />
-      )}
-      {selectedAccount && !loading && externalError && (
-        <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs p-3 rounded mb-6">
-          {externalError}
         </div>
       )}
 
@@ -703,45 +834,25 @@ export default function RichMenusListPage() {
         />
       )}
 
-      {/* Admin 管理メニュー見出し */}
-      {selectedAccount && !loading && !error && (
-        <h2 className="text-sm font-semibold text-ink-secondary mb-3">
-          管理画面で作成・編集するメニュー
-        </h2>
-      )}
-
-      {selectedAccount && !loading && !error && shownGroups.length === 0 && (
-        <div className="bg-white border border-hairline rounded-lg shadow-sm p-12 text-center">
-          <p className="text-ink-faint mb-4">
-            まだリッチメニューが作成されていません。
-          </p>
-          <Link
-            href="/rich-menus/new"
-            className="bg-accent text-on-accent transition-colors hover:bg-accent-hover inline-flex items-center gap-1 rounded-control px-4 py-2 text-sm font-medium"
-          >
-            <span className="text-lg leading-none">+</span> 最初のメニューを作る
-          </Link>
-        </div>
-      )}
-
-      {selectedAccount && !loading && !error && (
-        <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
+      {selectedAccount && (
+        <div style={FOLDER_RAIL_STYLE} className="grid gap-4 lg:grid-cols-[var(--folder-rail-width)_minmax(0,1fr)]">
           <FolderPanel
-            total={`${groups.length} 件`}
+            /* 見出しの総数は「すべて」の行と同じ数なので出さない（件数の重ね書きをやめる）。 */
             activeId={folderFilter}
             onSelect={setFolderFilter}
+            onAddFolder={() => setFolderDialogOpen(true)}
             rows={[
-              { id: '', label: 'すべて', count: groups.length },
+              { id: '', label: 'すべて', count: groupFacets?.total ?? groupTotal },
               ...folders.map((f) => ({
                 id: f.id,
                 label: f.name,
-                count: groups.filter((g) => g.folderId === f.id).length,
+                count: groupFacets?.folderCounts[f.id] ?? 0,
                 color: f.color,
               })),
               {
                 id: UNFILED,
                 label: '未分類',
-                count: groups.filter((g) => !g.folderId).length,
+                count: groupFacets?.folderCounts[UNFILED] ?? 0,
               },
             ]}
           >
@@ -749,142 +860,156 @@ export default function RichMenusListPage() {
               フォルダを消しても、入っていたメニューは未分類として残ります。
             </p>
           </FolderPanel>
+          <div className="min-w-0">
+            {loading ? (
+              <ListState kind="loading" title="読み込んでいます" description="このまま少しお待ちください。" />
+            ) : error ? (
+              <ListState
+                kind="error"
+                title="表示できませんでした"
+                description="再読み込みしても直らないときは、エラー報告へお知らせください。"
+                onRetry={() => void reload()}
+              />
+            ) : shownGroups.length === 0 ? (
+              richMenuFilterActive ? (
+                /* R173: 検索・絞り込み・フォルダの結果0件。元データ0件と分け、条件を外す口を出す。 */
+                <ListState
+                  kind="empty"
+                  emptyPreset="filtered"
+                  action={<Button variant="secondary" onClick={clearRichMenuFilters}>条件をクリア</Button>}
+                />
+              ) : (
+                <ListState
+                  kind="empty"
+                  title="まだリッチメニューがありません"
+                  description="トークの下に出すメニューを作れます。"
+                  action={<Button href="/rich-menus/new" variant="primary">＋ メニューを作る</Button>}
+                />
+              )
+            ) : (
+              <section className="border-hairline bg-canvas rounded-card overflow-hidden border shadow-card">
+                {/* #641: 操作列が広くなった分は表だけが横に流れる */}
+                <div className="overflow-x-auto">
+                <table className="w-full min-w-[760px] table-fixed text-left text-sm">
+                  <colgroup>
+                    {/*
+                      操作列はボタン幅で固定し、残りはメニューの列で吸収する。
+                      26%にすると右に余白が残り、枠にくっついて見える。
+                    */}
+                    <col style={{ width: '24%' }} />
+                    <col style={{ width: '12%' }} />
+                    <col style={{ width: '17%' }} />
+                    <col style={{ width: '12%' }} />
+                    <col style={{ width: '9%' }} />
+                    <col style={{ width: '12rem' }} />
+                  </colgroup>
+                  <thead>
+                    <TableHeadRow>
+                      <Th className="pl-5">メニュー</Th>
+                      <Th>状態</Th>
+                      <Th>誰に出るか</Th>
+                      <Th align="right">今月のタップ</Th>
+                      <Th>更新</Th>
+                      {/* 表が横に流れる帯でも操作列は右端に留める。 */}
+                      <Th className="bg-canvas-sunken sticky right-0 pr-5">操作</Th>
+                    </TableHeadRow>
+                  </thead>
+                  <tbody className="divide-hairline divide-y">
+                    {shownGroups.map((g) => (
+                      <tr key={g.id} className="h-[76px] align-middle">
+                        <td className="py-3 pr-4 pl-5">
+                          <div className="flex items-center gap-2">
+                            {reordering ? (
+                              <div className="flex shrink-0 gap-1">
+                                <button type="button" onClick={() => void moveGroup(g, -1)} disabled={reorderBusy} aria-label={`${g.name}を上へ`} className="border-hairline rounded-control border px-1.5 py-1 text-xs disabled:opacity-40">↑</button>
+                                <button type="button" onClick={() => void moveGroup(g, 1)} disabled={reorderBusy} aria-label={`${g.name}を下へ`} className="border-hairline rounded-control border px-1.5 py-1 text-xs disabled:opacity-40">↓</button>
+                              </div>
+                            ) : null}
+                            <div className="min-w-0">
+                              <Link href={`/rich-menus/edit?id=${g.id}`} className="text-ink block truncate font-semibold hover:underline" title={g.name}>{g.name}</Link>
+                              <p className="text-ink-faint mt-1 truncate text-xs" title={g.chatBarText}>
+                                {g.size === 'large'
+                                  ? `大 ${RICH_MENU_DIMENSIONS.large.width} × ${RICH_MENU_DIMENSIONS.large.height}px`
+                                  : `小 ${RICH_MENU_DIMENSIONS.compact.width} × ${RICH_MENU_DIMENSIONS.compact.height}px`}・ボタン「{g.chatBarText}」
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <MenuStatusBadge group={g} />
+                        </td>
+                        <td className="px-4 py-3 text-xs text-ink-secondary">
+                          {g.isDefaultForAll ? 'すべての友だち（既定）' : g.targetingEnabled && g.targetingCondition ? '条件で出し分け' : g.status === 'draft' ? '公開前' : 'すべての友だち'}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <p className="text-ink font-semibold tabular-nums">
+                            {g.monthlyStats
+                              ? `${g.monthlyStats.taps.toLocaleString('ja-JP')}回`
+                              : tapStats
+                                ? `${(tapsByGroup.get(g.id) ?? 0).toLocaleString('ja-JP')}回`
+                                : '—'}
+                          </p>
+                          <p className="text-ink-faint mt-1 text-micro">
+                            {g.monthlyStats?.uniqueAudience.value == null
+                              ? 'のべ人数は未取得'
+                              : `のべ${g.monthlyStats.uniqueAudience.value.toLocaleString('ja-JP')}人${g.monthlyStats.uniqueAudience.state === 'partial' ? '（記録開始後）' : ''}`}
+                          </p>
+                        </td>
+                        <td className="px-4 py-3 text-xs text-ink-secondary tabular-nums">
+                          {new Date(g.updatedAt).toLocaleDateString('ja-JP', { month: 'long', day: 'numeric' })}
+                        </td>
+                        <td className="bg-canvas sticky right-0 py-3 pr-5 pl-4">
+                          {/*
+                            ★V7 `Xn1Mz`：行の操作は「主な1つ（編集）＋…」。
+                            削除はメニューの中の危ない操作へ。ゴミ箱のアイコン
+                            だけのボタンは行に直に置かない。撮影口（szXsT）は
+                            「…」ボタンへ移す（2段操作の1段目）。
+                          */}
+                          <div className="relative flex w-full items-center justify-end gap-1.5">
+                            <RowActions
+                              subjectName={g.name}
+                              edit={{ href: `/rich-menus/edit?id=${g.id}` }}
+                              menuItems={[
+                                ...(g.status === 'published'
+                                  ? [{ id: 'apply', label: '表示先', onSelect: () => setApplyTo(g) }]
+                                  : []),
+                                {
+                                  id: 'duplicate',
+                                  label: '複製',
+                                  onSelect: () => { setDuplicateError(null); setDuplicateTarget(g) },
+                                },
+                                {
+                                  id: 'connections',
+                                  label: '切替のつながりを見る',
+                                  onSelect: () => router.push(`/rich-menus/connections?id=${encodeURIComponent(g.id)}`),
+                                },
+                              ]}
+                              destructiveItem={{
+                                id: 'delete',
+                                label: '削除する',
+                                onSelect: () => handleDelete(g),
+                              }}
+                              menuButtonProps={{ 'data-qa-open': g.status === 'published' ? 'szXsT' : 'szXsT-draft' }}
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                </div>
+              </section>
+            )}
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {shownGroups.map((g) => (
-            <div
-              key={g.id}
-              className="bg-white border border-hairline rounded-lg shadow-sm hover:shadow-md transition-shadow flex flex-col"
-            >
-              <Link
-                href={`/rich-menus/edit?id=${g.id}`}
-                className="flex-1 hover:bg-canvas-sunken rounded-t-lg overflow-hidden"
-              >
-                {/* thumbnail */}
-                <div
-                  className="w-full bg-canvas-sunken border-b border-hairline"
-                  style={{
-                    aspectRatio: g.size === 'large' ? '2500 / 1686' : '2500 / 843',
-                  }}
-                >
-                  {g.thumbnailR2Key ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={api.richMenuGroups.imageUrl(g.thumbnailR2Key)}
-                      alt={g.name}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-xs text-ink-faint">
-                      画像未設定
-                    </div>
-                  )}
-                </div>
-                <div className="p-5">
-                  <div className="flex items-start justify-between mb-2 gap-2">
-                    <h2 className="font-semibold text-ink truncate">{g.name}</h2>
-                    <StatusBadge status={g.status} />
-                  </div>
-                  <p className="text-sm text-ink-faint truncate">
-                    トーク表示: <span className="text-ink-secondary">{g.chatBarText}</span>
-                  </p>
-                  <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-ink-faint">
-                    <span className="whitespace-nowrap">
-                      出す順番 {priorityRankByGroup.get(g.id) ?? '—'}番
-                    </span>
-                    <span className="whitespace-nowrap">
-                      サイズ: {g.size === 'large' ? '2500×1686' : '2500×843'}
-                    </span>
-                    {tapStats && (
-                      <span className="whitespace-nowrap">
-                        今月 <span className="text-ink-secondary tabular-nums">
-                          {tapsByGroup.get(g.id) ?? 0}
-                        </span> 回
-                      </span>
-                    )}
-                    {g.targetingEnabled && g.targetingCondition && (
-                      <span className="text-accent font-medium whitespace-nowrap">条件で出し分け</span>
-                    )}
-                    {g.isDefaultForAll && (
-                      <span className="text-blue-600 font-medium whitespace-nowrap">
-                        ★ 全員のデフォルト
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </Link>
-              {reordering && (
-                <div className="border-hairline bg-canvas-sunken flex items-center justify-between gap-2 border-t px-4 py-2">
-                  <span className="text-ink-faint text-[11px]">
-                    出す順番 {priorityRankByGroup.get(g.id) ?? '—'}番
-                  </span>
-                  <div className="flex gap-1.5">
-                    <button
-                      onClick={() => void moveGroup(g, -1)}
-                      disabled={reorderBusy}
-                      className="border-hairline rounded-control hover:bg-canvas border px-2 py-0.5 text-xs disabled:opacity-40"
-                      aria-label="上へ"
-                    >
-                      ↑
-                    </button>
-                    <button
-                      onClick={() => void moveGroup(g, 1)}
-                      disabled={reorderBusy}
-                      className="border-hairline rounded-control hover:bg-canvas border px-2 py-0.5 text-xs disabled:opacity-40"
-                      aria-label="下へ"
-                    >
-                      ↓
-                    </button>
-                  </div>
-                </div>
-              )}
-              <div className="border-t border-hairline px-4 py-2.5 flex justify-end gap-4 text-xs">
-                {g.status === 'published' && (
-                  <button
-                    onClick={() => setApplyTo(g)}
-                    className="text-accent font-medium hover:underline"
-                  >
-                    友だちに表示
-                  </button>
-                )}
-                <Link
-                  href={`/rich-menus/edit?id=${g.id}`}
-                  className="text-ink-secondary hover:underline"
-                >
-                  編集
-                </Link>
-                <Link
-                  href={`/rich-menus/connections?id=${encodeURIComponent(g.id)}`}
-                  className="text-ink-secondary hover:underline"
-                >
-                  切替のつながりを見る
-                </Link>
-                <button
-                  onClick={() => handleDelete(g)}
-                  data-qa-open={g.status === 'published' ? 'szXsT-published' : 'szXsT'}
-                  className="text-ink-faint hover:text-red-600 hover:underline"
-                  title={g.status === 'published' ? 'LINE から取り下げてから削除' : '削除'}
-                >
-                  削除
-                </button>
+            {!loading && !error && groupTotal > 0 ? (
+              <div className="mt-4 flex items-center justify-between gap-4">
+                <p>
+                  <ListRange total={groupTotal} first={(currentPage - 1) * effectivePageSize + 1} last={Math.min(currentPage * effectivePageSize, groupTotal)} />
+                </p>
+                <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} ariaLabel="リッチメニューのページ送り" />
               </div>
-            </div>
-          ))}
+            ) : null}
           </div>
-        </div>
-      )}
-
-      {selectedAccount && !loading && !error && sorted.length > 0 && (
-        <div className="mt-4 flex items-center justify-between gap-4">
-          <p className="text-ink-faint text-xs">
-            {(currentPage - 1) * pageSize + 1}〜{Math.min(currentPage * pageSize, sorted.length)}件 / 全{sorted.length}件
-          </p>
-          <Pagination
-            page={currentPage}
-            pageCount={pageCount}
-            onPageChange={setPage}
-            ariaLabel="リッチメニューのページ送り"
-          />
         </div>
       )}
 
@@ -895,6 +1020,26 @@ export default function RichMenusListPage() {
           onClose={() => setApplyTo(null)}
         />
       )}
+
+      {/* N-154: 一覧から複製。名前・ボタン・画像・出し分けを写した下書きを作る。 */}
+      <ConfirmDialog
+        open={duplicateTarget !== null}
+        title={
+          duplicateTarget
+            ? `「${duplicateTarget.name}」を複製しますか？`
+            : 'リッチメニューを複製しますか？'
+        }
+        description="名前・画像・ボタン・出し分けの設定を写した下書きを新しく作ります。LINE上の表示は変わりません。"
+        confirmLabel="下書きとして複製する"
+        busy={duplicateBusy}
+        error={duplicateError ?? undefined}
+        onCancel={() => {
+          if (duplicateBusy) return
+          setDuplicateTarget(null)
+          setDuplicateError(null)
+        }}
+        onConfirm={() => void confirmDuplicate()}
+      />
 
       <ConfirmDialog
         open={importTarget !== null}
@@ -940,37 +1085,8 @@ export default function RichMenusListPage() {
             : '管理画面に取り込みました'
         }
         description="LINE上の表示は変更していません。管理画面で編集できるようになりました。"
-        cancelLabel="閉じる"
         onCancel={() => setImportedMenuName(null)}
       />
-
-      <ConfirmDialog
-        open={publishedDeleteTarget !== null}
-        designNode="szXsT"
-        title={
-          publishedDeleteTarget
-            ? `「${publishedDeleteTarget.name}」は先にLINEから取り下げてください`
-            : '先にLINEから取り下げてください'
-        }
-        description="LINEに登録中のリッチメニューは、管理画面だけから削除できません。いまは削除していません。"
-        cancelLabel="閉じる"
-        onCancel={() => setPublishedDeleteTarget(null)}
-      >
-        <ol className="space-y-2 text-sm text-ink-secondary">
-          <li>
-            <strong className="text-ink">次にすること：</strong>
-            「編集」→「危険な操作」→「LINEから取り下げ」の順に進んでください。
-          </li>
-          <li>
-            <strong className="text-ink">そのあと：</strong>
-            一覧へ戻り、改めて「削除」を選んでください。
-          </li>
-          <li>
-            <strong className="text-ink">いま残っているもの：</strong>
-            LINE上の表示、管理画面の設定、これまでのタップ記録は変更していません。
-          </li>
-        </ol>
-      </ConfirmDialog>
 
       <ConfirmDialog
         open={deleteTarget !== null}
@@ -982,11 +1098,13 @@ export default function RichMenusListPage() {
         }
         description={
           deleteTarget?.kind === 'managed'
-            ? '管理画面に保存したこのリッチメニューを削除します。LINEに登録中のメニューは、先に取り下げない限り削除できません。'
+            ? deleteTarget.group.status === 'published'
+              ? 'いま表示中の人と使用先を確認し、まずLINEから取り下げます。取り下げても管理画面の設定は残ります。'
+              : '管理画面に保存したこのリッチメニューを削除します。元には戻せません。'
             : 'この管理画面外で作成されたリッチメニューを、LINE公式アカウントから削除します。'
         }
-        confirmLabel={deleteTarget?.kind === 'external' ? 'LINEから削除' : '削除する'}
-        destructive
+        confirmLabel={deleteTarget?.kind === 'external' ? 'LINEから削除' : deleteTarget?.kind === 'managed' && deleteTarget.group.status === 'published' ? 'LINEから取り下げる' : '削除する'}
+        destructive={deleteTarget?.kind === 'external' || (deleteTarget?.kind === 'managed' && deleteTarget.group.status === 'draft')}
         busy={deleteBusy}
         error={deleteError ?? undefined}
         onCancel={() => {
@@ -999,7 +1117,7 @@ export default function RichMenusListPage() {
           setImpact(null)
           setImpactPhase('idle')
         }}
-        {...(deleteTarget?.kind === 'external' || canDeleteImpact({ impact, busy: deleteBusy })
+        {...(deleteTarget?.kind === 'external' || (deleteTarget?.kind === 'managed' && deleteTarget.group.status === 'published') || canDeleteImpact({ impact, busy: deleteBusy })
           ? { onConfirm: () => void confirmDelete() }
           : {})}
       >
@@ -1007,16 +1125,19 @@ export default function RichMenusListPage() {
           <>
             <ul className="space-y-2 text-sm text-ink-secondary">
               <li>
-                <strong className="text-ink">消えるもの：</strong>
-                このリッチメニューの設定と画像
+                <strong className="text-ink">{deleteTarget.group.status === 'published' ? '取り下げるもの：' : '消えるもの：'}</strong>
+                {deleteTarget.group.status === 'published' ? 'LINE上のこのリッチメニュー' : 'このリッチメニューの設定と画像'}
               </li>
               <li>
                 <strong className="text-ink">残るもの：</strong>
-                同じフォルダのほかのメニューと、これまでのタップ記録
+                {deleteTarget.group.status === 'published' ? '管理画面の設定と、これまでのタップ記録' : '同じフォルダのほかのメニューと、これまでのタップ記録'}
               </li>
-              <li>
-                <strong className="text-danger">元に戻せません。</strong>
-              </li>
+              {deleteTarget.group.status === 'draft' ? <li>
+                 <strong className="text-danger">元に戻せません。</strong>
+              </li> : <>
+                <li><strong className="text-ink">取り下げは、もう一度公開すれば戻せます。</strong></li>
+                <li>取り下げたあと、管理画面から削除できます。</li>
+              </>}
             </ul>
             {/*
               消したあとに何が起きるか（契約 #608）。読込・失敗・通常を
@@ -1082,191 +1203,138 @@ export default function RichMenusListPage() {
           </ul>
         )}
       </ConfirmDialog>
-    </main>
+    </div>
   )
 }
 
-function ExternalSection({
-  accountId,
-  accountName,
+function ExternalImportWorkspace({
   external,
-  onDeleteExternal,
+  loading,
+  error,
+  onBack,
+  onReload,
   onImport,
 }: {
-  accountId: string
-  accountName: string
-  external: { currentDefault: string | null; lineMenus: LineMenu[] }
-  onDeleteExternal: (menu: LineMenu) => void
+  external: { currentDefault: string | null; lineMenus: LineMenu[] } | null
+  loading: boolean
+  error: string | null
+  onBack: () => void
+  onReload: () => void
   onImport: (menu: LineMenu) => void
 }) {
-  const { currentDefault, lineMenus } = external
-  const sortedMenus = [...lineMenus].sort((a, b) => {
-    // 現在のデフォルトを先頭、次に admin 管理外、最後に admin 管理
-    if (a.isCurrentDefault) return -1
-    if (b.isCurrentDefault) return 1
-    if (a.adminManaged !== b.adminManaged) return a.adminManaged ? 1 : -1
-    return a.name.localeCompare(b.name)
-  })
-  const currentDefaultMenu = lineMenus.find((m) => m.isCurrentDefault) ?? null
-  const unmanagedCount = lineMenus.filter((m) => !m.adminManaged).length
+  const unmanaged = external?.lineMenus.filter((menu) => !menu.adminManaged) ?? []
+  const [selectedId, setSelectedId] = useState(unmanaged[0]?.richMenuId ?? '')
+  const selected = unmanaged.find((menu) => menu.richMenuId === selectedId) ?? unmanaged[0] ?? null
+  const areas = selected ? Array.from({ length: Math.min(selected.areasCount, 6) }, (_, index) => String.fromCharCode(65 + index)) : []
 
   return (
-    <section className="mb-8 bg-white border border-hairline rounded-lg shadow-sm p-5">
-      <div className="flex items-baseline justify-between gap-3 mb-3">
-        <h2 className="text-sm font-semibold text-ink">
-          LINE 公式アカウントの現状
-        </h2>
-        <span className="text-xs text-ink-faint truncate">{accountName}</span>
+    <div data-design-node="TL7tp" className="mx-auto flex max-w-[1584px] flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <nav className="text-ink-faint text-xs">
+          <button type="button" className="text-action hover:underline" onClick={onBack}>リッチメニュー</button>
+          <span className="mx-2">›</span>
+          <span>管理画面の外のメニュー</span>
+        </nav>
+        <Button type="button" onClick={onReload}>↻ LINEから読み直す</Button>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4 text-sm">
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-          <div className="text-xs text-blue-700 font-medium mb-0.5">
-            現在の「全員のデフォルト」
-          </div>
-          {currentDefaultMenu ? (
-            <div>
-              <div className="font-medium text-ink truncate">
-                {currentDefaultMenu.name}
+      {loading ? <ListState kind="loading" title="LINEのメニューを読み込んでいます" /> : null}
+      {!loading && error && !external ? <ListState kind="error" title="LINEのメニューを表示できませんでした" onRetry={onReload} /> : null}
+      {!loading && !error && unmanaged.length === 0 ? (
+        <div className="bg-canvas rounded-card border-hairline border">
+          <ListState kind="empty" title="管理画面の外のメニューはありません" description="LINE側だけにあるメニューが見つかると、ここに表示します。" />
+        </div>
+      ) : null}
+
+      {!loading && unmanaged.length > 0 ? (
+        <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_430px]">
+          <div className="space-y-4">
+            <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <h2 className="text-ink text-sm font-bold">LINE側にあって、この管理画面に無いメニュー</h2>
+                <span className="text-ink-faint text-xs">{unmanaged.length}件</span>
               </div>
-              {currentDefaultMenu.adminInfo ? (
-                <div className="text-xs text-ink-secondary truncate">
-                  管理画面: {currentDefaultMenu.adminInfo.groupName}
-                </div>
-              ) : (
-                <div className="text-xs text-amber-700">管理画面外で設定</div>
-              )}
-            </div>
-          ) : (
-            <div className="text-ink-faint text-xs">設定なし</div>
-          )}
-          {currentDefault && (
-            <div className="text-[10px] text-ink-faint font-mono mt-1 truncate">
-              {currentDefault}
-            </div>
-          )}
-        </div>
-        <div className="bg-canvas-sunken border border-hairline rounded-lg p-3">
-          <div className="text-xs text-ink-secondary font-medium mb-0.5">
-            LINE 上に登録されているメニュー
-          </div>
-          <div className="font-medium text-ink">{lineMenus.length} 個</div>
-          {unmanagedCount > 0 && (
-            <div className="text-xs text-amber-700">
-              うち {unmanagedCount} 個が管理画面外
-            </div>
-          )}
-        </div>
-      </div>
-
-      {lineMenus.length === 0 ? (
-        <div className="text-xs text-ink-faint py-3">
-          LINE 公式アカウントにはまだ rich menu が登録されていません。
-        </div>
-      ) : (
-        <div className="border border-hairline rounded-lg overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-canvas-sunken">
-              <tr className="text-left text-xs font-medium text-ink-secondary">
-                <th className="px-3 py-2 w-[88px]">画像</th>
-                <th className="px-3 py-2">名前</th>
-                <th className="px-3 py-2">サイズ</th>
-                <th className="px-3 py-2">管理状態</th>
-                <th className="px-3 py-2 w-px"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {sortedMenus.map((m) => (
-                <tr key={m.richMenuId} className="text-ink-secondary">
-                  <td className="px-3 py-2.5">
-                    <div
-                      className="w-20 bg-canvas-sunken rounded overflow-hidden"
-                      style={{
-                        aspectRatio:
-                          m.size.width === 2500 && m.size.height === 1686
-                            ? '2500 / 1686'
-                            : m.size.width === 2500 && m.size.height === 843
-                              ? '2500 / 843'
-                              : `${m.size.width} / ${m.size.height}`,
-                      }}
+              <div className="space-y-2">
+                {unmanaged.map((menu) => {
+                  const active = selected?.richMenuId === menu.richMenuId
+                  return (
+                    <button
+                      key={menu.richMenuId}
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() => setSelectedId(menu.richMenuId)}
+                      className={`border-hairline grid w-full grid-cols-[48px_minmax(0,1fr)_auto] items-center gap-3 rounded-control border p-3 text-left sm:grid-cols-[48px_minmax(0,1fr)_100px_110px_120px] ${active ? 'border-accent bg-accent-soft' : 'bg-canvas hover:bg-canvas-sunken'}`}
                     >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={api.richMenuGroups.externalImageUrl(m.richMenuId, accountId)}
-                        alt={m.name}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                      />
-                    </div>
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <div className="flex items-center gap-2 mb-1">
-                      {m.isCurrentDefault && (
-                        <span
-                          className="text-[10px] font-bold text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded"
-                          title="LINE 公式アカウントの全員のデフォルト"
-                        >
-                          DEFAULT
+                      <span className="bg-canvas-sunken text-ink-faint flex h-10 items-center justify-center rounded-control">▧</span>
+                      <span className="min-w-0"><strong className="text-ink block truncate text-sm">{menu.name || '名前なし'}</strong><span className="text-ink-faint block truncate text-xs">{menu.areasCount}面・切替なし・画像あり</span></span>
+                      <span className="text-ink hidden text-sm font-bold sm:block">—<small className="text-ink-faint block text-micro font-normal">今月</small></span>
+                      <span className="text-ink-secondary hidden text-xs sm:block">作成日不明</span>
+                      <span className="border-action text-action justify-self-end rounded-control border px-3 py-2 text-xs font-bold whitespace-nowrap">取り込む</span>
+                    </button>
+                  )
+                })}
+              </div>
+            </section>
+
+            <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card">
+              <h2 className="text-ink mb-3 text-sm font-bold">取り込むと、できるようになること</h2>
+              <ul className="space-y-3 text-xs text-ink-secondary">
+                <li>✓ 面ごとのボタンを、この画面から書き換えられます</li>
+                <li>✓ 「誰に出すか」の条件を付けられます（いまは全員に出ています）</li>
+                <li>✓ 面ごとのタップ数が取れるようになります</li>
+              </ul>
+              <Notice tone="info" className="mt-4">ⓘ 取り込んでも、お客さまに出ているメニューは変わりません。中身をこちらで持つようになるだけです。</Notice>
+            </section>
+          </div>
+
+          {selected ? (
+            <aside className="space-y-4">
+              <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card">
+                <h2 className="text-ink text-sm font-bold">選んだメニューの中身</h2>
+                <p className="text-ink mt-3 text-sm font-semibold">{selected.name || '名前なし'}</p>
+                <div className="border-hairline bg-canvas-sunken mt-3 grid grid-cols-3 overflow-hidden rounded-control border" style={{ aspectRatio: `${selected.size.width} / ${selected.size.height}` }}>
+                  {areas.map((area) => <span key={area} className="border-hairline text-ink-faint flex items-center justify-center border text-xs font-bold">{area}</span>)}
+                </div>
+                <h3 className="text-ink-secondary mt-3 text-xs font-bold">面ごとの動き（LINEから読んだもの）</h3>
+                {selected.areas?.length ? (
+                  <ul className="mt-2 space-y-2 text-xs">
+                    {selected.areas.slice(0, 6).map((area, index) => (
+                      <li key={`${selected.richMenuId}-${index}`} className="border-hairline grid grid-cols-[24px_minmax(0,1fr)] gap-2 rounded-control border p-2">
+                        <strong className="text-ink">{String.fromCharCode(65 + index)}</strong>
+                        <span className={area.action.supported ? 'text-ink-secondary break-words' : 'text-danger break-words'}>
+                          {externalActionText(area.action)}
                         </span>
-                      )}
-                      <span className="font-medium truncate max-w-[180px]">{m.name}</span>
-                    </div>
-                    <div className="text-[11px] text-ink-faint truncate max-w-[200px]">
-                      {m.chatBarText}
-                    </div>
-                    <div className="text-[10px] text-ink-faint font-mono truncate max-w-[280px]">
-                      {m.richMenuId}
-                    </div>
-                  </td>
-                  <td className="px-3 py-2.5 text-xs text-ink-secondary whitespace-nowrap">
-                    {m.size.width}×{m.size.height}
-                    <div className="text-[10px] text-ink-faint">{m.areasCount} エリア</div>
-                  </td>
-                  <td className="px-3 py-2.5 text-xs">
-                    {m.adminManaged && m.adminInfo ? (
-                      <Link
-                        href={`/rich-menus/edit?id=${m.adminInfo.groupId}`}
-                        className="text-ink-secondary hover:underline"
-                      >
-                        管理画面 → {m.adminInfo.groupName}
-                        <span className="text-ink-faint ml-1">({m.adminInfo.pageName})</span>
-                      </Link>
-                    ) : (
-                      <span
-                        className="text-amber-700 font-medium"
-                        title="LINE 公式マネージャー、または旧 MCP/CLI から作成された可能性"
-                      >
-                        管理画面外
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2.5 text-right whitespace-nowrap">
-                    {!m.adminManaged && (
-                      <div className="flex flex-col items-end gap-1">
-                        <button
-                          onClick={() => onImport(m)}
-                          data-qa-open="TL7tp"
-                          className="text-accent text-xs font-medium hover:underline"
-                          title="管理画面に取り込んで以後 UI で操作可能にする"
-                        >
-                          管理画面に取り込む
-                        </button>
-                        <button
-                          onClick={() => onDeleteExternal(m)}
-                          className="text-xs text-ink-faint hover:text-red-600 hover:underline"
-                          title="LINE から削除 (管理画面外メニューのみ)"
-                        >
-                          LINE から削除
-                        </button>
-                      </div>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-ink-faint mt-2 text-xs leading-5">LINEから面ごとの動きを取得できませんでした。読み直してから取り込んでください。</p>
+                )}
+                <Button type="button" variant="primary" className="mt-4" onClick={() => onImport(selected)}>この内容で取り込む</Button>
+              </section>
+              <Notice tone="warn">
+                <h2 className="mb-1 text-xs font-bold">気をつけること</h2>
+                <p className="text-xs">・LINE側で作られたメニューは、名前が無いことがあります</p>
+                <p className="text-xs">・取り込まずに「LINEから削除」すると、お客さまのメニューがすぐ消えます</p>
+              </Notice>
+            </aside>
+          ) : null}
         </div>
-      )}
-    </section>
+      ) : null}
+    </div>
   )
+}
+
+function externalActionText(action: NonNullable<LineMenu['areas']>[number]['action']): string {
+  if (!action.supported) return `未対応の動き（${action.type || '種類不明'}）`
+  if (action.type === 'uri' && action.url) return `URLを開く（${action.url}）`
+  if (action.type === 'message' && action.text) return `メッセージを送る「${action.text}」`
+  if (action.type === 'postback') {
+    return action.displayText ? `操作を実行して「${action.displayText}」と表示` : '操作を実行'
+  }
+  if (action.type === 'richmenuswitch' && action.richMenuAliasId) {
+    return `別のメニューへ切り替える（${action.richMenuAliasId}）`
+  }
+  return `未対応の動き（${action.type || '種類不明'}）`
 }

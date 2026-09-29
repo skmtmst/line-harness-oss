@@ -18,6 +18,7 @@ import {
 } from '../services/identity-candidates.js';
 import { detectFriendDuplicateCandidates } from '../services/friend-duplicate-candidates.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
+import { getFriendProfileCandidates } from '../services/friend-profile-candidates.js';
 
 const KINDS = new Set<IdentityCandidateKind>(['friend_duplicate', 'ec_member']);
 const STATUSES = new Set<IdentityCandidateStatus>([
@@ -74,12 +75,46 @@ function parseDecisionBody(value: unknown): DecideIdentityCandidateRequest {
       to: typeof value.reprocess.to === 'string' ? value.reprocess.to : null,
     };
   }
+  let profileSelections: DecideIdentityCandidateRequest['profileSelections'];
+  if (value.profileSelections !== undefined) {
+    if (!Array.isArray(value.profileSelections) || value.profileSelections.length > 100) {
+      throw new IdentityCandidateError(422, 'INVALID_PROFILE_SELECTIONS', 'プロフィールの採用値を確認できません');
+    }
+    profileSelections = value.profileSelections.map((raw) => {
+      if (!isRecord(raw)
+          || typeof raw.fieldKey !== 'string'
+          || !/^[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,99}$/.test(raw.fieldKey)
+          || typeof raw.sourceFriendId !== 'string'
+          || (raw.updateMode !== 'auto' && raw.updateMode !== 'fixed')) {
+        throw new IdentityCandidateError(422, 'INVALID_PROFILE_SELECTION', 'プロフィールの採用値を確認できません');
+      }
+      return {
+        fieldKey: raw.fieldKey,
+        sourceFriendId: raw.sourceFriendId,
+        updateMode: raw.updateMode,
+      };
+    });
+  }
   return {
     expectedVersion: Number(value.expectedVersion),
     decision: value.decision,
     reason: value.reason,
     ...(reprocess ? { reprocess } : {}),
+    ...(profileSelections ? { profileSelections } : {}),
   };
+}
+
+async function friendDuplicateDetail(c: Context<Env>, id: string) {
+  const data = await getIdentityCandidate(c.env.DB, tenantId(c), id);
+  if (data.kind !== 'friend_duplicate') {
+    throw new IdentityCandidateError(404, 'CANDIDATE_NOT_FOUND', '重複候補が見つかりません');
+  }
+  const accountIds = await candidateAccountIds(c.env.DB, tenantId(c), data.id);
+  if (!await canAccessAllLineAccounts(c.env.DB, getStaff(c), accountIds)) {
+    throw new IdentityCandidateError(404, 'CANDIDATE_NOT_FOUND', '重複候補が見つかりません');
+  }
+  const candidates = await getFriendProfileCandidates(c.env.DB, [data.left.id, data.right.id]);
+  return { ...data, ...candidates };
 }
 
 function parseUndoBody(value: unknown): UndoIdentityCandidateRequest {
@@ -111,21 +146,34 @@ function errorResponse(c: Context<Env>, error: unknown): Response {
 identityCandidates.get('/api/identity-candidates', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const kind = c.req.query('kind') as IdentityCandidateKind | undefined;
-    const status = (c.req.query('status') ?? 'pending') as IdentityCandidateStatus;
+    /*
+      FRIEND-11: 'all' は状態で絞らない。画面の「すべて」が従来は
+      status 未指定 = pending だけを見せていたため、「すべて」と
+      表示しながら確認済み・保留・別人の候補が隠れていた。
+    */
+    const statusRaw = c.req.query('status') ?? 'pending';
+    const status = statusRaw === 'all' ? 'all' : (statusRaw as IdentityCandidateStatus);
     if (!kind || !KINDS.has(kind)) {
       return c.json({ success: false, error: '候補の種類を指定してください', code: 'KIND_REQUIRED' }, 400);
     }
-    if (!STATUSES.has(status)) {
+    if (status !== 'all' && !STATUSES.has(status)) {
       return c.json({ success: false, error: '候補の状態が正しくありません', code: 'INVALID_STATUS' }, 400);
     }
     if (!canUseKind(c, kind)) {
       return c.json({ success: false, error: 'この候補を表示する権限がありません', code: 'FORBIDDEN' }, 403);
     }
     const scope = await getVisibleLineAccountScope(c.env.DB, getStaff(c));
+    const requestedAccountId = c.req.query('lineAccountId')?.trim() || null;
+    if (requestedAccountId && !scope.allowedAccountIds.includes(requestedAccountId)) {
+      return c.json({ success: false, error: '候補が見つかりません', code: 'CANDIDATE_NOT_FOUND' }, 404);
+    }
     const data = await listIdentityCandidates(c.env.DB, {
-      tenantId: tenantId(c), kind, status, allowedAccountIds: scope.allowedAccountIds,
+      tenantId: tenantId(c), kind, status,
+      allowedAccountIds: requestedAccountId ? [requestedAccountId] : scope.allowedAccountIds,
       limit: Math.max(1, positiveInt(c.req.query('limit'), 20, 100)),
       offset: positiveInt(c.req.query('offset'), 0, 100_000),
+      // FRIEND-11: 名前・根拠の検索は全件へかける。
+      q: c.req.query('q') ?? undefined,
     });
     return c.json({ success: true, data });
   } catch (error) {
@@ -220,3 +268,35 @@ identityCandidates.post('/api/identity-candidates/:id/undo', requireRole('owner'
     return errorResponse(c, error);
   }
 });
+
+identityCandidates.get(
+  '/api/friends/duplicates/:id',
+  requireRole('owner', 'admin', 'staff'),
+  async (c) => {
+    try {
+      return c.json({ success: true, data: await friendDuplicateDetail(c, c.req.param('id')) });
+    } catch (error) {
+      return errorResponse(c, error);
+    }
+  },
+);
+
+identityCandidates.patch(
+  '/api/friends/duplicates/:id',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    try {
+      const current = await friendDuplicateDetail(c, c.req.param('id'));
+      const staff = getStaff(c)!;
+      await decideIdentityCandidate(
+        c.env.DB,
+        { id: staff.id, name: staff.name, tenantId: tenantId(c) },
+        current.id,
+        parseDecisionBody(await safeBody(c)),
+      );
+      return c.json({ success: true, data: await friendDuplicateDetail(c, current.id) });
+    } catch (error) {
+      return errorResponse(c, error);
+    }
+  },
+);

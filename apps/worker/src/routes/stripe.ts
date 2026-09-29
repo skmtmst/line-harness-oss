@@ -7,6 +7,9 @@ import {
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { awardActivityMileage } from '../services/activity-mileage.js';
+import { applyActionScoreEvent } from '../services/action-score-events.js';
+import { listLimit } from './list-pagination.js';
+import { MAX_STRIPE_WEBHOOK_BODY_BYTES, readBodyWithinLimit, verifyStripeSignature } from '../services/stripe-signature.js';
 
 const stripe = new Hono<Env>();
 
@@ -31,7 +34,7 @@ stripe.get('/api/integrations/stripe/events', async (c) => {
   try {
     const friendId = c.req.query('friendId') ?? undefined;
     const eventType = c.req.query('eventType') ?? undefined;
-    const limit = Number(c.req.query('limit') ?? '100');
+    const limit = listLimit(c.req.query('limit'), 100);
     const items = await getStripeEvents(c.env.DB, { friendId, eventType, limit });
     return c.json({
       success: true,
@@ -54,54 +57,30 @@ stripe.get('/api/integrations/stripe/events', async (c) => {
 
 // ========== Stripe Webhookレシーバー ==========
 
-/** Stripe署名検証 */
-async function verifyStripeSignature(secret: string, rawBody: string, sigHeader: string): Promise<boolean> {
-  // Stripe署名形式: t=timestamp,v1=signature
-  const parts = Object.fromEntries(
-    sigHeader.split(',').map((p) => {
-      const [k, ...v] = p.split('=');
-      return [k, v.join('=')];
-    }),
-  );
-  const timestamp = parts.t;
-  const expectedSig = parts.v1;
-  if (!timestamp || !expectedSig) return false;
-
-  const encoder = new TextEncoder();
-  const signedPayload = `${timestamp}.${rawBody}`;
-  const key = await crypto.subtle.importKey(
-    'raw',
-    encoder.encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign'],
-  );
-  const sig = await crypto.subtle.sign('HMAC', key, encoder.encode(signedPayload));
-  const computedSig = Array.from(new Uint8Array(sig))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
-  return computedSig === expectedSig;
-}
-
 stripe.post('/api/integrations/stripe/webhook', async (c) => {
   try {
-    const stripeSecret = (c.env as unknown as Record<string, string | undefined>).STRIPE_WEBHOOK_SECRET;
-    let body: StripeWebhookBody;
-
-    if (stripeSecret) {
-      // 署名検証モード（本番環境）
-      const sigHeader = c.req.header('Stripe-Signature') ?? '';
-      const rawBody = await c.req.text();
-
-      const valid = await verifyStripeSignature(stripeSecret, rawBody, sigHeader);
-      if (!valid) {
-        return c.json({ success: false, error: 'Stripe signature verification failed' }, 401);
-      }
-      body = JSON.parse(rawBody) as StripeWebhookBody;
-    } else {
-      // シークレット未設定（開発環境向け）
-      body = await c.req.json<StripeWebhookBody>();
+    const stripeSecret = c.env.STRIPE_WEBHOOK_SECRET?.trim();
+    if (!stripeSecret) {
+      console.error('[stripe-webhook] STRIPE_WEBHOOK_SECRET is not configured');
+      return c.json({ success: false, error: 'Stripe webhook is not configured' }, 503);
     }
+
+    const declaredLength = Number(c.req.header('Content-Length') ?? '0');
+    if (Number.isFinite(declaredLength) && declaredLength > MAX_STRIPE_WEBHOOK_BODY_BYTES) {
+      return c.json({ success: false, error: 'Payload too large' }, 413);
+    }
+
+    const rawBody = await readBodyWithinLimit(c.req.raw);
+    if (rawBody === null) {
+      return c.json({ success: false, error: 'Payload too large' }, 413);
+    }
+
+    const sigHeader = c.req.header('Stripe-Signature') ?? '';
+    const valid = await verifyStripeSignature(stripeSecret, rawBody, sigHeader);
+    if (!valid) {
+      return c.json({ success: false, error: 'Stripe signature verification failed' }, 401);
+    }
+    const body = JSON.parse(rawBody) as StripeWebhookBody;
 
     // 冪等性チェック
     const existing = await getStripeEventByStripeId(c.env.DB, body.id);
@@ -127,8 +106,9 @@ stripe.post('/api/integrations/stripe/webhook', async (c) => {
 
     // 決済成功時の自動処理
     if (body.type === 'payment_intent.succeeded' && friendId) {
-      const { applyScoring } = await import('@line-crm/db');
-      await applyScoring(db, friendId, 'purchase');
+      const friendAccount = await db.prepare(
+        `SELECT line_account_id FROM friends WHERE id = ?`,
+      ).bind(friendId).first<{ line_account_id: string | null }>();
 
       // 自動タグ付け（product_idベース）
       const productId = obj.metadata?.product_id;
@@ -157,10 +137,30 @@ stripe.post('/api/integrations/stripe/webhook', async (c) => {
         },
         occurredAt: event.processed_at,
       });
+      if (friendAccount?.line_account_id) {
+        await applyActionScoreEvent(db, {
+          lineAccountId: friendAccount.line_account_id,
+          friendId,
+          eventType: 'purchase_completed',
+          source: 'stripe',
+          sourceEventId: body.id,
+          subjectKey: productId || obj.id,
+          occurredAt: event.processed_at,
+        }).catch((error) => {
+          // Stripeイベントは記録済み。派生スコアの失敗で再送を誘発しない。
+          console.error('stripe action score failed:', error);
+        });
+      }
 
       // イベントバスに発火（自動化ルール用）
       const { fireEvent } = await import('../services/event-bus.js');
-      await fireEvent(db, 'cv_fire', { friendId, eventData: { type: 'purchase', amount: obj.amount, stripeEventId: body.id } });
+      await fireEvent(db, 'cv_fire', {
+        sourceEventId: body.id,
+        sourceKind: 'stripe',
+        occurredAt: event.processed_at,
+        friendId,
+        eventData: { type: 'purchase', amount: obj.amount, stripeEventId: body.id },
+      }, undefined, friendAccount?.line_account_id, undefined, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY);
     }
 
     // サブスクリプションイベント処理

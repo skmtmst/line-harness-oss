@@ -1,6 +1,7 @@
 'use client'
 
 import type { DeliveryMode } from '@line-crm/shared'
+import { TimeField } from '@/components/shared/date-time-field'
 
 export interface ScheduleValue {
   delayMinutes: number
@@ -38,13 +39,13 @@ interface Props {
 }
 
 const inputCls =
-  'w-20 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500'
+  'w-20 border border-hairline rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent'
 
 export default function ScheduleInput({ mode, value, onChange }: Props) {
   if (mode === 'relative') {
     return (
       <div>
-        <label className="block text-xs font-medium text-gray-600 mb-1">遅延 (分)</label>
+        <label className="block text-xs font-medium text-ink-secondary mb-1">遅延 (分)</label>
         <input
           type="number"
           min={0}
@@ -52,14 +53,14 @@ export default function ScheduleInput({ mode, value, onChange }: Props) {
           value={value.delayMinutes}
           onChange={(e) => onChange({ ...value, delayMinutes: Math.max(0, Number(e.target.value) || 0) })}
         />
-        <p className="text-xs text-gray-400 mt-0.5">前のステップから</p>
+        <p className="text-xs text-ink-faint mt-0.5">前のステップから</p>
       </div>
     )
   }
   if (mode === 'elapsed') {
     return (
       <div className="space-y-2">
-        <label className="block text-xs font-medium text-gray-600">購読開始から</label>
+        <label className="block text-xs font-medium text-ink-secondary">購読開始から</label>
         <div className="flex items-center gap-2 flex-wrap">
           <input
             type="number"
@@ -68,7 +69,7 @@ export default function ScheduleInput({ mode, value, onChange }: Props) {
             value={value.offsetDays}
             onChange={(e) => onChange({ ...value, offsetDays: Math.max(0, Number(e.target.value) || 0) })}
           />
-          <span className="text-sm text-gray-700">日</span>
+          <span className="text-sm text-ink-secondary">日</span>
           <input
             type="number"
             min={0}
@@ -79,7 +80,7 @@ export default function ScheduleInput({ mode, value, onChange }: Props) {
               onChange({ ...value, offsetHours: Math.max(0, Math.min(23, Number(e.target.value) || 0)) })
             }
           />
-          <span className="text-sm text-gray-700">時間</span>
+          <span className="text-sm text-ink-secondary">時間</span>
           <input
             type="number"
             min={0}
@@ -93,7 +94,7 @@ export default function ScheduleInput({ mode, value, onChange }: Props) {
               })
             }
           />
-          <span className="text-sm text-gray-700">分後に配信</span>
+          <span className="text-sm text-ink-secondary">分後に配信</span>
         </div>
       </div>
     )
@@ -101,7 +102,7 @@ export default function ScheduleInput({ mode, value, onChange }: Props) {
   // absolute_time
   return (
     <div className="space-y-2">
-      <label className="block text-xs font-medium text-gray-600">購読開始から</label>
+      <label className="block text-xs font-medium text-ink-secondary">購読開始から</label>
       <div className="flex items-center gap-2 flex-wrap">
         <input
           type="number"
@@ -110,16 +111,16 @@ export default function ScheduleInput({ mode, value, onChange }: Props) {
           value={value.offsetDays}
           onChange={(e) => onChange({ ...value, offsetDays: Math.max(0, Number(e.target.value) || 0) })}
         />
-        <span className="text-sm text-gray-700">日後の</span>
-        <input
-          type="time"
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+        <span className="text-sm text-ink-secondary">日後の</span>
+        <TimeField
           value={value.deliveryTime}
-          onChange={(e) => onChange({ ...value, deliveryTime: e.target.value })}
+          aria-label="配信する時刻"
+          onChange={(v) => onChange({ ...value, deliveryTime: v })}
+          className="w-32"
         />
-        <span className="text-sm text-gray-700">に配信</span>
+        <span className="text-sm text-ink-secondary">に配信</span>
       </div>
-      <p className="text-xs text-gray-400">
+      <p className="text-xs text-ink-faint">
         ⓘ 配信時刻は5分単位で処理するため、指定時刻から最大5分遅れる場合があります
       </p>
     </div>

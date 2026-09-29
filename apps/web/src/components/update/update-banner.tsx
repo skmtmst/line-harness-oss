@@ -29,6 +29,13 @@ export function UpdateBanner() {
   const [status, setStatus] = useState<Status>({ kind: 'loading' })
 
   useEffect(() => {
+    // visual-qa は Pencil と同じ画面状態だけを撮る。運用環境向けの告知は
+    // 撮影器が付ける一時印で外し、通常利用時の表示条件は変えない。
+    try {
+      if (window.sessionStorage.getItem('lh_visual_qa_capture') === '1') return
+    } catch {
+      // ストレージを使えない環境では通常の表示判定を続ける。
+    }
     if (!updateBannerEnabled) return
 
     let cancelled = false

@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const PAGE = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'page.tsx'), 'utf8')
+const API = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'lib', 'api.ts'), 'utf8')
 
 /** 共通情報の削除確認（設計 `yPkWe` 14-1-C ／ 契約 #611）。 */
 describe('共通情報の削除確認', () => {
@@ -16,7 +17,7 @@ describe('共通情報の削除確認', () => {
   it('使用先が読めないときは消させない', () => {
     // 「参照0件」と読み違えて消すと、差し込んでいた文が空欄のまま送られ続ける。
     expect(PAGE).toContain('使用先を確認できませんでした')
-    expect(PAGE).toContain('canDeleteVar({ impact: singleImpact, typedKey, busy: singleBusy })')
+    expect(PAGE).toContain('canDeleteVar({ impact: singleImpact, typedKey, reason: singleReason, busy: singleBusy })')
   })
 
   it('差し込みキーを打つまで押し口を出さない', () => {
@@ -25,7 +26,7 @@ describe('共通情報の削除確認', () => {
      * 取り消せないので、対象を取り違えたまま押せる形にしない。
      */
     expect(PAGE).toContain('削除する場合は、差し込みキーを入力してください')
-    expect(PAGE).toContain('typedKey, busy: singleBusy }) ? (')
+    expect(PAGE).toContain('typedKey, reason: singleReason, busy: singleBusy }) ? (')
   })
 
   it('送信済みを消せない理由に混ぜない', () => {
@@ -54,13 +55,16 @@ describe('共通情報の削除確認', () => {
 
   it('いつ時点で確かめたかを書く', () => {
     expect(PAGE).toContain('checkedAtText(singleImpact.checkedAt)')
-    expect(PAGE).toContain('8種類を確認しました')
+    expect(PAGE).toContain('9種類を確認しました')
   })
 
-  it('まだ無い操作を押し口にしない', () => {
-    // 設計の「別の共通情報に差し替えてから削除する」は口がまだ無い。
-    expect(PAGE).toContain('まとめて差し替える操作は、まだ用意していません')
-    expect(PAGE).not.toContain('差し替えて削除')
+  it('差し替え候補と影響を読んだ後だけ、安全な差し替え操作を出す', () => {
+    expect(PAGE).toContain('api.commonVars.replacementCandidates')
+    expect(PAGE).toContain('api.commonVars.replacementImpact')
+    expect(PAGE).toContain('replacementImpact?.canReplace')
+    expect(PAGE).toContain('差し替えて削除')
+    expect(API).toContain('expectedRevision: string')
+    expect(API).toContain('apply: true')
   })
 
   it('撮影の押し口と面に印を付ける', () => {

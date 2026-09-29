@@ -10,12 +10,13 @@ const dbMocks = {
   deleteTag: vi.fn(),
   updateTagMileageSettings: vi.fn(),
   enqueueHistoricTagMileage: vi.fn(),
+  getTagRetroactiveMileagePreview: vi.fn(),
   getTagGroups: vi.fn(),
   createTagGroup: vi.fn(),
   updateTagGroup: vi.fn(),
   deleteTagGroup: vi.fn(),
   assignTagToGroup: vi.fn(),
-  updateTag: vi.fn(),
+  updateTagDefinition: vi.fn(),
   reorderTags: vi.fn(),
   normalizeTagNameForCleanup: (name: string) => name
     .normalize('NFKC')
@@ -24,6 +25,9 @@ const dbMocks = {
     .toLocaleLowerCase('ja-JP'),
 };
 vi.mock('@line-crm/db', () => dbMocks);
+
+const accountAccessMocks = vi.hoisted(() => ({ getVisibleLineAccountScope: vi.fn() }));
+vi.mock('../services/account-access.js', () => accountAccessMocks);
 
 const { tags } = await import('./tags.js');
 
@@ -36,7 +40,7 @@ function app(role: 'owner' | 'admin' | 'staff' = 'owner') {
   const a = new Hono<TestEnv>();
   a.use('*', async (c, next) => {
     c.set('staff', { id: 'staff-1', role });
-    c.env = { DB: {} as D1Database };
+    c.env = { DB: { prepare: () => ({ bind: (id: string) => ({ first: async () => /missing|nope|not-found/.test(id) ? null : { ...TAG_ROW, id, line_account_id: null }, run: async () => ({ success: true }) }) }) } as unknown as D1Database };
     await next();
   });
   a.route('/', tags);
@@ -113,6 +117,10 @@ function tagDeleteImpact(overrides: {
 describe('GET /api/tags', () => {
   beforeEach(() => {
     for (const fn of Object.values(dbMocks)) if ('mockReset' in fn) fn.mockReset();
+    accountAccessMocks.getVisibleLineAccountScope.mockReset();
+    accountAccessMocks.getVisibleLineAccountScope.mockResolvedValue({
+      allowedAccountIds: ['account-1'], ids: ['account-1'], canSeeUnassigned: true, isAccountScoped: false, accounts: [],
+    });
   });
 
   test('管理一覧では人数と使用先をまとめて取得する', async () => {
@@ -166,6 +174,23 @@ describe('GET /api/tags', () => {
     expect(body.data[0]).not.toHaveProperty('usedIn');
     expect(body.data[0]).not.toHaveProperty('otherActionCount');
     expect(body.data[0]).toHaveProperty('cleanupReasons', ['unused']);
+  });
+
+  test('見てよいLINE公式アカウントのタグだけを返す', async () => {
+    dbMocks.getTags.mockResolvedValue([
+      { ...TAG_ROW, id: 'visible', line_account_id: 'account-1' },
+      { ...TAG_ROW, id: 'hidden', line_account_id: 'account-2' },
+    ]);
+
+    const res = await app().request('/api/tags?lineAccountId=account-1');
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toMatchObject({ data: [{ id: 'visible' }] });
+  });
+
+  test('範囲外のLINE公式アカウントは存在を明かさない', async () => {
+    const res = await app().request('/api/tags?lineAccountId=account-2');
+    expect(res.status).toBe(404);
+    expect(dbMocks.getTags).not.toHaveBeenCalled();
   });
 
   test('集計済みで候補なしは空配列を返し、未取得と区別する', async () => {
@@ -470,13 +495,12 @@ describe('DELETE /api/tags/:id', () => {
 describe('PATCH /api/tags/reorder', () => {
   beforeEach(() => {
     for (const fn of Object.values(dbMocks)) if ('mockReset' in fn) fn.mockReset();
-    dbMocks.updateTag.mockResolvedValue(null);
   });
 
   test('渡された並びをそのまま保存する', async () => {
     const res = await patch('/api/tags/reorder', { ids: ['c', 'a', 'b'] });
     expect(res.status).toBe(200);
-    expect(dbMocks.reorderTags).toHaveBeenCalledWith(expect.anything(), ['c', 'a', 'b']);
+    expect(dbMocks.reorderTags).toHaveBeenCalledWith(expect.anything(), ['c', 'a', 'b'], expect.objectContaining({ canSeeUnassigned: true }));
   });
 
   test(':id に食われない', async () => {
@@ -484,7 +508,7 @@ describe('PATCH /api/tags/reorder', () => {
     // タグIDとして扱われ、並び替えのつもりが名前の変更として届く。
     await patch('/api/tags/reorder', { ids: ['a'] });
     expect(dbMocks.reorderTags).toHaveBeenCalled();
-    expect(dbMocks.updateTag).not.toHaveBeenCalled();
+    expect(dbMocks.updateTagDefinition).not.toHaveBeenCalled();
   });
 
   test('配列でないものは断る', async () => {
@@ -527,11 +551,32 @@ describe('PATCH /api/tags/:id/mileage', () => {
     mileage_multiplier_bps: 15000,
     mileage_multiplier_priority: 1,
   };
+  // サーバー側の事前計算の固定値（N-047）。token はこの結果から発行される。
+  const PREVIEW = {
+    tagId: 'tag-1',
+    lineAccountId: null,
+    friendIds: ['f-1', 'f-2', 'f-3'],
+    selfTargetIds: ['f-1', 'f-2'],
+    selfExcludedIds: ['f-3'],
+    referralTargetIds: ['f-1'],
+    referralExcludedIds: [],
+  };
+
+  async function previewTokenFor(mileage: { self: number; referrer: number }) {
+    const res = await post('/api/tags/tag-1/retroactive-preview', { mileage });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { data: { previewToken: string } };
+    return body.data.previewToken;
+  }
 
   beforeEach(() => {
     for (const fn of Object.values(dbMocks)) if ('mockReset' in fn) fn.mockReset();
     dbMocks.updateTagMileageSettings.mockResolvedValue(storedTag);
     dbMocks.enqueueHistoricTagMileage.mockResolvedValue(12);
+    dbMocks.getTagRetroactiveMileagePreview.mockResolvedValue(PREVIEW);
+    accountAccessMocks.getVisibleLineAccountScope.mockResolvedValue({
+      allowedAccountIds: ['a1'], ids: ['a1'], canSeeUnassigned: true, isAccountScoped: false, accounts: [],
+    });
   });
 
   test('通常の保存では既存ユーザーへ遡及しない', async () => {
@@ -547,17 +592,221 @@ describe('PATCH /api/tags/:id/mileage', () => {
     await expect(res.json()).resolves.toMatchObject({ success: true, data: { queued: 0 } });
   });
 
-  test('遡及を明示した場合だけ既存ユーザーをキューへ登録する', async () => {
+  test('遡及はサーバーの事前計算(previewToken)付きでキューへ登録する', async () => {
+    const previewToken = await previewTokenFor({ self: 100, referrer: 20 });
     const res = await patch('/api/tags/tag-1/mileage', {
       rewardMiles: 100,
       referralRewardMiles: 20,
       multiplierBps: 15000,
       multiplierPriority: 1,
       applyToExisting: true,
+      previewToken,
     });
 
     expect(res.status).toBe(200);
     expect(dbMocks.enqueueHistoricTagMileage).toHaveBeenCalledWith(expect.anything(), 'tag-1');
     await expect(res.json()).resolves.toMatchObject({ success: true, data: { queued: 12 } });
+  });
+
+  test('previewToken なしの遡及は422で保存も遡及もしない', async () => {
+    const res = await patch('/api/tags/tag-1/mileage', {
+      rewardMiles: 100,
+      referralRewardMiles: 20,
+      multiplierBps: null,
+      applyToExisting: true,
+    });
+
+    expect(res.status).toBe(422);
+    await expect(res.json()).resolves.toMatchObject({ code: 'RETROACTIVE_PREVIEW_REQUIRED' });
+    expect(dbMocks.updateTagMileageSettings).not.toHaveBeenCalled();
+    expect(dbMocks.enqueueHistoricTagMileage).not.toHaveBeenCalled();
+  });
+
+  test('確認時と違うマイルで実行すると409で止める', async () => {
+    const previewToken = await previewTokenFor({ self: 100, referrer: 20 });
+    const res = await patch('/api/tags/tag-1/mileage', {
+      rewardMiles: 200,
+      referralRewardMiles: 20,
+      multiplierBps: null,
+      applyToExisting: true,
+      previewToken,
+    });
+
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toMatchObject({ code: 'RETROACTIVE_PREVIEW_STALE' });
+    expect(dbMocks.enqueueHistoricTagMileage).not.toHaveBeenCalled();
+  });
+
+  test('確認後に対象が変わったら409で止める', async () => {
+    const previewToken = await previewTokenFor({ self: 100, referrer: 20 });
+    // 確認後に f-4 がタグ付きになった想定。実行時の再計算でズレる。
+    dbMocks.getTagRetroactiveMileagePreview.mockResolvedValue({
+      ...PREVIEW,
+      friendIds: [...PREVIEW.friendIds, 'f-4'],
+      selfTargetIds: [...PREVIEW.selfTargetIds, 'f-4'],
+    });
+    const res = await patch('/api/tags/tag-1/mileage', {
+      rewardMiles: 100,
+      referralRewardMiles: 20,
+      multiplierBps: null,
+      applyToExisting: true,
+      previewToken,
+    });
+
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toMatchObject({ code: 'RETROACTIVE_PREVIEW_STALE' });
+    expect(dbMocks.enqueueHistoricTagMileage).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST /api/tags/:id/retroactive-preview（N-047）', () => {
+  const PREVIEW = {
+    tagId: 'tag-1',
+    lineAccountId: 'a1',
+    friendIds: ['f-1', 'f-2', 'f-3'],
+    selfTargetIds: ['f-1', 'f-2'],
+    selfExcludedIds: ['f-3'],
+    referralTargetIds: ['f-1'],
+    referralExcludedIds: [],
+  };
+
+  beforeEach(() => {
+    for (const fn of Object.values(dbMocks)) if ('mockReset' in fn) fn.mockReset();
+    dbMocks.getTagRetroactiveMileagePreview.mockResolvedValue(PREVIEW);
+    accountAccessMocks.getVisibleLineAccountScope.mockResolvedValue({
+      allowedAccountIds: ['a1'], ids: ['a1'], canSeeUnassigned: true, isAccountScoped: false, accounts: [],
+    });
+  });
+
+  test('対象人数・除外・合計マイル・previewToken を返す', async () => {
+    const res = await post('/api/tags/tag-1/retroactive-preview', {
+      mileage: { self: 100, referrer: 20 },
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      data: Record<string, unknown> & { previewToken: string; selfMiles: number; totalMiles: number };
+    };
+    expect(body.data).toMatchObject({
+      friendCount: 3,
+      selfTargets: 2,
+      selfExcluded: 1,
+      referralTargets: 1,
+      referralExcluded: 0,
+      selfMiles: 200,
+      referralMiles: 20,
+      totalMiles: 220,
+      lineAccountId: 'a1',
+    });
+    expect(typeof body.data.previewToken).toBe('string');
+    expect(body.data.previewToken.startsWith('rtv1.')).toBe(true);
+    // 事前計算だけではキューへ積まない
+    expect(dbMocks.enqueueHistoricTagMileage).not.toHaveBeenCalled();
+  });
+
+  test('マイルを送らなければ保存済みの値で数える', async () => {
+    // DBスタブは mileage_reward: 0 の TAG_ROW を返す
+    const res = await post('/api/tags/tag-1/retroactive-preview', {});
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { data: { selfMiles: number; totalMiles: number } };
+    expect(body.data.selfMiles).toBe(0);
+    expect(body.data.totalMiles).toBe(0);
+  });
+
+  test('staff は呼べない', async () => {
+    const res = await post('/api/tags/tag-1/retroactive-preview', {}, 'staff');
+    expect(res.status).toBe(403);
+    expect(dbMocks.getTagRetroactiveMileagePreview).not.toHaveBeenCalled();
+  });
+
+  test('タグの所属と違うアカウントを指定すると404', async () => {
+    const res = await post('/api/tags/tag-1/retroactive-preview', {
+      lineAccountId: 'a-other',
+    });
+    // DBスタブのタグは line_account_id: null。requested と一致しない。
+    expect(res.status).toBe(404);
+  });
+});
+
+describe('旧タグ経路の名前検査と色の受付終了', () => {
+  beforeEach(() => {
+    for (const fn of Object.values(dbMocks)) if (fn && 'mockReset' in fn) (fn as { mockReset(): void }).mockReset();
+    dbMocks.createTag.mockImplementation(async (_db: unknown, input: { name: string; groupId: string | null }) => ({
+      ...TAG_ROW, id: 'tag-new', name: input.name, folder_id: input.groupId,
+    }));
+    accountAccessMocks.getVisibleLineAccountScope.mockResolvedValue({
+      allowedAccountIds: ['a1'], ids: ['a1'], canSeeUnassigned: false, isAccountScoped: false, accounts: [],
+    });
+    dbMocks.updateTagDefinition.mockImplementation(async (_db: unknown, input: { tagId: string; expectedVersion: number; isStarred?: boolean }) => ({
+      tag: { ...TAG_ROW, id: input.tagId, line_account_id: 'a1', version: input.expectedVersion + 1, is_starred: input.isStarred ? 1 : 0 },
+      automation: null,
+    }));
+    dbMocks.enqueueHistoricTagMileage.mockResolvedValue(0);
+  });
+
+  test('作成で81文字・制御文字は400で書かない', async () => {
+    const longName = await post('/api/tags', { name: 'あ'.repeat(81) });
+    expect(longName.status).toBe(400);
+    const controlName = await post('/api/tags', { name: 'VIP\n計画' });
+    expect(controlName.status).toBe(400);
+    expect(await controlName.json()).toMatchObject({ error: 'name must not contain control characters' });
+    expect(dbMocks.createTag).not.toHaveBeenCalled();
+  });
+
+  test('更新で81文字・制御文字は400で書かない', async () => {
+    const base = { lineAccountId: 'a1', expectedVersion: 1 };
+    const longName = await patch('/api/tags/tag-1', { ...base, name: 'あ'.repeat(81) });
+    expect(longName.status).toBe(400);
+    const controlName = await patch('/api/tags/tag-1', { ...base, name: 'VIP\x07計画' });
+    expect(controlName.status).toBe(400);
+    expect(dbMocks.updateTagDefinition).not.toHaveBeenCalled();
+  });
+
+  test('作成・更新で color が来たら400で案内して書かない', async () => {
+    const created = await post('/api/tags', { name: 'VIP', color: '#FF0000' });
+    expect(created.status).toBe(400);
+    expect(await created.json()).toMatchObject({ error: 'tag color is not supported; set the folder color instead' });
+    expect(dbMocks.createTag).not.toHaveBeenCalled();
+    const updated = await patch('/api/tags/tag-1', { color: '#FF0000' });
+    expect(updated.status).toBe(400);
+    expect(dbMocks.updateTagDefinition).not.toHaveBeenCalled();
+  });
+});
+
+describe('PATCH /api/tags/:id は expectedVersion 必須(#715)', () => {
+  beforeEach(() => {
+    for (const fn of Object.values(dbMocks)) if (fn && 'mockReset' in fn) (fn as { mockReset(): void }).mockReset();
+    accountAccessMocks.getVisibleLineAccountScope.mockResolvedValue({
+      allowedAccountIds: ['a1'], ids: ['a1'], canSeeUnassigned: false, isAccountScoped: false, accounts: [],
+    });
+    dbMocks.updateTagDefinition.mockImplementation(async (_db: unknown, input: { tagId: string; expectedVersion: number; isStarred?: boolean }) => ({
+      tag: { ...TAG_ROW, id: input.tagId, line_account_id: 'a1', version: input.expectedVersion + 1, is_starred: input.isStarred ? 1 : 0 },
+      automation: null,
+    }));
+    dbMocks.enqueueHistoricTagMileage.mockResolvedValue(0);
+  });
+
+  test('版が無いと400で定義口へ進まない', async () => {
+    const res = await patch('/api/tags/tag-1', { lineAccountId: 'a1', isStarred: true });
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toMatchObject({ error: 'expectedVersion is required' });
+    expect(dbMocks.updateTagDefinition).not.toHaveBeenCalled();
+  });
+
+  test('不正な版は400で定義口へ進まない', async () => {
+    for (const expectedVersion of [0, -1, 1.5, 'x']) {
+      const res = await patch('/api/tags/tag-1', { lineAccountId: 'a1', expectedVersion, isStarred: true });
+      expect(res.status).toBe(400);
+    }
+    expect(dbMocks.updateTagDefinition).not.toHaveBeenCalled();
+  });
+
+  test('正しい版なら200で進んだ版が返る', async () => {
+    const res = await patch('/api/tags/tag-1', { lineAccountId: 'a1', expectedVersion: 3, isStarred: true });
+    expect(res.status).toBe(200);
+    expect(dbMocks.updateTagDefinition).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ tagId: 'tag-1', lineAccountId: 'a1', expectedVersion: 3, isStarred: true }),
+    );
+    await expect(res.json()).resolves.toMatchObject({ success: true, data: { version: 4 } });
   });
 });

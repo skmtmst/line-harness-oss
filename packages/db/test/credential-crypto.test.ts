@@ -23,6 +23,9 @@ function account(overrides: Partial<LineAccount> = {}): LineAccount {
     channel_secret: 'legacy-secret',
     channel_access_token_encrypted: null,
     channel_secret_encrypted: null,
+    channel_access_token_updated_at: null,
+    channel_secret_updated_at: null,
+    login_channel_secret_updated_at: null,
     login_channel_id: null,
     login_channel_secret: null,
     liff_id: null,
@@ -34,6 +37,7 @@ function account(overrides: Partial<LineAccount> = {}): LineAccount {
     og_site_name: null,
     og_default_image_url: null,
     og_default_description: null,
+    official_profile_url: null,
     friend_capacity: null,
     capacity_warn_at: null,
     icon_url: null,
@@ -80,6 +84,8 @@ describe('LINE credential AES-GCM encryption', () => {
 
     expect(resolved.channel_access_token).toBe('new-token');
     expect(resolved.channel_secret).toBe('new-secret');
+    expect(resolved.channel_access_token_last4).toBe('oken');
+    expect(resolved.channel_secret_last4).toBe('cret');
     expect(warn).not.toHaveBeenCalled();
     warn.mockRestore();
   });
@@ -97,6 +103,8 @@ describe('LINE credential AES-GCM encryption', () => {
     );
     expect(resolved.channel_access_token).toBe('legacy-token');
     expect(resolved.channel_secret).toBe('legacy-secret');
+    expect(resolved.channel_access_token_last4).toBeNull();
+    expect(resolved.channel_secret_last4).toBeNull();
     expect(warn).toHaveBeenCalledTimes(2);
     expect(warn.mock.calls[0]).toEqual([{
       event: 'line_credential_plaintext_fallback',
@@ -118,6 +126,17 @@ describe('LINE credential AES-GCM encryption', () => {
       expect(output).not.toContain(value);
     }
     warn.mockRestore();
+  });
+
+  it('returns last four characters for legacy plaintext credentials', async () => {
+    const resolved = await decryptLineAccountCredentials(
+      account({ login_channel_secret: 'login-secret' }),
+      KEY,
+    );
+
+    expect(resolved.channel_access_token_last4).toBe('oken');
+    expect(resolved.channel_secret_last4).toBe('cret');
+    expect(resolved.login_channel_secret_last4).toBe('cret');
   });
 
   it('throws as before when decrypt fails and no plaintext fallback exists', async () => {
@@ -225,7 +244,7 @@ describe('LINE credential AES-GCM encryption', () => {
                 channel_secret: String(insertValues[4]),
                 channel_access_token_encrypted: String(insertValues[5]),
                 channel_secret_encrypted: String(insertValues[6]),
-                tenant_id: String(insertValues[15]),
+                tenant_id: String(insertValues[25]),
               });
             }
             return null;
@@ -249,7 +268,10 @@ describe('LINE credential AES-GCM encryption', () => {
     expect(insertValues[4]).toBe('secret-value');
     expect(insertValues[5]).not.toBe('token-value');
     expect(insertValues[6]).not.toBe('secret-value');
-    expect(insertValues[15]).toBe(DEFAULT_TENANT_ID);
+    expect(insertValues[7]).toEqual(expect.any(String));
+    expect(insertValues[8]).toEqual(expect.any(String));
+    expect(insertValues[9]).toBeNull();
+    expect(insertValues[25]).toBe(DEFAULT_TENANT_ID);
     expect(created.tenant_id).toBe(DEFAULT_TENANT_ID);
     expect(created.channel_access_token).toBe('token-value');
     expect(created.channel_secret).toBe('secret-value');

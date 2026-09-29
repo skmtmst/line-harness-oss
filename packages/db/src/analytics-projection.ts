@@ -1,3 +1,5 @@
+import { accountFeatureOffExclusionSql } from './account-settings.js';
+
 export interface AnalyticsProjectionRange {
   fromDate: string;
   toDate: string;
@@ -204,6 +206,344 @@ export async function rebuildAnalyticsDailyMetrics(
   };
 }
 
+type AnalyticsProjectionProgress = {
+  line_account_id: string;
+  cycle_id: string;
+  range_from: string;
+  range_to: string;
+  time_zone: string;
+  data_cutoff_at: string;
+  broad_from: string;
+  broad_to: string;
+  last_occurred_at: string;
+  last_event_id: string;
+  source_event_count: number;
+  phase: 'scan' | 'cleanup';
+};
+
+export type AnalyticsProjectionChunkResult = AnalyticsProjectionResult & {
+  completed: boolean;
+  readRows: number;
+  cursor: { occurredAt: string; eventId: string } | null;
+};
+
+export async function getAnalyticsProjectionSchedulerCursor(
+  db: D1Database,
+  now: string,
+): Promise<string> {
+  await db.prepare(
+    `INSERT OR IGNORE INTO analytics_projection_scheduler_state (id, last_account_id, updated_at)
+     VALUES (1, '', ?)`,
+  ).bind(now).run();
+  const row = await db.prepare(
+    `SELECT last_account_id FROM analytics_projection_scheduler_state WHERE id = 1`,
+  ).bind().first<{ last_account_id: string }>();
+  return row?.last_account_id ?? '';
+}
+
+export async function saveAnalyticsProjectionSchedulerCursor(
+  db: D1Database,
+  accountId: string,
+  now: string,
+): Promise<void> {
+  await db.prepare(
+    `UPDATE analytics_projection_scheduler_state SET last_account_id = ?, updated_at = ? WHERE id = 1`,
+  ).bind(accountId, now).run();
+}
+
+async function loadOrCreateProjectionProgress(
+  db: D1Database,
+  input: {
+    accountId: string;
+    timeZone: string;
+    range: AnalyticsProjectionRange;
+    dataCutoffAt: string;
+  },
+): Promise<AnalyticsProjectionProgress> {
+  let state = await db.prepare(
+    `SELECT * FROM analytics_projection_progress WHERE line_account_id = ?`,
+  ).bind(input.accountId).first<AnalyticsProjectionProgress>();
+  if (state) return state;
+
+  const cycleId = crypto.randomUUID();
+  const broadFrom = `${addUtcDays(input.range.fromDate, -2)}T00:00:00.000Z`;
+  const broadTo = `${addUtcDays(input.range.toDate, 2)}T23:59:59.999Z`;
+  await db.prepare(
+    `INSERT INTO analytics_projection_progress (
+       line_account_id, cycle_id, range_from, range_to, time_zone, data_cutoff_at,
+       broad_from, broad_to, last_occurred_at, last_event_id, source_event_count, updated_at
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, '', '', 0, ?)`,
+  ).bind(
+    input.accountId,
+    cycleId,
+    input.range.fromDate,
+    input.range.toDate,
+    input.timeZone,
+    input.dataCutoffAt,
+    broadFrom,
+    broadTo,
+    input.dataCutoffAt,
+  ).run();
+  state = await db.prepare(
+    `SELECT * FROM analytics_projection_progress WHERE line_account_id = ?`,
+  ).bind(input.accountId).first<AnalyticsProjectionProgress>();
+  if (!state) throw new Error('analytics_projection_progress_unavailable');
+  return state;
+}
+
+function jsonInsertStatements(
+  db: D1Database,
+  sql: string,
+  fixedBindings: unknown[],
+  rows: Array<Record<string, unknown>>,
+): D1PreparedStatement[] {
+  const statements: D1PreparedStatement[] = [];
+  for (let index = 0; index < rows.length; index += 500) {
+    statements.push(db.prepare(sql).bind(
+      ...fixedBindings,
+      JSON.stringify(rows.slice(index, index + 500)),
+    ));
+  }
+  return statements;
+}
+
+/** cron向け。最大3,000イベントだけを読み、確定後の中間行整理も分割する。 */
+export async function rebuildAnalyticsDailyMetricsChunk(
+  db: D1Database,
+  input: {
+    accountId: string;
+    timeZone: string;
+    range: AnalyticsProjectionRange;
+    dataCutoffAt: string;
+    limit?: number;
+  },
+): Promise<AnalyticsProjectionChunkResult> {
+  const state = await loadOrCreateProjectionProgress(db, input);
+  const limit = Math.max(1, Math.min(input.limit ?? 3_000, 3_000));
+  if (state.phase === 'cleanup') {
+    const reconciliation = await db.prepare(
+      `SELECT projected_count, mismatch_count, status
+         FROM analytics_reconciliation_runs
+        WHERE line_account_id = ? AND range_to = ?`,
+    ).bind(state.line_account_id, state.range_to).first<{
+      projected_count: number;
+      mismatch_count: number;
+      status: 'matched' | 'mismatched';
+    }>();
+    if (!reconciliation) throw new Error('analytics_projection_reconciliation_unavailable');
+    const deletedFriends = await db.prepare(
+      `DELETE FROM analytics_projection_friend_stage
+        WHERE rowid IN (
+          SELECT rowid FROM analytics_projection_friend_stage
+           WHERE line_account_id = ? AND cycle_id = ?
+           LIMIT ?
+        )`,
+    ).bind(state.line_account_id, state.cycle_id, limit).run();
+    const deletedFriendRows = Number(deletedFriends.meta?.changes ?? 0);
+    const remaining = limit - deletedFriendRows;
+    let deletedMetricRows = 0;
+    if (remaining > 0) {
+      const deletedMetrics = await db.prepare(
+        `DELETE FROM analytics_projection_metric_stage
+          WHERE rowid IN (
+            SELECT rowid FROM analytics_projection_metric_stage
+             WHERE line_account_id = ? AND cycle_id = ?
+             LIMIT ?
+          )`,
+      ).bind(state.line_account_id, state.cycle_id, remaining).run();
+      deletedMetricRows = Number(deletedMetrics.meta?.changes ?? 0);
+    }
+    const readRows = deletedFriendRows + deletedMetricRows;
+    const completed = readRows < limit;
+    if (completed) {
+      await db.prepare(
+        `DELETE FROM analytics_projection_progress
+          WHERE line_account_id = ? AND cycle_id = ?`,
+      ).bind(state.line_account_id, state.cycle_id).run();
+    }
+    return {
+      accountId: state.line_account_id,
+      fromDate: state.range_from,
+      toDate: state.range_to,
+      sourceEventCount: Number(state.source_event_count),
+      projectedCount: Number(reconciliation.projected_count),
+      mismatchCount: Number(reconciliation.mismatch_count),
+      status: reconciliation.status,
+      completed,
+      readRows,
+      cursor: null,
+    };
+  }
+  const page = await db.prepare(
+    `SELECT id, event_type, friend_id, occurred_at
+       FROM analytics_events
+      WHERE line_account_id = ? AND occurred_at >= ? AND occurred_at <= ?
+        AND occurred_at <= ?
+        AND (occurred_at > ? OR (occurred_at = ? AND id > ?))
+      ORDER BY occurred_at ASC, id ASC LIMIT ?`,
+  ).bind(
+    state.line_account_id,
+    state.broad_from,
+    state.broad_to,
+    state.data_cutoff_at,
+    state.last_occurred_at,
+    state.last_occurred_at,
+    state.last_event_id,
+    limit,
+  ).all<ProjectionSourceRow>();
+  const events = page.results
+    .map((row) => ({ ...row, metricDate: dateInTimeZone(row.occurred_at, state.time_zone) }))
+    .filter((row) => row.metricDate >= state.range_from && row.metricDate <= state.range_to);
+  const metrics = new Map<string, { metricDate: string; eventType: string; count: number }>();
+  const friends = new Map<string, { metricDate: string; eventType: string; friendId: string }>();
+  for (const event of events) {
+    const key = `${event.metricDate}\u0000${event.event_type}`;
+    const metric = metrics.get(key) ?? {
+      metricDate: event.metricDate,
+      eventType: event.event_type,
+      count: 0,
+    };
+    metric.count += 1;
+    metrics.set(key, metric);
+    if (event.friend_id) {
+      friends.set(`${key}\u0000${event.friend_id}`, {
+        metricDate: event.metricDate,
+        eventType: event.event_type,
+        friendId: event.friend_id,
+      });
+    }
+  }
+
+  const last = page.results.at(-1);
+  const nextOccurredAt = last?.occurred_at ?? state.last_occurred_at;
+  const nextEventId = last?.id ?? state.last_event_id;
+  const statements = [
+    ...jsonInsertStatements(db, `
+      INSERT INTO analytics_projection_metric_stage
+        (line_account_id, cycle_id, metric_date, event_type, event_count)
+      SELECT ?, ?,
+             json_extract(value, '$.metricDate'),
+             json_extract(value, '$.eventType'),
+             CAST(json_extract(value, '$.count') AS INTEGER)
+        FROM json_each(?) WHERE 1
+      ON CONFLICT(line_account_id, cycle_id, metric_date, event_type)
+      DO UPDATE SET event_count = event_count + excluded.event_count`,
+    [state.line_account_id, state.cycle_id], [...metrics.values()]),
+    ...jsonInsertStatements(db, `
+      INSERT OR IGNORE INTO analytics_projection_friend_stage
+        (line_account_id, cycle_id, metric_date, event_type, friend_id)
+      SELECT ?, ?,
+             json_extract(value, '$.metricDate'),
+             json_extract(value, '$.eventType'),
+             json_extract(value, '$.friendId')
+        FROM json_each(?)`,
+    [state.line_account_id, state.cycle_id], [...friends.values()]),
+    db.prepare(
+      `UPDATE analytics_projection_progress
+          SET last_occurred_at = ?, last_event_id = ?,
+              source_event_count = source_event_count + ?, updated_at = ?
+        WHERE line_account_id = ? AND cycle_id = ?`,
+    ).bind(
+      nextOccurredAt,
+      nextEventId,
+      events.length,
+      input.dataCutoffAt,
+      state.line_account_id,
+      state.cycle_id,
+    ),
+  ];
+  await db.batch(statements);
+
+  const sourceEventCount = Number(state.source_event_count) + events.length;
+  const completed = page.results.length < limit;
+  if (!completed) {
+    return {
+      accountId: state.line_account_id,
+      fromDate: state.range_from,
+      toDate: state.range_to,
+      sourceEventCount,
+      projectedCount: 0,
+      mismatchCount: 0,
+      status: 'matched',
+      completed: false,
+      readRows: page.results.length,
+      cursor: { occurredAt: nextOccurredAt, eventId: nextEventId },
+    };
+  }
+
+  await db.batch([
+    db.prepare(
+      `DELETE FROM analytics_daily_metrics
+        WHERE line_account_id = ? AND metric_date >= ? AND metric_date <= ?
+          AND metric_key IN ('event_total', 'unique_friends')`,
+    ).bind(state.line_account_id, state.range_from, state.range_to),
+    db.prepare(
+      `INSERT INTO analytics_daily_metrics (
+         line_account_id, metric_date, metric_key, dimension_key, dimension_value,
+         numerator, denominator, value, state, data_cutoff_at, updated_at
+       )
+       SELECT line_account_id, metric_date, 'event_total', 'event_type', event_type,
+              event_count, NULL, event_count, 'available', ?, datetime('now')
+         FROM analytics_projection_metric_stage
+        WHERE line_account_id = ? AND cycle_id = ?`,
+    ).bind(state.data_cutoff_at, state.line_account_id, state.cycle_id),
+    db.prepare(
+      `INSERT INTO analytics_daily_metrics (
+         line_account_id, metric_date, metric_key, dimension_key, dimension_value,
+         numerator, denominator, value, state, data_cutoff_at, updated_at
+       )
+       SELECT line_account_id, metric_date, 'unique_friends', 'event_type', event_type,
+              unique_friend_count, NULL, unique_friend_count, 'available', ?, datetime('now')
+         FROM analytics_projection_metric_stage
+        WHERE line_account_id = ? AND cycle_id = ?
+      `,
+    ).bind(state.data_cutoff_at, state.line_account_id, state.cycle_id),
+  ]);
+  const projected = await db.prepare(
+    `SELECT COALESCE(SUM(numerator), 0) count FROM analytics_daily_metrics
+      WHERE line_account_id = ? AND metric_date >= ? AND metric_date <= ?
+        AND metric_key = 'event_total'`,
+  ).bind(state.line_account_id, state.range_from, state.range_to).first<{ count: number }>();
+  const projectedCount = Number(projected?.count ?? 0);
+  const mismatchCount = Math.abs(sourceEventCount - projectedCount);
+  const status = mismatchCount === 0 ? 'matched' : 'mismatched';
+  const completedAt = new Date().toISOString();
+  await db.batch([
+    db.prepare(
+      `INSERT INTO analytics_reconciliation_runs (
+         id, line_account_id, range_from, range_to, source_event_count,
+         projected_count, mismatch_count, status, started_at, completed_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(line_account_id, range_to) DO UPDATE SET
+         range_from=excluded.range_from, source_event_count=excluded.source_event_count,
+         projected_count=excluded.projected_count, mismatch_count=excluded.mismatch_count,
+         status=excluded.status, error_code=NULL, started_at=excluded.started_at,
+         completed_at=excluded.completed_at`,
+    ).bind(
+      crypto.randomUUID(), state.line_account_id, state.range_from, state.range_to,
+      sourceEventCount, projectedCount, mismatchCount, status,
+      state.data_cutoff_at, completedAt,
+    ),
+    db.prepare(
+      `UPDATE analytics_projection_progress
+          SET phase = 'cleanup', updated_at = ?
+        WHERE line_account_id = ? AND cycle_id = ?`,
+    ).bind(completedAt, state.line_account_id, state.cycle_id),
+  ]);
+  return {
+    accountId: state.line_account_id,
+    fromDate: state.range_from,
+    toDate: state.range_to,
+    sourceEventCount,
+    projectedCount,
+    mismatchCount,
+    status,
+    completed: false,
+    readRows: page.results.length,
+    cursor: null,
+  };
+}
+
 function monthsBefore(now: Date, months: number): string {
   const value = new Date(now);
   value.setUTCMonth(value.getUTCMonth() - months);
@@ -213,6 +553,7 @@ function monthsBefore(now: Date, months: number): string {
 export async function purgeExpiredAnalyticsReadData(
   db: D1Database,
   now: Date,
+  limit = 1_000,
 ): Promise<{
   events: number;
   dailyMetrics: number;
@@ -226,29 +567,96 @@ export async function purgeExpiredAnalyticsReadData(
 }> {
   const eventCutoff = monthsBefore(now, 13);
   const dailyCutoff = monthsBefore(now, 25).slice(0, 10);
-  const results = await db.batch([
-    db.prepare(`DELETE FROM analytics_events WHERE occurred_at < ?`).bind(eventCutoff),
-    db.prepare(`DELETE FROM analytics_daily_metrics WHERE metric_date < ?`).bind(dailyCutoff),
-    db.prepare(`DELETE FROM analytics_reconciliation_runs WHERE completed_at < ?`).bind(eventCutoff),
-    db.prepare(`DELETE FROM analytics_result_audiences WHERE expires_at <= ?`).bind(now.toISOString()),
-    db.prepare(`DELETE FROM analytics_funnel_runs WHERE created_at < ?`).bind(eventCutoff),
-    db.prepare(`DELETE FROM analytics_cross_runs WHERE created_at < ?`).bind(eventCutoff),
-    db.prepare(`DELETE FROM analytics_saved_analysis_snapshots WHERE created_at < ?`).bind(eventCutoff),
-    db.prepare(`DELETE FROM analytics_url_exposures WHERE sent_at < ?`).bind(eventCutoff),
-    db.prepare(
-      `DELETE FROM analytics_url_exposure_queue
-        WHERE created_at < ? AND status IN ('processed','failed')`,
-    ).bind(eventCutoff),
-  ]);
+  let remaining = Number.isFinite(limit)
+    ? Math.max(1, Math.min(Math.trunc(limit), 1_000))
+    : 1_000;
+
+  const deleteChunk = async (sql: string, ...bindings: unknown[]): Promise<number> => {
+    if (remaining === 0) return 0;
+    const result = await db.prepare(sql).bind(...bindings, remaining).run();
+    const deleted = Number(result.meta?.changes ?? 0);
+    remaining -= deleted;
+    return deleted;
+  };
+
+  // 機能オフ中のアカウントの期限切れ行は消さずに残す。再オン後の
+  // purgeで消える。9表すべてに持ち主列がある。
+  const offAnalytics = (table: string): string =>
+    `AND NOT ${accountFeatureOffExclusionSql(`${table}.line_account_id`, 'analytics')}`;
+  const events = await deleteChunk(
+    `DELETE FROM analytics_events
+      WHERE rowid IN (
+        SELECT rowid FROM analytics_events WHERE occurred_at < ? ${offAnalytics('analytics_events')} ORDER BY occurred_at, rowid LIMIT ?
+      )`,
+    eventCutoff,
+  );
+  const dailyMetrics = await deleteChunk(
+    `DELETE FROM analytics_daily_metrics
+      WHERE rowid IN (
+        SELECT rowid FROM analytics_daily_metrics WHERE metric_date < ? ${offAnalytics('analytics_daily_metrics')} ORDER BY metric_date, rowid LIMIT ?
+      )`,
+    dailyCutoff,
+  );
+  const reconciliationRuns = await deleteChunk(
+    `DELETE FROM analytics_reconciliation_runs
+      WHERE rowid IN (
+        SELECT rowid FROM analytics_reconciliation_runs WHERE completed_at < ? ${offAnalytics('analytics_reconciliation_runs')} ORDER BY completed_at, rowid LIMIT ?
+      )`,
+    eventCutoff,
+  );
+  const audiences = await deleteChunk(
+    `DELETE FROM analytics_result_audiences
+      WHERE rowid IN (
+        SELECT rowid FROM analytics_result_audiences WHERE expires_at <= ? ${offAnalytics('analytics_result_audiences')} ORDER BY expires_at, rowid LIMIT ?
+      )`,
+    now.toISOString(),
+  );
+  const funnelRuns = await deleteChunk(
+    `DELETE FROM analytics_funnel_runs
+      WHERE rowid IN (
+        SELECT rowid FROM analytics_funnel_runs WHERE created_at < ? ${offAnalytics('analytics_funnel_runs')} ORDER BY created_at, rowid LIMIT ?
+      )`,
+    eventCutoff,
+  );
+  const crossRuns = await deleteChunk(
+    `DELETE FROM analytics_cross_runs
+      WHERE rowid IN (
+        SELECT rowid FROM analytics_cross_runs WHERE created_at < ? ${offAnalytics('analytics_cross_runs')} ORDER BY created_at, rowid LIMIT ?
+      )`,
+    eventCutoff,
+  );
+  const savedSnapshots = await deleteChunk(
+    `DELETE FROM analytics_saved_analysis_snapshots
+      WHERE rowid IN (
+        SELECT rowid FROM analytics_saved_analysis_snapshots WHERE created_at < ? ${offAnalytics('analytics_saved_analysis_snapshots')} ORDER BY created_at, rowid LIMIT ?
+      )`,
+    eventCutoff,
+  );
+  const urlExposures = await deleteChunk(
+    `DELETE FROM analytics_url_exposures
+      WHERE rowid IN (
+        SELECT rowid FROM analytics_url_exposures WHERE sent_at < ? ${offAnalytics('analytics_url_exposures')} ORDER BY sent_at, rowid LIMIT ?
+      )`,
+    eventCutoff,
+  );
+  const urlExposureQueue = await deleteChunk(
+    `DELETE FROM analytics_url_exposure_queue
+      WHERE rowid IN (
+        SELECT rowid FROM analytics_url_exposure_queue
+         WHERE created_at < ? AND status IN ('processed','failed') ${offAnalytics('analytics_url_exposure_queue')}
+         ORDER BY created_at, rowid LIMIT ?
+      )`,
+    eventCutoff,
+  );
   return {
-    events: Number(results[0]?.meta?.changes ?? 0),
-    dailyMetrics: Number(results[1]?.meta?.changes ?? 0),
-    reconciliationRuns: Number(results[2]?.meta?.changes ?? 0),
-    audiences: Number(results[3]?.meta?.changes ?? 0),
-    funnelRuns: Number(results[4]?.meta?.changes ?? 0),
-    crossRuns: Number(results[5]?.meta?.changes ?? 0),
-    savedSnapshots: Number(results[6]?.meta?.changes ?? 0),
-    urlExposures: Number(results[7]?.meta?.changes ?? 0),
-    urlExposureQueue: Number(results[8]?.meta?.changes ?? 0),
+    events,
+    dailyMetrics,
+    reconciliationRuns,
+    audiences,
+    funnelRuns,
+    crossRuns,
+    savedSnapshots,
+    urlExposures,
+    urlExposureQueue,
   };
 }

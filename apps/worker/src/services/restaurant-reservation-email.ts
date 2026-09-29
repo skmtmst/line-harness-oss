@@ -197,6 +197,7 @@ export async function processStoredRestaurantEmail(input: ProcessInput): Promise
 
   let object: R2ObjectBody | null;
   try {
+    if (!input.env.RAW_MAIL) throw new Error('RAW_MAIL binding is not configured');
     object = await input.env.RAW_MAIL.get(input.objectKey);
   } catch (error) {
     await markEvent(input.env, input.storeId, input.eventId, 'failed', {

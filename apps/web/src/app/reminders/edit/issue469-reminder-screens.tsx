@@ -1,0 +1,391 @@
+'use client'
+
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import type { ReminderDraftSettings, ReminderDraftStep, ReminderDraftVersion, ReminderValidationResult } from '@line-crm/shared'
+import { ApiError, api } from '@/lib/api'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import TargetMissing from '@/components/shared/target-missing'
+import { TextArea, TextInput } from '@/components/shared/form-controls'
+import { TableHeadRow, Th } from '@/components/shared/table'
+import {
+  Field,
+  LinePreview,
+  Pill,
+  ReminderButton as Button,
+  ReminderFooter,
+  ReminderPanel,
+  ReminderStepCard,
+  ReminderWizard,
+  ReminderWorkspace,
+  SummaryCard,
+} from '@/components/reminders/reminder-v6-ui'
+import { usePageTitle } from '@/components/shell/page-chrome'
+import InsertToolbar from '@/components/scenarios/insert-toolbar'
+import { firstReminderStepMessage, reminderPlaceholders, renderReminderBodySample } from '@/components/reminders/reminder-labels'
+import { useReminderTestRecipient } from '@/components/reminders/use-reminder-test-recipient'
+import { useReminderTestSend } from '@/components/reminders/use-reminder-test-send'
+import { TestRecipientGuidance, testRecipientDestinationLabel, testRecipientNote, testSendConfirmDescription } from '@/components/reminders/test-recipient-guidance'
+
+function formatTestedAt(value: string | null): string {
+  if (!value) return 'テスト記録なし'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return 'テスト記録なし'
+  return new Intl.DateTimeFormat('ja-JP', {
+    timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit',
+  }).format(date)
+}
+
+/** カードに出す「いつ届くか」。保存済みの offsetDays/sendAtTime から組み立てる。 */
+function stepTimingLabel(step: ReminderDraftStep, deliveryMode: ReminderDraftSettings['deliveryMode']): string {
+  if (deliveryMode === 'countdown') {
+    const minutes = -(step.offsetMinutes ?? 0)
+    if (minutes === 0) return '基準日 ちょうど'
+    if (minutes < 0) return `基準日の ${-minutes}分後`
+    return minutes % 60 === 0 ? `基準日の ${minutes / 60}時間前` : `基準日の ${minutes}分前`
+  }
+  const days = -(step.offsetDays ?? 0)
+  const dayLabel = days === 0 ? '当日' : days > 0 ? `${days}日前` : `${-days}日後`
+  return `基準日 ${dayLabel} ${step.sendAtTime ?? '時刻未設定'}`
+}
+
+export function Issue469ReminderStepEditor({ reminderId }: { reminderId: string }) {
+  usePageTitle('リマインダを作成・通知ステップ')
+  const router = useRouter()
+  const [settings, setSettings] = useState<ReminderDraftSettings | null>(null)
+  const [savedSettings, setSavedSettings] = useState<ReminderDraftSettings | null>(null)
+  const [versionId, setVersionId] = useState<string | null>(null)
+  /*
+   * R148 監査：開いたときの版時刻。通常保存は版IDを付け替えないため、
+   * 版IDだけでは別の画面の先勝ちを見逃す。保存のたびに変わるこの時刻も
+   * 送り、ずれていれば 409 で止める。
+   */
+  const [versionUpdatedAt, setVersionUpdatedAt] = useState<string | null>(null)
+  const [selectedStepId, setSelectedStepId] = useState<string | null>(null)
+  // 差し込みをカーソルの位置に入れるために、本文の入力欄そのものを渡す。
+  const bodyRef = useRef<HTMLTextAreaElement>(null)
+  const [validation, setValidation] = useState<ReminderValidationResult | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [conflict, setConflict] = useState(false)
+  /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
+  const [draftMissing, setDraftMissing] = useState(false)
+  /*
+   * 読み込み・保存の応答は順不同で返る。世代番号で最新の要求だけを
+   * 状態へ反映し、遅れた応答が新しい編集を上書きしないようにする。
+   */
+  const requestSeq = useRef(0)
+
+  const dirty = settings !== null && savedSettings !== null
+    && JSON.stringify(settings) !== JSON.stringify(savedSettings)
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
+
+  const loadDraft = useCallback(async () => {
+    const seq = ++requestSeq.current
+    setDraftMissing(false)
+    try {
+      const response = await api.reminders.getDraft(reminderId)
+      if (seq !== requestSeq.current) return
+      if (!response.success) throw new Error(response.error)
+      setSettings(response.data.settings)
+      setSavedSettings(response.data.settings)
+      setVersionId(response.data.versionId)
+      setVersionUpdatedAt(response.data.updatedAt)
+      setConflict(false)
+      setSelectedStepId((current) => current
+        && response.data.settings.steps.some((step) => step.stableStepId === current)
+        ? current
+        : response.data.settings.steps[0]?.stableStepId ?? null)
+    } catch (caught) {
+      if (seq !== requestSeq.current) return
+      if (caught instanceof ApiError && caught.status === 404) {
+        setDraftMissing(true)
+      } else {
+        setError('リマインダを読み込めませんでした。')
+      }
+    }
+  }, [reminderId])
+
+  useEffect(() => { void loadDraft() }, [loadDraft])
+  useEffect(() => {
+    void api.reminders.validateDraft(reminderId).then((response) => {
+      if (response.success) setValidation(response.data)
+    }).catch(() => undefined)
+  }, [reminderId])
+
+  const updateStep = useCallback((stableStepId: string, patch: Partial<ReminderDraftStep>) => {
+    setSettings((current) => current
+      ? {
+          ...current,
+          steps: current.steps.map((step) => step.stableStepId === stableStepId ? { ...step, ...patch } : step),
+        }
+      : current)
+  }, [])
+
+  const addStep = useCallback(() => {
+    const step: ReminderDraftStep = {
+      stableStepId: crypto.randomUUID(),
+      offsetMinutes: 0,
+      offsetDays: 0,
+      sendAtTime: '09:00',
+      messageType: 'text',
+      messageContent: '',
+    }
+    setSettings((current) => current ? { ...current, steps: [...current.steps, step] } : current)
+    setSelectedStepId(step.stableStepId)
+  }, [])
+
+  const removeStep = useCallback((stableStepId: string) => {
+    setSettings((current) => {
+      if (!current || current.steps.length <= 1) return current
+      const nextSteps = current.steps.filter((step) => step.stableStepId !== stableStepId)
+      return { ...current, steps: nextSteps }
+    })
+    setSelectedStepId((current) => current === stableStepId ? null : current)
+  }, [])
+
+  const moveStep = useCallback((stableStepId: string, direction: -1 | 1) => {
+    setSettings((current) => {
+      if (!current) return current
+      const index = current.steps.findIndex((step) => step.stableStepId === stableStepId)
+      const next = index + direction
+      if (index < 0 || next < 0 || next >= current.steps.length) return current
+      const steps = [...current.steps]
+      const [moved] = steps.splice(index, 1)
+      steps.splice(next, 0, moved)
+      return { ...current, steps }
+    })
+  }, [])
+
+  if (!settings && (draftMissing || !error)) {
+    if (!error && !draftMissing) return <p className="text-ink-faint p-6 text-sm">読み込んでいます</p>
+    return (
+      <TargetMissing
+        kind="not-found"
+        title="このリマインダは見つかりません"
+        description="削除されたか、別の記録です。一覧から選び直してください。"
+        backHref="/reminders"
+        backLabel="リマインダ一覧へ戻る"
+      />
+    )
+  }
+  if (!settings) {
+    return (
+      <TargetMissing
+        kind="error"
+        title="リマインダを読み込めませんでした"
+        description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+        onRetry={() => void loadDraft()}
+      />
+    )
+  }
+
+  const selectedIndex = settings.steps.findIndex((step) => step.stableStepId === selectedStepId)
+  /*
+   * REMINDER-07: ひな形なしの新規下書きは通知0件で作られる。
+   * 選べる通が無い状態をクラッシュさせず、「通知を追加」から始められる
+   * 空の状態として出す。公開・送信は別口の検査が止める。
+   */
+  const selectedStep = (selectedIndex >= 0 ? settings.steps[selectedIndex] : settings.steps[0]) ?? null
+  const allStepsHaveContent = settings.steps.length > 0
+    && settings.steps.every((step) => Boolean(step.templateId || step.messageContent.trim()))
+
+  async function save() {
+    if (!settings) return
+    const seq = ++requestSeq.current
+    setSaving(true)
+    setError('')
+    try {
+      const response = await api.reminders.saveDraft(
+        reminderId,
+        settings,
+        // R148 監査：版IDに加え、開いたときの版時刻も送る。別の画面が先に
+        // 保存していたら 409 になり、古い内容で上書きしない。
+        versionId ? { expectedVersionId: versionId, ...(versionUpdatedAt ? { expectedUpdatedAt: versionUpdatedAt } : {}) } : {},
+      )
+      if (seq !== requestSeq.current) return
+      if (!response.success) throw new Error(response.error)
+      // サーバー正規化後の形へ両方そろえて、保存直後に dirty が残らないようにする。
+      setSettings(response.data.settings)
+      setSavedSettings(response.data.settings)
+      setVersionId(response.data.versionId)
+      setVersionUpdatedAt(response.data.updatedAt)
+      router.push(`/reminders/edit?id=${encodeURIComponent(reminderId)}&stage=preview`)
+    } catch (saveError) {
+      if (seq !== requestSeq.current) return
+      if (saveError instanceof ApiError && saveError.status === 409) {
+        setConflict(true)
+        setError('この下書きは別の画面で先に更新されました。')
+      } else {
+        setError(saveError instanceof Error ? saveError.message : '通知ステップを保存できませんでした。')
+      }
+    } finally {
+      if (seq === requestSeq.current) setSaving(false)
+    }
+  }
+
+  return <div data-design-node="J64xI" className="grid gap-3">
+    <ReminderWizard current={3} />
+    <ReminderWorkspace aside={<div data-issue546-aside className="grid gap-3">
+      <SummaryCard rows={[["対象者", validation?.audience.matched == null ? '検査後に表示' : `${validation.audience.matched.toLocaleString('ja-JP')}人`], ['基準日', '予約日時（Google Meet相談）'], ['通知ステップ', `${settings.steps.length}件`], ['状態', dirty ? '未保存の変更あり' : '下書き']]} />
+      <LinePreview caption={selectedStep ? `表示例：${stepTimingLabel(selectedStep, settings.deliveryMode)} に届きます` : '通知はまだありません'} empty={!selectedStep}>{selectedStep ? selectedStep.messageContent ? renderReminderBodySample(selectedStep.messageContent) : '本文を入力すると、ここに表示例が出ます。' : '「通知を追加」で1通目を作成してください。'}</LinePreview>
+    </div>}>
+      <ReminderPanel title="通知ステップ" note="基準日を軸に、何回・いつ送るかを並べます。上から順に届きます。">
+        {settings.steps.length === 0 ? <p className="text-ink-faint rounded-lg border border-hairline p-3 text-xs">通知はまだありません。「通知を追加」で1通目を作成してください。本文が入るまで次へは進めません。</p> : null}
+        <div className="grid min-h-28 gap-2 md:grid-cols-3">{settings.steps.map((step, index) => <ReminderStepCard key={step.stableStepId} selected={step.stableStepId === selectedStep?.stableStepId} number={index + 1} timing={stepTimingLabel(step, settings.deliveryMode)} title={`${index + 1}通目のお知らせ`} note={step.messageContent} onClick={() => setSelectedStepId(step.stableStepId)} />)}</div>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <Button onClick={addStep} disabled={settings.steps.length >= 50}>通知を追加</Button>
+          <Button onClick={() => { if (selectedStep) moveStep(selectedStep.stableStepId, -1) }} disabled={!selectedStep || selectedIndex <= 0}>前へ移動</Button>
+          <Button onClick={() => { if (selectedStep) moveStep(selectedStep.stableStepId, 1) }} disabled={!selectedStep || selectedIndex < 0 || selectedIndex >= settings.steps.length - 1}>後ろへ移動</Button>
+          <Button onClick={() => { if (selectedStep) removeStep(selectedStep.stableStepId) }} disabled={settings.steps.length <= 1}>この通知を削除</Button>
+        </div>
+      </ReminderPanel>
+      {selectedStep ? <ReminderPanel title={`${selectedIndex + 1 || 1}通目のお知らせ`} note="送るタイミングと文面を決めます。">
+        <div className="grid gap-3">
+          <div className="grid gap-3 md:grid-cols-4">
+            <Field label="起点"><TextInput className="border-hairline rounded-control focus:ring-accent border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value="基準日" readOnly /></Field>
+            {settings.deliveryMode === 'countdown' ? (
+              <Field label="基準日の何分前" note="後ろにずらすときは負の数"><TextInput className="border-hairline rounded-control focus:ring-accent border px-3 py-2 text-sm focus:ring-2 focus:outline-none" type="number" min={-525600} max={525600} value={String(-(selectedStep.offsetMinutes ?? 0))} onChange={(event) => {
+                const minutesBefore = Number(event.target.value)
+                if (Number.isInteger(minutesBefore)) updateStep(selectedStep.stableStepId, { offsetMinutes: -minutesBefore })
+              }} /></Field>
+            ) : (<>
+              <Field label="基準日の何日前" note="後ろにずらすときは負の数"><TextInput className="border-hairline rounded-control focus:ring-accent border px-3 py-2 text-sm focus:ring-2 focus:outline-none" type="number" min={-365} max={365} value={String(-(selectedStep.offsetDays ?? 0))} onChange={(event) => {
+                const daysBefore = Number(event.target.value)
+                if (Number.isInteger(daysBefore)) updateStep(selectedStep.stableStepId, { offsetDays: -daysBefore })
+              }} /></Field>
+              <Field label="送信時刻"><TextInput className="border-hairline rounded-control focus:ring-accent min-w-24 border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value={selectedStep.sendAtTime ?? ''} placeholder="HH:MM" onChange={(event) => updateStep(selectedStep.stableStepId, { sendAtTime: event.target.value || null })} /></Field>
+            </>)}
+          </div>
+          <InsertToolbar
+            targetRef={bodyRef}
+            value={selectedStep.messageContent}
+            onChange={(next) => updateStep(selectedStep.stableStepId, { messageContent: next.slice(0, 5000) })}
+          />
+          <Field label="本文" required note={`${selectedStep.messageContent.length} / 5,000文字`}><TextArea ref={bodyRef} rows={3} className="border-hairline rounded-control focus:ring-accent border px-3 py-2 text-sm focus:ring-2 focus:outline-none" value={selectedStep.messageContent} onChange={(event) => updateStep(selectedStep.stableStepId, { messageContent: event.target.value })} /></Field>
+          {/\{\{[^}]+\}\}/.test(selectedStep.messageContent)
+            ? <p className="text-ink-secondary text-xs">見本：{renderReminderBodySample(selectedStep.messageContent)}</p>
+            : null}
+        </div>
+      </ReminderPanel> : null}
+      <ReminderPanel title="URLの扱い" note="短縮するとクリック数を計測できます。Meetの参加URLは短縮しない設定です。"><div className="flex items-center justify-between rounded-lg border border-hairline p-3 text-xs"><span>Google Meet 参加URL　<Pill>参加URL（差し込み）</Pill></span><strong>短縮しない</strong></div></ReminderPanel>
+      {error ? <p className="text-danger text-xs">{error}{conflict ? <button type="button" className="ml-2 underline" onClick={() => void loadDraft()}>最新を読み込み直す</button> : null}</p> : null}
+    </ReminderWorkspace>
+    <div className="mt-16"><ReminderFooter primary={saving ? '保存中…' : '送信設定へ'} primaryDisabled={saving || !allStepsHaveContent} onPrimary={() => void save()} /></div>
+    <ConfirmDialog primaryAction="cancel" open={leaveTarget !== null} title="保存していない変更があります" description="このまま移動すると、通知ステップへの変更は失われます。保存せずに移動しますか？" confirmLabel="保存せずに移動" cancelLabel="編集を続ける" onConfirm={confirmLeave} onCancel={cancelLeave} />
+    <style jsx global>{`
+      /*
+       * R17: 右390px固定は広い幅だけ。中くらいの幅では LINE のプレビューを
+       * 下へ送り、入力欄を細くしない。共通ワークスペースの 1100px 切り替え
+       * (reminder-v6-ui.module.css) と同じ境目にする。
+       */
+      @media(min-width: 1101px) {
+        [data-design-node='J64xI'] > div:nth-of-type(2) {
+          grid-template-columns: minmax(0, 1fr) 390px;
+        }
+      }
+      [data-issue546-aside] > section:first-child {
+        min-height: 299px;
+      }
+      [data-issue546-aside] > section:first-child dl > div {
+        padding-block: 20px;
+      }
+      [data-issue546-aside] > section:nth-child(2) {
+        min-height: 389px;
+      }
+      [data-design-node='J64xI'] textarea {
+        min-height: 86px;
+        height: 86px;
+      }
+    `}</style>
+  </div>
+}
+
+export function Issue469ReminderTestStage({ reminderId }: { reminderId: string }) {
+  usePageTitle('リマインダをテスト送信')
+  const router = useRouter()
+  const [draft, setDraft] = useState<ReminderDraftVersion | null>(null)
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [error, setError] = useState('')
+  /*
+   * DEEP-09: 本文・宛先・送信結果はすべて同じ対象キー（reminderId）で管理する。
+   * 宛先は useReminderTestRecipient、送信は useReminderTestSend が世代を持ち、
+   * 本文はここの世代番号が守る。対象が変わった時点で前の対象の表示を捨て、
+   * 遅れて届いた応答は破棄する。
+   */
+  const subjectSeq = useRef(0)
+  const testRecipient = useReminderTestRecipient(reminderId)
+  const testSend = useReminderTestSend(reminderId)
+
+  useEffect(() => {
+    const seq = ++subjectSeq.current
+    // 前の対象の本文・読み込みエラー・開いたままの確認窓を持ち越さない。
+    setDraft(null)
+    setError('')
+    setConfirmOpen(false)
+    void api.reminders.getDraft(reminderId).then((response) => {
+      if (seq !== subjectSeq.current) return
+      if (!response.success) throw new Error(response.error)
+      setDraft(response.data)
+    }).catch(() => {
+      if (seq === subjectSeq.current) setError('下書きを読み込めませんでした。')
+    })
+  }, [reminderId])
+
+  // 画面に出ている本文の版と送信先の対象が一致しているときだけ送れる。
+  // 切替え直後の「前の対象の下書きが残っている」間は送信を開かせない。
+  const subjectDraft = draft && draft.reminderId === reminderId ? draft : null
+
+  async function sendTest() {
+    const outcome = await testSend.send()
+    if (outcome.kind === 'succeeded') {
+      setDraft((current) => current ? { ...current, lastTestStatus: 'succeeded', lastTestedAt: outcome.testedAt } : current)
+      setConfirmOpen(false)
+      return
+    }
+    if (outcome.kind === 'failed' && outcome.recipientFault) {
+      // 送信先起因の失敗はパネル側の状態も最新へ揃え、窓を閉じて設定導線へ出す。
+      void testRecipient.reload()
+      setConfirmOpen(false)
+    }
+    // 確定失敗・結果不明は窓を開いたままにし、エラーは窓の中に出す。
+  }
+
+  if (!subjectDraft) return <p className={error ? 'text-danger p-6 text-sm' : 'text-ink-faint p-6 text-sm'}>{error || '下書きを読み込んでいます'}</p>
+
+  const testedAt = formatTestedAt(subjectDraft.lastTestedAt)
+  const sentTo = testSend.phase.kind === 'succeeded' ? testSend.phase.recipientName : null
+  const sentKind = testSend.phase.kind === 'succeeded' ? testSend.phase.recipientKind : null
+  // REMINDER-12: 届け先は「自分のLINE」と「登録済みテスト宛先」を区別して出す。
+  const recipient = testRecipientDestinationLabel(testRecipient.view, sentTo, sentKind)
+  const sendIssue = testSend.phase.kind === 'failed' || testSend.phase.kind === 'unknown' ? testSend.phase.message : ''
+  const sendBusy = testSend.phase.kind === 'sending'
+
+  const openConfirm = () => {
+    // 結果不明の試行だけ同じ冪等キーを引き継ぐ。それ以外は別のテスト＝新しいキー。
+    testSend.beginAttempt()
+    setConfirmOpen(true)
+  }
+
+  return <div data-design-node="W98zZQ" className="space-y-3">
+    <ReminderWizard current={4} />
+    <ReminderWorkspace aside={<div className="grid gap-3">
+      <SummaryCard rows={[["本番への影響", 'なし'], ['送信数', '1通'], ['送信先', recipient], ['送信方法', 'LINE公式']]} />
+      <LinePreview caption="テスト送信される1通目の内容">{firstReminderStepMessage(subjectDraft.settings) || '本文がありません'}</LinePreview>
+      <div className="grid grid-cols-2 gap-2"><Button onClick={openConfirm} disabled={sendBusy}>テスト送信</Button></div>
+    </div>}>
+      <ReminderPanel title="テスト対象" note={testRecipientNote(testRecipient.view, sentKind)}><dl className="grid min-h-24 grid-cols-2 gap-4 text-xs"><Metric label="送信先" value={recipient} /><Metric label="最終テスト日時" value={testedAt} /></dl><TestRecipientGuidance view={testRecipient.view} accountId={subjectDraft.settings.lineAccountId} onRecheck={() => void testRecipient.reload()} /></ReminderPanel>
+      <ReminderPanel title="差し込み値の確認" note="本文に書いた差し込みだけを並べ、どこから取るかを確認します。">{reminderPlaceholders(subjectDraft.settings, sentTo).length === 0 ? <p className="text-ink-faint px-3 py-3 text-xs">本文に差し込み値はありません。</p> : <table className="w-full border-collapse text-left text-xs"><thead><TableHeadRow><Th>変数</Th><Th>テストで使う値</Th><Th>本番での取得元</Th></TableHeadRow></thead><tbody className="border-hairline border-t">{reminderPlaceholders(subjectDraft.settings, sentTo).map((placeholder) => <tr key={placeholder.token} className="border-hairline border-t"><td className="px-3 py-3"><code>{placeholder.token}</code></td><td className="px-3 py-3">{placeholder.testValue}</td><td className="px-3 py-3">{placeholder.source}</td></tr>)}</tbody></table>}</ReminderPanel>
+      <ReminderPanel title="テスト送信の履歴" note="下書きに記録された直近のテストだけを表示します。" action={subjectDraft.lastTestStatus === 'succeeded' ? <Pill tone="success">直近のテストは成功</Pill> : undefined}><table className="w-full border-collapse text-left text-xs"><thead><TableHeadRow><Th>送信日時</Th><Th>送信した通知・宛先</Th><Th>結果</Th></TableHeadRow></thead><tbody className="border-hairline border-t"><tr><td className="px-3 py-3">{testedAt}</td><td className="px-3 py-3">下書きの通知 ／ {recipient}</td><td className="px-3 py-3"><Pill tone={subjectDraft.lastTestStatus === 'succeeded' ? 'success' : 'warning'}>{subjectDraft.lastTestStatus === 'succeeded' ? '送信できました' : '成功記録なし'}</Pill></td></tr></tbody></table></ReminderPanel>
+      {/* 送信の失敗・結果不明は一つの状態で持つ。窓が閉じているときだけ背面に出す。 */}
+      {sendIssue && !confirmOpen ? <p className="text-danger text-xs">{sendIssue}</p> : null}
+    </ReminderWorkspace>
+    <div className="mt-16"><ReminderFooter status={subjectDraft.lastTestStatus === 'succeeded' ? `テスト済み ${testedAt}` : '下書き保存'} secondary={{ label: 'テスト送信', onClick: openConfirm }} primary="最終確認へ" onPrimary={() => router.push(`/reminders/edit?id=${encodeURIComponent(reminderId)}&stage=confirm`)} /></div>
+    <ConfirmDialog open={confirmOpen} title="テスト送信しますか？" description={testSend.phase.kind === 'unknown' ? '前回の送信結果を確認できていません。再試行しても二重には送られません。' : testSendConfirmDescription(testRecipient.view, sentTo, sentKind)} confirmLabel={sendIssue ? 'もう一度送信' : 'テスト送信'} cancelLabel="配信予定へ戻る" busy={sendBusy} error={sendIssue} onConfirm={() => void sendTest()} onCancel={() => setConfirmOpen(false)} />
+  </div>
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return <div className="flex items-center justify-between gap-3 py-2"><dt className="text-ink-faint">{label}</dt><dd className="text-ink font-bold">{value}</dd></div>
+}

@@ -7,7 +7,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import type Database from 'better-sqlite3'
 import { createTestD1, insertFriend } from '../test-utils/d1-sqlite.js'
-import { buildSegmentQuery, matchesCondition, type SegmentCondition } from './segment-query.js'
+import { buildPublicSegmentQuery, buildSegmentQuery, matchesCondition, type SegmentCondition } from './segment-query.js'
 
 let db: D1Database
 let raw: Database.Database
@@ -59,6 +59,25 @@ describe('タグ', () => {
   })
 })
 
+describe('固定した配信対象', () => {
+  it('確認時点のIDだけを1 bindで固定し、多数でもD1のbind上限を越えない', async () => {
+    const ids = [...Array.from({ length: 240 }, (_, index) => `other-${index}`), 'a', 'c', 'a']
+    const condition: SegmentCondition = { operator: 'AND', rules: [{ type: 'friend_id_in', value: ids }] }
+    const { sql, bindings } = buildSegmentQuery(condition)
+    expect(sql).toContain('json_each(?)')
+    expect(bindings).toHaveLength(1)
+    expect(await idsMatching(condition)).toEqual(['a', 'c'])
+  })
+
+  it('空の固定対象は全員一致にせず拒否する', () => {
+    expect(() => buildSegmentQuery({ operator: 'AND', rules: [{ type: 'friend_id_in', value: [] }] })).toThrow()
+  })
+
+  it('一般の条件保存口は内部snapshot用ID列を拒否する', () => {
+    expect(() => buildPublicSegmentQuery({ operator: 'AND', rules: [{ type: 'friend_id_in', value: ['a'] }] })).toThrow('reserved')
+  })
+})
+
 describe('名前', () => {
   it('半角スペース区切りはいずれかに一致（OR）', async () => {
     expect(
@@ -82,6 +101,46 @@ describe('名前', () => {
       await idsMatching({
         operator: 'AND',
         rules: [{ type: 'name', value: { text: '田中太郎', targets: ['display'] } }],
+      }),
+    ).toEqual([])
+  })
+
+  /*
+   * R258: 検索対象の指定と未指定を区別する。空配列は「選んでいない」
+   * 状態のまま保存されたもので、全欄へ広げず作り直しを促す。
+   * 未指定（古い保存形）はこれまでどおり全欄で探す。
+   */
+  it('R258 空配列は全欄へ広がらない（作り直しを促す）', () => {
+    const empty: SegmentCondition = {
+      operator: 'AND',
+      rules: [{ type: 'name', value: { text: '田中', targets: [] } }],
+    }
+    expect(() => buildSegmentQuery(empty)).toThrow(/at least one target/)
+  })
+
+  it('R258 未指定は古い保存形として全欄で探す', async () => {
+    raw.prepare(`UPDATE friends SET display_name = 'ニックネーム' WHERE id = 'a'`).run()
+    // targets が無い古い形。real_name の値でも当たる。
+    expect(
+      await idsMatching({
+        operator: 'AND',
+        rules: [{ type: 'name', value: { text: '田中太郎' } }],
+      }),
+    ).toEqual(['a'])
+  })
+
+  it('R258 複数選択は選んだ欄だけで判定する', async () => {
+    raw.prepare(`UPDATE friends SET display_name = 'ニックネーム' WHERE id = 'a'`).run()
+    expect(
+      await idsMatching({
+        operator: 'AND',
+        rules: [{ type: 'name', value: { text: '田中太郎', targets: ['display', 'real'] } }],
+      }),
+    ).toEqual(['a'])
+    expect(
+      await idsMatching({
+        operator: 'AND',
+        rules: [{ type: 'name', value: { text: '田中太郎', targets: ['display', 'system'] } }],
       }),
     ).toEqual([])
   })
@@ -207,5 +266,138 @@ describe('matchesCondition', () => {
   it('条件が null / 空なら全員あてはまる（絞り込みなしの意味）', async () => {
     expect(await matchesCondition(db, 'c', null)).toBe(true)
     expect(await matchesCondition(db, 'c', { operator: 'AND', rules: [] })).toBe(true)
+  })
+})
+
+describe('分析の一時対象者(N-274)', () => {
+  /*
+   * audience の中身（friend ID）を条件へ埋めず、audience ID だけを持つ。
+   * 評価のたびに所属アカウントと期限を確かめるので、期限切れ・他アカウント・
+   * 消えた対象者は誰にもあてはまらない（fail-closed）。
+   */
+  function seedAudienceRow(
+    id: string,
+    accountId: string,
+    expiresAt: string,
+    friendIds: string[],
+  ): void {
+    raw.prepare(
+      `INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret, is_active)
+       VALUES (?, ?, ?, 'token', 'secret', 1)`,
+    ).run(accountId, `channel-${accountId}`, accountId)
+    raw.prepare(
+      `INSERT INTO analytics_cross_runs
+         (id, line_account_id, query_json, state, period_from, period_to, time_zone, data_cutoff_at, created_at)
+       VALUES (?, ?, '{}', 'available', '2026-09-01', '2026-09-30', 'Asia/Tokyo', '2026-10-01T00:00:00.000Z', '2026-10-01T00:00:00.000Z')`,
+    ).run(`run-${id}`, accountId)
+    raw.prepare(
+      `INSERT INTO analytics_result_audiences
+         (id, line_account_id, source_kind, source_result_id, selection_key, member_count, expires_at, created_at)
+       VALUES (?, ?, 'cross', ?, 'a:b', ?, ?, '2026-10-01T00:00:00.000Z')`,
+    ).run(id, accountId, `run-${id}`, friendIds.length, expiresAt)
+    for (const friendId of friendIds) {
+      raw.prepare(
+        `INSERT INTO analytics_result_audience_members (audience_id, friend_id) VALUES (?, ?)`,
+      ).run(id, friendId)
+    }
+  }
+
+  it('対象者の友だちだけが残る', async () => {
+    seedAudienceRow('aud-1', 'acc-seg', '2999-01-01T00:00:00.000Z', ['a', 'b'])
+    raw.prepare(`UPDATE friends SET line_account_id = 'acc-seg'`).run()
+    const matched = await idsMatching({
+      operator: 'AND',
+      rules: [{ type: 'analytics_audience', value: { audienceId: 'aud-1' } }],
+    })
+    expect(matched).toEqual(['a', 'b'])
+  })
+
+  it('期限切れ・他アカウント・不存在は誰にもあてはまらない', async () => {
+    seedAudienceRow('aud-expired', 'acc-seg', '2000-01-01T00:00:00.000Z', ['a'])
+    seedAudienceRow('aud-other', 'acc-other', '2999-01-01T00:00:00.000Z', ['a'])
+    raw.prepare(`UPDATE friends SET line_account_id = 'acc-seg'`).run()
+    for (const audienceId of ['aud-expired', 'aud-other', 'aud-none']) {
+      const matched = await idsMatching({
+        operator: 'AND',
+        rules: [{ type: 'analytics_audience', value: { audienceId } }],
+      })
+      expect(matched).toEqual([])
+    }
+  })
+
+  it('audienceId の空欄は全員一致にせず組み立てを断る', () => {
+    expect(() =>
+      buildSegmentQuery({ operator: 'AND', rules: [{ type: 'analytics_audience', value: { audienceId: '' } }] }),
+    ).toThrow()
+    expect(() =>
+      buildSegmentQuery({ operator: 'AND', rules: [{ type: 'analytics_audience', value: {} }] }),
+    ).toThrow()
+  })
+
+  it('一般の条件保存口でも使える（配信の保存経路が通る）', () => {
+    const { sql } = buildPublicSegmentQuery({
+      operator: 'AND',
+      rules: [{ type: 'analytics_audience', value: { audienceId: 'aud-1' } }],
+    })
+    expect(sql).toContain('analytics_result_audience_members')
+  })
+})
+
+describe('友だち一覧からの引継ぎ条件（chat_status / operator_id）', () => {
+  /*
+   * IDEA-03。一覧の「対応」「担当者」絞り込みを配信条件へ写すための
+   * ルール。一覧と同じ chats 台帳を見るので、一覧に出た人と
+   * 配信対象がずれない。行が無い人は一覧どおり resolved 扱い。
+   */
+  beforeEach(() => {
+    raw.prepare(
+      `INSERT INTO operators (id, name, email) VALUES ('op-1', '佐藤', 'sato@example.com')`,
+    ).run()
+    raw
+      .prepare(
+        `INSERT INTO chats (id, friend_id, operator_id, status, created_at, updated_at)
+         VALUES ('chat-a', 'a', 'op-1', 'unread', '2026-01-01T00:00:00.000', '2026-01-01T00:00:00.000'),
+                ('chat-b', 'b', NULL, 'resolved', '2026-01-01T00:00:00.000', '2026-01-01T00:00:00.000')`,
+      )
+      .run()
+    // c には chats 行を作らない（一覧どおり resolved 扱いになるはず）。
+  })
+
+  it('chat_status: 未対応の人だけが残る', async () => {
+    expect(
+      await idsMatching({ operator: 'AND', rules: [{ type: 'chat_status', value: 'unread' }] }),
+    ).toEqual(['a'])
+  })
+
+  it('chat_status: 対応済みは行の無い人も含む（一覧と同じ resolved 扱い）', async () => {
+    expect(
+      await idsMatching({ operator: 'AND', rules: [{ type: 'chat_status', value: 'resolved' }] }),
+    ).toEqual(['b', 'c'])
+  })
+
+  it('chat_status: 知らない状態は組み立てを断る', () => {
+    expect(() =>
+      buildSegmentQuery({ operator: 'AND', rules: [{ type: 'chat_status', value: 'closed' }] }),
+    ).toThrow()
+  })
+
+  it('operator_id: その担当者が付いている人だけが残る', async () => {
+    expect(
+      await idsMatching({ operator: 'AND', rules: [{ type: 'operator_id', value: 'op-1' }] }),
+    ).toEqual(['a'])
+  })
+
+  it('operator_id: 空欄は全員一致にせず組み立てを断る', () => {
+    expect(() =>
+      buildSegmentQuery({ operator: 'AND', rules: [{ type: 'operator_id', value: '' }] }),
+    ).toThrow()
+  })
+
+  it('一般の条件保存口（配信経路）でも組み立てられる', () => {
+    const { sql } = buildPublicSegmentQuery({
+      operator: 'AND',
+      rules: [{ type: 'chat_status', value: 'unread' }, { type: 'operator_id', value: 'op-1' }],
+    })
+    expect(sql).toContain('chats')
   })
 })

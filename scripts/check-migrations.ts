@@ -104,6 +104,29 @@ const RULES: Rule[] = [
     label: 'ADD CONSTRAINT ... UNIQUE is forbidden (may violate existing rows)',
     pattern: /\bADD\s+CONSTRAINT\s+\S+\s+UNIQUE\b/i,
   },
+  {
+    // pragma_table_info(...) / pragma_foreign_key_list(...) などの
+    // テーブル値関数形式は引数が固定でも、括弧無しの `FROM pragma_x` でも
+    // D1 の authorizer が SQLITE_AUTH で拒否する(#744)。
+    // 文形式の `PRAGMA name` はこの規則に掛からない。
+    label:
+      'pragma table-valued function is forbidden (D1 authorizer rejects pragma_* with SQLITE_AUTH)',
+    pattern: /\bpragma_\w+/i,
+  },
+  {
+    // `PRAGMA foreign_key_check` は D1 が拒否した実績があり、行を返すだけで
+    // 失敗にもならない。FK の最終確認はコミット時の強制と
+    // `PRAGMA defer_foreign_keys = off` に委ねる。
+    label:
+      'PRAGMA foreign_key_check is forbidden (D1 rejects it; use commit-time enforcement)',
+    pattern: /\bpragma\s+foreign_key_check\b/i,
+  },
+  {
+    // D1 は常に foreign_keys=on 相当で、ユーザー文からの切替は拒否される。
+    label:
+      'PRAGMA foreign_keys is forbidden (D1 always enforces foreign keys)',
+    pattern: /\bpragma\s+foreign_keys\b/i,
+  },
 ];
 
 /**
@@ -144,8 +167,28 @@ function stripLineComments(sql: string): string {
  */
 const REBUILD_MARKER = /--\s*migration-policy:\s*table-rebuild\b/i;
 
+/**
+ * 作り直しの中だけで「作る→写す→元の子へ戻す→落とす」ために使う
+ * 一時退避表の許可リスト。**ファイル名ごとに**名指しでだけ許す。
+ * ここに無い `*_backup` の DROP は今までどおり止まる。
+ */
+const SIDECAR_BACKUP_TABLES: Record<string, ReadonlySet<string>> = {
+  '382_tags_account_name_scope.sql': new Set([
+    'migration_382_tag_refs_backup',
+    'migration_382_friend_tags_backup',
+    'migration_382_friend_tag_side_effect_runs_backup',
+  ]),
+  // #937: conversion_points 再構築で CASCADE の子表（conversion_events /
+  // dedup_claims / revisions）を一時退避し、新表へ戻してから片付ける。
+  '440_conversion_draft_and_ingest.sql': new Set([
+    'migration_440_conversion_events_backup',
+    'migration_440_dedup_claims_backup',
+    'migration_440_revisions_backup',
+  ]),
+};
+
 /** 印のあるファイルが、ほんとうに表の作り直しになっているか。 */
-function isCoherentRebuild(stripped: string): boolean {
+function isCoherentRebuild(stripped: string, fileName?: string): boolean {
   const created = [...stripped.matchAll(/\bCREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?["\[`]?(\w+)["\]`]?/gi)]
     .map((m) => m[1]);
   const dropped = [...stripped.matchAll(/\bDROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?["\[`]?(\w+)["\]`]?/gi)]
@@ -155,13 +198,27 @@ function isCoherentRebuild(stripped: string): boolean {
 
   // 落とすだけ・改名するだけは通さない。作り直しは必ず両方そろう。
   for (const table of dropped) {
+    // D1 disallows TEMP tables. Migration 382 uses these three transaction-local
+    // sidecars to detach FK references before replacing tags, then restores and
+    // checks them before cleanup. Migration 440 backs up the CASCADE children of
+    // conversion_points for the same reason. Never permit arbitrary
+    // backup-table drops — only the names listed here, only in their own file.
+    const sidecars = SIDECAR_BACKUP_TABLES[fileName ?? ''];
+    if (sidecars?.has(table)) {
+      const create = new RegExp(`\\bCREATE\\s+TABLE\\s+${table}\\s*(?:\\(|AS\\s+SELECT\\b)`, 'i').exec(stripped);
+      const drop = new RegExp(`\\bDROP\\s+TABLE\\s+${table}\\s*;`, 'i').exec(stripped);
+      if (created.filter(name => name === table).length === 1
+        && dropped.filter(name => name === table).length === 1
+        && create && drop && create.index < drop.index) continue;
+      return false;
+    }
     const back = renamed.find((r) => r.to === table);
     if (!back) return false;
-    // 改名の元は、この手順で作った（か、前の手順で作った）`<表名>_new` であること。
-    if (back.from !== `${table}_new`) return false;
+    // 改名の元は、作り直し用と分かる `<表名>_new` / `<表名>_next` に限る。
+    if (![`${table}_new`, `${table}_next`].includes(back.from)) return false;
   }
   for (const r of renamed) {
-    if (r.from !== `${r.to}_new`) return false;
+    if (![`${r.to}_new`, `${r.to}_next`].includes(r.from)) return false;
     // 改名先の表を、この一連で落としているか、既にあるか。落としていない
     // のに同じ名前へ改名すると、その時点で失敗する。
   }
@@ -183,6 +240,18 @@ const GRANDFATHERED_REBUILDS = new Set([
   '135_step_message_kinds_rename.sql',
   '139_step_carousel_swap.sql',
   '140_step_carousel_rename.sql',
+  // 2026-09-03 に棚卸しで見つけた4本。いずれも印が付く前に検証・本番へ当てた
+  // 作り直しで、release.yml の安全検査を毎回落としていた。
+  '189_analytics_cross.sql',
+  '192_inbox_v6_foundation.sql',
+  '202_ec_event_account_and_identity.sql',
+  '265_nen_shared_friend_add_coupon.sql',
+  // #742: 354 は旧形式の作り直し（印なし・`_v1` 命名の逆向き手順）で、
+  // #744 の記録により検証 D1 へ適用済み（380・381 まで適用、382 のみ未適用）。
+  // 適用済みのため本体は書き換えず、ここで救済する。実質は正しい作り直し
+  // （全行を世代0埋めで写してから旧表を落とす）で、禁止規則・coherence 条件
+  // 自体は弱めない。これ以降の追加はしないこと（新規は印を使う）。
+  '354_analytics_cross_lease_generation.sql',
 ]);
 
 export function checkMigration(sql: string, fileName?: string): CheckResult {
@@ -191,12 +260,13 @@ export function checkMigration(sql: string, fileName?: string): CheckResult {
   if (fileName && GRANDFATHERED_REBUILDS.has(fileName)) return { ok: true };
 
   const rebuild = REBUILD_MARKER.test(sql);
-  if (rebuild && !isCoherentRebuild(stripped)) {
+  if (rebuild && !isCoherentRebuild(stripped, fileName)) {
     return {
       ok: false,
       violation:
         'table-rebuild の印があるが、作り直しの形になっていない'
-        + '（`<表名>_new` を作って、同じ表を落として、`<表名>` へ改名する組でのみ許される）',
+        + '（`<表名>_new` または `<表名>_next` を作って、同じ表を落とし、'
+        + '`<表名>` へ改名する組でのみ許される）',
     };
   }
 
@@ -221,8 +291,8 @@ const DEFAULT_MIGRATIONS_DIR = 'packages/db/migrations';
  * already been applied to production D1 and cannot be rewritten — they are
  * grandfathered. Bump this only when starting a new policy era.
  *
- * String comparison works here because migration prefixes are numeric and
- * zero-padded (`001`..`041`..), so lexicographic order matches numeric order.
+ * ファイル名は通常3桁でゼロ埋めするが、1000以降も同じ検査へ含めるため、
+ * 比較するときは文字列ではなく数値へ直す。
  */
 export const POLICY_CUTOFF_PREFIX = '041';
 
@@ -231,17 +301,20 @@ export const POLICY_CUTOFF_PREFIX = '041';
  * that fall under the active policy. With `all = true`, returns the input
  * unchanged (escape hatch for ad-hoc full scans).
  *
- * Files whose name starts with a prefix >= POLICY_CUTOFF_PREFIX pass. Files
- * with non-numeric or shorter prefixes pass through too (the comparison is
- * lexicographic and any newer naming scheme is assumed in-policy until we
- * decide otherwise).
+ * Files whose numeric prefix is >= POLICY_CUTOFF_PREFIX pass. Numeric prefix
+ * が読めない名前は、命名を変えて検査を迂回できないよう検査対象へ残す。
  */
 export function filterMigrationsByPolicy(
   names: string[],
   options: { all?: boolean } = {},
 ): string[] {
   if (options.all) return names;
-  return names.filter((name) => name >= POLICY_CUTOFF_PREFIX);
+  const cutoff = Number(POLICY_CUTOFF_PREFIX);
+  return names.filter((name) => {
+    const match = /^(\d+)_/.exec(name);
+    if (!match) return true;
+    return Number(match[1]) >= cutoff;
+  });
 }
 
 function listDefaultMigrations(options: { all?: boolean } = {}): string[] {

@@ -1,4 +1,6 @@
-import { jstNow } from './utils.js';
+import { accountFeatureOffExclusionSql, isAccountFeatureEnabled } from './account-settings.js';
+import { matchesCondition, parseCondition, type SegmentCondition } from './segment-conditions.js';
+import { dbTableExists, jstNow } from './utils.js';
 
 export const DEFAULT_MILEAGE_PROGRAM_ID = 'default';
 
@@ -163,11 +165,16 @@ export async function enqueueMileageEvent(
   input: EnqueueMileageEventInput,
 ): Promise<EngagementEvent> {
   const friend = await db
-    .prepare(`SELECT id, user_id FROM friends WHERE id = ?`)
+    .prepare(`SELECT id, user_id, line_account_id FROM friends WHERE id = ?`)
     .bind(input.friendId)
-    .first<{ id: string; user_id: string | null }>();
+    .first<{ id: string; user_id: string | null; line_account_id: string | null }>();
   if (!friend) throw new Error(`Mileage friend not found: ${input.friendId}`);
 
+  // N-231 案1: 受付時点で適用版の集合を固定する。後で公開されてもこの行は旧版のまま。
+  const versionMap = friend.line_account_id
+    ? await getAccountRuleVersionMap(db, friend.line_account_id)
+    : {};
+  const snapshot = JSON.stringify(versionMap);
   const now = jstNow();
   const event = await recordEngagementEvent(db, {
     idempotencyKey: `${input.source}:${input.eventType}:${input.sourceEventId}`,
@@ -186,10 +193,11 @@ export async function enqueueMileageEvent(
   await db
     .prepare(
       `INSERT OR IGNORE INTO mileage_event_queue
-         (engagement_event_id, status, attempts, available_at, created_at, updated_at)
-       VALUES (?, 'pending', 0, ?, ?, ?)`,
+         (engagement_event_id, status, attempts, available_at,
+          applied_published_snapshot, created_at, updated_at)
+       VALUES (?, 'pending', 0, ?, ?, ?, ?)`,
     )
-    .bind(event.id, now, now, now)
+    .bind(event.id, now, snapshot, now, now)
     .run();
   return event;
 }
@@ -292,6 +300,10 @@ export interface PostMileageAdjustmentInput {
   executedByStaffId: string;
   executedByStaffName: string;
   lineAccountId: string;
+  /** Positive adjustments create an expiring grant lot through the existing ledger trigger. */
+  expiresAt?: string | null;
+  /** Included in the idempotency fingerprint so a retry cannot add or remove delivery. */
+  notifyFriend?: boolean;
   occurredAt?: string;
 }
 
@@ -339,6 +351,43 @@ function adjustmentResult(
   };
 }
 
+function buildAdjustmentFingerprint(input: PostMileageAdjustmentInput): string {
+  const fingerprintInput: Record<string, unknown> = {
+    friendId: input.friendId,
+    amount: input.amount,
+    reason: input.reason,
+    reasonCategory: input.reasonCategory,
+    sourceReferenceId: input.sourceReferenceId ?? null,
+    lineAccountId: input.lineAccountId,
+  };
+  // Keep the original six-field shape when neither V6 option is used, so
+  // idempotent retries of adjustments created before this migration still work.
+  if (input.expiresAt) fingerprintInput.expiresAt = input.expiresAt;
+  if (input.notifyFriend) fingerprintInput.notifyFriend = true;
+  return JSON.stringify(fingerprintInput);
+}
+
+/**
+ * R378: 確定済みの調整を Idempotency-Key で探す。
+ *
+ * 承認境界の引き下げや元の有効期限の経過は「新しい調整への判定」なので、
+ * すでに台帳へ入った同じ要求の再送には適用しない。呼び出し側は
+ * 期限・境界の検査より先にここを試し、見つかったら当時の結果を返す。
+ * 同じキーで別の内容が来た場合は idempotency_conflict を投げる。
+ */
+export async function findCommittedMileageAdjustment(
+  db: D1Database,
+  input: PostMileageAdjustmentInput,
+): Promise<MileageAdjustmentResult | null> {
+  const programId = input.programId ?? DEFAULT_MILEAGE_PROGRAM_ID;
+  const existing = await db
+    .prepare(`SELECT * FROM mileage_ledger WHERE program_id = ? AND idempotency_key = ?`)
+    .bind(programId, input.idempotencyKey)
+    .first<MileageLedgerEntry>();
+  if (!existing) return null;
+  return adjustmentResult(existing, buildAdjustmentFingerprint(input), true);
+}
+
 /**
  * Append one manual adjustment without ever mutating the existing ledger.
  *
@@ -358,14 +407,7 @@ export async function postMileageAdjustment(
   const programId = input.programId ?? DEFAULT_MILEAGE_PROGRAM_ID;
   await ensureBuiltInProgram(db, programId);
 
-  const fingerprint = JSON.stringify({
-    friendId: input.friendId,
-    amount: input.amount,
-    reason: input.reason,
-    reasonCategory: input.reasonCategory,
-    sourceReferenceId: input.sourceReferenceId ?? null,
-    lineAccountId: input.lineAccountId,
-  });
+  const fingerprint = buildAdjustmentFingerprint(input);
   const existing = await db
     .prepare(`SELECT * FROM mileage_ledger WHERE program_id = ? AND idempotency_key = ?`)
     .bind(programId, input.idempotencyKey)
@@ -381,6 +423,10 @@ export async function postMileageAdjustment(
     lineAccountId: input.lineAccountId,
     executedByStaffId: input.executedByStaffId,
     executedByStaffName: input.executedByStaffName,
+    expiresAt: input.expiresAt ?? null,
+    // R380: 通知記録の作成自体が落ちたとき、あとから「通知だけ」を再送
+    // できるよう、依頼されたかどうかを台帳へ残す。
+    notifyFriend: input.notifyFriend === true,
   });
 
   const write = await db
@@ -468,10 +514,28 @@ const FRIEND_WALLET_SCOPE_SQL = `(
  * follow the same person across multiple LINE accounts without rewriting old
  * ledger rows; an unlinked friend still has a safe friend-scoped wallet.
  */
+/**
+ * m22u R360：交換の内訳選びと同じ「使える」基準。
+ * 期限切れロットの残数は、台帳に残っていても使えない。残高からも外す。
+ * 比較は交換予約と同じ now で行い、基準のずれを作らない。
+ */
+function expiredLotHoldbackSql(): string {
+  return `COALESCE((
+           SELECT SUM(l.remaining_amount) FROM mileage_grant_lots l
+            WHERE l.program_id = mp.id
+              AND l.status = 'available'
+              AND l.remaining_amount > 0
+              AND l.expires_at IS NOT NULL AND l.expires_at <= ?
+              AND (l.beneficiary_key = 'friend:' || ?
+                   OR l.beneficiary_key = 'user:' || (SELECT user_id FROM friends WHERE id = ?))
+         ), 0)`;
+}
+
 export async function getMileageSummaryForFriend(
   db: D1Database,
   friendId: string,
   programId = DEFAULT_MILEAGE_PROGRAM_ID,
+  now = new Date().toISOString(),
 ): Promise<MileageSummary> {
   await ensureBuiltInProgram(db, programId);
   const row = await db
@@ -480,7 +544,8 @@ export async function getMileageSummaryForFriend(
          SELECT user_id FROM friends WHERE id = ?
        )
        SELECT mp.name AS program_name,
-              COALESCE(SUM(CASE WHEN ml.status = 'available' THEN ml.amount ELSE 0 END), 0) AS available,
+              COALESCE(SUM(CASE WHEN ml.status = 'available' THEN ml.amount ELSE 0 END), 0)
+                - ${expiredLotHoldbackSql()} AS available,
               COALESCE(SUM(CASE WHEN ml.status = 'pending' THEN ml.amount ELSE 0 END), 0) AS pending,
               COALESCE(SUM(CASE WHEN ml.entry_type = 'grant' AND ml.amount > 0
                                 THEN ml.amount ELSE 0 END), 0) AS lifetime_earned,
@@ -494,7 +559,7 @@ export async function getMileageSummaryForFriend(
         WHERE mp.id = ?
         GROUP BY mp.id, mp.name`,
     )
-    .bind(friendId, friendId, programId)
+    .bind(friendId, now, friendId, friendId, friendId, programId)
     .first<{
       program_name: string;
       available: number;
@@ -519,7 +584,7 @@ export interface MileageHistoryItem {
   entryType: MileageEntryType;
   status: MileageEntryStatus;
   amount: number;
-  reason: string;
+  reason: string | null;
   source: string;
   sourceEventId: string | null;
   sourceReferenceId: string | null;
@@ -527,16 +592,28 @@ export interface MileageHistoryItem {
   mode: 'automatic' | 'manual';
   executedByStaffName: string | null;
   occurredAt: string;
+  /** この記録が属する LINE アカウント（不明なら null）。 */
+  lineAccountId: string | null;
+  /*
+   * true の行は、見ている担当者の権限外アカウントの記録。
+   * 残高は名寄せした本人で共通だが、調整の理由・実行者・元イベントは
+   * アカウントの閲覧権限で区切るため、この行では伏せてある（R387）。
+   */
+  restricted: boolean;
+  /** R380: 手動調整につけた友だち通知の状態。通知なし・権限外の行は null。 */
+  notificationStatus: string | null;
+  notificationErrorCode: string | null;
 }
 
 export async function getMileageHistoryForFriend(
   db: D1Database,
   friendId: string,
-  options: { programId?: string; limit?: number } = {},
+  options: { programId?: string; limit?: number; visibleAccountIds?: string[] } = {},
 ): Promise<MileageHistoryItem[]> {
   const programId = options.programId ?? DEFAULT_MILEAGE_PROGRAM_ID;
   await ensureBuiltInProgram(db, programId);
   const limit = Math.min(100, Math.max(1, options.limit ?? 20));
+  const visible = options.visibleAccountIds ? new Set(options.visibleAccountIds) : null;
   const result = await db
     .prepare(
       `WITH identity AS (
@@ -546,10 +623,16 @@ export async function getMileageHistoryForFriend(
               ml.source, ml.source_event_id, mr.name AS rule_name,
               json_extract(ml.metadata, '$.sourceReferenceId') AS source_reference_id,
               json_extract(ml.metadata, '$.executedByStaffName') AS executed_by_staff_name,
+              json_extract(ml.metadata, '$.lineAccountId') AS metadata_account_id,
+              bf.line_account_id AS entry_account_id,
+              man.status AS notification_status,
+              man.error_code AS notification_error_code,
               ml.occurred_at
          FROM mileage_ledger ml
          LEFT JOIN identity ON 1 = 1
          LEFT JOIN mileage_rules mr ON mr.id = ml.mileage_rule_id
+         LEFT JOIN friends bf ON bf.id = ml.beneficiary_friend_id
+         LEFT JOIN mileage_adjustment_notifications man ON man.ledger_entry_id = ml.id
         WHERE ml.program_id = ?
           AND ${FRIEND_WALLET_SCOPE_SQL}
         ORDER BY ml.occurred_at DESC, ml.created_at DESC, ml.id DESC
@@ -567,25 +650,43 @@ export async function getMileageHistoryForFriend(
       source_reference_id: string | null;
       rule_name: string | null;
       executed_by_staff_name: string | null;
+      metadata_account_id: string | null;
+      entry_account_id: string | null;
+      notification_status: string | null;
+      notification_error_code: string | null;
       occurred_at: string;
     }>();
 
-  return result.results.map((row) => ({
-    id: row.id,
-    entryType: row.entry_type,
-    status: row.status,
-    amount: row.amount,
-    reason: row.reason,
-    source: row.source,
-    sourceEventId: row.source_event_id,
-    sourceReferenceId: row.source_reference_id,
-    ruleName: row.rule_name,
-    mode: row.entry_type === 'adjustment' || row.source === 'manual' || row.source === 'admin_adjustment'
-      ? 'manual'
-      : 'automatic',
-    executedByStaffName: row.executed_by_staff_name,
-    occurredAt: row.occurred_at,
-  }));
+  return result.results.map((row) => {
+    const lineAccountId = row.metadata_account_id ?? row.entry_account_id;
+    /*
+     * 所属アカウントが分からない行も伏せる。分からない以上「見てよい」
+     * とは証明できないため、権限の外側と同じ扱いにする（安全側）。
+     */
+    const restricted = visible !== null && (lineAccountId === null || !visible.has(lineAccountId));
+    return {
+      id: row.id,
+      entryType: row.entry_type,
+      status: row.status,
+      amount: row.amount,
+      reason: restricted ? null : row.reason,
+      source: row.source,
+      sourceEventId: restricted ? null : row.source_event_id,
+      sourceReferenceId: restricted ? null : row.source_reference_id,
+      ruleName: restricted ? null : row.rule_name,
+      mode: row.entry_type === 'adjustment' || row.source === 'manual' || row.source === 'admin_adjustment'
+        ? 'manual'
+        : 'automatic',
+      executedByStaffName: restricted ? null : row.executed_by_staff_name,
+      occurredAt: row.occurred_at,
+      lineAccountId,
+      restricted,
+      // R380: 通知の失敗は履歴の行から再送できるように、状態だけを返す。
+      // 権限外アカウントの行では通知の有無も伏せる。
+      notificationStatus: restricted ? null : row.notification_status,
+      notificationErrorCode: restricted ? null : row.notification_error_code,
+    };
+  });
 }
 
 export interface MileageSelfInsights {
@@ -756,6 +857,8 @@ export async function getMileageEarningOpportunitiesForFriend(
           WHERE program_id = ?
             AND event_type IN ('friend_registered', ?, ?, ?, ?)
             AND is_active = 1
+            AND (line_account_id IS NULL
+                 OR line_account_id = (SELECT line_account_id FROM friends WHERE id = ?))
             AND (conditions IS NULL
                  OR COALESCE(json_extract(conditions, '$.beneficiary'), 'actor') = 'actor')
             AND (valid_from IS NULL OR valid_from <= ?)
@@ -765,6 +868,7 @@ export async function getMileageEarningOpportunitiesForFriend(
       .bind(
         DEFAULT_MILEAGE_PROGRAM_ID,
         ...eventTypes,
+        friendId,
         now,
         now,
       )
@@ -999,6 +1103,23 @@ export interface MileageRuleRow {
   amount: number;
   initial_status: 'pending' | 'available';
   conditions: string | null;
+  /**
+   * R52: 公開版が持つ対象条件(JSON文字列)。live の `mileage_rules` に列はなく、
+   * 公開版から組み立てた行だけが持つ(実行時のみ)。live 読みの行は
+   * undefined で、従来どおり条件なしとして付与する。
+   */
+  target_conditions?: string | null;
+  /**
+   * m22o: 公開版が持つ期限・取消・通知。target_conditions と同じく
+   * 公開版から組み立てた行だけが持つ(実行時のみ)。live 読みの行は
+   * undefined で、従来どおり期限なし・取消なし・通知なしとして扱う。
+   * 公開版(v1以降)の設定だけを使い、下書きは見ない。
+   */
+  expires_after_days?: number | null;
+  cancellation_event_types?: string[] | null;
+  notification?: { enabled: boolean; messageTemplate: string } | null;
+  /** 334(#521): 帰属アカウント。NULL は変更不可の既存全店ルール。 */
+  line_account_id?: string | null;
   is_active: number;
   valid_from: string | null;
   valid_until: string | null;
@@ -1058,10 +1179,21 @@ export async function createMileageRule(
     /** 期間限定のキャンペーン。列も突き合わせも前からあったが、書き込む口が無かった。 */
     validFrom?: string | null;
     validUntil?: string | null;
+    /** 334(#521): 帰属アカウント。新規ルールでは必須。 */
+    lineAccountId: string;
+    /**
+     * DRAFT-01: false なら最初のINSERTから停止(is_active=0)。未指定は従来どおり稼働。
+     * 「作る→別APIで止める」にすると途中失敗で稼働中のルールが残るため、
+     * 停止を指定した作成は1文で止まったまま入れる。
+     */
+    isActive?: boolean;
   },
 ): Promise<MileageRuleRow> {
   if (!Number.isInteger(input.amount) || input.amount <= 0) {
     throw new Error('Mileage rule amount must be a positive integer');
+  }
+  if (!input.lineAccountId.trim()) {
+    throw new Error('Mileage rule line account is required');
   }
   await ensureDefaultMileageProgram(db);
   const id = crypto.randomUUID();
@@ -1070,8 +1202,8 @@ export async function createMileageRule(
     .prepare(
       `INSERT INTO mileage_rules
          (id, program_id, name, event_type, source, amount, initial_status,
-          conditions, is_active, valid_from, valid_until, created_at, updated_at)
-       VALUES (?, 'default', ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)`,
+          conditions, line_account_id, is_active, valid_from, valid_until, created_at, updated_at)
+       VALUES (?, 'default', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -1081,6 +1213,8 @@ export async function createMileageRule(
       input.amount,
       input.initialStatus ?? 'available',
       input.conditions ? JSON.stringify(input.conditions) : null,
+      input.lineAccountId,
+      input.isActive === false ? 0 : 1,
       input.validFrom ?? null,
       input.validUntil ?? null,
       now,
@@ -1090,6 +1224,199 @@ export async function createMileageRule(
   const created = await getMileageRuleById(db, id);
   if (!created) throw new Error('Failed to create mileage rule');
   return created;
+}
+
+/**
+ * N-231 公開版(案1)。受付時点で固定する適用版の集合 {rule_id: version_number}。
+ * 0 は未公開(旧口で作ったまま)で、処理時は live を読む。単一IDへ潰さない。
+ */
+export async function getAccountRuleVersionMap(
+  db: D1Database,
+  lineAccountId: string,
+): Promise<Record<string, number>> {
+  const rows = await db
+    .prepare(
+      `SELECT id, COALESCE(published_version_number, 0) AS version_number
+         FROM mileage_rules
+        WHERE line_account_id = ?`,
+    )
+    .bind(lineAccountId)
+    .all<{ id: string; version_number: number }>();
+  const map: Record<string, number> = {};
+  for (const row of rows.results) {
+    map[row.id] = Number(row.version_number ?? 0);
+  }
+  return map;
+}
+
+/**
+ * queue 行の snapshot を読む。壊れていたら NULL 扱い(=旧来どおり live 読み)にする。
+ * 受付の安全は落とさず、処理だけが旧来動作へ退がる。
+ */
+export function parsePublishedSnapshot(value: string | null | undefined): Record<string, number> | null {
+  if (value === null || value === undefined || value === '') return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    return null;
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+  const map: Record<string, number> = {};
+  for (const [key, version] of Object.entries(parsed as Record<string, unknown>)) {
+    if (typeof key !== 'string' || key === '') return null;
+    if (!Number.isInteger(version) || (version as number) < 0) return null;
+    map[key] = version as number;
+  }
+  return map;
+}
+
+export async function getPublishedVersionContent(
+  db: D1Database,
+  ruleId: string,
+  versionNumber: number,
+): Promise<PublishedEarningRuleContent | null> {
+  const row = await db
+    .prepare(
+      `SELECT content_json FROM mileage_earning_rule_published_versions
+        WHERE rule_id = ? AND version_number = ?`,
+    )
+    .bind(ruleId, versionNumber)
+    .first<{ content_json: string }>();
+  if (!row) return null;
+  try {
+    return JSON.parse(row.content_json) as PublishedEarningRuleContent;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 公開版の中身。is_active は含めない。停止・再開は live の稼働で見る。
+ * R52: 下書きの対象条件(target_conditions)もここへ載せる。載せないと
+ * 公開版だけ条件が消え、対象外の友だちへ付与される。
+ * m22o: 期限・取消・通知も同じく公開版へ載せる。載せないと画面の設定が
+ * 実際の付与に効かない。content_json は形を持たないので、列を足さずに載る。
+ */
+export interface PublishedEarningRuleContent {
+  name: string;
+  event_type: string;
+  source: string | null;
+  amount: number;
+  initial_status: 'pending' | 'available';
+  conditions: string | null;
+  target_conditions: SegmentCondition | null;
+  valid_from: string | null;
+  valid_until: string | null;
+  /** m22o: 付与したマイルの有効期限(日数)。null は期限なし。 */
+  expires_after_days: number | null;
+  /** m22o: このきっかけが来たら過去の付与を取り消す。空は取消なし。 */
+  cancellation_event_types: string[];
+  /** m22o: 付与の後の友だちへの通知。off なら送らない。 */
+  notification: { enabled: boolean; messageTemplate: string };
+}
+
+export function publishedRuleContentFromDraft(
+  draft: {
+    name: string;
+    eventType: string;
+    source: string | null;
+    amount: number;
+    initialStatus: 'pending' | 'available';
+    validFrom: string | null;
+    validUntil: string | null;
+    /** R52: 下書きの対象条件。そのまま公開版へ載せる(条件なしは null)。 */
+    targetConditions?: SegmentCondition | null;
+    /** m22o: 下書きの有効期限・取消・通知。そのまま公開版へ載せる。 */
+    expiresAfterDays?: number | null;
+    cancellationEventTypes?: string[];
+    notification?: { enabled: boolean; messageTemplate: string } | null;
+  },
+  /** 下書きが持たない実行条件は、いまの live を引き継ぐ(消さない)。 */
+  currentConditions: string | null,
+): PublishedEarningRuleContent {
+  const expiresAfterDays = draft.expiresAfterDays ?? null;
+  const cancellations = Array.isArray(draft.cancellationEventTypes)
+    ? [...new Set(draft.cancellationEventTypes.filter((item) => typeof item === 'string' && item.trim() !== ''))].slice(0, 10)
+    : [];
+  const notifyEnabled = draft.notification?.enabled === true
+    && typeof draft.notification.messageTemplate === 'string'
+    && draft.notification.messageTemplate.trim() !== '';
+  return {
+    name: draft.name,
+    event_type: draft.eventType,
+    source: draft.source,
+    amount: draft.amount,
+    initial_status: draft.initialStatus,
+    conditions: currentConditions,
+    target_conditions: draft.targetConditions ?? null,
+    valid_from: draft.validFrom,
+    valid_until: draft.validUntil,
+    expires_after_days: Number.isInteger(expiresAfterDays) && (expiresAfterDays as number) > 0
+      ? expiresAfterDays as number
+      : null,
+    cancellation_event_types: cancellations,
+    notification: {
+      enabled: notifyEnabled,
+      messageTemplate: notifyEnabled ? (draft.notification as { messageTemplate: string }).messageTemplate : '',
+    },
+  };
+}
+
+/**
+ * snapshot で固定された版を1ルール分だけ実行用の行にする。
+ * version 0 は「受付時に未公開」。初公開で残した v0 があればそれを使い、
+ * 無ければ live を使う(受付から初公開まで live は誰も書き換えられない)。
+ * 行が無ければ null(適用しない)。
+ * 停止・再開(is_active)はいまの live を見る。公開内容は変えない。
+ */
+export async function resolvePinnedRuleRow(
+  db: D1Database,
+  input: { ruleId: string; versionNumber: number },
+): Promise<MileageRuleRow | null> {
+  const live = await getMileageRuleById(db, input.ruleId);
+  if (!live) return null;
+  if (input.versionNumber <= 0) {
+    const v0 = await getPublishedVersionContent(db, input.ruleId, 0);
+    if (!v0) return live;
+    return {
+      ...live,
+      name: v0.name,
+      event_type: v0.event_type,
+      source: v0.source,
+      amount: v0.amount,
+      initial_status: v0.initial_status,
+      conditions: v0.conditions,
+      // R52: 旧公開版の対象条件も引き継ぐ。無ければ null(条件なし)。
+      target_conditions: v0.target_conditions ? JSON.stringify(v0.target_conditions) : null,
+      valid_from: v0.valid_from,
+      valid_until: v0.valid_until,
+      // m22o: v0 は公開の仕組みができる前の live 写し。期限・取消・通知は持たない。
+      expires_after_days: v0.expires_after_days ?? null,
+      cancellation_event_types: v0.cancellation_event_types ?? [],
+      notification: v0.notification ?? null,
+    };
+  }
+  const content = await getPublishedVersionContent(db, input.ruleId, input.versionNumber);
+  if (!content) return null;
+  return {
+    ...live,
+    name: content.name,
+    event_type: content.event_type,
+    source: content.source,
+    amount: content.amount,
+    initial_status: content.initial_status,
+    conditions: content.conditions,
+    // R52: 公開版の対象条件を実行時の行へ載せる。無ければ null(条件なし)。
+    target_conditions: content.target_conditions ? JSON.stringify(content.target_conditions) : null,
+    valid_from: content.valid_from,
+    valid_until: content.valid_until,
+    // m22o: 公開版の期限・取消・通知を実行時の行へ載せる。古い公開版に
+    // 項目が無いときは期限なし・取消なし・通知なしとして扱う。
+    expires_after_days: content.expires_after_days ?? null,
+    cancellation_event_types: content.cancellation_event_types ?? [],
+    notification: content.notification ?? null,
+  };
 }
 
 export async function updateMileageRule(
@@ -1131,8 +1458,33 @@ export async function updateMileageRule(
   return getMileageRuleById(db, id);
 }
 
-export async function deleteMileageRule(db: D1Database, id: string): Promise<void> {
-  await db.prepare(`DELETE FROM mileage_rules WHERE id = ?`).bind(id).run();
+/**
+ * 決めごとを履歴ごと消さないための原子削除。N-232 用。
+ * 台帳(mileage_ledger)に1件でも参照があれば消さない。void の行も数える。
+ * SELECTとDELETEを分けると、その間に付与履歴が作られる競合で履歴付き決めごとを
+ * 消せるため、DELETE文自体に NOT EXISTS 条件を持たせて1文で実行する。
+ * 戻り値は消えた件数。0なら履歴あり・存在しない・同時削除のいずれかで、呼び出し側は安全拒否する。
+ */
+export async function deleteMileageRule(db: D1Database, id: string): Promise<number> {
+  /*
+   * R296: V6 の決めごとは下書き行が mileage_rules への FK を持つので、
+   * 下書きを残したまま本体を消すと外部キー違反で落ちる。先に下書きを消す。
+   * 両文に履歴ガードを付けて1トランザクション(batch)で送る——下書きだけ
+   * 消えて本体が残ると、一覧に出ないのに付与が動く決めごとになる。
+   */
+  const [, deleted] = await db.batch([
+    db.prepare(
+      `DELETE FROM mileage_earning_rule_drafts
+        WHERE rule_id = ?
+          AND NOT EXISTS (SELECT 1 FROM mileage_ledger WHERE mileage_rule_id = ?)`,
+    ).bind(id, id),
+    db.prepare(
+      `DELETE FROM mileage_rules
+        WHERE id = ?
+          AND NOT EXISTS (SELECT 1 FROM mileage_ledger WHERE mileage_rule_id = ?)`,
+    ).bind(id, id),
+  ]);
+  return deleted.meta?.changes ?? 0;
 }
 
 export interface ApplyMileageRulesInput {
@@ -1143,6 +1495,12 @@ export interface ApplyMileageRulesInput {
   subjectKey?: string | null;
   metadata?: Record<string, unknown> | null;
   occurredAt?: string;
+  /**
+   * N-231 案1: 受付時に固定した適用版の集合。null は旧来互換でそのまま live を読む。
+   * 空集合 {} は「所属ルールなし」(全店共通のみ)で、旧来の持ち主不明行と同じ結果になる。
+   * 版 0 は「受付時に未公開」。後の初公開で残る v0 があれば v0、無ければ live。
+   */
+  publishedSnapshot?: Record<string, number> | null;
 }
 
 interface MileageMultiplier {
@@ -1240,6 +1598,166 @@ async function resolveMileageMultiplier(
 }
 
 /**
+ * m22o: 公開版の有効期限(日数)から、台帳へ残す有効期限の日時を作る。
+ * 台帳の metadata.expiresAt は、使い道の山(mileage_grant_lots)へ
+ * expires_at として写る既存の仕組み(275 の trigger)が拾う。
+ * 日数が無い・壊れているときは null(期限なし)。
+ */
+function mileageGrantExpiresAt(occurredAt: string, days: number | null | undefined): string | null {
+  if (!Number.isInteger(days) || (days as number) <= 0) return null;
+  const base = Date.parse(occurredAt);
+  if (Number.isNaN(base)) return null;
+  return new Date(base + (days as number) * 86400_000).toISOString();
+}
+
+/** m22o: 見本の {balance} に入れる、いま使える残高。m22u R360: 期限切れは数えない。 */
+async function getMileageAvailableBalance(
+  db: D1Database,
+  input: { userId: string | null; friendId: string },
+): Promise<number> {
+  const now = new Date().toISOString();
+  const row = await db
+    .prepare(
+      `SELECT COALESCE(SUM(CASE WHEN status = 'available' THEN amount ELSE 0 END), 0) AS balance
+         FROM mileage_ledger
+        WHERE program_id = 'default'
+          AND ((? IS NOT NULL
+                AND (beneficiary_user_id = ?
+                     OR beneficiary_friend_id IN (SELECT id FROM friends WHERE user_id = ?)))
+               OR (? IS NULL AND beneficiary_friend_id = ?))`,
+    )
+    .bind(input.userId, input.userId, input.userId, input.userId, input.friendId)
+    .first<{ balance: number }>();
+  const base = Number(row?.balance ?? 0);
+  if (!(await dbTableExists(db, 'mileage_grant_lots'))) return base;
+  // 残高の表示(残高照会)と同じく、期限切れロットの残数は使えない分として引く。
+  const keys = input.userId
+    ? [`user:${input.userId}`, `friend:${input.friendId}`]
+    : [`friend:${input.friendId}`];
+  const expired = await db.prepare(
+    `SELECT COALESCE(SUM(remaining_amount), 0) AS holdback FROM mileage_grant_lots
+      WHERE program_id = 'default'
+        AND status = 'available' AND remaining_amount > 0
+        AND expires_at IS NOT NULL AND expires_at <= ?
+        AND beneficiary_key IN (${keys.map(() => '?').join(',')})`,
+  ).bind(now, ...keys).first<{ holdback: number }>();
+  return base - Number(expired?.holdback ?? 0);
+}
+
+/** m22o: 通知の見本の差し込み({awardedMiles}・{balance})を値で埋める。 */
+function renderMileageGrantNotification(
+  template: string,
+  input: { awardedMiles: number; balance: number },
+): string {
+  return template
+    .replace(/\{awardedMiles\}/g, String(input.awardedMiles))
+    .replace(/\{balance\}/g, String(input.balance));
+}
+
+/**
+ * m22o: 付与の後の友だちへの通知を1件だけ予約する。
+ * 手動調整の通知(mileage_adjustment_notifications)と同じ表を使う。
+ * 表は台帳1行に通知1行(ledger_entry_id が一意)で、送り分けは
+ * 台帳の entry_type(grant/adjustment)で見る。同じ付与の再送・
+ * キューの再試行では行を増やさず、送り済みなら送り直さない。
+ */
+async function reserveMileageGrantNotification(
+  db: D1Database,
+  input: {
+    lineAccountId: string;
+    friendId: string;
+    ledgerEntryId: string;
+    idempotencyKey: string;
+    message: string;
+  },
+): Promise<void> {
+  const now = jstNow();
+  await db
+    .prepare(
+      `INSERT OR IGNORE INTO mileage_adjustment_notifications
+         (id, line_account_id, friend_id, ledger_entry_id, idempotency_key, message_text, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
+    )
+    .bind(
+      crypto.randomUUID(), input.lineAccountId, input.friendId, input.ledgerEntryId,
+      input.idempotencyKey, input.message, now, now,
+    )
+    .run();
+}
+
+/**
+ * m22o: ルールで決めた取消の条件で、過去の付与を取り消す。
+ * 紹介成果の却下(#978 の取消の台帳)と同じ考え方: まだ取り消していない
+ * 付与だけに、負の reversal を1件ずつ残す。同じアカウントの中だけ。
+ *
+ * 合わせる鍵は「同じルール・同じ人・同じ出どころの番号(source_event_id)」。
+ * 別の予約の付与までは消さない。出どころの番号が無い行は特定できないので
+ * 触らない。止めたルールでも、止める前の付与の取消は残す。
+ */
+async function reverseMileageGrantsForCancellation(
+  db: D1Database,
+  input: {
+    friendId: string;
+    friendUserId: string | null;
+    lineAccountId: string | null;
+    eventId: string;
+    eventType: string;
+    source: string;
+    sourceEventId: string | null;
+    occurredAt: string;
+    pinned: Record<string, number>;
+  },
+): Promise<number> {
+  if (!input.sourceEventId || !input.lineAccountId) return 0;
+  let reversed = 0;
+  for (const [ruleId, versionNumber] of Object.entries(input.pinned)) {
+    const row = await resolvePinnedRuleRow(db, { ruleId, versionNumber });
+    if (!row) continue;
+    // 同じアカウントのルールだけ。よそのアカウントの付与に触らない。
+    if (row.line_account_id !== input.lineAccountId) continue;
+    const cancellations = row.cancellation_event_types ?? [];
+    if (!cancellations.includes(input.eventType)) continue;
+    const targets = await db
+      .prepare(
+        `SELECT original.*
+           FROM mileage_ledger original
+           LEFT JOIN mileage_ledger reversal ON reversal.reverses_entry_id = original.id
+          WHERE original.program_id = 'default'
+            AND original.mileage_rule_id = ?
+            AND original.entry_type = 'grant'
+            AND original.status = 'available'
+            AND original.source_event_id = ?
+            AND ((? IS NOT NULL AND original.beneficiary_user_id = ?)
+                 OR (? IS NULL AND original.beneficiary_friend_id = ?))
+            AND reversal.id IS NULL`,
+      )
+      .bind(ruleId, input.sourceEventId, input.friendUserId, input.friendUserId, input.friendUserId, input.friendId)
+      .all<MileageLedgerEntry>();
+    for (const grant of targets.results) {
+      await postMileageEntry(db, {
+        programId: grant.program_id,
+        beneficiaryUserId: grant.beneficiary_user_id,
+        beneficiaryFriendId: grant.beneficiary_friend_id,
+        engagementEventId: input.eventId,
+        mileageRuleId: ruleId,
+        entryType: 'reversal',
+        status: 'available',
+        amount: -grant.amount,
+        reason: `${row.name}の取消`,
+        source: input.source,
+        sourceEventId: input.sourceEventId,
+        idempotencyKey: `mileage-rule-reversal:${grant.id}`,
+        reversesEntryId: grant.id,
+        metadata: { ruleId, eventType: input.eventType, originalEntryId: grant.id },
+        occurredAt: input.occurredAt,
+      });
+      reversed += 1;
+    }
+  }
+  return reversed;
+}
+
+/**
  * Normalize one product action and apply every matching mileage rule exactly
  * once. Caps are evaluated against the canonical users.id identity, so a user
  * cannot reset a daily cap merely by switching between LINE accounts.
@@ -1249,9 +1767,9 @@ async function applyMileageRulesImmediately(
   input: ApplyMileageRulesInput,
 ): Promise<{ event: EngagementEvent; granted: MileageLedgerEntry[] }> {
   const friend = await db
-    .prepare(`SELECT id, user_id FROM friends WHERE id = ?`)
+    .prepare(`SELECT id, user_id, line_account_id FROM friends WHERE id = ?`)
     .bind(input.friendId)
-    .first<{ id: string; user_id: string | null }>();
+    .first<{ id: string; user_id: string | null; line_account_id: string | null }>();
   if (!friend) throw new Error(`Mileage friend not found: ${input.friendId}`);
 
   const occurredAt = input.occurredAt ?? jstNow();
@@ -1270,19 +1788,62 @@ async function applyMileageRulesImmediately(
     occurredAt,
   });
 
-  const rulesResult = await db
-    .prepare(
-      `SELECT * FROM mileage_rules
-        WHERE program_id = 'default'
-          AND event_type = ?
-          AND (source IS NULL OR source = ?)
-          AND is_active = 1
-          AND (valid_from IS NULL OR valid_from <= ?)
-          AND (valid_until IS NULL OR valid_until >= ?)
-        ORDER BY created_at ASC, id ASC`,
-    )
-    .bind(input.eventType, input.source, occurredAt, occurredAt)
-    .all<MileageRuleRow>();
+  // N-231 案1: snapshot がある行は固定版を、無い行(NULL 互換)は従来どおり live を読む。
+  // 全店共通(line_account_id IS NULL)は版を持たないので、どちらの場合も live を読む。
+  const pinned = input.publishedSnapshot ?? null;
+  let ruleRows: MileageRuleRow[];
+  if (pinned === null) {
+    const rulesResult = await db
+      .prepare(
+        `SELECT * FROM mileage_rules
+          WHERE program_id = 'default'
+            AND event_type = ?
+            AND (source IS NULL OR source = ?)
+            AND is_active = 1
+            AND (line_account_id IS NULL OR line_account_id = ?)
+            AND (valid_from IS NULL OR valid_from <= ?)
+            AND (valid_until IS NULL OR valid_until >= ?)
+          ORDER BY created_at ASC, id ASC`,
+      )
+      .bind(input.eventType, input.source, friend.line_account_id, occurredAt, occurredAt)
+      .all<MileageRuleRow>();
+    ruleRows = rulesResult.results;
+  } else {
+    const resolved: MileageRuleRow[] = [];
+    for (const [ruleId, versionNumber] of Object.entries(pinned)) {
+      const row = await resolvePinnedRuleRow(db, { ruleId, versionNumber });
+      if (!row) continue;
+      if (row.program_id !== 'default') continue;
+      if (row.event_type !== input.eventType) continue;
+      if (row.source !== null && row.source !== input.source) continue;
+      if (row.is_active !== 1) continue;
+      // 固定したのは所属ルールだけ。全店共通は下の live 読みで拾う。
+      if (row.line_account_id === null) continue;
+      if (row.line_account_id !== friend.line_account_id) continue;
+      if (row.valid_from !== null && row.valid_from > occurredAt) continue;
+      if (row.valid_until !== null && row.valid_until < occurredAt) continue;
+      resolved.push(row);
+    }
+    const globalsResult = await db
+      .prepare(
+        `SELECT * FROM mileage_rules
+          WHERE program_id = 'default'
+            AND event_type = ?
+            AND (source IS NULL OR source = ?)
+            AND is_active = 1
+            AND line_account_id IS NULL
+            AND (valid_from IS NULL OR valid_from <= ?)
+            AND (valid_until IS NULL OR valid_until >= ?)
+          ORDER BY created_at ASC, id ASC`,
+      )
+      .bind(input.eventType, input.source, occurredAt, occurredAt)
+      .all<MileageRuleRow>();
+    ruleRows = [...resolved, ...globalsResult.results].sort((a, b) =>
+      a.created_at < b.created_at ? -1
+      : a.created_at > b.created_at ? 1
+      : a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
+    );
+  }
 
   const identityKey = friend.user_id ? `user:${friend.user_id}` : `friend:${friend.id}`;
   const granted: MileageLedgerEntry[] = [];
@@ -1355,10 +1916,26 @@ async function applyMileageRulesImmediately(
     }
   }
 
-  for (const rule of rulesResult.results) {
+  for (const rule of ruleRows) {
     let conditions: MileageRuleConditions = {};
     if (rule.conditions) {
       try { conditions = JSON.parse(rule.conditions) as MileageRuleConditions; } catch { conditions = {}; }
+    }
+
+    /*
+     * R52: 公開版の対象条件に合わない友だちには付けない。
+     * 条件が壊れて読めないとき・評価で失敗したときも付けない。
+     * 「壊れているのに全員へ配る」のがいちばん困るため、閉じる側へ倒す。
+     */
+    if (rule.target_conditions !== undefined && rule.target_conditions !== null) {
+      let eligible = false;
+      try {
+        const target = parseCondition(rule.target_conditions);
+        eligible = target !== null && await matchesCondition(db, friend.id, target);
+      } catch {
+        eligible = false;
+      }
+      if (!eligible) continue;
     }
 
     const referrer = conditions.beneficiary === 'referrer'
@@ -1409,6 +1986,8 @@ async function applyMileageRulesImmediately(
           : conditions.uniquePerSubjectPerDay && input.subjectKey
             ? `rule:${rule.id}:identity:${beneficiaryIdentityKey}:day:${occurredAt.slice(0, 10)}:subject:${input.subjectKey}`
             : `rule:${rule.id}:event:${event.id}`;
+    // m22o: 公開版の有効期限を台帳へ残す。使い道の山へ写る既存の仕組みが拾う。
+    const expiresAt = mileageGrantExpiresAt(occurredAt, rule.expires_after_days ?? null);
     const entry = await postMileageEntry(db, {
       programId: rule.program_id,
       beneficiaryUserId,
@@ -1433,6 +2012,7 @@ async function applyMileageRulesImmediately(
         multiplierTagId: multiplier.tagId,
         multiplierTagName: multiplier.tagName,
         beneficiaryType: conditions.beneficiary ?? 'actor',
+        ...(expiresAt ? { expiresAt } : {}),
         ...(referrer ? {
           affiliateId: referrer.affiliateId,
           refCode: referrer.refCode,
@@ -1443,6 +2023,43 @@ async function applyMileageRulesImmediately(
       occurredAt,
     });
     granted.push(entry);
+    /*
+     * m22o: 公開版で「通知する」のときだけ、付与の後に友だちへ送る分を
+     * 予約する。送るのは Worker の cron。OFF なら予約しない。
+     */
+    const notify = rule.notification;
+    if (notify?.enabled && notify.messageTemplate && friend.line_account_id) {
+      const balance = await getMileageAvailableBalance(db, {
+        userId: beneficiaryUserId, friendId: beneficiaryFriendId,
+      });
+      await reserveMileageGrantNotification(db, {
+        lineAccountId: friend.line_account_id,
+        friendId: beneficiaryFriendId,
+        ledgerEntryId: entry.id,
+        idempotencyKey: `mileage-rule-grant:${entry.id}`,
+        message: renderMileageGrantNotification(notify.messageTemplate, {
+          awardedMiles: entry.amount, balance,
+        }),
+      });
+    }
+  }
+  /*
+   * m22o: 取消の条件に合うきっかけが来たら、過去の付与を取り消す。
+   * 受付時に固定した公開版だけを見て、下書きは見ない。版を持たない
+   * 古い行(NULL 互換)は従来どおり何もしない。既存の付与済みマイルは変えない。
+   */
+  if (pinned !== null) {
+    await reverseMileageGrantsForCancellation(db, {
+      friendId: friend.id,
+      friendUserId: friend.user_id,
+      lineAccountId: friend.line_account_id,
+      eventId: event.id,
+      eventType: input.eventType,
+      source: input.source,
+      sourceEventId: event.source_event_id,
+      occurredAt,
+      pinned,
+    });
   }
   return { event, granted };
 }
@@ -1466,6 +2083,20 @@ export interface MileageQueueResult {
   granted: number;
 }
 
+/**
+ * 付与キューの行の持ち主(=イベントの友だちが属するアカウント)が
+ * マイル機能オフかをSQL内で判定する式。持ち主不明の旧行は偽になり、
+ * 従来どおり進む。
+ */
+function mileageOwnerOffSql(eventIdColumn: string): string {
+  return `EXISTS (
+    SELECT 1 FROM engagement_events ee
+      JOIN friends f ON f.id = ee.actor_friend_id
+     WHERE ee.id = ${eventIdColumn}
+       AND ${accountFeatureOffExclusionSql('f.line_account_id', 'mileage')}
+  )`;
+}
+
 /** Drain a bounded batch. Safe for retries and overlapping cron invocations. */
 export async function processPendingMileageEvents(
   db: D1Database,
@@ -1473,31 +2104,51 @@ export async function processPendingMileageEvents(
 ): Promise<MileageQueueResult> {
   const limit = Math.min(250, Math.max(1, options.limit ?? 100));
   const now = options.now ?? jstNow();
+  // 停滞回収も機能オフ中のアカウントには当てない。OFF中は status も
+  // processing_started_at も updated_at も動かさず、再オンで回収する。
   await db
     .prepare(
       `UPDATE mileage_event_queue
           SET status = 'pending', processing_started_at = NULL, updated_at = ?
         WHERE status = 'processing'
-          AND datetime(processing_started_at) < datetime(?, '-10 minutes')`,
+          AND datetime(processing_started_at) < datetime(?, '-10 minutes')
+          AND NOT ${mileageOwnerOffSql('mileage_event_queue.engagement_event_id')}`,
     )
     .bind(now, now)
     .run();
 
+  // 機能オフ中の行は LIMIT を数える前に外す。後で弾くと、オフの古い行が
+  // 先頭を占めたままON中の他アカウントが永久に回らない。
   const due = await db
     .prepare(
-      `SELECT q.engagement_event_id
+      `SELECT q.engagement_event_id, q.applied_published_snapshot
          FROM mileage_event_queue q
         WHERE q.status IN ('pending','failed')
           AND q.attempts < 5
           AND datetime(q.available_at) <= datetime(?)
+          AND NOT ${mileageOwnerOffSql('q.engagement_event_id')}
         ORDER BY q.created_at ASC, q.engagement_event_id ASC
         LIMIT ?`,
     )
     .bind(now, limit)
-    .all<{ engagement_event_id: string }>();
+    .all<{ engagement_event_id: string; applied_published_snapshot: string | null }>();
 
   const result: MileageQueueResult = { claimed: 0, processed: 0, failed: 0, granted: 0 };
   for (const item of due.results) {
+    // 機能オフ中はclaim(状態更新)も付与もしない。pendingのまま残し、
+    // 再オンで再開する。持ち主が分からない行は従来どおり進める。
+    const owner = await db
+      .prepare(
+        `SELECT f.line_account_id AS line_account_id
+           FROM engagement_events ee LEFT JOIN friends f ON f.id = ee.actor_friend_id
+          WHERE ee.id = ?`,
+      )
+      .bind(item.engagement_event_id)
+      .first<{ line_account_id: string | null }>();
+    if (owner?.line_account_id
+      && !await isAccountFeatureEnabled(db, owner.line_account_id, 'mileage')) {
+      continue;
+    }
     const claim = await db
       .prepare(
         `UPDATE mileage_event_queue
@@ -1530,6 +2181,8 @@ export async function processPendingMileageEvents(
         subjectKey: typeof metadata.subjectKey === 'string' ? metadata.subjectKey : null,
         metadata,
         occurredAt: event.occurred_at,
+        // N-231 案1: 現在版ではなく受付時に固定した版を読む。NULL は旧来互換。
+        publishedSnapshot: parsePublishedSnapshot(item.applied_published_snapshot),
       });
       result.granted += projection.granted.length;
       result.processed += 1;
@@ -1578,6 +2231,7 @@ export interface FollowingMileageReconcileResult {
  * Materialize registration/continuous-follow milestones in bounded chunks.
  * Called on the existing 6-hour cron. Historic accounts are gradually caught
  * up without a full-table write spike; normal queue processing remains 5-minutely.
+ * 機能オフ中のアカウントの節目は作らない。再オン後の新しい節目から再開する。
  */
 export async function enqueueFollowingMileageMilestones(
   db: D1Database,
@@ -1615,6 +2269,7 @@ export async function enqueueFollowingMileageMilestones(
            FROM friends f
           WHERE f.is_following = 1
             AND ${eligibilitySql}
+            AND NOT ${accountFeatureOffExclusionSql('f.line_account_id', 'mileage')}
             AND NOT EXISTS (
               SELECT 1 FROM engagement_events ee WHERE ee.id = ${eventIdSql}
             )
@@ -1628,11 +2283,19 @@ export async function enqueueFollowingMileageMilestones(
     const queued = await db
       .prepare(
         `INSERT OR IGNORE INTO mileage_event_queue
-           (engagement_event_id, status, attempts, available_at, created_at, updated_at)
-         SELECT ee.id, 'pending', 0, ?, ?, ?
+           (engagement_event_id, status, attempts, available_at,
+            applied_published_snapshot, created_at, updated_at)
+         SELECT ee.id, 'pending', 0, ?,
+                (SELECT json_group_object(r.id, COALESCE(r.published_version_number, 0))
+                   FROM friends f2
+                   JOIN mileage_rules r ON r.line_account_id = f2.line_account_id
+                  WHERE f2.id = ee.actor_friend_id),
+                ?, ?
            FROM engagement_events ee
+           LEFT JOIN friends f ON f.id = ee.actor_friend_id
           WHERE ee.event_type = ?
             AND ee.source = 'line_relationship'
+            AND NOT ${accountFeatureOffExclusionSql('f.line_account_id', 'mileage')}
             AND NOT EXISTS (
               SELECT 1 FROM mileage_event_queue q WHERE q.engagement_event_id = ee.id
             )
@@ -1697,6 +2360,13 @@ export interface MileageAdminHistoryItem {
   ruleName: string | null;
   mode: 'automatic' | 'manual';
   executedByStaffName: string | null;
+  lineAccountName: string;
+  /** この記録が属する LINE アカウント（メタに残っていない古い行は null）。 */
+  lineAccountId: string | null;
+  /** 手動調整につけた友だち通知の状態。通知のない行は null。 */
+  notificationStatus: string | null;
+  notificationErrorCode: string | null;
+  balanceAfter: number;
   occurredAt: string;
 }
 
@@ -1964,6 +2634,11 @@ export async function getMileageAdminHistory(
     accountId: string;
     visibleAccountIds?: string[];
     search?: string;
+    /**
+     * V6R-CX-e: この友だちと同じ人（名寄せした複数アカウント）の履歴だけを返す。
+     * 名前で探して100件から拾うと、同名が多いと本人がこぼれた。
+     */
+    friendId?: string;
     entryType?: MileageEntryType;
     status?: MileageEntryStatus;
     mode?: 'automatic' | 'manual';
@@ -1986,9 +2661,11 @@ export async function getMileageAdminHistory(
     SELECT CASE WHEN f.user_id IS NOT NULL THEN 'user:' || f.user_id ELSE 'friend:' || f.id END AS identity_key,
            MIN(f.id) AS primary_friend_id,
            COALESCE(MAX(u.display_name), MAX(f.display_name), '名前未設定') AS display_name,
-           MAX(f.picture_url) AS picture_url
+           MAX(f.picture_url) AS picture_url,
+           MAX(la.name) AS line_account_name
       FROM friends f
       LEFT JOIN users u ON u.id = f.user_id
+      JOIN line_accounts la ON la.id = f.line_account_id
      WHERE f.line_account_id = ?
      GROUP BY identity_key
   ), ledger_rows AS (
@@ -1997,7 +2674,14 @@ export async function getMileageAdminHistory(
              WHEN COALESCE(ml.beneficiary_user_id, bf.user_id) IS NOT NULL
                THEN 'user:' || COALESCE(ml.beneficiary_user_id, bf.user_id)
              ELSE 'friend:' || ml.beneficiary_friend_id
-           END AS identity_key
+           END AS identity_key,
+           SUM(CASE WHEN ml.status = 'available' THEN ml.amount ELSE 0 END) OVER (
+             PARTITION BY CASE
+               WHEN COALESCE(ml.beneficiary_user_id, bf.user_id) IS NOT NULL
+                 THEN 'user:' || COALESCE(ml.beneficiary_user_id, bf.user_id)
+               ELSE 'friend:' || ml.beneficiary_friend_id END
+             ORDER BY ml.occurred_at, ml.created_at, ml.id ROWS UNBOUNDED PRECEDING
+           ) AS balance_after
       FROM mileage_ledger ml
       LEFT JOIN friends bf ON bf.id = ml.beneficiary_friend_id
      WHERE ml.program_id = 'default'
@@ -2017,6 +2701,13 @@ export async function getMileageAdminHistory(
   const scopeBinds = [accountId, ...visibleAccountIds, ...visibleAccountIds];
   const where = ["(? = '' OR sp.display_name LIKE '%' || ? || '%')"];
   const filters: unknown[] = [search, search];
+  if (options.friendId) {
+    where.push(`sp.identity_key = (
+      SELECT CASE WHEN f.user_id IS NOT NULL THEN 'user:' || f.user_id ELSE 'friend:' || f.id END
+        FROM friends f WHERE f.id = ?
+    )`);
+    filters.push(options.friendId);
+  }
   if (options.entryType) {
     where.push('lr.entry_type = ?');
     filters.push(options.entryType);
@@ -2044,15 +2735,19 @@ export async function getMileageAdminHistory(
     db
       .prepare(
         `${ctes}
-         SELECT lr.id, sp.primary_friend_id, sp.display_name, sp.picture_url,
+         SELECT lr.id, sp.primary_friend_id, sp.display_name, sp.picture_url, sp.line_account_name,
                 lr.entry_type, lr.status, lr.amount, lr.reason, lr.source,
                 lr.source_event_id, mr.name AS rule_name,
                 json_extract(lr.metadata, '$.sourceReferenceId') AS source_reference_id,
                 json_extract(lr.metadata, '$.executedByStaffName') AS executed_by_staff_name,
-                lr.occurred_at
+                json_extract(lr.metadata, '$.lineAccountId') AS line_account_id,
+                an.status AS notification_status,
+                an.error_code AS notification_error_code,
+                lr.occurred_at, lr.balance_after
            FROM ledger_rows lr
            INNER JOIN selected_profiles sp ON sp.identity_key = lr.identity_key
            LEFT JOIN mileage_rules mr ON mr.id = lr.mileage_rule_id
+           LEFT JOIN mileage_adjustment_notifications an ON an.ledger_entry_id = lr.id
           WHERE ${whereSql}
           ORDER BY lr.occurred_at DESC, lr.created_at DESC, lr.id DESC
           LIMIT ? OFFSET ?`,
@@ -2072,7 +2767,12 @@ export async function getMileageAdminHistory(
         source_reference_id: string | null;
         rule_name: string | null;
         executed_by_staff_name: string | null;
+        line_account_id: string | null;
+        notification_status: string | null;
+        notification_error_code: string | null;
         occurred_at: string;
+        line_account_name: string;
+        balance_after: number;
       }>(),
     db
       .prepare(
@@ -2104,6 +2804,11 @@ export async function getMileageAdminHistory(
         ? 'manual'
         : 'automatic',
       executedByStaffName: row.executed_by_staff_name,
+      lineAccountName: row.line_account_name,
+      lineAccountId: row.line_account_id,
+      notificationStatus: row.notification_status,
+      notificationErrorCode: row.notification_error_code,
+      balanceAfter: Number(row.balance_after ?? 0),
       occurredAt: row.occurred_at,
     })),
     pagination: { total: Number(count?.total ?? 0), limit, offset },
@@ -2119,9 +2824,12 @@ interface AffiliateConversionMileageContext {
   subject_user_id: string | null;
   beneficiary_friend_id: string | null;
   beneficiary_user_id: string | null;
+  beneficiary_line_account_id: string | null;
   offer_id: string | null;
   offer_name: string | null;
   reward_miles: number | null;
+  /** m22u R356: 承認時に凍結したマイル数。NULL の行は従来どおり現在値。 */
+  frozen_miles: number | null;
   mileage_program_id: string | null;
 }
 
@@ -2135,19 +2843,33 @@ export async function syncAffiliateConversionMileage(
   eventId: string,
   status: 'approved' | 'rejected',
 ): Promise<void> {
+  // 付けた時点の版があれば、その版の決まりを優先する(#823)。
+  // 版の表が無い古いスキーマでは、従来どおり今の案件の値を使う。
+  const hasVersionTables = (await dbTableExists(db, 'affiliate_offer_versions'))
+    && (await dbTableExists(db, 'affiliate_attribution_decisions'));
+  const milesSelect = hasVersionTables
+    ? 'COALESCE(ov.reward_miles, off.reward_miles) AS reward_miles'
+    : 'off.reward_miles AS reward_miles';
+  const versionJoins = hasVersionTables
+    ? `LEFT JOIN affiliate_attribution_decisions dad
+           ON dad.conversion_event_id = ce.id
+         LEFT JOIN affiliate_offer_versions ov ON ov.id = dad.offer_version_id`
+    : '';
   const context = await db
     .prepare(
       `SELECT ce.id AS event_id,
               ce.approval_status,
               ce.approved_at,
               ce.created_at,
+              ce.approval_reward_miles AS frozen_miles,
               ce.friend_id AS subject_friend_id,
               subject.user_id AS subject_user_id,
               a.friend_id AS beneficiary_friend_id,
               beneficiary.user_id AS beneficiary_user_id,
+              beneficiary.line_account_id AS beneficiary_line_account_id,
               off.id AS offer_id,
               off.name AS offer_name,
-              off.reward_miles,
+              ${milesSelect},
               off.mileage_program_id
          FROM conversion_events ce
          JOIN affiliates a ON a.id = ce.affiliate_id
@@ -2157,6 +2879,7 @@ export async function syncAffiliateConversionMileage(
            ON al.ref_code = ce.attributed_ref_code
           AND al.affiliate_id = ce.affiliate_id
          LEFT JOIN affiliate_offers off ON off.id = al.offer_id
+         ${versionJoins}
         WHERE ce.id = ? AND ce.affiliate_id IS NOT NULL`,
     )
     .bind(eventId)
@@ -2184,8 +2907,33 @@ export async function syncAffiliateConversionMileage(
     occurredAt,
   });
 
+  // N-238: 承認された紹介成果は「たまる決めごと」のきっかけとしても選べるよう、
+  // 共通イベントキューへも乗せる。行動した側（受益者=紹介者）へルールが効く。
+  // sourceEventId に決定版を含めるのは、却下→再承認を別の出来事として
+  // 再度ルールに通すため（初回承認のイベントへ冪等吸収されないようにする）。
+  // 成果の受益者が友だちとして解決できないイベントは、付与の相手がいないため
+  // キューへ入れない。
+  if (status === 'approved' && context.beneficiary_friend_id) {
+    await enqueueMileageEvent(db, {
+      eventType: 'affiliate_conversion_approved',
+      source: 'affiliate_conversion',
+      sourceEventId: `${eventId}:${decisionVersion}`,
+      friendId: context.beneficiary_friend_id,
+      subjectKey: eventId,
+      metadata: {
+        offerId: context.offer_id,
+        offerName: context.offer_name,
+        conversionEventId: eventId,
+        decisionVersion,
+      },
+      occurredAt,
+    });
+  }
+
   if (status === 'approved') {
-    const rewardMiles = context.reward_miles ?? 0;
+    // m22u R356: 承認時に凍結したマイル数があれば、変更後の案件設定ではなく
+    // 凍結値を使う。0 の凍結も有効（0 のまま完了し、後日の再送で増えない）。
+    const rewardMiles = context.frozen_miles ?? context.reward_miles ?? 0;
     if (rewardMiles <= 0) return;
     await postMileageEntry(db, {
       programId,
@@ -2239,5 +2987,16 @@ export async function syncAffiliateConversionMileage(
       metadata: { originalEntryId: grant.id },
       occurredAt,
     });
+    // m22u R359: 取り消した付与の未使用分を交換対象から外す。交換の内訳は
+    // ロットから選ぶため、台帳の取消だけでは取消済みロットが使われてしまう。
+    // 使い切った分は交換側の予約が残り、未使用分だけを無効化する。
+    // 再送では取消済みのため grants に載らず、ここも再実行されない。
+    if (await dbTableExists(db, 'mileage_grant_lots')) {
+      await db.prepare(
+        `UPDATE mileage_grant_lots
+            SET remaining_amount = 0, status = 'void'
+          WHERE ledger_entry_id = ? AND status = 'available'`,
+      ).bind(grant.id).run();
+    }
   }
 }

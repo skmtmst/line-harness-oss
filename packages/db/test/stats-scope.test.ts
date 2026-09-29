@@ -44,7 +44,11 @@ describe('tenant-scoped dashboard aggregations', () => {
       return a >= 0 && binds[a + 1] === 'account-b';
     })).toBe(true);
 
-    const migrations = queries.find(({ sql }) => sql.includes('FROM account_migrations'));
+    /*
+     * 「UID移行状況」カードの数は uid_migration_runs から取る（DASH-07）。
+     * 旧アカウント移行(account_migrations)の件数と混ぜない。
+     */
+    const migrations = queries.find(({ sql }) => sql.includes('FROM uid_migration_runs'));
     expect(migrations?.binds).toEqual(['account-a', 'account-b', 'account-a', 'account-b']);
     const broadcasts = queries.find(({ sql }) => sql.includes('FROM broadcasts b'));
     expect(broadcasts?.binds.slice(-4)).toEqual(['account-a', 'account-b', 'account-a', 'account-b']);
@@ -66,8 +70,38 @@ describe('tenant-scoped dashboard aggregations', () => {
 
     expectScoped(queries, "c.status = 'unread'");
     expectScoped(queries, "c.status = 'in_progress'");
+    expectScoped(queries, 'GROUP BY c.operator_id');
     expectScoped(queries, "direction = 'incoming'");
     expectScoped(queries, 'first_replied_at IS NOT NULL');
+  });
+
+  test('getInboxStats returns unread totals per assignee without turning unassigned into an id', async () => {
+    const queries: Query[] = [];
+    const db = recordingDb(queries);
+    const originalPrepare = db.prepare.bind(db);
+    db.prepare = ((sql: string) => {
+      const statement = originalPrepare(sql) as D1PreparedStatement & {
+        all: <T>() => Promise<D1Result<T>>;
+      };
+      if (sql.includes('GROUP BY c.operator_id')) {
+        statement.all = async <T>() => ({
+          results: [
+            { operator_id: null, operator_name: null, unread: 2 },
+            { operator_id: 'operator-1', operator_name: 'Kenta', unread: 3 },
+          ] as T[],
+          success: true,
+          meta: {},
+        } as D1Result<T>);
+      }
+      return statement;
+    }) as D1Database['prepare'];
+
+    const stats = await getInboxStats(db, 'operator-1', scope);
+
+    expect(stats.assigneeUnread).toEqual([
+      { operatorId: null, operatorName: null, unread: 2 },
+      { operatorId: 'operator-1', operatorName: 'Kenta', unread: 3 },
+    ]);
   });
 
   test('getListStats passes the scope into friend, message, scenario and reminder counts', async () => {

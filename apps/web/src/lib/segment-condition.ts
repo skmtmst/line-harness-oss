@@ -66,6 +66,14 @@ export function isRuleComplete(rule: SegmentRule): boolean {
       return typeof v?.fieldId === 'string' && v.fieldId !== ''
     case 'scenario_state':
       return typeof v?.scenarioId === 'string' && v.scenarioId !== ''
+    case 'analytics_audience':
+      // 分析画面から渡された一時対象者。audienceId が空なら書きかけと同じく落とす。
+      return typeof v?.audienceId === 'string' && v.audienceId !== ''
+    case 'broadcast_link_clicked':
+      // 配信詳細の追送で渡す条件。broadcastId が無いと「全員」として数えられるので必須。
+      return typeof v?.broadcastId === 'string' && v.broadcastId !== ''
+    case 'scenario_subscribed':
+      return typeof rule.value === 'string' && rule.value !== ''
     case 'score_range': {
       const minProvided = v?.min !== null && v?.min !== undefined && v.min !== ''
       const maxProvided = v?.max !== null && v?.max !== undefined && v.max !== ''
@@ -81,6 +89,43 @@ export function isRuleComplete(rule: SegmentRule): boolean {
       // is_hidden / reaction_state は常に値が入っている。
       return true
   }
+}
+
+/*
+ * R247: 入力済みだが不正な数値範囲（上下限の逆転・非整数）を見つける。
+ * `isRuleComplete` はこれを一律「書きかけ」として落とすため、そのまま
+ * 保存すると絞り込みが黙って外れる（対象が広がる）。編集中の空行とは分け、
+ * 両欄の近くに理由を示して保存を止めるために使う。なければ null。
+ */
+export function findInvalidRangeIssue(condition: SegmentCondition | null): string | null {
+  if (!condition) return null
+  const checkRule = (rule: SegmentRule): string | null => {
+    if (rule.type !== 'score_range') return null
+    const v = rule.value as { min?: unknown; max?: unknown } | null | undefined
+    const min = v?.min ?? null
+    const max = v?.max ?? null
+    if (min === null || min === undefined || min === '' || max === null || max === undefined || max === '') {
+      return null
+    }
+    if (!Number.isSafeInteger(min) || !Number.isSafeInteger(max)) {
+      return '行動スコアは整数で入力してください。'
+    }
+    if ((min as number) > (max as number)) {
+      return '行動スコアの上限が下限を下回っています。下限と上限を見直してください。'
+    }
+    return null
+  }
+  for (const rule of condition.rules ?? []) {
+    const issue = checkRule(rule)
+    if (issue) return issue
+  }
+  for (const group of condition.groups ?? []) {
+    for (const rule of group.rules ?? []) {
+      const issue = checkRule(rule)
+      if (issue) return issue
+    }
+  }
+  return null
 }
 
 /** 書きかけの行を落とす。保存にも数え上げにも同じものを使う。 */

@@ -28,6 +28,10 @@ beforeEach(() => {
     `INSERT INTO line_accounts (id, name, channel_id, channel_secret, channel_access_token, created_at, updated_at)
      VALUES ('acc-1', 'A店', 'c1', 's1', 't1', '2026-01-01', '2026-01-01')`,
   ).run();
+  db.prepare(
+    `INSERT INTO friends (id, line_user_id, line_account_id)
+     VALUES ('f-1', 'U-event-visibility', 'acc-1')`,
+  ).run();
 });
 
 describe('094 の既定値', () => {
@@ -58,8 +62,9 @@ describe('098 キャンセル待ち', () => {
     db
       .prepare(
         `INSERT OR IGNORE INTO event_waitlist
-           (id, event_id, slot_id, friend_id, identity_key, status, created_at)
-         VALUES (?, 'e-1', ?, 'f-1', ?, 'waiting', '2026-08-16T00:00:00.000Z')`,
+           (id, line_account_id, event_id, slot_id, friend_id, identity_key, status, created_at, updated_at)
+         VALUES (?, 'acc-1', 'e-1', ?, 'f-1', ?, 'waiting',
+                 '2026-08-16T00:00:00.000Z', '2026-08-16T00:00:00.000Z')`,
       )
       .run(id, slot, identityKey);
 
@@ -106,8 +111,10 @@ describe('098 キャンセル待ち', () => {
     expect(() =>
       db
         .prepare(
-          `INSERT INTO event_waitlist (id, event_id, slot_id, friend_id, identity_key, status, created_at)
-           VALUES ('w-9', 'e-1', 's-1', 'f-1', 'uid:xyz', 'attended', '2026-08-16T00:00:00.000Z')`,
+          `INSERT INTO event_waitlist
+             (id, line_account_id, event_id, slot_id, friend_id, identity_key, status, created_at, updated_at)
+           VALUES ('w-9', 'acc-1', 'e-1', 's-1', 'f-1', 'uid:xyz', 'attended',
+                   '2026-08-16T00:00:00.000Z', '2026-08-16T00:00:00.000Z')`,
         )
         .run(),
     ).toThrow();

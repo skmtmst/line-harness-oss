@@ -1,3 +1,4 @@
+@layer components {
 .overlay {
   position: fixed;
   inset: 0;
@@ -10,9 +11,27 @@
   padding: 16px;
 }
 
+/* ★V6 の短い確認窓は、一覧の内容を隠しすぎない固定位置に置く。 */
+.confirmationOverlay {
+  align-items: flex-start;
+  padding-top: 280px;
+}
+
+@media (max-height: 640px) {
+  .confirmationOverlay {
+    padding-top: 80px;
+  }
+}
+
 .panel {
   display: flex;
   width: min(844px, 100%);
+  /*
+   * R283: 縦に長い窓でも見出し・閉じる・保存/取消に到達できる。
+   * 面の高さを画面内に収め、中身だけを送る。見出し行と操作は
+   * 縮めずに残す（右詳細パネル drawer と同じ形で全画面に効かせる）。
+   */
+  max-height: calc(100dvh - 32px);
   flex-direction: column;
   gap: 12px;
   border: 1px solid var(--color-hairline);
@@ -27,9 +46,66 @@
   padding: 18px;
 }
 
-.panel:focus-visible,
-.button:focus-visible {
+/* Pencil の確認窓。説明は帯で囲まず、見出し・本文・操作を同じ面に置く。 */
+.confirmationPanel {
+  gap: 16px;
+  padding: 24px;
+}
+
+.compactConfirmation {
+  width: min(600px, 100%);
+}
+
+.destructiveConfirmation {
+  width: min(720px, 100%);
+}
+
+.confirmationPanel .title {
+  font-size: 18px;
+  line-height: 1.4;
+}
+
+.confirmationPanel .description {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-body);
+  line-height: 1.5;
+}
+
+.confirmationPanel .titleIcon {
+  color: var(--color-accent-deep);
+}
+
+.confirmationPanel[role='alertdialog'] .titleIcon {
+  color: var(--color-status-danger);
+}
+
+.panel:focus-visible {
   outline: revert;
+}
+
+/* 見出しと右上の×を1行に並べる。中身は今までどおり縦に積む。 */
+.headerRow {
+  display: flex;
+  /* R283: 中身が長くても見出し行は縮めない（上に固定）。 */
+  flex: 0 0 auto;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.headerContent {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.confirmationPanel .headerContent {
+  gap: 16px;
+}
+
+.close {
+  flex-shrink: 0;
 }
 
 .title {
@@ -79,7 +155,7 @@
   flex-direction: column;
   gap: 8px;
   border: 1px solid var(--color-status-danger-soft);
-  border-radius: var(--radius-tile);
+  border-radius: var(--radius-card);
   background: var(--color-status-danger-soft);
   padding: 16px;
 }
@@ -95,6 +171,9 @@
 
 .content {
   min-width: 0;
+  /* R283: 長い中身はこの中で送る。見出し・閉じる・操作は外に残る。 */
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .error {
@@ -108,26 +187,18 @@
 
 .actions {
   display: flex;
+  /* R283: 中身が長くても操作は縮めない（下に固定）。 */
+  flex: 0 0 auto;
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 10px;
 }
 
-.button {
-  display: inline-flex;
-  width: 112px;
-  min-height: 38px;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  border: 1px solid;
-  border-radius: var(--radius-control);
-  padding: 8px 12px;
-  font-size: var(--text-caption);
-  font-weight: 700;
-  cursor: pointer;
-}
-
+/*
+ * 実行・取消ボタンは共通Button（button.tsx）をそのまま使う。
+ * 高さ・文字サイズ・色（副次=secondary／通常実行=primary／危険=danger）は
+ * すべて部品側が持つ（#976 U077/U083/U084）。ここには幅の指定だけ残す。
+ */
 .buttonIcon {
   display: inline-flex;
   flex-shrink: 0;
@@ -136,30 +207,9 @@
 }
 
 .designButton {
-  width: 112px;
-}
-
-.button:disabled {
-  cursor: not-allowed;
-  opacity: 0.4;
-}
-
-.cancel {
-  border-color: var(--color-hairline);
-  background: var(--color-canvas);
-  color: var(--color-ink);
-}
-
-.confirm {
-  border-color: var(--color-accent);
-  background: var(--color-accent);
-  color: var(--color-on-accent);
-}
-
-.danger {
-  border-color: var(--color-status-danger);
-  background: var(--color-status-danger);
-  color: var(--color-on-accent);
+  min-width: 112px;
+  width: auto;
+  white-space: nowrap;
 }
 
 @media (max-width: 560px) {
@@ -167,8 +217,13 @@
     padding: 16px;
   }
 
-  .actions,
-  .button {
+  .actions {
     width: 100%;
   }
+
+  /* 狭い画面ではボタンを縦に積み、指で押せる幅を確保する。 */
+  .designButton {
+    width: 100%;
+  }
+}
 }

@@ -6,9 +6,9 @@ const PAGE = fs.readFileSync(path.join(process.cwd(), 'src/app/tags/searches/edi
 
 describe('保存した検索の条件編集', () => {
   it('対応マーク・シナリオ・友だち情報を既存APIから名前で選ぶ', () => {
-    expect(PAGE).toContain('api.supportMarks.list(selectedAccountId)')
+    expect(PAGE).toContain('api.supportMarks.list(selectedAccountId, { suppressFeatureDisabledEvent: true })')
     expect(PAGE).toContain('api.scenarios.list({ accountId: selectedAccountId })')
-    expect(PAGE).toContain('api.friendFields.list(selectedAccountId)')
+    expect(PAGE).toContain('api.friendFields.list(selectedAccountId, undefined, { suppressFeatureDisabledEvent: true })')
     expect(PAGE).toContain('marks.map((mark) => ({ value: mark.id, label: mark.name }))')
     expect(PAGE).toContain('scenarios.map((scenario) => ({ value: scenario.id, label: scenario.name }))')
     expect(PAGE).toContain('fields.map((field) => ({ value: field.fieldKey, label: field.name }))')
@@ -27,5 +27,10 @@ describe('保存した検索の条件編集', () => {
     expect(PAGE).toContain('condition.kind === \'mark\'')
     expect(PAGE).toContain('condition.kind === \'scenario\'')
     expect(PAGE).toContain('optionsWithCurrent(')
+  })
+
+  it('複製の失敗を黙らせず理由を出して画面に残す', () => {
+    expect(PAGE).toContain('if (!res.success) { setError(res.error); return }')
+    expect(PAGE).toContain('router.push(`/tags/searches/edit?id=${encodeURIComponent(res.data.id)}`)')
   })
 })

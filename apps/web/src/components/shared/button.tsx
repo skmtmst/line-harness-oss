@@ -9,7 +9,18 @@ import type {
 import styles from './button.module.css'
 
 type CommonProps = {
-  variant?: 'primary' | 'secondary'
+  /**
+   * `danger` は確定ダイアログの削除・解除などに使う赤。
+   * `#976` U077/U084: 危険操作は共通ボタンの1役割として持ち、
+   * 画面ごとの直書き赤（濃さがバラバラだった）を1本にする。
+   */
+  variant?: 'primary' | 'secondary' | 'danger'
+  /**
+   * `compact` は一覧の行内・絞り込み行など、32px級の操作と高さを
+   * そろえるときだけ使う（★V7：行内の操作は32）。本文の操作は
+   * `standard` のままにする。
+   */
+  size?: 'standard' | 'field' | 'compact'
   className?: string
   children: ReactNode
 }
@@ -17,6 +28,8 @@ type CommonProps = {
 type NativeButtonProps = CommonProps &
   Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children' | 'className' | 'href'> & {
     href?: never
+    /** 開いた直後に標的を寄せたいときだけ渡す（未保存の離脱確認の主ボタン）。 */
+    ref?: React.Ref<HTMLButtonElement>
   }
 
 type LinkButtonProps = CommonProps &
@@ -37,10 +50,11 @@ export type ButtonProps = NativeButtonProps | LinkButtonProps
  */
 export default function Button(props: ButtonProps) {
   const variant = props.variant ?? 'secondary'
-  const classes = [styles.button, styles[variant], props.className].filter(Boolean).join(' ')
+  const size = props.size ?? 'standard'
+  const classes = [styles.button, styles[variant], styles[size], props.className].filter(Boolean).join(' ')
 
   if ('href' in props && props.href !== undefined) {
-    const { children, className: _className, href, variant: _variant, ...linkProps } = props
+    const { children, className: _className, href, size: _size, variant: _variant, ...linkProps } = props
     return (
       <Link href={href} className={classes} {...linkProps}>
         {children}
@@ -51,12 +65,14 @@ export default function Button(props: ButtonProps) {
   const {
     children,
     className: _className,
+    size: _size,
     type = 'button',
     variant: _variant,
+    ref,
     ...buttonProps
   } = props
   return (
-    <button type={type} className={classes} {...buttonProps}>
+    <button type={type} className={classes} ref={ref} {...buttonProps}>
       {children}
     </button>
   )

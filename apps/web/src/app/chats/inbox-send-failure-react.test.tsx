@@ -1,0 +1,184 @@
+// @vitest-environment happy-dom
+import React, { act } from 'react'
+import { createRoot, type Root } from 'react-dom/client'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+import ChatsPage from './page'
+
+const fixture = vi.hoisted(() => ({
+  params: new URLSearchParams('friend=friend-a'),
+}))
+
+vi.mock('next/link', () => ({ default: () => null }))
+vi.mock('next/navigation', () => ({
+  useSearchParams: () => fixture.params,
+  usePathname: () => '/chats',
+  useRouter: () => ({ push() {}, replace() {}, refresh() {}, back() {}, forward() {}, prefetch() {} }),
+}))
+vi.mock('@/contexts/account-context', () => ({
+  useAccount: () => ({
+    selectedAccountId: 'account-a',
+    selectedAccount: null,
+    loading: false,
+  }),
+}))
+
+const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), {
+  status,
+  headers: { 'Content-Type': 'application/json' },
+})
+
+let sendResponse: () => Response = () => json({
+  success: true,
+  data: { sent: true, messageId: 'm-1', sentByStaffName: '自分', revision: 2 },
+})
+
+function responseFor(url: URL, init?: RequestInit): Response {
+  if (url.pathname === '/api/chats/friend-a/send' && init?.method === 'POST') {
+    return sendResponse()
+  }
+  if (url.pathname === '/api/chats') return json({ success: true, data: [] })
+  if (url.pathname === '/api/chats/stats') {
+    return json({ success: true, data: {
+      total: 0, unread: 0, inProgress: 0, onHold: 0, resolved: 0,
+      oldestUnansweredMinutes: null, assigneeUnread: [],
+    } })
+  }
+  if (url.pathname === '/api/support/inbox') {
+    return json({ success: true, data: { items: [], summary: { total: 0 } } })
+  }
+  if (url.pathname === '/api/operators') return json({ success: true, data: [] })
+  if (url.pathname === '/api/inbox/saved-views') return json({ success: true, data: [] })
+  if (url.pathname === '/api/friends/friend-a') {
+    return json({ success: true, data: {
+      id: 'friend-a', displayName: '失敗確認', pictureUrl: null, isFollowing: true,
+      metadata: {}, lineAccountId: 'account-a', realName: null, systemDisplayName: null,
+      refCode: null, createdAt: '2026-09-01T00:00:00.000Z', tags: [],
+      formSubmissions: [], support: null,
+    } })
+  }
+  if (url.pathname === '/api/chats/friend-a') {
+    return json({ success: true, data: {
+      id: 'friend-a', friendId: 'friend-a', friendName: '失敗確認',
+      friendRealName: null, friendPictureUrl: null, isAttention: false,
+      operatorId: null, status: 'unread', notes: null, revision: 1,
+      lastMessageAt: '2026-09-16T01:00:00.000Z', createdAt: '2026-09-01T00:00:00.000Z',
+      messages: [], hasMoreMessages: false,
+    } })
+  }
+  if (url.pathname.endsWith('/mileage')) {
+    return json({ success: true, data: {
+      summary: { programId: 'p', programName: 'マイル', available: 0, pending: 0, lifetimeEarned: 0, spent: 0 },
+      history: [],
+    } })
+  }
+  if (url.pathname.endsWith('/rich-menu')) {
+    return json({ success: true, data: { id: null, name: null, isDefault: false } })
+  }
+  if (url.pathname.endsWith('/read')) return json({ success: true, data: { isUnread: false } })
+  return json({ success: true, data: [] })
+}
+
+async function eventually(check: () => void, timeout = 1_500): Promise<void> {
+  const started = Date.now()
+  while (true) {
+    try {
+      check()
+      return
+    } catch (error) {
+      if (Date.now() - started >= timeout) throw error
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 10)) })
+    }
+  }
+}
+
+describe('N-028/N-029 受信箱送信の失敗理由', () => {
+  let host: HTMLDivElement
+  let root: Root
+
+  beforeEach(() => {
+    fixture.params = new URLSearchParams('friend=friend-a')
+    sendResponse = () => json({
+      success: true,
+      data: { sent: true, messageId: 'm-1', sentByStaffName: '自分', revision: 2 },
+    })
+    const values = new Map<string, string>()
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value),
+      removeItem: (key: string) => values.delete(key),
+    })
+    vi.stubGlobal('fetch', (input: string | URL, init?: RequestInit) =>
+      Promise.resolve(responseFor(new URL(String(input), 'http://localhost'), init)))
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
+    host = document.createElement('div')
+    document.body.appendChild(host)
+    root = createRoot(host)
+  })
+
+  afterEach(async () => {
+    await act(async () => root.unmount())
+    host.remove()
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+  })
+
+  async function typeAndSend(text: string) {
+    const textarea = host.querySelector('textarea[aria-label="メッセージを入力"]') as HTMLTextAreaElement
+    expect(textarea).not.toBeNull()
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')!.set!
+      setter.call(textarea, text)
+      textarea.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    const button = Array.from(host.querySelectorAll('button'))
+      .find((b) => b.textContent === '送信' && b.className.includes('bg-accent-deep'))!
+    await act(async () => { button.click() })
+  }
+
+  it('429は送信制限と待機時間をバナーで出し、入力を残す', async () => {
+    sendResponse = () => json({
+      success: false,
+      code: 'LINE_RATE_LIMITED',
+      data: { retryable: true, nextRetryAt: new Date(Date.now() + 7 * 60_000).toISOString() },
+    }, 429)
+    await act(async () => root.render(<ChatsPage />))
+    await eventually(() =>
+      expect(host.querySelector('textarea[aria-label="メッセージを入力"]')).not.toBeNull())
+
+    await typeAndSend('制限に当たる文')
+
+    await eventually(() => {
+      expect(host.textContent).toContain('送信制限')
+      expect(host.textContent).toContain('分後')
+    })
+    const textarea = host.querySelector('textarea[aria-label="メッセージを入力"]') as HTMLTextAreaElement
+    expect(textarea.value).toBe('制限に当たる文')
+  })
+
+  it('送達不明は二重送信を止める案内を出す', async () => {
+    sendResponse = () => json({
+      success: false,
+      code: 'OUTBOUND_CONFIRMATION_FAILED',
+      data: { retryable: false, nextRetryAt: null },
+    }, 503)
+    await act(async () => root.render(<ChatsPage />))
+    await eventually(() =>
+      expect(host.querySelector('textarea[aria-label="メッセージを入力"]')).not.toBeNull())
+
+    await typeAndSend('届いたか不明な文')
+
+    await eventually(() => expect(host.textContent).toContain('自動再送'))
+  })
+
+  it('リビジョン競合の409は従来どおり読み直しを促す', async () => {
+    sendResponse = () => json({ success: false, error: 'revision conflict' }, 409)
+    await act(async () => root.render(<ChatsPage />))
+    await eventually(() =>
+      expect(host.querySelector('textarea[aria-label="メッセージを入力"]')).not.toBeNull())
+
+    await typeAndSend('競合する文')
+
+    await eventually(() => expect(host.textContent).toContain('読み直してください'))
+  })
+})

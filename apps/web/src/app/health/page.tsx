@@ -3,6 +3,14 @@
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '@/lib/api'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import Progress from '@/components/shared/progress'
+import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import Select from '@/components/shared/select'
+import Avatar from '@/components/shared/avatar'
+import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
+import { parseJstDateTime, shortDateTime } from '@/lib/hq-banners'
+import { ChevronDown } from 'lucide-react'
 
 interface LineAccount {
   id: string
@@ -23,6 +31,25 @@ interface AccountHealthLog {
   createdAt: string
 }
 
+/*
+ * R168: BAN検知はcronで5分ごとに走る。最後の確認がしきい値より古いなら
+ * 「確認が止まっている」として区別する。古い正常の記録を現在の
+ * 正常稼働として見せないための区切り。
+ */
+const STALE_CHECK_AFTER_MS = 60 * 60 * 1000
+
+type AccountHealthState = AccountHealthLog['riskLevel'] | 'unknown' | 'error' | 'stale'
+
+interface AccountHealthSnapshot {
+  state: AccountHealthState
+  logs: AccountHealthLog[]
+}
+
+interface AccountHealthResponse {
+  success: boolean
+  data?: unknown
+}
+
 interface AccountMigration {
   id: string
   fromAccountId: string
@@ -34,31 +61,81 @@ interface AccountMigration {
   completedAt: string | null
 }
 
+type MigrationLoadState = 'loading' | 'ready' | 'error'
+
 const riskConfig = {
-  normal: { label: '正常', color: 'bg-green-500', textColor: 'text-green-700', bgColor: 'bg-green-100' },
-  warning: { label: '警告', color: 'bg-yellow-500', textColor: 'text-yellow-700', bgColor: 'bg-yellow-100' },
-  danger: { label: '危険', color: 'bg-red-500', textColor: 'text-red-700', bgColor: 'bg-red-100' },
+  normal: { label: '正常', color: 'bg-success', textColor: 'text-success', bgColor: 'bg-success-bg' },
+  warning: { label: '警告', color: 'bg-status-warn', textColor: 'text-status-warn-deep', bgColor: 'bg-status-warn-soft' },
+  danger: { label: '危険', color: 'bg-danger', textColor: 'text-danger', bgColor: 'bg-danger-bg' },
+  unknown: { label: '未確認', color: 'bg-ink-faint', textColor: 'text-ink-faint', bgColor: 'bg-canvas-sunken' },
+  error: { label: '取得失敗', color: 'bg-danger', textColor: 'text-danger', bgColor: 'bg-danger-bg' },
+  stale: { label: '確認停止中', color: 'bg-status-warn', textColor: 'text-status-warn-deep', bgColor: 'bg-status-warn-soft' },
+} satisfies Record<AccountHealthState, { label: string; color: string; textColor: string; bgColor: string }>
+
+/** 最終確認がしきい値より古いか。時刻が読めないものは「古い」とは言えないので stale にしない。 */
+function isStaleCheck(createdAt: string | null | undefined, now = new Date()): boolean {
+  if (!createdAt) return false
+  const checkedAt = parseJstDateTime(createdAt)
+  if (Number.isNaN(checkedAt.getTime())) return false
+  return now.getTime() - checkedAt.getTime() > STALE_CHECK_AFTER_MS
+}
+
+function isRiskLevel(value: unknown): value is AccountHealthLog['riskLevel'] {
+  return value === 'normal' || value === 'warning' || value === 'danger'
+}
+
+function resolveAccountHealth(response: AccountHealthResponse): AccountHealthSnapshot {
+  if (!response.success) return { state: 'error', logs: [] }
+
+  const payload = response.data && typeof response.data === 'object'
+    ? response.data as { riskLevel?: unknown; logs?: unknown }
+    : {}
+  const logs = Array.isArray(payload.logs) ? payload.logs as AccountHealthLog[] : []
+  const state = isRiskLevel(payload.riskLevel)
+    ? payload.riskLevel
+    : isRiskLevel(logs[0]?.riskLevel)
+      ? logs[0].riskLevel
+      : 'unknown'
+
+  return { state, logs }
+}
+
+async function loadAccountHealthStates(
+  accountIds: string[],
+  getHealth: (accountId: string) => Promise<AccountHealthResponse>,
+): Promise<Record<string, AccountHealthSnapshot>> {
+  const entries = await Promise.all(accountIds.map(async (accountId) => {
+    try {
+      return [accountId, resolveAccountHealth(await getHealth(accountId))] as const
+    } catch {
+      return [accountId, { state: 'error', logs: [] }] as const
+    }
+  }))
+
+  return Object.fromEntries(entries)
 }
 
 const statusConfig: Record<AccountMigration['status'], { label: string; textColor: string; bgColor: string }> = {
-  pending: { label: '待機中', textColor: 'text-gray-700', bgColor: 'bg-gray-100' },
-  in_progress: { label: '移行中', textColor: 'text-blue-700', bgColor: 'bg-blue-100' },
-  completed: { label: '完了', textColor: 'text-green-700', bgColor: 'bg-green-100' },
-  failed: { label: '失敗', textColor: 'text-red-700', bgColor: 'bg-red-100' },
+  pending: { label: '待機中', textColor: 'text-ink-secondary', bgColor: 'bg-canvas-sunken' },
+  in_progress: { label: '移行中', textColor: 'text-status-info', bgColor: 'bg-status-info-soft' },
+  completed: { label: '完了', textColor: 'text-success', bgColor: 'bg-success-bg' },
+  failed: { label: '失敗', textColor: 'text-danger', bgColor: 'bg-danger-bg' },
 }
 
 export default function HealthPage() {
   usePageTitle('BAN検知ダッシュボード')
   const [accounts, setAccounts] = useState<LineAccount[]>([])
   const [healthLogs, setHealthLogs] = useState<Record<string, AccountHealthLog[]>>({})
-  const [latestRisk, setLatestRisk] = useState<Record<string, AccountHealthLog['riskLevel']>>({})
+  const [latestRisk, setLatestRisk] = useState<Record<string, AccountHealthState>>({})
   const [migrations, setMigrations] = useState<AccountMigration[]>([])
+  const [migrationLoadState, setMigrationLoadState] = useState<MigrationLoadState>('loading')
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [migrateFrom, setMigrateFrom] = useState<string | null>(null)
   const [migrateToId, setMigrateToId] = useState('')
   const [migrating, setMigrating] = useState(false)
+  const [retryingHealthIds, setRetryingHealthIds] = useState<Set<string>>(new Set())
 
   const loadAccounts = useCallback(async () => {
     setLoading(true)
@@ -68,30 +145,18 @@ export default function HealthPage() {
       if (res.success) {
         const data = res.data as unknown as LineAccount[]
         setAccounts(data)
-        // Load health for each account
-        const risks: Record<string, AccountHealthLog['riskLevel']> = {}
-        for (const account of data) {
-          try {
-            const healthRes = await api.health.getHealth(account.id)
-            if (healthRes.success) {
-              const payload = healthRes.data as unknown as { lineAccountId: string; riskLevel: string; logs: AccountHealthLog[] }
-              const logs = payload.logs ?? []
-              setHealthLogs((prev) => ({ ...prev, [account.id]: logs }))
-              if (payload.riskLevel) {
-                risks[account.id] = payload.riskLevel as AccountHealthLog['riskLevel']
-              } else if (logs.length > 0) {
-                risks[account.id] = logs[0].riskLevel
-              } else {
-                risks[account.id] = 'normal'
-              }
-            }
-          } catch {
-            risks[account.id] = 'normal'
-          }
-        }
-        setLatestRisk(risks)
+        const snapshots = await loadAccountHealthStates(
+          data.map((account) => account.id),
+          (accountId) => api.health.getHealth(accountId),
+        )
+        setHealthLogs(Object.fromEntries(
+          Object.entries(snapshots).map(([accountId, snapshot]) => [accountId, snapshot.logs]),
+        ))
+        setLatestRisk(Object.fromEntries(
+          Object.entries(snapshots).map(([accountId, snapshot]) => [accountId, snapshot.state]),
+        ))
       } else {
-        setError('アカウント情報の取得に失敗しました')
+        setError('アカウント情報の取得に失敗しました。もう一度読み込んでください。')
       }
     } catch {
       setError('アカウント情報の読み込みに失敗しました。もう一度お試しください。')
@@ -100,14 +165,34 @@ export default function HealthPage() {
     }
   }, [])
 
+  const retryAccountHealth = useCallback(async (accountId: string) => {
+    setRetryingHealthIds((current) => new Set(current).add(accountId))
+    const snapshots = await loadAccountHealthStates(
+      [accountId],
+      (id) => api.health.getHealth(id),
+    )
+    const snapshot = snapshots[accountId]
+    setHealthLogs((current) => ({ ...current, [accountId]: snapshot.logs }))
+    setLatestRisk((current) => ({ ...current, [accountId]: snapshot.state }))
+    setRetryingHealthIds((current) => {
+      const next = new Set(current)
+      next.delete(accountId)
+      return next
+    })
+  }, [])
+
   const loadMigrations = useCallback(async () => {
+    setMigrationLoadState('loading')
     try {
       const res = await api.health.migrations()
-      if (res.success) {
-        setMigrations(res.data as unknown as AccountMigration[])
+      if (res.success && Array.isArray(res.data)) {
+        setMigrations(res.data as AccountMigration[])
+        setMigrationLoadState('ready')
+      } else {
+        setMigrationLoadState('error')
       }
     } catch {
-      // Non-blocking
+      setMigrationLoadState('error')
     }
   }, [])
 
@@ -130,7 +215,7 @@ export default function HealthPage() {
       setMigrateToId('')
       loadMigrations()
     } catch {
-      setError('移行リクエストに失敗しました')
+      setError('移行リクエストに失敗しました。通信を確かめて、もう一度お試しください。')
     } finally {
       setMigrating(false)
     }
@@ -142,128 +227,144 @@ export default function HealthPage() {
   }
 
   return (
-    <div>
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
 
       {/* Error */}
       {error && (
-        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-          {error}
-        </div>
+        <Notice tone="danger" message={error} onClose={() => setError('')} className="mb-4" />
       )}
 
       {/* Loading */}
       {loading ? (
-        <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-400">
+        <div className="bg-canvas rounded-card border border-hairline p-8 text-center text-ink-faint">
           読み込み中...
         </div>
       ) : accounts.length === 0 ? (
-        <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-400">
+        <div className="bg-canvas rounded-card border border-hairline p-8 text-center text-ink-faint">
           <p className="mb-2">LINEアカウントが登録されていません</p>
-          <p className="text-xs text-gray-300">先にアカウント管理からLINEアカウントを登録してください</p>
+          <p className="text-xs text-ink-faint">先にアカウント管理からLINEアカウントを登録してください</p>
         </div>
       ) : (
-        <>
+        <div className="flex flex-col gap-4">
           {/* Account Health Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {accounts.map((account) => {
-              const risk = latestRisk[account.id] || 'normal'
-              const config = riskConfig[risk]
+              const storedRisk = latestRisk[account.id] ?? 'unknown'
               const isExpanded = expandedId === account.id
               const logs = healthLogs[account.id] || []
+              const latestLog = logs[0] ?? null
+              // R168: 最終確認が古いときは、記録上の結果ではなく「確認が止まっている」を出す。
+              const stale = storedRisk !== 'unknown' && storedRisk !== 'error' && isStaleCheck(latestLog?.createdAt)
+              const risk: AccountHealthState = stale ? 'stale' : storedRisk
+              const config = riskConfig[risk]
+              const healthUnavailable = risk === 'unknown' || risk === 'error' || risk === 'stale'
 
               return (
-                <div key={account.id} className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                <div key={account.id} className="bg-canvas rounded-card border border-hairline overflow-hidden">
                   <button
                     onClick={() => handleExpand(account.id)}
-                    className="w-full p-4 text-left hover:bg-gray-50 transition-colors"
+                    className="w-full p-4 text-left hover:bg-canvas-sunken transition-colors"
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <div
-                          className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold text-sm"
-                          style={{ backgroundColor: 'var(--color-accent)' }}
-                        >
-                          L
-                        </div>
+                        {/* ★V7：全員同じ「L」の緑の四角では見分けられないので、他の画面と同じ頭文字の丸にする。 */}
+                        <Avatar name={account.name} size={40} />
                         <div>
-                          <h3 className="text-sm font-bold text-gray-900">{account.name}</h3>
-                          <p className="text-xs text-gray-400 font-mono">Channel: {account.channelId}</p>
+                          <h3 className="text-sm font-bold text-ink">{account.name}</h3>
+                          <p className="text-xs text-ink-faint">チャネル {account.channelId}</p>
+                          {/* R168: いつ確かめた結果かを常に出す。 */}
+                          <p className="text-xs text-ink-faint">
+                            最終確認 {latestLog ? shortDateTime(latestLog.createdAt) : '—'}
+                          </p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${config.bgColor} ${config.textColor}`}>
+                        <span className={`inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-medium px-2.5 py-1 rounded-full ${config.bgColor} ${config.textColor}`}>
                           <span className={`w-2 h-2 rounded-full ${config.color} ${risk === 'danger' ? 'animate-pulse' : ''}`} />
                           {config.label}
                         </span>
-                        <svg
-                          className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
+                        <ChevronDown aria-hidden="true" className={`size-4 text-ink-faint transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                       </div>
                     </div>
                   </button>
 
                   {/* Expanded: Health Logs */}
                   {isExpanded && (
-                    <div className="border-t border-gray-200 p-4">
-                      {risk === 'danger' && (
+                    <div className="border-t border-hairline p-4">
+                      {healthUnavailable && (
+                        <div className="border-hairline bg-canvas-sunken text-ink-secondary mb-3 rounded-card border p-3 text-sm">
+                          <p>
+                            {risk === 'error'
+                              ? 'ヘルス情報を取得できませんでした。'
+                              : risk === 'stale'
+                                ? `最後の確認は ${latestLog ? shortDateTime(latestLog.createdAt) : '—'} です。確認が止まっているため、現在の状態は分かりません（最後の結果は「${latestLog ? riskConfig[latestLog.riskLevel].label : '—'}」）。`
+                                : 'まだ確認結果がありません。'}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => void retryAccountHealth(account.id)}
+                            disabled={retryingHealthIds.has(account.id)}
+                            className="text-action mt-2 text-sm font-medium underline underline-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {retryingHealthIds.has(account.id) ? '再取得中...' : '再試行'}
+                          </button>
+                        </div>
+                      )}
+
+                      {/* 確認が止まっていても、最後の結果が危険なら移行の入口は残す。 */}
+                      {storedRisk === 'danger' && (
                         <div className="mb-3">
                           <button
                             onClick={() => {
                               setMigrateFrom(account.id)
                               setMigrateToId('')
                             }}
-                            className="px-3 py-1.5 rounded-lg text-white text-xs font-medium bg-red-500 hover:bg-red-600 transition-colors"
+                            className="px-3 py-1.5 rounded-control text-white text-xs font-medium bg-danger hover:brightness-92 transition-colors"
                           >
                             友だちを移行する
                           </button>
                         </div>
                       )}
 
-                      {logs.length === 0 ? (
-                        <p className="text-sm text-gray-400 text-center py-4">ヘルスログがありません</p>
-                      ) : (
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-sm">
+                      {logs.length > 0 ? (
+                        <DataTable>
                             <thead>
-                              <tr className="text-left text-xs text-gray-500 border-b border-gray-100">
-                                <th className="pb-2 pr-3 font-medium">エラーコード</th>
-                                <th className="pb-2 pr-3 font-medium">エラー数</th>
-                                <th className="pb-2 pr-3 font-medium">チェック期間</th>
-                                <th className="pb-2 pr-3 font-medium">リスク</th>
-                                <th className="pb-2 font-medium">日時</th>
-                              </tr>
+                              <TableHeadRow>
+                                <Th style={{ width: '20%' }}>エラーコード</Th>
+                                <Th style={{ width: '12%' }}>エラー数</Th>
+                                <Th style={{ width: '20%' }}>チェック期間</Th>
+                                <Th style={{ width: '18%' }}>リスク</Th>
+                                <Th style={{ width: '30%' }}>日時</Th>
+                              </TableHeadRow>
                             </thead>
                             <tbody>
                               {logs.map((log) => {
                                 const logConfig = riskConfig[log.riskLevel]
                                 return (
-                                  <tr key={log.id} className="border-b border-gray-50">
-                                    <td className="py-2 pr-3 font-mono text-gray-700">
+                                  <Tr key={log.id}>
+                                    <Td className="font-mono text-ink-secondary">
                                       {log.errorCode !== null ? log.errorCode : '-'}
-                                    </td>
-                                    <td className="py-2 pr-3 text-gray-700">{log.errorCount}</td>
-                                    <td className="py-2 pr-3 text-gray-500">{log.checkPeriod}</td>
-                                    <td className="py-2 pr-3">
+                                    </Td>
+                                    <Td className="text-ink-secondary">{log.errorCount}</Td>
+                                    <Td className="text-ink-secondary">{log.checkPeriod}</Td>
+                                    <Td>
                                       <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${logConfig.bgColor} ${logConfig.textColor}`}>
                                         <span className={`w-1.5 h-1.5 rounded-full ${logConfig.color} ${log.riskLevel === 'danger' ? 'animate-pulse' : ''}`} />
                                         {logConfig.label}
                                       </span>
-                                    </td>
-                                    <td className="py-2 text-gray-400 text-xs">
+                                    </Td>
+                                    <Td className="text-ink-faint text-xs">
                                       {new Date(log.createdAt).toLocaleString('ja-JP')}
-                                    </td>
-                                  </tr>
+                                    </Td>
+                                  </Tr>
                                 )
                               })}
                             </tbody>
-                          </table>
-                        </div>
-                      )}
+                        </DataTable>
+                      ) : !healthUnavailable ? (
+                        <p className="text-sm text-ink-faint text-center py-4">ヘルスログがありません</p>
+                      ) : null}
                     </div>
                   )}
                 </div>
@@ -273,48 +374,41 @@ export default function HealthPage() {
 
           {/* Migration Form Modal */}
           {migrateFrom && (
-            <div className="mb-8 bg-white rounded-lg border border-red-200 p-6">
-              <h2 className="text-sm font-bold text-gray-900 mb-4">
+            <div className="bg-canvas rounded-card border border-danger/30 p-6">
+              <h2 className="text-sm font-bold text-ink mb-4">
                 友だち移行: {getAccountName(migrateFrom)}
               </h2>
               <form onSubmit={handleMigrate}>
                 <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">移行先アカウント</label>
-                  <select
+                  <label className="block text-sm font-medium text-ink-secondary mb-1">移行先アカウント</label>
+                  <Select size="full"
                     value={migrateToId}
-                    onChange={(e) => setMigrateToId(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-500"
-                    required
-                  >
-                    <option value="">選択してください</option>
-                    {accounts
-                      .filter((a) => a.id !== migrateFrom && a.isActive)
-                      .map((a) => (
-                        <option key={a.id} value={a.id}>
-                          {a.name} ({a.channelId})
-                        </option>
-                      ))}
-                  </select>
+                    onChange={(value) => setMigrateToId(value)}
+                    aria-label="移行先アカウント"
+                    options={[
+                      { value: '', label: '選択してください' },
+                      ...accounts
+                        .filter((account) => account.id !== migrateFrom && account.isActive)
+                        .map((account) => ({
+                          value: account.id,
+                          label: `${account.name} (${account.channelId})`,
+                        })),
+                    ]}
+                  />
                 </div>
                 <div className="flex items-center gap-3">
-                  <button
-                    type="submit"
-                    disabled={migrating || !migrateToId}
-                    className="px-4 py-2 rounded-lg text-white text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                    style={{ backgroundColor: 'var(--color-accent)' }}
-                  >
+                  <Button type="submit" variant="primary" disabled={migrating || !migrateToId}>
                     {migrating ? '移行中...' : '移行を開始'}
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
                     onClick={() => {
                       setMigrateFrom(null)
                       setMigrateToId('')
                     }}
-                    className="px-4 py-2 rounded-lg text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors"
                   >
                     キャンセル
-                  </button>
+                  </Button>
                 </div>
               </form>
             </div>
@@ -322,75 +416,98 @@ export default function HealthPage() {
 
           {/* Migrations Table */}
           <div>
-            <h2 className="text-lg font-bold text-gray-900 mb-4">移行履歴</h2>
-            {migrations.length === 0 ? (
-              <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-400">
+            <h2 className="text-lg font-bold text-ink mb-4">移行履歴</h2>
+            {migrationLoadState === 'loading' ? (
+              <div className="border-hairline bg-canvas text-ink-faint rounded-card border p-8 text-center">
+                移行履歴を読み込んでいます...
+              </div>
+            ) : migrationLoadState === 'error' ? (
+              <Notice
+                tone="danger"
+                message="移行履歴を取得できませんでした。"
+                action={
+                  <button
+                    type="button"
+                    onClick={() => void loadMigrations()}
+                    className="text-sm font-medium underline underline-offset-2"
+                  >
+                    再読み込み
+                  </button>
+                }
+              />
+            ) : migrations.length === 0 ? (
+              <div className="bg-canvas rounded-card border border-hairline p-8 text-center text-ink-faint">
                 移行履歴はありません
               </div>
             ) : (
-              <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm min-w-[640px]">
+              <DataTable>
                     <thead>
-                      <tr className="text-left text-xs text-gray-500 bg-gray-50 border-b border-gray-200">
-                        <th className="px-4 py-3 font-medium">移行元</th>
-                        <th className="px-4 py-3 font-medium">移行先</th>
-                        <th className="px-4 py-3 font-medium">ステータス</th>
-                        <th className="px-4 py-3 font-medium">進捗</th>
-                        <th className="px-4 py-3 font-medium">開始日時</th>
-                        <th className="px-4 py-3 font-medium">完了日時</th>
-                      </tr>
+                      <TableHeadRow>
+                        <Th style={{ width: '16%' }}>移行元</Th>
+                        <Th style={{ width: '16%' }}>移行先</Th>
+                        <Th style={{ width: '14%' }}>ステータス</Th>
+                        <Th style={{ width: '24%' }}>進捗</Th>
+                        <Th style={{ width: '15%' }}>開始日時</Th>
+                        <Th style={{ width: '15%' }}>完了日時</Th>
+                      </TableHeadRow>
                     </thead>
                     <tbody>
                       {migrations.map((migration) => {
                         const status = statusConfig[migration.status]
-                        const progress = migration.totalCount > 0
-                          ? Math.round((migration.migratedCount / migration.totalCount) * 100)
+                        const countText = `${migration.migratedCount.toLocaleString('ja-JP')} / ${migration.totalCount.toLocaleString('ja-JP')} 人`
+                        const percent = migration.totalCount > 0
+                          ? (migration.migratedCount / migration.totalCount) * 100
                           : 0
                         return (
-                          <tr key={migration.id} className="border-b border-gray-100 hover:bg-gray-50">
-                            <td className="px-4 py-3 text-gray-900 font-medium">
+                          <Tr key={migration.id} interactive>
+                            <Td className="text-ink font-medium">
                               {getAccountName(migration.fromAccountId)}
-                            </td>
-                            <td className="px-4 py-3 text-gray-900 font-medium">
+                            </Td>
+                            <Td className="text-ink font-medium">
                               {getAccountName(migration.toAccountId)}
-                            </td>
-                            <td className="px-4 py-3">
+                            </Td>
+                            <Td>
                               <span className={`inline-flex text-xs font-medium px-2.5 py-1 rounded-full ${status.bgColor} ${status.textColor}`}>
                                 {status.label}
                               </span>
-                            </td>
-                            <td className="px-4 py-3">
-                              <div className="flex items-center gap-2">
-                                <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
-                                  <div
-                                    className="h-full rounded-full transition-all"
-                                    style={{ width: `${progress}%`, backgroundColor: 'var(--color-accent)' }}
-                                  />
-                                </div>
-                                <span className="text-xs text-gray-500">
-                                  {migration.migratedCount}/{migration.totalCount}
-                                </span>
-                              </div>
-                            </td>
-                            <td className="px-4 py-3 text-gray-400 text-xs">
+                            </Td>
+                            <Td>
+                              {/*
+                                移行の進みは共通部品 Progress（★V7 xiHO8）で出す。
+                                実行中→active、完了→done、失敗→partial（残りは赤の欠け）、
+                                待ち→preparing。数は文字でも残す（n / m 人）。
+                              */}
+                              {migration.status === 'in_progress' ? (
+                                <Progress state="active" title="移行中" percent={percent} countText={countText} className="min-w-48" />
+                              ) : migration.status === 'completed' ? (
+                                <Progress state="done" title="移行が完了しました" note={countText} className="min-w-48" />
+                              ) : migration.status === 'failed' ? (
+                                <Progress
+                                  state="partial"
+                                  title={migration.migratedCount > 0 ? `${countText}まで移行し、途中で止まりました` : `移行できませんでした（${countText}）`}
+                                  percent={percent}
+                                  className="min-w-48"
+                                />
+                              ) : (
+                                <Progress state="preparing" title="移行待ち" note={countText} className="min-w-48" />
+                              )}
+                            </Td>
+                            <Td className="text-ink-faint text-xs">
                               {new Date(migration.createdAt).toLocaleString('ja-JP')}
-                            </td>
-                            <td className="px-4 py-3 text-gray-400 text-xs">
+                            </Td>
+                            <Td className="text-ink-faint text-xs">
                               {migration.completedAt
                                 ? new Date(migration.completedAt).toLocaleString('ja-JP')
                                 : '-'}
-                            </td>
-                          </tr>
+                            </Td>
+                          </Tr>
                         )
                       })}
                     </tbody>
-                  </table>
-                </div>
-              </div>
+              </DataTable>
             )}
           </div>
-        </>
+        </div>
       )}
     </div>
   )

@@ -1,13 +1,21 @@
 'use client'
 
-import React, { Suspense, useState } from 'react'
+import React, { Suspense, useEffect, useId, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import type { Tag } from '@line-crm/shared'
 import Button from '@/components/shared/button'
+import DateTimeField from '@/components/shared/date-time-field'
 import Card, { CardHeader } from '@/components/shared/card'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { Field as FormField, RequiredBadge } from '@/components/shared/form-controls'
 import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 import PageHeader from '@/components/shared/page-header'
+import Select from '@/components/shared/select'
+import StickyBar from '@/components/shared/sticky-bar'
 import { api, ApiError } from '@/lib/api'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { useAccount } from '@/contexts/account-context'
 import {
   CATEGORY_MAX,
@@ -19,9 +27,11 @@ import {
   toCreateInput,
   titleNotice,
   validateDraft,
+  visibleAccountTags,
   type ColumnDraft,
   type Failure,
 } from './column-form'
+import { usePageTitle } from '@/components/shell/page-chrome'
 import styles from './column.module.css'
 
 /**
@@ -33,6 +43,8 @@ import styles from './column.module.css'
  * （引き継ぎ `v6-nen-column-create-handoff.md` の完了条件）。
  */
 function NewNenColumnInner() {
+  /* ★V7: 画面名は共通トップバーにだけ置く。共通 PageHeader が同じ題を隠す。 */
+  usePageTitle('コラムを書く')
   const router = useRouter()
   const { selectedAccountId } = useAccount()
   const [draft, setDraft] = useState<ColumnDraft>(EMPTY_DRAFT)
@@ -41,6 +53,39 @@ function NewNenColumnInner() {
   const [touched, setTouched] = useState(false)
   /* 打ち間違えたURLは読み込めない。**壊れた画像の印を出さない。** */
   const [imageBroken, setImageBroken] = useState(false)
+  const [tags, setTags] = useState<Tag[]>([])
+  const [audienceCount, setAudienceCount] = useState<number | null>(null)
+  /*
+   * #935 N-301: 入力途中で一覧や他画面へ移ると下書きが消えていた。
+   * 初期の空の状態と違う間だけ、ブラウザ離脱・画面内リンク・戻る操作を止めて確認する。
+   */
+  const dirty = JSON.stringify(draft) !== JSON.stringify(EMPTY_DRAFT)
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy })
+
+  // R23横展開: 対象タグの候補は今のアカウントだけ。切替で取り直す。
+  const [tagPruneNotice, setTagPruneNotice] = useState<string | null>(null)
+  useEffect(() => {
+    void api.tags.list(selectedAccountId ? { accountId: selectedAccountId } : undefined)
+      .then((response) => response.success && setTags(response.data)).catch(() => undefined)
+  }, [selectedAccountId])
+  // R23横展開(m18hと同じ形): 新しい候補にない対象タグは外して知らせる。
+  useEffect(() => {
+    if (draft.targetMode !== 'tag' || !draft.targetTagId) return
+    if (!tags.some((tag) => tag.id === draft.targetTagId)) {
+      setDraft({ ...draft, targetTagId: '' })
+      setTagPruneNotice('選んでいたタグは、今のアカウントにないため外しました。選び直してください。')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tags])
+  useEffect(() => {
+    if (!selectedAccountId || (draft.targetMode === 'tag' && !draft.targetTagId)) {
+      setAudienceCount(null)
+      return
+    }
+    void api.nenCampaigns.columnAudience(selectedAccountId, draft.targetMode, draft.targetTagId || null)
+      .then((response) => setAudienceCount(response.success ? response.data.count : null))
+      .catch(() => setAudienceCount(null))
+  }, [draft.targetMode, draft.targetTagId, selectedAccountId])
 
   if (!selectedAccountId) {
     return (
@@ -55,6 +100,8 @@ function NewNenColumnInner() {
   const errors = validateDraft(draft)
   const errorFor = (field: keyof ColumnDraft) =>
     touched ? errors.find((e) => e.field === field)?.message : undefined
+  /* 他アカウントのタグは選べると保存で400になるため、候補に出さない(点検 #512 の中4)。 */
+  const accountTags = selectedAccountId ? visibleAccountTags(tags, selectedAccountId) : []
 
   const save = async () => {
     setBusy(true)
@@ -78,6 +125,13 @@ function NewNenColumnInner() {
 
   return (
     <div className={styles.screen} data-design-node="ymXJK">
+      {/*
+        #972 U036: 390pxでは右の「前のコラムを下敷きにする」が幅を取り、
+        パンくずと見出し・説明が細い列に潰れていた。共通の PageHeader の
+        形は変えず、この画面の見出し帯だけ「収まらないとき操作を次の行へ
+        下げる」にする。収まる幅では1行のままで見た目は変わらない。
+      */}
+      <div data-page-header-wrap>
       <PageHeader
         breadcrumb={[
           { label: 'NEN配信', href: '/nen-campaigns' },
@@ -86,7 +140,17 @@ function NewNenColumnInner() {
         ]}
         title="コラムを書く"
         description="外部サイトの記事へつなぐ下書きを作ります。記事本文は外部サイトで管理します。"
+        actions={(
+          <Button href="/nen-campaigns?tab=columns" title="一覧で元のコラムを選びます">
+            前のコラムを下敷きにする
+          </Button>
+        )}
       />
+      <style>{`
+        [data-page-header-wrap] > div { flex-wrap: wrap; }
+        [data-page-header-wrap] > div > div + div { flex-wrap: wrap; max-width: 100%; margin-left: auto; }
+      `}</style>
+      </div>
 
       {failure ? (
         <p
@@ -97,6 +161,7 @@ function NewNenColumnInner() {
           {failure.message}
         </p>
       ) : null}
+      {tagPruneNotice ? <Notice tone="warn" message={tagPruneNotice} onClose={() => setTagPruneNotice(null)} className="mb-3" /> : null}
 
       <div className={styles.split}>
         <div className={styles.main}>
@@ -172,6 +237,56 @@ function NewNenColumnInner() {
             <p className={styles.note}>
               空のままなら公開日時は入りません。日本時間で保存します。
             </p>
+            <h3>いつ・だれに出しますか</h3>
+            <FormField label="配信対象">
+              <Select
+                aria-label="配信対象"
+                size="full"
+                value={draft.targetMode}
+                options={[
+                  { value: 'all', label: '友だち全員' },
+                  { value: 'tag', label: 'タグで絞る' },
+                ]}
+                onChange={(value) => setDraft((current) => ({
+                  ...current,
+                  targetMode: value as 'all' | 'tag',
+                }))}
+              />
+            </FormField>
+            {draft.targetMode === 'tag' ? (
+              <FormField label="対象タグ">
+                <Select
+                  aria-label="対象タグ"
+                  size="full"
+                  value={draft.targetTagId}
+                  error={errorFor('targetTagId')}
+                  options={[
+                    { value: '', label: 'タグを選択' },
+                    ...accountTags.map((tag) => ({ value: tag.id, label: tag.name })),
+                  ]}
+                  onChange={(value) => setDraft((current) => ({ ...current, targetTagId: value }))}
+                />
+              </FormField>
+            ) : null}
+            <p className={styles.note}>この条件では {audienceCount == null ? '—' : audienceCount.toLocaleString('ja-JP')}人に届きます。</p>
+            <Field label="配信日時（日本時間）" type="datetime-local" value={draft.scheduledAt} error={errorFor('scheduledAt')} onChange={(v) => setDraft((d) => ({ ...d, scheduledAt: v }))} />
+            {/* NEN-06: ここで入れた日時は下書きに記録されるだけで、まだ予約されない。
+                実際の配信は一覧でコラムを選んで「この内容で予約する」を押したときだけ始まる。 */}
+            <p className={styles.note}>この日時は下書きに記録されます。実際の配信は、一覧で「この内容で予約する」を押したときだけ始まります。</p>
+            <h3>読んだ人にすること</h3>
+            <Field label="読了イベント名" value={draft.completionEventName} placeholder="例: 秋の食事コラムを読了" onChange={(v) => setDraft((d) => ({ ...d, completionEventName: v }))} />
+            <FormField label="読了後に付けるタグ">
+              <Select
+                aria-label="読了後に付けるタグ"
+                size="full"
+                value={draft.completionTagId}
+                options={[
+                  { value: '', label: '付けない' },
+                  ...accountTags.map((tag) => ({ value: tag.id, label: tag.name })),
+                ]}
+                onChange={(value) => setDraft((current) => ({ ...current, completionTagId: value }))}
+              />
+            </FormField>
           </Card>
         </div>
 
@@ -238,36 +353,49 @@ function NewNenColumnInner() {
             </ul>
           </Card>
 
-          <Card layout="vertical" className={styles.section}>
+          <Card layout="vertical" className={styles.section} data-nen-part="cannot">
             <CardHeader title="この画面でできないこと" />
             <p className={styles.note}>
-              記事本文の編集、配信の予約・公開、読んだ人へのタグ付けはここでは行いません。
-              本文は外部サイトで、配信は保存したあとNENコラムの一覧から行います。
+              記事本文の編集はここでは行いません。本文は外部サイトで管理します。
             </p>
           </Card>
         </aside>
       </div>
 
-      <div className={styles.footer}>
-        <p className={styles.note}>
+      <StickyBar
+        status={(
+          <span className={styles.note}>
           {canSubmit({ draft, busy })
             ? 'まだ保存していません。保存すると下書きとして一覧に並びます。'
             : '題名と記事のURLを入れると保存できます。'}
-        </p>
-        <div className={styles.actions}>
-          <Button href="/nen-campaigns?tab=columns">キャンセル</Button>
-          <Button
-            type="button"
-            variant="primary"
-            data-qa-open="ymXJK"
-            disabled={!canSubmit({ draft, busy })}
-            onMouseDown={() => setTouched(true)}
-            onClick={() => void save()}
-          >
-            {busy ? '保存中…' : '下書きに保存'}
-          </Button>
-        </div>
-      </div>
+          </span>
+        )}
+        actions={(
+          <>
+            <Button href="/nen-campaigns?tab=columns">キャンセル</Button>
+            <Button
+              type="button"
+              variant="primary"
+              data-qa-open="ymXJK"
+              disabled={!canSubmit({ draft, busy })}
+              onMouseDown={() => setTouched(true)}
+              onClick={() => void save()}
+            >
+              {busy ? '保存中…' : '下書きに保存'}
+            </Button>
+          </>
+        )}
+      />
+      {/* #935 N-301: 入力途中で離れるときの確認。 */}
+      <ConfirmDialog primaryAction="cancel"
+        open={leaveTarget !== null}
+        title="入力中の内容があります"
+        description="このまま移動すると、入力した内容は保存されません。移動しますか？"
+        confirmLabel="保存せずに移動"
+        cancelLabel="入力を続ける"
+        onConfirm={confirmLeave}
+        onCancel={cancelLeave}
+      />
     </div>
   )
 }
@@ -284,23 +412,37 @@ function Field({
   error?: string
   type?: 'text' | 'datetime-local'
 }) {
+  // 日時の選択は押し口＋箱の作りで、包んだ `<label>` が押下を欄本体へ
+  // 再送達して開閉が裏返る。見出しと欄を並べ、見出しの `htmlFor` で結ぶ。
+  const fieldId = useId()
   return (
-    <label className={styles.field}>
-      <span className={styles.fieldLabel}>
+    <span className={styles.field}>
+      <label htmlFor={fieldId} className={styles.fieldLabel}>
         {label}
-        {required ? <span className={styles.required}>必須</span> : null}
+        {required ? <RequiredBadge /> : null}
         {max ? <span className={styles.count}>{value.trim().length} / {max}</span> : null}
-      </span>
-      <input
-        type={type ?? 'text'}
-        value={value}
-        placeholder={placeholder}
-        onChange={(e) => onChange(e.target.value)}
-        aria-invalid={error ? true : undefined}
-        className={`${styles.input} ${error ? styles.inputError : ''}`}
-      />
+      </label>
+      {type === 'datetime-local' ? (
+        <DateTimeField
+          id={fieldId}
+          value={value}
+          onChange={onChange}
+          invalid={Boolean(error)}
+          placeholder={placeholder}
+        />
+      ) : (
+        <input
+          id={fieldId}
+          type={type ?? 'text'}
+          value={value}
+          placeholder={placeholder}
+          onChange={(e) => onChange(e.target.value)}
+          aria-invalid={error ? true : undefined}
+          className={`${styles.input} ${error ? styles.inputError : ''}`}
+        />
+      )}
       {error ? <span className={styles.fieldError}>{error}</span> : null}
-    </label>
+    </span>
   )
 }
 

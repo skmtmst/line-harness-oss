@@ -1,10 +1,12 @@
 import type Database from 'better-sqlite3';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite';
+import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite';
 import {
   AutomationActionError,
+  cancelAutomationRun,
   processAutomationRun,
   processDueAutomationRuns,
+  retryAutomationRun,
   startAutomationRun,
   type ActionDefinition,
 } from './automation-engine';
@@ -138,6 +140,37 @@ describe('V6オートメーション実行エンジン', () => {
     expect(executor).not.toHaveBeenCalled();
   });
 
+  it('条件分岐は一致した側だけを動かし、選ばなかった側を履歴へ残す', async () => {
+    insertFriend(testDb.raw, 'friend-1', { line_account_id: 'account-1' });
+    testDb.raw.prepare(`INSERT INTO tags (id, name, line_account_id) VALUES ('vip', 'VIP', 'account-1')`).run();
+    testDb.raw.prepare(`INSERT INTO friend_tags (friend_id, tag_id) VALUES ('friend-1', 'vip')`).run();
+    const setup = addPublishedAutomation(testDb.raw, {
+      actions: [{
+        id: 'branch', type: 'branch', onFailure: 'stop',
+        params: {
+          condition: { operator: 'AND', rules: [{ type: 'tag_exists', value: 'vip' }] },
+          then: [action('yes')],
+          else: [action('no')],
+        },
+      }],
+    });
+    const created = await start(testDb.db, setup);
+    const seen: string[] = [];
+    expect(await processAutomationRun(testDb.db, created.runId!, {
+      now: T0,
+      executors: { record: async ({ action: current }) => { seen.push(current.id); } },
+    })).toBe('success');
+    expect(seen).toEqual(['branch/then/yes']);
+    expect(testDb.raw.prepare(
+      `SELECT step_key, status FROM automation_run_steps
+        WHERE automation_run_id = ? ORDER BY step_key`,
+    ).all(created.runId)).toEqual([
+      { step_key: 'branch', status: 'success' },
+      { step_key: 'branch/else/no', status: 'skipped' },
+      { step_key: 'branch/then/yes', status: 'success' },
+    ]);
+  });
+
   it('5分単位で待機し、期限後に同じ版の次の処理から再開する', async () => {
     const setup = addPublishedAutomation(testDb.raw, {
       actions: [action('pause', 'wait', { durationMinutes: 5 }), action('after-wait')],
@@ -241,6 +274,90 @@ describe('V6オートメーション実行エンジン', () => {
       `SELECT status, error_code FROM automation_run_steps
         WHERE automation_run_id = ? AND step_key = 'unknown'`,
     ).get(created.runId)).toEqual({ status: 'failed', error_code: 'unsupported_action_type' });
+  });
+
+  it('手動再実行は失敗した処理だけを新しい試行として動かす', async () => {
+    const setup = addPublishedAutomation(testDb.raw, {
+      actions: [action('already-done'), action('failed-once')],
+    });
+    const created = await start(testDb.db, setup);
+    const firstCalls: string[] = [];
+    expect(await processAutomationRun(testDb.db, created.runId!, {
+      now: T0,
+      executors: {
+        record: async ({ action: current }) => {
+          firstCalls.push(current.id);
+          if (current.id === 'failed-once') {
+            throw new AutomationActionError('permanent', '入力を直してください', false);
+          }
+        },
+      },
+    })).toBe('failed');
+    expect(firstCalls).toEqual(['already-done', 'failed-once']);
+
+    expect(await retryAutomationRun(testDb.db, {
+      runId: created.runId!,
+      allowedAccountIds: [setup.lineAccountId],
+      now: '2026-08-26T02:00:00.000Z',
+    })).toMatchObject({ retryStepCount: 1, status: 'waiting' });
+    const retryCalls: string[] = [];
+    expect(await processAutomationRun(testDb.db, created.runId!, {
+      now: '2026-08-26T02:00:00.000Z',
+      executors: { record: async ({ action: current }) => { retryCalls.push(current.id); } },
+    })).toBe('success');
+    expect(retryCalls).toEqual(['failed-once']);
+    expect(testDb.raw.prepare(
+      `SELECT step_key, attempt_number, status FROM automation_run_steps
+        WHERE automation_run_id = ? ORDER BY step_key`,
+    ).all(created.runId)).toEqual([
+      { step_key: 'already-done', attempt_number: 1, status: 'success' },
+      { step_key: 'failed-once', attempt_number: 2, status: 'success' },
+    ]);
+  });
+
+  // #736: 実行中の押し直しは通さず、副作用は1回だけにする。時刻の主張はしない。
+  // 1回目の retry が waiting へ変えた後なので、2回目の結果は待ち合わせに依らない。
+  it('実行中の再送は通さず副作用を1回にする', async () => {
+    const setup = addPublishedAutomation(testDb.raw, {
+      actions: [action('slow')],
+    });
+    const created = await start(testDb.db, setup);
+    expect(await processAutomationRun(testDb.db, created.runId!, {
+      now: T0,
+      executors: {
+        record: async () => {
+          throw new AutomationActionError('permanent', '入力を直してください', false);
+        },
+      },
+    })).toBe('failed');
+
+    expect(await retryAutomationRun(testDb.db, {
+      runId: created.runId!,
+      allowedAccountIds: [setup.lineAccountId],
+      now: T0,
+    })).toMatchObject({ status: 'waiting' });
+
+    const calls: string[] = [];
+    const processing = processAutomationRun(testDb.db, created.runId!, {
+      now: T0,
+      executors: {
+        record: async ({ action: current }) => {
+          calls.push(current.id);
+          await new Promise((resolve) => setTimeout(resolve, 50));
+        },
+      },
+    });
+    const second = await retryAutomationRun(testDb.db, {
+      runId: created.runId!,
+      allowedAccountIds: [setup.lineAccountId],
+      now: T0,
+    }).then(
+      () => 'unexpected-success',
+      (error: unknown) => (error as { code?: string }).code ?? 'unknown',
+    );
+    expect(second).toBe('not_retryable');
+    await expect(processing).resolves.toBe('success');
+    expect(calls).toEqual(['slow']);
   });
 
   it('実行開始時に共通アクション版を固定する', async () => {
@@ -347,5 +464,185 @@ describe('V6オートメーション実行エンジン', () => {
       },
     })).toBe('success');
     expect(seen).toEqual([{ id: original.id, attempt: 2 }]);
+  });
+});
+
+/*
+ * #942 N-353: 実行の取りやめ。実行記録は消せないため、取りやめは
+ * cancelled への状態遷移。終わっていない step だけ閉じ、確定した
+ * step は結果として残す。
+ */
+describe('実行の取りやめ（#942 N-353）', () => {
+  let testDb: SqliteD1;
+
+  beforeEach(() => {
+    testDb = createTestD1();
+  });
+
+  it('待機中の実行と、まだ終わっていない処理を取消で閉じる', async () => {
+    const setup = addPublishedAutomation(testDb.raw, {
+      actions: [action('first'), action('second')],
+    });
+    const created = await start(testDb.db, setup);
+
+    const result = await cancelAutomationRun(testDb.db, {
+      runId: created.runId!,
+      allowedAccountIds: ['account-1'],
+      now: T0,
+    });
+
+    expect(result).toEqual({
+      runId: created.runId, status: 'cancelled',
+      alreadyCancelled: false, cancelledStepCount: 2,
+    });
+    expect(testDb.raw.prepare(
+      `SELECT status, completed_at FROM automation_runs WHERE id = ?`,
+    ).get(created.runId)).toEqual({ status: 'cancelled', completed_at: T0 });
+    // 実行記録は消えない（状態遷移だけ）。
+    expect(testDb.raw.prepare(
+      `SELECT step_key, status FROM automation_run_steps
+        WHERE automation_run_id = ? ORDER BY rowid`,
+    ).all(created.runId)).toEqual([
+      { step_key: 'first', status: 'cancelled' },
+      { step_key: 'second', status: 'cancelled' },
+    ]);
+  });
+
+  it('確定した処理は残し、まだの処理だけを取り消す', async () => {
+    const setup = addPublishedAutomation(testDb.raw, {
+      actions: [action('done'), action('pending')],
+    });
+    const created = await start(testDb.db, setup);
+    testDb.raw.prepare(
+      `UPDATE automation_run_steps SET status = 'success', completed_at = ?
+        WHERE automation_run_id = ? AND step_key = 'done'`,
+    ).run(T0, created.runId);
+    testDb.raw.prepare(
+      `UPDATE automation_runs SET status = 'running', started_at = ? WHERE id = ?`,
+    ).run(T0, created.runId);
+
+    const result = await cancelAutomationRun(testDb.db, {
+      runId: created.runId!,
+      allowedAccountIds: ['account-1'],
+      now: T0,
+    });
+
+    expect(result).toMatchObject({ status: 'cancelled', cancelledStepCount: 1 });
+    expect(testDb.raw.prepare(
+      `SELECT step_key, status FROM automation_run_steps
+        WHERE automation_run_id = ? ORDER BY rowid`,
+    ).all(created.runId)).toEqual([
+      { step_key: 'done', status: 'success' },
+      { step_key: 'pending', status: 'cancelled' },
+    ]);
+  });
+
+  it('終わった実行は取りやめられない', async () => {
+    const setup = addPublishedAutomation(testDb.raw, { actions: [action('only')] });
+    const created = await start(testDb.db, setup);
+    for (const status of ['success', 'partial', 'failed', 'skipped_condition']) {
+      testDb.raw.prepare(
+        `UPDATE automation_runs SET status = ? WHERE id = ?`,
+      ).run(status, created.runId);
+      await expect(cancelAutomationRun(testDb.db, {
+        runId: created.runId!,
+        allowedAccountIds: ['account-1'],
+      })).rejects.toMatchObject({ code: 'not_cancellable' });
+    }
+  });
+
+  it('取消済みへの再取消はそのまま成功で返す', async () => {
+    const setup = addPublishedAutomation(testDb.raw, { actions: [action('only')] });
+    const created = await start(testDb.db, setup);
+    await cancelAutomationRun(testDb.db, {
+      runId: created.runId!, allowedAccountIds: ['account-1'],
+    });
+
+    const again = await cancelAutomationRun(testDb.db, {
+      runId: created.runId!, allowedAccountIds: ['account-1'],
+    });
+    expect(again).toEqual({
+      runId: created.runId, status: 'cancelled',
+      alreadyCancelled: true, cancelledStepCount: 0,
+    });
+  });
+
+  it('見えないアカウント・無い実行は not_found', async () => {
+    const setup = addPublishedAutomation(testDb.raw, { actions: [action('only')] });
+    const created = await start(testDb.db, setup);
+
+    await expect(cancelAutomationRun(testDb.db, {
+      runId: created.runId!, allowedAccountIds: [],
+    })).rejects.toMatchObject({ code: 'not_found' });
+    await expect(cancelAutomationRun(testDb.db, {
+      runId: created.runId!, allowedAccountIds: ['account-2'],
+    })).rejects.toMatchObject({ code: 'not_found' });
+    await expect(cancelAutomationRun(testDb.db, {
+      runId: 'no-such-run', allowedAccountIds: ['account-1'],
+    })).rejects.toMatchObject({ code: 'not_found' });
+  });
+
+  it('確認と更新の間に終わった実行は取りやめない', async () => {
+    /*
+     * 状態を読んでから閉じるまでに別接続が終わらせた競合。
+     * 呼び出しが最初の読み取りで止まる隙に、同じ行を success へ書き換える。
+     */
+    const setup = addPublishedAutomation(testDb.raw, { actions: [action('only')] });
+    const created = await start(testDb.db, setup);
+
+    const pending = cancelAutomationRun(testDb.db, {
+      runId: created.runId!, allowedAccountIds: ['account-1'],
+    });
+    testDb.raw.prepare(
+      `UPDATE automation_runs SET status = 'success', completed_at = ? WHERE id = ?`,
+    ).run(T0, created.runId);
+    await expect(pending).rejects.toMatchObject({ code: 'not_cancellable' });
+    // 先に閉じた側の結果は壊さない。
+    expect(testDb.raw.prepare(
+      `SELECT status FROM automation_runs WHERE id = ?`,
+    ).get(created.runId)).toEqual({ status: 'success' });
+  });
+
+  it('走り途中で取りやめると、次の処理へ進まずに止まる', async () => {
+    const setup = addPublishedAutomation(testDb.raw, {
+      actions: [action('first'), action('second')],
+    });
+    const created = await start(testDb.db, setup);
+
+    const seen: string[] = [];
+    const status = await processAutomationRun(testDb.db, created.runId!, {
+      now: T0,
+      executors: {
+        record: async ({ action: current }) => {
+          seen.push(current.id);
+          // 1つ目の処理のあとで取消が入る。2つ目へ進んではいけない。
+          await cancelAutomationRun(testDb.db, {
+            runId: created.runId!, allowedAccountIds: ['account-1'],
+          });
+        },
+      },
+    });
+
+    expect(status).toBe('cancelled');
+    expect(seen).toEqual(['first']);
+    expect(testDb.raw.prepare(
+      `SELECT status FROM automation_runs WHERE id = ?`,
+    ).get(created.runId)).toEqual({ status: 'cancelled' });
+  });
+
+  it('取りやめた実行は回収対象に出さない', async () => {
+    const setup = addPublishedAutomation(testDb.raw, { actions: [action('only')] });
+    const created = await start(testDb.db, setup);
+    await cancelAutomationRun(testDb.db, {
+      runId: created.runId!, allowedAccountIds: ['account-1'],
+    });
+
+    const seen: string[] = [];
+    const result = await processDueAutomationRuns(testDb.db, {
+      now: T0,
+      executors: { record: async ({ action: current }) => { seen.push(current.id); } },
+    });
+    expect(result.results.some((entry) => entry.runId === created.runId)).toBe(false);
+    expect(seen).toEqual([]);
   });
 });

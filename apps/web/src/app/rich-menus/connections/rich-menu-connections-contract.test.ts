@@ -14,7 +14,7 @@ describe('V6 リッチメニューの切替つながり', () => {
 
   it('既存のgroup取得だけを使い、切替数を固定値で作らない', () => {
     expect(PAGE).toContain('api.richMenuGroups.get(groupId)')
-    expect(PAGE).toContain('`${analysis.edges.length}件`')
+    expect(PAGE).toContain('analysis.edges.filter((edge) => edge.fromPageId === page.id)')
     expect(PAGE).not.toContain('切替ボタン" value="5件')
   })
 
@@ -33,7 +33,7 @@ describe('V6 リッチメニューの切替つながり', () => {
     expect(PAGE).toContain('kind="loading"')
     expect(PAGE).toContain('kind="empty"')
     expect(PAGE).toContain('kind="error"')
-    expect(PAGE).toContain('もう一度読み込む')
+    expect(PAGE).toContain('onRetry={() => void load()}')
   })
 
   it('一覧から切替のつながりへ進める', () => {

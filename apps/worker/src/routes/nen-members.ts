@@ -1,14 +1,63 @@
 import { Hono, type Context } from 'hono';
 import type { Message } from '@line-crm/line-sdk';
-import { getFriendByLineUserIdForAccount, jstNow, resolveLineCredential } from '@line-crm/db';
+import {
+  claimPhotoNotificationDelivery,
+  completePhotoNotificationDelivery,
+  findRewardedAdoptedDuplicate,
+  getEffectivePhotoRewardPolicy,
+  getFriendByLineUserIdForAccount,
+  getPhotoNotificationState,
+  jstNow,
+  resolveLineCredential,
+  findOrCreateGlobalTag,
+  toJstString,
+} from '@line-crm/db';
+import * as dbPackage from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
+import { requirePhotoPermission } from './nen-photo-operations.js';
 import { verifyCallerLineIdentity } from '../services/liff-auth.js';
 import { pushViaHarnessProxy } from '../services/line-proxy-send.js';
 import { dispatchLineProxyLocally } from '../services/local-line-proxy.js';
+import { imageDimensions, stripImageMetadata } from '../services/media-metadata.js';
+import {
+  getFileScanBySubject,
+  runBuiltinScanAndStore,
+  runScanForStoredObject,
+} from '../services/file-scan.js';
+import { ensureFileScanForUpload } from './file-scan.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { installNenRichMenu } from '../services/nen-rich-menu.js';
+import {
+  ACTIVITY_LABELS,
+  type FeedingPlan,
+  type FeedingProductRow,
+  DEFAULT_TREAT_LIMIT_PERCENT,
+  getTreatLimitPercent,
+  listFeedingProducts,
+  nenProducts,
+  productKind,
+  stapleProducts,
+  neuteredFromInput,
+  neuteredFromRow,
+  normalizeActivity,
+  pickProduct,
+  planForPetRow,
+  refreshStoredFeeding,
+} from '../services/nen-feeding.js';
 import { attachTagAndFireSideEffects } from '../services/friend-tag-attach.js';
+import { APPETITE_LABELS, STOOL_LABELS, isCareStoolStatus, thirtyDaySummary, type HealthLogRow } from '../services/nen-health-admin.js';
+import {
+  attemptPhotoRewardForPhoto,
+  ecPhotoPointClientFromEnv,
+  photoRewardDisplayState,
+  PHOTO_REWARD_REASON_LABELS,
+  PHOTO_REWARD_STALE_MS,
+  type EcPhotoPointClient,
+} from '../services/photo-reward-sync.js';
+import { petCallName, petGender } from '../services/nen-pet-name.js';
+import { isFeedingSupportedAnimal, petAnimalTypeLabel, toPetAnimalType } from '../lib/nen-pet-species.js';
+import { normalizeNenPetBirthday } from '../lib/nen-pet-birthday.js';
 import {
   refreshAllNenTags,
   syncNenHealthTags,
@@ -19,7 +68,32 @@ import {
 const nenMembers = new Hono<Env>();
 const CONCERNS = new Set(['tear_stain', 'coat', 'allergy', 'appetite', 'stool', 'weight', 'other']);
 const IMAGE_TYPES: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
-const PHOTO_ADOPTION_POINTS = 5;
+/*
+ * 採用1枚の点数は固定値ではなく、その時点で使っている報酬の決まりの版を
+ * 見る (#817)。版が無い古いDBでは5ptへ倒す。ここに数は書かない。
+ */
+
+/*
+ * ECへのポイント付与の接続先。誕生日クーポン（index.ts の cron）と同じ
+ * 2変数で決める。未設定の環境では outbox は積んだままにして、
+ * 「手続き中」→24時間で「要対応」と画面へ正直に出す（PHOTO-06）。
+ */
+function ecPhotoPointClient(c: Context<Env>): EcPhotoPointClient | undefined {
+  return ecPhotoPointClientFromEnv(c.env);
+}
+
+/** 一覧の point_sync_status を生のstatusではなく運用向けの派生状態で返すSQL。 */
+const PHOTO_REWARD_STATE_CASE = `
+  CASE
+    WHEN o.status = 'synced' THEN 'synced'
+    WHEN o.status = 'failed' AND o.last_error IN
+      ('customer_unlinked', 'invalid_award', 'ec_auth_failed', 'attempts_exhausted')
+      THEN 'failed_permanent'
+    WHEN o.status = 'failed' THEN 'failed_retryable'
+    WHEN o.updated_at < ? THEN 'stale'
+    ELSE 'pending'
+  END`;
+
 const PHOTO_REVIEW_REASON_LABELS = {
   quality: '写真が暗い・ぼやけている',
   privacy: '人の顔や個人情報が写っている',
@@ -27,7 +101,17 @@ const PHOTO_REVIEW_REASON_LABELS = {
   duplicate: '同じ写真がすでに投稿されている',
   other: 'そのほか',
 } as const;
-type PhotoReviewReasonCode = keyof typeof PHOTO_REVIEW_REASON_LABELS;
+export type PhotoReviewReasonCode = keyof typeof PHOTO_REVIEW_REASON_LABELS;
+
+function detectedImageMime(bytes: Uint8Array): keyof typeof IMAGE_TYPES | null {
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return 'image/jpeg';
+  if (bytes.length >= 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e
+      && bytes[3] === 0x47 && bytes[4] === 0x0d && bytes[5] === 0x0a
+      && bytes[6] === 0x1a && bytes[7] === 0x0a) return 'image/png';
+  if (bytes.length >= 12 && String.fromCharCode(...bytes.slice(0, 4)) === 'RIFF'
+      && String.fromCharCode(...bytes.slice(8, 12)) === 'WEBP') return 'image/webp';
+  return null;
+}
 
 const CONSULTATION_TAG_RULES = [
   { key: '食事', pattern: /ご飯|ごはん|フード|食欲|食いつき|食べ|偏食|おやつ|栄養|サプリ|水分|飲み水/ },
@@ -83,6 +167,8 @@ function dateOnly(value: unknown): string | null {
 function feedingGuide(animalType: string, weightKg: number) {
   // NENの初期目安。主食商品の熱量・年齢・活動量・体調で調整する前提で、
   // LIFF画面にも必ず「医療判断ではない目安」と表示する。
+  // DEEP-24: 係数は犬・猫専用。「その他」に犬の式を当てず null を返す。
+  if (!isFeedingSupportedAnimal(toPetAnimalType(animalType))) return null;
   const minPerKg = animalType === 'cat' ? 25 : 20;
   const maxPerKg = animalType === 'cat' ? 35 : 30;
   const min = Math.max(1, Math.round(weightKg * minPerKg));
@@ -96,7 +182,17 @@ function feedingGuide(animalType: string, weightKg: number) {
 }
 
 function petCard(pet: Record<string, unknown>): Message {
+  // DEEP-24: 「その他」は犬へ倒さず「その他」と出す。フード目安の計算は
+  // 犬・猫専用なので、対象外の子には数値の代わりにその旨を添える。
+  const supported = isFeedingSupportedAnimal(toPetAnimalType(pet.animal_type));
   const guide = `${pet.recommended_daily_min_grams}〜${pet.recommended_daily_max_grams}g/日`;
+  const feedingLines = supported
+    ? [
+        { type: 'text', text: `1日のフード目安：${guide}`, size: 'sm', color: '#334155', wrap: true },
+        { type: 'text', text: `鹿肉をトッピングする場合の目安：${pet.venison_daily_grams}g/日まで`, size: 'sm', color: '#334155', wrap: true },
+        { type: 'text', text: `1kgのフード：約${pet.food_cycle_days}日分`, size: 'sm', color: '#334155', wrap: true },
+      ]
+    : [{ type: 'text', text: 'フード目安の自動計算は犬・猫が対象です。かかりつけの獣医師にご相談ください。', size: 'sm', color: '#334155', wrap: true }];
   return {
     type: 'flex', altText: `${pet.name}ちゃんのマイペット登録が完了しました`,
     contents: {
@@ -104,11 +200,9 @@ function petCard(pet: Record<string, unknown>): Message {
       body: { type: 'box', layout: 'vertical', spacing: 'md', contents: [
         { type: 'text', text: 'MY PET CARD', size: 'xs', weight: 'bold', color: '#16815B' },
         { type: 'text', text: `${pet.name}ちゃん`, size: 'xl', weight: 'bold', color: '#123F2B' },
-        { type: 'text', text: `${pet.animal_type === 'cat' ? '猫' : '犬'}・${pet.breed || '品種未登録'}・${pet.weight_kg}kg`, size: 'sm', color: '#64748B', wrap: true },
+        { type: 'text', text: `${petAnimalTypeLabel(pet.animal_type)}・${pet.breed || '品種未登録'}・${pet.weight_kg}kg`, size: 'sm', color: '#64748B', wrap: true },
         { type: 'separator' },
-        { type: 'text', text: `1日のフード目安：${guide}`, size: 'sm', color: '#334155', wrap: true },
-        { type: 'text', text: `鹿肉をトッピングする場合の目安：${pet.venison_daily_grams}g/日まで`, size: 'sm', color: '#334155', wrap: true },
-        { type: 'text', text: `1kgのフード：約${pet.food_cycle_days}日分`, size: 'sm', color: '#334155', wrap: true },
+        ...feedingLines,
         { type: 'text', text: '※年齢・活動量・体調・商品の熱量で変わる一般的な目安です。心配な症状は獣医師へご相談ください。', size: 'xs', color: '#94A3B8', wrap: true },
       ] },
     },
@@ -135,7 +229,7 @@ async function pushPetCard(c: Context<Env>, friend: FriendRow, pet: Record<strin
   );
 }
 
-type ReviewPhotoRow = Record<string, unknown> & {
+export type ReviewPhotoRow = Record<string, unknown> & {
   id: string;
   friend_id: string;
   line_user_id: string;
@@ -145,15 +239,29 @@ type ReviewPhotoRow = Record<string, unknown> & {
   channel_access_token_encrypted: string | null;
 };
 
+/*
+ * 投稿者へ届く審査結果の文面。
+ *
+ * `pointsQueued` は EC 会員とつながっていて付与アウトボックスへ
+ * 実際に積んだときだけ true。つながっていない採用に
+ * 「ポイントを付ける手続きを始めました」と届けるのは、
+ * できていない約束を本人へ伝えることになる（#931 N-307）。
+ *
+ * `resubmitInvite` は差戻し画面の「もう一度送ってもらえるようお願いする」。
+ * チェックを外して保存した分には案内を添えない（#931 N-312）。
+ */
 function photoReviewMessage(
   status: 'adopted' | 'rejected',
   reasonCode: PhotoReviewReasonCode | null,
   reasonNote: string | null,
+  options: { pointsQueued: boolean; resubmitInvite: boolean },
 ): string {
   if (status === 'adopted') {
     return [
       'お写真をご投稿いただきありがとうございます。',
-      '今回のお写真を採用し、5ポイントを付与しました。',
+      options.pointsQueued
+        ? '今回のお写真を採用し、5ポイントを付ける手続きを始めました。'
+        : '今回のお写真を採用しました。',
       '公開への同意をいただいている場合だけ、公開ギャラリーへ掲載します。',
     ].join('\n');
   }
@@ -162,17 +270,20 @@ function photoReviewMessage(
     'お写真をご投稿いただきありがとうございます。',
     `今回は「${reason}」のため、掲載を見送らせていただきました。`,
     ...(reasonNote ? [reasonNote] : []),
-    '内容をご確認のうえ、よろしければ別のお写真をご投稿ください。',
+    ...(options.resubmitInvite
+      ? ['内容をご確認のうえ、よろしければ別のお写真をご投稿ください。']
+      : []),
   ].join('\n');
 }
 
-async function sendPhotoReviewNotification(
+export async function sendPhotoReviewNotification(
   c: Context<Env>,
   photo: ReviewPhotoRow,
   status: 'adopted' | 'rejected',
   reasonCode: PhotoReviewReasonCode | null,
   reasonNote: string | null,
   decisionId: string,
+  options: { pointsQueued: boolean; resubmitInvite: boolean },
 ): Promise<void> {
   if (!photo.is_following) throw new Error('LINEの友だちではないため通知できません');
   const accessToken = await resolveLineCredential(
@@ -180,28 +291,295 @@ async function sendPhotoReviewNotification(
     photo.channel_access_token,
     { lineAccountId: photo.line_account_id, field: 'channel_access_token' },
   );
-  const message = photoReviewMessage(status, reasonCode, reasonNote);
+  const message = photoReviewMessage(status, reasonCode, reasonNote, options);
+  // X-Line-Retry-Key はLINE仕様でUUID形式が必須のため、UUIDのdecisionIdをそのまま使う。
+  // `nen-photo-review:` 接頭辞を付けると実送信が400で失敗する。
   await pushViaHarnessProxy(
     c.env.WORKER_PUBLIC_URL || new URL(c.req.url).origin,
     accessToken,
     photo.line_user_id,
     [{ type: 'text', text: message }],
-    `nen-photo-review:${decisionId}`,
+    decisionId,
     (request) => dispatchLineProxyLocally(request, c.env, c.executionCtx),
   );
 }
 
-function mapPet(row: Record<string, unknown>) {
+/**
+ * 通知先の1行を取る。単票・一括どちらも同じ絞り込み
+ *（写真ID＋LINEアカウント＋友だちの所属アカウント）で、他アカウントへは届けない。
+ */
+export async function loadPhotoReviewRecipient(
+  db: D1Database,
+  input: { photoId: string; lineAccountId: string },
+): Promise<ReviewPhotoRow | null> {
+  return db.prepare(
+    `SELECT ps.*, s.customer_id, f.line_user_id, f.line_account_id, f.is_following,
+            a.channel_access_token, a.channel_access_token_encrypted
+       FROM nen_photo_submissions ps
+       JOIN friends f ON f.id = ps.friend_id
+       JOIN line_accounts a ON a.id = f.line_account_id
+       LEFT JOIN nen_ec_member_snapshots s ON s.friend_id = ps.friend_id
+      WHERE ps.id = ? AND ps.line_account_id = ? AND f.line_account_id = ?`,
+  ).bind(input.photoId, input.lineAccountId, input.lineAccountId).first<ReviewPhotoRow>();
+}
+
+/**
+ * 通知leaseの有効期間。確定に失敗した送信中は、切れた後に同じ安定keyで
+ * 再送・再照合できる（送達状態機械）。
+ */
+export const PHOTO_NOTIFICATION_LEASE_TTL_MS = 5 * 60 * 1000;
+
+export async function mirrorReviewNotificationStatus(
+  db: D1Database,
+  input: { photoId: string; lineAccountId: string; status: 'pending' | 'sent' | 'failed'; now?: string },
+): Promise<void> {
+  try {
+    await db.prepare(
+      `UPDATE nen_photo_submissions SET review_notification_status = ?, updated_at = ?
+        WHERE id = ? AND line_account_id = ?`,
+    ).bind(
+      input.status, input.now ?? new Date().toISOString(), input.photoId, input.lineAccountId,
+    ).run();
+  } catch (error) {
+    console.error('mirror review notification status failed', input.photoId, error);
+  }
+}
+
+/*
+ * 通知の送達オーケストレーション。claim→送信（安定key）→世代条件付き確定。
+ * 確定に失敗したら送達不明のまま残し、lease切れ後の再送で復旧できる。
+ * relayed は今回の呼び出しが実際に送信したかどうか。
+ */
+export async function deliverPhotoReviewNotification(
+  db: D1Database,
+  c: Context<Env>,
+  recipient: ReviewPhotoRow,
+  input: {
+    lineAccountId: string;
+    photoId: string;
+    status: 'adopted' | 'rejected';
+    reasonCode: PhotoReviewReasonCode | null;
+    reasonNote: string | null;
+    decisionId: string;
+    /** 差戻しメッセージへ再投稿の案内を添えるか（#931 N-312）。省略時は添える。 */
+    resubmitInvite?: boolean;
+  },
+): Promise<{ notificationStatus: 'sent' | 'failed'; notificationError: string | null; busy: boolean; relayed: boolean }> {
+  const now = new Date().toISOString();
+  const claimed = await claimPhotoNotificationDelivery(db, {
+    decisionId: input.decisionId, lineAccountId: input.lineAccountId,
+    leaseId: crypto.randomUUID(),
+    leaseExpiresAt: new Date(Date.now() + PHOTO_NOTIFICATION_LEASE_TTL_MS).toISOString(),
+    now,
+  });
+  if (!claimed) {
+    const state = await getPhotoNotificationState(db, {
+      decisionId: input.decisionId, lineAccountId: input.lineAccountId,
+    }).catch(() => null);
+    if (state?.status === 'sent') {
+      await mirrorReviewNotificationStatus(db, {
+        photoId: input.photoId, lineAccountId: input.lineAccountId, status: 'sent',
+      });
+      return { notificationStatus: 'sent', notificationError: null, busy: false, relayed: false };
+    }
+    if (state?.status === 'sending') {
+      return {
+        notificationStatus: 'failed', busy: true, relayed: false,
+        notificationError: 'ほかの処理が通知を実行中です。しばらくしてから再送してください。',
+      };
+    }
+    return {
+      notificationStatus: 'failed', busy: false, relayed: false,
+      notificationError: '通知の送信権を確保できませんでした。再送してください。',
+    };
+  }
+  let sendError: string | null = null;
+  let relayed = false;
+  try {
+    await sendPhotoReviewNotification(
+      c, recipient, input.status, input.reasonCode, input.reasonNote, input.decisionId,
+      {
+        // EC 会員とつながっている投稿者へだけ「手続きを始めた」と伝える（#931 N-307）。
+        pointsQueued: input.status === 'adopted' && Boolean(recipient.customer_id),
+        resubmitInvite: input.resubmitInvite !== false,
+      },
+    );
+    relayed = true;
+  } catch (error) {
+    sendError = error instanceof Error ? error.message : '審査結果をLINEで通知できませんでした';
+  }
+  try {
+    const completed = await completePhotoNotificationDelivery(db, {
+      decisionId: input.decisionId, lineAccountId: input.lineAccountId,
+      generation: claimed.generation, status: sendError ? 'failed' : 'sent', error: sendError,
+    });
+    if (completed) {
+      const finalStatus = sendError ? 'failed' : 'sent';
+      await mirrorReviewNotificationStatus(db, {
+        photoId: input.photoId, lineAccountId: input.lineAccountId, status: finalStatus,
+      });
+      return { notificationStatus: finalStatus, notificationError: sendError, busy: false, relayed };
+    }
+  } catch (error) {
+    console.error('complete photo notification failed', input.decisionId, error);
+  }
+  const state = await getPhotoNotificationState(db, {
+    decisionId: input.decisionId, lineAccountId: input.lineAccountId,
+  }).catch(() => null);
+  if (state?.status === 'sent') {
+    await mirrorReviewNotificationStatus(db, {
+      photoId: input.photoId, lineAccountId: input.lineAccountId, status: 'sent',
+    });
+    return { notificationStatus: 'sent', notificationError: null, busy: false, relayed };
+  }
   return {
-    id: row.id, customerId: row.customer_id, name: row.name, animalType: row.animal_type,
-    gender: row.gender, breed: row.breed, birthday: row.birthday, weightKg: row.weight_kg,
+    notificationStatus: 'failed', busy: false, relayed,
+    notificationError: '送達の記録を確定できませんでした。しばらくしてから再送してください。',
+  };
+}
+
+/**
+ * LIFF マイページ（★V6 37-2）に出す会員ランク・マイル。
+ * 設定（nen_rank_settings）とECから届いた値（nen_ec_member_snapshots）から組み立てる。
+ * ECの値が無い友だちは、これまでの足し算（purchase_amount）を通年の代わりに使う（暫定）。
+ * お客様に見せる呼び名は「マイル」。ここに「ポイント」は出さない。
+ */
+type RankLookup = { rank_key: string; name: string; annual_threshold_yen: number; mile_rate_percent: number };
+type MilestoneLookup = { threshold_yen: number; title: string };
+
+// packages/db の DEFAULT_NEN_RANKS と同じ値。多くのテストが @line-crm/db を丸ごと mock するため、
+// 設定の読み出しは実行時に引き、無ければこの値で組み立てる。
+const FALLBACK_RANKS: RankLookup[] = [
+  { rank_key: 'regular', name: 'レギュラー', annual_threshold_yen: 0, mile_rate_percent: 1 },
+  { rank_key: 'silver', name: 'シルバー', annual_threshold_yen: 30_000, mile_rate_percent: 1.5 },
+  { rank_key: 'gold', name: 'ゴールド', annual_threshold_yen: 60_000, mile_rate_percent: 2 },
+  { rank_key: 'platinum', name: 'プラチナ', annual_threshold_yen: 120_000, mile_rate_percent: 3 },
+];
+
+async function loadRankSetup(db: D1Database, lineAccountId: string | null): Promise<{ ranks: RankLookup[]; milestones: MilestoneLookup[] }> {
+  if (!lineAccountId) return { ranks: FALLBACK_RANKS, milestones: [] };
+  try {
+    // 丸ごと mock された @line-crm/db は、無い名前を読むだけで投げる。読み出しごと try に入れる。
+    const pkg = dbPackage as {
+      ensureNenRankDefaults?: (db: D1Database, id: string) => Promise<void>;
+      getNenRankSettings?: (db: D1Database, id: string) => Promise<RankLookup[]>;
+      getNenLifetimeMilestones?: (db: D1Database, id: string) => Promise<MilestoneLookup[]>;
+    };
+    const load = pkg.getNenRankSettings;
+    if (typeof load !== 'function') return { ranks: FALLBACK_RANKS, milestones: [] };
+    await pkg.ensureNenRankDefaults?.(db, lineAccountId);
+    const ranks = await load(db, lineAccountId);
+    const milestones = (await pkg.getNenLifetimeMilestones?.(db, lineAccountId)) ?? [];
+    return { ranks: ranks.length ? ranks : FALLBACK_RANKS, milestones };
+  } catch {
+    return { ranks: FALLBACK_RANKS, milestones: [] };
+  }
+}
+
+async function buildMembership(db: D1Database, lineAccountId: string | null, snapshot: Record<string, unknown> | null) {
+  const { ranks, milestones } = await loadRankSetup(db, lineAccountId);
+  const num = (value: unknown) => (Number.isFinite(Number(value)) ? Math.max(0, Math.round(Number(value))) : 0);
+  const ecRankKey = typeof snapshot?.member_rank_key === 'string' && snapshot.member_rank_key ? snapshot.member_rank_key : null;
+  const annualMilesYen = num(snapshot?.annual_miles_yen) || (ecRankKey ? 0 : num(snapshot?.purchase_amount));
+  const lifetimeMilesYen = Math.max(num(snapshot?.lifetime_miles_yen), num(snapshot?.purchase_amount));
+  const mileBalance = num(snapshot?.mile_balance) || num(snapshot?.point_balance);
+  const sortedRanks = [...ranks].sort((a, b) => a.annual_threshold_yen - b.annual_threshold_yen);
+  let index = ecRankKey ? sortedRanks.findIndex((r) => r.rank_key === ecRankKey) : -1;
+  if (index < 0) { index = 0; sortedRanks.forEach((r, i) => { if (annualMilesYen >= r.annual_threshold_yen) index = i; }); }
+  const rank = sortedRanks[index] ?? null;
+  const next = sortedRanks[index + 1] ?? null;
+  const sortedMilestones = [...milestones].sort((a, b) => a.threshold_yen - b.threshold_yen);
+  const nextMilestone = sortedMilestones.find((m) => m.threshold_yen > lifetimeMilesYen) ?? null;
+  return {
+    rankKey: rank?.rank_key ?? null,
+    rankName: rank?.name ?? String(snapshot?.member_rank ?? 'レギュラー'),
+    mileRatePercent: Number.isFinite(Number(snapshot?.mile_rate_percent)) && snapshot?.mile_rate_percent != null
+      ? Number(snapshot.mile_rate_percent)
+      : rank?.mile_rate_percent ?? null,
+    annualMilesYen,
+    lifetimeMilesYen,
+    mileBalance,
+    validUntil: typeof snapshot?.rank_valid_until === 'string' ? snapshot.rank_valid_until : null,
+    next: next ? { name: next.name, thresholdYen: next.annual_threshold_yen, remainingYen: Math.max(0, next.annual_threshold_yen - annualMilesYen) } : null,
+    ranks: sortedRanks.map((r) => ({ key: r.rank_key, name: r.name, thresholdYen: r.annual_threshold_yen, mileRatePercent: r.mile_rate_percent })),
+    milestones: sortedMilestones.map((m) => ({ thresholdYen: m.threshold_yen, title: m.title, reached: lifetimeMilesYen >= m.threshold_yen })),
+    nextMilestone: nextMilestone ? { thresholdYen: nextMilestone.threshold_yen, title: nextMilestone.title, remainingYen: nextMilestone.threshold_yen - lifetimeMilesYen } : null,
+  };
+}
+
+/**
+ * LIFF に返すペット。`feeding` は NRC／FEDIAF の式で毎回計算し直す（★V6 37-2「今日の目安」）。
+ * 主食（nen_feeding_products）が無いアカウントでは kcal だけ返し、グラムは null。
+ */
+function mapPet(row: Record<string, unknown>, products: FeedingProductRow[] = [], treatLimitPercent = DEFAULT_TREAT_LIMIT_PERCENT) {
+  const neutered = neuteredFromRow(row.neutered);
+  // DEEP-24: 「その他」の動物を犬へ変換しない。犬・猫専用の給与計算も対象外。
+  const animalType = toPetAnimalType(row.animal_type);
+  const feedingSupported = isFeedingSupportedAnimal(animalType);
+  const plan = planForPetRow({
+    id: String(row.id), animal_type: animalType, weight_kg: row.weight_kg as number | null,
+    birthday: (row.birthday as string | null) ?? null, neutered: row.neutered as number | null,
+    activity_level: (row.activity_level as string | null) ?? null, feeding_product_id: (row.feeding_product_id as string | null) ?? null,
+  }, products, new Date(), treatLimitPercent);
+  return {
+    id: row.id, customerId: row.customer_id, name: row.name, callName: petCallName(String(row.name ?? ''), row.gender), animalType,
+    gender: petGender(row.gender), breed: row.breed, birthday: row.birthday, weightKg: row.weight_kg,
     concerns: JSON.parse(String(row.concerns || '[]')),
-    recommendedDailyGrams: row.recommended_daily_grams,
-    recommendedDailyMinGrams: row.recommended_daily_min_grams,
-    recommendedDailyMaxGrams: row.recommended_daily_max_grams,
-    venisonDailyGrams: row.venison_daily_grams, foodCycleDays: row.food_cycle_days,
+    neutered: neutered === true ? 'yes' : neutered === false ? 'no' : 'unknown',
+    activityLevel: normalizeActivity(row.activity_level) ?? 'normal',
+    feedingProductId: row.feeding_product_id || null,
+    feeding: feedingView(plan),
+    // 種別が犬・猫以外のとき、過去に犬として計算・保存された目安を出さない。
+    recommendedDailyGrams: feedingSupported ? row.recommended_daily_grams : null,
+    recommendedDailyMinGrams: feedingSupported ? row.recommended_daily_min_grams : null,
+    recommendedDailyMaxGrams: feedingSupported ? row.recommended_daily_max_grams : null,
+    venisonDailyGrams: feedingSupported ? row.venison_daily_grams : null,
+    foodCycleDays: feedingSupported ? row.food_cycle_days : null,
     imageUrl: row.image_url || null,
   };
+}
+
+function feedingView(plan: FeedingPlan | null) {
+  if (!plan) return null;
+  return {
+    dailyKcal: plan.dailyKcal, dailyGrams: plan.dailyGrams, minGrams: plan.minGrams, maxGrams: plan.maxGrams,
+    rerKcal: plan.rerKcal, factor: plan.factor, factorLabel: plan.factorLabel, stage: plan.stage, stageLabel: plan.stageLabel,
+    ageMonths: plan.ageMonths, product: plan.product,
+    venison: plan.venison,
+  };
+}
+
+/** マイページの「いつもの主食」に出すのは主食だけ。然の商品（おやつ）は目安の計算にだけ使う。 */
+function feedingProductsView(products: FeedingProductRow[]) {
+  return stapleProducts(products).map((p) => ({ id: p.id, name: p.name, kcalPer100g: Number(p.kcal_per_100g), isDefault: p.is_default === 1, kind: productKind(p.kind) }));
+}
+function nenProductsView(products: FeedingProductRow[]) {
+  return nenProducts(products).map((p) => ({ id: p.id, name: p.name, kcalPer100g: Number(p.kcal_per_100g), isDefault: p.is_default === 1, kind: productKind(p.kind) }));
+}
+
+type FeedingCatalog = { products: FeedingProductRow[]; treatLimitPercent: number };
+
+async function accountFeedingProducts(c: Context<Env>, friend: FriendRow): Promise<FeedingCatalog> {
+  if (!friend.line_account_id) return { products: [], treatLimitPercent: DEFAULT_TREAT_LIMIT_PERCENT };
+  try {
+    const [products, treatLimitPercent] = await Promise.all([listFeedingProducts(c.env.DB, friend.line_account_id), getTreatLimitPercent(c.env.DB, friend.line_account_id)]);
+    return { products, treatLimitPercent };
+  } catch {
+    return { products: [], treatLimitPercent: DEFAULT_TREAT_LIMIT_PERCENT };
+  }
+}
+
+/**
+ * ペットの登録・変更に共通の入力（体重・避妊去勢・活動量・主食）。
+ * 想定外の値はエラーにせず「変更しない」（undefined）として扱う。
+ */
+function petFeedingInput(body: Record<string, unknown> | null, products: FeedingProductRow[]) {
+  const neutered = neuteredFromInput(body?.neutered);
+  const activityLevel = normalizeActivity(body?.activityLevel);
+  const rawProduct = body?.feedingProductId;
+  const feedingProductId = rawProduct === null || rawProduct === '' ? null
+    : typeof rawProduct === 'string' && stapleProducts(products).some((p) => p.id === rawProduct) ? rawProduct : undefined;
+  return { neutered, activityLevel, feedingProductId };
 }
 
 function decodeJpegData(data: unknown): Uint8Array | null {
@@ -216,6 +594,68 @@ function decodeJpegData(data: unknown): Uint8Array | null {
   }
 }
 
+/**
+ * 採用済み写真への公開同意を、管理画面と公式サイトが読む掲載台帳へ反映する。
+ *
+ * LIFF は「サイトへの掲載に同意する」を有効にした時点で「公式サイトに
+ * 掲載中」と案内するため、同意日時だけを保存して掲載台帳を作らないと、
+ * 管理画面にも EC の公開ギャラリーにも現れない。写真ごとに一意な掲載と
+ * 公式サイトの掲載先を冪等に作り、同意を付け直した場合は既存行を再開する。
+ */
+async function ensureConsentedPhotoSitePublication(
+  db: D1Database,
+  input: {
+    photoId: string;
+    friendId: string;
+    lineAccountId: string;
+    consentVersion: string;
+    showPetName: boolean;
+    siteUrl: string;
+    now: string;
+  },
+): Promise<void> {
+  const existing = await db.prepare(
+    `SELECT id FROM nen_photo_publications WHERE photo_id = ? AND line_account_id = ?`,
+  ).bind(input.photoId, input.lineAccountId).first<{ id: string }>();
+  const publicationId = existing?.id ?? `photo-publication:${input.photoId}`;
+  const placementId = `photo-publication-site:${input.photoId}`;
+  const siteLabel = `${input.siteUrl.replace(/\/+$/, '')}/`;
+  await db.batch([
+    db.prepare(
+      `UPDATE nen_photo_submissions
+          SET publication_consent_version = ?, publication_consent_at = ?,
+              publication_withdrawn_at = NULL, public_pet_name = ?,
+              public_image_url = COALESCE(public_image_url, review_image_url), updated_at = ?
+        WHERE id = ? AND friend_id = ? AND line_account_id = ?`,
+    ).bind(
+      input.consentVersion, input.now, input.showPetName ? 1 : 0, input.now,
+      input.photoId, input.friendId, input.lineAccountId,
+    ),
+    db.prepare(
+      `INSERT INTO nen_photo_publications
+        (id, photo_id, line_account_id, status, show_owner_name, version,
+         published_at, withdrawn_at, withdrawn_by, updated_at)
+       VALUES (?, ?, ?, 'published', 0, 1, ?, NULL, NULL, ?)
+       ON CONFLICT(photo_id) DO UPDATE SET
+         status = 'published',
+         withdrawn_at = NULL,
+         withdrawn_by = NULL,
+         version = CASE WHEN nen_photo_publications.status = 'withdrawn'
+           THEN nen_photo_publications.version + 1 ELSE nen_photo_publications.version END,
+         updated_at = excluded.updated_at`,
+    ).bind(publicationId, input.photoId, input.lineAccountId, input.now, input.now),
+    db.prepare(
+      `INSERT INTO nen_photo_publication_placements
+        (id, publication_id, line_account_id, placement_type, placement_label,
+         active, created_at, removed_at)
+       VALUES (?, ?, ?, 'site', ?, 1, ?, NULL)
+       ON CONFLICT(publication_id, placement_type, placement_label) DO UPDATE SET
+         active = 1,
+         removed_at = NULL`,
+    ).bind(placementId, publicationId, input.lineAccountId, siteLabel, input.now),
+  ]);
+}
+
 nenMembers.get('/api/liff/nen/member', async (c) => {
   const friend = await currentFriend(c);
   if (!friend) return c.json({ success: false, error: 'Unauthorized' }, 401);
@@ -226,8 +666,8 @@ nenMembers.get('/api/liff/nen/member', async (c) => {
       ps.publication_consent_at, ps.publication_withdrawn_at, ps.public_pet_name,
       ps.created_at, p.name pet_name
       FROM nen_photo_submissions ps JOIN nen_pet_profiles p ON p.id = ps.pet_id
-      WHERE ps.friend_id = ? AND ps.status = 'adopted'
-      ORDER BY ps.reviewed_at DESC, ps.created_at DESC LIMIT 30`).bind(friend.id).all<Record<string, unknown>>(),
+      WHERE ps.friend_id = ?
+      ORDER BY ps.created_at DESC LIMIT 30`).bind(friend.id).all<Record<string, unknown>>(),
     c.env.DB.prepare(`SELECT COUNT(*) submitted_count,
       SUM(CASE WHEN status='pending' THEN 1 ELSE 0 END) pending_count,
       SUM(CASE WHEN status='adopted' THEN 1 ELSE 0 END) adopted_count,
@@ -235,9 +675,17 @@ nenMembers.get('/api/liff/nen/member', async (c) => {
       FROM nen_photo_submissions WHERE friend_id = ?`).bind(friend.id).first<Record<string, unknown>>(),
     c.env.DB.prepare(`SELECT id, pet_id, topic, result_text, tag_name, created_at FROM nen_consultation_logs_v2 WHERE friend_id = ? ORDER BY created_at DESC LIMIT 20`).bind(friend.id).all<Record<string, unknown>>(),
   ]);
+  const membership = await buildMembership(c.env.DB, friend.line_account_id, snapshot);
+  const catalog = await accountFeedingProducts(c, friend);
+  const feedingProducts = catalog.products;
   return c.json({ success: true, data: {
     owner: { displayName: friend.display_name, customerId: snapshot?.customer_id || null },
-    pets: pets.results.map(mapPet),
+    membership,
+    pets: pets.results.map((row) => mapPet(row, feedingProducts, catalog.treatLimitPercent)),
+    feedingProducts: feedingProductsView(feedingProducts),
+    nenProducts: nenProductsView(feedingProducts),
+    treatLimitPercent: catalog.treatLimitPercent,
+    activityLabels: ACTIVITY_LABELS,
     commerce: snapshot ? {
       orders: JSON.parse(String(snapshot.orders_json || '[]')),
       subscription: snapshot.subscription_json ? JSON.parse(String(snapshot.subscription_json)) : null,
@@ -262,9 +710,30 @@ nenMembers.get('/api/liff/nen/member', async (c) => {
 });
 
 nenMembers.get('/api/public/nen/adopted-photos', async (c) => {
-  const lineAccountId = c.req.query('lineAccountId')?.trim();
-  if (!lineAccountId) return c.json({ success: false, error: 'lineAccountId is required' }, 400);
-  const rows = await c.env.DB.prepare(`SELECT ps.id, ps.image_url, ps.caption, ps.reviewed_at,
+  const requestedLineAccountId = c.req.query('lineAccountId')?.trim() ?? '';
+  const officialAccountBasicId = c.req.query('officialAccountBasicId')?.trim() ?? '';
+  if (!requestedLineAccountId && !officialAccountBasicId) {
+    return c.json({ success: false, error: 'lineAccountId or officialAccountBasicId is required' }, 400);
+  }
+
+  let lineAccountId = requestedLineAccountId;
+  if (officialAccountBasicId) {
+    const accounts = await c.env.DB.prepare(
+      `SELECT id FROM line_accounts
+        WHERE line_basic_id = ? AND is_active = 1 AND archived_at IS NULL
+        ORDER BY id LIMIT 2`,
+    ).bind(officialAccountBasicId).all<{ id: string }>();
+    if (accounts.results.length !== 1) {
+      return c.json({ success: false, error: 'LINE account not found' }, 404);
+    }
+    const resolvedLineAccountId = String(accounts.results[0].id);
+    if (lineAccountId && lineAccountId !== resolvedLineAccountId) {
+      return c.json({ success: false, error: 'LINE account selectors do not match' }, 400);
+    }
+    lineAccountId = resolvedLineAccountId;
+  }
+
+  const rows = await c.env.DB.prepare(`SELECT ps.id, ps.public_image_url AS image_url, ps.caption, ps.reviewed_at,
       CASE WHEN ps.public_pet_name = 1 THEN p.name ELSE NULL END pet_name
     FROM nen_photo_submissions ps
     JOIN nen_pet_profiles p ON p.id = ps.pet_id
@@ -273,11 +742,27 @@ nenMembers.get('/api/public/nen/adopted-photos', async (c) => {
       AND ps.line_account_id = ? AND f.line_account_id = ?
       AND ps.publication_consent_at IS NOT NULL
       AND ps.publication_withdrawn_at IS NULL
+      AND ps.public_image_url IS NOT NULL
+      AND EXISTS (
+        SELECT 1
+          FROM nen_photo_publications pub
+          JOIN nen_photo_publication_placements placement
+            ON placement.publication_id = pub.id
+           AND placement.line_account_id = pub.line_account_id
+         WHERE pub.photo_id = ps.id
+           AND pub.line_account_id = ps.line_account_id
+           AND pub.status = 'published'
+           AND pub.withdrawn_at IS NULL
+           AND placement.placement_type = 'site'
+           AND placement.active = 1
+           AND placement.removed_at IS NULL
+      )
     ORDER BY ps.reviewed_at DESC, ps.created_at DESC LIMIT 24`)
     .bind(lineAccountId, lineAccountId).all<Record<string, unknown>>();
   const origin = c.req.header('Origin') || '';
   const allowed = new Set(['https://stg.nen-petfood.com', 'https://nen-petfood.com', 'https://www.nen-petfood.com']);
   if (allowed.has(origin)) c.header('Access-Control-Allow-Origin', origin);
+  c.header('Vary', 'Origin');
   c.header('Cache-Control', 'public, max-age=60, s-maxage=300');
   return c.json({ success: true, data: rows.results.map((row) => ({
     id: row.id, imageUrl: row.image_url, caption: row.caption, petName: row.pet_name,
@@ -317,15 +802,25 @@ nenMembers.post('/api/liff/nen/pets', async (c) => {
   if (!friend) return c.json({ success: false, error: 'Unauthorized' }, 401);
   const body = await c.req.json<Record<string, unknown>>().catch(() => null);
   const name = typeof body?.name === 'string' ? body.name.trim() : '';
-  const animalType = body?.animalType === 'cat' ? 'cat' : body?.animalType === 'dog' ? 'dog' : '';
+  // DEEP-24: 「その他」も登録できる。犬・猫専用の目安計算は feedingGuide が
+  // 対象外として null を返し、犬の係数で作った数値を保存しない。
+  const animalType = body?.animalType === 'cat' || body?.animalType === 'dog' || body?.animalType === 'other' ? body.animalType : '';
   const breed = typeof body?.breed === 'string' ? body.breed.trim().slice(0, 80) : '';
   const weightKg = Number(body?.weightKg);
-  const birthday = dateOnly(body?.birthday);
+  // 誕生日は月日だけ（MM-DD）でも登録できる。生まれた年が分からない子も
+  // 誕生日配信へ載せるため。年齢は不明のまま出す。
+  const birthdayRaw = normalizeNenPetBirthday(body?.birthday);
+  const birthday = birthdayRaw === 'invalid' ? null : birthdayRaw;
   const concerns = Array.isArray(body?.concerns) ? body.concerns.filter((v): v is string => typeof v === 'string' && CONCERNS.has(v)).slice(0, 10) : [];
-  if (!name || name.length > 80 || !animalType || !breed || !birthday || !Number.isFinite(weightKg) || weightKg < 0.2 || weightKg > 150) {
+  const gender = petGender(body?.gender);
+  // 性別は必須（呼び名「くん」「ちゃん」を決めるため。★V6 37-2-A-2）
+  if (!name || name.length > 80 || !animalType || !breed || !birthday || !Number.isFinite(weightKg) || weightKg < 0.2 || weightKg > 150 || gender === 'unknown') {
     return c.json({ success: false, error: '入力内容を確認してください' }, 400);
   }
   const guide = feedingGuide(animalType, weightKg);
+  const catalog = await accountFeedingProducts(c, friend);
+  const products = catalog.products;
+  const feeding = petFeedingInput(body, products);
   const id = crypto.randomUUID();
   const now = jstNow();
   const photoBytes = body?.photoData ? decodeJpegData(body.photoData) : null;
@@ -337,18 +832,126 @@ nenMembers.post('/api/liff/nen/pets', async (c) => {
     `INSERT INTO nen_pet_profiles
       (id, friend_id, customer_id, name, animal_type, gender, birthday, breed, weight_kg, concerns,
        recommended_daily_grams, recommended_daily_min_grams, recommended_daily_max_grams,
-       venison_daily_grams, food_cycle_days, image_r2_key, image_url, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       venison_daily_grams, food_cycle_days, image_r2_key, image_url, created_at, updated_at,
+       weight_updated_at, neutered, activity_level, feeding_product_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).bind(
     id, friend.id, friend.user_id, name, animalType,
-    ['male', 'female'].includes(String(body?.gender)) ? String(body?.gender) : 'unknown',
-    birthday, breed, weightKg, JSON.stringify(concerns), guide.daily, guide.min, guide.max,
-    guide.venison, guide.cycleDays, photoKey, imageUrl, now, now,
+    gender,
+    birthday, breed, weightKg, JSON.stringify(concerns), guide?.daily ?? null, guide?.min ?? null, guide?.max ?? null,
+    guide?.venison ?? null, guide?.cycleDays ?? null, photoKey, imageUrl, now, now,
+    // 登録時に体重を入れているので、測った日＝登録日として記録する（監査 R57）。
+    now,
+    feeding.neutered === undefined || feeding.neutered === null ? null : feeding.neutered ? 1 : 0,
+    feeding.activityLevel ?? 'normal',
+    feeding.feedingProductId ?? null,
   ).run();
+  // NRC／FEDIAF の式で目安を上書き（主食が登録されているときだけグラムが決まる）。
+  const plan = planForPetRow({
+    id, animal_type: animalType, weight_kg: weightKg, birthday, neutered: feeding.neutered == null ? null : feeding.neutered ? 1 : 0,
+    activity_level: feeding.activityLevel ?? 'normal', feeding_product_id: feeding.feedingProductId ?? null,
+  }, products, new Date(), catalog.treatLimitPercent);
+  await refreshStoredFeeding(c.env.DB, id, plan, now);
   await syncNenPetTags(c.env.DB, friend.id);
   const saved = await c.env.DB.prepare(`SELECT * FROM nen_pet_profiles WHERE id = ?`).bind(id).first<Record<string, unknown>>();
   if (saved) c.executionCtx.waitUntil(pushPetCard(c, friend, saved).catch((err: unknown) => console.error('pet card push failed', err)));
-  return c.json({ success: true, data: mapPet(saved || { id }) }, 201);
+  return c.json({ success: true, data: mapPet(saved || { id }, products, catalog.treatLimitPercent) }, 201);
+});
+
+/**
+ * ペットの変更（★V6 37-2 マイペット「編集」）。体重・避妊去勢・活動量・主食・お悩みなど、
+ * 送られてきた項目だけを変える。目安（daily_kcal / recommended_*）はそのたびに計算し直す。
+ */
+nenMembers.put('/api/liff/nen/pets/:id', async (c) => {
+  const friend = await currentFriend(c);
+  if (!friend) return c.json({ success: false, error: 'Unauthorized' }, 401);
+  const petId = c.req.param('id');
+  const current = await c.env.DB.prepare(`SELECT * FROM nen_pet_profiles WHERE id = ? AND friend_id = ?`).bind(petId, friend.id).first<Record<string, unknown>>();
+  if (!current) return c.json({ success: false, error: 'Pet not found' }, 404);
+  const body = await c.req.json<Record<string, unknown>>().catch(() => null);
+  if (!body || typeof body !== 'object') return c.json({ success: false, error: '入力内容を確認してください' }, 400);
+
+  const sets: string[] = [];
+  const values: unknown[] = [];
+  let weightChanged = false;
+  if (body.name !== undefined) {
+    const name = typeof body.name === 'string' ? body.name.trim() : '';
+    if (!name || name.length > 80) return c.json({ success: false, error: '名前は1〜80文字で入力してください' }, 400);
+    sets.push('name = ?'); values.push(name);
+  }
+  if (body.breed !== undefined) {
+    const breed = typeof body.breed === 'string' ? body.breed.trim().slice(0, 80) : '';
+    if (!breed) return c.json({ success: false, error: '品種を入力してください' }, 400);
+    sets.push('breed = ?'); values.push(breed);
+  }
+  if (body.gender !== undefined) {
+    sets.push('gender = ?'); values.push(['male', 'female'].includes(String(body.gender)) ? String(body.gender) : 'unknown');
+  }
+  if (body.birthday !== undefined) {
+    // 月日だけ（MM-DD）も受け付ける。年が分からない子も誕生日配信へ載せる。
+    const birthday = normalizeNenPetBirthday(body.birthday);
+    if (birthday === 'invalid') return c.json({ success: false, error: '誕生日を確認してください' }, 400);
+    sets.push('birthday = ?'); values.push(birthday);
+  }
+  if (body.weightKg !== undefined) {
+    const weightKg = Number(body.weightKg);
+    if (!Number.isFinite(weightKg) || weightKg < 0.2 || weightKg > 150) return c.json({ success: false, error: '体重は 0.2〜150kg で入力してください' }, 400);
+    sets.push('weight_kg = ?'); values.push(Math.round(weightKg * 10) / 10);
+    // 監査 R57: 体重が変わったときだけ「体重の更新」を動かす。同じ値の再送や
+    // 名前だけの編集では日付を維持する。
+    const rounded = Math.round(weightKg * 10) / 10;
+    if (rounded !== Number(current.weight_kg)) {
+      weightChanged = true;
+    }
+  }
+  if (body.concerns !== undefined) {
+    const concerns = Array.isArray(body.concerns) ? body.concerns.filter((v): v is string => typeof v === 'string' && CONCERNS.has(v)).slice(0, 10) : [];
+    sets.push('concerns = ?'); values.push(JSON.stringify(concerns));
+  }
+  const catalog = await accountFeedingProducts(c, friend);
+  const products = catalog.products;
+  const feeding = petFeedingInput(body, products);
+  if (body.neutered !== undefined) {
+    if (feeding.neutered === undefined) return c.json({ success: false, error: '避妊去勢の選択を確認してください' }, 400);
+    sets.push('neutered = ?'); values.push(feeding.neutered === null ? null : feeding.neutered ? 1 : 0);
+  }
+  if (body.activityLevel !== undefined) {
+    if (!feeding.activityLevel) return c.json({ success: false, error: '活動量の選択を確認してください' }, 400);
+    sets.push('activity_level = ?'); values.push(feeding.activityLevel);
+  }
+  if (body.feedingProductId !== undefined) {
+    if (feeding.feedingProductId === undefined) return c.json({ success: false, error: '主食の選択を確認してください' }, 400);
+    sets.push('feeding_product_id = ?'); values.push(feeding.feedingProductId);
+  }
+  if (sets.length === 0) return c.json({ success: false, error: '変更する項目がありません' }, 400);
+
+  const now = jstNow();
+  sets.push('updated_at = ?'); values.push(now);
+  if (weightChanged) { sets.push('weight_updated_at = ?'); values.push(now); }
+  await c.env.DB.prepare(`UPDATE nen_pet_profiles SET ${sets.join(', ')} WHERE id = ? AND friend_id = ?`).bind(...values, petId, friend.id).run();
+  // 誕生日が変わったら、古い日付へ予約済みの誕生日クーポン配信を取消し、
+  // 次の日次走査で新しい誕生日から組み直させる。すでに発行済みの今年分は残る。
+  if (body.birthday !== undefined) {
+    const previous = (current.birthday as string | null) ?? null;
+    const normalized = normalizeNenPetBirthday(body.birthday);
+    if ((normalized === 'invalid' ? null : normalized) !== previous) {
+      await c.env.DB.prepare(
+        `UPDATE nen_delivery_jobs SET status = 'cancelled', updated_at = ?
+         WHERE campaign_key = 'birthday_coupon' AND status = 'pending' AND source_key LIKE ?`,
+      ).bind(now, `birthday:${petId}:%`).run();
+    }
+  }
+  const updated = await c.env.DB.prepare(`SELECT * FROM nen_pet_profiles WHERE id = ?`).bind(petId).first<Record<string, unknown>>();
+  if (!updated) return c.json({ success: false, error: 'Pet not found' }, 404);
+  const plan = planForPetRow({
+    id: petId, animal_type: String(updated.animal_type), weight_kg: updated.weight_kg as number | null, birthday: (updated.birthday as string | null) ?? null,
+    neutered: updated.neutered as number | null, activity_level: (updated.activity_level as string | null) ?? null,
+    feeding_product_id: (updated.feeding_product_id as string | null) ?? null,
+  }, products, new Date(), catalog.treatLimitPercent);
+  await refreshStoredFeeding(c.env.DB, petId, plan, now);
+  await syncNenPetTags(c.env.DB, friend.id);
+  const saved = await c.env.DB.prepare(`SELECT * FROM nen_pet_profiles WHERE id = ?`).bind(petId).first<Record<string, unknown>>();
+  return c.json({ success: true, data: mapPet(saved || updated, products, catalog.treatLimitPercent) });
 });
 
 nenMembers.post('/api/liff/nen/pets/:id/photo', async (c) => {
@@ -361,7 +964,8 @@ nenMembers.post('/api/liff/nen/pets/:id/photo', async (c) => {
   const bytes = decodeJpegData(body?.data);
   if (!bytes) return c.json({ success: false, error: 'ペット写真を確認してください' }, 400);
   const key = `nen-pet-profiles/${friend.id}/${pet.id}-${crypto.randomUUID()}.jpg`;
-  await c.env.IMAGES.put(key, bytes, { httpMetadata: { contentType: 'image/jpeg' }, customMetadata: { friendId: friend.id, petId: pet.id } });
+  // 公開配信される画像なので、撮影場所などの付帯メタデータは外して保存する（#931 N-310）。
+  await c.env.IMAGES.put(key, stripImageMetadata(bytes, 'image/jpeg'), { httpMetadata: { contentType: 'image/jpeg' }, customMetadata: { friendId: friend.id, petId: pet.id } });
   const imageUrl = `${c.env.WORKER_PUBLIC_URL || new URL(c.req.url).origin}/images/${key}`;
   await c.env.DB.prepare(`UPDATE nen_pet_profiles SET image_r2_key=?, image_url=?, updated_at=? WHERE id=? AND friend_id=?`)
     .bind(key, imageUrl, jstNow(), pet.id, friend.id).run();
@@ -397,10 +1001,40 @@ nenMembers.post('/api/liff/nen/health-logs', async (c) => {
        appetite=excluded.appetite, skin_status=excluded.skin_status, tear_stain_status=excluded.tear_stain_status, note=excluded.note`,
   ).bind(id, body!.petId, friend.id, loggedOn, weightKg, heartRateBpm, respiratoryRateBpm, stool, appetite, skin, tear, String(body?.note || '').slice(0, 500), jstNow()).run();
 
+  // 監査 R59: 日記につけた体重が「今日の目安」に反映されない穴を塞ぐ。
+  // この記録が体重を持つ記録の中でいちばん新しい日付なら、プロフィールの体重を
+  // その値に揃えて給餌目安も計算し直す（過去日の記録で今の体重を戻さない）。
+  if (weightKg != null) {
+    const newestWeightLog = await c.env.DB.prepare(
+      `SELECT MAX(logged_on) AS d FROM nen_health_logs WHERE pet_id = ? AND weight_kg IS NOT NULL`,
+    ).bind(body!.petId).first<{ d: string | null }>();
+    if (newestWeightLog?.d && loggedOn >= newestWeightLog.d) {
+      const [current, catalog] = await Promise.all([
+        c.env.DB.prepare(
+          `SELECT animal_type, birthday, neutered, activity_level, feeding_product_id FROM nen_pet_profiles WHERE id = ?`,
+        ).bind(body!.petId).first<Record<string, unknown>>(),
+        accountFeedingProducts(c, friend),
+      ]);
+      const now = jstNow();
+      // 監査 R57: 「体重の更新」には同期した瞬間ではなく日記の記録日（測った日）を入れる。
+      await c.env.DB.prepare(`UPDATE nen_pet_profiles SET weight_kg = ?, weight_updated_at = ?, updated_at = ? WHERE id = ?`).bind(weightKg, loggedOn, now, body!.petId).run();
+      if (current) {
+        const plan = planForPetRow({
+          id: String(body!.petId), animal_type: String(current.animal_type), weight_kg: weightKg,
+          birthday: (current.birthday as string | null) ?? null,
+          neutered: current.neutered as number | null,
+          activity_level: (current.activity_level as string | null) ?? null,
+          feeding_product_id: (current.feeding_product_id as string | null) ?? null,
+        }, catalog.products, new Date(), catalog.treatLimitPercent);
+        await refreshStoredFeeding(c.env.DB, String(body!.petId), plan, now);
+      }
+    }
+  }
+
   const latest = await c.env.DB.prepare(`SELECT appetite, stool_status FROM nen_health_logs WHERE pet_id = ? ORDER BY logged_on DESC LIMIT 3`).bind(body!.petId).all<{ appetite: string; stool_status: string }>();
   const checks = [
     { type: 'poor_appetite', hit: latest.results.length === 3 && latest.results.every((r) => r.appetite === 'poor') },
-    { type: 'abnormal_stool', hit: latest.results.length === 3 && latest.results.every((r) => r.stool_status !== 'normal') },
+    { type: 'abnormal_stool', hit: latest.results.length === 3 && latest.results.every((r) => isCareStoolStatus(r.stool_status)) },
   ];
   for (const check of checks) {
     if (check.hit) {
@@ -423,6 +1057,32 @@ nenMembers.get('/api/liff/nen/health-logs', async (c) => {
   return c.json({ success: true, data: rows.results });
 });
 
+/**
+ * 「獣医師に見せる（直近30日のまとめ）」（★V6 37-2-B）。管理画面の 30日のまとめ（★V6 37-4）と同じ計算。
+ * 本人のペットだけ。医療判断は含めない。
+ */
+nenMembers.get('/api/liff/nen/health-logs/summary', async (c) => {
+  const friend = await currentFriend(c);
+  if (!friend) return c.json({ success: false, error: 'Unauthorized' }, 401);
+  const petId = (c.req.query('petId') ?? '').trim();
+  const pet = await c.env.DB.prepare(`SELECT id, name, gender, animal_type, breed, birthday, weight_kg FROM nen_pet_profiles WHERE id = ? AND friend_id = ?`)
+    .bind(petId, friend.id).first<{ id: string; name: string; gender: string | null; animal_type: string; breed: string | null; birthday: string | null; weight_kg: number | null }>();
+  if (!pet) return c.json({ success: false, error: 'Pet not found' }, 404);
+  const today = new Date();
+  const since = new Date(today.getTime() - 30 * 86_400_000).toISOString().slice(0, 10);
+  const logs = await c.env.DB.prepare(
+    `SELECT pet_id, logged_on, weight_kg, stool_status, appetite, skin_status, tear_stain_status, heart_rate_bpm, respiratory_rate_bpm, note
+       FROM nen_health_logs WHERE pet_id = ? AND logged_on >= ? ORDER BY logged_on DESC`,
+  ).bind(pet.id, since).all<HealthLogRow>();
+  return c.json({ success: true, data: {
+    pet: { id: pet.id, name: pet.name, callName: petCallName(pet.name, pet.gender), animalType: toPetAnimalType(pet.animal_type), breed: pet.breed ?? '', birthday: pet.birthday, weightKg: pet.weight_kg },
+    owner: { name: friend.display_name ?? '' },
+    generatedAt: today.toISOString(),
+    summary: thirtyDaySummary(logs.results ?? [], today),
+    labels: { stool: STOOL_LABELS, appetite: APPETITE_LABELS },
+  } });
+});
+
 nenMembers.post('/api/liff/nen/photos', async (c) => {
   const friend = await currentFriend(c);
   if (!friend) return c.json({ success: false, error: 'Unauthorized' }, 401);
@@ -434,21 +1094,83 @@ nenMembers.post('/api/liff/nen/photos', async (c) => {
   let bytes: Uint8Array;
   try { bytes = Uint8Array.from(atob(raw), (ch) => ch.charCodeAt(0)); } catch { return c.json({ success: false, error: '画像を読み込めません' }, 400); }
   if (bytes.byteLength > 8 * 1024 * 1024) return c.json({ success: false, error: '画像は8MB以下にしてください' }, 400);
+  if (detectedImageMime(bytes) !== body.mimeType) {
+    return c.json({ success: false, error: '画像の内容と形式が一致しません' }, 400);
+  }
+  /*
+   * 実寸法をヘッダから測る（#931 N-310）。申告の mimeType と実体の一致までは
+   * 見ているが、寸法までは見ていなかった。読み取れない壊れた画像と、
+   * 展開時に過大になる巨大寸法は投稿経路で止める。
+   */
+  const dimensions = imageDimensions(bytes, body.mimeType);
+  if (!dimensions) {
+    return c.json({ success: false, error: '画像の寸法を確認できませんでした' }, 400);
+  }
+  if (dimensions.width > 20000 || dimensions.height > 20000) {
+    return c.json({ success: false, error: '画像の寸法が大きすぎます（20000px以内にしてください）' }, 400);
+  }
   const id = crypto.randomUUID();
-  const key = `nen-pets/${friend.id}/${id}.${IMAGE_TYPES[body.mimeType]}`;
-  await c.env.IMAGES.put(key, bytes, { httpMetadata: { contentType: body.mimeType }, customMetadata: { friendId: friend.id, petId: body.petId || '' } });
-  const imageUrl = `${c.env.WORKER_PUBLIC_URL || new URL(c.req.url).origin}/images/${key}`;
+  /*
+   * 重複判定のため、中身の hash を付ける (#817)。
+   * 完全に同じ写真だけを「重複」とし、似ている写真は自動で却下しない。
+   */
+  const hashDigest = await crypto.subtle.digest('SHA-256', bytes);
+  const contentHash = Array.from(new Uint8Array(hashDigest))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+  const extension = IMAGE_TYPES[body.mimeType];
+  const key = `nen-photo-originals/${friend.id}/${id}.${extension}`;
+  const reviewKey = `nen-photo-review/${friend.id}/${id}-v1.${extension}`;
+  const metadata = { friendId: friend.id, petId: body.petId || '', photoId: id };
+  /*
+   * 公開配信される審査用画像は付帯メタデータを外して保存する（#931 N-310）。
+   * 撮影場所・端末情報が /images/* から誰でも取れる状態を止める。
+   * 原本は二段階認証つきの取得だけに限る証跡として、そのまま残す。
+   */
+  const reviewBytes = stripImageMetadata(bytes, body.mimeType);
+  await Promise.all([
+    c.env.IMAGES.put(key, bytes, { httpMetadata: { contentType: body.mimeType }, customMetadata: metadata }),
+    c.env.IMAGES.put(reviewKey, reviewBytes, { httpMetadata: { contentType: body.mimeType }, customMetadata: { ...metadata, derivative: 'review-v1' } }),
+  ]);
+  const reviewImageUrl = `${c.env.WORKER_PUBLIC_URL || new URL(c.req.url).origin}/images/${reviewKey}`;
   const now = jstNow();
   await c.env.DB.prepare(`INSERT INTO nen_photo_submissions
     (id, friend_id, pet_id, r2_key, image_url, content_type, caption, status,
-     created_at, updated_at, line_account_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)`)
+     created_at, updated_at, line_account_id, review_image_url, public_image_url,
+     image_width, image_height, image_byte_size, content_hash)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
     .bind(
-      id, friend.id, body.petId, key, imageUrl, body.mimeType,
+      id, friend.id, body.petId, key, reviewImageUrl, body.mimeType,
       String(body.caption || '').trim().slice(0, 300), now, now, friend.line_account_id,
+      reviewImageUrl, reviewImageUrl, dimensions.width, dimensions.height, bytes.byteLength,
+      contentHash,
     ).run();
+  // 保存の直後に検査の段を入れる。clean になるまで審査へは流さない。
+  // 記録に失敗しても投稿自体は返す（門番は出す前にその場で回す）。
+  const photoScan = await ensureFileScanForUpload({
+    db: c.env.DB,
+    lineAccountId: String(friend.line_account_id),
+    subjectKind: 'photo',
+    subjectId: id,
+    mediaId: null,
+    filename: `photo.${extension}`,
+    mimeType: body.mimeType,
+    sizeBytes: bytes.byteLength,
+  }).catch((err) => {
+    console.error('photo scan record error:', id, err);
+    return null;
+  });
+  if (photoScan) {
+    await runBuiltinScanAndStore(c.env.DB, photoScan, bytes, {
+      filename: `photo.${extension}`,
+      mimeType: body.mimeType,
+      sizeBytes: bytes.byteLength,
+      width: dimensions.width,
+      height: dimensions.height,
+    }).catch((err) => console.error('photo scan error:', id, err));
+  }
   await syncNenPhotoTags(c.env.DB, friend.id);
-  return c.json({ success: true, data: { id, imageUrl, status: 'pending' } }, 201);
+  return c.json({ success: true, data: { id, imageUrl: reviewImageUrl, status: 'pending' } }, 201);
 });
 
 nenMembers.put('/api/liff/nen/photos/:id/publication-consent', async (c) => {
@@ -466,20 +1188,32 @@ nenMembers.put('/api/liff/nen/photos/:id/publication-consent', async (c) => {
     return c.json({ success: false, error: '公開同意の内容を確認してください' }, 400);
   }
   const photo = await c.env.DB.prepare(
-    `SELECT id FROM nen_photo_submissions WHERE id = ? AND friend_id = ? AND line_account_id = ?`,
-  ).bind(c.req.param('id'), friend.id, friend.line_account_id).first<{ id: string }>();
+    `SELECT id, status FROM nen_photo_submissions WHERE id = ? AND friend_id = ? AND line_account_id = ?`,
+  ).bind(c.req.param('id'), friend.id, friend.line_account_id).first<{ id: string; status: string }>();
   if (!photo) return c.json({ success: false, error: 'Not found' }, 404);
   const now = jstNow();
   if (body.consent) {
-    await c.env.DB.prepare(
-      `UPDATE nen_photo_submissions
-          SET publication_consent_version = ?, publication_consent_at = ?,
-              publication_withdrawn_at = NULL, public_pet_name = ?, updated_at = ?
-        WHERE id = ? AND friend_id = ? AND line_account_id = ?`,
-    ).bind(
-      consentVersion, now, body.showPetName === true ? 1 : 0, now,
-      photo.id, friend.id, friend.line_account_id,
-    ).run();
+    if (photo.status === 'adopted') {
+      await ensureConsentedPhotoSitePublication(c.env.DB, {
+        photoId: photo.id,
+        friendId: friend.id,
+        lineAccountId: String(friend.line_account_id),
+        consentVersion,
+        showPetName: body.showPetName === true,
+        siteUrl: c.env.NEN_EC_BASE_URL || 'https://nen-petfood.com',
+        now,
+      });
+    } else {
+      await c.env.DB.prepare(
+        `UPDATE nen_photo_submissions
+            SET publication_consent_version = ?, publication_consent_at = ?,
+                publication_withdrawn_at = NULL, public_pet_name = ?, updated_at = ?
+          WHERE id = ? AND friend_id = ? AND line_account_id = ?`,
+      ).bind(
+        consentVersion, now, body.showPetName === true ? 1 : 0, now,
+        photo.id, friend.id, friend.line_account_id,
+      ).run();
+    }
   } else {
     await c.env.DB.prepare(
       `UPDATE nen_photo_submissions
@@ -540,9 +1274,7 @@ function aiText(result: unknown): string {
 async function assignConsultationTags(c: Context<Env>, friendId: string, animalType: 'dog' | 'cat', detected: string[]) {
   const names = [`AI相談：${animalType === 'dog' ? 'わんちゃん' : 'ねこちゃん'}`, ...detected.map((tag) => `AI相談：${tag}`)];
   for (const name of names) {
-    await c.env.DB.prepare(`INSERT OR IGNORE INTO tags (id, name, color, created_at) VALUES (?, ?, '#16815B', ?)`)
-      .bind(crypto.randomUUID(), name, jstNow()).run();
-    const tag = await c.env.DB.prepare(`SELECT id FROM tags WHERE name = ?`).bind(name).first<{ id: string }>();
+    const tag = await findOrCreateGlobalTag(c.env.DB, { name, color: '#16815B' });
     if (tag) await attachTagAndFireSideEffects(c.env.DB, friendId, tag.id);
   }
   return names;
@@ -653,37 +1385,436 @@ nenMembers.put('/api/nen-members/care-flags/:id', requireRole('owner', 'admin', 
   return c.json({ success: true });
 });
 
-nenMembers.get('/api/nen-members/photos', async (c) => {
+/** 1ページの枚数。指定なし・壊れた指定は 200。上限も 200 で頭打ちにする。 */
+function photoPageSize(raw: string | undefined): number {
+  const value = Number(raw);
+  if (!Number.isFinite(value)) return 200;
+  return Math.min(200, Math.max(1, Math.trunc(value)));
+}
+
+/** 何枚目から取るか。指定なし・負・壊れた指定は 0。 */
+function photoPageOffset(raw: string | undefined): number {
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value <= 0) return 0;
+  return Math.trunc(value);
+}
+
+nenMembers.get('/api/nen-members/photos', requirePhotoPermission('photo.submission.view'), async (c) => {
   const accountId = c.req.query('accountId')?.trim();
   if (!accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
     return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
   }
+  /*
+   * 続きを取れるようにする。前は 200 枚で打ち切りだったので、審査待ちが
+   * 201 枚以上あるとダッシュボードの件数に届かなかった（#666）。
+   * 1ページの上限は 200 のまま。offset で次の 200 枚を取る。
+   */
+  const limit = photoPageSize(c.req.query('limit'));
+  const offset = photoPageOffset(c.req.query('offset'));
+  /*
+   * 名前・ペット名・コメントの部分一致で絞る（#931 N-308）。
+   * 200 枚ずつの区切りでしか見られない一覧だと、目的の1枚を探すのに
+   * 全部を読み進めるしかなかった。%・_・\ は LIKE の記号なので逃がす。
+   */
+  const q = (c.req.query('q') ?? '').trim().slice(0, 100);
+  const like = `%${q.replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`;
+  const staleCutoff = toJstString(new Date(Date.now() - PHOTO_REWARD_STALE_MS));
   const rows = await c.env.DB.prepare(
-    `SELECT ps.*, p.name pet_name, f.display_name owner_name
+    `SELECT ps.id, ps.friend_id, ps.pet_id, ps.review_image_url AS image_url,
+            ps.caption, ps.status, ps.awarded_points, ps.created_at, ps.reviewed_at,
+            ps.updated_at, ps.review_version, ps.publication_consent_at,
+            ps.publication_withdrawn_at, ps.public_pet_name, ps.review_reason_code,
+            ps.review_reason_note, ps.review_notification_status,
+            ps.display_rotation, f.photo_watch_required AS submitter_watch,
+            p.name pet_name, p.gender AS pet_gender, f.display_name owner_name,
+            (SELECT ${PHOTO_REWARD_STATE_CASE} FROM nen_photo_reward_outbox o
+              WHERE o.photo_id = ps.id AND o.line_account_id = ps.line_account_id) AS point_sync_status,
+            (SELECT r.flag FROM nen_photo_risk_assessments r
+              WHERE r.photo_id = ps.id AND r.line_account_id = ps.line_account_id
+              ORDER BY r.created_at DESC, r.id DESC LIMIT 1) AS latest_risk_flag,
+            (SELECT r.confidence FROM nen_photo_risk_assessments r
+              WHERE r.photo_id = ps.id AND r.line_account_id = ps.line_account_id
+              ORDER BY r.created_at DESC, r.id DESC LIMIT 1) AS latest_risk_confidence,
+            CASE WHEN EXISTS (
+              SELECT 1 FROM nen_photo_asset_jobs j
+               WHERE j.photo_id = ps.id AND j.line_account_id = ps.line_account_id AND j.status = 'failed'
+            ) THEN 1 ELSE 0 END AS has_failed_asset_job
        FROM nen_photo_submissions ps
        JOIN nen_pet_profiles p ON p.id = ps.pet_id
        JOIN friends f ON f.id = ps.friend_id
       WHERE ps.line_account_id = ? AND f.line_account_id = ?
-      ORDER BY ps.created_at DESC LIMIT 200`,
-  ).bind(accountId, accountId).all<Record<string, unknown>>();
-  return c.json({ success: true, data: rows.results });
+        ${q ? `AND (ps.caption LIKE ? ESCAPE '\\' OR p.name LIKE ? ESCAPE '\\' OR f.display_name LIKE ? ESCAPE '\\')` : ''}
+      ORDER BY ps.created_at DESC, ps.id DESC LIMIT ? OFFSET ?`,
+  ).bind(staleCutoff, ...(q ? [accountId, accountId, like, like, like] : [accountId, accountId]), limit, offset).all<Record<string, unknown>>();
+  return c.json({
+    success: true,
+    data: rows.results.map((row) => ({
+      ...row,
+      pet_call_name: petCallName(String(row.pet_name ?? ''), row.pet_gender),
+    })),
+  });
 });
 
-nenMembers.put('/api/nen-members/photos/:id/review', requireRole('owner', 'admin', 'staff'), async (c) => {
+nenMembers.get(
+  '/api/nen-members/photos/publications',
+  requirePhotoPermission('photo.submission.view'),
+  async (c) => {
+    const accountId = c.req.query('accountId')?.trim();
+    if (!accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
+    }
+    const staleCutoff = toJstString(new Date(Date.now() - PHOTO_REWARD_STALE_MS));
+    const rows = await c.env.DB.prepare(
+      `SELECT pub.id, pub.photo_id, pub.status, pub.show_owner_name, pub.view_count,
+              pub.version, pub.published_at, ps.public_image_url AS image_url,
+              ps.publication_consent_at, ps.publication_consent_version,
+              ps.awarded_points, ps.reviewed_at, ps.reviewed_by_name,
+              p.name AS pet_name,
+              CASE WHEN pub.show_owner_name = 1 THEN f.display_name ELSE NULL END AS owner_name,
+              (SELECT ${PHOTO_REWARD_STATE_CASE} FROM nen_photo_reward_outbox o
+                WHERE o.photo_id = ps.id AND o.line_account_id = pub.line_account_id) AS point_sync_status
+         FROM nen_photo_publications pub
+         JOIN nen_photo_submissions ps ON ps.id = pub.photo_id AND ps.line_account_id = pub.line_account_id
+         JOIN nen_pet_profiles p ON p.id = ps.pet_id
+         JOIN friends f ON f.id = ps.friend_id AND f.line_account_id = pub.line_account_id
+        WHERE pub.line_account_id = ? AND pub.status = 'published'
+          AND ps.status = 'adopted' AND ps.publication_consent_at IS NOT NULL
+          AND ps.publication_withdrawn_at IS NULL
+        ORDER BY pub.published_at DESC LIMIT 200`,
+    ).bind(staleCutoff, accountId).all<Record<string, unknown>>();
+    /*
+     * 公開中ではない掲載も同じ画面で追う（Issue #1040 IDEA-22）。
+     * ご本人がLIFFで同意を撤回すると写真側の publication_withdrawn_at が
+     * 立つが、掲載先の登録（placements.active=1）は残る。上の一覧の条件から
+     * 外れるだけでは「撤回後に残る公開先」を追えないため、掲載管理の対象を
+     * まとめて返す。公開そのものは変えず、整理操作は既存の withdraw 口。
+     */
+    const inactiveRows = await c.env.DB.prepare(
+      `SELECT pub.id, pub.photo_id, pub.status, pub.show_owner_name, pub.view_count,
+              pub.version, pub.published_at, pub.withdrawn_at, pub.updated_at,
+              sm.name AS withdrawn_by_name,
+              COALESCE(ps.public_image_url, ps.review_image_url) AS image_url,
+              ps.publication_consent_at, ps.publication_consent_version,
+              ps.publication_withdrawn_at, ps.status AS photo_status,
+              ps.awarded_points, ps.reviewed_at, ps.reviewed_by_name,
+              p.name AS pet_name,
+              CASE WHEN pub.show_owner_name = 1 THEN f.display_name ELSE NULL END AS owner_name,
+              (SELECT ${PHOTO_REWARD_STATE_CASE} FROM nen_photo_reward_outbox o
+                WHERE o.photo_id = ps.id AND o.line_account_id = pub.line_account_id) AS point_sync_status
+         FROM nen_photo_publications pub
+         JOIN nen_photo_submissions ps ON ps.id = pub.photo_id AND ps.line_account_id = pub.line_account_id
+         JOIN nen_pet_profiles p ON p.id = ps.pet_id
+         JOIN friends f ON f.id = ps.friend_id AND f.line_account_id = pub.line_account_id
+         LEFT JOIN staff_members sm ON sm.id = pub.withdrawn_by
+        WHERE pub.line_account_id = ?
+          AND NOT (pub.status = 'published' AND ps.status = 'adopted'
+                   AND ps.publication_consent_at IS NOT NULL
+                   AND ps.publication_withdrawn_at IS NULL)
+        ORDER BY pub.updated_at DESC LIMIT 200`,
+    ).bind(staleCutoff, accountId).all<Record<string, unknown>>();
+    /*
+     * 掲載先は1発で取る。写真ごとに1件ずつ取りに行くと、掲載数が増えるほど
+     * 遅くなる（N+1）。公開先ごとの掲載状態を追えるよう、外した先
+     * （active=0）も外した日時つきで返す（Issue #1040 IDEA-22）。
+     */
+    const allPublications = [...rows.results, ...inactiveRows.results];
+    const publicationIds = allPublications.map((row) => String(row.id));
+    const placementRows = publicationIds.length === 0 ? [] : (await c.env.DB.prepare(
+      `SELECT publication_id, id, placement_type, placement_label, view_count,
+              active, created_at, removed_at
+         FROM nen_photo_publication_placements
+        WHERE publication_id IN (${publicationIds.map(() => '?').join(',')})
+          AND line_account_id = ?
+        ORDER BY created_at`,
+    ).bind(...publicationIds, accountId).all<Record<string, unknown>>()).results;
+    const placementsByPublication = new Map<string, Array<Record<string, unknown>>>();
+    for (const placement of placementRows) {
+      const key = String(placement.publication_id);
+      const list = placementsByPublication.get(key) ?? [];
+      // publication_id は振り分け用で返さない。掲載中か外したかは active で見る。
+      list.push({
+        id: placement.id,
+        placement_type: placement.placement_type,
+        placement_label: placement.placement_label,
+        view_count: placement.view_count,
+        active: placement.active,
+        created_at: placement.created_at,
+        removed_at: placement.removed_at,
+      });
+      placementsByPublication.set(key, list);
+    }
+    const withPlacements = (row: Record<string, unknown>) => (
+      { ...row, placements: placementsByPublication.get(String(row.id)) ?? [] }
+    ) as Record<string, unknown> & { placements: Array<Record<string, unknown>> };
+    const items = rows.results.map(withPlacements);
+    const inactive = inactiveRows.results.map(withPlacements);
+    // ご本人が同意を撤回したのに掲載先の整理が残っているものと、
+    // 掲載先から外し終えたものを分ける（Issue #1040 IDEA-22）。
+    const pendingWithdrawals = inactive.filter((row) => String(row.status) !== 'withdrawn');
+    const withdrawnItems = inactive.filter((row) => String(row.status) === 'withdrawn');
+    const measured = items.filter((item) => item.view_count !== null && item.view_count !== undefined);
+    return c.json({ success: true, data: {
+      summary: {
+        publishedCount: items.length,
+        placementCount: new Set(items.flatMap((item) => (
+          item.placements.filter((placement) => Number(placement.active ?? 1) === 1)
+        ).map((placement) => `${placement.placement_type}:${placement.placement_label}`))).size,
+        topPhoto: measured.length
+          ? measured.reduce((top, item) => Number(item.view_count) > Number(top.view_count) ? item : top)
+          : null,
+        consentedCount: items.length,
+        attentionCount: pendingWithdrawals.length,
+        withdrawnCount: withdrawnItems.length,
+      },
+      items,
+      pendingWithdrawals,
+      withdrawnItems,
+    } });
+  },
+);
+
+// 公開の撤回・掲載先の変更は、審査とは別の上位権限だけでできるようにする（#931 N-311）。
+// 「審査できる人なら公開範囲も変えられる」状態を止め、掲載管理の権限を明示的に分ける。
+nenMembers.put('/api/nen-members/photos/publications/:id/withdraw', requireRole('owner', 'admin', 'staff'), requirePhotoPermission('photo.publication.manage'), async (c) => {
+  const body = await c.req.json<{ accountId?: string; expectedVersion?: number }>().catch(() => null);
+  const accountId = body?.accountId?.trim();
+  const idempotencyKey = c.req.header('Idempotency-Key')?.trim().slice(0, 120);
+  if (!accountId || !Number.isInteger(body?.expectedVersion) || !idempotencyKey) {
+    return c.json({ success: false, error: 'accountId、expectedVersion、Idempotency-Key は必須です' }, 400);
+  }
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+    return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
+  }
+  const publication = await c.env.DB.prepare(
+    `SELECT id, photo_id, status, version, last_idempotency_key
+       FROM nen_photo_publications WHERE id = ? AND line_account_id = ?`,
+  ).bind(c.req.param('id'), accountId).first<{
+    id: string; photo_id: string; status: string; version: number; last_idempotency_key: string | null;
+  }>();
+  if (!publication) return c.json({ success: false, error: 'Not found' }, 404);
+  if (publication.last_idempotency_key === idempotencyKey) {
+    return c.json({ success: true, data: { status: publication.status, version: publication.version } });
+  }
+  if (publication.status !== 'published' || publication.version !== body!.expectedVersion) {
+    return c.json({ success: false, error: '別の人が先に掲載状態を変更しました' }, 409);
+  }
+  const now = jstNow();
+  const reviewer = c.get('staff');
+  const results = await c.env.DB.batch([
+    c.env.DB.prepare(
+      `UPDATE nen_photo_publications
+          SET status = 'withdrawn', withdrawn_at = ?, withdrawn_by = ?, version = version + 1,
+              last_idempotency_key = ?, updated_at = ?
+        WHERE id = ? AND line_account_id = ? AND status = 'published' AND version = ?`,
+    ).bind(now, reviewer.id, idempotencyKey, now, publication.id, accountId, body!.expectedVersion),
+    c.env.DB.prepare(
+      `UPDATE nen_photo_publication_placements SET active = 0, removed_at = ?
+        WHERE publication_id = ? AND line_account_id = ? AND active = 1`,
+    ).bind(now, publication.id, accountId),
+    c.env.DB.prepare(
+      `UPDATE nen_photo_submissions SET publication_withdrawn_at = ?, updated_at = ?
+        WHERE id = ? AND line_account_id = ?`,
+    ).bind(now, now, publication.photo_id, accountId),
+  ]);
+  if (!results[0]?.meta.changes) {
+    return c.json({ success: false, error: '別の人が先に掲載状態を変更しました' }, 409);
+  }
+  return c.json({ success: true, data: { status: 'withdrawn', version: publication.version + 1 } });
+});
+
+nenMembers.put('/api/nen-members/photos/publications/:id/placements', requireRole('owner', 'admin', 'staff'), requirePhotoPermission('photo.publication.manage'), async (c) => {
+  const body = await c.req.json<{
+    accountId?: string;
+    expectedVersion?: number;
+    placements?: Array<{ type?: string; label?: string }>;
+  }>().catch(() => null);
+  const accountId = body?.accountId?.trim();
+  const idempotencyKey = c.req.header('Idempotency-Key')?.trim().slice(0, 120);
+  const allowed = new Set(['rich_menu', 'column', 'form', 'site']);
+  const placements = (body?.placements ?? []).map((placement) => ({
+    type: String(placement.type || ''), label: String(placement.label || '').trim().slice(0, 120),
+  }));
+  if (!accountId || !Number.isInteger(body?.expectedVersion) || !idempotencyKey
+      || placements.length > 20 || placements.some((placement) => !allowed.has(placement.type) || !placement.label)) {
+    return c.json({ success: false, error: '掲載先、accountId、expectedVersion、Idempotency-Key を確認してください' }, 400);
+  }
+  if (new Set(placements.map((placement) => `${placement.type}:${placement.label}`)).size !== placements.length) {
+    return c.json({ success: false, error: '同じ掲載先が重複しています' }, 400);
+  }
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+    return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
+  }
+  const publication = await c.env.DB.prepare(
+    `SELECT id, status, version, last_idempotency_key
+       FROM nen_photo_publications WHERE id = ? AND line_account_id = ?`,
+  ).bind(c.req.param('id'), accountId).first<{
+    id: string; status: string; version: number; last_idempotency_key: string | null;
+  }>();
+  if (!publication) return c.json({ success: false, error: 'Not found' }, 404);
+  if (publication.last_idempotency_key === idempotencyKey) {
+    return c.json({ success: true, data: { version: publication.version, placementCount: placements.length } });
+  }
+  if (publication.status !== 'published' || publication.version !== body!.expectedVersion) {
+    return c.json({ success: false, error: '別の人が先に掲載先を変更しました' }, 409);
+  }
+  const now = jstNow();
+  const results = await c.env.DB.batch([
+    c.env.DB.prepare(
+      `UPDATE nen_photo_publications SET version = version + 1, last_idempotency_key = ?, updated_at = ?
+        WHERE id = ? AND line_account_id = ? AND status = 'published' AND version = ?`,
+    ).bind(idempotencyKey, now, publication.id, accountId, body!.expectedVersion),
+    c.env.DB.prepare(
+      `UPDATE nen_photo_publication_placements SET active = 0, removed_at = ?
+        WHERE publication_id = ? AND line_account_id = ? AND active = 1`,
+    ).bind(now, publication.id, accountId),
+    ...placements.map((placement) => c.env.DB.prepare(
+      `INSERT INTO nen_photo_publication_placements
+        (id, publication_id, line_account_id, placement_type, placement_label, active, created_at, removed_at)
+       VALUES (?, ?, ?, ?, ?, 1, ?, NULL)
+       ON CONFLICT(publication_id, placement_type, placement_label)
+       DO UPDATE SET active = 1, removed_at = NULL`,
+    ).bind(crypto.randomUUID(), publication.id, accountId, placement.type, placement.label, now)),
+  ]);
+  if (!results[0]?.meta.changes) {
+    return c.json({ success: false, error: '別の人が先に掲載先を変更しました' }, 409);
+  }
+  return c.json({ success: true, data: { version: publication.version + 1, placementCount: placements.length } });
+});
+
+nenMembers.get('/api/nen-members/photos/:id', requirePhotoPermission('photo.submission.view'), async (c) => {
+  const accountId = c.req.query('accountId')?.trim();
+  if (!accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+    return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
+  }
+  const photo = await c.env.DB.prepare(
+    `SELECT ps.id, ps.review_image_url AS image_url, ps.caption, ps.status,
+            ps.image_width, ps.image_height, ps.image_byte_size, ps.captured_device,
+            ps.content_hash, ps.review_version, ps.created_at, ps.publication_consent_at,
+            ps.publication_consent_version, ps.publication_withdrawn_at,
+            ps.display_rotation, ps.awarded_points, ps.reviewed_at, ps.reviewed_by_name,
+            f.photo_watch_required AS submitter_watch,
+            p.name AS pet_name, p.gender AS pet_gender, p.animal_type, p.breed,
+            p.birthday, f.display_name AS owner_name,
+            (SELECT COUNT(*) FROM nen_photo_submissions prior
+              WHERE prior.friend_id = ps.friend_id AND prior.created_at <= ps.created_at) AS submission_count,
+            (SELECT COUNT(*) FROM nen_photo_submissions returned
+              WHERE returned.friend_id = ps.friend_id AND returned.status = 'rejected') AS returned_count
+       FROM nen_photo_submissions ps
+       JOIN nen_pet_profiles p ON p.id = ps.pet_id
+       JOIN friends f ON f.id = ps.friend_id
+      WHERE ps.id = ? AND ps.line_account_id = ? AND f.line_account_id = ?`,
+  ).bind(c.req.param('id'), accountId, accountId).first<Record<string, unknown>>();
+  if (!photo) return c.json({ success: false, error: 'Not found' }, 404);
+  /*
+   * 採用履歴・報酬・公開先を一緒に返す（Issue #1040 IDEA-22）。
+   * 「通した1回につきポイントの手続きが1回」か、撤回後にどの掲載先が
+   * 残っているかを、詳細を開いたときにその場で確認できるようにする。
+   */
+  const [risks, history, reward, publication] = await Promise.all([
+    c.env.DB.prepare(
+      `SELECT flag, confidence, note, provider, model_version, assessed_at
+         FROM nen_photo_risk_assessments
+        WHERE photo_id = ? AND line_account_id = ? ORDER BY created_at DESC`,
+    ).bind(c.req.param('id'), accountId).all<Record<string, unknown>>(),
+    c.env.DB.prepare(
+      `SELECT to_status, reason_code, reason_note, awarded_points,
+              reviewed_by_name, notification_status, created_at
+         FROM nen_photo_review_events
+        WHERE photo_id = ? AND line_account_id = ?
+        ORDER BY created_at DESC LIMIT 20`,
+    ).bind(c.req.param('id'), accountId).all<Record<string, unknown>>(),
+    c.env.DB.prepare(
+      `SELECT status, points, attempt_count, last_error, next_attempt_at, synced_at, updated_at
+         FROM nen_photo_reward_outbox
+        WHERE photo_id = ? AND line_account_id = ?`,
+    ).bind(c.req.param('id'), accountId).first<Record<string, unknown>>(),
+    c.env.DB.prepare(
+      `SELECT pub.id, pub.status, pub.view_count, pub.published_at, pub.withdrawn_at,
+              sm.name AS withdrawn_by_name
+         FROM nen_photo_publications pub
+         LEFT JOIN staff_members sm ON sm.id = pub.withdrawn_by
+        WHERE pub.photo_id = ? AND pub.line_account_id = ?`,
+    ).bind(c.req.param('id'), accountId).first<Record<string, unknown>>(),
+  ]);
+  const publicationPlacements = publication ? (await c.env.DB.prepare(
+    `SELECT id, placement_type, placement_label, view_count, active, created_at, removed_at
+       FROM nen_photo_publication_placements
+      WHERE publication_id = ? AND line_account_id = ?
+      ORDER BY created_at`,
+  ).bind(publication.id, accountId).all<Record<string, unknown>>()).results : [];
+  /*
+   * 報酬は生のstatusではなく運用向けの派生状態（state）で返す
+   * （PHOTO-06）。「手続き中」のまま24時間以上止まったものは stale、
+   * 再試行しても直らない失敗は failed_permanent として、
+   * 一覧（point_sync_status の CASE）と同じ顔ぶれで出す。
+   */
+  const rewardView = reward
+    ? {
+      ...reward,
+      state: photoRewardDisplayState({
+        status: reward.status as 'pending' | 'processing' | 'synced' | 'failed',
+        last_error: reward.last_error as string | null,
+        updated_at: String(reward.updated_at),
+      }, new Date()),
+      reason_label: PHOTO_REWARD_REASON_LABELS[String(reward.last_error ?? '')] ?? null,
+    }
+    : null;
+  /*
+   * 重複の判定 (#817)。完全に同じ中身の写真で、すでに採用されて
+   * 報酬が付いたものがあれば、前の投稿と並べて見せる。
+   * 似ている写真は自動で却下せず、注意の札だけに留める。
+   */
+  const [duplicate, rewardPolicy] = await Promise.all([
+    findRewardedAdoptedDuplicate(c.env.DB, {
+      contentHash: typeof photo.content_hash === 'string' ? photo.content_hash : null,
+      lineAccountId: accountId,
+      excludePhotoId: String(photo.id),
+    }),
+    getEffectivePhotoRewardPolicy(c.env.DB),
+  ]);
+  return c.json({
+    success: true,
+    data: {
+      ...photo,
+      pet_call_name: petCallName(String(photo.pet_name ?? ''), photo.pet_gender),
+      risks: risks.results,
+      history: history.results,
+      reward: rewardView,
+      publication: publication ? { ...publication, placements: publicationPlacements } : null,
+      duplicate,
+      rewardPolicy,
+    },
+  });
+});
+
+nenMembers.put('/api/nen-members/photos/:id/review', requireRole('owner', 'admin', 'staff'), requirePhotoPermission('photo.submission.review'), async (c) => {
   const body = await c.req.json<{
     accountId?: string;
     status?: string;
     reasonCode?: string;
     reasonNote?: string;
+    expectedVersion?: number;
+    resubmitInvite?: boolean;
+    watchSubmitter?: boolean;
+    // 重複のときの「報酬なしで採用」(#817)。点数を付けずに採用だけ残す。
+    withoutReward?: boolean;
   }>().catch(() => null);
   const accountId = body?.accountId?.trim();
-  if (!accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
+  // 再実行キー。連打・応答ロストのやり直しが「別の担当者が更新しました」に
+  // 化けないよう、一括審査や派生画像処理と同じく必須にする（#931 N-313）。
+  const key = c.req.header('Idempotency-Key')?.trim() ?? '';
+  if (!accountId || key.length < 8 || key.length > 200) {
+    return c.json({ success: false, error: '対象アカウントと再実行キーを確認してください' }, 400);
+  }
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
     return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
   }
   const status = String(body?.status || '');
   if (!['adopted', 'rejected'].includes(status)) return c.json({ success: false, error: 'Invalid review' }, 400);
+  if (!Number.isInteger(body?.expectedVersion)) return c.json({ success: false, error: 'expectedVersion is required' }, 400);
   const reasonCode = status === 'rejected' ? String(body?.reasonCode || '') : '';
   const reasonNote = String(body?.reasonNote || '').trim().slice(0, 500);
   if (status === 'rejected' && !Object.prototype.hasOwnProperty.call(PHOTO_REVIEW_REASON_LABELS, reasonCode)) {
@@ -692,40 +1823,112 @@ nenMembers.put('/api/nen-members/photos/:id/review', requireRole('owner', 'admin
   if (status === 'rejected' && reasonCode === 'other' && !reasonNote) {
     return c.json({ success: false, error: 'そのほかの理由を入力してください' }, 400);
   }
-  const photo = await c.env.DB.prepare(
-    `SELECT ps.*, s.customer_id, f.line_user_id, f.line_account_id, f.is_following,
-            a.channel_access_token, a.channel_access_token_encrypted
-       FROM nen_photo_submissions ps
-       JOIN friends f ON f.id = ps.friend_id
-       JOIN line_accounts a ON a.id = f.line_account_id
-       LEFT JOIN nen_ec_member_snapshots s ON s.friend_id = ps.friend_id
-      WHERE ps.id = ? AND ps.line_account_id = ? AND f.line_account_id = ?`,
-  ).bind(c.req.param('id'), accountId, accountId).first<ReviewPhotoRow>();
+  // 「もう一度送ってもらえるようお願いする」（#931 N-312）。採用には関係しない。
+  const resubmitInvite = status !== 'rejected' || body?.resubmitInvite !== false;
+  const watchSubmitter = status === 'rejected' && body?.watchSubmitter === true;
+  const photo = await loadPhotoReviewRecipient(
+    c.env.DB, { photoId: c.req.param('id'), lineAccountId: accountId },
+  );
   if (!photo) return c.json({ success: false, error: 'Not found' }, 404);
-  if (photo.status !== 'pending') return c.json({ success: false, error: 'Already reviewed' }, 409);
-  let awarded = 0;
-  let pointBalance: number | null = null;
-  if (status === 'adopted') {
-    if (!c.env.NEN_EC_BASE_URL || !c.env.ECCUBE_WEBHOOK_SECRET || !photo.customer_id) {
-      return c.json({ success: false, error: 'ECポイント連携が設定されていません' }, 503);
+  /*
+   * 同じ再実行キーの判断は、保存済みの結果をそのまま返す。
+   * キーだけ合って中身が違うときは、別の操作の取り違えなので衝突として止める。
+   */
+  const previous = await c.env.DB.prepare(
+    `SELECT to_status, reason_code, reason_note, awarded_points, notification_status
+       FROM nen_photo_review_events
+      WHERE photo_id = ? AND line_account_id = ? AND idempotency_key = ?`,
+  ).bind(c.req.param('id'), accountId, key).first<{
+    to_status: string; reason_code: string | null; reason_note: string | null;
+    awarded_points: number; notification_status: string;
+  }>();
+  if (previous) {
+    const same = previous.to_status === status
+      && (previous.reason_code ?? null) === (status === 'rejected' ? reasonCode : null)
+      && (previous.reason_note ?? null) === (status === 'rejected' ? (reasonNote || null) : null);
+    if (!same) {
+      return c.json({ success: false, error: '同じ再実行キーが別の入力に使われています', code: 'IDEMPOTENCY_CONFLICT' }, 409);
     }
-    const payload = JSON.stringify({
-      customerId: String(photo.customer_id),
-      awardKey: `nen-photo:${String(photo.id)}`,
-      points: PHOTO_ADOPTION_POINTS,
+    return c.json({
+      success: true,
+      duplicate: true,
+      data: {
+        awardedPoints: Number(previous.awarded_points),
+        pointBalance: null,
+        pointSync: Number(previous.awarded_points) > 0
+          ? (photo.customer_id ? 'pending' : 'needs_attention')
+          : 'not_required',
+        notificationStatus: previous.notification_status === 'sent' ? 'sent' : 'failed',
+      },
     });
-    const timestamp = String(Math.floor(Date.now() / 1000));
-    const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(c.env.ECCUBE_WEBHOOK_SECRET), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
-    const signature = Array.from(new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`${timestamp}.${payload}`))))
-      .map((byte) => byte.toString(16).padStart(2, '0')).join('');
-    const response = await fetch(`${c.env.NEN_EC_BASE_URL.replace(/\/$/, '')}/line-harness/photo-points`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Nen-Timestamp': timestamp, 'X-Nen-Signature': `sha256=${signature}` }, body: payload,
-    });
-    const result = await response.json().catch(() => ({})) as { success?: boolean; pointBalance?: number; error?: string };
-    if (!response.ok || !result.success) return c.json({ success: false, error: result.error || 'ECポイントを付与できませんでした' }, 502);
-    awarded = PHOTO_ADOPTION_POINTS;
-    pointBalance = Number(result.pointBalance || 0);
   }
+  if (photo.status !== 'pending' || Number(photo.review_version) !== body!.expectedVersion) {
+    return c.json({ success: false, error: 'Already reviewed' }, 409);
+  }
+  if (status === 'adopted') {
+    // 検査が終わるまで採用しない。失敗時は審査へ流さない（v6-22 §4）。
+    const targetPhotoId = c.req.param('id');
+    let photoScan = await getFileScanBySubject(c.env.DB, 'photo', targetPhotoId);
+    if (!photoScan) {
+      const row = await c.env.DB.prepare(
+        `SELECT r2_key, content_type, image_width, image_height, image_byte_size, line_account_id
+           FROM nen_photo_submissions WHERE id = ?`,
+      ).bind(targetPhotoId).first<{
+        r2_key: string; content_type: string; image_width: number | null;
+        image_height: number | null; image_byte_size: number | null; line_account_id: string;
+      }>();
+      // 大きさが分からない古い行では検査の記録を作れない。作らず門番に
+      // 409 で止めてもらい、500 にしない。
+      if (row && Number.isSafeInteger(row.image_byte_size) && (row.image_byte_size as number) >= 0) {
+        try {
+          const created = await ensureFileScanForUpload({
+            db: c.env.DB,
+            lineAccountId: row.line_account_id,
+            subjectKind: 'photo',
+            subjectId: targetPhotoId,
+            mediaId: null,
+            filename: `photo.${targetPhotoId}`,
+            mimeType: row.content_type,
+            sizeBytes: row.image_byte_size as number,
+          });
+          photoScan = await runScanForStoredObject(c.env.DB, c.env.IMAGES, created, row.r2_key, {
+            width: row.image_width, height: row.image_height,
+          }).catch(() => created);
+        } catch {
+          photoScan = null;
+        }
+      }
+    }
+    if (!photoScan || photoScan.status !== 'clean') {
+      const message = !photoScan || photoScan.status === 'pending'
+        ? '確かめています。確かめ終わるまで採用できません'
+        : '確認のため採用できません。管理者が確かめるまで、どこにも出ません';
+      return c.json({ success: false, code: 'file_scan_blocked', error: message }, 409);
+    }
+  }
+  /*
+   * 採用する時点の報酬の決まりを写す (#817)。版を変えても過去の付与は
+   * 変わらない。同じ写真が2回採用されても報酬は1回だけ——報酬つきで
+   * 採用済みの重複があるときは、選んだ操作に関わらず点数を付けない。
+   */
+  const policy = status === 'adopted' ? await getEffectivePhotoRewardPolicy(c.env.DB) : null;
+  const rewardedDuplicate = status === 'adopted'
+    ? await findRewardedAdoptedDuplicate(c.env.DB, {
+      contentHash: typeof photo.content_hash === 'string' ? photo.content_hash as string : null,
+      lineAccountId: accountId,
+      excludePhotoId: c.req.param('id'),
+    })
+    : null;
+  const withoutReward = status === 'adopted' && body?.withoutReward === true;
+  const awarded = status === 'adopted' && policy && !withoutReward && !rewardedDuplicate
+    ? policy.points
+    : 0;
+  const rewardSkipped: 'duplicate' | 'requested' | null = status !== 'adopted'
+    ? null
+    : rewardedDuplicate ? 'duplicate' : withoutReward ? 'requested' : null;
+  const pointSync: 'pending' | 'needs_attention' | 'not_required' = awarded <= 0
+    ? 'not_required'
+    : photo.customer_id ? 'pending' : 'needs_attention';
   const now = jstNow();
   const decisionId = crypto.randomUUID();
   try {
@@ -734,24 +1937,44 @@ nenMembers.put('/api/nen-members/photos/:id/review', requireRole('owner', 'admin
       c.env.DB.prepare(
         `INSERT INTO nen_photo_review_events
           (id, photo_id, line_account_id, from_status, to_status, reason_code, reason_note,
-           awarded_points, reviewed_by, reviewed_by_name, notification_status, created_at, updated_at)
-         SELECT ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, 'pending', ?, ?
+           awarded_points, reviewed_by, reviewed_by_name, notification_status,
+           idempotency_key, resubmit_invite, created_at, updated_at)
+         SELECT ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?
            FROM nen_photo_submissions
-          WHERE id = ? AND line_account_id = ? AND status = 'pending'`,
+          WHERE id = ? AND line_account_id = ? AND status = 'pending' AND review_version = ?`,
       ).bind(
         decisionId, c.req.param('id'), accountId, status, reasonCode || null, reasonNote || null,
-        awarded, reviewer.id, reviewer.name, now, now, c.req.param('id'), accountId,
+        awarded, reviewer.id, reviewer.name, key, resubmitInvite ? 1 : 0, now, now,
+        c.req.param('id'), accountId, body!.expectedVersion,
       ),
       c.env.DB.prepare(
         `UPDATE nen_photo_submissions
             SET status = ?, awarded_points = ?, review_reason_code = ?, review_reason_note = ?,
                 reviewed_by = ?, reviewed_by_name = ?, review_notification_status = 'pending',
-                reviewed_at = ?, updated_at = ?
-          WHERE id = ? AND line_account_id = ? AND status = 'pending'`,
+                reviewed_at = ?,
+                public_image_url = CASE WHEN ? = 'adopted'
+                  THEN COALESCE(public_image_url, review_image_url) ELSE public_image_url END,
+                review_version = review_version + 1, updated_at = ?
+          WHERE id = ? AND line_account_id = ? AND status = 'pending' AND review_version = ?`,
       ).bind(
         status, awarded, reasonCode || null, reasonNote || null, reviewer.id, reviewer.name,
-        now, now, c.req.param('id'), accountId,
+        now, status, now, c.req.param('id'), accountId, body!.expectedVersion,
       ),
+      ...(status === 'adopted' && awarded > 0 && photo.customer_id && policy ? [c.env.DB.prepare(
+        `INSERT INTO nen_photo_reward_outbox
+          (id, photo_id, line_account_id, friend_id, customer_id, provider_award_key,
+           policy_version, points, status, next_attempt_at, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)`,
+      ).bind(
+        crypto.randomUUID(), photo.id, accountId, photo.friend_id, photo.customer_id,
+        `nen-photo:${String(photo.id)}`, policy.policyKey, awarded, now, now, now,
+      )] : []),
+      // 「この人の次の投稿は、必ず人が見る」（#931 N-312）。確認対象の印を
+      // 友だちへ残し、次に届く写真の一覧へ出す。
+      ...(watchSubmitter ? [c.env.DB.prepare(
+        `UPDATE friends SET photo_watch_required = 1, updated_at = ?
+          WHERE id = ? AND line_account_id = ?`,
+      ).bind(now, photo.friend_id, accountId)] : []),
     ]);
     if (!results[0]?.meta.changes || !results[1]?.meta.changes) {
       return c.json({ success: false, error: 'Already reviewed' }, 409);
@@ -762,114 +1985,296 @@ nenMembers.put('/api/nen-members/photos/:id/review', requireRole('owner', 'admin
     }
     return c.json({ success: false, error: '同じ写真がほかの担当者により更新されました' }, 409);
   }
-  if (pointBalance !== null) {
-    await c.env.DB.prepare(`UPDATE nen_ec_member_snapshots SET point_balance=?, synced_at=? WHERE friend_id=?`)
-      .bind(pointBalance, now, photo.friend_id).run();
-    await c.env.DB.prepare(`INSERT OR IGNORE INTO nen_point_ledger (id, friend_id, amount, balance_after, reason, external_ref, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`)
-      .bind(crypto.randomUUID(), photo.friend_id, awarded, pointBalance, '写真採用', `nen-photo:${String(photo.id)}`, now).run();
-  }
   await syncNenPhotoTags(c.env.DB, String(photo.friend_id));
-  let notificationStatus: 'sent' | 'failed' = 'sent';
-  let notificationError: string | null = null;
-  try {
-    await sendPhotoReviewNotification(
-      c,
-      photo,
-      status as 'adopted' | 'rejected',
-      reasonCode ? reasonCode as PhotoReviewReasonCode : null,
-      reasonNote || null,
-      decisionId,
-    );
-  } catch (error) {
-    notificationStatus = 'failed';
-    notificationError = error instanceof Error ? error.message : '審査結果をLINEで通知できませんでした';
+  /*
+   * outbox を積んだら、その場でECへの付与を一度試す（PHOTO-06）。
+   * ここで届けば「手続き中」のまま残らない。失敗しても採用そのものは
+   * 完了させ、行は pending/failed のまま残り、日次回収・手動の
+   * 再試行・照合のどれかで後から進められる。
+   */
+  let finalPointSync: 'pending' | 'needs_attention' | 'not_required' | 'synced' = pointSync;
+  const ecClient = status === 'adopted' && photo.customer_id ? ecPhotoPointClient(c) : undefined;
+  if (ecClient) {
+    try {
+      const attempt = await attemptPhotoRewardForPhoto(
+        c.env.DB,
+        { photoId: String(photo.id), lineAccountId: accountId },
+        ecClient,
+        { now: new Date() },
+      );
+      if (attempt.kind === 'already_synced'
+        || (attempt.kind === 'delivered' && attempt.outcome.kind === 'synced')) {
+        finalPointSync = 'synced';
+      }
+    } catch (error) {
+      console.error('photo reward initial delivery failed', error);
+    }
   }
-  const notificationUpdatedAt = jstNow();
-  await c.env.DB.batch([
-    c.env.DB.prepare(
-      `UPDATE nen_photo_submissions SET review_notification_status = ?, updated_at = ? WHERE id = ?`,
-    ).bind(notificationStatus, notificationUpdatedAt, photo.id),
-    c.env.DB.prepare(
-      `UPDATE nen_photo_review_events
-          SET notification_status = ?, notification_error = ?, notification_attempt_count = 1,
-              notification_first_failed_at = ?, notification_sent_at = ?, updated_at = ?
-        WHERE id = ?`,
-    ).bind(
-      notificationStatus,
-      notificationError,
-      notificationStatus === 'failed' ? notificationUpdatedAt : null,
-      notificationStatus === 'sent' ? notificationUpdatedAt : null,
-      notificationUpdatedAt,
-      decisionId,
-    ),
-  ]);
+  const delivery = await deliverPhotoReviewNotification(c.env.DB, c, photo, {
+    lineAccountId: accountId,
+    photoId: photo.id,
+    status: status as 'adopted' | 'rejected',
+    reasonCode: reasonCode ? reasonCode as PhotoReviewReasonCode : null,
+    reasonNote: reasonNote || null,
+    decisionId,
+    resubmitInvite,
+  });
   return c.json({
     success: true,
     data: {
       awardedPoints: awarded,
-      pointBalance,
-      pointSync: status === 'adopted' ? 'synced' : 'not_required',
-      notificationStatus,
+      pointBalance: null,
+      pointSync: finalPointSync,
+      notificationStatus: delivery.notificationStatus,
+      rewardSkipped,
     },
   });
 });
 
-nenMembers.post('/api/nen-members/photos/:id/notification/retry', requireRole('owner', 'admin', 'staff'), async (c) => {
+/*
+ * 止まったポイント手続きを人が動かす口（PHOTO-06）。
+ *
+ * - point-retry …「手続き中」「確認が必要」の行を今すぐ届け直す。
+ * - point-reconcile … EC側に届いているかを awardKey で照合し、
+ *   EC成功・管理DB失敗の食い違いを synced へ収束させる。
+ *
+ * どちらも中身は同じ冪等な付与呼び出し（EC側が awardKey で二重付与を
+ * 防ぐ）で、入口を分けているのは「もう一度送る」と「届いたか確認する」
+ * という運用者の意図を監査ログへ残すため。
+ */
+async function handlePhotoRewardAction(c: Context<Env>, action: 'retry' | 'reconcile') {
   const body = await c.req.json<{ accountId?: string }>().catch(() => null);
   const accountId = body?.accountId?.trim();
-  if (!accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
+  if (!accountId) return c.json({ success: false, error: '対象アカウントを指定してください' }, 400);
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
     return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
   }
+  const photo = await c.env.DB.prepare(
+    `SELECT ps.id, ps.status, s.customer_id
+       FROM nen_photo_submissions ps
+       LEFT JOIN nen_ec_member_snapshots s ON s.friend_id = ps.friend_id
+      WHERE ps.id = ? AND ps.line_account_id = ?`,
+  ).bind(c.req.param('id'), accountId).first<{ id: string; status: string; customer_id: string | null }>();
+  if (!photo) return c.json({ success: false, error: '写真が見つかりません' }, 404);
+  if (photo.status !== 'adopted') {
+    return c.json({ success: false, error: '採用した写真だけがポイント付与の対象です' }, 400);
+  }
+  if (!photo.customer_id) {
+    return c.json({ success: false, error: 'EC会員とつながっていないためポイントを付けられません' }, 400);
+  }
+  const client = ecPhotoPointClient(c);
+  if (!client) {
+    return c.json({ success: false, error: 'ECへの接続が設定されていません' }, 503);
+  }
+  try {
+    const attempt = await attemptPhotoRewardForPhoto(
+      c.env.DB,
+      { photoId: photo.id, lineAccountId: accountId },
+      client,
+      { now: new Date() },
+    );
+    if (attempt.kind === 'no_reward') {
+      /*
+       * outbox 行が無い古い採用には勝手に手続きを作らない。
+       * 旧経路で付与済みかもしれず、ここで作ると二重付与になりうる
+       * （受入条件: 既存の5ptデータを再付与しない）。
+       */
+      return c.json({ success: false, error: '対象のポイント手続きが見つかりません' }, 404);
+    }
+    if (attempt.kind === 'busy') {
+      return c.json({ success: false, error: 'いま別の手続きが進行中です。少し待ってからやり直してください' }, 409);
+    }
+    const synced = attempt.kind === 'already_synced'
+      || (attempt.kind === 'delivered' && attempt.outcome.kind === 'synced');
+    const duplicate = attempt.kind === 'delivered'
+      && attempt.outcome.kind === 'synced'
+      && attempt.outcome.duplicate;
+    const reason = attempt.kind === 'delivered' && attempt.outcome.kind !== 'synced'
+      ? attempt.outcome.reason : null;
+    return c.json({
+      success: true,
+      data: {
+        action,
+        state: attempt.kind === 'delivered' ? attempt.state : 'synced',
+        synced,
+        duplicate,
+        reason,
+        reasonLabel: reason ? (PHOTO_REWARD_REASON_LABELS[reason] ?? reason) : null,
+      },
+    });
+  } catch (error) {
+    console.error(`photo reward ${action} failed`, error);
+    return c.json({ success: false, error: 'ポイントの手続きに失敗しました' }, 500);
+  }
+}
+
+nenMembers.post(
+  '/api/nen-members/photos/:id/point-retry',
+  requireRole('owner', 'admin', 'staff'),
+  requirePhotoPermission('photo.reward.reconcile'),
+  (c) => handlePhotoRewardAction(c, 'retry'),
+);
+nenMembers.post(
+  '/api/nen-members/photos/:id/point-reconcile',
+  requireRole('owner', 'admin', 'staff'),
+  requirePhotoPermission('photo.reward.reconcile'),
+  (c) => handlePhotoRewardAction(c, 'reconcile'),
+);
+
+/*
+ * 詳細画面で直した写真の向きを版つきで保存する（#931 N-309）。
+ * 「回す」が見た目だけだと、向きを直して通したつもりが元の向きで残る。
+ * 版（expectedVersion）を要求するのは、審査と同じく並行する直しと
+ * 通しの順序ずれを「別の担当者が更新しました」として気づけるようにするため。
+ */
+nenMembers.put('/api/nen-members/photos/:id/rotation', requireRole('owner', 'admin', 'staff'), requirePhotoPermission('photo.submission.review'), async (c) => {
+  const body = await c.req.json<{
+    accountId?: string;
+    rotation?: number;
+    expectedVersion?: number;
+  }>().catch(() => null);
+  const accountId = body?.accountId?.trim();
+  const key = c.req.header('Idempotency-Key')?.trim() ?? '';
+  if (!accountId || key.length < 8 || key.length > 200) {
+    return c.json({ success: false, error: '対象アカウントと再実行キーを確認してください' }, 400);
+  }
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+    return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
+  }
+  const rotation = Number(body?.rotation);
+  if (![0, 90, 180, 270].includes(rotation)) {
+    return c.json({ success: false, error: '向きは0・90・180・270のいずれかです' }, 400);
+  }
+  if (!Number.isInteger(body?.expectedVersion)) {
+    return c.json({ success: false, error: 'expectedVersion is required' }, 400);
+  }
+  const photo = await c.env.DB.prepare(
+    `SELECT id, status, review_version, display_rotation, rotation_idempotency_key
+       FROM nen_photo_submissions WHERE id = ? AND line_account_id = ?`,
+  ).bind(c.req.param('id'), accountId).first<{
+    id: string; status: string; review_version: number;
+    display_rotation: number; rotation_idempotency_key: string | null;
+  }>();
+  if (!photo) return c.json({ success: false, error: 'Not found' }, 404);
+  // 同じ再実行キーは保存済みの結果を返す。キーだけ合って向きが違うのは取り違え。
+  if (photo.rotation_idempotency_key === key) {
+    if (photo.display_rotation !== rotation) {
+      return c.json({ success: false, error: '同じ再実行キーが別の入力に使われています', code: 'IDEMPOTENCY_CONFLICT' }, 409);
+    }
+    return c.json({
+      success: true, duplicate: true,
+      data: { rotation: photo.display_rotation, reviewVersion: Number(photo.review_version) },
+    });
+  }
+  if (Number(photo.review_version) !== body!.expectedVersion) {
+    return c.json({ success: false, error: '同じ写真がほかの担当者により更新されました', code: 'VERSION_CONFLICT' }, 409);
+  }
+  // 向きの保存も版を進める。直しているあいだに通された版を
+  // 上書きすると、通した版と審査した見た目がずれるため。
+  const updated = await c.env.DB.prepare(
+    `UPDATE nen_photo_submissions
+        SET display_rotation = ?, rotation_idempotency_key = ?,
+            review_version = review_version + 1, updated_at = ?
+      WHERE id = ? AND line_account_id = ? AND review_version = ?`,
+  ).bind(rotation, key, jstNow(), c.req.param('id'), accountId, body!.expectedVersion).run();
+  if (!updated.meta.changes) {
+    return c.json({ success: false, error: '同じ写真がほかの担当者により更新されました', code: 'VERSION_CONFLICT' }, 409);
+  }
+  return c.json({
+    success: true,
+    data: { rotation, reviewVersion: body!.expectedVersion + 1 },
+  });
+});
+
+nenMembers.post('/api/nen-members/photos/:id/notification/retry', requireRole('owner', 'admin', 'staff'), requirePhotoPermission('photo.submission.review'), async (c) => {
+  const body = await c.req.json<{ accountId?: string }>().catch(() => null);
+  const accountId = body?.accountId?.trim();
+  // 再実行キー（#931 N-313）。送達が確定した再送を、同じキーのやり直しが
+  // もう一度送らないよう、使ったキーを写真へ記録する。
+  const key = c.req.header('Idempotency-Key')?.trim() ?? '';
+  if (!accountId || key.length < 8 || key.length > 200) {
+    return c.json({ success: false, error: '対象アカウントと再実行キーを確認してください' }, 400);
+  }
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+    return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
+  }
+  const photoMeta = await c.env.DB.prepare(
+    `SELECT id, review_notification_status, notification_retry_key
+       FROM nen_photo_submissions WHERE id = ? AND line_account_id = ?`,
+  ).bind(c.req.param('id'), accountId).first<{
+    id: string; review_notification_status: string | null; notification_retry_key: string | null;
+  }>();
+  if (!photoMeta) return c.json({ success: false, error: 'Not found' }, 404);
+  if (photoMeta.notification_retry_key === key) {
+    // 同じ再実行キーは送らず、記録済みの結果だけを返す。
+    return c.json({
+      success: true,
+      duplicate: true,
+      data: {
+        notificationStatus: photoMeta.review_notification_status === 'sent' ? 'sent' : 'failed',
+        resent: false,
+      },
+    });
+  }
+  const now = new Date().toISOString();
+  // 拾い上げる状態は claimPhotoNotificationDelivery の送信権条件と揃える。
+  // pending（一括の通知準備で落ちた対象など、まだ一度も送れていないもの）を
+  // 外すと、画面に失敗と出ているのに再送だけ 409 で断る食い違いが起きる。
   const row = await c.env.DB.prepare(
     `SELECT ps.id, ps.friend_id, f.line_user_id, f.line_account_id, f.is_following,
             a.channel_access_token, a.channel_access_token_encrypted,
-            e.id decision_id, e.to_status, e.reason_code, e.reason_note
+            e.id decision_id, e.to_status, e.reason_code, e.reason_note, e.resubmit_invite,
+            s.customer_id
        FROM nen_photo_submissions ps
        JOIN friends f ON f.id = ps.friend_id
        JOIN line_accounts a ON a.id = f.line_account_id
        JOIN nen_photo_review_events e ON e.photo_id = ps.id
+       LEFT JOIN nen_ec_member_snapshots s ON s.friend_id = ps.friend_id
       WHERE ps.id = ? AND ps.line_account_id = ? AND f.line_account_id = ?
-        AND e.notification_status = 'failed'
+        AND (e.notification_status IN ('pending', 'failed')
+          OR (e.notification_status = 'sending'
+            AND (e.notification_lease_expires_at IS NULL OR e.notification_lease_expires_at <= ?)))
       ORDER BY e.created_at DESC LIMIT 1`,
-  ).bind(c.req.param('id'), accountId, accountId).first<ReviewPhotoRow & {
+  ).bind(c.req.param('id'), accountId, accountId, now).first<ReviewPhotoRow & {
     decision_id: string;
     to_status: 'adopted' | 'rejected';
     reason_code: PhotoReviewReasonCode | null;
     reason_note: string | null;
+    resubmit_invite: number;
   }>();
-  if (!row) return c.json({ success: false, error: '再送する通知がありません' }, 409);
-  try {
-    await sendPhotoReviewNotification(
-      c, row, row.to_status, row.reason_code, row.reason_note, row.decision_id,
-    );
-  } catch (error) {
-    const message = error instanceof Error ? error.message : '審査結果をLINEで通知できませんでした';
-    const failedAt = jstNow();
-    await c.env.DB.prepare(
-      `UPDATE nen_photo_review_events
-          SET notification_status = 'failed', notification_error = ?,
-              notification_attempt_count = notification_attempt_count + 1,
-              notification_first_failed_at = COALESCE(notification_first_failed_at, ?),
-              updated_at = ?
-        WHERE id = ?`,
-    ).bind(message, failedAt, failedAt, row.decision_id).run();
-    return c.json({ success: false, error: message }, 502);
+  if (!row) {
+    const settled = await c.env.DB.prepare(
+      `SELECT e.notification_status AS notification_status
+         FROM nen_photo_review_events e
+        WHERE e.photo_id = ? AND e.line_account_id = ?
+        ORDER BY e.created_at DESC LIMIT 1`,
+    ).bind(c.req.param('id'), accountId).first<{ notification_status: string }>();
+    if (settled?.notification_status === 'sent') {
+      return c.json({ success: true, data: { notificationStatus: 'sent', resent: false } });
+    }
+    return c.json({ success: false, error: '再送する通知がありません' }, 409);
   }
-  const now = jstNow();
-  await c.env.DB.batch([
-    c.env.DB.prepare(
-      `UPDATE nen_photo_submissions SET review_notification_status = 'sent', updated_at = ? WHERE id = ?`,
-    ).bind(now, row.id),
-    c.env.DB.prepare(
-      `UPDATE nen_photo_review_events
-          SET notification_status = 'sent',
-              notification_attempt_count = notification_attempt_count + 1,
-              notification_sent_at = ?, updated_at = ?
-        WHERE id = ?`,
-    ).bind(now, now, row.decision_id),
-  ]);
-  return c.json({ success: true, data: { notificationStatus: 'sent' } });
+  const delivery = await deliverPhotoReviewNotification(c.env.DB, c, row, {
+    lineAccountId: accountId,
+    photoId: row.id,
+    status: row.to_status,
+    reasonCode: row.reason_code,
+    reasonNote: row.reason_note,
+    decisionId: row.decision_id,
+    // 差戻し時に選んだ再投稿案内の有無を、審査イベントから復元する（#931 N-312）。
+    resubmitInvite: row.resubmit_invite !== 0,
+  });
+  if (delivery.notificationStatus === 'sent') {
+    // 送達できた再送に限りキーを記録する。失敗した試行は同じキーでやり直せる。
+    await c.env.DB.prepare(
+      `UPDATE nen_photo_submissions SET notification_retry_key = ? WHERE id = ? AND line_account_id = ?`,
+    ).bind(key, row.id, accountId).run();
+    return c.json({ success: true, data: { notificationStatus: 'sent', resent: delivery.relayed } });
+  }
+  if (delivery.busy) {
+    return c.json({ success: false, error: delivery.notificationError }, 409);
+  }
+  return c.json({ success: false, error: delivery.notificationError }, 502);
 });
 
 nenMembers.post('/api/nen-members/tags/resync', requireRole('owner', 'admin'), async (c) => {
@@ -883,7 +2288,7 @@ nenMembers.post('/api/nen-members/tags/resync', requireRole('owner', 'admin'), a
   return c.json({ success: true, data: result });
 });
 
-nenMembers.get('/api/nen-members/friends/:friendId', async (c) => {
+nenMembers.get('/api/nen-members/friends/:friendId', requireRole('owner', 'admin', 'staff'), async (c) => {
   const friendId = c.req.param('friendId');
   const friend = await c.env.DB.prepare(
     `SELECT f.id, f.line_user_id, f.display_name, f.picture_url, f.is_following,
@@ -898,7 +2303,20 @@ nenMembers.get('/api/nen-members/friends/:friendId', async (c) => {
     c.env.DB.prepare(`SELECT * FROM nen_ec_member_snapshots WHERE friend_id = ?`).bind(friendId).first<Record<string, unknown>>(),
     c.env.DB.prepare(`SELECT * FROM nen_pet_profiles WHERE friend_id = ? ORDER BY created_at ASC`).bind(friendId).all<Record<string, unknown>>(),
     c.env.DB.prepare(`SELECT * FROM nen_health_logs WHERE friend_id = ? ORDER BY logged_on DESC LIMIT 100`).bind(friendId).all<Record<string, unknown>>(),
-    c.env.DB.prepare(`SELECT ps.*, p.name AS pet_name FROM nen_photo_submissions ps LEFT JOIN nen_pet_profiles p ON p.id = ps.pet_id WHERE ps.friend_id = ? ORDER BY ps.created_at DESC LIMIT 100`).bind(friendId).all<Record<string, unknown>>(),
+    c.env.DB.prepare(
+      `SELECT ps.id, ps.friend_id, ps.pet_id, ps.caption, ps.status, ps.awarded_points,
+              ps.point_transaction_id, ps.created_at, ps.reviewed_at, ps.updated_at,
+              ps.line_account_id, ps.publication_consent_version, ps.publication_consent_at,
+              ps.publication_withdrawn_at, ps.public_pet_name, ps.review_reason_code,
+              ps.review_reason_note, ps.reviewed_by, ps.reviewed_by_name,
+              ps.review_notification_status, ps.review_image_url, ps.public_image_url,
+              ps.image_width, ps.image_height, ps.image_byte_size, ps.captured_device,
+              ps.review_version, p.name AS pet_name
+         FROM nen_photo_submissions ps
+         LEFT JOIN nen_pet_profiles p ON p.id = ps.pet_id
+        WHERE ps.friend_id = ?
+        ORDER BY ps.created_at DESC LIMIT 100`,
+    ).bind(friendId).all<Record<string, unknown>>(),
     c.env.DB.prepare(`SELECT * FROM nen_point_ledger WHERE friend_id = ? ORDER BY created_at DESC LIMIT 100`).bind(friendId).all<Record<string, unknown>>(),
     c.env.DB.prepare(`SELECT id, source, external_event_id, event_type, customer_id, status, error_message, received_at, processed_at FROM ec_events WHERE friend_id = ? ORDER BY received_at DESC LIMIT 100`).bind(friendId).all<Record<string, unknown>>(),
   ]);

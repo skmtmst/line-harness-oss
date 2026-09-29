@@ -26,8 +26,12 @@ export function registerManageAdPlatforms(server: McpServer): void {
         .record(z.unknown())
         .optional()
         .describe(
-          "Platform config JSON. Meta: {pixel_id, access_token, test_event_code?}. X: {pixel_id, api_key, api_secret}. Google: {customer_id, conversion_action_id, oauth_token}. TikTok: {pixel_code, access_token}",
+          "Platform config JSON. Meta: {pixel_id, access_token, test_event_code?}. X: {pixel_id, api_key, api_secret, x_oauth_token, x_oauth_token_secret, conversion_id?}. Google: {customer_id, conversion_action_id, oauth_token}. TikTok: {pixel_code, access_token}",
         ),
+      lineAccountId: z
+        .string()
+        .optional()
+        .describe("Owning LINE account ID (required for 'create')"),
       isActive: z
         .boolean()
         .optional()
@@ -41,7 +45,7 @@ export function registerManageAdPlatforms(server: McpServer): void {
         .optional()
         .describe("Friend ID for test conversion (for 'test')"),
     },
-    async ({ action, platformId, name, displayName, config, isActive, eventName, friendId }) => {
+    async ({ action, platformId, name, displayName, config, lineAccountId, isActive, eventName, friendId }) => {
       try {
         const client = getClient();
 
@@ -71,10 +75,13 @@ export function registerManageAdPlatforms(server: McpServer): void {
             if (!config)
               throw new Error("config is required for create action");
 
+            if (!lineAccountId)
+              throw new Error("lineAccountId is required for create action");
             const platform = await client.adPlatforms.create({
               name,
               displayName,
               config,
+              lineAccountId,
             });
 
             return {
@@ -96,6 +103,7 @@ export function registerManageAdPlatforms(server: McpServer): void {
               displayName,
               config,
               isActive,
+              lineAccountId,
             });
 
             return {

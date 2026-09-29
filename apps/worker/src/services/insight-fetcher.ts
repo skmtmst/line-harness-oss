@@ -5,6 +5,7 @@ import {
   markInsightFailed,
   getLineAccountById,
 } from '@line-crm/db'
+import { featureJobCanRun } from './feature-enforcement.js'
 
 // Only run once per day — check if 24 hours have passed
 const INSIGHT_INTERVAL_MS = 24 * 60 * 60 * 1000
@@ -25,6 +26,11 @@ export async function processInsightFetch(
   if (pending.length === 0) return
 
   for (const item of pending) {
+    // 機能オフ中は取得も結果更新もしない。pendingのまま残し、
+    // 再オンで再開する。
+    if (item.lineAccountId && !await featureJobCanRun(db, { accountId: item.lineAccountId, featureId: 'broadcasts', job: 'broadcast insights' })) {
+      continue
+    }
     try {
       const client =
         (item.lineAccountId && lineClients.get(item.lineAccountId)) ||
@@ -58,6 +64,7 @@ export async function processInsightFetch(
         let hasAnyData = false
 
         let allCallsFailed = true
+        let skippedOffAccounts = 0
         for (const aid of accountIds) {
           // is_active は意図的にチェックしない: 配信時点で active だったアカウントが
           // insight 取得時 (送信から3日後) には deactivate されてる可能性があり、
@@ -65,6 +72,11 @@ export async function processInsightFetch(
           // is_active で skip すると、過去の配信メトリクスが欠損する。
           const account = await getLineAccountById(db, aid)
           if (!account) continue
+          // 機能オフ中のアカウント分は取得しない。ON中の分は集計する。
+          if (!await featureJobCanRun(db, { accountId: aid, featureId: 'broadcasts', job: 'broadcast insights' })) {
+            skippedOffAccounts += 1
+            continue
+          }
           const accClient = new LineClient(account.channel_access_token)
           try {
             const response = (await accClient.getUnitInsight(
@@ -86,6 +98,11 @@ export async function processInsightFetch(
           }
         }
 
+        if (accountIds.length > 0 && skippedOffAccounts === accountIds.length) {
+          // 全アカウントが機能オフ中は何も更新しない。pendingのまま残し、
+          // 再オンで再開する。
+          continue
+        }
         if (allCallsFailed) {
           // LINE 側が全 API call を失敗させた = 一時障害の可能性。pending のまま
           // retry させる (markInsightFailed が retryCount を上げて次回再試行)。

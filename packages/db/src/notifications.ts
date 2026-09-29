@@ -9,6 +9,7 @@ export interface NotificationRuleRow {
   channels: string;    // JSON配列
   line_account_id: string | null;
   is_active: number;
+  version: number; // 内容の版。更新のたびに+1し、発火時に台帳へ写す(N-327)
   created_at: string;
   updated_at: string;
 }
@@ -75,8 +76,8 @@ export async function createNotificationRule(
   // The legacy table defaults to active, which made a newly-saved definition
   // look live even though no recipient resolution or delivery was performed.
   await db.prepare(`INSERT INTO notification_rules
-    (id, name, event_type, conditions, channels, line_account_id, is_active, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)`)
+    (id, name, event_type, conditions, channels, line_account_id, is_active, version, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, 0, 1, ?, ?)`)
     .bind(
       id,
       input.name,
@@ -98,12 +99,17 @@ export async function updateNotificationRule(
 ): Promise<void> {
   const sets: string[] = [];
   const values: unknown[] = [];
+  // 内容の版: 名前・きっかけ・条件・通知方法が変わったら+1する。
+  // 公開/停止だけの切り替えは版を変えない(発火済みの版表示がぶれないため)。
+  const bumpsVersion = updates.name !== undefined || updates.eventType !== undefined
+    || updates.conditions !== undefined || updates.channels !== undefined;
   if (updates.name !== undefined) { sets.push('name = ?'); values.push(updates.name); }
   if (updates.eventType !== undefined) { sets.push('event_type = ?'); values.push(updates.eventType); }
   if (updates.conditions !== undefined) { sets.push('conditions = ?'); values.push(JSON.stringify(updates.conditions)); }
   if (updates.channels !== undefined) { sets.push('channels = ?'); values.push(JSON.stringify(updates.channels)); }
   if (updates.isActive !== undefined) { sets.push('is_active = ?'); values.push(updates.isActive ? 1 : 0); }
   if (sets.length === 0) return;
+  if (bumpsVersion) sets.push('version = version + 1');
   sets.push('updated_at = ?');
   values.push(jstNow());
   values.push(id);
@@ -182,15 +188,19 @@ export async function getNotificationCenter(
     staffId: string;
     category?: 'error' | 'update';
     limit?: number;
+    /** 通知一覧画面の「さらに読み込む」用。パネルは0のまま。 */
+    offset?: number;
   },
 ): Promise<NotificationCenterRow[]> {
-  const conditions = ['n.line_account_id = ?', "n.channel = 'dashboard'"];
+  // 'center' は旧実装が送信枠不足の通知へ付けていた値。画面は 'dashboard'
+  // しか読まなかったため書き込み済みの通知が見えなかった。両方を読む。
+  const conditions = ['n.line_account_id = ?', "n.channel IN ('dashboard', 'center')"];
   const values: unknown[] = [input.staffId, input.lineAccountId];
   if (input.category) {
     conditions.push('n.category = ?');
     values.push(input.category);
   }
-  values.push(input.limit ?? 20);
+  values.push(input.limit ?? 20, input.offset ?? 0);
   const result = await db.prepare(`
     SELECT n.*, r.read_at
     FROM notifications n
@@ -198,7 +208,7 @@ export async function getNotificationCenter(
       ON r.notification_id = n.id AND r.staff_id = ?
     WHERE ${conditions.join(' AND ')}
     ORDER BY n.created_at DESC, n.id DESC
-    LIMIT ?
+    LIMIT ? OFFSET ?
   `).bind(...values).all<NotificationCenterRow>();
   return result.results;
 }
@@ -216,7 +226,7 @@ export async function getNotificationCenterCounts(
     FROM notifications n
     LEFT JOIN staff_notification_reads r
       ON r.notification_id = n.id AND r.staff_id = ?
-    WHERE n.line_account_id = ? AND n.channel = 'dashboard'
+    WHERE n.line_account_id = ? AND n.channel IN ('dashboard', 'center')
   `).bind(input.staffId, input.lineAccountId).first<{
     all_count: number;
     error_count: number | null;
@@ -239,7 +249,7 @@ export async function markNotificationRead(
   const result = await db.prepare(`
     INSERT OR REPLACE INTO staff_notification_reads (notification_id, staff_id, read_at)
     SELECT id, ?, ? FROM notifications
-    WHERE id = ? AND line_account_id = ? AND channel = 'dashboard'
+    WHERE id = ? AND line_account_id = ? AND channel IN ('dashboard', 'center')
   `).bind(input.staffId, now, input.notificationId, input.lineAccountId).run();
   return Number(result.meta.changes ?? 0) > 0;
 }
@@ -252,7 +262,7 @@ export async function markAllNotificationsRead(
     category?: 'error' | 'update';
   },
 ): Promise<number> {
-  const conditions = ['line_account_id = ?', "channel = 'dashboard'"];
+  const conditions = ['line_account_id = ?', "channel IN ('dashboard', 'center')"];
   const values: unknown[] = [input.staffId, jstNow(), input.lineAccountId];
   if (input.category) {
     conditions.push('category = ?');

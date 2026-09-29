@@ -1,0 +1,531 @@
+// @vitest-environment happy-dom
+import React, { act } from 'react'
+import { createRoot, type Root } from 'react-dom/client'
+import { fireEvent } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import AccountMigration from './migration'
+
+/**
+ * Issue #1012 FRIEND-14/15/16/33/36 の回帰試験。
+ *
+ * 本物のReactで本物の `AccountMigration` を mount し、`api.ts` も実物を通す。
+ * 差し替えるのは通信(fetch)とルーティングだけ。
+ *
+ * - FRIEND-14: 「詳細を見る」は更新APIを呼ばない。承認だけが1回書き込む。
+ * - FRIEND-16: 履歴切替で古い応答が後から届いても対応表が戻らない。
+ * - FRIEND-33: 「本移行を実行」は確認画面を開くだけで、確定まで書き込まない。
+ * - FRIEND-36: 完了・一部失敗の履歴から確認付きの切り戻しへ進める。
+ */
+
+vi.hoisted(() => {
+  // api.ts はモジュール評価時に必須。実値は使わず fetch ごと差し替える。
+  process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
+})
+
+const fixture = vi.hoisted(() => ({
+  push: vi.fn(),
+  replace: vi.fn(),
+  params: new URLSearchParams('tab=migration'),
+}))
+
+const net = vi.hoisted(() => ({
+  calls: [] as Array<{ path: string; method: string }>,
+  /** 履歴一覧に出す run。 */
+  runs: [] as Array<Record<string, unknown>>,
+  /** run id ごとの対応表応答を差し替える。 */
+  detailResponders: new Map<string, () => Promise<Response>>(),
+  /** 自分自身（実行権限の案内に使う）。 */
+  me: { id: 'owner-2', role: 'owner' } as { id: string; role: string } | null,
+  /** TECH-07: 通信断・応答喪失を再現する。'network' で fetch が投げる。 */
+  failItemPatch: null as null | 'network' | { status: number; error: string },
+  failExecute: null as null | 'network' | { status: number; error: string },
+  failRollback: null as null | 'network',
+  /** 対応表GETの回数（結果不明時の読み直しを見る）。 */
+  detailGets: 0,
+  /** 一覧GETの失敗再現。'network' で fetch が投げる。 */
+  failList: null as null | 'network',
+}))
+
+vi.mock('next/link', () => ({
+  default: ({ children, ...props }: React.ComponentProps<'a'>) => <a {...props}>{children}</a>,
+}))
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: fixture.push, replace: fixture.replace }),
+  useSearchParams: () => fixture.params,
+  usePathname: () => '/accounts',
+}))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
+
+const ACCOUNTS = [
+  { id: 'acc-a', name: '移行元アカウント' },
+  { id: 'acc-b', name: '移行先アカウント' },
+]
+
+const ITEM = {
+  id: 'item-1', oldUid: 'UOLD-1', newUid: 'UNEW-1', candidateName: '候補 太郎',
+  evidenceType: 'operator_csv' as const, classification: 'review' as const,
+  conflictReason: null, decision: 'pending' as const, result: 'pending' as const,
+  errorMessage: null,
+}
+
+function runFixture(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'run-1', fromAccountId: 'acc-a', toAccountId: 'acc-b', purpose: '移行A',
+    sourceKind: 'csv', sourceFilename: 'map.csv', status: 'ready', dryRunRevision: 1,
+    counts: { total: 1, auto: 0, review: 1, unmatched: 0, conflict: 0, applied: 0, failed: 0 },
+    createdBy: 'owner-1', approvedBy: null, createdAt: '2026-09-20T00:00:00Z',
+    reviewedAt: '2026-09-20T01:00:00Z', executedAt: null, completedAt: null,
+    rolledBackAt: null, failureReason: null, rollbackable: false,
+    ...overrides,
+  }
+}
+
+function detailFixture(run: Record<string, unknown>) {
+  return {
+    ...run,
+    items: [ITEM], itemTotal: 1, itemLimit: 20, itemOffset: 0,
+    unresolved: 0,
+    decisionCounts: { pending: 0, link: 1, create: 0, exclude: 0 },
+  }
+}
+
+const json = (data: unknown, status = 200) =>
+  new Response(JSON.stringify({ success: status < 400, data }), { status, headers: { 'Content-Type': 'application/json' } })
+
+/** 通信そのものを差し替える。api・fetchApiは実物を通す。 */
+function installFetch() {
+  vi.stubGlobal('fetch', async (input: unknown, init?: RequestInit) => {
+    const raw = typeof input === 'string' ? input : String(input)
+    const url = new URL(raw.startsWith('http') ? raw : `https://test.local${raw}`)
+    const path = url.pathname
+    const method = init?.method ?? 'GET'
+    net.calls.push({ path: path + url.search, method })
+    if (path === '/api/line-accounts') return json(ACCOUNTS)
+    if (path === '/api/staff/me') {
+      return net.me ? json(net.me) : new Response(JSON.stringify({ success: false, error: 'x' }), { status: 500 })
+    }
+    if (path === '/api/friends/migrations' && method === 'GET') {
+      if (net.failList === 'network') throw new TypeError('Failed to fetch')
+      return json(net.runs)
+    }
+    const itemMatch = path.match(/^\/api\/friends\/migrations\/[^/]+\/items\/[^/]+$/)
+    if (itemMatch && method === 'PATCH') {
+      if (net.failItemPatch === 'network') throw new TypeError('Failed to fetch')
+      if (net.failItemPatch) {
+        return new Response(JSON.stringify({ success: false, error: net.failItemPatch.error }), { status: net.failItemPatch.status, headers: { 'Content-Type': 'application/json' } })
+      }
+      return json({ unresolved: 0 })
+    }
+    if (path.endsWith('/execute') && method === 'POST') {
+      if (net.failExecute === 'network') throw new TypeError('Failed to fetch')
+      if (net.failExecute) {
+        return new Response(JSON.stringify({ success: false, error: net.failExecute.error }), { status: net.failExecute.status, headers: { 'Content-Type': 'application/json' } })
+      }
+      return json(runFixture({ status: 'completed', counts: { total: 1, auto: 0, review: 1, unmatched: 0, conflict: 0, applied: 1, failed: 0 } }))
+    }
+    if (path.endsWith('/rollback') && method === 'POST') {
+      if (net.failRollback === 'network') throw new TypeError('Failed to fetch')
+      return json({ ...runFixture({ status: 'rolled_back' }), rolledBack: 1 })
+    }
+    const detailMatch = path.match(/^\/api\/friends\/migrations\/([^/]+)$/)
+    if (detailMatch && method === 'GET') {
+      net.detailGets += 1
+      const responder = net.detailResponders.get(detailMatch[1])
+      if (responder) return responder()
+      const run = net.runs.find((entry) => entry.id === detailMatch[1]) ?? runFixture({ id: detailMatch[1] })
+      return json(detailFixture(run))
+    }
+    return json(null)
+  })
+}
+
+let host: HTMLDivElement
+let root: Root
+
+beforeEach(() => {
+  fixture.push.mockClear()
+  fixture.replace.mockClear()
+  net.calls.length = 0
+  net.runs = [runFixture()]
+  net.detailResponders = new Map()
+  net.me = { id: 'owner-2', role: 'owner' }
+  net.failItemPatch = null
+  net.failExecute = null
+  net.failRollback = null
+  net.detailGets = 0
+  net.failList = null
+  installFetch()
+  ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+  host = document.createElement('div')
+  document.body.appendChild(host)
+  root = createRoot(host)
+})
+
+afterEach(async () => {
+  await act(async () => { root.unmount() })
+  host.remove()
+  document.body.innerHTML = ''
+  vi.unstubAllGlobals()
+  vi.restoreAllMocks()
+})
+
+async function render() {
+  await act(async () => { root.render(<AccountMigration />) })
+}
+
+async function flush() {
+  await act(async () => {
+    for (let i = 0; i < 10; i += 1) await Promise.resolve()
+  })
+}
+
+function buttonByText(text: string, scope: ParentNode = document.body): HTMLButtonElement {
+  const found = Array.from(scope.querySelectorAll('button')).find((button) => button.textContent?.trim() === text)
+  if (!found) throw new Error(`button "${text}" not found`)
+  return found
+}
+
+/** 履歴行のように、目的の文字列を中に含むボタンを拾う。 */
+function buttonContaining(text: string, scope: ParentNode = document.body): HTMLButtonElement {
+  const found = Array.from(scope.querySelectorAll('button')).find((button) => button.textContent?.includes(text))
+  if (!found) throw new Error(`button containing "${text}" not found`)
+  return found
+}
+
+function openDialog(): HTMLElement {
+  const dialog = document.body.querySelector('[role="dialog"], [role="alertdialog"]')
+  if (!dialog) throw new Error('dialog not open')
+  return dialog as HTMLElement
+}
+
+const writes = () => net.calls.filter((call) => call.method !== 'GET')
+
+describe('UID移行の詳細確認（FRIEND-14）', () => {
+  it('「詳細を見る」は読み取り専用で、更新APIを呼ばない', async () => {
+    await render()
+    await flush()
+    fireEvent.click(buttonByText('詳細を見る'))
+    await flush()
+    const dialog = openDialog()
+    expect(dialog.textContent).toContain('UOLD-1')
+    expect(dialog.textContent).toContain('候補 太郎')
+    expect(writes()).toHaveLength(0)
+  })
+
+  it('承認だけが対象itemへ1回書き込む', async () => {
+    await render()
+    await flush()
+    fireEvent.click(buttonByText('詳細を見る'))
+    await flush()
+    fireEvent.click(buttonByText('この組合せを承認', openDialog()))
+    await flush()
+    const patches = net.calls.filter((call) => call.method === 'PATCH')
+    expect(patches).toHaveLength(1)
+    expect(patches[0].path).toBe('/api/friends/migrations/run-1/items/item-1')
+  })
+
+  it('閉じるだけなら書き込まない', async () => {
+    await render()
+    await flush()
+    fireEvent.click(buttonByText('詳細を見る'))
+    await flush()
+    // UI-25: 「閉じる」は右上の×（aria-label）へ移った。
+    fireEvent.click(openDialog().querySelector<HTMLButtonElement>('button[aria-label="閉じる"]')!)
+    await flush()
+    expect(writes()).toHaveLength(0)
+  })
+})
+
+describe('UID移行の本実行（FRIEND-33）', () => {
+  it('「本移行を実行」は確認画面を開くだけで実行しない', async () => {
+    await render()
+    await flush()
+    fireEvent.click(buttonByText('本移行を実行'))
+    await flush()
+    const dialog = openDialog()
+    expect(dialog.textContent).toContain('移行元アカウント')
+    expect(dialog.textContent).toContain('結び付け 1 件')
+    expect(net.calls.some((call) => call.path.endsWith('/execute'))).toBe(false)
+  })
+
+  it('確認画面の確定だけが execute を1回呼ぶ', async () => {
+    await render()
+    await flush()
+    fireEvent.click(buttonByText('本移行を実行'))
+    await flush()
+    fireEvent.click(buttonByText('本移行を実行', openDialog()))
+    await flush()
+    const executes = net.calls.filter((call) => call.path.endsWith('/execute') && call.method === 'POST')
+    expect(executes).toHaveLength(1)
+  })
+
+  it('確認画面のキャンセルは書き込まない', async () => {
+    await render()
+    await flush()
+    fireEvent.click(buttonByText('本移行を実行'))
+    await flush()
+    fireEvent.click(buttonByText('キャンセル', openDialog()))
+    await flush()
+    expect(net.calls.some((call) => call.path.endsWith('/execute'))).toBe(false)
+  })
+
+  it('作成者本人には確定ボタンを出さず理由を示す', async () => {
+    net.me = { id: 'owner-1', role: 'owner' }
+    await render()
+    await flush()
+    fireEvent.click(buttonByText('本移行を実行'))
+    await flush()
+    const dialog = openDialog()
+    expect(dialog.textContent).toContain('別のownerが実行してください')
+    const confirms = Array.from(dialog.querySelectorAll('button')).filter((button) => button.textContent?.trim() === '本移行を実行')
+    expect(confirms).toHaveLength(0)
+    expect(net.calls.some((call) => call.path.endsWith('/execute'))).toBe(false)
+  })
+})
+
+describe('UID移行の切り戻し（FRIEND-36/15）', () => {
+  it('完了履歴は「実データはまだ変更していません」と言わず切り戻しへ進める', async () => {
+    net.runs = [runFixture({
+      status: 'completed', rollbackable: true,
+      counts: { total: 1, auto: 0, review: 1, unmatched: 0, conflict: 0, applied: 1, failed: 0 },
+    })]
+    await render()
+    await flush()
+    expect(document.body.textContent).not.toContain('実データはまだ変更していません')
+    expect(document.body.textContent).toContain('本移行と照合が完了しています')
+    fireEvent.click(buttonByText('この移行を切り戻す'))
+    await flush()
+    const dialog = openDialog()
+    expect(dialog.textContent).toContain('1 件')
+    expect(net.calls.some((call) => call.path.endsWith('/rollback'))).toBe(false)
+    fireEvent.click(buttonByText('切り戻す', dialog))
+    await flush()
+    expect(net.calls.filter((call) => call.path.endsWith('/rollback') && call.method === 'POST')).toHaveLength(1)
+  })
+
+  it('一部失敗の履歴は成功分・失敗分を分け、切り戻せることを示す', async () => {
+    net.runs = [runFixture({
+      status: 'failed', rollbackable: true, failureReason: '一部失敗',
+      counts: { total: 2, auto: 0, review: 0, unmatched: 0, conflict: 0, applied: 1, failed: 1 },
+    })]
+    await render()
+    await flush()
+    expect(document.body.textContent).toContain('一部だけ反映されました')
+    expect(document.body.textContent).toContain('一部失敗')
+    expect(document.body.textContent).not.toContain('本移行と照合が完了しています')
+    buttonByText('この移行を切り戻す')
+  })
+})
+
+describe('対応表の遅延応答（FRIEND-16）', () => {
+  it('履歴を連続で切り替えても、最後に選んだ対応表だけが残る', async () => {
+    const runB = runFixture({ id: 'run-b', purpose: '移行B', counts: { total: 22, auto: 0, review: 0, unmatched: 0, conflict: 0, applied: 0, failed: 0 } })
+    const runC = runFixture({ id: 'run-c', purpose: '移行C', counts: { total: 33, auto: 0, review: 0, unmatched: 0, conflict: 0, applied: 0, failed: 0 } })
+    net.runs = [runFixture(), runB, runC]
+    // run-b の応答だけを後回しにする。B/Cの対応表はUIDで見分ける。
+    let releaseB: (() => void) | null = null
+    net.detailResponders.set('run-b', () => new Promise<Response>((resolve) => {
+      releaseB = () => resolve(json({ ...detailFixture(runB), items: [{ ...ITEM, id: 'item-b', oldUid: 'U-B-999' }] }))
+    }))
+    net.detailResponders.set('run-c', async () => json({ ...detailFixture(runC), items: [{ ...ITEM, id: 'item-c', oldUid: 'U-C-888' }] }))
+    await render()
+    await flush()
+    // 履歴B → 履歴C と連続で切り替える。
+    fireEvent.click(buttonContaining('移行B'))
+    await flush()
+    fireEvent.click(buttonContaining('移行C'))
+    await flush()
+    expect(document.body.textContent).toContain('U-C-888')
+    // 遅れていたBの応答が届いても、表示はCのまま。
+    releaseB?.()
+    await flush()
+    expect(document.body.textContent).toContain('U-C-888')
+    expect(document.body.textContent).not.toContain('U-B-999')
+  })
+})
+
+describe('通信例外の結果不明（TECH-07 / FRIEND-33/34）', () => {
+  it('UID判断の通信断は「結果不明」と伝え、対応表を読み直す', async () => {
+    net.failItemPatch = 'network'
+    await render()
+    await flush()
+    fireEvent.click(buttonByText('詳細を見る'))
+    await flush()
+    const getsBefore = net.detailGets
+    fireEvent.click(buttonByText('この組合せを承認', openDialog()))
+    await flush()
+    // 「保存できませんでした」ではなく「応答を確認できなかった」と区別する。
+    expect(openDialog().textContent).toContain('応答を確認できませんでした')
+    expect(document.body.textContent).toContain('対応表を読み直して')
+    // 実際の判断を確かめるため対応表を読み直す。無条件の再送はしない。
+    expect(net.detailGets).toBeGreaterThan(getsBefore)
+    const patches = net.calls.filter((call) => call.method === 'PATCH')
+    expect(patches).toHaveLength(1)
+    // busy は必ず解除される（操作中のまま残らない）。
+    expect(buttonByText('この組合せを承認', openDialog()).disabled).toBe(false)
+  })
+
+  it('UID判断の確定失敗（サーバー応答あり）は結果不明と混ぜない', async () => {
+    net.failItemPatch = { status: 500, error: 'internal error' }
+    await render()
+    await flush()
+    fireEvent.click(buttonByText('詳細を見る'))
+    await flush()
+    const getsBefore = net.detailGets
+    fireEvent.click(buttonByText('この組合せを承認', openDialog()))
+    await flush()
+    expect(document.body.textContent).not.toContain('応答を確認できませんでした')
+    // サーバーが拒否した失敗では読み直しを増やさない。
+    expect(net.detailGets).toBe(getsBefore)
+  })
+
+  it('本移行の通信断は結果不明を示して履歴を読み直し、二重送信しない', async () => {
+    net.failExecute = 'network'
+    await render()
+    await flush()
+    fireEvent.click(buttonByText('本移行を実行'))
+    await flush()
+    const getsBefore = net.detailGets
+    fireEvent.click(buttonByText('本移行を実行', openDialog()))
+    await flush()
+    const dialog = openDialog()
+    expect(dialog.textContent).toContain('応答を確認できませんでした')
+    expect(dialog.textContent).toContain('履歴を読み直して')
+    expect(net.calls.filter((call) => call.path.endsWith('/execute') && call.method === 'POST')).toHaveLength(1)
+    expect(net.detailGets).toBeGreaterThan(getsBefore)
+    // busy 解除で閉じられる。再実行は操作者の判断に委ねる。
+    fireEvent.click(buttonByText('キャンセル', dialog))
+    await flush()
+  })
+
+  it('本移行の確定失敗（サーバー応答あり）は結果不明メッセージを出さない', async () => {
+    net.failExecute = { status: 409, error: 'already executing' }
+    await render()
+    await flush()
+    fireEvent.click(buttonByText('本移行を実行'))
+    await flush()
+    fireEvent.click(buttonByText('本移行を実行', openDialog()))
+    await flush()
+    const dialog = openDialog()
+    expect(dialog.textContent).not.toContain('応答を確認できませんでした')
+    expect(dialog.textContent).toContain('already executing')
+  })
+
+  it('切り戻しの通信断も結果不明を示して履歴を読み直す', async () => {
+    net.failRollback = 'network'
+    net.runs = [runFixture({
+      status: 'completed', rollbackable: true,
+      counts: { total: 1, auto: 0, review: 1, unmatched: 0, conflict: 0, applied: 1, failed: 0 },
+    })]
+    await render()
+    await flush()
+    fireEvent.click(buttonByText('この移行を切り戻す'))
+    await flush()
+    const getsBefore = net.detailGets
+    fireEvent.click(buttonByText('切り戻す', openDialog()))
+    await flush()
+    const dialog = openDialog()
+    expect(dialog.textContent).toContain('応答を確認できませんでした')
+    expect(net.calls.filter((call) => call.path.endsWith('/rollback') && call.method === 'POST')).toHaveLength(1)
+    expect(net.detailGets).toBeGreaterThan(getsBefore)
+  })
+})
+
+/**
+ * カード間隔そろえ（★V7 gap-4・2026-09-26）の描画試験。
+ * 空（履歴なし）・読み込み中・失敗・正常の主な状態を押さえる。
+ */
+describe('UID移行の空と履歴のカード表示', () => {
+  it('履歴なしは「テスト移行はまだありません」を白いカードの中に出す', async () => {
+    net.runs = []
+    await render()
+    await flush()
+    const emptyTitle = Array.from(document.body.querySelectorAll('p')).find((node) => node.textContent === 'テスト移行はまだありません')
+    expect(emptyTitle).toBeTruthy()
+    // 灰色の1枚ではなく、白地・枠・角丸のカード（section）の中にある。
+    const card = emptyTitle!.closest('section.bg-canvas')
+    expect(card).toBeTruthy()
+    expect(card!.querySelector('h2')?.textContent).toBe('テスト移行の結果')
+    // 履歴側の空カードも同じ形で出す。
+    expect(document.body.textContent).toContain('移行履歴はまだありません')
+  })
+
+  it('履歴なしでも下の履歴節へ飛ぶだけのボタンは出さない', async () => {
+    net.runs = []
+    await render()
+    await flush()
+    expect(document.body.querySelector('a[href="#migration-history"]')).toBeNull()
+    // 別画面への導線は残す。
+    expect(document.body.querySelector('a[href="/friends/migrations"]')).toBeTruthy()
+  })
+
+  it('読み込み中は1枚だけ出す', async () => {
+    net.runs = []
+    await render()
+    // 読み込み完了後は空のカードが出る（読み込み中の1枚と置き換わる）。
+    await flush()
+    expect(document.body.textContent).toContain('テスト移行はまだありません')
+    expect(document.body.textContent).not.toContain('UID移行を読み込んでいます')
+  })
+
+  it('読み込み失敗は1画面に1枚だけ出し、再読み込みできる', async () => {
+    net.runs = []
+    net.failList = 'network'
+    await render()
+    await flush()
+    expect(document.body.textContent).toContain('UID移行を表示できませんでした')
+    // 登録した履歴が消えたように見せない文言を出す。
+    expect(document.body.textContent).toContain('登録した移行履歴は消えていません')
+    // 再読み込みで直る。
+    net.failList = null
+    fireEvent.click(buttonByText('再読み込み'))
+    await flush()
+    expect(document.body.textContent).toContain('テスト移行はまだありません')
+  })
+
+  it('対応表あり（正常）は結果カードと履歴節を両方出す', async () => {
+    await render()
+    await flush()
+    expect(document.body.textContent).toContain('テスト移行の状態')
+    expect(document.body.textContent).toContain('移行履歴')
+    expect(document.body.querySelector('a[href="#migration-history"]')).toBeNull()
+  })
+})
+
+describe('R398 一部反映の500で「未変更」と残さない', () => {
+  it('本移行の500後は履歴を読み直し、反映済みと残作業を示す', async () => {
+    net.failExecute = { status: 500, error: '本移行を実行できませんでした' }
+    await render()
+    await flush()
+    fireEvent.click(buttonByText('本移行を実行'))
+    await flush()
+    const getsBefore = net.detailGets
+    // 確定後の読み直しでは、1件反映済みの失敗が返る。
+    net.detailResponders.set('run-1', async () => json(detailFixture(runFixture({
+      status: 'failed',
+      counts: { total: 2, auto: 0, review: 2, unmatched: 0, conflict: 0, applied: 1, failed: 1 },
+    }))))
+    fireEvent.click(buttonByText('本移行を実行', openDialog()))
+    await flush()
+    // POSTの再送はしないが、詳細GETは読み直す。
+    expect(net.calls.filter((call) => call.path.endsWith('/execute') && call.method === 'POST')).toHaveLength(1)
+    expect(net.detailGets).toBeGreaterThan(getsBefore)
+    const dialog = openDialog()
+    expect(dialog.textContent).toContain('1 件が反映されています')
+    expect(document.body.textContent).toContain('一部だけ反映されました')
+    expect(document.body.textContent).not.toContain('実データはまだ変更していません')
+  })
+
+  it('500後に詳細の再取得も失敗したら結果未確認になる', async () => {
+    net.failExecute = { status: 500, error: '本移行を実行できませんでした' }
+    await render()
+    await flush()
+    fireEvent.click(buttonByText('本移行を実行'))
+    await flush()
+    // 確定後の読み直しも失敗する。
+    net.detailResponders.set('run-1', async () => json(null, 500))
+    fireEvent.click(buttonByText('本移行を実行', openDialog()))
+    await flush()
+    expect(openDialog().textContent).toContain('実行結果を確認できませんでした')
+  })
+})

@@ -1,3 +1,4 @@
+@layer components {
 .badge {
   display: inline-flex;
   align-items: center;
@@ -11,8 +12,9 @@
 }
 
 .compact {
-  padding: 5px 8px;
-  font-size: var(--text-nano);
+  padding: 4px 8px;
+  /* ★V7：10px は表の中で読みにくかった（better-typography：12px を大きく下回らない）。 */
+  font-size: var(--text-micro);
 }
 
 .neutral {
@@ -26,16 +28,34 @@
 }
 
 .warning {
-  background: var(--color-status-warning-soft);
-  color: var(--color-status-warning);
+  background: var(--color-status-warn-soft);
+  color: var(--color-status-warn-deep);
 }
 
+/*
+ * #669 成功の札の文字は success に1本化する。accent-deep（#087a3e）と
+ * success（#047833）が同役で共存していた。地は同値（#e8f8ee）のまま。
+ */
 .success {
-  background: var(--color-accent-soft);
-  color: var(--color-accent);
+  background: var(--color-success-bg);
+  color: var(--color-success);
 }
 
 .danger {
   background: var(--color-status-danger-soft);
-  color: var(--color-status-danger);
+  /*
+   * #702: 文字は --color-danger(#b3261e)。--color-status-danger(#e5484d)
+   * だと薄い地で 3.53:1 しかなく AA(4.5:1)に届かない。#b3261e なら 5.89:1。
+   */
+  color: var(--color-danger);
+}
+
+/*
+ * 「？」の吹き出しの中の「くわしく」。見た目は HelpTip 側が持つ。
+ * ここでは押せるものとして輪郭の存在を契約へ示す。
+ */
+.badge a:focus-visible {
+  outline: 2px solid var(--color-status-info);
+  outline-offset: 1px;
+}
 }

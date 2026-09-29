@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
+const TABLE = readFileSync(new URL('../../components/friends/friend-list-table.tsx', import.meta.url), 'utf8')
 
 describe('V6 友だち一覧の読込状態', () => {
   it('読込・成功・失敗を別の状態として持つ', () => {
@@ -12,14 +13,20 @@ describe('V6 友だち一覧の読込状態', () => {
   })
 
   it('読込失敗を0件の友だち一覧として表示しない', () => {
-    expect(PAGE).toContain("loadStatus === 'error'")
-    expect(PAGE).toContain('登録した友だちは消えていません。')
-    expect(PAGE).toContain('友だちを再読み込み')
+    expect(PAGE).toContain('status={loadStatus}')
+    expect(TABLE).toContain("status === 'error'")
+    expect(TABLE).toContain('表示できませんでした')
+    expect(PAGE).toContain('onRetry={() => void loadFriends()}')
     expect(PAGE).not.toContain('setError(response.error)')
   })
 
   it('未取得の件数を0件にせずCSVも止める', () => {
-    expect(PAGE).toContain("loadStatus === 'ready' ? `${total.toLocaleString('ja-JP')}件` : '—'")
+    /*
+     * 絞り込みの行の件数は消した（見出し・ページ送りと3重だった）。
+     * 「未取得を0件に見せない」の役目は見出しの横の1か所が持つ。
+     */
+    expect(TABLE).toContain("status === 'ready' ? `${total.toLocaleString('ja-JP')}件` : '—'")
+    expect(PAGE).not.toContain("{loadStatus === 'ready' ? `${total.toLocaleString('ja-JP')}件` : '—'}")
     expect(PAGE).toContain("onExportReady(loadStatus === 'ready' ? exportCurrentPage : null)")
     expect(PAGE).toContain('disabled={!exportCurrentPage}')
   })

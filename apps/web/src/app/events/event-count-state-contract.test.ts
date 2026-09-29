@@ -1,0 +1,48 @@
+import { readFileSync } from 'node:fs'
+import { describe, expect, it } from 'vitest'
+
+const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
+const WORKER = readFileSync(new URL('../../../../worker/src/index.ts', import.meta.url), 'utf8')
+const WAITLIST = readFileSync(new URL('../../../../worker/src/services/event-waitlist.ts', import.meta.url), 'utf8')
+
+describe('V6 イベント予約の件数状態', () => {
+  it('読込中・失敗・成功を同じ補足にしない', () => {
+    expect(PAGE).toContain("if (status === 'loading') return '読み込み中'")
+    expect(PAGE).toContain("if (status === 'error') return '取得できませんでした'")
+    expect(PAGE).toContain('return readyDetail')
+  })
+
+  it('失敗時は一覧件数を0件とせずページ送りを出さない', () => {
+    expect(PAGE).toContain("!selectedAccountId || loadStatus === 'error'")
+    expect(PAGE).toContain("? '—'")
+    expect(PAGE).toContain('dataReady ? <Pagination')
+  })
+
+  it('取得成功後の実値0は0件として表示できる', () => {
+    expect(PAGE).toContain("listTotal === 0")
+    expect(PAGE).toContain("? '0件'")
+  })
+
+  it('全体平均でなく、次に声をかける回を帯へ出す', () => {
+    expect(PAGE).toContain("title=\"これからの回\"")
+    expect(PAGE).toContain("title=\"あと少しで満席\"")
+    expect(PAGE).toContain('声をかけると埋まります')
+    expect(PAGE).toContain("title=\"申し込みが少ない\"")
+    expect(PAGE).toContain('daysUntilIso(kpi.nearest_low_starts_at)')
+    expect(PAGE).not.toContain('title="定員の充足"')
+  })
+
+  it('終わった回は端末時計で数えず、重複する集計帯ごと出さない(点検#520軽16)', () => {
+    // ★V7: 下の集計カードと同じ数字の重複なので帯ごと出さない。終わった回は数えない。
+    expect(PAGE).not.toContain('一覧の集計（表示のみ）')
+    expect(PAGE).not.toContain('終わった回 <strong')
+    expect(PAGE).not.toContain('endedCount')
+  })
+
+  it('席が空いたあとの自動案内を、実際の定期処理があるときだけ案内する', () => {
+    expect(PAGE).toContain('キャンセルが出たら、キャンセル待ちの人に自動で順番が回ります。')
+    expect(WORKER).toContain('processEventWaitlistPromotionJobs')
+    expect(WAITLIST).toContain('enqueueEventWaitlistPromotion')
+    expect(WAITLIST).toContain('DEFAULT_OFFER_HOURS = 24')
+  })
+})

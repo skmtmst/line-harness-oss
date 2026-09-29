@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   getActiveOutgoingWebhooksByEvent,
@@ -31,7 +31,10 @@ describe('送信Webhookのアカウント・統括分離', () => {
         last_failed_at TEXT,
         line_account_id TEXT,
         created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
+        updated_at TEXT NOT NULL,
+        /* #939 N-368（移行437）: 削除は履歴を残す印。読み取りは印の無い行だけ。 */
+        deleted_at TEXT,
+        deleted_by_staff_id TEXT
       );
 
       INSERT INTO line_accounts (id, tenant_id) VALUES
@@ -77,5 +80,36 @@ describe('送信Webhookのアカウント・統括分離', () => {
   it('別アカウントのIDと存在しないIDは管理用の単一取得で見つからない', async () => {
     await expect(getOutgoingWebhookById(db, 'webhook-b', 'account-a')).resolves.toBeNull();
     await expect(getOutgoingWebhookById(db, 'missing', 'account-a')).resolves.toBeNull();
+  });
+
+  /*
+   * N-376: event_types が壊れた1行で配送全体を止めない。
+   * 壊れた行は構造化ログで記録して除外し、健全な行は送り続ける。
+   */
+  it('壊れた event_types の行だけを除外し、健全な行へは届け続ける', async () => {
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
+    sqlite.exec(`
+      INSERT INTO outgoing_webhooks
+        (id, name, url, event_types, line_account_id, created_at, updated_at)
+      VALUES
+        ('webhook-broken-json', '壊れたJSON', 'https://example.com/x', '{broken', 'account-a', '2026-01-01', '2026-01-01'),
+        ('webhook-broken-array', '配列でない', 'https://example.com/y', '"message_received"', 'account-a', '2026-01-01', '2026-01-01')
+    `);
+    try {
+      const rows = await getActiveOutgoingWebhooksByEvent(db, 'message_received', 'account-a');
+      expect(rows.map((row) => row.id)).toEqual(['webhook-a']);
+      // 壊れた行は webhookId 付きで安全に記録する（秘密値・URLは出さない）。
+      const events = errorLog.mock.calls
+        .map((call) => String(call[0]))
+        .filter((text) => text.includes('outgoing_webhook_event_types_broken'));
+      expect(events).toHaveLength(2);
+      for (const text of events) {
+        const parsed = JSON.parse(text) as { webhookId: string };
+        expect(['webhook-broken-json', 'webhook-broken-array']).toContain(parsed.webhookId);
+        expect(text).not.toContain('https://example.com');
+      }
+    } finally {
+      errorLog.mockRestore();
+    }
   });
 });

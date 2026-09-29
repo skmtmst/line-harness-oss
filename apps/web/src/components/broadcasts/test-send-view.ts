@@ -3,8 +3,20 @@ export type TestSendView = {
   message: string
 }
 
-/** 送れなかった人がいる結果を、成功の緑色で表示しない。 */
+/**
+ * 送れなかった人がいる結果を、成功の緑色で表示しない。
+ *
+ * **HTTP の成功と配信の成功は別物。** API は全員に失敗しても
+ * `success: true` で `sent: 0, failed: N` を返すので、届いた数と
+ * 届かなかった数で分ける。1名も届かなければエラー、一部だけなら要対応。
+ */
 export function testSendResult(sent: number, failed: number, at: string): TestSendView {
+  if (sent <= 0 && failed > 0) {
+    return {
+      kind: 'error',
+      message: `${at} テスト送信できませんでした (${failed}名すべてに届きませんでした)`,
+    }
+  }
   if (failed > 0) {
     return {
       kind: 'partial',

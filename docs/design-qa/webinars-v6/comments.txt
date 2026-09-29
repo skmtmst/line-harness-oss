@@ -1,0 +1,10 @@
+# コメント演出
+# /webinars/edit?id=webinar-1&pane=comments
+
+- 設計画像なし
+- UI HEAD: `84039ceca`
+- 撮影: `comments-1440.png` / `comments-1920.png`（1x）
+- 状態: 固定コメント2件を表示
+- 照合: 表見出し4列を `px-4 py-3` に統一し、縦余白が見えることを確認
+- 横はみ出し: 1440px / 1920px ともに0
+- 判定: match

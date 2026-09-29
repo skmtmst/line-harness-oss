@@ -8,6 +8,8 @@
  * どちらが正しいのか分からなくなる。件数が増えて重くなってから考える。
  */
 
+import { analyticsWindow, analyticsWindowWhere } from './utils.js';
+
 /** 期間。JSTの ISO 文字列で受ける。 */
 export interface DateRange {
   from: string;
@@ -98,6 +100,9 @@ export async function getLinkClickSummary(
   range: DateRange,
   limit = 50,
 ): Promise<LinkClickSummary[]> {
+  // 監査 R227: 時刻の列は Z と +09:00 が混在するため、範囲判定は
+  // 索引に乗る先読み＋julianday の正確判定の2段にする（上限は込み）。
+  const win = analyticsWindow(range.from, range.to);
   const result = await db
     .prepare(
       `SELECT c.tracked_link_id AS tracked_link_id,
@@ -106,12 +111,13 @@ export async function getLinkClickSummary(
               COUNT(DISTINCT c.friend_id) AS unique_friends
          FROM link_clicks c
          JOIN tracked_links l ON l.id = c.tracked_link_id
-        WHERE l.line_account_id = ? AND c.clicked_at >= ? AND c.clicked_at <= ?
+        WHERE l.line_account_id = ?
+          ${analyticsWindowWhere('c.clicked_at', true)}
         GROUP BY c.tracked_link_id
         ORDER BY clicks DESC
         LIMIT ?`,
     )
-    .bind(lineAccountId, range.from, range.to, limit)
+    .bind(lineAccountId, win.lo, win.hi, win.fromIso, win.toIso, limit)
     .all<{ tracked_link_id: string; name: string; clicks: number; unique_friends: number }>();
   return result.results.map((r) => ({
     trackedLinkId: r.tracked_link_id,
@@ -154,7 +160,17 @@ export async function getTrackedLinkStats(
   lineAccountId: string,
   range: DateRange,
   limit = 200,
+  query?: string,
 ): Promise<TrackedLinkStat[]> {
+  /*
+   * 監査 R72: 検索語は取得前のSQLへ渡す。上位200件を取ってから画面で絞ると、
+   * 201件目以降は検索しても見つからなかった。利用場所はタグ名・シナリオ名に
+   * 対応するので、リンク名・URL・紐づく名前を対象にする。
+   */
+  const needle = query?.trim().toLowerCase() ?? '';
+  // 監査 R227: クリック時刻は表記が混在するため、範囲判定は
+  // 索引に乗る先読み＋julianday の正確判定の2段にする（上限は込み）。
+  const win = analyticsWindow(range.from, range.to);
   const result = await db
     .prepare(
       `SELECT l.id AS tracked_link_id,
@@ -171,15 +187,25 @@ export async function getTrackedLinkStats(
          FROM tracked_links l
          LEFT JOIN link_clicks c
                 ON c.tracked_link_id = l.id
-               AND c.clicked_at >= ? AND c.clicked_at <= ?
+               ${analyticsWindowWhere('c.clicked_at', true)}
          LEFT JOIN tags t ON t.id = l.tag_id
          LEFT JOIN scenarios s ON s.id = l.scenario_id
         WHERE l.line_account_id = ?
+          ${needle ? `AND (
+            instr(lower(l.name), ?) > 0
+            OR instr(lower(l.original_url), ?) > 0
+            OR instr(lower(COALESCE(t.name, '')), ?) > 0
+            OR instr(lower(COALESCE(s.name, '')), ?) > 0
+          )` : ''}
         GROUP BY l.id
         ORDER BY clicks DESC, l.name ASC
         LIMIT ?`,
     )
-    .bind(range.from, range.to, lineAccountId, limit)
+    .bind(
+      win.lo, win.hi, win.fromIso, win.toIso, lineAccountId,
+      ...(needle ? [needle, needle, needle, needle] : []),
+      limit,
+    )
     .all<{
       tracked_link_id: string;
       name: string;
@@ -234,6 +260,9 @@ export async function getBroadcastSummary(
   range: DateRange,
   limit = 50,
 ): Promise<BroadcastSummary[]> {
+  // 監査 R227: 送信時刻は表記が混在するため、範囲判定は
+  // 索引に乗る先読み＋julianday の正確判定の2段にする（上限は込み）。
+  const win = analyticsWindow(range.from, range.to);
   const result = await db
     .prepare(
       `SELECT b.id AS broadcast_id, b.title AS name, b.sent_at AS sent_at,
@@ -241,11 +270,12 @@ export async function getBroadcastSummary(
          FROM broadcasts b
          LEFT JOIN broadcast_insights i ON i.broadcast_id = b.id
         WHERE b.line_account_id = ?
-          AND b.sent_at IS NOT NULL AND b.sent_at >= ? AND b.sent_at <= ?
+          AND b.sent_at IS NOT NULL
+          ${analyticsWindowWhere('b.sent_at', true)}
         ORDER BY b.sent_at DESC
         LIMIT ?`,
     )
-    .bind(lineAccountId, range.from, range.to, limit)
+    .bind(lineAccountId, win.lo, win.hi, win.fromIso, win.toIso, limit)
     .all<{
       broadcast_id: string;
       name: string;

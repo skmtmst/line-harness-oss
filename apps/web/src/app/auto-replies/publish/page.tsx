@@ -1,0 +1,994 @@
+'use client'
+
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
+import { useRouter, useSearchParams } from 'next/navigation'
+import {
+  Activity,
+  AlertTriangle,
+  ArrowLeft,
+  Bell,
+  Check,
+  CheckCircle2,
+  Copy,
+  Eye,
+  FlaskConical,
+  List,
+  MessageCircle,
+  PauseCircle,
+  Pencil,
+  Send,
+  Tag,
+  X,
+} from 'lucide-react'
+import type {
+  AutoReplyConflict,
+  AutoReplyDraftVersion,
+  AutoReplyDryRunResult,
+  AutoReplyPublishResult,
+  AutoReplyValidationResult,
+} from '@line-crm/shared'
+import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import LinePreview from '@/components/shared/line-preview'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import ListState from '@/components/shared/list-state'
+import TargetMissing from '@/components/shared/target-missing'
+import Select from '@/components/shared/select'
+import { usePageTitle } from '@/components/shell/page-chrome'
+import { ApiError, api, type FriendListItem } from '@/lib/api'
+import { canPublish, conflictTone, publishGates, type PublishStage } from './publish-flow'
+import './publish.css'
+
+type LoadState = 'loading' | 'ready' | 'error' | 'denied' | 'missing' | 'not-found'
+type FriendLoadState = 'loading' | 'ready' | 'error'
+
+const PAGE_TITLES: Record<PublishStage, string> = {
+  conflicts: '自動応答ルール・競合確認',
+  test: '自動応答をテスト',
+  confirm: '自動応答ルール・最終確認',
+  done: '自動応答・有効化完了',
+}
+
+const WIZARD_STEPS = [
+  '基本設定',
+  'どんなときに動くか',
+  '何を返すか',
+  '優先順位',
+  '確認',
+] as const
+
+const REASON_LABELS: Record<string, string> = {
+  message_kind_not_matched: 'メッセージの種類が違います',
+  keyword_not_matched: 'キーワードに当たりません',
+  outside_active_window: '受け付ける時間帯の外です',
+  weekday_not_allowed: 'この曜日は受け付けません',
+  operator_handling: '担当者が対応中です',
+  already_replied_once: 'この友だちへは一度返しています',
+  cooldown_active: '前回の返信から間を空けています',
+  friend_conditions_not_met: '友だちの条件に当てはまりません',
+  higher_priority_won: '上のルールが先に動きます',
+}
+
+/*
+ * 見送った理由の解除条件。書かないと「いつ動き始めるか」が読めず、
+ * 止めたつもりの設定を直したり、動かないと勘違いして問い合わせになる。
+ * 解除されないもの（1人1回・キーワード不一致・優先順位負け）は、
+ * 条件の意味そのものを書く。
+ */
+const REASON_RELEASE: Record<string, string> = {
+  outside_active_window: '時間帯の中に入ると動きます',
+  weekday_not_allowed: '応答する曜日・祝日の条件に合う日に動きます',
+  operator_handling: '対応中が解除されると動きます',
+  already_replied_once: '「1人につき1回だけ応答する」設定のため動きません',
+  cooldown_active: '設定した間隔がたつと動きます',
+  friend_conditions_not_met: 'この友だちが条件に合わないので動きません',
+  higher_priority_won: 'このルールを先に動かすには、評価順を上のルールより前にします',
+}
+
+/** 友だちのトーク状態の呼び方。受信箱と同じ3段に寄せる。 */
+const CHAT_STATUS_WORDS: Record<string, string> = {
+  unread: '未対応',
+  in_progress: '対応中',
+  on_hold: '保留',
+  resolved: '対応済み',
+}
+
+const RESULT_LABELS: Record<string, string> = {
+  won: '一致しました',
+  skipped: '見送りました',
+  not_matched: '一致しませんでした',
+}
+
+const ACTION_LABELS: Record<string, string> = {
+  add_tag: 'タグ追加',
+  remove_tag: 'タグ解除',
+  set_metadata: '友だち情報を更新',
+  start_scenario: 'シナリオ開始',
+  stop_scenario: 'シナリオ停止',
+  resume_scenario: 'シナリオ再開',
+  send_message: 'メッセージ送信',
+  send_webhook: '外部連携へ送信',
+  switch_rich_menu: 'リッチメニュー切替',
+  remove_rich_menu: 'リッチメニュー解除',
+  set_support_mark: '対応マーク',
+  support_mark: '対応マーク',
+  notify: '担当者通知',
+}
+
+function Wizard({ stage }: { stage: PublishStage }) {
+  const current = stage === 'conflicts' || stage === 'test' ? 3 : 4
+  return (
+    <ol className={"arp-steps"} aria-label="自動応答編集の進み方">
+      {WIZARD_STEPS.map((label, index) => {
+        const done = stage === 'done' || index < current
+        const active = !done && index === current
+        return (
+          <li key={label} className={"arp-step"} aria-current={active ? 'step' : undefined}>
+            <span className={done ? "arp-stepDone" : active ? "arp-stepCurrent" : "arp-stepTodo"}>
+              {done ? <Check aria-hidden="true" /> : index + 1}
+            </span>
+            <span>
+              <small>STEP {index + 1}</small>
+              <strong>{label}</strong>
+            </span>
+          </li>
+        )
+      })}
+    </ol>
+  )
+}
+
+function PanelHeading({ title, description }: { title: string; description?: string }) {
+  return (
+    <header className={"arp-panelHeading"}>
+      <h2>{title}</h2>
+      {description ? <p>{description}</p> : null}
+    </header>
+  )
+}
+
+function SummaryRows({ rows }: { rows: Array<{ label: string; value: string }> }) {
+  return (
+    <dl className={"arp-summaryRows"}>
+      {rows.map((row) => (
+        <div key={row.label}>
+          <dt>{row.label}</dt>
+          <dd title={row.value}>{row.value}</dd>
+        </div>
+      ))}
+    </dl>
+  )
+}
+
+/*
+ * LINEの見た目の枠は共通部品 `LinePreview`（B-6）。
+ * `lead`（いつ・何番目が動くか）は動く情報なので、見える札のまま残す。
+ */
+function AutoReplyPreview({
+  lead,
+  message,
+  actionLabel = '予約を確認',
+}: {
+  lead: string
+  message: string
+  actionLabel?: string
+}) {
+  return (
+    <LinePreview caption={lead}>
+      <div className="rounded-card bg-canvas p-4 text-caption font-semibold leading-relaxed text-ink">
+        <p className="whitespace-pre-wrap">{message}</p>
+        {actionLabel ? <p className="bg-accent-deep text-on-accent rounded-control mt-3 px-3 py-2 text-center">{actionLabel}</p> : null}
+      </div>
+    </LinePreview>
+  )
+}
+
+function actionTypeOf(value: unknown): string | null {
+  if (!value || typeof value !== 'object') return null
+  const item = value as Record<string, unknown>
+  const type = item.actionType ?? item.action_type ?? item.type
+  return typeof type === 'string' ? type : null
+}
+
+function actionLabel(types: string[]): string {
+  if (types.length === 0) return '返信のみ'
+  return types.map((type) => ACTION_LABELS[type] ?? '設定した処理').join('・')
+}
+
+function conditionLabel(draft: AutoReplyDraftVersion): string {
+  if (draft.settings.respondToAll) return 'すべてのメッセージ'
+  const words = draft.settings.keywords
+    ?.flatMap((item) => typeof item.keyword === 'string' ? [item.keyword] : []) ?? []
+  const keyword = words[0] ?? draft.settings.keyword
+  return keyword ? `「${keyword}」を含む` : '—（未取得）条件を確認できません'
+}
+
+function targetLabel(draft: AutoReplyDraftVersion): string {
+  const conditions = draft.settings.friendConditions
+  if (!conditions) return 'すべての友だち'
+  const label = conditions.label
+  return typeof label === 'string' && label ? label : '条件に合う友だち'
+}
+
+function scheduleLabel(draft: AutoReplyDraftVersion): string {
+  const { activeFrom, activeUntil } = draft.settings
+  if (!activeFrom && !activeUntil) return '毎日・終日'
+  return `毎日 ${activeFrom ?? '00:00'}〜${activeUntil ?? '24:00'}`
+}
+
+function responseLabel(draft: AutoReplyDraftVersion): string {
+  if (draft.settings.responseType === 'silent') return '返信なし・アクションのみ'
+  if (draft.settings.templateId) return 'テンプレート＋ボタン'
+  return draft.settings.responseType === 'text' ? 'テキスト' : '設定した返信'
+}
+
+function senderLabel(friend: FriendListItem): string {
+  const mark = friend.supportMark?.name ?? (friend.handled === false ? '未対応' : '対応状況なし')
+  const operator = friend.operator?.name ?? '担当者なし'
+  return `${mark}・${operator}`
+}
+
+function AutoReplyPublishInner() {
+  const router = useRouter()
+  const params = useSearchParams()
+  const autoReplyId = params.get('id') ?? ''
+  const [stage, setStage] = useState<PublishStage>('conflicts')
+  usePageTitle(PAGE_TITLES[stage])
+
+  const [loadState, setLoadState] = useState<LoadState>('loading')
+  const [friendLoadState, setFriendLoadState] = useState<FriendLoadState>('loading')
+  const [draft, setDraft] = useState<AutoReplyDraftVersion | null>(null)
+  const [conflicts, setConflicts] = useState<AutoReplyConflict[]>([])
+  const [friends, setFriends] = useState<FriendListItem[]>([])
+  const [friendTotal, setFriendTotal] = useState(0)
+  const [friendQuery, setFriendQuery] = useState('')
+  const [selectedFriendId, setSelectedFriendId] = useState('')
+  const [testMessage, setTestMessage] = useState('予約変更したい')
+  const [validation, setValidation] = useState<AutoReplyValidationResult | null>(null)
+  const [dryRun, setDryRun] = useState<AutoReplyDryRunResult | null>(null)
+  const [published, setPublished] = useState<AutoReplyPublishResult | null>(null)
+  const [acknowledged, setAcknowledged] = useState<Set<string>>(() => new Set())
+  const [testDialogOpen, setTestDialogOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [actionError, setActionError] = useState('')
+  /*
+    NEXT-20: 有効化の直後に「一時停止」を置くなら、一覧と同じ停止確認と
+    専用の停止口へ繋ぐ。止めた記録は stopped に持ち、画面の「稼働中」を
+    「停止中」へ更新する。
+  */
+  const [stopOpen, setStopOpen] = useState(false)
+  const [stopReason, setStopReason] = useState('')
+  const [stopError, setStopError] = useState('')
+  const [stopped, setStopped] = useState<{
+    stoppedAt: string | null
+    stoppedByStaffName: string | null
+    stopReason: string | null
+  } | null>(null)
+
+  // 送信者候補は先頭20件だけ。21件目以降は名前で探す。失敗時は選び直せるよう
+  // 再読込ボタンを出す（無いとテスト実行ボタンまで詰む）。
+  const loadFriends = useCallback(async (accountId: string, search?: string) => {
+    setFriendLoadState('loading')
+    try {
+      const res = await api.friends.list({
+        accountId,
+        includeChatStatus: true,
+        limit: 20,
+        search: search?.trim() || undefined,
+      })
+      if (!res.success) throw new Error(res.error)
+      const items = Array.isArray(res.data?.items) ? res.data.items : []
+      setFriends(items)
+      setFriendTotal(typeof res.data?.total === 'number' ? res.data.total : items.length)
+      setSelectedFriendId((current) => current || items[0]?.id || '')
+      setFriendLoadState('ready')
+    } catch {
+      setFriends([])
+      setFriendTotal(0)
+      setSelectedFriendId('')
+      setFriendLoadState('error')
+    }
+  }, [])
+
+  const load = useCallback(async () => {
+    if (!autoReplyId) {
+      // U098: 対象未指定は失敗と分ける。再読み込みしても対象は増えない。
+      setLoadState('missing')
+      return
+    }
+    setLoadState('loading')
+    try {
+      const [draftRes, conflictRes] = await Promise.all([
+        api.autoReplies.getDraft(autoReplyId),
+        api.autoReplies.conflicts(autoReplyId),
+      ])
+      if (!draftRes.success || !conflictRes.success || !draftRes.data?.settings) {
+        throw new Error('load failed')
+      }
+      setDraft(draftRes.data)
+      setConflicts(Array.isArray(conflictRes.data?.conflicts) ? conflictRes.data.conflicts : [])
+      setLoadState('ready')
+      await loadFriends(draftRes.data.settings.lineAccountId)
+    } catch (cause) {
+      if (cause instanceof ApiError && cause.status === 404) setLoadState('not-found')
+      else setLoadState(cause instanceof ApiError && cause.status === 403 ? 'denied' : 'error')
+    }
+  }, [autoReplyId, loadFriends])
+
+  useEffect(() => { void load() }, [load])
+
+  const gates = useMemo(
+    () => publishGates(validation, dryRun, acknowledged),
+    [validation, dryRun, acknowledged],
+  )
+  const ready = canPublish(gates)
+
+  const run = async (what: string, fn: () => Promise<void>) => {
+    if (busy) return
+    setBusy(true)
+    setActionError('')
+    try {
+      await fn()
+    } catch {
+      setActionError(`${what}できませんでした。状態を読み直してから、もう一度お試しください。`)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (loadState === 'loading') return <ListState kind="loading" />
+  if (loadState === 'denied') {
+    return (
+      <ListState
+        kind="forbidden"
+        title="この自動応答を有効化する権限がありません"
+        description="下書きの中身も表示していません。統括または管理者に有効化を依頼してください。"
+        action={<Button href="/auto-replies">自動応答の一覧へ戻る</Button>}
+      />
+    )
+  }
+  if (loadState === 'missing') {
+    /*
+      U098: 対象未指定のとき「再読み込み」は同じ失敗を繰り返すだけ。
+      一覧へ戻して、公開する下書きを選び直させる。
+    */
+    return (
+      <TargetMissing
+        kind="unspecified"
+        title="公開する自動応答が指定されていません"
+        description="編集画面から「公開」へ進むか、一覧から自動応答を選び直してください。"
+        backHref="/auto-replies"
+        backLabel="自動応答の一覧へ戻る"
+      />
+    )
+  }
+  if (loadState === 'not-found' || (!draft && loadState !== 'error')) {
+    return (
+      <TargetMissing
+        kind="not-found"
+        title="この自動応答は見つかりません"
+        description="削除されたか、別の記録です。一覧から選び直してください。"
+        backHref="/auto-replies"
+        backLabel="自動応答の一覧へ戻る"
+      />
+    )
+  }
+  if (loadState === 'error' || !draft) {
+    return (
+      <TargetMissing
+        kind="error"
+        title="下書きを表示できませんでした"
+        description="保存した下書きは消えていません。通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+        onRetry={() => void load()}
+      />
+    )
+  }
+
+  const draftActionTypes = draft.settings.actions
+    ?.flatMap((item) => {
+      const type = actionTypeOf(item)
+      return type ? [type] : []
+    }) ?? []
+  const testedActionTypes = dryRun?.actions.map((item) => item.kind) ?? draftActionTypes
+  const ruleName = draft.settings.name || draft.settings.keyword || '名前を確認できません'
+  const previewMessage = dryRun?.winner?.responseContent || draft.settings.responseContent
+    || '—（未取得）返信内容を確認できません'
+  /*
+    試した友だちのトークが「対応中」なのに返すルールは、担当者の返信と
+    二重に届く。抑止設定の無いルールが勝ったときだけ警告を出す。
+    （抑止対象は「対応中は返さない」を付けたルールだけ——予約・支払いの
+      自動通知は別経路なので、この判定では止まらない。）
+  */
+  const winnerCandidate = dryRun?.candidates.find(
+    (item) => item.autoReplyId === dryRun.winner?.autoReplyId,
+  ) ?? null
+  const winnerRepliesDuringHandling = Boolean(
+    dryRun?.operatorActive && dryRun.winner && winnerCandidate
+      && !winnerCandidate.suppressWhenOperatorActive,
+  )
+  const selectedFriend = friends.find((friend) => friend.id === selectedFriendId) ?? null
+
+  const openTestStage = () => {
+    setStage('test')
+    setTestDialogOpen(true)
+  }
+
+  const runDryTest = () => void run('テストを実行', async () => {
+    if (!selectedFriendId || !testMessage.trim()) throw new Error('test input missing')
+    const res = await api.autoReplies.testDraft(autoReplyId, {
+      friendId: selectedFriendId,
+      incomingText: testMessage,
+    })
+    if (!res.success) throw new Error('test failed')
+    setDryRun(res.data)
+    setTestDialogOpen(false)
+  })
+
+  const openStopDialog = () => {
+    setStopReason('')
+    setStopError('')
+    setStopOpen(true)
+  }
+
+  /*
+    停止は確認窓の決定ボタンからだけ呼ぶ。成功したら下書きと競合を
+    読み直し（load()）、画面に残る「稼働中」を停止の表示へ更新する。
+    失敗は窓の中に理由を出し、取消なら稼働は続く。
+  */
+  const handleStop = async () => {
+    if (busy) return
+    setBusy(true)
+    setStopError('')
+    try {
+      const res = await api.autoReplies.stop(
+        autoReplyId,
+        { reason: stopReason.trim() === '' ? null : stopReason.trim() },
+        crypto.randomUUID(),
+      )
+      if (!res.success) {
+        setStopError('自動応答を停止できませんでした。状態を読み直してからお試しください。')
+        return
+      }
+      setStopOpen(false)
+      setStopReason('')
+      setStopped({
+        stoppedAt: res.data.stoppedAt,
+        stoppedByStaffName: res.data.stoppedByStaffName,
+        stopReason: res.data.stopReason,
+      })
+      await load()
+    } catch (cause) {
+      // 権限で断られたときは読み直しても直らない。読み直せとは書かない。
+      setStopError(
+        cause instanceof ApiError && cause.status === 403
+          ? 'この自動応答を停止する権限がありません。統括または管理者に依頼してください。'
+          : '自動応答を停止できませんでした。状態を読み直してからお試しください。',
+      )
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /*
+    「複製して作成」は今の下書き設定を写した新しい下書きを作り、その
+    編集画面へ進む。単なる一覧リンクだと押した人が「複製された」と
+    読むので、対象を引き継いだ本物の複製にする。
+  */
+  const duplicate = () => void run('複製を作成', async () => {
+    if (!draft) throw new Error('draft missing')
+    const baseName = draft.settings.name || draft.settings.keyword || '自動応答'
+    const res = await api.autoReplies.createDraft({
+      ...draft.settings,
+      name: `${baseName}（複製）`.slice(0, 250),
+    })
+    if (!res.success || !res.data?.autoReplyId) throw new Error('duplicate failed')
+    router.push(`/auto-replies/edit?id=${encodeURIComponent(res.data.autoReplyId)}`)
+  })
+
+  return (
+    <div className={"arp-page"} data-design-node={stage === 'conflicts' ? 'U9hzqH' : stage === 'test' ? 'g46ja' : stage === 'confirm' ? 'Yj6CQ' : 'e6iJG'}>
+      <Link href="/auto-replies" className={"arp-backLink"}>
+        <ArrowLeft aria-hidden="true" />
+        {stage === 'test' ? '自動応答編集' : '自動応答一覧'}
+      </Link>
+
+      <Wizard stage={stage} />
+
+      {actionError ? (
+        <div className={"arp-errorNotice"} role="alert">
+          <AlertTriangle aria-hidden="true" />
+          {actionError}
+        </div>
+      ) : null}
+
+      {stage === 'conflicts' ? (
+        <>
+          <div className={"arp-columns"}>
+            <div className={"arp-mainColumn"}>
+              <section className={"arp-panel"}>
+                <PanelHeading title="競合・優先順位" description="同じメッセージに複数ルールが一致する場合の動作を確認します。" />
+                {conflicts.length > 0 ? (
+                  <div className={"arp-conflictNotice"}>
+                    <AlertTriangle aria-hidden="true" />
+                    <span><strong>競合するルールが{conflicts.length}件あります</strong><small>「{draft.settings.keyword}」という入力で複数ルールに一致します。</small></span>
+                  </div>
+                ) : null}
+                <ol className={"arp-priorityList"}>
+                  <li className={"arp-priorityWinner"}>
+                    <span>1</span>
+                    <div><strong>{ruleName}（このルール）</strong><small>{draft.settings.matchType === 'exact' ? '完全一致' : '部分一致'}：{draft.settings.keyword}</small></div>
+                    <em>最初に実行</em>
+                  </li>
+                  {conflicts.map((conflict, index) => {
+                    const tone = conflictTone(conflict, draft.autoReplyId)
+                    const checked = acknowledged.has(conflict.autoReplyId)
+                    return (
+                      <li key={conflict.autoReplyId}>
+                        <span>{index + 2}</span>
+                        <Checkbox
+                          checked={checked}
+                          aria-label={`${conflict.name}の重なりを確認した`}
+                          onCheckedChange={() => {
+                            setAcknowledged((current) => {
+                              const next = new Set(current)
+                              if (next.has(conflict.autoReplyId)) next.delete(conflict.autoReplyId)
+                              else next.add(conflict.autoReplyId)
+                              return next
+                            })
+                          }}
+                          description={`${tone.label}・${conflict.reason}`}
+                        >{conflict.name}</Checkbox>
+                        <em>{conflict.certainty === 'certain' ? '停止' : '対象外'}</em>
+                      </li>
+                    )
+                  })}
+                </ol>
+                <div className={"arp-conflictSettings"}>
+                  <div><span>一致後の動作</span><strong>最初の1件だけ実行</strong></div>
+                  <div><span>優先順位</span><strong>手動で並び替え</strong></div>
+                </div>
+              </section>
+              <section className={"arp-panel"}>
+                <PanelHeading title="ループ防止" description="自動応答が自動応答を呼び続けないよう制御します。" />
+                <ul className={"arp-loopList"}>
+                  <li><CheckCircle2 aria-hidden="true" />自動返信メッセージには反応しない</li>
+                  <li><CheckCircle2 aria-hidden="true" />同じ友だちへ{draft.settings.cooldownMinutes ?? 5}分間は再実行しない</li>
+                  <li><CheckCircle2 aria-hidden="true" />Webhookの再送は同一IDで除外</li>
+                </ul>
+              </section>
+            </div>
+            <aside className={"arp-sideColumn"}>
+              <section className={"arp-panel"}>
+                <PanelHeading title="判定例" />
+                <SummaryRows rows={[
+                  { label: '入力', value: '予約を変更したい' },
+                  { label: '一致したルール', value: `${conflicts.length}件` },
+                  { label: '実行されるもの', value: ruleName },
+                  { label: '停止', value: '1件目の実行後' },
+                ]} />
+              </section>
+              <section className={"arp-panel"}>
+                <PanelHeading title="運用監視" description="問題発生時はSlackへ通知します。" />
+                <ul className={"arp-monitorList"}>
+                  {['競合件数の急増', 'ループ検知', '実行失敗', '担当者引継ぎ失敗'].map((label) => (
+                    <li key={label}><Bell aria-hidden="true" />{label}</li>
+                  ))}
+                </ul>
+              </section>
+              <AutoReplyPreview lead="1番目のルールだけが実行されます" message={previewMessage} actionLabel="" />
+            </aside>
+          </div>
+          <div className={"arp-stickyBar"}>
+            <div />
+            <div className={"arp-stickyActions"}>
+              <Button href={`/auto-replies/edit?id=${encodeURIComponent(autoReplyId)}&step=response`}>下書き保存</Button>
+              <Button
+                data-qa-open="g46ja"
+                variant="primary"
+                disabled={busy || acknowledged.size !== conflicts.length}
+                onClick={openTestStage}
+              >
+                テストへ
+              </Button>
+            </div>
+            <div />
+          </div>
+        </>
+      ) : null}
+
+      {stage === 'test' ? (
+        <>
+          <div className={"arp-columns"}>
+            <div className={"arp-mainColumn"}>
+              <section className={`${"arp-panel"} ${"arp-confirmPanel"}`}>
+                <PanelHeading title="テスト入力" description="受信した想定の言葉を入力します。" />
+                <div className={"arp-testFields"}>
+                  <label>
+                    <span>メッセージ</span>
+                    <input
+                      value={testMessage}
+                      onChange={(event) => setTestMessage(event.target.value)}
+                      maxLength={2_000}
+                      placeholder="例：予約変更したい"
+                    />
+                  </label>
+                  <div className={"arp-selectField"}>
+                    <span>送信者</span>
+                    <Select
+                      aria-label="送信者"
+                      size="full"
+                      value={selectedFriendId}
+                      disabled={friendLoadState !== 'ready' || friends.length === 0}
+                      onChange={setSelectedFriendId}
+                      options={friends.length > 0
+                        ? friends.map((friend) => ({ value: friend.id, label: senderLabel(friend) }))
+                        : [{ value: '', label: friendLoadState === 'error' ? '—（未取得）送信者を確認できません' : '読み込み中' }]}
+                    />
+                    <span className="text-caption text-ink-faint">
+                      {friendLoadState === 'ready'
+                        ? `候補 ${friendTotal.toLocaleString('ja-JP')}人中 ${friends.length}人を表示`
+                        : friendLoadState === 'error'
+                          ? '送信者を確認できませんでした'
+                          : '送信者を読み込み中'}
+                      {selectedFriend?.chatStatus
+                        ? `・この友だちのトークは「${CHAT_STATUS_WORDS[selectedFriend.chatStatus] ?? '確認中'}」`
+                        : ''}
+                    </span>
+                    <div className="arp-senderTools">
+                      <input
+                        aria-label="送信者を名前で探す"
+                        value={friendQuery}
+                        onChange={(event) => setFriendQuery(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter' && draft?.settings.lineAccountId) {
+                            event.preventDefault()
+                            void loadFriends(draft.settings.lineAccountId, friendQuery)
+                          }
+                        }}
+                        placeholder="名前で探す"
+                      />
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        disabled={friendLoadState === 'loading' || !draft?.settings.lineAccountId}
+                        onClick={() => draft?.settings.lineAccountId && void loadFriends(draft.settings.lineAccountId, friendQuery)}
+                      >
+                        {friendLoadState === 'error' ? '送信者を読み直す' : '探す'}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+                <p className="text-caption text-ink-faint">
+                  ここで試しても、選んだ友だちへは何も届きません。動くかどうかの確認だけをします。
+                </p>
+              </section>
+
+              <section className={"arp-panel"}>
+                <PanelHeading title="判定結果" description="どのルールが反応するか確認します。" />
+                <div className={"arp-resultCards"}>
+                  <div>
+                    <MessageCircle aria-hidden="true" />
+                    <span><small>一致したルール</small><strong>{dryRun?.winner?.name ?? ruleName}</strong></span>
+                  </div>
+                  <div>
+                    <Tag aria-hidden="true" />
+                    <span><small>返信内容</small><strong>{responseLabel(draft)}</strong></span>
+                  </div>
+                </div>
+                {dryRun?.operatorActive ? (
+                  <div className={"arp-infoNotice"} role="note">
+                    <Bell aria-hidden="true" />
+                    この送信者のトークは「対応中」です。「対応中は返さない」設定のルールだけが見送られ、
+                    対応中が解除されるとあらためて動きます。
+                  </div>
+                ) : null}
+                {winnerRepliesDuringHandling ? (
+                  <div className={"arp-warningNotice"} role="alert">
+                    <AlertTriangle aria-hidden="true" />
+                    「{dryRun?.winner?.name}」は対応中でも返す設定です。担当者の返信と二重に届くことがあります。
+                    二重を避けたいときは、編集で「担当者が対応中のトークでは返さない」をオンにしてください。
+                  </div>
+                ) : null}
+                {dryRun ? (
+                  <ol className={"arp-evaluationList"}>
+                    {dryRun.candidates.map((candidate) => (
+                      <li key={candidate.autoReplyId}>
+                        <span>
+                          {candidate.priority}. {candidate.name}
+                          {candidate.suppressWhenOperatorActive ? (
+                            <small>「対応中は返さない」設定</small>
+                          ) : null}
+                        </span>
+                        <strong>{RESULT_LABELS[candidate.result] ?? candidate.result}</strong>
+                        {candidate.reasonCodes.length > 0 ? (
+                          <small>{candidate.reasonCodes.map((code) => REASON_LABELS[code] ?? code).join('・')}</small>
+                        ) : null}
+                        {candidate.reasonCodes.map((code) => REASON_RELEASE[code]).filter(Boolean).length > 0 ? (
+                          <small>
+                            {candidate.reasonCodes
+                              .map((code) => REASON_RELEASE[code])
+                              .filter(Boolean)
+                              .join('・')}
+                          </small>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ol>
+                ) : null}
+                {dryRun ? (
+                  <p className="text-caption text-ink-faint">
+                    「対応中は返さない」を付けたルールだけが、対応中の抑止対象です。
+                    予約・支払いなどの自動通知は別の送信経路なので、この判定では止まりません。
+                    ルールは上から順に見て、最初に条件まで通った1件だけが動きます。
+                  </p>
+                ) : null}
+              </section>
+            </div>
+
+            <aside className={"arp-sideColumn"}>
+              <section className={"arp-panel"}>
+                <PanelHeading title="設定内容" />
+                <SummaryRows rows={[
+                  { label: '本番への影響', value: 'なし' },
+                  { label: 'テスト', value: dryRun ? '完了' : '—（未取得）未実行' },
+                  { label: '一致したルール', value: dryRun?.winner?.name ?? '—（未取得）未実行' },
+                  { label: '実行される内容', value: actionLabel(testedActionTypes) },
+                ]} />
+              </section>
+              <AutoReplyPreview lead="［テスト］受信から 3秒後に返信" message={previewMessage} actionLabel="空き枠を見る" />
+              <div className={"arp-previewActions"}>
+                <Button onClick={() => setTestDialogOpen(true)}><Send aria-hidden="true" />テスト送信</Button>
+                <Button onClick={() => setTestDialogOpen(true)}><Eye aria-hidden="true" />応答イメージを見る</Button>
+              </div>
+            </aside>
+          </div>
+
+          <div className={"arp-stickyBar"}>
+            <div />
+            <div className={"arp-stickyActions"}>
+              <Button href={`/auto-replies/edit?id=${encodeURIComponent(autoReplyId)}`}>下書きを保存</Button>
+              <Button variant="primary" onClick={() => setTestDialogOpen(true)} disabled={busy || !selectedFriendId}>
+                自動応答をテスト
+              </Button>
+              <Button
+                data-qa-open="Yj6CQ"
+                disabled={busy || !dryRun}
+                onClick={() => void run('最終確認を表示', async () => {
+                  const res = await api.autoReplies.validateDraft(autoReplyId)
+                  if (!res.success) throw new Error('validate failed')
+                  setValidation(res.data)
+                  setStage('confirm')
+                })}
+              >
+                最終確認へ
+              </Button>
+            </div>
+            <div />
+          </div>
+        </>
+      ) : null}
+
+      {stage === 'confirm' ? (
+        <>
+          <div className={"arp-columns"}>
+            <div className={"arp-mainColumn"}>
+              <section className={`${"arp-panel"} ${"arp-checkPanel"}`}>
+                <PanelHeading title="有効化前チェック" />
+                <ul>
+                  {gates.map((gate) => (
+                    <li key={gate.label}>
+                      <CheckCircle2 aria-hidden="true" />
+                      <span>{gate.label}</span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+
+              <section className={"arp-panel"}>
+                <PanelHeading title="最終確認" description="有効化すると受信メッセージを自動判定します。" />
+                <SummaryRows rows={[
+                  { label: 'ルール名', value: ruleName },
+                  { label: 'どんなときに動くか', value: conditionLabel(draft) },
+                  { label: '曜日・時間', value: scheduleLabel(draft) },
+                  { label: '対象', value: targetLabel(draft) },
+                  { label: '返信', value: responseLabel(draft) },
+                  { label: 'アクション', value: actionLabel(draftActionTypes) },
+                ]} />
+                <div className={"arp-warningNotice"}>
+                  <AlertTriangle aria-hidden="true" />
+                  {draft.settings.oncePerFriend ? '最初の1件だけ実行し、' : ''}
+                  {draft.settings.cooldownMinutes
+                    ? `${draft.settings.cooldownMinutes}分間の連続反応を防止します。`
+                    : '設定した条件に合う最初のルールだけ実行します。'}
+                </div>
+              </section>
+            </div>
+
+            <aside className={"arp-sideColumn"}>
+              <AutoReplyPreview lead={`${conditionLabel(draft)}メッセージが届いたら、すぐに返します`} message={previewMessage} />
+              <section className={"arp-panel"}>
+                <PanelHeading title="有効化する内容" />
+                <SummaryRows rows={[
+                  { label: '状態', value: '有効化前' },
+                  {
+                    label: '過去の一致',
+                    value: draft.matchedLast28Days === null || draft.matchedLast28Days === undefined
+                      ? '—（未取得）'
+                      : `${draft.matchedLast28Days}件／28日`,
+                  },
+                  { label: '競合', value: `${conflicts.length}件・確認済み` },
+                  { label: '監視', value: 'Slack通知' },
+                ]} />
+              </section>
+            </aside>
+          </div>
+
+          <div className={"arp-stickyBar"}>
+            <div />
+            <div className={"arp-stickyActions"}>
+              <Button onClick={() => setStage('test')}><ArrowLeft aria-hidden="true" />戻って修正</Button>
+              <Button href={`/auto-replies/edit?id=${encodeURIComponent(autoReplyId)}`}>下書きを保存</Button>
+              <Button
+                variant="primary"
+                disabled={busy || !ready}
+                title={ready ? undefined : '上の確認がすべて済むまで有効化できません'}
+                onClick={() => void run('自動応答を有効化', async () => {
+                  const key = `${autoReplyId}:${draft.versionId}`
+                  const res = await api.autoReplies.publishDraft(
+                    autoReplyId,
+                    { acknowledgedConflictIds: [...acknowledged] },
+                    key,
+                  )
+                  if (!res.success) throw new Error('publish failed')
+                  setPublished(res.data)
+                  setStage('done')
+                })}
+              >
+                自動応答を有効化
+              </Button>
+            </div>
+            <div />
+          </div>
+        </>
+      ) : null}
+
+      {stage === 'done' && published ? (
+        <>
+          <div className={"arp-columns"}>
+            <section className={`${"arp-panel"} ${"arp-donePanel"}`}>
+              <div className={"arp-doneMark"}><MessageCircle aria-hidden="true" /></div>
+              <h2>{stopped ? '自動応答を停止しました' : '自動応答を有効化しました'}</h2>
+              <p>{stopped
+                ? '受信メッセージへの自動返信は止まりました。再開は自動応答の一覧からできます。'
+                : '受信メッセージを判定し、一致した友だちへ自動で返信します。'}</p>
+              <div className={"arp-doneSummary"}>
+                <SummaryRows rows={[
+                  { label: 'ルール名', value: ruleName },
+                  { label: 'どんなときに動くか', value: conditionLabel(draft) },
+                  { label: '対象', value: targetLabel(draft) },
+                  { label: '優先順位', value: `${draft.settings.priority}番目` },
+                  { label: '状態', value: stopped ? '停止中' : '稼働中' },
+                ]} />
+              </div>
+              {stopped ? (
+                <div className={"arp-infoNotice"}>
+                  <PauseCircle aria-hidden="true" />
+                  {stopped.stoppedByStaffName ?? 'あなた'}が停止しました
+                  {stopped.stopReason ? `（${stopped.stopReason}）` : ''}。
+                  再開は自動応答の一覧からできます。
+                </div>
+              ) : (
+                <div className={"arp-infoNotice"}>
+                  <Bell aria-hidden="true" />
+                  実行エラー・競合増加・担当者引継ぎはSlackへ通知します。
+                </div>
+              )}
+              <div className={"arp-doneActions"}>
+                <Button href="/auto-replies"><List aria-hidden="true" />一覧へ戻る</Button>
+                <Button href={`/auto-replies/runs?id=${encodeURIComponent(autoReplyId)}`} variant="primary">
+                  <Activity aria-hidden="true" />実行状況を確認
+                </Button>
+              </div>
+            </section>
+
+            <aside className={"arp-sideColumn"}>
+              <section className={"arp-panel"}>
+                <PanelHeading title="次にできること" description="稼働中でも安全に変更できます。" />
+                <div className={"arp-nextActions"}>
+                  {stopped ? (
+                    <Button href="/auto-replies"><List aria-hidden="true" />一覧で再開する</Button>
+                  ) : (
+                    <Button onClick={openStopDialog} disabled={busy}>
+                      <PauseCircle aria-hidden="true" />自動応答を一時停止
+                    </Button>
+                  )}
+                  <Button href={`/auto-replies/edit?id=${encodeURIComponent(autoReplyId)}`}><Pencil aria-hidden="true" />内容を編集する</Button>
+                  <Button onClick={openTestStage}><FlaskConical aria-hidden="true" />テストを再実行</Button>
+                  <Button onClick={duplicate} disabled={busy}><Copy aria-hidden="true" />自動応答を複製して作成</Button>
+                </div>
+              </section>
+              <section className={"arp-panel"}>
+                <PanelHeading title="監視中" description="問題が起きた場合だけ表示します。" />
+                <ul className={"arp-monitorList"}>
+                  {['実行失敗', '競合数の増加', 'ループ検知', '担当者引継ぎ失敗'].map((label) => (
+                    <li key={label}><Activity aria-hidden="true" />{label}</li>
+                  ))}
+                </ul>
+              </section>
+              <AutoReplyPreview lead={`「${testMessage}」を受信したらすぐ返します`} message={previewMessage} actionLabel="空き枠を見る" />
+            </aside>
+          </div>
+          <div className={"arp-stickyBar"} aria-hidden="true"><div /></div>
+        </>
+      ) : null}
+
+      {stage === 'test' && testDialogOpen ? (
+        <div className={"arp-overlay"} role="presentation">
+          <section className={"arp-dialog"} role="dialog" aria-modal="true" aria-labelledby="test-dialog-title">
+            <div className={"arp-dialogTitle"}>
+              <CheckCircle2 aria-hidden="true" />
+              <h2 id="test-dialog-title">テストを実行しますか？</h2>
+              <button type="button" onClick={() => setTestDialogOpen(false)} disabled={busy} aria-label="閉じる" className="ml-auto rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken disabled:opacity-50">
+                <X aria-hidden="true" className="h-5 w-5" />
+              </button>
+            </div>
+            <p>入力内容に一致するルールと実行予定のアクションを確認します。</p>
+            <div className={"arp-dialogActions"}>
+              <Button onClick={() => { setTestDialogOpen(false); setStage('conflicts') }}>競合と優先順位へ戻る</Button>
+              <Button data-qa-open="g46ja-run" onClick={runDryTest} disabled={busy || !selectedFriendId || !testMessage.trim()}>
+                {busy ? 'テスト中…' : '自動応答をテスト'}
+              </Button>
+              <Button variant="primary" disabled={!dryRun} onClick={() => setTestDialogOpen(false)}>
+                最終確認へ
+              </Button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {/*
+        停止の確認窓。一覧の停止と同じ組み立て：対象と影響を見せてから
+        決定ボタンで専用の停止口へ。理由（任意）は記録に残る。
+      */}
+      <ConfirmDialog
+        open={stopOpen}
+        title={`自動応答「${ruleName}」を停止しますか？`}
+        description="止めているあいだ、この自動応答は動きません。いつ・誰が・なぜ止めたかが記録に残り、あとから再開できます。"
+        confirmLabel="停止する"
+        busy={busy}
+        error={stopError}
+        onCancel={() => {
+          if (busy) return
+          setStopError('')
+          setStopReason('')
+          setStopOpen(false)
+        }}
+        onConfirm={() => void handleStop()}
+      >
+        <div>
+          <label htmlFor="auto-reply-publish-stop-reason" className="text-ink-secondary block text-xs font-medium">
+            停止の理由（任意・記録に残ります）
+          </label>
+          <textarea
+            id="auto-reply-publish-stop-reason"
+            value={stopReason}
+            onChange={(e) => setStopReason(e.target.value)}
+            maxLength={500}
+            rows={2}
+            placeholder="例: キャンペーンが終わったので"
+            className="border-hairline rounded-control mt-1 w-full border px-3 py-2 text-sm"
+          />
+        </div>
+      </ConfirmDialog>
+    </div>
+  )
+}
+
+export default function AutoReplyPublishPage() {
+  return (
+    <Suspense fallback={<ListState kind="loading" />}>
+      <AutoReplyPublishInner />
+    </Suspense>
+  )
+}

@@ -1,8 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
+import { QrCode } from 'lucide-react'
 import type { EntryRoute } from '@line-crm/shared'
 import { api } from '@/lib/api'
+import { qrToDataURL } from '@/lib/qr-image'
+import Button from '@/components/shared/button'
+import Select from '@/components/shared/select'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
 
 /**
  * 友だち追加のQRコード（設計 V2 1-1-1）。
@@ -15,69 +20,187 @@ import { api } from '@/lib/api'
  * 選べば、外部サービスへデータを送らずにPDF化できる。
  */
 
+/*
+ * 選べる大きさ（#689）。
+ *
+ * Worker の /api/qr は 64〜1024px、かつ縦×横が 1,048,576 まで（`normalizeQrSize`）。
+ * 以前は「大」を 1200px にしていたため、正しく選んだ人だけが 400 で保存できなかった。
+ * ここに足すときは、必ず 1024px 以下・面積 1,048,576 以下にする。
+ */
 const SIZES = [
-  { value: '1200x1200', label: '大（1200px）', note: '印刷向け' },
+  { value: '1024x1024', label: '大（1024px）', note: '印刷向け' },
   { value: '600x600', label: '中（600px）', note: '画面向け' },
-  { value: '240x240', label: '小（240px）', note: '確認用' },
+  { value: '300x300', label: '小（300px）', note: '確認用' },
 ]
 
 /** Worker の /api/qr が受ける形式。順番はよく使うものから。 */
 const FORMATS = [
   { value: 'png', label: 'PNG' },
-  { value: 'svg', label: 'SVG' },
   { value: 'jpg', label: 'JPG' },
+  { value: 'svg', label: 'SVG' },
 ]
+
+export function resolveOfficialProfileUrl(
+  officialProfileUrl?: string | null,
+  accountBasicId?: string | null,
+): string | null {
+  if (officialProfileUrl !== undefined) return officialProfileUrl
+  if (!accountBasicId) return null
+  const basicId = accountBasicId.startsWith('@') ? accountBasicId : `@${accountBasicId}`
+  return `https://line.me/R/ti/p/${basicId}`
+}
+
+function DownloadIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="M10 3v9m0 0 3-3m-3 3L7 9M4 14v2h12v-2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
 
 export default function QrDialog({
   open,
   onClose,
   accountName,
+  officialProfileUrl,
   accountBasicId,
   baseLink,
   initialRouteId = '',
+  onRouteIdChange,
+  visualReferenceQr = false,
+  routes: routesProp,
+  routesPending: routesPendingProp,
 }: {
   open: boolean
   onClose: () => void
   accountName: string
+  /** LINE公式プロフィールで発行した lin.ee の短縮URL。 */
+  officialProfileUrl?: string | null
   /** 公式アカウントのID（`@nen` など）。QRの下に出す案内先の組み立てに使う。 */
   accountBasicId?: string | null
   baseLink: string
   /** 呼び出し元で選んでいた経路。開いたときの初期値になる。 */
   initialRouteId?: string
+  /** ダイアログ内で経路を変えたときに呼ばれる。呼び出し元はURLへ写す。 */
+  onRouteIdChange?: (routeId: string) => void
+  /** 撮影固定応答でだけ使うPencilの簡略見本。通常時は実URLのQRを生成する。 */
+  visualReferenceQr?: boolean
+  /*
+    呼び出し元が既に取った経路一覧。渡されたら取り直さない。
+    同じ口を外と中で2回叩かない。
+  */
+  routes?: EntryRoute[]
+  /*
+    経路一覧の取得がまだ終わっていないとき true。
+    アカウント切替直後など、一覧が来る前に「経路が見つからない」と
+    断定しないための目印（DASH-09）。
+  */
+  routesPending?: boolean
 }) {
-  const [routes, setRoutes] = useState<EntryRoute[]>([])
+  const [fetchedRoutes, setFetchedRoutes] = useState<EntryRoute[] | null>(null)
+  const routes = routesProp ?? fetchedRoutes ?? []
+  const routesPending = routesProp !== undefined ? (routesPendingProp ?? false) : fetchedRoutes === null
   const [routeId, setRouteId] = useState(initialRouteId)
+  /*
+   * 一覧に無いIDを指定されたときだけ取り直す。止めた経路は一覧から
+   * 外れるため、「見つからない」と「止めている」を分けるための1回。
+   */
+  const [lookedUpRoute, setLookedUpRoute] = useState<EntryRoute | null>(null)
   const [size, setSize] = useState(SIZES[0].value)
   const [format, setFormat] = useState(FORMATS[0].value)
-  const [copied, setCopied] = useState(false)
+  /* 印刷用PDFの取り寄せ状態。失敗してもダイアログは閉じない。 */
+  const [pdfState, setPdfState] = useState<'idle' | 'working' | 'failed'>('idle')
+  /*
+   * コピーの結果は3状態。失敗しても押す前と同じ見た目だと、
+   * 配布に使うURLを取れていないことに気づけない（DASH-29）。
+   */
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle')
+  const [qrDataUrl, setQrDataUrl] = useState('')
 
   // 開くたびに呼び出し元の選択に合わせる。閉じている間に向こうで
   // 経路を変えていたら、次に開いたときはそちらが正。
   useEffect(() => {
-    if (open) setRouteId(initialRouteId)
+    if (open) {
+      setRouteId(initialRouteId)
+      setPdfState('idle')
+    }
   }, [open, initialRouteId])
 
   useEffect(() => {
-    if (!open) return
+    if (!open || routesProp) return
     let cancelled = false
     void api.entryRoutes.list()
       .then((res) => {
-        // 停止中の経路のQRを配ると、読み取っても友だち追加できない。
-        if (!cancelled && res.success) setRoutes(res.data.filter((r) => r.isActive))
+        if (!cancelled) setFetchedRoutes(res.success ? res.data : [])
       })
       .catch(() => {
         // 経路一覧だけが取れなくても、基本の追加URLのQRは表示できる。
+        if (!cancelled) setFetchedRoutes([])
       })
     return () => {
       cancelled = true
     }
-  }, [open])
-
-  if (!open) return null
+  }, [open, routesProp])
 
   const base = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '')
   const route = routes.find((r) => r.id === routeId)
-  const link = route ? `${base}/r/${route.refCode}` : baseLink
+    ?? (lookedUpRoute?.id === routeId ? lookedUpRoute : null)
+  /*
+   * 一覧に無いIDは1件だけ取り直す。止めた経路は「停止しています」と出し、
+   * 削除・別アカウントの経路は「見つからない」と出す。基本URLのQRへ
+   * 黙って置き換えない。経路を選び直すまでQR・コピー・ダウンロードを
+   * 止める（DASH-09 / DASH-28 の方向）。
+   */
+  useEffect(() => {
+    if (!open || routeId === '' || routesPending) return
+    if (routes.some((r) => r.id === routeId)) {
+      setLookedUpRoute(null)
+      return
+    }
+    let cancelled = false
+    setLookedUpRoute(null)
+    void api.entryRoutes.get(routeId)
+      .then((res) => {
+        if (!cancelled && res.success) setLookedUpRoute(res.data)
+      })
+      .catch(() => {
+        // 取れなければ「見つからない」のまま。ここでは何も出さない。
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [open, routeId, routes, routesPending])
+  /* 止めた経路は QR も印刷も出さない（M）。選択肢にも出さない。 */
+  const routeStopped = route != null && !route.isActive
+  const routeMissing = routeId !== '' && !route && !routesPending
+  const link = route && route.isActive ? `${base}/r/${route.refCode}` : baseLink
+  const blocked = routeMissing || routeStopped
+
+  useEffect(() => {
+    let cancelled = false
+    setQrDataUrl('')
+    // PERF-09: 閉じている間は QR を作らない。開いた時点で qrcode を読む。
+    if (!open || blocked) {
+      return () => { cancelled = true }
+    }
+    void qrToDataURL(link, {
+      width: 220,
+      margin: 1,
+      color: { dark: '#171717', light: '#ffffff' },
+    }).then((dataUrl) => {
+      if (!cancelled) setQrDataUrl(dataUrl)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [link, blocked, open])
+
+  // Escape・Tabの循環・背景スクロール停止・閉じたあとのフォーカス戻しは
+  // 共通のoverlay作法に揃える。保存中の処理はないためEscapeは常に閉じる。
+  const panelRef = useOverlayFocus(open, onClose)
+
+  if (!open) return null
+
   const qrSrc = `${base}/api/qr?size=${size}&format=${format}&data=${encodeURIComponent(link)}`
   const saveHref = `${qrSrc}&download=1&filename=${encodeURIComponent(
     route ? `qr-${route.refCode}` : 'qr-friend-add',
@@ -89,25 +212,63 @@ export default function QrDialog({
    * 経路を選んでいればその経路のリンク。経路ごとに分けて発行したのに
    * ここが公式アカウントのままだと、どのQRを見ているのか分からない。
    *
-   * 基本のときは公式アカウントのURL。LINE が配る lin.ee の短縮URLは
-   * API から取れないので、公式ID（basicId）から組み立てる。同じ場所に
-   * 着く。ID が無いアカウントでは何も出さない。
+   * 基本のときはAPIが返した公式プロフィール短縮URLを優先する。
+   * 段階配備中の旧Workerでは公式ID（basicId）から同じ行き先を組み立てる。
    */
-  const profileUrl = route
+  const profileUrl = route && route.isActive
     ? link
-    : accountBasicId
-      ? `https://line.me/R/ti/p/${accountBasicId.startsWith('@') ? accountBasicId : `@${accountBasicId}`}`
-      : null
+    : blocked
+      ? null
+      : resolveOfficialProfileUrl(officialProfileUrl, accountBasicId)
 
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(link)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1200)
+      setCopyState('copied')
+      setTimeout(() => setCopyState('idle'), 1200)
     } catch {
-      // 安全なコンテキストでないとコピーできない。下の欄から手で取れる。
+      /*
+       * 権限拒否・安全なコンテキストでない環境では書けない。
+       * 黙って終わらせず、手動で選択してコピーする案内を出す（DASH-29）。
+       */
+      setCopyState('failed')
     }
   }
+
+  /*
+   * 印刷用PDFはサーバーで作る（M）。止めた経路は409で断られる。
+   * 基本の追加URLには経路IDが無いため、従来どおりブラウザの印刷を使う。
+   */
+  const downloadPdf = async () => {
+    if (!route || !route.isActive) return
+    setPdfState('working')
+    try {
+      const blob = await api.entryRoutes.qrPdf(route.id)
+      const objectUrl = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = objectUrl
+      anchor.download = `qr-${route.refCode}.pdf`
+      document.body.appendChild(anchor)
+      anchor.click()
+      anchor.remove()
+      URL.revokeObjectURL(objectUrl)
+      setPdfState('idle')
+    } catch {
+      setPdfState('failed')
+    }
+  }
+
+  /* 止めた記録の表示用。読めない日時は出さない。 */
+  const stoppedDetail = (() => {
+    if (!routeStopped || !route) return null
+    const reason = route.stoppedReason?.trim() || null
+    const at = route.stoppedAt ? new Date(route.stoppedAt) : null
+    const when = at && Number.isFinite(at.getTime())
+      ? at.toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' })
+      : null
+    if (reason && when) return `${reason}（${when}に停止）`
+    return reason ?? (when ? `${when}に停止` : null)
+  })()
 
   const printQr = () => {
     const printWindow = window.open('', '_blank', 'width=720,height=820')
@@ -137,14 +298,16 @@ export default function QrDialog({
   return (
     <div
       data-design="QR"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4"
       role="dialog"
       aria-modal="true"
       aria-label="友だち追加のQRコード"
       onClick={onClose}
     >
       <div
-        className="bg-canvas rounded-card border-hairline max-h-[90vh] w-full max-w-3xl overflow-y-auto border p-6 shadow-[1px_1px_2px_rgba(29,29,31,0.13)]"
+        ref={panelRef}
+        className="bg-canvas rounded-panel border-hairline max-h-[90vh] w-full overflow-y-auto border p-8 shadow-float"
+        style={{ maxWidth: 820 }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-start justify-between gap-3">
@@ -165,16 +328,33 @@ export default function QrDialog({
 
         <div className="grid gap-5 sm:grid-cols-[auto_1fr]">
           {/* 名前はQRの下。読み取る人が見るのは絵で、名前はその確認に使う。 */}
-          <div className="flex flex-col items-center">
-            <div className="bg-canvas-sunken rounded-card flex h-[240px] w-[240px] items-center justify-center">
-              {/* eslint-disable-next-line @next/next/no-img-element -- Worker のQRプロキシ。静的アセットではない */}
-              <img
-                src={qrSrc}
-                alt="友だち追加QRコード"
-                width={200}
-                height={200}
-                className="h-[200px] w-[200px]"
-              />
+          <div className="flex min-w-0 flex-col items-center">
+            {/*
+              QRの枠は横幅に応じて縮める（DASH-13）。320pxでは280px固定だと
+              パネルの内側に収まらず横にはみ出していた。正方形は保つ。
+            */}
+            <div className="bg-canvas-sunken rounded-panel flex aspect-square w-full max-w-[280px] items-center justify-center">
+              {routeStopped ? (
+                <p className="text-ink-secondary px-4 text-center text-xs leading-relaxed" role="alert">
+                  この経路は停止しています。QRコードは表示しません。
+                  {stoppedDetail ? <><br />{stoppedDetail}</> : null}
+                </p>
+              ) : routeMissing ? (
+                <p className="text-ink-faint max-w-[220px] px-4 text-center text-xs leading-relaxed">
+                  選んだ経路はこのアカウントでは見つかりません。<br />経路を選び直してください。
+                </p>
+              ) : visualReferenceQr ? (
+                <QrCode aria-label="友だち追加QRコード" className="text-ink" size={150} strokeWidth={3.8} />
+              ) : (
+                /* eslint-disable-next-line @next/next/no-img-element -- Worker のQRプロキシ。静的アセットではない */
+                <img
+                  src={qrDataUrl || qrSrc}
+                  alt="友だち追加QRコード"
+                  width={220}
+                  height={220}
+                  className="aspect-square h-auto w-full max-w-[220px]"
+                />
+              )}
             </div>
             <p className="text-ink mt-3 text-sm font-medium">{accountName}</p>
             {profileUrl && (
@@ -182,34 +362,47 @@ export default function QrDialog({
                 href={profileUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="text-action mt-1 max-w-[240px] truncate text-xs hover:underline"
+                className="text-action mt-1 max-w-full truncate text-xs hover:underline"
               >
                 {profileUrl}
               </a>
             )}
           </div>
 
-          <div className="space-y-4">
+          <div className="min-w-0 space-y-4">
             <div>
               <label htmlFor="qr-route" className="text-ink-secondary mb-1 block text-xs font-medium">
                 発行中の追加URL
               </label>
-              <select
+              <Select
+                aria-label="発行中の追加URL"
+                size="full"
                 id="qr-route"
                 value={routeId}
-                onChange={(e) => setRouteId(e.target.value)}
-                className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
-              >
-                <option value="">基本の追加URL</option>
-                {routes.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.name}
-                  </option>
-                ))}
-              </select>
-              <p className="text-ink-faint mt-1 text-xs">
-                選んだ経路のQRコードとURLが表示されます。
-              </p>
+                onChange={(value) => {
+                  setRouteId(value)
+                  onRouteIdChange?.(value)
+                }}
+                className="w-full"
+                options={[
+                  { value: '', label: '基本の追加URL' },
+                  ...routes.filter((r) => r.isActive).map((r) => ({ value: r.id, label: r.name })),
+                ]}
+              />
+              {routeStopped ? (
+                <p className="text-danger mt-1 text-xs" role="alert">
+                  この経路は停止しています。QRコードと印刷は出せません。
+                  {stoppedDetail ? ` ${stoppedDetail}` : '別の経路か「基本の追加URL」を選んでください。'}
+                </p>
+              ) : routeMissing ? (
+                <p className="text-danger mt-1 text-xs" role="alert">
+                  選んだ経路はこのアカウントでは使えません。別の経路か「基本の追加URL」を選んでください。
+                </p>
+              ) : (
+                <p className="text-ink-faint mt-1 text-xs">
+                  選んだ経路のQRコードとURLが表示されます。
+                </p>
+              )}
             </div>
 
             <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
@@ -217,31 +410,32 @@ export default function QrDialog({
                 <label htmlFor="qr-size" className="text-ink-secondary mb-1 block text-xs font-medium">
                   画像の大きさ
                 </label>
-                <select
+                <Select
+                  aria-label="画像の大きさ"
+                  size="full"
                   id="qr-size"
                   value={size}
-                  onChange={(e) => setSize(e.target.value)}
-                  className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
-                >
-                  {SIZES.map((s) => (
-                    <option key={s.value} value={s.value}>
-                      {s.label}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(value) => setSize(value)}
+                  className="w-full"
+                  options={SIZES.map((s) => ({ value: s.value, label: s.label }))}
+                />
               </div>
               <div>
                 <span className="text-ink-secondary mb-1 block text-xs font-medium">
-                  形式
+                  ダウンロード形式
                 </span>
-                <div className="border-hairline rounded-control flex overflow-hidden border" aria-label="画像形式">
+                {/*
+                  3形式は等幅のセグメントにする（DASH-19）。内容幅の flex だと
+                  SVG 側だけ余白が偏り、未選択の余白が選択肢の一部に見えた。
+                */}
+                <div className="border-hairline rounded-control grid grid-cols-3 overflow-hidden border" aria-label="画像形式">
                   {FORMATS.map((entry) => (
                     <button
                       key={entry.value}
                       type="button"
                       onClick={() => setFormat(entry.value)}
                       aria-pressed={format === entry.value}
-                      className={`border-hairline border-r px-3 py-2 text-xs font-medium last:border-r-0 ${format === entry.value ? 'bg-action text-on-action' : 'text-ink-secondary hover:bg-canvas-sunken'}`}
+                      className={`border-hairline flex h-10 items-center justify-center border-r px-2 text-xs font-medium last:border-r-0 ${format === entry.value ? 'bg-action text-on-action' : 'text-ink-secondary hover:bg-canvas-sunken'}`}
                     >
                       {entry.label}
                     </button>
@@ -257,54 +451,96 @@ export default function QrDialog({
               >
                 友だち追加リンク
               </label>
-              <div className="flex items-stretch gap-2">
-                <input
+              {/*
+                コピー操作は入力欄の外の独立した列へ出す（DASH-20）。
+                欄内の absolute 配置だと「コピーしました ✓」に変わったとき
+                URL と重なり、狭い幅では右側が切れていた。狭い幅では下へ。
+              */}
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
+                <textarea
                   id="qr-link"
                   readOnly
-                  value={link}
+                  rows={3}
+                  value={blocked ? '' : link}
                   onFocus={(e) => e.currentTarget.select()}
-                  className="border-hairline bg-canvas-sunken text-ink-secondary rounded-control min-w-0 flex-1 truncate border px-3 py-2 font-mono text-xs"
+                  className="border-hairline bg-canvas-sunken text-ink-secondary rounded-control min-w-0 flex-1 resize-none border px-3 py-2 font-mono text-xs leading-relaxed focus:outline-none"
                 />
-                <button
+                <Button
+                  variant="secondary"
+                  type="button"
                   onClick={copy}
-                  className="text-on-accent rounded-control shrink-0 px-4 text-xs font-medium"
-                  style={{
-                    backgroundColor: copied ? 'var(--color-success)' : 'var(--color-accent)',
-                  }}
+                  disabled={blocked}
+                  className="min-h-11 shrink-0"
                 >
-                  {copied ? 'コピーしました ✓' : 'コピー'}
-                </button>
+                  コピー
+                </Button>
               </div>
-              <p className="text-ink-faint mt-1 text-xs">
-                このURLから追加された友だちは、流入元を記録して計測できます。
+              {/*
+                コピーの成否は読み上げにも通知する（DASH-29）。
+                失敗時は欄から手動で選択してコピーできる案内を残す。
+              */}
+              <p aria-live="polite" className={`mt-1 text-xs ${copyState === 'failed' ? 'text-danger' : copyState === 'copied' ? 'text-success' : 'text-ink-faint'}`}>
+                {copyState === 'failed'
+                  ? 'コピーできませんでした。上のURLを選択してコピーしてください'
+                  : copyState === 'copied'
+                    ? 'コピーしました ✓'
+                    : 'このURLから追加された友だちは、流入元を記録して計測できます。'}
               </p>
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <a
-                href={saveHref}
-                className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
-              >
-                {format.toUpperCase()}をダウンロード
-              </a>
-              <button
-                type="button"
-                onClick={printQr}
-                className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
-              >
-                PDFで印刷
-              </button>
+              {blocked ? (
+                <Button variant="primary" disabled>
+                  <DownloadIcon />画像をダウンロード
+                </Button>
+              ) : (
+                <Button
+                  href={saveHref}
+                  variant="primary"
+                >
+                  <DownloadIcon />画像をダウンロード
+                </Button>
+              )}
+              {/*
+                印刷用PDFはサーバーで作る（M）。経路を選んでいるときは
+                サーバーのPDFを取り寄せ、基本の追加URLのときだけ従来の
+                ブラウザ印刷を使う。止めた経路では押せない。
+              */}
+              {route && route.isActive ? (
+                <Button
+                  variant="secondary"
+                  type="button"
+                  onClick={() => void downloadPdf()}
+                  disabled={pdfState === 'working'}
+                >
+                  PDFで印刷
+                </Button>
+              ) : (
+                <Button
+                  variant="secondary"
+                  type="button"
+                  onClick={printQr}
+                  disabled={blocked}
+                >
+                  PDFで印刷
+                </Button>
+              )}
+            </div>
+            {pdfState === 'failed' ? (
+              <p className="text-danger mt-1 text-xs" role="alert">
+                印刷用PDFを作れませんでした。もう一度押してください。
+              </p>
+            ) : null}
+
+            <div className="border-hairline bg-surface-pearl rounded-control border p-4">
+              <h3 className="text-ink text-sm font-bold">使うときのヒント</h3>
+              <ul className="text-ink-faint mt-2 space-y-1 text-xs leading-relaxed">
+                <li>・印刷には「大（1024px）」を選んでください（小さいと読み取れないことがあります）</li>
+                <li>・流入経路ごとにリンクを分けると、どこから来たかを計測できます</li>
+                <li>・QRの周囲は余白を1cm以上あけてください</li>
+              </ul>
             </div>
           </div>
-        </div>
-
-        <div className="border-hairline mt-5 border-t pt-4">
-          <h3 className="text-ink text-sm font-bold">使うときのヒント</h3>
-          <ul className="text-ink-faint mt-2 space-y-1 text-xs leading-relaxed">
-            <li>・印刷は 1200px 以上を推奨します（小さいと読み取れないことがあります）</li>
-            <li>・流入経路ごとにリンクを分けると、どこから来たかを計測できます</li>
-            <li>・QRの周囲は余白を1cm以上あけてください</li>
-          </ul>
         </div>
       </div>
     </div>

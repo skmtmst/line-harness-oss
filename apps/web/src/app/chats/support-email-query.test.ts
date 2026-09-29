@@ -12,6 +12,17 @@ describe('buildSupportEmailInboxQuery', () => {
     expect(query.get('status')).toBe('all')
     expect(query.get('q')).toBe('定期便')
     expect(query.get('limit')).toBe('200')
+    // メールはLINEアカウントに所属しない。選択中のアカウントを
+    // 検索条件へ混ぜると、アカウント選択中にメールが消える。
     expect(query.has('lineAccountId')).toBe(false)
+  })
+
+  it('2ページ目以降はoffsetを付けて遡れる', () => {
+    const first = new URLSearchParams(buildSupportEmailInboxQuery({ status: 'all' }))
+    expect(first.has('offset')).toBe(false)
+
+    const next = new URLSearchParams(buildSupportEmailInboxQuery({ status: 'all', offset: 200 }))
+    expect(next.get('offset')).toBe('200')
+    expect(next.get('limit')).toBe('200')
   })
 })

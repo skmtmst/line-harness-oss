@@ -3,11 +3,42 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { api, eventsApi, type EventDetail, type EventSlot } from '@/lib/api'
+import {
+  api,
+  ApiError,
+  EventSlotsPartialError,
+  eventsApi,
+  type EventDetail,
+  type EventSlot,
+  type EventSlotInput,
+} from '@/lib/api'
 import ImageUploader from '@/components/shared/image-uploader'
+import LinePreview from '@/components/shared/line-preview'
 import { AsideCard, ChoiceCard, Field, FormSection, inputClass } from '@/components/shared/create-page'
-import { generateBulkSlots } from './bulk-slot-generator'
+import { BULK_SLOT_LIMIT, generateBulkSlots } from './bulk-slot-generator'
 import { formatSlotJp, jstHHMMToUtcIso, splitBand, todayJst } from './jst'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { TextInput } from '@/components/shared/form-controls'
+import DateField from '@/components/shared/date-field'
+import Notice from '@/components/shared/notice'
+import { TimeField } from '@/components/shared/date-time-field'
+import Checkbox from '@/components/shared/checkbox'
+import Select from '@/components/shared/select'
+import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import EventQuestionsEditor, { parseEventQuestions } from '@/components/events/event-questions-editor'
+// #740: 下書きの初期値と字数上限は編集画面と共有する。片方だけ変えないこと。
+import {
+  EVENT_CANCEL_DEADLINE_OPTIONS,
+  EVENT_DEFAULT_DRAFT,
+  EVENT_DESCRIPTION_MAX_LENGTH,
+  EVENT_ENTRY_CUTOFF_OPTIONS,
+  EVENT_NAME_MAX_LENGTH,
+  deadlineOptionsWithSaved,
+  deadlineSelectValue,
+  parseDeadlineSelect,
+  resolveEventMultiAccountIds,
+} from './event-draft-shared'
 
 /**
  * イベントを作る（設計 V2 8-3-2 / 8-3-3 / 8-3-4）。
@@ -28,29 +59,44 @@ const STEPS: Array<{ no: 1 | 2 | 3; label: string; todo: string; done: string }>
   { no: 3, label: '公開設定', todo: '承認制・リマインダ・公開', done: '承認制・リマインダ' },
 ]
 
-const DEFAULT_DRAFT: EventDetail = {
-  id: '',
-  name: '',
-  venue_name: null,
-  venue_url: null,
-  image_url: null,
-  description: null,
-  description_centered: 0,
-  max_bookings_per_friend: null,
-  requires_approval: 0,
-  cancel_deadline_hours_before: null,
-  reminder_day_before_enabled: 1,
-  reminder_hours_before: null,
-  is_published: 0,
-  sort_order: 0,
-  confirmation_message_extra: null,
-  reminder_message_extra: null,
-  og_title: null,
-  og_description: null,
-  og_image_url: null,
-  visible_tag_id: null,
-  waitlist_enabled: 0,
-  entry_cutoff_hours_before: null,
+const DEFAULT_DRAFT: EventDetail = EVENT_DEFAULT_DRAFT
+const APPROVAL_DEADLINE_OPTIONS = [
+  { value: '2', label: '申込から2時間' },
+  { value: '24', label: '申込から24時間' },
+  { value: '72', label: '申込から72時間' },
+]
+
+type FirstSlotDraft = {
+  date: string
+  startTime: string
+  durationMinutes: number
+  capacity: string
+}
+
+const DEFAULT_FIRST_SLOT: FirstSlotDraft = {
+  date: todayJst(),
+  startTime: '14:00',
+  durationMinutes: 90,
+  capacity: '12',
+}
+
+function firstSlotPayload(slot: FirstSlotDraft) {
+  // 検証は日時変換より先に行う。空の日付を先に変換すると
+  // 「Invalid time value」という内部表現が画面に出る(#1000 DETAIL-08)。
+  if (!slot.date || !slot.startTime) throw new Error('開催日と開始時刻を入力してください')
+  if (!Number.isInteger(slot.durationMinutes) || slot.durationMinutes < 15) {
+    throw new Error('開催時間は15分以上で入力してください')
+  }
+  const capacity = Number(slot.capacity)
+  if (!Number.isInteger(capacity) || capacity < 1) {
+    throw new Error('定員は1以上の数で入力してください')
+  }
+  const startsAt = jstHHMMToUtcIso(slot.date, slot.startTime)
+  return {
+    starts_at: startsAt,
+    ends_at: new Date(new Date(startsAt).getTime() + slot.durationMinutes * 60_000).toISOString(),
+    capacity,
+  }
 }
 
 export interface EventWizardProps {
@@ -58,6 +104,10 @@ export interface EventWizardProps {
   /** 作成済みイベントのID。①を保存した時点で入る */
   eventId: string | null
   step: 1 | 2 | 3
+}
+
+function wizardSnapshot(draft: EventDetail, firstSlot: FirstSlotDraft): string {
+  return JSON.stringify({ draft, firstSlot })
 }
 
 export default function EventWizard({ accountId, eventId, step }: EventWizardProps) {
@@ -68,6 +118,21 @@ export default function EventWizard({ accountId, eventId, step }: EventWizardPro
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(Boolean(eventId))
+  const [firstSlot, setFirstSlot] = useState<FirstSlotDraft>(DEFAULT_FIRST_SLOT)
+  /*
+    #1000 DETAIL-09: ①概要の「最初の予約枠」がどの枠を指すかは、概要段階で
+    確定した枠IDに限定する。slots[0] は②で早い日時を足すと別の枠に
+    入れ替わるため、更新対象の識別には使えない。
+  */
+  const [firstSlotId, setFirstSlotId] = useState<string | null>(null)
+  /*
+   * R161 監査：名前・質問を入れたままパンくずで一覧へ戻ると、確認なく
+   * 空欄に戻る。保存済み（読み込み・保存の直後）の姿との差を未保存とし、
+   * 離れる操作では確認を出す。
+   */
+  const [savedSnapshot, setSavedSnapshot] = useState<string>(() => wizardSnapshot(DEFAULT_DRAFT, DEFAULT_FIRST_SLOT))
+  const dirty = wizardSnapshot(draft, firstSlot) !== savedSnapshot
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
 
   // ②③は①を保存したあとにしか入れない。URL を直接叩かれても①へ戻す。
   useEffect(() => {
@@ -99,8 +164,34 @@ export default function EventWizard({ accountId, eventId, step }: EventWizardPro
           eventsApi.listSlots(accountId, eventId),
         ])
         if (cancelled) return
-        setDraft(ev)
+        // Worker は質問定義を questions_json の文字列で返す。フォームは
+        // 配列で触るので、ここでほぐしてから draft に載せる。
+        const loadedDraft = { ...ev, questions: parseEventQuestions(ev.questions_json) }
+        setDraft(loadedDraft)
         setSlots(slotsRes.items)
+        const first = slotsRes.items[0]
+        // フォームへ写した枠のIDを記録する。あとで一覧が並び替わっても
+        // 「最初の予約枠」の保存先はこの枠のまま(DETAIL-09)。
+        setFirstSlotId(first?.id ?? null)
+        let loadedFirstSlot: FirstSlotDraft | null = null
+        if (first) {
+          const startsAt = new Date(first.starts_at)
+          const endsAt = new Date(first.ends_at)
+          const parts = new Intl.DateTimeFormat('en-CA', {
+            year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: 'Asia/Tokyo',
+          }).formatToParts(startsAt)
+          const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((x) => x.type === type)?.value ?? ''
+          loadedFirstSlot = {
+            date: `${part('year')}-${part('month')}-${part('day')}`,
+            startTime: `${part('hour')}:${part('minute')}`,
+            durationMinutes: Math.max(15, Math.round((endsAt.getTime() - startsAt.getTime()) / 60_000)),
+            capacity: first.capacity == null ? '' : String(first.capacity),
+          }
+          setFirstSlot(loadedFirstSlot)
+        }
+        // R161 監査：読み込んだ直後の姿を「保存済み」とし、変えた分だけ未保存にする。
+        setSavedSnapshot(wizardSnapshot(loadedDraft, loadedFirstSlot ?? DEFAULT_FIRST_SLOT))
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e))
       } finally {
@@ -126,6 +217,7 @@ export default function EventWizard({ accountId, eventId, step }: EventWizardPro
       description_centered: d.description_centered,
       max_bookings_per_friend: d.max_bookings_per_friend,
       requires_approval: d.requires_approval,
+      approval_deadline_hours: d.approval_deadline_hours,
       cancel_deadline_hours_before: d.cancel_deadline_hours_before,
       reminder_day_before_enabled: d.reminder_day_before_enabled,
       reminder_hours_before: d.reminder_hours_before,
@@ -137,42 +229,122 @@ export default function EventWizard({ accountId, eventId, step }: EventWizardPro
       waitlist_enabled: d.waitlist_enabled ?? 0,
       entry_cutoff_hours_before: d.entry_cutoff_hours_before ?? null,
       target_type: d.target_type ?? 'single',
+      // #740: 複数横断を選んだら現アカウントを必ず含めて送る。入れないと
+      // サーバの multi 契約（非空配列）に触れて 422 になる。単一のときは
+      // 従来どおり送らない（既存挙動を変えない）。
+      account_ids: resolveEventMultiAccountIds(d, accountId),
+      // 申込時の質問。空配列は「質問なし」を保存する（null なら定義を消す）。
+      questions: d.questions ?? null,
     }
   }
 
   /** 段階をまたぐ保存。goto に進み先の段階、null なら一覧へ戻る。 */
   async function persist(goto: 1 | 2 | 3 | null) {
     if (saving) return
+    /*
+      #1000 DETAIL-08: 通信を始める前に入力を全部検証する。先に
+      createEvent を呼ぶと、日付空・所要時間不正・定員0のような
+      入力エラーでもイベント本体だけが作られてしまう。
+    */
     if (!draft.name.trim()) {
       setError('イベント名は必須です')
       return
     }
-    if (draft.name.length > 255) {
+    if (draft.name.length > EVENT_NAME_MAX_LENGTH) {
       setError('イベント名は255字以内で入力してください')
       return
     }
-    if (draft.description && draft.description.length > 20000) {
+    if (draft.description && draft.description.length > EVENT_DESCRIPTION_MAX_LENGTH) {
       setError('イベント詳細は20,000字以内で入力してください')
       return
     }
+    /*
+      ①概要の「最初の予約枠」は、概要段階で確定した枠ID(firstSlotId)だけを
+      更新対象にする。slots[0] は②で早い日時を足すと別の枠に変わるので、
+      更新対象の識別に使わない(#1000 DETAIL-09)。
+      ②③からの保存では枠を触らない。枠の追加・削除・まとめて作成は
+      ②の各操作に限定し、イベント設定の保存と分離する。
+    */
+    const syncFirstSlot = step === 1
+    let slotPayload: ReturnType<typeof firstSlotPayload> | null = null
+    if (syncFirstSlot) {
+      try {
+        slotPayload = firstSlotPayload(firstSlot)
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e))
+        return
+      }
+    }
     setSaving(true)
     setError(null)
+    let eventSaved = false
     try {
       let id = eventId
+      let savedDraft = draft
       if (id) {
-        const updated = await eventsApi.updateEvent(accountId, id, payloadOf(draft))
+        const updated = await eventsApi.updateEvent(accountId, id, payloadOf(draft), draft.version ?? 1)
         setDraft(updated)
+        savedDraft = updated
       } else {
         const created = await eventsApi.createEvent(accountId, payloadOf(draft))
         id = created.id
+        /*
+          枠の保存だけ失敗しても、次の試行でイベント本体を重複作成しない。
+          URLへ作成済みIDを先に残し、再試行は更新として扱う。
+        */
+        router.replace('/events/new?step=1&id=' + id)
       }
+      eventSaved = true
+      if (slotPayload && id) {
+        if (firstSlotId && slots.some((s) => s.id === firstSlotId)) {
+          // 概要で確定した枠だけを更新する。ほかの枠の日時・定員は触らない。
+          await eventsApi.updateSlot(accountId, id, firstSlotId, slotPayload)
+          /*
+            EVENT-01: 保存した枠を一覧へ即時反映する。PUT の戻り値は枠の
+            行だけで申込数(active_count)を持たないので、残席表示を狂わせ
+            ないよう一覧を読み直してから段階2へ進む。失敗時はここで
+            例外になり、古い一覧のまま「保存できた」とは表示しない。
+          */
+          const refreshed = await eventsApi.listSlots(accountId, id)
+          setSlots(refreshed.items)
+        } else {
+          /*
+            まだ枠IDを持たない(新規作成直後・①で消えた)ときだけ作る。
+            client_key はイベントにつき1つの初回枠を表す固定キーで、
+            応答喪失後の再送でもサーバー側が同じ枠へ解決する(DETAIL-11)。
+          */
+          const res = await eventsApi.createSlots(accountId, id, [
+            { ...slotPayload, client_key: `first-slot:${id}` },
+          ])
+          const created = res.items[0]
+          if (created) {
+            setFirstSlotId(created.id)
+            setSlots((cur) =>
+              cur.some((s) => s.id === created.id) ? cur : [...cur, created],
+            )
+          }
+        }
+      }
+      // R161 監査：保存の直後の姿を「保存済み」とし、確認が出ないようにする。
+      // 枠の保存で例外になったときはここへ来ないため、書きかけは残る。
+      setSavedSnapshot(wizardSnapshot(savedDraft, firstSlot))
       if (goto === null) {
         router.push(`/events?highlight=${id}`)
         return
       }
       router.replace(`/events/new?step=${goto}&id=${id}`)
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      const reason =
+        e instanceof ApiError && e.status === 409 && e.code === 'version_conflict'
+          ? '別の画面でイベントが更新されました。開き直してからもう一度保存してください。'
+          : e instanceof Error ? e.message : String(e)
+      // 部分成功のときは何が保存されたかを示し、同じボタンで再開できる
+      // ことを伝える(DETAIL-08)。イベントIDはURLの ?id= に残っている。
+      setError(
+        eventSaved
+          ? `イベント本体は保存しましたが、最初の予約枠を保存できませんでした。もう一度押すと続きから再開します。（${reason}）`
+          : reason,
+      )
     } finally {
       setSaving(false)
     }
@@ -205,14 +377,21 @@ export default function EventWizard({ accountId, eventId, step }: EventWizardPro
       <StepNav current={step} />
 
       {error && (
-        <div className="bg-danger-bg text-danger rounded-card mb-3 px-4 py-3 text-sm">{error}</div>
+        <Notice tone="danger" className="mb-3">
+          {error}
+        </Notice>
       )}
+
+      {/* R161 監査：概要・予約枠・公開設定の書きかけがある間の離脱確認。 */}
+      <ConfirmDialog primaryAction="cancel" open={leaveTarget !== null} title="保存していない変更があります" description="このまま移動すると、イベントへの変更は失われます。保存せずに移動しますか？" confirmLabel="保存せずに移動" cancelLabel="編集を続ける" onConfirm={confirmLeave} onCancel={cancelLeave} />
 
       {step === 1 && (
         <OverviewStep
           draft={draft}
           update={update}
           saving={saving}
+          firstSlot={firstSlot}
+          setFirstSlot={setFirstSlot}
           onDraftSave={() => persist(null)}
           onNext={() => persist(2)}
         />
@@ -262,7 +441,7 @@ function StepNav({ current }: { current: 1 | 2 | 3 }) {
             <span
               className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
                 active
-                  ? 'bg-accent text-on-accent'
+                  ? 'bg-accent-deep text-on-accent'
                   : done
                     ? 'bg-success-bg text-success'
                     : 'bg-canvas-sunken text-ink-faint'
@@ -305,7 +484,7 @@ function StepFooter({
       <button
         onClick={next.onClick}
         disabled={saving}
-        className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-5 py-2 text-sm font-medium transition-colors disabled:opacity-40"
+        className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-5 py-2 text-sm font-medium transition-colors disabled:opacity-40"
       >
         {saving ? '保存中...' : next.label}
       </button>
@@ -321,32 +500,58 @@ function OverviewStep({
   draft,
   update,
   saving,
+  firstSlot,
+  setFirstSlot,
   onDraftSave,
   onNext,
 }: {
   draft: EventDetail
   update: <K extends keyof EventDetail>(k: K, v: EventDetail[K]) => void
   saving: boolean
+  firstSlot: FirstSlotDraft
+  setFirstSlot: (slot: FirstSlotDraft) => void
   onDraftSave: () => void
   onNext: () => void
 }) {
   const descLen = (draft.description ?? '').length
+  const previewCapacity = Number(firstSlot.capacity)
+  const previewDate = firstSlot.date
+    ? new Intl.DateTimeFormat('ja-JP', {
+        month: 'long', day: 'numeric', weekday: 'short', timeZone: 'Asia/Tokyo',
+      }).format(new Date(`${firstSlot.date}T00:00:00+09:00`))
+    : '開催日を入力'
+  const previewEnd = (() => {
+    const [hour, minute] = firstSlot.startTime.split(':').map(Number)
+    if (!Number.isFinite(hour) || !Number.isFinite(minute)) return '終了時刻未定'
+    const total = hour * 60 + minute + firstSlot.durationMinutes
+    const hhmm = `${String(Math.floor(total / 60) % 24).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
+    /*
+     * 日をまたぐ枠は終了側の日付も出す(DETAIL-10)。
+     * 「23:30〜01:00」だけでは翌日と読み取れない。
+     */
+    if (total < 24 * 60 || !firstSlot.date) return hhmm
+    const endDate = new Date(new Date(`${firstSlot.date}T00:00:00+09:00`).getTime() + total * 60_000)
+    if (Number.isNaN(endDate.getTime())) return hhmm
+    const endDay = new Intl.DateTimeFormat('ja-JP', {
+      month: 'long', day: 'numeric', weekday: 'short', timeZone: 'Asia/Tokyo',
+    }).format(endDate)
+    return `${endDay} ${hhmm}`
+  })()
   return (
-    <div data-design="Body">
-      <div data-design="Left" className="bg-canvas rounded-card border-hairline space-y-5 border p-6">
+    <div data-design="Body" className="flex flex-col items-start gap-4 xl:flex-row">
+      <div data-design="Left" className="bg-canvas rounded-card border-hairline min-w-0 flex-1 space-y-3 border p-4">
       <FormSection step={1} label="イベントの中身" note="友だちの予約ページにそのまま出ます">
-        <Field label="イベント名" htmlFor="ev-name" required>
-          <input
-            id="ev-name"
-            value={draft.name}
-            onChange={(e) => update('name', e.target.value)}
-            maxLength={255}
-            placeholder="例：第1回 定期便のはじめ方 説明会"
-            className={inputClass}
-          />
-        </Field>
-
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Field label="イベント名" htmlFor="ev-name" required>
+            <input
+              id="ev-name"
+              value={draft.name}
+              onChange={(e) => update('name', e.target.value)}
+              maxLength={EVENT_NAME_MAX_LENGTH}
+              placeholder="例：第1回 定期便のはじめ方 説明会"
+              className={inputClass}
+            />
+          </Field>
           <Field label="開催場所" htmlFor="ev-venue">
             <input
               id="ev-venue"
@@ -368,12 +573,17 @@ function OverviewStep({
           </Field>
         </div>
 
-        <ImageUploader
-          mode="url"
-          value={draft.image_url ? { mode: 'url', url: draft.image_url } : null}
-          onChange={(v) => update('image_url', v?.mode === 'url' ? v.url : null)}
-          label="イベント画像"
-        />
+        <details className="border-hairline rounded-control border px-3 py-2">
+          <summary className="text-action cursor-pointer text-sm font-medium">イベント画像を設定する</summary>
+          <div className="mt-3">
+            <ImageUploader
+              mode="url"
+              value={draft.image_url ? { mode: 'url', url: draft.image_url } : null}
+              onChange={(v) => update('image_url', v?.mode === 'url' ? v.url : null)}
+              label="イベント画像"
+            />
+          </div>
+        </details>
 
         <div>
           <div className="mb-1 flex items-center justify-between">
@@ -388,48 +598,105 @@ function OverviewStep({
             id="ev-desc"
             value={draft.description ?? ''}
             onChange={(e) => update('description', e.target.value || null)}
-            rows={8}
+            // U056: 長文欄ははじめから3行分の高さで出す。
+            rows={3}
             placeholder="例：開催趣旨、注意事項、持ち物などを記載…"
             className={inputClass}
           />
-          <label className="text-ink-secondary mt-2 flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={draft.description_centered === 1}
-              onChange={(e) => update('description_centered', e.target.checked ? 1 : 0)}
-            />
+          <Checkbox
+            className="mt-2"
+            checked={draft.description_centered === 1}
+            onCheckedChange={(checked) => update('description_centered', checked ? 1 : 0)}
+          >
             詳細を中央揃えで表示する
-          </label>
+          </Checkbox>
         </div>
       </FormSection>
 
-      <FormSection step={2} label="申し込みの上限">
+      <FormSection
+        step={2}
+        label="最初の予約枠"
+        note="イベントの内容と一緒に、最初の開催日時と定員を保存します。追加の回は次の段階で増やせます。"
+      >
+        {/*
+          日付 4・開始 3・時間 2・定員 2 の割合。日付は「2026年9月26日（土）」と
+          長いので均等4列では「2026年9月…」と切れて何日か読めない。
+        */}
+        <div className="grid gap-3 sm:grid-cols-11">
+          <div className="sm:col-span-4">
+          <Field label="日付" htmlFor="first-slot-date" required>
+            <DateField
+              id="first-slot-date"
+              value={firstSlot.date}
+              onChange={(v) => setFirstSlot({ ...firstSlot, date: v })}
+            />
+          </Field>
+          </div>
+          <div className="sm:col-span-3">
+          <Field label="開始" htmlFor="first-slot-start" required>
+            <TimeField
+              id="first-slot-start"
+              value={firstSlot.startTime}
+              onChange={(v) => setFirstSlot({ ...firstSlot, startTime: v })}
+            />
+          </Field>
+          </div>
+          <div className="sm:col-span-2">
+          <Field label="時間（分）" htmlFor="first-slot-duration" required>
+            <TextInput
+              id="first-slot-duration"
+              type="number"
+              min={15}
+              step={15}
+              value={firstSlot.durationMinutes}
+              onChange={(event) => setFirstSlot({ ...firstSlot, durationMinutes: Number(event.target.value) })}
+            />
+          </Field>
+          </div>
+          <div className="sm:col-span-2">
+          <Field label="定員" htmlFor="first-slot-capacity" required>
+            <TextInput
+              id="first-slot-capacity"
+              type="number"
+              min={1}
+              value={firstSlot.capacity}
+              onChange={(event) => setFirstSlot({ ...firstSlot, capacity: event.target.value })}
+            />
+          </Field>
+          </div>
+        </div>
+      </FormSection>
+
+      <div className="grid gap-4 xl:grid-cols-2">
+      <FormSection step={3} label="申し込みの上限">
         <Field
           label="1人あたりの予約回数"
           htmlFor="ev-max"
           note="同じ友だちが何回まで申し込めるかを決めます。"
         >
-          <select
+          <Select
+            aria-label="1人あたりの予約回数"
+            size="full"
             id="ev-max"
-            value={draft.max_bookings_per_friend ?? 'unlimited'}
-            onChange={(e) =>
+            value={draft.max_bookings_per_friend == null ? 'unlimited' : String(draft.max_bookings_per_friend)}
+            onChange={(value) =>
               update(
                 'max_bookings_per_friend',
-                e.target.value === 'unlimited' ? null : Number(e.target.value),
+                value === 'unlimited' ? null : Number(value),
               )
             }
-            className={inputClass}
-          >
-            <option value="unlimited">制限なし</option>
-            <option value="1">1回まで</option>
-            <option value="2">2回まで</option>
-            <option value="3">3回まで</option>
-            <option value="5">5回まで</option>
-          </select>
+            options={[
+              { value: 'unlimited', label: '制限なし' },
+              { value: '1', label: '1回まで' },
+              { value: '2', label: '2回まで' },
+              { value: '3', label: '3回まで' },
+              { value: '5', label: '5回まで' },
+            ]}
+          />
         </Field>
       </FormSection>
 
-      <FormSection step={3} label="公開対象">
+      <FormSection step={4} label="公開対象">
         <div className="grid gap-2 sm:grid-cols-2">
           <ChoiceCard
             selected={(draft.target_type ?? 'single') === 'single'}
@@ -451,6 +718,66 @@ function OverviewStep({
           </p>
         )}
       </FormSection>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-2">
+      <FormSection
+        step={5}
+        label="申し込みのときに聞くこと"
+        note="予約フォームに質問を追加できます。回答は申込の一覧で確認できます。"
+      >
+        <EventQuestionsEditor
+          questions={draft.questions ?? []}
+          onChange={(next) => update('questions', next)}
+        />
+      </FormSection>
+
+      <FormSection
+        step={6}
+        label="満席になったとき"
+        note="満席後も申し込みを受けるかを決めます。"
+      >
+        <Checkbox
+          checked={draft.waitlist_enabled === 1}
+          onCheckedChange={(checked) => update('waitlist_enabled', checked ? 1 : 0)}
+          description="空きが出たら、申込者一覧で待っている方を順に確認できます。"
+        >
+          キャンセル待ちを受け付ける
+        </Checkbox>
+      </FormSection>
+
+      <FormSection
+        step={7}
+        label="申し込んだ人にすること"
+        note="受付と前日のお知らせを自動で行います。"
+      >
+        <Checkbox
+          checked={draft.requires_approval === 1}
+          onCheckedChange={(checked) => update('requires_approval', checked ? 1 : 0)}
+          description="申し込み後、申込者一覧で承認するまで確定しません。承認待ちの分も残席を使います。"
+        >
+          承認してから予約を確定する
+        </Checkbox>
+        <Field label="承認の期限" htmlFor="approval-deadline-hours">
+          <Select
+            id="approval-deadline-hours"
+            aria-label="承認の期限"
+            value={String(draft.approval_deadline_hours)}
+            disabled={draft.requires_approval !== 1}
+            onChange={(value) => update('approval_deadline_hours', Number(value))}
+            options={APPROVAL_DEADLINE_OPTIONS}
+            size="full"
+          />
+        </Field>
+        <Checkbox
+          checked={draft.reminder_day_before_enabled === 1}
+          onCheckedChange={(checked) => update('reminder_day_before_enabled', checked ? 1 : 0)}
+          description="開催前日にLINEで自動のお知らせを送ります。"
+        >
+          前日に思い出してもらう
+        </Checkbox>
+      </FormSection>
+      </div>
 
       <div className="border-hairline mt-5 flex flex-wrap justify-between gap-2 border-t pt-4">
         <button
@@ -463,12 +790,45 @@ function OverviewStep({
         <button
           onClick={onNext}
           disabled={saving}
-          className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-5 py-2 text-sm font-medium transition-colors disabled:opacity-40"
+          className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-5 py-2 text-sm font-medium transition-colors disabled:opacity-40"
         >
           {saving ? '保存中...' : '概要を保存して次へ'}
         </button>
       </div>
       </div>
+
+      <aside data-design="Right" className="w-full shrink-0 space-y-3 xl:w-96">
+        {/* LINEの見た目の枠は共通部品 `LinePreview`（B-6）。緑の二重枠はやめる。 */}
+        <LinePreview>
+          <div className="bg-canvas rounded-card border-hairline overflow-hidden border">
+              <div className="bg-canvas-sunken flex h-24 items-center justify-center text-xs text-ink-faint">
+                {draft.image_url ? '設定した画像が表示されます' : 'イベント画像'}
+              </div>
+              <div className="space-y-2 p-4">
+                <p className="text-ink font-semibold">{draft.name.trim() || 'イベント名'}</p>
+                <p className="text-ink-secondary text-xs">{previewDate} {firstSlot.startTime}〜{previewEnd}</p>
+                <p className="text-ink-secondary text-xs">{draft.venue_name || '開催場所を入力'}</p>
+                <p className="text-ink-secondary text-xs">
+                  {Number.isInteger(previewCapacity) && previewCapacity > 0 ? `のこり ${previewCapacity}名` : '定員を入力'}
+                </p>
+                <p className="text-ink-faint line-clamp-3 text-xs">
+                  {draft.description || 'イベントの説明がここに表示されます。'}
+                </p>
+                <span className="bg-accent-deep text-on-accent rounded-control block px-4 py-2 text-center text-sm font-medium">
+                  申し込む
+                </span>
+              </div>
+          </div>
+        </LinePreview>
+        <div className="bg-warning-bg rounded-card border-warning/30 border p-4">
+          <h2 className="text-warning text-sm font-semibold">保存すると起きること</h2>
+          <ul className="text-ink-secondary mt-2 space-y-2 text-xs">
+            <li>定員を超える申し込みは受け付けません。</li>
+            <li>最初の予約枠も同時に作成します。</li>
+            <li>追加の回やキャンセル待ちは次の段階で設定できます。</li>
+          </ul>
+        </div>
+      </aside>
     </div>
   )
 }
@@ -515,6 +875,27 @@ function SlotsStep({
   const [bandEnd, setBandEnd] = useState('17:00')
   const [slotMinutes, setSlotMinutes] = useState(90)
   const [bulkCapacity, setBulkCapacity] = useState('')
+  /*
+    確認は設計の窓で出す。**ブラウザの `confirm()` を使わない。**
+    何件できるのか・どの枠が消えるのかを本文で読ませられず、
+    画像比較にも写らない。
+  */
+  /*
+    #1000 DETAIL-11: 下見の時点で操作ID(operationId)と枠ごとの再送防止キー
+    (client_key)を確定する。分割送信の途中で失敗・応答を失っても、
+    残りだけを同じキーで再送すればサーバー側が二重登録を吸収する。
+    bulkDone はこの下見のうち作成が確認できた件数。
+  */
+  const [bulkPreview, setBulkPreview] = useState<{
+    operationId: string
+    slots: Array<EventSlotInput & { client_key: string }>
+  } | null>(null)
+  const [bulkDone, setBulkDone] = useState(0)
+  const [bulkBusy, setBulkBusy] = useState(false)
+  const [bulkError, setBulkError] = useState('')
+  const [removeTarget, setRemoveTarget] = useState<EventSlot | null>(null)
+  const [removing, setRemoving] = useState(false)
+  const [removeError, setRemoveError] = useState('')
 
   async function addOne() {
     setBusy(true)
@@ -546,6 +927,11 @@ function SlotsStep({
         throw new Error('時間帯と1枠の長さが合いません。長さを短くするか時間帯を広げてください')
       }
       const cap = bulkCapacity === '' ? null : Number(bulkCapacity)
+      /*
+        生成は501件目で打ち切られるので、ここに来るまでに大量の
+        オブジェクトは作られない(DETAIL-12)。超過分は捨てて件数だけで止める。
+        500件超は作る口も受け付けない(点検#520の中9)。
+      */
       const generated = generateBulkSlots({
         start_date: bulkStart,
         end_date: bulkEnd,
@@ -556,9 +942,20 @@ function SlotsStep({
       if (generated.length === 0) {
         throw new Error('条件に合う枠が0件でした。期間と曜日を確かめてください')
       }
-      if (!confirm(`${generated.length}件の枠を追加します。よろしいですか？`)) return
-      await eventsApi.createSlots(accountId, eventId, generated)
-      await refreshSlots()
+      if (generated.length > BULK_SLOT_LIMIT) {
+        throw new Error('500件を超える一括作成はできません。期間や曜日を分けて追加してください')
+      }
+      // 作る前に下見を出す。ここではまだ1件も作っていない。
+      const operationId = crypto.randomUUID()
+      setBulkError('')
+      setBulkDone(0)
+      setBulkPreview({
+        operationId,
+        slots: generated.map((slot, index) => ({
+          ...slot,
+          client_key: `${operationId}:${index}`,
+        })),
+      })
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e))
     } finally {
@@ -566,17 +963,61 @@ function SlotsStep({
     }
   }
 
-  async function removeSlot(s: EventSlot) {
-    if (!confirm('この枠を削除しますか？')) return
-    setBusy(true)
-    setErr(null)
+  async function createBulk() {
+    if (!bulkPreview || bulkBusy) return
+    setBulkBusy(true)
+    setBulkError('')
     try {
-      await eventsApi.deleteSlot(accountId, eventId, s.id)
+      /*
+        確定済みの分は送り直さない(DETAIL-11)。残りは同じ client_key を
+        持つので、応答喪失などで画面の件数と実際がずれていても
+        サーバー側で既存枠へ解決され、総数は増えない。
+      */
+      const remaining = bulkPreview.slots.slice(bulkDone)
+      if (remaining.length === 0) {
+        setBulkPreview(null)
+        setBulkDone(0)
+        await refreshSlots()
+        return
+      }
+      await eventsApi.createSlots(accountId, eventId, remaining)
+      setBulkPreview(null)
+      setBulkDone(0)
       await refreshSlots()
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e))
+      // 400件ずつ送るので、途中で切れると一部だけ作られたまま残る。
+      // 作成が確認できた件数を数え、残りだけを次の送信対象にする。
+      const completed = e instanceof EventSlotsPartialError ? e.completed.length : 0
+      const done = bulkDone + completed
+      setBulkDone(done)
+      setBulkError(
+        done > 0
+          ? `${done}件は追加済みです。残り${bulkPreview.slots.length - done}件は、もう一度「まとめて追加する」を押すと続きから再開します。`
+          : '枠を作りきれませんでした。途中まで作られていることがあります。一覧を読み直して、足りない分だけ追加してください。',
+      )
+      await refreshSlots()
     } finally {
-      setBusy(false)
+      setBulkBusy(false)
+    }
+  }
+
+  /*
+    申込が入っている枠はボタンを押せないようにしてある
+    （`disabled={busy || taken > 0}`）。ここまで来るのは申込0件の枠だけ。
+  */
+  async function removeSlot() {
+    if (!removeTarget || removing) return
+    setRemoving(true)
+    setRemoveError('')
+    setErr(null)
+    try {
+      await eventsApi.deleteSlot(accountId, eventId, removeTarget.id)
+      setRemoveTarget(null)
+      await refreshSlots()
+    } catch {
+      setRemoveError('枠を削除できませんでした。あとから申込が入った可能性があります。読み直してから、もう一度お試しください。')
+    } finally {
+      setRemoving(false)
     }
   }
 
@@ -595,30 +1036,24 @@ function SlotsStep({
         <FormSection step={1} label="枠を1つ追加する">
           <div className="grid gap-3 sm:grid-cols-4">
             <Field label="日付" htmlFor="slot-date">
-              <input
+              <DateField
                 id="slot-date"
-                type="date"
                 value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className={inputClass}
+                onChange={setDate}
               />
             </Field>
             <Field label="開始" htmlFor="slot-start">
-              <input
+              <TimeField
                 id="slot-start"
-                type="time"
                 value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
-                className={inputClass}
+                onChange={setStartTime}
               />
             </Field>
             <Field label="終了" htmlFor="slot-end">
-              <input
+              <TimeField
                 id="slot-end"
-                type="time"
                 value={endTime}
-                onChange={(e) => setEndTime(e.target.value)}
-                className={inputClass}
+                onChange={setEndTime}
               />
             </Field>
             <Field label="定員" htmlFor="slot-cap">
@@ -648,21 +1083,17 @@ function SlotsStep({
         >
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="開始日" htmlFor="bulk-start">
-              <input
+              <DateField
                 id="bulk-start"
-                type="date"
                 value={bulkStart}
-                onChange={(e) => setBulkStart(e.target.value)}
-                className={inputClass}
+                onChange={setBulkStart}
               />
             </Field>
             <Field label="終了日" htmlFor="bulk-end">
-              <input
+              <DateField
                 id="bulk-end"
-                type="date"
                 value={bulkEnd}
-                onChange={(e) => setBulkEnd(e.target.value)}
-                className={inputClass}
+                onChange={setBulkEnd}
               />
             </Field>
           </div>
@@ -694,36 +1125,28 @@ function SlotsStep({
 
           <div className="grid gap-3 sm:grid-cols-4">
             <Field label="時間帯" htmlFor="band-start">
-              <input
+              <TimeField
                 id="band-start"
-                type="time"
                 value={bandStart}
-                onChange={(e) => setBandStart(e.target.value)}
-                className={inputClass}
+                onChange={setBandStart}
               />
             </Field>
             <Field label="　" htmlFor="band-end">
-              <input
+              <TimeField
                 id="band-end"
-                type="time"
                 value={bandEnd}
-                onChange={(e) => setBandEnd(e.target.value)}
-                className={inputClass}
+                onChange={setBandEnd}
               />
             </Field>
             <Field label="1枠の長さ" htmlFor="slot-min">
-              <select
+              <Select
+                aria-label="1枠の長さ"
+                size="full"
                 id="slot-min"
-                value={slotMinutes}
-                onChange={(e) => setSlotMinutes(Number(e.target.value))}
-                className={inputClass}
-              >
-                {[30, 45, 60, 90, 120].map((m) => (
-                  <option key={m} value={m}>
-                    {m}分
-                  </option>
-                ))}
-              </select>
+                value={String(slotMinutes)}
+                onChange={(value) => setSlotMinutes(Number(value))}
+                options={[30, 45, 60, 90, 120].map((m) => ({ value: String(m), label: `${m}分` }))}
+              />
             </Field>
             <Field label="各枠の定員" htmlFor="bulk-cap">
               <input
@@ -755,50 +1178,48 @@ function SlotsStep({
               まだ枠がありません。枠を1つも作らないと公開できません。
             </p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[420px] text-sm">
+            <DataTable>
                 <thead>
-                  <tr className="border-hairline text-ink-faint border-b text-xs">
-                    <th className="px-2 py-2 text-left font-semibold">日時</th>
-                    <th className="px-2 py-2 text-right font-semibold">定員</th>
-                    <th className="px-2 py-2 text-right font-semibold">申込</th>
-                    <th className="px-2 py-2 text-right font-semibold">残り</th>
-                    <th className="px-2 py-2 text-right font-semibold">操作</th>
-                  </tr>
+                  <TableHeadRow>
+                    <Th style={{ width: '32%' }}>日時</Th>
+                    <Th style={{ width: '14%' }} align="right">定員</Th>
+                    <Th style={{ width: '14%' }} align="right">申込</Th>
+                    <Th style={{ width: '14%' }} align="right">残り</Th>
+                    <Th style={{ width: '26%' }} align="right">操作</Th>
+                  </TableHeadRow>
                 </thead>
                 <tbody>
                   {slots.map((s) => {
                     const taken = s.active_count ?? 0
                     return (
-                      <tr key={s.id} className="border-hairline border-b last:border-b-0">
-                        <td className="text-ink px-2 py-2">
+                      <Tr key={s.id}>
+                        <Td>
                           {formatSlotJp(s.starts_at, s.ends_at)}
-                        </td>
-                        <td className="text-ink-secondary px-2 py-2 text-right tabular-nums">
+                        </Td>
+                        <Td align="right" className="text-ink-secondary tabular-nums">
                           {s.capacity == null ? '無制限' : `${s.capacity}名`}
-                        </td>
-                        <td className="text-ink-secondary px-2 py-2 text-right tabular-nums">
+                        </Td>
+                        <Td align="right" className="text-ink-secondary tabular-nums">
                           {taken}名
-                        </td>
-                        <td className="text-ink-secondary px-2 py-2 text-right tabular-nums">
+                        </Td>
+                        <Td align="right" className="text-ink-secondary tabular-nums">
                           {s.capacity == null ? '—' : `${Math.max(0, s.capacity - taken)}名`}
-                        </td>
-                        <td className="px-2 py-2 text-right">
+                        </Td>
+                        <ActionCell>
                           <button
-                            onClick={() => removeSlot(s)}
+                            onClick={() => { setRemoveError(''); setRemoveTarget(s) }}
                             disabled={busy || taken > 0}
                             title={taken > 0 ? '申込が入っているため削除できません' : undefined}
                             className="text-danger text-xs hover:underline disabled:no-underline disabled:opacity-30"
                           >
                             削除
                           </button>
-                        </td>
-                      </tr>
+                        </ActionCell>
+                      </Tr>
                     )
                   })}
                 </tbody>
-              </table>
-            </div>
+            </DataTable>
           )}
         </FormSection>
 
@@ -809,50 +1230,52 @@ function SlotsStep({
         >
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="キャンセルできる期限" htmlFor="cancel-deadline">
-              <select
+              {/*
+                EVENT-03: 保存値の意味は編集画面・Worker と同じ。
+                null=不可、0=開始直前まで、正数=開始N時間前。
+                選択肢は event-draft-shared で共有し、編集と食い違わせない。
+              */}
+              <Select
+                aria-label="キャンセルできる期限"
+                size="full"
                 id="cancel-deadline"
-                value={draft.cancel_deadline_hours_before ?? ''}
-                onChange={(e) =>
-                  update(
-                    'cancel_deadline_hours_before',
-                    e.target.value === '' ? null : Number(e.target.value),
-                  )
+                value={deadlineSelectValue(draft.cancel_deadline_hours_before)}
+                onChange={(value) =>
+                  update('cancel_deadline_hours_before', parseDeadlineSelect(value))
                 }
-                className={inputClass}
-              >
-                <option value="">いつでもキャンセルできる</option>
-                <option value="2">開始の2時間前まで</option>
-                <option value="24">開始の24時間前まで</option>
-                <option value="48">開始の48時間前まで</option>
-              </select>
+                options={deadlineOptionsWithSaved(
+                  EVENT_CANCEL_DEADLINE_OPTIONS,
+                  draft.cancel_deadline_hours_before,
+                )}
+              />
             </Field>
             <Field label="開始前のお知らせ" htmlFor="reminder-hours">
-              <select
+              <Select
+                aria-label="開始前のお知らせ"
+                size="full"
                 id="reminder-hours"
-                value={draft.reminder_hours_before ?? ''}
-                onChange={(e) =>
+                value={draft.reminder_hours_before == null ? '' : String(draft.reminder_hours_before)}
+                onChange={(value) =>
                   update(
                     'reminder_hours_before',
-                    e.target.value === '' ? null : Number(e.target.value),
+                    value === '' ? null : Number(value),
                   )
                 }
-                className={inputClass}
-              >
-                <option value="">送らない</option>
-                <option value="1">開始の1時間前に送る</option>
-                <option value="2">開始の2時間前に送る</option>
-                <option value="3">開始の3時間前に送る</option>
-              </select>
+                options={[
+                  { value: '', label: '送らない' },
+                  { value: '1', label: '開始の1時間前に送る' },
+                  { value: '2', label: '開始の2時間前に送る' },
+                  { value: '3', label: '開始の3時間前に送る' },
+                ]}
+              />
             </Field>
           </div>
-          <label className="text-ink-secondary flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={draft.reminder_day_before_enabled === 1}
-              onChange={(e) => update('reminder_day_before_enabled', e.target.checked ? 1 : 0)}
-            />
+          <Checkbox
+            checked={draft.reminder_day_before_enabled === 1}
+            onCheckedChange={(checked) => update('reminder_day_before_enabled', checked ? 1 : 0)}
+          >
             前日にもお知らせを送る
-          </label>
+          </Checkbox>
         </FormSection>
 
         <StepFooter
@@ -873,7 +1296,7 @@ function SlotsStep({
                 {slots.slice(0, 5).map((s) => (
                   <li
                     key={s.id}
-                    className="text-ink border-hairline rounded-control border bg-white px-3 py-2 text-xs"
+                    className="text-ink border-hairline rounded-control border bg-canvas px-3 py-2 text-xs"
                   >
                     {formatSlotJp(s.starts_at, s.ends_at)}
                     {s.capacity != null && ` 残り${Math.max(0, s.capacity - (s.active_count ?? 0))}`}
@@ -892,6 +1315,42 @@ function SlotsStep({
           </ul>
         </AsideCard>
       </div>
+
+      <ConfirmDialog
+        open={bulkPreview !== null}
+        title={
+          bulkDone > 0
+            ? `残り${(bulkPreview?.slots.length ?? 0) - bulkDone}件の予約枠を追加しますか？`
+            : `${bulkPreview?.slots.length ?? 0}件の予約枠を追加しますか？`
+        }
+        description={`${bulkPreview && bulkPreview.slots.length > 0 ? formatSlotJp(bulkPreview.slots[0].starts_at, bulkPreview.slots[0].ends_at) : ''}から${bulkPreview && bulkPreview.slots.length > 0 ? formatSlotJp(bulkPreview.slots[bulkPreview.slots.length - 1].starts_at, bulkPreview.slots[bulkPreview.slots.length - 1].ends_at) : ''}までをまとめて追加します。いまある枠は消えません。追加した枠は1件ずつ削除できます（申込が入ったあとは削除できません）。${bulkDone > 0 ? `${bulkDone}件は追加済みで、再送しても二重にはなりません。` : ''}`}
+        confirmLabel="まとめて追加する"
+        busy={bulkBusy}
+        error={bulkError}
+        onConfirm={() => void createBulk()}
+        onCancel={() => {
+          if (bulkBusy) return
+          setBulkError('')
+          setBulkDone(0)
+          setBulkPreview(null)
+        }}
+      />
+
+      <ConfirmDialog
+        open={removeTarget !== null}
+        title="この予約枠を削除しますか？"
+        description={`${removeTarget ? formatSlotJp(removeTarget.starts_at, removeTarget.ends_at) : ''}の枠を削除します。この枠はもう選べなくなります。いま申込は入っていません。ほかの枠とイベント本体は残ります。この操作は元に戻せません。`}
+        confirmLabel="削除する"
+        destructive
+        busy={removing}
+        error={removeError}
+        onConfirm={() => void removeSlot()}
+        onCancel={() => {
+          if (removing) return
+          setRemoveError('')
+          setRemoveTarget(null)
+        }}
+      />
     </div>
   )
 }
@@ -960,20 +1419,24 @@ function PublishStep({
               onClick={() => update('requires_approval', 1)}
             />
           </div>
-          <label className="text-ink-secondary flex items-start gap-2 text-sm">
-            <input
-              type="checkbox"
-              className="mt-0.5"
-              checked={draft.waitlist_enabled === 1}
-              onChange={(e) => update('waitlist_enabled', e.target.checked ? 1 : 0)}
+          <Field label="承認の期限" htmlFor="publish-approval-deadline-hours">
+            <Select
+              id="publish-approval-deadline-hours"
+              aria-label="承認の期限"
+              value={String(draft.approval_deadline_hours)}
+              disabled={draft.requires_approval !== 1}
+              onChange={(value) => update('approval_deadline_hours', Number(value))}
+              options={APPROVAL_DEADLINE_OPTIONS}
+              size="full"
             />
-            <span>
-              定員に達したらキャンセル待ちを受け付ける
-              <span className="text-ink-faint block text-xs">
-                空きが出たら、待っている方に自動でお知らせします。
-              </span>
-            </span>
-          </label>
+          </Field>
+          <Checkbox
+            checked={draft.waitlist_enabled === 1}
+            onCheckedChange={(checked) => update('waitlist_enabled', checked ? 1 : 0)}
+            description="空きが出たら、待っている方に自動でお知らせします。"
+          >
+            定員に達したらキャンセル待ちを受け付ける
+          </Checkbox>
         </FormSection>
 
         <FormSection step={2} label="誰に見せるか">
@@ -993,50 +1456,42 @@ function PublishStep({
           </div>
           {draft.visible_tag_id && (
             <Field label="対象のタグ" htmlFor="visible-tag">
-              <select
+              <Select
+                aria-label="対象のタグ"
+                size="full"
                 id="visible-tag"
                 value={draft.visible_tag_id ?? ''}
-                onChange={(e) => update('visible_tag_id', e.target.value || null)}
-                className={inputClass}
-              >
-                {tags.length === 0 && <option value="">（タグがありません）</option>}
-                {tags.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
+                onChange={(value) => update('visible_tag_id', value || null)}
+                options={[
+                  ...(tags.length === 0 ? [{ value: '', label: '（タグがありません）' }] : []),
+                  ...tags.map((t) => ({ value: t.id, label: t.name })),
+                ]}
+              />
             </Field>
           )}
         </FormSection>
 
         <FormSection step={3} label="いつまで受け付けるか">
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field
-              label="公開する日時"
-              note="日時を指定しての予約公開は、まだ保存する場所がありません。"
-            >
-              <select disabled className={`${inputClass} opacity-50`} title="準備中です">
-                <option>すぐに公開する</option>
-              </select>
-            </Field>
             <Field label="申込の締め切り" htmlFor="entry-cutoff">
-              <select
+              {/*
+                EVENT-04: 選択肢は編集画面と同じ一覧を使う。保存値が選択肢に
+                無いときは「保存済み：…」として出し、先頭項目を選んだように
+                見せない。
+              */}
+              <Select
+                aria-label="申込の締め切り"
+                size="full"
                 id="entry-cutoff"
-                value={draft.entry_cutoff_hours_before ?? ''}
-                onChange={(e) =>
-                  update(
-                    'entry_cutoff_hours_before',
-                    e.target.value === '' ? null : Number(e.target.value),
-                  )
+                value={deadlineSelectValue(draft.entry_cutoff_hours_before)}
+                onChange={(value) =>
+                  update('entry_cutoff_hours_before', parseDeadlineSelect(value))
                 }
-                className={inputClass}
-              >
-                <option value="">開始まで受け付ける</option>
-                <option value="2">開始の2時間前まで</option>
-                <option value="24">開始の24時間前まで</option>
-                <option value="48">開始の48時間前まで</option>
-              </select>
+                options={deadlineOptionsWithSaved(
+                  EVENT_ENTRY_CUTOFF_OPTIONS,
+                  draft.entry_cutoff_hours_before,
+                )}
+              />
             </Field>
           </div>
         </FormSection>
@@ -1066,33 +1521,17 @@ function PublishStep({
               className={inputClass}
             />
           </Field>
-          <label className="text-ink-faint flex items-start gap-2 text-sm" title="準備中です">
-            <input type="checkbox" disabled className="mt-0.5" />
-            <span>
-              主催者にもメールで知らせる
-              <span className="block text-xs">
-                申込が入るたびに、登録メールアドレスへ届きます。保存する場所がまだありません。
-              </span>
-            </span>
-          </label>
         </FormSection>
 
         <FormSection step={5} label="公開">
-          <label className="text-ink-secondary flex items-start gap-2 text-sm">
-            <input
-              type="checkbox"
-              className="mt-0.5"
-              checked={draft.is_published === 1}
-              disabled={noSlots}
-              onChange={(e) => update('is_published', e.target.checked ? 1 : 0)}
-            />
-            <span>
-              保存したらすぐ公開する
-              <span className="text-ink-faint block text-xs">
-                オフにすると下書きとして保存され、URLを開いても表示されません。
-              </span>
-            </span>
-          </label>
+          <Checkbox
+            checked={draft.is_published === 1}
+            disabled={noSlots}
+            onCheckedChange={(checked) => update('is_published', checked ? 1 : 0)}
+            description="オフにすると下書きとして保存され、URLを開いても表示されません。"
+          >
+            保存したらすぐ公開する
+          </Checkbox>
           {/* 枠が0件のイベントは、公開しても friend 側に日時が1つも出ない。
               公開できてしまうと「公開したのに申し込めない」になる。 */}
           {noSlots && (
@@ -1104,7 +1543,14 @@ function PublishStep({
 
         <StepFooter
           back={{ label: '予約枠に戻る', onClick: onBack }}
-          next={{ label: '保存して公開', onClick: onPublish }}
+          next={{
+            /*
+              EVENT-02: ボタン名は実際の保存結果と合わせる。公開OFFのまま
+              「保存して公開」と出すと、下書き保存を公開と誤認する。
+            */
+            label: draft.is_published === 1 ? '保存して公開' : '下書きとして保存',
+            onClick: onPublish,
+          }}
           saving={saving}
         />
       </div>
@@ -1113,7 +1559,7 @@ function PublishStep({
         <AsideCard title="確定したときに届くメッセージ" note="プレビュー">
           <div className="bg-canvas-sunken rounded-card p-3">
             <p className="text-ink-faint mb-1 text-xs">然-NEN-</p>
-            <p className="text-ink rounded-2xl bg-white px-4 py-3 text-sm leading-6 whitespace-pre-wrap">
+            <p className="text-ink rounded-2xl bg-canvas px-4 py-3 text-sm leading-6 whitespace-pre-wrap">
               {preview}
             </p>
           </div>
@@ -1122,7 +1568,7 @@ function PublishStep({
         <AsideCard title="気をつけること">
           <ul className="text-ink-faint space-y-1.5 text-xs leading-relaxed">
             <li>・公開後に日時を変えると、申込済みの方へ変更のお知らせが届きます</li>
-            <li>・承認制にすると、申込直後は「受付中」の表示になります</li>
+            <li>・承認制にすると、申込直後は「受付中」の表示になります。承認待ちの分も残席を使います</li>
             <li>・タグで絞ると、対象外の方にはページが表示されません</li>
           </ul>
         </AsideCard>

@@ -3,15 +3,18 @@ import type { Context } from 'hono';
 import { LineClient } from '@line-crm/line-sdk';
 import type { Message } from '@line-crm/line-sdk';
 import {
-  getLineAccounts,
+  listLineAccountsWithTenantStatus,
   getFriendByLineUserIdForAccount,
   upsertFriend,
   getChatByFriendId,
   createChat,
   updateChat,
+  isOperationCapabilityStopped,
   jstNow,
+  OPERATION_CAPABILITIES,
 } from '@line-crm/db';
-import type { Friend, LineAccount } from '@line-crm/db';
+import type { Friend, LineAccount, OperationCapability } from '@line-crm/db';
+import { OPERATION_PROXY_CAPABILITY_HEADER } from '../services/operation-send-paths.js';
 import { authenticateApiToken } from '../middleware/auth.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { messageToLogPayload } from '../services/step-delivery.js';
@@ -58,6 +61,16 @@ const MESSAGE_SEND_PATHS = new Set([
   '/v2/bot/message/multicast',
   '/v2/bot/message/broadcast',
   '/v2/bot/message/reply',
+  '/v2/bot/message/narrowcast',
+]);
+
+// broadcast_dispatch の緊急停止 (#960) で止める送信パス。
+// 例外は2系統: reply (replyToken 前提の1:1返信) と、push に
+// X-Line-Harness-Source: manual を付けた担当者の個別返信。自動 push
+// (manual 指定なし) は一斉送信と同じく停止対象。
+const BULK_DISPATCH_PATHS = new Set([
+  '/v2/bot/message/broadcast',
+  '/v2/bot/message/multicast',
   '/v2/bot/message/narrowcast',
 ]);
 
@@ -124,8 +137,19 @@ function asMessages(value: unknown): Message[] {
  * or the env default token. Returns a Response on auth/validation failure.
  */
 async function resolveCaller(c: Context<Env>, token: string): Promise<ResolvedCaller | Response> {
-  const accounts = await getLineAccounts(c.env.DB);
-  const active = accounts.filter((a) => a.is_active);
+  const accounts = await listLineAccountsWithTenantStatus(c.env.DB);
+  // This is the last server-side gate before api.line.me. Keeping stopped
+  // accounts out of token resolution protects every proxy-based dispatcher,
+  // even if a future job forgets its claim-time filter.
+  const active = accounts.filter((a) => a.is_active && a.tenant_status === 'active');
+
+  // A DB-registered channel token always keeps its tenant boundary. Without
+  // this check, a stopped tenant whose token also happens to be configured as
+  // the environment default could fall through to the legacy env-token path.
+  const registeredByToken = accounts.find((a) => a.channel_access_token === token);
+  if (registeredByToken && registeredByToken.tenant_status !== 'active') {
+    return c.json({ code: 'TENANT_SUSPENDED', message: '契約先の利用が停止されています' }, 403);
+  }
 
   const byChannelToken = active.find((a) => a.channel_access_token === token);
   if (byChannelToken) {
@@ -225,13 +249,18 @@ async function getFriendsByLineUserIds(
       for (const row of scoped.results ?? []) found.set(row.line_user_id, row);
     }
 
-    // C-2bで複合一意制約へ移行したら、この無指定フォールバックを削除する。
-    // 今回は既存の未割当行・他アカウント行を見失わず、挙動を維持する。
+    // 別アカウント所有の行には触れない (Issue #961)。拾うのは未割当
+    // (line_account_id IS NULL) の行だけ。他アカウントの友だちへ送信を
+    // 記録する場合は、行を移す代わりにこのアカウント用の行を作る側へ回す。
     const unresolved = chunk.filter((lineUserId) => !found.has(lineUserId));
     if (unresolved.length > 0) {
       const unresolvedPlaceholders = unresolved.map(() => '?').join(',');
       const fallback = await db
-        .prepare(`SELECT * FROM friends WHERE line_user_id IN (${unresolvedPlaceholders})`)
+        .prepare(
+          `SELECT * FROM friends
+            WHERE line_account_id IS NULL
+              AND line_user_id IN (${unresolvedPlaceholders})`,
+        )
         .bind(...unresolved)
         .all<Friend>();
       for (const row of fallback.results ?? []) found.set(row.line_user_id, row);
@@ -283,11 +312,26 @@ async function createFriendForRecipient(
   }
 }
 
+/**
+ * R381: 同じ送信キー（X-Line-Retry-Key）への再送で履歴を二重に書かないため、
+ * キーがある送信は内容から決まるIDを使う。初回の200で履歴を書けなかった
+ * 場合も、LINEが「受理済み」を返す409の再送で同じIDへ同じ行を補完できる。
+ */
+async function deterministicLogId(seed: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(seed));
+  const bytes = new Uint8Array(digest.slice(0, 16));
+  bytes[6] = (bytes[6] & 0x0f) | 0x50;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0'));
+  return `${hex.slice(0, 4).join('')}-${hex.slice(4, 6).join('')}-${hex.slice(6, 8).join('')}-${hex.slice(8, 10).join('')}-${hex.slice(10).join('')}`;
+}
+
 /** Multi-row INSERT keeps large broadcasts within the D1 subrequest budget. */
 async function insertLogRows(
   db: D1Database,
   rows: LogRow[],
   source: ProxyLogSource,
+  logKey?: string | null,
 ): Promise<void> {
   if (rows.length === 0) return;
   const now = jstNow();
@@ -297,20 +341,25 @@ async function insertLogRows(
     const values = chunk
       .map(() => `(?, ?, 'outgoing', ?, ?, NULL, NULL, ?, ?, ?, ?)`)
       .join(', ');
-    const params = chunk.flatMap((row) => [
-      crypto.randomUUID(),
-      row.friendId,
-      row.messageType,
-      row.content,
-      row.deliveryType,
-      source,
-      row.lineAccountId,
-      now,
-    ]);
+    const params: unknown[] = [];
+    for (const [index, row] of chunk.entries()) {
+      params.push(
+        logKey
+          ? await deterministicLogId(`line-proxy-send:${logKey}:${row.friendId}:${i + index}`)
+          : crypto.randomUUID(),
+        row.friendId,
+        row.messageType,
+        row.content,
+        row.deliveryType,
+        source,
+        row.lineAccountId,
+        now,
+      );
+    }
     statements.push(
       db
         .prepare(
-          `INSERT INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, delivery_type, source, line_account_id, created_at)
+          `INSERT OR IGNORE INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, delivery_type, source, line_account_id, created_at)
            VALUES ${values}`,
         )
         .bind(...params),
@@ -338,6 +387,7 @@ async function logProxySend(
   path: string,
   rawBody: string,
   source: ProxyLogSource,
+  logKey?: string | null,
 ): Promise<void> {
   try {
     const parsed = JSON.parse(rawBody) as ParsedSend;
@@ -364,7 +414,7 @@ async function logProxySend(
         (await getFriendByLineUserIdForAccount(db, parsed.to, lineAccountId)) ??
         (await createFriendForRecipient(db, lineClient, parsed.to, lineAccountId));
       if (!friend) return;
-      await insertLogRows(db, rowsFor(friend.id, 'push'), source);
+      await insertLogRows(db, rowsFor(friend.id, 'push'), source, logKey);
       await touchChat(db, friend.id);
       return;
     }
@@ -396,7 +446,7 @@ async function logProxySend(
           `[line-proxy] multicast: ${skipped} unknown recipients not logged (friend-creation cap ${MAX_FRIEND_CREATIONS})`,
         );
       }
-      await insertLogRows(db, rows, source);
+      await insertLogRows(db, rows, source, logKey);
       return;
     }
 
@@ -436,7 +486,7 @@ async function logProxySend(
         return;
       }
       const rows = friendIds.flatMap((friendId) => rowsFor(friendId, null));
-      await insertLogRows(db, rows, source);
+      await insertLogRows(db, rows, source, logKey);
       console.log(`[line-proxy] broadcast logged for ${friendIds.length} friends`);
       return;
     }
@@ -535,6 +585,38 @@ function proxyHandler(prefix: string, upstreamBase: string, logSends: boolean) {
     const retryKey = c.req.header('X-Line-Retry-Key');
     if (retryKey) headers['X-Line-Retry-Key'] = retryKey;
 
+    /*
+     * 緊急停止の判定は副作用 (上流fetch) の直前に置く (#960 / #1050)。
+     * broadcast/multicast/narrowcast と manual 指定なしの自動 push は、
+     * 該当 capability が止まっている間は上流へ一切出さない。
+     * 例外は reply と X-Line-Harness-Source: manual の push —— 人間が
+     * 相手を見て送る1:1返信は一斉送信の停止対象ではない。
+     *
+     * #1050: X-Line-Harness-Capability で送信経路の停止対象を名乗れる。
+     * 値が無い・知らない値の自動送信は従来どおり broadcast_dispatch
+     * (一斉送信 = 安全側) として止める。
+     * アカウント単位の停止とグローバル (*) の停止の両方が効く。
+     */
+    const requestedCapability = c.req.header(OPERATION_PROXY_CAPABILITY_HEADER);
+    const dispatchCapability: OperationCapability =
+      requestedCapability &&
+      (OPERATION_CAPABILITIES as readonly string[]).includes(requestedCapability)
+        ? (requestedCapability as OperationCapability)
+        : 'broadcast_dispatch';
+    const isBulkDispatch =
+      method === 'POST' &&
+      (BULK_DISPATCH_PATHS.has(path) ||
+        (path === '/v2/bot/message/push' && logSource !== 'manual'));
+    if (
+      isBulkDispatch &&
+      (await isOperationCapabilityStopped(c.env.DB, caller.lineAccountId, dispatchCapability))
+    ) {
+      return c.json(
+        { message: 'Message dispatch is stopped by emergency operation control' },
+        409,
+      );
+    }
+
     let upstream: Response;
     try {
       upstream = await fetch(`${upstreamBase}${encodedPath}${url.search}`, {
@@ -548,11 +630,21 @@ function proxyHandler(prefix: string, upstreamBase: string, logSends: boolean) {
       return c.json({ message: 'Upstream request failed' }, 502);
     }
 
-    if (isMessageSend && upstream.ok && rawBody) {
+    /*
+     * R381: LINE が同じ送信キーを受理済みとして返す409（応答消失後の再送
+     * など）でも履歴を書く。本文は一度だけ届いているが、初回の200で履歴の
+     * 保存が落ちたとき、再送の409へ追従して同じ決まったIDの行を補完する。
+     * insertLogRows は送信キーから決まるIDの INSERT OR IGNORE なので、
+     * 初回の保存が済んでいれば二重には書かない。
+     */
+    const dedupeAccepted = Boolean(
+      retryKey && upstream.status === 409 && upstream.headers.get('x-line-accepted-request-id'),
+    );
+    if (isMessageSend && rawBody && (upstream.ok || dedupeAccepted)) {
       // Log in the background where possible: a multicast to hundreds of
       // friends must not delay the client response (timeout → client retry →
       // double send). Falls back to inline await outside a Workers runtime.
-      const logging = logProxySend(c.env.DB, caller, path, rawBody, logSource);
+      const logging = logProxySend(c.env.DB, caller, path, rawBody, logSource, retryKey);
       try {
         c.executionCtx.waitUntil(logging);
       } catch {

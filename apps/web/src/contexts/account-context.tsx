@@ -2,12 +2,13 @@
 
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import type { ReactNode } from 'react'
-import { api } from '@/lib/api'
+import { loadLineAccounts } from '@/lib/line-accounts-cache'
 
 const STORAGE_KEY = 'lh_selected_account'
 
 export interface AccountWithStats {
   id: string
+  revision?: number
   channelId: string
   name: string
   displayName?: string
@@ -41,6 +42,11 @@ export interface AccountWithStats {
     friendCount: number
     activeScenarios: number
     messagesThisMonth: number
+    staffCount: number
+  }
+  connection?: {
+    status: 'ok' | 'warn' | 'unknown'
+    checkedAt: string | null
   }
 }
 
@@ -50,8 +56,20 @@ interface AccountContextValue {
   selectedAccount: AccountWithStats | null
   setSelectedAccountId: (id: string) => void
   clearSelectedAccountId: () => void
+  /**
+   * 一覧を取り直す。取り直しボタンや保存・確認の直後に呼ぶので、
+   * 使い回しの答えは使わず必ず取り直す（古い一覧を見せない）。
+   */
   refreshAccounts: () => Promise<void>
   loading: boolean
+  /**
+   * 一覧の取得に失敗したときだけ立つ。失敗を `accounts=[]` のままにすると
+   * 「アカウントが1件も無い」画面に見えるので、利用側はこれを見て
+   * 「読み込めませんでした＋再読み込み」を出す（Issue #978）。
+   */
+  error: string | null
+  /** 再読み込みの最中。失敗表示の再試行ボタンを止めるのに使う。 */
+  refreshing: boolean
 }
 
 const AccountContext = createContext<AccountContextValue | null>(null)
@@ -60,6 +78,8 @@ export function AccountProvider({ children }: { children: ReactNode }) {
   const [accounts, setAccounts] = useState<AccountWithStats[]>([])
   const [selectedAccountId, setSelectedAccountIdState] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [refreshing, setRefreshing] = useState(false)
 
   const setSelectedAccountId = useCallback((id: string) => {
     setSelectedAccountIdState(id)
@@ -80,9 +100,17 @@ export function AccountProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const refreshAccounts = useCallback(async () => {
+    setRefreshing(true)
     try {
-      const res = await api.lineAccounts.list(false)
-      if (res.success && res.data.length > 0) {
+      // 取り直しの口なので、使い回しの答えは捨てて必ず取り直す。
+      const res = await loadLineAccounts({ reload: true })
+      if (!res.success) {
+        // 失敗時は手元の一覧を消さない。古い一覧でも「アカウントなし」の
+        // 空画面より役に立つし、初回失敗ではもともと空なので差し支えない。
+        setError(res.error || 'アカウント一覧を読み込めませんでした')
+        return
+      }
+      if (res.data.length > 0) {
         const list = res.data as AccountWithStats[]
         setAccounts(list)
 
@@ -104,10 +132,12 @@ export function AccountProvider({ children }: { children: ReactNode }) {
         setAccounts([])
         setSelectedAccountIdState(null)
       }
+      setError(null)
     } catch {
-      // Failed to load accounts
+      setError('アカウント一覧を読み込めませんでした')
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
   }, [])
 
@@ -119,7 +149,7 @@ export function AccountProvider({ children }: { children: ReactNode }) {
 
   return (
     <AccountContext.Provider
-      value={{ accounts, selectedAccountId, selectedAccount, setSelectedAccountId, clearSelectedAccountId, refreshAccounts, loading }}
+      value={{ accounts, selectedAccountId, selectedAccount, setSelectedAccountId, clearSelectedAccountId, refreshAccounts, loading, error, refreshing }}
     >
       {children}
     </AccountContext.Provider>

@@ -31,10 +31,108 @@ describe('compileSavedSearch', () => {
     }
   });
 
-  it('未接続の購入条件を黙って無視しない', () => {
+  it('予約・回答・リマインダ・購入を同じOR群へ接続する', () => {
+    const result = compileSavedSearch({
+      any: [
+        { kind: 'event_booking', op: 'exists', value: 'event-a' },
+        { kind: 'calendar_booking', op: 'exists', value: 'confirmed' },
+        { kind: 'form', formId: 'form-a', op: 'exists' },
+        { kind: 'reminder', op: 'exists', value: 'reminder-a' },
+        { kind: 'purchase', op: 'exists' },
+      ],
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.sql).toContain('event_bookings');
+      expect(result.value.sql).toContain('calendar_bookings');
+      expect(result.value.sql).toContain('form_submissions');
+      expect(result.value.sql).toContain('friend_reminders');
+      expect(result.value.sql).toContain('ec_events');
+      expect(result.value.sql).toContain(' OR ');
+      expect(result.value.binds).toEqual(['event-a', 'confirmed', 'confirmed', 'form-a', 'reminder-a']);
+    }
+  });
+
+  it('使えない演算子を黙って無視しない', () => {
     expect(compileSavedSearch({ all: [{ kind: 'purchase', op: 'gte', value: 1 }] })).toEqual({
       ok: false,
-      error: '購入履歴の条件は、購入と友だちを結ぶ口が未接続です',
+      error: '存在確認で使えない比較方法が指定されています',
     });
+  });
+
+  /*
+    ATTR-13: 画面で選べる友だち情報の比較方法はすべて実行できる。
+    「登録あり／なし」は値を取らず、大小比較は数値ならCASTする。
+  */
+  it('友だち情報の全演算子を実行できるSQLへ変換する', () => {
+    const ops = [
+      'eq', 'equals', 'ne', 'not_equals', 'contains', 'not_contains',
+      'exists', 'not_exists', 'gte', 'gt', 'lte', 'lt',
+    ];
+    for (const op of ops) {
+      const result = compileSavedSearch({
+        all: [{ kind: 'field', key: 'pet_name', op, value: op === 'exists' || op === 'not_exists' ? undefined : 'ポチ' }],
+      });
+      expect(result.ok, `${op} は変換できる`).toBe(true);
+    }
+  });
+
+  it('友だち情報の「登録あり／なし」は値なしで動く', () => {
+    const exists = compileSavedSearch({ all: [{ kind: 'field', key: 'pet_name', op: 'exists' }] });
+    expect(exists).toEqual({
+      ok: true,
+      value: expect.objectContaining({ binds: ['pet_name', 'pet_name'] }),
+    });
+    if (exists.ok) expect(exists.value.sql).toContain('IS NOT NULL');
+
+    const notExists = compileSavedSearch({ all: [{ kind: 'field', key: 'pet_name', op: 'not_exists' }] });
+    if (notExists.ok) expect(notExists.value.sql).toContain('IS NULL');
+  });
+
+  it('数値の大小比較はCASTして、日付などは文字列のまま比べる', () => {
+    const numeric = compileSavedSearch({ all: [{ kind: 'field', key: 'weight', op: 'gte', value: '5' }] });
+    if (numeric.ok) {
+      expect(numeric.value.sql).toContain('CAST');
+      expect(numeric.value.binds).toEqual(['weight', 5]);
+    }
+    const isoDate = compileSavedSearch({ all: [{ kind: 'field', key: 'birthday', op: 'lt', value: '2020-01-01' }] });
+    if (isoDate.ok) {
+      expect(isoDate.value.sql).not.toContain('CAST');
+      expect(isoDate.value.binds).toEqual(['birthday', '2020-01-01']);
+    }
+  });
+
+  it('表に無い友だち情報の演算子は断る', () => {
+    const result = compileSavedSearch({ all: [{ kind: 'field', key: 'pet_name', op: 'includes', value: 'x' }] });
+    expect(result).toEqual({ ok: false, error: '友だち情報で使えない比較方法が指定されています' });
+  });
+});
+
+describe('R183 逆転期間は0人として扱わず断る', () => {
+  it('開始日が終了日より後なら実行しない', () => {
+    const result = compileSavedSearch({
+      all: [{ kind: 'created_at', op: 'between', value: { from: '2026-09-30', to: '2026-09-01' } }],
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain('開始日が終了日より後');
+  });
+
+  it('最終反応日の逆転も断る', () => {
+    const result = compileSavedSearch({
+      all: [{ kind: 'last_activity', op: 'between', value: { from: '2026-09-30', to: '2026-09-01' } }],
+    });
+    expect(result.ok).toBe(false);
+  });
+
+  it('両端同日・片側指定・正常な期間は通る', () => {
+    for (const value of [
+      { from: '2026-09-01', to: '2026-09-01' },
+      { from: '2026-09-01', to: '' },
+      { from: '', to: '2026-09-01' },
+      { from: '2026-09-01', to: '2026-09-30' },
+    ]) {
+      const result = compileSavedSearch({ all: [{ kind: 'created_at', op: 'between', value }] });
+      expect(result.ok).toBe(true);
+    }
   });
 });

@@ -1,4 +1,4 @@
-import { jstNow } from './utils.js';
+import { boundedListLimit, jstNow, nonNegativeListOffset } from './utils.js';
 // オペレーター＆チャット管理クエリヘルパー
 
 export interface OperatorRow {
@@ -72,23 +72,29 @@ export async function deleteOperator(db: D1Database, id: string): Promise<void> 
 
 // --- チャット ---
 
-export async function getChats(db: D1Database, opts: { status?: string; operatorId?: string } = {}): Promise<ChatRow[]> {
+export async function getChats(
+  db: D1Database,
+  opts: { status?: string; operatorId?: string; limit?: number; offset?: number } = {},
+): Promise<ChatRow[]> {
+  const limit = boundedListLimit(opts.limit, 200);
+  const offset = nonNegativeListOffset(opts.offset);
   if (opts.status && opts.operatorId) {
-    const result = await db.prepare(`SELECT * FROM chats WHERE status = ? AND operator_id = ? ORDER BY last_message_at DESC`)
-      .bind(opts.status, opts.operatorId).all<ChatRow>();
+    const result = await db.prepare(`SELECT * FROM chats WHERE status = ? AND operator_id = ? ORDER BY last_message_at DESC LIMIT ? OFFSET ?`)
+      .bind(opts.status, opts.operatorId, limit, offset).all<ChatRow>();
     return result.results;
   }
   if (opts.status) {
-    const result = await db.prepare(`SELECT * FROM chats WHERE status = ? ORDER BY last_message_at DESC`)
-      .bind(opts.status).all<ChatRow>();
+    const result = await db.prepare(`SELECT * FROM chats WHERE status = ? ORDER BY last_message_at DESC LIMIT ? OFFSET ?`)
+      .bind(opts.status, limit, offset).all<ChatRow>();
     return result.results;
   }
   if (opts.operatorId) {
-    const result = await db.prepare(`SELECT * FROM chats WHERE operator_id = ? ORDER BY last_message_at DESC`)
-      .bind(opts.operatorId).all<ChatRow>();
+    const result = await db.prepare(`SELECT * FROM chats WHERE operator_id = ? ORDER BY last_message_at DESC LIMIT ? OFFSET ?`)
+      .bind(opts.operatorId, limit, offset).all<ChatRow>();
     return result.results;
   }
-  const result = await db.prepare(`SELECT * FROM chats ORDER BY last_message_at DESC`).all<ChatRow>();
+  const result = await db.prepare(`SELECT * FROM chats ORDER BY last_message_at DESC LIMIT ? OFFSET ?`)
+    .bind(limit, offset).all<ChatRow>();
   return result.results;
 }
 
@@ -141,14 +147,23 @@ export async function updateChat(
 }
 
 /** 友だちからメッセージ受信時にチャットを作成/更新 */
-export async function upsertChatOnMessage(db: D1Database, friendId: string): Promise<ChatRow> {
+export async function upsertChatOnMessage(
+  db: D1Database,
+  friendId: string,
+  /**
+   * LINEイベントの timestamp (JST文字列)。一覧の並びは起こった順を正と
+   * するため last_message_at にはこちらを入れる。対応期限の時計
+   * (last_incoming_at / last_customer_message_at) は届いた時刻のまま。
+   */
+  eventAt?: string | null,
+): Promise<ChatRow> {
   const now = jstNow();
   // createChat はレースで負けた場合も相手が作った行を返すので、必ずその行に対して
   // 受信時の更新 (resolved→unread, last_message_at) を適用する。挿入直後の自行にも
   // 適用されるが no-op 相当なので害はない。
   const chat = (await getChatByFriendId(db, friendId)) ?? (await createChat(db, { friendId }));
   const newStatus = chat.status === 'resolved' || chat.status === 'on_hold' ? 'unread' : chat.status;
-  await updateChat(db, chat.id, { status: newStatus, lastMessageAt: now });
+  await updateChat(db, chat.id, { status: newStatus, lastMessageAt: eventAt ?? now });
 
   // 受信の時刻を残し、初回返信の時計を巻き直す（107）。
   //

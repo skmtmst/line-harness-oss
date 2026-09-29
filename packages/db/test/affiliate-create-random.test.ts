@@ -13,6 +13,8 @@ import { getAffiliateByFriendId } from '../src/affiliate-links.js';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PKG_ROOT = join(__dirname, '..');
 const MIGRATIONS_DIR = join(PKG_ROOT, 'migrations');
+const TENANT_ID = '00000000-0000-4000-8000-000000000001';
+const ACCOUNT_ID = 'account-test';
 
 const BENIGN = /duplicate column name|already exists/i;
 
@@ -92,11 +94,20 @@ describe('createAffiliateWithRandomCode', () => {
 
   beforeEach(() => {
     sqlite = setupDb();
+    sqlite.prepare(`INSERT INTO line_accounts
+      (id, channel_id, name, channel_secret, channel_access_token, tenant_id, created_at, updated_at)
+      VALUES (?, 'channel-test', 'Test account', 'secret', 'token', ?, '2024-01-01', '2024-01-01')`)
+      .run(ACCOUNT_ID, TENANT_ID);
     db = asD1(sqlite);
   });
 
   test('generates a random base62 code and persists the row', async () => {
-    const aff = await createAffiliateWithRandomCode(db, { name: 'Alice', commissionRate: 10 });
+    const aff = await createAffiliateWithRandomCode(db, {
+      tenantId: TENANT_ID,
+      lineAccountId: ACCOUNT_ID,
+      name: 'Alice',
+      commissionRate: 10,
+    });
     expect(aff.code).toMatch(/^[0-9A-Za-z]{6}$/);
     expect(aff.name).toBe('Alice');
     expect(aff.commission_rate).toBe(10);
@@ -118,7 +129,11 @@ describe('createAffiliateWithRandomCode', () => {
     let i = 0;
     const gen = () => slugs[Math.min(i++, slugs.length - 1)];
 
-    const aff = await createAffiliateWithRandomCode(db, { name: 'Bob' }, gen);
+    const aff = await createAffiliateWithRandomCode(db, {
+      tenantId: TENANT_ID,
+      lineAccountId: ACCOUNT_ID,
+      name: 'Bob',
+    }, gen);
     expect(aff.code).toBe('FRESH2');
     expect(i).toBe(2); // first slug collided, second succeeded
   });
@@ -129,6 +144,8 @@ describe('createAffiliateWithRandomCode', () => {
     const first = await createAffiliateWithRandomCode(db, {
       name: 'Carol',
       friendId: 'friend-1',
+      tenantId: TENANT_ID,
+      lineAccountId: ACCOUNT_ID,
     });
     expect(first.friend_id).toBe('friend-1');
     expect(await getAffiliateByFriendId(db, 'friend-1')).not.toBeNull();
@@ -136,7 +153,12 @@ describe('createAffiliateWithRandomCode', () => {
     // The friend_id partial UNIQUE index (migration 046) must reject the second
     // affiliate — and it must NOT be swallowed by the code-collision retry loop.
     await expect(
-      createAffiliateWithRandomCode(db, { name: 'Dave', friendId: 'friend-1' }),
+      createAffiliateWithRandomCode(db, {
+        name: 'Dave',
+        friendId: 'friend-1',
+        tenantId: TENANT_ID,
+        lineAccountId: ACCOUNT_ID,
+      }),
     ).rejects.toThrow(/UNIQUE constraint failed/i);
   });
 });

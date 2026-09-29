@@ -13,10 +13,10 @@ function describeCondition(condition: SavedSearchCondition) {
 }
 
 describe('保存した検索の条件表示', () => {
-  it('対応マーク・シナリオ・対応状態を運用者向けの名前にする', () => {
+  it('対応マーク・シナリオ・対応状況を運用者向けの名前にする', () => {
     expect(describeCondition({ kind: 'mark', op: 'eq', value: 'mark-1' })).toBe('対応マークが「未対応」')
     expect(describeCondition({ kind: 'scenario', op: 'eq', value: 'scenario-1' })).toBe('シナリオが「初回フォロー」')
-    expect(describeCondition({ kind: 'chat_status', op: 'eq', value: 'in_progress' })).toBe('対応状態が「対応中」')
+    expect(describeCondition({ kind: 'chat_status', op: 'eq', value: 'in_progress' })).toBe('対応状況が「対応中」')
   })
 
   it('日付範囲をobject文字列にせず日付として表示する', () => {

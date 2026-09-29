@@ -10,20 +10,78 @@
 /** 期間の指定。設計の「今日 / 過去7日 / 過去28日」に対応する。 */
 export type DashboardPeriod = 'today' | 'last7' | 'last28';
 
-export type DashboardSectionState = 'ok' | 'empty' | 'unavailable' | 'stale' | 'estimated';
+export type DashboardSectionState = 'ok' | 'empty' | 'unavailable' | 'stale' | 'estimated' | 'partial';
+
+export type DashboardFreshness = 'fresh' | 'delayed' | 'stale' | 'unavailable' | 'partial';
 
 export interface DashboardSectionStatus {
   status: DashboardSectionState;
   /** The latest time represented by this section. */
-  asOf: string;
+  asOf: string | null;
+  /** The age/availability of the source represented by asOf. */
+  freshness: DashboardFreshness;
+  /** Why a source is unavailable or partial. */
+  reason: DashboardMetricReason;
   /** Human-readable fixed period key; the UI maps it to Japanese labels. */
   period: DashboardPeriod | 'latest' | 'last7-fixed' | 'this-month';
+}
+
+export type DashboardMetricState =
+  | 'available'
+  | 'empty'
+  | 'unavailable'
+  | 'estimated'
+  | 'partial'
+  | 'stale';
+
+export type DashboardMetricReason =
+  | 'source_failed'
+  | 'fetch_failed'
+  | 'not_connected'
+  | 'not_loaded'
+  | 'not_applicable'
+  | null;
+
+export interface DashboardMetric<T> {
+  /** 未取得・取得失敗時は0や空配列にせずnull。 */
+  value: T | null;
+  state: DashboardMetricState;
+  reason: DashboardMetricReason;
+  asOf: string | null;
+  period: DashboardSectionStatus['period'];
+}
+
+export interface DashboardFriendTrendPoint {
+  date: string;
+  added: number;
+  blocked: number;
+  /** その日の終わりの有効友だち数。 */
+  active: number;
+  /**
+   * 日次記録が無く、いまの友だちから逆算した日。
+   *
+   * 退会して行ごと消えた友だちは数に出ないので、実態より少なく見える。
+   * 画面はこの日を実線で結ばない。正しい記録と同じ見た目にすると、
+   * 見た人が違いに気づけない。
+   */
+  estimated: boolean;
+  /**
+   * その日に増えた友だちの経路内訳。多い順。
+   *
+   * `name` が null の行は「経路不明」（中継リンクを踏まずに増えた分）。
+   * 画面は null を経路名ではなく `—`（内訳なしと同じ置き方）で出す。
+   */
+  sources: Array<{ name: string | null; count: number }>;
 }
 
 export interface DashboardOverview {
   period: DashboardPeriod;
   /** 集計した時刻（JST）。カードごとの基準日がずれていないことの証拠になる。 */
   generatedAt: string;
+  /** 取得に成功した元データのうち、最も古い基準時刻。 */
+  asOf: string | null;
+  /** セクション全体のうち最も注意が必要な鮮度。 */
+  freshness: DashboardFreshness;
   friends: {
     /** 有効＝ブロックされておらず、非表示にもしていない。 */
     active: number;
@@ -36,7 +94,15 @@ export interface DashboardOverview {
   inbox: {
     unanswered: number;
     inProgress: number;
+    /** 保留。受信箱の対応状況と同じ4状態で数える。 */
+    onHold: number;
     resolved: number;
+    /**
+     * チャネル別の内訳。LINE は友だち単位、MAIL はスレッド単位で数える。
+     * 受信箱の一覧（`/api/chats`・`/api/support/inbox`）と同じ定義・同じ範囲。
+     */
+    line: InboxStatusBreakdown;
+    email: InboxStatusBreakdown;
     /** 未対応のうち、最も古いものからの経過時間（分）。無ければ null。 */
     oldestUnansweredMinutes: number | null;
     /**
@@ -48,7 +114,11 @@ export interface DashboardOverview {
     averageFirstReplyMinutes: number | null;
   };
   delivery: {
-    /** 期間内に送った通数。 */
+    /**
+     * 今月に送った通数。見出し「今月の配信」どおり、選んだ期間に関わらず
+     * 今月1日から数える。messages_log は送信時に1行足すので created_at が
+     * 送信日時にあたる（予約分を先に書く口はない）。
+     */
     sent: number;
     /**
      * こちらから送った数（プッシュ）と、受信への応答（リプライ）。
@@ -58,7 +128,10 @@ export interface DashboardOverview {
      */
     push: number;
     reply: number;
-    /** 期間内の一斉配信の件数。 */
+    /**
+     * 今月の一斉配信の件数。sent と同じく今月1日から数える。
+     * 数えるのは送った日（sent_at）。作った日ではない。
+     */
     broadcasts: number;
     /** 今月の送信上限。LINE から取れないときは null。 */
     quotaLimit: number | null;
@@ -66,22 +139,7 @@ export interface DashboardOverview {
     quotaUsed: number | null;
   };
   /** 友だち数の推移。古い順。 */
-  trend: Array<{
-    date: string;
-    added: number;
-    blocked: number;
-    /** その日の終わりの有効友だち数。 */
-    active: number;
-    /**
-     * 日次記録が無く、いまの友だちから逆算した日。
-     *
-     * 退会して行ごと消えた友だちは数に出ないので、実態より少なく見える。
-     * 画面はこの日を実線で結ばない。正しい記録と同じ見た目にすると、
-     * 見た人が違いに気づけない。
-     */
-    estimated: boolean;
-    sources: Array<{ name: string; count: number }>;
-  }>;
+  trend: DashboardFriendTrendPoint[];
   conversions: {
     /** 期間内の成果の件数。 */
     total: number;
@@ -94,7 +152,8 @@ export interface DashboardOverview {
     scenarios: { active: number; paused: number };
     migrations: { active: number; completed: number };
     bookings: { pending: number; upcoming: number };
-    inflowTop: Array<{ name: string; count: number }>;
+    /** 経路不明の塊は name=null で返す。経路名「経路不明」として出さない。 */
+    inflowTop: Array<{ name: string | null; count: number }>;
     funnelAlerts: number;
     automationFailures: number;
   };
@@ -110,6 +169,98 @@ export interface DashboardOverview {
     trend: DashboardSectionStatus;
     conversions: DashboardSectionStatus;
     operations: DashboardSectionStatus;
+  };
+  /**
+   * V6画面が使う、未取得をnullで区別できる指標契約。
+   * 上の既存フィールドは段階配備中の互換用に残す。
+   */
+  metrics: {
+    activeFriends: DashboardMetric<number>;
+    monthlyQuota: DashboardMetric<{
+      used: number | null;
+      limit: number | null;
+      remaining: number | null;
+      /** LINE が「上限なし」の契約を返したとき true。limit=null と区別する（DASH-08）。 */
+      unlimited: boolean;
+    }>;
+    friendTrend: DashboardMetric<DashboardFriendTrendPoint[]>;
+    officialProfileUrl: DashboardMetric<string>;
+  };
+}
+
+const FRESH_MINUTES = 5;
+const DELAYED_MINUTES = 15;
+const STALE_MINUTES = 60;
+
+function parseDashboardTime(value: string): number {
+  const normalized = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:\.\d+)?$/.test(value)
+    ? `${value.replace(' ', 'T')}+09:00`
+    : value;
+  return Date.parse(normalized);
+}
+
+/** 正本 §6-2 の境界をserver側で判定する。画面の時計では判定しない。 */
+export function dashboardFreshness(
+  asOf: string | null,
+  options: {
+    now?: number;
+    failedSources?: number;
+    totalSources?: number;
+    checkIntervalMinutes?: number;
+  } = {},
+): DashboardFreshness {
+  const failedSources = options.failedSources ?? 0;
+  const totalSources = Math.max(options.totalSources ?? 1, 1);
+  if (failedSources >= totalSources) return 'unavailable';
+  if (failedSources > 0) return 'partial';
+  if (!asOf) return 'unavailable';
+  const timestamp = parseDashboardTime(asOf);
+  if (!Number.isFinite(timestamp)) return 'unavailable';
+  const ageMinutes = Math.max(0, ((options.now ?? Date.now()) - timestamp) / 60_000);
+  if (
+    (options.checkIntervalMinutes !== undefined
+      && ageMinutes > options.checkIntervalMinutes * 2)
+    || ageMinutes > STALE_MINUTES
+  ) return 'stale';
+  if (ageMinutes <= FRESH_MINUTES) return 'fresh';
+  if (ageMinutes <= DELAYED_MINUTES) return 'delayed';
+  // 共通状態は5種類だけなので、delayedの上限を超えた値はstaleへ送る。
+  return 'stale';
+}
+
+function oldestDashboardTime(values: Array<string | null | undefined>): string | null {
+  const valid = values
+    .filter((value): value is string => typeof value === 'string' && Number.isFinite(parseDashboardTime(value)))
+    .sort((left, right) => parseDashboardTime(left) - parseDashboardTime(right));
+  return valid[0] ?? null;
+}
+
+function latestDashboardTime(values: Array<string | null | undefined>): string | null {
+  const valid = values
+    .filter((value): value is string => typeof value === 'string' && Number.isFinite(parseDashboardTime(value)))
+    .sort((left, right) => parseDashboardTime(right) - parseDashboardTime(left));
+  return valid[0] ?? null;
+}
+
+/** 一部だけ失敗した応答を unavailable ではなく partial としてまとめる。 */
+export function summarizeDashboardFreshness(
+  sections: DashboardOverview['sections'],
+): { asOf: string | null; freshness: DashboardFreshness } {
+  const values = Object.values(sections);
+  const unavailable = values.filter((section) => section.freshness === 'unavailable').length;
+  const freshness: DashboardFreshness = values.some((section) => section.freshness === 'partial')
+    || (unavailable > 0 && unavailable < values.length)
+    ? 'partial'
+    : unavailable === values.length
+      ? 'unavailable'
+      : values.some((section) => section.freshness === 'stale')
+        ? 'stale'
+        : values.some((section) => section.freshness === 'delayed')
+          ? 'delayed'
+          : 'fresh';
+  return {
+    asOf: oldestDashboardTime(values.map((section) => section.asOf)),
+    freshness,
   };
 }
 
@@ -133,6 +284,11 @@ export function periodStart(period: DashboardPeriod): string {
   if (period === 'today') return jstDate(0);
   if (period === 'last7') return jstDate(-6);
   return jstDate(-27);
+}
+
+/** 今月の始まり（JSTの日付）。「今月の配信」は選んだ期間に関わらず今月1日から数える。 */
+export function monthStart(): string {
+  return `${jstDate(0).slice(0, 8)}01`;
 }
 
 /** 期間に含まれる日数。推移の折れ線の点の数になる。 */
@@ -211,21 +367,108 @@ function accountScopeSql(scope: AccountStatsScope, column: string): { sql: strin
   return { sql: scope.includeUnassigned ? `${column} IS NULL` : '1 = 0', binds: [] };
 }
 
-async function inboxState(db: D1Database, scope: AccountStatsScope): Promise<DashboardOverview['inbox']> {
-  const account = accountScopeSql(scope, 'f.line_account_id');
-  const row = await db
+/** 受信箱の対応状況4状態の件数。受信箱の一覧と同じ定義で数えたもの。 */
+export interface InboxStatusBreakdown {
+  unanswered: number;
+  inProgress: number;
+  onHold: number;
+  resolved: number;
+}
+
+/**
+ * 受信箱の対応状況の正本（LINE＋MAILの4状態）。
+ *
+ * ダッシュボードの「現在の対応状況」と受信箱の絞り込みが同じ数を出すための、
+ * 唯一の数え方。二重に持たない。
+ *
+ * - LINE は `/api/chats` の一覧と同じく友だち単位。messages_log か chats の
+ *   どちらかに履歴がある友だちを母集団にし、最新の chats 行の status を使う
+ *   （行が無い友だちは対応済み。一覧の `COALESCE(c.status, 'resolved')` と同じ）。
+ * - MAIL は `/api/support/inbox` と同じく `support_email_threads` の status 単位。
+ * - MAIL はアカウントを持たないため、未割り当てが見える範囲のときだけ数える
+ *   （受信箱の一覧と同じ条件）。アカウント選択中も、見える人には数える。
+ */
+export interface InboxStatusCounts extends InboxStatusBreakdown {
+  line: InboxStatusBreakdown;
+  email: InboxStatusBreakdown;
+}
+
+const ZERO_BREAKDOWN: InboxStatusBreakdown = { unanswered: 0, inProgress: 0, onHold: 0, resolved: 0 };
+
+export async function getInboxStatusCounts(
+  db: D1Database,
+  scope: AccountStatsScope,
+): Promise<InboxStatusCounts> {
+  const friendScope = accountScopeSql(scope, 'f.line_account_id');
+  const includeEmail = 'allTenants' in scope ? true : scope.includeUnassigned;
+
+  const lineRow = await db
     .prepare(
       `SELECT
          SUM(CASE WHEN status = 'unread' THEN 1 ELSE 0 END) AS unanswered,
          SUM(CASE WHEN status = 'in_progress' THEN 1 ELSE 0 END) AS in_progress,
-         SUM(CASE WHEN status = 'resolved' THEN 1 ELSE 0 END) AS resolved,
-         MIN(CASE WHEN status = 'unread' THEN last_message_at END) AS oldest
-       FROM chats c
-       JOIN friends f ON f.id = c.friend_id
-       WHERE ${account.sql}`,
+         SUM(CASE WHEN status = 'on_hold' THEN 1 ELSE 0 END) AS on_hold,
+         SUM(CASE WHEN status = 'resolved' THEN 1 ELSE 0 END) AS resolved
+       FROM (
+         SELECT COALESCE(
+           (SELECT c.status FROM chats c
+             WHERE c.friend_id = f.id
+             ORDER BY c.created_at DESC, c.id DESC LIMIT 1),
+           'resolved'
+         ) AS status
+         FROM friends f
+         WHERE ${friendScope.sql}
+           AND (EXISTS (
+                  SELECT 1 FROM messages_log m
+                   WHERE m.friend_id = f.id
+                     AND (m.delivery_type IS NULL OR m.delivery_type != 'test')
+                )
+             OR EXISTS (SELECT 1 FROM chats c WHERE c.friend_id = f.id))
+       )`,
     )
-    .bind(...account.binds)
-    .first<{ unanswered: number; in_progress: number; resolved: number; oldest: string | null }>();
+    .bind(...friendScope.binds)
+    .first<{ unanswered: number | null; in_progress: number | null; on_hold: number | null; resolved: number | null }>();
+  const line: InboxStatusBreakdown = {
+    unanswered: lineRow?.unanswered ?? 0,
+    inProgress: lineRow?.in_progress ?? 0,
+    onHold: lineRow?.on_hold ?? 0,
+    resolved: lineRow?.resolved ?? 0,
+  };
+
+  let email: InboxStatusBreakdown = { ...ZERO_BREAKDOWN };
+  if (includeEmail) {
+    const mailRow = await db
+      .prepare(
+        `SELECT
+           SUM(CASE WHEN status = 'unread' THEN 1 ELSE 0 END) AS unanswered,
+           SUM(CASE WHEN status = 'in_progress' THEN 1 ELSE 0 END) AS in_progress,
+           SUM(CASE WHEN status = 'on_hold' THEN 1 ELSE 0 END) AS on_hold,
+           SUM(CASE WHEN status = 'resolved' THEN 1 ELSE 0 END) AS resolved
+         FROM support_email_threads`,
+      )
+      .first<{ unanswered: number | null; in_progress: number | null; on_hold: number | null; resolved: number | null }>();
+    email = {
+      unanswered: mailRow?.unanswered ?? 0,
+      inProgress: mailRow?.in_progress ?? 0,
+      onHold: mailRow?.on_hold ?? 0,
+      resolved: mailRow?.resolved ?? 0,
+    };
+  }
+
+  return {
+    unanswered: line.unanswered + email.unanswered,
+    inProgress: line.inProgress + email.inProgress,
+    onHold: line.onHold + email.onHold,
+    resolved: line.resolved + email.resolved,
+    line,
+    email,
+  };
+}
+
+async function inboxState(db: D1Database, scope: AccountStatsScope): Promise<DashboardOverview['inbox']> {
+  const account = accountScopeSql(scope, 'f.line_account_id');
+  const counts = await getInboxStatusCounts(db, scope);
+  const includeEmail = 'allTenants' in scope ? true : scope.includeUnassigned;
 
   // 受信から初回返信までの平均。JSTの過去7日。
   // 記録が無い往復（107より前）は WHERE で外れる。
@@ -249,16 +492,42 @@ async function inboxState(db: D1Database, scope: AccountStatsScope): Promise<Das
     // 107 がまだ当たっていない環境。平均だけ出ない。
   }
 
+  // 最も古い未対応。LINE と MAIL のうち待ちが長い方（受信箱の最長待ちと同じ）。
+  const oldestAt: Array<string | null> = [];
+  const lineOldest = await db
+    .prepare(
+      `SELECT MIN(CASE WHEN c.status = 'unread' THEN c.last_message_at END) AS oldest
+         FROM chats c
+         JOIN friends f ON f.id = c.friend_id
+        WHERE ${account.sql}`,
+    )
+    .bind(...account.binds)
+    .first<{ oldest: string | null }>();
+  oldestAt.push(lineOldest?.oldest ?? null);
+  if (includeEmail) {
+    const mailOldest = await db
+      .prepare(
+        `SELECT MIN(CASE WHEN status = 'unread' THEN last_incoming_at END) AS oldest
+           FROM support_email_threads`,
+      )
+      .first<{ oldest: string | null }>();
+    oldestAt.push(mailOldest?.oldest ?? null);
+  }
   let oldestMinutes: number | null = null;
-  if (row?.oldest) {
-    const diff = Date.now() - new Date(row.oldest).getTime();
+  for (const at of oldestAt) {
+    if (!at) continue;
+    const diff = Date.now() - new Date(at).getTime();
     // 未来の時刻が入っていることがある（時計ずれ）。負の経過時間は意味がないので落とす。
-    oldestMinutes = diff > 0 ? Math.floor(diff / 60000) : 0;
+    const minutes = diff > 0 ? Math.floor(diff / 60000) : 0;
+    oldestMinutes = oldestMinutes === null ? minutes : Math.max(oldestMinutes, minutes);
   }
   return {
-    unanswered: row?.unanswered ?? 0,
-    inProgress: row?.in_progress ?? 0,
-    resolved: row?.resolved ?? 0,
+    unanswered: counts.unanswered,
+    inProgress: counts.inProgress,
+    onHold: counts.onHold,
+    resolved: counts.resolved,
+    line: counts.line,
+    email: counts.email,
     oldestUnansweredMinutes: oldestMinutes,
     averageFirstReplyMinutes: averageFirstReply,
   };
@@ -293,16 +562,33 @@ export async function recordFriendSnapshot(
   db: D1Database,
   accountId: string | null,
   date?: string,
+  limit = 1_000,
 ): Promise<void> {
   const day = date ?? jstDate(0);
   if (accountId === null) {
-    const accounts = await db
-      .prepare('SELECT id FROM line_accounts')
+    const batchLimit = Number.isFinite(limit)
+      ? Math.max(1, Math.min(Math.trunc(limit), 1_000))
+      : 1_000;
+    const targets = await db
+      .prepare(
+        `SELECT targets.id
+           FROM (
+             SELECT id FROM line_accounts
+             UNION ALL SELECT ? AS id
+           ) targets
+           LEFT JOIN friend_daily_snapshots snapshots
+             ON snapshots.date = ? AND snapshots.line_account_id = targets.id
+          ORDER BY
+            CASE WHEN snapshots.updated_at IS NULL THEN 0 ELSE 1 END ASC,
+            snapshots.updated_at ASC,
+            targets.id ASC
+          LIMIT ?`,
+      )
+      .bind(UNASSIGNED_SNAPSHOT_ACCOUNT_ID, day, batchLimit)
       .all<{ id: string }>();
-    await Promise.all([
-      ...accounts.results.map((account) => recordFriendSnapshot(db, account.id, day)),
-      recordFriendSnapshot(db, UNASSIGNED_SNAPSHOT_ACCOUNT_ID, day),
-    ]);
+    await Promise.all(
+      targets.results.map((target) => recordFriendSnapshot(db, target.id, day)),
+    );
     return;
   }
 
@@ -381,21 +667,22 @@ function snapshotScopeSql(scope: AccountStatsScope): { sql: string; binds: strin
 async function friendTrend(
   db: D1Database,
   scope: AccountStatsScope,
-): Promise<DashboardOverview['trend']> {
+): Promise<{ points: DashboardOverview['trend']; asOf: string | null }> {
   const days = TREND_DAYS;
   const start = jstDate(-(TREND_DAYS - 1));
   const snapshotScope = snapshotScopeSql(scope);
 
   const recorded = await db
     .prepare(
-      `SELECT date, SUM(active) AS active, SUM(added) AS added, SUM(blocked) AS blocked
+      `SELECT date, SUM(active) AS active, SUM(added) AS added, SUM(blocked) AS blocked,
+              MIN(updated_at) AS updatedAt
          FROM friend_daily_snapshots
         WHERE ${snapshotScope.sql} AND date >= ?
         GROUP BY date
         ORDER BY date`,
     )
     .bind(...snapshotScope.binds, start)
-    .all<{ date: string; active: number; added: number; blocked: number }>();
+    .all<{ date: string; active: number; added: number; blocked: number; updatedAt: string }>();
   const byDate = new Map(recorded.results.map((r) => [r.date, r]));
 
   const friends = accountScopeSql(scope, 'line_account_id');
@@ -410,17 +697,22 @@ async function friendTrend(
     .bind(...binds)
     .all<{ d: string; n: number }>();
   const addedByDate = new Map(addedRows.results.map((r) => [r.d, r.n]));
+  /*
+   * 経路不明（ref_code が経路に結びつかない追加）は name=null で返す。
+   * 「経路不明」を経路名として出すと、実在する経路と区別がつかない。
+   * 画面は null を `—` として出す。
+   */
   const sourceRows = await db.prepare(
     `SELECT substr(f.created_at, 1, 10) AS d,
-            COALESCE(er.name, '経路不明') AS name,
+            er.name AS name,
             COUNT(*) AS n
        FROM friends f
        LEFT JOIN entry_routes er ON er.ref_code = f.ref_code
       WHERE f.created_at >= ? AND ${accountScopeSql(scope, 'f.line_account_id').sql}
       GROUP BY d, name
       ORDER BY n DESC`,
-  ).bind(...binds).all<{ d: string; name: string; n: number }>();
-  const sourcesByDate = new Map<string, Array<{ name: string; count: number }>>();
+  ).bind(...binds).all<{ d: string; name: string | null; n: number }>();
+  const sourcesByDate = new Map<string, Array<{ name: string | null; count: number }>>();
   for (const row of sourceRows.results) {
     const list = sourcesByDate.get(row.d) ?? [];
     list.push({ name: row.name, count: row.n });
@@ -447,7 +739,12 @@ async function friendTrend(
     }
     running -= addedByDate.get(date) ?? 0;
   }
-  return out.reverse();
+  return {
+    points: out.reverse(),
+    // snapshot があるときは、画面を再取得した時刻ではなく保存済みの成功時刻を返す。
+    // 全日が推定なら、現在の friends を直接読み終えた時刻が取得成功時刻になる。
+    asOf: latestDashboardTime(recorded.results.map((row) => row.updatedAt)) ?? new Date().toISOString(),
+  };
 }
 
 async function conversionSummary(
@@ -490,12 +787,23 @@ export async function getDashboardOverview(
   db: D1Database,
   period: DashboardPeriod,
   scope: AccountStatsScope,
+  /**
+   * 受信箱の数を数える範囲。省略時は `scope` と同じ。
+   * ダッシュボードは選択中のアカウントだけを見るが、MAIL はアカウントを
+   * 持たないため、受信箱の一覧と同じく未割り当てが見える範囲では MAIL も
+   * 合わせて数える。呼び出し側（ルート）が staff の可視範囲で渡す。
+   */
+  inboxScope: AccountStatsScope = scope,
 ): Promise<DashboardOverview> {
   const start = periodStart(period);
+  const month = monthStart();
   const partialFailures: string[] = [];
+  const sourceAsOf = new Map<string, string>();
   const safe = async <T>(name: string, run: Promise<T>, fallback: T): Promise<T> => {
     try {
-      return await run;
+      const value = await run;
+      sourceAsOf.set(name, new Date().toISOString());
+      return value;
     } catch (error) {
       partialFailures.push(name);
       console.error(`[dashboard] ${name} failed`, error);
@@ -525,10 +833,16 @@ export async function getDashboardOverview(
          FROM friend_scenarios fs JOIN friends f ON f.id=fs.friend_id
         WHERE ${friendAccount.sql}`,
     ).bind(...friendAccount.binds).first<{ active: number | null; paused: number | null }>(),
+    /*
+     * ダッシュボードの「UID移行状況」カードが見るのは UID 移行の実行記録。
+     * 旧アカウント移行（account_migrations）の件数を出すと別機能の数字が
+     * 混ざるので、uid_migration_runs から数える（DASH-07）。
+     * active = 確認・実行待ちを含む未完了の実行、completed = 完了済み。
+     */
     db.prepare(
-      `SELECT SUM(CASE WHEN status IN ('pending','in_progress') THEN 1 ELSE 0 END) active,
+      `SELECT SUM(CASE WHEN status IN ('dry_run','review','ready','executing') THEN 1 ELSE 0 END) active,
               SUM(CASE WHEN status='completed' THEN 1 ELSE 0 END) completed
-         FROM account_migrations
+         FROM uid_migration_runs
         WHERE (${migrationFrom.sql} OR ${migrationTo.sql})`,
     ).bind(...migrationFrom.binds, ...migrationTo.binds).first<{ active: number | null; completed: number | null }>(),
     db.prepare(
@@ -537,11 +851,11 @@ export async function getDashboardOverview(
          FROM bookings WHERE ${bookingAccount.sql}`,
     ).bind(new Date().toISOString(), ...bookingAccount.binds).first<{ pending: number | null; upcoming: number | null }>(),
     db.prepare(
-      `SELECT COALESCE(er.name, '経路不明') name, COUNT(*) count
+      `SELECT er.name name, COUNT(*) count
          FROM friends f LEFT JOIN entry_routes er ON er.ref_code=f.ref_code
         WHERE f.created_at >= ? AND ${friendAccount.sql}
         GROUP BY name ORDER BY count DESC LIMIT 3`,
-    ).bind(start, ...friendAccount.binds).all<{ name: string; count: number }>(),
+    ).bind(start, ...friendAccount.binds).all<{ name: string | null; count: number }>(),
     count(db,
       `WITH funnel AS (
          SELECT f.ref_code, COUNT(DISTINCT f.id) additions, COUNT(ce.id) conversions
@@ -564,7 +878,7 @@ export async function getDashboardOverview(
     automationFailures,
   }));
 
-  const [friends, inbox, trend, conversions, sent, broadcasts, operations] = await Promise.all([
+  const [friends, inbox, trendResult, conversions, sent, broadcasts, operations] = await Promise.all([
     safe('friends', friendBreakdown(db, null, accountScopeSql(scope, 'line_account_id')), {
       active: 0,
       total: 0,
@@ -572,19 +886,23 @@ export async function getDashboardOverview(
       hiddenByUs: 0,
       blockedBoth: 0,
     }),
-    safe('inbox', inboxState(db, scope), {
+    safe('inbox', inboxState(db, inboxScope), {
       unanswered: 0,
       inProgress: 0,
+      onHold: 0,
       resolved: 0,
+      line: { ...ZERO_BREAKDOWN },
+      email: { ...ZERO_BREAKDOWN },
       oldestUnansweredMinutes: null,
       averageFirstReplyMinutes: null,
     }),
     // 推移だけは period を渡さない。上の切り替えに関わらず直近7日で見る。
-    safe('trend', friendTrend(db, scope), []),
+    safe('trend', friendTrend(db, scope), { points: [], asOf: null }),
     safe('conversions', conversionSummary(db, period, scope), { total: 0, byPoint: [] }),
     // プッシュ（こちらから）と リプライ（受信への応答）を分ける。
     // source は 028 で入っている。auto_reply と manual が応答。
-    db
+    // 見出し「今月の配信」どおり、選んだ期間ではなく今月1日から数える。
+    safe('delivery', db
       .prepare(
         `SELECT
            COUNT(*) AS sent,
@@ -592,39 +910,85 @@ export async function getDashboardOverview(
          FROM messages_log ml
           WHERE direction = 'outgoing' AND ml.created_at >= ? AND ${messageAccount.sql}`,
       )
-      .bind(start, ...messageAccount.binds)
+      .bind(month, ...messageAccount.binds)
       .first<{ sent: number; reply: number }>()
-      .then((value) => value)
-      .catch((error) => { partialFailures.push('delivery'); console.error('[dashboard] delivery failed', error); return null; }),
+      .then((value) => value), null),
+    // 一斉配信は「作った日」ではなく「送った日」で数える。先月作って今月
+    // 送った配信を先月扱いにすると、見出し「今月の配信」と実際がずれる。
+    // sent_at が無い古い行だけ created_at で代用する（0件へ落とさない）。
     safe('broadcasts', count(
       db,
       `SELECT COUNT(*) AS n FROM broadcasts b
-        WHERE status = 'sent' AND b.created_at >= ? AND ${broadcastScope}`,
-      start, ...broadcastAccount.binds, ...broadcastJsonAccount.binds,
+        WHERE status = 'sent' AND COALESCE(b.sent_at, b.created_at) >= ? AND ${broadcastScope}`,
+      month, ...broadcastAccount.binds, ...broadcastJsonAccount.binds,
     ), 0),
     safe('operations', operationsPromise, emptyOperations),
   ]);
 
   const generatedAt = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().replace('Z', '+09:00');
+  const trend = trendResult.points;
+  if (trendResult.asOf) sourceAsOf.set('trend', trendResult.asOf);
   const status = (
     names: string | string[],
     empty: boolean,
     sectionPeriod: DashboardSectionStatus['period'],
-  ): DashboardSectionStatus => ({
-    status: (Array.isArray(names) ? names : [names]).some((name) => partialFailures.includes(name))
-      ? 'unavailable'
-      : empty ? 'empty' : 'ok',
-    asOf: generatedAt,
-    period: sectionPeriod,
-  });
+  ): DashboardSectionStatus => {
+    const sources = Array.isArray(names) ? names : [names];
+    const failedSources = sources.filter((name) => partialFailures.includes(name)).length;
+    const asOf = oldestDashboardTime(sources.map((name) => sourceAsOf.get(name)));
+    const freshness = dashboardFreshness(asOf, {
+      failedSources,
+      totalSources: sources.length,
+    });
+    return {
+      status: failedSources === sources.length
+        ? 'unavailable'
+        : failedSources > 0
+          ? 'partial'
+          : freshness === 'stale' ? 'stale' : empty ? 'empty' : 'ok',
+      asOf,
+      freshness,
+      reason: failedSources > 0 ? 'source_failed' : null,
+      period: sectionPeriod,
+    };
+  };
   const trendStatus = status('trend', trend.length === 0, 'last7-fixed');
   if (trendStatus.status === 'ok' && trend.some((point) => point.estimated)) {
     trendStatus.status = 'estimated';
   }
+  const sections: DashboardOverview['sections'] = {
+    friends: status('friends', friends.total === 0, 'latest'),
+    inbox: status('inbox', inbox.unanswered + inbox.inProgress + inbox.onHold + inbox.resolved === 0, 'latest'),
+    delivery: status(['delivery', 'broadcasts'], (sent?.sent ?? 0) === 0 && broadcasts === 0, 'this-month'),
+    quota: {
+      status: 'unavailable', asOf: null, freshness: 'unavailable',
+      reason: 'not_loaded', period: 'this-month',
+    },
+    trend: trendStatus,
+    conversions: status('conversions', conversions.total === 0, period),
+    operations: status(
+      'operations',
+      operations.scenarios.active + operations.scenarios.paused
+        + operations.migrations.active + operations.migrations.completed
+        + operations.bookings.pending + operations.bookings.upcoming
+        + operations.funnelAlerts + operations.automationFailures === 0
+        && operations.inflowTop.length === 0,
+      period,
+    ),
+  };
+  const metricState = (section: DashboardSectionStatus): DashboardMetricState =>
+    section.freshness === 'stale' || section.freshness === 'partial'
+      ? section.freshness
+      : section.status === 'ok' ? 'available' : section.status;
+  const metricReason = (section: DashboardSectionStatus): DashboardMetricReason =>
+    section.status === 'unavailable' || section.status === 'partial' ? 'source_failed' : null;
+
+  const summary = summarizeDashboardFreshness(sections);
 
   return {
     period,
     generatedAt,
+    ...summary,
     friends,
     inbox,
     delivery: {
@@ -641,22 +1005,36 @@ export async function getDashboardOverview(
     conversions,
     partialFailures,
     operations,
-    sections: {
-      friends: status('friends', friends.total === 0, 'latest'),
-      inbox: status('inbox', inbox.unanswered + inbox.inProgress + inbox.resolved === 0, 'latest'),
-      delivery: status(['delivery', 'broadcasts'], (sent?.sent ?? 0) === 0 && broadcasts === 0, period),
-      quota: { status: 'unavailable', asOf: generatedAt, period: 'this-month' },
-      trend: trendStatus,
-      conversions: status('conversions', conversions.total === 0, period),
-      operations: status(
-        'operations',
-        operations.scenarios.active + operations.scenarios.paused
-          + operations.migrations.active + operations.migrations.completed
-          + operations.bookings.pending + operations.bookings.upcoming
-          + operations.funnelAlerts + operations.automationFailures === 0
-          && operations.inflowTop.length === 0,
-        period,
-      ),
+    sections,
+    metrics: {
+      activeFriends: {
+        value: sections.friends.status === 'unavailable' ? null : friends.active,
+        state: metricState(sections.friends),
+        reason: metricReason(sections.friends),
+        asOf: sections.friends.status === 'unavailable' ? null : sections.friends.asOf,
+        period: sections.friends.period,
+      },
+      monthlyQuota: {
+        value: null,
+        state: 'unavailable',
+        reason: 'not_loaded',
+        asOf: null,
+        period: 'this-month',
+      },
+      friendTrend: {
+        value: sections.trend.status === 'unavailable' ? null : trend,
+        state: metricState(sections.trend),
+        reason: metricReason(sections.trend),
+        asOf: sections.trend.status === 'unavailable' ? null : sections.trend.asOf,
+        period: sections.trend.period,
+      },
+      officialProfileUrl: {
+        value: null,
+        state: 'unavailable',
+        reason: 'not_loaded',
+        asOf: null,
+        period: 'latest',
+      },
     },
   };
 }
@@ -676,6 +1054,17 @@ export interface InboxStats {
   /** 今日の受信。 */
   todayInbound: number;
   todayByChannel: { line: number; email: number };
+  /**
+   * 担当者ごとの未読数。担当がまだ決まっていない会話は operatorId/name が null。
+   *
+   * 一覧はページ送りされるため、画面側で見えている行を数えてはいけない。
+   * 0件の担当者はこの配列に現れず、担当者一覧と結合する画面側が実値0として描く。
+   */
+  assigneeUnread: Array<{
+    operatorId: string | null;
+    operatorName: string | null;
+    unread: number;
+  }>;
 }
 
 /**
@@ -715,6 +1104,20 @@ export async function getInboxStats(
       )
     : await count(db, `SELECT COUNT(*) AS n FROM chats c JOIN friends f ON f.id = c.friend_id WHERE c.status = 'in_progress' AND ${friendScope.sql}`, ...friendScope.binds);
 
+  const assigneeUnreadRows = await db
+    .prepare(
+      `SELECT c.operator_id, o.name AS operator_name, COUNT(*) AS unread
+         FROM chats c
+         JOIN friends f ON f.id = c.friend_id
+         LEFT JOIN operators o ON o.id = c.operator_id
+        WHERE c.status = 'unread' AND ${friendScope.sql}
+        GROUP BY c.operator_id, o.name
+        ORDER BY CASE WHEN c.operator_id IS NULL THEN 0 ELSE 1 END,
+                 o.name ASC, c.operator_id ASC`,
+    )
+    .bind(...friendScope.binds)
+    .all<{ operator_id: string | null; operator_name: string | null; unread: number }>();
+
   // source は 'line' 以外にメール由来などが入る。line 以外をまとめてメール扱いに
   // すると、将来 source が増えたときに黙って混ざる。line と email だけを数える。
   const byChannel = await db
@@ -739,6 +1142,11 @@ export async function getInboxStats(
     mine,
     todayInbound: byChannel?.total ?? 0,
     todayByChannel: { line: byChannel?.line_n ?? 0, email: byChannel?.email_n ?? 0 },
+    assigneeUnread: assigneeUnreadRows.results.map((row) => ({
+      operatorId: row.operator_id,
+      operatorName: row.operator_name,
+      unread: Number(row.unread),
+    })),
   };
 }
 
@@ -789,8 +1197,9 @@ export async function getFriendStats(
     // （相手にブロックされている事実は変わらないため）。
     blockedByThem: breakdown.blockedByThem + breakdown.blockedBoth,
     hiddenByUs: breakdown.hiddenByUs,
-    unanswered: inbox.unanswered,
-    resolved: inbox.resolved,
+    // 友だち画面は LINE の友だちの数。MAIL のスレッドは混ぜない。
+    unanswered: inbox.line.unanswered,
+    resolved: inbox.line.resolved,
     addedThisMonth,
     addedLastMonth,
   };
@@ -798,7 +1207,10 @@ export async function getFriendStats(
 
 /** 一斉配信の一覧に出す数（設計 `V2 4-2 一斉配信` の KPIs）。 */
 export interface BroadcastStats {
-  /** 今月の配信件数と、そのうち予約中。 */
+  /**
+   * 今月送り終わった配信の件数と、そのうち予約中。
+   * 数えるのは送った日（sent_at）。作った日ではない（BROADCAST-14）。
+   */
   thisMonth: number;
   scheduled: number;
   /** 過去28日の到達と失敗。 */
@@ -814,19 +1226,61 @@ export interface BroadcastStats {
  * 開封率は broadcast_insights から。LINEは20人未満の配信だと開封数を返さない
  * ので、その配信は平均から外す。0として混ぜると平均が不当に下がる。
  */
-export async function getBroadcastStats(db: D1Database): Promise<BroadcastStats> {
+type BroadcastStatsScope = {
+  allowedAccountIds: readonly string[];
+  canSeeUnassigned: boolean;
+};
+
+function broadcastStatsFilter(
+  accountId: string | undefined,
+  scope: BroadcastStatsScope | undefined,
+  alias = '',
+): { sql: string; binds: string[] } {
+  const column = `${alias}line_account_id`;
+  const targetType = `${alias}target_type`;
+  const accountIds = `${alias}account_ids`;
+  if (accountId) {
+    return {
+      sql: ` AND (${column} = ? OR (${targetType} = 'multi-account-dedup' AND ${accountIds} IS NOT NULL AND EXISTS (SELECT 1 FROM json_each(${accountIds}) WHERE value = ?)))`,
+      binds: [accountId, accountId],
+    };
+  }
+  if (!scope) return { sql: '', binds: [] };
+
+  const conditions: string[] = [];
+  const binds: string[] = [];
+  if (scope.allowedAccountIds.length > 0) {
+    const placeholders = scope.allowedAccountIds.map(() => '?').join(', ');
+    conditions.push(`(${column} IN (${placeholders}) OR (${targetType} = 'multi-account-dedup' AND ${accountIds} IS NOT NULL AND EXISTS (SELECT 1 FROM json_each(${accountIds}) WHERE value IN (${placeholders}))))`);
+    binds.push(...scope.allowedAccountIds, ...scope.allowedAccountIds);
+  }
+  if (scope.canSeeUnassigned) conditions.push(`(${column} IS NULL AND ${accountIds} IS NULL)`);
+  return { sql: ` AND (${conditions.length > 0 ? conditions.join(' OR ') : '0 = 1'})`, binds };
+}
+
+export async function getBroadcastStats(
+  db: D1Database,
+  accountId?: string,
+  scope?: BroadcastStatsScope,
+): Promise<BroadcastStats> {
   const monthStart = jstDate(0).slice(0, 7);
   const since = jstDate(-27);
+  const accountFilter = broadcastStatsFilter(accountId, scope);
+  const insightAccountFilter = broadcastStatsFilter(accountId, scope, 'b.');
 
   const [counts, reach] = await Promise.all([
     db
       .prepare(
+        // BROADCAST-14: 「今月の配信」は送り終わったものを、送った日で数える。
+        // 下書きや予約を作っただけでは配信実績にならない。ダッシュボードの
+        // delivery.broadcasts と同じく、sent_at の無い古い行だけ
+        // created_at で代用する（0件へ落とさない）。
         `SELECT
-           SUM(CASE WHEN substr(created_at, 1, 7) = ? THEN 1 ELSE 0 END) AS this_month,
+           SUM(CASE WHEN status = 'sent' AND substr(COALESCE(sent_at, created_at), 1, 7) = ? THEN 1 ELSE 0 END) AS this_month,
            SUM(CASE WHEN status = 'scheduled' THEN 1 ELSE 0 END) AS scheduled
-         FROM broadcasts`,
+         FROM broadcasts WHERE 1 = 1${accountFilter.sql}`,
       )
-      .bind(monthStart)
+      .bind(monthStart, ...accountFilter.binds)
       .first<{ this_month: number; scheduled: number }>(),
     db
       .prepare(
@@ -834,9 +1288,9 @@ export async function getBroadcastStats(db: D1Database): Promise<BroadcastStats>
            COALESCE(SUM(success_count), 0) AS delivered,
            COALESCE(SUM(total_count - success_count), 0) AS failed
          FROM broadcasts
-          WHERE status = 'sent' AND created_at >= ?`,
+          WHERE status = 'sent' AND COALESCE(sent_at, created_at) >= ?${accountFilter.sql}`,
       )
-      .bind(since)
+      .bind(since, ...accountFilter.binds)
       .first<{ delivered: number; failed: number }>(),
   ]);
 
@@ -847,9 +1301,11 @@ export async function getBroadcastStats(db: D1Database): Promise<BroadcastStats>
         // open_rate は取り込み時に計算済み。ここで割り直すと、
         // 分母の取り方が2か所に分かれて食い違う。
         `SELECT AVG(open_rate) * 100 AS rate
-           FROM broadcast_insights
-          WHERE delivered >= 20 AND open_rate IS NOT NULL`,
+           FROM broadcast_insights bi
+           JOIN broadcasts b ON b.id = bi.broadcast_id
+          WHERE delivered >= 20 AND open_rate IS NOT NULL${insightAccountFilter.sql}`,
       )
+      .bind(...insightAccountFilter.binds)
       .first<{ rate: number | null }>();
     openRate = row?.rate === null || row?.rate === undefined ? null : Math.round(row.rate * 10) / 10;
   } catch {
@@ -880,6 +1336,8 @@ export interface ListStats {
     inUse: number;
     unanswered: number;
     inProgress: number;
+    /** 受信箱の「保留」トーク数。未対応割合の母数を全状態にするため（#1014 ATTR-21）。 */
+    onHold: number;
     resolved: number;
     /** 過去7日でマークを変えた回数（110）。 */
     changedLast7: number;
@@ -961,7 +1419,10 @@ export async function getListStats(db: D1Database, scope: AccountStatsScope): Pr
         )
         .bind(...markScope.binds, ...friendScope.binds)
         .first<{ total: number; in_use: number }>();
-      const inbox = await inboxState(db, scope);
+      // #1014 ATTR-21: 「未対応◯%」の母数は受信箱全体（unread＋対応中＋
+      // 保留＋対応済み）。数え方は受信箱の正本（getInboxStatusCounts）の
+      // LINE 側を使う。MAIL のスレッドは友だち属性の母数に混ぜない。
+      const inbox = (await getInboxStatusCounts(db, scope)).line;
       // 変更履歴も、対象の友だちが属するアカウントで絞る。
       const changed = await db
         .prepare(
@@ -981,10 +1442,11 @@ export async function getListStats(db: D1Database, scope: AccountStatsScope): Pr
         inUse: row?.in_use ?? 0,
         unanswered: inbox.unanswered,
         inProgress: inbox.inProgress,
+        onHold: inbox.onHold,
         resolved: inbox.resolved,
         changedLast7,
       };
-    }, { total: 0, inUse: 0, unanswered: 0, inProgress: 0, resolved: 0, changedLast7: 0 }),
+    }, { total: 0, inUse: 0, unanswered: 0, inProgress: 0, onHold: 0, resolved: 0, changedLast7: 0 }),
 
     safe(async () => {
       // 上限50は画面に出すためだけの値。DB側に制約は無い。
@@ -1013,7 +1475,7 @@ export async function getListStats(db: D1Database, scope: AccountStatsScope): Pr
         `SELECT COUNT(DISTINCT template_id) AS n FROM (
            SELECT template_id FROM scenario_steps WHERE template_id IS NOT NULL
            UNION ALL
-           SELECT template_id FROM auto_replies WHERE template_id IS NOT NULL
+           SELECT template_id FROM auto_replies WHERE template_id IS NOT NULL AND deleted_at IS NULL
          )`,
       );
       // テンプレート由来の短縮URLのクリック率（110）。
@@ -1074,8 +1536,8 @@ export async function getListStats(db: D1Database, scope: AccountStatsScope): Pr
       const row = await db
         .prepare(
           `SELECT
-             (SELECT COUNT(*) FROM reminders WHERE ${reminderScope.sql}) AS total,
-             (SELECT COUNT(*) FROM reminders WHERE is_active = 1 AND ${reminderScope.sql}) AS active,
+             (SELECT COUNT(*) FROM reminders WHERE deleted_at IS NULL AND ${reminderScope.sql}) AS total,
+             (SELECT COUNT(*) FROM reminders WHERE deleted_at IS NULL AND is_active = 1 AND ${reminderScope.sql}) AS active,
              (SELECT COUNT(*) FROM friend_reminders fr JOIN friends f ON f.id = fr.friend_id WHERE fr.status = 'active' AND ${friendScope.sql}) AS waiting`,
         )
         .bind(...reminderScope.binds, ...reminderScope.binds, ...friendScope.binds)

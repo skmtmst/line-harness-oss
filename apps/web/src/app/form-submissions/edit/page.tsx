@@ -13,68 +13,76 @@
  * それまでの回答と結びつかなくなる。画面には出すだけで、編集させない。
  */
 
+import ListState from '@/components/shared/list-state'
+import Select from '@/components/shared/select'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import {
   emptyLayout,
+  formThemeContrastError,
   newBlockId,
+  normalizeFormTheme,
+  validateFormForPublish,
   type FormBlock,
   type FormInputType,
   type FormLayout,
   type FormOptions,
   type FormSection,
+  type FormTheme,
 } from '@line-crm/shared'
-import { api } from '@/lib/api'
+import { normalizeSectionName } from '@/components/forms/section-name'
+import { api, ApiError, fetchApi } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
-import Header from '@/components/layout/header'
 import { Field, inputClass } from '@/components/shared/form-controls'
 import BlockEditor, { BLOCK_MENU } from '@/components/forms/block-editor'
 import FormPreview from '@/components/forms/form-preview'
+import FormDesignSettings from './form-design-settings'
+import { ogImageUrlError, validateLayoutForSave } from './form-validate'
 import OptionsDialog from '@/components/forms/options-dialog'
+import { describeFormUpdates } from '@/components/forms/form-update-summary'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import StickyBar from '@/components/shared/sticky-bar'
+import SaveConflictBar from '@/components/shared/save-conflict-bar'
+import TargetMissing from '@/components/shared/target-missing'
+import { conflictMessage } from './form-conflict-message'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { EMPTY_REFS, type FormRefs } from '@/components/forms/form-refs'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import ActionMenu from '@/components/shared/action-menu'
+import Button from '@/components/shared/button'
+import {
+  formJumpsInto as jumpsInto,
+  makeFormBlock as makeBlock,
+  takenFormAnswerNames as takenAnswerNames,
+  uniqueFormCopyName as uniqueCopyName,
+} from '@/components/forms/form-definition-operations'
 
 /** 共通ヘッダを指す番号。セクションの添字と混ぜないために -1 を使う。 */
 const HEADER_TAB = -1
 
-function makeBlock(kind: string, type?: FormInputType, count = 0): FormBlock {
-  const id = newBlockId()
-  switch (kind) {
-    case 'heading':
-      return { id, kind: 'heading', text: '見出し', level: 2 }
-    case 'text':
-      return { id, kind: 'text', text: '' }
-    case 'image':
-      return { id, kind: 'image', mediaUrl: '', size: 'normal' }
-    case 'button':
-      return { id, kind: 'button', label: 'ボタン', url: '', style: 'default' }
-    default:
-      return {
-        id,
-        kind: 'input',
-        type: type ?? 'text',
-        // 回答データの見出しは英数字で作る。日本語のままだと、受け渡しの
-        // 途中で化けることがある。
-        name: `q${count + 1}_${id.slice(2)}`,
-        label: '',
-        required: false,
-        ...(type === 'radio' || type === 'checkbox' || type === 'select'
-          ? {
-              choiceMode: 'tag' as const,
-              choices: [
-                { id: newBlockId('c'), label: '選択肢1' },
-                { id: newBlockId('c'), label: '選択肢2' },
-              ],
-            }
-          : {}),
-      }
-  }
-}
-
+/**
+ * そのページへ飛ばしている選択肢の数。
+ *
+ * ページを消すと、この分岐は行き先を失って「次へ進む」に戻る。消す前に
+ * 何本つなぎ直すのかを言うために数える。**数え漏らしを作らないよう、
+ * 全ページの入力ブロックを見る**（自分自身のページも数える。消えるまでは
+ * 分岐として生きているため）。
+ */
+/**
+ * 複製の回答キーを一意にする。
+ *
+ * 回答は `name` を鍵に保存される。`${base}_copy` が既にあれば
+ * `_copy2`、`_copy3` と番号を足して、重ならない名前を作る。
+ */
 function FormEditInner() {
   const params = useSearchParams()
   const id = params.get('id') ?? ''
+  const editorTab = params.get('tab') === 'design'
+    ? 'design'
+    : params.get('tab') === 'options'
+      ? 'options'
+      : 'basic'
   const { selectedAccount, selectedAccountId } = useAccount()
 
   /**
@@ -88,20 +96,60 @@ function FormEditInner() {
   const answerUrl = liffId ? `https://liff.line.me/${liffId}/forms/${id}` : null
 
   const [name, setName] = useState('')
+  usePageTitle(name || '回答フォーム編集')
   const [description, setDescription] = useState('')
   const [isActive, setIsActive] = useState(true)
   const [submitCount, setSubmitCount] = useState(0)
   const [onSubmitTagId, setOnSubmitTagId] = useState('')
+  const [ogTitle, setOgTitle] = useState('')
+  const [ogDescription, setOgDescription] = useState('')
+  const [ogImageUrl, setOgImageUrl] = useState('')
   const [layout, setLayoutState] = useState<FormLayout>(emptyLayout)
   const [tab, setTab] = useState(0)
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null)
   const [refs, setRefs] = useState<FormRefs>(EMPTY_REFS)
-  const [showOptions, setShowOptions] = useState(false)
+  const [showOptions, setShowOptions] = useState(editorTab === 'options')
   const [showAddMenu, setShowAddMenu] = useState(false)
+  const addMenuButtonRef = useRef<HTMLButtonElement>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  /** 本体が読めたかどうか。読めていないときの保存・入力の失敗と分ける。 */
+  const [formLoaded, setFormLoaded] = useState(false)
+  /** 取得の失敗の内訳（保存・入力の失敗とは分ける）。 */
+  const [formLoadFailed, setFormLoadFailed] = useState<'missing' | 'error' | null>(null)
+  /** 失敗したあとの「もう一度読み込む」で取り直すための番号。 */
+  const [reloadKey, setReloadKey] = useState(0)
+  // 保存済み・読み直し直後の姿。タブ移動やタブを閉じる前の確認に使う。
+  const savedSnapshot = useRef<string | null>(null)
+  /**
+   * 読み込んだ時点の編集の版(#723)。保存でそのまま送り返す。
+   *
+   * 押すたびに取り直すと楽観ロックの意味が無くなるので、**読み込みと
+   * 保存成功のときだけ**入れ替える。
+   */
+  const [contentRevision, setContentRevision] = useState<number | null>(null)
+  const [publishedVersionId, setPublishedVersionId] = useState<string | null>(null)
+  /*
+   * P（公開前の試し）：試し合言葉と試しURL。合言葉の生の値はこの画面でしか
+   * 見られない。試しは保存済みの下書きに出る（保存していない変更は出ない）。
+   */
+  const [testToken, setTestToken] = useState<string | null>(null)
+  const [testExpiresAt, setTestExpiresAt] = useState<string | null>(null)
+  const [testBusy, setTestBusy] = useState(false)
+  const [testError, setTestError] = useState('')
+  /**
+   * ほかの人が先に保存していたとき（409）。
+   *
+   * **入力は捨てない。**自動で読み直すと入力が消えるので、読み直すかどうかは
+   * 運用者に決めてもらう。`updatedAt` は相手がいつ保存したかの手がかり。
+   */
+  const [conflict, setConflict] = useState<{ updatedAt: string } | null>(null)
+
+  useEffect(() => {
+    if (editorTab === 'options') setShowOptions(true)
+  }, [editorTab])
 
   // 元に戻す / やり直す。並べ替えは失敗しても取り返せるようにする。
   const undoStack = useRef<FormLayout[]>([])
@@ -134,15 +182,73 @@ function FormEditInner() {
     })
   }
 
+  /**
+   * フォーム本体の読み込み。初回と、競合（409）で運用者が「最新の内容を
+   * 読み込む」を押したときに使う。
+   *
+   * **押されるまで呼ばない。**自動で読み直すと入力が消える。
+   */
+  const loadForm = useCallback(async () => {
+    if (!id || !selectedAccountId) return false
+    const res = await api.forms.get(id, selectedAccountId)
+    if (!res.success) return false
+    // layout はサーバ側が必ず作って返す（古いフォームは fields から）
+    const nextLayout = res.data.layout ?? emptyLayout()
+    const loaded = {
+      name: res.data.name,
+      description: res.data.description ?? '',
+      isActive: res.data.isActive,
+      onSubmitTagId: res.data.onSubmitTagId ?? '',
+      ogTitle: res.data.ogTitle ?? '',
+      ogDescription: res.data.ogDescription ?? '',
+      ogImageUrl: res.data.ogImageUrl ?? '',
+      layout: nextLayout,
+    }
+    setName(loaded.name)
+    setDescription(loaded.description)
+    setIsActive(loaded.isActive)
+    setSubmitCount(res.data.submitCount ?? 0)
+    setOnSubmitTagId(loaded.onSubmitTagId)
+    setOgTitle(loaded.ogTitle)
+    setOgDescription(loaded.ogDescription)
+    setOgImageUrl(loaded.ogImageUrl)
+    setLayoutState(nextLayout)
+    setContentRevision(res.data.contentRevision)
+    setPublishedVersionId(res.data.publishedVersionId)
+    setConflict(null)
+    // 未保存のままタブ移動したときの確認に使う。読み直しが基準。
+    savedSnapshot.current = JSON.stringify(loaded)
+    setFormLoaded(true)
+    return true
+  }, [id, selectedAccountId])
+
+  const reloadAfterConflict = async () => {
+    setError('')
+    setNotice('')
+    try {
+      await loadForm()
+      setNotice('最新の内容を読み込みました')
+    } catch {
+      setError('読み込みに失敗しました。もう一度読み込んでください。')
+    }
+  }
+
   useEffect(() => {
+    setFormLoadFailed(null)
     void (async () => {
       try {
+        // 参照一覧は選んでいる公式アカウントに絞る。絞らないと別アカウントの
+        // タグ等が混ざり、付け間違いの元になる。
+        const tagPath = selectedAccountId
+          ? `/api/tags?lineAccountId=${encodeURIComponent(selectedAccountId)}`
+          : '/api/tags'
+        const accountFilter = selectedAccountId ? { accountId: selectedAccountId } : undefined
         const [tagRes, ffRes, scenarioRes, reminderRes, templateRes] = await Promise.all([
-          api.tags.list(),
-          selectedAccountId ? api.friendFields.list(selectedAccountId) : Promise.resolve({ success: true as const, data: [] }),
-          api.scenarios.list(),
-          api.reminders.list(),
-          api.templates.list(),
+          fetchApi<{ success: boolean; data: Array<{ id: string; name: string }> }>(tagPath),
+          selectedAccountId ? api.friendFields.list(selectedAccountId, undefined, { suppressFeatureDisabledEvent: true }) : Promise.resolve({ success: true as const, data: [] }),
+          api.scenarios.list(accountFilter),
+          api.reminders.list(accountFilter),
+          api.templates.list(undefined, selectedAccountId ?? undefined),
         ])
         setRefs({
           tags: tagRes.success ? tagRes.data.map((t) => ({ id: t.id, name: t.name })) : [],
@@ -160,24 +266,21 @@ function FormEditInner() {
             : [],
         })
 
-        if (!id || !selectedAccountId) return
-        const res = await api.forms.get(id, selectedAccountId)
-        if (res.success) {
-          setName(res.data.name)
-          setDescription(res.data.description ?? '')
-          setIsActive(res.data.isActive)
-          setSubmitCount(res.data.submitCount ?? 0)
-          setOnSubmitTagId(res.data.onSubmitTagId ?? '')
-          // layout はサーバ側が必ず作って返す（古いフォームは fields から）
-          setLayoutState(res.data.layout ?? emptyLayout())
+        const ok = await loadForm()
+        // id なし・未選択は別の面で出す。ここは取得して見つからないときだけ。
+        if (!ok && id && selectedAccountId) setFormLoadFailed('missing')
+      } catch (caught) {
+        if (caught instanceof ApiError && caught.status === 404) {
+          setFormLoadFailed('missing')
+        } else {
+          setError('読み込みに失敗しました。もう一度読み込んでください。')
+          setFormLoadFailed('error')
         }
-      } catch {
-        setError('読み込みに失敗しました')
       } finally {
         setLoading(false)
       }
     })()
-  }, [id, selectedAccountId])
+  }, [id, loadForm, reloadKey, selectedAccountId])
 
   // いま編集している並び（共通ヘッダ か セクション）
   const blocks = useMemo(
@@ -224,9 +327,11 @@ function FormEditInner() {
   const duplicateBlock = () => {
     if (selectedIndex < 0) return
     const source = blocks[selectedIndex]
+    // 回答キーが重なると片方の答えが消える。既存の名前と突き合わせて一意にする。
+    const taken = takenAnswerNames(layout)
     const copy: FormBlock =
       source.kind === 'input'
-        ? { ...source, id: newBlockId(), name: `${source.name}_copy` }
+        ? { ...source, id: newBlockId(), name: uniqueCopyName(source.name, taken) }
         : { ...source, id: newBlockId() }
     const next = [...blocks]
     next.splice(selectedIndex + 1, 0, copy)
@@ -253,11 +358,14 @@ function FormEditInner() {
 
   const renameSection = (index: number) => {
     const current = layout.sections[index]
+    if (!current) return
     const next = window.prompt('ページの名前', current.name)
-    if (next === null) return
+    // 空のページ名は作らせない。取り消し・空白だけも元のままにする。
+    const name = normalizeSectionName(next)
+    if (name === null) return
     setLayout((prev) => ({
       ...prev,
-      sections: prev.sections.map((s, i) => (i === index ? { ...s, name: next } : s)),
+      sections: prev.sections.map((s, i) => (i === index ? { ...s, name } : s)),
     }))
   }
 
@@ -266,11 +374,16 @@ function FormEditInner() {
     const copy: FormSection = {
       id: newBlockId('s'),
       name: `${source.name}のコピー`,
-      blocks: source.blocks.map((b) =>
-        b.kind === 'input'
-          ? { ...b, id: newBlockId(), name: `${b.name}_copy` }
-          : { ...b, id: newBlockId() },
-      ),
+      blocks: (() => {
+        // ページ内の複製同士でも重ねないよう、作るたびに一覧へ足す。
+        const taken = takenAnswerNames(layout)
+        return source.blocks.map((b) => {
+          if (b.kind !== 'input') return { ...b, id: newBlockId() }
+          const name = uniqueCopyName(b.name, taken)
+          taken.add(name)
+          return { ...b, id: newBlockId(), name }
+        })
+      })(),
     }
     setLayout((prev) => ({
       ...prev,
@@ -279,12 +392,23 @@ function FormEditInner() {
     setTab(index + 1)
   }
 
+  /*
+   * ページの削除。**ブラウザの `confirm()` は使わない。**
+   * 何個のブロックが消えるのか、どの分岐がつなぎ直されるのかを本文で読ませる。
+   *
+   * **`destructive` は付けない。** ここで消えるのは画面上の下書きだけで、
+   * 「元に戻す」で戻せるし、保存するまで保存済みのフォームは変わらない。
+   * 戻せる操作に赤い窓を出すと、本当に戻せない操作と見分けがつかなくなる。
+   */
+  const [removeSectionIndex, setRemoveSectionIndex] = useState<number | null>(null)
+  const removeSectionTarget =
+    removeSectionIndex === null ? null : (layout.sections[removeSectionIndex] ?? null)
+
   const removeSection = (index: number) => {
     if (layout.sections.length <= 1) return
     const target = layout.sections[index]
-    if (target.blocks.length > 0 && !window.confirm(`「${target.name}」を中身ごと削除します。`)) {
-      return
-    }
+    if (!target) return
+    setRemoveSectionIndex(null)
     setLayout((prev) => ({
       ...prev,
       // 消えるページへ飛ばしていた選択肢は、行き先を外して「次へ進む」に戻す
@@ -307,21 +431,148 @@ function FormEditInner() {
     setTab(Math.max(0, index - 1))
   }
 
-  const save = async () => {
+  const askRemoveSection = (index: number) => {
+    if (layout.sections.length <= 1) return
+    // 中身が無いページは、消えるものが無いので確認しない。
+    if ((layout.sections[index]?.blocks.length ?? 0) === 0) {
+      removeSection(index)
+      return
+    }
+    setRemoveSectionIndex(index)
+  }
+
+  // いまの入力と保存済みの姿を比べる。読み直し前は何も比べない。
+  const currentSnapshot = JSON.stringify({
+    name,
+    description,
+    isActive,
+    onSubmitTagId,
+    ogTitle,
+    ogDescription,
+    ogImageUrl,
+    layout,
+  })
+  const dirty = savedSnapshot.current !== null && currentSnapshot !== savedSnapshot.current
+
+  /*
+   * 「保存せずに移動」を選んだとき、保存済み・読み直し直後の姿へ戻す。
+   *
+   * `?tab=` だけ変わる移動や、移動先から同じ画面へ戻ったときに「消えます」と
+   * 言ったはずの変更が残っていると困る。画面がアンマウントされない
+   * 移動でも、実際に捨てた形にしてから離れる（FORM-19）。
+   */
+  const discardChanges = useCallback(() => {
+    const snapshot = savedSnapshot.current
+    if (!snapshot) return
+    const saved = JSON.parse(snapshot) as {
+      name: string
+      description: string
+      isActive: boolean
+      onSubmitTagId: string
+      ogTitle: string
+      ogDescription: string
+      ogImageUrl: string
+      layout: FormLayout
+    }
+    setName(saved.name)
+    setDescription(saved.description)
+    setIsActive(saved.isActive)
+    setOnSubmitTagId(saved.onSubmitTagId)
+    setOgTitle(saved.ogTitle)
+    setOgDescription(saved.ogDescription)
+    setOgImageUrl(saved.ogImageUrl)
+    setLayoutState(saved.layout)
+    // 捨てたあとの「元に戻す」で破棄した変更が蘇らないよう、履歴も切る。
+    undoStack.current = []
+    redoStack.current = []
+    setSelectedBlockId(null)
+  }, [])
+
+  /*
+   * 未保存の変更がある間、画面を離れる操作を止める共通の番兵（DETAIL-04系）。
+   * タブ移動のリンク・左メニュー・戻る操作・再読込を同じ確認対話へ寄せる。
+   * 一覧へのリンク（パンくずの「回答フォーム」）も同じ捕まえ方で止まる。
+   */
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({
+    dirty,
+    busy: saving,
+    onDiscard: discardChanges,
+  })
+
+  const save = async (publishAfter = false): Promise<boolean> => {
     if (!selectedAccountId) {
       setError('LINE公式アカウントを選んでください')
-      return
+      return false
     }
     if (!name.trim()) {
       setError('フォーム名を入力してください')
-      return
+      return false
     }
     const unnamed = layout.header
       .concat(layout.sections.flatMap((s) => s.blocks))
       .find((b) => b.kind === 'input' && !b.label.trim())
     if (unnamed) {
       setError('タイトルが空のブロックがあります')
-      return
+      return false
+    }
+    // 回答キーが重なると片方の答えが消える。保存の直前にも止める。
+    const seenNames = new Set<string>()
+    const dup = layout.header
+      .concat(layout.sections.flatMap((s) => s.blocks))
+      .find((b) => {
+        if (b.kind !== 'input') return false
+        if (seenNames.has(b.name)) return true
+        seenNames.add(b.name)
+        return false
+      })
+    if (dup) {
+      setError('回答キーが重なっています。複製した入力欄を確認してください')
+      return false
+    }
+    // 空の選択肢・URLの形・期限の形。壊れた定義のまま保存させない。
+    const layoutError = validateLayoutForSave(layout)
+    if (layoutError) {
+      setError(layoutError)
+      return false
+    }
+
+    /*
+     * FORM-18: カードの画像URLは https:// だけ受け付ける。
+     * 欄の注記と同じ決めごとを保存でも守る。**入力は残す**——値を
+     * 消すと直せないので、理由だけ出して送らない。
+     */
+    const ogImageError = ogImageUrlError(ogImageUrl)
+    if (ogImageError) {
+      setError(ogImageError)
+      return false
+    }
+
+    /*
+     * P（読みにくい色）：文字と背景の差が 4.5:1 未満の組み合わせは保存できない。
+     * 下書きも公開も同じ決まり（保存APIも同じ検査をする。ここで先に止めるのは、
+     * 保存だけ済んで「保存できませんでした」に化けるのを防ぐため）。
+     */
+    const contrastError = formThemeContrastError(normalizeFormTheme(layout.options?.theme))
+    if (contrastError) {
+      setError(contrastError)
+      return false
+    }
+
+    // 公開に進むときだけ、公開前の検査を通す。分岐の循環・消えた行き先・
+    // 共通ヘッダの分岐・選ぶ先が空の動作は、下書きでは許すが公開は止める。
+    // （公開APIも同じ検査をする。ここで先に止めるのは、保存だけ済んで
+    // 「公開に失敗しました」に化けるのを防ぐため）
+    if (publishAfter) {
+      const publishError = validateFormForPublish(layout)
+      if (publishError) {
+        setError(publishError)
+        return false
+      }
+    }
+
+    if (contentRevision === null) {
+      setError('読み込みが終わっていません。少し待ってから、もう一度お試しください')
+      return false
     }
 
     setSaving(true)
@@ -333,37 +584,142 @@ function FormEditInner() {
         description: description.trim() || null,
         layout,
         onSubmitTagId: onSubmitTagId || null,
-        isActive,
+        // 未公開の下書きは publish API が成功するまで受付中にしない。
+        isActive: publishedVersionId ? isActive : false,
+        ogTitle: ogTitle.trim() || null,
+        ogDescription: ogDescription.trim() || null,
+        ogImageUrl: ogImageUrl.trim() || null,
+        expectedContentRevision: contentRevision,
       })
       if (!res.success) {
         setError(res.error)
-        return
+        return false
       }
-      setNotice('保存しました')
+      // 次の保存はこの版を送る。取り直さないと、続けて保存したときに
+      // 自分の1回目と衝突する。
+      setContentRevision(res.data.contentRevision)
+      setConflict(null)
+      if (publishAfter) {
+        const published = await api.forms.publish(id, selectedAccountId, res.data.contentRevision)
+        if (!published.success) {
+          setError(published.error)
+          return false
+        }
+        setPublishedVersionId(published.data.id)
+        setIsActive(true)
+        setNotice(published.data.replayed ? 'この版は公開済みです' : 'この版を公開しました')
+      } else {
+        setNotice(publishedVersionId ? '下書きを保存しました。公開中の内容は変わっていません' : '下書きを保存しました')
+      }
+      if (publishAfter) {
+        savedSnapshot.current = JSON.stringify({
+            name, description, isActive: true, onSubmitTagId,
+            ogTitle, ogDescription, ogImageUrl, layout,
+          })
+      } else {
+        savedSnapshot.current = currentSnapshot
+      }
+      return true
     } catch (e) {
-      setError(e instanceof Error ? e.message : '保存に失敗しました')
+      /*
+       * #723: ほかの人が先に保存していた（409）。
+       *
+       * **入力はそのまま画面に残す。**読み直すと入力が消えるので、ここでは
+       * 読み直さない。読み直すかどうかは運用者が決める（下のボタン）。
+       * 文言は共通情報の編集（`contents/vars`）と同じ言い方に揃える。
+       * 保管・削除の「影響が変わりました」とは意味が違うので使わない。
+       */
+      if (e instanceof ApiError && e.status === 409) {
+        const data = e.data as { updatedAt?: unknown } | null
+        const updatedAt = typeof data?.updatedAt === 'string' ? data.updatedAt : ''
+        setConflict({ updatedAt })
+        setError(conflictMessage(updatedAt))
+        return false
+      }
+      setError(e instanceof Error ? e.message : '保存に失敗しました。通信を確かめて、もう一度お試しください。')
+      return false
     } finally {
       setSaving(false)
     }
   }
 
+  /*
+   * P（公開前の試し）：試し合言葉を取って試しURLを作る。試しは保存済みの
+   * 下書きに出る。試しの回答は集計に入らず、回答後の動作も動かない。
+   */
+  const startTest = async () => {
+    if (!selectedAccountId || testBusy) return
+    setTestBusy(true)
+    setTestError('')
+    try {
+      const res = await api.forms.issueTestToken(id, selectedAccountId)
+      if (!res.success) throw new Error(res.error)
+      setTestToken(res.data.token)
+      setTestExpiresAt(res.data.expiresAt)
+    } catch {
+      setTestError('試し合言葉を作れませんでした。もう一度お試しください。')
+    } finally {
+      setTestBusy(false)
+    }
+  }
+  const testUrl = answerUrl && testToken
+    ? `${answerUrl}${answerUrl.includes('?') ? '&' : '?'}test_token=${encodeURIComponent(testToken)}`
+    : null
+
+  /*
+    対象が無いときは、タブ・入力・右の案内・固定バーのどれも出さない。
+    代わりに ★V7 TargetMissing を出す（設計 `x5cgUH`）。
+  */
   if (!id) {
     return (
-      <div>
-
-        <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
-          フォームが指定されていません。
-          <Link href="/form-submissions" className="text-accent ml-1 hover:underline">
-            一覧へ戻る
-          </Link>
-        </p>
-      </div>
+      <TargetMissing
+        kind="unspecified"
+        title="編集する回答フォームが指定されていません"
+        description="一覧から編集するフォームを選び直してください。"
+        backHref="/form-submissions"
+        backLabel="回答フォーム一覧へ戻る"
+      />
+    )
+  }
+  if (!loading && !selectedAccountId) {
+    return (
+      <ListState
+        kind="empty"
+        title="LINE公式アカウントを選んでください"
+        description="選ぶとフォームを編集できます。"
+      />
+    )
+  }
+  if (!loading && formLoadFailed === 'missing') {
+    return (
+      <TargetMissing
+        kind="not-found"
+        title="このフォームは見つかりません"
+        description="削除されたか、リンクが古くなっています。一覧から選び直してください。"
+        accountName={selectedAccount?.name}
+        backHref="/form-submissions"
+        backLabel="回答フォーム一覧へ戻る"
+      />
+    )
+  }
+  if (!loading && formLoadFailed === 'error' && !formLoaded) {
+    return (
+      <TargetMissing
+        kind="error"
+        title="フォームを読み込めませんでした"
+        description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+        onRetry={() => {
+          setLoading(true)
+          setReloadKey((k) => k + 1)
+        }}
+      />
     )
   }
 
   return (
-    <div>
-      <nav className="text-ink-faint mb-2 text-xs" data-design="Crumb">
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <nav className="text-ink-faint text-xs" data-design="Crumb">
         <Link href="/form-submissions" className="hover:underline">
           回答フォーム
         </Link>
@@ -371,45 +727,42 @@ function FormEditInner() {
         <span>{name || '（名前なし）'}</span>
       </nav>
 
-      <div data-design="Head">
-        <Header
-          title="回答フォーム編集"
-          description="ブロックを積んでフォームを作ります。選択肢ごとにタグを付けたり、答えを友だち情報へ入れたりできます。"
-          action={
-            <div className="flex flex-wrap gap-2">
-              {/* 設計にあるが、まだ作っていないもの。並びから消すと「この画面には
-                  その機能が無い」ように見えるので、押せない状態で置いておく。
-                  デザイン設定は、フォームの見た目をこのアプリのデザインに
-                  そろえる方針にしたため、色やフォントを選ぶ画面は作っていない。 */}
-              {['マニュアル', '下書き保存', 'デザイン設定'].map((label) => (
-                <button
-                  key={label}
-                  disabled
-                  title="準備中です"
-                  className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
-                >
-                  {label}
-                </button>
-              ))}
-              <button
-                onClick={() => setShowOptions(true)}
-                className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
-              >
-                オプション設定
-              </button>
-              <button
-                onClick={save}
-                disabled={saving}
-                className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40"
-              >
-                {saving ? '保存中...' : 'フォームを保存'}
-              </button>
-            </div>
-          }
-        />
-      </div>
+      <nav className="flex flex-wrap gap-2" aria-label="回答フォームの編集画面">
+        <Button
+          href={`/form-submissions/edit?id=${encodeURIComponent(id)}&tab=basic`}
+          variant={editorTab === 'basic' ? 'primary' : 'secondary'}
+        >
+          フォーム編集
+        </Button>
+        <Button
+          href={`/form-submissions/edit?id=${encodeURIComponent(id)}&tab=design`}
+          variant={editorTab === 'design' ? 'primary' : 'secondary'}
+        >
+          デザイン設定
+        </Button>
+        <Button
+          href={`/form-submissions/edit?id=${encodeURIComponent(id)}&tab=options`}
+          variant={editorTab === 'options' ? 'primary' : 'secondary'}
+        >
+          オプション設定
+        </Button>
+      </nav>
 
-      {loading ? (
+      {/*
+        #723: 保存の失敗は3つのタブすべてで届かせる。
+        位置と重なりは共通部品が持つので、ここに `z-[60]` を手書きしない。
+        競合のときだけ「最新の内容を読み込む」を添える（押すまで読み直さない）。
+      */}
+      {error && (
+        <SaveConflictBar
+          message={error}
+          actionLabel={conflict ? '最新の内容を読み込む（入力中の内容は消えます）' : undefined}
+          onAction={conflict ? () => void reloadAfterConflict() : undefined}
+          actionQa="form-edit-conflict-reload"
+        />
+      )}
+
+      {loading || !formLoaded ? (
         <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
           読み込み中...
         </div>
@@ -417,7 +770,7 @@ function FormEditInner() {
         <>
           <div
             data-design="Meta"
-            className="bg-canvas rounded-card border-hairline mb-4 grid gap-4 border p-4 sm:grid-cols-2 xl:grid-cols-5"
+            className="bg-canvas rounded-card border-hairline grid gap-4 border p-4 sm:grid-cols-2 xl:grid-cols-5"
           >
             <Field label="フォーム名" htmlFor="fm-name" required>
               <input
@@ -430,15 +783,7 @@ function FormEditInner() {
             </Field>
 
             <Field label="公開状態" htmlFor="fm-active">
-              <select
-                id="fm-active"
-                value={isActive ? '1' : '0'}
-                onChange={(e) => setIsActive(e.target.value === '1')}
-                className={inputClass}
-              >
-                <option value="1">公開中</option>
-                <option value="0">停止中</option>
-              </select>
+              <Select id="fm-active" aria-label="公開状態" value={isActive ? '1' : '0'} onChange={(value) => setIsActive(value === '1')} options={[{ value: "1", label: "公開中" }, { value: "0", label: "停止中" }]} size="full" />
             </Field>
 
             <Field
@@ -446,19 +791,14 @@ function FormEditInner() {
               htmlFor="fm-tag"
               note="このフォームに答えた人を、あとから絞り込めます。"
             >
-              <select
+              <Select
                 id="fm-tag"
+                aria-label="回答したときに付けるタグ"
                 value={onSubmitTagId}
-                onChange={(e) => setOnSubmitTagId(e.target.value)}
-                className={inputClass}
-              >
-                <option value="">— 付けない —</option>
-                {refs.tags.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
+                onChange={(value) => setOnSubmitTagId(value)}
+                options={[{ value: '', label: '— 付けない —' }, ...refs.tags.map((t) => ({ value: t.id, label: t.name }))]}
+                size="full"
+              />
             </Field>
 
             <Field
@@ -466,7 +806,7 @@ function FormEditInner() {
               note={
                 answerUrl
                   ? '友だちに配るURLです。LINEの中で開きます。'
-                  : 'このアカウントに LIFF を登録すると、配れるURLが出ます。'
+                  : '回答用URLを発行する設定がまだありません。LINEアカウント設定を確認してください。'
               }
             >
               {answerUrl ? (
@@ -505,22 +845,93 @@ function FormEditInner() {
             </div>
           </div>
 
+          {/*
+            P（公開前の試し）：下書きをお客さま画面で試す。試しの回答は集計に
+            入らず、回答後の動作も動かない。合言葉は24時間有効。
+            説明の帯は1本の決まりに触れないよう、帯ではなく枠で出す。
+          */}
+          <div className="bg-canvas rounded-card border-hairline mt-4 border p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-ink text-sm font-semibold">公開前に試す</p>
+                <p className="text-ink-secondary mt-0.5 text-xs">
+                  保存済みの下書きをお客さま画面で開きます。試しの回答は集計に入らず、回答後の動作も動きません。保存していない変更は試しに出ないので、先に下書きを保存してください。
+                </p>
+              </div>
+              <Button
+                onClick={() => void startTest()}
+                disabled={testBusy || !answerUrl}
+                title={answerUrl ? '試し合言葉を取って試しURLを作ります' : '回答用URLがまだ無いため試せません'}
+              >
+                {testBusy ? '用意しています...' : 'テスト回答を始める'}
+              </Button>
+            </div>
+            {testError && <p role="alert" className="text-danger mt-2 text-xs">{testError}</p>}
+            {testUrl && (
+              <div className="mt-3">
+                <div className="flex items-center gap-1">
+                  <input
+                    readOnly
+                    value={testUrl}
+                    onFocus={(e) => e.currentTarget.select()}
+                    aria-label="試しURL"
+                    className={`${inputClass} text-xs`}
+                  />
+                  <Button
+                    onClick={() => {
+                      void navigator.clipboard
+                        .writeText(testUrl)
+                        .catch(() => window.prompt('コピーしてください:', testUrl))
+                    }}
+                  >
+                    コピー
+                  </Button>
+                </div>
+                <p className="text-ink-faint mt-1 text-xs">
+                  {testExpiresAt ? `このURLは${new Date(testExpiresAt).toLocaleString('ja-JP', { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}まで使えます。` : ''}
+                  試しは友だち登録済みのLINEで開いてください。
+                </p>
+              </div>
+            )}
+          </div>
+
           <div className="grid gap-4 xl:grid-cols-[minmax(320px,26rem)_minmax(0,1fr)]">
             {/* ---- 出来上がり ---- */}
-            <section data-design="Preview" className="xl:sticky xl:top-4 xl:self-start">
-              <h2 className="text-ink-secondary mb-2 text-xs font-medium">出来上がり</h2>
+            <section data-design="Preview" className="min-w-0 xl:sticky xl:top-4 xl:self-start">
+              <h2 className="text-ink-secondary mb-1 text-xs font-medium">お客さまに見える形</h2>
+              <p className="mb-2 text-xs text-ink-faint">実際にお客さまが見る画面です</p>
               <FormPreview layout={layout} sectionIndex={tab === HEADER_TAB ? 0 : tab} />
+              <p className="mt-2 text-center text-xs text-ink-faint">
+                このフォームは {selectedAccount?.name ?? '選択中のLINE公式アカウント'} が作成しています
+              </p>
             </section>
 
             {/* ---- 設定 ---- */}
-            <section className="min-w-0">
+            {editorTab === 'design' ? (
+              <FormDesignSettings
+                formId={id}
+                accountId={selectedAccountId}
+                value={layout.options.theme}
+                ogTitle={ogTitle}
+                ogDescription={ogDescription}
+                ogImageUrl={ogImageUrl}
+                onChange={(theme: FormTheme) => setLayout((prev) => ({
+                  ...prev,
+                  options: { ...prev.options, theme },
+                }))}
+                onOgTitleChange={setOgTitle}
+                onOgDescriptionChange={setOgDescription}
+                onOgImageUrlChange={setOgImageUrl}
+              />
+            ) : (
+            <section className="flex min-w-0 flex-col gap-4">
               {/* タブ */}
               <div className="border-hairline flex flex-wrap items-center gap-1 border-b pb-2">
                 <button
                   onClick={() => setTab(HEADER_TAB)}
                   className={`rounded-control px-3 py-1.5 text-sm font-medium whitespace-nowrap ${
                     tab === HEADER_TAB
-                      ? 'bg-accent-soft text-accent'
+                      ? 'bg-accent-soft text-accent-deep'
                       : 'text-ink-secondary hover:bg-canvas-sunken'
                   }`}
                 >
@@ -535,7 +946,7 @@ function FormEditInner() {
                       title="ダブルクリックで名前を変えられます"
                       className={`rounded-control px-3 py-1.5 text-sm font-medium whitespace-nowrap ${
                         tab === i
-                          ? 'bg-accent-soft text-accent'
+                          ? 'bg-accent-soft text-accent-deep'
                           : 'text-ink-secondary hover:bg-canvas-sunken'
                       }`}
                     >
@@ -552,7 +963,7 @@ function FormEditInner() {
                         </button>
                         {layout.sections.length > 1 && (
                           <button
-                            onClick={() => removeSection(i)}
+                            onClick={() => askRemoveSection(i)}
                             className="text-danger px-1 text-xs"
                             title="このページを削除"
                           >
@@ -566,7 +977,7 @@ function FormEditInner() {
 
                 <button
                   onClick={addSection}
-                  className="text-accent hover:bg-accent-soft rounded-control px-2 py-1.5 text-sm font-bold"
+                  className="text-accent-deep hover:bg-accent-soft rounded-control px-2 py-1.5 text-sm font-bold"
                   title="ページを足す"
                 >
                   ＋
@@ -623,37 +1034,28 @@ function FormEditInner() {
 
                   <div className="relative">
                     <button
+                      ref={addMenuButtonRef}
                       onClick={() => setShowAddMenu((v) => !v)}
-                      className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-3 py-1.5 text-xs font-medium"
+                      aria-expanded={showAddMenu}
+                      aria-haspopup="menu"
+                      className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-3 py-1.5 text-xs font-medium"
                     >
-                      ＋ ブロックを追加
+                      ＋ ブロックを追加（12種）
                     </button>
-                    {showAddMenu && (
-                      <>
-                        {/* 外を押したら閉じる */}
-                        <button
-                          className="fixed inset-0 z-10 cursor-default"
-                          onClick={() => setShowAddMenu(false)}
-                          aria-label="閉じる"
-                        />
-                        <div className="bg-canvas rounded-card border-hairline absolute right-0 z-20 mt-1 w-48 border py-1 shadow-lg">
-                          {['飾り', '入力'].map((group) => (
-                            <div key={group}>
-                              <p className="text-ink-faint px-3 py-1 text-[11px]">{group}</p>
-                              {BLOCK_MENU.filter((m) => m.group === group).map((m) => (
-                                <button
-                                  key={`${m.kind}-${m.type ?? ''}`}
-                                  onClick={() => addBlock(m.kind, m.type)}
-                                  className="text-ink hover:bg-canvas-sunken block w-full px-3 py-1.5 text-left text-sm"
-                                >
-                                  {m.label}
-                                </button>
-                              ))}
-                            </div>
-                          ))}
-                        </div>
-                      </>
-                    )}
+                    <ActionMenu
+                      open={showAddMenu}
+                      ariaLabel="追加するブロック"
+                      onClose={() => setShowAddMenu(false)}
+                      anchorRef={addMenuButtonRef}
+                      items={['飾り', '入力'].flatMap((group) =>
+                        BLOCK_MENU.filter((m) => m.group === group).map((m, index) => ({
+                          id: `${m.kind}-${m.type ?? ''}`,
+                          label: m.label,
+                          sectionBefore: index === 0 ? group : undefined,
+                          onSelect: () => addBlock(m.kind, m.type),
+                        })),
+                      )}
+                    />
                   </div>
                 </div>
               </div>
@@ -675,6 +1077,7 @@ function FormEditInner() {
                       index={index}
                       sections={layout.sections}
                       refs={refs}
+                      inHeader={tab === HEADER_TAB}
                       selected={block.id === selectedBlockId}
                       onSelect={() => setSelectedBlockId(block.id)}
                       onChange={(patch) => patchBlock(block.id, patch)}
@@ -683,7 +1086,45 @@ function FormEditInner() {
                 )}
               </div>
 
-              <div className="bg-canvas rounded-card border-hairline mt-4 space-y-4 border p-4">
+              {/*
+                送信時に更新する情報の一覧（IDEA-13）。
+                各質問が友だちのどの情報を更新するか・どんな条件で更新するかを、
+                保存・公開の前にまとめて確認できるようにする。質問が増えた
+                フォームでは、ブロックを1つずつ開かなくても全体を見通せる。
+              */}
+              {(() => {
+                const overview = describeFormUpdates(layout, refs, onSubmitTagId)
+                if (overview.questions.length === 0 && overview.formWide.length === 0) {
+                  return null
+                }
+                return (
+                  <details className="bg-canvas rounded-card border-hairline border p-4">
+                    <summary className="text-ink cursor-pointer text-sm font-bold">
+                      送信時に更新する情報（{overview.questions.length}件の質問
+                      {overview.formWide.length > 0 ? `・フォーム全体${overview.formWide.length}件` : ''}）
+                    </summary>
+                    <ul className="mt-3 space-y-2">
+                      {overview.questions.map((question) => (
+                        <li key={question.blockId} className="text-xs">
+                          <span className="text-ink font-medium">{question.label}</span>
+                          <ul className="text-ink-faint mt-0.5 list-disc space-y-0.5 pl-5">
+                            {question.lines.map((line) => (
+                              <li key={line}>{line}</li>
+                            ))}
+                          </ul>
+                        </li>
+                      ))}
+                      {overview.formWide.map((line) => (
+                        <li key={line} className="text-ink-secondary text-xs">
+                          ・{line}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                )
+              })()}
+
+              <div className="bg-canvas rounded-card border-hairline space-y-4 border p-4">
                 <Field
                   label="説明"
                   htmlFor="fm-desc"
@@ -698,13 +1139,90 @@ function FormEditInner() {
                   />
                 </Field>
 
-                {error && <p className="text-danger text-sm">{error}</p>}
+                {/*
+                  #723: 失敗の知らせは、この中ではなくタブの外（`SaveConflictBar`）へ
+                  出す。ここに書くと、デザイン設定タブでは DOM にも出ず、
+                  オプション設定タブでは覆いの下敷きになる。二重に出さないため
+                  ここからは消してある。
+                */}
                 {notice && <p className="text-success text-sm">{notice}</p>}
               </div>
             </section>
+            )}
           </div>
         </>
       )}
+
+      <StickyBar
+        actions={(
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => void save(false)}
+              disabled={saving}
+              title="フォームを保存（公開中の内容は変わりません）"
+              className="border-hairline text-ink bg-canvas hover:bg-canvas-sunken rounded-control border px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40"
+            >
+              {saving ? '保存中...' : '下書きを保存'}
+            </button>
+            <button
+              onClick={() => void save(true)}
+              disabled={saving}
+              className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40"
+            >
+              {saving ? '処理中...' : 'この版を公開'}
+            </button>
+          </div>
+        )}
+      />
+
+      {/*
+        ページを消す前の確認。**「元に戻す」で戻せるので `destructive` は付けない。**
+        保存するまで、保存済みのフォームと集まった回答は変わらない。
+      */}
+      <ConfirmDialog
+        open={removeSectionTarget !== null}
+        title={removeSectionTarget ? `ページ「${removeSectionTarget.name}」を削除しますか？` : ''}
+        description="このページと、中に置いたブロックを画面から外します。保存するまで、保存済みのフォームは変わりません。"
+        confirmLabel="削除する"
+        onConfirm={() => {
+          if (removeSectionIndex !== null) removeSection(removeSectionIndex)
+        }}
+        onCancel={() => setRemoveSectionIndex(null)}
+      >
+        {removeSectionTarget && (
+          <ul className="text-ink-secondary space-y-1 text-xs leading-5">
+            <li>
+              ・消えること: このページのブロック
+              <span className="tabular-nums">{removeSectionTarget.blocks.length}</span>
+              個が一緒に外れます。
+            </li>
+            {/* 行き先を失った分岐は「次へ進む」に戻る。何本つなぎ直すのかを先に言う。 */}
+            {jumpsInto(layout, removeSectionTarget.id) > 0 && (
+              <li>
+                ・つなぎ直すこと: このページへ飛ばしていた選択肢
+                <span className="tabular-nums">{jumpsInto(layout, removeSectionTarget.id)}</span>
+                件は、行き先が外れて「次へ進む」に戻ります。
+              </li>
+            )}
+            <li>・残ること: すでに集まった回答は消えません。</li>
+            <li>・戻せます: 上の「元に戻す」で戻せます。保存するまで保存済みのフォームは変わりません。</li>
+          </ul>
+        )}
+      </ConfirmDialog>
+
+      {/*
+        未保存のまま画面を離れようとしたときの確認。保存済みのフォームと
+        集まった回答は変わらないが、画面上の下書きは消えるので聞く。
+      */}
+      <ConfirmDialog primaryAction="cancel"
+        open={leaveTarget !== null}
+        title="保存していない変更があります"
+        description="このまま移動すると、保存していない変更は消えます。先に保存しますか。"
+        confirmLabel="保存せずに移動"
+        cancelLabel="編集を続ける"
+        onConfirm={confirmLeave}
+        onCancel={cancelLeave}
+      />
 
       {showOptions && (
         <OptionsDialog
@@ -712,6 +1230,10 @@ function FormEditInner() {
           refs={refs}
           onChange={(options: FormOptions) => setLayout((prev) => ({ ...prev, options }))}
           onClose={() => setShowOptions(false)}
+          onSave={async () => {
+            const saved = await save()
+            if (saved) setShowOptions(false)
+          }}
         />
       )}
     </div>
@@ -719,7 +1241,6 @@ function FormEditInner() {
 }
 
 export default function FormEditPage() {
-  usePageTitle('回答フォーム編集')
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
     <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>

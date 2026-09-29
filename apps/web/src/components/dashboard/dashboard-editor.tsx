@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   closestCenter,
   DndContext,
@@ -8,6 +8,7 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
+  type Announcements,
   type DragEndEvent,
 } from '@dnd-kit/core'
 import {
@@ -18,32 +19,26 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import {
+  DASHBOARD_CARD_GROUPS,
+  DASHBOARD_TODAY_VISIBLE_LIMIT,
+  type DashboardCardGroup,
+  type DashboardCardId,
+} from '@line-crm/shared'
+import { ChevronDown, ChevronUp } from 'lucide-react'
+import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import Notice from '@/components/shared/notice'
 
-export type DashboardCardId =
-  | 'today-inbox'
-  | 'today-photo-review'
-  | 'today-bookings'
-  | 'today-shipments'
-  | 'shipment'
-  | 'pending-inbox'
-  | 'friend-trend'
-  | 'friend-add'
-  | 'scenario-status'
-  | 'uid-migration'
-  | 'send-quota'
-  | 'operational-alerts'
-  | 'connection-status'
-  | 'upcoming'
-  | 'monthly-delivery'
-  | 'recent-results'
-  | 'booking-status'
-  | 'inflow-top'
-  | 'funnel-alert'
-  | 'automation-failures'
-  | 'support-mark-status'
-  | 'friend-status'
-
-export type DashboardGroup = 'today' | 'main' | 'right'
+/*
+ * カードIDと区分の正本は @line-crm/shared の DASHBOARD_CARD_GROUPS。
+ * 保存APIも同じ一覧で検証するため、ここだけ変えると画面が送るIDを
+ * APIが拒否する（DASH-01の再来になる）。名前・説明・既定ON/OFFだけを
+ * ここで持ち、IDと区分は共有定義から組み立てる。
+ */
+export type { DashboardCardId }
+export type DashboardGroup = DashboardCardGroup
 
 export type DashboardPreferenceItem = {
   id: DashboardCardId
@@ -60,32 +55,42 @@ type CardDefinition = {
   defaultVisible: boolean
 }
 
-export const TODAY_TASK_LIMIT = 4
+export const TODAY_TASK_LIMIT = DASHBOARD_TODAY_VISIBLE_LIMIT
 
-export const DASHBOARD_CARD_DEFINITIONS: CardDefinition[] = [
-  { id: 'today-inbox', label: '対応が必要な受信', description: 'LINE・メールの未対応', group: 'today', defaultVisible: true },
-  { id: 'today-photo-review', label: '写真審査', description: '確認待ち・ポイント付与', group: 'today', defaultVisible: true },
-  { id: 'today-bookings', label: '今日の予約', description: '変更・取消を含む予約', group: 'today', defaultVisible: true },
-  { id: 'today-shipments', label: '出荷予定件数', description: '今日・明日の出荷', group: 'today', defaultVisible: true },
-  { id: 'shipment', label: '出荷予定', description: 'メイン｜横幅いっぱい', group: 'main', defaultVisible: true },
-  { id: 'pending-inbox', label: '対応が必要な受信一覧', description: '未対応のLINE・メール', group: 'main', defaultVisible: true },
-  { id: 'friend-trend', label: '友だち数の推移', description: '登録・ブロック・有効数', group: 'main', defaultVisible: true },
-  { id: 'friend-add', label: '友だち追加リンク', description: '追加URL・QRコード', group: 'main', defaultVisible: true },
-  { id: 'scenario-status', label: 'シナリオ配信状況', description: 'メイン｜配信中・停止中', group: 'main', defaultVisible: false },
-  { id: 'uid-migration', label: 'UID移行状況', description: 'メイン｜移行の進捗', group: 'main', defaultVisible: false },
-  { id: 'send-quota', label: '今月の送信枠', description: '右サイド｜使用数と残り', group: 'right', defaultVisible: true },
-  { id: 'operational-alerts', label: '運用アラート', description: '右サイド｜障害・処理異常', group: 'right', defaultVisible: true },
-  { id: 'connection-status', label: '接続状態', description: '右サイド｜Webhook・自動処理', group: 'right', defaultVisible: true },
-  { id: 'support-mark-status', label: '現在の対応マーク', description: '右サイド｜未対応・対応済み', group: 'right', defaultVisible: true },
-  { id: 'friend-status', label: '友だちの状態', description: '右サイド｜有効数・ブロック率', group: 'right', defaultVisible: false },
-  { id: 'upcoming', label: '今後の予定', description: '予約・配信の予定', group: 'right', defaultVisible: true },
-  { id: 'monthly-delivery', label: '今月の配信', description: 'プッシュ・リプライ・残枠', group: 'right', defaultVisible: true },
-  { id: 'recent-results', label: '最近の成果', description: 'コンバージョン', group: 'right', defaultVisible: true },
-  { id: 'booking-status', label: '予約状況', description: '右サイド｜予約の内訳', group: 'right', defaultVisible: false },
-  { id: 'inflow-top', label: '流入経路TOP3', description: '右サイド｜友だち追加経路', group: 'right', defaultVisible: false },
-  { id: 'funnel-alert', label: 'ファネル要注意', description: '右サイド｜離脱の検知', group: 'right', defaultVisible: false },
-  { id: 'automation-failures', label: 'オートメーション失敗', description: '右サイド｜失敗した処理', group: 'right', defaultVisible: false },
-]
+/** カードの名前・説明・既定ON/OFF。キーは共有定義のIDと完全一致する（型で強制）。 */
+const CARD_META: Record<DashboardCardId, { label: string; description: string; defaultVisible: boolean }> = {
+  'today-inbox': { label: '対応が必要な受信', description: '上部・小カード', defaultVisible: true },
+  'today-photo-review': { label: '写真審査', description: '上部・小カード', defaultVisible: true },
+  'today-bookings': { label: '今日の予約', description: '上部・小カード', defaultVisible: true },
+  'today-shipments': { label: '出荷予定件数', description: '上部・小カード', defaultVisible: true },
+  'shipment': { label: '出荷予定', description: 'メイン・横長', defaultVisible: true },
+  'pending-inbox': { label: '対応が必要な受信一覧', description: 'メイン・横長', defaultVisible: true },
+  'friend-trend': { label: '友だち数の推移', description: 'メイン・横長', defaultVisible: true },
+  'friend-add': { label: '友だち追加リンク', description: 'メイン・左カラム', defaultVisible: true },
+  'scenario-status': { label: 'シナリオ配信状況', description: 'メイン｜配信中・停止中', defaultVisible: false },
+  'uid-migration': { label: 'UID移行状況', description: 'メイン｜移行の進捗', defaultVisible: false },
+  'send-quota': { label: '今月の送信枠', description: '右サイド', defaultVisible: true },
+  'operational-alerts': { label: '運用アラート', description: '右サイド', defaultVisible: true },
+  'connection-status': { label: '接続状態', description: '右サイド', defaultVisible: true },
+  'support-mark-status': { label: '現在の対応状況', description: '右サイド', defaultVisible: true },
+  'friend-status': { label: '友だちの状態', description: '右サイド｜有効数・ブロック率', defaultVisible: false },
+  /* M: 予約だけでなく予約配信・リマインダも載せるので、表題と名前を「今後の予定」にした。 */
+  'upcoming': { label: '今後の予定', description: '右サイド', defaultVisible: true },
+  /* L (#824): 通知の送達台帳から数えた今日の失敗。出どころはカードの「？」に出す。 */
+  'delivery-failures': { label: '配信の失敗', description: '右サイド｜今日・出どころ付き', defaultVisible: true },
+  'monthly-delivery': { label: '今月の配信', description: '右サイド', defaultVisible: true },
+  'recent-results': { label: '最近の成果', description: '右サイド', defaultVisible: true },
+  'booking-status': { label: '予約状況', description: '右サイド｜本日・変更・キャンセル', defaultVisible: false },
+  'inflow-top': { label: '流入経路TOP3', description: '右サイド｜直近7日の上位経路', defaultVisible: false },
+  'funnel-alert': { label: 'ファネル要注意', description: '右サイド｜離脱率が基準超過時', defaultVisible: false },
+  'automation-failures': { label: 'オートメーション失敗', description: '右サイド｜失敗した処理', defaultVisible: false },
+}
+
+export const DASHBOARD_CARD_DEFINITIONS: CardDefinition[] = (
+  Object.keys(DASHBOARD_CARD_GROUPS) as DashboardGroup[]
+).flatMap((group) =>
+  DASHBOARD_CARD_GROUPS[group].map((id) => ({ id, group, ...CARD_META[id] })),
+)
 
 const CARD_DEFINITION_MAP = new Map(DASHBOARD_CARD_DEFINITIONS.map((card) => [card.id, card]))
 const DASHBOARD_GROUPS: DashboardGroup[] = ['today', 'main', 'right']
@@ -139,6 +144,40 @@ export function reorderDashboardItems(
   return arrayMove(items, oldIndex, newIndex)
 }
 
+/*
+ * R116: ドラッグを使わない1つずつの移動。タッチやマウスだけ、キーボード
+ * だけのどちらでも順番を変えられるようにする。端では何もしない。
+ */
+export function moveDashboardItem(
+  items: DashboardPreferenceItem[],
+  id: DashboardCardId,
+  direction: 'up' | 'down',
+): DashboardPreferenceItem[] {
+  const index = items.findIndex((item) => item.id === id)
+  const next = direction === 'up' ? index - 1 : index + 1
+  if (index < 0 || next < 0 || next >= items.length) return items
+  return arrayMove(items, index, next)
+}
+
+/** 「今日やること」の5枚目をONにしたとき、並びのいちばん下を自動でOFFにする。 */
+export function toggleDashboardItem(
+  items: DashboardPreferenceItem[],
+  id: DashboardCardId,
+  limit?: number,
+): DashboardPreferenceItem[] {
+  const target = items.find((item) => item.id === id)
+  if (!target) return items
+
+  const toggled = items.map((item) => item.id === id ? { ...item, visible: !item.visible } : item)
+  if (target.visible || limit === undefined) return toggled
+  if (toggled.filter((item) => item.visible).length <= limit) return toggled
+
+  const lowestVisible = toggled.findLast((item) => item.visible)
+  return lowestVisible
+    ? toggled.map((item) => item.id === lowestVisible.id ? { ...item, visible: false } : item)
+    : toggled
+}
+
 function CloseIcon() {
   return (
     <svg aria-hidden="true" viewBox="0 0 20 20" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
@@ -157,11 +196,13 @@ function GripIcon() {
   )
 }
 
-function SortableCardRow({ item, definition, onToggle, toggleDisabled }: {
+function SortableCardRow({ item, definition, canMoveUp, canMoveDown, onMove, onToggle }: {
   item: DashboardPreferenceItem
   definition: CardDefinition
+  canMoveUp: boolean
+  canMoveDown: boolean
+  onMove: (direction: 'up' | 'down') => void
   onToggle: () => void
-  toggleDisabled: boolean
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id })
   const style = { transform: CSS.Transform.toString(transform), transition }
@@ -175,33 +216,95 @@ function SortableCardRow({ item, definition, onToggle, toggleDisabled }: {
         <p className="text-ink truncate text-sm font-medium" title={definition.label}>{definition.label}</p>
         <p className="text-ink-faint truncate text-[11px]" title={definition.description}>{definition.description}</p>
       </div>
-      <label className={`relative inline-flex shrink-0 items-center ${toggleDisabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}>
-        <input type="checkbox" checked={item.visible} disabled={toggleDisabled} onChange={onToggle} className="peer sr-only" aria-label={`${definition.label}を${item.visible ? '非表示' : '表示'}にする`} />
-        <span className="bg-hairline peer-checked:bg-accent h-6 w-[42px] rounded-pill transition-colors" />
-        <span className="bg-canvas absolute left-0.5 h-5 w-5 rounded-full shadow-sm transition-transform peer-checked:translate-x-[18px]" />
-      </label>
+      {/*
+        R116: ドラッグが難しいときの上下ボタン。タッチやマウスだけでも
+        1つずつ動かせる。端では押せない。
+      */}
+      <div role="group" aria-label={`${definition.label}の順番`} className="flex shrink-0 items-center">
+        <button
+          type="button"
+          aria-label={`${definition.label}を1つ上へ移動`}
+          disabled={!canMoveUp}
+          onClick={() => onMove('up')}
+          className="text-ink-faint hover:text-ink rounded p-1 disabled:opacity-30"
+        >
+          <ChevronUp aria-hidden="true" className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          aria-label={`${definition.label}を1つ下へ移動`}
+          disabled={!canMoveDown}
+          onClick={() => onMove('down')}
+          className="text-ink-faint hover:text-ink rounded p-1 disabled:opacity-30"
+        >
+          <ChevronDown aria-hidden="true" className="h-4 w-4" />
+        </button>
+      </div>
+      <Checkbox
+        checked={item.visible}
+        onCheckedChange={onToggle}
+        aria-label={`${definition.label}を${item.visible ? '非表示' : '表示'}にする`}
+        className="shrink-0"
+      />
     </div>
   )
 }
 
 function PreviewCard({ children, muted = false }: { children: ReactNode; muted?: boolean }) {
-  return <div className={`rounded-lg border px-2 py-2 text-[10px] font-medium ${muted ? 'border-dashed border-hairline text-ink-faint' : 'border-hairline bg-canvas text-ink shadow-[1px_1px_2px_rgba(29,29,31,0.10)]'}`}>{children}</div>
+  return <div className={`rounded-lg border px-2 py-2 text-[10px] font-medium ${muted ? 'border-dashed border-hairline text-ink-faint' : 'border-hairline bg-canvas text-ink shadow-card'}`}>{children}</div>
 }
 
+/*
+ * プレビューは実画面と同じ配置モデル（draftの3区分の並び）を使う（DASH-06）。
+ * PCは「今日やること」4列＋メイン/右の左右分割、スマホは1列積みで、
+ * 実画面の390pxの見え方（先頭2件＋折りたたみ）に合わせる。
+ */
 function DashboardPreview({ draft }: { draft: DashboardPreferences }) {
+  const [device, setDevice] = useState<'pc' | 'mobile'>('pc')
   const visible = (group: DashboardGroup) => draft[group].filter((item) => item.visible)
   const label = (id: DashboardCardId) => CARD_DEFINITION_MAP.get(id)?.label ?? id
   const visibleCount = DASHBOARD_GROUPS.reduce((count, group) => count + visible(group).length, 0)
+  const todayVisible = visible('today')
+  // 実画面の390pxでは KpiCollapse が先頭2件だけを出し、残りは「集計を見る」で開く。
+  const mobileTodayShown = todayVisible.slice(0, 2)
+  const mobileTodayCollapsed = todayVisible.length - mobileTodayShown.length
   return (
     <div className="border-hairline bg-canvas-sunken rounded-card border p-3">
-      <p className="text-ink-faint mb-2 text-[11px]">実際のダッシュボードと同じ順番で表示します。</p>
-      <div className="grid grid-cols-4 gap-1.5">
-        {visible('today').map((item) => <PreviewCard key={item.id}>{label(item.id)}</PreviewCard>)}
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <p className="text-ink-faint text-[11px]">実際のダッシュボードと同じ順番で表示します。</p>
+        <div className="flex gap-1" role="tablist" aria-label="プレビューの画面幅">
+          {([['pc', 'PC'], ['mobile', 'スマホ']] as const).map(([key, text]) => (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={device === key}
+              onClick={() => setDevice(key)}
+              className={`rounded-pill border px-2.5 py-1 text-[10px] font-medium ${device === key ? 'border-accent-deep bg-accent-deep text-on-accent' : 'border-hairline bg-canvas text-ink-secondary'}`}
+            >{text}</button>
+          ))}
+        </div>
       </div>
-      <div className="mt-2 grid grid-cols-[minmax(0,3fr)_minmax(76px,1fr)] gap-2">
-        <div className="space-y-1.5">{visible('main').map((item) => <PreviewCard key={item.id}>{label(item.id)}</PreviewCard>)}</div>
-        <div className="space-y-1.5">{visible('right').map((item) => <PreviewCard key={item.id}>{label(item.id)}</PreviewCard>)}</div>
-      </div>
+      {device === 'pc' ? (
+        <>
+          <div className="grid grid-cols-4 gap-1.5">
+            {todayVisible.map((item) => <PreviewCard key={item.id}>{label(item.id)}</PreviewCard>)}
+          </div>
+          <div className="mt-2 grid grid-cols-[minmax(0,3fr)_minmax(76px,1fr)] gap-2">
+            <div className="space-y-1.5">{visible('main').map((item) => <PreviewCard key={item.id}>{label(item.id)}</PreviewCard>)}</div>
+            <div className="space-y-1.5">{visible('right').map((item) => <PreviewCard key={item.id}>{label(item.id)}</PreviewCard>)}</div>
+          </div>
+        </>
+      ) : (
+        <div className="space-y-1.5">
+          {mobileTodayShown.map((item) => <PreviewCard key={item.id}>{label(item.id)}</PreviewCard>)}
+          {mobileTodayCollapsed > 0 ? (
+            <PreviewCard muted>ほか {mobileTodayCollapsed}件（「集計を見る」で開きます）</PreviewCard>
+          ) : null}
+          {visible('main').map((item) => <PreviewCard key={item.id}>{label(item.id)}</PreviewCard>)}
+          {visible('right').map((item) => <PreviewCard key={item.id}>{label(item.id)}</PreviewCard>)}
+        </div>
+      )}
       {visibleCount === 0 ? <PreviewCard muted>表示するカードがありません</PreviewCard> : null}
     </div>
   )
@@ -213,41 +316,70 @@ function groupLabel(group: DashboardGroup): string {
   return '右サイド'
 }
 
-export default function DashboardEditor({ open, preferences, onCancel, onApply, onReset }: {
+export default function DashboardEditor({ open, preferences, saving = false, saveError, saveConflict, onReloadPreferences, onCancel, onApply, onReset }: {
   open: boolean
   preferences: DashboardPreferences
+  saving?: boolean
+  /*
+   * 保存・初期化の失敗はパネルの中へ出す（DASH-05）。背景の画面エラーと
+   * 分離し、入力を消さずにその場で再試行できるようにする。
+   */
+  saveError?: string | null
+  /** 409のとき true。「最新の配置を読み込む」導線を出す。 */
+  saveConflict?: boolean
+  /** 最新の配置を読み直し、成功したらその配置を返す（draftの新しい起点）。 */
+  onReloadPreferences?: () => Promise<DashboardPreferences | null>
   onCancel: () => void
   onApply: (next: DashboardPreferences) => void
   onReset?: () => void
 }) {
   const [draft, setDraft] = useState(preferences)
   const [mode, setMode] = useState<'cards' | 'preview'>('cards')
+  const [confirmingReset, setConfirmingReset] = useState(false)
+  const [reloading, setReloading] = useState(false)
+  /* R116: ボタン移動の結果を日本語で読み上げる。 */
+  const [announcement, setAnnouncement] = useState('')
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   )
-  const visibleTodayCount = useMemo(() => draft.today.filter((item) => item.visible).length, [draft.today])
-
+  /*
+   * 編集中のdraftはパネルを開いた時点の配置で固定する（DASH-15）。
+   * 開いている間に遅れて届いた配置GETや別経路の保存結果で
+   * preferences が更新されても、利用者が直した途中の内容を黙って
+   * 上書きしない。新しい配置は保存競合（409）として通知する。
+   */
+  const preferencesRef = useRef(preferences)
+  preferencesRef.current = preferences
   useEffect(() => {
     if (open) {
-      setDraft(preferences)
+      setDraft(preferencesRef.current)
       setMode('cards')
+      setConfirmingReset(false)
     }
-  }, [open, preferences])
-
-  useEffect(() => {
-    if (!open) return
-    const previous = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => { document.body.style.overflow = previous }
   }, [open])
+
+  const reloadLatest = async () => {
+    if (!onReloadPreferences) return
+    setReloading(true)
+    try {
+      const latest = await onReloadPreferences()
+      if (latest) setDraft(latest)
+    } finally {
+      setReloading(false)
+    }
+  }
+
+  // Escape・Tabの循環・背景スクロール停止・閉じたあとのフォーカス戻しは
+  // 共通のoverlay作法に揃える。保存中は確定途中の内容を失わないよう閉じない。
+  const panelRef = useOverlayFocus(open, onCancel, saving)
 
   if (!open) return null
 
   const toggle = (group: DashboardGroup, id: DashboardCardId) => {
     setDraft((current) => ({
       ...current,
-      [group]: current[group].map((item) => item.id === id ? { ...item, visible: !item.visible } : item),
+      [group]: toggleDashboardItem(current[group], id, group === 'today' ? TODAY_TASK_LIMIT : undefined),
     }))
   }
 
@@ -260,23 +392,114 @@ export default function DashboardEditor({ open, preferences, onCancel, onApply, 
     }))
   }
 
+  /* R116: 上下ボタンでの移動。端では何もしない。結果は日本語で読み上げる。 */
+  const handleMove = (group: DashboardGroup, id: DashboardCardId, direction: 'up' | 'down') => {
+    const next = moveDashboardItem(draft[group], id, direction)
+    if (next === draft[group]) return
+    setDraft({ ...draft, [group]: next })
+    const position = next.findIndex((item) => item.id === id) + 1
+    setAnnouncement(`${CARD_DEFINITION_MAP.get(id)?.label ?? id}を${position}番目へ移動しました`)
+  }
+
+  /*
+   * R116: ドラッグ中の読み上げも日本語にする。dnd-kit の既定は英語で、
+   * 位置も伝わらない。`draft` は描画時点の並びで、指している先の番号を言う。
+   */
+  const japaneseAnnouncements = (group: DashboardGroup): Announcements => {
+    const labelOf = (id: unknown) => CARD_DEFINITION_MAP.get(id as DashboardCardId)?.label ?? String(id)
+    const positionOf = (id: unknown) => draft[group].findIndex((item) => item.id === id) + 1
+    return {
+      onDragStart: ({ active }) => `${labelOf(active.id)}を持ち上げました。今の位置は${positionOf(active.id)}番目です。`,
+      onDragOver: ({ active, over }) => {
+        if (!over || active.id === over.id) return undefined
+        return `${labelOf(active.id)}を${labelOf(over.id)}の位置へ移動します。`
+      },
+      onDragEnd: ({ active, over }) => {
+        if (!over || active.id === over.id) return `${labelOf(active.id)}の位置は変わりませんでした。`
+        return `${labelOf(active.id)}を${positionOf(over.id)}番目へ移動しました。`
+      },
+      onDragCancel: ({ active }) => `${labelOf(active.id)}の移動をやめました。`,
+    }
+  }
+
   return (
-    <div data-design="Editor" className="bg-ink/25 fixed inset-0 z-50 flex justify-end" role="presentation" onMouseDown={onCancel}>
-      <aside role="dialog" aria-modal="true" aria-labelledby="dashboard-editor-title" className="bg-canvas flex h-full w-full max-w-[460px] flex-col shadow-[-8px_0_28px_rgba(26,28,26,0.14)]" onMouseDown={(event) => event.stopPropagation()}>
-        <header className="border-hairline border-b px-[22px] pt-5">
+    <div data-design="Editor" className="bg-ink/30 fixed inset-0 z-50 flex justify-end" role="presentation" onMouseDown={() => { if (!saving) onCancel() }}>
+      <aside ref={panelRef} role="dialog" aria-modal="true" aria-labelledby="dashboard-editor-title" className="bg-canvas flex h-full w-full max-w-[540px] flex-col shadow-float" onMouseDown={(event) => event.stopPropagation()}>
+        <header className="border-hairline border-b px-[22px] pb-4 pt-5">
           <div className="flex items-start justify-between gap-4">
             <div>
               <h2 id="dashboard-editor-title" className="text-ink text-lg font-bold">ダッシュボード編集</h2>
-              <p className="text-ink-faint mt-1 text-xs leading-relaxed">持ち手をドラッグして移動。スイッチで表示を切り替えます。</p>
+              <p className="text-ink-faint mt-1 text-xs leading-relaxed">表示するカードと位置を変更します</p>
             </div>
-            <button type="button" onClick={onCancel} aria-label="閉じる" className="text-ink-faint hover:text-ink rounded-control p-1.5"><CloseIcon /></button>
+            <button type="button" onClick={onCancel} disabled={saving} aria-label="閉じる" className="text-ink-faint hover:text-ink rounded-control p-1.5"><CloseIcon /></button>
           </div>
-          <button type="button" onClick={() => onReset ? onReset() : setDraft(defaultDashboardPreferences())} className="text-action mt-2 text-xs font-medium hover:underline">初期状態に戻す</button>
-          <div className="mt-3 flex gap-5" role="tablist" aria-label="ダッシュボード編集モード">
-            <button type="button" role="tab" aria-selected={mode === 'cards'} onClick={() => setMode('cards')} className={`border-b-2 px-0.5 pb-2.5 text-sm font-semibold ${mode === 'cards' ? 'border-accent text-accent' : 'border-transparent text-ink-faint hover:text-ink'}`}>カードと配置</button>
-            <button type="button" role="tab" aria-selected={mode === 'preview'} onClick={() => setMode('preview')} className={`border-b-2 px-0.5 pb-2.5 text-sm font-semibold ${mode === 'preview' ? 'border-accent text-accent' : 'border-transparent text-ink-faint hover:text-ink'}`}>プレビュー</button>
+          <div className="mt-4 flex items-center justify-between gap-4">
+            <p className="text-ink-secondary text-xs">持ち手をドラッグして移動。上下ボタン・キーボードでも順番を変更。スイッチで表示を切り替えます。</p>
+            {/*
+              「初期状態に戻す」は個人配置の削除なので、パネル内の確認を
+              挟んでから実行する（A01-02）。1回目のクリックは確認を出すだけで、
+              キャンセルすれば配置も編集中の内容も変わらない。
+            */}
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => onReset ? setConfirmingReset(true) : setDraft(defaultDashboardPreferences())}
+              className="text-action shrink-0 text-xs font-medium hover:underline"
+            >初期状態に戻す</button>
+          </div>
+          {confirmingReset ? (
+            <div role="alert" className="bg-status-warn-soft text-status-warn-deep mt-2 rounded-control px-3 py-2.5 text-xs leading-relaxed">
+              <p className="font-semibold">現在の配置を削除して初期状態へ戻します</p>
+              <p className="mt-1">この操作はすぐに保存され、あとからキャンセルしても元には戻りません。</p>
+              <div className="mt-2 flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => { setConfirmingReset(false); onReset?.() }}
+                  className="text-status-warn-deep font-semibold underline"
+                >削除して初期状態へ戻す</button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmingReset(false)}
+                  className="font-medium underline"
+                >やめる</button>
+              </div>
+            </div>
+          ) : null}
+          <div className="mt-3 flex gap-2" role="tablist" aria-label="ダッシュボード編集モード">
+            <Button role="tab" aria-selected={mode === 'cards'} onClick={() => setMode('cards')} variant={mode === 'cards' ? 'primary' : 'secondary'}>カードと配置</Button>
+            <Button role="tab" aria-selected={mode === 'preview'} onClick={() => setMode('preview')} variant={mode === 'preview' ? 'primary' : 'secondary'}>プレビュー</Button>
           </div>
         </header>
+
+        {/* R116: 上下ボタンで動かした結果を読み上げる（見た目には出さない）。 */}
+        <p role="status" className="sr-only">{announcement}</p>
+
+        {/*
+          配置の保存・初期化の失敗はこのパネルの上部へ出す（DASH-05）。
+          再試行は「意図した配置操作」だけを実行し、概要の再取得はしない。
+        */}
+        {saveError ? (
+          <div role="alert" className="bg-danger-bg text-danger mx-[22px] mt-3 rounded-control px-3 py-2.5 text-xs leading-relaxed">
+            <p className="font-medium">{saveError}</p>
+            <div className="mt-1.5 flex flex-wrap gap-3">
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => onApply(draft)}
+                className="font-medium underline"
+              >もう一度保存する</button>
+              {saveConflict && onReloadPreferences ? (
+                <button
+                  type="button"
+                  disabled={saving || reloading}
+                  onClick={() => void reloadLatest()}
+                  className="font-medium underline"
+                >{reloading ? '読み込み中…' : '最新の配置を読み込む'}</button>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
 
         <div className="flex-1 overflow-y-auto px-[22px] py-5">
           {mode === 'preview' ? <DashboardPreview draft={draft} /> : (
@@ -285,29 +508,57 @@ export default function DashboardEditor({ open, preferences, onCancel, onApply, 
                 <section key={group}>
                   <div className="mb-2 flex items-baseline justify-between gap-3">
                     <h3 className="text-ink text-sm font-bold">{groupLabel(group)}</h3>
-                    <span className="text-ink-faint text-[11px]">{group === 'today' ? '最大4枚まで・ドラッグで順番変更' : 'ドラッグで順番変更'}</span>
+                    {/*
+                      **上限と操作は別の話なので、1行にまとめない。**
+                      設計 `ZN0ov` は「「今日やること」は4枠までです」を独立した1行で出す。
+                      繋げると、上限の文と操作の案内が1つの札に見える。
+                    */}
+                    <span className="text-ink-faint text-[11px]">上下ボタン・ドラッグで順番変更</span>
                   </div>
-                  <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(event) => handleDragEnd(group, event)}>
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    accessibility={{
+                      announcements: japaneseAnnouncements(group),
+                      screenReaderInstructions: { draggable: '持ち上げるには Space を押し、上下の矢印キーで移動し、Space で置きます。Esc でやめます。' },
+                    }}
+                    onDragEnd={(event) => handleDragEnd(group, event)}
+                  >
                     <SortableContext items={draft[group].map((item) => item.id)} strategy={verticalListSortingStrategy}>
                       <div className="border-hairline overflow-hidden rounded-[9px] border">
-                        {draft[group].map((item) => {
+                        {draft[group].map((item, index) => {
                           const definition = CARD_DEFINITION_MAP.get(item.id)
                           if (!definition) return null
-                          const toggleDisabled = group === 'today' && !item.visible && visibleTodayCount >= TODAY_TASK_LIMIT
-                          return <SortableCardRow key={item.id} item={item} definition={definition} onToggle={() => toggle(group, item.id)} toggleDisabled={toggleDisabled} />
+                          return (
+                            <SortableCardRow
+                              key={item.id}
+                              item={item}
+                              definition={definition}
+                              canMoveUp={index > 0}
+                              canMoveDown={index < draft[group].length - 1}
+                              onMove={(direction) => handleMove(group, item.id, direction)}
+                              onToggle={() => toggle(group, item.id)}
+                            />
+                          )
                         })}
                       </div>
                     </SortableContext>
                   </DndContext>
+                  {group === 'today' ? (
+                    <Notice tone="warn" className="mt-3">
+                      <p className="font-semibold">「今日やること」は4枠までです</p>
+                      <p className="mt-1">5つ目をONにすると、いちばん下のカードが自動でOFFになります。順番を入れ替えて、先に出したい4つを上に置いてください。</p>
+                    </Notice>
+                  ) : null}
                 </section>
               ))}
             </div>
           )}
         </div>
 
-        <footer className="border-hairline flex items-center justify-end gap-2 border-t px-[22px] py-4">
-          <button type="button" onClick={onCancel} className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-4 py-2 text-sm font-medium">キャンセル</button>
-          <button type="button" onClick={() => onApply(draft)} className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-5 py-2 text-sm font-medium">変更を適用</button>
+        <footer className="border-hairline flex items-center justify-center gap-2 border-t px-[22px] py-4">
+          <Button onClick={onCancel} disabled={saving}>キャンセル</Button>
+          <Button onClick={() => onApply(draft)} disabled={saving} aria-busy={saving} variant="primary">{saving ? '保存中…' : 'ダッシュボードに反映'}</Button>
         </footer>
       </aside>
     </div>

@@ -1,70 +1,42 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
-import { getAccountSetting, setAccountSetting } from '@line-crm/db';
-import { DEFAULT_TENANT_ID } from '@line-crm/shared';
+import {
+  auditDeviceFamily,
+  auditEventStatement,
+  getAccountSetting,
+  getAccountSettings,
+  getVersionedAccountSetting,
+  maskAuditIp,
+  setAccountSetting,
+} from '@line-crm/db';
+import {
+  DEFAULT_TENANT_ID,
+  FEATURE_CATALOG,
+  FEATURE_IDS,
+  MENU_SECTION_LABELS,
+  expectedMenuItemOrder,
+  isMenuSectionId,
+  type FeatureId,
+} from '@line-crm/shared';
 import type { Env } from '../index.js';
 import { restaurantTestEnabled } from '../lib/environment-features.js';
 import { requireRole } from '../middleware/role-guard.js';
+import { canAccessAllLineAccounts } from '../services/account-access.js';
+import { accountFeatureAvailabilityMap } from '../services/feature-enforcement.js';
 
 /**
  * 機能のオン／オフ。
  *
- * 新しいテーブルは要らない。account_settings が既に key/value の置き場で、
- * ここへ 'feature.<キー>' として入れる。機能が増えるたびに列を足す形に
- * すると、機能を1つ足すのにマイグレーションが要ることになる。
+ * account_settings の版付き一括設定を正本にし、旧 `feature.<キー>` は
+ * 保存済みデータを読むための互換経路として残す。
  */
 const featureSettings = new Hono<Env>();
 
-/**
- * 切り替えられる機能。
- *
- * ここに無いキーは受け付けない。任意のキーを書けるようにすると、
- * 打ち間違いがそのまま保存され、「切ったはずなのに出ている」という
- * 形で表に出る。
- *
- * V2 10-3 でオフと定義された機能だけ既定を無効にし、それ以外は有効。
- * 保存済みの値がある場合は、そちらを優先する。
- */
-export const TOGGLEABLE_FEATURES = [
-  'scenarios',
-  'broadcasts',
-  'templates',
-  'reminders',
-  'auto_replies',
-  'rich_menus',
-  'inflow_tracking',
-  'forms',
-  'photo_review',
-  // サイドメニューにあってオン／オフの受け口が無かったもの。
-  // 受け口が無いと、機能設定に並べてもスイッチが保存されない。
-  'automations',
-  'external_integrations',
-  'friend_add_routing',
-  'multi_store_hierarchy',
-  'multi_store_bulk_updates',
-  'reservation_ledger',
-  'external_reservations',
-  'google_business_profile',
-  'friend_fields',
-  'support_marks',
-  'saved_searches',
-  'media',
-  'common_vars',
-  'analytics',
-  'site_tracking',
-  'webinars',
-  'events',
-  'booking',
-  'affiliates',
-  'mileage',
-  'ec_commerce',
-  'line_notifications',
-  'nen_campaigns',
-  // 飲食店向けテスト領域は1つのスイッチでまとめて表示を切り替える。
-  'restaurant_test',
-] as const;
+/** 受け付けるIDは共有カタログそのもの。画面・Workerで別の配列を持たない。 */
+export const TOGGLEABLE_FEATURES: readonly FeatureId[] = FEATURE_IDS;
+const TOGGLEABLE_FEATURE_SET = new Set<string>(TOGGLEABLE_FEATURES);
 
-export type ToggleableFeature = (typeof TOGGLEABLE_FEATURES)[number];
+export type ToggleableFeature = FeatureId;
 
 const SETTING_PREFIX = 'feature.';
 const SIDEBAR_ORDER_KEY = 'sidebar.order';
@@ -78,17 +50,28 @@ const SIDEBAR_ORDER_KEY = 'sidebar.order';
 const SIDEBAR_ITEM_ORDER_KEY = 'sidebar.item_order';
 const PARENT_CHILD_MODE_KEY = 'organization.parent_child_enabled';
 const SPECIALIZED_CATALOG_KEY = 'feature.specialized.catalog';
+const FEATURE_SETTINGS_BUNDLE_KEY = 'feature.settings_bundle_v1';
 
-/** V2 10-3 の初期表示。記録が無い契約ではこの状態から始める。 */
-export const DEFAULT_DISABLED_FEATURES = new Set<ToggleableFeature>([
-  'webinars',
-  'affiliates',
-  'multi_store_hierarchy',
-  'multi_store_bulk_updates',
-  'reservation_ledger',
-  'external_reservations',
-  'google_business_profile',
-]);
+type FeatureSettingsData = {
+  features: Record<string, boolean>;
+  sidebarOrder: string[] | null;
+  sidebarItemOrder: Record<string, string[]> | null;
+};
+
+type FeatureSettingsState = FeatureSettingsData & { version: number };
+
+type FeatureVisibilityData = {
+  /**
+   * サイドバーに項目を出せるかだけを返す。会社の保存値、契約、依存理由は
+   * 管理情報なので、一般staff向けの応答へ混ぜない。
+   */
+  features: Record<FeatureId, boolean>;
+};
+
+/** 共有カタログで既定オフの機能。記録が無いアカウントではこの状態から始める。 */
+export const DEFAULT_DISABLED_FEATURES = new Set<ToggleableFeature>(
+  FEATURE_CATALOG.filter(({ defaultEnabled }) => !defaultEnabled).map(({ featureId }) => featureId),
+);
 
 /**
  * このリポジトリで専門設計済みの然向け機能。
@@ -102,7 +85,7 @@ export const NEN_SPECIALIZED_FEATURES: ToggleableFeature[] = [
 ];
 
 function isToggleable(key: unknown): key is ToggleableFeature {
-  return typeof key === 'string' && (TOGGLEABLE_FEATURES as readonly string[]).includes(key);
+  return typeof key === 'string' && TOGGLEABLE_FEATURE_SET.has(key);
 }
 
 export function featureIsEnabled(raw: string | null, key: ToggleableFeature): boolean {
@@ -136,6 +119,658 @@ export function specializedCatalog(raw: string | null): string[] {
 }
 
 /**
+ * オフ前の影響確認(#643)。
+ *
+ * 公開・予約・稼働中の仕事を壊さずにオフできるよう、オフにしようと
+ * している機能ごとに「公開中」「予約中」「依存機能」の件数と対象種別を
+ * 数える。数えるだけでは保存しない。影響がある保存には確認トークンが
+ * 要り、状態が変わったら取り直しになる。
+ *
+ * 数え先はこのアカウントに結び付く行だけにする。アカウント列が空の行を
+ * 共有として数えるのは、読み取り側が共有扱いしている表だけ
+ * (自動応答・ウェビナー)。それ以外は厳密にこのアカウントの行だけ数え、
+ * 他テナントの名寄せなし行を混ぜない。詳しくは FEATURE_IMPACT_COVERAGE。
+ */
+export type FeatureImpactKind = 'published' | 'scheduled' | 'dependent';
+
+export type FeatureImpactItem = {
+  kind: FeatureImpactKind;
+  /** 運用者に見せる対象の呼び名。表名や内部IDは出さない。 */
+  targetType: string;
+  count: number;
+};
+
+export type FeatureImpact = {
+  feature: ToggleableFeature;
+  items: FeatureImpactItemWithIds[];
+  /** 確認トークンなしでは保存できない影響があるか。 */
+  blocking: boolean;
+};
+
+/** 確認トークンの置き場。汎用設定表の1行で足り、移行は要らない。 */
+const OFF_CONFIRM_KEY = 'feature.off_confirm';
+/** 確認から保存までの持ち時間。稼働中は変わるため短めにする。 */
+const OFF_CONFIRM_TTL_MS = 10 * 60 * 1000;
+
+type OffConfirmation = {
+  token: string;
+  impactHash: string;
+  version: number;
+  expiresAt: number;
+};
+
+/**
+ * 一斉配信のアカウント結び付け。複数アカウント宛て(重複除き)は
+ * account_ids の JSON 配列にも対象が入る。一覧取得と同じ条件。
+ */
+const BROADCAST_ACCOUNT_SCOPE = `(b.line_account_id = ?
+  OR (b.target_type = 'multi-account-dedup' AND b.account_ids IS NOT NULL
+    AND EXISTS (SELECT 1 FROM json_each(b.account_ids) WHERE value = ?)))`;
+
+/**
+ * 回答フォームの影響範囲。結び付けが無いフォームは表示上は全アカウントに
+ * 出るが、持ち主が分からないため影響には加算しない(実readerと意図的に
+ * 違う。影響は「このアカウントが止める仕事」だけ数える)。
+ */
+const FORM_ACCOUNT_SCOPE = `EXISTS (SELECT 1 FROM form_accounts fa WHERE fa.form_id = f.id AND fa.line_account_id = ?)`;
+
+/**
+ * 切替対象の網羅表。各機能が「何を数えるか」か
+ * 「数えない理由」のどちらかを必ず持つ。FEATURE_CATALOGに機能を
+ * 足したらここも足す。足さなければ型検査と契約テストが落ちる。
+ *
+ * 数え先はこのアカウントに結び付く行だけにする。アカウント列が空の
+ * 行を共有として数えるのは、読み取り側が共有扱いしている表だけ
+ * (自動応答・ウェビナー)。それ以外は厳密にこのアカウントの行だけ
+ * 数え、他テナントの名寄せなし行を混ぜない。アカウントに結び付け
+ * られない表は数えず、理由を残して 0 件と混ぜない。
+ */
+export type FeatureImpactSource = {
+  kind: FeatureImpactKind;
+  /** 運用者に見せる対象の呼び名。表名や内部IDは出さない。 */
+  targetType: string;
+  /**
+   * FROM〜WHERE。件数とID取得で共有し、条件ずれを防ぐ。
+   * dispatcherのclaim条件と同じ述語にする。
+   */
+  fromWhere: string;
+  /** ID列(主表のid)。保存時に対象集合を固定するために使う。 */
+  idColumn: string;
+  /** ? の個数。すべて accountId で埋める。 */
+  params: 1 | 2;
+};
+
+/**
+ * 1項目あたりの応答に載せる対象IDの上限。照合用の fingerprintIds は
+ * 上限なしの全IDで、101件目以降の入れ替えも検出する。
+ */
+const IMPACT_IDS_LIMIT = 100;
+
+export type FeatureImpactItemWithIds = FeatureImpactItem & {
+  /** 対象行ID(並び替え済み)。応答用で上限を超えたら先頭分だけ。 */
+  ids: string[];
+  /** 上限を超えて応答のIDが欠けているか。 */
+  truncated: boolean;
+  /**
+   * 照合用の全対象ID(並び替え済み、上限なし)。確認トークンの
+   * fingerprintにだけ使い、応答には含めない。
+   */
+  fingerprintIds: string[];
+};
+
+export type FeatureImpactCoverageEntry =
+  | { readonly scope: 'counted'; readonly sources: readonly FeatureImpactSource[] }
+  | { readonly scope: 'none'; readonly reason: string };
+
+export const FEATURE_IMPACT_COVERAGE: Readonly<Record<FeatureId, FeatureImpactCoverageEntry>> = {
+  broadcasts: {
+    scope: 'counted',
+    sources: [
+      {
+        kind: 'scheduled',
+        targetType: '予約済みの配信',
+        fromWhere: `FROM broadcasts b WHERE b.status = 'scheduled' AND ${BROADCAST_ACCOUNT_SCOPE}`,
+        idColumn: 'b.id',
+        params: 2,
+      },
+      {
+        kind: 'published',
+        targetType: '送信中の配信',
+        fromWhere: `FROM broadcasts b WHERE b.status = 'sending' AND ${BROADCAST_ACCOUNT_SCOPE}`,
+        idColumn: 'b.id',
+        params: 2,
+      },
+    ],
+  },
+  scenarios: {
+    scope: 'counted',
+    sources: [
+      {
+        kind: 'published',
+        targetType: '公開中のシナリオ',
+        fromWhere: `FROM scenarios WHERE is_active = 1 AND line_account_id = ?`,
+        idColumn: 'scenarios.id',
+        params: 1,
+      },
+      {
+        kind: 'dependent',
+        targetType: '回答後にシナリオへつなぐフォーム',
+        fromWhere: `FROM forms f WHERE f.on_submit_scenario_id IS NOT NULL AND f.is_active = 1 AND ${FORM_ACCOUNT_SCOPE}`,
+        idColumn: 'f.id',
+        params: 1,
+      },
+      {
+        kind: 'dependent',
+        targetType: 'シナリオを使う紹介オファー',
+        fromWhere: `FROM affiliate_offers WHERE scenario_id IS NOT NULL AND is_active = 1 AND line_account_id = ?`,
+        idColumn: 'affiliate_offers.id',
+        params: 1,
+      },
+    ],
+  },
+  templates: {
+    scope: 'counted',
+    sources: [
+      {
+        kind: 'dependent',
+        targetType: 'テンプレートを使う自動応答',
+        fromWhere: `FROM auto_replies WHERE template_id IS NOT NULL AND is_active = 1 AND deleted_at IS NULL AND (line_account_id IS NULL OR line_account_id = ?)`,
+        idColumn: 'auto_replies.id',
+        params: 1,
+      },
+    ],
+  },
+  reminders: {
+    scope: 'counted',
+    sources: [
+      {
+        kind: 'published',
+        targetType: '有効なリマインド設定',
+        fromWhere: `FROM reminders WHERE is_active = 1 AND deleted_at IS NULL AND line_account_id = ?`,
+        idColumn: 'reminders.id',
+        params: 1,
+      },
+      {
+        kind: 'scheduled',
+        targetType: '送信待ちのリマインド',
+        fromWhere: `FROM friend_reminders fr
+         JOIN reminders r ON r.id = fr.reminder_id AND r.is_active = 1 AND r.deleted_at IS NULL AND r.line_account_id = ?
+         WHERE fr.status = 'active'`,
+        idColumn: 'fr.id',
+        params: 1,
+      },
+    ],
+  },
+  auto_replies: {
+    scope: 'counted',
+    sources: [
+      {
+        kind: 'published',
+        targetType: '有効な自動応答',
+        fromWhere: `FROM auto_replies WHERE is_active = 1 AND deleted_at IS NULL AND (line_account_id IS NULL OR line_account_id = ?)`,
+        idColumn: 'auto_replies.id',
+        params: 1,
+      },
+    ],
+  },
+  rich_menus: {
+    scope: 'counted',
+    sources: [
+      {
+        kind: 'published',
+        targetType: '利用中のリッチメニュー',
+        fromWhere: `FROM rich_menu_assignments WHERE line_account_id = ?`,
+        idColumn: 'rich_menu_assignments.id',
+        params: 1,
+      },
+    ],
+  },
+  inflow_tracking: {
+    scope: 'counted',
+    sources: [
+      {
+        kind: 'published',
+        targetType: '公開中の計測リンク',
+        fromWhere: `FROM tracked_links WHERE is_active = 1 AND line_account_id = ?`,
+        idColumn: 'tracked_links.id',
+        params: 1,
+      },
+      {
+        kind: 'published',
+        targetType: '公開中の流入経路',
+        fromWhere: `FROM entry_routes WHERE is_active = 1 AND line_account_id = ?`,
+        idColumn: 'entry_routes.id',
+        params: 1,
+      },
+    ],
+  },
+  forms: {
+    scope: 'counted',
+    sources: [
+      {
+        kind: 'published',
+        targetType: '公開中の回答フォーム',
+        fromWhere: `FROM forms f WHERE f.is_active = 1 AND ${FORM_ACCOUNT_SCOPE}`,
+        idColumn: 'f.id',
+        params: 1,
+      },
+    ],
+  },
+  photo_review: {
+    scope: 'counted',
+    sources: [
+      {
+        kind: 'scheduled',
+        targetType: '審査待ちの写真',
+        fromWhere: `FROM nen_photo_submissions WHERE status = 'pending' AND line_account_id = ?`,
+        idColumn: 'nen_photo_submissions.id',
+        params: 1,
+      },
+    ],
+  },
+  automations: {
+    scope: 'counted',
+    sources: [
+      {
+        kind: 'scheduled',
+        targetType: '実行待ち・実行中の自動処理',
+        fromWhere: `FROM automation_runs
+         WHERE status IN ('queued', 'running', 'waiting') AND is_test = 0 AND line_account_id = ?`,
+        idColumn: 'automation_runs.id',
+        params: 1,
+      },
+    ],
+  },
+  external_integrations: {
+    scope: 'counted',
+    sources: [
+      {
+        kind: 'published',
+        targetType: '有効な受信Webhook',
+        fromWhere: `FROM incoming_webhooks WHERE is_active = 1 AND line_account_id = ? AND deleted_at IS NULL`,
+        idColumn: 'incoming_webhooks.id',
+        params: 1,
+      },
+    ],
+  },
+  friend_add_routing: {
+    scope: 'counted',
+    sources: [
+      {
+        kind: 'published',
+        targetType: '公開中の振り分けルール',
+        fromWhere: `FROM friend_add_rules WHERE status = 'published' AND line_account_id = ?`,
+        idColumn: 'friend_add_rules.id',
+        params: 1,
+      },
+    ],
+  },
+  multi_store_hierarchy: {
+    scope: 'none',
+    reason: '店舗束の構成設定で、待ち行を持たない',
+  },
+  friend_fields: {
+    scope: 'counted',
+    sources: [
+      {
+        kind: 'scheduled',
+        targetType: '実行中の属性移行',
+        fromWhere: `FROM field_migration_runs WHERE status IN ('queued', 'running') AND line_account_id = ?`,
+        idColumn: 'field_migration_runs.id',
+        params: 1,
+      },
+    ],
+  },
+  support_marks: {
+    scope: 'none',
+    reason: '付け替え申請は状態を持たない記録で、待ち行でない',
+  },
+  saved_searches: {
+    scope: 'none',
+    reason: '保存条件と利用履歴で、待ち行を持たない',
+  },
+  media: {
+    scope: 'counted',
+    sources: [
+      {
+        kind: 'dependent',
+        targetType: '素材への利用参照',
+        fromWhere: `FROM media_usages u JOIN media m ON m.id = u.media_id AND m.line_account_id = ?`,
+        idColumn: 'm.id',
+        params: 1,
+      },
+    ],
+  },
+  common_vars: {
+    scope: 'counted',
+    sources: [
+      {
+        kind: 'scheduled',
+        targetType: '反映待ちの共通変数変更',
+        fromWhere: `FROM common_var_schedules s
+         JOIN common_vars v ON v.id = s.var_id AND v.archived_at IS NULL AND v.line_account_id = ?
+         WHERE s.applied_at IS NULL`,
+        idColumn: 's.id',
+        params: 1,
+      },
+    ],
+  },
+  analytics: {
+    scope: 'counted',
+    sources: [
+      {
+        kind: 'scheduled',
+        targetType: '有効なレポート予約',
+        fromWhere: `FROM analytics_report_schedules WHERE status = 'active' AND line_account_id = ?`,
+        idColumn: 'analytics_report_schedules.id',
+        params: 1,
+      },
+    ],
+  },
+  site_tracking: {
+    scope: 'none',
+    reason: '計測ログは履歴で、待ち行を持たない',
+  },
+  webinars: {
+    scope: 'counted',
+    sources: [
+      {
+        kind: 'published',
+        targetType: '公開中のウェビナー',
+        fromWhere: `FROM webinars WHERE status = 'active' AND account_id = ?`,
+        idColumn: 'webinars.id',
+        params: 1,
+      },
+      {
+        kind: 'scheduled',
+        targetType: '送信待ちのウェビナー通知',
+        fromWhere: `FROM webinar_notification_jobs j
+         JOIN webinars w ON w.id = j.webinar_id AND w.account_id = ?
+         WHERE j.status IN ('queued', 'claimed', 'retry_wait')`,
+        idColumn: 'j.id',
+        params: 1,
+      },
+    ],
+  },
+  events: {
+    scope: 'counted',
+    sources: [
+      {
+        kind: 'published',
+        targetType: '公開中のイベント',
+        fromWhere: `FROM events WHERE is_published = 1 AND deleted_at IS NULL AND line_account_id = ?`,
+        idColumn: 'events.id',
+        params: 1,
+      },
+      {
+        kind: 'scheduled',
+        targetType: '受付中のイベント予約',
+        fromWhere: `FROM event_bookings WHERE status IN ('requested', 'confirmed') AND line_account_id = ?`,
+        idColumn: 'event_bookings.id',
+        params: 1,
+      },
+      {
+        kind: 'scheduled',
+        targetType: '送信待ちのイベントリマインド',
+        fromWhere: `FROM event_booking_reminders ebr
+         JOIN event_bookings eb ON eb.id = ebr.booking_id AND eb.line_account_id = ?
+         WHERE ebr.status = 'pending'`,
+        idColumn: 'ebr.id',
+        params: 1,
+      },
+    ],
+  },
+  booking: {
+    scope: 'counted',
+    sources: [
+      {
+        kind: 'scheduled',
+        targetType: '受付中の予約',
+        fromWhere: `FROM bookings WHERE status IN ('requested', 'confirmed') AND line_account_id = ?`,
+        idColumn: 'bookings.id',
+        params: 1,
+      },
+      {
+        kind: 'scheduled',
+        targetType: '送信待ちの予約リマインド',
+        fromWhere: `FROM booking_reminders br
+         JOIN bookings b ON b.id = br.booking_id AND b.line_account_id = ?
+         WHERE br.status = 'pending'`,
+        idColumn: 'br.id',
+        params: 1,
+      },
+    ],
+  },
+  affiliates: {
+    scope: 'counted',
+    sources: [
+      {
+        kind: 'published',
+        targetType: '受付中の紹介オファー',
+        fromWhere: `FROM affiliate_offers WHERE is_active = 1 AND line_account_id = ?`,
+        idColumn: 'affiliate_offers.id',
+        params: 1,
+      },
+      {
+        kind: 'scheduled',
+        targetType: '精算待ちの支払い',
+        fromWhere: `FROM affiliate_payout_batches
+         WHERE state IN ('created', 'approved') AND line_account_id = ?`,
+        idColumn: 'affiliate_payout_batches.id',
+        params: 1,
+      },
+    ],
+  },
+  mileage: {
+    scope: 'counted',
+    sources: [
+      {
+        kind: 'scheduled',
+        targetType: '処理中のマイル交換',
+        fromWhere: `FROM mileage_redemptions
+         WHERE status IN ('reserved', 'delivering') AND line_account_id = ?`,
+        idColumn: 'mileage_redemptions.id',
+        params: 1,
+      },
+      {
+        kind: 'dependent',
+        targetType: 'マイル特典を使う紹介オファー',
+        fromWhere: `FROM affiliate_offers
+         WHERE mileage_program_id IS NOT NULL AND is_active = 1 AND line_account_id = ?`,
+        idColumn: 'affiliate_offers.id',
+        params: 1,
+      },
+    ],
+  },
+  ec_commerce: {
+    scope: 'counted',
+    sources: [
+      {
+        kind: 'scheduled',
+        targetType: '処理中のEC注文',
+        fromWhere: `FROM ec_orders
+         WHERE normalized_status = 'current' AND line_account_id = ?`,
+        idColumn: 'ec_orders.id',
+        params: 1,
+      },
+    ],
+  },
+  line_notifications: {
+    scope: 'counted',
+    sources: [
+      {
+        kind: 'published',
+        targetType: '有効な通知ルール',
+        fromWhere: `FROM notification_rules WHERE is_active = 1 AND line_account_id = ?`,
+        idColumn: 'notification_rules.id',
+        params: 1,
+      },
+      {
+        kind: 'scheduled',
+        targetType: '送信待ちの通知',
+        fromWhere: `FROM notification_deliveries
+         WHERE status IN ('pending', 'provider_accepted', 'retry_wait')
+         AND execution_mode != 'test' AND line_account_id = ?`,
+        idColumn: 'notification_deliveries.id',
+        params: 1,
+      },
+    ],
+  },
+  nen_campaigns: {
+    scope: 'counted',
+    sources: [
+      {
+        kind: 'scheduled',
+        targetType: '送信待ちのNEN配信',
+        fromWhere: `FROM nen_delivery_jobs
+         WHERE status IN ('pending', 'processing') AND line_account_id = ?`,
+        idColumn: 'nen_delivery_jobs.id',
+        params: 1,
+      },
+    ],
+  },
+  restaurant_test: {
+    scope: 'none',
+    reason: '検証用のため、本番の稼働対象としない',
+  },
+};
+
+async function collectFeatureImpact(
+  db: D1Database,
+  accountId: string,
+  feature: ToggleableFeature,
+): Promise<FeatureImpactItemWithIds[]> {
+  const entry = FEATURE_IMPACT_COVERAGE[feature];
+  if (!entry) {
+    throw new Error(`影響の数え先が未定義です: ${String(feature)}`);
+  }
+  if (entry.scope === 'none') return [];
+  const items: FeatureImpactItemWithIds[] = [];
+  for (const source of entry.sources) {
+    const params = source.params === 2 ? [accountId, accountId] : [accountId];
+    /*
+     * 対象IDは上限なしの1回の読取で全件そろえ、件数もその全IDから数える(#643)。
+     *
+     * COUNT(*) とID読取を別々に投げると、間に1件増えただけで
+     * 「件数はN、照合はN+1件分」という食い違いが起きる。結合を含む
+     * 数え先ではCOUNT(*)が重複を数えることもある。数える対象と
+     * 照合する対象は必ず同じ全IDにする。
+     */
+    const rows = await db
+      .prepare(
+        `SELECT ${source.idColumn} AS id ${source.fromWhere} ORDER BY ${source.idColumn}`,
+      )
+      .bind(...params)
+      .all<{ id: string }>();
+    const fingerprintIds = [...new Set(rows.results.map((row) => String(row.id)))].sort();
+    if (fingerprintIds.length === 0) continue;
+    items.push({
+      kind: source.kind,
+      targetType: source.targetType,
+      count: fingerprintIds.length,
+      ids: fingerprintIds.slice(0, IMPACT_IDS_LIMIT),
+      truncated: fingerprintIds.length > IMPACT_IDS_LIMIT,
+      fingerprintIds,
+    });
+  }
+  return items;
+}
+
+/** 保存案の実効値。無効環境の飲食店テストは保存時と同じく無効に倒す。 */
+function effectiveFeatures(
+  current: Record<string, boolean>,
+  incoming: Record<string, unknown> | undefined,
+  restaurantEnabled: boolean,
+): Record<string, boolean> {
+  const next = { ...current };
+  for (const [key, value] of Object.entries(incoming ?? {})) {
+    next[key] = key === 'restaurant_test' && !restaurantEnabled ? false : (value as boolean);
+  }
+  return next;
+}
+
+/** 有効→無効に変わる機能だけが影響確認の対象。 */
+function offTransitions(
+  current: Record<string, boolean>,
+  next: Record<string, boolean>,
+): ToggleableFeature[] {
+  return (Object.keys(next) as ToggleableFeature[]).filter(
+    (key) => isToggleable(key) && current[key] === true && next[key] === false,
+  );
+}
+
+async function impactFingerprint(input: unknown): Promise<string> {
+  const bytes = new TextEncoder().encode(JSON.stringify(input));
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+async function readOffConfirmation(db: D1Database, accountId: string): Promise<OffConfirmation | null> {
+  const raw = await getAccountSetting(db, accountId, OFF_CONFIRM_KEY);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as Partial<OffConfirmation>;
+    if (typeof parsed.token !== 'string' || typeof parsed.impactHash !== 'string'
+      || typeof parsed.version !== 'number' || typeof parsed.expiresAt !== 'number') {
+      return null;
+    }
+    if (parsed.expiresAt <= Date.now()) {
+      await db.prepare('DELETE FROM account_settings WHERE line_account_id = ? AND key = ?')
+        .bind(accountId, OFF_CONFIRM_KEY).run();
+      return null;
+    }
+    return parsed as OffConfirmation;
+  } catch {
+    return null;
+  }
+}
+
+async function deleteOffConfirmation(db: D1Database, accountId: string): Promise<void> {
+  await db.prepare('DELETE FROM account_settings WHERE line_account_id = ? AND key = ?')
+    .bind(accountId, OFF_CONFIRM_KEY).run();
+}
+
+/**
+ * 応答用の影響表示。fingerprintIds は照合専用のため落とす。
+ * 全IDを応答に載せると件数が多いときに巨大になる。
+ */
+function toPublicImpacts(impacts: FeatureImpact[]): PublicImpact[] {
+  return impacts.map((impact) => ({
+    feature: impact.feature,
+    blocking: impact.blocking,
+    items: impact.items.map((item) => ({
+      kind: item.kind,
+      targetType: item.targetType,
+      count: item.count,
+      ids: item.ids,
+      truncated: item.truncated,
+    })),
+  }));
+}
+
+type FeatureImpactItemPublic = Omit<FeatureImpactItemWithIds, 'fingerprintIds'>;
+
+type PublicImpact = {
+  feature: ToggleableFeature;
+  blocking: boolean;
+  items: FeatureImpactItemPublic[];
+};
+
+/** 変更案の影響を数える。保存はしない。 */
+async function buildImpacts(
+  db: D1Database,
+  accountId: string,
+  offs: ToggleableFeature[],
+): Promise<FeatureImpact[]> {
+  const impacts: FeatureImpact[] = [];
+  for (const feature of offs) {
+    const items = await collectFeatureImpact(db, accountId, feature);
+    impacts.push({ feature, items, blocking: items.length > 0 });
+  }
+  return impacts;
+}
+
+/**
  * アカウントを決める。
  *
  * 機能のオン／オフはアカウントごとに持つ。店舗ごとに使う機能が違うため。
@@ -146,59 +781,237 @@ function getAccountId(c: Context<Env>): string | null {
   return c.req.query('account_id') || null;
 }
 
-featureSettings.get('/api/settings/features', async (c) => {
+function cleanStringArray(raw: unknown): string[] | null {
+  if (!Array.isArray(raw)) return null;
+  const values = raw.filter(
+    (value): value is string => typeof value === 'string' && value.length > 0,
+  );
+  if (values.length !== raw.length || new Set(values).size !== values.length) return null;
+  return values;
+}
+
+function cleanItemOrder(raw: unknown): Record<string, string[]> | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const cleaned: Record<string, string[]> = {};
+  for (const [sectionId, ids] of Object.entries(raw as Record<string, unknown>)) {
+    if (!sectionId) return null;
+    const values = cleanStringArray(ids);
+    if (!values) return null;
+    cleaned[sectionId] = values;
+  }
+  return cleaned;
+}
+
+/**
+ * 区分の並び（sidebarOrder）の保存値検査。
+ *
+ * 読み出し側は部分・未知を許容して残すが、書き込みはカタログの
+ * 区分見出しをちょうど1回ずつ並べた完全な順序だけを受け付ける。
+ * 未知の区分や過不足を通すと、読み出し側の「知らない値は捨てる」
+ * 処理で並びが黙って欠ける（N-441）。
+ */
+function cleanSidebarOrderStrict(raw: unknown): string[] | null {
+  const values = cleanStringArray(raw);
+  if (!values) return null;
+  if (values.length !== MENU_SECTION_LABELS.length) return null;
+  const known = new Set(MENU_SECTION_LABELS);
+  return values.every((label) => known.has(label)) ? values : null;
+}
+
+/**
+ * 区分ごとの項目の並び（sidebarItemOrder）の保存値検査。
+ *
+ * 画面が組み立てる完全な順序と同じ約束をサーバーでも検査する:
+ * 知らない区分・知らない項目・別区分の項目・重複・欠落・余分は
+ * 全部400。専用機能の区分は、そのアカウントの専用カタログへ
+ * 実際に載っている項目だけが正解になる（画面側の絞り込みと同じ）。
+ */
+function cleanItemOrderStrict(
+  raw: unknown,
+  specializedFeatureKeys: ReadonlySet<string>,
+): Record<string, string[]> | null {
+  const cleaned = cleanItemOrder(raw);
+  if (!cleaned) return null;
+  const expected = expectedMenuItemOrder(specializedFeatureKeys);
+  for (const sectionId of Object.keys(cleaned)) {
+    if (!isMenuSectionId(sectionId)) return null;
+  }
+  for (const [sectionId, ids] of Object.entries(cleaned)) {
+    const wanted = expected[sectionId] ?? [];
+    if (ids.length !== wanted.length) return null;
+    const submitted = new Set(ids);
+    if (!wanted.every((id) => submitted.has(id))) return null;
+  }
+  for (const sectionId of Object.keys(expected)) {
+    if (!Object.prototype.hasOwnProperty.call(cleaned, sectionId)) return null;
+  }
+  return cleaned;
+}
+
+async function loadLegacyFeatureSettings(
+  db: D1Database,
+  accountId: string,
+  restaurantEnabled: boolean,
+): Promise<FeatureSettingsData> {
+  // 一括設定が無い旧保存だけの読み分け。キーごとの往復(30本超)を1往復に束ねる(#633)。
+  const stored = await getAccountSettings(db, accountId, [
+    ...TOGGLEABLE_FEATURES.map((key) => `${SETTING_PREFIX}${key}`),
+    SIDEBAR_ORDER_KEY,
+    SIDEBAR_ITEM_ORDER_KEY,
+  ]);
+  const features: Record<string, boolean> = {};
+  for (const key of TOGGLEABLE_FEATURES) {
+    features[key] = key === 'restaurant_test' && !restaurantEnabled
+      ? false
+      : featureIsEnabled(stored[`${SETTING_PREFIX}${key}`] ?? null, key);
+  }
+
+  const orderRaw = stored[SIDEBAR_ORDER_KEY] ?? null;
+  const itemOrderRaw = stored[SIDEBAR_ITEM_ORDER_KEY] ?? null;
+  let sidebarOrder: string[] | null = null;
+  let sidebarItemOrder: Record<string, string[]> | null = null;
+  try {
+    sidebarOrder = orderRaw ? cleanStringArray(JSON.parse(orderRaw)) : null;
+  } catch {
+    sidebarOrder = null;
+  }
+  try {
+    sidebarItemOrder = itemOrderRaw ? cleanItemOrder(JSON.parse(itemOrderRaw)) : null;
+  } catch {
+    sidebarItemOrder = null;
+  }
+  return { features, sidebarOrder, sidebarItemOrder };
+}
+
+async function loadFeatureSettings(
+  db: D1Database,
+  accountId: string,
+  restaurantEnabled: boolean,
+): Promise<FeatureSettingsState> {
+  const saved = await getVersionedAccountSetting<FeatureSettingsData>(
+    db,
+    accountId,
+    FEATURE_SETTINGS_BUNDLE_KEY,
+  );
+  if (!saved) {
+    return {
+      ...(await loadLegacyFeatureSettings(db, accountId, restaurantEnabled)),
+      version: 0,
+    };
+  }
+
+  const features: Record<string, boolean> = {};
+  for (const key of TOGGLEABLE_FEATURES) {
+    const value = saved.data.features?.[key];
+    features[key] = key === 'restaurant_test' && !restaurantEnabled
+      ? false
+      : typeof value === 'boolean' ? value : featureIsEnabled(null, key);
+  }
+  return {
+    version: saved.version,
+    features,
+    sidebarOrder: cleanStringArray(saved.data.sidebarOrder) ?? null,
+    sidebarItemOrder: cleanItemOrder(saved.data.sidebarItemOrder) ?? null,
+  };
+}
+
+async function loadFeatureVisibility(
+  db: D1Database,
+  accountId: string,
+  restaurantEnabled: boolean,
+): Promise<FeatureVisibilityData> {
+  // 専用カタログは設定束と独立して読めるため先に並列で投げる(#633)。
+  const [state, specializedRaw] = await Promise.all([
+    loadFeatureSettings(db, accountId, restaurantEnabled),
+    getAccountSetting(db, accountId, SPECIALIZED_CATALOG_KEY),
+  ]);
+  const featureStates = await accountFeatureAvailabilityMap(db, accountId, state.features);
+  const specialized = new Set(specializedCatalog(specializedRaw));
+  return {
+    features: Object.fromEntries(TOGGLEABLE_FEATURES.map((featureId) => [
+      featureId,
+      featureStates[featureId].effectiveEnabled
+        && (!NEN_SPECIALIZED_FEATURES.includes(featureId) || specialized.has(featureId)),
+    ])) as Record<FeatureId, boolean>,
+  };
+}
+
+/**
+ * 一般staffの画面の殻専用。表示可否のboolean以外は返さず、管理GETと分離する。
+ * account境界は応答を作る前に検査し、空scope・別accountを同じ403へ倒す。
+ */
+featureSettings.get('/api/settings/features/visibility', async (c) => {
   try {
     const accountId = getAccountId(c);
-    if (!accountId) return c.json({ success: false, error: 'account_id が必要です' }, 400);
-
-    const features: Record<string, boolean> = {};
-    for (const key of TOGGLEABLE_FEATURES) {
-      const raw = await getAccountSetting(c.env.DB, accountId, `${SETTING_PREFIX}${key}`);
-      features[key] = key === 'restaurant_test' && !restaurantTestEnabled(c.env)
-        ? false
-        : featureIsEnabled(raw, key);
+    if (!accountId) {
+      return c.json({
+        success: false,
+        error: 'account_id が必要です',
+        code: 'FEATURE_SETTINGS_ACCOUNT_REQUIRED',
+      }, 400);
     }
-
-    const orderRaw = await getAccountSetting(c.env.DB, accountId, SIDEBAR_ORDER_KEY);
-    let sidebarOrder: string[] | null = null;
-    if (orderRaw) {
-      try {
-        const parsed = JSON.parse(orderRaw) as unknown;
-        if (Array.isArray(parsed)) sidebarOrder = parsed.map(String);
-      } catch {
-        sidebarOrder = null;
-      }
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      return c.json({
+        success: false,
+        error: 'このLINEアカウントの機能表示を確認する権限がありません',
+        code: 'FEATURE_SETTINGS_SCOPE_FORBIDDEN',
+      }, 403);
     }
+    return c.json({
+      success: true,
+      data: await loadFeatureVisibility(
+        c.env.DB,
+        accountId,
+        restaurantTestEnabled(c.env),
+      ),
+    });
+  } catch (err) {
+    console.error('GET /api/settings/features/visibility error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
 
-    const itemOrderRaw = await getAccountSetting(c.env.DB, accountId, SIDEBAR_ITEM_ORDER_KEY);
-    let sidebarItemOrder: Record<string, string[]> | null = null;
-    if (itemOrderRaw) {
-      try {
-        const parsed = JSON.parse(itemOrderRaw) as unknown;
-        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-          const cleaned: Record<string, string[]> = {};
-          for (const [sectionId, ids] of Object.entries(parsed as Record<string, unknown>)) {
-            if (Array.isArray(ids)) cleaned[sectionId] = ids.map(String);
-          }
-          sidebarItemOrder = cleaned;
-        }
-      } catch {
-        // 壊れていたら既定の並びで出す。読めない値で画面を落とさない。
-        sidebarItemOrder = null;
-      }
+featureSettings.get('/api/settings/features', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const accountId = getAccountId(c);
+    if (!accountId) {
+      return c.json({
+        success: false,
+        error: 'account_id が必要です',
+        code: 'FEATURE_SETTINGS_ACCOUNT_REQUIRED',
+      }, 400);
     }
-
-    const [parentChildRaw, specializedRaw] = await Promise.all([
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      return c.json({
+        success: false,
+        error: 'このLINEアカウントの機能設定を表示する権限がありません',
+        code: 'FEATURE_SETTINGS_SCOPE_FORBIDDEN',
+      }, 403);
+    }
+    // 親子モード・専用カタログは設定束と独立して読めるため並列で投げる(#633)。
+    const [state, parentChildRaw, specializedRaw] = await Promise.all([
+      loadFeatureSettings(
+        c.env.DB,
+        accountId,
+        restaurantTestEnabled(c.env),
+      ),
       getAccountSetting(c.env.DB, accountId, PARENT_CHILD_MODE_KEY),
       getAccountSetting(c.env.DB, accountId, SPECIALIZED_CATALOG_KEY),
     ]);
+    const featureStates = await accountFeatureAvailabilityMap(
+      c.env.DB,
+      accountId,
+      state.features,
+    );
 
     return c.json({
       success: true,
       data: {
-        features,
-        sidebarOrder,
-        sidebarItemOrder,
+        features: state.features,
+        featureStates,
+        sidebarOrder: state.sidebarOrder,
+        sidebarItemOrder: state.sidebarItemOrder,
+        version: state.version,
         parentChildMode: settingIsEnabled(parentChildRaw),
         specializedFeatureKeys: specializedCatalog(specializedRaw),
       },
@@ -209,21 +1022,128 @@ featureSettings.get('/api/settings/features', async (c) => {
   }
 });
 
+/**
+ * 変更案の影響確認。保存はしない。
+ *
+ * 有効→無効に変わる機能ごとに公開中・予約中・依存機能の件数と対象種別を
+ * 返す。止まる仕事があるときだけ確認トークンを発行し、保存時に求める。
+ * 影響がなければトークンは要らない(通常保存)。
+ */
+featureSettings.post('/api/settings/features/impact', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const accountId = getAccountId(c);
+    if (!accountId) return c.json({ success: false, error: 'account_id が必要です' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      return c.json({ success: false, error: 'Forbidden' }, 403);
+    }
+
+    const body = await c.req.json<{
+      features?: Record<string, unknown>;
+      expectedVersion?: unknown;
+    }>();
+
+    if (body.features !== undefined && (typeof body.features !== 'object' || body.features === null || Array.isArray(body.features))) {
+      return c.json({ success: false, error: 'features はオブジェクトで指定してください' }, 400);
+    }
+    const unknownKeys = Object.keys(body.features ?? {}).filter((k) => !isToggleable(k));
+    if (unknownKeys.length > 0) {
+      return c.json(
+        { success: false, error: `知らない機能です: ${unknownKeys.join(', ')}` },
+        400,
+      );
+    }
+    const invalidFeature = Object.entries(body.features ?? {})
+      .find(([, value]) => typeof value !== 'boolean');
+    if (invalidFeature) {
+      return c.json({
+        success: false,
+        error: `${invalidFeature[0]} はtrueまたはfalseで指定してください`,
+      }, 400);
+    }
+    if (body.expectedVersion !== undefined
+      && (!Number.isInteger(body.expectedVersion) || Number(body.expectedVersion) < 0)) {
+      return c.json({
+        success: false,
+        error: 'expectedVersion は0以上の整数で指定してください',
+      }, 400);
+    }
+
+    const restaurantEnabled = restaurantTestEnabled(c.env);
+    const current = await loadFeatureSettings(c.env.DB, accountId, restaurantEnabled);
+    if (body.expectedVersion !== undefined && Number(body.expectedVersion) !== current.version) {
+      return c.json({
+        success: false,
+        error: '別の管理者が先に変更しました。最新の設定を読み直してください。',
+        data: { currentVersion: current.version },
+      }, 409);
+    }
+
+    const next = effectiveFeatures(current.features, body.features, restaurantEnabled);
+    const offs = offTransitions(current.features, next);
+    const impacts = await buildImpacts(c.env.DB, accountId, offs);
+    const requiresConfirmation = impacts.some((impact) => impact.blocking);
+
+    let impactToken: string | null = null;
+    if (requiresConfirmation) {
+      impactToken = crypto.randomUUID();
+      const impactHash = await impactFingerprint({
+        accountId,
+        version: current.version,
+        features: next,
+        impacts,
+      });
+      await setAccountSetting(
+        c.env.DB,
+        accountId,
+        OFF_CONFIRM_KEY,
+        JSON.stringify({
+          token: impactToken,
+          impactHash,
+          version: current.version,
+          expiresAt: Date.now() + OFF_CONFIRM_TTL_MS,
+        } satisfies OffConfirmation),
+      );
+    } else if (offs.length > 0) {
+      await deleteOffConfirmation(c.env.DB, accountId);
+    }
+
+    return c.json({
+      success: true,
+      data: {
+        version: current.version,
+        impacts: toPublicImpacts(impacts),
+        requiresConfirmation,
+        impactToken,
+      },
+    });
+  } catch (err) {
+    console.error('POST /api/settings/features/impact error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
 featureSettings.put('/api/settings/features', requireRole('owner', 'admin'), async (c) => {
   try {
     const accountId = getAccountId(c);
     if (!accountId) return c.json({ success: false, error: 'account_id が必要です' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      return c.json({ success: false, error: 'Forbidden' }, 403);
+    }
 
     const body = await c.req.json<{
       features?: Record<string, unknown>;
       sidebarOrder?: unknown;
       sidebarItemOrder?: unknown;
       catalog?: unknown;
+      expectedVersion?: unknown;
+      impactToken?: unknown;
+      reason?: unknown;
     }>();
 
+    let catalog: ToggleableFeature[] | undefined;
     if (body.catalog !== undefined) {
       const staff = c.get('staff');
-      // TODO(OPS-b): 運営フラグが追加されたら、既定統括による暫定判定を見直す。
+      // #558: 運営ロール未導入の現行契約では、既定統括の owner だけが変更できる。
       if (staff?.role !== 'owner' || staff.readOnly
         || (staff.tenantId ?? DEFAULT_TENANT_ID) !== DEFAULT_TENANT_ID) {
         return c.json({ success: false, error: 'この操作には運営権限が必要です' }, 403);
@@ -235,15 +1155,9 @@ featureSettings.put('/api/settings/features', requireRole('owner', 'admin'), asy
         || !NEN_SPECIALIZED_FEATURES.includes(key as ToggleableFeature))) {
         return c.json({ success: false, error: 'catalog に知らない専用機能が含まれています' }, 400);
       }
-      const catalog = body.catalog.filter(
+      catalog = body.catalog.filter(
         (key): key is ToggleableFeature => typeof key === 'string'
           && NEN_SPECIALIZED_FEATURES.includes(key as ToggleableFeature),
-      );
-      await setAccountSetting(
-        c.env.DB,
-        accountId,
-        SPECIALIZED_CATALOG_KEY,
-        JSON.stringify(catalog),
       );
     }
 
@@ -254,52 +1168,379 @@ featureSettings.put('/api/settings/features', requireRole('owner', 'admin'), asy
         400,
       );
     }
-
-    for (const [key, value] of Object.entries(body.features ?? {})) {
-      const enabled = key === 'restaurant_test' && !restaurantTestEnabled(c.env)
-        ? false
-        : value !== false;
-      await setAccountSetting(
-        c.env.DB,
-        accountId,
-        `${SETTING_PREFIX}${key}`,
-        JSON.stringify({ enabled }),
-      );
+    const invalidFeature = Object.entries(body.features ?? {})
+      .find(([, value]) => typeof value !== 'boolean');
+    if (invalidFeature) {
+      return c.json({
+        success: false,
+        error: `${invalidFeature[0]} はtrueまたはfalseで指定してください`,
+      }, 400);
     }
 
+    let sidebarOrder: string[] | null | undefined;
     if (body.sidebarOrder !== undefined) {
-      if (!Array.isArray(body.sidebarOrder)) {
-        return c.json({ success: false, error: 'sidebarOrder は配列で指定してください' }, 400);
+      sidebarOrder = cleanSidebarOrderStrict(body.sidebarOrder);
+      if (!sidebarOrder) {
+        return c.json({
+          success: false,
+          error: 'sidebarOrder はすべての区分を過不足なく並べた配列で指定してください',
+        }, 400);
       }
-      await setAccountSetting(
-        c.env.DB,
-        accountId,
-        SIDEBAR_ORDER_KEY,
-        JSON.stringify(body.sidebarOrder.map(String)),
-      );
     }
 
+    let sidebarItemOrder: Record<string, string[]> | null | undefined;
     if (body.sidebarItemOrder !== undefined) {
-      const raw = body.sidebarItemOrder;
-      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-        return c.json({ success: false, error: 'sidebarItemOrder はオブジェクトで指定してください' }, 400);
+      /*
+       * 正解の顔ぶれはアカウントごとの専用カタログで変わる。
+       * 同じ要求でカタログも変わるなら保存後の姿（新しいカタログ）を
+       * 正解にする。画面が現在の表示から組み立てた完全な並びと
+       * 一致するものだけを受け付ける（N-441）。
+       */
+      const specializedKeys = catalog !== undefined
+        ? new Set<string>(catalog)
+        : new Set(specializedCatalog(
+            await getAccountSetting(c.env.DB, accountId, SPECIALIZED_CATALOG_KEY),
+          ));
+      sidebarItemOrder = cleanItemOrderStrict(body.sidebarItemOrder, specializedKeys);
+      if (!sidebarItemOrder) {
+        return c.json({
+          success: false,
+          error: 'sidebarItemOrder は各区分の項目を過不足なく並べたオブジェクトで指定してください',
+        }, 400);
       }
-      const cleaned: Record<string, string[]> = {};
-      for (const [sectionId, ids] of Object.entries(raw as Record<string, unknown>)) {
-        if (!Array.isArray(ids)) {
-          return c.json({ success: false, error: `sidebarItemOrder.${sectionId} は配列で指定してください` }, 400);
-        }
-        cleaned[sectionId] = ids.map(String);
-      }
-      await setAccountSetting(
-        c.env.DB,
-        accountId,
-        SIDEBAR_ITEM_ORDER_KEY,
-        JSON.stringify(cleaned),
-      );
     }
 
-    return c.json({ success: true, data: null });
+    const hasBundleUpdate = body.features !== undefined
+      || body.sidebarOrder !== undefined
+      || body.sidebarItemOrder !== undefined;
+
+    /*
+     * 変更理由の必須化（N-444）。あとから「なぜ変えたか」を追えるよう、
+     * 保存する要求は全部、空白ではない理由を持つこと。
+     */
+    const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
+    if ((hasBundleUpdate || catalog !== undefined) && reason.length === 0) {
+      return c.json({
+        success: false,
+        error: '変更理由を入力してください',
+        code: 'FEATURE_SETTINGS_REASON_REQUIRED',
+      }, 400);
+    }
+    /*
+     * 機能・順序の保存は版なしでは受け付けない(#643)。版なし逐次保存は
+     * 途中失敗で部分反映になり、版付きGETとの不整合を起こすため。
+     *
+     * ただし断るだけでは呼び出し側が次に何を送ればよいか分からない。
+     * 機械可読な code と、そのまま送り返せる現在の版を必ず添えて、
+     * 1往復で正しい保存へ進めるようにする。
+     */
+    if (hasBundleUpdate && body.expectedVersion === undefined) {
+      const current = await loadFeatureSettings(
+        c.env.DB,
+        accountId,
+        restaurantTestEnabled(c.env),
+      );
+      return c.json({
+        success: false,
+        error: 'expectedVersion が必要です。最新の設定を読み直してください。',
+        code: 'EXPECTED_VERSION_REQUIRED',
+        data: { currentVersion: current.version },
+      }, 400);
+    }
+    if (body.expectedVersion !== undefined
+      && (!Number.isInteger(body.expectedVersion) || Number(body.expectedVersion) < 0)) {
+      return c.json({
+        success: false,
+        error: 'expectedVersion は0以上の整数で指定してください',
+      }, 400);
+    }
+    if (body.impactToken !== undefined && typeof body.impactToken !== 'string') {
+      return c.json({
+        success: false,
+        error: 'impactToken は文字列で指定してください',
+      }, 400);
+    }
+
+    /**
+     * オフ前の影響確認(#643)。有効→無効に変わる機能に止まる仕事が
+     * あるのに、有効な確認トークンが無ければ保存しない。直接PUTでの
+     * 迂回もここで止める。影響が無ければ通常保存する。
+     */
+    const restaurantEnabledForImpact = restaurantTestEnabled(c.env);
+    let presentedToken: string | null = null;
+    /** 監査へ残す影響確認の結果。確認が要らない変更は要らなかったと記録する。 */
+    let impactAudit: { offCount: number; blocking: boolean; confirmed: boolean } | null = null;
+    if (body.features !== undefined) {
+      const impactCurrent = await loadFeatureSettings(
+        c.env.DB,
+        accountId,
+        restaurantEnabledForImpact,
+      );
+      const impactNext = effectiveFeatures(
+        impactCurrent.features,
+        body.features,
+        restaurantEnabledForImpact,
+      );
+      const impactOffs = offTransitions(impactCurrent.features, impactNext);
+      if (impactOffs.length > 0) {
+        const impacts = await buildImpacts(c.env.DB, accountId, impactOffs);
+        const blocking = impacts.some((impact) => impact.blocking);
+        impactAudit = { offCount: impactOffs.length, blocking, confirmed: false };
+        if (blocking) {
+          const fingerprint = await impactFingerprint({
+            accountId,
+            version: impactCurrent.version,
+            features: impactNext,
+            impacts,
+          });
+          const saved = await readOffConfirmation(c.env.DB, accountId);
+          if (typeof body.impactToken !== 'string'
+            || !saved
+            || saved.token !== body.impactToken
+            || saved.impactHash !== fingerprint
+            || saved.version !== impactCurrent.version) {
+            return c.json({
+              success: false,
+              error: 'オフにしようとしている機能に、公開中・予約中・依存中のものがあります。内容を確認してから保存してください。',
+              code: 'IMPACT_CONFIRMATION_REQUIRED',
+              data: { impacts: toPublicImpacts(impacts), currentVersion: impactCurrent.version },
+            }, 409);
+          }
+          presentedToken = body.impactToken;
+          impactAudit = { offCount: impactOffs.length, blocking: true, confirmed: true };
+        }
+      }
+    }
+
+    let savedVersion: number | null = null;
+    let auditSaved = false;
+
+    /**
+     * 一括保存(#643)。一括設定・専用カタログ・確認トークン消費を
+     * 単一batch(本番D1では1トランザクション)で書き、途中失敗の
+     * 部分反映を起こさない。失敗時は例外か409で、版も実効値も
+     * 変わらない。
+     */
+    if (hasBundleUpdate) {
+      const current = await loadFeatureSettings(
+        c.env.DB,
+        accountId,
+        restaurantTestEnabled(c.env),
+      );
+      if (Number(body.expectedVersion) !== current.version) {
+        return c.json({
+          success: false,
+          error: '別の管理者が先に変更しました。最新の設定を読み直してください。',
+          data: { currentVersion: current.version },
+        }, 409);
+      }
+      const incomingFeatures = { ...(body.features ?? {}) } as Record<string, boolean>;
+      if (!restaurantTestEnabled(c.env) && 'restaurant_test' in incomingFeatures) {
+        incomingFeatures.restaurant_test = false;
+      }
+      const nextVersion = current.version + 1;
+      const bundleValue = JSON.stringify({
+        version: nextVersion,
+        data: {
+          features: { ...current.features, ...incomingFeatures },
+          sidebarOrder: sidebarOrder === undefined ? current.sidebarOrder : sidebarOrder,
+          sidebarItemOrder: sidebarItemOrder === undefined
+            ? current.sidebarItemOrder
+            : sidebarItemOrder,
+        },
+      });
+      const now = new Date(Date.now() + 9 * 60 * 60_000)
+        .toISOString()
+        .replace('Z', '+09:00');
+      const bundleExists = await getVersionedAccountSetting(
+        c.env.DB,
+        accountId,
+        FEATURE_SETTINGS_BUNDLE_KEY,
+      ) !== null;
+      /*
+       * 同時保存の敗者は1行も書かない(#643)。
+       *
+       * 一括設定のCASだけを条件にすると、負けた側でも専用カタログの
+       * 上書きと確認トークンの削除だけが残り、409を返しながら別の
+       * 変更が効いてしまう。そこで同じ版の判定式を全statementに付け、
+       * 版が動いていれば「どれも0行」にする。判定式は一括設定の行しか
+       * 見ないので、最後に置いた一括設定の更新までは同じ結果になる。
+       */
+      const versionGuard = bundleExists
+        ? `EXISTS (SELECT 1 FROM account_settings guard
+             WHERE guard.line_account_id = ? AND guard.key = ?
+               AND json_valid(guard.value)
+               AND CAST(json_extract(guard.value, '$.version') AS INTEGER) = ?)`
+        : `NOT EXISTS (SELECT 1 FROM account_settings guard
+             WHERE guard.line_account_id = ? AND guard.key = ?)`;
+      const guardParams = bundleExists
+        ? [accountId, FEATURE_SETTINGS_BUNDLE_KEY, current.version]
+        : [accountId, FEATURE_SETTINGS_BUNDLE_KEY];
+      const statements: D1PreparedStatement[] = [];
+      if (catalog !== undefined) {
+        statements.push(c.env.DB.prepare(
+          `INSERT INTO account_settings (id, line_account_id, key, value, created_at, updated_at)
+           SELECT ?, ?, ?, ?, ?, ? WHERE ${versionGuard}
+           ON CONFLICT (line_account_id, key)
+             DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+        ).bind(
+          crypto.randomUUID(),
+          accountId,
+          SPECIALIZED_CATALOG_KEY,
+          JSON.stringify(catalog),
+          now,
+          now,
+          ...guardParams,
+        ));
+      }
+      if (presentedToken !== null) {
+        statements.push(c.env.DB.prepare(
+          `DELETE FROM account_settings
+            WHERE line_account_id = ? AND key = ? AND ${versionGuard}`,
+        ).bind(accountId, OFF_CONFIRM_KEY, ...guardParams));
+      }
+      /*
+       * 保存の監査（N-444）も同じbatch・同じ判定式で書く。
+       * CASに負けたときは監査行も0行になり、「保存されていない成功」や
+       * 「前後versionが混ざった監査」は残らない。
+       */
+      const staff = c.get('staff');
+      const auditData = {
+        features: { ...current.features, ...incomingFeatures },
+        sidebarOrder: sidebarOrder === undefined ? current.sidebarOrder : sidebarOrder,
+        sidebarItemOrder: sidebarItemOrder === undefined
+          ? current.sidebarItemOrder
+          : sidebarItemOrder,
+      };
+      statements.push(auditEventStatement(
+        c.env.DB,
+        {
+          sourceKind: 'feature_settings',
+          tenantId: staff?.tenantId,
+          lineAccountId: accountId,
+          category: 'business',
+          actorPrincipalId: staff?.id,
+          actorRole: staff?.role,
+          action: 'feature_settings.save',
+          targetKind: 'feature_settings',
+          targetId: accountId,
+          result: 'success',
+          before: { ...current },
+          after: {
+            version: nextVersion,
+            ...auditData,
+            catalog: catalog ?? null,
+            impact: impactAudit,
+          },
+          reason,
+          requestTraceId: c.req.header('cf-ray') ?? c.req.header('x-request-id') ?? null,
+          ipPrefix: maskAuditIp(c.req.header('cf-connecting-ip')),
+          deviceFamily: auditDeviceFamily(c.req.header('user-agent')),
+        },
+        { sql: versionGuard, params: guardParams },
+      ));
+      // 一括設定の更新は最後に置く。先に置くと後続の判定式が
+      // 「新しい版」を見てしまい、同じ前提で揃わなくなる。
+      const casIndex = statements.length;
+      statements.push(bundleExists
+        ? c.env.DB.prepare(
+          `UPDATE account_settings
+              SET value = ?, updated_at = ?
+            WHERE line_account_id = ? AND key = ?
+              AND json_valid(value)
+              AND CAST(json_extract(value, '$.version') AS INTEGER) = ?`,
+        ).bind(bundleValue, now, accountId, FEATURE_SETTINGS_BUNDLE_KEY, current.version)
+        : c.env.DB.prepare(
+          `INSERT OR IGNORE INTO account_settings
+            (id, line_account_id, key, value, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+        ).bind(
+          crypto.randomUUID(),
+          accountId,
+          FEATURE_SETTINGS_BUNDLE_KEY,
+          bundleValue,
+          now,
+          now,
+        ));
+      const results = await c.env.DB.batch(statements);
+      const changed = (index: number): number =>
+        Number((results[index] as D1Result | undefined)?.meta?.changes ?? 0);
+      if (changed(casIndex) !== 1) {
+        // 判定式を共有しているので、負けたときは他のstatementも0行のはず。
+        // 万一残っていれば契約が壊れているため、監視できるよう記録する。
+        const leaked = results
+          .map((_, index) => index)
+          .filter((index) => index !== casIndex && changed(index) > 0);
+        if (leaked.length > 0) {
+          console.error('PUT /api/settings/features CAS partial write:', JSON.stringify({
+            accountId, expectedVersion: current.version, leaked,
+          }));
+        }
+        const reread = await loadFeatureSettings(
+          c.env.DB,
+          accountId,
+          restaurantTestEnabled(c.env),
+        );
+        return c.json({
+          success: false,
+          error: '別の管理者が先に変更しました。最新の設定を読み直してください。',
+          data: { currentVersion: reread.version },
+        }, 409);
+      }
+      savedVersion = nextVersion;
+      auditSaved = true;
+    } else if (catalog !== undefined) {
+      /*
+       * 専用カタログだけの変更は単独1行の保存で部分反映は起きないが、
+       * 監査も同じbatchに入れて「保存だけ残る」「監査だけ残る」の
+       * どちらも起こさない（N-444）。
+       */
+      const staff = c.get('staff');
+      const now = new Date(Date.now() + 9 * 60 * 60_000)
+        .toISOString()
+        .replace('Z', '+09:00');
+      const catalogValue = JSON.stringify(catalog);
+      const previousRaw = await getAccountSetting(c.env.DB, accountId, SPECIALIZED_CATALOG_KEY);
+      await c.env.DB.batch([
+        c.env.DB.prepare(
+          `INSERT INTO account_settings (id, line_account_id, key, value, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?)
+           ON CONFLICT (line_account_id, key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+        ).bind(crypto.randomUUID(), accountId, SPECIALIZED_CATALOG_KEY, catalogValue, now, now),
+        auditEventStatement(c.env.DB, {
+          sourceKind: 'feature_settings',
+          tenantId: staff?.tenantId,
+          lineAccountId: accountId,
+          category: 'business',
+          actorPrincipalId: staff?.id,
+          actorRole: staff?.role,
+          action: 'feature_settings.save',
+          targetKind: 'feature_settings',
+          targetId: accountId,
+          result: 'success',
+          before: { catalog: previousRaw ? specializedCatalog(previousRaw) : null },
+          after: { catalog },
+          reason,
+          requestTraceId: c.req.header('cf-ray') ?? c.req.header('x-request-id') ?? null,
+          ipPrefix: maskAuditIp(c.req.header('cf-connecting-ip')),
+          deviceFamily: auditDeviceFamily(c.req.header('user-agent')),
+        }),
+      ]);
+      auditSaved = true;
+    }
+
+    if (auditSaved) {
+      // 詳しい監査は保存と同じbatchで書いた。共通middlewareの
+      // 素の記録（api.put…）と二重にしない。
+      c.set('auditRecorded', true);
+    }
+
+    // 確認トークンの使い切り消費は保存と同じbatchに含めた。
+    // batchが失敗したら版も実効値もトークンも変わらない。
+    return c.json({
+      success: true,
+      data: savedVersion === null ? null : { version: savedVersion },
+    });
   } catch (err) {
     console.error('PUT /api/settings/features error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);

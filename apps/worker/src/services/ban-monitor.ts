@@ -10,7 +10,17 @@ import {
   createAccountHealthLog,
   createNotification,
   getLatestRiskLevel,
+  recordPoolSwitchEvent,
+  listAutoSwitchedOutPoolAccounts,
+  togglePoolAccount,
+  recordAuditEvent,
+  type LineAccount,
 } from '@line-crm/db';
+
+/** Webhook が無いまま警告を出すまでの時間（v6-33 §11-1 の既定24時間）。 */
+const WEBHOOK_SILENCE_WARNING_MS = 24 * 60 * 60 * 1000;
+/** 「正常」が続いたらプールへ自動で戻すまでの時間（X の確定値・24時間）。 */
+const POOL_RETURN_NORMAL_MS = 24 * 60 * 60 * 1000;
 
 export async function checkAccountHealth(
   db: D1Database,
@@ -26,11 +36,17 @@ export async function checkAccountHealth(
       console.error(`ヘルスチェックエラー (account ${account.id}):`, err);
     }
   }
+
+  try {
+    await returnRecoveredAccountsToPools(db);
+  } catch (err) {
+    console.error('プールへの自動復帰に失敗しました:', err);
+  }
 }
 
 async function checkSingleAccount(
   db: D1Database,
-  account: { id: string; channel_access_token: string },
+  account: LineAccount,
 ): Promise<void> {
   const jstMs = Date.now() + 9 * 60 * 60_000;
   const now = new Date(jstMs);
@@ -68,14 +84,22 @@ async function checkSingleAccount(
     errorCount = 1;
   }
 
+  // Webhook 受信が想定時間（既定24時間）無いときは warning。
+  // 受信しない運用のアカウントは webhook_silence_exempt で外せる。
+  const silent = !account.webhook_silence_exempt
+    && (account.last_webhook_received_at
+      ? new Date(account.last_webhook_received_at).getTime() < Date.now() - WEBHOOK_SILENCE_WARNING_MS
+      // 受信実績がまだ無いときは、作られてから24時間経ったものだけを対象にする。
+      : account.created_at
+        ? new Date(account.created_at).getTime() < Date.now() - WEBHOOK_SILENCE_WARNING_MS
+        : false);
+
   // リスクレベル判定
   let riskLevel = 'normal';
   if (errorCode === 403) {
     riskLevel = 'danger'; // BAN の可能性
-  } else if (errorCode === 429) {
-    riskLevel = 'warning'; // レート制限
-  } else if (totalSent > 5000) {
-    riskLevel = 'warning'; // 大量送信の警告
+  } else if (errorCode === 429 || silent || totalSent > 5000) {
+    riskLevel = 'warning'; // レート制限・Webhook無受信・大量送信の警告
   }
 
   const previousRiskLevel = await getLatestRiskLevel(db, account.id);
@@ -125,5 +149,118 @@ async function checkSingleAccount(
 
   if (riskLevel === 'danger') {
     console.error(`⚠️ BAN検知: アカウント ${account.id} で403エラー発生。即座に確認が必要。`);
+    /*
+     * 自動切替（v6-33 §11-2、X-2）。トラフィックプールに入っている
+     * アカウントが danger になったら、プールの中だけで止めて、
+     * 友だち追加先を同じ組の予備へ切り替える。
+     * アカウント自体の is_active は触らない（配信・受信の停止は別の決まり）。
+     */
+    await switchOutOfPools(db, account.id);
+  }
+}
+
+/** danger になったアカウントを、入っているプールから外す。 */
+async function switchOutOfPools(db: D1Database, lineAccountId: string): Promise<void> {
+  const pools = await db
+    .prepare(
+      `SELECT pa.id AS pool_account_id, pa.pool_id
+         FROM pool_accounts pa
+         JOIN traffic_pools tp ON tp.id = pa.pool_id
+        WHERE pa.line_account_id = ? AND pa.is_active = 1`,
+    )
+    .bind(lineAccountId)
+    .all<{ pool_account_id: string; pool_id: string }>();
+
+  for (const row of pools.results) {
+    await togglePoolAccount(db, row.pool_account_id, false);
+    await recordPoolSwitchEvent(db, {
+      poolId: row.pool_id,
+      lineAccountId,
+      direction: 'out',
+      reason: 'health_danger',
+    });
+    await recordAuditEvent(db, {
+      category: 'business',
+      actorRole: 'system',
+      action: 'line_account.pool_switch',
+      targetKind: 'line_account',
+      targetId: lineAccountId,
+      reason: 'health_danger',
+      lineAccountId,
+    });
+    await createNotification(db, {
+      eventType: 'account_pool_switched',
+      title: 'アカウントの割り当てを自動で切り替えました',
+      body: '接続の状態が「危ない」になったため、同じ組の予備へ切り替えました。元のアカウントが24時間「正常」なら自動で戻します。',
+      channel: 'dashboard',
+      lineAccountId,
+      category: 'error',
+      metadata: JSON.stringify({ poolId: row.pool_id, direction: 'out', reason: 'health_danger' }),
+    });
+  }
+}
+
+/**
+ * 自動で外れたアカウントを、24時間「正常」が続いたらプールへ戻す（X-2）。
+ * 「正常が続いた」＝直近24時間に warning/danger の記録が1件も無い。
+ */
+async function returnRecoveredAccountsToPools(db: D1Database): Promise<void> {
+  const switchedOut = await listAutoSwitchedOutPoolAccounts(db);
+  // account_health_logs.created_at は JST(+09:00) 表記。同じ形で比べる。
+  const since =
+    new Date(Date.now() - POOL_RETURN_NORMAL_MS + 9 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, -1) + '+09:00';
+
+  for (const entry of switchedOut) {
+    const abnormal = await db
+      .prepare(
+        `SELECT COUNT(*) AS count FROM account_health_logs
+          WHERE line_account_id = ? AND risk_level != 'normal' AND created_at > ?`,
+      )
+      .bind(entry.line_account_id, since)
+      .first<{ count: number }>();
+    // 24時間ぶんの記録がまだ溜まっていない（外れたばかり）ときは戻さない。
+    if ((abnormal?.count ?? 0) > 0) continue;
+    const normalCount = await db
+      .prepare(
+        `SELECT COUNT(*) AS count FROM account_health_logs
+          WHERE line_account_id = ? AND risk_level = 'normal' AND created_at > ?`,
+      )
+      .bind(entry.line_account_id, since)
+      .first<{ count: number }>();
+    if ((normalCount?.count ?? 0) === 0) continue;
+
+    await db
+      .prepare(
+        `UPDATE pool_accounts SET is_active = 1
+          WHERE pool_id = ? AND line_account_id = ? AND is_active = 0`,
+      )
+      .bind(entry.pool_id, entry.line_account_id)
+      .run();
+    await recordPoolSwitchEvent(db, {
+      poolId: entry.pool_id,
+      lineAccountId: entry.line_account_id,
+      direction: 'in',
+      reason: 'health_recovered_24h',
+    });
+    await recordAuditEvent(db, {
+      category: 'business',
+      actorRole: 'system',
+      action: 'line_account.pool_switch',
+      targetKind: 'line_account',
+      targetId: entry.line_account_id,
+      reason: 'health_recovered_24h',
+      lineAccountId: entry.line_account_id,
+    });
+    await createNotification(db, {
+      eventType: 'account_pool_switched',
+      title: 'アカウントの割り当てが元に戻りました',
+      body: '24時間「正常」が続いたため、予備から元のアカウントへ戻しました。',
+      channel: 'dashboard',
+      lineAccountId: entry.line_account_id,
+      category: 'update',
+      metadata: JSON.stringify({ poolId: entry.pool_id, direction: 'in', reason: 'health_recovered_24h' }),
+    });
   }
 }

@@ -86,6 +86,12 @@ export interface UsersGroupedOptions {
   q?: string;
   onlyDups?: boolean;
   account?: string;
+  /**
+   * FRIEND-09: UID連携の絞り込みはサーバー側の全件にかける。
+   * 画面側で表示中ページだけを絞ると「1人中 51〜1人」のような
+   * 範囲表示になり、2ページ目以降の対象へ辿れない。
+   */
+  uid?: 'linked' | 'unlinked';
   page?: number;
   pageSize?: number;
   forceRefresh?: boolean;
@@ -229,6 +235,12 @@ function applyFilters(rows: UnifiedUserRow[], opts: UsersGroupedOptions): Unifie
   }
   if (opts.account) {
     filtered = filtered.filter((r) => r.accounts.some((a) => a.accountId === opts.account));
+  }
+  if (opts.uid === 'linked') {
+    filtered = filtered.filter((r) => r.identityKeyKind === 'uid');
+  } else if (opts.uid === 'unlinked') {
+    // 未連携・要確認は「uid以外」。url_token は確認が要る側に含める。
+    filtered = filtered.filter((r) => r.identityKeyKind !== 'uid');
   }
   if (opts.q) {
     const q = opts.q.toLowerCase();

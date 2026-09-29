@@ -6,8 +6,10 @@ export type EventNotificationKind =
   | 'confirmed'
   | 'rejected'
   | 'cancelled_by_admin'
+  | 'waitlist_offer'
   | 'reminder_day_before'
-  | 'reminder_hours_before';
+  | 'reminder_hours_before'
+  | 'schedule_changed';
 
 export interface EventNotificationContext {
   eventName: string;
@@ -15,10 +17,15 @@ export interface EventNotificationContext {
   venueName?: string | null;
   venueUrl?: string | null;
   hoursBefore?: number;
+  /** 変更のお知らせ (schedule_changed) の新旧の要点。人の言葉で1行。 */
+  changeSummary?: string | null;
   // 確定系 (received_confirmed / confirmed) の末尾に追記。空 / null は何もしない。
   confirmationExtra?: string | null;
   // リマインド系 (reminder_day_before / reminder_hours_before) の末尾に追記。
   reminderExtra?: string | null;
+  /** キャンセル待ちの期限付き座席保留。URLが無い場合も期限は必ず案内する。 */
+  offerExpiresAtJst?: string | null;
+  offerUrl?: string | null;
 }
 
 function appendExtra(base: string, extra: string | null | undefined): string {
@@ -52,6 +59,13 @@ export function renderEventNotificationText(
       return `申し訳ございません、今回のイベント予約はお受けできませんでした。${detail}`;
     case 'cancelled_by_admin':
       return `運営側でイベント予約をキャンセルさせていただきました。${detail}\n\n詳細は LINE にてご連絡ください。`;
+    case 'waitlist_offer': {
+      const deadline = ctx.offerExpiresAtJst
+        ? `\n回答期限: ${ctx.offerExpiresAtJst}`
+        : '';
+      const link = ctx.offerUrl ? `\n\n予約する: ${ctx.offerUrl}` : '';
+      return `キャンセル待ちの空きが出ました。${detail}${deadline}${link}\n\n期限までに予約するか選んでください。期限を過ぎると次の方へご案内します。`;
+    }
     case 'reminder_day_before':
       return appendExtra(`【リマインド】明日イベントが開催されます。${detail}`, ctx.reminderExtra);
     case 'reminder_hours_before': {
@@ -60,6 +74,12 @@ export function renderEventNotificationText(
         `【リマインド】まもなくイベント開始です（あと ${hours} 時間）。${detail}`,
         ctx.reminderExtra,
       );
+    }
+    case 'schedule_changed': {
+      const summary = ctx.changeSummary?.trim()
+        ? `\n\n変更内容: ${ctx.changeSummary.trim()}`
+        : '';
+      return `イベントの内容が変更になりました。${detail}${summary}\n\n参加が難しい場合は予約履歴画面から変更・キャンセルをお願いします。`;
     }
   }
 }

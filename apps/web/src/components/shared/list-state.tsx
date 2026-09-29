@@ -1,6 +1,7 @@
 import React from 'react'
 import type { ReactNode } from 'react'
-import { Inbox, Loader, Lock, TriangleAlert } from 'lucide-react'
+import { Inbox, Loader, Lock } from 'lucide-react'
+import TargetMissing from './target-missing'
 import styles from './list-state.module.css'
 
 /**
@@ -21,20 +22,48 @@ import styles from './list-state.module.css'
  * 専用の部品が描かれたら、ここを合わせ直す。
  */
 export type ListStateKind = 'loading' | 'empty' | 'error' | 'forbidden'
+/**
+ * 空の内訳。`createable` はまだ1件も無い（作る口を出す）、`readonly` は
+ * 画面から作れない記録、`filtered` は絞り込みの結果が0件（R38）。
+ * 0件の絞り込みに作る口を出すと、保存済みが消えたと誤読される。
+ */
+export type EmptyListPreset = 'createable' | 'readonly' | 'filtered'
 
-/** 設計 `hqTfD` / `u2ArlH` / `ZAkSe`。24px の線画。 */
-const ICONS: Record<ListStateKind, typeof Inbox> = {
+/**
+ * 設計 `hqTfD` / `u2ArlH`。24px の線画。
+ *
+ * `error` はここに無い。★V7 `x63W5x` の決まりで、失敗の1枚は
+ * TargetMissing の error と同じ中立の見た目（canvas-sunken の丸＋
+ * cloud-off、見出し ink 15px 太字、副ボタン「もう一度読み込む」1つ）に
+ * する。赤い三角・赤い見出しはやめた（利用者の失敗ではないため）。
+ */
+const ICONS: Record<Exclude<ListStateKind, 'error'>, typeof Inbox> = {
   loading: Loader,
   empty: Inbox,
-  error: TriangleAlert,
   forbidden: Lock,
 }
 
-const PRESETS: Record<ListStateKind, { title: string; description: string }> = {
+/**
+ * 状態ごとの言葉。**画面側からも読めるように出す。**
+ *
+ * 一覧の外（帯や表の中）で同じ事故を伝える画面がある。そこで文言を
+ * 書き直すと、**同じ事故が画面によって違う言葉になる**（リマインダは
+ * 「リマインダの読み込みに失敗しました。もう一度お試しください。」で、
+ * ほかは「表示できませんでした」だった）。ここから引く。
+ */
+export const PRESETS: Record<ListStateKind, { title: string; description: string }> = {
   loading: { title: '読み込んでいます', description: 'このまま少しお待ちください。' },
   empty: { title: 'データがありません', description: '条件を変えるか、新しく作成してください。' },
   error: { title: '表示できませんでした', description: '再読み込みしても直らない場合はエラー報告へ。' },
   forbidden: { title: '表示する権限がありません', description: '見るには権限が要ります。オーナーか管理者に追加を依頼してください。' },
+}
+
+export const EMPTY_PRESETS: Record<EmptyListPreset, { title: string; description: string }> = {
+  createable: PRESETS.empty,
+  readonly: { title: '記録はありません', description: '記録が増えると、ここに表示されます。' },
+  // R38: 絞り込みの結果が0件。「まだありません」と言わず、条件を外す口と
+  // 一緒に使う（action に「条件を外す」ボタンを渡す）。
+  filtered: { title: '条件に合うものがありません', description: '条件を変えるか、絞り込みを外してください。' },
 }
 
 export default function ListState({
@@ -42,7 +71,11 @@ export default function ListState({
   title,
   description,
   action,
+  onRetry,
+  retrying = false,
+  emptyPreset = 'createable',
   className,
+  'data-design': dataDesign,
 }: {
   kind: ListStateKind
   /** 設計どおりの文言で足りないとき（「まだタグがありません」など）だけ渡す。 */
@@ -50,30 +83,56 @@ export default function ListState({
   description?: string
   /** 作成導線つきの空状態（設計 `fRgeK`）。押せる操作が画面の他所にあるなら渡さない。 */
   action?: ReactNode
+  /** もう一度読み込む。`error` のときだけ押し口を出す。 */
+  onRetry?: () => void
+  /** 読み直している間。二度押しを止める。 */
+  retrying?: boolean
+  /** 画面から作れない記録一覧では、作成を促さない文言にする。 */
+  emptyPreset?: EmptyListPreset
   className?: string
+  /** 設計の節の印の受け口。共通化で印を落とさないため。 */
+  'data-design'?: string
 }) {
-  const preset = PRESETS[kind]
-  const danger = kind === 'error'
+  const preset = kind === 'empty' ? EMPTY_PRESETS[emptyPreset] : PRESETS[kind]
+
+  // 失敗の1枚は TargetMissing の error と同じ中身を使う（★V7 `x63W5x`）。
+  // 見た目が2か所でずれないように、ここで組み立て直さない。
+  // className は付けない（見た目は TargetMissing が持つ。余白は親で付ける）。
+  if (kind === 'error') {
+    return (
+      <div data-list-state="error" role="alert" data-design={dataDesign}>
+        <TargetMissing
+          kind="error"
+          title={title ?? preset.title}
+          description={description ?? preset.description}
+          onRetry={onRetry}
+          retrying={retrying}
+        />
+        {action}
+      </div>
+    )
+  }
+
   const Icon = ICONS[kind]
 
   // className は先に組む。JSX の中で足すと、直書きを数える仕掛け
   // （`scripts/design-debt.mjs`）から中身が見えなくなる。
   const rootClass = [styles.root, className].filter(Boolean).join(' ')
-  const iconClass = [styles.icon, danger && styles.iconDanger, kind === 'loading' && styles.spin]
+  const iconClass = [styles.icon, kind === 'loading' && styles.spin]
     .filter(Boolean)
     .join(' ')
-  const titleClass = [styles.title, danger && styles.titleDanger].filter(Boolean).join(' ')
 
   return (
     <div
       className={rootClass}
       data-list-state={kind}
-      // 読み込み中は読み上げにも伝える。エラーと権限不足はその場で読ませる。
+      data-design={dataDesign}
+      // 読み込み中は読み上げにも伝える。権限不足はその場で読ませる。
       aria-busy={kind === 'loading' || undefined}
-      role={danger || kind === 'forbidden' ? 'alert' : undefined}
+      role={kind === 'forbidden' ? 'alert' : undefined}
     >
       <Icon aria-hidden="true" size={24} className={iconClass} />
-      <p className={titleClass}>{title ?? preset.title}</p>
+      <p className={styles.title}>{title ?? preset.title}</p>
       <p className={styles.description}>{description ?? preset.description}</p>
       {action ? <div className={styles.action}>{action}</div> : null}
     </div>

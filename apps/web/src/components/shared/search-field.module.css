@@ -1,8 +1,10 @@
+@layer components {
 .search {
   box-sizing: border-box;
   display: flex;
   min-width: 0;
-  height: 42px;
+  /* #976 U083: 42px だった高さを入力欄・ボタンと同じ40pxへそろえる */
+  height: 40px;
   align-items: center;
   gap: 10px;
   padding: 0 14px;
@@ -25,11 +27,14 @@
 .input {
   min-width: 0;
   flex: 1;
+  /* #734: 内側の入力本体も器の高さいっぱいにする（実測21pxでタップ領域不足と誤検出される） */
+  align-self: stretch;
   border: 0;
   background: transparent;
   color: var(--color-ink);
   font-family: inherit;
-  font-size: var(--text-caption);
+  /* #976 U079: 検索欄の文字も入力欄と同じ14px（以前は12pxで最小だった） */
+  font-size: var(--text-body);
 }
 
 .input::placeholder {
@@ -37,9 +42,21 @@
   opacity: 1;
 }
 
-.input:focus-visible,
+/*
+ * 輪郭はフォーカスされる要素自身（中の input）に出す。外枠の `:focus-within`
+ * ring では Tab 点検（`document.activeElement` の枠を見る）が反応せず、
+ * /hq/banners・/ops・/ops/support・/ops/tenants の検索欄が「枠が出ない」と
+ * 判定された（2026-09-25）。外枠と中の二重にならないよう外枠の ring は持たない。
+ * 色・太さ・余白は #804 と同じ（2px・action 色・offset 2px）。
+ */
+.input:focus-visible {
+  outline: 2px solid var(--color-action);
+  outline-offset: 2px;
+}
+
 .clear:focus-visible {
-  outline: revert;
+  outline: 2px solid var(--color-action);
+  outline-offset: 2px;
 }
 
 .input::-webkit-search-cancel-button {
@@ -82,8 +99,20 @@
   }
 }
 
+/* #976 U079/U083: タッチ端末は文字16px・高さ44px（入力欄と同じ規定）。 */
+@media (pointer: coarse) {
+  .search {
+    height: 44px;
+  }
+
+  .input {
+    font-size: var(--text-lead);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .loadingIcon {
     animation: none;
   }
+}
 }

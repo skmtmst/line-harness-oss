@@ -1,4 +1,5 @@
 import type { Tag } from '@line-crm/shared'
+import { tagTextColor } from '@/lib/presentation'
 
 interface TagBadgeProps {
   tag: Tag
@@ -24,7 +25,7 @@ export default function TagBadge({ tag, onRemove }: TagBadgeProps) {
       className="rounded-pill inline-flex items-center gap-1.5 px-2.5 py-0.5 text-xs font-medium"
       // 下地は同じ色の 10%（`1a`）。色の数だけ Tailwind の class を用意できない
       // ので、ここだけ style で書く。
-      style={{ backgroundColor: `${color}1a`, color }}
+      style={{ backgroundColor: `${color}1a`, color: tagTextColor(color) }}
     >
       <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: color }} aria-hidden="true" />
       {tag.name}

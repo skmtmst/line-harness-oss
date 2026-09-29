@@ -1,4 +1,5 @@
 import type { Message } from '@line-crm/line-sdk';
+import { convertBroadcastAsset, isBroadcastAssetKind } from '@line-crm/shared';
 import { autoTrackContent } from './auto-track.js';
 import { buildMessage } from './line-message.js';
 import {
@@ -16,6 +17,10 @@ export const MAX_BROADCAST_MESSAGES = 5;
 
 const SUPPORTED_TYPES = new Set([
   'text', 'image', 'flex', 'location', 'video', 'audio', 'sticker', 'carousel',
+  // 配信用素材（カルーセル・リッチ・クーポン・リサーチ）は、画面の保存と
+  // 同じ変換（`@line-crm/shared`）で LINE の種別に直してから送る。
+  // 画面では通るのに送信で断られる形にしない（監査 R144）。
+  'rich_message', 'card_message', 'coupon', 'research',
 ]);
 
 export interface BroadcastMessagePart {
@@ -63,7 +68,14 @@ function contentForBubble(type: string, value: unknown): string {
   }
   if (type === 'flex') {
     const flexJson = nonEmptyString(content.flexJson, 'flexJson');
-    jsonObject(flexJson, 'flexJson');
+    const parsed = jsonObject(flexJson, 'flexJson');
+    /*
+     * R234: `{}` のような「JSON としては正しいが中身が無い」も送る前（保存・
+     * 配信前検査・送信）に止める。送れるのはバブルかカルーセルだけ。
+     */
+    if (parsed.type !== 'bubble' && parsed.type !== 'carousel') {
+      throw new Error('Flexはバブルかカルーセルの形にしてください');
+    }
     return flexJson;
   }
   if (type === 'carousel') {
@@ -72,6 +84,14 @@ function contentForBubble(type: string, value: unknown): string {
     try { columns = JSON.parse(columnsJson); } catch { /* handled below */ }
     if (!Array.isArray(columns) || columns.length === 0) {
       throw new Error('messageBubbles columnsJson must be a non-empty JSON array');
+    }
+    // R234: `[{}]` のような「配列だが中身が空」も止める。選んだテンプレートの
+    // 中身は必ず 1 枚以上のパネル（キーを持つ object）のはず。
+    const broken = columns.some((column) =>
+      !column || typeof column !== 'object' || Array.isArray(column) || Object.keys(column).length === 0,
+    );
+    if (broken) {
+      throw new Error('カルーセルの中身を確認してください。空のパネルがあります');
     }
     return columnsJson;
   }
@@ -89,6 +109,10 @@ function contentForBubble(type: string, value: unknown): string {
     if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
       throw new Error('messageBubbles location coordinates are required');
     }
+    // 監査 R210: 地図上に無い数字を完成扱いにしない。画面の検査とそろえる。
+    if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+      throw new Error('位置情報の緯度は-90〜90、経度は-180〜180で入力してください');
+    }
     return JSON.stringify({
       title: typeof location.title === 'string' && location.title.trim() ? location.title.trim() : '場所',
       address: typeof location.address === 'string' ? location.address.trim() : '',
@@ -102,17 +126,31 @@ function contentForBubble(type: string, value: unknown): string {
     if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) {
       throw new Error('messageBubbles audio duration is required');
     }
+    /*
+     * R234: LINE は https で公開された音声しか受けない。not-a-url のような値は
+     * 保存できても送信で断られるので、保存・配信前検査の時点で止める。
+     */
+    const audioUrl = nonEmptyString(audio.originalContentUrl, 'audio originalContentUrl');
+    if (!audioUrl.toLowerCase().startsWith('https://')) {
+      throw new Error('音声のURLは https:// から始めてください');
+    }
     return JSON.stringify({
-      originalContentUrl: nonEmptyString(audio.originalContentUrl, 'audio originalContentUrl'),
+      originalContentUrl: audioUrl,
       duration: Math.round(durationSeconds * 1000),
     });
   }
   if (type === 'sticker') {
     const sticker = record(state.sticker);
-    return JSON.stringify({
-      packageId: nonEmptyString(sticker.packageId, 'sticker packageId'),
-      stickerId: nonEmptyString(sticker.stickerId, 'sticker stickerId'),
-    });
+    const packageId = nonEmptyString(sticker.packageId, 'sticker packageId');
+    const stickerId = nonEmptyString(sticker.stickerId, 'sticker stickerId');
+    /*
+     * R234: LINE の番号はどちらも数字だけ。not-a-package のような文字は
+     * 保存できても送信で断られるので、保存・配信前検査の時点で止める。
+     */
+    if (!/^\d+$/.test(packageId) || !/^\d+$/.test(stickerId)) {
+      throw new Error('スタンプの番号が正しくありません。一覧から選び直してください');
+    }
+    return JSON.stringify({ packageId, stickerId });
   }
   throw new Error(`Unsupported broadcast bubble type: ${type}`);
 }
@@ -145,8 +183,29 @@ export function parseBroadcastMessageParts(input: {
     const bubble = item as StoredBubble;
     const type = typeof bubble?.type === 'string' ? bubble.type : '';
     if (!SUPPORTED_TYPES.has(type)) throw new Error(`Unsupported broadcast bubble type: ${type || '(missing)'}`);
+    const id = typeof bubble.id === 'string' && bubble.id ? bubble.id : `bubble-${index + 1}`;
+    /*
+     * 配信用素材は、画面の保存（1吹き出し）と同じ変換で LINE の種別に直す。
+     * 直せない素材は、送信の直前で利用者への直し方とともに止める。
+     * 中身の JSON を本文に落とさない（監査 R144）。
+     */
+    if (isBroadcastAssetKind(type)) {
+      const content = record(bubble.content);
+      const converted = convertBroadcastAsset(
+        type,
+        typeof content.assetName === 'string' ? content.assetName : '',
+        content,
+      );
+      if (!converted.ok) throw new Error(converted.error);
+      return {
+        id,
+        messageType: converted.message.messageType,
+        messageContent: converted.message.messageContent,
+        altText: input.altText ?? converted.message.altText,
+      };
+    }
     return {
-      id: typeof bubble.id === 'string' && bubble.id ? bubble.id : `bubble-${index + 1}`,
+      id,
       messageType: type,
       messageContent: contentForBubble(type, bubble.content),
       altText: input.altText ?? undefined,
@@ -172,10 +231,14 @@ export async function autoTrackMessageParts(
   workerUrl: string | undefined,
   lineAccountId: string | null,
   trackLinks: boolean,
+  broadcastId?: string | null,
 ): Promise<BroadcastMessagePart[]> {
   if (!workerUrl || !trackLinks) return parts;
   return Promise.all(parts.map(async (part) => {
-    const tracked = await autoTrackContent(db, part.messageType, part.messageContent, workerUrl, { lineAccountId });
+    const tracked = await autoTrackContent(db, part.messageType, part.messageContent, workerUrl, {
+      lineAccountId,
+      broadcastId,
+    });
     return { ...part, messageType: tracked.messageType, messageContent: tracked.content };
   }));
 }

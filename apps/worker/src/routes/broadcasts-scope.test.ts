@@ -2,21 +2,30 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 
 const mocks = vi.hoisted(() => ({
+  getBroadcasts: vi.fn(),
   getBroadcastById: vi.fn(),
   createBroadcast: vi.fn(),
   updateBroadcast: vi.fn(),
   deleteBroadcast: vi.fn(),
   scope: vi.fn(),
   lineClient: vi.fn(),
+  processBroadcastSend: vi.fn(),
+  processQueuedBroadcasts: vi.fn(),
+  dispatchOperatorEvent: vi.fn(),
+  dbRun: vi.fn(),
 }));
 
-vi.mock('@line-crm/db', () => ({
-  getBroadcasts: vi.fn(),
+vi.mock('@line-crm/db', async (importOriginal) => ({
+  // 台帳・記録・状態の純粋な部品と集計は本物を使う（#816）。
+  // 境界の判定対象（取得・作成・更新・削除）だけ差し替える。
+  ...(await importOriginal<typeof import('@line-crm/db')>()),
+  getBroadcasts: mocks.getBroadcasts,
   getBroadcastById: mocks.getBroadcastById,
   createBroadcast: mocks.createBroadcast,
   updateBroadcast: mocks.updateBroadcast,
   deleteBroadcast: mocks.deleteBroadcast,
   getLineAccountById: vi.fn(),
+  isOperationCapabilityStopped: vi.fn(async () => false),
 }));
 vi.mock('../services/account-access.js', () => ({
   getVisibleLineAccountScope: mocks.scope,
@@ -32,6 +41,16 @@ vi.mock('../services/account-access.js', () => ({
   },
 }));
 vi.mock('@line-crm/line-sdk', () => ({ LineClient: mocks.lineClient }));
+vi.mock('../services/broadcast.js', () => ({
+  processBroadcastSend: mocks.processBroadcastSend,
+  processQueuedBroadcasts: mocks.processQueuedBroadcasts,
+  buildMessage: vi.fn(),
+  // N-062: 即時送信の直前再確認はこの試験の対象外のため通す。枠の拒否は専用試験で見る。
+  guardScheduledBroadcastQuota: async () => ({ blocked: false }),
+}));
+vi.mock('../services/operator-notification-dispatch.js', () => ({
+  dispatchOperatorEvent: mocks.dispatchOperatorEvent,
+}));
 
 const { broadcasts } = await import('./broadcasts.js');
 
@@ -41,12 +60,23 @@ const ownBroadcast = {
   scheduled_at: null, sent_at: null, total_count: 0, success_count: 0,
   created_at: '2026-08-25T00:00:00+09:00', account_ids: null, dedup_priority: null,
   failed_account_ids: null, track_links: 1, line_account_id: 'own-account',
+  folder_id: 'folder-1', measure_opens: 0,
 };
 
 function app() {
   const instance = new Hono<{ Bindings: { DB: D1Database; LINE_CHANNEL_ACCESS_TOKEN: string; WORKER_URL: string } }>();
   instance.use('*', async (c, next) => {
-    c.env = { DB: {} as D1Database, LINE_CHANNEL_ACCESS_TOKEN: 'default', WORKER_URL: 'https://worker.test' };
+    const db = {
+      prepare: vi.fn(() => ({
+        // 二者承認のゲートも口の一部。人数0・境目既定で承認なしに通す。
+        bind: vi.fn(() => ({
+          run: mocks.dbRun,
+          first: vi.fn(async () => null),
+          all: vi.fn(async () => ({ results: [] })),
+        })),
+      })),
+    } as unknown as D1Database;
+    c.env = { DB: db, LINE_CHANNEL_ACCESS_TOKEN: 'default', WORKER_URL: 'https://worker.test' };
     c.set('staff' as never, { id: 'owner', name: 'Owner', role: 'owner', readOnly: false, tenantId: 'tenant-a' } as never);
     await next();
   });
@@ -70,6 +100,10 @@ beforeEach(() => {
   mocks.scope.mockResolvedValue({
     accounts: [], ids: ['own-account'], allowedAccountIds: ['own-account'], canSeeUnassigned: false,
   });
+  mocks.dbRun.mockResolvedValue({ meta: { changes: 1 } });
+  mocks.processBroadcastSend.mockResolvedValue(undefined);
+  mocks.processQueuedBroadcasts.mockResolvedValue(undefined);
+  mocks.dispatchOperatorEvent.mockResolvedValue([]);
 });
 
 describe('broadcast tenant scope', () => {
@@ -115,6 +149,54 @@ describe('broadcast tenant scope', () => {
     mocks.getBroadcastById.mockResolvedValue(ownBroadcast);
     const response = await app().request('/api/broadcasts/broadcast-1');
     expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      data: { folderId: 'folder-1', measureOpens: false },
+    });
+  });
+
+  test('送信が完了した後だけ同じアカウントの運用者通知を発火する', async () => {
+    mocks.getBroadcastById
+      .mockResolvedValueOnce(ownBroadcast)
+      .mockResolvedValueOnce({
+        ...ownBroadcast,
+        status: 'sent',
+        sent_at: '2026-09-09T00:00:00.000Z',
+      });
+
+    const response = await app().request(
+      '/api/broadcasts/broadcast-1/send', json('POST', undefined, true),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.processBroadcastSend).toHaveBeenCalledOnce();
+    expect(mocks.dispatchOperatorEvent).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({
+        lineAccountId: 'own-account',
+        eventType: 'broadcast_completed',
+        sourceEventId: 'broadcast-1',
+        executionMode: 'automatic',
+      }),
+    );
+  });
+
+  test('配信本体が失敗したときは完了通知を発火しない', async () => {
+    mocks.getBroadcastById.mockResolvedValueOnce(ownBroadcast);
+    mocks.processBroadcastSend.mockRejectedValueOnce(new Error('LINE unavailable'));
+
+    const response = await app().request(
+      '/api/broadcasts/broadcast-1/send', json('POST', undefined, true),
+    );
+
+    expect(response.status).toBe(500);
+    expect(mocks.dispatchOperatorEvent).not.toHaveBeenCalled();
+  });
+
+  test('rejects a list query for an account outside the visible scope', async () => {
+    const response = await app().request('/api/broadcasts?lineAccountId=other-account');
+    expect(response.status).toBe(403);
+    expect(mocks.getBroadcasts).not.toHaveBeenCalled();
   });
 
   test('treats an unassigned body account according to canSeeUnassigned', async () => {

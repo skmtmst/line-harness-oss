@@ -4,10 +4,14 @@ import type { Env } from '../index.js'
 
 const mocks = vi.hoisted(() => ({
   getTemplatesWithUsageCount: vi.fn(),
+  getTemplateSendCounts: vi.fn(),
   getTemplateById: vi.fn(),
   getTemplateUsage: vi.fn(),
   createTemplate: vi.fn(),
   updateTemplate: vi.fn(),
+  saveTemplateDraft: vi.fn(),
+  publishTemplate: vi.fn(),
+  hasTemplateDraft: vi.fn().mockReturnValue(false),
   deleteTemplate: vi.fn(),
   getCarouselTapTotals: vi.fn(),
 }))
@@ -46,6 +50,7 @@ const bindings = { DB: {} as D1Database } as Env['Bindings']
 beforeEach(() => {
   vi.clearAllMocks()
   mocks.getCarouselTapTotals.mockResolvedValue(new Map())
+  mocks.getTemplateSendCounts.mockResolvedValue(new Map())
   accountAccess.canAccessAllLineAccounts.mockResolvedValue(true)
   accountAccess.getVisibleLineAccountScope.mockResolvedValue({
     allowedAccountIds: ['account-1'],
@@ -137,7 +142,7 @@ describe('question templates', () => {
   })
 
   it('returns question and publication state in the list contract', async () => {
-    mocks.getTemplatesWithUsageCount.mockResolvedValue([{
+    mocks.getTemplatesWithUsageCount.mockResolvedValue({ items: [{
       id: 'question-1',
       name: '継続の意思をうかがう',
       category: '定期便',
@@ -150,7 +155,7 @@ describe('question templates', () => {
       created_at: '2026-08-29T12:00:00+09:00',
       updated_at: '2026-08-29T12:00:00+09:00',
       line_account_id: 'account-1',
-    }])
+    }], total: 1 })
 
     const response = await app().request('/api/templates', {}, bindings)
     expect(response.status).toBe(200)

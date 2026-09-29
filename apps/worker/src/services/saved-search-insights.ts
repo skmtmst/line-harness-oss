@@ -1,12 +1,70 @@
 import {
+  jstNow,
   validateSearchConditions,
   type SavedSearch,
+  type SearchConditions,
 } from '@line-crm/db';
 import { compileSavedSearch } from './saved-search-filter.js';
 
 export interface SavedSearchMatchInsight {
   matchCount: number | null;
   matchCountError: string | null;
+}
+
+export interface SavedSearchMatchPreview {
+  total: number | null;
+  byChannel: { line: number | null; mail: number | null };
+  calculatedAt: string;
+  error: string | null;
+}
+
+/** 編集中の条件を、保存済み条件と同じ評価器で数える。 */
+export async function getSavedSearchMatchPreview(
+  db: D1Database,
+  conditions: SearchConditions,
+  lineAccountId: string,
+): Promise<SavedSearchMatchPreview> {
+  const calculatedAt = jstNow();
+  const compiled = compileSavedSearch(conditions);
+  if (!compiled.ok) {
+    return {
+      total: null,
+      byChannel: { line: null, mail: null },
+      calculatedAt,
+      error: compiled.error,
+    };
+  }
+  try {
+    const row = await db.prepare(
+      `SELECT COUNT(DISTINCT f.id) AS total,
+              COUNT(DISTINCT CASE
+                WHEN NULLIF(f.line_user_id, '') IS NOT NULL THEN f.id END) AS line_total,
+              COUNT(DISTINCT CASE
+                WHEN json_valid(f.metadata) = 1
+                 AND NULLIF(CAST(json_extract(f.metadata, '$.email') AS TEXT), '') IS NOT NULL
+                THEN f.id END) AS mail_total
+         FROM friends f
+        WHERE f.line_account_id = ? AND ${compiled.value.sql}`,
+    ).bind(lineAccountId, ...compiled.value.binds).first<{
+      total: number | string;
+      line_total: number | string;
+      mail_total: number | string;
+    }>();
+    if (!row) throw new Error('saved_search_preview_missing');
+    return {
+      total: Number(row.total),
+      byChannel: { line: Number(row.line_total), mail: Number(row.mail_total) },
+      calculatedAt,
+      error: null,
+    };
+  } catch {
+    return {
+      total: null,
+      byChannel: { line: null, mail: null },
+      calculatedAt,
+      error: '該当人数を確認できませんでした',
+    };
+  }
 }
 
 /**

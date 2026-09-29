@@ -2,7 +2,15 @@
 // 対象ウェビナーは webinar_followup_configs で明示的に有効化し、enabled_at
 // より前の過去リードを一斉送信しない。LINE送信は必ずHarnessプロキシ経由。
 
-import { getFriendById, getLineAccountById, jstNow } from '@line-crm/db';
+import {
+  getFriendById,
+  getLineAccountById,
+  isOperationCapabilityStopped,
+  jstNow,
+  listLineAccountsWithTenantStatus,
+} from '@line-crm/db';
+import { featureJobCanRun } from './feature-enforcement.js';
+import { isStoppedTenantStatus } from './tenant-runtime-status.js';
 import { pushViaHarnessProxy, type HarnessProxyDispatch } from './line-proxy-send.js';
 
 export type WebinarFollowupOptions = {
@@ -32,6 +40,7 @@ type FollowupRow = {
   id: string;
   retry_key: string;
   status: 'pending' | 'sent' | 'failed';
+  last_error?: string | null;
 };
 
 type JourneyCandidate = {
@@ -48,6 +57,7 @@ type JourneyFollowupRow = {
   id: string;
   retry_key: string;
   status: 'pending' | 'sent' | 'failed' | 'skipped';
+  last_error?: string | null;
 };
 
 function formUrl(liffId: string, formId: string): string {
@@ -162,7 +172,7 @@ async function getOrCreateFollowup(
   kind: FollowupKind,
 ): Promise<FollowupRow> {
   const existing = await db.prepare(
-    `SELECT id, retry_key, status FROM webinar_followups
+    `SELECT id, retry_key, status, last_error FROM webinar_followups
      WHERE webinar_id = ? AND friend_id = ? AND kind = ?`,
   ).bind(candidate.webinar_id, candidate.friend_id, kind).first<FollowupRow>();
   if (existing) return existing;
@@ -179,7 +189,7 @@ async function getOrCreateFollowup(
   ).run();
   return (
     await db.prepare(
-      `SELECT id, retry_key, status FROM webinar_followups
+      `SELECT id, retry_key, status, last_error FROM webinar_followups
        WHERE webinar_id = ? AND friend_id = ? AND kind = ?`,
     ).bind(candidate.webinar_id, candidate.friend_id, kind).first<FollowupRow>()
   )!;
@@ -327,7 +337,7 @@ async function getOrCreateJourneyFollowup(
   kind: WebinarJourneyFollowupKind,
 ): Promise<JourneyFollowupRow> {
   const existing = await db.prepare(
-    `SELECT id, retry_key, status FROM webinar_journey_followups
+    `SELECT id, retry_key, status, last_error FROM webinar_journey_followups
      WHERE webinar_id = ? AND friend_id = ? AND kind = ?`,
   ).bind(candidate.webinar_id, candidate.friend_id, kind).first<JourneyFollowupRow>();
   if (existing) return existing;
@@ -346,7 +356,7 @@ async function getOrCreateJourneyFollowup(
   ).run();
   return (
     await db.prepare(
-      `SELECT id, retry_key, status FROM webinar_journey_followups
+      `SELECT id, retry_key, status, last_error FROM webinar_journey_followups
        WHERE webinar_id = ? AND friend_id = ? AND kind = ?`,
     ).bind(candidate.webinar_id, candidate.friend_id, kind).first<JourneyFollowupRow>()
   )!;
@@ -392,10 +402,31 @@ export async function processWebinarFollowups(
       candidate, kind: 'submitted_no_booking_24h' as const,
     })),
   ];
+  const tenantStatusByAccount = new Map(
+    (await listLineAccountsWithTenantStatus(db)).map((account) => [account.id, account.tenant_status]),
+  );
   let sent = 0;
   let failed = 0;
   for (const { candidate, kind } of due) {
     const followup = await getOrCreateFollowup(db, candidate, kind);
+    if (followup.last_error === 'tenant_suspended') continue;
+    if (candidate.account_id && isStoppedTenantStatus(tenantStatusByAccount.get(candidate.account_id))) {
+      await db.prepare(
+        `UPDATE webinar_followups
+            SET status='failed', last_error='tenant_suspended', updated_at=?
+          WHERE id=? AND status!='sent'`,
+      ).bind(jstNow(), followup.id).run();
+      continue;
+    }
+    // 機能オフ中は追跡行を作らず送らない。期限後も再オンで安全に再開する。
+    if (candidate.account_id && !await featureJobCanRun(db, { accountId: candidate.account_id, featureId: 'webinars', job: 'webinar followups' })) {
+      continue;
+    }
+    // 緊急停止 (#1050): reminder_dispatch 停止中も追跡行を作らず送らない。
+    if (candidate.account_id &&
+        await isOperationCapabilityStopped(db, candidate.account_id, 'reminder_dispatch')) {
+      continue;
+    }
     if (followup.status === 'sent') continue;
     try {
       const friend = await getFriendById(db, candidate.friend_id);
@@ -413,6 +444,12 @@ export async function processWebinarFollowups(
       }
       const delivery = await deliveryConfig(db, candidate.account_id, options);
       if (!delivery.liffId) throw new Error('LIFF ID not configured');
+      // 送信直前にも緊急停止を確かめる (#1050)。停止中は pending のまま残し、
+      // 次の tick で再送対象になる。
+      if (candidate.account_id &&
+          await isOperationCapabilityStopped(db, candidate.account_id, 'reminder_dispatch')) {
+        continue;
+      }
       const url = formUrl(delivery.liffId, candidate.form_id);
       const text = buildCtaFollowupText(kind, url);
       await pushViaHarnessProxy(
@@ -422,6 +459,7 @@ export async function processWebinarFollowups(
         [{ type: 'text', text }],
         followup.retry_key,
         options.proxyDispatch,
+        'reminder_dispatch',
       );
       await db.prepare(
         `UPDATE webinar_followups
@@ -441,6 +479,20 @@ export async function processWebinarFollowups(
 
   for (const { candidate, kind } of journeyDue) {
     const followup = await getOrCreateJourneyFollowup(db, candidate, kind);
+    if (followup.last_error === 'tenant_suspended') continue;
+    if (candidate.account_id && isStoppedTenantStatus(tenantStatusByAccount.get(candidate.account_id))) {
+      await db.prepare(
+        `UPDATE webinar_journey_followups
+            SET status='skipped', last_error='tenant_suspended', updated_at=?
+          WHERE id=? AND status NOT IN ('sent','skipped')`,
+      ).bind(jstNow(), followup.id).run();
+      continue;
+    }
+    // 緊急停止 (#1050): reminder_dispatch 停止中は追跡行を作らず送らない。
+    if (candidate.account_id &&
+        await isOperationCapabilityStopped(db, candidate.account_id, 'reminder_dispatch')) {
+      continue;
+    }
     if (followup.status === 'sent' || followup.status === 'skipped') continue;
     try {
       const friend = await getFriendById(db, candidate.friend_id);
@@ -453,6 +505,11 @@ export async function processWebinarFollowups(
       }
       const delivery = await deliveryConfig(db, candidate.account_id, options);
       if (!delivery.liffId) throw new Error('LIFF ID not configured');
+      // 送信直前にも緊急停止を確かめる (#1050)。停止中は pending のまま残す。
+      if (candidate.account_id &&
+          await isOperationCapabilityStopped(db, candidate.account_id, 'reminder_dispatch')) {
+        continue;
+      }
       const pickerUrl = webinarPickerUrl(delivery.liffId, candidate.slug);
       const text = buildJourneyFollowupText(
         kind, candidate.title, pickerUrl, candidate.booking_url,
@@ -464,6 +521,7 @@ export async function processWebinarFollowups(
         [{ type: 'text', text }],
         followup.retry_key,
         options.proxyDispatch,
+        'reminder_dispatch',
       );
       const sentAt = jstNow();
       await db.prepare(

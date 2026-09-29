@@ -1,4 +1,4 @@
-import { jstNow } from './utils.js';
+import { boundedListLimit, jstNow } from './utils.js';
 // Stripe決済連携クエリヘルパー
 
 export interface StripeEventRow {
@@ -13,7 +13,7 @@ export interface StripeEventRow {
 }
 
 export async function getStripeEvents(db: D1Database, opts: { friendId?: string; eventType?: string; limit?: number } = {}): Promise<StripeEventRow[]> {
-  const limit = opts.limit ?? 100;
+  const limit = boundedListLimit(opts.limit, 100);
   if (opts.friendId) {
     const result = await db.prepare(`SELECT * FROM stripe_events WHERE friend_id = ? ORDER BY processed_at DESC LIMIT ?`)
       .bind(opts.friendId, limit).all<StripeEventRow>();

@@ -1,20 +1,12 @@
 name: Deploy scripts CI
 
-# PR gate for the deploy tooling.
+# Post-merge gate for the deploy tooling.
 #
-# worker-ci.yml only watches apps/worker and packages/*, so changes under
-# scripts/deploy landed with zero status checks. These scripts decide whether a
-# deploy is allowed to proceed, so they need at least as much checking as the
-# code they guard.
+# Pull requests are checked once by required-pr-gate.yml. This workflow keeps
+# the same checks on pushes to the integration and production branches without
+# running them a second time on pull requests.
 
 on:
-  pull_request:
-    paths:
-      - 'scripts/**'
-      - 'package.json'
-      - 'vitest.config.ts'
-      - 'tsconfig.base.json'
-      - '.github/workflows/**'
   push:
     branches: [codex/development, main]
     paths:
@@ -32,16 +24,31 @@ jobs:
   deploy-scripts-ci:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
+
+      # `@line-crm/shared` の入口 (package.json の main / exports) は dist を
+      # 指している。`test:scripts` が読む scripts/verify-staging-operational-path.ts
+      # は packages/db/src 経由で shared を読むので、dist が無いと vite が入口を
+      # 解決できず、**試験を1件も走らせないまま**読み込みの段階で落ちる。
+      #
+      # PR は required-pr-gate.yml の `repository-checks` が install の直後に
+      # 同じ build を置いているため緑になる。本流に入ってから走るこの workflow
+      # だけが落ちていた (#714。2026-09-10 に6回連続で failure)。
+      #
+      # build するのは shared だけでよい。db や line-sdk まで足さなくても
+      # `test:scripts` が緑になること、後段の typecheck は dist 無しでも通ることを、
+      # dist を消した状態で実際に走らせて確かめている。
+      - name: Build the shared package
+        run: pnpm --filter @line-crm/shared build
 
       - name: Vitest (scripts)
         # Includes the git-backed deploy lock integration tests, which drive

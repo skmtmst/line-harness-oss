@@ -76,10 +76,16 @@ export function pageOf<T>(rows: T[], page: number, pageSize: number): T[] {
   return rows.slice((current - 1) * size, current * size)
 }
 
-/** CSVの1セル。改行・カンマ・引用符が入っても列がずれないようにする。 */
+/**
+ * CSVの1セル。改行・カンマ・引用符が入っても列がずれないようにする。
+ *
+ * 名前が `=+-@` で始まると表計算ソフトが数式として実行する（CSV
+ * インジェクション）ため、サーバの書き出しと同じく先頭へ `'` を付ける。
+ */
 export function csvCell(value: string | number | null | undefined): string {
   const text = value == null ? '' : String(value)
-  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
+  const safe = /^[=+\-@]/.test(text) ? `'${text}` : text
+  return /[",\r\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe
 }
 
 export const OFFER_CSV_HEADER = [

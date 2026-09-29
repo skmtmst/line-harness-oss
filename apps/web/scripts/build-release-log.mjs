@@ -16,6 +16,10 @@ const WEB_ROOT = join(SCRIPT_DIR, '..')
 const LOG_DIR = join(WEB_ROOT, '../../docs/release-log')
 const OUT_DIR = join(WEB_ROOT, 'src/generated')
 const OUT_FILE = join(OUT_DIR, 'release-log.json')
+/** 運用状態の画面が読む要約（下の summarize）。 */
+const SUMMARY_FILE = join(OUT_DIR, 'release-log-summary.json')
+/** 要約に本文ごと残す、反映済みの新しい行の数。画面が出す10行より十分多く。 */
+const SUMMARY_KEEP = 50
 
 /** 見出しは3つだけ。増やすと、読む側が分類を覚えないといけなくなる。 */
 const KINDS = { 追加: 'added', 変更: 'changed', 修正: 'fixed' }
@@ -108,6 +112,7 @@ function main() {
     console.warn('[release-log] docs/release-log がありません。空で出します。')
     mkdirSync(OUT_DIR, { recursive: true })
     writeFileSync(OUT_FILE, JSON.stringify({ releases: [] }, null, 2))
+    writeFileSync(SUMMARY_FILE, JSON.stringify({ releases: [] }) + '\n')
     return
   }
 
@@ -150,8 +155,42 @@ function main() {
 
   mkdirSync(OUT_DIR, { recursive: true })
   writeFileSync(OUT_FILE, JSON.stringify({ releases }, null, 2) + '\n')
+  writeFileSync(SUMMARY_FILE, JSON.stringify(summarize(releases)) + '\n')
   const total = releases.reduce((n, r) => n + r.entries.length, 0)
   console.log(`[release-log] ${releases.length} 版 / ${total} 件を書き出しました`)
 }
 
-main()
+/*
+ * 運用状態の画面用の要約。
+ *
+ * 全文（release-log.json）は未反映の行が数千件あり、画面のJSに同梱すると
+ * それだけで 160kB を超えた。画面が本文を出すのは「反映済みの新しい行」だけで、
+ * ほかは版ごとの件数しか使わない。そこで件数（entryCount）を残し、本文は
+ * 反映済みの新しい SUMMARY_KEEP 行だけにする。
+ *
+ * 「新しい行」の並べ方は画面（update-history.ts の collectRecentUpdates）と同じ
+ * `at ?? released` の新しい順。画面は配備記録と混ぜて新しい10行を出すので、
+ * 反映済みの新しい10行より多く残しておけば、表示される行は全文のときと変わらない。
+ */
+export function summarize(releases) {
+  const rows = []
+  releases.forEach((release, r) => {
+    if (!release.released) return
+    release.entries.forEach((entry, e) => {
+      rows.push({ r, e, key: Date.parse(entry.at ?? release.released ?? '') })
+    })
+  })
+  rows.sort((a, b) => b.key - a.key)
+  const keep = new Set(rows.slice(0, SUMMARY_KEEP).map((row) => `${row.r}:${row.e}`))
+  return {
+    releases: releases.map((release, r) => ({
+      version: release.version,
+      released: release.released,
+      entryCount: release.entries.length,
+      entries: release.entries.filter((_, e) => keep.has(`${r}:${e}`)),
+    })),
+  }
+}
+
+// 試験から summarize だけを読むとき（import）は書き出さない。
+if (process.argv[1] && process.argv[1].endsWith('build-release-log.mjs')) main()

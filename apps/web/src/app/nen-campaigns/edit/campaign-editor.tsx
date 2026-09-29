@@ -1,39 +1,36 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { api, type NenCampaignSetting } from '@/lib/api'
-import Header from '@/components/layout/header'
+import { Eye, FlaskConical, Gift, X } from 'lucide-react'
+import { ApiError, api, type NenCampaignAfterAction, type NenCampaignSetting } from '@/lib/api'
+import { checkNenCampaignBodyLength, NEN_CAMPAIGN_BODY_MAX_LENGTH } from '@line-crm/shared'
 import { useAccount } from '@/contexts/account-context'
 import { Field, inputClass } from '@/components/shared/form-controls'
-import { formatCampaignTiming } from '../campaign-display'
+import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
+import LinePreview from '@/components/shared/line-preview'
+import Notice from '@/components/shared/notice'
+import { TimeField } from '@/components/shared/date-time-field'
+import Combobox from '@/components/shared/combobox'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import ListState from '@/components/shared/list-state'
+import StickyBar from '@/components/shared/sticky-bar'
+import InsertToolbar from '@/components/scenarios/insert-toolbar'
 import { usePageTitle } from '@/components/shell/page-chrome'
-
-/**
- * NENコラムを編集する（設計 V2 9-1-1）。
- *
- * 設計は「どの配信か → いつ届けるか → 誰に届けるか → 今回の内容」の4節。
- * `nen_campaign_settings` にあるのは、きっかけ・何日後・時刻・題・本文・
- * 画像・ボタン・動かすかどうか。設計の**毎週金曜10:00のような曜日指定**と、
- * **タグで絞り込む**は、持っている列と合わない。
- *
- * この配信は「きっかけが起きた N日後の指定時刻」に動く。毎週ではない。
- * 曜日の欄を出すと、設定したのに毎週来ない配信ができるので出していない。
- */
-
-const CATEGORY_LABEL: Record<NenCampaignSetting['category'], string> = {
-  transactional: '注文まわり',
-  follow_up: 'フォロー',
-  column: 'コラム',
-  birthday: '誕生日',
-}
+import { formatCampaignTiming } from '../campaign-display'
+import styles from './campaign-editor.module.css'
 
 const TRIGGER_LABEL: Record<string, string> = {
   'ec.order.confirmed': '注文を受け付けたとき',
   'ec.order.shipped': '商品を発送したとき',
-  'ec.order.delivered': '商品が届いたとき',
+  'ec.order.delivered': '注文が届いたとき',
+  'ec.order.arrived': '注文が届いたとき',
   'pet.birthday': 'ペットの誕生日',
 }
+
+type FormOption = { id: string; name: string; description: string | null; isActive: boolean }
 
 function triggerLabel(setting: NenCampaignSetting): string {
   if (setting.campaignKey === 'birthday_coupon') return 'ペットの誕生日'
@@ -41,19 +38,41 @@ function triggerLabel(setting: NenCampaignSetting): string {
   return TRIGGER_LABEL[setting.triggerEvent] ?? '登録済みのきっかけ'
 }
 
+function previewBody(value: string): string {
+  return value
+    .replaceAll('{{pet_name}}', 'ももちゃん')
+    .replaceAll('{{ペットの名前}}', 'もも')
+    .replaceAll('{{商品名}}', 'フード')
+    .replaceAll('{{name}}', '高橋 直人')
+}
+
+function openFormUrl(liffId: string | null | undefined, formId: string): string | null {
+  if (!liffId) return null
+  return `https://liff.line.me/${liffId}/?page=form&id=${encodeURIComponent(formId)}`
+}
+
 export default function CampaignEditor({ campaignKey }: { campaignKey: string }) {
-  usePageTitle('NEN配信を編集する')
   const [setting, setSetting] = useState<NenCampaignSetting | null>(null)
   const [draft, setDraft] = useState<Partial<NenCampaignSetting>>({})
+  const [forms, setForms] = useState<FormOption[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [testSearchOpen, setTestSearchOpen] = useState(false)
   const [testSearch, setTestSearch] = useState('')
   const [testCandidates, setTestCandidates] = useState<Array<{ id: string; displayName: string | null }>>([])
   const [testLoginUsers, setTestLoginUsers] = useState<Array<{ id: string; displayName: string }>>([])
   const [testing, setTesting] = useState(false)
-  const { selectedAccountId } = useAccount()
+  /*
+   * #935 N-299: 「これから届く◯通」は実数で言う。取れなければ件数を言わない
+   * 文に切り替える（数字をでたらめに出さない）。
+   */
+  const [pendingCount, setPendingCount] = useState<number | null>(null)
+  const bodyRef = useRef<HTMLTextAreaElement>(null)
+  const { selectedAccountId, selectedAccount } = useAccount()
+
+  usePageTitle(`${setting?.label ?? 'NEN配信'}を編集する`)
 
   useEffect(() => {
     if (!selectedAccountId) {
@@ -62,25 +81,31 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
       return
     }
     let cancelled = false
-    void (async () => {
-      try {
-        const res = await api.nenCampaigns.settings(selectedAccountId)
-        if (cancelled) return
-        if (res.success) {
-          const found = res.data.find((s) => s.campaignKey === campaignKey) ?? null
-          setSetting(found)
-          if (found) setDraft(found)
-          if (!found) setError('この配信が見つかりませんでした')
-        }
-      } catch {
-        if (!cancelled) setError('読み込みに失敗しました')
-      } finally {
-        if (!cancelled) setLoading(false)
+    setLoading(true)
+    void Promise.all([
+      api.nenCampaigns.settings(selectedAccountId),
+      api.forms.list(selectedAccountId),
+    ]).then(([settingsResponse, formsResponse]) => {
+      if (cancelled) return
+      if (settingsResponse.success) {
+        const found = settingsResponse.data.find((item) => item.campaignKey === campaignKey) ?? null
+        setSetting(found)
+        if (found) setDraft(found)
+        else setError('この配信が見つかりませんでした')
       }
-    })()
-    return () => {
-      cancelled = true
-    }
+      if (formsResponse.success) setForms(formsResponse.data)
+    }).catch(() => {
+      if (!cancelled) setError('読み込みに失敗しました。もう一度読み込んでください。')
+    }).finally(() => {
+      if (!cancelled) setLoading(false)
+    })
+    // 待ち件数の取得だけ失敗しても編集画面は開けるように、別の取りこぼし扱いにする。
+    void api.nenCampaigns.overview(selectedAccountId)
+      .then((res) => {
+        if (!cancelled && res.success) setPendingCount(res.data.jobs.pendingByCampaign?.[campaignKey] ?? 0)
+      })
+      .catch(() => undefined)
+    return () => { cancelled = true }
   }, [campaignKey, selectedAccountId])
 
   useEffect(() => {
@@ -102,34 +127,91 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
   }, [selectedAccountId])
 
   const merged = { ...setting, ...draft } as NenCampaignSetting
+  /*
+   * #935 N-301: 本文などを書きかけのまま離れると消えていた。
+   * 読み込み後の値と違う間だけ、ブラウザ離脱・画面内リンク・戻る操作を止めて確認する。
+   * 保存成功で setting が更新されdirtyが外れ、保存失敗では入力を残したままdirtyのまま。
+   */
+  const dirty = setting !== null && JSON.stringify(draft) !== JSON.stringify(setting)
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
+  const actions = merged.afterActions ?? []
+  const formAction = actions.find((action) => action.kind === 'open_form')
+  const mileageAction = actions.find((action) => action.kind === 'award_mileage')
+  const isBirthday = merged.campaignKey === 'birthday_coupon'
+  /*
+   * NEN-07: つなぐフォームが消えた・公開を止めた・別アカウント専用の設定は
+   * 「設定不足」。一覧へ返す判定もサーバが行い、ここでは選択肢と照合して
+   * 保存前に理由を出す(一覧に載らないフォーム=削除済みか他アカウント専用)。
+   */
+  const selectedForm = formAction ? forms.find((form) => form.id === formAction.formId) : undefined
+  const formIssueMessage = formAction
+    ? (!selectedForm
+        ? 'つなぐ回答フォームが見つかりません（削除されたか、別のLINEアカウント専用の可能性があります）'
+        : !selectedForm.isActive
+          ? 'つなぐ回答フォームは公開されていません'
+          : null)
+    : null
+  const formIssueBanner = setting?.formIssue
+    ? setting.formIssue === 'form_unselected'
+      ? '設定不足：つなぐ回答フォームが選ばれていません。この間、新しい配信は予約されません。フォームを選んで保存してください。'
+      : '設定不足：つなぐ回答フォームが使えなくなっています。この間、新しい配信は予約されません。フォームを選び直して保存してください。'
+    : null
 
-  /** テスト送信の相手を名前で探す。宛先を選ばないと送れない。 */
+  const setActions = (afterActions: NenCampaignAfterAction[]) => {
+    setDraft((previous) => ({ ...previous, afterActions }))
+  }
+
+  const addFormAction = (formId: string) => {
+    const form = forms.find((candidate) => candidate.id === formId)
+    if (!form) return
+    const next: NenCampaignAfterAction = {
+      kind: 'open_form', formId: form.id, formName: form.name, buttonLabel: '感想を書く（30秒）',
+    }
+    setDraft((previous) => ({
+      ...previous,
+      afterActions: [...actions.filter((action) => action.kind !== 'open_form'), next],
+      buttonLabel: next.buttonLabel,
+      buttonUrl: openFormUrl(selectedAccount?.liffId, form.id) ?? merged.buttonUrl,
+    }))
+  }
+
+  const addMileageAction = () => {
+    setActions([
+      ...actions.filter((action) => action.kind !== 'award_mileage'),
+      { kind: 'award_mileage', amount: 200, trigger: 'form_submitted' },
+    ])
+  }
+
   const searchFriends = async () => {
     const query = testSearch.trim()
-    const res = await api.friends.list({ search: query, accountId: selectedAccountId ?? undefined, limit: 5 })
-    if (res.success) {
-      const matchingLoginUsers = testLoginUsers.filter((candidate) => candidate.displayName.toLocaleLowerCase().includes(query.toLocaleLowerCase()))
-      const found = res.data.items.map((friend) => ({ id: friend.id, displayName: friend.displayName }))
-      setTestCandidates([...new Map([...matchingLoginUsers, ...found].map((candidate) => [candidate.id, candidate])).values()])
+    setNotice('')
+    try {
+      const response = await api.friends.list({ search: query, accountId: selectedAccountId ?? undefined, limit: 5 })
+      if (!response.success) throw new Error('failed')
+      const loginUsers = testLoginUsers.filter((candidate) => candidate.displayName.toLocaleLowerCase().includes(query.toLocaleLowerCase()))
+      const friends = response.data.items.map((friend) => ({ id: friend.id, displayName: friend.displayName }))
+      setTestCandidates([...new Map([...loginUsers, ...friends].map((candidate) => [candidate.id, candidate])).values()])
+    } catch {
+      setNotice('相手を探せませんでした。通信を確認してもう一度お試しください。')
     }
   }
 
   const sendTest = async (friendId: string) => {
-    if (!selectedAccountId) {
-      setError('アカウントを選んでください')
-      return
-    }
+    if (!selectedAccountId) return
     setTesting(true)
     setError('')
     setNotice('')
     try {
+      // 監査 R65: 保存済みの本文ではなく、今編集している下書きを試送する。
       await api.nenCampaigns.testSend({
-        campaignKey: campaignKey,
-        accountId: selectedAccountId,
-        friendId,
+        campaignKey, accountId: selectedAccountId, friendId,
+        draft: {
+          title: merged.title, bodyText: merged.bodyText,
+          buttonLabel: merged.buttonLabel ?? '', buttonUrl: merged.buttonUrl ?? '', imageUrl: merged.imageUrl ?? '',
+        },
       })
       setNotice('テスト送信しました')
-      setTestCandidates([])
+      setTestSearchOpen(false)
     } catch {
       setError('テスト送信できませんでした')
     } finally {
@@ -137,365 +219,173 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
     }
   }
 
+  const bodyCheck = checkNenCampaignBodyLength(merged.bodyText ?? '')
+  const bodyLimitLabel = NEN_CAMPAIGN_BODY_MAX_LENGTH.toLocaleString('ja-JP')
+
   const save = async () => {
     if (!setting || !selectedAccountId) return
-    if (!merged.title?.trim()) {
-      setError('タイトルを入力してください')
+    if (!merged.bodyText?.trim()) {
+      setError('本文を入力してください')
+      return
+    }
+    if (!bodyCheck.fits) {
+      setError(`本文が長すぎます（現在${bodyCheck.length.toLocaleString('ja-JP')}字・上限${bodyLimitLabel}字）。短くしてから保存してください。入力内容はそのまま残っています。`)
+      return
+    }
+    // NEN-07: 使えないフォームがつながったまま保存させない(サーバでも同じ検査)。
+    if (formIssueMessage) {
+      setError(`${formIssueMessage}。フォームを外して選び直してから保存してください`)
       return
     }
     setSaving(true)
     setError('')
     setNotice('')
     try {
-      const res = await api.nenCampaigns.updateSetting(selectedAccountId, setting.campaignKey, {
+      const response = await api.nenCampaigns.updateSetting(selectedAccountId, setting.campaignKey, {
         isEnabled: merged.isEnabled,
         title: merged.title,
         bodyText: merged.bodyText,
         delayDays: merged.delayDays,
         deliveryTime: merged.deliveryTime,
-        buttonLabel: merged.buttonLabel,
-        buttonUrl: merged.buttonUrl,
+        buttonLabel: formAction?.buttonLabel ?? merged.buttonLabel,
+        buttonUrl: formAction ? openFormUrl(selectedAccount?.liffId, formAction.formId) ?? merged.buttonUrl : merged.buttonUrl,
         imageUrl: merged.imageUrl,
+        dedupWindowDays: merged.dedupWindowDays,
+        // チェックはフォーム未選択だとOFF表示・無効になる。見た目どおりに
+        // 送らないと、表示はOFFなのにDBのONが残り続け、設定不足の解除を
+        // 阻む保存拒否(除外にはフォーム必須)に当たってしまう。
+        excludeFormRespondents: Boolean(formAction) && merged.excludeFormRespondents,
+        afterActions: actions,
       })
-      if (!res.success) {
-        setError('保存に失敗しました')
+      if (!response.success) {
+        setError('保存に失敗しました。通信を確かめて、もう一度お試しください。')
         return
       }
       setSetting(merged)
-      setNotice('保存しました')
-    } catch {
-      setError('保存できませんでした。通信状態を確認して、もう一度お試しください。')
+      setNotice('配信内容を保存しました')
+    } catch (error) {
+      const reason = error instanceof ApiError && error.message ? error.message : ''
+      setError(reason || '保存できませんでした。通信状態を確認して、もう一度お試しください。')
     } finally {
       setSaving(false)
     }
   }
 
-  if (loading) {
-    return (
-      <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
-        読み込み中...
-      </div>
-    )
-  }
+  if (loading) return <ListState kind="loading" title="NEN配信を読み込んでいます" />
+  if (!setting) return <ListState kind="error" title={error || 'この配信が見つかりませんでした'} />
 
-  if (!setting) {
-    return (
-      <div>
-
-        <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
-          {error || 'この配信が見つかりませんでした。'}
-          <Link href="/nen-campaigns" className="text-accent ml-1 hover:underline">
-            NEN配信へ戻る
-          </Link>
-        </p>
-      </div>
-    )
-  }
+  // 監査 R64: 一覧と同じ説明を同じ関数から作る。起点は発送（scheduledAfter と同じ）。
+  const timing = `${formatCampaignTiming({ campaignKey, delayDays: merged.delayDays, deliveryTime: merged.deliveryTime.slice(0, 5) })} に届きます`
 
   return (
-    <div>
-      <nav className="text-ink-faint mb-2 text-xs" data-design="Crumb">
-        <Link href="/nen-campaigns" className="hover:underline">
-          NEN配信
-        </Link>
-        <span className="mx-1.5">/</span>
-        <span>編集</span>
-      </nav>
-
-      <div data-design="Head">
-        <Header
-          title={`${setting.label}を編集する`}
-          description="定期的に届けるコラムの内容と送り方を設定します。"
-          action={
-            <div className="flex flex-wrap gap-2">
-              {/* 宛先を選ばないと送れない。名前で探して選ぶ。 */}
-              <div className="flex items-center gap-1">
-                <input
-                  type="search"
-                  value={testSearch}
-                  onChange={(e) => setTestSearch(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') void searchFriends()
-                  }}
-                  placeholder="テスト送信の相手を名前で探す"
-                  aria-label="テスト送信の相手を名前で探す"
-                  className="border-hairline rounded-control border px-3 py-2 text-sm"
-                />
-                <button
-                  onClick={() => void searchFriends()}
-                  disabled={!testSearch.trim() || testing}
-                  className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium disabled:opacity-40"
-                >
-                  探す
-                </button>
-              </div>
-              <Link
-                href="/nen-campaigns"
-                className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
-              >
-                キャンセル
-              </Link>
-              <button
-                onClick={save}
-                disabled={saving}
-                className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40"
-              >
-                {saving ? '保存中...' : '変更を保存'}
-              </button>
-            </div>
-          }
-        />
+    <div data-design-node="HpKyF" className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <nav data-design="Crumb" className="text-ink-faint flex min-w-0 flex-1 items-center gap-2 text-xs" aria-label="パンくず">
+          <Link href="/nen-campaigns" className="text-action hover:underline">NEN配信</Link><span>›</span>
+          {/* #935 N-305: 以前は実在しないタブ名を指していた。設計の語「配信フロー」は残し、行き先を実在するタブへ直す。 */}
+          <Link href="/nen-campaigns?tab=auto" className="text-action hover:underline">配信フロー</Link><span>›</span><span>{setting.label}</span>
+        </nav>
+        <Button onClick={() => setTestSearchOpen((open) => !open)} className="h-10"><FlaskConical aria-hidden size={17} />自分にテスト送信</Button>
       </div>
 
-      {error && (
-        <div className="bg-danger-bg border-danger-bg text-danger mb-4 rounded-lg border p-4 text-sm">
-          {error}
-        </div>
-      )}
-      {notice && <p className="text-success mb-4 text-sm">{notice}</p>}
+      {error && <Notice tone="danger" message={error} />}
+      {notice && <p className="bg-accent-soft text-accent-deep rounded-card px-4 py-3 text-sm">{notice}</p>}
+      {formIssueBanner && <Notice tone="warn" message={formIssueBanner} />}
 
-      {testCandidates.length > 0 && (
-        <div className="bg-canvas rounded-card border-hairline mb-4 border p-3">
-          <p className="text-ink-secondary mb-2 text-xs font-medium">テスト送信の相手を選ぶ</p>
-          <ul className="flex flex-wrap gap-2">
-            {testCandidates.map((f) => (
-              <li key={f.id}>
-                <button
-                  onClick={() => void sendTest(f.id)}
-                  disabled={testing}
-                  className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-pill border px-3 py-1.5 text-xs disabled:opacity-40"
-                >
-                  {f.displayName}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
+      {testSearchOpen && (
+        <section className="bg-canvas rounded-card border-hairline flex flex-wrap items-center gap-2 border p-3">
+          <input type="search" value={testSearch} onChange={(event) => setTestSearch(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') void searchFriends() }} placeholder="テスト送信の相手を名前で探す" aria-label="テスト送信の相手を名前で探す" className={`${inputClass} max-w-sm`} />
+          <Button onClick={() => void searchFriends()}>探す</Button>
+          {testCandidates.map((candidate) => <Button key={candidate.id} variant="primary" disabled={testing} onClick={() => void sendTest(candidate.id)}>{candidate.displayName ?? '名前なし'}へ送る</Button>)}
+        </section>
       )}
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(260px,1fr)]">
-        <div data-design="Body" className="space-y-5">
-          {/* ---- 1 ---- */}
-          <section className="bg-canvas rounded-card border-hairline space-y-4 border p-5">
-            <h2 className="text-ink text-sm font-bold">
-              <span className="bg-accent-soft text-accent rounded-pill mr-2 px-2 py-0.5 text-xs">
-                1
-              </span>
-              どの配信か
-            </h2>
-            <Field label="配信名">
-              <p className="border-hairline text-ink rounded-control border px-3 py-2 text-sm">
-                {setting.label}
-                <span className="text-ink-faint ml-2 text-xs">
-                  {CATEGORY_LABEL[setting.category]}
-                </span>
-              </p>
-            </Field>
-            {/* 配信ごとに送るアカウントを選ぶ列が無い。 */}
-            <Field label="対象アカウント" note="配信ごとにアカウントを分ける設定は、まだありません。">
-              <p className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm">
-                既定のアカウント
-              </p>
-            </Field>
+      <div className={styles.editorGrid}>
+        <div data-design="Body" className="space-y-4">
+          <section className="bg-canvas rounded-card border-hairline border p-4">
+            <h2 className="text-ink mb-4 text-base font-bold">いつ送りますか</h2>
+             <div className={styles.timingGrid}>
+              <Field label="きっかけ"><p className="border-hairline rounded-control border px-3 py-2 text-sm">{triggerLabel(setting)}</p></Field>
+              <Field label={isBirthday ? '送る日' : '何日後'}>{isBirthday ? <p className="border-hairline rounded-control border px-3 py-2 text-sm">3日前</p> : <input type="number" min={0} max={365} value={merged.delayDays} onChange={(event) => setDraft((previous) => ({ ...previous, delayDays: Number(event.target.value) }))} className={inputClass} />}</Field>
+              <Field label="時刻">{isBirthday ? <p className="border-hairline rounded-control border px-3 py-2 text-sm">10:00（固定）</p> : <TimeField aria-label="送る時刻" value={merged.deliveryTime.slice(0, 5)} onChange={(v) => setDraft((previous) => ({ ...previous, deliveryTime: v }))} />}</Field>
+               <Field label="届かない日"><p className="border-hairline rounded-control border px-3 py-2 text-sm">なし（毎日送る）</p></Field>
+             </div>
+             {isBirthday && <p className="text-ink-faint mt-3 text-xs">この日時は誕生日配信の実行処理で固定されています。</p>}
+             {!isBirthday && <div className="mt-4 space-y-3">
+              <Checkbox checked={merged.dedupWindowDays > 0} onCheckedChange={(checked) => setDraft((previous) => ({ ...previous, dedupWindowDays: checked ? 30 : 0 }))} description="30日のあいだに1回だけにします。まとめ買いのときに何通も届くのを防ぎます。">同じ人に何度も送らない</Checkbox>
+              {merged.campaignKey === 'review_request' && <Checkbox checked={Boolean(formAction) && merged.excludeFormRespondents} disabled={!formAction} onCheckedChange={(checked) => setDraft((previous) => ({ ...previous, excludeFormRespondents: checked }))} description="この配信につないだ口コミフォームの回答記録を見ます。先に回答フォームを選んでください。">すでに口コミを書いた人には送らない</Checkbox>}
+            </div>}
           </section>
 
-          {/* ---- 2 ---- */}
-          <section className="bg-canvas rounded-card border-hairline space-y-4 border p-5">
-            <h2 className="text-ink text-sm font-bold">
-              <span className="bg-accent-soft text-accent rounded-pill mr-2 px-2 py-0.5 text-xs">
-                2
-              </span>
-              いつ届けるか
-            </h2>
-            <p className="text-ink-faint text-xs leading-relaxed">
-              {setting.campaignKey === 'birthday_coupon'
-                ? 'ペットの誕生日の3日前、10:00に届きます。この日時は誕生日配信の実行処理で固定されています。'
-                : 'この配信は「きっかけが起きたあと、指定した日数が経った日の指定時刻」に届きます。毎週きまった曜日・毎月きまった日で送る形は、まだ保存する場所がありません。'}
-            </p>
-            <Field label="きっかけ">
-              <p className="border-hairline text-ink rounded-control border px-3 py-2 text-sm">
-                {triggerLabel(setting)}
-              </p>
-            </Field>
-            <div className="grid gap-4 sm:grid-cols-2">
-              {setting.campaignKey === 'birthday_coupon' ? (
-                <>
-                  <Field label="送る日">
-                    <p className="border-hairline text-ink rounded-control border px-3 py-2 text-sm">
-                      誕生日の3日前
-                    </p>
-                  </Field>
-                  <Field label="時刻">
-                    <p className="border-hairline text-ink rounded-control border px-3 py-2 text-sm">
-                      10:00（固定）
-                    </p>
-                  </Field>
-                </>
-              ) : (
-                <>
-                  <Field label="何日後に送るか" htmlFor="nc-delay" note="0 なら当日です。">
-                    <input
-                      id="nc-delay"
-                      type="number"
-                      min={0}
-                      value={merged.delayDays ?? 0}
-                      onChange={(e) => setDraft((p) => ({ ...p, delayDays: Number(e.target.value) }))}
-                      className={`${inputClass} w-32 tabular-nums`}
-                    />
-                  </Field>
-                  <Field label="時刻" htmlFor="nc-time">
-                    <input
-                      id="nc-time"
-                      type="time"
-                      value={(merged.deliveryTime ?? '10:00').slice(0, 5)}
-                      onChange={(e) => setDraft((p) => ({ ...p, deliveryTime: e.target.value }))}
-                      className={`${inputClass} w-40`}
-                    />
-                  </Field>
-                </>
-              )}
+          <section className="bg-canvas rounded-card border-hairline border p-4">
+            <h2 className="text-ink mb-4 text-base font-bold">送るもの</h2>
+            <div className="bg-canvas-sunken rounded-card border-hairline border p-3">
+              {/*
+                NEXT-16: この配信は1通だけ。保存スキーマも bodyText 1件で、
+                複数吹き出しの追加・差し替え・削除はWorker側に口がない。
+                押せる見た目のまま置くと「増やせる」と誤解するので出さない。
+              */}
+              <div className="mb-3"><p className="text-ink-secondary text-xs font-bold">リッチメッセージ</p></div>
+              <div className="bg-canvas rounded-card border-hairline border p-3">
+                <InsertToolbar targetRef={bodyRef} value={merged.bodyText} onChange={(bodyText) => setDraft((previous) => ({ ...previous, bodyText }))} />
+                {bodyCheck.fits ? (
+                  <p className="text-ink-faint mt-2 text-right text-xs tabular-nums">あと{(NEN_CAMPAIGN_BODY_MAX_LENGTH - bodyCheck.length).toLocaleString('ja-JP')}字（上限{bodyLimitLabel}字。長すぎるとLINEで送れません）</p>
+                ) : (
+                  <p role="alert" className="text-danger mt-2 text-right text-xs font-bold tabular-nums">{bodyLimitLabel}字を超えています（現在{bodyCheck.length.toLocaleString('ja-JP')}字）。短くしてください。</p>
+                )}
+                {bodyCheck.fits && !bodyCheck.expandedFits && (
+                  <p className="text-ink-faint mt-1 text-right text-xs">差し込む名前が長いと、送るときに長すぎる場合があります。</p>
+                )}
+                <textarea ref={bodyRef} rows={5} value={merged.bodyText} onChange={(event) => setDraft((previous) => ({ ...previous, bodyText: event.target.value }))} aria-label="配信本文" className={`${inputClass} mt-2 resize-y leading-relaxed`} />
+              </div>
             </div>
+            <p className="text-ink-faint mt-3 text-xs">この配信は1通で届きます。吹き出しの追加・差し替えにはまだ対応していません。</p>
           </section>
 
-          {/* ---- 3 ---- */}
-          <section className="bg-canvas rounded-card border-hairline space-y-3 border p-5">
-            <h2 className="text-ink text-sm font-bold">
-              <span className="bg-accent-soft text-accent rounded-pill mr-2 px-2 py-0.5 text-xs">
-                3
-              </span>
-              誰に届けるか
-            </h2>
-            {/* 宛先を絞る列が無い。きっかけに当たった人にだけ届く。 */}
-            <p className="text-ink-faint text-xs leading-relaxed">
-              きっかけに当たった友だちに届きます。タグでさらに絞り込む設定は、まだ保存する場所がありません。
-            </p>
-          </section>
-
-          {/* ---- 4 ---- */}
-          <section className="bg-canvas rounded-card border-hairline space-y-4 border p-5">
-            <h2 className="text-ink text-sm font-bold">
-              <span className="bg-accent-soft text-accent rounded-pill mr-2 px-2 py-0.5 text-xs">
-                4
-              </span>
-              今回の内容
-            </h2>
-
-            <Field
-              label="画像を添える"
-              htmlFor="nc-image"
-              note="本文の上に1枚表示されます。画像のURLを入れてください。"
-            >
-              <input
-                id="nc-image"
-                type="url"
-                value={merged.imageUrl ?? ''}
-                onChange={(e) => setDraft((p) => ({ ...p, imageUrl: e.target.value || null }))}
-                placeholder="https://example.com/column_08.jpg"
-                className={inputClass}
-              />
-            </Field>
-
-            <Field label="タイトル" htmlFor="nc-title" required>
-              <input
-                id="nc-title"
-                type="text"
-                value={merged.title ?? ''}
-                onChange={(e) => setDraft((p) => ({ ...p, title: e.target.value }))}
-                className={inputClass}
-              />
-            </Field>
-
-            <Field label="本文" htmlFor="nc-body">
-              <textarea
-                id="nc-body"
-                rows={6}
-                value={merged.bodyText ?? ''}
-                onChange={(e) => setDraft((p) => ({ ...p, bodyText: e.target.value }))}
-                className={`${inputClass} resize-y`}
-              />
-            </Field>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="ボタンの文字" htmlFor="nc-btn">
-                <input
-                  id="nc-btn"
-                  type="text"
-                  value={merged.buttonLabel ?? ''}
-                  onChange={(e) => setDraft((p) => ({ ...p, buttonLabel: e.target.value || null }))}
-                  placeholder="続きを読む"
-                  className={inputClass}
-                />
-              </Field>
-              <Field label="ボタンの行き先" htmlFor="nc-url">
-                <input
-                  id="nc-url"
-                  type="url"
-                  value={merged.buttonUrl ?? ''}
-                  onChange={(e) => setDraft((p) => ({ ...p, buttonUrl: e.target.value || null }))}
-                  placeholder="https://nen-petfood.com/column/…"
-                  className={inputClass}
-                />
-              </Field>
+          <section className="bg-canvas rounded-card border-hairline border p-4">
+            <h2 className="text-ink text-base font-bold">押されたあとにすること</h2><p className="text-ink-faint mt-1 text-xs">リッチメッセージの面を押した人に何をするかです。</p>
+            <div className="mt-3 space-y-2">
+              {formAction?.kind === 'open_form' && <div className="border-hairline rounded-control flex items-center gap-3 border px-4 py-3"><span className="text-ink-faint text-lg">▣</span><div className="min-w-0 flex-1"><p className="text-sm font-bold">回答フォーム「{formAction.formName}」を開く</p><p className="text-ink-faint text-xs">星の評価と、ひとことだけの短いフォームです</p></div><Button aria-label="回答フォームを外す" onClick={() => setActions(actions.filter((action) => action !== formAction))}><X aria-hidden size={16} /></Button></div>}
+              {mileageAction?.kind === 'award_mileage' && <div className="border-hairline rounded-control flex items-center gap-3 border px-4 py-3"><Gift aria-hidden className="text-ink-faint" size={18} /><div className="min-w-0 flex-1"><p className="text-sm font-bold">書いてくれたらマイルを {mileageAction.amount.toLocaleString('ja-JP')} 付ける</p><p className="text-ink-faint text-xs">回答フォームへの送信をきっかけにしています</p></div><Button aria-label="マイル付与を外す" onClick={() => setActions(actions.filter((action) => action !== mileageAction))}><X aria-hidden size={16} /></Button></div>}
+              {formIssueMessage && <p role="alert" className="text-danger text-xs font-bold">{formIssueMessage}。フォームを外して選び直してください。</p>}
+              {!formAction && <label className="block text-xs font-bold">回答フォームを開かせる（任意）<Combobox aria-label="回答フォームを開かせる（任意）" placeholder="回答フォームを選ぶ" value="" onChange={(formId) => addFormAction(formId)} options={forms.map((form) => ({ value: form.id, label: form.name, dot: form.isActive ? 'green' : 'gray', disabled: !form.isActive, hint: form.isActive ? undefined : '公開されていないため選べません' }))} className="mt-1 font-normal" /></label>}
+              {!mileageAction && <Button onClick={addMileageAction} className="w-full"><Gift aria-hidden size={16} />回答後に200マイル付ける</Button>}
             </div>
-
-            <label className="text-ink-secondary flex items-start gap-2 text-sm">
-              <input
-                type="checkbox"
-                className="mt-0.5"
-                checked={merged.isEnabled ?? false}
-                onChange={(e) => setDraft((p) => ({ ...p, isEnabled: e.target.checked }))}
-              />
-              <span>
-                この配信を動かす
-                <span className="text-ink-faint block text-xs">
-                  オフにすると、次回以降の自動送信を止めます。
-                </span>
-              </span>
-            </label>
           </section>
         </div>
 
-        {/* ---- プレビュー ---- */}
-        <aside data-design="Right" className="space-y-4">
+        <aside data-design="Right" className="space-y-3">
           <section className="bg-canvas rounded-card border-hairline border p-4">
-            <h2 className="text-ink mb-2 text-sm font-bold">届き方のプレビュー</h2>
-            <p className="text-ink-faint mb-2 text-xs">
-              {formatCampaignTiming(merged)}
-            </p>
-            <div className="bg-canvas-sunken rounded-card space-y-2 p-3">
-              {merged.imageUrl && (
-                // eslint-disable-next-line @next/next/no-img-element -- 外部URLの見本。静的アセットではない
-                <img
-                  src={merged.imageUrl}
-                  alt=""
-                  className="rounded-control max-h-32 w-full object-cover"
-                />
-              )}
-              <p className="text-ink text-sm font-bold">{merged.title || '（タイトル未入力）'}</p>
-              <p className="text-ink-secondary text-xs leading-relaxed whitespace-pre-wrap">
-                {merged.bodyText || '（本文未入力）'}
-              </p>
-              {merged.buttonLabel && (
-                <p className="border-hairline rounded-control text-accent border py-1.5 text-center text-xs">
-                  {merged.buttonLabel}
-                </p>
-              )}
-            </div>
+            <p className="text-ink-secondary mb-3 flex items-center gap-2 text-xs font-bold"><Eye aria-hidden size={15} />高橋 直人さん（ももちゃん）にはこう届きます</p>
+            {/* LINEの見た目の枠は共通部品 `LinePreview`（B-6）。届く日時は見える札のまま残す。 */}
+            <LinePreview caption={`◷ ${timing}`}><div className="bg-canvas rounded-card p-4"><p className="text-sm leading-relaxed whitespace-pre-wrap">{previewBody(merged.bodyText)}</p>{merged.buttonLabel && <p className="bg-accent-deep text-on-accent rounded-control mt-3 py-2 text-center text-xs font-bold">★ {merged.buttonLabel}</p>}</div></LinePreview>
           </section>
-
-          {/* 配信ごとの送信・開封を数える経路が無い。 */}
-          <section className="bg-canvas rounded-card border-hairline border p-4">
-            <h2 className="text-ink mb-2 text-sm font-bold">前回の結果</h2>
-            <p className="text-ink-faint text-xs leading-relaxed">
-              配信ごとの送信数・開封数を数える経路がまだありません。送信の待ち行列は
-              <Link href="/nen-campaigns" className="text-accent mx-1 hover:underline">
-                フォロー配信
-              </Link>
-              で見られます。
-            </p>
-          </section>
+          <section className="bg-canvas rounded-card border-hairline border p-4"><h2 className="text-sm font-bold">つながる先</h2><dl className="mt-3 space-y-2 text-xs"><div className="flex justify-between gap-3"><dt className="text-ink font-bold">→ EC連携</dt><dd className="text-ink-secondary">注文と到着の記録</dd></div><div className="flex justify-between gap-3"><dt className="text-ink font-bold">→ 共通情報</dt><dd className="text-ink-secondary">差し込んでいる「商品名」</dd></div><div className="flex justify-between gap-3"><dt className="text-ink font-bold">→ 友だち属性</dt><dd className="text-ink-secondary">友だち情報欄「ペットの名前」</dd></div>{mileageAction?.kind === 'award_mileage' && <div className="flex justify-between gap-3"><dt className="text-ink font-bold">→ マイル</dt><dd className="text-ink-secondary">書いてくれたら {mileageAction.amount}</dd></div>}{formAction?.kind === 'open_form' && <div className="flex justify-between gap-3"><dt className="text-ink font-bold">→ 回答フォーム</dt><dd className="text-ink-secondary">{formAction.formName}{selectedForm ? (selectedForm.isActive ? '（公開中）' : '（公開されていません）') : '（見つかりません）'}</dd></div>}</dl></section>
+          {/* 監査 R63: このアカウントの実績ではなく一般的な目安。実績の断定文（「3倍でした」等）は事実に見えるため、目安だと分かる言い方にする。 */}
+          <section className="border-warning bg-warning-bg text-warning rounded-card border p-4"><h2 className="text-sm font-bold">気をつけること（一般的な目安）</h2><div className="mt-3 space-y-3 text-xs"><p><strong className="block">◷ 届く時間は実績で確かめられます</strong>このアカウントでの反応がいい時間帯は、分析の「配信の反応」で見られます</p><p><strong className="block">▣ 吹き出しは少なめが安心です</strong>1回にたくさんの吹き出しを送るとブロックされやすい傾向があります</p></div></section>
         </aside>
       </div>
+
+      {/*
+        #935 N-299: 以前は固定の数字を書いていたのでたらめだった。実際は配信待ちの分が
+        予約したときの中身（スナップショット）のまま届き、保存した新しい中身は
+        これから新しく始まる配信にだけ使われる。件数が取れたときだけ実数で言う。
+      */}
+      <StickyBar status={merged.isEnabled
+        ? pendingCount !== null && pendingCount > 0
+          ? `動いています。配信待ちの${pendingCount.toLocaleString('ja-JP')}通は予約したときの中身のまま届きます。保存した新しい中身は、次のきっかけからの配信に使われます。`
+          : '動いています。保存した新しい中身は、次のきっかけからの配信に使われます。すでに配信待ちの分は、予約したときの中身のまま届きます。'
+        : '停止中です。保存しても新しい配信は始まりません。'} actions={<><Button href="/nen-campaigns">キャンセル</Button><Button onClick={() => setTestSearchOpen(true)}><FlaskConical aria-hidden size={16} />自分にテスト送信</Button><Button variant="primary" onClick={() => void save()} disabled={saving || !bodyCheck.fits}>{saving ? '保存中…' : '配信内容を保存'}</Button></>} />
+      {/* #935 N-301: 書きかけのまま離れるときの確認。 */}
+      <ConfirmDialog primaryAction="cancel"
+        open={leaveTarget !== null}
+        title="入力中の内容があります"
+        description="このまま移動すると、入力した内容は保存されません。移動しますか？"
+        confirmLabel="保存せずに移動"
+        cancelLabel="編集を続ける"
+        onConfirm={confirmLeave}
+        onCancel={cancelLeave}
+      />
     </div>
   )
 }

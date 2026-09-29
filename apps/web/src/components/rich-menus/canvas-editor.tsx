@@ -1,7 +1,9 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { RichMenuAreaIntent } from '@/lib/api'
+import { RICH_MENU_DIMENSIONS, type RichMenuAreaIntent } from '@line-crm/shared'
+import Notice from '@/components/shared/notice'
+import { intentLabelOf } from '@/components/rich-menus/area-properties'
 
 export type Area = {
   id: string
@@ -9,8 +11,12 @@ export type Area = {
   boundsY: number
   boundsWidth: number
   boundsHeight: number
-  /** LINE に登録するときの動きの種類。intent から決まる。 */
-  actionType: 'uri' | 'message' | 'postback' | 'richmenuswitch'
+  /**
+   * LINE に登録するときの動きの種類。intent から決まる。
+   * datetimepicker・clipboard は新しい2種。DB へは postback に載るが、
+   * 画面が送る段階では intent から決めた本来の種類を載せる。
+   */
+  actionType: 'uri' | 'message' | 'postback' | 'richmenuswitch' | 'datetimepicker' | 'clipboard'
   actionData: Record<string, unknown>
   /** 運用者から見た「何をするボタンか」。 */
   intent?: RichMenuAreaIntent | null
@@ -24,11 +30,6 @@ export type Area = {
   formId?: string | null
   trackedLinkId?: string | null
 }
-
-const SIZE_DIMS = {
-  large: { width: 2500, height: 1686 },
-  compact: { width: 2500, height: 843 },
-} as const
 
 const SNAP_PX = 4
 const MIN_AREA = 20
@@ -72,6 +73,11 @@ function snap(value: number, others: number[]): number {
   return value
 }
 
+/** 読み上げと一覧で使う名前。未命名なら位置から通し番号を振る。 */
+export function areaDisplayName(area: Area, index: number): string {
+  return area.label?.trim() || `${index + 1}番目のボタン`
+}
+
 function isOverlapping(a: Area, others: Area[]): boolean {
   return others.some((b) => {
     if (b.id === a.id) return false
@@ -97,12 +103,16 @@ export function CanvasEditor({
   onPreviewAction,
 }: Props) {
   const canvasRef = useRef<HTMLDivElement>(null)
-  const dims = SIZE_DIMS[size]
+  const dims = RICH_MENU_DIMENSIONS[size]
   const [scale, setScale] = useState(0.3)
   const [drag, setDrag] = useState<DragState>(null)
+  /** 上限に当たったときの知らせ。**`alert()` の代わりに画面へ残す。** */
+  const [limitNotice, setLimitNotice] = useState('')
 
   function toImageCoord(clientX: number, clientY: number) {
-    const rect = canvasRef.current!.getBoundingClientRect()
+    // 描画前は ref がまだ無い。非null断言の代わりに原点へ倒す。
+    const rect = canvasRef.current?.getBoundingClientRect()
+    if (!rect) return { x: 0, y: 0 }
     return {
       x: Math.round((clientX - rect.left) / scale),
       y: Math.round((clientY - rect.top) / scale),
@@ -208,11 +218,15 @@ export function CanvasEditor({
         const w = Math.abs(x - drag.startX)
         const h = Math.abs(y - drag.startY)
         if (w >= MIN_AREA && h >= MIN_AREA) {
-          // LINE の上限 (1 page あたり area 20 個) を事前にブロック。
-          // 上限を超えて追加させると Save Draft / Publish が 400 になる。
+          /*
+            LINEの上限（1ページに20個）を先に止める。超えて足すと、保存や
+            登録のときに断られる。**`alert()` では出さない**——見た目が
+            ブラウザ任せで、画像比較にも写らない。画面に文で残す。
+          */
           if (areas.length >= 20) {
-            alert('1 ページあたり areas は最大 20 個までです (LINE 仕様)。')
+            setLimitNotice('1つのページに置けるボタンは20個までです（LINEの決まり）。')
           } else {
+            setLimitNotice('')
             onAddArea({
               id: typeof crypto !== 'undefined' && 'randomUUID' in crypto
                 ? crypto.randomUUID()
@@ -248,7 +262,7 @@ export function CanvasEditor({
   useEffect(() => {
     if (!selectedAreaId || preview) return
     function onKey(e: KeyboardEvent) {
-      const target = e.target as HTMLElement | null
+      const target = e.target instanceof HTMLElement ? e.target : null
       const tag = target?.tagName
       // INPUT/TEXTAREA/SELECT に focus がある間は area 操作を無効化
       // (右パネルの action-type / target-page select で矢印キーが奪われる事故防止)
@@ -298,6 +312,11 @@ export function CanvasEditor({
 
   return (
     <div className="space-y-2 select-none">
+      {limitNotice && (
+        <Notice tone="warn">
+          {limitNotice}
+        </Notice>
+      )}
       <div className="flex items-center gap-2 text-sm">
         <span className="text-gray-500 text-xs">ズーム</span>
         {[0.25, 0.3, 0.5, 0.75, 1].map((s) => (
@@ -318,7 +337,7 @@ export function CanvasEditor({
         </span>
         {!preview && (
           <span className="ml-auto text-xs text-gray-400">
-            空白でドラッグ → 新規矩形 / 矩形クリックで選択 / 矢印キーで微調整 / Delete で削除
+            空白でドラッグ → 新規矩形 / 矩形クリックか下の一覧で選択 / 矢印キーで微調整 / Delete で削除
           </span>
         )}
       </div>
@@ -344,7 +363,7 @@ export function CanvasEditor({
               className="absolute inset-0 w-full h-full pointer-events-none object-cover"
             />
           )}
-          {areas.map((area) => {
+          {areas.map((area, index) => {
             const overlap = isOverlapping(area, areas)
             const selected = area.id === selectedAreaId
             const borderColor = preview
@@ -358,7 +377,31 @@ export function CanvasEditor({
               <div
                 key={area.id}
                 onMouseDown={(e) => handleAreaMouseDown(e, area)}
-                className="absolute"
+                /*
+                 * R233: 編集画面のエリアはキーボードだけでも選べるようにする。
+                 * focus した時点で選択扱いにすると、そのまま矢印キーで動かせる。
+                 * プレビューでは従来どおりクリック専用（訴求の試し押し用）。
+                 */
+                role={preview ? undefined : 'button'}
+                tabIndex={preview ? undefined : 0}
+                aria-pressed={preview ? undefined : selected}
+                aria-label={
+                  preview
+                    ? undefined
+                    : `${areaDisplayName(area, index)}、動きは${intentLabelOf(area)}`
+                }
+                onFocus={preview ? undefined : () => onSelectArea(area.id)}
+                onKeyDown={
+                  preview
+                    ? undefined
+                    : (e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          onSelectArea(area.id)
+                        }
+                      }
+                }
+                className="absolute focus-visible:outline-2 focus-visible:outline-status-info"
                 style={{
                   left: area.boundsX * scale,
                   top: area.boundsY * scale,
@@ -406,6 +449,45 @@ export function CanvasEditor({
           )}
         </div>
       </div>
+      {/*
+        R233: エリア一覧（要件19-64）。マウスで画像上の矩形を掴めなくても、
+        ここから Tab → Enter で選べ、選んだあとは右の設定欄・矢印キーが効く。
+        各ボタンの動きもここで読み上げられる。
+      */}
+      {!preview && areas.length > 0 && (
+        <div className="space-y-1">
+          <h3 className="text-ink-faint text-xs font-semibold">エリア一覧</h3>
+          <ul className="border-hairline divide-hairline divide-y rounded border">
+            {areas.map((area, index) => {
+              const selected = area.id === selectedAreaId
+              const name = areaDisplayName(area, index)
+              return (
+                <li key={area.id} className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    aria-current={selected ? true : undefined}
+                    onClick={() => onSelectArea(area.id)}
+                    className={`flex-1 px-3 py-2 text-left text-sm focus-visible:outline-2 focus-visible:outline-status-info ${
+                      selected ? 'bg-accent-soft text-ink font-semibold' : 'text-ink hover:bg-canvas-sunken'
+                    }`}
+                  >
+                    <span className="mr-2">{name}</span>
+                    <span className="text-ink-faint text-xs">動き: {intentLabelOf(area)}</span>
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`${name}を消す`}
+                    onClick={() => onDeleteArea(area.id)}
+                    className="text-status-danger mr-2 px-2 py-1 text-xs focus-visible:outline-2 focus-visible:outline-status-info"
+                  >
+                    消す
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+      )}
     </div>
   )
 }

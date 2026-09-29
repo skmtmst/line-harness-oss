@@ -51,4 +51,38 @@ describe('auditLog', () => {
     expect(entry.actorId).toBe('unknown');
     expect(entry.actorRole).toBe('unknown');
   });
+
+  it('media.download は成功・拒否と対象アカウントを書き手へ渡す', async () => {
+    const bound: unknown[][] = [];
+    const fakeDb = {
+      prepare: () => ({
+        bind: (...args: unknown[]) => ({
+          run: async () => {
+            bound.push(args);
+          },
+        }),
+      }),
+    };
+    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const app = new Hono<Env>();
+    app.get('/x', (c) => {
+      c.set('staff', { id: 'staff-1', name: 'N', role: 'staff', readOnly: false });
+      auditLog(c, 'media.download', { kind: 'media', id: 'md-1' }, { result: 'denied', lineAccountId: 'account-1' });
+      return c.json({ ok: true });
+    });
+    await app.request('/x', {}, { DB: fakeDb } as unknown as Env['Bindings']);
+    // 書き込みは waitUntil 任せなので、1手待ってから見る。
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    // bind の並び: id, sourceKind, sourceId, tenantId, lineAccountId, category,
+    // actorPrincipalId, actorRole, action, targetKind, targetId, result, ...
+    expect(bound).toHaveLength(1);
+    const row = bound[0] as unknown[];
+    expect(row[4]).toBe('account-1');
+    expect(row[8]).toBe('media.download');
+    expect(row[10]).toBe('md-1');
+    expect(row[11]).toBe('denied');
+    // URLや秘密値は残さない。残るのは誰が・何に・何をしたかだけ。
+    expect(JSON.stringify(row)).not.toContain('http');
+    spy.mockRestore();
+  });
 });

@@ -1,0 +1,134 @@
+/*
+ * 設計 ★V6 34-2「レシピ一覧」（`y0P0Qx`、1920）。
+ *
+ * 1 枚 1 行のカード。左に中身、右に操作。
+ * **押せない理由は操作の下に置く。** ボタンの隣に並べると、
+ * 理由がボタンの説明に見えて「押せば直る」と読まれる。
+ */
+
+.page {
+  display: flex;
+  flex-direction: column; /* layout: vertical */
+  gap: 20px; /* gap: 20 */
+}
+
+.list {
+  display: flex;
+  flex-direction: column; /* layout: vertical */
+  gap: 12px; /* gap: 12 */
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 240px;
+  gap: 20px; /* gap: 20 */
+  padding: 20px; /* padding: 20 */
+  border: 1px solid var(--color-hairline); /* stroke: $hairline */
+  border-radius: var(--radius-card); /* cornerRadius: $radius-md */
+  background: var(--color-canvas); /* fill: $canvas */
+}
+
+@media (max-width: 900px) {
+  .card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.body {
+  display: flex;
+  flex-direction: column; /* layout: vertical */
+  gap: 8px; /* gap: 8 */
+  min-width: 0;
+}
+
+.name {
+  color: var(--color-ink); /* fill: $ink */
+  font-size: var(--text-heading); /* fontSize: $size-heading */
+  font-weight: 700; /* fontWeight: 700 */
+}
+
+.purpose {
+  color: var(--color-ink-secondary); /* fill: $ink-secondary */
+  font-size: var(--text-body); /* fontSize: $size-body */
+}
+
+.line {
+  color: var(--color-ink-secondary); /* fill: $ink-secondary */
+  font-size: var(--text-body); /* fontSize: $size-body */
+  line-height: 1.6;
+}
+
+.label {
+  margin-right: 4px;
+  color: var(--color-ink-faint); /* fill: $ink-faint */
+}
+
+.requirements {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px; /* gap: 6 */
+  vertical-align: middle;
+}
+
+/* 数の代わりに理由を出す行。**数字に見せない。** */
+.count {
+  color: var(--color-ink-faint); /* fill: $ink-faint */
+  font-size: var(--text-caption); /* fontSize: $size-caption */
+}
+
+.actions {
+  display: flex;
+  flex-direction: column; /* layout: vertical */
+  gap: 8px; /* gap: 8 */
+  align-items: stretch;
+}
+
+.primary {
+  padding: 10px 16px; /* padding: 10 16 */
+  border-radius: var(--radius-control); /* cornerRadius: $radius-sm */
+  background: var(--color-accent-deep); /* fill: $accent-deep */
+  color: var(--color-on-accent); /* fill: $on-accent */
+  font-size: var(--text-label); /* fontSize: $size-label */
+  font-weight: 700; /* fontWeight: 700 */
+  text-align: center;
+}
+
+.primary:hover {
+  filter: brightness(0.92);
+}
+
+.secondary {
+  padding: 10px 16px; /* padding: 10 16 */
+  border: 1px solid var(--color-hairline); /* stroke: $hairline */
+  border-radius: var(--radius-control); /* cornerRadius: $radius-sm */
+  background: var(--color-canvas); /* fill: $canvas */
+  color: var(--color-ink); /* fill: $ink */
+  font-size: var(--text-label); /* fontSize: $size-label */
+  font-weight: 700; /* fontWeight: 700 */
+  text-align: center;
+}
+
+.secondary:hover {
+  background: var(--color-canvas-sunken);
+}
+
+/* 押せないものは、押せる形にしない。 */
+.blocked {
+  padding: 10px 16px; /* padding: 10 16 */
+  border: 1px solid var(--color-hairline); /* stroke: $hairline */
+  border-radius: var(--radius-control); /* cornerRadius: $radius-sm */
+  background: var(--color-canvas-sunken); /* fill: $canvas-sunken */
+  color: var(--color-ink-faint); /* fill: $ink-faint */
+  font-size: var(--text-label); /* fontSize: $size-label */
+  font-weight: 700; /* fontWeight: 700 */
+  text-align: center;
+}
+
+.reason {
+  color: var(--color-ink-faint); /* fill: $ink-faint */
+  font-size: var(--text-caption); /* fontSize: $size-caption */
+  line-height: 1.5;
+}

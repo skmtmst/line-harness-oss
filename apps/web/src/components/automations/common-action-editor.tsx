@@ -4,7 +4,7 @@ import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-react'
 import type { CommonActionResources, CommonActionStep } from '@/lib/api'
 import Button from '@/components/shared/button'
 import IconButton from '@/components/shared/icon-button'
-import SelectField from '@/components/shared/select-field'
+import Select from '@/components/shared/select'
 import { TextArea, TextField } from '@/components/shared/text-field'
 
 const ACTION_OPTIONS: Array<{ value: CommonActionStep['type']; label: string }> = [
@@ -28,9 +28,24 @@ function defaultParams(type: CommonActionStep['type']): Record<string, unknown> 
   return {}
 }
 
+/**
+ * 手順IDの採番1本化（#519 軽）。`crypto.randomUUID` は非HTTPS環境で
+ * 例外になるため、使えないときは乱数+時刻へ落とす。
+ */
+export function newStepId(): string {
+  try {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID()
+    }
+  } catch {
+    // 下の代替へ落とす。
+  }
+  return `step-${Date.now().toString(36)}-${Math.floor(Math.random() * 0xffff_ffff).toString(36)}`
+}
+
 export function newCommonActionStep(type: CommonActionStep['type'] = 'add_tag'): CommonActionStep {
   return {
-    id: crypto.randomUUID(),
+    id: newStepId(),
     type,
     params: defaultParams(type),
     onFailure: 'stop',
@@ -79,11 +94,13 @@ export default function CommonActionEditor({
           <div className="grid gap-3 lg:grid-cols-2">
             <label className="text-ink-secondary text-sm">
               処理
-              <SelectField
+              <Select
+                aria-label="処理"
+                size="full"
                 value={step.type}
-                onChange={(event) => update(index, {
-                  type: event.target.value as CommonActionStep['type'],
-                  params: defaultParams(event.target.value as CommonActionStep['type']),
+                onChange={(value) => update(index, {
+                  type: value as CommonActionStep['type'],
+                  params: defaultParams(value as CommonActionStep['type']),
                 })}
                 className="mt-1 w-full"
                 options={ACTION_OPTIONS}
@@ -91,9 +108,11 @@ export default function CommonActionEditor({
             </label>
             <label className="text-ink-secondary text-sm">
               失敗したとき
-              <SelectField
+              <Select
+                aria-label="失敗したとき"
+                size="full"
                 value={step.onFailure}
-                onChange={(event) => update(index, { onFailure: event.target.value as 'stop' | 'continue' })}
+                onChange={(value) => update(index, { onFailure: value as 'stop' | 'continue' })}
                 className="mt-1 w-full"
                 options={[
                   { value: 'stop', label: 'ここで止める' },
@@ -136,9 +155,11 @@ function ResourceSelect({
   return (
     <label className="text-ink-secondary block text-sm">
       {label}
-      <SelectField
+      <Select
+        aria-label={label}
+        size="full"
         value={value}
-        onChange={(event) => onChange(event.target.value)}
+        onChange={(value) => onChange(value)}
         className="mt-1 w-full"
         options={[{ value: '', label: `${label}を選ぶ` }, ...options.map((option) => ({ value: option.id, label: option.name }))]}
       />
@@ -169,7 +190,14 @@ function ActionParams({
     return <ResourceSelect label="リッチメニュー" value={String(step.params.richMenuPageId ?? '')} options={resources.richMenus} onChange={(richMenuPageId) => onChange({ richMenuPageId })} />
   }
   if (step.type === 'common_action') {
-    return <ResourceSelect label="共通アクション" value={String(step.params.commonActionId ?? '')} options={resources.commonActions} onChange={(commonActionId) => onChange({ commonActionId })} />
+    const commonActionId = String(step.params.commonActionId ?? '')
+    const selected = resources.commonActions.find((item) => item.id === commonActionId)
+    return (
+      <div>
+        <ResourceSelect label="共通アクション" value={commonActionId} options={resources.commonActions} onChange={(nextId) => onChange({ commonActionId: nextId })} />
+        {selected ? <p className="text-ink-secondary mt-2 text-xs">共通アクション「{selected.name}」 v{selected.version}</p> : null}
+      </div>
+    )
   }
   if (step.type === 'wait') {
     return (
@@ -181,9 +209,15 @@ function ActionParams({
   }
   if (step.type === 'send_message') {
     const templateId = String(step.params.templateId ?? '')
+    const selected = resources.templates.find((item) => item.id === templateId)
     return (
       <div className="space-y-3">
         <ResourceSelect label="テンプレート" value={templateId} options={resources.templates} onChange={(next) => onChange(next ? { templateId: next } : { content: '' })} />
+        {selected ? (
+          <p className="text-ink-secondary text-xs">
+            テンプレート「{selected.name}」　版: —（未取得。テンプレートの版を返す口が接続されると表示します）
+          </p>
+        ) : null}
         {!templateId ? (
           <label className="text-ink-secondary block text-sm">
             送る本文

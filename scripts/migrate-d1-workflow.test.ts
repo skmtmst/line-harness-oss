@@ -23,6 +23,15 @@ describe('D1 migration workflow safety', () => {
     expect(manualWorkflow).toContain('name: ${{ inputs.environment }}');
   });
 
+  it('can select one exact migration without applying other pending files', () => {
+    expect(manualWorkflow).toMatch(/migration:\n[\s\S]*?type: string/);
+    expect(manualWorkflow).toContain('TARGET_MIGRATION: ${{ inputs.migration }}');
+    expect(manualWorkflow).toContain("grep -Eq '^[0-9]{3,}_[A-Za-z0-9_-]+\\.sql$'");
+    expect(manualWorkflow).toContain('grep -qxF "$target_path" "$all_pending_file"');
+    expect(manualWorkflow).toContain('printf \'%s\\n\' "$target_path" > "$apply_file"');
+    expect(manualWorkflow).toContain('cp "$all_pending_file" "$apply_file"');
+  });
+
   it('accepts the Environment-scoped Cloudflare secret names', () => {
     expect(manualWorkflow).toContain(
       'CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}',
@@ -68,6 +77,18 @@ describe('D1 migration workflow safety', () => {
       expect(workflow).toContain(
         'Time Travel のブックマークを取れませんでした。戻る先が無いので中止します。',
       );
+    }
+  });
+
+  it('does not use the runner context in job-level env (steps only)', () => {
+    // `runner.temp` などは step の中でだけ有効。job の env に書くと
+    // workflow 自体が「Unrecognized named-value: runner」で起動すらしない。
+    // job の env は4空白、step の env は8空白なので字下げで見分ける。
+    const jobEnvBlocks =
+      manualWorkflow.match(/^ {4}env:\n(?: {6}\S[^\n]*\n?)+/gm) ?? [];
+    expect(jobEnvBlocks.length).toBeGreaterThan(0);
+    for (const block of jobEnvBlocks) {
+      expect(block).not.toContain('${{ runner.');
     }
   });
 });

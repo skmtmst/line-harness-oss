@@ -205,8 +205,12 @@ describe('GET /api/ec-commerce/shipments', () => {
   });
 
   it('走査した件数と上限を返す（取りこぼしの判断に使う）', async () => {
+    /*
+     * 走査の下限は200件（DASH-22）。明細の表示件数 limit=5 に合わせて
+     * 走査を25件へ縮めると、上部カードの「今日の件数」が過少になる。
+     */
     const data = await callShipments([orderRow()], '?limit=5');
     expect(data.scanned).toBe(1);
-    expect(data.scanLimit).toBe(25);
+    expect(data.scanLimit).toBe(200);
   });
 });

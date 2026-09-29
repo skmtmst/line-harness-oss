@@ -1,14 +1,15 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Header from '@/components/layout/header'
-import { useEmbeddedPage } from '@/components/layout/embedded-page-context'
 import SummaryBar from '@/components/users/summary-bar'
 import UsersFilters from '@/components/users/users-filters'
 import UsersTable from '@/components/users/users-table'
 import MergedPersonDetailView from '@/components/merged-person/merged-person-detail'
+import Button from '@/components/shared/button'
 import { api } from '@/lib/api'
+import { csvCell } from '@/lib/presentation'
 import type { UserRowData } from '@/components/users/user-row'
+import { usePageTitle } from '@/components/shell/page-chrome'
 
 const PAGE_SIZE = 50
 
@@ -18,13 +19,14 @@ interface AccountOption {
 }
 
 export default function UsersPage() {
-  const embedded = useEmbeddedPage()
+  usePageTitle('統合ユーザー')
   const [rows, setRows] = useState<UserRowData[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [q, setQ] = useState('')
   const [onlyDups, setOnlyDups] = useState(false)
   const [account, setAccount] = useState('')
+  const [uid, setUid] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [accountOptions, setAccountOptions] = useState<AccountOption[]>([])
@@ -52,8 +54,9 @@ export default function UsersPage() {
   }, [q])
 
   useEffect(() => {
+    // FRIEND-09: UID条件も含めて条件変更時は1ページへ戻す。
     setPage(1)
-  }, [debouncedQ, onlyDups, account])
+  }, [debouncedQ, onlyDups, account, uid])
 
   // アカウント候補は LINE アカウント API から取得（ページ依存させない）。
   // /api/users-grouped は inactive を除外して集計するので、候補も active のみ。
@@ -81,6 +84,8 @@ export default function UsersPage() {
         q: debouncedQ || undefined,
         onlyDups: onlyDups || undefined,
         account: account || undefined,
+        // FRIEND-09: UID絞り込みはサーバーへ渡し、全件へ適用する。
+        uid: uid === 'linked' || uid === 'unlinked' ? uid : undefined,
         page,
         pageSize: PAGE_SIZE,
         forceRefresh: force || undefined,
@@ -93,13 +98,13 @@ export default function UsersPage() {
         // 失敗時に古い rows を残すと、新しいフィルタ条件で古いデータが見えて誤誘導するのでクリア。
         setRows([])
         setTotal(0)
-        setError('取得に失敗しました')
+        setError('取得に失敗しました。もう一度読み込んでください。')
       }
     } catch {
       if (seq !== requestSeqRef.current) return
       setRows([])
       setTotal(0)
-      setError('取得に失敗しました')
+      setError('取得に失敗しました。もう一度読み込んでください。')
     } finally {
       if (seq === requestSeqRef.current) {
         setLoading(false)
@@ -109,21 +114,67 @@ export default function UsersPage() {
         }
       }
     }
-  }, [debouncedQ, onlyDups, account, page, pendingForceRefresh])
+  }, [debouncedQ, onlyDups, account, uid, page, pendingForceRefresh])
 
   useEffect(() => {
     load()
   }, [load])
 
-  const headerDescription = useMemo(
-    () => '複数のLINEアカウントにいる同じ人を、元の友だちを残したまま確認します。',
-    [],
-  )
+  /*
+   * FRIEND-09/10: CSV は「表示中の条件」に合う全件を対象にする。
+   * 以前は表示中ページの50行だけを出していたため、UID条件を掛けた画面と
+   * 書き出しの対象がずれていた。1回の応答上限（200件）で順に取り、
+   * 件数と同じだけ集まるまで続ける。
+   * セル整形は共通の csvCell（先頭 = + - @ への ' 付け + 引用符の二重化）。
+   */
+  const [exporting, setExporting] = useState(false)
+  const [exportError, setExportError] = useState('')
+  const exportCsv = async () => {
+    if (exporting) return
+    setExporting(true)
+    setExportError('')
+    try {
+      const filters = {
+        q: debouncedQ || undefined,
+        onlyDups: onlyDups || undefined,
+        account: account || undefined,
+        uid: uid === 'linked' || uid === 'unlinked' ? uid : undefined,
+      } as const
+      const all: UserRowData[] = []
+      let exportTotal = total
+      // 上限は途中で件数が増えても無限に追い続けないための安全弁。
+      for (let p = 1; all.length < exportTotal && p <= 500; p += 1) {
+        const res = await api.usersGrouped.list({ ...filters, page: p, pageSize: 200 })
+        if (!res.success) throw new Error('fetch failed')
+        all.push(...res.data.rows)
+        exportTotal = res.data.total
+        if (res.data.rows.length === 0) break
+      }
+      const lines = [
+        ['統合ユーザー', '連絡先', '紐付くアカウント', 'UID', '最終接触'].map(csvCell).join(','),
+        ...all.map((row) => [
+          row.displayName ?? '', row.emails[0] ?? row.phones[0] ?? '',
+          row.accounts.map((item) => item.accountName).join('・'),
+          row.identityKeyKind === 'uid' ? '連携済み' : row.identityKeyKind === 'url_token' ? '要確認' : '未連携',
+          row.lastActivityAt,
+        ].map(csvCell).join(',')),
+      ]
+      const url = URL.createObjectURL(new Blob([`\uFEFF${lines.join('\n')}`], { type: 'text/csv;charset=utf-8' }))
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = 'merged-users.csv'
+      anchor.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      setExportError('CSVを書き出せませんでした。時間をおいてやり直してください。')
+    } finally {
+      setExporting(false)
+    }
+  }
 
   if (openedPersonId) {
     return (
       <div className="space-y-4" data-users-design="v6">
-        {!embedded ? <Header title="統合ユーザー" description={headerDescription} /> : null}
         <MergedPersonDetailView
           personId={openedPersonId}
           onClose={() => setOpenedPersonId(null)}
@@ -134,44 +185,66 @@ export default function UsersPage() {
 
   return (
     <div className="space-y-4" data-users-design="v6" data-design-node="r7eSi">
-      {!embedded ? <Header title="統合ユーザー" description={headerDescription} /> : null}
+      {/*
+        使い方の説明は毎回読むものではないので、共通 Disclosure が無い
+        いまは1行の小さな説明文に留める（カードにしない）。
+      */}
+      <p className="text-xs leading-5 text-ink-secondary">
+        複数の友だちを、1人の顧客として横断管理します。同じ人か確認が必要なものは「要確認」と表示します。
+      </p>
 
-      <section className="rounded-v6-card border border-hairline bg-canvas px-4 py-3 shadow-v6-card">
-        <p className="text-sm font-bold text-v6-ink">
-          複数の友だちを、1人の顧客として横断管理します。
-        </p>
-        <p className="mt-1 text-xs leading-5 text-v6-ink-secondary">
-          元の友だちは残したまま、登録アカウント・最終接触・重複配信の確認ができます。同じ人か確認が必要なものは「要確認」と表示します。
-        </p>
-      </section>
+      <SummaryBar rows={rows} />
 
-      <SummaryBar />
-
-      <div className="flex items-stretch gap-3">
-        <div className="flex-1">
-          <UsersFilters
-            q={q}
-            onlyDups={onlyDups}
-            account={account}
-            accountOptions={accountOptions}
-            onChange={(next) => {
-              if (next.q !== undefined) setQ(next.q)
-              if (next.onlyDups !== undefined) setOnlyDups(next.onlyDups)
-              if (next.account !== undefined) setAccount(next.account)
-            }}
-          />
-        </div>
-        <button
+      {/*
+        U018: 390pxでは作成・CSV・検索・絞り込みが同じ帯に入り、検索欄が
+        細線まで潰れていた。操作（作成・CSV・再計算）の行と、検索・絞り込みの
+        行を縦に分ける。検索欄は常に全幅の独立行にし、絞り込みは収まらない
+        幅だけ折り返す。共通部品の形は変えず、画面側の scoped style で効かせる。
+      */}
+      <div className="flex flex-wrap items-center gap-2" data-users-actions="true">
+        <Button href="/friends/identity-candidates" variant="primary">
+          ＋ 統合ユーザーを作成
+        </Button>
+        <Button type="button" onClick={() => void exportCsv()} disabled={exporting} className="ml-auto">
+          {exporting ? '書き出し中…' : 'CSVで書き出す'}
+        </Button>
+        <Button
           type="button"
           onClick={() => setPendingForceRefresh(true)}
           disabled={refreshing}
-          className="rounded-[9px] border border-[#DADDE2] bg-white px-4 text-xs font-semibold text-[#565F59] shadow-[1px_1px_2px_rgba(29,29,31,0.13)] hover:bg-[#F6F6F8] disabled:opacity-50"
           title="最新の状態を取得して一覧を更新"
         >
           {refreshing ? '再計算中…' : '再計算'}
-        </button>
+        </Button>
       </div>
+      <div data-users-filters>
+        <UsersFilters
+          q={q}
+          onlyDups={onlyDups}
+          account={account}
+          uid={uid}
+          accountOptions={accountOptions}
+          onChange={(next) => {
+            if (next.q !== undefined) setQ(next.q)
+            if (next.onlyDups !== undefined) setOnlyDups(next.onlyDups)
+            if (next.account !== undefined) setAccount(next.account)
+            if (next.uid !== undefined) setUid(next.uid)
+          }}
+        />
+      </div>
+      <style>{`
+        [data-users-filters] > div { flex-wrap: wrap; }
+        [data-users-filters] [data-design-node="phlR1"] { flex: 1 1 100%; }
+        /* U041: 7列の表は狭い幅で見出しが衝突する。列同士の比較が要る表なので、
+           収まらない幅では枠の内側だけ横へ動かして見出しの形を保つ。 */
+        [data-scroll-table] > div { overflow-x: auto; }
+        [data-scroll-table] table { min-width: 860px; }
+      `}</style>
 
+      {exportError ? <p className="text-xs text-danger" role="alert">{exportError}</p> : null}
+
+      {/* U041: 見出し同士の衝突を、枠の内側の横移動で避ける。 */}
+      <div data-scroll-table>
       <UsersTable
         rows={rows}
         total={total}
@@ -179,9 +252,11 @@ export default function UsersPage() {
         pageSize={PAGE_SIZE}
         loading={loading}
         error={Boolean(error)}
+        onRetry={() => void load()}
         onPageChange={setPage}
         onOpenMergedPerson={setOpenedPersonId}
       />
+      </div>
     </div>
   )
 }

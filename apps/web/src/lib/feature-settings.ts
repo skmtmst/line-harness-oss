@@ -31,6 +31,12 @@ export type FeatureKey =
   | 'ec_commerce'
   | 'line_notifications'
   | 'restaurant_test'
+  | 'multi_store_hierarchy'
+  | 'friend_fields'
+  | 'support_marks'
+  | 'saved_searches'
+  | 'common_vars'
+  | 'site_tracking'
 
 export interface FeatureItem {
   id: string
@@ -48,7 +54,7 @@ export interface FeatureGroup {
   items: FeatureItem[]
 }
 
-export const FEATURE_SETTINGS_UPDATED_EVENT = 'line-harness:feature-settings-updated'
+export { FEATURE_SETTINGS_UPDATED_EVENT } from './feature-settings-event'
 export const SPECIALIZED_FEATURE_KEYS: FeatureKey[] = ['nen_campaigns', 'photo_review', 'ec_commerce', 'line_notifications']
 
 /**
@@ -81,6 +87,12 @@ export const DEFAULT_FEATURES: Record<FeatureKey, boolean> = {
   ec_commerce: true,
   line_notifications: true,
   restaurant_test: true,
+  multi_store_hierarchy: false,
+  friend_fields: true,
+  support_marks: true,
+  saved_searches: true,
+  common_vars: true,
+  site_tracking: true,
 }
 
 function toFeatureItem(item: MenuItem): FeatureItem {
@@ -137,13 +149,18 @@ export function groupEnabledCount(group: FeatureGroup, features: Record<string, 
  * サービスでは区分ごと出さない。切り替えられる項目が1つも無い区分
  * （設定など）は、スイッチが並ばないので出さない。
  */
-export function visibleFeatureGroups(options: { specializedFeatureKeys: string[] }): FeatureGroup[] {
+export function visibleFeatureGroups(options: {
+  specializedFeatureKeys: string[]
+  includeRestaurantTest?: boolean
+}): FeatureGroup[] {
   const specialized = new Set(options.specializedFeatureKeys)
   return FEATURE_GROUPS.map((group) =>
     group.id === 'specialized'
       ? { ...group, items: group.items.filter((item) => item.keys.some((key) => specialized.has(key))) }
       : group,
-  ).filter((group) => group.items.length > 0 && group.id !== 'restaurant-test')
+  ).filter((group) =>
+    group.items.length > 0 && (options.includeRestaurantTest || group.id !== 'restaurant-test'),
+  )
 }
 
 /** 並び順の保存の形。区分の目印ごとに、項目の目印を並べて持つ。 */

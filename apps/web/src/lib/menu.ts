@@ -1,5 +1,4 @@
 import type { FeatureKey } from './feature-settings'
-import { hqOpenHref } from './hq-navigation'
 
 /**
  * サイドメニューの項目。**ここが正本。**
@@ -30,6 +29,13 @@ export interface MenuItem {
   featureKey?: FeatureKey
   /** 消せない項目。機能設定では鍵付きで出し、スイッチを触れなくする。 */
   required?: boolean
+  /**
+   * href と違う permission key で出し分けたいときに使う（N-411）。
+   * 例: 本人の勤務は href が '/booking/staff/shifts' だが鍵は 'booking.staff.own'。
+   */
+  permissionKey?: string
+  /** true のとき owner/admin には出さない（staff の本人向け項目）。 */
+  staffOnly?: boolean
   /** 赤で出す項目。 */
   danger?: boolean
 }
@@ -44,33 +50,28 @@ export interface MenuSection {
   items: MenuItem[]
 }
 
-/** 統括コンソールだけで使う、店舗横断の管理メニュー。 */
+/** 統括コンソールだけで使う、アカウント横断の管理メニュー。 */
 export const HQ_MENU_SECTIONS: MenuSection[] = [
   {
     id: 'hq',
     label: null,
     title: '統括',
     items: [
-      { href: '/hq', label: '店舗管理', icon: 'M3 21h18M5 21V7l7-4 7 4v14M9 10h2m2 0h2m-6 4h2m2 0h2m-6 4h2m2 0h2', id: 'hq-stores', note: '統括に属するLINE公式アカウントを管理します', required: true },
-      { href: hqOpenHref('tags'), label: 'タグ', icon: 'M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z', id: 'hq-tags', note: '店舗を選んでタグ管理を開きます', required: true },
-      { href: hqOpenHref('templates'), label: 'テンプレート管理', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', id: 'hq-templates', note: '店舗を選んでテンプレート管理を開きます', required: true },
-      { href: hqOpenHref('rich-menus'), label: 'リッチメニュー管理', icon: 'M4 4h6v6H4V4zm0 10h6v6H4v-6zm10-10h6v6h-6V4zm0 10h6v6h-6v-6z', id: 'hq-rich-menus', note: '店舗を選んでリッチメニュー管理を開きます', required: true },
-      { href: hqOpenHref('form-submissions'), label: '回答フォーム管理', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2', id: 'hq-forms', note: '店舗を選んで回答フォーム管理を開きます', required: true },
-      { href: '/hq/settings', label: '設定', icon: 'M4 6h16M4 12h16M4 18h7', id: 'hq-settings', note: '統括の設定を管理します', required: true },
+      { href: '/hq', label: 'アカウント', icon: 'M3 21h18M5 21V7l7-4 7 4v14M9 10h2m2 0h2m-6 4h2m2 0h2m-6 4h2m2 0h2', id: 'hq-stores', note: '統括に属するLINE公式アカウントを管理します', required: true },
+      { href: '/hq/friend-attributes', label: '友だち属性', icon: 'M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z', id: 'hq-tags', note: 'タグのひな形を作成し、アカウントへ配布します', required: true },
+      { href: '/hq/templates', label: 'テンプレート', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', id: 'hq-templates', note: 'メッセージのひな形を作成し、アカウントへ配布します', required: true },
+      { href: '/hq/rich-menus', label: 'リッチメニュー', icon: 'M4 4h6v6H4V4zm0 10h6v6H4v-6zm10-10h6v6h-6V4zm0 10h6v6h-6v-6z', id: 'hq-rich-menus', note: 'リッチメニューのひな形を作成し、アカウントへ配布します', required: true },
+      { href: '/hq/form-submissions', label: '回答フォーム', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2', id: 'hq-forms', note: '回答フォームのひな形を作成し、アカウントへ配布します', required: true },
+      { href: '/hq/banners', label: 'バナー生成', icon: 'M4 5a2 2 0 012-2h12a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm4 5a1.5 1.5 0 100-3 1.5 1.5 0 000 3zm12 5l-5-5L5 21', id: 'hq-banners', note: '配信やリッチメニューに使う画像をAIで作り、アカウントへ渡します', required: true },
     ],
   },
 ]
 
 export const MENU_SECTIONS: MenuSection[] = [
   {
-    /*
-     * 見出しを付けない。毎日開くものが、ここに見出し無しでひとかたまりに
-     * なっている。以前は「対応」「友だち属性」と2つ見出しを挟んでいたが、
-     * 項目が1〜2個の区分に見出しを付けると、行数のわりに縦が伸びる。
-     */
     id: 'basic',
-    label: null,
-    title: '基本',
+    label: 'メイン',
+    title: 'メイン',
     items: [
       { href: '/', label: 'ダッシュボード', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' , id: 'dashboard', note: '数字と、今日やることのまとめ', required: true },
       { href: '/chats', label: '受信箱', icon: 'M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5', badge: 'unanswered' , id: 'inbox', note: 'LINEとメールの問い合わせをまとめて扱います', required: true },
@@ -105,7 +106,7 @@ export const MENU_SECTIONS: MenuSection[] = [
       { href: '/templates', label: 'テンプレート', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' , id: 'templates', note: '差し込み変数付きの文面', featureKey: 'templates' },
       { href: '/rich-menus', label: 'リッチメニュー', icon: 'M4 4h6v6H4V4zm0 10h6v6H4v-6zm10-10h6v6h-6V4zm0 10h6v6h-6v-6z' , id: 'rich-menus', note: 'トーク下部のメニューと出し分け', featureKey: 'rich_menus' },
       { href: '/form-submissions', label: '回答フォーム', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' , id: 'forms', note: 'フォームの作成と、友だち情報欄への記録', featureKey: 'forms' },
-      { href: '/contents/vars', label: '共通情報', icon: 'M4 7V4h16v3M9 20h6M12 4v16' , id: 'common-vars', note: '会社名・営業時間など、アカウント内で共通に使う文字。テンプレートに差し込める', featureKey: 'media' },
+      { href: '/contents/vars', label: '共通情報', icon: 'M4 7V4h16v3M9 20h6M12 4v16' , id: 'common-vars', note: '会社名・営業時間など、アカウント内で共通に使う文字。テンプレートに差し込める', featureKey: 'common_vars' },
       { href: '/contents', label: '登録メディア一覧', icon: 'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z' , id: 'contents', note: '配信で使う画像・動画・ファイルの置き場', featureKey: 'media' },
     ],
   },
@@ -138,6 +139,9 @@ export const MENU_SECTIONS: MenuSection[] = [
       { href: '/booking/bookings', label: '予約管理', icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' , id: 'booking-bookings', note: '入った予約の確認と変更', featureKey: 'booking' },
       { href: '/booking/menus', label: '予約設定', icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z' , id: 'booking-menus', note: '予約メニュー・受付枠・休業日', featureKey: 'booking' },
       { href: '/events', label: 'イベント予約', icon: 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2H7a2 2 0 00-2 2v2m5-7v3m4-3v3' , id: 'events', note: '日時と定員を決めた申込の受付', featureKey: 'events' },
+      // N-411 本人勤務: 予約スタッフと紐づいたログインユーザーだけの入口。
+      // owner/admin は担当スタッフ一覧から開くため出さない。
+      { href: '/booking/staff/shifts', label: '自分の勤務', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', id: 'booking-own-shifts', note: '自分のシフト・休憩・外部カレンダー連携', featureKey: 'booking', permissionKey: 'booking.staff.own', staffOnly: true },
     ],
   },
   {
@@ -145,13 +149,16 @@ export const MENU_SECTIONS: MenuSection[] = [
     label: '専用機能',
     title: '専用機能',
     items: [
-      { href: '/nen-campaigns', label: 'NEN配信', icon: 'M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z' , id: 'nen-campaigns', note: '購入後のご案内・コラム・誕生日クーポンを管理します', featureKey: 'nen_campaigns' },
+      // ★V6 37-1。会員（ランク・ライフタイム・マイル）。写真審査は「投稿」に改名（2026-09-16、Masato の決定）。
+      { href: '/nen/members', label: '会員', icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z', id: 'nen-members', note: '会員ランク（通年・ライフタイム）とマイルの一覧・設定', featureKey: 'ec_commerce' },
+      // ★V6 37-3／37-4（2026-09-16 採用）。ペットの正本は LINE 側（お客様がマイページで登録）。
+      { href: '/nen/pets', label: 'マイペット', icon: 'M12 21c-4.97 0-9-3.582-9-8 0-2.5 1.5-4 3-4 1 0 1.5.5 2 1 .5-1.5 2-2.5 4-2.5s3.5 1 4 2.5c.5-.5 1-1 2-1 1.5 0 3 1.5 3 4 0 4.418-4.03 8-9 8z M8 5a1.5 1.5 0 100 3 1.5 1.5 0 000-3z M16 5a1.5 1.5 0 100 3 1.5 1.5 0 000-3z', id: 'nen-pets', note: 'お客様が登録したペットの一覧と「今日の目安」。主食のカロリー表もここ', featureKey: 'photo_review' },
+      { href: '/nen/health', label: '健康日記', icon: 'M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z M9 12h2l1-2 1.5 4 1-2H16', id: 'nen-health', note: 'お客様が付けた健康日記から、気になる変化と「30日のまとめ」を見る', featureKey: 'photo_review' },
       // /health は「BAN検知ダッシュボード」で写真審査ではない。写真審査の画面は
       // /nen-members。§3-1 が BAN検知を「運用状態」へ統合すると書いているので
       // そちらに合わせた。仕様書 §2 もこのルートに直してある（2026-08-18）。
-      { href: '/nen-members', label: '写真審査', icon: 'M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z M15 13a3 3 0 11-6 0 3 3 0 016 0z', badge: 'photos' , id: 'photo-review', note: 'お客様が投稿した写真を確認・承認します', featureKey: 'photo_review' },
-      { href: '/ec-commerce', label: 'EC連携', icon: 'M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z', badge: 'unmatched' , id: 'ec-commerce', note: 'ECの会員・注文・定期便データを取り込みます', featureKey: 'ec_commerce' },
-      { href: '/line-notifications', label: 'LINE通知', icon: 'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9', id: 'line-notifications', note: '注文・入金・発送・返金・定期便の重要なお知らせ', featureKey: 'line_notifications' },
+      { href: '/nen-members', label: '投稿', icon: 'M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z M15 13a3 3 0 11-6 0 3 3 0 016 0z', badge: 'photos' , id: 'photo-review', note: 'お客様が投稿した写真を確認・承認します', featureKey: 'photo_review' },
+      { href: '/nen-campaigns', label: 'NEN配信', icon: 'M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z' , id: 'nen-campaigns', note: '購入後のご案内・コラム・誕生日クーポンを管理します', featureKey: 'nen_campaigns' },
     ],
   },
   {
@@ -159,9 +166,19 @@ export const MENU_SECTIONS: MenuSection[] = [
     label: '設定',
     title: '設定',
     items: [
+      { href: '/getting-started', label: 'はじめの設定', icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z', id: 'getting-started', note: '最初にやることの順路と、いまどこまで終わったか', required: true },
+      // 「設定」区分の先頭。要件 `v6-33-account-settings` §5-3。
+      // **統括の店舗管理（/hq）とは別のもの。** こちらは送受信に使う
+      // LINE公式アカウントそのものの設定。
+      { href: '/accounts', label: 'LINEアカウント', icon: 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4-.8L3 21l1.9-3.8A7.9 7.9 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z' , id: 'line-accounts', note: '送受信に使うLINE公式アカウントと接続の状態', required: true },
+      // 複数のLINEアカウントを「店舗のまとまり」へ振り分ける層。multi_store_hierarchy の受け口。
+      { href: '/pools', label: 'プール管理', icon: 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10' , id: 'pools', note: '複数のLINEアカウントを店舗のまとまりとして管理します', featureKey: 'multi_store_hierarchy' },
       { href: '/staff', label: 'ログインユーザー', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z' , id: 'staff', note: '管理画面に入る人と、その権限', required: true },
       { href: '/settings', label: '機能設定', icon: 'M4 6h16M4 12h16M4 18h7' , id: 'settings', note: 'この画面。項目の表示と並びを決めます', required: true },
       { href: '/emergency', label: '運用状態', icon: 'M13 10V3L4 14h7v7l9-11h-7z', badge: 'operations' , id: 'emergency', note: '配信の停止・再開と、異常の記録', required: true },
+      // EC連携・LINE通知は「ECとLINEをつなぐ配管の点検口」。専用機能から設定へ移した（2026-09-16）。
+      { href: '/ec-commerce', label: 'EC連携', icon: 'M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z', badge: 'unmatched' , id: 'ec-commerce', note: 'ECの会員・注文・定期便データを取り込みます', featureKey: 'ec_commerce' },
+      { href: '/line-notifications', label: 'LINE通知', icon: 'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9', id: 'line-notifications', note: '注文・入金・発送・返金・定期便の重要なお知らせ', featureKey: 'line_notifications' },
     ],
   },
   {
@@ -178,7 +195,7 @@ export const MENU_SECTIONS: MenuSection[] = [
       { href: '/restaurant-test/tables', label: '座席・卓管理', icon: 'M4 6h16M6 6v12m12-12v12M4 18h16M9 10h6v4H9z', id: 'restaurant-tables', note: 'フロア、席種、収容人数、結合ルール', featureKey: 'restaurant_test' },
       { href: '/restaurant-test/inventory', label: '予約枠・在庫', icon: 'M3 5h18v14H3zM3 10h18M8 5v14M13 5v14M18 5v14', id: 'restaurant-inventory', note: '時間帯と媒体別の受入枠を管理', featureKey: 'restaurant_test' },
       { href: '/restaurant-test/menu', label: 'メニュー管理', icon: 'M4 6h16M4 10h16M4 14h10M4 18h10', id: 'restaurant-menu', note: 'コース・単品・価格・アレルギー情報', featureKey: 'restaurant_test' },
-      { href: '/restaurant-test/google', label: 'Google・口コミ', icon: 'M21 12a9 9 0 11-2.64-6.36M21 4v6h-6', id: 'restaurant-google', note: 'GBP口コミ返信と最新情報の下書き管理', featureKey: 'restaurant_test' },
+      { href: '/restaurant-test/google', label: 'Googleビジネス', icon: 'M21 12a9 9 0 11-2.64-6.36M21 4v6h-6', id: 'restaurant-google', note: 'Googleの口コミ確認・AI返信下書き・公開', featureKey: 'restaurant_test' },
       { href: '/restaurant-test/line-followup', label: 'LINE来店フォロー', icon: 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z', id: 'restaurant-line-followup', note: '予約前・来店後・口コミ・会員証のLINEカード', featureKey: 'restaurant_test' },
     ],
   },
@@ -186,6 +203,75 @@ export const MENU_SECTIONS: MenuSection[] = [
 
 /** 区分の目印から中身を引く。 */
 export const MENU_SECTION_BY_ID = new Map(MENU_SECTIONS.map((section) => [section.id, section]))
+
+/**
+ * 画面 → 左メニューの所属の正本（#984 LAY-15）。
+ *
+ * ほとんどの画面は、パスの前方一致で「どの項目の配下か」が決まる。
+ * 例外だけをここへ書く。URL上の置き場と、使う人が属すると感じる
+ * メニューが違う画面があるため。
+ *
+ * 例: UID移行は `/accounts?tab=migration` に置いてあるが、画面の中身は
+ * 友だちの主タブの1枚（友だち一覧／重複検出／統合ユーザー／UID移行）。
+ * LINEアカウント設定の一部ではないので、ここで「友だち」のものと宣言する。
+ *
+ * キーは `パス?クエリ`（クエリが無い画面はパスだけ）。クエリの並びや
+ * 余分なパラメータに左右されないよう、照合は `menuOwnerForScreen` を
+ * 通す（キーのクエリは「この組が揃っていること」の条件として読む）。
+ * 値は所属先の MenuItem.id。値が示す項目がメニューから外れた場合、
+ * 宣言は効かず通常のパス一致へ戻る（サイドバー側でそう扱う）。
+ *
+ * 値を配列にすると「候補の順」で宣言できる。左から順に、いまの人の
+ * メニューに見えている最初の項目が選ばれる（Issue #708）。
+ * 受付枠 `/booking/staff/shifts` は、担当者には「自分の勤務」、
+ * 管理者には「予約設定」の一部として見せたいため、2つの候補を持つ。
+ */
+export const SCREEN_MENU_OWNER: Record<string, string | readonly string[]> = {
+  '/accounts?tab=migration': 'friends',
+  /*
+   * /conversions の1画面に「成果とアフィリエイト」と「コンバージョン」の
+   * 2機能が同居する（conversions-tab-title.ts と同じ対応）。左メニューは
+   * 2項目に分かれているので、開いているタブ側の項目を選ぶ。宣言が無いと
+   * 案件タブを開いても「コンバージョン」が光り、画面名と食い違う。
+   */
+  '/conversions?tab=affiliates': 'affiliates',
+  '/conversions?tab=offers': 'affiliates',
+  '/conversions?tab=approvals': 'affiliates',
+  '/conversions?tab=payment': 'affiliates',
+  '/conversions?tab=points': 'conversions',
+  '/conversions?tab=report': 'conversions',
+  /*
+   * 受付枠は /booking/menus のタブと見た目を揃えているが、URLは
+   * /booking/staff/shifts に置いてある。メニューの項目は担当者向けの
+   * 「自分の勤務」（staffOnly）なので、管理者の画面では選ぶものが無く、
+   * どの所属か分からなくなっていた（Issue #708）。担当者は自分の勤務、
+   * 管理者は予約設定を選ぶ。
+   */
+  '/booking/staff/shifts': ['booking-own-shifts', 'booking-menus'],
+}
+
+/**
+ * いまの画面が宣言済みの所属を持つなら、所属先候補の MenuItem.id を
+ * 優先順で返す。宣言が無ければ undefined。
+ *
+ * `?tab=migration&from=sidebar` のように宣言へ無いパラメータが
+ * 増えても、`tab=migration` が揃っている限り同じ画面として扱う。
+ * パラメータの並び順にも依存しない。
+ *
+ * 候補が複数ある画面（受付枠など）では、呼ぶ側が「いまの人に見えている
+ * 最初の項目」を選ぶ（Issue #708）。
+ */
+export function menuOwnerForScreen(pathname: string, search: string): readonly string[] | undefined {
+  const current = new URLSearchParams(search)
+  for (const [screen, owner] of Object.entries(SCREEN_MENU_OWNER)) {
+    const [path, query = ''] = screen.split('?')
+    if (path !== pathname) continue
+    const required = new URLSearchParams(query)
+    const satisfied = Array.from(required.entries()).every(([key, value]) => current.get(key) === value)
+    if (satisfied) return typeof owner === 'string' ? [owner] : owner
+  }
+  return undefined
+}
 
 /**
  * 保存された並び順を当てる。

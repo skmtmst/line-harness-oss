@@ -1,9 +1,11 @@
 import { describe, expect, test, beforeEach, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
+import { createTestD1, insertFriend } from '../test-utils/d1-sqlite.js';
 
 const accountAccessMocks = vi.hoisted(() => ({
   canAccessAllLineAccounts: vi.fn(),
+  getVisibleLineAccountScope: vi.fn(),
 }));
 
 vi.mock('../services/account-access.js', () => accountAccessMocks);
@@ -56,14 +58,26 @@ function makeScenarioDb(rows: ScenarioRow[]) {
         },
         async all<_T>() {
           calls.push({ sql, binds: bound });
-          if (/FROM scenarios s\b/i.test(sql) && /line_account_id IS NULL/i.test(sql)) {
-            const [lineAccountId] = bound as [string];
-            const filtered = rows.filter(
-              (r) => r.line_account_id == null || r.line_account_id === lineAccountId,
-            );
-            return { results: filtered };
+          if (/SELECT s\.\*, COUNT\(ss\.id\)/i.test(sql)) {
+            const [lineAccountId, limit, offset] = bound as [string, number, number];
+            const includeGlobal = /line_account_id IS NULL/i.test(sql);
+            const filtered = rows.filter((r) =>
+              r.line_account_id === lineAccountId || (includeGlobal && r.line_account_id == null));
+            return { results: filtered.slice(offset, offset + limit) };
           }
           return { results: [] };
+        },
+        async first<_T>() {
+          calls.push({ sql, binds: bound });
+          if (/COUNT\(\*\) AS total FROM scenarios/i.test(sql)) {
+            const [lineAccountId] = bound as [string];
+            const includeGlobal = /line_account_id IS NULL/i.test(sql);
+            return {
+              total: rows.filter((r) =>
+                r.line_account_id === lineAccountId || (includeGlobal && r.line_account_id == null)).length,
+            } as _T;
+          }
+          return null;
         },
       };
       return stmt;
@@ -72,17 +86,21 @@ function makeScenarioDb(rows: ScenarioRow[]) {
   return { db, calls };
 }
 
-function setupApp(db: D1Database) {
+function setupApp(
+  db: D1Database,
+  permissionKeys: string[] = ['/scenarios'],
+  role: 'owner' | 'admin' | 'staff' = 'owner',
+) {
   const app = new Hono<Env>();
   app.use('*', async (c, next) => {
     c.env = { DB: db } as Env['Bindings'];
     c.set('staff', {
       id: 'owner-1',
       name: '管理者',
-      role: 'owner',
+      role,
       readOnly: false,
       tenantId: 'tenant-1',
-      permissionKeys: ['/scenarios'],
+      permissionKeys,
       assignedLineAccountId: null,
       canAccessDescendantAccounts: true,
     });
@@ -106,6 +124,10 @@ const rowBase = {
 beforeEach(() => {
   for (const fn of Object.values(dbMocks)) fn.mockReset();
   accountAccessMocks.canAccessAllLineAccounts.mockReset().mockResolvedValue(true);
+  accountAccessMocks.getVisibleLineAccountScope.mockReset().mockResolvedValue({
+    allowedAccountIds: ['acc-1'],
+    canSeeUnassigned: true,
+  });
 });
 
 describe('GET /api/scenarios?lineAccountId=X', () => {
@@ -119,42 +141,46 @@ describe('GET /api/scenarios?lineAccountId=X', () => {
 
     const res = await setupApp(db).request('/api/scenarios?lineAccountId=acc-1');
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { success: boolean; data: { id: string; lineAccountId: string | null }[] };
+    const body = (await res.json()) as { success: boolean; data: { items: { id: string; lineAccountId: string | null }[]; total: number; limit: number } };
     expect(body.success).toBe(true);
     // webhook.ts:211 / liff.ts:878 trigger scenarios where line_account_id is
     // NULL (global) OR matches the active account. The list endpoint must
     // mirror that so the UI does not hide records the engine will fire.
-    const ids = body.data.map((d) => d.id).sort();
+    const ids = body.data.items.map((d) => d.id).sort();
     expect(ids).toEqual(['s-acc1', 's-global']);
     // Serializer surfaces the binding so the UI can distinguish 全アカ共通 from
     // an account-specific scenario.
-    const globalRow = body.data.find((d) => d.id === 's-global');
+    const globalRow = body.data.items.find((d) => d.id === 's-global');
     expect(globalRow?.lineAccountId).toBeNull();
     // 一覧を引くクエリは1本だけ。人数の集計は別に1本走るので、
     // 本数ではなく「一覧を引くもの」を選んで見る。
-    const listCalls = calls.filter((c) => /FROM scenarios s\b/i.test(c.sql));
+    const listCalls = calls.filter((c) => /SELECT s\.\*, COUNT\(ss\.id\)/i.test(c.sql));
     expect(listCalls).toHaveLength(1);
     expect(listCalls[0].sql).toMatch(/line_account_id IS NULL/);
     expect(listCalls[0].sql).toMatch(/s\.line_account_id = \?/);
-    expect(listCalls[0].binds).toEqual(['acc-1']);
+    expect(listCalls[0].binds).toEqual(['acc-1', 50, 0]);
 
     // 購読中と読了済は、シナリオごとに引かず1回でまとめて数える。
     // 件数ぶん往復すると、シナリオが増えるほど一覧が遅くなる。
     const countCalls = calls.filter((c) => /FROM friend_scenarios/i.test(c.sql));
     expect(countCalls).toHaveLength(1);
+    expect(countCalls[0].sql).toMatch(/f\.line_account_id IN/);
+    expect(countCalls[0].binds).toEqual(expect.arrayContaining(['acc-1']));
   });
 
-  test('falls back to getScenarios helper when no lineAccountId is provided', async () => {
-    dbMocks.getScenarios.mockResolvedValue([
-      { id: 's-x', name: 'x', line_account_id: null, ...rowBase },
+  test('lineAccountId が無くても可視範囲をDB側で絞ってページ化する', async () => {
+    const { db, calls } = makeScenarioDb([
+      { id: 's-x', name: 'x', line_account_id: 'acc-1', ...rowBase },
+      { id: 's-hidden', name: 'hidden', line_account_id: 'acc-2', ...rowBase },
     ]);
-    const { db } = makeScenarioDb([]);
 
     const res = await setupApp(db).request('/api/scenarios');
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { success: boolean; data: { id: string }[] };
-    expect(body.data.map((d) => d.id)).toEqual(['s-x']);
-    expect(dbMocks.getScenarios).toHaveBeenCalledTimes(1);
+    const body = (await res.json()) as { success: boolean; data: { items: { id: string }[] } };
+    expect(body.data.items.map((d) => d.id)).toEqual(['s-x']);
+    const listCall = calls.find((call) => /SELECT s\.\*, COUNT\(ss\.id\)/i.test(call.sql));
+    expect(listCall?.sql).toMatch(/s\.line_account_id IN/);
+    expect(listCall?.binds).toEqual(['acc-1', 50, 0]);
   });
 
   test('returns empty array when filter matches nothing and no globals exist', async () => {
@@ -165,8 +191,90 @@ describe('GET /api/scenarios?lineAccountId=X', () => {
 
     const res = await setupApp(db).request('/api/scenarios?lineAccountId=acc-1');
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { success: boolean; data: unknown[] };
-    expect(body.data).toEqual([]);
+    const body = (await res.json()) as { success: boolean; data: { items: unknown[]; total: number } };
+    expect(body.data.items).toEqual([]);
+    expect(body.data.total).toBe(0);
+  });
+
+  test('担当外アカウントの一覧は存在を隠す', async () => {
+    const { db } = makeScenarioDb([]);
+    const res = await setupApp(db).request('/api/scenarios?lineAccountId=acc-other');
+    expect(res.status).toBe(404);
+  });
+
+  test('アカウント限定担当には全店共通シナリオを返さない', async () => {
+    accountAccessMocks.getVisibleLineAccountScope.mockResolvedValue({
+      allowedAccountIds: ['acc-1'], canSeeUnassigned: false,
+    });
+    const { db } = makeScenarioDb([
+      { id: 's-global', name: 'global', line_account_id: null, ...rowBase },
+      { id: 's-acc1', name: 'acc1', line_account_id: 'acc-1', ...rowBase },
+    ]);
+    const res = await setupApp(db).request('/api/scenarios?lineAccountId=acc-1');
+    const body = await res.json() as { data: { items: Array<{ id: string }> } };
+    expect(body.data.items.map((item) => item.id)).toEqual(['s-acc1']);
+  });
+
+  test('limit は200へ丸め、page から offset を計算する', async () => {
+    const { db, calls } = makeScenarioDb([
+      { id: 's-1', name: 'one', line_account_id: 'acc-1', ...rowBase },
+    ]);
+    const res = await setupApp(db).request('/api/scenarios?lineAccountId=acc-1&limit=999&page=3');
+    expect(res.status).toBe(200);
+    const body = await res.json() as { data: { limit: number; sort: unknown[] } };
+    expect(body.data.limit).toBe(200);
+    expect(body.data.sort).toEqual([
+      { field: 'createdAt', direction: 'desc' },
+      { field: 'id', direction: 'desc' },
+    ]);
+    const listCall = calls.find((call) => /SELECT s\.\*, COUNT\(ss\.id\)/i.test(call.sql));
+    expect(listCall?.binds).toEqual(['acc-1', 200, 400]);
+  });
+
+  test('検索と状態とフォルダをページ分割より先にDBで絞る', async () => {
+    const { db, calls } = makeScenarioDb([
+      { id: 's-1', name: '夏のお知らせ', line_account_id: 'acc-1', ...rowBase },
+    ]);
+    const res = await setupApp(db).request(
+      '/api/scenarios?lineAccountId=acc-1&query=%E5%A4%8F&active=0&createdFrom=2026-09-01&folderId=folder-1',
+    );
+    expect(res.status).toBe(200);
+    const listCall = calls.find((call) => /SELECT s\.\*, COUNT\(ss\.id\)/i.test(call.sql));
+    // #625: D1 の LIKE パターン50バイト制限を避けるため instr() で部分一致する。
+    // 束縛は `%夏%` ではなく検索語そのもの。
+    expect(listCall?.sql).toMatch(/instr\(lower\(s\.name\), lower\(\?\)\) > 0/);
+    expect(listCall?.sql).toMatch(/s\.is_active = 0/);
+    expect(listCall?.sql).toMatch(/s\.created_at >= \?/);
+    expect(listCall?.sql).toMatch(/s\.folder_id = \?/);
+    expect(listCall?.binds).toEqual(['acc-1', '夏', '2026-09-01', 'folder-1', 50, 0]);
+  });
+
+  test('購読数は選択中のLINEアカウントだけを実DBで集計する', async () => {
+    const { db, raw } = createTestD1();
+    raw.prepare(`INSERT INTO scenarios
+      (id, name, trigger_type, is_active, delivery_mode, line_account_id, created_at, updated_at)
+      VALUES ('s-global', '全店シナリオ', 'friend_add', 1, 'relative', NULL, '2026-09-01', '2026-09-01')`).run();
+    insertFriend(raw, 'friend-a', { line_account_id: 'acc-1' });
+    insertFriend(raw, 'friend-b', { line_account_id: 'acc-2' });
+    raw.prepare(`INSERT INTO friend_scenarios (id, friend_id, scenario_id, status)
+      VALUES ('run-a', 'friend-a', 's-global', 'active'), ('run-b', 'friend-b', 's-global', 'active')`).run();
+
+    const res = await setupApp(db).request('/api/scenarios?lineAccountId=acc-1&limit=1&page=1');
+    expect(res.status).toBe(200);
+    const body = await res.json() as {
+      data: { items: Array<{ id: string; subscriberCount: number }>; total: number; limit: number };
+    };
+    expect(body.data).toMatchObject({ total: 1, limit: 1 });
+    expect(body.data.items).toEqual([
+      expect.objectContaining({ id: 's-global', subscriberCount: 1 }),
+    ]);
+  });
+
+  test('閲覧権限がない利用者には一覧を返さない', async () => {
+    const { db } = makeScenarioDb([]);
+    const res = await setupApp(db, [], 'staff').request('/api/scenarios');
+    expect(res.status).toBe(403);
+    expect(dbMocks.getScenarioById).not.toHaveBeenCalled();
   });
 });
 
@@ -345,5 +453,244 @@ describe('シナリオ通の本文契約', () => {
 
     expect(response.status).toBe(201);
     expect(dbMocks.createScenarioStep).toHaveBeenCalledTimes(1);
+  });
+
+  test('R214: 質問のURL選択肢に不正なURLは 400 で止める', async () => {
+    dbMocks.getScenarioById.mockResolvedValue(visibleScenario);
+    const db = {
+      prepare(sql: string) {
+        const statement = {
+          bind() {
+            return statement;
+          },
+          async first() {
+            if (/SELECT delivery_mode FROM scenarios/i.test(sql)) {
+              return { delivery_mode: 'relative' };
+            }
+            if (/SELECT id FROM scenario_steps/i.test(sql)) return null;
+            return null;
+          },
+        };
+        return statement;
+      },
+    } as unknown as D1Database;
+
+    const response = await setupApp(db).request('/api/scenarios/scenario-1/steps', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        stepOrder: 1,
+        delayMinutes: 0,
+        messageType: 'text',
+        messageContent: ' ',
+        question: {
+          text: '体調はいかがですか？',
+          tapMode: 'single',
+          choices: [{ label: '詳しく見る', behavior: 'url', url: 'not-a-url' }],
+        },
+      }),
+    });
+
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as { success: boolean; error: string };
+    expect(body.success).toBe(false);
+    expect(body.error).toContain('選択肢1のURL');
+    expect(dbMocks.createScenarioStep).not.toHaveBeenCalled();
+  });
+
+  test('R214: 正しい https のURLの質問は保存できる', async () => {
+    dbMocks.getScenarioById.mockResolvedValue(visibleScenario);
+    const db = {
+      prepare(sql: string) {
+        const statement = {
+          bind() {
+            return statement;
+          },
+          async first() {
+            if (/SELECT delivery_mode FROM scenarios/i.test(sql)) {
+              return { delivery_mode: 'relative' };
+            }
+            if (/SELECT id FROM scenario_steps/i.test(sql)) return null;
+            return null;
+          },
+        };
+        return statement;
+      },
+    } as unknown as D1Database;
+    dbMocks.createScenarioStep.mockResolvedValue({ id: 'step-1' });
+
+    const response = await setupApp(db).request('/api/scenarios/scenario-1/steps', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        stepOrder: 1,
+        delayMinutes: 0,
+        messageType: 'text',
+        messageContent: ' ',
+        question: {
+          text: '体調はいかがですか？',
+          tapMode: 'single',
+          choices: [{ label: '詳しく見る', behavior: 'url', url: 'https://example.com/a' }],
+        },
+      }),
+    });
+
+    expect(response.status).toBe(201);
+    expect(dbMocks.createScenarioStep).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('GET /api/scenarios/:id/preview', () => {
+  test('軽15: 壊れた開始日時は simulate と同じく 400 で断る', async () => {
+    // 前段の可視確認を通す（存在する扱い）。検証はその後ろで動く。
+    dbMocks.getScenarioById.mockResolvedValue({ id: 's-1', line_account_id: 'acc-1' });
+    const { db } = makeScenarioDb([]);
+    const res = await setupApp(db).request(
+      `/api/scenarios/s-1/preview?startAt=${encodeURIComponent('壊れた日時')}`,
+    );
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { success: boolean; code: string; field: string };
+    expect(body).toMatchObject({ success: false, code: 'start_at_invalid', field: 'startAt' });
+  });
+
+  test('R212: 下書きの通は isDraft 付きで返る（送られる通と見分けられる）', async () => {
+    dbMocks.getScenarioById.mockResolvedValue({ id: 's-1', line_account_id: 'acc-1' });
+    dbMocks.resolveStepContent.mockImplementation(
+      async (_db: unknown, step: { message_content: string }) => ({
+        messageType: 'text',
+        messageContent: step.message_content,
+        questionJson: null,
+      }),
+    );
+    dbMocks.computeNextDeliveryAt.mockImplementation(() => new Date('2026-09-28T10:00:00+09:00'));
+    const db = {
+      prepare(sql: string) {
+        const statement = {
+          bind() {
+            return statement;
+          },
+          async first() {
+            if (/FROM scenarios/i.test(sql)) {
+              return { delivery_mode: 'elapsed', line_account_id: 'acc-1' };
+            }
+            return null;
+          },
+          async all() {
+            return {
+              results: [
+                {
+                  id: 'st-1', step_order: 1, delay_minutes: 0, offset_days: 0,
+                  offset_minutes: 0, delivery_time: null, template_id: null,
+                  message_type: 'text', message_content: '通常の通',
+                  question_json: null, is_draft: 0,
+                },
+                {
+                  id: 'st-2', step_order: 2, delay_minutes: 0, offset_days: 1,
+                  offset_minutes: 0, delivery_time: null, template_id: null,
+                  message_type: 'text', message_content: '下書きの通',
+                  question_json: null, is_draft: 1,
+                },
+              ],
+            };
+          },
+        };
+        return statement;
+      },
+    } as unknown as D1Database;
+    const res = await setupApp(db).request(
+      `/api/scenarios/s-1/preview?startAt=${encodeURIComponent('2026-09-28T10:00:00+09:00')}`,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      success: boolean;
+      data: { steps: Array<{ stepOrder: number; isDraft: boolean }> };
+    };
+    expect(body.success).toBe(true);
+    expect(body.data.steps.map((s) => [s.stepOrder, s.isDraft])).toEqual([
+      [1, false],
+      [2, true],
+    ]);
+  });
+
+  test('R237: 公開版・通の控えのどれかと、控えの理由が返る', async () => {
+    dbMocks.getScenarioById.mockResolvedValue({ id: 's-1', line_account_id: 'acc-1' });
+    dbMocks.resolveStepContent.mockImplementation(
+      async (_db: unknown, step: { template_id: string | null; message_content: string }) => {
+        if (step.template_id === 'tpl-ok') {
+          return {
+            messageType: 'text', messageContent: '公開版', questionJson: null,
+            templateIdAtSend: 'tpl-ok', fallbackReason: null,
+          };
+        }
+        // 実物の resolveStepContent と同じく、参照が無い通の理由は null。
+        if (step.template_id == null) {
+          return {
+            messageType: 'text', messageContent: step.message_content, questionJson: null,
+            templateIdAtSend: null, fallbackReason: null,
+          };
+        }
+        return {
+          messageType: 'text', messageContent: step.message_content, questionJson: null,
+          templateIdAtSend: null, fallbackReason: 'unpublished',
+        };
+      },
+    );
+    dbMocks.computeNextDeliveryAt.mockImplementation(() => new Date('2026-09-28T10:00:00+09:00'));
+    const db = {
+      prepare(sql: string) {
+        const statement = {
+          bind() {
+            return statement;
+          },
+          async first() {
+            if (/FROM scenarios/i.test(sql)) {
+              return { delivery_mode: 'elapsed', line_account_id: 'acc-1' };
+            }
+            return null;
+          },
+          async all() {
+            return {
+              results: [
+                {
+                  id: 'st-1', step_order: 1, delay_minutes: 0, offset_days: 0,
+                  offset_minutes: 0, delivery_time: null, template_id: 'tpl-ok',
+                  message_type: 'text', message_content: '控え',
+                  question_json: null, is_draft: 0,
+                },
+                {
+                  id: 'st-2', step_order: 2, delay_minutes: 0, offset_days: 1,
+                  offset_minutes: 0, delivery_time: null, template_id: 'tpl-draft',
+                  message_type: 'text', message_content: '控え',
+                  question_json: null, is_draft: 0,
+                },
+                {
+                  id: 'st-3', step_order: 3, delay_minutes: 0, offset_days: 2,
+                  offset_minutes: 0, delivery_time: null, template_id: null,
+                  message_type: 'text', message_content: '直接書いた通',
+                  question_json: null, is_draft: 0,
+                },
+              ],
+            };
+          },
+        };
+        return statement;
+      },
+    } as unknown as D1Database;
+    const res = await setupApp(db).request(
+      `/api/scenarios/s-1/preview?startAt=${encodeURIComponent('2026-09-28T10:00:00+09:00')}`,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      success: boolean;
+      data: {
+        steps: Array<{ stepOrder: number; contentSource: string; fallbackReason: string | null }>;
+      };
+    };
+    expect(body.success).toBe(true);
+    expect(body.data.steps.map((s) => [s.stepOrder, s.contentSource, s.fallbackReason])).toEqual([
+      [1, 'template', null],
+      [2, 'step-fallback', 'unpublished'],
+      [3, 'step', null],
+    ]);
   });
 });

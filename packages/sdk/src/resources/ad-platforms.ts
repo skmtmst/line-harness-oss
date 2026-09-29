@@ -7,6 +7,7 @@ export interface AdPlatform {
   displayName: string | null
   config: Record<string, unknown>
   isActive: boolean
+  lineAccountId: string | null
   createdAt: string
   updatedAt: string
 }
@@ -15,6 +16,7 @@ export interface AdConversionLog {
   id: string
   adPlatformId: string
   friendId: string
+  lineAccountId: string | null
   eventName: string
   clickId: string | null
   clickIdType: string | null
@@ -27,6 +29,7 @@ export interface CreateAdPlatformInput {
   name: 'meta' | 'x' | 'google' | 'tiktok'
   displayName?: string
   config: Record<string, unknown>
+  lineAccountId: string
 }
 
 export interface UpdateAdPlatformInput {
@@ -34,6 +37,7 @@ export interface UpdateAdPlatformInput {
   displayName?: string | null
   config?: Record<string, unknown>
   isActive?: boolean
+  lineAccountId?: string | null
 }
 
 export class AdPlatformsResource {

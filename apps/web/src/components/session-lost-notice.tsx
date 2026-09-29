@@ -18,11 +18,17 @@
 
 import { useEffect, useState } from 'react'
 import { SESSION_LOST_EVENT } from '@/lib/api'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
 
 const ROLE_KEY = 'lh_staff_role'
 
 export default function SessionLostNotice() {
   const [shown, setShown] = useState(false)
+  /*
+   * ここは閉じられない案内（Escapeでは閉じない）だが、フォーカスが背面の
+   * 操作へ漏れないように窓の中へ閉じ込める。背面のスクロールも止める。
+   */
+  const panelRef = useOverlayFocus(shown, () => {}, true)
 
   useEffect(() => {
     const onLost = () => {
@@ -44,7 +50,7 @@ export default function SessionLostNotice() {
       aria-modal="true"
       aria-labelledby="session-lost-title"
     >
-      <div className="rounded-card mt-12 w-full max-w-xl bg-white p-6 shadow-lg">
+      <div ref={panelRef} className="rounded-card mt-12 w-full max-w-xl bg-white p-6 shadow-lg">
         <h2 id="session-lost-title" className="text-ink text-lg font-bold">
           ログイン情報がサーバーに届いていません
         </h2>
@@ -90,7 +96,7 @@ export default function SessionLostNotice() {
               window.localStorage.removeItem(ROLE_KEY)
               window.location.href = '/login'
             }}
-            className="bg-accent text-on-accent hover:bg-accent-hover rounded-control h-10 px-5 text-sm font-bold"
+            className="bg-accent-deep text-on-accent hover:brightness-92 rounded-control h-10 px-5 text-sm font-bold"
           >
             ログインし直す
           </button>

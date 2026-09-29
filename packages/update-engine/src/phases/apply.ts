@@ -6,13 +6,7 @@ import { listWorkerBindings, putWorkerScript } from '../cf-api/workers.js';
 import { deployPagesProject } from '../cf-api/pages.js';
 import { materializeAdminFiles } from '../materialize.js';
 
-/**
- * Compatibility flags the LINE Harness Worker requires. The script upload
- * API replaces metadata wholesale, so these must be re-sent on every PUT —
- * omitting them would strip `nodejs_compat` and break `node:*` imports.
- * Kept in lockstep with apps/worker/wrangler.toml.
- */
-const WORKER_COMPATIBILITY_FLAGS = ['nodejs_compat'];
+import { WORKER_COMPATIBILITY_FLAGS } from '../compat-flags.js';
 
 /**
  * Result of a successful apply phase.

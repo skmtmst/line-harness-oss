@@ -4,6 +4,7 @@ import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite';
 import type { ActionDefinition, AutomationActionExecutor } from './automation-engine';
 import {
   dispatchAutomationEvent,
+  processOverdueSupportMarkTriggers,
   processScheduledAutomationTriggers,
 } from './automation-triggers';
 
@@ -34,6 +35,7 @@ function addAutomation(
     triggerConfig?: Record<string, unknown>;
     conditionConfig?: Record<string, unknown>;
     action?: ActionDefinition;
+    priority?: number;
   },
 ): void {
   const accountId = input.accountId ?? 'account-1';
@@ -41,8 +43,8 @@ function addAutomation(
   raw.prepare(
     `INSERT INTO automation_definitions
        (id, line_account_id, name, status, priority)
-     VALUES (?, ?, ?, 'active', 0)`,
-  ).run(input.id, accountId, input.id);
+     VALUES (?, ?, ?, 'active', ?)`,
+  ).run(input.id, accountId, input.id, input.priority ?? 0);
   raw.prepare(
     `INSERT INTO automation_versions
        (id, automation_id, version_number, status, trigger_type, trigger_config,
@@ -98,6 +100,22 @@ describe('V6オートメーションのきっかけ接続', () => {
       .toEqual({ count: 1 });
   });
 
+  it('メッセージの含まれる言葉が一致する公開版だけを開始する', async () => {
+    addAutomation(testDb.raw, {
+      id: 'message-match', triggerType: 'message_received', triggerConfig: { keyword: '予約' },
+    });
+    const missed = await dispatchAutomationEvent(testDb.db, {
+      lineAccountId: 'account-1', eventType: 'message_received', sourceEventId: 'message-1',
+      friendId: 'friend-1', eventData: { text: 'こんにちは' },
+    }, { now: NOW, executors });
+    expect(missed).toEqual([]);
+    const matched = await dispatchAutomationEvent(testDb.db, {
+      lineAccountId: 'account-1', eventType: 'message_received', sourceEventId: 'message-2',
+      friendId: 'friend-1', eventData: { text: '予約をお願いします' },
+    }, { now: NOW, executors });
+    expect(matched).toMatchObject([{ automationId: 'message-match', status: 'success' }]);
+  });
+
   it('友だち条件は既存の共通条件部品で判定し、条件外も履歴へ残す', async () => {
     testDb.raw.prepare(`INSERT INTO tags (id, name) VALUES ('vip', 'VIP')`).run();
     addAutomation(testDb.raw, {
@@ -128,6 +146,51 @@ describe('V6オートメーションのきっかけ接続', () => {
     }]);
     expect(testDb.raw.prepare(`SELECT COUNT(*) AS count FROM automation_runs`).get())
       .toEqual({ count: 0 });
+  });
+
+  it('対応マークの自動変更は条件に合う最優先の1本だけを実行する', async () => {
+    addAutomation(testDb.raw, {
+      id: 'mark-low', triggerType: 'support_mark_change', priority: 10,
+      triggerConfig: { kind: 'support_mark_rule', event: 'message_received' },
+    });
+    addAutomation(testDb.raw, {
+      id: 'mark-high', triggerType: 'support_mark_change', priority: 100,
+      triggerConfig: { kind: 'support_mark_rule', event: 'message_received' },
+    });
+
+    const result = await dispatchAutomationEvent(testDb.db, {
+      lineAccountId: 'account-1', eventType: 'message_received', sourceEventId: 'webhook-mark-1',
+      friendId: 'friend-1', eventData: {},
+    }, { now: NOW, executors });
+
+    expect(result).toMatchObject([{ automationId: 'mark-high', status: 'success' }]);
+    expect(record).toHaveBeenCalledTimes(1);
+    expect(testDb.raw.prepare(`SELECT automation_id FROM automation_runs`).all())
+      .toEqual([{ automation_id: 'mark-high' }]);
+  });
+
+  it('返信期限超過は期限時刻を不変IDにして同じ会話を二重実行しない', async () => {
+    addAutomation(testDb.raw, {
+      id: 'mark-overdue', triggerType: 'support_mark_change', priority: 100,
+      triggerConfig: { kind: 'support_mark_rule', event: 'response_overdue' },
+    });
+    testDb.raw.prepare(
+      `INSERT INTO chats
+         (id, friend_id, status, line_account_id, next_response_due_at, created_at, updated_at)
+       VALUES ('chat-1', 'friend-1', 'unread', 'account-1',
+               '2026-08-25T00:00:00.000Z', ?, ?)`,
+    ).run(NOW, NOW);
+
+    const first = await processOverdueSupportMarkTriggers(testDb.db, {
+      now: NOW, executors, limit: 10,
+    });
+    const second = await processOverdueSupportMarkTriggers(testDb.db, {
+      now: NOW, executors, limit: 10,
+    });
+
+    expect(first).toMatchObject([{ automationId: 'mark-overdue', kind: 'created' }]);
+    expect(second).toMatchObject([{ automationId: 'mark-overdue', kind: 'existing' }]);
+    expect(record).toHaveBeenCalledTimes(1);
   });
 
   it('不明なきっかけ設定を全員一致として扱わない', async () => {
@@ -228,5 +291,33 @@ describe('V6オートメーションのきっかけ接続', () => {
       expect.objectContaining({ automationId: 'daily-off-grid', error: 'trigger_config_time_invalid' }),
     ]));
     expect(record).not.toHaveBeenCalled();
+  });
+
+  it('EC受信の全11種をきっかけとして受け付ける', async () => {
+    const { EC_EVENT_TYPES } = await import('@line-crm/shared');
+    expect(EC_EVENT_TYPES).toHaveLength(11);
+    for (const eventType of EC_EVENT_TYPES) {
+      const items = await dispatchAutomationEvent(testDb.db, {
+        lineAccountId: 'account-1', eventType, sourceEventId: `ec-${eventType}`,
+        friendId: 'friend-1', eventData: {},
+      }, { now: NOW, executors });
+      expect(items).toEqual([]);
+    }
+  });
+
+  it('発送完了の公開版を開始し、再配達を二重実行しない', async () => {
+    addAutomation(testDb.raw, { id: 'shipped-follow', triggerType: 'ec.order.shipped' });
+    const input = {
+      lineAccountId: 'account-1', eventType: 'ec.order.shipped', sourceEventId: 'event-ship-1',
+      friendId: 'friend-1', eventData: { orderNumber: 'NEN-1001' },
+    };
+
+    expect(await dispatchAutomationEvent(testDb.db, input, { now: NOW, executors }))
+      .toMatchObject([{ automationId: 'shipped-follow', kind: 'created', status: 'success' }]);
+    expect(await dispatchAutomationEvent(testDb.db, input, { now: NOW, executors }))
+      .toMatchObject([{ automationId: 'shipped-follow', kind: 'existing', status: 'success' }]);
+    expect(record).toHaveBeenCalledTimes(1);
+    expect(testDb.raw.prepare(`SELECT COUNT(*) AS count FROM automation_runs`).get())
+      .toEqual({ count: 1 });
   });
 });

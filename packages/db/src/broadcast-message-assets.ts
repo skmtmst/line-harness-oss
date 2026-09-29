@@ -31,6 +31,41 @@ export async function listBroadcastMessageAssets(db: D1Database, lineAccountId?:
   return result.results;
 }
 
+/**
+ * 件数だけを種類ごとに返す（PERF-04）。
+ *
+ * 件数タブは各行の payload を必要としないので、本文を読まない集計で足りる。
+ * scopeWhere/scopeBindings には呼び出し側がアカウント可視範囲の条件を渡す
+ * （一覧の line_account_id 絞り込みと同じ範囲で数えないと件数が合わない）。
+ */
+export async function countBroadcastMessageAssetsByKind(
+  db: D1Database,
+  scopeWhere: string,
+  scopeBindings: unknown[] = [],
+  lineAccountId?: string,
+) {
+  const clauses = [scopeWhere];
+  const bindings = [...scopeBindings];
+  if (lineAccountId) {
+    // 一覧と同じ「自アカウント＋未割当」の絞り込み。
+    clauses.push('(line_account_id = ? OR line_account_id IS NULL)');
+    bindings.push(lineAccountId);
+  }
+  const rows = await db.prepare(
+    `SELECT kind, COUNT(*) AS count FROM broadcast_message_assets WHERE ${clauses.join(' AND ')} GROUP BY kind`,
+  ).bind(...bindings).all<{ kind: BroadcastMessageAssetKind; count: number }>();
+  const counts: Record<BroadcastMessageAssetKind, number> = {
+    rich_message: 0,
+    card_message: 0,
+    coupon: 0,
+    research: 0,
+  };
+  for (const row of rows.results) {
+    if (row.kind in counts) counts[row.kind] = Number(row.count);
+  }
+  return counts;
+}
+
 export function getBroadcastMessageAsset(db: D1Database, id: string) {
   return db.prepare('SELECT * FROM broadcast_message_assets WHERE id = ?').bind(id).first<BroadcastMessageAsset>();
 }

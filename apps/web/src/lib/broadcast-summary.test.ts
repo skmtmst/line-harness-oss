@@ -6,7 +6,7 @@
  * 気づく手がかりが画面のどこにも無い。
  */
 import { describe, it, expect } from 'vitest'
-import { messageTypeLabel, contentExcerpt, audienceSummary } from './broadcast-summary'
+import { messageTypeLabel, contentExcerpt, audienceSummary, rowExcerpt } from './broadcast-summary'
 
 describe('送るものの種別', () => {
   it('種別ごとの名前を出す', () => {
@@ -125,7 +125,53 @@ describe('宛先の要約', () => {
     }, tagName)).toBe('シナリオ購読中の全員')
   })
 
+  it('BROADCAST-15: シナリオ指定は名前を出し、消えたものと区別する', () => {
+    const scenarioName = (id: string) => ({ s1: '初回フォロー' })[id] ?? null
+    const targeted = {
+      targetType: 'segment',
+      segmentConditions: {
+        operator: 'AND',
+        rules: [{ type: 'is_following', value: true }, { type: 'scenario_subscribed', value: 's1' }],
+      },
+    }
+    // 名前を引ける画面は「シナリオ：名前」。「タグ未指定」とは出さない。
+    expect(audienceSummary(targeted, tagName, scenarioName)).toBe('シナリオ：初回フォロー')
+    // 消えたシナリオは、あったことが分かる表記にする。
+    expect(audienceSummary({
+      targetType: 'segment',
+      segmentConditions: {
+        operator: 'AND',
+        rules: [{ type: 'is_following', value: true }, { type: 'scenario_subscribed', value: 'gone' }],
+      },
+    }, tagName, scenarioName)).toBe('シナリオ（削除済み）')
+    // 名前を引かない画面は従来どおり。
+    expect(audienceSummary(targeted, tagName)).toBe('指定のシナリオを購読中')
+  })
+
   it('条件が残っていなければ、その旨を出す', () => {
     expect(audienceSummary({ targetType: 'segment', segmentConditions: null }, tagName)).toBe('条件なし')
+  })
+})
+
+describe('一覧の1行目に出す「内容／種別」', () => {
+  it('本文があれば「本文／種別」でつなぐ', () => {
+    expect(rowExcerpt('text', '8月のキャンペーンをお知らせします')).toBe(
+      '8月のキャンペーンをお知らせします／テキスト',
+    )
+  })
+
+  /**
+   * `contentExcerpt` は読めない中身のとき種別の名前をそのまま返す。
+   * 素直につなぐと「写真／写真」になり、同じ語を2度読ませることになる。
+   */
+  it('抜粋が種別の名前と同じなら、種別だけを出す', () => {
+    expect(rowExcerpt('image', '読めない中身')).toBe('写真')
+    expect(rowExcerpt('image', '')).toBe('写真')
+  })
+
+  it('本文が空でも「—」や undefined を出さない', () => {
+    const value = rowExcerpt('text', '')
+    expect(value).toBe('テキスト')
+    expect(value).not.toContain('undefined')
   })
 })

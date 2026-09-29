@@ -17,7 +17,7 @@ export default function AffiliateOffersRedirectPage() {
   }, [router])
 
   return (
-    <div className="p-8 text-center text-gray-400 text-sm">
+    <div className="p-8 text-center text-ink-faint text-sm">
       移動中...
     </div>
   )

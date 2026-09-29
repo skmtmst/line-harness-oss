@@ -2,6 +2,7 @@ import type { UpdateContext } from '../types.js';
 import type { EventEmitter } from '../events.js';
 import { listWorkerBindings, putWorkerScript } from '../cf-api/workers.js';
 import { rollbackPagesDeployment } from '../cf-api/pages.js';
+import { WORKER_COMPATIBILITY_FLAGS } from '../compat-flags.js';
 
 /**
  * Snapshot fields required to roll back a partially-applied update.
@@ -85,7 +86,7 @@ export async function runRollback(
     scriptName: ctx.workerName,
     scriptContent: bytes,
     bindings,
-    compatibilityFlags: ['nodejs_compat'],
+    compatibilityFlags: WORKER_COMPATIBILITY_FLAGS,
     keepAssets: true,
   });
 

@@ -20,6 +20,10 @@ export const FUNNEL_STEP_KINDS = [
 ] as const;
 export type FunnelStepKind = (typeof FUNNEL_STEP_KINDS)[number];
 
+// V6ファネルの運用状態。active 以外は一覧と再集計・対象者作成・新版保存から外す。
+// stopped は再開できる。archived は復帰しない終端状態。
+export type FunnelStatus = 'active' | 'stopped' | 'archived';
+
 export interface Funnel {
   id: string;
   line_account_id: string | null;
@@ -27,6 +31,7 @@ export interface Funnel {
   segment_json: string | null;
   window_days: number;
   created_at: string;
+  status: FunnelStatus;
 }
 
 export interface FunnelStep {

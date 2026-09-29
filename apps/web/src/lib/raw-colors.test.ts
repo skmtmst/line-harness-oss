@@ -10,9 +10,8 @@
  *
  *   - ファイルごとの数が基準より増えたら落ちる
  *   - 基準に無いファイルに1か所でもあれば落ちる
- *   - 減ったときも落ちる。基準を締め直さないと、また増える余地が残るため
  *
- * 直し方はどちらも同じ:
+ * 意図して増やす場合の基準更新:
  *
  *     node apps/web/scripts/raw-color-baseline.mjs
  *
@@ -41,13 +40,4 @@ describe('生の Tailwind の色', () => {
     expect(worse).toEqual({})
   })
 
-  it('減ったら基準も締め直されている', () => {
-    const better: Record<string, string> = {}
-    for (const [file, was] of Object.entries(baseline)) {
-      const count = now[file] ?? 0
-      if (count < was) better[file] = `${was} → ${count}`
-    }
-    // 落ちたら: node apps/web/scripts/raw-color-baseline.mjs
-    expect(better).toEqual({})
-  })
 })

@@ -1,6 +1,4 @@
-import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { FEATURE_IDS } from '@line-crm/shared'
 import { describe, expect, it } from 'vitest'
 import { MENU_SECTIONS, orderedMenuSections } from './menu'
 import {
@@ -53,8 +51,15 @@ describe('機能設定とサイドメニューが同じ一覧を見る', () => {
     expect(restaurant.label).toBe('飲食店向け（テスト）')
     expect(restaurant.items.map((item) => item.label)).toEqual([
       '店舗ダッシュボード', '組織・権限', '承認ワークフロー', '予約台帳', '座席・卓管理',
-      '予約枠・在庫', 'メニュー管理', 'Google・口コミ', 'LINE来店フォロー',
+      '予約枠・在庫', 'メニュー管理', 'Googleビジネス', 'LINE来店フォロー',
     ])
+  })
+
+  it('飲食店向けテストは機能設定でだけ表示を選べる', () => {
+    expect(visibleFeatureGroups({ specializedFeatureKeys: [] })
+      .some((group) => group.id === 'restaurant-test')).toBe(false)
+    expect(visibleFeatureGroups({ specializedFeatureKeys: [], includeRestaurantTest: true })
+      .some((group) => group.id === 'restaurant-test')).toBe(true)
   })
 
   it('サイドメニューにある切り替え可能な項目には、必ずキーがある', () => {
@@ -70,7 +75,8 @@ describe('機能設定とサイドメニューが同じ一覧を見る', () => {
   it('専門設計カタログにある項目だけを専用機能に出す', () => {
     const groups = visibleFeatureGroups({ specializedFeatureKeys: ['photo_review'] })
     const specialized = groups.find((group) => group.id === 'specialized')!
-    expect(specialized.items.map((item) => item.id)).toEqual(['photo-review'])
+    // 2026-09-16 採用: マイペット（★V6 37-3）と健康日記（★V6 37-4）は「投稿」と同じ photo_review の受け口。
+    expect(specialized.items.map((item) => item.id)).toEqual(['nen-pets', 'nen-health', 'photo-review'])
 
     const withoutDesign = visibleFeatureGroups({ specializedFeatureKeys: [] })
     expect(withoutDesign.some((group) => group.id === 'specialized')).toBe(false)
@@ -88,7 +94,41 @@ describe('機能設定とサイドメニューが同じ一覧を見る', () => {
     expect(SIDEBAR_FEATURE_BY_HREF['/automations']).toBe('automations')
     expect(SIDEBAR_FEATURE_BY_HREF['/webhooks']).toBe('external_integrations')
     expect(SIDEBAR_FEATURE_BY_HREF['/events']).toBe('events')
+    // multi_store_hierarchy の受け口（#860）。off でメニューから消え、直URLは API が 403 で止める。
+    expect(SIDEBAR_FEATURE_BY_HREF['/pools']).toBe('multi_store_hierarchy')
+    expect(DEFAULT_FEATURES.multi_store_hierarchy).toBe(false)
+    // 友だち属性3機能（#861）。/tags はタグ自体が必須なのでメニューは隠さず、
+    // タブと子ページでキーごとに閉じる。サーバーの既定（defaultEnabled: true）と合わせる。
+    expect(DEFAULT_FEATURES.friend_fields).toBe(true)
+    expect(DEFAULT_FEATURES.support_marks).toBe(true)
+    expect(DEFAULT_FEATURES.saved_searches).toBe(true)
+    for (const key of ['friend_fields', 'support_marks', 'saved_searches']) {
+      expect(FEATURE_IDS).toContain(key)
+    }
+    // 共通情報は共通情報キー、登録メディアはメディアキー（#862）。
+    // 以前は共通情報が media キーに抱き合わせで、片方だけ切れなかった。
+    expect(SIDEBAR_FEATURE_BY_HREF['/contents/vars']).toBe('common_vars')
+    expect(DEFAULT_FEATURES.common_vars).toBe(true)
+    expect(FEATURE_IDS).toContain('common_vars')
+    const contentsSection = FEATURE_GROUPS.find((group) => group.id === 'contents')!
+    const varsItem = contentsSection.items.find((item) => item.id === 'common-vars')!
+    const mediaItem = contentsSection.items.find((item) => item.id === 'contents')!
+    expect(varsItem.keys).toEqual(['common_vars'])
+    expect(mediaItem.keys).toEqual(['media'])
+    // キーを個別に切ると、その項目だけが消える。
+    expect(itemIsEnabled(varsItem, { common_vars: false })).toBe(false)
+    expect(itemIsEnabled(mediaItem, { common_vars: false })).toBe(true)
+    expect(itemIsEnabled(varsItem, { media: false })).toBe(true)
+    expect(itemIsEnabled(mediaItem, { media: false })).toBe(false)
     expect(SIDEBAR_FEATURE_BY_HREF['/booking/bookings']).toBe('booking')
+    expect(SIDEBAR_FEATURE_BY_HREF['/booking/menus']).toBe('booking')
+    const used = MENU_SECTIONS.flatMap((section) => section.items.map((item) => item.featureKey))
+    expect(used).not.toEqual(expect.arrayContaining([
+      'reservation_ledger',
+      'multi_store_bulk_updates',
+      'external_reservations',
+      'google_business_profile',
+    ]))
   })
 })
 
@@ -144,24 +184,8 @@ describe('並び替え', () => {
 })
 
 describe('保存の受け口', () => {
-  /**
-   * 画面が使うキーを、サーバーが1つ残らず受け付けること。
-   *
-   * サーバーは知らないキーを 400 で弾く。片方にだけキーを足すと、
-   * スイッチは動くのに保存だけ落ちる（画面には「保存できませんでした」としか
-   * 出ない）。実際に、友だち追加時の配信・コンテンツ・分析・自動化・予約は
-   * 受け口が無いままメニューに並んでいた。
-   */
-  it('worker の TOGGLEABLE_FEATURES が、画面の使うキーを全部含む', () => {
-    const workerSource = readFileSync(
-      join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'worker', 'src', 'routes', 'feature-settings.ts'),
-      'utf8',
-    )
-    const start = workerSource.indexOf('export const TOGGLEABLE_FEATURES = [')
-    const end = workerSource.indexOf('] as const;', start)
-    const accepted = new Set(
-      [...workerSource.slice(start, end).matchAll(/'([a-z_]+)'/g)].map((m) => m[1]),
-    )
+  it('画面のキーはすべて共有カタログに存在する', () => {
+    const accepted = new Set<string>(FEATURE_IDS)
     const used = MENU_SECTIONS.flatMap((section) =>
       section.items.map((item) => item.featureKey).filter((key): key is NonNullable<typeof key> => Boolean(key)),
     )

@@ -1,19 +1,23 @@
 'use client'
 
+import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import Button from '@/components/shared/button'
 import Card, { CardHeader } from '@/components/shared/card'
 import ListState from '@/components/shared/list-state'
-import SummaryCard from '@/components/shared/summary-card'
+import TargetMissing from '@/components/shared/target-missing'
+import KpiCard from '@/components/shared/kpi-card'
 import { DataTable, Td, Th, Tr } from '@/components/shared/table'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import {
   api,
+  ApiError,
   type FriendDetail,
   type MileageConnectedAccount,
+  type MileageFriendV6,
   type MileageHistoryItem,
   type MileageSelfInsights,
   type MileageSummary,
@@ -21,11 +25,20 @@ import {
 import {
   formatMileageChange,
   formatMileageDate,
+  friendHistoryItem,
+  mileageDetailHasSourceEvent,
+  mileageRankProgress,
   mileageEntryTypeLabel,
   mileageSourceLabel,
+  mileageSourceNoteText,
   mileageStatusLabel,
+  type MileageDetailHistoryItem,
 } from '../../mileage-display'
+import { mileageConnectedAccounts, mileageRewardedActions } from '../../mileage-response-state'
 import MileageAdjustmentDialog from './mileage-adjustment-dialog'
+import Dialog from '@/components/shared/dialog'
+import Notice from '@/components/shared/notice'
+import { Field, TextArea } from '@/components/shared/form-controls'
 
 type MileageDetail = {
   summary: MileageSummary
@@ -37,46 +50,89 @@ type MileageDetail = {
 function FriendMileageInner() {
   const searchParams = useSearchParams()
   const friendId = searchParams.get('id') ?? ''
+  const openAdjustment = searchParams.get('adjust') === '1'
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const requestRef = useRef(0)
   const [friend, setFriend] = useState<FriendDetail | null>(null)
   const [mileage, setMileage] = useState<MileageDetail | null>(null)
+  const [v6Friend, setV6Friend] = useState<MileageFriendV6 | null>(null)
+  const [v6History, setV6History] = useState<MileageDetailHistoryItem[] | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
+  /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
+  const [missing, setMissing] = useState(false)
   const [canAdjust, setCanAdjust] = useState(false)
   const [canConfigureAdjustmentPolicy, setCanConfigureAdjustmentPolicy] = useState(false)
   const [adjustmentOpen, setAdjustmentOpen] = useState(false)
+  /** R: 確定待ちの確定・取消。理由を必須で集めてから実行する。 */
+  const [pendingAction, setPendingAction] = useState<{ entryId: string; kind: 'confirm' | 'void'; label: string } | null>(null)
+  const [pendingReason, setPendingReason] = useState('')
+  const [pendingBusy, setPendingBusy] = useState(false)
+  const [pendingError, setPendingError] = useState('')
+  /** R380: 履歴の行から失敗した通知だけを送り直す。残高は動かさない。 */
+  const [notificationRetryId, setNotificationRetryId] = useState<string | null>(null)
+  const [notificationRetryError, setNotificationRetryError] = useState('')
   usePageTitle(friend?.displayName ? `${friend.displayName}のマイル明細` : null)
 
   const load = useCallback(async () => {
     if (!selectedAccountId || !friendId) {
       setFriend(null)
       setMileage(null)
+      setV6Friend(null)
+      setV6History(null)
       setLoading(false)
       return
     }
     const request = ++requestRef.current
     setLoading(true)
     setError(false)
+    setMissing(false)
     try {
-      const [friendResponse, mileageResponse, staffResponse] = await Promise.all([
-        api.friends.get(friendId),
+      const friendResponse = await api.friends.get(friendId)
+      if (!friendResponse.success) throw new Error('load_failed')
+      const [mileageResponse, staffResponse, v6Response, historyResponse] = await Promise.all([
         api.friends.mileage(friendId, { limit: 100, accountId: selectedAccountId }),
         api.staff.me().catch(() => null),
+        // V6R-CX-e: 名前で探して100件から拾うと、同名が多いと本人がこぼれる。友だちIDで取る。
+        api.mileage.friendsV6({
+          accountId: selectedAccountId,
+          friendId,
+          limit: 1,
+          offset: 0,
+        }).catch(() => null),
+        api.mileage.history({
+          accountId: selectedAccountId,
+          friendId,
+          limit: 100,
+          offset: 0,
+        }).catch(() => null),
       ])
       if (request !== requestRef.current) return
-      if (!friendResponse.success || !mileageResponse.success) throw new Error('load_failed')
+      if (!mileageResponse.success) throw new Error('load_failed')
       setFriend(friendResponse.data)
       setMileage(mileageResponse.data)
+      setV6Friend(v6Response?.success && Array.isArray(v6Response.data?.items)
+        ? v6Response.data.items.find((item) => item.friendId === friendId) ?? null
+        : null)
+      setV6History(historyResponse?.success && Array.isArray(historyResponse.data?.items)
+        // サーバがこの人（名寄せした複数アカウント）の履歴だけを返す。
+        ? historyResponse.data.items.map(friendHistoryItem)
+        : null)
       setCanAdjust(Boolean(staffResponse?.success && (staffResponse.data.role === 'owner' || staffResponse.data.role === 'admin')))
       setCanConfigureAdjustmentPolicy(Boolean(staffResponse?.success && staffResponse.data.role === 'owner'))
-    } catch {
+    } catch (caught) {
       if (request !== requestRef.current) return
       setFriend(null)
       setMileage(null)
+      setV6Friend(null)
+      setV6History(null)
       setCanAdjust(false)
       setCanConfigureAdjustmentPolicy(false)
-      setError(true)
+      if (caught instanceof ApiError && caught.status === 404) {
+        setMissing(true)
+      } else {
+        setError(true)
+      }
     } finally {
       if (request === requestRef.current) setLoading(false)
     }
@@ -87,79 +143,299 @@ function FriendMileageInner() {
     void load()
   }, [accountLoading, load])
 
+  useEffect(() => {
+    if (openAdjustment && canAdjust && friend && mileage) setAdjustmentOpen(true)
+  }, [canAdjust, friend, mileage, openAdjustment])
+
+  const retryNotification = async (entryId: string, entryAccountId: string) => {
+    setNotificationRetryId(entryId)
+    setNotificationRetryError('')
+    try {
+      const response = await api.mileage.retryMileageNotification(entryId, { accountId: entryAccountId })
+      if (!response.success) throw new ApiError(500, response.error || '通知を再送できませんでした。')
+      await load()
+    } catch (caught) {
+      setNotificationRetryError(caught instanceof ApiError ? caught.message : '通知を再送できませんでした。時間をおいてもう一度お試しください。')
+    } finally {
+      setNotificationRetryId(null)
+    }
+  }
+
+  const runPendingAction = async () => {
+    if (!pendingAction || !selectedAccountId) return
+    const reason = pendingReason.trim()
+    if (!reason) {
+      setPendingError('理由を入力してください')
+      return
+    }
+    setPendingBusy(true)
+    setPendingError('')
+    try {
+      const response = pendingAction.kind === 'confirm'
+        ? await api.mileage.confirmMileageEntry(pendingAction.entryId, { accountId: selectedAccountId, reason })
+        : await api.mileage.voidMileageEntry(pendingAction.entryId, { accountId: selectedAccountId, reason })
+      if (!response.success) throw new ApiError(500, response.error || '処理できませんでした。もう一度お試しください。')
+      setPendingAction(null)
+      setPendingReason('')
+      await load()
+    } catch (caught) {
+      setPendingError(caught instanceof ApiError ? caught.message : '処理できませんでした。もう一度お試しください。')
+    } finally {
+      setPendingBusy(false)
+    }
+  }
+
   if (accountLoading || loading) {
     return <div data-design-node="HIU5O"><ListState kind="loading" title="マイル明細を読み込んでいます" /></div>
+  }
+  /*
+    U098: 対象未指定のとき「再読み込み」は同じ失敗を繰り返すだけ。
+    友だちの一覧へ戻して選び直させる。アカウント未選択より先に言う。
+  */
+  if (!friendId) {
+    return (
+      <div data-design-node="HIU5O">
+        <TargetMissing
+          kind="unspecified"
+          title="マイル明細を見る友だちが指定されていません"
+          description="友だちの一覧から、明細を見る人を選び直してください。"
+          backHref="/friends"
+          backLabel="友だち一覧へ戻る"
+        />
+      </div>
+    )
   }
   if (!selectedAccountId) {
     return <div data-design-node="HIU5O"><ListState kind="empty" title="LINEアカウントを選択してください" description="共通トップバーでLINEアカウントを選ぶと、友だちのマイル明細を確認できます。" /></div>
   }
+  if (missing || (!error && (!friend || !mileage))) {
+    return (
+      <div data-design-node="HIU5O">
+        <TargetMissing
+          kind="not-found"
+          title="この友だちは見つかりません"
+          description="友だちが選択中のLINEアカウントにいるか確認して、一覧から選び直してください。"
+          backHref="/friends"
+          backLabel="友だち一覧へ戻る"
+        />
+      </div>
+    )
+  }
   if (error || !friend || !mileage) {
     return (
       <div data-design-node="HIU5O">
-        <ListState
+        <TargetMissing
           kind="error"
           title="マイル明細を表示できませんでした"
-          description="友だちが選択中のLINEアカウントにいるか確認して、再読み込みしてください。"
-          action={<Button onClick={() => void load()}>マイル明細を再読み込み</Button>}
+          description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+          onRetry={() => void load()}
         />
       </div>
     )
   }
 
-  const displayName = friend.displayName || '名前未設定'
+  const displayName = v6Friend?.displayName || friend.displayName || '名前未設定'
+  const rankLabel = v6Friend?.rank === 'gold'
+    ? 'ゴールド'
+    : v6Friend?.rank === 'silver'
+      ? 'シルバー'
+      : v6Friend?.rank === 'bronze'
+        ? 'ブロンズ'
+        : v6Friend?.rank ?? 'ランクなし'
+  const nextRankLabel = v6Friend?.nextRank === 'gold'
+    ? 'ゴールド'
+    : v6Friend?.nextRank === 'silver'
+      ? 'シルバー'
+      : v6Friend?.nextRank === 'bronze'
+        ? 'ブロンズ'
+        : v6Friend?.nextRank
+  /* R54: 未公開と最高到達の区別は mileageRankProgress にまとめる。 */
+  const rankProgress = mileageRankProgress({
+    rank: v6Friend?.rank,
+    rankReason: v6Friend?.rankReason,
+    nextRankLabel,
+    milesToNextRank: v6Friend?.milesToNextRank,
+  })
+  const rankHeadline = rankProgress.headline
+  const rankDetail = rankProgress.detail
+  const rankUnpublished = rankProgress.unpublished
+  const available = v6Friend?.available ?? mileage.summary.available
+  const rewardedActions = mileageRewardedActions(mileage.insights)
+  const connectedAccounts = mileageConnectedAccounts(mileage.connections)
+  const displayedHistory: MileageDetailHistoryItem[] = v6History ?? mileage.history
+  /*
+   * R383: 期限つきマイルがあって30日内は0のとき、いちばん近い失効日を
+   * 「M月D日」で短く添える。
+   */
+  const nextExpiringLabel = v6Friend?.nextExpiringAt
+    ? new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric' }).format(new Date(v6Friend.nextExpiringAt))
+    : null
+  /* R387: 権限の外側のアカウントの記録は理由が null で返る。まとめて一枠で数える。 */
+  const reasonSummary = displayedHistory.reduce<Array<{ reason: string; count: number; amount: number }>>((items, item) => {
+    const key = item.reason ?? '権限の外側にあるアカウントの記録'
+    const found = items.find((candidate) => candidate.reason === key)
+    if (found) { found.count += 1; found.amount += item.amount } else items.push({ reason: key, count: 1, amount: item.amount })
+    return items
+  }, []).sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount))
   return (
     <div data-design-node="HIU5O" className="space-y-4">
       <Breadcrumb items={[{ label: 'マイル', href: '/mileage' }, { label: `${displayName}のマイル明細` }]} />
 
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
-        <SummaryCard variant="v6" title="利用可能" value={mileage.summary.available} unit=" mile" detail="いま使える残高" />
-        <SummaryCard variant="v6" title="確定待ち" value={mileage.summary.pending} unit=" mile" detail="条件の確定を待っています" />
-        <SummaryCard variant="v6" title="30日以内に失効" value={null} unit=" mile" detail="失効ロットの接続が必要" badge="未取得" badgeTone="neutral" />
-        <SummaryCard variant="v6" title="生涯付与" value={mileage.summary.lifetimeEarned} unit=" mile" detail={`${mileage.insights.rewardedActions.toLocaleString('ja-JP')}回の付与記録`} />
-        <SummaryCard variant="v6" title="使用済み" value={mileage.summary.spent} unit=" mile" detail="交換などで使った合計" />
+        <KpiCard variant="v6" title="利用可能" value={available} unit=" マイル" detail="" help="いま使える残高です" />
+        <KpiCard variant="v6" title="確定待ち" value={v6Friend?.pending ?? mileage.summary.pending} unit=" マイル" detail="条件の確定を待っています" />
+        <KpiCard
+          variant="v6"
+          title="30日以内に失効"
+          value={v6Friend?.expiringMiles30d ?? null}
+          unit=" マイル"
+          detail={v6Friend
+            ? v6Friend.expiringMiles30d == null
+              ? '期限付きの付与記録はありません'
+              // R383: 期限つきマイルが30日より先だけにあるときは 0 と区別し、
+              // いちばん近い失効日を添えて「期限なし」と誤解させない。
+              : v6Friend.expiringMiles30d === 0 && nextExpiringLabel
+                ? `30日以内の失効はありません（次は ${nextExpiringLabel}）`
+                : '30日以内に期限を迎える分'
+            : '友だち別失効の取得口を確認できませんでした'}
+        />
+        <KpiCard
+          variant="v6"
+          title="生涯付与"
+          value={v6Friend?.lifetimeEarned ?? mileage.summary.lifetimeEarned}
+          unit=" マイル"
+          detail={rewardedActions === null ? '付与記録の回数は未取得' : `${rewardedActions.toLocaleString('ja-JP')}回の付与記録`}
+        />
+        <KpiCard variant="v6" title="使用済み" value={v6Friend?.spent ?? mileage.summary.spent} unit=" マイル" detail={v6Friend ? `今月の増減 ${v6Friend.monthChange > 0 ? '+' : ''}${v6Friend.monthChange.toLocaleString('ja-JP')} マイル` : '交換などで使った合計'} />
       </div>
 
       <Card overflow="hidden">
         <CardHeader
           title="友だちと接続LINEアカウント"
-          meta={mileage.connections.length > 0 ? `${mileage.connections.length}件を表示` : '—'}
-          action={<div className="flex flex-wrap gap-2">{canAdjust ? <Button variant="primary" onClick={() => setAdjustmentOpen(true)}>マイルを手で増やす・減らす</Button> : null}<Button href={`/friends/detail?id=${encodeURIComponent(friend.id)}`}>友だちの詳細を見る</Button></div>}
+          meta={connectedAccounts === null ? '—' : `${connectedAccounts.length}件を表示`}
+          action={<div className="flex flex-wrap gap-2">{canAdjust ? <Button variant="secondary" onClick={() => setAdjustmentOpen(true)}>マイルを手で増やす・減らす</Button> : null}<Button href={`/friends/detail?id=${encodeURIComponent(friend.id)}`}>友だちの詳細を見る</Button></div>}
         />
         <div className="flex flex-wrap items-center gap-4 p-4">
-          {friend.pictureUrl ? <img src={friend.pictureUrl} alt="" className="h-12 w-12 rounded-full object-cover" /> : <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent-soft text-lg font-bold text-accent">{displayName.slice(0, 1)}</div>}
+          {friend.pictureUrl ? <img src={friend.pictureUrl} alt="" className="h-12 w-12 rounded-full object-cover" /> : <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent-soft text-lg font-bold text-accent-deep">{displayName.slice(0, 1)}</div>}
           <div className="min-w-44">
-            <p className="font-bold text-v6-ink">{displayName}</p>
-            <p className="mt-1 text-xs text-v6-ink-faint">本人確認済みの接続先だけを表示します</p>
+            <p className="font-bold text-ink">{displayName}</p>
+            <p className="mt-1 text-xs text-ink-faint">本人確認済みの接続先だけを表示します</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            {mileage.connections.length > 0 ? mileage.connections.map((connection) => (
-              <span key={connection.accountId} className="rounded-full border border-hairline bg-v6-surface px-3 py-1 text-xs font-semibold text-v6-ink-secondary">{connection.accountName}</span>
-            )) : <span className="text-sm text-v6-ink-faint">接続先を確認できませんでした</span>}
+            {connectedAccounts === null ? (
+              <span className="text-sm text-ink-faint">接続先を確認できませんでした</span>
+            ) : connectedAccounts.length > 0 ? connectedAccounts.map((connection) => (
+              <span key={connection.accountId} className="rounded-full border border-hairline bg-surface-pearl px-3 py-1 text-xs font-semibold text-ink-secondary">{connection.accountName}</span>
+            )) : <span className="text-sm text-ink-faint">接続先はありません</span>}
           </div>
         </div>
       </Card>
 
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader title="ランクの進み" meta={rankLabel} />
+          <div className="p-4">
+            {/*
+              R54: ランク未公開（今も次もなし）と最高到達を区別する。
+              未公開なのに「いちばん上のランクです」と出していた。
+              未公開の2行目は理由の重ね書きにせず、作り先を案内する。
+            */}
+            <p className="text-sm font-bold text-ink">{rankHeadline}</p>
+            {rankUnpublished ? (
+              <p className="mt-1 text-xs text-ink-faint">
+                ランクを作ると、ここに進み具合が出ます。
+                <Link href="/mileage?tab=rewards" className="font-semibold text-action">使い道・ランクを作る</Link>
+              </p>
+            ) : (
+              <p className="mt-1 text-xs text-ink-faint">{rankDetail}</p>
+            )}
+          </div>
+        </Card>
+        <Card>
+          <CardHeader title="何でたまったか" meta={`${reasonSummary.length}種類`} />
+          <div className="divide-y divide-hairline">
+            {reasonSummary.length === 0 ? <p className="p-4 text-sm text-ink-faint">付与理由の記録はありません</p> : reasonSummary.slice(0, 5).map((reason) => (
+              <div key={reason.reason} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
+                <span className="truncate text-ink" title={reason.reason}>{reason.reason}</span>
+                <span className="shrink-0 font-semibold tabular-nums text-ink-secondary">{reason.count}回 ／ {formatMileageChange(reason.amount)} マイル</span>
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
+
       <Card overflow="hidden">
-        <CardHeader title="付与・使用・失効・調整の履歴" meta={`最新${mileage.history.length.toLocaleString('ja-JP')}件`} />
-        {mileage.history.length === 0 ? (
+        <CardHeader title="付与・使用・失効・調整の履歴" meta={`最新${displayedHistory.length.toLocaleString('ja-JP')}件`} />
+        {notificationRetryError ? (
+          <div className="px-4 pt-3"><Notice tone="error">{notificationRetryError}</Notice></div>
+        ) : null}
+        {displayedHistory.length === 0 ? (
           <ListState kind="empty" title="マイルの履歴はありません" description="付与や使用が記録されると、ここに理由と日時が表示されます。" />
         ) : (
           <DataTable>
-            <thead><tr><Th>発生日時</Th><Th>種類・状態</Th><Th align="right">増減</Th><Th>理由</Th><Th>発生元</Th><Th>ルール・実行者</Th></tr></thead>
+            <thead><tr><Th>発生日時</Th><Th>種類・状態</Th><Th align="right">増減</Th><Th align="right">変更後残高</Th><Th>理由</Th><Th>発生元</Th><Th>ルール・実行者</Th>{canAdjust ? <Th align="right">操作</Th> : null}</tr></thead>
             <tbody>
-              {mileage.history.map((item) => (
+              {displayedHistory.map((item) => (
                 <Tr key={item.id}>
                   <Td><time dateTime={item.occurredAt}>{formatMileageDate(item.occurredAt)}</time></Td>
-                  <Td><p className="font-semibold text-v6-ink">{mileageEntryTypeLabel(item.entryType)}</p><p className="mt-1 text-xs text-v6-ink-faint">{mileageStatusLabel(item.status)}</p></Td>
-                  <Td align="right"><span className={item.amount < 0 ? 'font-bold text-v6-danger' : 'font-bold text-accent'}>{formatMileageChange(item.amount)} mile</span></Td>
-                  <Td><p className="max-w-56 truncate font-medium text-v6-ink" title={item.reason}>{item.reason}</p></Td>
+                  <Td><p className="font-semibold text-ink">{mileageEntryTypeLabel(item.entryType)}</p><p className="mt-1 text-xs text-ink-faint">{mileageStatusLabel(item.status)}</p></Td>
+                  <Td align="right"><span className={item.amount < 0 ? 'font-bold text-danger' : 'font-bold text-accent-deep'}>{formatMileageChange(item.amount)} マイル</span></Td>
+                  <Td align="right" className="tabular-nums">{'balanceAfter' in item && typeof item.balanceAfter === 'number' ? `${item.balanceAfter.toLocaleString('ja-JP')} マイル` : '—'}</Td>
+                  <Td>
+                    {item.restricted || item.reason == null ? (
+                      <p className="max-w-56 text-sm text-ink-faint">権限の外側にあるアカウントの記録</p>
+                    ) : (
+                      <p className="max-w-56 truncate font-medium text-ink" title={item.reason}>{item.reason}</p>
+                    )}
+                  </Td>
                   <Td>
                     <p>{mileageSourceLabel(item.source)}</p>
-                    <p className="mt-1 max-w-44 truncate text-xs text-v6-ink-faint" title={item.sourceReferenceId ?? undefined}>
-                      {item.sourceReferenceId ? `調整元ID: ${item.sourceReferenceId}` : item.sourceEventId ? '元の記録あり' : '元の記録なし'}
+                    <p className="mt-1 text-xs text-ink-faint">
+                      {mileageSourceNoteText({ sourceReferenceId: item.sourceReferenceId, hasSourceEvent: mileageDetailHasSourceEvent(item) })}
                     </p>
                   </Td>
-                  <Td><p>{item.ruleName ?? '—'}</p><p className="mt-1 text-xs text-v6-ink-faint">{item.mode === 'manual' ? item.executedByStaffName ?? '実行者は未取得' : '自動処理'}</p></Td>
+                  <Td>
+                    <p>{item.restricted ? '—' : item.ruleName ?? '—'}</p>
+                    <p className="mt-1 text-xs text-ink-faint">
+                      {item.mode === 'manual'
+                        ? item.restricted ? '権限の外側の記録' : item.executedByStaffName ?? '実行者は未取得'
+                        : '自動処理'}
+                    </p>
+                  </Td>
+                  {canAdjust ? (
+                    <Td align="right">
+                      <div className="flex justify-end gap-2">
+                        {item.status === 'pending' && !item.restricted ? (
+                          <>
+                            <Button
+                              variant="secondary"
+                              onClick={() => {
+                                setPendingAction({ entryId: item.id, kind: 'confirm', label: item.reason ?? '' })
+                                setPendingReason('')
+                                setPendingError('')
+                              }}
+                            >確定する</Button>
+                            <Button
+                              variant="secondary"
+                              onClick={() => {
+                                setPendingAction({ entryId: item.id, kind: 'void', label: item.reason ?? '' })
+                                setPendingReason('')
+                                setPendingError('')
+                              }}
+                            >取消す</Button>
+                          </>
+                        ) : null}
+                        {/* R380: 残高は動かさず、失敗した通知だけを送り直す。 */}
+                        {item.notificationStatus === 'failed' && !item.restricted ? (
+                          <Button
+                            variant="secondary"
+                            disabled={notificationRetryId === item.id}
+                            onClick={() => void retryNotification(item.id, item.lineAccountId ?? selectedAccountId)}
+                          >{notificationRetryId === item.id ? '送り直し中…' : '通知を再送'}</Button>
+                        ) : null}
+                      </div>
+                    </Td>
+                  ) : null}
                 </Tr>
               ))}
             </tbody>
@@ -171,11 +447,41 @@ function FriendMileageInner() {
         accountId={selectedAccountId}
         friendId={friend.id}
         friendName={displayName}
-        currentBalance={mileage.summary.available}
+        currentBalance={available}
         onCancel={() => setAdjustmentOpen(false)}
         onCompleted={load}
         canConfigurePolicy={canConfigureAdjustmentPolicy}
       />
+      <Dialog
+        open={pendingAction !== null}
+        title={pendingAction?.kind === 'void' ? 'この記録を取り消します' : '確定待ちを確定します'}
+        description={pendingAction?.kind === 'void'
+          ? '元の記録は消さず、逆向きの記録を追加して残高を戻します。'
+          : '確定すると利用可能な残高へ移ります。'}
+        tone={pendingAction?.kind === 'void' ? 'destructive' : 'default'}
+        busy={pendingBusy}
+        error={pendingError}
+        confirmLabel={pendingAction?.kind === 'void' ? 'この理由で取消す' : 'この理由で確定する'}
+        cancelLabel="やめる"
+        onConfirm={() => void runPendingAction()}
+        onCancel={() => { if (!pendingBusy) { setPendingAction(null); setPendingReason(''); setPendingError('') } }}
+      >
+        <div className="space-y-4">
+          <div className="rounded-control bg-canvas-sunken p-3">
+            <p className="text-xs font-semibold text-ink-faint">対象の記録</p>
+            <p className="mt-1 text-sm font-semibold text-ink">{pendingAction?.label}</p>
+          </div>
+          <Field label="理由" htmlFor="mileage-pending-reason" required>
+            <TextArea
+              id="mileage-pending-reason"
+              rows={3}
+              value={pendingReason}
+              onChange={(event) => setPendingReason(event.target.value)}
+            />
+          </Field>
+          <Notice tone="info">理由は履歴に残り、あとから実行者と一緒に確認できます。</Notice>
+        </div>
+      </Dialog>
     </div>
   )
 }

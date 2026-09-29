@@ -166,6 +166,11 @@ export interface AutoTrackedLinkInput {
   originalUrl: string;
   lineAccountId?: string | null;
   /**
+   * 同じURLでも利用先ごとに集計を分けるための範囲。
+   * 省略時は従来どおりアカウントとURLの組で再利用する。
+   */
+  dedupScope?: string | null;
+  /**
    * この短縮URLを含んでいたテンプレート（110）。
    *
    * dedup_key には入れない。同じURLがテンプレートAとBの両方に出ても
@@ -180,7 +185,9 @@ export interface AutoTrackedLinkInput {
 
 function autoTrackedLinkDedupKey(input: AutoTrackedLinkInput): string {
   // Must match the backfill expression in migration 050.
-  return `${input.lineAccountId ?? ''}|${input.originalUrl}`;
+  return input.dedupScope
+    ? `${input.lineAccountId ?? ''}|${input.dedupScope}|${input.originalUrl}`
+    : `${input.lineAccountId ?? ''}|${input.originalUrl}`;
 }
 
 async function getTrackedLinkByDedupKey(
@@ -352,4 +359,3 @@ export async function getLinkClicks(
     .all<LinkClickWithFriend>();
   return result.results;
 }
-

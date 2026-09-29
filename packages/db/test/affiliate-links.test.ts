@@ -34,7 +34,16 @@ function execSafe(db: Database.Database, sql: string): void {
   }
 }
 
+/*
+ * 移行の再生は全部同期で走る。テストごとに繰り返すとその間ワーカーが
+ * 止まり、CI が vitest の状況報告待ちで落ちる。1度だけ組み立てて中身を
+ * 控え、以後は写しから起こす。写しは独立したDBなので、テスト同士は
+ * 影響し合わない。
+ */
+let migratedSnapshot: Buffer | null = null;
+
 function setupDb(): Database.Database {
+  if (migratedSnapshot) return new Database(migratedSnapshot);
   const db = new Database(':memory:');
   execSafe(db, readFileSync(join(PKG_ROOT, 'schema.sql'), 'utf8'));
   const migrationFiles = readdirSync(MIGRATIONS_DIR)
@@ -43,6 +52,7 @@ function setupDb(): Database.Database {
   for (const file of migrationFiles) {
     execSafe(db, readFileSync(join(MIGRATIONS_DIR, file), 'utf8'));
   }
+  migratedSnapshot = db.serialize();
   return db;
 }
 
@@ -155,6 +165,7 @@ describe('affiliate-links CRUD', () => {
 
   test('createAffiliateLink returns correct fields', async () => {
     insertLineAccount(sqlite, 'la-001');
+    sqlite.prepare(`UPDATE affiliates SET line_account_id = ? WHERE id = ?`).run('la-001', AFF_ID);
     const link = await createAffiliateLink(db, {
       affiliateId: AFF_ID,
       label: 'Test Label',
@@ -275,6 +286,20 @@ describe('affiliate-links CRUD', () => {
   test('listAffiliateLinks returns empty array for unknown affiliate', async () => {
     const links = await listAffiliateLinks(db, 'nonexistent');
     expect(links).toEqual([]);
+  });
+
+  test('紹介者と別のLINEアカウントではリンクを作成・一覧取得できない', async () => {
+    insertLineAccount(sqlite, 'la-own');
+    insertLineAccount(sqlite, 'la-other');
+    sqlite.prepare(`UPDATE affiliates SET line_account_id = ? WHERE id = ?`).run('la-own', AFF_ID);
+
+    await expect(createAffiliateLink(db, {
+      affiliateId: AFF_ID,
+      lineAccountId: 'la-other',
+    })).rejects.toThrow('affiliate link account mismatch');
+
+    await createAffiliateLink(db, { affiliateId: AFF_ID, lineAccountId: 'la-own' });
+    expect(await listAffiliateLinks(db, AFF_ID, { lineAccountId: 'la-other' })).toEqual([]);
   });
 
   // ── countAffiliateLinks ──────────────────────────────────────────────────

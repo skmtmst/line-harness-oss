@@ -1,0 +1,1091 @@
+import { settlementSurvived, settlementWriteStatements } from './affiliate-settlements.js';
+
+export type AffiliateBankAccountType = 'ordinary' | 'checking';
+
+export interface AffiliateBankProfile {
+  affiliateId: string;
+  lineAccountId: string;
+  bankCode: string;
+  bankName: string;
+  branchCode: string;
+  branchName: string;
+  accountType: AffiliateBankAccountType;
+  accountLast4: string;
+  accountHolderName: string;
+  version: number;
+  updatedAt: string;
+}
+
+type BankProfileRow = {
+  affiliate_id: string;
+  line_account_id: string;
+  bank_code: string;
+  bank_name: string;
+  branch_code: string;
+  branch_name: string;
+  account_type: AffiliateBankAccountType;
+  account_number_encrypted: string;
+  account_last4: string;
+  account_holder_name: string;
+  version: number;
+  last_idempotency_key: string;
+  last_request_fingerprint: string;
+  updated_at: string;
+};
+
+function bankProfile(row: BankProfileRow): AffiliateBankProfile {
+  return {
+    affiliateId: row.affiliate_id,
+    lineAccountId: row.line_account_id,
+    bankCode: row.bank_code,
+    bankName: row.bank_name,
+    branchCode: row.branch_code,
+    branchName: row.branch_name,
+    accountType: row.account_type,
+    accountLast4: row.account_last4,
+    accountHolderName: row.account_holder_name,
+    version: Number(row.version),
+    updatedAt: row.updated_at,
+  };
+}
+
+export async function getAffiliateBankProfile(
+  db: D1Database,
+  input: { tenantId: string; lineAccountId: string; affiliateId: string },
+): Promise<AffiliateBankProfile | null> {
+  const row = await db.prepare(
+    `SELECT * FROM affiliate_bank_profiles
+      WHERE organization_id = ? AND line_account_id = ? AND affiliate_id = ?`,
+  ).bind(input.tenantId, input.lineAccountId, input.affiliateId).first<BankProfileRow>();
+  return row ? bankProfile(row) : null;
+}
+
+export type SaveAffiliateBankProfileResult =
+  | { kind: 'created'; profile: AffiliateBankProfile }
+  | { kind: 'updated'; profile: AffiliateBankProfile }
+  | { kind: 'duplicate'; profile: AffiliateBankProfile }
+  | { kind: 'changed' }
+  | { kind: 'idempotency_conflict' };
+
+export async function saveAffiliateBankProfile(
+  db: D1Database,
+  input: {
+    tenantId: string;
+    lineAccountId: string;
+    affiliateId: string;
+    bankCode: string;
+    bankName: string;
+    branchCode: string;
+    branchName: string;
+    accountType: AffiliateBankAccountType;
+    encryptedAccountNumber: string;
+    accountLast4: string;
+    accountHolderName: string;
+    accountFingerprint: string;
+    expectedVersion: number;
+    idempotencyKey: string;
+    requestFingerprint: string;
+    now?: string;
+  },
+): Promise<SaveAffiliateBankProfileResult> {
+  const existing = await db.prepare(
+    `SELECT * FROM affiliate_bank_profiles
+      WHERE organization_id = ? AND line_account_id = ? AND affiliate_id = ?`,
+  ).bind(input.tenantId, input.lineAccountId, input.affiliateId).first<BankProfileRow>();
+  if (existing?.last_idempotency_key === input.idempotencyKey) {
+    return existing.last_request_fingerprint === input.requestFingerprint
+      ? { kind: 'duplicate', profile: bankProfile(existing) }
+      : { kind: 'idempotency_conflict' };
+  }
+  if ((existing?.version ?? 0) !== input.expectedVersion) return { kind: 'changed' };
+
+  const now = input.now ?? new Date().toISOString();
+  if (!existing) {
+    await db.prepare(
+      `INSERT INTO affiliate_bank_profiles
+         (affiliate_id, organization_id, line_account_id, bank_code, bank_name,
+          branch_code, branch_name, account_type, account_number_encrypted,
+          account_last4, account_holder_name, account_fingerprint, version,
+          last_idempotency_key, last_request_fingerprint, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)`,
+    ).bind(
+      input.affiliateId, input.tenantId, input.lineAccountId, input.bankCode,
+      input.bankName, input.branchCode, input.branchName, input.accountType,
+      input.encryptedAccountNumber, input.accountLast4, input.accountHolderName,
+      input.accountFingerprint, input.idempotencyKey, input.requestFingerprint, now, now,
+    ).run();
+  } else {
+    const changed = await db.prepare(
+      `UPDATE affiliate_bank_profiles
+          SET bank_code = ?, bank_name = ?, branch_code = ?, branch_name = ?,
+              account_type = ?, account_number_encrypted = ?, account_last4 = ?,
+              account_holder_name = ?, account_fingerprint = ?, version = version + 1,
+              last_idempotency_key = ?, last_request_fingerprint = ?, updated_at = ?
+        WHERE affiliate_id = ? AND organization_id = ? AND line_account_id = ? AND version = ?`,
+    ).bind(
+      input.bankCode, input.bankName, input.branchCode, input.branchName,
+      input.accountType, input.encryptedAccountNumber, input.accountLast4,
+      input.accountHolderName, input.accountFingerprint, input.idempotencyKey,
+      input.requestFingerprint, now, input.affiliateId, input.tenantId,
+      input.lineAccountId, input.expectedVersion,
+    ).run();
+    if (Number(changed.meta.changes ?? 0) !== 1) return { kind: 'changed' };
+  }
+  const profile = await getAffiliateBankProfile(db, input);
+  if (!profile) throw new Error('affiliate bank profile was not saved');
+  return { kind: existing ? 'updated' : 'created', profile };
+}
+
+export type EligibleRewardRow = {
+  conversion_event_id: string;
+  affiliate_id: string;
+  affiliate_name: string;
+  affiliate_code: string;
+  offer_id: string | null;
+  approved_at: string;
+  reward_amount: number;
+  bank_profile_version: number | null;
+  calculation_id: string;
+};
+
+export interface AffiliateSettlementPreviewRow {
+  affiliateId: string;
+  affiliateName: string;
+  code: string;
+  /** 今回払う額。取消の差し引き後。 */
+  amount: number;
+  /** 差し引き前の報酬額。amount + deduction と等しい。 */
+  grossAmount: number;
+  /** 今回差し引く取消額。無いときは 0。 */
+  deduction: number;
+  conversionCount: number;
+  bankProfileRegistered: boolean;
+}
+
+/**
+ * 締め対象から外れた成果。報酬が0円(以下)の行は支払えないため締めへ
+ * 含めないのは仕様どおりだが、件数と対象を運用者が確認できるよう
+ * プレビューへ出す(N-219)。
+ */
+export interface AffiliateSettlementExcludedRow {
+  conversionEventId: string;
+  affiliateId: string;
+  affiliateName: string;
+  code: string;
+  approvedAt: string;
+  /** 丸め後の報酬額(円)。0円以下が対象。 */
+  rewardAmount: number;
+}
+
+/** 除外行の明細は先頭分だけ返す。残りは件数で分かる。 */
+export const EXCLUDED_ZERO_AMOUNT_PREVIEW_ROWS = 100;
+
+export interface AffiliateAccountSettlementPreview {
+  lineAccountId: string;
+  periodFrom: string;
+  periodTo: string;
+  currency: 'JPY';
+  totalAmount: number;
+  conversionCount: number;
+  affiliates: AffiliateSettlementPreviewRow[];
+  /** 報酬0円で対象から外れた成果の件数と明細(先頭100件)。 */
+  excludedZeroAmount: {
+    count: number;
+    rows: AffiliateSettlementExcludedRow[];
+  };
+  /**
+   * 期間の始まりより前に承認され、まだ締められていない繰越分。
+   * 月をまたいで保留が明けた成果や前月の積み残しをここで数える。
+   */
+  carriedOver: {
+    count: number;
+    amount: number;
+  };
+  /** 今回差し引く取消額の合計。 */
+  totalDeduction: number;
+  /**
+   * R288: 今回引ききれず次回へ繰り越す取消額。次回200円・取消300円なら
+   * 200を引き、残り100を繰り越す(正の振込はしない)。
+   */
+  carriedDeduction: {
+    count: number;
+    amount: number;
+  };
+  previewVersion: string;
+}
+
+async function sha256(value: string): Promise<string> {
+  const bytes = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value)));
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * 締め対象候補の全行。0円以下の行も含めて返すので、呼び出し側が
+ * 「含める行」と「外れた行」を分けて数えられる(N-219)。
+ */
+async function eligibleRewardRows(
+  db: D1Database,
+  input: { tenantId: string; lineAccountId: string; periodFrom: string; periodTo: string },
+): Promise<EligibleRewardRow[]> {
+  // 全体締めも承認時の版だけを使う。版が無い承認済み行は対象外にして
+  // 安全に止める(現在値での再計算はしない)。版は承認時と移行で作られる。
+  const result = await db.prepare(
+    `SELECT ce.id AS conversion_event_id,
+            a.id AS affiliate_id,
+            a.name AS affiliate_name,
+            a.code AS affiliate_code,
+            calc.offer_id AS offer_id,
+            ce.approved_at,
+            calc.amount_minor AS reward_amount,
+            bp.version AS bank_profile_version,
+            calc.id AS calculation_id
+       FROM conversion_events ce
+       JOIN friends f ON f.id = ce.friend_id AND f.line_account_id = ?
+       JOIN affiliates a
+         ON a.tenant_id = ? AND a.line_account_id = ?
+        AND (ce.affiliate_id = a.id OR (ce.affiliate_id IS NULL AND ce.affiliate_code = a.code))
+       JOIN affiliate_reward_calculations calc
+         ON calc.conversion_event_id = ce.id
+        AND calc.formula IN ('rate', 'fixed')
+        AND calc.organization_id = a.tenant_id
+        AND calc.line_account_id = a.line_account_id
+        AND calc.affiliate_id = a.id
+       LEFT JOIN affiliate_bank_profiles bp
+         ON bp.affiliate_id = a.id AND bp.organization_id = a.tenant_id
+        AND bp.line_account_id = a.line_account_id
+      WHERE COALESCE(ce.approval_status, 'pending') = 'approved'
+        AND ce.approved_at IS NOT NULL
+        /*
+         * R44/R45:
+         * - 左側の下限は付けない。前の締めに間に合わなかった承認済み・
+         *   未クレジットの成果は繰越として今回の対象に含める。
+         * - 境界の比較は julianday で時刻値に揃える。approved_at は
+         *   JST(+09:00)文字列、期間の端は UTC(Z)文字列が来るため、
+         *   文字列どうしの比較だと月またぎで誤判定する。
+         */
+        AND julianday(ce.approved_at) <= julianday(?)
+        AND julianday(ce.approved_at) <= julianday(?, '-' || COALESCE(a.hold_days, 0) || ' days')
+        AND NOT EXISTS (
+          SELECT 1 FROM affiliate_reward_entries re
+           WHERE re.conversion_event_id = ce.id AND re.entry_type = 'credit'
+        )
+      ORDER BY a.id, ce.approved_at, ce.id`,
+  ).bind(
+    input.lineAccountId, input.tenantId, input.lineAccountId,
+    input.periodTo, input.periodTo,
+  ).all<EligibleRewardRow>();
+  return result.results;
+}
+
+function isPayableReward(row: EligibleRewardRow): boolean {
+  return Math.round(Number(row.reward_amount)) > 0;
+}
+
+async function eligibleRewards(
+  db: D1Database,
+  input: { tenantId: string; lineAccountId: string; periodFrom: string; periodTo: string },
+): Promise<EligibleRewardRow[]> {
+  return (await eligibleRewardRows(db, input)).filter(isPayableReward);
+}
+
+/**
+ * プレビュー版の算出。プレビュー表示と全体締めで同じ行集合から同じ版を
+ * 作るための共通関数。締めはこの版の照合に使った行集合をそのまま明細へ
+ * 書き込む(照合後に取り直さない = TOCTOU排除)。
+ * R288: 版は取消の差し引き計画も含める。プレビュー後に新しい取消が
+ * 来たら版が変わり、締めは changed で止まる(黙って別額では締めない)。
+ */
+export async function accountPreviewVersion(rows: EligibleRewardRow[], deductionFingerprint = ''): Promise<string> {
+  const versionSource = rows.map((row) => [
+    row.conversion_event_id,
+    row.affiliate_id,
+    Math.round(Number(row.reward_amount)),
+    row.approved_at,
+  ].join(':')).join('|');
+  return sha256(deductionFingerprint ? `${versionSource}|${deductionFingerprint}` : versionSource);
+}
+
+type UnappliedDebit = {
+  id: string;
+  affiliateId: string;
+  amount: number;
+  unapplied: number;
+  createdAt: string;
+};
+
+/**
+ * R288: まだ次の締めへ入れていない取消(debit)を古い順で返す。
+ * 消費の記録は締め明細行(entry_id 参照)。行が付けば適用済みで、
+ * もう次の締めには出てこない(二重控除しない)。
+ * 台帳が無い環境(移行前)では空を返して既存表示を壊さない。
+ */
+/**
+ * m22u R358 の回帰用に公開する、未適用の取り立て(clawback)の読み取り。
+ * 締め→却下で起こした相殺は、再承認で確定が戻ると取り立て対象から外す。
+ */
+export async function unappliedSettlementDebits(
+  db: D1Database,
+  input: { tenantId: string; lineAccountId: string },
+): Promise<UnappliedDebit[]> {
+  const tables = await db.prepare(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('affiliate_reward_entries','affiliate_settlement_lines')",
+  ).all<{ name: string }>();
+  if (tables.results.length < 2) return [];
+  const rows = await db.prepare(
+    `SELECT d.id, d.affiliate_id,
+            d.amount_minor AS amount,
+            d.amount_minor + COALESCE(SUM(sl.amount_minor), 0) AS unapplied,
+            d.created_at
+       FROM affiliate_reward_entries d
+       LEFT JOIN affiliate_settlement_lines sl
+         ON sl.entry_id = d.id AND sl.status = 'included'
+      WHERE d.organization_id = ? AND d.line_account_id = ?
+        AND d.entry_type = 'debit'
+        -- m22u R358: 再承認で確定が戻った成果の相殺は取り立てない。
+        -- 確定が有効なまま残る限り、却下の取り消しは無かったことになる。
+        AND NOT EXISTS (
+          SELECT 1 FROM affiliate_reward_entries c
+           WHERE c.conversion_event_id = d.conversion_event_id
+             AND c.entry_type = 'credit'
+             AND c.status <> 'reversed'
+        )
+      GROUP BY d.id
+      ORDER BY d.created_at, d.id`,
+  ).bind(input.tenantId, input.lineAccountId).all<{
+    id: string; affiliate_id: string; amount: number; unapplied: number; created_at: string;
+  }>();
+  return rows.results
+    .map((row) => ({
+      id: row.id,
+      affiliateId: row.affiliate_id,
+      amount: Math.round(Number(row.amount)),
+      unapplied: Math.round(Number(row.unapplied)),
+      createdAt: row.created_at,
+    }))
+    .filter((debit) => debit.unapplied > 0);
+}
+
+type DeductionPlan = {
+  /** 紹介者ごとの今回差し引き額。 */
+  perAffiliate: Map<string, number>;
+  /** 書き込む取消行。amount は負数。 */
+  lines: Array<{ debitId: string; affiliateId: string; amount: number }>;
+  totalDeduction: number;
+  /** 版照合に入れる指紋。 */
+  fingerprint: string;
+  /** 今回引ききれず次回へ繰り越す分。 */
+  carried: { count: number; amount: number };
+};
+
+/**
+ * R288: 紹介者の今回報酬へ、未適用の古い取消から充てる計画。
+ * 同一アカウント・同一紹介者の締めへ一度だけ適用する。
+ * 報酬を超える取消は報酬分だけ引き、残りは繰り越す(正の振込はしない)。
+ * プレビューと締めはこの同じ計画から作る。
+ */
+function planDeductionApplication(
+  grossByAffiliate: Map<string, number>,
+  debits: UnappliedDebit[],
+): DeductionPlan {
+  const byAffiliate = new Map<string, UnappliedDebit[]>();
+  for (const debit of debits) {
+    const list = byAffiliate.get(debit.affiliateId) ?? [];
+    list.push(debit);
+    byAffiliate.set(debit.affiliateId, list);
+  }
+  const perAffiliate = new Map<string, number>();
+  const lines: DeductionPlan['lines'] = [];
+  const consumed = new Map<string, number>();
+  let totalDeduction = 0;
+  for (const [affiliateId, gross] of grossByAffiliate) {
+    let rest = gross;
+    let deduction = 0;
+    for (const debit of byAffiliate.get(affiliateId) ?? []) {
+      if (rest <= 0) break;
+      const use = Math.min(rest, debit.unapplied);
+      if (use <= 0) continue;
+      lines.push({ debitId: debit.id, affiliateId, amount: -use });
+      consumed.set(debit.id, (consumed.get(debit.id) ?? 0) + use);
+      deduction += use;
+      rest -= use;
+    }
+    perAffiliate.set(affiliateId, deduction);
+    totalDeduction += deduction;
+  }
+  let carriedCount = 0;
+  let carriedAmount = 0;
+  for (const debit of debits) {
+    const remainder = debit.unapplied - (consumed.get(debit.id) ?? 0);
+    if (remainder > 0) {
+      carriedCount += 1;
+      carriedAmount += remainder;
+    }
+  }
+  const fingerprint = debits
+    .map((debit) => `${debit.id}:${debit.unapplied}:${consumed.get(debit.id) ?? 0}`)
+    .join('|');
+  return {
+    perAffiliate, lines, totalDeduction,
+    fingerprint,
+    carried: { count: carriedCount, amount: carriedAmount },
+  };
+}
+
+export async function previewAffiliateAccountSettlement(
+  db: D1Database,
+  input: { tenantId: string; lineAccountId: string; periodFrom: string; periodTo: string },
+): Promise<AffiliateAccountSettlementPreview> {
+  const candidates = await eligibleRewardRows(db, input);
+  const rows = candidates.filter(isPayableReward);
+  // 0円以下で外れた行は黙って捨てない。件数と対象を締めプレビューへ
+  // 出し、運用者が「外れる成果」を確かめてから締められるようにする。
+  const excluded = candidates
+    .filter((row) => !isPayableReward(row))
+    .map((row) => ({
+      conversionEventId: row.conversion_event_id,
+      affiliateId: row.affiliate_id,
+      affiliateName: row.affiliate_name,
+      code: row.affiliate_code,
+      approvedAt: row.approved_at,
+      rewardAmount: Math.round(Number(row.reward_amount)),
+    }));
+  const grossByAffiliate = new Map<string, number>();
+  for (const row of rows) {
+    grossByAffiliate.set(
+      row.affiliate_id,
+      (grossByAffiliate.get(row.affiliate_id) ?? 0) + Math.round(Number(row.reward_amount)),
+    );
+  }
+  // R288: 締め後の取消は次の締めで差し引く。紹介者ごとに未適用の
+  // 古い取消から充て、引ききれない分は次回へ繰り越す。
+  const plan = planDeductionApplication(
+    grossByAffiliate,
+    await unappliedSettlementDebits(db, input),
+  );
+  const grouped = new Map<string, AffiliateSettlementPreviewRow>();
+  for (const row of rows) {
+    const gross = grossByAffiliate.get(row.affiliate_id) ?? 0;
+    const deduction = plan.perAffiliate.get(row.affiliate_id) ?? 0;
+    const current = grouped.get(row.affiliate_id) ?? {
+      affiliateId: row.affiliate_id,
+      affiliateName: row.affiliate_name,
+      code: row.affiliate_code,
+      // amount は純額(報酬−差し引き)。元の報酬と差し引きは別に持つ。
+      amount: gross - deduction,
+      grossAmount: gross,
+      deduction,
+      conversionCount: 0,
+      bankProfileRegistered: row.bank_profile_version !== null,
+    };
+    current.conversionCount += 1;
+    grouped.set(row.affiliate_id, current);
+  }
+  // 期間の始まりより前の承認分は「繰越」として別に数える。
+  // 時刻は julianday 相当の瞬時比較(new Date の時刻値)で揃える。
+  const periodFromMs = new Date(input.periodFrom).getTime();
+  const carried = rows.filter((row) => new Date(row.approved_at).getTime() < periodFromMs);
+  return {
+    lineAccountId: input.lineAccountId,
+    periodFrom: input.periodFrom,
+    periodTo: input.periodTo,
+    currency: 'JPY',
+    totalAmount: Array.from(grouped.values()).reduce((sum, item) => sum + item.amount, 0),
+    conversionCount: rows.length,
+    affiliates: Array.from(grouped.values()),
+    excludedZeroAmount: {
+      count: excluded.length,
+      rows: excluded.slice(0, EXCLUDED_ZERO_AMOUNT_PREVIEW_ROWS),
+    },
+    carriedOver: {
+      count: carried.length,
+      amount: carried.reduce((sum, row) => sum + Math.round(Number(row.reward_amount)), 0),
+    },
+    totalDeduction: plan.totalDeduction,
+    carriedDeduction: plan.carried,
+    previewVersion: await accountPreviewVersion(rows, plan.fingerprint),
+  };
+}
+
+export type CloseAffiliateAccountSettlementResult =
+  | { kind: 'created' | 'duplicate'; settlementId: string; totalAmount: number; conversionCount: number; version: number; closedAt: string }
+  | { kind: 'empty' | 'changed' | 'idempotency_conflict' };
+
+export async function closeAffiliateAccountSettlement(
+  db: D1Database,
+  input: {
+    tenantId: string;
+    lineAccountId: string;
+    periodFrom: string;
+    periodTo: string;
+    actorId: string;
+    expectedPreviewVersion: string;
+    idempotencyKey: string;
+    requestFingerprint: string;
+    now?: string;
+  },
+): Promise<CloseAffiliateAccountSettlementResult> {
+  const existing = await db.prepare(
+    `SELECT id, total_amount_minor, version, closed_at, request_fingerprint,
+            (SELECT COUNT(*) FROM affiliate_settlement_lines sl WHERE sl.settlement_id = s.id) AS line_count
+       FROM affiliate_settlements s
+      WHERE organization_id = ? AND line_account_id = ? AND idempotency_key = ?`,
+  ).bind(input.tenantId, input.lineAccountId, input.idempotencyKey).first<{
+    id: string; total_amount_minor: number; version: number; closed_at: string;
+    request_fingerprint: string; line_count: number;
+  }>();
+  if (existing) {
+    if (existing.request_fingerprint !== input.requestFingerprint) return { kind: 'idempotency_conflict' };
+    return {
+      kind: 'duplicate', settlementId: existing.id,
+      totalAmount: Number(existing.total_amount_minor), conversionCount: Number(existing.line_count),
+      version: Number(existing.version), closedAt: existing.closed_at,
+    };
+  }
+  // 行集合は1回だけ取得し、版照合と明細書込みの両方に使う。
+  // 照合後に取り直すと、その隙に承認・締めが変わってheaderと明細がずれる。
+  const rows = await eligibleRewards(db, input);
+  if (rows.length === 0) return { kind: 'empty' };
+  // R288: プレビューと同じ差し引き計画を作り、版で照合する。
+  // 報酬だけでなく未適用の取消も版に入るため、プレビュー後に来た
+  // 取消は changed で止まる(黙って別額では締めない)。
+  const grossByAffiliate = new Map<string, number>();
+  for (const row of rows) {
+    grossByAffiliate.set(
+      row.affiliate_id,
+      (grossByAffiliate.get(row.affiliate_id) ?? 0) + Math.round(Number(row.reward_amount)),
+    );
+  }
+  const plan = planDeductionApplication(
+    grossByAffiliate,
+    await unappliedSettlementDebits(db, input),
+  );
+  if (await accountPreviewVersion(rows, plan.fingerprint) !== input.expectedPreviewVersion) {
+    return { kind: 'changed' };
+  }
+  const totalAmount = Array.from(grossByAffiliate).reduce(
+    (sum, [affiliateId, gross]) => sum + gross - (plan.perAffiliate.get(affiliateId) ?? 0),
+    0,
+  );
+  const now = input.now ?? new Date().toISOString();
+  const settlementId = crypto.randomUUID();
+  const statements: D1PreparedStatement[] = [db.prepare(
+    `INSERT INTO affiliate_settlements
+       (id, organization_id, line_account_id, affiliate_id, period_from, period_to,
+        timezone, currency, total_amount_minor, state, closed_by, version,
+        idempotency_key, closed_at, created_at, request_fingerprint)
+     VALUES (?, ?, ?, NULL, ?, ?, 'Asia/Tokyo', 'JPY', ?, 'closed', ?, 1, ?, ?, ?, ?)`,
+  ).bind(
+    settlementId, input.tenantId, input.lineAccountId, input.periodFrom, input.periodTo,
+    totalAmount, input.actorId, input.idempotencyKey, now, now, input.requestFingerprint,
+  )];
+  // 版は承認時と移行で作り済みのため、ここでは紐付けるだけ(作らない)。
+  // 個別締めと同じ書込み時fenceを通す。読取後に別接続が承認を取り消したり
+  // 対象を別アカウントへ移したりした場合、この締めはまるごと巻き戻る。
+  statements.push(...settlementWriteStatements(db, {
+    tenantId: input.tenantId,
+    lineAccountId: input.lineAccountId,
+    settlementId,
+    now,
+    targets: rows.map((row) => ({
+      conversionEventId: row.conversion_event_id,
+      affiliateId: row.affiliate_id,
+      calculationId: row.calculation_id,
+      amount: Math.round(Number(row.reward_amount)),
+      approvedAt: row.approved_at,
+    })),
+    // R288: 取消の消費行。同じ取消を別締めが先に付けたら書かず、
+    // 巻き戻しで締めごと消える(部分適用は残らない)。
+    expectedDebitEntryIds: plan.lines.map((line) => line.debitId),
+    debitLines: plan.lines,
+  }));
+  try {
+    await db.batch(statements);
+  } catch (error) {
+    // 並行する締めが先に書いた場合は読み直して回収する。同一操作は冪等な
+    // duplicateへ、別内容だけ409相当へ。勝者が無い制約違反は投げ直す。
+    if (!/UNIQUE|constraint|busy|locked/i.test(error instanceof Error ? error.message : String(error))) throw error;
+    const winner = await db.prepare(
+      `SELECT id, total_amount_minor, version, closed_at, request_fingerprint,
+              (SELECT COUNT(*) FROM affiliate_settlement_lines sl WHERE sl.settlement_id = s.id) AS line_count
+         FROM affiliate_settlements s
+        WHERE organization_id = ? AND line_account_id = ? AND idempotency_key = ?`,
+    ).bind(input.tenantId, input.lineAccountId, input.idempotencyKey).first<{
+      id: string; total_amount_minor: number; version: number; closed_at: string;
+      request_fingerprint: string; line_count: number;
+    }>();
+    if (winner) {
+      if (winner.request_fingerprint !== input.requestFingerprint) return { kind: 'idempotency_conflict' };
+      return {
+        kind: 'duplicate', settlementId: winner.id,
+        totalAmount: Number(winner.total_amount_minor), conversionCount: Number(winner.line_count),
+        version: Number(winner.version), closedAt: winner.closed_at,
+      };
+    }
+    return { kind: 'changed' };
+  }
+  // fenceが1件でも落ちていれば、この締めは同じトランザクションで巻き戻り
+  // headerごと消えている。金額を保証できないので確定にはしない。
+  if (!await settlementSurvived(db, settlementId)) return { kind: 'changed' };
+  return {
+    kind: 'created', settlementId, totalAmount,
+    conversionCount: rows.length, version: 1, closedAt: now,
+  };
+}
+
+type PayoutBatchRow = {
+  id: string; organization_id: string; line_account_id: string; settlement_id: string;
+  total_amount_minor: number; currency: string; line_count: number; state: string;
+  bank_format: string | null; file_checksum: string | null; version: number;
+  idempotency_key: string | null; request_fingerprint: string | null;
+  export_object_key: string | null; export_expires_at: string | null;
+  download_token_hash: string | null; export_idempotency_key: string | null;
+  export_request_fingerprint: string | null; created_at: string;
+};
+
+export interface AffiliatePayoutBatch {
+  id: string; lineAccountId: string; settlementId: string; totalAmount: number;
+  currency: string; lineCount: number; state: string; bankFormat: string | null;
+  fileChecksum: string | null; version: number; downloadExpiresAt: string | null;
+  createdAt: string;
+}
+
+function payoutBatch(row: PayoutBatchRow): AffiliatePayoutBatch {
+  return {
+    id: row.id, lineAccountId: row.line_account_id, settlementId: row.settlement_id,
+    totalAmount: Number(row.total_amount_minor), currency: row.currency,
+    lineCount: Number(row.line_count), state: row.state, bankFormat: row.bank_format,
+    fileChecksum: row.file_checksum, version: Number(row.version),
+    downloadExpiresAt: row.export_expires_at, createdAt: row.created_at,
+  };
+}
+
+export type CreateAffiliatePayoutBatchResult =
+  | { kind: 'created'; batch: AffiliatePayoutBatch }
+  | { kind: 'duplicate'; batch: AffiliatePayoutBatch }
+  | { kind: 'not_found' }
+  | { kind: 'changed' }
+  | { kind: 'bank_missing'; missingAffiliateIds: string[] }
+  | { kind: 'idempotency_conflict' };
+
+export async function createAffiliatePayoutBatch(
+  db: D1Database,
+  input: {
+    tenantId: string; lineAccountId: string; settlementId: string; expectedVersion: number;
+    bankFormat: 'zengin_csv'; actorId: string; idempotencyKey: string;
+    requestFingerprint: string; now?: string;
+  },
+): Promise<CreateAffiliatePayoutBatchResult> {
+  const replay = await db.prepare(
+    `SELECT * FROM affiliate_payout_batches
+      WHERE organization_id = ? AND line_account_id = ? AND idempotency_key = ?`,
+  ).bind(input.tenantId, input.lineAccountId, input.idempotencyKey).first<PayoutBatchRow>();
+  if (replay) {
+    return replay.request_fingerprint === input.requestFingerprint
+      ? { kind: 'duplicate', batch: payoutBatch(replay) }
+      : { kind: 'idempotency_conflict' };
+  }
+  const settlement = await db.prepare(
+    `SELECT id, version, state, total_amount_minor FROM affiliate_settlements
+      WHERE id = ? AND organization_id = ? AND line_account_id = ?`,
+  ).bind(input.settlementId, input.tenantId, input.lineAccountId).first<{
+    id: string; version: number; state: string; total_amount_minor: number;
+  }>();
+  if (!settlement) return { kind: 'not_found' };
+  if (Number(settlement.version) !== input.expectedVersion || settlement.state !== 'closed') {
+    return { kind: 'changed' };
+  }
+  const lines = await db.prepare(
+    `SELECT sl.id AS settlement_line_id, sl.affiliate_id, sl.amount_minor,
+            bp.bank_code, bp.bank_name, bp.branch_code, bp.branch_name, bp.account_type,
+            bp.account_number_encrypted, bp.account_last4, bp.account_holder_name
+       FROM affiliate_settlement_lines sl
+       LEFT JOIN affiliate_bank_profiles bp
+         ON bp.affiliate_id = sl.affiliate_id AND bp.organization_id = ? AND bp.line_account_id = ?
+      WHERE sl.settlement_id = ? AND sl.status = 'included'
+      ORDER BY sl.affiliate_id, sl.id`,
+  ).bind(input.tenantId, input.lineAccountId, input.settlementId).all<{
+    settlement_line_id: string; affiliate_id: string; amount_minor: number;
+    bank_code: string | null; bank_name: string | null; branch_code: string | null;
+    branch_name: string | null; account_type: AffiliateBankAccountType | null;
+    account_number_encrypted: string | null; account_last4: string | null;
+    account_holder_name: string | null;
+  }>();
+  const missing = Array.from(new Set(lines.results
+    .filter((line) => !line.account_number_encrypted)
+    .map((line) => line.affiliate_id)));
+  if (missing.length > 0) return { kind: 'bank_missing', missingAffiliateIds: missing };
+  const id = crypto.randomUUID();
+  const now = input.now ?? new Date().toISOString();
+  const statements: D1PreparedStatement[] = [db.prepare(
+    `INSERT INTO affiliate_payout_batches
+       (id, organization_id, line_account_id, settlement_id, total_amount_minor,
+        currency, line_count, state, bank_format, created_by, created_at,
+        version, idempotency_key, request_fingerprint)
+     VALUES (?, ?, ?, ?, ?, 'JPY', ?, 'created', ?, ?, ?, 1, ?, ?)`,
+  ).bind(
+    id, input.tenantId, input.lineAccountId, input.settlementId,
+    Number(settlement.total_amount_minor), lines.results.length, input.bankFormat,
+    input.actorId, now, input.idempotencyKey, input.requestFingerprint,
+  )];
+  for (const line of lines.results) {
+    statements.push(db.prepare(
+      `INSERT INTO affiliate_payout_batch_lines
+         (id, batch_id, settlement_line_id, affiliate_id, amount_minor, bank_code,
+          bank_name, branch_code, branch_name, account_type, account_number_encrypted,
+          account_last4, account_holder_name, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(
+      crypto.randomUUID(), id, line.settlement_line_id, line.affiliate_id,
+      Number(line.amount_minor), line.bank_code!, line.bank_name!, line.branch_code!,
+      line.branch_name!, line.account_type!, line.account_number_encrypted!,
+      line.account_last4!, line.account_holder_name!, now,
+    ));
+  }
+  await db.batch(statements);
+  const row = await db.prepare('SELECT * FROM affiliate_payout_batches WHERE id = ?').bind(id).first<PayoutBatchRow>();
+  if (!row) throw new Error('affiliate payout batch was not created');
+  return { kind: 'created', batch: payoutBatch(row) };
+}
+
+export async function getAffiliatePayoutBatchExport(
+  db: D1Database,
+  input: { tenantId: string; lineAccountId: string; batchId: string },
+): Promise<{ batch: PayoutBatchRow; lines: Array<{
+  affiliateId: string; amount: number; bankCode: string; bankName: string;
+  branchCode: string; branchName: string; accountType: AffiliateBankAccountType;
+  encryptedAccountNumber: string; accountLast4: string; accountHolderName: string;
+}> } | null> {
+  const batch = await db.prepare(
+    `SELECT * FROM affiliate_payout_batches
+      WHERE id = ? AND organization_id = ? AND line_account_id = ?`,
+  ).bind(input.batchId, input.tenantId, input.lineAccountId).first<PayoutBatchRow>();
+  if (!batch) return null;
+  const result = await db.prepare(
+    `SELECT affiliate_id, SUM(amount_minor) AS amount_minor, bank_code, bank_name,
+            branch_code, branch_name, account_type, account_number_encrypted,
+            account_last4, account_holder_name
+       FROM affiliate_payout_batch_lines WHERE batch_id = ?
+      GROUP BY affiliate_id, bank_code, bank_name, branch_code, branch_name,
+               account_type, account_number_encrypted, account_last4, account_holder_name
+      ORDER BY affiliate_id`,
+  ).bind(input.batchId).all<{
+    affiliate_id: string; amount_minor: number; bank_code: string; bank_name: string;
+    branch_code: string; branch_name: string; account_type: AffiliateBankAccountType;
+    account_number_encrypted: string; account_last4: string; account_holder_name: string;
+  }>();
+  return {
+    batch,
+    lines: result.results.map((row) => ({
+      affiliateId: row.affiliate_id, amount: Number(row.amount_minor), bankCode: row.bank_code,
+      bankName: row.bank_name, branchCode: row.branch_code, branchName: row.branch_name,
+      accountType: row.account_type, encryptedAccountNumber: row.account_number_encrypted,
+      accountLast4: row.account_last4, accountHolderName: row.account_holder_name,
+    })),
+  };
+}
+
+export type MarkAffiliatePayoutExportedResult =
+  | { kind: 'exported'; batch: AffiliatePayoutBatch; objectKey: string }
+  | { kind: 'duplicate'; batch: AffiliatePayoutBatch; objectKey: string }
+  | { kind: 'changed' }
+  | { kind: 'idempotency_conflict' };
+
+export async function markAffiliatePayoutExported(
+  db: D1Database,
+  input: {
+    tenantId: string; lineAccountId: string; batchId: string; expectedVersion: number;
+    idempotencyKey: string; requestFingerprint: string; objectKey: string;
+    checksum: string; expiresAt: string; downloadTokenHash: string; now?: string;
+  },
+): Promise<MarkAffiliatePayoutExportedResult> {
+  const current = await db.prepare(
+    `SELECT * FROM affiliate_payout_batches
+      WHERE id = ? AND organization_id = ? AND line_account_id = ?`,
+  ).bind(input.batchId, input.tenantId, input.lineAccountId).first<PayoutBatchRow>();
+  if (!current) return { kind: 'changed' };
+  if (current.export_idempotency_key === input.idempotencyKey) {
+    if (current.export_request_fingerprint !== input.requestFingerprint || !current.export_object_key) {
+      return { kind: 'idempotency_conflict' };
+    }
+    await db.prepare(
+      `UPDATE affiliate_payout_batches
+          SET download_token_hash = ?, export_expires_at = ?
+        WHERE id = ? AND organization_id = ? AND line_account_id = ?`,
+    ).bind(
+      input.downloadTokenHash, input.expiresAt, input.batchId, input.tenantId, input.lineAccountId,
+    ).run();
+    const replay = await db.prepare('SELECT * FROM affiliate_payout_batches WHERE id = ?')
+      .bind(input.batchId).first<PayoutBatchRow>();
+    if (!replay) throw new Error('affiliate payout batch disappeared');
+    return { kind: 'duplicate', batch: payoutBatch(replay), objectKey: current.export_object_key };
+  }
+  if (Number(current.version) !== input.expectedVersion || current.state !== 'created') {
+    return { kind: 'changed' };
+  }
+  const now = input.now ?? new Date().toISOString();
+  const result = await db.prepare(
+    `UPDATE affiliate_payout_batches
+        SET state = 'exported', file_checksum = ?, export_object_key = ?,
+            export_expires_at = ?, download_token_hash = ?, exported_at = ?,
+            export_idempotency_key = ?, export_request_fingerprint = ?, version = version + 1
+      WHERE id = ? AND organization_id = ? AND line_account_id = ?
+        AND version = ? AND state = 'created'`,
+  ).bind(
+    input.checksum, input.objectKey, input.expiresAt, input.downloadTokenHash, now,
+    input.idempotencyKey, input.requestFingerprint, input.batchId, input.tenantId,
+    input.lineAccountId, input.expectedVersion,
+  ).run();
+  if (Number(result.meta.changes ?? 0) !== 1) return { kind: 'changed' };
+  const updated = await db.prepare('SELECT * FROM affiliate_payout_batches WHERE id = ?').bind(input.batchId).first<PayoutBatchRow>();
+  if (!updated) throw new Error('affiliate payout batch disappeared');
+  return { kind: 'exported', batch: payoutBatch(updated), objectKey: input.objectKey };
+}
+
+export async function getAffiliatePayoutDownload(
+  db: D1Database,
+  input: { tenantId: string; lineAccountId: string; batchId: string; tokenHash: string; now?: string },
+): Promise<{ objectKey: string; fileChecksum: string | null } | null> {
+  const row = await db.prepare(
+    `SELECT export_object_key, file_checksum FROM affiliate_payout_batches
+      WHERE id = ? AND organization_id = ? AND line_account_id = ?
+        AND state = 'exported' AND download_token_hash = ? AND export_expires_at > ?`,
+  ).bind(
+    input.batchId, input.tenantId, input.lineAccountId, input.tokenHash,
+    input.now ?? new Date().toISOString(),
+  ).first<{ export_object_key: string; file_checksum: string | null }>();
+  return row ? { objectKey: row.export_object_key, fileChecksum: row.file_checksum } : null;
+}
+
+export interface AffiliateStatementSnapshot {
+  settlementId: string; settlementVersion: number; affiliateId: string;
+  affiliateName: string; affiliateCode: string; periodFrom: string; periodTo: string;
+  totalAmount: number; currency: string; lineCount: number;
+  /** R288: 明細でも元報酬・差し引きを分けて見せる。無いときは 0。 */
+  grossAmount: number;
+  deductionAmount: number;
+}
+
+export async function prepareAffiliateStatement(
+  db: D1Database,
+  input: { tenantId: string; lineAccountId: string; settlementId: string; affiliateId: string },
+): Promise<AffiliateStatementSnapshot | null> {
+  const row = await db.prepare(
+    `SELECT s.id AS settlement_id, s.version, s.period_from, s.period_to, s.currency,
+            a.id AS affiliate_id, a.name AS affiliate_name, a.code AS affiliate_code,
+            COALESCE(SUM(sl.amount_minor), 0) AS total_amount,
+            COALESCE(SUM(CASE WHEN sl.amount_minor > 0 THEN sl.amount_minor ELSE 0 END), 0) AS gross_amount,
+            COALESCE(SUM(CASE WHEN sl.amount_minor < 0 THEN -sl.amount_minor ELSE 0 END), 0) AS deduction_amount,
+            COUNT(sl.id) AS line_count
+       FROM affiliate_settlements s
+       JOIN affiliate_settlement_lines sl ON sl.settlement_id = s.id AND sl.affiliate_id = ?
+       JOIN affiliates a ON a.id = sl.affiliate_id AND a.tenant_id = s.organization_id
+      WHERE s.id = ? AND s.organization_id = ? AND s.line_account_id = ? AND s.state = 'closed'
+      GROUP BY s.id, s.version, s.period_from, s.period_to, s.currency, a.id, a.name, a.code`,
+  ).bind(input.affiliateId, input.settlementId, input.tenantId, input.lineAccountId).first<{
+    settlement_id: string; version: number; period_from: string; period_to: string; currency: string;
+    affiliate_id: string; affiliate_name: string; affiliate_code: string;
+    total_amount: number; gross_amount: number; deduction_amount: number; line_count: number;
+  }>();
+  return row ? {
+    settlementId: row.settlement_id, settlementVersion: Number(row.version),
+    affiliateId: row.affiliate_id, affiliateName: row.affiliate_name,
+    affiliateCode: row.affiliate_code, periodFrom: row.period_from, periodTo: row.period_to,
+    totalAmount: Number(row.total_amount), currency: row.currency, lineCount: Number(row.line_count),
+    grossAmount: Number(row.gross_amount), deductionAmount: Number(row.deduction_amount),
+  } : null;
+}
+
+type StatementRow = {
+  id: string; line_account_id: string; affiliate_id: string; settlement_id: string;
+  total_amount_minor: number; status: string; version: number; pdf_object_key: string;
+  idempotency_key: string | null; request_fingerprint: string | null;
+  snapshot_json: string; file_checksum: string | null; expires_at: string | null; created_at: string;
+};
+
+export interface AffiliateStatement {
+  id: string; lineAccountId: string; affiliateId: string; settlementId: string;
+  totalAmount: number; status: string; version: number; expiresAt: string | null; createdAt: string;
+}
+
+function affiliateStatement(row: StatementRow): AffiliateStatement {
+  return {
+    id: row.id, lineAccountId: row.line_account_id, affiliateId: row.affiliate_id,
+    settlementId: row.settlement_id, totalAmount: Number(row.total_amount_minor),
+    status: row.status, version: Number(row.version), expiresAt: row.expires_at, createdAt: row.created_at,
+  };
+}
+
+export async function getAffiliateStatementReplay(
+  db: D1Database,
+  input: { tenantId: string; lineAccountId: string; idempotencyKey: string },
+): Promise<{ statement: AffiliateStatement; requestFingerprint: string; objectKey: string } | null> {
+  const row = await db.prepare(
+    `SELECT * FROM affiliate_statements
+      WHERE organization_id = ? AND line_account_id = ? AND idempotency_key = ?`,
+  ).bind(input.tenantId, input.lineAccountId, input.idempotencyKey).first<StatementRow>();
+  return row ? {
+    statement: affiliateStatement(row), requestFingerprint: row.request_fingerprint ?? '', objectKey: row.pdf_object_key,
+  } : null;
+}
+
+export async function createAffiliateStatement(
+  db: D1Database,
+  input: {
+    tenantId: string; lineAccountId: string; snapshot: AffiliateStatementSnapshot;
+    objectKey: string; checksum: string; idempotencyKey: string; requestFingerprint: string;
+    actorId: string; expiresAt: string; now?: string;
+  },
+): Promise<AffiliateStatement> {
+  const id = crypto.randomUUID();
+  const now = input.now ?? new Date().toISOString();
+  await db.prepare(
+    `INSERT INTO affiliate_statements
+       (id, organization_id, line_account_id, affiliate_id, settlement_id,
+        total_amount_minor, status, version, pdf_object_key, generated_by,
+        expires_at, created_at, idempotency_key, request_fingerprint, snapshot_json, file_checksum)
+     VALUES (?, ?, ?, ?, ?, ?, 'generated', 1, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).bind(
+    id, input.tenantId, input.lineAccountId, input.snapshot.affiliateId,
+    input.snapshot.settlementId, input.snapshot.totalAmount, input.objectKey,
+    input.actorId, input.expiresAt, now, input.idempotencyKey, input.requestFingerprint,
+    JSON.stringify(input.snapshot), input.checksum,
+  ).run();
+  return {
+    id, lineAccountId: input.lineAccountId, affiliateId: input.snapshot.affiliateId,
+    settlementId: input.snapshot.settlementId, totalAmount: input.snapshot.totalAmount,
+    status: 'generated', version: 1, expiresAt: input.expiresAt, createdAt: now,
+  };
+}
+
+export async function listAffiliateStatementsForSelf(
+  db: D1Database,
+  input: { tenantId: string; lineAccountId: string; affiliateId: string },
+): Promise<AffiliateStatement[]> {
+  const rows = await db.prepare(
+    `SELECT * FROM affiliate_statements
+      WHERE organization_id = ? AND line_account_id = ? AND affiliate_id = ?
+        AND status = 'generated'
+      ORDER BY created_at DESC, id DESC`,
+  ).bind(input.tenantId, input.lineAccountId, input.affiliateId).all<StatementRow>();
+  return rows.results.map(affiliateStatement);
+}
+
+export async function getAffiliateStatementDownload(
+  db: D1Database,
+  input: { tenantId: string; lineAccountId: string; affiliateId: string; statementId: string; now?: string },
+): Promise<{ statement: AffiliateStatement; objectKey: string; checksum: string | null } | null> {
+  const row = await db.prepare(
+    `SELECT * FROM affiliate_statements
+      WHERE id = ? AND organization_id = ? AND line_account_id = ? AND affiliate_id = ?
+        AND status = 'generated' AND (expires_at IS NULL OR expires_at > ?)`,
+  ).bind(
+    input.statementId, input.tenantId, input.lineAccountId, input.affiliateId,
+    input.now ?? new Date().toISOString(),
+  ).first<StatementRow>();
+  return row ? { statement: affiliateStatement(row), objectKey: row.pdf_object_key, checksum: row.file_checksum } : null;
+}
+
+/**
+ * R43: 締め済み台帳の再開情報。画面を離れても `closed` 状態が消えるだけで
+ * 台帳自体は残るため、期間で引き直して明細発行・CSV準備を再開できる
+ * ようにする。
+ */
+export interface AffiliateSettlementResume {
+  settlementId: string;
+  state: string;
+  version: number;
+  closedAt: string | null;
+  totalAmount: number;
+  conversionCount: number;
+  periodFrom: string;
+  periodTo: string;
+  affiliates: Array<{
+    affiliateId: string;
+    affiliateName: string;
+    code: string;
+    amount: number;
+    conversionCount: number;
+    statementIssued: boolean;
+    bankProfileRegistered: boolean;
+  }>;
+  batch: { id: string; state: string; lineCount: number } | null;
+}
+
+export async function getClosedAccountSettlement(
+  db: D1Database,
+  input: { tenantId: string; lineAccountId: string; periodFrom: string; periodTo: string },
+): Promise<AffiliateSettlementResume | null> {
+  // 期間文字列の書式は書き込んだ時期で揺れる(JST/UTC)ため、julianday で
+  // 同じ時刻範囲かを照合する。
+  const settlement = await db.prepare(
+    `SELECT s.id, s.state, s.version, s.closed_at, s.total_amount_minor,
+            s.period_from, s.period_to,
+            (SELECT COUNT(*) FROM affiliate_settlement_lines sl
+              WHERE sl.settlement_id = s.id AND sl.status = 'included'
+                AND sl.amount_minor > 0) AS line_count
+       FROM affiliate_settlements s
+      WHERE s.organization_id = ? AND s.line_account_id = ?
+        AND julianday(s.period_from) = julianday(?) AND julianday(s.period_to) = julianday(?)
+        AND s.state IN ('closed', 'exported', 'paid', 'partial')
+      ORDER BY s.closed_at DESC, s.id DESC
+      LIMIT 1`,
+  ).bind(input.tenantId, input.lineAccountId, input.periodFrom, input.periodTo).first<{
+    id: string; state: string; version: number; closed_at: string | null;
+    total_amount_minor: number; period_from: string; period_to: string; line_count: number;
+  }>();
+  if (!settlement) return null;
+
+  const lines = await db.prepare(
+    `SELECT sl.affiliate_id, a.name AS affiliate_name, a.code AS affiliate_code,
+            SUM(sl.amount_minor) AS amount,
+            COUNT(CASE WHEN sl.amount_minor > 0 THEN 1 END) AS line_count,
+            MAX(EXISTS(
+              SELECT 1 FROM affiliate_statements st
+               WHERE st.settlement_id = sl.settlement_id
+                 AND st.affiliate_id = sl.affiliate_id
+                 AND st.status = 'generated')) AS statement_issued,
+            MAX(bp.version IS NOT NULL) AS bank_profile_registered
+       FROM affiliate_settlement_lines sl
+       JOIN affiliates a ON a.id = sl.affiliate_id
+       LEFT JOIN affiliate_bank_profiles bp
+         ON bp.affiliate_id = sl.affiliate_id
+        AND bp.organization_id = ? AND bp.line_account_id = ?
+      WHERE sl.settlement_id = ? AND sl.status = 'included'
+      GROUP BY sl.affiliate_id
+      ORDER BY a.name, sl.affiliate_id`,
+  ).bind(input.tenantId, input.lineAccountId, settlement.id).all<{
+    affiliate_id: string; affiliate_name: string; affiliate_code: string;
+    amount: number; line_count: number; statement_issued: number; bank_profile_registered: number;
+  }>();
+
+  const batch = await db.prepare(
+    `SELECT id, state, line_count FROM affiliate_payout_batches
+      WHERE organization_id = ? AND line_account_id = ? AND settlement_id = ?
+      ORDER BY created_at DESC, id DESC LIMIT 1`,
+  ).bind(input.tenantId, input.lineAccountId, settlement.id).first<{
+    id: string; state: string; line_count: number;
+  }>();
+
+  return {
+    settlementId: settlement.id,
+    state: settlement.state,
+    version: Number(settlement.version),
+    closedAt: settlement.closed_at,
+    totalAmount: Number(settlement.total_amount_minor),
+    conversionCount: Number(settlement.line_count),
+    periodFrom: settlement.period_from,
+    periodTo: settlement.period_to,
+    affiliates: lines.results.map((line) => ({
+      affiliateId: line.affiliate_id,
+      affiliateName: line.affiliate_name,
+      code: line.affiliate_code,
+      amount: Number(line.amount),
+      conversionCount: Number(line.line_count),
+      statementIssued: line.statement_issued === 1,
+      bankProfileRegistered: line.bank_profile_registered === 1,
+    })),
+    batch: batch
+      ? { id: batch.id, state: batch.state, lineCount: Number(batch.line_count) }
+      : null,
+  };
+}

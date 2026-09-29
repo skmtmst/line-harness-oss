@@ -1,4 +1,4 @@
-import { jstNow } from './utils.js';
+import { boundedListLimit, jstNow } from './utils.js';
 // アクション自動化 (IF-THEN ルール) クエリヘルパー
 
 export interface AutomationRow {
@@ -25,6 +25,241 @@ export interface AutomationLogRow {
   created_at: string;
 }
 
+export type AutomationRunDomainStatus =
+  | 'queued'
+  | 'running'
+  | 'waiting'
+  | 'success'
+  | 'partial'
+  | 'failed'
+  | 'cancelled'
+  | 'skipped_condition';
+
+export interface AutomationExecutionRunRow {
+  id: string;
+  line_account_id: string;
+  account_name: string | null;
+  automation_id: string;
+  automation_name: string;
+  automation_version_id: string;
+  /** 実行時に固定された版番号（#942 N-354：詳細・CSVで見せる）。 */
+  version_number: number;
+  /** 1人テストの実行は1（#942 N-354：テスト実行の印）。 */
+  is_test: number;
+  friend_id: string | null;
+  friend_name: string | null;
+  source_event_id: string;
+  trigger_type: string;
+  status: AutomationRunDomainStatus;
+  started_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  duration_ms: number | null;
+  successful_actions: string | null;
+  skipped_actions: string | null;
+  failed_action: string | null;
+  failure_code: string | null;
+  /** いま公開中の版。実行した版との違いを画面で区別する（#1043）。 */
+  current_published_version_id: string | null;
+  current_version_number: number | null;
+  /**
+   * 待機中のstepに失敗の再試行が混ざっているか（#1043）。
+   * `wait` の待機は retry_at が NULL、失敗の再試行は retry_at を持つ。
+   */
+  has_retry_wait: number | null;
+}
+
+export interface AutomationExecutionRunSummaryRow {
+  total: number;
+  executed: number;
+  skipped: number;
+  failed: number;
+  most_run_name: string | null;
+  most_run_count: number | null;
+}
+
+export interface AutomationExecutionRunsQuery {
+  allowedAccountIds: string[];
+  from: string;
+  to: string;
+  status?: AutomationRunDomainStatus[];
+  search?: string;
+  /**
+   * 既定では本番実行だけを出し、テスト実行は明示したときだけ含める
+   * （V6 25-1-B「既定の一覧では本番だけを出し、切替で含める」）。
+   */
+  includeTest?: boolean;
+  limit: number;
+  offset: number;
+}
+
+function automationRunWhere(input: AutomationExecutionRunsQuery, includeFilters: boolean) {
+  if (input.allowedAccountIds.length === 0) return { sql: '1 = 0', binds: [] as unknown[] };
+  const clauses = [
+    `r.line_account_id IN (${input.allowedAccountIds.map(() => '?').join(', ')})`,
+    'datetime(r.created_at) >= datetime(?)',
+    'datetime(r.created_at) < datetime(?)',
+  ];
+  const binds: unknown[] = [...input.allowedAccountIds, input.from, input.to];
+  // テスト実行は一覧・集計・CSVすべてで既定除外。切替時だけ含める。
+  if (!input.includeTest) clauses.push('r.is_test = 0');
+  if (includeFilters && input.status?.length) {
+    clauses.push(`r.status IN (${input.status.map(() => '?').join(', ')})`);
+    binds.push(...input.status);
+  }
+  if (includeFilters && input.search?.trim()) {
+    const needle = `%${input.search.trim().replaceAll('%', '\\%').replaceAll('_', '\\_')}%`;
+    clauses.push(`(
+      COALESCE(f.display_name, '') LIKE ? ESCAPE '\\' OR d.name LIKE ? ESCAPE '\\' OR
+      v.trigger_type LIKE ? ESCAPE '\\' OR r.source_event_id LIKE ? ESCAPE '\\'
+    )`);
+    binds.push(needle, needle, needle, needle);
+  }
+  return { sql: clauses.join(' AND '), binds };
+}
+
+/**
+ * V6 25-1-B: 新しい横断台帳を作らず、既存automation_runsを読み取り用に整える。
+ * 書込時の詳細状態はそのまま保存し、共通状態への読み替えはAPI境界で行う。
+ */
+export async function getAutomationExecutionRuns(
+  db: D1Database,
+  input: AutomationExecutionRunsQuery,
+): Promise<{ rows: AutomationExecutionRunRow[]; total: number; summary: AutomationExecutionRunSummaryRow }> {
+  const filtered = automationRunWhere(input, true);
+  const summaryScope = automationRunWhere(input, false);
+
+  const [itemsResult, totalRow, summaryCounts, mostRun] = await Promise.all([
+    db.prepare(
+      `SELECT r.id, r.line_account_id, la.name AS account_name,
+              r.automation_id, d.name AS automation_name, r.automation_version_id,
+              v.version_number, r.is_test,
+              d.current_published_version_id, cv.version_number AS current_version_number,
+              r.friend_id, f.display_name AS friend_name, r.source_event_id,
+              v.trigger_type, r.status, r.started_at, r.completed_at, r.created_at,
+              CASE WHEN r.started_at IS NOT NULL AND r.completed_at IS NOT NULL
+                   THEN MAX(0, ROUND((julianday(r.completed_at) - julianday(r.started_at)) * 86400000))
+                   ELSE NULL END AS duration_ms,
+              GROUP_CONCAT(CASE WHEN s.status = 'success' THEN s.action_type END, ' / ') AS successful_actions,
+              GROUP_CONCAT(CASE WHEN s.status = 'skipped' THEN s.action_type END, ' / ') AS skipped_actions,
+              MAX(CASE WHEN s.status = 'failed' THEN s.action_type END) AS failed_action,
+              MAX(CASE WHEN s.status = 'failed' THEN s.error_code END) AS failure_code,
+              MAX(CASE WHEN s.status = 'waiting' AND s.retry_at IS NOT NULL THEN 1 ELSE 0 END) AS has_retry_wait
+         FROM automation_runs r
+         JOIN automation_definitions d ON d.id = r.automation_id
+         JOIN automation_versions v ON v.id = r.automation_version_id
+         LEFT JOIN automation_versions cv ON cv.id = d.current_published_version_id
+         LEFT JOIN friends f ON f.id = r.friend_id
+         LEFT JOIN line_accounts la ON la.id = r.line_account_id
+         LEFT JOIN automation_run_steps s ON s.automation_run_id = r.id
+        WHERE ${filtered.sql}
+        GROUP BY r.id
+        ORDER BY datetime(r.created_at) DESC, r.id DESC
+        LIMIT ? OFFSET ?`,
+    ).bind(...filtered.binds, input.limit, input.offset).all<AutomationExecutionRunRow>(),
+    db.prepare(`SELECT COUNT(*) AS total FROM automation_runs r
+      JOIN automation_definitions d ON d.id = r.automation_id
+      JOIN automation_versions v ON v.id = r.automation_version_id
+      LEFT JOIN friends f ON f.id = r.friend_id
+      WHERE ${filtered.sql}`).bind(...filtered.binds).first<{ total: number }>(),
+    db.prepare(`SELECT COUNT(*) AS total,
+        SUM(CASE WHEN r.status IN ('success', 'partial', 'failed') THEN 1 ELSE 0 END) AS executed,
+        SUM(CASE WHEN r.status = 'skipped_condition' THEN 1 ELSE 0 END) AS skipped,
+        SUM(CASE WHEN r.status IN ('failed', 'partial') THEN 1 ELSE 0 END) AS failed
+      FROM automation_runs r WHERE ${summaryScope.sql}`)
+      .bind(...summaryScope.binds).first<{ total: number; executed: number; skipped: number; failed: number }>(),
+    db.prepare(`SELECT d.name AS most_run_name, COUNT(*) AS most_run_count
+      FROM automation_runs r JOIN automation_definitions d ON d.id = r.automation_id
+      WHERE ${summaryScope.sql} AND r.status IN ('success', 'partial', 'failed')
+      GROUP BY r.automation_id, d.name ORDER BY most_run_count DESC, d.name ASC LIMIT 1`)
+      .bind(...summaryScope.binds).first<{ most_run_name: string; most_run_count: number }>(),
+  ]);
+
+  return {
+    rows: itemsResult.results,
+    total: Number(totalRow?.total ?? 0),
+    summary: {
+      total: Number(summaryCounts?.total ?? 0),
+      executed: Number(summaryCounts?.executed ?? 0),
+      skipped: Number(summaryCounts?.skipped ?? 0),
+      failed: Number(summaryCounts?.failed ?? 0),
+      most_run_name: mostRun?.most_run_name ?? null,
+      most_run_count: mostRun ? Number(mostRun.most_run_count) : null,
+    },
+  };
+}
+
+/**
+ * 1件の実行記録を、詳細表示に必要な項目つきで読む（#942 N-354）。
+ *
+ * 版番号・テスト実行の印は実行時に `automation_version_id` / `is_test` へ
+ * 固定されているものをそのまま出す。対象アカウント外は見せない。
+ */
+export async function getAutomationExecutionRun(
+  db: D1Database,
+  input: { runId: string; allowedAccountIds: string[] },
+): Promise<AutomationExecutionRunRow | null> {
+  if (input.allowedAccountIds.length === 0) return null;
+  return db.prepare(
+    `SELECT r.id, r.line_account_id, la.name AS account_name,
+            r.automation_id, d.name AS automation_name, r.automation_version_id,
+            v.version_number, r.is_test,
+            d.current_published_version_id, cv.version_number AS current_version_number,
+            r.friend_id, f.display_name AS friend_name, r.source_event_id,
+            v.trigger_type, r.status, r.started_at, r.completed_at, r.created_at,
+            CASE WHEN r.started_at IS NOT NULL AND r.completed_at IS NOT NULL
+                 THEN MAX(0, ROUND((julianday(r.completed_at) - julianday(r.started_at)) * 86400000))
+                 ELSE NULL END AS duration_ms,
+            GROUP_CONCAT(CASE WHEN s.status = 'success' THEN s.action_type END, ' / ') AS successful_actions,
+            GROUP_CONCAT(CASE WHEN s.status = 'skipped' THEN s.action_type END, ' / ') AS skipped_actions,
+            MAX(CASE WHEN s.status = 'failed' THEN s.action_type END) AS failed_action,
+            MAX(CASE WHEN s.status = 'failed' THEN s.error_code END) AS failure_code,
+            MAX(CASE WHEN s.status = 'waiting' AND s.retry_at IS NOT NULL THEN 1 ELSE 0 END) AS has_retry_wait
+       FROM automation_runs r
+       JOIN automation_definitions d ON d.id = r.automation_id
+       JOIN automation_versions v ON v.id = r.automation_version_id
+       LEFT JOIN automation_versions cv ON cv.id = d.current_published_version_id
+       LEFT JOIN friends f ON f.id = r.friend_id
+       LEFT JOIN line_accounts la ON la.id = r.line_account_id
+       LEFT JOIN automation_run_steps s ON s.automation_run_id = r.id
+      WHERE r.id = ?
+        AND r.line_account_id IN (${input.allowedAccountIds.map(() => '?').join(',')})
+      GROUP BY r.id`,
+  ).bind(input.runId, ...input.allowedAccountIds).first<AutomationExecutionRunRow>();
+}
+
+export interface AutomationExecutionRunStepRow {
+  step_key: string;
+  action_type: string;
+  common_action_version_id: string | null;
+  status: 'queued' | 'running' | 'waiting' | 'success' | 'failed' | 'skipped' | 'cancelled';
+  attempt_number: number;
+  error_code: string | null;
+  error_message: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+}
+
+/**
+ * 実行の処理ごとの結果を順番どおりに読む（#942 N-354：処理ごとの結果と試行数）。
+ *
+ * `output_json` / `input_json` は API へ出さない。友だちの情報や送った内容が
+ * 入りうるため、結果の状態・回数・エラーの種類だけを返す。
+ */
+export async function getAutomationExecutionRunSteps(
+  db: D1Database,
+  runId: string,
+): Promise<AutomationExecutionRunStepRow[]> {
+  const result = await db.prepare(
+    `SELECT step_key, action_type, common_action_version_id, status, attempt_number,
+            error_code, error_message, started_at, completed_at
+       FROM automation_run_steps
+      WHERE automation_run_id = ?
+      ORDER BY rowid ASC`,
+  ).bind(runId).all<AutomationExecutionRunStepRow>();
+  return result.results ?? [];
+}
+
 // --- 自動化ルール ---
 
 export async function getAutomations(db: D1Database): Promise<AutomationRow[]> {
@@ -34,17 +269,6 @@ export async function getAutomations(db: D1Database): Promise<AutomationRow[]> {
 
 export async function getAutomationById(db: D1Database, id: string): Promise<AutomationRow | null> {
   return db.prepare(`SELECT * FROM automations WHERE id = ?`).bind(id).first<AutomationRow>();
-}
-
-export async function createAutomation(
-  db: D1Database,
-  input: { name: string; description?: string; eventType: string; conditions?: Record<string, unknown>; actions: unknown[]; priority?: number },
-): Promise<AutomationRow> {
-  const id = crypto.randomUUID();
-  const now = jstNow();
-  await db.prepare(`INSERT INTO automations (id, name, description, event_type, conditions, actions, priority, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-    .bind(id, input.name, input.description ?? null, input.eventType, JSON.stringify(input.conditions ?? {}), JSON.stringify(input.actions), input.priority ?? 0, now, now).run();
-  return (await getAutomationById(db, id))!;
 }
 
 export async function updateAutomation(
@@ -75,13 +299,14 @@ export async function deleteAutomation(db: D1Database, id: string): Promise<void
 // --- 自動化ログ ---
 
 export async function getAutomationLogs(db: D1Database, automationId?: string, limit = 100): Promise<AutomationLogRow[]> {
+  const safeLimit = boundedListLimit(limit, 100);
   if (automationId) {
     const result = await db.prepare(`SELECT * FROM automation_logs WHERE automation_id = ? ORDER BY created_at DESC LIMIT ?`)
-      .bind(automationId, limit).all<AutomationLogRow>();
+      .bind(automationId, safeLimit).all<AutomationLogRow>();
     return result.results;
   }
   const result = await db.prepare(`SELECT * FROM automation_logs ORDER BY created_at DESC LIMIT ?`)
-    .bind(limit).all<AutomationLogRow>();
+    .bind(safeLimit).all<AutomationLogRow>();
   return result.results;
 }
 

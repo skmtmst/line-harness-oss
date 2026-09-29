@@ -1,15 +1,90 @@
+import { EC_EVENT_TYPES } from '@line-crm/shared';
+import { CredentialEncryptionKeyError, decryptCredential, encryptCredential } from './credential-crypto.js';
 import { jstNow, toJstString } from './utils.js';
 // Webhook IN/OUT クエリヘルパー
+
+/**
+ * 受信・送信Webhookの secret の最低文字数。API の入力検査と旧平文の表示判定は
+ * この値だけを見る。apps/worker/src/routes/webhooks.ts はこれを読み替えて使う。
+ */
+export const WEBHOOK_SECRET_MIN_LENGTH = 32;
+
+/**
+ * 送信WebhookのeventTypesに指定できる種別の正本(#829 N-383)。
+ * 実際にイベントバスへ発火され送信Webhookへ届く種別だけを載せる。
+ * `*` は全種別を受け取る明示規約。受信口の発火は `incoming_webhook.<source_type>` で届く。
+ */
+export const KNOWN_OUTGOING_EVENT_TYPES: readonly string[] = [
+  'friend_add',
+  'friend_unfollow',
+  'message_received',
+  'postback_received',
+  'tag_change',
+  'cv_fire',
+  'staff_assigned',
+  'manual_reply_sent',
+  // R150: 見本にある出来事は実際に購読できるようにする。
+  // 送信側は forms.ts / booking.ts の発火点。
+  'form_submitted',
+  'booking_created',
+  ...EC_EVENT_TYPES,
+];
+
+const INCOMING_WEBHOOK_EVENT_PREFIX = 'incoming_webhook.';
+
+/**
+ * 送信Webhookの購読種別として有効か。
+ * `*` は全件、`incoming_webhook.<source>` は受信口ごとの発火に一致する。
+ * `incoming_webhook.*` は照合規約上どの発火にも一致しないので通さない。
+ */
+export function isKnownOutgoingEventType(eventType: string): boolean {
+  if (eventType === '*') return true;
+  if (KNOWN_OUTGOING_EVENT_TYPES.includes(eventType)) return true;
+  if (!eventType.startsWith(INCOMING_WEBHOOK_EVENT_PREFIX)) return false;
+  const sourceType = eventType.slice(INCOMING_WEBHOOK_EVENT_PREFIX.length);
+  return sourceType.length > 0 && !sourceType.includes('*');
+}
 
 export interface IncomingWebhookRow {
   id: string;
   name: string;
   source_type: string;
+  /** 旧平文。#650 以降の新規・更新では NULL になる。読み取りの後方互換だけに使う。 */
   secret: string | null;
+  /** AES-GCM 暗号文。#650 以降の正本。旧スキーマの行には無いことがある。 */
+  secret_encrypted?: string | null;
+  /**
+   * S (#939 機能26): 入れ替え前の合言葉の暗号文。入れ替えから24時間だけ
+   * 署名の照合に使える。期限は secret_rotated_at から数える。
+   */
+  secret_previous_encrypted?: string | null;
+  /** 合言葉を最後に入れ替えた時刻。入れ替えたことが無い行は NULL。 */
+  secret_rotated_at?: string | null;
   is_active: number;
   line_account_id: string | null;
+  version: number;
+  identity_match_json: string;
+  action_refs_json: string;
+  latest_masked_sample_json: string | null;
+  latest_received_at: string | null;
+  /** #939 N-368: 履歴保持の削除印。NULL 以外の行は読み取り・実行から外す。 */
+  deleted_at?: string | null;
+  deleted_by_staff_id?: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface OutgoingWebhookDeliverySummaryRow {
+  webhook_id: string;
+  total: number;
+  succeeded: number;
+  failed: number;
+  pending: number;
+  last_status: WebhookInteractionStatus | null;
+  last_response_status: number | null;
+  last_completed_at: string | null;
+  last_failure_reason: WebhookInteractionFailureReason | null;
+  can_retry: number;
 }
 
 export interface OutgoingWebhookRow {
@@ -17,7 +92,10 @@ export interface OutgoingWebhookRow {
   name: string;
   url: string;
   event_types: string; // JSON配列
+  /** 旧平文。#650 以降の新規・更新では NULL になる。読み取りの後方互換だけに使う。 */
   secret: string | null;
+  /** AES-GCM 暗号文。#650 以降の正本。旧スキーマの行には無いことがある。 */
+  secret_encrypted?: string | null;
   is_active: number;
   /** 失敗したとき何回まで送り直すか。0 なら送り直さない */
   max_retries: number;
@@ -25,7 +103,15 @@ export interface OutgoingWebhookRow {
   consecutive_failures: number;
   /** 最後に失敗した時刻。成功すると NULL に戻る */
   last_failed_at: string | null;
+  /**
+   * 連続失敗で自動停止した時刻(#938)。手動停止(NULL)と区別する。
+   * 運用者が再有効化すると NULL に戻る。
+   */
+  auto_stopped_at?: string | null;
   line_account_id?: string | null;
+  /** #939 N-368: 履歴保持の削除印。NULL 以外の行は読み取り・実行から外す。 */
+  deleted_at?: string | null;
+  deleted_by_staff_id?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -38,7 +124,12 @@ export type WebhookInteractionFailureReason =
   | 'response_429'
   | 'response_5xx'
   | 'processing_failed'
-  | 'unknown';
+  | 'unknown'
+  /**
+   * d23b R415: こちら側の署名用の合言葉が読めず、外部へ一度も送れて
+   * いない失敗。「相手から返事がない」(connection_failed)と区別する。
+   */
+  | 'secret_unavailable';
 
 export interface WebhookInteractionRow {
   id: string;
@@ -67,7 +158,43 @@ export interface WebhookInteractionSummary {
   incoming: number;
   succeeded: number;
   failed: number;
+  /**
+   * 送信の失敗の総数(d23b R408)。失敗の内訳を画面へ説明するとき、
+   * 受信の失敗と混ぜないために使う。
+   */
+  outgoingFailed: number;
+  /**
+   * 送信の失敗のうち、今この画面からまとめて送り直せる件数(d23b R408)。
+   * 届いたか分からない記録・署名の合言葉が読めない記録・送り先が
+   * 消えた/止まった記録・自動の送り直しが動いている記録は含まない。
+   */
+  retryable: number;
+  /**
+   * 失敗のうち「相手先へ届いたか分からない」件数(IDEA-26)。
+   * この件数は無条件のまとめて再送へ入れず、相手先で確かめてから
+   * 1件ずつやり直す対象として画面へ示す。
+   */
+  resultUnknown: number;
   averageDurationMs: number | null;
+}
+
+/** 自動配送台帳(outgoing_webhook_deliveries)の状態。 */
+export type OutgoingDeliveryStatus = 'pending' | 'sending' | 'retry_wait' | 'delivered' | 'failed';
+
+/**
+ * 一覧用の行(d23b R412/R414)。やり取りの記録に、送り先と自動配送の
+ * 現状を添えたもの。個別取得(getWebhookInteractionById)では付かない。
+ */
+export interface WebhookInteractionListRow extends WebhookInteractionRow {
+  /**
+   * 送り先の有効印。削除印のある・存在しない送り先では NULL。
+   * webhook_id 自体が NULL の記録（連携先が消えたもの）でも NULL。
+   */
+  linked_webhook_active: number | null;
+  /** 同じ通知の自動配送の現状。台帳に無い記録では NULL。 */
+  delivery_status: OutgoingDeliveryStatus | null;
+  /** 自動配送の次回予定。予定が無いとき NULL。 */
+  delivery_next_retry_at: string | null;
 }
 
 export async function createWebhookInteraction(
@@ -175,6 +302,143 @@ export async function restoreWebhookInteractionFailure(
   ).bind(id, lineAccountId).run();
 }
 
+/**
+ * d23b R409: 元の失敗記録を「やり直し済み」に畳むのと、やり直し用の記録を
+ * 作るのを1つのDBバッチで行う。どちらかだけ残る中途半端な形（元は
+ * retried なのにやり直し行が無い等）を作らない。
+ *
+ * 元の行がすでに畳まれている(別のやり直しが先に動いた)ときは、INSERT 側の
+ * NOT EXISTS(retry_of_id) が通らず、UPDATE 側も status='failed' でないので
+ * 0件になる。やり直し行が一度作られていれば、その後の重複した申込は
+ * どちらも何もしない。片方だけ失敗したときはバッチごと巻き戻される。
+ */
+export async function claimWebhookInteractionRetryAndInsert(
+  db: D1Database,
+  original: Pick<WebhookInteractionRow, 'id' | 'line_account_id'>,
+  input: {
+    id?: string;
+    webhookId: string;
+    webhookName: string;
+    eventType: string;
+    triggerSummary: string;
+    requestBodyJson: string;
+    idempotencyKey: string;
+  },
+): Promise<{ claimed: boolean; retryId: string }> {
+  const retryId = input.id ?? crypto.randomUUID();
+  const now = jstNow();
+  const [claim, insert] = await db.batch([
+    db.prepare(
+      `UPDATE webhook_interaction_logs SET status='retried'
+        WHERE id=? AND line_account_id=? AND direction='outgoing' AND status='failed'`,
+    ).bind(original.id, original.line_account_id),
+    db.prepare(
+      `INSERT INTO webhook_interaction_logs
+         (id, line_account_id, direction, webhook_id, webhook_name, event_type,
+          trigger_summary, status, request_body_json, response_status,
+          attempt_count, duration_ms, failure_reason, idempotency_key,
+          retry_of_id, started_at, completed_at, created_at)
+       SELECT ?, ?, 'outgoing', ?, ?, ?, ?, 'pending', ?, NULL, 0, NULL, NULL, ?, ?, ?, NULL, ?
+        WHERE EXISTS (
+          SELECT 1 FROM webhook_interaction_logs WHERE id = ? AND status = 'retried'
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM webhook_interaction_logs WHERE retry_of_id = ?
+        )`,
+    ).bind(
+      retryId, original.line_account_id, input.webhookId, input.webhookName,
+      input.eventType, input.triggerSummary, input.requestBodyJson,
+      input.idempotencyKey, original.id, now, now, original.id, original.id,
+    ),
+  ]);
+  const claimChanged = Number(claim.meta?.changes ?? 0) > 0;
+  const insertChanged = Number(insert.meta?.changes ?? 0) > 0;
+  if (!claimChanged && insertChanged) {
+    // まれな割り込み(先のやり直しが claim 済みだが行がまだ無い瞬間)で
+    // 孤児の pending 行が残らないよう、自分が作った分だけ消す。
+    try {
+      await deletePendingWebhookInteraction(db, retryId, original.line_account_id);
+    } catch (error) {
+      console.error('webhook_interaction_logs の孤児行の後始末に失敗:', error);
+    }
+  }
+  return { claimed: claimChanged && insertChanged, retryId };
+}
+
+/**
+ * 送る前に止まったやり直しの記録を消す（d23b R413）。
+ * まだ外部へ一度も出ていない pending の行だけを消す。確定済みの行は
+ * 履歴なので消さない。
+ */
+export async function deletePendingWebhookInteraction(
+  db: D1Database,
+  id: string,
+  lineAccountId: string,
+): Promise<void> {
+  await db.prepare(
+    `DELETE FROM webhook_interaction_logs
+      WHERE id=? AND line_account_id=? AND status='pending'`,
+  ).bind(id, lineAccountId).run();
+}
+
+/**
+ * d23b R409: 「処理中」のまま放置された記録を「届いたか分からない失敗」へ
+ * 直す。始まった時刻から一定時間(既定15分)が過ぎた pending は、結果を書く
+ * 途中で止まったものとみなす。一覧から永久に消えない・処理中のままに
+ * しないための回収。
+ */
+export async function markStalePendingWebhookInteractions(
+  db: D1Database,
+  lineAccountId: string,
+  staleBeforeMs = 15 * 60 * 1000,
+): Promise<number> {
+  const cutoff = toJstString(new Date(Date.now() - staleBeforeMs));
+  const result = await db.prepare(
+    `UPDATE webhook_interaction_logs
+        SET status='failed', failure_reason='unknown', completed_at=?
+      WHERE line_account_id=? AND status='pending' AND started_at < ?`,
+  ).bind(jstNow(), lineAccountId, cutoff).run();
+  return Number(result.meta?.changes ?? 0);
+}
+
+/**
+ * d23b R412: 同じ通知（同じ送り先＋同じ冪等キー）の失敗記録をまとめて
+ * 「やり直し済み」へ畳む。手動・自動のどちらかで届いたとき、残っている
+ * 失敗記録をそのまま「やり直せる」状態で残さない。
+ */
+export async function markFailedInteractionsRetried(
+  db: D1Database,
+  lineAccountId: string,
+  webhookId: string,
+  idempotencyKey: string,
+): Promise<void> {
+  await db.prepare(
+    `UPDATE webhook_interaction_logs SET status='retried'
+      WHERE line_account_id=? AND webhook_id=? AND idempotency_key=?
+        AND direction='outgoing' AND status='failed'`,
+  ).bind(lineAccountId, webhookId, idempotencyKey).run();
+}
+
+/**
+ * 同じ通知がすでに届いた記録があるか(d23b R412)。
+ * 自動配送の回収が送る前に確かめ、手動のやり直しで届いた分を
+ * 二重に送らない。
+ */
+export async function hasSucceededInteractionForKey(
+  db: D1Database,
+  lineAccountId: string,
+  webhookId: string,
+  idempotencyKey: string,
+): Promise<boolean> {
+  const row = await db.prepare(
+    `SELECT 1 AS yes FROM webhook_interaction_logs
+      WHERE line_account_id=? AND webhook_id=? AND idempotency_key=?
+        AND direction='outgoing' AND status='succeeded'
+      LIMIT 1`,
+  ).bind(lineAccountId, webhookId, idempotencyKey).first<{ yes: number }>();
+  return Boolean(row?.yes);
+}
+
 export async function listWebhookInteractions(
   db: D1Database,
   input: {
@@ -187,7 +451,7 @@ export async function listWebhookInteractions(
     limit?: number;
   },
 ): Promise<{
-  items: WebhookInteractionRow[];
+  items: WebhookInteractionListRow[];
   total: number;
   page: number;
   limit: number;
@@ -199,38 +463,62 @@ export async function listWebhookInteractions(
   const cutoff = toJstString(new Date(Date.now() - periodDays * 86_400_000));
   const page = Math.max(1, integerOr(input.page, 1));
   const limit = Math.min(50, Math.max(10, integerOr(input.limit, 20)));
-  const clauses = ['line_account_id=?', 'created_at>=?', "status!='retried'"];
+  // d23b R409: 結果を書く途中で止まった「処理中」を先に回収する。
+  // 一覧を開いた時点で回収すれば、滞留分はここで失敗として見える。
+  try {
+    await markStalePendingWebhookInteractions(db, input.lineAccountId);
+  } catch (error) {
+    // 回収だけの失敗で一覧そのものを止めない。
+    console.error('webhook_interaction_logs の滞留回収に失敗:', error);
+  }
+  const clauses = ['l.line_account_id=?', 'l.created_at>=?', "l.status!='retried'"];
   const binds: unknown[] = [input.lineAccountId, cutoff];
   if (input.direction) {
-    clauses.push('direction=?');
+    clauses.push('l.direction=?');
     binds.push(input.direction);
   }
   if (input.status) {
-    clauses.push('status=?');
+    clauses.push('l.status=?');
     binds.push(input.status);
   }
   if (input.search?.trim()) {
-    clauses.push('(webhook_name LIKE ? OR trigger_summary LIKE ? OR event_type LIKE ?)');
+    clauses.push('(l.webhook_name LIKE ? OR l.trigger_summary LIKE ? OR l.event_type LIKE ?)');
     const like = `%${input.search.trim().slice(0, 100)}%`;
     binds.push(like, like, like);
   }
   const where = clauses.join(' AND ');
+  // d23b R414: 送り先の現状と、同じ通知の自動配送の現状を添える。
+  // 画面は「消えた・止まった・自動で動いている」理由を行ごとに出せる。
+  // 削除印のある送り先は「無い」として扱う（N-368）。
+  const joinedTables = `webhook_interaction_logs l
+    LEFT JOIN outgoing_webhooks ow
+           ON ow.id = l.webhook_id AND ow.deleted_at IS NULL
+    LEFT JOIN outgoing_webhook_deliveries d
+           ON d.webhook_id = l.webhook_id AND d.idempotency_key = l.idempotency_key`;
   const [rows, totalRow, summaryRow] = await Promise.all([
     db.prepare(
-      `SELECT * FROM webhook_interaction_logs WHERE ${where}
-       ORDER BY created_at DESC LIMIT ? OFFSET ?`,
-    ).bind(...binds, limit, (page - 1) * limit).all<WebhookInteractionRow>(),
-    db.prepare(`SELECT COUNT(*) AS count FROM webhook_interaction_logs WHERE ${where}`)
+      `SELECT l.*,
+              ow.is_active AS linked_webhook_active,
+              d.status AS delivery_status,
+              d.next_retry_at AS delivery_next_retry_at
+         FROM ${joinedTables}
+        WHERE ${where}
+        ORDER BY l.created_at DESC LIMIT ? OFFSET ?`,
+    ).bind(...binds, limit, (page - 1) * limit).all<WebhookInteractionListRow>(),
+    db.prepare(`SELECT COUNT(*) AS count FROM webhook_interaction_logs l WHERE ${where}`)
       .bind(...binds).first<{ count: number }>(),
     db.prepare(
       `SELECT COUNT(*) AS total,
-              SUM(CASE WHEN direction='outgoing' THEN 1 ELSE 0 END) AS outgoing,
-              SUM(CASE WHEN direction='incoming' THEN 1 ELSE 0 END) AS incoming,
-              SUM(CASE WHEN status='succeeded' THEN 1 ELSE 0 END) AS succeeded,
-              SUM(CASE WHEN status='failed' THEN 1 ELSE 0 END) AS failed,
-              AVG(CASE WHEN status IN ('succeeded','failed') THEN duration_ms END) AS average_duration_ms
-         FROM webhook_interaction_logs
-        WHERE line_account_id=? AND created_at>=? AND status!='retried'`,
+              SUM(CASE WHEN l.direction='outgoing' THEN 1 ELSE 0 END) AS outgoing,
+              SUM(CASE WHEN l.direction='incoming' THEN 1 ELSE 0 END) AS incoming,
+              SUM(CASE WHEN l.status='succeeded' THEN 1 ELSE 0 END) AS succeeded,
+              SUM(CASE WHEN l.status='failed' THEN 1 ELSE 0 END) AS failed,
+              SUM(CASE WHEN l.direction='outgoing' AND l.status='failed' THEN 1 ELSE 0 END) AS outgoing_failed,
+              SUM(CASE WHEN ${RETRYABLE_FAILURE_CORE} THEN 1 ELSE 0 END) AS retryable,
+              SUM(CASE WHEN l.status='failed' AND l.failure_reason='unknown' THEN 1 ELSE 0 END) AS result_unknown,
+              AVG(CASE WHEN l.status IN ('succeeded','failed') THEN l.duration_ms END) AS average_duration_ms
+         FROM ${joinedTables}
+        WHERE l.line_account_id=? AND l.created_at>=? AND l.status!='retried'`,
     ).bind(input.lineAccountId, cutoff).first<Record<string, number | null>>(),
   ]);
   return {
@@ -244,6 +532,9 @@ export async function listWebhookInteractions(
       incoming: summaryRow?.incoming ?? 0,
       succeeded: summaryRow?.succeeded ?? 0,
       failed: summaryRow?.failed ?? 0,
+      outgoingFailed: summaryRow?.outgoing_failed ?? 0,
+      retryable: summaryRow?.retryable ?? 0,
+      resultUnknown: summaryRow?.result_unknown ?? 0,
       averageDurationMs: summaryRow?.average_duration_ms == null
         ? null
         : Math.round(summaryRow.average_duration_ms),
@@ -251,17 +542,554 @@ export async function listWebhookInteractions(
   };
 }
 
+/*
+ * まとめて再送で選ぶ失敗の条件（webhook_interaction_logs を `l` で参照）。
+ *
+ * 除外するもの:
+ *   - 届いたか分からない記録(unknown) … 届いていた処理を二重に送る恐れ(IDEA-26)
+ *   - 署名の合言葉が読めなかった記録(secret_unavailable) … 鍵を戻すまで届かない(d23b R415)
+ *   - 送り先が消えた・止められた記録 … やり直しても必ず外す(d23b R405)
+ *   - 送った内容が残っていない記録 … 同じ出来事を再現できない
+ *   - 自動の送り直しがまだ動いている記録 … 手動と並ぶと二重に届く(d23b R412)
+ *   - 自動の送り直しですでに届いた記録 … もう一度送ると二重に届く(d23b R412)
+ *
+ * d23b R405: 以前は先頭から固定件数だけ読んでいたため、消えた・止まった
+ * 送り先の記録が先頭に固まると、後ろの送れる記録へ何度押しても届かなかった。
+ * 選ぶ段階で対象外を外し、残りを必ず処理できるようにする。
+ */
+const RETRYABLE_FAILURE_CORE = `
+  (l.failure_reason IS NULL OR l.failure_reason NOT IN ('unknown','secret_unavailable'))
+  AND l.request_body_json IS NOT NULL
+  AND EXISTS (
+    SELECT 1 FROM outgoing_webhooks ow
+     WHERE ow.id = l.webhook_id AND ow.is_active = 1 AND ow.deleted_at IS NULL
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM outgoing_webhook_deliveries d
+     WHERE d.webhook_id = l.webhook_id
+       AND d.idempotency_key = l.idempotency_key
+       AND d.status IN ('pending','sending','retry_wait','delivered')
+  )`;
+
+const RETRYABLE_FAILURE_FILTER =
+  `l.direction='outgoing' AND l.status='failed' AND ${RETRYABLE_FAILURE_CORE}`;
+
 export async function listFailedWebhookInteractionsForRetry(
   db: D1Database,
   lineAccountId: string,
   limit = 50,
 ): Promise<WebhookInteractionRow[]> {
   const result = await db.prepare(
-    `SELECT * FROM webhook_interaction_logs
-      WHERE line_account_id=? AND direction='outgoing' AND status='failed'
-      ORDER BY created_at ASC LIMIT ?`,
+    `SELECT l.* FROM webhook_interaction_logs l
+      WHERE l.line_account_id=? AND ${RETRYABLE_FAILURE_FILTER}
+      ORDER BY l.created_at ASC LIMIT ?`,
   ).bind(lineAccountId, Math.min(50, Math.max(1, limit))).all<WebhookInteractionRow>();
   return result.results ?? [];
+}
+
+/**
+ * まとめて再試行の対象になる失敗記録の総数。
+ * 1リクエストの外部通信上限で一部しか処理できないとき、残り件数を
+ * 画面へ明示するために使う（N-387: 対象外を黙って残さない）。
+ * 結果不明の記録は対象外なので、ここでも数えない(IDEA-26)。
+ */
+export async function countFailedWebhookInteractionsForRetry(
+  db: D1Database,
+  lineAccountId: string,
+): Promise<number> {
+  const row = await db.prepare(
+    `SELECT COUNT(*) AS count FROM webhook_interaction_logs l
+      WHERE l.line_account_id=? AND ${RETRYABLE_FAILURE_FILTER}`,
+  ).bind(lineAccountId).first<{ count: number }>();
+  return Number(row?.count ?? 0);
+}
+
+/**
+ * まとめて再送の対象外に残った失敗記録の総数(d23b R405/R408)。
+ * 送り先が消えた・止まった・内容が残っていない・自動の送り直しが
+ * 動いている・署名の合言葉が読めない、のどれかに当たる記録を数える。
+ * 「届いたか分からない」記録は別口(needsReview)で数えるので含めない。
+ */
+export async function countExcludedFailedWebhookInteractions(
+  db: D1Database,
+  lineAccountId: string,
+): Promise<number> {
+  const row = await db.prepare(
+    `SELECT COUNT(*) AS count FROM webhook_interaction_logs l
+      WHERE l.line_account_id=? AND l.direction='outgoing' AND l.status='failed'
+        AND (l.failure_reason IS NULL OR l.failure_reason <> 'unknown')
+        AND NOT (${RETRYABLE_FAILURE_CORE})`,
+  ).bind(lineAccountId).first<{ count: number }>();
+  return Number(row?.count ?? 0);
+}
+
+/**
+ * 「届いたか分からない」失敗記録の総数(IDEA-26)。
+ * まとめて再送には乗せず、画面へ「相手先で確かめる必要がある件数」として返す。
+ */
+export async function countUnverifiedWebhookInteractions(
+  db: D1Database,
+  lineAccountId: string,
+): Promise<number> {
+  const row = await db.prepare(
+    `SELECT COUNT(*) AS count FROM webhook_interaction_logs
+      WHERE line_account_id=? AND direction='outgoing' AND status='failed'
+        AND failure_reason='unknown'`,
+  ).bind(lineAccountId).first<{ count: number }>();
+  return Number(row?.count ?? 0);
+}
+
+export async function getOutgoingWebhookDeliverySummaries(
+  db: D1Database,
+  lineAccountId: string,
+  periodDays = 30,
+): Promise<OutgoingWebhookDeliverySummaryRow[]> {
+  const days = Math.min(365, Math.max(1, Math.floor(periodDays)));
+  const cutoff = toJstString(new Date(Date.now() - days * 86_400_000));
+  const result = await db.prepare(`
+    WITH recent AS (
+      SELECT *
+        FROM webhook_interaction_logs
+       WHERE line_account_id = ? AND direction = 'outgoing'
+         AND created_at >= ? AND status != 'retried'
+    ), totals AS (
+      SELECT webhook_id,
+             COUNT(*) AS total,
+             SUM(CASE WHEN status = 'succeeded' THEN 1 ELSE 0 END) AS succeeded,
+             SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failed,
+             SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending
+        FROM recent
+       WHERE webhook_id IS NOT NULL
+       GROUP BY webhook_id
+    ), latest AS (
+      SELECT *, ROW_NUMBER() OVER (
+        PARTITION BY webhook_id ORDER BY created_at DESC, id DESC
+      ) AS row_number
+        FROM recent
+       WHERE webhook_id IS NOT NULL
+    )
+    SELECT ow.id AS webhook_id,
+           COALESCE(t.total, 0) AS total,
+           COALESCE(t.succeeded, 0) AS succeeded,
+           COALESCE(t.failed, 0) AS failed,
+           COALESCE(t.pending, 0) AS pending,
+           l.status AS last_status,
+           l.response_status AS last_response_status,
+           l.completed_at AS last_completed_at,
+           l.failure_reason AS last_failure_reason,
+           CASE WHEN ow.is_active = 1 AND l.status = 'failed'
+                  AND l.request_body_json IS NOT NULL THEN 1 ELSE 0 END AS can_retry
+      FROM outgoing_webhooks ow
+ LEFT JOIN totals t ON t.webhook_id = ow.id
+ LEFT JOIN latest l ON l.webhook_id = ow.id AND l.row_number = 1
+     WHERE ow.line_account_id = ? AND ow.deleted_at IS NULL
+     ORDER BY ow.created_at DESC, ow.id ASC
+  `).bind(lineAccountId, cutoff, lineAccountId).all<OutgoingWebhookDeliverySummaryRow>();
+  return result.results ?? [];
+}
+
+/**
+ * Webhook secret の暗号化の約束(#650)。
+ *
+ * 保存形式: secret_encrypted 列に `k<鍵ID>.v1.<iv>.<暗号文>` を入れる。
+ * 鍵ID は鍵素材の SHA-256 先頭12桁で、鍵そのものは含まない。
+ * secret 列の旧平文は後方互換の読み取りだけに使い、新規・更新では NULL にする。
+ * 平文で返すのは作成直後の1回だけ(API層)。GET・ログ・エラーには出さない。
+ * 送信・照合の直前だけ復号する。鍵不足・復号失敗は例外にして止める。
+ * 平文列の廃止は、暗号化の行き渡り確認後に別の票で行う。
+ *
+ * 鍵ローテーション手順(新旧併用):
+ * 1. 新鍵を現行にし、旧鍵を LINE_CREDENTIAL_PREVIOUS_KEYS に残す(両方で読める期間)。
+ * 2. backfillWebhookSecrets で全行を新鍵に寄せ直す(dry-run→batch→照合)。
+ * 3. getWebhookSecretKeyStats で旧鍵IDの参照が 0 件になったら旧鍵を捨てる。
+ */
+export type WebhookSecretColumns = {
+  id?: string;
+  secret: string | null;
+  secret_encrypted?: string | null;
+  /** S: 入れ替え前の合言葉の暗号文。併用期間の照合だけに使う。 */
+  secret_previous_encrypted?: string | null;
+  /** S: 合言葉を最後に入れ替えた時刻。入れ替えたことが無い行は NULL。 */
+  secret_rotated_at?: string | null;
+};
+
+/**
+ * S (#939 機能26): 入れ替えた前の合言葉を受け付ける併用期間。
+ * 新しい合言葉を保存した時点から24時間だけ、前の合言葉の署名も通す。
+ */
+export const WEBHOOK_SECRET_PREVIOUS_GRACE_MS = 24 * 60 * 60 * 1000;
+
+/** 呼び出し側が渡す鍵。文字列1件は現行鍵だけの指定とみなす。 */
+export interface WebhookKeyInput {
+  current?: string | undefined;
+  previous?: string | string[] | undefined;
+}
+
+interface WebhookKeySet {
+  current: { id: string; material: string };
+  previous: { id: string; material: string }[];
+}
+
+const keyIdCache = new Map<string, string>();
+
+/** 鍵素材から鍵ID(SHA-256 先頭12桁)を作る。鍵素材そのものは含まない。 */
+export async function webhookKeyId(material: string): Promise<string> {
+  const normalized = material.trim();
+  const cached = keyIdCache.get(normalized);
+  if (cached) return cached;
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(normalized));
+  const id = Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('')
+    .slice(0, 12);
+  keyIdCache.set(normalized, id);
+  return id;
+}
+
+async function readWorkerEnvKey(name: string): Promise<string | undefined> {
+  try {
+    // Worker は bindings から読む。Node の単体テストには bindings がないため、
+    // その場合は呼び出し側が渡した鍵だけを使う(暗号化の書き込みは鍵必須)。
+    const runtime = await import('cloudflare:workers');
+    const bindings = runtime.env as unknown as Record<string, string | undefined>;
+    return bindings[name]?.trim() || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function normalizeKeyInput(keys?: WebhookKeyInput | string): WebhookKeyInput {
+  if (typeof keys === 'string') return { current: keys };
+  return keys ?? {};
+}
+
+async function readWebhookKeySet(keys?: WebhookKeyInput | string): Promise<WebhookKeySet | undefined> {
+  const input = normalizeKeyInput(keys);
+  const current = input.current?.trim() || await readWorkerEnvKey('LINE_CREDENTIAL_ENCRYPTION_KEY');
+  if (!current) return undefined;
+  const rawPrevious = input.previous ?? await readWorkerEnvKey('LINE_CREDENTIAL_PREVIOUS_KEYS');
+  const materials = (Array.isArray(rawPrevious) ? rawPrevious : String(rawPrevious ?? '').split(','))
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0 && entry !== current);
+  const previous: WebhookKeySet['previous'] = [];
+  for (const material of materials) {
+    previous.push({ id: await webhookKeyId(material), material });
+  }
+  return { current: { id: await webhookKeyId(current), material: current }, previous };
+}
+
+const STORED_SECRET_PATTERN = /^k([0-9a-f]{12})\.(v1\..+)$/;
+
+/** 保存値を鍵IDと暗号本体に分ける。旧平文・不明形式は null。 */
+function parseStoredSecret(stored: string): { keyId: string | null; payload: string } | null {
+  const versioned = STORED_SECRET_PATTERN.exec(stored);
+  if (versioned) return { keyId: versioned[1], payload: versioned[2] };
+  if (stored.startsWith('v1.')) return { keyId: null, payload: stored };
+  return null;
+}
+
+/** 平文を1件、現行鍵で暗号化する。現行鍵がなければ書かずに例外にする。 */
+export async function encryptWebhookSecret(
+  value: string,
+  keys?: WebhookKeyInput | string,
+): Promise<string> {
+  const set = await readWebhookKeySet(keys);
+  if (!set) throw new CredentialEncryptionKeyError();
+  const payload = await encryptCredential(value, set.current.material);
+  return `k${set.current.id}.${payload}`;
+}
+
+/**
+ * 送信・照合の直前だけ呼ぶ。暗号文があれば現行→旧鍵の順で復号し、
+ * 旧平文だけの行はそのまま返す。鍵不足・復号失敗は例外にする。
+ * 戻り値 null は未設定。例外とログに秘密値・鍵は含めない。
+ */
+export async function resolveWebhookSecret(
+  row: WebhookSecretColumns,
+  keys?: WebhookKeyInput | string,
+): Promise<string | null> {
+  if (row.secret_encrypted) {
+    const parsed = parseStoredSecret(row.secret_encrypted);
+    if (!parsed) {
+      console.error(JSON.stringify({
+        event: 'webhook_secret_unknown_format',
+        webhookId: row.id ?? null,
+      }));
+      throw new Error('Unable to decrypt webhook secret');
+    }
+    const set = await readWebhookKeySet(keys);
+    const candidates = set
+      ? (parsed.keyId
+        ? [set.current, ...set.previous].filter((key) => key.id === parsed.keyId)
+        : [set.current, ...set.previous])
+      : [];
+    if (candidates.length === 0) {
+      console.error(JSON.stringify({
+        event: 'webhook_secret_key_unavailable',
+        webhookId: row.id ?? null,
+        keyId: parsed.keyId,
+      }));
+      throw new Error('Unable to decrypt webhook secret');
+    }
+    for (const candidate of candidates) {
+      try {
+        return await decryptCredential(parsed.payload, candidate.material);
+      } catch {
+        // 鍵IDが付いた行は対応鍵だけ試す。付いていない旧形式だけ全鍵を試す。
+        if (parsed.keyId) break;
+      }
+    }
+    console.error(JSON.stringify({
+      event: 'webhook_secret_decrypt_failed',
+      webhookId: row.id ?? null,
+      keyId: parsed.keyId,
+    }));
+    throw new Error('Unable to decrypt webhook secret');
+  }
+  return row.secret;
+}
+
+/**
+ * S (#939 機能26): 併用期間内の前の合言葉を返す。
+ * 期限切れ・未設定・前の値が無い行は null。復号に失敗しても例外にせず、
+ * 「前の合言葉では通せない」だけにする(現行の合言葉の判定は別で行う)。
+ */
+export async function resolvePreviousWebhookSecret(
+  row: WebhookSecretColumns,
+  keys?: WebhookKeyInput | string,
+  now = Date.now(),
+): Promise<string | null> {
+  if (!row.secret_previous_encrypted || !row.secret_rotated_at) return null;
+  const rotatedAt = Date.parse(row.secret_rotated_at);
+  if (!Number.isFinite(rotatedAt) || now - rotatedAt > WEBHOOK_SECRET_PREVIOUS_GRACE_MS) return null;
+  try {
+    return await resolveWebhookSecret(
+      { id: row.id, secret: null, secret_encrypted: row.secret_previous_encrypted },
+      keys,
+    );
+  } catch {
+    console.error(JSON.stringify({
+      event: 'webhook_secret_previous_decrypt_failed',
+      webhookId: row.id ?? null,
+    }));
+    return null;
+  }
+}
+
+/** 一覧・詳細の hasSecret 判定。秘密値そのものは返さない。 */
+export function hasWebhookSecret(row: WebhookSecretColumns): boolean {
+  if (row.secret_encrypted) return true;
+  return !!row.secret && row.secret.length >= WEBHOOK_SECRET_MIN_LENGTH;
+}
+
+export type WebhookSecretTable = 'incoming_webhooks' | 'outgoing_webhooks';
+
+export interface WebhookSecretBackfillOptions {
+  lineAccountId?: string;
+  tables?: WebhookSecretTable[];
+  batchSize?: number;
+  dryRun?: boolean;
+  keys?: WebhookKeyInput | string;
+}
+
+export interface WebhookSecretBackfillReport {
+  dryRun: boolean;
+  batchSize: number;
+  legacyTotal: number;
+  rekeyTotal: number;
+  processed: number;
+  migrated: number;
+  failed: Array<{
+    table: WebhookSecretTable;
+    id: string;
+    reason: 'unreadable' | 'encrypt_failed' | 'verify_failed' | 'write_failed';
+  }>;
+  remainingLegacy: number;
+  remainingRekey: number;
+  done: boolean;
+}
+
+async function countLegacyWebhookSecrets(
+  db: D1Database,
+  table: WebhookSecretTable,
+  lineAccountId?: string,
+): Promise<number> {
+  // 「平文が残っているか」だけを見る。暗号文が既に入っていても平文が残る行は
+  // 未完了として数える。両方ある行を移行済みと数えると、done が嘘になる。
+  const where = lineAccountId === undefined
+    ? `secret IS NOT NULL`
+    : `line_account_id = ? AND secret IS NOT NULL`;
+  const binds = lineAccountId === undefined ? [] : [lineAccountId];
+  const row = await db.prepare(
+    `SELECT COUNT(*) AS count FROM ${table} WHERE ${where}`,
+  ).bind(...binds).first<{ count: number }>();
+  return row?.count ?? 0;
+}
+
+async function countRekeyWebhookSecrets(
+  db: D1Database,
+  table: WebhookSecretTable,
+  currentKeyId: string,
+  lineAccountId?: string,
+): Promise<number> {
+  const where = lineAccountId === undefined
+    ? `secret_encrypted IS NOT NULL AND secret_encrypted NOT LIKE ?`
+    : `line_account_id = ? AND secret_encrypted IS NOT NULL AND secret_encrypted NOT LIKE ?`;
+  const binds = lineAccountId === undefined ? [`k${currentKeyId}.%`] : [lineAccountId, `k${currentKeyId}.%`];
+  const row = await db.prepare(
+    `SELECT COUNT(*) AS count FROM ${table} WHERE ${where}`,
+  ).bind(...binds).first<{ count: number }>();
+  return row?.count ?? 0;
+}
+
+/**
+ * 既存の平文・旧鍵暗号文を現行鍵へ寄せる(dry-run→batch→照合→再開)。
+ *
+ * - dryRun=true は件数だけ数えて書かない(移行前の見積もり用)。
+ * - 1行ごとに「読む→現行鍵で暗号化→復号で照合→1文で平文NULL化」し、
+ *   どこかで失敗した行は平文を残したまま failed に積んで次へ進む。
+ * - べき等なので中断したら同じ条件で呼び直せば残りが進む(失敗再開)。
+ * - 現行鍵がなければ何も書かず例外にする。
+ */
+export async function backfillWebhookSecrets(
+  db: D1Database,
+  options: WebhookSecretBackfillOptions = {},
+): Promise<WebhookSecretBackfillReport> {
+  const tables = options.tables ?? ['incoming_webhooks', 'outgoing_webhooks'];
+  const batchSize = Math.min(500, Math.max(1, Math.floor(options.batchSize ?? 50)));
+  const dryRun = options.dryRun ?? true;
+  const set = await readWebhookKeySet(options.keys);
+  if (!set) throw new CredentialEncryptionKeyError();
+  const likeCurrent = `k${set.current.id}.%`;
+
+  const report: WebhookSecretBackfillReport = {
+    dryRun,
+    batchSize,
+    legacyTotal: 0,
+    rekeyTotal: 0,
+    processed: 0,
+    migrated: 0,
+    failed: [],
+    remainingLegacy: 0,
+    remainingRekey: 0,
+    done: false,
+  };
+  for (const table of tables) {
+    report.legacyTotal += await countLegacyWebhookSecrets(db, table, options.lineAccountId);
+    report.rekeyTotal += await countRekeyWebhookSecrets(db, table, set.current.id, options.lineAccountId);
+  }
+  if (dryRun) {
+    report.remainingLegacy = report.legacyTotal;
+    report.remainingRekey = report.rekeyTotal;
+    report.done = report.legacyTotal === 0 && report.rekeyTotal === 0;
+    return report;
+  }
+
+  for (const table of tables) {
+    // 平文が残っている行と、旧鍵のままの行を拾う。暗号文を入れた後に平文だけ
+    // 消し損ねた行も `secret IS NOT NULL` で拾い直せる(数えるだけで終わらせない)。
+    const where = options.lineAccountId === undefined
+      ? `secret IS NOT NULL OR (secret_encrypted IS NOT NULL AND secret_encrypted NOT LIKE ?)`
+      : `line_account_id = ? AND (secret IS NOT NULL OR (secret_encrypted IS NOT NULL AND secret_encrypted NOT LIKE ?))`;
+    const binds = options.lineAccountId === undefined ? [likeCurrent] : [options.lineAccountId, likeCurrent];
+    const targets = await db.prepare(
+      `SELECT id, secret, secret_encrypted FROM ${table} WHERE ${where} ORDER BY id ASC LIMIT ?`,
+    ).bind(...binds, batchSize).all<{ id: string; secret: string | null; secret_encrypted: string | null }>();
+    for (const target of targets.results ?? []) {
+      report.processed += 1;
+      let plaintext: string | null;
+      try {
+        plaintext = await resolveWebhookSecret(
+          { id: target.id, secret: target.secret, secret_encrypted: target.secret_encrypted },
+          { current: set.current.material, previous: set.previous.map((key) => key.material) },
+        );
+      } catch {
+        report.failed.push({ table, id: target.id, reason: 'unreadable' });
+        continue;
+      }
+      if (!plaintext) {
+        report.failed.push({ table, id: target.id, reason: 'unreadable' });
+        continue;
+      }
+      let stored: string;
+      try {
+        stored = await encryptWebhookSecret(plaintext, { current: set.current.material });
+      } catch {
+        report.failed.push({ table, id: target.id, reason: 'encrypt_failed' });
+        continue;
+      }
+      const parsed = parseStoredSecret(stored);
+      let verified = false;
+      if (parsed) {
+        try {
+          verified = (await decryptCredential(parsed.payload, set.current.material)) === plaintext;
+        } catch {
+          verified = false;
+        }
+      }
+      if (!verified) {
+        report.failed.push({ table, id: target.id, reason: 'verify_failed' });
+        continue;
+      }
+      try {
+        const updateWhere = options.lineAccountId === undefined ? `id = ?` : `id = ? AND line_account_id = ?`;
+        const updateBinds = options.lineAccountId === undefined
+          ? [stored, jstNow(), target.id]
+          : [stored, jstNow(), target.id, options.lineAccountId];
+        await db.prepare(
+          `UPDATE ${table} SET secret_encrypted = ?, secret = NULL, updated_at = ? WHERE ${updateWhere}`,
+        ).bind(...updateBinds).run();
+        report.migrated += 1;
+      } catch {
+        report.failed.push({ table, id: target.id, reason: 'write_failed' });
+      }
+    }
+  }
+
+  for (const table of tables) {
+    report.remainingLegacy += await countLegacyWebhookSecrets(db, table, options.lineAccountId);
+    report.remainingRekey += await countRekeyWebhookSecrets(db, table, set.current.id, options.lineAccountId);
+  }
+  report.done = report.remainingLegacy === 0 && report.remainingRekey === 0;
+  return report;
+}
+
+export interface WebhookSecretKeyStats {
+  legacy: number;
+  encrypted: number;
+  unknownFormat: number;
+  byKeyId: Record<string, number>;
+}
+
+/**
+ * 鍵IDごとの暗号文の分布。旧鍵の参照が 0 件になったら旧鍵を捨てられる(廃止照合)。
+ * 未指定時は全アカウント、指定時はそのアカウントだけ数える。
+ */
+export async function getWebhookSecretKeyStats(
+  db: D1Database,
+  lineAccountId?: string,
+): Promise<WebhookSecretKeyStats> {
+  const stats: WebhookSecretKeyStats = { legacy: 0, encrypted: 0, unknownFormat: 0, byKeyId: {} };
+  const tables: WebhookSecretTable[] = ['incoming_webhooks', 'outgoing_webhooks'];
+  for (const table of tables) {
+    const where = lineAccountId === undefined ? '' : 'WHERE line_account_id = ?';
+    const binds = lineAccountId === undefined ? [] : [lineAccountId];
+    const rows = await db.prepare(
+      `SELECT secret, secret_encrypted FROM ${table} ${where}`,
+    ).bind(...binds).all<{ secret: string | null; secret_encrypted: string | null }>();
+    for (const row of rows.results ?? []) {
+      if (row.secret) stats.legacy += 1;
+      if (!row.secret_encrypted) continue;
+      const parsed = parseStoredSecret(row.secret_encrypted);
+      if (!parsed?.keyId) {
+        stats.unknownFormat += 1;
+        continue;
+      }
+      stats.encrypted += 1;
+      stats.byKeyId[parsed.keyId] = (stats.byKeyId[parsed.keyId] ?? 0) + 1;
+    }
+  }
+  return stats;
 }
 
 // --- 受信Webhook ---
@@ -271,7 +1099,7 @@ export async function getIncomingWebhooks(
   lineAccountId: string,
 ): Promise<IncomingWebhookRow[]> {
   const result = await db
-    .prepare(`SELECT * FROM incoming_webhooks WHERE line_account_id = ? ORDER BY created_at DESC`)
+    .prepare(`SELECT * FROM incoming_webhooks WHERE line_account_id = ? AND deleted_at IS NULL ORDER BY created_at DESC`)
     .bind(lineAccountId)
     .all<IncomingWebhookRow>();
   return result.results;
@@ -283,25 +1111,109 @@ export async function getIncomingWebhookById(
   lineAccountId?: string,
 ): Promise<IncomingWebhookRow | null> {
   if (lineAccountId === undefined) {
-    return db.prepare(`SELECT * FROM incoming_webhooks WHERE id = ?`).bind(id).first<IncomingWebhookRow>();
+    return db.prepare(`SELECT * FROM incoming_webhooks WHERE id = ? AND deleted_at IS NULL`).bind(id).first<IncomingWebhookRow>();
   }
   return db
-    .prepare(`SELECT * FROM incoming_webhooks WHERE id = ? AND line_account_id = ?`)
+    .prepare(`SELECT * FROM incoming_webhooks WHERE id = ? AND line_account_id = ? AND deleted_at IS NULL`)
     .bind(id, lineAccountId)
     .first<IncomingWebhookRow>();
+}
+
+export type IncomingWebhookIdentityMatch = {
+  methods: Array<{
+    kind: 'harness_friend_id' | 'external_customer_id' | 'verified_email' | 'verified_phone';
+    path: string;
+  }>;
+  onNotFound: 'do_nothing' | 'unmatched_box' | 'create_candidate';
+};
+
+export type IncomingWebhookActionRef = {
+  refKind: string;
+  refId: string;
+  refVersionId: string | null;
+};
+
+export async function updateIncomingWebhookConfig(
+  db: D1Database,
+  input: {
+    id: string;
+    lineAccountId: string;
+    expectedVersion: number;
+    identityMatching: IncomingWebhookIdentityMatch;
+    actions: IncomingWebhookActionRef[];
+  },
+): Promise<
+  | { status: 'updated'; item: IncomingWebhookRow }
+  | { status: 'conflict'; currentVersion: number }
+  | { status: 'not_found' }
+> {
+  const result = await db.prepare(`UPDATE incoming_webhooks
+    SET identity_match_json = ?, action_refs_json = ?, version = version + 1, updated_at = ?
+    WHERE id = ? AND line_account_id = ? AND version = ? AND deleted_at IS NULL`)
+    .bind(
+      JSON.stringify(input.identityMatching),
+      JSON.stringify(input.actions),
+      jstNow(),
+      input.id,
+      input.lineAccountId,
+      input.expectedVersion,
+    )
+    .run();
+  if ((result.meta.changes ?? 0) > 0) {
+    return {
+      status: 'updated',
+      item: (await getIncomingWebhookById(db, input.id, input.lineAccountId))!,
+    };
+  }
+  const current = await getIncomingWebhookById(db, input.id, input.lineAccountId);
+  return current
+    ? { status: 'conflict', currentVersion: Number(current.version) }
+    : { status: 'not_found' };
+}
+
+export async function updateIncomingWebhookMaskedSample(
+  db: D1Database,
+  id: string,
+  lineAccountId: string,
+  maskedSample: unknown,
+  receivedAt = jstNow(),
+): Promise<void> {
+  await db.prepare(`UPDATE incoming_webhooks
+    SET latest_masked_sample_json = ?, latest_received_at = ?
+    WHERE id = ? AND line_account_id = ? AND deleted_at IS NULL`)
+    .bind(JSON.stringify(maskedSample), receivedAt, id, lineAccountId)
+    .run();
 }
 
 export async function createIncomingWebhook(
   db: D1Database,
   input: { name: string; sourceType?: string; secret?: string; lineAccountId: string },
+  keys?: WebhookKeyInput | string,
 ): Promise<IncomingWebhookRow> {
   const id = crypto.randomUUID();
   const now = jstNow();
+  // secret があるときは暗号化して保存し、平文は残さない。鍵がなければ例外にする。
+  const encrypted = input.secret === undefined
+    ? null
+    : await encryptWebhookSecret(input.secret, keys);
   await db
-    .prepare(`INSERT INTO incoming_webhooks (id, name, source_type, secret, line_account_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`)
-    .bind(id, input.name, input.sourceType ?? 'custom', input.secret ?? null, input.lineAccountId, now, now)
+    .prepare(`INSERT INTO incoming_webhooks (id, name, source_type, secret, secret_encrypted, line_account_id, created_at, updated_at) VALUES (?, ?, ?, NULL, ?, ?, ?, ?)`)
+    .bind(id, input.name, input.sourceType ?? 'custom', encrypted, input.lineAccountId, now, now)
     .run();
   return (await getIncomingWebhookById(db, id, input.lineAccountId))!;
+}
+
+/**
+ * R424: 秘密値の等価判定（定数時間）。同じ値の再保存を重複操作として扱い、
+ * 旧合言葉の猶予を保つために使う。判定自体に秘密値は出さない。
+ */
+function sameSecretValue(current: string, next: string): boolean {
+  if (current.length !== next.length) return false;
+  let diff = 0;
+  for (let index = 0; index < current.length; index += 1) {
+    diff |= current.charCodeAt(index) ^ next.charCodeAt(index);
+  }
+  return diff === 0;
 }
 
 export async function updateIncomingWebhook(
@@ -309,29 +1221,75 @@ export async function updateIncomingWebhook(
   id: string,
   lineAccountId: string,
   updates: Partial<{ name: string; sourceType: string; secret: string; isActive: boolean }>,
+  keys?: WebhookKeyInput | string,
 ): Promise<void> {
   const sets: string[] = [];
   const values: unknown[] = [];
   if (updates.name !== undefined) { sets.push('name = ?'); values.push(updates.name); }
   if (updates.sourceType !== undefined) { sets.push('source_type = ?'); values.push(updates.sourceType); }
-  if (updates.secret !== undefined) { sets.push('secret = ?'); values.push(updates.secret); }
+  if (updates.secret !== undefined) {
+    // 入れ直しは暗号化して保存し、旧平文を消す。鍵がなければ例外にする。
+    /*
+     * S (#939 機能26): 入れ替え前の合言葉は secret_previous_encrypted へ移し、
+     * 入れ替え時刻と一緒に残す。受信側は入れ替えから24時間だけ前の
+     * 合言葉の署名も受け付ける(相手側の切り替えに猶予を持たせる)。
+     * 前の値が暗号文ならそのまま移す。旧平文だけ残る行は暗号化して移す。
+     *
+     * R424: 同じ新値の再保存（応答消失の再試行）は重複操作として扱い、
+     * 既存 previous と失効時刻を保つ。別値への変更だけが猶予を作り直す。
+     */
+    const before = await db
+      .prepare(`SELECT secret, secret_encrypted FROM incoming_webhooks WHERE id = ? AND line_account_id = ?`)
+      .bind(id, lineAccountId)
+      .first<{ secret: string | null; secret_encrypted: string | null }>();
+    let resave = false;
+    try {
+      const current = await resolveWebhookSecret(
+        { secret: before?.secret ?? null, secret_encrypted: before?.secret_encrypted ?? null },
+        keys,
+      );
+      resave = current !== null && sameSecretValue(current, updates.secret);
+    } catch {
+      resave = false;
+    }
+    if (!resave) {
+      const previous = before?.secret_encrypted
+        ?? (before?.secret ? await encryptWebhookSecret(before.secret, keys) : null);
+      sets.push('secret_previous_encrypted = ?');
+      values.push(previous);
+      sets.push('secret_rotated_at = ?');
+      values.push(jstNow());
+      sets.push('secret_encrypted = ?');
+      values.push(await encryptWebhookSecret(updates.secret, keys));
+      sets.push('secret = NULL');
+    }
+  }
   if (updates.isActive !== undefined) { sets.push('is_active = ?'); values.push(updates.isActive ? 1 : 0); }
   if (sets.length === 0) return;
   sets.push('updated_at = ?');
   values.push(jstNow());
   values.push(id);
   values.push(lineAccountId);
-  await db.prepare(`UPDATE incoming_webhooks SET ${sets.join(', ')} WHERE id = ? AND line_account_id = ?`)
+  await db.prepare(`UPDATE incoming_webhooks SET ${sets.join(', ')} WHERE id = ? AND line_account_id = ? AND deleted_at IS NULL`)
     .bind(...values).run();
 }
 
+/**
+ * N-368 (#939): 削除は行を消さず印を付ける。届いた・送った記録と
+ * 「いつ誰が止めたか」の履歴を残すため。返り値は印を付けられたか。
+ * 既に印のある行や別アカウントの行は false。
+ */
 export async function deleteIncomingWebhook(
   db: D1Database,
   id: string,
   lineAccountId: string,
-): Promise<void> {
-  await db.prepare(`DELETE FROM incoming_webhooks WHERE id = ? AND line_account_id = ?`)
-    .bind(id, lineAccountId).run();
+  deletedByStaffId?: string,
+): Promise<boolean> {
+  const result = await db.prepare(`UPDATE incoming_webhooks
+    SET deleted_at = ?, deleted_by_staff_id = ?, is_active = 0, updated_at = ?
+    WHERE id = ? AND line_account_id = ? AND deleted_at IS NULL`)
+    .bind(jstNow(), deletedByStaffId ?? null, jstNow(), id, lineAccountId).run();
+  return (result.meta.changes ?? 0) > 0;
 }
 
 // --- 送信Webhook ---
@@ -340,7 +1298,7 @@ export async function getOutgoingWebhooks(
   lineAccountId: string,
 ): Promise<OutgoingWebhookRow[]> {
   const result = await db
-    .prepare(`SELECT * FROM outgoing_webhooks WHERE line_account_id = ? ORDER BY created_at DESC`)
+    .prepare(`SELECT * FROM outgoing_webhooks WHERE line_account_id = ? AND deleted_at IS NULL ORDER BY created_at DESC`)
     .bind(lineAccountId)
     .all<OutgoingWebhookRow>();
   return result.results;
@@ -352,7 +1310,7 @@ export async function getOutgoingWebhookById(
   lineAccountId: string,
 ): Promise<OutgoingWebhookRow | null> {
   return db
-    .prepare(`SELECT * FROM outgoing_webhooks WHERE id = ? AND line_account_id = ?`)
+    .prepare(`SELECT * FROM outgoing_webhooks WHERE id = ? AND line_account_id = ? AND deleted_at IS NULL`)
     .bind(id, lineAccountId)
     .first<OutgoingWebhookRow>();
 }
@@ -360,12 +1318,17 @@ export async function getOutgoingWebhookById(
 export async function createOutgoingWebhook(
   db: D1Database,
   input: { name: string; url: string; eventTypes: string[]; secret?: string; maxRetries?: number; lineAccountId: string },
+  keys?: WebhookKeyInput | string,
 ): Promise<OutgoingWebhookRow> {
   const id = crypto.randomUUID();
   const now = jstNow();
+  // secret があるときは暗号化して保存し、平文は残さない。鍵がなければ例外にする。
+  const encrypted = input.secret === undefined
+    ? null
+    : await encryptWebhookSecret(input.secret, keys);
   await db
-    .prepare(`INSERT INTO outgoing_webhooks (id, name, url, event_types, secret, max_retries, line_account_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-    .bind(id, input.name, input.url, JSON.stringify(input.eventTypes), input.secret ?? null, input.maxRetries ?? 0, input.lineAccountId, now, now)
+    .prepare(`INSERT INTO outgoing_webhooks (id, name, url, event_types, secret, secret_encrypted, max_retries, line_account_id, created_at, updated_at) VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?)`)
+    .bind(id, input.name, input.url, JSON.stringify(input.eventTypes), encrypted, input.maxRetries ?? 0, input.lineAccountId, now, now)
     .run();
   return (await getOutgoingWebhookById(db, id, input.lineAccountId))!;
 }
@@ -382,31 +1345,48 @@ export async function updateOutgoingWebhook(
     isActive: boolean;
     maxRetries: number;
   }>,
+  keys?: WebhookKeyInput | string,
 ): Promise<void> {
   const sets: string[] = [];
   const values: unknown[] = [];
   if (updates.name !== undefined) { sets.push('name = ?'); values.push(updates.name); }
   if (updates.url !== undefined) { sets.push('url = ?'); values.push(updates.url); }
   if (updates.eventTypes !== undefined) { sets.push('event_types = ?'); values.push(JSON.stringify(updates.eventTypes)); }
-  if (updates.secret !== undefined) { sets.push('secret = ?'); values.push(updates.secret); }
-  if (updates.isActive !== undefined) { sets.push('is_active = ?'); values.push(updates.isActive ? 1 : 0); }
+  if (updates.secret !== undefined) {
+    // 入れ直しは暗号化して保存し、旧平文を消す。鍵がなければ例外にする。
+    sets.push('secret_encrypted = ?');
+    values.push(await encryptWebhookSecret(updates.secret, keys));
+    sets.push('secret = NULL');
+  }
+  if (updates.isActive !== undefined) {
+    sets.push('is_active = ?');
+    values.push(updates.isActive ? 1 : 0);
+    // 再有効化は「自動停止の記録」を消す。止まった事実は連続失敗数と
+    // 通知センターの履歴に残る(#938)。
+    if (updates.isActive) sets.push('auto_stopped_at = NULL');
+  }
   if (updates.maxRetries !== undefined) { sets.push('max_retries = ?'); values.push(updates.maxRetries); }
   if (sets.length === 0) return;
   sets.push('updated_at = ?');
   values.push(jstNow());
   values.push(id);
   values.push(lineAccountId);
-  await db.prepare(`UPDATE outgoing_webhooks SET ${sets.join(', ')} WHERE id = ? AND line_account_id = ?`)
+  await db.prepare(`UPDATE outgoing_webhooks SET ${sets.join(', ')} WHERE id = ? AND line_account_id = ? AND deleted_at IS NULL`)
     .bind(...values).run();
 }
 
+/** N-368 (#939): 受信側と同じく、削除は履歴を残す印。返り値は印を付けられたか。 */
 export async function deleteOutgoingWebhook(
   db: D1Database,
   id: string,
   lineAccountId: string,
-): Promise<void> {
-  await db.prepare(`DELETE FROM outgoing_webhooks WHERE id = ? AND line_account_id = ?`)
-    .bind(id, lineAccountId).run();
+  deletedByStaffId?: string,
+): Promise<boolean> {
+  const result = await db.prepare(`UPDATE outgoing_webhooks
+    SET deleted_at = ?, deleted_by_staff_id = ?, is_active = 0, updated_at = ?
+    WHERE id = ? AND line_account_id = ? AND deleted_at IS NULL`)
+    .bind(jstNow(), deletedByStaffId ?? null, jstNow(), id, lineAccountId).run();
+  return (result.meta.changes ?? 0) > 0;
 }
 
 /** 指定イベントタイプに一致するアクティブな送信Webhookを取得 */
@@ -420,12 +1400,183 @@ export async function getActiveOutgoingWebhooksByEvent(
     .prepare(`
       SELECT *
       FROM outgoing_webhooks
-      WHERE is_active = 1 AND line_account_id = ?
+      WHERE is_active = 1 AND line_account_id = ? AND deleted_at IS NULL
     `)
     .bind(lineAccountId)
     .all<OutgoingWebhookRow>();
-  return all.results.filter((w) => {
-    const types: string[] = JSON.parse(w.event_types);
-    return types.includes(eventType) || types.includes('*');
-  });
+  // N-376: event_types が壊れた1行で配送全体を止めない。壊れた行だけを
+  // 構造化ログで記録して除外し、健全な行への配送は継続する。
+  const matched: OutgoingWebhookRow[] = [];
+  for (const w of all.results) {
+    let types: unknown;
+    try {
+      types = JSON.parse(w.event_types);
+    } catch {
+      console.error(
+        JSON.stringify({ event: 'outgoing_webhook_event_types_broken', webhookId: w.id, reason: 'malformed_json' }),
+      );
+      continue;
+    }
+    if (!Array.isArray(types)) {
+      console.error(
+        JSON.stringify({ event: 'outgoing_webhook_event_types_broken', webhookId: w.id, reason: 'event_types_not_array' }),
+      );
+      continue;
+    }
+    if (types.includes(eventType) || types.includes('*')) matched.push(w);
+  }
+  return matched;
+}
+
+// --- 人が見つからなかった届物（#939 N-367） ---
+//
+// 受信Webhookの「未照合時の扱い」で unmatched_box / create_candidate を
+// 選んだとき、見つからなかった届物をここへ置く。どちらも「あとで人が
+// 確かめる箱」の1行で、kind だけが違う。
+//   unmatched_box      … 未照合として確認する
+//   create_candidate   … 友だち候補として残す（自動で友だちは作らない。
+//                        相手の名乗りをそのまま友だちにすると成り済ませるため）
+// 同じ受信の再送は (webhook_id, source_event_id) の UNIQUE で増やさない。
+
+//   ambiguous        … 同じ値の友だちが2人以上いて自動では決められない
+//                      (S #939 機能26)。人が候補から選ぶまで保留する。
+export type IncomingWebhookUnmatchedKind = 'unmatched' | 'candidate' | 'ambiguous';
+export type IncomingWebhookUnmatchedStatus = 'pending' | 'resolved' | 'dismissed';
+
+export interface IncomingWebhookUnmatchedEventRow {
+  id: string;
+  webhook_id: string;
+  line_account_id: string;
+  source_event_id: string;
+  kind: IncomingWebhookUnmatchedKind;
+  status: IncomingWebhookUnmatchedStatus;
+  /** 照合に使おうとした {kind, path, value} の並び。値は運用者が照合するためのもの。 */
+  identity_attempts_json: string;
+  /** 届いた本文の形だけの見本。値は •••• に伏せる。 */
+  masked_shape_json: string | null;
+  /** S: kind='ambiguous' の届物が持つ、一致した友だちIDの並び。 */
+  candidate_friend_ids_json?: string | null;
+  resolved_friend_id: string | null;
+  resolved_by: string | null;
+  resolved_at: string | null;
+  received_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function recordIncomingWebhookUnmatched(
+  db: D1Database,
+  input: {
+    webhookId: string;
+    lineAccountId: string;
+    sourceEventId: string;
+    kind: IncomingWebhookUnmatchedKind;
+    identityAttempts: Array<{ kind: string; path: string; value: string }>;
+    maskedShape?: unknown;
+    /** kind='ambiguous' のとき、一致した友だちIDの並び(人が選ぶ元)。 */
+    candidateFriendIds?: string[];
+    receivedAt?: string;
+  },
+): Promise<IncomingWebhookUnmatchedEventRow> {
+  const id = crypto.randomUUID();
+  const now = jstNow();
+  /*
+   * S: candidate_friend_ids_json は入れ替えた表(migration 489)にだけある。
+   * 値を渡されたときだけ列名をSQLに含める。移行前の旧表でも unmatched /
+   * candidate の記録は動き続ける。
+   */
+  const candidateColumn = input.candidateFriendIds === undefined
+    ? ''
+    : ', candidate_friend_ids_json';
+  const candidateValue = input.candidateFriendIds === undefined ? '' : ', ?';
+  const binds: unknown[] = [
+    id,
+    input.webhookId,
+    input.lineAccountId,
+    input.sourceEventId,
+    input.kind,
+    JSON.stringify(input.identityAttempts),
+    input.maskedShape === undefined ? null : JSON.stringify(input.maskedShape),
+  ];
+  if (input.candidateFriendIds !== undefined) binds.push(JSON.stringify(input.candidateFriendIds));
+  binds.push(input.receivedAt ?? now, now, now);
+  await db.prepare(`INSERT OR IGNORE INTO incoming_webhook_unmatched_events
+      (id, webhook_id, line_account_id, source_event_id, kind, status,
+       identity_attempts_json, masked_shape_json${candidateColumn}, received_at, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, 'pending', ?, ?${candidateValue}, ?, ?, ?)`)
+    .bind(...binds)
+    .run();
+  return (await db.prepare(`SELECT * FROM incoming_webhook_unmatched_events
+      WHERE webhook_id = ? AND source_event_id = ?`)
+    .bind(input.webhookId, input.sourceEventId)
+    .first<IncomingWebhookUnmatchedEventRow>())!;
+}
+
+export async function listIncomingWebhookUnmatched(
+  db: D1Database,
+  webhookId: string,
+  lineAccountId: string,
+  status: IncomingWebhookUnmatchedStatus = 'pending',
+  limit = 50,
+  offset = 0,
+): Promise<IncomingWebhookUnmatchedEventRow[]> {
+  const result = await db.prepare(`SELECT * FROM incoming_webhook_unmatched_events
+      WHERE webhook_id = ? AND line_account_id = ? AND status = ?
+      ORDER BY received_at DESC LIMIT ? OFFSET ?`)
+    .bind(webhookId, lineAccountId, status, Math.min(100, Math.max(1, limit)), Math.max(0, offset))
+    .all<IncomingWebhookUnmatchedEventRow>();
+  return result.results ?? [];
+}
+
+export async function countIncomingWebhookUnmatched(
+  db: D1Database,
+  webhookId: string,
+  lineAccountId: string,
+  status: IncomingWebhookUnmatchedStatus = 'pending',
+): Promise<number> {
+  const row = await db.prepare(`SELECT COUNT(*) AS count FROM incoming_webhook_unmatched_events
+      WHERE webhook_id = ? AND line_account_id = ? AND status = ?`)
+    .bind(webhookId, lineAccountId, status)
+    .first<{ count: number }>();
+  return row?.count ?? 0;
+}
+
+export async function getIncomingWebhookUnmatchedById(
+  db: D1Database,
+  id: string,
+  lineAccountId: string,
+): Promise<IncomingWebhookUnmatchedEventRow | null> {
+  return db.prepare(`SELECT * FROM incoming_webhook_unmatched_events
+      WHERE id = ? AND line_account_id = ?`)
+    .bind(id, lineAccountId)
+    .first<IncomingWebhookUnmatchedEventRow>();
+}
+
+/**
+ * 箱の中の届物を「処理済み」にする。
+ * dismiss … 何もしないで閉じる / link … 指定の友だちに結び付けて閉じる。
+ * 返り値は状態を動かせたか（pending の行だけが動く）。
+ */
+export async function resolveIncomingWebhookUnmatched(
+  db: D1Database,
+  id: string,
+  lineAccountId: string,
+  resolution: { action: 'dismiss' } | { action: 'link'; friendId: string },
+  resolvedBy?: string,
+): Promise<boolean> {
+  const now = jstNow();
+  const result = await db.prepare(`UPDATE incoming_webhook_unmatched_events
+      SET status = ?, resolved_friend_id = ?, resolved_by = ?, resolved_at = ?, updated_at = ?
+      WHERE id = ? AND line_account_id = ? AND status = 'pending'`)
+    .bind(
+      resolution.action === 'link' ? 'resolved' : 'dismissed',
+      resolution.action === 'link' ? resolution.friendId : null,
+      resolvedBy ?? null,
+      now,
+      now,
+      id,
+      lineAccountId,
+    )
+    .run();
+  return (result.meta.changes ?? 0) > 0;
 }

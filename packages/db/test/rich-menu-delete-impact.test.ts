@@ -104,7 +104,11 @@ describe('getRichMenuDeleteImpact', () => {
 
     expect(impact).toMatchObject({
       group: { id: 'target', name: '下書きメニュー', status: 'draft' },
-      currentAudience: { value: null, reason: 'assignment_ledger_unavailable' },
+      currentAudience: {
+        value: 0,
+        state: 'partial',
+        reason: 'preexisting_assignments_not_backfilled',
+      },
       nextDisplay: { guaranteedGroupId: null, reason: 'friend_specific_rules' },
       incomingSwitches: [],
       operationalReferences: [],

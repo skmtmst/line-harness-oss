@@ -1,0 +1,726 @@
+import { jstNow } from './utils.js';
+import { recordMenuVersion } from './menu-versions.js';
+
+export type BookingInterval = { start: string; end: string; capacity?: number };
+export type BookingExceptionKind = 'closed' | 'custom_hours' | 'open';
+export type BookingExceptionScope = 'store' | 'staff' | 'resource';
+export type BookingPriceMode = 'fixed' | 'free' | 'inquiry';
+
+/** LIFF 予約「日時を選ぶ」段の最初の形。'list' がいまの形（既定）。 */
+export type LiffDateView = 'list' | 'calendar';
+
+/**
+ * 読み出し用。migration 前の行（列が無い）や壊れた値は
+ * いまの形 'list' に倒す。保存時の拒否は Worker の検証が行う。
+ */
+export function normalizeLiffDateView(value: unknown): LiffDateView {
+  return value === 'calendar' ? 'calendar' : 'list';
+}
+
+export interface BookingAvailabilityExceptionRow {
+  id: string;
+  line_account_id: string;
+  scope_kind: BookingExceptionScope;
+  scope_id: string | null;
+  date_from: string;
+  date_to: string;
+  kind: BookingExceptionKind;
+  hours_json: string;
+  reason: string | null;
+  version: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BookingAvailabilityException {
+  id: string;
+  lineAccountId: string;
+  scopeKind: BookingExceptionScope;
+  scopeId: string | null;
+  date: string | null;
+  dateFrom: string;
+  dateTo: string;
+  kind: BookingExceptionKind;
+  intervals: BookingInterval[];
+  reason: string | null;
+  note: string | null;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BookingAdminSettings {
+  id: string | null;
+  lineAccountId: string;
+  organizationName: string;
+  version: number;
+  timeZone: string;
+  bookingWindowDays: number;
+  cutoffMinutesBefore: number;
+  cancelDeadlineMinutesBefore: number;
+  maxActiveBookingsPerFriend: number;
+  approvalMode: 'automatic' | 'manual';
+  holdMinutes: number;
+  slotGranularityMinutes: 5 | 10 | 15 | 30 | 60;
+  /** LIFF 予約「日時を選ぶ」段の最初の形。migration 前の行も 'list'。 */
+  liffDateView: LiffDateView;
+  /** 前日お知らせの送信時刻（店舗タイムゾーンの壁時刻）。null は予約24時間前。 */
+  reminderDayBeforeTime: string | null;
+  /** 当日お知らせを開始の何時間前に送るか。未設定の店舗は既定値。 */
+  reminderHoursBefore: number;
+  menuCount: number;
+  activeMenuCount: number;
+  inactiveMenuCount: number;
+  businessHoursConfigured: boolean;
+  businessHours: Array<{ weekday: number; intervals: BookingInterval[] }>;
+  exceptions: BookingAvailabilityException[];
+  updatedAt: string;
+}
+
+export interface BookingAdminSettingsInput {
+  timeZone: string;
+  bookingWindowDays: number;
+  cutoffMinutesBefore: number;
+  cancelDeadlineMinutesBefore: number;
+  maxActiveBookingsPerFriend: number;
+  approvalMode: 'automatic' | 'manual';
+  holdMinutes: number;
+  slotGranularityMinutes: 5 | 10 | 15 | 30 | 60;
+  reminderDayBeforeTime: string | null;
+  reminderHoursBefore: number | null;
+  /**
+   * LIFF 予約「日時を選ぶ」段の最初の形。省いたときは今の値を保つ
+   * （初回作成だけ 'list'）。営業時間の保存で黙って戻さないため。
+   */
+  liffDateView?: LiffDateView;
+  businessHours?: Array<{ weekday: number; intervals: BookingInterval[] }>;
+}
+
+export interface BookingAdminResource {
+  id: string;
+  lineAccountId: string;
+  name: string;
+  type: string;
+  capacity: number;
+  isActive: boolean;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+  usage: {
+    menuCount: number;
+    bookingCount: number;
+    exceptionCount: number;
+    referenced: boolean;
+  };
+  businessHours: BookingInterval[];
+  exceptions: BookingAvailabilityException[];
+}
+
+const DEFAULT_SETTINGS = {
+  timeZone: 'Asia/Tokyo',
+  bookingWindowDays: 60,
+  cutoffMinutesBefore: 1440,
+  cancelDeadlineMinutesBefore: 1440,
+  maxActiveBookingsPerFriend: 1,
+  approvalMode: 'automatic' as const,
+  holdMinutes: 15,
+  slotGranularityMinutes: 15 as const,
+  reminderDayBeforeTime: null as string | null,
+  reminderHoursBefore: 2,
+};
+
+function parseIntervals(raw: string): BookingInterval[] {
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.flatMap((item) => {
+      if (!item || typeof item !== 'object') return [];
+      const value = item as Record<string, unknown>;
+      return typeof value.start === 'string' && typeof value.end === 'string'
+        ? [{ start: value.start, end: value.end, ...(Number.isFinite(Number(value.capacity)) ? { capacity: Number(value.capacity) } : {}) }]
+        : [];
+    });
+  } catch {
+    return [];
+  }
+}
+
+export function serializeBookingException(
+  row: BookingAvailabilityExceptionRow,
+): BookingAvailabilityException {
+  return {
+    id: row.id,
+    lineAccountId: row.line_account_id,
+    scopeKind: row.scope_kind,
+    scopeId: row.scope_id,
+    date: row.date_from === row.date_to ? row.date_from : null,
+    dateFrom: row.date_from,
+    dateTo: row.date_to,
+    kind: row.kind,
+    intervals: parseIntervals(row.hours_json),
+    reason: row.reason,
+    note: row.reason,
+    version: Number(row.version),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export async function getBookingAdminSettings(
+  db: D1Database,
+  lineAccountId: string,
+): Promise<BookingAdminSettings | null> {
+  const [account, setting, hoursResult, exceptionResult, counts] = await Promise.all([
+    db.prepare(`SELECT id, name, created_at FROM line_accounts WHERE id = ?`)
+      .bind(lineAccountId)
+      .first<{ id: string; name: string; created_at: string }>(),
+    db.prepare(`SELECT * FROM booking_settings WHERE line_account_id = ?`)
+      .bind(lineAccountId)
+      .first<{
+        id: string;
+        timezone: string;
+        booking_window_days: number;
+        cutoff_minutes_before: number;
+        cancel_deadline_minutes_before: number;
+        max_active_bookings_per_friend: number;
+        approval_mode: 'automatic' | 'manual';
+        hold_minutes: number;
+        slot_granularity_minutes: 5 | 10 | 15 | 30 | 60;
+        reminder_day_before_time: string | null;
+        reminder_hours_before: number | null;
+        liff_date_view?: string | null;
+        business_hours_configured: number;
+        version: number;
+        updated_at: string;
+      }>(),
+    db.prepare(`SELECT bh.weekday, bh.start_time, bh.end_time, bh.capacity
+      FROM booking_business_hours bh
+      INNER JOIN booking_settings bs ON bs.id = bh.booking_settings_id
+      WHERE bs.line_account_id = ?
+      ORDER BY bh.weekday ASC, bh.start_time ASC`)
+      .bind(lineAccountId)
+      .all<{ weekday: number; start_time: string; end_time: string; capacity: number }>(),
+    db.prepare(`SELECT * FROM booking_availability_exceptions
+      WHERE line_account_id = ? AND scope_kind = 'store'
+      ORDER BY date_from ASC, date_to ASC, id ASC`)
+      .bind(lineAccountId)
+      .all<BookingAvailabilityExceptionRow>(),
+    db.prepare(`SELECT COUNT(*) AS menu_count,
+      SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) AS active_menu_count
+      FROM menus WHERE line_account_id = ? AND deleted_at IS NULL`)
+      .bind(lineAccountId)
+      .first<{ menu_count: number; active_menu_count: number | null }>(),
+  ]);
+  if (!account) return null;
+
+  const grouped = new Map<number, BookingInterval[]>();
+  for (let weekday = 0; weekday <= 6; weekday++) grouped.set(weekday, []);
+  for (const row of hoursResult.results ?? []) {
+    grouped.get(Number(row.weekday))?.push({ start: row.start_time, end: row.end_time, capacity: Number(row.capacity ?? 1) });
+  }
+  const menuCount = Number(counts?.menu_count ?? 0);
+  const activeMenuCount = Number(counts?.active_menu_count ?? 0);
+
+  return {
+    id: setting?.id ?? null,
+    lineAccountId,
+    organizationName: account.name,
+    version: Number(setting?.version ?? 0),
+    timeZone: setting?.timezone ?? DEFAULT_SETTINGS.timeZone,
+    bookingWindowDays: Number(setting?.booking_window_days ?? DEFAULT_SETTINGS.bookingWindowDays),
+    cutoffMinutesBefore: Number(setting?.cutoff_minutes_before ?? DEFAULT_SETTINGS.cutoffMinutesBefore),
+    cancelDeadlineMinutesBefore: Number(
+      setting?.cancel_deadline_minutes_before ?? DEFAULT_SETTINGS.cancelDeadlineMinutesBefore,
+    ),
+    maxActiveBookingsPerFriend: Number(
+      setting?.max_active_bookings_per_friend ?? DEFAULT_SETTINGS.maxActiveBookingsPerFriend,
+    ),
+    approvalMode: setting?.approval_mode ?? DEFAULT_SETTINGS.approvalMode,
+    holdMinutes: Number(setting?.hold_minutes ?? DEFAULT_SETTINGS.holdMinutes),
+    slotGranularityMinutes: setting?.slot_granularity_minutes ?? DEFAULT_SETTINGS.slotGranularityMinutes,
+    reminderDayBeforeTime: setting?.reminder_day_before_time ?? DEFAULT_SETTINGS.reminderDayBeforeTime,
+    reminderHoursBefore: Number(
+      setting?.reminder_hours_before ?? DEFAULT_SETTINGS.reminderHoursBefore,
+    ),
+    liffDateView: normalizeLiffDateView(setting?.liff_date_view),
+    menuCount,
+    activeMenuCount,
+    inactiveMenuCount: Math.max(0, menuCount - activeMenuCount),
+    businessHoursConfigured: setting?.business_hours_configured === 1,
+    businessHours: [...grouped.entries()].map(([weekday, intervals]) => ({ weekday, intervals })),
+    exceptions: (exceptionResult.results ?? []).map(serializeBookingException),
+    updatedAt: setting?.updated_at ?? account.created_at,
+  };
+}
+
+/**
+ * 店舗共通の予約ルールを版付きで保存する。
+ *
+ * version=0 はまだ行が無い店舗の初回保存だけに使う。INSERT ... SELECT で
+ * line_accounts の存在を同じ文の中で確かめるため、存在しないアカウントへ
+ * 孤立した設定行を作らない。既存行は line_account_id と version の両方を
+ * UPDATE 条件に含め、読んだ後に別の保存が入った場合は上書きしない。
+ */
+export async function saveBookingAdminSettings(
+  db: D1Database,
+  input: BookingAdminSettingsInput & {
+    lineAccountId: string;
+    expectedVersion: number;
+  },
+): Promise<
+  | { status: 'created' | 'updated'; item: BookingAdminSettings }
+  | { status: 'conflict'; currentVersion: number }
+  | { status: 'not_found' }
+> {
+  const now = jstNow();
+  let changed = 0;
+  if (input.expectedVersion === 0) {
+    const settingsId = crypto.randomUUID();
+    const create = db.prepare(`INSERT INTO booking_settings
+      (id, line_account_id, timezone, booking_window_days, cutoff_minutes_before,
+       cancel_deadline_minutes_before, max_active_bookings_per_friend,
+       approval_mode, hold_minutes, slot_granularity_minutes,
+       reminder_day_before_time, reminder_hours_before, liff_date_view,
+       business_hours_configured,
+       created_at, updated_at)
+      SELECT ?, id, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+      FROM line_accounts
+      WHERE id = ?
+      ON CONFLICT(line_account_id) DO NOTHING`)
+      .bind(
+        settingsId,
+        input.timeZone,
+        input.bookingWindowDays,
+        input.cutoffMinutesBefore,
+        input.cancelDeadlineMinutesBefore,
+        input.maxActiveBookingsPerFriend,
+        input.approvalMode,
+        input.holdMinutes,
+        input.slotGranularityMinutes,
+        input.reminderDayBeforeTime,
+        input.reminderHoursBefore,
+        input.liffDateView ?? 'list',
+        input.businessHours === undefined ? 0 : 1,
+        now,
+        now,
+        input.lineAccountId,
+      );
+    if (input.businessHours === undefined) {
+      const result = await create.run();
+      changed = result.meta.changes ?? 0;
+    } else {
+      const statements: D1PreparedStatement[] = [create];
+      for (const day of input.businessHours) {
+        for (const interval of day.intervals) {
+          statements.push(db.prepare(`INSERT INTO booking_business_hours
+            (id, booking_settings_id, weekday, start_time, end_time, capacity)
+            SELECT ?, id, ?, ?, ?, ? FROM booking_settings
+            WHERE id = ? AND line_account_id = ? AND version = 1`)
+            .bind(
+              crypto.randomUUID(), day.weekday, interval.start, interval.end,
+              interval.capacity ?? 1, settingsId, input.lineAccountId,
+            ));
+        }
+      }
+      const results = await db.batch(statements);
+      changed = results[0]?.meta.changes ?? 0;
+    }
+  } else if (input.businessHours !== undefined) {
+    const statements: D1PreparedStatement[] = [
+      db.prepare(`DELETE FROM booking_business_hours
+        WHERE booking_settings_id IN (
+          SELECT id FROM booking_settings WHERE line_account_id = ? AND version = ?
+        )`).bind(input.lineAccountId, input.expectedVersion),
+    ];
+    for (const day of input.businessHours) {
+      for (const interval of day.intervals) {
+        statements.push(db.prepare(`INSERT INTO booking_business_hours
+          (id, booking_settings_id, weekday, start_time, end_time, capacity)
+          SELECT ?, id, ?, ?, ?, ? FROM booking_settings
+          WHERE line_account_id = ? AND version = ?`)
+          .bind(
+            crypto.randomUUID(), day.weekday, interval.start, interval.end,
+            interval.capacity ?? 1, input.lineAccountId, input.expectedVersion,
+          ));
+      }
+    }
+    statements.push(db.prepare(`UPDATE booking_settings
+      SET timezone = ?, booking_window_days = ?, cutoff_minutes_before = ?,
+          cancel_deadline_minutes_before = ?, max_active_bookings_per_friend = ?,
+          approval_mode = ?, hold_minutes = ?, slot_granularity_minutes = ?,
+          reminder_day_before_time = ?, reminder_hours_before = ?,
+          liff_date_view = COALESCE(?, liff_date_view),
+          business_hours_configured = 1, version = version + 1, updated_at = ?
+      WHERE line_account_id = ? AND version = ?`)
+      .bind(
+        input.timeZone,
+        input.bookingWindowDays,
+        input.cutoffMinutesBefore,
+        input.cancelDeadlineMinutesBefore,
+        input.maxActiveBookingsPerFriend,
+        input.approvalMode,
+        input.holdMinutes,
+        input.slotGranularityMinutes,
+        input.reminderDayBeforeTime,
+        input.reminderHoursBefore,
+        input.liffDateView ?? null,
+        now,
+        input.lineAccountId,
+        input.expectedVersion,
+      ));
+    const results = await db.batch(statements);
+    changed = results[results.length - 1]?.meta.changes ?? 0;
+  } else {
+    const result = await db.prepare(`UPDATE booking_settings
+      SET timezone = ?, booking_window_days = ?, cutoff_minutes_before = ?,
+          cancel_deadline_minutes_before = ?, max_active_bookings_per_friend = ?,
+          approval_mode = ?, hold_minutes = ?, slot_granularity_minutes = ?,
+          reminder_day_before_time = ?, reminder_hours_before = ?,
+          liff_date_view = COALESCE(?, liff_date_view),
+          version = version + 1, updated_at = ?
+      WHERE line_account_id = ? AND version = ?`)
+      .bind(
+        input.timeZone,
+        input.bookingWindowDays,
+        input.cutoffMinutesBefore,
+        input.cancelDeadlineMinutesBefore,
+        input.maxActiveBookingsPerFriend,
+        input.approvalMode,
+        input.holdMinutes,
+        input.slotGranularityMinutes,
+        input.reminderDayBeforeTime,
+        input.reminderHoursBefore,
+        input.liffDateView ?? null,
+        now,
+        input.lineAccountId,
+        input.expectedVersion,
+      )
+      .run();
+    changed = result.meta.changes ?? 0;
+  }
+
+  if (changed > 0) {
+    const item = await getBookingAdminSettings(db, input.lineAccountId);
+    return item
+      ? { status: input.expectedVersion === 0 ? 'created' : 'updated', item }
+      : { status: 'not_found' };
+  }
+
+  const current = await db.prepare(`SELECT la.id AS account_id, bs.version
+    FROM line_accounts la
+    LEFT JOIN booking_settings bs ON bs.line_account_id = la.id
+    WHERE la.id = ?`)
+    .bind(input.lineAccountId)
+    .first<{ account_id: string; version: number | null }>();
+  if (!current) return { status: 'not_found' };
+  return { status: 'conflict', currentVersion: Number(current.version ?? 0) };
+}
+
+export async function listBookingAdminResources(
+  db: D1Database,
+  lineAccountId: string,
+): Promise<BookingAdminResource[]> {
+  const [resources, exceptions] = await Promise.all([
+    db.prepare(`WITH scoped_resources AS (
+        SELECT * FROM booking_resources WHERE line_account_id = ?
+      ), menu_usage AS (
+        SELECT mr.resource_id, COUNT(*) AS menu_count
+        FROM booking_menu_resources mr
+        INNER JOIN scoped_resources sr ON sr.id = mr.resource_id
+        GROUP BY mr.resource_id
+      ), booking_usage AS (
+        SELECT brc.resource_id, COUNT(DISTINCT brc.booking_id) AS booking_count
+        FROM booking_resource_consumptions brc
+        INNER JOIN scoped_resources sr ON sr.id = brc.resource_id
+        WHERE brc.line_account_id = ?
+        GROUP BY brc.resource_id
+      ), exception_usage AS (
+        SELECT e.scope_id AS resource_id, COUNT(*) AS exception_count
+        FROM booking_availability_exceptions e
+        INNER JOIN scoped_resources sr ON sr.id = e.scope_id
+        WHERE e.line_account_id = ? AND e.scope_kind = 'resource'
+        GROUP BY e.scope_id
+      )
+      SELECT r.id, r.line_account_id, r.name, r.resource_type, r.capacity,
+        r.is_active, r.version, r.created_at, r.updated_at,
+        COALESCE(m.menu_count, 0) AS menu_count,
+        COALESCE(b.booking_count, 0) AS booking_count,
+        COALESCE(e.exception_count, 0) AS exception_count
+      FROM scoped_resources r
+      LEFT JOIN menu_usage m ON m.resource_id = r.id
+      LEFT JOIN booking_usage b ON b.resource_id = r.id
+      LEFT JOIN exception_usage e ON e.resource_id = r.id
+      ORDER BY r.name ASC, r.id ASC`)
+      .bind(lineAccountId, lineAccountId, lineAccountId)
+      .all<{
+        id: string; line_account_id: string; name: string; resource_type: string;
+        capacity: number; is_active: number; version: number; created_at: string; updated_at: string;
+        menu_count: number; booking_count: number; exception_count: number;
+      }>(),
+    db.prepare(`SELECT * FROM booking_availability_exceptions
+      WHERE line_account_id = ? AND scope_kind = 'resource'
+      ORDER BY date_from ASC, date_to ASC, id ASC`)
+      .bind(lineAccountId)
+      .all<BookingAvailabilityExceptionRow>(),
+  ]);
+  const byResource = new Map<string, BookingAvailabilityException[]>();
+  for (const row of exceptions.results ?? []) {
+    const list = byResource.get(row.scope_id ?? '') ?? [];
+    list.push(serializeBookingException(row));
+    byResource.set(row.scope_id ?? '', list);
+  }
+  return (resources.results ?? []).map((row) => ({
+    id: row.id,
+    lineAccountId: row.line_account_id,
+    name: row.name,
+    type: row.resource_type,
+    capacity: Number(row.capacity),
+    isActive: row.is_active === 1,
+    version: Number(row.version),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    usage: {
+      menuCount: Number(row.menu_count),
+      bookingCount: Number(row.booking_count),
+      exceptionCount: Number(row.exception_count),
+      referenced: Number(row.menu_count) + Number(row.booking_count) + Number(row.exception_count) > 0,
+    },
+    businessHours: [],
+    exceptions: byResource.get(row.id) ?? [],
+  }));
+}
+
+export async function listBookingAvailabilityExceptions(
+  db: D1Database,
+  lineAccountId: string,
+): Promise<BookingAvailabilityException[]> {
+  const result = await db.prepare(`SELECT * FROM booking_availability_exceptions
+    WHERE line_account_id = ? ORDER BY date_from ASC, date_to ASC, id ASC`)
+    .bind(lineAccountId)
+    .all<BookingAvailabilityExceptionRow>();
+  return (result.results ?? []).map(serializeBookingException);
+}
+
+export async function getBookingAvailabilityException(
+  db: D1Database,
+  id: string,
+  lineAccountId: string,
+): Promise<BookingAvailabilityException | null> {
+  const row = await db.prepare(`SELECT * FROM booking_availability_exceptions
+    WHERE id = ? AND line_account_id = ?`)
+    .bind(id, lineAccountId)
+    .first<BookingAvailabilityExceptionRow>();
+  return row ? serializeBookingException(row) : null;
+}
+
+function bookingExceptionScopeWriteGuard(
+  lineAccountId: string,
+  scopeKind: BookingExceptionScope,
+  scopeId: string | null,
+): { sql: string; values: Array<string | null> } {
+  if (scopeKind === 'store') {
+    return { sql: '? IS NULL', values: [scopeId] };
+  }
+  const table = scopeKind === 'staff' ? 'staff' : 'booking_resources';
+  return {
+    sql: `EXISTS (SELECT 1 FROM ${table}
+      WHERE id = ? AND line_account_id = ? AND is_active = 1)`,
+    values: [scopeId, lineAccountId],
+  };
+}
+
+export async function createBookingAvailabilityException(
+  db: D1Database,
+  input: {
+    lineAccountId: string;
+    scopeKind: BookingExceptionScope;
+    scopeId: string | null;
+    dateFrom: string;
+    dateTo: string;
+    kind: BookingExceptionKind;
+    intervals: BookingInterval[];
+    reason: string | null;
+  },
+): Promise<BookingAvailabilityException | null> {
+  const id = crypto.randomUUID();
+  const now = jstNow();
+  const guard = bookingExceptionScopeWriteGuard(
+    input.lineAccountId,
+    input.scopeKind,
+    input.scopeId,
+  );
+  const row = await db.prepare(`INSERT INTO booking_availability_exceptions
+    (id, line_account_id, scope_kind, scope_id, date_from, date_to,
+     kind, hours_json, reason, created_at, updated_at)
+    SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+    WHERE ${guard.sql}
+    RETURNING *`)
+    .bind(
+      id,
+      input.lineAccountId,
+      input.scopeKind,
+      input.scopeId,
+      input.dateFrom,
+      input.dateTo,
+      input.kind,
+      JSON.stringify(input.intervals),
+      input.reason,
+      now,
+      now,
+      ...guard.values,
+    )
+    .first<BookingAvailabilityExceptionRow>();
+  return row ? serializeBookingException(row) : null;
+}
+
+export async function updateBookingAvailabilityException(
+  db: D1Database,
+  input: {
+    id: string;
+    lineAccountId: string;
+    expectedVersion: number;
+    scopeKind: BookingExceptionScope;
+    scopeId: string | null;
+    dateFrom: string;
+    dateTo: string;
+    kind: BookingExceptionKind;
+    intervals: BookingInterval[];
+    reason: string | null;
+  },
+): Promise<
+  | { status: 'updated'; item: BookingAvailabilityException }
+  | { status: 'conflict'; currentVersion: number }
+  | { status: 'not_found' }
+  | { status: 'scope_not_found' }
+> {
+  const guard = bookingExceptionScopeWriteGuard(
+    input.lineAccountId,
+    input.scopeKind,
+    input.scopeId,
+  );
+  const row = await db.prepare(`UPDATE booking_availability_exceptions
+    SET scope_kind = ?, scope_id = ?, date_from = ?, date_to = ?, kind = ?,
+        hours_json = ?, reason = ?, version = version + 1, updated_at = ?
+    WHERE id = ? AND line_account_id = ? AND version = ?
+      AND ${guard.sql}
+    RETURNING *`)
+    .bind(
+      input.scopeKind,
+      input.scopeId,
+      input.dateFrom,
+      input.dateTo,
+      input.kind,
+      JSON.stringify(input.intervals),
+      input.reason,
+      jstNow(),
+      input.id,
+      input.lineAccountId,
+      input.expectedVersion,
+      ...guard.values,
+    )
+    .first<BookingAvailabilityExceptionRow>();
+  if (row) return { status: 'updated', item: serializeBookingException(row) };
+  const current = await db.prepare(`SELECT version FROM booking_availability_exceptions
+    WHERE id = ? AND line_account_id = ?`)
+    .bind(input.id, input.lineAccountId)
+    .first<{ version: number }>();
+  if (!current) return { status: 'not_found' };
+  return Number(current.version) === input.expectedVersion
+    ? { status: 'scope_not_found' }
+    : { status: 'conflict', currentVersion: Number(current.version) };
+}
+
+/**
+ * 例外日を版付きで消す。
+ *
+ * 消す直前に別の変更が入っていたら上書きせず conflict を返し、
+ * 呼び出し側へ最新版を読み直してもらう。別アカウントのIDは
+ * line_account_id が一致しないため not_found として隠す。
+ */
+export async function deleteBookingAvailabilityException(
+  db: D1Database,
+  input: {
+    id: string;
+    lineAccountId: string;
+    expectedVersion: number;
+  },
+): Promise<
+  | { status: 'deleted' }
+  | { status: 'conflict'; currentVersion: number }
+  | { status: 'not_found' }
+> {
+  const result = await db.prepare(`DELETE FROM booking_availability_exceptions
+    WHERE id = ? AND line_account_id = ? AND version = ?`)
+    .bind(input.id, input.lineAccountId, input.expectedVersion)
+    .run();
+  if ((result.meta.changes ?? 0) > 0) return { status: 'deleted' };
+  const current = await db.prepare(`SELECT version FROM booking_availability_exceptions
+    WHERE id = ? AND line_account_id = ?`)
+    .bind(input.id, input.lineAccountId)
+    .first<{ version: number }>();
+  return current
+    ? { status: 'conflict', currentVersion: Number(current.version) }
+    : { status: 'not_found' };
+}
+
+export async function updateBookingMenuSettings(
+  db: D1Database,
+  input: {
+    id: string;
+    lineAccountId: string;
+    expectedVersion: number;
+    priceMode?: BookingPriceMode;
+    basePrice?: number;
+    bookingWindowDays?: number | null;
+    cutoffHoursBefore?: number | null;
+    cancelDeadlineHoursBefore?: number | null;
+    /** 公開切替だけ変えるときに使う。送らなければ今のまま。 */
+    isActive?: boolean;
+    /** 版に残す「誰が」。無ければ空で残す。 */
+    staffId?: string | null;
+  },
+): Promise<
+  | { status: 'updated'; version: number }
+  | { status: 'conflict'; currentVersion: number }
+  | { status: 'not_found' }
+  | { status: 'no_changes' }
+> {
+  const sets: string[] = [];
+  const values: unknown[] = [];
+  const add = (column: string, value: unknown) => {
+    sets.push(`${column} = ?`);
+    values.push(value);
+  };
+  if (input.priceMode !== undefined) add('price_mode', input.priceMode);
+  if (input.basePrice !== undefined) add('base_price', input.basePrice);
+  if (input.priceMode === 'free' || input.priceMode === 'inquiry') {
+    const existingIndex = sets.indexOf('base_price = ?');
+    if (existingIndex >= 0) values[existingIndex] = 0;
+    else add('base_price', 0);
+  }
+  if (input.bookingWindowDays !== undefined) add('booking_window_days', input.bookingWindowDays);
+  if (input.cutoffHoursBefore !== undefined) add('cutoff_hours_before', input.cutoffHoursBefore);
+  if (input.cancelDeadlineHoursBefore !== undefined) {
+    add('cancel_deadline_hours_before', input.cancelDeadlineHoursBefore);
+  }
+  if (input.isActive !== undefined) add('is_active', input.isActive ? 1 : 0);
+  if (sets.length === 0) return { status: 'no_changes' };
+  sets.push('version = version + 1', 'updated_at = ?');
+  values.push(jstNow(), input.id, input.lineAccountId, input.expectedVersion);
+  const result = await db.prepare(`UPDATE menus SET ${sets.join(', ')}
+    WHERE id = ? AND line_account_id = ? AND deleted_at IS NULL AND version = ?`)
+    .bind(...values)
+    .run();
+  if ((result.meta.changes ?? 0) > 0) {
+    // 保存するたびに版を1つ足す（T）。前の版は変えない。
+    await recordMenuVersion(db, { menuId: input.id, staffId: input.staffId ?? null });
+    return { status: 'updated', version: input.expectedVersion + 1 };
+  }
+  const current = await db.prepare(`SELECT version FROM menus
+    WHERE id = ? AND line_account_id = ? AND deleted_at IS NULL`)
+    .bind(input.id, input.lineAccountId)
+    .first<{ version: number }>();
+  return current
+    ? { status: 'conflict', currentVersion: Number(current.version) }
+    : { status: 'not_found' };
+}

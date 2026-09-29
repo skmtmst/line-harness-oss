@@ -1,0 +1,125 @@
+'use client'
+
+import type { ReactNode } from 'react'
+import NoteBar from '@/components/shared/note-bar'
+import KpiCard from '@/components/shared/kpi-card'
+import KpiCollapse from '@/components/ui/kpi-collapse'
+import { Tabs } from '@/components/shared/tabs'
+import {
+  nextMonthResetLabel,
+  remainingPercent,
+  type BannerStats,
+  type BannerUsage,
+} from '@/lib/hq-banners'
+
+export type BannerTab = 'projects' | 'library'
+
+/**
+ * 35-1 / 35-3 の1行目。タブ（プロジェクト一覧／画像ライブラリ）と、右端の操作。
+ * Pencil `jGeAF` / `bpdek`。タブの切り替えは `?tab=` で、Link にしない
+ * （`docs/v6-common-rules.md` §2-2）。
+ */
+export function BannerTabs({
+  current,
+  onChange,
+  actions,
+}: {
+  current: BannerTab
+  onChange: (tab: BannerTab) => void
+  actions?: ReactNode
+}) {
+  return (
+    <div data-design-node={current === 'projects' ? 'jGeAF' : 'bpdek'}>
+      <Tabs
+        items={[
+          { label: 'プロジェクト一覧', current: current === 'projects', onClick: () => onChange('projects') },
+          { label: '画像ライブラリ', current: current === 'library', onClick: () => onChange('library') },
+        ]}
+        actions={actions}
+      />
+      {/*
+        U032: 狭い幅ではタブと右端の操作（プロジェクトを作る・
+        アーカイブを見る）を別行にする。共通の Tabs は横1行・高さ44で
+        固定なので、この画面だけの規格外変更にならないよう、
+        設計Nodeの中の nav にだけメディアクエリで折り返しを足す。
+      */}
+      <style jsx global>{`
+        @media (width < 768px) {
+          [data-design-node='jGeAF'] > nav,
+          [data-design-node='bpdek'] > nav {
+            height: auto;
+            min-height: 44px;
+            flex-wrap: wrap;
+            row-gap: 4px;
+            padding-bottom: 8px;
+          }
+        }
+      `}</style>
+    </div>
+  )
+}
+
+/**
+ * 数値カード帯。Pencil `jT1tM` / `Y0IibP`。4枚とも同じ出どころ。
+ * 数が取れないときは「—」（推測値で埋めない。§7-9）。
+ */
+export function BannerKpis({
+  stats,
+  usage,
+  loading,
+}: {
+  stats: BannerStats | null
+  usage: BannerUsage | null
+  loading: boolean
+}) {
+  const percent = remainingPercent(usage)
+  return (
+    <KpiCollapse data-design-node="jT1tM" gridClassName="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <KpiCard
+        variant="v6"
+        title="プロジェクト"
+        value={stats ? stats.projects.active : null}
+        unit=""
+        detail={stats ? `アーカイブ ${stats.projects.archived}` : '—'}
+        loading={loading}
+      />
+      <KpiCard
+        variant="v6"
+        title="今月の生成"
+        value={usage ? usage.month.used : null}
+        unit="枚"
+        detail={usage ? `今日 ${usage.today.used}枚・1日の上限 ${usage.today.limit}枚` : '—'}
+        loading={loading}
+      />
+      <KpiCard
+        variant="v6"
+        title="今月の残り"
+        value={usage ? usage.month.remaining : null}
+        unit="枚"
+        badge={percent === null ? undefined : `${percent}%`}
+        badgeTone={percent !== null && percent <= 20 ? 'danger' : 'accent'}
+        detail={usage ? `上限 ${usage.month.limit}枚・${nextMonthResetLabel()} に戻る` : '—'}
+        loading={loading}
+      />
+      <KpiCard
+        variant="v6"
+        title="アカウントへ渡した画像"
+        value={stats ? stats.deliveredImages : null}
+        unit="枚"
+        detail={stats ? `${stats.deliveredAccounts}アカウント` : '—'}
+        loading={loading}
+      />
+    </KpiCollapse>
+  )
+}
+
+/** 案内帯。Pencil `Z59tV` / `LDu3x`。1画面に1本（§2-3）。 */
+export function BannerNote() {
+  return (
+    <div data-design-node="Z59tV">
+      <NoteBar tone="info">
+        作った画像は統括の登録メディアに保存されます。アカウントへ渡すと、そのアカウントの配信・リッチメニュー・回答フォームから選べるようになります。
+      </NoteBar>
+    </div>
+  )
+}

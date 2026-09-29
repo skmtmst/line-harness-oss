@@ -67,7 +67,13 @@ const UNAUTHENTICATED_PATTERNS: Array<string | RegExp> = [
   /^\/api\/forms\/[^/]+\/submit$/,
   // サイトスクリプトの受け口。認証が無く、外のサイトから直接叩かれる。
   '/api/site/collect',
+  // R429: 公開受信口。署名で守る公開口で、管理画面の認証は通さない。
+  // 未検証の Bearer/Cookie で認証済み枠（1000/分）へ切り替わると
+  // 公開受信の負荷抑制が緩むため、Authorization の有無によらず IP 枠で抑える。
+  /^\/api\/webhooks\/incoming\/[^/]+\/receive$/,
   '/api/qr',
+  // 会員登録・メールログイン・パスワード再設定。認証前に叩かれる入口なので低い上限にする。
+  /^\/api\/auth\/(register|password)\//,
 ];
 
 function isUnauthenticatedPath(path: string): boolean {

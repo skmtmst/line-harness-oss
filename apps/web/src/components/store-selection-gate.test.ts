@@ -7,7 +7,7 @@ const sidebar = readFileSync(new URL('./layout/sidebar.tsx', import.meta.url), '
 
 describe('店舗未選択の共通ゲート', () => {
   it('AppShellの1か所で子画面のマウントを止める', () => {
-    expect(shell).toContain('<StoreSelectionGate>{children}</StoreSelectionGate>')
+    expect(shell).toContain('<StoreSelectionGate><FeatureDisabledGate>{children}</FeatureDisabledGate></StoreSelectionGate>')
     expect(gate).toContain("decision === 'block-unselected'")
     expect(gate).toContain("decision === 'show'")
   })
@@ -16,7 +16,9 @@ describe('店舗未選択の共通ゲート', () => {
     expect(gate).toContain("decision === 'wait'")
     expect(gate).toContain('店舗が選ばれていません')
     expect(gate).toContain('この画面は店舗ごとのデータを扱います。統括の店舗一覧から店舗を選んでください。')
-    expect(gate).toContain('href="/hq"')
+    // 店舗を選んだあと元の画面へ戻れるよう、戻り先を持ち越す（NEXT-07）。
+    expect(gate).toContain('storeSelectionHref')
+    expect(gate).toContain('href={selectHref}')
     expect(gate).toContain('店舗を選ぶ')
     expect(gate).toContain('data-design="Empty"')
   })

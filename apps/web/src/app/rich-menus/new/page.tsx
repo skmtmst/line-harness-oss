@@ -1,287 +1,277 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import Header from '@/components/layout/header'
-import StepTrail from '@/components/shared/step-trail'
+import type { Folder, MediaItem } from '@line-crm/shared'
+import RichMenuCreateForm, {
+  freshRichMenuCreateValue,
+  NEW_MENU_INTENTS_WITH_SWITCH,
+  type RichMenuCreateValue,
+  type RichMenuOption,
+} from '@/components/rich-menus/rich-menu-create-form'
+import { areaDraftsForCreate, createAreaDrafts, pruneStaleAreaTags, pruneStaleAreaTemplates, unsetAreaLabels } from '@/components/rich-menus/action-drafts'
+import type { Area } from '@/components/rich-menus/canvas-editor'
+import MediaPickerDialog from '@/app/contents/media-picker-dialog'
+import StickyBar from '@/components/shared/sticky-bar'
+import Button from '@/components/shared/button'
+import Notice from '@/components/shared/notice'
+import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { api } from '@/lib/api'
-import {
-  TEMPLATES,
-  SIZE_DIMENSIONS,
-  templateToAreas,
-  type RichMenuTemplate,
-} from '@/lib/rich-menu-templates'
-import { usePageTitle } from '@/components/shell/page-chrome'
-
-const SIZE_TABS: { value: 'large' | 'compact'; label: string; dims: string; hint: string }[] = [
-  {
-    value: 'large',
-    label: '大きい',
-    dims: '2500 × 1686',
-    hint: '画面をしっかり使う。ボタンを6つまで置ける',
-  },
-  {
-    value: 'compact',
-    label: '小さい',
-    dims: '2500 × 843',
-    hint: 'トークが隠れにくい。横に並べる形',
-  },
-]
+import { TEMPLATES } from '@/lib/rich-menu-templates'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { pruneCondition } from '@/lib/segment-condition'
 
 /**
- * 分割の形を図で見せる。
- *
- * テンプレートごとに絵を用意せず、areas からそのまま描く。
- * テンプレートを足したときに絵を描き忘れることがない。
+ * N-161: 作成画面の「切替ボタン」は行き先を orderIndex の文字列で持つ
+ * （この時点ではページに実IDがないため）。送信の形へ直す。
+ * 行き先が未設定のものは null を返して呼び出し側で断る。
  */
-function TemplatePreview({ template }: { template: RichMenuTemplate }) {
-  const dims = SIZE_DIMENSIONS[template.size]
-  // 枠線の分だけ内側に寄せる。隣り合う区画がくっついて見えないように。
-  const inset = dims.width * 0.006
-  return (
-    <svg
-      viewBox={`0 0 ${dims.width} ${dims.height}`}
-      className="border-hairline bg-canvas-sunken w-full rounded border"
-      role="img"
-      aria-label={`${template.label} の分割イメージ`}
-    >
-      {template.areas.length === 0 ? (
-        <text
-          x={dims.width / 2}
-          y={dims.height / 2}
-          textAnchor="middle"
-          dominantBaseline="central"
-          fontSize={dims.height / 7}
-          style={{ fill: 'var(--color-ink-faint)' }}
-        >
-          自由に配置
-        </text>
-      ) : (
-        template.areas.map((a, i) => (
-          <rect
-            key={i}
-            x={a.x + inset}
-            y={a.y + inset}
-            width={Math.max(0, a.w - inset * 2)}
-            height={Math.max(0, a.h - inset * 2)}
-            rx={dims.width * 0.008}
-            strokeWidth={dims.width * 0.004}
-            style={{ fill: 'var(--color-accent-soft)', stroke: 'var(--color-accent)' }}
-          />
-        ))
-      )}
-    </svg>
-  )
+function areaDraftsWithSwitchTargets(areas: Area[]) {
+  return areaDraftsForCreate(areas).map((area) => {
+    if (area.actionType !== 'richmenuswitch') return area
+    const raw = area.actionData?.targetPageId
+    const index = typeof raw === 'string' ? Number(raw) : NaN
+    const { targetPageId: _dropped, ...rest } = (area.actionData ?? {}) as Record<string, unknown>
+    return {
+      ...area,
+      actionData: Number.isInteger(index) ? { ...rest, targetPageIndex: index } : rest,
+    }
+  })
 }
 
 export default function NewRichMenuPage() {
   usePageTitle('リッチメニューを作る')
   const router = useRouter()
   const { selectedAccount } = useAccount()
-  const [name, setName] = useState('')
-  const [chatBarText, setChatBarText] = useState('メニュー')
-  const [size, setSize] = useState<'large' | 'compact'>('large')
-  const [templateKey, setTemplateKey] = useState(TEMPLATES[0].key)
+  const [value, setValue] = useState<RichMenuCreateValue>(freshRichMenuCreateValue)
+  const [folders, setFolders] = useState<Folder[]>([])
+  const [tags, setTags] = useState<RichMenuOption[]>([])
+  const [templates, setTemplates] = useState<RichMenuOption[]>([])
+  const [forms, setForms] = useState<RichMenuOption[]>([])
+  const [trackedLinks, setTrackedLinks] = useState<RichMenuOption[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  /*
+   * その場の入力欄エラー。名前・トーク画面下の文言の空は、ページ最下部の
+   * 帯ではなく該当の欄の下に出し、その欄へフォーカスを移す。
+   * 入力し直したらその欄の文言は消す。
+   */
+  const [nameError, setNameError] = useState<string | null>(null)
+  const [chatBarTextError, setChatBarTextError] = useState<string | null>(null)
 
-  const shownTemplates = useMemo(() => TEMPLATES.filter((t) => t.size === size), [size])
-  const tmpl = shownTemplates.find((t) => t.key === templateKey) ?? shownTemplates[0]
-
-  function changeSize(next: 'large' | 'compact') {
-    setSize(next)
-    // 大きさを変えると選べる形も変わる。先頭を選び直す。
-    const first = TEMPLATES.find((t) => t.size === next)
-    if (first) setTemplateKey(first.key)
+  function focusField(id: 'rich-menu-name' | 'rich-menu-chat-bar-text') {
+    // state の描画を待たずに欄へ移す（欄自体は既に画面にある）。
+    requestAnimationFrame(() => document.getElementById(id)?.focus())
   }
+  /** N-164: 登録メディアから選んだ画像。作成時に既定ページへ登録する。 */
+  const [mediaPickerOpen, setMediaPickerOpen] = useState(false)
+  const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null)
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    if (!selectedAccount) {
-      setError('アカウントを選択してください')
+  /*
+   * N-162: 初期値から1か所でも変わっていたら未保存とみなす。
+   * freshRichMenuCreateValue は決定的なので、丸ごと比較で足りる。
+   * 作成成功後は編集画面へ router.push で進み、警告は出さない。
+   * N-164: 選んだメディアも未保存の入力として数える。
+   */
+  const [initialValue] = useState(freshRichMenuCreateValue)
+  const dirty = JSON.stringify(value) !== JSON.stringify(initialValue) || selectedMedia !== null
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: submitting })
+
+  // N-164: アカウントを切り替えたら、前のアカウントで選んだメディアは捨てる。
+  // 別アカウントの画像を持ち込めないよう、選択は常に今のアカウントのものだけ。
+  useEffect(() => {
+    setSelectedMedia(null)
+  }, [selectedAccount?.id])
+
+  // R23: 別アカウントの同名タグが混ざらないよう、候補は今のアカウントだけ。
+  const [tagPruneNotice, setTagPruneNotice] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      const [folderRes, tagRes, templateRes, formRes, linkRes] = await Promise.allSettled([
+        api.folders.list('rich_menu'),
+        api.tags.list(selectedAccount ? { accountId: selectedAccount.id } : undefined),
+        api.templates.list(undefined, selectedAccount?.id ?? undefined),
+        selectedAccount ? api.forms.list(selectedAccount.id) : Promise.resolve({ success: true as const, data: [] }),
+        api.trackedLinks.list(),
+      ])
+      if (cancelled) return
+      if (folderRes.status === 'fulfilled' && folderRes.value.success) setFolders(folderRes.value.data)
+      if (tagRes.status === 'fulfilled' && tagRes.value.success) setTags(tagRes.value.data.map(({ id, name }) => ({ id, name })))
+      if (templateRes.status === 'fulfilled' && templateRes.value.success) setTemplates(templateRes.value.data.map(({ id, name }) => ({ id, name })))
+      if (formRes.status === 'fulfilled' && formRes.value.success) setForms(formRes.value.data.map(({ id, name }) => ({ id, name })))
+      if (linkRes.status === 'fulfilled' && linkRes.value.success) setTrackedLinks(linkRes.value.data.map(({ id, name }) => ({ id, name })))
+    })()
+    return () => { cancelled = true }
+  }, [selectedAccount])
+
+  /*
+   * R23: アカウントを切り替えたら候補が変わる。前のアカウントにしかない
+   * タグを選んでいたら、新しいアカウントには存在しないため外して知らせる。
+   * 外すものがなければ何もしない（終わりがあるので繰り返さない）。
+   */
+  useEffect(() => {
+    const tagPruned = pruneStaleAreaTags(value.areaDraftsByTemplate, new Set(tags.map((tag) => tag.id)))
+    /*
+     * m18r: テンプレートも今のアカウントだけ。候補がまだ届いていない
+     * （空）と「このアカウントに無い」の区別が付かないため、空の間は
+     * 外さない。届いた候補に無い選択だけ外す。
+     */
+    const tplPruned = templates.length === 0
+      ? { next: tagPruned.next, removed: 0 }
+      : pruneStaleAreaTemplates(tagPruned.next, new Set(templates.map((template) => template.id)))
+    const removed = tagPruned.removed + tplPruned.removed
+    if (removed === 0) return
+    setValue({ ...value, areaDraftsByTemplate: tplPruned.next })
+    setTagPruneNotice(`選んでいた候補のうち${removed}件は、今のアカウントにないため外しました。選び直してください。`)
+  }, [tags, templates, value])
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault()
+    if (!selectedAccount) return setError('アカウントを選択してください')
+    // ブラウザ標準の required 吹き出しは英語になるため使わない。空はここで日本語で止める。
+    // 名前・トーク画面下の文言は該当の欄の下にその場で出し、その欄へ移す。
+    if (!value.name.trim()) {
+      setNameError('名前を入力してください')
+      setError(null)
+      focusField('rich-menu-name')
       return
     }
-    if (!name.trim()) {
-      setError('名前を入力してください')
+    if (!value.chatBarText.trim()) {
+      setChatBarTextError('トーク画面下の文言を入力してください')
+      setError(null)
+      focusField('rich-menu-chat-bar-text')
       return
     }
+    const selectedTemplate = TEMPLATES.find((item) => item.key === value.templateKey)
+    if (!selectedTemplate) return setError('面の分けかたを選び直してください')
+    const areas = value.areaDraftsByTemplate[selectedTemplate.key] ?? createAreaDrafts(selectedTemplate)
+    // N-161: 切替ボタンの行き先が未設定のまま送ると server が 400 にする。
+    // 先にここで止めて、どの面が未設定か分かる文言にする。
+    if (areas.some((area) => area.actionType === 'richmenuswitch' && !String(area.actionData?.targetPageId ?? '').trim())) {
+      return setError('「メニューを切り替える」面の行き先ページが決まっていません。面の設定で切り替え先を選んでください。')
+    }
+    // 出し分けを選んだのに条件が空（書きかけ行だけ）だと「誰にも出ない
+    // 下書き」が作れる。保存に使う形と同じく、書けた行だけで数える。
+    const targetingCondition = value.targetingEnabled ? pruneCondition(value.targetingCondition) : null
+    if (value.targetingEnabled && !targetingCondition) {
+      return setError('出す相手の条件を設定してください。')
+    }
+    const pageAreas = areaDraftsWithSwitchTargets(areas)
     setSubmitting(true)
+    setTagPruneNotice(null)
     setError(null)
+    setNameError(null)
+    setChatBarTextError(null)
     try {
-      const res = await api.richMenuGroups.create({
+      const response = await api.richMenuGroups.create({
         accountId: selectedAccount.id,
-        name: name.trim(),
-        chatBarText: chatBarText.trim(),
-        size: tmpl.size,
-        pages: [{ name: 'ページ 1', orderIndex: 0, areas: templateToAreas(tmpl) }],
+        name: value.name.trim(),
+        chatBarText: value.chatBarText.trim(),
+        size: selectedTemplate.size,
+        folderId: value.folderId || null,
+        // N-161: 既定ページ・出し分け・全員既定も作成で決める。
+        defaultPageIndex: value.defaultPageIndex,
+        isDefaultForAll: value.isDefaultForAll && !value.targetingEnabled,
+        targetingEnabled: value.targetingEnabled,
+        targetingCondition: targetingCondition ? JSON.stringify(targetingCondition) : null,
+        targetingPriority: value.targetingPriority,
+        // N-164: 選んだ登録メディアを既定ページの画像として登録する。
+        imageMediaId: selectedMedia?.id,
+        pages: Array.from({ length: value.tabCount + 1 }, (_, index) => ({
+          name: index === 0 ? 'トップ' : `タブ ${String.fromCharCode(65 + index - 1)}`,
+          orderIndex: index,
+          areas: pageAreas,
+        })),
       })
-      if (!res.success) throw new Error(res.error ?? '作成失敗')
-      router.push(`/rich-menus/edit?id=${res.data.id}`)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      if (!response.success) throw new Error(response.error ?? '作成失敗')
+      /*
+       * N-161: 未完の作業があるなら「形とボタン」へ、全部そろっていれば
+       * 「公開のしかた」へ進む。未完項目を次画面へ隠さない。
+       */
+      const incomplete = !selectedMedia || unsetAreaLabels(areas).length > 0
+      router.push(`/rich-menus/edit?id=${response.data.id}${incomplete ? '' : '&step=publish'}`)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause))
       setSubmitting(false)
     }
   }
 
   return (
-    <main data-design-node="XtfO3" className="mx-auto max-w-4xl p-6">
-      <nav data-design="Crumb" className="text-ink-faint mb-2 text-xs">
-        <Link href="/rich-menus" className="hover:underline">
-          リッチメニュー
-        </Link>
-        <span className="mx-1.5">/</span>
-        <span>新規作成</span>
-      </nav>
-
-      <div data-design="Head">
-        <Header
-          description="名前と土台のレイアウトを決めます。画像とタップ領域は、作成後の編集画面で設定します。"
-        />
-      </div>
-
-      {/*
-        **段を出す。**この画面で全部決めるのか、まだ続きがあるのかが
-        本文の断りだけでは伝わらない。設計 12-1 は 形とボタン → 誰に出すか →
-        公開のしかた の3段。ここは1段目。
-      */}
-      <StepTrail
-        label="リッチメニュー作成の進み方"
-        items={[
-          { label: '形を決める', state: 'current' },
-          { label: 'ボタンと出し分け', state: 'todo' },
-          { label: '公開のしかた', state: 'todo' },
-        ]}
-      />
-
-      <form
-        onSubmit={handleSubmit}
-        className="border-hairline bg-canvas rounded-card mt-4 space-y-6 border p-6 shadow-sm"
-      >
-        <div>
-          <label className="text-ink-secondary mb-1 block text-sm font-medium">
-            名前{' '}
-            <span className="bg-danger-bg text-danger rounded-pill ml-1 px-1.5 py-0.5 text-[10px]">
-              必須
-            </span>
-          </label>
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-            className="border-hairline rounded-control focus:ring-accent block w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
-            placeholder="例：メインメニュー"
-          />
-          <p className="text-ink-faint mt-1 text-xs">
-            管理画面での識別用です。友だちには表示されません。
-          </p>
-        </div>
-
-        <div>
-          <label className="text-ink-secondary mb-1 block text-sm font-medium">
-            トーク画面下の文言
-          </label>
-          <input
-            value={chatBarText}
-            onChange={(e) => setChatBarText(e.target.value)}
-            maxLength={14}
-            required
-            className="border-hairline rounded-control focus:ring-accent block w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
-          />
-          <p className="text-ink-faint mt-1 text-xs">
-            14文字以内。メニューを開く前にトーク画面下に表示されます。
-          </p>
-        </div>
-
-        <div>
-          <span className="text-ink-secondary mb-2 block text-sm font-medium">画像の大きさ</span>
-          <div className="flex flex-wrap gap-2">
-            {SIZE_TABS.map((s) => {
-              const active = size === s.value
-              return (
-                <button
-                  key={s.value}
-                  type="button"
-                  onClick={() => changeSize(s.value)}
-                  aria-pressed={active}
-                  className={`rounded-control border px-4 py-2 text-left text-sm transition-colors ${
-                    active
-                      ? 'border-accent bg-accent-soft text-ink'
-                      : 'border-hairline text-ink-secondary hover:bg-canvas-sunken'
-                  }`}
-                >
-                  <span className="font-medium whitespace-nowrap">{s.label}</span>
-                  <span className="text-ink-faint ml-2 text-xs whitespace-nowrap">{s.dims}</span>
-                  <span className="text-ink-faint mt-0.5 block text-[11px]">{s.hint}</span>
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
-        <div>
-          <span className="text-ink-secondary mb-2 block text-sm font-medium">
-            土台のレイアウト
-          </span>
-          <p className="text-ink-faint mb-3 text-xs">
-            あとから編集画面で区切り直せます。迷ったら6分割で始めてください。
-          </p>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {shownTemplates.map((t) => {
-              const active = templateKey === t.key
-              return (
-                <label
-                  key={t.key}
-                  className={`rounded-card cursor-pointer border p-3 transition-colors ${
-                    active
-                      ? 'border-accent bg-accent-soft'
-                      : 'border-hairline hover:bg-canvas-sunken'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="template"
-                    value={t.key}
-                    checked={active}
-                    onChange={(e) => setTemplateKey(e.target.value)}
-                    className="sr-only"
+    <div data-design-node="XtfO3" className="mx-auto max-w-screen-2xl py-6">
+      <nav data-design="Crumb" className="text-ink-faint mb-2 text-xs"><Link href="/rich-menus" className="hover:underline">リッチメニュー</Link><span className="mx-1.5">/</span><span>新規作成</span></nav>
+      {tagPruneNotice ? <Notice tone="warn" message={tagPruneNotice} onClose={() => setTagPruneNotice(null)} className="mb-3" /> : null}
+      <form onSubmit={handleSubmit}>
+        <RichMenuCreateForm
+          value={value}
+          onChange={(next) => {
+            // 入力し直したらその欄の文言は消す。
+            if (next.name !== value.name && nameError) setNameError(null)
+            if (next.chatBarText !== value.chatBarText && chatBarTextError) setChatBarTextError(null)
+            setValue(next)
+          }}
+          nameError={nameError}
+          chatBarTextError={chatBarTextError}
+          folders={folders}
+          tags={tags}
+          templates={templates}
+          forms={forms}
+          trackedLinks={trackedLinks}
+          allowedIntents={NEW_MENU_INTENTS_WITH_SWITCH}
+          audienceSetup
+          imageAction={(
+            <div className="mt-2 space-y-2">
+              {selectedMedia && selectedAccount ? (
+                <div className="border-hairline flex items-center gap-3 rounded-control border p-2">
+                  {/* 選択値のプレビューは認証つきURLで出す（保管URLは露出しない） */}
+                  <img
+                    src={api.media.contentUrl(selectedMedia.id, selectedAccount.id)}
+                    alt={`選択中の画像: ${selectedMedia.filename}`}
+                    className="h-16 w-24 rounded-control border-hairline border object-cover"
                   />
-                  <TemplatePreview template={t} />
-                  <div className="text-ink mt-2 text-xs font-medium">{t.label}</div>
-                  {t.description && (
-                    <p className="text-ink-faint mt-0.5 text-[11px] leading-snug">
-                      {t.description}
-                    </p>
-                  )}
-                </label>
-              )
-            })}
-          </div>
-        </div>
-
-        {error && (
-          <div className="bg-danger-bg text-danger rounded-control border border-red-200 p-3 text-sm">
-            {error}
-          </div>
-        )}
-
-        <div className="border-hairline flex justify-end gap-2 border-t pt-4">
-          <Link
-            href="/rich-menus"
-            className="border-hairline rounded-control hover:bg-canvas-sunken border px-4 py-2 text-sm font-medium transition-colors"
-          >
-            キャンセル
-          </Link>
-          <button
-            type="submit"
-            disabled={submitting || !selectedAccount}
-            className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium transition-opacity disabled:opacity-50"
-          >
-            {submitting ? '作成中...' : '作成して編集へ'}
-          </button>
-        </div>
+                  <div className="min-w-0">
+                    <p className="text-ink truncate text-xs font-medium">{selectedMedia.filename}</p>
+                    <div className="mt-1 flex gap-2">
+                      <Button type="button" onClick={() => setMediaPickerOpen(true)}>選び直す</Button>
+                      <Button type="button" onClick={() => setSelectedMedia(null)}>選ばない</Button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <Button type="button" onClick={() => setMediaPickerOpen(true)} disabled={!selectedAccount}>登録メディアから選ぶ</Button>
+              )}
+            </div>
+          )}
+          footer={<StickyBar actions={<><Button href="/rich-menus">キャンセル</Button><Button type="submit" variant="primary" disabled={submitting || !selectedAccount}>{submitting ? '作成中...' : '作成して編集へ'}</Button></>} />}
+        />
+        {error ? <Notice tone="danger" message={error} className="mt-3" /> : null}
       </form>
-    </main>
+      {/* N-164: キャンセル（onClose）は何も変えない。入力した内容はそのまま残る。 */}
+      <MediaPickerDialog
+        open={mediaPickerOpen}
+        accountId={selectedAccount?.id ?? null}
+        kind="image"
+        title="リッチメニューの画像を選ぶ"
+        description="作成したメニューの最初に見せるページへ登録します。"
+        onClose={() => setMediaPickerOpen(false)}
+        onSelect={(item) => {
+          setSelectedMedia(item)
+          setMediaPickerOpen(false)
+        }}
+      />
+      <ConfirmDialog primaryAction="cancel"
+        open={leaveTarget !== null}
+        title="入力中の内容があります"
+        description="このまま移動すると、入力した内容は保存されません。移動しますか？"
+        confirmLabel="保存せずに移動"
+        cancelLabel="入力を続ける"
+        onConfirm={confirmLeave}
+        onCancel={cancelLeave}
+      />
+    </div>
   )
 }

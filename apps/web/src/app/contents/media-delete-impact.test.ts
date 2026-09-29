@@ -7,14 +7,16 @@ import {
   NOT_AVAILABLE,
   referenceKindText,
   referenceNameText,
+  summarizeBulkDeleteResult,
   usageText,
 } from './media-delete-impact'
+import { mediaUsageKindText } from './media-usage-display'
 
 const impact = (over: Record<string, unknown> = {}) =>
   ({
     media: { id: 'm1', filename: '夏の定番セット.jpg', kind: 'image' },
     usageCount: 0, references: [], checkedAt: '2026-08-30T01:00:00.000Z',
-    lastScannedAt: null, canDelete: true, recommendedAction: 'delete',
+    lastScannedAt: null, verified: true, canDelete: true, recommendedAction: 'delete',
     ...over,
   }) as never
 
@@ -26,6 +28,16 @@ describe('使用中の言い方', () => {
 
   it('件数をそのまま出す', () => {
     expect(usageText(impact({ usageCount: 3 }))).toBe('いま 3か所で使われています。')
+  })
+
+  it('R34: 未確認の0件は「使っていない」にしない', () => {
+    expect(usageText(impact({ verified: false, usageCount: 0, canDelete: false })))
+      .toBe('使われている場所を確かめられませんでした。')
+  })
+
+  it('R34: 未確認でも見つかった使用先は数え、未確認がある旨を添える', () => {
+    expect(usageText(impact({ verified: false, usageCount: 2, canDelete: false })))
+      .toBe('いま 2か所で使われています（ほかに確認できていない場所があります）。')
   })
 })
 
@@ -47,6 +59,18 @@ describe('使用先', () => {
       expect(referenceKindText(kind)).not.toMatch(/[a-z_]/)
     }
     expect(referenceKindText('rich_menu')).toBe('リッチメニュー')
+  })
+
+  it('#550 M4 「シナリオの通」ではなく「シナリオのステップ」と書く', () => {
+    // 削除の窓と詳細画面で同じ使用先が違う名前に見えていた。
+    expect(referenceKindText('scenario_step')).toBe('シナリオのステップ')
+  })
+
+  it('#550 M4 種別の言い方は使用箇所の1つの表と同じにする', () => {
+    // 表を2か所に置くと、片方だけ直して食い違いが再発する。
+    for (const kind of ['template', 'broadcast', 'rich_menu', 'scenario_step', 'nen_column', 'event', 'webinar'] as const) {
+      expect(referenceKindText(kind)).toBe(mediaUsageKindText(kind))
+    }
   })
 
   it('名前が無い理由を書き分ける', () => {
@@ -71,6 +95,10 @@ describe('消せない理由', () => {
   it('消せるときは理由を出さない', () => {
     expect(blockedReason(impact())).toBeNull()
   })
+
+  it('R34: 未確認は読み直しを促す', () => {
+    expect(blockedReason(impact({ verified: false, canDelete: false }))).toContain('読み直して')
+  })
 })
 
 describe('確かめた時刻', () => {
@@ -80,6 +108,27 @@ describe('確かめた時刻', () => {
 
   it('読めなければ「—（未取得）」', () => {
     expect(checkedAtText('こわれた日付')).toBe(NOT_AVAILABLE)
+  })
+})
+
+describe('#550 M3 まとめて削除の結果文', () => {
+  it('全部消せたら成功の文にする', () => {
+    expect(summarizeBulkDeleteResult(3, [])).toEqual({ tone: 'success', message: '削除しました（3件）' })
+  })
+
+  it('一部失敗したら成功数と失敗した名前を残す', () => {
+    // 件ごとに上書きすると最後の1件しか残らない。
+    expect(summarizeBulkDeleteResult(1, ['a.png', 'b.png'])).toEqual({
+      tone: 'error',
+      message: '削除しました1件、失敗2件（a.png、b.png）',
+    })
+  })
+
+  it('全部失敗したら失敗した名前を残す', () => {
+    expect(summarizeBulkDeleteResult(0, ['a.png'])).toEqual({
+      tone: 'error',
+      message: '削除できませんでした（a.png）',
+    })
   })
 })
 
@@ -94,5 +143,10 @@ describe('消してよいか', () => {
   it('読み込めていないときと送信中は押せない', () => {
     expect(canDelete({ impact: null, busy: false })).toBe(false)
     expect(canDelete({ impact: impact(), busy: true })).toBe(false)
+  })
+
+  it('R34: 未確認は確かめられないので押せない', () => {
+    // canDelete が立っていても、未確認なら通さない。
+    expect(canDelete({ impact: impact({ verified: false, canDelete: true }), busy: false })).toBe(false)
   })
 })

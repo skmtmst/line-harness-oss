@@ -2,6 +2,7 @@ import { Hono, type Context } from 'hono';
 import type { Env } from '../index.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { requireRole } from '../middleware/role-guard.js';
+import { isPlatformAdmin } from '../middleware/platform-admin.js';
 import { dbFor } from '../services/db-router.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 
@@ -39,11 +40,13 @@ function parseFeaturePacks(value: unknown): FeaturePack[] | null {
  * Cross-tenant operations deliberately use a route-local gate. Query scoping
  * cannot protect these endpoints because they are intended to manage tenants.
  */
-function canManageTenants(c: Context<Env>): boolean {
+async function canManageTenants(c: Context<Env>): Promise<boolean> {
+  // ★V6 37: 運営マスター（platform_admins）で判定する。既定の統括のオーナーを
+  // 運営とみなす旧判定は、platform_admins が空の間だけの互換として
+  // middleware/platform-admin.ts に残している。
   const staff = c.get('staff');
-  return staff?.role === 'owner'
-    && !staff.readOnly
-    && (staff.tenantId ?? DEFAULT_TENANT_ID) === DEFAULT_TENANT_ID;
+  if (!staff || staff.readOnly) return false;
+  return isPlatformAdmin(c);
 }
 
 function forbidden(c: Context<Env>) {
@@ -54,7 +57,7 @@ function forbidden(c: Context<Env>) {
 export const tenants = new Hono<Env>();
 
 tenants.post('/api/tenants', async (c) => {
-  if (!canManageTenants(c)) return forbidden(c);
+  if (!(await canManageTenants(c))) return forbidden(c);
 
   const body = await c.req.json<{
     name?: unknown;
@@ -99,7 +102,7 @@ tenants.post('/api/tenants', async (c) => {
 });
 
 tenants.get('/api/tenants', async (c) => {
-  if (!canManageTenants(c)) return forbidden(c);
+  if (!(await canManageTenants(c))) return forbidden(c);
   const includeArchived = c.req.query('include_archived') === '1';
   const query = `SELECT id, name, status, feature_packs, created_at, updated_at
     FROM tenants
@@ -116,7 +119,7 @@ tenants.get('/api/tenants', async (c) => {
 });
 
 tenants.patch('/api/tenants/:id/status', async (c) => {
-  if (!canManageTenants(c)) return forbidden(c);
+  if (!(await canManageTenants(c))) return forbidden(c);
   const body = await c.req.json<{ status?: unknown }>().catch(() => null);
   const status = body?.status;
   if (typeof status !== 'string' || !ALLOWED_TENANT_STATUSES.has(status as TenantStatus)) {
@@ -135,7 +138,7 @@ tenants.patch('/api/tenants/:id/status', async (c) => {
 });
 
 tenants.patch('/api/tenants/:id/feature-packs', async (c) => {
-  if (!canManageTenants(c)) return forbidden(c);
+  if (!(await canManageTenants(c))) return forbidden(c);
   const body = await c.req.json<{ featurePacks?: unknown }>().catch(() => null);
   const featurePacks = parseFeaturePacks(body?.featurePacks);
   if (!featurePacks) {

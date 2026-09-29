@@ -1,0 +1,440 @@
+import {
+  getFriendById,
+  getFriendByLineUserIdForAccount,
+  getLineAccountById,
+  getReminderVersionSteps,
+  jstNow,
+  type ReminderDraftSettings,
+  type ReminderVersionRow,
+} from '@line-crm/db';
+import { resolveReminderSendAt } from '@line-crm/shared';
+import { LineClient } from '@line-crm/line-sdk';
+import { buildReminderStepMessage } from './reminder-delivery.js';
+import { buildPublicSegmentQuery, buildSegmentWhere, isEmptySegmentCondition } from './segment-query.js';
+import {
+  completeOutboundSendStatement,
+  hashOutboundPayload,
+  reserveOutboundSend,
+} from './outbound-idempotency.js';
+
+export interface ReminderValidationResult {
+  valid: boolean;
+  checks: Array<{
+    key: string;
+    label: string;
+    status: 'passed' | 'failed';
+    message: string;
+  }>;
+  audience: { matched: number; excluded: number };
+}
+
+export interface ReminderPreviewResult {
+  targetDate: string;
+  items: Array<{
+    stableStepId: string;
+    stepNumber: number;
+    scheduledAt: string;
+    label: string;
+    state: 'scheduled' | 'past' | 'duplicate';
+  }>;
+  summary: {
+    audience: number;
+    next7Days: number;
+    next30Days: number;
+    duplicateCount: number;
+  };
+}
+
+function check(
+  key: string,
+  label: string,
+  passed: boolean,
+  message: string,
+): ReminderValidationResult['checks'][number] {
+  return { key, label, status: passed ? 'passed' : 'failed', message };
+}
+
+export async function countReminderAudience(
+  db: D1Database,
+  settings: ReminderDraftSettings,
+): Promise<{ matched: number; excluded: number }> {
+  const total = await db.prepare(
+    `SELECT COUNT(*) AS count FROM friends WHERE line_account_id = ?`,
+  ).bind(settings.lineAccountId).first<{ count: number }>();
+  const totalCount = Number(total?.count ?? 0);
+  // 条件があるときは条件が勝つ。無いときだけ従来のタグ・全員へ倒す。
+  if (!isEmptySegmentCondition(settings.targetCondition as never)) {
+    const { matched } = await countReminderAudienceByCondition(
+      db, settings.lineAccountId, settings.targetCondition,
+    );
+    return { matched, excluded: Math.max(0, totalCount - matched) };
+  }
+  const matched = settings.targetTagId
+    ? await db.prepare(
+        `SELECT COUNT(DISTINCT f.id) AS count
+           FROM friends f
+           JOIN friend_tags ft ON ft.friend_id = f.id AND ft.tag_id = ?
+          WHERE f.line_account_id = ? AND f.is_following = 1`,
+      ).bind(settings.targetTagId, settings.lineAccountId).first<{ count: number }>()
+    : await db.prepare(
+        `SELECT COUNT(*) AS count FROM friends
+          WHERE line_account_id = ? AND is_following = 1`,
+      ).bind(settings.lineAccountId).first<{ count: number }>();
+  const matchedCount = Number(matched?.count ?? 0);
+  return { matched: matchedCount, excluded: Math.max(0, totalCount - matchedCount) };
+}
+
+/**
+ * 条件に当てはまる送信可能者 (フォロー中) を数える。
+ *
+ * 形の検査は保存時に済ませている。ここで組み立てに失敗したら
+ * 例外を投げ、呼び出し側で 422 にする。0 を返すと「誰もいない」と
+ * 見えて、そのまま公開へ進めてしまう。
+ */
+export async function countReminderAudienceByCondition(
+  db: D1Database,
+  lineAccountId: string,
+  condition: ReminderDraftSettings['targetCondition'],
+): Promise<{ matched: number }> {
+  // friend_id_in は内部スナップショット専用。保存口では受け付けない。
+  buildPublicSegmentQuery(condition as never);
+  const where = buildSegmentWhere(condition as never);
+  const row = await db.prepare(
+    `SELECT COUNT(*) AS count FROM friends f
+      WHERE f.line_account_id = ? AND f.is_following = 1 AND (${where.sql})`,
+  ).bind(lineAccountId, ...where.bindings).first<{ count: number }>();
+  return { matched: Number(row?.count ?? 0) };
+}
+
+/**
+ * 「顔ぶれを見る」の中身。条件に当てはまる送信可能者を先頭から数件返す。
+ *
+ * 名前だけ返し、本文・連絡先は返さない。人数の数え直しと同じ条件・範囲で
+ * 切るので、「数」と「顔ぶれ」がずれない。
+ */
+export async function sampleReminderAudience(
+  db: D1Database,
+  settings: ReminderDraftSettings,
+  limit = 20,
+): Promise<Array<{ id: string; displayName: string }>> {
+  const capped = Number.isInteger(limit) ? Math.min(100, Math.max(1, limit)) : 20;
+  if (!isEmptySegmentCondition(settings.targetCondition as never)) {
+    buildPublicSegmentQuery(settings.targetCondition as never);
+    const where = buildSegmentWhere(settings.targetCondition as never);
+    const rows = await db.prepare(
+      `SELECT f.id AS id, f.display_name AS displayName FROM friends f
+        WHERE f.line_account_id = ? AND f.is_following = 1 AND (${where.sql})
+        ORDER BY f.created_at ASC, f.id ASC LIMIT ?`,
+    ).bind(settings.lineAccountId, ...where.bindings, capped)
+      .all<{ id: string; displayName: string | null }>();
+    return (rows.results ?? []).map((row) => ({
+      id: row.id,
+      displayName: row.displayName ?? '（名前なし）',
+    }));
+  }
+  if (settings.targetTagId) {
+    const rows = await db.prepare(
+      `SELECT DISTINCT f.id AS id, f.display_name AS displayName
+         FROM friends f
+         JOIN friend_tags ft ON ft.friend_id = f.id AND ft.tag_id = ?
+        WHERE f.line_account_id = ? AND f.is_following = 1
+        ORDER BY f.id ASC LIMIT ?`,
+    ).bind(settings.targetTagId, settings.lineAccountId, capped)
+      .all<{ id: string; displayName: string | null }>();
+    return (rows.results ?? []).map((row) => ({
+      id: row.id,
+      displayName: row.displayName ?? '（名前なし）',
+    }));
+  }
+  const rows = await db.prepare(
+    `SELECT f.id AS id, f.display_name AS displayName FROM friends f
+      WHERE f.line_account_id = ? AND f.is_following = 1
+      ORDER BY f.created_at ASC, f.id ASC LIMIT ?`,
+  ).bind(settings.lineAccountId, capped)
+    .all<{ id: string; displayName: string | null }>();
+  return (rows.results ?? []).map((row) => ({
+    id: row.id,
+    displayName: row.displayName ?? '（名前なし）',
+  }));
+}
+
+export async function validateReminderDraft(
+  db: D1Database,
+  settings: ReminderDraftSettings,
+  version: ReminderVersionRow,
+): Promise<ReminderValidationResult> {
+  const checks: ReminderValidationResult['checks'] = [];
+  checks.push(check('name', '管理名', Boolean(settings.name.trim()), '管理名が入力されています'));
+  checks.push(check('account', 'LINEアカウント', Boolean(settings.lineAccountId), '送信元が選ばれています'));
+  checks.push(check('steps', '通知ステップ', settings.steps.length > 0, `${settings.steps.length}件の通知があります`));
+  const bodiesValid = settings.steps.every((step) => Boolean(step.templateId || step.messageContent.trim()));
+  checks.push(check('messages', '送る内容', bodiesValid, bodiesValid
+    ? 'すべての通知に送る内容があります'
+    : '送る内容が空の通知があります'));
+  const scheduleKeys = settings.steps.map((step) => settings.deliveryMode === 'time'
+    ? `${step.offsetDays ?? 0}:${step.sendAtTime ?? ''}`
+    : String(step.offsetMinutes));
+  const noDuplicates = new Set(scheduleKeys).size === scheduleKeys.length;
+  checks.push(check('duplicate_schedule', '送信時刻の重複', noDuplicates, noDuplicates
+    ? '同じ時刻の通知はありません'
+    : '同じ時刻になる通知があります'));
+  const fieldValid = settings.triggerType !== 'friend_field' || Boolean(settings.triggerFieldId);
+  const eventValid = settings.triggerType !== 'event' || Boolean(settings.triggerEventId);
+  checks.push(check('trigger_field', '基準日', fieldValid && eventValid,
+    fieldValid && eventValid
+      ? '基準日が設定されています'
+      : !fieldValid
+        ? '基準日に使う友だち情報欄を選んでください'
+        : '基準日にするイベントを選んでください'));
+  // N-068: 毎年くり返す友だち情報欄起点では、2月29日の平年の扱いが
+  // 保存済みであることを公開前に確かめる。
+  const leapValid = !(settings.repeatYearly && settings.triggerType === 'friend_field')
+    || ['feb28', 'mar1', 'skip'].includes(settings.leapYearPolicy ?? '');
+  checks.push(check('leap_year_policy', '2月29日の扱い', leapValid, leapValid
+    ? '2月29日が基準日のときの扱いが設定されています'
+    : '2月29日が基準日のときの平年の扱いを選んでください'));
+  const stopConfirmed = settings.stopConditions.bookingCancelled
+    || settings.stopConditions.supportMarkCompleted
+    || settings.stopConditions.friendBlocked
+    || settings.stopConditions.daysAfterTarget !== null;
+  checks.push(check('stop_conditions', '終了・停止条件', stopConfirmed, stopConfirmed
+    ? '終了・停止条件が設定されています'
+    : '終了・停止条件を1つ以上設定してください'));
+  const testPassed = version.last_test_status === 'succeeded';
+  checks.push(check('test_send', 'テスト送信', testPassed, testPassed
+    ? '直近のテスト送信が成功しています'
+    : '公開前にテスト送信を成功させてください'));
+  const audience = await countReminderAudience(db, settings);
+  return { valid: checks.every((item) => item.status === 'passed'), checks, audience };
+}
+
+export async function previewReminderDraft(
+  db: D1Database,
+  settings: ReminderDraftSettings,
+  targetDate: Date,
+): Promise<ReminderPreviewResult> {
+  const audience = await countReminderAudience(db, settings);
+  const now = new Date();
+  const dates = settings.steps.map((step, index) => ({
+    step,
+    stepNumber: index + 1,
+    scheduledAt: resolveReminderSendAt(targetDate, {
+      offsetDays: step.offsetDays ?? null,
+      sendAtTime: step.sendAtTime ?? null,
+      offsetMinutes: step.offsetMinutes,
+    }, settings.deliveryMode),
+  }));
+  const counts = new Map<string, number>();
+  for (const { scheduledAt } of dates) {
+    const key = scheduledAt.toISOString();
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  const next7 = new Date(now.getTime() + 7 * 86_400_000);
+  const next30 = new Date(now.getTime() + 30 * 86_400_000);
+  return {
+    targetDate: targetDate.toISOString(),
+    items: dates.map(({ step, stepNumber, scheduledAt }) => ({
+      stableStepId: step.stableStepId,
+      stepNumber,
+      scheduledAt: scheduledAt.toISOString(),
+      label: settings.deliveryMode === 'time'
+        ? `${step.offsetDays ?? 0}日 ${step.sendAtTime ?? '—'}`
+        : `${step.offsetMinutes}分`,
+      state: (counts.get(scheduledAt.toISOString()) ?? 0) > 1
+        ? 'duplicate'
+        : scheduledAt <= now ? 'past' : 'scheduled',
+    })),
+    summary: {
+      audience: audience.matched,
+      next7Days: dates.filter(({ scheduledAt }) => scheduledAt > now && scheduledAt <= next7).length * audience.matched,
+      next30Days: dates.filter(({ scheduledAt }) => scheduledAt > now && scheduledAt <= next30).length * audience.matched,
+      duplicateCount: [...counts.values()].reduce((sum, count) => sum + Math.max(0, count - 1), 0),
+    },
+  };
+}
+
+/**
+ * REMINDER-12: テスト送信の届け先の種別。
+ *
+ * - self       : 操作者本人のLINE。staff_members.line_user_id とこの
+ *   アカウントの友だち行の対応をサーバーで確認できた場合だけ名乗る。
+ * - registered : アカウント設定で登録されたテスト送信先。本人では
+ *   ないので、画面・確認窓・要約は「登録済みテスト宛先」と実名を出す。
+ */
+export type ReminderTestRecipientKind = 'self' | 'registered';
+
+export interface ReminderTestRecipientStatus {
+  // unset=未設定 / unavailable=設定済みだが届けられない / ready=送信できる
+  state: 'unset' | 'unavailable' | 'ready';
+  recipient: { id: string; displayName: string; pictureUrl: string | null } | null;
+  /** ready のときだけ埋まる届け先の種別。それ以外は null。 */
+  recipientKind: ReminderTestRecipientKind | null;
+}
+
+export type ReminderTestOperator = { staffId?: string | null };
+
+function recipientOf(friend: {
+  id: string;
+  display_name: string | null;
+  picture_url: string | null;
+}): NonNullable<ReminderTestRecipientStatus['recipient']> {
+  return {
+    id: friend.id,
+    displayName: friend.display_name ?? 'テスト送信先',
+    pictureUrl: friend.picture_url,
+  };
+}
+
+/*
+ * テスト送信の届け先を解決する。送信前の画面表示（GET test-recipient）と
+ * 実送信（testReminderDraft）が同じ判定を使うので、表示と送信がずれない。
+ *
+ * REMINDER-12: 「自分のLINEへ」と案内しながら登録済みテスト宛先へ
+ * 送っていた取り違えを直す。届け先は2種類に分け、どちらであるかを
+ * recipientKind で画面へ返す。
+ *
+ * 1. 本人宛て（self）: 操作者の staff_members.line_user_id がこの
+ *    アカウントの友だち行と一致し、ブロックされていなければ本人へ送る。
+ *    対応が確認できない・確認自体に失敗した場合は本人宛てを無効化し、
+ *    登録宛先へ倒す（本人を名乗らない）。
+ * 2. 登録テスト宛先（registered）: アカウント設定の test_recipients 先頭。
+ *    本人以外へ届くため、画面は必ず「登録済みテスト宛先」と実名を出す。
+ */
+export async function resolveReminderTestRecipient(
+  db: D1Database,
+  lineAccountId: string,
+  operator?: ReminderTestOperator,
+): Promise<ReminderTestRecipientStatus> {
+  if (operator?.staffId) {
+    const self = await resolveSelfRecipient(db, operator.staffId, lineAccountId);
+    if (self) return self;
+  }
+  const setting = await db.prepare(
+    `SELECT value FROM account_settings WHERE line_account_id = ? AND key = 'test_recipients'`,
+  ).bind(lineAccountId).first<{ value: string }>();
+  const friendId = setting ? (JSON.parse(setting.value) as string[])[0] : undefined;
+  if (!friendId) return { state: 'unset', recipient: null, recipientKind: null };
+  const friend = await getFriendById(db, friendId);
+  if (!friend || friend.line_account_id !== lineAccountId || !friend.is_following) {
+    return { state: 'unavailable', recipient: null, recipientKind: null };
+  }
+  return { state: 'ready', recipient: recipientOf(friend), recipientKind: 'registered' };
+}
+
+/*
+ * 操作者本人のLINE宛てを解決する。本人対応が確認できたときだけ ready+self を
+ * 返し、確認できない・確認に失敗したときは null（＝本人宛て無効）を返す。
+ * 例外を握りつぶすのは「確認できなかった」に含めるためで、本人を名乗る
+ * 判定だけが失敗を隠す。登録宛先の解決は別経路で行う。
+ */
+async function resolveSelfRecipient(
+  db: D1Database,
+  staffId: string,
+  lineAccountId: string,
+): Promise<ReminderTestRecipientStatus | null> {
+  try {
+    const staff = await db.prepare(
+      `SELECT line_user_id FROM staff_members WHERE id = ? AND is_active = 1`,
+    ).bind(staffId).first<{ line_user_id: string | null }>();
+    if (!staff?.line_user_id) return null;
+    const friend = await getFriendByLineUserIdForAccount(db, staff.line_user_id, lineAccountId);
+    if (!friend || friend.line_account_id !== lineAccountId || !friend.is_following) {
+      return null;
+    }
+    return { state: 'ready', recipient: recipientOf(friend), recipientKind: 'self' };
+  } catch {
+    // 本人対応の確認自体に失敗した場合は本人宛てを無効化する。
+    return null;
+  }
+}
+
+export async function testReminderDraft(
+  db: D1Database,
+  version: ReminderVersionRow,
+  settings: ReminderDraftSettings,
+  requestKey: string,
+  operator?: ReminderTestOperator,
+): Promise<{
+  sent: number;
+  recipientName: string;
+  recipientKind: ReminderTestRecipientKind | null;
+  replayed: boolean;
+  testedAt: string;
+  requestId: string | null;
+}> {
+  // 表示（GET test-recipient）と同じ解決関数・同じ操作者を使う。
+  // 画面が出した届け先と実際に届く先がずれないことが REMINDER-12 の条件。
+  const recipient = await resolveReminderTestRecipient(db, settings.lineAccountId, operator);
+  if (recipient.state === 'unset') throw new Error('REMINDER_TEST_RECIPIENT_NOT_CONFIGURED');
+  if (recipient.state !== 'ready' || !recipient.recipient) {
+    throw new Error('REMINDER_TEST_RECIPIENT_NOT_AVAILABLE');
+  }
+  const friendId = recipient.recipient.id;
+  const friend = await getFriendById(db, friendId);
+  if (!friend) throw new Error('REMINDER_TEST_RECIPIENT_NOT_AVAILABLE');
+  const step = (await getReminderVersionSteps(db, version.id))[0];
+  if (!step) throw new Error('REMINDER_TEST_STEP_NOT_FOUND');
+
+  const payloadHash = await hashOutboundPayload(JSON.stringify({
+    versionId: version.id,
+    stepId: step.id,
+    friendId,
+    content: step.message_content,
+  }));
+  const now = jstNow();
+  const reservation = await reserveOutboundSend(db, {
+    key: requestKey,
+    channel: 'line',
+    resourceId: `reminder-test:${version.id}:${friendId}:${step.id}`,
+    payloadHash,
+    retryInProgress: true,
+    now,
+  });
+  if (reservation.kind === 'conflict') throw new Error('REMINDER_TEST_KEY_CONFLICT');
+  if (reservation.kind === 'replay') {
+    return {
+      sent: 1,
+      recipientName: friend.display_name ?? 'テスト送信先',
+      recipientKind: recipient.recipientKind,
+      replayed: true,
+      testedAt: now,
+      requestId: null,
+    };
+  }
+
+  const account = await getLineAccountById(db, settings.lineAccountId);
+  if (!account) throw new Error('REMINDER_LINE_ACCOUNT_NOT_FOUND');
+  const built = await buildReminderStepMessage(db, step, friend, new Date(), 'test_send');
+  const response = await new LineClient(account.channel_access_token)
+    .pushMessageWithRequestId(friend.line_user_id, [built.message], requestKey);
+  const logId = crypto.randomUUID();
+  await db.batch([
+    db.prepare(
+      `INSERT INTO messages_log
+         (id, friend_id, direction, message_type, content, template_id_at_send,
+          delivery_type, source, line_account_id, created_at)
+       VALUES (?, ?, 'outgoing', ?, ?, ?, 'test', 'reminder_test', ?, ?)`,
+    ).bind(
+      logId,
+      friend.id,
+      built.messageType,
+      built.messageContent,
+      built.templateId,
+      settings.lineAccountId,
+      now,
+    ),
+    completeOutboundSendStatement(db, {
+      key: requestKey,
+      responseId: response.requestId ?? logId,
+      now,
+    }),
+  ]);
+  return {
+    sent: 1,
+    recipientName: friend.display_name ?? 'テスト送信先',
+    recipientKind: recipient.recipientKind,
+    replayed: false,
+    testedAt: now,
+    requestId: response.requestId ?? null,
+  };
+}

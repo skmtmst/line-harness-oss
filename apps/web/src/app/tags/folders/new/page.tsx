@@ -1,28 +1,53 @@
 'use client'
 
-import { Suspense, useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
+import { Suspense, useEffect, useRef, useState, type MouseEvent } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Check } from 'lucide-react'
+import { Check, FolderCheck, Trash2, X } from 'lucide-react'
 import { ApiError, api } from '@/lib/api'
 import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import StickyBar from '@/components/shared/sticky-bar'
+import TagsPageV4 from '@/components/friend-fields/tags-page-v4'
+import { useAccount } from '@/contexts/account-context'
 import {
   folderSaveErrorMessage,
   isCurrentFolderRequest,
   type FolderRequestKey,
 } from './folder-editor-state'
 
-const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4', '#6B7280']
+/*
+  フォルダの色。**緑から始める。** V6 の基調色は `--color-accent`（#06c755）で、
+  設計 `byqIW` も緑始まりの8色。青から始めると、既定で選ばれる色が
+  基調色から外れる。
+
+  **名前を必ず付ける。** 要件 04 §13 は「色だけでフォルダ・マーク・状態を
+  区別しない」「すべての色選択に名前またはラベルを付ける」と決めている。
+  前は読み上げが「色 #3B82F6」で、**色が見えない人には16進数しか届かなかった。**
+*/
+const COLORS: ReadonlyArray<{ value: string; name: string }> = [
+  { value: '#06C755', name: '緑' },
+  { value: '#3B82F6', name: '青' },
+  { value: '#06B6D4', name: '水色' },
+  { value: '#7C3AED', name: '紫' },
+  { value: '#EC4899', name: 'ピンク' },
+  { value: '#EF4444', name: '赤' },
+  { value: '#F59E0B', name: '黄' },
+  { value: '#6B7280', name: 'グレー' },
+]
 
 function FolderEditor() {
   const router = useRouter()
   const params = useSearchParams()
+  const { selectedAccountId } = useAccount()
   const editId = params.get('id')
   const [name, setName] = useState('')
-  const [color, setColor] = useState(COLORS[0])
+  const [color, setColor] = useState(COLORS[0].value)
   const [scope, setScope] = useState<'tag' | 'friend_field'>('tag')
+  const [folderAccountId, setFolderAccountId] = useState<string | null>(selectedAccountId)
   const [saving, setSaving] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
   const [error, setError] = useState('')
   const activeRequestRef = useRef<FolderRequestKey>({ editId, generation: 0 })
   /**
@@ -33,9 +58,12 @@ function FolderEditor() {
     editId ? 'loading' : 'ready',
   )
 
-  // 画面名は共通トップバーだけに置く（`docs/v6-shell-contract.md` §3）。
+  // 画面名は共通トップバーだけに置く（`docs/v6-common-rules.md` §1）。
   // 本文に大見出しを戻すと、上部バーと同じ文字が2つ並ぶ。
-  usePageTitle(editId ? 'フォルダを編集' : 'フォルダを追加')
+  usePageTitle('友だち属性')
+
+  const close = () => router.push('/tags')
+  const dialogRef = useOverlayFocus(!deleteOpen, close, saving)
 
   const loadFolder = () => {
     const request = {
@@ -49,18 +77,19 @@ function FolderEditor() {
     // 同じページで ?id= が外れた場合も、前の編集内容を新規作成へ持ち越さない。
     if (!editId) {
       setName('')
-      setColor(COLORS[0])
+      setColor(COLORS[0].value)
       setScope('tag')
+      setFolderAccountId(selectedAccountId)
       setLoadState('ready')
       return
     }
 
     // 別フォルダの名前を読込中の面へ残さない。
     setName('')
-    setColor(COLORS[0])
+    setColor(COLORS[0].value)
     setLoadState('loading')
     void api.tagGroups
-      .list()
+      .list(selectedAccountId)
       .then((result) => {
         if (!isCurrentFolderRequest(activeRequestRef.current, request)) return
         if (!result.success) {
@@ -73,7 +102,8 @@ function FolderEditor() {
           return
         }
         setName(group.name)
-        setColor(group.color ?? COLORS[0])
+        setColor(group.color ?? COLORS[0].value)
+        setFolderAccountId(group.accountId)
         setLoadState('ready')
       })
       .catch((reason: unknown) => {
@@ -83,7 +113,7 @@ function FolderEditor() {
       })
   }
 
-  useEffect(loadFolder, [editId])
+  useEffect(loadFolder, [editId, selectedAccountId])
 
   const save = async () => {
     if (!name.trim() || saving || loadState !== 'ready') return
@@ -92,8 +122,8 @@ function FolderEditor() {
     try {
       if (scope === 'tag') {
         const result = editId
-          ? await api.tagGroups.update(editId, { name: name.trim(), color })
-          : await api.tagGroups.create({ name: name.trim(), color })
+          ? await api.tagGroups.update(editId, { name: name.trim(), color, accountId: folderAccountId })
+          : await api.tagGroups.create({ name: name.trim(), color, accountId: selectedAccountId })
         if (!result.success) throw new Error('save_failed')
       } else {
         const result = await api.folders.create({ kind: 'friend_field', name: name.trim(), color })
@@ -109,6 +139,29 @@ function FolderEditor() {
     }
   }
 
+  const remove = async () => {
+    if (!editId || saving) return
+    const request = { ...activeRequestRef.current }
+    setSaving(true)
+    setError('')
+    try {
+      const result = await api.tagGroups.delete(editId, folderAccountId)
+      if (!result.success) throw new Error('delete_failed')
+      if (!isCurrentFolderRequest(activeRequestRef.current, request)) return
+      router.push('/tags')
+    } catch (reason) {
+      if (!isCurrentFolderRequest(activeRequestRef.current, request)) return
+      setDeleteOpen(false)
+      setError(folderSaveErrorMessage(reason instanceof ApiError ? reason.status : undefined))
+    } finally {
+      if (isCurrentFolderRequest(activeRequestRef.current, request)) setSaving(false)
+    }
+  }
+
+  const closeFromBackdrop = (event: MouseEvent<HTMLDivElement>) => {
+    if (event.target === event.currentTarget && !saving) close()
+  }
+
   /**
    * 保存を止めている理由。**押せないだけにしない。**
    * 何が足りないのか本文に出さないと、直しようがないまま詰まる。
@@ -122,19 +175,29 @@ function FolderEditor() {
 
   return (
     <div data-design="friend-attributes-folder-v4" data-design-node="byqIW">
-      <header className="mb-5 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-ink-secondary text-sm">タグや友だち情報欄を、運用目的ごとに整理します。</p>
-          <nav className="text-ink-faint mt-3 text-xs">
-            <Link href="/tags" className="text-action hover:underline">友だち属性</Link>
-            <span className="mx-2">›</span>
-            {editId ? 'フォルダを編集' : 'フォルダを追加'}
-          </nav>
-        </div>
-        <Link href="/tags" className="rounded-control border-hairline bg-canvas text-ink-secondary border px-4 py-2.5 text-sm font-medium">友だち属性へ</Link>
-      </header>
-
-      <section className="rounded-card border-hairline bg-canvas mx-auto w-full max-w-[720px] border p-7 [box-shadow:1px_1px_1px_rgba(15,23,42,0.14)]">
+      {/* 設計 byqIW はタグ一覧を残したまま、追加・編集で同じ窓を重ねる。 */}
+      <TagsPageV4 accountId={selectedAccountId} />
+      <div
+        ref={dialogRef}
+        className="fixed inset-0 z-[90] flex items-center justify-center bg-ink/45 p-4"
+        onMouseDown={closeFromBackdrop}
+      >
+        <section
+          className="rounded-card border-hairline bg-canvas flex max-h-full w-full max-w-[620px] flex-col overflow-hidden border shadow-2xl"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="folder-editor-title"
+        >
+          <header className="border-hairline relative border-b px-5 py-4">
+            <h2 id="folder-editor-title" className="text-xl font-bold text-ink">
+              {editId ? 'フォルダを編集' : 'フォルダを追加'}
+            </h2>
+            <p className="text-ink-secondary mt-1 text-xs">{editId ? '名前と色を変えられます。削除しても中の項目は未分類に残ります。' : 'タグや友だち情報欄を、運用目的ごとに整理します。'}</p>
+            <button type="button" aria-label="閉じる" disabled={saving} onClick={close} className="text-ink-faint hover:text-ink absolute right-4 top-4 rounded p-1 disabled:opacity-40">
+              <X size={18} aria-hidden="true" />
+            </button>
+          </header>
+          <div className="min-h-0 overflow-y-auto px-5 py-4">
         {loadState === 'forbidden' ? (
           <p className="text-ink-secondary text-sm">見る権限がありません</p>
         ) : (
@@ -149,7 +212,7 @@ function FolderEditor() {
 
             <label className="block">
               <span className="text-ink mb-1.5 block text-sm font-semibold">
-                フォルダ名 <span className="bg-danger-bg text-danger rounded px-1.5 py-0.5 text-[10px]">必須</span>
+                フォルダ名
               </span>
               {/* 設計 `byqIW` の入力欄は h=44・文字13。 */}
               <input
@@ -159,11 +222,11 @@ function FolderEditor() {
                 placeholder="例: 購入"
                 maxLength={60}
                 disabled={loadState !== 'ready'}
-                className="rounded-control border-hairline text-label focus:border-accent focus:ring-accent/15 h-11 w-full border px-3 outline-none focus:ring-2 disabled:opacity-40"
+                className="rounded-control border-hairline text-label h-11 w-full border px-3 disabled:opacity-40"
               />
             </label>
 
-            <div className="mt-6">
+            <div className="mt-4">
               <p className="text-ink mb-3 text-sm font-semibold">フォルダの色</p>
               {/*
                 設計 `byqIW` の色見本は **枠38×38（r=10・背景canvas）の中に
@@ -173,34 +236,35 @@ function FolderEditor() {
               */}
               <div className="flex flex-wrap gap-2">
                 {COLORS.map((item) => {
-                  const selected = color === item
+                  const selected = color === item.value
                   return (
                     <button
-                      key={item}
+                      key={item.value}
                       type="button"
-                      aria-label={`色 ${item}`}
+                      /* **16進数ではなく名前で言う。**（要件 §13） */
+                      aria-label={item.name}
                       aria-pressed={selected}
+                      title={item.name}
                       disabled={loadState !== 'ready'}
-                      onClick={() => setColor(item)}
-                      className={`rounded-tile bg-canvas flex h-[38px] w-[38px] items-center justify-center disabled:opacity-40 ${
+                      onClick={() => setColor(item.value)}
+                      className={`rounded-card bg-canvas flex h-[38px] w-[38px] items-center justify-center disabled:opacity-40 ${
                         selected ? 'ring-accent ring-2' : 'ring-hairline ring-1'
                       }`}
                     >
-                      <span className="relative flex h-5 w-5 items-center justify-center rounded-full" style={{ backgroundColor: item }}>
+                      <span className="relative flex h-5 w-5 items-center justify-center rounded-full" style={{ backgroundColor: item.value }}>
                         {selected && <Check size={16} strokeWidth={3} className="text-on-accent" aria-hidden="true" />}
                       </span>
                     </button>
                   )
                 })}
               </div>
-              <p className="text-ink-faint mt-3 text-xs">選んだ色は、フォルダと中に入れた属性の印に使われます。</p>
             </div>
 
             {/*
               設計 `byqIW` の「一覧での表示」。色だけ選んでも、一覧で
               どう出るかは分からない。**選んだ色のまま名前を並べて見せる。**
             */}
-            <div className="rounded-tile border-hairline bg-canvas-sunken mt-6 flex flex-col gap-[7px] border p-[14px]">
+            <div className="rounded-card border-hairline bg-canvas-sunken mt-4 flex flex-col gap-[7px] border p-[14px]">
               <p className="text-nano text-ink-faint font-semibold">一覧での表示</p>
               <div className="flex items-center gap-2">
                 <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: color }} aria-hidden="true" />
@@ -212,13 +276,13 @@ function FolderEditor() {
               <div className="border-hairline mt-7 border-t pt-6">
                 <p className="text-ink mb-3 text-sm font-semibold">作成する場所</p>
                 <div className="flex gap-2">
-                  <button type="button" onClick={() => setScope('tag')} className={`rounded-pill border px-4 py-2 text-sm font-medium ${scope === 'tag' ? 'border-accent bg-accent-soft text-accent' : 'border-hairline text-ink-secondary'}`}>タグ</button>
-                  <button type="button" onClick={() => setScope('friend_field')} className={`rounded-pill border px-4 py-2 text-sm font-medium ${scope === 'friend_field' ? 'border-accent bg-accent-soft text-accent' : 'border-hairline text-ink-secondary'}`}>友だち情報欄</button>
+                  <button type="button" onClick={() => setScope('tag')} className={`rounded-pill border px-4 py-2 text-sm font-medium ${scope === 'tag' ? 'border-accent bg-accent-soft text-accent-deep' : 'border-hairline text-ink-secondary'}`}>タグ</button>
+                  <button type="button" onClick={() => setScope('friend_field')} className={`rounded-pill border px-4 py-2 text-sm font-medium ${scope === 'friend_field' ? 'border-accent bg-accent-soft text-accent-deep' : 'border-hairline text-ink-secondary'}`}>友だち情報欄</button>
                 </div>
               </div>
             )}
 
-            <p className="rounded-control border-hairline bg-canvas-sunken text-ink-secondary mt-7 border p-4 text-xs leading-5">フォルダをあとで削除しても、中に入れたタグや友だち情報欄は削除されず「未分類」に残ります。</p>
+            <p className="text-ink-secondary mt-4 text-xs leading-5">このダイアログは追加のときも編集のときも同じものを使います。</p>
 
             {error && <p className="text-danger mt-4 text-sm">{error}</p>}
             {/* 止まっている理由は本文に出す。押せない見た目だけにしない。 */}
@@ -227,13 +291,35 @@ function FolderEditor() {
               <p className="text-ink-faint mt-4 text-xs">{blockedReason}</p>
             )}
 
-            <div className="mt-7 flex justify-end gap-2">
-              <button type="button" onClick={() => router.back()} className="rounded-control border-hairline text-ink-secondary border px-5 py-2.5 text-sm font-medium">キャンセル</button>
-              <button type="button" disabled={saving || blockedReason !== null} onClick={() => void save()} className="rounded-control bg-accent text-on-accent px-5 py-2.5 text-sm font-bold disabled:opacity-40">{saving ? '保存中…' : editId ? '保存する' : 'フォルダを追加'}</button>
-            </div>
+            <StickyBar
+              className="-mx-5 -mb-4 mt-4 rounded-none border-x-0 border-b-0"
+              destructive={editId ? (
+                <Button type="button" className="border-danger/30 text-danger" disabled={saving} onClick={() => setDeleteOpen(true)}>
+                  <Trash2 size={16} aria-hidden="true" /> フォルダを削除
+                </Button>
+              ) : undefined}
+              actions={(
+                <>
+                  <button type="button" disabled={saving} onClick={close} className="rounded-control border-hairline bg-canvas text-ink-secondary border px-4 py-2.5 text-sm font-medium hover:bg-canvas-sunken disabled:opacity-40">キャンセル</button>
+                  <Button type="button" variant="primary" disabled={saving || blockedReason !== null} onClick={() => void save()}>{saving ? '保存中…' : editId ? <><FolderCheck size={16} aria-hidden="true" /> フォルダを保存</> : 'フォルダを追加'}</Button>
+                </>
+              )}
+            />
           </>
         )}
+          </div>
       </section>
+      </div>
+      <ConfirmDialog
+        open={deleteOpen}
+        title={`「${name}」を削除しますか？`}
+        description="フォルダだけを削除します。中にあるタグは削除されず、未分類へ戻ります。"
+        confirmLabel="このフォルダを削除"
+        destructive
+        busy={saving}
+        onCancel={() => { if (!saving) setDeleteOpen(false) }}
+        onConfirm={() => void remove()}
+      />
     </div>
   )
 }

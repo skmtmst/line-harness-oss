@@ -22,7 +22,16 @@ describe('友だち属性 V4 contract', () => {
     expect(editor).toContain("useState(initialValues?.applyToExisting ?? initialApplyToExisting)")
     expect(editor).toContain('すでに付いている人への反映')
     expect(editor).toContain('さかのぼってマイルを積みますか？')
+    expect(editor).toContain('max-w-[670px] -translate-y-7')
+    expect(editor).toContain('<Coins size={21}')
+    expect(editor).toContain('新規作成のときはこのダイアログは出ません')
     expect(page).toContain('applyToExisting: applyRetroactive && values.applyToExisting')
+  })
+
+  it('公開・下書き版が無いタグの削除確認は設計どおり5行にする', () => {
+    const source = read('components/friend-fields/tags-page-v4.tsx')
+    expect(source).toContain('if (impact?.linkedActions.length)')
+    expect(source).toContain("rows.push({ name: '使用中の版'")
   })
 
   it('タグ編集と対応マーク保管はV6の結果を正しく案内する', () => {
@@ -30,8 +39,7 @@ describe('友だち属性 V4 contract', () => {
     const markList = read('components/friend-fields/mark-list.tsx')
     expect(editor).toContain("mode === 'edit' ? 'この変更で起きること' : 'この設定で起きること'")
     expect(editor).toContain('取り消せない操作です')
-    expect(markList).toContain('友だちは「${defaultMark?.name')
-    expect(markList).toContain('変更履歴は残ります')
+    expect(markList).toContain('選んだマークへ置き換えて履歴を残します')
     expect(markList).not.toContain('対応マークが未設定へ戻ります')
   })
 
@@ -42,7 +50,7 @@ describe('友だち属性 V4 contract', () => {
     expect(editor).not.toContain('text-[32px] font-bold tracking-tight')
     expect(editor).not.toContain('友だちを分類するタグを作ります。タグが付いた瞬間の連動')
     expect(editor).toContain('番目のアクションを複製')
-    expect(editor).toContain("action.type === 'タグ' || action.type === 'マイル'")
+    expect(editor).toContain("action.type === 'タグ追加' || action.type === 'タグ解除'")
     // マイル設定だけを根拠に、存在しない連動アクションを作って表示しない。
     expect(editor).not.toContain("id: 'sample-1'")
   })
@@ -50,10 +58,11 @@ describe('友だち属性 V4 contract', () => {
   it('タグの複製はリンクだけで終わらず、既存データを作成画面へ引き継ぐ', () => {
     const page = read('components/friend-fields/new-tag-page-v4.tsx')
     expect(page).toContain("const copyId = params.get('copy')")
-    expect(page).toContain('api.tags.list({ withCounts: true })')
-    expect(page).toContain('name: `${copySource.name} のコピー`')
-    expect(page).toContain('rewardMiles: copySource.mileageReward ?? 0')
-    expect(page).toContain('actions: []')
+    expect(page).toContain('api.tags.definition(copyId, selectedAccountId)')
+    expect(page).toContain('name: `${copySource.tag.name} のコピー`')
+    expect(page).toContain('rewardMiles: copySource.tag.mileageReward ?? 0')
+    expect(page).toContain('.map((action) => linkedActionFromDefinition(')
+    expect(page).toContain('copySource.tag.linkedActions?.find')
   })
 
   it('一覧は20・30・40・50件で切り替え、ページを無限に横並びにしない', () => {
@@ -65,9 +74,10 @@ describe('友だち属性 V4 contract', () => {
     expect(source).not.toContain("'前へ'")
     expect(source).toContain('CSVで一括登録')
     // 2026-08-26: 「並び替え」ボタンは設計に無い。つまみを常に出して、
-    // いつでも並び替えられるようにした（docs/v6-shell-contract.md の 4-1 基準）。
+    // いつでも並び替えられるようにした（docs/v6-common-rules.md §1 の 4-1 基準）。
+    // N-049: つまみはドラッグ専用の印ではなく ReorderGrip（↑↓キーでも動く）。
     expect(source).not.toContain('並び替えを終了')
-    expect(source).toContain('ドラッグして並び替え')
+    expect(source).toContain('ReorderGrip')
     expect(source).not.toContain('min-w-[1180px]')
   })
 
@@ -94,10 +104,26 @@ describe('友だち属性 V4 contract', () => {
     expect(migrate).toContain('api.friendFields.migrationPreview(')
     expect(migrate).toContain('事前確認する')
     expect(migrate).not.toContain('dry-run')
-    expect(migrate).toContain('友だちの値や既存の項目は変更しません')
-    expect(migrate).not.toContain('migrationExecute')
+    expect(migrate).toContain('事前確認では値を1件も変更しません')
+    /*
+      ATTR-09: 事前確認で止まらず、確認済みの内容で実行までつなぐ。
+      実行には previewToken と冪等キーが要る（ATTR-10）。
+      以前は `not.toContain('migrationExecute')` で「実行口を持たない」
+      ことを固定していた。それが監査で指摘した欠陥そのものだった。
+    */
+    expect(migrate).toContain('api.friendFields.migrationExecute(')
+    expect(migrate).toContain('移行を実行する')
+    expect(migrate).toContain('previewToken')
+    expect(migrate).toContain('crypto.randomUUID()')
+    // ATTR-10: 確認中に条件を変えたら、飛んでいる確認の応答を捨てる。
+    expect(migrate).toContain('createResponseGate')
+    expect(migrate).toContain('resetConfirmation')
     // 回答フォームはまだアカウント所属を持たない。全体件数を0件と偽らない。
-    expect(list).toContain("formLinks === null ? '未取得'")
+    // **見るのは「口が無いときに数を作らないか」。言い方の字面は固定しない。**
+    // 「未取得」の一語だけでは、待てば出るのか・壊れているのかが分からないので、
+    // 共通部品の文へ広げた（`field-list-kpi-reason-contract.test.ts` が中身を見る）。
+    expect(list).toContain('summary?.formLinks === null')
+    expect(list).toContain("notConnectedText('回答フォームの登録先')")
     // 画面名は共通トップバーだけに置く。本文の大見出しへ戻さない。
     expect(create).not.toContain("import Header from '@/components/layout/header'")
     expect(migrate).not.toContain("import Header from '@/components/layout/header'")
@@ -108,9 +134,17 @@ describe('友だち属性 V4 contract', () => {
     const empty = source.indexOf('まだ友だち情報欄がありません')
     expect(empty).toBeGreaterThan(-1)
     expect(source.slice(0, empty).lastIndexOf("status === 'error'")).toBeGreaterThan(-1)
-    expect(source).toContain("status === 'ready' ? <Button href=\"/tags/fields/new\"")
-    expect(source).toContain('status === \'ready\' && error')
-    expect(source).toContain('友だち情報欄を再読み込み</Button>')
+    /*
+      #1014 ATTR-22: 「＋ 項目を作る」はタブ行の右に1個だけ。
+      一覧部品は作成ボタンを持たない。
+      #1014 ATTR-02: 操作の失敗は読み込みの失敗（error）とは別の
+      actionError に載せる。再読込で消えて「成功に見える」を防ぐ。
+    */
+    const tabsPage = read('components/friend-fields/tags-page-v4.tsx')
+    expect(tabsPage).toContain('href="/tags/fields/new"')
+    expect(source).not.toContain('href="/tags/fields/new"')
+    expect(source).toContain('status === \'ready\' && actionError')
+    expect(source).toContain('onRetry={() => void load()}')
     expect(source).toContain("setError(forbidden ? '' : '再読み込みしても直らない場合はエラー報告へ。')")
     expect(source).toContain('setItems([])')
   })
@@ -177,7 +211,15 @@ describe('友だち属性 V4 contract', () => {
     // ここで「手動」と埋めると、断定できなかったものを断定したことになる。
     expect(source).toContain("tag.assignSource ? SOURCE_LABELS[tag.assignSource] : '—'")
     // 使用先。`withCounts=1` で読んでいるので、無いのは0件＝「未使用」。
-    expect(source).toContain("api.tags.list({ withCounts: true })")
+    expect(source).toContain("api.tags.list({ withCounts: true, accountId })")
+    /*
+     * フォルダの選択肢はタグのアカウント範囲に限る（他アカウントの
+     * フォルダへ黙って入れない）。一覧では選び直し欄を置かず（m21o）、
+     * 編集画面の「所属フォルダ」で変える。絞りは編集画面の読み込み時に行う。
+     */
+    expect(source).not.toContain('<FolderSelect')
+    const edit = read('components/friend-fields/edit-tag-page-v4.tsx')
+    expect(edit).toContain('folders.data.filter((group) => group.accountId === selectedAccountId)')
     expect(source).toContain("if (!tag.usedIn) return 'なし'")
     /*
       「未使用」は **友だち0人かつ全参照0件**（kenta 確定 2026-08-26）。
@@ -219,7 +261,8 @@ describe('友だち属性 V4 contract', () => {
     // #384で共通Tag型へ入ったため、画面だけの仮型へ戻さない。
     expect(source).not.toContain('TagWithCleanup')
     // 未取得は `—`、取得できて0件は `0件`。
-    expect(source).toContain("`未使用 ${unusedCount === null ? '—' : `${unusedCount}件`}`")
+    // 未使用の数は KPI の「未使用」カードが受け持つ（タグ総数の重ね書きをやめた跡）。
+    expect(source).toContain("value: unusedCount,")
     expect(source).toContain("unit: cleanupCount === null ? '' : '件'")
   })
 
@@ -248,30 +291,41 @@ describe('友だち属性 V4 contract', () => {
     }
     expect(dialog).toContain('入らなかった')
     expect(dialog).toContain('failedTagRowsCsv(result.rows)')
+    for (const label of ['新しく作る', '飛ばす', 'エラー', 'やめる', '一覧へ戻る']) {
+      expect(dialog).toContain(label)
+    }
+    expect(dialog).toContain(".slice(0, 5)")
+    expect(dialog).not.toContain('<Th>フォルダ</Th><Th>入らなかった理由</Th>')
   })
 
-  it('使用中のタグを、画面が削除させない', () => {
+  it('使用中のタグは削除せず、影響確認後に履歴を残してアーカイブする', () => {
     const source = read('components/friend-fields/tags-page-v4.tsx')
-    // 削除する前に影響を数える口を叩く（PR #381）。
-    expect(source).toContain('api.tags.deleteImpact(tag.id)')
+    // アーカイブ前に実参照と版を返す正本の口を叩く。
+    expect(source).toContain('api.tags.dependencies(tag.id, accountId)')
     /*
-      **DELETE 側にはまだ強制停止が入っていない。** 止めるのは画面の役目。
-      読込中・失敗・使用中の3つとも押せなくする。
-      失敗を「参照0件」と読み違えて消させないため、失敗も止める側に入れる。
+      読込中・失敗は押せなくする。使用中でも物理削除はせず、いま付いている
+      友だちと履歴を残すアーカイブなら実行できる。
     */
-    expect(source).toContain("const blocked = impactStatus !== 'ready' || impact?.canDelete === false")
-    expect(source).toContain('if (blocked || text !== tag.name || saving) return')
-    expect(source).toContain('disabled={blocked || saving || text !== tag.name}')
+    expect(source).toContain("const blocked = impactStatus !== 'ready' || !impact || !accountId || saving")
+    expect(source).toContain('disabled={blocked || text !== tag.name}')
     // 確認欄も止める。名前を打てば消せる、と思わせない。
     expect(source).toContain('disabled={blocked}')
     // 止まっている理由を必ず出す。押せないだけだと理由が分からない。
     expect(source).toContain('影響を確認しています')
     expect(source).toContain('影響を確認できませんでした')
-    expect(source).toContain('使用中のため削除できません')
+    expect(source).toContain('api.tags.archive(tag.id, accountId')
+    expect(source).toContain('max-w-[670px] -translate-y-5')
+    expect(source).toContain('gap-3 px-4 py-3')
+    expect(source).toContain('expectedVersion: impact.tag.version')
+    expect(source).toContain('impactRevision: impact.revision')
+    expect(source).toContain('crypto.randomUUID()')
     // 消せるタグに赤い警告を出さない。以前は三項演算子の else で
     // 「アフィリエイトのオファーで使用中」と誤表示していた。
     expect(source).toContain("impactStatus === 'ready' && impact && !impact.canDelete && (")
-    expect(source).not.toContain('アフィリエイトのオファーで使用中のタグは削除できません')
+    expect(source).not.toContain('api.tags.delete(tag.id)')
+    expect(source).toContain('impact.referenceCounts.affiliateOffers > 0')
+    /* R190: 操作名は保管に統一。実行するのは履歴を残す保管（アーカイブ）。 */
+    expect(source).toContain('有効な参照があるタグは保管できません')
   })
 
   it('参照先は0件のものを出さず、取れないときは「0」と書かない', () => {
@@ -289,13 +343,33 @@ describe('友だち属性 V4 contract', () => {
     // 0件は出さない。
     expect(source).toContain('labels.filter(([key]) => refs[key] > 0)')
     // 取れていないときは `—`。0件（「なし」）と書き分ける。
-    expect(source).toContain("refs ? refSummary(refs, MANUAL_REFS) : '—'")
+    expect(source).toContain("refs ? manualRefSummary(refs) : '—'")
     expect(source).toContain("refs ? refSummary(refs, AUTO_REFS) : '—'")
+    expect(source).toContain("MANUAL_REFS.filter(([key]) => key !== 'affiliateOffers')")
   })
 
   it('タグの作成・編集・一覧ルートはV4を既定表示にする', () => {
     expect(read('app/tags/page.tsx')).toContain('<TagsPageV4 accountId={selectedAccountId} />')
     expect(read('app/tags/new/page.tsx')).toContain('<NewTagPageV4 />')
     expect(read('app/tags/edit/page.tsx')).toContain('<EditTagPageV4 />')
+  })
+
+  it('タグ編集の削除確認は参照件数の実値を出し、取れなければ押せなくする', () => {
+    const source = read('components/friend-fields/edit-tag-page-v4.tsx')
+    // `load()` で取った `dependencies` を窓へ渡す。固定値を書かない。
+    expect(source).toContain('api.tags.dependencies(tagId, selectedAccountId)')
+    expect(source).toContain('dependencies={dependencies} dependenciesStatus={dependenciesStatus}')
+    expect(source).not.toMatch(/参照<\/dt><dd[^>]*>3件/)
+    expect(source).not.toMatch(/自動付与の参照<\/dt><dd[^>]*>1件/)
+    // 実値が出るのは「人が選ぶ参照」と「自動の参照」の合計。
+    expect(source).toContain('MANUAL_REF_KEYS')
+    expect(source).toContain('AUTO_REF_KEYS')
+    expect(source).toContain("manualRefs === null ? '—'")
+    expect(source).toContain("autoRefs === null ? '—'")
+    // 取れていないあいだは削除を押せなくし、理由を出す。
+    expect(source).toContain("const blocked = dependenciesStatus !== 'ready' || !dependencies")
+    expect(source).toContain('disabled={deleting || blocked || confirmation !== tag.name}')
+    expect(source).toContain('影響を確認しています')
+    expect(source).toContain('影響を確認できませんでした')
   })
 })

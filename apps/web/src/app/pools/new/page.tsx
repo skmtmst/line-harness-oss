@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { LineAccount } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import CreatePage, { Field, inputClass } from '@/components/shared/create-page'
+import Select from '@/components/shared/select'
 
 /** slug は URL に出る。日本語や記号を許すと /pool/xxx が壊れる。 */
 const SLUG_PATTERN = /^[a-z0-9][a-z0-9-]{1,31}$/
@@ -13,21 +14,63 @@ export default function NewPoolPage() {
   const [slug, setSlug] = useState('')
   const [accountId, setAccountId] = useState('')
   const [accounts, setAccounts] = useState<LineAccount[]>([])
+  const [accountsError, setAccountsError] = useState('')
+  const selectedAccount = accounts.find((account) => account.id === accountId)
 
-  useEffect(() => {
-    void api.lineAccounts.list().then((res) => {
+  /**
+   * 受け入れ先の一覧。取れなかったときに「アカウントが0件」と
+   * 見せると選びようがないので、失敗したことと読み直す口を出す。
+   */
+  const loadAccounts = useCallback(async () => {
+    setAccountsError('')
+    try {
+      const res = await api.lineAccounts.list()
       if (res.success) {
         setAccounts(res.data)
-        if (res.data.length > 0) setAccountId(res.data[0].id)
+        // 既に選んだあと（再読み込み）なら、その選択を上書きしない。
+        if (res.data.length > 0) setAccountId((current) => current || res.data[0].id)
+      } else {
+        setAccountsError('LINEアカウントを読み込めませんでした。もう一度お試しください。')
       }
-    })
+    } catch {
+      setAccountsError('LINEアカウントを読み込めませんでした。通信を確かめて、もう一度お試しください。')
+    }
   }, [])
+
+  useEffect(() => {
+    void loadAccounts()
+  }, [loadAccounts])
 
   return (
     <CreatePage
       title="プールを作る"
       description="複数のLINE公式アカウントをひとまとめにして、友だちの追加先を自動で振り分けます。"
+      showHeader={false}
       parent={['プール', '/pools']}
+      variant="v6"
+      aside={(
+        <section className="bg-canvas border-hairline rounded-card border p-5 shadow-sm">
+          <h2 className="text-ink text-base font-bold">プレビュー</h2>
+          <p className="text-ink-faint mt-1 text-xs">友だちが開く追加先と、現在の受け入れ先です。</p>
+          <div className="bg-canvas-sunken rounded-control mt-4 p-4">
+            <p className="text-ink-faint text-xs">友だち追加URL</p>
+            {slug && SLUG_PATTERN.test(slug) ? (
+              <>
+                <code className="text-ink mt-1 block break-all text-sm">/pool/{slug}</code>
+                <p className="text-ink-faint mt-1 text-xs">保存すると、このURLが発行されます。</p>
+              </>
+            ) : (
+              <>
+                {/* #975 U066: 未入力でも実URLに見える表示をしない。例と明記する。 */}
+                <code className="text-ink-faint mt-1 block break-all text-sm">例: /pool/shibuya</code>
+                <p className="text-ink-faint mt-1 text-xs">まだURLは発行されていません。「URLに使う名前」を入れて保存すると、正式なURLが発行されます。</p>
+              </>
+            )}
+            <p className="text-ink-faint mt-4 text-xs">現在の受け入れ先</p>
+            <p className="text-ink mt-1 text-sm font-semibold">{selectedAccount?.name ?? '未選択'}</p>
+          </div>
+        </section>
+      )}
       validate={() => {
         if (!name.trim()) return '名前を入力してください'
         if (!SLUG_PATTERN.test(slug)) {
@@ -94,18 +137,26 @@ export default function NewPoolPage() {
         required
         note="友だち数が上限に近づいたら、ここを切り替えます。配ったURLはそのまま使えます。"
       >
-        <select
+        <Select
           id="pl-account"
           value={accountId}
-          onChange={(e) => setAccountId(e.target.value)}
-          className={inputClass}
-        >
-          {accounts.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.name}
-            </option>
-          ))}
-        </select>
+          onChange={(value) => setAccountId(value)}
+          aria-label="いまの受け入れ先"
+          size="full"
+          options={accounts.map((account) => ({ value: account.id, label: account.name }))}
+        />
+        {accountsError && (
+          <p className="text-danger mt-1 text-xs">
+            {accountsError}{' '}
+            <button
+              type="button"
+              onClick={() => void loadAccounts()}
+              className="underline"
+            >
+              再読み込み
+            </button>
+          </p>
+        )}
       </Field>
     </CreatePage>
   )

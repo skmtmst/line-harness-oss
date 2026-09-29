@@ -1,4 +1,7 @@
+import * as dbPackage from '@line-crm/db';
+import type { NenRankSetting } from '@line-crm/db';
 import { attachTagAndFireSideEffects, detachTagAndFireSideEffects } from './friend-tag-attach.js';
+import { createFeatureJobGate } from './feature-enforcement.js';
 
 export const NEN_TAG = {
   member: 'nen-tag-member-nen',
@@ -93,6 +96,10 @@ type Snapshot = {
   purchase_count: number;
   purchase_amount: number;
   member_rank: string;
+  /** ECが計算した通年（1〜12月の購入額）。届いていなければ 0。 */
+  annual_miles_yen?: number | null;
+  /** ECが計算したランクのキー。届いていなければ null（通年としきい値から求める）。 */
+  member_rank_key?: string | null;
 };
 
 type Pet = {
@@ -137,6 +144,25 @@ const DELIVERY_ELIGIBILITY_TAGS = [
   NEN_TAG.deliveryReview, NEN_TAG.deliveryRecommendation, NEN_TAG.deliveryColumn,
   NEN_TAG.deliveryBirthday,
 ];
+const EC_STATE_TAGS = [
+  NEN_TAG.member, NEN_TAG.lineLinked, NEN_TAG.ecLinked, ...RANK_TAGS,
+  ...PURCHASE_STATE_TAGS, ...PURCHASE_RECENCY_TAGS,
+  NEN_TAG.purchase20k, NEN_TAG.purchase50k, NEN_TAG.purchase100k,
+  NEN_TAG.paymentAmazon, NEN_TAG.paymentCard, NEN_TAG.paymentBank,
+  ...SUBSCRIPTION_STATE_TAGS,
+  NEN_TAG.interestVenison, NEN_TAG.interestPetFood,
+  NEN_TAG.productMince, NEN_TAG.productRib, NEN_TAG.productBalance, NEN_TAG.productTreat,
+  NEN_TAG.productSet, NEN_TAG.productSingle, NEN_TAG.productTrial, NEN_TAG.productSubscription,
+];
+const SCHEDULED_REFRESH_BATCH_SIZE = 20;
+const ALL_REFRESH_TAGS = [...new Set([
+  ...EC_STATE_TAGS,
+  ...PET_STATE_TAGS,
+  ...HEALTH_STATE_TAGS,
+  ...PHOTO_STATE_TAGS,
+  ...DELIVERY_ELIGIBILITY_TAGS,
+  NEN_TAG.deliveryOptout,
+])];
 
 function parseJson<T>(value: string | null | undefined, fallback: T): T {
   if (!value) return fallback;
@@ -175,7 +201,6 @@ function productTags(nameValue: unknown): string[] {
 export function deriveEcTagIds(snapshot: Snapshot | null, now = new Date()): Set<string> {
   const desired = new Set<string>([NEN_TAG.member, NEN_TAG.lineLinked]);
   if (!snapshot) {
-    desired.add(NEN_TAG.rankBasic);
     desired.add(NEN_TAG.purchaseNone);
     desired.add(NEN_TAG.subscriptionNone);
     return desired;
@@ -184,7 +209,6 @@ export function deriveEcTagIds(snapshot: Snapshot | null, now = new Date()): Set
 
   const amount = Math.max(0, Number(snapshot.purchase_amount || 0));
   const count = Math.max(0, Number(snapshot.purchase_count || 0));
-  desired.add(amount >= 100_000 ? NEN_TAG.rankPlatinum : amount >= 50_000 ? NEN_TAG.rankGold : amount >= 20_000 ? NEN_TAG.rankSilver : NEN_TAG.rankBasic);
   if (count === 0) desired.add(NEN_TAG.purchaseNone);
   if (count === 1) desired.add(NEN_TAG.purchaseFirst);
   if (count > 0) desired.add(NEN_TAG.purchaseExperienced);
@@ -274,7 +298,8 @@ export function derivePetTagIds(pets: Pet[], now = new Date()): Set<string> {
       const age = ageYears(pet.birthday, now);
       if (age !== null) desired.add(age < 1 ? NEN_TAG.petYoung : age >= 7 ? NEN_TAG.petSenior : NEN_TAG.petAdult);
       if (age !== null && age >= 7) desired.add(NEN_TAG.interestSenior);
-      const month = Number(pet.birthday.slice(5, 7));
+      // 誕生日は月日だけ（MM-DD）の形もあるので、最後5桁から月を取る。
+      const month = Number(pet.birthday.slice(-5, -3));
       if (month === currentMonth) desired.add(NEN_TAG.petBirthdayThisMonth);
       if (month === nextMonth) desired.add(NEN_TAG.petBirthdayNextMonth);
     }
@@ -285,13 +310,94 @@ export function derivePetTagIds(pets: Pet[], now = new Date()): Set<string> {
   return desired;
 }
 
-async function syncManagedTags(db: D1Database, friendId: string, managed: readonly string[], desired: Set<string>): Promise<{ added: number; removed: number }> {
+/**
+ * ランクのタグ。設定（nen_rank_settings）から「いまのランクのタグ1つ」を選ぶ。
+ * 設定が無いアカウントは初期の4ランク（migration 080 のタグ）で判定する。
+ *
+ * ランクは通年（ECが計算した annual_miles_yen）で決まる。ECから rank_key が届いて
+ * いればそれを優先し、届いていなければ通年としきい値から求める。ECの値が無い
+ * 友だち（連携前）は購入額の足し算（purchase_amount）を通年の代わりに使う。
+ */
+type RankTagLookup = Pick<NenRankSetting, 'rank_key' | 'name' | 'annual_threshold_yen' | 'mile_rate_percent' | 'tag_id'>;
+
+// packages/db の DEFAULT_NEN_RANKS と同じ値。多くのテストが @line-crm/db を丸ごと mock するため、
+// ここでは定数を import せず、設定の読み出しだけを実行時に引く。
+const DEFAULT_RANK_LOOKUP: RankTagLookup[] = [
+  { rank_key: 'regular', name: 'レギュラー', annual_threshold_yen: 0, mile_rate_percent: 1, tag_id: NEN_TAG.rankBasic },
+  { rank_key: 'silver', name: 'シルバー', annual_threshold_yen: 30_000, mile_rate_percent: 1.5, tag_id: NEN_TAG.rankSilver },
+  { rank_key: 'gold', name: 'ゴールド', annual_threshold_yen: 60_000, mile_rate_percent: 2, tag_id: NEN_TAG.rankGold },
+  { rank_key: 'platinum', name: 'プラチナ', annual_threshold_yen: 120_000, mile_rate_percent: 3, tag_id: NEN_TAG.rankPlatinum },
+];
+
+async function loadRankSettings(db: D1Database, lineAccountId: string): Promise<RankTagLookup[]> {
+  try {
+    // 丸ごと mock された @line-crm/db は、無い名前を読むだけで投げる。読み出しごと try に入れる。
+    const loader = (dbPackage as { getNenRankSettings?: (db: D1Database, id: string) => Promise<NenRankSetting[]> }).getNenRankSettings;
+    if (typeof loader !== 'function') return [];
+    return await loader(db, lineAccountId);
+  } catch {
+    return [];
+  }
+}
+
+function pickRank(ranks: RankTagLookup[], annualYen: number, preferredKey: string | null): RankTagLookup | null {
+  if (ranks.length === 0) return null;
+  const sorted = [...ranks].sort((a, b) => a.annual_threshold_yen - b.annual_threshold_yen);
+  let index = preferredKey ? sorted.findIndex((rank) => rank.rank_key === preferredKey) : -1;
+  if (index < 0) {
+    index = 0;
+    sorted.forEach((rank, i) => { if (annualYen >= rank.annual_threshold_yen) index = i; });
+  }
+  return sorted[index] ?? null;
+}
+
+export class RankTagResolver {
+  private readonly cache = new Map<string, RankTagLookup[]>();
+
+  constructor(private readonly db: D1Database) {}
+
+  async ranksFor(lineAccountId: string | null): Promise<RankTagLookup[]> {
+    const key = lineAccountId ?? '';
+    const cached = this.cache.get(key);
+    if (cached) return cached;
+    const ranks = lineAccountId ? await loadRankSettings(this.db, lineAccountId) : [];
+    const lookup = ranks.length ? ranks : DEFAULT_RANK_LOOKUP;
+    this.cache.set(key, lookup);
+    return lookup;
+  }
+
+  /** このアカウントで付け替え対象になるランクタグ全部（既存の4つ＋設定で作ったもの）。 */
+  async managedTagIds(lineAccountId: string | null): Promise<string[]> {
+    const ranks = await this.ranksFor(lineAccountId);
+    return [...new Set([...RANK_TAGS, ...ranks.map((rank) => rank.tag_id).filter((id): id is string => Boolean(id))])];
+  }
+
+  async desiredTagId(lineAccountId: string | null, snapshot: Snapshot | null): Promise<string | null> {
+    const ranks = await this.ranksFor(lineAccountId);
+    const annual = snapshot
+      ? Math.max(0, Number(snapshot.annual_miles_yen ?? 0) || Number(snapshot.purchase_amount || 0))
+      : 0;
+    const rank = pickRank(ranks, annual, snapshot?.member_rank_key ?? null);
+    return rank?.tag_id ?? null;
+  }
+}
+
+async function syncManagedTags(
+  db: D1Database,
+  friendId: string,
+  managed: readonly string[],
+  desired: Set<string>,
+  prefetchedCurrentIds?: Set<string>,
+): Promise<{ added: number; removed: number }> {
   const uniqueManaged = [...new Set(managed)];
-  const placeholders = uniqueManaged.map(() => '?').join(',');
-  const current = await db.prepare(
-    `SELECT tag_id FROM friend_tags WHERE friend_id = ? AND tag_id IN (${placeholders})`,
-  ).bind(friendId, ...uniqueManaged).all<{ tag_id: string }>();
-  const currentIds = new Set(current.results.map((row) => row.tag_id));
+  let currentIds = prefetchedCurrentIds;
+  if (!currentIds) {
+    const placeholders = uniqueManaged.map(() => '?').join(',');
+    const current = await db.prepare(
+      `SELECT tag_id FROM friend_tags WHERE friend_id = ? AND tag_id IN (${placeholders})`,
+    ).bind(friendId, ...uniqueManaged).all<{ tag_id: string }>();
+    currentIds = new Set(current.results.map((row) => row.tag_id));
+  }
   let added = 0;
   let removed = 0;
   for (const tagId of uniqueManaged) {
@@ -307,23 +413,18 @@ async function syncManagedTags(db: D1Database, friendId: string, managed: readon
 export async function syncNenEcTags(db: D1Database, friendId: string, now = new Date()): Promise<{ added: number; removed: number }> {
   const [snapshot, friend] = await Promise.all([
     db.prepare(
-      `SELECT customer_id, orders_json, subscription_json, purchase_count, purchase_amount, member_rank
+      `SELECT customer_id, orders_json, subscription_json, purchase_count, purchase_amount, member_rank,
+              annual_miles_yen, member_rank_key
          FROM nen_ec_member_snapshots WHERE friend_id = ?`,
     ).bind(friendId).first<Snapshot>(),
-    db.prepare(`SELECT user_id FROM friends WHERE id = ?`).bind(friendId).first<{ user_id: string | null }>(),
+    db.prepare(`SELECT user_id, line_account_id FROM friends WHERE id = ?`).bind(friendId).first<{ user_id: string | null; line_account_id: string | null }>(),
   ]);
   const desired = deriveEcTagIds(snapshot, now);
   if (friend?.user_id) desired.add(NEN_TAG.ecLinked);
-  const managed = [
-    NEN_TAG.member, NEN_TAG.lineLinked, NEN_TAG.ecLinked, ...RANK_TAGS,
-    ...PURCHASE_STATE_TAGS, ...PURCHASE_RECENCY_TAGS,
-    NEN_TAG.purchase20k, NEN_TAG.purchase50k, NEN_TAG.purchase100k,
-    NEN_TAG.paymentAmazon, NEN_TAG.paymentCard, NEN_TAG.paymentBank,
-    ...SUBSCRIPTION_STATE_TAGS,
-    NEN_TAG.interestVenison, NEN_TAG.interestPetFood,
-    NEN_TAG.productMince, NEN_TAG.productRib, NEN_TAG.productBalance, NEN_TAG.productTreat,
-    NEN_TAG.productSet, NEN_TAG.productSingle, NEN_TAG.productTrial, NEN_TAG.productSubscription,
-  ];
+  const resolver = new RankTagResolver(db);
+  const rankTag = await resolver.desiredTagId(friend?.line_account_id ?? null, snapshot);
+  if (rankTag) desired.add(rankTag);
+  const managed = [...EC_STATE_TAGS, ...await resolver.managedTagIds(friend?.line_account_id ?? null)];
   return syncManagedTags(db, friendId, managed, desired);
 }
 
@@ -343,20 +444,37 @@ export async function syncNenHealthTags(db: D1Database, friendId: string, now = 
     db.prepare(`SELECT flag_type FROM nen_care_flags WHERE friend_id = ? AND status = 'active'`)
       .bind(friendId).all<{ flag_type: string }>(),
   ]);
+  const desired = deriveHealthTagIds(logs.results, flags.results, now);
+  return syncManagedTags(db, friendId, HEALTH_STATE_TAGS, desired);
+}
+
+type HealthLog = {
+  pet_id: string;
+  logged_on: string;
+  weight_kg: number | null;
+  heart_rate_bpm: number | null;
+  respiratory_rate_bpm: number | null;
+};
+
+export function deriveHealthTagIds(
+  logs: HealthLog[],
+  flags: Array<{ flag_type: string }>,
+  now = new Date(),
+): Set<string> {
   const desired = new Set<string>();
-  if (logs.results.length) {
+  if (logs.length) {
     desired.add(NEN_TAG.healthDiary);
     desired.add(NEN_TAG.interestHealth);
   }
-  if (logs.results.some((log) => log.weight_kg !== null)) desired.add(NEN_TAG.healthWeightLog);
-  if (logs.results.some((log) => log.heart_rate_bpm !== null)) desired.add(NEN_TAG.healthHeartLog);
-  if (logs.results.some((log) => log.respiratory_rate_bpm !== null)) desired.add(NEN_TAG.healthBreathLog);
-  if (flags.results.some((flag) => flag.flag_type === 'poor_appetite')) desired.add(NEN_TAG.healthAppetiteCheck);
-  if (flags.results.some((flag) => flag.flag_type === 'abnormal_stool')) desired.add(NEN_TAG.healthStoolCheck);
-  const recent30 = logs.results.filter((log) => (daysSince(log.logged_on, now) ?? 31) <= 30);
+  if (logs.some((log) => log.weight_kg !== null)) desired.add(NEN_TAG.healthWeightLog);
+  if (logs.some((log) => log.heart_rate_bpm !== null)) desired.add(NEN_TAG.healthHeartLog);
+  if (logs.some((log) => log.respiratory_rate_bpm !== null)) desired.add(NEN_TAG.healthBreathLog);
+  if (flags.some((flag) => flag.flag_type === 'poor_appetite')) desired.add(NEN_TAG.healthAppetiteCheck);
+  if (flags.some((flag) => flag.flag_type === 'abnormal_stool')) desired.add(NEN_TAG.healthStoolCheck);
+  const recent30 = logs.filter((log) => (daysSince(log.logged_on, now) ?? 31) <= 30);
   if (recent30.length >= 3) desired.add(NEN_TAG.actionDiaryContinued);
   const byPet = new Map<string, number[]>();
-  for (const log of logs.results) {
+  for (const log of logs) {
     if (log.weight_kg === null) continue;
     const weights = byPet.get(log.pet_id) || [];
     if (weights.length < 2) weights.push(Number(log.weight_kg));
@@ -365,7 +483,7 @@ export async function syncNenHealthTags(db: D1Database, friendId: string, now = 
   if ([...byPet.values()].some(([latest, previous]) => previous > 0 && Math.abs(latest - previous) / previous >= 0.1)) {
     desired.add(NEN_TAG.healthWeightCheck);
   }
-  return syncManagedTags(db, friendId, HEALTH_STATE_TAGS, desired);
+  return desired;
 }
 
 export async function syncNenPhotoTags(db: D1Database, friendId: string): Promise<{ added: number; removed: number }> {
@@ -375,11 +493,17 @@ export async function syncNenPhotoTags(db: D1Database, friendId: string): Promis
             SUM(CASE WHEN status='adopted' THEN 1 ELSE 0 END) adopted
        FROM nen_photo_submissions WHERE friend_id = ?`,
   ).bind(friendId).first<{ total: number; pending: number; adopted: number }>();
+  return syncManagedTags(db, friendId, PHOTO_STATE_TAGS, derivePhotoTagIds(counts));
+}
+
+function derivePhotoTagIds(
+  counts: { total: number; pending: number; adopted: number } | null | undefined,
+): Set<string> {
   const desired = new Set<string>();
   if (Number(counts?.total || 0) > 0) desired.add(NEN_TAG.actionPhotoPosted);
   if (Number(counts?.pending || 0) > 0) desired.add(NEN_TAG.actionPhotoReview);
   if (Number(counts?.adopted || 0) > 0) desired.add(NEN_TAG.actionPhotoApproved);
-  return syncManagedTags(db, friendId, PHOTO_STATE_TAGS, desired);
+  return desired;
 }
 
 async function syncNenDeliveryTags(db: D1Database, friendId: string): Promise<{ added: number; removed: number }> {
@@ -401,19 +525,200 @@ export async function syncAllNenTagsForFriend(db: D1Database, friendId: string, 
 
 export type NenTagScope = Array<string | null> | { allTenants: true };
 
-export async function refreshAllNenTags(db: D1Database, scope: NenTagScope, limit = 500, now = new Date()): Promise<{ friends: number; added: number; removed: number }> {
-  const allTenants = !Array.isArray(scope);
-  const allowedAccountIds = allTenants ? [] : scope;
+type ScheduledRefreshResult = {
+  friends: number;
+  added: number;
+  removed: number;
+  hasMore?: boolean;
+  cursor?: string | null;
+};
+
+type RefreshState = { lastFriendId: string; cycleStartedAt: string };
+type RefreshFriend = { id: string; user_id: string | null; line_account_id: string | null };
+type SnapshotRow = Snapshot & { friend_id: string };
+type PetRow = Pet & { friend_id: string };
+type HealthLogRow = HealthLog & { friend_id: string };
+
+async function getRefreshState(db: D1Database, now: string): Promise<RefreshState> {
+  await db.prepare(
+    `INSERT OR IGNORE INTO nen_tag_refresh_state
+       (id, last_friend_id, cycle_started_at, updated_at)
+     VALUES (1, '', ?, ?)`,
+  ).bind(now, now).run();
+  const row = await db.prepare(
+    `SELECT last_friend_id, cycle_started_at FROM nen_tag_refresh_state WHERE id = 1`,
+  ).bind().first<{ last_friend_id: string; cycle_started_at: string }>();
+  if (!row) throw new Error('NEN tag refresh state is unavailable');
+  return { lastFriendId: row.last_friend_id, cycleStartedAt: row.cycle_started_at };
+}
+
+async function saveRefreshState(db: D1Database, state: RefreshState, now: string): Promise<void> {
+  await db.prepare(
+    `UPDATE nen_tag_refresh_state
+        SET last_friend_id = ?, cycle_started_at = ?, updated_at = ?
+      WHERE id = 1`,
+  ).bind(state.lastFriendId, state.cycleStartedAt, now).run();
+}
+
+function rowsByFriend<T extends { friend_id: string }>(rows: T[]): Map<string, T[]> {
+  const result = new Map<string, T[]>();
+  for (const row of rows) {
+    const values = result.get(row.friend_id) ?? [];
+    values.push(row);
+    result.set(row.friend_id, values);
+  }
+  return result;
+}
+
+async function refreshScheduledNenTags(
+  db: D1Database,
+  requestedLimit: number,
+  now: Date,
+): Promise<ScheduledRefreshResult> {
+  const nowText = now.toISOString();
+  const state = await getRefreshState(db, nowText);
+  const batchSize = Math.min(
+    SCHEDULED_REFRESH_BATCH_SIZE,
+    Math.max(1, Math.min(requestedLimit, 1_000)),
+  );
+  const page = await db.prepare(
+    `SELECT id, user_id, line_account_id FROM friends
+      WHERE is_following = 1 AND user_id IS NOT NULL AND user_id <> '' AND id > ?
+      ORDER BY id ASC LIMIT ?`,
+  ).bind(state.lastFriendId, batchSize + 1).all<RefreshFriend>();
+  const hasMore = page.results.length > batchSize;
+  const friends = page.results.slice(0, batchSize);
+
+  if (friends.length === 0) {
+    await saveRefreshState(db, { lastFriendId: '', cycleStartedAt: nowText }, nowText);
+    return { friends: 0, added: 0, removed: 0, hasMore: false, cursor: null };
+  }
+
+  const friendIds = friends.map((friend) => friend.id);
+  const placeholders = friendIds.map(() => '?').join(',');
+  const selectedFriendValues = friendIds.map(() => '(?)').join(',');
+  // 1人最大200件を1つのUNIONにまとめる。20人でも健康記録は最大4,000行。
+  const healthQuery = `${friendIds.map(() => `
+    SELECT friend_id, pet_id, logged_on, weight_kg, heart_rate_bpm, respiratory_rate_bpm
+      FROM (
+        SELECT friend_id, pet_id, logged_on, weight_kg, heart_rate_bpm, respiratory_rate_bpm
+          FROM nen_health_logs WHERE friend_id = ? ORDER BY logged_on DESC LIMIT 200
+      )`).join(' UNION ALL ')} ORDER BY friend_id ASC, logged_on DESC`;
+  // 設定で増やしたランクのタグも「いま付いているか」を先に読む（読まないと外せない）。
+  const rankResolver = new RankTagResolver(db);
+  const extraRankTags = new Set<string>();
+  for (const accountId of new Set(friends.map((friend) => friend.line_account_id))) {
+    for (const tagId of await rankResolver.managedTagIds(accountId)) extraRankTags.add(tagId);
+  }
+  const refreshTags = [...new Set([...ALL_REFRESH_TAGS, ...extraRankTags])];
+  const currentTagQueries = [];
+  for (let index = 0; index < refreshTags.length; index += 40) {
+    const tagIds = refreshTags.slice(index, index + 40);
+    currentTagQueries.push(db.prepare(
+      `SELECT friend_id, tag_id FROM friend_tags
+        WHERE friend_id IN (${placeholders})
+          AND tag_id IN (${tagIds.map(() => '?').join(',')})`,
+    ).bind(...friendIds, ...tagIds).all<{ friend_id: string; tag_id: string }>());
+  }
+  const [snapshots, pets, healthLogs, careFlags, photos, currentTagPages] = await Promise.all([
+    db.prepare(
+      `SELECT friend_id, customer_id, orders_json, subscription_json,
+              purchase_count, purchase_amount, member_rank, annual_miles_yen, member_rank_key
+         FROM nen_ec_member_snapshots WHERE friend_id IN (${placeholders})`,
+    ).bind(...friendIds).all<SnapshotRow>(),
+    db.prepare(
+      `SELECT friend_id, animal_type, birthday, weight_kg, concerns, image_url
+         FROM nen_pet_profiles WHERE friend_id IN (${placeholders})`,
+    ).bind(...friendIds).all<PetRow>(),
+    db.prepare(healthQuery).bind(...friendIds).all<HealthLogRow>(),
+    db.prepare(
+      `SELECT friend_id, flag_type FROM nen_care_flags
+        WHERE status = 'active' AND friend_id IN (${placeholders})`,
+    ).bind(...friendIds).all<{ friend_id: string; flag_type: string }>(),
+    db.prepare(
+      `WITH selected_friends(friend_id) AS (VALUES ${selectedFriendValues})
+       SELECT selected_friends.friend_id,
+              EXISTS(
+                SELECT 1 FROM nen_photo_submissions
+                 WHERE friend_id = selected_friends.friend_id LIMIT 1
+              ) total,
+              EXISTS(
+                SELECT 1 FROM nen_photo_submissions
+                 WHERE friend_id = selected_friends.friend_id AND status = 'pending' LIMIT 1
+              ) pending,
+              EXISTS(
+                SELECT 1 FROM nen_photo_submissions
+                 WHERE friend_id = selected_friends.friend_id AND status = 'adopted' LIMIT 1
+              ) adopted
+         FROM selected_friends`,
+    ).bind(...friendIds).all<{ friend_id: string; total: number; pending: number; adopted: number }>(),
+    Promise.all(currentTagQueries),
+  ]);
+
+  const snapshotByFriend = new Map(snapshots.results.map((row) => [row.friend_id, row]));
+  const petsByFriend = rowsByFriend(pets.results);
+  const healthByFriend = rowsByFriend(healthLogs.results);
+  const flagsByFriend = rowsByFriend(careFlags.results);
+  const photoByFriend = new Map(photos.results.map((row) => [row.friend_id, row]));
+  const tagsByFriend = rowsByFriend(currentTagPages.flatMap((page) => page.results));
+  let added = 0;
+  let removed = 0;
+  const gate = createFeatureJobGate();
+
+  for (const friend of friends) {
+    // 機能オフ中は付け替えしない。再オンで再開する。
+    if (!await gate.canRun(db, friend.line_account_id, 'photo_review', 'NEN tag refresh')) {
+      continue;
+    }
+    const current = new Set((tagsByFriend.get(friend.id) ?? []).map((row) => row.tag_id));
+    const snapshot = snapshotByFriend.get(friend.id) ?? null;
+    const ecDesired = deriveEcTagIds(snapshot, now);
+    if (friend.user_id) ecDesired.add(NEN_TAG.ecLinked);
+    const rankTag = await rankResolver.desiredTagId(friend.line_account_id, snapshot);
+    if (rankTag) ecDesired.add(rankTag);
+    const rankManaged = await rankResolver.managedTagIds(friend.line_account_id);
+    const desiredGroups: Array<[readonly string[], Set<string>]> = [
+      [[...EC_STATE_TAGS, ...rankManaged], ecDesired],
+      [PET_STATE_TAGS, derivePetTagIds(petsByFriend.get(friend.id) ?? [], now)],
+      [HEALTH_STATE_TAGS, deriveHealthTagIds(
+        healthByFriend.get(friend.id) ?? [],
+        flagsByFriend.get(friend.id) ?? [],
+        now,
+      )],
+      [PHOTO_STATE_TAGS, derivePhotoTagIds(photoByFriend.get(friend.id))],
+      [DELIVERY_ELIGIBILITY_TAGS,
+        new Set(current.has(NEN_TAG.deliveryOptout) ? [] : DELIVERY_ELIGIBILITY_TAGS)],
+    ];
+    for (const [managed, desired] of desiredGroups) {
+      const changed = await syncManagedTags(db, friend.id, managed, desired, current);
+      added += changed.added;
+      removed += changed.removed;
+    }
+  }
+
+  const cursor = hasMore ? friends.at(-1)!.id : null;
+  await saveRefreshState(db, hasMore
+    ? { ...state, lastFriendId: cursor! }
+    : { lastFriendId: '', cycleStartedAt: nowText }, nowText);
+  return { friends: friends.length, added, removed, hasMore, cursor };
+}
+
+export async function refreshAllNenTags(
+  db: D1Database,
+  scope: NenTagScope,
+  limit = 500,
+  now = new Date(),
+): Promise<ScheduledRefreshResult> {
+  if (!Array.isArray(scope)) return refreshScheduledNenTags(db, limit, now);
+  const allowedAccountIds = scope;
   const assignedIds = allowedAccountIds.filter((id): id is string => id !== null);
-  const accountWhere = allTenants
-    ? null
-    : assignedIds.length
-      ? `(line_account_id IN (${assignedIds.map(() => '?').join(',')})${allowedAccountIds.includes(null) ? ' OR line_account_id IS NULL' : ''})`
-      : allowedAccountIds.includes(null) ? 'line_account_id IS NULL' : '1 = 0';
+  const accountWhere = assignedIds.length
+    ? `(line_account_id IN (${assignedIds.map(() => '?').join(',')})${allowedAccountIds.includes(null) ? ' OR line_account_id IS NULL' : ''})`
+    : allowedAccountIds.includes(null) ? 'line_account_id IS NULL' : '1 = 0';
   const friends = await db.prepare(
-    `SELECT id FROM friends
+    `SELECT id, user_id, line_account_id FROM friends
       WHERE is_following = 1 AND user_id IS NOT NULL AND user_id <> ''
-        ${accountWhere ? `AND ${accountWhere}` : ''}
+        AND ${accountWhere}
       ORDER BY updated_at DESC LIMIT ?`,
   ).bind(...assignedIds, Math.max(1, Math.min(limit, 1000))).all<{ id: string }>();
   let added = 0;

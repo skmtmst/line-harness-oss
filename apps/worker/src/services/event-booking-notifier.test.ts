@@ -41,6 +41,18 @@ describe('renderEventNotificationText', () => {
     expect(text).toContain('LINE にてご連絡');
   });
 
+  test('キャンセル待ちの空きは回答期限と本人用URLを案内する', () => {
+    const text = renderEventNotificationText('waitlist_offer', {
+      ...baseCtx,
+      offerExpiresAtJst: '2026-06-02 10:00',
+      offerUrl: 'https://liff.line.me/example?eventWaitlistToken=secret',
+    });
+    expect(text).toContain('キャンセル待ちの空きが出ました');
+    expect(text).toContain('回答期限: 2026-06-02 10:00');
+    expect(text).toContain('期限を過ぎると次の方へ');
+    expect(text).toContain('eventWaitlistToken=secret');
+  });
+
   test('前日リマインダ', () => {
     const text = renderEventNotificationText('reminder_day_before', baseCtx);
     expect(text).toContain('明日イベントが開催');
@@ -72,6 +84,16 @@ describe('renderEventNotificationText', () => {
     });
     expect(text).toContain('会場: 渋谷');
     expect(text).not.toContain('https://');
+  });
+
+  test('U: 日時・会場の変更は新旧を添えて知らせる', () => {
+    const text = renderEventNotificationText('schedule_changed', {
+      ...baseCtx,
+      changeSummary: '9月25日 10:00 → 9月26日 10:00',
+    });
+    expect(text).toContain('イベントの内容が変更になりました');
+    expect(text).toContain('変更内容: 9月25日 10:00 → 9月26日 10:00');
+    expect(text).toContain('予約履歴画面から変更・キャンセル');
   });
 });
 

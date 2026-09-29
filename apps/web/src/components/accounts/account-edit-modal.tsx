@@ -1,7 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useId, useRef, useState } from 'react'
 import { api } from '@/lib/api'
+import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import {
   AccountFormSections,
   emptyAccountFormState,
@@ -21,6 +23,12 @@ interface Props {
   initialFriendCapacity?: number | null
   initialCapacityWarnAt?: number | null
   initialIconUrl?: string | null
+  /**
+   * R73。詳細画面の「編集する」は `basic`（名前などの登録内容）、
+   * 「差し替える」は `credentials`（Messaging の鍵・トークンの入力欄を
+   * 開いた状態）で開く。どちらも同じ保存口（PATCH/PUT 振り分け）を使う。
+   */
+  initialSection?: 'basic' | 'credentials'
   onClose: () => void
   onSaved: () => void
 }
@@ -42,6 +50,7 @@ export default function AccountEditModal({
   initialFriendCapacity = null,
   initialCapacityWarnAt = null,
   initialIconUrl = null,
+  initialSection = 'basic',
   onClose,
   onSaved,
 }: Props) {
@@ -66,22 +75,26 @@ export default function AccountEditModal({
   )
   const [iconUrl, setIconUrl] = useState(initialIconUrl ?? '')
   const [saving, setSaving] = useState(false)
+  const modalTitleId = useId()
   const [error, setError] = useState('')
+  const [stepUp, setStepUp] = useState<StepUpRequest | null>(null)
 
-  // Lock background scroll while modal open. Restore on unmount so navigation
-  // away mid-edit doesn't leave the page in a non-scrollable state.
-  useEffect(() => {
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.body.style.overflow = prev
-    }
-  }, [])
+  /*
+   * 本人確認（StepUpPrompt）の窓が重なっている間は、Escape を
+   * 最上位の窓だけへ効かせるため外側の閉じる処理を止める。
+   * hook の依存にすると効果の掛け直しでフォーカスが飛ぶので ref 越しに見る。
+   * 背面のスクロール停止もこの hook が担う。
+   */
+  const stepUpOpenRef = useRef(false)
+  stepUpOpenRef.current = stepUp != null
+  const panelRef = useOverlayFocus(true, () => {
+    if (!stepUpOpenRef.current) onClose()
+  }, saving)
 
   const update = (partial: Partial<AccountFormState>) =>
     setState((s) => ({ ...s, ...partial }))
 
-  const handleSave = async (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent, stepUpToken?: string) => {
     e.preventDefault()
     setSaving(true)
     setError('')
@@ -149,15 +162,20 @@ export default function AccountEditModal({
     }
 
     try {
-      const res = await api.lineAccounts.update(accountId, payload)
+      const res = await api.lineAccounts.update(accountId, payload, stepUpToken)
       if (res.success) {
         onSaved()
         onClose()
       } else {
-        setError(res.error || '保存に失敗しました')
+        setError(res.error || '保存に失敗しました。通信を確かめて、もう一度お試しください。')
       }
-    } catch {
-      setError('保存に失敗しました')
+    } catch (caught) {
+      // 接続情報の書き換えは大事な操作。本人確認を求められたら窓を立てる（V-1）。
+      if (!stepUpToken && isStepUpRequired(caught)) {
+        setStepUp({ purpose: 'line_account.credentials', action: '接続情報を変更する', retry: (token) => handleSave(e, token) })
+        return
+      }
+      setError('保存に失敗しました。通信を確かめて、もう一度お試しください。')
     } finally {
       setSaving(false)
     }
@@ -169,11 +187,15 @@ export default function AccountEditModal({
       onClick={onClose}
     >
       <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={modalTitleId}
         className="my-2 w-full max-w-2xl overflow-hidden rounded-lg bg-white shadow-xl sm:my-4"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-200 bg-white px-4 py-4 sm:px-6">
-          <h2 className="text-base font-bold text-gray-900">アカウント編集</h2>
+          <h2 id={modalTitleId} className="text-base font-bold text-gray-900">{initialSection === 'credentials' ? '資格情報を差し替える' : '登録の内容を編集する'}</h2>
           <button
             type="button"
             onClick={onClose}
@@ -201,7 +223,7 @@ export default function AccountEditModal({
             showMessagingRequired={false}
             channelIdEditable={false}
             defaultOpen={{
-              messaging: false,
+              messaging: initialSection === 'credentials',
               // Open Login/LIFF by default in edit mode if they're empty,
               // since "I want to fill these in" is the most common edit
               // intent now that they were previously SQL-only.
@@ -272,7 +294,7 @@ export default function AccountEditModal({
 
           <AccountSetupUrls
             liffId={state.liffId.trim() || initialLiffId || null}
-            heading="このアカで使う URL（LINE Developers Console に貼る）"
+            heading="このアカウントで使う URL（LINE Developers Console に貼る）"
           />
 
           {error && (
@@ -300,6 +322,7 @@ export default function AccountEditModal({
           </div>
         </form>
       </div>
+      {stepUp && <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} />}
     </div>
   )
 }

@@ -1,3 +1,4 @@
+@layer components {
 /* ---------------------------------------------------------------------
  * 一覧表の外枠と行。Pencil V5 の `RwC76`「共通 標準一覧表」。★V5 で60回。
  *
@@ -16,13 +17,36 @@
 }
 
 .frame {
-  overflow: hidden; /* clip: true */
+  /* #707: 390pxで列幅の合計が容器を超えるとき、外枠で切り落とさず
+   * 横スクロールで届ける（PC幅では収まるので見た目は変わらない）。
+   * 角丸の切り抜きは overflow-x:auto でも保たれる。 */
+  overflow-x: auto; /* clip: true → 390pxでは送って見せる */
+  overflow-y: hidden;
   border: 1px solid var(--color-hairline); /* stroke: $hairline */
-  border-radius: var(--radius-tile); /* cornerRadius: $radius-md */
+  border-radius: var(--radius-card); /* cornerRadius: $radius-md */
 }
 
 .row {
   height: 58px; /* 行 height: 58 */
+}
+
+/* ★V7のゆったりした行（高さ64px）。付けないときは58pxのまま。 */
+.rowComfortable {
+  height: 64px;
+}
+
+/* ★V7：選んでいる行は薄い緑の地。色だけでなく aria-selected でも伝える。 */
+.rowSelected {
+  background: var(--color-accent-soft);
+}
+
+/* ★V7：押せる行・選べる行だけ、指を乗せたときに一段沈んだ地を敷く。 */
+.rowInteractive:hover {
+  background: var(--color-canvas-sunken);
+}
+
+.rowInteractive.rowSelected:hover {
+  background: var(--color-accent-soft);
 }
 
 .row + .row .bodyCell {
@@ -68,4 +92,6 @@
   padding: 0 12px;
   vertical-align: middle;
   white-space: nowrap;
+  text-align: right; /* 中身を右端にそろえ、右の余白を左（12px）と同じにする。 */
+}
 }

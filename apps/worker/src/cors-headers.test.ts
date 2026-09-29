@@ -41,6 +41,10 @@ describe('CORS の許可ヘッダ', () => {
     expect(allowed.has('x-confirm-irreversible')).toBe(true);
   });
 
+  it('重要操作の再認証ヘッダが入っている', () => {
+    expect(allowed.has('x-step-up-token')).toBe(true);
+  });
+
   it('管理画面が実際に送るヘッダが、すべて許されている', () => {
     /*
      * 画面のコードから、リクエストヘッダとして書かれている名前を拾う。

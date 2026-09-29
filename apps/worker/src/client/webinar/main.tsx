@@ -10,6 +10,12 @@
 
 import { StrictMode, useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import {
+  buildFormSubmitHeaders,
+  newFormIdempotencyKey,
+  toFormIdempotencyKey,
+  type FormIdempotencyKey,
+} from '@line-crm/shared';
 import { buildMeetingDateOptions } from './date-options.js';
 import './styles.css';
 
@@ -28,7 +34,10 @@ export interface WebinarContext {
 }
 
 const DRIFT_TOLERANCE = 5;
-const HEARTBEAT_MS = 30_000;
+// J #821: 再生中だけ15秒ごとに送る。
+const HEARTBEAT_MS = 15_000;
+
+type HeartbeatPlayerState = 'playing' | 'paused' | 'hidden' | 'buffering' | 'seeking';
 
 // プレビューモード (?preview=1): 運営が内容確認するための隠しモード。
 // ライブ位置に縛られず 0 秒から再生し、シークバー + 速度切替を出す。
@@ -485,15 +494,30 @@ function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string }) {
     return () => document.removeEventListener('visibilitychange', onVisible);
   }, [expectedPosition, ended]);
 
-  // ハートビート (配信終了後は送らない)
+  // ハートビート (配信終了後は送らない。J #821: 再生中だけ15秒ごと)。
+  // 状態を区別する: 再生・一時停止・隠れた・読み込み待ち・位置の移動・速度。
+  // 一時停止や隠れている時間はサーバー側で視聴に数えない。
   useEffect(() => {
     if (!state?.live || !joined || ended || IS_PREVIEW) return;
     const src = state;
+    const playerState = (): HeartbeatPlayerState => {
+      const video = videoRef.current;
+      if (!video) return 'playing';
+      if (document.visibilityState === 'hidden') return 'hidden';
+      if (video.seeking) return 'seeking';
+      if (video.readyState < 3 && !video.paused) return 'buffering';
+      if (video.paused) return 'paused';
+      return 'playing';
+    };
     const timer = setInterval(() => {
+      const video = videoRef.current;
       const pos = Math.min(Math.floor(expectedPosition()), src.durationSeconds);
       void apiPost(`/api/liff/webinars/${encodeURIComponent(slug)}/heartbeat`, {
         sessionStartAt: src.sessionStartAt,
         positionSeconds: pos,
+        playerState: playerState(),
+        playbackRate: video?.playbackRate ?? 1,
+        clientAtMs: Date.now(),
       }, ctx).catch(() => undefined);
     }, HEARTBEAT_MS);
     return () => clearInterval(timer);
@@ -968,7 +992,7 @@ function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string }) {
 // 送信は既存 POST /api/forms/:id/submit — タグ付与・シナリオ発火・回答保存が
 // フォーム機能側でそのまま動く。
 
-function FormSheet({
+export function FormSheet({
   sheet,
   ctx,
   onFunnelEvent,
@@ -992,6 +1016,11 @@ function FormSheet({
   const [values, setValues] = useState<Record<string, string | string[]>>({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // 別の回答として送り直す誘導(内容違い・期限切れの使い回し)。自動では
+  // 新しいキーに付け替えず、利用者の操作のときだけ送り直す。
+  const [resendOffer, setResendOffer] = useState(false);
+  // 論理送信単位の安定した冪等キー。連打・通信再送は同じキーで送る。
+  const idemKeyRef = useRef<{ defId: string; key: FormIdempotencyKey } | null>(null);
   const startedRef = useRef(false);
   const completedFieldsRef = useRef(new Set<string>());
   const bookingRedirectTimerRef = useRef<number | null>(null);
@@ -1040,16 +1069,65 @@ function FormSheet({
     onFunnelEvent('submit_attempt');
     setSubmitting(true);
     setError(null);
-    try {
+    setResendOffer(false);
+    if (idemKeyRef.current?.defId !== def.id) {
+      idemKeyRef.current = { defId: def.id, key: newFormIdempotencyKey() };
+    }
+    const idemKey = idemKeyRef.current.key;
+    // #729: ヘッダ組立は共有部品へ寄せる。認証の取得(ctx)・URL・再送はここに残す。
+    const postOnce = async (key: FormIdempotencyKey) => {
       const r = await fetch(`/api/forms/${encodeURIComponent(def.id)}/submit`, {
         method: 'POST',
-        headers: buildAuthHeaders(ctx, { 'Content-Type': 'application/json' }),
+        headers: buildAuthHeaders(ctx, buildFormSubmitHeaders(key)),
         body: JSON.stringify({ data: values }),
       });
-      const json = (await r.json()) as { success: boolean; error?: string };
-      if (!r.ok || !json.success) {
+      const json = (await r.json().catch(() => null)) as {
+        success: boolean;
+        error?: string;
+        code?: string;
+        data?: { complete?: boolean };
+        retryable?: boolean;
+        idempotencyKey?: string;
+      } | null;
+      return { status: r.status, json };
+    };
+    try {
+      // 202(未完)は同じキーで送り直し、元のキーへの誘導は付け替えて続ける。
+      // 新しい回答を作る付け替えは自動ではしない。
+      let currentKey = idemKey;
+      let attempt = await postOnce(currentKey);
+      for (let i = 0; i < 4; i += 1) {
+        if (attempt.status === 202 && attempt.json?.retryable) {
+          await new Promise((r) => setTimeout(r, 1500));
+          attempt = await postOnce(currentKey);
+          continue;
+        }
+        const guided = attempt.json?.code === 'idempotency_recovery_pending'
+          ? attempt.json?.idempotencyKey
+          : undefined;
+        if (attempt.status === 409 && guided && guided !== currentKey) {
+          currentKey = toFormIdempotencyKey(guided);
+          idemKeyRef.current = { defId: def.id, key: currentKey };
+          attempt = await postOnce(currentKey);
+          continue;
+        }
+        break;
+      }
+      const { status, json } = attempt;
+      const ok = status === 200 || status === 201;
+      if (!ok || !json?.success) {
         onFunnelEvent('submit_error');
-        setError(json.error || '送信に失敗しました。もう一度お試しください。');
+        const code = json?.code;
+        if (status === 409 && (code === 'idempotency_content_mismatch' || code === 'idempotency_expired')) {
+          setError(code === 'idempotency_expired'
+            ? '送信の有効期限が切れました。もう一度送る場合は下のボタンから送り直してください。'
+            : '送信済みの内容と異なるため、そのままでは送れません。別の回答として送る場合は下のボタンから送り直してください。');
+          setResendOffer(true);
+        } else if (status === 202) {
+          setError('送信を受け付けましたが、一部の処理が終わっていません。時間をおいて送り直してください。');
+        } else {
+          setError(json?.error || '送信に失敗しました。もう一度お試しください。');
+        }
         setSubmitting(false);
         return;
       }
@@ -1287,6 +1365,19 @@ function FormSheet({
                 })}
               </div>
               {error && <p className="mt-2 text-sm font-bold text-red-600">{error}</p>}
+              {resendOffer && !submitting && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    idemKeyRef.current = null;
+                    setResendOffer(false);
+                    void submit();
+                  }}
+                  className="mt-2 w-full rounded-full border border-gray-300 bg-white py-2 text-sm font-bold text-gray-700"
+                >
+                  別の回答として送り直す
+                </button>
+              )}
             </div>
             <div className="-mx-5 -mb-5 shrink-0 border-t border-gray-200 bg-white px-5 pb-4 pt-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)]">
               <p className="mb-2 text-center text-xs font-bold text-gray-600" aria-live="polite">

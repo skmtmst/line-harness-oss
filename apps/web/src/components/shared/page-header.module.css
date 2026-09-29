@@ -1,3 +1,4 @@
+@layer components {
 /*
  * ページヘッダー。★V5 227枚すべての先頭にある帯。
  *
@@ -39,4 +40,5 @@
   align-items: center;
   gap: 8px; /* gap: 8 */
   flex: none;
+}
 }

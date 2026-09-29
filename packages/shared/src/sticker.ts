@@ -17,6 +17,21 @@ type StickerSource = {
 };
 
 const STICKER_FALLBACK = '[スタンプ]';
+const LINE_STICKER_HOSTS = new Set(['stickershop.line-scdn.net']);
+
+/** 保存済みJSONに外部URLが混ざっても、LINE公式の配信元以外は画像として開かない。 */
+export function isAllowedStickerUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:'
+      && !url.username
+      && !url.password
+      && LINE_STICKER_HOSTS.has(url.hostname)
+      && /^\/stickershop\/v1\/sticker\/[^/]+\/iPhone\/sticker@2x\.png$/.test(url.pathname);
+  } catch {
+    return false;
+  }
+}
 
 function toOptionalString(value: unknown): string | undefined {
   if (typeof value === 'string' && value.trim()) return value;
@@ -54,7 +69,7 @@ export function parseStickerMessageContent(content: string): StickerMessageConte
       typeof parsed.stickerId === 'string' &&
       parsed.stickerId.trim() &&
       typeof parsed.stickerUrl === 'string' &&
-      parsed.stickerUrl.trim()
+      isAllowedStickerUrl(parsed.stickerUrl)
     ) {
       return {
         type: 'sticker',

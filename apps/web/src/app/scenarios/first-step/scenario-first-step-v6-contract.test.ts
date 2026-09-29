@@ -27,14 +27,37 @@ const PREVIEW_CSS = fs.readFileSync(path.join(COMPONENTS, 'step-preview.module.c
 const TABS_CSS = fs.readFileSync(path.join(COMPONENTS, 'message-type-tabs.module.css'), 'utf8')
 
 describe('V6 1通目設定の契約', () => {
+  it('画面名を上部バーだけに置き、本文はパンくずとキャンセルから始める', () => {
+    expect(PAGE).toContain("usePageTitle('1通目を設定')")
+    expect(PAGE).not.toContain("import Header from '@/components/layout/header'")
+    expect(PAGE).not.toContain('<Header')
+    expect(PAGE).toContain('✕ キャンセル')
+  })
+
   it('設計Node IDを画面に残す', () => {
     expect(PAGE).toContain('data-design-node="kk8dz"')
   })
 
   it('段の見出しを設計の言葉にする', () => {
+    expect(PAGE).toContain("usePageTitle('1通目を設定')")
     expect(PAGE).toContain('この1通目を誰に送るか')
     expect(PAGE).toContain('1通目の内容')
     expect(PAGE).not.toContain('>配信対象の絞り込み</h2>')
+  })
+
+  it('作成の現在地と保存前の要点を同時に確認できる', () => {
+    expect(PAGE).toContain('aria-label="シナリオ作成の進み方"')
+    expect(PAGE).toContain('label="シナリオ情報" state="done"')
+    expect(PAGE).toContain('label="配信方式" state="done"')
+    expect(PAGE).toContain('label="1通目を設定" state="current"')
+    // B-6: 題「LINEプレビュー」は共通部品が出す。画面側は使うだけ。
+    expect(PREVIEW).toContain('<LinePreview')
+    // R213: 通番号は変数で出す（2通目以降の編集で正しい番号になる）。
+    // 新規1通目の既定は 1 のままなので、ここの見た目は変わらない。
+    // R235: 時刻未設定の分岐が入ったが、通番号は両方の枝で変数のまま。
+    expect(PREVIEW).toContain('${stepLabel}')
+    expect(PREVIEW).toContain('stepOrder = 1')
+    expect(PREVIEW).toContain('設定サマリー')
   })
 
   it('下見は「配信の流れ」1枚にまとめる', () => {
@@ -70,14 +93,35 @@ describe('V6 1通目設定の契約', () => {
     expect(TABS).not.toContain('rounded-t-control')
   })
 
-  it('本文の高さと、日数・時刻の幅を設計に合わせる', () => {
-    expect(PAGE_CSS).toMatch(/\.bodyField \{[^}]*height: 118px;/)
-    expect(PAGE_CSS).toMatch(/\.smallField \{[^}]*height: 38px;[^}]*width: 110px;/)
-    expect(PAGE_CSS).toMatch(/\.timeField \{[^}]*height: 38px;[^}]*width: 130px;/)
+  it('入力欄の高さと本文の伸び方を共通基準（UX-01）に合わせる', () => {
+    /*
+     * SCENARIO-19: 入力・選択・ボタンは PC 40px・タッチ 44px。
+     * 本文の作成欄は 160px を下限に内容に応じて伸び、上限を超えた分は
+     * 欄内スクロール。幅だけが設計固有の数（日数110）。
+     * 時刻の入力は★V7の時刻の選択（高さ40・14px）へ寄せ、画面固有の
+     * 幅130の決めは消した。
+     */
+    expect(PAGE_CSS).toMatch(/\.smallField \{[^}]*height: 40px;[^}]*width: 110px;/)
+    expect(PAGE_CSS).toMatch(/\.bodyField \{[^}]*min-height: 160px;/)
+    expect(PAGE_CSS).toMatch(/\.bodyField \{[^}]*field-sizing: content;/)
+    expect(PAGE_CSS).toMatch(/\.bodyField \{[^}]*max-height:/)
+    expect(PAGE_CSS).toContain('@media (pointer: coarse)')
+    expect(PAGE_CSS).toMatch(/\.smallField \{[^}]*height: 44px;/)
     expect(PAGE).toContain('styles.bodyField')
     expect(PAGE).toContain('styles.smallField')
-    expect(PAGE).toContain('styles.timeField')
+    expect(PAGE).toContain('<TimeField')
+    expect(PAGE).toContain('aria-label="配信する時刻"')
+    expect(PAGE).not.toContain('styles.timeField')
     expect(PAGE).not.toContain('w-20 border px-3 py-2 text-sm')
+  })
+
+  it('本文は手動でも広げられ、「本文」の字が入力欄と結び付く', () => {
+    // SCENARIO-19: resize を禁じると、伸長が効かない環境で長文が隠れたままになる。
+    expect(PAGE).toContain('resize-y')
+    expect(PAGE).not.toContain('resize-none')
+    // ラベルを押すと入力欄へ移る（UX-01 / U087）。
+    expect(PAGE).toContain('htmlFor="first-step-body"')
+    expect(PAGE).toContain('id="first-step-body"')
   })
 
   it('本文の文字数を出す', () => {
@@ -85,11 +129,37 @@ describe('V6 1通目設定の契約', () => {
     expect(PAGE).toContain('<CharCounter length={bodyLength} />')
   })
 
+  it('作成途中へ戻ったときは既存の1通目を表示し、重複追加せず更新する', () => {
+    expect(PAGE).toContain('restoreFirstStep(first')
+    expect(PAGE).toContain('setExistingStepId(restored.existingStepId)')
+    expect(PAGE).toContain('api.scenarios.updateStep(id, existingStepId, stepPayload)')
+    expect(PAGE).toContain('api.scenarios.addStep(id, stepPayload)')
+  })
+
+  it('シナリオが確定するまで保存できない', () => {
+    // SCENARIO-04：取得待ち・取得失敗のまま保存を押せると、まだ知らない
+    // 既存の1通目へ重ねて追加してしまう。
+    expect(PAGE).toContain("useState<LoadState>('idle')")
+    expect(PAGE).toContain("setLoadState('ready')")
+    expect(PAGE).toContain("setLoadState('error')")
+    expect(PAGE).toContain('loadState !== \'ready\'')
+    // 再読み込みは ★V7 TargetMissing の error（onRetry が番号を進めて取り直す）。
+    expect(PAGE).toContain('kind="error"')
+    expect(PAGE).toContain('onRetry={() => setReloadKey((k) => k + 1)}')
+  })
+
+  it('保存の失敗・切断で「保存中」のままにしない', () => {
+    // SCENARIO-05：例外でも finally で busy を戻し、入力を残して再試行できる。
+    expect(PAGE).toContain('} catch (submitError) {')
+    expect(PAGE).toContain('setSaving(false)')
+    expect(PAGE).toContain('入力内容は残っています')
+  })
+
   it('上限を超えた本文では保存を押せなくし、理由を本文に出す', () => {
     expect(PAGE).toContain('const bodyOverLimit =')
     expect(PAGE).toContain('isOverCharLimit(bodyLength, LINE_TEXT_LIMIT)')
-    expect(PAGE).toContain('disabled={saving || bodyOverLimit}')
-    expect(PAGE).toContain('if (saving || bodyOverLimit) return')
+    expect(PAGE).toContain("disabled={saving || bodyOverLimit || loadState !== 'ready'}")
+    expect(PAGE).toContain("if (saving || bodyOverLimit || loadState !== 'ready' || !scenario) return")
     expect(PAGE).toContain('LINEが受け付けないため、この状態では保存できません。')
   })
 })

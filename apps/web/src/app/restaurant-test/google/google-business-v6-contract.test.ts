@@ -1,0 +1,73 @@
+import { readFileSync } from 'node:fs'
+import { describe, expect, it } from 'vitest'
+
+const page = readFileSync(new URL('./google-business.tsx', import.meta.url), 'utf8')
+const globalStyles = readFileSync(new URL('../../globals.css', import.meta.url), 'utf8')
+const api = readFileSync(new URL('../../../lib/restaurant-google-api.ts', import.meta.url), 'utf8')
+
+describe('Googleビジネス V6正本契約', () => {
+  it('V6正本の設定ノード・一体型パネル・接続カードを使う', () => {
+    expect(page).toContain("const designNode = reviewEditorOpen ? 'TJPK5' : tab === 'settings' ? 'p9ALPi' : 'lM0zP'")
+    expect(page).toContain('const panelNode = profileNode ?? postsNode ?? performanceNode ?? designNode')
+    expect(page).toContain('data-design-node={panelNode}')
+    expect(page).toContain('style={{ minHeight: 58 }}')
+    expect(page).toContain('style={{ maxWidth: 680 }}')
+    expect(page).toContain('style={{ maxWidth: 880 }}')
+    expect(page).toContain('Googleアカウントを接続')
+    expect(page).toContain('接続する店舗は、1つのLINEアカウントにつき1店舗です。')
+    expect(page).toContain('tabIndex={item.current ? 0 : -1}')
+    expect(page).toContain("key !== 'ArrowRight'")
+  })
+
+  it('表示用の役割名ではなくAPIの権限判定で接続ボタンを制御する', () => {
+    expect(api).toContain('permissions: { canManageConnection: boolean; canPublishReply: boolean }')
+    expect(page).toContain('data.permissions.canManageConnection')
+    expect(page).not.toContain('api.staff.me()')
+    expect(page).toContain('disabled={busy || !canManage || !data.oauthConfigured}')
+  })
+
+  it('口コミ4分類の件数をすべて表示し、V6の返信編集・公開確認の幅を保つ', () => {
+    expect(api).toContain('attentionCount: number')
+    expect(page).toContain('attention: data.summary.attentionCount')
+    expect(page).toContain('all: data.summary.storedCount')
+    expect(page).toContain('count: filterCounts[key]')
+    expect(page).toContain('className="gb-review-filters mb-3"')
+    expect(globalStyles).toContain('@media (max-width: 1350px)')
+    expect(globalStyles).toContain('.gb-review-filters')
+    expect(page).toContain('data-design-node="TJPK5"')
+    expect(page).toContain('data-design-node="xSudF"')
+    expect(globalStyles).toContain('grid-template-columns: minmax(0, 1fr) 390px')
+    expect(page).toContain('<StickyBar')
+  })
+
+  it('GB-3の全操作を消さず、Pencilと1対1で配置する', () => {
+    const draftStart = page.indexOf('data-design-node="TJPK5"')
+    const draftEnd = page.indexOf('<ConfirmDialog', draftStart)
+    const draft = page.slice(draftStart, draftEnd)
+
+    expect(draft).toContain('data-gb3-column="editor"')
+    expect(draft).toContain('data-gb3-column="publish-actions"')
+    expect(draft).toContain('aria-label="公開前の確認"')
+    expect(draft).toContain('data-gb3-action="back-to-reviews"')
+    expect(draft).toContain('href={backHref}')
+    expect(draft).toContain('data-gb3-action="open-google-review"')
+    expect(page).toContain('const googleReviewSourceUrl = data.connection.locationMapsUrl')
+    expect(page).toContain('https://www.google.com/maps/search/?api=1&query=')
+    expect(draft).toContain('href={googleReviewSourceUrl}')
+    expect(draft).toContain('target="_blank"')
+    expect(draft).toContain('Googleで原文を確認')
+    expect(draft).toContain('data-gb3-action="generate-draft"')
+    expect(draft).toContain("generate('new')")
+    expect(draft).toContain('data-gb3-action="shorten-draft"')
+    expect(draft).toContain("generate('shorter')")
+    expect(draft).toContain('data-gb3-action="polish-draft"')
+    expect(draft).toContain("generate('polite')")
+    expect(draft).toContain('data-gb3-action="save-draft"')
+    expect(draft).toContain('onClick={() => void save()}')
+    expect(draft).toContain("'下書き保存'")
+    expect(draft).toContain('data-gb3-action="open-publish-confirm"')
+    expect(draft).toContain('setConfirming(true)')
+    expect(draft).toContain('disabled={!canOpenConfirm}')
+    expect(page).toContain('const canOpenConfirm = canPublish && data.writeEnabled')
+  })
+})

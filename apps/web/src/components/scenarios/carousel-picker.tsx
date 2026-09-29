@@ -10,9 +10,40 @@
  * 1枚も無いときに選択欄だけ出しても進めないので、作りに行く導線を出す。
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { api } from '@/lib/api'
+import Select from '@/components/shared/select'
+import { scenarioReferenceData } from './scenario-reference-data'
+
+interface SendableTemplateCandidate {
+  accountId?: string | null
+  publishedVersion?: number | null
+  publishedAt?: string | null
+}
+
+/** 公開済みかつ選択中アカウントの候補だけを、元の順番で返す。 */
+export function filterSendableTemplates<T extends SendableTemplateCandidate>(
+  templates: T[],
+  selectedAccountId?: string | null,
+): T[] {
+  return templates.filter((template) => {
+    if (template.publishedAt === null || template.publishedVersion === 0) return false
+    return !selectedAccountId
+      || template.accountId === selectedAccountId
+  })
+}
+
+/** 遅れて返った古い読み込み結果を描画しないための世代番号。 */
+export function createLoadGeneration() {
+  let current = 0
+  return {
+    next: () => {
+      current += 1
+      return current
+    },
+    isCurrent: (generation: number) => generation === current,
+  }
+}
 
 export interface CarouselTemplate {
   id: string
@@ -34,6 +65,8 @@ export interface CarouselPickerProps {
   /** 選んでいるテンプレートID。 */
   value: string
   onChange: (templateId: string, template: CarouselTemplate | null) => void
+  /** 選んでいるLINEアカウント。渡すとその持ち主の公開版だけを候補にする。 */
+  accountId?: string | null
 }
 
 /** テンプレートの中身から、枚数と1枚目の題を読む。 */
@@ -54,15 +87,20 @@ function summarize(content: string): { panels: number; firstTitle: string } {
   }
 }
 
-export default function CarouselPicker({ value, onChange }: CarouselPickerProps) {
+export default function CarouselPicker({ value, onChange, accountId }: CarouselPickerProps) {
   const [items, setItems] = useState<CarouselTemplate[]>([])
   const [loading, setLoading] = useState(true)
+  const generationRef = useRef(createLoadGeneration())
 
   useEffect(() => {
-    void api.templates.list().then((res) => {
+    // 独立審査(指摘4): 持ち主の公開版だけを候補にし、古い応答は世代で捨てる。
+    const generation = generationRef.current.next()
+    setLoading(true)
+    void scenarioReferenceData.templates(accountId ?? undefined).then((res) => {
+      if (!generationRef.current.isCurrent(generation)) return
       if (res.success) {
         setItems(
-          res.data
+          filterSendableTemplates(res.data, accountId)
             .filter((t) => t.messageType === 'carousel')
             .map((t) => ({
               id: t.id,
@@ -74,7 +112,7 @@ export default function CarouselPicker({ value, onChange }: CarouselPickerProps)
       }
       setLoading(false)
     })
-  }, [])
+  }, [accountId])
 
   if (loading) {
     return <p className="text-ink-faint py-6 text-center text-sm">読み込み中…</p>
@@ -103,21 +141,22 @@ export default function CarouselPicker({ value, onChange }: CarouselPickerProps)
         <span className="text-ink-secondary mb-1 block text-xs font-medium">
           カルーセル <span className="text-danger">*</span>
         </span>
-        <select
+        <Select
           value={value}
-          onChange={(e) => {
-            const picked = items.find((t) => t.id === e.target.value) ?? null
-            onChange(e.target.value, picked)
+          onChange={(next) => {
+            const picked = items.find((t) => t.id === next) ?? null
+            onChange(next, picked)
           }}
-          className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm"
-        >
-          <option value="">選んでください</option>
-          {items.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.name}（{t.panels}枚{t.firstTitle ? `／${t.firstTitle}` : ''}）
-            </option>
-          ))}
-        </select>
+          aria-label="カルーセル"
+          options={[
+            { value: '', label: '選んでください' },
+            ...items.map((t) => ({
+              value: t.id,
+              label: `${t.name}（${t.panels}枚${t.firstTitle ? `／${t.firstTitle}` : ''}）`,
+            })),
+          ]}
+          size="full"
+        />
       </label>
       <p className="text-ink-faint text-xs leading-relaxed">
         カルーセルを直すと、この通の中身も一緒に変わります。

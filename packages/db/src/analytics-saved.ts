@@ -19,6 +19,18 @@ export interface SavedAnalyticsSummary {
     periodTo: string;
     dataCutoffAt: string;
     createdAt: string;
+    /**
+     * 写しを取った元の定義が、その後に新版へ進んでいるか（ANALYTICS-05/06）。
+     *
+     * ファネルは「その時点の版」で集計して固定される。あとからファネルの
+     * 定義が変わると、この写しは旧版の結果になる。未取得・失敗といった
+     * 集計状態とは別の軸なので、状態のラベルには混ぜない。
+     */
+    definitionStale: boolean;
+    /** 写しが使った定義の版。分からなければ null。 */
+    sourceVersionNumber: number | null;
+    /** 元の定義のいまの版。分からなければ null。 */
+    sourceCurrentVersionNumber: number | null;
   } | null;
 }
 
@@ -189,6 +201,18 @@ export async function getSavedAnalytics(
   db: D1Database,
   lineAccountId: string,
 ): Promise<SavedAnalyticsSummary[]> {
+  // R461: 旧版判定は、期限削除される元 run（analytics_funnel_runs）への
+  // JOIN に頼らない。保存時に固定した定義（versions 表の definition_json）
+  // から使った版を読む。元 run が13か月で消えても判定が解除されない。
+  const funnelCurrent = await db.prepare(
+    `SELECT funnel_id, MAX(version_number) AS current_version
+       FROM analytics_funnel_versions
+      WHERE line_account_id = ?
+      GROUP BY funnel_id`,
+  ).bind(lineAccountId).all<{ funnel_id: string; current_version: number }>();
+  const currentByFunnel = new Map(
+    funnelCurrent.results.map((row) => [row.funnel_id, Number(row.current_version)]),
+  );
   const rows = await db.prepare(
     `SELECT a.*,
             (SELECT COUNT(*) FROM analytics_saved_analysis_snapshots s
@@ -196,13 +220,22 @@ export async function getSavedAnalytics(
             s.id AS snapshot_id, s.state AS snapshot_state,
             s.period_from AS snapshot_period_from, s.period_to AS snapshot_period_to,
             s.data_cutoff_at AS snapshot_data_cutoff_at,
-            s.created_at AS snapshot_created_at
+            s.created_at AS snapshot_created_at,
+            sv.version_number AS snapshot_analysis_version,
+            sv.definition_json AS snapshot_definition_json,
+            fv.version_number AS snapshot_source_version,
+            (SELECT MAX(v2.version_number) FROM analytics_funnel_versions v2
+              WHERE v2.funnel_id = fr.funnel_id) AS source_current_version
        FROM analytics_saved_analyses a
        LEFT JOIN analytics_saved_analysis_snapshots s ON s.id = (
          SELECT s2.id FROM analytics_saved_analysis_snapshots s2
           WHERE s2.saved_analysis_id = a.id
           ORDER BY s2.created_at DESC, s2.id DESC LIMIT 1
        )
+       LEFT JOIN analytics_saved_analysis_versions sv ON sv.id = s.analysis_version_id
+       LEFT JOIN analytics_funnel_runs fr
+         ON s.source_kind = 'funnel' AND fr.id = s.source_result_id
+       LEFT JOIN analytics_funnel_versions fv ON fv.id = fr.funnel_version_id
       WHERE a.line_account_id = ? AND a.status = 'active'
       ORDER BY a.updated_at DESC, a.id DESC`,
   ).bind(lineAccountId).all<{
@@ -212,27 +245,60 @@ export async function getSavedAnalytics(
     snapshot_id: string | null; snapshot_state: SavedAnalyticsState | null;
     snapshot_period_from: string | null; snapshot_period_to: string | null;
     snapshot_data_cutoff_at: string | null; snapshot_created_at: string | null;
+    snapshot_analysis_version: number | null;
+    snapshot_definition_json: string | null;
+    snapshot_source_version: number | null; source_current_version: number | null;
   }>();
-  return rows.results.map((row) => ({
-    id: row.id,
-    name: row.name,
-    kind: row.kind,
-    status: row.status,
-    currentVersionNumber: row.current_version_number,
-    createdBy: row.created_by,
-    createdByName: row.created_by_name,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-    snapshotCount: Number(row.snapshot_count),
-    latestSnapshot: row.snapshot_id ? {
-      id: row.snapshot_id,
-      state: row.snapshot_state!,
-      periodFrom: row.snapshot_period_from!,
-      periodTo: row.snapshot_period_to!,
-      dataCutoffAt: row.snapshot_data_cutoff_at!,
-      createdAt: row.snapshot_created_at!,
-    } : null,
-  }));
+  return rows.results.map((row) => {
+    const snapshotAnalysisStale = row.snapshot_analysis_version != null
+      && row.snapshot_analysis_version < row.current_version_number;
+    // R461: 使った版は保存時の定義から読む。元 run が期限削除で消えても
+    // 版は残る。定義が読めない（壊れている）ときは「最新」と言わず
+    // 古い側に倒して注意を残す。
+    let sourceVersion = row.snapshot_source_version;
+    let sourceCurrent = row.source_current_version;
+    if (row.kind === 'funnel' && row.snapshot_definition_json) {
+      try {
+        const definition = JSON.parse(row.snapshot_definition_json) as {
+          funnelId?: unknown; versionNumber?: unknown;
+        };
+        if (typeof definition.versionNumber === 'number') sourceVersion = definition.versionNumber;
+        if (typeof definition.funnelId === 'string') {
+          const current = currentByFunnel.get(definition.funnelId);
+          if (current !== undefined) sourceCurrent = current;
+        }
+      } catch {
+        sourceVersion = null;
+        sourceCurrent = null;
+      }
+    }
+    const sourceDefinitionStale = row.kind === 'funnel'
+      ? sourceVersion == null || sourceCurrent == null || sourceCurrent > sourceVersion
+      : false;
+    return {
+      id: row.id,
+      name: row.name,
+      kind: row.kind,
+      status: row.status,
+      currentVersionNumber: row.current_version_number,
+      createdBy: row.created_by,
+      createdByName: row.created_by_name,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      snapshotCount: Number(row.snapshot_count),
+      latestSnapshot: row.snapshot_id ? {
+        id: row.snapshot_id,
+        state: row.snapshot_state!,
+        periodFrom: row.snapshot_period_from!,
+        periodTo: row.snapshot_period_to!,
+        dataCutoffAt: row.snapshot_data_cutoff_at!,
+        createdAt: row.snapshot_created_at!,
+        definitionStale: snapshotAnalysisStale || sourceDefinitionStale,
+        sourceVersionNumber: sourceVersion,
+        sourceCurrentVersionNumber: sourceCurrent,
+      } : null,
+    };
+  });
 }
 
 export async function getSavedAnalyticsSnapshots(

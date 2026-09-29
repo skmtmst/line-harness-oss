@@ -1,6 +1,10 @@
-.createActions,
-.body {
+.createActions {
   margin-top: 18px;
+}
+
+.body {
+  /* 親の gap-4（16px）で間隔を作るため、ここでは余白を足さない。 */
+  margin-top: 0;
 }
 
 .contentLayout {
@@ -10,8 +14,8 @@
 }
 
 .folderRail {
-  width: 252px;
-  flex: 0 0 252px;
+  width: var(--folder-rail-width);
+  flex: 0 0 var(--folder-rail-width);
 }
 
 @media (max-width: 900px) {
@@ -24,3 +28,10 @@
     flex-basis: auto;
   }
 }
+
+/*
+ * ★V7 監査の直し A（`LD96g`）：767px 以下は表を出さず、共通の一覧カード
+ * （`MobileTableCards`・`md:hidden`）に任せる。以前ここにあったCSS畳み込みは、
+ * 名前欄の `max-w-0` が残って名前が消える原因だったので撤去した。
+ * 768px 以上は表のまま（`hidden md:block`）。
+ */

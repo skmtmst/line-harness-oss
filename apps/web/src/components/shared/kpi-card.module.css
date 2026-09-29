@@ -1,0 +1,171 @@
+@layer components {
+.card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 100px;
+  padding: 14px 16px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+  box-shadow: var(--shadow-card);
+}
+
+.card[hidden] {
+  display: none;
+}
+
+.cardV6 {
+  justify-content: flex-start;
+  min-height: 106px;
+  gap: 5px;
+  padding: 16px;
+}
+
+.cardBroadcast {
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 18px;
+}
+
+.head {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  /*
+   * 題の行の高さは 20px にそろえる。「？」の有無で数字の位置が
+   * ずれないようにする（？自体は 18px の箱で、行を伸ばさない）。
+   */
+  min-height: 20px;
+}
+
+.retry {
+  margin-left: 8px;
+  color: var(--color-action);
+  font-size: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.retry:focus-visible {
+  outline: revert;
+}
+
+.label {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  font-weight: 600;
+}
+
+.labelV6 {
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+}
+
+.labelBroadcast {
+  color: var(--color-ink-faint);
+  font-size: var(--text-label);
+}
+
+.labelSkeleton {
+  display: inline-block;
+  width: 80px;
+  height: var(--text-caption);
+  border-radius: 4px;
+  background: var(--color-canvas-sunken);
+}
+
+.badge {
+  flex-shrink: 0;
+  padding: 3px 8px;
+  border-radius: var(--radius-card);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-deep);
+  font-size: var(--text-nano);
+  font-weight: 600;
+}
+
+.badge_neutral {
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+}
+
+.badge_warning {
+  background: var(--color-status-warn-soft);
+  color: var(--color-status-warn-deep);
+}
+
+.badge_danger {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+.link {
+  flex-shrink: 0;
+  color: var(--color-action);
+  font-size: var(--text-nano);
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+.link:focus-visible {
+  outline: revert;
+}
+
+.value {
+  color: var(--color-ink);
+  font-size: var(--text-metric);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  /*
+   * 数の行の高さは1行ぶんにそろえる。題の行（.head 20px）と合わせて、
+   * 「？」の有無や補足の長さで数字の位置がずれないようにする。
+   */
+  min-height: 1lh;
+}
+
+.valueWarning {
+  color: var(--color-warning);
+}
+
+.valueFaint {
+  color: var(--color-ink-faint);
+}
+
+.detail {
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  /* 補足の行の高さは1行ぶんにそろえる。空でも潰さない。 */
+  min-height: 1lh;
+}
+
+.detailV6 {
+  font-weight: 500;
+}
+
+/* ★V7：補足は状態ではないので緑にしない（緑は「正常」の意味だけに使う）。以前は accent-deep。 */
+.detailNotice {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-weight: 500;
+}
+
+.skeleton {
+  width: 96px;
+  height: var(--text-metric);
+  border-radius: 4px;
+  background: var(--color-canvas-sunken);
+  animation: kpi-card-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes kpi-card-pulse {
+  50% {
+    opacity: 0.5;
+  }
+}
+}

@@ -1,7 +1,8 @@
-import { Hono } from 'hono';
+import { Hono, type MiddlewareHandler } from 'hono';
 import {
   getEntryRoutes,
   getEntryRouteById,
+  getLineAccountById,
   createEntryRoute,
   updateEntryRoute,
   deleteEntryRoute,
@@ -11,12 +12,35 @@ import {
   createEntryRouteGenre,
   updateEntryRouteGenre,
 } from '@line-crm/db';
+import { QrCapacityError, encodeQr } from '../lib/qr-matrix.js';
+import { QrPdfError, buildQrPrintPdf } from '../lib/qr-print-pdf.js';
 import type { EntryRoute, EntryRouteGenre } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
+import { resolveRequestBoundary } from '../services/request-boundary.js';
 
 const entryRoutes = new Hono<Env>();
+const INFLOW_LINKS_PERMISSION = '/inflow-links';
+
+/**
+ * 流入経路の運用は、役割ではなく画面権限にも委譲する。
+ * 完全削除は不可逆なので、この門番を使わず従来どおり owner/admin に限定する。
+ */
+function requireEntryRouteManagement(): MiddlewareHandler<Env> {
+  return async (c, next) => {
+    const staff = c.get('staff');
+    const allowed = staff && (
+      staff.role === 'owner'
+      || staff.role === 'admin'
+      || (staff.role === 'staff' && staff.permissionKeys?.includes(INFLOW_LINKS_PERMISSION))
+    );
+    if (!allowed) {
+      return c.json({ success: false, error: 'この機能を操作する権限がありません' }, 403);
+    }
+    return next();
+  };
+}
 
 function serialize(row: EntryRoute) {
   return {
@@ -31,6 +55,9 @@ function serialize(row: EntryRoute) {
     introTemplateId: row.intro_template_id,
     runAccountFriendAddScenarios: row.run_account_friend_add_scenarios === 1,
     isActive: row.is_active === 1,
+    stoppedAt: row.stopped_at ?? null,
+    stoppedReason: row.stopped_reason ?? null,
+    lineAccountId: row.line_account_id ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -47,6 +74,18 @@ function serializeGenre(row: EntryRouteGenre) {
 
 function canAccessEntryRoute(row: EntryRoute, tenantId: string): boolean {
   return row.tenant_id === tenantId || (row.tenant_id === null && tenantId === DEFAULT_TENANT_ID);
+}
+
+async function canAccessEntryRouteAccount(
+  db: D1Database,
+  staff: NonNullable<Env['Variables']['staff']>,
+  row: EntryRoute,
+): Promise<boolean> {
+  // migration 308 より前の未割当行は従来どおりtenant境界で扱う。
+  // 所有accountがある行は、同じtenantのowner/adminでも担当外なら変更させない。
+  const accountId = row.line_account_id ?? null;
+  if (accountId === null) return true;
+  return (await resolveRequestBoundary(db, staff, accountId)).allowed;
 }
 
 entryRoutes.get('/api/entry-route-genres', async (c) => {
@@ -100,9 +139,21 @@ entryRoutes.patch('/api/entry-route-genres/:id', requireRole('owner', 'admin'), 
 // GET /api/entry-routes — list all
 entryRoutes.get('/api/entry-routes', async (c) => {
   try {
-    const tenantId = c.get('staff').tenantId ?? DEFAULT_TENANT_ID;
+    const staff = c.get('staff');
+    const tenantId = staff.tenantId ?? DEFAULT_TENANT_ID;
+    // N-011: 選択accountをAPIへ渡し、DBの行と共通境界で照合する。
+    // 範囲外の指定は「ない」ものとして404にする。
+    const requested = (c.req.query('account_id') ?? '').trim();
+    const decision = await resolveRequestBoundary(c.env.DB, staff, requested || undefined);
+    if (!decision.allowed) return c.json({ success: false, error: 'Not found' }, 404);
+    const scope = decision.scope;
     const rows = await getEntryRoutes(c.env.DB, tenantId);
-    return c.json({ success: true, data: rows.map(serialize) });
+    const visible = rows.filter((row) => {
+      const accountId = (row as { line_account_id?: string | null }).line_account_id ?? null;
+      if (requested) return accountId === requested;
+      return accountId == null ? scope.canSeeUnassigned : scope.allowedAccountIds.includes(accountId);
+    });
+    return c.json({ success: true, data: visible.map(serialize) });
   } catch (err) {
     console.error('GET /api/entry-routes error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
@@ -124,7 +175,7 @@ entryRoutes.get('/api/entry-routes/:id', async (c) => {
 });
 
 // POST /api/entry-routes — create
-entryRoutes.post('/api/entry-routes', requireRole('owner', 'admin'), async (c) => {
+entryRoutes.post('/api/entry-routes', requireEntryRouteManagement(), async (c) => {
   try {
     const body = await c.req.json<{
       refCode: string;
@@ -137,6 +188,11 @@ entryRoutes.post('/api/entry-routes', requireRole('owner', 'admin'), async (c) =
       introTemplateId?: string | null;
       runAccountFriendAddScenarios?: boolean;
       isActive?: boolean;
+      /** R39: 画面のヘッダーで選んだ所属。機能強制ミドルウェアが読む鍵と同名で受ける。 */
+      lineAccountId?: string | null;
+      line_account_id?: string | null;
+      accountId?: string | null;
+      account_id?: string | null;
     }>();
     const refCode = body.refCode?.trim();
     const name = body.name?.trim();
@@ -150,8 +206,27 @@ entryRoutes.post('/api/entry-routes', requireRole('owner', 'admin'), async (c) =
     if ((genre?.length ?? 0) > 80 || name.length > 120) {
       return c.json({ success: false, error: 'ジャンルは80文字、名前は120文字以内で入力してください' }, 400);
     }
-    const tenantId = c.get('staff').tenantId ?? DEFAULT_TENANT_ID;
-    const row = await createEntryRoute(c.env.DB, { ...body, refCode, name, genre, tenantId });
+    const staff = c.get('staff');
+    // R39: 送りに所属が無いと機能強制で止まる。担当アカウント制の職員は
+    // 自分の所属へ倒し、それでも無ければ作らせない。
+    const lineAccountId = body.lineAccountId?.trim()
+      || body.line_account_id?.trim()
+      || body.accountId?.trim()
+      || body.account_id?.trim()
+      || staff.assignedLineAccountId
+      || null;
+    if (!lineAccountId) {
+      return c.json({
+        success: false,
+        error: 'LINEアカウントを指定してください',
+        code: 'LINE_ACCOUNT_REQUIRED',
+      }, 400);
+    }
+    // N-011 と同じ境界で照合する。範囲外の指定は「ない」ものとして404にする。
+    const decision = await resolveRequestBoundary(c.env.DB, staff, lineAccountId);
+    if (!decision.allowed) return c.json({ success: false, error: 'Not found' }, 404);
+    const tenantId = staff.tenantId ?? DEFAULT_TENANT_ID;
+    const row = await createEntryRoute(c.env.DB, { ...body, refCode, name, genre, tenantId, lineAccountId });
     return c.json({ success: true, data: serialize(row) }, 201);
   } catch (err) {
     console.error('POST /api/entry-routes error:', err);
@@ -163,12 +238,15 @@ entryRoutes.post('/api/entry-routes', requireRole('owner', 'admin'), async (c) =
 });
 
 // PATCH /api/entry-routes/:id — update
-entryRoutes.patch('/api/entry-routes/:id', requireRole('owner', 'admin'), async (c) => {
+entryRoutes.patch('/api/entry-routes/:id', requireEntryRouteManagement(), async (c) => {
   try {
     const id = c.req.param('id');
     const tenantId = c.get('staff').tenantId ?? DEFAULT_TENANT_ID;
     const existing = await getEntryRouteById(c.env.DB, id);
     if (!existing || !canAccessEntryRoute(existing, tenantId)) return c.json({ success: false, error: 'Not found' }, 404);
+    if (!await canAccessEntryRouteAccount(c.env.DB, c.get('staff'), existing)) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
     const body = await c.req.json<
       Partial<{
         refCode: string;
@@ -181,10 +259,11 @@ entryRoutes.patch('/api/entry-routes/:id', requireRole('owner', 'admin'), async 
         introTemplateId: string | null;
         runAccountFriendAddScenarios: boolean;
         isActive: boolean;
+        stoppedReason?: string | null;
       }>
     >();
-    if (body.refCode !== undefined && !/^[A-Za-z0-9_-]{1,64}$/.test(body.refCode.trim())) {
-      return c.json({ success: false, error: 'ref_code は64文字以内の半角英数字・_・-で入力してください' }, 400);
+    if (body.refCode !== undefined && body.refCode.trim() !== existing.ref_code) {
+      return c.json({ success: false, error: 'ref_code は作成後に変更できません' }, 400);
     }
     if (body.genre !== undefined && body.genre !== null && (!body.genre.trim() || body.genre.trim().length > 80)) {
       return c.json({ success: false, error: 'ジャンルは1〜80文字で入力してください' }, 400);
@@ -192,7 +271,11 @@ entryRoutes.patch('/api/entry-routes/:id', requireRole('owner', 'admin'), async 
     if (body.name !== undefined && (!body.name.trim() || body.name.trim().length > 120)) {
       return c.json({ success: false, error: '名前は1〜120文字で入力してください' }, 400);
     }
-    if (body.refCode !== undefined) body.refCode = body.refCode.trim();
+    if (body.stoppedReason !== undefined && body.stoppedReason !== null
+      && (typeof body.stoppedReason !== 'string' || body.stoppedReason.trim().length > 200)) {
+      return c.json({ success: false, error: '停止理由は200文字以内で入力してください' }, 400);
+    }
+    delete body.refCode;
     if (typeof body.genre === 'string') body.genre = body.genre.trim();
     if (body.name !== undefined) body.name = body.name.trim();
     const row = await updateEntryRoute(c.env.DB, id, body);
@@ -214,10 +297,94 @@ entryRoutes.delete('/api/entry-routes/:id', requireRole('owner', 'admin'), async
     const tenantId = c.get('staff').tenantId ?? DEFAULT_TENANT_ID;
     const existing = await getEntryRouteById(c.env.DB, id);
     if (!existing || !canAccessEntryRoute(existing, tenantId)) return c.json({ success: false, error: 'Not found' }, 404);
-    await deleteEntryRoute(c.env.DB, id);
+    if (!await canAccessEntryRouteAccount(c.env.DB, c.get('staff'), existing)) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    const body: { confirmationName?: unknown } = await c.req
+      .json<{ confirmationName?: unknown }>()
+      .catch(() => ({}));
+    if (typeof body.confirmationName !== 'string' || body.confirmationName !== existing.name) {
+      return c.json({
+        success: false,
+        error: '完全削除する経路名を正確に入力してください。',
+        code: 'ENTRY_ROUTE_NAME_CONFIRMATION_MISMATCH',
+      }, 422);
+    }
+    const result = await deleteEntryRoute(c.env.DB, id, body.confirmationName);
+    if (result === 'not_found') return c.json({ success: false, error: 'Not found' }, 404);
+    if (result === 'name_mismatch') {
+      return c.json({
+        success: false,
+        error: '経路名が変更されています。画面を読み直してから、もう一度確認してください。',
+        code: 'ENTRY_ROUTE_NAME_CONFIRMATION_MISMATCH',
+      }, 422);
+    }
+    if (result === 'in_use') {
+      return c.json({
+        success: false,
+        error: '利用履歴がある経路は完全削除できません。受付停止を選んでください。',
+        code: 'ENTRY_ROUTE_IN_USE',
+      }, 409);
+    }
     return c.json({ success: true });
   } catch (err) {
     console.error('DELETE /api/entry-routes/:id error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// POST /api/entry-routes/:id/qr-pdf — printing sheet (A4, 1 page)
+entryRoutes.post('/api/entry-routes/:id/qr-pdf', requireEntryRouteManagement(), async (c) => {
+  try {
+    const id = c.req.param('id');
+    const staff = c.get('staff');
+    const tenantId = staff.tenantId ?? DEFAULT_TENANT_ID;
+    const existing = await getEntryRouteById(c.env.DB, id);
+    if (!existing || !canAccessEntryRoute(existing, tenantId)) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    if (!await canAccessEntryRouteAccount(c.env.DB, staff, existing)) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    // 止めた経路は QR も印刷も出さない。画面も同じ文を見せる。
+    if (existing.is_active !== 1) {
+      return c.json({ success: false, error: 'この経路は停止しています' }, 409);
+    }
+    const url = `${new URL(c.req.url).origin}/r/${existing.ref_code}`;
+    let symbol;
+    try {
+      symbol = encodeQr(url);
+    } catch (err) {
+      if (err instanceof QrCapacityError) {
+        return c.json({ success: false, error: 'URLが長すぎてQRにできません' }, 400);
+      }
+      throw err;
+    }
+    const account = existing.line_account_id
+      ? await getLineAccountById(c.env.DB, existing.line_account_id)
+      : null;
+    const accountName = account?.name?.trim() || existing.name;
+    const jst = new Date(Date.now() + 9 * 3_600_000).toISOString();
+    const issuedAt = `${jst.slice(0, 10)} ${jst.slice(11, 16)}`;
+    let pdf: Uint8Array;
+    try {
+      pdf = buildQrPrintPdf({ accountName, url, issuedAt, qr: symbol });
+    } catch (err) {
+      if (err instanceof QrPdfError) {
+        return c.json({ success: false, error: '印刷用PDFを作れませんでした' }, 400);
+      }
+      throw err;
+    }
+    // ref_code は半角英数字だけなので、そのままファイル名に使える。
+    return new Response(pdf, {
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="qr-${existing.ref_code}.pdf"`,
+        'Cache-Control': 'no-store',
+      },
+    });
+  } catch (err) {
+    console.error('POST /api/entry-routes/:id/qr-pdf error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

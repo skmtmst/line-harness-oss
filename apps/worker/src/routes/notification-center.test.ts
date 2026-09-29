@@ -69,7 +69,7 @@ describe('dashboard notification center routes', () => {
     );
     expect(response.status).toBe(200);
     expect(getNotificationCenter).toHaveBeenCalledWith(env.DB, {
-      lineAccountId: 'account-a', staffId: 'staff-a', category: 'update', limit: 10,
+      lineAccountId: 'account-a', staffId: 'staff-a', category: 'update', limit: 10, offset: 0,
     });
     expect(await response.json()).toMatchObject({
       success: true,

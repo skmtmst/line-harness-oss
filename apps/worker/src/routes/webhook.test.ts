@@ -4,12 +4,14 @@ import { Hono } from 'hono';
 const lineClientMocks = vi.hoisted(() => ({
   getProfile: vi.fn(),
   replyMessage: vi.fn(),
+  replyMessageWithRequestId: vi.fn(),
   pushMessage: vi.fn(),
 }));
 
 // Stub the DB graph — these tests focus on webhook guard behavior and the
 // first-contact friend registration path without touching real D1/LINE.
 vi.mock('@line-crm/db', () => ({
+  isOperationCapabilityStopped: vi.fn(async () => false),
   upsertFriend: vi.fn(),
   updateFriendFollowStatus: vi.fn(),
   getFriendByLineUserIdForAccount: vi.fn(),
@@ -20,7 +22,7 @@ vi.mock('@line-crm/db', () => ({
   advanceFriendScenario: vi.fn(),
   completeFriendScenario: vi.fn(),
   upsertChatOnMessage: vi.fn(),
-  getLineAccounts: vi.fn().mockResolvedValue([]),
+  listLineAccountsWithTenantStatus: vi.fn().mockResolvedValue([]),
   jstNow: vi.fn(),
   computeNextDeliveryAt: vi.fn(),
   resolveStepContent: vi.fn(),
@@ -34,8 +36,31 @@ vi.mock('@line-crm/db', () => ({
   recordFriendAddEvent: vi.fn().mockResolvedValue('friend-add-event-1'),
   captureFriendAddEventAttribution: vi.fn().mockResolvedValue(null),
   markFriendAddEventRouting: vi.fn().mockResolvedValue(undefined),
+  claimFriendAddSendRight: vi.fn().mockResolvedValue({ held: true, generation: 1, previousDispatchUnknown: false }),
+  touchFriendAddSendClaim: vi.fn().mockResolvedValue(true),
+  releaseFriendAddSendRight: vi.fn().mockResolvedValue(undefined),
   recordAnalyticsEvent: vi.fn().mockResolvedValue({ id: 'analytics-event-1' }),
+  recordIncomingLineMessage: vi.fn().mockImplementation(async (_db, input) => ({
+    id: input.id, inserted: true, isUnsent: false, unsentAt: null,
+  })),
+  recordLineMessageUnsend: vi.fn().mockResolvedValue(undefined),
   recordAutoReplyHit: vi.fn().mockResolvedValue(undefined),
+  reserveAutoReplyEvaluation: vi.fn().mockImplementation(async (_db, input) => ({
+    created: true,
+    row: {
+      id: `evaluation-${input.incomingEventId}`,
+      incoming_event_id: input.incomingEventId,
+      status: 'received',
+      reply_status: 'not_attempted',
+    },
+  })),
+  ensureAutoReplyPublishedVersion: vi.fn().mockResolvedValue({ id: 'version-1' }),
+  recordAutoReplyEvaluationDetail: vi.fn().mockResolvedValue(undefined),
+  markAutoReplyEvaluationMatched: vi.fn().mockResolvedValue(undefined),
+  markAutoReplyEvaluationSkipped: vi.fn().mockResolvedValue(undefined),
+  markAutoReplyEvaluationFinished: vi.fn().mockResolvedValue(undefined),
+  reserveAutoReplyActionRun: vi.fn().mockResolvedValue({ id: 'action-run-1', acquired: true }),
+  finishAutoReplyActionRun: vi.fn().mockResolvedValue(undefined),
   toJstString: vi.fn().mockReturnValue('2026-08-24T12:00:00.000+09:00'),
 }));
 
@@ -81,7 +106,7 @@ import {
   enrollFriendInScenario,
   getEntryRouteByRefCode,
   getFriendByLineUserIdForAccount,
-  getLineAccounts,
+  listLineAccountsWithTenantStatus,
   getMessageTemplateById,
   getScenarioSteps,
   getScenarios,
@@ -94,10 +119,15 @@ import {
   recordFriendAddEvent,
   captureFriendAddEventAttribution,
   markFriendAddEventRouting,
+  claimFriendAddSendRight,
+  touchFriendAddSendClaim,
+  releaseFriendAddSendRight,
   recordAnalyticsEvent,
+  recordIncomingLineMessage,
 } from '@line-crm/db';
 import { fireEvent } from '../services/event-bus.js';
 import { handleCarouselTap } from '../services/carousel-tap.js';
+import { applyFriendAddRouting } from '../services/friend-add-routing.js';
 import { webhook } from './webhook.js';
 
 function setupApp() {
@@ -130,13 +160,13 @@ const baseExecutionCtx = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(getLineAccounts).mockResolvedValue([]);
+  vi.mocked(listLineAccountsWithTenantStatus).mockResolvedValue([]);
 });
 
 describe('POST /webhook — V6 friend-add ledger', () => {
   test('再追加と今回リンクをWebhookイベント単位で記録する', async () => {
     vi.mocked(verifySignature).mockResolvedValue(true);
-    vi.mocked(getLineAccounts).mockResolvedValue([{
+    vi.mocked(listLineAccountsWithTenantStatus).mockResolvedValue([{
       id: 'account-main', channel_secret: 'env-default-secret',
       channel_access_token: 'account-token', is_active: 1,
     } as never]);
@@ -174,7 +204,8 @@ describe('POST /webhook — V6 friend-add ledger', () => {
       eventId: 'friend-add-event-1', lineAccountId: 'account-main', friendId: 'friend-1',
     });
     expect(markFriendAddEventRouting).toHaveBeenCalledWith(baseEnv.DB, expect.objectContaining({
-      eventId: 'friend-add-event-1', lineAccountId: 'account-main', status: 'completed',
+      eventId: 'friend-add-event-1', lineAccountId: 'account-main', status: 'partial_failed',
+      errorCode: 'send_failed', scenarioEnrollmentId: null, deliveryCount: 0,
     }));
   });
 });
@@ -182,7 +213,7 @@ describe('POST /webhook — V6 friend-add ledger', () => {
 describe('POST /webhook — V6分析イベント', () => {
   test('友だち解除をWebhookの発生時刻とIDで記録する', async () => {
     vi.mocked(verifySignature).mockResolvedValue(true);
-    vi.mocked(getLineAccounts).mockResolvedValue([{
+    vi.mocked(listLineAccountsWithTenantStatus).mockResolvedValue([{
       id: 'account-main', channel_secret: 'env-default-secret',
       channel_access_token: 'account-token', is_active: 1,
     } as never]);
@@ -214,6 +245,43 @@ describe('POST /webhook — V6分析イベント', () => {
       occurredAt: new Date(1787530800000).toISOString(),
       dimensions: undefined,
     });
+  });
+});
+
+describe('POST /webhook — 停止中の契約先', () => {
+  test('受信メッセージは保存するが返信・自動化を発火しない', async () => {
+    vi.mocked(verifySignature).mockResolvedValue(true);
+    vi.mocked(listLineAccountsWithTenantStatus).mockResolvedValue([{
+      id: 'account-stopped', channel_secret: 'env-default-secret',
+      channel_access_token: 'account-token', is_active: 1, tenant_status: 'suspended',
+    } as never]);
+    vi.mocked(getFriendByLineUserIdForAccount).mockResolvedValue({
+      id: 'friend-stopped', line_user_id: 'U-stopped', line_account_id: 'account-stopped',
+      is_following: 1,
+    } as never);
+    const waitUntil = vi.fn();
+
+    const response = await setupApp().request('/webhook', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Line-Signature': 'x'.repeat(44) },
+      body: JSON.stringify({ destination: 'stopped-destination', events: [{
+        type: 'message', webhookEventId: 'stopped-message-1', timestamp: 1787530800000,
+        source: { type: 'user', userId: 'U-stopped' }, replyToken: 'reply-stopped',
+        message: { id: 'line-message-stopped', type: 'text', text: '問い合わせです' },
+      }] }),
+    }, baseEnv, { ...baseExecutionCtx, waitUntil } as ExecutionContext);
+    expect(response.status).toBe(200);
+    await (waitUntil.mock.calls[0]?.[0] as Promise<void>);
+
+    expect(recordIncomingLineMessage).toHaveBeenCalledWith(baseEnv.DB, expect.objectContaining({
+      friendId: 'friend-stopped', content: '問い合わせです', lineAccountId: 'account-stopped',
+    }));
+    expect(upsertChatOnMessage).toHaveBeenCalledWith(baseEnv.DB, 'friend-stopped', '2026-08-24T12:00:00.000+09:00');
+    expect(lineClientMocks.replyMessage).not.toHaveBeenCalled();
+    expect(lineClientMocks.pushMessage).not.toHaveBeenCalled();
+    expect(fireEvent).not.toHaveBeenCalled();
+    expect(applyFriendAddRouting).not.toHaveBeenCalled();
+    expect(handleCarouselTap).not.toHaveBeenCalled();
   });
 });
 
@@ -357,7 +425,7 @@ describe('POST /webhook — DoS defenses (#104)', () => {
 describe('POST /webhook — postback events', () => {
   test('records a carousel tap without firing catch-all automations', async () => {
     vi.mocked(verifySignature).mockResolvedValue(true);
-    vi.mocked(getLineAccounts).mockResolvedValue([{
+    vi.mocked(listLineAccountsWithTenantStatus).mockResolvedValue([{
       id: 'account-main', channel_secret: 'env-default-secret',
       channel_access_token: 'account-token', is_active: 1,
     } as never]);
@@ -582,7 +650,7 @@ describe('POST /webhook — postback events', () => {
 describe('POST /webhook — first-contact existing friends', () => {
   test('auto-registers an unknown text-message sender without firing friend_add handling', async () => {
     vi.mocked(verifySignature).mockResolvedValue(true);
-    vi.mocked(getLineAccounts).mockResolvedValue([{
+    vi.mocked(listLineAccountsWithTenantStatus).mockResolvedValue([{
       id: 'account-main',
       is_active: 1,
       channel_secret: 'env-default-secret',
@@ -682,7 +750,7 @@ describe('POST /webhook — first-contact existing friends', () => {
       pictureUrl: 'https://example.com/profile.jpg',
       statusMessage: 'hello',
     });
-    expect(upsertChatOnMessage).toHaveBeenCalledWith(db, 'friend-1');
+    expect(upsertChatOnMessage).toHaveBeenCalledWith(db, 'friend-1', '2026-08-24T12:00:00.000+09:00');
     expect(fireEvent).toHaveBeenCalledWith(
       db,
       'message_received',
@@ -703,5 +771,131 @@ describe('POST /webhook — first-contact existing friends', () => {
     expect(addTagToFriend).not.toHaveBeenCalled();
     expect(getEntryRouteByRefCode).not.toHaveBeenCalled();
     expect(getMessageTemplateById).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST /webhook — friend-add抑止理由の台帳記録 (#622)', () => {
+  async function sendFollowWithRouting(routing: unknown) {
+    vi.mocked(verifySignature).mockResolvedValue(true);
+    vi.mocked(listLineAccountsWithTenantStatus).mockResolvedValue([{
+      id: 'account-main', channel_secret: 'env-default-secret',
+      channel_access_token: 'account-token', is_active: 1,
+    } as never]);
+    lineClientMocks.getProfile.mockResolvedValue({ displayName: '田中さん' });
+    vi.mocked(upsertFriend).mockResolvedValue({
+      id: 'friend-1', line_user_id: 'U-1', line_account_id: 'account-main',
+      unfollow_count: 1, created_at: '2026-01-01T00:00:00.000+09:00',
+      first_followed_at: '2026-01-01T00:00:00.000+09:00',
+    } as never);
+    vi.mocked(captureFriendAddEventAttribution).mockResolvedValue(null);
+    vi.mocked(getEntryRouteByRefCode).mockResolvedValue(null);
+    vi.mocked(getScenarios).mockResolvedValue([]);
+    vi.mocked(applyFriendAddRouting).mockResolvedValue(routing as never);
+
+    const waitUntil = vi.fn();
+    const response = await setupApp().request('/webhook', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Line-Signature': 'x'.repeat(44) },
+      body: JSON.stringify({ events: [{
+        type: 'follow', webhookEventId: 'webhook-follow-1', timestamp: 1787530800000,
+        source: { type: 'user', userId: 'U-1' }, replyToken: 'reply-1',
+        follow: { isUnblocked: false },
+      }] }),
+    }, baseEnv, { ...baseExecutionCtx, waitUntil } as ExecutionContext);
+    expect(response.status).toBe(200);
+    await (waitUntil.mock.calls[0]?.[0] as Promise<void>);
+  }
+
+  const suppressedCases = [
+    'outside_weekday',
+    'outside_time_window',
+    'friend_condition_not_met',
+    'friend_condition_unreadable',
+    'resend_suppressed',
+    'delivery_disabled',
+  ] as const;
+
+  test.each(suppressedCases)('抑止時は status=suppressed と理由 %s を error_code へ記録する', async (reason) => {
+    await sendFollowWithRouting({
+      routed: true, kind: 'returning', enrollments: [], timing: 'immediate',
+      suppressed: true, suppressReason: reason, ruleId: 'rule-1', ruleVersionId: 'rule-1-v1',
+    });
+    expect(markFriendAddEventRouting).toHaveBeenCalledWith(baseEnv.DB, expect.objectContaining({
+      eventId: 'friend-add-event-1', lineAccountId: 'account-main',
+      status: 'suppressed', errorCode: reason,
+    }));
+  });
+
+  test('送れなかったときは completed にせず partial_failed と send_failed を記録する', async () => {
+    await sendFollowWithRouting({
+      routed: true, kind: 'returning', enrollments: [], timing: 'immediate',
+      suppressed: false, suppressReason: null, ruleId: 'rule-1', ruleVersionId: 'rule-1-v1',
+    });
+    expect(markFriendAddEventRouting).toHaveBeenCalledWith(baseEnv.DB, expect.objectContaining({
+      eventId: 'friend-add-event-1', lineAccountId: 'account-main',
+      status: 'partial_failed', errorCode: 'send_failed', deliveryCount: 0,
+    }));
+  });
+
+  test('処理も送信も失敗したときは、処理再試行後に戻す送信結果を同時に記録する', async () => {
+    await sendFollowWithRouting({
+      routed: true, kind: 'returning', enrollments: [], timing: 'immediate',
+      suppressed: false, suppressReason: null, ruleId: 'rule-1', ruleVersionId: 'rule-1-v1',
+      actionFailureCount: 1,
+    });
+    expect(markFriendAddEventRouting).toHaveBeenCalledWith(baseEnv.DB, expect.objectContaining({
+      eventId: 'friend-add-event-1', lineAccountId: 'account-main',
+      status: 'partial_failed', errorCode: 'action_failed', deliveryCount: 0,
+      actionBaseStatus: 'partial_failed', actionBaseErrorCode: 'send_failed',
+    }));
+  });
+
+  test('設定なしの受け皿経路で送れなかったときも partial_failed にする', async () => {
+    await sendFollowWithRouting({ routed: false, suppressed: false, enrollments: [] });
+    expect(markFriendAddEventRouting).toHaveBeenCalledWith(baseEnv.DB, expect.objectContaining({
+      eventId: 'friend-add-event-1', lineAccountId: 'account-main',
+      status: 'partial_failed', errorCode: 'send_failed', deliveryCount: 0,
+    }));
+  });
+
+  test('送信権を取れなかった実行は送らず duplicate_in_flight で引く', async () => {
+    vi.mocked(claimFriendAddSendRight).mockResolvedValueOnce({ held: false, generation: 0, previousDispatchUnknown: false });
+    await sendFollowWithRouting({
+      routed: true, kind: 'first_time',
+      enrollments: [{ scenarioId: 'scenario-1', enrollment: { id: 'enrollment-1' }, resumed: false }],
+      timing: 'immediate', suppressed: false, suppressReason: null,
+      ruleId: 'rule-1', ruleVersionId: 'rule-1-v1',
+    });
+    expect(markFriendAddEventRouting).toHaveBeenCalledWith(baseEnv.DB, expect.objectContaining({
+      eventId: 'friend-add-event-1', lineAccountId: 'account-main',
+      status: 'partial_failed', errorCode: 'duplicate_in_flight', deliveryCount: 0,
+    }));
+    expect(releaseFriendAddSendRight).not.toHaveBeenCalled();
+  });
+
+  test('送信権の予約に失敗したら送らず send_claim_unavailable で残す', async () => {
+    vi.mocked(claimFriendAddSendRight).mockRejectedValueOnce(new Error('db down'));
+    await sendFollowWithRouting({
+      routed: true, kind: 'returning',
+      enrollments: [{ scenarioId: 'scenario-1', enrollment: { id: 'enrollment-1' }, resumed: false }],
+      timing: 'immediate', suppressed: false, suppressReason: null,
+      ruleId: 'rule-1', ruleVersionId: 'rule-1-v1',
+    });
+    expect(markFriendAddEventRouting).toHaveBeenCalledWith(baseEnv.DB, expect.objectContaining({
+      eventId: 'friend-add-event-1', lineAccountId: 'account-main',
+      status: 'partial_failed', errorCode: 'send_claim_unavailable', deliveryCount: 0,
+    }));
+  });
+
+  test('回収で旧持ち主になったら送信も確定もしない', async () => {
+    vi.mocked(touchFriendAddSendClaim).mockResolvedValueOnce(false);
+    await sendFollowWithRouting({
+      routed: true, kind: 'returning',
+      enrollments: [{ scenarioId: 'scenario-1', enrollment: { id: 'enrollment-1' }, resumed: false }],
+      timing: 'immediate', suppressed: false, suppressReason: null,
+      ruleId: 'rule-1', ruleVersionId: 'rule-1-v1',
+    });
+    expect(markFriendAddEventRouting).not.toHaveBeenCalled();
+    expect(releaseFriendAddSendRight).not.toHaveBeenCalled();
   });
 });

@@ -8,7 +8,8 @@ ALTER TABLE common_vars
 
 -- 既存の使用先がすべて同じアカウントを示す場合だけ、その所属を採用する。
 -- 2アカウント以上で使われる値や、所属を証明できない値はNULLのまま残す。
-WITH usage_accounts AS (
+-- 各複合SELECTを4項以下に分け、最後のUNIONで使用先の重複を除く。
+WITH usage_a(var_id, account_id) AS (
   SELECT DISTINCT cv.id AS var_id, t.line_account_id AS account_id
     FROM common_vars cv JOIN templates t
       ON t.line_account_id IS NOT NULL
@@ -29,7 +30,7 @@ WITH usage_accounts AS (
     FROM common_vars cv JOIN reminder_steps rs
       ON instr(coalesce(rs.message_content, ''), '{{var.' || cv.var_key || '}}') > 0
     JOIN reminders r ON r.id = rs.reminder_id AND r.line_account_id IS NOT NULL
-  UNION
+), usage_b(var_id, account_id) AS (
   SELECT DISTINCT cv.id, ar.line_account_id
     FROM common_vars cv JOIN auto_replies ar
       ON ar.line_account_id IS NOT NULL
@@ -41,6 +42,10 @@ WITH usage_accounts AS (
       ON a.line_account_id IS NOT NULL
      AND (instr(coalesce(a.conditions, ''), '{{var.' || cv.var_key || '}}') > 0
        OR instr(coalesce(a.actions, ''), '{{var.' || cv.var_key || '}}') > 0)
+), usage_accounts(var_id, account_id) AS (
+  SELECT var_id, account_id FROM usage_a
+  UNION
+  SELECT var_id, account_id FROM usage_b
 )
 UPDATE common_vars
    SET line_account_id = (

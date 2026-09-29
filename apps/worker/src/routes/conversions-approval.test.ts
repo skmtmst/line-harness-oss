@@ -8,6 +8,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // pass-through, and the 404 for missing / non-attributed events.
 const dbMocks = {
   getLineAccounts: vi.fn().mockResolvedValue([]),
+  getLineAccountScopeEntries: vi.fn(async (...args: unknown[]) => dbMocks.getLineAccounts(...args)),
+  getAccountSetting: vi.fn().mockResolvedValue(null),
+  getVersionedAccountSetting: vi.fn().mockResolvedValue({
+    version: 1,
+    data: { features: { affiliates: true } },
+  }),
   getStaffByApiKey: vi.fn(),
   recoverStalledBroadcasts: vi.fn(),
   recoverStuckDeliveries: vi.fn(),
@@ -15,14 +21,26 @@ const dbMocks = {
   getConversionPoints: vi.fn(),
   getConversionPointById: vi.fn(),
   createConversionPoint: vi.fn(),
-  deleteConversionPoint: vi.fn(),
+  stopConversionPoint: vi.fn(),
   trackConversion: vi.fn(),
   getConversionEvents: vi.fn(),
   getConversionReport: vi.fn(),
   getConversionApprovalQueue: vi.fn(),
   setConversionApproval: vi.fn(),
+  decideConversionApproval: vi.fn(),
+  getApprovalNotificationState: vi.fn(),
+  markApprovalNotified: vi.fn(),
   getConversionApprovalNotifyInfo: vi.fn(),
+  // N-212 の案件動作はここでは対象外 — 案件なしとして通す。
+  getConversionOfferActionPlan: vi.fn().mockResolvedValue(null),
   syncAffiliateConversionMileage: vi.fn().mockResolvedValue(undefined),
+  listConversionDefinitions: vi.fn(),
+  getConversionDefinitionDetail: vi.fn(),
+  addConversionDefinitionUsage: vi.fn(),
+  getConversionDefinitionReport: vi.fn(),
+  listConversionDefinitionsForExport: vi.fn(),
+  ConversionDefinitionError: class ConversionDefinitionError extends Error {},
+  CONVERSION_DEFINITION_USAGE_KINDS: [],
 };
 vi.mock('@line-crm/db', () => dbMocks);
 
@@ -51,10 +69,12 @@ const env = {
 } as unknown as import('../index.js').Env['Bindings'];
 
 function req(method: string, path: string, body?: unknown) {
+  const separator = path.includes('?') ? '&' : '?';
+  const scopedPath = `${path}${separator}accountId=account-1`;
   const headers = new Headers({ Authorization: `Bearer ${API_KEY}` });
   if (body !== undefined) headers.set('Content-Type', 'application/json');
   return worker.fetch(
-    new Request(`https://worker.example.com${path}`, {
+    new Request(`https://worker.example.com${scopedPath}`, {
       method,
       headers,
       body: body !== undefined ? JSON.stringify(body) : undefined,
@@ -66,8 +86,16 @@ function req(method: string, path: string, body?: unknown) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  dbMocks.getLineAccounts.mockResolvedValue([]);
+  dbMocks.getLineAccounts.mockResolvedValue([
+    { id: 'account-1', tenant_id: '00000000-0000-4000-8000-000000000001' },
+  ]);
   dbMocks.syncAffiliateConversionMileage.mockResolvedValue(undefined);
+  // R354: 承認世代の通知は未送信として扱い、初回承認の通知を通す。
+  dbMocks.getApprovalNotificationState.mockResolvedValue({
+    send: true,
+    approvedAt: '2026-09-01T00:00:00.000+09:00',
+  });
+  dbMocks.markApprovalNotified.mockResolvedValue(true);
 });
 
 describe('GET /api/conversions/approvals', () => {
@@ -125,32 +153,53 @@ describe('GET /api/conversions/approvals', () => {
     expect(callArgs.limit).toBe(200);
   });
 
-  it('clamps oversized limit to 500', async () => {
+  it('clamps oversized limit to 200', async () => {
     dbMocks.getConversionApprovalQueue.mockResolvedValue([]);
     await req('GET', '/api/conversions/approvals?limit=99999');
     const callArgs = dbMocks.getConversionApprovalQueue.mock.calls[0][1];
-    expect(callArgs.limit).toBe(500);
+    expect(callArgs.limit).toBe(200);
+  });
+
+  it('does not pass a negative limit or offset to the database', async () => {
+    dbMocks.getConversionApprovalQueue.mockResolvedValue([]);
+    await req('GET', '/api/conversions/approvals?limit=-1&offset=-2');
+    const callArgs = dbMocks.getConversionApprovalQueue.mock.calls[0][1];
+    expect(callArgs).toMatchObject({ limit: 200, offset: 0 });
+  });
+});
+
+describe('GET /api/conversions/events', () => {
+  it('clamps huge, negative, and non-numeric pagination values', async () => {
+    dbMocks.getConversionEvents.mockResolvedValue([]);
+    await req('GET', '/api/conversions/events?limit=999999&offset=-1');
+    expect(dbMocks.getConversionEvents.mock.calls[0][1]).toMatchObject({ limit: 200, offset: 0 });
+
+    await req('GET', '/api/conversions/events?limit=NaN');
+    expect(dbMocks.getConversionEvents.mock.calls[1][1]).toMatchObject({ limit: 100, offset: 0 });
   });
 });
 
 describe('PATCH /api/conversions/events/:id/approval', () => {
   it('approves an attributed event', async () => {
-    dbMocks.setConversionApproval.mockResolvedValue(true);
+    dbMocks.decideConversionApproval.mockResolvedValue({ outcome: 'updated', currentStatus: 'approved' });
     dbMocks.getConversionApprovalNotifyInfo.mockResolvedValue({
       affiliateId: 'aff-1',
       offerName: '案件X',
       rewardAmount: 5000,
+      notifyOnConversion: true,
     });
     const res = await req('PATCH', '/api/conversions/events/ev-1/approval', {
       status: 'approved',
+      expectedStatus: 'pending',
     });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { data: { approvalStatus: string } };
     expect(body.data.approvalStatus).toBe('approved');
-    expect(dbMocks.setConversionApproval).toHaveBeenCalledWith(
+    expect(dbMocks.decideConversionApproval).toHaveBeenCalledWith(
       expect.anything(),
       'ev-1',
       'approved',
+      'pending',
     );
     expect(dbMocks.syncAffiliateConversionMileage).toHaveBeenCalledWith(
       expect.anything(),
@@ -160,13 +209,14 @@ describe('PATCH /api/conversions/events/:id/approval', () => {
   });
 
   it('notifies the affiliate on approval', async () => {
-    dbMocks.setConversionApproval.mockResolvedValue(true);
+    dbMocks.decideConversionApproval.mockResolvedValue({ outcome: 'updated', currentStatus: 'approved' });
     dbMocks.getConversionApprovalNotifyInfo.mockResolvedValue({
       affiliateId: 'aff-1',
       offerName: '案件X',
       rewardAmount: 5000,
+      notifyOnConversion: true,
     });
-    await req('PATCH', '/api/conversions/events/ev-1/approval', { status: 'approved' });
+    await req('PATCH', '/api/conversions/events/ev-1/approval', { status: 'approved', expectedStatus: 'pending' });
     expect(notifyAffiliateApproval).toHaveBeenCalledWith(
       expect.anything(),
       expect.anything(),
@@ -177,9 +227,10 @@ describe('PATCH /api/conversions/events/:id/approval', () => {
   });
 
   it('does NOT notify the affiliate on rejection', async () => {
-    dbMocks.setConversionApproval.mockResolvedValue(true);
+    dbMocks.decideConversionApproval.mockResolvedValue({ outcome: 'updated', currentStatus: 'approved' });
     const res = await req('PATCH', '/api/conversions/events/ev-1/approval', {
       status: 'rejected',
+      expectedStatus: 'pending',
     });
     expect(res.status).toBe(200);
     expect(dbMocks.getConversionApprovalNotifyInfo).not.toHaveBeenCalled();
@@ -187,10 +238,11 @@ describe('PATCH /api/conversions/events/:id/approval', () => {
   });
 
   it('still returns 200 when the notify lookup finds nothing', async () => {
-    dbMocks.setConversionApproval.mockResolvedValue(true);
+    dbMocks.decideConversionApproval.mockResolvedValue({ outcome: 'updated', currentStatus: 'approved' });
     dbMocks.getConversionApprovalNotifyInfo.mockResolvedValue(null);
     const res = await req('PATCH', '/api/conversions/events/ev-1/approval', {
       status: 'approved',
+      expectedStatus: 'pending',
     });
     expect(res.status).toBe(200);
     expect(notifyAffiliateApproval).not.toHaveBeenCalled();
@@ -201,7 +253,7 @@ describe('PATCH /api/conversions/events/:id/approval', () => {
       status: 'pending',
     });
     expect(res.status).toBe(400);
-    expect(dbMocks.setConversionApproval).not.toHaveBeenCalled();
+    expect(dbMocks.decideConversionApproval).not.toHaveBeenCalled();
   });
 
   it('rejects a missing status with 400', async () => {
@@ -210,17 +262,24 @@ describe('PATCH /api/conversions/events/:id/approval', () => {
   });
 
   it('404s a missing or non-attributed event', async () => {
-    dbMocks.setConversionApproval.mockResolvedValue(false);
+    dbMocks.decideConversionApproval.mockResolvedValue({ outcome: 'not_found', currentStatus: 'pending' });
     const res = await req('PATCH', '/api/conversions/events/nope/approval', {
       status: 'rejected',
+      expectedStatus: 'pending',
     });
     expect(res.status).toBe(404);
   });
 
   it('returns 200 without calling notifyAffiliate when status is already_set (double-click guard)', async () => {
-    dbMocks.setConversionApproval.mockResolvedValue('already_set');
+    dbMocks.decideConversionApproval.mockResolvedValue({ outcome: 'already_set', currentStatus: 'approved' });
+    // R354: 同じ承認世代の通知は送り済みなので送らない。
+    dbMocks.getApprovalNotificationState.mockResolvedValue({
+      send: false,
+      approvedAt: '2026-09-01T00:00:00.000+09:00',
+    });
     const res = await req('PATCH', '/api/conversions/events/ev-dup/approval', {
       status: 'approved',
+      expectedStatus: 'pending',
     });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { data: { approvalStatus: string } };
@@ -235,11 +294,38 @@ describe('PATCH /api/conversions/events/:id/approval', () => {
     expect(dbMocks.getConversionApprovalNotifyInfo).not.toHaveBeenCalled();
   });
 
+  it('notifies once on already_set when the approval generation was never notified (R354 repair)', async () => {
+    dbMocks.decideConversionApproval.mockResolvedValue({ outcome: 'already_set', currentStatus: 'approved' });
+    dbMocks.getApprovalNotificationState.mockResolvedValue({
+      send: true,
+      approvedAt: '2026-09-01T00:00:00.000+09:00',
+    });
+    dbMocks.getConversionApprovalNotifyInfo.mockResolvedValue({
+      affiliateId: 'aff-1',
+      offerName: '案件X',
+      rewardAmount: 5000,
+      notifyOnConversion: true,
+    });
+    dbMocks.markApprovalNotified.mockResolvedValue(true);
+    const res = await req('PATCH', '/api/conversions/events/ev-dup/approval', {
+      status: 'approved',
+      expectedStatus: 'pending',
+    });
+    expect(res.status).toBe(200);
+    expect(notifyAffiliateApproval).toHaveBeenCalledTimes(1);
+    expect(dbMocks.markApprovalNotified).toHaveBeenCalledWith(
+      expect.anything(),
+      'ev-dup',
+      '2026-09-01T00:00:00.000+09:00',
+    );
+  });
+
   it('returns 500 when the mileage projection fails so a retry can repair it', async () => {
-    dbMocks.setConversionApproval.mockResolvedValue(true);
+    dbMocks.decideConversionApproval.mockResolvedValue({ outcome: 'updated', currentStatus: 'approved' });
     dbMocks.syncAffiliateConversionMileage.mockRejectedValue(new Error('ledger unavailable'));
     const res = await req('PATCH', '/api/conversions/events/ev-1/approval', {
       status: 'approved',
+      expectedStatus: 'pending',
     });
     expect(res.status).toBe(500);
     expect(notifyAffiliateApproval).not.toHaveBeenCalled();

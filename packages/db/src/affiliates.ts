@@ -7,6 +7,8 @@ import { generateRefSlug } from './affiliate-links.js';
 
 export interface Affiliate {
   id: string;
+  tenant_id: string;
+  line_account_id: string | null;
   name: string;
   code: string;
   commission_rate: number;
@@ -23,6 +25,33 @@ export interface Affiliate {
   notify_on_conversion: number;
 }
 
+/** 認証利用者が読める紹介者の所属範囲。tenant と account の両方を必須にする。 */
+export interface AffiliateScope {
+  tenantId: string;
+  allowedLineAccountIds: string[];
+  includeUnassigned?: boolean;
+}
+
+function affiliateScopeSql(scope: AffiliateScope, alias = ''): {
+  sql: string;
+  binds: unknown[];
+} {
+  const column = (name: string) => `${alias}${name}`;
+  const accountParts: string[] = [];
+  const binds: unknown[] = [scope.tenantId];
+  if (scope.allowedLineAccountIds.length > 0) {
+    accountParts.push(
+      `${column('line_account_id')} IN (${scope.allowedLineAccountIds.map(() => '?').join(', ')})`,
+    );
+    binds.push(...scope.allowedLineAccountIds);
+  }
+  if (scope.includeUnassigned) accountParts.push(`${column('line_account_id')} IS NULL`);
+  return {
+    sql: `${column('tenant_id')} = ? AND (${accountParts.join(' OR ') || '0 = 1'})`,
+    binds,
+  };
+}
+
 export interface AffiliateClick {
   id: string;
   affiliate_id: string;
@@ -33,9 +62,16 @@ export interface AffiliateClick {
 
 // ── Affiliate CRUD ──────────────────────────────────────────────────────────
 
-export async function getAffiliates(db: D1Database): Promise<Affiliate[]> {
+export async function getAffiliates(
+  db: D1Database,
+  scope?: AffiliateScope,
+): Promise<Affiliate[]> {
+  const scoped = scope ? affiliateScopeSql(scope) : null;
   const result = await db
-    .prepare(`SELECT * FROM affiliates ORDER BY created_at DESC`)
+    .prepare(
+      `SELECT * FROM affiliates${scoped ? ` WHERE ${scoped.sql}` : ''} ORDER BY created_at DESC`,
+    )
+    .bind(...(scoped?.binds ?? []))
     .all<Affiliate>();
   return result.results;
 }
@@ -43,10 +79,12 @@ export async function getAffiliates(db: D1Database): Promise<Affiliate[]> {
 export async function getAffiliateById(
   db: D1Database,
   id: string,
+  scope?: AffiliateScope,
 ): Promise<Affiliate | null> {
+  const scoped = scope ? affiliateScopeSql(scope) : null;
   return db
-    .prepare(`SELECT * FROM affiliates WHERE id = ?`)
-    .bind(id)
+    .prepare(`SELECT * FROM affiliates WHERE id = ?${scoped ? ` AND ${scoped.sql}` : ''}`)
+    .bind(id, ...(scoped?.binds ?? []))
     .first<Affiliate>();
 }
 
@@ -61,36 +99,94 @@ export async function getAffiliateByCode(
 }
 
 export interface CreateAffiliateInput {
+  tenantId: string;
+  lineAccountId: string;
   name: string;
   code: string;
   commissionRate?: number;
   /** Optional LINE friend UUID to bind for self-serve (LIFF) affiliates. */
   friendId?: string | null;
+  /**
+   * Stable per-attempt UUID from the client (#686). When the create commits
+   * but the response is lost, the client retries with the SAME operationId;
+   * this lets the retry recover the original row instead of creating a
+   * duplicate affiliate.
+   */
+  operationId?: string | null;
+}
+
+/** Look up a prior create by its client-supplied operation UUID (idempotent replay, #686). */
+async function findAffiliateByOperationId(
+  db: D1Database,
+  tenantId: string,
+  lineAccountId: string,
+  operationId: string,
+): Promise<Affiliate | null> {
+  return db
+    .prepare(
+      `SELECT * FROM affiliates WHERE tenant_id = ? AND line_account_id = ? AND operation_id = ?`,
+    )
+    .bind(tenantId, lineAccountId, operationId)
+    .first<Affiliate>();
+}
+
+function isOperationIdConflict(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /UNIQUE constraint failed/i.test(msg) && /affiliates\.operation_id/i.test(msg);
 }
 
 export async function createAffiliate(
   db: D1Database,
   input: CreateAffiliateInput,
 ): Promise<Affiliate> {
+  if (input.operationId) {
+    const existing = await findAffiliateByOperationId(db, input.tenantId, input.lineAccountId, input.operationId);
+    if (existing) return existing;
+  }
+
   const id = crypto.randomUUID();
   const now = jstNow();
 
-  await db
-    .prepare(
-      `INSERT INTO affiliates (id, name, code, commission_rate, is_active, created_at, friend_id)
-       VALUES (?, ?, ?, ?, 1, ?, ?)`,
-    )
-    .bind(id, input.name, input.code, input.commissionRate ?? 0, now, input.friendId ?? null)
-    .run();
+  try {
+    await db
+      .prepare(
+        `INSERT INTO affiliates
+           (id, tenant_id, line_account_id, name, code, commission_rate, is_active, created_at, friend_id, operation_id)
+         VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
+      )
+      .bind(
+        id,
+        input.tenantId,
+        input.lineAccountId,
+        input.name,
+        input.code,
+        input.commissionRate ?? 0,
+        now,
+        input.friendId ?? null,
+        input.operationId ?? null,
+      )
+      .run();
+  } catch (err) {
+    // A concurrent retry of the same operationId won the race; recover its row.
+    if (input.operationId && isOperationIdConflict(err)) {
+      const winner = await findAffiliateByOperationId(db, input.tenantId, input.lineAccountId, input.operationId);
+      if (winner) return winner;
+    }
+    throw err;
+  }
 
   return (await getAffiliateById(db, id))!;
 }
 
 export interface CreateAffiliateWithRandomCodeInput {
+  tenantId: string;
+  lineAccountId: string;
   name: string;
   commissionRate?: number;
   /** Optional LINE friend UUID to bind (enforced 1:1 by the partial UNIQUE index). */
   friendId?: string | null;
+  /** See CreateAffiliateInput.operationId (#686). */
+  operationId?: string | null;
 }
 
 /**
@@ -111,6 +207,11 @@ export async function createAffiliateWithRandomCode(
   input: CreateAffiliateWithRandomCodeInput,
   _slugGen: (len: number) => string = generateRefSlug,
 ): Promise<Affiliate> {
+  if (input.operationId) {
+    const existing = await findAffiliateByOperationId(db, input.tenantId, input.lineAccountId, input.operationId);
+    if (existing) return existing;
+  }
+
   const id = crypto.randomUUID();
   const now = jstNow();
 
@@ -123,14 +224,31 @@ export async function createAffiliateWithRandomCode(
     try {
       await db
         .prepare(
-          `INSERT INTO affiliates (id, name, code, commission_rate, is_active, created_at, friend_id)
-           VALUES (?, ?, ?, ?, 1, ?, ?)`,
+          `INSERT INTO affiliates
+             (id, tenant_id, line_account_id, name, code, commission_rate, is_active, created_at, friend_id, operation_id)
+           VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
         )
-        .bind(id, input.name, code, input.commissionRate ?? 0, now, input.friendId ?? null)
+        .bind(
+          id,
+          input.tenantId,
+          input.lineAccountId,
+          input.name,
+          code,
+          input.commissionRate ?? 0,
+          now,
+          input.friendId ?? null,
+          input.operationId ?? null,
+        )
         .run();
 
       return (await getAffiliateById(db, id))!;
     } catch (err) {
+      // A concurrent retry of the same operationId won the race; recover its row
+      // instead of continuing to burn code-collision retries.
+      if (input.operationId && isOperationIdConflict(err)) {
+        const winner = await findAffiliateByOperationId(db, input.tenantId, input.lineAccountId, input.operationId);
+        if (winner) return winner;
+      }
       const msg = err instanceof Error ? err.message : String(err);
       // Retry ONLY on a code collision. Any other UNIQUE violation (notably the
       // friend_id partial index) must propagate so the caller can return 409.
@@ -162,6 +280,7 @@ export async function updateAffiliate(
   db: D1Database,
   id: string,
   updates: UpdateAffiliateInput,
+  scope?: AffiliateScope,
 ): Promise<Affiliate | null> {
   const fields: string[] = [];
   const values: unknown[] = [];
@@ -197,15 +316,18 @@ export async function updateAffiliate(
     values.push(updates.notify_on_conversion);
   }
 
-  if (fields.length === 0) return getAffiliateById(db, id);
+  if (fields.length === 0) return getAffiliateById(db, id, scope);
 
-  values.push(id);
+  const scoped = scope ? affiliateScopeSql(scope) : null;
+  values.push(id, ...(scoped?.binds ?? []));
   await db
-    .prepare(`UPDATE affiliates SET ${fields.join(', ')} WHERE id = ?`)
+    .prepare(
+      `UPDATE affiliates SET ${fields.join(', ')} WHERE id = ?${scoped ? ` AND ${scoped.sql}` : ''}`,
+    )
     .bind(...values)
     .run();
 
-  return getAffiliateById(db, id);
+  return getAffiliateById(db, id, scope);
 }
 
 export async function deleteAffiliate(
@@ -276,7 +398,7 @@ export interface AffiliateReport {
 export async function getAffiliateReport(
   db: D1Database,
   affiliateId?: string,
-  opts: { startDate?: string; endDate?: string } = {},
+  opts: { startDate?: string; endDate?: string; scope?: AffiliateScope } = {},
 ): Promise<AffiliateReport[]> {
   const conditions: string[] = [];
   const values: unknown[] = [];
@@ -284,6 +406,11 @@ export async function getAffiliateReport(
   if (affiliateId) {
     conditions.push('a.id = ?');
     values.push(affiliateId);
+  }
+  if (opts.scope) {
+    const scoped = affiliateScopeSql(opts.scope, 'a.');
+    conditions.push(scoped.sql);
+    values.push(...scoped.binds);
   }
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -364,21 +491,45 @@ export async function getAffiliateReport(
          (SELECT COUNT(*)
             FROM ref_tracking rt
             JOIN affiliate_links al ON al.ref_code = rt.ref_code
-           WHERE al.affiliate_id = a.id${clickDateCond}) as total_clicks,
+           WHERE al.affiliate_id = a.id
+             AND al.line_account_id IS a.line_account_id${clickDateCond}) as total_clicks,
          (SELECT COUNT(*) FROM conversion_events ce
-          WHERE (ce.affiliate_id = a.id OR ce.affiliate_code = a.code)${cvDateCond}) as total_conversions,
+          WHERE (ce.affiliate_id = a.id OR ce.affiliate_code = a.code)
+            AND EXISTS (
+              SELECT 1 FROM friends cef
+               WHERE cef.id = ce.friend_id
+                 AND cef.line_account_id IS a.line_account_id
+            )
+            AND EXISTS (
+              SELECT 1 FROM conversion_points cep
+               WHERE cep.id = ce.conversion_point_id
+                 AND cep.line_account_id IS a.line_account_id
+            )${cvDateCond}) as total_conversions,
          (SELECT COALESCE(SUM(cp.value), 0) FROM conversion_events ce
           JOIN conversion_points cp ON cp.id = ce.conversion_point_id
-          WHERE (ce.affiliate_id = a.id OR ce.affiliate_code = a.code)${cvDateCond}) as total_revenue,
-         (SELECT COALESCE(SUM(off.reward_amount), 0)
+          JOIN friends cef ON cef.id = ce.friend_id
+          WHERE (ce.affiliate_id = a.id OR ce.affiliate_code = a.code)
+            AND cef.line_account_id IS a.line_account_id
+            AND cp.line_account_id IS a.line_account_id${cvDateCond}) as total_revenue,
+         (SELECT COALESCE(SUM(COALESCE(calc.amount_minor, 0)), 0)
             FROM conversion_events ce
-            JOIN affiliate_links al
-              ON al.ref_code = ce.attributed_ref_code
-             AND al.affiliate_id = a.id
-            JOIN affiliate_offers off ON off.id = al.offer_id
+            JOIN friends cef ON cef.id = ce.friend_id
+            LEFT JOIN affiliate_reward_calculations calc
+              ON calc.conversion_event_id = ce.id
+             AND calc.formula IN ('rate', 'fixed', 'legacy')
+             AND calc.line_account_id IS a.line_account_id
+             AND calc.affiliate_id = a.id
            WHERE (ce.affiliate_id = a.id OR ce.affiliate_code = a.code)
+             AND cef.line_account_id IS a.line_account_id
+             AND EXISTS (
+               SELECT 1 FROM conversion_points cep
+                WHERE cep.id = ce.conversion_point_id
+                  AND cep.line_account_id IS a.line_account_id
+             )
              AND COALESCE(ce.approval_status, 'pending') = 'approved'${cvDateCond}) as confirmed_reward,
-         (SELECT COUNT(*) FROM affiliate_links al WHERE al.affiliate_id = a.id) as link_count,
+         (SELECT COUNT(*) FROM affiliate_links al
+           WHERE al.affiliate_id = a.id
+             AND al.line_account_id IS a.line_account_id) as link_count,
          COALESCE(fa.friend_adds, 0) as friend_adds
        FROM affiliates a
        LEFT JOIN friend_adds fa ON fa.affiliate_id = a.id

@@ -1,28 +1,56 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import {
   recordSiteEvent,
   linkVisitorToFriend,
   getPageViewSummary,
   getFriendSiteEvents,
+  getOrCreateSiteTrackingKey,
+  getSiteTrackingAccountId,
   SITE_EVENT_TYPES,
+  type SiteConsent,
   type SiteEventType,
   getSiteTrackingSummary,
+  getSiteConsentSummary,
+  recordSiteConsentDecision,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
+import { requireRole } from '../middleware/role-guard.js';
+import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
+import { accountFeatureIsEnabled } from '../services/feature-enforcement.js';
 
 /**
  * 自社サイトの行動記録。
  *
  * 埋め込んだJSから送られてくる訪問と操作を受け取る。
  *
- * 受け口（/api/site/collect）は認証しない。外のサイトのブラウザから
- * 直接叩かれるので、鍵を置いてもページのソースに出てしまう。
+ * 受け口（/api/site/collect）は認証しない。計測鍵はページのソースに出る
+ * 公開識別子であり、LINEアカウントへの帰属にだけ使う。
  * その代わりレート制限を掛け、受け取る中身を厳しく絞る。
  */
 const siteTracking = new Hono<Env>();
 
 /** cookie に入れる訪問者ID。形だけ確かめる（中身は当てにしない）。 */
 const VISITOR_ID_PATTERN = /^[A-Za-z0-9_-]{8,64}$/;
+const TRACKING_KEY_PATTERN = /^hk_(?:[a-f0-9]{32}|9f3a2c81b4)$/;
+
+async function visibleAccountId(c: Context<Env>): Promise<string | Response> {
+  /*
+   * 管理画面は `account_id` で送る（rangeQuery の約束）。
+   * 旧い呼び出し（`accountId`）も当面は受ける。どちらも無ければ
+   * 可視アカウントが1つだけのときだけ補う。
+   */
+  const accountId = (c.req.query('account_id') ?? c.req.query('accountId'))?.trim();
+  const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+  if (!accountId) {
+    return scope.allowedAccountIds.length === 1
+      ? scope.allowedAccountIds[0]
+      : c.json({ success: false, error: 'accountId required' }, 400);
+  }
+  if (!scope.allowedAccountIds.includes(accountId)) {
+    return c.json({ success: false, error: '対象が見つかりません' }, 404);
+  }
+  return accountId;
+}
 
 /**
  * CORS。
@@ -52,14 +80,39 @@ siteTracking.post('/api/site/collect', async (c) => {
     const body = await c.req.json<{
       visitorId?: unknown;
       eventType?: unknown;
+      host?: unknown;
       path?: unknown;
       label?: unknown;
       valueNum?: unknown;
       referrer?: unknown;
+      trackingKey?: unknown;
+      consent?: unknown;
+      consentDecision?: unknown;
     }>();
 
     const visitorId = String(body.visitorId ?? '');
-    if (!VISITOR_ID_PATTERN.test(visitorId)) return c.body(null, 204, corsHeaders());
+    const trackingKey = String(body.trackingKey ?? '');
+    if (!VISITOR_ID_PATTERN.test(visitorId) || !TRACKING_KEY_PATTERN.test(trackingKey)) {
+      return c.body(null, 204, corsHeaders());
+    }
+    const lineAccountId = await getSiteTrackingAccountId(c.env.DB, trackingKey);
+    if (!lineAccountId) return c.body(null, 204, corsHeaders());
+
+    // 計測がオフのaccountへは書かない（#859 site_tracking）。それでも204を
+    // 返すのは、埋め込み先の公開サイトから設定状態を推測させないため。
+    if (!(await accountFeatureIsEnabled(c.env.DB, lineAccountId, 'site_tracking'))) {
+      return c.body(null, 204, corsHeaders());
+    }
+
+    // 同意 (#818)。granted のときだけ行動を記録する。
+    // declined/unset は件数だけ数えて、閲覧そのものは1件も残さない。
+    const consent = (['granted', 'declined', 'unset'] as const)
+      .includes(body.consent as SiteConsent)
+      ? (body.consent as SiteConsent)
+      : 'unset';
+    if (body.consentDecision === 'granted' || body.consentDecision === 'declined') {
+      await recordSiteConsentDecision(c.env.DB, lineAccountId, body.consentDecision);
+    }
 
     const eventType = String(body.eventType ?? 'page_view');
     if (!(SITE_EVENT_TYPES as readonly string[]).includes(eventType)) {
@@ -68,7 +121,10 @@ siteTracking.post('/api/site/collect', async (c) => {
 
     await recordSiteEvent(c.env.DB, {
       visitorId,
+      lineAccountId,
       eventType: eventType as SiteEventType,
+      consent,
+      host: body.host,
       // クエリ文字列の除去は recordSiteEvent の中で行う。
       // 受け口ごとに書くと、必ずどこかで忘れる。
       path: body.path,
@@ -97,12 +153,25 @@ siteTracking.get('/api/site/script.js', (c) => {
   // 差し込めない（環境ごとに違うため）。
   const script = `(function () {
   var ENDPOINT = ${JSON.stringify(`${origin}/api/site/collect`)};
+  // #819: 成果の計測口。タグの data-site にサイトIDを書くと、
+  // 許可ドメイン上の到達を成果として数える。同意が無い間は送らない。
+  var CV_ENDPOINT = ${JSON.stringify(`${origin}/api/public/web-conversions`)};
+  var TRACKING_KEY = document.currentScript && document.currentScript.getAttribute('data-key');
+  var SITE_ID = document.currentScript && document.currentScript.getAttribute('data-site');
   var COOKIE = 'lh_visitor';
+  var CONSENT_COOKIE = 'lh_consent';
   var YEAR = 365 * 24 * 60 * 60;
 
   function readCookie() {
     var m = document.cookie.match(/(?:^|; )lh_visitor=([^;]*)/);
     return m ? m[1] : null;
+  }
+  function readConsent() {
+    var m = document.cookie.match(/(?:^|; )lh_consent=([^;]*)/);
+    return m && (m[1] === 'granted' || m[1] === 'declined') ? m[1] : null;
+  }
+  function writeConsent(value) {
+    document.cookie = CONSENT_COOKIE + '=' + value + ';path=/;max-age=' + YEAR + ';SameSite=Lax';
   }
   function makeId() {
     // crypto があれば使う。無い環境でも動くよう時刻と乱数で作る。
@@ -118,7 +187,11 @@ siteTracking.get('/api/site/script.js', (c) => {
     return id;
   }
   function send(payload) {
+    if (!TRACKING_KEY) return;
     payload.visitorId = visitorId();
+    payload.trackingKey = TRACKING_KEY;
+    // 同意の状態 (#818)。granted 以外はサーバー側で記録せず件数だけ数える。
+    payload.consent = readConsent() || 'unset';
     var body = JSON.stringify(payload);
     // ページを離れる瞬間でも送れるよう sendBeacon を優先する。
     if (navigator.sendBeacon) {
@@ -128,20 +201,86 @@ siteTracking.get('/api/site/script.js', (c) => {
     fetch(ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body, keepalive: true }).catch(function () {});
   }
 
-  // 訪問。パスだけを送る。クエリ文字列はサーバー側でも落とすが、
+  // 成果の計測 (#819)。サイトIDがあるタグだけが呼ぶ。
+  // 許可ドメイン・同意・友だちとの結び付きの判定は受け口側で行う。
+  function sendConversion(path) {
+    if (!SITE_ID) return;
+    if (readConsent() !== 'granted') return;
+    var payload = {
+      siteId: SITE_ID,
+      visitorId: visitorId(),
+      host: location.hostname,
+      path: path,
+      consent: 'granted',
+      sourceEventId: null,
+    };
+    var body = JSON.stringify(payload);
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon(CV_ENDPOINT, new Blob([body], { type: 'application/json' }));
+      return;
+    }
+    fetch(CV_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body, keepalive: true }).catch(function () {});
+  }
+
+  // 同意の案内。答えるまで計測しない。サイト側で独自に同意を取る場合は
+  // window.lhConsent(true/false) を呼べばこの案内は出ない。
+  function answer(decision) {
+    writeConsent(decision);
+    var bar = document.getElementById('lh-consent');
+    if (bar) bar.parentNode.removeChild(bar);
+    send({ eventType: 'page_view', consentDecision: decision, host: location.hostname, path: location.pathname });
+    // 同意した瞬間の閲覧も成果の対象にする(許可ドメインなら)。
+    if (decision === 'granted') sendConversion(location.pathname);
+  }
+  function showConsentBanner() {
+    if (readConsent() || document.getElementById('lh-consent') || !document.body) return;
+    var bar = document.createElement('div');
+    bar.id = 'lh-consent';
+    bar.setAttribute('role', 'dialog');
+    bar.setAttribute('aria-label', '閲覧の記録について');
+    bar.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:2147483000;background:#fff;border-top:1px solid #ddd;padding:12px 16px;font:13px/1.6 sans-serif;color:#333;display:flex;flex-wrap:wrap;align-items:center;gap:10px;justify-content:flex-end;box-shadow:0 -2px 8px rgba(0,0,0,.08)';
+    var text = document.createElement('span');
+    text.style.cssText = 'flex:1;min-width:200px';
+    text.textContent = '広告の効果を知るため、この端末での閲覧を記録してよいですか？';
+    var no = document.createElement('button');
+    no.type = 'button';
+    no.textContent = '記録しない';
+    no.style.cssText = 'padding:8px 16px;border:1px solid #ccc;border-radius:6px;background:#fff;cursor:pointer;font-size:13px';
+    var yes = document.createElement('button');
+    yes.type = 'button';
+    yes.textContent = '記録してよい';
+    yes.style.cssText = 'padding:8px 16px;border:none;border-radius:6px;background:#06c755;color:#fff;cursor:pointer;font-size:13px';
+    no.addEventListener('click', function () { answer('declined'); });
+    yes.addEventListener('click', function () { answer('granted'); });
+    bar.appendChild(text);
+    bar.appendChild(no);
+    bar.appendChild(yes);
+    document.body.appendChild(bar);
+  }
+  window.lhConsent = function (granted) {
+    answer(granted ? 'granted' : 'declined');
+  };
+
+  // 訪問。ホストとパスだけを送る。クエリ文字列はサーバー側でも落とすが、
   // 送らないに越したことはない。
-  send({ eventType: 'page_view', path: location.pathname, referrer: document.referrer || null });
+  send({ eventType: 'page_view', host: location.hostname, path: location.pathname, referrer: document.referrer || null });
+  sendConversion(location.pathname);
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', showConsentBanner);
+  } else {
+    showConsentBanner();
+  }
 
   // data-lh-event を付けた要素のクリック。
   document.addEventListener('click', function (e) {
     var el = e.target && e.target.closest ? e.target.closest('[data-lh-event]') : null;
     if (!el) return;
-    send({ eventType: 'click', path: location.pathname, label: el.getAttribute('data-lh-event') });
+    send({ eventType: 'click', host: location.hostname, path: location.pathname, label: el.getAttribute('data-lh-event') });
   }, true);
 
   // 外から呼べるようにしておく。購入完了などをページ側から送れる。
   window.lhTrack = function (label, valueNum) {
-    send({ eventType: 'custom', path: location.pathname, label: label, valueNum: valueNum });
+    send({ eventType: 'custom', host: location.hostname, path: location.pathname, label: label, valueNum: valueNum });
   };
 })();`;
 
@@ -157,7 +296,7 @@ siteTracking.get('/api/site/script.js', (c) => {
 //
 // LIFF やフォームの中から呼ぶ。ここは認証済みの経路から呼ばれる前提だが、
 // 友だちIDを当てられても「その人の行動が紐づく」だけで、情報は返さない。
-siteTracking.post('/api/site/link', async (c) => {
+siteTracking.post('/api/site/link', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const body = await c.req.json<{ visitorId?: unknown; friendId?: unknown; via?: unknown }>();
     const visitorId = String(body.visitorId ?? '');
@@ -165,10 +304,17 @@ siteTracking.post('/api/site/link', async (c) => {
     if (!VISITOR_ID_PATTERN.test(visitorId) || !friendId) {
       return c.json({ success: false, error: 'visitorId と friendId が必要です' }, 400);
     }
+    const friend = await c.env.DB.prepare(
+      'SELECT line_account_id FROM friends WHERE id = ?',
+    ).bind(friendId).first<{ line_account_id: string | null }>();
+    if (!friend?.line_account_id
+      || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [friend.line_account_id])) {
+      return c.json({ success: false, error: '対象が見つかりません' }, 404);
+    }
     const via = ['entry_route', 'liff', 'form', 'manual'].includes(String(body.via))
       ? (String(body.via) as 'entry_route' | 'liff' | 'form' | 'manual')
       : 'manual';
-    const linked = await linkVisitorToFriend(c.env.DB, visitorId, friendId, via);
+    const linked = await linkVisitorToFriend(c.env.DB, visitorId, friend.line_account_id, friendId, via);
     // 既に別の人と結びついていたら false。上書きしないので、
     // 「結びつかなかった」ことだけ伝える。
     return c.json({ success: true, data: { linked } });
@@ -179,10 +325,27 @@ siteTracking.post('/api/site/link', async (c) => {
 });
 
 // GET /api/site/summary — 計測が動いているかと、その内訳
-siteTracking.get('/api/site/summary', async (c) => {
+siteTracking.get('/api/site/tracking-key', requireRole('owner', 'admin', 'staff'), async (c) => {
+  const accountId = await visibleAccountId(c);
+  if (typeof accountId !== 'string') return accountId;
   try {
-    const summary = await getSiteTrackingSummary(c.env.DB);
-    return c.json({ success: true, data: summary });
+    const trackingKey = await getOrCreateSiteTrackingKey(c.env.DB, accountId);
+    return c.json({ success: true, data: { accountId, trackingKey } });
+  } catch (err) {
+    console.error('GET /api/site/tracking-key error:', err);
+    return c.json({ success: false, error: '計測鍵を取得できませんでした' }, 500);
+  }
+});
+
+siteTracking.get('/api/site/summary', requireRole('owner', 'admin', 'staff'), async (c) => {
+  const accountId = await visibleAccountId(c);
+  if (typeof accountId !== 'string') return accountId;
+  try {
+    const [summary, consent] = await Promise.all([
+      getSiteTrackingSummary(c.env.DB, accountId),
+      getSiteConsentSummary(c.env.DB, accountId),
+    ]);
+    return c.json({ success: true, data: { ...summary, consent } });
   } catch (err) {
     console.error('GET /api/site/summary error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
@@ -190,7 +353,9 @@ siteTracking.get('/api/site/summary', async (c) => {
 });
 
 // GET /api/site/pages — ページ別の閲覧数（管理画面用）
-siteTracking.get('/api/site/pages', async (c) => {
+siteTracking.get('/api/site/pages', requireRole('owner', 'admin', 'staff'), async (c) => {
+  const accountId = await visibleAccountId(c);
+  if (typeof accountId !== 'string') return accountId;
   try {
     const jstNow = new Date(Date.now() + 9 * 3600_000);
     const to = c.req.query('to') ?? jstNow.toISOString().slice(0, 10);
@@ -200,7 +365,9 @@ siteTracking.get('/api/site/pages', async (c) => {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
       return c.json({ success: false, error: '期間は 2026-08-01 の形で指定してください' }, 400);
     }
-    const items = await getPageViewSummary(c.env.DB, { from, to: `${to}T23:59:59.999` });
+    const items = await getPageViewSummary(c.env.DB, {
+      lineAccountId: accountId, from, to: `${to}T23:59:59.999`,
+    });
     return c.json({ success: true, data: items });
   } catch (err) {
     console.error('GET /api/site/pages error:', err);
@@ -209,14 +376,23 @@ siteTracking.get('/api/site/pages', async (c) => {
 });
 
 // GET /api/friends/:id/site-events — 1人の行動履歴（友だち詳細用）
-siteTracking.get('/api/friends/:id/site-events', async (c) => {
+siteTracking.get('/api/friends/:id/site-events', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
-    const items = await getFriendSiteEvents(c.env.DB, c.req.param('id'), 100);
+    const friendId = c.req.param('id');
+    const friend = await c.env.DB.prepare(
+      'SELECT line_account_id FROM friends WHERE id = ?',
+    ).bind(friendId).first<{ line_account_id: string | null }>();
+    if (!friend?.line_account_id
+      || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [friend.line_account_id])) {
+      return c.json({ success: false, error: '対象が見つかりません' }, 404);
+    }
+    const items = await getFriendSiteEvents(c.env.DB, friendId, friend.line_account_id, 100);
     return c.json({
       success: true,
       data: items.map((e) => ({
         id: e.id,
         eventType: e.event_type,
+        host: e.host,
         path: e.path,
         label: e.label,
         occurredAt: e.occurred_at,

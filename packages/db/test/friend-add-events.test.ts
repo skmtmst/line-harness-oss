@@ -1,10 +1,14 @@
-import { beforeEach, describe, expect, test } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from 'vitest';
 import Database from 'better-sqlite3';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   captureFriendAddEventAttribution,
+  claimFailedFriendAddActionRuns,
+  claimFriendAddEventForActionRetry,
+  claimInitialFriendAddActionRun,
+  finishFriendAddActionRun,
   listFriendAddEvents,
   markFriendAddEventRouting,
   recordFriendAddAttributionCandidate,
@@ -42,6 +46,16 @@ function setup(): Database.Database {
   sqlite.prepare(
     `INSERT INTO entry_routes (id, ref_code, name) VALUES ('route-1', 'current-link', '夏の広告')`,
   ).run();
+  sqlite.prepare(
+    `INSERT INTO scenarios (id, name, trigger_type, is_active, line_account_id)
+     VALUES ('scenario-1', '初回案内', 'friend_add', 1, 'account-1')`,
+  ).run();
+  sqlite.prepare(
+    `INSERT INTO friend_scenarios
+      (id, friend_id, scenario_id, status, started_at, updated_at)
+     VALUES ('enrollment-1', 'friend-1', 'scenario-1', 'active',
+             '2026-08-24T10:00:00.000+09:00', '2026-08-24T10:00:00.000+09:00')`,
+  ).run();
   return sqlite;
 }
 
@@ -65,7 +79,15 @@ describe('friend add V6 event ledger', () => {
   let sqlite: Database.Database;
   let db: D1Database;
 
-  beforeEach(() => { sqlite = setup(); db = asD1(sqlite); });
+  // 土台の当て直し(約1.4秒×8本)を1回にし、試験ごとは巻き戻しで戻す。
+  // 376番の試験と同じ理由(worker の onTaskUpdate タイムアウト避け)。
+  beforeAll(() => { sqlite = setup(); db = asD1(sqlite); });
+
+  beforeEach(() => { sqlite.exec('BEGIN'); });
+
+  afterEach(() => { sqlite.exec('ROLLBACK'); });
+
+  afterAll(() => { sqlite.close(); });
 
   test('今回リンクをイベントへ結び付けても初回流入コードを上書きしない', async () => {
     const candidate = await recordFriendAddAttributionCandidate(db, {
@@ -83,12 +105,18 @@ describe('friend add V6 event ledger', () => {
     })).toEqual({ refCode: 'current-link', entryRouteId: 'route-1' });
     await markFriendAddEventRouting(db, {
       eventId, lineAccountId: 'account-1', status: 'completed',
+      scenarioEnrollmentId: 'enrollment-1', deliveryCount: 1,
     });
 
     expect(sqlite.prepare(`SELECT ref_code FROM friends WHERE id = 'friend-1'`).get())
       .toEqual({ ref_code: 'first-touch' });
     expect(sqlite.prepare(`SELECT status, consumed_by_event_id FROM friend_add_attribution_candidates WHERE id = ?`).get(candidate.id))
       .toEqual({ status: 'consumed', consumed_by_event_id: eventId });
+    expect(sqlite.prepare(
+      `SELECT scenario_enrollment_id, delivery_count,
+              first_delivery_sent_at IS NOT NULL AS has_sent_at
+         FROM friend_add_events WHERE id = ?`,
+    ).get(eventId)).toEqual({ scenario_enrollment_id: 'enrollment-1', delivery_count: 1, has_sent_at: 1 });
   });
 
   test('取れなかったイベントは unavailable、後着候補は late のまま混同しない', async () => {
@@ -137,5 +165,57 @@ describe('friend add V6 event ledger', () => {
     expect(list.items).toHaveLength(1);
     expect(list.items[0]).toMatchObject({ friendId: 'friend-1', displayName: '田中さん', kind: 'returning' });
     expect(list.summary).toMatchObject({ total: 1, returning: 1, firstTime: 0 });
+  });
+
+  test('処理の固定IDを一度だけ確保し、成功済みを再実行候補に戻さない', async () => {
+    const eventId = await recordFriendAddEvent(db, {
+      lineAccountId: 'account-1', friendId: 'friend-1', webhookEventId: 'webhook-action',
+      friendKind: 'first_time', occurredAt: '2026-08-24T13:00:00.000+09:00',
+    });
+    const input = {
+      eventId,
+      actionStableId: 'version-1:0',
+      actionType: 'tag',
+      actionSnapshot: JSON.stringify({ kind: 'row', actionType: 'tag', config: { op: 'add', tagIds: ['tag-1'] } }),
+      idempotencyKey: `friend-add-action:${eventId}:version-1:0`,
+    };
+    const first = await claimInitialFriendAddActionRun(db, input);
+    expect(first.acquired).toBe(true);
+    await finishFriendAddActionRun(db, { id: first.id, status: 'completed' });
+    const replay = await claimInitialFriendAddActionRun(db, input);
+    expect(replay).toEqual({ id: first.id, acquired: false, status: 'completed' });
+    expect(sqlite.prepare(
+      `SELECT status, attempt_count, action_type, json_valid(action_snapshot) AS valid
+         FROM friend_add_action_runs WHERE id = ?`,
+    ).get(first.id)).toEqual({ status: 'completed', attempt_count: 1, action_type: 'tag', valid: 1 });
+  });
+
+  test('失敗分の同時再試行は親CASで一勝し、成功済み処理を確保しない', async () => {
+    const eventId = await recordFriendAddEvent(db, {
+      lineAccountId: 'account-1', friendId: 'friend-1', webhookEventId: 'webhook-retry',
+      friendKind: 'first_time', occurredAt: '2026-08-24T14:00:00.000+09:00',
+    });
+    sqlite.prepare(`UPDATE friend_add_events SET routing_status = 'partial_failed' WHERE id = ?`).run(eventId);
+    sqlite.prepare(
+      `INSERT INTO friend_add_action_runs
+        (id, event_id, action_stable_id, action_type, action_snapshot, idempotency_key,
+         status, attempt_count, last_error_code)
+       VALUES ('ok', ?, 'v1:0', 'tag', '{}', 'retry-ok', 'completed', 1, NULL),
+              ('ng', ?, 'v1:1', 'tag', '{}', 'retry-ng', 'failed', 1, 'action_failed')`,
+    ).run(eventId, eventId);
+
+    const [first, second] = await Promise.all([
+      claimFriendAddEventForActionRetry(db, { eventId, lineAccountId: 'account-1' }),
+      claimFriendAddEventForActionRetry(db, { eventId, lineAccountId: 'account-1' }),
+    ]);
+    expect([first, second].filter(Boolean)).toHaveLength(1);
+    expect(await claimFriendAddEventForActionRetry(db, { eventId, lineAccountId: 'account-2' })).toBeNull();
+
+    const claimed = await claimFailedFriendAddActionRuns(db, eventId);
+    expect(claimed.map((row) => row.id)).toEqual(['ng']);
+    expect(sqlite.prepare(`SELECT status, attempt_count FROM friend_add_action_runs WHERE id = 'ok'`).get())
+      .toEqual({ status: 'completed', attempt_count: 1 });
+    expect(sqlite.prepare(`SELECT status, attempt_count FROM friend_add_action_runs WHERE id = 'ng'`).get())
+      .toEqual({ status: 'running', attempt_count: 2 });
   });
 });

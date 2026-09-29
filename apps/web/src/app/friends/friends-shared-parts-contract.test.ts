@@ -55,13 +55,13 @@ describe('友だち一覧(PhxG6)を共通部品へ載せ替える契約', () => 
     expect(FRIENDS_BODY, '詳細条件が110pxでない').toContain('w-27.5')
     expect(FRIENDS_BODY, '保存した検索が130pxでない').toContain('w-32.5')
     expect(FRIENDS_BODY, '検索実行が70pxでない').toContain('w-17.5')
-    expect(FRIENDS_BODY).not.toContain('h-10 whitespace-nowrap rounded-v6-control')
+    expect(FRIENDS_BODY).not.toContain('h-10 whitespace-nowrap rounded-control')
   })
 
-  it('行のアバターは真円ではなく設計の40x40 r=18', () => {
-    expect(TOKENS).toContain('--radius-v6-large: 18px;')
-    expect(ROW_BODY).toContain('h-10 w-10 shrink-0 rounded-v6-large bg-v6-avatar-bg object-cover')
-    expect(ROW_BODY, 'アバターが真円のまま').not.toContain('h-10 w-10 shrink-0 rounded-full')
+  // ★V7「友だちの顔」（KXDhj）：共通 Avatar の 40px の丸。画像が読めない時も頭文字（2026-09-24）。
+  it('行の顔は共通 Avatar（40px）', () => {
+    expect(ROW_BODY).toContain('<Avatar name={friend.displayName} src={friend.pictureUrl} size={40} />')
+    expect(ROW_BODY, '画像を直接描いている').not.toMatch(/<img src=\{friend\.pictureUrl\}/)
   })
 
   it('行の担当者に丸アイコンを出し、未割り当ては全角ハイフンで埋める', () => {
@@ -74,8 +74,8 @@ describe('友だち一覧(PhxG6)を共通部品へ載せ替える契約', () => 
 })
 
 describe('統合ユーザー(r7eSi)の指標カードを共通部品へ載せ替える契約', () => {
-  it('共通SummaryCardだけを描き、手書きの面と24pxの値を残さない', () => {
-    expect(SUMMARY).toContain("import SummaryCard from '@/components/shared/summary-card'")
+  it('共通KpiCardだけを描き、手書きの面と24pxの値を残さない', () => {
+    expect(SUMMARY).toContain("import KpiCard from '@/components/shared/kpi-card'")
     expect(SUMMARY_BODY, '値が24pxのまま').not.toContain('text-2xl')
     expect(SUMMARY_BODY, '手書きの角丸が残っている').not.toContain('rounded-[')
     expect(SUMMARY_BODY, '手書きの影が残っている').not.toContain('shadow-[')
@@ -103,15 +103,20 @@ describe('重複検出で取れない数を作らない契約', () => {
   })
 
   it('取れない数は「—」と未接続の説明にする', () => {
-    expect(DUPLICATES_BODY).toContain('label="重複による配信コスト"')
-    expect(DUPLICATES_BODY).toContain('value="—"')
-    expect(DUPLICATES_BODY).toContain('まだ繋がっていません。配信実績が接続されると表示されます。')
+    /* #1005: 独自カードをやめて共通 KpiCard の3段へ揃えた。値の「—」と
+       短い状態は常時表示、接続待ちの説明は説明アイコンの中へ。 */
+    expect(DUPLICATES_BODY).toContain("import KpiCard from '@/components/shared/kpi-card'")
+    expect(DUPLICATES_BODY).toContain('title="重複配信の削減"')
+    expect(DUPLICATES_BODY).toContain('valueText="—"')
+    expect(DUPLICATES_BODY).toContain('配信前プレビューの実績')
   })
 
   it('読込中と取得失敗を状態の言葉でそろえる', () => {
     expect(DUPLICATES_BODY).toContain('読み込んでいます')
     expect(DUPLICATES_BODY).toContain('読み込めませんでした')
-    expect(DUPLICATES_BODY, '取得失敗にやり直す口が無い').toContain('再読み込み')
+    // ★V7 `x63W5x`：失敗の1枚は共通部品の error（副ボタン「もう一度読み込む」つき）。
+    // 文言は部品が持つ。ここでは口（`onRetry`）があることだけ見る。
+    expect(DUPLICATES_BODY, '取得失敗にやり直す口が無い').toContain('onRetry={() => void loadCandidates()}')
     expect(DUPLICATES_BODY).not.toContain('読み込み中…')
     expect(DUPLICATES_BODY).not.toContain('集計の取得に失敗しました')
   })

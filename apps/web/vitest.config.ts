@@ -10,7 +10,22 @@ export default defineConfig({
      */
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
+      /*
+       * 実物の worker ルートを画面試験へ mount すると、packages/db が
+       * Workers 専用の 'cloudflare:workers' を読みにいって解決に落ちる。
+       * 読み出し側は「無い環境」を try/catch で許容するので空の実物を当てる。
+       */
+      'cloudflare:workers': fileURLToPath(new URL('./src/test-utils/cloudflare-workers-stub.ts', import.meta.url)),
     },
+  },
+  /*
+   * 画面と同じJSXの書き方で読む。Next は自動runtime(React を import
+   * しなくてもJSXが書ける)なので、試験だけ古い runtime にすると
+   * `React is not defined` で落ちる。落ち方が中身と関係ないので、
+   * 原因を探すのに時間がかかる(#630)。
+   */
+  esbuild: {
+    jsx: 'automatic',
   },
   test: {
     environment: 'node',

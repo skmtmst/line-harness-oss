@@ -20,7 +20,7 @@ describe('V6 LINE notification history contract', () => {
     expect(PAGE).toContain('lineAccountId={selectedAccountId}')
     expect(LIST).toContain('if (!lineAccountId)')
     expect(API).toContain("new URLSearchParams({ lineAccountId: params.lineAccountId })")
-    expect(LIST.indexOf('++requestRef.current')).toBeLessThan(LIST.indexOf('if (!lineAccountId)'))
+    expect(LIST.indexOf('++env.requestRef.current')).toBeLessThan(LIST.indexOf('if (!params.lineAccountId)'))
   })
 
   it('distinguishes loading, empty, failure, and a real zero', () => {
@@ -29,24 +29,46 @@ describe('V6 LINE notification history contract', () => {
     expect(LIST).toContain('kind="error"')
     expect(LIST).toContain("value={summary?.failed ?? null}")
     expect(LIST).toContain("items.length === 0")
+    expect(LIST).toContain('data-list-state={listState}')
   })
 
   it('does not claim delivery or individual reads from a LINE API acceptance', () => {
     expect(LIST).toContain('LINE API受付済み')
     expect(LIST).not.toContain('届きました')
     expect(LIST).not.toContain('開きました')
-    expect(LIST).toContain('個人の既読は、現在の記録からは取得できません')
+    expect(LIST).toContain('個人の既読は取得できません')
   })
 
-  it('does not show an unsafe retry control before an idempotent retry API exists', () => {
-    expect(LIST).not.toContain('送信を再試行')
-    expect(API).toContain('retryAvailable: false')
+  it('shows retry only when the ledger marks the row retryable and sends its record version', () => {
+    expect(LIST).toContain('item.retryAvailable && canRetry ?')
+    expect(LIST).toContain('expectedVersion: item.recordVersion')
+    expect(LIST).toContain('送信を再試行')
+    expect(API).toContain('retryAvailable: boolean')
+    expect(API).toContain('/api/line-notifications/deliveries/${encodeURIComponent(id)}/retry')
     expect(LIST).toContain('受信箱で連絡')
   })
 
-  it('keeps unconnected attempt, click, and version data nullable', () => {
-    expect(API).toContain('attemptCount: number | null')
+  it('uses ledger attempts while keeping click and definition version nullable', () => {
+    expect(API).toContain('attemptCount: number')
     expect(API).toContain('clickedAt: string | null')
     expect(API).toContain('version: number | null')
+    expect(API).toContain('recordVersion: number')
+  })
+
+  it('advances the account/tab generation synchronously in the render body, not inside a useEffect', () => {
+    /*
+     * 司令塔差し戻し: 世代の切替をuseEffectで行うと、account切替の
+     * レンダーから次のuseEffectが動くまでの窓で、直前のPromiseが
+     * マイクロタスクとして先にほどけたとき、isCurrent判定が古い世代の
+     * ままになり、notice・retrying・reloadが新しい画面へ漏れる。
+     * レンダー本体で同期して進めていることを、構造で固定する。
+     */
+    const setScopeIndex = LIST.indexOf('setScope({ key: currentScopeKey, generation: scope.generation + 1 })')
+    const firstUseEffectIndex = LIST.indexOf('useEffect(')
+    expect(setScopeIndex).toBeGreaterThan(-1)
+    expect(firstUseEffectIndex).toBeGreaterThan(-1)
+    expect(setScopeIndex).toBeLessThan(firstUseEffectIndex)
+    // env越しに非同期処理から読める世代のミラーも、useEffectではなくレンダー本体で更新する。
+    expect(LIST.indexOf('scopeRef.current = scope')).toBeLessThan(firstUseEffectIndex)
   })
 })

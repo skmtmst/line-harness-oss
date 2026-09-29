@@ -51,7 +51,8 @@ function database(): D1Database {
           if (sql.includes('INSERT INTO nen_pet_profiles')) {
             pets.push({ id: String(binds[0]), friend_id: String(binds[1]), customer_id: binds[2] as string | null, name: String(binds[3]), animal_type: String(binds[4]), gender: String(binds[5]), birthday: binds[6] as string | null });
           } else if (sql.includes('UPDATE nen_pet_profiles')) {
-            const pet = pets.find((p) => p.id === binds[5]);
+            // WHERE id = ? は最後のbind。列構成が変わっても末尾がid。
+            const pet = pets.find((p) => p.id === binds[binds.length - 1]);
             if (pet) Object.assign(pet, { name: binds[0], animal_type: binds[1], gender: binds[2], birthday: binds[3] });
           } else if (sql.includes('DELETE FROM nen_pet_profiles')) {
             pets = pets.filter((p) => p.id !== binds[0]);

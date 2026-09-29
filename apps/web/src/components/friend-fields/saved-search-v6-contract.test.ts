@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 const root = process.cwd()
 const editPage = readFileSync(resolve(root, 'src/app/tags/searches/edit/page.tsx'), 'utf8')
 const friendsPage = readFileSync(resolve(root, 'src/app/friends/page.tsx'), 'utf8')
+  + readFileSync(resolve(root, 'src/components/friends/saved-search-dialog.tsx'), 'utf8')
 const advanced = readFileSync(resolve(root, 'src/components/friends/advanced-search-dialog.tsx'), 'utf8')
 const list = readFileSync(resolve(root, 'src/components/friend-fields/saved-search-list.tsx'), 'utf8')
 
@@ -14,14 +15,15 @@ describe('V6 保存した検索の画面契約', () => {
     expect(editPage).toContain('api.savedSearches.update')
     expect(editPage).toContain('api.savedSearches.create')
     expect(editPage).toContain('api.savedSearches.delete')
-    expect(editPage).toContain('api.friends.list')
+    expect(editPage).toContain('api.savedSearches.preview')
+    expect(editPage).toContain('api.savedSearches.detail')
     expect(editPage).toContain('すべて満たす')
     expect(editPage).toContain('いずれか1つ以上満たす')
   })
 
   it('保存と呼び出しをブラウザ1台だけのlocalStorageへ戻さない', () => {
-    expect(advanced).toContain('api.savedSearches.create')
-    expect(friendsPage).toContain('api.savedSearches.list')
+    expect(advanced).toContain('api.friendSavedViews.create')
+    expect(friendsPage).toContain('api.friendSavedViews.list')
     expect(advanced + friendsPage).not.toContain("localStorage.setItem('friends.savedSearch'")
     expect(advanced + friendsPage).not.toContain("localStorage.getItem('friends.savedSearch'")
   })
@@ -29,12 +31,18 @@ describe('V6 保存した検索の画面契約', () => {
   it('一覧の適用リンクと編集リンクを分ける', () => {
     expect(list).toContain('/friends?savedSearch=')
     expect(list).toContain('/tags/searches/edit?id=')
-    expect(list).toContain('条件を確認・編集')
+    /*
+      #1014 ATTR-24: 省略した名前のヒントは「条件を確認・編集」の固定文
+      ではなく、名前そのもの（title）と「名前 を編集」の読み上げに分ける。
+    */
+    expect(list).toContain('title={search.name}')
+    expect(list).toContain('aria-label={`${search.name} を編集`}')
+    expect(list).not.toContain('title="条件を確認・編集"')
   })
 
   it('条件は共通の日本語変換を使い、内部の演算子や値を直書きしない', () => {
     expect(list).toContain('describeSavedCondition')
-    expect(list).toContain('api.supportMarks.list(accountId)')
+    expect(list).toContain('api.supportMarks.list(accountId, { suppressFeatureDisabledEvent: true })')
     expect(list).toContain('api.scenarios.list({ accountId })')
     expect(list).not.toContain('function describeOne')
     expect(list).not.toContain("parts.map(String).join(' ')")

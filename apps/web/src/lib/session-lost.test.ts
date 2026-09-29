@@ -40,14 +40,25 @@ describe('合図の名前', () => {
   })
 })
 
-/** fetchApi の 401 判定だけを取り出したもの。 */
-function shouldAnnounceSessionLost(status: number): boolean {
-  return status === 401
+/*
+ * fetchApi の 401 判定だけを取り出したもの（#1058）。
+ * 401でも再認証などの業務コード付きは、呼んだ画面が自分で処理するので出さない。
+ */
+const EXEMPT_401_CODES = new Set(['STEP_UP_REQUIRED', 'STEP_UP_UNAUTHORIZED'])
+function shouldAnnounceSessionLost(status: number, code?: string): boolean {
+  return status === 401 && (code === undefined || !EXEMPT_401_CODES.has(code))
 }
 
 describe('どの応答で合図を出すか', () => {
   it('401 のときだけ出す', () => {
     expect(shouldAnnounceSessionLost(401)).toBe(true)
+    expect(shouldAnnounceSessionLost(401, 'Unauthorized')).toBe(true)
+  })
+
+  it('再認証の業務401では出さない（#1058）', () => {
+    // 緊急操作の再認証やり直しは、画面が自分で案内する通常の状態。
+    expect(shouldAnnounceSessionLost(401, 'STEP_UP_REQUIRED')).toBe(false)
+    expect(shouldAnnounceSessionLost(401, 'STEP_UP_UNAUTHORIZED')).toBe(false)
   })
 
   it('403（権限不足）では出さない', () => {

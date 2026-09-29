@@ -1,4 +1,5 @@
 import type { Env } from '../index.js';
+import { accountFeatureOffExclusionSql } from '@line-crm/db';
 import { dbFor } from './db-router.js';
 import {
   findRestaurantMediaBySender,
@@ -186,6 +187,7 @@ async function storeRawEmail(
   const pipeAbort = new AbortController();
   const pipePromise = message.raw.pipeTo(fixedLength.writable, { signal: pipeAbort.signal });
   try {
+    if (!env.RAW_MAIL) throw new Error('RAW_MAIL binding is not configured');
     await env.RAW_MAIL.put(objectKey, fixedLength.readable, {
       httpMetadata: { contentType: 'message/rfc822' },
       customMetadata,
@@ -433,15 +435,18 @@ export async function deleteExpiredRestaurantRawEmails(
 
   while (checked < maxPerRun) {
     const limit = Math.min(RETENTION_BATCH_SIZE, maxPerRun - checked);
-    const { results } = await db.prepare(`SELECT id, r2_key
-      FROM rt_inbound_emails
-      WHERE r2_key <> '' AND datetime(received_at) < datetime(?)
-      ORDER BY received_at, id
+    // 機能オフ中の店舗分は消さずに残す。持ち主不明(storeなし)は従来どおり消す。
+    const { results } = await db.prepare(`SELECT e.id, e.r2_key
+      FROM rt_inbound_emails e LEFT JOIN rt_stores st ON st.id = e.store_id
+      WHERE e.r2_key <> '' AND datetime(e.received_at) < datetime(?)
+        AND NOT ${accountFeatureOffExclusionSql('st.line_account_id', 'restaurant_test')}
+      ORDER BY e.received_at, e.id
       LIMIT ?`).bind(cutoff, limit).all<{ id: string; r2_key: string }>();
     if (results.length === 0) break;
     checked += results.length;
 
     try {
+      if (!env.RAW_MAIL) throw new Error('RAW_MAIL binding is not configured');
       await env.RAW_MAIL.delete(results.map((row) => row.r2_key));
       for (let offset = 0; offset < results.length; offset += 100) {
         await db.batch(results.slice(offset, offset + 100).map((row) => db.prepare(`UPDATE rt_inbound_emails

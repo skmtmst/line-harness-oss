@@ -1,7 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import SummaryCard from '@/components/shared/summary-card'
+import KpiCard from '@/components/shared/kpi-card'
+import type { UserRowData } from './user-row'
 import { api } from '@/lib/api'
 import { createLatestRequestGuard } from './summary-request-guard'
 
@@ -16,10 +17,10 @@ type LoadStatus = 'loading' | 'ready' | 'error'
 /**
  * 統合ユーザー（設計 `r7eSi`）の指標カード。
  *
- * 面・角丸・文字は共通 SummaryCard に任せる。ここで手書きしていたときは
+ * 面・角丸・文字は共通 KpiCard に任せる。ここで手書きしていたときは
  * 値が24pxになっていて、設計の22pxと1画面ぶんずれていた。
  */
-export default function SummaryBar() {
+export default function SummaryBar({ rows = [] }: { rows?: UserRowData[] }) {
   const [stats, setStats] = useState<Stats | null>(null)
   const [status, setStatus] = useState<LoadStatus>('loading')
   const [requestGuard] = useState(createLatestRequestGuard)
@@ -58,24 +59,23 @@ export default function SummaryBar() {
   const failure = status === 'error'
   const detailOf = (ready: string) =>
     loading ? '読み込んでいます' : failure ? <FailureDetail onRetry={load} /> : ready
-  const dupRate =
-    stats && stats.totalFollowing > 0 ? (stats.friendDups / stats.totalFollowing) * 100 : stats ? 0 : null
+  const linkedUidCount = rows.filter((row) => row.identityKeyKind === 'uid').length
 
   return (
     <div
-      className="grid grid-cols-2 gap-4 sm:grid-cols-4"
+      className="grid grid-cols-2 gap-4 sm:grid-cols-3"
       data-design-node="r7eSi"
       data-users-summary="v6"
       data-summary-state={status}
     >
-      <SummaryCard
+      <KpiCard
         title="統合ユーザー"
         value={stats?.uniquePeople ?? null}
         unit="人"
         detail={detailOf('重複を1人にまとめた数')}
         loading={loading}
       />
-      <SummaryCard
+      <KpiCard
         title="紐付く友だち"
         value={stats?.totalFollowing ?? null}
         unit="件"
@@ -86,20 +86,17 @@ export default function SummaryBar() {
         friendDups は行ベースの「余分な登録行数」(SUM(row_cnt - 1))。
         1人が3アカウントに居れば +2 と数える。通数でも金額でもない。
       */}
-      <SummaryCard
-        title="重複している行"
-        value={stats?.friendDups ?? null}
-        unit="件"
-        detail={detailOf('複数登録による余分')}
+      <KpiCard
+        title="UID連携済み"
+        value={status === 'ready' ? linkedUidCount : null}
+        unit="人"
+        detail={detailOf('このページでUID確認済み')}
         loading={loading}
       />
-      <SummaryCard
-        title="重複率"
-        value={dupRate === null ? null : Number(dupRate.toFixed(1))}
-        unit="%"
-        detail={detailOf('紐付く友だちのうち余分')}
-        loading={loading}
-      />
+      {/*
+        「重複配信の削減」は未接続の機能のため、カードごと出さない。
+        通数・接続後の断り書きは、つながってから足す。
+      */}
     </div>
   )
 }
@@ -111,7 +108,7 @@ function FailureDetail({ onRetry }: { onRetry: () => void }) {
       <button
         type="button"
         onClick={onRetry}
-        className="ml-1.5 font-semibold text-v6-action underline hover:no-underline"
+        className="ml-1.5 font-semibold text-action underline hover:no-underline"
       >
         再読み込み
       </button>

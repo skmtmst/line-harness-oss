@@ -1,3 +1,4 @@
+@layer components {
 /*
  * ページ内タブ。Pencil V5 の `VPn1F`（選択中）と `ISA1Q`（通常）。
  *
@@ -63,10 +64,12 @@
   opacity: 0.45;
 }
 
-/* VPn1F 共通 ページ内タブ項目（選択中） */
+/* VPn1F 共通 ページ内タブ項目（選択中）
+ * #976 U084: 文字色は `$accent`(#06c755、白地で2.26:1) から
+ * `$accent-deep`(#087a3e、5.44:1) へ。下線も同じ色で揃える。 */
 .current {
-  border-bottom-color: var(--color-accent); /* stroke: $accent */
-  color: var(--color-accent); /* fill: $accent */
+  border-bottom-color: var(--color-accent-deep);
+  color: var(--color-accent-deep);
   font-weight: 700; /* fontWeight: 700 */
   cursor: default;
 }
@@ -80,5 +83,28 @@
 }
 
 .current .count {
-  color: var(--color-accent);
+  color: var(--color-accent-deep);
+}
+
+/*
+ * #1014 U029: 390pxではタブ4個と右端の操作が44pxの1行に入らず、
+ * 重なって読めなかった。狭い画面ではタブ行を折り返し、タブは横に
+ * 流せる（スクロール）、操作は次の行へ下ろす。高さ固定も外す。
+ */
+@media (max-width: 767px) {
+  .list {
+    flex-wrap: wrap;
+    height: auto;
+    padding-bottom: 8px;
+  }
+
+  .items {
+    flex: 1 1 100%;
+    overflow-x: auto;
+  }
+
+  .actions {
+    padding-bottom: 0;
+  }
+}
 }

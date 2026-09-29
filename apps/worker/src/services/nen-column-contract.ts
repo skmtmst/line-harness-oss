@@ -10,7 +10,11 @@ export type NenColumnCreateError =
   | 'excerpt_too_long'
   | 'article_url_invalid'
   | 'image_url_invalid'
-  | 'published_at_invalid';
+  | 'published_at_invalid'
+  | 'target_invalid'
+  | 'scheduled_at_invalid'
+  | 'past_datetime'
+  | 'completion_invalid';
 
 export type NenColumnCreateInput = {
   title: string;
@@ -20,6 +24,12 @@ export type NenColumnCreateInput = {
   imageUrl: string | null;
   publishedAt: string | null;
   slug: string;
+  targetMode: 'all' | 'tag';
+  targetTagId: string | null;
+  scheduledAt: string | null;
+  completionEventName: string | null;
+  completionTagId: string | null;
+  sourceColumnId: string | null;
 };
 
 export type NenColumnStorageFields = {
@@ -42,6 +52,7 @@ type ValidationResult =
 
 const CREATE_KEYS = new Set([
   'title', 'category', 'excerpt', 'articleUrl', 'imageUrl', 'publishedAt',
+  'targetMode', 'targetTagId', 'scheduledAt', 'completionEventName', 'completionTagId', 'sourceColumnId',
 ]);
 
 /**
@@ -189,6 +200,35 @@ export function validateNenColumnCreateBody(body: Record<string, unknown>): Vali
     publishedAt = new Date(body.publishedAt).toISOString();
   }
 
+  const targetMode = body.targetMode === undefined ? 'all' : body.targetMode;
+  if (targetMode !== 'all' && targetMode !== 'tag') return { ok: false, error: 'target_invalid' };
+  const targetTagId = typeof body.targetTagId === 'string' && body.targetTagId.trim() ? body.targetTagId.trim() : null;
+  if ((body.targetTagId != null && typeof body.targetTagId !== 'string') || (targetMode === 'tag' && !targetTagId)) {
+    return { ok: false, error: 'target_invalid' };
+  }
+  const scheduledAt = typeof body.scheduledAt === 'string' && body.scheduledAt.trim()
+    ? body.scheduledAt.trim() : null;
+  if (body.scheduledAt != null && body.scheduledAt !== ''
+    && (typeof body.scheduledAt !== 'string' || !Number.isFinite(Date.parse(body.scheduledAt)))) {
+    return { ok: false, error: 'scheduled_at_invalid' };
+  }
+  /*
+   * #935 N-304: 過去の予約日時は断る。通すと次のtickで即送され、
+   * 「予約した」のに「今届いた」と画面の約束が崩れる（予約画面と同じ決めごと）。
+   */
+  if (scheduledAt && Date.parse(scheduledAt) <= Date.now()) {
+    return { ok: false, error: 'past_datetime' };
+  }
+  const completionEventName = typeof body.completionEventName === 'string' && body.completionEventName.trim()
+    ? body.completionEventName.trim() : null;
+  const completionTagId = typeof body.completionTagId === 'string' && body.completionTagId.trim()
+    ? body.completionTagId.trim() : null;
+  const sourceColumnId = typeof body.sourceColumnId === 'string' && body.sourceColumnId.trim()
+    ? body.sourceColumnId.trim() : null;
+  if ([completionEventName, completionTagId, sourceColumnId].some((value) => value && value.length > 160)) {
+    return { ok: false, error: 'completion_invalid' };
+  }
+
   return {
     ok: true,
     value: {
@@ -199,6 +239,12 @@ export function validateNenColumnCreateBody(body: Record<string, unknown>): Vali
       imageUrl,
       publishedAt,
       slug,
+      targetMode,
+      targetTagId,
+      scheduledAt: scheduledAt ? new Date(scheduledAt).toISOString() : null,
+      completionEventName,
+      completionTagId,
+      sourceColumnId,
     },
   };
 }

@@ -3,13 +3,22 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Star } from 'lucide-react'
 import type { FriendListItem } from '@/lib/api'
+import MenuPortal from '@/components/shared/menu-portal'
 import Pagination from '@/components/shared/pagination'
-import FriendListRow from './friend-list-row'
+import Checkbox from '@/components/shared/checkbox'
+import ListState from '@/components/shared/list-state'
+import ListRange from '@/components/ui/list-range'
+import PageSizeSelect from '@/components/ui/page-size-select'
+import FriendListRow, { FriendListCard } from './friend-list-row'
 
-export type FriendListColumn = 'support' | 'scenario' | 'latest' | 'tags' | 'last'
+export type FriendListColumn = 'support' | 'scenario' | 'latest' | 'tags' | 'source' | 'last'
 
 interface Props {
   friends: FriendListItem[]
+  status?: 'loading' | 'ready' | 'error'
+  emptyTitle?: string
+  emptyDescription?: string
+  onRetry?: () => void
   selectedIds?: Set<string>
   onToggleSelect?: (id: string) => void
   onToggleAll?: (select: boolean) => void
@@ -28,11 +37,18 @@ const COLUMN_LABELS: Array<{ key: FriendListColumn; label: string }> = [
   { key: 'scenario', label: 'シナリオ' },
   { key: 'latest', label: '最新メッセージ' },
   { key: 'tags', label: 'タグ・属性' },
+  // N-038: 流入元は追加時に一度だけ付く計測値。一覧に列が無く、
+  // どの施策から来た人か一覧では読めなかった。
+  { key: 'source', label: '流入元' },
   { key: 'last', label: '最終接触' },
 ]
 
 export default function FriendListTable({
   friends,
+  status = 'ready',
+  emptyTitle = '条件に合う友だちが見つかりません',
+  emptyDescription = '検索条件を外すか、別のキーワードでお試しください。',
+  onRetry,
   selectedIds,
   onToggleSelect,
   onToggleAll,
@@ -45,15 +61,12 @@ export default function FriendListTable({
   onPageChange,
   onPageSizeChange,
 }: Props) {
-  const checkboxRef = useRef<HTMLInputElement>(null)
   const [visible, setVisible] = useState<Set<FriendListColumn>>(() => new Set(COLUMN_LABELS.map((column) => column.key)))
   const [preferencesReady, setPreferencesReady] = useState(false)
+  const [columnsOpen, setColumnsOpen] = useState(false)
+  const columnsButtonRef = useRef<HTMLButtonElement>(null)
   const selectedCount = friends.filter((friend) => selectedIds?.has(friend.id)).length
   const allSelected = friends.length > 0 && selectedCount === friends.length
-
-  useEffect(() => {
-    if (checkboxRef.current) checkboxRef.current.indeterminate = selectedCount > 0 && !allSelected
-  }, [allSelected, selectedCount])
 
   useEffect(() => {
     try {
@@ -86,6 +99,7 @@ export default function FriendListTable({
     visible.has('scenario') ? 'minmax(85px,.65fr)' : null,
     visible.has('latest') ? 'minmax(150px,1.45fr)' : null,
     visible.has('tags') ? 'minmax(150px,1.35fr)' : null,
+    visible.has('source') ? 'minmax(110px,.8fr)' : null,
     visible.has('last') ? '90px' : null,
   ].filter(Boolean).join(' '), [visible])
 
@@ -93,84 +107,143 @@ export default function FriendListTable({
   const rangeEnd = Math.min(page * pageSize, total)
 
   return (
-    <section className="flex min-h-155 flex-col overflow-hidden rounded-v6-card border border-hairline bg-canvas shadow-v6-card" data-design="V6FriendTable" data-design-node="k4Hz0X">
-      <div className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-hairline px-4">
-        <h2 className="whitespace-nowrap text-sm font-bold text-v6-ink">
-          友だち一覧 <span className="ml-1 text-xs font-bold text-v6-accent">{total.toLocaleString('ja-JP')}件</span>
+    <section className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card" data-design="V6FriendTable" data-design-node="k4Hz0X">
+      {/*
+        FRIEND-17: 狭い幅ではツールバーの右側（件数・表示項目）を折り返して
+        隠さない。h-14 の固定高は lg 以上にだけ掛ける。
+      */}
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-hairline px-4 py-3 lg:h-14 lg:flex-nowrap lg:py-0">
+        <h2 className="whitespace-nowrap text-sm font-bold text-ink">
+          {/*
+            未取得の件数は0件に見せない（絞り込みの行の件数を消した後は、
+            この見出しがその役目を持つ）。取れるまでは「—」。
+          */}
+          友だち一覧 <span className="ml-1 text-xs font-bold text-ink-faint">{status === 'ready' ? `${total.toLocaleString('ja-JP')}件` : '—'}</span>
         </h2>
-        <div className="flex items-center gap-4 text-xs">
-          <span className="whitespace-nowrap text-v6-ink-faint">{selectedCount}件選択中</span>
-          <details className="relative">
-            <summary className="flex h-9 cursor-pointer list-none items-center gap-2 whitespace-nowrap font-semibold text-v6-action">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
+          {/* 選んでいる時だけ出す（★V7：0件の時は意味が無い）。 */}
+          {selectedCount > 0 ? <span className="whitespace-nowrap font-semibold text-accent-deep">{selectedCount}件選択中</span> : null}
+          <span className="relative inline-flex">
+            <button
+              ref={columnsButtonRef}
+              type="button"
+              aria-expanded={columnsOpen}
+              onClick={() => setColumnsOpen((current) => !current)}
+              className="flex h-9 cursor-pointer items-center gap-2 whitespace-nowrap font-semibold text-action"
+            >
               表示項目を編集
-            </summary>
-            <div className="absolute right-0 z-20 mt-1 w-52 rounded-tile border border-hairline bg-canvas p-2 shadow-lg">
-              {COLUMN_LABELS.map((column) => (
-                <label key={column.key} className="flex cursor-pointer items-center gap-2 rounded-v6-option px-2 py-2 text-xs text-v6-ink-secondary hover:bg-v6-surface-strong">
-                  <input
-                    type="checkbox"
-                    checked={visible.has(column.key)}
-                    onChange={(event) => setVisible((previous) => {
-                      const next = new Set(previous)
-                      if (event.target.checked) next.add(column.key)
-                      else next.delete(column.key)
-                      return next
-                    })}
-                    className="h-4 w-4 accent-v6-accent"
-                  />
-                  {column.label}
-                </label>
-              ))}
-            </div>
-          </details>
-          <select value={pageSize} onChange={(event) => onPageSizeChange(Number(event.target.value))} className="v6-select h-10 min-w-34.5 rounded-v6-control border border-hairline bg-canvas text-sm font-semibold text-v6-ink">
-            {pageSizeOptions.map((size) => <option key={size} value={size}>{size}件表示</option>)}
-          </select>
+            </button>
+            <MenuPortal
+              open={columnsOpen}
+              align="end"
+              getAnchor={() => columnsButtonRef.current}
+              onClose={() => setColumnsOpen(false)}
+            >
+              <div
+                className="w-52 rounded-card border border-hairline bg-canvas p-2 shadow-float"
+                // 最上層では absolute 指定を無効にする（位置は器が決める）。
+                style={{ position: 'static' }}
+              >
+                {COLUMN_LABELS.map((column) => (
+                  <div key={column.key} className="rounded-control px-2 py-2 hover:bg-canvas-sunken">
+                    {/* ★V7 共通 チェックボックス（gvjpx）。 */}
+                    <Checkbox
+                      checked={visible.has(column.key)}
+                      onCheckedChange={(checked) => setVisible((previous) => {
+                        const next = new Set(previous)
+                        if (checked) next.add(column.key)
+                        else next.delete(column.key)
+                        return next
+                      })}
+                    >
+                      {column.label}
+                    </Checkbox>
+                  </div>
+                ))}
+              </div>
+            </MenuPortal>
+          </span>
+          {/* #668: 件数の選び口は他の一覧と同じ「表示件数」セレクト。 */}
+          <PageSizeSelect
+            data-qa-open="LT8RS"
+            value={pageSize}
+            onChange={onPageSizeChange}
+            options={[...pageSizeOptions]}
+          />
         </div>
       </div>
 
-      <div className="grid h-11 shrink-0 items-center gap-2 border-b border-hairline bg-v6-surface-strong px-3 text-micro font-semibold text-v6-ink-secondary" style={{ gridTemplateColumns }}>
+      {/* FRIEND-17: 列見出しは表と対になるため、カード表示の幅では出さない。 */}
+      <div className="hidden h-11 shrink-0 items-center gap-2 border-b border-hairline bg-canvas-sunken px-3 text-micro font-semibold text-ink-secondary lg:grid" style={{ gridTemplateColumns }}>
         <div>
-          <input
-            ref={checkboxRef}
-            type="checkbox"
+          {/* ★V7 共通 チェックボックス（gvjpx）。一部だけ選んでいるときは「―」。 */}
+          <Checkbox
             checked={allSelected}
-            onChange={(event) => onToggleAll?.(event.target.checked)}
+            indeterminate={selectedCount > 0 && !allSelected}
+            onCheckedChange={(checked) => onToggleAll?.(checked)}
             aria-label="表示中の友だちをすべて選ぶ"
-            className="h-4 w-4 cursor-pointer accent-v6-accent"
           />
         </div>
-        <Star aria-label="注目" className="h-4 w-4 text-v6-ink-faint" />
+        <Star aria-label="注目" className="h-4 w-4 text-ink-faint" />
         <div className="truncate">友だち</div>
         {visible.has('support') ? <div className="truncate">対応・担当</div> : null}
         {visible.has('scenario') ? <div className="truncate" data-column="scenario">シナリオ</div> : null}
         {visible.has('latest') ? <div className="truncate">最新メッセージ</div> : null}
         {visible.has('tags') ? <div className="truncate">タグ・属性</div> : null}
+        {visible.has('source') ? <div className="truncate" data-column="source">流入元</div> : null}
         {visible.has('last') ? <div className="truncate text-center">最終接触</div> : null}
       </div>
 
-      <div className="min-h-0 flex-1">
-        {friends.length === 0 ? (
-          <div className="flex h-full min-h-77.5 flex-col items-center justify-center px-6 text-center">
-            <p className="text-sm font-semibold text-v6-ink-secondary">条件に合う友だちが見つかりません</p>
-            <p className="mt-1 text-xs text-v6-ink-faint">検索条件を外すか、別のキーワードでお試しください。</p>
+      <div>
+        {status === 'loading' ? (
+          <div className="flex items-center justify-center bg-canvas-sunken/30 px-6 py-10">
+            <ListState kind="loading" title="読み込んでいます" description="このまま少しお待ちください。" />
+          </div>
+        ) : status === 'error' ? (
+          <div className="flex items-center justify-center bg-canvas-sunken/30 px-6 py-10">
+            <ListState
+              kind="error"
+              title="表示できませんでした"
+              description="再読み込みしても直らないときは、エラー報告へお知らせください。"
+              onRetry={onRetry}
+            />
+          </div>
+        ) : friends.length === 0 ? (
+          <div className="flex items-center justify-center bg-canvas-sunken/30 px-6 py-10">
+            <ListState kind="empty" title={emptyTitle} description={emptyDescription} />
           </div>
         ) : friends.map((friend) => (
-          <FriendListRow
-            key={friend.id}
-            friend={friend}
-            selected={selectedIds?.has(friend.id)}
-            onToggleSelect={() => onToggleSelect?.(friend.id)}
-            onToggleAttention={() => onToggleAttention?.(friend)}
-            visibleColumns={visible}
-            gridTemplateColumns={gridTemplateColumns}
-          />
+          /*
+            FRIEND-17: lg未満はカード、lg以上はグリッド行。
+            両方描いてCSSで分ける。列の表示切替（visible）は両側で効く。
+          */
+          <div key={friend.id} className="contents">
+            <div className="lg:hidden">
+              <FriendListCard
+                friend={friend}
+                selected={selectedIds?.has(friend.id)}
+                onToggleSelect={() => onToggleSelect?.(friend.id)}
+                onToggleAttention={() => onToggleAttention?.(friend)}
+                visibleColumns={visible}
+              />
+            </div>
+            <div className="hidden lg:block">
+              <FriendListRow
+                friend={friend}
+                selected={selectedIds?.has(friend.id)}
+                onToggleSelect={() => onToggleSelect?.(friend.id)}
+                onToggleAttention={() => onToggleAttention?.(friend)}
+                visibleColumns={visible}
+                gridTemplateColumns={gridTemplateColumns}
+              />
+            </div>
+          </div>
         ))}
       </div>
 
-      <div className="flex h-12 shrink-0 items-center justify-between border-t border-hairline px-4">
-        <span className="text-xs text-v6-ink-faint">{rangeStart}〜{rangeEnd}件 / 全{total.toLocaleString('ja-JP')}件</span>
-        <Pagination page={page} pageCount={pageCount} onPageChange={onPageChange} ariaLabel="友だち一覧のページ" />
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-hairline px-4 py-2 lg:h-12 lg:flex-nowrap lg:py-0">
+        <ListRange total={total} first={rangeStart} last={rangeEnd} />
+        <Pagination page={page} pageCount={pageCount} onPageChange={onPageChange} disabled={status !== 'ready'} ariaLabel="友だち一覧のページ" />
       </div>
     </section>
   )

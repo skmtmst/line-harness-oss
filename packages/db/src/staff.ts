@@ -1,6 +1,8 @@
 import { jstNow } from './utils.js';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 
+export type TenantStatus = 'active' | 'suspended' | 'archived';
+
 export interface StaffMember {
   id: string;
   name: string;
@@ -21,12 +23,46 @@ export interface StaffMember {
   totp_pending_secret_enc: string | null;
   totp_enabled_at: string | null;
   totp_last_used_step: number | null;
+  password_hash?: string | null;
+  password_updated_at?: string | null;
   assigned_line_account_id?: string | null;
   can_access_descendant_accounts?: number;
   account_scope?: 'all' | 'accounts';
+  policy_version?: number;
+  /** N-424: 明示保存された役割bundle。NULL は従来どおり role+access_level から導出。 */
+  role_bundle?: string | null;
+  /** N-424: 「見えるだけ」の permission key(JSON配列)。GET系だけを許可する。 */
+  view_permission_keys?: string | null;
+  /** N-424: スタッフのメール表示。'full'|'masked'|'none'、NULL は従来判定。 */
+  email_mask?: string | null;
+  /** N-433: 確認待ちの新しいメールアドレス。確認するまで email は変えない。 */
+  email_change_new?: string | null;
+  email_change_token_hash?: string | null;
+  email_change_expires_at?: string | null;
   tenant_id: string | null;
+  /** 認証用 JOIN でだけ付く所属統括の実効状態。既定の運営会社は常に active。 */
+  tenant_status?: TenantStatus;
   created_at: string;
   updated_at: string;
+}
+
+/**
+ * 認証用 staff 取得の共通射影。
+ *
+ * 既定の運営会社は契約先の停止対象ではないため常に active とする。
+ * それ以外で統括行が失われている場合は安全側の archived に倒す。
+ */
+const STAFF_WITH_TENANT_STATUS = `SELECT sm.*,
+  CASE
+    WHEN COALESCE(sm.tenant_id, ?) = ? THEN 'active'
+    WHEN t.status IN ('active', 'suspended', 'archived') THEN t.status
+    ELSE 'archived'
+  END AS tenant_status
+  FROM staff_members sm
+  LEFT JOIN tenants t ON t.id = COALESCE(sm.tenant_id, ?)`;
+
+function tenantStatusBindings(): [string, string, string] {
+  return [DEFAULT_TENANT_ID, DEFAULT_TENANT_ID, DEFAULT_TENANT_ID];
 }
 
 export interface CreateStaffInput {
@@ -44,6 +80,9 @@ export interface CreateStaffInput {
   assigned_line_account_id?: string | null;
   can_access_descendant_accounts?: boolean;
   account_scope?: 'all' | 'accounts';
+  role_bundle?: string | null;
+  view_permission_keys?: string[];
+  email_mask?: string | null;
   tenant_id?: string | null;
 }
 
@@ -65,9 +104,17 @@ export interface UpdateStaffInput {
   totp_pending_secret_enc?: string | null;
   totp_enabled_at?: string | null;
   totp_last_used_step?: number | null;
+  password_hash?: string | null;
+  password_updated_at?: string | null;
   assigned_line_account_id?: string | null;
   can_access_descendant_accounts?: boolean;
   account_scope?: 'all' | 'accounts';
+  role_bundle?: string | null;
+  view_permission_keys?: string[];
+  email_mask?: string | null;
+  email_change_new?: string | null;
+  email_change_token_hash?: string | null;
+  email_change_expires_at?: string | null;
 }
 
 function generateApiKey(): string {
@@ -82,8 +129,8 @@ export async function getStaffByApiKey(
   apiKey: string,
 ): Promise<StaffMember | null> {
   return db
-    .prepare('SELECT * FROM staff_members WHERE api_key = ? AND is_active = 1')
-    .bind(apiKey)
+    .prepare(`${STAFF_WITH_TENANT_STATUS} WHERE sm.api_key = ? AND sm.is_active = 1`)
+    .bind(...tenantStatusBindings(), apiKey)
     .first<StaffMember>();
 }
 
@@ -92,8 +139,8 @@ export async function getStaffByLineUserId(
   lineUserId: string,
 ): Promise<StaffMember | null> {
   return db
-    .prepare('SELECT * FROM staff_members WHERE line_user_id = ? AND is_active = 1')
-    .bind(lineUserId)
+    .prepare(`${STAFF_WITH_TENANT_STATUS} WHERE sm.line_user_id = ? AND sm.is_active = 1`)
+    .bind(...tenantStatusBindings(), lineUserId)
     .first<StaffMember>();
 }
 
@@ -109,8 +156,8 @@ export async function getStaffByLineUserIdIncludingInactive(
   lineUserId: string,
 ): Promise<StaffMember | null> {
   return db
-    .prepare('SELECT * FROM staff_members WHERE line_user_id = ?')
-    .bind(lineUserId)
+    .prepare(`${STAFF_WITH_TENANT_STATUS} WHERE sm.line_user_id = ?`)
+    .bind(...tenantStatusBindings(), lineUserId)
     .first<StaffMember>();
 }
 
@@ -127,9 +174,34 @@ export async function getStaffById(
   id: string,
 ): Promise<StaffMember | null> {
   return db
-    .prepare('SELECT * FROM staff_members WHERE id = ?')
-    .bind(id)
+    .prepare(`${STAFF_WITH_TENANT_STATUS} WHERE sm.id = ?`)
+    .bind(...tenantStatusBindings(), id)
     .first<StaffMember>();
+}
+
+/**
+ * 担当者の表示名をまとめて引く（R35）。
+ *
+ * 登録メディアの `uploaded_by` は内部ID（UUID）のまま残し、画面には
+ * この名前を出す。退職・削除済みで引けないIDは載せない（呼び出し側が
+ * 「削除された担当者」と出す）。空・重複は取り除いて1回で引く。
+ */
+export async function getStaffNameMap(
+  db: D1Database,
+  ids: Array<string | null | undefined>,
+): Promise<Map<string, string>> {
+  const unique = [...new Set(
+    ids.filter((id): id is string => typeof id === 'string' && id.length > 0),
+  )];
+  const names = new Map<string, string>();
+  if (unique.length === 0) return names;
+  const placeholders = unique.map(() => '?').join(',');
+  const rows = await db
+    .prepare(`SELECT id, name FROM staff_members WHERE id IN (${placeholders})`)
+    .bind(...unique)
+    .all<{ id: string; name: string }>();
+  for (const row of rows.results ?? []) names.set(row.id, row.name);
+  return names;
 }
 
 export async function createStaffMember(
@@ -146,8 +218,9 @@ export async function createStaffMember(
        (id, name, email, role, access_level, api_key, line_user_id, is_active,
         permission_keys, notification_preferences, invite_status, invite_token_hash,
         invite_expires_at, assigned_line_account_id, can_access_descendant_accounts,
-        account_scope, tenant_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        account_scope, role_bundle, view_permission_keys, email_mask,
+        tenant_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id, input.name, input.email ?? null, input.role, input.access_level ?? 'full', apiKey,
@@ -157,6 +230,9 @@ export async function createStaffMember(
       input.invite_expires_at ?? null, input.assigned_line_account_id ?? null,
       input.can_access_descendant_accounts ? 1 : 0,
       input.account_scope ?? 'all',
+      input.role_bundle ?? null,
+      input.view_permission_keys ? JSON.stringify(input.view_permission_keys) : null,
+      input.email_mask ?? null,
       input.tenant_id ?? DEFAULT_TENANT_ID, now, now,
     )
     .run();
@@ -173,7 +249,7 @@ export async function updateStaffMember(
   input: UpdateStaffInput,
 ): Promise<StaffMember | null> {
   const now = jstNow();
-  const sets: string[] = ['updated_at = ?'];
+  const sets: string[] = ['updated_at = ?', 'policy_version = policy_version + 1'];
   const values: (string | number | null)[] = [now];
 
   if (input.name !== undefined) { sets.push('name = ?'); values.push(input.name); }
@@ -193,9 +269,17 @@ export async function updateStaffMember(
   if (input.totp_pending_secret_enc !== undefined) { sets.push('totp_pending_secret_enc = ?'); values.push(input.totp_pending_secret_enc); }
   if (input.totp_enabled_at !== undefined) { sets.push('totp_enabled_at = ?'); values.push(input.totp_enabled_at); }
   if (input.totp_last_used_step !== undefined) { sets.push('totp_last_used_step = ?'); values.push(input.totp_last_used_step); }
+  if (input.password_hash !== undefined) { sets.push('password_hash = ?'); values.push(input.password_hash); }
+  if (input.password_updated_at !== undefined) { sets.push('password_updated_at = ?'); values.push(input.password_updated_at); }
   if (input.assigned_line_account_id !== undefined) { sets.push('assigned_line_account_id = ?'); values.push(input.assigned_line_account_id); }
   if (input.can_access_descendant_accounts !== undefined) { sets.push('can_access_descendant_accounts = ?'); values.push(input.can_access_descendant_accounts ? 1 : 0); }
   if (input.account_scope !== undefined) { sets.push('account_scope = ?'); values.push(input.account_scope); }
+  if (input.role_bundle !== undefined) { sets.push('role_bundle = ?'); values.push(input.role_bundle); }
+  if (input.view_permission_keys !== undefined) { sets.push('view_permission_keys = ?'); values.push(JSON.stringify(input.view_permission_keys)); }
+  if (input.email_mask !== undefined) { sets.push('email_mask = ?'); values.push(input.email_mask); }
+  if (input.email_change_new !== undefined) { sets.push('email_change_new = ?'); values.push(input.email_change_new); }
+  if (input.email_change_token_hash !== undefined) { sets.push('email_change_token_hash = ?'); values.push(input.email_change_token_hash); }
+  if (input.email_change_expires_at !== undefined) { sets.push('email_change_expires_at = ?'); values.push(input.email_change_expires_at); }
 
   values.push(id);
   await db
@@ -214,6 +298,29 @@ export async function getStaffAccountScopeIds(db: D1Database, staffId: string): 
   return result.results.map((row) => row.line_account_id);
 }
 
+/*
+ * 一覧の N+1 対策。1人ずつ getStaffAccountScopeIds を叩くと
+ * 人数分の往復になるので、一覧では IN で一括取得して振り分ける。
+ */
+export async function getStaffAccountScopeMap(
+  db: D1Database,
+  staffIds: string[],
+): Promise<Map<string, string[]>> {
+  const map = new Map<string, string[]>();
+  const ids = [...new Set(staffIds.filter((id) => typeof id === 'string' && id.length > 0))];
+  if (ids.length === 0) return map;
+  const result = await db
+    .prepare(`SELECT staff_id, line_account_id FROM staff_account_scopes WHERE staff_id IN (${ids.map(() => '?').join(',')}) ORDER BY staff_id, line_account_id`)
+    .bind(...ids)
+    .all<{ staff_id: string; line_account_id: string }>();
+  for (const row of result.results) {
+    const list = map.get(row.staff_id) ?? [];
+    list.push(row.line_account_id);
+    map.set(row.staff_id, list);
+  }
+  return map;
+}
+
 export async function replaceStaffAccountScopes(
   db: D1Database,
   staffId: string,
@@ -229,7 +336,15 @@ export async function replaceStaffAccountScopes(
 }
 
 export async function getStaffByInviteTokenHash(db: D1Database, tokenHash: string): Promise<StaffMember | null> {
-  return db.prepare('SELECT * FROM staff_members WHERE invite_token_hash = ?').bind(tokenHash).first<StaffMember>();
+  return db
+    .prepare(`${STAFF_WITH_TENANT_STATUS} WHERE sm.invite_token_hash = ?`)
+    .bind(...tenantStatusBindings(), tokenHash)
+    .first<StaffMember>();
+}
+
+/** N-433: メール変更の確認リンクから本人の行を引く。トークンは指紋で照合する。 */
+export async function getStaffByEmailChangeTokenHash(db: D1Database, tokenHash: string): Promise<StaffMember | null> {
+  return db.prepare('SELECT * FROM staff_members WHERE email_change_token_hash = ?').bind(tokenHash).first<StaffMember>();
 }
 
 export async function deleteStaffMember(db: D1Database, id: string): Promise<void> {
@@ -270,14 +385,142 @@ export async function createAdminSession(
   tokenHash: string,
   staffId: string,
   expiresAt: string,
+  device: { userAgent?: string | null; ipPrefix?: string | null; deviceHash?: string | null; unfamiliarAt?: string | null } = {},
 ): Promise<void> {
   await db
     .prepare(
-      `INSERT INTO admin_sessions (token_hash, staff_id, expires_at)
-       VALUES (?, ?, ?)`,
+      `INSERT INTO admin_sessions (token_hash, staff_id, expires_at, user_agent, ip_prefix, device_hash, unfamiliar_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
     )
-    .bind(tokenHash, staffId, expiresAt)
+    .bind(tokenHash, staffId, expiresAt, device.userAgent ?? null, device.ipPrefix ?? null, device.deviceHash ?? null, device.unfamiliarAt ?? null)
     .run();
+}
+
+/** V: 大事な操作の再確認・いつもと違うログインで読み書きするセッション本体。 */
+export interface AdminSessionSecurity {
+  token_hash: string;
+  staff_id: string;
+  created_at: string;
+  expires_at: string;
+  step_up_at: string | null;
+  device_hash: string | null;
+  ip_prefix: string | null;
+  unfamiliar_at: string | null;
+}
+
+export async function getAdminSessionByTokenHash(
+  db: D1Database,
+  tokenHash: string,
+): Promise<AdminSessionSecurity | null> {
+  return db
+    .prepare(
+      `SELECT token_hash, staff_id, created_at, expires_at, step_up_at, device_hash, ip_prefix, unfamiliar_at
+       FROM admin_sessions
+       WHERE token_hash = ?`,
+    )
+    .bind(tokenHash)
+    .first<AdminSessionSecurity>();
+}
+
+/** 再確認（step-up）に成功した時刻をセッションへ刻む。APIキー経路は行が無いので何もしない。 */
+export async function markAdminSessionStepUp(
+  db: D1Database,
+  tokenHash: string,
+  stepUpAt: string,
+): Promise<void> {
+  await db
+    .prepare('UPDATE admin_sessions SET step_up_at = ? WHERE token_hash = ?')
+    .bind(stepUpAt, tokenHash)
+    .run();
+}
+
+/**
+ * 過去に同じ端末か同じ場所から入った形跡があるか。
+ *
+ * 端末（device_hash）と場所（ip_prefix）は片方しか残っていない行もあるため、
+ * 「比べられる側が存在する」信号ごとに照合する。判断材料がまだ1件も無い
+ * 初回ログインは比較対象がないので unfamiliar にしない（導入直後の全員通知を
+ * 避ける狙いもある）。
+ */
+export async function adminSessionFamiliarity(
+  db: D1Database,
+  staffId: string,
+  input: { deviceHash: string | null; ipPrefix: string | null },
+): Promise<{ hasBaseline: boolean; deviceKnown: boolean; ipKnown: boolean }> {
+  const rows = await db
+    .prepare(
+      `SELECT
+         COUNT(*) AS baseline_count,
+         MAX(CASE WHEN device_hash IS NOT NULL AND device_hash = ? THEN 1 ELSE 0 END) AS device_known,
+         MAX(CASE WHEN ip_prefix IS NOT NULL AND ip_prefix = ? THEN 1 ELSE 0 END) AS ip_known,
+         MAX(CASE WHEN device_hash IS NOT NULL THEN 1 ELSE 0 END) AS has_device_data
+       FROM admin_sessions
+       WHERE staff_id = ?`,
+    )
+    .bind(input.deviceHash ?? '', input.ipPrefix ?? '', staffId)
+    .first<{ baseline_count: number; device_known: number; ip_known: number; has_device_data: number }>();
+  const hasBaseline = Number(rows?.baseline_count ?? 0) > 0;
+  const hasDeviceData = Number(rows?.has_device_data ?? 0) > 0;
+  return {
+    hasBaseline,
+    // 端末は device_hash が取れるようになってから照合する。過去に1件も
+    // 記録が無い間は「初めて」と断定しない。
+    deviceKnown: !input.deviceHash || !hasDeviceData || Number(rows?.device_known ?? 0) > 0,
+    // 場所は ip_prefix が昔から記録されているので、そのまま照合する。
+    ipKnown: !input.ipPrefix || Number(rows?.ip_known ?? 0) > 0,
+  };
+}
+
+/** 本人のセッション一覧用。token_hash は漏れても認証に使えない指紋として返す。 */
+export interface AdminSessionSummary {
+  token_hash: string;
+  created_at: string;
+  expires_at: string;
+  user_agent: string | null;
+  ip_prefix: string | null;
+}
+
+export async function listAdminSessionsByStaff(
+  db: D1Database,
+  staffId: string,
+  now: string,
+): Promise<AdminSessionSummary[]> {
+  const result = await db
+    .prepare(
+      `SELECT token_hash, created_at, expires_at, user_agent, ip_prefix
+       FROM admin_sessions
+       WHERE staff_id = ? AND expires_at > ?
+       ORDER BY created_at DESC`,
+    )
+    .bind(staffId, now)
+    .all<AdminSessionSummary>();
+  return result.results ?? [];
+}
+
+/** 本人のセッションだけを消す。他人の token_hash を指定しても削除しない。 */
+export async function deleteAdminSessionForStaff(
+  db: D1Database,
+  staffId: string,
+  tokenHash: string,
+): Promise<boolean> {
+  const result = await db
+    .prepare('DELETE FROM admin_sessions WHERE staff_id = ? AND token_hash = ?')
+    .bind(staffId, tokenHash)
+    .run();
+  return (result.meta.changes ?? 0) > 0;
+}
+
+/** 今のセッション以外をまとめて失効させる。消した件数を返す。 */
+export async function deleteOtherAdminSessions(
+  db: D1Database,
+  staffId: string,
+  keepTokenHash: string,
+): Promise<number> {
+  const result = await db
+    .prepare('DELETE FROM admin_sessions WHERE staff_id = ? AND token_hash <> ?')
+    .bind(staffId, keepTokenHash)
+    .run();
+  return result.meta.changes ?? 0;
 }
 
 export async function getStaffByAdminSession(
@@ -287,12 +530,18 @@ export async function getStaffByAdminSession(
 ): Promise<StaffMember | null> {
   return db
     .prepare(
-      `SELECT sm.*
+      `SELECT sm.*,
+              CASE
+                WHEN COALESCE(sm.tenant_id, ?) = ? THEN 'active'
+                WHEN t.status IN ('active', 'suspended', 'archived') THEN t.status
+                ELSE 'archived'
+              END AS tenant_status
        FROM admin_sessions s
        JOIN staff_members sm ON sm.id = s.staff_id
+       LEFT JOIN tenants t ON t.id = COALESCE(sm.tenant_id, ?)
        WHERE s.token_hash = ? AND s.expires_at > ? AND sm.is_active = 1`,
     )
-    .bind(tokenHash, now)
+    .bind(...tenantStatusBindings(), tokenHash, now)
     .first<StaffMember>();
 }
 
@@ -318,12 +567,18 @@ export async function revokeStaffAuthentication(db: D1Database, staffId: string)
   ]);
 }
 
+export type TwoFactorChallengePurpose = 'verify' | 'setup';
+
 export interface TwoFactorChallenge {
   token_hash: string;
   staff_id: string;
   expires_at: string;
   attempts: number;
   created_at: string;
+  /** 'verify' は登録済みの確認用、'setup' は未登録者の初回設定用。混ぜて使えない。 */
+  purpose: TwoFactorChallengePurpose;
+  /** 1 なら確認後に発行するセッションを 7 日、0 なら既定の 8 時間にする。 */
+  remember: number;
 }
 
 export async function createTwoFactorChallenge(
@@ -331,11 +586,12 @@ export async function createTwoFactorChallenge(
   tokenHash: string,
   staffId: string,
   expiresAt: string,
+  options: { purpose?: TwoFactorChallengePurpose; remember?: boolean } = {},
 ): Promise<void> {
   await db.prepare('DELETE FROM admin_two_factor_challenges WHERE staff_id = ?').bind(staffId).run();
   await db.prepare(
-    'INSERT INTO admin_two_factor_challenges (token_hash, staff_id, expires_at) VALUES (?, ?, ?)',
-  ).bind(tokenHash, staffId, expiresAt).run();
+    'INSERT INTO admin_two_factor_challenges (token_hash, staff_id, expires_at, purpose, remember) VALUES (?, ?, ?, ?, ?)',
+  ).bind(tokenHash, staffId, expiresAt, options.purpose ?? 'verify', options.remember ? 1 : 0).run();
 }
 
 export async function getTwoFactorChallenge(

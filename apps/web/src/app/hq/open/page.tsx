@@ -4,18 +4,23 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import HqAccountList from '@/components/hq/account-list'
 import Button from '@/components/shared/button'
+import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
+import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount, type AccountWithStats } from '@/contexts/account-context'
 import { api } from '@/lib/api'
 import { resolveHqOpenTarget, type HqOpenTarget } from '@/lib/hq-navigation'
-import { restaurantTestUiEnabled } from '@/lib/environment-features'
 
 export default function HqOpenPage() {
+  // 左のメニューと同じ名前を見出しにする（/hq と同じ）。
+  usePageTitle('アカウント')
   const router = useRouter()
   const { setSelectedAccountId } = useAccount()
   const [target, setTarget] = useState<HqOpenTarget | null>(null)
   const [accounts, setAccounts] = useState<AccountWithStats[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     const resolved = resolveHqOpenTarget(new URLSearchParams(window.location.search).get('target'))
@@ -36,13 +41,13 @@ export default function HqOpenPage() {
         setAccounts(response.data as AccountWithStats[])
       })
       .catch(() => {
-        if (!cancelled) setError('店舗情報を読み込めませんでした。時間をおいてもう一度お試しください。')
+        if (!cancelled) setError('アカウント情報を読み込めませんでした。時間をおいてもう一度お試しください。')
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
       })
     return () => { cancelled = true }
-  }, [target])
+  }, [target, reloadKey])
 
   const openStorePage = (accountId: string) => {
     if (!target) return
@@ -59,33 +64,48 @@ export default function HqOpenPage() {
   }
 
   return (
-    <div>
-      <header data-design="Head" className="mb-6 flex flex-wrap items-start justify-between gap-4">
+    <div className="flex flex-col gap-4">
+      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
+      <header data-design="Head" className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-accent">統括コンソール</p>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight text-ink">どの店舗の{target.label}を開きますか</h1>
-          <p className="mt-1 text-sm text-ink-secondary">店舗を選ぶと、その店舗の管理画面へ移動します。</p>
+          <p className="text-sm font-semibold text-ink-secondary">統括コンソール</p>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight text-ink">どのアカウントの{target.label}を開きますか</h1>
+          <p className="mt-1 text-sm text-ink-secondary">アカウントを選ぶと、そのアカウントの管理画面へ移動します。</p>
         </div>
-        <Button href="/hq" variant="secondary" className="shrink-0">店舗管理へ戻る</Button>
+        <Button href="/hq" variant="secondary" className="shrink-0">アカウント管理へ戻る</Button>
       </header>
 
-      {error ? <div className="rounded-card bg-danger-bg p-4 text-sm text-danger" role="alert">{error}</div> : null}
+      {error ? (
+        <Notice
+          tone="danger"
+          message={error}
+          action={
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => { setError(''); setLoading(true); setReloadKey((key) => key + 1) }}
+            >
+              再読み込み
+            </Button>
+          }
+        />
+      ) : null}
       {!error && loading ? (
-        <div className="flex min-h-64 items-center justify-center" role="status" aria-label="店舗を読み込み中">
+        <div className="flex min-h-64 items-center justify-center" role="status" aria-label="アカウントを読み込み中">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-hairline border-t-accent" />
         </div>
       ) : null}
       {!error && !loading && accounts.length === 0 ? (
-        <section data-design="Empty" className="rounded-card border border-hairline bg-canvas px-6 py-16 text-center shadow-sm">
-          <h2 className="text-xl font-bold text-ink">まだ店舗がありません</h2>
-          <p className="mt-2 text-sm text-ink-secondary">最初のLINE公式アカウントを登録してください。</p>
-          {restaurantTestUiEnabled() ? (
-            <Button href="/restaurant-test/stores/new" variant="primary" className="mt-6">＋店舗の新規アカウント登録</Button>
-          ) : null}
-        </section>
+        <ListState
+          kind="empty"
+          data-design="Empty"
+          title="まだアカウントがありません"
+          description="最初のLINE公式アカウントを登録してください。"
+          action={<Button href="/accounts/new" variant="primary">＋LINEアカウントを新規登録</Button>}
+        />
       ) : null}
       {!error && !loading && accounts.length > 0 ? (
-        <HqAccountList accounts={accounts} onSelect={openStorePage} selectLabel="この店舗を選ぶ" />
+        <HqAccountList accounts={accounts} onSelect={openStorePage} selectLabel="このアカウントを選ぶ" />
       ) : null}
     </div>
   )

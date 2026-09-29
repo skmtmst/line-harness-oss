@@ -9,6 +9,7 @@
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { runApply } from '../../src/phases/apply.js';
+import { WORKER_COMPATIBILITY_FLAGS } from '../../src/compat-flags.js';
 import { createEventEmitter } from '../../src/events.js';
 import { ADMIN_URL_PLACEHOLDER } from '../../src/materialize.js';
 import type { ParsedBundle } from '../../src/bundle.js';
@@ -142,7 +143,8 @@ describe('runApply — install topologies', () => {
     expect(putWorkerScript).toHaveBeenCalledTimes(1);
     const args = vi.mocked(putWorkerScript).mock.calls[0][0];
     expect(args.keepAssets).toBe(true);
-    expect(args.compatibilityFlags).toEqual(['nodejs_compat']);
+    expect(args.compatibilityFlags).toEqual(WORKER_COMPATIBILITY_FLAGS);
+    expect(WORKER_COMPATIBILITY_FLAGS).toContain('global_fetch_strictly_public');
     expect(args.bindings).toEqual([
       { type: 'd1', name: 'DB', database_id: 'd1id' },
       { type: 'assets', name: 'ASSETS' },

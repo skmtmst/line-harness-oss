@@ -1,0 +1,12 @@
+{
+  "name": "musubo-service-site",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "build": "node build.mjs",
+    "build:production": "node build.mjs --production",
+    "test": "node --test test/*.test.mjs",
+    "preview": "node preview.mjs"
+  }
+}

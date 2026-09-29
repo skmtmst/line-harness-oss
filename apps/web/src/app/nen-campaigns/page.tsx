@@ -1,492 +1,437 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
-import Header from '@/components/layout/header'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
-import { api, type NenCampaignSetting, type NenColumn, type NenPetProfile } from '@/lib/api'
+import { usePageTitle } from '@/components/shell/page-chrome'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { useAccount } from '@/contexts/account-context'
-import { formatCampaignTiming, formatNenJobDateTime } from './campaign-display'
+import {
+  api,
+  ApiError,
+  type NenCampaignSetting,
+  type NenColumn,
+  type NenColumnMetrics,
+  type NenDeliveryDetail,
+  type NenDeliveryList,
+  type NenFlowMetrics,
+} from '@/lib/api'
+import { NenOverview, type ColumnDeliveryPlan, type FriendOption, type NenCoupon, type NenKpis, type NenTab } from './nen-overview'
+import { defaultScheduleLocal, jstMonthRange } from './nen-period'
 
-type Tab = 'flow' | 'columns' | 'pets' | 'history'
 type Notice = { tone: 'success' | 'error'; text: string }
-type FriendOption = { id: string; displayName: string | null }
 
-const categoryLabel: Record<NenCampaignSetting['category'], string> = {
-  transactional: '購入通知', follow_up: '購入後フォロー', column: 'コンテンツ', birthday: '記念日',
-}
-const jobStatusLabel: Record<string, string> = {
-  pending: '配信待ち', processing: '送信中', sent: '送信済み', skipped: '対象外',
-  failed: '送信できませんでした', cancelled: '取り消し済み',
-}
-const columnDeliveryStatusLabel: Record<NenColumn['deliveryStatus'], string> = {
-  draft: '下書き',
-  scheduled: '予約ずみ',
-  queued: '配信待ち',
-  sent: '出したもの',
+const TABS: NenTab[] = ['auto', 'columns', 'history', 'paused']
+const EMPTY_ERRORS: Record<NenTab, string> = { auto: '', columns: '', history: '', paused: '' }
+
+/** テスト送信の失敗理由。送信先の問題（未登録・友だち解除）は直し方まで言う。 */
+function testSendFailureText(caught: unknown, fallback: string): string {
+  if (caught instanceof ApiError && (caught.code === 'test_recipient_unavailable' || caught.status === 404)) {
+    return 'テスト送信先が登録されていないか、友だち追加されていません。「設定 › アカウント」の「テスト送信先」で登録し、そのLINEで友だち追加されているか確認してください。'
+  }
+  return `${fallback}通信の状態を確認して、もう一度お試しください。`
 }
 
-function Toggle({ checked, disabled, onChange, label }: { checked: boolean; disabled?: boolean; onChange: () => void; label: string }) {
-  return (
-    <button type="button" role="switch" aria-checked={checked} aria-label={label} disabled={disabled} onClick={onChange}
-      className={`inline-flex h-7 w-12 shrink-0 items-center rounded-full p-1 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:ring-offset-2 disabled:opacity-50 ${checked ? 'bg-emerald-500' : 'bg-gray-300'}`}>
-      <span className={`h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${checked ? 'translate-x-5' : 'translate-x-0'}`} />
-    </button>
-  )
+function isTab(value: string | null): value is NenTab {
+  return value !== null && (TABS as string[]).includes(value)
 }
 
-function ColumnLinePreview({ column, onClose }: { column: NenColumn; onClose: () => void }) {
-  return (
-    <section id={`column-preview-${column.id}`} className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm sm:col-span-2">
-      <div className="flex items-center justify-between gap-3 border-b border-gray-200 bg-[#3f3f3f] px-4 py-3 text-white">
-        <div>
-          <p className="text-sm font-bold">LINE配信プレビュー</p>
-          <p className="mt-0.5 text-xs text-gray-300">実際のトーク画面に近い見え方です</p>
-        </div>
-        <button type="button" onClick={onClose} className="rounded-lg border border-white/30 px-3 py-1.5 text-xs font-semibold hover:bg-white/10">
-          プレビューを隠す
-        </button>
-      </div>
-      <div className="bg-[#8facd8] p-4 sm:p-6">
-        <div className="mx-auto flex max-w-md items-start gap-2.5">
-          <div aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/70 bg-[#075b36] text-sm font-bold text-white shadow-sm">
-            然
-          </div>
-          <div className="min-w-0 flex-1 space-y-2">
-            <p className="mb-1 text-xs font-medium text-white/95">然-NEN-</p>
-            <div className="rounded-2xl rounded-tl-md bg-white px-4 py-3 shadow-sm">
-              <p className="whitespace-pre-wrap text-sm leading-6 text-gray-800">{column.introText}</p>
-            </div>
-            <div className="overflow-hidden rounded-2xl rounded-tl-md bg-white shadow-md">
-              {column.imageUrl && <img src={column.imageUrl} alt={`${column.title}のアイキャッチ`} className="aspect-[3/2] w-full object-cover" />}
-              <div className="space-y-3 p-4">
-                <h4 className="text-base font-bold leading-6 text-[#123f2b]">{column.title}</h4>
-                <p className="text-sm leading-6 text-slate-600">{column.excerpt}</p>
-              </div>
-              <div className="border-t border-gray-100 p-3">
-                <div className="rounded-lg bg-[#0f766e] py-2.5 text-center text-sm font-semibold text-white">コラムを読む</div>
-              </div>
-            </div>
-            <p className="mt-1 text-right text-[10px] text-white/80">配信イメージ</p>
-          </div>
-        </div>
-      </div>
-    </section>
-  )
-}
-
-function CampaignLinePreview({ setting, onClose }: { setting: NenCampaignSetting; onClose: () => void }) {
-  const isBirthday = setting.campaignKey === 'birthday_coupon'
-  const isOrderConfirmed = setting.campaignKey === 'order_confirmed'
-  const title = setting.title.replaceAll('{{pet_name}}', 'ココ').replaceAll('{{coupon_code}}', 'NENBDAY-1234').replaceAll('{{coupon_expiry}}', '2026-09-30')
-  const body = setting.bodyText.replaceAll('{{pet_name}}', 'ココ').replaceAll('{{coupon_code}}', 'NENBDAY-1234').replaceAll('{{coupon_expiry}}', '2026-09-30')
-  const automaticDetails = isBirthday
-    ? ['クーポンコード：NENBDAY-1234', '有効期限：2026-09-30']
-    : [
-        '注文番号：NEN-000123',
-        '毎日の鹿肉バランス 4袋セット × 1',
-        '合計：¥6,280',
-        'お届け予定：2026-09-16 14:00〜16:00',
-        ...(!isOrderConfirmed ? ['配送会社：ヤマト運輸', '送り状番号：1234-5678-9012'] : []),
-      ]
-
-  return (
-    <section id={`campaign-preview-${setting.campaignKey}`} className="border-t border-gray-100 bg-gray-50/80 p-4 sm:p-5">
-      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-        <div className="flex items-center justify-between gap-3 bg-[#3f3f3f] px-4 py-3 text-white">
-          <div>
-            <p className="text-sm font-bold">{setting.label}のLINE配信プレビュー</p>
-            <p className="mt-0.5 text-xs text-gray-300">見出し・本文・自動挿入データを含む送信イメージ</p>
-          </div>
-          <button type="button" onClick={onClose} className="rounded-lg border border-white/30 px-3 py-1.5 text-xs font-semibold hover:bg-white/10">プレビューを隠す</button>
-        </div>
-        <div className="grid lg:grid-cols-[minmax(0,1fr)_260px]">
-          <div className="bg-[#8facd8] p-4 sm:p-6">
-            <div className="mx-auto flex max-w-md items-start gap-2.5">
-              <div aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/70 bg-[#075b36] text-sm font-bold text-white shadow-sm">然</div>
-              <div className="min-w-0 flex-1">
-                <p className="mb-1 text-xs font-medium text-white/95">然-NEN-</p>
-                <div className="overflow-hidden rounded-2xl rounded-tl-md bg-white shadow-md">
-                  {setting.imageUrl && <img src={setting.imageUrl} alt="" className="aspect-[3/2] w-full object-cover" />}
-                  <div className="space-y-3 p-4">
-                    <h4 className="text-base font-bold leading-6 text-[#123f2b]">{title}</h4>
-                    <p className="whitespace-pre-wrap text-sm leading-6 text-slate-600">{body}</p>
-                    <div className="space-y-1.5 border-t border-gray-100 pt-3">
-                      {automaticDetails.map((detail) => <p key={detail} className="text-xs leading-5 text-slate-500">{detail}</p>)}
-                    </div>
-                  </div>
-                  {setting.buttonLabel && <div className="border-t border-gray-100 p-3"><div className="rounded-lg bg-[#0f766e] py-2.5 text-center text-sm font-semibold text-white">{setting.buttonLabel}</div></div>}
-                </div>
-                <p className="mt-1 text-right text-[10px] text-white/80">配信イメージ</p>
-              </div>
-            </div>
-          </div>
-          <aside className="border-t border-gray-200 p-4 lg:border-l lg:border-t-0">
-            <p className="text-sm font-bold text-gray-900">表示内容の見方</p>
-            <div className="mt-4 space-y-4 text-xs leading-5 text-gray-600">
-              <div><span className="mb-1 inline-block rounded-full bg-emerald-50 px-2 py-0.5 font-semibold text-emerald-700">編集できる内容</span><p>見出し・本文・画像・下部ボタンです。</p></div>
-              <div><span className="mb-1 inline-block rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-600">自動で入る内容</span><p>{isBirthday ? 'ペット名・クーポン番号・有効期限' : '注文番号・商品・金額・配送情報'}は、お客様ごとの実データに置き換わります。</p></div>
-              <p className="rounded-xl bg-amber-50 p-3 text-amber-800">ここでプレビューを開いても、LINEへの送信は発生しません。</p>
-            </div>
-          </aside>
-        </div>
-      </div>
-    </section>
-  )
-}
-
+/**
+ * NEN配信。★V6 37-6（`z4q1K`）／37-6-A（`u66A0`）。
+ *
+ * 数値カード（今月・先月・開封・注文・届かなかった）は月の範囲で実口から取る。
+ * タブごとに必要なものだけ取り、失敗はそのタブの帯で示す（点検 #512 の中3）。
+ */
 export default function NenCampaignsPage() {
+  usePageTitle('NEN配信')
   const { selectedAccountId } = useAccount()
-  const [tab, setTab] = useState<Tab>('flow')
+  const [tab, setTab] = useState<NenTab>('auto')
   const [settings, setSettings] = useState<NenCampaignSetting[]>([])
   const [columns, setColumns] = useState<NenColumn[]>([])
-  const [pets, setPets] = useState<NenPetProfile[]>([])
+  // コラム一覧は口の既定200件で打ち切られる。全体件数を保持し、一覧へ出す（#935 N-300）。
+  const [columnsTotal, setColumnsTotal] = useState<number | null>(null)
   const [friends, setFriends] = useState<FriendOption[]>([])
-  const [jobs, setJobs] = useState<Array<{ id: string; label: string; friendName: string | null; scheduledAt: string; status: string; attempts: number; lastError: string | null }>>([])
-  const [overview, setOverview] = useState<{ activeCampaigns: number; jobs: { pending: number; sent: number; failed: number }; columns: number; pets: number; coupons: number } | null>(null)
-  const [coupon, setCoupon] = useState({ isEnabled: true, codePrefix: 'NENBDAY', benefitLabel: 'お誕生日月限定クーポン', discountAmount: 500, validityDays: 31 })
-  const [expanded, setExpanded] = useState<string | null>('arrival_check')
+  const [kpis, setKpis] = useState<NenKpis | null>(null)
+  const [flowMetrics, setFlowMetrics] = useState<NenFlowMetrics | null>(null)
+  const [columnMetrics, setColumnMetrics] = useState<NenColumnMetrics | null>(null)
+  const [deliveryList, setDeliveryList] = useState<NenDeliveryList | null>(null)
+  const [deliveryDetail, setDeliveryDetail] = useState<NenDeliveryDetail | null>(null)
+  const [coupon, setCoupon] = useState<NenCoupon>({ isEnabled: true, codePrefix: 'NENBDAY', benefitLabel: 'お誕生日月限定クーポン', discountAmount: 500, validityDays: 31, leapYearPolicy: 'feb28' })
+  const [couponOpen, setCouponOpen] = useState(false)
+  const [savingCoupon, setSavingCoupon] = useState(false)
   const [saving, setSaving] = useState<string | null>(null)
   const [testing, setTesting] = useState<string | null>(null)
   const [previewCampaignKey, setPreviewCampaignKey] = useState<string | null>(null)
-  const [previewColumnId, setPreviewColumnId] = useState<string | null>(null)
-  const [editingColumnId, setEditingColumnId] = useState<string | null>(null)
+  const [selectedColumnId, setSelectedColumnId] = useState<string | null>(null)
+  const [audienceCount, setAudienceCount] = useState<number | null>(null)
+  const [plan, setPlan] = useState<ColumnDeliveryPlan>(() => ({ when: 'now', scheduledAt: defaultScheduleLocal(new Date()) }))
+  const [introDraft, setIntroDraft] = useState('')
   const [savingColumnId, setSavingColumnId] = useState<string | null>(null)
   const [testFriendId, setTestFriendId] = useState('')
   const [notice, setNotice] = useState<Notice | null>(null)
   const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState('')
-  const [petDraft, setPetDraft] = useState({ friendId: '', name: '', animalType: 'dog', gender: 'unknown', birthday: '' })
+  const [tabErrors, setTabErrors] = useState<Record<NenTab, string>>(EMPTY_ERRORS)
   const loadSequence = useRef(0)
+  const loadedTabs = useRef<Set<NenTab>>(new Set())
+  const tabRef = useRef<NenTab>(tab)
+  tabRef.current = tab
 
-  const load = useCallback(async () => {
+  /*
+    数値カード帯はどのタブでも同じ4枚（★V6 37-6）。今月と先月を月の範囲で取る。
+    自動配信・停止中・コラムは同じ取得で足りる。送った履歴だけ別に取る。
+  */
+  const loadTab = useCallback(async (next: NenTab) => {
     const sequence = ++loadSequence.current
     setLoading(true)
-    setLoadError('')
     if (!selectedAccountId) {
-      setSettings([]); setColumns([]); setPets([]); setJobs([]); setOverview(null)
+      setSettings([]); setColumns([]); setColumnsTotal(null); setKpis(null)
+      setFlowMetrics(null); setColumnMetrics(null); setDeliveryList(null); setDeliveryDetail(null)
+      setTabErrors(EMPTY_ERRORS)
+      loadedTabs.current.clear()
+      setLoading(false); return
+    }
+    const fail = (message: string) => {
+      if (sequence !== loadSequence.current) return
+      setTabErrors((current) => ({ ...current, [next]: message }))
       setLoading(false)
-      return
+    }
+    const done = () => {
+      if (sequence !== loadSequence.current) return
+      setTabErrors((current) => ({ ...current, [next]: '' }))
+      loadedTabs.current.add(next)
+      setLoading(false)
     }
     try {
-      const [settingRes, columnRes, petRes, jobRes, overviewRes, couponRes] = await Promise.all([
-        api.nenCampaigns.settings(selectedAccountId), api.nenCampaigns.columns(selectedAccountId),
-        api.nenCampaigns.pets(selectedAccountId), api.nenCampaigns.jobs(selectedAccountId),
-        api.nenCampaigns.overview(selectedAccountId), api.nenCampaigns.birthdayCoupon(selectedAccountId),
+      if (next === 'history') {
+        const deliveryRes = await api.nenCampaigns.deliveries(selectedAccountId, { limit: 20 })
+        if (sequence !== loadSequence.current) return
+        if (!deliveryRes.success) return fail('送った履歴を読み込めませんでした。')
+        setDeliveryList(deliveryRes.data); done()
+        return
+      }
+      const now = new Date()
+      const thisMonth = jstMonthRange(now)
+      const lastMonth = jstMonthRange(now, -1)
+      const [settingRes, columnRes, flowRes, columnMetricRes, thisMonthRes, lastMonthRes, couponRes] = await Promise.all([
+        api.nenCampaigns.settings(selectedAccountId),
+        api.nenCampaigns.columns(selectedAccountId),
+        api.nenCampaigns.flowMetrics(selectedAccountId, { from: thisMonth.from, to: thisMonth.to }),
+        api.nenCampaigns.columnMetrics(selectedAccountId, { from: thisMonth.from, to: thisMonth.to }),
+        api.nenCampaigns.deliveries(selectedAccountId, { from: thisMonth.from, to: thisMonth.to, limit: 1 }),
+        api.nenCampaigns.deliveries(selectedAccountId, { from: lastMonth.from, to: lastMonth.to, limit: 1 }),
+        api.nenCampaigns.birthdayCoupon(selectedAccountId),
       ])
       if (sequence !== loadSequence.current) return
-      if (!settingRes.success || !columnRes.success || !petRes.success || !jobRes.success || !overviewRes.success || !couponRes.success) throw new Error()
-      setSettings(settingRes.data)
-      setColumns(columnRes.data)
-      setPets(petRes.data)
-      setJobs(jobRes.data)
-      setOverview(overviewRes.data)
-      setCoupon(couponRes.data)
-    } catch {
-      if (sequence === loadSequence.current) setLoadError('フォロー配信の情報を読み込めませんでした。')
-    } finally {
-      if (sequence === loadSequence.current) setLoading(false)
-    }
+      if (!settingRes.success || !columnRes.success || !flowRes.success || !columnMetricRes.success || !thisMonthRes.success || !lastMonthRes.success) {
+        return fail(next === 'columns' ? 'コラムの情報を読み込めませんでした。' : '自動配信の情報を読み込めませんでした。')
+      }
+      setSettings(settingRes.data); setColumns(columnRes.data)
+      setColumnsTotal(columnRes.pagination?.total ?? columnRes.data.length)
+      setFlowMetrics(flowRes.data); setColumnMetrics(columnMetricRes.data)
+      if (couponRes.success) setCoupon(couponRes.data)
+      const openable = columnMetricRes.data.columns.filter((column) => column.articleOpened.state === 'available' && column.sent > 0)
+      const opened = openable.reduce((sum, column) => sum + (column.articleOpened.value ?? 0), 0)
+      const sentColumns = openable.reduce((sum, column) => sum + column.sent, 0)
+      const unmet = thisMonthRes.data.summary.unmetReasons ?? {}
+      setKpis({
+        monthLabel: thisMonth.label,
+        sentThisMonth: thisMonthRes.data.summary.sent,
+        sentLastMonth: lastMonthRes.data.summary.sent,
+        openRate: sentColumns > 0 ? Math.round((opened / sentColumns) * 100) : null,
+        orders: flowRes.data.summary.associatedConversions,
+        orderAmount: flowRes.data.summary.associatedConversionAmount,
+        undelivered: thisMonthRes.data.summary.failed,
+        blocked: unmet.blocked ?? 0,
+        unfollowed: unmet.unfollowed ?? 0,
+      })
+      // 数値カードは全タブで共通なので、自動配信・停止中・コラムの3つをまとめて読み込み済みにする。
+      for (const shared of ['auto', 'columns', 'paused'] as NenTab[]) loadedTabs.current.add(shared)
+      setTabErrors((current) => ({ ...current, auto: '', columns: '', paused: '' }))
+      done()
+    } catch { fail('情報を読み込めませんでした。通信を確認してください。') }
   }, [selectedAccountId])
 
-  useEffect(() => { void load() }, [load])
+  const loadTabRef = useRef(loadTab)
+  loadTabRef.current = loadTab
   useEffect(() => {
-    setFriends([])
-    setTestFriendId('')
+    loadedTabs.current.clear()
+    setSelectedColumnId(null)
+    void loadTab(tabRef.current)
+  }, [loadTab])
+  useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get('tab')
+    if (isTab(requested) && requested !== 'auto') {
+      setTab(requested)
+      void loadTabRef.current(requested)
+    }
+    // 初回だけURLの指定タブを開く。loadTabはref経由で最新のものを使う。
+  }, [])
+  /*
+    テスト送信先の候補。実口（getTestRecipient）は「設定 › アカウント › テスト送信先」に登録され、
+    かつ友だち追加中の人にしか送らない。登録されていない友だちを候補に並べると、押しても届かず
+    理由も分からないので、登録済みの人だけを出す。ログインユーザーも登録していれば含まれる。
+  */
+  useEffect(() => {
+    setFriends([]); setTestFriendId('')
     if (!selectedAccountId) return
     let cancelled = false
-    void Promise.allSettled([
-      api.friends.list({ accountId: selectedAccountId, limit: 100, includeTags: false }),
-      api.accountSettings.getTestRecipientLoginUsers(selectedAccountId),
-    ]).then(([friendResult, loginUserResult]) => {
-      if (cancelled) return
-      if (friendResult.status !== 'fulfilled' || !friendResult.value.success) return
-      const friendResponse = friendResult.value
-      // 100件より古い友だちでも、LINE連携済みログインユーザーは先頭へ残す。
-      // NENテスト送信APIは同じLINEアカウントの友だちだけを受け付けるため、
-      // sameAccount=true の候補だけを混ぜる。
-      const loginUsers = loginUserResult.status === 'fulfilled' && loginUserResult.value.success
-        ? loginUserResult.value.data
-            .filter((candidate) => candidate.sameAccount)
-            .map((candidate) => ({ id: candidate.id, displayName: candidate.staffName }))
-        : []
-      const accountFriends = friendResponse.data.items.map((friend) => ({ id: friend.id, displayName: friend.displayName }))
-      const list = [...new Map([...loginUsers, ...accountFriends].map((friend) => [friend.id, friend])).values()]
-      setFriends(list)
-      setTestFriendId((current) =>
-        list.some((friend) => friend.id === current) ? current : list[0]?.id || '',
-      )
-      setPetDraft((current) => ({ ...current, friendId: current.friendId || list[0]?.id || '' }))
+    api.accountSettings.getTestRecipients(selectedAccountId).then((result) => {
+      if (cancelled || !result.success) return
+      const list = result.data.map((friend) => ({ id: friend.id, displayName: friend.displayName }))
+      setFriends(list); setTestFriendId((current) => list.some((friend) => friend.id === current) ? current : list[0]?.id || '')
     }).catch(() => undefined)
     return () => { cancelled = true }
   }, [selectedAccountId])
 
-  const updateDraft = (key: string, patch: Partial<NenCampaignSetting>) => {
-    setSettings((current) => current.map((item) => item.campaignKey === key ? { ...item, ...patch } : item))
+  // コラムを選ぶと、紹介文の下書きと「送る相手」の人数をそのコラムに合わせる。
+  const selectedColumn = columns.find((column) => column.id === selectedColumnId) ?? null
+  useEffect(() => {
+    setIntroDraft(selectedColumn?.introText ?? '')
+    setAudienceCount(null)
+    if (!selectedAccountId || !selectedColumn) return
+    let cancelled = false
+    api.nenCampaigns.columnAudience(selectedAccountId, selectedColumn.targetMode, selectedColumn.targetTagId)
+      .then((result) => { if (!cancelled && result.success) setAudienceCount(result.data.count) })
+      .catch(() => undefined)
+    return () => { cancelled = true }
+    // 選び直したときだけ取り直す（同じコラムの一覧再読込では人数を取り直さない）。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedAccountId, selectedColumn?.id, selectedColumn?.targetMode, selectedColumn?.targetTagId])
+
+  /*
+   * #935 N-301: 紹介文の入力途中で画面を離れると内容が消えていた。
+   * ブラウザ離脱・画面内リンク・戻る操作・別コラムへの選び直しを止めて確認する。
+   */
+  const introDirty = selectedColumn !== null && introDraft !== (selectedColumn.introText ?? '')
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({
+    dirty: introDirty,
+    busy: savingColumnId !== null,
+  })
+  const [pendingColumnSelect, setPendingColumnSelect] = useState<{ id: string | null } | null>(null)
+  const selectColumn = (id: string | null) => {
+    if (introDirty && id !== selectedColumnId) {
+      setPendingColumnSelect({ id })
+      return
+    }
+    setSelectedColumnId(id)
   }
 
-  const saveSetting = async (setting: NenCampaignSetting, override?: Partial<NenCampaignSetting>) => {
+  const updateDraft = (key: string, patch: Partial<NenCampaignSetting>) => setSettings((current) => current.map((item) => item.campaignKey === key ? { ...item, ...patch } : item))
+  // 停止・再開だけは専用の口を使い、本文などは送り直さない。保存済み本文が
+  // 上限を超えていても停止は必ずできる必要がある（#659差し戻し2点目）。
+  const toggleSetting = async (setting: NenCampaignSetting) => {
     if (!selectedAccountId) return
-    const next = { ...setting, ...override }
-    setSaving(setting.campaignKey)
-    setNotice(null)
+    const nextEnabled = !setting.isEnabled
+    setSaving(setting.campaignKey); setNotice(null)
     try {
-      await api.nenCampaigns.updateSetting(selectedAccountId, setting.campaignKey, {
-        isEnabled: next.isEnabled, title: next.title, bodyText: next.bodyText,
-        delayDays: next.delayDays, deliveryTime: next.deliveryTime,
-        buttonLabel: next.buttonLabel, buttonUrl: next.buttonUrl, imageUrl: next.imageUrl,
-      })
-      updateDraft(setting.campaignKey, next)
-      setNotice({ tone: 'success', text: `${setting.label}の設定を保存しました。` })
-    } catch { setNotice({ tone: 'error', text: `${setting.label}を保存できませんでした。` }) }
+      await api.nenCampaigns.setEnabled(selectedAccountId, setting.campaignKey, nextEnabled)
+      updateDraft(setting.campaignKey, { isEnabled: nextEnabled })
+      setNotice({ tone: 'success', text: `${setting.label}を${nextEnabled ? '動かしました' : '止めました'}。` })
+    } catch { setNotice({ tone: 'error', text: `${setting.label}を切り替えられませんでした。` }) }
     finally { setSaving(null) }
   }
-
   const testSend = async (setting: NenCampaignSetting) => {
-    if (!selectedAccountId || !testFriendId) {
-      setNotice({ tone: 'error', text: 'テスト送信先を選択してください。' }); return
-    }
+    if (!selectedAccountId || !testFriendId) { setNotice({ tone: 'error', text: 'テスト送信先を選択してください。' }); return }
     setTesting(setting.campaignKey)
-    try {
-      await api.nenCampaigns.testSend({ campaignKey: setting.campaignKey, accountId: selectedAccountId, friendId: testFriendId })
-      setNotice({ tone: 'success', text: `${setting.label}をテスト送信しました。` })
-    } catch { setNotice({ tone: 'error', text: 'テスト送信できませんでした。' }) }
-    finally { setTesting(null) }
+    try { await api.nenCampaigns.testSend({ campaignKey: setting.campaignKey, accountId: selectedAccountId, friendId: testFriendId }); setNotice({ tone: 'success', text: `${setting.label}をテスト送信しました。LINEを確認してください。` }) }
+    catch (caught) { setNotice({ tone: 'error', text: testSendFailureText(caught, 'テスト送信できませんでした。') }) } finally { setTesting(null) }
   }
-
   const deliverColumn = async (column: NenColumn, scheduledAt?: string) => {
     if (!selectedAccountId) return
     try {
       const result = await api.nenCampaigns.deliverColumn(column.id, { accountId: selectedAccountId, scheduledAt })
       if (!result.success) throw new Error(result.error)
-      setNotice({ tone: 'success', text: `${result.data.queued}人分のコラム配信を予約しました。` })
-      await load()
-    } catch { setNotice({ tone: 'error', text: 'コラムを配信予約できませんでした。' }) }
-  }
-
-  const updateColumnDraft = (id: string, introText: string) => {
-    setColumns((current) => current.map((column) => column.id === id ? { ...column, introText } : column))
-  }
-
-  const saveColumnMessage = async (column: NenColumn) => {
-    if (!selectedAccountId) return
-    if (!column.introText.trim()) {
-      setNotice({ tone: 'error', text: '挨拶・要約文を入力してください。' }); return
+      // #935 N-303: 同じ相手へ二度は入らない。0人なら「入れた」と言わず実態を伝える。
+      setNotice({ tone: 'success', text: result.data.queued === 0
+        ? `「${column.title}」はすでに配信待ちに入っているか、いま送れる相手がいません。`
+        : scheduledAt ? `「${column.title}」を${result.data.queued}人分 予約しました。` : `「${column.title}」を${result.data.queued}人分 配信待ちに入れました。` })
+      await loadTab('columns')
+    } catch (caught) {
+      setNotice({ tone: 'error', text: caught instanceof ApiError && caught.code === 'past_datetime'
+        ? '予約日時が過去になっています。いまより先の日時を選び直してください。'
+        : 'コラムを配信予約できませんでした。コラムの配信が停止中でないか確認してください。' })
     }
+  }
+  const saveColumnMessage = async (column: NenColumn) => {
+    if (!selectedAccountId || !introDraft.trim()) { setNotice({ tone: 'error', text: '紹介文を入力してください。' }); return }
     setSavingColumnId(column.id)
     try {
-      await api.nenCampaigns.updateColumnMessage(selectedAccountId, column.id, column.introText)
-      setNotice({ tone: 'success', text: `「${column.title}」の配信文を保存しました。` })
-      setEditingColumnId(null)
-    } catch { setNotice({ tone: 'error', text: 'コラムの配信文を保存できませんでした。' }) }
-    finally { setSavingColumnId(null) }
+      await api.nenCampaigns.updateColumnMessage(selectedAccountId, column.id, introDraft)
+      setColumns((current) => current.map((item) => item.id === column.id ? { ...item, introText: introDraft } : item))
+      setNotice({ tone: 'success', text: `「${column.title}」の紹介文を保存しました。` })
+    } catch { setNotice({ tone: 'error', text: 'コラムの紹介文を保存できませんでした。' }) } finally { setSavingColumnId(null) }
   }
-
-  const addPet = async () => {
-    if (!selectedAccountId || !petDraft.friendId || !petDraft.name.trim()) { setNotice({ tone: 'error', text: 'LINEアカウント、LINEユーザー、ペットのお名前を入力してください。' }); return }
+  /*
+    ★V6 37-6-A「ECのコラムを取り込む」。EC で保存されたコラムは Webhook で自動的に届く。
+    ここでは、宛先（LINEアカウント）が決まらずに未割り当てのまま残っている分を、
+    選択中のアカウントへ割り当てて一覧に出す。
+  */
+  const [importing, setImporting] = useState(false)
+  const importColumns = async () => {
+    if (!selectedAccountId || importing) return
+    setImporting(true); setNotice(null)
     try {
-      await api.nenCampaigns.createPet(selectedAccountId, { ...petDraft, birthday: petDraft.birthday || undefined })
-      setPetDraft((current) => ({ ...current, name: '', birthday: '', gender: 'unknown' }))
-      setNotice({ tone: 'success', text: 'ペット情報を登録しました。' })
-      await load()
-    } catch { setNotice({ tone: 'error', text: 'ペット情報を登録できませんでした。' }) }
+      const result = await api.nenCampaigns.importColumns(selectedAccountId)
+      if (!result.success) throw new Error(result.error)
+      setNotice({ tone: 'success', text: result.data.imported > 0
+        ? `ECのコラムを${result.data.imported}本 取り込みました。`
+        : '新しいコラムはありません。ECでコラムを保存すると自動でここに届きます。' })
+      await loadTab('columns')
+    } catch { setNotice({ tone: 'error', text: 'ECのコラムを取り込めませんでした。通信の状態を確認して、もう一度お試しください。' }) }
+    finally { setImporting(false) }
   }
-
-  const saveCoupon = async () => {
+  const duplicateColumn = async (column: NenColumn) => {
     if (!selectedAccountId) return
+    try { const result = await api.nenCampaigns.duplicateColumn(column.id, selectedAccountId); if (!result.success) throw new Error(); setNotice({ tone: 'success', text: `「${column.title}」を下書きへ複製しました。` }); await loadTab('columns'); setSelectedColumnId(result.data.id) }
+    catch { setNotice({ tone: 'error', text: 'コラムを複製できませんでした。' }) }
+  }
+  const testColumn = async (column: NenColumn) => {
+    if (!selectedAccountId || !testFriendId) { setNotice({ tone: 'error', text: 'テスト送信先を選択してください。' }); return }
+    setTesting(column.id)
+    try { await api.nenCampaigns.testColumn(column.id, selectedAccountId, testFriendId); setNotice({ tone: 'success', text: `「${column.title}」をテスト送信しました。LINEを確認してください。` }) }
+    catch (caught) { setNotice({ tone: 'error', text: testSendFailureText(caught, 'コラムをテスト送信できませんでした。') }) } finally { setTesting(null) }
+  }
+  const sendPendingNow = async () => {
+    if (!selectedAccountId) return
+    /*
+      送る件数は一覧の窓付き集計(summary.pending)ではなく、口と同じ決めごとの
+      overview.jobs.pending(未来ぶん)を使う(点検 #512 の中2)。窓が違う数を
+      送ると、変わっていないのに409で失敗する。
+    */
     try {
-      await api.nenCampaigns.updateBirthdayCoupon(selectedAccountId, coupon)
-      setNotice({ tone: 'success', text: 'お誕生日クーポン設定を保存しました。' })
-    } catch { setNotice({ tone: 'error', text: 'クーポン設定を保存できませんでした。' }) }
+      const overviewRes = await api.nenCampaigns.overview(selectedAccountId)
+      if (!overviewRes.success) throw new Error()
+      const result = await api.nenCampaigns.sendPendingNow(selectedAccountId, overviewRes.data.jobs.pending)
+      if (!result.success) throw new Error()
+      setNotice({ tone: 'success', text: `${result.data.queued}件を今すぐ送る待ち行列へ移しました。` }); await loadTab('history')
+    }
+    catch { setNotice({ tone: 'error', text: '待っている配信の件数が変わりました。読み直して確認してください。' }) }
+  }
+  const saveCoupon = async () => {
+    if (!selectedAccountId || savingCoupon) return
+    // 空欄は 0 になるので、汎用エラー(400)になる前に具体的な直し方を出す。
+    if (!Number.isInteger(coupon.discountAmount) || coupon.discountAmount < 1 || coupon.discountAmount > 100000) {
+      setNotice({ tone: 'error', text: '割引の額は1〜100,000円の整数で入力してください。' })
+      return
+    }
+    if (!Number.isInteger(coupon.validityDays) || coupon.validityDays < 1 || coupon.validityDays > 365) {
+      setNotice({ tone: 'error', text: '使える日数は1〜365日の整数で入力してください。' })
+      return
+    }
+    if (!/^[A-Z0-9-]{3,10}$/.test(coupon.codePrefix)) {
+      setNotice({ tone: 'error', text: 'クーポンの頭の文字は半角大文字・数字・-で3〜10文字にしてください。' })
+      return
+    }
+    setSavingCoupon(true)
+    try { await api.nenCampaigns.updateBirthdayCoupon(selectedAccountId, coupon); setNotice({ tone: 'success', text: 'お誕生日クーポン設定を保存しました。' }); setCouponOpen(false) }
+    catch { setNotice({ tone: 'error', text: 'クーポン設定を保存できませんでした。' }) }
+    finally { setSavingCoupon(false) }
+  }
+  const showDelivery = async (id: string) => {
+    if (!selectedAccountId) return
+    if (deliveryDetail?.id === id) { setDeliveryDetail(null); return }
+    try {
+      const result = await api.nenCampaigns.delivery(id, selectedAccountId)
+      if (!result.success) throw new Error()
+      setDeliveryDetail(result.data)
+    } catch { setNotice({ tone: 'error', text: '配信時の内容を表示できませんでした。' }) }
+  }
+  // 検索語はサーバー側の履歴全体へ効く。ページ送り・状態チップの切替でも消えないよう
+  // ここに保持し、新しい検索(q を明示)が来たときだけ差し替える。
+  const [historyQuery, setHistoryQuery] = useState('')
+  const changeDeliveryView = async (status?: string, cursor?: string, q?: string) => {
+    if (!selectedAccountId) return
+    const effectiveQuery = q === undefined ? historyQuery : q
+    try {
+      const result = await api.nenCampaigns.deliveries(selectedAccountId, { limit: 20, status, q: effectiveQuery || undefined, cursor })
+      if (!result.success) throw new Error()
+      setDeliveryList(result.data); setDeliveryDetail(null); setHistoryQuery(effectiveQuery)
+    } catch { setNotice({ tone: 'error', text: '送った履歴を更新できませんでした。' }) }
+  }
+  const retryDelivery = async (id: string, expectedVersion: number, reason: string) => {
+    if (!selectedAccountId || !reason.trim()) { setNotice({ tone: 'error', text: '再送する理由を入力してください。' }); return }
+    try {
+      const result = await api.nenCampaigns.retryDelivery(id, { lineAccountId: selectedAccountId, expectedVersion, reason: reason.trim() })
+      if (!result.success) throw new Error()
+      setNotice({ tone: 'success', text: '配信を再送待ちへ戻しました。' }); setDeliveryDetail(null); await loadTab('history')
+    } catch { setNotice({ tone: 'error', text: '配信を再送待ちへ戻せませんでした。状態を更新して確認してください。' }) }
+  }
+  const changeTab = (next: NenTab) => {
+    setTab(next)
+    setNotice(null)
+    window.history.replaceState(window.history.state, '', next === 'auto' ? '/nen-campaigns' : `/nen-campaigns?tab=${next}`)
+    if (!loadedTabs.current.has(next)) void loadTab(next)
   }
 
-  if (loading) return <><Header title="NEN配信" /><main className="p-6"><ListState kind="loading" /></main></>
+  if (loading && loadedTabs.current.size === 0) return <div className="p-6"><ListState kind="loading" /></div>
 
-  if (loadError) {
-    return (
-      <>
-        <Header title="NEN配信" />
-        <main className="p-6">
-          <ListState
-            kind="error"
-            description={loadError}
-            action={(
-              <Button variant="primary" onClick={() => void load()}>
-                フォロー配信を再読み込み
-              </Button>
-            )}
-          />
-        </main>
-      </>
-    )
-  }
+  /*
+    ヘッダー操作。★V6 37-6 の「配信を追加」は、自動配信の種類が実キー固定（追加口が無い）
+    ため置かない。コラムは ★V6 37-6-A どおり「ECのコラムを取り込む」（未割り当て分の割り当て）。
+    #618: 一覧に件数があっても未選択でも届くよう、新規作成入口「コラムを書く」
+    （/nen-campaigns/columns/new・日時あり下書き保存）をヘッダーに置く。
+  */
+  const headerAction = tab === 'columns' ? (
+    <span className="flex flex-wrap items-center justify-end gap-2">
+      <Button href="/nen-campaigns/columns/new" variant="primary">コラムを書く</Button>
+      <Button type="button" disabled={importing || !selectedAccountId} onClick={() => void importColumns()}>{importing ? '取り込んでいます…' : 'ECのコラムを取り込む'}</Button>
+    </span>
+  )
+    : tab === 'history' ? <Button type="button" disabled={!deliveryList?.summary.pending} onClick={() => void sendPendingNow()}>待っているものを今すぐ送る</Button>
+      : null
 
   return (
     <>
-      {/* Pen canonical: V2 9-1 NEN配信 / ケアフラグ連動 */}
-      <div data-design="Head">
-        <Header
-          title="NEN配信"
-          description="購入後のご案内、NENコラム、お誕生日クーポンなど、お客様との関係を育てる配信を管理します。"
-        />
-      </div>
-
-      <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-faint text-xs">配信ジョブ</p>
-          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-            {settings.length}
-            <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>
-          </p>
-          <p className="text-ink-faint mt-0.5 text-xs">
-            稼働中 {settings.filter((x) => x.isEnabled).length}
-          </p>
-        </div>
-        {/* 配信した通数・到達率・失敗を、この画面では集計していない。 */}
-        <div className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-faint text-xs">今月の配信</p>
-          <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
-          <p className="text-ink-faint mt-0.5 text-xs">この画面では集計していません</p>
-        </div>
-        <div className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-faint text-xs">待機中</p>
-          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-            {overview?.jobs.pending ?? '—'}
-            <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>
-          </p>
-          <p className="text-ink-faint mt-0.5 text-xs">送信待ちのジョブ</p>
-        </div>
-        <div className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-faint text-xs">失敗</p>
-          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-            {overview?.jobs.failed ?? '—'}
-            <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>
-          </p>
-          <p className="text-ink-faint mt-0.5 text-xs">
-            {overview ? (overview.jobs.failed === 0 ? '失敗の記録はありません' : '失敗した配信を確認してください') : '確認できません'}
-          </p>
-        </div>
-      </div>
-      <main className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6">
-        <section className="hidden" aria-hidden="true">
-          <p className="text-xs font-semibold tracking-[0.25em] text-emerald-100">NEN CUSTOMER JOURNEY</p>
-          <h1 className="mt-2 text-2xl font-bold sm:text-3xl">購入後も、LINEで丁寧につながる</h1>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-emerald-50">商品到着後の確認、口コミ、次の商品提案、コラム、お誕生日までを一つの画面で管理します。</p>
-          {overview && <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-5">
-            {[
-              ['稼働中', `${overview.activeCampaigns}件`], ['配信待ち', `${overview.jobs.pending}件`],
-              ['送信済み', `${overview.jobs.sent}件`], ['コラム', `${overview.columns}件`], ['ペット情報', `${overview.pets}件`],
-            ].map(([label, value]) => <div key={label} className="rounded-2xl bg-white/10 p-3 backdrop-blur"><p className="text-xs text-emerald-100">{label}</p><p className="mt-1 text-xl font-bold">{value}</p></div>)}
-          </div>}
-        </section>
-
-        {notice && <div className={`rounded-2xl border px-4 py-3 text-sm ${notice.tone === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-700'}`}>{notice.text}</div>}
-
-        <div className="flex gap-2 overflow-x-auto rounded-2xl border border-gray-200 bg-white p-2">
-          {([['flow', '配信フロー'], ['columns', 'NENコラム'], ['pets', 'ペット・誕生日'], ['history', '配信履歴']] as Array<[Tab, string]>).map(([key, label]) =>
-            <button key={key} onClick={() => setTab(key)} className={`whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-semibold ${tab === key ? 'bg-emerald-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}>{label}</button>)}
-        </div>
-
-        {tab === 'flow' && <section className="space-y-4">
-          <div className="rounded-2xl border border-gray-200 bg-white p-4 sm:flex sm:items-center sm:justify-between">
-            <div><h2 className="font-bold text-gray-900">テスト送信先</h2><p className="mt-1 text-xs text-gray-500">保存後、実際のLINE表示を確認できます。</p></div>
-            <select value={testFriendId} onChange={(e) => setTestFriendId(e.target.value)} className="mt-3 w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm sm:mt-0 sm:w-72">
-              <option value="">未設定</option>
-              {friends.map((friend) => <option key={friend.id} value={friend.id}>{friend.displayName || '名前未取得'}</option>)}
-            </select>
-          </div>
-          {settings.map((setting) => (
-            <article key={setting.campaignKey} className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-              <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
-                <div className="flex items-center gap-4">
-                  <Toggle checked={setting.isEnabled} disabled={saving === setting.campaignKey} label={`${setting.label}を切り替える`} onChange={() => void saveSetting(setting, { isEnabled: !setting.isEnabled })} />
-                  <div><div className="flex flex-wrap items-center gap-2"><h3 className="font-bold text-gray-900">{setting.label}</h3><span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">{categoryLabel[setting.category]}</span></div>
-                    <p className="mt-1 text-xs text-gray-500">{formatCampaignTiming(setting)}</p></div>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    aria-expanded={previewCampaignKey === setting.campaignKey}
-                    aria-controls={`campaign-preview-${setting.campaignKey}`}
-                    onClick={() => setPreviewCampaignKey(previewCampaignKey === setting.campaignKey ? null : setting.campaignKey)}
-                    className={`rounded-xl border px-4 py-2 text-sm font-semibold ${previewCampaignKey === setting.campaignKey ? 'border-emerald-600 bg-emerald-50 text-emerald-800' : 'border-emerald-200 text-emerald-700 hover:bg-emerald-50'}`}
-                  >{previewCampaignKey === setting.campaignKey ? 'プレビューを隠す' : '配信プレビュー'}</button>
-                  <button onClick={() => setExpanded(expanded === setting.campaignKey ? null : setting.campaignKey)} className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700">{expanded === setting.campaignKey ? '編集を閉じる' : '内容を編集'}</button>
-                  {/* 設計 9-1-1。送り方まで含めて1画面で直す。 */}
-                  <Link href={`/nen-campaigns/edit?key=${encodeURIComponent(setting.campaignKey)}`} className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700">送り方も編集</Link>
-                </div>
-              </div>
-              {previewCampaignKey === setting.campaignKey && <CampaignLinePreview setting={setting} onClose={() => setPreviewCampaignKey(null)} />}
-              {expanded === setting.campaignKey && <div className="border-t border-gray-100 bg-gray-50/70 p-4 sm:p-5">
-                <div className="mx-auto max-w-4xl space-y-4">
-                  {setting.category === 'follow_up' && <div className="grid grid-cols-2 gap-3"><label className="text-sm font-semibold text-gray-700">発送から何日後<input type="number" min={1} max={365} value={setting.delayDays} onChange={(e) => updateDraft(setting.campaignKey, { delayDays: Number(e.target.value) })} className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5" /></label><label className="text-sm font-semibold text-gray-700">送信時刻<input type="time" value={setting.deliveryTime} onChange={(e) => updateDraft(setting.campaignKey, { deliveryTime: e.target.value })} className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5" /></label></div>}
-                  <label className="block text-sm font-semibold text-gray-700">見出し<input value={setting.title} maxLength={120} onChange={(e) => updateDraft(setting.campaignKey, { title: e.target.value })} className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5" /></label>
-                  <label className="block text-sm font-semibold text-gray-700">本文<textarea value={setting.bodyText} rows={5} maxLength={1500} onChange={(e) => updateDraft(setting.campaignKey, { bodyText: e.target.value })} className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 leading-6" /></label>
-                  <div className="grid gap-3 sm:grid-cols-2"><label className="text-sm font-semibold text-gray-700">ボタン名<input value={setting.buttonLabel || ''} maxLength={20} onChange={(e) => updateDraft(setting.campaignKey, { buttonLabel: e.target.value })} className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5" /></label><label className="text-sm font-semibold text-gray-700">リンク先<input type="url" value={setting.buttonUrl || ''} onChange={(e) => updateDraft(setting.campaignKey, { buttonUrl: e.target.value })} className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5" /></label></div>
-                  <label className="block text-sm font-semibold text-gray-700">画像URL（任意）<input type="url" value={setting.imageUrl || ''} onChange={(e) => updateDraft(setting.campaignKey, { imageUrl: e.target.value })} className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5" /></label>
-                  <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"><button onClick={() => void testSend(setting)} disabled={testing === setting.campaignKey} className="rounded-xl border border-emerald-600 px-4 py-2.5 text-sm font-semibold text-emerald-700">{testing === setting.campaignKey ? '送信中...' : 'テスト送信'}</button><button onClick={() => void saveSetting(setting)} disabled={saving === setting.campaignKey} className="rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white">{saving === setting.campaignKey ? '保存中...' : '保存'}</button></div>
-                </div>
-              </div>}
-            </article>
-          ))}
-        </section>}
-
-        {tab === 'columns' && <section className="space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm text-ink-secondary">EC側から届いたコラムと、ここで書いた下書きが並びます。</p>
-            {/* 記事本文はEC側が正本。ここで作れるのは「外部記事へつなぐ下書き」だけ。 */}
-            <Button href="/nen-campaigns/columns/new" variant="primary">コラムを書く</Button>
-          </div>
-          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-900"><strong>EC-CUBEと自動連携します。</strong><br />NENコラムを保存すると、タイトル・概要・アイキャッチ・記事URLがここへ下書きとして届きます。確認後にLINE配信してください。</div>
-          {columns.length === 0 ? <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-12 text-center text-gray-500">同期されたコラムはまだありません。</div> : columns.map((column) => {
-            const isPreviewOpen = previewColumnId === column.id
-            return (
-              <article key={column.id} className="grid gap-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:grid-cols-[180px_1fr] sm:p-5">
-                {column.imageUrl ? <img src={column.imageUrl} alt="" className="aspect-[3/2] w-full rounded-xl object-cover" /> : <div className="aspect-[3/2] rounded-xl bg-gray-100" />}
-                <div>
-                  <div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-emerald-50 px-2 py-1 text-xs text-emerald-700">{column.category || 'コラム'}</span><span className="text-xs text-gray-400">{columnDeliveryStatusLabel[column.deliveryStatus] ?? '—'}</span></div>
-                  <h3 className="mt-2 text-lg font-bold text-gray-900">{column.title}</h3>
-                  <p className="mt-1 text-sm leading-6 text-gray-600">{column.excerpt}</p>
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <a href={column.articleUrl} target="_blank" rel="noreferrer" className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700">記事を確認</a>
-                    <button
-                      type="button"
-                      aria-expanded={isPreviewOpen}
-                      aria-controls={`column-preview-${column.id}`}
-                      onClick={() => setPreviewColumnId(isPreviewOpen ? null : column.id)}
-                      className={`rounded-xl border px-4 py-2 text-sm font-semibold ${isPreviewOpen ? 'border-emerald-600 bg-emerald-50 text-emerald-800' : 'border-emerald-200 text-emerald-700 hover:bg-emerald-50'}`}
-                    >
-                      {isPreviewOpen ? 'プレビューを隠す' : '配信プレビュー'}
-                    </button>
-                    <button type="button" onClick={() => setEditingColumnId(editingColumnId === column.id ? null : column.id)} className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700">
-                      {editingColumnId === column.id ? '編集を閉じる' : '配信文を編集'}
-                    </button>
-                    <button onClick={() => void deliverColumn(column)} className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white">今すぐ配信予約</button>
-                    <input type="datetime-local" aria-label="配信日時" onChange={(e) => { if (e.target.value) void deliverColumn(column, new Date(e.target.value).toISOString()) }} className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
-                  </div>
-                  {editingColumnId === column.id && <div className="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4">
-                    <label className="block text-sm font-semibold text-gray-800">カードの前に送る挨拶・要約文
-                      <textarea value={column.introText} maxLength={1500} rows={7} onChange={(e) => updateColumnDraft(column.id, e.target.value)} className="mt-2 w-full rounded-xl border border-emerald-200 bg-white px-3 py-2.5 text-sm leading-6" />
-                    </label>
-                    <div className="mt-2 flex items-center justify-between gap-3"><p className="text-xs text-gray-500">タイトルと概要から自動作成されています。配信前に自由に編集できます。</p><span className="text-xs text-gray-400">{column.introText.length}/1500</span></div>
-                    <div className="mt-3 flex justify-end"><button type="button" onClick={() => void saveColumnMessage(column)} disabled={savingColumnId === column.id} className="rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{savingColumnId === column.id ? '保存中...' : '配信文を保存'}</button></div>
-                  </div>}
-                </div>
-                {isPreviewOpen && <ColumnLinePreview column={column} onClose={() => setPreviewColumnId(null)} />}
-              </article>
-            )
-          })}
-        </section>}
-
-        {tab === 'pets' && <section className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
-          <div className="space-y-4"><div className="rounded-2xl border border-gray-200 bg-white p-5"><h2 className="text-lg font-bold text-gray-900">ペット情報を登録</h2><p className="mt-1 text-sm text-gray-500">LINEログイン会員が任意入力した情報も、ここに自動保存されます。</p><div className="mt-5 grid gap-3 sm:grid-cols-2"><select value={petDraft.friendId} onChange={(e) => setPetDraft({ ...petDraft, friendId: e.target.value })} className="rounded-xl border border-gray-200 px-3 py-2.5"><option value="">LINEユーザーを選択</option>{friends.map((friend) => <option key={friend.id} value={friend.id}>{friend.displayName || '名前未取得'}</option>)}</select><input placeholder="わんちゃん・ねこちゃんのお名前" value={petDraft.name} onChange={(e) => setPetDraft({ ...petDraft, name: e.target.value })} className="rounded-xl border border-gray-200 px-3 py-2.5" /><select value={petDraft.animalType} onChange={(e) => setPetDraft({ ...petDraft, animalType: e.target.value })} className="rounded-xl border border-gray-200 px-3 py-2.5"><option value="dog">わんちゃん</option><option value="cat">ねこちゃん</option><option value="other">その他</option></select><select value={petDraft.gender} onChange={(e) => setPetDraft({ ...petDraft, gender: e.target.value })} className="rounded-xl border border-gray-200 px-3 py-2.5"><option value="unknown">回答しない</option><option value="male">男の子</option><option value="female">女の子</option></select><input type="date" value={petDraft.birthday} onChange={(e) => setPetDraft({ ...petDraft, birthday: e.target.value })} className="rounded-xl border border-gray-200 px-3 py-2.5" /><button onClick={() => void addPet()} className="rounded-xl bg-emerald-600 px-4 py-2.5 font-semibold text-white">登録する</button></div></div>
-            <div className="space-y-3">{pets.map((pet) => <div key={pet.id} className="flex items-center justify-between rounded-2xl border border-gray-200 bg-white p-4"><div><p className="font-bold text-gray-900">{pet.name} <span className="ml-1 text-xs font-normal text-gray-400">{pet.animalType === 'dog' ? 'わんちゃん' : pet.animalType === 'cat' ? 'ねこちゃん' : 'その他'}</span></p><p className="mt-1 text-sm text-gray-500">{pet.ownerName || '名前未取得'} · {pet.gender === 'male' ? '男の子' : pet.gender === 'female' ? '女の子' : '性別未回答'} · {pet.birthday || '誕生日未登録'}</p></div><button onClick={() => selectedAccountId && void api.nenCampaigns.deletePet(selectedAccountId, pet.id).then(load)} className="text-sm text-red-500">削除</button></div>)}</div></div>
-          <div className="h-fit rounded-2xl border border-gray-200 bg-white p-5"><div className="flex items-center justify-between"><div><h2 className="text-lg font-bold text-gray-900">お誕生日クーポン</h2><p className="mt-1 text-xs text-gray-500">誕生日の3日前、10:00に自動送信</p></div><Toggle checked={coupon.isEnabled} label="誕生日クーポンを切り替える" onChange={() => setCoupon({ ...coupon, isEnabled: !coupon.isEnabled })} /></div><div className="mt-5 space-y-4"><label className="block text-sm font-semibold text-gray-700">コードの先頭<input value={coupon.codePrefix} onChange={(e) => setCoupon({ ...coupon, codePrefix: e.target.value.toUpperCase() })} className="mt-1.5 w-full rounded-xl border border-gray-200 px-3 py-2.5" /></label><label className="block text-sm font-semibold text-gray-700">特典名<input value={coupon.benefitLabel} onChange={(e) => setCoupon({ ...coupon, benefitLabel: e.target.value })} className="mt-1.5 w-full rounded-xl border border-gray-200 px-3 py-2.5" /></label><label className="block text-sm font-semibold text-gray-700">割引金額<input type="number" min={1} max={100000} value={coupon.discountAmount} onChange={(e) => setCoupon({ ...coupon, discountAmount: Number(e.target.value) })} className="mt-1.5 w-full rounded-xl border border-gray-200 px-3 py-2.5" /></label><label className="block text-sm font-semibold text-gray-700">有効日数<input type="number" min={1} max={365} value={coupon.validityDays} onChange={(e) => setCoupon({ ...coupon, validityDays: Number(e.target.value) })} className="mt-1.5 w-full rounded-xl border border-gray-200 px-3 py-2.5" /></label><button onClick={() => void saveCoupon()} className="w-full rounded-xl bg-emerald-600 px-4 py-2.5 font-semibold text-white">設定を保存</button></div></div>
-        </section>}
-
-        {tab === 'history' && <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white"><div className="border-b border-gray-100 p-5"><h2 className="font-bold text-gray-900">直近100件の配信</h2></div><div className="divide-y divide-gray-100">{jobs.length === 0 ? <p className="p-8 text-center text-sm text-gray-500">配信履歴はまだありません。</p> : jobs.map((job) => <div key={job.id} className="grid gap-2 p-4 text-sm sm:grid-cols-[1.2fr_1fr_1fr_auto]"><div><p className="font-semibold text-gray-900">{job.label}</p><p className="text-xs text-gray-400">{job.friendName || '名前未取得'}</p></div><p className="text-gray-600">予定：{formatNenJobDateTime(job.scheduledAt)}</p><p className="text-gray-600">試行：{job.attempts}回</p><span className={`h-fit rounded-full px-2.5 py-1 text-xs font-semibold ${job.status === 'sent' ? 'bg-emerald-50 text-emerald-700' : job.status === 'failed' ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700'}`}>{jobStatusLabel[job.status] ?? '状態を確認できません'}</span>{job.lastError && <p className="sm:col-span-4 text-xs text-red-500">{job.lastError}</p>}</div>)}</div></section>}
-      </main>
+      {/*
+        ★V7 `x63W5x`：タブの失敗をページ上の帯に出さない。一覧の場所の
+        ListState error だけにまとめる（同じ失敗を2回出さない）。
+        失敗の文言（`tabErrors`）と取り直し（`loadTab`）は NenOverview へ渡す。
+      */}
+      <NenOverview
+        topAction={headerAction}
+        tab={tab} onTabChange={changeTab} settings={settings} columns={columns} kpis={kpis}
+        tabError={tabErrors[tab]} onRetryTab={() => loadTab(tab)}
+        kpisFailed={kpis === null && (tabErrors.auto !== '' || tabErrors.columns !== '' || tabErrors.paused !== '')}
+        flowMetrics={flowMetrics} columnMetrics={columnMetrics} deliveryList={deliveryList} deliveryDetail={deliveryDetail}
+        friends={friends} testFriendId={testFriendId} onTestFriendChange={setTestFriendId} accountId={selectedAccountId}
+        loading={loading} notice={notice}
+        saving={saving} testing={testing}
+        previewCampaignKey={previewCampaignKey} onPreviewCampaign={setPreviewCampaignKey}
+        onToggleSetting={(setting) => void toggleSetting(setting)} onTestSend={(setting) => void testSend(setting)}
+        coupon={coupon} couponOpen={couponOpen} onCouponOpenChange={setCouponOpen} onCouponChange={setCoupon} onSaveCoupon={() => void saveCoupon()} savingCoupon={savingCoupon}
+        selectedColumnId={selectedColumnId} onSelectColumn={selectColumn} audienceCount={audienceCount}
+        columnsTotal={columnsTotal}
+        plan={plan} onPlanChange={setPlan}
+        introDraft={introDraft} onIntroChange={setIntroDraft} onSaveIntro={(column) => void saveColumnMessage(column)} savingColumnId={savingColumnId}
+        onDeliverColumn={(column, scheduledAt) => void deliverColumn(column, scheduledAt)}
+        onDuplicateColumn={(column) => void duplicateColumn(column)} onTestColumn={(column) => void testColumn(column)}
+        onShowDelivery={(id) => void showDelivery(id)} onRetryDelivery={(id, version, reason) => void retryDelivery(id, version, reason)}
+        onChangeDeliveryView={(status, cursor, q) => void changeDeliveryView(status, cursor, q)}
+      />
+      {/* #935 N-301: 紹介文の入力途中で画面を離れる／別コラムへ移るときの確認。 */}
+      <ConfirmDialog primaryAction="cancel"
+        open={leaveTarget !== null}
+        title="入力した紹介文が保存されていません"
+        description="このまま移動すると、入力した紹介文は保存されません。移動しますか？"
+        confirmLabel="保存せずに移動"
+        cancelLabel="書き続ける"
+        onConfirm={confirmLeave}
+        onCancel={cancelLeave}
+      />
+      <ConfirmDialog
+        open={pendingColumnSelect !== null}
+        title="入力した紹介文が保存されていません"
+        description="このまま別のコラムへ移ると、入力した紹介文は消えます。移りますか？"
+        confirmLabel="保存せずに移る"
+        cancelLabel="書き続ける"
+        onConfirm={() => {
+          const target = pendingColumnSelect
+          setPendingColumnSelect(null)
+          if (target) setSelectedColumnId(target.id)
+        }}
+        onCancel={() => setPendingColumnSelect(null)}
+      />
     </>
   )
 }

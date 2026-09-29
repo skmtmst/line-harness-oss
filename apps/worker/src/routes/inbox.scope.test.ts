@@ -85,6 +85,24 @@ describe('inbox tenant scope', () => {
     }));
   });
 
+  test('unanswered list passes search and DB pagination options with the tenant scope', async () => {
+    const response = await request(
+      '/api/inbox/unanswered?q=%E8%A6%81%E7%A2%BA%E8%AA%8D&account=account-b&minWaitMinutes=45&page=3&pageSize=25',
+      staff,
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.computeUnansweredInbox).toHaveBeenCalledWith(db, {
+      q: '要確認',
+      account: 'account-b',
+      minWaitMinutes: 45,
+      page: 3,
+      pageSize: 25,
+      allowedAccountIds: ['account-b'],
+      canSeeUnassigned: false,
+    });
+  });
+
   test('unanswered count passes the authenticated tenant scope', async () => {
     expect((await request('/api/inbox/unanswered/count', staff)).status).toBe(200);
     expect(mocks.getVisibleLineAccountScope).toHaveBeenCalledWith(db, staff);

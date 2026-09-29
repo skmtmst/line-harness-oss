@@ -14,10 +14,11 @@ export const NOT_AVAILABLE = '—（未取得）'
 /**
  * 差し込みキーの見せ方。
  *
- * **一覧と同じ `{{var.キー}}` の形にする。** 一覧では
- * `{{var.shop_hours}}` と出しているので、確認だけ `{shop_hours}` に
- * すると、どちらを打てばよいのか分からない（設計は `{会社名}` と
- * 書いているが、実装が本文で使っている形はこちら）。
+ * 本文で実際に置き換えられるのは `{{var.shop_hours}}` の形だけ
+ * （差し込みの解析は `{{ … }}` しか拾わない）。`{営業時間}` のような
+ * 見た目だけの表記を案内すると、手で写した運用者の本文が
+ * 置き換えられないまま相手に届く。一覧・編集・コピーで出す表記は、
+ * 挿入ツールが入れる形と同じ内部参照にそろえる。
  */
 export function placeholderText(varKey: string): string {
   return `{{var.${varKey}}}`
@@ -80,11 +81,13 @@ export function unavailableText(impact: CommonVarDeleteImpact): string | null {
 export function canDelete(input: {
   impact: CommonVarDeleteImpact | null
   typedKey: string
+  reason: string
   busy: boolean
 }): boolean {
   const impact = input.impact
   if (!impact || input.busy) return false
   if (!impact.canDelete) return false
+  if (!input.reason.trim()) return false
   return input.typedKey.trim() === placeholderText(impact.variable.varKey)
 }
 
@@ -92,6 +95,7 @@ export function canDelete(input: {
 export function blockedReason(input: {
   impact: CommonVarDeleteImpact | null
   typedKey: string
+  reason: string
 }): string | null {
   const impact = input.impact
   if (!impact) return '使用先をまだ読み込めていません。'
@@ -99,6 +103,7 @@ export function blockedReason(input: {
     return `${impact.blockingTotal.toLocaleString('ja-JP')}か所で使われているあいだは削除できません。`
       + '使用先から外してから、もう一度お試しください。'
   }
+  if (!input.reason.trim()) return '消した理由を入力してください。'
   if (input.typedKey.trim() !== placeholderText(impact.variable.varKey)) {
     return `確認のため ${placeholderText(impact.variable.varKey)} を入力してください。`
   }

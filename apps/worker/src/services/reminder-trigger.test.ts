@@ -1,4 +1,8 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const mocks = vi.hoisted(() => ({ enroll: vi.fn() }));
+vi.mock('@line-crm/db', () => ({ enrollFriendInReminder: mocks.enroll }));
+
 import { resolveAnchor, enrollByTrigger, type ReminderTriggerRow } from './reminder-trigger.js';
 
 const RULE: ReminderTriggerRow = {
@@ -7,7 +11,13 @@ const RULE: ReminderTriggerRow = {
   trigger_offset_minutes: null,
   send_at_time: null,
   target_tag_id: null,
+  trigger_event_id: null,
+  current_published_version_id: 'version-1',
 };
+
+beforeEach(() => {
+  mocks.enroll.mockReset().mockResolvedValue({ id: 'enrollment-1' });
+});
 
 describe('起点の時刻', () => {
   it('何も設定しなければ開始時刻そのもの', () => {
@@ -62,6 +72,7 @@ function makeDb(handlers: {
   rules?: unknown[];
   tagged?: unknown;
   existing?: unknown;
+  friendAccount?: unknown;
 }) {
   const runs: string[] = [];
   const db = {
@@ -75,6 +86,9 @@ function makeDb(handlers: {
             async first() {
               if (query.includes('friend_tags')) return handlers.tagged ?? null;
               if (query.includes('friend_reminders')) return handlers.existing ?? null;
+              if (query.includes('FROM friends')) {
+                return handlers.friendAccount ?? { line_account_id: 'account-1' };
+              }
               return null;
             },
             async run() {
@@ -96,6 +110,7 @@ describe('きっかけによる自動登録', () => {
       triggerType: 'booking',
       friendId: 'f-1',
       startsAtIso: '2026-08-20T01:00:00.000Z',
+      lineAccountId: 'account-1',
     });
     expect(n).toBe(0);
     expect(runs).toEqual([]);
@@ -110,6 +125,7 @@ describe('きっかけによる自動登録', () => {
       triggerType: 'booking',
       friendId: 'f-1',
       startsAtIso: '2026-08-20T01:00:00.000Z',
+      lineAccountId: 'account-1',
     });
     expect(n).toBe(0);
     expect(runs).toEqual([]);
@@ -124,9 +140,15 @@ describe('きっかけによる自動登録', () => {
       triggerType: 'booking',
       friendId: 'f-1',
       startsAtIso: '2026-08-20T01:00:00.000Z',
+      lineAccountId: 'account-1',
     });
     expect(n).toBe(1);
-    expect(runs).toHaveLength(1);
+    expect(runs).toHaveLength(0);
+    expect(mocks.enroll).toHaveBeenCalledWith(db, expect.objectContaining({
+      reminderId: 'r-1',
+      friendId: 'f-1',
+      sourceKind: 'booking',
+    }));
   });
 
   it('同じ起点で既に登録済みなら増やさない', async () => {
@@ -136,6 +158,7 @@ describe('きっかけによる自動登録', () => {
       triggerType: 'booking',
       friendId: 'f-1',
       startsAtIso: '2026-08-20T01:00:00.000Z',
+      lineAccountId: 'account-1',
     });
     expect(n).toBe(0);
     expect(runs).toEqual([]);
@@ -147,7 +170,67 @@ describe('きっかけによる自動登録', () => {
       triggerType: 'booking',
       friendId: 'f-1',
       startsAtIso: 'garbage',
+      lineAccountId: 'account-1',
     });
     expect(n).toBe(0);
+  });
+
+  it('友だちの所属と店舗が違うときは書かずに落とす', async () => {
+    const { db } = makeDb({ rules: [RULE], friendAccount: { line_account_id: 'account-2' } });
+    await expect(enrollByTrigger(db, {
+      triggerType: 'booking',
+      friendId: 'f-1',
+      startsAtIso: '2026-08-20T01:00:00.000Z',
+      lineAccountId: 'account-1',
+    })).rejects.toThrow('REMINDER_ACCOUNT_MISMATCH');
+    expect(mocks.enroll).not.toHaveBeenCalled();
+  });
+
+  it('イベント限定ルールは、起こったイベントと一致するときだけ登録する', async () => {
+    const { db } = makeDb({ rules: [{ ...RULE, trigger_type: 'event', trigger_event_id: 'event-a' }] });
+    const wrongEvent = await enrollByTrigger(db, {
+      triggerType: 'event',
+      friendId: 'f-1',
+      startsAtIso: '2026-08-20T01:00:00.000Z',
+      eventId: 'event-b',
+      lineAccountId: 'account-1',
+    });
+    expect(wrongEvent).toBe(0);
+    expect(mocks.enroll).not.toHaveBeenCalled();
+
+    const rightEvent = await enrollByTrigger(db, {
+      triggerType: 'event',
+      friendId: 'f-1',
+      startsAtIso: '2026-08-20T01:00:00.000Z',
+      eventId: 'event-a',
+      lineAccountId: 'account-1',
+    });
+    expect(rightEvent).toBe(1);
+    expect(mocks.enroll).toHaveBeenCalledWith(db, expect.objectContaining({ reminderId: 'r-1' }));
+  });
+
+  it('イベント限定ルールへイベントidが来ないときは登録しない', async () => {
+    // 呼出元がイベントidを取りこぼしたとき、全イベントへ誤配信しない。
+    const { db } = makeDb({ rules: [{ ...RULE, trigger_type: 'event', trigger_event_id: 'event-a' }] });
+    const n = await enrollByTrigger(db, {
+      triggerType: 'event',
+      friendId: 'f-1',
+      startsAtIso: '2026-08-20T01:00:00.000Z',
+      lineAccountId: 'account-1',
+    });
+    expect(n).toBe(0);
+    expect(mocks.enroll).not.toHaveBeenCalled();
+  });
+
+  it('イベント無指定ルールはどのイベントでも登録する（従来動作）', async () => {
+    const { db } = makeDb({ rules: [{ ...RULE, trigger_type: 'event', trigger_event_id: null }] });
+    const n = await enrollByTrigger(db, {
+      triggerType: 'event',
+      friendId: 'f-1',
+      startsAtIso: '2026-08-20T01:00:00.000Z',
+      eventId: 'event-b',
+      lineAccountId: 'account-1',
+    });
+    expect(n).toBe(1);
   });
 });

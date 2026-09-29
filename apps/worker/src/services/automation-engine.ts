@@ -3,7 +3,11 @@
  *
  * 旧 automations.actions は読まない。実行開始時に公開版と共通アクション版を
  * 固定し、外部処理は注入された executor に同じ stepExecutionId を渡す。
- */
+*/
+
+import { matchesCondition, type SegmentCondition } from './segment-query.js';
+import { featureJobCanRun } from './feature-enforcement.js';
+import { isOperationCapabilityStopped, listLineAccountsWithTenantStatus } from '@line-crm/db';
 
 const DEFAULT_LEASE_MINUTES = 5;
 const RETRY_DELAYS_MINUTES = [1, 5, 30] as const;
@@ -29,6 +33,8 @@ export interface ActionDefinition {
   onFailure: FailureMode;
   /** 実行開始時に固定した共通アクション版。実行計画だけが持つ。 */
   commonActionVersionId?: string | null;
+  /** 実行計画で固定した、親分岐の通過条件。保存APIから直接は受け取らない。 */
+  branchConditions?: Array<{ condition: SegmentCondition; expected: boolean }>;
 }
 
 interface RunRow {
@@ -63,6 +69,8 @@ interface StepRow {
 export interface AutomationRunStartInput {
   lineAccountId: string;
   automationId: string;
+  /** 1人テストだけが指定する。定義の稼働状態を変えず、この版を固定する。 */
+  automationVersionId?: string;
   sourceEventId: string;
   idempotencyKey: string;
   friendId?: string | null;
@@ -104,6 +112,8 @@ export interface AutomationEngineOptions {
   executors?: Record<string, AutomationActionExecutor>;
   now?: string;
   leaseMinutes?: number;
+  /** Cron supplies one shared snapshot so status enforcement never becomes N+1. */
+  tenantStatusByAccount?: ReadonlyMap<string, 'active' | 'suspended' | 'archived'>;
 }
 
 export class AutomationActionError extends Error {
@@ -114,6 +124,26 @@ export class AutomationActionError extends Error {
   ) {
     super(message);
     this.name = 'AutomationActionError';
+  }
+}
+
+export class AutomationRunRetryError extends Error {
+  constructor(
+    public readonly code: 'not_found' | 'not_retryable' | 'retry_conflict',
+    message: string,
+  ) {
+    super(message);
+    this.name = 'AutomationRunRetryError';
+  }
+}
+
+export class AutomationRunCancelError extends Error {
+  constructor(
+    public readonly code: 'not_found' | 'not_cancellable',
+    message: string,
+  ) {
+    super(message);
+    this.name = 'AutomationRunCancelError';
   }
 }
 
@@ -167,7 +197,19 @@ function parseActions(text: string): ActionDefinition[] {
     const commonActionVersionId = typeof item.commonActionVersionId === 'string'
       ? item.commonActionVersionId.trim() || null
       : null;
-    return { id, type, params, onFailure, commonActionVersionId };
+    let branchConditions: ActionDefinition['branchConditions'];
+    if (item.branchConditions !== undefined) {
+      if (!Array.isArray(item.branchConditions)) {
+        throw new AutomationActionError('invalid_branch_condition', '分岐の実行条件が不正です', false);
+      }
+      branchConditions = item.branchConditions.map((entry) => {
+        if (!isRecord(entry) || !isRecord(entry.condition) || typeof entry.expected !== 'boolean') {
+          throw new AutomationActionError('invalid_branch_condition', '分岐の実行条件が不正です', false);
+        }
+        return { condition: entry.condition as unknown as SegmentCondition, expected: entry.expected };
+      });
+    }
+    return { id, type, params, onFailure, commonActionVersionId, branchConditions };
   });
 }
 
@@ -236,9 +278,12 @@ async function buildExecutionPlan(
     prefix?: string;
     depth?: number;
     budget?: { count: number };
+    branchDepth?: number;
+    branchConditions?: Array<{ condition: SegmentCondition; expected: boolean }>;
   },
 ): Promise<ActionDefinition[]> {
   const depth = input.depth ?? 0;
+  const branchDepth = input.branchDepth ?? 0;
   const budget = input.budget ?? { count: 0 };
   if (depth > 20) {
     throw new AutomationActionError('common_action_too_deep', '共通アクションの呼び出しが深すぎます', false);
@@ -250,11 +295,46 @@ async function buildExecutionPlan(
       throw new AutomationActionError('execution_plan_too_large', '実行する処理が多すぎます', false);
     }
     const stepKey = input.prefix ? `${input.prefix}/${action.id}` : action.id;
+    if (action.type === 'branch') {
+      if (branchDepth >= 3) {
+        throw new AutomationActionError('branch_too_deep', '条件分岐の入れ子は3段までです', false);
+      }
+      const condition = action.params.condition as SegmentCondition;
+      const thenActions = action.params.then as ActionDefinition[];
+      const elseActions = action.params.else as ActionDefinition[];
+      if (!condition || !Array.isArray(thenActions) || !Array.isArray(elseActions)) {
+        throw new AutomationActionError('branch_invalid', '条件分岐の設定が壊れています', false);
+      }
+      plan.push({
+        ...action,
+        id: stepKey,
+        type: 'branch_marker',
+        params: { condition },
+        branchConditions: input.branchConditions,
+      });
+      plan.push(...await buildExecutionPlan(db, {
+        ...input,
+        actions: thenActions,
+        prefix: `${stepKey}/then`,
+        branchDepth: branchDepth + 1,
+        branchConditions: [...(input.branchConditions ?? []), { condition, expected: true }],
+        budget,
+      }));
+      plan.push(...await buildExecutionPlan(db, {
+        ...input,
+        actions: elseActions,
+        prefix: `${stepKey}/else`,
+        branchDepth: branchDepth + 1,
+        branchConditions: [...(input.branchConditions ?? []), { condition, expected: false }],
+        budget,
+      }));
+      continue;
+    }
     if (action.type !== 'common_action') {
       const params = action.type === 'wait' && action.params.durationMinutes === undefined
         ? { ...action.params, durationMinutes: action.params.minutes }
         : action.params;
-      plan.push({ ...action, id: stepKey, params });
+      plan.push({ ...action, id: stepKey, params, branchConditions: input.branchConditions });
       continue;
     }
 
@@ -287,6 +367,7 @@ async function buildExecutionPlan(
       params: { commonActionId: action.params.commonActionId },
       onFailure: action.onFailure,
       commonActionVersionId,
+      branchConditions: input.branchConditions,
     });
     plan.push(...await buildExecutionPlan(db, {
       lineAccountId: input.lineAccountId,
@@ -294,6 +375,8 @@ async function buildExecutionPlan(
       actions: parseActions(version.action_config),
       prefix: stepKey,
       depth: depth + 1,
+      branchDepth,
+      branchConditions: input.branchConditions,
       budget,
     }));
   }
@@ -331,14 +414,25 @@ export async function startAutomationRun(
 ): Promise<AutomationRunStartResult> {
   const now = nowIso(input.now);
   const published = await db.prepare(
-    `SELECT d.id AS automation_id, d.current_published_version_id AS version_id,
+    `SELECT d.id AS automation_id, v.id AS version_id,
             v.action_config
        FROM automation_definitions d
        JOIN automation_versions v
-         ON v.id = d.current_published_version_id AND v.automation_id = d.id
-        AND v.status = 'published'
-      WHERE d.id = ? AND d.line_account_id = ? AND d.status = 'active'`,
-  ).bind(input.automationId, input.lineAccountId).first<{
+         ON v.id = CASE WHEN ? = 1 THEN ? ELSE d.current_published_version_id END
+        AND v.automation_id = d.id
+        AND (? = 1 OR v.status = 'published')
+      WHERE d.id = ? AND d.line_account_id = ?
+        AND (? = 1 OR d.status = 'active')
+        AND (? = 0 OR v.id IN (d.current_draft_version_id, d.current_published_version_id))`,
+  ).bind(
+    input.isTest ? 1 : 0,
+    input.automationVersionId ?? null,
+    input.isTest ? 1 : 0,
+    input.automationId,
+    input.lineAccountId,
+    input.isTest ? 1 : 0,
+    input.isTest ? 1 : 0,
+  ).first<{
     automation_id: string;
     version_id: string;
     action_config: string;
@@ -586,6 +680,33 @@ export async function processAutomationRun(
 ): Promise<RunStatus | 'busy' | 'not_found'> {
   const now = nowIso(options.now);
   const leaseMinutes = options.leaseMinutes ?? DEFAULT_LEASE_MINUTES;
+  // 機能オフ中はclaimせずqueuedのまま残す。再オンで再開する。
+  const ownerRow = await db
+    .prepare(`SELECT line_account_id FROM automation_runs WHERE id = ?`)
+    .bind(runId)
+    .first<{ line_account_id: string | null }>();
+  const tenantStatusByAccount = options.tenantStatusByAccount ?? new Map(
+    (await listLineAccountsWithTenantStatus(db)).map((account) => [account.id, account.tenant_status]),
+  );
+  const ownerTenantStatus = ownerRow?.line_account_id
+    ? tenantStatusByAccount.get(ownerRow.line_account_id)
+    : undefined;
+  if (ownerTenantStatus && ownerTenantStatus !== 'active') {
+    await db.prepare(
+      `UPDATE automation_runs
+          SET status = 'cancelled', completed_at = ?, resume_at = NULL, lease_expires_at = NULL
+        WHERE id = ? AND status IN ('queued', 'waiting', 'running')`,
+    ).bind(now, runId).run();
+    return 'cancelled';
+  }
+  if (ownerRow?.line_account_id && !await featureJobCanRun(db, { accountId: ownerRow.line_account_id, featureId: 'automations', job: 'automation runs' })) {
+    return 'busy';
+  }
+  // 緊急停止 (#1050): automation_actions が止まっている統括は claim せず
+  // queued のまま残す。停止中の実行は外部へ何も出さない。
+  if (await isOperationCapabilityStopped(db, ownerRow?.line_account_id ?? null, 'automation_actions')) {
+    return 'busy';
+  }
   if (!(await claimRun(db, runId, now, leaseMinutes))) {
     const existing = await getRun(db, runId);
     if (!existing) return 'not_found';
@@ -610,6 +731,28 @@ export async function processAutomationRun(
 
   for (let index = run.current_step; index < actions.length; index += 1) {
     const action = actions[index];
+    /*
+     * 取消（cancelAutomationRun）は step と step の境目で効かせる。
+     * 走っている途中で取りやめられたら、これ以降の処理へ進まず
+     * `cancelled` で返す。走り中の step 自体は取消側で閉じている。
+     */
+    const latest = await db.prepare(`SELECT status FROM automation_runs WHERE id = ?`)
+      .bind(run.id).first<{ status: RunStatus }>();
+    if (!latest) return 'not_found';
+    if (latest.status === 'cancelled') return 'cancelled';
+    /*
+     * 緊急停止 (#1050) も step の境目で効かせる。claim 後に止まった分は
+     * run を queued へ戻し、現在の step から再開できるようにする。
+     * 停止を理由に failed / skipped にはしない。
+     */
+    if (await isOperationCapabilityStopped(db, run.line_account_id, 'automation_actions')) {
+      await db.prepare(
+        `UPDATE automation_runs
+            SET status = 'queued', lease_expires_at = NULL
+          WHERE id = ? AND status = 'running'`,
+      ).bind(run.id).run();
+      return 'busy';
+    }
     let step = await getStep(db, run.id, action.id);
     if (!step) {
       await precreateSteps(db, run, [action]);
@@ -624,6 +767,27 @@ export async function processAutomationRun(
       await db.prepare(`UPDATE automation_runs SET current_step = ? WHERE id = ?`)
         .bind(index + 1, run.id).run();
       continue;
+    }
+
+    if (action.branchConditions?.length) {
+      const branchSelected = await action.branchConditions.reduce(async (previous, item) => {
+        if (!await previous) return false;
+        const matched = run.friend_id
+          ? await matchesCondition(db, run.friend_id, item.condition)
+          : false;
+        return matched === item.expected;
+      }, Promise.resolve(true));
+      if (!branchSelected) {
+        await db.prepare(
+          `UPDATE automation_run_steps
+              SET status = 'skipped', output_json = ?, completed_at = ?,
+                  retry_at = NULL, lease_expires_at = NULL
+            WHERE id = ? AND status NOT IN ('success', 'skipped')`,
+        ).bind(JSON.stringify({ reason: 'branch_not_selected' }), now, step.id).run();
+        await db.prepare(`UPDATE automation_runs SET current_step = ? WHERE id = ?`)
+          .bind(index + 1, run.id).run();
+        continue;
+      }
     }
 
     if (action.type === 'wait' && step.status === 'waiting') {
@@ -670,6 +834,21 @@ export async function processAutomationRun(
                   retry_at = NULL, lease_expires_at = NULL
             WHERE id = ? AND status = 'running'`,
         ).bind(JSON.stringify({ versionId: step.common_action_version_id }), now, step.id).run();
+        await db.prepare(`UPDATE automation_runs SET current_step = ? WHERE id = ?`)
+          .bind(index + 1, run.id).run();
+        continue;
+      }
+      if (action.type === 'branch_marker') {
+        const condition = action.params.condition as SegmentCondition;
+        const matched = run.friend_id
+          ? await matchesCondition(db, run.friend_id, condition)
+          : false;
+        await db.prepare(
+          `UPDATE automation_run_steps
+              SET status = 'success', output_json = ?, completed_at = ?,
+                  retry_at = NULL, lease_expires_at = NULL
+            WHERE id = ? AND status = 'running'`,
+        ).bind(JSON.stringify({ matched }), now, step.id).run();
         await db.prepare(`UPDATE automation_runs SET current_step = ? WHERE id = ?`)
           .bind(index + 1, run.id).run();
         continue;
@@ -729,12 +908,155 @@ export async function processAutomationRun(
   return finishRun(db, run.id, now);
 }
 
+/**
+ * 失敗した処理だけを同じ実行計画で再開する。
+ *
+ * 成功・見送り済みの step はそのまま残し、失敗 step だけを waiting に戻す。
+ * processAutomationRun は成功済み step を飛ばすため、外部処理を二重に動かさない。
+ */
+export async function retryAutomationRun(
+  db: D1Database,
+  input: { runId: string; allowedAccountIds: string[]; now?: string },
+): Promise<{ runId: string; retryStepCount: number; status: 'waiting' }> {
+  if (input.allowedAccountIds.length === 0) {
+    throw new AutomationRunRetryError('not_found', '実行記録が見つかりません');
+  }
+  const run = await db.prepare(
+    `SELECT r.id, r.status, r.current_step, v.action_config, r.execution_plan_json
+       FROM automation_runs r
+       JOIN automation_versions v
+         ON v.id = r.automation_version_id AND v.automation_id = r.automation_id
+      WHERE r.id = ? AND r.line_account_id IN (${input.allowedAccountIds.map(() => '?').join(',')})`,
+  ).bind(input.runId, ...input.allowedAccountIds).first<{
+    id: string;
+    status: RunStatus;
+    current_step: number;
+    action_config: string;
+    execution_plan_json: string | null;
+  }>();
+  if (!run) throw new AutomationRunRetryError('not_found', '実行記録が見つかりません');
+  if (run.status !== 'failed' && run.status !== 'partial') {
+    throw new AutomationRunRetryError('not_retryable', '失敗した処理がある実行だけ、もう一度実行できます');
+  }
+
+  const failed = await db.prepare(
+    `SELECT step_key FROM automation_run_steps
+      WHERE automation_run_id = ? AND status = 'failed' AND step_key != '__configuration__'`,
+  ).bind(run.id).all<{ step_key: string }>();
+  if (failed.results.length === 0) {
+    throw new AutomationRunRetryError('not_retryable', '安全に再実行できる失敗処理がありません');
+  }
+  let actions: ActionDefinition[];
+  try {
+    actions = parseActions(run.execution_plan_json ?? run.action_config);
+  } catch {
+    throw new AutomationRunRetryError('not_retryable', '実行時の処理内容を確認できないため、再実行できません');
+  }
+  const indexes = new Map(actions.map((action, index) => [action.id, index]));
+  const retryIndexes = failed.results.map((step) => indexes.get(step.step_key));
+  if (retryIndexes.some((index) => index === undefined)) {
+    throw new AutomationRunRetryError('not_retryable', '失敗した処理を実行時の内容と照合できません');
+  }
+  const currentStep = Math.min(...retryIndexes as number[]);
+  const now = nowIso(input.now);
+  const results = await db.batch([
+    db.prepare(
+      `UPDATE automation_run_steps
+          SET status = 'waiting', retry_at = ?, completed_at = NULL, lease_expires_at = NULL
+        WHERE automation_run_id = ? AND status = 'failed' AND step_key != '__configuration__'`,
+    ).bind(now, run.id),
+    db.prepare(
+      `UPDATE automation_runs
+          SET status = 'waiting', current_step = ?, resume_at = ?, completed_at = NULL,
+              lease_expires_at = NULL
+        WHERE id = ? AND status IN ('failed', 'partial')`,
+    ).bind(currentStep, now, run.id),
+  ]);
+  if ((results[0].meta?.changes ?? 0) !== failed.results.length || (results[1].meta?.changes ?? 0) !== 1) {
+    throw new AutomationRunRetryError('retry_conflict', '実行記録の状態が変わりました。再読み込みしてください');
+  }
+  return { runId: run.id, retryStepCount: failed.results.length, status: 'waiting' };
+}
+
+/**
+ * 実行の取りやめ（#942 N-353）。
+ *
+ * **実行記録は消せない**（`trg_automation_runs_no_delete`）。だから取りやめは
+ * `cancelled` への状態遷移にする。
+ *
+ * - `queued` / `running` / `waiting` の実行だけ止められる。
+ * - 終わった実行（success / partial / failed / skipped_condition）は
+ *   `not_cancellable` で断る。取りやめても結果は変わらない。
+ * - すでに `cancelled` なら何もせず成功で返す（**何度押しても同じ結果**）。
+ *
+ * 走り途中（running）の実行は、`processAutomationRun` が処理と処理の境目で
+ * 実行の状態を見直すので、次の処理へ進まずに止まる。進行中だった step も
+ * `cancelled` にして「どこまで動いたか」が記録から読める形に残す。
+ */
+export async function cancelAutomationRun(
+  db: D1Database,
+  input: { runId: string; allowedAccountIds: string[]; now?: string },
+): Promise<{ runId: string; status: 'cancelled'; alreadyCancelled: boolean; cancelledStepCount: number }> {
+  if (input.allowedAccountIds.length === 0) {
+    throw new AutomationRunCancelError('not_found', '実行記録が見つかりません');
+  }
+  const run = await db.prepare(
+    `SELECT id, status FROM automation_runs
+      WHERE id = ? AND line_account_id IN (${input.allowedAccountIds.map(() => '?').join(',')})`,
+  ).bind(input.runId, ...input.allowedAccountIds).first<{ id: string; status: RunStatus }>();
+  if (!run) throw new AutomationRunCancelError('not_found', '実行記録が見つかりません');
+  if (run.status === 'cancelled') {
+    return { runId: run.id, status: 'cancelled', alreadyCancelled: true, cancelledStepCount: 0 };
+  }
+  if (['success', 'partial', 'failed', 'skipped_condition'].includes(run.status)) {
+    throw new AutomationRunCancelError(
+      'not_cancellable', 'すでに終わった実行は取りやめられません',
+    );
+  }
+  const now = nowIso(input.now);
+  // 状態を見てから閉じるまでに終わってしまう競合は、WHERE で防ぐ。
+  // **先に実行そのものを閉じる。** step だけ先に閉じると、直前に失敗で
+  // 確定した実行（再実行で残り step を動かせるもの）の queued step まで
+  // 潰してしまう。
+  const closed = await db.prepare(
+    `UPDATE automation_runs
+        SET status = 'cancelled', completed_at = ?, resume_at = NULL, lease_expires_at = NULL
+      WHERE id = ? AND status IN ('queued', 'running', 'waiting')`,
+  ).bind(now, run.id).run();
+  if ((closed.meta?.changes ?? 0) !== 1) {
+    // 競合で閉じられなかった＝もう終わったか、先に取りやめられた。
+    const latest = await db.prepare(`SELECT status FROM automation_runs WHERE id = ?`)
+      .bind(run.id).first<{ status: RunStatus }>();
+    if (latest?.status === 'cancelled') {
+      return { runId: run.id, status: 'cancelled', alreadyCancelled: true, cancelledStepCount: 0 };
+    }
+    throw new AutomationRunCancelError('not_cancellable', 'すでに終わった実行は取りやめられません');
+  }
+  // まだ動いていない・待っている・走り途中の step も閉じる。
+  // 成功・失敗・見送りで確定した step は結果として残す。
+  const steps = await db.prepare(
+    `UPDATE automation_run_steps
+        SET status = 'cancelled', completed_at = COALESCE(completed_at, ?),
+            retry_at = NULL, lease_expires_at = NULL
+      WHERE automation_run_id = ? AND status IN ('queued', 'running', 'waiting')`,
+  ).bind(now, run.id).run();
+  return {
+    runId: run.id,
+    status: 'cancelled',
+    alreadyCancelled: false,
+    cancelledStepCount: steps.meta?.changes ?? 0,
+  };
+}
+
 export async function processDueAutomationRuns(
   db: D1Database,
   options: AutomationEngineOptions & { limit?: number } = {},
 ): Promise<{ processed: number; results: Array<{ runId: string; status: string }> }> {
   const now = nowIso(options.now);
   const limit = Math.max(1, Math.min(options.limit ?? 100, 500));
+  const tenantStatusByAccount = new Map(
+    (await listLineAccountsWithTenantStatus(db)).map((account) => [account.id, account.tenant_status]),
+  );
   const due = await db.prepare(
     `SELECT id FROM automation_runs
       WHERE status = 'queued'
@@ -745,7 +1067,7 @@ export async function processDueAutomationRuns(
   ).bind(now, now, limit).all<{ id: string }>();
   const results: Array<{ runId: string; status: string }> = [];
   for (const row of due.results ?? []) {
-    const status = await processAutomationRun(db, row.id, { ...options, now });
+    const status = await processAutomationRun(db, row.id, { ...options, now, tenantStatusByAccount });
     results.push({ runId: row.id, status });
   }
   return { processed: results.length, results };

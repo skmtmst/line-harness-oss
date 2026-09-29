@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { StaffMember } from '@line-crm/shared'
-import { staffActionPolicy } from './staff-actions'
+import { matchStaffMember, scopeBundleToStaffRole, staffActionPolicy } from './staff-actions'
 
 function member(overrides: Partial<StaffMember> = {}): StaffMember {
   return {
@@ -53,4 +53,37 @@ describe('ログインユーザーの危険操作', () => {
     expect(policy.showAccountActions).toBe(false)
   })
 
+})
+
+describe('アクセス表とスタッフ表の名寄せ(#530)', () => {
+  const members = [
+    member({ id: 'stf-1', name: '佐々木 亮太', email: 'sasaki@example.com' }),
+    member({ id: 'stf-2', name: '佐々木 亮太', email: 'sasaki.2@example.com' }),
+  ]
+
+  it('IDが一致すれば名前もメールも見ない', () => {
+    expect(matchStaffMember(members, { id: 'stf-2', email: 'other@example.com' })?.id).toBe('stf-2')
+  })
+
+  it('IDが無ければメール一致(大文字小文字を区別しない)を優先する', () => {
+    expect(matchStaffMember(members, { id: 'unknown', email: 'SASAKI@example.com' })?.id).toBe('stf-1')
+  })
+
+  it('同姓同名だけでは結び付けない', () => {
+    expect(matchStaffMember(members, { id: 'unknown', email: 'nobody@example.com' })).toBeNull()
+    expect(matchStaffMember(members, { id: 'unknown', email: null })).toBeNull()
+  })
+
+  it('伏せ字のメール同士では結び付けない', () => {
+    expect(matchStaffMember(members, { id: 'unknown', email: 's***@example.com' })).toBeNull()
+  })
+})
+
+describe('見せる範囲の保存先(#530)', () => {
+  it('管理者と見るだけはそのまま、運用と受付はスタッフへ寄る', () => {
+    expect(scopeBundleToStaffRole('administrator')).toBe('admin')
+    expect(scopeBundleToStaffRole('operations')).toBe('staff')
+    expect(scopeBundleToStaffRole('reception')).toBe('staff')
+    expect(scopeBundleToStaffRole('view_only')).toBe('viewer')
+  })
 })
