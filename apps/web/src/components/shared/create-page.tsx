@@ -7,14 +7,15 @@ import Header from '@/components/layout/header'
 import Button from '@/components/shared/button'
 import HelpTip from '@/components/shared/help-tip'
 import StickyBar from '@/components/shared/sticky-bar'
-import { ApiError } from '@/lib/api'
+import { describeSaveFailure } from '@/lib/api'
 
-const SAVE_FALLBACK = '保存に失敗しました。入力内容を確認して、もう一度お試しください。'
-
+/*
+ * D005: `ApiError.message` は安全と判定されない応答では `API error: <番号>` の
+ * 内部文になる。そのまま出すと運用者に意味が伝わらない。保存の失敗文は
+ * `describeSaveFailure`（状態別の立て直し文）に寄せ、作る画面でそろえる。
+ */
 export function createPageErrorMessage(error: unknown): string {
-  if (error instanceof ApiError) return error.message
-  if (error instanceof Error && /[ぁ-んァ-ヶ一-龠]/u.test(error.message)) return error.message
-  return SAVE_FALLBACK
+  return describeSaveFailure(error)
 }
 
 /**
