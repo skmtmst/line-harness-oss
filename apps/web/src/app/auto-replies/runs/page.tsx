@@ -14,9 +14,18 @@ import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-ba
 import StickyBar from '@/components/shared/sticky-bar'
 import KpiCard from '@/components/shared/kpi-card'
 import { api, ApiError } from '@/lib/api'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import styles from './auto-reply-runs.module.css'
 
 const PAGE_SIZE = 20
+
+/**
+ * R530: 再実行・一時停止は owner/admin だけ（再実行POST・更新PUT の
+ * requireRole と同じ境目）。見るだけにはボタンを出さず、理由を1つの帯で出す。
+ * 403 で断られたときは読み直しではなく権限の説明を出す。
+ */
+const NO_MANAGE_NOTE = '実行結果の再実行・一時停止はオーナーと管理者だけができます。必要なときはオーナーか管理者に頼んでください。'
+const NO_RETRY_PERMISSION = '再実行する権限がありません。オーナーか管理者に頼んでください。'
 
 const STATUS: Record<ExecutionRunStatus, { label: string; tone: StatusBadgeTone }> = {
   succeeded: { label: '成功', tone: 'success' },
@@ -98,6 +107,8 @@ function csvFor(items: AutoReplyRun[]): string {
 function AutoReplyRunsInner() {
   const searchParams = useSearchParams()
   const requestedRuleId = searchParams.get('id') ?? ''
+  const staffRole = useStaffRole()
+  const canManage = staffRole === null || canManageRole(staffRole)
   const [data, setData] = useState<AutoReplyRunsResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -171,6 +182,9 @@ function AutoReplyRunsInner() {
       if (e instanceof ApiError && e.status === 409) {
         setActionMessage('すでに処理中または完了しています。最新の状態を読み直しました。')
         await load()
+      } else if (e instanceof ApiError && e.status === 403) {
+        // 権限で断られたときは読み直しても直らない。読み直せとは書かない。
+        setActionMessage(NO_RETRY_PERMISSION)
       } else {
         setActionMessage('失敗した処理をもう一度実行できませんでした。時間を置いてお試しください。')
       }
@@ -233,6 +247,11 @@ function AutoReplyRunsInner() {
 
   return (
     <div className={styles.page} data-design-node="t7UtYQ">
+      {!canManage && (
+        <p className="bg-info-bg text-ink-secondary rounded-control mb-4 px-4 py-3 text-xs leading-relaxed">
+          {NO_MANAGE_NOTE}実行結果の確認と書き出しはこのまま使えます。
+        </p>
+      )}
       <div className={styles.topActions}>
         <Link href="/auto-replies" className={styles.back}><ArrowLeft size={16} />自動応答一覧</Link>
         <Button onClick={() => void exportCsv()} disabled={!data?.rule.id || exporting}>
@@ -284,7 +303,7 @@ function AutoReplyRunsInner() {
                         })()}
                         <StatusBadge tone={view.tone} size="compact">{view.label}</StatusBadge>
                         <time className={styles.time} dateTime={item.occurredAt}>{formatTime(item.occurredAt)}</time>
-                        {item.canRetry ? (
+                        {item.canRetry && canManage ? (
                           <div data-retry-row>
                             <Button
                               variant="secondary"
@@ -374,9 +393,12 @@ function AutoReplyRunsInner() {
         status={data?.rule.isActive === false ? 'この自動応答は停止中です' : '変更は実行結果に影響しません'}
         actions={(
           <>
-            <Button onClick={() => void pause()} disabled={!data?.rule.id || data.rule.isActive !== true || pausing}>
-              <Pause size={16} />{pausing ? '停止しています' : '自動応答を一時停止'}
-            </Button>
+            {/* 一時停止は更新口（owner/admin）なので見るだけには出さない。設定の編集への移動は操作ではないので残す。 */}
+            {canManage && (
+              <Button onClick={() => void pause()} disabled={!data?.rule.id || data.rule.isActive !== true || pausing}>
+                <Pause size={16} />{pausing ? '停止しています' : '自動応答を一時停止'}
+              </Button>
+            )}
             <Button variant="primary" href={data?.rule.id ? `/auto-replies/edit?id=${encodeURIComponent(data.rule.id)}` : '/auto-replies'}>
               <Pencil size={16} />自動応答の設定を編集
             </Button>
