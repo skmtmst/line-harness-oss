@@ -12,6 +12,8 @@ import CreatePage, { AsideCard, Field, inputClass } from '@/components/shared/cr
 import { isStepUpRequired, useStepUpGate } from '@/components/step-up-prompt'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import { useAccount } from '@/contexts/account-context'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { MIN_SECRET_LENGTH, generateSecret } from '../secret'
 
 /**
@@ -112,6 +114,21 @@ function NewWebhookForm() {
       current.includes(value) ? current.filter((item) => item !== value) : [...current, value],
     )
   }
+  /* 自動で振った署名は初期値。入れ直し・作り直しだけを未保存と数える。 */
+  const initialSecretRef = useRef(secret)
+
+  /*
+   * 追加途中の離脱確認。名前・URL・送る出来事・署名・送り直しのどれかに
+   * 手を付けていたら、キャンセルや左メニューで確認窓を出す。
+   * 追加が終わると一覧へ router.push するので、成功後に警告は出ない。
+   */
+  const dirty = Boolean(
+    name || url || incomingSources || maxRetries !== '0' ||
+    secret !== initialSecretRef.current ||
+    sendAllEvents !== !presetValid ||
+    selectedEvents.join(',') !== (presetValid ? presetEvent! : '')
+  )
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty })
 
   if (staffRole !== null && staffRole !== 'owner') {
     return (
@@ -337,6 +354,7 @@ function NewWebhookForm() {
         </div>
       </Field>
       {stepUpPrompt}
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した送り先" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </CreatePage>
   )
 }

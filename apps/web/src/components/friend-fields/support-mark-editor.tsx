@@ -11,7 +11,7 @@ import Button from '@/components/shared/button'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import Checkbox from '@/components/shared/checkbox'
 import Card from '@/components/shared/card'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import Select from '@/components/shared/select'
 import ListState from '@/components/shared/list-state'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -445,7 +445,7 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
       </>
       )}
       {/* R176 監査：名前・色などの書きかけがある間の離脱確認。 */}
-      <ConfirmDialog primaryAction="cancel" open={leaveTarget !== null} title="保存していない変更があります" description="このまま移動すると、マークへの変更は失われます。保存せずに移動しますか？" confirmLabel="保存せずに移動" cancelLabel="編集を続ける" onConfirm={confirmLeave} onCancel={cancelLeave} />
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="マークへの変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )
 }

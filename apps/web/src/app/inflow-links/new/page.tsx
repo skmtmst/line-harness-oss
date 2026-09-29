@@ -10,7 +10,7 @@ import { qrToDataURL } from '@/lib/qr-image'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { useAccount } from '@/contexts/account-context'
 import Checkbox from '@/components/shared/checkbox'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import Notice from '@/components/shared/notice'
 import CreatePage, {
   AsideCard,
@@ -426,15 +426,7 @@ export default function NewInflowLinkPage() {
 
     </CreatePage>
 
-    <ConfirmDialog primaryAction="cancel"
-      open={leaveTarget !== null}
-      title="保存していない変更があります"
-      description="このまま移動すると、入力した流入リンクは失われます。保存せずに移動しますか？"
-      confirmLabel="保存せずに移動"
-      cancelLabel="編集を続ける"
-      onConfirm={confirmLeave}
-      onCancel={cancelLeave}
-    />
+    <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した流入リンク" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </>
   )
 }
