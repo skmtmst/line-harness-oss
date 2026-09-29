@@ -175,6 +175,9 @@ export default function NewProxyBookingPage() {
   const [time, setTime] = useState('')
   const [customerNote, setCustomerNote] = useState('')
   const [idempotencyKey, setIdempotencyKey] = useState('')
+  // R559: 電話客の台帳作成のキー。予約本体のキーから派生させ、確定操作の
+  // 再送では同じ台帳が返るようにする（冪等表の主キーで予約とぶつけない）。
+  const customerIdempotencyKey = useRef('')
   const [result, setResult] = useState<ProxyBookingResult | null>(null)
   const [customerContext, setCustomerContext] = useState<BookingCustomerContext | null>(null)
   const [conflictAlternatives, setConflictAlternatives] = useState<BookingConflictAlternatives | null>(null)
@@ -275,6 +278,7 @@ export default function NewProxyBookingPage() {
     setReminderPreview([])
     setNotification({ send_line_confirmation: true, day_before: true, hours_before: true })
     setIdempotencyKey('')
+    customerIdempotencyKey.current = ''
     setLoading(false)
     setError('')
     pendingSelect.current = {}
@@ -580,9 +584,11 @@ export default function NewProxyBookingPage() {
         && customerSavedInput.current.pet === petName.trim())
     )) return customer
     if (!selectedAccountId) return null
+    // R559: 応答消失後の再送で台帳を二重作成しないよう、確定操作ごとの
+    // キー（予約本体のキーから派生）で送る。
     const response = await bookingApi.createCustomer(selectedAccountId, {
       display_name: customerName.trim(), phone: customerPhone.trim(), pet_name: petName.trim() || undefined,
-    })
+    }, customerIdempotencyKey.current || undefined)
     customerSavedInput.current = { name: customerName.trim(), phone: customerPhone.trim(), pet: petName.trim() }
     setCustomer(response.customer)
     return response.customer
@@ -645,7 +651,10 @@ export default function NewProxyBookingPage() {
       if (latestSelectionKey.current !== requestKey) return
       setConfirmedSlot(available)
       setReminderPreview(preview.reminders)
-      setIdempotencyKey(crypto.randomUUID())
+      // R559: 確認ごとに予約と台帳のキーを1組だけ発行する。再送時は同じ組で送る。
+      const freshKey = crypto.randomUUID()
+      setIdempotencyKey(freshKey)
+      customerIdempotencyKey.current = `${freshKey}:customer`
       setStep('confirm')
     } catch {
       if (latestSelectionKey.current !== requestKey) return
@@ -681,6 +690,10 @@ export default function NewProxyBookingPage() {
       let bookingCustomer: BookingCustomerSummary | null = null
       if (phoneCustomer) {
         try {
+          // R559: 台帳の作成はこの確定操作のキーで束ねる。再送時は同じ
+          // 顧客が返り、台帳は1件のまま予約はその顧客IDを使う。
+          // 確認を経ずに来たときだけ、ここで組を作る。
+          if (!customerIdempotencyKey.current) customerIdempotencyKey.current = `${key}:customer`
           bookingCustomer = await ensureCustomerForBooking()
         } catch {
           setError('電話客の情報を保存できませんでした。名前と電話番号を確認してください。')
@@ -1102,7 +1115,7 @@ export default function NewProxyBookingPage() {
                 <Summary label="予約台帳" value="1件追加（電話で受けた予約も同じ台帳へ記録します）" />
               </Card>
               <Card title="次にすること">
-                <div className="flex flex-wrap gap-2"><Button variant="primary" href="/booking/bookings">今日の台帳を見る</Button><Button href={`/booking/bookings/detail?id=${encodeURIComponent(result.booking_id)}`}>この予約の詳細を見る</Button><Button onClick={() => { setStep('input'); setResult(null); setTime(''); setIdempotencyKey('') }}>続けてもう1件入れる</Button></div>
+                <div className="flex flex-wrap gap-2"><Button variant="primary" href="/booking/bookings">今日の台帳を見る</Button><Button href={`/booking/bookings/detail?id=${encodeURIComponent(result.booking_id)}`}>この予約の詳細を見る</Button><Button onClick={() => { setStep('input'); setResult(null); setTime(''); setIdempotencyKey(''); customerIdempotencyKey.current = '' }}>続けてもう1件入れる</Button></div>
               </Card>
             </div>
             <aside data-design="Right" className="space-y-4">

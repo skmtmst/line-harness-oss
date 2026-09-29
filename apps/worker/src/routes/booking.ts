@@ -86,6 +86,7 @@ import {
 } from '../services/booking-confirm.js';
 import { attachTagAndFireSideEffects } from '../services/friend-tag-attach.js';
 import {
+  BOOKING_CUSTOMER_IDEMPOTENCY_TTL_MINUTES,
   DEFAULT_ACCOUNT_SETTINGS,
   IDEMPOTENCY_TTL_MINUTES,
   MENU_IDEMPOTENCY_TTL_MINUTES,
@@ -1056,6 +1057,27 @@ booking.post(
   async (c) => {
     const accountId = await resolveAccountIdAdmin(c);
     if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+    /*
+     * R559: 応答消失後の再送で同じ電話客を2件作らない。呼び出し側が
+     * 確定操作ごとに付ける一意キーで作成済み応答を返す。検証で落ちた
+     * 要求は保存しないので、入力を直して同じキーで送り直せる。キーの無い
+     * 従来の呼び出しは従来どおり毎回作成する。migration 無しで済ませるため、LIFF用の
+     * 冪等表を借り、subject には friend ではなく staff id を入れる。
+     * 照合は (key, account, staff) の範囲に閉じ、別アカウントの行は
+     * 別物として扱う（=tenant 越しの id 漏れ防止）。
+     */
+    const idemKey = c.req.header('Idempotency-Key')?.trim() || null;
+    const staffSubject = c.get('staff')?.id ?? 'admin';
+    const idemScope = {
+      key: idemKey ?? '',
+      lineAccountId: accountId,
+      friendId: staffSubject,
+      now: new Date(),
+    };
+    if (idemKey) {
+      const cached = await findIdempotencyResponse(c.env.DB, idemScope);
+      if (cached) return c.json(cached.body as Record<string, unknown>, cached.status as 201);
+    }
     const body = await c.req.json<{
       display_name?: string;
       phone?: string;
@@ -1075,6 +1097,15 @@ booking.post(
         email: body.email,
         encryptionKey: c.env.LINE_CREDENTIAL_ENCRYPTION_KEY,
       });
+      // R559: 同じキーの再送には作り直さずこの応答を返す。24時間の窓。
+      if (idemKey) {
+        await saveIdempotencyResponse(c.env.DB, {
+          ...idemScope,
+          status: 201,
+          body: { customer },
+          ttlMinutes: BOOKING_CUSTOMER_IDEMPOTENCY_TTL_MINUTES,
+        });
+      }
       return c.json({ customer }, 201);
     } catch (error) {
       const code = error instanceof Error ? error.message : '';
