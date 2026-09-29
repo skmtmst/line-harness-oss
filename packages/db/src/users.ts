@@ -268,15 +268,68 @@ export async function archiveUser(db: D1Database, id: string): Promise<User | nu
   return getUserById(db, id);
 }
 
+export interface RelinkActor {
+  id: string | null;
+  reason?: string;
+}
+
+/*
+ * R394: 友だちを別の本人へ結び直すときは、古い候補の有効な結び付き行も
+ * 外す。friends だけ付け替えると、結び付き行（U1のまま）と現在値（U2）が
+ * 食い違い、古い候補の取消が新しい結び付きを消してしまう。
+ * 外した行は unlinked_at・理由付きで残すので、誰が何を直したか追える。
+ * 戻り値は結び直せたかどうか。同時に別の人が動かしたときは false を返し、
+ * 呼び手が409にする（何も書かれていないことが条件）。
+ */
 export async function linkFriendToUser(
   db: D1Database,
   friendId: string,
   userId: string,
-): Promise<void> {
-  await db
-    .prepare(`UPDATE friends SET user_id = ?, updated_at = ? WHERE id = ?`)
-    .bind(userId, jstNow(), friendId)
-    .run();
+  actor: RelinkActor | null = null,
+): Promise<boolean> {
+  const now = jstNow();
+  const current = await db
+    .prepare(`SELECT user_id FROM friends WHERE id = ?`)
+    .bind(friendId)
+    .first<{ user_id: string | null }>();
+  if (!current) return false;
+  const before = current.user_id ?? null;
+  if (before === userId) return true;
+  const expectedGuard = `EXISTS (SELECT 1 FROM friends WHERE id = ? AND user_id IS ?)`;
+  /*
+   * 版進めも付け替えが効いたときだけ行う。競合で付け替えが0件なら
+   * 版も触らず、false（変更0）と対にする。
+   */
+  const movedGuard = `EXISTS (SELECT 1 FROM friends WHERE id = ? AND user_id = ?)`;
+  const results = await db.batch([
+    db.prepare(
+      `UPDATE friend_identity_links
+          SET unlinked_by = ?, unlinked_at = ?, unlink_reason = ?
+        WHERE friend_id = ? AND unlinked_at IS NULL AND ${expectedGuard}`,
+    ).bind(
+      actor?.id ?? null, now,
+      actor?.reason ?? '別の統合ユーザーへ結び直しました',
+      friendId, friendId, before,
+    ),
+    db.prepare(
+      `UPDATE friends SET user_id = ?, updated_at = ? WHERE id = ? AND user_id IS ?`,
+    ).bind(userId, now, friendId, before),
+    ...(before && before !== userId
+      ? [db.prepare(
+        `UPDATE users SET revision = revision + 1, updated_at = ? WHERE id = ? AND ${movedGuard}`,
+      ).bind(now, before, friendId, userId)]
+      : []),
+    db.prepare(
+      `UPDATE users SET revision = revision + 1, updated_at = ? WHERE id = ? AND ${movedGuard}`,
+    ).bind(now, userId, friendId, userId),
+  ]);
+  /*
+   * R392: 結び付きが変わるので両本人の版を進める。後に開いた保存は409になる。
+   * friends の付け替えが0件＝別の人が先に動かした＝結び付き行も触っていない
+   *（同じ条件のため）ので false で知らせる。
+   */
+  const moved = Number(results[1]?.meta?.changes ?? 0) === 1;
+  return moved;
 }
 
 export async function getUserFriends(
