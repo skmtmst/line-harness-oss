@@ -58,7 +58,8 @@ export default function HqTagDefinitionEditor({ definition, mode = 'create', sav
   error?: string
   notice?: string
   onCancel: () => void
-  onSave: (definition: TagDefinition) => void | Promise<void>
+  /** R561: 正規編集部品の「保存して続けて作る」の選択を統括の保存へ伝える。 */
+  onSave: (definition: TagDefinition, andAnother?: boolean) => void | Promise<void>
 }) {
   const now = new Date().toISOString()
   const groups: TagGroup[] = definition.folders.map((folder, index) => ({
@@ -83,6 +84,6 @@ export default function HqTagDefinitionEditor({ definition, mode = 'create', sav
     error={error}
     notice={notice}
     onCancel={onCancel}
-    onSave={async values => { await onSave(hqTagEditorToDefinition(definition, values)) }}
+    onSave={async (values, andAnother) => { await onSave(hqTagEditorToDefinition(definition, values), andAnother) }}
   />
 }

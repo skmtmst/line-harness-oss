@@ -118,6 +118,8 @@ export default function TemplateConsole({ type, useCanonicalEditors = true }: { 
   const [message, setMessage] = useState('')
   const [remove, setRemove] = useState<HqTemplate | null>(null)
   const [now, setNow] = useState(Date.now())
+  /** R561: 連続作成のたびに正規編集部品を掛け直し、空の新規入力へ戻す番号。 */
+  const [formKey, setFormKey] = useState(0)
   const lock = useRef(false)
   const createAttempt = useRef<CreationAttempt | null>(null)
   const creationScope = useRef<CreationScope | null>(null)
@@ -189,7 +191,7 @@ export default function TemplateConsole({ type, useCanonicalEditors = true }: { 
     if (!alive.current) return
     loadDetailIntoForm(loaded); setSelected([]); setSearch(''); setPreflight(null); setChoices({}); setStage(next)
   })
-  const save = (distribute: boolean, sourceDefinition = definition, sourceName = name, sourceDescription = description) => perform(async () => {
+  const save = (distribute: boolean, sourceDefinition = definition, sourceName = name, sourceDescription = description, andAnother = false) => perform(async () => {
     const preparedDefinition = definitionForName(type, sourceDefinition, sourceName.trim(), sourceDescription.trim())
     const validation = !sourceName.trim() ? 'ひな形の名前を入力してください。' : definitionError(type, preparedDefinition, creationScope.current?.tenantId)
     if (validation) throw new Error(validation)
@@ -243,12 +245,15 @@ export default function TemplateConsole({ type, useCanonicalEditors = true }: { 
       createSettlement.current = null
     }
     if (!alive.current) return
+    const isNew = !detail
     loadDetailIntoForm(saved)
     createAttempt.current = null
     setCreateUncertain(false)
     setTemplates(current => [saved.template, ...current.filter(row => row.id !== saved.template.id)])
     setMessage('ひな形を保存しました。')
     if (continueToAccounts) { setSelected([]); setSearch(''); setStage('accounts') }
+    // R561: 「保存して続けて作る」は新規作成のときだけ、保存済みの行を残したまま空の新規入力へ戻る。
+    else if (andAnother && isNew) { setDetail(null); setName(''); setDescription(''); setDefinition(freshDefinition(type)); setFormKey(current => current + 1); setStage('edit') }
     else setStage('list')
   })
   const checkStores = (ids: string[]) => void perform(async () => {
@@ -324,11 +329,11 @@ export default function TemplateConsole({ type, useCanonicalEditors = true }: { 
   const title = stage === 'list' ? PAGE_TITLES[type] : stage === 'edit' ? `${LABELS[type]}のひな形を${detail ? '編集' : '作成'}` : stage === 'accounts' ? '配布先アカウントを選択' : stage === 'duplicates' ? `重複する項目が${duplicates.length}件あります` : done ? '配布が完了しました' : '配布結果を確認しています'
   const validation = definitionError(type, definitionForName(type, definition, name.trim(), description.trim()), creationScope.current?.tenantId)
   const canonicalEditorOwnsSave = useCanonicalEditors && (type === 'tag' || type === 'form')
-  const saveCanonicalDefinition = async (next: TemplateDefinition) => {
+  const saveCanonicalDefinition = async (next: TemplateDefinition, andAnother = false) => {
     const nextName = definitionName(type, next)
     const nextDescription = 'tag' in next ? next.tag.description ?? '' : 'form' in next ? next.form.description ?? '' : description
     setDefinition(next); setName(nextName); setDescription(nextDescription)
-    await save(false, next, nextName, nextDescription)
+    await save(false, next, nextName, nextDescription, andAnother)
   }
 
   return <div className={styles.console} data-design-node={NODES[stage]} aria-busy={busy}>
@@ -363,6 +368,7 @@ export default function TemplateConsole({ type, useCanonicalEditors = true }: { 
           <Notice tone="warn" message="前回の保存結果がまだ確定していません。重複を防ぐため入力を固定しています。同じ依頼を再確認し、保存済みならその結果を読み込みます。" />
           <div className={styles.footer}><Button variant="primary" disabled={busy} onClick={() => save(false)}>前回の保存を再確認</Button></div>
         </> : <TemplateDefinitionEditor
+          key={formKey}
           type={type}
           value={definition}
           disabled={busy || createUncertain}
