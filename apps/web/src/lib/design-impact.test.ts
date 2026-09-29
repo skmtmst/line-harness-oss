@@ -50,7 +50,7 @@ describe('共通部品の影響範囲', () => {
     expect(directImporters(files, paginationCss, importIndex)).toEqual([pagination])
   })
 
-  it('共通Paginationを直接importする53ファイルだけを利用先に数える', () => {
+  it('共通Paginationを直接importする54ファイルだけを利用先に数える', () => {
     // ダッシュボードの受信カードが自前の「前へ／次へ」をやめて共通へ寄せた。
     // 設計（`vUXKb` / `NjK9q`）は表の下にページ送りがあり、番号で飛べる。
     // 2026-09-02: 成果地点と流入経路の押せない「前へ／次へ」も共通へ寄せた。
@@ -105,6 +105,8 @@ describe('共通部品の影響範囲', () => {
       'app/line-notifications/page.tsx',
       'app/mileage/action-score-tab.tsx',
       'app/mileage/mileage-history-tab.tsx',
+      // R365: 要対応の交換が21件以上あっても残りを出せるよう、20件ずつのページ送りに寄せた。
+      'app/mileage/mileage-rewards-tab.tsx',
       'app/mileage/page.tsx',
       // 2026-09-18: NEN配信のコラム一覧（★V6 37-6-A）。8本ずつのページ送り。
       'app/nen-campaigns/nen-overview.tsx',

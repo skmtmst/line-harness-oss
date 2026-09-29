@@ -274,12 +274,13 @@ export interface RelinkActor {
 }
 
 /*
- * R394: 友だちを別の本人へ結び直すときは、古い候補の有効な結び付き行も
- * 外す。friends だけ付け替えると、結び付き行（U1のまま）と現在値（U2）が
- * 食い違い、古い候補の取消が新しい結び付きを消してしまう。
- * 外した行は unlinked_at・理由付きで残すので、誰が何を直したか追える。
- * 戻り値は結び直せたかどうか。同時に別の人が動かしたときは false を返し、
- * 呼び手が409にする（何も書かれていないことが条件）。
+ * R385 + R392/R394: 友だちを本人へ結ぶときは、結び直しの競合対策と
+ * マイルの移管の両方を行う。
+ * R394: 古い候補の有効な結び付き行も外す（friendsだけ付け替えると古い取消が
+ * 新しい結び付きを消す）。外した行は理由付きで残す。
+ * R385: 結ぶ前に友だち宛てへ付いた台帳・ロット・財布を本人キーへ移す
+ * （行は消さず、再実行しても重複しない）。
+ * R392: 両本人の版を付け替え成功時だけ進め、競合時はfalseで409にする。
  */
 export async function linkFriendToUser(
   db: D1Database,
@@ -288,13 +289,45 @@ export async function linkFriendToUser(
   actor: RelinkActor | null = null,
 ): Promise<boolean> {
   const now = jstNow();
+  const userKey = `user:${userId}`;
+  const friendKey = `friend:${friendId}`;
+  const migrateMileage = async (): Promise<void> => {
+    await db.batch([
+      db.prepare(
+        `UPDATE mileage_ledger SET beneficiary_user_id = ?
+          WHERE beneficiary_friend_id = ? AND beneficiary_user_id IS NULL`,
+      ).bind(userId, friendId),
+      db.prepare(
+        `UPDATE mileage_grant_lots SET beneficiary_key = ?
+          WHERE beneficiary_key = ?`,
+      ).bind(userKey, friendKey),
+      // 友だち名義の財布を本人の財布へ足す。本人の財布があれば残高を合算し、
+      // なければそのまま本人名義にする。そのあと友だち名義の行を消す。
+      db.prepare(
+        `INSERT INTO mileage_wallets
+           (program_id, beneficiary_key, beneficiary_user_id, beneficiary_friend_id,
+            available, pending, version, updated_at)
+         SELECT program_id, ?, ?, NULL, available, pending, 1, ?
+           FROM mileage_wallets WHERE beneficiary_key = ?
+         ON CONFLICT(program_id, beneficiary_key) DO UPDATE SET
+           available = mileage_wallets.available + excluded.available,
+           pending = mileage_wallets.pending + excluded.pending,
+           version = mileage_wallets.version + 1,
+           updated_at = excluded.updated_at`,
+      ).bind(userKey, userId, now, friendKey),
+      db.prepare(`DELETE FROM mileage_wallets WHERE beneficiary_key = ?`).bind(friendKey),
+    ]);
+  };
   const current = await db
     .prepare(`SELECT user_id FROM friends WHERE id = ?`)
     .bind(friendId)
     .first<{ user_id: string | null }>();
   if (!current) return false;
   const before = current.user_id ?? null;
-  if (before === userId) return true;
+  if (before === userId) {
+    await migrateMileage();
+    return true;
+  }
   const expectedGuard = `EXISTS (SELECT 1 FROM friends WHERE id = ? AND user_id IS ?)`;
   /*
    * 版進めも付け替えが効いたときだけ行う。競合で付け替えが0件なら
@@ -326,10 +359,12 @@ export async function linkFriendToUser(
   /*
    * R392: 結び付きが変わるので両本人の版を進める。後に開いた保存は409になる。
    * friends の付け替えが0件＝別の人が先に動かした＝結び付き行も触っていない
-   *（同じ条件のため）ので false で知らせる。
+   *（同じ条件のため）ので false で知らせる。マイル移管は成功時だけ行う。
    */
   const moved = Number(results[1]?.meta?.changes ?? 0) === 1;
-  return moved;
+  if (!moved) return false;
+  await migrateMileage();
+  return true;
 }
 
 export async function getUserFriends(

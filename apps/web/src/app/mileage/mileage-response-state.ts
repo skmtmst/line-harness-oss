@@ -20,5 +20,16 @@ export function mileageRewardedActions(value: unknown): number | null {
 
 /** 未取得と、取得できた 0 件を区別したまま接続先を返す。 */
 export function mileageConnectedAccounts(value: unknown): MileageConnectedAccount[] | null {
-  return Array.isArray(value) ? value as MileageConnectedAccount[] : null
+  if (!Array.isArray(value)) return null
+  /*
+   * R386: 同じアカウントの複数プロフィールを同じ本人へ結ぶと、接続先の
+   * 一覧に同じアカウントが重なって返ることがある。表示はアカウント単位に
+   * 絞り、同じアカウントIDの重複キー警告も防ぐ。
+   */
+  const seen = new Set<string>()
+  return (value as MileageConnectedAccount[]).filter((connection) => {
+    if (seen.has(connection.accountId)) return false
+    seen.add(connection.accountId)
+    return true
+  })
 }

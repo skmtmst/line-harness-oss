@@ -3018,7 +3018,8 @@ export type MileageHistoryItem = {
   entryType: 'grant' | 'reversal' | 'spend' | 'expiration' | 'adjustment'
   status: 'pending' | 'available' | 'void'
   amount: number
-  reason: string
+  /** 権限の外側のアカウントの記録では null。見分けには restricted を使う。 */
+  reason: string | null
   source: string
   sourceEventId: string | null
   sourceReferenceId: string | null
@@ -3027,6 +3028,13 @@ export type MileageHistoryItem = {
   executedByStaffName: string | null
   balanceAfter?: number
   occurredAt: string
+  /** この記録が属するLINEアカウント。分からないときは null。 */
+  lineAccountId?: string | null
+  /** true の行は見ている人の権限外アカウントの記録で、理由・実行者・元イベントは伏せてある。 */
+  restricted?: boolean
+  /** 手動調整につけた友だち通知の状態。通知なし・権限外の行は null。 */
+  notificationStatus?: string | null
+  notificationErrorCode?: string | null
 }
 export type MileageSelfInsights = {
   accountCount: number
@@ -3282,6 +3290,9 @@ export type MileageAdminHistoryItem = {
   mode: 'automatic' | 'manual'
   executedByStaffName: string | null
   lineAccountName: string
+  lineAccountId?: string | null
+  notificationStatus?: string | null
+  notificationErrorCode?: string | null
   balanceAfter: number
   occurredAt: string
 }
@@ -3316,7 +3327,10 @@ export type MileageFriendV6 = {
   monthChange: number
   available: number
   pending: number
+  /** 30日以内に期限を迎える分。期限つきロットが無いときは null（0 とは別物）。 */
   expiringMiles30d: number | null
+  /** いちばん近い失効日。期限つきロットがあれば 30 日より先でも入る。 */
+  nextExpiringAt: string | null
   lifetimeEarned: number
   spent: number
   lastChangedAt: string | null
@@ -3333,6 +3347,8 @@ export type MileageFriendsV6Overview = {
     monthChange: number
     rankCounts: Array<{ rewardId: string; rankName: string; requiredMiles: number; friendCount: number }>
     expiringMiles30d: number | null
+    /** 一覧の中でいちばん近い失効日。期限つきロットがなければ null。 */
+    nextExpiringAt: string | null
   }
   items: MileageFriendV6[]
   pagination: { total: number; limit: number; offset: number }
@@ -11682,6 +11698,15 @@ export const api = {
           headers: { 'X-Confirm-Irreversible': 'mileage-entry-void' },
           body: JSON.stringify(data),
         },
+      ),
+    /*
+     * R380/R381: 残高は動かさず、調整につけた友だち通知だけを再送する。
+     * 送り済みなら何もしない（サーバ側で二度送らない）。
+     */
+    retryMileageNotification: (entryId: string, data: { accountId: string }) =>
+      fetchApi<ApiResponse<{ notification: MileageAdjustmentResult['notification'] }>>(
+        `/api/mileage/entries/${encodeURIComponent(entryId)}/notification-retry`,
+        { method: 'POST', body: JSON.stringify(data) },
       ),
     testEarningRule: (accountId: string, draft: unknown) =>
       fetchApi<ApiResponse<MileageEarningRuleTestResult>>('/api/mileage/earning-rules/test', {

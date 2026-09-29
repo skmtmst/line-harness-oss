@@ -31,6 +31,8 @@ const dbMocks = {
   applyMileageRulesForEvent: vi.fn(),
   getMileageManualAdjustmentPolicy: vi.fn(),
   setMileageManualAdjustmentPolicy: vi.fn(),
+  findCommittedMileageAdjustment: vi.fn(),
+  getMileageAdjustmentNotificationRecord: vi.fn(),
   postMileageAdjustment: vi.fn(),
   confirmPendingMileageEntry: vi.fn(),
   voidMileageLedgerEntry: vi.fn(),
@@ -282,7 +284,7 @@ describe('mileage admin API', () => {
     expect(deliveryMocks.deliverMileageReward).not.toHaveBeenCalled();
   });
 
-  it('lists failed redemptions inside the account boundary without secrets', async () => {
+  it('lists redemptions needing attention by default without secrets', async () => {
     dbMocks.listMileageRedemptions.mockResolvedValueOnce({
       items: [{
         id: 'redemption-9', lineAccountId: 'account-1', rewardId: 'reward-1',
@@ -293,10 +295,11 @@ describe('mileage admin API', () => {
       }],
       pagination: { total: 1, limit: 100, offset: 0 },
     });
+    // R364: 既定は要対応（失敗中＋配送中）。照合待ちを一覧から消さない。
     const response = await call('/api/mileage/redemptions?accountId=account-1&limit=999');
     expect(response.status).toBe(200);
     expect(dbMocks.listMileageRedemptions).toHaveBeenCalledWith(env.DB, {
-      lineAccountId: 'account-1', status: 'delivery_failed', limit: 100, offset: 0,
+      lineAccountId: 'account-1', status: 'needs_attention', limit: 100, offset: 0,
     });
     const body = await response.json() as {
       data: { items: Array<Record<string, unknown>>; pagination: Record<string, unknown> };
@@ -321,6 +324,7 @@ describe('mileage admin API', () => {
   it('retries only a failed fulfillment and keeps the same redemption', async () => {
     dbMocks.getMileageRedemption.mockResolvedValue({
       id: 'redemption-9', lineAccountId: 'account-1', status: 'delivery_failed',
+      idempotencyKey: 'secret-key-9', requestFingerprint: 'secret-fp-9',
     });
     deliveryMocks.deliverMileageReward.mockResolvedValueOnce({
       status: 'succeeded', rewardName: '500円引き', customerMessage: '',
@@ -334,10 +338,40 @@ describe('mileage admin API', () => {
     expect(deliveryMocks.deliverMileageReward).toHaveBeenCalledWith(
       env.DB, 'redemption-9', expect.objectContaining({}),
     );
+    // R367: 交換の今の状態も返す。画面は返却完了などを区別できる。
+    const body = await response.json() as { data: { redemption: Record<string, unknown> } };
+    expect(body.data.redemption).toMatchObject({ id: 'redemption-9', lineAccountId: 'account-1' });
+    expect(JSON.stringify(body)).not.toContain('secret');
+  });
+
+  /*
+   * R364: 配送中（照合待ち）のやり直しも受け付ける。
+   * 送ったか確かめられない手順は送り直さない（配送側の責務）。
+   * （直す前は delivering が409＝赤）
+   */
+  it('retries a delivering redemption left unconfirmed without resending', async () => {
+    dbMocks.getMileageRedemption.mockResolvedValue({
+      id: 'redemption-hold', lineAccountId: 'account-1', status: 'delivering',
+      idempotencyKey: 'key-hold', requestFingerprint: 'fp-hold',
+    });
+    deliveryMocks.deliverMileageReward.mockResolvedValueOnce({
+      status: 'delivery_failed', rewardName: '500円引き', customerMessage: '',
+      rewardCode: null, retryAt: null, failurePolicy: 'retry',
+      message: '特典の送信は終わっています。確定を確認しています。',
+    });
+    const response = await call('/api/mileage/redemptions/redemption-hold/retry-fulfillment', {
+      method: 'POST', body: JSON.stringify({ accountId: 'account-1' }),
+    });
+    expect(response.status).toBe(202);
+    expect(deliveryMocks.deliverMileageReward).toHaveBeenCalledWith(
+      env.DB, 'redemption-hold', expect.objectContaining({}),
+    );
+    const body = await response.json() as { data: { redemption: Record<string, unknown> } };
+    expect(body.data.redemption).toMatchObject({ id: 'redemption-hold' });
   });
 
   it('refuses to retry a redemption that is not failing', async () => {
-    for (const status of ['reserved', 'delivering', 'succeeded', 'refunded']) {
+    for (const status of ['reserved', 'succeeded', 'refunded']) {
       dbMocks.getMileageRedemption.mockResolvedValueOnce({
         id: `redemption-${status}`, lineAccountId: 'account-1', status,
       });
@@ -855,6 +889,124 @@ describe('mileage admin API', () => {
     });
     expect(hidden.status).toBe(404);
     expect(dbMocks.postMileageAdjustment).not.toHaveBeenCalled();
+  });
+
+  /*
+   * R378: 確定済みの調整を同じ内容で再送したときは、あとから変わった
+   * 承認境界や経過した元の期限で拒否せず、当時の結果をそのまま返す。
+   */
+  it('replays a committed adjustment even after the approval threshold was lowered', async () => {
+    dbMocks.findCommittedMileageAdjustment.mockResolvedValueOnce({
+      entry: { id: 'entry-9', amount: 500 },
+      balanceBefore: 100,
+      balanceAfter: 600,
+      replayed: true,
+    });
+    // 境界を 100 へ下げたあとの再送。新規判定なら承認依頼になる額。
+    dbMocks.getMileageManualAdjustmentPolicy.mockResolvedValueOnce({ approvalThreshold: 100 });
+    const response = await call('/api/mileage/adjustments', {
+      method: 'POST',
+      headers: {
+        'Idempotency-Key': '11111111-2222-4333-8444-555555555555',
+        'X-Confirm-Irreversible': 'mileage-adjustment',
+      },
+      body: JSON.stringify({
+        accountId: 'account-1', friendId: 'friend-1', direction: 'increase', amount: 500,
+        reasonCategory: 'campaign', reason: 'キャンペーン調整',
+        expiresAt: '2020-01-01T00:00:00.000Z',
+      }),
+    });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      data: { entryId: 'entry-9', balanceBefore: 100, balanceAfter: 600, replayed: true },
+    });
+    expect(dbMocks.createMileageAdjustmentApprovalRequest).not.toHaveBeenCalled();
+    expect(dbMocks.postMileageAdjustment).not.toHaveBeenCalled();
+  });
+
+  it('rejects a same-key retry whose content differs from the committed adjustment', async () => {
+    dbMocks.findCommittedMileageAdjustment.mockRejectedValueOnce(
+      new dbMocks.MileageAdjustmentError('idempotency_conflict'),
+    );
+    const response = await call('/api/mileage/adjustments', {
+      method: 'POST',
+      headers: {
+        'Idempotency-Key': '11111111-2222-4333-8444-555555555555',
+        'X-Confirm-Irreversible': 'mileage-adjustment',
+      },
+      body: JSON.stringify({
+        accountId: 'account-1', friendId: 'friend-1', direction: 'increase', amount: 999,
+        reasonCategory: 'campaign', reason: '別の内容',
+      }),
+    });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      success: false, code: 'idempotency_conflict',
+    });
+    expect(dbMocks.postMileageAdjustment).not.toHaveBeenCalled();
+  });
+
+  /*
+   * R380/R381: 通知だけをあとから再送する口。残高は動かさず、保存済みの
+   * 本文と送信キーで再送する。通知を依頼していない調整や、担当外の
+   * アカウントの調整には使えない。
+   */
+  it('retries a stored notification without reapplying mileage', async () => {
+    d1.prepare.mockImplementationOnce(() => ({
+      bind: () => ({
+        first: vi.fn().mockResolvedValue({
+          id: 'entry-1', beneficiary_friend_id: 'friend-1', idempotency_key: 'key-1',
+          amount: 100, metadata: JSON.stringify({ notifyFriend: true, balanceAfter: 600 }),
+        }),
+      }),
+    }));
+    dbMocks.getMileageAdjustmentNotificationRecord.mockResolvedValueOnce({
+      id: 'notif-1', friendId: 'friend-1', ledgerEntryId: 'entry-1',
+      idempotencyKey: 'notif-key-1', messageText: '保存済み本文',
+    });
+    const res = await call('/api/mileage/entries/entry-1/notification-retry', {
+      method: 'POST',
+      body: JSON.stringify({ accountId: 'account-1' }),
+    });
+    expect(res.status).toBe(200);
+    expect(adjustmentNotificationMocks.sendMileageAdjustmentNotification).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        lineAccountId: 'account-1',
+        friendId: 'friend-1',
+        ledgerEntryId: 'entry-1',
+        idempotencyKey: 'notif-key-1',
+        message: '保存済み本文',
+      }),
+    );
+    expect(dbMocks.postMileageAdjustment).not.toHaveBeenCalled();
+  });
+
+  it('rejects a retry for an adjustment that never requested a notification', async () => {
+    d1.prepare.mockImplementationOnce(() => ({
+      bind: () => ({
+        first: vi.fn().mockResolvedValue({
+          id: 'entry-2', beneficiary_friend_id: 'friend-1', idempotency_key: 'key-2',
+          amount: 100, metadata: JSON.stringify({ notifyFriend: false }),
+        }),
+      }),
+    }));
+    const res = await call('/api/mileage/entries/entry-2/notification-retry', {
+      method: 'POST',
+      body: JSON.stringify({ accountId: 'account-1' }),
+    });
+    expect(res.status).toBe(404);
+    expect(adjustmentNotificationMocks.sendMileageAdjustmentNotification).not.toHaveBeenCalled();
+  });
+
+  it('rejects a retry for an entry outside the operator account scope', async () => {
+    const res = await call('/api/mileage/entries/entry-9/notification-retry', {
+      method: 'POST',
+      body: JSON.stringify({ accountId: 'account-2' }),
+    });
+    expect(res.status).toBe(404);
+    expect(d1.prepare).not.toHaveBeenCalled();
+    expect(adjustmentNotificationMocks.sendMileageAdjustmentNotification).not.toHaveBeenCalled();
   });
 
   it('lets only owners configure the approval threshold', async () => {
