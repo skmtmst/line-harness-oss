@@ -178,7 +178,7 @@ function MigrateFriendField() {
           name: targetName.trim() || `${source.name}（新）`,
           fieldKey: targetKey.trim() || `${source.fieldKey}_new`.slice(0, 32),
           type: targetType,
-        })
+        }, crypto.randomUUID())
         if (!created.success) throw new Error(created.error)
         targetField = created.data
         if (!gateRef.current.current(token) || accountRef.current !== account) return
