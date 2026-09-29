@@ -6705,6 +6705,65 @@ CREATE TABLE tenants (
 , feature_packs TEXT NOT NULL DEFAULT '[]', plan_key TEXT, plan_status TEXT NOT NULL DEFAULT 'exempt'
   CHECK (plan_status IN ('exempt', 'trialing', 'active', 'past_due', 'canceled')), trial_ends_at TEXT, stripe_customer_id TEXT, stripe_subscription_id TEXT, current_period_ends_at TEXT, plan_updated_at TEXT, signup_device_marker TEXT);
 
+CREATE TABLE tiktok_pnl_order_lines (
+  -- `<TikTok注文ID>:<行番号>`。シートのキー列（A列）にもこの値を使う。
+  -- 主キーは line_account_id と組にする。TikTok注文IDはアカウントをまたいで
+  -- 重複し得るため、単独キーにすると先に取り込んだアカウントが行を占有し、
+  -- 別アカウントの同一注文IDが混入・欠落する。
+  line_key TEXT NOT NULL,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  tiktok_order_id TEXT NOT NULL,
+  line_index INTEGER NOT NULL,
+  -- 集計の基準日（JST）。支払日、なければ注文日から求める。YYYY-MM-DD。
+  order_date_jst TEXT NOT NULL,
+  paid_at TEXT,
+  -- EC側から届いた生のステータス。表示用の日本語化は書き出し時に行う。
+  order_status TEXT,
+  sku TEXT,
+  product_name TEXT NOT NULL,
+  quantity INTEGER NOT NULL,
+  unit_price_yen INTEGER,
+  line_amount_yen INTEGER,
+  -- 同日・同一購入者を1発送と数えるための識別子（EC側で正規化済み）。
+  buyer_key TEXT,
+  source_updated_at TEXT,
+  fetched_at TEXT NOT NULL,
+  -- 1 = シートへ未反映（新規または内容が変わった）。書き出し成功で 0 に戻す。
+  sheet_dirty INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (line_account_id, line_key)
+);
+
+CREATE TABLE tiktok_pnl_settings (
+  line_account_id TEXT PRIMARY KEY REFERENCES line_accounts(id) ON DELETE CASCADE,
+  -- 1 = このアカウントで利益計算シートを使う。既定は 0。
+  -- cron は 1 のアカウントだけ処理する。Google Sheets連携が繋がっているだけで
+  -- 勝手にスプレッドシートを作らないための明示的な有効化。
+  -- 管理画面の手動同期が押された時に 1 へ上げる。
+  enabled INTEGER NOT NULL DEFAULT 0,
+  spreadsheet_id TEXT,
+  spreadsheet_url TEXT,
+  status TEXT NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending', 'ready', 'error')),
+  -- 同期中の目印（開始時刻）。手動同期と定期実行が重なると同じ明細を
+  -- 二重に追記してしまうため、アカウント単位の排他に使う。
+  -- 途中で落ちた場合も古い値は期限切れとして無視する。
+  sync_started_at TEXT,
+  -- 雛形（見出し・数式・マスタ）を書き込み終えた時刻。
+  -- 作成と書き込みを分けたので、ここが空なら次tickで書き込みだけやり直す。
+  -- 2つ目のスプレッドシートを作らないための目印。
+  template_filled_at TEXT,
+  -- EC側取り込みの再開点（source_updated_at ベース）。
+  import_cursor TEXT,
+  last_import_at TEXT,
+  last_sheet_sync_at TEXT,
+  last_error TEXT,
+  consecutive_failures INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE tracked_links (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
@@ -8981,6 +9040,12 @@ CREATE INDEX idx_tenants_signup_device_marker
 
 CREATE UNIQUE INDEX idx_tenants_stripe_customer
   ON tenants(stripe_customer_id) WHERE stripe_customer_id IS NOT NULL;
+
+CREATE INDEX idx_tiktok_pnl_lines_account_date
+  ON tiktok_pnl_order_lines(line_account_id, order_date_jst);
+
+CREATE INDEX idx_tiktok_pnl_lines_dirty
+  ON tiktok_pnl_order_lines(line_account_id, sheet_dirty);
 
 CREATE UNIQUE INDEX idx_tracked_links_dedup_key
   ON tracked_links (dedup_key) WHERE dedup_key IS NOT NULL;

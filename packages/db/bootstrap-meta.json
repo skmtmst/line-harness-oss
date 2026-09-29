@@ -475,7 +475,8 @@
     "517_mileage_reward_version_revision.sql",
     "520_incoming_webhook_receipt_plan.sql",
     "521_incoming_webhook_receipt_body_hash.sql",
-    "532_webhook_interaction_secret_unavailable.sql"
+    "532_webhook_interaction_secret_unavailable.sql",
+    "535_tiktok_pnl.sql"
   ],
-  "migrationCount": 476
+  "migrationCount": 477
 }
