@@ -4552,7 +4552,7 @@ const spec = {
       post: {
         tags: ['Affiliates'],
         summary: 'アフィリエイト作成',
-        requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { name: { type: 'string' }, code: { type: 'string' }, commissionRate: { type: 'number' } }, required: ['name', 'code'] } } } },
+        requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { name: { type: 'string' }, code: { type: 'string' }, commissionRate: { type: 'number' }, isActive: { type: 'boolean' } }, required: ['name', 'code'] } } } },
         responses: { '201': { description: 'Created' } },
       },
     },

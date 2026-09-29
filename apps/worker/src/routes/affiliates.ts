@@ -393,6 +393,8 @@ affiliates.post('/api/affiliates', requireRole('owner', 'admin'), async (c) => {
       issueInitialLink?: boolean;
       lineAccountId?: string;
       operationId?: string;
+      // R525: 「すぐに計測を始める」オフで登録したら最初の行から停止で作る。
+      isActive?: boolean;
     }>();
 
     const name = typeof body.name === 'string' ? body.name.trim() : '';
@@ -471,6 +473,8 @@ affiliates.post('/api/affiliates', requireRole('owner', 'admin'), async (c) => {
           code,
           commissionRate: body.commissionRate,
           operationId: operationId || undefined,
+          // R525: 追加情報の保存が失敗しても稼働で残さない。
+          isActive: body.isActive,
         });
         return c.json({ success: true, data: serializeAffiliate(item) }, 201);
       } catch (err) {
@@ -499,6 +503,8 @@ affiliates.post('/api/affiliates', requireRole('owner', 'admin'), async (c) => {
         commissionRate: body.commissionRate,
         friendId: friendId || null,
         operationId: operationId || undefined,
+        // R525: 追加情報の保存が失敗しても稼働で残さない。
+        isActive: body.isActive,
       });
     } catch (err) {
       // The friend_id partial UNIQUE index throws when the friend already has an

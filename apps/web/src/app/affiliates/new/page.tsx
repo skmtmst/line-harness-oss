@@ -245,16 +245,24 @@ export default function NewAffiliatePage() {
               issueInitialLink: true,
               lineAccountId: selectedAccountId,
               operationId,
+              // R525: 計測オフの登録は最初の行から停止で作る。追加情報の
+              // 保存が失敗しても稼働では残らない。
+              isActive: startTracking,
             })
             if (!res.success) throw new Error('create_failed')
             affiliateId = res.data.id
             setCreatedId(affiliateId)
+            // 保存された行の稼働状態へ寄せる。応答消失後の再送が古い行を
+            // 回収したときも、画面の表示と再試行の送り先がずれない。
+            setStartTracking(res.data.isActive)
           } catch {
             throw new Error('アフィリエイターを登録できませんでした。入力を確認して、もう一度お試しください。')
           }
         }
-        // 連絡先・保留期間・支払いサイクル・通知・計測の開始は作成のAPIが
-        // 受けないので、続けて更新する。1つの操作として見えるようにまとめる。
+        // 連絡先・保留期間・支払いサイクル・通知は作成のAPIが受けないので、
+        // 続けて更新する。1つの操作として見えるようにまとめる。
+        // 計測の開始だけは作成のAPIへ渡す（R525）。更新でのみ送ると、
+        // 更新の失敗時に稼働の行が残ってしまう。
         // 名前・報酬率も更新APIが受けるので、途中保存後にここを直して
         // 再開した分もまとめて送る（一部項目だけだと画面上の変更を失う、
         // Issue #686）。
@@ -328,6 +336,15 @@ export default function NewAffiliatePage() {
             <p className="font-semibold">基本情報は保存済みです</p>
             <p className="mt-1">
               下の「追加情報の保存を再開する」で続けるか、未保存の追加情報を破棄して一覧へ戻れます。
+            </p>
+            {/*
+              R525: 追加情報の保存に失敗しても、作った行の稼働状態は
+              登録時の指定のまま。計測が始まっているかを取り違えさせない。
+            */}
+            <p className="mt-1">
+              {startTracking
+                ? '「すぐに計測を始める」がオンなので、追加情報を保存すると計測も始まります。'
+                : '「すぐに計測を始める」がオフなので、計測は始まらないまま追加情報だけを保存します。'}
             </p>
           </Notice>
         ) : null}

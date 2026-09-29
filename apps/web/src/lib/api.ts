@@ -9629,6 +9629,8 @@ export const api = {
       lineAccountId?: string
       /** 安定した操作UUID（#686）。同じ値での再送は同じ登録を返す。 */
       operationId?: string
+      /** R525: オフで登録したら最初の行から停止で作る。省略時は稼働。 */
+      isActive?: boolean
     }) =>
       fetchApi<ApiResponse<Affiliate> & { link?: { refCode: string; url: string } | null }>(
         '/api/affiliates',
