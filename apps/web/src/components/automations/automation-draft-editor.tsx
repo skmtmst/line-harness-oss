@@ -12,6 +12,7 @@ import TargetMissing from '@/components/shared/target-missing'
 import Select from '@/components/shared/select'
 import { useCanManageAutomations } from './use-automation-permission'
 import Notice from '@/components/shared/notice'
+import { isoToJstDatetimeLocal } from './automation-datetime'
 
 // #734: きっかけ・処理の選択肢は共有の正本から描画する。新規作成と同じ一覧。
 const EVENTS: Array<{ value: AutomationDraftDetail['eventType']; label: string }> = AUTOMATION_DRAFT_TRIGGER_OPTIONS.map(
@@ -28,15 +29,6 @@ function stringParam(value: unknown): string {
 
 function stringListParam(value: unknown): string {
   return Array.isArray(value) ? value.map((item) => String(item)).filter(Boolean).join(',') : stringParam(value)
-}
-
-/** ISO日時を datetime-local 入力の形へ直す。 */
-function isoToLocalInput(value: string): string {
-  const time = Date.parse(value)
-  if (!Number.isFinite(time)) return ''
-  const date = new Date(time)
-  const pad = (part: number) => String(part).padStart(2, '0')
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
 // #734: この画面で欄を持たない設定は、読み込んだ値をそのまま残す。
@@ -70,6 +62,10 @@ export default function AutomationDraftEditor({ draftId }: { draftId: string }) 
   const [preserved, setPreserved] = useState<Record<string, unknown>>({})
   const [preservedFor, setPreservedFor] = useState('')
   const [actionType, setActionType] = useState<AutomationDraftAction['type']>('add_tag')
+  /** 先頭の処理の番号。読み込んだIDを保つ（R481）。 */
+  const [actionId, setActionId] = useState('step-1')
+  /** 2件目以降の処理。この画面では欄を持たないので読み込んだまま返す（R481）。 */
+  const [extraActions, setExtraActions] = useState<AutomationDraftAction[]>([])
   const [actionTagId, setActionTagId] = useState('')
   const [actionScenarioId, setActionScenarioId] = useState('')
   const [actionMessage, setActionMessage] = useState('')
@@ -105,7 +101,7 @@ export default function AutomationDraftEditor({ draftId }: { draftId: string }) 
       setTriggerTagId(stringParam(draft.triggerConfig.tagId))
       setTriggerTagAction(draft.triggerConfig.action === 'remove' ? 'remove' : 'add')
       setTriggerKeyword(stringParam(draft.triggerConfig.keyword))
-      setTriggerAt(isoToLocalInput(stringParam(draft.triggerConfig.at)))
+      setTriggerAt(isoToJstDatetimeLocal(stringParam(draft.triggerConfig.at)))
       setTriggerTime(stringParam(draft.triggerConfig.time))
       setTriggerWeekdays(stringListParam(draft.triggerConfig.weekdays))
       setTriggerFriendIds(stringListParam(draft.triggerConfig.friendIds))
@@ -113,6 +109,8 @@ export default function AutomationDraftEditor({ draftId }: { draftId: string }) 
       setPreservedFor(draft.eventType)
       if (action) {
         setActionType(action.type)
+        setActionId(typeof action.id === 'string' && action.id ? action.id : 'step-1')
+        setExtraActions(draft.actions.slice(1))
         setActionTagId(stringParam(action.params.tagId))
         setActionScenarioId(stringParam(action.params.scenarioId))
         setActionMessage(stringParam(action.params.content))
@@ -162,7 +160,7 @@ export default function AutomationDraftEditor({ draftId }: { draftId: string }) 
   }
 
   const action: AutomationDraftAction = {
-    id: 'step-1',
+    id: actionId,
     type: actionType,
     params: actionType === 'add_tag'
       ? { tagId: actionTagId }
@@ -232,7 +230,7 @@ export default function AutomationDraftEditor({ draftId }: { draftId: string }) 
             name: name.trim(),
             eventType,
             triggerConfig: buildTriggerConfig(),
-            actions: [action],
+            actions: [action, ...extraActions],
           })
           if (!response.success) throw new Error(response.error)
           return draftId
@@ -309,7 +307,7 @@ export default function AutomationDraftEditor({ draftId }: { draftId: string }) 
       ) : null}
       {eventType === 'datetime' ? (
         <>
-          <Field label="実行日時" htmlFor="au-trigger-at" required>
+          <Field label="実行日時" htmlFor="au-trigger-at" required help="日本時間で入力します。表示も保存も日本時間です。">
             <DateTimeField
               id="au-trigger-at"
               aria-label="実行日時"
@@ -381,6 +379,9 @@ export default function AutomationDraftEditor({ draftId }: { draftId: string }) 
       ) : null}
 
       <p className="text-ink mt-2 text-sm font-semibold">3. 何をするか</p>
+      {extraActions.length > 0 ? (
+        <p className="text-xs text-ink-secondary">ほかに{extraActions.length}件の処理があります。この画面では変えられませんが、保存しても残ります。</p>
+      ) : null}
       <Field label="すること" htmlFor="au-action" required>
         <Select
           id="au-action"
