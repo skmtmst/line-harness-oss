@@ -174,10 +174,41 @@ async function findUser(db: D1Database, tenantId: string, id: string): Promise<U
           )
         )`,
   ).bind(id, tenantId, tenantId, tenantId).first<UserRow>();
-  if (!row) {
+  if (row) return row;
+  /*
+   * R391: 結び付きが0件の本人は上の条件では見つからない。解除は正常な
+   * 終わり方なので、解除履歴がこの統括に残っている本人は保管状態として開く。
+   * 行そのものは users に残っていることが条件。権限の可否は呼び手
+   * （canAccessPerson）が別に見る。
+   */
+  const archived = await db.prepare(
+    `SELECT u.id, u.tenant_id, u.status, u.revision, u.display_name,
+            u.primary_display_name, u.created_at, u.updated_at, u.archived_at
+       FROM users u
+      WHERE u.id = ?
+        AND (u.tenant_id = ? OR u.tenant_id IS NULL)
+        AND EXISTS (
+          SELECT 1 FROM identity_events e
+           WHERE e.tenant_id = ? AND e.user_id = u.id
+        )`,
+  ).bind(id, tenantId, tenantId).first<UserRow>();
+  if (!archived) {
     throw new MergedPersonError(404, 'PERSON_NOT_FOUND', '統合ユーザーが見つかりません');
   }
-  return row;
+  return archived;
+}
+
+/** R391: この統括に本人の操作履歴が残っているか（保管状態の判定用）。 */
+export async function hasMergedPersonHistory(
+  db: D1Database,
+  tenantId: string,
+  id: string,
+): Promise<boolean> {
+  const found = await db.prepare(
+    `SELECT 1 AS found FROM identity_events
+      WHERE tenant_id = ? AND user_id = ? LIMIT 1`,
+  ).bind(tenantId, id).first<{ found: number }>();
+  return Boolean(found);
 }
 
 async function linkedRows(
@@ -208,14 +239,23 @@ async function profileRows(
   tenantId: string,
   userId: string,
 ): Promise<ProfileRow[]> {
+  /*
+   * R390: 解除済みの友だちを採用元にする値は返さない。解除時に無効化するが、
+   * それ以前の行が残っていても、結び付いていない友だち由来は隠す。
+   * 採用元を持たない値（手入力など）はそのまま返す。
+   */
   const result = await db.prepare(
     `SELECT field_key, field_label, value_json, value_preview, source_type,
             source_id, source_label, source_friend_id, verified_at,
             selected_by_name, selected_at, update_mode
        FROM user_profile_values
       WHERE tenant_id = ? AND user_id = ? AND is_active = 1
+        AND (
+          source_friend_id IS NULL
+          OR source_friend_id IN (SELECT id FROM friends WHERE user_id = ?)
+        )
       ORDER BY field_label, field_key`,
-  ).bind(tenantId, userId).all<ProfileRow>();
+  ).bind(tenantId, userId, userId).all<ProfileRow>();
   return result.results;
 }
 
@@ -224,6 +264,10 @@ async function priorityRows(
   tenantId: string,
   userId: string,
 ): Promise<PriorityRow[]> {
+  /*
+   * R390: 解除済みの友だちを有効な配信先として返さない。解除時に引退させるが、
+   * それ以前の行が残っていても、現在結び付いていない友だちの行は隠す。
+   */
   const result = await db.prepare(
     `SELECT p.purpose, p.friend_id, f.line_account_id,
             la.name AS line_account_name, p.priority, p.is_active, p.reason
@@ -231,8 +275,9 @@ async function priorityRows(
        JOIN friends f ON f.id = p.friend_id
        JOIN line_accounts la ON la.id = f.line_account_id
       WHERE p.tenant_id = ? AND p.user_id = ? AND p.retired_at IS NULL
+        AND f.user_id = ?
       ORDER BY p.purpose, p.priority, p.friend_id`,
-  ).bind(tenantId, userId).all<PriorityRow>();
+  ).bind(tenantId, userId, userId).all<PriorityRow>();
   return result.results;
 }
 
@@ -648,32 +693,80 @@ export async function unlinkMergedPersonFriend(
   if (!friend) {
     throw new MergedPersonError(404, 'PERSON_LINK_NOT_FOUND', '解除する友だちの結び付けが見つかりません');
   }
+  /*
+   * R390: 解除と一緒に、解除した友だち由来の設定を整理する。採用値の情報源を
+   * 失う値は無効化し、配信先は利用対象外（引退）へ移す。行自体は消さず、
+   * identity_events に件数を残すので履歴は追える。
+   */
+  const [retiredPriorities, deactivatedProfiles] = await Promise.all([
+    db.prepare(
+      `SELECT COUNT(*) AS count FROM user_delivery_priorities
+        WHERE tenant_id = ? AND user_id = ? AND friend_id = ? AND retired_at IS NULL`,
+    ).bind(actor.tenantId, id, friendId).first<{ count: number }>(),
+    db.prepare(
+      `SELECT COUNT(*) AS count FROM user_profile_values
+        WHERE tenant_id = ? AND user_id = ? AND source_friend_id = ? AND is_active = 1`,
+    ).bind(actor.tenantId, id, friendId).first<{ count: number }>(),
+  ]);
   const now = nowIso();
+  /*
+   * R389: 版の確保を書き込みより先に行うのではなく、各文に版の条件を付ける。
+   * 版が進んでいると全ての文が0件更新になり、409側は friend・link・履歴の
+   * どれも変えない。最後の users 更新の件数で 200/409 を決める。
+   */
+  const revisionGuard = `EXISTS (SELECT 1 FROM users WHERE id = ? AND revision = ?)`;
   const results = await db.batch([
     db.prepare(
       `UPDATE friend_identity_links
           SET unlinked_by = ?, unlinked_at = ?, unlink_reason = ?
-        WHERE tenant_id = ? AND user_id = ? AND friend_id = ? AND unlinked_at IS NULL`,
-    ).bind(actor.id, now, reason, actor.tenantId, id, friendId),
+        WHERE tenant_id = ? AND user_id = ? AND friend_id = ? AND unlinked_at IS NULL
+          AND ${revisionGuard}`,
+    ).bind(actor.id, now, reason, actor.tenantId, id, friendId, id, user.revision),
     db.prepare(
-      'UPDATE friends SET user_id = NULL, updated_at = ? WHERE id = ? AND user_id = ?',
-    ).bind(now, friendId, id),
+      `UPDATE friends SET user_id = NULL, updated_at = ? WHERE id = ? AND user_id = ?
+        AND ${revisionGuard}`,
+    ).bind(now, friendId, id, id, user.revision),
+    db.prepare(
+      `UPDATE user_delivery_priorities
+          SET retired_at = ?, updated_at = ?
+        WHERE tenant_id = ? AND user_id = ? AND friend_id = ? AND retired_at IS NULL
+          AND ${revisionGuard}`,
+    ).bind(now, now, actor.tenantId, id, friendId, id, user.revision),
+    db.prepare(
+      `UPDATE user_profile_values
+          SET is_active = 0, updated_at = ?
+        WHERE tenant_id = ? AND user_id = ? AND source_friend_id = ? AND is_active = 1
+          AND ${revisionGuard}`,
+    ).bind(now, actor.tenantId, id, friendId, id, user.revision),
     db.prepare(
       `INSERT INTO identity_events (
         id, tenant_id, user_id, event_type, summary, before_json, after_json,
         actor_staff_id, actor_name, occurred_at, correlation_id
-      ) VALUES (?, ?, ?, 'unlink', ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      SELECT ?, ?, ?, 'unlink', ?, ?, ?, ?, ?, ?, ?
+      WHERE ${revisionGuard}`,
     ).bind(
       crypto.randomUUID(), actor.tenantId, id, '統合ユーザーから友だちを解除しました',
       JSON.stringify({ friendId, lineAccountId: friend.line_account_id }),
-      JSON.stringify({ friendId, linked: false, reason }),
+      JSON.stringify({
+        friendId,
+        linked: false,
+        reason,
+        retiredPriorities: retiredPriorities?.count ?? 0,
+        deactivatedProfiles: deactivatedProfiles?.count ?? 0,
+      }),
       actor.id, actor.name, now, crypto.randomUUID(),
+      id, user.revision,
     ),
     db.prepare(
       `UPDATE users SET revision = revision + 1, updated_at = ?
         WHERE id = ? AND revision = ? AND (tenant_id = ? OR tenant_id IS NULL)`,
     ).bind(now, id, user.revision, actor.tenantId),
   ]);
-  if (changes(results.at(-1)) !== 1) throw staleError();
+  const friendChanges = changes(results[1]);
+  const historyChanges = changes(results[4]);
+  if (changes(results.at(-1)) !== 1 || friendChanges !== 1 || historyChanges !== 1) {
+    throw staleError();
+  }
   return { personId: id, friendId, revision: user.revision + 1, unlinkedAt: now };
 }
