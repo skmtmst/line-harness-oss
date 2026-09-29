@@ -49,6 +49,13 @@ export default function NewAffiliateOfferPage() {
   const [createdId, setCreatedId] = useState<string | null>(null)
   const [tags, setTags] = useState<Tag[]>([])
   const [scenarios, setScenarios] = useState<Scenario[]>([])
+  /*
+   * R524: 候補の取得状態を1件ずつ持つ。失敗を「（なし）」に化けさせない。
+   * 失敗中は保存も止め、画面内の「もう一度読み込む」で取り直す。
+   */
+  const [tagsFetch, setTagsFetch] = useState<'loading' | 'ready' | 'failed'>('loading')
+  const [scenariosFetch, setScenariosFetch] = useState<'loading' | 'ready' | 'failed'>('loading')
+  const [candidateSeq, setCandidateSeq] = useState(0)
   // 作成の再送で二重登録にしないための、この登録試行1回分の安定した操作
   // UUID（Issue #686）。押し直しても同じ値のままにするため onSave では
   // 作らず、ここと onReset だけで作り直す。
@@ -80,22 +87,40 @@ export default function NewAffiliateOfferPage() {
     if (!selectedAccountId) {
       setTags([])
       setScenarios([])
+      setTagsFetch('ready')
+      setScenariosFetch('ready')
       return () => { cancelled = true }
     }
+    // 取り直しの間は古いアカウントの候補を選ばせない。失敗は空に化けさせず
+    // 失敗のまま残す（R524）。
+    setTags([])
+    setScenarios([])
+    setTagsFetch('loading')
+    setScenariosFetch('loading')
     const accountParams = { accountId: selectedAccountId }
     void Promise.allSettled([api.tags.list(accountParams), api.scenarios.list(accountParams)]).then(
       ([t, s]) => {
         if (cancelled) return
-        if (t.status === 'fulfilled' && t.value.success) setTags(t.value.data)
+        if (t.status === 'fulfilled' && t.value.success) {
+          setTags(t.value.data)
+          setTagsFetch('ready')
+        } else {
+          setTags([])
+          setTagsFetch('failed')
+        }
         if (s.status === 'fulfilled' && s.value.success) {
           setScenarios(s.value.data as unknown as Scenario[])
+          setScenariosFetch('ready')
+        } else {
+          setScenarios([])
+          setScenariosFetch('failed')
         }
       },
     )
     return () => {
       cancelled = true
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, candidateSeq])
 
   const yen = rewardAmount ? Number(rewardAmount) : 0
   const miles = rewardMiles ? Number(rewardMiles) : 0
@@ -113,6 +138,11 @@ export default function NewAffiliateOfferPage() {
       validate={() => {
         if (!name.trim()) return '案件名を入力してください'
         if (!selectedAccountId) return 'LINEアカウントを選んでください（画面上部で選べます）'
+        // R524: 候補の取得失敗を「（なし）」のつもりで確定させない。
+        // 取り直してから保存する。
+        if (tagsFetch === 'failed' || scenariosFetch === 'failed') {
+          return 'タグまたはシナリオの候補を読み込めませんでした。「もう一度読み込む」で取り直してから保存してください'
+        }
         if (!rewardAmount && !rewardMiles) return '報酬（円かマイル）のどちらかを入れてください'
         const amountError = rewardIntegerError(rewardAmount, 'amount')
         if (amountError) return amountError
@@ -323,6 +353,25 @@ export default function NewAffiliateOfferPage() {
             ]}
             size="standard"
           />
+          {/*
+            R524: 失敗を「（なし）」と区別する。読み込み中も一言出し、
+            候補が無いのか・まだ読んでいるのかを取り違えさせない。
+          */}
+          {tagsFetch === 'loading' ? (
+            <p className="text-ink-faint mt-1 text-xs">タグの候補を読み込んでいます</p>
+          ) : null}
+          {tagsFetch === 'failed' ? (
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+              <p className="text-danger">タグの候補を読み込めませんでした。</p>
+              <button
+                type="button"
+                onClick={() => setCandidateSeq((n) => n + 1)}
+                className="text-accent-deep hover:bg-accent-soft rounded-control px-3 py-1 font-semibold"
+              >
+                もう一度読み込む
+              </button>
+            </div>
+          ) : null}
         </Field>
 
         <Field
@@ -342,6 +391,22 @@ export default function NewAffiliateOfferPage() {
             ]}
             size="standard"
           />
+          {/* R524: タグ側と同じく、失敗は「（なし）」と区別して再試行を出す。 */}
+          {scenariosFetch === 'loading' ? (
+            <p className="text-ink-faint mt-1 text-xs">シナリオの候補を読み込んでいます</p>
+          ) : null}
+          {scenariosFetch === 'failed' ? (
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+              <p className="text-danger">シナリオの候補を読み込めませんでした。</p>
+              <button
+                type="button"
+                onClick={() => setCandidateSeq((n) => n + 1)}
+                className="text-accent-deep hover:bg-accent-soft rounded-control px-3 py-1 font-semibold"
+              >
+                もう一度読み込む
+              </button>
+            </div>
+          ) : null}
         </Field>
         </div>
 
