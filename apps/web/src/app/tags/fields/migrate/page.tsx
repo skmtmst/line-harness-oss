@@ -547,7 +547,7 @@ function MigrateFriendField() {
         「移行を実行する」には戻さない。
       */}
       {!run && executedRunId ? (
-        <section data-design="ResultPending" className="rounded-card border border-hairline bg-canvas p-5 shadow-sm" aria-live="polite">
+        <section data-design="Result" className="rounded-card border border-hairline bg-canvas p-5" aria-live="polite">
           <h2 className="text-base font-bold text-ink">移行の結果</h2>
           <p className="mt-2 text-sm text-ink">{pollProblem || '実行を受け付けました。結果を確認しています…'}</p>
         </section>
