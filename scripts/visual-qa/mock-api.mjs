@@ -1233,6 +1233,7 @@ const SHAPES = {
   */
   '/api/analytics/report-schedules': {
     items: [],
+    recentOneTime: [],
     options: {
       timeZone: 'Asia/Tokyo',
       savedAnalyses: [
@@ -2081,6 +2082,34 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   }
   if (pathname === '/api/analytics/saved') {
     return { success: true, data: ANALYTICS_SAVED }
+  }
+  /* R454: 1回送信の履歴と送り直し。型どおりの器で返す。 */
+  const reportRuns = /^\/api\/analytics\/report-schedules\/([^/]+)\/runs$/.exec(pathname)
+  if (method === 'GET' && reportRuns) {
+    return {
+      success: true,
+      data: {
+        schedule: {
+          id: reportRuns[1], lineAccountId: 'visual-qa-account', name: '1回送信の見本',
+          sections: ['friends'], savedAnalysisIds: [], cadence: 'weekly', weekday: 1,
+          monthDay: null, sendTime: '09:00', timeZone: 'Asia/Tokyo', periodDays: 7,
+          recipients: [{ kind: 'email', email: 'report@example.com', label: 'report@example.com' }],
+          channels: ['email'], alertRules: [], status: 'archived', isOneTime: true,
+          nextRunAt: '2026-09-07T00:00:00.000Z', createdBy: null,
+          createdAt: '2026-09-06T00:00:00.000Z', updatedAt: '2026-09-07T01:00:00.000Z',
+        },
+        runs: [{
+          id: 'visual-run-1', scheduleId: reportRuns[1], lineAccountId: 'visual-qa-account',
+          scheduledFor: '2026-09-07T00:00:00.000Z', periodFrom: '2026-08-31', periodTo: '2026-09-06',
+          timeZone: 'Asia/Tokyo', dataCutoffAt: '2026-09-07T00:00:00.000Z', state: 'failed',
+          result: {}, deliveryResults: [{ channel: 'email', recipient: 'report@example.com', status: 'failed', reason: '見本の失敗' }],
+          errorCode: 'synthetic_mail_failed', startedAt: '2026-09-07T00:00:00.000Z', completedAt: '2026-09-07T00:01:00.000Z',
+        }],
+      },
+    }
+  }
+  if (method === 'POST' && /^\/api\/analytics\/report-schedules\/[^/]+\/retry$/.test(pathname)) {
+    return { success: true, data: null }
   }
   const savedSnapshots = /^\/api\/analytics\/saved\/([^/]+)\/snapshots$/.exec(pathname)
   if (savedSnapshots) {
