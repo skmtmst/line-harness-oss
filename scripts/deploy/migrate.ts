@@ -24,6 +24,7 @@ import {
   columnsOf,
   describeMarker,
   judge,
+  attributeMarkers,
   markersOf,
   schemaFromSqliteMaster,
   type Marker,
@@ -145,8 +146,16 @@ function inspect(target: Target): Row[] {
   } catch {
     // _migrations がまだ無い。seed がその状態を想定している。
   }
-  return migrationFiles().map((file) => {
-    const verdict = judge(markersOf(readFileSync(join(MIGRATIONS_DIR, file), 'utf8'), final), live);
+  // 目印の持ち主を先に決めてから判定する。索引を貼り直すだけのファイルが
+  // 「古いほうが作った索引が在る」せいで partial に化けるのを防ぐ。
+  const attributed = attributeMarkers(
+    migrationFiles().map((file) => ({
+      file,
+      markers: markersOf(readFileSync(join(MIGRATIONS_DIR, file), 'utf8'), final),
+    })),
+  );
+  return attributed.map(({ file, markers }) => {
+    const verdict = judge(markers, live);
     return {
       file,
       state: verdict.state,
