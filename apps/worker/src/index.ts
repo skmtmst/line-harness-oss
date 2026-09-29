@@ -465,6 +465,10 @@ app.route('/', errorMessages);
 app.route('/', accountHandovers);
 app.route('/', friendBulkRuns);
 app.route('/', friendMigrations);
+// NOTE: R393 — /api/friends/people 等の固定名は :id より先に載せる。
+// duplicates（本人候補・統合ユーザー）は friends の GET /:id より先でないと
+// people を友だちIDと読んで404になる。broadcastApprovals と同じ考え方。
+app.route('/', duplicates);
 app.route('/', friends);
 app.route('/', tags);
 app.route('/', scenarios);
@@ -479,7 +483,6 @@ app.route('/', brand);
 app.route('/', conversions);
 app.route('/', affiliates);
 app.route('/', affiliateOffers);
-app.route('/', duplicates);
 app.route('/', usersGrouped);
 app.route('/', inbox);
 app.route('/', openapi);
