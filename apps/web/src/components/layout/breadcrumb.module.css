@@ -29,7 +29,7 @@
 
 .current {
   color: var(--color-ink);
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .separator {

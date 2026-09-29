@@ -67,7 +67,7 @@
 /* 箱の中の「?」。★V7 `LYs5d`：11px 太字 `ink-secondary`。 */
 .mark {
   font-size: var(--text-micro); /* fontSize: 11 */
-  font-weight: 700;
+  font-weight: 500;
   line-height: 1;
 }
 

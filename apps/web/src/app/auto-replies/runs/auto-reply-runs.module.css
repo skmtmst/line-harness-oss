@@ -88,7 +88,7 @@
   background: var(--color-accent-soft);
   color: var(--color-ink);
   font-size: var(--text-nano);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .runIdentity {
@@ -198,7 +198,7 @@
 .facts dd {
   color: var(--color-ink);
   font-size: var(--text-label);
-  font-weight: 700;
+  font-weight: 600;
   text-align: right;
 }
 
