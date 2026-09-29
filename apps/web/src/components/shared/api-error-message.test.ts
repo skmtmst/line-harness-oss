@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ApiError } from '@/lib/api'
-import { classifyApiFailure, describeApiFailure, japaneseDetailOf, loadFailureCopy, retryAfterSecondsOf } from './api-error-message'
+import { classifyApiFailure, describeApiFailure, isForbiddenOrRateLimited, japaneseDetailOf, loadFailureCopy, loadFailureNotice, retryAfterSecondsOf } from './api-error-message'
 
 describe('APIの失敗を原因どおりに言い分ける（R32）', () => {
   it('403は権限不足に分け、統括への依頼を案内する', () => {
@@ -95,5 +95,21 @@ describe('読み込み失敗の1枚（403・429の出し分け）', () => {
     expect(view.title).toContain('表示できませんでした')
     expect(view.retryable).toBe(true)
     expect(loadFailureCopy(new TypeError('Failed to fetch'), 'この画面').retryable).toBe(true)
+  })
+
+  it('403・429だけ特別扱いにする目安がある', () => {
+    expect(isForbiddenOrRateLimited(new ApiError(403, 'API error: 403'))).toBe(true)
+    expect(isForbiddenOrRateLimited(new ApiError(429, 'API error: 429'))).toBe(true)
+    expect(isForbiddenOrRateLimited(new ApiError(500, 'API error: 500'))).toBe(false)
+    expect(isForbiddenOrRateLimited(new TypeError('Failed to fetch'))).toBe(false)
+  })
+
+  it('帯の1行は生の内部文を出さない', () => {
+    expect(loadFailureNotice(new ApiError(403, 'API error: 403'), 'この画面'))
+      .toContain('権限がありません')
+    expect(loadFailureNotice(new ApiError(429, 'API error: 429', undefined, undefined, undefined, 30), 'この画面'))
+      .toContain('30秒')
+    expect(loadFailureNotice(new ApiError(500, 'API error: 500'), 'この画面'))
+      .not.toContain('API error')
   })
 })

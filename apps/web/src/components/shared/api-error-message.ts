@@ -122,3 +122,21 @@ export function loadFailureCopy(
     retryable: true,
   }
 }
+
+/**
+ * 403・429だけ特別な1枚にするか。画面が独自の失敗文を持っているとき、
+ * この2つだけ共通文へ切り替える目安にする（それ以外は画面の文のまま）。
+ */
+export function isForbiddenOrRateLimited(err: unknown): boolean {
+  const kind = classifyApiFailure(err)
+  return kind === 'forbidden' || kind === 'rateLimited'
+}
+
+/**
+ * 帯（Notice）や赤字1行に出す読み込み失敗の1行（m23m）。
+ * 生の `API error: NNN` を出さず、見出しと案内をつなげた1行にする。
+ */
+export function loadFailureNotice(err: unknown, target: string): string {
+  const view = loadFailureCopy(err, target)
+  return `${view.title}。${view.description}`
+}
