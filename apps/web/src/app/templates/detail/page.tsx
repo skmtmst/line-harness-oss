@@ -19,6 +19,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { templateDeleteDescription } from '../template-delete-message'
 import { messageTypeText } from '../template-message-type'
+import { isTemplateDetailData } from '../template-detail-data'
 
 interface Usage {
   autoReplies: Array<{ id: string; keyword: string; templateVersion: number | null }>
@@ -114,11 +115,18 @@ function TemplateDetailInner() {
     setLoading(true)
     try {
       const detail = await api.templates.get(id)
-      if (detail.success) {
+      if (detail.success && isTemplateDetailData(detail.data)) {
         setTemplate(detail.data)
-        setUsage(detail.data.usedBy)
-      } else {
+        setUsage(detail.data.usedBy ?? null)
+      } else if (!detail.success) {
         setError('テンプレートを読み込めませんでした。もう一度お試しください。')
+      } else {
+        /*
+         * D008: success:true だが形が違う応答（存在しないIDへの一覧形など）。
+         * 無いものを「ある」ように描くと編集・削除の口まで出るので、
+         * 見つからないものとして扱う。
+         */
+        setMissing(true)
       }
     } catch (caught) {
       if (caught instanceof ApiError && caught.status === 404) {
