@@ -575,6 +575,117 @@ describe('V6共通アクション', () => {
     expect(count()).toEqual({ count: 3 });
   });
 
+  it('参照をまたぐ4段分岐の公開は理由と経路を示して止まる（監査 R478）', async () => {
+    const branchOf = (id: string, thenSteps: unknown[], elseSteps: unknown[]) => ({
+      id, type: 'branch', onFailure: 'stop',
+      params: {
+        condition: { operator: 'AND', rules: [{ type: 'tag_exists', value: 'tag-1' }] },
+        then: thenSteps, else: elseSteps,
+      },
+    });
+    const nested = (levels: number, prefix: string): unknown[] => levels === 0
+      ? tagAction('tag-1')
+      : [branchOf(`${prefix}-b${levels}`, nested(levels - 1, `${prefix}-t`), tagAction('tag-1'))];
+    const refTo = (id: string, targetId: string) => ({
+      id, type: 'common_action', params: { commonActionId: targetId }, onFailure: 'stop',
+    });
+
+    // 3段の分岐を持つLは公開できる（境界）。
+    const leaf = await createCommonAction(testDb.db, {
+      lineAccountId: 'account-1', name: '分岐3段', actions: nested(3, 'leaf'),
+    });
+    await publishCommonActionDraft(testDb.db, {
+      id: leaf.id, lineAccountId: 'account-1',
+      draftVersionId: leaf.draftVersionId, expectedDraftRevision: 1,
+    });
+    // 1段の分岐でLを呼ぶCは展開で4段になるため、実行に渡す前に止まる。
+    const caller = await createCommonAction(testDb.db, {
+      lineAccountId: 'account-1', name: '分岐を呼ぶ',
+      actions: [branchOf('c-b', [refTo('call-leaf', leaf.id)], tagAction('tag-1'))],
+    });
+    await expect(publishCommonActionDraft(testDb.db, {
+      id: caller.id, lineAccountId: 'account-1',
+      draftVersionId: caller.draftVersionId, expectedDraftRevision: 1,
+    })).rejects.toMatchObject({ code: 'branch_too_deep' });
+    await expect(publishCommonActionDraft(testDb.db, {
+      id: caller.id, lineAccountId: 'account-1',
+      draftVersionId: caller.draftVersionId, expectedDraftRevision: 1,
+    })).rejects.toThrow(/3段/);
+  });
+
+  it('呼び出し21段は公開を止め20段は通す（監査 R478）', async () => {
+    const publishOne = async (name: string, childId: string | null) => {
+      const created = await createCommonAction(testDb.db, {
+        lineAccountId: 'account-1',
+        name,
+        actions: childId
+          ? [{ id: `call-${name}`, type: 'common_action', params: { commonActionId: childId }, onFailure: 'stop' }]
+          : tagAction('tag-1'),
+      });
+      await publishCommonActionDraft(testDb.db, {
+        id: created.id, lineAccountId: 'account-1',
+        draftVersionId: created.draftVersionId, expectedDraftRevision: 1,
+      });
+      return created.id;
+    };
+    // 20段の連鎖は公開できる（境界）。末尾から順に公開する。
+    let child20: string | null = null;
+    for (let i = 20; i >= 1; i--) {
+      child20 = await publishOne(`連鎖20-${i}`, child20);
+    }
+    // 21段の連鎖は先頭の公開で止まる。末尾20段の公開は通る。
+    let child21: string | null = null;
+    for (let i = 21; i >= 2; i--) {
+      child21 = await publishOne(`連鎖21-${i}`, child21);
+    }
+    const head21 = await createCommonAction(testDb.db, {
+      lineAccountId: 'account-1',
+      name: '連鎖21-1',
+      actions: child21
+        ? [{ id: 'call-21-1', type: 'common_action', params: { commonActionId: child21 }, onFailure: 'stop' }]
+        : tagAction('tag-1'),
+    });
+    await expect(publishCommonActionDraft(testDb.db, {
+      id: head21.id, lineAccountId: 'account-1',
+      draftVersionId: head21.draftVersionId, expectedDraftRevision: 1,
+    })).rejects.toMatchObject({ code: 'common_action_too_deep' });
+  });
+
+  it('展開1001処理は公開を止め1000処理は通す（監査 R478）', async () => {
+    const waits = (count: number, prefix: string) => Array.from({ length: count }, (_, index) => ({
+      id: `${prefix}-w${index}`, type: 'wait', params: { minutes: 5 }, onFailure: 'stop',
+    }));
+    const leaf = await createCommonAction(testDb.db, {
+      lineAccountId: 'account-1', name: '待機99',
+      actions: waits(99, 'leaf'),
+    });
+    await publishCommonActionDraft(testDb.db, {
+      id: leaf.id, lineAccountId: 'account-1',
+      draftVersionId: leaf.draftVersionId, expectedDraftRevision: 1,
+    });
+    const refs = (count: number, prefix: string) => Array.from({ length: count }, (_, index) => ({
+      id: `${prefix}-call${index}`, type: 'common_action',
+      params: { commonActionId: leaf.id }, onFailure: 'stop',
+    }));
+    // 呼び出し10回で990+10=1000処理は公開できる（境界）。
+    const ok = await createCommonAction(testDb.db, {
+      lineAccountId: 'account-1', name: '千処理', actions: refs(10, 'ok'),
+    });
+    await publishCommonActionDraft(testDb.db, {
+      id: ok.id, lineAccountId: 'account-1',
+      draftVersionId: ok.draftVersionId, expectedDraftRevision: 1,
+    });
+    // もう1処理足して1001になると、実行に渡す前に止まる。
+    const over = await createCommonAction(testDb.db, {
+      lineAccountId: 'account-1', name: '千一処理',
+      actions: [...refs(10, 'over'), { id: 'extra', type: 'wait', params: { minutes: 5 }, onFailure: 'stop' }],
+    });
+    await expect(publishCommonActionDraft(testDb.db, {
+      id: over.id, lineAccountId: 'account-1',
+      draftVersionId: over.draftVersionId, expectedDraftRevision: 1,
+    })).rejects.toMatchObject({ code: 'execution_plan_too_large' });
+  });
+
   it('一覧で旧版利用ありと未使用を区別する', async () => {
     const used = await createCommonAction(testDb.db, {
       lineAccountId: 'account-1', name: '利用中', actions: tagAction('tag-1'),

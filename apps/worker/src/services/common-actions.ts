@@ -487,6 +487,127 @@ async function pinAndValidateReferences(
   return pinned;
 }
 
+/*
+ * 監査 R478: 公開前に参照先の固定版まで展開し、実行計画と同じ制限を検査する。
+ * 公開だけ通って開始時に失敗する内容を、理由と対象経路を示して止める。
+ * 制限値は automation-engine の buildExecutionPlan と同じにする。
+ * - 共通アクションの呼び出し: 20段まで（利用先から1段使う前提で深さ1から数える）
+ * - 条件分岐の入れ子: 3段まで
+ * - 展開後の処理総数: 1000個まで（呼び出し自体も1個に数える）
+ */
+const EXPANSION_MAX_DEPTH = 20;
+const EXPANSION_MAX_BRANCH_DEPTH = 3;
+const EXPANSION_MAX_STEPS = 1000;
+
+async function resolvePublishedVersionActions(
+  db: D1Database,
+  lineAccountId: string,
+  actionId: string,
+  pinnedVersionId: unknown,
+): Promise<{ versionId: string; actions: ActionDefinition[] } | null> {
+  if (typeof pinnedVersionId === 'string' && pinnedVersionId.trim()) {
+    const pinned = await db.prepare(
+      `SELECT cav.id, cav.action_config
+         FROM common_action_versions cav
+         JOIN common_actions ca ON ca.id = cav.common_action_id
+        WHERE cav.id = ? AND cav.common_action_id = ? AND cav.status = 'published'
+          AND ca.line_account_id = ?`,
+    ).bind(pinnedVersionId, actionId, lineAccountId).first<{ id: string; action_config: string }>();
+    if (pinned) return { versionId: pinned.id, actions: parseStoredActions(pinned.action_config) };
+  }
+  const current = await db.prepare(
+    `SELECT cav.id, cav.action_config
+       FROM common_actions ca
+       JOIN common_action_versions cav
+         ON cav.id = ca.current_published_version_id AND cav.common_action_id = ca.id
+        AND cav.status = 'published'
+      WHERE ca.id = ? AND ca.line_account_id = ? AND ca.status = 'published'`,
+  ).bind(actionId, lineAccountId).first<{ id: string; action_config: string }>();
+  if (!current) return null;
+  return { versionId: current.id, actions: parseStoredActions(current.action_config) };
+}
+
+async function assertPublishableExpansion(
+  db: D1Database,
+  lineAccountId: string,
+  actions: ActionDefinition[],
+): Promise<void> {
+  const state = { count: 0 };
+  await walkExpansion(db, lineAccountId, actions, {
+    depth: 1,
+    branchDepth: 0,
+    chain: [],
+    ids: [],
+    state,
+  });
+}
+
+async function walkExpansion(
+  db: D1Database,
+  lineAccountId: string,
+  actions: ActionDefinition[],
+  context: { depth: number; branchDepth: number; chain: string[]; ids: string[]; state: { count: number } },
+): Promise<void> {
+  if (context.depth > EXPANSION_MAX_DEPTH) {
+    throw new CommonActionValidationError(
+      'common_action_too_deep',
+      `共通アクションの呼び出しが深すぎます（${EXPANSION_MAX_DEPTH}段まで）。経路：${context.chain.join('→')}`,
+      'actions',
+    );
+  }
+  for (const action of actions) {
+    context.state.count += 1;
+    if (context.state.count > EXPANSION_MAX_STEPS) {
+      throw new CommonActionValidationError(
+        'execution_plan_too_large',
+        `実行する処理が多すぎます（${EXPANSION_MAX_STEPS}個まで）。経路：${context.chain.join('→')}`,
+        'actions',
+      );
+    }
+    if (action.type === 'branch') {
+      if (context.branchDepth >= EXPANSION_MAX_BRANCH_DEPTH) {
+        throw new CommonActionValidationError(
+          'branch_too_deep',
+          `条件分岐の入れ子は${EXPANSION_MAX_BRANCH_DEPTH}段までです。経路：${context.chain.join('→')}`,
+          'actions',
+        );
+      }
+      const params = action.params as { then?: unknown; else?: unknown };
+      const thenActions = Array.isArray(params.then) ? params.then as ActionDefinition[] : [];
+      const elseActions = Array.isArray(params.else) ? params.else as ActionDefinition[] : [];
+      await walkExpansion(db, lineAccountId, thenActions, { ...context, branchDepth: context.branchDepth + 1 });
+      await walkExpansion(db, lineAccountId, elseActions, { ...context, branchDepth: context.branchDepth + 1 });
+      continue;
+    }
+    if (action.type !== 'common_action') continue;
+    const actionId = action.params.commonActionId;
+    if (typeof actionId !== 'string' || !actionId.trim()) continue;
+    if (context.ids.includes(actionId)) {
+      throw new CommonActionValidationError(
+        'common_action_cycle', '共通アクションの呼び出しを循環させることはできません', 'actions',
+      );
+    }
+    const resolved = await resolvePublishedVersionActions(
+      db, lineAccountId, actionId, action.params.commonActionVersionId,
+    );
+    // 公開できる参照先があることは pin で保証済み。無いものは飛ばす。
+    if (!resolved) continue;
+    const nameRow = await db.prepare(
+      `SELECT name FROM common_actions WHERE id = ? AND line_account_id = ?`,
+    ).bind(actionId, lineAccountId).first<{ name: string }>();
+    context.chain.push(nameRow?.name ?? actionId);
+    context.ids.push(actionId);
+    await walkExpansion(db, lineAccountId, resolved.actions, {
+      ...context,
+      depth: context.depth + 1,
+      chain: context.chain,
+      ids: context.ids,
+    });
+    context.chain.pop();
+    context.ids.pop();
+  }
+}
+
 async function assertNoCycle(
   db: D1Database,
   lineAccountId: string,
@@ -1075,6 +1196,8 @@ export async function publishCommonActionDraft(
   }
   const actions = validateActionShape(JSON.parse(draft.action_config));
   const pinned = await pinAndValidateReferences(db, input.lineAccountId, owner.id, actions);
+  // 監査 R478: 参照を展開した深さ・総数も公開前に検査する。
+  await assertPublishableExpansion(db, input.lineAccountId, pinned);
   const now = new Date().toISOString();
   const result = await db.batch([
     db.prepare(
