@@ -394,7 +394,7 @@ function BookingsInner() {
   /* TECH-03: 申込者CSVの書出し中。失敗は occurrenceActionError へ出す。 */
   const [csvBusy, setCsvBusy] = useState(false)
   const [broadcastMessage, setBroadcastMessage] = useState('')
-  const [broadcastPreview, setBroadcastPreview] = useState<{ broadcastId: string; recipientCount: number; scope: string } | null>(null)
+  const [broadcastPreview, setBroadcastPreview] = useState<{ broadcastId: string; recipientCount: number; scope: string; occurrenceId: string } | null>(null)
   const [broadcastBusy, setBroadcastBusy] = useState(false)
   const [broadcastConfirmOpen, setBroadcastConfirmOpen] = useState(false)
   const [broadcastError, setBroadcastError] = useState('')
@@ -438,6 +438,15 @@ function BookingsInner() {
   const occurrenceSlotsRequestRef = useRef(0)
   const occurrenceApplicantsRequestRef = useRef(0)
   const broadcastPreviewKeyRef = useRef<string | null>(null)
+  /*
+   * 今選んでいる開催回。申込プレビューの遅い応答が、切り替え前の
+   * 開催回のものかを見分ける。描画のたびに写す（state は非同期の
+   *  closures では古いままになるため）。
+   */
+  const selectedOccurrenceIdRef = useRef(selectedOccurrenceId)
+  if (selectedOccurrenceIdRef.current !== selectedOccurrenceId) {
+    selectedOccurrenceIdRef.current = selectedOccurrenceId
+  }
 
   /*
    * **アカウント・イベントを切り替えたら、進行中の記録を失効させる。**
@@ -478,6 +487,23 @@ function BookingsInner() {
     setBroadcastPreview(null)
     broadcastPreviewKeyRef.current = null
     setBroadcastMessage('')
+    setBroadcastError('')
+  }
+  /*
+   * **開催回を切り替えたら、前の開催回の下書きは捨てる。**
+   *
+   * 開催回1の対象確定を押したまま開催回2へ切り替えると、1の応答が
+   * 2の申込者の読み込みより後に返り、**2の画面に1の対象人数と確認
+   * ボタンが復活した。** そのまま進むと別日の申込者へ送りかねない。
+   * 描画のうちに捨てる（文面は残し、対象・確認・使い回し鍵だけ捨てる）。
+   */
+  const [broadcastOccurrenceScope, setBroadcastOccurrenceScope] = useState(selectedOccurrenceId)
+  if (broadcastOccurrenceScope !== selectedOccurrenceId) {
+    setBroadcastOccurrenceScope(selectedOccurrenceId)
+    setBroadcastBusy(false)
+    setBroadcastConfirmOpen(false)
+    setBroadcastPreview(null)
+    broadcastPreviewKeyRef.current = null
     setBroadcastError('')
   }
   /*
@@ -931,6 +957,7 @@ function BookingsInner() {
     const message = broadcastMessage.trim()
     if (!accountId || !occurrence || !message || broadcastBusy) return
     const startedScope = scope
+    const startedOccurrenceId = occurrence.id
     setBroadcastBusy(true)
     setBroadcastError('')
     try {
@@ -942,9 +969,12 @@ function BookingsInner() {
         snapshotId: occurrenceApplicants.snapshotId,
       }, idempotencyKey)
       if (scopeRef.current !== startedScope) return
-      setBroadcastPreview({ ...result, scope: startedScope })
+      /* 開催回が切り替わっていたら、前の開催回の下書きは捨てる。 */
+      if (selectedOccurrenceIdRef.current !== startedOccurrenceId) return
+      setBroadcastPreview({ ...result, scope: startedScope, occurrenceId: startedOccurrenceId })
     } catch {
       if (scopeRef.current !== startedScope) return
+      if (selectedOccurrenceIdRef.current !== startedOccurrenceId) return
       setBroadcastError('対象を確定できませんでした。内容を確認して、もう一度お試しください。')
     } finally {
       if (scopeRef.current === startedScope) setBroadcastBusy(false)
@@ -952,7 +982,7 @@ function BookingsInner() {
   }
 
   async function sendOccurrenceBroadcast() {
-    if (!broadcastPreview || broadcastPreview.scope !== scope || broadcastBusy) return
+    if (!broadcastPreview || broadcastPreview.scope !== scope || broadcastPreview.occurrenceId !== selectedOccurrenceId || broadcastBusy) return
     const startedScope = scope
     setBroadcastBusy(true)
     setBroadcastError('')
@@ -993,7 +1023,9 @@ function BookingsInner() {
   const currentPage = Math.min(page, pageCount)
   const selectedAccountRole = accounts.find((account) => account.id === selectedAccountId)?.role
   const canManageApplicantBroadcast = selectedAccountRole === 'owner' || selectedAccountRole === 'admin'
-  const activeBroadcastPreview = broadcastPreview?.scope === scope ? broadcastPreview : null
+  const activeBroadcastPreview = broadcastPreview?.scope === scope && broadcastPreview.occurrenceId === selectedOccurrenceId
+    ? broadcastPreview
+    : null
 
   return (
     <div className="flex flex-col gap-4">
