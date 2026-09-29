@@ -66,6 +66,7 @@ interface VersionRow {
   version_number: number;
   status: 'draft' | 'published';
   action_config: string;
+  draft_revision: number;
   created_by: string | null;
   created_at: string;
   published_at: string | null;
@@ -76,6 +77,8 @@ export interface CommonActionVersion {
   versionNumber: number;
   status: 'draft' | 'published';
   actions: ActionDefinition[];
+  /* 監査 R473・R477: 保存ごとに進む改訂番号。古い読み取りからの保存・公開を止める。 */
+  draftRevision: number;
   createdBy: string | null;
   createdAt: string;
   publishedAt: string | null;
@@ -140,6 +143,19 @@ function requiredString(value: unknown, field: string, label: string): string {
     throw new CommonActionValidationError('required', `${label}を入力してください`, field);
   }
   return value.trim();
+}
+
+/*
+ * 監査 R473・R477: 読み取り時の改訂番号。保存・公開のたびに照合し、
+ * 古い画面からの上書きを止める。利用者に入力させる項目ではない。
+ */
+function requiredDraftRevision(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 1) {
+    throw new CommonActionValidationError(
+      'required', '編集中の版を確認してください', 'expectedDraftRevision',
+    );
+  }
+  return value;
 }
 
 function parseStoredActions(raw: string): ActionDefinition[] {
@@ -902,6 +918,7 @@ export async function updateCommonActionDraft(
   db: D1Database,
   input: {
     id: string; lineAccountId: string; expectedDraftVersionId: unknown;
+    expectedDraftRevision: unknown;
     name: unknown; description?: unknown; actions: unknown;
   },
 ): Promise<void> {
@@ -911,6 +928,8 @@ export async function updateCommonActionDraft(
   if (!owner.current_draft_version_id || owner.current_draft_version_id !== expected) {
     throw new CommonActionValidationError('version_conflict', '別の人が新版を作りました。再読み込みしてください');
   }
+  // 監査 R473: 版IDは編集を重ねても変わらない。改訂番号で先行保存を検知する。
+  const expectedRevision = requiredDraftRevision(input.expectedDraftRevision);
   const name = requiredString(input.name, 'name', '共通アクション名');
   const description = typeof input.description === 'string' && input.description.trim()
     ? input.description.trim()
@@ -919,16 +938,21 @@ export async function updateCommonActionDraft(
   const now = new Date().toISOString();
   const result = await db.batch([
     db.prepare(
-      `UPDATE common_action_versions SET action_config = ?
-        WHERE id = ? AND common_action_id = ? AND status = 'draft'`,
-    ).bind(JSON.stringify(actions), expected, owner.id),
+      `UPDATE common_action_versions
+          SET action_config = ?, draft_revision = draft_revision + 1
+        WHERE id = ? AND common_action_id = ? AND status = 'draft'
+          AND draft_revision = ?`,
+    ).bind(JSON.stringify(actions), expected, owner.id, expectedRevision),
     db.prepare(
       `UPDATE common_actions SET name = ?, description = ?, updated_at = ?
         WHERE id = ? AND line_account_id = ? AND current_draft_version_id = ?`,
     ).bind(name, description, now, owner.id, input.lineAccountId, expected),
   ]);
   if ((result[0].meta?.changes ?? 0) !== 1 || (result[1].meta?.changes ?? 0) !== 1) {
-    throw new CommonActionValidationError('version_conflict', '編集中の版が変わりました。再読み込みしてください');
+    throw new CommonActionValidationError(
+      'draft_revision_conflict',
+      '別の担当者が先に保存しました。読み込み直して差分を確認してください',
+    );
   }
 }
 
@@ -980,7 +1004,7 @@ export async function createCommonActionDraft(
 
 export async function publishCommonActionDraft(
   db: D1Database,
-  input: { id: string; lineAccountId: string; draftVersionId: unknown },
+  input: { id: string; lineAccountId: string; draftVersionId: unknown; expectedDraftRevision: unknown },
 ): Promise<{ versionId: string; versionNumber: number }> {
   const owner = await getOwnedAction(db, input.id, input.lineAccountId);
   if (!owner) throw new CommonActionValidationError('not_found', '共通アクションが見つかりません');
@@ -988,12 +1012,21 @@ export async function publishCommonActionDraft(
   if (owner.current_draft_version_id !== draftVersionId) {
     throw new CommonActionValidationError('version_conflict', '公開対象の下書きが変わりました。再読み込みしてください');
   }
+  // 監査 R477: 公開の読取後に保存が入ったら、古い読取の公開で上書きしない。
+  const expectedRevision = requiredDraftRevision(input.expectedDraftRevision);
   const draft = await db.prepare(
-    `SELECT id, common_action_id, version_number, status, action_config, created_by, created_at, published_at
+    `SELECT id, common_action_id, version_number, status, action_config, draft_revision,
+            created_by, created_at, published_at
        FROM common_action_versions
       WHERE id = ? AND common_action_id = ? AND status = 'draft'`,
   ).bind(draftVersionId, owner.id).first<VersionRow>();
   if (!draft) throw new CommonActionValidationError('draft_not_found', '公開する下書きが見つかりません');
+  if (Number(draft.draft_revision) !== expectedRevision) {
+    throw new CommonActionValidationError(
+      'draft_revision_conflict',
+      '公開前に下書きが更新されました。差分を確認し直してください',
+    );
+  }
   const actions = validateActionShape(JSON.parse(draft.action_config));
   const pinned = await pinAndValidateReferences(db, input.lineAccountId, owner.id, actions);
   const now = new Date().toISOString();
@@ -1001,8 +1034,9 @@ export async function publishCommonActionDraft(
     db.prepare(
       `UPDATE common_action_versions
           SET status = 'published', action_config = ?, published_at = ?
-        WHERE id = ? AND common_action_id = ? AND status = 'draft'`,
-    ).bind(JSON.stringify(pinned), now, draft.id, owner.id),
+        WHERE id = ? AND common_action_id = ? AND status = 'draft'
+          AND draft_revision = ?`,
+    ).bind(JSON.stringify(pinned), now, draft.id, owner.id, expectedRevision),
     db.prepare(
       `UPDATE common_actions
           SET status = 'published', current_draft_version_id = NULL,
@@ -1011,7 +1045,10 @@ export async function publishCommonActionDraft(
     ).bind(draft.id, now, owner.id, input.lineAccountId, draft.id),
   ]);
   if ((result[0].meta?.changes ?? 0) !== 1 || (result[1].meta?.changes ?? 0) !== 1) {
-    throw new CommonActionValidationError('version_conflict', '公開直前に版が変わりました。再読み込みしてください');
+    throw new CommonActionValidationError(
+      'draft_revision_conflict',
+      '公開前に下書きが更新されました。差分を確認し直してください',
+    );
   }
   return { versionId: draft.id, versionNumber: draft.version_number };
 }
@@ -1028,7 +1065,7 @@ export async function getCommonActionDetail(
   if (!owner) throw new CommonActionValidationError('not_found', '共通アクションが見つかりません');
   const [versionsResult, bindingsResult] = await Promise.all([
     db.prepare(
-      `SELECT id, common_action_id, version_number, status, action_config,
+      `SELECT id, common_action_id, version_number, status, action_config, draft_revision,
               created_by, created_at, published_at
          FROM common_action_versions WHERE common_action_id = ?
         ORDER BY version_number DESC`,
@@ -1105,6 +1142,7 @@ export async function getCommonActionDetail(
     versionNumber: row.version_number,
     status: row.status,
     actions: parseStoredActions(row.action_config),
+    draftRevision: Number(row.draft_revision ?? 1),
     createdBy: row.created_by,
     createdAt: row.created_at,
     publishedAt: row.published_at,

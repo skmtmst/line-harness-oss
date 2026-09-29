@@ -115,6 +115,13 @@ describe('V6共通アクションの画面契約', () => {
     expect(VERSIONS).toContain('旧版のまま進行中')
   })
 
+  it('下書き保存・公開は改訂番号を照合する（監査 R473・R477）', () => {
+    expect(API).toContain('expectedDraftRevision')
+    expect(EDIT).toContain('expectedDraftRevision: draftRevision')
+    expect(EDIT).toContain('最新の内容を読み込み直す')
+    expect(VERSIONS).toContain('version.draftRevision')
+  })
+
   it('版操作は店が外れていたら実行しない (#580)', () => {
     expect(VERSIONS).toContain('if (!selectedAccountId) {')
     expect(VERSIONS).toContain('LINEアカウントを選び直してください')

@@ -3782,7 +3782,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
         currentDraftVersionId: null,
         currentPublishedVersionId: 'cav-broadcast-delivered-tag-1',
         versions: [{
-          id: 'cav-broadcast-delivered-tag-1', versionNumber: 1, status: 'published',
+          id: 'cav-broadcast-delivered-tag-1', versionNumber: 1, status: 'published', draftRevision: 1,
           actions: [{ id: 'broadcast-delivered-tag-step', type: 'add_tag', params: { tagId: 'tag-broadcast-delivered' }, onFailure: 'stop' }],
           createdBy: 'Kenta Kawano', createdAt: '2026-08-20T00:00:00.000Z', publishedAt: '2026-08-20T00:00:00.000Z',
         }],

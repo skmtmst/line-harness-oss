@@ -59,6 +59,7 @@ describe('V6共通アクション', () => {
       id: created.id,
       lineAccountId: 'account-1',
       expectedDraftVersionId: created.draftVersionId,
+      expectedDraftRevision: 1,
       name: '来店後フォロー',
       description: '公開前の変更',
       actions: tagAction('tag-1'),
@@ -67,6 +68,7 @@ describe('V6共通アクション', () => {
       id: created.id,
       lineAccountId: 'account-1',
       draftVersionId: created.draftVersionId,
+      expectedDraftRevision: 2,
     });
 
     expect(published).toEqual({ versionId: created.draftVersionId, versionNumber: 1 });
@@ -96,6 +98,7 @@ describe('V6共通アクション', () => {
       id: created.id,
       lineAccountId: 'account-1',
       draftVersionId: created.draftVersionId,
+      expectedDraftRevision: 1,
     })).rejects.toMatchObject({
       code: 'resource_not_found',
       field: 'actions.0.params.tagId',
@@ -117,7 +120,7 @@ describe('V6共通アクション', () => {
         lineAccountId: 'account-1', name, actions: messageAction(templateId),
       });
       return publishCommonActionDraft(testDb.db, {
-        id: created.id, lineAccountId: 'account-1', draftVersionId: created.draftVersionId,
+        id: created.id, lineAccountId: 'account-1', draftVersionId: created.draftVersionId, expectedDraftRevision: 1,
       });
     };
     const unpublished = await createTemplate(testDb.db, {
@@ -183,13 +186,13 @@ describe('V6共通アクション', () => {
       lineAccountId: 'account-1', name: 'VIP向け', actions: tagAction('tag-1'),
     });
     await publishCommonActionDraft(testDb.db, {
-      id: yes.id, lineAccountId: 'account-1', draftVersionId: yes.draftVersionId,
+      id: yes.id, lineAccountId: 'account-1', draftVersionId: yes.draftVersionId, expectedDraftRevision: 1,
     });
     const no = await createCommonAction(testDb.db, {
       lineAccountId: 'account-1', name: '通常向け', actions: tagAction('tag-1'),
     });
     await publishCommonActionDraft(testDb.db, {
-      id: no.id, lineAccountId: 'account-1', draftVersionId: no.draftVersionId,
+      id: no.id, lineAccountId: 'account-1', draftVersionId: no.draftVersionId, expectedDraftRevision: 1,
     });
     const branched = await createCommonAction(testDb.db, {
       lineAccountId: 'account-1',
@@ -204,7 +207,7 @@ describe('V6共通アクション', () => {
       }],
     });
     await publishCommonActionDraft(testDb.db, {
-      id: branched.id, lineAccountId: 'account-1', draftVersionId: branched.draftVersionId,
+      id: branched.id, lineAccountId: 'account-1', draftVersionId: branched.draftVersionId, expectedDraftRevision: 1,
     });
     const detail = await getCommonActionDetail(testDb.db, {
       id: branched.id, lineAccountId: 'account-1',
@@ -222,7 +225,7 @@ describe('V6共通アクション', () => {
       lineAccountId: 'account-1', name: '来店後フォロー', actions: tagAction('tag-1'),
     });
     await publishCommonActionDraft(testDb.db, {
-      id: source.id, lineAccountId: 'account-1', draftVersionId: source.draftVersionId,
+      id: source.id, lineAccountId: 'account-1', draftVersionId: source.draftVersionId, expectedDraftRevision: 1,
     });
     const copied = await duplicateCommonAction(testDb.db, {
       id: source.id, lineAccountId: 'account-1', createdBy: 'staff-1',
@@ -243,7 +246,7 @@ describe('V6共通アクション', () => {
       actions: [{ id: 'metadata', type: 'set_metadata', params: { values: { '': '値' } }, onFailure: 'stop' }],
     });
     await expect(publishCommonActionDraft(testDb.db, {
-      id: invalid.id, lineAccountId: 'account-1', draftVersionId: invalid.draftVersionId,
+      id: invalid.id, lineAccountId: 'account-1', draftVersionId: invalid.draftVersionId, expectedDraftRevision: 1,
     })).rejects.toMatchObject({ code: 'metadata_key_required' });
 
     const waiting = await createCommonAction(testDb.db, {
@@ -252,7 +255,7 @@ describe('V6共通アクション', () => {
       actions: [{ id: 'wait', type: 'wait', params: { minutes: 5 }, onFailure: 'stop' }],
     });
     await publishCommonActionDraft(testDb.db, {
-      id: waiting.id, lineAccountId: 'account-1', draftVersionId: waiting.draftVersionId,
+      id: waiting.id, lineAccountId: 'account-1', draftVersionId: waiting.draftVersionId, expectedDraftRevision: 1,
     });
     const detail = await getCommonActionDetail(testDb.db, {
       id: waiting.id, lineAccountId: 'account-1',
@@ -265,7 +268,7 @@ describe('V6共通アクション', () => {
       lineAccountId: 'account-1', name: '固定版', actions: tagAction('tag-1'),
     });
     await publishCommonActionDraft(testDb.db, {
-      id: created.id, lineAccountId: 'account-1', draftVersionId: created.draftVersionId,
+      id: created.id, lineAccountId: 'account-1', draftVersionId: created.draftVersionId, expectedDraftRevision: 1,
     });
     testDb.raw.prepare(
       `INSERT INTO common_action_bindings
@@ -280,11 +283,12 @@ describe('V6共通アクション', () => {
       id: created.id,
       lineAccountId: 'account-1',
       expectedDraftVersionId: draft2.draftVersionId,
+      expectedDraftRevision: 1,
       name: '固定版',
       actions: [{ id: 'wait', type: 'wait', params: { minutes: 5 }, onFailure: 'stop' }],
     });
     await publishCommonActionDraft(testDb.db, {
-      id: created.id, lineAccountId: 'account-1', draftVersionId: draft2.draftVersionId,
+      id: created.id, lineAccountId: 'account-1', draftVersionId: draft2.draftVersionId, expectedDraftRevision: 2,
     });
 
     expect(testDb.raw.prepare(
@@ -336,12 +340,13 @@ describe('V6共通アクション', () => {
       lineAccountId: 'account-1', name: 'B', actions: tagAction('tag-1'),
     });
     await publishCommonActionDraft(testDb.db, {
-      id: first.id, lineAccountId: 'account-1', draftVersionId: first.draftVersionId,
+      id: first.id, lineAccountId: 'account-1', draftVersionId: first.draftVersionId, expectedDraftRevision: 1,
     });
     await updateCommonActionDraft(testDb.db, {
       id: second.id,
       lineAccountId: 'account-1',
       expectedDraftVersionId: second.draftVersionId,
+      expectedDraftRevision: 1,
       name: 'B',
       actions: [{
         id: 'call-a', type: 'common_action',
@@ -349,7 +354,7 @@ describe('V6共通アクション', () => {
       }],
     });
     await publishCommonActionDraft(testDb.db, {
-      id: second.id, lineAccountId: 'account-1', draftVersionId: second.draftVersionId,
+      id: second.id, lineAccountId: 'account-1', draftVersionId: second.draftVersionId, expectedDraftRevision: 2,
     });
     const draftA2 = await createCommonActionDraft(testDb.db, {
       id: first.id, lineAccountId: 'account-1',
@@ -358,6 +363,7 @@ describe('V6共通アクション', () => {
       id: first.id,
       lineAccountId: 'account-1',
       expectedDraftVersionId: draftA2.draftVersionId,
+      expectedDraftRevision: 1,
       name: 'A',
       actions: [{
         id: 'call-b', type: 'common_action',
@@ -366,10 +372,10 @@ describe('V6共通アクション', () => {
     });
 
     await expect(publishCommonActionDraft(testDb.db, {
-      id: first.id, lineAccountId: 'account-1', draftVersionId: draftA2.draftVersionId,
+      id: first.id, lineAccountId: 'account-1', draftVersionId: draftA2.draftVersionId, expectedDraftRevision: 2,
     })).rejects.toBeInstanceOf(CommonActionValidationError);
     await expect(publishCommonActionDraft(testDb.db, {
-      id: first.id, lineAccountId: 'account-1', draftVersionId: draftA2.draftVersionId,
+      id: first.id, lineAccountId: 'account-1', draftVersionId: draftA2.draftVersionId, expectedDraftRevision: 2,
     })).rejects.toMatchObject({ code: 'common_action_cycle' });
   });
 
@@ -378,7 +384,7 @@ describe('V6共通アクション', () => {
       lineAccountId: 'account-1', name: '公開と下書き', actions: tagAction('tag-1'),
     });
     await publishCommonActionDraft(testDb.db, {
-      id: created.id, lineAccountId: 'account-1', draftVersionId: created.draftVersionId,
+      id: created.id, lineAccountId: 'account-1', draftVersionId: created.draftVersionId, expectedDraftRevision: 1,
     });
     // 公開v1は処理1個、下書きv2は処理2個にする。
     const draft2 = await createCommonActionDraft(testDb.db, {
@@ -388,6 +394,7 @@ describe('V6共通アクション', () => {
       id: created.id,
       lineAccountId: 'account-1',
       expectedDraftVersionId: draft2.draftVersionId,
+      expectedDraftRevision: 1,
       name: '公開と下書き',
       actions: [...tagAction('tag-1'), ...tagAction('tag-1').map((step) => ({ ...step, id: 'tag-step-2' }))],
     });
@@ -407,7 +414,7 @@ describe('V6共通アクション', () => {
       lineAccountId: 'account-1', name: '数える対象', actions: tagAction('tag-1'),
     });
     await publishCommonActionDraft(testDb.db, {
-      id: created.id, lineAccountId: 'account-1', draftVersionId: created.draftVersionId,
+      id: created.id, lineAccountId: 'account-1', draftVersionId: created.draftVersionId, expectedDraftRevision: 1,
     });
     // 同じ自動化の2か所で呼ぶ。片方（never）はまだ動かしていない。
     testDb.raw.prepare(
@@ -457,11 +464,12 @@ describe('V6共通アクション', () => {
       id: created.id,
       lineAccountId: 'account-1',
       expectedDraftVersionId: draft2.draftVersionId,
+      expectedDraftRevision: 1,
       name: '数える対象',
       actions: [{ id: 'wait', type: 'wait', params: { minutes: 5 }, onFailure: 'stop' }],
     });
     await publishCommonActionDraft(testDb.db, {
-      id: created.id, lineAccountId: 'account-1', draftVersionId: draft2.draftVersionId,
+      id: created.id, lineAccountId: 'account-1', draftVersionId: draft2.draftVersionId, expectedDraftRevision: 2,
     });
     await updateCommonActionBindingVersion(testDb.db, {
       id: created.id,
@@ -485,18 +493,71 @@ describe('V6共通アクション', () => {
     });
   });
 
+  it('古い読み取りからの保存・公開は改訂番号で止まる（監査 R473・R477）', async () => {
+    const wait5 = [{ id: 'wait', type: 'wait', params: { minutes: 5 }, onFailure: 'stop' }] as const;
+    const wait60 = [{ id: 'wait', type: 'wait', params: { minutes: 60 }, onFailure: 'stop' }] as const;
+    const created = await createCommonAction(testDb.db, {
+      lineAccountId: 'account-1', name: '競合する下書き',
+      actions: [...wait5],
+    });
+    // 別担当に相当する先行保存（改訂1→2。5分が60分になる）。
+    await updateCommonActionDraft(testDb.db, {
+      id: created.id,
+      lineAccountId: 'account-1',
+      expectedDraftVersionId: created.draftVersionId,
+      expectedDraftRevision: 1,
+      name: '競合する下書き',
+      actions: [...wait60],
+    });
+    // R473: 開いたままだった古い画面の保存（名前だけでも）は409で止まる。
+    await expect(updateCommonActionDraft(testDb.db, {
+      id: created.id,
+      lineAccountId: 'account-1',
+      expectedDraftVersionId: created.draftVersionId,
+      expectedDraftRevision: 1,
+      name: '古い名前',
+      actions: [...wait5],
+    })).rejects.toMatchObject({ code: 'draft_revision_conflict' });
+    // 先行保存の60分は残り、5分に戻っていない（下書きは公開時に正規化される）。
+    let detail = await getCommonActionDetail(testDb.db, {
+      id: created.id, lineAccountId: 'account-1',
+    });
+    expect(detail.versions[0].actions[0].params).toEqual({ minutes: 60 });
+    expect(detail.versions[0].draftRevision).toBe(2);
+
+    // R477: 公開の読取後に保存が入った古い読取の公開も409で止まる。
+    await expect(publishCommonActionDraft(testDb.db, {
+      id: created.id,
+      lineAccountId: 'account-1',
+      draftVersionId: created.draftVersionId,
+      expectedDraftRevision: 1,
+    })).rejects.toMatchObject({ code: 'draft_revision_conflict' });
+    // 最新の改訂での公開は成功し、保存済みの60分が公開される。
+    const published = await publishCommonActionDraft(testDb.db, {
+      id: created.id,
+      lineAccountId: 'account-1',
+      draftVersionId: created.draftVersionId,
+      expectedDraftRevision: 2,
+    });
+    expect(published.versionNumber).toBe(1);
+    detail = await getCommonActionDetail(testDb.db, {
+      id: created.id, lineAccountId: 'account-1',
+    });
+    expect(detail.versions[0].actions[0].params).toEqual({ durationMinutes: 60 });
+  });
+
   it('一覧で旧版利用ありと未使用を区別する', async () => {
     const used = await createCommonAction(testDb.db, {
       lineAccountId: 'account-1', name: '利用中', actions: tagAction('tag-1'),
     });
     await publishCommonActionDraft(testDb.db, {
-      id: used.id, lineAccountId: 'account-1', draftVersionId: used.draftVersionId,
+      id: used.id, lineAccountId: 'account-1', draftVersionId: used.draftVersionId, expectedDraftRevision: 1,
     });
     const unused = await createCommonAction(testDb.db, {
       lineAccountId: 'account-1', name: '未使用', actions: tagAction('tag-1'),
     });
     await publishCommonActionDraft(testDb.db, {
-      id: unused.id, lineAccountId: 'account-1', draftVersionId: unused.draftVersionId,
+      id: unused.id, lineAccountId: 'account-1', draftVersionId: unused.draftVersionId, expectedDraftRevision: 1,
     });
     testDb.raw.prepare(
       `INSERT INTO common_action_bindings
@@ -517,7 +578,7 @@ describe('V6共通アクション', () => {
       lineAccountId: 'account-1', name: '集計対象', actions: tagAction('tag-1'),
     });
     await publishCommonActionDraft(testDb.db, {
-      id: created.id, lineAccountId: 'account-1', draftVersionId: created.draftVersionId,
+      id: created.id, lineAccountId: 'account-1', draftVersionId: created.draftVersionId, expectedDraftRevision: 1,
     });
     testDb.raw.prepare(
       `INSERT INTO automation_definitions
@@ -569,6 +630,7 @@ describe('V6共通アクション', () => {
       id: published.id,
       lineAccountId: 'account-1',
       draftVersionId: published.draftVersionId,
+      expectedDraftRevision: 1,
     });
     const resources = await listCommonActionResources(testDb.db, {
       lineAccountId: 'account-1',
@@ -593,7 +655,7 @@ describe('V6共通アクション', () => {
       lineAccountId: 'account-1', name: '呼ばれない公開中', actions: tagAction('tag-1'),
     });
     await publishCommonActionDraft(testDb.db, {
-      id: published.id, lineAccountId: 'account-1', draftVersionId: published.draftVersionId,
+      id: published.id, lineAccountId: 'account-1', draftVersionId: published.draftVersionId, expectedDraftRevision: 1,
     });
     // 下書きのままのものと、保管に回したもの。どちらも呼び出し元なし。
     await createCommonAction(testDb.db, {
@@ -603,7 +665,7 @@ describe('V6共通アクション', () => {
       lineAccountId: 'account-1', name: '呼ばれない保管', actions: tagAction('tag-1'),
     });
     await publishCommonActionDraft(testDb.db, {
-      id: archived.id, lineAccountId: 'account-1', draftVersionId: archived.draftVersionId,
+      id: archived.id, lineAccountId: 'account-1', draftVersionId: archived.draftVersionId, expectedDraftRevision: 1,
     });
     testDb.raw.prepare(`UPDATE common_actions SET status = 'archived' WHERE id = ?`).run(archived.id);
 

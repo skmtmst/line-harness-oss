@@ -32,6 +32,9 @@ function EditCommonActionInner() {
   const [description, setDescription] = useState('')
   const [actions, setActions] = useState<CommonActionStep[]>([])
   const [draftVersionId, setDraftVersionId] = useState('')
+  /* 監査 R473: 読み取り時の改訂番号。保存時に照合し、先行保存があれば409で止まる。 */
+  const [draftRevision, setDraftRevision] = useState(1)
+  const [saveConflict, setSaveConflict] = useState(false)
   const [resources, setResources] = useState<CommonActionResources>(EMPTY_RESOURCES)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -68,6 +71,8 @@ function EditCommonActionInner() {
       setDescription(detail.description ?? '')
       setActions(draft.actions)
       setDraftVersionId(draft.id)
+      setDraftRevision(draft.draftRevision ?? 1)
+      setSaveConflict(false)
       setResources(resourceResponse.data)
     }).catch((caught) => {
       /*
@@ -104,9 +109,11 @@ function EditCommonActionInner() {
     }
     setSaving(true)
     setError('')
+    setSaveConflict(false)
     try {
       await api.commonActions.updateDraft(id, selectedAccountId, {
         expectedDraftVersionId: draftVersionId,
+        expectedDraftRevision: draftRevision,
         name: name.trim(),
         description: description.trim() || null,
         actions,
@@ -114,6 +121,8 @@ function EditCommonActionInner() {
       router.push(`/common-actions/versions?id=${encodeURIComponent(id)}`)
     } catch (caught) {
       setError(caught instanceof ApiError || caught instanceof Error ? caught.message : '下書きを保存できませんでした')
+      // 監査 R473: 先行保存との競合は入力を保持したまま、読み直しへ導く。
+      if (caught instanceof ApiError && caught.status === 409) setSaveConflict(true)
     } finally {
       setSaving(false)
     }
@@ -244,6 +253,11 @@ function EditCommonActionInner() {
         </aside>
       </div>
       {error ? <p className="text-danger mt-4 text-sm" role="alert">{error}</p> : null}
+      {saveConflict ? (
+        <div className="mt-4">
+          <Button onClick={() => { setSaveConflict(false); setReloadKey((key) => key + 1) }}>最新の内容を読み込み直す</Button>
+        </div>
+      ) : null}
       <StickyBar
         status={saving ? '下書きを保存しています' : '公開済みの版には影響しません'}
         actions={(

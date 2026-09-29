@@ -34,7 +34,8 @@ async function requireAccount(c: Context<Env>): Promise<string | Response> {
 }
 
 function validationResponse(c: Context<Env>, error: CommonActionValidationError): Response {
-  const conflict = new Set(['version_conflict', 'draft_exists']);
+  // 監査 R473・R477・R467: 改訂・利用版の競合は409で再確認へ導く。
+  const conflict = new Set(['version_conflict', 'draft_exists', 'draft_revision_conflict']);
   const notFound = new Set([
     'not_found', 'draft_not_found', 'base_version_not_found', 'version_not_found', 'binding_not_found',
   ]);
@@ -210,11 +211,13 @@ commonActions.put('/api/common-actions/:id/draft', requireRole('owner', 'admin')
   if (typeof id !== 'string') return id;
   const body = await c.req.json<{
     expectedDraftVersionId?: unknown;
+    expectedDraftRevision?: unknown;
     name?: unknown;
     description?: unknown;
     actions?: unknown;
   }>().catch(() => ({} as {
     expectedDraftVersionId?: unknown;
+    expectedDraftRevision?: unknown;
     name?: unknown;
     description?: unknown;
     actions?: unknown;
@@ -224,6 +227,7 @@ commonActions.put('/api/common-actions/:id/draft', requireRole('owner', 'admin')
       id: c.req.param('id'),
       lineAccountId: id,
       expectedDraftVersionId: body.expectedDraftVersionId,
+      expectedDraftRevision: body.expectedDraftRevision,
       name: body.name,
       description: body.description,
       actions: body.actions,
@@ -251,10 +255,14 @@ commonActions.post(
   async (c) => {
     const id = await requireAccount(c);
     if (typeof id !== 'string') return id;
+    // 監査 R477: 公開確認に使った下書きの改訂番号を照合する。
+    const body = await c.req.json<{ expectedDraftRevision?: unknown }>()
+      .catch(() => ({} as { expectedDraftRevision?: unknown }));
     return endpoint(c, () => publishCommonActionDraft(c.env.DB, {
       id: c.req.param('id'),
       lineAccountId: id,
       draftVersionId: c.req.param('versionId'),
+      expectedDraftRevision: body.expectedDraftRevision,
     }));
   },
 );

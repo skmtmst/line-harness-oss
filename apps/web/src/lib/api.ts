@@ -2339,6 +2339,8 @@ export type CommonActionVersion = {
   versionNumber: number;
   status: 'draft' | 'published';
   actions: CommonActionStep[];
+  /* 監査 R473・R477: 保存ごとに進む改訂番号。 */
+  draftRevision: number;
   createdBy: string | null;
   createdAt: string;
   publishedAt: string | null;
@@ -10342,8 +10344,10 @@ export const api = {
       `/api/common-actions?account_id=${encodeURIComponent(accountId)}`,
       { method: 'POST', body: JSON.stringify(data) },
     ),
+    // 監査 R473: 保存ごとに進む改訂番号を照合する。古い画面の保存は409で止まる。
     updateDraft: (id: string, accountId: string, data: {
       expectedDraftVersionId: string;
+      expectedDraftRevision: number;
       name: string;
       description?: string | null;
       actions: CommonActionStep[];
@@ -10356,10 +10360,11 @@ export const api = {
         `/api/common-actions/${id}/versions?account_id=${encodeURIComponent(accountId)}`,
         { method: 'POST', body: JSON.stringify({ fromVersionId }) },
       ),
-    publish: (id: string, accountId: string, versionId: string) =>
+    // 監査 R477: 公開確認に使った改訂番号を照合する。読取後の保存があれば409で止まる。
+    publish: (id: string, accountId: string, versionId: string, expectedDraftRevision: number) =>
       fetchApi<ApiResponse<{ versionId: string; versionNumber: number }>>(
         `/api/common-actions/${id}/versions/${versionId}/publish?account_id=${encodeURIComponent(accountId)}`,
-        { method: 'POST', body: '{}' },
+        { method: 'POST', body: JSON.stringify({ expectedDraftRevision }) },
       ),
     // 監査 R467: 比較に使った現在版IDを更新要求にも渡す。無いと422で
     // 利用者が解消できない。先に別担当が切り替えたら409で再確認へ導く。

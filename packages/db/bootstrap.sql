@@ -1723,7 +1723,7 @@ CREATE TABLE common_action_versions (
   action_config    TEXT NOT NULL DEFAULT '[]',
   created_by       TEXT,
   created_at       TEXT NOT NULL DEFAULT (datetime('now')),
-  published_at     TEXT,
+  published_at     TEXT, draft_revision INTEGER NOT NULL DEFAULT 1,
   UNIQUE (common_action_id, version_number)
 );
 

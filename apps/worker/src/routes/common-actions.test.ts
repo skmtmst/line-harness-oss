@@ -145,7 +145,11 @@ describe('V6共通アクションAPI', () => {
     // 「対象アクション」だけ公開し、「別のアクション」は下書きのままにする。
     const publish = await adminApp.request(
       `/api/common-actions/${created[0].id}/versions/${created[0].draftVersionId}/publish?account_id=account-1`,
-      { method: 'POST' },
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expectedDraftRevision: 1 }),
+      },
     );
     expect(publish.status).toBe(200);
 
@@ -171,6 +175,45 @@ describe('V6共通アクションAPI', () => {
     expect(empty.status).toBe(200);
     // 見出し1行だけ。0件の条件で対象外の行を混ぜない。
     expect((await empty.text()).trim().split('\r\n')).toHaveLength(1);
+  });
+
+  it('古い改訂の保存・公開は409で止まる（監査 R473・R477）', async () => {
+    const adminApp = setupApp(testDb.db, admin);
+    const created = await adminApp.request('/api/common-actions?account_id=account-1', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: '競合する下書き', actions: action }),
+    });
+    const createdBody = await created.json() as { data: { id: string; draftVersionId: string } };
+    const put = (revision: number) => adminApp.request(
+      `/api/common-actions/${createdBody.data.id}/draft?account_id=account-1`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          expectedDraftVersionId: createdBody.data.draftVersionId,
+          expectedDraftRevision: revision,
+          name: '競合する下書き',
+          actions: action,
+        }),
+      },
+    );
+    expect((await put(1)).status).toBe(200);
+    // 改訂が進んだ後の古い番号では409。成功済みの保存は残る。
+    const stale = await put(1);
+    expect(stale.status).toBe(409);
+    await expect(stale.json()).resolves.toMatchObject({
+      success: false, code: 'draft_revision_conflict',
+    });
+    const publish = await adminApp.request(
+      `/api/common-actions/${createdBody.data.id}/versions/${createdBody.data.draftVersionId}/publish?account_id=account-1`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expectedDraftRevision: 1 }),
+      },
+    );
+    expect(publish.status).toBe(409);
   });
 
   it('タグ付与の連動ドロワーへ13種類のschemaと範囲内選択肢を返す', async () => {
