@@ -88,6 +88,7 @@ import { attachTagAndFireSideEffects } from '../services/friend-tag-attach.js';
 import {
   DEFAULT_ACCOUNT_SETTINGS,
   IDEMPOTENCY_TTL_MINUTES,
+  MENU_IDEMPOTENCY_TTL_MINUTES,
   type BookingStatus,
 } from '../services/booking-types.js';
 import { awardActivityMileage } from '../services/activity-mileage.js';
@@ -2147,6 +2148,27 @@ async function isAssignableAutoTag(
 booking.post('/api/booking/admin/menus', requirePermission(BOOKING_MENUS_KEY), async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
   if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  /*
+   * R535: 応答消失後の再送で同じメニューを2件作らない。呼び出し側が
+   * 作成試行ごとに付ける一意キーで作成済み応答を返す。検証で落ちた
+   * 要求は保存しないので、入力を直して同じキーで送り直せる。キーの無い
+   * 従来の呼び出しは従来どおり毎回作成する。migration 無しで済ませるため、LIFF用の
+   * 冪等表を借り、subject には friend ではなく staff id を入れる。
+   * 照合は (key, account, staff) の範囲に閉じ、別アカウントの行は
+   * 別物として扱う（=tenant 越しの id 漏れ防止）。
+   */
+  const idemKey = c.req.header('Idempotency-Key')?.trim() || null;
+  const staffSubject = c.get('staff')?.id ?? 'admin';
+  const idemScope = {
+    key: idemKey ?? '',
+    lineAccountId: accountId,
+    friendId: staffSubject,
+    now: new Date(),
+  };
+  if (idemKey) {
+    const cached = await findIdempotencyResponse(c.env.DB, idemScope);
+    if (cached) return c.json(cached.body as Record<string, unknown>, cached.status as 201);
+  }
   const b = await c.req.json<{
     name: string;
     category_label?: string | null;
@@ -2203,6 +2225,15 @@ booking.post('/api/booking/admin/menus', requirePermission(BOOKING_MENUS_KEY), a
       ...ruleColumns.map((col) => rules.value[col]),
     )
     .run();
+  // R535: 同じキーの再送には作り直さずこの応答を返す。24時間の窓。
+  if (idemKey) {
+    await saveIdempotencyResponse(c.env.DB, {
+      ...idemScope,
+      status: 201,
+      body: { id, version: 1 },
+      ttlMinutes: MENU_IDEMPOTENCY_TTL_MINUTES,
+    });
+  }
   // 作った時点の中身を最初の版として残す（T）。
   await recordMenuVersion(c.env.DB, { menuId: id, staffId: c.get('staff')?.id ?? null });
   return c.json({ id, version: 1 }, 201);
