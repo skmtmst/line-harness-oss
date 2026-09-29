@@ -1204,17 +1204,30 @@ export async function updateCommonActionDraft(
     db, input.lineAccountId, owner.id, validateActionShape(input.actions),
   );
   const now = new Date().toISOString();
+  /*
+   * 監査 R473: 2文とも改訂番号で条件付けし、競合時はどちらも
+   * 書き換えない。親行を先に触り、版行の番号上げは後に回す。
+   * 逆順にすると成功時でも親行の条件が新しい番号を見て外れる。
+   */
   const result = await db.batch([
+    db.prepare(
+      `UPDATE common_actions SET name = ?, description = ?, updated_at = ?
+        WHERE id = ? AND line_account_id = ? AND current_draft_version_id = ?
+          AND EXISTS (
+            SELECT 1 FROM common_action_versions
+             WHERE id = ? AND common_action_id = ? AND status = 'draft'
+               AND draft_revision = ?
+          )`,
+    ).bind(
+      name, description, now, owner.id, input.lineAccountId, expected,
+      expected, owner.id, expectedRevision,
+    ),
     db.prepare(
       `UPDATE common_action_versions
           SET action_config = ?, draft_revision = draft_revision + 1
         WHERE id = ? AND common_action_id = ? AND status = 'draft'
           AND draft_revision = ?`,
     ).bind(JSON.stringify(actions), expected, owner.id, expectedRevision),
-    db.prepare(
-      `UPDATE common_actions SET name = ?, description = ?, updated_at = ?
-        WHERE id = ? AND line_account_id = ? AND current_draft_version_id = ?`,
-    ).bind(name, description, now, owner.id, input.lineAccountId, expected),
   ]);
   if ((result[0].meta?.changes ?? 0) !== 1 || (result[1].meta?.changes ?? 0) !== 1) {
     throw new CommonActionValidationError(
@@ -1310,19 +1323,32 @@ export async function publishCommonActionDraft(
   // 監査 R478: 参照を展開した深さ・総数も公開前に検査する。
   await assertPublishableExpansion(db, input.lineAccountId, pinned);
   const now = new Date().toISOString();
+  /*
+   * 監査 R477: 保存と同じく2文とも改訂番号で条件付けし、競合時は
+   * 親行の版ポインタも版行の状態も変えない。親行を先に触り、
+   * 版行の公開切替は後に回す（成功時の条件外れを防ぐ）。
+   */
   const result = await db.batch([
+    db.prepare(
+      `UPDATE common_actions
+          SET status = 'published', current_draft_version_id = NULL,
+              current_published_version_id = ?, updated_at = ?
+        WHERE id = ? AND line_account_id = ? AND current_draft_version_id = ?
+          AND EXISTS (
+            SELECT 1 FROM common_action_versions
+             WHERE id = ? AND common_action_id = ? AND status = 'draft'
+               AND draft_revision = ?
+          )`,
+    ).bind(
+      draft.id, now, owner.id, input.lineAccountId, draft.id,
+      draft.id, owner.id, expectedRevision,
+    ),
     db.prepare(
       `UPDATE common_action_versions
           SET status = 'published', action_config = ?, published_at = ?
         WHERE id = ? AND common_action_id = ? AND status = 'draft'
           AND draft_revision = ?`,
     ).bind(JSON.stringify(pinned), now, draft.id, owner.id, expectedRevision),
-    db.prepare(
-      `UPDATE common_actions
-          SET status = 'published', current_draft_version_id = NULL,
-              current_published_version_id = ?, updated_at = ?
-        WHERE id = ? AND line_account_id = ? AND current_draft_version_id = ?`,
-    ).bind(draft.id, now, owner.id, input.lineAccountId, draft.id),
   ]);
   if ((result[0].meta?.changes ?? 0) !== 1 || (result[1].meta?.changes ?? 0) !== 1) {
     throw new CommonActionValidationError(

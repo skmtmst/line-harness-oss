@@ -511,6 +511,22 @@ describe('V6共通アクション', () => {
     });
     expect(detail.versions[0].actions[0].params).toEqual({ durationMinutes: 60 });
     expect(detail.versions[0].draftRevision).toBe(2);
+    /*
+     * 監査 R473: 409では古い画面の名前も残らない。親行と版行の
+     * どちらも先行保存のまま（名前・版ポインタ・改訂番号が不変）。
+     */
+    expect(detail.name).toBe('競合する下書き');
+    expect(detail.currentDraftVersionId).toBe(created.draftVersionId);
+    expect(testDb.raw.prepare(
+      `SELECT name, current_draft_version_id, draft_revision
+         FROM common_actions ca
+         JOIN common_action_versions cav ON cav.id = ca.current_draft_version_id
+        WHERE ca.id = ?`,
+    ).get(created.id)).toEqual({
+      name: '競合する下書き',
+      current_draft_version_id: created.draftVersionId,
+      draft_revision: 2,
+    });
 
     // R477: 公開の読取後に保存が入った古い読取の公開も409で止まる。
     await expect(publishCommonActionDraft(testDb.db, {
@@ -519,6 +535,21 @@ describe('V6共通アクション', () => {
       draftVersionId: created.draftVersionId,
       expectedDraftRevision: 1,
     })).rejects.toMatchObject({ code: 'draft_revision_conflict' });
+    /*
+     * 監査 R477: 409では親行の版ポインタも版行の状態も変わらない。
+     * 下書きのまま（公開ポインタなし・版は下書きのまま）。
+     */
+    expect(testDb.raw.prepare(
+      `SELECT status, current_draft_version_id, current_published_version_id
+         FROM common_actions WHERE id = ?`,
+    ).get(created.id)).toEqual({
+      status: 'draft',
+      current_draft_version_id: created.draftVersionId,
+      current_published_version_id: null,
+    });
+    expect(testDb.raw.prepare(
+      `SELECT status, draft_revision FROM common_action_versions WHERE id = ?`,
+    ).get(created.draftVersionId)).toEqual({ status: 'draft', draft_revision: 2 });
     // 最新の改訂での公開は成功し、保存済みの60分が公開される。
     const published = await publishCommonActionDraft(testDb.db, {
       id: created.id,
