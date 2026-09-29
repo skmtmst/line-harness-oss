@@ -50,9 +50,6 @@ export default function CommonActionsPage() {
    */
   const runPermissions = useAutomationRunPermissions()
   const canExportCsv = runPermissions?.canExport ?? false
-  /* 監査 R464: 0件の条件では書き出せない。押せる理由がない操作は置かない。 */
-  const csvEmpty = !loading && !error && total === 0
-  const csvScoped = filter !== 'all' || deferredQuery.trim() !== ''
   /* 監査 R128: 正本表に登録があるときだけ出す。無ければボタン自体を出さない。 */
   const manualHref = useManualHref('/common-actions')
   // /common-actions はメニューの接頭辞に当たらず上部バーが空になるため、画面名を明示する。
@@ -140,6 +137,10 @@ export default function CommonActionsPage() {
     executions: summary?.executions ?? 0,
     failures: summary?.failures ?? 0,
   }), [summary])
+
+  /* 監査 R464: 0件の条件では書き出せない。押せる理由がない操作は置かない。 */
+  const csvEmpty = !loading && !error && total === 0
+  const csvScoped = filter !== 'all' || deferredQuery.trim() !== ''
 
   // ★V7 `x63W5x`：集計が取れていない間、絞り込みの件数に 0 を出さない。
   const filterCount = (value: Filter): number | undefined => {
