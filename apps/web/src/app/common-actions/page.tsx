@@ -384,10 +384,13 @@ export default function CommonActionsPage() {
                     ) : null}
                   </Td>
                   <Td>
-                    {item.publishedVersion ? `v${item.publishedVersion}` : '—'}
+                    {/* 短い文字列は途中で折らない。版と札は1行ずつ出す。 */}
+                    <span className="block truncate" title={item.publishedVersion ? `v${item.publishedVersion}` : undefined}>
+                      {item.publishedVersion ? `v${item.publishedVersion}` : '—'}
+                    </span>
                     {/* 監査 R470: 公開版と下書きが両方あるとき、下書きの存在も識別できるようにする。 */}
                     {item.status === 'published' && item.draftVersion != null ? (
-                      <span className="text-ink-faint ml-1 text-xs" title={`下書きv${item.draftVersion}を編集中`}>下書きあり</span>
+                      <span className="text-ink-faint block truncate text-xs" title={`下書きv${item.draftVersion}を編集中`}>下書きあり</span>
                     ) : null}
                   </Td>
                   <ActionCell>
