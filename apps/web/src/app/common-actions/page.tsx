@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react'
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ExternalLink, MoreHorizontal, RefreshCw } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
@@ -77,8 +77,14 @@ export default function CommonActionsPage() {
   // 行の「その他」メニューの開き先（#641）
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const router = useRouter()
+  /*
+   * 監査 R465: アカウント・検索・絞り込みを含む取得の世代。取得中に条件が
+   * 変わったら、遅れて届いた古い応答は捨てて現在の一覧を上書きしない。
+   */
+  const requestSeq = useRef(0)
 
   const load = useCallback(async () => {
+    const my = ++requestSeq.current
     if (!selectedAccountId) {
       setItems([])
       setSummary(null)
@@ -101,6 +107,7 @@ export default function CommonActionsPage() {
         api.automations.list({ accountId: selectedAccountId }).catch(() => null),
         api.automations.templates(selectedAccountId).catch(() => null),
       ])
+      if (requestSeq.current !== my) return
       if (response.success) {
         setItems(response.data)
         setTotal(response.pagination?.total ?? response.data.length)
@@ -113,9 +120,10 @@ export default function CommonActionsPage() {
       } : null)
       setTemplateCount(templatesResponse?.success ? templatesResponse.data.length : null)
     } catch (caught) {
+      if (requestSeq.current !== my) return
       setError(caught instanceof Error ? caught.message : '共通アクションを読み込めませんでした')
     } finally {
-      setLoading(false)
+      if (requestSeq.current === my) setLoading(false)
     }
   }, [deferredQuery, filter, page, selectedAccountId])
 
