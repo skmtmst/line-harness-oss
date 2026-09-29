@@ -33,7 +33,10 @@ const EMPTY: WebhookInteractionList = {
   total: 0,
   page: 1,
   limit: 20,
-  summary: { total: 0, outgoing: 0, incoming: 0, succeeded: 0, failed: 0, resultUnknown: 0, averageDurationMs: null },
+  summary: {
+    total: 0, outgoing: 0, incoming: 0, succeeded: 0, failed: 0,
+    resultUnknown: 0, outgoingFailed: 0, retryable: 0, averageDurationMs: null,
+  },
 }
 
 const EVENT_LABELS: Record<string, string> = {
@@ -68,26 +71,40 @@ function directionLabel(direction: WebhookInteraction['direction']): string {
 }
 
 /*
- * IDEA-26: 失敗カードの補足。「届いたか分からない」ものは無条件に
- * 再送できないので、まとめてやり直せる数とは分けて件数を示す。
+ * 失敗カードの補足(IDEA-26 / d23b R408)。
+ * 「送った失敗」と「受け取りの失敗」を分け、ここから送り直せる件数と
+ * 対象外の件数を書く。届いたか分からないものは無条件に再送しない。
  */
 function failureDetail(
   items: WebhookInteraction[],
-  failed: number,
-  resultUnknown: number,
+  summary: WebhookInteractionList['summary'],
 ): string {
-  if (failed === 0) return '失敗はありません'
-  const reviewNote = resultUnknown > 0
-    ? `うち${resultUnknown}件は届いたか分からないため、相手先で確かめてからやり直します`
-    : ''
-  const visibleFailures = items.filter((item) => item.status === 'failed')
-  if (visibleFailures.length === 0) return `送り直せます${reviewNote ? `。${reviewNote}` : ''}`
-
-  const firstDestination = visibleFailures[0]?.webhookName.split('／')[0]?.trim()
-  const sameDestination = firstDestination
-    && visibleFailures.every((item) => item.webhookName.startsWith(firstDestination))
-  const retryNote = sameDestination ? `すべて${firstDestination}。送り直せます` : '送り直せます'
-  return reviewNote ? `${retryNote}。${reviewNote}` : retryNote
+  if (summary.failed === 0) return '失敗はありません'
+  const parts: string[] = []
+  const incomingFailed = Math.max(0, summary.failed - summary.outgoingFailed)
+  if (summary.retryable > 0) {
+    const visibleFailures = items.filter((item) => item.status === 'failed' && item.direction === 'outgoing')
+    const firstDestination = visibleFailures[0]?.webhookName.split('／')[0]?.trim()
+    const sameDestination = firstDestination
+      && visibleFailures.length > 0
+      && visibleFailures.every((item) => item.webhookName.startsWith(firstDestination))
+    parts.push(sameDestination
+      ? `すべて${firstDestination}へ。うち${summary.retryable}件はここから送り直せます`
+      : `うち${summary.retryable}件はここから送り直せます`)
+  } else if (summary.outgoingFailed > 0) {
+    parts.push('ここからまとめて送り直せる失敗はありません。行ごとの理由を確かめてください')
+  }
+  const excluded = summary.outgoingFailed - summary.retryable
+  if (excluded > 0) {
+    parts.push(`${excluded}件は送り先の停止・削除・自動の送り直し中などで対象外です`)
+  }
+  if (summary.resultUnknown > 0) {
+    parts.push(`うち${summary.resultUnknown}件は届いたか分からないため、相手先で確かめてからやり直します`)
+  }
+  if (incomingFailed > 0) {
+    parts.push(`受け取りの失敗${incomingFailed}件は相手側で送り直してもらってください`)
+  }
+  return parts.join('。') || '失敗はありません'
 }
 
 /**
@@ -117,10 +134,28 @@ function retryabilityText(item: WebhookInteraction, allowed: boolean): string {
   if (item.direction === 'incoming') {
     return '受け取った記録なので、こちらからは送り直せません。相手側でもう一度送ってもらってください。'
   }
+  // d23b R414: 送り直せない理由を、送り先の現状に合わせて分ける。
+  if (item.retryBlockReason === 'webhook_deleted') {
+    return '送り先は削除されました。ここからは送り直せません。必要なら連携を作り直してください。'
+  }
+  if (item.retryBlockReason === 'webhook_inactive') {
+    return '送り先が止められています。送信の一覧で動かしてから「やり直す」を押してください。'
+  }
+  if (item.retryBlockReason === 'auto_retry_scheduled') {
+    return `自動での送り直しが予定されています${item.autoRetryNextAt ? `（${formatJst(item.autoRetryNextAt)}頃）` : ''}。しばらく待って届かない場合は、連携先の状態を確かめてください。`
+  }
+  if (item.retryBlockReason === 'already_delivered') {
+    return '自動の送り直しで届いています。ここから送り直す必要はありません。'
+  }
   if (!item.canRetry) {
     return 'つなぎ先の設定が消えたか、送った内容が残っていないため、ここからは送り直せません。'
   }
   if (!allowed) return '送り直せるのは管理者です。'
+  // d23b R415: こちら側の署名の準備ができなかった失敗。相手へ届いていない
+  // ので、設定を直してからそのままやり直せる。
+  if (item.failureReasonCode === 'secret_unavailable') {
+    return '署名に使う合言葉をこちらで確認できませんでした。相手には一度も送っていません。連携の設定を保存し直してから「やり直す」を押してください。'
+  }
   if (item.failureReasonCode === 'unknown') {
     return '相手先に届いたか分かっていません。相手先の記録で同じ処理がないか確かめてから「やり直す」を押してください。'
   }
@@ -180,7 +215,8 @@ export default function WebhookInteractions() {
     setData(EMPTY)
     setLoadedAccountId(null)
     setSelected(null)
-    setNotice(null)
+    // d23b R406: 「結果を確かめてください」の案内は読み直しでは消さない。
+    // 届いた・消えたは呼び出し側が新しい文へ置き換える。
     setRetrying(null)
     setBulkRetrying(false)
     setConfirmingRetry(null)
@@ -261,6 +297,21 @@ export default function WebhookInteractions() {
       */
       if (error instanceof ApiError && error.code === 'result_unknown_needs_check') {
         setConfirmingRetry(item)
+      } else if (error instanceof ApiError && error.code === 'webhook_not_found') {
+        // d23b R414: 操作の間に送り先が消えた。案内を残して一覧を読み直す。
+        setNotice({ tone: 'danger', message: '送り先は削除されています。一覧の表示を最新にしました。' })
+        void load()
+      } else if (error instanceof ApiError && error.code === 'auto_retry_scheduled') {
+        // d23b R412: 同じ通知の自動送り直しが動いている。重ねて送らない。
+        setNotice({ tone: 'danger', message: 'この通知は自動での送り直しが予定されています。しばらく待っても届かない場合は、連携先の設定を確かめてください。' })
+      } else if (error instanceof ApiError && error.code === 'already_delivered') {
+        setNotice({ tone: 'danger', message: 'この通知は自動の送り直しで届いています。一覧の表示を最新にしました。' })
+        void load()
+      } else if (error instanceof ApiError && error.code === 'webhook_inactive') {
+        setNotice({ tone: 'danger', message: '送り先が止められています。送信の一覧で動かしてからやり直してください。' })
+      } else if (error instanceof ApiError && error.status === 503) {
+        // d23b R415: こちら側の署名の準備ができない。送ってはいない。
+        setNotice({ tone: 'danger', message: '署名に使う合言葉を確認できないため、まだ送っていません。連携の設定を保存し直してからやり直してください。' })
       } else {
         setNotice({ tone: 'danger', message: '送り直しを受け付けられませんでした。状態を読み直してからお試しください。' })
       }
@@ -288,8 +339,13 @@ export default function WebhookInteractions() {
       const reviewNote = response.data.needsReview > 0
         ? `届いたか分からないものが${response.data.needsReview}件あります。相手先の記録で同じ処理がないか確かめてから、一覧で1件ずつやり直してください。`
         : ''
-      const bulkMessage = `${response.data.requested}件を確認し、${response.data.succeeded}件が届きました。届かなかったもの ${response.data.failed}件、対象外 ${response.data.skipped}件です。${remainingNote}${reviewNote}`
-      if (response.data.failed > 0 || response.data.skipped > 0 || response.data.remaining > 0 || response.data.needsReview > 0) {
+      // d23b R408: 最初から対象外だった件数（消えた・止まった送り先、
+      // 自動の送り直しが動いている記録など）も黙って残さない。
+      const excludedNote = response.data.excluded > 0
+        ? `送り先が消えた・止まっている・自動の送り直し中などで、対象外のものが${response.data.excluded}件あります。`
+        : ''
+      const bulkMessage = `${response.data.requested}件を確認し、${response.data.succeeded}件が届きました。届かなかったもの ${response.data.failed}件、対象外 ${response.data.skipped}件です。${remainingNote}${reviewNote}${excludedNote}`
+      if (response.data.failed > 0 || response.data.skipped > 0 || response.data.remaining > 0 || response.data.needsReview > 0 || response.data.excluded > 0) {
         setNotice({ tone: 'danger', message: bulkMessage })
       } else {
         notifyToast(bulkMessage)
@@ -316,8 +372,8 @@ export default function WebhookInteractions() {
       {canRetry ? <div className={styles.topActions}>
         <Button
           onClick={() => void retryFailed()}
-          disabled={loading || bulkRetrying || data.summary.failed === 0}
-          title={data.summary.failed === 0 ? '送り直す失敗はありません' : undefined}
+          disabled={loading || bulkRetrying || data.summary.retryable === 0}
+          title={data.summary.retryable === 0 ? '今ここから送り直せる失敗はありません' : undefined}
         >
           <RefreshCw size={16} aria-hidden="true" />
           {bulkRetrying ? '失敗したものを確認中' : '失敗したものをまとめてやり直す'}
@@ -340,7 +396,7 @@ export default function WebhookInteractions() {
           <div className={styles.cards}>
             <KpiCard variant="v6" title={`この${periodDays}日`} value={data.summary.total} unit="回" detail={`送った ${data.summary.outgoing.toLocaleString('ja-JP')}・受け取った ${data.summary.incoming.toLocaleString('ja-JP')}`} />
             <KpiCard variant="v6" title="成功" value={data.summary.succeeded} unit="回" detail={`この${periodDays}日で ${successRate.toLocaleString('ja-JP')}%`} />
-            <KpiCard variant="v6" title="失敗" value={data.summary.failed} unit="回" detail={failureDetail(data.items, data.summary.failed, data.summary.resultUnknown)} badge={data.summary.failed > 0 ? 'やり直す' : undefined} badgeTone="danger" />
+            <KpiCard variant="v6" title="失敗" value={data.summary.failed} unit="回" detail={failureDetail(data.items, data.summary)} badge={data.summary.failed > 0 ? 'やり直す' : undefined} badgeTone="danger" />
             <KpiCard variant="v6" title="返事までの時間" value={data.summary.averageDurationMs == null ? null : Math.round(data.summary.averageDurationMs / 100) / 10} unit="秒" detail={durationDetail(data.items, data.summary.averageDurationMs, periodDays)} />
           </div>
 

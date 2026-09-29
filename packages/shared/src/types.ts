@@ -1460,7 +1460,8 @@ export type WebhookInteractionFailureReason =
   | 'response_429'
   | 'response_5xx'
   | 'processing_failed'
-  | 'unknown';
+  | 'unknown'
+  | 'secret_unavailable';
 
 /**
  * 外部連携の1回分の安全な表示。URL、シークレット、送受信本文は含めない。
@@ -1481,6 +1482,22 @@ export interface WebhookInteraction {
   /** 判定に使う失敗理由の記号。'unknown' は送り直し前に相手先での確認を要する。 */
   failureReasonCode: WebhookInteractionFailureReason | null;
   canRetry: boolean;
+  /**
+   * 送り直せない理由(d23b R414)。canRetry=false のとき、なぜ直せないかを
+   * 画面へ出せるように返す。
+   *   webhook_deleted       送り先が削除された
+   *   webhook_inactive      送り先が止められている
+   *   auto_retry_scheduled  自動の送り直しが動いている（もう届いている途中）
+   *   already_delivered     自動の送り直しですでに届いた
+   */
+  retryBlockReason:
+    | 'webhook_deleted'
+    | 'webhook_inactive'
+    | 'auto_retry_scheduled'
+    | 'already_delivered'
+    | null;
+  /** 自動の送り直しの次回予定。予定が無いとき null。 */
+  autoRetryNextAt: string | null;
   startedAt: string;
   completedAt: string | null;
   retryOfId: string | null;
@@ -1494,6 +1511,10 @@ export interface WebhookInteractionSummary {
   failed: number;
   /** 失敗のうち「届いたか分からない」件数。まとめて再送の対象外(IDEA-26)。 */
   resultUnknown: number;
+  /** 送信の失敗の総数(d23b R408)。受信の失敗と混ぜない。 */
+  outgoingFailed: number;
+  /** 送信の失敗のうち、今ここからまとめて送り直せる件数(d23b R408)。 */
+  retryable: number;
   averageDurationMs: number | null;
 }
 

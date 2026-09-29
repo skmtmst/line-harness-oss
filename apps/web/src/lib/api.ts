@@ -12016,7 +12016,7 @@ export const api = {
         // remaining: 1回の外部通信上限で今回やり直せず残った失敗の件数(N-387)。
         // needsReview: 届いたか分からず、相手先で確かめてから1件ずつ
         // やり直す必要がある件数。まとめて再送には乗らない(IDEA-26)。
-        fetchApi<ApiResponse<{ requested: number; succeeded: number; failed: number; skipped: number; remaining: number; needsReview: number }>>(
+        fetchApi<ApiResponse<{ requested: number; succeeded: number; failed: number; skipped: number; remaining: number; needsReview: number; excluded: number }>>(
           `/api/webhooks/interactions/retry-failed?lineAccountId=${encodeURIComponent(lineAccountId)}`,
           { method: 'POST', body: '{}' },
         ),

@@ -474,7 +474,8 @@
     "520_incoming_webhook_receipt_plan.sql",
     "521_incoming_webhook_receipt_body_hash.sql",
     "525_common_action_draft_revision.sql",
-    "526_common_action_request_key.sql"
+    "526_common_action_request_key.sql",
+    "532_webhook_interaction_secret_unavailable.sql"
   ],
-  "migrationCount": 475
+  "migrationCount": 476
 }

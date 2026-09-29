@@ -29,10 +29,15 @@ describe('staging operational verification safety', () => {
 
   test('accepts only the dedicated staging resources with cron disabled', () => {
     expect(readVerificationTarget(stagingConfig)).toMatchObject({
-      workerUrl: 'https://nen-line-stg.skmtmst.workers.dev',
+      workerUrl: 'https://stg-api.musubo.jp',
     });
     expect(() => readVerificationTarget(stagingConfig.replace('name = "nen-line-stg"', 'name = "production"')))
       .toThrow('Only the staging Worker is allowed');
+    expect(() =>
+      readVerificationTarget(
+        stagingConfig.replace('WORKER_PUBLIC_URL = "https://stg-api.musubo.jp"', 'WORKER_PUBLIC_URL = "https://api.musubo.jp"'),
+      ),
+    ).toThrow('Unexpected staging Worker URL');
     expect(() => readVerificationTarget(`${stagingConfig}\n[triggers]\ncrons = ["* * * * *"]`))
       .toThrow('must not have cron triggers');
   });
