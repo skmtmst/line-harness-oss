@@ -79,6 +79,7 @@ import {
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
+import { formatDateTime, formatNumber } from '@/lib/format'
 
 type ScenarioWithSteps = Scenario & { steps: ScenarioStep[] }
 
@@ -504,14 +505,7 @@ export default function ScenarioDetailClient({
   const deliveryMode: DeliveryMode = (scenario?.deliveryMode ?? 'relative') as DeliveryMode
   const latestStartedAt = runs?.subscriptions[0]?.startedAt ?? null
   const latestStartedLabel = latestStartedAt
-    ? new Intl.DateTimeFormat('ja-JP', {
-        timeZone: 'Asia/Tokyo',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-      }).format(new Date(latestStartedAt))
+    ? formatDateTime(new Date(latestStartedAt))
     : null
 
   const loadScenario = useCallback(async (fresh = false) => {
@@ -1922,7 +1916,7 @@ export default function ScenarioDetailClient({
             {simulationRefreshing
               ? '予約中の人数を計算しています…'
               : simulation
-                ? `予約中${simulation.audience.newStartPlanned.toLocaleString('ja-JP')}人へ、条件を満たした時点から順に配信します。`
+                ? `予約中${formatNumber(simulation.audience.newStartPlanned)}人へ、条件を満たした時点から順に配信します。`
                 : '条件を満たした友だちから順に配信します。'}
           </p>
           <Link href={`/scenarios/results?id=${encodeURIComponent(id)}`} className="font-semibold underline underline-offset-2">
@@ -2157,7 +2151,7 @@ export default function ScenarioDetailClient({
                     {simulationRefreshing
                       ? '予約中の人数を計算しています…'
                       : simulation
-                        ? `予約中 ${simulation.audience.newStartPlanned.toLocaleString('ja-JP')}人`
+                        ? `予約中 ${formatNumber(simulation.audience.newStartPlanned)}人`
                         : triggerCount === 0
                           ? 'アクションなどから開始できます'
                           : '押すと足せます'}
@@ -2218,14 +2212,14 @@ export default function ScenarioDetailClient({
           <div>
             <p className="text-ink-faint text-xs">購読中</p>
             <p className="text-ink text-xl font-bold tabular-nums">
-              {stats.activeNow.toLocaleString('ja-JP')}
+              {formatNumber(stats.activeNow)}
               <span className="text-ink-faint ml-0.5 text-xs font-normal">人</span>
             </p>
           </div>
           <div className="border-hairline border-l pl-8">
             <p className="text-ink-faint text-xs">読了済</p>
             <p className="text-ink text-xl font-bold tabular-nums">
-              {stats.completed.toLocaleString('ja-JP')}
+              {formatNumber(stats.completed)}
               <span className="text-ink-faint ml-0.5 text-xs font-normal">人</span>
             </p>
           </div>
@@ -2241,7 +2235,7 @@ export default function ScenarioDetailClient({
           </div>
           {biggestDrop && (
             <p className="text-warning ml-auto text-xs">
-              ↘ {biggestDrop.fromOrder}通目で {biggestDrop.lost.toLocaleString('ja-JP')}人（
+              ↘ {biggestDrop.fromOrder}通目で {formatNumber(biggestDrop.lost)}人（
               {Math.round(biggestDrop.rate * 100)}%）が離脱しています
             </p>
           )}
@@ -2669,7 +2663,7 @@ export default function ScenarioDetailClient({
             ? '購読中の人数は確認できません。'
             : stats.activeNow === 0
               ? '現在購読中の友だちは0人です。'
-              : `現在${stats.activeNow.toLocaleString('ja-JP')}人が購読中です。途中の人は続きを受け取れません。`,
+              : `現在${formatNumber(stats.activeNow)}人が購読中です。途中の人は続きを受け取れません。`,
           'シナリオの設定と今後の配信が削除されます。',
           'これまでの配信履歴は監査記録として残ります。',
           'この操作は取り消せません。',

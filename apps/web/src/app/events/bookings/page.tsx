@@ -29,6 +29,7 @@ import {
   type EventSlot,
 } from '@/lib/api'
 import { describeBookingCapacity } from '../event-attention'
+import { formatDateTime } from '@/lib/format'
 
 const PAGE_SIZE = 20
 
@@ -101,14 +102,7 @@ function formatJp(iso: string | null | undefined, fallback: string): string {
   if (!iso) return fallback
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return fallback
-  return date.toLocaleString('ja-JP', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'Asia/Tokyo',
-  })
+  return formatDateTime(date)
 }
 
 /**

@@ -1,5 +1,6 @@
 import { fetchApi } from './api'
 import type { ApiResponse } from '@line-crm/shared'
+import { formatNumber } from '@/lib/format'
 
 /**
  * 然-NEN- マイペット（★V6 37-3）／健康日記（★V6 37-4）。
@@ -141,7 +142,7 @@ export function headCountLabel(total: number, page: number, pageSize: number): s
   if (total === 0) return '0頭'
   const from = (page - 1) * pageSize + 1
   const to = Math.min(total, page * pageSize)
-  return `${total.toLocaleString('ja-JP')}頭中 ${from}〜${to}頭`
+  return `${formatNumber(total)}頭中 ${from}〜${to}頭`
 }
 
 function qs(params: Record<string, string | number | undefined>): string {

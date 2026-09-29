@@ -25,6 +25,7 @@ import StatusBadge from '@/components/shared/status-badge'
 import KpiCard from '@/components/shared/kpi-card'
 import StickyBar from '@/components/shared/sticky-bar'
 import ListRange from '@/components/ui/list-range'
+import { formatNumber } from '@/lib/format'
 
 type KindFilter = 'all' | FriendAddEventKind
 type AttributionFilter = 'all' | FriendAddEventAttributionStatus
@@ -327,8 +328,8 @@ function FriendAddRunsInner() {
       anchor.click()
       URL.revokeObjectURL(url)
       setCsvNote(truncated
-        ? `新しい順に${items.length.toLocaleString('ja-JP')}件まで書き出しました。それより古い記録は含まれていません。`
-        : `${items.length.toLocaleString('ja-JP')}件を書き出しました。`)
+        ? `新しい順に${formatNumber(items.length)}件まで書き出しました。それより古い記録は含まれていません。`
+        : `${formatNumber(items.length)}件を書き出しました。`)
     } catch {
       setCsvNote('書き出す記録を取得できませんでした。通信を確認して、もう一度お試しください。')
     } finally {
@@ -457,7 +458,7 @@ function FriendAddRunsInner() {
           <section className="overflow-hidden rounded-card border border-hairline bg-canvas">
             <div className="border-b border-hairline px-4 py-3">
               <h2 className="font-bold">最近の友だち追加</h2>
-              <p className="mt-1 text-xs text-ink-faint">何をきっかけに、何が実行されたかを確認できます。絞り込みはすべての記録に効き、CSVは絞り込みに合う記録を新しい順にすべて書き出します（上限{(CSV_EXPORT_MAX_PAGES * CSV_EXPORT_PAGE_SIZE).toLocaleString('ja-JP')}件）。</p>
+              <p className="mt-1 text-xs text-ink-faint">何をきっかけに、何が実行されたかを確認できます。絞り込みはすべての記録に効き、CSVは絞り込みに合う記録を新しい順にすべて書き出します（上限{formatNumber((CSV_EXPORT_MAX_PAGES * CSV_EXPORT_PAGE_SIZE))}件）。</p>
               {csvNote ? <p className="mt-1 text-xs text-ink-faint">{csvNote}</p> : null}
             </div>
             <div className="divide-y divide-hairline px-4">

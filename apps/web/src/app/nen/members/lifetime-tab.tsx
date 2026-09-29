@@ -17,6 +17,7 @@ import { nenRanksApi, type NenRankSettingsData } from '@/lib/nen-ranks-api'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import type { LoadStatus } from './page'
 import { yen } from './rank-view'
+import { formatNumber } from '@/lib/format'
 
 type Draft = { id: string | null; threshold: string; title: string; notify: boolean; reachedCount: number }
 
@@ -172,7 +173,7 @@ export default function LifetimeTab({
                     <span className="min-w-0 truncate text-label text-ink-faint" title="限定グッズは決まり次第ここで設定します">限定グッズは決まり次第ここで設定します</span>
                   </span>
                 </Td>
-                <Td align="right" className="cq-hide-below-1010 w-28"><span className="text-label font-semibold tabular-nums text-ink">{row.reachedCount.toLocaleString('ja-JP')}人</span></Td>
+                <Td align="right" className="cq-hide-below-1010 w-28"><span className="text-label font-semibold tabular-nums text-ink">{formatNumber(row.reachedCount)}人</span></Td>
                 <Td className="w-44">
                   <Toggle checked={row.notify} onChange={(checked) => update(index, { notify: checked })} label={row.notify ? '通知する' : '通知しない'} />
                 </Td>

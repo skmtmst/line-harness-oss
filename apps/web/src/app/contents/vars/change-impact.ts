@@ -2,6 +2,7 @@ import type { CommonVarChangeImpact, CommonVarDeleteImpact } from '@line-crm/sha
 import { ApiError } from '@/lib/api'
 import { STATE_TEXT, notConnectedText } from '@/components/shared/not-connected'
 import { placeholderText } from './delete-impact'
+import { formatNumber } from '@/lib/format'
 
 /**
  * 共通情報を**変える前**の影響確認（設計 `uNBlA` 14-1-B）。
@@ -101,14 +102,14 @@ export function changeSummaryText(impact: CommonVarDeleteImpact | CommonVarChang
       + '保存しても、いま変わる場所はありません。'
   }
   return `保存すると、${placeholderText(impact.variable.varKey)} を差し込んでいる `
-    + `${immediate.toLocaleString('ja-JP')}か所がすぐ変わります。`
+    + `${formatNumber(immediate)}か所がすぐ変わります。`
 }
 
 /** 送信済みの分。**「変わりません」を書かないと、遡って直ると誤解される。** */
 export function historicalText(impact: CommonVarDeleteImpact | CommonVarChangeImpact): string | null {
   const { historical } = changeCounts(impact)
   if (historical === 0) return null
-  return `送信済みの${historical.toLocaleString('ja-JP')}か所は変わりません。`
+  return `送信済みの${formatNumber(historical)}か所は変わりません。`
     + 'すでに届いた文は書き換わりません。'
 }
 
@@ -116,7 +117,7 @@ export function historicalText(impact: CommonVarDeleteImpact | CommonVarChangeIm
 export function hiddenText(impact: CommonVarDeleteImpact | CommonVarChangeImpact): string | null {
   if (impact.unavailableReferences.length === 0) return null
   return impact.unavailableReferences
-    .map((ref) => `${ref.kindLabel}${ref.count.toLocaleString('ja-JP')}件（${ref.reason}）`)
+    .map((ref) => `${ref.kindLabel}${formatNumber(ref.count)}件（${ref.reason}）`)
     .join('／')
 }
 
@@ -151,7 +152,7 @@ export function reflectionScopeText(
     (label) => !(REFLECTION_STATUS_ORDER as readonly string[]).includes(label),
   )
   return `内訳: ${[...known, ...unknown]
-    .map((label) => `${label}${counts.get(label)!.toLocaleString('ja-JP')}件`)
+    .map((label) => `${label}${formatNumber(counts.get(label)!)}件`)
     .join('・')}`
 }
 
@@ -184,10 +185,10 @@ export function reflectionTimingText(
   }
   const unchanged: string[] = []
   if (fixed > 0) {
-    unchanged.push(`送信を始めた配信${fixed.toLocaleString('ja-JP')}か所`)
+    unchanged.push(`送信を始めた配信${formatNumber(fixed)}か所`)
   }
   if (historical > 0) {
-    unchanged.push(`送信済み${historical.toLocaleString('ja-JP')}か所`)
+    unchanged.push(`送信済み${formatNumber(historical)}か所`)
   }
   if (unchanged.length > 0) {
     parts.push(`${unchanged.join('と')}は、そのときの値のまま変わりません。`)
@@ -287,9 +288,9 @@ export function reviewWarnings(impact: CommonVarChangeImpact): string[] {
  */
 export function characterCountText(item: CommonVarChangeImpact['items'][number]): string {
   if (item.nextCharacterCount === null) return '—'
-  const next = item.nextCharacterCount.toLocaleString('ja-JP')
+  const next = formatNumber(item.nextCharacterCount)
   if (item.characterLimit === null) return `${next}文字`
-  return `${next} / ${item.characterLimit.toLocaleString('ja-JP')}文字`
+  return `${next} / ${formatNumber(item.characterLimit)}文字`
 }
 
 /**

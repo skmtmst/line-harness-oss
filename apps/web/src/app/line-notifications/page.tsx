@@ -32,6 +32,7 @@ import {
 } from './customer-kpis'
 import KpiCollapse from '@/components/ui/kpi-collapse'
 import styles from './customer-notifications.module.css'
+import { formatDateTime } from '@/lib/format'
 
 const customerFilters = [
   ['all', 'すべて'],
@@ -67,9 +68,7 @@ function formatUpdatedAt(iso: string | null | undefined): string {
   if (!iso) return '最終更新 —'
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return '最終更新 —'
-  return `最終更新 ${date.toLocaleString('ja-JP', {
-    timeZone: 'Asia/Tokyo', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
-  })}`
+  return `最終更新 ${formatDateTime(date)}`
 }
 
 function isIncomplete(setting: EcNotificationSetting): boolean {

@@ -36,6 +36,7 @@ import { campaignTriggerLabel, formatCampaignAudience, formatCampaignTiming, for
 import { isPastScheduledAt, publishedAtIso } from './columns/new/column-form'
 import { CampaignLinePreview, COLUMN_PET_NAME_FALLBACK, ColumnLinePreview } from './line-preview'
 import { jstLongDateTime, jstShortDate, jstShortDateTime } from './nen-period'
+import { formatNumber } from '@/lib/format'
 
 /*
  * NEN配信の一覧。★V6 37-6（`z4q1K`）自動配信／37-6-A（`u66A0`）コラム。
@@ -149,7 +150,7 @@ function skippedReasonsDetail(skippedReasons: Record<string, number> | undefined
 }
 
 function num(value: number | null | undefined): string {
-  return value == null ? '—' : value.toLocaleString('ja-JP')
+  return value == null ? '—' : formatNumber(value)
 }
 
 /** 自動配信の行に付ける印。実キーごと（★V6 37-6 の1列目）。 */

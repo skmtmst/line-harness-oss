@@ -30,7 +30,7 @@ import { notifyToast } from '@/components/shared/toast'
 import { TimeField } from '@/components/shared/date-time-field'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
-import { shortDate } from '../../lib/format-time'
+import { formatDay, formatRange } from '@/lib/format'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -1048,7 +1048,7 @@ function StoreShiftsView() {
                         </div>
                       ) : (
                         <>
-                          <p className="text-ink font-semibold tabular-nums">{shortDate(from)}{from !== to ? `〜${shortDate(to)}` : ''}</p>
+                          <p className="text-ink font-semibold tabular-nums">{from !== to ? formatRange(from, to) : formatDay(from)}</p>
                           <p className="text-ink-secondary mt-1 text-sm">{item.reason || item.note || '休業日'}</p>
                           {canEditSettings ? (
                             <div className="mt-2 flex gap-3 text-xs">

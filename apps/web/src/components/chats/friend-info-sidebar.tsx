@@ -9,6 +9,7 @@ import type { FriendField } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import { GripVertical, X } from 'lucide-react'
+import { formatNumber } from '@/lib/format'
 
 interface FriendDetail {
   id: string
@@ -695,14 +696,14 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
                     <div>
                       <p className="text-ink-faint text-[10px] font-semibold">{mileage.summary.programName}</p>
                       <p className="text-ink mt-0.5 text-xl font-bold tabular-nums">
-                        {mileage.summary.available.toLocaleString('ja-JP')}
+                        {formatNumber(mileage.summary.available)}
                         <span className="text-ink-faint ml-1 text-[11px] font-semibold">mile</span>
                       </p>
                       <p className="text-ink-faint text-[10px]">利用可能</p>
                     </div>
                     {mileage.summary.pending > 0 && (
                       <span className="bg-canvas-sunken text-ink-secondary rounded-pill px-2 py-1 text-[10px] font-medium">
-                        確定待ち {mileage.summary.pending.toLocaleString('ja-JP')}
+                        確定待ち {formatNumber(mileage.summary.pending)}
                       </span>
                     )}
                   </div>
@@ -713,7 +714,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
                         <div key={item.id} className="flex items-center justify-between gap-2 text-[10px]">
                           <span className="text-ink-faint min-w-0 truncate">{item.reason}</span>
                           <span className={`shrink-0 font-semibold tabular-nums ${item.amount > 0 ? 'text-success' : 'text-ink-secondary'}`}>
-                            {item.amount > 0 ? '+' : ''}{item.amount.toLocaleString('ja-JP')}
+                            {item.amount > 0 ? '+' : ''}{formatNumber(item.amount)}
                           </span>
                         </div>
                       ))}
@@ -989,7 +990,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
                 */}
                 {typeof friend.formSubmissionTotal === 'number' && friend.formSubmissionTotal > 0 && (
                   <span className="text-[10px] text-ink-faint">
-                    {friend.formSubmissionTotal.toLocaleString('ja-JP')}件中 1〜{friend.formSubmissions.length.toLocaleString('ja-JP')}件を表示
+                    {formatNumber(friend.formSubmissionTotal)}件中 1〜{formatNumber(friend.formSubmissions.length)}件を表示
                   </span>
                 )}
               </div>

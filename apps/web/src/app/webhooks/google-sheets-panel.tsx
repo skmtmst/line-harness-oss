@@ -8,6 +8,7 @@ import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Disclosure from '@/components/shared/disclosure'
 import { isGoogleSheetsConnectionPayload, isGoogleSheetsRunsPayload } from '@line-crm/shared'
+import { formatDateTime, formatNumber } from '@/lib/format'
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
@@ -50,12 +51,6 @@ const RUN_STATUS_LABEL: Record<GoogleSheetsSyncRun['status'], string> = {
  */
 const STALE_RUN_MS = 30 * 60 * 1000
 
-function formatDateTime(value: string | null | undefined): string {
-  if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  return date.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })
-}
 
 /**
  * #838 第2段: Google Sheets への直接書き出しの設定と状態。
@@ -642,7 +637,7 @@ export default function GoogleSheetsPanel() {
                         <span className="text-ink-faint text-xs">（切替前の出力先）</span>
                       )}
                       <span className="text-ink-secondary text-xs">
-                        {run.rowsWritten.toLocaleString('ja-JP')}行
+                        {formatNumber(run.rowsWritten)}行
                       </span>
                       {run.error === 'stale_run' ? (
                         <span className="text-status-warning text-xs">途中で止まったため自動で終了しました</span>

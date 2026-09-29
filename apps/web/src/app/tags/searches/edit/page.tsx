@@ -36,6 +36,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { savedSearchSummary, type SavedSearchConditionLabels } from '@/components/friends/saved-search-utils'
 import MetricValue from '@/components/ui/metric-value'
 import { AttributeKindGuide, DuplicateNameNote, findDuplicateNames } from '@/components/friend-fields/attribute-kind-guide'
+import { formatDateTime } from '@/lib/format'
 
 /*
  * R185: 友だち画面で作れる条件はここでも編集できるようにする。実行側
@@ -902,7 +903,7 @@ function SavedSearchEditInner() {
               {previewError || preview?.error
                 ? '未計算'
                 : preview?.calculatedAt
-                  ? `${new Date(preview.calculatedAt).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}に計算`
+                  ? `${formatDateTime(preview.calculatedAt)}に計算`
                   : '未計算'}
             </p>
             {previewError ? (

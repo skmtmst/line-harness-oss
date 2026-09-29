@@ -22,6 +22,7 @@ import { classifyApiFailure } from '@/components/shared/api-error-message'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { bookingMenuError } from '../menu-validation'
+import { formatNumber } from '@/lib/format'
 
 /**
  * メニューを追加する（設計 V6 28-1-B / node GhOb3）。
@@ -244,7 +245,7 @@ export default function NewBookingMenuPage() {
     ? 'お問い合わせ'
     : priceMode === 'free'
       ? '無料'
-      : `¥${Number(basePrice).toLocaleString()}`
+      : `¥${formatNumber(Number(basePrice))}`
 
   /*
    * 作成途中の離脱確認。名前・時間・料金・担当・タグのどれかに手を付けて
@@ -718,7 +719,7 @@ export default function NewBookingMenuPage() {
            * ルールではない。R306: 未設定と取得失敗は別の言葉で出す。
            */}
           <ActionSummary
-            title={bookingMileage === null ? '予約時のマイル' : `マイルを ${bookingMileage.toLocaleString()} 付ける`}
+            title={bookingMileage === null ? '予約時のマイル' : `マイルを ${formatNumber(bookingMileage)} 付ける`}
             detail={
               mileageLoadState === 'loading'
                 ? 'マイル設定を読み込んでいます…'
@@ -735,7 +736,7 @@ export default function NewBookingMenuPage() {
                   ? '未取得'
                   : bookingMileage === null
                     ? '未設定'
-                    : `予約で ${bookingMileage.toLocaleString()}`
+                    : `予約で ${formatNumber(bookingMileage)}`
             }
             href="/mileage?tab=earning-rules"
           />

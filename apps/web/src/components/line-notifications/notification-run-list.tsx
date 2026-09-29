@@ -11,6 +11,7 @@ import Select from '@/components/shared/select'
 import KpiCard from '@/components/shared/kpi-card'
 import { DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import Notice from '@/components/shared/notice'
+import { formatDateTime, formatNumber } from '@/lib/format'
 
 const PAGE_SIZE = 20
 
@@ -61,10 +62,7 @@ function formatJst(value: string | null): string {
   }
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '—'
-  return new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', hour12: false,
-  }).format(date)
+  return formatDateTime(date)
 }
 
 type LoadState = 'loading' | 'ready' | 'error' | 'forbidden'
@@ -600,7 +598,7 @@ export default function NotificationRunList({
           </DataTable>
           <div className="flex items-center justify-between gap-4">
             <p className="text-xs text-ink-faint">
-              {(page - 1) * PAGE_SIZE + 1}〜{Math.min(page * PAGE_SIZE, scopedTotal)}件 / 全{scopedTotal.toLocaleString('ja-JP')}件
+              {(page - 1) * PAGE_SIZE + 1}〜{Math.min(page * PAGE_SIZE, scopedTotal)}件 / 全{formatNumber(scopedTotal)}件
             </p>
             <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
           </div>

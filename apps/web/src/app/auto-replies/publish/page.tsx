@@ -39,6 +39,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import { ApiError, api, type FriendListItem } from '@/lib/api'
 import { canPublish, conflictTone, publishGates, type PublishStage } from './publish-flow'
 import './publish.css'
+import { formatNumber } from '@/lib/format'
 
 type LoadState = 'loading' | 'ready' | 'error' | 'denied' | 'missing' | 'not-found'
 type FriendLoadState = 'loading' | 'ready' | 'error'
@@ -627,7 +628,7 @@ function AutoReplyPublishInner() {
                     />
                     <span className="text-caption text-ink-faint">
                       {friendLoadState === 'ready'
-                        ? `候補 ${friendTotal.toLocaleString('ja-JP')}人中 ${friends.length}人を表示`
+                        ? `候補 ${formatNumber(friendTotal)}人中 ${friends.length}人を表示`
                         : friendLoadState === 'error'
                           ? '送信者を確認できませんでした'
                           : '送信者を読み込み中'}
