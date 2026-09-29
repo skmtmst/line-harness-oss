@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { usageSummaryDetail } from './usage-summary'
+import { sumBindingCount, usageSummaryDetail } from './usage-summary'
 
 const b = (consumerType: string) => ({ consumerType })
 
@@ -29,5 +29,30 @@ describe('usageSummaryDetail', () => {
 
   test('種類が空文字だけのときは機能数を出さない', () => {
     expect(usageSummaryDetail([b('')])).toBe('版を固定した利用先')
+  })
+})
+
+/* 監査 R469: 未取得を含む合計は確定しない。全未取得・既知0・既知非ゼロ・混在を区別する。 */
+describe('sumBindingCount', () => {
+  test('利用先が無ければ0件（確定した0）', () => {
+    expect(sumBindingCount([], 'runningCount')).toBe(0)
+    expect(sumBindingCount([], 'waitingCount')).toBe(0)
+  })
+
+  test('既知だけなら合計する', () => {
+    const bindings = [
+      { runningCount: 2, waitingCount: 1 },
+      { runningCount: 0, waitingCount: 3 },
+    ]
+    expect(sumBindingCount(bindings, 'runningCount')).toBe(2)
+    expect(sumBindingCount(bindings, 'waitingCount')).toBe(4)
+  })
+
+  test('1か所でも未取得があれば合計は未確定（null）', () => {
+    expect(sumBindingCount([{ runningCount: null }], 'runningCount')).toBeNull()
+    expect(sumBindingCount(
+      [{ runningCount: 2 }, { runningCount: null }],
+      'runningCount',
+    )).toBeNull()
   })
 })

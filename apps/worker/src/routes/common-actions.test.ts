@@ -4,6 +4,12 @@ import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite';
 import type { Env } from '../index';
 import type { AuthenticatedStaff } from '../middleware/auth';
 import { commonActions } from './common-actions';
+import {
+  createCommonAction,
+  createCommonActionDraft,
+  publishCommonActionDraft,
+  updateCommonActionDraft,
+} from '../services/common-actions.js';
 
 function setupApp(db: D1Database, staff: AuthenticatedStaff) {
   const app = new Hono<Env>();
@@ -127,6 +133,202 @@ describe('V6共通アクションAPI', () => {
     expect(csv.status).toBe(200);
     expect(csv.headers.get('content-type')).toContain('text/csv');
     expect(await csv.text()).toContain('今月の実行');
+  });
+
+  it('CSVは一覧と同じ検索・絞り込みで絞られる（監査 R464）', async () => {
+    const adminApp = setupApp(testDb.db, admin);
+    const created: Array<{ id: string; draftVersionId: string }> = [];
+    for (const name of ['対象アクション', '別のアクション']) {
+      const response = await adminApp.request('/api/common-actions?account_id=account-1', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, actions: action }),
+      });
+      expect(response.status).toBe(201);
+      const body = await response.json() as { data: { id: string; draftVersionId: string } };
+      created.push(body.data);
+    }
+    // 「対象アクション」だけ公開し、「別のアクション」は下書きのままにする。
+    const publish = await adminApp.request(
+      `/api/common-actions/${created[0].id}/versions/${created[0].draftVersionId}/publish?account_id=account-1`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expectedDraftRevision: 1 }),
+      },
+    );
+    expect(publish.status).toBe(200);
+
+    const byQuery = await adminApp.request(
+      '/api/common-actions?account_id=account-1&format=csv&query=%E5%AF%BE%E8%B1%A1',
+    );
+    expect(byQuery.status).toBe(200);
+    const byQueryText = await byQuery.text();
+    expect(byQueryText).toContain('対象アクション');
+    expect(byQueryText).not.toContain('別のアクション');
+
+    const byStatus = await adminApp.request(
+      '/api/common-actions?account_id=account-1&format=csv&status=published',
+    );
+    expect(byStatus.status).toBe(200);
+    const byStatusText = await byStatus.text();
+    expect(byStatusText).toContain('対象アクション');
+    expect(byStatusText).not.toContain('別のアクション');
+
+    const empty = await adminApp.request(
+      '/api/common-actions?account_id=account-1&format=csv&query=%E8%A9%B2%E5%BD%93%E3%81%AA%E3%81%97',
+    );
+    expect(empty.status).toBe(200);
+    // 見出し1行だけ。0件の条件で対象外の行を混ぜない。
+    expect((await empty.text()).trim().split('\r\n')).toHaveLength(1);
+  });
+
+  it('古い改訂の保存・公開は409で止まる（監査 R473・R477）', async () => {
+    const adminApp = setupApp(testDb.db, admin);
+    const created = await adminApp.request('/api/common-actions?account_id=account-1', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: '競合する下書き', actions: action }),
+    });
+    const createdBody = await created.json() as { data: { id: string; draftVersionId: string } };
+    const put = (revision: number) => adminApp.request(
+      `/api/common-actions/${createdBody.data.id}/draft?account_id=account-1`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          expectedDraftVersionId: createdBody.data.draftVersionId,
+          expectedDraftRevision: revision,
+          name: '競合する下書き',
+          actions: action,
+        }),
+      },
+    );
+    expect((await put(1)).status).toBe(200);
+    // 改訂が進んだ後の古い番号では409。成功済みの保存は残る。
+    const stale = await put(1);
+    expect(stale.status).toBe(409);
+    await expect(stale.json()).resolves.toMatchObject({
+      success: false, code: 'draft_revision_conflict',
+    });
+    const publish = await adminApp.request(
+      `/api/common-actions/${createdBody.data.id}/versions/${createdBody.data.draftVersionId}/publish?account_id=account-1`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expectedDraftRevision: 1 }),
+      },
+    );
+    expect(publish.status).toBe(409);
+  });
+
+  it('同じ作成鍵の再送は同じ作成へ戻る（監査 R475）', async () => {
+    const adminApp = setupApp(testDb.db, admin);
+    const post = () => adminApp.request('/api/common-actions?account_id=account-1', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: '再試行する作成', actions: action, clientRequestKey: 'req-route-1' }),
+    });
+    const first = await post();
+    expect(first.status).toBe(201);
+    const firstBody = await first.json() as { data: { id: string } };
+    // 応答消失後の再試行も201で同じIDへ戻り、二重作成にしない。
+    const retry = await post();
+    expect(retry.status).toBe(201);
+    const retryBody = await retry.json() as { data: { id: string } };
+    expect(retryBody.data.id).toBe(firstBody.data.id);
+    expect(testDb.raw.prepare(`SELECT COUNT(*) AS count FROM common_actions`).get())
+      .toEqual({ count: 1 });
+  });
+
+  it('確認後の参照先更新がある公開は409で止まる（監査 R479）', async () => {
+    const adminApp = setupApp(testDb.db, admin);
+    const wait5 = [{ id: 'wait', type: 'wait', params: { minutes: 5 }, onFailure: 'stop' }];
+    const leaf = await createCommonAction(testDb.db, {
+      lineAccountId: 'account-1', name: '参照される処理', actions: wait5,
+    });
+    await publishCommonActionDraft(testDb.db, {
+      id: leaf.id, lineAccountId: 'account-1',
+      draftVersionId: leaf.draftVersionId, expectedDraftRevision: 1,
+    });
+    const caller = await createCommonAction(testDb.db, {
+      lineAccountId: 'account-1', name: '呼び出す処理',
+      actions: [{ id: 'call', type: 'common_action', params: { commonActionId: leaf.id }, onFailure: 'stop' }],
+    });
+    const leafDraft = await createCommonActionDraft(testDb.db, {
+      id: leaf.id, lineAccountId: 'account-1',
+    });
+    await updateCommonActionDraft(testDb.db, {
+      id: leaf.id, lineAccountId: 'account-1',
+      expectedDraftVersionId: leafDraft.draftVersionId, expectedDraftRevision: 1,
+      name: '参照される処理',
+      actions: [{ id: 'wait', type: 'wait', params: { minutes: 60 }, onFailure: 'stop' }],
+    });
+    await publishCommonActionDraft(testDb.db, {
+      id: leaf.id, lineAccountId: 'account-1',
+      draftVersionId: leafDraft.draftVersionId, expectedDraftRevision: 2,
+    });
+    const response = await adminApp.request(
+      `/api/common-actions/${caller.id}/versions/${caller.draftVersionId}/publish?account_id=account-1`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expectedDraftRevision: 1 }),
+      },
+    );
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toMatchObject({
+      success: false, code: 'reference_updated',
+    });
+  });
+
+  it('保管は未使用なら成功し利用中は422・権限なしは403（監査 R480）', async () => {
+    const adminApp = setupApp(testDb.db, admin);
+    const staffApp = setupApp(testDb.db, { role: 'staff' } as AuthenticatedStaff);
+    const created = await adminApp.request('/api/common-actions?account_id=account-1', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: '要らない試作', actions: action }),
+    });
+    const createdBody = await created.json() as { data: { id: string; draftVersionId: string } };
+    const id = createdBody.data.id;
+
+    // 権限なしの担当者はサーバでも拒否される。
+    expect((await staffApp.request(`/api/common-actions/${id}/archive?account_id=account-1`, {
+      method: 'POST',
+    })).status).toBe(403);
+
+    // 未使用なら保管でき、通常一覧から外れる。
+    const archived = await adminApp.request(`/api/common-actions/${id}/archive?account_id=account-1`, {
+      method: 'POST',
+    });
+    expect(archived.status).toBe(200);
+    await expect(archived.json()).resolves.toMatchObject({ success: true, data: { archived: true } });
+    const list = await adminApp.request('/api/common-actions?account_id=account-1');
+    const listBody = await list.json() as { data: Array<{ id: string }> };
+    expect(listBody.data.map((item) => item.id)).not.toContain(id);
+
+    // 戻すと通常一覧に戻る。
+    const unarchived = await adminApp.request(`/api/common-actions/${id}/unarchive?account_id=account-1`, {
+      method: 'POST',
+    });
+    expect(unarchived.status).toBe(200);
+    const relist = await adminApp.request('/api/common-actions?account_id=account-1');
+    const relistBody = await relist.json() as { data: Array<{ id: string }> };
+    expect(relistBody.data.map((item) => item.id)).toContain(id);
+
+    // 利用中は422で利用先を示す。
+    testDb.raw.prepare(
+      `INSERT INTO common_action_bindings
+         (id, line_account_id, common_action_id, common_action_version_id,
+          consumer_type, consumer_id, consumer_path)
+       VALUES ('b-route-used', 'account-1', ?, ?, 'automation', 'auto-1', 'root')`,
+    ).run(id, createdBody.data.draftVersionId);
+    const inUse = await adminApp.request(`/api/common-actions/${id}/archive?account_id=account-1`, {
+      method: 'POST',
+    });
+    expect(inUse.status).toBe(422);
+    await expect(inUse.json()).resolves.toMatchObject({ success: false, code: 'binding_exists' });
   });
 
   it('タグ付与の連動ドロワーへ13種類のschemaと範囲内選択肢を返す', async () => {

@@ -380,6 +380,8 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/chats/{id}/render-preview',
   'POST /api/chats/{id}/send-combined',
   'POST /api/chats/{id}/schedule',
+  'POST /api/common-actions/{id}/archive',
+  'POST /api/common-actions/{id}/unarchive',
   'POST /api/common-vars/exports',
   'POST /api/common-vars/exports/{id}/regenerate',
   'POST /api/conversions/approvals/bulk',

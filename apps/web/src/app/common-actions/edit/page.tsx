@@ -17,7 +17,8 @@ import TargetMissing from '@/components/shared/target-missing'
 import StickyBar from '@/components/shared/sticky-bar'
 import { useCanManageCommonActions } from '@/components/automations/use-common-action-permission'
 import { TextArea, TextField } from '@/components/shared/text-field'
-import BranchEditors, { newBranchStep, updateBranchStep } from '../branch-editor'
+import BranchEditors, { newBranchStep, updateBranchStep, type BranchPatch } from '../branch-editor'
+import { mergeOrderedActions, stepNumbers } from '../action-order'
 
 const EMPTY_RESOURCES: CommonActionResources = {
   tags: [], scenarios: [], templates: [], webhooks: [], richMenus: [], commonActions: [],
@@ -32,6 +33,9 @@ function EditCommonActionInner() {
   const [description, setDescription] = useState('')
   const [actions, setActions] = useState<CommonActionStep[]>([])
   const [draftVersionId, setDraftVersionId] = useState('')
+  /* 監査 R473: 読み取り時の改訂番号。保存時に照合し、先行保存があれば409で止まる。 */
+  const [draftRevision, setDraftRevision] = useState(1)
+  const [saveConflict, setSaveConflict] = useState(false)
   const [resources, setResources] = useState<CommonActionResources>(EMPTY_RESOURCES)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -68,6 +72,8 @@ function EditCommonActionInner() {
       setDescription(detail.description ?? '')
       setActions(draft.actions)
       setDraftVersionId(draft.id)
+      setDraftRevision(draft.draftRevision ?? 1)
+      setSaveConflict(false)
       setResources(resourceResponse.data)
     }).catch((caught) => {
       /*
@@ -104,9 +110,11 @@ function EditCommonActionInner() {
     }
     setSaving(true)
     setError('')
+    setSaveConflict(false)
     try {
       await api.commonActions.updateDraft(id, selectedAccountId, {
         expectedDraftVersionId: draftVersionId,
+        expectedDraftRevision: draftRevision,
         name: name.trim(),
         description: description.trim() || null,
         actions,
@@ -114,14 +122,15 @@ function EditCommonActionInner() {
       router.push(`/common-actions/versions?id=${encodeURIComponent(id)}`)
     } catch (caught) {
       setError(caught instanceof ApiError || caught instanceof Error ? caught.message : '下書きを保存できませんでした')
+      // 監査 R473: 先行保存との競合は入力を保持したまま、読み直しへ導く。
+      if (caught instanceof ApiError && caught.status === 409) setSaveConflict(true)
     } finally {
       setSaving(false)
     }
   }
 
-  const branches = actions.filter((action) => action.type === 'branch')
   const plainActions = actions.filter((action) => action.type !== 'branch')
-  const updateBranch = (branchId: string, patch: { tagId?: string; thenId?: string; elseId?: string }) => {
+  const updateBranch = (branchId: string, patch: BranchPatch) => {
     setActions((current) => current.map((step) => step.id === branchId ? updateBranchStep(step, patch) : step))
   }
 
@@ -221,10 +230,10 @@ function EditCommonActionInner() {
           </section>
           <section>
             <h2 className="text-ink mb-3 font-semibold">順番に動かす処理</h2>
-            <CommonActionEditor value={plainActions} resources={resources} onChange={(next) => setActions([...next, ...branches])} />
+            {/* 監査 R474: 分岐の位置を保ち、通常処理の編集で順序を変えない。番号は実行順。 */}
+            <CommonActionEditor value={plainActions} resources={resources} stepNumbers={stepNumbers(actions)} onChange={(next) => setActions((current) => mergeOrderedActions(current, next))} />
             <BranchEditors
-              branches={branches}
-              offset={plainActions.length}
+              steps={actions}
               resources={resources}
               onUpdate={updateBranch}
               onRemove={(branchId) => setActions((current) => current.filter((step) => step.id !== branchId))}
@@ -244,6 +253,11 @@ function EditCommonActionInner() {
         </aside>
       </div>
       {error ? <p className="text-danger mt-4 text-sm" role="alert">{error}</p> : null}
+      {saveConflict ? (
+        <div className="mt-4">
+          <Button onClick={() => { setSaveConflict(false); setReloadKey((key) => key + 1) }}>最新の内容を読み込み直す</Button>
+        </div>
+      ) : null}
       <StickyBar
         status={saving ? '下書きを保存しています' : '公開済みの版には影響しません'}
         actions={(
