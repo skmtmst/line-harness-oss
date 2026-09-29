@@ -52,6 +52,19 @@ async function requireAutomationPermission(c: Context<Env>, next: () => Promise<
   await next();
 }
 
+// 実行記録の「見るだけ」の入口。設定画面で閲覧だけを許可した担当者でも
+// 履歴の一覧・詳細を読めるよう、共通の閲覧判定（viewPermissionKeys）を使う。
+// 再試行・取消・CSV書き出しはこの後の個別権限が引き続き守る。
+async function requireAutomationViewPermission(c: Context<Env>, next: () => Promise<void>) {
+  const staff = c.get('staff');
+  if (!staff || (staff.role === 'staff'
+    && !staff.permissionKeys?.includes('/automations')
+    && !staff.viewPermissionKeys?.includes('/automations'))) {
+    return c.json({ success: false, error: 'この機能を閲覧する権限がありません' }, 403);
+  }
+  await next();
+}
+
 async function requireAutomationTestPermission(c: Context<Env>, next: () => Promise<void>) {
   const staff = c.get('staff');
   if (!staff || (staff.role === 'staff'
@@ -646,8 +659,13 @@ automations.post(
   async (c) => {
     const accountId = await requireDraftAccount(c);
     if (typeof accountId !== 'string') return accountId;
-    const body = await c.req.json<{ versionId?: unknown; friendId?: unknown; operationKey?: unknown }>()
-      .catch((): { versionId?: unknown; friendId?: unknown; operationKey?: unknown } => ({}));
+    const body = await c.req.json<{
+      versionId?: unknown; friendId?: unknown; operationKey?: unknown;
+      expectedCommonActions?: unknown;
+    }>().catch((): {
+      versionId?: unknown; friendId?: unknown; operationKey?: unknown;
+      expectedCommonActions?: unknown;
+    } => ({}));
     return definitionEndpoint(c, () => runAutomationTest(c.env.DB, {
       automationId: c.req.param('id'),
       versionId: body.versionId,
@@ -655,6 +673,8 @@ automations.post(
       lineAccountId: accountId,
       credentialEncryptionKey: c.env.LINE_CREDENTIAL_ENCRYPTION_KEY,
       operationKey: body.operationKey,
+      // R487: 確認時に見せた共通アクションの版の一式。食い違えば409で送らない。
+      expectedCommonActions: body.expectedCommonActions,
     }));
   },
 );
@@ -662,7 +682,7 @@ automations.post(
 /** V6 25-1-B: 既存automation_runsを、共通実行記録契約で読む。 */
 automations.get(
   '/api/automation-runs',
-  requireAutomationPermission,
+  requireAutomationViewPermission,
   requireRole('owner', 'admin', 'staff'),
   async (c) => {
   try {
@@ -797,7 +817,7 @@ automations.post(
  */
 automations.get(
   '/api/automation-runs/:id',
-  requireAutomationPermission,
+  requireAutomationViewPermission,
   requireRole('owner', 'admin', 'staff'),
   async (c) => {
     try {

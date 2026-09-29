@@ -1,3 +1,4 @@
+import { resolveCommonActionVersion } from './automation-engine.js';
 import { buildSegmentWhere, parseCondition, type SegmentCondition } from './segment-query.js';
 
 export type AutomationDraftActionType =
@@ -47,6 +48,42 @@ export interface AutomationDraftDetail {
   triggerConfig: Record<string, unknown>;
   conditions: Record<string, unknown>;
   actions: AutomationDraftAction[];
+  /**
+   * 監査 R486/R487: 下書きの各「共通アクションを実行」が、確認した時点で
+   * どの公開版を指すか。送る内容の確認と実行前の照合の両方に使う。
+   * 実行計画を立てる瞬間と同じ順番（下書きの処理の並び）で返す。
+   */
+  commonActionRefs: AutomationDraftCommonActionRef[];
+  /**
+   * `commonActionRefs` が指す版の中身。版のidを鍵にする。
+   * 版の中身に入れ子の「共通アクションを実行」があるとき、その固定先の版も
+   * 同じ地図へ入れるので、確認画面はネスト分も同じ版番号まで辿って出せる。
+   */
+  commonActionVersions: Record<string, AutomationDraftCommonActionVersionDetail>;
+}
+
+/** 下書きの処理1件が指す共通アクションの固定版（見つからないときは null）。 */
+export interface AutomationDraftCommonActionRef {
+  /** 下書きの処理の番号（束の consumer_path と同じ）。 */
+  stepId: string;
+  commonActionId: string;
+  name: string | null;
+  versionId: string | null;
+  versionNumber: number | null;
+}
+
+/** 確認画面へ出すための、共通アクションの版の中身。 */
+export interface AutomationDraftCommonActionVersionDetail {
+  commonActionId: string;
+  name: string;
+  versionNumber: number;
+  /** 版に保存された処理。共通アクションは多様な種別を持つので緩い形のまま。 */
+  actions: Array<{
+    id: string;
+    type: string;
+    params: Record<string, unknown>;
+    onFailure: 'stop' | 'continue';
+  }>;
 }
 
 /**
@@ -585,6 +622,15 @@ export async function getAutomationDraft(
   input: { id: string; lineAccountId: string },
 ): Promise<AutomationDraftDetail> {
   const row = await readAutomationDraftRow(db, input);
+  const actions = parseActions(row.action_config);
+  const commonActionRefs = await resolveDraftCommonActionRefs(
+    db, input.lineAccountId, row.id, actions,
+  );
+  const commonActionVersions = await collectCommonActionVersionDetails(
+    db,
+    input.lineAccountId,
+    commonActionRefs.map((ref) => ref.versionId).filter((id): id is string => !!id),
+  );
   return {
     id: row.id,
     // 中身の指紋を混ぜた札を返す。画面はこれをそのまま送り返すだけでよい。
@@ -594,8 +640,98 @@ export async function getAutomationDraft(
     eventType: row.trigger_type,
     triggerConfig: parseObject(row.trigger_config, '下書きのきっかけ'),
     conditions: parseObject(row.condition_config, '下書きの条件'),
-    actions: parseActions(row.action_config),
+    actions,
+    commonActionRefs,
+    commonActionVersions,
   };
+}
+
+/**
+ * 下書きの各「共通アクションを実行」が実行時に使う版を、実行計画と同じ
+ * 引き方（`resolveCommonActionVersion`）で解決する。束がまだ無い・参照先が
+ * 消えた・公開版が無いときは `versionId` が null になり、確認画面は
+ * 「送る内容を確かめられない」として送信へ進めない。
+ */
+async function resolveDraftCommonActionRefs(
+  db: D1Database,
+  lineAccountId: string,
+  automationId: string,
+  actions: AutomationDraftAction[],
+): Promise<AutomationDraftCommonActionRef[]> {
+  const refs: AutomationDraftCommonActionRef[] = [];
+  for (const action of actions) {
+    if (action.type !== 'common_action') continue;
+    const commonActionId = typeof action.params.commonActionId === 'string'
+      ? action.params.commonActionId
+      : '';
+    const versionId = await resolveCommonActionVersion(db, {
+      lineAccountId, automationId, action,
+    });
+    const meta = await db.prepare(
+      `SELECT ca.name, cav.version_number
+         FROM common_actions ca
+         LEFT JOIN common_action_versions cav ON cav.id = ?
+        WHERE ca.id = ? AND ca.line_account_id = ?`,
+    ).bind(versionId, commonActionId, lineAccountId)
+      .first<{ name: string; version_number: number | null }>();
+    refs.push({
+      stepId: action.id,
+      commonActionId,
+      name: meta?.name ?? null,
+      versionId,
+      versionNumber: meta?.version_number == null ? null : Number(meta.version_number),
+    });
+  }
+  return refs;
+}
+
+/**
+ * 確認画面へ出す版の中身を集める。種の版から辿れる入れ子の固定先
+ * （版の中身に書き込まれた `commonActionVersionId`）も同じ地図へ足す。
+ * 上限は実行計画の呼び出し深さと同じ考え方で絞る。
+ */
+const COMMON_ACTION_VERSION_MAP_MAX = 50;
+
+async function collectCommonActionVersionDetails(
+  db: D1Database,
+  lineAccountId: string,
+  seedVersionIds: string[],
+): Promise<Record<string, AutomationDraftCommonActionVersionDetail>> {
+  const versions: Record<string, AutomationDraftCommonActionVersionDetail> = {};
+  const queue = [...seedVersionIds];
+  while (queue.length > 0 && Object.keys(versions).length < COMMON_ACTION_VERSION_MAP_MAX) {
+    const versionId = queue.shift() ?? '';
+    if (!versionId || versions[versionId]) continue;
+    const row = await db.prepare(
+      `SELECT cav.common_action_id, cav.version_number, cav.action_config, ca.name
+         FROM common_action_versions cav
+         JOIN common_actions ca ON ca.id = cav.common_action_id
+        WHERE cav.id = ? AND cav.status = 'published' AND ca.line_account_id = ?`,
+    ).bind(versionId, lineAccountId).first<{
+      common_action_id: string; version_number: number; action_config: string; name: string;
+    }>();
+    if (!row) continue;
+    let steps: AutomationDraftCommonActionVersionDetail['actions'] = [];
+    try {
+      const parsed: unknown = JSON.parse(row.action_config);
+      if (Array.isArray(parsed)) steps = parsed as AutomationDraftCommonActionVersionDetail['actions'];
+    } catch {
+      // 読めない版は空として出し、確認画面が「中身を確かめられない」側へ倒す。
+    }
+    versions[versionId] = {
+      commonActionId: row.common_action_id,
+      name: row.name,
+      versionNumber: Number(row.version_number),
+      actions: steps,
+    };
+    for (const step of steps) {
+      const nested = typeof step.params?.commonActionVersionId === 'string'
+        ? step.params.commonActionVersionId.trim()
+        : '';
+      if (nested && !versions[nested]) queue.push(nested);
+    }
+  }
+  return versions;
 }
 
 export async function updateAutomationDraft(

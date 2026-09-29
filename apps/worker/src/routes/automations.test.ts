@@ -83,6 +83,10 @@ function setupApp(db: D1Database, staff?: Partial<AuthenticatedStaff>) {
 
 const STAFF_WITHOUT_KEY = { role: 'staff', permissionKeys: [] } as Partial<AuthenticatedStaff>;
 const STAFF_WITH_KEY = { role: 'staff', permissionKeys: ['/automations'] } as Partial<AuthenticatedStaff>;
+// R496: 設定画面で「閲覧だけ」を許可した担当者。変更のキーは持たない。
+const STAFF_WITH_VIEW_KEY = {
+  role: 'staff', permissionKeys: [], viewPermissionKeys: ['/automations'],
+} as Partial<AuthenticatedStaff>;
 const STAFF_WITH_EXPORT_KEY = {
   role: 'staff', permissionKeys: ['/automations', 'automation.run.export'],
 } as Partial<AuthenticatedStaff>;
@@ -335,6 +339,45 @@ describe('権限キー検査（#554 点検#519中4・中5）', () => {
     const res = await setupApp(fakeD1(), STAFF_WITH_KEY)
       .request('/api/automation-runs?lineAccountId=acc-1');
     expect(res.status).toBe(200);
+  });
+
+  // R496: 「閲覧だけ」の権限で保存した担当者が履歴を読めなかった不具合。
+  // 一覧・詳細は読めるが、書き出し・再試行・取消は従来どおり拒否する。
+  test('閲覧だけの権限のstaffは一覧・詳細を読め、変更系は拒否される', async () => {
+    dbMocks.getAutomationExecutionRuns.mockResolvedValue({
+      rows: [],
+      total: 0,
+      summary: { total: 0, executed: 0, skipped: 0, failed: 0, most_run_name: null, most_run_count: null },
+    });
+    const list = await setupApp(fakeD1(), STAFF_WITH_VIEW_KEY)
+      .request('/api/automation-runs?lineAccountId=acc-1');
+    expect(list.status).toBe(200);
+
+    dbMocks.getAutomationExecutionRun.mockResolvedValue(runRow({
+      id: 'run-1', status: 'success', version_number: 2,
+      completed_at: '2026-08-28T01:00:01.000Z', duration_ms: 1000,
+    }));
+    dbMocks.getAutomationExecutionRunSteps.mockResolvedValue([]);
+    const detail = await setupApp(fakeD1(), STAFF_WITH_VIEW_KEY)
+      .request('/api/automation-runs/run-1');
+    expect(detail.status).toBe(200);
+
+    // CSV書き出しは automation.run.export が別途要る。
+    const csv = await setupApp(fakeD1(), STAFF_WITH_VIEW_KEY)
+      .request('/api/automation-runs?lineAccountId=acc-1&format=csv');
+    expect(csv.status).toBe(403);
+  });
+
+  test('閲覧だけの権限のstaffは再試行・取消を実行できない', async () => {
+    const testDb = realAutomationDb();
+    addRun(testDb.raw, { id: 'run-1', status: 'failed' });
+    addRun(testDb.raw, { id: 'run-2', status: 'waiting' });
+    const retry = await setupApp(testDb.db, STAFF_WITH_VIEW_KEY)
+      .request('/api/automation-runs/run-1/retry', { method: 'POST' });
+    expect(retry.status).toBe(403);
+    const cancel = await setupApp(testDb.db, STAFF_WITH_VIEW_KEY)
+      .request('/api/automation-runs/run-2/cancel', { method: 'POST' });
+    expect(cancel.status).toBe(403);
   });
 
   test('詳細は権限キーのないstaffに403を返す（アカウント範囲内でも）', async () => {

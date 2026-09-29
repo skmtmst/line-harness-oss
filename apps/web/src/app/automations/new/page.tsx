@@ -6,7 +6,10 @@ import type { ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Automation } from '@line-crm/shared'
 import { AUTOMATION_DRAFT_ACTION_OPTIONS, AUTOMATION_DRAFT_TRIGGER_OPTIONS } from '@line-crm/shared'
-import { api, ApiError, type AutomationDraftAction, type AutomationDraftDetail } from '@/lib/api'
+import {
+  api, ApiError, type AutomationDraftAction, type AutomationDraftCommonActionVersionDetail,
+  type AutomationDraftDetail,
+} from '@/lib/api'
 import Breadcrumb from '@/components/shared/breadcrumb'
 import FilterChip from '@/components/shared/filter-chip'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -666,6 +669,11 @@ interface TestConfirmation {
   contents: string[]
   effects: string[]
   /**
+   * R487: 確認画面で出した共通アクションの版の一式。実行要求に添え、
+   * Worker が確認後の利用版切り替えを 409 で止める照合に使う。
+   */
+  commonActionExpectations: Array<{ stepId: string; commonActionId: string; versionId: string }>
+  /**
    * R484: この確認だけの要求キー。応答が失われたあとの再試行も同じ鍵で
    * 呼び、Worker は2件目の実行を作らず初回を返す。確認を開くたびに振る。
    */
@@ -1198,31 +1206,108 @@ export default function NewAutomationPage() {
     actionDraftToPayload(row, index))
 
   /**
+   * 共通アクションの版の中身を、確認画面向けの一文へたたむ（R486）。
+   * 入れ子の呼び出しは `commonActionVersions` 地図を辿って版番号まで出す。
+   * 中身を確かめられない枝があれば `unresolved` を立て、送信へ進めない。
+   */
+  const describeCommonActionSteps = (
+    steps: AutomationDraftCommonActionVersionDetail['actions'],
+    versions: AutomationDraftDetail['commonActionVersions'],
+    depth: number,
+    unresolved: { flag: boolean },
+  ): string => {
+    if (depth > 5) {
+      unresolved.flag = true
+      return '中身を確認できません'
+    }
+    const parts = steps.map((step) => {
+      const params = step.params ?? {}
+      if (step.type === 'send_message') return `メッセージ「${String(params.content ?? '')}」を送る`
+      if (step.type === 'add_tag' || step.type === 'remove_tag') {
+        const tagId = String(params.tagId ?? '')
+        const tagName = tags.find((tag) => tag.id === tagId)?.name ?? tagId
+        return step.type === 'add_tag' ? `タグ「${tagName}」を付ける` : `タグ「${tagName}」を外す`
+      }
+      if (step.type === 'wait') {
+        const minutes = String(params.durationMinutes ?? params.minutes ?? '')
+        return `${minutes}分待つ`
+      }
+      if (step.type === 'start_scenario' || step.type === 'stop_scenario' || step.type === 'resume_scenario') {
+        const scenarioId = String(params.scenarioId ?? '')
+        const scenarioName = scenarios.find((item) => item.id === scenarioId)?.name ?? scenarioId
+        if (step.type === 'stop_scenario') return `シナリオ「${scenarioName}」を止める`
+        if (step.type === 'resume_scenario') return `シナリオ「${scenarioName}」を再開する`
+        return `シナリオ「${scenarioName}」を始める`
+      }
+      if (step.type === 'send_webhook') return 'Webhookへ送る'
+      if (step.type === 'set_metadata') return '友だち情報を更新する'
+      if (step.type === 'switch_rich_menu' || step.type === 'remove_rich_menu') return 'リッチメニューを切り替える'
+      if (step.type === 'common_action') {
+        const versionId = String(params.commonActionVersionId ?? '')
+        const version = versionId ? versions[versionId] : undefined
+        if (!version) {
+          unresolved.flag = true
+          return '共通アクション（使う版を確認できません）'
+        }
+        return `共通アクション「${version.name}」第${version.versionNumber}版（${describeCommonActionSteps(version.actions, versions, depth + 1, unresolved)}）`
+      }
+      if (step.type === 'branch') return '条件で分かれる'
+      return '設定した処理を実行'
+    })
+    return parts.length > 0 ? parts.join('、') : '処理なし'
+  }
+
+  /**
    * 確認に出す「実際に送られる中身」（N-358）。
    *
    * **画面の入力からは作らない。** サーバーが持っている下書きから作る。
    * 入力中で未保存の文面が確認へ混ざると、見た内容と送る内容がずれる。
+   *
+   * R486: 共通アクションは名前だけでなく、確認時に固定される版の番号と
+   * その中身（本文）まで出す。版や中身が解決できない処理が1件でも
+   * あれば `unconfirmed` を立て、送信は受け付けない。
    */
-  const describeDraftActions = (list: AutomationDraftAction[]): { contents: string[]; effects: string[] } => ({
-    contents: list.map((step) => {
+  const describeDraftActions = (
+    list: AutomationDraftAction[],
+    refs: AutomationDraftDetail['commonActionRefs'],
+    versions: AutomationDraftDetail['commonActionVersions'],
+  ): { contents: string[]; effects: string[]; unconfirmed: boolean } => {
+    const unresolved = { flag: false }
+    const contents = list.map((step) => {
       if (step.type === 'send_message') return `メッセージ「${String(step.params.content ?? '')}」`
       if (step.type === 'add_tag') {
         const tagId = String(step.params.tagId ?? '')
         return `タグ「${tags.find((tag) => tag.id === tagId)?.name ?? tagId}」を付ける`
       }
       if (step.type === 'common_action') {
-        const commonActionId = String(step.params.commonActionId ?? '')
-        return `共通アクション「${commonActions.find((item) => item.id === commonActionId)?.name ?? commonActionId}」を実行`
+        const ref = refs.find((item) => item.stepId === step.id)
+        const name = ref?.name
+          ?? commonActions.find((item) => item.id === ref?.commonActionId)?.name
+          ?? ref?.commonActionId ?? '共通アクション'
+        if (!ref?.versionId) {
+          unresolved.flag = true
+          return `共通アクション「${name}」（使う版を確認できません）`
+        }
+        const version = versions[ref.versionId]
+        if (!version) {
+          unresolved.flag = true
+          return `共通アクション「${name}」第${ref.versionNumber ?? '?'}版（中身を確認できません）`
+        }
+        return `共通アクション「${version.name}」第${version.versionNumber}版：${describeCommonActionSteps(version.actions, versions, 1, unresolved)}`
       }
       return `シナリオ「${String(step.params.scenarioId ?? '')}」を始める`
-    }),
-    effects: [
-      list.some((step) => step.type === 'send_message') ? 'メッセージが相手に届きます' : null,
-      list.some((step) => step.type === 'add_tag') ? 'タグが相手に付きます' : null,
-      list.some((step) => step.type === 'start_scenario') ? 'シナリオが相手に始まります' : null,
-      list.some((step) => step.type === 'common_action') ? '共通アクションの処理が相手に動きます' : null,
-    ].filter((item): item is string => item !== null),
-  })
+    })
+    return {
+      contents,
+      effects: [
+        list.some((step) => step.type === 'send_message') ? 'メッセージが相手に届きます' : null,
+        list.some((step) => step.type === 'add_tag') ? 'タグが相手に付きます' : null,
+        list.some((step) => step.type === 'start_scenario') ? 'シナリオが相手に始まります' : null,
+        list.some((step) => step.type === 'common_action') ? '共通アクションの処理が相手に動きます' : null,
+      ].filter((item): item is string => item !== null),
+      unconfirmed: unresolved.flag,
+    }
+  }
 
   useEffect(() => {
     /*
@@ -1498,11 +1583,26 @@ export default function NewAutomationPage() {
         ...payload,
       })
       if (!res.success) throw new Error(res.error)
-      // 保存すると中身が変わるので、版の札も新しくなる。取り直してから
-      // 見込み人数と公開へ渡す。古い札のままだと Worker に弾かれる（それが正しい）。
+      /*
+       * 保存すると中身が変わるので、版の札も新しくなる。取り直してから
+       * 見込み人数と公開へ渡す。古い札のままだと Worker に弾かれる（それが正しい）。
+       *
+       * R489: 公開するのは「自分の保存が作った版」だけ。保存と読み直しの
+       * 間に別の人が保存すると、読み直しが返すのはその人の版になる。
+       * 版の札には中身の指紋が入っているので、札が違う＝中身が違う。
+       * そのまま使うと自分が確認していない内容を公開してしまうため、
+       * 409 と同じ扱いで止めて、双方の入力を残して案内する。
+       */
       const saved = await api.automations.getDraft(draft.id, accountId)
       if (!saved.success) throw new Error(saved.error)
-      draft = { id: draft.id, draftVersionId: saved.data.draftVersionId }
+      if (saved.data.draftVersionId !== res.data.draftVersionId) {
+        throw new ApiError(
+          409,
+          'ほかの人が同じ下書きを保存しました。内容を確かめてから、もう一度お試しください',
+          'version_conflict',
+        )
+      }
+      draft = { id: draft.id, draftVersionId: res.data.draftVersionId }
       writeStoredDraft(accountId, draft)
       const savedTime = Date.now()
       /*
@@ -1699,7 +1799,18 @@ export default function NewAutomationPage() {
         bindAccountDraft(accountId, refreshed)
       }
       if (selectedAccountRef.current !== accountId) return
-      const described = describeDraftActions(detail.data.actions)
+      const refs = detail.data.commonActionRefs ?? []
+      const described = describeDraftActions(
+        detail.data.actions, refs, detail.data.commonActionVersions ?? {},
+      )
+      /*
+       * R486: 使う版・中身が確かめられない共通アクションがあるときは
+       * 確認画面を開かない。「見ていないものを送る」を防ぐ。
+       */
+      if (described.unconfirmed || refs.some((ref) => !ref.versionId)) {
+        setError('共通アクションの内容を確認できませんでした。編集を開き直して確かめてから、もう一度試してください')
+        return
+      }
       setTestConfirmation({
         accountId,
         draftId: draft.id,
@@ -1709,6 +1820,12 @@ export default function NewAutomationPage() {
         friendId,
         contents: described.contents,
         effects: described.effects,
+        // R487: 確認時に見せた版の一式。実行前の照合へそのまま渡す。
+        commonActionExpectations: refs.map((ref) => ({
+          stepId: ref.stepId,
+          commonActionId: ref.commonActionId,
+          versionId: ref.versionId ?? '',
+        })),
         // R484: 確認を開くたびに新しい鍵。同じ確認の再試行だけが同じ鍵。
         operationKey: newOperationKey(),
       })
@@ -1769,9 +1886,22 @@ export default function NewAutomationPage() {
     try {
       const latest = await api.automations.getDraft(pending.draftId, pending.accountId)
       if (!latest.success) throw new Error(latest.error)
+      /*
+       * R487: 下書きの版と中身に加え、確認した共通アクションの版も
+       * いま解決されるものと照合する。束の切り替えは版の札を変えないので、
+       * ここで先に気づけば Worker へ送る前に止められる（最後の砦は Worker）。
+       */
+      const latestRefs = latest.data.commonActionRefs ?? []
+      const commonActionsUnchanged = latestRefs.length === pending.commonActionExpectations.length
+        && pending.commonActionExpectations.every((expected) => {
+          const current = latestRefs.find((ref) => ref.stepId === expected.stepId)
+          return current?.commonActionId === expected.commonActionId
+            && current?.versionId === expected.versionId
+        })
       if (
         latest.data.draftVersionId !== pending.draftVersionId
         || draftFingerprint(latest.data) !== pending.fingerprint
+        || !commonActionsUnchanged
       ) {
         if (sameAccount()) {
           setTestConfirmation(null)
@@ -1783,7 +1913,7 @@ export default function NewAutomationPage() {
       if (ticket !== testTicketRef.current) return
       const result = await api.automations.test(
         pending.draftId, pending.accountId, pending.friendId, pending.draftVersionId,
-        pending.operationKey,
+        pending.operationKey, pending.commonActionExpectations,
       )
       if (!result.success) throw new Error(result.error)
       if (!sameAccount()) {
