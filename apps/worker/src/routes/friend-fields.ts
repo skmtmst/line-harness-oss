@@ -23,8 +23,8 @@ import {
   executeFieldMigration,
   getFriendFieldsWithValues,
   getFriendById,
-  setFriendFieldValue,
   setFriendFieldValuesBulk,
+  setFriendFieldValuesForFriend,
   jstNow,
   validateFieldKey,
   validateFriendFieldValue,
@@ -879,13 +879,18 @@ friendFields.put('/api/friends/:id/fields', requireRole('owner', 'admin', 'staff
       );
     }
 
-    for (const item of pending) {
-      await setFriendFieldValue(c.env.DB, {
+    /*
+     * M046: 複数項目の保存は同じ取引（1回のbatch）で確定する。
+     * 1件ずつ書くと、途中失敗で500なのに先に書けた分が残る部分保存になる。
+     * batchは原子的で、1文でも失敗したら永続変更は0件になる。
+     * 値は上で validate済みの正規化ずみが pending に入っている。
+     */
+    if (pending.length > 0) {
+      await setFriendFieldValuesForFriend(c.env.DB, {
         friendId,
-        fieldId: item.fieldId,
-        value: item.value,
+        entries: pending.map((item) => ({ fieldId: item.fieldId, value: item.value })),
         updatedBy: staff?.id ?? 'unknown',
-        field: item.field,
+        now: jstNow(),
       });
     }
 
