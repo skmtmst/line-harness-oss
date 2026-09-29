@@ -258,6 +258,14 @@ export type Env = {
     LINE_CHANNEL_ID: string;
     LINE_LOGIN_CHANNEL_ID: string;
     LINE_LOGIN_CHANNEL_SECRET: string;
+    /**
+     * 管理画面ログイン専用のLINE Loginチャネル。他社向けサービスの入口を
+     * 自社プロバイダーから切り離すために使う。未設定なら
+     * `LINE_LOGIN_CHANNEL_ID` / `LINE_LOGIN_CHANNEL_SECRET` を使う。
+     * 会員向けLIFF連携（`routes/liff.ts`）はこの設定を見ない。
+     */
+    ADMIN_LINE_LOGIN_CHANNEL_ID?: string;
+    ADMIN_LINE_LOGIN_CHANNEL_SECRET?: string;
     /** Stripe Webhook署名キー。未設定時はStripe受信ルートだけ503で拒否する。 */
     STRIPE_WEBHOOK_SECRET?: string;
     /** 統括のバナー生成（OpenAI 画像生成）。未設定時は生成だけ503で断る。 */
