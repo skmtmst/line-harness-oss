@@ -69,8 +69,10 @@ export default function DuplicatesPage() {
   const [statsFailure, setStatsFailure] = useState<unknown>(null)
   const [candidates, setCandidates] = useState<IdentityCandidateListItem[]>([])
   const [candidateTotal, setCandidateTotal] = useState(0)
-  const [statusCounts, setStatusCounts] = useState<Partial<Record<IdentityCandidateStatus, number>>>({})
-  const [lowConfidenceCount, setLowConfidenceCount] = useState(0)
+  // statusCounts / lowConfidenceCount は旧Workerとの互換で省かれることがある。
+  // 省かれたときは null のまま残し、空の集計で0組と誤案内しない。
+  const [statusCounts, setStatusCounts] = useState<Partial<Record<IdentityCandidateStatus, number>> | null>(null)
+  const [lowConfidenceCount, setLowConfidenceCount] = useState<number | null>(null)
   const [query, setQuery] = useState('')
   // FRIEND-11: 検索はサーバーへ渡して全件へかける。入力中の逐次送信を避けるため debounce。
   const [debouncedQuery, setDebouncedQuery] = useState('')
@@ -146,8 +148,8 @@ export default function DuplicatesPage() {
       if (res.success) {
         setCandidates(res.data.items)
         setCandidateTotal(res.data.total)
-        setStatusCounts(res.data.statusCounts ?? {})
-        setLowConfidenceCount(res.data.lowConfidenceCount ?? 0)
+        setStatusCounts(res.data.statusCounts ?? null)
+        setLowConfidenceCount(res.data.lowConfidenceCount ?? null)
         setCandidateFailure(null)
       } else {
         // FRIEND-12: 失敗を「新しい条件の0件」と誤認させない。
@@ -204,6 +206,27 @@ export default function DuplicatesPage() {
     const interval = setInterval(() => setTick((t) => t + 1), 60_000)
     return () => clearInterval(interval)
   }, [])
+
+  /*
+   * R598の件数矛盾の修正：statusCounts が無い（旧Worker）とき合計を0組と
+   * 誤案内しない。絞り込み無しなら一覧の total が全体の総数と確実に等しい
+   * のでそれを出し、内訳（確認待ち・確認済み・根拠不足）は「—」にする。
+   * 絞り込み中は全体が分からないので合計も「—」（一覧の下に絞り込み後の
+   * 件数が出ている）。読み込み待ちの0も出さない（FRIEND-12）。
+   */
+  const unfilteredCandidates = status === '' && debouncedQuery.trim() === ''
+  const duplicateTotalText =
+    statusCounts !== null
+      ? `${fmt.format(Object.values(statusCounts).reduce((sum, n) => sum + (n ?? 0), 0))}組`
+      : !unfilteredCandidates || candidateError || (candidatesLoading && candidateTotal === 0)
+        ? '—'
+        : `${fmt.format(candidateTotal)}組`
+  const duplicateDetail =
+    statusCounts !== null
+      ? `${fmt.format(statusCounts.pending ?? 0)}組を確認待ち`
+      : !unfilteredCandidates || candidateError
+        ? '読み込めませんでした'
+        : '内訳は読み込めませんでした'
 
   return (
     <div className="flex flex-col gap-4" data-duplicates-design="v4">
@@ -265,8 +288,8 @@ export default function DuplicatesPage() {
               全件を数えた statusCounts / lowConfidenceCount で出す。
               （読み込み50件で頭打ちにならない。）
             */}
-            <KpiCard title="重複候補" value={null} unit="" valueText={`${fmt.format(Object.values(statusCounts).reduce((sum, n) => sum + (n ?? 0), 0))}組`} detail={`${fmt.format(statusCounts.pending ?? 0)}組を確認待ち`} />
-            <KpiCard title="確認済み" value={null} unit="" valueText={`${fmt.format(statusCounts.linked ?? 0)}組`} detail="" help="統合ユーザーに紐付け済みの組数です" />
+            <KpiCard title="重複候補" value={null} unit="" valueText={duplicateTotalText} detail={duplicateDetail} />
+            <KpiCard title="確認済み" value={null} unit="" valueText={statusCounts !== null ? `${fmt.format(statusCounts.linked ?? 0)}組` : '—'} detail={statusCounts !== null ? '' : '読み込めませんでした'} help="統合ユーザーに紐付け済みの組数です" />
             {/*
               friendDups は「重複した登録の行数」。送った通数ではない。
               以前はこれを「余分な配信回数」「1配信あたり浪費 ¥X」と言い切り、
@@ -304,7 +327,7 @@ export default function DuplicatesPage() {
                 description="重複している友だち登録の数に1通あたりの単価を掛けた見積りです。実際に送った配信の実績ではありません。"
               />
             )}
-            <KpiCard title="根拠不足" value={null} unit="" valueText={`${fmt.format(lowConfidenceCount)}組`} detail="" help="名前・画像だけの候補です" />
+            <KpiCard title="根拠不足" value={null} unit="" valueText={lowConfidenceCount !== null ? `${fmt.format(lowConfidenceCount)}組` : '—'} detail={lowConfidenceCount !== null ? '' : '読み込めませんでした'} help="名前・画像だけの候補です" />
           </section>
 
           <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-ink-secondary">
