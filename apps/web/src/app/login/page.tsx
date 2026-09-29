@@ -76,7 +76,8 @@ export default function LoginPage() {
       return
     }
     if (res.data.twoFactor && res.data.challengeToken) {
-      window.location.assign(`/login/two-factor#${new URLSearchParams({ lh_2fa: res.data.challengeToken }).toString()}`)
+      // R507: 二段階認証の画面で実際のログイン方法を出せるよう、経路の印を付ける。
+      window.location.assign(`/login/two-factor#${new URLSearchParams({ lh_2fa: res.data.challengeToken, lh_method: 'password' }).toString()}`)
       return
     }
     if (res.data.sessionToken) storeAdminSession(res.data.sessionToken, res.csrfToken)

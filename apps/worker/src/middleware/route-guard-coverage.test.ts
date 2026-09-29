@@ -328,6 +328,7 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'PATCH /api/line-accounts/order',
     'PATCH /api/ops/members/:staffId',
     'PATCH /api/ops/support/tickets/:id',
+    'PATCH /api/ops/tenants/:id/feature-packs',
     'PATCH /api/ops/tenants/:id/status',
     'PATCH /api/restaurant-test/approvals/:id',
     'PATCH /api/restaurant-test/memberships/:id',
