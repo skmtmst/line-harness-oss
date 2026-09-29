@@ -46,7 +46,7 @@ describe('V6 knowledge UI', () => {
       { ...article.evidence[0], role: 'condition', quote: '対象フォームの回答後アクション' },
     ] }} onClose={() => {}} onSaved={() => {}} />))
     expect(document.body.textContent).toContain('#MB-0312 実際の問い合わせ件名')
-    expect(document.querySelector('time')?.textContent).toBe('09:40')
+    expect(document.querySelector('time')?.textContent).toBe('9:40')
     expect(document.body.textContent).toContain('適用条件：対象フォームの回答後アクション')
   })
   it('does not invent an applicability condition when the source has none', async () => {

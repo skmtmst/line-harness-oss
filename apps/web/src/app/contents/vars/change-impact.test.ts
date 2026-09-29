@@ -294,7 +294,7 @@ describe('共通情報編集（uNBlA）の画面', () => {
     expect(IMPACT_SECTION).toContain('changeSummaryText(impact)')
     expect(IMPACT_SECTION).toContain('historicalText(impact)')
     expect(IMPACT_SECTION).toContain('usageGroups.map')
-    expect(IMPACT_SECTION).toContain('group.count.toLocaleString')
+    expect(IMPACT_SECTION).toContain('formatNumber(group.count')
   })
 
   it('1件ずつ見る画面では、保存後の文を作れない行を空文字で埋めない', () => {

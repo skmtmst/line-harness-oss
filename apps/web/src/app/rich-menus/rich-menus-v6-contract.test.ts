@@ -52,8 +52,8 @@ describe('V6リッチメニューの画面契約', () => {
   })
 
   it('一覧APIの月間タップ数とのべ人数を表示し、部分集計だと明記する', () => {
-    expect(PAGE).toContain('g.monthlyStats.taps.toLocaleString')
-    expect(PAGE).toContain('g.monthlyStats.uniqueAudience.value.toLocaleString')
+    expect(PAGE).toContain('formatNumber(g.monthlyStats.taps')
+    expect(PAGE).toContain('formatNumber(g.monthlyStats.uniqueAudience.value')
     expect(PAGE).toContain('（記録開始後）')
   })
 

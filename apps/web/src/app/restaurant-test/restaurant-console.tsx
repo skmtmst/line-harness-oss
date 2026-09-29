@@ -22,6 +22,7 @@ import {
   type RestaurantSnapshot,
   type RestaurantStore,
 } from '@/lib/restaurant-test-api'
+import { formatDateTime, formatTime, formatYen } from '@/lib/format'
 
 const viewMeta = {
   dashboard: ['店舗ダッシュボード', '全店舗の予約・空席・連携状態を、本部からまとめて確認します。'],
@@ -53,13 +54,11 @@ const sourceTone: Record<string, string> = {
 function formatDate(value: string, withDate = true) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '—'
-  return new Intl.DateTimeFormat('ja-JP', withDate
-    ? { month: 'numeric', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' }
-    : { hour: '2-digit', minute: '2-digit' }).format(date)
+  return withDate ? formatDateTime(date) : formatTime(date)
 }
 
 function yen(value: number) {
-  return new Intl.NumberFormat('ja-JP', { style: 'currency', currency: 'JPY', maximumFractionDigits: 0 }).format(value)
+  return formatYen(value)
 }
 
 function safeArray(value: string): string[] {
@@ -221,9 +220,7 @@ function intakeAddressError(error: unknown): string {
 function intakeDate(value: string): string {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '日時不明'
-  return new Intl.DateTimeFormat('ja-JP', {
-    year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit',
-  }).format(date)
+  return formatDateTime(date)
 }
 
 function IntakeAddressPanel({ accountId, store }: { accountId: string; store: RestaurantStore | null }) {

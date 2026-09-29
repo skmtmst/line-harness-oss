@@ -18,7 +18,7 @@ const TABS = RAW
 
   集計は期間で絞れるので、その期間に成果が1件も無い紹介者は**行そのものが
   返らない**。一覧には載っているので押せてしまい、
-  `report.clicks.toLocaleString()` で**内訳の面ごと落ちていた**
+  `formatNumber(report.clicks)` で**内訳の面ごと落ちていた**
   （`Cannot read properties of undefined (reading 'toLocaleString')`）。
 
   ここが緩むと、押した運用者には「壊れた」としか見えない。

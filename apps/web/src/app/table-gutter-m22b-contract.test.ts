@@ -92,7 +92,7 @@ describe('m22b 表の左右の余白（文字だけのセルを包む）', () =>
   it('/：日付と数字を包み、余白で測らせる', () => {
     const body = read('components', 'dashboard', 'friend-trend-table.tsx')
     expect(body).toContain('<span>{diff === null')
-    expect(body).toContain('<span>{row.active.toLocaleString')
+    expect(body).toContain('<span>{formatNumber(row.active')
   })
 
   it('/booking/menus：行頭の名前を包む', () => {
@@ -108,7 +108,7 @@ describe('m22b 表の左右の余白（文字だけのセルを包む）', () =>
 
   it('/friends/migrations：日付を包む', () => {
     const body = read('app', 'friends', 'migrations', 'page.tsx')
-    expect(body).toContain('<span className="block">{new Date(job.created_at)')
+    expect(body).toContain('<span className="block">{formatDateTime(job.created_at)')
   })
 
   it('/friends/identity-candidates：採用する値を包む', () => {

@@ -261,7 +261,7 @@ describe('V6回答フォームの未実装3画面', () => {
     expect(RESPONSES_PAGE).toContain('responseResult.data.summary ?? null')
     expect(RESPONSES_PAGE).toContain('completedDestinationWrites(summary)')
     expect(RESPONSES_PAGE).toContain('nextVisitPeople(summary)')
-    expect(RESPONSES_PAGE).toContain('summary.completionRate.toLocaleString')
+    expect(RESPONSES_PAGE).toContain('formatNumber(summary.completionRate)')
     expect(RESPONSES_PAGE).toContain('destinationWriteText(item.destinationWrite)')
     expect(RESPONSES_PAGE).toContain('回答単位の版は未取得')
   })
@@ -325,8 +325,8 @@ describe('V6回答フォームの中項目(#503 M3・M9)', () => {
 
 describe('P 一覧の数・公開前の試し・読みにくい色', () => {
   it('一覧の行に今月の件数と完了率を出し、「？」は見出しに1つだけ置く', () => {
-    expect(PAGE).toContain('今月 ${form.monthlySubmitCount')
-    expect(PAGE).toContain('完了率 ${form.monthlyCompletionRate')
+    expect(PAGE).toContain('今月 ${formatNumber(form.monthlySubmitCount)}件')
+    expect(PAGE).toContain('完了率 ${formatNumber(form.monthlyCompletionRate)}%')
     expect(PAGE).toContain('今月 —')
     expect(PAGE).toContain('完了率 —')
     expect(PAGE).toContain('今月の完了率の説明')
