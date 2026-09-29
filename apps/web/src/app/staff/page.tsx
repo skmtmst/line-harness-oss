@@ -37,6 +37,7 @@ import { SCOPE_ITEMS, BUNDLE_PRESETS, BROADCAST_EDIT_OPERATION_KEYS, type Featur
 import { csvCell } from '@/lib/presentation'
 import { qrToDataURL } from '@/lib/qr-image'
 import { isActiveAdministrator, matchStaffMember, staffActionPolicy } from './staff-actions'
+import { applyScopeRowChange, restoreSavedLevels, scopePiiToEmailMask } from './staff-scope-draft'
 import { CONVERSION_APPROVAL_EDIT_KEY, PERMISSION_LABELS, normalizeStaffPermissionKeys, permissionLabel, toggleStaffPermissionKey } from './permission-labels'
 import OtpInput from '@/components/shared/otp-input'
 
@@ -270,7 +271,7 @@ const SCOPE_COVERED_KEYS: ReadonlySet<string> = new Set([
   ...BROADCAST_EDIT_OPERATION_KEYS,
 ])
 
-function PermissionScopeView({ user, memberId, canSave, copyCandidates, roleCounts, accountNames, savedEditKeys, savedViewKeys, onClose, onSaved, onConflict }: {
+function PermissionScopeView({ user, memberId, canSave, copyCandidates, roleCounts, accountNames, savedEditKeys, savedViewKeys, savedEmailMask, onClose, onSaved, onConflict }: {
   user: AccessUserItem
   memberId: string | null
   canSave: boolean
@@ -279,21 +280,48 @@ function PermissionScopeView({ user, memberId, canSave, copyCandidates, roleCoun
   accountNames: Record<string, string>
   savedEditKeys: string[]
   savedViewKeys: string[]
+  savedEmailMask: 'full' | 'masked' | 'none' | null
   onClose: () => void
   onSaved: () => Promise<void>
   onConflict: () => Promise<void>
 }) {
+  const isCustom = user.roleBundle === 'custom'
+  const hasSaved = memberId !== null
+  /*
+   * R497: 個別設定の人は保存済みキーを3択へ写して出す。
+   * プリセット（受付など）への当てはめはしない。結び付いていない人
+   * （保存済みが取れない）は従来どおりかたまり表示のままにする。
+   */
+  // 開いたときの保存済みが土台。11行の写しなので描画ごとに作り直す。
+  const savedBase: ScopeLevels | null =
+    isCustom && hasSaved ? restoreSavedLevels(savedEditKeys, savedViewKeys, savedEmailMask) : null
   const [bundle, setBundle] = useState<Exclude<AccessRoleBundle, 'custom'>>(
     user.roleBundle === 'custom' ? 'reception' : user.roleBundle,
   )
   /*
-   * 「項目ごとに決める」の上書き。null はbundle初期値のまま。
+   * 「項目ごとに決める」の上書き。null は下書きの土台のまま。
    * 1項目でも触ると個別設定（custom）として保存される。
    */
   const [customLevels, setCustomLevels] = useState<ScopeLevels | null>(null)
-  const levels: ScopeLevels = customLevels ?? BUNDLE_PRESETS[bundle].levels
-  const setLevel = (itemId: string, level: FeatureAccessLevel) =>
+  /*
+   * R497: 行を触った記録。かたまり・コピーは全体の置き換えなので消す。
+   * 行だけ触った保存は、触った行だけ保存済みキーへ適用する
+   * （触っていない行の部分設定を落とさないため）。
+   */
+  const [touchedRowIds, setTouchedRowIds] = useState<string[]>([])
+  const [wholesale, setWholesale] = useState(false)
+  const levels: ScopeLevels = customLevels ?? savedBase ?? BUNDLE_PRESETS[bundle].levels
+  const dirty = wholesale || touchedRowIds.length > 0
+  /*
+   * R497: 個別設定の初期表示では、どの かたまりも選んでいない
+   * （保存済みは下の表に出す）。かたまり・コピーを選び直したら選んだものを出す。
+   */
+  const selectedBundle: Exclude<AccessRoleBundle, 'custom'> | null =
+    !isCustom || wholesale ? bundle : null
+  const setLevel = (itemId: string, level: FeatureAccessLevel) => {
     setCustomLevels({ ...levels, [itemId]: level })
+    setTouchedRowIds((current) => (current.includes(itemId) ? current : [...current, itemId]))
+  }
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
   const [saveConfirmOpen, setSaveConfirmOpen] = useState(false)
@@ -305,7 +333,7 @@ function PermissionScopeView({ user, memberId, canSave, copyCandidates, roleCoun
    * 成功したら捨て、下書きを変えたら作り直す（内容違いの使い回しは422になる）。
    */
   const saveKeyRef = useRef<string | null>(null)
-  useEffect(() => { saveKeyRef.current = null }, [bundle, customLevels])
+  useEffect(() => { saveKeyRef.current = null }, [bundle, customLevels, wholesale, touchedRowIds])
   const [copyOpen, setCopyOpen] = useState(false)
   const [copySourceId, setCopySourceId] = useState('')
   const [copyNotice, setCopyNotice] = useState('')
@@ -327,6 +355,13 @@ function PermissionScopeView({ user, memberId, canSave, copyCandidates, roleCoun
     if (targetIsAdministrator) return setSaveError('管理者の権限はこの画面では変えられません。役割を変えるときは一覧の「変更する」から行います。')
     if (!memberId) return setSaveError('スタッフ情報と結び付いていないため保存できません。名前とメールを確認してください。')
     if (!canSave) return setSaveError('権限のかたまりは管理者だけが変えられます。')
+    // R497: 何も変えていない保存は更新要求を送らない。権限も
+    // セッションも版も変わらないので、確認窓を出さず閉じるだけにする。
+    if (!dirty) {
+      setSaveError('')
+      onClose()
+      return
+    }
     setSaveError('')
     setSaveConfirmError('')
     setSaveConfirmOpen(true)
@@ -341,11 +376,37 @@ function PermissionScopeView({ user, memberId, canSave, copyCandidates, roleCoun
       // N-424: bundle 名をそのまま送る。role へ潰すと「受付」と「運用」が区別できない。
       // 項目を1つでも触っていたら3択表ごと送り、API側が個別設定として保存する。
       saveKeyRef.current ??= crypto.randomUUID()
-      const piiLevel = customLevels?.pii
+      /*
+       * R497: 個別設定の人が行だけ触った保存は、触った行だけ保存済みキーへ
+       * 適用して送る。触っていない行の部分設定（3択に写せない細かい差）は
+       * そのまま残す。かたまり・コピー・プリセットの人の行編集は、土台が
+       * プリセットで欠けがないため従来どおり3択表ごと送る。
+       */
+      const surgical = isCustom && hasSaved && touchedRowIds.length > 0 && !wholesale
+      let permissionKeys: string[] | undefined
+      let permissionViewKeys: string[] | undefined
+      let emailMask: 'full' | 'masked' | 'none' | undefined
+      if (surgical) {
+        let nextEdit = [...savedEditKeys]
+        let nextView = [...savedViewKeys]
+        for (const itemId of touchedRowIds) {
+          const applied = applyScopeRowChange(nextEdit, nextView, itemId, levels[itemId] ?? 'none')
+          nextEdit = applied.edit
+          nextView = applied.view
+        }
+        permissionKeys = nextEdit
+        permissionViewKeys = nextView
+        emailMask = scopePiiToEmailMask(levels.pii)
+      } else {
+        const piiLevel = customLevels?.pii
+        emailMask = piiLevel === 'edit' ? 'full' : piiLevel === 'view' ? 'masked' : piiLevel === 'none' ? 'none' : undefined
+      }
       const result = await api.staff.update(memberId, {
         roleBundle: bundle,
-        permissionScope: customLevels ?? undefined,
-        emailMask: piiLevel === 'edit' ? 'full' : piiLevel === 'view' ? 'masked' : piiLevel === 'none' ? 'none' : undefined,
+        permissionScope: surgical ? undefined : (customLevels ?? undefined),
+        permissionKeys,
+        permissionViewKeys,
+        emailMask,
         idempotencyKey: saveKeyRef.current,
         expectedPolicyVersion: user.policyVersion,
       }, stepUpToken)
@@ -392,6 +453,8 @@ function PermissionScopeView({ user, memberId, canSave, copyCandidates, roleCoun
     // 表示と保存がずれるので、上書きは捨てる。
     setCustomLevels(null)
     setBundle(source.roleBundle)
+    setTouchedRowIds([])
+    setWholesale(true)
     setSaveError('')
     setCopyNotice(`${source.name}の「${ACCESS_ROLE_LABEL[source.roleBundle]}」を下書きに反映しました。保存するまでは変更されません。`)
   }
@@ -409,9 +472,15 @@ function PermissionScopeView({ user, memberId, canSave, copyCandidates, roleCoun
     : piiLevel === 'view'
       ? '電話番号・住所・メールは伏せて表示します'
       : '電話番号・住所・メールは見せません'
-  const savedLevels = user.roleBundle === 'custom' ? null : BUNDLE_PRESETS[user.roleBundle].levels
-  const changedItems = savedLevels
-    ? SCOPE_ITEMS.filter((item) => (levels[item.id] ?? 'none') !== (savedLevels[item.id] ?? 'none'))
+  /*
+   * R497: 差分の土台は保存済みそのもの。個別設定の人も保存済みキーから
+   * 写せるようになったので、内訳の差分が出せる。保存済みが取れない
+   * （結び付いていない個別設定）ときだけ未確認になる。
+   */
+  const compareBase: ScopeLevels | null =
+    savedBase ?? (user.roleBundle === 'custom' ? null : BUNDLE_PRESETS[user.roleBundle].levels)
+  const changedItems = compareBase
+    ? SCOPE_ITEMS.filter((item) => (levels[item.id] ?? 'none') !== (compareBase[item.id] ?? 'none'))
     : null
   /*
    * R497: 表にない保存済みキー（`/automations` など）。保存しても落とさない
@@ -419,7 +488,6 @@ function PermissionScopeView({ user, memberId, canSave, copyCandidates, roleCoun
    */
   const extraKeys = [...new Set([...savedEditKeys, ...savedViewKeys])].filter((key) => !SCOPE_COVERED_KEYS.has(key))
   const extraLabels = extraKeys.map((key) => permissionLabel(key) || key)
-  const dirty = customLevels !== null || bundle !== user.roleBundle
   return <div data-design-node="EOTS4" className="flex flex-col gap-4 pb-28">
     {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
     <div className="flex items-center justify-between"><nav className="text-xs text-ink-faint"><span className="font-bold text-action">ログインユーザー</span>　›　<span className="font-bold text-action">{user.name}</span>　›　見せる範囲</nav><Button variant="secondary" disabled={!writable || copyCandidates.length === 0} onClick={() => setCopyOpen((current) => !current)}>ほかの人と同じにする</Button></div>
@@ -431,13 +499,18 @@ function PermissionScopeView({ user, memberId, canSave, copyCandidates, roleCoun
     */}
     <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_390px]">
       <div className="flex flex-col gap-4">
-        <section className="rounded-card border border-hairline bg-canvas p-4"><h2 className="text-base font-bold text-ink">いまの権限</h2><p className="mt-1 text-xs text-ink-secondary">{user.name}さんはいま「{ACCESS_ROLE_LABEL[user.roleBundle]}」です。{user.roleBundle === 'custom' ? '項目ごとの内訳は取得できていません（未確認）。' : ''}{targetIsAdministrator ? '' : '保存すると、対象者はもう一度ログインが必要です。'}</p>{/* IDEA-30: 閲覧・編集・実行とあわせて対象アカウントの権限もこの画面で確認できるようにする。 */}<p className="mt-2 text-xs text-ink-secondary">対象のLINEアカウント：{accessScopeLabel(user, accountNames)}{user.accountScope.type === 'accounts' && user.accountScope.includesDescendants ? '（配下のアカウントも含みます）' : ''}</p>{targetIsAdministrator ? <p className="mt-2 text-xs font-medium text-ink-secondary">管理者はすべての機能を使えます。この画面では権限の確認だけでき、ここからは変更できません。役割を変えるときは一覧の「変更する」から行います。</p> : null}</section>
+        <section className="rounded-card border border-hairline bg-canvas p-4"><h2 className="text-base font-bold text-ink">いまの権限</h2><p className="mt-1 text-xs text-ink-secondary">{user.name}さんはいま「{ACCESS_ROLE_LABEL[user.roleBundle]}」です。{isCustom ? (savedBase ? '下の表には保存されている内容をそのまま出しています。' : '項目ごとの内訳は取得できていません（未確認）。') : ''}{targetIsAdministrator ? '' : '保存すると、対象者はもう一度ログインが必要です。'}</p>{/* IDEA-30: 閲覧・編集・実行とあわせて対象アカウントの権限もこの画面で確認できるようにする。 */}<p className="mt-2 text-xs text-ink-secondary">対象のLINEアカウント：{accessScopeLabel(user, accountNames)}{user.accountScope.type === 'accounts' && user.accountScope.includesDescendants ? '（配下のアカウントも含みます）' : ''}</p>{targetIsAdministrator ? <p className="mt-2 text-xs font-medium text-ink-secondary">管理者はすべての機能を使えます。この画面では権限の確認だけでき、ここからは変更できません。役割を変えるときは一覧の「変更する」から行います。</p> : null}</section>
         <section className="rounded-card border border-hairline bg-canvas p-4"><h2 className="text-base font-bold text-ink">かたまりから選ぶ</h2><p className="mt-1 text-xs text-ink-faint">よく使う組み合わせを用意しています。選んでから、下で細かく直せます。</p><div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">{bundles.map(([value, label, note]) => <button key={value} type="button" disabled={!writable} onClick={() => {
             // R67: かたまりを選んだら個別の上書きは捨てる。残したままにすると
             // 表示は新しいかたまりなのに保存は古い個別設定になる。
+            // R497: 選んでいる かたまりの選び直しは何も変えない。
+            // 個別設定の人が かたまりを選ぶのは、個別設定から変える操作になる。
+            if (value === bundle && customLevels === null && !isCustom) return
             setCustomLevels(null)
             setBundle(value)
-          }} className={`rounded-control border p-3 text-left ${bundle === value ? 'border-accent bg-accent-soft' : 'border-divider-soft bg-canvas'} ${writable ? '' : 'cursor-not-allowed opacity-60'}`}><span className="flex items-center justify-between"><span className="text-sm font-bold text-ink">{label}</span><span className="text-xs text-ink-faint">{roleCounts[value]}人</span></span><span className={`mt-2 block text-xs ${bundle === value ? 'font-semibold text-success' : 'text-ink-faint'}`}>{note}</span></button>)}</div></section>
+            setTouchedRowIds([])
+            setWholesale(true)
+          }} className={`rounded-control border p-3 text-left ${selectedBundle === value ? 'border-accent bg-accent-soft' : 'border-divider-soft bg-canvas'} ${writable ? '' : 'cursor-not-allowed opacity-60'}`}><span className="flex items-center justify-between"><span className="text-sm font-bold text-ink">{label}</span><span className="text-xs text-ink-faint">{roleCounts[value]}人</span></span><span className={`mt-2 block text-xs ${selectedBundle === value ? 'font-semibold text-success' : 'text-ink-faint'}`}>{note}</span></button>)}</div></section>
         {/*
           LAY-07: 機能ごとにカードへ分け、その中に3択を置く。
           以前の3列140px固定の表形式は狭い幅で潰れていた。
@@ -747,7 +820,7 @@ function StaffPageHost() {
       candidate.id !== permissionTarget.id && candidate.roleBundle !== 'custom'
     ))
     const permissionMember = memberById.get(permissionTarget.id)
-    return <PermissionScopeView user={permissionTarget} memberId={permissionMember?.id ?? null} canSave={administrator} copyCandidates={copyCandidates} roleCounts={accessSummary.roleCounts} accountNames={accountNames} savedEditKeys={permissionMember?.permissionKeys ?? []} savedViewKeys={permissionMember?.permissionViewKeys ?? []} onClose={() => setPermissionTarget(null)} onSaved={finishPermissionSave} onConflict={handlePermissionConflict} />
+    return <PermissionScopeView user={permissionTarget} memberId={permissionMember?.id ?? null} canSave={administrator} copyCandidates={copyCandidates} roleCounts={accessSummary.roleCounts} accountNames={accountNames} savedEditKeys={permissionMember?.permissionKeys ?? []} savedViewKeys={permissionMember?.permissionViewKeys ?? []} savedEmailMask={permissionMember?.emailMask ?? null} onClose={() => setPermissionTarget(null)} onSaved={finishPermissionSave} onConflict={handlePermissionConflict} />
   }
   return <div data-design-node="e3jz3" className="flex flex-col gap-4"><div><MergedTabs basePath="/staff" tabs={staffTabs} active={tab} defaultKey="members" actions={tabAction} /></div>
     {/*
