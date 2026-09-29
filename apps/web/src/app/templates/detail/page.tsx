@@ -397,7 +397,7 @@ function TemplateDetailInner() {
                   </span>
                 )}
               </div>
-              <pre className="bg-canvas-sunken text-ink-secondary mt-3 overflow-x-auto rounded p-3 text-xs whitespace-pre-wrap">
+              <pre className="bg-canvas-sunken text-ink-secondary mt-3 overflow-x-auto rounded-mini p-3 text-xs whitespace-pre-wrap">
                 {body}
               </pre>
             </section>
@@ -549,7 +549,7 @@ function TemplateDetailInner() {
               ) : (
                 <div className="bg-canvas-sunken rounded-card p-3">
                   <p className="text-ink-faint mb-1 text-xs">然-NEN-</p>
-                  <p className="text-ink rounded-2xl bg-canvas px-4 py-3 text-sm leading-6 whitespace-pre-wrap">
+                  <p className="text-ink rounded-card bg-canvas px-4 py-3 text-sm leading-6 whitespace-pre-wrap">
                     {body}
                   </p>
                 </div>

@@ -2136,18 +2136,18 @@ export default function NewAutomationPage() {
             {/* AUTOMATION-02: 要約と同じ条件から作った札。条件が本当に無いときだけ「条件なし」。 */}
             <div className="mt-3 flex flex-wrap gap-2">
               {usesKeyword && keyword.trim() ? (
-                <span className="inline-flex min-h-9 items-center rounded-full border border-hairline bg-canvas px-3 text-xs font-medium text-ink-secondary">「{keyword.trim()}」を含む</span>
+                <span className="inline-flex min-h-9 items-center rounded-pill border border-hairline bg-canvas px-3 text-xs font-medium text-ink-secondary">「{keyword.trim()}」を含む</span>
               ) : null}
               {conditionSummaries.map((text, index) => (
                 <span
                   key={`${index}-${text}`}
-                  className="inline-flex min-h-9 items-center rounded-full border border-hairline bg-canvas px-3 text-xs font-medium text-ink-secondary"
+                  className="inline-flex min-h-9 items-center rounded-pill border border-hairline bg-canvas px-3 text-xs font-medium text-ink-secondary"
                 >
                   {text}
                 </span>
               ))}
               {!((usesKeyword && keyword.trim()) || conditionSummaries.length > 0) ? (
-                <span className="inline-flex min-h-9 items-center rounded-full border border-hairline bg-canvas px-3 text-xs font-medium text-ink-secondary">条件なし</span>
+                <span className="inline-flex min-h-9 items-center rounded-pill border border-hairline bg-canvas px-3 text-xs font-medium text-ink-secondary">条件なし</span>
               ) : null}
             </div>
             {conditionUnreadable ? (

@@ -262,7 +262,7 @@ function ImagePreview({ content }: { content: string }) {
     const url = parsed.previewImageUrl || parsed.originalContentUrl
     return (
       <div>
-        <span className="text-xs font-medium text-chip-alt bg-chip-alt-soft px-2 py-0.5 rounded mb-2 inline-block">画像</span>
+        <span className="text-xs font-medium text-chip-alt bg-chip-alt-soft px-2 py-0.5 rounded-mini mb-2 inline-block">画像</span>
         {url ? (
           <img src={url} alt="preview" className="border-hairline rounded-card mt-1 max-w-[200px] border" />
         ) : (
@@ -1776,9 +1776,9 @@ export default function ScenarioDetailClient({
       <div>
 
         <div className="bg-canvas rounded-card border border-hairline p-8 animate-pulse space-y-4">
-          <div className="bg-canvas-sunken h-6 w-1/3 rounded" />
-          <div className="h-4 bg-canvas-sunken rounded w-2/3" />
-          <div className="h-4 bg-canvas-sunken rounded w-1/2" />
+          <div className="bg-canvas-sunken h-6 w-1/3 rounded-mini" />
+          <div className="h-4 bg-canvas-sunken rounded-mini w-2/3" />
+          <div className="h-4 bg-canvas-sunken rounded-mini w-1/2" />
         </div>
       </div>
     )
@@ -2440,9 +2440,9 @@ export default function ScenarioDetailClient({
                           {stat ? (
                             <span className="inline-flex items-center gap-2">
                               {reachBarWidth === null ? null : (
-                                <span className="bg-canvas-sunken h-1.5 w-20 overflow-hidden rounded-full">
+                                <span className="bg-canvas-sunken h-1.5 w-20 overflow-hidden rounded-pill">
                                   <span
-                                    className="bg-ink-faint block h-full rounded-full"
+                                    className="bg-ink-faint block h-full rounded-pill"
                                     style={{ width: reachBarWidth }}
                                   />
                                 </span>

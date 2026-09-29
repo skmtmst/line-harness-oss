@@ -61,7 +61,7 @@ function ImageThumb({ raw }: { raw: string }) {
         src={src}
         alt=""
         loading="lazy"
-        className="h-12 w-12 flex-shrink-0 rounded object-cover ring-1 ring-hairline"
+        className="h-12 w-12 flex-shrink-0 rounded-mini object-cover ring-1 ring-hairline"
       />
       <span className="text-sm text-ink-faint">画像</span>
     </span>
@@ -90,21 +90,21 @@ export default function InboxRow({ row }: Props) {
         <img
           src={row.pictureUrl}
           alt=""
-          className="h-10 w-10 flex-shrink-0 rounded-full object-cover"
+          className="h-10 w-10 flex-shrink-0 rounded-pill object-cover"
         />
       ) : (
-        <div className="h-10 w-10 flex-shrink-0 rounded-full bg-shell-gray" />
+        <div className="h-10 w-10 flex-shrink-0 rounded-pill bg-shell-gray" />
       )}
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className="truncate text-sm font-medium text-ink">
             {row.displayName || '(名前なし)'}
           </span>
-          <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[10px] font-medium text-success">
+          <span className="rounded-pill bg-accent-soft px-2 py-0.5 text-[10px] font-medium text-success">
             {row.accountName}
           </span>
           {machineAfterIncoming && (
-            <span className="rounded-full bg-info-bg px-2 py-0.5 text-[10px] font-medium text-info">
+            <span className="rounded-pill bg-info-bg px-2 py-0.5 text-[10px] font-medium text-info">
               auto 返答済
             </span>
           )}

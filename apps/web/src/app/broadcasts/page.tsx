@@ -862,7 +862,7 @@ function BroadcastList() {
                           {broadcast.title}
                         </a>
                         {isDedup && (
-                          <span className="inline-flex items-center whitespace-nowrap px-1.5 py-0 rounded text-[10px] font-medium bg-info-bg text-info">
+                          <span className="inline-flex items-center whitespace-nowrap px-1.5 py-0 rounded-mini text-[10px] font-medium bg-info-bg text-info">
                             複数アカウント
                           </span>
                         )}
@@ -891,7 +891,7 @@ function BroadcastList() {
                         </span>
                       ) : (
                         <span className="inline-flex flex-wrap items-center gap-1">
-                          <span className={`inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded-full text-xs font-medium ${statusInfo.className}`}>
+                          <span className={`inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded-pill text-xs font-medium ${statusInfo.className}`}>
                             {statusInfo.label}
                           </span>
                           <ApprovalBadge status={broadcast.approvalStatus} />

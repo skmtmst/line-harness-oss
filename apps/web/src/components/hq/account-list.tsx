@@ -13,10 +13,10 @@ function AccountIcon({ account }: { account: AccountWithStats }) {
   const src = accountIconUrl(account)
   if (src) {
     // eslint-disable-next-line @next/next/no-img-element -- LINE公式アカウントのCDN画像
-    return <img src={src} alt="" className="h-9 w-9 shrink-0 rounded-full object-cover" />
+    return <img src={src} alt="" className="h-9 w-9 shrink-0 rounded-pill object-cover" />
   }
   const label = (account.displayName || account.name).trim().slice(0, 1)
-  return <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-soft text-sm font-bold text-accent-deep">{label}</span>
+  return <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-pill bg-accent-soft text-sm font-bold text-accent-deep">{label}</span>
 }
 
 function ConnectionStatus({ status }: { status: 'ok' | 'warn' | 'unknown' | undefined }) {
@@ -37,7 +37,7 @@ export default function HqAccountList({
   selectLabel?: string
 }) {
   return (
-    <section data-design="List" data-design-node="vLMQ5" className="min-w-0 overflow-hidden rounded-card border border-hairline bg-canvas shadow-sm">
+    <section data-design="List" data-design-node="vLMQ5" className="min-w-0 overflow-hidden rounded-card border border-hairline bg-canvas shadow-card">
       {/*
         U042: 768px 未満では表の右端にある操作（ログイン・設定）へ
         横スクロールしないと届かなかった。スマホでは名前＋状態＋操作が

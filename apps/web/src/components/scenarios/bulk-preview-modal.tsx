@@ -126,7 +126,7 @@ export default function BulkPreviewModal({ open, scenarioId, onClose }: Props) {
           {steps.map((s) => (
             <details
               key={s.stepOrder}
-              className="border-hairline group rounded-lg border p-3"
+              className="border-hairline group rounded-control border p-3"
             >
               <summary className="flex cursor-pointer list-none items-center gap-2 text-sm">
                 <span className="text-ink-faint w-8 font-mono">#{s.stepOrder}</span>
@@ -142,7 +142,7 @@ export default function BulkPreviewModal({ open, scenarioId, onClose }: Props) {
                   <p className="text-ink-faint mt-1 text-xs">{source}</p>
                 ) : null
               })()}
-              <pre className="bg-canvas-sunken text-ink-secondary mt-2 max-h-48 overflow-y-auto rounded p-2 text-xs break-words whitespace-pre-wrap">
+              <pre className="bg-canvas-sunken text-ink-secondary mt-2 max-h-48 overflow-y-auto rounded-mini p-2 text-xs break-words whitespace-pre-wrap">
                 {s.messageContent}
               </pre>
             </details>

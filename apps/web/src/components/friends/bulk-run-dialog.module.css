@@ -42,7 +42,7 @@
 .op, .opOn { display: flex; min-height: 104px; flex-direction: column; gap: 3px; text-align: left; border: 1px solid var(--color-hairline); border-radius: var(--radius-control); background: var(--color-canvas); padding: 12px; }
 .op:disabled { cursor: not-allowed; opacity: .68; }
 .opOn { border-color: var(--color-accent); background: var(--color-accent-soft); }
-.opIcon { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 8px; background: var(--color-canvas-sunken); color: var(--color-ink-secondary); font-weight: 600; }
+.opIcon { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: var(--radius-control); background: var(--color-canvas-sunken); color: var(--color-ink-secondary); font-weight: 600; }
 .opLabel { color: var(--color-ink); font-size: var(--text-micro); font-weight: 500; }
 .opNote { color: var(--color-ink-secondary); font-size: var(--text-nano); }
 .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }

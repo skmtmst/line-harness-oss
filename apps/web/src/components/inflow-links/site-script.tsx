@@ -440,7 +440,7 @@ export default function SiteScript() {
             </p>
             <div className="mt-3 rounded-control border border-hairline bg-canvas-sunken p-4" aria-label="サイトに出る案内の見本">
               <p className="text-xs text-ink-secondary">サイトの下に出る案内（見本）</p>
-              <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-control bg-canvas p-3 shadow-sm">
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-control bg-canvas p-3 shadow-card">
                 <p className="text-xs text-ink">広告の効果を知るため、この端末での閲覧を記録してよいですか？</p>
                 <div className="flex gap-2">
                   <span className="rounded-control border border-hairline px-3 py-1.5 text-xs text-ink-secondary">記録しない</span>

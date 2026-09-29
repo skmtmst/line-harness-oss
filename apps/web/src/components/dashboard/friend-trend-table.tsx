@@ -30,7 +30,7 @@ export default function FriendTrendTable({
     return (
       <div className="space-y-2 p-5">
         {[0, 1, 2, 3, 4].map((i) => (
-          <div key={i} className="bg-canvas-sunken h-8 animate-pulse rounded" />
+          <div key={i} className="bg-canvas-sunken h-8 animate-pulse rounded-mini" />
         ))}
       </div>
     )

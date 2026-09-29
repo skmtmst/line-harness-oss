@@ -82,13 +82,13 @@ function UrlRow({ label, hint, url }: { label: string; hint: string; url: string
           value={url}
           placeholder="—"
           onFocus={(e) => e.currentTarget.select()}
-          className="min-w-0 flex-1 truncate rounded border border-hairline bg-surface-pearl px-2 py-1.5 font-mono text-xs text-ink-secondary"
+          className="min-w-0 flex-1 truncate rounded-mini border border-hairline bg-surface-pearl px-2 py-1.5 font-mono text-xs text-ink-secondary"
         />
         <button
           type="button"
           onClick={onCopy}
           disabled={!url}
-          className="shrink-0 rounded border border-hairline px-2 text-xs font-medium hover:bg-surface-pearl disabled:cursor-not-allowed disabled:opacity-40"
+          className="shrink-0 rounded-mini border border-hairline px-2 text-xs font-medium hover:bg-surface-pearl disabled:cursor-not-allowed disabled:opacity-40"
         >
           {copied ? '✓' : 'コピー'}
         </button>

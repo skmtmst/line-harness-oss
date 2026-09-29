@@ -67,7 +67,7 @@
 .track {
   height: 8px; /* height: 8 */
   overflow: hidden;
-  border-radius: 4px; /* cornerRadius: 4 */
+  border-radius: var(--radius-mini); /* cornerRadius: 4 */
   background: var(--color-shell); /* fill: $shell */
   position: relative;
 }
@@ -75,7 +75,7 @@
 .fill {
   position: absolute;
   inset: 0;
-  border-radius: 4px; /* cornerRadius: 4 */
+  border-radius: var(--radius-mini); /* cornerRadius: 4 */
   background: var(--color-accent-deep); /* fill: $accent-deep */
   transform: scaleX(0);
   transform-origin: left center;
@@ -99,7 +99,7 @@
   bottom: 0;
   left: 0;
   width: 29%; /* width: 110（380 の帯のとき） */
-  border-radius: 4px; /* cornerRadius: 4 */
+  border-radius: var(--radius-mini); /* cornerRadius: 4 */
   background: var(--color-accent-deep); /* fill: $accent-deep */
   opacity: 0.6; /* opacity: 0.6 */
   animation: progress-slide var(--motion-slow) var(--motion-ease-in-out) infinite alternate;

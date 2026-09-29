@@ -1334,7 +1334,7 @@ function EditCommonVarInner() {
             if (e.target === e.currentTarget) setDraft(null)
           }}
         >
-          <div ref={draftPanelRef} className="rounded-card bg-canvas w-full max-w-md space-y-4 p-6 shadow-xl">
+          <div ref={draftPanelRef} className="rounded-card bg-canvas w-full max-w-md space-y-4 p-6 shadow-float">
             <div className="flex items-start justify-between gap-3">
               <p className="text-ink text-sm font-semibold">スケジュール設定</p>
               <button type="button" onClick={() => setDraft(null)} aria-label="閉じる" className="rounded-mini p-1 text-ink-secondary hover:bg-canvas-sunken">

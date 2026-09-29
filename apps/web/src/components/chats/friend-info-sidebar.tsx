@@ -488,7 +488,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
               setShowSettings(!showSettings)
             }}
             aria-expanded={showSettings}
-            className="mr-14 inline-flex h-8 shrink-0 items-center justify-center whitespace-nowrap rounded-lg border border-hairline bg-canvas px-3 text-[11px] font-semibold text-ink-faint hover:bg-canvas-sunken"
+            className="mr-14 inline-flex h-8 shrink-0 items-center justify-center whitespace-nowrap rounded-control border border-hairline bg-canvas px-3 text-[11px] font-semibold text-ink-faint hover:bg-canvas-sunken"
           >
             表示項目
           </button>
@@ -593,10 +593,10 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
         {loading ? (
           <div className="p-4 space-y-3 animate-pulse">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-shell-gray" />
+              <div className="w-12 h-12 rounded-pill bg-shell-gray" />
               <div className="flex-1 space-y-2">
-                <div className="h-3 bg-shell-gray rounded w-32" />
-                <div className="h-2 bg-shell rounded w-20" />
+                <div className="h-3 bg-shell-gray rounded-mini w-32" />
+                <div className="h-2 bg-shell rounded-mini w-20" />
               </div>
             </div>
           </div>
@@ -625,27 +625,27 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
               <p className="text-ink-faint mt-0.5 text-[11px]">LINE表示名</p>
               <div className="mt-3 flex max-w-full items-center justify-center gap-1.5">
                 {chatStatus?.status && statusLabels[chatStatus.status] ? (
-                  <span className={`inline-flex items-center rounded-full px-2 py-1 text-[11px] font-semibold ${statusLabels[chatStatus.status].className}`}>
+                  <span className={`inline-flex items-center rounded-pill px-2 py-1 text-[11px] font-semibold ${statusLabels[chatStatus.status].className}`}>
                     {statusLabels[chatStatus.status].label}
                   </span>
                 ) : (
-                  <span className="bg-canvas-sunken text-ink-faint rounded-full px-2 py-1 text-[11px] font-semibold">未設定</span>
+                  <span className="bg-canvas-sunken text-ink-faint rounded-pill px-2 py-1 text-[11px] font-semibold">未設定</span>
                 )}
                 <span
-                  className="bg-canvas-sunken text-ink-secondary max-w-[130px] truncate rounded-full px-2 py-1 text-[11px] font-semibold"
+                  className="bg-canvas-sunken text-ink-secondary max-w-[130px] truncate rounded-pill px-2 py-1 text-[11px] font-semibold"
                   title={operatorName ?? undefined}
                 >
                   {operatorName || '未割り当て'}
                 </span>
               </div>
               {!friend.isFollowing && (
-                <span className="bg-canvas-sunken text-ink-faint mt-2 inline-block rounded px-1.5 py-0.5 text-[10px] font-medium">
+                <span className="bg-canvas-sunken text-ink-faint mt-2 inline-block rounded-mini px-1.5 py-0.5 text-[10px] font-medium">
                   ブロック済
                 </span>
               )}
               <a
                 href={`/friends/detail?id=${friend.id}`}
-                className="border-hairline text-action mt-3 inline-flex items-center rounded-lg border px-3 py-2 text-xs font-semibold hover:bg-canvas-sunken"
+                className="border-hairline text-action mt-3 inline-flex items-center rounded-control border px-3 py-2 text-xs font-semibold hover:bg-canvas-sunken"
               >
                 友だち詳細
               </a>
@@ -676,7 +676,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
             <div style={sectionStyle('mileage')} className={`${sectionVisibility('mileage')} px-5 py-4`}>
               <h4 className="text-ink mb-2 text-xs font-bold">マイル</h4>
               {mileage.kind === 'loading' ? (
-                <div className="h-24 animate-pulse rounded-xl bg-shell" />
+                <div className="h-24 animate-pulse rounded-card bg-shell" />
               ) : mileage.kind === 'error' ? (
                 /* INBOX-08: 失敗と未登録を分け、その場で再試行できる。 */
                 <div className="space-y-1.5">
@@ -701,7 +701,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
                       <p className="text-ink-faint text-[10px]">利用可能</p>
                     </div>
                     {mileage.summary.pending > 0 && (
-                      <span className="bg-canvas-sunken text-ink-secondary rounded-full px-2 py-1 text-[10px] font-medium">
+                      <span className="bg-canvas-sunken text-ink-secondary rounded-pill px-2 py-1 text-[10px] font-medium">
                         確定待ち {mileage.summary.pending.toLocaleString('ja-JP')}
                       </span>
                     )}
@@ -739,7 +739,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
               <div className="flex justify-between items-center">
                 <span className="text-[11px] text-ink-faint">対応状況</span>
                 {chatStatus?.status && statusLabels[chatStatus.status] ? (
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusLabels[chatStatus.status].className}`}>
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-pill text-xs font-medium ${statusLabels[chatStatus.status].className}`}>
                     {statusLabels[chatStatus.status].label}
                   </span>
                 ) : (
@@ -834,7 +834,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
                   {friend.tags.map((tag) => (
                     <span
                       key={tag.id}
-                      className="inline-flex max-w-full items-center rounded px-2 py-0.5 text-[10px] font-medium"
+                      className="inline-flex max-w-full items-center rounded-mini px-2 py-0.5 text-[10px] font-medium"
                       style={{
                         backgroundColor: `${tag.color}20`,
                         color: tagTextColor(tag.color),
@@ -862,7 +862,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
                 </a>
               </div>
               {friendFields.kind === 'loading' ? (
-                <div className="h-10 animate-pulse rounded-lg bg-canvas-sunken" />
+                <div className="h-10 animate-pulse rounded-control bg-canvas-sunken" />
               ) : friendFields.kind === 'error' ? (
                 <div className="space-y-1.5">
                   <p className="text-[11px] text-danger">項目を読み込めませんでした</p>
@@ -922,7 +922,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-xs text-ink-secondary">{richMenu.name ?? '(名前なし)'}</span>
                   {richMenu.isDefault && (
-                    <span className="px-1.5 py-0 rounded text-[10px] font-medium bg-shell text-ink-faint">
+                    <span className="px-1.5 py-0 rounded-mini text-[10px] font-medium bg-shell text-ink-faint">
                       デフォルト
                     </span>
                   )}
@@ -1002,7 +1002,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
                     const labels = new Map(submission.fields.map((field) => [field.name, field.label]))
                     const answers = Object.entries(submission.data).filter(([key]) => !key.startsWith('_'))
                     return (
-                      <div key={submission.id} className="rounded-lg border border-divider-soft bg-surface-pearl p-3">
+                      <div key={submission.id} className="rounded-control border border-divider-soft bg-surface-pearl p-3">
                         <div className="flex items-start justify-between gap-2">
                           <p className="text-xs font-medium text-ink-secondary break-words">{submission.formName}</p>
                           <time className="shrink-0 text-[10px] text-ink-faint">

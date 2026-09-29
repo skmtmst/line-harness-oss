@@ -349,7 +349,7 @@ export default function MileageHistoryTab({ accountId, canOperate = false }: { a
         <label className="flex flex-col gap-1 text-sm">
           <span className="font-semibold text-ink">理由（必須）</span>
           <textarea
-            className="min-h-20 rounded border border-hairline px-3 py-2 text-sm"
+            className="min-h-20 rounded-mini border border-hairline px-3 py-2 text-sm"
             value={pendingReason}
             onChange={(event) => setPendingReason(event.target.value)}
             placeholder={pendingAction?.kind === 'confirm' ? '例：入金を確認しました' : '例：予約がキャンセルされました'}

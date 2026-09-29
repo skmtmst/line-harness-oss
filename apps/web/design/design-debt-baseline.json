@@ -73,7 +73,7 @@
     "direct-secondary-button": 1
   },
   "app/chats/page.tsx": {
-    "arbitrary-value": 40,
+    "arbitrary-value": 37,
     "direct-secondary-button": 9,
     "unresolved-classname": 2,
     "direct-primary-button": 1
@@ -96,7 +96,6 @@
     "unresolved-classname": 5
   },
   "app/duplicates/page.tsx": {
-    "arbitrary-value": 3,
     "direct-secondary-button": 1
   },
   "app/ec-commerce/connector-panel.tsx": {
@@ -195,7 +194,7 @@
   },
   "app/line-notifications/page.tsx": {
     "direct-primary-button": 1,
-    "arbitrary-value": 8,
+    "arbitrary-value": 7,
     "unresolved-classname": 3
   },
   "app/login/two-factor/page.tsx": {
@@ -301,14 +300,14 @@
   },
   "app/settings/page.tsx": {
     "unresolved-classname": 1,
-    "arbitrary-value": 16
+    "arbitrary-value": 15
   },
   "app/staff/new/page.tsx": {
     "direct-secondary-button": 1,
     "arbitrary-value": 2
   },
   "app/staff/page.tsx": {
-    "arbitrary-value": 18,
+    "arbitrary-value": 17,
     "direct-primary-button": 3,
     "direct-secondary-button": 4
   },
@@ -423,7 +422,7 @@
     "direct-primary-button": 1
   },
   "components/chats/inbox-kpis.tsx": {
-    "arbitrary-value": 13,
+    "arbitrary-value": 12,
     "direct-secondary-button": 1
   },
   "components/chats/saved-view-dialog.tsx": {
@@ -432,12 +431,12 @@
     "direct-secondary-button": 1
   },
   "components/chats/template-picker.tsx": {
-    "arbitrary-value": 15,
+    "arbitrary-value": 11,
     "direct-secondary-button": 3,
     "direct-primary-button": 1
   },
   "components/dashboard/dashboard-editor.tsx": {
-    "arbitrary-value": 15,
+    "arbitrary-value": 14,
     "direct-primary-button": 1,
     "direct-secondary-button": 1
   },
@@ -475,14 +474,14 @@
     "direct-secondary-button": 1
   },
   "components/forms/form-preview.tsx": {
-    "arbitrary-value": 7,
+    "arbitrary-value": 6,
     "unresolved-classname": 1
   },
   "components/forms/options-dialog.tsx": {
     "unresolved-classname": 8
   },
   "components/friend-attributes-v2/tag-list-v2.tsx": {
-    "arbitrary-value": 81,
+    "arbitrary-value": 78,
     "direct-secondary-button": 6,
     "unresolved-classname": 6,
     "direct-primary-button": 2,
@@ -495,13 +494,13 @@
     "arbitrary-value": 1
   },
   "components/friend-fields/field-list.tsx": {
-    "arbitrary-value": 7
+    "arbitrary-value": 5
   },
   "components/friend-fields/mark-list.tsx": {
-    "arbitrary-value": 10
+    "arbitrary-value": 8
   },
   "components/friend-fields/saved-search-list.tsx": {
-    "arbitrary-value": 11
+    "arbitrary-value": 10
   },
   "components/friend-fields/support-mark-rules-panel.tsx": {
     "unresolved-classname": 41
@@ -725,7 +724,7 @@
     "unresolved-classname": 20
   },
   "components/support/email-thread.tsx": {
-    "arbitrary-value": 9,
+    "arbitrary-value": 7,
     "direct-secondary-button": 6,
     "direct-primary-button": 2
   },

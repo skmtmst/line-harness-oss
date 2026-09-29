@@ -308,8 +308,8 @@ export default function HealthPage() {
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className={`inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-medium px-2.5 py-1 rounded-full ${config.bgColor} ${config.textColor}`}>
-                          <span className={`w-2 h-2 rounded-full ${config.color} ${risk === 'danger' ? 'animate-pulse' : ''}`} />
+                        <span className={`inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-medium px-2.5 py-1 rounded-pill ${config.bgColor} ${config.textColor}`}>
+                          <span className={`w-2 h-2 rounded-pill ${config.color} ${risk === 'danger' ? 'animate-pulse' : ''}`} />
                           {config.label}
                         </span>
                         <ChevronDown aria-hidden="true" className={`size-4 text-ink-faint transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
@@ -385,8 +385,8 @@ export default function HealthPage() {
                                     <Td className="text-ink-secondary">{log.errorCount}</Td>
                                     <Td className="text-ink-secondary">{log.checkPeriod}</Td>
                                     <Td>
-                                      <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${logConfig.bgColor} ${logConfig.textColor}`}>
-                                        <span className={`w-1.5 h-1.5 rounded-full ${logConfig.color} ${log.riskLevel === 'danger' ? 'animate-pulse' : ''}`} />
+                                      <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-pill ${logConfig.bgColor} ${logConfig.textColor}`}>
+                                        <span className={`w-1.5 h-1.5 rounded-pill ${logConfig.color} ${log.riskLevel === 'danger' ? 'animate-pulse' : ''}`} />
                                         {logConfig.label}
                                       </span>
                                     </Td>
@@ -503,7 +503,7 @@ export default function HealthPage() {
                               {getAccountName(migration.toAccountId)}
                             </Td>
                             <Td>
-                              <span className={`inline-flex text-xs font-medium px-2.5 py-1 rounded-full ${status.bgColor} ${status.textColor}`}>
+                              <span className={`inline-flex text-xs font-medium px-2.5 py-1 rounded-pill ${status.bgColor} ${status.textColor}`}>
                                 {status.label}
                               </span>
                             </Td>
