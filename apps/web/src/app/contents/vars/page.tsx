@@ -741,11 +741,18 @@ function VarsPageInner() {
   ) : null
 
   /*
+   * m26m: 一覧の取得失敗（403・503）は件数が未知。読めていないのに
+   * `items.length`（初期値0）を出すと、実在する7件を0件と誤案内する。
+   * 成功時0件と区別するため、失敗中は「—」にする。復旧後は実件数に戻る。
+   */
+  const listFailed = listFailure != null
+
+  /*
    * 狭い幅で出すフォルダの選択欄（#973 U026）。縦パネルは長い一覧が
    * 本文の前に来て、親グリッドの右へはみ出す元にもなっていた。
    */
   const folderOptions = [
-    { value: '', label: `すべて（${items.length}件）` },
+    { value: '', label: listFailed ? 'すべて（—）' : `すべて（${items.length}件）` },
     { value: UNGROUPED, label: `未分類（${unfiledCount === null ? '—' : `${unfiledCount}件`}）` },
     ...folders.map((folder) => ({
       value: folder.id,
@@ -841,7 +848,8 @@ function VarsPageInner() {
             onSelect={setFolderFilter}
             onAddFolder={() => setAddingFolder(true)}
             rows={[
-              { id: '', label: 'すべて', count: items.length },
+              // m26m: 一覧の取得失敗中は件数未知（nullは数えない約束）。0と出さない。
+              { id: '', label: 'すべて', count: listFailed ? null : items.length },
               {
                 id: UNGROUPED,
                 label: '未分類',
@@ -1164,6 +1172,13 @@ function VarsPageInner() {
             )}
           </div>
 
+          {/*
+            m26m: 一覧の取得失敗中は表の下の「0件」も出さない。
+            失敗の1枚（権限案内・再試行）が件数の置き場所になる。
+            復旧後は実件数を戻す。フォルダだけの失敗では一覧は読めて
+            いるので、この行は残す（R589の「取得済み7件を維持」を守る）。
+          */}
+          {listFailed ? null : (
           <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
             {/* m18s: 絞り込み後の件数は一覧の側に出す。見出しには出さない。 */}
             <ListRange
@@ -1183,6 +1198,7 @@ function VarsPageInner() {
               {selected.size > 0 && <span className="tabular-nums">（{selected.size}）</span>}
             </button>
           </div>
+          )}
         </div>
       </div>
 
