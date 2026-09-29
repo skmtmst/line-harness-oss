@@ -17,6 +17,8 @@ type BindingForSummary = {
 type BindingForCount = {
   runningCount?: number | null
   waitingCount?: number | null
+  olderRunningCount?: number | null
+  olderWaitingCount?: number | null
 }
 
 /*
@@ -26,7 +28,7 @@ type BindingForCount = {
  */
 export function sumBindingCount(
   bindings: BindingForCount[],
-  key: 'runningCount' | 'waitingCount',
+  key: 'runningCount' | 'waitingCount' | 'olderRunningCount' | 'olderWaitingCount',
 ): number | null {
   let sum = 0
   for (const binding of bindings) {

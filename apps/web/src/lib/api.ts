@@ -2355,6 +2355,9 @@ export type CommonActionBinding = {
   hasNewerVersion: boolean;
   runningCount: number | null;
   waitingCount: number | null;
+  /* 監査 R471: 切替後に旧版のまま進んでいる実行。現在版の件数とは分ける。 */
+  olderRunningCount: number | null;
+  olderWaitingCount: number | null;
   updatedAt: string;
 };
 

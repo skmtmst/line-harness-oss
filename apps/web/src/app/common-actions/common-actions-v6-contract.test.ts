@@ -107,6 +107,14 @@ describe('V6共通アクションの画面契約', () => {
     expect(VERSIONS).toContain('dialogError')
   })
 
+  it('利用先ごとの件数と旧版の残りを分けて出す（監査 R471・R472）', () => {
+    expect(WORKER).toContain('older_running_count')
+    expect(WORKER).toContain('consumer_path')
+    expect(API).toContain('olderRunningCount')
+    expect(VERSIONS).toContain('olderRunningCount')
+    expect(VERSIONS).toContain('旧版のまま進行中')
+  })
+
   it('版操作は店が外れていたら実行しない (#580)', () => {
     expect(VERSIONS).toContain('if (!selectedAccountId) {')
     expect(VERSIONS).toContain('LINEアカウントを選び直してください')

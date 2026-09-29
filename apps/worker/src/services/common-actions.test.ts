@@ -402,6 +402,89 @@ describe('V6共通アクション', () => {
     expect(summary.actions).toBe(1);
   });
 
+  it('利用先ごとの実行件数を数え旧版の残りも分ける（監査 R471・R472）', async () => {
+    const created = await createCommonAction(testDb.db, {
+      lineAccountId: 'account-1', name: '数える対象', actions: tagAction('tag-1'),
+    });
+    await publishCommonActionDraft(testDb.db, {
+      id: created.id, lineAccountId: 'account-1', draftVersionId: created.draftVersionId,
+    });
+    // 同じ自動化の2か所で呼ぶ。片方（never）はまだ動かしていない。
+    testDb.raw.prepare(
+      `INSERT INTO common_action_bindings
+         (id, line_account_id, common_action_id, common_action_version_id,
+          consumer_type, consumer_id, consumer_path)
+       VALUES ('b-root', 'account-1', ?, ?, 'automation', 'auto-1', 'root'),
+              ('b-never', 'account-1', ?, ?, 'automation', 'auto-1', 'never')`,
+    ).run(created.id, created.draftVersionId, created.id, created.draftVersionId);
+    testDb.raw.prepare(
+      `INSERT INTO automation_definitions (id, line_account_id, name, status, current_published_version_id)
+       VALUES ('auto-1', 'account-1', '呼ぶ側', 'active', 'auto-1-v1')`,
+    ).run();
+    testDb.raw.prepare(
+      `INSERT INTO automation_versions (id, automation_id, version_number, status, trigger_type, action_config)
+       VALUES ('auto-1-v1', 'auto-1', 1, 'published', 'message_received', '[]')`,
+    ).run();
+    for (const [id, status] of [['r-run', 'running'], ['r-wait', 'waiting']] as const) {
+      testDb.raw.prepare(
+        `INSERT INTO automation_runs
+           (id, line_account_id, automation_id, automation_version_id,
+            source_event_id, idempotency_key, status, is_test)
+         VALUES (?, 'account-1', 'auto-1', 'auto-1-v1', ?, ?, ?, 0)`,
+      ).run(id, `event-${id}`, `key-${id}`, status);
+      // root の呼び出し箇所の目印だけがある。never 側の手順は無い。
+      testDb.raw.prepare(
+        `INSERT INTO automation_run_steps
+           (id, automation_run_id, step_key, action_type, common_action_version_id,
+            idempotency_key, status)
+         VALUES (?, ?, 'root', 'common_action_marker', ?, ?, ?)`,
+      ).run(`step-${id}`, id, created.draftVersionId, `step-${id}`, status);
+    }
+
+    let detail = await getCommonActionDetail(testDb.db, {
+      id: created.id, lineAccountId: 'account-1',
+    });
+    const byId = new Map(detail.bindings.map((binding) => [binding.id, binding]));
+    // R472: 動かしていない箇所は0件。同じ実行を重ねて数えない。
+    expect(byId.get('b-root')).toMatchObject({ runningCount: 1, waitingCount: 1 });
+    expect(byId.get('b-never')).toMatchObject({ runningCount: 0, waitingCount: 0 });
+
+    // v2 を公開して root の利用先だけ切り替える。実行中の2件は旧版のまま。
+    const draft2 = await createCommonActionDraft(testDb.db, {
+      id: created.id, lineAccountId: 'account-1',
+    });
+    await updateCommonActionDraft(testDb.db, {
+      id: created.id,
+      lineAccountId: 'account-1',
+      expectedDraftVersionId: draft2.draftVersionId,
+      name: '数える対象',
+      actions: [{ id: 'wait', type: 'wait', params: { minutes: 5 }, onFailure: 'stop' }],
+    });
+    await publishCommonActionDraft(testDb.db, {
+      id: created.id, lineAccountId: 'account-1', draftVersionId: draft2.draftVersionId,
+    });
+    await updateCommonActionBindingVersion(testDb.db, {
+      id: created.id,
+      bindingId: 'b-root',
+      lineAccountId: 'account-1',
+      versionId: draft2.draftVersionId,
+      expectedVersionId: created.draftVersionId,
+    });
+
+    detail = await getCommonActionDetail(testDb.db, {
+      id: created.id, lineAccountId: 'account-1',
+    });
+    const migrated = detail.bindings.find((binding) => binding.id === 'b-root');
+    // R471: 新版の件数は0だが、旧版で進行中の2件を見失わない。
+    expect(migrated).toMatchObject({
+      versionNumber: 2,
+      runningCount: 0,
+      waitingCount: 0,
+      olderRunningCount: 1,
+      olderWaitingCount: 1,
+    });
+  });
+
   it('一覧で旧版利用ありと未使用を区別する', async () => {
     const used = await createCommonAction(testDb.db, {
       lineAccountId: 'account-1', name: '利用中', actions: tagAction('tag-1'),

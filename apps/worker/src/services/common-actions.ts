@@ -92,6 +92,9 @@ export interface CommonActionBinding {
   hasNewerVersion: boolean;
   runningCount: number | null;
   waitingCount: number | null;
+  /* 監査 R471: 切替後に旧版のまま進んでいる実行。現在版の件数とは分ける。 */
+  olderRunningCount: number | null;
+  olderWaitingCount: number | null;
   updatedAt: string;
 }
 
@@ -1034,11 +1037,17 @@ export async function getCommonActionDetail(
       `SELECT b.id, b.consumer_type, b.consumer_id, b.consumer_path,
               b.common_action_version_id, b.updated_at, v.version_number,
               pv.version_number AS latest_version_number,
+              /* 監査 R472: 利用先の呼び出し箇所と実行の目印を突き合わせる。
+                 自動化IDと版だけでは、動かしていない箇所に同じ実行を
+                 重ねて数えてしまう。空の箇所は全体とみなす。 */
               CASE WHEN b.consumer_type = 'automation' THEN (
                 SELECT COUNT(DISTINCT r.id) FROM automation_runs r
                 JOIN automation_run_steps s ON s.automation_run_id = r.id
                 WHERE r.automation_id = b.consumer_id
                   AND s.common_action_version_id = b.common_action_version_id
+                  AND (b.consumer_path = ''
+                    OR s.step_key = b.consumer_path
+                    OR substr(s.step_key, 1, length(b.consumer_path) + 1) = b.consumer_path || '/')
                   AND r.status = 'running'
               ) END AS running_count,
               CASE WHEN b.consumer_type = 'automation' THEN (
@@ -1046,8 +1055,39 @@ export async function getCommonActionDetail(
                 JOIN automation_run_steps s ON s.automation_run_id = r.id
                 WHERE r.automation_id = b.consumer_id
                   AND s.common_action_version_id = b.common_action_version_id
+                  AND (b.consumer_path = ''
+                    OR s.step_key = b.consumer_path
+                    OR substr(s.step_key, 1, length(b.consumer_path) + 1) = b.consumer_path || '/')
                   AND r.status = 'waiting'
-              ) END AS waiting_count
+              ) END AS waiting_count,
+              /* 監査 R471: 新版へ切り替えたあとも、旧版のまま進んでいる
+                 実行を別に数える。0と混ぜると監視から漏れる。 */
+              CASE WHEN b.consumer_type = 'automation' THEN (
+                SELECT COUNT(DISTINCT r.id) FROM automation_runs r
+                JOIN automation_run_steps s ON s.automation_run_id = r.id
+                WHERE r.automation_id = b.consumer_id
+                  AND s.common_action_version_id <> b.common_action_version_id
+                  AND s.common_action_version_id IN (
+                    SELECT v2.id FROM common_action_versions v2
+                     WHERE v2.common_action_id = b.common_action_id)
+                  AND (b.consumer_path = ''
+                    OR s.step_key = b.consumer_path
+                    OR substr(s.step_key, 1, length(b.consumer_path) + 1) = b.consumer_path || '/')
+                  AND r.status = 'running'
+              ) END AS older_running_count,
+              CASE WHEN b.consumer_type = 'automation' THEN (
+                SELECT COUNT(DISTINCT r.id) FROM automation_runs r
+                JOIN automation_run_steps s ON s.automation_run_id = r.id
+                WHERE r.automation_id = b.consumer_id
+                  AND s.common_action_version_id <> b.common_action_version_id
+                  AND s.common_action_version_id IN (
+                    SELECT v2.id FROM common_action_versions v2
+                     WHERE v2.common_action_id = b.common_action_id)
+                  AND (b.consumer_path = ''
+                    OR s.step_key = b.consumer_path
+                    OR substr(s.step_key, 1, length(b.consumer_path) + 1) = b.consumer_path || '/')
+                  AND r.status = 'waiting'
+              ) END AS older_waiting_count
          FROM common_action_bindings b
          JOIN common_action_versions v ON v.id = b.common_action_version_id
          LEFT JOIN common_action_versions pv ON pv.id = ?
@@ -1057,6 +1097,7 @@ export async function getCommonActionDetail(
       id: string; consumer_type: string; consumer_id: string; consumer_path: string;
       common_action_version_id: string; updated_at: string; version_number: number;
       latest_version_number: number | null; running_count: number | null; waiting_count: number | null;
+      older_running_count: number | null; older_waiting_count: number | null;
     }>(),
   ]);
   const versions = (versionsResult.results ?? []).map((row) => ({
@@ -1079,6 +1120,8 @@ export async function getCommonActionDetail(
     hasNewerVersion: row.latest_version_number !== null && row.latest_version_number > row.version_number,
     runningCount: row.running_count === null ? null : Number(row.running_count),
     waitingCount: row.waiting_count === null ? null : Number(row.waiting_count),
+    olderRunningCount: row.older_running_count === null ? null : Number(row.older_running_count),
+    olderWaitingCount: row.older_waiting_count === null ? null : Number(row.older_waiting_count),
     updatedAt: row.updated_at,
   }));
   return {
