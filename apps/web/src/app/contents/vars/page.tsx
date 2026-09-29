@@ -33,6 +33,7 @@ import {
   usageText,
 } from './delete-impact'
 import ListState from '@/components/shared/list-state'
+import { classifyApiFailure, isForbidden } from '@/components/shared/api-error-message'
 import CopyTextButton from '@/components/ui/copy-text-button'
 import SortSelect from '@/components/ui/sort-select'
 import PageSizeSelect from '@/components/ui/page-size-select'
@@ -109,6 +110,17 @@ function VarsPageInner() {
   const [unfiledCount, setUnfiledCount] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  /*
+    R590: 一覧の取得失敗は原因どおりに言い分ける。403は権限案内、
+    503などは通信障害と再試行にするため、捕まえた失敗そのものも持つ。
+  */
+  const [listFailure, setListFailure] = useState<unknown>(null)
+  /*
+    R589: フォルダの取得失敗は一覧と切り分ける。フォルダだけ503/403でも
+    取得済みの共通情報と空欄警告は残し、フォルダ欄だけ失敗を示す。
+  */
+  const [folderFailure, setFolderFailure] = useState<unknown>(null)
+  const [folderReloading, setFolderReloading] = useState(false)
   /** 一覧が件数上限で切られたときに絞り込み誘導を出す。 */
   const [listLimited, setListLimited] = useState(false)
 
@@ -175,6 +187,34 @@ function VarsPageInner() {
   }, [])
   const [savingFolder, setSavingFolder] = useState(false)
 
+  /** R589: フォルダは一覧と独立して読む。成否を一覧と混ぜない。 */
+  const loadFolders = useCallback(async () => {
+    const accountAtRequest = selectedAccountId
+    if (!accountAtRequest) {
+      setFolders([])
+      setUnfiledCount(null)
+      setFolderFailure(null)
+      return
+    }
+    setFolderReloading(true)
+    setFolderFailure(null)
+    try {
+      // #730: 選択中の1件に閉じた母集団で数える。
+      const folderList = await api.folders.list('common_var', accountAtRequest)
+      if (accountAtRequest !== latestAccountRef.current) return
+      if (folderList.success) {
+        setFolders(folderList.data)
+        setUnfiledCount(folderList.unfiledCount ?? null)
+      } else {
+        setFolderFailure(new ApiError(500, folderList.error))
+      }
+    } catch (caught) {
+      if (accountAtRequest === latestAccountRef.current) setFolderFailure(caught)
+    } finally {
+      if (accountAtRequest === latestAccountRef.current) setFolderReloading(false)
+    }
+  }, [selectedAccountId])
+
   const load = useCallback(async () => {
     const accountAtRequest = selectedAccountId
     if (!accountAtRequest) {
@@ -184,25 +224,19 @@ function VarsPageInner() {
     }
     setLoading(true)
     setError('')
+    setListFailure(null)
     try {
-      const [vars, folderList] = await Promise.all([
-        api.commonVars.list(accountAtRequest),
-        // #730: 選択中の1件に閉じた母集団で数える。
-        api.folders.list('common_var', accountAtRequest),
-      ])
+      const vars = await api.commonVars.list(accountAtRequest)
       if (accountAtRequest !== latestAccountRef.current) return
       if (vars.success) {
         setItems(vars.data)
         setListLimited(vars.meta?.limited ?? false)
       }
-      if (folderList.success) {
-        setFolders(folderList.data)
-        setUnfiledCount(folderList.unfiledCount ?? null)
-      }
     } catch (e) {
       // 権限なしと通信障害で文言を分ける。同じ文言だと運用者が接続を
       // 確かめ続け、権限申請に気づけない。
       if (accountAtRequest === latestAccountRef.current) {
+        setListFailure(e)
         setError(e instanceof ApiError && e.status === 403
           ? 'この一覧を見る権限がありません。管理者に権限を申請してください。'
           : '読み込みに失敗しました。接続を確かめて、もう一度お試しください。')
@@ -215,7 +249,8 @@ function VarsPageInner() {
   useEffect(() => {
     if (accountLoading) return
     void load()
-  }, [accountLoading, load])
+    void loadFolders()
+  }, [accountLoading, load, loadFolders])
 
   useEffect(() => {
     singleRequestRef.current = {
@@ -285,6 +320,7 @@ function VarsPageInner() {
       setFolderName('')
       setAddingFolder(false)
       void load()
+      void loadFolders()
     } catch {
       setError('フォルダを作れませんでした')
     } finally {
@@ -305,6 +341,7 @@ function VarsPageInner() {
       setDeletingFolder(null)
       if (folderFilter === deletingFolder.id) setFolderFilter('')
       void load()
+      void loadFolders()
     } catch {
       if (accountAtRequest === latestAccountRef.current) setFolderError('フォルダを削除できませんでした。')
     } finally {
@@ -681,6 +718,28 @@ function VarsPageInner() {
     </div>
   )
 
+  /** R589: フォルダ欄の失敗は403（権限）とそれ以外（通信）で案内を分ける。 */
+  const folderForbidden = folderFailure != null && classifyApiFailure(folderFailure) === 'forbidden'
+
+  /*
+   * R589: フォルダだけの失敗の置き場所。縦パネルと狭い幅の選択欄の
+   * 両方から同じものを使う。一覧全体の失敗とは別に、ここだけ出す。
+   */
+  const folderFailureNote = folderFailure ? (
+    <div role="alert" className="space-y-1.5">
+      <p className="text-ink-secondary text-xs">
+        {folderForbidden
+          ? 'フォルダを見る権限がありません。オーナーか管理者に追加を依頼してください。'
+          : 'フォルダを読み込めませんでした。登録した共通情報は消えていません。'}
+      </p>
+      {folderForbidden ? null : (
+        <Button type="button" onClick={() => void loadFolders()} disabled={folderReloading}>
+          {folderReloading ? '読み込んでいます' : 'もう一度読み込む'}
+        </Button>
+      )}
+    </div>
+  ) : null
+
   /*
    * 狭い幅で出すフォルダの選択欄（#973 U026）。縦パネルは長い一覧が
    * 本文の前に来て、親グリッドの右へはみ出す元にもなっていた。
@@ -759,6 +818,7 @@ function VarsPageInner() {
           ) : (
             <Button type="button" onClick={() => setAddingFolder(true)}>フォルダを追加</Button>
           )}
+          {folderFailureNote}
           {/*
             R37: 狭い幅では縦パネルが出ないため、選んでいるフォルダの
             名前変更・削除を選べる口をここに置く。PCの「…」と同じ窓へ届く。
@@ -804,6 +864,7 @@ function VarsPageInner() {
               })),
             ]}
           >
+            {folderFailureNote}
             {folderError ? <p role="alert" className="text-ink-secondary text-xs">{folderError}</p> : null}
             {addingFolder ? (
               folderForm
@@ -891,12 +952,25 @@ function VarsPageInner() {
               // ★V7 `x63W5x`：失敗を「まだありません」と言わない。
               // 消えたように読めるため、空の案内と作成ボタンは出さない。
               <div className="text-ink-faint px-4 py-8 text-center text-sm">
-                <ListState
-                  kind="error"
-                  title="共通情報を読み込めませんでした"
-                  description="通信が切れたか、サーバが応えませんでした。登録した内容は消えていません。"
-                  onRetry={() => void load()}
-                />
+                {/*
+                  R590: 403は権限案内にする。押しても直らない再試行は
+                  出さない。503などは通信障害と再試行のまま残す。
+                */}
+                {isForbidden(listFailure) ? (
+                  <ListState
+                    kind="forbidden"
+                    title="共通情報を見る権限がありません"
+                    description={error}
+                  />
+                ) : (
+                  <ListState
+                    kind="error"
+                    title="共通情報を読み込めませんでした"
+                    description={error}
+                    error={listFailure ?? undefined}
+                    onRetry={() => void load()}
+                  />
+                )}
               </div>
             ) : current.length === 0 ? (
               <div className="text-ink-faint px-4 py-8 text-center text-sm">
