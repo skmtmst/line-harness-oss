@@ -660,6 +660,12 @@ try {
       () => document.querySelector('#fm-name')?.value === 'サーバ側の名前',
       undefined, { timeout: 15_000 },
     )
+    /*
+     * M003：送った中身と保存されている中身が同じだと自分の再送とみなして
+     * 競合を出さない。何も変えずに保存すると再送扱いになるため、ほかの人の
+     * 編集として競合を見るには先に1文字変えておく。
+     */
+    await page.locator('#fm-name').fill('わたしが直した名前')
     await page.getByRole('link', { name: 'オプション設定' }).click()
     const dialog = page.locator('[aria-modal="true"]')
     await dialog.waitFor({ timeout: 15_000 })
