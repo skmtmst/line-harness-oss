@@ -124,7 +124,12 @@ export type WebhookInteractionFailureReason =
   | 'response_429'
   | 'response_5xx'
   | 'processing_failed'
-  | 'unknown';
+  | 'unknown'
+  /**
+   * d23b R415: こちら側の署名用の合言葉が読めず、外部へ一度も送れて
+   * いない失敗。「相手から返事がない」(connection_failed)と区別する。
+   */
+  | 'secret_unavailable';
 
 export interface WebhookInteractionRow {
   id: string;
@@ -154,12 +159,42 @@ export interface WebhookInteractionSummary {
   succeeded: number;
   failed: number;
   /**
+   * 送信の失敗の総数(d23b R408)。失敗の内訳を画面へ説明するとき、
+   * 受信の失敗と混ぜないために使う。
+   */
+  outgoingFailed: number;
+  /**
+   * 送信の失敗のうち、今この画面からまとめて送り直せる件数(d23b R408)。
+   * 届いたか分からない記録・署名の合言葉が読めない記録・送り先が
+   * 消えた/止まった記録・自動の送り直しが動いている記録は含まない。
+   */
+  retryable: number;
+  /**
    * 失敗のうち「相手先へ届いたか分からない」件数(IDEA-26)。
    * この件数は無条件のまとめて再送へ入れず、相手先で確かめてから
    * 1件ずつやり直す対象として画面へ示す。
    */
   resultUnknown: number;
   averageDurationMs: number | null;
+}
+
+/** 自動配送台帳(outgoing_webhook_deliveries)の状態。 */
+export type OutgoingDeliveryStatus = 'pending' | 'sending' | 'retry_wait' | 'delivered' | 'failed';
+
+/**
+ * 一覧用の行(d23b R412/R414)。やり取りの記録に、送り先と自動配送の
+ * 現状を添えたもの。個別取得(getWebhookInteractionById)では付かない。
+ */
+export interface WebhookInteractionListRow extends WebhookInteractionRow {
+  /**
+   * 送り先の有効印。削除印のある・存在しない送り先では NULL。
+   * webhook_id 自体が NULL の記録（連携先が消えたもの）でも NULL。
+   */
+  linked_webhook_active: number | null;
+  /** 同じ通知の自動配送の現状。台帳に無い記録では NULL。 */
+  delivery_status: OutgoingDeliveryStatus | null;
+  /** 自動配送の次回予定。予定が無いとき NULL。 */
+  delivery_next_retry_at: string | null;
 }
 
 export async function createWebhookInteraction(
@@ -267,6 +302,143 @@ export async function restoreWebhookInteractionFailure(
   ).bind(id, lineAccountId).run();
 }
 
+/**
+ * d23b R409: 元の失敗記録を「やり直し済み」に畳むのと、やり直し用の記録を
+ * 作るのを1つのDBバッチで行う。どちらかだけ残る中途半端な形（元は
+ * retried なのにやり直し行が無い等）を作らない。
+ *
+ * 元の行がすでに畳まれている(別のやり直しが先に動いた)ときは、INSERT 側の
+ * NOT EXISTS(retry_of_id) が通らず、UPDATE 側も status='failed' でないので
+ * 0件になる。やり直し行が一度作られていれば、その後の重複した申込は
+ * どちらも何もしない。片方だけ失敗したときはバッチごと巻き戻される。
+ */
+export async function claimWebhookInteractionRetryAndInsert(
+  db: D1Database,
+  original: Pick<WebhookInteractionRow, 'id' | 'line_account_id'>,
+  input: {
+    id?: string;
+    webhookId: string;
+    webhookName: string;
+    eventType: string;
+    triggerSummary: string;
+    requestBodyJson: string;
+    idempotencyKey: string;
+  },
+): Promise<{ claimed: boolean; retryId: string }> {
+  const retryId = input.id ?? crypto.randomUUID();
+  const now = jstNow();
+  const [claim, insert] = await db.batch([
+    db.prepare(
+      `UPDATE webhook_interaction_logs SET status='retried'
+        WHERE id=? AND line_account_id=? AND direction='outgoing' AND status='failed'`,
+    ).bind(original.id, original.line_account_id),
+    db.prepare(
+      `INSERT INTO webhook_interaction_logs
+         (id, line_account_id, direction, webhook_id, webhook_name, event_type,
+          trigger_summary, status, request_body_json, response_status,
+          attempt_count, duration_ms, failure_reason, idempotency_key,
+          retry_of_id, started_at, completed_at, created_at)
+       SELECT ?, ?, 'outgoing', ?, ?, ?, ?, 'pending', ?, NULL, 0, NULL, NULL, ?, ?, ?, NULL, ?
+        WHERE EXISTS (
+          SELECT 1 FROM webhook_interaction_logs WHERE id = ? AND status = 'retried'
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM webhook_interaction_logs WHERE retry_of_id = ?
+        )`,
+    ).bind(
+      retryId, original.line_account_id, input.webhookId, input.webhookName,
+      input.eventType, input.triggerSummary, input.requestBodyJson,
+      input.idempotencyKey, original.id, now, now, original.id, original.id,
+    ),
+  ]);
+  const claimChanged = Number(claim.meta?.changes ?? 0) > 0;
+  const insertChanged = Number(insert.meta?.changes ?? 0) > 0;
+  if (!claimChanged && insertChanged) {
+    // まれな割り込み(先のやり直しが claim 済みだが行がまだ無い瞬間)で
+    // 孤児の pending 行が残らないよう、自分が作った分だけ消す。
+    try {
+      await deletePendingWebhookInteraction(db, retryId, original.line_account_id);
+    } catch (error) {
+      console.error('webhook_interaction_logs の孤児行の後始末に失敗:', error);
+    }
+  }
+  return { claimed: claimChanged && insertChanged, retryId };
+}
+
+/**
+ * 送る前に止まったやり直しの記録を消す（d23b R413）。
+ * まだ外部へ一度も出ていない pending の行だけを消す。確定済みの行は
+ * 履歴なので消さない。
+ */
+export async function deletePendingWebhookInteraction(
+  db: D1Database,
+  id: string,
+  lineAccountId: string,
+): Promise<void> {
+  await db.prepare(
+    `DELETE FROM webhook_interaction_logs
+      WHERE id=? AND line_account_id=? AND status='pending'`,
+  ).bind(id, lineAccountId).run();
+}
+
+/**
+ * d23b R409: 「処理中」のまま放置された記録を「届いたか分からない失敗」へ
+ * 直す。始まった時刻から一定時間(既定15分)が過ぎた pending は、結果を書く
+ * 途中で止まったものとみなす。一覧から永久に消えない・処理中のままに
+ * しないための回収。
+ */
+export async function markStalePendingWebhookInteractions(
+  db: D1Database,
+  lineAccountId: string,
+  staleBeforeMs = 15 * 60 * 1000,
+): Promise<number> {
+  const cutoff = toJstString(new Date(Date.now() - staleBeforeMs));
+  const result = await db.prepare(
+    `UPDATE webhook_interaction_logs
+        SET status='failed', failure_reason='unknown', completed_at=?
+      WHERE line_account_id=? AND status='pending' AND started_at < ?`,
+  ).bind(jstNow(), lineAccountId, cutoff).run();
+  return Number(result.meta?.changes ?? 0);
+}
+
+/**
+ * d23b R412: 同じ通知（同じ送り先＋同じ冪等キー）の失敗記録をまとめて
+ * 「やり直し済み」へ畳む。手動・自動のどちらかで届いたとき、残っている
+ * 失敗記録をそのまま「やり直せる」状態で残さない。
+ */
+export async function markFailedInteractionsRetried(
+  db: D1Database,
+  lineAccountId: string,
+  webhookId: string,
+  idempotencyKey: string,
+): Promise<void> {
+  await db.prepare(
+    `UPDATE webhook_interaction_logs SET status='retried'
+      WHERE line_account_id=? AND webhook_id=? AND idempotency_key=?
+        AND direction='outgoing' AND status='failed'`,
+  ).bind(lineAccountId, webhookId, idempotencyKey).run();
+}
+
+/**
+ * 同じ通知がすでに届いた記録があるか(d23b R412)。
+ * 自動配送の回収が送る前に確かめ、手動のやり直しで届いた分を
+ * 二重に送らない。
+ */
+export async function hasSucceededInteractionForKey(
+  db: D1Database,
+  lineAccountId: string,
+  webhookId: string,
+  idempotencyKey: string,
+): Promise<boolean> {
+  const row = await db.prepare(
+    `SELECT 1 AS yes FROM webhook_interaction_logs
+      WHERE line_account_id=? AND webhook_id=? AND idempotency_key=?
+        AND direction='outgoing' AND status='succeeded'
+      LIMIT 1`,
+  ).bind(lineAccountId, webhookId, idempotencyKey).first<{ yes: number }>();
+  return Boolean(row?.yes);
+}
+
 export async function listWebhookInteractions(
   db: D1Database,
   input: {
@@ -279,7 +451,7 @@ export async function listWebhookInteractions(
     limit?: number;
   },
 ): Promise<{
-  items: WebhookInteractionRow[];
+  items: WebhookInteractionListRow[];
   total: number;
   page: number;
   limit: number;
@@ -291,39 +463,62 @@ export async function listWebhookInteractions(
   const cutoff = toJstString(new Date(Date.now() - periodDays * 86_400_000));
   const page = Math.max(1, integerOr(input.page, 1));
   const limit = Math.min(50, Math.max(10, integerOr(input.limit, 20)));
-  const clauses = ['line_account_id=?', 'created_at>=?', "status!='retried'"];
+  // d23b R409: 結果を書く途中で止まった「処理中」を先に回収する。
+  // 一覧を開いた時点で回収すれば、滞留分はここで失敗として見える。
+  try {
+    await markStalePendingWebhookInteractions(db, input.lineAccountId);
+  } catch (error) {
+    // 回収だけの失敗で一覧そのものを止めない。
+    console.error('webhook_interaction_logs の滞留回収に失敗:', error);
+  }
+  const clauses = ['l.line_account_id=?', 'l.created_at>=?', "l.status!='retried'"];
   const binds: unknown[] = [input.lineAccountId, cutoff];
   if (input.direction) {
-    clauses.push('direction=?');
+    clauses.push('l.direction=?');
     binds.push(input.direction);
   }
   if (input.status) {
-    clauses.push('status=?');
+    clauses.push('l.status=?');
     binds.push(input.status);
   }
   if (input.search?.trim()) {
-    clauses.push('(webhook_name LIKE ? OR trigger_summary LIKE ? OR event_type LIKE ?)');
+    clauses.push('(l.webhook_name LIKE ? OR l.trigger_summary LIKE ? OR l.event_type LIKE ?)');
     const like = `%${input.search.trim().slice(0, 100)}%`;
     binds.push(like, like, like);
   }
   const where = clauses.join(' AND ');
+  // d23b R414: 送り先の現状と、同じ通知の自動配送の現状を添える。
+  // 画面は「消えた・止まった・自動で動いている」理由を行ごとに出せる。
+  // 削除印のある送り先は「無い」として扱う（N-368）。
+  const joinedTables = `webhook_interaction_logs l
+    LEFT JOIN outgoing_webhooks ow
+           ON ow.id = l.webhook_id AND ow.deleted_at IS NULL
+    LEFT JOIN outgoing_webhook_deliveries d
+           ON d.webhook_id = l.webhook_id AND d.idempotency_key = l.idempotency_key`;
   const [rows, totalRow, summaryRow] = await Promise.all([
     db.prepare(
-      `SELECT * FROM webhook_interaction_logs WHERE ${where}
-       ORDER BY created_at DESC LIMIT ? OFFSET ?`,
-    ).bind(...binds, limit, (page - 1) * limit).all<WebhookInteractionRow>(),
-    db.prepare(`SELECT COUNT(*) AS count FROM webhook_interaction_logs WHERE ${where}`)
+      `SELECT l.*,
+              ow.is_active AS linked_webhook_active,
+              d.status AS delivery_status,
+              d.next_retry_at AS delivery_next_retry_at
+         FROM ${joinedTables}
+        WHERE ${where}
+        ORDER BY l.created_at DESC LIMIT ? OFFSET ?`,
+    ).bind(...binds, limit, (page - 1) * limit).all<WebhookInteractionListRow>(),
+    db.prepare(`SELECT COUNT(*) AS count FROM webhook_interaction_logs l WHERE ${where}`)
       .bind(...binds).first<{ count: number }>(),
     db.prepare(
       `SELECT COUNT(*) AS total,
-              SUM(CASE WHEN direction='outgoing' THEN 1 ELSE 0 END) AS outgoing,
-              SUM(CASE WHEN direction='incoming' THEN 1 ELSE 0 END) AS incoming,
-              SUM(CASE WHEN status='succeeded' THEN 1 ELSE 0 END) AS succeeded,
-              SUM(CASE WHEN status='failed' THEN 1 ELSE 0 END) AS failed,
-              SUM(CASE WHEN status='failed' AND failure_reason='unknown' THEN 1 ELSE 0 END) AS result_unknown,
-              AVG(CASE WHEN status IN ('succeeded','failed') THEN duration_ms END) AS average_duration_ms
-         FROM webhook_interaction_logs
-        WHERE line_account_id=? AND created_at>=? AND status!='retried'`,
+              SUM(CASE WHEN l.direction='outgoing' THEN 1 ELSE 0 END) AS outgoing,
+              SUM(CASE WHEN l.direction='incoming' THEN 1 ELSE 0 END) AS incoming,
+              SUM(CASE WHEN l.status='succeeded' THEN 1 ELSE 0 END) AS succeeded,
+              SUM(CASE WHEN l.status='failed' THEN 1 ELSE 0 END) AS failed,
+              SUM(CASE WHEN l.direction='outgoing' AND l.status='failed' THEN 1 ELSE 0 END) AS outgoing_failed,
+              SUM(CASE WHEN ${RETRYABLE_FAILURE_CORE} THEN 1 ELSE 0 END) AS retryable,
+              SUM(CASE WHEN l.status='failed' AND l.failure_reason='unknown' THEN 1 ELSE 0 END) AS result_unknown,
+              AVG(CASE WHEN l.status IN ('succeeded','failed') THEN l.duration_ms END) AS average_duration_ms
+         FROM ${joinedTables}
+        WHERE l.line_account_id=? AND l.created_at>=? AND l.status!='retried'`,
     ).bind(input.lineAccountId, cutoff).first<Record<string, number | null>>(),
   ]);
   return {
@@ -337,6 +532,8 @@ export async function listWebhookInteractions(
       incoming: summaryRow?.incoming ?? 0,
       succeeded: summaryRow?.succeeded ?? 0,
       failed: summaryRow?.failed ?? 0,
+      outgoingFailed: summaryRow?.outgoing_failed ?? 0,
+      retryable: summaryRow?.retryable ?? 0,
       resultUnknown: summaryRow?.result_unknown ?? 0,
       averageDurationMs: summaryRow?.average_duration_ms == null
         ? null
@@ -346,14 +543,36 @@ export async function listWebhookInteractions(
 }
 
 /*
- * IDEA-26: 「結果を確認できませんでした」(failure_reason='unknown') の記録は
- * 相手先へ届いたか分からない。無条件にまとめて再送すると、届いていた
- * 処理を二重に送る恐れがあるため一括再送の対象から外し、相手先で
- * 確かめてから1件ずつやり直す対象として別に数える。
+ * まとめて再送で選ぶ失敗の条件（webhook_interaction_logs を `l` で参照）。
+ *
+ * 除外するもの:
+ *   - 届いたか分からない記録(unknown) … 届いていた処理を二重に送る恐れ(IDEA-26)
+ *   - 署名の合言葉が読めなかった記録(secret_unavailable) … 鍵を戻すまで届かない(d23b R415)
+ *   - 送り先が消えた・止められた記録 … やり直しても必ず外す(d23b R405)
+ *   - 送った内容が残っていない記録 … 同じ出来事を再現できない
+ *   - 自動の送り直しがまだ動いている記録 … 手動と並ぶと二重に届く(d23b R412)
+ *   - 自動の送り直しですでに届いた記録 … もう一度送ると二重に届く(d23b R412)
+ *
+ * d23b R405: 以前は先頭から固定件数だけ読んでいたため、消えた・止まった
+ * 送り先の記録が先頭に固まると、後ろの送れる記録へ何度押しても届かなかった。
+ * 選ぶ段階で対象外を外し、残りを必ず処理できるようにする。
  */
+const RETRYABLE_FAILURE_CORE = `
+  (l.failure_reason IS NULL OR l.failure_reason NOT IN ('unknown','secret_unavailable'))
+  AND l.request_body_json IS NOT NULL
+  AND EXISTS (
+    SELECT 1 FROM outgoing_webhooks ow
+     WHERE ow.id = l.webhook_id AND ow.is_active = 1 AND ow.deleted_at IS NULL
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM outgoing_webhook_deliveries d
+     WHERE d.webhook_id = l.webhook_id
+       AND d.idempotency_key = l.idempotency_key
+       AND d.status IN ('pending','sending','retry_wait','delivered')
+  )`;
+
 const RETRYABLE_FAILURE_FILTER =
-  `direction='outgoing' AND status='failed'
-   AND (failure_reason IS NULL OR failure_reason <> 'unknown')`;
+  `l.direction='outgoing' AND l.status='failed' AND ${RETRYABLE_FAILURE_CORE}`;
 
 export async function listFailedWebhookInteractionsForRetry(
   db: D1Database,
@@ -361,9 +580,9 @@ export async function listFailedWebhookInteractionsForRetry(
   limit = 50,
 ): Promise<WebhookInteractionRow[]> {
   const result = await db.prepare(
-    `SELECT * FROM webhook_interaction_logs
-      WHERE line_account_id=? AND ${RETRYABLE_FAILURE_FILTER}
-      ORDER BY created_at ASC LIMIT ?`,
+    `SELECT l.* FROM webhook_interaction_logs l
+      WHERE l.line_account_id=? AND ${RETRYABLE_FAILURE_FILTER}
+      ORDER BY l.created_at ASC LIMIT ?`,
   ).bind(lineAccountId, Math.min(50, Math.max(1, limit))).all<WebhookInteractionRow>();
   return result.results ?? [];
 }
@@ -379,8 +598,27 @@ export async function countFailedWebhookInteractionsForRetry(
   lineAccountId: string,
 ): Promise<number> {
   const row = await db.prepare(
-    `SELECT COUNT(*) AS count FROM webhook_interaction_logs
-      WHERE line_account_id=? AND ${RETRYABLE_FAILURE_FILTER}`,
+    `SELECT COUNT(*) AS count FROM webhook_interaction_logs l
+      WHERE l.line_account_id=? AND ${RETRYABLE_FAILURE_FILTER}`,
+  ).bind(lineAccountId).first<{ count: number }>();
+  return Number(row?.count ?? 0);
+}
+
+/**
+ * まとめて再送の対象外に残った失敗記録の総数(d23b R405/R408)。
+ * 送り先が消えた・止まった・内容が残っていない・自動の送り直しが
+ * 動いている・署名の合言葉が読めない、のどれかに当たる記録を数える。
+ * 「届いたか分からない」記録は別口(needsReview)で数えるので含めない。
+ */
+export async function countExcludedFailedWebhookInteractions(
+  db: D1Database,
+  lineAccountId: string,
+): Promise<number> {
+  const row = await db.prepare(
+    `SELECT COUNT(*) AS count FROM webhook_interaction_logs l
+      WHERE l.line_account_id=? AND l.direction='outgoing' AND l.status='failed'
+        AND (l.failure_reason IS NULL OR l.failure_reason <> 'unknown')
+        AND NOT (${RETRYABLE_FAILURE_CORE})`,
   ).bind(lineAccountId).first<{ count: number }>();
   return Number(row?.count ?? 0);
 }

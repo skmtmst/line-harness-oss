@@ -38,6 +38,21 @@ on:
         type: string
         required: false
         default: ''
+      pages_config_replay:
+        description: 未適用D1を避け、現在公開中と同じ管理画面コードを新しい検証API URLで再ビルドする
+        type: boolean
+        required: true
+        default: false
+      pages_source_sha:
+        description: 現在公開中の管理画面の40桁Git SHA
+        type: string
+        required: false
+        default: ''
+      expected_pages_deployment_id:
+        description: 現在公開中の管理画面のDeployment ID
+        type: string
+        required: false
+        default: ''
       expected_google_business_write_enabled:
         description: 配備後にVersionの実効値を照合する（今回の試験はtrue、戻す時はfalse）
         type: choice
@@ -71,13 +86,16 @@ jobs:
       WORKER_CONFIG_REPLAY: ${{ github.event_name == 'workflow_dispatch' && inputs.worker_config_replay || false }}
       WORKER_SOURCE_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.worker_source_sha || '' }}
       EXPECTED_WORKER_VERSION_ID: ${{ github.event_name == 'workflow_dispatch' && inputs.expected_worker_version_id || '' }}
+      PAGES_CONFIG_REPLAY: ${{ github.event_name == 'workflow_dispatch' && inputs.pages_config_replay || false }}
+      PAGES_SOURCE_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.pages_source_sha || '' }}
+      EXPECTED_PAGES_DEPLOYMENT_ID: ${{ github.event_name == 'workflow_dispatch' && inputs.expected_pages_deployment_id || '' }}
       EXPECTED_GOOGLE_BUSINESS_WRITE_ENABLED: ${{ github.event_name == 'workflow_dispatch' && inputs.expected_google_business_write_enabled || 'skip' }}
       GH_TOKEN: ${{ github.token }}
       WORKER_API_TOKEN: ${{ secrets.CLOUDFLARE_WORKERS_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN || secrets.CF_API_TOKEN }}
       PAGES_API_TOKEN: ${{ secrets.CLOUDFLARE_PAGES_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN || secrets.CF_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID || secrets.CF_ACCOUNT_ID }}
       D1_STAGING_DATABASE_NAME: ${{ secrets.D1_STAGING_DATABASE_NAME }}
-      STAGING_API_URL: https://nen-line-stg.skmtmst.workers.dev
+      STAGING_API_URL: https://stg-api.musubo.jp
       STAGING_PAGES_PROJECT: nen-line-stg-admin
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -96,6 +114,11 @@ jobs:
           test "$GITHUB_REF" = "refs/heads/codex/development"
           test "$DELIVERY_MODE" = "dry-run" -o "$DELIVERY_MODE" = "apply"
           test "$DELIVERY_TARGET" = "all" -o "$DELIVERY_TARGET" = "worker" -o "$DELIVERY_TARGET" = "admin"
+          test "$WORKER_CONFIG_REPLAY" != "true" -o "$PAGES_CONFIG_REPLAY" != "true"
+          if [ "$PAGES_CONFIG_REPLAY" = "true" ]; then
+            test "$GITHUB_EVENT_NAME" = "workflow_dispatch"
+            test "$DELIVERY_TARGET" = "admin"
+          fi
           test -n "$CLOUDFLARE_ACCOUNT_ID"
           if [ "$DELIVERY_TARGET" != "admin" ]; then
             test -n "$WORKER_API_TOKEN"
@@ -158,7 +181,8 @@ jobs:
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
-          if [ "$DELIVERY_MODE" = "apply" ] && [ "$pending_count" -ne 0 ] && [ "$WORKER_CONFIG_REPLAY" != "true" ]; then
+          if [ "$DELIVERY_MODE" = "apply" ] && [ "$pending_count" -ne 0 ] && \
+            [ "$WORKER_CONFIG_REPLAY" != "true" ] && [ "$PAGES_CONFIG_REPLAY" != "true" ]; then
             echo "::error::検証D1に未適用マイグレーションが ${pending_count} 件あります。Migrate D1を先に実行してください。"
             exit 1
           fi
@@ -195,6 +219,34 @@ jobs:
             test -n "$(git -C "$worker_root" diff -- apps/worker/wrangler.staging.toml)"
           fi
           echo "root=$worker_root" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare the deployed Admin source for config replay
+        id: admin_source
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ env.PAGES_API_TOKEN }}
+        run: |
+          admin_root="$GITHUB_WORKSPACE"
+          if [ "$PAGES_CONFIG_REPLAY" = "true" ]; then
+            printf '%s' "$PAGES_SOURCE_SHA" | grep -Eq '^[0-9a-f]{40}$'
+            printf '%s' "$EXPECTED_PAGES_DEPLOYMENT_ID" | grep -Eq '^[0-9a-f-]{36}$'
+
+            project=$(curl --fail-with-body --silent --show-error \
+              -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/$STAGING_PAGES_PROJECT")
+            active_id=$(printf '%s' "$project" | jq -r '.result.canonical_deployment.id')
+            active_sha=$(printf '%s' "$project" | jq -r '.result.canonical_deployment.deployment_trigger.metadata.commit_hash')
+            test "$active_id" = "$EXPECTED_PAGES_DEPLOYMENT_ID"
+            test "$active_sha" = "$PAGES_SOURCE_SHA"
+
+            git fetch --no-tags --deepen=200 origin codex/development
+            git cat-file -e "$PAGES_SOURCE_SHA^{commit}"
+            git merge-base --is-ancestor "$PAGES_SOURCE_SHA" "$GITHUB_SHA"
+            admin_root="$RUNNER_TEMP/admin-source"
+            git worktree add --detach "$admin_root" "$PAGES_SOURCE_SHA"
+            pnpm --dir "$admin_root" install --frozen-lockfile
+            test -z "$(git -C "$admin_root" status --porcelain)"
+          fi
+          echo "root=$admin_root" >> "$GITHUB_OUTPUT"
 
       - name: Acquire the shared staging lock
         id: staging_lock
@@ -275,11 +327,15 @@ jobs:
 
       - name: Build Admin Panel dependencies
         if: env.DELIVERY_TARGET != 'worker'
-        run: pnpm --filter @line-harness/update-engine build
+        run: |
+          cd "${{ steps.admin_source.outputs.root }}"
+          pnpm --filter @line-harness/update-engine build
 
       - name: Build Admin Panel for staging
         if: env.DELIVERY_TARGET != 'worker'
-        run: pnpm --filter web build
+        run: |
+          cd "${{ steps.admin_source.outputs.root }}"
+          pnpm --filter web build
         env:
           NEXT_PUBLIC_API_URL: ${{ env.STAGING_API_URL }}
           NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ vars.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
@@ -291,11 +347,36 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ env.PAGES_API_TOKEN }}
         run: |
+          cd "${{ steps.admin_source.outputs.root }}"
+          source_sha="$GITHUB_SHA"
+          if [ "$PAGES_CONFIG_REPLAY" = "true" ]; then
+            source_sha="$PAGES_SOURCE_SHA"
+          fi
           npx wrangler pages deploy apps/web/out \
             --project-name "$STAGING_PAGES_PROJECT" \
             --branch main \
-            --commit-hash "$GITHUB_SHA" \
-            --commit-message "staging deploy $GITHUB_SHA"
+            --commit-hash "$source_sha" \
+            --commit-message "staging API URL config replay from $source_sha"
+
+          # Pagesのcanonical反映はアップロード完了より少し遅れることがある。
+          # 再配備はせず、読み取りだけで反映を待つ。
+          for attempt in {1..15}; do
+            project=$(curl --fail-with-body --silent --show-error \
+              -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/$STAGING_PAGES_PROJECT")
+            deployed_id=$(printf '%s' "$project" | jq -r '.result.canonical_deployment.id')
+            deployed_sha=$(printf '%s' "$project" | jq -r '.result.canonical_deployment.deployment_trigger.metadata.commit_hash')
+            if [ "$deployed_sha" = "$source_sha" ] && \
+              { [ "$PAGES_CONFIG_REPLAY" != "true" ] || [ "$deployed_id" != "$EXPECTED_PAGES_DEPLOYMENT_ID" ]; }; then
+              break
+            fi
+            sleep 2
+          done
+          test "$deployed_sha" = "$source_sha"
+          if [ "$PAGES_CONFIG_REPLAY" = "true" ]; then
+            test "$deployed_id" != "$EXPECTED_PAGES_DEPLOYMENT_ID"
+          fi
+          echo "Admin Deployment ID: $deployed_id" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Summarize
         if: always()
@@ -310,6 +391,7 @@ jobs:
             echo "- Worker Version ID: \`${{ steps.worker_deploy.outputs.version_id || '未配備' }}\`"
             echo "- Worker config replay: \`$WORKER_CONFIG_REPLAY\`"
             echo "- Admin: \`nen-line-stg-admin\`"
+            echo "- Admin config replay: \`$PAGES_CONFIG_REPLAY\` (source: \`${PAGES_SOURCE_SHA:-$GITHUB_SHA}\`)"
             echo "- D1 migration: 未適用 ${{ steps.pending_migrations.outputs.count || '確認失敗' }} 件（このWorkflowでは適用しません）"
           } >> "$GITHUB_STEP_SUMMARY"
 

@@ -473,7 +473,8 @@
     "513_conversion_approval_freeze.sql",
     "514_tiktok_pnl.sql",
     "520_incoming_webhook_receipt_plan.sql",
-    "521_incoming_webhook_receipt_body_hash.sql"
+    "521_incoming_webhook_receipt_body_hash.sql",
+    "532_webhook_interaction_secret_unavailable.sql"
   ],
   "migrationCount": 474
 }

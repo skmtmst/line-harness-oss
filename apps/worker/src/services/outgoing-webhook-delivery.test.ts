@@ -1,7 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createTestD1 } from '../test-utils/d1-sqlite.js';
 import {
   checkWebhookUrlSafety,
+  deliverOnce,
   deliverWebhook,
+  failureReasonForDelivery,
+  recordDeliveryOutcome,
   isSafeWebhookUrl,
   postWebhookSafely,
   retryAfterDelayMs,
@@ -846,3 +850,110 @@ async function hmacHex(secret: string, body: string): Promise<string> {
   const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(body));
   return Array.from(new Uint8Array(signature)).map((b) => b.toString(16).padStart(2, '0')).join('');
 }
+
+// ---- d23b: 結果不明の正規化・履歴からの失敗数・1回固定配送 ----
+
+describe('届いたか分からない失敗は「不明」として残す(d23b R410)', () => {
+  it('応答を受け取る前に切れた失敗は outcomeUnknown を立てる', async () => {
+    stubFetch(['throw']);
+    const res = await deliverWebhook(
+      { ...WEBHOOK, max_retries: 0 }, '{}',
+      { sleep: noSleep, lookupHost: publicOnlyLookup },
+    );
+    expect(res).toMatchObject({ ok: false, lastStatus: null, outcomeUnknown: true });
+  });
+
+  it('応答を受けた失敗は outcomeUnknown を立てない', async () => {
+    stubFetch([500]);
+    const res = await deliverWebhook(
+      { ...WEBHOOK, max_retries: 0 }, '{}',
+      { sleep: noSleep, lookupHost: publicOnlyLookup },
+    );
+    expect(res.outcomeUnknown).toBeFalsy();
+  });
+
+  it('配送結果を履歴の失敗理由へ同じ言葉で写す', () => {
+    // こちらで一度も送っていない失敗は「相手から返事がない」と混ぜない。
+    expect(failureReasonForDelivery({ ok: false, attempts: 0, lastStatus: null, secretUnavailable: true }))
+      .toBe('secret_unavailable');
+    // 届いたか分からない失敗は「不明」にする。response_xxx に分類しない。
+    expect(failureReasonForDelivery({ ok: false, attempts: 1, lastStatus: null, outcomeUnknown: true }))
+      .toBe('unknown');
+    expect(failureReasonForDelivery({ ok: false, attempts: 1, lastStatus: null, blocked: true, blockReason: 'blocked_ip' }))
+      .toBe('processing_failed');
+    expect(failureReasonForDelivery({ ok: false, attempts: 1, lastStatus: 503 }))
+      .toBe('response_5xx');
+    expect(failureReasonForDelivery({ ok: false, attempts: 1, lastStatus: 429 }))
+      .toBe('response_429');
+    expect(failureReasonForDelivery({ ok: false, attempts: 1, lastStatus: 404 }))
+      .toBe('response_4xx');
+  });
+});
+
+describe('連続失敗数は履歴から数え直す(d23b R411)', () => {
+  function seed(db: ReturnType<typeof createTestD1>['raw']) {
+    db.exec(`
+      INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret)
+      VALUES ('account-a', 'ch-a', 'テスト店', 'token', 'secret');
+      INSERT INTO outgoing_webhooks (id, name, url, line_account_id)
+      VALUES ('wh-1', '顧客管理', 'https://example.com/hook', 'account-a');
+    `);
+  }
+
+  function insertLog(
+    db: ReturnType<typeof createTestD1>['raw'],
+    id: string, status: 'succeeded' | 'failed', createdAt: string,
+  ) {
+    db.prepare(
+      `INSERT INTO webhook_interaction_logs
+         (id, line_account_id, direction, webhook_id, webhook_name, event_type,
+          trigger_summary, status, idempotency_key, started_at, created_at)
+       VALUES (?, 'account-a', 'outgoing', 'wh-1', '顧客管理', 'friend.added',
+               '友だちが追加されたとき', ?, ?, ?, ?)`,
+    ).run(id, status, `key-${id}`, createdAt, createdAt);
+  }
+
+  function failuresOf(db: ReturnType<typeof createTestD1>['raw']): number {
+    return (db.prepare('SELECT consecutive_failures AS n FROM outgoing_webhooks WHERE id=?')
+      .get('wh-1') as { n: number }).n;
+  }
+
+  it('成功で0へ戻ったあと、遅れて確定した失敗は最後の成功以降の実数で上書きする', async () => {
+    const { db, raw } = createTestD1();
+    seed(raw);
+    // 古い失敗 → 成功 → 新しい失敗2件、という履歴を作る。
+    insertLog(raw, 'old-fail', 'failed', '2026-09-01T00:00:00.000+09:00');
+    insertLog(raw, 'mid-ok', 'succeeded', '2026-09-02T00:00:00.000+09:00');
+    insertLog(raw, 'new-fail-1', 'failed', '2026-09-03T00:00:00.000+09:00');
+    insertLog(raw, 'new-fail-2', 'failed', '2026-09-04T00:00:00.000+09:00');
+    raw.prepare('UPDATE outgoing_webhooks SET consecutive_failures = 9 WHERE id=?').run('wh-1');
+
+    await recordDeliveryOutcome(db, 'wh-1', false);
+    // +1 積み上げではなく履歴の実数(2)へ寄せる。
+    expect(failuresOf(raw)).toBe(2);
+
+    await recordDeliveryOutcome(db, 'wh-1', true);
+    expect(failuresOf(raw)).toBe(0);
+  });
+
+  it('履歴が1件も無い送り先は従来どおり +1 で進める', async () => {
+    const { db, raw } = createTestD1();
+    seed(raw);
+    await recordDeliveryOutcome(db, 'wh-1', false);
+    expect(failuresOf(raw)).toBe(1);
+    await recordDeliveryOutcome(db, 'wh-1', false);
+    expect(failuresOf(raw)).toBe(2);
+  });
+});
+
+describe('1回だけ送る配送(d23b R419)', () => {
+  it('deliverOnce は設定の送り直し回数を使わず1回だけ送る', async () => {
+    const count = stubFetch([500, 500, 500]);
+    const res = await deliverOnce(
+      { ...WEBHOOK, max_retries: 5 }, '{}',
+      { sleep: noSleep, lookupHost: publicOnlyLookup },
+    );
+    expect(res).toMatchObject({ ok: false, attempts: 1, lastStatus: 500 });
+    expect(count()).toBe(1);
+  });
+});
