@@ -71,6 +71,13 @@ export interface CreatePageProps {
   /** 保存前の確認。文字列を返すとその内容をエラーとして出し、保存しない */
   validate?: () => string | null
   /**
+   * 保存の失敗文。省略時は `createPageErrorMessage`（`describeSaveFailure`）。
+   * M030: 発行の失敗を原文のまま出さないよう、画面はここに
+   * `describeApiFailure(err, action, { forbidden })` を渡す
+   * （403は権限の案内・429は待ち案内・400は直し方つき）。
+   */
+  describeError?: (error: unknown) => string
+  /**
    * 右の列。設計では作成画面の多くが「入力の左」と「見え方・注意の右」に
    * 分かれている。入力しながら、お客様側にどう出るかを見られるようにする。
    */
@@ -96,6 +103,7 @@ export default function CreatePage({
   successHref,
   onReset,
   validate,
+  describeError,
   aside,
   saveLabel,
   showHeader = true,
@@ -129,7 +137,7 @@ export default function CreatePage({
       // 作った行を一覧で目立たせる。どこに増えたのか探させない。
       router.push(successHref ? successHref(id) : createPageReturnHref(parent[1], id))
     } catch (e) {
-      setError(createPageErrorMessage(e))
+      setError(describeError ? describeError(e) : createPageErrorMessage(e))
     } finally {
       setSaving(false)
     }

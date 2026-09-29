@@ -28,16 +28,25 @@ describe('V6 流入経路一覧の契約', () => {
     expect(PAGE).toContain('<ListState kind="loading"')
     expect(PAGE).toContain('kind="error"')
     expect(PAGE).toContain('kind="empty"')
-    // 読み込めなかったときの言葉と、やり直す口。
-    expect(PAGE).toContain('流入経路を読み込めませんでした')
-    expect(PAGE).toContain('流入経路を再読み込み')
+    // M029: 原因をそのまま渡す。403は権限の案内・再試行なし、
+    // 429は待ち案内つきで再試行あり（m23mの共通文）。
+    expect(PAGE).toContain("import { loadFailureCopy } from '@/components/shared/api-error-message'")
+    expect(PAGE).toContain("loadFailureCopy(loadError, '流入経路')")
+    expect(PAGE).toContain('error={loadError ?? undefined}')
+    expect(PAGE).toContain('onRetry={loadFailure?.retryable ? () => void load() : undefined}')
+    // 通らない再試行を促す一律の文・ボタンは残さない。
+    expect(PAGE).not.toContain('流入経路を読み込めませんでした')
+    expect(PAGE).not.toContain('流入経路を再読み込み')
   })
 
   it('一覧を引けなかったことを、空と別に覚える', () => {
     expect(PAGE).toContain('const [loadFailed, setLoadFailed] = useState(false)')
     // 例外で抜けても「読み込み中」のまま固まらない。
-    expect(PAGE).toContain('} catch {')
+    expect(PAGE).toContain('} catch (e) {')
     expect(PAGE).toContain('setLoadFailed(true)')
+    // M029: 原因も残し、403・429を言い分ける。
+    expect(PAGE).toContain('const [loadError, setLoadError] = useState<unknown>(null)')
+    expect(PAGE).toContain('setLoadError(e)')
     // 失敗を赤帯だけで流していた古い出し方は残さない。
     expect(PAGE).not.toContain("setError('リファラルリンクの取得に失敗しました')")
   })
