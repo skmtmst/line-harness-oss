@@ -14,6 +14,8 @@ import Select from '@/components/shared/select'
 import StickyBar from '@/components/shared/sticky-bar'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import {
   api,
   ApiError,
@@ -86,6 +88,16 @@ const ALERT_RULE_DEFS: Array<{
 function defaultAlertDrafts(enabled: boolean): Record<string, AlertRuleDraft> {
   return Object.fromEntries(ALERT_RULE_DEFS.map((def) => [def.id, { enabled, threshold: def.threshold, minimumSample: def.minimumSample }]))
 }
+
+/*
+ * 作るときの未保存の基準。初期値そのままの署名。空の宛先行（文字なし）は
+ * 未保存に数えない（下の署名と同じく空欄を外す）。なおすときは読み直した
+ * 値で基準を作り直す（読み直し効果の中）。
+ */
+const NEW_BASELINE = JSON.stringify([
+  '週次まとめ', ['friends', 'reactions', 'routes', 'usage'], [], 'weekly', '1', '1', '09:00', '7',
+  [], [], true, false, false, true, defaultAlertDrafts(true), [],
+])
 
 const ROLE_LABEL = { owner: '統括', admin: '管理者', staff: '運用担当' } as const
 
@@ -221,6 +233,11 @@ function AnalyticsReportFormPage() {
   const [alertDrafts, setAlertDrafts] = useState<Record<string, AlertRuleDraft>>(() => defaultAlertDrafts(true))
   // 画面に出せない決めごと(将来増えた種類など)は、消さずにそのまま保存へ回す。
   const [extraAlertRules, setExtraAlertRules] = useState<AnalyticsReportSchedule['alertRules']>([])
+  // なおすときは読み直すまで基準なし。作るときは初期値が基準。
+  const [baseline, setBaseline] = useState<string | null>(editId ? null : NEW_BASELINE)
+  useEffect(() => {
+    setBaseline(editId ? null : NEW_BASELINE)
+  }, [editId])
 
   useEffect(() => {
     let active = true
@@ -289,6 +306,15 @@ function AnalyticsReportFormPage() {
           }
           setAlertDrafts(drafts)
           setExtraAlertRules(extras)
+          // なおし時の未保存の基準は、読み直した値そのまま。
+          setBaseline(JSON.stringify([
+            schedule.name, schedule.sections, schedule.savedAnalysisIds, schedule.cadence,
+            String(schedule.weekday ?? 1), String(schedule.monthDay ?? 1), schedule.sendTime, String(schedule.periodDays),
+            schedule.recipients.filter((item) => item.kind === 'staff' && item.staffId).map((item) => item.staffId as string),
+            schedule.recipients.filter((item) => item.kind === 'email' && item.email).map((item) => (item.email as string).trim()).filter(Boolean),
+            schedule.channels.includes('dashboard'), schedule.channels.includes('email'), schedule.channels.includes('line'),
+            schedule.alertRules.length > 0, drafts, extras,
+          ]))
           setLoading(false)
           return
         }
@@ -488,6 +514,23 @@ function AnalyticsReportFormPage() {
       if (sameTarget()) setSaving(false)
     }
   }
+
+  /*
+   * つくる・なおし途中の離脱確認。基準（初期値または読み直した値）から
+   * 変わっていたら、キャンセルや左メニューで確認窓を出す。空の宛先行は
+   * 数えない。保存・送信が終わると別画面へ router.push するので、
+   * 成功後に警告は出ない。
+   */
+  const signature = JSON.stringify([
+    name, sections, savedAnalysisIds, cadence, weekday, monthDay, sendTime, periodDays,
+    staffIds.filter(Boolean),
+    emails.map((item) => item.trim()).filter(Boolean),
+    dashboardEnabled, emailEnabled, lineEnabled, alertsEnabled, alertDrafts, extraAlertRules,
+  ])
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({
+    dirty: baseline !== null && signature !== baseline,
+    busy: saving,
+  })
 
   if (accountLoading || loading) return <ListState kind="loading" title="定期レポートを読み込んでいます" />
   if (!selectedAccountId) return <ListState kind="empty" title="LINE公式アカウントを選んでください" description="上のバーで、レポートを作るLINE公式アカウントを選んでください。" />
@@ -793,6 +836,7 @@ function AnalyticsReportFormPage() {
           : <>まだ動いていません。つくると、次の{nextLabel}から届きはじめます。</>}
         actions={<><Link className="text-ink-secondary inline-flex h-10 items-center px-3 text-sm no-underline" href="/analytics">キャンセル</Link>{!editing && <Button variant="secondary" disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} onClick={() => void submit(true)}>今すぐ1回だけ送る</Button>}<Button disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} onClick={() => void submit(false)}>{saving ? (editing ? '保存しています' : '作っています') : (editing ? '変更を保存する' : 'つくって動かす')}</Button></>}
       />
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した定期レポート" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )
 }

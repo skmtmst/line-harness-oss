@@ -13,7 +13,7 @@ import LinePreview from '@/components/shared/line-preview'
 import Notice from '@/components/shared/notice'
 import { TimeField } from '@/components/shared/date-time-field'
 import Combobox from '@/components/shared/combobox'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import ListState from '@/components/shared/list-state'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -377,15 +377,7 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
           : '動いています。保存した新しい中身は、次のきっかけからの配信に使われます。すでに配信待ちの分は、予約したときの中身のまま届きます。'
         : '停止中です。保存しても新しい配信は始まりません。'} actions={<><Button href="/nen-campaigns">キャンセル</Button><Button onClick={() => setTestSearchOpen(true)}><FlaskConical aria-hidden size={16} />自分にテスト送信</Button><Button variant="primary" onClick={() => void save()} disabled={saving || !bodyCheck.fits}>{saving ? '保存中…' : '配信内容を保存'}</Button></>} />
       {/* #935 N-301: 書きかけのまま離れるときの確認。 */}
-      <ConfirmDialog primaryAction="cancel"
-        open={leaveTarget !== null}
-        title="入力中の内容があります"
-        description="このまま移動すると、入力した内容は保存されません。移動しますか？"
-        confirmLabel="保存せずに移動"
-        cancelLabel="編集を続ける"
-        onConfirm={confirmLeave}
-        onCancel={cancelLeave}
-      />
+      <UnsavedLeaveDialog open={leaveTarget !== null} onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )
 }

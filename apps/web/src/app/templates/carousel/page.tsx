@@ -8,6 +8,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import type { Folder } from '@line-crm/shared'
 import { Field, inputClass } from '@/components/shared/create-page'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import LinePreview from '@/components/shared/line-preview'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Notice from '@/components/shared/notice'
@@ -302,15 +303,7 @@ function CarouselEditorInner() {
     busy: saving,
   })
   const leaveConfirmDialog = (
-    <ConfirmDialog primaryAction="cancel"
-      open={leaveTarget !== null}
-      title="保存していない変更があります"
-      description="このまま移動すると、カルーセルの変更は失われます。保存せずに移動しますか？"
-      confirmLabel="保存せずに移動"
-      cancelLabel="編集を続ける"
-      onConfirm={confirmLeave}
-      onCancel={cancelLeave}
-    />
+    <UnsavedLeaveDialog open={leaveTarget !== null} subject="カルーセルの変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
   )
   /*
    * N-144: カルーセルの作成・保存APIは owner/admin だけ。staff が
