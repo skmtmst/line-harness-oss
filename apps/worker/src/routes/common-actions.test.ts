@@ -129,6 +129,50 @@ describe('V6共通アクションAPI', () => {
     expect(await csv.text()).toContain('今月の実行');
   });
 
+  it('CSVは一覧と同じ検索・絞り込みで絞られる（監査 R464）', async () => {
+    const adminApp = setupApp(testDb.db, admin);
+    const created: Array<{ id: string; draftVersionId: string }> = [];
+    for (const name of ['対象アクション', '別のアクション']) {
+      const response = await adminApp.request('/api/common-actions?account_id=account-1', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, actions: action }),
+      });
+      expect(response.status).toBe(201);
+      const body = await response.json() as { data: { id: string; draftVersionId: string } };
+      created.push(body.data);
+    }
+    // 「対象アクション」だけ公開し、「別のアクション」は下書きのままにする。
+    const publish = await adminApp.request(
+      `/api/common-actions/${created[0].id}/versions/${created[0].draftVersionId}/publish?account_id=account-1`,
+      { method: 'POST' },
+    );
+    expect(publish.status).toBe(200);
+
+    const byQuery = await adminApp.request(
+      '/api/common-actions?account_id=account-1&format=csv&query=%E5%AF%BE%E8%B1%A1',
+    );
+    expect(byQuery.status).toBe(200);
+    const byQueryText = await byQuery.text();
+    expect(byQueryText).toContain('対象アクション');
+    expect(byQueryText).not.toContain('別のアクション');
+
+    const byStatus = await adminApp.request(
+      '/api/common-actions?account_id=account-1&format=csv&status=published',
+    );
+    expect(byStatus.status).toBe(200);
+    const byStatusText = await byStatus.text();
+    expect(byStatusText).toContain('対象アクション');
+    expect(byStatusText).not.toContain('別のアクション');
+
+    const empty = await adminApp.request(
+      '/api/common-actions?account_id=account-1&format=csv&query=%E8%A9%B2%E5%BD%93%E3%81%AA%E3%81%97',
+    );
+    expect(empty.status).toBe(200);
+    // 見出し1行だけ。0件の条件で対象外の行を混ぜない。
+    expect((await empty.text()).trim().split('\r\n')).toHaveLength(1);
+  });
+
   it('タグ付与の連動ドロワーへ13種類のschemaと範囲内選択肢を返す', async () => {
     testDb.raw.prepare(
       `INSERT INTO tags (id, name, line_account_id) VALUES ('tag-1', '会員', 'account-1')`,

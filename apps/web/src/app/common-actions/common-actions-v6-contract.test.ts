@@ -77,7 +77,15 @@ describe('V6共通アクションの画面契約', () => {
   it('一覧の集計・絞り込み・CSVを新しい契約へ接続する', () => {
     expect(LIST).toContain('summary?.executions')
     expect(LIST).toContain('summary?.failures')
-    expect(LIST).toContain('api.commonActions.csvUrl(selectedAccountId)')
+    // 監査 R464: CSVは一覧の検索・絞り込みを引き継ぎ、範囲と件数を事前に出す。
+    expect(LIST).toContain('api.commonActions.csvUrl({')
+    expect(LIST).toContain('status: filter')
+    expect(LIST).toContain('query: deferredQuery')
+    expect(LIST).toContain('この条件の')
+    expect(LIST).toContain('条件に合う共通アクションがないため書き出せません')
+    // 監査 R466: 書き出し権限のない担当者にリンク自体を出さない。
+    expect(LIST).toContain('canExportCsv')
+    expect(LIST).toContain('useAutomationRunPermissions')
     expect(LIST).toContain('古い版あり')
     expect(LIST).toContain('limit: PAGE_SIZE')
     expect(LIST).toContain('offset: (page - 1) * PAGE_SIZE')

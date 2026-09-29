@@ -10314,8 +10314,14 @@ export const api = {
         freshness?: 'available'
       }>(`/api/common-actions?${query}`);
     },
-    csvUrl: (accountId: string) =>
-      `${API_URL}/api/common-actions?account_id=${encodeURIComponent(accountId)}&format=csv`,
+    // 監査 R464: 一覧の検索・絞り込みをそのまま渡す。付けないと
+    // 「絞り込んだつもりが全件」になる。status=all・空queryは付けない。
+    csvUrl: (params: { accountId: string; status?: string; query?: string }) => {
+      const query = new URLSearchParams({ account_id: params.accountId, format: 'csv' });
+      if (params.status && params.status !== 'all') query.set('status', params.status);
+      if (params.query?.trim()) query.set('query', params.query.trim());
+      return `${API_URL}/api/common-actions?${query}`;
+    },
     get: (id: string, accountId: string) =>
       fetchApi<ApiResponse<CommonActionDetail>>(
         `/api/common-actions/${id}?account_id=${encodeURIComponent(accountId)}`,

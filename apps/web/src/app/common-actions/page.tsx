@@ -18,6 +18,7 @@ import Pagination from '@/components/shared/pagination'
 import ListRange from '@/components/ui/list-range'
 import { Tabs } from '@/components/shared/tabs'
 import { useCanManageCommonActions } from '@/components/automations/use-common-action-permission'
+import { useAutomationRunPermissions } from '@/components/automations/use-can-manage'
 import { useManualHref } from '@/lib/use-manual-href'
 import IconButton from '@/components/shared/icon-button'
 import ActionMenu from '@/components/shared/action-menu'
@@ -42,6 +43,16 @@ const STATUS_LABEL: Record<CommonActionSummary['status'], string> = {
 
 export default function CommonActionsPage() {
   const canManage = useCanManageCommonActions()
+  /*
+   * 監査 R466: 書き出しの権限（automation.run.export）がない担当者には
+   * 出力リンク自体を出さない。押してから403になる誘導をやめる。
+   * 本当の可否はサーバが決める（routeは403を維持）。
+   */
+  const runPermissions = useAutomationRunPermissions()
+  const canExportCsv = runPermissions?.canExport ?? false
+  /* 監査 R464: 0件の条件では書き出せない。押せる理由がない操作は置かない。 */
+  const csvEmpty = !loading && !error && total === 0
+  const csvScoped = filter !== 'all' || deferredQuery.trim() !== ''
   /* 監査 R128: 正本表に登録があるときだけ出す。無ければボタン自体を出さない。 */
   const manualHref = useManualHref('/common-actions')
   // /common-actions はメニューの接頭辞に当たらず上部バーが空になるため、画面名を明示する。
@@ -216,7 +227,26 @@ export default function CommonActionsPage() {
       */}
       <div className="my-3 flex flex-wrap items-center gap-2">
         {canManage ? <Button href="/common-actions/new" variant="primary">＋ 共通アクションを作る</Button> : null}
-        {selectedAccountId ? <Button href={api.commonActions.csvUrl(selectedAccountId)}>CSVで書き出す</Button> : null}
+        {/*
+          監査 R464: 「この条件の結果を書き出す」が既定。検索・絞り込みを
+          そのまま渡し、実行前に範囲と件数が分かる文を添える。
+        */}
+        {canExportCsv && selectedAccountId ? (
+          csvEmpty ? (
+            <Button disabled title="条件に合う共通アクションがないため書き出せません">CSVで書き出す</Button>
+          ) : (
+            <Button href={api.commonActions.csvUrl({
+              accountId: selectedAccountId,
+              status: filter === 'all' ? undefined : filter,
+              query: deferredQuery.trim() || undefined,
+            })}>CSVで書き出す</Button>
+          )
+        ) : null}
+        {canExportCsv && selectedAccountId && !loading && !error ? (
+          <span className="text-xs text-ink-faint">
+            {csvScoped ? `この条件の${total}件を書き出します` : `全${total}件を書き出します`}
+          </span>
+        ) : null}
       </div>
 
       {/*
