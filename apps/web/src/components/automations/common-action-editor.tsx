@@ -57,6 +57,7 @@ export default function CommonActionEditor({
   resources,
   onChange,
   stepNumbers,
+  resourcesFailed = false,
 }: {
   value: CommonActionStep[]
   resources: CommonActionResources
@@ -66,6 +67,12 @@ export default function CommonActionEditor({
    * 無ければ従来どおりこの欄だけの連番。見た目と動きは変えない。
    */
   stepNumbers?: Record<string, number>
+  /*
+   * 監査 R585: 選択肢の取得に失敗したとき。真の0件（空のまま正常取得）と
+   * 分け、欄ごとの「選べる◯◯がありません」を出さない。失敗の案内と
+   * 再取得の口は呼び出し側の欄の近くが出す。既定 false で従来どおり。
+   */
+  resourcesFailed?: boolean
 }) {
   const numberOf = (index: number, step: CommonActionStep) => stepNumbers?.[step.id] ?? index + 1
   const update = (index: number, patch: Partial<CommonActionStep>) => {
@@ -133,6 +140,7 @@ export default function CommonActionEditor({
             <ActionParams
               step={step}
               resources={resources}
+              resourcesFailed={resourcesFailed}
               onChange={(params) => update(index, { params })}
             />
           </div>
@@ -153,11 +161,14 @@ function ResourceSelect({
   value,
   options,
   onChange,
+  resourcesFailed = false,
 }: {
   label: string
   value: string
   options: Array<{ id: string; name: string }>
   onChange: (value: string) => void
+  /** 監査 R585: 取得失敗時は真の0件と分け、空の案内を出さない。 */
+  resourcesFailed?: boolean
 }) {
   return (
     <label className="text-ink-secondary block text-sm">
@@ -170,7 +181,7 @@ function ResourceSelect({
         className="mt-1 w-full"
         options={[{ value: '', label: `${label}を選ぶ` }, ...options.map((option) => ({ value: option.id, label: option.name }))]}
       />
-      {options.length === 0 ? <span className="text-warning mt-1 block text-xs">選べる{label}がありません</span> : null}
+      {options.length === 0 && !resourcesFailed ? <span className="text-warning mt-1 block text-xs">選べる{label}がありません</span> : null}
     </label>
   )
 }
@@ -178,30 +189,32 @@ function ResourceSelect({
 function ActionParams({
   step,
   resources,
+  resourcesFailed = false,
   onChange,
 }: {
   step: CommonActionStep
   resources: CommonActionResources
+  resourcesFailed?: boolean
   onChange: (params: Record<string, unknown>) => void
 }) {
   if (step.type === 'add_tag' || step.type === 'remove_tag') {
-    return <ResourceSelect label="タグ" value={String(step.params.tagId ?? '')} options={resources.tags} onChange={(tagId) => onChange({ tagId })} />
+    return <ResourceSelect label="タグ" value={String(step.params.tagId ?? '')} options={resources.tags} resourcesFailed={resourcesFailed} onChange={(tagId) => onChange({ tagId })} />
   }
   if (step.type === 'start_scenario' || step.type === 'stop_scenario' || step.type === 'resume_scenario') {
-    return <ResourceSelect label="シナリオ" value={String(step.params.scenarioId ?? '')} options={resources.scenarios} onChange={(scenarioId) => onChange({ scenarioId })} />
+    return <ResourceSelect label="シナリオ" value={String(step.params.scenarioId ?? '')} options={resources.scenarios} resourcesFailed={resourcesFailed} onChange={(scenarioId) => onChange({ scenarioId })} />
   }
   if (step.type === 'send_webhook') {
-    return <ResourceSelect label="送信先" value={String(step.params.webhookId ?? '')} options={resources.webhooks} onChange={(webhookId) => onChange({ webhookId })} />
+    return <ResourceSelect label="送信先" value={String(step.params.webhookId ?? '')} options={resources.webhooks} resourcesFailed={resourcesFailed} onChange={(webhookId) => onChange({ webhookId })} />
   }
   if (step.type === 'switch_rich_menu') {
-    return <ResourceSelect label="リッチメニュー" value={String(step.params.richMenuPageId ?? '')} options={resources.richMenus} onChange={(richMenuPageId) => onChange({ richMenuPageId })} />
+    return <ResourceSelect label="リッチメニュー" value={String(step.params.richMenuPageId ?? '')} options={resources.richMenus} resourcesFailed={resourcesFailed} onChange={(richMenuPageId) => onChange({ richMenuPageId })} />
   }
   if (step.type === 'common_action') {
     const commonActionId = String(step.params.commonActionId ?? '')
     const selected = resources.commonActions.find((item) => item.id === commonActionId)
     return (
       <div>
-        <ResourceSelect label="共通アクション" value={commonActionId} options={resources.commonActions} onChange={(nextId) => onChange({ commonActionId: nextId })} />
+        <ResourceSelect label="共通アクション" value={commonActionId} options={resources.commonActions} resourcesFailed={resourcesFailed} onChange={(nextId) => onChange({ commonActionId: nextId })} />
         {selected ? <p className="text-ink-secondary mt-2 text-xs">共通アクション「{selected.name}」 v{selected.version}</p> : null}
       </div>
     )
@@ -219,7 +232,7 @@ function ActionParams({
     const selected = resources.templates.find((item) => item.id === templateId)
     return (
       <div className="space-y-3">
-        <ResourceSelect label="テンプレート" value={templateId} options={resources.templates} onChange={(next) => onChange(next ? { templateId: next } : { content: '' })} />
+        <ResourceSelect label="テンプレート" value={templateId} options={resources.templates} resourcesFailed={resourcesFailed} onChange={(next) => onChange(next ? { templateId: next } : { content: '' })} />
         {selected ? (
           <p className="text-ink-secondary text-xs">
             テンプレート「{selected.name}」　版: —（未取得。テンプレートの版を返す口が接続されると表示します）
