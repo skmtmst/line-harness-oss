@@ -45,6 +45,23 @@
 - Workerのカスタムドメインは wrangler の `routes`（`custom_domain = true`）で宣言し、デプロイ時に自動でDNS・証明書が設定される。Pagesのカスタムドメインは Cloudflare 側でプロジェクトに紐付ける。
 - `stg.musubo.jp`（サービス紹介サイトの確認用・Xserver）と `r.musubo.jp` / `rs.musubo.jp`（メール受信）は別用途。変更しない。
 - 新ドメイン経由のLINEログイン・LIFF・Webhookを使うには、LINE Developers側にURLの**追加**登録が必要（既存URLは削除しない）。
+- 管理画面のログイン後の着地先（`ADMIN_PUBLIC_URL`）は値を1つしか持てない。他社向け提供に合わせ **musubo.jp 一本化**とした（利用者判断・2026-09-29）。自社用の `*.pages.dev` から入っても着地は `https://admin.musubo.jp` になる。表示とログインは従来どおり動く。
+
+### LINE DevelopersのコールバックURL（musubo.jp分）
+
+`redirect_uri` はリクエストされたホスト名から作られるため、**ホスト名ごとに登録が必要**。コールバックURL欄は複数行で複数URLを持てるので、必ず**追加**する（既存URLを削除すると既存の画面が落ちる）。
+
+| 環境 | LINE LoginチャネルID | 追加するURL | 状態 |
+| --- | --- | --- | --- |
+| 検証 | `2011090925`（`然-NEN- TEST`） | `https://stg-api.musubo.jp/api/auth/line/callback` | 登録済み・ログイン成功確認済み（2026-09-29） |
+| 本番 | `2011036323` | `https://api.musubo.jp/api/auth/line/callback` | **未登録** |
+
+本番の登録は、`ADMIN_PUBLIC_URL` と管理画面ビルドの `NEXT_PUBLIC_API_URL` を musubo.jp へ切り替える**本番リリースより前に**済ませる。順番を逆にすると、切替後の `redirect_uri` が未登録になり本番のLINEログインが自社利用分も含めて失敗する。
+
+本番リリース時に合わせて必要な設定:
+
+- GitHub secret `NEXT_PUBLIC_API_URL` を `https://api.musubo.jp` にする（管理画面バンドルのAPI接続先）
+- Worker secret `ADMIN_ORIGIN` は新旧2オリジンを保持済み（2026-09-29にCodexが設定）
 
 ## 通知事故を防ぐルール
 
