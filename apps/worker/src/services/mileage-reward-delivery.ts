@@ -134,12 +134,23 @@ class RedemptionStepBusyError extends Error {
  * 同じキーで送り直すと LINE 側が新規受付して二重に届くので、
  * 送らず・確定もせず、人が確かめる照合待ちに残す。
  * 確定失敗と同じ扱い（失敗に落とさない・返却しない）。
+ * db の親クラスは継承しない。最上位で参照すると db を mock した
+ * 試験が読み込み時に落ちるため、Error 継承＋code・名前で見分ける。
  */
-class RedemptionRetryKeyExpiredError extends MileageRedemptionConfirmError {
+class RedemptionRetryKeyExpiredError extends Error {
+  readonly code = 'retry_key_expired';
   constructor() {
     super('LINEの重複防止期限（24時間）を過ぎたため自動送信を止めました');
     this.name = 'RedemptionRetryKeyExpiredError';
   }
+}
+
+/** R344 の合図かどうか。code・名前でも見る。 */
+function isRetryKeyExpiredError(error: unknown): error is RedemptionRetryKeyExpiredError {
+  if (error instanceof RedemptionRetryKeyExpiredError) return true;
+  return error instanceof Error
+    && (error.name === 'RedemptionRetryKeyExpiredError'
+      || (error as { code?: unknown }).code === 'retry_key_expired');
 }
 
 /**
@@ -401,29 +412,29 @@ export async function deliverMileageReward(
         message: 'ほかの処理が同じ交換を進めています。少し待ってからもう一度お試しください。',
       };
     }
+    if (isRetryKeyExpiredError(error)) {
+      // R344: 期限切れは自動で送らない。理由だけ残し、人が確かめる。
+      await db.prepare(
+        `UPDATE mileage_redemptions
+            SET failure_code = 'retry_key_expired',
+                failure_message = 'LINEの重複防止期限（24時間）を過ぎたため自動送信を止めました。内容を確かめてください。',
+                updated_at = ?
+          WHERE id = ? AND status = 'delivering'`,
+      ).bind(now, redemptionId).run();
+      return {
+        status: 'delivery_failed', rewardName: plan.rewardName,
+        customerMessage: plan.customerMessage, rewardCode: null,
+        retryAt: null,
+        failurePolicy: plan.failurePolicy,
+        message: 'LINEの重複防止期限（24時間）を過ぎたため自動送信を止めました。内容を確かめてください。',
+      };
+    }
     if (error instanceof MileageRedemptionConfirmError) {
       /*
        * 外部送信は終わっているかもしれない。失敗に落とすとやり直しで
        * 再送するので、`delivering` のまま残して回収(cron・貸出期限)に任せる。
        * 呼び出し側には202相当の「確認中」で返す。
        */
-      if (error instanceof RedemptionRetryKeyExpiredError) {
-        // R344: 期限切れは自動で送らない。理由だけ残し、人が確かめる。
-        await db.prepare(
-          `UPDATE mileage_redemptions
-              SET failure_code = 'retry_key_expired',
-                  failure_message = 'LINEの重複防止期限（24時間）を過ぎたため自動送信を止めました。内容を確かめてください。',
-                  updated_at = ?
-            WHERE id = ? AND status = 'delivering'`,
-        ).bind(now, redemptionId).run();
-        return {
-          status: 'delivery_failed', rewardName: plan.rewardName,
-          customerMessage: plan.customerMessage, rewardCode: null,
-          retryAt: null,
-          failurePolicy: plan.failurePolicy,
-          message: 'LINEの重複防止期限（24時間）を過ぎたため自動送信を止めました。内容を確かめてください。',
-        };
-      }
       return {
         status: 'delivery_failed', rewardName: plan.rewardName,
         customerMessage: plan.customerMessage, rewardCode: null,
