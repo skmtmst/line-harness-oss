@@ -35,6 +35,16 @@
 | R2（予約メール原文・非公開） | `musubo-raw-mail` | `musubo-raw-mail-stg` |
 | 管理画面 Pages | `nen-line-admin-98712679` | `nen-line-stg-admin` |
 | Worker設定 | `apps/worker/wrangler.toml` | `apps/worker/wrangler.staging.toml` |
+| カスタムドメイン（管理画面） | `admin.musubo.jp` | `stg-admin.musubo.jp` |
+| カスタムドメイン（API/LIFF） | `api.musubo.jp` | `stg-api.musubo.jp` |
+
+## musubo.jp カスタムドメイン（2026-09-29）
+
+- 他社向けサービス提供のため、既存環境へ musubo.jp のカスタムドメインを追加した。新しい環境は作らず、同じWorker・D1・R2・Pagesを使う。
+- 既存の `*.pages.dev` / `*.workers.dev` URLは自社用としてそのまま使える。`ADMIN_ORIGIN` は新旧両方のオリジンをカンマ区切りで持つ。
+- Workerのカスタムドメインは wrangler の `routes`（`custom_domain = true`）で宣言し、デプロイ時に自動でDNS・証明書が設定される。Pagesのカスタムドメインは Cloudflare 側でプロジェクトに紐付ける。
+- `stg.musubo.jp`（サービス紹介サイトの確認用・Xserver）と `r.musubo.jp` / `rs.musubo.jp`（メール受信）は別用途。変更しない。
+- 新ドメイン経由のLINEログイン・LIFF・Webhookを使うには、LINE Developers側にURLの**追加**登録が必要（既存URLは削除しない）。
 
 ## 通知事故を防ぐルール
 
@@ -115,7 +125,7 @@ pnpm --filter worker build
   --config apps/worker/wrangler.staging.toml
 
 # 管理画面
-NEXT_PUBLIC_API_URL=https://nen-line-stg.skmtmst.workers.dev \
+NEXT_PUBLIC_API_URL=https://stg-api.musubo.jp \
   pnpm --filter web build
 ./node_modules/.bin/wrangler pages deploy apps/web/out \
   --project-name nen-line-stg-admin \
