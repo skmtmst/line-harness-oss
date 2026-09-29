@@ -11,6 +11,7 @@ import StickyBar from '@/components/shared/sticky-bar'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { TextField } from '@/components/shared/text-field'
 import { ApiError } from '@/lib/api'
+import { describeApiFailure, isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import { nenRanksApi, type NenFeedingData, type NenFeedingKind } from '@/lib/nen-ranks-api'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 
@@ -46,6 +47,8 @@ export default function FeedingTab({ accountId }: { accountId: string }) {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [treatLimit, setTreatLimit] = useState('10')
+  /** 読み込みで捕まえた失敗。共通の失敗面へ渡し、403と429を言い分ける（M036）。 */
+  const [loadError, setLoadError] = useState<unknown>(null)
   /** 表示中データ・下書きがどのアカウントのものか。編集状態はアカウントに固定する（DEEP-22）。 */
   const [dataAccountId, setDataAccountId] = useState(accountId)
   /** 要求世代。切替・再取得で進め、遅れて届いた古い応答を捨てる。 */
@@ -73,6 +76,7 @@ export default function FeedingTab({ accountId }: { accountId: string }) {
     setError('')
     cancelLeave()
     setNotice(hadUnsaved ? 'LINEアカウントを切り替えたため、保存していない変更は破棄しました。' : '')
+    setLoadError(null)
     setStatus('loading')
   }
 
@@ -83,6 +87,7 @@ export default function FeedingTab({ accountId }: { accountId: string }) {
     const generation = ++generationRef.current
     const account = accountId
     setStatus('loading')
+    setLoadError(null)
     try {
       const res = await nenRanksApi.feeding(account)
       if (!res.success) throw new Error(res.error)
@@ -95,6 +100,8 @@ export default function FeedingTab({ accountId }: { accountId: string }) {
       setStatus('ready')
     } catch (caught) {
       if (generationRef.current !== generation) return
+      // 失敗そのままを残す。共通の失敗面が403（再試行なし）と429（待ち案内）を言い分ける（M036）。
+      setLoadError(caught)
       setStatus(caught instanceof ApiError && caught.status === 403 ? 'forbidden' : 'error')
     }
   }, [accountId])
@@ -161,7 +168,10 @@ export default function FeedingTab({ accountId }: { accountId: string }) {
         ? `主食を保存し、登録済みのペット ${res.data.refreshedPets.toLocaleString('ja-JP')}頭の目安を計算し直しました。`
         : '主食を保存しました。')
     } catch (caught) {
-      setError(caught instanceof Error && caught.message ? caught.message : '保存できませんでした。もう一度お試しください。')
+      // M036: 生のまま出さず、共通の状態別案内へ渡す（403は権限・429は待ち案内）。
+      setError(describeApiFailure(caught, '主食の保存', {
+        forbidden: '主食を保存する権限がありません。権限を確認してください。',
+      }))
     } finally {
       setBusy(false)
     }
@@ -170,7 +180,7 @@ export default function FeedingTab({ accountId }: { accountId: string }) {
   const noticeEl = notice ? <p className="text-label text-accent-deep" role="status">{notice}</p> : null
   if (status === 'loading' && !data) return <>{noticeEl}<ListState kind="loading" title="主食のカロリー表を読み込んでいます" /></>
   if (status === 'forbidden') return <ListState kind="forbidden" />
-  if (status === 'error') return <ListState kind="error" title="主食のカロリー表を読み込めませんでした" description="通信の状態を確認して、もう一度お試しください。" onRetry={() => void load()} />
+  if (status === 'error') return <ListState kind="error" title="主食のカロリー表を読み込めませんでした" description={isForbiddenOrRateLimited(loadError) ? undefined : '通信の状態を確認して、もう一度お試しください。'} error={loadError ?? undefined} onRetry={() => void load()} />
   // アカウント切替直後：次の取得が終わるまで読み込み表示にする。旧アカウントの表は出さない。
   if (!data) return <>{noticeEl}<ListState kind="loading" title="主食のカロリー表を読み込んでいます" /></>
 
