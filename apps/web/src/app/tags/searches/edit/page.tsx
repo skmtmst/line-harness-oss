@@ -551,10 +551,12 @@ function SavedSearchEditInner() {
   const gateRef = useRef(createResponseGate())
   const accountRef = useRef(selectedAccountId)
   accountRef.current = selectedAccountId
-
-  useEffect(() => {
-    gateRef.current.invalidate()
-  }, [selectedAccountId])
+  /*
+   * R518: アカウントまたは検索IDの切替で飛んだ読み直しの世代。
+   * 古い応答が届いても今の対象のものでなければ捨て、前のアカウントの
+   * 内容を表示しない。
+   */
+  const loadGenerationRef = useRef(0)
 
   /*
    * R179: 保存直後の再計算は、保存応答の新しい版と正規化済み条件を
@@ -589,7 +591,33 @@ function SavedSearchEditInner() {
   }, [conditions, id, original?.revision, selectedAccountId])
 
   useEffect(() => {
+    const generation = loadGenerationRef.current + 1
+    loadGenerationRef.current = generation
     let cancelled = false
+    /*
+     * R518: アカウントまたは検索IDの切替時点で、前対象の表示・操作を
+     * 無効にする。読み直しが終わるまで `original` を空にし、取得に失敗
+     * しても前の名前・条件と複製・保存・削除が残らないようにする。
+     * 飛んでいる人数の再計算も今の対象のものではないので無効にする。
+     */
+    gateRef.current.invalidate()
+    setOriginal(null)
+    setName('')
+    setConditions({ all: [], any: [] })
+    setIsShared(false)
+    setTags([])
+    setMarks([])
+    setScenarios([])
+    setFields([])
+    setForms([])
+    setOperators([])
+    setReferenceErrors({ marks: false, scenarios: false, fields: false, forms: false, operators: false })
+    setSavedCount(null)
+    setSiblingSearches([])
+    setPreviewCount(null)
+    setPreview(null)
+    setPreviewStale(false)
+    setPreviewError('')
     setLoading(true)
     setError('')
     setSearchMissing(false)
@@ -608,7 +636,8 @@ function SavedSearchEditInner() {
       api.forms.list(selectedAccountId).catch(() => null),
       api.operators.list().catch(() => null),
     ]).then(([detail, searches, tagResult, markResult, scenarioResult, fieldResult, formResult, operatorResult]) => {
-      if (cancelled) return
+      // R518: 切替後に届いた古い応答は捨てる。今の対象の再試行だけを描く。
+      if (cancelled || generation !== loadGenerationRef.current) return
       if (tagResult.success) setTags(tagResult.data)
       setMarks(markResult?.success ? markResult.data : [])
       setScenarios(scenarioResult?.success ? scenarioResult.data : [])
@@ -647,7 +676,8 @@ function SavedSearchEditInner() {
       /* IDEA-04: 計算に失敗している保存値を「計算済み」の時点付きで見せない。 */
       setPreviewError(found.match.error ?? '')
     }).catch((caught: unknown) => {
-      if (cancelled) return
+      // R518: 古い対象の失敗で今の画面を上書きしない。前の内容は既に消してある。
+      if (cancelled || generation !== loadGenerationRef.current) return
       if (caught instanceof ApiError && caught.status === 404) {
         setError('保存した検索が見つかりません')
         setSearchMissing(true)
@@ -655,7 +685,7 @@ function SavedSearchEditInner() {
         setError('保存した検索を読み込めませんでした')
       }
     }).finally(() => {
-      if (!cancelled) setLoading(false)
+      if (!cancelled && generation === loadGenerationRef.current) setLoading(false)
     })
     return () => { cancelled = true }
   }, [id, reloadKey, selectedAccountId])

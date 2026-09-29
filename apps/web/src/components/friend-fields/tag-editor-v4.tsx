@@ -378,6 +378,8 @@ export default function TagEditorV4({
   saving,
   error,
   notice,
+  foldersFailed = false,
+  onRetryFolders,
   onCancel,
   onSave,
   onDelete,
@@ -399,6 +401,10 @@ export default function TagEditorV4({
   saving: boolean
   error?: string
   notice?: string
+  /** D011: フォルダ一覧の取得に失敗したとき、所属フォルダ欄の下に出す。 */
+  foldersFailed?: boolean
+  /** D011: フォルダ一覧の取り直し。渡したときだけ再読み込みの押し口を出す。 */
+  onRetryFolders?: () => void
   onCancel: () => void
   onSave: (values: TagEditorValues, andAnother: boolean, applyRetroactive: boolean, previewToken?: string) => Promise<void>
   onDelete?: () => void
@@ -536,6 +542,17 @@ export default function TagEditorV4({
               <label className="min-w-0"><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">タグ名 <RequiredBadge /></span><input value={name} onChange={(event) => setName(event.target.value)} placeholder="例: 定期購入者" className={inputClass} /><DuplicateNameNote duplicates={nameDuplicates} kindLabel="タグ" /></label>
             </div>
             <p className="mt-3 text-xs leading-5 text-ink-faint">どの分類に入れるかを選びます。未選択なら「未分類」になります。フォルダの色がタグの印になります。</p>
+            {/*
+              D011: フォルダ一覧の取得に失敗しても、複製元の失敗と混ぜない。
+              未分類のまま作るか、ここで読み直せる。画面全体の読み込み失敗
+              ではないので、欄のそばに理由と押し口を出す。
+            */}
+            {foldersFailed ? (
+              <div className="rounded-control border-hairline bg-canvas-sunken mt-3 flex flex-wrap items-center gap-3 border p-3">
+                <p role="alert" className="text-ink-secondary text-xs">フォルダを読み込めませんでした。未分類で作るか、読み直してください。</p>
+                {onRetryFolders ? <Button type="button" onClick={onRetryFolders}>フォルダを読み直す</Button> : null}
+              </div>
+            ) : null}
             {/* IDEA-04: 「タグ」を選んだ理由と、値を持たせるなら情報欄・対応状態なら対応マークという違いを、作る場所で確認できるようにする。 */}
             <div className="mt-4"><AttributeKindGuide current="tag" /></div>
             <Checkbox className="mt-4" checked={isStarred} onCheckedChange={setIsStarred} description="このスイッチ、またはタグ一覧の星をクリックして、友だち一覧への表示をON／OFFできます。">友だち一覧に表示する（★）</Checkbox>
