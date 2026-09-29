@@ -31,7 +31,9 @@ describe('#640 省略表示の全文確認（title）', () => {
 
   it('/auto-replies: 操作列と今月の応答セルは title で全文を出す', () => {
     expect(AUTO_REPLIES).toMatch(/whitespace-nowrap"[\s\S]{0,120}?title=\{`今月 /)
-    expect(AUTO_REPLIES).toMatch(/title=\{\['編集'[\s\S]{0,200}?join\('・'\)\}/)
+    // R527: 見るだけには操作を出さず理由を title に出す。管理者向けの全文は残す。
+    expect(AUTO_REPLIES).toMatch(/\['編集'[\s\S]{0,200}?join\('・'\)/)
+    expect(AUTO_REPLIES).toMatch(/title=\{canManage/)
   })
 
   it('/auto-replies: 表の見出しは title で意味を補う', () => {
