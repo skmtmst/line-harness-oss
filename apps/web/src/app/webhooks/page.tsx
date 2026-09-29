@@ -784,7 +784,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
 
       {/* Rotate-secret modal — used to recover legacy webhooks or rotate. */}
       {rotateTarget && (
-        <div ref={rotateModalRef} className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+        <div ref={rotateModalRef} className="fixed inset-0 bg-scrim flex items-center justify-center z-50 p-4">
           <form onSubmit={handleRotateSubmit} role="dialog" aria-modal="true" aria-labelledby="rotate-secret-title" className="bg-canvas rounded-lg shadow-xl max-w-lg w-full p-6">
             <div className="mb-2 flex items-start justify-between gap-3">
               <h2 id="rotate-secret-title" className="text-lg font-semibold text-ink">
@@ -848,7 +848,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
 
       {/* Created-secret modal — shown ONCE after a successful create. */}
       {createdSecret && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-scrim flex items-center justify-center z-50 p-4">
           <div ref={secretModalRef} role="dialog" aria-modal="true" aria-labelledby="created-secret-title" className="bg-canvas rounded-lg shadow-xl max-w-lg w-full p-6">
             <div className="mb-2 flex items-start justify-between gap-3">
               <h2 id="created-secret-title" className="text-lg font-semibold text-ink">
@@ -885,7 +885,7 @@ function WebhooksPageInner({ tab }: { tab: Tab }) {
                   setCreatedSecret(null)
                   setSecretCopied(false)
                 }}
-                className="px-4 py-2 text-sm rounded-lg text-white font-medium"
+                className="px-4 py-2 text-sm rounded-lg text-on-accent font-medium"
                 style={{ backgroundColor: 'var(--color-accent)' }}
               >
                 保存しました

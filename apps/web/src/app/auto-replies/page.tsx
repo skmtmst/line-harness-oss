@@ -839,7 +839,7 @@ export default function AutoRepliesPage() {
                 <th className="hidden px-4 py-3">累計</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-divider-soft">
               {/*
                 読めていないときに「ありません」と言わない。消えたように読める。
                 読込中・読めなかった・権限が無い・本当に0件を言い分ける。

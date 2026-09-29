@@ -280,7 +280,7 @@ function WebinarArchiveConfirm({
       onConfirm={copy.stopFirst ? undefined : onConfirm}
     >
       {copy.stopFirst ? (
-        <div className="rounded-control border border-amber-200 bg-amber-50 p-3 text-xs text-ink">
+        <div className="rounded-control border border-status-warn bg-status-warn-soft p-3 text-xs text-ink">
           <p>{copy.stopFirst}</p>
           <div className="mt-3">
             <Button href={`/webinars/edit?id=${target.id}`}>編集画面で公開を停止する</Button>

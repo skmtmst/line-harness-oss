@@ -6,7 +6,7 @@
   align-items: center;
   justify-content: center;
   overflow-y: auto;
-  background: #11182755;
+  background: var(--color-scrim);
   padding: 16px;
 }
 

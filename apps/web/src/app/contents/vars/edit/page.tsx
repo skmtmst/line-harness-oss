@@ -1326,7 +1326,7 @@ function EditCommonVarInner() {
 
       {draft && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-scrim p-4"
           role="dialog"
           aria-modal="true"
           aria-label="スケジュール設定"

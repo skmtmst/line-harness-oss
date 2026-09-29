@@ -101,7 +101,7 @@ function EmailThreadHeader({ children }: { children: React.ReactNode }) {
      * 顧客情報は2行目へ折り返す。1行に固定すると 320/390px で件名や
      * 右の操作が潰れて、誰へ返すのか読めなかった。LINE のトークと同じ組み方。
      */
-    <div className="flex min-h-[66px] flex-wrap items-center justify-between gap-x-2 gap-y-2 border-b border-[#E5E7EB] bg-canvas px-4 py-3">
+    <div className="flex min-h-[66px] flex-wrap items-center justify-between gap-x-2 gap-y-2 border-b border-hairline bg-canvas px-4 py-3">
       {children}
     </div>
   )
@@ -642,7 +642,7 @@ export default function EmailThread({
             <button
               type="button"
               onClick={onOpenCustomerInfo}
-              className="whitespace-nowrap rounded-lg border border-[#E5E7EB] bg-canvas px-2.5 py-1.5 text-xs font-semibold text-[#2563EB] hover:bg-[#F7F8F6]"
+              className="whitespace-nowrap rounded-lg border border-hairline bg-canvas px-2.5 py-1.5 text-xs font-semibold text-action hover:bg-canvas-sunken"
             >
               顧客情報を開く
             </button>
@@ -650,7 +650,7 @@ export default function EmailThread({
         </div>
       </EmailThreadHeader>
 
-      <div ref={listRef} className="flex-1 space-y-4 overflow-y-auto bg-[#F7F8F6] p-4">
+      <div ref={listRef} className="flex-1 space-y-4 overflow-y-auto bg-canvas-sunken p-4">
         {/*
           PERF-11: 初回は新しい側の100件だけ。もっと古い履歴があるときは
           押した分だけ上へ足す。取りこぼしを見せないため hasMoreOlder が
@@ -662,7 +662,7 @@ export default function EmailThread({
               type="button"
               onClick={() => void loadOlder()}
               disabled={olderLoading}
-              className="rounded-full border border-[#E5E7EB] bg-canvas px-3 py-1.5 text-xs font-semibold text-[#2563EB] hover:bg-[#F7F8F6] disabled:opacity-50"
+              className="rounded-full border border-hairline bg-canvas px-3 py-1.5 text-xs font-semibold text-action hover:bg-canvas-sunken disabled:opacity-50"
             >
               {olderLoading ? '読み込み中...' : '過去のメッセージを読み込む'}
             </button>
@@ -673,7 +673,7 @@ export default function EmailThread({
             <div
               className={`max-w-[86%] rounded-2xl px-4 py-3 shadow-sm sm:max-w-[72%] ${
                 message.direction === 'outgoing'
-                  ? 'rounded-br-md bg-[#c9f4d8] text-ink'
+                  ? 'rounded-br-md bg-accent-soft text-ink'
                   : 'rounded-bl-md bg-canvas text-ink'
               }`}
             >
@@ -701,7 +701,7 @@ export default function EmailThread({
         <div ref={bottomRef} />
       </div>
 
-      <div data-inbox-v4="composer" className="sticky bottom-0 border-t border-[#E5E7EB] bg-canvas px-4 py-3">
+      <div data-inbox-v4="composer" className="sticky bottom-0 border-t border-hairline bg-canvas px-4 py-3">
         {/*
           上段。LINE のトークと同じ：テンプレートを選択 ・ 送信の設定 …… 改行のしかた。
           U010: 横に収まらなければ次の行へ折り返す。1行に固定したままだと
@@ -712,14 +712,14 @@ export default function EmailThread({
             <button
               type="button"
               onClick={() => setShowTemplatePicker(true)}
-              className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-[#E5E7EB] bg-canvas px-3 py-2 text-xs font-semibold text-[#2563EB] hover:bg-[#F7F8F6]"
+              className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-hairline bg-canvas px-3 py-2 text-xs font-semibold text-action hover:bg-canvas-sunken"
             >
               ▧ テンプレートを選択
             </button>
             <button
               type="button"
               onClick={() => setShowComposerOptions(v => !v)}
-              className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-[#E5E7EB] bg-canvas px-3 py-2 text-xs font-semibold text-[#2563EB] hover:bg-[#F7F8F6]"
+              className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-hairline bg-canvas px-3 py-2 text-xs font-semibold text-action hover:bg-canvas-sunken"
             >
               ⚙ {showComposerOptions ? '送信の設定を閉じる' : '送信の設定'}
             </button>
@@ -727,7 +727,7 @@ export default function EmailThread({
               type="button"
               onClick={openMemoEditor}
               aria-expanded={showMemoEditor}
-              className="inline-flex shrink-0 items-center whitespace-nowrap rounded-lg border border-[#E5E7EB] bg-canvas px-3 py-2 text-xs font-semibold text-[#344054] hover:bg-[#F7F8F6]"
+              className="inline-flex shrink-0 items-center whitespace-nowrap rounded-lg border border-hairline bg-canvas px-3 py-2 text-xs font-semibold text-ink-secondary hover:bg-canvas-sunken"
             >
               内部メモ
             </button>
@@ -771,7 +771,7 @@ export default function EmailThread({
 
         {showMemoEditor && typeof document !== 'undefined' && createPortal(
           <div
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-[#101828]/45 p-4"
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-ink/45 p-4"
             role="dialog"
             aria-modal="true"
             aria-labelledby="email-internal-memo-title"
@@ -779,10 +779,10 @@ export default function EmailThread({
           >
             <div
               ref={memoDialogRef}
-              className="max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto rounded-[14px] border border-[#E5E7EB] bg-canvas shadow-2xl"
+              className="max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto rounded-[14px] border border-hairline bg-canvas shadow-2xl"
               onClick={(event) => event.stopPropagation()}
             >
-              <div className="flex items-start justify-between gap-3 border-b border-[#E5E7EB] px-5 py-4">
+              <div className="flex items-start justify-between gap-3 border-b border-hairline px-5 py-4">
                 <div>
                   <h2 id="email-internal-memo-title" className="text-ink text-base font-bold">内部メモ</h2>
                   <p className="text-ink-faint mt-1 text-xs">担当者だけに表示され、相手には送信されません。</p>
@@ -798,7 +798,7 @@ export default function EmailThread({
                 </button>
               </div>
               <div className="px-5 py-4">
-                <label htmlFor="email-internal-memo" className="text-xs font-semibold text-[#667085]">メモ内容</label>
+                <label htmlFor="email-internal-memo" className="text-xs font-semibold text-ink-faint">メモ内容</label>
                 <textarea
                   id="email-internal-memo"
                   value={memoDraft}
@@ -806,12 +806,12 @@ export default function EmailThread({
                   rows={7}
                   autoFocus
                   placeholder="メモを追加"
-                  className="mt-2 w-full resize-y rounded-lg border border-[#D0D5DD] bg-canvas px-3 py-2 text-sm leading-6 outline-none focus:border-[#06C755] focus:ring-2 focus:ring-[#06C755]/15"
+                  className="mt-2 w-full resize-y rounded-lg border border-hairline bg-canvas px-3 py-2 text-sm leading-6 outline-none focus:border-accent focus:ring-2 focus:ring-accent/15"
                 />
                 {memoError && <p className="text-danger mt-1 text-xs">{memoError}</p>}
               </div>
-              <div className="flex justify-end gap-2 border-t border-[#E5E7EB] px-5 py-4">
-                <button type="button" onClick={closeMemoEditor} className="rounded-lg border border-[#E5E7EB] bg-canvas px-4 py-2 text-sm font-semibold text-[#667085] hover:bg-[#F7F8F6]">キャンセル</button>
+              <div className="flex justify-end gap-2 border-t border-hairline px-5 py-4">
+                <button type="button" onClick={closeMemoEditor} className="rounded-lg border border-hairline bg-canvas px-4 py-2 text-sm font-semibold text-ink-faint hover:bg-canvas-sunken">キャンセル</button>
                 <button
                   type="button"
                   onClick={() => void saveMemo()}
@@ -839,7 +839,7 @@ export default function EmailThread({
           </p>
         )}
         {error && <p className="text-danger mb-2 text-xs">{error}</p>}
-        <div className="rounded-[10px] border border-[#D0D5DD] bg-canvas p-2 focus-within:border-[#06C755] focus-within:ring-2 focus-within:ring-[#06C755]/15">
+        <div className="rounded-[10px] border border-hairline bg-canvas p-2 focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/15">
           <textarea
             value={reply}
             onChange={(e) => setReplyDraft(e.target.value)}

@@ -334,7 +334,7 @@ export default function TemplatePicker({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-[#101828]/45 p-4"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-ink/45 p-4"
       role="dialog"
       aria-modal="true"
       aria-label="テンプレートを選択"
@@ -342,28 +342,28 @@ export default function TemplatePicker({
     >
       <div
         ref={dialogRef}
-        className="flex h-[min(720px,calc(100vh-32px))] w-[min(920px,calc(100vw-32px))] flex-col overflow-hidden rounded-[14px] border border-[#E5E7EB] bg-canvas shadow-2xl"
+        className="flex h-[min(720px,calc(100vh-32px))] w-[min(920px,calc(100vw-32px))] flex-col overflow-hidden rounded-[14px] border border-hairline bg-canvas shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <header className="flex items-start justify-between gap-4 border-b border-[#E5E7EB] px-6 py-5">
+        <header className="flex items-start justify-between gap-4 border-b border-hairline px-6 py-5">
           <div>
-            <h2 className="text-lg font-bold text-[#1F2937]">テンプレートを選択</h2>
-            <p className="mt-1 text-xs leading-relaxed text-[#667085]">
+            <h2 className="text-lg font-bold text-ink">テンプレートを選択</h2>
+            <p className="mt-1 text-xs leading-relaxed text-ink-faint">
               選択した内容を入力欄へ入れます。この操作だけでは送信されません。
             </p>
           </div>
           <button
             onClick={onClose}
             aria-label="閉じる"
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-lg leading-none text-[#667085] hover:bg-[#F2F4F7] hover:text-[#1F2937]"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-lg leading-none text-ink-faint hover:bg-shell hover:text-ink"
           >
             ✕
           </button>
         </header>
 
-        <div className="grid gap-3 border-b border-[#E5E7EB] px-6 py-4 md:grid-cols-[1fr_240px]">
+        <div className="grid gap-3 border-b border-hairline px-6 py-4 md:grid-cols-[1fr_240px]">
           <div className="relative">
-            <svg className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-[#98A2B3]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            <svg className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-ink-faint" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
             <input
               ref={searchInputRef}
               type="search"
@@ -371,7 +371,7 @@ export default function TemplatePicker({
               onChange={(e) => setSearch(e.target.value)}
               placeholder="テンプレート名・本文で検索"
               aria-label="テンプレート名・本文で検索"
-              className="w-full rounded-lg border border-[#E5E7EB] py-2.5 pr-3 pl-9 text-sm outline-none focus:border-[#06C755] focus:ring-2 focus:ring-[#06C755]/15"
+              className="w-full rounded-lg border border-hairline py-2.5 pr-3 pl-9 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/15"
             />
           </div>
           <TemplateFolderSelect
@@ -393,7 +393,7 @@ export default function TemplatePicker({
             md 未満では高さを画面の45%に留め、下のプレビューと操作へ
             続けて届くようにする。md 以上はグリッドの残り高を使う。
           */}
-          <div className="max-h-[45dvh] min-h-0 overflow-y-auto border-b border-[#E5E7EB] bg-[#F7F8F6] p-3 md:max-h-none md:border-b-0 md:border-r">
+          <div className="max-h-[45dvh] min-h-0 overflow-y-auto border-b border-hairline bg-canvas-sunken p-3 md:max-h-none md:border-b-0 md:border-r">
             <div className="mb-2 flex flex-wrap items-center gap-1.5">
               {[
                 { key: 'all' as const, label: 'すべて' },
@@ -406,7 +406,7 @@ export default function TemplatePicker({
                   type="button"
                   onClick={() => setCategory(item.key)}
                   aria-pressed={category === item.key}
-                  className={`rounded-md border px-2.5 py-1.5 text-xs font-semibold ${category === item.key ? 'border-[#A6E7BD] bg-[#EAFBF0] text-[#057A37]' : 'border-[#E5E7EB] bg-canvas text-[#667085] hover:bg-[#F2F4F7]'}`}
+                  className={`rounded-md border px-2.5 py-1.5 text-xs font-semibold ${category === item.key ? 'border-accent-border bg-accent-soft text-accent-deep' : 'border-hairline bg-canvas text-ink-faint hover:bg-shell'}`}
                 >
                   {item.label}
                 </button>
@@ -424,7 +424,7 @@ export default function TemplatePicker({
                   まとめて選ぶ
                 </button>
               ) : null}
-              <span className="ml-auto text-[11px] text-[#98A2B3]">
+              <span className="ml-auto text-[11px] text-ink-faint">
                 {visibleTemplatesStatus === 'ready' ? `${total}件` : '—'}
               </span>
             </div>
@@ -433,7 +433,7 @@ export default function TemplatePicker({
               1件も無いときは、推測ではなく実績が無いことを先に断る。
             */}
             {category === 'frequent' && visibleTemplatesStatus === 'ready' && shown.length > 0 && !frequentHasUsage ? (
-              <p className="mb-2 text-[11px] leading-relaxed text-[#98A2B3]">
+              <p className="mb-2 text-[11px] leading-relaxed text-ink-faint">
                 まだ送信・使用の実績がないため、実績順ではなく登録順で表示しています。
               </p>
             ) : null}
@@ -442,7 +442,7 @@ export default function TemplatePicker({
             ) : visibleTemplatesStatus === 'error' ? (
               <p className="px-4 py-10 text-center text-sm text-danger">テンプレートを読み込めませんでした。もう一度開き直してください。</p>
             ) : shown.length === 0 ? (
-              <p className="px-4 py-10 text-center text-sm text-[#98A2B3]">
+              <p className="px-4 py-10 text-center text-sm text-ink-faint">
                 {/*
                   PERF-12: 絞り込み中の0件は「見つからない」、無条件の0件は
                   「まだ無い」。届いた分だけを絞った見かけ上の0と区別する。
@@ -472,10 +472,10 @@ export default function TemplatePicker({
                       aria-pressed={packMode ? inPack : selected?.id === template.id}
                       className={`w-full rounded-lg border px-3 py-3 text-left ${inPack || (!packMode && selected?.id === template.id) ? 'border-accent-border bg-accent-soft' : 'border-shell-gray bg-canvas hover:bg-canvas-sunken'}`}
                     >
-                      <p className="truncate text-sm font-semibold text-[#1F2937]" title={template.name}>
+                      <p className="truncate text-sm font-semibold text-ink" title={template.name}>
                         {inPack ? `${packIndex + 1}. ` : ''}{template.name}
                       </p>
-                      <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-[#667085]">{template.messageContent}</p>
+                      <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-ink-faint">{template.messageContent}</p>
                     </button>
                   </li>
                   )
@@ -492,7 +492,7 @@ export default function TemplatePicker({
                   type="button"
                   onClick={loadMore}
                   disabled={loadingMore}
-                  className="rounded-full border border-[#E5E7EB] bg-canvas px-3 py-1.5 text-xs font-semibold text-[#2563EB] hover:bg-[#F2F4F7] disabled:opacity-50"
+                  className="rounded-full border border-hairline bg-canvas px-3 py-1.5 text-xs font-semibold text-action hover:bg-shell disabled:opacity-50"
                 >
                   {loadingMore ? '読み込み中...' : `さらに表示（残り${total - templates.length}件）`}
                 </button>
@@ -528,26 +528,26 @@ export default function TemplatePicker({
             {selected ? (
               <div>
                 <div className="flex items-center justify-between gap-3">
-                  <h3 className="text-base font-bold text-[#1F2937]">{selected.name}</h3>
-                  {category === 'frequent' && <span className="rounded-lg border border-[#F6D68A] bg-[#FFF8E7] px-2.5 py-1.5 text-xs font-semibold text-[#B45309]">☆ よく使う</span>}
+                  <h3 className="text-base font-bold text-ink">{selected.name}</h3>
+                  {category === 'frequent' && <span className="rounded-lg border border-status-warn bg-status-warn-soft px-2.5 py-1.5 text-xs font-semibold text-status-warn-deep">☆ よく使う</span>}
                 </div>
-                <p className="mt-5 text-xs font-semibold text-[#667085]">送信内容のプレビュー</p>
-                <div className="mt-3 min-h-[250px] rounded-[12px] bg-[#7292BD] p-5 shadow-card">
-                  <div className="flex justify-center"><span className="rounded-full bg-canvas/85 px-3 py-1 text-[11px] text-[#667085]">今日</span></div>
-                  <div className="mt-4 max-w-[78%] rounded-[12px] rounded-tl-[4px] bg-canvas px-4 py-3 text-sm leading-6 whitespace-pre-wrap text-[#344054] shadow-sm">{previewContent ?? selected.messageContent}</div>
+                <p className="mt-5 text-xs font-semibold text-ink-faint">送信内容のプレビュー</p>
+                <div className="mt-3 min-h-[250px] rounded-[12px] bg-line-talk p-5 shadow-card">
+                  <div className="flex justify-center"><span className="rounded-full bg-canvas/85 px-3 py-1 text-[11px] text-ink-faint">今日</span></div>
+                  <div className="mt-4 max-w-[78%] rounded-[12px] rounded-tl-[4px] bg-canvas px-4 py-3 text-sm leading-6 whitespace-pre-wrap text-ink-secondary shadow-sm">{previewContent ?? selected.messageContent}</div>
                 </div>
                 {previewContent !== null && resolvedPreview?.unresolved.length ? (
                   <p className="mt-3 text-xs leading-6 text-danger" role="alert">
                     解決できない差し込みがあります: {resolvedPreview.unresolved.map((v) => `{{${v}}}`).join(' ')}。このまま送信するとエラーになります。
                   </p>
                 ) : null}
-                <div className="mt-3 rounded-lg bg-[#F7F8F6] px-4 py-3 text-xs leading-6 text-[#667085]">
+                <div className="mt-3 rounded-lg bg-canvas-sunken px-4 py-3 text-xs leading-6 text-ink-faint">
                   この操作ではまだ送信されません。入力欄へ内容を挿入します。<br />
                   種類：テキスト
                 </div>
               </div>
             ) : (
-              <p className="mt-10 text-center text-sm text-[#98A2B3]">左からテンプレートを選択してください。</p>
+              <p className="mt-10 text-center text-sm text-ink-faint">左からテンプレートを選択してください。</p>
             )}
           </section>
         </div>
@@ -560,15 +560,15 @@ export default function TemplatePicker({
           現在の選択名を操作の直上に固定して出す。押す直前に
           何を挿入するかが画面に残る。
         */}
-        <footer className="border-t border-[#E5E7EB] bg-canvas px-6 py-4">
+        <footer className="border-t border-hairline bg-canvas px-6 py-4">
           {selected ? (
-            <p className="mb-1 truncate text-xs font-semibold text-[#344054] md:hidden" title={selected.name}>
+            <p className="mb-1 truncate text-xs font-semibold text-ink-secondary md:hidden" title={selected.name}>
               選択中: {selected.name}
             </p>
           ) : (
-            <p className="mb-1 text-xs text-[#98A2B3] md:hidden">テンプレートが選択されていません</p>
+            <p className="mb-1 text-xs text-ink-faint md:hidden">テンプレートが選択されていません</p>
           )}
-          <p className="text-xs text-[#667085]">
+          <p className="text-xs text-ink-faint">
             {packMode
               ? '選んだ順にまとめて送ります。送る前に確認画面が出ます。'
               : '入力後に文章を編集してから送信できます。'}
@@ -576,7 +576,7 @@ export default function TemplatePicker({
           <div className="mt-3 flex flex-wrap justify-end gap-2">
             <button
               onClick={onClose}
-              className="min-h-11 whitespace-nowrap rounded-lg border border-[#E5E7EB] bg-canvas px-4 py-2 text-sm font-semibold text-[#667085] hover:bg-[#F7F8F6]"
+              className="min-h-11 whitespace-nowrap rounded-lg border border-hairline bg-canvas px-4 py-2 text-sm font-semibold text-ink-faint hover:bg-canvas-sunken"
             >
               キャンセル
             </button>
