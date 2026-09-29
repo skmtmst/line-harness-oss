@@ -271,6 +271,8 @@ describe('新規作成画面: 予約後に付けるタグ', () => {
     expect(fixture.createMenu).toHaveBeenCalledWith(
       'account-b',
       expect.objectContaining({ auto_tag_id: null }),
+      // R535: 作成試行の一意キーも一緒に送る。
+      expect.any(String),
     )
   })
 
@@ -288,6 +290,8 @@ describe('新規作成画面: 予約後に付けるタグ', () => {
     expect(fixture.createMenu).toHaveBeenCalledWith(
       'account-a',
       expect.objectContaining({ auto_tag_id: 'tag-active' }),
+      // R535: 作成試行の一意キーも一緒に送る。
+      expect.any(String),
     )
   })
 
