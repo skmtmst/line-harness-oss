@@ -13,6 +13,7 @@ import NoteBar from '@/components/shared/note-bar'
 import { useAccount } from '@/contexts/account-context'
 import { publicationStateLabel } from '@/components/webinars/publication-label'
 import { webinarErrorText } from '@/components/webinars/webinar-error-text'
+import { isOwnerOrAdmin } from '@/lib/staff-capability'
 
 type PublishedWebinar = Webinar & {
   publicationState?: 'period' | 'always' | 'scheduled' | 'ended' | 'unset' | null
@@ -40,6 +41,14 @@ function PublishedWebinarContent() {
   const [missing, setMissing] = useState(false)
   const [notice, setNotice] = useState('')
   const [busy, setBusy] = useState(false)
+  /*
+   * D001: 一時停止・通知テスト・複製の口は owner/admin だけ（Worker の
+   * requireRole とそろえる）。閲覧だけの担当者には押せる口を出さず、
+   * 理由を添える（テンプレート詳細 N-144 と同じ出し分け）。
+   * 読み取り（GET）は staff も通るので、編集画面への行き来は残す。
+   */
+  const [canMutateWebinars] = useState(() =>
+    typeof window === 'undefined' ? true : isOwnerOrAdmin())
 
   const load = useCallback(async () => {
     if (!id) {
@@ -167,7 +176,7 @@ function PublishedWebinarContent() {
           <div className="mt-5 flex flex-wrap justify-center gap-3"><Button href="/webinars">ウェビナー一覧へ</Button><Button variant="primary" href={`/webinars/edit?id=${encodeURIComponent(webinar.id)}&pane=participants`}>参加状況を確認</Button>{publicUrl ? <Button href={publicUrl} target="_blank" rel="noreferrer">公開ページを見る</Button> : null}</div>
         </section>
         <aside className="space-y-4">
-          <section className="border-hairline bg-canvas rounded-card border p-5 shadow-card"><h2 className="text-ink font-bold">次にできること</h2><p className="text-ink-faint mt-1 text-xs">公開中でも下書き版を作り、安全に内容を変更できます。</p><div className="mt-4 grid gap-2"><Button disabled={busy} onClick={() => void run('pause')}>公開を一時停止</Button><Button href={`/webinars/edit?id=${encodeURIComponent(webinar.id)}`}>ウェビナーを編集</Button><Button disabled={busy} onClick={() => void run('test')}>通知をテスト</Button><Button disabled={busy} onClick={() => void run('duplicate')}>ウェビナーを複製して作成</Button></div></section>
+          <section className="border-hairline bg-canvas rounded-card border p-5 shadow-card"><h2 className="text-ink font-bold">次にできること</h2><p className="text-ink-faint mt-1 text-xs">公開中でも下書き版を作り、安全に内容を変更できます。</p><div className="mt-4 grid gap-2">{canMutateWebinars ? <Button disabled={busy} onClick={() => void run('pause')}>公開を一時停止</Button> : null}<Button href={`/webinars/edit?id=${encodeURIComponent(webinar.id)}`}>ウェビナーを編集</Button>{canMutateWebinars ? <Button disabled={busy} onClick={() => void run('test')}>通知をテスト</Button> : null}{canMutateWebinars ? <Button disabled={busy} onClick={() => void run('duplicate')}>ウェビナーを複製して作成</Button> : null}{canMutateWebinars ? null : <p className="text-ink-secondary text-xs">公開の変更（停止・通知テスト・複製）はオーナーか管理者が行います。必要なときは依頼してください。</p>}</div></section>
           <section className="border-hairline bg-canvas rounded-card border p-5 shadow-card"><h2 className="text-ink font-bold">監視中</h2><p className="text-ink-faint mt-1 text-xs">問題が起きた場合だけ表示します。</p><div className="mt-4 space-y-3">{[
             ['通知失敗', editor.monitoring.notificationFailures],
             ['申込重複', editor.monitoring.duplicateRegistrations],
