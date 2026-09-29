@@ -565,13 +565,14 @@ automations.post(
   async (c) => {
     const accountId = await requireDraftAccount(c);
     if (typeof accountId !== 'string') return accountId;
-    const body = await c.req.json<{ expectedDraftVersionId?: unknown; activate?: unknown }>()
-      .catch((): { expectedDraftVersionId?: unknown; activate?: unknown } => ({}));
+    const body = await c.req.json<{ expectedDraftVersionId?: unknown; activate?: unknown; expectedStatus?: unknown }>()
+      .catch((): { expectedDraftVersionId?: unknown; activate?: unknown; expectedStatus?: unknown } => ({}));
     return draftEndpoint(c, () => publishAutomationDraft(c.env.DB, {
       id: c.req.param('id'),
       lineAccountId: accountId,
       expectedDraftVersionId: body.expectedDraftVersionId,
       activate: body.activate,
+      expectedStatus: body.expectedStatus,
     }));
   },
 );
@@ -645,14 +646,15 @@ automations.post(
   async (c) => {
     const accountId = await requireDraftAccount(c);
     if (typeof accountId !== 'string') return accountId;
-    const body = await c.req.json<{ versionId?: unknown; friendId?: unknown }>()
-      .catch((): { versionId?: unknown; friendId?: unknown } => ({}));
+    const body = await c.req.json<{ versionId?: unknown; friendId?: unknown; operationKey?: unknown }>()
+      .catch((): { versionId?: unknown; friendId?: unknown; operationKey?: unknown } => ({}));
     return definitionEndpoint(c, () => runAutomationTest(c.env.DB, {
       automationId: c.req.param('id'),
       versionId: body.versionId,
       friendId: body.friendId,
       lineAccountId: accountId,
       credentialEncryptionKey: c.env.LINE_CREDENTIAL_ENCRYPTION_KEY,
+      operationKey: body.operationKey,
     }));
   },
 );
@@ -717,10 +719,17 @@ automations.get(
       (row) => mapExecutionRun(row, holdReasons.get(row.line_account_id) ?? null),
     );
     if (wantsCsv) {
+      /*
+       * R495: 上限5,000件で切れたことを黙らせない。総件数と出力件数を
+       * 応答の頭に載せ、切れたかどうかを使い手へ知らせる（画面が読む）。
+       */
       return new Response(executionRunsCsv(items), {
         headers: {
           'Content-Type': 'text/csv; charset=utf-8',
           'Content-Disposition': 'attachment; filename="automation-runs.csv"',
+          'X-Csv-Total-Count': String(result.total),
+          'X-Csv-Returned-Count': String(items.length),
+          'X-Csv-Truncated': result.total > items.length ? '1' : '0',
         },
       });
     }

@@ -319,6 +319,13 @@ export async function runAutomationTest(
     friendId: unknown;
     lineAccountId: string;
     credentialEncryptionKey?: string;
+    /**
+     * 同じ確認画面の操作を識別する鍵（R484）。確認を開くたびに画面が振る。
+     * 応答が失われたあとの再試行は同じ鍵で来るので、2件目の実行を作らず
+     * 初回の実行を返す。鍵が無い・形が違う呼び出しは古い画面と見て、
+     * 従来どおり新しい実行を作る。
+     */
+    operationKey?: unknown;
   },
 ): Promise<{ runId: string; versionId: string; status: RunStatus | 'busy' }> {
   /*
@@ -359,13 +366,40 @@ export async function runAutomationTest(
     `SELECT 1 AS ok FROM friends f
       WHERE f.id = ? AND f.line_account_id = ? AND (${where.sql}) LIMIT 1`,
   ).bind(friendId, input.lineAccountId, ...where.bindings).first<{ ok: number }>();
-  const requestId = crypto.randomUUID();
+  /*
+   * R484: 同じ確認の再試行は同じ鍵で来る。先に初回の実行を探し、
+   * あれば作らずにそれを返す（副作用は1件のまま）。
+   * 応答が届く前に止まった再試行（まだ queued/waiting）もここで拾うので、
+   * 作り直して二重に送ることはない。
+   */
+  const operationKey = typeof input.operationKey === 'string' ? input.operationKey.trim() : '';
+  const idempotencyKey = /^[A-Za-z0-9._-]{8,128}$/.test(operationKey)
+    ? `manual-test:${operationKey}`
+    : `manual-test:${crypto.randomUUID()}`;
+  const previous = await db.prepare(
+    `SELECT id, status, automation_version_id
+       FROM automation_runs
+      WHERE line_account_id = ? AND automation_id = ? AND idempotency_key = ?`,
+  ).bind(input.lineAccountId, input.automationId, idempotencyKey).first<{
+    id: string;
+    status: RunStatus;
+    automation_version_id: string;
+  }>();
+  if (previous) {
+    // 同じ鍵で版が違う＝確認したときと中身が違う。送らずに競合で返す。
+    if (previous.automation_version_id !== version.version_id) {
+      throw new AutomationDefinitionError(
+        'version_conflict', '確認したあとに下書きが変わりました。送っていません。もう一度、送る内容を確認してください',
+      );
+    }
+    return { runId: previous.id, versionId: previous.automation_version_id, status: previous.status };
+  }
   const started = await startAutomationRun(db, {
     lineAccountId: input.lineAccountId,
     automationId: input.automationId,
     automationVersionId: version.version_id,
-    sourceEventId: `manual-test:${requestId}`,
-    idempotencyKey: `manual-test:${requestId}`,
+    sourceEventId: idempotencyKey,
+    idempotencyKey,
     friendId,
     inputEvent: { type: 'manual_test' },
     conditionMatched: !!match,

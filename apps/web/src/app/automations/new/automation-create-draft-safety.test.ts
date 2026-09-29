@@ -282,7 +282,7 @@ async function attachApiMock(page: Page, options: { slowCreate?: boolean; slowTe
     if (/^\/api\/automations\/[^/]+\/test$/.test(url.pathname)) {
       state.testCalls.push(call)
       if (options.slowTest) await testBarrier
-      await json(route, { success: true, data: { runId: 'run-1', versionId: 'version', status: 'accepted' } })
+      await json(route, { success: true, data: { runId: 'run-1', versionId: 'version', status: 'queued' } })
       return
     }
 
@@ -718,9 +718,13 @@ describe('V6 ルールを作る（Rv8Jv）の誤操作防止（#679）', () => {
     // 送るのは「確認に使った札」そのもの。保存でできた新しい札である。
     const storedRevision = (await storedDraftsOf(page))[ACCOUNT_A]?.draftVersionId
     expect(storedRevision).toBe('draft-account-a-1-r1')
-    expect(api.testCalls[0]?.body).toEqual({ versionId: storedRevision, friendId: 'friend-001' })
+    expect(api.testCalls[0]?.body).toEqual({
+      versionId: storedRevision,
+      friendId: 'friend-001',
+      operationKey: expect.stringMatching(/^[A-Za-z0-9._-]{8,128}$/),
+    })
     api.releaseTest()
-    await page.getByText('1人テストを受け付けました（状態: accepted）').waitFor()
+    await page.getByText('1人テストを受け付けました（受け付け済み）。結果は下の実行から確認できます。').waitFor()
     expect(api.testCalls).toHaveLength(1)
   }, 60_000)
 
@@ -774,11 +778,15 @@ describe('V6 ルールを作る（Rv8Jv）を本物のWorkerに繋いだとき�
     const retried = await openTestConfirmation(page, FRIEND_A)
     expect(await retried.innerText()).toContain('メッセージ「別タブが書き換えた文面です。」')
     await retried.getByRole('button', { name: 'この内容で送る' }).click()
-    await page.getByText('1人テストを受け付けました（状態:', { exact: false }).waitFor()
+    await page.getByText('1人テストを受け付けました（', { exact: false }).waitFor()
     expect(worker.testCalls).toHaveLength(1)
     const retriedRevision = (await storedDraftsOf(page))[ACCOUNT_A]?.draftVersionId
     expect(versionRowId(retriedRevision as string)).toBe(afterOther.versionId)
-    expect(worker.testCalls[0]?.body).toEqual({ versionId: retriedRevision, friendId: FRIEND_A })
+    expect(worker.testCalls[0]?.body).toEqual({
+      versionId: retriedRevision,
+      friendId: FRIEND_A,
+      operationKey: expect.stringMatching(/^[A-Za-z0-9._-]{8,128}$/),
+    })
   }, 90_000)
 
   /*

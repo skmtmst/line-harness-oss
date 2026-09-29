@@ -34,6 +34,7 @@ import ConditionBuilder, {
 // owner/admin は常に通り、権限キーを持つスタッフも通す。表示の判定は
 // 共通アクションと同じフック1本に寄せる（サーバの認可が正本）。
 import { useCanManageCommonActions } from '@/components/automations/use-common-action-permission'
+import { isoToJstDatetimeLocal } from '@/components/automations/automation-datetime'
 import styles from './new-automation.module.css'
 import Button from '@/components/shared/button'
 import {
@@ -432,10 +433,18 @@ interface FormSnapshot {
   /* DETAIL-15: 保存の状態は控えごと持ち、切り替えても正しく戻る。 */
   savedAt: number | null
   savedFingerprint: string | null
-  saveOutcome: 'idle' | 'saved' | 'failed'
+  /*
+   * R491: 公開まで済んだら 'published' で控える。戻ったときに未公開の
+   * 下書きと受け取って作り直し、稼働ルールを2件にしないため。
+   */
+  saveOutcome: 'idle' | 'saved' | 'failed' | 'published'
+  /** 公開済みのときだけ、元のルールの番号。 */
+  publishedDefinitionId: string | null
   previewCount: number | null
   /* AUTOMATION-03: 人数の確認は保存とは別の成否。失敗したことだけ控える。 */
   previewFailed: boolean
+  /** R488: 受け付けた1人テストの実行。戻ったときは要求IDで読み直す。 */
+  testRun: TestRunRecord | null
 }
 
 const blankFormSnapshot = (): FormSnapshot => ({
@@ -451,8 +460,10 @@ const blankFormSnapshot = (): FormSnapshot => ({
   savedAt: null,
   savedFingerprint: null,
   saveOutcome: 'idle',
+  publishedDefinitionId: null,
   previewCount: null,
   previewFailed: false,
+  testRun: null,
 })
 
 /** 何か入力されているか。空のまま切り替えただけなら控えを残さない。 */
@@ -559,13 +570,8 @@ const draftPayloadFingerprint = (form: {
   actions: form.actions.map(actionDraftToPayload),
 })
 
-/** ISOの日時を、画面の datetime-local（日本時間）の文字へ戻す。 */
-const isoToDatetimeLocal = (iso: string): string => {
-  const time = Date.parse(iso)
-  if (!Number.isFinite(time)) return ''
-  // 保存時は `${local}:00+09:00` として送っているので、戻すときも日本時間基準。
-  return new Date(time + 9 * 60 * 60 * 1000).toISOString().slice(0, 16)
-}
+/** ISOの日時を、画面の datetime-local（日本時間）の文字へ戻す。実体は共有（R482）。 */
+const isoToDatetimeLocal = isoToJstDatetimeLocal
 
 /**
  * 保存済みの下書きを、この画面の入力の形へ戻す（DETAIL-13の再開）。
@@ -659,7 +665,40 @@ interface TestConfirmation {
   friendId: string
   contents: string[]
   effects: string[]
+  /**
+   * R484: この確認だけの要求キー。応答が失われたあとの再試行も同じ鍵で
+   * 呼び、Worker は2件目の実行を作らず初回を返す。確認を開くたびに振る。
+   */
+  operationKey: string
 }
+
+/**
+ * R488: 受け付けた1人テストの実行。状態は日本語で出し、同じ実行の
+ * 結果へ飛べるように実行IDを持つ。新規実行と結果確認を混同させない。
+ */
+interface TestRunRecord {
+  runId: string
+  /** Worker が返したままの状態（queued/waiting/success/...）。 */
+  status: string
+  accountId: string
+  at: number
+}
+
+/** 1人テストの実行状態を日本語で出す（R488：生の `waiting` は出さない）。 */
+const TEST_RUN_STATUS_LABEL: Record<string, string> = {
+  queued: '受け付け済み',
+  running: '動いています',
+  waiting: '待機中',
+  success: '終わりました',
+  partial: '一部だけ終わりました',
+  // 失敗の文は立て直し方まで書く（error-copy-recovery-contract）。次の手は下の「実行の結果を見る」。
+  failed: '失敗しました。実行の結果を見てください。',
+  cancelled: '取りやめました',
+  skipped_condition: '条件に外れて動きませんでした',
+  busy: '混み合っています',
+}
+
+const testRunStatusLabel = (status: string): string => TEST_RUN_STATUS_LABEL[status] ?? '確認中'
 
 /**
  * タグ・シナリオの選択行(#734: 借金を増やさないため1つにまとめた)。
@@ -758,13 +797,27 @@ export default function NewAutomationPage() {
   /* このアカウントに前に保存した下書きがある、という案内にだけ使う控え。 */
   const [storedDraftHint, setStoredDraftHint] = useState<StoredDraft | null>(null)
   /* DETAIL-15: 未保存・保存中・保存済み・保存後の変更・失敗を1つの状態から出す。 */
-  const [saveOutcome, setSaveOutcome] = useState<'idle' | 'saved' | 'failed'>('idle')
+  const [saveOutcome, setSaveOutcome] = useState<'idle' | 'saved' | 'failed' | 'published'>('idle')
+  /* R491: 公開済みで戻ったとき、元のルールへ案内するための番号。 */
+  const [publishedRuleId, setPublishedRuleId] = useState<string | null>(null)
+  /* R488: 受け付けた1人テストの実行。 */
+  const [testRun, setTestRun] = useState<TestRunRecord | null>(null)
   const [savedAt, setSavedAt] = useState<number | null>(null)
   const [savedFingerprint, setSavedFingerprint] = useState<string | null>(null)
   // 画面の描き直しを待たずに二重押しを止める鍵（N-357・N-358）。
   const saveRunningRef = useRef(false)
   const testRunningRef = useRef(false)
   const prepareRunningRef = useRef(false)
+  /*
+   * R485: 送信前の読み取り待ちに取消の番号を持たせる。「やめる」を押すと
+   * 番号が進み、遅れて返った読み取りは送信へ進まない。
+   */
+  const testTicketRef = useRef(0)
+  /*
+   * R491: 公開待ちの応答を要求の世代で照合する。アカウントごとに保存の
+   * 番号を振り、切替後に届いた古い応答で画面を戻さない。
+   */
+  const saveTicketRef = useRef<Record<string, number>>({})
   const selectedAccountRef = useRef(selectedAccountId)
   selectedAccountRef.current = selectedAccountId
   /*
@@ -803,8 +856,10 @@ export default function NewAutomationPage() {
     savedAt,
     savedFingerprint,
     saveOutcome,
+    publishedDefinitionId: publishedRuleId,
     previewCount,
     previewFailed,
+    testRun,
   })
 
   /** 控えを画面へ戻す。eventType の切替で詳細設定が消えないよう印を付ける。 */
@@ -822,8 +877,10 @@ export default function NewAutomationPage() {
     setSavedAt(snapshot.savedAt)
     setSavedFingerprint(snapshot.savedFingerprint)
     setSaveOutcome(snapshot.saveOutcome)
+    setPublishedRuleId(snapshot.publishedDefinitionId)
     setPreviewCount(snapshot.previewCount)
     setPreviewFailed(snapshot.previewFailed)
+    setTestRun(snapshot.testRun)
   }
 
   /*
@@ -959,6 +1016,12 @@ export default function NewAutomationPage() {
     if (stashed) {
       if (stashed.savedDraft && selectedAccountId) draftByAccountRef.current[selectedAccountId] = stashed.savedDraft
       applyFormSnapshot(stashed)
+      // R488・第145回: 受け付けた実行があれば状態を読み直す。待機が
+      // 終わっていれば、その結果に戻る。公開済みの控えは元ルールへ案内する。
+      if (stashed.testRun && selectedAccountId) void refreshTestRun(stashed.testRun, selectedAccountId)
+      if (stashed.saveOutcome === 'published' && stashed.publishedDefinitionId) {
+        setNotice('この内容はすでに公開済みです。一覧で確認できます。')
+      }
       // URLの再開先も切り替え先の下書き（または無し）へ置き換える。
       const nextTarget = stashed.savedDraft?.id ?? null
       setResumeTarget(nextTarget)
@@ -1051,8 +1114,10 @@ export default function NewAutomationPage() {
           savedAt: null,
           savedFingerprint: fingerprint,
           saveOutcome: 'saved',
+          publishedDefinitionId: null,
           previewCount: null,
           previewFailed: false,
+          testRun: null,
         }
         setResumeStatus('ready')
         setNotice('保存した下書きを読み込みました。続きを直せます。')
@@ -1288,7 +1353,9 @@ export default function NewAutomationPage() {
     : blockedReason ?? (
         saveOutcome === 'failed'
           ? '保存できませんでした。入力した内容は残っています'
-          : saveOutcome === 'saved'
+          : saveOutcome === 'published'
+            ? '公開しました。一覧で確認できます'
+            : saveOutcome === 'saved'
             ? [
                 dirtySinceSave
                   ? '保存したあとに内容を変更しています'
@@ -1336,6 +1403,22 @@ export default function NewAutomationPage() {
     }
   }
 
+  /**
+   * R490: 下書きが消えていたら、公開済みの定義として残っているか照合する。
+   * 公開の応答が失われたあとの再試行で、新しい下書きを作る前に呼ぶ。
+   * 公開済み（動いている・止めている）が見つかれば true。
+   */
+  const reconcilePublishedDraft = async (accountId: string, draftId: string): Promise<boolean> => {
+    try {
+      const list = await api.automations.list({ accountId })
+      if (!list.success) return false
+      const found = list.data.find((item) => item.id === draftId)
+      return !!found && (found.status === 'active' || found.status === 'stopped')
+    } catch {
+      return false
+    }
+  }
+
   const save = async (activate: boolean) => {
     // N-357: 連打で下書きが2つできないよう、描き直しより先に鍵をかける。
     if (saveRunningRef.current) return
@@ -1366,6 +1449,25 @@ export default function NewAutomationPage() {
     }
     const fingerprint = canonicalJson(payload)
     const formAtSave = captureFormSnapshot()
+    /*
+     * R491: すでに公開済みの内容をそのまま「つくって動かす」と、
+     * 同じ稼働ルールが2件になる。変えていないなら一覧へ案内し、
+     * 変えた後なら新しいルールとして作る（明示的な作り直し）。
+     */
+    if (saveOutcome === 'published' && publishedRuleId && savedFingerprint === fingerprint) {
+      setError('この内容はすでに公開済みです。一覧で確認してください。')
+      setNotice('')
+      router.push(`/automations?highlight=${publishedRuleId}`)
+      return
+    }
+    // R491: 公開待ちの応答を要求の世代で照合するための番号。
+    const saveTicket = (saveTicketRef.current[accountId ?? ''] ?? 0) + 1
+    if (accountId) saveTicketRef.current[accountId] = saveTicket
+    // R490: 公開の POST まで進んだか。再試行の案内と照合に使う。
+    let publishAttempted = false
+    let publishDraftId: string | null = null
+    // R490: 照合は catch からも触るので、try の外で持つ。
+    let draft: StoredDraft | null = null
     try {
       if (!accountId) throw new Error('LINE公式アカウントを選んでください')
       /*
@@ -1374,7 +1476,7 @@ export default function NewAutomationPage() {
        * 前に保存した別の下書きや、別の店の下書きを上書きすることはない。
        * 結び付いていなければ新しい下書きを作る（新規作成＝新規ID）。
        */
-      let draft = draftByAccountRef.current[accountId] ?? null
+      draft = draftByAccountRef.current[accountId] ?? null
       if (!draft) {
         /*
          * DETAIL-13: 作成操作の冪等鍵。まだ下書きが無い保存のたびに振り直すと、
@@ -1414,12 +1516,17 @@ export default function NewAutomationPage() {
         savedAt: savedTime,
         savedFingerprint: fingerprint,
         saveOutcome: 'saved',
+        publishedDefinitionId: null,
+        // 保存し直したら前の1人テストの結果は古い内容のもの。残さない。
+        testRun: null,
       }
       bindAccountDraft(accountId, draft)
       if (selectedAccountRef.current === accountId) {
         setSavedAt(savedTime)
         setSavedFingerprint(fingerprint)
         setSaveOutcome('saved')
+        setPublishedRuleId(null)
+        setTestRun(null)
         setStoredDraftHint(null)
         // 再読込・「戻る」でこの下書きへ戻れるよう、URLへ番号を載せる。
         // 再開では番号と中身・版を一緒に読むので、空の画面からの
@@ -1440,18 +1547,72 @@ export default function NewAutomationPage() {
         }
         return
       }
-      const published = await api.automations.publishDraft(draft.id, accountId, draft.draftVersionId, true)
+      /*
+       * R483: 新規作成の下書きは状態が draft のはず。読み取り後の停止・再開を
+       * 読んだ時点の状態で上書きしないよう、見た状態を条件に入れる。
+       */
+      publishAttempted = true
+      publishDraftId = draft.id
+      const published = await api.automations.publishDraft(draft.id, accountId, draft.draftVersionId, true, 'draft')
       if (!published.success) throw new Error(published.error)
       // 公開したら下書きは無くなるので控えも捨てる。
       clearStoredDraft(accountId)
       bindAccountDraft(accountId, null)
-      if (selectedAccountRef.current === accountId) router.push(`/automations?highlight=${draft.id}`)
+      if (selectedAccountRef.current === accountId
+        && saveTicketRef.current[accountId] === saveTicket) {
+        router.push(`/automations?highlight=${draft.id}`)
+      } else {
+        /*
+         * R491: 別の店を見ている間に公開が済んだ。控えを「公開済み」にして、
+         * 戻ったときに未公開の下書きと受け取って作り直さないようにする。
+         * 古い番号の応答（世代が違う）は何も書かない。
+         */
+        if (saveTicketRef.current[accountId] === saveTicket) {
+          const stashed = formStashRef.current[accountId]
+          if (stashed) {
+            stashed.savedDraft = null
+            stashed.saveOutcome = 'published'
+            stashed.publishedDefinitionId = draft.id
+          }
+        }
+      }
     } catch (caught) {
       // 下書き自体が無くなっていたら控えを捨て、次は作り直す（N-357）。
       if (
         caught instanceof ApiError &&
         (caught.status === 404 || caught.status === 409 || caught.code === 'not_found' || caught.code === 'version_conflict')
       ) {
+        /*
+         * R490: 動かし始める操作で下書きが404/409のときは、公開済みか先に
+         * 照合する。公開の応答が失われたあとの再試行では、更新の404が
+         * 公開済みの合図になる。公開済みなら作り直さず元のルールへ案内し、
+         * 稼働ルールを2件にしない。
+         */
+        if (activate && draft && accountId) {
+          const reconciled = await reconcilePublishedDraft(accountId, draft.id)
+          if (reconciled) {
+            clearStoredDraft(accountId)
+            bindAccountDraft(accountId, null)
+            const stashed = formStashRef.current[accountId]
+            if (stashed) {
+              stashed.savedDraft = null
+              stashed.saveOutcome = 'published'
+              stashed.publishedDefinitionId = draft.id
+              stashed.savedAt = null
+            }
+            if (selectedAccountRef.current === accountId) {
+              setSaveOutcome('published')
+              setPublishedRuleId(draft.id)
+              setResumeTarget(null)
+              syncResumeUrl(null)
+              setNotice('すでに公開されています。一覧で確認できます。')
+              router.push(`/automations?highlight=${draft.id}`)
+            }
+            saveRunningRef.current = false
+            setSaving(false)
+            return
+          }
+        }
         if (accountId) {
           clearStoredDraft(accountId)
           bindAccountDraft(accountId, null)
@@ -1460,6 +1621,7 @@ export default function NewAutomationPage() {
             stashed.saveOutcome = 'idle'
             stashed.savedFingerprint = null
             stashed.savedAt = null
+            stashed.publishedDefinitionId = null
             stashed.previewCount = null
             stashed.previewFailed = false
           }
@@ -1468,6 +1630,7 @@ export default function NewAutomationPage() {
           setSaveOutcome('idle')
           setSavedFingerprint(null)
           setSavedAt(null)
+          setPublishedRuleId(null)
           setPreviewCount(null)
           setPreviewFailed(false)
           // 消えた下書きの番号をURLに残さない。残すと再読込のたびに
@@ -1481,11 +1644,20 @@ export default function NewAutomationPage() {
       }
       if (selectedAccountRef.current === accountId) {
         setSaveOutcome('failed')
-        setError(
-          caught instanceof ApiError || caught instanceof Error
-            ? caught.message
-            : '保存できませんでした',
-        )
+        /*
+         * R490: 公開の POST まで進んだ後の通信切れは、成功か失敗か分からない。
+         * 同じ操作を繰り返す前に一覧で公開済みか確かめるよう案内する。
+         */
+        if (activate && publishAttempted && publishDraftId
+          && !(caught instanceof ApiError && (caught.status === 404 || caught.status === 409))) {
+          setError('通信が切れて結果が分かりませんでした。公開されているか一覧で確認してから、もう一度お試しください。')
+        } else {
+          setError(
+            caught instanceof ApiError || caught instanceof Error
+              ? caught.message
+              : '保存できませんでした',
+          )
+        }
       }
     } finally {
       saveRunningRef.current = false
@@ -1537,6 +1709,8 @@ export default function NewAutomationPage() {
         friendId,
         contents: described.contents,
         effects: described.effects,
+        // R484: 確認を開くたびに新しい鍵。同じ確認の再試行だけが同じ鍵。
+        operationKey: newOperationKey(),
       })
     } catch (caught) {
       if (selectedAccountRef.current !== accountId) return
@@ -1563,10 +1737,32 @@ export default function NewAutomationPage() {
    * 実行記録を作る前にこの指紋と DB の中身を突き合わせ、違えば 409 で返す。
    * 画面側の突き合わせを外しても実送信は起きない（逆変異で確認済み）。
    */
+  /**
+   * R488: 受け付けた実行の状態を読み直す。待機が終わっていれば終わった
+   * 状態に変わる。店が替わっていたら書かない。
+   */
+  const refreshTestRun = async (record: TestRunRecord, accountId: string): Promise<void> => {
+    try {
+      const detail = await api.automations.getRun(record.runId)
+      if (!detail.success) return
+      if (selectedAccountRef.current !== accountId) return
+      const next = { ...record, status: detail.data.status }
+      setTestRun((current) => current && current.runId === record.runId ? next : current)
+      const stashed = formStashRef.current[accountId]
+      if (stashed?.testRun?.runId === record.runId) stashed.testRun = next
+    } catch {
+      // 読み直しの失敗は黙る。古い状態のまま残し、押せばまた読める。
+    }
+  }
+
   const runOnePersonTest = async () => {
     const pending = testConfirmation
     if (!pending || testRunningRef.current) return
     testRunningRef.current = true
+    // R485: 送信前の読み取りに番号を付ける。「やめる」で番号が進んだら、
+    // 遅れて返っても送信へ進まない。
+    const ticket = testTicketRef.current + 1
+    testTicketRef.current = ticket
     setTesting(true)
     setError('')
     const sameAccount = () => selectedAccountRef.current === pending.accountId
@@ -1583,16 +1779,44 @@ export default function NewAutomationPage() {
         }
         return
       }
+      // R485: 読み取り待ちに「やめる」を押されていたら送らない。
+      if (ticket !== testTicketRef.current) return
       const result = await api.automations.test(
         pending.draftId, pending.accountId, pending.friendId, pending.draftVersionId,
+        pending.operationKey,
       )
       if (!result.success) throw new Error(result.error)
-      if (!sameAccount()) return
+      if (!sameAccount()) {
+        /*
+         * 第145回: 待っている間に店を替えたら、前の店の成否をこの画面へ
+         * 書かない。ただし実行は要求IDで読み直せるよう控える。
+         */
+        const stashed = formStashRef.current[pending.accountId]
+        if (stashed) {
+          stashed.testRun = {
+            runId: result.data.runId, status: result.data.status,
+            accountId: pending.accountId, at: Date.now(),
+          }
+        }
+        return
+      }
       setTestConfirmation(null)
-      setNotice(`1人テストを受け付けました（状態: ${result.data.status}）`)
+      const record: TestRunRecord = {
+        runId: result.data.runId, status: result.data.status,
+        accountId: pending.accountId, at: Date.now(),
+      }
+      setTestRun(record)
+      const stashed = formStashRef.current[pending.accountId]
+      if (stashed) stashed.testRun = record
+      setNotice(`1人テストを受け付けました（${testRunStatusLabel(result.data.status)}）。結果は下の実行から確認できます。`)
     } catch (caught) {
       // 待っている間に店を替えたら、前の店の成否をこの画面へ書かない。
       if (!sameAccount()) return
+      // R485: 取りやめた後の失敗は出さない。送っていないので黙って閉じる。
+      if (ticket !== testTicketRef.current) {
+        setTestConfirmation(null)
+        return
+      }
       // Worker が「確認したときと違う」と返したときも、画面側で気づいたときと
       // 同じ扱いにする。古い確認を開いたままにしない。
       if (caught instanceof ApiError && (caught.status === 409 || caught.code === 'version_conflict')) {
@@ -2017,7 +2241,11 @@ export default function NewAutomationPage() {
                 <div className="flex gap-2">
                   <Button
                     variant="secondary"
-                    onClick={() => setTestConfirmation(null)}
+                    onClick={() => {
+                      // R485: 読み取り待ちの送信を止める番号を進める。
+                      testTicketRef.current += 1
+                      setTestConfirmation(null)
+                    }}
                   >
                     やめる
                   </Button>
@@ -2027,6 +2255,47 @@ export default function NewAutomationPage() {
                     onClick={() => void runOnePersonTest()}
                   >
                     {testing ? '送信中...' : 'この内容で送る'}
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+            {/*
+             * R488: 受け付けた1人テストの実行。待機・完了・失敗を日本語で区別し、
+             * 同じ実行の結果へ飛べる。新規実行と結果確認を混同させない。
+             */}
+            {testRun ? (
+              <div className="mt-3 space-y-2 rounded-control border border-hairline bg-canvas-sunken p-3" aria-label="1人テストの実行">
+                <p className="text-xs font-bold text-ink">試した実行：{testRunStatusLabel(testRun.status)}</p>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="secondary"
+                    onClick={() => router.push(`/automations/runs?run=${encodeURIComponent(testRun.runId)}`)}
+                  >
+                    実行の結果を見る
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    disabled={testing}
+                    onClick={() => void refreshTestRun(testRun, testRun.accountId)}
+                  >
+                    結果を読み直す
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+            {/*
+             * R491: 公開済みで戻ったときは、元のルールへ案内する。
+             * 同じ内容の作り直しは案内に従い、別ルールは入力を変えて作る。
+             */}
+            {saveOutcome === 'published' && publishedRuleId ? (
+              <div className="mt-3 space-y-2 rounded-control border border-hairline bg-canvas-sunken p-3" aria-label="公開済みの案内">
+                <p className="text-xs font-bold text-ink">この内容はすでに公開済みです</p>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="secondary"
+                    onClick={() => router.push(`/automations?highlight=${publishedRuleId}`)}
+                  >
+                    公開したルールを見る
                   </Button>
                 </div>
               </div>

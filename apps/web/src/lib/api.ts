@@ -2867,7 +2867,15 @@ async function fetchApiBlob(path: string, init?: { method?: string }): Promise<B
  * ファイル名はサーバーの Content-Disposition を優先し、無いときだけ
  * fallbackFilename を使う。
  */
-export async function downloadApiFile(path: string, fallbackFilename: string): Promise<void> {
+/**
+ * R495: 上限で切れたCSVを見分けるため、応答の頭の件数も返す。
+ * 既存の呼び出しは戻り値を使わないので、そのまま動く。
+ */
+export async function downloadApiFile(path: string, fallbackFilename: string): Promise<{
+  totalCount: number | null
+  returnedCount: number | null
+  truncated: boolean
+}> {
   const res = await fetch(`${API_URL}${path}`, {
     credentials: 'include',
     headers: adminSessionHeaders(),
@@ -2890,6 +2898,16 @@ export async function downloadApiFile(path: string, fallbackFilename: string): P
   }
   const disposition = res.headers.get('Content-Disposition') ?? ''
   const named = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(disposition)?.[1]
+  const numericHeader = (name: string): number | null => {
+    const raw = res.headers.get(name)
+    if (raw === null) return null
+    const value = Number(raw)
+    return Number.isInteger(value) && value >= 0 ? value : null
+  }
+  const totalCount = numericHeader('X-Csv-Total-Count')
+  const returnedCount = numericHeader('X-Csv-Returned-Count')
+  const truncated = res.headers.get('X-Csv-Truncated') === '1'
+    || (totalCount !== null && returnedCount !== null && totalCount > returnedCount)
   const blob = await res.blob()
   const href = URL.createObjectURL(blob)
   try {
@@ -2900,6 +2918,7 @@ export async function downloadApiFile(path: string, fallbackFilename: string): P
   } finally {
     URL.revokeObjectURL(href)
   }
+  return { totalCount, returnedCount, truncated }
 }
 
 export type FriendListParams = {
@@ -10260,10 +10279,12 @@ export const api = {
         `/api/automations/${encodeURIComponent(id)}/audience-preview?account_id=${encodeURIComponent(accountId)}`,
         { method: 'POST', body: JSON.stringify({ versionId }) },
       ),
-    test: (id: string, accountId: string, friendId: string, versionId?: string) =>
+    // R484: `operationKey` は確認画面ごとの要求キー。同じ確認の再試行は
+    // 同じ鍵で呼び、Worker は2件目の実行を作らず初回を返す。
+    test: (id: string, accountId: string, friendId: string, versionId?: string, operationKey?: string) =>
       fetchApi<ApiResponse<{ runId: string; versionId: string; status: string }>>(
         `/api/automations/${encodeURIComponent(id)}/test?account_id=${encodeURIComponent(accountId)}`,
-        { method: 'POST', body: JSON.stringify({ versionId, friendId }) },
+        { method: 'POST', body: JSON.stringify({ versionId, friendId, operationKey }) },
       ),
     templates: (accountId: string) =>
       fetchApi<ApiResponse<AutomationTemplateSummary[]>>(
@@ -10304,10 +10325,12 @@ export const api = {
       `/api/automation-drafts/${encodeURIComponent(id)}?account_id=${encodeURIComponent(accountId)}`,
       { method: 'PUT', body: JSON.stringify(data) },
     ),
-    publishDraft: (id: string, accountId: string, expectedDraftVersionId: string, activate = true) =>
+    // R483: `expectedStatus` は確認時に見た稼働状態。読み取り後の停止・再開を
+    // 読んだ時点の状態で上書きしないよう、書き込み条件に入れる。
+    publishDraft: (id: string, accountId: string, expectedDraftVersionId: string, activate = true, expectedStatus?: string) =>
       fetchApi<ApiResponse<{ id: string; versionId: string; versionNumber: number; status: 'active' | 'stopped' }>>(
         `/api/automation-drafts/${encodeURIComponent(id)}/publish?account_id=${encodeURIComponent(accountId)}`,
-        { method: 'POST', body: JSON.stringify({ expectedDraftVersionId, activate }) },
+        { method: 'POST', body: JSON.stringify({ expectedDraftVersionId, activate, expectedStatus }) },
       ),
     // #942 N-352: 一覧の「編集」。公開済みの定義に改訂用の下書きをぶら下げる。
     // すでに下書きがあればそれを返す（何度押しても1件）。

@@ -801,7 +801,18 @@ export async function updateAutomationDraft(
 
 export async function publishAutomationDraft(
   db: D1Database,
-  input: { id: string; lineAccountId: string; expectedDraftVersionId: unknown; activate: unknown },
+  input: {
+    id: string;
+    lineAccountId: string;
+    expectedDraftVersionId: unknown;
+    activate: unknown;
+    /**
+     * 公開の確認時に画面が見ていた稼働状態（R483）。
+     * 渡されたときだけ書き込み条件に入れ、読み取り後の停止・再開を
+     * 読んだ時点の状態で上書きしない。省略時は従来どおり状態を見ない。
+     */
+    expectedStatus?: unknown;
+  },
 ): Promise<{ id: string; versionId: string; versionNumber: number; status: 'active' | 'stopped' }> {
   const current = await readAutomationDraftRow(db, { id: input.id, lineAccountId: input.lineAccountId });
   const expected = requiredString(input.expectedDraftVersionId, 'expectedDraftVersionId', '公開する版');
@@ -840,29 +851,61 @@ export async function publishAutomationDraft(
    * 新規の下書き（定義が draft）は `activate` で動かすか止めたままかを選ぶ。
    * **動いている・止めている定義の改訂下書きは、いまの稼働状態を保つ。**
    * 止めているルールを直して公開したら勝手に動き出す、を防ぐ。
+   *
+   * 読み取りから書き込みまでの間に別の担当が停止（または再開）しても、
+   * 読んだ時点の状態で上書きしないよう、画面が見た状態を
+   * `expectedStatus` で受け取って書き込み条件に入れる（R483）。
+   * 食い違えば当てずに 409 で返し、最新の状態変更を残す。
    */
   const status: 'active' | 'stopped' = current.definition_status === 'draft'
     ? (input.activate === false ? 'stopped' : 'active')
     : current.definition_status;
+  const expectedStatus = typeof input.expectedStatus === 'string' ? input.expectedStatus : null;
+  if (expectedStatus !== null && !['draft', 'active', 'stopped'].includes(expectedStatus)) {
+    throw new AutomationDraftError('status_invalid', '公開するルールの状態を確認してください');
+  }
   const now = new Date().toISOString();
+  /*
+   * 2文はひとつのまとまりで当てる。版だけ先に公開済みへ倒れると、
+   * 下書きの指し先が宙に浮いて編集面が開けなくなる。
+   * 1文目にも定義の指し先と状態の条件を付けて、2文目と同時に
+   * 当たる・外れるようにする（batch はひとつの取引きで流れる）。
+   */
+  const definitionGuard = `EXISTS (
+    SELECT 1 FROM automation_definitions d
+     WHERE d.id = ? AND d.line_account_id = ?
+       AND d.status IN ('draft', 'active', 'stopped')
+       ${expectedStatus === null ? '' : 'AND d.status = ?'}
+       AND d.current_draft_version_id = ?
+  )`;
+  const definitionGuardBinds = expectedStatus === null
+    ? [current.id, input.lineAccountId, expectedVersionId]
+    : [current.id, input.lineAccountId, expectedStatus, expectedVersionId];
   const results = await db.batch([
     db.prepare(
       `UPDATE automation_versions SET status = 'published', published_at = ?
         WHERE id = ? AND automation_id = ? AND status = 'draft'
           AND trigger_type = ? AND trigger_config = ?
-          AND condition_config = ? AND action_config = ?`,
+          AND condition_config = ? AND action_config = ?
+          AND ${definitionGuard}`,
     ).bind(
       now, expectedVersionId, current.id,
       current.trigger_type, current.trigger_config,
       current.condition_config, current.action_config,
+      ...definitionGuardBinds,
     ),
     db.prepare(
       `UPDATE automation_definitions
           SET status = ?, current_published_version_id = ?, current_draft_version_id = NULL, updated_at = ?
         WHERE id = ? AND line_account_id = ?
           AND status IN ('draft', 'active', 'stopped')
+          ${expectedStatus === null ? '' : 'AND status = ?'}
           AND current_draft_version_id = ?`,
-    ).bind(status, expectedVersionId, now, current.id, input.lineAccountId, expectedVersionId),
+    ).bind(
+      status, expectedVersionId, now, current.id, input.lineAccountId,
+      ...(expectedStatus === null ? [] : [expectedStatus]),
+      expectedVersionId,
+    ),
   ]);
   if ((results[0].meta?.changes ?? 0) !== 1 || (results[1].meta?.changes ?? 0) !== 1) {
     throw new AutomationDraftError('version_conflict', '公開する前に下書きが変わりました。再読み込みしてください');
