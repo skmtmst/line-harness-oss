@@ -270,6 +270,18 @@ export function checkMigration(sql: string, fileName?: string): CheckResult {
     };
   }
 
+  const longPattern = tooLongLikePattern(stripped);
+  if (longPattern) {
+    return {
+      ok: false,
+      violation:
+        `LIKE のパターンが ${longPattern.length} 文字で、D1 の上限50文字を超えている`
+        + ` (matched: "${longPattern}")。`
+        + '起点の語で `substr(lower(sql), instr(lower(sql), \'<語>\'))` に切ってから'
+        + '残りを LIKE すると、意味を変えずに短くできる',
+    };
+  }
+
   for (const rule of RULES) {
     // 作り直しで見逃すのは、作り直しに必要な2つだけ。
     if (rebuild && rule.allowedInRebuild) continue;
@@ -279,6 +291,27 @@ export function checkMigration(sql: string, fileName?: string): CheckResult {
     }
   }
   return { ok: true };
+}
+
+/**
+ * D1 が受け付ける LIKE パターンの上限。
+ *
+ * これを超えると `LIKE or GLOB pattern too complex: SQLITE_ERROR` で落ち、
+ * ファイル全体が中止される。本番で 382 が、未適用のまま 440 も同じ形で
+ * 引っかかっていた（2026-09-29）。50文字までは通り、51文字から落ちることを
+ * 本番D1で実測した。
+ *
+ * エラー文からは「どの条件が不成立か」が分からないので、アサーションを書く側が
+ * 短く保つしかない。
+ */
+export const D1_LIKE_PATTERN_LIMIT = 50;
+
+/** 上限を超える LIKE のパターンがあれば、最初の1つを返す。 */
+export function tooLongLikePattern(sql: string): string | null {
+  for (const m of sql.matchAll(/\bLIKE\s+'([^']*)'/gi)) {
+    if (m[1].length > D1_LIKE_PATTERN_LIMIT) return m[1];
+  }
+  return null;
 }
 
 // ─── CLI ──────────────────────────────────────────────────────────────────────

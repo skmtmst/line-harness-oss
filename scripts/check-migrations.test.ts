@@ -4,6 +4,7 @@ import {
   POLICY_CUTOFF_PREFIX,
   checkMigration,
   filterMigrationsByPolicy,
+  tooLongLikePattern,
 } from './check-migrations';
 
 describe('382の参照退避表だけを同一ファイル内で片付ける', () => {
@@ -343,5 +344,39 @@ describe('印が付く前に当ててしまった作り直し', () => {
     // 印を後付けしても `_v1` 命名の逆向き手順は coherence 不合格のまま。
     // 救済は一覧だけで、規則自体は弱めていない。
     expect(checkMigration(`-- migration-policy: table-rebuild\n${sql354}`, '355_something_else.sql').ok).toBe(false);
+  });
+});
+
+describe('D1 の LIKE パターン上限', () => {
+  // 本番D1で実測: 50文字までは通り、51文字から
+  // `LIKE or GLOB pattern too complex` で落ちる。落ちるとファイル全体が中止され、
+  // エラー文にはどの条件が不成立かも出ない。382 と 440 が実際にこれで止まった。
+  const long = `%${'a'.repeat(49)}%`; // 51文字
+  const edge = `%${'a'.repeat(48)}%`; // 50文字
+
+  it('51文字のパターンは落とす', () => {
+    const result = checkMigration(`SELECT 1 WHERE lower(sql) LIKE '${long}';`, '600_x.sql');
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.violation).toContain('D1 の上限50文字');
+  });
+
+  it('50文字ちょうどは通す', () => {
+    expect(checkMigration(`SELECT 1 WHERE lower(sql) LIKE '${edge}';`, '600_x.sql')).toEqual({ ok: true });
+  });
+
+  it('コメントの中の長いパターンは数えない', () => {
+    expect(checkMigration(`-- LIKE '${long}'\nSELECT 1;`, '600_x.sql')).toEqual({ ok: true });
+  });
+
+  it('tooLongLikePattern は最初の超過分を返す', () => {
+    expect(tooLongLikePattern(`LIKE '${edge}' AND LIKE '${long}'`)).toBe(long);
+    expect(tooLongLikePattern(`LIKE '${edge}'`)).toBeNull();
+  });
+
+  it('382 と 440 の実ファイルが上限を超えていない', () => {
+    for (const name of ['382_tags_account_name_scope.sql', '440_conversion_draft_and_ingest.sql']) {
+      const sql = readFileSync(new URL(`../packages/db/migrations/${name}`, import.meta.url), 'utf8');
+      expect(tooLongLikePattern(sql)).toBeNull();
+    }
   });
 });
