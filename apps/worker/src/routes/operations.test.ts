@@ -1376,7 +1376,7 @@ describe('m26f: 緊急対応の失敗後回復', () => {
     };
   }
 
-  function stopInit(stepUpToken: string, key: string): RequestInit {
+  function stopInit(stepUpToken: string, key: string, capabilities: string[] = ['broadcast_dispatch']): RequestInit {
     return {
       method: 'POST',
       headers: {
@@ -1387,7 +1387,7 @@ describe('m26f: 緊急対応の失敗後回復', () => {
       },
       body: JSON.stringify({
         lineAccountId: 'account-1',
-        capabilities: ['broadcast_dispatch'],
+        capabilities,
         reason: '障害対応テスト',
         expectedVersion: 0,
         confirmation: '停止',
@@ -1556,6 +1556,103 @@ describe('m26f: 緊急対応の失敗後回復', () => {
     expect(testDb.raw.prepare(
       "SELECT COUNT(*) AS n FROM operation_request_receipts WHERE action = 'stop' AND resource_id = ?",
     ).bind(incidentId).get()).toEqual({ n: 1 });
+    expect(
+      (testDb.raw.prepare(
+        "SELECT COUNT(*) AS n FROM operation_notification_outbox WHERE incident_id = ? AND event_kind = 'restored'",
+      ).bind(incidentId).get() as { n: number }).n,
+    ).toBe(2);
+  });
+
+  it('R573: 部分復旧のreceipt保存の失敗後に同じキーで送り直すと一度だけ補い、他人・異内容は409のまま', async () => {
+    await grantStepUp('m26f-partial-stop-token');
+    const stopped = await app().request(
+      '/api/operations/incidents',
+      stopInit('m26f-partial-stop-token', 'm26f-partial-stop-key', ['broadcast_dispatch', 'scenario_dispatch']),
+      bindings(),
+    );
+    expect(stopped.status).toBe(201);
+    const stoppedBody = await stopped.json() as {
+      data: { control: { version: number }; incident: { id: string } };
+    };
+    const incidentId = stoppedBody.data.incident.id;
+    const version = stoppedBody.data.control.version;
+
+    // 停止後に追加された稼働シナリオは復旧前検査で追加ずれになり、
+    // その能力だけ止まったままの部分復旧になる。
+    testDb.raw.prepare(
+      `INSERT INTO scenarios (id, name, trigger_type, is_active, line_account_id)
+       VALUES ('sc-m26f-partial', '停止後追加', 'manual', 1, 'account-1')`,
+    ).run();
+
+    await grantStepUp('m26f-partial-restore-token-1');
+    const first = restoreInit('m26f-partial-restore-token-1', 'm26f-partial-restore-key-1', incidentId, version);
+    const failed = await app().request(
+      first.path, first.init,
+      bindings({ DB: failAt(/INSERT OR IGNORE INTO operation_request_receipts/) }),
+    );
+    expect(failed.status).toBe(500);
+    // 版だけ進み、停止記録は動いたまま、記録と通知準備が欠けた状態。
+    expect(testDb.raw.prepare(
+      'SELECT version, active_incident_id FROM operation_control_sets WHERE scope_key = ?',
+    ).bind('account-1').get()).toEqual({ version: version + 1, active_incident_id: incidentId });
+    expect(testDb.raw.prepare(
+      'SELECT status FROM operation_incidents WHERE id = ?',
+    ).bind(incidentId).get()).toEqual({ status: 'stopped' });
+    expect(testDb.raw.prepare(
+      'SELECT restore_report_json FROM operation_incidents WHERE id = ?',
+    ).bind(incidentId).get()).not.toEqual({ restore_report_json: null });
+    expect(testDb.raw.prepare(
+      'SELECT COUNT(*) AS n FROM operation_request_receipts WHERE action = ? AND resource_id = ?',
+    ).bind(`restore:${incidentId}`, incidentId).get()).toEqual({ n: 0 });
+    expect(testDb.raw.prepare(
+      "SELECT COUNT(*) AS n FROM operation_notification_outbox WHERE incident_id = ? AND event_kind = 'restored'",
+    ).bind(incidentId).get()).toEqual({ n: 0 });
+
+    await grantStepUp('m26f-partial-restore-token-2');
+    const second = restoreInit('m26f-partial-restore-token-2', 'm26f-partial-restore-key-1', incidentId, version);
+    const retried = await app().request(second.path, second.init, bindings());
+    expect(retried.status).toBe(200);
+    const retriedBody = await retried.json() as {
+      success: boolean; duplicate: boolean;
+      data: { status: string; report: unknown };
+    };
+    expect(retriedBody).toMatchObject({ success: true, duplicate: true, data: { status: 'partial' } });
+    expect(retriedBody.data.report).not.toBeNull();
+    // 記録と通知準備は一度だけ補われる。
+    expect(testDb.raw.prepare(
+      'SELECT COUNT(*) AS n FROM operation_request_receipts WHERE action = ? AND resource_id = ?',
+    ).bind(`restore:${incidentId}`, incidentId).get()).toEqual({ n: 1 });
+    expect(
+      (testDb.raw.prepare(
+        "SELECT COUNT(*) AS n FROM operation_notification_outbox WHERE incident_id = ? AND event_kind = 'restored'",
+      ).bind(incidentId).get() as { n: number }).n,
+    ).toBe(2);
+
+    // 異内容（進んだ版と違う版）の再送は競合のまま。
+    await grantStepUp('m26f-partial-restore-token-3');
+    const mismatched = restoreInit('m26f-partial-restore-token-3', 'm26f-partial-restore-key-2', incidentId, version + 99);
+    const conflicted = await app().request(mismatched.path, mismatched.init, bindings());
+    expect(conflicted.status).toBe(409);
+    expect(await conflicted.json()).toMatchObject({ success: false, code: 'VERSION_CONFLICT' });
+
+    // 他人（確定させた担当者と違う）の再送は競合のまま。
+    testDb.raw.prepare(
+      `INSERT INTO staff_members (id, name, role, api_key, account_scope)
+       VALUES ('admin-1', 'Admin', 'admin', 'admin-m26f-partial-key', 'accounts')`,
+    ).run();
+    testDb.raw.prepare(
+      `INSERT INTO staff_account_scopes (staff_id, line_account_id, created_at)
+       VALUES ('admin-1', 'account-1', '2026-09-16T00:00:00.000Z')`,
+    ).run();
+    await grantStepUp('m26f-partial-restore-token-4', 'admin-1');
+    const foreign = restoreInit('m26f-partial-restore-token-4', 'm26f-partial-restore-key-3', incidentId, version);
+    const rejected = await app('admin').request(foreign.path, foreign.init, bindings());
+    expect(rejected.status).toBe(409);
+
+    // 409の再送では記録も通知準備も増えない。
+    expect(testDb.raw.prepare(
+      'SELECT COUNT(*) AS n FROM operation_request_receipts WHERE action = ? AND resource_id = ?',
+    ).bind(`restore:${incidentId}`, incidentId).get()).toEqual({ n: 1 });
     expect(
       (testDb.raw.prepare(
         "SELECT COUNT(*) AS n FROM operation_notification_outbox WHERE incident_id = ? AND event_kind = 'restored'",
