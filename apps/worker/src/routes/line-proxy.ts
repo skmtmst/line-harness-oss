@@ -630,11 +630,21 @@ function proxyHandler(prefix: string, upstreamBase: string, logSends: boolean) {
       return c.json({ message: 'Upstream request failed' }, 502);
     }
 
-    if (isMessageSend && upstream.ok && rawBody) {
+    /*
+     * R381: LINE が同じ送信キーを受理済みとして返す409（応答消失後の再送
+     * など）でも履歴を書く。本文は一度だけ届いているが、初回の200で履歴の
+     * 保存が落ちたとき、再送の409へ追従して同じ決まったIDの行を補完する。
+     * insertLogRows は送信キーから決まるIDの INSERT OR IGNORE なので、
+     * 初回の保存が済んでいれば二重には書かない。
+     */
+    const dedupeAccepted = Boolean(
+      retryKey && upstream.status === 409 && upstream.headers.get('x-line-accepted-request-id'),
+    );
+    if (isMessageSend && rawBody && (upstream.ok || dedupeAccepted)) {
       // Log in the background where possible: a multicast to hundreds of
       // friends must not delay the client response (timeout → client retry →
       // double send). Falls back to inline await outside a Workers runtime.
-      const logging = logProxySend(c.env.DB, caller, path, rawBody, logSource);
+      const logging = logProxySend(c.env.DB, caller, path, rawBody, logSource, retryKey);
       try {
         c.executionCtx.waitUntil(logging);
       } catch {

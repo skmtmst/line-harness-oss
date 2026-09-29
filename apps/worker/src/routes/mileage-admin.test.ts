@@ -31,8 +31,8 @@ const dbMocks = {
   applyMileageRulesForEvent: vi.fn(),
   getMileageManualAdjustmentPolicy: vi.fn(),
   setMileageManualAdjustmentPolicy: vi.fn(),
-  findCommittedMileageAdjustment: vi.fn(async () => null),
-  getMileageAdjustmentNotificationRecord: vi.fn(async () => null),
+  findCommittedMileageAdjustment: vi.fn(),
+  getMileageAdjustmentNotificationRecord: vi.fn(),
   postMileageAdjustment: vi.fn(),
   confirmPendingMileageEntry: vi.fn(),
   voidMileageLedgerEntry: vi.fn(),
@@ -912,6 +912,69 @@ describe('mileage admin API', () => {
       success: false, code: 'idempotency_conflict',
     });
     expect(dbMocks.postMileageAdjustment).not.toHaveBeenCalled();
+  });
+
+  /*
+   * R380/R381: 通知だけをあとから再送する口。残高は動かさず、保存済みの
+   * 本文と送信キーで再送する。通知を依頼していない調整や、担当外の
+   * アカウントの調整には使えない。
+   */
+  it('retries a stored notification without reapplying mileage', async () => {
+    d1.prepare.mockImplementationOnce(() => ({
+      bind: () => ({
+        first: vi.fn().mockResolvedValue({
+          id: 'entry-1', beneficiary_friend_id: 'friend-1', idempotency_key: 'key-1',
+          amount: 100, metadata: JSON.stringify({ notifyFriend: true, balanceAfter: 600 }),
+        }),
+      }),
+    }));
+    dbMocks.getMileageAdjustmentNotificationRecord.mockResolvedValueOnce({
+      id: 'notif-1', friendId: 'friend-1', ledgerEntryId: 'entry-1',
+      idempotencyKey: 'notif-key-1', messageText: '保存済み本文',
+    });
+    const res = await call('/api/mileage/entries/entry-1/notification-retry', {
+      method: 'POST',
+      body: JSON.stringify({ accountId: 'account-1' }),
+    });
+    expect(res.status).toBe(200);
+    expect(adjustmentNotificationMocks.sendMileageAdjustmentNotification).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        lineAccountId: 'account-1',
+        friendId: 'friend-1',
+        ledgerEntryId: 'entry-1',
+        idempotencyKey: 'notif-key-1',
+        message: '保存済み本文',
+      }),
+    );
+    expect(dbMocks.postMileageAdjustment).not.toHaveBeenCalled();
+  });
+
+  it('rejects a retry for an adjustment that never requested a notification', async () => {
+    d1.prepare.mockImplementationOnce(() => ({
+      bind: () => ({
+        first: vi.fn().mockResolvedValue({
+          id: 'entry-2', beneficiary_friend_id: 'friend-1', idempotency_key: 'key-2',
+          amount: 100, metadata: JSON.stringify({ notifyFriend: false }),
+        }),
+      }),
+    }));
+    const res = await call('/api/mileage/entries/entry-2/notification-retry', {
+      method: 'POST',
+      body: JSON.stringify({ accountId: 'account-1' }),
+    });
+    expect(res.status).toBe(404);
+    expect(adjustmentNotificationMocks.sendMileageAdjustmentNotification).not.toHaveBeenCalled();
+  });
+
+  it('rejects a retry for an entry outside the operator account scope', async () => {
+    const res = await call('/api/mileage/entries/entry-9/notification-retry', {
+      method: 'POST',
+      body: JSON.stringify({ accountId: 'account-2' }),
+    });
+    expect(res.status).toBe(404);
+    expect(d1.prepare).not.toHaveBeenCalled();
+    expect(adjustmentNotificationMocks.sendMileageAdjustmentNotification).not.toHaveBeenCalled();
   });
 
   it('lets only owners configure the approval threshold', async () => {
