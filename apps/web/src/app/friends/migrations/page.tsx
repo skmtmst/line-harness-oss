@@ -188,7 +188,6 @@ export default function FriendMigrationsPage() {
           {([['basic', '基本（名前・LINEアカウント・登録日）', false], ['tags_fields', 'タグ・友だち情報', true], ['support', '対応状況・対応マーク・担当者', true]] as const).map(([value, label, unavailable]) => <Checkbox key={value} checked={columns.includes(value)} onCheckedChange={() => toggleColumn(value)} disabled={unavailable} description={unavailable ? 'まだ書き出せません' : undefined}>{label}</Checkbox>)}
         </fieldset>
         <p className="text-ink-secondary mt-2 text-xs">今書き出せるのは基本の5列だけです。タグ・友だち情報、対応情報は入りません。</p>
-        <p className="text-ink-faint mt-2 text-xs">電話番号やメールなどの個人情報は、見る権限がある人だけ選べます。</p>
         <p className="text-ink-secondary mt-4 text-sm">文字コード： UTF-8</p><p className="text-ink-faint mt-1 text-xs">Shift_JISの書き出しはまだ使えません。今はUTF-8を選んでください。</p>
         <div className="mt-4 flex items-center gap-3"><Button variant="primary" disabled={busy} onClick={() => void createExport()}>書き出しを作る</Button>{exportResult && <a className="text-action text-sm font-semibold hover:underline" href={`${process.env.NEXT_PUBLIC_API_URL ?? ''}${exportResult.downloadUrl}`}>CSVをダウンロード（{exportResult.rowCount ?? '—'}件）</a>}</div>
         {manageLocked ? <p className="text-ink-secondary mt-2 text-xs">{MANAGE_FORBIDDEN}</p> : null}
