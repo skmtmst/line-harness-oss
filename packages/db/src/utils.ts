@@ -59,6 +59,19 @@ export function nextDateString(day: string): string {
 }
 
 /*
+ * JSTの当月1日 00:00 を `jstNow` と同じ表記（+09:00 付き）で返す。
+ * SQLite の `datetime('now','start of month')` は UTC の月初を返すため、
+ * 日本時間の月初 0〜9 時に前月の記録を混ぜていた（監査 R384）。
+ * `occurred_at` など JST 文字列入りの列と文字列比較できる形に揃える。
+ */
+export function jstMonthStartString(nowMs = Date.now()): string {
+  const jst = new Date(nowMs + JST_OFFSET_MS);
+  const year = jst.getUTCFullYear();
+  const month = String(jst.getUTCMonth() + 1).padStart(2, '0');
+  return `${year}-${month}-01T00:00:00.000+09:00`;
+}
+
+/*
  * 監査 R227: 期間の境界を UTC の ISO 文字列へ揃える。
  * 記録の時刻は JST 表記（`jstNow` の `+09:00`）で、画面から来る期間も
  * JST の暦日を指す。時差の書かれた値（`Z`・`+09:00`）はそのまま、

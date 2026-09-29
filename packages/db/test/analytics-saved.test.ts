@@ -154,4 +154,44 @@ describe('V6 保存した分析', () => {
       sourceResultId: 'cross-pending', createdByName: '担当A', createdAt: '2026-08-08T01:00:00.000Z',
     })).rejects.toThrow('analytics_saved_source_not_found');
   });
+
+  it('R461: 元の実行記録が期限削除で消えても旧版の注意は残る', async () => {
+    sqlite.exec(`
+      INSERT INTO funnels (id, name, line_account_id, status)
+        VALUES ('funnel-b','導線B','account-a','active');
+      INSERT INTO analytics_funnel_versions
+        (id, funnel_id, line_account_id, version_number, window_days, steps_json, created_at)
+        VALUES ('fvb-1','funnel-b','account-a',1,30,'[]','2026-08-01');
+      INSERT INTO analytics_funnel_runs (
+        id, line_account_id, funnel_id, funnel_version_id, cohort_from, cohort_to,
+        time_zone, data_cutoff_at, state, result_json, created_at
+      ) VALUES (
+        'run-b1','account-a','funnel-b','fvb-1','2026-08-01','2026-08-07',
+        'Asia/Tokyo','2026-08-08','available','{"groups":[]}','2026-08-08'
+      );
+    `);
+    await createSavedAnalyticsFromResult(db, {
+      lineAccountId: 'account-a', name: '導線Bの写し', sourceKind: 'funnel',
+      sourceResultId: 'run-b1', createdByName: '担当A', createdAt: '2026-08-08T01:00:00.000Z',
+    });
+    sqlite.exec(`
+      INSERT INTO analytics_funnel_versions
+        (id, funnel_id, line_account_id, version_number, window_days, steps_json, created_at)
+        VALUES ('fvb-2','funnel-b','account-a',2,30,'[]','2026-08-09');
+    `);
+    let list = await getSavedAnalytics(db, 'account-a');
+    expect(list[0].latestSnapshot).toMatchObject({
+      definitionStale: true, sourceVersionNumber: 1, sourceCurrentVersionNumber: 2,
+    });
+    // 13か月の期限削除で元の実行記録だけ消えた状態を再現する
+    sqlite.prepare(`DELETE FROM analytics_funnel_runs WHERE id = 'run-b1'`).run();
+    // 写しの中身は変わらない
+    const snapshots = await getSavedAnalyticsSnapshots(db, 'account-a', list[0].id);
+    expect(snapshots?.[0].result).toEqual({ groups: [] });
+    // 旧版の注意は残り、版も「不明」にならない
+    list = await getSavedAnalytics(db, 'account-a');
+    expect(list[0].latestSnapshot).toMatchObject({
+      definitionStale: true, sourceVersionNumber: 1, sourceCurrentVersionNumber: 2,
+    });
+  });
 });

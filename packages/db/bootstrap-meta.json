@@ -472,7 +472,9 @@
     "512_restaurant_google_metrics.sql",
     "513_conversion_approval_freeze.sql",
     "516_mileage_redemption_reward_snapshot.sql",
-    "517_mileage_reward_version_revision.sql"
+    "517_mileage_reward_version_revision.sql",
+    "520_incoming_webhook_receipt_plan.sql",
+    "521_incoming_webhook_receipt_body_hash.sql"
   ],
-  "migrationCount": 473
+  "migrationCount": 475
 }

@@ -120,7 +120,7 @@ function fakeDb(opts: {
 function loggedRows(executed: Exec[]) {
   const rows: { friendId: unknown; messageType: unknown; content: unknown; deliveryType: unknown; source: unknown; lineAccountId: unknown }[] = [];
   for (const e of executed) {
-    if (!e.sql.includes('INSERT INTO messages_log')) continue;
+    if (!e.sql.includes('INTO messages_log')) continue;
     for (let i = 0; i < e.params.length; i += 8) {
       rows.push({
         friendId: e.params[i + 1],
@@ -419,6 +419,49 @@ describe('push', () => {
       'chat-1',
       expect.objectContaining({ status: 'in_progress' }),
     );
+  });
+
+  /*
+   * R381: 同じ送信キー（X-Line-Retry-Key）の再送は履歴を二重に書かない。
+   * 初回の200で履歴の保存が落ちても、LINEが「受理済み」を返す409の再送で
+   * 同じ決まったIDの行へ補完する。
+   */
+  test('same retry key generates one log row across 200 and accepted-409 retries', async () => {
+    const { db, executed } = fakeDb();
+    const retryHeaders = { 'X-Line-Retry-Key': 'retry-key-1' };
+    const first = await setupApp().request(
+      pushRequest('acc-token', undefined, retryHeaders), {}, env(db),
+    );
+    expect(first.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        headers: expect.objectContaining({ 'X-Line-Retry-Key': 'retry-key-1' }),
+      }),
+    );
+
+    fetchMock.mockImplementationOnce(async () => new Response('{"message":"accepted"}', {
+      status: 409,
+      headers: { 'content-type': 'application/json', 'x-line-accepted-request-id': 'req-1' },
+    }));
+    const second = await setupApp().request(
+      pushRequest('acc-token', undefined, retryHeaders), {}, env(db),
+    );
+    // 受理済み409はそのまま呼び出し側へ返すが、履歴は書く
+    expect(second.status).toBe(409);
+    const inserts = executed.filter((e) => e.sql.includes('INTO messages_log'));
+    expect(inserts).toHaveLength(2);
+    // 同じ送信キー・同じ友だち・同じ位置 → 同じID。実DBでは INSERT OR IGNORE が1行に畳む。
+    expect(inserts[0].params[0]).toBe(inserts[1].params[0]);
+  });
+
+  test('requests without a retry key still get fresh log ids', async () => {
+    const { db, executed } = fakeDb();
+    await setupApp().request(pushRequest('acc-token'), {}, env(db));
+    await setupApp().request(pushRequest('acc-token'), {}, env(db));
+    const inserts = executed.filter((e) => e.sql.includes('INTO messages_log'));
+    expect(inserts).toHaveLength(2);
+    expect(inserts[0].params[0]).not.toBe(inserts[1].params[0]);
   });
 
   test('manual header logs a 1:1 operator reply as source=manual and is not forwarded', async () => {

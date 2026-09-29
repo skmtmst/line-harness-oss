@@ -23,6 +23,8 @@ import {
   applyMileageRulesForEvent,
   getMileageManualAdjustmentPolicy,
   setMileageManualAdjustmentPolicy,
+  getMileageAdjustmentNotificationRecord,
+  findCommittedMileageAdjustment,
   postMileageAdjustment,
   MileageAdjustmentError,
   MileageV6Error,
@@ -922,8 +924,8 @@ scoring.post(
       if (typeof notifyFriend !== 'boolean') {
         return c.json({ success: false, error: 'notifyFriend must be a boolean' }, 400);
       }
-      if (expiresAt && (Number.isNaN(expiresAt.getTime()) || expiresAt.getTime() <= Date.now())) {
-        return c.json({ success: false, error: 'expiresAt must be a future date-time' }, 400);
+      if (expiresAt && Number.isNaN(expiresAt.getTime())) {
+        return c.json({ success: false, error: 'expiresAt must be a date-time' }, 400);
       }
       if (expiresAt && direction !== 'increase') {
         return c.json({ success: false, error: 'expiresAt can only be set when increasing mileage' }, 400);
@@ -938,6 +940,69 @@ scoring.post(
       ).bind(friendId, accountId).first<{ id: string }>();
       if (!friend) return c.json({ success: false, error: 'Friend not found' }, 404);
 
+      const staff = c.get('staff');
+      const signedAmount = direction === 'decrease' ? -amount : amount;
+      const adjustmentInput = {
+        friendId,
+        amount: signedAmount,
+        reason,
+        reasonCategory,
+        sourceReferenceId: sourceReferenceId || null,
+        idempotencyKey,
+        executedByStaffId: staff.id,
+        executedByStaffName: staff.name,
+        lineAccountId: accountId,
+        expiresAt: expiresAt?.toISOString() ?? null,
+        notifyFriend,
+      };
+
+      /*
+       * R378: 確定済みの同じ要求は当時の結果をそのまま返す。承認境界の
+       * 引き下げや元の有効期限の経過は「新しい調整への判定」なので、
+       * 確定済みの再送には適用しない。同じキーで別の内容なら409。
+       * 通知だけの復旧（前回は残高反映済み・通知のみ失敗）もここで行い、
+       * 残高へ再適用しない。
+       */
+      const committed = await findCommittedMileageAdjustment(c.env.DB, adjustmentInput);
+      if (committed) {
+        const replayedNotification = notifyFriend
+          ? await sendMileageAdjustmentNotification(c, {
+              lineAccountId: accountId,
+              friendId,
+              ledgerEntryId: committed.entry.id,
+              idempotencyKey,
+              message: mileageAdjustmentMessage({
+                direction,
+                amount,
+                balanceAfter: committed.balanceAfter,
+                expiresAt: expiresAt?.toISOString() ?? null,
+              }),
+            }).catch(() => ({
+              id: null,
+              status: 'failed' as const,
+              attemptCount: 0,
+              errorCode: 'notification_record_failed',
+            }))
+          : null;
+        return c.json({
+          success: true,
+          data: {
+            entryId: committed.entry.id,
+            balanceBefore: committed.balanceBefore,
+            amount: committed.entry.amount,
+            balanceAfter: committed.balanceAfter,
+            replayed: true,
+            expiresAt: expiresAt?.toISOString() ?? null,
+            notification: replayedNotification,
+          },
+        }, 200);
+      }
+
+      // R378: 期限切れの判定と承認境界は「新しい調整」だけに適用する。
+      if (expiresAt && expiresAt.getTime() <= Date.now()) {
+        return c.json({ success: false, error: 'expiresAt must be a future date-time' }, 400);
+      }
+
       const policy = await getMileageManualAdjustmentPolicy(c.env.DB, accountId);
       if (!policy) {
         return c.json({
@@ -946,7 +1011,6 @@ scoring.post(
           code: 'ADJUSTMENT_POLICY_REQUIRED',
         }, 400);
       }
-      const staff = c.get('staff');
       if (amount >= policy.approvalThreshold) {
         /*
          * R: 境界以上の調整は実行せず、別のオーナーへの承認依頼として残す
@@ -980,20 +1044,7 @@ scoring.post(
         }, 202);
       }
 
-      const signedAmount = direction === 'decrease' ? -amount : amount;
-      const result = await postMileageAdjustment(c.env.DB, {
-        friendId,
-        amount: signedAmount,
-        reason,
-        reasonCategory,
-        sourceReferenceId: sourceReferenceId || null,
-        idempotencyKey,
-        executedByStaffId: staff.id,
-        executedByStaffName: staff.name,
-        lineAccountId: accountId,
-        expiresAt: expiresAt?.toISOString() ?? null,
-        notifyFriend,
-      });
+      const result = await postMileageAdjustment(c.env.DB, adjustmentInput);
       auditLog(c, 'mileage.adjustment.create', { kind: 'mileage_ledger', id: result.entry.id });
       const notification = notifyFriend
         ? await sendMileageAdjustmentNotification(c, {
@@ -1090,7 +1141,29 @@ scoring.post(
       auditLog(c, 'mileage.adjustment.approval.approve', {
         kind: 'mileage_adjustment_approval_requests', id: request.id,
       });
-      return c.json({ success: true, data: { request, entryId: entry.id } });
+      /*
+       * 依頼時に「友だちに知らせる」が選ばれていれば、承認で残高へ
+       * 反映されたこのタイミングで通知する。失敗は残高を巻き戻さず、
+       * 失敗の記録として残る（あとから通知だけ再送できる）。
+       */
+      const approvedMetadata = entry.metadata
+        ? JSON.parse(entry.metadata) as { balanceAfter?: number }
+        : {};
+      const notification = request.notify_friend === 1
+        ? await sendMileageAdjustmentNotification(c, {
+            lineAccountId: request.line_account_id,
+            friendId: request.friend_id,
+            ledgerEntryId: entry.id,
+            idempotencyKey: request.idempotency_key,
+            message: mileageAdjustmentMessage({
+              direction: request.direction,
+              amount: request.amount,
+              balanceAfter: Number(approvedMetadata.balanceAfter ?? 0),
+              expiresAt: request.expires_at,
+            }),
+          }).catch(() => null)
+        : null;
+      return c.json({ success: true, data: { request, entryId: entry.id, notification } });
     } catch (error) {
       return mileageV6Error(c, error);
     }
@@ -1230,9 +1303,81 @@ scoring.post(
 );
 
 /*
- * R: 「決めごとをテスト」。下書きの内容を直近30日のイベントへ当てはめて
- * 何人に・合計いくら付きそうかだけを返す。台帳・キューには何も書かない。
+ * R380/R381: 手動調整の友だち通知だけをあとから再送する。
+ * 残高は動かさない。通知記録があれば保存済みの本文・送信キーで再送し、
+ * 記録自体が作れなかった調整では台帳の依頼印（notifyFriend）を見て
+ * 本文を組み直して送る。sent 済みの再送は sendMileageNotification 側で
+ * 何もしない（二重送信しない）。
  */
+scoring.post(
+  '/api/mileage/entries/:id/notification-retry',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    try {
+      const body = await c.req.json<{ accountId?: unknown }>()
+        .catch(() => ({} as { accountId?: unknown }));
+      const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
+      if (!await canUseMileageAccount(c, accountId)) {
+        return c.json({ success: false, error: 'LINE account not found' }, accountId ? 404 : 400);
+      }
+      const entryId = c.req.param('id');
+      const entry = await c.env.DB.prepare(
+        `SELECT id, beneficiary_friend_id, idempotency_key, amount, metadata
+           FROM mileage_ledger
+          WHERE id = ? AND program_id = 'default' AND entry_type = 'adjustment'
+            AND json_extract(metadata, '$.lineAccountId') = ?`,
+      ).bind(entryId, accountId).first<{
+        id: string; beneficiary_friend_id: string | null; idempotency_key: string;
+        amount: number; metadata: string | null;
+      }>();
+      if (!entry || !entry.beneficiary_friend_id) {
+        return c.json({ success: false, error: 'Notification target not found' }, 404);
+      }
+      const record = await getMileageAdjustmentNotificationRecord(c.env.DB, {
+        lineAccountId: accountId,
+        ledgerEntryId: entry.id,
+      });
+      const metadata = entry.metadata ? JSON.parse(entry.metadata) as {
+        notifyFriend?: boolean;
+        adjustmentFingerprint?: string;
+        balanceAfter?: number;
+        expiresAt?: string | null;
+      } : {};
+      /*
+       * 通知記録が無い＝依頼時に記録の作成自体が失敗した場合。古い台帳には
+       * notifyFriend がないので、指紋の中の notifyFriend でも確かめる。
+       */
+      const fingerprintRequested = (() => {
+        try {
+          return JSON.parse(metadata.adjustmentFingerprint ?? '{}')?.notifyFriend === true;
+        } catch {
+          return false;
+        }
+      })();
+      if (!record && metadata.notifyFriend !== true && !fingerprintRequested) {
+        return c.json({ success: false, error: 'この調整に通知の依頼はありません' }, 404);
+      }
+      const notification = await sendMileageAdjustmentNotification(c, {
+        lineAccountId: accountId,
+        friendId: record?.friendId ?? entry.beneficiary_friend_id,
+        ledgerEntryId: entry.id,
+        idempotencyKey: record?.idempotencyKey ?? entry.idempotency_key,
+        message: record?.messageText ?? mileageAdjustmentMessage({
+          direction: entry.amount > 0 ? 'increase' : 'decrease',
+          amount: Math.abs(entry.amount),
+          balanceAfter: Number(metadata.balanceAfter ?? 0),
+          expiresAt: metadata.expiresAt ?? null,
+        }),
+      });
+      auditLog(c, 'mileage.adjustment.notification.retry', {
+        kind: 'mileage_adjustment_notifications', id: notification.id ?? entry.id,
+      });
+      return c.json({ success: true, data: { notification } });
+    } catch (error) {
+      return mileageV6Error(c, error);
+    }
+  },
+);
 scoring.post(
   '/api/mileage/earning-rules/test',
   requireRole('owner', 'admin'),
