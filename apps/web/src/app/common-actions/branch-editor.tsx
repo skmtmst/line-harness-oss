@@ -164,7 +164,7 @@ export default function BranchEditors({
     ...resources.tags.map((tag) => ({ value: tag.id, label: tag.name })),
     // 保存済みのタグが選択肢に無いときも値を保つ（消さない）。
     ...(selected && !resources.tags.some((tag) => tag.id === selected)
-      ? [{ value: selected, label: '選択中のタグ（取得できません）' }]
+      ? [{ value: selected, label: '選択中のタグ（未取得。タグの一覧を読み込み直すと表示します）' }]
       : []),
   ]
   return (
