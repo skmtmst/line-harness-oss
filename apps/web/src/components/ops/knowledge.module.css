@@ -85,7 +85,7 @@
 .filters .articleKindFilter { width: 212px; max-width: 100%; height: 36px; font-size: var(--text-caption); font-weight: 400; padding-left: 10px; }
 .count { margin-left: auto; color: var(--color-ink-faint); font-size: var(--text-caption); white-space: nowrap; }
 .table th, .table td { padding: 0 16px; font-size: var(--text-caption); text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.table thead tr { height: 44px; background: var(--color-surface-chrome); }
+.table thead tr { height: 44px; background: var(--color-shell-gray); }
 .table tbody tr { height: 56px; }
 .table td { color: var(--color-ink-secondary); }
 .table .titleCell { font-weight: 600; color: var(--color-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -128,7 +128,7 @@
 :global([data-knowledge-shell]):has(.page, .supportPage) > aside nav > p { height: 34px; padding: 12px 12px 5px; }
 :global([data-knowledge-shell]):has(.page, .supportPage) > aside nav a { font-size: var(--text-body); gap: 11px; }
 :global([data-knowledge-shell]):has(.page, .supportPage) > aside > div:last-child { padding: 8px 12px; }
-.footer button:disabled { opacity: 1; background: var(--color-surface-chrome); color: var(--color-ink-faint); border-color: var(--color-hairline); }
+.footer button:disabled { opacity: 1; background: var(--color-shell-gray); color: var(--color-ink-faint); border-color: var(--color-hairline); }
 /* Scope shared Dialog adjustments to these V6 instances, including portal content. */
 :global([data-design-node='DHdsw'][role='presentation']):has(.editor),
 :global([data-design-node='ZAOc7'][role='presentation']):has(.editor) { align-items: flex-start; padding-top: 120px; background: var(--color-scrim); }

@@ -22,9 +22,12 @@ describe('#976 デザイン統一', () => {
   const layout = read('../../app/layout.tsx')
 
   it('U080: 書体の正本は --font-sans で、body は inline style ではなく font-sans を読む', () => {
-    expect(globals).toMatch(/--font-sans:\s*"Noto Sans JP",\s*"Hiragino Sans",\s*"Yu Gothic",\s*system-ui,\s*sans-serif;/)
+    // ★V7「見た目の物差し」§3: 「Inter, Noto Sans JP」の順。英字と数字は
+    // Inter（next/font が --font-inter を出す）、かなと漢字は Noto Sans JP。
+    expect(globals).toMatch(/--font-sans:\s*var\(--font-inter\),\s*var\(--font-noto-sans-jp\),\s*"Hiragino Sans",\s*"Yu Gothic",\s*system-ui,\s*sans-serif;/)
     expect(layout).toContain('font-sans')
     expect(layout).not.toContain('fontFamily')
+    expect(layout).toContain("from 'next/font/google'")
     // 友だち属性V2の画像比較用例外（SF系）は残す。統一対象から外す決定。
     expect(globals).toMatch(/\.friend-attributes-v2-shell\s*{[^}]*font-family:\s*"SF Pro Text"/s)
   })

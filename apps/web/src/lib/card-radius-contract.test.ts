@@ -12,26 +12,29 @@ function token(name: string): string {
 }
 
 /**
- * **カードと窓を同じ角丸にしない。**
+ * **カードと窓の角丸は、名前を分けたまま同じ 12px へ畳む（★V7）。**
  *
- * 以前は `--radius-card` も `--radius-panel` も 12px で、1つの値が
- * 「画面のカード」と「モーダルの外枠」の両方を指していた。設計では
- * 別物で、カードは `$radius-md`(10)、窓は `$radius-panel`(12)。
- * 片方に合わせるともう片方がずれるので、用途で分けてある。
+ * V6 ではカードが `$radius-md`(10)、窓が `$radius-panel`(12) と別物だった。
+ * ★V7「見た目の物差し」§1 で丸みは 6 / 8 / 12 / 999 の4段だけになり、
+ * 「カード・ダイアログ・知らせ」は同じ 12px 段に入る。
+ * 値が同じでも名前は用途ごとに残す。画面側の `rounded-card` /
+ * `rounded-panel` は触らず、ここで値だけが読み替わる。
  */
-describe('カードと窓の角丸を用途で分ける', () => {
-  it('カードは設計の10px', () => {
-    // pRHvc 検索と絞り込み / k4Hz0X 友だち一覧カード / eHPwj 一括操作バー
-    expect(token('radius-card')).toBe('10px')
+describe('カードと窓の角丸は V7 の 12px 段に揃う', () => {
+  it('カードは V7 の12px', () => {
+    // ★V7: 丸みは 6 / 8 / 12 / 999 の4段。カードは 12px。
+    expect(token('radius-card')).toBe('12px')
   })
 
-  it('窓は設計の12px', () => {
+  it('窓は V7 の12px', () => {
     // J6x4Q 標準確認モーダル / z7O873 友だち 詳細検索モーダル
     expect(token('radius-panel')).toBe('12px')
   })
 
-  it('同じ値へ戻していない', () => {
-    expect(token('radius-card')).not.toBe(token('radius-panel'))
+  it('値が同じでも、用途の名前は別のまま残す', () => {
+    // 2つの名前があるので、将来片方だけを変えられる。
+    expect(token('radius-card')).not.toBe('(未定義)')
+    expect(token('radius-panel')).not.toBe('(未定義)')
   })
 
   it('窓の外枠がカードの角丸を使っていない', () => {

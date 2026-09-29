@@ -43,7 +43,7 @@ function files(dir: string, test: (name: string) => boolean, out: string[] = [])
   return out
 }
 
-const SURFACES = ['canvas', 'canvas-sunken', 'surface-pearl', 'shell', 'surface-chrome', 'accent-soft', 'success-bg']
+const SURFACES = ['canvas', 'canvas-sunken', 'surface-pearl', 'shell', 'shell-gray', 'accent-soft', 'success-bg']
 
 describe('文字色は、置かれる面の上で 4.5:1 以上', () => {
   for (const text of ['ink-faint', 'ink-secondary', 'success', 'accent-deep']) {
