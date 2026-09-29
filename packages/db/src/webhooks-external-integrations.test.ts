@@ -319,9 +319,11 @@ describe('外部APIの鍵 (N-380)', () => {
     });
 
     const rotated = await rotateIntegrationApiToken(db, first.row.id, 'account-a', 'staff-2');
-    expect(rotated).not.toBeNull();
+    // R431: 同時再発行の当たり外れを区別するため、成否ではなく状態で返す。
+    // 逐次の再発行が通ること・古い鍵だけ止まることの意図は変えない。
+    if (rotated.status !== 'ok') throw new Error('rotate should succeed');
     expect(await resolveIntegrationApiToken(db, first.token)).toBeNull();
-    const rotatedRow = await resolveIntegrationApiToken(db, rotated!.token);
+    const rotatedRow = await resolveIntegrationApiToken(db, rotated.token);
     expect(rotatedRow).toMatchObject({
       line_account_id: 'account-a',
       rotated_from_id: first.row.id,
@@ -329,7 +331,7 @@ describe('外部APIの鍵 (N-380)', () => {
     // 別の鍵は生きている。
     expect(await resolveIntegrationApiToken(db, second.token)).not.toBeNull();
     // 失効済みは再入れ替えできない。
-    expect(await rotateIntegrationApiToken(db, first.row.id, 'account-a')).toBeNull();
+    expect((await rotateIntegrationApiToken(db, first.row.id, 'account-a')).status).toBe('not_found');
 
     expect(await revokeIntegrationApiToken(db, second.row.id, 'account-a', 'staff-1')).toBe(true);
     expect(await resolveIntegrationApiToken(db, second.token)).toBeNull();

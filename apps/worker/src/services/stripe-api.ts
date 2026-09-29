@@ -144,6 +144,11 @@ export interface StripeInvoiceListOptions {
   createdGte?: number;
 }
 
+export interface StripePaymentIntent {
+  id: string;
+  invoice: string | null;
+}
+
 export const stripeApi = {
   createCustomer: (env: StripeEnv, input: { name: string; email: string | null; tenantId: string }, fetchImpl?: typeof fetch) =>
     stripeRequest<StripeCustomer>(env, 'POST', '/v1/customers', {
@@ -182,6 +187,11 @@ export const stripeApi = {
 
   retrieveSubscription: (env: StripeEnv, subscriptionId: string, fetchImpl?: typeof fetch) =>
     stripeRequest<StripeSubscription>(env, 'GET', `/v1/subscriptions/${encodeURIComponent(subscriptionId)}`, undefined, { fetchImpl }),
+
+  // charge.refunded の Charge に invoice が付かず payment_intent だけの場合の解決用。
+  // PaymentIntent.invoice は請求書払いなら常にIDが入る（2024-06-20 API版で有効）。
+  retrievePaymentIntent: (env: StripeEnv, paymentIntentId: string, fetchImpl?: typeof fetch) =>
+    stripeRequest<StripePaymentIntent>(env, 'GET', `/v1/payment_intents/${encodeURIComponent(paymentIntentId)}`, undefined, { fetchImpl }),
 
   listInvoices: (
     env: StripeEnv,

@@ -3900,7 +3900,9 @@ const spec = {
         tags: ['Webhook'],
         summary: '公開APIトークンの再発行',
         description: '旧トークンを即座に失効させ、同じ名前・範囲の新しいトークンを発行する(#939 N-380)。'
-          + '新しい平文はこの応答に1回だけ返す。',
+          + '新しい平文はこの応答に1回だけ返す。'
+          + '同じ旧IDへの同時再発行は1本だけ成功し、負けた側は409 TOKEN_ROTATE_CONFLICT'
+          + '（新トークンなし・現在の一覧付き）で返す。失効が先に確定した後の再発行も作らない。',
         parameters: [
           { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
           { name: 'lineAccountId', in: 'query', required: true, schema: { type: 'string' } },
@@ -3908,6 +3910,7 @@ const spec = {
         responses: {
           '200': { description: '再発行した。data.token に新しい平文が1回だけ入る' },
           '404': { description: 'Not found' },
+          '409': { description: '同時再発行に負けた。data を見ず一覧を読み直す' },
         },
       },
     },
@@ -3918,7 +3921,8 @@ const spec = {
         description: '外部システム向け公開API(#939 N-380)。管理画面の認証境界の外にあるため'
           + ' security は空。route が `Authorization: Bearer lhp_…` の公開APIトークンを'
           + '自分で照合し、scope tags:read が必要。トークンのアカウントのタグと'
-          + '共通タグだけを返す。',
+          + '共通タグだけを返す。外部連携を止めている間も読み取りは使える'
+          + '（書き込みの POST は 403 FEATURE_DISABLED で止まる）。',
         security: [],
         responses: {
           '200': { description: 'タグ一覧' },
@@ -3935,7 +3939,12 @@ const spec = {
           + ' security は空。route が `Authorization: Bearer lhp_…` の公開APIトークンを'
           + '自分で照合し、scope tags:write が必要。'
           + '友だちはトークンのアカウント所属、タグは同じアカウントか共通で、'
-          + '手動付与が禁じられたタグは付けない。管理画面の付与と同じ効果を持つ。',
+          + '手動付与が禁じられたタグは付けない。管理画面の付与と同じ効果を持つ。'
+          + '書き込みは外部連携が有効なアカウントだけが使える。止めている間は'
+          + '403 FEATURE_DISABLED でタグは増えない（読み取りの GET tags は棚卸しのため使える）。'
+          + '始まるシナリオは友だちと同じアカウント・全体共通の公開済みだけ。'
+          + '同じ要求の再送は不足の購読だけを一度完成させ、二重には作らない。'
+          + 'タグ変化の出来事は発生元の不変ID付きで公開版オートメーションへ渡す。',
         security: [],
         parameters: [{ name: 'friendId', in: 'path', required: true, schema: { type: 'string' } }],
         requestBody: {
@@ -3951,11 +3960,11 @@ const spec = {
           },
         },
         responses: {
-          '200': { description: 'すでに付いていた' },
+          '200': { description: 'すでに付いていた（不足の購読があれば今回完成させた）' },
           '201': { description: '付けた' },
           '400': { description: 'Invalid request' },
           '401': { description: 'トークンが無いか無効' },
-          '403': { description: 'scope 不足' },
+          '403': { description: 'scope 不足または外部連携がオフ' },
           '404': { description: 'Not found' },
         },
       },

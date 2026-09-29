@@ -172,6 +172,7 @@ shared-button-importer app/templates/questions/new/page.tsx
 shared-button-importer app/templates/template-asset-editor.tsx
 shared-button-importer app/updates/page.tsx
 shared-button-importer app/users/page.tsx
+shared-button-importer app/webhooks/api-tokens-panel.tsx
 shared-button-importer app/webhooks/edit/page.tsx
 shared-button-importer app/webhooks/google-sheets-panel.tsx
 shared-button-importer app/webhooks/new/page.tsx

@@ -11,6 +11,7 @@ const stripe = vi.hoisted(() => ({
   createPortalSession: vi.fn(),
   retrievePrice: vi.fn(),
   retrieveSubscription: vi.fn(),
+  retrievePaymentIntent: vi.fn(),
   listInvoices: vi.fn(),
 }));
 vi.mock('../services/stripe-api.js', async (importOriginal) => {
@@ -414,6 +415,42 @@ describe('課金 Webhook', () => {
     expect(info).toHaveBeenCalledWith(JSON.stringify({
       message: 'billing webhook: charge.refunded 対象外',
       eventId: 'evt_ec_refund',
+      reason: 'Stripe Billing請求書でない',
+    }));
+  });
+
+  it('invoiceが無くpayment_intentのみのEC-CUBE返金でも、Billing請求書のPaymentIntentならStripeに問い合わせて反映する', async () => {
+    setTenant({ stripe_customer_id: 'cus_1' });
+    testDb.raw.prepare(
+      `INSERT INTO billing_invoices (id, tenant_id, status, amount_paid, amount_due, amount_refunded, currency, synced_at, created_at)
+       VALUES ('in_pi_test', ?, 'paid', 4_000, 4_000, 0, 'jpy', '2026-09-27T00:00:00+09:00', '2026-09-27T00:00:00+09:00')`,
+    ).run(DEFAULT_TENANT_ID);
+    stripe.retrievePaymentIntent.mockResolvedValue({ id: 'pi_test', invoice: 'in_pi_test' });
+
+    const res = await webhook({
+      id: 'evt_pi_refund',
+      type: 'charge.refunded',
+      data: { object: { id: 'ch_pi', customer: 'cus_1', invoice: null, payment_intent: 'pi_test', amount_refunded: 4_000 } },
+    });
+
+    expect(res.status).toBe(200);
+    expect(stripe.retrievePaymentIntent).toHaveBeenCalledWith(expect.anything(), 'pi_test');
+    expect(testDb.raw.prepare(`SELECT amount_refunded FROM billing_invoices WHERE id = 'in_pi_test'`).get()).toMatchObject({ amount_refunded: 4_000 });
+  });
+
+  it('payment_intentがあっても請求書に紐付かなければ対象外として記録する（Stripe未設定時は問い合わせない）', async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    const res = await webhook({
+      id: 'evt_pi_no_invoice',
+      type: 'charge.refunded',
+      data: { object: { id: 'ch_ec2', customer: 'cus_ec2', invoice: null, payment_intent: 'pi_ec', amount_refunded: 1_200 } },
+    }, { env: { STRIPE_SECRET_KEY: undefined } });
+
+    expect(res.status).toBe(200);
+    expect(stripe.retrievePaymentIntent).not.toHaveBeenCalled();
+    expect(info).toHaveBeenCalledWith(JSON.stringify({
+      message: 'billing webhook: charge.refunded 対象外',
+      eventId: 'evt_pi_no_invoice',
       reason: 'Stripe Billing請求書でない',
     }));
   });
