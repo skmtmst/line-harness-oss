@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useEffect, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { EC_EVENT_TYPES, ecEventLabel } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
@@ -57,6 +57,8 @@ const WEBHOOK_EVENT_GROUPS: ReadonlyArray<{
 /** 送信Webhookを作る唯一のフォーム。一覧の追加導線もこの画面へ集約する。 */
 function NewWebhookForm() {
   const { selectedAccountId } = useAccount()
+  const selectedAccountIdRef = useRef(selectedAccountId)
+  selectedAccountIdRef.current = selectedAccountId
   const searchParams = useSearchParams()
   /*
    * R150: 見本の「送り先を作る」は /webhooks/new?event=<種類> で開く。
@@ -80,7 +82,15 @@ function NewWebhookForm() {
   const [incomingSources, setIncomingSources] = useState('')
   const [secret, setSecret] = useState(generateSecret)
   const [maxRetries, setMaxRetries] = useState('0')
-  const { gate, prompt: stepUpPrompt } = useStepUpGate()
+  const { gate, prompt: stepUpPrompt, cancel: cancelStepUp } = useStepUpGate()
+  /*
+   * d23b R420: 本人確認の窓を開いたままアカウントを切り替えられたら、
+   * 開いた時点のアカウントの操作としての意味はもう無い。窓を閉じて
+   * 待っている保存を止める。
+   */
+  useEffect(() => {
+    cancelStepUp()
+  }, [selectedAccountId, cancelStepUp])
   /*
    * 送り先の作成は統括だけ（R32）。口側が `requireRole('owner')` で守っている。
    * 直接URLで開いた管理者には作らず、統括への依頼を案内する。
@@ -143,9 +153,12 @@ function NewWebhookForm() {
         return null
       }}
       onSave={async () => {
-        if (!selectedAccountId) throw new Error('LINEアカウントを選択してください')
+        // d23b R420: 保存を始めた時点のアカウントを固定する。本人確認の
+        // 窓をまたぐあいだに切り替えられたら、別アカウントへ登録しない。
+        const requestAccountId = selectedAccountId
+        if (!requestAccountId) throw new Error('LINEアカウントを選択してください')
         const payload = {
-          lineAccountId: selectedAccountId,
+          lineAccountId: requestAccountId,
           name: name.trim(),
           url: url.trim(),
           eventTypes: sendAllEvents
@@ -177,6 +190,11 @@ function NewWebhookForm() {
           }
           const token = await gate('webhook.secret', 'Webhookを登録する')
           if (!token) throw caught
+          // d23b R420: 本人確認のあいだに切り替えられたら、切り替え先の
+          // アカウントへ誤った送り先を登録しない。
+          if (selectedAccountIdRef.current !== requestAccountId) {
+            throw new Error('LINEアカウントが切り替わりました。登録せずに止めました。もう一度やり直してください。')
+          }
           res = await create(token)
         }
         if (!res.success) throw new Error(res.error)
@@ -280,7 +298,7 @@ function NewWebhookForm() {
         label="シークレット"
         htmlFor="wh-secret"
         required
-        note="送信時に X-Webhook-Signature ヘッダで署名します。受け取る側で同じ値を使って確かめてください。"
+        note="送信時に X-Harness-Signature ヘッダで署名します（値は v1=署名。入力は「タイムスタンプ.イベントID.本文」の HMAC-SHA256。X-Harness-Event-Id・X-Harness-Timestamp とあわせて送ります）。受け取る側で同じ値を使って確かめてください。"
       >
         <div className="flex gap-2">
           <input

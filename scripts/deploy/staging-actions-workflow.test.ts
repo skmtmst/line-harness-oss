@@ -109,6 +109,21 @@ describe('Deploy Cloudflare Staging workflow', () => {
     expect(workflow).toContain('[ "$WORKER_CONFIG_REPLAY" != "true" ]');
   });
 
+  it('rebuilds only the verified live Admin source when unrelated D1 migrations are pending', () => {
+    expect(workflow).toContain('pages_config_replay:');
+    expect(workflow).toContain('pages_source_sha:');
+    expect(workflow).toContain('expected_pages_deployment_id:');
+    expect(workflow).toContain('test "$DELIVERY_TARGET" = "admin"');
+    expect(workflow).toContain('test "$active_id" = "$EXPECTED_PAGES_DEPLOYMENT_ID"');
+    expect(workflow).toContain('test "$active_sha" = "$PAGES_SOURCE_SHA"');
+    expect(workflow).toContain('git merge-base --is-ancestor "$PAGES_SOURCE_SHA" "$GITHUB_SHA"');
+    expect(workflow).toContain('git worktree add --detach "$admin_root" "$PAGES_SOURCE_SHA"');
+    expect(workflow).toContain('[ "$PAGES_CONFIG_REPLAY" != "true" ]');
+    expect(workflow).toContain('test "$deployed_sha" = "$source_sha"');
+    expect(workflow).toContain('test "$deployed_id" != "$EXPECTED_PAGES_DEPLOYMENT_ID"');
+    expect(workflow).not.toContain('pnpm d1 migrations apply');
+  });
+
   it('verifies the active Version ID and Google write setting after Worker deploy', () => {
     expect(workflow).toContain('id: worker_deploy');
     expect(workflow).toContain('Current Version ID:');

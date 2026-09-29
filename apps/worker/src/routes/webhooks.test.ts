@@ -26,6 +26,8 @@ vi.mock('@line-crm/db', async (importOriginal) => {
   countFailedWebhookInteractionsForRetry: vi.fn().mockResolvedValue(0),
   // IDEA-26: 結果不明の失敗件数(まとめて再送しない対象)。
   countUnverifiedWebhookInteractions: vi.fn().mockResolvedValue(0),
+  // d23b R408: まとめて再送の対象外に残った件数(消えた・止まった送り先等)。
+  countExcludedFailedWebhookInteractions: vi.fn().mockResolvedValue(0),
   listWebhookInteractions: vi.fn(),
   getOutgoingWebhookDeliverySummaries: vi.fn(),
   updateIncomingWebhookConfig: vi.fn(),
@@ -94,6 +96,9 @@ vi.mock('../services/outgoing-webhook-delivery.js', async (importOriginal) => {
   return {
     ...actual,
     deliverWebhook: vi.fn().mockResolvedValue({ ok: true, attempts: 1, lastStatus: 204 }),
+    // d23b R419: 試し送信は1回固定の配送経路を呼ぶ。deliverWebhook を
+    // 別途モックしても内部呼び出しは通らないので、deliverOnce も差し替える。
+    deliverOnce: vi.fn().mockResolvedValue({ ok: true, attempts: 1, lastStatus: 204 }),
   };
 });
 
@@ -132,7 +137,7 @@ import { retryWebhookInteraction } from '../services/webhook-interactions.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { fireEvent } from '../services/event-bus.js';
 import { executeIncomingWebhookActions, previewIncomingWebhook } from '../services/incoming-webhook-actions.js';
-import { deliverWebhook } from '../services/outgoing-webhook-delivery.js';
+import { deliverWebhook, deliverOnce } from '../services/outgoing-webhook-delivery.js';
 import type { Env } from '../index.js';
 import { webhooks } from './webhooks.js';
 
@@ -233,7 +238,10 @@ beforeEach(() => {
   vi.mocked(finishWebhookInteraction).mockResolvedValue(undefined);
   vi.mocked(listWebhookInteractions).mockResolvedValue({
     items: [], total: 0, page: 1, limit: 20,
-    summary: { total: 0, outgoing: 0, incoming: 0, succeeded: 0, failed: 0, resultUnknown: 0, averageDurationMs: null },
+    summary: {
+      total: 0, outgoing: 0, incoming: 0, succeeded: 0, failed: 0,
+      resultUnknown: 0, outgoingFailed: 0, retryable: 0, averageDurationMs: null,
+    },
   });
   vi.mocked(listFailedWebhookInteractionsForRetry).mockResolvedValue([]);
   vi.mocked(getOutgoingWebhookDeliverySummaries).mockResolvedValue([]);
@@ -242,6 +250,7 @@ beforeEach(() => {
     matchedFriendId: null, executed: 0, failed: 0, matchStatus: 'not_found',
   });
   vi.mocked(deliverWebhook).mockResolvedValue({ ok: true, attempts: 1, lastStatus: 204 });
+  vi.mocked(deliverOnce).mockResolvedValue({ ok: true, attempts: 1, lastStatus: 204 });
   vi.mocked(getIncomingWebhookById).mockResolvedValue(incomingWebhookRow());
   vi.mocked(getOutgoingWebhookById).mockResolvedValue({
     id: 'wh-1', name: 'test', url: 'https://example.com/hook', event_types: '["*"]',
@@ -1309,7 +1318,8 @@ describe('POST /api/webhooks/outgoing/:id/test', () => {
     expect(res.status).toBe(200);
     // N-371: 試し送信も共通封筒 {id,type,occurred_at,account_id,data,attempt}
     // で送る。封筒の id と冪等キーは同じ値（再送しても同じ出来事）。
-    const call = vi.mocked(deliverWebhook).mock.calls[0];
+    // d23b R419: 試し送信は送り直し無しの1回固定経路(deliverOnce)を呼ぶ。
+    const call = vi.mocked(deliverOnce).mock.calls[0];
     expect(call?.[0]).toMatchObject({ id: 'wh-1' });
     const sentBody = JSON.parse(call?.[1] ?? '{}') as Record<string, unknown>;
     expect(sentBody).toMatchObject({
@@ -1339,6 +1349,8 @@ describe('Webhookやり取り記録', () => {
     request_body_json: '{"private":"本文"}', response_status: 500,
     attempt_count: 2, duration_ms: 820, failure_reason: 'response_5xx' as const,
     idempotency_key: 'delivery-a', retry_of_id: null,
+    linked_webhook_active: 1 as const, delivery_status: null,
+    delivery_next_retry_at: null,
     started_at: '2026-08-29T10:00:00.000+09:00', completed_at: '2026-08-29T10:00:00.820+09:00',
     created_at: '2026-08-29T10:00:00.000+09:00',
   };
@@ -1346,7 +1358,10 @@ describe('Webhookやり取り記録', () => {
   test('一覧はアカウントを検査し、本文・配送ID・Webhook IDを返さない', async () => {
     vi.mocked(listWebhookInteractions).mockResolvedValue({
       items: [failedRow], total: 1, page: 1, limit: 20,
-      summary: { total: 1, outgoing: 1, incoming: 0, succeeded: 0, failed: 1, resultUnknown: 0, averageDurationMs: 820 },
+      summary: {
+        total: 1, outgoing: 1, incoming: 0, succeeded: 0, failed: 1,
+        resultUnknown: 0, outgoingFailed: 1, retryable: 1, averageDurationMs: 820,
+      },
     });
     const res = await setupApp().request(
       `/api/webhooks/interactions?lineAccountId=${ACCOUNT_ID}`,
@@ -1931,7 +1946,7 @@ describe('#650 fail-closed: 鍵不足・復号失敗は安全に止める', () =
     );
     expect(res.status).toBe(503);
     expect(await res.text()).not.toContain('v1-broken-xyz');
-    expect(deliverWebhook).not.toHaveBeenCalled();
+    expect(deliverOnce).not.toHaveBeenCalled();
   });
 
   test('試し送信は復号した値で署名し、他アカウントは403にする', async () => {
@@ -1943,14 +1958,14 @@ describe('#650 fail-closed: 鍵不足・復号失敗は安全に止める', () =
     );
     expect(res.status).toBe(200);
     expect(resolveWebhookSecret).toHaveBeenCalledWith(expect.objectContaining({ id: 'wh-1' }), { current: TEST_KEY, previous: undefined });
-    // 署名用の復号は deliverWebhook が行う。ここでは鍵がそのまま渡ることを見る。
+    // 署名用の復号は配送側が行う。ここでは鍵がそのまま渡ることを見る。
     // 呼び出し元で復号した値を詰め替える形に戻すと、鍵を渡し忘れた経路が
     // 黙って署名なしで送るので、鍵の受け渡しの方を固定する(#650 再審査)。
     // N-371/N-372(#940): 本文は共通封筒で、冪等キーは封筒の id と同じ値。
-    const testCall = vi.mocked(deliverWebhook).mock.calls[0]!;
+    const testCall = vi.mocked(deliverOnce).mock.calls[0]!;
     const sentBody = testCall[1] as string;
     const sendOptions = testCall[2] as { idempotencyKey?: string };
-    expect(deliverWebhook).toHaveBeenCalledWith(
+    expect(deliverOnce).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'wh-1', secret_encrypted: 'v1-enc-abc' }),
       expect.stringContaining('webhook.test'),
       expect.objectContaining({ credentialKeys: { current: TEST_KEY, previous: undefined } }),

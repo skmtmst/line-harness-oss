@@ -6851,7 +6851,7 @@ CREATE TABLE users (
 , tenant_id TEXT REFERENCES tenants(id) ON DELETE RESTRICT, status TEXT NOT NULL DEFAULT 'active'
   CHECK (status IN ('active', 'review', 'archived')), primary_display_name TEXT, revision INTEGER NOT NULL DEFAULT 1 CHECK (revision >= 1), created_by TEXT, archived_at TEXT);
 
-CREATE TABLE webhook_interaction_logs (
+CREATE TABLE "webhook_interaction_logs" (
   id                 TEXT PRIMARY KEY,
   line_account_id    TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
   direction          TEXT NOT NULL CHECK (direction IN ('outgoing', 'incoming')),
@@ -6867,7 +6867,7 @@ CREATE TABLE webhook_interaction_logs (
   failure_reason     TEXT CHECK (
     failure_reason IS NULL OR failure_reason IN (
       'connection_failed', 'response_4xx', 'response_429',
-      'response_5xx', 'processing_failed', 'unknown'
+      'response_5xx', 'processing_failed', 'unknown', 'secret_unavailable'
     )
   ),
   idempotency_key    TEXT NOT NULL,
@@ -9031,16 +9031,16 @@ CREATE INDEX idx_users_phone ON users (phone);
 CREATE INDEX idx_users_tenant_status
   ON users(tenant_id, status, updated_at DESC);
 
-CREATE INDEX idx_webhook_interactions_account_created
+CREATE INDEX idx_webhook_interactions_account_created_v532
   ON webhook_interaction_logs (line_account_id, created_at DESC);
 
-CREATE INDEX idx_webhook_interactions_account_status
+CREATE INDEX idx_webhook_interactions_account_status_v532
   ON webhook_interaction_logs (line_account_id, status, created_at DESC);
 
-CREATE INDEX idx_webhook_interactions_connection_period
+CREATE INDEX idx_webhook_interactions_connection_period_v532
   ON webhook_interaction_logs(line_account_id, webhook_id, created_at DESC, status);
 
-CREATE INDEX idx_webhook_interactions_webhook
+CREATE INDEX idx_webhook_interactions_webhook_v532
   ON webhook_interaction_logs (line_account_id, webhook_id, created_at DESC);
 
 CREATE INDEX idx_webinar_action_executions_status
