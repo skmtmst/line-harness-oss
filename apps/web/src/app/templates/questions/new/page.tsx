@@ -10,7 +10,7 @@ import QuestionEditor, {
   type ScenarioQuestion,
 } from '@/components/scenarios/question-editor'
 import Button from '@/components/shared/button'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import LinePreview from '@/components/shared/line-preview'
 import Notice from '@/components/shared/notice'
 import { isForbiddenOrRateLimited, loadFailureNotice } from '@/components/shared/api-error-message'
@@ -341,7 +341,7 @@ function QuestionTemplatePageInner() {
         )}
       />
       {/* R136 監査：質問文などの書きかけがある間の離脱確認。 */}
-      <ConfirmDialog primaryAction="cancel" open={leaveTarget !== null} title="保存していない変更があります" description="このまま移動すると、質問への変更は失われます。保存せずに移動しますか？" confirmLabel="保存せずに移動" cancelLabel="編集を続ける" onConfirm={confirmLeave} onCancel={cancelLeave} />
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="質問への変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )
 }

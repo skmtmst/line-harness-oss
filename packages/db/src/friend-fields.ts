@@ -994,6 +994,40 @@ export async function setFriendFieldValuesBulk(
 }
 
 /**
+ * M046: 1人の複数項目を1回のD1 batchで書く。
+ *
+ * 値は呼び出し側で validate済みの正規化ずみを渡すこと。batchは原子的で、
+ * 途中の1文が失敗したら永続変更は0件になる。空配列は呼ばないこと。
+ */
+export async function setFriendFieldValuesForFriend(
+  db: D1Database,
+  input: {
+    friendId: string;
+    entries: Array<{ fieldId: string; value: string | null }>;
+    updatedBy: string;
+    now: string;
+  },
+): Promise<number> {
+  const statements = input.entries.map((entry) =>
+    entry.value === null || entry.value === ''
+      ? db
+          .prepare('DELETE FROM friend_field_values WHERE friend_id = ? AND field_id = ?')
+          .bind(input.friendId, entry.fieldId)
+      : db
+          .prepare(
+            `INSERT INTO friend_field_values (friend_id, field_id, value, updated_by, updated_at)
+             VALUES (?, ?, ?, ?, ?)
+             ON CONFLICT(friend_id, field_id)
+             DO UPDATE SET value = excluded.value, updated_by = excluded.updated_by,
+                           updated_at = excluded.updated_at`,
+          )
+          .bind(input.friendId, entry.fieldId, entry.value, input.updatedBy, input.now),
+  );
+  await db.batch(statements);
+  return statements.length;
+}
+
+/**
  * テンプレートの差し込み用に、その友だちの値を key => value で返す。
  *
  * 値が無い項目は既定値で埋める。差し込みの結果が空文字になるより、

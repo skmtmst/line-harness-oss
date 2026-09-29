@@ -12,7 +12,7 @@ import { initialWizardStep, STEP } from './terms-state'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import Checkbox from '@/components/shared/checkbox'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import StickyBar from '@/components/shared/sticky-bar'
 
 const steps = [
@@ -278,6 +278,6 @@ export default function NewRestaurantStorePage() {
       </div>
     </div>
     {/* R161 監査：店舗名などの書きかけがある間の離脱確認。 */}
-    <ConfirmDialog primaryAction="cancel" open={leaveTarget !== null} title="保存していない変更があります" description="このまま移動すると、入力した店舗の内容は保存されません。保存せずに移動しますか？" confirmLabel="保存せずに移動" cancelLabel="入力を続ける" onConfirm={confirmLeave} onCancel={cancelLeave} />
+    <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した店舗の内容" onConfirm={confirmLeave} onCancel={cancelLeave} />
   </div>
 }

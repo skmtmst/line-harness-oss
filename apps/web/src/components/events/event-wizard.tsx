@@ -18,6 +18,7 @@ import { AsideCard, ChoiceCard, Field, FormSection, inputClass } from '@/compone
 import { BULK_SLOT_LIMIT, generateBulkSlots } from './bulk-slot-generator'
 import { formatSlotJp, jstHHMMToUtcIso, splitBand, todayJst } from './jst'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { TextInput } from '@/components/shared/form-controls'
 import DateField from '@/components/shared/date-field'
@@ -383,7 +384,7 @@ export default function EventWizard({ accountId, eventId, step }: EventWizardPro
       )}
 
       {/* R161 監査：概要・予約枠・公開設定の書きかけがある間の離脱確認。 */}
-      <ConfirmDialog primaryAction="cancel" open={leaveTarget !== null} title="保存していない変更があります" description="このまま移動すると、イベントへの変更は失われます。保存せずに移動しますか？" confirmLabel="保存せずに移動" cancelLabel="編集を続ける" onConfirm={confirmLeave} onCancel={cancelLeave} />
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="イベントへの変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
 
       {step === 1 && (
         <OverviewStep

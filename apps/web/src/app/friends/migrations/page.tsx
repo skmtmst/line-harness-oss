@@ -3,7 +3,8 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useState } from 'react'
 import type { LineAccount } from '@line-crm/shared'
-import { api, type FriendMigrationJob } from '@/lib/api'
+import { api, ApiError, type FriendMigrationJob } from '@/lib/api'
+import { describeApiFailure, japaneseDetailOf } from '@/components/shared/api-error-message'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import Disclosure from '@/components/shared/disclosure'
@@ -42,7 +43,9 @@ export default function FriendMigrationsPage() {
   const [accounts, setAccounts] = useState<LineAccount[]>([])
   const [accountId, setAccountId] = useState('')
   const [jobs, setJobs] = useState<FriendMigrationJob[]>([])
-  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [status, setStatus] = useState<'loading' | 'ready' | 'error' | 'forbidden'>('loading')
+  // M016：書き出し・取り込みは owner/admin 専用。押せる人かで案内を変える目安。
+  const [role, setRole] = useState('')
   // R114: タグ・友だち情報と対応情報の書き出しは未接続のため、初期選択は
   // 実際に出る基本だけにする。選べるのに出ない状態を作らない。
   const [columns, setColumns] = useState<Array<'basic' | 'tags_fields' | 'support'>>(['basic'])
@@ -65,12 +68,30 @@ export default function FriendMigrationsPage() {
       setAccountId((value) => value || accountResponse.data[0]?.id || '')
       setJobs(jobResponse.data)
       setStatus('ready')
-    } catch {
-      setStatus('error')
+    } catch (caught) {
+      // M016：読み込み 403 は権限不足として分ける（押しても直らない再試行は出さない）。
+      setStatus(caught instanceof ApiError && caught.status === 403 ? 'forbidden' : 'error')
     }
   }, [])
 
-  useEffect(() => { void load() }, [load])
+  useEffect(() => {
+    void load()
+    try {
+      setRole(window.localStorage.getItem('lh_staff_role') ?? '')
+    } catch {
+      // ストレージが使えなくても画面は出せる
+    }
+  }, [load])
+
+  /*
+   * M016：操作の失敗は原文（`API error: NNN`・英語生文）のまま出さない。
+   * 安全なサーバ文があればそのまま、無ければ共通の状態別案内へ渡す。
+   */
+  const MANAGE_FORBIDDEN = '書き出し・取り込みの操作はオーナーか管理者だけができます。必要なときはオーナーか管理者の方に操作してもらってください。'
+  const operationFailureMessage = (caught: unknown, action: string): string =>
+    japaneseDetailOf(caught) || describeApiFailure(caught, action, { forbidden: MANAGE_FORBIDDEN })
+  // 役割が分かっていて owner/admin でないときだけ、ボタンの近くに理由を出す。
+  const manageLocked = role !== '' && role !== 'owner' && role !== 'admin'
 
   const toggleColumn = (column: 'basic' | 'tags_fields' | 'support') => {
     setColumns((current) => current.includes(column) ? current.filter((value) => value !== column) : [...current, column])
@@ -81,11 +102,11 @@ export default function FriendMigrationsPage() {
     setBusy(true); setMessage(null)
     try {
       const response = await api.friendMigrations.createExport({ accountId, columns, encoding })
-      if (!response.success) throw new Error(response.error)
+      if (!response.success) { setMessage(response.error); return }
       setExportResult(response.data)
       setMessage('書き出しを作りました。ダウンロードできる期間は7日です。')
       await load()
-    } catch (error) { setMessage(error instanceof Error ? error.message : '書き出しを作れませんでした。') }
+    } catch (error) { setMessage(operationFailureMessage(error, '書き出し')) }
     finally { setBusy(false) }
   }
 
@@ -115,15 +136,35 @@ export default function FriendMigrationsPage() {
       const digest = await crypto.subtle.digest('SHA-256', await file.arrayBuffer())
       const sourceChecksum = Array.from(new Uint8Array(digest)).map((value) => value.toString(16).padStart(2, '0')).join('')
       const response = await api.friendMigrations.previewImport({ accountId, sourceFilename: file.name, sourceChecksum, rows })
-      if (!response.success) throw new Error(response.error)
+      if (!response.success) { setMessage(response.error); return }
       setImportId(response.data.id); setSummary(response.data.result.summary)
       setMessage(response.data.duplicate ? '同じファイルの確認結果を表示しました。二重には反映しません。' : '確認だけ完了しました。まだ友だち情報は変更していません。')
       await load()
-    } catch (error) { setMessage(error instanceof Error ? error.message : '取り込みを確認できませんでした。') }
+    } catch (error) { setMessage(operationFailureMessage(error, '確認')) }
     finally { setBusy(false) }
   }
 
+  /*
+   * M015：反映の失敗で画面が固まっていた（try/catch が無く、throw が
+   * 未捕捉になり busy が戻らなかった）。失敗文を出して busy を戻し、
+   * 履歴を読み直す。
+   */
+  const executeImport = async () => {
+    if (!importId || busy) return
+    setBusy(true)
+    try {
+      const response = await api.friendMigrations.executeImport(importId)
+      setMessage(response.success ? `${response.data.applied ?? 0}件を反映しました。` : response.error)
+    } catch (error) {
+      setMessage(operationFailureMessage(error, '反映'))
+    } finally {
+      setBusy(false)
+    }
+    await load()
+  }
+
   if (status === 'loading') return <ListState kind="loading" title="書き出し・取り込みを読み込んでいます" />
+  if (status === 'forbidden') return <ListState kind="forbidden" title="書き出し・取り込みを見る権限がありません" description="見るには権限が要ります。オーナーか管理者の方に確認してください。" />
   if (status === 'error') return <ListState kind="error" title="書き出し・取り込みを表示できませんでした" description="履歴は消えていません。" action={<Button onClick={() => void load()}>再読み込み</Button>} />
 
   {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
@@ -150,6 +191,7 @@ export default function FriendMigrationsPage() {
         <p className="text-ink-faint mt-2 text-xs">電話番号やメールなどの個人情報は、見る権限がある人だけ選べます。</p>
         <p className="text-ink-secondary mt-4 text-sm">文字コード： UTF-8</p><p className="text-ink-faint mt-1 text-xs">Shift_JISの書き出しはまだ使えません。今はUTF-8を選んでください。</p>
         <div className="mt-4 flex items-center gap-3"><Button variant="primary" disabled={busy} onClick={() => void createExport()}>書き出しを作る</Button>{exportResult && <a className="text-action text-sm font-semibold hover:underline" href={`${process.env.NEXT_PUBLIC_API_URL ?? ''}${exportResult.downloadUrl}`}>CSVをダウンロード（{exportResult.rowCount ?? '—'}件）</a>}</div>
+        {manageLocked ? <p className="text-ink-secondary mt-2 text-xs">{MANAGE_FORBIDDEN}</p> : null}
         <p className="text-ink-faint mt-2 text-xs">件数が多いときは、できあがったらお知らせします。ダウンロードできる期間は7日です。</p>
       </section>
 
@@ -176,7 +218,8 @@ export default function FriendMigrationsPage() {
           </div>
         ) : null}
         <div className="mt-4 flex items-center gap-3"><Button variant="primary" disabled={busy} onClick={() => void previewImport()}>まず確認だけする</Button><span className="text-ink-faint text-xs">確認の結果を見てから反映</span></div>
-        {summary && <><h3 className="text-ink mt-5 text-sm font-bold">確認の結果</h3><div className="mt-2 grid grid-cols-5 gap-2"><KpiCard variant="v6" title="追加" value={summary.add} unit="件" detail="" help="新しく登録する件数です" /><KpiCard variant="v6" title="更新" value={summary.update} unit="件" detail="" help="値を変更する件数です" /><KpiCard variant="v6" title="変更なし" value={summary.unchanged} unit="件" detail="" help="同じ内容の件数です" /><KpiCard variant="v6" title="競合" value={summary.conflict} unit="件" detail="判断が必要" /><KpiCard variant="v6" title="エラー" value={summary.error} unit="件" detail="直して再確認" /></div>{importId && <div className="mt-4"><Button disabled={summary.conflict + summary.error > 0 || busy} onClick={async () => { setBusy(true); const response = await api.friendMigrations.executeImport(importId); setMessage(response.success ? `${response.data.applied ?? 0}件を反映しました。` : response.error); setBusy(false); await load() }}>確認した内容を反映</Button></div>}</>}
+        {manageLocked ? <p className="text-ink-secondary mt-2 text-xs">{MANAGE_FORBIDDEN}</p> : null}
+        {summary && <><h3 className="text-ink mt-5 text-sm font-bold">確認の結果</h3><div className="mt-2 grid grid-cols-5 gap-2"><KpiCard variant="v6" title="追加" value={summary.add} unit="件" detail="" help="新しく登録する件数です" /><KpiCard variant="v6" title="更新" value={summary.update} unit="件" detail="" help="値を変更する件数です" /><KpiCard variant="v6" title="変更なし" value={summary.unchanged} unit="件" detail="" help="同じ内容の件数です" /><KpiCard variant="v6" title="競合" value={summary.conflict} unit="件" detail="判断が必要" /><KpiCard variant="v6" title="エラー" value={summary.error} unit="件" detail="直して再確認" /></div>{importId && <div className="mt-4"><Button disabled={summary.conflict + summary.error > 0 || busy} onClick={() => void executeImport()}>確認した内容を反映</Button></div>}</>}
         <p className="text-ink-faint mt-4 text-xs leading-relaxed">LINEのユーザーIDとLINEアカウントは、既存行の取り込みでは変わりません。同じファイルをもう一度入れても二重には反映しません。</p>
       </section>
     </div>
