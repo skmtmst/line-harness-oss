@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { X } from 'lucide-react'
-import { api } from '@/lib/api'
+import { ApiError, api } from '@/lib/api'
 import type { AutoReplyDraftInput, AutoReplyDraftVersion } from '@line-crm/shared'
 import { validateFlexContent } from '@line-crm/shared'
 import type { SegmentCondition } from '@/lib/segment-condition'
@@ -24,6 +24,7 @@ import {
   type InlineAction,
 } from './draft-fields'
 import Notice from '@/components/shared/notice'
+import Disclosure from '@/components/shared/disclosure'
 import ImageUploader from '@/components/shared/image-uploader'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
@@ -363,6 +364,17 @@ export default function EditDialog({
   const [friendConditionOpen, setFriendConditionOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  /*
+   * m26c R551: 下書き保存の競合（409）で、先行内容との比較と読み直しの
+   * 導線を出す。入力は保持し、読み直すまで消さない。
+   * m26c R569: 公開中ルールの一覧編集は下書きへ保存される。稼働中は
+   * 無変更なので、公開フローへ案内する。
+   */
+  const [conflictInfo, setConflictInfo] = useState<{
+    keyword: string
+    responseContent: string
+  } | null>(null)
+  const [draftSaved, setDraftSaved] = useState(false)
   // アクションで選ぶもの（タグ・友だち情報・対応マーク・シナリオ・共通情報）。
   const actionOptions = useActionOptions()
   // 一覧内で開く編集窓は共通のoverlay制御へ寄せる。Escape・Tab循環・背景
@@ -440,6 +452,8 @@ export default function EditDialog({
       setError('返信する画像を選んでください'); return
     }
     setError('')
+    setConflictInfo(null)
+    setDraftSaved(false)
     setSaving(true)
     try {
       const body: {
@@ -537,7 +551,13 @@ export default function EditDialog({
           expectedVersion: draft.versionNumber,
         })
       } else if (draft.id) {
-        await api.autoReplies.update(draft.id, body)
+        const updated = await api.autoReplies.update(draft.id, body)
+        if (updated.success && updated.data?.draftSaved) {
+          // m26c R569: 稼働中は無変更で下書きへ載った。閉じずに公開フローへ案内する。
+          setDraftSaved(true)
+          setSaving(false)
+          return
+        }
       } else {
         // AUTOREPLY-08: 新規作成は常に止まった状態で保存する。チェックを
         // 付けて作る形にすると「オフで保存したのに動く」の逆が起きる。
@@ -546,7 +566,23 @@ export default function EditDialog({
       }
       onSaved()
     } catch (e) {
-      setError(e instanceof Error ? e.message : '保存に失敗しました。通信を確かめて、もう一度お試しください。')
+      // m26c R551: 競合は入力を保持したまま、先行内容との比較と読み直しを出す。
+      if (e instanceof ApiError && e.status === 409) {
+        const data = e.data as {
+          currentVersion?: number
+          current?: { keyword?: string; responseContent?: string }
+        } | null
+        setError(e.message || 'ほかの変更が先に保存されました。最新の状態を読み直してください')
+        if (data?.current) {
+          setConflictInfo({
+            keyword: typeof data.current.keyword === 'string' ? data.current.keyword : '',
+            responseContent:
+              typeof data.current.responseContent === 'string' ? data.current.responseContent : '',
+          })
+        }
+      } else {
+        setError(e instanceof Error ? e.message : '保存に失敗しました。通信を確かめて、もう一度お試しください。')
+      }
     }
     setSaving(false)
   }
@@ -1517,6 +1553,46 @@ export default function EditDialog({
             </>
           ) : null}
           {error && <p className="text-xs text-red-600">{error}</p>}
+          {conflictInfo && (
+            <Notice tone="warn">
+              <p>ほかの担当者の保存が先に入っています。あなたの入力は消えていません。</p>
+              <Disclosure size="compact" title="先に保存された内容と比べる">
+                <dl className="mt-2 space-y-1 text-xs">
+                  <div className="flex gap-2">
+                    <dt className="text-ink-faint shrink-0">言葉</dt>
+                    <dd className="text-ink font-medium">{conflictInfo.keyword || '—'}</dd>
+                  </div>
+                  <div className="flex gap-2">
+                    <dt className="text-ink-faint shrink-0">返信</dt>
+                    <dd className="text-ink whitespace-pre-wrap font-medium">
+                      {conflictInfo.responseContent || '—'}
+                    </dd>
+                  </div>
+                </dl>
+              </Disclosure>
+              <div className="mt-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => window.location.reload()}
+                >
+                  最新の状態を読み直す
+                </Button>
+              </div>
+            </Notice>
+          )}
+          {draftSaved && draft.id && (
+            <Notice
+              tone="info"
+              message="稼働中の定義は変えていません。下書きに保存しました。競合の確認・テストを経て公開してください。"
+              action={
+                <Button type="button" href={`/auto-replies/publish?id=${encodeURIComponent(draft.id)}`}>
+                  公開フローへ進む
+                </Button>
+              }
+              onClose={() => onSaved()}
+            />
+          )}
         </div>
         {/* ★V7: 窓の中身だけをスクロールさせ、保存の段は窓の下に固定する。 */}
         {!page && <StickyBar className="mx-5 mb-4 shrink-0" actions={stickyActions} />}
