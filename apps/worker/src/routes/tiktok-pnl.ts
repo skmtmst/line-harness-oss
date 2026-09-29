@@ -63,6 +63,9 @@ tiktokPnl.get(
         lastImportAt: settings?.last_import_at ?? null,
         lastSheetSyncAt: settings?.last_sheet_sync_at ?? null,
         lastError: settings?.last_error ?? null,
+        // 連続失敗回数。ここが増え続けている時は再接続や設定の見直しが必要なので
+        // 管理画面で見えるようにする。
+        consecutiveFailures: settings?.consecutive_failures ?? 0,
         pendingRows: pending?.n ?? 0,
       },
     });
@@ -80,6 +83,14 @@ tiktokPnl.post(
     if (!integration) {
       return fail(c, 409, 'Google Sheets連携が未接続です。先に管理画面のスプレッドシート連携を接続してください');
     }
+    // 手動同期を押した時点が、このアカウントで利益計算シートを使うという
+    // 明示的な意思表示。ここで有効化して以降はcronの対象にもする。
+    await dbFor(c.env).prepare(
+      `INSERT INTO tiktok_pnl_settings (line_account_id, enabled)
+         VALUES (?, 1)
+       ON CONFLICT(line_account_id)
+         DO UPDATE SET enabled = 1, updated_at = datetime('now')`,
+    ).bind(lineAccountId).run();
     const result = await syncTiktokPnlForAccount(c.env, integration, {
       now: new Date().toISOString(),
     });

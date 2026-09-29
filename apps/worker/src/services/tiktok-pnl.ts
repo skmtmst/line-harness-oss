@@ -50,9 +50,15 @@ const TAB_SETTINGS = '設定';
 
 export interface TiktokPnlSettingsRow {
   line_account_id: string;
+  /** 1 = 利益計算シートを使う。0 のアカウントは cron が触らない。 */
+  enabled: number;
   spreadsheet_id: string | null;
   spreadsheet_url: string | null;
   status: 'pending' | 'ready' | 'error';
+  /** 同期中の目印。アカウント単位の排他に使う。 */
+  sync_started_at: string | null;
+  /** 雛形（見出し・数式・マスタ）を書き終えた時刻。 */
+  template_filled_at: string | null;
   import_cursor: string | null;
   last_import_at: string | null;
   last_sheet_sync_at: string | null;
@@ -210,8 +216,17 @@ async function importFromEc(
       await upsertOrder(db, lineAccountId, order, nowIso);
       imported += 1;
     }
-    cursor = body.next_since ?? cursor;
-    if (!body.has_more || orders.length === 0) break;
+    // カーソルはページごとに保存する。次のページで失敗しても、
+    // ここまで取り込んだ分をもう一度取り直さない。
+    const nextCursor = body.next_since ?? null;
+    const advanced = nextCursor !== null && nextCursor !== cursor;
+    if (advanced) {
+      cursor = nextCursor;
+      await saveSettings(db, lineAccountId, { import_cursor: cursor, last_import_at: nowIso });
+    }
+    // カーソルが進まないまま has_more=true が返ると同じページを延々と取り込み、
+    // 明細が重複するか1tickを丸ごと空回りさせる。進まなければ打ち切る。
+    if (!body.has_more || orders.length === 0 || !advanced) break;
   }
   return { orders: imported, cursor };
 }
@@ -251,6 +266,8 @@ async function upsertOrder(
          sheet_dirty = CASE WHEN
              tiktok_pnl_order_lines.order_date_jst IS NOT excluded.order_date_jst
              OR tiktok_pnl_order_lines.order_status IS NOT excluded.order_status
+             -- SKUもシートのE列に出るので、ここが変わったら書き出し対象に戻す。
+             OR tiktok_pnl_order_lines.sku IS NOT excluded.sku
              OR tiktok_pnl_order_lines.product_name IS NOT excluded.product_name
              OR tiktok_pnl_order_lines.quantity IS NOT excluded.quantity
              OR tiktok_pnl_order_lines.unit_price_yen IS NOT excluded.unit_price_yen
@@ -296,14 +313,25 @@ function detailFormulaHeader(): string[] {
   ];
 }
 
-function monthlyPnlRows(nowIso: string): (string | number)[][] {
+/** 月次PnLのA列（月）。明細のO列と文字列で突き合わせるので日付にしない。 */
+const MONTHLY_PNL_ROW_COUNT = 24;
+
+function monthlyPnlMonthColumn(nowIso: string): string[][] {
+  const rows: string[][] = [];
+  for (let i = 0; i < MONTHLY_PNL_ROW_COUNT; i += 1) {
+    rows.push([jstMonthOf(nowIso, i - 1)]);
+  }
+  return rows;
+}
+
+/** 月次PnLのB〜L列（数式のみ）。A列の月は別途RAWで書き込む。 */
+function monthlyPnlRows(): (string | number)[][] {
   const D = q(TAB_DETAIL);
   const S = q(TAB_SETTINGS);
   const rows: (string | number)[][] = [];
-  for (let i = 0; i < 24; i += 1) {
+  for (let i = 0; i < MONTHLY_PNL_ROW_COUNT; i += 1) {
     const row = i + 2;
     rows.push([
-      jstMonthOf(nowIso, i - 1),
       `=IF($A${row}="","",SUMIFS(${D}!$H$2:$H,${D}!$O$2:$O,$A${row},${D}!$X$2:$X,1))`,
       `=IF($A${row}="","",SUMIFS(${D}!$Q$2:$Q,${D}!$O$2:$O,$A${row},${D}!$X$2:$X,1))`,
       `=IF($A${row}="","",SUMIFS(${D}!$S$2:$S,${D}!$O$2:$O,$A${row},${D}!$X$2:$X,1))`,
@@ -406,18 +434,21 @@ function guideRows(): string[][] {
   ];
 }
 
-/** 雛形スプレッドシートを作成し、そのIDを返す。 */
-async function createTemplateSpreadsheet(
+/**
+ * 空のスプレッドシート（タブだけ）を作る。中身の書き込みは fillTemplate に分ける。
+ *
+ * 1回のtickで「作成」と「書き込み」を続けてやると、書き込みで失敗した時に
+ * IDを保存できず、次のtickがまた新しいスプレッドシートを作ってしまう。
+ * 作成直後にIDを保存し、書き込みは何度でもやり直せる形にする。
+ */
+async function createEmptySpreadsheet(
   options: RequestOptions,
-  nowIso: string,
 ): Promise<{ spreadsheetId: string; url: string }> {
   const created = await authorizedJson<{ spreadsheetId?: string; spreadsheetUrl?: string }>(
     options,
     SHEETS_API,
     {
       method: 'POST',
-      // 作成の再試行は同名シートの二重作成になり得るが、成功応答を取りこぼした
-      // 場合のみで、次tickの設定行チェックで気付ける。retry既定のままにする。
       body: {
         properties: { title: TIKTOK_PNL_SPREADSHEET_TITLE, locale: 'ja_JP', timeZone: 'Asia/Tokyo' },
         sheets: [
@@ -434,7 +465,21 @@ async function createTemplateSpreadsheet(
   );
   const spreadsheetId = created.spreadsheetId;
   if (!spreadsheetId) throw new TiktokPnlError('sheet_create_failed');
+  return {
+    spreadsheetId,
+    url: `https://docs.google.com/spreadsheets/d/${spreadsheetId}`,
+  };
+}
 
+/**
+ * 見出し・数式・マスタを固定の範囲へ書き込む。範囲を決め打ちしているので
+ * 何度実行しても同じ結果になり、途中で失敗しても次tickでやり直せる。
+ */
+async function fillTemplate(
+  options: RequestOptions,
+  spreadsheetId: string,
+  nowIso: string,
+): Promise<void> {
   const enc = encodeURIComponent;
   const data: { range: string; values: (string | number)[][] }[] = [
     { range: `'${TAB_GUIDE}'!A1`, values: guideRows() },
@@ -482,11 +527,11 @@ async function createTemplateSpreadsheet(
       ]],
     },
     {
-      range: `'${TAB_PNL}'!A1`,
+      range: `'${TAB_PNL}'!B1`,
       values: [
-        ['月', '売上', '商品原価', 'アフィリ報酬', 'TikTok手数料', '発送件数', '送料', '資材費',
+        ['売上', '商品原価', 'アフィリ報酬', 'TikTok手数料', '発送件数', '送料', '資材費',
           '調整額（手動：返品等はマイナス）', '広告費（手動）', '営業利益', '利益率'],
-        ...monthlyPnlRows(nowIso),
+        ...monthlyPnlRows(),
       ],
     },
     { range: `'${TAB_RANK}'!A1`, values: rankRows() },
@@ -496,10 +541,20 @@ async function createTemplateSpreadsheet(
     `${SHEETS_API}/${enc(spreadsheetId)}/values:batchUpdate`,
     { method: 'POST', body: { valueInputOption: 'USER_ENTERED', data } },
   );
-  return {
-    spreadsheetId,
-    url: `https://docs.google.com/spreadsheets/d/${spreadsheetId}`,
-  };
+  // 月次PnLのA列（月）だけはRAWで書く。USER_ENTEREDだと ja_JP のシートが
+  // "2026-09" を日付として取り込み、明細のO列（LEFT(注文日,7)の文字列）と
+  // SUMIFS が一致しなくなって全部0円になる。
+  await authorizedJson(
+    options,
+    `${SHEETS_API}/${enc(spreadsheetId)}/values:batchUpdate`,
+    {
+      method: 'POST',
+      body: {
+        valueInputOption: 'RAW',
+        data: [{ range: `'${TAB_PNL}'!A1`, values: [['月'], ...monthlyPnlMonthColumn(nowIso)] }],
+      },
+    },
+  );
 }
 
 // ---------- 明細タブへの書き出し ----------
@@ -623,7 +678,8 @@ async function saveSettings(
   db: D1Database,
   lineAccountId: string,
   patch: Partial<Pick<TiktokPnlSettingsRow,
-    'spreadsheet_id' | 'spreadsheet_url' | 'status' | 'import_cursor'
+    'enabled' | 'spreadsheet_id' | 'spreadsheet_url' | 'status' | 'import_cursor'
+    | 'sync_started_at' | 'template_filled_at'
     | 'last_import_at' | 'last_sheet_sync_at' | 'last_error' | 'consecutive_failures'>>,
 ): Promise<void> {
   const sets: string[] = [];
@@ -649,8 +705,38 @@ export interface TiktokPnlAccountResult {
   spreadsheetUrl?: string | null;
 }
 
+/** 同期中の目印が残ったまま落ちた場合に、次の実行を通すまでの猶予。 */
+const SYNC_LOCK_STALE_MS = 30 * 60 * 1000;
+
 /**
- * 1アカウント分の同期。シート作成 → EC取り込み → 明細書き出しの順で、
+ * アカウント単位の排他を取る。手動同期と定期実行が重なると、同じ未反映行を
+ * 両方が「新規」と判断して明細タブへ二重に追記してしまうため、
+ * 先に目印を立てられた方だけが進む。
+ */
+async function acquireSyncLock(
+  db: D1Database,
+  lineAccountId: string,
+  nowIso: string,
+): Promise<boolean> {
+  const staleBefore = new Date(Date.parse(nowIso) - SYNC_LOCK_STALE_MS).toISOString();
+  const updated = await db.prepare(
+    `UPDATE tiktok_pnl_settings
+        SET sync_started_at = ?, updated_at = datetime('now')
+      WHERE line_account_id = ?
+        AND (sync_started_at IS NULL OR sync_started_at < ?)`,
+  ).bind(nowIso, lineAccountId, staleBefore).run();
+  return (updated.meta?.changes ?? 0) === 1;
+}
+
+async function releaseSyncLock(db: D1Database, lineAccountId: string): Promise<void> {
+  await db.prepare(
+    `UPDATE tiktok_pnl_settings SET sync_started_at = NULL, updated_at = datetime('now')
+      WHERE line_account_id = ?`,
+  ).bind(lineAccountId).run();
+}
+
+/**
+ * 1アカウント分の同期。シート作成 → 雛形書き込み → EC取り込み → 明細書き出しの順で、
  * 途中で失敗しても進んだ分は保存し、次tickで続きから再開できるようにする。
  */
 export async function syncTiktokPnlForAccount(
@@ -663,6 +749,18 @@ export async function syncTiktokPnlForAccount(
   const lineAccountId = integration.line_account_id;
   const settings = await loadSettings(db, lineAccountId);
 
+  if (!await acquireSyncLock(db, lineAccountId, input.now)) {
+    // 既に走っている。重複追記を避けるため今回は何もしない。
+    return {
+      status: 'skipped',
+      createdSheet: false,
+      importedOrders: 0,
+      wroteRows: 0,
+      error: 'sync_in_progress',
+      spreadsheetUrl: settings.spreadsheet_url,
+    };
+  }
+
   let createdSheet = false;
   let importedOrders = 0;
   let wroteRows = 0;
@@ -672,14 +770,23 @@ export async function syncTiktokPnlForAccount(
 
     let spreadsheetId = settings.spreadsheet_id;
     if (!spreadsheetId) {
-      const created = await createTemplateSpreadsheet(options, input.now);
+      // 作成したらすぐIDを保存する。次の雛形書き込みで失敗しても、
+      // 次tickは同じスプレッドシートへ書き込みだけやり直す。
+      const created = await createEmptySpreadsheet(options);
       spreadsheetId = created.spreadsheetId;
       createdSheet = true;
       await saveSettings(db, lineAccountId, {
         spreadsheet_id: created.spreadsheetId,
         spreadsheet_url: created.url,
-        status: 'ready',
+        status: 'pending',
         last_error: null,
+      });
+    }
+    if (!settings.template_filled_at || createdSheet) {
+      await fillTemplate(options, spreadsheetId, input.now);
+      await saveSettings(db, lineAccountId, {
+        template_filled_at: input.now,
+        status: 'ready',
       });
     }
 
@@ -735,13 +842,26 @@ export async function syncTiktokPnlForAccount(
       last_error: kind,
       consecutive_failures: settings.consecutive_failures + 1,
     });
+    // Googleの認可が切れている場合は連携そのものを期限切れにする。
+    // ここを更新しないと、毎回失敗するだけで管理画面に再接続の案内が出ず、
+    // 利用者はシートが止まった理由が分からない。
+    if (kind === 'auth_expired') {
+      await db.prepare(
+        `UPDATE google_sheets_integrations
+            SET status = 'expired', last_sync_error = 'auth_expired', updated_at = ?
+          WHERE id = ?`,
+      ).bind(input.now, integration.id).run();
+    }
     return { status: 'error', createdSheet, importedOrders, wroteRows, error: kind };
+  } finally {
+    await releaseSyncLock(db, lineAccountId);
   }
 }
 
 /**
- * 6時間ごとの定期実行。Google Sheets 連携済み（#838）のアカウントを対象に、
- * 機能ゲート（external_integrations）を通ったものだけ同期する。
+ * 6時間ごとの定期実行。Google Sheets 連携済み（#838）かつ利益計算シートを
+ * 有効化したアカウントを対象に、機能ゲート（external_integrations）を
+ * 通ったものだけ同期する。
  */
 export async function processTiktokPnlTick(
   env: Env['Bindings'],
@@ -749,10 +869,15 @@ export async function processTiktokPnlTick(
 ): Promise<TiktokPnlTickResult> {
   const db = env.DB;
   const gate = createFeatureJobGate();
+  // enabled = 1 のアカウントだけを対象にする。Google Sheets 連携は
+  // 他の機能（#838）でも使うので、連携済みを条件にすると利益計算を
+  // 頼んでいないアカウントにも勝手にスプレッドシートを作ってしまう。
+  // 管理画面の手動同期が押された時に enabled が 1 になる。
   const integrations = await db.prepare(
-    `SELECT * FROM google_sheets_integrations
-      WHERE status = 'connected'
-      ORDER BY line_account_id`,
+    `SELECT g.* FROM google_sheets_integrations g
+       JOIN tiktok_pnl_settings s ON s.line_account_id = g.line_account_id
+      WHERE g.status = 'connected' AND s.enabled = 1
+      ORDER BY g.line_account_id`,
   ).all<GoogleSheetsIntegrationRow>();
 
   const result: TiktokPnlTickResult = {

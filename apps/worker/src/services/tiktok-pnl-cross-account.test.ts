@@ -107,12 +107,13 @@ async function makeIntegration(
     .bind(accountId).first<GoogleSheetsIntegrationRow>())!;
 }
 
-/** 雛形作成を通らないよう、利益計算シートは既にある状態にしておく。 */
+/** 雛形作成・書き込みを通らないよう、利益計算シートは既にある状態にしておく。 */
 function seedSettings(testDb: SqliteD1, accountId: string, spreadsheetId: string): void {
   testDb.raw.prepare(
-    `INSERT INTO tiktok_pnl_settings (line_account_id, spreadsheet_id, spreadsheet_url, status)
-     VALUES (?, ?, ?, 'ready')`,
-  ).run(accountId, spreadsheetId, `https://docs.google.com/spreadsheets/d/${spreadsheetId}`);
+    `INSERT INTO tiktok_pnl_settings
+       (line_account_id, enabled, spreadsheet_id, spreadsheet_url, status, template_filled_at)
+     VALUES (?, 1, ?, ?, 'ready', ?)`,
+  ).run(accountId, spreadsheetId, `https://docs.google.com/spreadsheets/d/${spreadsheetId}`, NOW);
 }
 
 function envFor(testDb: SqliteD1, withEc: boolean): Env['Bindings'] {
