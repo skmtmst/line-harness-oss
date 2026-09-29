@@ -96,19 +96,38 @@ export default function NewBookingStaffPage() {
     }
   }, [selectedAccountId, menusReloadKey])
 
+  /*
+   * 追加発見: ログインユーザー一覧の取得失敗と「誰もいない」を言い分ける。
+   * 失敗しても入力済みの内容は state に残る。再取得だけ送り直す。
+   */
+  const [membersLoading, setMembersLoading] = useState(true)
+  const [membersError, setMembersError] = useState<unknown>(null)
+  const [membersReloadKey, setMembersReloadKey] = useState(0)
+
   useEffect(() => {
     let alive = true
+    setMembersLoading(true)
+    setMembersError(null)
     api.staff.list()
       .then((res) => {
-        if (alive && res.success) setMembers(res.data.filter((m) => m.isActive))
+        if (alive) {
+          if (res.success) setMembers(res.data.filter((m) => m.isActive))
+          setMembersError(null)
+          setMembersLoading(false)
+        }
       })
-      .catch(() => {
+      .catch((error: unknown) => {
         // ログインユーザー一覧が引けなくても登録自体はできる。
+        // 失敗を「紐づけない」と混ぜない。再取得の口を出す。
+        if (alive) {
+          setMembersError(error)
+          setMembersLoading(false)
+        }
       })
     return () => {
       alive = false
     }
-  }, [])
+  }, [membersReloadKey])
 
   function toggle(id: string) {
     setOffered((cur) => {
@@ -402,17 +421,31 @@ export default function NewBookingStaffPage() {
           htmlFor="bs-member"
           note="紐づけると、そのログインユーザーが「本人の勤務」としてこの担当者のシフト・休憩・外部連携を管理できます。"
         >
-          <Select
-            aria-label="ログインユーザーとの紐づけ"
-            id="bs-member"
-            size="full"
-            value={staffMemberId}
-            onChange={setStaffMemberId}
-            options={[
-              { value: '', label: '紐づけない' },
-              ...members.map((m) => ({ value: m.id, label: `${m.name}${m.email ? `（${m.email}）` : ''}` })),
-            ]}
-          />
+          {membersLoading ? (
+            <ListState kind="loading" title="ログインユーザーを読み込んでいます" />
+          ) : membersError !== null ? (
+            <ListState
+              kind="error"
+              title="ログインユーザーを読み込めませんでした"
+              // m23m: 403・429は共通の1枚（権限の案内・待ち案内）へ切り替える。
+              // それ以外は画面の文のまま。入力は残っているので再取得だけ案内する。
+              description={isForbiddenOrRateLimited(membersError) ? undefined : '通信の不具合などでログインユーザー一覧を取得できませんでした。入力した内容はそのまま残っています。「もう一度読み込む」を押してください。'}
+              error={membersError}
+              onRetry={() => setMembersReloadKey((value) => value + 1)}
+            />
+          ) : (
+            <Select
+              aria-label="ログインユーザーとの紐づけ"
+              id="bs-member"
+              size="full"
+              value={staffMemberId}
+              onChange={setStaffMemberId}
+              options={[
+                { value: '', label: '紐づけない' },
+                ...members.map((m) => ({ value: m.id, label: `${m.name}${m.email ? `（${m.email}）` : ''}` })),
+              ]}
+            />
+          )}
         </Field>
       </FormSection>
     </CreatePage>
