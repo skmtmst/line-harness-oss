@@ -13,6 +13,8 @@ import StickyBar from '@/components/shared/sticky-bar'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import TemplateAssetEditor from '../template-asset-editor'
+import type { TemplateDetailData } from '../template-detail-data'
+import { isTemplateDetailData } from '../template-detail-data'
 import {
   EMPTY_TEMPLATE_REFERENCES,
   MessageTemplateEditor,
@@ -258,35 +260,14 @@ function TemplateAccountNotice({
   )
 }
 
-/** 詳細口（GET /api/templates/:id）が返す利用先の形。 */
-type TemplateDetailData = Extract<
-  Awaited<ReturnType<typeof api.templates.get>>,
-  { success: true }
->['data']
-type TemplateUsedBy = TemplateDetailData['usedBy']
-
 /**
- * D007: 詳細口の応答の形。**success:true でも本文が無い応答がある。**
- *
- * 存在しないIDへ一覧形 `{items:[]}` が返るなど、型どおりでない応答を
- * 確かめず ready にすると、見本づくりが `content.replace` で落ちる。
- * 名前・種類・本文の3つが文字列のときだけ、中身として受け取る。
- * 利用先は無くてもよい（未取得は null として扱う）が、有るときは
- * 対象の形でないと利用先の表示で落ちるので、物でなければ捨てる。
+ * D007/D008: 詳細口の応答の形の番人は `../template-detail-data` に1つだけ
+ * （先頭で読み込んでいる）。編集と詳細の両方で同じものを使う。
+ * 形が違う応答はここでは受け取らず、「読み込めませんでした」へ回す。
  */
-function isTemplateDetailData(data: unknown): data is TemplateDetailData {
-  if (typeof data !== 'object' || data === null) return false
-  const record = data as Record<string, unknown>
-  if (
-    typeof record.name !== 'string' ||
-    typeof record.messageType !== 'string' ||
-    typeof record.messageContent !== 'string'
-  ) {
-    return false
-  }
-  const usedBy = record.usedBy
-  return usedBy === undefined || usedBy === null || typeof usedBy === 'object'
-}
+
+/** 詳細口（GET /api/templates/:id）が返す利用先の形。 */
+type TemplateUsedBy = TemplateDetailData['usedBy']
 
 /**
  * 利用先の1行分（IDEA-11）。
