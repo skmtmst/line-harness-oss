@@ -52,6 +52,8 @@ const EVENT_LABELS: Record<string, string> = {
 }
 
 function eventLabel(item: WebhookInteraction): string {
+  // d23d R407: 試しは受け取りではないので、実処理と別の文言にする。
+  if (item.eventType === 'incoming_webhook.test') return `${item.webhookName}の受け取りを試したとき`
   if (item.direction === 'incoming') return `${item.webhookName}から受け取ったとき`
   return EVENT_LABELS[item.eventType] ?? '外部サービスへ送る条件に合ったとき'
 }
@@ -128,6 +130,10 @@ function durationDetail(
  * （ボタンが無いだけでは、対象の消えた失敗と条件違いが区別できない）。
  */
 function retryabilityText(item: WebhookInteraction, allowed: boolean): string {
+  // d23d R407: 試しは届いた記録ではない。「届いたので送り直す必要なし」とは案内しない。
+  if (item.eventType === 'incoming_webhook.test') {
+    return '受け取りの試しの記録です。実際の受け取りと処理の実行はしていないため、送り直す対象ではありません。'
+  }
   if (item.status === 'succeeded') return '届いた記録なので、送り直す必要はありません。'
   if (item.status === 'pending') return 'いま処理の途中です。終わってから結果を確かめてください。'
   if (item.status === 'retried') return 'すでに送り直した記録です。あとから追加された新しい記録の結果を確かめてください。'
@@ -446,7 +452,7 @@ export default function WebhookInteractions() {
                       {item.retryOfId ? <div className={styles.secondary}>前の失敗をやり直した記録</div> : null}
                     </Td>
                     <Td><div className={styles.primary} title={item.triggerSummary}>{item.triggerSummary}</div><div className={styles.secondary}>安全のため本文と接続情報は一覧に表示しません</div></Td>
-                    <Td><StatusBadge tone={item.status === 'succeeded' ? 'success' : item.status === 'failed' ? 'danger' : 'info'}>{item.responseLabel}</StatusBadge></Td>
+                    <Td><StatusBadge tone={item.eventType === 'incoming_webhook.test' ? 'info' : item.status === 'succeeded' ? 'success' : item.status === 'failed' ? 'danger' : 'info'}>{item.responseLabel}</StatusBadge></Td>
                     <Td>{item.durationMs == null ? '—' : `${Math.round(item.durationMs / 100) / 10}秒`}</Td>
                     <ActionCell><div className={styles.rowActions}><Button onClick={() => setSelected(item)}>中身を見る</Button>{canRetry && item.canRetry ? <Button onClick={() => item.failureReasonCode === 'unknown' ? setConfirmingRetry(item) : void retry(item)} disabled={retrying === item.id}>{retrying === item.id ? 'やり直し中' : 'やり直す'}</Button> : null}</div></ActionCell>
                   </Tr>

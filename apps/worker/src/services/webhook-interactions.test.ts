@@ -261,4 +261,33 @@ describe('画面へ出す安全な言葉', () => {
     expect(webhookFailureLabel('secret_unavailable')).toBe('署名の合言葉を確認できないため、まだ送っていません');
     expect(webhookResponseLabel(original)).toBe('つなぎ先で処理できませんでした');
   });
+
+  // d23d R407: 試しは照合も実行もしていないので、実処理の
+  // 「結びつきました」ではなく試算の結果をそのまま出す。
+  const incomingTestRow = (idempotencyKey: string): WebhookInteractionRow => ({
+    ...original,
+    direction: 'incoming', event_type: 'incoming_webhook.test', status: 'succeeded',
+    failure_reason: null, response_status: null, request_body_json: null,
+    idempotency_key: idempotencyKey,
+  });
+
+  it.each([
+    ['matched', '照合できました（試し）'],
+    ['ambiguous', '照合候補が複数（試し）'],
+    ['not_found', '照合相手なし（試し）'],
+    ['invalid', '行動の確認で不備（試し）'],
+  ])('試しの結果 %s は実際の試算結果を出す', (outcome, label) => {
+    expect(webhookResponseLabel(incomingTestRow(`incoming-test:${outcome}:uuid-1`))).toBe(label);
+  });
+
+  it('結果の印が無い古い試し記録は「結びつきました」と言わない', () => {
+    expect(webhookResponseLabel(incomingTestRow('plain-uuid')))
+      .toBe('受け取りの試し（実行していません）');
+  });
+
+  it('実際の受信の記録は従来どおり「結びつきました」', () => {
+    expect(webhookResponseLabel({
+      ...incomingTestRow('key'), event_type: 'incoming_webhook.custom',
+    })).toBe('結びつきました');
+  });
 });

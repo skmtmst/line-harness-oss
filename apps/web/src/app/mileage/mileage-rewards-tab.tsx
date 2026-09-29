@@ -366,7 +366,12 @@ export default function MileageRewardsTab({ accountId }: { accountId: string | n
         ? await api.mileage.stopReward(reward.id, accountId)
         : reward.status === 'stopped'
           ? await api.mileage.resumeReward(reward.id, accountId)
-          : await api.mileage.publishReward(reward.id, accountId)
+          : await api.mileage.publishReward(
+          reward.id,
+          accountId,
+          reward.currentDraftVersionId ?? reward.currentVersion?.id ?? undefined,
+          reward.currentVersion?.revision,
+        )
       if (!response.success) throw new Error(response.error)
       await load()
     } catch {
