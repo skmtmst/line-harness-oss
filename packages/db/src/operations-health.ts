@@ -1114,6 +1114,27 @@ export async function saveOperationRequestReceipt(
   return Number(result.meta?.changes ?? 0) === 1;
 }
 
+/**
+ * R573: 対象に結び付いた再実行記録があるか。
+ *
+ * 停止・復旧は状態確定のあとで receipt を保存する。receipt の保存だけ失敗すると
+ * 状態だけ残り、同じキー・版の再送は版競合になる。再送の修復では「誰かの完了した
+ * 要求がこの対象を持っているか」で、他人の確定済み要求の横取りか、置き去りの
+ * 部分実行かを見分ける。記録がある対象は他人の確定済みとして競合のままにする。
+ */
+export async function hasOperationRequestReceiptForResource(
+  db: D1Database,
+  action: string,
+  resourceId: string,
+): Promise<boolean> {
+  const hit = await db.prepare(
+    `SELECT 1 FROM operation_request_receipts
+      WHERE action = ? AND resource_id = ?
+      LIMIT 1`,
+  ).bind(action, resourceId).first();
+  return hit !== null;
+}
+
 export type OperationDeploymentEventInput = {
   deploymentId: string;
   phase: 'queued' | 'deploying' | 'verifying' | 'succeeded' | 'failed' | 'rolled_back';
