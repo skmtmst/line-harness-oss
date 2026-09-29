@@ -1,5 +1,5 @@
 import { Hono, type Context } from 'hono';
-import { getLineAccountById, jstNow, recordConversionSourceEvent } from '@line-crm/db';
+import { getLineAccountById, jstNow, nextVersionToken, recordConversionSourceEvent } from '@line-crm/db';
 import {
   checkNenCampaignBodyLength,
   countNenCampaignBodyLength,
@@ -52,6 +52,7 @@ import {
 } from '../services/nen-campaign-metrics.js';
 import { auditLog } from '../lib/audit-log.js';
 import { normalizeNenPetBirthday } from '../lib/nen-pet-birthday.js';
+import { isValidIdempotencyKey } from '../services/outbound-idempotency.js';
 import { listLimit, listOffset } from './list-pagination.js';
 
 const nenCampaigns = new Hono<Env>();
@@ -197,10 +198,18 @@ nenCampaigns.get('/api/nen-campaigns/settings', async (c) => {
    * 「設定不足」と出せるよう、配信ごとに判定を行へ添えてから返す。
    */
   const settings = await Promise.all(campaigns.map(async (row) => ({
-    ...row,
-    form_issue: await nenCampaignFormIssue(c.env.DB, row, accountId),
+    ...toCampaignSettingPayload(row),
+    formIssue: await nenCampaignFormIssue(c.env.DB, row, accountId),
   })));
-  return c.json({ success: true, data: settings.map((row) => ({
+  return c.json({ success: true, data: settings });
+});
+
+/**
+ * 一覧の1行の写し。M507 の409（data.latest）でも同じ形で最新の内容を返す。
+ * formIssue は付けない（競合時は画面が読み直すため）。
+ */
+function toCampaignSettingPayload(row: CampaignRow) {
+  return {
     campaignKey: row.campaign_key,
     label: row.label,
     category: row.category,
@@ -216,10 +225,23 @@ nenCampaigns.get('/api/nen-campaigns/settings', async (c) => {
     dedupWindowDays: row.dedup_window_days ?? 30,
     excludeFormRespondents: row.exclude_form_respondents === 1,
     afterActions: row.after_actions ?? [],
-    formIssue: row.form_issue,
     updatedAt: row.updated_at ?? '',
-  })) });
-});
+  };
+}
+
+/**
+ * アカウント別設定JSONの中の版を読む。行が無い初回保存は共通設定の版を
+ * 基準にする（一覧がその値を updatedAt として見せているため）。
+ */
+function readCampaignSettingUpdatedAt(raw: string | null, fallback: string): string {
+  if (!raw) return fallback;
+  try {
+    const parsed = JSON.parse(raw) as { updated_at?: unknown };
+    return typeof parsed.updated_at === 'string' ? parsed.updated_at : fallback;
+  } catch {
+    return fallback;
+  }
+}
 
 nenCampaigns.put('/api/nen-campaigns/settings/:campaignKey', requireRole('owner', 'admin'), async (c) => {
   const accountId = await requireAccount(c);
@@ -303,7 +325,16 @@ nenCampaigns.put('/api/nen-campaigns/settings/:campaignKey', requireRole('owner'
   if (formIssue) {
     return c.json({ success: false, error: NEN_CAMPAIGN_FORM_ISSUE_LABELS[formIssue] }, 400);
   }
-  await saveNenCampaignAccountSetting(c.env.DB, accountId, {
+  /*
+   * M507: 配信設定の同時保存は後勝ちで先の変更が黙って消えていた。
+   * 版（expectedUpdatedAt）が送られてきたときだけ、保存前の値と
+   * 照合してから書く。古い画面からの保存は409で止め、最新の内容を
+   * data.latest で返す。送られてこない従来の呼び出しはそのまま通す。
+   * 設定はアカウント別のJSON1行なので、行全体の比べ書き（CAS）で
+   * 読み→書きのすき間の割り込みも止める。migration なし。
+   */
+  const expectedUpdatedAt = typeof body.expectedUpdatedAt === 'string' ? body.expectedUpdatedAt : null;
+  const next: CampaignRow = {
     ...current,
     is_enabled: body.isEnabled ? 1 : 0,
     title: body.title.trim(),
@@ -317,8 +348,58 @@ nenCampaigns.put('/api/nen-campaigns/settings/:campaignKey', requireRole('owner'
     exclude_form_respondents: excludeFormRespondents ? 1 : 0,
     after_actions: afterActions,
     updated_at: jstNow(),
-  });
-  return c.json({ success: true });
+  };
+  // 版を送らない従来の呼び出しは、以前とまったく同じ書き方で通す。
+  // どちらの場合も新しい版を返す（画面が次の保存へ進めるため）。
+  if (expectedUpdatedAt === null) {
+    await saveNenCampaignAccountSetting(c.env.DB, accountId, next);
+    const savedSetting = await getNenCampaign(c.env.DB, key, accountId);
+    return c.json({ success: true, data: { updatedAt: savedSetting?.updated_at ?? next.updated_at } });
+  }
+  const settingKey = `nen.campaign.${key}`;
+  const saved = await c.env.DB.prepare(
+    `SELECT value FROM account_settings WHERE line_account_id = ? AND key = ?`,
+  ).bind(accountId, settingKey).first<{ value: string }>();
+  const savedUpdatedAt = readCampaignSettingUpdatedAt(saved?.value ?? null, current.updated_at ?? '');
+  // 版は必ず単調に進める。同じミリ秒の連打でも次の保存と見分けられる。
+  next.updated_at = nextVersionToken(savedUpdatedAt);
+  if (savedUpdatedAt !== expectedUpdatedAt) {
+    const latest = await getNenCampaign(c.env.DB, key, accountId);
+    return c.json({
+      success: false, code: 'VERSION_CONFLICT',
+      error: 'ほかの人が先に設定を変えました。最新の内容を確認してから保存し直してください。',
+      data: { latest: latest ? toCampaignSettingPayload(latest) : null },
+    }, 409);
+  }
+  const nextValue = JSON.stringify(next);
+  if (!saved) {
+    const inserted = await c.env.DB.prepare(
+      `INSERT INTO account_settings (id, line_account_id, key, value, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT(line_account_id, key) DO NOTHING`,
+    ).bind(crypto.randomUUID(), accountId, settingKey, nextValue, next.updated_at, next.updated_at).run();
+    if ((inserted.meta?.changes ?? 0) === 0) {
+      const latest = await getNenCampaign(c.env.DB, key, accountId);
+      return c.json({
+        success: false, code: 'VERSION_CONFLICT',
+        error: 'ほかの人が先に設定を変えました。最新の内容を確認してから保存し直してください。',
+        data: { latest: latest ? toCampaignSettingPayload(latest) : null },
+      }, 409);
+    }
+  } else {
+    const written = await c.env.DB.prepare(
+      `UPDATE account_settings SET value = ?, updated_at = ? WHERE line_account_id = ? AND key = ? AND value = ?`,
+    ).bind(nextValue, next.updated_at, accountId, settingKey, saved.value).run();
+    if ((written.meta?.changes ?? 0) === 0) {
+      const latest = await getNenCampaign(c.env.DB, key, accountId);
+      return c.json({
+        success: false, code: 'VERSION_CONFLICT',
+        error: 'ほかの人が先に設定を変えました。最新の内容を確認してから保存し直してください。',
+        data: { latest: latest ? toCampaignSettingPayload(latest) : null },
+      }, 409);
+    }
+  }
+  return c.json({ success: true, data: { updatedAt: next.updated_at } });
 });
 
 // 一覧の停止・再開（isEnabledだけの切り替え）専用の口。上のPUTと同じ口を
@@ -765,16 +846,54 @@ nenCampaigns.post('/api/nen-campaigns/columns/:id/deliver', requireRole('owner',
 nenCampaigns.put('/api/nen-campaigns/columns/:id/message', requireRole('owner', 'admin'), async (c) => {
   const accountId = await requireAccount(c);
   if (typeof accountId !== 'string') return accountId;
-  const body = await c.req.json<{ introText?: string }>().catch(() => null);
+  const body = await c.req.json<{ introText?: string; expectedUpdatedAt?: string }>().catch(() => null);
   const introText = body?.introText?.trim() || '';
   if (!introText || introText.length > 1500) {
     return c.json({ success: false, error: 'introText is required and must be 1500 characters or fewer' }, 400);
   }
-  const result = await c.env.DB.prepare(
-    `UPDATE nen_columns SET intro_text = ?, updated_at = ? WHERE id = ? AND line_account_id = ?`,
-  ).bind(introText, jstNow(), c.req.param('id'), accountId).run();
-  if (!result.meta.changes) return c.json({ success: false, error: 'Column not found' }, 404);
-  return c.json({ success: true });
+  /*
+   * M507: 紹介文の同時保存は後勝ちで先の変更が黙って消えていた。
+   * 版（expectedUpdatedAt）が送られてきたときだけ照合してから書く。
+   * 古い画面からの保存は409で止め、最新の紹介文を data.latest で返す。
+   * 送られてこない従来の呼び出しは以前とまったく同じ書き方で通す。
+   * 版は必ず単調に進める（同じミリ秒の連打でも見分けられる）。
+   */
+  const expectedUpdatedAt = typeof body?.expectedUpdatedAt === 'string' ? body.expectedUpdatedAt : null;
+  if (expectedUpdatedAt === null) {
+    const stamped = jstNow();
+    const result = await c.env.DB.prepare(
+      `UPDATE nen_columns SET intro_text = ?, updated_at = ? WHERE id = ? AND line_account_id = ?`,
+    ).bind(introText, stamped, c.req.param('id'), accountId).run();
+    if (!result.meta.changes) return c.json({ success: false, error: 'Column not found' }, 404);
+    return c.json({ success: true, data: { updatedAt: stamped } });
+  }
+  const seen = await c.env.DB.prepare(
+    `SELECT intro_text, updated_at FROM nen_columns WHERE id = ? AND line_account_id = ?`,
+  ).bind(c.req.param('id'), accountId).first<{ intro_text: string | null; updated_at: string }>();
+  if (!seen) return c.json({ success: false, error: 'Column not found' }, 404);
+  if (seen.updated_at !== expectedUpdatedAt) {
+    return c.json({
+      success: false, code: 'VERSION_CONFLICT',
+      error: 'ほかの人が先に紹介文を変えました。最新の内容を確認してから保存し直してください。',
+      data: { latest: { introText: seen.intro_text ?? '', updatedAt: seen.updated_at } },
+    }, 409);
+  }
+  const stamped = nextVersionToken(seen.updated_at);
+  const written = await c.env.DB.prepare(
+    `UPDATE nen_columns SET intro_text = ?, updated_at = ? WHERE id = ? AND line_account_id = ? AND updated_at = ?`,
+  ).bind(introText, stamped, c.req.param('id'), accountId, seen.updated_at).run();
+  if (!written.meta.changes) {
+    const latest = await c.env.DB.prepare(
+      `SELECT intro_text, updated_at FROM nen_columns WHERE id = ? AND line_account_id = ?`,
+    ).bind(c.req.param('id'), accountId).first<{ intro_text: string | null; updated_at: string }>();
+    if (!latest) return c.json({ success: false, error: 'Column not found' }, 404);
+    return c.json({
+      success: false, code: 'VERSION_CONFLICT',
+      error: 'ほかの人が先に紹介文を変えました。最新の内容を確認してから保存し直してください。',
+      data: { latest: { introText: latest.intro_text ?? '', updatedAt: latest.updated_at } },
+    }, 409);
+  }
+  return c.json({ success: true, data: { updatedAt: stamped } });
 });
 
 nenCampaigns.get('/api/nen-campaigns/pets', requireRole('owner', 'admin', 'staff'), async (c) => {
@@ -783,7 +902,7 @@ nenCampaigns.get('/api/nen-campaigns/pets', requireRole('owner', 'admin', 'staff
   const query = (c.req.query('search') || '').trim();
   const like = `%${query.replace(/[\\%_]/g, '\\$&')}%`;
   const rows = await c.env.DB.prepare(
-    `SELECT p.id, p.friend_id, p.customer_id, p.name, p.animal_type, p.gender, p.birthday,
+    `SELECT p.id, p.friend_id, p.customer_id, p.name, p.animal_type, p.gender, p.birthday, p.updated_at,
             f.display_name, f.line_user_id
        FROM nen_pet_profiles p JOIN friends f ON f.id = p.friend_id
       WHERE f.line_account_id = ?
@@ -794,6 +913,8 @@ nenCampaigns.get('/api/nen-campaigns/pets', requireRole('owner', 'admin', 'staff
     id: row.id, friendId: row.friend_id, customerId: row.customer_id, name: row.name,
     animalType: row.animal_type, gender: row.gender, birthday: row.birthday,
     ownerName: row.display_name, lineUserId: row.line_user_id,
+    // M511: 更新の版照合に使う。無ければ送らず従来どおり通す。
+    updatedAt: typeof row.updated_at === 'string' ? row.updated_at : '',
   })) });
 });
 
@@ -888,6 +1009,41 @@ function petPatchBody(body: Record<string, unknown> | null):
   return patch;
 }
 
+/*
+ * M510: 登録ボタンの二重押し・通信再送で同じペットが2頭できないよう、
+ * Idempotency-Key を行IDにする（broadcasts と同じ決めごと）。キーが無い
+ * 従来の呼び出しはそのまま作る。同じキーで内容が違う再送は取り違えなので
+ * 409 で止める。再送の返しは作り直さない。
+ */
+function samePetCreateRequest(existing: {
+  friend_id: string; customer_id: string | null; name: string; animal_type: string;
+  gender: string; birthday: string | null; breed: string | null; weight_kg: number | null;
+}, friendId: string, customerId: string | null, input: {
+  name: string; animalType: string; gender: string; birthday: string | null;
+  breed: string | null; weightKg: number | null;
+}): boolean {
+  return existing.friend_id === friendId
+    && (existing.customer_id ?? null) === (customerId ?? null)
+    && existing.name === input.name
+    && existing.animal_type === input.animalType
+    && existing.gender === input.gender
+    && (existing.birthday ?? null) === (input.birthday ?? null)
+    && (existing.breed ?? null) === (input.breed ?? null)
+    && (existing.weight_kg ?? null) === (input.weightKg ?? null);
+}
+
+async function findPetById(db: D1Database, id: string) {
+  return db.prepare(
+    `SELECT p.friend_id, p.customer_id, p.name, p.animal_type, p.gender, p.birthday, p.breed, p.weight_kg,
+            f.line_account_id
+       FROM nen_pet_profiles p JOIN friends f ON f.id = p.friend_id WHERE p.id = ?`,
+  ).bind(id).first<{
+    friend_id: string; customer_id: string | null; name: string; animal_type: string;
+    gender: string; birthday: string | null; breed: string | null; weight_kg: number | null;
+    line_account_id: string | null;
+  }>();
+}
+
 nenCampaigns.post('/api/nen-campaigns/pets', requireRole('owner', 'admin'), async (c) => {
   const accountId = await requireAccount(c);
   if (typeof accountId !== 'string') return accountId;
@@ -902,15 +1058,44 @@ nenCampaigns.post('/api/nen-campaigns/pets', requireRole('owner', 'admin'), asyn
   if (!friend || friend.line_account_id !== accountId) {
     return c.json({ success: false, error: 'Friend not found' }, 404);
   }
+  const customerId = typeof body.customerId === 'string' ? body.customerId : null;
+  const rawKey = c.req.header('Idempotency-Key')?.trim() || null;
+  if (rawKey !== null && !isValidIdempotencyKey(rawKey)) {
+    return c.json({ success: false, error: '再実行キーの形式が正しくありません' }, 400);
+  }
+  if (rawKey) {
+    const existing = await findPetById(c.env.DB, rawKey);
+    if (existing && existing.line_account_id === accountId) {
+      if (!samePetCreateRequest(existing, body.friendId, customerId, input)) {
+        return c.json({ success: false, code: 'IDEMPOTENCY_CONFLICT', error: '同じ再実行キーが別の内容に使われています' }, 409);
+      }
+      c.header('Idempotency-Replayed', 'true');
+      return c.json({ success: true, duplicate: true, data: { id: rawKey } }, 200);
+    }
+    if (existing) {
+      return c.json({ success: false, code: 'IDEMPOTENCY_CONFLICT', error: '同じ再実行キーが別の内容に使われています' }, 409);
+    }
+  }
   const now = jstNow();
-  const id = crypto.randomUUID();
-  await c.env.DB.prepare(
-    `INSERT INTO nen_pet_profiles (id, friend_id, customer_id, name, animal_type, gender, birthday, breed, weight_kg, created_at, updated_at, weight_updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).bind(id, body.friendId, typeof body.customerId === 'string' ? body.customerId : null,
-    input.name, input.animalType, input.gender, input.birthday, input.breed, input.weightKg, now, now,
-    // 体重を入れて登録したときだけ「測った日＝登録日」を記録（監査 R57）。
-    input.weightKg == null ? null : now).run();
+  const id = rawKey ?? crypto.randomUUID();
+  try {
+    await c.env.DB.prepare(
+      `INSERT INTO nen_pet_profiles (id, friend_id, customer_id, name, animal_type, gender, birthday, breed, weight_kg, created_at, updated_at, weight_updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(id, body.friendId, customerId,
+      input.name, input.animalType, input.gender, input.birthday, input.breed, input.weightKg, now, now,
+      // 体重を入れて登録したときだけ「測った日＝登録日」を記録（監査 R57）。
+      input.weightKg == null ? null : now).run();
+  } catch (error) {
+    // 並行した再送が先に作ったときだけ保存済みを返す。それ以外は投げ直す。
+    const existing = rawKey ? await findPetById(c.env.DB, rawKey) : null;
+    if (!existing || existing.line_account_id !== accountId) throw error;
+    if (!samePetCreateRequest(existing, body.friendId, customerId, input)) {
+      return c.json({ success: false, code: 'IDEMPOTENCY_CONFLICT', error: '同じ再実行キーが別の内容に使われています' }, 409);
+    }
+    c.header('Idempotency-Replayed', 'true');
+    return c.json({ success: true, duplicate: true, data: { id: rawKey } }, 200);
+  }
   await syncNenPetTags(c.env.DB, body.friendId);
   return c.json({ success: true, data: { id } }, 201);
 });
@@ -918,21 +1103,28 @@ nenCampaigns.post('/api/nen-campaigns/pets', requireRole('owner', 'admin'), asyn
 nenCampaigns.put('/api/nen-campaigns/pets/:id', requireRole('owner', 'admin'), async (c) => {
   const accountId = await requireAccount(c);
   if (typeof accountId !== 'string') return accountId;
-  const body = await c.req.json<Record<string, unknown>>().catch(() => null);
+  const body = await c.req.json<Record<string, unknown> & { expectedUpdatedAt?: string }>().catch(() => null);
   // 入力検証はDBを読む前に済ませる。無効な入力ではDBへ一切行かない。
   const patch = petPatchBody(body ?? {});
   if ('error' in patch) return c.json({ success: false, error: patch.error }, 400);
   const pet = await c.env.DB.prepare(
-    `SELECT p.friend_id, p.name, p.animal_type, p.gender, p.birthday, p.breed, p.weight_kg, f.line_account_id
+    `SELECT p.friend_id, p.name, p.animal_type, p.gender, p.birthday, p.breed, p.weight_kg, p.updated_at, f.line_account_id
      FROM nen_pet_profiles p JOIN friends f ON f.id = p.friend_id WHERE p.id = ?`,
   ).bind(c.req.param('id')).first<{
     friend_id: string; name: string; animal_type: string; gender: string;
     birthday: string | null; breed: string | null; weight_kg: number | null;
-    line_account_id: string | null;
+    updated_at: string; line_account_id: string | null;
   }>();
   if (!pet || pet.line_account_id !== accountId) {
     return c.json({ success: false, error: 'Pet not found' }, 404);
   }
+  /*
+   * M511: ペット更新の同時保存は後勝ちで先の変更が黙って消えていた。
+   * 版（expectedUpdatedAt）が送られてきたときだけ updated_at の一致も
+   * 条件に入れる。古い画面からの保存は409で止め、最新の名前つきで返す。
+   * 送られてこない従来の呼び出しはそのまま通す。
+   */
+  const petExpectedUpdatedAt = typeof body?.expectedUpdatedAt === 'string' ? body.expectedUpdatedAt : null;
   // 送られてこなかった項目は現値を保つ部分更新（LIFF PUT と同じ意味づけ）。
   // 既定値で上書きすると、名前だけ直す更新で他項目まで消えてしまう。
   const input = {
@@ -945,13 +1137,38 @@ nenCampaigns.put('/api/nen-campaigns/pets/:id', requireRole('owner', 'admin'), a
   };
   // 監査 R57: 「体重の更新」は体重が実際に変わったときだけ動かす。
   // 名前だけの編集や同じ値の再送では日付を維持する。
+  // M511: 版つきの保存は版を必ず単調に進める（同じミリ秒の連打でも見分けられる）。
   const weightTouched = patch.weightKg !== undefined && patch.weightKg !== pet.weight_kg;
-  await c.env.DB.prepare(
+  const petNewUpdatedAt = petExpectedUpdatedAt === null ? jstNow() : nextVersionToken(pet.updated_at);
+  const petWritten = await c.env.DB.prepare(
     `UPDATE nen_pet_profiles SET name = ?, animal_type = ?, gender = ?, birthday = ?, breed = ?, weight_kg = ?, updated_at = ?,
        weight_updated_at = CASE WHEN ? THEN ? ELSE weight_updated_at END
-     WHERE id = ?`,
-  ).bind(input.name, input.animalType, input.gender, input.birthday, input.breed, input.weightKg, jstNow(),
-    weightTouched ? 1 : 0, jstNow(), c.req.param('id')).run();
+     WHERE (? IS NULL OR updated_at = ?) AND id = ?`,
+  ).bind(input.name, input.animalType, input.gender, input.birthday, input.breed, input.weightKg, petNewUpdatedAt,
+    weightTouched ? 1 : 0, jstNow(), petExpectedUpdatedAt, petExpectedUpdatedAt, c.req.param('id')).run();
+  if (!petWritten.meta.changes) {
+    const latest = await c.env.DB.prepare(
+      `SELECT p.name, p.animal_type, p.gender, p.birthday, p.breed, p.weight_kg, p.updated_at, f.line_account_id
+         FROM nen_pet_profiles p JOIN friends f ON f.id = p.friend_id WHERE p.id = ?`,
+    ).bind(c.req.param('id')).first<{
+      name: string; animal_type: string; gender: string; birthday: string | null;
+      breed: string | null; weight_kg: number | null; updated_at: string; line_account_id: string | null;
+    }>();
+    if (!latest || latest.line_account_id !== accountId) {
+      return c.json({ success: false, error: 'Pet not found' }, 404);
+    }
+    return c.json({
+      success: false, code: 'VERSION_CONFLICT',
+      error: 'ほかの人が先にペットの情報を変えました。最新の内容を確認してから保存し直してください。',
+      data: {
+        latest: {
+          name: latest.name, animalType: latest.animal_type, gender: latest.gender,
+          birthday: latest.birthday, breed: latest.breed, weightKg: latest.weight_kg,
+          updatedAt: latest.updated_at,
+        },
+      },
+    }, 409);
+  }
   // 誕生日を明示して変えたときだけ、古い日付へ予約済みの誕生日クーポン配信を
   // 取消し、次の日次走査で新しい誕生日から組み直させる。発行済みの今年分は残る。
   if (patch.birthday !== undefined && (pet.birthday ?? null) !== patch.birthday) {
@@ -961,7 +1178,7 @@ nenCampaigns.put('/api/nen-campaigns/pets/:id', requireRole('owner', 'admin'), a
     ).bind(jstNow(), `birthday:${c.req.param('id')}:%`).run();
   }
   await syncNenPetTags(c.env.DB, pet.friend_id);
-  return c.json({ success: true });
+  return c.json({ success: true, data: { updatedAt: petNewUpdatedAt } });
 });
 
 nenCampaigns.delete('/api/nen-campaigns/pets/:id', requireRole('owner', 'admin'), async (c) => {
