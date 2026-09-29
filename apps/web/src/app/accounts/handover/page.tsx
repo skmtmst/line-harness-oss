@@ -22,6 +22,7 @@ import { TableHeadRow, Th } from '@/components/shared/table'
 import { TextInput } from '@/components/shared/form-controls'
 import { useStepUpGate } from '@/components/step-up-prompt'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import {
   DIFFERENT_PROVIDER_NOTE,
   HANDOVER_STEPS,
@@ -58,10 +59,21 @@ function formatMonthDayTime(value: string | null): string {
   }).format(new Date(value))
 }
 
+/**
+ * 見るだけの担当者（staff）には変更の入口を出さない（R522）。
+ * 口側は発行・読み取り・事前確認・判断・本実行・取り消し・切り戻しを
+ * owner/admin だけに絞っている（`account-handovers.ts` の requireRole）ので、
+ * 画面も同じ境目（`canManageRole`）で出し分ける。確認が終わるまで
+ * （staffRole === null）は今までどおり出す。
+ */
+const NO_MANAGE_NOTE = '引き継ぎの変更はオーナーと管理者だけができます。必要なときはオーナーか管理者に頼んでください。'
+
 /** LINEアカウントの乗り換え・引き継ぎ。設計 ★V6 33-4（`nx3XW`）。 */
 function Handover() {
   const search = useSearchParams()
   const id = search?.get('id') ?? ''
+  const staffRole = useStaffRole()
+  const canManage = staffRole === null || canManageRole(staffRole)
   const [account, setAccount] = useState<LineAccount | null>(null)
   const [accounts, setAccounts] = useState<LineAccount[]>([])
   const [handover, setHandover] = useState<HandoverView | null>(null)
@@ -377,6 +389,11 @@ function Handover() {
             { label: '乗り換え' },
           ]} />
         </div>
+        {!canManage && (
+          <p className="bg-info-bg text-ink-secondary rounded-control mb-4 px-4 py-3 text-xs leading-relaxed">
+            {NO_MANAGE_NOTE}引き継ぎの状態はこのまま見られます。
+          </p>
+        )}
         <div className="grid gap-4 lg:grid-cols-2">
           <Card padding="roomy">
             <p className="text-ink text-sm font-bold">このアカウントから移す</p>
@@ -385,10 +402,12 @@ function Handover() {
               発行するだけでは何も変わりません。
             </p>
             {executeError && <Notice tone="danger" className="mt-3"><p>{executeError}</p></Notice>}
-            <Button type="button" variant="primary" className="mt-3" disabled={issuing}
-              onClick={() => { setExecuteError(''); void issueCode() }}>
-              {issuing ? '発行中…' : '引き継ぎコードを出す'}
-            </Button>
+            {canManage && (
+              <Button type="button" variant="primary" className="mt-3" disabled={issuing}
+                onClick={() => { setExecuteError(''); void issueCode() }}>
+                {issuing ? '発行中…' : '引き継ぎコードを出す'}
+              </Button>
+            )}
           </Card>
           <Card padding="roomy">
             <p className="text-ink text-sm font-bold">このアカウントへ移す</p>
@@ -396,20 +415,22 @@ function Handover() {
               移し元のアカウントで発行した引き継ぎコードを入れてください。
               読んだだけでは友だちは動きません。あとで事前確認をします。
             </p>
-            <div className="mt-3 flex items-start gap-2">
-              <TextInput
-                className="flex-1"
-                placeholder="引き継ぎコード"
-                value={linkCode}
-                onChange={(e) => setLinkCode(e.target.value)}
-                disabled={linking}
-                aria-label="引き継ぎコード"
-              />
-              <Button type="button" variant="primary" disabled={linking || !linkCode.trim()}
-                onClick={() => void submitLinkCode()}>
-                {linking ? '確認中…' : 'コードを読む'}
-              </Button>
-            </div>
+            {canManage && (
+              <div className="mt-3 flex items-start gap-2">
+                <TextInput
+                  className="flex-1"
+                  placeholder="引き継ぎコード"
+                  value={linkCode}
+                  onChange={(e) => setLinkCode(e.target.value)}
+                  disabled={linking}
+                  aria-label="引き継ぎコード"
+                />
+                <Button type="button" variant="primary" disabled={linking || !linkCode.trim()}
+                  onClick={() => void submitLinkCode()}>
+                  {linking ? '確認中…' : 'コードを読む'}
+                </Button>
+              </div>
+            )}
             {linkError && <p role="alert" className="text-danger mt-2 text-xs">{linkError}</p>}
           </Card>
         </div>
@@ -432,6 +453,11 @@ function Handover() {
           { label: '乗り換え' },
         ]} />
       </div>
+      {!canManage && (
+        <p className="bg-info-bg text-ink-secondary rounded-control px-4 py-3 text-xs leading-relaxed">
+          {NO_MANAGE_NOTE}引き継ぎの状態はこのまま見られます。
+        </p>
+      )}
 
       <ol className="grid gap-2 lg:grid-cols-5">
         {HANDOVER_STEPS.map((step) => {
@@ -502,26 +528,28 @@ function Handover() {
                 ? `元の友だち ${handover.counts.sourceTotal}人 ＝ 自動で一致 ${handover.counts.auto} ＋ 要確認 ${handover.counts.review} ＋ 一致しない ${handover.counts.unmatched} ＋ 別人の可能性 ${handover.counts.lookalike}`
                 : '4区分の合計を確認できないため、人数は表示していません。'}
             </p>
-            {/* 件数照合（X-3）。申告数が合計と違うままでは本実行できない。 */}
-            <div className="border-hairline mt-3 flex flex-wrap items-end gap-2 border-t pt-3">
-              <label className="block">
-                <span className="text-ink-faint text-xs">
-                  移し元システムが言う友だち数（申告。分からなければ空欄）
-                </span>
-                <TextInput
-                  type="number"
-                  min={0}
-                  className="mt-1 w-40"
-                  placeholder="例: 231"
-                  value={declaredTotalInput}
-                  onChange={(e) => setDeclaredTotalInput(e.target.value)}
-                  disabled={refreshing || !handover.counts}
-                />
-              </label>
-              <p className="text-ink-faint text-xs leading-relaxed">
-                申告の数と事前確認の合計が違うままでは、本実行しません。
-              </p>
-            </div>
+            {/* 件数照合（X-3）。申告数が合計と違うままでは本実行できない。申告の入力は変更なので見るだけには出さない。 */}
+            {canManage && (
+              <div className="border-hairline mt-3 flex flex-wrap items-end gap-2 border-t pt-3">
+                <label className="block">
+                  <span className="text-ink-faint text-xs">
+                    移し元システムが言う友だち数（申告。分からなければ空欄）
+                  </span>
+                  <TextInput
+                    type="number"
+                    min={0}
+                    className="mt-1 w-40"
+                    placeholder="例: 231"
+                    value={declaredTotalInput}
+                    onChange={(e) => setDeclaredTotalInput(e.target.value)}
+                    disabled={refreshing || !handover.counts}
+                  />
+                </label>
+                <p className="text-ink-faint text-xs leading-relaxed">
+                  申告の数と事前確認の合計が違うままでは、本実行しません。
+                </p>
+              </div>
+            )}
             {handover.declaredFriendTotal !== null
               && handover.declaredFriendTotal !== undefined
               && handover.counts
@@ -554,8 +582,9 @@ function Handover() {
                     /*
                       人が決める段（X-3）。「要確認」「別人の可能性」の行は
                       書き換えられる。同じ人（link）は候補がいるときだけ。
+                      見るだけの担当者には書き換えを出さず、決めた内容だけ見せる。
                     */
-                    const editable = decision.bucket === 'review' || decision.bucket === 'lookalike'
+                    const editable = canManage && (decision.bucket === 'review' || decision.bucket === 'lookalike')
                     return (
                       <tr key={decision.id} className="text-sm">
                         <td className="px-4 py-3 font-medium">{decision.sourceName ?? decision.from_friend_id}</td>
@@ -597,7 +626,7 @@ function Handover() {
             <p className="text-ink-secondary border-hairline border-t px-5 py-3 text-xs">
               残り {handover.unresolvedReviews ?? '—'}人。名前と画像だけの一致では、自動で同じ人にしません。
             </p>
-            {Object.keys(decisionEdits).length > 0 && (
+            {canManage && Object.keys(decisionEdits).length > 0 && (
               <div className="border-hairline flex flex-wrap items-center justify-between gap-2 border-t px-5 py-3">
                 {decisionError
                   ? <p role="alert" className="text-danger text-xs">{decisionError}</p>
@@ -616,36 +645,38 @@ function Handover() {
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap gap-2">
               <Button href={`/accounts/detail?id=${account.id}`}>やめる</Button>
-              {/* 取り消しは進行中だけ。終わった引き継ぎは切り戻しで戻す。 */}
-              {handover.status !== 'completed' && handover.status !== 'failed' && (
+              {/* 取り消しは進行中だけ。終わった引き継ぎは切り戻しで戻す。変更なので見るだけには出さない。 */}
+              {canManage && handover.status !== 'completed' && handover.status !== 'failed' && (
                 <Button type="button" variant="danger"
                   onClick={() => setCancelOpen(true)}>
                   引き継ぎを取り消す
                 </Button>
               )}
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" disabled={refreshing || !countsAreComplete} onClick={() => void rerunPreview()}>
-                {refreshing ? '確認中…' : '事前確認をやり直す'}
-              </Button>
-              <Button
-                type="button"
-                variant="primary"
-                disabled={(handover.unresolvedReviews ?? 1) > 0
-                  || handover.status === 'completed'
-                  || Object.keys(decisionEdits).length > 0
-                  || (handover.declaredFriendTotal !== null
-                    && handover.declaredFriendTotal !== undefined
-                    && handover.counts !== null
-                    && handover.declaredFriendTotal !== handover.counts.sourceTotal)}
-                onClick={() => { setExecuteError(''); setConfirmOpen(true) }}
-              >
-                {executing ? '実行中…' : '本実行へ進む'}
-              </Button>
-            </div>
+            {canManage && (
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" disabled={refreshing || !countsAreComplete} onClick={() => void rerunPreview()}>
+                  {refreshing ? '確認中…' : '事前確認をやり直す'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="primary"
+                  disabled={(handover.unresolvedReviews ?? 1) > 0
+                    || handover.status === 'completed'
+                    || Object.keys(decisionEdits).length > 0
+                    || (handover.declaredFriendTotal !== null
+                      && handover.declaredFriendTotal !== undefined
+                      && handover.counts !== null
+                      && handover.declaredFriendTotal !== handover.counts.sourceTotal)}
+                  onClick={() => { setExecuteError(''); setConfirmOpen(true) }}
+                >
+                  {executing ? '実行中…' : '本実行へ進む'}
+                </Button>
+              </div>
+            )}
           </div>
-          {/* 切り戻し（X-3）。本実行から7日間だけ、終わった引き継ぎを戻せる。 */}
-          {handover.status === 'completed' && !handover.rolledBackAt && handover.rollbackDeadline
+          {/* 切り戻し（X-3）。本実行から7日間だけ、終わった引き継ぎを戻せる。変更なので見るだけには出さない。 */}
+          {canManage && handover.status === 'completed' && !handover.rolledBackAt && handover.rollbackDeadline
             && handover.rollbackDeadline > new Date().toISOString() && (
             <div className="border-hairline rounded-control flex flex-wrap items-center justify-between gap-2 border px-4 py-3">
               <div>
