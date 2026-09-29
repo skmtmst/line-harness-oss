@@ -95,6 +95,7 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
   feature('/api/webhooks', 'external_integrations'),
   feature('/api/integrations/google-calendar', 'external_integrations'),
   feature('/api/integrations/google-sheets', 'external_integrations'),
+  feature('/api/integrations/tiktok-pnl', 'external_integrations'),
   feature('/api/ad-platforms', 'external_integrations'),
   feature('/api/ad-costs', 'external_integrations'),
   feature('/api/instagram', 'external_integrations'),
