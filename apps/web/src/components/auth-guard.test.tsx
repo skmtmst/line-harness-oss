@@ -253,3 +253,190 @@ describe('PERF-07 AuthGuard のセッション確認再利用', () => {
     expect(host.querySelector('[data-child]')).not.toBeNull()
   })
 })
+
+/*
+ * R505: 古い確認の応答が新しいログインの画面用権限・CSRFを上書きしない。
+ *
+ * 確認ごとに要求世代と開始時の指紋を持ち、副作用の前に照合する。
+ * 古い成功応答は捨て、古い401ではログインへ送らず、新しいログインを
+ * 確認し直す。新しい応答が最後なら今の状態を保つ。
+ */
+describe('R505 古い確認の応答は新しいログインを上書きしない', () => {
+  beforeEach(() => {
+    currentPath = '/'
+    replaceMock.mockReset()
+    invalidateAuthSessionCheck()
+    storage = new MemoryStorage()
+    vi.stubGlobal('localStorage', storage)
+    vi.stubGlobal('sessionStorage', new MemoryStorage())
+    host = document.createElement('div')
+    document.body.appendChild(host)
+    root = createRoot(host)
+  })
+
+  afterEach(() => {
+    act(() => { root.unmount() })
+    host.remove()
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  function sessionResponse(opts: { name: string; role: string; csrf: string; permissions?: string[] }) {
+    return new Response(
+      JSON.stringify({
+        success: true,
+        data: {
+          name: opts.name,
+          role: opts.role,
+          tenantStatus: 'active',
+          permissionKeys: opts.permissions ?? [],
+          viewPermissionKeys: [],
+        },
+        csrfToken: opts.csrf,
+      }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    )
+  }
+
+  /** 確認の往復だけ保留できる fetch。確認以外（一覧の先取りなど）はすぐ返す。 */
+  function holdSessionChecks() {
+    const resolvers: Array<(res: Response) => void> = []
+    fetchSpy = vi.fn(async (url: unknown) => {
+      if (String(url).includes('/api/auth/session')) {
+        return new Promise<Response>((resolve) => { resolvers.push(resolve) })
+      }
+      return sessionOk()
+    })
+    vi.stubGlobal('fetch', fetchSpy)
+    return resolvers
+  }
+
+  /** 別タブでBがログインしたことにする（このタブには storage イベントだけ届く）。 */
+  function otherTabLoginAsB() {
+    storage.setItem('lh_csrf', 'csrf-B')
+    storage.setItem('lh_staff_name', 'B担当')
+    storage.setItem('lh_staff_role', 'viewer')
+    let event: Event
+    try {
+      event = new StorageEvent('storage', { key: 'lh_csrf' })
+    } catch {
+      event = new Event('storage')
+      Object.defineProperty(event, 'key', { value: 'lh_csrf' })
+    }
+    act(() => { window.dispatchEvent(event) })
+  }
+
+  const responseA = () => sessionResponse({ name: 'A担当', role: 'admin', csrf: 'csrf-A', permissions: ['staff.manage'] })
+  const responseB = () => sessionResponse({ name: 'B担当', role: 'viewer', csrf: 'csrf-B', permissions: [] })
+
+  it('別タブのログイン後に届いた古い成功応答は捨て、新しいログインを確認し直す', async () => {
+    const resolvers = holdSessionChecks()
+    await render()
+    await settle()
+    expect(resolvers).toHaveLength(1)
+
+    otherTabLoginAsB()
+
+    // 遅れていたAの成功応答が届いても、Bの名前・権限・CSRFを書き戻さない。
+    await act(async () => { resolvers[0](responseA()) })
+    await settle()
+    expect(storage.getItem('lh_csrf')).toBe('csrf-B')
+    expect(storage.getItem('lh_staff_name')).toBe('B担当')
+    expect(storage.getItem('lh_staff_role')).toBe('viewer')
+    expect(replaceMock).not.toHaveBeenCalled()
+
+    // 新しいログインを確認し直す。再確認がBを返せばBで画面を出す。
+    expect(resolvers).toHaveLength(2)
+    await act(async () => { resolvers[1](responseB()) })
+    await settle()
+    expect(host.querySelector('[data-child]')).not.toBeNull()
+    expect(storage.getItem('lh_staff_name')).toBe('B担当')
+    expect(replaceMock).not.toHaveBeenCalled()
+  })
+
+  it('新しい画面の確認が済んだ後に届いた古い成功応答は捨てる', async () => {
+    const resolvers = holdSessionChecks()
+    await render()
+    await settle()
+    expect(resolvers).toHaveLength(1)
+
+    currentPath = '/friends'
+    await act(async () => { root.render(<AuthGuard><div data-child>中身</div></AuthGuard>) })
+    await settle()
+    expect(resolvers).toHaveLength(2)
+
+    await act(async () => { resolvers[1](responseB()) })
+    await settle()
+    expect(host.querySelector('[data-child]')).not.toBeNull()
+    expect(storage.getItem('lh_csrf')).toBe('csrf-B')
+
+    // 取り消された旧画面のAの応答が遅れて届いても、Bを書き戻さない。
+    await act(async () => { resolvers[0](responseA()) })
+    await settle()
+    expect(storage.getItem('lh_csrf')).toBe('csrf-B')
+    expect(storage.getItem('lh_staff_name')).toBe('B担当')
+    expect(storage.getItem('lh_staff_role')).toBe('viewer')
+    expect(host.querySelector('[data-child]')).not.toBeNull()
+    expect(replaceMock).not.toHaveBeenCalled()
+  })
+
+  it('別タブのログイン後に届いた古い401ではログインへ送らず、確認し直す', async () => {
+    const resolvers = holdSessionChecks()
+    await render()
+    await settle()
+    expect(resolvers).toHaveLength(1)
+
+    otherTabLoginAsB()
+
+    // 古いAの401が届いても、Bでログイン中の画面をログインへ戻さない。
+    await act(async () => { resolvers[0](new Response(null, { status: 401 })) })
+    await settle()
+    expect(replaceMock).not.toHaveBeenCalledWith('/login')
+    expect(resolvers).toHaveLength(2)
+
+    await act(async () => { resolvers[1](responseB()) })
+    await settle()
+    expect(host.querySelector('[data-child]')).not.toBeNull()
+    expect(replaceMock).not.toHaveBeenCalledWith('/login')
+  })
+
+  it('新しい確認の応答が最後に届けば今の状態を保つ', async () => {
+    const resolvers = holdSessionChecks()
+    await render()
+    await settle()
+
+    currentPath = '/friends'
+    await act(async () => { root.render(<AuthGuard><div data-child>中身</div></AuthGuard>) })
+    await settle()
+
+    // 古いAが先に届き、新しいBが後に届けば、最後はBの状態になる。
+    await act(async () => { resolvers[0](responseA()) })
+    await settle()
+    await act(async () => { resolvers[1](responseB()) })
+    await settle()
+    expect(storage.getItem('lh_csrf')).toBe('csrf-B')
+    expect(storage.getItem('lh_staff_name')).toBe('B担当')
+    expect(host.querySelector('[data-child]')).not.toBeNull()
+    expect(replaceMock).not.toHaveBeenCalled()
+  })
+
+  it('画面遷移で取り消された旧401はログインへ送らない', async () => {
+    const resolvers = holdSessionChecks()
+    await render()
+    await settle()
+
+    currentPath = '/friends'
+    await act(async () => { root.render(<AuthGuard><div data-child>中身</div></AuthGuard>) })
+    await settle()
+
+    // 旧画面のAの401が遅れても、新しい画面の確認が生きていれば遷移しない。
+    await act(async () => { resolvers[0](new Response(null, { status: 401 })) })
+    await settle()
+    expect(replaceMock).not.toHaveBeenCalledWith('/login')
+
+    await act(async () => { resolvers[1](responseB()) })
+    await settle()
+    expect(host.querySelector('[data-child]')).not.toBeNull()
+    expect(replaceMock).not.toHaveBeenCalledWith('/login')
+  })
+})
