@@ -6,6 +6,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Tag } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useAccount } from '@/contexts/account-context'
 import CreatePage, {
   AsideCard,
@@ -82,9 +84,10 @@ export default function NewMileageRulePage() {
   useEffect(() => {
     let cancelled = false
     // R23横展開: 倍率つきタグの表示は今のアカウントだけ。切替で取り直す。
+    // m23m: タグ候補が取れなくても決めごとは作れる。取れない失敗で画面を落とさない。
     void api.tags.list(selectedAccountId ? { accountId: selectedAccountId } : undefined).then((res) => {
       if (!cancelled && res.success) setTags(res.data)
-    })
+    }).catch(() => {})
     return () => {
       cancelled = true
     }
@@ -106,6 +109,20 @@ export default function NewMileageRulePage() {
   )
 
   const sourceLabel = selected.sources.find(([v]) => v === source)?.[1] ?? 'すべて'
+
+  /*
+   * 作成途中の離脱確認。名前・行動・付与数・制限のどれかに手を付けていたら、
+   * キャンセルや左メニューで確認窓を出す。作成が終わると一覧へ router.push
+   * するので、成功後に警告は出ない。
+   */
+  const dirty = Boolean(
+    name !== '予約してくれたら 300 マイル' || eventType !== 'booking_created' || source ||
+    amount !== '300' || initialStatus !== 'available' || ignoreMultiplier || dailyCap ||
+    uniqueMode || beneficiary !== 'actor' || validFrom || validUntil ||
+    expiresAfterDays !== '365' || !reverseOnCancellation || targetConditions !== null ||
+    !isActive || !notifyFriend
+  )
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty })
 
   return (
     <CreatePage
@@ -453,6 +470,7 @@ export default function NewMileageRulePage() {
           >作成したらすぐ動かす</Checkbox>
         </details>
       </FormSection>
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した決めごと" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </CreatePage>
   )
 }

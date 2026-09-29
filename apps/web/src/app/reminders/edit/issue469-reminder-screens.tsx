@@ -6,6 +6,7 @@ import type { ReminderDraftSettings, ReminderDraftStep, ReminderDraftVersion, Re
 import { ApiError, api } from '@/lib/api'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import TargetMissing from '@/components/shared/target-missing'
 import { TextArea, TextInput } from '@/components/shared/form-controls'
 import { TableHeadRow, Th } from '@/components/shared/table'
@@ -273,7 +274,7 @@ export function Issue469ReminderStepEditor({ reminderId }: { reminderId: string 
       {error ? <p className="text-danger text-xs">{error}{conflict ? <button type="button" className="ml-2 underline" onClick={() => void loadDraft()}>最新を読み込み直す</button> : null}</p> : null}
     </ReminderWorkspace>
     <div className="mt-16"><ReminderFooter primary={saving ? '保存中…' : '送信設定へ'} primaryDisabled={saving || !allStepsHaveContent} onPrimary={() => void save()} /></div>
-    <ConfirmDialog primaryAction="cancel" open={leaveTarget !== null} title="保存していない変更があります" description="このまま移動すると、通知ステップへの変更は失われます。保存せずに移動しますか？" confirmLabel="保存せずに移動" cancelLabel="編集を続ける" onConfirm={confirmLeave} onCancel={cancelLeave} />
+    <UnsavedLeaveDialog open={leaveTarget !== null} subject="通知ステップへの変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
     <style jsx global>{`
       /*
        * R17: 右390px固定は広い幅だけ。中くらいの幅では LINE のプレビューを

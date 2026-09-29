@@ -19,16 +19,24 @@ const DIRTY_SIGNATURE = /dirty|unsaved|savedSnapshot|未保存/i
 
 /** 番兵を持つ画面。`useUnsavedGuard` と離脱確認ダイアログの両方が必要。 */
 const GUARDED = [
+  'app/affiliate-offers/new/page.tsx',
+  'app/analytics/reports/new/page.tsx',
+  'app/booking/menus/new/page.tsx',
   'app/booking/menus/staff/page.tsx',
+  'app/booking/staff/new/page.tsx',
   'app/booking/staff/shifts/page.tsx',
   'app/contents/vars/edit/page.tsx',
   'app/contents/vars/new/page.tsx',
+  'app/conversions/new/page.tsx',
   'app/ec-commerce/connector-panel.tsx',
   'app/form-submissions/edit/page.tsx',
   'app/friend-add-settings/friend-add-rule-editor.tsx',
   'app/inflow-links/new/page.tsx',
+  'app/line-notifications/operator/new/page.tsx',
   'app/mileage/earning-rules/edit/page.tsx',
+  'app/mileage/earning-rules/new/page.tsx',
   'app/mileage/page.tsx',
+  'app/mileage/rewards/edit/page.tsx',
   'app/nen-campaigns/columns/new/page.tsx',
   'app/nen-campaigns/edit/campaign-editor.tsx',
   'app/nen-campaigns/edit/page.tsx',
@@ -47,11 +55,13 @@ const GUARDED = [
   'app/rich-menus/new/page.tsx',
   'app/settings/page.tsx',
   'app/settings/file-scan/page.tsx',
+  'app/staff/new/page.tsx',
   'app/tags/fields/edit/page.tsx',
   'app/tags/fields/new/page.tsx',
   'app/tags/searches/edit/page.tsx',
   'app/templates/carousel/page.tsx',
   'app/templates/questions/new/page.tsx',
+  'app/webhooks/new/page.tsx',
   'app/webinars/edit/page.tsx',
   'app/webinars/new/page.tsx',
   'components/accounts/account-ordering.tsx',
@@ -80,6 +90,8 @@ const EXEMPTIONS: Record<string, string> = {
     '「未保存の追加情報を破棄して一覧へ戻る」明示フロー。dirty管理ではなく部分保存の案内',
   'app/automations/new/page.tsx':
     'サーバーへ下書き保存する多段ウィザード。段またぎ・店ごとの退避があり離脱の扱いは別途検討',
+  'app/accounts/new/page.tsx':
+    '登録ウィザードでdirty管理なし（コメント中の「未保存」記述のみ。R523の復帰案内の文言）',
   'app/booking/bookings/new/page.tsx':
     'dirty管理なし（コメント中の「未保存」記述のみ）',
   'app/hq/templates/template-console.tsx':
@@ -146,21 +158,13 @@ const EDITOR_MIN_INPUTS = 3
  * **ここへの追加は禁止。** 新しい編集画面は最初から GUARDED か EXEMPTIONS に入れる。
  */
 const UNTRIAGED: Record<string, string> = {
-  'app/affiliate-offers/new/page.tsx':
-    's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'app/affiliates/tabs.tsx':
     's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'app/analytics/page.tsx':
     's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
-  'app/analytics/reports/new/page.tsx':
-    's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'app/auto-replies/publish/page.tsx':
     's2: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'app/booking/bookings/detail/page.tsx':
-    's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
-  'app/booking/menus/new/page.tsx':
-    's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
-  'app/booking/staff/new/page.tsx':
     's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'app/booking/staff/page.tsx':
     's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
@@ -176,8 +180,6 @@ const UNTRIAGED: Record<string, string> = {
     's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'app/contents/vars/page.tsx':
     's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
-  'app/conversions/new/page.tsx':
-    's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'app/events/bookings/page.tsx':
     's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'app/friends/detail/page.tsx':
@@ -186,12 +188,6 @@ const UNTRIAGED: Record<string, string> = {
   'app/hq/support/page.tsx':
     'hq: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'app/inflow-links/_components/edit-route-modal.tsx':
-    's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
-  'app/line-notifications/operator/new/page.tsx':
-    's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
-  'app/mileage/earning-rules/new/page.tsx':
-    's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
-  'app/mileage/rewards/edit/page.tsx':
     's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'app/nen/pets/pet-editor.tsx':
     's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
@@ -214,8 +210,6 @@ const UNTRIAGED: Record<string, string> = {
   'app/templates/template-asset-editor.tsx':
     's2: テンプレート編集の本体（app/templates/edit から載る）。V6R-S2-a（board#1066）で付ける',
   'app/webhooks/edit/page.tsx':
-    's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
-  'app/webhooks/new/page.tsx':
     's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',
   'app/webhooks/page.tsx':
     's3: 未判定。番兵が要る長い編集か、閉じれば戻る小さな操作かを担当が決める',

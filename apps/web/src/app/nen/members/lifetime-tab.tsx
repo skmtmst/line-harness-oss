@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Button from '@/components/shared/button'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import Chip from '@/components/shared/chip'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
@@ -210,15 +210,7 @@ export default function LifetimeTab({
         )}
       />
 
-      <ConfirmDialog primaryAction="cancel"
-        open={leaveTarget !== null}
-        title="保存していない変更があります"
-        description="このまま移動すると、節目への変更は失われます。保存せずに移動しますか？"
-        confirmLabel="保存せずに移動"
-        cancelLabel="編集を続ける"
-        onConfirm={confirmLeave}
-        onCancel={cancelLeave}
-      />
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="節目への変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </>
   )
 }

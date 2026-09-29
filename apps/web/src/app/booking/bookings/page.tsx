@@ -10,6 +10,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Button from '@/components/shared/button'
 import ListToolbar from '@/components/shared/list-toolbar'
 import ListState from '@/components/shared/list-state'
+import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
@@ -308,6 +309,8 @@ export default function BookingsPage() {
   const [calendarSeq, setCalendarSeq] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  /** m23m: 捕まえた読み込み失敗。403・429の1枚へ渡すためだけに持つ。 */
+  const [loadError, setLoadError] = useState<unknown>(null)
   // copied 状態は URL 単位で持つ。アカウント切替で shareUrl が変わると
   // 自動で「コピー済」が消えるので、A の URL をコピーしたまま B 画面で
   // 「B フォームと思い込んで送信」する事故を防ぐ。
@@ -411,6 +414,7 @@ export default function BookingsPage() {
     const requestId = ++listRequestRef.current
     setLoading(true)
     setError(null)
+    setLoadError(null)
     // タブ/アカウント切り替えで先に list をクリア。fetch 失敗時に前タブの行が
     // 残ってしまい、誤って別ステータスの予約を操作してしまう事故を防ぐ。
     setItems([])
@@ -429,6 +433,7 @@ export default function BookingsPage() {
       setTotal(r.total)
     } catch (e) {
       if (requestId !== listRequestRef.current || listAccountRef.current !== requestedAccountId) return
+      setLoadError(e)
       setError(e instanceof Error ? e.message : String(e))
     } finally {
       if (requestId === listRequestRef.current && listAccountRef.current === requestedAccountId) setLoading(false)
@@ -889,7 +894,10 @@ export default function BookingsPage() {
           <ListState
             kind="error"
             title="予約を読み込めませんでした"
-            description="通信が切れたか、サーバが応えませんでした。登録した内容は消えていません。"
+            // m23m: 403・429は共通の1枚（権限の案内・待ち案内）へ切り替える。
+            // それ以外は画面の文のまま。
+            description={isForbiddenOrRateLimited(loadError) ? undefined : '通信が切れたか、サーバが応えませんでした。登録した内容は消えていません。'}
+            error={loadError ?? undefined}
             onRetry={() => void load()}
           />
         ) : (
@@ -1092,7 +1100,10 @@ export default function BookingsPage() {
               <ListState
                 kind="error"
                 title="予約を読み込めませんでした"
-                description="通信が切れたか、サーバが応えませんでした。登録した内容は消えていません。"
+                // m23m: 403・429は共通の1枚（権限の案内・待ち案内）へ切り替える。
+                // それ以外は画面の文のまま。
+                description={isForbiddenOrRateLimited(loadError) ? undefined : '通信が切れたか、サーバが応えませんでした。登録した内容は消えていません。'}
+                error={loadError ?? undefined}
                 onRetry={() => void load()}
               />
             </div>

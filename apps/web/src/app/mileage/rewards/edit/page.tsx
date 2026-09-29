@@ -15,6 +15,8 @@ import Select from '@/components/shared/select'
 import StickyBar from '@/components/shared/sticky-bar'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { localDateTime, utcDateTime } from '@/lib/presentation'
 import { LIMIT_FIELD_ERRORS, normalizeDigits, optionalInteger, validateReward, type FormState } from './reward-form'
 import {
@@ -154,6 +156,11 @@ function MileageRewardEditorInner() {
   const [commonActions, setCommonActions] = useState<CommonActionOption[]>([])
   const [commonActionsFailed, setCommonActionsFailed] = useState(false)
   const [touched, setTouched] = useState(false)
+  /*
+   * 未保存の基準。作るときは空欄、なおすときは読み直した値。
+   * 下書き・交換テストの保存が通るたびに今の入力へ進める。
+   */
+  const [baseline, setBaseline] = useState(() => JSON.stringify(EMPTY))
   usePageTitle(editing ? '使い道を編集' : '使い道をつくる')
 
   const load = useCallback(async () => {
@@ -170,7 +177,9 @@ function MileageRewardEditorInner() {
       const found = detail?.success && isMileageRewardSummary(detail.data) ? detail.data : fallback
       if (!found) throw new Error('failed')
       setReward(found)
-      setForm(formOf(found))
+      const loaded = formOf(found)
+      setForm(loaded)
+      setBaseline(JSON.stringify(loaded))
       setState('ready')
     } catch (err) {
       /* 権限不足は取得失敗と別。次にすることが違う。 */
@@ -235,6 +244,7 @@ function MileageRewardEditorInner() {
     }
     if (!saved.success) throw new Error('failed')
     setReward(saved.data)
+    setBaseline(JSON.stringify(form))
     if (!rewardId) router.replace(`/mileage/rewards/edit?id=${encodeURIComponent(saved.data.id)}`)
     return saved.data
   }
@@ -296,6 +306,16 @@ function MileageRewardEditorInner() {
       setTesting(false)
     }
   }
+
+  /*
+   * つくる・なおし途中の離脱確認。基準（空欄または読み直した値・保存ずみ）
+   * から変わっていたら、キャンセルや左メニューで確認窓を出す。
+   * 保存・公開が終わると一覧へ router.push するので、成功後に警告は出ない。
+   */
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({
+    dirty: JSON.stringify(form) !== baseline,
+    busy: saving || testing,
+  })
 
   if (state === 'loading') return <ListState kind="loading" title="使い道を読み込んでいます" />
   if (state === 'forbidden') {
@@ -495,6 +515,7 @@ function MileageRewardEditorInner() {
         onCancel={() => setPublishOpen(false)}
         onConfirm={() => void save(true)}
       />
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した使い道" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )
 }

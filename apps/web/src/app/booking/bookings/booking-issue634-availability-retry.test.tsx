@@ -38,22 +38,28 @@ vi.mock('@/contexts/account-context', () => ({
   }),
 }))
 
-vi.mock('@/lib/api', () => ({
-  api: {
-    staff: { me: fixture.staffMe },
-  },
-  bookingApi: {
-    listRequests: fixture.listRequests,
-    requestsSummary: fixture.requestsSummary,
-    listMenus: fixture.listMenus,
-    listStaff: fixture.listStaff,
-    getAvailabilityBatch: fixture.availabilityBatch,
-    getAvailability: fixture.availability,
-    getBooking: fixture.getBooking,
-    decideRequest: fixture.decideRequest,
-    downloadLedgerCsv: fixture.downloadLedgerCsv,
-  },
-}))
+vi.mock('@/lib/api', async (importOriginal) => {
+  // m23m: 実物の輸出（ApiError・describeSaveFailure など）は残す。
+  // 画面が共通の失敗文へ寄ったため、取り替えは口（api・bookingApi）だけにする。
+  const actual = await importOriginal<typeof import('@/lib/api')>()
+  return {
+    ...actual,
+    api: {
+      staff: { me: fixture.staffMe },
+    },
+    bookingApi: {
+      listRequests: fixture.listRequests,
+      requestsSummary: fixture.requestsSummary,
+      listMenus: fixture.listMenus,
+      listStaff: fixture.listStaff,
+      getAvailabilityBatch: fixture.availabilityBatch,
+      getAvailability: fixture.availability,
+      getBooking: fixture.getBooking,
+      decideRequest: fixture.decideRequest,
+      downloadLedgerCsv: fixture.downloadLedgerCsv,
+    },
+  }
+})
 
 import BookingsPage from './page'
 

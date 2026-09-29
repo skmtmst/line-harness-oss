@@ -50,7 +50,8 @@ describe('V6 友だち追加時配信・実行結果の契約', () => {
   it('読込・空・失敗・アカウント未選択を同じ状態にしない', () => {
     expect(PAGE).toContain('<ListState kind="loading"')
     expect(PAGE).toContain('LINE公式アカウントを選んでください')
-    expect(PAGE).toContain('kind="error"')
+    // M009: 403 は forbidden で出す。HTTP の状態を共通部品にそのまま渡す。
+    expect(PAGE).toContain("errorStatus === 403 ? 'forbidden' : 'error'")
     expect(PAGE).toContain('条件に合う実行結果はありません')
     expect(PAGE).toContain('もう一度読み込む')
   })

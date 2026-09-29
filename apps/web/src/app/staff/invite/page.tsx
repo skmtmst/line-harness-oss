@@ -36,7 +36,10 @@ export default function StaffInvitationPage() {
       setToken('')
       setView('complete')
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : '招待を確認できませんでした。')
+      // D016: サーバの日本語案内（410の期限切れなど）はそのまま出す。
+      // 内部文（`API error: NNN`）だけ汎用文へ落とす。
+      const message = caught instanceof Error ? caught.message : ''
+      setError(message && !/^API error: /.test(message) ? message : '招待を確認できませんでした。時間をおいて、もう一度お試しください。')
       setView('ready')
     }
   }

@@ -27,6 +27,7 @@ import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import StickyBar from '@/components/shared/sticky-bar'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import TargetMissing from '@/components/shared/target-missing'
@@ -2316,15 +2317,7 @@ function EditWebinarInner() {
     選ぶ手段がなくなる。
   */
   const leaveConfirmDialog = (
-    <ConfirmDialog primaryAction="cancel"
-      open={leaveTarget !== null}
-      title="保存していない変更があります"
-      description="このまま移動すると、ウェビナーの変更は失われます。保存せずに移動しますか？"
-      confirmLabel="保存せずに移動"
-      cancelLabel="編集を続ける"
-      onConfirm={confirmLeave}
-      onCancel={cancelLeave}
-    />
+    <UnsavedLeaveDialog open={leaveTarget !== null} subject="ウェビナーの変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
   )
 
   /*

@@ -12,6 +12,8 @@ import CreatePage, {
 } from '@/components/shared/create-page'
 import Checkbox from '@/components/shared/checkbox'
 import ListState from '@/components/shared/list-state'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 /* R309: メニュー候補の料金は一覧・割当表と同じ共通表示にする。 */
 import { menuPriceLabel } from '../../lib/menu-price'
 import Select from '@/components/shared/select'
@@ -98,6 +100,17 @@ export default function NewBookingStaffPage() {
   const [canManageStaff] = useState(() =>
     typeof window === 'undefined' ? true : canEditFeature('booking.settings'))
 
+  /*
+   * 登録途中の離脱確認。名前・表示名・肩書き・写真・紹介文・メニュー割当・
+   * 受付設定のどれかに手を付けていたら、キャンセルや左メニューで確認窓を出す。
+   * 登録が終わると一覧へ router.push するので、成功後に警告は出ない。
+   */
+  const dirty = Boolean(
+    name || displayName || role || imageUrl || bio || staffMemberId ||
+    isDesignationOptional || !isActive || offered.size > 0
+  )
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty })
+
   const shownName = displayName.trim() || name.trim() || 'スタッフ'
   const staffInput = () => ({
     name,
@@ -123,6 +136,7 @@ export default function NewBookingStaffPage() {
   }
 
   return (
+    <>
     <CreatePage
       title="予約スタッフを登録する"
       description="お客様が予約するときに指名できる担当者を登録します。"
@@ -367,5 +381,7 @@ export default function NewBookingStaffPage() {
         </Field>
       </FormSection>
     </CreatePage>
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力したスタッフ" onConfirm={confirmLeave} onCancel={cancelLeave} />
+    </>
   )
 }

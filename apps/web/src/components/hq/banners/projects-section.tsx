@@ -4,6 +4,7 @@ import { Archive, Plus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Button from '@/components/shared/button'
+import { describeApiFailure, japaneseDetailOf } from '@/components/shared/api-error-message'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
 import SearchField from '@/components/shared/search-field'
@@ -100,7 +101,13 @@ export default function ProjectsSection({
       onChanged()
       router.push(`/hq/banners/project?id=${encodeURIComponent(res.data.id)}`)
     } catch (caught) {
-      setFormError(caught instanceof Error && caught.message ? caught.message : 'プロジェクトを作れませんでした')
+      /*
+       * M022：原文のまま出さず、共通の状態別案内へ渡す。
+       * 送り直しは開いたままの窓からできる（再試行の言葉つき）。
+       */
+      setFormError(japaneseDetailOf(caught) || describeApiFailure(caught, 'プロジェクトの作成', {
+        forbidden: 'この操作はオーナーか管理者だけができます。必要なときはオーナーか管理者の方に操作してもらってください。',
+      }))
     } finally {
       setFormBusy(false)
     }

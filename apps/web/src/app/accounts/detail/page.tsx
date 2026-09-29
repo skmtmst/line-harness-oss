@@ -46,6 +46,8 @@ function AccountDetail() {
 
   const [account, setAccount] = useState<AccountDetailView | null>(null)
   const [all, setAll] = useState<LineAccount[]>([])
+  // R521: 親名称用の一覧は補助データ。本人の取得と切り離し、取れなくても詳細は出す。
+  const [allState, setAllState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
   const [missing, setMissing] = useState(false)
@@ -72,15 +74,27 @@ function AccountDetail() {
     id: string; kind: string; title: string | null; skippedAt: string
   }> | null>(null)
 
+  // R521: 親名称の一覧だけ失敗しても詳細全体を読めなくしない。ここだけ取り直せる。
+  const loadAll = useCallback(async () => {
+    setAllState('loading')
+    try {
+      const list = await api.lineAccounts.list()
+      if (!list.success) { setAllState('error'); return }
+      setAll(list.data)
+      setAllState('ready')
+    } catch {
+      setAllState('error')
+    }
+  }, [])
+
   const load = useCallback(async () => {
     if (!id) return
     setStatus('loading')
     setMissing(false)
     try {
-      const [one, list] = await Promise.all([api.lineAccounts.get(id), api.lineAccounts.list()])
+      const one = await api.lineAccounts.get(id)
       if (!one.success) { setStatus('error'); return }
       setAccount(one.data)
-      if (list.success) setAll(list.data)
       // 止まっているアカウントでは「送らなかった」一覧も読む（X-1）。
       if (!one.data.isActive && !one.data.archivedAt) {
         api.lineAccounts.skippedDeliveries(id)
@@ -101,6 +115,7 @@ function AccountDetail() {
   }, [id])
 
   useEffect(() => { void load() }, [load])
+  useEffect(() => { void loadAll() }, [loadAll])
   useEffect(() => {
     let active = true
     void api.staff.me().then((response) => {
@@ -276,7 +291,34 @@ function AccountDetail() {
                 <InlineRow label="タイムゾーン" value={account.timezone ?? 'Asia/Tokyo'} />
                 <InlineRow label="国・地域" value={account.country ?? '未設定'} />
                 <InlineRow label="役割メモ" value={account.role ?? '未設定'} />
-                <InlineRow label="親アカウント" value={parentLabel(account, all)} />
+                {/*
+                  R521: 親名称の一覧だけ取れないときはこの欄だけ未取得にし、
+                  詳細のほかの欄はそのまま出す。ここだけ取り直せる。
+                */}
+                {!account.parentLineAccountId ? (
+                  <InlineRow label="親アカウント" value="なし（このアカウントが親）" />
+                ) : allState === 'ready' ? (
+                  <InlineRow label="親アカウント" value={parentLabel(account, all)} />
+                ) : allState === 'loading' ? (
+                  <InlineRow label="親アカウント" value="読み込んでいます" />
+                ) : (
+                  <div
+                    className="grid min-w-0 gap-3 border-b border-hairline py-1 last:border-b-0"
+                    style={{ gridTemplateColumns: '9rem minmax(0, 1fr)' }}
+                  >
+                    <dt className="text-ink-faint text-xs">親アカウント</dt>
+                    <dd className="text-ink-secondary min-w-0 break-words text-right text-sm">
+                      読み込めませんでした
+                      <button
+                        type="button"
+                        onClick={() => void loadAll()}
+                        className="text-action ml-2 text-xs font-bold underline"
+                      >
+                        もう一度読み込む
+                      </button>
+                    </dd>
+                  </div>
+                )}
                 <InlineRow
                   label="友だち数"
                   value={account.stats
