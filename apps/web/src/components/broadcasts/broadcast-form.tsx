@@ -82,6 +82,14 @@ import type { BroadcastApprovalCandidate } from '@/lib/api'
 
 interface BroadcastFormProps {
   tags: Tag[]
+  /**
+   * R581: タグ候補の取得状態。呼び側（作成ページ）が持つ。
+   * 取得失敗と真の0件を分け、同じ画面で再試行できるようにする。
+   * 未指定は取得ずみ扱い（一覧の埋め込みフォームは従来どおり）。
+   */
+  tagsStatus?: 'loading' | 'ready' | 'error'
+  /** R581: タグ候補の再取得。入力はフォームが持つので、再試行で消えない。 */
+  onRetryTags?: () => void
   /** 作成された実物。予約だけを完了画面へ送り、下書きと取り違えない。 */
   onSuccess: (broadcast: ApiBroadcast) => void
   /**
@@ -590,6 +598,8 @@ function bubblesError(bubbles: BroadcastBubble[]): string {
 
 export default function BroadcastForm({
   tags,
+  tagsStatus = 'ready',
+  onRetryTags,
   onSuccess,
   onDraftSaved,
   onCancel,
@@ -2071,8 +2081,35 @@ export default function BroadcastForm({
               value={tagId}
               onChange={setTagId}
               options={tags.map((tag) => ({ value: tag.id, label: tag.name }))}
+              loading={tagsStatus === 'loading'}
+              /*
+               * R581: 候補が取れていない間は開かせない。空のまま開くと
+               * 「候補はありません」と出て、通信失敗が「タグが無い」と
+               * 誤って伝わる。読み込み中も同じ。
+               */
+              disabled={tagsStatus !== 'ready'}
               className="mt-1 w-full sm:max-w-sm"
             />
+            {/*
+              R581: 通信失敗と真の0件を分ける。失敗は赤を使わず注意色で出し、
+              同じ画面で再試行できるようにする（失敗・直し方は「？」に入れない）。
+              真の0件は作り先を案内する。入力はフォームが持つので、
+              再試行で書きかけは消えない。
+            */}
+            {tagsStatus === 'loading' && <p className="mt-1 text-xs text-ink-faint">タグを読み込んでいます…</p>}
+            {tagsStatus === 'error' && (
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <p className="text-xs text-warning">タグを読み込めませんでした。通信を確かめて、もう一度お試しください。</p>
+                {onRetryTags && <Button variant="secondary" size="compact" onClick={onRetryTags}>もう一度読み込む</Button>}
+              </div>
+            )}
+            {tagsStatus === 'ready' && tags.length === 0 && (
+              <p className="mt-1 text-xs text-ink-faint">
+                タグはまだありません。先に
+                <Link href="/tags" className="font-semibold text-action hover:underline">友だち属性 ＞ タグ</Link>
+                で作成してください。
+              </p>
+            )}
           </div>}
           {targetMode === 'advanced' && <div className="border-hairline mt-4 border-t pt-4">
             {/*
