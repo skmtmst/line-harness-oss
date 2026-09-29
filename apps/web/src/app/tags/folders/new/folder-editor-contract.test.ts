@@ -87,6 +87,14 @@ describe('フォルダの作成・編集（設計 byqIW）', () => {
     expect(source).toContain("{loadState === 'ready' && blockedReason && (")
   })
 
+  it('削除の失敗は保存と別の言葉で出す', () => {
+    const source = read(FOLDER_EDITOR)
+    // D013: 以前は削除の失敗にも保存系の文言を使っていた。
+    expect(source).toContain('folderDeleteErrorMessage(')
+    expect(source).toMatch(/remove[\s\S]*?folderDeleteErrorMessage/u)
+    expect(source).not.toMatch(/setDeleteOpen\(false\)[\s\S]{0,200}?folderSaveErrorMessage/u)
+  })
+
   it('編集時はフォルダだけを削除し、中のタグを残すことを確認する', () => {
     const source = read(FOLDER_EDITOR)
     expect(source).toContain('api.tagGroups.delete(editId, folderAccountId)')

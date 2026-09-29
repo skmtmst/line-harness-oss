@@ -35,7 +35,7 @@ import {
 import { adminSessionHeaders } from '@/lib/admin-session'
 import { csvCell } from '@/lib/presentation'
 import { formatMileageDate, formatMileageNumber } from './mileage-display'
-import { mileagePaginationTotal } from './mileage-response-state'
+import { describeMileageCsvExportFailure, mileagePaginationTotal } from './mileage-response-state'
 import { ruleEventLabel } from './earning-rule-view'
 import MileageHistoryTab from './mileage-history-tab'
 import ActionScoreTab from './action-score-tab'
@@ -212,6 +212,8 @@ function MileagePageInner() {
   const [isOwner, setIsOwner] = useState(false)
   /** R: 高額調整の承認待ち。依頼した人とは別のオーナーが決める。 */
   const [approvalRequests, setApprovalRequests] = useState<MileageAdjustmentApprovalRequest[] | null>(null)
+  // M502: 承認待ちの取得失敗は黙って消さない。0 件と失敗を区別して出す。
+  const [approvalFailed, setApprovalFailed] = useState(false)
   const [approvalBusyId, setApprovalBusyId] = useState<string | null>(null)
   const [rejectTarget, setRejectTarget] = useState<MileageAdjustmentApprovalRequest | null>(null)
   const [rejectReason, setRejectReason] = useState('')
@@ -385,13 +387,17 @@ function MileagePageInner() {
   const loadApprovalRequests = useCallback(async () => {
     if (!selectedAccountId) {
       setApprovalRequests(null)
+      setApprovalFailed(false)
       return
     }
     try {
       const response = await api.mileage.adjustmentApprovals(selectedAccountId, 'pending')
+      // M502: 失敗応答も失敗として残す。依頼 0 件と区別する。
       setApprovalRequests(response.success ? response.data : null)
+      setApprovalFailed(!response.success)
     } catch {
       setApprovalRequests(null)
+      setApprovalFailed(true)
     }
   }, [selectedAccountId])
 
@@ -551,12 +557,17 @@ function MileagePageInner() {
     if (!selectedAccountId || exportingRules) return
     setExportingRules(true)
     setRuleActionError('')
+    // M503: 応答の状態を残す。通信断（fetch が投げる）は null のまま。
+    let exportStatus: number | null = null
     try {
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/api/mileage/rules/export?accountId=${encodeURIComponent(selectedAccountId)}`,
         { credentials: 'include', headers: adminSessionHeaders() },
       )
-      if (!res.ok) throw new Error('export_failed')
+      if (!res.ok) {
+        exportStatus = res.status
+        throw new Error('export_failed')
+      }
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
@@ -565,7 +576,7 @@ function MileagePageInner() {
       a.click()
       URL.revokeObjectURL(url)
     } catch {
-      setRuleActionError('CSVを書き出せませんでした。権限を確認して、もう一度お試しください。')
+      setRuleActionError(describeMileageCsvExportFailure(exportStatus))
     } finally {
       setExportingRules(false)
     }
@@ -711,6 +722,20 @@ function MileagePageInner() {
               </li>
             ))}
           </ul>
+        </section>
+      ) : approvalFailed ? (
+        /*
+         * M502: 承認待ちの取得失敗はこの欄で理由と取り直しを出す。
+         * 依頼 0 件（欄なし）と区別する。赤は使わない。
+         */
+        <section className="overflow-hidden rounded-card border border-hairline bg-canvas" aria-label="承認待ちのマイル変更">
+          <div className="flex items-center justify-between border-b border-hairline px-4 py-3">
+            <h2 className="text-base font-bold text-ink">承認待ちのマイル変更</h2>
+          </div>
+          <div className="px-4 py-3">
+            <p className="text-sm text-ink-secondary">承認待ちを読み込めませんでした。依頼があるか分からない状態です。</p>
+            <Button onClick={() => void loadApprovalRequests()} className="mt-2">もう一度読み込む</Button>
+          </div>
         </section>
       ) : null}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">

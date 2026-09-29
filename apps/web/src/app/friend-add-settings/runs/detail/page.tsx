@@ -10,7 +10,8 @@ import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import StatusBadge from '@/components/shared/status-badge'
 import TargetMissing from '@/components/shared/target-missing'
-import { api, ApiError, type FriendAddRunDetail } from '@/lib/api'
+import { api, type FriendAddRunDetail } from '@/lib/api'
+import { describeFriendAddFailure } from '../../friend-add-failure'
 import {
   DELIVERY_UNKNOWN_ACTION,
   DELIVERY_UNKNOWN_CODE,
@@ -65,6 +66,8 @@ function FriendAddRunDetailInner() {
   const [detail, setDetail] = useState<FriendAddRunDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  // M010: 403 は共通部品の forbidden で出す。HTTP の状態をそのまま渡す。
+  const [errorStatus, setErrorStatus] = useState<number | null>(null)
   /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
   const [missing, setMissing] = useState(false)
   const [retrying, setRetrying] = useState(false)
@@ -83,6 +86,7 @@ function FriendAddRunDetailInner() {
     }
     setLoading(true)
     setError('')
+    setErrorStatus(null)
     setMissing(false)
     try {
       const response = await api.friendAddRules.runDetail(selectedAccountId, runId)
@@ -94,11 +98,14 @@ function FriendAddRunDetailInner() {
       setDetail(response.data)
     } catch (caught) {
       if (requestId !== requestSequence.current) return
-      if (caught instanceof ApiError && caught.status === 404) {
+      // M010: 403 は権限不足と分かる文にし、「通信が切れた」とは言わない。
+      const failure = describeFriendAddFailure(caught, '実行詳細', 'load')
+      if (failure.status === 404) {
         setMissing(true)
         return
       }
-      setError('実行詳細を表示できませんでした。')
+      setError(failure.message)
+      setErrorStatus(failure.status)
     } finally {
       if (requestId === requestSequence.current) setLoading(false)
     }
@@ -121,8 +128,13 @@ function FriendAddRunDetailInner() {
       }
       setNotice(`${response.data.retried}件の失敗処理を再試行しました。`)
       await load()
-    } catch {
-      setNotice('失敗した処理を再試行できませんでした。状態を読み直してください。')
+    } catch (caught) {
+      // M011: 権限・対象なし・再試行中を一律にしない。409 は応答消失後の
+      // 再送（実際は通っている）ことがあるので、先に読み直して今を見てから
+      // 文を出す（読み直しがお知らせを消すため）。
+      const failure = describeFriendAddFailure(caught, '失敗した処理', 'retry')
+      if (failure.status === 409) await load()
+      setNotice(failure.message)
     } finally {
       setRetrying(false)
     }
@@ -159,11 +171,22 @@ function FriendAddRunDetailInner() {
     )
   }
   if (error || !detail) {
+    // M010: 403 は権限の面で出す。通信断と混ぜない。
+    if (errorStatus === 403) {
+      return (
+        <ListState
+          kind="forbidden"
+          title="実行詳細を表示する権限がありません"
+          description={error}
+          onRetry={() => void load()}
+        />
+      )
+    }
     return (
       <TargetMissing
         kind="error"
         title="実行詳細を表示できませんでした"
-        description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+        description={error || '通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。'}
         onRetry={() => void load()}
       />
     )
