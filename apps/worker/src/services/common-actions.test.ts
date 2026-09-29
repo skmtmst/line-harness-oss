@@ -674,8 +674,8 @@ describe('V6共通アクション', () => {
       id: `${prefix}-w${index}`, type: 'wait', params: { minutes: 5 }, onFailure: 'stop',
     }));
     const leaf = await createCommonAction(testDb.db, {
-      lineAccountId: 'account-1', name: '待機99',
-      actions: waits(99, 'leaf'),
+      lineAccountId: 'account-1', name: '待機90',
+      actions: waits(90, 'leaf'),
     });
     await publishCommonActionDraft(testDb.db, {
       id: leaf.id, lineAccountId: 'account-1',
@@ -685,18 +685,23 @@ describe('V6共通アクション', () => {
       id: `${prefix}-call${index}`, type: 'common_action',
       params: { commonActionId: leaf.id }, onFailure: 'stop',
     }));
-    // 呼び出し10回で990+10=1000処理は公開できる（境界）。
+    /*
+     * 監査 R478: 実行時は利用側の呼び出し1件が先に数えられる。
+     * 呼び出し10回で900+10=910に89処理を足した999へ利用側1件で
+     * 1000処理は公開できる（境界）。
+     */
     const ok = await createCommonAction(testDb.db, {
-      lineAccountId: 'account-1', name: '千処理', actions: refs(10, 'ok'),
+      lineAccountId: 'account-1', name: '千処理',
+      actions: [...refs(10, 'ok'), ...waits(89, 'ok')],
     });
     await publishCommonActionDraft(testDb.db, {
       id: ok.id, lineAccountId: 'account-1',
       draftVersionId: ok.draftVersionId, expectedDraftRevision: 1,
     });
-    // もう1処理足して1001になると、実行に渡す前に止まる。
+    // もう1処理足して1000になると、利用側と合わせて1001で実行に渡す前に止まる。
     const over = await createCommonAction(testDb.db, {
       lineAccountId: 'account-1', name: '千一処理',
-      actions: [...refs(10, 'over'), { id: 'extra', type: 'wait', params: { minutes: 5 }, onFailure: 'stop' }],
+      actions: [...refs(10, 'over'), ...waits(90, 'over')],
     });
     await expect(publishCommonActionDraft(testDb.db, {
       id: over.id, lineAccountId: 'account-1',
