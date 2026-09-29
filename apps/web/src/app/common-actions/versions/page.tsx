@@ -41,6 +41,9 @@ function CommonActionVersionsInner() {
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const [detail, setDetail] = useState<CommonActionDetail | null>(null)
   const [summary, setSummary] = useState<CommonActionSummary | null>(null)
+  /* 監査 R586: 月次集計だけの失敗は詳細と分ける。版・利用先・履歴は残す。 */
+  const [summaryError, setSummaryError] = useState('')
+  const [summaryRetrying, setSummaryRetrying] = useState(false)
   const [loading, setLoading] = useState(true)
   const [working, setWorking] = useState('')
   const [error, setError] = useState('')
@@ -56,10 +59,37 @@ function CommonActionVersionsInner() {
   const requestSeq = useRef(0)
   const lastTargetKey = useRef('')
 
+  /* 監査 R586: 月次集計だけを取り直す。詳細は触らない。 */
+  const reloadSummary = useCallback(async () => {
+    if (!selectedAccountId || !id) return
+    const my = ++requestSeq.current
+    setSummaryRetrying(true)
+    setSummaryError('')
+    try {
+      const listResponse = await api.commonActions.list({ accountId: selectedAccountId })
+      if (requestSeq.current !== my) return
+      if (listResponse.success) {
+        setSummary(listResponse.data.find((item) => item.id === id) ?? null)
+        setSummaryError('')
+      } else {
+        setSummary(null)
+        setSummaryError(listResponse.error || '月次件数を取得できませんでした。通信の状態を確認してください。')
+      }
+    } catch {
+      if (requestSeq.current !== my) return
+      setSummary(null)
+      setSummaryError('月次件数を取得できませんでした。通信の状態を確認してください。')
+    } finally {
+      if (requestSeq.current === my) setSummaryRetrying(false)
+    }
+  }, [id, selectedAccountId])
+
   const load = useCallback(async () => {
     // U096: 対象が無いURLでは取りに行かない。案内は描画側で出す。
     if (!selectedAccountId || !id) {
       setDetail(null)
+      setSummary(null)
+      setSummaryError('')
       setLoading(false)
       return
     }
@@ -68,27 +98,27 @@ function CommonActionVersionsInner() {
       lastTargetKey.current = targetKey
       setDetail(null)
       setSummary(null)
+      setSummaryError('')
       setPendingBindingId(null)
     }
     const my = ++requestSeq.current
     setLoading(true)
     setError('')
     setLoadFailure(null)
+    setSummaryError('')
+    // 監査 R586: 詳細と月次集計は別々に取り、片方の失敗でもう片方を捨てない。
     try {
-      const [response, listResponse] = await Promise.all([
-        api.commonActions.get(id, selectedAccountId),
-        api.commonActions.list({ accountId: selectedAccountId }),
-      ])
+      const response = await api.commonActions.get(id, selectedAccountId)
       if (requestSeq.current !== my) return
       if (response.success) setDetail(response.data)
       else {
+        setDetail(null)
         setError(response.error)
         setLoadFailure('error')
       }
-      setSummary(listResponse.success ? listResponse.data.find((item) => item.id === id) ?? null : null)
     } catch (caught) {
       if (requestSeq.current !== my) return
-      setSummary(null)
+      setDetail(null)
       // U096: 生の `API error: 404` を主文にしない。原因別の言葉に写す。
       if (caught instanceof ApiError && caught.status === 404) {
         setError('この共通アクションは削除されたか、別のLINEアカウントのものです。')
@@ -102,6 +132,22 @@ function CommonActionVersionsInner() {
           : '版と利用先を読み込めませんでした。通信の状態を確認してください。')
         setLoadFailure('error')
       }
+    }
+    try {
+      const listResponse = await api.commonActions.list({ accountId: selectedAccountId })
+      if (requestSeq.current !== my) return
+      if (listResponse.success) {
+        setSummary(listResponse.data.find((item) => item.id === id) ?? null)
+        setSummaryError('')
+      } else {
+        setSummary(null)
+        setSummaryError(listResponse.error || '月次件数を取得できませんでした。通信の状態を確認してください。')
+      }
+    } catch {
+      if (requestSeq.current !== my) return
+      setSummary(null)
+      // 一覧だけの失敗は全体の失敗にしない。詳細の loadFailure は触らない。
+      setSummaryError('月次件数を取得できませんでした。通信の状態を確認してください。')
     } finally {
       if (requestSeq.current === my) setLoading(false)
     }
@@ -250,11 +296,41 @@ function CommonActionVersionsInner() {
         )}
       />
 
+      {summaryError ? (
+        <Notice
+          tone="warn"
+          message="月次件数を取得できませんでした。版と利用先は表示しています。"
+          action={(
+            <Button variant="secondary" disabled={summaryRetrying} onClick={() => void reloadSummary()}>
+              月次件数をもう一度読み込む
+            </Button>
+          )}
+        />
+      ) : null}
+
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
         <KpiCard variant="v6" title="いまの版" value={published?.versionNumber ?? null} unit="" detail={published?.publishedAt ? `${new Date(published.publishedAt).toLocaleDateString('ja-JP')} に公開` : 'まだ公開していません'} />
         <KpiCard variant="v6" title="呼び出し元" value={detail.bindings.length} unit="" detail={usageSummaryDetail(detail.bindings)} />
-        <KpiCard variant="v6" title="今月 動いた回数" value={summary?.executionCountThisMonth ?? null} unit="" detail="" help="実行記録から集計しています" />
-        <KpiCard variant="v6" title="失敗" value={summary?.failureCountThisMonth ?? null} unit="" detail="" help="部分成功を含みます" />
+        <KpiCard
+          variant="v6"
+          title="今月 動いた回数"
+          value={summary?.executionCountThisMonth ?? null}
+          unit=""
+          detail={summaryError ? '取得できませんでした' : ''}
+          help="実行記録から集計しています"
+          onRetry={summaryError ? () => void reloadSummary() : undefined}
+          retryLabel="月次件数をもう一度読み込む"
+        />
+        <KpiCard
+          variant="v6"
+          title="失敗"
+          value={summary?.failureCountThisMonth ?? null}
+          unit=""
+          detail={summaryError ? '取得できませんでした' : ''}
+          help="部分成功を含みます"
+          onRetry={summaryError ? () => void reloadSummary() : undefined}
+          retryLabel="月次件数をもう一度読み込む"
+        />
         <KpiCard variant="v6" title="古い版のまま" value={detail.bindings.filter((binding) => binding.hasNewerVersion).length} unit="" detail="回答フォーム" badge={detail.bindings.some((binding) => binding.hasNewerVersion) ? '要確認' : undefined} />
       </div>
 
@@ -323,7 +399,7 @@ function CommonActionVersionsInner() {
           <div>
             <h2 className="text-ink font-semibold">版の履歴</h2>
             <p className="text-ink-faint mt-1 text-sm">公開した版は書き換えられません。</p>
-            <p className="text-ink-faint mt-1 text-xs">この30日の実行 {summary?.executionCountThisMonth.toLocaleString('ja-JP') ?? '—'}回・失敗 {summary?.failureCountThisMonth.toLocaleString('ja-JP') ?? '—'}回</p>
+            <p className="text-ink-faint mt-1 text-xs">この30日の実行 {summary?.executionCountThisMonth.toLocaleString('ja-JP') ?? '—'}回・失敗 {summary?.failureCountThisMonth.toLocaleString('ja-JP') ?? '—'}回{summaryError ? '（月次件数を取得できませんでした）' : ''}</p>
           </div>
         </div>
         <DataTable>
