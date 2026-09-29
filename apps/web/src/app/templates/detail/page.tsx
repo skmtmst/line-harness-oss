@@ -20,6 +20,7 @@ import { isOwnerOrAdmin } from '@/lib/staff-capability'
 import { templateDeleteDescription } from '../template-delete-message'
 import { messageTypeText } from '../template-message-type'
 import { isTemplateDetailData } from '../template-detail-data'
+import { formatDateTime } from '@/lib/format'
 
 interface Usage {
   autoReplies: Array<{ id: string; keyword: string; templateVersion: number | null }>
@@ -692,17 +693,6 @@ function TemplateDetailInner() {
  * 日時の表示（一覧と同じく日本時間）。来ない・壊れているときは
  * 「—」にし、取れていないのを空欄や変な日付にしない。
  */
-function formatDateTime(iso: string): string {
-  const time = new Date(iso).getTime()
-  if (!Number.isFinite(time)) return '—'
-  return new Date(iso).toLocaleString('ja-JP', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
 
 function Row({ label, value }: { label: string; value: string }) {
   return (

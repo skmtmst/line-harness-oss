@@ -12,6 +12,7 @@ import { hqTemplatesApi, type TemplateType, type TemplateDetail, type TemplateIn
 import styles from './template-console.module.css'
 import { clearCreationAttempt, loadCreationAttempt, persistCreationAttempt, sameCreationScope, type CreationAttempt, type CreationScope } from '@/lib/hq-template-create-attempt'
 import TemplateDefinitionEditor, { definitionError, definitionForName, definitionName, freshDefinition, referenceCount } from './template-definition-editor'
+import { formatDateTime } from '@/lib/format'
 
 const LABELS: Record<TemplateType, string> = { tag: 'タグ', template: 'テンプレート', rich_menu: 'リッチメニュー', form: '回答フォーム' }
 const PAGE_TITLES: Record<TemplateType, string> = { tag: '友だち属性', template: 'テンプレート', rich_menu: 'リッチメニュー', form: '回答フォーム' }
@@ -34,7 +35,7 @@ const STEPS: readonly { stage: Stage; label: string }[] = [
 ]
 const choiceKey = (account: string, source: string) => JSON.stringify([account, source])
 const failedStores = (result: DistributionResult) => result.stores.filter(store => ['failed', 'version_conflict', 'unsupported'].includes(store.status))
-const formatDate = (value: string) => Number.isFinite(Date.parse(value)) ? new Date(value).toLocaleString('ja-JP') : '—'
+const formatDate = (value: string) => Number.isFinite(Date.parse(value)) ? formatDateTime(value) : '—'
 const errorText = (error: unknown) => error instanceof Error ? error.message : '処理できませんでした。時間をおいて再確認してください。'
 
 export function resolvedItems(preflight: Preflight, choices: Record<string, DistributionMode>): Resolution[] | null {

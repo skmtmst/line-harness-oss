@@ -170,7 +170,7 @@ describe('届かなかった交換の欄(本物のReact)', () => {
     expect(text).toContain('特典を渡せませんでした')
     expect(text).toContain('3回')
     // 最終日時は日本時間で出す。UTCの01:02は10:02。
-    expect(text).toContain('2026/09/09 10:02')
+    expect(text).toContain('9月9日（水）10:02')
     expect(text).toContain('もう一度届ける')
   })
 

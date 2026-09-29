@@ -15,6 +15,7 @@ import KpiCard from '@/components/shared/kpi-card'
 import Notice from '@/components/shared/notice'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { contractDetail, minutesLabel, revenueDetail, revenueSourceLabel } from './format'
+import { formatNumber } from '@/lib/format'
 
 /**
  * 運営ダッシュボード ★V6 37-2 `Xvofy`。
@@ -229,7 +230,7 @@ export default function OpsDashboardPage() {
                 <Tr key={row.tenantId}>
                   <Td><Link href={`/ops/tenants/detail?id=${encodeURIComponent(row.tenantId)}`} className="block truncate text-label font-medium text-ink hover:underline">{row.tenantName}</Link></Td>
                   <Td><span className="text-caption text-ink-secondary">{row.planLabel}</span></Td>
-                  <Td><span className="text-caption text-ink">{row.messages.toLocaleString('ja-JP')} / {row.limits.messages === null ? '—' : row.limits.messages.toLocaleString('ja-JP')}</span></Td>
+                  <Td><span className="text-caption text-ink">{formatNumber(row.messages)} / {row.limits.messages === null ? '—' : formatNumber(row.limits.messages)}</span></Td>
                   <Td><span className="text-caption text-ink">{row.bannerUnits} / {row.limits.images ?? '—'}</span></Td>
                   <Td><span className="text-caption text-ink">{formatBytes(row.mediaBytes)} / {row.limits.mediaBytes === null ? '—' : formatBytes(row.limits.mediaBytes)}</span></Td>
                   <Td align="right">{row.usageRate >= 90 ? <Chip tone="danger">{row.usageRate}%</Chip> : row.usageRate >= 70 ? <Chip tone="warn">{row.usageRate}%</Chip> : <Chip tone="neutral">{row.usageRate}%</Chip>}</Td>

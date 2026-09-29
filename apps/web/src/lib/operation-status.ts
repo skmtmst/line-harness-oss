@@ -1,4 +1,5 @@
 import type { AccountHealthLog, LineAccount } from '@line-crm/shared'
+import { formatDateTime, formatNumber } from '@/lib/format'
 
 export type OperationSeverity = 'normal' | 'warning' | 'danger' | 'unknown'
 
@@ -110,14 +111,7 @@ export function formatOperationDate(value: string | null): string {
   if (!text) return 'まだありません'
   const date = parseOperationDate(text)
   if (!date) return '日時不明'
-  return date.toLocaleString('ja-JP', {
-    timeZone: 'Asia/Tokyo',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  return formatDateTime(date)
 }
 
 const OFFSET_SUFFIX = /(?:[zZ]|[+-]\d{2}:?\d{2})$/
@@ -146,7 +140,7 @@ export function buildResearchReport(input: {
   const remaining =
     input.quotaLimit == null || input.quotaUsed == null
       ? '取得できません'
-      : Math.max(input.quotaLimit - input.quotaUsed, 0).toLocaleString('ja-JP')
+      : formatNumber(Math.max(input.quotaLimit - input.quotaUsed, 0))
 
   const lines = [
     '# 運用状態 調査レポート',

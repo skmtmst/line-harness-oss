@@ -21,6 +21,7 @@ import { api } from '@/lib/api'
 import FriendAddRuleEditor from './friend-add-rule-editor'
 import { describeFriendAddFailure } from './friend-add-failure'
 import { useCursorStack } from './use-cursor-stack'
+import { formatNumber } from '@/lib/format'
 
 const KIND_LABELS: Record<FriendAddRuleKind, string> = {
   first_time: 'はじめて友だち追加した人',
@@ -28,7 +29,7 @@ const KIND_LABELS: Record<FriendAddRuleKind, string> = {
 }
 
 function countText(value: number | null, unit: string) {
-  return value === null ? '—' : `${value.toLocaleString()}${unit}`
+  return value === null ? '—' : `${formatNumber(value)}${unit}`
 }
 
 function successRate(delivered: number | null, failed: number | null) {

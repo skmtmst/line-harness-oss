@@ -16,6 +16,7 @@ import { formatJstDateTime } from '@/lib/presentation'
 import { nenRanksApi, type NenRankSettingsData } from '@/lib/nen-ranks-api'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import type { LoadStatus } from './page'
+import { formatNumber } from '@/lib/format'
 
 type Draft = { id: string | null; name: string; threshold: string; rate: string; tagName: string | null; memberCount: number }
 
@@ -222,7 +223,7 @@ export default function RankSettingsTab({
                         {row.tagName ?? (row.name.trim() ? `[会員] ランク：${row.name.trim()}（保存すると作られます）` : '—')}
                       </span>
                     </Td>
-                    <Td align="right" className="cq-hide-below-800 w-24"><span className="text-label font-semibold tabular-nums text-ink">{row.memberCount.toLocaleString('ja-JP')}人</span></Td>
+                    <Td align="right" className="cq-hide-below-800 w-24"><span className="text-label font-semibold tabular-nums text-ink">{formatNumber(row.memberCount)}人</span></Td>
                     <Td align="right" className="w-14">
                       {isBase ? null : row.id === null ? (
                         /* まだ保存していない行の取り消しは、確認なしの文字ボタン。 */

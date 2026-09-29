@@ -7,6 +7,7 @@ import Drawer from '@/components/shared/drawer'
 import ListState from '@/components/shared/list-state'
 import { petAnimalTypeLabel, type NenHealthSummaryData } from '@/lib/nen-pets-api'
 import type { SummaryStatus } from './page'
+import { formatDay } from '@/lib/format'
 import './print.css'
 
 const SKIN_LABELS: Record<string, string> = { normal: '問題なし', itchy: 'かゆそう', red: '赤み', other: 'その他' }
@@ -114,7 +115,7 @@ export function SummarySheet({ summary }: { summary: NenHealthSummaryData }) {
   return createPortal(
     <div data-print-sheet="" aria-hidden="true">
       <p><strong>健康日記 30日のまとめ</strong></p>
-      <p>{summary.pet.callName || summary.pet.name}（{kind}{summary.pet.breed ? `・${summary.pet.breed}` : ''}・{summary.pet.ageLabel}）／飼い主 {summary.owner.name}／作成 {summary.generatedAt.slice(0, 10)}</p>
+      <p>{summary.pet.callName || summary.pet.name}（{kind}{summary.pet.breed ? `・${summary.pet.breed}` : ''}・{summary.pet.ageLabel}）／飼い主 {summary.owner.name}／作成 {formatDay(summary.generatedAt)}</p>
       <p>
         記録 {s.records}件／{s.days}日。
         体重 {s.weight ? `${s.weight.first}kg → ${s.weight.last}kg（最小 ${s.weight.min}・最大 ${s.weight.max}）` : '記録なし'}。

@@ -79,6 +79,7 @@ import {
   SingleOperatorFields,
 } from '@/components/broadcasts/broadcast-approval'
 import type { BroadcastApprovalCandidate } from '@/lib/api'
+import { formatDateTime, formatDay, formatNumber, formatTime } from '@/lib/format'
 
 interface BroadcastFormProps {
   tags: Tag[]
@@ -184,9 +185,7 @@ export function moveMessageTypeTabFocus(
 const EMOJIS = ['😊', '✨', '🎉', '🐕', '🐈', '🌿', '❤️', '👍']
 
 function formatScheduleTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString('ja-JP', {
-    timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit',
-  })
+  return formatTime(iso)
 }
 
 /**
@@ -1419,7 +1418,7 @@ export default function BroadcastForm({
     setTestSending(true)
     setError('')
     setTestResult(null)
-    const at = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })
+    const at = formatTime(new Date())
     try {
       const draft = await persistDraft(null, true)
       if (!draft) return
@@ -1520,10 +1519,10 @@ export default function BroadcastForm({
     ? (() => {
         const ex = preflight.exclusions
         const parts = [
-          ex.blocked > 0 ? `ブロック ${ex.blocked.toLocaleString('ja-JP')}人` : null,
-          ex.hidden > 0 ? `非表示 ${ex.hidden.toLocaleString('ja-JP')}人` : null,
-          ex.missingDestination > 0 ? `宛先不明 ${ex.missingDestination.toLocaleString('ja-JP')}人` : null,
-          ex.duplicate > 0 ? `重複 ${ex.duplicate.toLocaleString('ja-JP')}人` : null,
+          ex.blocked > 0 ? `ブロック ${formatNumber(ex.blocked)}人` : null,
+          ex.hidden > 0 ? `非表示 ${formatNumber(ex.hidden)}人` : null,
+          ex.missingDestination > 0 ? `宛先不明 ${formatNumber(ex.missingDestination)}人` : null,
+          ex.duplicate > 0 ? `重複 ${formatNumber(ex.duplicate)}人` : null,
         ].filter((part): part is string => part !== null)
         return parts.length > 0 ? `${parts.join('・')}を除外` : '除外なし'
       })()
@@ -1540,13 +1539,11 @@ export default function BroadcastForm({
     : quota.state === 'unavailable'
       ? '確認できませんでした'
       : quota.state === 'insufficient'
-        ? `不足しています（残り ${quota.remaining?.toLocaleString('ja-JP') ?? '—'} / ${quota.monthlyLimit?.toLocaleString('ja-JP') ?? '—'}通）`
-        : `残り ${quota.remaining?.toLocaleString('ja-JP') ?? '—'} / ${quota.monthlyLimit?.toLocaleString('ja-JP') ?? '—'}通（この配信で ${quota.planned.toLocaleString('ja-JP')}通を使用）`
+        ? `不足しています（残り ${formatNumber(quota.remaining)} / ${formatNumber(quota.monthlyLimit)}通）`
+        : `残り ${formatNumber(quota.remaining)} / ${formatNumber(quota.monthlyLimit)}通（この配信で ${formatNumber(quota.planned)}通を使用）`
   /** 対象の人数を数えた時刻。応答の evaluatedAt をJSTで出す。 */
   const evaluatedAtLabel = preflight?.audience?.evaluatedAt
-    ? new Date(preflight.audience.evaluatedAt).toLocaleString('ja-JP', {
-        timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit',
-      })
+    ? formatDateTime(preflight.audience.evaluatedAt)
     : null
   /** 把握できる重複配信。同じ時刻の前後1時間に入っている別の予約。 */
   const concurrentBroadcasts = preflight?.concurrentBroadcasts ?? []
@@ -1768,7 +1765,7 @@ export default function BroadcastForm({
               <h3 className="text-lg font-bold text-ink">配信内容</h3>
               <p className="mt-1 text-xs text-ink-faint">対象・日時・メッセージの最終確認です。</p>
               <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-                <div><dt className="text-xs text-ink-faint">対象</dt><dd className="mt-1 font-medium text-ink">{confirmAudienceLabel} {audienceCount?.toLocaleString('ja-JP') ?? '—'}人</dd></div>
+                <div><dt className="text-xs text-ink-faint">対象</dt><dd className="mt-1 font-medium text-ink">{confirmAudienceLabel} {formatNumber(audienceCount)}人</dd></div>
                 <div><dt className="text-xs text-ink-faint">配信日時</dt><dd className="mt-1 font-medium text-ink">{sendWhenLabel ?? '未設定'}</dd></div>
               </dl>
             </section>
@@ -1778,7 +1775,7 @@ export default function BroadcastForm({
               <dl className="mt-4 divide-y divide-hairline text-sm">
                 <div className="flex justify-between py-3"><dt className="font-medium text-ink">対象条件</dt><dd className="text-ink-secondary">除外{preflight?.exclusions?.total ?? 0}人を含めて確認済み</dd></div>
                 <div className="flex justify-between py-3"><dt className="font-medium text-ink">メッセージ表示</dt><dd className="text-ink-secondary">LINEプレビュー確認済み</dd></div>
-                <div className="flex justify-between py-3"><dt className="font-medium text-ink">送信枠</dt><dd className="text-ink-secondary">残り {quota?.remaining?.toLocaleString('ja-JP') ?? '—'} / {quota?.monthlyLimit?.toLocaleString('ja-JP') ?? '—'}通</dd></div>
+                <div className="flex justify-between py-3"><dt className="font-medium text-ink">送信枠</dt><dd className="text-ink-secondary">残り {formatNumber(quota?.remaining)} / {formatNumber(quota?.monthlyLimit)}通</dd></div>
               </dl>
             </section>
           </section>
@@ -1881,7 +1878,7 @@ export default function BroadcastForm({
                   <div key={broadcast.id} className="broadcast-recent-row grid items-center gap-3 border-b border-hairline px-3 py-2.5 text-xs last:border-b-0">
                     <div className="min-w-0"><p className="truncate font-bold text-action">{broadcast.title}</p><p className="truncate text-ink-faint">{typeLabel(broadcast.messageType)} 1通</p></div>
                     <span className="text-ink-secondary">{broadcast.status === 'sent' ? '送信済み' : broadcast.status === 'scheduled' ? '予約済み' : '下書き'}</span>
-                    <span className="text-ink-faint">{broadcast.sentAt || broadcast.scheduledAt ? new Date(broadcast.sentAt ?? broadcast.scheduledAt ?? '').toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '未設定'}</span>
+                    <span className="text-ink-faint">{broadcast.sentAt || broadcast.scheduledAt ? formatDateTime(broadcast.sentAt ?? broadcast.scheduledAt ?? '') : '未設定'}</span>
                     <button type="button" className="text-left font-semibold text-action hover:underline" onClick={() => duplicateRecent(broadcast)}>複製する</button>
                   </div>
                 )) : <p className="p-5 text-sm text-ink-faint">最近の配信はまだありません。</p>}
@@ -1905,7 +1902,7 @@ export default function BroadcastForm({
             <div className="rounded-card bg-accent-soft px-5 py-3 text-right">
               <p className="text-xs font-medium text-accent-deep">送信対象</p>
               <p className="text-hero text-accent-deep">
-                {audienceDisplayCount?.toLocaleString('ja-JP') ?? '—'}
+                {formatNumber(audienceDisplayCount)}
                 <span className="ml-1 text-sm font-normal">人</span>
               </p>
             </div>
@@ -1937,10 +1934,10 @@ export default function BroadcastForm({
               <p className="text-ink text-sm">
                 分析で作った対象者
                 {audienceNotice.label && <span className="ml-1 text-ink-secondary text-xs">{audienceNotice.label}</span>}
-                <span className="ml-2 font-bold">{audienceNotice.memberCount.toLocaleString('ja-JP')}人</span>
+                <span className="ml-2 font-bold">{formatNumber(audienceNotice.memberCount)}人</span>
               </p>
               <p className="text-ink-faint text-xs">
-                {new Date(audienceNotice.expiresAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}まで有効・送る直前にもう一度確かめます
+                {formatDateTime(audienceNotice.expiresAt)}まで有効・送る直前にもう一度確かめます
               </p>
             </div>
           )}
@@ -2023,7 +2020,7 @@ export default function BroadcastForm({
                 ].map(([label, value]) => (
                   <div key={String(label)} className="rounded-control border border-hairline bg-canvas-sunken p-3">
                     <p className="text-xs font-medium text-ink-faint">{label}</p>
-                    <p className="text-ink mt-1 text-hero tabular-nums">{Number(value).toLocaleString('ja-JP')}人</p>
+                    <p className="text-ink mt-1 text-hero tabular-nums">{formatNumber(Number(value))}人</p>
                   </div>
                 ))}
               </div>
@@ -2339,7 +2336,7 @@ export default function BroadcastForm({
             <p className="text-sm font-bold text-ink">開封・クリックの集計</p>
             <p className="mt-1 text-xs text-ink-faint">
               {quota?.monthlyUsed !== null && quota?.monthlyUsed !== undefined && quota.monthlyLimit !== null
-                ? `LINEの月間送信枠を使います（今月 ${quota.monthlyUsed.toLocaleString('ja-JP')} / ${quota.monthlyLimit.toLocaleString('ja-JP')} 通）。`
+                ? `LINEの月間送信枠を使います（今月 ${formatNumber(quota.monthlyUsed)} / ${formatNumber(quota.monthlyLimit)} 通）。`
                 : 'LINEの月間送信枠を確認しています。'}
             </p>
           </div>
@@ -2351,7 +2348,7 @@ export default function BroadcastForm({
                 {[-1, 0, 1, 2].map((offset) => {
                   const base = scheduledDate ? new Date(`${scheduledDate}T00:00:00+09:00`) : null
                   if (base) base.setDate(base.getDate() + offset)
-                  const ymd = base ? base.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', weekday: 'short' }) : '日付未設定'
+                  const ymd = base ? formatDay(base) : '日付未設定'
                   const concurrent = offset === 0 ? concurrentBroadcasts : []
                   return <div key={offset} className={`rounded-control border p-3 text-xs ${offset === 0 ? 'border-accent bg-accent-soft' : 'border-hairline'}`}><p className="font-semibold text-ink">{ymd}{offset === 0 ? ' 今回' : ''}</p>{concurrent.length ? concurrent.map((item) => <p key={item.id} className="mt-2 truncate text-ink-secondary" title={item.title}>{formatScheduleTime(item.scheduledAt)}　{item.title}</p>) : <p className="mt-2 text-ink-faint">予定なし</p>}</div>
                 })}
@@ -2375,7 +2372,7 @@ export default function BroadcastForm({
           {/* 「今すぐ」は日時を持たないので未設定扱いしない。予約と混同しないよう別の文にする。 */}
           <li className="flex items-center gap-2"><span className={scheduledLabel || sendMode === 'now' ? 'text-success' : 'text-warning'}>{scheduledLabel || sendMode === 'now' ? '✓' : '!'}</span><span>{sendMode === 'now' ? '今すぐ配信を選んでいます' : '配信日時が設定されています'}</span></li>
           <li className="flex items-center gap-2"><span className={testResult?.kind === 'success' ? 'text-success' : testResult ? 'text-danger' : 'text-warning'}>{testResult?.kind === 'success' ? '✓' : '!'}</span><span>{testResult?.kind === 'success' ? 'テスト送信が完了しています' : testResult ? 'テスト送信で届かなかった宛先があります' : 'テスト送信がまだです'}</span></li>
-          <li className="flex items-center gap-2"><span className={quotaInsufficient || lengthNotice.tone === 'error' ? 'text-danger' : quotaAvailable ? 'text-success' : 'text-warning'}>{quotaInsufficient || lengthNotice.tone === 'error' ? '!' : quotaAvailable ? '✓' : '○'}</span><span>{visualQaAugustCampaign ? '送信枠を超えていません' : quotaInsufficient ? `送信枠が${Math.max(0, quota.planned - (quota.remaining ?? 0)).toLocaleString('ja-JP')}通不足しています` : quotaAvailable ? `送信枠は残り${quota.remaining?.toLocaleString('ja-JP')}通です` : '送信枠を確認できません'}</span></li>
+          <li className="flex items-center gap-2"><span className={quotaInsufficient || lengthNotice.tone === 'error' ? 'text-danger' : quotaAvailable ? 'text-success' : 'text-warning'}>{quotaInsufficient || lengthNotice.tone === 'error' ? '!' : quotaAvailable ? '✓' : '○'}</span><span>{visualQaAugustCampaign ? '送信枠を超えていません' : quotaInsufficient ? `送信枠が${formatNumber(Math.max(0, quota.planned - (quota.remaining ?? 0)))}通不足しています` : quotaAvailable ? `送信枠は残り${formatNumber(quota.remaining)}通です` : '送信枠を確認できません'}</span></li>
         </ul>
         {!visualQaAugustCampaign && <Checkbox
           checked={previewConfirmed}
@@ -2400,7 +2397,7 @@ export default function BroadcastForm({
         <dl className="mt-5 divide-y divide-hairline text-sm">
           {[
             ['管理名', title.trim() || '（未入力）'],
-            ['対象', visualQaAugustCampaign ? '条件指定 1,213人' : `${confirmAudienceLabel} ${audienceCount === null ? '—' : `${audienceCount.toLocaleString('ja-JP')}人`}`],
+            ['対象', visualQaAugustCampaign ? '条件指定 1,213人' : `${confirmAudienceLabel} ${audienceCount === null ? '—' : `${formatNumber(audienceCount)}人`}`],
             ['除外', visualQaAugustCampaign ? 'ブロック 12人を除外' : exclusionNote ?? '—'],
             ['配信日時', visualQaAugustCampaign ? '2026/08/24 10:00' : sendWhenLabel ?? '未設定'],
             ['送信枠', visualQaAugustCampaign ? '残り 8,700 / 10,000通' : quotaNote ?? '—'],
@@ -2463,7 +2460,7 @@ export default function BroadcastForm({
               <p className="mt-1 text-xs text-ink-faint">保存前に対象と送信方法を確認します。</p>
               <dl className="mt-4 divide-y divide-hairline text-sm">
                 <div className="flex justify-between py-2"><dt className="text-ink-faint">選択中</dt><dd className="font-medium text-ink">{selectedTemplate?.name ?? '未選択'}</dd></div>
-                <div className="flex justify-between py-2"><dt className="text-ink-faint">更新日</dt><dd className="font-medium text-ink">{selectedTemplate?.updatedAt ? new Date(selectedTemplate.updatedAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}</dd></div>
+                <div className="flex justify-between py-2"><dt className="text-ink-faint">更新日</dt><dd className="font-medium text-ink">{selectedTemplate?.updatedAt ? formatDateTime(selectedTemplate.updatedAt) : '—'}</dd></div>
                 <div className="flex justify-between py-2"><dt className="text-ink-faint">使用回数</dt><dd className="font-medium text-ink">{selectedTemplate?.usageCount === undefined ? '—' : `${selectedTemplate.usageCount}回`}</dd></div>
               </dl>
             </section>
@@ -2487,7 +2484,7 @@ export default function BroadcastForm({
           </div>
         ) : preflightDialogOpen ? (
           <div className="space-y-3">
-            <section className="rounded-card border border-hairline bg-canvas p-5"><h3 className="text-lg font-medium text-ink">設定サマリー</h3><p className="mt-1 text-xs text-ink-faint">保存前に対象と送信方法を確認します。</p><dl className="mt-4 divide-y divide-hairline text-sm"><div className="flex justify-between py-2"><dt className="text-ink-faint">配信人数</dt><dd className="font-medium text-ink">{audienceCount?.toLocaleString('ja-JP') ?? '—'}人</dd></div><div className="flex justify-between py-2"><dt className="text-ink-faint">送信枠</dt><dd className="font-medium text-danger">不足 {quota && quota.remaining !== null ? Math.max(0, quota.planned - quota.remaining).toLocaleString('ja-JP') : '—'}通</dd></div><div className="flex justify-between py-2"><dt className="text-ink-faint">状態</dt><dd className="font-medium text-danger">要確認</dd></div></dl></section>
+            <section className="rounded-card border border-hairline bg-canvas p-5"><h3 className="text-lg font-medium text-ink">設定サマリー</h3><p className="mt-1 text-xs text-ink-faint">保存前に対象と送信方法を確認します。</p><dl className="mt-4 divide-y divide-hairline text-sm"><div className="flex justify-between py-2"><dt className="text-ink-faint">配信人数</dt><dd className="font-medium text-ink">{formatNumber(audienceCount)}人</dd></div><div className="flex justify-between py-2"><dt className="text-ink-faint">送信枠</dt><dd className="font-medium text-danger">不足 {quota && quota.remaining !== null ? formatNumber(Math.max(0, quota.planned - quota.remaining)) : '—'}通</dd></div><div className="flex justify-between py-2"><dt className="text-ink-faint">状態</dt><dd className="font-medium text-danger">要確認</dd></div></dl></section>
             <section className="rounded-card border border-hairline bg-canvas p-5"><h3 className="text-lg font-bold text-ink">メッセージプレビュー</h3><p className="mt-1 text-xs text-ink-faint">実際のLINE表示に近い確認用プレビューです。</p><div className="mt-4 rounded-control bg-canvas-sunken p-4 text-sm text-ink">8月限定キャンペーンのお知らせです。</div></section>
             <div className="grid grid-cols-2 gap-2"><Button type="button">テスト送信</Button><Button type="button" disabled>配信イメージを見る</Button></div>
           </div>
@@ -2511,9 +2508,9 @@ export default function BroadcastForm({
               <h3 className="font-bold text-ink">設定内容</h3>
               <dl className="mt-3 divide-y divide-hairline text-xs">
                 {[
-                  ['配信対象', visualQaAugustCampaign ? '条件指定 1,213人' : `${confirmAudienceLabel} ${audienceCount === null ? '—' : `${audienceCount.toLocaleString('ja-JP')}人`}`],
+                  ['配信対象', visualQaAugustCampaign ? '条件指定 1,213人' : `${confirmAudienceLabel} ${audienceCount === null ? '—' : `${formatNumber(audienceCount)}人`}`],
                   ['配信日時', visualQaAugustCampaign ? '2026/08/24 10:00' : sendWhenLabel ?? '未設定'],
-                  ['送信数', visualQaAugustCampaign ? '1,213通' : audienceCount === null ? '—' : `${audienceCount.toLocaleString('ja-JP')}通`],
+                  ['送信数', visualQaAugustCampaign ? '1,213通' : audienceCount === null ? '—' : `${formatNumber(audienceCount)}通`],
                   ['配信後', visualQaAugustCampaign ? 'タグ「配信済み」を追加' : publishedActions.find((action) => action.versionId === afterActionVersionId)?.name ?? '実行しない'],
                 ].map(([label, value]) => <div key={label} className="flex items-center justify-between gap-3 py-4"><dt className="text-ink-faint">{label}</dt><dd className="text-right font-medium text-ink">{value}</dd></div>)}
               </dl>
@@ -2524,7 +2521,7 @@ export default function BroadcastForm({
             <section className="rounded-card border border-hairline bg-canvas p-5">
               <h3 className="text-sm font-bold text-ink">設定内容</h3>
               <dl className="mt-3 space-y-3 text-sm">
-                <div><dt className="text-xs text-ink-faint">配信対象</dt><dd className="font-medium text-ink">{confirmAudienceLabel} {audienceDisplayCount === null ? '—' : `${audienceDisplayCount.toLocaleString('ja-JP')}人`}</dd></div>
+                <div><dt className="text-xs text-ink-faint">配信対象</dt><dd className="font-medium text-ink">{confirmAudienceLabel} {audienceDisplayCount === null ? '—' : `${formatNumber(audienceDisplayCount)}人`}</dd></div>
                 <div><dt className="text-xs text-ink-faint">配信日時</dt><dd className="font-medium text-ink">未設定</dd></div>
                 <div><dt className="text-xs text-ink-faint">送信数</dt><dd className="font-medium text-ink">{bubbles.length}通</dd></div>
               </dl>
@@ -2543,7 +2540,7 @@ export default function BroadcastForm({
               <h3 className="text-sm font-bold text-ink">設定内容</h3>
               <dl className="mt-3 divide-y divide-hairline text-xs">
                 {[
-                  ['配信対象', `${confirmAudienceLabel} ${audienceCount === null ? '—' : `${audienceCount.toLocaleString('ja-JP')}人`}`],
+                  ['配信対象', `${confirmAudienceLabel} ${audienceCount === null ? '—' : `${formatNumber(audienceCount)}人`}`],
                   ['配信日時', scheduledLabel ?? '未設定'],
                   ['送信数', `${bubbles.length}通`],
                   ['配信後', publishedActions.find((action) => action.versionId === afterActionVersionId)?.name ?? '未設定'],
@@ -2553,7 +2550,7 @@ export default function BroadcastForm({
             <section className="rounded-card border border-hairline bg-canvas p-5">
               <h3 className="text-sm font-bold text-ink">送信枠</h3>
               <p className="mt-1 text-xs text-ink-faint">現在の枠内で送信できるか確認します。</p>
-              {quota ? <><p className="mt-3 text-sm font-semibold text-ink">使用予定　{quota.planned.toLocaleString('ja-JP')} / {quota.monthlyLimit?.toLocaleString('ja-JP') ?? '—'}通</p><div className="mt-2 h-2 overflow-hidden rounded-pill bg-canvas-sunken"><div className={`h-full ${quotaInsufficient ? 'bg-danger' : 'bg-accent'}`} style={{ width: quota.monthlyLimit ? `${Math.min(100, ((quota.monthlyUsed ?? 0) + quota.planned) / quota.monthlyLimit * 100)}%` : '0%' }} /></div><p className={`mt-2 text-xs font-medium ${quotaInsufficient ? 'text-danger' : 'text-success'}`}>{quotaInsufficient ? `不足 ${Math.max(0, quota.planned - (quota.remaining ?? 0)).toLocaleString('ja-JP')}通` : `残り ${quota.remaining?.toLocaleString('ja-JP') ?? '—'}通`}</p></> : <p className="mt-3 text-xs text-warning">送信枠を確認できませんでした。</p>}
+              {quota ? <><p className="mt-3 text-sm font-semibold text-ink">使用予定　{formatNumber(quota.planned)} / {formatNumber(quota.monthlyLimit)}通</p><div className="mt-2 h-2 overflow-hidden rounded-pill bg-canvas-sunken"><div className={`h-full ${quotaInsufficient ? 'bg-danger' : 'bg-accent'}`} style={{ width: quota.monthlyLimit ? `${Math.min(100, ((quota.monthlyUsed ?? 0) + quota.planned) / quota.monthlyLimit * 100)}%` : '0%' }} /></div><p className={`mt-2 text-xs font-medium ${quotaInsufficient ? 'text-danger' : 'text-success'}`}>{quotaInsufficient ? `不足 ${formatNumber(Math.max(0, quota.planned - (quota.remaining ?? 0)))}通` : `残り ${formatNumber(quota.remaining)}通`}</p></> : <p className="mt-3 text-xs text-warning">送信枠を確認できませんでした。</p>}
             </section>
             <LinePreview><div className="rounded-control bg-canvas p-4 text-sm text-ink"><BubblePreview bubble={bubbles[0]} buttons={messageButtons} /></div></LinePreview>
           </div>
@@ -2702,7 +2699,7 @@ export default function BroadcastForm({
       open={preflightDialogOpen}
       title={quotaInsufficient ? '配信枠が不足しています' : '配信前チェック'}
       description={quotaInsufficient
-        ? `現在の送信枠では${quota?.planned.toLocaleString('ja-JP')}通を送信できません。対象を絞るか、配信設定を確認してください。`
+        ? `現在の送信枠では${formatNumber(quota?.planned)}通を送信できません。対象を絞るか、配信設定を確認してください。`
         : '対象・メッセージ・日時・送信枠を確認しました。'}
       confirmLabel="対象を見直す"
       cancelLabel="戻る"
@@ -2747,7 +2744,7 @@ export default function BroadcastForm({
             <dd className="text-ink text-right font-medium">
               {confirmAudienceLabel}
               <span className="ml-2 tabular-nums">
-                {audienceCount === null ? '—' : `${audienceCount.toLocaleString('ja-JP')}人`}
+                {audienceCount === null ? '—' : `${formatNumber(audienceCount)}人`}
               </span>
             </dd>
           </div>
@@ -2914,7 +2911,7 @@ export default function BroadcastForm({
               送信枠を使う。「消費しません」と書くと実装と食い違う。
             */}
             <Notice tone="info">
-              テスト送信もLINE公式アカウントの送信枠を使用します（見込み {(testRecipients.length * bubbles.length).toLocaleString('ja-JP')}通）。
+              テスト送信もLINE公式アカウントの送信枠を使用します（見込み {formatNumber((testRecipients.length * bubbles.length))}通）。
             </Notice>
           </>
         )}

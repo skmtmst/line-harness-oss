@@ -17,6 +17,7 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { NEN_CAMPAIGN_BODY_MAX_LENGTH } from '@line-crm/shared'
+import { formatNumber } from '@/lib/format'
 
 const lineAccountsListApi = vi.hoisted(() => vi.fn())
 const settingsApi = vi.hoisted(() => vi.fn())
@@ -198,7 +199,7 @@ describe('NEN配信本文の上限4500字（実mount・Issue #659）', () => {
     await mount()
     await setBody('あ'.repeat(NEN_CAMPAIGN_BODY_MAX_LENGTH + 1))
 
-    const limitLabel = NEN_CAMPAIGN_BODY_MAX_LENGTH.toLocaleString('ja-JP')
+    const limitLabel = formatNumber(NEN_CAMPAIGN_BODY_MAX_LENGTH)
     expect(container.textContent).toContain(`${limitLabel}字を超えています`)
     expect(saveButton().disabled).toBe(true)
 

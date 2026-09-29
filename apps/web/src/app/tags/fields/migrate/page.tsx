@@ -20,6 +20,7 @@ import { ApiError, api, describeSaveFailure } from '@/lib/api'
 import type { FriendFieldMigrationPreview, FriendFieldMigrationRun } from '@/lib/api'
 import { createResponseGate } from '@/lib/latest-request'
 import { FIELD_TYPE_HINTS, FIELD_TYPE_LABELS } from '@/components/friend-fields/field-list'
+import { formatDateTime } from '@/lib/format'
 
 const TYPES = Object.keys(FIELD_TYPE_LABELS) as FriendFieldType[]
 
@@ -463,7 +464,7 @@ function MigrateFriendField() {
           </div>
         ) : <Notice tone="success" className="mt-3">切り替えが必要な使用先はありません。</Notice>
           : <p className="mt-3 text-sm text-ink-faint">事前確認すると、回答フォームや自動処理などの使用先を表示します。</p>}
-        {preview?.runId && preview.previewExpiresAt ? <p className="mt-2 text-xs text-ink-faint">確認番号：{preview.runId} ／ 有効期限：{new Date(preview.previewExpiresAt).toLocaleString('ja-JP')}</p> : null}
+        {preview?.runId && preview.previewExpiresAt ? <p className="mt-2 text-xs text-ink-faint">確認番号：{preview.runId} ／ 有効期限：{formatDateTime(preview.previewExpiresAt)}</p> : null}
       </section>
 
       {run ? (
@@ -489,7 +490,7 @@ function MigrateFriendField() {
           */}
           {run.rollbackDeadline ? (
             <p className="mt-3 text-xs leading-5 text-ink-faint">
-              元の項目の値は {new Date(run.rollbackDeadline).toLocaleString('ja-JP')} まで残ります。元に戻す必要がある場合は、この期限前に運用へ相談してください。
+              元の項目の値は {formatDateTime(run.rollbackDeadline)} まで残ります。元に戻す必要がある場合は、この期限前に運用へ相談してください。
             </p>
           ) : null}
         </section>

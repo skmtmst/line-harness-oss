@@ -28,14 +28,13 @@ import { firstReminderStepMessage, reminderPlaceholders, renderReminderBodySampl
 import { useReminderTestRecipient } from '@/components/reminders/use-reminder-test-recipient'
 import { useReminderTestSend } from '@/components/reminders/use-reminder-test-send'
 import { TestRecipientGuidance, testRecipientDestinationLabel, testRecipientNote, testSendConfirmDescription } from '@/components/reminders/test-recipient-guidance'
+import { formatDateTime, formatNumber } from '@/lib/format'
 
 function formatTestedAt(value: string | null): string {
   if (!value) return 'テスト記録なし'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return 'テスト記録なし'
-  return new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit',
-  }).format(date)
+  return formatDateTime(date)
 }
 
 /** カードに出す「いつ届くか」。保存済みの offsetDays/sendAtTime から組み立てる。 */
@@ -229,7 +228,7 @@ export function Issue469ReminderStepEditor({ reminderId }: { reminderId: string 
   return <div data-design-node="J64xI" className="grid gap-3">
     <ReminderWizard current={3} />
     <ReminderWorkspace aside={<div data-issue546-aside className="grid gap-3">
-      <SummaryCard rows={[["対象者", validation?.audience.matched == null ? '検査後に表示' : `${validation.audience.matched.toLocaleString('ja-JP')}人`], ['基準日', '予約日時（Google Meet相談）'], ['通知ステップ', `${settings.steps.length}件`], ['状態', dirty ? '未保存の変更あり' : '下書き']]} />
+      <SummaryCard rows={[["対象者", validation?.audience.matched == null ? '検査後に表示' : `${formatNumber(validation.audience.matched)}人`], ['基準日', '予約日時（Google Meet相談）'], ['通知ステップ', `${settings.steps.length}件`], ['状態', dirty ? '未保存の変更あり' : '下書き']]} />
       <LinePreview caption={selectedStep ? `表示例：${stepTimingLabel(selectedStep, settings.deliveryMode)} に届きます` : '通知はまだありません'} empty={!selectedStep}>{selectedStep ? selectedStep.messageContent ? renderReminderBodySample(selectedStep.messageContent) : '本文を入力すると、ここに表示例が出ます。' : '「通知を追加」で1通目を作成してください。'}</LinePreview>
     </div>}>
       <ReminderPanel title="通知ステップ" note="基準日を軸に、何回・いつ送るかを並べます。上から順に届きます。">

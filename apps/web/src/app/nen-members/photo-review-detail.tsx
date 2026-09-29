@@ -16,8 +16,9 @@ import { photoPetDisplayName } from '@/components/shared/photo-display-name'
 import { petAnimalTypeLabel } from '@/lib/nen-pets-api'
 import { photoReviewReasonLabel, mileStatusLabel, text } from './photo-text'
 import { readSessionSnapshot } from '@/lib/session-snapshot'
+import { formatDay, formatNumber } from '@/lib/format'
 
-const numberOrDash = (value: unknown) => Number.isFinite(Number(value)) ? Number(value).toLocaleString('ja-JP') : '—'
+const numberOrDash = (value: unknown) => Number.isFinite(Number(value)) ? formatNumber(Number(value)) : '—'
 
 export function PhotoReviewDetail({
   photo, position, total, loading, loadKind, reviewing, notice, accountNotice, assetStatus, derivatives, assetsFailed, onReloadAssets, assetProcessing, rotationSaving,
@@ -108,7 +109,7 @@ export function PhotoReviewDetail({
   const duplicateDate = (() => {
     const date = new Date(String(duplicate?.createdAt ?? duplicate?.created_at ?? ''))
     if (Number.isNaN(date.getTime())) return '—'
-    return new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric' }).format(date)
+    return formatDay(date)
   })()
   const duplicateImageUrl = safePhotoSrc(duplicate ? text(duplicate.imageUrl ?? duplicate.image_url) : '')
   return <div data-photo-view="detail">

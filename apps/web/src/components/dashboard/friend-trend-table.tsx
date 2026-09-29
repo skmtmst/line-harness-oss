@@ -1,6 +1,7 @@
 import HelpTip from '@/components/shared/help-tip'
 import type { DashboardOverview } from '@/lib/api'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { formatNumber } from '@/lib/format'
 
 /**
  * 友だち数の推移。
@@ -87,7 +88,7 @@ export default function FriendTrendTable({
                   <Td align="right" className="tabular-nums"><span>{row.added}</span></Td>
                   <Td align="right" className="tabular-nums"><span>{row.blocked}</span></Td>
                   <Td align="right" className="font-medium tabular-nums">
-                    <span>{row.active.toLocaleString('ja-JP')}</span>
+                    <span>{formatNumber(row.active)}</span>
                   </Td>
                 </Tr>
               )

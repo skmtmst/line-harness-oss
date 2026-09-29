@@ -31,6 +31,7 @@ import {
 } from '@/lib/api'
 import { localDateTime, utcDateTime } from '@/lib/presentation'
 import { validateRuleName, validateTestScore } from './score-rules-validation'
+import { formatDay, formatNumber } from '@/lib/format'
 
 type ConfirmAction = { kind: 'publish'; draftVersionId: string } | { kind: 'stop' } | null
 
@@ -528,8 +529,8 @@ export default function ActionScoreRulesPage() {
                 </Button>
                 {bandPreview ? (
                   <p className="text-xs text-ink-secondary" role="status">
-                    高い {bandPreview.counts.high.toLocaleString('ja-JP')}人・ふつう {bandPreview.counts.normal.toLocaleString('ja-JP')}人・低い {bandPreview.counts.low.toLocaleString('ja-JP')}人
-                    <span className="text-ink-faint">（全{bandPreview.totalFriends.toLocaleString('ja-JP')}人・{bandPreview.measuredAt.slice(0, 10)}時点・点数は変わりません）</span>
+                    高い {formatNumber(bandPreview.counts.high)}人・ふつう {formatNumber(bandPreview.counts.normal)}人・低い {formatNumber(bandPreview.counts.low)}人
+                    <span className="text-ink-faint">（全{formatNumber(bandPreview.totalFriends)}人・{formatDay(bandPreview.measuredAt)}時点・点数は変わりません）</span>
                   </p>
                 ) : null}
               </div>

@@ -9,6 +9,7 @@ import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import DateTimeField from '@/components/shared/date-time-field'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
+import { formatDateTime } from '@/lib/format'
 
 
 const JST_PARTS = new Intl.DateTimeFormat('en-CA', {
@@ -43,9 +44,7 @@ export function dateTimeLocalJstToUtcIso(value: string): string | null {
 function formatDate(value: string): string {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '—'
-  return new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
-  }).format(date)
+  return formatDateTime(date)
 }
 
 export function ReminderRegistrantsPanel({ reminderId }: { reminderId: string }) {

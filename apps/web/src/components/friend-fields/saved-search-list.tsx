@@ -21,6 +21,7 @@ import {
   savedSearchKpiValues,
   type SavedSearchUsageFilter,
 } from './saved-search-kpis'
+import { formatDateTime, formatNumber } from '@/lib/format'
 
 function isSavedSearchCondition(item: unknown): item is SavedSearchCondition {
   if (!item || typeof item !== 'object') return false
@@ -432,7 +433,7 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
                   {note ? <p className="text-ink-faint">{note}</p> : null}
                 </td>
                 <td className="px-3 py-3 align-top tabular-nums text-ink" title={search.matchCountError ?? undefined}>
-                  {search.matchCount === null || search.matchCount === undefined ? '—' : `${search.matchCount.toLocaleString('ja-JP')}人`}
+                  {search.matchCount === null || search.matchCount === undefined ? '—' : `${formatNumber(search.matchCount)}人`}
                 </td>
                 <td className="px-3 py-3 align-top">
                   <span className={`rounded-pill px-2 py-0.5 text-[11px] ${search.isShared ? 'bg-action-soft text-action' : 'bg-canvas-sunken text-ink-secondary'}`}>
@@ -444,7 +445,7 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
                 </td>
                 <td className="px-3 py-3 align-top text-xs text-ink">
                   <p>{search.updatedBy ?? search.createdBy ?? '—'}</p>
-                  <p className="text-ink-faint">{new Date(search.updatedAt ?? search.createdAt).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+                  <p className="text-ink-faint">{formatDateTime(search.updatedAt ?? search.createdAt)}</p>
                 </td>
                 <td className="px-3 py-3 align-top">
                   {/*
@@ -507,7 +508,7 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
                         {all.length === 0 && any.length === 0 ? '指定なし' : null}
                       </p>
                       <p className="mt-1 text-xs text-ink-faint">
-                        {search.matchCount === null || search.matchCount === undefined ? '該当 —' : `該当 ${search.matchCount.toLocaleString('ja-JP')}人`}・{search.usedIn === undefined ? '使用先 —' : search.usedIn.length === 0 ? '未使用' : search.usedIn.map((usage) => `${USAGE_KIND_LABELS[usage.kind]}「${usage.name}」`).join('・')}
+                        {search.matchCount === null || search.matchCount === undefined ? '該当 —' : `該当 ${formatNumber(search.matchCount)}人`}・{search.usedIn === undefined ? '使用先 —' : search.usedIn.length === 0 ? '未使用' : search.usedIn.map((usage) => `${USAGE_KIND_LABELS[usage.kind]}「${usage.name}」`).join('・')}
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-2 pt-1">

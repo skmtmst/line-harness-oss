@@ -39,6 +39,7 @@ import {
   normalizeFeatureSettings,
   splitFeatureGroups,
 } from './feature-settings-view'
+import { formatDay, formatNumber } from '@/lib/format'
 
 function LockIcon() {
   return (
@@ -155,16 +156,16 @@ function UsageBadge({ category, onRetry }: { category: UsageCategory; onRetry?: 
   return (
     <span
       className="rounded-pill border-info bg-info-bg text-info whitespace-nowrap border px-2 py-0.5 text-[10px] font-bold"
-      title={`${category.label}：作成 ${created.toLocaleString('ja-JP')}、利用中 ${inUse.toLocaleString('ja-JP')}`}
+      title={`${category.label}：作成 ${formatNumber(created)}、利用中 ${formatNumber(inUse)}`}
     >
-      利用中 {inUse.toLocaleString('ja-JP')} / 作成 {created.toLocaleString('ja-JP')}
+      利用中 {formatNumber(inUse)} / 作成 {formatNumber(created)}
     </span>
   )
 }
 
 /** 最終利用の日付だけを短く出す。時刻はバッジに入らないのでタイトルへ残す。 */
 function shortUsageDate(value: string): string {
-  return value.slice(0, 10).replaceAll('-', '/')
+  return formatDay(value)
 }
 
 /**
@@ -222,7 +223,7 @@ function FeatureUsageBadge({ usage, label, onRetry }: {
       </>
     )
   }
-  const count = activity.value.toLocaleString('ja-JP')
+  const count = formatNumber(activity.value)
   if (activityBasis === 'current') {
     return (
       <span
@@ -925,7 +926,7 @@ export default function SettingsPage() {
   }
 
   const impactSummary = (group: FeatureImpactGroup) => group.items
-    .map((item) => `${item.targetType} ${item.count.toLocaleString('ja-JP')}件`)
+    .map((item) => `${item.targetType} ${formatNumber(item.count)}件`)
     .join('、')
 
   return (

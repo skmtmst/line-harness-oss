@@ -28,6 +28,7 @@ import IconButton from '@/components/shared/icon-button'
 import { Pill } from '@/components/reminders/reminder-v6-ui'
 import { deleteReminderSelection } from './delete-reminder-selection'
 import { formatTriggerOffset } from './reminder-timing'
+import { formatDateTime } from '@/lib/format'
 
 interface Reminder {
   id: string; name: string; description: string | null; isActive: boolean
@@ -51,12 +52,11 @@ const SORT_OPTIONS = [
   { value: 'name', label: '名前順' },
 ]
 /** 行ごとに作ると件数分だけ重いため、外で1回作って使い回す (#489-19)。 */
-const lastSentFormat = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 function rowView(reminder: Reminder) {
   const timing = formatTriggerOffset(reminder.triggerOffsetMinutes)
   const status = reminder.lifecycleStatus === 'draft' ? '下書き' as const : reminder.lifecycleStatus === 'stopped' || !reminder.isActive ? '停止中' as const : '有効' as const
   const date = reminder.lastSentAt ? new Date(reminder.lastSentAt) : null
-  const last = date && !Number.isNaN(date.getTime()) ? lastSentFormat.format(date) : '—'
+  const last = date && !Number.isNaN(date.getTime()) ? formatDateTime(date) : '—'
   return { subtitle: reminder.timingSummary ?? `${timing}${reminder.sendAtTime ? ` ${reminder.sendAtTime}` : ''} ／ テキスト ${reminder.stepCount ?? 0}通`, status, base: reminder.baseDateSummary ?? (reminder.triggerType === 'booking' ? '予約日時' : reminder.triggerType === 'event' ? 'イベント開催日' : reminder.triggerType === 'friend_field' ? '友だち情報欄の日付' : '指定日時'), planned: reminder.plannedDeliveries == null ? '—' : `${reminder.plannedDeliveries}通`, last }
 }
 

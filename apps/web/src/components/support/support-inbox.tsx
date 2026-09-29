@@ -10,6 +10,7 @@ import ListState from '@/components/shared/list-state'
 import { ApiError, fetchApi } from '@/lib/api'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import { createPollGeneration, startVisiblePoll } from '@/lib/visible-polling'
+import { formatDateTime } from '@/lib/format'
 
 type Channel = 'all' | 'line' | 'email'
 type ThreadStatus = 'unread' | 'in_progress' | 'on_hold' | 'resolved'
@@ -98,7 +99,7 @@ function isStaleUnresolved(item: Pick<InboxItem, 'status' | 'lastIncomingAt'>): 
 }
 
 function dateTime(iso: string): string {
-  return new Date(iso).toLocaleString('ja-JP', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+  return formatDateTime(iso)
 }
 
 /**

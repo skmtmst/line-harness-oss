@@ -26,6 +26,7 @@ import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import { describeCondition } from './scenario-dialogs'
 import { scenarioReferenceData } from './scenario-reference-data'
+import { formatNumber } from '@/lib/format'
 
 interface TagOption {
   id: string
@@ -381,7 +382,7 @@ export default function TriggerEditor({
               ? `対象の絞り込み：${describeCondition(usableCondition)}`
               : '対象の絞り込みは未設定です。フォロー中の友だち全員が対象です。'}
             {match.kind === 'ready'
-              ? ` いま一致するのは ${match.matched.toLocaleString('ja-JP')} 人です。`
+              ? ` いま一致するのは ${formatNumber(match.matched)} 人です。`
               : ''}
           </p>
           <p className="text-ink-faint mt-1 text-xs">
@@ -426,7 +427,7 @@ export default function TriggerEditor({
               <dt className="text-ink-faint text-xs">一致</dt>
               <dd className="text-ink mt-0.5 text-xl font-bold tabular-nums">
                 {match.kind === 'ready' ? (
-                  `${match.matched.toLocaleString('ja-JP')}人`
+                  `${formatNumber(match.matched)}人`
                 ) : match.kind === 'loading' ? (
                   <span className="text-ink-faint text-sm font-normal">読み込んでいます</span>
                 ) : match.kind === 'error' ? (
@@ -440,9 +441,9 @@ export default function TriggerEditor({
               <dt className="text-ink-faint text-xs">すでに購読中</dt>
               <dd className="text-warning mt-0.5 text-xl font-bold tabular-nums">
                 {match.kind === 'ready'
-                  ? `${match.alreadySubscribed.toLocaleString('ja-JP')}人`
+                  ? `${formatNumber(match.alreadySubscribed)}人`
                   : typeof activeNow === 'number'
-                    ? `${activeNow.toLocaleString('ja-JP')}人`
+                    ? `${formatNumber(activeNow)}人`
                     : <span className="text-ink-faint">—</span>}
               </dd>
             </div>
@@ -450,7 +451,7 @@ export default function TriggerEditor({
               <dt className="text-ink-faint text-xs">予約中</dt>
               <dd className="text-success mt-0.5 text-xl font-bold tabular-nums">
                 {match.kind === 'ready'
-                  ? `${match.newStartPlanned.toLocaleString('ja-JP')}人`
+                  ? `${formatNumber(match.newStartPlanned)}人`
                   : <span className="text-ink-faint">—</span>}
               </dd>
             </div>
@@ -471,7 +472,7 @@ export default function TriggerEditor({
               ? '一致は「対象の絞り込み」に当てはまる友だちの数です。'
               : '絞り込みが空なので、フォロー中の友だち全員を数えています。'}
             {match.kind === 'ready'
-              ? ` 対象外は${match.excluded.toLocaleString('ja-JP')}人です。試算では配信も購読も始まりません。`
+              ? ` 対象外は${formatNumber(match.excluded)}人です。試算では配信も購読も始まりません。`
               : ' 試算では配信も購読も始まりません。'}
           </p>
         </div>
