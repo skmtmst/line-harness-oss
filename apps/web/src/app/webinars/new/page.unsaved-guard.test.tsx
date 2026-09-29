@@ -30,12 +30,27 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', accounts: [], loading: false }),
 }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined }))
-vi.mock('@/lib/api', () => ({
-  webinarApi: {
-    folders: async () => ({ success: true, data: [] }),
-    create: fixture.create,
+vi.mock('@/lib/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/api')>()
+  return {
+    ...actual,
+    webinarApi: {
+      folders: async () => ({ success: true, data: [] }),
+      create: fixture.create,
+    },
+  }
+})
+
+/* happy-dom に localStorage は無い。booking 配下と同じ memory stub を置く。 */
+const localStorageValues = new Map<string, string>()
+Object.defineProperty(window, 'localStorage', {
+  value: {
+    getItem: (key: string) => localStorageValues.get(key) ?? null,
+    setItem: (key: string, value: string) => { localStorageValues.set(key, String(value)) },
+    removeItem: (key: string) => { localStorageValues.delete(key) },
+    clear: () => { localStorageValues.clear() },
   },
-}))
+})
 
 let host: HTMLDivElement
 let root: Root
@@ -44,6 +59,8 @@ beforeEach(() => {
   fixture.push.mockClear()
   fixture.create.mockReset()
   fixture.create.mockResolvedValue({ success: true, data: { id: 'new-webinar' } })
+  /* 保存できる担当者として描く（D001 の権限出し分けの対象外）。 */
+  window.localStorage.setItem('lh_staff_role', 'owner')
   // 素の a 押下で happy-dom が実際に遷移するため、試験ごとに住所を戻す。
   // 戻さないと「同じ住所への移動」として番兵が正しく無視してしまう。
   window.history.replaceState(null, '', '/webinars/new')

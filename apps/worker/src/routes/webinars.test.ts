@@ -2423,3 +2423,33 @@ describe('R97 視聴後アクションを実行口へ接続する', () => {
     expect(dbMocks.finishWebinarActionExecution).not.toHaveBeenCalled();
   });
 });
+
+/*
+ * D001: 公開完了画面の変更系の口（一時停止・通知テスト・複製）と作成は
+ * owner/admin のみ。画面側で staff へ出さなくなっても、口側の門は残す。
+ * staff が直接叩いても 403 で、何も書き換えない。
+ */
+describe('webinar published mutations role guard (D001)', () => {
+  test.each([
+    ['POST', '/api/webinars', {}],
+    ['POST', '/api/webinars/w1/pause', { expectedVersion: 3 }],
+    ['POST', '/api/webinars/w1/duplicate', { expectedVersion: 3 }],
+    ['POST', '/api/webinars/w1/public-page/test', {}],
+  ])('staff の %s %s は 403', async (method, path, body) => {
+    dbMocks.getWebinarById.mockResolvedValue(makeWebinar({ account_id: 'account-a' }));
+    const staffApp = new Hono<Env>();
+    staffApp.use('*', async (c, next) => {
+      c.set('staff', { id: 'staff-1', name: 'Staff', role: 'staff', readOnly: false });
+      return next();
+    });
+    staffApp.route('/', webinarRoutes);
+
+    const res = await staffApp.request(path, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }, env, execCtx);
+
+    expect(res.status).toBe(403);
+  });
+});
