@@ -69,6 +69,8 @@ export function Issue469ReminderStepEditor({ reminderId }: { reminderId: string 
   const [validation, setValidation] = useState<ReminderValidationResult | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  // 捕まえた取得失敗そのもの。TargetMissingのerrorへ渡す（403は再試行なし）。
+  const [loadError, setLoadError] = useState<unknown>(null)
   const [conflict, setConflict] = useState(false)
   /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
   const [draftMissing, setDraftMissing] = useState(false)
@@ -85,6 +87,9 @@ export function Issue469ReminderStepEditor({ reminderId }: { reminderId: string 
   const loadDraft = useCallback(async () => {
     const seq = ++requestSeq.current
     setDraftMissing(false)
+    // 再試行・成功で古い失敗文を残さない（staleな赤字の消し忘れ防止）。
+    setError('')
+    setLoadError(null)
     try {
       const response = await api.reminders.getDraft(reminderId)
       if (seq !== requestSeq.current) return
@@ -98,11 +103,15 @@ export function Issue469ReminderStepEditor({ reminderId }: { reminderId: string 
         && response.data.settings.steps.some((step) => step.stableStepId === current)
         ? current
         : response.data.settings.steps[0]?.stableStepId ?? null)
+      // 成功したら失敗文は消す（直前の失敗が残らないように）。
+      setError('')
+      setLoadError(null)
     } catch (caught) {
       if (seq !== requestSeq.current) return
       if (caught instanceof ApiError && caught.status === 404) {
         setDraftMissing(true)
       } else {
+        setLoadError(caught)
         setError('リマインダを読み込めませんでした。')
       }
     }
@@ -177,6 +186,7 @@ export function Issue469ReminderStepEditor({ reminderId }: { reminderId: string 
         kind="error"
         title="リマインダを読み込めませんでした"
         description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+        error={loadError ?? undefined}
         onRetry={() => void loadDraft()}
       />
     )

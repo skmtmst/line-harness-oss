@@ -1,12 +1,14 @@
 'use client'
 
-import { Suspense, useEffect, useState } from 'react'
+import { Suspense, useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { api } from '@/lib/api'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Stepper, { type StepperStep } from '@/components/shared/stepper'
 import Notice from '@/components/shared/notice'
+import TargetMissing from '@/components/shared/target-missing'
+import { isForbiddenOrRateLimited, loadFailureNotice } from '@/components/shared/api-error-message'
 import EditDialog, { toVersionDraft, type AutoReplyDraft } from '@/components/auto-replies/edit-dialog'
 import './issue481-height.css'
 
@@ -40,69 +42,83 @@ function AutoReplyEditInner() {
   >([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  // R528: 捕まえた取得失敗そのもの。TargetMissingのerrorへ渡す
+  // （403は再試行なし・429は待ち案内）。
+  const [loadError, setLoadError] = useState<unknown>(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError('')
+    setLoadError(null)
+    try {
+      const [draftRes, liveRes] = await Promise.all([
+        id ? api.autoReplies.getDraft(id) : Promise.resolve(null),
+        id ? api.autoReplies.get(id).catch(() => null) : Promise.resolve(null),
+      ])
+      // R23横展開: 返す文の候補は、この応答のアカウントだけ。新規は全体。
+      const draftAccountId = draftRes?.success ? draftRes.data.settings.lineAccountId : null
+      const tplRes = await api.templates.list(undefined, draftAccountId ?? undefined)
+      if (tplRes.success) {
+        setTemplates(
+          tplRes.data.map((t) => ({
+            id: t.id,
+            name: t.name,
+            messageType: t.messageType,
+            messageContent: t.messageContent,
+          })),
+        )
+      }
+      if (id) {
+        if (draftRes?.success) {
+          const [conflictRes, summaryRes] = await Promise.all([
+            api.autoReplies.conflicts(id).catch(() => null),
+            api.autoReplies.summary(draftRes.data.settings.lineAccountId).catch(() => null),
+          ])
+          setDraft(toVersionDraft(draftRes.data, {
+            isActive: liveRes?.success ? liveRes.data.isActive : true,
+            conflictAttentionCount: conflictRes?.success ? conflictRes.data.conflicts.length : null,
+            receiveSourceCounts: summaryRes?.success ? summaryRes.data.receiveSourceCounts : null,
+          }))
+        } else {
+          setError(draftRes?.error ?? '下書きを読み込めませんでした')
+        }
+      } else {
+        setDraft({
+          keyword: '',
+          matchType: 'exact',
+          responseType: 'text',
+          responseContent: '',
+          templateId: null,
+          lineAccountId: null,
+          // AUTOREPLY-08: 新しい応答は止まった状態で作る。
+          isActive: false,
+          priority: 0,
+          messageKinds: null,
+        })
+      }
+    } catch (caught) {
+      setLoadError(caught)
+      if (isForbiddenOrRateLimited(caught)) {
+        setError(loadFailureNotice(caught, '下書き'))
+      } else {
+        const message = caught instanceof Error ? caught.message : ''
+        setError(message && !/^API error: /.test(message) ? message : '読み込みに失敗しました。もう一度読み込んでください。')
+      }
+    } finally {
+      setLoading(false)
+    }
+  }, [id])
 
   useEffect(() => {
     let active = true
     void (async () => {
-      try {
-        const [draftRes, liveRes] = await Promise.all([
-          id ? api.autoReplies.getDraft(id) : Promise.resolve(null),
-          id ? api.autoReplies.get(id).catch(() => null) : Promise.resolve(null),
-        ])
-        if (!active) return
-        // R23横展開: 返す文の候補は、この応答のアカウントだけ。新規は全体。
-        const draftAccountId = draftRes?.success ? draftRes.data.settings.lineAccountId : null
-        const tplRes = await api.templates.list(undefined, draftAccountId ?? undefined)
-        if (!active) return
-        if (tplRes.success) {
-          setTemplates(
-            tplRes.data.map((t) => ({
-              id: t.id,
-              name: t.name,
-              messageType: t.messageType,
-              messageContent: t.messageContent,
-            })),
-          )
-        }
-        if (id) {
-          if (draftRes?.success) {
-            const [conflictRes, summaryRes] = await Promise.all([
-              api.autoReplies.conflicts(id).catch(() => null),
-              api.autoReplies.summary(draftRes.data.settings.lineAccountId).catch(() => null),
-            ])
-            if (!active) return
-            setDraft(toVersionDraft(draftRes.data, {
-              isActive: liveRes?.success ? liveRes.data.isActive : true,
-              conflictAttentionCount: conflictRes?.success ? conflictRes.data.conflicts.length : null,
-              receiveSourceCounts: summaryRes?.success ? summaryRes.data.receiveSourceCounts : null,
-            }))
-          } else {
-            setError(draftRes?.error ?? '下書きを読み込めませんでした')
-          }
-        } else {
-          setDraft({
-            keyword: '',
-            matchType: 'exact',
-            responseType: 'text',
-            responseContent: '',
-            templateId: null,
-            lineAccountId: null,
-            // AUTOREPLY-08: 新しい応答は止まった状態で作る。
-            isActive: false,
-            priority: 0,
-            messageKinds: null,
-          })
-        }
-      } catch {
-        if (active) setError('読み込みに失敗しました。もう一度読み込んでください。')
-      } finally {
-        if (active) setLoading(false)
-      }
+      if (!active) return
+      await load()
     })()
     return () => {
       active = false
     }
-  }, [id])
+  }, [load])
 
   return (
     <div data-issue481-height>
@@ -114,7 +130,7 @@ function AutoReplyEditInner() {
         <span>{id ? '編集' : '作成'}</span>
       </nav>
 
-      {error && (
+      {error && !(id && !draft && !loading) && (
         <Notice tone="danger" message={error} onClose={() => setError('')} className="mb-4" />
       )}
 
@@ -122,6 +138,14 @@ function AutoReplyEditInner() {
         <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
           読み込み中...
         </div>
+      ) : id && !draft ? (
+        <TargetMissing
+          kind="error"
+          title="下書きを読み込めませんでした"
+          description={error || '通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。'}
+          error={loadError ?? undefined}
+          onRetry={() => void load()}
+        />
       ) : draft ? (
         <>
         <Stepper

@@ -25,6 +25,7 @@ import {
   type ProxyBookingResult,
 } from '@/lib/api'
 import { canOperateBookings } from '../../lib/booking-permissions'
+import { describeApiFailure, isForbidden, loadFailureNotice } from '@/components/shared/api-error-message'
 
 type Step = 'input' | 'confirm' | 'done' | 'conflict'
 
@@ -447,21 +448,27 @@ export default function NewProxyBookingPage() {
     return () => { active = false }
   }, [selectedAccountId, friend, customer])
 
-  useEffect(() => {
+  // R534: メニュー取得専用の失敗保持。403は権限案内で再試行なし、
+  // それ以外は同じ条件で取り直せる。
+  const [menusLoadError, setMenusLoadError] = useState<unknown>(null)
+  const loadMenus = useCallback(async () => {
     if (!selectedAccountId) {
       setMenus([])
       return
     }
-    let active = true
-    void bookingApi.listMenus(selectedAccountId)
-      .then((response) => {
-        if (active) setMenus(response.menus.filter((item) => item.is_active === 1))
-      })
-      .catch(() => {
-        if (active) setError('予約メニューを読み込めませんでした')
-      })
-    return () => { active = false }
+    setMenusLoadError(null)
+    try {
+      const response = await bookingApi.listMenus(selectedAccountId)
+      setMenus(response.menus.filter((item) => item.is_active === 1))
+    } catch (caught) {
+      setMenusLoadError(caught)
+      setError(isForbidden(caught) ? loadFailureNotice(caught, '予約メニュー') : '予約メニューを読み込めませんでした')
+    }
   }, [selectedAccountId])
+
+  useEffect(() => {
+    void loadMenus()
+  }, [loadMenus])
 
   useEffect(() => {
     setStaffId('')
@@ -717,6 +724,8 @@ export default function NewProxyBookingPage() {
         setConflictAlternatives(cause.data as BookingConflictAlternatives | null)
         setStep('conflict')
         setError('選んだ時間は、ほかの予約で埋まりました')
+      } else if (cause instanceof ApiError) {
+        setError(describeApiFailure(cause, '予約の登録', { forbidden: '予約を入れられるのは、予約の操作権限を持つ人だけです。' }))
       } else {
         setError('予約を登録できませんでした。状態を確認して、もう一度お試しください。')
       }
@@ -745,7 +754,16 @@ export default function NewProxyBookingPage() {
       </nav>
 
       {error && step !== 'conflict' && (
-        <Notice tone="danger" message={error} onClose={() => setError('')} />
+        <Notice
+          tone="danger"
+          message={error}
+          onClose={() => setError('')}
+          action={menusLoadError && !isForbidden(menusLoadError) ? (
+            <Button type="button" onClick={() => { setError(''); void loadMenus() }}>
+              もう一度読み込む
+            </Button>
+          ) : undefined}
+        />
       )}
 
       {staffResolved && !canOperate ? (

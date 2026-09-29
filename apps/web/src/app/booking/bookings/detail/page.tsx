@@ -333,6 +333,9 @@ function BookingDetailInner() {
   const [acting, setActing] = useState(false)
   const [decideTarget, setDecideTarget] = useState<BookingAction | null>(null)
   const [error, setError] = useState('')
+  // R533: 捕まえた取得失敗そのもの。TargetMissingのerrorへ渡す
+  // （403は権限案内で再試行なし・429は待ち案内）。
+  const [loadError, setLoadError] = useState<unknown>(null)
   /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
   const [bookingMissing, setBookingMissing] = useState(false)
   /**
@@ -436,6 +439,7 @@ function BookingDetailInner() {
     }
     setLoading(true)
     setError('')
+    setLoadError(null)
     setBookingMissing(false)
     try {
       const res = await bookingApi.getBooking(accountId, bookingId)
@@ -451,6 +455,7 @@ function BookingDetailInner() {
       if (caught instanceof ApiError && caught.status === 404) {
         setBookingMissing(true)
       } else {
+        setLoadError(caught)
         setError('読み込みに失敗しました。もう一度読み込んでください。')
       }
       return null
@@ -880,6 +885,7 @@ function BookingDetailInner() {
         kind="error"
         title="予約を読み込めませんでした"
         description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
+        error={loadError ?? undefined}
         onRetry={() => void load()}
       />
     )
