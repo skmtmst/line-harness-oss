@@ -977,7 +977,7 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
                             } ${active ? 'ring-accent ring-2 ring-inset' : ''}`}
                             style={
                               n > 0
-                                ? { backgroundColor: `rgb(var(--accent-rgb, 37 99 235) / ${0.04 + strength * 0.18})` }
+                                ? { backgroundColor: `color-mix(in srgb, var(--color-action) ${Math.round((0.04 + strength * 0.18) * 100)}%, transparent)` }
                                 : undefined
                             }
                           >

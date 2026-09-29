@@ -418,13 +418,13 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
           )
         }
         return (
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 text-xs text-amber-900">
+          <div className="bg-status-warn-soft border border-status-warn rounded-lg p-3 mb-4 text-xs text-status-warn-deep">
             LIFF ID が未設定のため予約 URL を生成できません。LINE アカウント設定で LIFF ID を登録してください。
           </div>
         )
       })()}
       {eventId && draft.is_published === 0 && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 text-xs text-amber-900">
+        <div className="bg-status-warn-soft border border-status-warn rounded-lg p-3 mb-4 text-xs text-status-warn-deep">
           現在「下書き」状態です。公開設定タブで「公開する」を ON にすると友だち向けの予約 URL が表示されます。
         </div>
       )}
@@ -444,10 +444,10 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
                 title={disabled ? 'まず「概要」を保存してください' : undefined}
                 className={`flex-1 px-4 py-3 text-sm font-medium transition-colors border-b-2 ${
                   active
-                    ? 'border-blue-600 text-blue-600 bg-blue-50'
+                    ? 'border-action text-action bg-status-info-soft'
                     : disabled
-                    ? 'border-transparent text-gray-300 cursor-not-allowed'
-                    : 'border-transparent text-gray-600 hover:bg-gray-50'
+                    ? 'border-transparent text-ink-disabled cursor-not-allowed'
+                    : 'border-transparent text-ink-secondary hover:bg-surface-pearl'
                 }`}
               >
                 <div>{t.label}</div>
@@ -475,7 +475,7 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
         {tab !== 'slots' && (
           <StickyBar
             status={(
-              <span className="text-xs text-gray-500">
+              <span className="text-xs text-ink-faint">
               {tab === 'overview' && !eventId && '保存するとイベントが作成され、予約枠タブに進みます'}
               {tab === 'overview' && eventId && '変更を「概要を保存」で確定します'}
               {tab === 'publish' && '「公開する」ON で友だちに予約 URL を案内できます'}
@@ -534,8 +534,8 @@ function OverviewTab({
   return (
     <div className="space-y-5">
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">
-          イベント名 <span className="text-red-500">*</span>
+        <label className="block text-sm font-medium text-ink-secondary mb-1.5">
+          イベント名 <span className="text-status-danger">*</span>
         </label>
         <input
           type="text"
@@ -548,7 +548,7 @@ function OverviewTab({
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">開催場所</label>
+          <label className="block text-sm font-medium text-ink-secondary mb-1.5">開催場所</label>
           <input
             type="text"
             value={draft.venue_name ?? ''}
@@ -558,7 +558,7 @@ function OverviewTab({
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">会場 URL</label>
+          <label className="block text-sm font-medium text-ink-secondary mb-1.5">会場 URL</label>
           <input
             type="url"
             value={draft.venue_url ?? ''}
@@ -577,9 +577,9 @@ function OverviewTab({
         />
       </div>
       <div>
-        <label className="flex justify-between items-center text-sm font-medium text-gray-700 mb-1.5">
+        <label className="flex justify-between items-center text-sm font-medium text-ink-secondary mb-1.5">
           <span>イベント詳細</span>
-          <span className={`text-xs ${descLen > 20000 ? 'text-red-600' : 'text-gray-500'}`}>
+          <span className={`text-xs ${descLen > 20000 ? 'text-danger' : 'text-ink-faint'}`}>
             {descLen.toLocaleString()} / 20,000
           </span>
         </label>
@@ -610,7 +610,7 @@ function OverviewTab({
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+        <label className="block text-sm font-medium text-ink-secondary mb-1.5">
           1 人あたり予約回数
         </label>
         <Select
@@ -634,17 +634,17 @@ function OverviewTab({
 
       {/* 公開対象 */}
       <div className="border-t border-hairline pt-5">
-        <div className="text-sm font-medium text-gray-700 mb-2">公開対象</div>
+        <div className="text-sm font-medium text-ink-secondary mb-2">公開対象</div>
         <div className="grid grid-cols-2 gap-2 mb-3">
           <button
             type="button"
             onClick={() => update('target_type', 'single')}
             className={`p-3 border-2 rounded-lg text-left ${
-              targetType === 'single' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+              targetType === 'single' ? 'border-action bg-status-info-soft' : 'border-hairline hover:border-hairline'
             }`}
           >
             <div className="text-sm font-bold">単一アカウント</div>
-            <div className="text-xs text-gray-600">1 つの LINE アカウントで運用</div>
+            <div className="text-xs text-ink-secondary">1 つの LINE アカウントで運用</div>
           </button>
           <button
             type="button"
@@ -662,19 +662,19 @@ function OverviewTab({
               }
             }}
             className={`p-3 border-2 rounded-lg text-left ${
-              targetType === 'multi-account-dedup' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+              targetType === 'multi-account-dedup' ? 'border-action bg-status-info-soft' : 'border-hairline hover:border-hairline'
             }`}
           >
             <div className="text-sm font-bold">複数アカウント横断</div>
-            <div className="text-xs text-gray-600">重複なし配信に対応</div>
+            <div className="text-xs text-ink-secondary">重複なし配信に対応</div>
           </button>
         </div>
 
         {targetType === 'multi-account-dedup' && (
           <div className="space-y-1.5">
-            <div className="text-xs text-gray-600">対象アカウント（重複なし配信）</div>
+            <div className="text-xs text-ink-secondary">対象アカウント（重複なし配信）</div>
             {activeAccounts.length === 0 && (
-              <div className="text-sm text-gray-500 italic p-2">アクティブなアカウントがありません</div>
+              <div className="text-sm text-ink-faint italic p-2">アクティブなアカウントがありません</div>
             )}
             {activeAccounts.map((a) => {
               // 現在ログイン中のアカウントは外せない (外すと保存後 redirect が
@@ -757,7 +757,7 @@ function SlotsTab({
 
   if (!eventId) {
     return (
-      <div className="text-center py-8 text-gray-500 text-sm">
+      <div className="text-center py-8 text-ink-faint text-sm">
         まず「概要」タブで保存してから予約枠を追加してください。
       </div>
     )
@@ -845,7 +845,7 @@ function SlotsTab({
   return (
     <div>
       <div className="flex flex-wrap gap-2 mb-4 items-center justify-between">
-        <div className="text-sm text-gray-600">{slots.length} 件の予約枠</div>
+        <div className="text-sm text-ink-secondary">{slots.length} 件の予約枠</div>
         <div className="flex gap-2">
           <Button onClick={() => setShowAdd(true)}>
             ＋ 枠を追加
@@ -855,9 +855,9 @@ function SlotsTab({
           </Button>
         </div>
       </div>
-      {err && <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg mb-3 text-sm">{err}</div>}
+      {err && <div className="bg-danger-bg border border-status-danger-border text-danger p-3 rounded-lg mb-3 text-sm">{err}</div>}
       {slots.length === 0 ? (
-        <div className="text-center py-12 text-gray-500 text-sm border border-dashed border-hairline rounded-lg">
+        <div className="text-center py-12 text-ink-faint text-sm border border-dashed border-hairline rounded-lg">
           予約枠がありません。「＋ 枠を追加」または「一括追加」から作成してください。
         </div>
       ) : (
@@ -884,7 +884,7 @@ function SlotsTab({
                       onClick={() => toggleActive(s)}
                       disabled={busy}
                       className={`text-xs px-2 py-1 rounded-full font-medium ${
-                        s.is_active === 1 ? 'bg-green-100 text-success' : 'bg-gray-100 text-gray-600'
+                        s.is_active === 1 ? 'bg-accent-soft text-success' : 'bg-shell text-ink-secondary'
                       }`}
                     >
                       {s.is_active === 1 ? '有効' : '停止'}
@@ -1041,7 +1041,7 @@ function AddSlotDialog({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-scrim flex items-center justify-center z-50">
       <div ref={panelRef} role="dialog" aria-modal="true" aria-label="予約枠を追加" className="bg-canvas rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
         <div className="mb-4 flex items-start justify-between gap-3">
           <h3 className="text-lg font-bold text-ink">予約枠を追加</h3>
@@ -1049,10 +1049,10 @@ function AddSlotDialog({
             <X aria-hidden="true" className="h-5 w-5" />
           </button>
         </div>
-        {err && <div className="bg-red-50 border border-red-200 text-red-700 p-2 rounded-lg mb-3 text-sm">{err}</div>}
+        {err && <div className="bg-danger-bg border border-status-danger-border text-danger p-2 rounded-lg mb-3 text-sm">{err}</div>}
         <div className="space-y-3">
           <label className="block">
-            <span className="text-sm font-medium text-gray-700">日付（JST）</span>
+            <span className="text-sm font-medium text-ink-secondary">日付（JST）</span>
             <DateField
               value={date}
               onChange={setDate}
@@ -1062,7 +1062,7 @@ function AddSlotDialog({
           </label>
           <div className="grid grid-cols-2 gap-3">
             <label>
-              <span className="text-sm font-medium text-gray-700">開始</span>
+              <span className="text-sm font-medium text-ink-secondary">開始</span>
               <TimeField
                 value={startTime}
                 onChange={setStartTime}
@@ -1071,7 +1071,7 @@ function AddSlotDialog({
               />
             </label>
             <label>
-              <span className="text-sm font-medium text-gray-700">終了</span>
+              <span className="text-sm font-medium text-ink-secondary">終了</span>
               <TimeField
                 value={endTime}
                 onChange={setEndTime}
@@ -1081,7 +1081,7 @@ function AddSlotDialog({
             </label>
           </div>
           <label className="block">
-            <span className="text-sm font-medium text-gray-700">定員（空欄=無制限）</span>
+            <span className="text-sm font-medium text-ink-secondary">定員（空欄=無制限）</span>
             <input
               type="number"
               min={1}
@@ -1098,7 +1098,7 @@ function AddSlotDialog({
           <button
             onClick={submit}
             disabled={busy}
-            className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            className="px-4 py-2 text-sm bg-action text-on-accent rounded-lg hover:bg-action-hover disabled:opacity-50"
           >
             追加
           </button>
@@ -1294,16 +1294,16 @@ export function BulkSlotDialog({
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <label>
-              <span className="text-sm font-medium text-gray-700">開始日</span>
+              <span className="text-sm font-medium text-ink-secondary">開始日</span>
               <DateField value={start} onChange={setStart} aria-label="開始日" className="mt-1" />
             </label>
             <label>
-              <span className="text-sm font-medium text-gray-700">終了日</span>
+              <span className="text-sm font-medium text-ink-secondary">終了日</span>
               <DateField value={end} onChange={setEnd} aria-label="終了日" className="mt-1" />
             </label>
           </div>
           <div>
-            <span className="text-sm font-medium text-gray-700 block mb-1.5">曜日</span>
+            <span className="text-sm font-medium text-ink-secondary block mb-1.5">曜日</span>
             {/* R218: 色だけでなく aria-pressed で選択状態を読み上げに伝える。 */}
             <div className="flex gap-1.5" role="group" aria-label="枠を作る曜日">
               {['日', '月', '火', '水', '木', '金', '土'].map((d, i) => (
@@ -1314,8 +1314,8 @@ export function BulkSlotDialog({
                   onClick={() => toggleWeekday(i)}
                   className={`flex-1 px-2 py-2 text-sm border rounded-lg ${
                     weekdays.includes(i)
-                      ? 'bg-blue-600 text-white border-blue-600'
-                      : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                      ? 'bg-action text-on-accent border-action'
+                      : 'border-hairline text-ink-secondary hover:bg-surface-pearl'
                   }`}
                 >
                   {d}
@@ -1324,7 +1324,7 @@ export function BulkSlotDialog({
             </div>
           </div>
           <div>
-            <span className="text-sm font-medium text-gray-700 block mb-1.5">時刻パターン</span>
+            <span className="text-sm font-medium text-ink-secondary block mb-1.5">時刻パターン</span>
             {patterns.map((p, i) => (
               <div key={i} className="flex gap-2 mb-1.5 items-center">
                 <TimeField
@@ -1333,7 +1333,7 @@ export function BulkSlotDialog({
                   aria-label={`${i + 1}件目の開始`}
                   className="flex-1"
                 />
-                <span className="text-gray-500">〜</span>
+                <span className="text-ink-faint">〜</span>
                 <TimeField
                   value={p.end}
                   onChange={(v) => setPatterns((ps) => ps.map((x, j) => (j === i ? { ...x, end: v } : x)))}
@@ -1344,7 +1344,7 @@ export function BulkSlotDialog({
                   <button
                     type="button"
                     onClick={() => setPatterns((ps) => ps.filter((_, j) => j !== i))}
-                    className="text-red-600 px-2"
+                    className="text-danger px-2"
                   >
                     ×
                   </button>
@@ -1354,13 +1354,13 @@ export function BulkSlotDialog({
             <button
               type="button"
               onClick={() => setPatterns((ps) => [...ps, { start: '14:00', end: '15:00' }])}
-              className="text-sm text-blue-600 hover:underline"
+              className="text-sm text-action hover:underline"
             >
               ＋ パターン追加
             </button>
           </div>
           <label className="block">
-            <span className="text-sm font-medium text-gray-700">定員（各枠共通・空欄=無制限）</span>
+            <span className="text-sm font-medium text-ink-secondary">定員（各枠共通・空欄=無制限）</span>
             <input
               type="number"
               min={1}
@@ -1442,7 +1442,7 @@ function PublishTab({
             className="mb-2"
           />
         ) : null}
-        <label htmlFor="ev-visible-tag" className="mb-1.5 block text-sm font-medium text-gray-700">
+        <label htmlFor="ev-visible-tag" className="mb-1.5 block text-sm font-medium text-ink-secondary">
           公開対象
         </label>
         <Select
@@ -1452,14 +1452,14 @@ function PublishTab({
           onChange={(value) => update('visible_tag_id', value === '' ? null : value)}
           options={[{ value: '', label: '友だち全員' }, ...tags.map((t) => ({ value: t.id, label: `${t.name} を持つ人だけ` }))]}
         />
-        <p className="mt-1 text-xs text-gray-500">
+        <p className="mt-1 text-xs text-ink-faint">
           絞ると、タグを持たない人にはイベントが存在しないものとして扱われます。
           URL を直接開いても表示されません。
         </p>
       </div>
 
       <div>
-        <label htmlFor="ev-entry-cutoff" className="mb-1.5 block text-sm font-medium text-gray-700">
+        <label htmlFor="ev-entry-cutoff" className="mb-1.5 block text-sm font-medium text-ink-secondary">
           申込の締め切り
         </label>
         {/*
@@ -1482,7 +1482,7 @@ function PublishTab({
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+        <label className="block text-sm font-medium text-ink-secondary mb-1.5">
           キャンセル期限（友だち側）
         </label>
         {/*
@@ -1536,15 +1536,15 @@ function PublishTab({
       <div className="border-t border-hairline pt-5 space-y-4">
         <div>
           <div className="text-sm font-medium text-ink mb-1">予約者向けカスタムメッセージ</div>
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-ink-faint">
             予約者だけに届く LINE 通知の末尾に追加されます（Zoom URL など）。空欄ならデフォルト文言のみ。
           </p>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+          <label className="block text-sm font-medium text-ink-secondary mb-1.5">
             ✉️ 予約確定メッセージへの追記
-            <span className="ml-2 text-xs text-gray-400">
+            <span className="ml-2 text-xs text-ink-faint">
               {(draft.confirmation_message_extra ?? '').length} / 2,000
             </span>
           </label>
@@ -1556,13 +1556,13 @@ function PublishTab({
             placeholder="例: 当日の Zoom URL: https://us02web.zoom.us/j/..."
             className="w-full border border-hairline rounded-lg px-3 py-2 text-sm"
           />
-          <p className="text-xs text-gray-500 mt-1">確定通知（即時 / 後追い承認）の末尾に追加</p>
+          <p className="text-xs text-ink-faint mt-1">確定通知（即時 / 後追い承認）の末尾に追加</p>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+          <label className="block text-sm font-medium text-ink-secondary mb-1.5">
             リマインドメッセージへの追記
-            <span className="ml-2 text-xs text-gray-400">
+            <span className="ml-2 text-xs text-ink-faint">
               {(draft.reminder_message_extra ?? '').length} / 2,000
             </span>
           </label>
@@ -1574,14 +1574,14 @@ function PublishTab({
             placeholder="例: 開始 10 分前に同じ URL からご入室ください"
             className="w-full border border-hairline rounded-lg px-3 py-2 text-sm"
           />
-          <p className="text-xs text-gray-500 mt-1">前日 / N 時間前のリマインド末尾に追加</p>
+          <p className="text-xs text-ink-faint mt-1">前日 / N 時間前のリマインド末尾に追加</p>
         </div>
       </div>
 
       <hr className="border-hairline" />
 
       <div>
-        <div className="text-sm font-medium text-gray-700 mb-2">公開状態</div>
+        <div className="text-sm font-medium text-ink-secondary mb-2">公開状態</div>
         {/*
           R218: 下書き/公開は二者択一なので、素のボタンではなく
           共通の RadioCard（本物の input[type=radio]）にする。
@@ -1605,7 +1605,7 @@ function PublishTab({
             note="予約 URL が有効になる"
           />
         </RadioCardGroup>
-        <p className="text-xs text-gray-500 mt-2">
+        <p className="text-xs text-ink-faint mt-2">
           {draft.is_published === 1
             ? '✓ 保存後、友だちに「予約 URL」を案内できます。'
             : '保存しても友だちには表示されません。'}

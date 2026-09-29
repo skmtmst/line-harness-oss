@@ -890,7 +890,7 @@ function CarouselEditorInner() {
             <div className="bg-canvas-sunken rounded-card overflow-x-auto p-3">
               <div className="flex gap-2">
                 {panels.map((panel, i) => (
-                  <div key={i} className="w-56 shrink-0 overflow-hidden rounded-2xl bg-white">
+                  <div key={i} className="w-56 shrink-0 overflow-hidden rounded-2xl bg-canvas">
                     {typeof panel.thumbnailImageUrl === 'string' && /^https?:\/\//.test(panel.thumbnailImageUrl) ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={panel.thumbnailImageUrl} alt="" className="h-28 w-full object-cover" />

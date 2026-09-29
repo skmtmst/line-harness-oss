@@ -193,7 +193,7 @@ export function AreaProperties({
       <div className="flex items-center justify-between">
         <h3 className="text-ink-secondary font-semibold">選択中のボタン</h3>
         {showManagementDetails && onDelete ? (
-          <button type="button" onClick={onDelete} className="text-xs text-red-600 hover:underline">
+          <button type="button" onClick={onDelete} className="text-xs text-danger hover:underline">
             削除
           </button>
         ) : null}
@@ -347,7 +347,7 @@ export function AreaProperties({
             size="full"
           />
           {templates.length === 0 && (
-            <p className="mt-1 text-[11px] text-amber-600">
+            <p className="mt-1 text-[11px] text-status-warn-deep">
               テンプレートがまだありません。先に「テンプレート」で作ってください。
             </p>
           )}
@@ -367,7 +367,7 @@ export function AreaProperties({
             size="full"
           />
           {forms.length === 0 && (
-            <p className="mt-1 text-[11px] text-amber-600">
+            <p className="mt-1 text-[11px] text-status-warn-deep">
               回答フォームがまだありません。先に「回答フォーム」で作ってください。
             </p>
           )}
@@ -387,7 +387,7 @@ export function AreaProperties({
             size="full"
           />
           {pages.length < 2 && (
-            <p className="mt-1 text-[11px] text-amber-600">
+            <p className="mt-1 text-[11px] text-status-warn-deep">
               タブの切り替えには2ページ以上必要です。先にページを追加してください。
             </p>
           )}

@@ -318,37 +318,37 @@ export function CanvasEditor({
         </Notice>
       )}
       <div className="flex items-center gap-2 text-sm">
-        <span className="text-gray-500 text-xs">ズーム</span>
+        <span className="text-ink-faint text-xs">ズーム</span>
         {[0.25, 0.3, 0.5, 0.75, 1].map((s) => (
           <button
             key={s}
             onClick={() => setScale(s)}
             className={`px-2 py-0.5 text-xs rounded ${
               Math.abs(scale - s) < 0.01
-                ? 'bg-gray-800 text-white'
-                : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                ? 'bg-ink text-on-accent'
+                : 'bg-shell hover:bg-shell-gray text-ink-secondary'
             }`}
           >
             {Math.round(s * 100)}%
           </button>
         ))}
-        <span className="ml-3 text-xs text-gray-400">
+        <span className="ml-3 text-xs text-ink-faint">
           {dims.width}×{dims.height}
         </span>
         {!preview && (
-          <span className="ml-auto text-xs text-gray-400">
+          <span className="ml-auto text-xs text-ink-faint">
             空白でドラッグ → 新規矩形 / 矩形クリックか下の一覧で選択 / 矢印キーで微調整 / Delete で削除
           </span>
         )}
       </div>
       <div
-        className="overflow-auto border border-gray-300 bg-gray-100"
+        className="overflow-auto border border-hairline bg-shell"
         style={{ maxHeight: '70vh' }}
       >
         <div
           ref={canvasRef}
           onMouseDown={handleCanvasMouseDown}
-          className="relative bg-white"
+          className="relative bg-canvas"
           style={{
             width: dims.width * scale,
             height: dims.height * scale,
@@ -369,10 +369,10 @@ export function CanvasEditor({
             const borderColor = preview
               ? 'transparent'
               : overlap
-                ? '#dc2626'
+                ? 'var(--color-danger)'
                 : selected
-                  ? '#2563eb'
-                  : '#3b82f6'
+                  ? 'var(--color-action)'
+                  : 'var(--color-status-info)'
             return (
               <div
                 key={area.id}
@@ -411,8 +411,8 @@ export function CanvasEditor({
                   background: preview
                     ? 'transparent'
                     : selected
-                      ? 'rgba(37,99,235,0.18)'
-                      : 'rgba(59,130,246,0.10)',
+                      ? 'color-mix(in srgb, var(--color-action) 18%, transparent)'
+                      : 'color-mix(in srgb, var(--color-status-info) 10%, transparent)',
                   cursor: preview ? 'pointer' : 'move',
                   boxSizing: 'border-box',
                 }}
@@ -426,7 +426,7 @@ export function CanvasEditor({
                         position: 'absolute',
                         width: 8,
                         height: 8,
-                        background: '#2563eb',
+                        background: 'var(--color-action)',
                         ...handleStyle(h),
                       }}
                     />
@@ -442,8 +442,8 @@ export function CanvasEditor({
                 top: previewRect.y * scale,
                 width: previewRect.w * scale,
                 height: previewRect.h * scale,
-                border: '2px dashed #2563eb',
-                background: 'rgba(37,99,235,0.10)',
+                border: '2px dashed var(--color-action)',
+                background: 'color-mix(in srgb, var(--color-action) 10%, transparent)',
               }}
             />
           )}

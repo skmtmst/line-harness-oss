@@ -43,7 +43,7 @@ export const FRIEND_ATTRIBUTES_V2_QA_FIXTURE: FriendAttributesV2Fixture = {
     ['未契約', -1, 3, 0, 0, null, true],
     ['誕生日クーポン対象', 0, 0, 20, 0, null, false],
   ].map(([name, groupIndex, friendCount, reward, referral, multiplier, starred], index) => ({
-    id: `qa-tag-${index}`, name: String(name), color: '#8B938D',
+    id: `qa-tag-${index}`, name: String(name), color: 'var(--color-ink-faint)',
     groupId: Number(groupIndex) >= 0 ? QA_GROUPS[Number(groupIndex)].id : null,
     friendCount: Number(friendCount), mileageReward: Number(reward), referralMileageReward: Number(referral),
     mileageMultiplierBps: multiplier == null ? null : Number(multiplier), mileageMultiplierPriority: 0,
@@ -183,9 +183,9 @@ export default function FriendAttributesV2TagList({ fixture }: { fixture?: Frien
   const current = Math.min(page, pages)
   const visible = fixture ? filtered : filtered.slice((current - 1) * pageSize, current * pageSize)
   const folderRows = [
-    { id: '', name: 'すべて', color: '#06C755', count: fixture?.folderCounts.all ?? items.length },
+    { id: '', name: 'すべて', color: 'var(--color-accent)', count: fixture?.folderCounts.all ?? items.length },
     ...groups.map((group) => ({ id: group.id, name: group.name, color: group.color ?? '#8B938D', count: fixture?.folderCounts[group.id] ?? items.filter((tag) => tag.groupId === group.id).length })),
-    { id: UNGROUPED, name: '未分類', color: '#B8BDB9', count: fixture?.folderCounts[UNGROUPED] ?? items.filter((tag) => !tag.groupId).length },
+    { id: UNGROUPED, name: '未分類', color: 'var(--color-ink-disabled)', count: fixture?.folderCounts[UNGROUPED] ?? items.filter((tag) => !tag.groupId).length },
   ]
   const duplicateCount = useMemo(() => { const names = new Map<string, number>(); items.forEach((tag) => names.set(tag.name, (names.get(tag.name) ?? 0) + 1)); return [...names.values()].filter((count) => count > 1).reduce((sum, count) => sum + count, 0) }, [items])
   const kpis = [

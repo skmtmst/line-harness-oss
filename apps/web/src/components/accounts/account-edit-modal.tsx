@@ -183,7 +183,7 @@ export default function AccountEditModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-2 sm:p-4"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-scrim p-2 sm:p-4"
       onClick={onClose}
     >
       <div
@@ -191,15 +191,15 @@ export default function AccountEditModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={modalTitleId}
-        className="my-2 w-full max-w-2xl overflow-hidden rounded-lg bg-white shadow-xl sm:my-4"
+        className="my-2 w-full max-w-2xl overflow-hidden rounded-lg bg-canvas shadow-xl sm:my-4"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-200 bg-white px-4 py-4 sm:px-6">
-          <h2 id={modalTitleId} className="text-base font-bold text-gray-900">{initialSection === 'credentials' ? '資格情報を差し替える' : '登録の内容を編集する'}</h2>
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-hairline bg-canvas px-4 py-4 sm:px-6">
+          <h2 id={modalTitleId} className="text-base font-bold text-ink">{initialSection === 'credentials' ? '資格情報を差し替える' : '登録の内容を編集する'}</h2>
           <button
             type="button"
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 text-xl leading-none"
+            className="text-ink-faint hover:text-ink-secondary text-xl leading-none"
             aria-label="閉じる"
           >
             ×
@@ -208,11 +208,11 @@ export default function AccountEditModal({
 
         <form onSubmit={handleSave} className="space-y-4 p-4 sm:p-6">
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">アカウント名</label>
+            <label className="block text-xs font-medium text-ink-secondary mb-1">アカウント名</label>
             <input
               value={state.name}
               onChange={(e) => update({ name: e.target.value })}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              className="w-full border border-hairline rounded-lg px-3 py-2 text-sm"
               required
             />
           </div>
@@ -298,23 +298,23 @@ export default function AccountEditModal({
           />
 
           {error && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded text-red-700 text-xs">
+            <div className="p-3 bg-danger-bg border border-status-danger-border rounded text-danger text-xs">
               {error}
             </div>
           )}
 
-          <div className="sticky bottom-0 -mx-4 flex justify-end gap-2 border-t border-gray-100 bg-white px-4 pb-1 pt-3 sm:-mx-6 sm:px-6">
+          <div className="sticky bottom-0 -mx-4 flex justify-end gap-2 border-t border-divider-soft bg-canvas px-4 pb-1 pt-3 sm:-mx-6 sm:px-6">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-lg text-sm font-medium border border-gray-300 hover:bg-gray-50"
+              className="px-4 py-2 rounded-lg text-sm font-medium border border-hairline hover:bg-surface-pearl"
             >
               キャンセル
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="px-4 py-2 rounded-lg text-white text-sm font-medium disabled:opacity-50"
+              className="px-4 py-2 rounded-lg text-on-accent text-sm font-medium disabled:opacity-50"
               style={{ backgroundColor: 'var(--color-accent)' }}
             >
               {saving ? '保存中...' : '保存'}

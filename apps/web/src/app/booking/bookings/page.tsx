@@ -1358,7 +1358,7 @@ function BookingDetailPanel({
         type="button"
         aria-label="閉じる"
         onClick={onClose}
-        className="absolute inset-0 bg-black/30"
+        className="absolute inset-0 bg-scrim"
       />
       <aside className="relative h-full w-full overflow-y-auto bg-canvas-sunken shadow-xl">
         <div className="border-hairline sticky top-0 z-10 flex min-h-16 items-center justify-between gap-3 border-b bg-canvas px-6 py-3">
@@ -1494,7 +1494,7 @@ function ActionButtons({
         </button>
         <button
           onClick={() => onAction('reject')}
-          className="text-danger bg-danger-bg rounded-md px-3 py-1 text-xs font-medium hover:bg-red-100"
+          className="text-danger bg-danger-bg rounded-md px-3 py-1 text-xs font-medium hover:bg-status-danger-selected"
         >
           拒否
         </button>

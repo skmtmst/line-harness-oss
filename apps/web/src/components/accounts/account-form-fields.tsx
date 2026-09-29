@@ -51,19 +51,19 @@ export function FormSection({
 }) {
   const [open, setOpen] = useState(defaultOpen)
   return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden">
+    <div className="border border-hairline rounded-lg overflow-hidden">
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 text-left"
+        className="w-full flex items-center justify-between px-4 py-3 bg-surface-pearl hover:bg-shell text-left"
       >
         <div className="min-w-0 pr-3">
-          <p className="text-sm font-semibold text-gray-800">{title}</p>
-          {description && <p className="text-xs text-gray-500 mt-0.5">{description}</p>}
+          <p className="text-sm font-semibold text-ink">{title}</p>
+          {description && <p className="text-xs text-ink-faint mt-0.5">{description}</p>}
         </div>
-        <span className="shrink-0 text-xs text-gray-400">{open ? '▼' : '▶'}</span>
+        <span className="shrink-0 text-xs text-ink-faint">{open ? '▼' : '▶'}</span>
       </button>
-      {open && <div className="p-4 space-y-3 bg-white">{children}</div>}
+      {open && <div className="p-4 space-y-3 bg-canvas">{children}</div>}
     </div>
   )
 }
@@ -87,9 +87,9 @@ export function TextField({
 }) {
   return (
     <div>
-      <label className="block text-xs font-medium text-gray-700 mb-1">
+      <label className="block text-xs font-medium text-ink-secondary mb-1">
         {label}
-        {required && <span className="text-red-500 ml-1">*</span>}
+        {required && <span className="text-status-danger ml-1">*</span>}
       </label>
       <input
         type={type}
@@ -97,9 +97,9 @@ export function TextField({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         required={required}
-        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+        className="w-full border border-hairline rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
       />
-      {hint && <p className="text-[11px] text-gray-400 mt-1">{hint}</p>}
+      {hint && <p className="text-[11px] text-ink-faint mt-1">{hint}</p>}
     </div>
   )
 }
@@ -144,14 +144,14 @@ export function AccountFormSections({
           />
         ) : (
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Channel ID</label>
+            <label className="block text-xs font-medium text-ink-secondary mb-1">Channel ID</label>
             <input
               value={state.channelId}
               readOnly
               disabled
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono bg-gray-50 text-gray-500 cursor-not-allowed"
+              className="w-full border border-hairline rounded-lg px-3 py-2 text-sm font-mono bg-surface-pearl text-ink-faint cursor-not-allowed"
             />
-            <p className="text-[11px] text-gray-400 mt-1">
+            <p className="text-[11px] text-ink-faint mt-1">
               Channel ID は変更できません（LINE 側で固定の識別子）
             </p>
           </div>
@@ -219,7 +219,7 @@ export function AccountFormSections({
         defaultOpen={defaultOpen?.ogp ?? false}
       >
         <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">
+          <label className="block text-xs font-medium text-ink-secondary mb-1">
             サイト名（og:site_name）
           </label>
           <input
@@ -227,9 +227,9 @@ export function AccountFormSections({
             value={state.ogSiteName ?? ''}
             placeholder={`空欄なら「${state.name || 'アカウント名'}」がフォールバック`}
             onChange={(e) => update({ ogSiteName: e.target.value || null })}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+            className="w-full border border-hairline rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
           />
-          <p className="text-[11px] text-gray-400 mt-1">
+          <p className="text-[11px] text-ink-faint mt-1">
             リンクプレビューでブランド名として表示されます。
           </p>
         </div>

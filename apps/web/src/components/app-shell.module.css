@@ -113,7 +113,7 @@
   padding: 8px 14px;
   border-radius: var(--radius-control);
   background: var(--color-ink);
-  color: #ffffff;
+  color: var(--color-on-accent);
   font-size: var(--text-body);
   font-weight: 600;
   transform: translateY(-200%);

@@ -147,7 +147,7 @@ describe('友だちV6の画面契約', () => {
 
   it('重複画面の密度を保ち、統合ユーザーはV6の実Nodeへ結び付ける', () => {
     expect(DUPLICATES).toContain('rounded-[14px]')
-    expect(DUPLICATES).toContain('#DADDE2')
+    expect(DUPLICATES).toContain('border-hairline')
     expect(USERS_PAGE).toContain('data-design-node="r7eSi"')
     expect(USERS_TABLE).toContain('rounded-card')
     expect(USER_ROW).toContain('border-divider-soft')
