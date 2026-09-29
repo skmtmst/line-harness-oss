@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Button from '@/components/shared/button'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import Select from '@/components/shared/select'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import Stepper from '@/components/shared/stepper'
@@ -282,15 +282,7 @@ export default function NewWebinarPage() {
           </>
         )}
       />
-      <ConfirmDialog primaryAction="cancel"
-        open={leaveTarget !== null}
-        title="保存していない変更があります"
-        description="このまま移動すると、入力した内容は保存されません。移動しますか？"
-        confirmLabel="保存せずに移動"
-        cancelLabel="入力を続ける"
-        onConfirm={confirmLeave}
-        onCancel={cancelLeave}
-      />
+      <UnsavedLeaveDialog open={leaveTarget !== null} onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )
 }

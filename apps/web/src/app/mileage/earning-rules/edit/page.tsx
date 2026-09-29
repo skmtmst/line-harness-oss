@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 import Button from '@/components/shared/button'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import CreatePage, {
@@ -381,15 +381,7 @@ function EditMileageRuleInner() {
         </FormSection>
       </CreatePage>
 
-      <ConfirmDialog primaryAction="cancel"
-        open={leaveTarget !== null}
-        title="保存していない変更があります"
-        description="このまま移動すると、下書きへの変更は失われます。保存せずに移動しますか？"
-        confirmLabel="保存せずに移動"
-        cancelLabel="編集を続ける"
-        onConfirm={confirmLeave}
-        onCancel={cancelLeave}
-      />
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="下書きへの変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </>
   )
 }
