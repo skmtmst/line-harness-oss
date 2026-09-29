@@ -691,7 +691,8 @@ const TEST_RUN_STATUS_LABEL: Record<string, string> = {
   waiting: '待機中',
   success: '終わりました',
   partial: '一部だけ終わりました',
-  failed: '失敗しました',
+  // 失敗の文は立て直し方まで書く（error-copy-recovery-contract）。次の手は下の「実行の結果を見る」。
+  failed: '失敗しました。実行の結果を見てください。',
   cancelled: '取りやめました',
   skipped_condition: '条件に外れて動きませんでした',
   busy: '混み合っています',
