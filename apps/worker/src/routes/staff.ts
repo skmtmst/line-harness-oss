@@ -360,6 +360,14 @@ staff.get('/api/staff/me', async (c) => {
 
 staff.get('/api/staff', async (c) => {
   try {
+    /*
+     * M025: 範囲限定の担当者には権限者の一覧を出さない。画面（/hq/members）
+     * と同じ基準で拒否する（403）。氏名・役割・範囲が出るため、伏せ字の
+     * メールだけでは足りない。
+     */
+    if (!await hasAllAccountScope(c.env.DB, c.get('staff'))) {
+      return c.json({ success: false, error: '全店舗の担当者だけが権限者の一覧を見られます' }, 403);
+    }
     const members = await getStaffMembers(c.env.DB, currentTenantId(c));
     // 担当範囲を1人ずつ読むと人数分の往復になるので一括取得する(#515 中1)。
     const scopes = await getStaffAccountScopeMap(

@@ -70,16 +70,23 @@ function MembersInner() {
     setStatus('loading')
     setActionError('')
     try {
-      const [staffRes, accountRes, meRes, loginRes] = await Promise.all([
+      // M025: 範囲限定の担当者に一覧は出さない（口も403で断る）。
+      // 先に自分を読んで理由の分かる面を出し、通らない一覧は呼ばない。
+      const meRes = await api.staff.me()
+      if (!meRes.success) throw new Error(meRes.error)
+      setMe(meRes.data)
+      if (meRes.data.accountScope === 'accounts') {
+        setStatus('ready')
+        return
+      }
+      const [staffRes, accountRes, loginRes] = await Promise.all([
         api.staff.list(),
         api.lineAccounts.list(),
-        api.staff.me(),
         api.staff.lastLogins().catch(() => null),
       ])
       if (!staffRes.success) throw new Error(staffRes.error)
       setMembers(staffRes.data)
       if (accountRes.success) setAccounts(accountRes.data)
-      if (meRes.success) setMe(meRes.data)
       if (loginRes?.success) setLastLogins(loginRes.data)
       setStatus('ready')
     } catch (caught) {
