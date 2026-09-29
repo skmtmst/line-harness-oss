@@ -79,7 +79,7 @@ export default function TemplateFolderSelect({
         <ul
           role="listbox"
           aria-label="テンプレートのフォルダ"
-          className="max-h-72 min-w-64 overflow-y-auto rounded-control border border-hairline bg-canvas p-1.5 shadow-lg"
+          className="max-h-72 min-w-64 overflow-y-auto rounded-control border border-hairline bg-canvas p-1.5 shadow-float"
           // 最上層では absolute 指定を無効にする（位置は器が決める）。
           // 欄に焦点を残したまま押せるよう、押す前に焦点を移さない。
           style={{ position: 'static' }}

@@ -255,7 +255,7 @@ function BubblePreview({ bubble, buttons = [] }: { bubble: BroadcastBubble; butt
   const text = String(bubble.content.text ?? '')
   const imageUrl = String(bubble.content.previewImageUrl ?? bubble.content.imageUrl ?? '')
   if (bubble.type === 'text') return <div className="max-w-[82%]">
-    <div className="whitespace-pre-wrap break-words rounded-card rounded-tl-sm bg-canvas px-3 py-2 text-[13px] shadow-sm">{text || 'テキストを入力すると表示されます'}</div>
+    <div className="whitespace-pre-wrap break-words rounded-card rounded-tl-mini bg-canvas px-3 py-2 text-[13px] shadow-card">{text || 'テキストを入力すると表示されます'}</div>
     {buttons.map((button) => <div key={`${button.label}-${button.value}`} className="bg-accent-deep text-on-accent mt-1 truncate rounded-control px-3 py-2 text-center text-xs font-medium" title={button.value}>{button.label || 'ボタン'}</div>)}
   </div>
   if (bubble.type === 'sticker') {
@@ -266,14 +266,14 @@ function BubblePreview({ bubble, buttons = [] }: { bubble: BroadcastBubble; butt
   }
   if (bubble.type === 'location') {
     const loc = (bubble.content.state as MessageKindState | undefined)?.location
-    return <div className="bg-canvas w-[82%] rounded-card p-3 text-[13px] shadow-sm">
+    return <div className="bg-canvas w-[82%] rounded-card p-3 text-[13px] shadow-card">
       <p className="text-ink font-bold">{loc?.title || '場所'}</p>
       <p className="text-ink-faint mt-0.5 text-[11px]">{loc?.address || '住所を入れると出ます'}</p>
     </div>
   }
   if (bubble.type === 'audio') {
     const au = (bubble.content.state as MessageKindState | undefined)?.audio
-    return <div className="bg-canvas flex w-[82%] items-center gap-2 rounded-card p-3 text-[13px] shadow-sm">
+    return <div className="bg-canvas flex w-[82%] items-center gap-2 rounded-card p-3 text-[13px] shadow-card">
       <span className="text-lg">▶</span>
       <span className="text-ink-faint text-[11px]">{au?.duration ? `${au.duration} 秒` : '音声'}</span>
     </div>
@@ -281,20 +281,20 @@ function BubblePreview({ bubble, buttons = [] }: { bubble: BroadcastBubble; butt
   if (bubble.type === 'carousel') {
     const name = String(bubble.content.templateName ?? '')
     return <div className="flex w-full gap-2 overflow-x-auto pb-1">
-      {[0, 1].map((i) => <div key={i} className="bg-canvas w-36 shrink-0 rounded-card p-2 shadow">
+      {[0, 1].map((i) => <div key={i} className="bg-canvas w-36 shrink-0 rounded-card p-2 shadow-card">
         <div className="bg-canvas-sunken h-20 rounded-control" />
         <p className="text-ink mt-2 truncate text-xs font-medium">{i === 0 ? (name || 'カルーセル') : '…'}</p>
       </div>)}
     </div>
   }
   if (bubble.type === 'image') return imageUrl ? <img src={imageUrl} alt="写真プレビュー" className="max-h-52 w-[82%] rounded-card object-cover" /> : <div className="flex h-36 w-[82%] items-center justify-center rounded-card bg-canvas-sunken text-sm text-ink-faint">写真</div>
-  if (bubble.type === 'flex') return <div className="w-[82%] rounded-card bg-canvas p-4 shadow-sm"><p className="text-xs font-medium text-info">Flexテンプレート</p><p className="mt-1 truncate text-[11px] text-ink-faint">{String(bubble.content.templateName ?? 'Flex JSON')}</p></div>
+  if (bubble.type === 'flex') return <div className="w-[82%] rounded-card bg-canvas p-4 shadow-card"><p className="text-xs font-medium text-info">Flexテンプレート</p><p className="mt-1 truncate text-[11px] text-ink-faint">{String(bubble.content.templateName ?? 'Flex JSON')}</p></div>
   if (bubble.type === 'video' || bubble.type === 'rich_video') return <div className="relative flex h-40 w-[82%] items-center justify-center overflow-hidden rounded-card bg-ink text-canvas"><span className="text-4xl">▶</span><span className="absolute bottom-2 left-3 text-xs">{bubble.type === 'rich_video' ? 'リッチビデオ' : '動画'}</span></div>
   if (bubble.type === 'card_message') {
     const cards = Array.isArray(bubble.content.cards) ? bubble.content.cards as Array<Record<string, unknown>> : [{ title: bubble.content.assetName ?? 'カード' }]
-    return <div className="flex w-full gap-2 overflow-x-auto pb-1">{cards.map((card, index) => <div key={index} className="w-36 shrink-0 rounded-card bg-canvas p-2 shadow">{card.imageUrl ? <img src={String(card.imageUrl)} alt="" className="h-20 w-full rounded-control object-cover" /> : <div className="h-20 rounded-control bg-canvas-sunken"/>}<p className="mt-2 truncate text-xs font-semibold">{String(card.title ?? 'カード')}</p><button className="mt-2 w-full rounded bg-accent-deep py-1 text-[10px] text-on-accent">{String(card.actionLabel ?? '詳しく見る')}</button></div>)}</div>
+    return <div className="flex w-full gap-2 overflow-x-auto pb-1">{cards.map((card, index) => <div key={index} className="w-36 shrink-0 rounded-card bg-canvas p-2 shadow-card">{card.imageUrl ? <img src={String(card.imageUrl)} alt="" className="h-20 w-full rounded-control object-cover" /> : <div className="h-20 rounded-control bg-canvas-sunken"/>}<p className="mt-2 truncate text-xs font-semibold">{String(card.title ?? 'カード')}</p><button className="mt-2 w-full rounded-mini bg-accent-deep py-1 text-[10px] text-on-accent">{String(card.actionLabel ?? '詳しく見る')}</button></div>)}</div>
   }
-  return <div className="w-[82%] overflow-hidden rounded-card bg-canvas shadow-sm">{imageUrl && <img src={imageUrl} alt="素材プレビュー" className="h-32 w-full object-cover" />}<div className="p-3"><p className="text-xs font-medium">{String(bubble.content.assetName ?? TYPE_LABELS[bubble.type])}</p><p className="mt-1 text-[11px] text-ink-faint">{TYPE_LABELS[bubble.type]}のプレビュー</p></div></div>
+  return <div className="w-[82%] overflow-hidden rounded-card bg-canvas shadow-card">{imageUrl && <img src={imageUrl} alt="素材プレビュー" className="h-32 w-full object-cover" />}<div className="p-3"><p className="text-xs font-medium">{String(bubble.content.assetName ?? TYPE_LABELS[bubble.type])}</p><p className="mt-1 text-[11px] text-ink-faint">{TYPE_LABELS[bubble.type]}のプレビュー</p></div></div>
 }
 
 function BubbleEditor({ bubble, index, total, assets, assetsStatus, accountId, onChange, onMove, onDelete }: {
@@ -308,14 +308,14 @@ function BubbleEditor({ bubble, index, total, assets, assetsStatus, accountId, o
   const availableAssets = assets.filter((asset) => asset.kind === bubble.type)
   // 差し込みをカーソルの位置に入れるために、入力欄そのものを渡す。
   const textRef = useRef<HTMLTextAreaElement>(null)
-  return <section className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-sm">
+  return <section className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-card">
     {/*
       吹き出しの見出し行。狭い幅では2段に折る。折らないと、種類の選択肢と
       移動・削除ボタンが横に並んだまま表示域をはみ出し、解除や並べ替えが
       右側へ隠れる（監査 R149）。
     */}
     <div className="flex flex-wrap items-center gap-3 border-b border-hairline bg-canvas-sunken px-4 py-3">
-      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-accent-deep text-xs font-medium text-on-accent">{index + 1}</span>
+      <span className="flex h-7 w-7 items-center justify-center rounded-pill bg-accent-deep text-xs font-medium text-on-accent">{index + 1}</span>
       <Select
         aria-label={`吹き出し${index + 1}の種類`}
         value={bubble.type}
@@ -348,7 +348,7 @@ function BubbleEditor({ bubble, index, total, assets, assetsStatus, accountId, o
           />
         </div>
         <textarea ref={textRef} rows={6} maxLength={MAX_TEXT_LENGTH} value={String(bubble.content.text ?? '')} onChange={(e) => onChange({ ...bubble, content: { text: e.target.value } })} placeholder="テキストを入力" className="border-hairline focus:border-accent rounded-card w-full resize-none border p-3 text-sm focus:outline-none" />
-        <div className="mt-2 flex items-center justify-between"><div className="flex gap-1">{EMOJIS.map((emoji) => <button key={emoji} type="button" onClick={() => onChange({ ...bubble, content: { text: `${String(bubble.content.text ?? '')}${emoji}`.slice(0, MAX_TEXT_LENGTH) } })} className="rounded border px-1.5 py-1 text-sm">{emoji}</button>)}</div><span className="text-xs font-semibold text-ink-faint">{messageLengthLabel(String(bubble.content.text ?? '').length)}</span></div>
+        <div className="mt-2 flex items-center justify-between"><div className="flex gap-1">{EMOJIS.map((emoji) => <button key={emoji} type="button" onClick={() => onChange({ ...bubble, content: { text: `${String(bubble.content.text ?? '')}${emoji}`.slice(0, MAX_TEXT_LENGTH) } })} className="rounded-mini border px-1.5 py-1 text-sm">{emoji}</button>)}</div><span className="text-xs font-semibold text-ink-faint">{messageLengthLabel(String(bubble.content.text ?? '').length)}</span></div>
       </div>}
       {bubble.type === 'flex' && <div>
         <label className="mb-1 block text-xs font-medium text-ink-secondary">Flex JSON</label>
@@ -1783,7 +1783,7 @@ export default function BroadcastForm({
             </section>
           </section>
         ) : null}
-        <section id="broadcast-step-basic" className={`${shows('basic') ? '' : 'hidden'} rounded-card border border-hairline bg-canvas p-5 shadow-sm`}>
+        <section id="broadcast-step-basic" className={`${shows('basic') ? '' : 'hidden'} rounded-card border border-hairline bg-canvas p-5 shadow-card`}>
           <div className="mb-4">
             <h3 className="text-lg font-bold text-ink">基本設定</h3>
             <p className="mt-1 text-sm text-ink-faint">管理名と保存先を設定します。</p>
@@ -1815,7 +1815,7 @@ export default function BroadcastForm({
           </div>
           <label className="mt-4 block">
             <span className="flex items-center justify-between gap-2 text-sm font-bold text-ink">
-              <span>社内メモ <span className="ml-1 rounded bg-canvas-sunken px-1.5 py-0.5 text-xs font-normal text-ink-faint">任意</span></span>
+              <span>社内メモ <span className="ml-1 rounded-mini bg-canvas-sunken px-1.5 py-0.5 text-xs font-normal text-ink-faint">任意</span></span>
               <span className="text-xs font-normal text-ink-faint">友だちには表示されません</span>
             </span>
             <textarea
@@ -1830,7 +1830,7 @@ export default function BroadcastForm({
         </section>
         {shows('basic') && (
           <>
-            <section className="rounded-card border border-hairline bg-canvas p-5 shadow-sm">
+            <section className="rounded-card border border-hairline bg-canvas p-5 shadow-card">
               <h3 className="text-lg font-bold text-ink">配信方法</h3>
               <p className="mt-1 text-xs text-ink-faint">新規作成・テンプレート・過去の配信の複製から選べます。</p>
               {/*
@@ -1868,7 +1868,7 @@ export default function BroadcastForm({
               </RadioCardGroup>
             </section>
 
-            <section className="rounded-card border border-hairline bg-canvas p-5 shadow-sm">
+            <section className="rounded-card border border-hairline bg-canvas p-5 shadow-card">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
                   <h3 className="text-lg font-bold text-ink">最近の配信</h3>
@@ -1889,7 +1889,7 @@ export default function BroadcastForm({
             </section>
           </>
         )}
-        <section id="broadcast-step-audience" className={`${shows('audience') ? '' : 'hidden'} rounded-card border border-hairline bg-canvas p-5 shadow-sm`}>
+        <section id="broadcast-step-audience" className={`${shows('audience') ? '' : 'hidden'} rounded-card border border-hairline bg-canvas p-5 shadow-card`}>
           <div className="flex flex-wrap items-start justify-between gap-3">
             {/*
               番号は上の段（STEP 1〜5）に合わせる。**本文だけ別の番号を振らない。**
@@ -2034,8 +2034,8 @@ export default function BroadcastForm({
                 <div className="mt-2 divide-y divide-hairline">
                   {preflight.audience.representatives.map((friend) => (
                     <div key={friend.friendId} className="flex items-center gap-3 py-3">
-                      {friend.pictureUrl ? <img src={friend.pictureUrl} alt="" className="size-8 rounded-full object-cover" /> : (
-                        <span className="flex size-8 items-center justify-center rounded-full bg-accent-soft text-xs font-medium text-accent-deep">{friend.displayName?.slice(0, 1) ?? '—'}</span>
+                      {friend.pictureUrl ? <img src={friend.pictureUrl} alt="" className="size-8 rounded-pill object-cover" /> : (
+                        <span className="flex size-8 items-center justify-center rounded-pill bg-accent-soft text-xs font-medium text-accent-deep">{friend.displayName?.slice(0, 1) ?? '—'}</span>
                       )}
                       <div><p className="text-sm font-semibold text-ink">{friend.displayName ?? '名前未登録'}</p><p className="text-xs text-ink-faint">{friend.summary}</p></div>
                     </div>
@@ -2142,7 +2142,7 @@ export default function BroadcastForm({
           （DOMには居るため既存テストは通っていた）。監査 #615。
         */}
         {showTemplatePicker && (
-          <section className="mt-4 rounded-card border border-hairline bg-canvas p-5 shadow-sm">
+          <section className="mt-4 rounded-card border border-hairline bg-canvas p-5 shadow-card">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h3 className="text-lg font-bold text-ink">テンプレート選択</h3>
@@ -2553,7 +2553,7 @@ export default function BroadcastForm({
             <section className="rounded-card border border-hairline bg-canvas p-5">
               <h3 className="text-sm font-bold text-ink">送信枠</h3>
               <p className="mt-1 text-xs text-ink-faint">現在の枠内で送信できるか確認します。</p>
-              {quota ? <><p className="mt-3 text-sm font-semibold text-ink">使用予定　{quota.planned.toLocaleString('ja-JP')} / {quota.monthlyLimit?.toLocaleString('ja-JP') ?? '—'}通</p><div className="mt-2 h-2 overflow-hidden rounded-full bg-canvas-sunken"><div className={`h-full ${quotaInsufficient ? 'bg-danger' : 'bg-accent'}`} style={{ width: quota.monthlyLimit ? `${Math.min(100, ((quota.monthlyUsed ?? 0) + quota.planned) / quota.monthlyLimit * 100)}%` : '0%' }} /></div><p className={`mt-2 text-xs font-medium ${quotaInsufficient ? 'text-danger' : 'text-success'}`}>{quotaInsufficient ? `不足 ${Math.max(0, quota.planned - (quota.remaining ?? 0)).toLocaleString('ja-JP')}通` : `残り ${quota.remaining?.toLocaleString('ja-JP') ?? '—'}通`}</p></> : <p className="mt-3 text-xs text-warning">送信枠を確認できませんでした。</p>}
+              {quota ? <><p className="mt-3 text-sm font-semibold text-ink">使用予定　{quota.planned.toLocaleString('ja-JP')} / {quota.monthlyLimit?.toLocaleString('ja-JP') ?? '—'}通</p><div className="mt-2 h-2 overflow-hidden rounded-pill bg-canvas-sunken"><div className={`h-full ${quotaInsufficient ? 'bg-danger' : 'bg-accent'}`} style={{ width: quota.monthlyLimit ? `${Math.min(100, ((quota.monthlyUsed ?? 0) + quota.planned) / quota.monthlyLimit * 100)}%` : '0%' }} /></div><p className={`mt-2 text-xs font-medium ${quotaInsufficient ? 'text-danger' : 'text-success'}`}>{quotaInsufficient ? `不足 ${Math.max(0, quota.planned - (quota.remaining ?? 0)).toLocaleString('ja-JP')}通` : `残り ${quota.remaining?.toLocaleString('ja-JP') ?? '—'}通`}</p></> : <p className="mt-3 text-xs text-warning">送信枠を確認できませんでした。</p>}
             </section>
             <LinePreview><div className="rounded-control bg-canvas p-4 text-sm text-ink"><BubblePreview bubble={bubbles[0]} buttons={messageButtons} /></div></LinePreview>
           </div>
@@ -2902,8 +2902,8 @@ export default function BroadcastForm({
             <ul className="space-y-2">
               {testRecipients.map((recipient) => (
                 <li key={recipient.id} className="flex items-center gap-3 rounded-control border border-hairline p-3">
-                  {recipient.pictureUrl ? <img src={recipient.pictureUrl} alt="" className="h-9 w-9 rounded-full object-cover" /> : (
-                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-ink-secondary text-sm font-bold text-on-accent">{recipient.displayName.slice(0, 1)}</span>
+                  {recipient.pictureUrl ? <img src={recipient.pictureUrl} alt="" className="h-9 w-9 rounded-pill object-cover" /> : (
+                    <span className="flex h-9 w-9 items-center justify-center rounded-pill bg-ink-secondary text-sm font-bold text-on-accent">{recipient.displayName.slice(0, 1)}</span>
                   )}
                   <span className="min-w-0 flex-1 truncate text-sm font-bold text-ink">{recipient.displayName}</span>
                 </li>

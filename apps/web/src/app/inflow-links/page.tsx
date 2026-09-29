@@ -835,7 +835,7 @@ function InflowLinksPageInner({
         />
 
         <section className="flex min-w-0 flex-col gap-4">
-          <div className="flex flex-col gap-3 rounded-xl border border-hairline bg-canvas p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-col gap-3 rounded-card border border-hairline bg-canvas p-4 shadow-card lg:flex-row lg:items-center lg:justify-between">
             <div>
               <p className="text-xs font-medium text-ink-faint">選択中のフォルダ</p>
               <h2 className="mt-0.5 text-lg font-bold text-ink">{selectedGenreLabel || 'フォルダを選んでください'}</h2>
@@ -941,7 +941,7 @@ function InflowLinksPageInner({
           }
         />
       ) : (
-        <div className="overflow-hidden rounded-lg border border-hairline bg-canvas">
+        <div className="overflow-hidden rounded-control border border-hairline bg-canvas">
           <table className="w-full table-fixed text-xs">
             <colgroup>
               {/* ★V7：REF は流入元名の下へ。名前が「Googl…」まで削られていたので列を1つ減らし、
@@ -1063,7 +1063,7 @@ function InflowLinksPageInner({
                         <span className="flex min-w-0 items-center gap-1 text-ink-secondary" title={r.name}>
                           <span className="truncate whitespace-nowrap">{r.name}</span>
                           <span
-                            className="shrink-0 rounded border border-accent-border bg-accent-soft px-1 py-0.5 text-micro text-accent-deep"
+                            className="shrink-0 rounded-mini border border-accent-border bg-accent-soft px-1 py-0.5 text-micro text-accent-deep"
                             title="クリック計測とシナリオ起動が設定されています。追加先の振り分けは全体設定に従います。"
                           >
                             計測済
@@ -1073,7 +1073,7 @@ function InflowLinksPageInner({
                         <span className="flex min-w-0 items-center gap-1 text-ink-secondary" title={r.name}>
                           <span className="truncate whitespace-nowrap">{r.name}</span>
                           <span
-                            className="shrink-0 rounded border border-status-warn-soft bg-status-warn-soft px-1 py-0.5 text-micro text-status-warn-deep"
+                            className="shrink-0 rounded-mini border border-status-warn-soft bg-status-warn-soft px-1 py-0.5 text-micro text-status-warn-deep"
                             title="外部で発行されたREFです。流入実績だけを集計しています。"
                           >
                             未登録
@@ -1109,7 +1109,7 @@ function InflowLinksPageInner({
                     <td className="px-2 py-3 text-ink-secondary">
                       {tag ? (
                         <span
-                          className="block truncate whitespace-nowrap rounded-full px-2 py-0.5 text-center text-[11px] font-medium"
+                          className="block truncate whitespace-nowrap rounded-pill px-2 py-0.5 text-center text-[11px] font-medium"
                           style={{
                             backgroundColor: `${tag.color}22`,
                             color: tagTextColor(tag.color),
@@ -1331,7 +1331,7 @@ function FragmentRow({
                     <Link
                       key={f.id}
                       href={`/chats?friend=${f.id}`}
-                      className="flex items-center justify-between bg-canvas rounded-lg px-3 py-2 border border-hairline hover:border-action"
+                      className="flex items-center justify-between bg-canvas rounded-control px-3 py-2 border border-hairline hover:border-action"
                     >
                       <span className="text-sm text-ink font-medium truncate">
                         {f.displayName}

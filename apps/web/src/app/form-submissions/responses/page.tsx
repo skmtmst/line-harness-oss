@@ -517,7 +517,7 @@ function ResponseDetail({
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       <button type="button" className="bg-ink/30 absolute inset-0" onClick={onClose} aria-label="回答詳細を閉じる" />
-      <aside ref={panelRef} role="dialog" aria-modal="true" aria-label="回答詳細" className="bg-canvas relative h-full w-full max-w-md overflow-y-auto p-5 shadow-xl">
+      <aside ref={panelRef} role="dialog" aria-modal="true" aria-label="回答詳細" className="bg-canvas relative h-full w-full max-w-md overflow-y-auto p-5 shadow-float">
         <div className="border-hairline flex items-center justify-between border-b pb-4"><h2 className="text-ink text-base font-bold">回答詳細</h2><button type="button" onClick={onClose} className="text-ink-faint text-xl" aria-label="閉じる">×</button></div>
         <dl className="mt-5 space-y-4">
           <Detail label="答えた人" value={item.friendName ?? '不明'} />

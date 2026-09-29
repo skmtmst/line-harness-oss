@@ -253,7 +253,7 @@ function StartScenarioDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-6" style={{ background: 'color-mix(in srgb, var(--color-ink) 35%, transparent)' }} role="dialog" aria-modal="true" aria-labelledby="start-scenario-title">
-      <div ref={panelRef} className="border-hairline flex w-full flex-col overflow-y-auto rounded-card border shadow-xl" style={{ height: 860, maxWidth: 1040, background: 'var(--color-canvas)' }}>
+      <div ref={panelRef} className="border-hairline flex w-full flex-col overflow-y-auto rounded-card border shadow-float" style={{ height: 860, maxWidth: 1040, background: 'var(--color-canvas)' }}>
         <div className="border-hairline flex items-start justify-between gap-4 border-b px-6 py-5">
           <div>
             <h2 id="start-scenario-title" className="text-ink text-xl font-bold">
@@ -295,7 +295,7 @@ function StartScenarioDialog({
               ) : null}
               {checks.map((item) => (
                 <li key={item.label} className="flex items-start gap-3">
-                  <span aria-hidden className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-medium ${item.state === 'ok' ? 'bg-success-bg text-success' : item.state === 'warn' ? 'bg-warning-bg text-warning' : 'bg-canvas-sunken text-ink-faint'}`}>
+                  <span aria-hidden className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-pill text-xs font-medium ${item.state === 'ok' ? 'bg-success-bg text-success' : item.state === 'warn' ? 'bg-warning-bg text-warning' : 'bg-canvas-sunken text-ink-faint'}`}>
                     {item.state === 'ok' ? '✓' : item.state === 'warn' ? '!' : '—'}
                   </span>
                   <span><span className="text-ink block font-medium">{item.label}</span><span className="text-ink-faint block text-xs">{item.detail}</span></span>

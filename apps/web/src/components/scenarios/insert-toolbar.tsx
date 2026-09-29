@@ -135,7 +135,7 @@ export default function InsertToolbar({ targetRef, value, onChange, includeAnswe
       onClose={() => setOpen(null)}
     >
       <div
-        className="border-hairline rounded-card bg-canvas max-h-64 w-64 overflow-y-auto border shadow-lg"
+        className="border-hairline rounded-card bg-canvas max-h-64 w-64 overflow-y-auto border shadow-float"
         // 最上層では absolute 指定を無効にする（位置は器が決める）。
         style={{ position: 'static' }}
       >
@@ -204,7 +204,7 @@ export default function InsertToolbar({ targetRef, value, onChange, includeAnswe
           onClose={() => setOpen(null)}
         >
           <div
-            className="border-hairline rounded-card bg-canvas w-72 border p-3 shadow-lg"
+            className="border-hairline rounded-card bg-canvas w-72 border p-3 shadow-float"
             // 最上層では absolute 指定を無効にする（位置は器が決める）。
             style={{ position: 'static' }}
           >

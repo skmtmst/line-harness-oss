@@ -188,7 +188,7 @@ function NotificationsPageInner() {
                   {item.isRead ? (
                     <span aria-hidden="true" className="mt-1.5 h-2 w-2 shrink-0" />
                   ) : (
-                    <span aria-hidden="true" className="bg-action mt-1.5 h-2 w-2 shrink-0 rounded-full" />
+                    <span aria-hidden="true" className="bg-action mt-1.5 h-2 w-2 shrink-0 rounded-pill" />
                   )}
                   <span className="min-w-0 flex-1">
                     <span className={item.isRead ? 'text-ink block truncate text-sm' : 'text-ink block truncate text-sm font-semibold'}>

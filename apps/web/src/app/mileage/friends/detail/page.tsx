@@ -316,7 +316,7 @@ function FriendMileageInner() {
           action={<div className="flex flex-wrap gap-2">{canAdjust ? <Button variant="secondary" onClick={() => setAdjustmentOpen(true)}>マイルを手で増やす・減らす</Button> : null}<Button href={`/friends/detail?id=${encodeURIComponent(friend.id)}`}>友だちの詳細を見る</Button></div>}
         />
         <div className="flex flex-wrap items-center gap-4 p-4">
-          {friend.pictureUrl ? <img src={friend.pictureUrl} alt="" className="h-12 w-12 rounded-full object-cover" /> : <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent-soft text-lg font-bold text-accent-deep">{displayName.slice(0, 1)}</div>}
+          {friend.pictureUrl ? <img src={friend.pictureUrl} alt="" className="h-12 w-12 rounded-pill object-cover" /> : <div className="flex h-12 w-12 items-center justify-center rounded-pill bg-accent-soft text-lg font-bold text-accent-deep">{displayName.slice(0, 1)}</div>}
           <div className="min-w-44">
             <p className="font-bold text-ink">{displayName}</p>
             <p className="mt-1 text-xs text-ink-faint">本人確認済みの接続先だけを表示します</p>
@@ -325,7 +325,7 @@ function FriendMileageInner() {
             {connectedAccounts === null ? (
               <span className="text-sm text-ink-faint">接続先を確認できませんでした</span>
             ) : connectedAccounts.length > 0 ? connectedAccounts.map((connection) => (
-              <span key={connection.accountId} className="rounded-full border border-hairline bg-surface-pearl px-3 py-1 text-xs font-semibold text-ink-secondary">{connection.accountName}</span>
+              <span key={connection.accountId} className="rounded-pill border border-hairline bg-surface-pearl px-3 py-1 text-xs font-semibold text-ink-secondary">{connection.accountName}</span>
             )) : <span className="text-sm text-ink-faint">接続先はありません</span>}
           </div>
         </div>
