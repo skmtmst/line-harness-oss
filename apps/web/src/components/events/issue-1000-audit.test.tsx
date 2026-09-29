@@ -208,6 +208,7 @@ it('D09: ①に戻って保存しても、更新先は概要段階で確定し�
   expect(st.updateSlot).toHaveBeenCalledWith(
     'account-a', 'event-1', 'old-slot',
     expect.objectContaining({ starts_at: old.starts_at, ends_at: old.ends_at, capacity: 12 }),
+    1,
   )
 })
 

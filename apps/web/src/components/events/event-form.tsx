@@ -831,12 +831,43 @@ function SlotsTab({
     }
   }
 
+  /*
+    m26g R577: 枠の切替・編集は期待版つきで送る。古い画面からの操作は
+    409 になり、敗者側は一覧を読み直して最新の差分を見せる。
+  */
+  function slotConflictMessage(e: ApiError): string {
+    const current = (e.data as { current?: EventSlot } | undefined)?.current
+    const detail = current
+      ? `最新の枠は定員${current.capacity ?? '無制限'}・${current.is_active === 1 ? '有効' : '停止'}です。`
+      : ''
+    return `ほかの画面でこの枠が更新されました。一覧を読み直しました。${detail}最新の内容を確認してから、もう一度お試しください。`
+  }
+
+  async function updateSlotWithConflictRefresh(
+    slot: EventSlot,
+    body: Partial<EventSlot>,
+  ): Promise<void> {
+    if (!eventId) return
+    try {
+      await eventsApi.updateSlot(accountId, eventId, slot.id, body, slot.version ?? 1)
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 409 && e.code === 'version_conflict') {
+        await refresh()
+        throw new Error(slotConflictMessage(e))
+      }
+      throw e
+    }
+  }
+
   async function toggleActive(s: EventSlot) {
     if (!eventId) return
     setBusy(true)
+    setErr(null)
     try {
-      await eventsApi.updateSlot(accountId, eventId, s.id, { is_active: s.is_active === 1 ? 0 : 1 })
+      await updateSlotWithConflictRefresh(s, { is_active: s.is_active === 1 ? 0 : 1 })
       await refresh()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e))
     } finally {
       setBusy(false)
     }
@@ -930,7 +961,7 @@ function SlotsTab({
           slot={editSlotTarget}
           onClose={() => setEditSlotTarget(null)}
           onSubmit={async (next) => {
-            await eventsApi.updateSlot(accountId, eventId, editSlotTarget.id, next)
+            await updateSlotWithConflictRefresh(editSlotTarget, next)
             await refresh()
             setEditSlotTarget(null)
           }}
