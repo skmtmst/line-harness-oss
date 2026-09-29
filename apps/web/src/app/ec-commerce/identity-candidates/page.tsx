@@ -93,9 +93,28 @@ export default function EcIdentityCandidatesPage() {
   useEffect(() => { void loadOperations() }, [loadOperations])
 
   const scopedItems = review.items
+  /*
+   * R600：運用集計と候補一覧は別の読み口。集計だけが失敗しても、
+   * 取得済みの候補と判定入口は残す。集計の失敗は集計の場所（数値の
+   * カード帯）にだけ出し、画面全体のエラーに広げない。
+   */
+  const reviewReady = review.state === 'ready'
+  const operationsReady = operationsState === 'ready' && operations !== null
   const candidateCount = operations?.summary.candidateExternalCustomers ?? 0
   const noneCount = Math.max(0, (operations?.summary.unmatched ?? 0) - candidateCount)
   const conflictCount = operations?.summary.duplicateSuspicions ?? 0
+  /*
+   * 集計のカード帯の3段目。読めていない数を 0 と書かない（未取得は「—」）。
+   * 4枚が同じ1回の取得を指すので、再試行の口は先頭の1枚にだけ寄せる。
+   */
+  const operationsDetail = (normal: React.ReactNode): React.ReactNode => {
+    if (operationsReady) return normal
+    if (operationsState === 'loading') return '読み込んでいます'
+    if (operationsState === 'forbidden') return '表示する権限がありません'
+    if (operationsState === 'error') return '読み込めませんでした'
+    return normal
+  }
+  const operationsRetry = operationsState === 'error' ? () => { void loadOperations() } : undefined
   const impactByCandidate = useMemo(
     () => new Map((operations?.items ?? []).map((item) => [item.id, candidateImpactText(item.impact)] as const)),
     [operations],
@@ -111,11 +130,16 @@ export default function EcIdentityCandidatesPage() {
       ? right.confidence.score - left.confidence.score
       : Date.parse(right.detectedAt) - Date.parse(left.detectedAt)), [scopedItems, sort, view])
 
-  const pageState = operationsState !== 'ready'
-    ? operationsState
-    : review.state === 'ready' && scopedItems.length === 0
+  /*
+   * R600：候補の有無は候補の読み口で決める。運用集計の失敗では
+   * 画面を隠さない（集計欄だけが失敗表示になる）。候補の読み口が
+   * 失敗・権限不足のときは従来どおり中身を出さない。
+   */
+  const pageState = !reviewReady
+    ? review.state
+    : scopedItems.length === 0 || operationsState === 'empty'
       ? 'empty'
-      : review.state
+      : 'ready'
 
   return (
     <div className={ecStyles.root}>
@@ -143,24 +167,61 @@ export default function EcIdentityCandidatesPage() {
       {pageState === 'ready' ? (
         <>
           <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-            <KpiCard variant="v6" title="結びついていない" value={operations?.summary.unmatched ?? null} unit="件" detail="確認待ちの注文・会員" badge="要対応" />
-            <KpiCard variant="v6" title="候補が見つかった" value={candidateCount} unit="件" detail="" help="名前や電話が近い人がいます" />
-            <KpiCard variant="v6" title="自動で結びついた" value={operations?.summary.linked ?? null} unit="件" detail="" help="同じ人として結びついた会員です" />
+            <KpiCard
+              variant="v6"
+              title="結びついていない"
+              value={operationsReady ? (operations?.summary.unmatched ?? null) : null}
+              unit="件"
+              detail={operationsDetail('確認待ちの注文・会員')}
+              badge="要対応"
+              loading={operationsState === 'loading'}
+              onRetry={operationsRetry}
+            />
+            <KpiCard
+              variant="v6"
+              title="候補が見つかった"
+              value={operationsReady ? candidateCount : null}
+              unit="件"
+              detail={operationsDetail('')}
+              help="名前や電話が近い人がいます"
+              loading={operationsState === 'loading'}
+            />
+            <KpiCard
+              variant="v6"
+              title="自動で結びついた"
+              value={operationsReady ? (operations?.summary.linked ?? null) : null}
+              unit="件"
+              detail={operationsDetail('')}
+              help="同じ人として結びついた会員です"
+              loading={operationsState === 'loading'}
+            />
             {/*
               m22d: 「24件」は「結びついていない」のカードと一覧の件数に集約し、
               ここでは繰り返さない。売上の中身は「？」へ移す。
             */}
-            <KpiCard variant="v6" title="結びつけると増える売上" value={operations?.summary.potentialRevenue ?? null} unit="円" detail="分析にも入ります" help="結びついていない注文・会員の売上見込みです" />
+            <KpiCard
+              variant="v6"
+              title="結びつけると増える売上"
+              value={operationsReady ? (operations?.summary.potentialRevenue ?? null) : null}
+              unit="円"
+              detail={operationsDetail('分析にも入ります')}
+              help="結びついていない注文・会員の売上見込みです"
+              loading={operationsState === 'loading'}
+            />
           </div>
 
           <NoteBar help="メールアドレスか電話番号が同じなら自動で結びつきます" helpLabel="自動で結びつく条件">メールアドレスか電話番号が同じなら、自動で結びつきます。どちらも違うときに、ここへ並びます。名前だけが同じ人は、別人のこともあるので自動では結びつけません。</NoteBar>
 
           <div className="flex flex-wrap items-center justify-between gap-3">
+            {/*
+              R600：集計が読めていないときは数を出さない（0件と書くと
+              「候補が消えた」に見える）。`count` を省くと札だけになる。
+            */}
             <Tabs items={([
-                ['all', 'すべて', operations?.summary.unmatched ?? 0],
-                ['candidate', '候補あり', candidateCount],
-                ['none', '候補なし', noneCount],
-                ['conflict', '同じ人が2人いる疑い', conflictCount],
+                ['all', 'すべて', operationsReady ? operations?.summary.unmatched ?? 0 : undefined],
+                ['candidate', '候補あり', operationsReady ? candidateCount : undefined],
+                ['none', '候補なし', operationsReady ? noneCount : undefined],
+                ['conflict', '同じ人が2人いる疑い', operationsReady ? conflictCount : undefined],
               ] as const).map(([value, label, count]) => ({
                 label,
                 count,
@@ -246,7 +307,12 @@ export default function EcIdentityCandidatesPage() {
           ) : null}
 
           <p className={styles.footerNote}>
-            <ListRange label="結びついていない" total={operations?.summary.unmatched ?? 0} first={shown.length === 0 ? 0 : 1} last={shown.length} />
+            {operationsReady ? (
+              <ListRange label="結びついていない" total={operations?.summary.unmatched ?? 0} first={shown.length === 0 ? 0 : 1} last={shown.length} />
+            ) : (
+              /* R600：総数が読めていないときは「—」にし、0件と書かない。 */
+              <span className="text-ink-faint text-xs">結びついていない —</span>
+            )}
             <span className="block">結び付けても元の注文とLINEの友だちは残り、過去のLINE送信は再送しません。</span>
           </p>
 
