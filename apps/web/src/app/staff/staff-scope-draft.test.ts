@@ -7,7 +7,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import { BROADCAST_EDIT_OPERATION_KEYS } from '@line-crm/shared'
-import { applyScopeRowChange, restoreSavedLevels, scopePiiToEmailMask } from './staff-scope-draft'
+import { applyScopeRowChange, findPartialScopeRows, restoreSavedLevels, scopePiiToEmailMask } from './staff-scope-draft'
 
 describe('R497 保存済みを3択へ写す', () => {
   it('受信箱だけの個別設定は受信箱だけ変えられるで写す（受付の当てはめはしない）', () => {
@@ -78,5 +78,42 @@ describe('R497 触った行だけ保存済みキーへ適用する', () => {
     expect(scopePiiToEmailMask('view')).toBe('masked')
     expect(scopePiiToEmailMask('none')).toBe('none')
     expect(scopePiiToEmailMask(undefined)).toBe('masked')
+  })
+})
+
+describe('R497b 一部だけ許可の行を見つける', () => {
+  it('分析の1キーのみは一部として見つかる（出さないと写っても実在する）', () => {
+    const rows = findPartialScopeRows(['/chats', '/analytics'], [])
+    const analytics = rows.find((row) => row.itemId === 'analytics')
+    expect(analytics).toBeTruthy()
+    expect(analytics?.allowedKeys).toContain('/analytics')
+    // 受信箱は1キー全部なので一部ではない。
+    expect(rows.some((row) => row.itemId === 'inbox')).toBe(false)
+  })
+
+  it('全部ある行と何もない行は一部ではない', () => {
+    expect(findPartialScopeRows(['/chats'], [])).toEqual([])
+    expect(findPartialScopeRows([], [])).toEqual([])
+  })
+
+  it('edit と view に分かれて全部ある混ざりも一部として見つかる', () => {
+    const rows = findPartialScopeRows(['/friends'], ['/tags'])
+    expect(rows.some((row) => row.itemId === 'friends')).toBe(true)
+  })
+
+  it('view だけ全部ある行は一部ではない', () => {
+    const rows = findPartialScopeRows([], ['/friends', '/tags'])
+    expect(rows.some((row) => row.itemId === 'friends')).toBe(false)
+  })
+
+  it('配信の操作キーがなくても一部とは言わない（古い保存行の約束）', () => {
+    // 配信の表キーは全部あるが操作キーはない → 配信editのまま。
+    const rows = findPartialScopeRows(
+      ['/broadcasts', '/scenarios', '/reminders', '/auto-replies', '/friend-add-settings',
+        '/templates', '/rich-menus', '/line-notifications', '/nen-campaigns', '/nen-members',
+        '/webinars', '/contents', '/contents/vars', '/form-submissions'],
+      [],
+    )
+    expect(rows.some((row) => row.itemId === 'delivery')).toBe(false)
   })
 })
