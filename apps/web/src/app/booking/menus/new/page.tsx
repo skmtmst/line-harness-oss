@@ -654,11 +654,14 @@ export default function NewBookingMenuPage() {
             {/*
              * R536: 403は権限不足で、押しても直らない再試行は出さない。
              * それ以外は入力を保ったまま同じ画面から取り直せる。
+             * DEEP-17: 取得失敗の文言は契約どおり「開き直してください」にし、
+             * 候補未確定を「未登録」と誤表示させない（下の0件表示と区別）。
+             * 両契約を満たすため、契約文のまま入力保持の一言を添える。
              */}
             <p className="text-ink-faint text-sm">
               {classifyApiFailure(staffError) === 'forbidden'
                 ? '担当スタッフを見る権限がありません。オーナーか管理者に追加を依頼してください。'
-                : '担当を読み込めませんでした。入力はそのまま残っています。'}
+                : '担当を読み込めませんでした。開き直してください（入力はそのまま残っています）'}
             </p>
             {classifyApiFailure(staffError) !== 'forbidden' && selectedAccountId && (
               <Button
