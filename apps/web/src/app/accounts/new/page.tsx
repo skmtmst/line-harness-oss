@@ -13,6 +13,7 @@ import StatusBadge from '@/components/shared/status-badge'
 import Notice from '@/components/shared/notice'
 import NoticeLineRegisterDialog from '@/components/hq/notice-line-register-dialog'
 import { CHECK_STATE_LABEL, canSave, stoppedAt, toSteps } from '../connection-check-view'
+import { isDuplicateChannelError, matchRegisteredAccountId } from './account-recovery'
 
 const WIZARD_STEPS = [
   { number: 1, label: '基本情報', designNode: 'a8qMXX' },
@@ -46,6 +47,8 @@ export default function NewLineAccountPage() {
   const [busyAction, setBusyAction] = useState<BusyAction>(null)
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [error, setError] = useState('')
+  // R523: 応答消失・重複で見つけた登録済みアカウント。詳細へ復帰するために持つ。
+  const [recoveredAccountId, setRecoveredAccountId] = useState('')
   const [stepUp, setStepUp] = useState<StepUpRequest | null>(null)
   const busyLock = useRef(false)
   const stepPanelRef = useRef<HTMLDivElement>(null)
@@ -97,6 +100,7 @@ export default function NewLineAccountPage() {
     })
     setConnection(null)
     setError('')
+    setRecoveredAccountId('')
   }
 
   const validateStep = (step: StepNumber) => {
@@ -153,6 +157,20 @@ export default function NewLineAccountPage() {
     }
   }
 
+  /*
+   * R523: 同じチャネルIDで作られた行が残っていないか照合する。
+   * 取れなければ null（未保存と断定しない）。一覧が読めない試験環境でも落ちない。
+   */
+  const findRegisteredAccountId = async (channelId: string): Promise<string | null> => {
+    try {
+      const list = await api.lineAccounts.list()
+      if (!list.success) return null
+      return matchRegisteredAccountId(list.data, channelId)
+    } catch {
+      return null
+    }
+  }
+
   const save = async (stepUpToken?: string) => {
     if (!connectionPassed || busyLock.current) {
       setError('5段すべて通ってから保存してください。')
@@ -161,9 +179,19 @@ export default function NewLineAccountPage() {
     busyLock.current = true
     setBusyAction('save')
     setError('')
+    setRecoveredAccountId('')
     try {
       const response = await api.lineAccounts.connect(input(), stepUpToken)
       if (!response.success) {
+        // R523: 重複（同じ情報での再試行で行き止まり）は登録済みの詳細へ案内する。
+        if (isDuplicateChannelError(response.error)) {
+          const recovered = await findRegisteredAccountId(form.channelId)
+          if (recovered) {
+            setRecoveredAccountId(recovered)
+            setError('このチャネルIDは登録済みです。登録済みのアカウントを開いて確認してください。')
+            return
+          }
+        }
         setError(response.error)
         return
       }
@@ -176,7 +204,14 @@ export default function NewLineAccountPage() {
         setStepUp({ purpose: 'line_account.connect', action: 'LINEの接続を登録する', retry: save })
         return
       }
-      setError('登録できませんでした。DBには保存していません。時間をおいて、もう一度お試しください。')
+      // R523: 応答が無い失敗は「未保存」と断定しない。作られた行が残っていることがある。
+      const recovered = await findRegisteredAccountId(form.channelId)
+      if (recovered) {
+        setRecoveredAccountId(recovered)
+        setError('保存は終わっている可能性があります。登録済みのアカウントを開いて確認してください。')
+        return
+      }
+      setError('登録できませんでした。時間をおいて、もう一度お試しください。')
     } finally {
       busyLock.current = false
       setBusyAction(null)
@@ -323,7 +358,21 @@ export default function NewLineAccountPage() {
           </div>}
         </div>
 
-        {error && <Notice tone="danger" message={error} onClose={() => setError('')} className="mt-4" />}
+        {/*
+          R523: 登録済みを見つけたときは赤の失敗にせず、詳細への復帰と一緒に
+          黄の注意で出す（失敗の1枚はここだけ）。
+        */}
+        {recoveredAccountId ? (
+          <Notice
+            tone="warn"
+            message={error || '保存は終わっている可能性があります。登録済みのアカウントを開いて確認してください。'}
+            action={<Button href={`/accounts/detail?id=${encodeURIComponent(recoveredAccountId)}`}>登録したアカウントを見る</Button>}
+            onClose={() => { setError(''); setRecoveredAccountId('') }}
+            className="mt-4"
+          />
+        ) : error ? (
+          <Notice tone="danger" message={error} onClose={() => setError('')} className="mt-4" />
+        ) : null}
         <NoticeLineRegisterDialog open={noticeDialog === 'open'} onClose={() => setNoticeDialog('done')} />
         {stepUp && <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} />}
         <div data-design="Actions">
