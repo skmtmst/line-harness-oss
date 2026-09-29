@@ -18,6 +18,7 @@ import {
   MessageTemplateEditor,
   TemplateInsertControls,
   buildTemplatePreview,
+  extractMessageUrls,
   previewDateValue,
   type TemplateReferences,
   type TemplateReferenceState,
@@ -263,6 +264,29 @@ type TemplateDetailData = Extract<
   { success: true }
 >['data']
 type TemplateUsedBy = TemplateDetailData['usedBy']
+
+/**
+ * D007: 詳細口の応答の形。**success:true でも本文が無い応答がある。**
+ *
+ * 存在しないIDへ一覧形 `{items:[]}` が返るなど、型どおりでない応答を
+ * 確かめず ready にすると、見本づくりが `content.replace` で落ちる。
+ * 名前・種類・本文の3つが文字列のときだけ、中身として受け取る。
+ * 利用先は無くてもよい（未取得は null として扱う）が、有るときは
+ * 対象の形でないと利用先の表示で落ちるので、物でなければ捨てる。
+ */
+function isTemplateDetailData(data: unknown): data is TemplateDetailData {
+  if (typeof data !== 'object' || data === null) return false
+  const record = data as Record<string, unknown>
+  if (
+    typeof record.name !== 'string' ||
+    typeof record.messageType !== 'string' ||
+    typeof record.messageContent !== 'string'
+  ) {
+    return false
+  }
+  const usedBy = record.usedBy
+  return usedBy === undefined || usedBy === null || typeof usedBy === 'object'
+}
 
 /**
  * 利用先の1行分（IDEA-11）。
@@ -546,7 +570,8 @@ function TemplateEditInner() {
     void api.templates
       .get(id)
       .then((res) => {
-        if (!res.success) {
+        // D007: success:true でも形が違う応答は「読み込めませんでした」へ。
+        if (!res.success || !isTemplateDetailData(res.data)) {
           accept((prev) => ({ ...prev, status: 'failed' }))
           return
         }
@@ -724,6 +749,8 @@ const TemplateEditPageWithTestSupport = Object.assign(TemplateEditPage, {
     TemplateUsageNotice,
     templateUsageEntries,
     buildTemplatePreview,
+    extractMessageUrls,
+    isTemplateDetailData,
     loadTemplateReferences,
     previewDateValue,
     requestTemplateReferences,
