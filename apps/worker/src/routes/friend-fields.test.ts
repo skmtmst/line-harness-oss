@@ -9,6 +9,12 @@ const mocks = {
   getFriendFieldByIdForScope: vi.fn(),
   createFriendField: vi.fn(),
   createFriendFieldForScope: vi.fn(),
+  createFriendFieldIdempotent: vi.fn(),
+  FriendFieldCreateError: class FriendFieldCreateError extends Error {
+    constructor(public readonly code: string, message: string) {
+      super(message);
+    }
+  },
   updateFriendField: vi.fn(),
   reorderFriendFields: vi.fn(),
   deleteFriendField: vi.fn(),
@@ -93,15 +99,23 @@ function req(
   path: string,
   method: string,
   body?: unknown,
+  headers: Record<string, string> = {},
 ) {
   return app.fetch(
     new Request(`https://example.com${path}`, {
       method,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...headers },
       body: body === undefined ? undefined : JSON.stringify(body),
     }),
     env,
   );
+}
+
+/** 項目作成の口を叩く。R515で要求キーが必須になったため、鍵を付けて送る。 */
+function createReq(app: ReturnType<typeof makeApp>, body: unknown, key = 'field-key-1') {
+  return req(app, '/api/friend-fields?lineAccountId=account-1', 'POST', body, {
+    'Idempotency-Key': key,
+  });
 }
 
 const FIELD = {
@@ -135,6 +149,10 @@ beforeEach(() => {
   mocks.getFriendFieldByIdForScope.mockResolvedValue({ ...FIELD, line_account_id: 'account-1', tenant_id: 'tenant-1', is_inherited: 0 });
   mocks.createFriendField.mockResolvedValue(FIELD);
   mocks.createFriendFieldForScope.mockResolvedValue({ ...FIELD, line_account_id: 'account-1', tenant_id: 'tenant-1', is_inherited: 0 });
+  mocks.createFriendFieldIdempotent.mockResolvedValue({
+    field: { ...FIELD, line_account_id: 'account-1', tenant_id: 'tenant-1', is_inherited: 0 },
+    replayed: false,
+  });
   mocks.updateFriendField.mockResolvedValue(FIELD);
   mocks.reorderFriendFields.mockResolvedValue(undefined);
   mocks.countFriendFieldValues.mockResolvedValue(0);
@@ -158,26 +176,61 @@ beforeEach(() => {
 
 describe('項目の作成', () => {
   it('差し込み名の形が正しければ作れる', async () => {
-    const res = await req(makeApp(), '/api/friend-fields?lineAccountId=account-1', 'POST', {
+    const res = await createReq(makeApp(), {
       name: 'ペットの名前',
       fieldKey: 'pet_name',
       type: 'text',
     });
     expect(res.status).toBe(201);
+    expect(mocks.createFriendFieldIdempotent).toHaveBeenCalledWith(
+      env.DB,
+      expect.anything(),
+      expect.objectContaining({ name: 'ペットの名前', fieldKey: 'pet_name' }),
+      'field-key-1',
+    );
+  });
+
+  it('R515: 要求キーなしの作成は実行しない', async () => {
+    const res = await req(makeApp(), '/api/friend-fields?lineAccountId=account-1', 'POST', {
+      name: 'ペットの名前',
+      fieldKey: 'pet_name',
+      type: 'text',
+    });
+    expect(res.status).toBe(400);
+    expect(mocks.createFriendFieldIdempotent).not.toHaveBeenCalled();
+  });
+
+  it('R515: 同じ要求キーの再送は保存済みを200で返す', async () => {
+    mocks.createFriendFieldIdempotent.mockResolvedValue({
+      field: { ...FIELD, line_account_id: 'account-1', tenant_id: 'tenant-1', is_inherited: 0 },
+      replayed: true,
+    });
+    const res = await createReq(makeApp(), { name: 'ペットの名前', fieldKey: 'pet_name', type: 'text' });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ data: { id: 'ff-1' } });
+  });
+
+  it('R515: 同じ要求キーに異なる内容は409で止める', async () => {
+    mocks.createFriendFieldIdempotent.mockRejectedValue(
+      new mocks.FriendFieldCreateError('idempotency_conflict', '同じ要求キーに異なる内容が指定されました'),
+    );
+    const res = await createReq(makeApp(), { name: '別の名前', fieldKey: 'other_key', type: 'text' });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: 'idempotency_conflict' });
   });
 
   it('差し込み名の形が違えば422', async () => {
-    const res = await req(makeApp(), '/api/friend-fields?lineAccountId=account-1', 'POST', {
+    const res = await createReq(makeApp(), {
       name: 'x',
       fieldKey: 'ペット',
       type: 'text',
     });
     expect(res.status).toBe(422);
-    expect(mocks.createFriendFieldForScope).not.toHaveBeenCalled();
+    expect(mocks.createFriendFieldIdempotent).not.toHaveBeenCalled();
   });
 
   it('知らない種類は422', async () => {
-    const res = await req(makeApp(), '/api/friend-fields?lineAccountId=account-1', 'POST', {
+    const res = await createReq(makeApp(), {
       name: 'x',
       fieldKey: 'x',
       type: 'rating',
@@ -186,7 +239,7 @@ describe('項目の作成', () => {
   });
 
   it('選択肢は文字列の配列だけ', async () => {
-    const res = await req(makeApp(), '/api/friend-fields?lineAccountId=account-1', 'POST', {
+    const res = await createReq(makeApp(), {
       name: 'x',
       fieldKey: 'x',
       type: 'select',
@@ -196,8 +249,8 @@ describe('項目の作成', () => {
   });
 
   it('差し込み名が重複したら409', async () => {
-    mocks.createFriendFieldForScope.mockRejectedValue(new Error('UNIQUE constraint failed'));
-    const res = await req(makeApp(), '/api/friend-fields?lineAccountId=account-1', 'POST', {
+    mocks.createFriendFieldIdempotent.mockRejectedValue(new Error('UNIQUE constraint failed'));
+    const res = await createReq(makeApp(), {
       name: 'x',
       fieldKey: 'dup',
       type: 'text',
@@ -206,22 +259,23 @@ describe('項目の作成', () => {
   });
 
   it.each(['datetime', 'image', 'pdf'])('V6の%s項目を作れる', async (type) => {
-    const res = await req(makeApp(), '/api/friend-fields?lineAccountId=account-1', 'POST', {
+    const res = await createReq(makeApp(), {
       name: type,
       fieldKey: `field_${type}`,
       type,
     });
     expect(res.status).toBe(201);
-    expect(mocks.createFriendFieldForScope).toHaveBeenCalledWith(
+    expect(mocks.createFriendFieldIdempotent).toHaveBeenCalledWith(
       env.DB,
       expect.anything(),
       expect.objectContaining({ type }),
+      expect.anything(),
     );
   });
 
 describe('R181 既定値は個別値と同じ物差しで検証する', () => {
   async function createDefault(type: string, defaultValue: unknown) {
-    return req(makeApp(), '/api/friend-fields?lineAccountId=account-1', 'POST', {
+    return createReq(makeApp(), {
       name: '検査項目', fieldKey: `check_${type}`, type, defaultValue,
     });
   }
@@ -229,7 +283,7 @@ describe('R181 既定値は個別値と同じ物差しで検証する', () => {
   it('存在しない日付の既定値は422', async () => {
     const res = await createDefault('date', '2026-02-31');
     expect(res.status).toBe(422);
-    expect(mocks.createFriendFieldForScope).not.toHaveBeenCalled();
+    expect(mocks.createFriendFieldIdempotent).not.toHaveBeenCalled();
   });
 
   it('うるう日の既定値は作れる', async () => {
@@ -240,13 +294,13 @@ describe('R181 既定値は個別値と同じ物差しで検証する', () => {
   it('存在しない日時の既定値は422', async () => {
     const res = await createDefault('datetime', '2026-02-31T10:00:00+09:00');
     expect(res.status).toBe(422);
-    expect(mocks.createFriendFieldForScope).not.toHaveBeenCalled();
+    expect(mocks.createFriendFieldIdempotent).not.toHaveBeenCalled();
   });
 
   it('数字のない電話番号の既定値は422', async () => {
     const res = await createDefault('tel', '--------');
     expect(res.status).toBe(422);
-    expect(mocks.createFriendFieldForScope).not.toHaveBeenCalled();
+    expect(mocks.createFriendFieldIdempotent).not.toHaveBeenCalled();
   });
 
   it('正しい電話番号の既定値は作れる', async () => {
@@ -268,11 +322,11 @@ describe('R181 既定値は個別値と同じ物差しで検証する', () => {
 });
 
   it('選択肢を不変ID付きで保存する', async () => {
-    const res = await req(makeApp(), '/api/friend-fields?lineAccountId=account-1', 'POST', {
+    const res = await createReq(makeApp(), {
       name: '都道府県', fieldKey: 'prefecture', type: 'select', options: ['東京', '大阪'], defaultValue: '東京',
     });
     expect(res.status).toBe(201);
-    const input = mocks.createFriendFieldForScope.mock.calls.at(-1)?.[2] as { optionsJson: string; defaultValue: string };
+    const input = mocks.createFriendFieldIdempotent.mock.calls.at(-1)?.[2] as { optionsJson: string; defaultValue: string };
     const options = JSON.parse(input.optionsJson) as Array<{ id: string; label: string }>;
     expect(options.map((item) => item.label)).toEqual(['東京', '大阪']);
     expect(options.every((item) => item.id.length > 0)).toBe(true);
@@ -280,11 +334,11 @@ describe('R181 既定値は個別値と同じ物差しで検証する', () => {
   });
 
   it('画像・PDFの既定値と本文差し込みを拒否する', async () => {
-    const res = await req(makeApp(), '/api/friend-fields?lineAccountId=account-1', 'POST', {
+    const res = await createReq(makeApp(), {
       name: '本人確認', fieldKey: 'identity_file', type: 'pdf', defaultValue: 'media-1', allowTextInsertion: true,
     });
     expect(res.status).toBe(422);
-    expect(mocks.createFriendFieldForScope).not.toHaveBeenCalled();
+    expect(mocks.createFriendFieldIdempotent).not.toHaveBeenCalled();
   });
 
   it('staffは定義を作れない', async () => {
@@ -355,6 +409,22 @@ describe('項目の更新', () => {
     });
     expect(res.status).toBe(409);
     expect(await res.json()).toMatchObject({ code: 'VERSION_CONFLICT' });
+  });
+
+  it('R517: 版の衝突では最新の内容を付けて返す', async () => {
+    mocks.updateFriendField.mockResolvedValue(null);
+    mocks.getFriendFieldByIdForScope.mockResolvedValue({
+      ...FIELD, id: 'ff-1', name: 'Bの名前', version: 2,
+      line_account_id: 'account-1', tenant_id: 'tenant-1', is_inherited: 0,
+    });
+    const res = await req(makeApp(), '/api/friend-fields/ff-1?lineAccountId=account-1', 'PATCH', {
+      version: 1, name: 'Aの名前',
+    });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({
+      code: 'VERSION_CONFLICT',
+      data: { latest: { id: 'ff-1', name: 'Bの名前', version: 2 } },
+    });
   });
 });
 

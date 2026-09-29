@@ -83,3 +83,90 @@ describe('契約先の詳細の概要', () => {
     }
   })
 })
+
+describe('契約先の詳細：飲食店機能トグル', () => {
+  it('オフの統括でトグルを押すとPATCHで["restaurant"]を送り、再読込する', async () => {
+    let patchBody: unknown = null
+    let getCount = 0
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      if (url.endsWith('/api/ops/tenants/t1') && (!init || init.method === undefined)) {
+        getCount += 1
+        return new Response(JSON.stringify({
+          success: true,
+          data: { ...payload, tenant: { ...payload.tenant, featurePacks: [] } },
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }
+      if (url.endsWith('/api/ops/tenants/t1/feature-packs') && init?.method === 'PATCH') {
+        patchBody = JSON.parse(String(init.body))
+        return new Response(JSON.stringify({ success: true, data: { featurePacks: ['restaurant'] } }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }
+      return new Response(JSON.stringify({ success: false, error: `unexpected ${url}` }), { status: 404, headers: { 'Content-Type': 'application/json' } })
+    }))
+
+    await act(async () => { root.render(<OpsTenantDetailPage />) })
+    await flush()
+    const toggle = host.querySelector('button[role="switch"]') as HTMLButtonElement
+    expect(toggle).toBeTruthy()
+    expect(toggle.getAttribute('aria-checked')).toBe('false')
+
+    await act(async () => { toggle.click() })
+    await flush()
+
+    expect(patchBody).toEqual({ featurePacks: ['restaurant'] })
+    expect(getCount).toBe(2) // 初回読込＋トグル後の再読込
+  })
+
+  it('オンの統括でトグルを押すとPATCHで空配列を送る', async () => {
+    let patchBody: unknown = null
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      if (url.endsWith('/api/ops/tenants/t1') && (!init || init.method === undefined)) {
+        return new Response(JSON.stringify({
+          success: true,
+          data: { ...payload, tenant: { ...payload.tenant, featurePacks: ['restaurant'] } },
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }
+      if (url.endsWith('/api/ops/tenants/t1/feature-packs') && init?.method === 'PATCH') {
+        patchBody = JSON.parse(String(init.body))
+        return new Response(JSON.stringify({ success: true, data: { featurePacks: [] } }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }
+      return new Response(JSON.stringify({ success: false, error: `unexpected ${url}` }), { status: 404, headers: { 'Content-Type': 'application/json' } })
+    }))
+
+    await act(async () => { root.render(<OpsTenantDetailPage />) })
+    await flush()
+    const toggle = host.querySelector('button[role="switch"]') as HTMLButtonElement
+    expect(toggle.getAttribute('aria-checked')).toBe('true')
+
+    await act(async () => { toggle.click() })
+    await flush()
+
+    expect(patchBody).toEqual({ featurePacks: [] })
+  })
+
+  it('保存に失敗するとエラーを表示し、featurePacksは変わらない', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      if (url.endsWith('/api/ops/tenants/t1') && (!init || init.method === undefined)) {
+        return new Response(JSON.stringify({
+          success: true,
+          data: { ...payload, tenant: { ...payload.tenant, featurePacks: [] } },
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }
+      if (url.endsWith('/api/ops/tenants/t1/feature-packs') && init?.method === 'PATCH') {
+        return new Response(JSON.stringify({ success: false, error: '権限がありません' }), { status: 403, headers: { 'Content-Type': 'application/json' } })
+      }
+      return new Response(JSON.stringify({ success: false, error: `unexpected ${url}` }), { status: 404, headers: { 'Content-Type': 'application/json' } })
+    }))
+
+    await act(async () => { root.render(<OpsTenantDetailPage />) })
+    await flush()
+    const toggle = host.querySelector('button[role="switch"]') as HTMLButtonElement
+    await act(async () => { toggle.click() })
+    await flush()
+
+    expect(host.textContent ?? '').toContain('権限がありません')
+    expect(toggle.getAttribute('aria-checked')).toBe('false')
+  })
+})

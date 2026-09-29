@@ -29,7 +29,9 @@ describe('V6 対応マーク', () => {
     expect(EDITOR).not.toContain('<Header')
     expect(EDITOR).toContain('api.supportMarks.create')
     expect(EDITOR).toContain('api.supportMarks.update')
-    expect(EDITOR).toContain('api.supportMarks.list(selectedAccountId)')
+    // R510: 一覧の取得は再試行できる形（load 関数）に切り出した。
+    // 取得時のアカウントを退避し、その口を呼ぶ約束は変えない。
+    expect(EDITOR).toContain('api.supportMarks.list(account)')
     for (const label of ['マーク名', '色', '並び順', '新しい友だちに最初から付ける']) expect(EDITOR).toContain(label)
   })
 
@@ -44,7 +46,9 @@ describe('V6 対応マーク', () => {
   })
 
   it('保存と保管の失敗で内部のAPI文言をそのまま表示しない', () => {
-    expect(EDITOR).toContain('対応マークを保存できませんでした。状態を読み直してから、もう一度お試しください。')
+    // R511: 保存の失敗文は共通関数（失敗の文の共通関数）に寄せた。
+    // 403 の権限不足と通信の失敗を分け、API の本文をそのまま出さない約束は変えない。
+    expect(EDITOR).toContain('describeSaveFailure(reason)')
     expect(LIST).toContain('対応マークを保管できませんでした。状態を読み直してから、もう一度お試しください。')
     expect(EDITOR).not.toContain('reason instanceof ApiError ? reason.message')
     expect(LIST).not.toContain("reason instanceof ApiError ? reason.message : '削除できませんでした'")
