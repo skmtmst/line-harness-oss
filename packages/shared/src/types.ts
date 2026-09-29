@@ -1862,6 +1862,8 @@ export interface StaffMember {
   permissionScope?: Record<string, 'edit' | 'view' | 'none'>;
   /** N-424: この人が他者のメールをどう見るか（full=実値/masked=伏せ字/none=出さない）。 */
   emailMask?: 'full' | 'masked' | 'none' | null;
+  /** R499: 保存の競合検出に使う版。開いたときの値を送り、他者が先に変えていたら409で止まる。 */
+  policyVersion?: number;
 }
 
 export interface StaffProfile {

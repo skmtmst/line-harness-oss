@@ -475,9 +475,11 @@
     "517_mileage_reward_version_revision.sql",
     "520_incoming_webhook_receipt_plan.sql",
     "521_incoming_webhook_receipt_body_hash.sql",
+    "527_staff_permission_receipts.sql",
+    "528_step_up_grant_binding.sql",
     "532_webhook_interaction_secret_unavailable.sql",
     "534_google_sheets_sync_run_scope.sql",
     "535_tiktok_pnl.sql"
   ],
-  "migrationCount": 478
+  "migrationCount": 480
 }

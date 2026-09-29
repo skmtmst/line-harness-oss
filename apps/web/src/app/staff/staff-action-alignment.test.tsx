@@ -140,7 +140,11 @@ describe('ログインユーザー操作の表示と実処理 (#834)', () => {
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))
     await waitFor(() => expect(fixture.updateStaff).toHaveBeenCalledTimes(1))
     // N-424: bundle名をそのまま送る（roleへ潰すと受付/運用が区別できない）。
-    expect(fixture.updateStaff).toHaveBeenCalledWith('target', { roleBundle: 'view_only', permissionScope: undefined, emailMask: undefined }, undefined)
+    // R498/R499: 同じ保存の送り直しに備えて要求キー、同時編集の競合検出に版を付ける。
+    expect(fixture.updateStaff).toHaveBeenCalledWith('target', expect.objectContaining({ roleBundle: 'view_only', permissionScope: undefined, emailMask: undefined }), undefined)
+    const sent = fixture.updateStaff.mock.calls[0][1] as Record<string, unknown>
+    expect(typeof sent.idempotencyKey).toBe('string')
+    expect(sent.expectedPolicyVersion).toBe(1)
   })
 
   it('「項目ごとに決める」を触ると3択表ごと更新口へ送る（N-424）', async () => {

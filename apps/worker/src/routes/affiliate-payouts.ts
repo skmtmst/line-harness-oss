@@ -16,7 +16,7 @@ import {
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import type { Env } from '../index.js';
 import { auditLog } from '../lib/audit-log.js';
-import { sha256Hex } from '../middleware/auth.js';
+import { adminSessionTokenHashFromRequest, sha256Hex } from '../middleware/auth.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { notifyAffiliate } from '../services/affiliate-notifier.js';
@@ -267,6 +267,7 @@ affiliatePayouts.post(
     if (!stepUpToken || !await consumeStepUpGrant(c.env.DB, {
       tokenHash: await sha256Hex(stepUpToken), staffId: c.get('staff')!.id,
       purpose: 'affiliate.payout.export',
+      sessionTokenHash: await adminSessionTokenHashFromRequest(c),
     })) {
       return c.json({ success: false, error: 'CSV出力には二段階認証による再認証が必要です', code: 'STEP_UP_REQUIRED' }, 428);
     }

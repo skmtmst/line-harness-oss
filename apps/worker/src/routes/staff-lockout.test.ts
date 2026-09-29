@@ -361,8 +361,10 @@ describe('最後の管理者を締め出さない', () => {
     const res = await send('/api/staff/admin-a', 'PATCH', { isActive: false });
 
     expect(res.status).toBe(200);
+    // R501: 管理者を外す書き込みは「ほかに有効な管理者が残る」を同じ条件にする。
     expect(dbMocks.updateStaffMember).toHaveBeenCalledWith(
       env.DB, 'admin-a', expect.objectContaining({ is_active: 0 }),
+      expect.objectContaining({ requireRemainingAdmin: expect.objectContaining({ tenantId: expect.any(String) }) }),
     );
   });
 
