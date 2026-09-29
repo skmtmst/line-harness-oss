@@ -2,21 +2,24 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { adminSessionHandoffPath, adminSessionHeaders, captureTwoFactorChallenge, clearTwoFactorChallenge, takeTwoFactorNextPath, storeAdminSession } from '@/lib/admin-session'
+import { adminSessionHandoffPath, adminSessionHeaders, captureTwoFactorChallenge, captureTwoFactorMethod, clearTwoFactorChallenge, takeTwoFactorNextPath, storeAdminSession, type TwoFactorMethod } from '@/lib/admin-session'
 import { useBrand } from '@/lib/use-brand'
 import Notice from '@/components/shared/notice'
 import OtpInput from '@/components/shared/otp-input'
+import { twoFactorFailureMessage } from './two-factor-error'
 
 export default function TwoFactorLoginPage() {
   const [code, setCode] = useState('')
   /** 失敗のたびに入力欄を作り直し、1マス目へ戻す。 */
   const [attempt, setAttempt] = useState(0)
   const [challenge, setChallenge] = useState('')
+  const [method, setMethod] = useState<TwoFactorMethod>('line')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const brand = useBrand()
 
-  useEffect(() => setChallenge(captureTwoFactorChallenge()), [])
+  // R507: 方法の受け取りは合言葉の受け取りより先に（合言葉の受け取りで hash が消えるため）。
+  useEffect(() => { setMethod(captureTwoFactorMethod()); setChallenge(captureTwoFactorChallenge()) }, [])
 
   const submit = async () => {
     if (!challenge || code.length !== 6) return setError('6桁の認証コードを入力してください')
@@ -57,7 +60,8 @@ export default function TwoFactorLoginPage() {
       clearTwoFactorChallenge()
       window.location.assign(adminSessionHandoffPath(nextPath, body.data?.sessionToken, body.csrfToken))
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : '認証できませんでした')
+      // R506: 通信断の技術文言をそのまま出さない。
+      setError(twoFactorFailureMessage(caught))
       setCode('')
       setAttempt((current) => current + 1)
     } finally { setLoading(false) }
@@ -73,7 +77,8 @@ export default function TwoFactorLoginPage() {
         320px では2列がはみ出す（監査 m18e）。狭い幅では1列に積む。
       */}
       <div className="mt-6 grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
-        <div className="rounded-control bg-canvas-sunken px-3 py-2 text-success">✓ LINEログイン</div>
+        {/* R507: メール経路ではLINEログイン済みと断定しない。実際の方法を出す。 */}
+        <div className="rounded-control bg-canvas-sunken px-3 py-2 text-success">{method === 'password' ? '✓ メールログイン' : '✓ LINEログイン'}</div>
         <div className="rounded-control bg-accent-soft px-3 py-2 font-medium text-accent-deep">2　二段階認証</div>
       </div>
       <div className="mt-7 text-center">
