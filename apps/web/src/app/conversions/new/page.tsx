@@ -181,6 +181,12 @@ export default function NewConversionPointPage() {
   /** N-268: チェックすると下書きで保存し、公開するまで計測しない。 */
   const [saveAsDraft, setSaveAsDraft] = useState(false)
   const [points, setPoints] = useState<ConversionPoint[]>([])
+  /**
+   * R597: 同名判定のもと（`GET /api/conversions/points`）が読めないとき、
+   * 黙って空として扱うと同名警告が消え、未確認のまま作れてしまう。
+   * 失敗を残し、名前欄の下で失敗と再試行を出す。
+   */
+  const [pointsFailed, setPointsFailed] = useState(false)
   const [usageKinds, setUsageKinds] = useState<Record<UsageGroupKind, UsageKindResult>>(EMPTY_USAGE_KINDS)
   const [selectedUsageKeys, setSelectedUsageKeys] = useState<Set<string>>(new Set())
   const [preview, setPreview] = useState<ConversionDefinitionPreview | null>(null)
@@ -189,15 +195,22 @@ export default function NewConversionPointPage() {
   const previewRequests = useRef(createLatestPreviewRequestGate())
 
   // 右の「同種の成果地点」に要る。作る前に、似たものが既にあるか分かるように。
-  useEffect(() => {
-    let cancelled = false
+  // R597: 読めないときは握りつぶさず失敗を残す。再試行はこの関数を呼ぶ。
+  const requestPoints = useCallback(() => {
+    setPointsFailed(false)
     void api.conversions.points().then((response) => {
-      if (!cancelled && response.success) setPoints(response.data)
-    }).catch(() => undefined)
-    return () => {
-      cancelled = true
-    }
+      if (response.success) {
+        setPoints(response.data)
+        setPointsFailed(false)
+      } else {
+        setPointsFailed(true)
+      }
+    }).catch(() => setPointsFailed(true))
   }, [])
+
+  useEffect(() => {
+    requestPoints()
+  }, [requestPoints])
 
   /*
    * 集計対象アカウントは画面上部の選択に固定する(DETAIL-17)。
@@ -535,6 +548,27 @@ export default function NewConversionPointPage() {
               <p className="text-danger mt-1 text-xs" role="alert">
                 同じ名前の「{duplicateName.name}」があります。同じ意味の成果地点を2つ作らないでください。
               </p>
+            )}
+            {/*
+              R597: 同名のもとが読めないときは、警告が出ないこと自体を伝える。
+              読み込めなかった時は赤を使わない（★V7）。再試行で直れば
+              同名警告が戻る。保存自体は止めない（保存時の重複拒否は
+              監査の範囲外のため、ここでは未確認のまま残す）。
+            */}
+            {pointsFailed && (
+              <div className="mt-1">
+                <p className="text-ink-secondary text-xs" role="alert">
+                  同じ名前があるか確認できませんでした。同じ意味の成果地点があるかもしれません。
+                </p>
+                <Button
+                  variant="secondary"
+                  size="field"
+                  className="mt-1.5"
+                  onClick={() => requestPoints()}
+                >
+                  同名の確認を再読み込み
+                </Button>
+              </div>
             )}
           </Field>
 
